@@ -475,6 +475,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
     <div class="card-header">Registro attività operatori</div>
     <div style="padding:14px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--paper2)">
       <div class="filter-group"><span class="filter-label">Operatore</span><select id="log-filt-op" onchange="renderRegistro()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"><option value="">Tutti</option></select></div>
+      <div class="filter-group"><span class="filter-label">Categoria</span><select id="log-filt-cat" onchange="renderRegistro()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"><option value="">Tutte</option><option value="registrazione">Registrazioni</option><option value="modulo">Moduli</option><option value="nota">Note</option><option value="collaboratore">Collaboratori</option><option value="rapporto">Rapporto</option></select></div>
       <div class="filter-group"><span class="filter-label">Cerca</span><input type="text" id="log-filt-cerca" placeholder="Cerca..." oninput="renderRegistro()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink);width:160px"></div>
       <div class="filter-group"><span class="filter-label">Dal</span><input type="date" id="log-filt-dal" onchange="renderRegistro()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"></div>
       <div class="filter-group"><span class="filter-label">Al</span><input type="date" id="log-filt-al" onchange="renderRegistro()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"></div>
@@ -1030,7 +1031,7 @@ async function renderCollaboratoriUI(){const section=document.getElementById('co
 async function aggiungiCollaboratore(){const nome=document.getElementById('new-collab-nome').value.trim();if(!nome){toast('Inserisci un nome');return}
   if(collaboratoriCache.find(c=>c.nome.toLowerCase()===nome.toLowerCase())){toast('Collaboratore già esistente');return}
   try{const r=await sbPost('collaboratori',{nome,attivo:true});collaboratoriCache.push(r[0]);collaboratoriCache.sort((a,b)=>a.nome.localeCompare(b.nome));
-    document.getElementById('new-collab-nome').value='';renderCollaboratoriUI();aggiornaNomi();toast('Collaboratore aggiunto')}catch(e){if(e.message&&e.message.includes('duplicate'))toast('Nome già esistente');else toast('Errore')}}
+    logAzione('Collaboratore aggiunto',nome);document.getElementById('new-collab-nome').value='';renderCollaboratoriUI();aggiornaNomi();toast('Collaboratore aggiunto')}catch(e){if(e.message&&e.message.includes('duplicate'))toast('Nome già esistente');else toast('Errore')}}
 function rinominaCollaboratore(nome){const b=document.getElementById('pwd-modal-content');
   b.innerHTML='<h3>Rinomina collaboratore</h3><div class="pwd-field"><label>Nome attuale</label><input type="text" value="'+escP(nome)+'" readonly style="background:var(--paper2);color:var(--muted)"></div><div class="pwd-field"><label>Nuovo nome</label><input type="text" id="rin-collab-nuovo" value="'+escP(nome)+'"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaRinominaCollaboratore(\''+nome.replace(/'/g,"\\'")+'\')">Salva</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');setTimeout(()=>{const i=document.getElementById('rin-collab-nuovo');if(i){i.focus();i.select()}},100)}
@@ -1046,7 +1047,7 @@ async function salvaRinominaCollaboratore(vecchio){const nuovo=document.getEleme
     collaboratoriCache.sort((a,b)=>a.nome.localeCompare(b.nome));
     logAzione('Rinomina collaboratore',vecchio+' → '+nuovo);document.getElementById('pwd-modal').classList.add('hidden');renderCollaboratoriUI();aggiornaNomi();render();toast('Collaboratore rinominato')}catch(e){toast('Errore: nome già esistente?')}}
 async function disattivaCollaboratore(nome){if(!confirm('Disattivare "'+nome+'"? Non apparirà più nell\'autocomplete.'))return;
-  try{await sbPatch('collaboratori','nome=eq.'+encodeURIComponent(nome),{attivo:false});collaboratoriCache=collaboratoriCache.filter(c=>c.nome!==nome);renderCollaboratoriUI();aggiornaNomi();toast('Collaboratore disattivato')}catch(e){toast('Errore')}}
+  try{await sbPatch('collaboratori','nome=eq.'+encodeURIComponent(nome),{attivo:false});collaboratoriCache=collaboratoriCache.filter(c=>c.nome!==nome);logAzione('Collaboratore disattivato',nome);renderCollaboratoriUI();aggiornaNomi();toast('Collaboratore disattivato')}catch(e){toast('Errore')}}
 async function riattivaCollaboratore(nome){try{await sbPatch('collaboratori','nome=eq.'+encodeURIComponent(nome),{attivo:true});
   collaboratoriCache.push({nome,attivo:true});collaboratoriCache.sort((a,b)=>a.nome.localeCompare(b.nome));renderCollaboratoriUI();aggiornaNomi();toast('Collaboratore riattivato')}catch(e){toast('Errore')}}
 
@@ -1056,11 +1057,14 @@ function renderRegistro(){const el=document.getElementById('registro-list');if(!
   const selOp=document.getElementById('log-filt-op');if(selOp){const cv=selOp.value;const ops=[...new Set(logCache.map(l=>l.operatore))].sort();
     selOp.innerHTML='<option value="">Tutti</option>'+ops.map(n=>'<option'+(n===cv?' selected':'')+'>'+escP(n)+'</option>').join('')}
   const fo=(document.getElementById('log-filt-op')||{}).value||'';
+  const fcat=(document.getElementById('log-filt-cat')||{}).value||'';
   const fc=(document.getElementById('log-filt-cerca')||{}).value||'';
   const fd=(document.getElementById('log-filt-dal')||{}).value||'';
   const fa=(document.getElementById('log-filt-al')||{}).value||'';
+  const catMap={registrazione:['Nuova registrazione','Modifica registrazione','Eliminata registrazione'],modulo:['Modulo allineamento','Modulo apprezzamento','Modulo rdi','Eliminato modulo'],nota:['Nota inviata'],collaboratore:['Rinomina collaboratore','Importa collaboratori','Collaboratore aggiunto','Collaboratore disattivato'],rapporto:['Rapporto salvato']};
   let filtered=logCache.filter(l=>{if(fo&&l.operatore!==fo)return false;
-    if(fc&&!l.azione.toLowerCase().includes(fc.toLowerCase())&&!l.dettaglio.toLowerCase().includes(fc.toLowerCase()))return false;
+    if(fcat&&catMap[fcat]&&!catMap[fcat].some(a=>l.azione.startsWith(a)))return false;
+    if(fc&&!l.azione.toLowerCase().includes(fc.toLowerCase())&&!(l.dettaglio||'').toLowerCase().includes(fc.toLowerCase()))return false;
     if(fd&&l.created_at<fd)return false;if(fa&&l.created_at>fa+'T23:59:59')return false;return true});
   if(!filtered.length){el.innerHTML='<p style="color:var(--muted);padding:10px">Nessuna attività registrata</p>';return}
   el.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:.88rem"><thead><tr style="border-bottom:2px solid var(--line);text-align:left"><th style="padding:8px">Data/Ora</th><th style="padding:8px">Operatore</th><th style="padding:8px">Azione</th><th style="padding:8px">Dettaglio</th></tr></thead><tbody>'+filtered.slice(0,200).map(l=>{
