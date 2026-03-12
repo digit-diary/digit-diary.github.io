@@ -230,6 +230,9 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 .tipo-item-default{font-size:.7rem;color:var(--muted);font-weight:400}
 .btn-del-tipo{background:none;border:1px solid var(--accent);color:var(--accent);padding:3px 8px;font-size:.68rem;font-weight:700;cursor:pointer;border-radius:2px;font-family:'Source Sans 3',sans-serif}
 .btn-del-tipo:hover{background:var(--accent);color:white}
+.btn-ord{background:none;border:1px solid var(--line);color:var(--muted);width:24px;height:22px;font-size:.65rem;cursor:pointer;border-radius:2px;display:flex;align-items:center;justify-content:center;padding:0;font-family:sans-serif;line-height:1}
+.btn-ord:hover:not(:disabled){background:var(--accent2);color:white;border-color:var(--accent2)}
+.btn-ord:disabled{opacity:.25;cursor:default}
 .add-tipo-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
 .add-tipo-row .field{flex:1;min-width:150px}
 .add-tipo-row input[type="color"]{width:44px;height:38px;border:1px solid var(--line);border-radius:2px;cursor:pointer;background:none;padding:2px}
@@ -480,8 +483,9 @@ const TIPI_DEFAULT=[{nome:'Attività',colore:'#1a4a7a'},{nome:'Richiesta',colore
 let tipiPersonalizzati=[],coloriOverride={},tipoSelezionato='Attività',modalEntryId=null,modalTipoSel=null,datiCache=[],pinnedIds=new Set(),scadenzeCache=[],pwdHash=null,recoveryCode=null,charts={},operatoriSalvati=[];
 let rapportoMese=new Date().getMonth(),rapportoAnno=new Date().getFullYear(),rapportoGiornoAperto=null,rapportiCache={},noteColleghiCache=[],operatoriAuthCache=[];
 const CAMPI_RAPPORTO_DEFAULT=[{key:'sup_note',label:'Supervisore',type:'input'},{key:'cassa_note',label:'Cassa',type:'text'},{key:'sala_note',label:'Sala',type:'text'},{key:'n_assegni',label:'Incasso Assegni',type:'text'},{key:'prelievi',label:'Prelievi',type:'text'},{key:'assenze',label:'Assenze',type:'text'}];
-let campiRapportoExtra=[],tipiNascosti=[],campiNascosti=[];
-function getTuttiTipi(){return[...TIPI_DEFAULT.filter(t=>!tipiNascosti.includes(t.nome)).map(t=>coloriOverride[t.nome]?{nome:t.nome,colore:coloriOverride[t.nome]}:t),...tipiPersonalizzati]}
+let campiRapportoExtra=[],tipiNascosti=[],campiNascosti=[],tipiOrdine=[],campiOrdine=[],campiLabelOverride={},tipiLabelOverride={};
+function getTuttiTipi(){let list=[...TIPI_DEFAULT.filter(t=>!tipiNascosti.includes(t.nome)).map(t=>{const c=coloriOverride[t.nome]||t.colore;return{nome:t.nome,colore:c}}),...tipiPersonalizzati];
+  if(tipiOrdine.length)list.sort((a,b)=>{const ia=tipiOrdine.indexOf(a.nome),ib=tipiOrdine.indexOf(b.nome);return(ia===-1?999:ia)-(ib===-1?999:ib)});return list}
 function getColore(n){return coloriOverride[n]||(getTuttiTipi().find(t=>t.nome===n)||{}).colore||'#8a7d6b'}
 function getOperatore(){return sessionStorage.getItem('operatore_corrente')||''}
 async function sha256(t){const d=new TextEncoder().encode(t),h=await crypto.subtle.digest('SHA-256',d);return Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,'0')).join('')}
@@ -506,6 +510,9 @@ async function loadAll(){
   const cr=await getImp('campi_rapporto_extra');if(cr)try{campiRapportoExtra=JSON.parse(cr)}catch(e){}
   const tn=await getImp('tipi_nascosti');if(tn)try{tipiNascosti=JSON.parse(tn)}catch(e){}
   const cn=await getImp('campi_nascosti');if(cn)try{campiNascosti=JSON.parse(cn)}catch(e){}
+  const to=await getImp('tipi_ordine');if(to)try{tipiOrdine=JSON.parse(to)}catch(e){}
+  const cmo=await getImp('campi_ordine');if(cmo)try{campiOrdine=JSON.parse(cmo)}catch(e){}
+  const clo=await getImp('campi_label_override');if(clo)try{campiLabelOverride=JSON.parse(clo)}catch(e){}
   datiCache=await sbGet('registrazioni?order=data.desc');
   const pins=await sbGet('note_fissate?select=registrazione_id');pinnedIds=new Set(pins.map(p=>p.registrazione_id));
   scadenzeCache=await sbGet('scadenze?order=data_scadenza.asc');
@@ -594,7 +601,8 @@ function renderOperatoriUI(){const el=document.getElementById('operatori-list');
   const addRow=el.parentElement.querySelector('.add-tipo-row');if(addRow)addRow.style.display=admin?'':'none'}
 
 // CAMPI RAPPORTO
-function getCampiRapporto(){return[...CAMPI_RAPPORTO_DEFAULT.filter(c=>!campiNascosti.includes(c.key)),...campiRapportoExtra]}
+function getCampiRapporto(){let list=[...CAMPI_RAPPORTO_DEFAULT.filter(c=>!campiNascosti.includes(c.key)).map(c=>campiLabelOverride[c.key]?{...c,label:campiLabelOverride[c.key]}:c),...campiRapportoExtra];
+  if(campiOrdine.length)list.sort((a,b)=>{const ia=campiOrdine.indexOf(a.key),ib=campiOrdine.indexOf(b.key);return(ia===-1?999:ia)-(ib===-1?999:ib)});return list}
 async function saveCampiExtra(){await setImp('campi_rapporto_extra',JSON.stringify(campiRapportoExtra))}
 async function aggiungiCampoRapporto(){const n=document.getElementById('new-campo-nome').value.trim();if(!n){toast('Inserisci un nome');return}const key='extra_'+n.toLowerCase().replace(/[^a-z0-9]/g,'_');
   if(getCampiRapporto().find(c=>c.label.toLowerCase()===n.toLowerCase())){toast('Campo già esistente');return}
@@ -602,8 +610,29 @@ async function aggiungiCampoRapporto(){const n=document.getElementById('new-camp
 async function rimuoviCampoRapporto(key){if(!confirm('Rimuovere questo campo?'))return;campiRapportoExtra=campiRapportoExtra.filter(c=>c.key!==key);await saveCampiExtra();renderCampiRapportoUI();toast('Campo rimosso')}
 async function nascondiCampoDefault(key){const d=CAMPI_RAPPORTO_DEFAULT.find(x=>x.key===key);if(!confirm('Nascondere il campo "'+(d?d.label:key)+'"? I dati esistenti non verranno eliminati.'))return;campiNascosti.push(key);await setImp('campi_nascosti',JSON.stringify(campiNascosti));renderCampiRapportoUI();toast('Campo nascosto')}
 async function ripristinaCampoDefault(key){campiNascosti=campiNascosti.filter(k=>k!==key);await setImp('campi_nascosti',JSON.stringify(campiNascosti));renderCampiRapportoUI();toast('Campo ripristinato')}
+async function spostaTipo(nome,dir){const tutti=getTuttiTipi().map(t=>t.nome);const i=tutti.indexOf(nome);if(i===-1)return;const ni=i+dir;if(ni<0||ni>=tutti.length)return;[tutti[i],tutti[ni]]=[tutti[ni],tutti[i]];tipiOrdine=tutti;await setImp('tipi_ordine',JSON.stringify(tipiOrdine));renderTipiUI()}
+async function spostaCampo(key,dir){const campi=getCampiRapporto().map(c=>c.key);const i=campi.indexOf(key);if(i===-1)return;const ni=i+dir;if(ni<0||ni>=campi.length)return;[campi[i],campi[ni]]=[campi[ni],campi[i]];campiOrdine=campi;await setImp('campi_ordine',JSON.stringify(campiOrdine));renderCampiRapportoUI()}
+function rinominaCampo(key){const campi=getCampiRapporto();const c=campi.find(x=>x.key===key);if(!c)return;
+  const b=document.getElementById('pwd-modal-content');b.innerHTML='<h3>Rinomina campo</h3><div class="pwd-field"><label>Nuovo nome</label><input type="text" id="rename-campo-val" value="'+escP(c.label)+'"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiRinominaCampo(\''+key+'\')">Salva</button></div>';
+  document.getElementById('pwd-modal').classList.remove('hidden');setTimeout(()=>{const inp=document.getElementById('rename-campo-val');inp.focus();inp.select()},100)}
+async function eseguiRinominaCampo(key){const val=document.getElementById('rename-campo-val').value.trim();if(!val){toast('Inserisci un nome');return}
+  const isDefault=CAMPI_RAPPORTO_DEFAULT.find(d=>d.key===key);
+  if(isDefault){campiLabelOverride[key]=val;await setImp('campi_label_override',JSON.stringify(campiLabelOverride))}
+  else{const c=campiRapportoExtra.find(x=>x.key===key);if(c){c.label=val;await saveCampiExtra()}}
+  document.getElementById('pwd-modal').classList.add('hidden');renderCampiRapportoUI();toast('Campo rinominato')}
+function rinominaTipo(nome){const b=document.getElementById('pwd-modal-content');
+  b.innerHTML='<h3>Rinomina tipo evento</h3><p style="color:var(--muted);font-size:.82rem">Nota: le registrazioni esistenti manterranno il nome originale.</p><div class="pwd-field"><label>Nuovo nome</label><input type="text" id="rename-tipo-val" value="'+escP(nome)+'"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiRinominaTipo(\''+nome.replace(/'/g,"\\'")+'\')">Salva</button></div>';
+  document.getElementById('pwd-modal').classList.remove('hidden');setTimeout(()=>{const inp=document.getElementById('rename-tipo-val');inp.focus();inp.select()},100)}
+async function eseguiRinominaTipo(vecchioNome){const nuovoNome=document.getElementById('rename-tipo-val').value.trim();if(!nuovoNome){toast('Inserisci un nome');return}if(nuovoNome===vecchioNome){document.getElementById('pwd-modal').classList.add('hidden');return}
+  if(getTuttiTipi().find(t=>t.nome.toLowerCase()===nuovoNome.toLowerCase()&&t.nome!==vecchioNome)){toast('Nome già esistente');return}
+  const isDefault=TIPI_DEFAULT.find(d=>d.nome===vecchioNome);
+  if(isDefault){toast('I tipi predefiniti non possono essere rinominati (usati nel codice)');return}
+  const tp=tipiPersonalizzati.find(t=>t.nome===vecchioNome);if(tp){tp.nome=nuovoNome;if(coloriOverride[vecchioNome]){coloriOverride[nuovoNome]=coloriOverride[vecchioNome];delete coloriOverride[vecchioNome]}
+    const oi=tipiOrdine.indexOf(vecchioNome);if(oi!==-1)tipiOrdine[oi]=nuovoNome;
+    await saveTipiP();await saveColoriOverride();if(tipiOrdine.length)await setImp('tipi_ordine',JSON.stringify(tipiOrdine))}
+  document.getElementById('pwd-modal').classList.add('hidden');renderTipiUI();toast('Tipo rinominato')}
 function renderCampiRapportoUI(){const el=document.getElementById('rapporto-campi-list');if(!el)return;const campi=getCampiRapporto();const adm=isAdmin();
-  let cHtml=campi.map(c=>{const isDefault=CAMPI_RAPPORTO_DEFAULT.find(d=>d.key===c.key);return'<div class="tipo-item"><div class="tipo-color" style="background:'+(c.type==='number'?'#3498db':'#2ecc71')+'"></div><div class="tipo-item-name">'+escP(c.label)+(isDefault?' <span class="tipo-item-default">(predefinito)</span>':'')+'</div>'+(adm?'<button class="btn-del-tipo" onclick="'+(isDefault?'nascondiCampoDefault':'rimuoviCampoRapporto')+'(\''+c.key+'\')">Rimuovi</button>':'')+'</div>'}).join('');
+  let cHtml=campi.map((c,idx)=>{const isDefault=CAMPI_RAPPORTO_DEFAULT.find(d=>d.key===c.key);return'<div class="tipo-item"><div class="tipo-color" style="background:'+(c.type==='number'?'#3498db':'#2ecc71')+'"></div><div class="tipo-item-name">'+escP(c.label)+(isDefault?' <span class="tipo-item-default">(predefinito)</span>':'')+'</div>'+(adm?'<div style="display:flex;gap:3px;margin-left:auto"><button class="btn-ord" onclick="spostaCampo(\''+c.key+'\',-1)"'+(idx===0?' disabled':'')+'>&#9650;</button><button class="btn-ord" onclick="spostaCampo(\''+c.key+'\',1)"'+(idx===campi.length-1?' disabled':'')+'>&#9660;</button></div><button class="btn-del-tipo" style="margin-left:6px" onclick="rinominaCampo(\''+c.key+'\')">Rinomina</button><button class="btn-del-tipo" style="margin-left:4px" onclick="'+(isDefault?'nascondiCampoDefault':'rimuoviCampoRapporto')+'(\''+c.key+'\')">Rimuovi</button>':'')+'</div>'}).join('');
   if(adm&&campiNascosti.length){cHtml+='<div style="margin-top:12px;padding:10px;background:var(--paper2);border-radius:3px"><small style="color:var(--muted);display:block;margin-bottom:6px">Campi nascosti:</small>'+campiNascosti.map(k=>{const d=CAMPI_RAPPORTO_DEFAULT.find(x=>x.key===k);return'<button style="margin:2px 4px;padding:3px 10px;font-size:.78rem;cursor:pointer;border:1px dashed var(--accent2);color:var(--accent2);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif" onclick="ripristinaCampoDefault(\''+k+'\')">+ '+(d?escP(d.label):k)+'</button>'}).join('')+'</div>'}
   el.innerHTML=cHtml;const addCampo=el.parentElement.querySelector('.add-tipo-row');if(addCampo)addCampo.style.display=adm?'':'none'}
 
@@ -632,7 +661,7 @@ function renderTipiUI(){const tutti=getTuttiTipi();
   document.getElementById('modal-tipo-tags').innerHTML=tutti.map(t=>'<button class="modal-tipo-tag'+(modalTipoSel===t.nome?' selected':'')+'" data-tipo="'+esc(t.nome)+'" style="'+(modalTipoSel===t.nome?'background:'+t.colore+';border-color:'+t.colore:'')+'">'+esc(t.nome)+'</button>').join('');
   document.getElementById('modal-tipo-tags').querySelectorAll('.modal-tipo-tag').forEach(b=>{b.onclick=()=>{modalTipoSel=b.dataset.tipo;renderTipiUI()}});
   const tl=document.getElementById('tipo-list');if(tl){const adm=isAdmin();
-    let tlHtml=tutti.map(t=>{const d=TIPI_DEFAULT.find(x=>x.nome===t.nome);return'<div class="tipo-item">'+(adm?'<input type="color" class="tipo-color-picker" value="'+t.colore+'" onchange="cambiaColoreTipo(\''+t.nome.replace(/'/g,"\\'")+'\',this.value)">':'<div class="tipo-color" style="background:'+t.colore+'"></div>')+'<div class="tipo-item-name">'+esc(t.nome)+(d?' <span class="tipo-item-default">(predefinito)</span>':'')+'</div>'+(adm?'<button class="btn-del-tipo" onclick="'+(d?'nascondiTipoDefault':'rimuoviTipo')+'(\''+t.nome.replace(/'/g,"\\'")+'\')">Rimuovi</button>':'')+'</div>'}).join('');
+    let tlHtml=tutti.map((t,idx)=>{const d=TIPI_DEFAULT.find(x=>x.nome===t.nome);const ne=t.nome.replace(/'/g,"\\'");return'<div class="tipo-item">'+(adm?'<input type="color" class="tipo-color-picker" value="'+t.colore+'" onchange="cambiaColoreTipo(\''+ne+'\',this.value)">':'<div class="tipo-color" style="background:'+t.colore+'"></div>')+'<div class="tipo-item-name">'+esc(t.nome)+(d?' <span class="tipo-item-default">(predefinito)</span>':'')+'</div>'+(adm?'<div style="display:flex;gap:3px;margin-left:auto"><button class="btn-ord" onclick="spostaTipo(\''+ne+'\',-1)"'+(idx===0?' disabled':'')+'>&#9650;</button><button class="btn-ord" onclick="spostaTipo(\''+ne+'\',1)"'+(idx===tutti.length-1?' disabled':'')+'>&#9660;</button></div>'+(!d?'<button class="btn-del-tipo" style="margin-left:6px" onclick="rinominaTipo(\''+ne+'\')">Rinomina</button>':'')+'<button class="btn-del-tipo" style="margin-left:4px" onclick="'+(d?'nascondiTipoDefault':'rimuoviTipo')+'(\''+ne+'\')">Rimuovi</button>':'')+'</div>'}).join('');
     if(adm&&tipiNascosti.length){tlHtml+='<div style="margin-top:12px;padding:10px;background:var(--paper2);border-radius:3px"><small style="color:var(--muted);display:block;margin-bottom:6px">Tipi nascosti:</small>'+tipiNascosti.map(n=>'<button style="margin:2px 4px;padding:3px 10px;font-size:.78rem;cursor:pointer;border:1px dashed var(--accent2);color:var(--accent2);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif" onclick="ripristinaTipoDefault(\''+n.replace(/'/g,"\\'")+'\')">+ '+escP(n)+'</button>').join('')+'</div>'}
     tl.innerHTML=tlHtml;const addTipo=tl.parentElement.querySelector('.add-tipo-row');if(addTipo)addTipo.style.display=adm?'':'none'}
   let s=document.getElementById('dyn-styles');if(!s){s=document.createElement('style');s.id='dyn-styles';document.head.appendChild(s)}
