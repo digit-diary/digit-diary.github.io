@@ -359,6 +359,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
       <button class="btn-header btn-bell" id="btn-bell" onclick="toggleScadenzeDropdown()" style="position:relative;font-size:1.2rem;padding:6px 12px" title="Scadenze / Promemoria">&#128276;<span class="bell-badge" id="bell-badge" style="display:none"></span></button>
       <button class="btn-header" id="btn-tema" onclick="toggleTema()">Tema scuro</button>
       <button class="btn-header" onclick="window.print()">Stampa</button>
+      <button class="btn-header" onclick="esci()" style="color:var(--accent)">Esci</button>
     </div>
   </div>
 </header>
@@ -461,7 +462,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
     <div class="add-tipo-row" style="margin-top:14px"><div class="field"><label>Nome nuovo campo</label><input type="text" id="new-campo-nome" placeholder="es. Bar, VIP Area..."></div><button class="btn-add-tipo" onclick="aggiungiCampoRapporto()">+ Aggiungi</button></div></div>
   <div class="settings-section"><h4>Scadenze attive</h4><div id="scadenze-settings-list"></div></div>
   <div class="settings-section"><h4>Operatori</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Operatore attuale: <strong id="op-attuale">—</strong>. Ogni operatore accede con il proprio nome e password.</p><div id="operatori-list" style="margin-bottom:14px"></div>
-    <div class="add-tipo-row" style="align-items:flex-end"><div class="field"><label>Nome</label><input type="text" id="new-operatore-nome" placeholder="Nome..."></div><div class="field"><label>Password</label><input type="password" id="new-operatore-pwd" placeholder="Min 4 caratteri..."></div><button class="btn-add-tipo" onclick="aggiungiOperatoreConPwd()">+ Crea operatore</button></div></div>
+    <div class="add-tipo-row" style="align-items:flex-end"><div class="field"><label>Nome</label><input type="text" id="new-operatore-nome" placeholder="Nome..."></div><div class="field"><label>Password</label><input type="password" id="new-operatore-pwd" placeholder="Min 4 caratteri..."></div><div class="field"><label>Conferma password</label><input type="password" id="new-operatore-pwd2" placeholder="Ripeti..."></div><button class="btn-add-tipo" onclick="aggiungiOperatoreConPwd()">+ Crea operatore</button></div></div>
   <div class="settings-section"><h4>Sicurezza</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Password master (admin) per accesso senza operatore</p><div class="settings-btn-row"><button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button><button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia password operatore</button></div></div>
 </div>
 
@@ -512,8 +513,10 @@ async function loadAll(){
 // PASSWORD
 async function checkPwd(){const nome=document.getElementById('login-nome').value.trim(),v=document.getElementById('pwd-input').value,h=await sha256(v),err=document.getElementById('login-error');
   // Try individual operator login first
-  if(nome){const authData=await sbGet('operatori_auth?nome=eq.'+encodeURIComponent(nome)+'&select=nome,pwd_hash,ruolo');
-    if(authData.length&&authData[0].pwd_hash===h){sessionStorage.setItem('operatore_corrente',nome);sessionStorage.setItem('diario_auth','1');document.getElementById('login-overlay').classList.add('hidden');document.getElementById('operatore-display').textContent='Operatore: '+nome;setTimeout(()=>mostraNoteNonLette(),500);return}
+  if(nome){const authData=await sbGet('operatori_auth?nome=eq.'+encodeURIComponent(nome)+'&select=nome,pwd_hash,ruolo,deve_cambiare_pwd');
+    if(authData.length&&authData[0].pwd_hash===h){sessionStorage.setItem('operatore_corrente',nome);sessionStorage.setItem('diario_auth','1');document.getElementById('login-overlay').classList.add('hidden');document.getElementById('operatore-display').textContent='Operatore: '+nome;
+      if(authData[0].deve_cambiare_pwd)setTimeout(()=>forzaCambioPwdOperatore(nome),300);
+      else setTimeout(()=>mostraNoteNonLette(),500);return}
     // If operator exists but wrong password
     if(authData.length){err.textContent='Password errata per '+nome;document.getElementById('pwd-input').value='';document.getElementById('pwd-input').focus();setTimeout(()=>err.textContent='',2500);return}}
   // Fallback: master password (admin)
@@ -543,12 +546,22 @@ function chiediOperatore(){const nomi=[...new Set([...operatoriSalvati,...operat
 function confermaOperatore(){const n=document.getElementById('inp-operatore').value.trim();if(!n){toast('Inserisci un nome');return}sessionStorage.setItem('operatore_corrente',n);chiudiTuttiModali();document.getElementById('operatore-display').textContent='Operatore: '+n;setTimeout(()=>mostraNoteNonLette(),500)}
 function chiudiTuttiModali(){['pwd-modal','operatore-modal','modal-overlay','profilo-modal','scadenza-modal','note-modal'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add('hidden')})}
 function cambiaOperatore(){chiediOperatore()}
-async function aggiungiOperatoreConPwd(){const n=document.getElementById('new-operatore-nome').value.trim(),p=document.getElementById('new-operatore-pwd').value;
+function forzaCambioPwdOperatore(nome){const b=document.getElementById('pwd-modal-content');
+  b.innerHTML='<h3>Benvenuto '+escP(nome)+'!</h3><p>Per sicurezza, scegli una nuova password personale.</p><div class="pwd-field"><label>Nuova password (min 4 car.)</label><input type="password" id="op-new-pwd-1"></div><div class="pwd-field"><label>Conferma password</label><input type="password" id="op-new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="eseguiForzaCambioPwdOp(\''+nome.replace(/'/g,"\\'")+'\')">Imposta</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';
+  document.getElementById('pwd-modal').classList.remove('hidden');setTimeout(()=>document.getElementById('op-new-pwd-1').focus(),100)}
+async function eseguiForzaCambioPwdOp(nome){const p1=document.getElementById('op-new-pwd-1').value,p2=document.getElementById('op-new-pwd-2').value,err=document.getElementById('pwd-modal-error');
+  if(p1.length<4){err.textContent='Troppo corta (min 4)';return}if(p1!==p2){err.textContent='Le password non coincidono';return}
+  const nh=await sha256(p1);try{await sbPatch('operatori_auth','nome=eq.'+encodeURIComponent(nome),{pwd_hash:nh,deve_cambiare_pwd:false});
+  document.getElementById('pwd-modal-content').innerHTML='<h3>Password impostata!</h3><p style="text-align:center;color:var(--muted)">Da ora accedi con la tua nuova password.</p><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\');mostraNoteNonLette()">OK</button></div>';
+  toast('Password personale impostata!')}catch(e){err.textContent='Errore salvataggio'}}
+function esci(){sessionStorage.removeItem('diario_auth');sessionStorage.removeItem('operatore_corrente');location.reload()}
+async function aggiungiOperatoreConPwd(){const n=document.getElementById('new-operatore-nome').value.trim(),p=document.getElementById('new-operatore-pwd').value,p2=document.getElementById('new-operatore-pwd2').value;
   if(!n){toast('Inserisci un nome');return}if(p.length<4){toast('Password minimo 4 caratteri');return}
+  if(p!==p2){toast('Le password non coincidono');return}
   if(operatoriAuthCache.find(o=>o.nome.toLowerCase()===n.toLowerCase())){toast('Operatore già esistente');return}
-  const h=await sha256(p);try{await sbPost('operatori_auth',{nome:n,pwd_hash:h});operatoriAuthCache.push({nome:n,ruolo:'operatore'});
+  const h=await sha256(p);try{await sbPost('operatori_auth',{nome:n,pwd_hash:h,deve_cambiare_pwd:true});operatoriAuthCache.push({nome:n,ruolo:'operatore'});
   if(!operatoriSalvati.includes(n)){operatoriSalvati.push(n);operatoriSalvati.sort();await saveOperatori()}
-  document.getElementById('new-operatore-nome').value='';document.getElementById('new-operatore-pwd').value='';renderOperatoriUI();toast('Operatore "'+n+'" creato con password')}catch(e){toast('Errore creazione')}}
+  document.getElementById('new-operatore-nome').value='';document.getElementById('new-operatore-pwd').value='';document.getElementById('new-operatore-pwd2').value='';renderOperatoriUI();toast('Operatore "'+n+'" creato con password')}catch(e){toast('Errore creazione')}}
 async function rimuoviOperatore(n){if(!confirm('Rimuovere operatore "'+n+'"?'))return;operatoriSalvati=operatoriSalvati.filter(o=>o!==n);await saveOperatori();
   try{await sbDel('operatori_auth','nome=eq.'+encodeURIComponent(n));operatoriAuthCache=operatoriAuthCache.filter(o=>o.nome!==n)}catch(e){}renderOperatoriUI();toast('Rimosso')}
 async function cambiaPasswordOperatore(){const op=getOperatore();if(!op){toast('Seleziona prima un operatore');return}
@@ -653,7 +666,7 @@ async function segnaNotaLetta(id){try{await sbPatch('note_colleghi','id=eq.'+id,
 async function eliminaNotaCollega(id){try{await sbDel('note_colleghi','id=eq.'+id);noteColleghiCache=noteColleghiCache.filter(n=>n.id!==id);renderNoteCollega();toast('Nota eliminata')}catch(e){toast('Errore')}}
 function renderNoteCollega(){const op=getOperatore();
   // Populate destinatario dropdown
-  const sel=document.getElementById('nota-dest');if(sel){const cv=sel.value;const tutti=[...new Set([...operatoriSalvati,...(datiCache.map(e=>e.operatore).filter(Boolean))])].sort().filter(n=>n!==op);
+  const sel=document.getElementById('nota-dest');if(sel){const cv=sel.value;const tutti=[...new Set([...operatoriSalvati,...operatoriAuthCache.map(o=>o.nome),...(datiCache.map(e=>e.operatore).filter(Boolean))])].sort().filter(n=>n&&n!==op);
     sel.innerHTML='<option value="">Seleziona operatore...</option>'+tutti.map(n=>'<option'+(n===cv?' selected':'')+'>'+escP(n)+'</option>').join('')}
   const da=document.getElementById('nota-da');if(da)da.value=op||'(nessun operatore selezionato)';
   // Note ricevute
@@ -848,7 +861,7 @@ window.addEventListener('load',async()=>{
   renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();
   // Flatpickr date pickers
   if(window.flatpickr){const fpOpts={locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,onChange:()=>render()};flatpickr('#filt-dal',fpOpts);flatpickr('#filt-al',fpOpts)}});
-document.getElementById('pwd-modal').addEventListener('click',function(e){if(e.target===this){const c=document.getElementById('pwd-modal-content').innerHTML;if(c.includes('predefinita')||c.includes('Cambia la password')||c.includes('Password impostata')||c.includes('Reimpostata'))return;this.classList.add('hidden')}});
+document.getElementById('pwd-modal').addEventListener('click',function(e){if(e.target===this){const c=document.getElementById('pwd-modal-content').innerHTML;if(c.includes('predefinita')||c.includes('Cambia la password')||c.includes('Password impostata')||c.includes('Reimpostata')||c.includes('Benvenuto')||c.includes('scegli una nuova'))return;this.classList.add('hidden')}});
 document.getElementById('operatore-modal').addEventListener('click',function(e){if(e.target===this){const inp=document.getElementById('inp-operatore');if(inp&&inp.value.trim())confermaOperatore();else this.classList.add('hidden')}});
 document.getElementById('modal-overlay').addEventListener('click',function(e){if(e.target===this)chiudiModal()});
 document.getElementById('profilo-modal').addEventListener('click',function(e){if(e.target===this)this.classList.add('hidden')});
