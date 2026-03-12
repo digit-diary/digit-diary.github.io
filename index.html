@@ -854,7 +854,7 @@ window.addEventListener('load',async()=>{
   if(localStorage.getItem('tema')==='dark'){document.body.classList.add('dark-theme');document.getElementById('btn-tema').textContent='Tema chiaro'}
   document.getElementById('entries-list').innerHTML='<div class="loading">Caricamento...</div>';
   await loadAll();
-  const h=document.getElementById('login-hint');if(pwdHash===DEFAULT_PWD_HASH)h.innerHTML='Accedi come <strong>Admin</strong> (password: diario2024)<br>oppure accedi con nome operatore';
+  const h=document.getElementById('login-hint');if(pwdHash===DEFAULT_PWD_HASH)h.innerHTML='Accedi come Admin oppure seleziona il tuo nome';
   else if(operatoriAuthCache.length)h.innerHTML='Accedi come Admin oppure seleziona il tuo nome';
   // Populate login dropdown
   const loginSel=document.getElementById('login-nome');if(loginSel){const ops=[...new Set([...operatoriAuthCache.map(o=>o.nome),...operatoriSalvati])].sort();
