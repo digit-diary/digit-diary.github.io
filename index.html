@@ -54,11 +54,11 @@ header h1{font-family:'Playfair Display',serif;font-size:2.2rem;color:var(--ink)
 header h1 .subtitle{display:block;font-size:.9rem;font-family:'Source Sans 3',sans-serif;font-weight:300;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;margin-bottom:4px}
 header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',sans-serif;font-weight:600;color:var(--accent2);letter-spacing:.1em;text-transform:uppercase;margin-top:4px}
 .header-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
-.date-badge{font-family:'Playfair Display',serif;font-size:.95rem;color:var(--muted);text-align:right}
+.date-badge{font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--muted);text-align:right}
 .header-btns{display:flex;gap:6px;align-items:center}
 .btn-header{background:none;border:1px solid var(--line);color:var(--muted);padding:6px 14px;font-size:.8rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;border-radius:2px;font-family:'Source Sans 3',sans-serif;transition:all .15s}
 .btn-header:hover{background:var(--ink);color:var(--paper);border-color:var(--ink)}
-.operatore-badge{font-size:.88rem;color:var(--accent2);font-weight:600;text-align:right}
+.operatore-badge{font-size:.98rem;color:var(--accent2);font-weight:600;text-align:right}
 .bell-badge{position:absolute;top:-4px;right:-4px;background:var(--accent);color:white;font-size:.65rem;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px;line-height:1;font-family:'Source Sans 3',sans-serif}
 .btn-bell{border:none!important}
 .btn-bell.has-alerts{animation:bellShake 0.5s ease-in-out}
@@ -228,9 +228,9 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 .tipo-color-picker{width:32px;height:32px;border:1px solid var(--line);border-radius:2px;cursor:pointer;background:none;padding:1px;flex-shrink:0}
 .tipo-item-name{flex:1;font-weight:600;font-size:.9rem;color:var(--ink)}
 .tipo-item-default{font-size:.7rem;color:var(--muted);font-weight:400}
-.btn-del-tipo{background:none;border:1px solid var(--accent);color:var(--accent);padding:3px 8px;font-size:.68rem;font-weight:700;cursor:pointer;border-radius:2px;font-family:'Source Sans 3',sans-serif}
+.btn-del-tipo{background:none;border:1px solid var(--accent);color:var(--accent);padding:4px 10px;font-size:.76rem;font-weight:700;cursor:pointer;border-radius:2px;font-family:'Source Sans 3',sans-serif}
 .btn-del-tipo:hover{background:var(--accent);color:white}
-.btn-ord{background:none;border:1px solid var(--line);color:var(--muted);width:24px;height:22px;font-size:.65rem;cursor:pointer;border-radius:2px;display:flex;align-items:center;justify-content:center;padding:0;font-family:sans-serif;line-height:1}
+.btn-ord{background:none;border:1px solid var(--line);color:var(--muted);width:26px;height:24px;font-size:.72rem;cursor:pointer;border-radius:2px;display:flex;align-items:center;justify-content:center;padding:0;font-family:sans-serif;line-height:1}
 .btn-ord:hover:not(:disabled){background:var(--accent2);color:white;border-color:var(--accent2)}
 .btn-ord:disabled{opacity:.25;cursor:default}
 .add-tipo-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
@@ -483,8 +483,9 @@ const TIPI_DEFAULT=[{nome:'Attività',colore:'#1a4a7a'},{nome:'Richiesta',colore
 let tipiPersonalizzati=[],coloriOverride={},tipoSelezionato='Attività',modalEntryId=null,modalTipoSel=null,datiCache=[],pinnedIds=new Set(),scadenzeCache=[],pwdHash=null,recoveryCode=null,charts={},operatoriSalvati=[];
 let rapportoMese=new Date().getMonth(),rapportoAnno=new Date().getFullYear(),rapportoGiornoAperto=null,rapportiCache={},noteColleghiCache=[],operatoriAuthCache=[];
 const CAMPI_RAPPORTO_DEFAULT=[{key:'sup_note',label:'Supervisore',type:'input'},{key:'cassa_note',label:'Cassa',type:'text'},{key:'sala_note',label:'Sala',type:'text'},{key:'n_assegni',label:'Incasso Assegni',type:'text'},{key:'prelievi',label:'Prelievi',type:'text'},{key:'assenze',label:'Assenze',type:'text'}];
-let campiRapportoExtra=[],tipiNascosti=[],campiNascosti=[],tipiOrdine=[],campiOrdine=[],campiLabelOverride={},tipiLabelOverride={};
-function getTuttiTipi(){let list=[...TIPI_DEFAULT.filter(t=>!tipiNascosti.includes(t.nome)).map(t=>{const c=coloriOverride[t.nome]||t.colore;return{nome:t.nome,colore:c}}),...tipiPersonalizzati];
+let campiRapportoExtra=[],tipiNascosti=[],campiNascosti=[],tipiOrdine=[],campiOrdine=[],campiLabelOverride={},tipiRinominati={};
+function nomeCorrente(orig){return tipiRinominati[orig]||orig}
+function getTuttiTipi(){let list=[...TIPI_DEFAULT.filter(t=>!tipiNascosti.includes(t.nome)).map(t=>{const c=coloriOverride[t.nome]||t.colore;const n=tipiRinominati[t.nome]||t.nome;return{nome:n,colore:c,_orig:t.nome}}),...tipiPersonalizzati];
   if(tipiOrdine.length)list.sort((a,b)=>{const ia=tipiOrdine.indexOf(a.nome),ib=tipiOrdine.indexOf(b.nome);return(ia===-1?999:ia)-(ib===-1?999:ib)});return list}
 function getColore(n){return coloriOverride[n]||(getTuttiTipi().find(t=>t.nome===n)||{}).colore||'#8a7d6b'}
 function getOperatore(){return sessionStorage.getItem('operatore_corrente')||''}
@@ -513,6 +514,7 @@ async function loadAll(){
   const to=await getImp('tipi_ordine');if(to)try{tipiOrdine=JSON.parse(to)}catch(e){}
   const cmo=await getImp('campi_ordine');if(cmo)try{campiOrdine=JSON.parse(cmo)}catch(e){}
   const clo=await getImp('campi_label_override');if(clo)try{campiLabelOverride=JSON.parse(clo)}catch(e){}
+  const tr=await getImp('tipi_rinominati');if(tr)try{tipiRinominati=JSON.parse(tr)}catch(e){}
   datiCache=await sbGet('registrazioni?order=data.desc');
   const pins=await sbGet('note_fissate?select=registrazione_id');pinnedIds=new Set(pins.map(p=>p.registrazione_id));
   scadenzeCache=await sbGet('scadenze?order=data_scadenza.asc');
@@ -524,7 +526,7 @@ async function loadAll(){
 async function checkPwd(){const nome=document.getElementById('login-nome').value.trim(),v=document.getElementById('pwd-input').value,h=await sha256(v),err=document.getElementById('login-error');
   // Try individual operator login first
   if(nome){const authData=await sbGet('operatori_auth?nome=eq.'+encodeURIComponent(nome)+'&select=nome,pwd_hash,ruolo,deve_cambiare_pwd');
-    if(authData.length&&authData[0].pwd_hash===h){sessionStorage.setItem('operatore_corrente',nome);sessionStorage.setItem('diario_auth','1');sessionStorage.removeItem('is_admin');document.getElementById('login-overlay').classList.add('hidden');document.getElementById('operatore-display').textContent='Operatore: '+nome;
+    if(authData.length&&authData[0].pwd_hash===h){sessionStorage.setItem('operatore_corrente',nome);sessionStorage.setItem('diario_auth','1');sessionStorage.removeItem('is_admin');document.getElementById('login-overlay').classList.add('hidden');document.getElementById('operatore-display').textContent='Operatore: '+nome;applicaTemaOperatore();
       if(authData[0].deve_cambiare_pwd)setTimeout(()=>forzaCambioPwdOperatore(nome),300);
       else setTimeout(()=>mostraNoteNonLette(),500);return}
     // If operator exists but wrong password
@@ -533,7 +535,7 @@ async function checkPwd(){const nome=document.getElementById('login-nome').value
   if(h===pwdHash){document.getElementById('login-overlay').classList.add('hidden');sessionStorage.setItem('diario_auth','1');sessionStorage.setItem('is_admin','1');
     if(nome){sessionStorage.setItem('operatore_corrente',nome);document.getElementById('operatore-display').textContent='Operatore: '+nome;setTimeout(()=>mostraNoteNonLette(),500)}
     else{sessionStorage.setItem('operatore_corrente','Admin');document.getElementById('operatore-display').textContent='Admin';}
-    renderTipiUI();renderOperatoriUI();renderCampiRapportoUI();
+    applicaTemaOperatore();renderTipiUI();renderOperatoriUI();renderCampiRapportoUI();
   }else{err.textContent=nome?'Operatore non trovato o password errata':'Password errata';document.getElementById('pwd-input').value='';document.getElementById('pwd-input').focus();setTimeout(()=>err.textContent='',2500)}}
 function mostraForzaCambio(){const b=document.getElementById('pwd-modal-content');b.innerHTML='<h3>Cambia la password</h3><p>Password predefinita. Impostane una nuova.</p><div class="pwd-field"><label>Nuova password (min 4 car.)</label><input type="password" id="new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="eseguiPrimoCambio()">Imposta</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';document.getElementById('pwd-modal').classList.remove('hidden');setTimeout(()=>document.getElementById('new-pwd-1').focus(),100)}
 async function eseguiPrimoCambio(){const p1=document.getElementById('new-pwd-1').value,p2=document.getElementById('new-pwd-2').value,err=document.getElementById('pwd-modal-error');if(p1.length<4){err.textContent='Troppo corta';return}if(p1!==p2){err.textContent='Non coincidono';return}
@@ -621,23 +623,36 @@ async function eseguiRinominaCampo(key){const val=document.getElementById('renam
   else{const c=campiRapportoExtra.find(x=>x.key===key);if(c){c.label=val;await saveCampiExtra()}}
   document.getElementById('pwd-modal').classList.add('hidden');renderCampiRapportoUI();toast('Campo rinominato')}
 function rinominaTipo(nome){const b=document.getElementById('pwd-modal-content');
-  b.innerHTML='<h3>Rinomina tipo evento</h3><p style="color:var(--muted);font-size:.82rem">Nota: le registrazioni esistenti manterranno il nome originale.</p><div class="pwd-field"><label>Nuovo nome</label><input type="text" id="rename-tipo-val" value="'+escP(nome)+'"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiRinominaTipo(\''+nome.replace(/'/g,"\\'")+'\')">Salva</button></div>';
+  b.innerHTML='<h3>Rinomina tipo evento</h3><div class="pwd-field"><label>Nuovo nome</label><input type="text" id="rename-tipo-val" value="'+escP(nome)+'"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiRinominaTipo(\''+nome.replace(/'/g,"\\'")+'\')">Salva</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');setTimeout(()=>{const inp=document.getElementById('rename-tipo-val');inp.focus();inp.select()},100)}
 async function eseguiRinominaTipo(vecchioNome){const nuovoNome=document.getElementById('rename-tipo-val').value.trim();if(!nuovoNome){toast('Inserisci un nome');return}if(nuovoNome===vecchioNome){document.getElementById('pwd-modal').classList.add('hidden');return}
   if(getTuttiTipi().find(t=>t.nome.toLowerCase()===nuovoNome.toLowerCase()&&t.nome!==vecchioNome)){toast('Nome già esistente');return}
-  const isDefault=TIPI_DEFAULT.find(d=>d.nome===vecchioNome);
-  if(isDefault){toast('I tipi predefiniti non possono essere rinominati (usati nel codice)');return}
-  const tp=tipiPersonalizzati.find(t=>t.nome===vecchioNome);if(tp){tp.nome=nuovoNome;if(coloriOverride[vecchioNome]){coloriOverride[nuovoNome]=coloriOverride[vecchioNome];delete coloriOverride[vecchioNome]}
+  // Trova il nome originale (default) se era già stato rinominato
+  const origDefault=Object.entries(tipiRinominati).find(([k,v])=>v===vecchioNome);
+  const nomeOriginale=origDefault?origDefault[0]:vecchioNome;
+  const isDefault=TIPI_DEFAULT.find(d=>d.nome===nomeOriginale);
+  if(isDefault){tipiRinominati[nomeOriginale]=nuovoNome;await setImp('tipi_rinominati',JSON.stringify(tipiRinominati));
+    if(coloriOverride[vecchioNome]){coloriOverride[nomeOriginale]=coloriOverride[vecchioNome];if(vecchioNome!==nomeOriginale)delete coloriOverride[vecchioNome];await saveColoriOverride()}
+    const oi=tipiOrdine.indexOf(vecchioNome);if(oi!==-1){tipiOrdine[oi]=nuovoNome;await setImp('tipi_ordine',JSON.stringify(tipiOrdine))}
+    // Aggiorna registrazioni nel DB e nella cache
+    try{await sbPatch('registrazioni','tipo=eq.'+encodeURIComponent(vecchioNome),{tipo:nuovoNome})}catch(e){}
+    datiCache.forEach(e=>{if(e.tipo===vecchioNome)e.tipo=nuovoNome})
+  }else{const tp=tipiPersonalizzati.find(t=>t.nome===vecchioNome);if(tp){tp.nome=nuovoNome;if(coloriOverride[vecchioNome]){coloriOverride[nuovoNome]=coloriOverride[vecchioNome];delete coloriOverride[vecchioNome]}
     const oi=tipiOrdine.indexOf(vecchioNome);if(oi!==-1)tipiOrdine[oi]=nuovoNome;
-    await saveTipiP();await saveColoriOverride();if(tipiOrdine.length)await setImp('tipi_ordine',JSON.stringify(tipiOrdine))}
-  document.getElementById('pwd-modal').classList.add('hidden');renderTipiUI();toast('Tipo rinominato')}
+    await saveTipiP();await saveColoriOverride();if(tipiOrdine.length)await setImp('tipi_ordine',JSON.stringify(tipiOrdine))
+    try{await sbPatch('registrazioni','tipo=eq.'+encodeURIComponent(vecchioNome),{tipo:nuovoNome})}catch(e){}
+    datiCache.forEach(e=>{if(e.tipo===vecchioNome)e.tipo=nuovoNome})}}
+  if(tipoSelezionato===vecchioNome)tipoSelezionato=nuovoNome;
+  document.getElementById('pwd-modal').classList.add('hidden');renderTipiUI();render();updateStats();toast('Tipo rinominato')}
 function renderCampiRapportoUI(){const el=document.getElementById('rapporto-campi-list');if(!el)return;const campi=getCampiRapporto();const adm=isAdmin();
   let cHtml=campi.map((c,idx)=>{const isDefault=CAMPI_RAPPORTO_DEFAULT.find(d=>d.key===c.key);return'<div class="tipo-item"><div class="tipo-color" style="background:'+(c.type==='number'?'#3498db':'#2ecc71')+'"></div><div class="tipo-item-name">'+escP(c.label)+(isDefault?' <span class="tipo-item-default">(predefinito)</span>':'')+'</div>'+(adm?'<div style="display:flex;gap:3px;margin-left:auto"><button class="btn-ord" onclick="spostaCampo(\''+c.key+'\',-1)"'+(idx===0?' disabled':'')+'>&#9650;</button><button class="btn-ord" onclick="spostaCampo(\''+c.key+'\',1)"'+(idx===campi.length-1?' disabled':'')+'>&#9660;</button></div><button class="btn-del-tipo" style="margin-left:6px" onclick="rinominaCampo(\''+c.key+'\')">Rinomina</button><button class="btn-del-tipo" style="margin-left:4px" onclick="'+(isDefault?'nascondiCampoDefault':'rimuoviCampoRapporto')+'(\''+c.key+'\')">Rimuovi</button>':'')+'</div>'}).join('');
   if(adm&&campiNascosti.length){cHtml+='<div style="margin-top:12px;padding:10px;background:var(--paper2);border-radius:3px"><small style="color:var(--muted);display:block;margin-bottom:6px">Campi nascosti:</small>'+campiNascosti.map(k=>{const d=CAMPI_RAPPORTO_DEFAULT.find(x=>x.key===k);return'<button style="margin:2px 4px;padding:3px 10px;font-size:.78rem;cursor:pointer;border:1px dashed var(--accent2);color:var(--accent2);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif" onclick="ripristinaCampoDefault(\''+k+'\')">+ '+(d?escP(d.label):k)+'</button>'}).join('')+'</div>'}
   el.innerHTML=cHtml;const addCampo=el.parentElement.querySelector('.add-tipo-row');if(addCampo)addCampo.style.display=adm?'':'none'}
 
 // TEMA
-function toggleTema(){document.body.classList.toggle('dark-theme');const isDark=document.body.classList.contains('dark-theme');localStorage.setItem('tema',isDark?'dark':'light');document.getElementById('btn-tema').textContent=isDark?'Tema chiaro':'Tema scuro'}
+function getTemaKey(){return'tema_'+(getOperatore()||'default')}
+function toggleTema(){document.body.classList.toggle('dark-theme');const isDark=document.body.classList.contains('dark-theme');localStorage.setItem(getTemaKey(),isDark?'dark':'light');document.getElementById('btn-tema').textContent=isDark?'Tema chiaro':'Tema scuro'}
+function applicaTemaOperatore(){const t=localStorage.getItem(getTemaKey())||localStorage.getItem('tema')||'light';if(t==='dark'){document.body.classList.add('dark-theme');document.getElementById('btn-tema').textContent='Tema chiaro'}else{document.body.classList.remove('dark-theme');document.getElementById('btn-tema').textContent='Tema scuro'}}
 
 // NAVIGATION
 function switchPage(name){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');document.querySelector('.nav-tab[data-page="'+name+'"]').classList.add('active');sessionStorage.setItem('pagina_corrente',name);
@@ -656,12 +671,12 @@ async function ripristinaTipoDefault(n){tipiNascosti=tipiNascosti.filter(t=>t!==
 function renderTipiUI(){const tutti=getTuttiTipi();
   document.getElementById('form-tipo-tags').innerHTML=tutti.map(t=>'<button class="tipo-tag'+(tipoSelezionato===t.nome?' active':'')+'" data-tipo="'+esc(t.nome)+'" style="'+(tipoSelezionato===t.nome?'background:'+t.colore+';border-color:'+t.colore:'')+'">'+esc(t.nome)+'</button>').join('');
   document.getElementById('form-tipo-tags').querySelectorAll('.tipo-tag').forEach(b=>{b.onclick=()=>{tipoSelezionato=b.dataset.tipo;renderTipiUI()}});
-  const errRow=document.getElementById('errore-extra-row');if(errRow)errRow.style.display=tipoSelezionato==='Errore'?'block':'none';
+  const errRow=document.getElementById('errore-extra-row');if(errRow)errRow.style.display=tipoSelezionato===nomeCorrente('Errore')?'block':'none';
   const fs=document.getElementById('filt-tipo');if(fs){const cv=fs.value;fs.innerHTML='<option value="">Tutti</option>'+tutti.map(t=>'<option'+(t.nome===cv?' selected':'')+'>'+esc(t.nome)+'</option>').join('')}
   document.getElementById('modal-tipo-tags').innerHTML=tutti.map(t=>'<button class="modal-tipo-tag'+(modalTipoSel===t.nome?' selected':'')+'" data-tipo="'+esc(t.nome)+'" style="'+(modalTipoSel===t.nome?'background:'+t.colore+';border-color:'+t.colore:'')+'">'+esc(t.nome)+'</button>').join('');
   document.getElementById('modal-tipo-tags').querySelectorAll('.modal-tipo-tag').forEach(b=>{b.onclick=()=>{modalTipoSel=b.dataset.tipo;renderTipiUI()}});
   const tl=document.getElementById('tipo-list');if(tl){const adm=isAdmin();
-    let tlHtml=tutti.map((t,idx)=>{const d=TIPI_DEFAULT.find(x=>x.nome===t.nome);const ne=t.nome.replace(/'/g,"\\'");return'<div class="tipo-item">'+(adm?'<input type="color" class="tipo-color-picker" value="'+t.colore+'" onchange="cambiaColoreTipo(\''+ne+'\',this.value)">':'<div class="tipo-color" style="background:'+t.colore+'"></div>')+'<div class="tipo-item-name">'+esc(t.nome)+(d?' <span class="tipo-item-default">(predefinito)</span>':'')+'</div>'+(adm?'<div style="display:flex;gap:3px;margin-left:auto"><button class="btn-ord" onclick="spostaTipo(\''+ne+'\',-1)"'+(idx===0?' disabled':'')+'>&#9650;</button><button class="btn-ord" onclick="spostaTipo(\''+ne+'\',1)"'+(idx===tutti.length-1?' disabled':'')+'>&#9660;</button></div>'+(!d?'<button class="btn-del-tipo" style="margin-left:6px" onclick="rinominaTipo(\''+ne+'\')">Rinomina</button>':'')+'<button class="btn-del-tipo" style="margin-left:4px" onclick="'+(d?'nascondiTipoDefault':'rimuoviTipo')+'(\''+ne+'\')">Rimuovi</button>':'')+'</div>'}).join('');
+    let tlHtml=tutti.map((t,idx)=>{const d=t._orig?TIPI_DEFAULT.find(x=>x.nome===t._orig):null;const ne=t.nome.replace(/'/g,"\\'");const origNe=t._orig?(t._orig.replace(/'/g,"\\'")):ne;return'<div class="tipo-item">'+(adm?'<input type="color" class="tipo-color-picker" value="'+t.colore+'" onchange="cambiaColoreTipo(\''+(t._orig||ne)+'\',this.value)">':'<div class="tipo-color" style="background:'+t.colore+'"></div>')+'<div class="tipo-item-name">'+esc(t.nome)+(d?' <span class="tipo-item-default">(predefinito)</span>':'')+'</div>'+(adm?'<div style="display:flex;gap:3px;margin-left:auto"><button class="btn-ord" onclick="spostaTipo(\''+ne+'\',-1)"'+(idx===0?' disabled':'')+'>&#9650;</button><button class="btn-ord" onclick="spostaTipo(\''+ne+'\',1)"'+(idx===tutti.length-1?' disabled':'')+'>&#9660;</button></div><button class="btn-del-tipo" style="margin-left:6px" onclick="rinominaTipo(\''+ne+'\')">Rinomina</button><button class="btn-del-tipo" style="margin-left:4px" onclick="'+(d?'nascondiTipoDefault(\''+origNe+'\')':'rimuoviTipo(\''+ne+'\')')+'">Rimuovi</button>':'')+'</div>'}).join('');
     if(adm&&tipiNascosti.length){tlHtml+='<div style="margin-top:12px;padding:10px;background:var(--paper2);border-radius:3px"><small style="color:var(--muted);display:block;margin-bottom:6px">Tipi nascosti:</small>'+tipiNascosti.map(n=>'<button style="margin:2px 4px;padding:3px 10px;font-size:.78rem;cursor:pointer;border:1px dashed var(--accent2);color:var(--accent2);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif" onclick="ripristinaTipoDefault(\''+n.replace(/'/g,"\\'")+'\')">+ '+escP(n)+'</button>').join('')+'</div>'}
     tl.innerHTML=tlHtml;const addTipo=tl.parentElement.querySelector('.add-tipo-row');if(addTipo)addTipo.style.display=adm?'':'none'}
   let s=document.getElementById('dyn-styles');if(!s){s=document.createElement('style');s.id='dyn-styles';document.head.appendChild(s)}
@@ -785,7 +800,7 @@ function render(){const f=getFiltrati(),el=document.getElementById('entries-list
 function aggiornaNomi(){const nomi=[...new Set(datiCache.map(e=>e.nome))].sort();document.getElementById('nomi-list').innerHTML=nomi.map(n=>'<option value="'+n+'">').join('');
   const sel=document.getElementById('filt-persona'),cur=sel.value;sel.innerHTML='<option value="">Tutte</option>'+nomi.map(n=>'<option'+(n===cur?' selected':'')+'>'+escP(n)+'</option>').join('')}
 function resetFiltri(){['filt-persona','filt-tipo'].forEach(id=>document.getElementById(id).value='');['filt-cerca'].forEach(id=>document.getElementById(id).value='');const fd=document.getElementById('filt-dal'),fa=document.getElementById('filt-al');if(fd._flatpickr)fd._flatpickr.clear();else fd.value='';if(fa._flatpickr)fa._flatpickr.clear();else fa.value='';render()}
-function updateStats(){document.getElementById('stats-bar').innerHTML='<div class="stat"><div class="stat-num">'+datiCache.length+'</div><div class="stat-label">Totale</div></div><div class="stat"><div class="stat-num blue">'+new Set(datiCache.map(e=>e.nome)).size+'</div><div class="stat-label">Collaboratori</div></div><div class="stat"><div class="stat-num red">'+datiCache.filter(e=>e.tipo==='Errore').length+'</div><div class="stat-label">Errori</div></div><div class="stat"><div class="stat-num teal">'+datiCache.filter(e=>e.tipo==='Malattia').length+'</div><div class="stat-label">Malattie</div></div><div class="stat"><div class="stat-num gold">'+datiCache.filter(e=>e.tipo==='Apprezzamento').length+'</div><div class="stat-label">Apprezzamenti</div></div>'}
+function updateStats(){document.getElementById('stats-bar').innerHTML='<div class="stat"><div class="stat-num">'+datiCache.length+'</div><div class="stat-label">Totale</div></div><div class="stat"><div class="stat-num blue">'+new Set(datiCache.map(e=>e.nome)).size+'</div><div class="stat-label">Collaboratori</div></div><div class="stat"><div class="stat-num red">'+datiCache.filter(e=>e.tipo===nomeCorrente('Errore')).length+'</div><div class="stat-label">'+nomeCorrente('Errore')+'</div></div><div class="stat"><div class="stat-num teal">'+datiCache.filter(e=>e.tipo===nomeCorrente('Malattia')).length+'</div><div class="stat-label">'+nomeCorrente('Malattia')+'</div></div><div class="stat"><div class="stat-num gold">'+datiCache.filter(e=>e.tipo===nomeCorrente('Apprezzamento')).length+'</div><div class="stat-label">'+nomeCorrente('Apprezzamento')+'</div></div>'}
 
 // RAPPORTO GIORNALIERO
 async function fetchRapportiMese(a,m){const start=a+'-'+String(m+1).padStart(2,'0')+'-01';const nm=m===11?new Date(a+1,0,1):new Date(a,m+1,1);const end=nm.getFullYear()+'-'+String(nm.getMonth()+1).padStart(2,'0')+'-01';
@@ -837,8 +852,8 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
     // Auto-malattia: parse assenze field
     const assenzeText=data.assenze||'';if(assenzeText.trim()){const righe=assenzeText.split('\n').filter(r=>r.trim());
       for(const riga of righe){const m=riga.match(/^([A-ZÀ-Üa-zà-ü\s.'-]+?)\s*(assente|malattia|malato|malata)/i);if(m){const nome=m[1].trim();
-        const esiste=datiCache.find(e=>e.nome.toLowerCase()===nome.toLowerCase()&&e.tipo==='Malattia'&&e.data.startsWith(ds));
-        if(!esiste){const rec={id:Date.now()+Math.floor(Math.random()*1000),nome,tipo:'Malattia',testo:'Assente per malattia (da rapporto '+turno+' del '+new Date(ds+'T12:00:00').toLocaleDateString('it-IT')+')',data:ds+'T'+new Date().toTimeString().slice(0,8)+'.000Z',operatore:getOperatore()};
+        const esiste=datiCache.find(e=>e.nome.toLowerCase()===nome.toLowerCase()&&e.tipo===nomeCorrente('Malattia')&&e.data.startsWith(ds));
+        if(!esiste){const rec={id:Date.now()+Math.floor(Math.random()*1000),nome,tipo:nomeCorrente('Malattia'),testo:'Assente per malattia (da rapporto '+turno+' del '+new Date(ds+'T12:00:00').toLocaleDateString('it-IT')+')',data:ds+'T'+new Date().toTimeString().slice(0,8)+'.000Z',operatore:getOperatore()};
           try{await sbPost('registrazioni',rec);datiCache.unshift(rec)}catch(e){}}}}}
     }catch(e){console.error(e);toast('Errore salvataggio')}}
 
@@ -887,12 +902,12 @@ async function esportaRapportoPDF(){if(!window.jspdf){toast('Caricamento PDF...'
 // STATISTICHE
 function renderStatistiche(){if(!datiCache.length){document.getElementById('stats-summary').innerHTML='<p style="color:var(--muted);text-align:center;padding:40px">Nessun dato da analizzare</p>';return}
   // Summary
-  const nCollab=new Set(datiCache.map(e=>e.nome)).size;const nErr=datiCache.filter(e=>e.tipo==='Errore').length;const totImp=datiCache.reduce((s,e)=>s+(parseFloat(e.importo)||0),0);
-  document.getElementById('stats-summary').innerHTML='<div class="stats-bar" style="margin-bottom:0"><div class="stat"><div class="stat-num">'+datiCache.length+'</div><div class="stat-label">Registrazioni totali</div></div><div class="stat"><div class="stat-num blue">'+nCollab+'</div><div class="stat-label">Collaboratori</div></div><div class="stat"><div class="stat-num red">'+nErr+'</div><div class="stat-label">Errori</div></div><div class="stat"><div class="stat-num teal">'+datiCache.filter(e=>e.tipo==='Malattia').length+'</div><div class="stat-label">Malattie</div></div><div class="stat"><div class="stat-num gold">'+(totImp?totImp.toFixed(2):'0')+'</div><div class="stat-label">Importo totale</div></div></div>';
+  const nCollab=new Set(datiCache.map(e=>e.nome)).size;const nErr=datiCache.filter(e=>e.tipo===nomeCorrente('Errore')).length;const totImp=datiCache.reduce((s,e)=>s+(parseFloat(e.importo)||0),0);
+  document.getElementById('stats-summary').innerHTML='<div class="stats-bar" style="margin-bottom:0"><div class="stat"><div class="stat-num">'+datiCache.length+'</div><div class="stat-label">Registrazioni totali</div></div><div class="stat"><div class="stat-num blue">'+nCollab+'</div><div class="stat-label">Collaboratori</div></div><div class="stat"><div class="stat-num red">'+nErr+'</div><div class="stat-label">'+nomeCorrente('Errore')+'</div></div><div class="stat"><div class="stat-num teal">'+datiCache.filter(e=>e.tipo===nomeCorrente('Malattia')).length+'</div><div class="stat-label">'+nomeCorrente('Malattia')+'</div></div><div class="stat"><div class="stat-num gold">'+(totImp?totImp.toFixed(2):'0')+'</div><div class="stat-label">Importo totale</div></div></div>';
   // Grafico mensile (full width, primo)
   const tipiCount={};datiCache.forEach(e=>{tipiCount[e.tipo]=(tipiCount[e.tipo]||0)+1});
   const tl=Object.keys(tipiCount).sort((a,b)=>tipiCount[b]-tipiCount[a]);
-  const now=new Date(),ml=[],md=[],me=[];for(let i=11;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);ml.push(MESI[d.getMonth()]+' '+d.getFullYear());md.push(datiCache.filter(e=>{const ed=new Date(e.data);return ed.getMonth()===d.getMonth()&&ed.getFullYear()===d.getFullYear()}).length);me.push(datiCache.filter(e=>{const ed=new Date(e.data);return e.tipo==='Errore'&&ed.getMonth()===d.getMonth()&&ed.getFullYear()===d.getFullYear()}).length)}
+  const now=new Date(),ml=[],md=[],me=[];for(let i=11;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);ml.push(MESI[d.getMonth()]+' '+d.getFullYear());md.push(datiCache.filter(e=>{const ed=new Date(e.data);return ed.getMonth()===d.getMonth()&&ed.getFullYear()===d.getFullYear()}).length);me.push(datiCache.filter(e=>{const ed=new Date(e.data);return e.tipo===nomeCorrente('Errore')&&ed.getMonth()===d.getMonth()&&ed.getFullYear()===d.getFullYear()}).length)}
   renderChart('chart-mesi','bar',{labels:ml,datasets:[{label:'Tutte le registrazioni',data:md,backgroundColor:'rgba(26,74,122,0.7)',borderRadius:4},{label:'Di cui errori',data:me,backgroundColor:'rgba(192,57,43,0.7)',borderRadius:4}]},{plugins:{legend:{position:'top',labels:{font:{size:13},padding:16}}},scales:{y:{beginAtZero:true,ticks:{stepSize:1,font:{size:12}}},x:{ticks:{font:{size:11}}}}});
   // Doughnut tipi
   renderChart('chart-tipi','doughnut',{labels:tl.map(t=>t+' ('+tipiCount[t]+')'),datasets:[{data:tl.map(t=>tipiCount[t]),backgroundColor:tl.map(t=>getColore(t)),borderWidth:2,borderColor:'white'}]},{plugins:{legend:{position:'bottom',labels:{font:{size:12},padding:12,usePointStyle:true}}}});
@@ -909,7 +924,7 @@ function renderStatistiche(){if(!datiCache.length){document.getElementById('stat
   const totGen=cr.reduce((s,c)=>s+c[1].tot,0);th+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td class="num"><strong>'+totGen+'</strong></td>'+tp.map(t=>{const v=cr.reduce((s,c)=>s+(c[1][t.nome]||0),0);return'<td class="num"><strong>'+(v?'<span class="mini-badge" style="background:'+t.colore+'">'+v+'</span>':'-')+'</strong></td>'}).join('')+'</tr>';
   th+='</tbody></table>';document.getElementById('collab-table-wrap').innerHTML=th;
   // Tabella errori con importi e reparto
-  const errori=datiCache.filter(e=>e.tipo==='Errore');const errMap={};
+  const errori=datiCache.filter(e=>e.tipo===nomeCorrente('Errore'));const errMap={};
   errori.forEach(e=>{if(!errMap[e.nome])errMap[e.nome]={count:0,totCHF:0,totEUR:0,reparti:{}};errMap[e.nome].count++;const imp=parseFloat(e.importo)||0;if(imp){if(e.valuta==='EUR')errMap[e.nome].totEUR+=imp;else errMap[e.nome].totCHF+=imp}const rep=e.reparto||'N/D';errMap[e.nome].reparti[rep]=(errMap[e.nome].reparti[rep]||0)+1});
   const errSorted=Object.entries(errMap).sort((a,b)=>b[1].count-a[1].count);
   if(errSorted.length){let et='<table class="collab-table"><thead><tr><th>Collaboratore</th><th class="num">N. Errori</th><th>Reparti</th><th class="num">Totale CHF</th><th class="num">Totale EUR</th></tr></thead><tbody>';
@@ -943,7 +958,7 @@ async function esportaPDF(){const f=getFiltrati();if(!f.length){toast('Nessun da
 
 // INIT
 window.addEventListener('load',async()=>{
-  if(localStorage.getItem('tema')==='dark'){document.body.classList.add('dark-theme');document.getElementById('btn-tema').textContent='Tema chiaro'}
+  if(localStorage.getItem('tema')==='dark'){document.body.classList.add('dark-theme');document.getElementById('btn-tema').textContent='Tema chiaro'}// tema provvisorio, poi si applica quello dell'operatore
   document.getElementById('entries-list').innerHTML='<div class="loading">Caricamento...</div>';
   await loadAll();
   const h=document.getElementById('login-hint');if(pwdHash===DEFAULT_PWD_HASH)h.innerHTML='Accedi come Admin oppure seleziona il tuo nome';
@@ -951,7 +966,7 @@ window.addEventListener('load',async()=>{
   // Populate login dropdown
   const loginSel=document.getElementById('login-nome');if(loginSel){const ops=operatoriAuthCache.map(o=>o.nome).sort();
     loginSel.innerHTML='<option value="">-- Admin (password master) --</option>'+ops.map(n=>'<option value="'+escP(n)+'">'+escP(n)+'</option>').join('')}
-  if(sessionStorage.getItem('diario_auth')==='1'){document.getElementById('login-overlay').classList.add('hidden');
+  if(sessionStorage.getItem('diario_auth')==='1'){document.getElementById('login-overlay').classList.add('hidden');applicaTemaOperatore();
     if(getOperatore()){document.getElementById('operatore-display').textContent='Operatore: '+getOperatore();
       // Check se deve ancora cambiare password
       const authCheck=await sbGet('operatori_auth?nome=eq.'+encodeURIComponent(getOperatore())+'&select=deve_cambiare_pwd');
