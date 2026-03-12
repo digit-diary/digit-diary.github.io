@@ -887,7 +887,7 @@ function apriModulo(tipo){
   if(tipo==='allineamento'){
     html+='Rilevamento di non conformità e colloquio di allineamento</div><div style="padding:18px">';
     html+='<div class="modulo-field"><label>Collaboratore</label><div class="ac-wrap"><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." oninput="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')" onfocus="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')"><div class="ac-drop" id="ac-mod-nomi"></div></div></div>';
-    html+='<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="'+escP(op)+'"></div>';
+    html+='<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="Sig.ra Fertitta Lara"></div>';
     html+='<div class="modulo-field"><label>Data</label><input type="text" id="mod-data" value="'+oggi+'"></div>';
     html+='<div class="modulo-field"><label>Non conformità rilevata (descrizione)</label><textarea id="mod-non-conf" placeholder="Descrizione della non conformità..."></textarea><div class="btn-ai-wrap"><button class="btn-ai" onclick="miglioraTesto(\'mod-non-conf\',\'non conformità\')">Migliora testo con AI</button></div></div>';
     html+='<div class="modulo-field"><label>Obiettivo concordato onde evitare il ripetersi della non conformità</label><textarea id="mod-obiettivo" placeholder="Obiettivo concordato..."></textarea><div class="btn-ai-wrap"><button class="btn-ai" onclick="miglioraTesto(\'mod-obiettivo\',\'obiettivo concordato\')">Migliora testo con AI</button></div></div>';
@@ -895,14 +895,14 @@ function apriModulo(tipo){
   }else if(tipo==='apprezzamento'){
     html+='Colloquio di apprezzamento</div><div style="padding:18px">';
     html+='<div class="modulo-field"><label>Collaboratore</label><div class="ac-wrap"><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." oninput="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')" onfocus="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')"><div class="ac-drop" id="ac-mod-nomi"></div></div></div>';
-    html+='<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="'+escP(op)+'"></div>';
+    html+='<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="Sig.ra Fertitta Lara"></div>';
     html+='<div class="modulo-field"><label>Data</label><input type="text" id="mod-data" value="'+oggi+'"></div>';
     html+='<div class="modulo-field"><label>Descrizione</label><textarea id="mod-descrizione" placeholder="Descrizione dell\'apprezzamento..."></textarea><div class="btn-ai-wrap"><button class="btn-ai" onclick="miglioraTesto(\'mod-descrizione\',\'apprezzamento\')">Migliora testo con AI</button></div></div>';
     html+='<div class="modulo-field"><label>Osservazioni da parte del Resp. Settore</label><textarea id="mod-osservazioni" placeholder="Osservazioni..."></textarea><div class="btn-ai-wrap"><button class="btn-ai" onclick="miglioraTesto(\'mod-osservazioni\',\'osservazioni\')">Migliora testo con AI</button></div></div>';
   }else if(tipo==='rdi'){
     html+='Rapporto disciplinare interno (RDI)</div><div style="padding:18px">';
     html+='<div class="modulo-field"><label>Collaboratore</label><div class="ac-wrap"><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." oninput="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')" onfocus="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')"><div class="ac-drop" id="ac-mod-nomi"></div></div></div>';
-    html+='<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="'+escP(op)+'"></div>';
+    html+='<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="Sig.ra Fertitta Lara"></div>';
     html+='<div class="modulo-field"><label>Data</label><input type="text" id="mod-data" value="'+oggi+'"></div>';
     html+='<div class="modulo-field"><label>Non conformità rilevata</label><textarea id="mod-non-conf" placeholder="Descrizione della non conformità..."></textarea><div class="btn-ai-wrap"><button class="btn-ai" onclick="miglioraTesto(\'mod-non-conf\',\'non conformità\')">Migliora testo con AI</button></div></div>';
     html+='<div class="modulo-field"><label>Obiettivo concordato onde evitare il ripetersi della non conformità</label><textarea id="mod-obiettivo" placeholder="Obiettivo concordato..."></textarea><div class="btn-ai-wrap"><button class="btn-ai" onclick="miglioraTesto(\'mod-obiettivo\',\'obiettivo concordato\')">Migliora testo con AI</button></div></div>';
@@ -931,7 +931,7 @@ async function generaModuloPDF(tipo){
     const t1='Rilevamento di non conformità';const t2='e colloquio di allineamento';
     doc.text(t1,pw/2,y,{align:'center'});y+=6;doc.text(t2,pw/2,y,{align:'center'});y+=14;
     drawFieldLine(doc,mx,y,'Collaboratore','Sig./Sig.ra '+collab,pw);y+=10;
-    drawFieldLine(doc,mx,y,'Resp. Settore','Sig./Sig.ra '+resp,pw);y+=10;
+    drawFieldLine(doc,mx,y,'Resp. Settore',resp,pw);y+=10;
     drawFieldLine(doc,mx,y,'Data',data,pw);y+=14;
     const nonConf=(document.getElementById('mod-non-conf')||{}).value||'';
     checkPage(30);y=drawBlockField(doc,mx,y,'Non conformità rilevata (descrizione)',nonConf,pw);y+=10;
@@ -948,7 +948,7 @@ async function generaModuloPDF(tipo){
     doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(0);
     doc.text('Colloquio di apprezzamento',pw/2,y,{align:'center'});y+=14;
     drawFieldLine(doc,mx,y,'Collaboratore','Sig./Sig.ra '+collab,pw);y+=10;
-    drawFieldLine(doc,mx,y,'Resp. Settore','Sig./Sig.ra '+resp,pw);y+=10;
+    drawFieldLine(doc,mx,y,'Resp. Settore',resp,pw);y+=10;
     drawFieldLine(doc,mx,y,'Data',data,pw);y+=14;
     const desc=(document.getElementById('mod-descrizione')||{}).value||'';
     checkPage(30);y=drawBlockField(doc,mx,y,'Descrizione',desc,pw);y+=10;
@@ -960,7 +960,7 @@ async function generaModuloPDF(tipo){
     doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(0);
     doc.text('Rapporto disciplinare interno (RDI)',pw/2,y,{align:'center'});y+=14;
     drawFieldLine(doc,mx,y,'Collaboratore','Sig./Sig.ra '+collab,pw);y+=10;
-    drawFieldLine(doc,mx,y,'Resp. Settore','Sig./Sig.ra '+resp,pw);y+=10;
+    drawFieldLine(doc,mx,y,'Resp. Settore',resp,pw);y+=10;
     drawFieldLine(doc,mx,y,'Data',data,pw);y+=14;
     const nonConf=(document.getElementById('mod-non-conf')||{}).value||'';
     checkPage(30);y=drawBlockField(doc,mx,y,'Non conformità rilevata',nonConf,pw);y+=10;
