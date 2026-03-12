@@ -12,6 +12,8 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/it.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 :root{--ink:#1a1208;--paper:#faf7f2;--paper2:#f3ede3;--line:#e8dfd0;--accent:#c0392b;--accent2:#8b6914;--muted:#8a7d6b;--shadow:rgba(26,18,8,0.1)}
 body.dark-theme{--ink:#e0d8c8;--paper:#1a1a2e;--paper2:#16213e;--line:#2a2a44;--accent:#e74c3c;--accent2:#d4a017;--muted:#9a9aaa;--shadow:rgba(0,0,0,0.3);background:#0f0f1a;background-image:repeating-linear-gradient(45deg,transparent,transparent 40px,rgba(255,255,255,0.015) 40px,rgba(255,255,255,0.015) 41px)}
@@ -475,7 +477,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
     <div class="card-header">Registro attività operatori</div>
     <div style="padding:14px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--paper2)">
       <div class="filter-group"><span class="filter-label">Operatore</span><select id="log-filt-op" onchange="renderRegistro()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"><option value="">Tutti</option></select></div>
-      <div class="filter-group"><span class="filter-label">Categoria</span><select id="log-filt-cat" onchange="renderRegistro()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"><option value="">Tutte</option><option value="registrazione">Registrazioni</option><option value="modulo">Moduli</option><option value="nota">Note</option><option value="collaboratore">Collaboratori</option><option value="rapporto">Rapporto</option></select></div>
+      <div class="filter-group"><span class="filter-label">Categoria</span><select id="log-filt-cat" onchange="renderRegistro()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"><option value="">Tutte</option><option value="registrazione">Registrazioni</option><option value="modulo">Moduli</option><option value="nota">Note</option><option value="collaboratore">Collaboratori</option><option value="operatore">Operatori</option><option value="scadenza">Scadenze</option><option value="tipo">Tipi evento</option></select></div>
       <div class="filter-group"><span class="filter-label">Cerca</span><input type="text" id="log-filt-cerca" placeholder="Cerca..." oninput="renderRegistro()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink);width:160px"></div>
       <div class="filter-group"><span class="filter-label">Dal</span><input type="date" id="log-filt-dal" onchange="renderRegistro()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"></div>
       <div class="filter-group"><span class="filter-label">Al</span><input type="date" id="log-filt-al" onchange="renderRegistro()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"></div>
@@ -503,6 +505,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
         <p style="color:var(--muted);font-size:.82rem;margin:0">Rapporto disciplinare interno (I° e II° livello)</p>
       </div>
     </div>
+    <div style="padding:0 16px 16px"><button class="btn-salva" onclick="document.getElementById('import-modulo-file').click()" style="background:var(--accent2)">Importa modulo esistente (Word/PDF)</button><input type="file" id="import-modulo-file" accept=".docx,.doc,.pdf" style="display:none" onchange="importaModuloFile(this)"></div>
   </div>
   <div id="modulo-form-area" style="display:none"></div>
 </div>
@@ -640,9 +643,9 @@ async function aggiungiOperatoreConPwd(){const n=document.getElementById('new-op
   if(operatoriAuthCache.find(o=>o.nome.toLowerCase()===n.toLowerCase())){toast('Operatore già esistente');return}
   const h=await sha256(p);try{await sbRpc('add_operator',{p_nome:n,p_hash:h});operatoriAuthCache.push({nome:n,ruolo:'operatore'});
   if(!operatoriSalvati.includes(n)){operatoriSalvati.push(n);operatoriSalvati.sort();await saveOperatori()}
-  document.getElementById('new-operatore-nome').value='';document.getElementById('new-operatore-pwd').value='';document.getElementById('new-operatore-pwd2').value='';renderOperatoriUI();toast('Operatore "'+n+'" creato con password')}catch(e){toast('Errore creazione')}}
+  logAzione('Operatore creato',n);document.getElementById('new-operatore-nome').value='';document.getElementById('new-operatore-pwd').value='';document.getElementById('new-operatore-pwd2').value='';renderOperatoriUI();toast('Operatore "'+n+'" creato con password')}catch(e){toast('Errore creazione')}}
 async function rimuoviOperatore(n){if(!confirm('Rimuovere operatore "'+n+'"?'))return;operatoriSalvati=operatoriSalvati.filter(o=>o!==n);await saveOperatori();
-  try{await sbRpc('remove_operator',{p_nome:n});operatoriAuthCache=operatoriAuthCache.filter(o=>o.nome!==n)}catch(e){}renderOperatoriUI();toast('Rimosso')}
+  try{await sbRpc('remove_operator',{p_nome:n});operatoriAuthCache=operatoriAuthCache.filter(o=>o.nome!==n)}catch(e){}logAzione('Operatore rimosso',n);renderOperatoriUI();toast('Rimosso')}
 async function cambiaPasswordOperatore(){const op=getOperatore();if(!op){toast('Seleziona prima un operatore');return}
   const b=document.getElementById('pwd-modal-content');b.innerHTML='<h3>Cambia password operatore</h3><p>Operatore: <strong>'+escP(op)+'</strong></p><div class="pwd-field"><label>Password attuale</label><input type="password" id="op-old-pwd"></div><div class="pwd-field"><label>Nuova password (min 4)</label><input type="password" id="op-new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="op-new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiCambioPwdOp()">Conferma</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';
   document.getElementById('pwd-modal').classList.remove('hidden')}
@@ -722,7 +725,7 @@ async function saveTipiP(){await setImp('tipi_personalizzati',JSON.stringify(tip
 async function saveColoriOverride(){await setImp('colori_override',JSON.stringify(coloriOverride))}
 async function saveOperatori(){await setImp('operatori_lista',JSON.stringify(operatoriSalvati))}
 async function cambiaColoreTipo(nome,colore){coloriOverride[nome]=colore;const tp=tipiPersonalizzati.find(t=>t.nome===nome);if(tp)tp.colore=colore;await saveColoriOverride();if(tp)await saveTipiP();renderTipiUI()}
-async function aggiungiTipoPersonalizzato(){const n=document.getElementById('new-tipo-nome').value.trim(),c=document.getElementById('new-tipo-colore').value;if(!n){toast('Inserisci un nome');return}if(getTuttiTipi().find(t=>t.nome.toLowerCase()===n.toLowerCase())){toast('Già esistente');return}tipiPersonalizzati.push({nome:n,colore:c});await saveTipiP();document.getElementById('new-tipo-nome').value='';renderTipiUI();toast('Tipo aggiunto')}
+async function aggiungiTipoPersonalizzato(){const n=document.getElementById('new-tipo-nome').value.trim(),c=document.getElementById('new-tipo-colore').value;if(!n){toast('Inserisci un nome');return}if(getTuttiTipi().find(t=>t.nome.toLowerCase()===n.toLowerCase())){toast('Già esistente');return}tipiPersonalizzati.push({nome:n,colore:c});await saveTipiP();logAzione('Tipo aggiunto',n);document.getElementById('new-tipo-nome').value='';renderTipiUI();toast('Tipo aggiunto')}
 async function rimuoviTipo(n){if(!confirm('Rimuovere "'+n+'"?'))return;tipiPersonalizzati=tipiPersonalizzati.filter(t=>t.nome!==n);delete coloriOverride[n];await saveTipiP();await saveColoriOverride();renderTipiUI();toast('Rimosso')}
 async function nascondiTipoDefault(n){if(!confirm('Nascondere il tipo "'+n+'"? Le registrazioni esistenti non verranno eliminate.'))return;tipiNascosti.push(n);await setImp('tipi_nascosti',JSON.stringify(tipiNascosti));renderTipiUI();toast('Tipo "'+n+'" nascosto')}
 async function ripristinaTipoDefault(n){tipiNascosti=tipiNascosti.filter(t=>t!==n);await setImp('tipi_nascosti',JSON.stringify(tipiNascosti));renderTipiUI();toast('Tipo "'+n+'" ripristinato')}
@@ -783,8 +786,8 @@ function apriScadenza(id){const b=document.getElementById('scadenza-content');b.
   if(window.flatpickr)flatpickr('#scad-data',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,minDate:'today'})}
 async function salvaScadenza(regId){const t=document.getElementById('scad-titolo').value.trim(),d=document.getElementById('scad-data').value,desc=document.getElementById('scad-desc').value.trim();
   if(!t||!d){toast('Compila titolo e data');return}
-  try{const r=await sbPost('scadenze',{registrazione_id:regId,titolo:t,data_scadenza:d,descrizione:desc});scadenzeCache.push(r[0]);renderScadenzeBanner();document.getElementById('scadenza-modal').classList.add('hidden');toast('Scadenza impostata')}catch(e){toast('Errore')}}
-async function completaScadenza(id){try{await sbPatch('scadenze','id=eq.'+id,{completata:true,completata_da:getOperatore()||'?'});const s=scadenzeCache.find(s=>s.id===id);if(s){s.completata=true;s.completata_da=getOperatore()||'?'}renderScadenzeBanner();renderScadenzeSettings();toggleScadenzeDropdown();toggleScadenzeDropdown();toast('Completata')}catch(e){toast('Errore')}}
+  try{const r=await sbPost('scadenze',{registrazione_id:regId,titolo:t,data_scadenza:d,descrizione:desc});scadenzeCache.push(r[0]);logAzione('Scadenza creata',t+' - '+d);renderScadenzeBanner();document.getElementById('scadenza-modal').classList.add('hidden');toast('Scadenza impostata')}catch(e){toast('Errore')}}
+async function completaScadenza(id){try{await sbPatch('scadenze','id=eq.'+id,{completata:true,completata_da:getOperatore()||'?'});const s=scadenzeCache.find(s=>s.id===id);if(s){s.completata=true;s.completata_da=getOperatore()||'?';logAzione('Scadenza completata',s.titolo)}renderScadenzeBanner();renderScadenzeSettings();toggleScadenzeDropdown();toggleScadenzeDropdown();toast('Completata')}catch(e){toast('Errore')}}
 async function eliminaScadenza(id){try{await sbDel('scadenze','id=eq.'+id);scadenzeCache=scadenzeCache.filter(s=>s.id!==id);renderScadenzeBanner();renderScadenzeSettings();toast('Eliminata')}catch(e){toast('Errore')}}
 function renderScadenzeBanner(){const banner=document.getElementById('scadenze-banner'),dd=document.getElementById('scadenze-dropdown');
   const oggi=new Date().toISOString().split('T')[0];const attive=scadenzeCache.filter(s=>!s.completata);const scadute=attive.filter(s=>s.data_scadenza<=oggi);const prossime=attive.filter(s=>s.data_scadenza>oggi);
@@ -827,12 +830,12 @@ async function salvaModificaNota(id){const msg=document.getElementById('edit-not
   const n=noteColleghiCache.find(n=>n.id===id);const gid=n?n.gruppo_id:null;
   const ids=gid?noteColleghiCache.filter(x=>x.gruppo_id===gid&&x.da_operatore===n.da_operatore).map(x=>x.id):[id];
   try{for(const nid of ids){await sbPatch('note_colleghi','id=eq.'+nid,{messaggio:msg});const c=noteColleghiCache.find(x=>x.id===nid);if(c)c.messaggio=msg}
-  document.getElementById('pwd-modal').classList.add('hidden');renderNoteCollega();toast('Nota modificata')}catch(e){toast('Errore')}}
+  logAzione('Nota modificata',msg.substring(0,50));document.getElementById('pwd-modal').classList.add('hidden');renderNoteCollega();toast('Nota modificata')}catch(e){toast('Errore')}}
 async function annullaInvioNota(id){const n=noteColleghiCache.find(n=>n.id===id);const gid=n?n.gruppo_id:null;
   const ids=gid?noteColleghiCache.filter(x=>x.gruppo_id===gid&&x.da_operatore===n.da_operatore).map(x=>x.id):[id];
   const label=ids.length>1?'Annullare l\'invio di '+ids.length+' note? Verranno eliminate per tutti i destinatari.':'Annullare l\'invio? La nota verrà eliminata anche per il destinatario.';
   if(!confirm(label))return;
-  try{for(const nid of ids){await sbDel('note_colleghi','id=eq.'+nid)}noteColleghiCache=noteColleghiCache.filter(x=>!ids.includes(x.id));renderNoteCollega();toast('Invio annullato')}catch(e){toast('Errore')}}
+  try{for(const nid of ids){await sbDel('note_colleghi','id=eq.'+nid)}noteColleghiCache=noteColleghiCache.filter(x=>!ids.includes(x.id));logAzione('Annullamento nota','Nota annullata ('+ids.length+' destinatari)');renderNoteCollega();toast('Invio annullato')}catch(e){toast('Errore')}}
 function renderNoteCollega(){const op=getOperatore();
   // Populate destinatari checkboxes
   const box=document.getElementById('nota-dest-box');if(box){const checked=new Set(getDestinatariSelezionati());const tutti=operatoriAuthCache.map(o=>o.nome).sort().filter(n=>n&&n!==op);
@@ -971,7 +974,7 @@ async function generaModuloPDF(tipo){
   else if(tipo==='apprezzamento'){dati.descrizione=(document.getElementById('mod-descrizione')||{}).value||'';dati.osservazioni=(document.getElementById('mod-osservazioni')||{}).value||''}
   try{if(window._editModuloId){await sbPatch('moduli','id=eq.'+window._editModuloId,{collaboratore:collab,resp_settore:resp,data_modulo:data,dati,operatore:getOperatore()});const idx=moduliCache.findIndex(x=>x.id===window._editModuloId);if(idx!==-1)Object.assign(moduliCache[idx],{collaboratore:collab,resp_settore:resp,data_modulo:data,dati});window._editModuloId=null;toast('Modulo aggiornato e PDF generato!')}
   else{const rec={tipo,collaboratore:collab,resp_settore:resp,data_modulo:data,dati,operatore:getOperatore()};const saved=await sbPost('moduli',rec);moduliCache.unshift(saved[0]);toast('PDF generato e modulo salvato!')}
-  logAzione('Modulo '+tipo,collab+' - '+data);renderModuliList();chiudiModulo()}catch(e){console.error(e);toast('PDF generato (errore salvataggio DB)')}}
+  window._importedFileData=null;logAzione('Modulo '+tipo,collab+' - '+data);renderModuliList();chiudiModulo()}catch(e){console.error(e);toast('PDF generato (errore salvataggio DB)')}}
 function drawField(doc,x,y,label,value){doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0);doc.text(label+':',x,y);
   doc.setFont('helvetica','normal');doc.text(value,x+doc.getTextWidth(label+':  '),y)}
 function drawFieldMulti(doc,x,y,label,value,pw){doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0);
@@ -1061,7 +1064,7 @@ function renderRegistro(){const el=document.getElementById('registro-list');if(!
   const fc=(document.getElementById('log-filt-cerca')||{}).value||'';
   const fd=(document.getElementById('log-filt-dal')||{}).value||'';
   const fa=(document.getElementById('log-filt-al')||{}).value||'';
-  const catMap={registrazione:['Nuova registrazione','Modifica registrazione','Eliminata registrazione'],modulo:['Modulo allineamento','Modulo apprezzamento','Modulo rdi','Eliminato modulo'],nota:['Nota inviata'],collaboratore:['Rinomina collaboratore','Importa collaboratori','Collaboratore aggiunto','Collaboratore disattivato'],rapporto:['Rapporto salvato']};
+  const catMap={registrazione:['Nuova registrazione','Modifica registrazione','Eliminata registrazione'],modulo:['Modulo allineamento','Modulo apprezzamento','Modulo rdi','Eliminato modulo'],nota:['Nota inviata','Nota modificata','Annullamento nota'],collaboratore:['Rinomina collaboratore','Importa collaboratori','Collaboratore aggiunto','Collaboratore disattivato'],rapporto:['Rapporto salvato'],scadenza:['Scadenza creata','Scadenza completata'],operatore:['Operatore creato','Operatore rimosso'],tipo:['Tipo aggiunto']};
   let filtered=logCache.filter(l=>{if(fo&&l.operatore!==fo)return false;
     if(fcat&&catMap[fcat]&&!catMap[fcat].some(a=>l.azione.startsWith(a)))return false;
     if(fc&&!l.azione.toLowerCase().includes(fc.toLowerCase())&&!(l.dettaglio||'').toLowerCase().includes(fc.toLowerCase()))return false;
@@ -1085,6 +1088,67 @@ async function importaCollaboratori(input){const file=input.files[0];if(!file)re
   renderCollaboratoriUI();aggiornaNomi();input.value='';
   toast(aggiunti+' collaboratori importati'+(duplicati?' ('+duplicati+' già esistenti)':''));
   if(aggiunti)logAzione('Importa collaboratori',aggiunti+' nomi importati da '+file.name)}
+
+// IMPORTA MODULO DA WORD/PDF
+async function importaModuloFile(input){const file=input.files[0];if(!file)return;
+  const ext=file.name.split('.').pop().toLowerCase();let testo='';
+  toast('Lettura file in corso...');
+  try{
+    if(ext==='docx'){const buf=await file.arrayBuffer();const result=await mammoth.extractRawText({arrayBuffer:buf});testo=result.value}
+    else if(ext==='doc'){const buf=await file.arrayBuffer();const bytes=new Uint8Array(buf);let raw='';for(let i=0;i<bytes.length;i++){const c=bytes[i];if(c>=32&&c<127||c===10||c===13)raw+=String.fromCharCode(c)}testo=raw.replace(/[^\x20-\x7E\xC0-\xFF\n]/g,' ').replace(/\s{3,}/g,' ')}
+    else if(ext==='pdf'){if(typeof pdfjsLib==='undefined'){toast('Libreria PDF non caricata');input.value='';return}
+      pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      const buf=await file.arrayBuffer();const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+      for(let i=1;i<=pdf.numPages;i++){const page=await pdf.getPage(i);const tc=await page.getTextContent();testo+=tc.items.map(it=>it.str).join(' ')+'\n'}}
+    else{toast('Formato non supportato');input.value='';return}
+  }catch(e){console.error(e);toast('Errore lettura file');input.value='';return}
+  input.value='';
+  // Rileva tipo dal contenuto
+  const lower=testo.toLowerCase();let tipo='allineamento';
+  if(lower.includes('apprezzamento'))tipo='apprezzamento';
+  else if(lower.includes('rapporto disciplinare')||lower.includes('rdi'))tipo='rdi';
+  // Estrai campi
+  const parsed=parseModuloTesto(testo,tipo);
+  // Apri form pre-compilato
+  apriModulo(tipo);
+  setTimeout(()=>{const ce=document.getElementById('mod-collaboratore');if(ce&&parsed.collaboratore)ce.value=parsed.collaboratore;
+    const re=document.getElementById('mod-resp');if(re&&parsed.resp)re.value=parsed.resp;
+    const de=document.getElementById('mod-data');if(de&&parsed.data)de.value=parsed.data;
+    if(tipo==='allineamento'||tipo==='rdi'){
+      const nc=document.getElementById('mod-non-conf');if(nc&&parsed.non_conformita)nc.value=parsed.non_conformita;
+      const ob=document.getElementById('mod-obiettivo');if(ob&&parsed.obiettivo)ob.value=parsed.obiettivo;
+      const sc=document.getElementById('mod-scadenza');if(sc&&parsed.scadenza)sc.value=parsed.scadenza;
+      if(tipo==='rdi'){const lv=document.getElementById('mod-livello');if(lv&&parsed.livello)lv.value=parsed.livello}}
+    else if(tipo==='apprezzamento'){
+      const ds=document.getElementById('mod-descrizione');if(ds&&parsed.descrizione)ds.value=parsed.descrizione;
+      const os=document.getElementById('mod-osservazioni');if(os&&parsed.osservazioni)os.value=parsed.osservazioni}
+    // Salva file originale come base64 per scaricarlo dopo
+    const reader=new FileReader();reader.onload=()=>{window._importedFileData={name:file.name,type:file.type,data:reader.result}};reader.readAsDataURL(file);
+    toast('Modulo importato - controlla i campi e genera il PDF')},100)}
+function parseModuloTesto(testo,tipo){const r={};const lines=testo.split(/\n/);
+  // Cerca collaboratore
+  for(let i=0;i<lines.length;i++){const l=lines[i].trim();
+    if(/collaboratore/i.test(l)){const next=(lines[i+1]||'').trim();if(next&&next.length>2&&!/resp|settore|data|non conf/i.test(next)){r.collaboratore=next.replace(/^(sig\.|sig\.ra|sig)\s*/i,'').trim()}
+      const m=l.match(/collaboratore\s*[:\s]+(.+)/i);if(m&&m[1].trim().length>2)r.collaboratore=m[1].trim().replace(/^(sig\.|sig\.ra|sig)\s*/i,'').trim()}}
+  // Cerca resp settore
+  for(let i=0;i<lines.length;i++){const l=lines[i].trim();
+    if(/resp.*settore/i.test(l)){const next=(lines[i+1]||'').trim();if(next&&next.length>2&&!/data|non conf|collab/i.test(next)){r.resp=next.replace(/^(sig\.|sig\.ra|sig)\s*/i,'').trim()}
+      const m=l.match(/settore\s*[:\s]+(.+)/i);if(m&&m[1].trim().length>2)r.resp=m[1].trim().replace(/^(sig\.|sig\.ra|sig)\s*/i,'').trim()}}
+  // Cerca data
+  const dm=testo.match(/(\d{1,2}[.\/]\d{1,2}[.\/]\d{2,4})/);if(dm)r.data=dm[1];
+  // Cerca non conformità / descrizione
+  if(tipo==='allineamento'||tipo==='rdi'){
+    const ncMatch=testo.match(/non conformit[àa][^]*?(?=obiettivo|scadenza|firma|$)/i);
+    if(ncMatch){let t=ncMatch[0].replace(/non conformit[àa]\s*(rilevata)?\s*(\(descrizione\))?\s*/i,'').trim();t=t.replace(/\n{2,}/g,'\n').trim();if(t.length>3)r.non_conformita=t.substring(0,500)}
+    const obMatch=testo.match(/obiettivo concordato[^]*?(?=scadenza|chiediamo|firma|$)/i);
+    if(obMatch){let t=obMatch[0].replace(/obiettivo concordato[^]*?non conformit[àa]\s*/i,'').trim();if(t.length>3)r.obiettivo=t.substring(0,500)}
+    if(tipo==='rdi'){r.livello=testo.toLowerCase().includes('ii°')||testo.toLowerCase().includes('grave')?'II':'I'}}
+  else if(tipo==='apprezzamento'){
+    const descMatch=testo.match(/descrizione[^]*?(?=osservazioni|firma|$)/i);
+    if(descMatch){let t=descMatch[0].replace(/descrizione\s*/i,'').trim();if(t.length>3)r.descrizione=t.substring(0,500)}
+    const ossMatch=testo.match(/osservazioni[^]*?(?=firma|distribuzione|$)/i);
+    if(ossMatch){let t=ossMatch[0].replace(/osservazioni[^]*?settore\s*/i,'').trim();if(t.length>3)r.osservazioni=t.substring(0,500)}}
+  return r}
 
 // PROFILO COLLABORATORE
 function apriProfilo(nome){const entries=datiCache.filter(e=>e.nome===nome);const tipiCount={};entries.forEach(e=>{tipiCount[e.tipo]=(tipiCount[e.tipo]||0)+1});
