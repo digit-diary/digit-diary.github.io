@@ -480,8 +480,8 @@ const TIPI_DEFAULT=[{nome:'Attività',colore:'#1a4a7a'},{nome:'Richiesta',colore
 let tipiPersonalizzati=[],coloriOverride={},tipoSelezionato='Attività',modalEntryId=null,modalTipoSel=null,datiCache=[],pinnedIds=new Set(),scadenzeCache=[],pwdHash=null,recoveryCode=null,charts={},operatoriSalvati=[];
 let rapportoMese=new Date().getMonth(),rapportoAnno=new Date().getFullYear(),rapportoGiornoAperto=null,rapportiCache={},noteColleghiCache=[],operatoriAuthCache=[];
 const CAMPI_RAPPORTO_DEFAULT=[{key:'sup_note',label:'Supervisore',type:'input'},{key:'cassa_note',label:'Cassa',type:'text'},{key:'sala_note',label:'Sala',type:'text'},{key:'n_assegni',label:'Incasso Assegni',type:'text'},{key:'prelievi',label:'Prelievi',type:'text'},{key:'assenze',label:'Assenze',type:'text'}];
-let campiRapportoExtra=[];
-function getTuttiTipi(){return[...TIPI_DEFAULT.map(t=>coloriOverride[t.nome]?{nome:t.nome,colore:coloriOverride[t.nome]}:t),...tipiPersonalizzati]}
+let campiRapportoExtra=[],tipiNascosti=[],campiNascosti=[];
+function getTuttiTipi(){return[...TIPI_DEFAULT.filter(t=>!tipiNascosti.includes(t.nome)).map(t=>coloriOverride[t.nome]?{nome:t.nome,colore:coloriOverride[t.nome]}:t),...tipiPersonalizzati]}
 function getColore(n){return coloriOverride[n]||(getTuttiTipi().find(t=>t.nome===n)||{}).colore||'#8a7d6b'}
 function getOperatore(){return sessionStorage.getItem('operatore_corrente')||''}
 async function sha256(t){const d=new TextEncoder().encode(t),h=await crypto.subtle.digest('SHA-256',d);return Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,'0')).join('')}
@@ -504,6 +504,8 @@ async function loadAll(){
   const co=await getImp('colori_override');if(co)try{coloriOverride=JSON.parse(co)}catch(e){}
   const ops=await getImp('operatori_lista');if(ops)try{operatoriSalvati=JSON.parse(ops)}catch(e){}
   const cr=await getImp('campi_rapporto_extra');if(cr)try{campiRapportoExtra=JSON.parse(cr)}catch(e){}
+  const tn=await getImp('tipi_nascosti');if(tn)try{tipiNascosti=JSON.parse(tn)}catch(e){}
+  const cn=await getImp('campi_nascosti');if(cn)try{campiNascosti=JSON.parse(cn)}catch(e){}
   datiCache=await sbGet('registrazioni?order=data.desc');
   const pins=await sbGet('note_fissate?select=registrazione_id');pinnedIds=new Set(pins.map(p=>p.registrazione_id));
   scadenzeCache=await sbGet('scadenze?order=data_scadenza.asc');
@@ -524,6 +526,7 @@ async function checkPwd(){const nome=document.getElementById('login-nome').value
   if(h===pwdHash){document.getElementById('login-overlay').classList.add('hidden');sessionStorage.setItem('diario_auth','1');sessionStorage.setItem('is_admin','1');
     if(nome){sessionStorage.setItem('operatore_corrente',nome);document.getElementById('operatore-display').textContent='Operatore: '+nome;setTimeout(()=>mostraNoteNonLette(),500)}
     else{sessionStorage.setItem('operatore_corrente','Admin');document.getElementById('operatore-display').textContent='Admin';}
+    renderTipiUI();renderOperatoriUI();renderCampiRapportoUI();
   }else{err.textContent=nome?'Operatore non trovato o password errata':'Password errata';document.getElementById('pwd-input').value='';document.getElementById('pwd-input').focus();setTimeout(()=>err.textContent='',2500)}}
 function mostraForzaCambio(){const b=document.getElementById('pwd-modal-content');b.innerHTML='<h3>Cambia la password</h3><p>Password predefinita. Impostane una nuova.</p><div class="pwd-field"><label>Nuova password (min 4 car.)</label><input type="password" id="new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="eseguiPrimoCambio()">Imposta</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';document.getElementById('pwd-modal').classList.remove('hidden');setTimeout(()=>document.getElementById('new-pwd-1').focus(),100)}
 async function eseguiPrimoCambio(){const p1=document.getElementById('new-pwd-1').value,p2=document.getElementById('new-pwd-2').value,err=document.getElementById('pwd-modal-error');if(p1.length<4){err.textContent='Troppo corta';return}if(p1!==p2){err.textContent='Non coincidono';return}
@@ -591,15 +594,18 @@ function renderOperatoriUI(){const el=document.getElementById('operatori-list');
   const addRow=el.parentElement.querySelector('.add-tipo-row');if(addRow)addRow.style.display=admin?'':'none'}
 
 // CAMPI RAPPORTO
-function getCampiRapporto(){return[...CAMPI_RAPPORTO_DEFAULT,...campiRapportoExtra]}
+function getCampiRapporto(){return[...CAMPI_RAPPORTO_DEFAULT.filter(c=>!campiNascosti.includes(c.key)),...campiRapportoExtra]}
 async function saveCampiExtra(){await setImp('campi_rapporto_extra',JSON.stringify(campiRapportoExtra))}
 async function aggiungiCampoRapporto(){const n=document.getElementById('new-campo-nome').value.trim();if(!n){toast('Inserisci un nome');return}const key='extra_'+n.toLowerCase().replace(/[^a-z0-9]/g,'_');
   if(getCampiRapporto().find(c=>c.label.toLowerCase()===n.toLowerCase())){toast('Campo già esistente');return}
   campiRapportoExtra.push({key,label:n,type:'text'});await saveCampiExtra();document.getElementById('new-campo-nome').value='';renderCampiRapportoUI();toast('Campo aggiunto')}
 async function rimuoviCampoRapporto(key){if(!confirm('Rimuovere questo campo?'))return;campiRapportoExtra=campiRapportoExtra.filter(c=>c.key!==key);await saveCampiExtra();renderCampiRapportoUI();toast('Campo rimosso')}
+async function nascondiCampoDefault(key){const d=CAMPI_RAPPORTO_DEFAULT.find(x=>x.key===key);if(!confirm('Nascondere il campo "'+(d?d.label:key)+'"? I dati esistenti non verranno eliminati.'))return;campiNascosti.push(key);await setImp('campi_nascosti',JSON.stringify(campiNascosti));renderCampiRapportoUI();toast('Campo nascosto')}
+async function ripristinaCampoDefault(key){campiNascosti=campiNascosti.filter(k=>k!==key);await setImp('campi_nascosti',JSON.stringify(campiNascosti));renderCampiRapportoUI();toast('Campo ripristinato')}
 function renderCampiRapportoUI(){const el=document.getElementById('rapporto-campi-list');if(!el)return;const campi=getCampiRapporto();const adm=isAdmin();
-  el.innerHTML=campi.map(c=>{const isDefault=CAMPI_RAPPORTO_DEFAULT.find(d=>d.key===c.key);return'<div class="tipo-item"><div class="tipo-color" style="background:'+(c.type==='number'?'#3498db':'#2ecc71')+'"></div><div class="tipo-item-name">'+escP(c.label)+(isDefault?' <span class="tipo-item-default">(predefinito)</span>':'')+'</div>'+(adm&&!isDefault?'<button class="btn-del-tipo" onclick="rimuoviCampoRapporto(\''+c.key+'\')">Rimuovi</button>':'')+'</div>'}).join('');
-  const addCampo=el.parentElement.querySelector('.add-tipo-row');if(addCampo)addCampo.style.display=adm?'':'none'}
+  let cHtml=campi.map(c=>{const isDefault=CAMPI_RAPPORTO_DEFAULT.find(d=>d.key===c.key);return'<div class="tipo-item"><div class="tipo-color" style="background:'+(c.type==='number'?'#3498db':'#2ecc71')+'"></div><div class="tipo-item-name">'+escP(c.label)+(isDefault?' <span class="tipo-item-default">(predefinito)</span>':'')+'</div>'+(adm?'<button class="btn-del-tipo" onclick="'+(isDefault?'nascondiCampoDefault':'rimuoviCampoRapporto')+'(\''+c.key+'\')">Rimuovi</button>':'')+'</div>'}).join('');
+  if(adm&&campiNascosti.length){cHtml+='<div style="margin-top:12px;padding:10px;background:var(--paper2);border-radius:3px"><small style="color:var(--muted);display:block;margin-bottom:6px">Campi nascosti:</small>'+campiNascosti.map(k=>{const d=CAMPI_RAPPORTO_DEFAULT.find(x=>x.key===k);return'<button style="margin:2px 4px;padding:3px 10px;font-size:.78rem;cursor:pointer;border:1px dashed var(--accent2);color:var(--accent2);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif" onclick="ripristinaCampoDefault(\''+k+'\')">+ '+(d?escP(d.label):k)+'</button>'}).join('')+'</div>'}
+  el.innerHTML=cHtml;const addCampo=el.parentElement.querySelector('.add-tipo-row');if(addCampo)addCampo.style.display=adm?'':'none'}
 
 // TEMA
 function toggleTema(){document.body.classList.toggle('dark-theme');const isDark=document.body.classList.contains('dark-theme');localStorage.setItem('tema',isDark?'dark':'light');document.getElementById('btn-tema').textContent=isDark?'Tema chiaro':'Tema scuro'}
@@ -607,7 +613,7 @@ function toggleTema(){document.body.classList.toggle('dark-theme');const isDark=
 // NAVIGATION
 function switchPage(name){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');document.querySelector('.nav-tab[data-page="'+name+'"]').classList.add('active');sessionStorage.setItem('pagina_corrente',name);
   if(name==='statistiche')renderStatistiche();if(name==='rapporto')renderRapporto();if(name==='note-collega')renderNoteCollega();if(name==='impostazioni'){renderTipiUI();renderScadenzeSettings();renderOperatoriUI();renderCampiRapportoUI();
-    const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=(isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'')+'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}}}
+    const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}}}
 
 // TIPI
 async function saveTipiP(){await setImp('tipi_personalizzati',JSON.stringify(tipiPersonalizzati))}
@@ -616,6 +622,8 @@ async function saveOperatori(){await setImp('operatori_lista',JSON.stringify(ope
 async function cambiaColoreTipo(nome,colore){coloriOverride[nome]=colore;const tp=tipiPersonalizzati.find(t=>t.nome===nome);if(tp)tp.colore=colore;await saveColoriOverride();if(tp)await saveTipiP();renderTipiUI()}
 async function aggiungiTipoPersonalizzato(){const n=document.getElementById('new-tipo-nome').value.trim(),c=document.getElementById('new-tipo-colore').value;if(!n){toast('Inserisci un nome');return}if(getTuttiTipi().find(t=>t.nome.toLowerCase()===n.toLowerCase())){toast('Già esistente');return}tipiPersonalizzati.push({nome:n,colore:c});await saveTipiP();document.getElementById('new-tipo-nome').value='';renderTipiUI();toast('Tipo aggiunto')}
 async function rimuoviTipo(n){if(!confirm('Rimuovere "'+n+'"?'))return;tipiPersonalizzati=tipiPersonalizzati.filter(t=>t.nome!==n);delete coloriOverride[n];await saveTipiP();await saveColoriOverride();renderTipiUI();toast('Rimosso')}
+async function nascondiTipoDefault(n){if(!confirm('Nascondere il tipo "'+n+'"? Le registrazioni esistenti non verranno eliminate.'))return;tipiNascosti.push(n);await setImp('tipi_nascosti',JSON.stringify(tipiNascosti));renderTipiUI();toast('Tipo "'+n+'" nascosto')}
+async function ripristinaTipoDefault(n){tipiNascosti=tipiNascosti.filter(t=>t!==n);await setImp('tipi_nascosti',JSON.stringify(tipiNascosti));renderTipiUI();toast('Tipo "'+n+'" ripristinato')}
 function renderTipiUI(){const tutti=getTuttiTipi();
   document.getElementById('form-tipo-tags').innerHTML=tutti.map(t=>'<button class="tipo-tag'+(tipoSelezionato===t.nome?' active':'')+'" data-tipo="'+esc(t.nome)+'" style="'+(tipoSelezionato===t.nome?'background:'+t.colore+';border-color:'+t.colore:'')+'">'+esc(t.nome)+'</button>').join('');
   document.getElementById('form-tipo-tags').querySelectorAll('.tipo-tag').forEach(b=>{b.onclick=()=>{tipoSelezionato=b.dataset.tipo;renderTipiUI()}});
@@ -623,8 +631,10 @@ function renderTipiUI(){const tutti=getTuttiTipi();
   const fs=document.getElementById('filt-tipo');if(fs){const cv=fs.value;fs.innerHTML='<option value="">Tutti</option>'+tutti.map(t=>'<option'+(t.nome===cv?' selected':'')+'>'+esc(t.nome)+'</option>').join('')}
   document.getElementById('modal-tipo-tags').innerHTML=tutti.map(t=>'<button class="modal-tipo-tag'+(modalTipoSel===t.nome?' selected':'')+'" data-tipo="'+esc(t.nome)+'" style="'+(modalTipoSel===t.nome?'background:'+t.colore+';border-color:'+t.colore:'')+'">'+esc(t.nome)+'</button>').join('');
   document.getElementById('modal-tipo-tags').querySelectorAll('.modal-tipo-tag').forEach(b=>{b.onclick=()=>{modalTipoSel=b.dataset.tipo;renderTipiUI()}});
-  const tl=document.getElementById('tipo-list');if(tl){const adm=isAdmin();tl.innerHTML=tutti.map(t=>{const d=TIPI_DEFAULT.find(x=>x.nome===t.nome);return'<div class="tipo-item">'+(adm?'<input type="color" class="tipo-color-picker" value="'+t.colore+'" onchange="cambiaColoreTipo(\''+t.nome.replace(/'/g,"\\'")+'\',this.value)">':'<div class="tipo-color" style="background:'+t.colore+'"></div>')+'<div class="tipo-item-name">'+esc(t.nome)+(d?' <span class="tipo-item-default">(predefinito)</span>':'')+'</div>'+(adm&&!d?'<button class="btn-del-tipo" onclick="rimuoviTipo(\''+t.nome.replace(/'/g,"\\'")+'\')">Rimuovi</button>':'')+'</div>'}).join('');
-    const addTipo=tl.parentElement.querySelector('.add-tipo-row');if(addTipo)addTipo.style.display=adm?'':'none'}
+  const tl=document.getElementById('tipo-list');if(tl){const adm=isAdmin();
+    let tlHtml=tutti.map(t=>{const d=TIPI_DEFAULT.find(x=>x.nome===t.nome);return'<div class="tipo-item">'+(adm?'<input type="color" class="tipo-color-picker" value="'+t.colore+'" onchange="cambiaColoreTipo(\''+t.nome.replace(/'/g,"\\'")+'\',this.value)">':'<div class="tipo-color" style="background:'+t.colore+'"></div>')+'<div class="tipo-item-name">'+esc(t.nome)+(d?' <span class="tipo-item-default">(predefinito)</span>':'')+'</div>'+(adm?'<button class="btn-del-tipo" onclick="'+(d?'nascondiTipoDefault':'rimuoviTipo')+'(\''+t.nome.replace(/'/g,"\\'")+'\')">Rimuovi</button>':'')+'</div>'}).join('');
+    if(adm&&tipiNascosti.length){tlHtml+='<div style="margin-top:12px;padding:10px;background:var(--paper2);border-radius:3px"><small style="color:var(--muted);display:block;margin-bottom:6px">Tipi nascosti:</small>'+tipiNascosti.map(n=>'<button style="margin:2px 4px;padding:3px 10px;font-size:.78rem;cursor:pointer;border:1px dashed var(--accent2);color:var(--accent2);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif" onclick="ripristinaTipoDefault(\''+n.replace(/'/g,"\\'")+'\')">+ '+escP(n)+'</button>').join('')+'</div>'}
+    tl.innerHTML=tlHtml;const addTipo=tl.parentElement.querySelector('.add-tipo-row');if(addTipo)addTipo.style.display=adm?'':'none'}
   let s=document.getElementById('dyn-styles');if(!s){s=document.createElement('style');s.id='dyn-styles';document.head.appendChild(s)}
   s.textContent=tutti.map(t=>'.badge-'+t.nome.replace(/ /g,'-')+'{background:'+t.colore+'}').join('\n')}
 
@@ -771,8 +781,9 @@ async function renderRapportoCalendario(){const v=document.getElementById('rappo
   const totalCells=startDay+daysInMonth;const remaining=totalCells%7?7-totalCells%7:0;
   for(let i=1;i<=remaining;i++){html+='<div class="rapporto-day-cell other-month"><div class="day-num">'+i+'</div></div>'}
   html+='</div>';
-  html+='<div style="display:flex;justify-content:center;gap:12px;margin-top:20px"><button class="btn-export" onclick="esportaRapportoCSV()" style="padding:10px 24px;font-size:.85rem">Esporta CSV</button><button class="btn-export btn-export-pdf" onclick="esportaRapportoPDF()" style="padding:10px 24px;font-size:.85rem">Esporta PDF</button></div>';
-  v.innerHTML=html}
+  html+='<div style="margin-top:20px;text-align:center"><div style="display:flex;justify-content:center;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:12px"><div class="field"><label style="font-size:.78rem;color:var(--muted);display:block;margin-bottom:2px">Dal</label><input type="text" id="rapp-dal" readonly style="width:120px;padding:7px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper2);color:var(--ink);cursor:pointer"></div><div class="field"><label style="font-size:.78rem;color:var(--muted);display:block;margin-bottom:2px">Al</label><input type="text" id="rapp-al" readonly style="width:120px;padding:7px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper2);color:var(--ink);cursor:pointer"></div></div><div style="display:flex;justify-content:center;gap:12px"><button class="btn-export" onclick="esportaRapportoCSV()" style="padding:10px 24px;font-size:.85rem">Esporta CSV</button><button class="btn-export btn-export-pdf" onclick="esportaRapportoPDF()" style="padding:10px 24px;font-size:.85rem">Esporta PDF</button></div></div>';
+  v.innerHTML=html;
+  if(window.flatpickr){const ms=rapportoAnno+'-'+String(rapportoMese+1).padStart(2,'0')+'-01';const ed=new Date(rapportoAnno,rapportoMese+1,0).getDate();const me=rapportoAnno+'-'+String(rapportoMese+1).padStart(2,'0')+'-'+String(ed).padStart(2,'0');flatpickr('#rapp-dal',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',defaultDate:ms,allowInput:false});flatpickr('#rapp-al',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',defaultDate:me,allowInput:false})}}
 function navMese(delta){rapportoMese+=delta;if(rapportoMese>11){rapportoMese=0;rapportoAnno++}if(rapportoMese<0){rapportoMese=11;rapportoAnno--}renderRapportoCalendario()}
 async function apriGiorno(ds){rapportoGiornoAperto=ds;const d=new Date(ds+'T12:00:00');
   const rdata=rapportiCache[ds]||{};const p=rdata.PRESTO||{};const n=rdata.NOTTE||{};
@@ -784,7 +795,7 @@ async function apriGiorno(ds){rapportoGiornoAperto=ds;const d=new Date(ds+'T12:0
     let fields='';getCampiRapporto().forEach(c=>{const isExtra=!CAMPI_RAPPORTO_DEFAULT.find(d=>d.key===c.key);const val=isExtra?extra[c.key]:data[c.key];
       if(c.type==='number')fields+=nf(cls+'-'+c.key,c.label,val);else if(c.type==='input')fields+=sf(cls+'-'+c.key,c.label,val);else fields+=tf(cls+'-'+c.key,c.label,val)});
     return'<div class="turno-col"><div class="turno-header '+cls+'">'+turno+'</div><div class="turno-body">'+fields+'<div class="autosave-status" id="status-'+cls+'" style="text-align:center;font-size:.75rem;color:var(--muted);margin-top:8px;min-height:18px"></div></div></div>'}
-  v.innerHTML='<button class="btn-back" onclick="rapportoGiornoAperto=null;renderRapportoCalendario()">&larr; Torna al calendario</button><div class="rapporto-detail"><h3>Rapporto del '+d.getDate()+' '+MESI_FULL[d.getMonth()]+' '+d.getFullYear()+' — '+GIORNI[d.getDay()]+'</h3><div class="turno-columns">'+turnoCol('PRESTO','presto',p)+turnoCol('NOTTE','notte',n)+'</div><div style="display:flex;justify-content:center;gap:12px;margin-top:20px"><button class="btn-export" onclick="esportaRapportoCSV()" style="padding:10px 24px;font-size:.9rem">Esporta CSV mese</button><button class="btn-export btn-export-pdf" onclick="esportaRapportoPDF()" style="padding:10px 24px;font-size:.9rem">Esporta PDF mese</button></div></div>';
+  v.innerHTML='<button class="btn-back" onclick="rapportoGiornoAperto=null;renderRapportoCalendario()">&larr; Torna al calendario</button><div class="rapporto-detail"><h3>Rapporto del '+d.getDate()+' '+MESI_FULL[d.getMonth()]+' '+d.getFullYear()+' — '+GIORNI[d.getDay()]+'</h3><div class="turno-columns">'+turnoCol('PRESTO','presto',p)+turnoCol('NOTTE','notte',n)+'</div><div style="display:flex;justify-content:center;gap:12px;margin-top:20px"><button class="btn-export" onclick="esportaRapportoCSV()" style="padding:10px 24px;font-size:.9rem">Esporta CSV</button><button class="btn-export btn-export-pdf" onclick="esportaRapportoPDF()" style="padding:10px 24px;font-size:.9rem">Esporta PDF</button></div></div>';
   // Autosave debounce
   let timers={};function autoSave(turno,cls){clearTimeout(timers[cls]);const st=document.getElementById('status-'+cls);if(st)st.textContent='Salvando...';timers[cls]=setTimeout(()=>salvaRapportoTurno(ds,turno,cls).then(()=>{if(st){st.textContent='Salvato';setTimeout(()=>{if(st)st.textContent=''},2000)}}),1200)}
   document.querySelectorAll('#rapporto-view .turno-body textarea, #rapporto-view .turno-body input').forEach(el=>{const cls=el.id.startsWith('presto')?'presto':'notte';const turno=cls==='presto'?'PRESTO':'NOTTE';el.addEventListener('input',()=>autoSave(turno,cls));el.addEventListener('change',()=>autoSave(turno,cls))})}
@@ -803,26 +814,46 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
     }catch(e){console.error(e);toast('Errore salvataggio')}}
 
 // RAPPORTO EXPORT
-function esportaRapportoCSV(){const daysInMonth=new Date(rapportoAnno,rapportoMese+1,0).getDate();const campi=getCampiRapporto();
-  const rows=[['Data','Turno',...campi.map(c=>c.label)]];
-  for(let d=1;d<=daysInMonth;d++){const ds=rapportoAnno+'-'+String(rapportoMese+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-    ['PRESTO','NOTTE'].forEach(turno=>{const r=(rapportiCache[ds]||{})[turno];if(!r)return;const extra=r.note_extra?JSON.parse(r.note_extra):{};
-      const vals=campi.map(c=>{const isExtra=!CAMPI_RAPPORTO_DEFAULT.find(x=>x.key===c.key);const v=isExtra?extra[c.key]:r[c.key];return'"'+(v||'').toString().replace(/"/g,'""').replace(/\n/g,' ')+'"'});
-      rows.push([new Date(ds+'T12:00:00').toLocaleDateString('it-IT'),turno,...vals])})}
-  if(rows.length<2){toast('Nessun rapporto per questo mese');return}
+function getRapportoDateRange(){const dalEl=document.getElementById('rapp-dal'),alEl=document.getElementById('rapp-al');
+  if(dalEl&&dalEl.value&&alEl&&alEl.value)return{dal:dalEl.value,al:alEl.value};
+  const dal=rapportoAnno+'-'+String(rapportoMese+1).padStart(2,'0')+'-01';const ed=new Date(rapportoAnno,rapportoMese+1,0).getDate();
+  return{dal,al:rapportoAnno+'-'+String(rapportoMese+1).padStart(2,'0')+'-'+String(ed).padStart(2,'0')}}
+async function fetchRapportiRange(dal,al){const data=await sbGet('rapporti_giornalieri?data_rapporto=gte.'+dal+'&data_rapporto=lte.'+al+'&order=data_rapporto.asc');
+  const byDate={};data.forEach(r=>{if(!byDate[r.data_rapporto])byDate[r.data_rapporto]={};byDate[r.data_rapporto][r.turno]=r});return byDate}
+async function esportaRapportoCSV(){const{dal,al}=getRapportoDateRange();const byDate=await fetchRapportiRange(dal,al);
+  const dates=Object.keys(byDate).sort();if(!dates.length){toast('Nessun rapporto nel periodo selezionato');return}
+  const campi=getCampiRapporto();const rows=[['Data','Campo','PRESTO','NOTTE']];
+  dates.forEach(ds=>{const d=new Date(ds+'T12:00:00');const dayLabel=d.toLocaleDateString('it-IT')+' '+GIORNI[d.getDay()];
+    const p=byDate[ds].PRESTO||{},n=byDate[ds].NOTTE||{};const extraP=p.note_extra?JSON.parse(p.note_extra):{};const extraN=n.note_extra?JSON.parse(n.note_extra):{};
+    campi.forEach((c,i)=>{const isExtra=!CAMPI_RAPPORTO_DEFAULT.find(x=>x.key===c.key);
+      const vP=(isExtra?(extraP[c.key]||''):(p[c.key]||'')).toString().replace(/"/g,'""').replace(/\n/g,' ');
+      const vN=(isExtra?(extraN[c.key]||''):(n[c.key]||'')).toString().replace(/"/g,'""').replace(/\n/g,' ');
+      rows.push([i===0?'"'+dayLabel+'"':'','"'+c.label+'"','"'+vP+'"','"'+vN+'"'])});
+    rows.push(['','','',''])});
   const blob=new Blob(['\uFEFF'+rows.map(r=>r.join(';')).join('\n')],{type:'text/csv;charset=utf-8'});
-  Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'rapporto_'+MESI_FULL[rapportoMese]+'_'+rapportoAnno+'.csv'}).click();toast('CSV esportato!')}
+  Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'rapporto_'+dal+'_'+al+'.csv'}).click();toast('CSV esportato!')}
 async function esportaRapportoPDF(){if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore caricamento libreria PDF');return}}
-  const daysInMonth=new Date(rapportoAnno,rapportoMese+1,0).getDate();const campi=getCampiRapporto();
-  const body=[];for(let d=1;d<=daysInMonth;d++){const ds=rapportoAnno+'-'+String(rapportoMese+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-    ['PRESTO','NOTTE'].forEach(turno=>{const r=(rapportiCache[ds]||{})[turno];if(!r)return;const extra=r.note_extra?JSON.parse(r.note_extra):{};
-      body.push([new Date(ds+'T12:00:00').toLocaleDateString('it-IT'),turno,...campi.map(c=>{const isExtra=!CAMPI_RAPPORTO_DEFAULT.find(x=>x.key===c.key);return(isExtra?extra[c.key]:r[c.key])||''})])})}
-  if(!body.length){toast('Nessun rapporto per questo mese');return}
-  try{const{jsPDF}=window.jspdf;const doc=new jsPDF('landscape','mm','a4');
-  doc.setFontSize(14);doc.setFont('helvetica','bold');doc.text('Rapporto Giornaliero - '+MESI_FULL[rapportoMese]+' '+rapportoAnno,14,15);
-  doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(120);doc.text('Casino Lugano SA - Generato il '+new Date().toLocaleDateString('it-IT'),14,21);doc.setTextColor(0);
-  doc.autoTable({startY:26,head:[['Data','Turno',...campi.map(c=>c.label)]],body,styles:{fontSize:7,cellPadding:2,overflow:'linebreak'},headStyles:{fillColor:[26,18,8],textColor:[250,247,242]},alternateRowStyles:{fillColor:[250,247,242]},margin:{left:10,right:10}});
-  doc.save('rapporto_'+MESI_FULL[rapportoMese]+'_'+rapportoAnno+'.pdf');toast('PDF esportato!')}catch(e){toast('Errore generazione PDF')}}
+  const{dal,al}=getRapportoDateRange();const byDate=await fetchRapportiRange(dal,al);
+  const dates=Object.keys(byDate).sort();if(!dates.length){toast('Nessun rapporto nel periodo selezionato');return}
+  const campi=getCampiRapporto();const dalF=new Date(dal+'T12:00:00').toLocaleDateString('it-IT'),alF=new Date(al+'T12:00:00').toLocaleDateString('it-IT');
+  try{const{jsPDF}=window.jspdf;const doc=new jsPDF('portrait','mm','a4');
+  doc.setFontSize(14);doc.setFont('helvetica','bold');doc.text('Rapporto Giornaliero',14,15);
+  doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(120);doc.text('Casinò Lugano SA — dal '+dalF+' al '+alF,14,21);doc.setTextColor(0);
+  let y=28;
+  dates.forEach(ds=>{const d=new Date(ds+'T12:00:00');const dayLabel=d.getDate()+' '+MESI_FULL[d.getMonth()]+' '+d.getFullYear()+' — '+GIORNI[d.getDay()];
+    const p=byDate[ds].PRESTO||{},n=byDate[ds].NOTTE||{};const extraP=p.note_extra?JSON.parse(p.note_extra):{};const extraN=n.note_extra?JSON.parse(n.note_extra):{};
+    const body=campi.map(c=>{const isExtra=!CAMPI_RAPPORTO_DEFAULT.find(x=>x.key===c.key);
+      return[c.label,(isExtra?(extraP[c.key]||''):(p[c.key]||'')).toString(),(isExtra?(extraN[c.key]||''):(n[c.key]||'')).toString()]});
+    const tableH=campi.length*9+18;if(y+tableH>doc.internal.pageSize.height-15){doc.addPage();y=15}
+    doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(26,18,8);doc.text(dayLabel,14,y);doc.setTextColor(0);y+=2;
+    doc.autoTable({startY:y,head:[['Campo','PRESTO','NOTTE']],body,
+      styles:{fontSize:8,cellPadding:3,overflow:'linebreak',lineWidth:0.1},
+      headStyles:{fillColor:[26,18,8],textColor:[250,247,242],fontStyle:'bold',halign:'center'},
+      columnStyles:{0:{cellWidth:42,fontStyle:'bold',fillColor:[245,243,238]},1:{cellWidth:'auto'},2:{cellWidth:'auto'}},
+      alternateRowStyles:{fillColor:[250,247,242]},margin:{left:14,right:14},theme:'grid'});
+    y=doc.lastAutoTable.finalY+10});
+  const tp=doc.internal.getNumberOfPages();for(let i=1;i<=tp;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(150);doc.text('Casinò Lugano SA — Pag. '+i+'/'+tp,14,doc.internal.pageSize.height-8)}
+  doc.save('rapporto_'+dal+'_'+al+'.pdf');toast('PDF esportato!')}catch(e){console.error('PDF error:',e);toast('Errore generazione PDF: '+e.message)}}
 
 // STATISTICHE
 function renderStatistiche(){if(!datiCache.length){document.getElementById('stats-summary').innerHTML='<p style="color:var(--muted);text-align:center;padding:40px">Nessun dato da analizzare</p>';return}
