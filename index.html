@@ -828,7 +828,7 @@ function getGiornataCasino(){const now=new Date();if(now.getHours()<6)now.setDat
 async function fetchRapportiMese(a,m){const start=a+'-'+String(m+1).padStart(2,'0')+'-01';const nm=m===11?new Date(a+1,0,1):new Date(a,m+1,1);const end=nm.getFullYear()+'-'+String(nm.getMonth()+1).padStart(2,'0')+'-01';
   const data=await sbGet('rapporti_giornalieri?data_rapporto=gte.'+start+'&data_rapporto=lt.'+end);
   data.forEach(r=>{const k=r.data_rapporto;if(!rapportiCache[k])rapportiCache[k]={};rapportiCache[k][r.turno]=r})}
-function renderRapporto(){if(rapportoGiornoAperto)renderRapportoDetail();else renderRapportoCalendario()}
+async function renderRapporto(){if(rapportoGiornoAperto){await fetchRapportiMese(rapportoAnno,rapportoMese);apriGiorno(rapportoGiornoAperto)}else renderRapportoCalendario()}
 async function renderRapportoCalendario(){const v=document.getElementById('rapporto-view');v.innerHTML='<div class="loading">Caricamento...</div>';
   await fetchRapportiMese(rapportoAnno,rapportoMese);
   const firstDay=new Date(rapportoAnno,rapportoMese,1).getDay();const startDay=(firstDay+6)%7;const daysInMonth=new Date(rapportoAnno,rapportoMese+1,0).getDate();
