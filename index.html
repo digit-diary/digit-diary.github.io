@@ -140,6 +140,10 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 .badge{font-size:.74rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;padding:3px 10px;border-radius:2px;color:white}
 .entry-text{font-size:1rem;color:#3d3326;line-height:1.5}
 .entry-meta{font-size:.88rem;color:var(--muted);margin-top:5px;font-style:italic}
+.modulo-card:hover{border-color:var(--accent2)!important;background:var(--paper2)}
+.modulo-field{margin-bottom:14px}.modulo-field label{display:block;font-weight:700;font-size:.84rem;margin-bottom:4px;color:var(--ink)}
+.modulo-field input,.modulo-field textarea,.modulo-field select{width:100%;padding:10px;font-family:'Source Sans 3',sans-serif;font-size:.95rem;border:1.5px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)}
+.modulo-field textarea{min-height:80px;resize:vertical}
 .entry-actions{display:flex;flex-direction:row;align-items:center;justify-content:flex-end;gap:6px;padding:8px 18px 12px;grid-column:1/-1;opacity:0;transition:opacity .15s}
 .entry:hover .entry-actions{opacity:1}
 .btn-act{background:none;border:1px solid;border-radius:2px;cursor:pointer;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 9px;font-family:'Source Sans 3',sans-serif;transition:all .15s;white-space:nowrap}
@@ -378,6 +382,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
   <button class="nav-tab" data-page="rapporto" onclick="switchPage('rapporto')">Rapporto Giornaliero</button>
   <button class="nav-tab" data-page="note-collega" onclick="switchPage('note-collega')">Note Colleghi <span id="note-badge" style="display:none;background:var(--accent);color:white;border-radius:9px;font-size:.7rem;padding:1px 6px;margin-left:4px;font-weight:700"></span></button>
   <button class="nav-tab" data-page="statistiche" onclick="switchPage('statistiche')">Statistiche</button>
+  <button class="nav-tab" data-page="moduli" onclick="switchPage('moduli')">Moduli</button>
   <button class="nav-tab" data-page="impostazioni" onclick="switchPage('impostazioni')">Impostazioni</button>
 </div>
 
@@ -426,10 +431,10 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 <!-- NOTE COLLEGHI -->
 <div class="page" id="page-note-collega">
   <div class="main-card">
-    <div class="card-header">Invia nota a un collega</div>
+    <div class="card-header">Invia nota ai colleghi</div>
     <div class="form-area">
       <div class="form-row">
-        <div class="field"><label>Destinatario</label><select id="nota-dest"><option value="">Seleziona operatore...</option></select></div>
+        <div class="field" style="flex:2"><label>Destinatari</label><div id="nota-dest-box" style="display:flex;flex-wrap:wrap;gap:6px 12px;padding:8px 10px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);min-height:38px"><label style="font-size:.82rem;font-weight:700;color:var(--accent2);cursor:pointer;display:flex;align-items:center;gap:4px;margin-right:8px"><input type="checkbox" id="nota-tutti" onchange="toggleTuttiDest()"> Tutti</label></div></div>
         <div class="field"><label>Da</label><input type="text" id="nota-da" readonly style="background:var(--paper2);color:var(--muted)"></div>
       </div>
       <div class="field" style="margin-bottom:16px"><label>Messaggio</label><textarea id="nota-msg" placeholder="Scrivi il messaggio per il collega..." style="min-height:100px"></textarea></div>
@@ -460,12 +465,37 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 </div>
 
 <!-- IMPOSTAZIONI -->
+<!-- MODULI DISCIPLINARI -->
+<div class="page" id="page-moduli">
+  <div class="main-card">
+    <div class="card-header">Moduli disciplinari</div>
+    <p style="color:var(--muted);font-size:.86rem;margin:0 0 20px;padding:0 16px">Seleziona un modulo, compila i campi e genera il PDF.</p>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;padding:0 16px 16px" id="moduli-cards">
+      <div class="modulo-card" onclick="apriModulo('allineamento')" style="flex:1;min-width:200px;padding:18px;border:2px solid var(--line);border-radius:4px;cursor:pointer;transition:border-color .2s">
+        <h4 style="margin:0 0 6px;font-family:'Playfair Display',serif;color:var(--ink)">Allineamento</h4>
+        <p style="color:var(--muted);font-size:.82rem;margin:0">Rilevamento di non conformità e colloquio di allineamento</p>
+      </div>
+      <div class="modulo-card" onclick="apriModulo('apprezzamento')" style="flex:1;min-width:200px;padding:18px;border:2px solid var(--line);border-radius:4px;cursor:pointer;transition:border-color .2s">
+        <h4 style="margin:0 0 6px;font-family:'Playfair Display',serif;color:var(--ink)">Apprezzamento</h4>
+        <p style="color:var(--muted);font-size:.82rem;margin:0">Colloquio di apprezzamento</p>
+      </div>
+      <div class="modulo-card" onclick="apriModulo('rdi')" style="flex:1;min-width:200px;padding:18px;border:2px solid var(--line);border-radius:4px;cursor:pointer;transition:border-color .2s">
+        <h4 style="margin:0 0 6px;font-family:'Playfair Display',serif;color:var(--ink)">RDI</h4>
+        <p style="color:var(--muted);font-size:.82rem;margin:0">Rapporto disciplinare interno (I° e II° livello)</p>
+      </div>
+    </div>
+  </div>
+  <div id="modulo-form-area" style="display:none"></div>
+</div>
+
 <div class="page" id="page-impostazioni">
   <div class="settings-section"><h4>Tipi di evento</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:16px">I tipi predefiniti non possono essere eliminati.</p><div class="tipo-list" id="tipo-list"></div>
     <div class="add-tipo-row"><div class="field"><label>Nome nuovo tipo</label><input type="text" id="new-tipo-nome" placeholder="es. Ritardo, Lode..."></div><div class="field"><label>Colore</label><input type="color" id="new-tipo-colore" value="#e67e22"></div><button class="btn-add-tipo" onclick="aggiungiTipoPersonalizzato()">+ Aggiungi</button></div>
   </div>
   <div class="settings-section"><h4>Campi Rapporto Giornaliero</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Gestisci le sezioni visibili nel rapporto giornaliero.</p><div id="rapporto-campi-list"></div>
     <div class="add-tipo-row" style="margin-top:14px"><div class="field"><label>Nome nuovo campo</label><input type="text" id="new-campo-nome" placeholder="es. Bar, VIP Area..."></div><button class="btn-add-tipo" onclick="aggiungiCampoRapporto()">+ Aggiungi</button></div></div>
+  <div class="settings-section" id="collab-section" style="display:none"><h4>Gestione Collaboratori</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Lista master dei nomi collaboratori per l'autocomplete nel diario e nei moduli.</p><div id="collaboratori-list" style="margin-bottom:14px"></div>
+    <div class="add-tipo-row"><div class="field"><label>Nome nuovo collaboratore</label><input type="text" id="new-collab-nome" placeholder="Nome e Cognome..."></div><button class="btn-add-tipo" onclick="aggiungiCollaboratore()">+ Aggiungi</button></div></div>
   <div class="settings-section"><h4>Scadenze attive</h4><div id="scadenze-settings-list"></div></div>
   <div class="settings-section"><h4>Operatori</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Operatore attuale: <strong id="op-attuale">—</strong>. Ogni operatore accede con il proprio nome e password.</p><div id="operatori-list" style="margin-bottom:14px"></div>
     <div class="add-tipo-row" style="align-items:flex-end"><div class="field"><label>Nome</label><input type="text" id="new-operatore-nome" placeholder="Nome..."></div><div class="field"><label>Password</label><input type="password" id="new-operatore-pwd" placeholder="Min 4 caratteri..."></div><div class="field"><label>Conferma password</label><input type="password" id="new-operatore-pwd2" placeholder="Ripeti..."></div><button class="btn-add-tipo" onclick="aggiungiOperatoreConPwd()">+ Crea operatore</button></div></div>
@@ -487,6 +517,7 @@ let tipiPersonalizzati=[],coloriOverride={},tipoSelezionato='Attività',modalEnt
 let rapportoMese=new Date().getMonth(),rapportoAnno=new Date().getFullYear(),rapportoGiornoAperto=null,rapportiCache={},noteColleghiCache=[],operatoriAuthCache=[];
 const CAMPI_RAPPORTO_DEFAULT=[{key:'sup_note',label:'Supervisore',type:'input'},{key:'cassa_note',label:'Cassa',type:'text'},{key:'sala_note',label:'Sala',type:'text'},{key:'n_assegni',label:'Incasso Assegni',type:'text'},{key:'prelievi',label:'Prelievi',type:'text'},{key:'assenze',label:'Assenze',type:'text'}];
 let campiRapportoExtra=[],tipiNascosti=[],campiNascosti=[],tipiOrdine=[],campiOrdine=[],campiLabelOverride={},tipiRinominati={};
+let collaboratoriCache=[],moduliCache=[];
 function nomeCorrente(orig){return tipiRinominati[orig]||orig}
 function getTuttiTipi(){let list=[...TIPI_DEFAULT.filter(t=>!tipiNascosti.includes(t.nome)).map(t=>{const c=coloriOverride[t.nome]||t.colore;const n=tipiRinominati[t.nome]||t.nome;return{nome:n,colore:c,_orig:t.nome}}),...tipiPersonalizzati];
   if(tipiOrdine.length)list.sort((a,b)=>{const ia=tipiOrdine.indexOf(a.nome),ib=tipiOrdine.indexOf(b.nome);return(ia===-1?999:ia)-(ib===-1?999:ib)});return list}
@@ -523,6 +554,8 @@ async function loadAll(){
   scadenzeCache=await sbGet('scadenze?order=data_scadenza.asc');
   noteColleghiCache=await sbGet('note_colleghi?order=created_at.desc');
   operatoriAuthCache=await sbRpc('list_operators')||[];
+  collaboratoriCache=await sbGet('collaboratori?attivo=eq.true&order=nome.asc');
+  moduliCache=await sbGet('moduli?order=created_at.desc');
 }
 
 // PASSWORD
@@ -662,7 +695,7 @@ function applicaTemaOperatore(){const t=localStorage.getItem(getTemaKey())||loca
 // NAVIGATION
 function switchPage(name){flushRapportoSave();document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');document.querySelector('.nav-tab[data-page="'+name+'"]').classList.add('active');sessionStorage.setItem('pagina_corrente',name);
   if(name==='statistiche')renderStatistiche();if(name==='rapporto'){if(!rapportoGiornoAperto){const gc=getGiornataCasino();const d=new Date(gc+'T12:00:00');rapportoMese=d.getMonth();rapportoAnno=d.getFullYear();rapportoGiornoAperto=gc}renderRapporto()}if(name==='note-collega')renderNoteCollega();if(name==='impostazioni'){renderTipiUI();renderScadenzeSettings();renderOperatoriUI();renderCampiRapportoUI();
-    const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}}}
+    const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}renderCollaboratoriUI()}if(name==='moduli')renderModuliList()}
 
 // TIPI
 async function saveTipiP(){await setImp('tipi_personalizzati',JSON.stringify(tipiPersonalizzati))}
@@ -696,7 +729,9 @@ function escP(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/
 async function salva(){const nome=document.getElementById('inp-nome').value.trim(),testo=document.getElementById('inp-testo').value.trim();if(!nome){toast('Inserisci il nome');return}if(!testo){toast('Scrivi una descrizione');return}
   const importo=parseFloat(document.getElementById('inp-importo').value)||0;const valuta=importo?document.getElementById('inp-valuta').value:'';const reparto=document.getElementById('inp-reparto').value;
   const rec={id:Date.now(),nome,tipo:tipoSelezionato,testo,data:new Date().toISOString(),operatore:getOperatore(),importo,valuta,reparto};
-  try{await sbPost('registrazioni',rec);datiCache.unshift(rec);document.getElementById('inp-testo').value='';document.getElementById('inp-importo').value='';document.getElementById('inp-reparto').value='';toast('Registrato per '+nome);aggiornaNomi();render();updateStats()}catch(e){toast('Errore salvataggio')}}
+  try{await sbPost('registrazioni',rec);datiCache.unshift(rec);document.getElementById('inp-testo').value='';document.getElementById('inp-importo').value='';document.getElementById('inp-reparto').value='';
+    if(!collaboratoriCache.find(c=>c.nome.toLowerCase()===nome.toLowerCase())){try{const cr=await sbPost('collaboratori',{nome,attivo:true});collaboratoriCache.push(cr[0]);collaboratoriCache.sort((a,b)=>a.nome.localeCompare(b.nome))}catch(e2){}}
+    toast('Registrato per '+nome);aggiornaNomi();render();updateStats()}catch(e){toast('Errore salvataggio')}}
 async function elimina(id){if(!confirm('Eliminare?'))return;try{await sbDel('registrazioni','id=eq.'+id);datiCache=datiCache.filter(e=>e.id!==id);pinnedIds.delete(id);aggiornaNomi();render();updateStats();toast('Eliminata')}catch(e){toast('Errore')}}
 async function togglePin(id){try{if(pinnedIds.has(id)){await sbDel('note_fissate','registrazione_id=eq.'+id);pinnedIds.delete(id)}else{await sbPost('note_fissate',{registrazione_id:id});pinnedIds.add(id)}render()}catch(e){toast('Errore')}}
 
@@ -749,33 +784,54 @@ function renderScadenzeSettings(){const el=document.getElementById('scadenze-set
   el.innerHTML=scadenzeCache.map(s=>'<div class="scad-item"><span class="scad-date">'+new Date(s.data_scadenza+'T12:00:00').toLocaleDateString('it-IT')+'</span><span class="scad-title"><strong>'+escP(s.titolo)+'</strong>'+(s.descrizione?' - '+escP(s.descrizione):'')+'</span><button style="color:#2c6e49;border-color:#2c6e49" onclick="completaScadenza('+s.id+');renderScadenzeSettings()">Fatto</button><button style="color:var(--accent);border-color:var(--accent)" onclick="eliminaScadenza('+s.id+');renderScadenzeSettings()">Elimina</button></div>').join('')}
 
 // NOTE COLLEGHI
-async function inviaNotaCollega(){const dest=document.getElementById('nota-dest').value,msg=document.getElementById('nota-msg').value.trim(),da=getOperatore();
-  if(!da){toast('Seleziona prima un operatore (in alto)');return}if(!dest){toast('Seleziona un destinatario');return}if(!msg){toast('Scrivi un messaggio');return}
-  try{const r=await sbPost('note_colleghi',{da_operatore:da,a_operatore:dest,messaggio:msg});noteColleghiCache.unshift(r[0]);document.getElementById('nota-msg').value='';renderNoteCollega();toast('Nota inviata a '+dest)}catch(e){toast('Errore invio')}}
+function toggleTuttiDest(){const c=document.getElementById('nota-tutti').checked;document.querySelectorAll('#nota-dest-box input[type=checkbox]:not(#nota-tutti)').forEach(cb=>cb.checked=c)}
+function getDestinatariSelezionati(){return[...document.querySelectorAll('#nota-dest-box input[type=checkbox]:not(#nota-tutti)')].filter(cb=>cb.checked).map(cb=>cb.value)}
+async function inviaNotaCollega(){const dests=getDestinatariSelezionati(),msg=document.getElementById('nota-msg').value.trim(),da=getOperatore();
+  if(!da){toast('Seleziona prima un operatore (in alto)');return}if(!dests.length){toast('Seleziona almeno un destinatario');return}if(!msg){toast('Scrivi un messaggio');return}
+  const gid=dests.length>1?crypto.randomUUID():null;
+  try{for(const dest of dests){const r=await sbPost('note_colleghi',{da_operatore:da,a_operatore:dest,messaggio:msg,gruppo_id:gid});noteColleghiCache.unshift(r[0])}
+  document.getElementById('nota-msg').value='';document.querySelectorAll('#nota-dest-box input[type=checkbox]').forEach(cb=>cb.checked=false);renderNoteCollega();toast('Nota inviata a '+dests.join(', '))}catch(e){toast('Errore invio')}}
 async function segnaNotaLetta(id){try{await sbPatch('note_colleghi','id=eq.'+id,{letta:true});const n=noteColleghiCache.find(n=>n.id===id);if(n)n.letta=true;renderNoteCollega()}catch(e){toast('Errore')}}
 async function eliminaNotaCollega(id,ruolo){if(!confirm('Eliminare questa nota?'))return;
   const campo=ruolo==='mitt'?'nascosta_mitt':'nascosta_dest';
-  try{await sbPatch('note_colleghi','id=eq.'+id,{[campo]:true});const n=noteColleghiCache.find(n=>n.id===id);if(n)n[campo]=true;renderNoteCollega();toast('Nota rimossa')}catch(e){toast('Errore')}}
+  const n=noteColleghiCache.find(x=>x.id===id);
+  const ids=(ruolo==='mitt'&&n&&n.gruppo_id)?noteColleghiCache.filter(x=>x.gruppo_id===n.gruppo_id&&x.da_operatore===n.da_operatore).map(x=>x.id):[id];
+  try{for(const nid of ids){await sbPatch('note_colleghi','id=eq.'+nid,{[campo]:true});const c=noteColleghiCache.find(x=>x.id===nid);if(c)c[campo]=true}renderNoteCollega();toast('Nota rimossa')}catch(e){toast('Errore')}}
 function modificaNotaCollega(id){const n=noteColleghiCache.find(n=>n.id===id);if(!n)return;
+  const gid=n.gruppo_id;const gruppo=gid?noteColleghiCache.filter(x=>x.gruppo_id===gid&&x.da_operatore===n.da_operatore):null;
+  const destLabel=gruppo&&gruppo.length>1?gruppo.map(x=>escP(x.a_operatore)).join(', '):escP(n.a_operatore);
   const b=document.getElementById('pwd-modal-content');
-  b.innerHTML='<h3>Modifica nota</h3><p>Destinatario: <strong>'+escP(n.a_operatore)+'</strong></p><div class="pwd-field"><label>Messaggio</label><textarea id="edit-nota-msg" style="width:100%;min-height:80px;padding:10px;font-family:\'Source Sans 3\',sans-serif;font-size:.95rem;border:1.5px solid var(--line);border-radius:2px;resize:vertical">'+n.messaggio.replace(/</g,'&lt;')+'</textarea></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaModificaNota('+id+')">Salva</button></div>';
+  b.innerHTML='<h3>Modifica nota</h3><p>Destinatari: <strong>'+destLabel+'</strong></p><div class="pwd-field"><label>Messaggio</label><textarea id="edit-nota-msg" style="width:100%;min-height:80px;padding:10px;font-family:\'Source Sans 3\',sans-serif;font-size:.95rem;border:1.5px solid var(--line);border-radius:2px;resize:vertical">'+n.messaggio.replace(/</g,'&lt;')+'</textarea></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaModificaNota('+id+')">Salva</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden')}
 async function salvaModificaNota(id){const msg=document.getElementById('edit-nota-msg').value.trim();if(!msg){toast('Scrivi un messaggio');return}
-  try{await sbPatch('note_colleghi','id=eq.'+id,{messaggio:msg});const n=noteColleghiCache.find(n=>n.id===id);if(n)n.messaggio=msg;
+  const n=noteColleghiCache.find(n=>n.id===id);const gid=n?n.gruppo_id:null;
+  const ids=gid?noteColleghiCache.filter(x=>x.gruppo_id===gid&&x.da_operatore===n.da_operatore).map(x=>x.id):[id];
+  try{for(const nid of ids){await sbPatch('note_colleghi','id=eq.'+nid,{messaggio:msg});const c=noteColleghiCache.find(x=>x.id===nid);if(c)c.messaggio=msg}
   document.getElementById('pwd-modal').classList.add('hidden');renderNoteCollega();toast('Nota modificata')}catch(e){toast('Errore')}}
-async function annullaInvioNota(id){if(!confirm('Annullare l\'invio? La nota verrà eliminata anche per il destinatario.'))return;
-  try{await sbDel('note_colleghi','id=eq.'+id);noteColleghiCache=noteColleghiCache.filter(n=>n.id!==id);renderNoteCollega();toast('Invio annullato')}catch(e){toast('Errore')}}
+async function annullaInvioNota(id){const n=noteColleghiCache.find(n=>n.id===id);const gid=n?n.gruppo_id:null;
+  const ids=gid?noteColleghiCache.filter(x=>x.gruppo_id===gid&&x.da_operatore===n.da_operatore).map(x=>x.id):[id];
+  const label=ids.length>1?'Annullare l\'invio di '+ids.length+' note? Verranno eliminate per tutti i destinatari.':'Annullare l\'invio? La nota verrà eliminata anche per il destinatario.';
+  if(!confirm(label))return;
+  try{for(const nid of ids){await sbDel('note_colleghi','id=eq.'+nid)}noteColleghiCache=noteColleghiCache.filter(x=>!ids.includes(x.id));renderNoteCollega();toast('Invio annullato')}catch(e){toast('Errore')}}
 function renderNoteCollega(){const op=getOperatore();
-  // Populate destinatario dropdown
-  const sel=document.getElementById('nota-dest');if(sel){const cv=sel.value;const tutti=operatoriAuthCache.map(o=>o.nome).sort().filter(n=>n&&n!==op);
-    sel.innerHTML='<option value="">Seleziona operatore...</option>'+tutti.map(n=>'<option'+(n===cv?' selected':'')+'>'+escP(n)+'</option>').join('')}
+  // Populate destinatari checkboxes
+  const box=document.getElementById('nota-dest-box');if(box){const checked=new Set(getDestinatariSelezionati());const tutti=operatoriAuthCache.map(o=>o.nome).sort().filter(n=>n&&n!==op);
+    box.innerHTML='<label style="font-size:.82rem;font-weight:700;color:var(--accent2);cursor:pointer;display:flex;align-items:center;gap:4px;margin-right:8px"><input type="checkbox" id="nota-tutti" onchange="toggleTuttiDest()"> Tutti</label>'+tutti.map(n=>'<label style="font-size:.82rem;cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" value="'+escP(n)+'"'+(checked.has(n)?' checked':'')+'> '+escP(n)+'</label>').join('')}
   const da=document.getElementById('nota-da');if(da)da.value=op||'(nessun operatore)';
   // Note ricevute (escluse nascoste per destinatario)
-  const ricevute=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.nascosta_dest).slice(0,20);
+  const ricevute=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.nascosta_dest).slice(0,50);
   const rl=document.getElementById('note-ricevute-list');if(rl){rl.innerHTML=ricevute.length?ricevute.map(n=>'<div class="scad-item" style="'+(n.letta?'opacity:.6':'')+';flex-wrap:wrap"><div style="display:flex;align-items:center;gap:8px;width:100%"><span class="scad-date" style="min-width:100px;color:var(--accent2)">Da: <strong>'+escP(n.da_operatore)+'</strong></span><span style="font-size:.78rem;color:var(--muted)">'+new Date(n.created_at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})+'</span>'+(n.letta?'<span style="color:#2c6e49;font-size:.72rem;font-weight:700">Letta</span>':'<button style="color:#2c6e49;border-color:#2c6e49;padding:2px 8px;font-size:.7rem" onclick="segnaNotaLetta('+n.id+')">Segna letta</button>')+'<button style="color:var(--accent);border-color:var(--accent);padding:2px 8px;font-size:.7rem" onclick="eliminaNotaCollega('+n.id+',\'dest\')">Elimina</button></div><div style="padding:8px 0 4px;width:100%;font-size:.95rem">'+esc(n.messaggio)+'</div></div>').join(''):'<p style="color:var(--muted)">Nessuna nota ricevuta</p>'}
-  // Note inviate (escluse nascoste per mittente)
-  const inviate=noteColleghiCache.filter(n=>n.da_operatore===op&&!n.nascosta_mitt).slice(0,20);
-  const il=document.getElementById('note-inviate-list');if(il){il.innerHTML=inviate.length?inviate.map(n=>'<div class="scad-item" style="flex-wrap:wrap"><div style="display:flex;align-items:center;gap:8px;width:100%"><span class="scad-date" style="min-width:100px;color:var(--accent2)">A: <strong>'+escP(n.a_operatore)+'</strong></span><span style="font-size:.78rem;color:var(--muted)">'+new Date(n.created_at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})+'</span><span style="font-size:.72rem;color:'+(n.letta?'#2c6e49':'var(--muted)')+';font-weight:600">'+(n.letta?'Letta':'Non letta')+'</span><button style="color:var(--accent2);border-color:var(--accent2);padding:2px 8px;font-size:.7rem" onclick="modificaNotaCollega('+n.id+')">Modifica</button><button style="color:#c0392b;border-color:#c0392b;padding:2px 8px;font-size:.7rem" onclick="annullaInvioNota('+n.id+')">Annulla invio</button><button style="color:var(--muted);border-color:var(--muted);padding:2px 8px;font-size:.7rem" onclick="eliminaNotaCollega('+n.id+',\'mitt\')">Nascondi</button></div><div style="padding:8px 0 4px;width:100%;font-size:.95rem">'+esc(n.messaggio)+'</div></div>').join(''):'<p style="color:var(--muted)">Nessuna nota inviata</p>'}}
+  // Note inviate (escluse nascoste per mittente), raggruppate per gruppo_id
+  const inviate=noteColleghiCache.filter(n=>n.da_operatore===op&&!n.nascosta_mitt);
+  const gruppi=[];const visti=new Set();
+  inviate.forEach(n=>{if(visti.has(n.id))return;if(n.gruppo_id){const gNotes=inviate.filter(x=>x.gruppo_id===n.gruppo_id);gNotes.forEach(x=>visti.add(x.id));gruppi.push({tipo:'gruppo',notes:gNotes,id:n.id,gruppo_id:n.gruppo_id,messaggio:n.messaggio,created_at:n.created_at})}else{visti.add(n.id);gruppi.push({tipo:'singola',notes:[n],id:n.id,gruppo_id:null,messaggio:n.messaggio,created_at:n.created_at})}});
+  const il=document.getElementById('note-inviate-list');if(il){il.innerHTML=gruppi.length?gruppi.slice(0,30).map(g=>{
+    const dests=g.notes.map(n=>escP(n.a_operatore)).join(', ');
+    const alcunaLetta=g.notes.some(n=>n.letta);const tutteLette=g.notes.every(n=>n.letta);
+    const statoLabel=tutteLette?'Letta da tutti':alcunaLetta?'Letta da alcuni':'Non letta';
+    const statoColor=tutteLette?'#2c6e49':alcunaLetta?'#e67e22':'var(--muted)';
+    const canEdit=!alcunaLetta;
+    return'<div class="scad-item" style="flex-wrap:wrap"><div style="display:flex;align-items:center;gap:8px;width:100%;flex-wrap:wrap"><span class="scad-date" style="min-width:100px;color:var(--accent2)">A: <strong>'+dests+'</strong></span><span style="font-size:.78rem;color:var(--muted)">'+new Date(g.created_at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})+'</span><span style="font-size:.72rem;color:'+statoColor+';font-weight:600">'+statoLabel+'</span>'+(canEdit?'<button style="color:var(--accent2);border-color:var(--accent2);padding:2px 8px;font-size:.7rem" onclick="modificaNotaCollega('+g.id+')">Modifica</button><button style="color:#c0392b;border-color:#c0392b;padding:2px 8px;font-size:.7rem" onclick="annullaInvioNota('+g.id+')">Annulla invio</button>':'')+'<button style="color:var(--muted);border-color:var(--muted);padding:2px 8px;font-size:.7rem" onclick="eliminaNotaCollega('+g.id+',\'mitt\')">Nascondi</button></div><div style="padding:8px 0 4px;width:100%;font-size:.95rem">'+esc(g.messaggio)+'</div></div>'}).join(''):'<p style="color:var(--muted)">Nessuna nota inviata</p>'}}
 function aggiornaNoteBadge(){const op=getOperatore();const badge=document.getElementById('note-badge');if(!badge||!op)return;
   const nonLette=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.letta&&!n.nascosta_dest).length;
   if(nonLette>0){badge.style.display='inline';badge.textContent=nonLette}else{badge.style.display='none'}}
@@ -794,6 +850,172 @@ function mostraNoteNonLette(){const op=getOperatore();if(!op)return;
   document.getElementById('note-modal').classList.remove('hidden')}
 async function segnaNoteLette(){const op=getOperatore();const nonLette=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.letta);
   for(const n of nonLette){try{await sbPatch('note_colleghi','id=eq.'+n.id,{letta:true});n.letta=true}catch(e){}}renderNoteCollega()}
+
+// MODULI DISCIPLINARI
+function apriModulo(tipo){
+  const area=document.getElementById('modulo-form-area');area.style.display='block';
+  const op=getOperatore()||'';const oggi=new Date().toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'});
+  let html='<div class="main-card" style="margin-top:18px"><div class="card-header">';
+  if(tipo==='allineamento'){
+    html+='Rilevamento di non conformità e colloquio di allineamento</div><div style="padding:18px">';
+    html+='<div class="modulo-field"><label>Collaboratore</label><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." list="nomi-list" autocomplete="off"></div>';
+    html+='<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="'+escP(op)+'"></div>';
+    html+='<div class="modulo-field"><label>Data</label><input type="text" id="mod-data" value="'+oggi+'"></div>';
+    html+='<div class="modulo-field"><label>Non conformità rilevata (descrizione)</label><textarea id="mod-non-conf" placeholder="Descrizione della non conformità..."></textarea></div>';
+    html+='<div class="modulo-field"><label>Obiettivo concordato onde evitare il ripetersi della non conformità</label><textarea id="mod-obiettivo" placeholder="Obiettivo concordato..."></textarea></div>';
+    html+='<div class="modulo-field"><label>Scadenza</label><input type="text" id="mod-scadenza" placeholder="Termine di verifica..."></div>';
+  }else if(tipo==='apprezzamento'){
+    html+='Colloquio di apprezzamento</div><div style="padding:18px">';
+    html+='<div class="modulo-field"><label>Collaboratore</label><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." list="nomi-list" autocomplete="off"></div>';
+    html+='<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="'+escP(op)+'"></div>';
+    html+='<div class="modulo-field"><label>Data</label><input type="text" id="mod-data" value="'+oggi+'"></div>';
+    html+='<div class="modulo-field"><label>Descrizione</label><textarea id="mod-descrizione" placeholder="Descrizione dell\'apprezzamento..."></textarea></div>';
+    html+='<div class="modulo-field"><label>Osservazioni da parte del Resp. Settore</label><textarea id="mod-osservazioni" placeholder="Osservazioni..."></textarea></div>';
+  }else if(tipo==='rdi'){
+    html+='Rapporto disciplinare interno (RDI)</div><div style="padding:18px">';
+    html+='<div class="modulo-field"><label>Collaboratore</label><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." list="nomi-list" autocomplete="off"></div>';
+    html+='<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="'+escP(op)+'"></div>';
+    html+='<div class="modulo-field"><label>Data</label><input type="text" id="mod-data" value="'+oggi+'"></div>';
+    html+='<div class="modulo-field"><label>Non conformità rilevata</label><textarea id="mod-non-conf" placeholder="Descrizione della non conformità..."></textarea></div>';
+    html+='<div class="modulo-field"><label>Obiettivo concordato onde evitare il ripetersi della non conformità</label><textarea id="mod-obiettivo" placeholder="Obiettivo concordato..."></textarea></div>';
+    html+='<div class="modulo-field"><label>Scadenza (termine di verifica)</label><input type="text" id="mod-scadenza" placeholder="Termine di verifica..."></div>';
+    html+='<div class="modulo-field"><label>Livello RDI</label><select id="mod-livello"><option value="I">I° livello</option><option value="II">II° livello (grave)</option></select></div>';
+  }
+  html+='<div style="display:flex;gap:12px;margin-top:18px"><button class="btn-salva" onclick="generaModuloPDF(\''+tipo+'\')">Genera PDF</button><button class="btn-modal-cancel" onclick="chiudiModulo()">Annulla</button></div>';
+  html+='</div></div>';area.innerHTML=html;
+  area.scrollIntoView({behavior:'smooth'})}
+function chiudiModulo(){document.getElementById('modulo-form-area').style.display='none';document.getElementById('modulo-form-area').innerHTML='';window._editModuloId=null}
+async function generaModuloPDF(tipo){
+  const collab=(document.getElementById('mod-collaboratore')||{}).value||'';
+  const resp=(document.getElementById('mod-resp')||{}).value||'';
+  const data=(document.getElementById('mod-data')||{}).value||'';
+  if(!collab){toast('Inserisci il nome del collaboratore');return}
+  const doc=new jspdf.jsPDF({unit:'mm',format:'a4'});const pw=doc.internal.pageSize.getWidth();let y=20;
+  doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(120);
+  doc.text('Casino Lugano SA',pw/2,y,{align:'center'});y+=8;
+  doc.setTextColor(0);doc.setFontSize(14);
+  if(tipo==='allineamento'){
+    doc.text('Rilevamento di non conformità',pw/2,y,{align:'center'});y+=6;
+    doc.text('e colloquio di allineamento',pw/2,y,{align:'center'});y+=14;
+    drawField(doc,20,y,'Collaboratore',collab);y+=14;
+    drawField(doc,20,y,'Resp. Settore',resp);y+=14;
+    drawField(doc,20,y,'Data',data);y+=14;
+    const nonConf=(document.getElementById('mod-non-conf')||{}).value||'';
+    y=drawFieldMulti(doc,20,y,'Non conformità rilevata (descrizione)',nonConf,pw);y+=8;
+    const obiettivo=(document.getElementById('mod-obiettivo')||{}).value||'';
+    y=drawFieldMulti(doc,20,y,'Obiettivo concordato tra '+collab+' e Resp. Settore onde evitare il ripetersi della non conformità',obiettivo,pw);y+=8;
+    const scad=(document.getElementById('mod-scadenza')||{}).value||'';
+    drawField(doc,20,y,'Scadenza',scad);y+=8;
+    doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(80);
+    doc.text('Chiediamo che, a partire da subito, venga raggiunto l\'obiettivo di cui sopra.',20,y+=10);y+=18;
+    drawFirme(doc,20,y,pw);y+=24;
+    drawDistribuzione(doc,20,y,['Diario di bordo del collaboratore','Resp. Settore']);
+  }else if(tipo==='apprezzamento'){
+    doc.text('Colloquio di apprezzamento',pw/2,y,{align:'center'});y+=14;
+    drawField(doc,20,y,'Collaboratore',collab);y+=14;
+    drawField(doc,20,y,'Resp. Settore',resp);y+=14;
+    drawField(doc,20,y,'Data',data);y+=14;
+    const desc=(document.getElementById('mod-descrizione')||{}).value||'';
+    y=drawFieldMulti(doc,20,y,'Descrizione',desc,pw);y+=8;
+    const oss=(document.getElementById('mod-osservazioni')||{}).value||'';
+    y=drawFieldMulti(doc,20,y,'Osservazioni da parte del Resp. Settore',oss,pw);y+=18;
+    drawFirme(doc,20,y,pw);y+=24;
+    drawDistribuzione(doc,20,y,['Diario di bordo del collaboratore','Resp. Settore']);
+  }else if(tipo==='rdi'){
+    doc.text('Rapporto disciplinare interno (RDI)',pw/2,y,{align:'center'});y+=14;
+    drawField(doc,20,y,'Collaboratore',collab);y+=14;
+    drawField(doc,20,y,'Resp. Settore',resp);y+=14;
+    drawField(doc,20,y,'Data',data);y+=14;
+    const nonConf=(document.getElementById('mod-non-conf')||{}).value||'';
+    y=drawFieldMulti(doc,20,y,'Non conformità rilevata',nonConf,pw);y+=8;
+    const obiettivo=(document.getElementById('mod-obiettivo')||{}).value||'';
+    y=drawFieldMulti(doc,20,y,'Obiettivo concordato tra '+collab+' e Resp. Settore onde evitare il ripetersi della non conformità',obiettivo,pw);y+=8;
+    const scad=(document.getElementById('mod-scadenza')||{}).value||'';
+    drawField(doc,20,y,'Scadenza (termine di verifica)',scad);y+=14;
+    const livello=(document.getElementById('mod-livello')||{}).value||'I';
+    doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0);
+    doc.text('Il presente RDI vale quale:',20,y);y+=8;
+    doc.setFont('helvetica','normal');doc.setFontSize(10);
+    doc.text((livello==='I'?'[X]':'[  ]')+' Rapporto disciplinare interno di I° livello',24,y);y+=6;
+    doc.text((livello==='II'?'[X]':'[  ]')+' Rapporto disciplinare interno grave (II° livello)',24,y);y+=14;
+    drawFirme(doc,20,y,pw);y+=10;
+    doc.setFontSize(7.5);doc.setFont('helvetica','italic');doc.setTextColor(100);
+    const notaLines=doc.splitTextToSize('* Il collaboratore che non vuole sottoscrivere il rapporto disciplinare lo deve espressamente dichiarare, scrivendolo al posto della firma.',pw-40);
+    doc.text(notaLines,20,y);y+=notaLines.length*4+8;
+    drawDistribuzione(doc,20,y,['Resp. Settore','Resp. Risorse Umane']);
+  }
+  doc.save('Modulo_'+tipo.charAt(0).toUpperCase()+tipo.slice(1)+'_'+collab.replace(/\s+/g,'_')+'_'+data.replace(/\//g,'-')+'.pdf');
+  // Salva/aggiorna nel database
+  const dati={};
+  if(tipo==='allineamento'||tipo==='rdi'){dati.non_conformita=(document.getElementById('mod-non-conf')||{}).value||'';dati.obiettivo=(document.getElementById('mod-obiettivo')||{}).value||'';dati.scadenza=(document.getElementById('mod-scadenza')||{}).value||'';if(tipo==='rdi')dati.livello=(document.getElementById('mod-livello')||{}).value||'I'}
+  else if(tipo==='apprezzamento'){dati.descrizione=(document.getElementById('mod-descrizione')||{}).value||'';dati.osservazioni=(document.getElementById('mod-osservazioni')||{}).value||''}
+  try{if(window._editModuloId){await sbPatch('moduli','id=eq.'+window._editModuloId,{collaboratore:collab,resp_settore:resp,data_modulo:data,dati,operatore:getOperatore()});const idx=moduliCache.findIndex(x=>x.id===window._editModuloId);if(idx!==-1)Object.assign(moduliCache[idx],{collaboratore:collab,resp_settore:resp,data_modulo:data,dati});window._editModuloId=null;toast('Modulo aggiornato e PDF generato!')}
+  else{const rec={tipo,collaboratore:collab,resp_settore:resp,data_modulo:data,dati,operatore:getOperatore()};const saved=await sbPost('moduli',rec);moduliCache.unshift(saved[0]);toast('PDF generato e modulo salvato!')}
+  renderModuliList();chiudiModulo()}catch(e){console.error(e);toast('PDF generato (errore salvataggio DB)')}}
+function drawField(doc,x,y,label,value){doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0);doc.text(label+':',x,y);
+  doc.setFont('helvetica','normal');doc.text(value,x+doc.getTextWidth(label+':  '),y)}
+function drawFieldMulti(doc,x,y,label,value,pw){doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0);
+  const labelLines=doc.splitTextToSize(label+':',pw-40);doc.text(labelLines,x,y);y+=labelLines.length*5+3;
+  doc.setFont('helvetica','normal');doc.setFontSize(10);
+  if(value){const lines=doc.splitTextToSize(value,pw-40);doc.text(lines,x,y);y+=lines.length*5+2}
+  doc.setDrawColor(180);doc.line(x,y,pw-20,y);y+=4;return y}
+function drawFirme(doc,x,y,pw){doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(0);
+  const mid=pw/2;doc.text('Firma del Resp. Settore',x,y);doc.text('Firma del collaboratore',mid+10,y);y+=10;
+  doc.setDrawColor(150);doc.line(x,y,x+70,y);doc.line(mid+10,y,mid+80,y)}
+function drawDistribuzione(doc,x,y,items){doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(80);
+  doc.text('Distribuzione:',x,y);y+=6;doc.setFont('helvetica','normal');
+  items.forEach(item=>{doc.text('> '+item,x+4,y);y+=5})}
+function renderModuliList(){let c=document.getElementById('moduli-list-section');
+  if(!c){c=document.createElement('div');c.id='moduli-list-section';c.className='main-card';c.style.marginTop='20px';document.getElementById('page-moduli').appendChild(c)}
+  const fn=(document.getElementById('mod-filt-nome')||{}).value||'';const ft=(document.getElementById('mod-filt-tipo')||{}).value||'';
+  const fd=(document.getElementById('mod-filt-dal')||{}).value||'';const fa=(document.getElementById('mod-filt-al')||{}).value||'';
+  let filtered=moduliCache.filter(m=>{if(fn&&!m.collaboratore.toLowerCase().includes(fn.toLowerCase()))return false;if(ft&&m.tipo!==ft)return false;
+    if(fd&&m.created_at<fd)return false;if(fa&&m.created_at>fa+'T23:59:59')return false;return true});
+  const tl={allineamento:'Allineamento',apprezzamento:'Apprezzamento',rdi:'RDI'};
+  const tc={allineamento:'#1a4a7a',apprezzamento:'#b8860b',rdi:'#c0392b'};
+  let html='<div class="card-header">Moduli generati ('+moduliCache.length+')</div>';
+  html+='<div style="padding:14px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--paper2)">';
+  html+='<div class="filter-group"><span class="filter-label">Collaboratore</span><input type="text" id="mod-filt-nome" value="'+escP(fn)+'" placeholder="Cerca nome..." oninput="renderModuliList()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"></div>';
+  html+='<div class="filter-group"><span class="filter-label">Tipo</span><select id="mod-filt-tipo" onchange="renderModuliList()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"><option value="">Tutti</option><option value="allineamento"'+(ft==='allineamento'?' selected':'')+'>Allineamento</option><option value="apprezzamento"'+(ft==='apprezzamento'?' selected':'')+'>Apprezzamento</option><option value="rdi"'+(ft==='rdi'?' selected':'')+'>RDI</option></select></div>';
+  html+='<div class="filter-group"><span class="filter-label">Dal</span><input type="date" id="mod-filt-dal" value="'+fd+'" onchange="renderModuliList()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"></div>';
+  html+='<div class="filter-group"><span class="filter-label">Al</span><input type="date" id="mod-filt-al" value="'+fa+'" onchange="renderModuliList()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"></div>';
+  html+='<button class="btn-act tipo" onclick="[\'mod-filt-nome\',\'mod-filt-dal\',\'mod-filt-al\'].forEach(i=>{const e=document.getElementById(i);if(e)e.value=\'\'});const s=document.getElementById(\'mod-filt-tipo\');if(s)s.value=\'\';renderModuliList()">Reset</button></div>';
+  if(!filtered.length){html+='<div style="padding:20px;text-align:center;color:var(--muted)">Nessun modulo trovato</div>'}
+  else{html+='<div style="padding:10px">'+filtered.slice(0,50).map(m=>{const d=new Date(m.created_at);
+    return'<div class="scad-item" style="flex-wrap:wrap;padding:12px 0"><div style="display:flex;align-items:center;gap:10px;width:100%;flex-wrap:wrap"><span class="scad-date">'+d.toLocaleDateString('it-IT')+'</span><strong>'+escP(m.collaboratore)+'</strong><span class="badge" style="background:'+tc[m.tipo]+';color:white;padding:2px 10px;border-radius:2px;font-size:.78rem">'+tl[m.tipo]+'</span><span style="font-size:.78rem;color:var(--muted)">Resp: '+escP(m.resp_settore)+(m.operatore?' — da '+escP(m.operatore):'')+'</span><div style="margin-left:auto;display:flex;gap:6px"><button class="btn-act edit" onclick="apriModuloSalvato('+m.id+')">Apri</button><button class="btn-act tipo" onclick="ristampaModuloPDF('+m.id+')">PDF</button><button class="btn-act del" onclick="eliminaModulo('+m.id+')">Elimina</button></div></div></div>'}).join('')+'</div>'}
+  c.innerHTML=html}
+function apriModuloSalvato(id){const m=moduliCache.find(x=>x.id===id);if(!m)return;
+  apriModulo(m.tipo);window._editModuloId=id;
+  setTimeout(()=>{const ce=document.getElementById('mod-collaboratore');if(ce)ce.value=m.collaboratore;
+    const re=document.getElementById('mod-resp');if(re)re.value=m.resp_settore;
+    const de=document.getElementById('mod-data');if(de)de.value=m.data_modulo;const dt=m.dati||{};
+    if(m.tipo==='allineamento'||m.tipo==='rdi'){const nc=document.getElementById('mod-non-conf');if(nc)nc.value=dt.non_conformita||'';
+      const ob=document.getElementById('mod-obiettivo');if(ob)ob.value=dt.obiettivo||'';
+      const sc=document.getElementById('mod-scadenza');if(sc)sc.value=dt.scadenza||'';
+      if(m.tipo==='rdi'){const lv=document.getElementById('mod-livello');if(lv)lv.value=dt.livello||'I'}}
+    else if(m.tipo==='apprezzamento'){const ds=document.getElementById('mod-descrizione');if(ds)ds.value=dt.descrizione||'';
+      const os=document.getElementById('mod-osservazioni');if(os)os.value=dt.osservazioni||''}},50)}
+function ristampaModuloPDF(id){apriModuloSalvato(id);setTimeout(()=>{const m=moduliCache.find(x=>x.id===id);if(m)generaModuloPDF(m.tipo)},150)}
+async function eliminaModulo(id){if(!confirm('Eliminare questo modulo?'))return;
+  try{await sbDel('moduli','id=eq.'+id);moduliCache=moduliCache.filter(x=>x.id!==id);renderModuliList();toast('Modulo eliminato')}catch(e){toast('Errore eliminazione')}}
+
+// GESTIONE COLLABORATORI
+async function renderCollaboratoriUI(){const section=document.getElementById('collab-section');if(!section)return;
+  section.style.display=isAdmin()?'':'none';if(!isAdmin())return;
+  const tutti=await sbGet('collaboratori?order=nome.asc');
+  const attivi=tutti.filter(c=>c.attivo!==false);const inattivi=tutti.filter(c=>c.attivo===false);
+  const el=document.getElementById('collaboratori-list');
+  let html=attivi.length?attivi.map(c=>'<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border:1px solid var(--line)"><span style="flex:1;font-weight:400">'+escP(c.nome)+'</span><button class="btn-del-tipo" onclick="disattivaCollaboratore(\''+c.nome.replace(/'/g,"\\'")+'\')">Rimuovi</button></div>').join(''):'<p style="color:var(--muted);font-size:.85rem">Nessun collaboratore.</p>';
+  if(inattivi.length){html+='<div style="margin-top:12px;padding:10px;background:var(--paper2);border-radius:3px"><small style="color:var(--muted);display:block;margin-bottom:6px">Collaboratori disattivati (clicca per riattivare):</small><div style="display:flex;flex-wrap:wrap;gap:6px">'+inattivi.map(c=>'<button style="padding:4px 10px;font-size:.82rem;border:1px solid var(--line);border-radius:2px;cursor:pointer;background:var(--paper);color:var(--muted)" onclick="riattivaCollaboratore(\''+c.nome.replace(/'/g,"\\'")+'\')">+ '+escP(c.nome)+'</button>').join('')+'</div></div>'}
+  el.innerHTML=html}
+async function aggiungiCollaboratore(){const nome=document.getElementById('new-collab-nome').value.trim();if(!nome){toast('Inserisci un nome');return}
+  if(collaboratoriCache.find(c=>c.nome.toLowerCase()===nome.toLowerCase())){toast('Collaboratore già esistente');return}
+  try{const r=await sbPost('collaboratori',{nome,attivo:true});collaboratoriCache.push(r[0]);collaboratoriCache.sort((a,b)=>a.nome.localeCompare(b.nome));
+    document.getElementById('new-collab-nome').value='';renderCollaboratoriUI();aggiornaNomi();toast('Collaboratore aggiunto')}catch(e){if(e.message&&e.message.includes('duplicate'))toast('Nome già esistente');else toast('Errore')}}
+async function disattivaCollaboratore(nome){if(!confirm('Disattivare "'+nome+'"? Non apparirà più nell\'autocomplete.'))return;
+  try{await sbPatch('collaboratori','nome=eq.'+encodeURIComponent(nome),{attivo:false});collaboratoriCache=collaboratoriCache.filter(c=>c.nome!==nome);renderCollaboratoriUI();aggiornaNomi();toast('Collaboratore disattivato')}catch(e){toast('Errore')}}
+async function riattivaCollaboratore(nome){try{await sbPatch('collaboratori','nome=eq.'+encodeURIComponent(nome),{attivo:true});
+  collaboratoriCache.push({nome,attivo:true});collaboratoriCache.sort((a,b)=>a.nome.localeCompare(b.nome));renderCollaboratoriUI();aggiornaNomi();toast('Collaboratore riattivato')}catch(e){toast('Errore')}}
 
 // PROFILO COLLABORATORE
 function apriProfilo(nome){const entries=datiCache.filter(e=>e.nome===nome);const tipiCount={};entries.forEach(e=>{tipiCount[e.tipo]=(tipiCount[e.tipo]||0)+1});
@@ -821,7 +1043,8 @@ function render(){const f=getFiltrati(),el=document.getElementById('entries-list
     const metaLines=[];if(e.operatore)metaLines.push('Inserita da '+escP(e.operatore));
     if(e.modificato_da)metaLines.push('Modificata da '+escP(e.modificato_da));
     return'<div class="entry'+(pin?' pinned':'')+'"><div class="entry-date"><div class="entry-day">'+d.getDate()+'</div><div class="entry-month">'+MESI[d.getMonth()]+' '+d.getFullYear()+'</div><div class="entry-time">'+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})+'</div></div><div class="entry-body"><div class="entry-top"><span class="entry-name" onclick="apriProfilo(\''+e.nome.replace(/'/g,"\\'")+'\')">'+esc(e.nome)+'</span><span class="badge '+bc+'">'+e.tipo+'</span>'+rep+imp+'</div><div class="entry-text">'+esc(e.testo)+'</div>'+(metaLines.length?'<div class="entry-meta">'+metaLines.join(' · ')+'</div>':'')+'</div><div class="entry-actions"><button class="btn-act pin" onclick="togglePin('+e.id+')">'+(pin?'Rimuovi pin':'Fissa')+'</button><button class="btn-act scad" onclick="apriScadenza('+e.id+')">Scadenza</button><button class="btn-act tipo" onclick="apriModal('+e.id+',\''+te+'\')">Tipo</button><button class="btn-act edit" onclick="modificaRegistrazione('+e.id+')">Modifica</button><button class="btn-act del" onclick="elimina('+e.id+')">Elimina</button></div></div>'}).join('')}
-function aggiornaNomi(){const nomi=[...new Set(datiCache.map(e=>e.nome))].sort();document.getElementById('nomi-list').innerHTML=nomi.map(n=>'<option value="'+n+'">').join('');
+function aggiornaNomi(){const nomi=[...new Set([...collaboratoriCache.map(c=>c.nome),...datiCache.map(e=>e.nome)])].filter(Boolean).sort();
+  document.getElementById('nomi-list').innerHTML=nomi.map(n=>'<option value="'+n+'">').join('');
   const sel=document.getElementById('filt-persona'),cur=sel.value;sel.innerHTML='<option value="">Tutte</option>'+nomi.map(n=>'<option'+(n===cur?' selected':'')+'>'+escP(n)+'</option>').join('')}
 function resetFiltri(){['filt-persona','filt-tipo'].forEach(id=>document.getElementById(id).value='');['filt-cerca'].forEach(id=>document.getElementById(id).value='');const fd=document.getElementById('filt-dal'),fa=document.getElementById('filt-al');if(fd._flatpickr)fd._flatpickr.clear();else fd.value='';if(fa._flatpickr)fa._flatpickr.clear();else fa.value='';render()}
 function updateStats(){document.getElementById('stats-bar').innerHTML='<div class="stat"><div class="stat-num">'+datiCache.length+'</div><div class="stat-label">Totale</div></div><div class="stat"><div class="stat-num blue">'+new Set(datiCache.map(e=>e.nome)).size+'</div><div class="stat-label">Collaboratori</div></div><div class="stat"><div class="stat-num red">'+datiCache.filter(e=>e.tipo===nomeCorrente('Errore')).length+'</div><div class="stat-label">'+nomeCorrente('Errore')+'</div></div><div class="stat"><div class="stat-num teal">'+datiCache.filter(e=>e.tipo===nomeCorrente('Malattia')).length+'</div><div class="stat-label">'+nomeCorrente('Malattia')+'</div></div><div class="stat"><div class="stat-num gold">'+datiCache.filter(e=>e.tipo===nomeCorrente('Apprezzamento')).length+'</div><div class="stat-label">'+nomeCorrente('Apprezzamento')+'</div></div>'}
@@ -887,6 +1110,7 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
 // RAPPORTO EXPORT
 function getRapportoDateRange(){const dalEl=document.getElementById('rapp-dal'),alEl=document.getElementById('rapp-al');
   if(dalEl&&dalEl.value&&alEl&&alEl.value)return{dal:dalEl.value,al:alEl.value};
+  if(rapportoGiornoAperto)return{dal:rapportoGiornoAperto,al:rapportoGiornoAperto};
   const dal=rapportoAnno+'-'+String(rapportoMese+1).padStart(2,'0')+'-01';const ed=new Date(rapportoAnno,rapportoMese+1,0).getDate();
   return{dal,al:rapportoAnno+'-'+String(rapportoMese+1).padStart(2,'0')+'-'+String(ed).padStart(2,'0')}}
 async function fetchRapportiRange(dal,al){const data=await sbGet('rapporti_giornalieri?data_rapporto=gte.'+dal+'&data_rapporto=lte.'+al+'&order=data_rapporto.asc');
