@@ -1007,13 +1007,27 @@ async function renderCollaboratoriUI(){const section=document.getElementById('co
   const tutti=await sbGet('collaboratori?order=nome.asc');
   const attivi=tutti.filter(c=>c.attivo!==false);const inattivi=tutti.filter(c=>c.attivo===false);
   const el=document.getElementById('collaboratori-list');
-  let html=attivi.length?attivi.map(c=>'<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border:1px solid var(--line)"><span style="flex:1;font-weight:400">'+escP(c.nome)+'</span><button class="btn-del-tipo" onclick="disattivaCollaboratore(\''+c.nome.replace(/'/g,"\\'")+'\')">Rimuovi</button></div>').join(''):'<p style="color:var(--muted);font-size:.85rem">Nessun collaboratore.</p>';
+  let html=attivi.length?attivi.map(c=>'<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border:1px solid var(--line)"><span style="flex:1;font-weight:400">'+escP(c.nome)+'</span><button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2)" onclick="rinominaCollaboratore(\''+c.nome.replace(/'/g,"\\'")+'\')">Rinomina</button><button class="btn-del-tipo" onclick="disattivaCollaboratore(\''+c.nome.replace(/'/g,"\\'")+'\')">Rimuovi</button></div>').join(''):'<p style="color:var(--muted);font-size:.85rem">Nessun collaboratore.</p>';
   if(inattivi.length){html+='<div style="margin-top:12px;padding:10px;background:var(--paper2);border-radius:3px"><small style="color:var(--muted);display:block;margin-bottom:6px">Collaboratori disattivati (clicca per riattivare):</small><div style="display:flex;flex-wrap:wrap;gap:6px">'+inattivi.map(c=>'<button style="padding:4px 10px;font-size:.82rem;border:1px solid var(--line);border-radius:2px;cursor:pointer;background:var(--paper);color:var(--muted)" onclick="riattivaCollaboratore(\''+c.nome.replace(/'/g,"\\'")+'\')">+ '+escP(c.nome)+'</button>').join('')+'</div></div>'}
   el.innerHTML=html}
 async function aggiungiCollaboratore(){const nome=document.getElementById('new-collab-nome').value.trim();if(!nome){toast('Inserisci un nome');return}
   if(collaboratoriCache.find(c=>c.nome.toLowerCase()===nome.toLowerCase())){toast('Collaboratore già esistente');return}
   try{const r=await sbPost('collaboratori',{nome,attivo:true});collaboratoriCache.push(r[0]);collaboratoriCache.sort((a,b)=>a.nome.localeCompare(b.nome));
     document.getElementById('new-collab-nome').value='';renderCollaboratoriUI();aggiornaNomi();toast('Collaboratore aggiunto')}catch(e){if(e.message&&e.message.includes('duplicate'))toast('Nome già esistente');else toast('Errore')}}
+function rinominaCollaboratore(nome){const b=document.getElementById('pwd-modal-content');
+  b.innerHTML='<h3>Rinomina collaboratore</h3><div class="pwd-field"><label>Nome attuale</label><input type="text" value="'+escP(nome)+'" readonly style="background:var(--paper2);color:var(--muted)"></div><div class="pwd-field"><label>Nuovo nome</label><input type="text" id="rin-collab-nuovo" value="'+escP(nome)+'"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaRinominaCollaboratore(\''+nome.replace(/'/g,"\\'")+'\')">Salva</button></div>';
+  document.getElementById('pwd-modal').classList.remove('hidden');setTimeout(()=>{const i=document.getElementById('rin-collab-nuovo');if(i){i.focus();i.select()}},100)}
+async function salvaRinominaCollaboratore(vecchio){const nuovo=document.getElementById('rin-collab-nuovo').value.trim();
+  if(!nuovo){toast('Inserisci un nome');return}if(nuovo===vecchio){document.getElementById('pwd-modal').classList.add('hidden');return}
+  try{await sbPatch('collaboratori','nome=eq.'+encodeURIComponent(vecchio),{nome:nuovo});
+    await sbPatch('registrazioni','nome=eq.'+encodeURIComponent(vecchio),{nome:nuovo});
+    await sbPatch('note_colleghi','da_operatore=eq.'+encodeURIComponent(vecchio),{da_operatore:nuovo});
+    await sbPatch('note_colleghi','a_operatore=eq.'+encodeURIComponent(vecchio),{a_operatore:nuovo});
+    await sbPatch('moduli','collaboratore=eq.'+encodeURIComponent(vecchio),{collaboratore:nuovo});
+    const ci=collaboratoriCache.findIndex(c=>c.nome===vecchio);if(ci!==-1)collaboratoriCache[ci].nome=nuovo;
+    datiCache.forEach(e=>{if(e.nome===vecchio)e.nome=nuovo});
+    collaboratoriCache.sort((a,b)=>a.nome.localeCompare(b.nome));
+    document.getElementById('pwd-modal').classList.add('hidden');renderCollaboratoriUI();aggiornaNomi();render();toast('Collaboratore rinominato')}catch(e){toast('Errore: nome già esistente?')}}
 async function disattivaCollaboratore(nome){if(!confirm('Disattivare "'+nome+'"? Non apparirà più nell\'autocomplete.'))return;
   try{await sbPatch('collaboratori','nome=eq.'+encodeURIComponent(nome),{attivo:false});collaboratoriCache=collaboratoriCache.filter(c=>c.nome!==nome);renderCollaboratoriUI();aggiornaNomi();toast('Collaboratore disattivato')}catch(e){toast('Errore')}}
 async function riattivaCollaboratore(nome){try{await sbPatch('collaboratori','nome=eq.'+encodeURIComponent(nome),{attivo:true});
