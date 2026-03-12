@@ -144,6 +144,8 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 .modulo-field{margin-bottom:14px}.modulo-field label{display:block;font-weight:700;font-size:.84rem;margin-bottom:4px;color:var(--ink)}
 .modulo-field input,.modulo-field textarea,.modulo-field select{width:100%;padding:10px;font-family:'Source Sans 3',sans-serif;font-size:.95rem;border:1.5px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)}
 .modulo-field textarea{min-height:80px;resize:vertical}
+.ac-wrap{position:relative}.ac-drop{position:absolute;top:100%;left:0;right:0;max-height:180px;overflow-y:auto;background:var(--paper);border:1.5px solid var(--accent2);border-top:none;border-radius:0 0 3px 3px;z-index:900;display:none;box-shadow:0 4px 12px rgba(0,0,0,.15)}
+.ac-drop.show{display:block}.ac-drop div{padding:8px 12px;cursor:pointer;font-size:.92rem;color:var(--ink)}.ac-drop div:hover,.ac-drop div.ac-active{background:var(--accent2);color:white}
 .entry-actions{display:flex;flex-direction:row;align-items:center;justify-content:flex-end;gap:6px;padding:8px 18px 12px;grid-column:1/-1;opacity:0;transition:opacity .15s}
 .entry:hover .entry-actions{opacity:1}
 .btn-act{background:none;border:1px solid;border-radius:2px;cursor:pointer;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 9px;font-family:'Source Sans 3',sans-serif;transition:all .15s;white-space:nowrap}
@@ -393,7 +395,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
     <div class="card-header">Nuova Registrazione</div>
     <div class="form-area">
       <div class="form-row">
-        <div class="field"><label>Collaboratore</label><input type="text" id="inp-nome" placeholder="Nome collaboratore..." list="nomi-list"></div>
+        <div class="field"><label>Collaboratore</label><div class="ac-wrap"><input type="text" id="inp-nome" placeholder="Nome collaboratore..." oninput="acFiltra('inp-nome','ac-nomi')" onfocus="acFiltra('inp-nome','ac-nomi')"><div class="ac-drop" id="ac-nomi"></div></div></div>
         <div class="field"><label>Tipo evento</label><div class="tipo-tags" id="form-tipo-tags"></div></div>
       </div>
       <div class="field" style="margin-bottom:16px"><label>Descrizione <small style="color:var(--muted);font-weight:300;text-transform:none;letter-spacing:0;font-size:.75rem">Ctrl+Invio per salvare</small></label><textarea id="inp-testo" placeholder="Descrivi brevemente l'evento..."></textarea></div>
@@ -503,7 +505,6 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 </div>
 
 <div class="toast" id="toast"></div>
-<datalist id="nomi-list"></datalist>
 
 <script>
 const _k='DiarioCL26',_a='IRArGgsoICV9Xw4gNAggXg0le0UNBzNHCiwKentdNDE3MSNWbSlLfDQKUj8AICoGSFIcKwkrBCk5FmF/NyAPOAU1KgUEfykjChchKXMpX2ArC1M0Hg4UNAFTKi8SKFtacQVbQS0KDEsaNRAFBH8pLxQQW1sqAHF8NDA5IwAgKQkBeD4kGDwDJnYBZnc3IAwkXQwABQR7LihVPS0IOQN2XTwkKUJHNXYJd1MmMQw6NgoWDkhwFSQZQ10uNQICQS8uAkIvCyIBakARACc+IAcTfA==',_u='LB0VAhpVbGNQUjwYFQgMBywtQl8oHhsDBQgtOhxFMRkAEAgcJmJRWQ==';function _d(e){const b=atob(e),r=[];for(let i=0;i<b.length;i++)r.push(String.fromCharCode(b.charCodeAt(i)^_k.charCodeAt(i%_k.length)));return r.join('')}
@@ -859,7 +860,7 @@ function apriModulo(tipo){
   let html='<div class="main-card" style="margin-top:18px"><div class="card-header">';
   if(tipo==='allineamento'){
     html+='Rilevamento di non conformità e colloquio di allineamento</div><div style="padding:18px">';
-    html+='<div class="modulo-field"><label>Collaboratore</label><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." list="nomi-list"></div>';
+    html+='<div class="modulo-field"><label>Collaboratore</label><div class="ac-wrap"><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." oninput="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')" onfocus="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')"><div class="ac-drop" id="ac-mod-nomi"></div></div></div>';
     html+='<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="'+escP(op)+'"></div>';
     html+='<div class="modulo-field"><label>Data</label><input type="text" id="mod-data" value="'+oggi+'"></div>';
     html+='<div class="modulo-field"><label>Non conformità rilevata (descrizione)</label><textarea id="mod-non-conf" placeholder="Descrizione della non conformità..."></textarea></div>';
@@ -867,14 +868,14 @@ function apriModulo(tipo){
     html+='<div class="modulo-field"><label>Scadenza</label><input type="text" id="mod-scadenza" placeholder="Termine di verifica..."></div>';
   }else if(tipo==='apprezzamento'){
     html+='Colloquio di apprezzamento</div><div style="padding:18px">';
-    html+='<div class="modulo-field"><label>Collaboratore</label><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." list="nomi-list"></div>';
+    html+='<div class="modulo-field"><label>Collaboratore</label><div class="ac-wrap"><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." oninput="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')" onfocus="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')"><div class="ac-drop" id="ac-mod-nomi"></div></div></div>';
     html+='<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="'+escP(op)+'"></div>';
     html+='<div class="modulo-field"><label>Data</label><input type="text" id="mod-data" value="'+oggi+'"></div>';
     html+='<div class="modulo-field"><label>Descrizione</label><textarea id="mod-descrizione" placeholder="Descrizione dell\'apprezzamento..."></textarea></div>';
     html+='<div class="modulo-field"><label>Osservazioni da parte del Resp. Settore</label><textarea id="mod-osservazioni" placeholder="Osservazioni..."></textarea></div>';
   }else if(tipo==='rdi'){
     html+='Rapporto disciplinare interno (RDI)</div><div style="padding:18px">';
-    html+='<div class="modulo-field"><label>Collaboratore</label><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." list="nomi-list"></div>';
+    html+='<div class="modulo-field"><label>Collaboratore</label><div class="ac-wrap"><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." oninput="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')" onfocus="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')"><div class="ac-drop" id="ac-mod-nomi"></div></div></div>';
     html+='<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="'+escP(op)+'"></div>';
     html+='<div class="modulo-field"><label>Data</label><input type="text" id="mod-data" value="'+oggi+'"></div>';
     html+='<div class="modulo-field"><label>Non conformità rilevata</label><textarea id="mod-non-conf" placeholder="Descrizione della non conformità..."></textarea></div>';
@@ -1044,9 +1045,18 @@ function render(){const f=getFiltrati(),el=document.getElementById('entries-list
     const metaLines=[];if(e.operatore)metaLines.push('Inserita da '+escP(e.operatore));
     if(e.modificato_da)metaLines.push('Modificata da '+escP(e.modificato_da));
     return'<div class="entry'+(pin?' pinned':'')+'"><div class="entry-date"><div class="entry-day">'+d.getDate()+'</div><div class="entry-month">'+MESI[d.getMonth()]+' '+d.getFullYear()+'</div><div class="entry-time">'+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})+'</div></div><div class="entry-body"><div class="entry-top"><span class="entry-name" onclick="apriProfilo(\''+e.nome.replace(/'/g,"\\'")+'\')">'+esc(e.nome)+'</span><span class="badge '+bc+'">'+e.tipo+'</span>'+rep+imp+'</div><div class="entry-text">'+esc(e.testo)+'</div>'+(metaLines.length?'<div class="entry-meta">'+metaLines.join(' · ')+'</div>':'')+'</div><div class="entry-actions"><button class="btn-act pin" onclick="togglePin('+e.id+')">'+(pin?'Rimuovi pin':'Fissa')+'</button><button class="btn-act scad" onclick="apriScadenza('+e.id+')">Scadenza</button><button class="btn-act tipo" onclick="apriModal('+e.id+',\''+te+'\')">Tipo</button><button class="btn-act edit" onclick="modificaRegistrazione('+e.id+')">Modifica</button><button class="btn-act del" onclick="elimina('+e.id+')">Elimina</button></div></div>'}).join('')}
-function aggiornaNomi(){const nomi=[...new Set([...collaboratoriCache.map(c=>c.nome),...datiCache.map(e=>e.nome)])].filter(Boolean).sort();
-  document.getElementById('nomi-list').innerHTML=nomi.map(n=>'<option value="'+n+'">').join('');
+function getNomiLista(){return[...new Set([...collaboratoriCache.map(c=>c.nome),...datiCache.map(e=>e.nome)])].filter(Boolean).sort()}
+function aggiornaNomi(){const nomi=getNomiLista();
   const sel=document.getElementById('filt-persona'),cur=sel.value;sel.innerHTML='<option value="">Tutte</option>'+nomi.map(n=>'<option'+(n===cur?' selected':'')+'>'+escP(n)+'</option>').join('')}
+function acFiltra(inputId,dropId){const inp=document.getElementById(inputId),drop=document.getElementById(dropId);if(!inp||!drop)return;
+  const v=inp.value.toLowerCase(),nomi=getNomiLista();
+  const filtrati=v?nomi.filter(n=>n.toLowerCase().includes(v)):nomi;
+  if(!filtrati.length){drop.classList.remove('show');return}
+  drop.innerHTML=filtrati.slice(0,15).map(n=>'<div onmousedown="acScegli(\''+inputId+'\',\''+dropId+'\',\''+n.replace(/'/g,"\\'")+'\')">'+escP(n)+'</div>').join('');
+  drop.classList.add('show')}
+function acScegli(inputId,dropId,nome){const inp=document.getElementById(inputId),drop=document.getElementById(dropId);
+  if(inp)inp.value=nome;if(drop)drop.classList.remove('show')}
+document.addEventListener('click',function(e){document.querySelectorAll('.ac-drop.show').forEach(d=>{if(!d.parentElement.contains(e.target))d.classList.remove('show')})})
 function resetFiltri(){['filt-persona','filt-tipo'].forEach(id=>document.getElementById(id).value='');['filt-cerca'].forEach(id=>document.getElementById(id).value='');const fd=document.getElementById('filt-dal'),fa=document.getElementById('filt-al');if(fd._flatpickr)fd._flatpickr.clear();else fd.value='';if(fa._flatpickr)fa._flatpickr.clear();else fa.value='';render()}
 function updateStats(){document.getElementById('stats-bar').innerHTML='<div class="stat"><div class="stat-num">'+datiCache.length+'</div><div class="stat-label">Totale</div></div><div class="stat"><div class="stat-num blue">'+new Set(datiCache.map(e=>e.nome)).size+'</div><div class="stat-label">Collaboratori</div></div><div class="stat"><div class="stat-num red">'+datiCache.filter(e=>e.tipo===nomeCorrente('Errore')).length+'</div><div class="stat-label">'+nomeCorrente('Errore')+'</div></div><div class="stat"><div class="stat-num teal">'+datiCache.filter(e=>e.tipo===nomeCorrente('Malattia')).length+'</div><div class="stat-label">'+nomeCorrente('Malattia')+'</div></div><div class="stat"><div class="stat-num gold">'+datiCache.filter(e=>e.tipo===nomeCorrente('Apprezzamento')).length+'</div><div class="stat-label">'+nomeCorrente('Apprezzamento')+'</div></div>'}
 
