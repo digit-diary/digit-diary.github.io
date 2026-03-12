@@ -674,7 +674,7 @@ async function inviaNotaCollega(){const dest=document.getElementById('nota-dest'
   if(!da){toast('Seleziona prima un operatore (in alto)');return}if(!dest){toast('Seleziona un destinatario');return}if(!msg){toast('Scrivi un messaggio');return}
   try{const r=await sbPost('note_colleghi',{da_operatore:da,a_operatore:dest,messaggio:msg});noteColleghiCache.unshift(r[0]);document.getElementById('nota-msg').value='';renderNoteCollega();toast('Nota inviata a '+dest)}catch(e){toast('Errore invio')}}
 async function segnaNotaLetta(id){try{await sbPatch('note_colleghi','id=eq.'+id,{letta:true});const n=noteColleghiCache.find(n=>n.id===id);if(n)n.letta=true;renderNoteCollega()}catch(e){toast('Errore')}}
-async function eliminaNotaCollega(id){try{await sbDel('note_colleghi','id=eq.'+id);noteColleghiCache=noteColleghiCache.filter(n=>n.id!==id);renderNoteCollega();toast('Nota eliminata')}catch(e){toast('Errore')}}
+async function eliminaNotaCollega(id){if(!confirm('Eliminare questa nota?'))return;try{await sbDel('note_colleghi','id=eq.'+id);noteColleghiCache=noteColleghiCache.filter(n=>n.id!==id);renderNoteCollega();toast('Nota eliminata')}catch(e){toast('Errore')}}
 function renderNoteCollega(){const op=getOperatore()||(isAdmin()?'Admin':'');
   // Populate destinatario dropdown
   const sel=document.getElementById('nota-dest');if(sel){const cv=sel.value;const tutti=operatoriAuthCache.map(o=>o.nome).sort().filter(n=>n&&n!==op);
