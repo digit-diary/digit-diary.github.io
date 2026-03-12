@@ -866,7 +866,13 @@ window.addEventListener('load',async()=>{
   // Populate login dropdown
   const loginSel=document.getElementById('login-nome');if(loginSel){const ops=operatoriAuthCache.map(o=>o.nome).sort();
     loginSel.innerHTML='<option value="">-- Admin (password master) --</option>'+ops.map(n=>'<option value="'+escP(n)+'">'+escP(n)+'</option>').join('')}
-  if(sessionStorage.getItem('diario_auth')==='1'){document.getElementById('login-overlay').classList.add('hidden');if(getOperatore()){document.getElementById('operatore-display').textContent='Operatore: '+getOperatore();setTimeout(()=>mostraNoteNonLette(),800)}}
+  if(sessionStorage.getItem('diario_auth')==='1'){document.getElementById('login-overlay').classList.add('hidden');
+    if(getOperatore()){document.getElementById('operatore-display').textContent='Operatore: '+getOperatore();
+      // Check se deve ancora cambiare password
+      const authCheck=await sbGet('operatori_auth?nome=eq.'+encodeURIComponent(getOperatore())+'&select=deve_cambiare_pwd');
+      if(authCheck.length&&authCheck[0].deve_cambiare_pwd)setTimeout(()=>forzaCambioPwdOperatore(getOperatore()),300);
+      else setTimeout(()=>mostraNoteNonLette(),800);
+    }else if(isAdmin()){document.getElementById('operatore-display').textContent='Admin'}}
   else document.getElementById('pwd-input').focus();
   const n=new Date();document.getElementById('today-date').innerHTML=n.getDate()+' '+MESI[n.getMonth()]+' '+n.getFullYear()+'<br><small style="color:var(--muted);font-size:.75rem">'+GIORNI[n.getDay()]+'</small>';
   renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();
