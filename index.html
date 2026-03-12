@@ -370,7 +370,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 <div class="nav-tabs">
   <button class="nav-tab active" data-page="diario" onclick="switchPage('diario')">Diario</button>
   <button class="nav-tab" data-page="rapporto" onclick="switchPage('rapporto')">Rapporto Giornaliero</button>
-  <button class="nav-tab" data-page="note-collega" onclick="switchPage('note-collega')">Note Colleghi</button>
+  <button class="nav-tab" data-page="note-collega" onclick="switchPage('note-collega')">Note Colleghi <span id="note-badge" style="display:none;background:var(--accent);color:white;border-radius:9px;font-size:.7rem;padding:1px 6px;margin-left:4px;font-weight:700"></span></button>
   <button class="nav-tab" data-page="statistiche" onclick="switchPage('statistiche')">Statistiche</button>
   <button class="nav-tab" data-page="impostazioni" onclick="switchPage('impostazioni')">Impostazioni</button>
 </div>
@@ -697,6 +697,17 @@ function renderNoteCollega(){const op=getOperatore();
   // Note inviate (escluse nascoste per mittente)
   const inviate=noteColleghiCache.filter(n=>n.da_operatore===op&&!n.nascosta_mitt).slice(0,20);
   const il=document.getElementById('note-inviate-list');if(il){il.innerHTML=inviate.length?inviate.map(n=>'<div class="scad-item" style="flex-wrap:wrap"><div style="display:flex;align-items:center;gap:8px;width:100%"><span class="scad-date" style="min-width:100px;color:var(--accent2)">A: <strong>'+escP(n.a_operatore)+'</strong></span><span style="font-size:.78rem;color:var(--muted)">'+new Date(n.created_at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})+'</span><span style="font-size:.72rem;color:'+(n.letta?'#2c6e49':'var(--muted)')+';font-weight:600">'+(n.letta?'Letta':'Non letta')+'</span><button style="color:var(--accent2);border-color:var(--accent2);padding:2px 8px;font-size:.7rem" onclick="modificaNotaCollega('+n.id+')">Modifica</button><button style="color:#c0392b;border-color:#c0392b;padding:2px 8px;font-size:.7rem" onclick="annullaInvioNota('+n.id+')">Annulla invio</button><button style="color:var(--muted);border-color:var(--muted);padding:2px 8px;font-size:.7rem" onclick="eliminaNotaCollega('+n.id+',\'mitt\')">Nascondi</button></div><div style="padding:8px 0 4px;width:100%;font-size:.95rem">'+esc(n.messaggio)+'</div></div>').join(''):'<p style="color:var(--muted)">Nessuna nota inviata</p>'}}
+function aggiornaNoteBadge(){const op=getOperatore();const badge=document.getElementById('note-badge');if(!badge||!op)return;
+  const nonLette=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.letta&&!n.nascosta_dest).length;
+  if(nonLette>0){badge.style.display='inline';badge.textContent=nonLette}else{badge.style.display='none'}}
+async function pollNuoveNote(){if(sessionStorage.getItem('diario_auth')!=='1')return;
+  try{const nuove=await sbGet('note_colleghi?order=created_at.desc');
+    const op=getOperatore();const vecchieNonLette=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.letta&&!n.nascosta_dest).length;
+    noteColleghiCache=nuove;aggiornaNoteBadge();
+    const nuoveNonLette=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.letta&&!n.nascosta_dest).length;
+    if(nuoveNonLette>vecchieNonLette)toast('Hai '+nuoveNonLette+' nota/e non letta/e!');
+    const pg=sessionStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();
+  }catch(e){}}
 function mostraNoteNonLette(){const op=getOperatore();if(!op)return;
   const nonLette=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.letta&&!n.nascosta_dest);if(!nonLette.length)return;
   const mc=document.getElementById('note-modal-content');
@@ -886,8 +897,10 @@ window.addEventListener('load',async()=>{
     }else if(isAdmin()){document.getElementById('operatore-display').textContent='Admin'}}
   else document.getElementById('pwd-input').focus();
   const n=new Date();document.getElementById('today-date').innerHTML=n.getDate()+' '+MESI[n.getMonth()]+' '+n.getFullYear()+'<br><small style="color:var(--muted);font-size:.75rem">'+GIORNI[n.getDay()]+'</small>';
-  renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();
+  renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();aggiornaNoteBadge();
   const savedPage=sessionStorage.getItem('pagina_corrente');if(savedPage&&savedPage!=='diario')switchPage(savedPage);
+  // Polling note ogni 15 secondi
+  setInterval(pollNuoveNote,15000);
   // Flatpickr date pickers
   if(window.flatpickr){const fpOpts={locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,onChange:()=>render()};flatpickr('#filt-dal',fpOpts);flatpickr('#filt-al',fpOpts)}});
 document.getElementById('pwd-modal').addEventListener('click',function(e){if(e.target===this){const c=document.getElementById('pwd-modal-content').innerHTML;if(c.includes('predefinita')||c.includes('Cambia la password')||c.includes('Password impostata')||c.includes('Reimpostata')||c.includes('Benvenuto')||c.includes('scegli una nuova'))return;this.classList.add('hidden')}});
