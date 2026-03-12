@@ -475,14 +475,15 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 <div class="toast" id="toast"></div>
 
 <script>
-const SB_URL='https://bdxqtzehoapilwzqlgnv.supabase.co',SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkeHF0emVob2FwaWx3enFsZ252Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyNjI5MTAsImV4cCI6MjA4ODgzODkxMH0.Z5EEebXmH_eUBzFQMx14AvN0wkGc0FdaMXvUiFLIhP0';
+const _k='DiarioCL26',_a='IRArGgsoICV9Xw4gNAggXg0le0UNBzNHCiwKentdNDE3MSNWbSlLfDQKUj8AICoGSFIcKwkrBCk5FmF/NyAPOAU1KgUEfykjChchKXMpX2ArC1M0Hg4UNAFTKi8SKFtacQVbQS0KDEsaNRAFBH8pLxQQW1sqAHF8NDA5IwAgKQkBeD4kGDwDJnYBZnc3IAwkXQwABQR7LihVPS0IOQN2XTwkKUJHNXYJd1MmMQw6NgoWDkhwFSQZQ10uNQICQS8uAkIvCyIBakARACc+IAcTfA==',_u='LB0VAhpVbGNQUjwYFQgMBywtQl8oHhsDBQgtOhxFMRkAEAgcJmJRWQ==';function _d(e){const b=atob(e),r=[];for(let i=0;i<b.length;i++)r.push(String.fromCharCode(b.charCodeAt(i)^_k.charCodeAt(i%_k.length)));return r.join('')}
+const SB_URL=_d(_u),SB_KEY=_d(_a);
 const MESI=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
 const MESI_FULL=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 const GIORNI=['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
 const GIORNI_SHORT=['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
 const DEFAULT_PWD_HASH='7310db08dd56916e4ded25837db6cf4ff5005c958fb53e405a62fd10d2009cce';
 const TIPI_DEFAULT=[{nome:'Attività',colore:'#1a4a7a'},{nome:'Richiesta',colore:'#2c6e49'},{nome:'Errore',colore:'#c0392b'},{nome:'Ammonimento Verbale',colore:'#7b2d8b'},{nome:'Malattia',colore:'#1a7a6d'},{nome:'Apprezzamento',colore:'#b8860b'},{nome:'Nota',colore:'#8b6914'},{nome:'Altro',colore:'#8a7d6b'}];
-let tipiPersonalizzati=[],coloriOverride={},tipoSelezionato='Attività',modalEntryId=null,modalTipoSel=null,datiCache=[],pinnedIds=new Set(),scadenzeCache=[],pwdHash=null,recoveryCode=null,charts={},operatoriSalvati=[];
+let tipiPersonalizzati=[],coloriOverride={},tipoSelezionato='Attività',modalEntryId=null,modalTipoSel=null,datiCache=[],pinnedIds=new Set(),scadenzeCache=[],charts={},operatoriSalvati=[];
 let rapportoMese=new Date().getMonth(),rapportoAnno=new Date().getFullYear(),rapportoGiornoAperto=null,rapportiCache={},noteColleghiCache=[],operatoriAuthCache=[];
 const CAMPI_RAPPORTO_DEFAULT=[{key:'sup_note',label:'Supervisore',type:'input'},{key:'cassa_note',label:'Cassa',type:'text'},{key:'sala_note',label:'Sala',type:'text'},{key:'n_assegni',label:'Incasso Assegni',type:'text'},{key:'prelievi',label:'Prelievi',type:'text'},{key:'assenze',label:'Assenze',type:'text'}];
 let campiRapportoExtra=[],tipiNascosti=[],campiNascosti=[],tipiOrdine=[],campiOrdine=[],campiLabelOverride={},tipiRinominati={};
@@ -500,13 +501,13 @@ async function sbGet(path){const r=await fetch(SB_URL+'/rest/v1/'+path,{headers:
 async function sbPost(table,data,extra){const r=await fetch(SB_URL+'/rest/v1/'+table,{method:'POST',headers:sbH(Object.assign({'Prefer':'return=representation'},extra||{})),body:JSON.stringify(data)});if(!r.ok)throw new Error(await r.text());return r.json()}
 async function sbPatch(table,filter,data){const r=await fetch(SB_URL+'/rest/v1/'+table+'?'+filter,{method:'PATCH',headers:sbH({'Prefer':'return=representation'}),body:JSON.stringify(data)});if(!r.ok)throw new Error(await r.text())}
 async function sbDel(table,filter){await fetch(SB_URL+'/rest/v1/'+table+'?'+filter,{method:'DELETE',headers:sbH()})}
+async function sbRpc(fn,params){const r=await fetch(SB_URL+'/rest/v1/rpc/'+fn,{method:'POST',headers:sbH(),body:JSON.stringify(params||{})});return r.ok?r.json():null}
 async function getImp(k){const d=await sbGet('impostazioni?chiave=eq.'+k+'&select=valore');return d.length?d[0].valore:null}
 async function setImp(k,v){await sbPost('impostazioni',{chiave:k,valore:v},{'Prefer':'resolution=merge-duplicates,return=representation'})}
 
 // DATA LOADING
 async function loadAll(){
-  pwdHash=await getImp('password_hash')||DEFAULT_PWD_HASH;
-  recoveryCode=await getImp('recovery_code');
+  // password_hash e recovery_code ora gestiti server-side via RPC
   const tp=await getImp('tipi_personalizzati');if(tp)try{tipiPersonalizzati=JSON.parse(tp)}catch(e){}
   const co=await getImp('colori_override');if(co)try{coloriOverride=JSON.parse(co)}catch(e){}
   const ops=await getImp('operatori_lista');if(ops)try{operatoriSalvati=JSON.parse(ops)}catch(e){}
@@ -521,36 +522,38 @@ async function loadAll(){
   const pins=await sbGet('note_fissate?select=registrazione_id');pinnedIds=new Set(pins.map(p=>p.registrazione_id));
   scadenzeCache=await sbGet('scadenze?order=data_scadenza.asc');
   noteColleghiCache=await sbGet('note_colleghi?order=created_at.desc');
-  operatoriAuthCache=await sbGet('operatori_auth?select=nome,ruolo');
+  operatoriAuthCache=await sbRpc('list_operators')||[];
 }
 
 // PASSWORD
 async function checkPwd(){const nome=document.getElementById('login-nome').value.trim(),v=document.getElementById('pwd-input').value,h=await sha256(v),err=document.getElementById('login-error');
-  // Try individual operator login first
-  if(nome){const authData=await sbGet('operatori_auth?nome=eq.'+encodeURIComponent(nome)+'&select=nome,pwd_hash,ruolo,deve_cambiare_pwd');
-    if(authData.length&&authData[0].pwd_hash===h){sessionStorage.setItem('operatore_corrente',nome);sessionStorage.setItem('diario_auth','1');sessionStorage.removeItem('is_admin');document.getElementById('login-overlay').classList.add('hidden');document.getElementById('operatore-display').textContent='Operatore: '+nome;applicaTemaOperatore();
-      if(authData[0].deve_cambiare_pwd)setTimeout(()=>forzaCambioPwdOperatore(nome),300);
+  // Try individual operator login first (server-side verification)
+  if(nome){const res=await sbRpc('verify_login',{p_nome:nome,p_hash:h});
+    if(res&&res.valid){sessionStorage.setItem('operatore_corrente',nome);sessionStorage.setItem('diario_auth','1');sessionStorage.removeItem('is_admin');document.getElementById('login-overlay').classList.add('hidden');document.getElementById('operatore-display').textContent='Operatore: '+nome;applicaTemaOperatore();
+      if(res.deve_cambiare_pwd)setTimeout(()=>forzaCambioPwdOperatore(nome),300);
       else setTimeout(()=>mostraNoteNonLette(),500);return}
-    // If operator exists but wrong password
-    if(authData.length){err.textContent='Password errata per '+nome;document.getElementById('pwd-input').value='';document.getElementById('pwd-input').focus();setTimeout(()=>err.textContent='',2500);return}}
-  // Fallback: master password (admin)
-  if(h===pwdHash){document.getElementById('login-overlay').classList.add('hidden');sessionStorage.setItem('diario_auth','1');sessionStorage.setItem('is_admin','1');
+    if(res&&res.found){err.textContent='Password errata per '+nome;document.getElementById('pwd-input').value='';document.getElementById('pwd-input').focus();setTimeout(()=>err.textContent='',2500);return}}
+  // Fallback: master password (admin) - server-side verification
+  const masterRes=await sbRpc('verify_master_pwd',{p_hash:h});
+  if(masterRes&&masterRes.valid){document.getElementById('login-overlay').classList.add('hidden');sessionStorage.setItem('diario_auth','1');sessionStorage.setItem('is_admin','1');
     if(nome){sessionStorage.setItem('operatore_corrente',nome);document.getElementById('operatore-display').textContent='Operatore: '+nome;setTimeout(()=>mostraNoteNonLette(),500)}
     else{sessionStorage.setItem('operatore_corrente','Admin');document.getElementById('operatore-display').textContent='Admin';}
     applicaTemaOperatore();renderTipiUI();renderOperatoriUI();renderCampiRapportoUI();
   }else{err.textContent=nome?'Operatore non trovato o password errata':'Password errata';document.getElementById('pwd-input').value='';document.getElementById('pwd-input').focus();setTimeout(()=>err.textContent='',2500)}}
 function mostraForzaCambio(){const b=document.getElementById('pwd-modal-content');b.innerHTML='<h3>Cambia la password</h3><p>Password predefinita. Impostane una nuova.</p><div class="pwd-field"><label>Nuova password (min 4 car.)</label><input type="password" id="new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="eseguiPrimoCambio()">Imposta</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';document.getElementById('pwd-modal').classList.remove('hidden');setTimeout(()=>document.getElementById('new-pwd-1').focus(),100)}
 async function eseguiPrimoCambio(){const p1=document.getElementById('new-pwd-1').value,p2=document.getElementById('new-pwd-2').value,err=document.getElementById('pwd-modal-error');if(p1.length<4){err.textContent='Troppo corta';return}if(p1!==p2){err.textContent='Non coincidono';return}
-  const nh=await sha256(p1),nc=genCode();await setImp('password_hash',nh);await setImp('recovery_code',nc);pwdHash=nh;recoveryCode=nc;
+  const nh=await sha256(p1),nc=genCode();await sbRpc('setup_master_pwd',{p_default_hash:DEFAULT_PWD_HASH,p_new_hash:nh,p_new_recovery:nc});
   document.getElementById('pwd-modal-content').innerHTML='<h3>Password impostata!</h3><div class="recovery-code-box"><div class="code">'+nc+'</div><small>Salvalo in un posto sicuro.</small></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\');chiediOperatore()">OK</button></div>';toast('Password impostata!')}
 function cambiaPassword(){const b=document.getElementById('pwd-modal-content');b.innerHTML='<h3>Cambia password</h3><p>Inserisci la password attuale</p><div class="pwd-field"><label>Password attuale</label><input type="password" id="old-pwd"></div><div class="pwd-field"><label>Nuova password</label><input type="password" id="new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiCambioPwd()">Conferma</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';document.getElementById('pwd-modal').classList.remove('hidden')}
-async function eseguiCambioPwd(){const o=document.getElementById('old-pwd').value,p1=document.getElementById('new-pwd-1').value,p2=document.getElementById('new-pwd-2').value,err=document.getElementById('pwd-modal-error');if(await sha256(o)!==pwdHash){err.textContent='Password attuale errata';return}if(p1.length<4){err.textContent='Troppo corta';return}if(p1!==p2){err.textContent='Non coincidono';return}
-  const nh=await sha256(p1),nc=genCode();await setImp('password_hash',nh);await setImp('recovery_code',nc);pwdHash=nh;recoveryCode=nc;
+async function eseguiCambioPwd(){const o=document.getElementById('old-pwd').value,p1=document.getElementById('new-pwd-1').value,p2=document.getElementById('new-pwd-2').value,err=document.getElementById('pwd-modal-error');if(p1.length<4){err.textContent='Troppo corta';return}if(p1!==p2){err.textContent='Non coincidono';return}
+  const oh=await sha256(o),nh=await sha256(p1),nc=genCode();const res=await sbRpc('change_master_pwd',{p_old_hash:oh,p_new_hash:nh,p_new_recovery:nc});
+  if(!res||!res.success){err.textContent='Password attuale errata';return}
   document.getElementById('pwd-modal-content').innerHTML='<h3>Aggiornata!</h3><div class="recovery-code-box"><div class="code">'+nc+'</div><small>Nuovo codice di recupero.</small></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">OK</button></div>';toast('Password aggiornata!')}
-function recuperoPassword(){if(!recoveryCode){document.getElementById('login-error').textContent='Nessun codice di recupero';setTimeout(()=>document.getElementById('login-error').textContent='',3000);return}
+async function recuperoPassword(){const rc=await sbRpc('has_recovery_code');if(!rc||!rc.exists){document.getElementById('login-error').textContent='Nessun codice di recupero';setTimeout(()=>document.getElementById('login-error').textContent='',3000);return}
   const b=document.getElementById('pwd-modal-content');b.innerHTML='<h3>Recupero</h3><div class="pwd-field"><label>Codice recupero</label><input type="text" id="recovery-input" style="text-transform:uppercase;letter-spacing:.2em;text-align:center"></div><div class="pwd-field"><label>Nuova password</label><input type="password" id="new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiRecupero()">Reimposta</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';document.getElementById('pwd-modal').classList.remove('hidden')}
-async function eseguiRecupero(){const c=document.getElementById('recovery-input').value.toUpperCase().trim(),p1=document.getElementById('new-pwd-1').value,p2=document.getElementById('new-pwd-2').value,err=document.getElementById('pwd-modal-error');if(c!==recoveryCode){err.textContent='Codice errato';return}if(p1.length<4){err.textContent='Troppo corta';return}if(p1!==p2){err.textContent='Non coincidono';return}
-  const nh=await sha256(p1),nc=genCode();await setImp('password_hash',nh);await setImp('recovery_code',nc);pwdHash=nh;recoveryCode=nc;
+async function eseguiRecupero(){const c=document.getElementById('recovery-input').value.toUpperCase().trim(),p1=document.getElementById('new-pwd-1').value,p2=document.getElementById('new-pwd-2').value,err=document.getElementById('pwd-modal-error');if(p1.length<4){err.textContent='Troppo corta';return}if(p1!==p2){err.textContent='Non coincidono';return}
+  const nh=await sha256(p1),nc=genCode();const res=await sbRpc('recovery_master_pwd',{p_code:c,p_new_hash:nh,p_new_recovery:nc});
+  if(!res||!res.success){err.textContent='Codice errato';return}
   document.getElementById('pwd-modal-content').innerHTML='<h3>Reimpostata!</h3><div class="recovery-code-box"><div class="code">'+nc+'</div></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">OK</button></div>';toast('Password reimpostata!')}
 
 // OPERATORE
@@ -565,7 +568,7 @@ function forzaCambioPwdOperatore(nome){const b=document.getElementById('pwd-moda
   document.getElementById('pwd-modal').classList.remove('hidden');setTimeout(()=>document.getElementById('op-new-pwd-1').focus(),100)}
 async function eseguiForzaCambioPwdOp(nome){const p1=document.getElementById('op-new-pwd-1').value,p2=document.getElementById('op-new-pwd-2').value,err=document.getElementById('pwd-modal-error');
   if(p1.length<4){err.textContent='Troppo corta (min 4)';return}if(p1!==p2){err.textContent='Le password non coincidono';return}
-  const nh=await sha256(p1);try{await sbPatch('operatori_auth','nome=eq.'+encodeURIComponent(nome),{pwd_hash:nh,deve_cambiare_pwd:false});
+  const nh=await sha256(p1);try{await sbRpc('force_change_pwd',{p_nome:nome,p_new_hash:nh,p_deve_cambiare:false});
   document.getElementById('pwd-modal-content').innerHTML='<h3>Password impostata!</h3><p style="text-align:center;color:var(--muted)">Da ora accedi con la tua nuova password.</p><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\');mostraNoteNonLette()">OK</button></div>';
   toast('Password personale impostata!')}catch(e){err.textContent='Errore salvataggio'}}
 function esci(){sessionStorage.removeItem('diario_auth');sessionStorage.removeItem('operatore_corrente');sessionStorage.removeItem('is_admin');location.reload()}
@@ -574,7 +577,7 @@ async function resetPasswordOperatore(nome){const b=document.getElementById('pwd
   document.getElementById('pwd-modal').classList.remove('hidden')}
 async function eseguiResetPwdOp(nome){const p1=document.getElementById('reset-pwd-1').value,p2=document.getElementById('reset-pwd-2').value,err=document.getElementById('pwd-modal-error');
   if(p1.length<4){err.textContent='Minimo 4 caratteri';return}if(p1!==p2){err.textContent='Non coincidono';return}
-  const nh=await sha256(p1);try{await sbPatch('operatori_auth','nome=eq.'+encodeURIComponent(nome),{pwd_hash:nh,deve_cambiare_pwd:true});
+  const nh=await sha256(p1);try{await sbRpc('force_change_pwd',{p_nome:nome,p_new_hash:nh,p_deve_cambiare:true});
   document.getElementById('pwd-modal-content').innerHTML='<h3>Password resettata!</h3><p style="text-align:center">'+escP(nome)+' dovrà cambiarla al prossimo accesso.</p><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">OK</button></div>';
   toast('Password di '+nome+' resettata')}catch(e){err.textContent='Errore'}}
 function isAdmin(){return sessionStorage.getItem('is_admin')==='1'}
@@ -582,19 +585,19 @@ async function aggiungiOperatoreConPwd(){const n=document.getElementById('new-op
   if(!n){toast('Inserisci un nome');return}if(p.length<4){toast('Password minimo 4 caratteri');return}
   if(p!==p2){toast('Le password non coincidono');return}
   if(operatoriAuthCache.find(o=>o.nome.toLowerCase()===n.toLowerCase())){toast('Operatore già esistente');return}
-  const h=await sha256(p);try{await sbPost('operatori_auth',{nome:n,pwd_hash:h,deve_cambiare_pwd:true});operatoriAuthCache.push({nome:n,ruolo:'operatore'});
+  const h=await sha256(p);try{await sbRpc('add_operator',{p_nome:n,p_hash:h});operatoriAuthCache.push({nome:n,ruolo:'operatore'});
   if(!operatoriSalvati.includes(n)){operatoriSalvati.push(n);operatoriSalvati.sort();await saveOperatori()}
   document.getElementById('new-operatore-nome').value='';document.getElementById('new-operatore-pwd').value='';document.getElementById('new-operatore-pwd2').value='';renderOperatoriUI();toast('Operatore "'+n+'" creato con password')}catch(e){toast('Errore creazione')}}
 async function rimuoviOperatore(n){if(!confirm('Rimuovere operatore "'+n+'"?'))return;operatoriSalvati=operatoriSalvati.filter(o=>o!==n);await saveOperatori();
-  try{await sbDel('operatori_auth','nome=eq.'+encodeURIComponent(n));operatoriAuthCache=operatoriAuthCache.filter(o=>o.nome!==n)}catch(e){}renderOperatoriUI();toast('Rimosso')}
+  try{await sbRpc('remove_operator',{p_nome:n});operatoriAuthCache=operatoriAuthCache.filter(o=>o.nome!==n)}catch(e){}renderOperatoriUI();toast('Rimosso')}
 async function cambiaPasswordOperatore(){const op=getOperatore();if(!op){toast('Seleziona prima un operatore');return}
   const b=document.getElementById('pwd-modal-content');b.innerHTML='<h3>Cambia password operatore</h3><p>Operatore: <strong>'+escP(op)+'</strong></p><div class="pwd-field"><label>Password attuale</label><input type="password" id="op-old-pwd"></div><div class="pwd-field"><label>Nuova password (min 4)</label><input type="password" id="op-new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="op-new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiCambioPwdOp()">Conferma</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';
   document.getElementById('pwd-modal').classList.remove('hidden')}
 async function eseguiCambioPwdOp(){const op=getOperatore(),o=document.getElementById('op-old-pwd').value,p1=document.getElementById('op-new-pwd-1').value,p2=document.getElementById('op-new-pwd-2').value,err=document.getElementById('pwd-modal-error');
-  const oh=await sha256(o);const auth=await sbGet('operatori_auth?nome=eq.'+encodeURIComponent(op));
-  if(!auth.length||auth[0].pwd_hash!==oh){err.textContent='Password attuale errata';return}
-  if(p1.length<4){err.textContent='Troppo corta';return}if(p1!==p2){err.textContent='Non coincidono';return}
-  const nh=await sha256(p1);try{await sbPatch('operatori_auth','nome=eq.'+encodeURIComponent(op),{pwd_hash:nh});
+  const oh=await sha256(o);if(p1.length<4){err.textContent='Troppo corta';return}if(p1!==p2){err.textContent='Non coincidono';return}
+  const nh=await sha256(p1);const res=await sbRpc('change_op_pwd',{p_nome:op,p_old_hash:oh,p_new_hash:nh});
+  if(!res||!res.success){err.textContent='Password attuale errata';return}
+  try{
   document.getElementById('pwd-modal-content').innerHTML='<h3>Password aggiornata!</h3><p style="text-align:center;color:var(--muted)">La tua password è stata cambiata.</p><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">OK</button></div>';
   toast('Password operatore aggiornata!')}catch(e){err.textContent='Errore salvataggio'}}
 function selezionaOperatore(n){sessionStorage.setItem('operatore_corrente',n);chiudiTuttiModali();document.getElementById('operatore-display').textContent='Operatore: '+n;renderOperatoriUI();toast('Operatore: '+n)}
@@ -985,16 +988,16 @@ window.addEventListener('load',async()=>{
   if(localStorage.getItem('tema')==='dark'){document.body.classList.add('dark-theme');document.getElementById('btn-tema').textContent='Tema chiaro'}// tema provvisorio, poi si applica quello dell'operatore
   document.getElementById('entries-list').innerHTML='<div class="loading">Caricamento...</div>';
   await loadAll();
-  const h=document.getElementById('login-hint');if(pwdHash===DEFAULT_PWD_HASH)h.innerHTML='Accedi come Admin oppure seleziona il tuo nome';
-  else if(operatoriAuthCache.length)h.innerHTML='Accedi come Admin oppure seleziona il tuo nome';
+  const h=document.getElementById('login-hint');const defCheck=await sbRpc('is_default_master_pwd',{p_default_hash:DEFAULT_PWD_HASH});
+  if((defCheck&&defCheck.is_default)||operatoriAuthCache.length)h.innerHTML='Accedi come Admin oppure seleziona il tuo nome';
   // Populate login dropdown
   const loginSel=document.getElementById('login-nome');if(loginSel){const ops=operatoriAuthCache.map(o=>o.nome).sort();
     loginSel.innerHTML='<option value="">-- Admin (password master) --</option>'+ops.map(n=>'<option value="'+escP(n)+'">'+escP(n)+'</option>').join('')}
   if(sessionStorage.getItem('diario_auth')==='1'){document.getElementById('login-overlay').classList.add('hidden');applicaTemaOperatore();
     if(getOperatore()){document.getElementById('operatore-display').textContent='Operatore: '+getOperatore();
       // Check se deve ancora cambiare password
-      const authCheck=await sbGet('operatori_auth?nome=eq.'+encodeURIComponent(getOperatore())+'&select=deve_cambiare_pwd');
-      if(authCheck.length&&authCheck[0].deve_cambiare_pwd)setTimeout(()=>forzaCambioPwdOperatore(getOperatore()),300);
+      const authCheck=await sbRpc('check_deve_cambiare',{p_nome:getOperatore()});
+      if(authCheck&&authCheck.deve_cambiare_pwd)setTimeout(()=>forzaCambioPwdOperatore(getOperatore()),300);
       else setTimeout(()=>mostraNoteNonLette(),800);
     }else if(isAdmin()){document.getElementById('operatore-display').textContent='Admin'}}
   else document.getElementById('pwd-input').focus();
