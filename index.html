@@ -603,7 +603,7 @@ function renderCampiRapportoUI(){const el=document.getElementById('rapporto-camp
 function toggleTema(){document.body.classList.toggle('dark-theme');const isDark=document.body.classList.contains('dark-theme');localStorage.setItem('tema',isDark?'dark':'light');document.getElementById('btn-tema').textContent=isDark?'Tema chiaro':'Tema scuro'}
 
 // NAVIGATION
-function switchPage(name){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');document.querySelector('.nav-tab[data-page="'+name+'"]').classList.add('active');
+function switchPage(name){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');document.querySelector('.nav-tab[data-page="'+name+'"]').classList.add('active');sessionStorage.setItem('pagina_corrente',name);
   if(name==='statistiche')renderStatistiche();if(name==='rapporto')renderRapporto();if(name==='note-collega')renderNoteCollega();if(name==='impostazioni'){renderTipiUI();renderScadenzeSettings();renderOperatoriUI();renderCampiRapportoUI();
     const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=(isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'')+'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}}}
 
@@ -675,7 +675,7 @@ async function inviaNotaCollega(){const dest=document.getElementById('nota-dest'
   try{const r=await sbPost('note_colleghi',{da_operatore:da,a_operatore:dest,messaggio:msg});noteColleghiCache.unshift(r[0]);document.getElementById('nota-msg').value='';renderNoteCollega();toast('Nota inviata a '+dest)}catch(e){toast('Errore invio')}}
 async function segnaNotaLetta(id){try{await sbPatch('note_colleghi','id=eq.'+id,{letta:true});const n=noteColleghiCache.find(n=>n.id===id);if(n)n.letta=true;renderNoteCollega()}catch(e){toast('Errore')}}
 async function eliminaNotaCollega(id){try{await sbDel('note_colleghi','id=eq.'+id);noteColleghiCache=noteColleghiCache.filter(n=>n.id!==id);renderNoteCollega();toast('Nota eliminata')}catch(e){toast('Errore')}}
-function renderNoteCollega(){const op=getOperatore();
+function renderNoteCollega(){const op=getOperatore()||(isAdmin()?'Admin':'');
   // Populate destinatario dropdown
   const sel=document.getElementById('nota-dest');if(sel){const cv=sel.value;const tutti=operatoriAuthCache.map(o=>o.nome).sort().filter(n=>n&&n!==op);
     sel.innerHTML='<option value="">Seleziona operatore...</option>'+tutti.map(n=>'<option'+(n===cv?' selected':'')+'>'+escP(n)+'</option>').join('')}
@@ -870,6 +870,7 @@ window.addEventListener('load',async()=>{
   else document.getElementById('pwd-input').focus();
   const n=new Date();document.getElementById('today-date').innerHTML=n.getDate()+' '+MESI[n.getMonth()]+' '+n.getFullYear()+'<br><small style="color:var(--muted);font-size:.75rem">'+GIORNI[n.getDay()]+'</small>';
   renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();
+  const savedPage=sessionStorage.getItem('pagina_corrente');if(savedPage&&savedPage!=='diario')switchPage(savedPage);
   // Flatpickr date pickers
   if(window.flatpickr){const fpOpts={locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,onChange:()=>render()};flatpickr('#filt-dal',fpOpts);flatpickr('#filt-al',fpOpts)}});
 document.getElementById('pwd-modal').addEventListener('click',function(e){if(e.target===this){const c=document.getElementById('pwd-modal-content').innerHTML;if(c.includes('predefinita')||c.includes('Cambia la password')||c.includes('Password impostata')||c.includes('Reimpostata')||c.includes('Benvenuto')||c.includes('scegli una nuova'))return;this.classList.add('hidden')}});
