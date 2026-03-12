@@ -885,8 +885,10 @@ function apriModulo(tipo){
   const area=document.getElementById('modulo-form-area');area.style.display='block';
   const op=getOperatore()||'';const oggi=new Date().toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'});
   let html='<div class="main-card" style="margin-top:18px"><div class="card-header">';
+  const aiBox='<div class="ai-gen-box" style="margin-bottom:16px;padding:14px;background:linear-gradient(135deg,rgba(102,126,234,.08),rgba(118,75,162,.08));border:1.5px solid rgba(102,126,234,.25);border-radius:6px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:1.1rem">&#9733;</span><strong style="font-size:.92rem">Genera con AI</strong><span style="font-size:.78rem;color:var(--muted)">Descrivi la situazione e l\'AI compila tutti i campi</span></div><textarea id="ai-gen-prompt" placeholder="Es: devo preparare un allineamento per il coordinatore Valet Troncao Hugo in quanto ha modificato manualmente la voce funzione da coordinatore a responsabile..." style="width:100%;min-height:70px;padding:10px;border:1px solid var(--line);border-radius:4px;font-size:.88rem;background:var(--paper);color:var(--ink);resize:vertical"></textarea><div style="margin-top:8px;display:flex;gap:8px;align-items:center"><button class="btn-ai" id="btn-ai-gen" onclick="generaModuloAI(\''+tipo+'\')">Genera tutti i campi</button><span id="ai-gen-status" style="font-size:.78rem;color:var(--muted)"></span></div></div>';
   if(tipo==='allineamento'){
     html+='Rilevamento di non conformità e colloquio di allineamento</div><div style="padding:18px">';
+    html+=aiBox;
     html+='<div class="modulo-field"><label>Collaboratore</label><div class="ac-wrap"><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." oninput="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')" onfocus="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')"><div class="ac-drop" id="ac-mod-nomi"></div></div></div>';
     html+='<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="Sig.ra Fertitta Lara"></div>';
     html+='<div class="modulo-field"><label>Data</label><input type="text" id="mod-data" value="'+oggi+'"></div>';
@@ -895,6 +897,7 @@ function apriModulo(tipo){
     html+='<div class="modulo-field"><label>Scadenza</label><input type="text" id="mod-scadenza" placeholder="Termine di verifica..."></div>';
   }else if(tipo==='apprezzamento'){
     html+='Colloquio di apprezzamento</div><div style="padding:18px">';
+    html+=aiBox;
     html+='<div class="modulo-field"><label>Collaboratore</label><div class="ac-wrap"><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." oninput="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')" onfocus="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')"><div class="ac-drop" id="ac-mod-nomi"></div></div></div>';
     html+='<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="Sig.ra Fertitta Lara"></div>';
     html+='<div class="modulo-field"><label>Data</label><input type="text" id="mod-data" value="'+oggi+'"></div>';
@@ -902,6 +905,7 @@ function apriModulo(tipo){
     html+='<div class="modulo-field"><label>Osservazioni da parte del Resp. Settore</label><textarea id="mod-osservazioni" placeholder="Osservazioni..."></textarea><div class="btn-ai-wrap"><button class="btn-ai" onclick="miglioraTesto(\'mod-osservazioni\',\'osservazioni\')">Migliora testo con AI</button></div></div>';
   }else if(tipo==='rdi'){
     html+='Rapporto disciplinare interno (RDI)</div><div style="padding:18px">';
+    html+=aiBox;
     html+='<div class="modulo-field"><label>Collaboratore</label><div class="ac-wrap"><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." oninput="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')" onfocus="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')"><div class="ac-drop" id="ac-mod-nomi"></div></div></div>';
     html+='<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="Sig.ra Fertitta Lara"></div>';
     html+='<div class="modulo-field"><label>Data</label><input type="text" id="mod-data" value="'+oggi+'"></div>';
@@ -1128,6 +1132,41 @@ async function miglioraTesto(fieldId,contesto){const el=document.getElementById(
     if(migliorato){el.value=migliorato.trim();toast('Testo migliorato!')}else throw new Error('Nessuna risposta')
   }catch(e){console.error(e);toast('Errore AI: verifica la chiave Gemini')}
   if(btn){btn.disabled=false;btn.textContent='Migliora testo con AI'}}
+async function generaModuloAI(tipo){
+  const prompt=(document.getElementById('ai-gen-prompt')||{}).value||'';
+  if(!prompt.trim()){toast('Scrivi una descrizione della situazione');return}
+  if(!geminiKey){toast('Configura la chiave Gemini nelle Impostazioni');return}
+  const btn=document.getElementById('btn-ai-gen');const status=document.getElementById('ai-gen-status');
+  if(btn){btn.disabled=true;btn.textContent='Generazione in corso...'}
+  if(status)status.textContent='L\'AI sta compilando i campi...';
+  let fields='';
+  if(tipo==='allineamento'||tipo==='rdi'){
+    fields='- collaboratore: nome completo del collaboratore (es. "Sig. Troncao Hugo Camilo")\n- non_conformita: descrizione dettagliata della non conformità rilevata (2-3 paragrafi, formale, in terza persona)\n- obiettivo: obiettivo concordato per evitare il ripetersi (elenco puntato con "Si invita formalmente il collaboratore a:")\n- scadenza: termine di verifica (es. "A partire da subito" oppure una data specifica se menzionata)';
+  }else if(tipo==='apprezzamento'){
+    fields='- collaboratore: nome completo del collaboratore\n- descrizione: descrizione dettagliata del merito/apprezzamento (2-3 paragrafi, formale, valorizzando il contributo)\n- osservazioni: osservazioni del Resp. Settore (commento positivo e incoraggiamento)';
+  }
+  const sysPrompt='Sei il responsabile HR del Casino Lugano SA, in Svizzera. Devi compilare un modulo '+tipo+' basandoti sulla descrizione fornita dall\'operatore.\n\nREGOLE:\n- Scrivi in italiano formale, in terza persona ("il collaboratore", "il Sig./la Sig.ra")\n- Sii dettagliato e preciso: usa date, orari, circostanze se presenti nella descrizione\n- Per le non conformità usa espressioni come "si rileva che...", "tale condotta non è conforme...", "dalla revisione risulta che..."\n- Per gli obiettivi usa "Si invita formalmente il collaboratore a:" seguito da elenco puntato\n- NON inventare fatti non presenti nella descrizione\n- Rispondi SOLO con un JSON valido con questi campi:\n'+fields+'\n\nDescrizione dell\'operatore:\n'+prompt;
+  try{
+    const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+geminiKey,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{parts:[{text:sysPrompt}]}],generationConfig:{temperature:0.4,maxOutputTokens:1500}})});
+    if(!r.ok)throw new Error('API error '+r.status);
+    const data=await r.json();let txt=data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if(!txt)throw new Error('Nessuna risposta');
+    txt=txt.replace(/```json\s*/g,'').replace(/```\s*/g,'').trim();
+    const parsed=JSON.parse(txt);
+    if(parsed.collaboratore){const el=document.getElementById('mod-collaboratore');if(el)el.value=parsed.collaboratore}
+    if(tipo==='allineamento'||tipo==='rdi'){
+      if(parsed.non_conformita){const el=document.getElementById('mod-non-conf');if(el)el.value=parsed.non_conformita}
+      if(parsed.obiettivo){const el=document.getElementById('mod-obiettivo');if(el)el.value=parsed.obiettivo}
+      if(parsed.scadenza){const el=document.getElementById('mod-scadenza');if(el)el.value=parsed.scadenza}
+    }else if(tipo==='apprezzamento'){
+      if(parsed.descrizione){const el=document.getElementById('mod-descrizione');if(el)el.value=parsed.descrizione}
+      if(parsed.osservazioni){const el=document.getElementById('mod-osservazioni');if(el)el.value=parsed.osservazioni}
+    }
+    if(status)status.innerHTML='<span style="color:#2c6e49">Campi compilati! Verifica e modifica se necessario.</span>';
+    toast('Campi compilati dall\'AI!')
+  }catch(e){console.error(e);if(status)status.innerHTML='<span style="color:#c0392b">Errore: verifica la chiave Gemini</span>';toast('Errore AI')}
+  if(btn){btn.disabled=false;btn.textContent='Genera tutti i campi'}}
 
 // IMPORTA MODULO DA WORD/PDF
 async function importaModuloFile(input){const file=input.files[0];if(!file)return;
