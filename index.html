@@ -677,7 +677,7 @@ async function segnaNotaLetta(id){try{await sbPatch('note_colleghi','id=eq.'+id,
 async function eliminaNotaCollega(id){try{await sbDel('note_colleghi','id=eq.'+id);noteColleghiCache=noteColleghiCache.filter(n=>n.id!==id);renderNoteCollega();toast('Nota eliminata')}catch(e){toast('Errore')}}
 function renderNoteCollega(){const op=getOperatore();
   // Populate destinatario dropdown
-  const sel=document.getElementById('nota-dest');if(sel){const cv=sel.value;const tutti=[...new Set([...operatoriSalvati,...operatoriAuthCache.map(o=>o.nome),...(datiCache.map(e=>e.operatore).filter(Boolean))])].sort().filter(n=>n&&n!==op);
+  const sel=document.getElementById('nota-dest');if(sel){const cv=sel.value;const tutti=operatoriAuthCache.map(o=>o.nome).sort().filter(n=>n&&n!==op);
     sel.innerHTML='<option value="">Seleziona operatore...</option>'+tutti.map(n=>'<option'+(n===cv?' selected':'')+'>'+escP(n)+'</option>').join('')}
   const da=document.getElementById('nota-da');if(da)da.value=op||'(nessun operatore selezionato)';
   // Note ricevute
@@ -864,7 +864,7 @@ window.addEventListener('load',async()=>{
   const h=document.getElementById('login-hint');if(pwdHash===DEFAULT_PWD_HASH)h.innerHTML='Accedi come Admin oppure seleziona il tuo nome';
   else if(operatoriAuthCache.length)h.innerHTML='Accedi come Admin oppure seleziona il tuo nome';
   // Populate login dropdown
-  const loginSel=document.getElementById('login-nome');if(loginSel){const ops=[...new Set([...operatoriAuthCache.map(o=>o.nome),...operatoriSalvati])].sort();
+  const loginSel=document.getElementById('login-nome');if(loginSel){const ops=operatoriAuthCache.map(o=>o.nome).sort();
     loginSel.innerHTML='<option value="">-- Admin (password master) --</option>'+ops.map(n=>'<option value="'+escP(n)+'">'+escP(n)+'</option>').join('')}
   if(sessionStorage.getItem('diario_auth')==='1'){document.getElementById('login-overlay').classList.add('hidden');if(getOperatore()){document.getElementById('operatore-display').textContent='Operatore: '+getOperatore();setTimeout(()=>mostraNoteNonLette(),800)}}
   else document.getElementById('pwd-input').focus();
