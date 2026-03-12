@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
 <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/it.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root{--ink:#1a1208;--paper:#faf7f2;--paper2:#f3ede3;--line:#e8dfd0;--accent:#c0392b;--accent2:#8b6914;--muted:#8a7d6b;--shadow:rgba(26,18,8,0.1)}
 body.dark-theme{--ink:#e0d8c8;--paper:#1a1a2e;--paper2:#16213e;--line:#2a2a44;--accent:#e74c3c;--accent2:#d4a017;--muted:#9a9aaa;--shadow:rgba(0,0,0,0.3);background:#0f0f1a;background-image:repeating-linear-gradient(45deg,transparent,transparent 40px,rgba(255,255,255,0.015) 40px,rgba(255,255,255,0.015) 41px)}
@@ -385,6 +386,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
   <button class="nav-tab" data-page="note-collega" onclick="switchPage('note-collega')">Note Colleghi <span id="note-badge" style="display:none;background:var(--accent);color:white;border-radius:9px;font-size:.7rem;padding:1px 6px;margin-left:4px;font-weight:700"></span></button>
   <button class="nav-tab" data-page="statistiche" onclick="switchPage('statistiche')">Statistiche</button>
   <button class="nav-tab" data-page="moduli" onclick="switchPage('moduli')">Moduli</button>
+  <button class="nav-tab" data-page="registro" onclick="switchPage('registro')" id="tab-registro" style="display:none">Registro Attività</button>
   <button class="nav-tab" data-page="impostazioni" onclick="switchPage('impostazioni')">Impostazioni</button>
 </div>
 
@@ -467,6 +469,20 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 </div>
 
 <!-- IMPOSTAZIONI -->
+<!-- REGISTRO ATTIVITA -->
+<div class="page" id="page-registro">
+  <div class="main-card">
+    <div class="card-header">Registro attività operatori</div>
+    <div style="padding:14px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--paper2)">
+      <div class="filter-group"><span class="filter-label">Operatore</span><select id="log-filt-op" onchange="renderRegistro()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"><option value="">Tutti</option></select></div>
+      <div class="filter-group"><span class="filter-label">Cerca</span><input type="text" id="log-filt-cerca" placeholder="Cerca..." oninput="renderRegistro()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink);width:160px"></div>
+      <div class="filter-group"><span class="filter-label">Dal</span><input type="date" id="log-filt-dal" onchange="renderRegistro()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"></div>
+      <div class="filter-group"><span class="filter-label">Al</span><input type="date" id="log-filt-al" onchange="renderRegistro()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"></div>
+    </div>
+    <div id="registro-list" style="padding:12px 18px"></div>
+  </div>
+</div>
+
 <!-- MODULI DISCIPLINARI -->
 <div class="page" id="page-moduli">
   <div class="main-card">
@@ -497,7 +513,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
   <div class="settings-section"><h4>Campi Rapporto Giornaliero</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Gestisci le sezioni visibili nel rapporto giornaliero.</p><div id="rapporto-campi-list"></div>
     <div class="add-tipo-row" style="margin-top:14px"><div class="field"><label>Nome nuovo campo</label><input type="text" id="new-campo-nome" placeholder="es. Bar, VIP Area..."></div><button class="btn-add-tipo" onclick="aggiungiCampoRapporto()">+ Aggiungi</button></div></div>
   <div class="settings-section" id="collab-section" style="display:none"><h4>Gestione Collaboratori</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Lista master dei nomi collaboratori per l'autocomplete nel diario e nei moduli.</p><div id="collaboratori-list" style="margin-bottom:14px"></div>
-    <div class="add-tipo-row"><div class="field"><label>Nome nuovo collaboratore</label><input type="text" id="new-collab-nome" placeholder="Nome e Cognome..."></div><button class="btn-add-tipo" onclick="aggiungiCollaboratore()">+ Aggiungi</button></div></div>
+    <div class="add-tipo-row"><div class="field"><label>Nome nuovo collaboratore</label><input type="text" id="new-collab-nome" placeholder="Nome e Cognome..."></div><button class="btn-add-tipo" onclick="aggiungiCollaboratore()">+ Aggiungi</button><button class="btn-add-tipo" onclick="document.getElementById('import-collab-file').click()" style="background:var(--accent2)">Importa Excel/CSV</button><input type="file" id="import-collab-file" accept=".xlsx,.xls,.csv,.txt" style="display:none" onchange="importaCollaboratori(this)"></div></div>
   <div class="settings-section"><h4>Scadenze attive</h4><div id="scadenze-settings-list"></div></div>
   <div class="settings-section"><h4>Operatori</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Operatore attuale: <strong id="op-attuale">—</strong>. Ogni operatore accede con il proprio nome e password.</p><div id="operatori-list" style="margin-bottom:14px"></div>
     <div class="add-tipo-row" style="align-items:flex-end"><div class="field"><label>Nome</label><input type="text" id="new-operatore-nome" placeholder="Nome..."></div><div class="field"><label>Password</label><input type="password" id="new-operatore-pwd" placeholder="Min 4 caratteri..."></div><div class="field"><label>Conferma password</label><input type="password" id="new-operatore-pwd2" placeholder="Ripeti..."></div><button class="btn-add-tipo" onclick="aggiungiOperatoreConPwd()">+ Crea operatore</button></div></div>
@@ -519,7 +535,7 @@ let tipiPersonalizzati=[],coloriOverride={},tipoSelezionato='Attività',modalEnt
 let rapportoMese=new Date().getMonth(),rapportoAnno=new Date().getFullYear(),rapportoGiornoAperto=null,rapportiCache={},noteColleghiCache=[],operatoriAuthCache=[];
 const CAMPI_RAPPORTO_DEFAULT=[{key:'sup_note',label:'Supervisore',type:'input'},{key:'cassa_note',label:'Cassa',type:'text'},{key:'sala_note',label:'Sala',type:'text'},{key:'n_assegni',label:'Incasso Assegni',type:'text'},{key:'prelievi',label:'Prelievi',type:'text'},{key:'assenze',label:'Assenze',type:'text'}];
 let campiRapportoExtra=[],tipiNascosti=[],campiNascosti=[],tipiOrdine=[],campiOrdine=[],campiLabelOverride={},tipiRinominati={};
-let collaboratoriCache=[],moduliCache=[];
+let collaboratoriCache=[],moduliCache=[],logCache=[];
 function nomeCorrente(orig){return tipiRinominati[orig]||orig}
 function getTuttiTipi(){let list=[...TIPI_DEFAULT.filter(t=>!tipiNascosti.includes(t.nome)).map(t=>{const c=coloriOverride[t.nome]||t.colore;const n=tipiRinominati[t.nome]||t.nome;return{nome:n,colore:c,_orig:t.nome}}),...tipiPersonalizzati];
   if(tipiOrdine.length)list.sort((a,b)=>{const ia=tipiOrdine.indexOf(a.nome),ib=tipiOrdine.indexOf(b.nome);return(ia===-1?999:ia)-(ib===-1?999:ib)});return list}
@@ -558,6 +574,7 @@ async function loadAll(){
   operatoriAuthCache=await sbRpc('list_operators')||[];
   collaboratoriCache=await sbGet('collaboratori?attivo=eq.true&order=nome.asc');
   moduliCache=await sbGet('moduli?order=created_at.desc');
+  logCache=await sbGet('log_attivita?order=created_at.desc&limit=500');
 }
 
 // PASSWORD
@@ -573,7 +590,7 @@ async function checkPwd(){const nome=document.getElementById('login-nome').value
   if(masterRes&&masterRes.valid){document.getElementById('login-overlay').classList.add('hidden');sessionStorage.setItem('diario_auth','1');sessionStorage.setItem('is_admin','1');
     if(nome){sessionStorage.setItem('operatore_corrente',nome);document.getElementById('operatore-display').textContent='Operatore: '+nome;setTimeout(()=>mostraNoteNonLette(),500)}
     else{sessionStorage.setItem('operatore_corrente','Admin');document.getElementById('operatore-display').textContent='Admin';}
-    applicaTemaOperatore();renderTipiUI();renderOperatoriUI();renderCampiRapportoUI();
+    applicaTemaOperatore();renderTipiUI();renderOperatoriUI();renderCampiRapportoUI();document.getElementById('tab-registro').style.display='';
   }else{err.textContent=nome?'Operatore non trovato o password errata':'Password errata';document.getElementById('pwd-input').value='';document.getElementById('pwd-input').focus();setTimeout(()=>err.textContent='',2500)}}
 function mostraForzaCambio(){const b=document.getElementById('pwd-modal-content');b.innerHTML='<h3>Cambia la password</h3><p>Password predefinita. Impostane una nuova.</p><div class="pwd-field"><label>Nuova password (min 4 car.)</label><input type="password" id="new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="eseguiPrimoCambio()">Imposta</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';document.getElementById('pwd-modal').classList.remove('hidden');setTimeout(()=>document.getElementById('new-pwd-1').focus(),100)}
 async function eseguiPrimoCambio(){const p1=document.getElementById('new-pwd-1').value,p2=document.getElementById('new-pwd-2').value,err=document.getElementById('pwd-modal-error');if(p1.length<4){err.textContent='Troppo corta';return}if(p1!==p2){err.textContent='Non coincidono';return}
@@ -697,7 +714,7 @@ function applicaTemaOperatore(){const t=localStorage.getItem(getTemaKey())||loca
 // NAVIGATION
 function switchPage(name){flushRapportoSave();document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');document.querySelector('.nav-tab[data-page="'+name+'"]').classList.add('active');sessionStorage.setItem('pagina_corrente',name);
   if(name==='statistiche')renderStatistiche();if(name==='rapporto'){if(!rapportoGiornoAperto){const gc=getGiornataCasino();const d=new Date(gc+'T12:00:00');rapportoMese=d.getMonth();rapportoAnno=d.getFullYear();rapportoGiornoAperto=gc}renderRapporto()}if(name==='note-collega')renderNoteCollega();if(name==='impostazioni'){renderTipiUI();renderScadenzeSettings();renderOperatoriUI();renderCampiRapportoUI();
-    const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}renderCollaboratoriUI()}if(name==='moduli')renderModuliList()}
+    const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}renderCollaboratoriUI()}if(name==='moduli')renderModuliList();if(name==='registro')renderRegistro()}
 
 // TIPI
 async function saveTipiP(){await setImp('tipi_personalizzati',JSON.stringify(tipiPersonalizzati))}
@@ -733,8 +750,8 @@ async function salva(){const nome=document.getElementById('inp-nome').value.trim
   const rec={id:Date.now(),nome,tipo:tipoSelezionato,testo,data:new Date().toISOString(),operatore:getOperatore(),importo,valuta,reparto};
   try{await sbPost('registrazioni',rec);datiCache.unshift(rec);document.getElementById('inp-testo').value='';document.getElementById('inp-importo').value='';document.getElementById('inp-reparto').value='';
     if(!collaboratoriCache.find(c=>c.nome.toLowerCase()===nome.toLowerCase())){try{const cr=await sbPost('collaboratori',{nome,attivo:true});collaboratoriCache.push(cr[0]);collaboratoriCache.sort((a,b)=>a.nome.localeCompare(b.nome))}catch(e2){}}
-    toast('Registrato per '+nome);aggiornaNomi();render();updateStats()}catch(e){toast('Errore salvataggio')}}
-async function elimina(id){if(!confirm('Eliminare?'))return;try{await sbDel('registrazioni','id=eq.'+id);datiCache=datiCache.filter(e=>e.id!==id);pinnedIds.delete(id);aggiornaNomi();render();updateStats();toast('Eliminata')}catch(e){toast('Errore')}}
+    logAzione('Nuova registrazione',nome+' - '+tipoSelezionato+': '+testo.substring(0,60));toast('Registrato per '+nome);aggiornaNomi();render();updateStats()}catch(e){toast('Errore salvataggio')}}
+async function elimina(id){if(!confirm('Eliminare?'))return;const _e=datiCache.find(x=>x.id===id);try{await sbDel('registrazioni','id=eq.'+id);datiCache=datiCache.filter(e=>e.id!==id);pinnedIds.delete(id);if(_e)logAzione('Eliminata registrazione',_e.nome+' - '+_e.tipo);aggiornaNomi();render();updateStats();toast('Eliminata')}catch(e){toast('Errore')}}
 async function togglePin(id){try{if(pinnedIds.has(id)){await sbDel('note_fissate','registrazione_id=eq.'+id);pinnedIds.delete(id)}else{await sbPost('note_fissate',{registrazione_id:id});pinnedIds.add(id)}render()}catch(e){toast('Errore')}}
 
 // MODIFICA REGISTRAZIONE
@@ -751,7 +768,7 @@ async function salvaModificaRegistrazione(id){const nome=document.getElementById
   const impEl=document.getElementById('edit-importo'),repEl=document.getElementById('edit-reparto'),valEl=document.getElementById('edit-valuta');
   if(impEl)update.importo=parseFloat(impEl.value)||0;if(repEl)update.reparto=repEl.value;if(valEl)update.valuta=update.importo?valEl.value:'';
   try{await sbPatch('registrazioni','id=eq.'+id,update);const e=datiCache.find(x=>x.id===id);if(e)Object.assign(e,update);
-    document.getElementById('pwd-modal').classList.add('hidden');render();updateStats();toast('Registrazione modificata')}catch(e){toast('Errore salvataggio')}}
+    logAzione('Modifica registrazione',nome+' - '+tipo+': '+testo.substring(0,60));document.getElementById('pwd-modal').classList.add('hidden');render();updateStats();toast('Registrazione modificata')}catch(e){toast('Errore salvataggio')}}
 
 // MODAL TIPO
 function apriModal(id,tipo){modalEntryId=id;modalTipoSel=tipo;renderTipiUI();document.getElementById('modal-overlay').classList.remove('hidden')}
@@ -792,7 +809,7 @@ async function inviaNotaCollega(){const dests=getDestinatariSelezionati(),msg=do
   if(!da){toast('Seleziona prima un operatore (in alto)');return}if(!dests.length){toast('Seleziona almeno un destinatario');return}if(!msg){toast('Scrivi un messaggio');return}
   const gid=dests.length>1?crypto.randomUUID():null;
   try{for(const dest of dests){const r=await sbPost('note_colleghi',{da_operatore:da,a_operatore:dest,messaggio:msg,gruppo_id:gid});noteColleghiCache.unshift(r[0])}
-  document.getElementById('nota-msg').value='';document.querySelectorAll('#nota-dest-box input[type=checkbox]').forEach(cb=>cb.checked=false);renderNoteCollega();toast('Nota inviata a '+dests.join(', '))}catch(e){toast('Errore invio')}}
+  logAzione('Nota inviata','A: '+dests.join(', ')+' - '+msg.substring(0,50));document.getElementById('nota-msg').value='';document.querySelectorAll('#nota-dest-box input[type=checkbox]').forEach(cb=>cb.checked=false);renderNoteCollega();toast('Nota inviata a '+dests.join(', '))}catch(e){toast('Errore invio')}}
 async function segnaNotaLetta(id){try{await sbPatch('note_colleghi','id=eq.'+id,{letta:true});const n=noteColleghiCache.find(n=>n.id===id);if(n)n.letta=true;renderNoteCollega()}catch(e){toast('Errore')}}
 async function eliminaNotaCollega(id,ruolo){if(!confirm('Eliminare questa nota?'))return;
   const campo=ruolo==='mitt'?'nascosta_mitt':'nascosta_dest';
@@ -953,7 +970,7 @@ async function generaModuloPDF(tipo){
   else if(tipo==='apprezzamento'){dati.descrizione=(document.getElementById('mod-descrizione')||{}).value||'';dati.osservazioni=(document.getElementById('mod-osservazioni')||{}).value||''}
   try{if(window._editModuloId){await sbPatch('moduli','id=eq.'+window._editModuloId,{collaboratore:collab,resp_settore:resp,data_modulo:data,dati,operatore:getOperatore()});const idx=moduliCache.findIndex(x=>x.id===window._editModuloId);if(idx!==-1)Object.assign(moduliCache[idx],{collaboratore:collab,resp_settore:resp,data_modulo:data,dati});window._editModuloId=null;toast('Modulo aggiornato e PDF generato!')}
   else{const rec={tipo,collaboratore:collab,resp_settore:resp,data_modulo:data,dati,operatore:getOperatore()};const saved=await sbPost('moduli',rec);moduliCache.unshift(saved[0]);toast('PDF generato e modulo salvato!')}
-  renderModuliList();chiudiModulo()}catch(e){console.error(e);toast('PDF generato (errore salvataggio DB)')}}
+  logAzione('Modulo '+tipo,collab+' - '+data);renderModuliList();chiudiModulo()}catch(e){console.error(e);toast('PDF generato (errore salvataggio DB)')}}
 function drawField(doc,x,y,label,value){doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0);doc.text(label+':',x,y);
   doc.setFont('helvetica','normal');doc.text(value,x+doc.getTextWidth(label+':  '),y)}
 function drawFieldMulti(doc,x,y,label,value,pw){doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0);
@@ -999,7 +1016,7 @@ function apriModuloSalvato(id){const m=moduliCache.find(x=>x.id===id);if(!m)retu
       const os=document.getElementById('mod-osservazioni');if(os)os.value=dt.osservazioni||''}},50)}
 function ristampaModuloPDF(id){apriModuloSalvato(id);setTimeout(()=>{const m=moduliCache.find(x=>x.id===id);if(m)generaModuloPDF(m.tipo)},150)}
 async function eliminaModulo(id){if(!confirm('Eliminare questo modulo?'))return;
-  try{await sbDel('moduli','id=eq.'+id);moduliCache=moduliCache.filter(x=>x.id!==id);renderModuliList();toast('Modulo eliminato')}catch(e){toast('Errore eliminazione')}}
+  const _m=moduliCache.find(x=>x.id===id);try{await sbDel('moduli','id=eq.'+id);moduliCache=moduliCache.filter(x=>x.id!==id);if(_m)logAzione('Eliminato modulo',_m.tipo+' - '+_m.collaboratore);renderModuliList();toast('Modulo eliminato')}catch(e){toast('Errore eliminazione')}}
 
 // GESTIONE COLLABORATORI
 async function renderCollaboratoriUI(){const section=document.getElementById('collab-section');if(!section)return;
@@ -1027,11 +1044,43 @@ async function salvaRinominaCollaboratore(vecchio){const nuovo=document.getEleme
     const ci=collaboratoriCache.findIndex(c=>c.nome===vecchio);if(ci!==-1)collaboratoriCache[ci].nome=nuovo;
     datiCache.forEach(e=>{if(e.nome===vecchio)e.nome=nuovo});
     collaboratoriCache.sort((a,b)=>a.nome.localeCompare(b.nome));
-    document.getElementById('pwd-modal').classList.add('hidden');renderCollaboratoriUI();aggiornaNomi();render();toast('Collaboratore rinominato')}catch(e){toast('Errore: nome già esistente?')}}
+    logAzione('Rinomina collaboratore',vecchio+' → '+nuovo);document.getElementById('pwd-modal').classList.add('hidden');renderCollaboratoriUI();aggiornaNomi();render();toast('Collaboratore rinominato')}catch(e){toast('Errore: nome già esistente?')}}
 async function disattivaCollaboratore(nome){if(!confirm('Disattivare "'+nome+'"? Non apparirà più nell\'autocomplete.'))return;
   try{await sbPatch('collaboratori','nome=eq.'+encodeURIComponent(nome),{attivo:false});collaboratoriCache=collaboratoriCache.filter(c=>c.nome!==nome);renderCollaboratoriUI();aggiornaNomi();toast('Collaboratore disattivato')}catch(e){toast('Errore')}}
 async function riattivaCollaboratore(nome){try{await sbPatch('collaboratori','nome=eq.'+encodeURIComponent(nome),{attivo:true});
   collaboratoriCache.push({nome,attivo:true});collaboratoriCache.sort((a,b)=>a.nome.localeCompare(b.nome));renderCollaboratoriUI();aggiornaNomi();toast('Collaboratore riattivato')}catch(e){toast('Errore')}}
+
+// LOG ATTIVITA
+async function logAzione(azione,dettaglio){try{const rec={operatore:getOperatore()||'Admin',azione,dettaglio:dettaglio||''};await sbPost('log_attivita',rec);logCache.unshift(Object.assign(rec,{created_at:new Date().toISOString()}))}catch(e){}}
+function renderRegistro(){const el=document.getElementById('registro-list');if(!el)return;
+  const selOp=document.getElementById('log-filt-op');if(selOp){const cv=selOp.value;const ops=[...new Set(logCache.map(l=>l.operatore))].sort();
+    selOp.innerHTML='<option value="">Tutti</option>'+ops.map(n=>'<option'+(n===cv?' selected':'')+'>'+escP(n)+'</option>').join('')}
+  const fo=(document.getElementById('log-filt-op')||{}).value||'';
+  const fc=(document.getElementById('log-filt-cerca')||{}).value||'';
+  const fd=(document.getElementById('log-filt-dal')||{}).value||'';
+  const fa=(document.getElementById('log-filt-al')||{}).value||'';
+  let filtered=logCache.filter(l=>{if(fo&&l.operatore!==fo)return false;
+    if(fc&&!l.azione.toLowerCase().includes(fc.toLowerCase())&&!l.dettaglio.toLowerCase().includes(fc.toLowerCase()))return false;
+    if(fd&&l.created_at<fd)return false;if(fa&&l.created_at>fa+'T23:59:59')return false;return true});
+  if(!filtered.length){el.innerHTML='<p style="color:var(--muted);padding:10px">Nessuna attività registrata</p>';return}
+  el.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:.88rem"><thead><tr style="border-bottom:2px solid var(--line);text-align:left"><th style="padding:8px">Data/Ora</th><th style="padding:8px">Operatore</th><th style="padding:8px">Azione</th><th style="padding:8px">Dettaglio</th></tr></thead><tbody>'+filtered.slice(0,200).map(l=>{
+    const d=new Date(l.created_at);return'<tr style="border-bottom:1px solid var(--line)"><td style="padding:6px 8px;white-space:nowrap;color:var(--muted);font-size:.82rem">'+d.toLocaleDateString('it-IT')+' '+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})+'</td><td style="padding:6px 8px;font-weight:600">'+escP(l.operatore)+'</td><td style="padding:6px 8px">'+escP(l.azione)+'</td><td style="padding:6px 8px;color:var(--muted);font-size:.84rem">'+escP(l.dettaglio)+'</td></tr>'}).join('')+'</tbody></table>'}
+
+// IMPORTA COLLABORATORI DA FILE
+async function importaCollaboratori(input){const file=input.files[0];if(!file)return;
+  const ext=file.name.split('.').pop().toLowerCase();let nomi=[];
+  if(ext==='csv'||ext==='txt'){const text=await file.text();nomi=text.split(/[\r\n]+/).map(l=>l.replace(/[";]/g,'').trim()).filter(Boolean)}
+  else if(ext==='xlsx'||ext==='xls'){const buf=await file.arrayBuffer();const wb=XLSX.read(buf);const ws=wb.Sheets[wb.SheetNames[0]];const data=XLSX.utils.sheet_to_json(ws,{header:1});
+    data.forEach(row=>{if(row[0]&&typeof row[0]==='string'){const n=row[0].trim();if(n&&n.length>1)nomi.push(n)}})
+  }else{toast('Formato non supportato');input.value='';return}
+  if(!nomi.length){toast('Nessun nome trovato nel file');input.value='';return}
+  let aggiunti=0,duplicati=0;
+  for(const nome of nomi){if(collaboratoriCache.find(c=>c.nome.toLowerCase()===nome.toLowerCase())){duplicati++;continue}
+    try{const r=await sbPost('collaboratori',{nome,attivo:true});collaboratoriCache.push(r[0]);aggiunti++}catch(e){duplicati++}}
+  collaboratoriCache.sort((a,b)=>a.nome.localeCompare(b.nome));
+  renderCollaboratoriUI();aggiornaNomi();input.value='';
+  toast(aggiunti+' collaboratori importati'+(duplicati?' ('+duplicati+' già esistenti)':''));
+  if(aggiunti)logAzione('Importa collaboratori',aggiunti+' nomi importati da '+file.name)}
 
 // PROFILO COLLABORATORE
 function apriProfilo(nome){const entries=datiCache.filter(e=>e.nome===nome);const tipiCount={};entries.forEach(e=>{tipiCount[e.tipo]=(tipiCount[e.tipo]||0)+1});
@@ -1248,7 +1297,7 @@ window.addEventListener('load',async()=>{
       const authCheck=await sbRpc('check_deve_cambiare',{p_nome:getOperatore()});
       if(authCheck&&authCheck.deve_cambiare_pwd)setTimeout(()=>forzaCambioPwdOperatore(getOperatore()),300);
       else setTimeout(()=>mostraNoteNonLette(),800);
-    }else if(isAdmin()){document.getElementById('operatore-display').textContent='Admin'}}
+    }else if(isAdmin()){document.getElementById('operatore-display').textContent='Admin';document.getElementById('tab-registro').style.display=''}}
   else document.getElementById('pwd-input').focus();
   const n=new Date();document.getElementById('today-date').innerHTML=n.getDate()+' '+MESI[n.getMonth()]+' '+n.getFullYear()+'<br><small style="color:var(--muted);font-size:.75rem">'+GIORNI[n.getDay()]+'</small>';
   renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();aggiornaNoteBadge();
