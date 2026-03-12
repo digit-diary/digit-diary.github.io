@@ -798,7 +798,7 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
         const esiste=datiCache.find(e=>e.nome.toLowerCase()===nome.toLowerCase()&&e.tipo==='Malattia'&&e.data.startsWith(ds));
         if(!esiste){const rec={id:Date.now()+Math.floor(Math.random()*1000),nome,tipo:'Malattia',testo:'Assente per malattia (da rapporto '+turno+' del '+new Date(ds+'T12:00:00').toLocaleDateString('it-IT')+')',data:ds+'T'+new Date().toTimeString().slice(0,8)+'.000Z',operatore:getOperatore()};
           try{await sbPost('registrazioni',rec);datiCache.unshift(rec)}catch(e){}}}}}
-    toast('Rapporto '+turno+' salvato!')}catch(e){console.error(e);toast('Errore salvataggio')}}
+    }catch(e){console.error(e);toast('Errore salvataggio')}}
 
 // RAPPORTO EXPORT
 function esportaRapportoCSV(){const daysInMonth=new Date(rapportoAnno,rapportoMese+1,0).getDate();const campi=getCampiRapporto();
