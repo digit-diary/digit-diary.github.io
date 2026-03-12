@@ -21,7 +21,7 @@ body.dark-theme input,body.dark-theme textarea,body.dark-theme select{color:var(
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Source Sans 3',sans-serif;font-size:16px;background:#d4c9b5;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:30px 16px 60px;background-image:repeating-linear-gradient(45deg,transparent,transparent 40px,rgba(0,0,0,0.015) 40px,rgba(0,0,0,0.015) 41px)}
 #login-overlay{position:fixed;inset:0;background:rgba(26,18,8,0.92);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(4px)}
-#login-overlay.hidden{display:none}
+#login-overlay.hidden,.authed #login-overlay{display:none}
 .login-box{background:var(--paper);padding:40px 48px;border-radius:3px;box-shadow:6px 6px 0 #b8aa95;text-align:center;min-width:320px;max-width:400px}
 .login-box h2{font-family:'Playfair Display',serif;font-size:1.6rem;margin-bottom:6px;color:var(--ink)}
 .login-box p{color:var(--muted);font-size:.85rem;margin-bottom:22px}
@@ -334,6 +334,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 </style>
 </head>
 <body>
+<script>if(sessionStorage.getItem('diario_auth')==='1')document.documentElement.classList.add('authed')</script>
 <div id="login-overlay"><div class="login-box">
   <h2>Accesso Protetto</h2><p>Seleziona il tuo nome e inserisci la password</p>
   <select id="login-nome" style="margin-bottom:8px;text-align:left;letter-spacing:0;padding:11px 14px;width:100%;border:1.5px solid var(--line);border-radius:2px;font-size:1rem;font-family:'Source Sans 3',sans-serif;color:var(--ink);background:var(--paper2);cursor:pointer"><option value="">-- Seleziona operatore --</option></select>
