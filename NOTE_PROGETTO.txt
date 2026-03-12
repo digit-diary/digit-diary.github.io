@@ -1,0 +1,331 @@
+================================================================================
+            DIARIO COLLABORATORI - Casino Lugano SA
+                    Note di Progetto
+================================================================================
+
+  Progetto:    Diario Collaboratori
+  Autore:      Casino Lugano SA
+  Sito live:   https://digit-diary.github.io
+  Repository:  https://github.com/digit-diary/digit-diary.github.io
+  Hosting:     GitHub Pages (gratuito, illimitato)
+  Database:    Supabase (PostgreSQL cloud, piano gratuito)
+  Data:        Marzo 2026
+
+
+================================================================================
+  PANORAMICA
+================================================================================
+
+  Applicazione web single-file (index.html) per la gestione del personale
+  del Casino Lugano SA. Permette di registrare eventi, redigere rapporti
+  giornalieri, inviare note tra colleghi e consultare statistiche.
+
+  Tecnologie utilizzate:
+  - HTML/CSS/JavaScript (tutto in un unico file)
+  - Supabase REST API (database PostgreSQL cloud)
+  - jsPDF + AutoTable (esportazione PDF)
+  - Chart.js (grafici statistiche)
+  - Flatpickr (calendario date)
+
+
+================================================================================
+  FUNZIONALITA PRINCIPALI
+================================================================================
+
+  1. DIARIO REGISTRAZIONI
+     - Registrazione eventi per collaboratore (nome, tipo, descrizione)
+     - Tipi di evento: Attivita, Richiesta, Errore, Ammonimento Verbale,
+       Malattia, Apprezzamento, Nota, Altro (+ tipi personalizzati)
+     - Per il tipo "Errore": campi extra Reparto, Importo e Valuta
+     - Filtri: per persona, tipo, periodo (Dal/Al), ricerca testo
+     - Note fissate (pin) per evidenziare registrazioni importanti
+     - Profilo collaboratore con cronologia e grafici
+     - Esportazione CSV e PDF con layout professionale
+
+  2. RAPPORTO GIORNALIERO
+     - Calendario mensile con navigazione mese/anno
+     - Due turni per giorno: PRESTO e NOTTE
+     - Campi predefiniti: Supervisore, Cassa, Sala, Incasso Assegni,
+       Prelievi, Assenze (+ campi personalizzati dall'admin)
+     - Salvataggio automatico silenzioso (autosave ogni 1.2 secondi)
+     - Auto-rilevamento malattie dal campo assenze
+     - Esportazione PDF con layout identico al sito:
+       tabella per giorno con colonne Campo/PRESTO/NOTTE
+     - Esportazione CSV con stessa struttura
+     - Filtro Dal/Al per esportare un periodo specifico
+
+  3. NOTE COLLEGHI
+     - Invio messaggi a uno o piu operatori contemporaneamente
+     - Checkboxes per destinatari + opzione "Tutti"
+     - Note multi-destinatario raggruppate per gruppo_id
+     - Notifiche in tempo reale (polling ogni 15 secondi)
+     - Badge con contatore note non lette sul tab
+     - Popup automatico note non lette al login
+     - Modifica messaggio inviato (agisce su tutto il gruppo)
+     - Annullamento invio (elimina per tutti i destinatari)
+     - Blocco modifica/annullamento quando la nota e stata letta
+     - Eliminazione indipendente: mittente e destinatario gestiscono
+       le proprie note separatamente
+     - Conferma prima di eliminare
+
+  4. STATISTICHE
+     - Riepilogo: totale registrazioni, collaboratori, errori, malattie
+     - Grafico mensile (ultimi 12 mesi) con registrazioni ed errori
+     - Grafico a ciambella per distribuzione tipi
+     - Grafico per giorno della settimana
+     - Top 15 collaboratori per numero di registrazioni
+     - Tabella dettagliata collaboratori x tipi con totali
+     - Tabella errori con importi (CHF/EUR) e reparti
+
+  5. SCADENZE E PROMEMORIA
+     - Creazione scadenze collegate a registrazioni
+     - Campanella con badge nel header (numero scadenze attive)
+     - Dropdown con lista scadenze imminenti
+     - Completamento scadenza con nome operatore e data
+     - Scadenze completate visibili con barrato
+
+  6. IMPOSTAZIONI (ADMIN)
+     - Gestione tipi di evento: aggiungere, rimuovere, cambiare colore
+       (anche i tipi predefiniti possono essere nascosti/ripristinati)
+     - Gestione campi rapporto giornaliero: aggiungere, rimuovere
+       (anche i campi predefiniti possono essere nascosti/ripristinati)
+     - Gestione operatori: creare, rimuovere, resettare password
+     - Cambio password master
+     - Tema chiaro/scuro
+
+  7. MODULI DISCIPLINARI
+     - Tre moduli PDF generabili dall'app:
+       1. Allineamento: rilevamento non conformita + colloquio
+       2. Apprezzamento: colloquio di apprezzamento
+       3. RDI: rapporto disciplinare interno (I° e II° livello)
+     - Campi compilabili con dati pre-compilati (data, resp. settore)
+     - Generazione PDF con layout professionale
+     - Firme e distribuzione automatiche
+
+
+================================================================================
+  SISTEMA DI AUTENTICAZIONE
+================================================================================
+
+  Login a due livelli:
+
+  ADMIN (password master)
+  - Accesso completo a tutte le funzionalita
+  - Puo creare e rimuovere operatori
+  - Puo cambiare colori tipi e gestire campi rapporto
+  - Puo resettare password operatori
+  - Puo cambiare la password master
+  - Nelle impostazioni vede solo "Cambia password master"
+
+  OPERATORE (password personale)
+  - Accesso alle funzionalita operative (diario, rapporto, note, statistiche)
+  - Al primo accesso viene richiesto di cambiare la password temporanea
+  - Puo cambiare la propria password
+  - Non puo creare/rimuovere operatori ne modificare tipi/campi
+  - Nelle impostazioni vede solo "Cambia la mia password"
+
+  Sicurezza:
+  - Password hashate con SHA-256
+  - Codice di recupero generato automaticamente
+  - Prevenzione flash login al refresh (script inline pre-body)
+  - Controllo deve_cambiare_pwd anche dopo refresh pagina
+
+
+================================================================================
+  DATABASE SUPABASE - TABELLE
+================================================================================
+
+  registrazioni
+    id, nome, tipo, testo, data, created_at, operatore, importo, valuta, reparto
+
+  rapporti_giornalieri
+    id, data_rapporto, turno, sup_note, cassa_note, sala_note,
+    n_assegni, prelievi, assenze, operatore, note_extra,
+    updated_at, created_at
+    UNIQUE (data_rapporto, turno)
+
+  note_fissate
+    registrazione_id (PK), fissata_at
+
+  scadenze
+    id, registrazione_id, titolo, descrizione, data_scadenza,
+    completata, completata_da, created_at
+
+  impostazioni
+    chiave (PK), valore
+
+  note_colleghi
+    id, da_operatore, a_operatore, messaggio, letta,
+    nascosta_dest, nascosta_mitt, created_at
+
+  operatori_auth
+    nome (PK), pwd_hash, recovery_code, ruolo,
+    deve_cambiare_pwd, created_at
+
+  collaboratori
+    id, nome (UNIQUE), attivo, created_at
+
+  moduli
+    id, tipo (allineamento/apprezzamento/rdi), collaboratore,
+    resp_settore, data_modulo, dati (JSONB), operatore, created_at
+
+
+================================================================================
+  HOSTING E DEPLOYMENT
+================================================================================
+
+  Precedente: Netlify (sospeso per superamento 300 crediti gratuiti)
+  Attuale:    GitHub Pages (gratuito, illimitato)
+
+  Account GitHub: digit-diary
+  Repository:     digit-diary.github.io (pubblico)
+  Branch:         main
+  URL:            https://digit-diary.github.io
+
+  Per aggiornare il sito:
+    cd /Users/bushi/Desktop/DiarioCollaboratori
+    git add index.html
+    git commit -m "Descrizione modifica"
+    git push origin main
+
+  Il sito si aggiorna automaticamente in 1-2 minuti dopo il push.
+
+
+================================================================================
+  STORICO MODIFICHE
+================================================================================
+
+  [1]  Setup iniziale
+       - Creazione app single-file con Supabase
+       - Registrazioni, filtri, esportazione CSV/PDF
+
+  [2]  Tipo Errore con campi extra
+       - Reparto, Importo e Valuta visibili solo per tipo "Errore"
+
+  [3]  Calendario scadenze
+       - Flatpickr nel dialog scadenza
+       - Campanella con badge notifiche nel header
+
+  [4]  Totali nelle statistiche
+       - Riga totale per ogni tipo nella tabella collaboratori
+
+  [5]  Migrazione Netlify -> GitHub Pages
+       - Creazione account digit-diary su GitHub
+       - Deploy su GitHub Pages
+
+  [6]  Sistema Note Colleghi
+       - Invio/ricezione note tra operatori
+       - Notifiche in tempo reale (polling 15s)
+       - Badge su tab "Note Colleghi"
+       - Toast per nuove note
+       - Modifica, annullamento invio, eliminazione indipendente
+
+  [7]  Sistema login operatori
+       - Login con password individuale per ogni operatore
+       - Primo accesso: cambio password obbligatorio
+       - Dropdown operatori nella schermata login
+       - Admin con password master separata
+
+  [8]  Restrizioni admin
+       - Solo admin puo: creare/rimuovere operatori, cambiare colori,
+         gestire tipi e campi, cambiare password master, resettare pwd
+
+  [9]  Fix vari UX
+       - Fix flash login al refresh
+       - Fix modal fantasma (note-modal)
+       - Fix rapporto errore salvataggio (on_conflict upsert)
+       - Fix Admin come mittente nelle note
+       - Fix ripristino pagina corrente dopo refresh
+       - Fix deve_cambiare_pwd bypassabile con refresh
+       - Autosave silenzioso (nessun toast "Salvato")
+
+  [10] Export rapporto migliorato
+       - PDF con layout identico al sito (Campo/PRESTO/NOTTE per giorno)
+       - CSV con stessa struttura
+       - Filtro Dal/Al con flatpickr per periodo personalizzato
+
+  [11] Admin puo gestire voci predefinite
+       - Rimuovere/ripristinare tipi di evento predefiniti
+       - Rimuovere/ripristinare campi rapporto predefiniti
+       - Fix: opzioni admin visibili subito dopo login (no refresh)
+       - Fix: admin vede solo "Cambia password master"
+
+  [12] Riordinamento e rinomina tipi/campi
+       - Admin puo riordinare tipi di evento (drag & drop)
+       - Admin puo rinominare tipi di evento (incluso predefiniti)
+       - Admin puo riordinare campi rapporto giornaliero
+       - Admin puo rinominare campi rapporto giornaliero
+
+  [13] Rinomina tipi + tema operatore + UI
+       - Rinomina tipi evento (incluso predefiniti) funzionante
+       - Tema chiaro/scuro salvato per ogni operatore
+       - Fix UI vari
+
+  [14] Modifica registrazioni + tracciamento
+       - Operatori possono modificare le proprie registrazioni
+       - Tracciamento modifiche: data, operatore, testo originale
+       - Font migliorato per nomi operatori
+
+  [15] Rapporto giornaliero migliorato
+       - Apre direttamente il giorno corrente (giornata casino ore 6-6)
+       - Fix: rapporto non mostrava dati (fetch prima di aprire giorno)
+       - Salvataggio immediato quando si esce dalla pagina
+
+  [16] Hardening sicurezza
+       - Credenziali Supabase offuscate con XOR encoding (non piu in chiaro)
+       - 13 funzioni RPC server-side (SECURITY DEFINER) per tutte le
+         operazioni di autenticazione: login, cambio password, recupero,
+         gestione operatori
+       - Tabella operatori_auth bloccata: RLS senza policy = nessun accesso
+         diretto via REST API (pwd_hash mai esposto al client)
+       - Tabella impostazioni: policy RLS blocca accesso a password_hash
+         e recovery_code (le altre chiavi restano accessibili)
+       - Client usa esclusivamente sbRpc() per tutte le operazioni auth
+       - File migrate_security.sql con tutte le query di migrazione
+
+  [17] Note multi-destinatario + blocco modifica
+       - Invio note a piu destinatari contemporaneamente (checkboxes)
+       - Opzione "Tutti" per selezionare tutti gli operatori
+       - Note raggruppate per gruppo_id nelle note inviate
+       - Modifica/annullamento agisce su tutto il gruppo
+       - Blocco modifica e annullamento quando la nota e stata letta
+       - Nascondi gruppo per il mittente
+
+  [18] Moduli disciplinari
+       - Nuovo tab "Moduli" con 3 moduli PDF generabili:
+         1. Allineamento: non conformita + obiettivo + scadenza
+         2. Apprezzamento: descrizione + osservazioni
+         3. RDI: non conformita + obiettivo + scadenza + livello I/II
+       - Layout PDF professionale con intestazione Casino Lugano SA
+       - Firme e distribuzione automatiche
+       - Campi pre-compilati (data odierna, operatore come Resp. Settore)
+
+
+================================================================================
+  FILE DEL PROGETTO
+================================================================================
+
+  index.html            L'intera applicazione (HTML + CSS + JS)
+  schema.sql            Schema iniziale tabella registrazioni
+  migrate.sql           Migrazione: rapporti, note_fissate, scadenze
+  migrate_security.sql  Migrazione sicurezza: 13 RPC + RLS policies
+  migrazione.js         Script per migrare dati da localStorage a Supabase
+  netlify.toml          Vecchia configurazione Netlify (non piu usata)
+  NOTE_PROGETTO.txt     Questo file
+
+
+================================================================================
+  CREDENZIALI SUPABASE
+================================================================================
+
+  URL:      https://bdxqtzehoapilwzqlgnv.supabase.co
+  Anon Key: offuscata nel codice (XOR encoding)
+
+  La sicurezza e gestita su piu livelli:
+  - Credenziali offuscate (XOR, non in chiaro nel sorgente)
+  - Row Level Security (RLS) su tabelle sensibili
+  - Operazioni auth via RPC server-side (SECURITY DEFINER)
+  - pwd_hash e recovery_code mai accessibili via REST API
+
+
+================================================================================
