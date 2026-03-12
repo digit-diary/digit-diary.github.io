@@ -393,7 +393,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
     <div class="card-header">Nuova Registrazione</div>
     <div class="form-area">
       <div class="form-row">
-        <div class="field"><label>Collaboratore</label><input type="text" id="inp-nome" placeholder="Nome collaboratore..." list="nomi-list" autocomplete="off"><datalist id="nomi-list"></datalist></div>
+        <div class="field"><label>Collaboratore</label><input type="text" id="inp-nome" placeholder="Nome collaboratore..." list="nomi-list"></div>
         <div class="field"><label>Tipo evento</label><div class="tipo-tags" id="form-tipo-tags"></div></div>
       </div>
       <div class="field" style="margin-bottom:16px"><label>Descrizione <small style="color:var(--muted);font-weight:300;text-transform:none;letter-spacing:0;font-size:.75rem">Ctrl+Invio per salvare</small></label><textarea id="inp-testo" placeholder="Descrivi brevemente l'evento..."></textarea></div>
@@ -503,6 +503,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 </div>
 
 <div class="toast" id="toast"></div>
+<datalist id="nomi-list"></datalist>
 
 <script>
 const _k='DiarioCL26',_a='IRArGgsoICV9Xw4gNAggXg0le0UNBzNHCiwKentdNDE3MSNWbSlLfDQKUj8AICoGSFIcKwkrBCk5FmF/NyAPOAU1KgUEfykjChchKXMpX2ArC1M0Hg4UNAFTKi8SKFtacQVbQS0KDEsaNRAFBH8pLxQQW1sqAHF8NDA5IwAgKQkBeD4kGDwDJnYBZnc3IAwkXQwABQR7LihVPS0IOQN2XTwkKUJHNXYJd1MmMQw6NgoWDkhwFSQZQ10uNQICQS8uAkIvCyIBakARACc+IAcTfA==',_u='LB0VAhpVbGNQUjwYFQgMBywtQl8oHhsDBQgtOhxFMRkAEAgcJmJRWQ==';function _d(e){const b=atob(e),r=[];for(let i=0;i<b.length;i++)r.push(String.fromCharCode(b.charCodeAt(i)^_k.charCodeAt(i%_k.length)));return r.join('')}
@@ -858,7 +859,7 @@ function apriModulo(tipo){
   let html='<div class="main-card" style="margin-top:18px"><div class="card-header">';
   if(tipo==='allineamento'){
     html+='Rilevamento di non conformità e colloquio di allineamento</div><div style="padding:18px">';
-    html+='<div class="modulo-field"><label>Collaboratore</label><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." list="nomi-list" autocomplete="off"></div>';
+    html+='<div class="modulo-field"><label>Collaboratore</label><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." list="nomi-list"></div>';
     html+='<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="'+escP(op)+'"></div>';
     html+='<div class="modulo-field"><label>Data</label><input type="text" id="mod-data" value="'+oggi+'"></div>';
     html+='<div class="modulo-field"><label>Non conformità rilevata (descrizione)</label><textarea id="mod-non-conf" placeholder="Descrizione della non conformità..."></textarea></div>';
@@ -866,14 +867,14 @@ function apriModulo(tipo){
     html+='<div class="modulo-field"><label>Scadenza</label><input type="text" id="mod-scadenza" placeholder="Termine di verifica..."></div>';
   }else if(tipo==='apprezzamento'){
     html+='Colloquio di apprezzamento</div><div style="padding:18px">';
-    html+='<div class="modulo-field"><label>Collaboratore</label><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." list="nomi-list" autocomplete="off"></div>';
+    html+='<div class="modulo-field"><label>Collaboratore</label><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." list="nomi-list"></div>';
     html+='<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="'+escP(op)+'"></div>';
     html+='<div class="modulo-field"><label>Data</label><input type="text" id="mod-data" value="'+oggi+'"></div>';
     html+='<div class="modulo-field"><label>Descrizione</label><textarea id="mod-descrizione" placeholder="Descrizione dell\'apprezzamento..."></textarea></div>';
     html+='<div class="modulo-field"><label>Osservazioni da parte del Resp. Settore</label><textarea id="mod-osservazioni" placeholder="Osservazioni..."></textarea></div>';
   }else if(tipo==='rdi'){
     html+='Rapporto disciplinare interno (RDI)</div><div style="padding:18px">';
-    html+='<div class="modulo-field"><label>Collaboratore</label><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." list="nomi-list" autocomplete="off"></div>';
+    html+='<div class="modulo-field"><label>Collaboratore</label><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." list="nomi-list"></div>';
     html+='<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="'+escP(op)+'"></div>';
     html+='<div class="modulo-field"><label>Data</label><input type="text" id="mod-data" value="'+oggi+'"></div>';
     html+='<div class="modulo-field"><label>Non conformità rilevata</label><textarea id="mod-non-conf" placeholder="Descrizione della non conformità..."></textarea></div>';
