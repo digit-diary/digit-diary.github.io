@@ -724,7 +724,7 @@ function applicaTemaOperatore(){const t=localStorage.getItem(getTemaKey())||loca
 // NAVIGATION
 function switchPage(name){flushRapportoSave();document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');document.querySelector('.nav-tab[data-page="'+name+'"]').classList.add('active');sessionStorage.setItem('pagina_corrente',name);
   if(name==='statistiche')renderStatistiche();if(name==='rapporto'){if(!rapportoGiornoAperto){const gc=getGiornataCasino();const d=new Date(gc+'T12:00:00');rapportoMese=d.getMonth();rapportoAnno=d.getFullYear();rapportoGiornoAperto=gc}renderRapporto()}if(name==='note-collega')renderNoteCollega();if(name==='impostazioni'){renderTipiUI();renderScadenzeSettings();renderOperatoriUI();renderCampiRapportoUI();
-    const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}renderCollaboratoriUI();const ai=document.getElementById('ai-section');if(ai)ai.style.display=isAdmin()?'':'none';if(isAdmin()&&geminiKey){const gs=document.getElementById('gemini-status');if(gs)gs.innerHTML='<span style="color:#2c6e49">Chiave configurata</span>'}}if(name==='moduli')renderModuliList();if(name==='registro')renderRegistro()}
+    const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}renderCollaboratoriUI();const ai=document.getElementById('ai-section');if(ai)ai.style.display=isAdmin()?'':'none';if(isAdmin()&&geminiKey){const gs=document.getElementById('gemini-status');if(gs)gs.innerHTML='<span style="color:#2c6e49">Chiave configurata</span>'}}if(name==='moduli'){if(!document.getElementById('mod-list-results'))_modFiltInit=false;renderModuliList()};if(name==='registro')renderRegistro()}
 
 // TIPI
 async function saveTipiP(){await setImp('tipi_personalizzati',JSON.stringify(tipiPersonalizzati))}
@@ -994,7 +994,7 @@ async function generaModuloPDF(tipo){
   const isEdit=!!window._editModuloId;
   try{if(isEdit){await sbPatch('moduli','id=eq.'+window._editModuloId,{collaboratore:collab,resp_settore:resp,data_modulo:data,dati,operatore:getOperatore()});const idx=moduliCache.findIndex(x=>x.id===window._editModuloId);if(idx!==-1)Object.assign(moduliCache[idx],{collaboratore:collab,resp_settore:resp,data_modulo:data,dati});window._editModuloId=null;toast('Modulo aggiornato e PDF generato!')}
   else{const rec={tipo,collaboratore:collab,resp_settore:resp,data_modulo:data,dati,operatore:getOperatore()};const saved=await sbPost('moduli',rec);moduliCache.unshift(saved[0]);toast('PDF generato e modulo salvato!')}
-  window._importedFileData=null;logAzione((isEdit?'Modificato':'Creato')+' modulo '+tipo,collab+' - '+data);renderModuliList();chiudiModulo()}catch(e){console.error(e);toast('PDF generato (errore salvataggio DB)')}}
+  window._importedFileData=null;logAzione((isEdit?'Modificato':'Creato')+' modulo '+tipo,collab+' - '+data);aggiornaModuliLista();const _cnt=document.getElementById('mod-list-count');if(_cnt)_cnt.textContent=moduliCache.length;chiudiModulo()}catch(e){console.error(e);toast('PDF generato (errore salvataggio DB)')}}
 function drawFieldLine(doc,x,y,label,value,pw){doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0);
   doc.text(label+':',x,y);const lw=doc.getTextWidth(label+':  ');
   doc.setFont('helvetica','normal');doc.text(value,x+lw,y);
@@ -1013,25 +1013,44 @@ function drawFirmePro(doc,x,y,pw){doc.setFont('helvetica','normal');doc.setFontS
 function drawDistribuzionePro(doc,x,y,items){doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(80);
   doc.text('Distribuzione:',x,y);doc.setFont('helvetica','normal');
   doc.text(items.join(', '),x+doc.getTextWidth('Distribuzione:  '),y)}
-function renderModuliList(){let c=document.getElementById('moduli-list-section');
+let _modFiltInit=false;
+function renderModuliList(){
+  let c=document.getElementById('moduli-list-section');
   if(!c){c=document.createElement('div');c.id='moduli-list-section';c.className='main-card';c.style.marginTop='20px';document.getElementById('page-moduli').appendChild(c)}
+  if(!_modFiltInit){
+    const fStyle='padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)';
+    let hdr='<div class="card-header">Moduli generati (<span id="mod-list-count">'+moduliCache.length+'</span>)</div>';
+    hdr+='<div style="padding:14px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--paper2)">';
+    hdr+='<div class="filter-group"><span class="filter-label">Collaboratore</span><input type="text" id="mod-filt-nome" placeholder="Cerca nome..." oninput="aggiornaModuliLista()" style="'+fStyle+'"></div>';
+    hdr+='<div class="filter-group"><span class="filter-label">Tipo</span><select id="mod-filt-tipo" onchange="aggiornaModuliLista()" style="'+fStyle+'"><option value="">Tutti</option><option value="allineamento">Allineamento</option><option value="apprezzamento">Apprezzamento</option><option value="rdi">RDI</option></select></div>';
+    hdr+='<div class="filter-group"><span class="filter-label">Dal</span><input type="text" id="mod-filt-dal" placeholder="gg/mm/aaaa" style="'+fStyle+'" readonly></div>';
+    hdr+='<div class="filter-group"><span class="filter-label">Al</span><input type="text" id="mod-filt-al" placeholder="gg/mm/aaaa" style="'+fStyle+'" readonly></div>';
+    hdr+='<button class="btn-act tipo" onclick="resetModuliFiltri()">Reset</button></div>';
+    hdr+='<div id="mod-list-results" style="padding:10px"></div>';
+    c.innerHTML=hdr;
+    if(window.flatpickr){const fpOpts={locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,onChange:()=>aggiornaModuliLista()};flatpickr('#mod-filt-dal',fpOpts);flatpickr('#mod-filt-al',fpOpts)}
+    _modFiltInit=true;
+  }
+  const cnt=document.getElementById('mod-list-count');if(cnt)cnt.textContent=moduliCache.length;
+  aggiornaModuliLista();
+}
+function resetModuliFiltri(){
+  const n=document.getElementById('mod-filt-nome');if(n)n.value='';
+  const t=document.getElementById('mod-filt-tipo');if(t)t.value='';
+  ['mod-filt-dal','mod-filt-al'].forEach(id=>{const el=document.getElementById(id);if(el){el.value='';if(el._flatpickr)el._flatpickr.clear()}});
+  aggiornaModuliLista();
+}
+function aggiornaModuliLista(){
   const fn=(document.getElementById('mod-filt-nome')||{}).value||'';const ft=(document.getElementById('mod-filt-tipo')||{}).value||'';
   const fd=(document.getElementById('mod-filt-dal')||{}).value||'';const fa=(document.getElementById('mod-filt-al')||{}).value||'';
   let filtered=moduliCache.filter(m=>{if(fn&&!m.collaboratore.toLowerCase().includes(fn.toLowerCase()))return false;if(ft&&m.tipo!==ft)return false;
     if(fd&&m.created_at<fd)return false;if(fa&&m.created_at>fa+'T23:59:59')return false;return true});
   const tl={allineamento:'Allineamento',apprezzamento:'Apprezzamento',rdi:'RDI'};
   const tc={allineamento:'#1a4a7a',apprezzamento:'#b8860b',rdi:'#c0392b'};
-  let html='<div class="card-header">Moduli generati ('+moduliCache.length+')</div>';
-  html+='<div style="padding:14px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--paper2)">';
-  html+='<div class="filter-group"><span class="filter-label">Collaboratore</span><input type="text" id="mod-filt-nome" value="'+escP(fn)+'" placeholder="Cerca nome..." oninput="renderModuliList()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"></div>';
-  html+='<div class="filter-group"><span class="filter-label">Tipo</span><select id="mod-filt-tipo" onchange="renderModuliList()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"><option value="">Tutti</option><option value="allineamento"'+(ft==='allineamento'?' selected':'')+'>Allineamento</option><option value="apprezzamento"'+(ft==='apprezzamento'?' selected':'')+'>Apprezzamento</option><option value="rdi"'+(ft==='rdi'?' selected':'')+'>RDI</option></select></div>';
-  html+='<div class="filter-group"><span class="filter-label">Dal</span><input type="date" id="mod-filt-dal" value="'+fd+'" onchange="renderModuliList()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"></div>';
-  html+='<div class="filter-group"><span class="filter-label">Al</span><input type="date" id="mod-filt-al" value="'+fa+'" onchange="renderModuliList()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"></div>';
-  html+='<button class="btn-act tipo" onclick="[\'mod-filt-nome\',\'mod-filt-dal\',\'mod-filt-al\'].forEach(i=>{const e=document.getElementById(i);if(e)e.value=\'\'});const s=document.getElementById(\'mod-filt-tipo\');if(s)s.value=\'\';renderModuliList()">Reset</button></div>';
-  if(!filtered.length){html+='<div style="padding:20px;text-align:center;color:var(--muted)">Nessun modulo trovato</div>'}
-  else{html+='<div style="padding:10px">'+filtered.slice(0,50).map(m=>{const d=new Date(m.created_at);
-    return'<div class="scad-item" style="flex-wrap:wrap;padding:12px 0"><div style="display:flex;align-items:center;gap:10px;width:100%;flex-wrap:wrap"><span class="scad-date">'+d.toLocaleDateString('it-IT')+'</span><strong>'+escP(m.collaboratore)+'</strong><span class="badge" style="background:'+tc[m.tipo]+';color:white;padding:2px 10px;border-radius:2px;font-size:.78rem">'+tl[m.tipo]+'</span><span style="font-size:.78rem;color:var(--muted)">Resp: '+escP(m.resp_settore)+(m.operatore?' — da '+escP(m.operatore):'')+'</span><div style="margin-left:auto;display:flex;gap:6px"><button class="btn-act edit" onclick="apriModuloSalvato('+m.id+')">Apri</button><button class="btn-act tipo" onclick="ristampaModuloPDF('+m.id+')">PDF</button><button class="btn-act del" onclick="eliminaModulo('+m.id+')">Elimina</button></div></div></div>'}).join('')+'</div>'}
-  c.innerHTML=html}
+  const box=document.getElementById('mod-list-results');if(!box)return;
+  if(!filtered.length){box.innerHTML='<div style="padding:14px;text-align:center;color:var(--muted)">Nessun modulo trovato</div>';return}
+  box.innerHTML=filtered.slice(0,50).map(m=>{const d=new Date(m.created_at);
+    return'<div class="scad-item" style="flex-wrap:wrap;padding:12px 0"><div style="display:flex;align-items:center;gap:10px;width:100%;flex-wrap:wrap"><span class="scad-date">'+d.toLocaleDateString('it-IT')+'</span><strong>'+escP(m.collaboratore)+'</strong><span class="badge" style="background:'+tc[m.tipo]+';color:white;padding:2px 10px;border-radius:2px;font-size:.78rem">'+tl[m.tipo]+'</span><span style="font-size:.78rem;color:var(--muted)">Resp: '+escP(m.resp_settore)+(m.operatore?' — da '+escP(m.operatore):'')+'</span><div style="margin-left:auto;display:flex;gap:6px"><button class="btn-act edit" onclick="apriModuloSalvato('+m.id+')">Apri</button><button class="btn-act tipo" onclick="ristampaModuloPDF('+m.id+')">PDF</button><button class="btn-act del" onclick="eliminaModulo('+m.id+')">Elimina</button></div></div></div>'}).join('')}
 function apriModuloSalvato(id){const m=moduliCache.find(x=>x.id===id);if(!m)return;
   apriModulo(m.tipo);window._editModuloId=id;
   setTimeout(()=>{const ce=document.getElementById('mod-collaboratore');if(ce)ce.value=m.collaboratore;
@@ -1045,7 +1064,7 @@ function apriModuloSalvato(id){const m=moduliCache.find(x=>x.id===id);if(!m)retu
       const os=document.getElementById('mod-osservazioni');if(os)os.value=dt.osservazioni||''}},50)}
 function ristampaModuloPDF(id){apriModuloSalvato(id);setTimeout(()=>{const m=moduliCache.find(x=>x.id===id);if(m)generaModuloPDF(m.tipo)},150)}
 async function eliminaModulo(id){if(!confirm('Eliminare questo modulo?'))return;
-  const _m=moduliCache.find(x=>x.id===id);try{await sbDel('moduli','id=eq.'+id);moduliCache=moduliCache.filter(x=>x.id!==id);if(_m)logAzione('Eliminato modulo',_m.tipo+' - '+_m.collaboratore);renderModuliList();toast('Modulo eliminato')}catch(e){toast('Errore eliminazione')}}
+  const _m=moduliCache.find(x=>x.id===id);try{await sbDel('moduli','id=eq.'+id);moduliCache=moduliCache.filter(x=>x.id!==id);if(_m)logAzione('Eliminato modulo',_m.tipo+' - '+_m.collaboratore);aggiornaModuliLista();const cnt=document.getElementById('mod-list-count');if(cnt)cnt.textContent=moduliCache.length;toast('Modulo eliminato')}catch(e){toast('Errore eliminazione')}}
 
 // GESTIONE COLLABORATORI
 async function renderCollaboratoriUI(){const section=document.getElementById('collab-section');if(!section)return;
