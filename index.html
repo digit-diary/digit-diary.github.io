@@ -791,7 +791,7 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
   campi.forEach(c=>{const el=document.getElementById(cls+'-'+c.key);if(!el)return;const val=c.type==='number'?parseInt(el.value)||0:el.value;
     if(CAMPI_RAPPORTO_DEFAULT.find(d=>d.key===c.key))data[c.key]=val;else extra[c.key]=val});
   data.note_extra=JSON.stringify(extra);
-  try{const r=await sbPost('rapporti_giornalieri',data,{'Prefer':'resolution=merge-duplicates,return=representation'});if(!rapportiCache[ds])rapportiCache[ds]={};rapportiCache[ds][turno]=r[0];
+  try{const r=await fetch(SB_URL+'/rest/v1/rapporti_giornalieri?on_conflict=data_rapporto,turno',{method:'POST',headers:sbH({'Prefer':'resolution=merge-duplicates,return=representation'}),body:JSON.stringify(data)}).then(r=>{if(!r.ok)throw new Error('save failed');return r.json()});if(!rapportiCache[ds])rapportiCache[ds]={};rapportiCache[ds][turno]=r[0];
     // Auto-malattia: parse assenze field
     const assenzeText=data.assenze||'';if(assenzeText.trim()){const righe=assenzeText.split('\n').filter(r=>r.trim());
       for(const riga of righe){const m=riga.match(/^([A-ZÀ-Üa-zà-ü\s.'-]+?)\s*(assente|malattia|malato|malata)/i);if(m){const nome=m[1].trim();
