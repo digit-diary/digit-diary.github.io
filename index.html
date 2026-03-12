@@ -847,8 +847,8 @@ window.addEventListener('load',async()=>{
   renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();
   // Flatpickr date pickers
   if(window.flatpickr){const fpOpts={locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,onChange:()=>render()};flatpickr('#filt-dal',fpOpts);flatpickr('#filt-al',fpOpts)}});
-document.getElementById('pwd-modal').addEventListener('click',function(e){if(e.target===this)this.classList.add('hidden')});
-document.getElementById('operatore-modal').addEventListener('click',function(e){if(e.target===this)this.classList.add('hidden')});
+document.getElementById('pwd-modal').addEventListener('click',function(e){if(e.target===this){const c=document.getElementById('pwd-modal-content').innerHTML;if(c.includes('predefinita')||c.includes('Cambia la password'))return;this.classList.add('hidden')}});
+document.getElementById('operatore-modal').addEventListener('click',function(e){if(e.target===this){const inp=document.getElementById('inp-operatore');if(inp&&inp.value.trim())confermaOperatore();else this.classList.add('hidden')}});
 document.getElementById('modal-overlay').addEventListener('click',function(e){if(e.target===this)chiudiModal()});
 document.getElementById('profilo-modal').addEventListener('click',function(e){if(e.target===this)this.classList.add('hidden')});
 document.getElementById('scadenza-modal').addEventListener('click',function(e){if(e.target===this)this.classList.add('hidden')});
