@@ -670,7 +670,7 @@ function renderScadenzeSettings(){const el=document.getElementById('scadenze-set
   el.innerHTML=scadenzeCache.map(s=>'<div class="scad-item"><span class="scad-date">'+new Date(s.data_scadenza+'T12:00:00').toLocaleDateString('it-IT')+'</span><span class="scad-title"><strong>'+escP(s.titolo)+'</strong>'+(s.descrizione?' - '+escP(s.descrizione):'')+'</span><button style="color:#2c6e49;border-color:#2c6e49" onclick="completaScadenza('+s.id+');renderScadenzeSettings()">Fatto</button><button style="color:var(--accent);border-color:var(--accent)" onclick="eliminaScadenza('+s.id+');renderScadenzeSettings()">Elimina</button></div>').join('')}
 
 // NOTE COLLEGHI
-async function inviaNotaCollega(){const dest=document.getElementById('nota-dest').value,msg=document.getElementById('nota-msg').value.trim(),da=getOperatore();
+async function inviaNotaCollega(){const dest=document.getElementById('nota-dest').value,msg=document.getElementById('nota-msg').value.trim(),da=getOperatore()||(isAdmin()?'Admin':'');
   if(!da){toast('Seleziona prima un operatore (in alto)');return}if(!dest){toast('Seleziona un destinatario');return}if(!msg){toast('Scrivi un messaggio');return}
   try{const r=await sbPost('note_colleghi',{da_operatore:da,a_operatore:dest,messaggio:msg});noteColleghiCache.unshift(r[0]);document.getElementById('nota-msg').value='';renderNoteCollega();toast('Nota inviata a '+dest)}catch(e){toast('Errore invio')}}
 async function segnaNotaLetta(id){try{await sbPatch('note_colleghi','id=eq.'+id,{letta:true});const n=noteColleghiCache.find(n=>n.id===id);if(n)n.letta=true;renderNoteCollega()}catch(e){toast('Errore')}}
@@ -679,7 +679,7 @@ function renderNoteCollega(){const op=getOperatore();
   // Populate destinatario dropdown
   const sel=document.getElementById('nota-dest');if(sel){const cv=sel.value;const tutti=operatoriAuthCache.map(o=>o.nome).sort().filter(n=>n&&n!==op);
     sel.innerHTML='<option value="">Seleziona operatore...</option>'+tutti.map(n=>'<option'+(n===cv?' selected':'')+'>'+escP(n)+'</option>').join('')}
-  const da=document.getElementById('nota-da');if(da)da.value=op||'(nessun operatore selezionato)';
+  const da=document.getElementById('nota-da');if(da)da.value=op||(isAdmin()?'Admin':'(nessun operatore)');
   // Note ricevute
   const ricevute=noteColleghiCache.filter(n=>n.a_operatore===op).slice(0,20);
   const rl=document.getElementById('note-ricevute-list');if(rl){rl.innerHTML=ricevute.length?ricevute.map(n=>'<div class="scad-item" style="'+(n.letta?'opacity:.6':'')+';flex-wrap:wrap"><div style="display:flex;align-items:center;gap:8px;width:100%"><span class="scad-date" style="min-width:100px;color:var(--accent2)">Da: <strong>'+escP(n.da_operatore)+'</strong></span><span style="font-size:.78rem;color:var(--muted)">'+new Date(n.created_at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})+'</span>'+(n.letta?'<span style="color:#2c6e49;font-size:.72rem;font-weight:700">Letta</span>':'<button style="color:#2c6e49;border-color:#2c6e49;padding:2px 8px;font-size:.7rem" onclick="segnaNotaLetta('+n.id+')">Segna letta</button>')+'<button style="color:var(--accent);border-color:var(--accent);padding:2px 8px;font-size:.7rem" onclick="eliminaNotaCollega('+n.id+')">Elimina</button></div><div style="padding:8px 0 4px;width:100%;font-size:.95rem">'+esc(n.messaggio)+'</div></div>').join(''):'<p style="color:var(--muted)">Nessuna nota ricevuta</p>'}
