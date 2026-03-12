@@ -658,7 +658,7 @@ function applicaTemaOperatore(){const t=localStorage.getItem(getTemaKey())||loca
 
 // NAVIGATION
 function switchPage(name){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');document.querySelector('.nav-tab[data-page="'+name+'"]').classList.add('active');sessionStorage.setItem('pagina_corrente',name);
-  if(name==='statistiche')renderStatistiche();if(name==='rapporto')renderRapporto();if(name==='note-collega')renderNoteCollega();if(name==='impostazioni'){renderTipiUI();renderScadenzeSettings();renderOperatoriUI();renderCampiRapportoUI();
+  if(name==='statistiche')renderStatistiche();if(name==='rapporto'){if(!rapportoGiornoAperto){const gc=getGiornataCasino();const d=new Date(gc+'T12:00:00');rapportoMese=d.getMonth();rapportoAnno=d.getFullYear();rapportoGiornoAperto=gc}renderRapporto()}if(name==='note-collega')renderNoteCollega();if(name==='impostazioni'){renderTipiUI();renderScadenzeSettings();renderOperatoriUI();renderCampiRapportoUI();
     const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}}}
 
 // TIPI
@@ -824,6 +824,7 @@ function resetFiltri(){['filt-persona','filt-tipo'].forEach(id=>document.getElem
 function updateStats(){document.getElementById('stats-bar').innerHTML='<div class="stat"><div class="stat-num">'+datiCache.length+'</div><div class="stat-label">Totale</div></div><div class="stat"><div class="stat-num blue">'+new Set(datiCache.map(e=>e.nome)).size+'</div><div class="stat-label">Collaboratori</div></div><div class="stat"><div class="stat-num red">'+datiCache.filter(e=>e.tipo===nomeCorrente('Errore')).length+'</div><div class="stat-label">'+nomeCorrente('Errore')+'</div></div><div class="stat"><div class="stat-num teal">'+datiCache.filter(e=>e.tipo===nomeCorrente('Malattia')).length+'</div><div class="stat-label">'+nomeCorrente('Malattia')+'</div></div><div class="stat"><div class="stat-num gold">'+datiCache.filter(e=>e.tipo===nomeCorrente('Apprezzamento')).length+'</div><div class="stat-label">'+nomeCorrente('Apprezzamento')+'</div></div>'}
 
 // RAPPORTO GIORNALIERO
+function getGiornataCasino(){const now=new Date();if(now.getHours()<6)now.setDate(now.getDate()-1);return now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')}
 async function fetchRapportiMese(a,m){const start=a+'-'+String(m+1).padStart(2,'0')+'-01';const nm=m===11?new Date(a+1,0,1):new Date(a,m+1,1);const end=nm.getFullYear()+'-'+String(nm.getMonth()+1).padStart(2,'0')+'-01';
   const data=await sbGet('rapporti_giornalieri?data_rapporto=gte.'+start+'&data_rapporto=lt.'+end);
   data.forEach(r=>{const k=r.data_rapporto;if(!rapportiCache[k])rapportiCache[k]={};rapportiCache[k][r.turno]=r})}
@@ -831,7 +832,7 @@ function renderRapporto(){if(rapportoGiornoAperto)renderRapportoDetail();else re
 async function renderRapportoCalendario(){const v=document.getElementById('rapporto-view');v.innerHTML='<div class="loading">Caricamento...</div>';
   await fetchRapportiMese(rapportoAnno,rapportoMese);
   const firstDay=new Date(rapportoAnno,rapportoMese,1).getDay();const startDay=(firstDay+6)%7;const daysInMonth=new Date(rapportoAnno,rapportoMese+1,0).getDate();
-  const oggi=new Date();const oggiStr=oggi.getFullYear()+'-'+String(oggi.getMonth()+1).padStart(2,'0')+'-'+String(oggi.getDate()).padStart(2,'0');
+  const oggiStr=getGiornataCasino();
   let yearOpts='';for(let y=2023;y<=rapportoAnno+1;y++)yearOpts+='<option'+(y===rapportoAnno?' selected':'')+'>'+y+'</option>';
   let html='<div class="rapporto-nav"><button onclick="navMese(-1)">&lt;</button><div class="month-label">'+MESI_FULL[rapportoMese]+' <select onchange="rapportoAnno=parseInt(this.value);renderRapportoCalendario()" style="font-family:Playfair Display,serif;font-size:1.3rem;border:none;background:transparent;color:var(--ink);cursor:pointer">'+yearOpts+'</select></div><button onclick="navMese(1)">&gt;</button></div>';
   html+='<div class="rapporto-calendar">';
