@@ -147,6 +147,8 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 .modulo-field{margin-bottom:14px}.modulo-field label{display:block;font-weight:700;font-size:.84rem;margin-bottom:4px;color:var(--ink)}
 .modulo-field input,.modulo-field textarea,.modulo-field select{width:100%;padding:10px;font-family:'Source Sans 3',sans-serif;font-size:.95rem;border:1.5px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)}
 .modulo-field textarea{min-height:80px;resize:vertical}
+.btn-ai{background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:3px;padding:4px 12px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:'Source Sans 3',sans-serif;letter-spacing:.02em;transition:opacity .2s;margin-top:4px}
+.btn-ai:hover{opacity:.85}.btn-ai:disabled{opacity:.5;cursor:wait}.btn-ai-wrap{display:flex;justify-content:flex-end}
 .ac-wrap{position:relative}.ac-drop{position:absolute;top:100%;left:0;width:220px;max-height:150px;overflow-y:auto;background:var(--paper);border:1.5px solid var(--accent2);border-top:none;border-radius:0 0 3px 3px;z-index:900;display:none;box-shadow:0 4px 12px rgba(0,0,0,.15)}
 .ac-drop.show{display:block}.ac-drop div{padding:5px 10px;cursor:pointer;font-size:.84rem;color:var(--ink)}.ac-drop div:hover,.ac-drop div.ac-active{background:var(--accent2);color:white}
 .entry-actions{display:flex;flex-direction:row;align-items:center;justify-content:flex-end;gap:6px;padding:8px 18px 12px;grid-column:1/-1;opacity:0;transition:opacity .15s}
@@ -522,6 +524,8 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
   <div class="settings-section"><h4>Operatori</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Operatore attuale: <strong id="op-attuale">—</strong>. Ogni operatore accede con il proprio nome e password.</p><div id="operatori-list" style="margin-bottom:14px"></div>
     <div class="add-tipo-row" style="align-items:flex-end"><div class="field"><label>Nome</label><input type="text" id="new-operatore-nome" placeholder="Nome..."></div><div class="field"><label>Password</label><input type="password" id="new-operatore-pwd" placeholder="Min 4 caratteri..."></div><div class="field"><label>Conferma password</label><input type="password" id="new-operatore-pwd2" placeholder="Ripeti..."></div><button class="btn-add-tipo" onclick="aggiungiOperatoreConPwd()">+ Crea operatore</button></div></div>
   <div class="settings-section"><h4>Sicurezza</h4><div class="settings-btn-row" id="sicurezza-btns"></div></div>
+  <div class="settings-section" id="ai-section" style="display:none"><h4>Assistente AI (Gemini)</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Migliora automaticamente i testi nei moduli disciplinari. Ottieni una chiave gratuita su <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--accent2)">Google AI Studio</a>.</p>
+    <div class="add-tipo-row"><div class="field" style="flex:2"><label>Chiave API Gemini</label><input type="password" id="gemini-key-input" placeholder="AIza..."></div><button class="btn-add-tipo" onclick="salvaGeminiKey()">Salva</button></div><p id="gemini-status" style="font-size:.82rem;margin-top:8px"></p></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -579,6 +583,7 @@ async function loadAll(){
   collaboratoriCache=await sbGet('collaboratori?attivo=eq.true&order=nome.asc');
   moduliCache=await sbGet('moduli?order=created_at.desc');
   logCache=await sbGet('log_attivita?order=created_at.desc&limit=500');
+  await loadGeminiKey();
 }
 
 // PASSWORD
@@ -718,7 +723,7 @@ function applicaTemaOperatore(){const t=localStorage.getItem(getTemaKey())||loca
 // NAVIGATION
 function switchPage(name){flushRapportoSave();document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');document.querySelector('.nav-tab[data-page="'+name+'"]').classList.add('active');sessionStorage.setItem('pagina_corrente',name);
   if(name==='statistiche')renderStatistiche();if(name==='rapporto'){if(!rapportoGiornoAperto){const gc=getGiornataCasino();const d=new Date(gc+'T12:00:00');rapportoMese=d.getMonth();rapportoAnno=d.getFullYear();rapportoGiornoAperto=gc}renderRapporto()}if(name==='note-collega')renderNoteCollega();if(name==='impostazioni'){renderTipiUI();renderScadenzeSettings();renderOperatoriUI();renderCampiRapportoUI();
-    const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}renderCollaboratoriUI()}if(name==='moduli')renderModuliList();if(name==='registro')renderRegistro()}
+    const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}renderCollaboratoriUI();const ai=document.getElementById('ai-section');if(ai)ai.style.display=isAdmin()?'':'none';if(isAdmin()&&geminiKey){const gs=document.getElementById('gemini-status');if(gs)gs.innerHTML='<span style="color:#2c6e49">Chiave configurata</span>'}}if(name==='moduli')renderModuliList();if(name==='registro')renderRegistro()}
 
 // TIPI
 async function saveTipiP(){await setImp('tipi_personalizzati',JSON.stringify(tipiPersonalizzati))}
@@ -884,23 +889,23 @@ function apriModulo(tipo){
     html+='<div class="modulo-field"><label>Collaboratore</label><div class="ac-wrap"><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." oninput="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')" onfocus="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')"><div class="ac-drop" id="ac-mod-nomi"></div></div></div>';
     html+='<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="'+escP(op)+'"></div>';
     html+='<div class="modulo-field"><label>Data</label><input type="text" id="mod-data" value="'+oggi+'"></div>';
-    html+='<div class="modulo-field"><label>Non conformità rilevata (descrizione)</label><textarea id="mod-non-conf" placeholder="Descrizione della non conformità..."></textarea></div>';
-    html+='<div class="modulo-field"><label>Obiettivo concordato onde evitare il ripetersi della non conformità</label><textarea id="mod-obiettivo" placeholder="Obiettivo concordato..."></textarea></div>';
+    html+='<div class="modulo-field"><label>Non conformità rilevata (descrizione)</label><textarea id="mod-non-conf" placeholder="Descrizione della non conformità..."></textarea><div class="btn-ai-wrap"><button class="btn-ai" onclick="miglioraTesto(\'mod-non-conf\',\'non conformità\')">Migliora testo con AI</button></div></div>';
+    html+='<div class="modulo-field"><label>Obiettivo concordato onde evitare il ripetersi della non conformità</label><textarea id="mod-obiettivo" placeholder="Obiettivo concordato..."></textarea><div class="btn-ai-wrap"><button class="btn-ai" onclick="miglioraTesto(\'mod-obiettivo\',\'obiettivo concordato\')">Migliora testo con AI</button></div></div>';
     html+='<div class="modulo-field"><label>Scadenza</label><input type="text" id="mod-scadenza" placeholder="Termine di verifica..."></div>';
   }else if(tipo==='apprezzamento'){
     html+='Colloquio di apprezzamento</div><div style="padding:18px">';
     html+='<div class="modulo-field"><label>Collaboratore</label><div class="ac-wrap"><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." oninput="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')" onfocus="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')"><div class="ac-drop" id="ac-mod-nomi"></div></div></div>';
     html+='<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="'+escP(op)+'"></div>';
     html+='<div class="modulo-field"><label>Data</label><input type="text" id="mod-data" value="'+oggi+'"></div>';
-    html+='<div class="modulo-field"><label>Descrizione</label><textarea id="mod-descrizione" placeholder="Descrizione dell\'apprezzamento..."></textarea></div>';
-    html+='<div class="modulo-field"><label>Osservazioni da parte del Resp. Settore</label><textarea id="mod-osservazioni" placeholder="Osservazioni..."></textarea></div>';
+    html+='<div class="modulo-field"><label>Descrizione</label><textarea id="mod-descrizione" placeholder="Descrizione dell\'apprezzamento..."></textarea><div class="btn-ai-wrap"><button class="btn-ai" onclick="miglioraTesto(\'mod-descrizione\',\'apprezzamento\')">Migliora testo con AI</button></div></div>';
+    html+='<div class="modulo-field"><label>Osservazioni da parte del Resp. Settore</label><textarea id="mod-osservazioni" placeholder="Osservazioni..."></textarea><div class="btn-ai-wrap"><button class="btn-ai" onclick="miglioraTesto(\'mod-osservazioni\',\'osservazioni\')">Migliora testo con AI</button></div></div>';
   }else if(tipo==='rdi'){
     html+='Rapporto disciplinare interno (RDI)</div><div style="padding:18px">';
     html+='<div class="modulo-field"><label>Collaboratore</label><div class="ac-wrap"><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." oninput="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')" onfocus="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')"><div class="ac-drop" id="ac-mod-nomi"></div></div></div>';
     html+='<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="'+escP(op)+'"></div>';
     html+='<div class="modulo-field"><label>Data</label><input type="text" id="mod-data" value="'+oggi+'"></div>';
-    html+='<div class="modulo-field"><label>Non conformità rilevata</label><textarea id="mod-non-conf" placeholder="Descrizione della non conformità..."></textarea></div>';
-    html+='<div class="modulo-field"><label>Obiettivo concordato onde evitare il ripetersi della non conformità</label><textarea id="mod-obiettivo" placeholder="Obiettivo concordato..."></textarea></div>';
+    html+='<div class="modulo-field"><label>Non conformità rilevata</label><textarea id="mod-non-conf" placeholder="Descrizione della non conformità..."></textarea><div class="btn-ai-wrap"><button class="btn-ai" onclick="miglioraTesto(\'mod-non-conf\',\'non conformità\')">Migliora testo con AI</button></div></div>';
+    html+='<div class="modulo-field"><label>Obiettivo concordato onde evitare il ripetersi della non conformità</label><textarea id="mod-obiettivo" placeholder="Obiettivo concordato..."></textarea><div class="btn-ai-wrap"><button class="btn-ai" onclick="miglioraTesto(\'mod-obiettivo\',\'obiettivo concordato\')">Migliora testo con AI</button></div></div>';
     html+='<div class="modulo-field"><label>Scadenza (termine di verifica)</label><input type="text" id="mod-scadenza" placeholder="Termine di verifica..."></div>';
     html+='<div class="modulo-field"><label>Livello RDI</label><select id="mod-livello"><option value="I">I° livello</option><option value="II">II° livello (grave)</option></select></div>';
   }
@@ -1088,6 +1093,25 @@ async function importaCollaboratori(input){const file=input.files[0];if(!file)re
   renderCollaboratoriUI();aggiornaNomi();input.value='';
   toast(aggiunti+' collaboratori importati'+(duplicati?' ('+duplicati+' già esistenti)':''));
   if(aggiunti)logAzione('Importa collaboratori',aggiunti+' nomi importati da '+file.name)}
+
+// ASSISTENTE AI GEMINI
+let geminiKey='';
+async function loadGeminiKey(){const k=await getImp('gemini_api_key');if(k)geminiKey=k}
+async function salvaGeminiKey(){const k=document.getElementById('gemini-key-input').value.trim();if(!k){toast('Inserisci la chiave');return}
+  await setImp('gemini_api_key',k);geminiKey=k;document.getElementById('gemini-key-input').value='';
+  document.getElementById('gemini-status').innerHTML='<span style="color:#2c6e49;font-weight:600">Chiave salvata</span>';toast('Chiave Gemini salvata')}
+async function miglioraTesto(fieldId,contesto){const el=document.getElementById(fieldId);if(!el)return;
+  const testo=el.value.trim();if(!testo){toast('Scrivi prima un testo da migliorare');return}
+  if(!geminiKey){toast('Configura la chiave Gemini nelle Impostazioni');return}
+  const btn=el.parentElement.querySelector('.btn-ai');if(btn){btn.disabled=true;btn.textContent='Elaborazione...'}
+  try{const prompt='Sei un esperto di risorse umane in un casinò svizzero. Migliora il seguente testo per un documento disciplinare formale (contesto: '+contesto+'). Rendi il testo professionale, chiaro e formale in italiano. Mantieni il significato originale. Rispondi SOLO con il testo migliorato, senza commenti o prefissi.\n\nTesto originale:\n'+testo;
+    const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+geminiKey,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.3,maxOutputTokens:500}})});
+    if(!r.ok)throw new Error('API error '+r.status);
+    const data=await r.json();const migliorato=data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if(migliorato){el.value=migliorato.trim();toast('Testo migliorato!')}else throw new Error('Nessuna risposta')
+  }catch(e){console.error(e);toast('Errore AI: verifica la chiave Gemini')}
+  if(btn){btn.disabled=false;btn.textContent='Migliora testo con AI'}}
 
 // IMPORTA MODULO DA WORD/PDF
 async function importaModuloFile(input){const file=input.files[0];if(!file)return;
