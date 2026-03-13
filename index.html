@@ -89,6 +89,28 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 .cassa-alert-banner.hidden{display:none}
 .cassa-alerts-dropdown{width:100%;max-width:1280px;background:var(--paper);border-radius:3px;box-shadow:2px 2px 0 #b8aa95;margin-bottom:12px;padding:16px;font-size:.85rem}
 .cassa-alerts-dropdown.hidden{display:none}
+/* RICERCA GLOBALE */
+.ricerca-globale-wrap{width:100%;max-width:1280px;margin-bottom:16px;position:relative}
+.ricerca-globale-input{width:100%;padding:12px 18px 12px 42px;border:2px solid var(--line);border-radius:3px;font-size:1rem;font-family:'Source Sans 3',sans-serif;background:var(--paper);color:var(--ink);outline:none;transition:border-color .2s}
+.ricerca-globale-input:focus{border-color:var(--accent2)}
+.ricerca-globale-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:1.1rem;color:var(--muted);pointer-events:none}
+.ricerca-globale-results{position:absolute;top:100%;left:0;right:0;max-height:420px;overflow-y:auto;background:var(--paper);border:2px solid var(--accent2);border-top:none;border-radius:0 0 3px 3px;z-index:900;box-shadow:0 6px 20px var(--shadow);display:none}
+.ricerca-globale-results.show{display:block}
+.rg-section{padding:6px 14px;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;background:var(--paper2);border-bottom:1px solid var(--line)}
+.rg-item{padding:10px 14px;border-bottom:1px solid var(--line);cursor:pointer;display:flex;gap:10px;align-items:center;font-size:.9rem}
+.rg-item:hover{background:var(--paper2)}
+.rg-item .rg-badge{font-size:.7rem;font-weight:700;padding:2px 8px;border-radius:2px;color:white;white-space:nowrap}
+.rg-item .rg-text{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rg-item .rg-date{font-size:.78rem;color:var(--muted);white-space:nowrap}
+/* RISCHIO ALERT */
+.rischio-alert-banner{width:100%;max-width:1280px;color:white;padding:12px 20px;border-radius:3px;margin-bottom:10px;font-size:.85rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:space-between;background:#8e44ad}
+.rischio-alert-banner:hover{opacity:.9}
+.rischio-alerts-dropdown{width:100%;max-width:1280px;background:var(--paper);border-radius:3px;box-shadow:2px 2px 0 #b8aa95;margin-bottom:12px;padding:16px;font-size:.85rem}
+.rischio-alerts-dropdown.hidden{display:none}
+/* TEMPLATE RAPIDI */
+.template-rapidi-wrap{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.template-rapido-btn{padding:8px 14px;border:1.5px dashed var(--accent2);border-radius:3px;background:none;color:var(--accent2);font-size:.78rem;font-weight:600;cursor:pointer;font-family:'Source Sans 3',sans-serif;transition:all .15s}
+.template-rapido-btn:hover{background:var(--accent2);color:white;border-style:solid}
 .cassa-alert-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .cassa-alert-item:last-child{border-bottom:none}
 .cassa-alert-item .alert-name{font-weight:700;min-width:160px}
@@ -407,6 +429,13 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 <div class="scadenze-banner hidden" id="scadenze-banner" onclick="toggleScadenzeDropdown()"></div>
 <div class="scadenze-dropdown hidden" id="scadenze-dropdown"></div>
 <div id="cassa-alerts-container"></div>
+<div id="rischio-alerts-container"></div>
+
+<div class="ricerca-globale-wrap">
+  <span class="ricerca-globale-icon">&#128269;</span>
+  <input type="text" class="ricerca-globale-input" id="ricerca-globale" placeholder="Cerca ovunque: diario, moduli, note, registro..." oninput="cercaGlobale(this.value)" onfocus="if(this.value.length>=2)cercaGlobale(this.value)">
+  <div class="ricerca-globale-results" id="ricerca-globale-results"></div>
+</div>
 
 <div class="nav-tabs">
   <button class="nav-tab active" data-page="diario" onclick="switchPage('diario')">&#128214; Diario</button>
@@ -486,6 +515,9 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 
 <!-- STATISTICHE -->
 <div class="page" id="page-statistiche">
+  <div style="display:flex;justify-content:flex-end;margin-bottom:14px;gap:10px">
+    <button class="btn-export btn-export-pdf" onclick="generaRiepilogoMensile()" style="padding:10px 24px;font-size:.88rem">&#128203; Riepilogo mensile PDF</button>
+  </div>
   <div id="stats-summary" style="margin-bottom:20px"></div>
   <div class="stats-grid">
     <div class="chart-card full"><h4>Registrazioni negli ultimi 12 mesi</h4><div class="chart-wrap" style="max-height:350px"><canvas id="chart-mesi"></canvas></div></div>
@@ -517,7 +549,19 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 <div class="page" id="page-moduli">
   <div class="main-card">
     <div class="card-header">Moduli disciplinari</div>
-    <p style="color:var(--muted);font-size:.86rem;margin:0 0 20px;padding:0 16px">Seleziona un modulo, compila i campi e genera il PDF.</p>
+    <p style="color:var(--muted);font-size:.86rem;margin:0 0 12px;padding:0 16px">Seleziona un modulo, compila i campi e genera il PDF.</p>
+    <div style="padding:0 16px 12px"><span style="font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600">Template rapidi</span>
+      <div class="template-rapidi-wrap" style="margin-top:6px">
+        <button class="template-rapido-btn" onclick="templateRapido('allineamento','cassa_errore')">Errore cassa</button>
+        <button class="template-rapido-btn" onclick="templateRapido('allineamento','ritardo')">Ritardo</button>
+        <button class="template-rapido-btn" onclick="templateRapido('allineamento','uniforme')">Uniforme non conforme</button>
+        <button class="template-rapido-btn" onclick="templateRapido('allineamento','comportamento')">Comportamento inadeguato</button>
+        <button class="template-rapido-btn" onclick="templateRapido('allineamento','procedura')">Mancato rispetto procedura</button>
+        <button class="template-rapido-btn" onclick="templateRapido('apprezzamento','prestazione')">Prestazione eccellente</button>
+        <button class="template-rapido-btn" onclick="templateRapido('apprezzamento','cliente')">Feedback positivo cliente</button>
+        <button class="template-rapido-btn" onclick="templateRapido('rdi','recidiva')">Recidiva (RDI)</button>
+      </div>
+    </div>
     <div style="display:flex;gap:14px;flex-wrap:wrap;padding:0 16px 16px" id="moduli-cards">
       <div class="modulo-card" onclick="apriModulo('allineamento')" style="flex:1;min-width:200px;padding:18px;border:2px solid var(--line);border-radius:4px;cursor:pointer;transition:border-color .2s">
         <h4 style="margin:0 0 6px;font-family:'Playfair Display',serif;color:var(--ink)">Allineamento</h4>
@@ -842,8 +886,8 @@ async function salva(){const nome=document.getElementById('inp-nome').value.trim
   const rec={id:Date.now(),nome,tipo:tipoSelezionato,testo,data:new Date().toISOString(),operatore:getOperatore(),importo,valuta,reparto};
   try{await sbPost('registrazioni',rec);datiCache.unshift(rec);document.getElementById('inp-testo').value='';document.getElementById('inp-importo').value='';document.getElementById('inp-reparto').value='';
     if(!collaboratoriCache.find(c=>c.nome.toLowerCase()===nome.toLowerCase())){try{const cr=await sbPost('collaboratori',{nome,attivo:true});collaboratoriCache.push(cr[0]);collaboratoriCache.sort((a,b)=>a.nome.localeCompare(b.nome))}catch(e2){}}
-    logAzione('Nuova registrazione',nome+' - '+tipoSelezionato+': '+testo.substring(0,60));toast('Registrato per '+nome);aggiornaNomi();render();updateStats();renderCassaAlerts()}catch(e){toast('Errore salvataggio')}}
-async function elimina(id){if(!confirm('Eliminare?'))return;const _e=datiCache.find(x=>x.id===id);try{await sbDel('registrazioni','id=eq.'+id);datiCache=datiCache.filter(e=>e.id!==id);pinnedIds.delete(id);if(_e)logAzione('Eliminata registrazione',_e.nome+' - '+_e.tipo);aggiornaNomi();render();updateStats();renderCassaAlerts();toast('Eliminata')}catch(e){toast('Errore')}}
+    logAzione('Nuova registrazione',nome+' - '+tipoSelezionato+': '+testo.substring(0,60));toast('Registrato per '+nome);aggiornaNomi();render();updateStats();renderCassaAlerts();renderRischioAlerts()}catch(e){toast('Errore salvataggio')}}
+async function elimina(id){if(!confirm('Eliminare?'))return;const _e=datiCache.find(x=>x.id===id);try{await sbDel('registrazioni','id=eq.'+id);datiCache=datiCache.filter(e=>e.id!==id);pinnedIds.delete(id);if(_e)logAzione('Eliminata registrazione',_e.nome+' - '+_e.tipo);aggiornaNomi();render();updateStats();renderCassaAlerts();renderRischioAlerts();toast('Eliminata')}catch(e){toast('Errore')}}
 async function togglePin(id){try{if(pinnedIds.has(id)){await sbDel('note_fissate','registrazione_id=eq.'+id);pinnedIds.delete(id)}else{await sbPost('note_fissate',{registrazione_id:id});pinnedIds.add(id)}render()}catch(e){toast('Errore')}}
 
 // MODIFICA REGISTRAZIONE
@@ -860,7 +904,7 @@ async function salvaModificaRegistrazione(id){const nome=document.getElementById
   const impEl=document.getElementById('edit-importo'),repEl=document.getElementById('edit-reparto'),valEl=document.getElementById('edit-valuta');
   if(impEl)update.importo=parseFloat(impEl.value)||0;if(repEl)update.reparto=repEl.value;if(valEl)update.valuta=update.importo?valEl.value:'';
   try{await sbPatch('registrazioni','id=eq.'+id,update);const e=datiCache.find(x=>x.id===id);if(e)Object.assign(e,update);
-    logAzione('Modifica registrazione',nome+' - '+tipo+': '+testo.substring(0,60));document.getElementById('pwd-modal').classList.add('hidden');render();updateStats();renderCassaAlerts();toast('Registrazione modificata')}catch(e){toast('Errore salvataggio')}}
+    logAzione('Modifica registrazione',nome+' - '+tipo+': '+testo.substring(0,60));document.getElementById('pwd-modal').classList.add('hidden');render();updateStats();renderCassaAlerts();renderRischioAlerts();toast('Registrazione modificata')}catch(e){toast('Errore salvataggio')}}
 
 // MODAL TIPO
 function apriModal(id,tipo){modalEntryId=id;modalTipoSel=tipo;renderTipiUI();document.getElementById('modal-overlay').classList.remove('hidden')}
@@ -950,6 +994,154 @@ function renderCassaAlerts(){const container=document.getElementById('cassa-aler
 function toggleCassaDD(type){const dd=document.getElementById('cassa-'+type+'-dd');if(dd)dd.classList.toggle('hidden')}
 function apriModuloVeloce(tipo,nome){switchPage('moduli');
   setTimeout(()=>{apriModulo(tipo);setTimeout(()=>{const ci=document.getElementById('mod-collaboratore');if(ci)ci.value=nome},100)},200)}
+
+// ALERT COLLABORATORE A RISCHIO (2+ allineamenti stessa ragione)
+function checkRischioAlerts(){
+  const alerts=[];
+  const nomiSet=new Set(moduliCache.filter(m=>m.tipo==='allineamento').map(m=>m.collaboratore.toLowerCase()));
+  nomiSet.forEach(nomeLc=>{
+    const allins=moduliCache.filter(m=>m.tipo==='allineamento'&&m.collaboratore.toLowerCase()===nomeLc).sort((a,b)=>(a.created_at||a.data_modulo||'').localeCompare(b.created_at||b.data_modulo||''));
+    if(allins.length<2)return;
+    const nome=allins[0].collaboratore;
+    const hasRdi=moduliCache.some(m=>m.tipo==='rdi'&&m.collaboratore.toLowerCase()===nomeLc&&(m.created_at||m.data_modulo||'')>(allins[allins.length-1].created_at||allins[allins.length-1].data_modulo||''));
+    if(hasRdi)return;
+    alerts.push({nome,count:allins.length,lastDate:allins[allins.length-1].data_modulo||allins[allins.length-1].created_at||''})});
+  return alerts}
+function renderRischioAlerts(){const container=document.getElementById('rischio-alerts-container');if(!container)return;
+  const alerts=checkRischioAlerts();if(!alerts.length){container.innerHTML='';return}
+  let html='<div class="rischio-alert-banner" onclick="toggleRischioDD()">&#9888;&#65039; '+alerts.length+' collaboratore/i a rischio disciplinare (2+ allineamenti) — Prossimo allineamento scatta RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
+  html+='<div class="rischio-alerts-dropdown hidden" id="rischio-dd">';
+  alerts.forEach(a=>{const dt=a.lastDate?new Date(a.lastDate+'T12:00:00').toLocaleDateString('it-IT'):'';
+    html+='<div class="cassa-alert-item"><span class="alert-name">'+escP(a.nome)+'</span><span class="alert-detail">'+a.count+' allineamenti'+' (ultimo: '+dt+'). Il prossimo provvedimento sarà un RDI.</span><button class="alert-action" style="background:#8e44ad" onclick="apriModuloVeloce(\'rdi\',\''+a.nome.replace(/'/g,"\\'")+'\')">Crea RDI</button></div>'});
+  html+='</div>';container.innerHTML=html}
+function toggleRischioDD(){const dd=document.getElementById('rischio-dd');if(dd)dd.classList.toggle('hidden')}
+
+// TEMPLATE RAPIDI
+const TEMPLATES_RAPIDI={
+  cassa_errore:{tipo:'allineamento',non_conf:'In data {data}, durante il turno di servizio, è stata rilevata una differenza di cassa a carico del collaboratore. L\'importo della differenza ammonta a CHF ___. Tale discrepanza è stata accertata a seguito del conteggio di fine turno.',obiettivo:'Il collaboratore si impegna a prestare maggiore attenzione durante le operazioni di cassa, verificando ogni transazione e controllando il conteggio prima della chiusura del turno.',scadenza:'A partire da subito'},
+  ritardo:{tipo:'allineamento',non_conf:'In data {data}, il collaboratore si è presentato al posto di lavoro con un ritardo di ___ minuti rispetto all\'orario previsto dal turno assegnato, senza aver comunicato preventivamente l\'impossibilità di presentarsi in orario.',obiettivo:'Il collaboratore si impegna a rispettare rigorosamente gli orari di servizio e a comunicare tempestivamente eventuali ritardi al responsabile di turno.',scadenza:'A partire da subito'},
+  uniforme:{tipo:'allineamento',non_conf:'In data {data}, il collaboratore si è presentato al turno di servizio con l\'uniforme non conforme alle disposizioni aziendali.',obiettivo:'Il collaboratore si impegna a presentarsi al lavoro indossando l\'uniforme completa e conforme al regolamento aziendale.',scadenza:'A partire da subito'},
+  comportamento:{tipo:'allineamento',non_conf:'In data {data}, è stato rilevato un comportamento inadeguato da parte del collaboratore durante il turno di servizio.',obiettivo:'Il collaboratore si impegna a mantenere un comportamento professionale e rispettoso nei confronti di colleghi e clienti.',scadenza:'A partire da subito'},
+  procedura:{tipo:'allineamento',non_conf:'In data {data}, il collaboratore non ha rispettato la procedura prevista per ___.',obiettivo:'Il collaboratore si impegna a seguire scrupolosamente le procedure operative stabilite.',scadenza:'A partire da subito'},
+  prestazione:{tipo:'apprezzamento',descrizione:'Si desidera riconoscere la prestazione eccellente del collaboratore, il quale ha dimostrato particolare impegno e professionalità nello svolgimento delle proprie mansioni.',osservazioni:'Il responsabile di settore esprime piena soddisfazione per il lavoro svolto e incoraggia il collaboratore a mantenere questo livello di eccellenza.'},
+  cliente:{tipo:'apprezzamento',descrizione:'A seguito di un feedback positivo ricevuto da un cliente, si desidera riconoscere l\'atteggiamento professionale e cortese del collaboratore che ha contribuito a un\'esperienza positiva per il cliente.',osservazioni:'Il responsabile di settore ringrazia il collaboratore per l\'attenzione dedicata alla clientela.'},
+  recidiva:{tipo:'rdi',non_conf:'Il collaboratore è stato già oggetto di precedenti allineamenti per la medesima non conformità. Nonostante i colloqui di allineamento effettuati, la non conformità si è ripetuta in data {data}.',obiettivo:'Il collaboratore è consapevole che ulteriori recidive potranno comportare provvedimenti disciplinari di grado superiore.',scadenza:'A partire da subito',livello:'I'}
+};
+function templateRapido(tipo,templateKey){
+  const tmpl=TEMPLATES_RAPIDI[templateKey];if(!tmpl)return;
+  apriModulo(tipo);
+  const oggi=new Date().toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'});
+  setTimeout(()=>{
+    if(tmpl.non_conf){const el=document.getElementById('mod-non-conf');if(el)el.value=tmpl.non_conf.replace('{data}',oggi)}
+    if(tmpl.obiettivo){const el=document.getElementById('mod-obiettivo');if(el)el.value=tmpl.obiettivo}
+    if(tmpl.scadenza){const el=document.getElementById('mod-scadenza');if(el)el.value=tmpl.scadenza}
+    if(tmpl.descrizione){const el=document.getElementById('mod-descrizione');if(el)el.value=tmpl.descrizione}
+    if(tmpl.osservazioni){const el=document.getElementById('mod-osservazioni');if(el)el.value=tmpl.osservazioni}
+    if(tmpl.livello){const el=document.getElementById('mod-livello');if(el)el.value=tmpl.livello}
+  },150)}
+
+// RICERCA GLOBALE
+let _rgTimeout=null;
+function cercaGlobale(q){clearTimeout(_rgTimeout);const dd=document.getElementById('ricerca-globale-results');
+  if(!q||q.length<2){dd.classList.remove('show');return}
+  _rgTimeout=setTimeout(()=>{_eseguiRicercaGlobale(q.toLowerCase())},200)}
+function _eseguiRicercaGlobale(q){
+  const dd=document.getElementById('ricerca-globale-results');let html='';let tot=0;
+  // Diario
+  const diarioRes=datiCache.filter(e=>e.nome.toLowerCase().includes(q)||e.testo.toLowerCase().includes(q)||e.tipo.toLowerCase().includes(q)).slice(0,8);
+  if(diarioRes.length){html+='<div class="rg-section">Diario ('+diarioRes.length+(diarioRes.length>=8?'+':'')+')</div>';
+    diarioRes.forEach(e=>{const d=new Date(e.data);html+='<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'diario\');document.getElementById(\'filt-cerca\').value=\''+escP(q)+'\';render()"><span class="rg-badge" style="background:'+getColore(e.tipo)+'">'+escP(e.tipo)+'</span><span class="rg-text"><strong>'+escP(e.nome)+'</strong> — '+escP(e.testo.substring(0,80))+'</span><span class="rg-date">'+d.toLocaleDateString('it-IT')+'</span></div>'});tot+=diarioRes.length}
+  // Moduli
+  const moduRes=moduliCache.filter(m=>(m.collaboratore||'').toLowerCase().includes(q)||(m.tipo||'').toLowerCase().includes(q)||JSON.stringify(m.dati||{}).toLowerCase().includes(q)).slice(0,6);
+  if(moduRes.length){html+='<div class="rg-section">Moduli ('+moduRes.length+(moduRes.length>=6?'+':'')+')</div>';
+    moduRes.forEach(m=>{const colB={allineamento:'#e67e22',apprezzamento:'#b8860b',rdi:'#c0392b'}[m.tipo]||'var(--muted)';
+      html+='<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'moduli\');setTimeout(()=>apriModuloSalvato('+m.id+'),300)"><span class="rg-badge" style="background:'+colB+'">'+escP(m.tipo)+'</span><span class="rg-text"><strong>'+escP(m.collaboratore)+'</strong> — '+escP(m.data_modulo||'')+'</span><span class="rg-date">'+(m.created_at?new Date(m.created_at).toLocaleDateString('it-IT'):'')+'</span></div>'});tot+=moduRes.length}
+  // Note colleghi
+  const noteRes=noteColleghiCache.filter(n=>n.messaggio.toLowerCase().includes(q)||n.da_operatore.toLowerCase().includes(q)||n.a_operatore.toLowerCase().includes(q)).slice(0,5);
+  if(noteRes.length){html+='<div class="rg-section">Note Colleghi ('+noteRes.length+(noteRes.length>=5?'+':'')+')</div>';
+    noteRes.forEach(n=>{html+='<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'note-collega\')"><span class="rg-badge" style="background:#2980b9">Nota</span><span class="rg-text"><strong>'+escP(n.da_operatore)+'</strong> → '+escP(n.a_operatore)+' — '+escP(n.messaggio.substring(0,60))+'</span><span class="rg-date">'+new Date(n.created_at).toLocaleDateString('it-IT')+'</span></div>'});tot+=noteRes.length}
+  // Registro
+  const logRes=logCache.filter(l=>l.azione.toLowerCase().includes(q)||(l.dettaglio||'').toLowerCase().includes(q)||(l.operatore||'').toLowerCase().includes(q)).slice(0,5);
+  if(logRes.length){html+='<div class="rg-section">Registro ('+logRes.length+(logRes.length>=5?'+':'')+')</div>';
+    logRes.forEach(l=>{html+='<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'registro\');document.getElementById(\'log-filt-cerca\').value=\''+escP(q)+'\';renderRegistro()"><span class="rg-badge" style="background:var(--muted)">Log</span><span class="rg-text"><strong>'+escP(l.operatore||'')+'</strong> — '+escP(l.azione)+' '+escP((l.dettaglio||'').substring(0,50))+'</span><span class="rg-date">'+new Date(l.created_at).toLocaleDateString('it-IT')+'</span></div>'});tot+=logRes.length}
+  if(!tot)html='<div class="rg-item" style="justify-content:center;color:var(--muted)">Nessun risultato per "'+escP(q)+'"</div>';
+  dd.innerHTML=html;dd.classList.add('show')}
+function chiudiRicercaGlobale(){document.getElementById('ricerca-globale-results').classList.remove('show');document.getElementById('ricerca-globale').value=''}
+document.addEventListener('click',function(e){const w=document.querySelector('.ricerca-globale-wrap');if(w&&!w.contains(e.target))document.getElementById('ricerca-globale-results').classList.remove('show')});
+document.getElementById('ricerca-globale').addEventListener('keydown',function(e){if(e.key==='Escape')chiudiRicercaGlobale()});
+
+// RIEPILOGO MENSILE PDF
+async function generaRiepilogoMensile(){
+  if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore caricamento libreria PDF');return}}
+  const now=new Date();const mese=now.getMonth(),anno=now.getFullYear();
+  const meseName=MESI_FULL[mese]+' '+anno;
+  const primoGiorno=anno+'-'+String(mese+1).padStart(2,'0')+'-01';
+  const meseData=datiCache.filter(e=>e.data>=primoGiorno&&e.data<anno+'-'+String(mese+2>12?1:mese+2).padStart(2,'0')+'-01');
+  const meseModuli=moduliCache.filter(m=>{const d=m.created_at||m.data_modulo||'';return d>=primoGiorno});
+  try{
+    const{jsPDF}=window.jspdf;const doc=new jsPDF('portrait','mm','a4');const pw=doc.internal.pageSize.getWidth();const mx=16;let y=14;
+    // Logo
+    if(_logoB64)try{doc.addImage(_logoB64,'PNG',pw/2-20,y,40,22.5)}catch(e){}
+    y+=28;
+    doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(26,18,8);
+    doc.text('Riepilogo Mensile',pw/2,y,{align:'center'});y+=7;
+    doc.setFontSize(11);doc.setFont('helvetica','normal');doc.setTextColor(100);
+    doc.text(meseName+' — Casino Lugano SA',pw/2,y,{align:'center'});y+=10;
+    doc.setTextColor(0);
+    // Statistiche generali
+    const nCollab=new Set(meseData.map(e=>e.nome)).size;
+    const nErr=meseData.filter(e=>e.tipo===nomeCorrente('Errore')).length;
+    const nMal=meseData.filter(e=>e.tipo===nomeCorrente('Malattia')).length;
+    const nAppr=meseData.filter(e=>e.tipo===nomeCorrente('Apprezzamento')).length;
+    const totImp=meseData.reduce((s,e)=>s+(parseFloat(e.importo)||0),0);
+    const nAllin=meseModuli.filter(m=>m.tipo==='allineamento').length;
+    const nRdi=meseModuli.filter(m=>m.tipo==='rdi').length;
+    const nApprM=meseModuli.filter(m=>m.tipo==='apprezzamento').length;
+    doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text('Panoramica',mx,y);y+=6;
+    doc.setFont('helvetica','normal');doc.setFontSize(9.5);
+    const stats=[
+      ['Registrazioni totali',meseData.length],['Collaboratori coinvolti',nCollab],
+      ['Errori',nErr],['Malattie',nMal],['Apprezzamenti',nAppr],
+      ['Importo totale errori',totImp.toFixed(2)+' CHF'],
+      ['Moduli allineamento generati',nAllin],['Moduli RDI generati',nRdi],['Moduli apprezzamento generati',nApprM]
+    ];
+    doc.autoTable({startY:y,margin:{left:mx,right:mx},
+      body:stats.map(s=>[s[0],String(s[1])]),
+      theme:'grid',styles:{fontSize:9,cellPadding:3},
+      columnStyles:{0:{fontStyle:'bold',cellWidth:90},1:{halign:'center'}},
+      alternateRowStyles:{fillColor:[250,247,242]}});
+    y=doc.lastAutoTable.finalY+10;
+    // Top collaboratori
+    if(meseData.length){
+      const cc={};meseData.forEach(e=>{cc[e.nome]=(cc[e.nome]||0)+1});
+      const top10=Object.entries(cc).sort((a,b)=>b[1]-a[1]).slice(0,10);
+      doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text('Top 10 collaboratori con più registrazioni',mx,y);y+=2;
+      doc.autoTable({startY:y,margin:{left:mx,right:mx},
+        head:[['Collaboratore','N. registrazioni']],
+        body:top10.map(([n,c])=>[n,String(c)]),
+        headStyles:{fillColor:[26,18,8],textColor:[250,247,242]},
+        styles:{fontSize:9,cellPadding:3},columnStyles:{1:{halign:'center'}},
+        alternateRowStyles:{fillColor:[250,247,242]}});
+      y=doc.lastAutoTable.finalY+10}
+    // Errori per collaboratore
+    const errori=meseData.filter(e=>e.tipo===nomeCorrente('Errore'));
+    if(errori.length){
+      const errMap={};errori.forEach(e=>{if(!errMap[e.nome])errMap[e.nome]={count:0,tot:0};errMap[e.nome].count++;errMap[e.nome].tot+=(parseFloat(e.importo)||0)});
+      const errSorted=Object.entries(errMap).sort((a,b)=>b[1].count-a[1].count);
+      if(y+30>doc.internal.pageSize.getHeight()-20){doc.addPage();y=16}
+      doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text('Dettaglio errori per collaboratore',mx,y);y+=2;
+      doc.autoTable({startY:y,margin:{left:mx,right:mx},
+        head:[['Collaboratore','N. errori','Importo totale']],
+        body:errSorted.map(([n,d])=>[n,String(d.count),d.tot.toFixed(2)+' CHF']),
+        headStyles:{fillColor:[192,57,43],textColor:[255,255,255]},
+        styles:{fontSize:9,cellPadding:3},columnStyles:{1:{halign:'center'},2:{halign:'right'}},
+        alternateRowStyles:{fillColor:[250,247,242]}});
+      y=doc.lastAutoTable.finalY+10}
+    // Footer
+    const tp=doc.internal.getNumberOfPages();for(let i=1;i<=tp;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(150);
+      doc.text('Casino Lugano SA — Riepilogo '+meseName+' — Pag. '+i+'/'+tp,mx,doc.internal.pageSize.getHeight()-8)}
+    doc.save('Riepilogo_'+meseName.replace(/\s/g,'_')+'.pdf');toast('Riepilogo mensile PDF generato!')
+  }catch(e){console.error(e);toast('Errore generazione PDF: '+e.message)}}
 
 // NOTE COLLEGHI
 function toggleTuttiDest(){const c=document.getElementById('nota-tutti').checked;document.querySelectorAll('#nota-dest-box input[type=checkbox]:not(#nota-tutti)').forEach(cb=>cb.checked=c)}
@@ -1207,7 +1399,7 @@ async function generaModuloPDF(tipo){
   const isEdit=!!window._editModuloId;
   try{if(isEdit){await sbPatch('moduli','id=eq.'+window._editModuloId,{collaboratore:collab,resp_settore:resp,data_modulo:data,dati,operatore:getOperatore()});const idx=moduliCache.findIndex(x=>x.id===window._editModuloId);if(idx!==-1)Object.assign(moduliCache[idx],{collaboratore:collab,resp_settore:resp,data_modulo:data,dati});window._editModuloId=null;toast('Modulo aggiornato e PDF generato!')}
   else{const rec={tipo,collaboratore:collab,resp_settore:resp,data_modulo:data,dati,operatore:getOperatore()};const saved=await sbPost('moduli',rec);moduliCache.unshift(saved[0]);toast('PDF generato e modulo salvato!')}
-  window._importedFileData=null;logAzione((isEdit?'Modificato':'Creato')+' modulo '+tipo,collab+' - '+data);aggiornaModuliLista();const _cnt=document.getElementById('mod-list-count');if(_cnt)_cnt.textContent=moduliCache.length;renderCassaAlerts();chiudiModulo()}catch(e){console.error(e);toast('PDF generato (errore salvataggio DB)')}}
+  window._importedFileData=null;logAzione((isEdit?'Modificato':'Creato')+' modulo '+tipo,collab+' - '+data);aggiornaModuliLista();const _cnt=document.getElementById('mod-list-count');if(_cnt)_cnt.textContent=moduliCache.length;renderCassaAlerts();renderRischioAlerts();chiudiModulo()}catch(e){console.error(e);toast('PDF generato (errore salvataggio DB)')}}
 function drawFieldLine(doc,x,y,label,value,pw){doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0);
   doc.text(label+':',x,y);const lw=doc.getTextWidth(label+':  ');
   doc.setFont('helvetica','normal');doc.text(value,x+lw,y);
@@ -1667,7 +1859,7 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
     // Auto-differenze cassa: parse differenze_cassa field
     const diffExtra=data.note_extra?JSON.parse(data.note_extra):{};
     const diffText=diffExtra.differenze_cassa||'';
-    if(diffText.trim()){await parseDifferenzeCassa(diffText,ds,turno);renderCassaAlerts()}
+    if(diffText.trim()){await parseDifferenzeCassa(diffText,ds,turno);renderCassaAlerts();renderRischioAlerts()}
     }catch(e){console.error(e);toast('Errore salvataggio')}}
 
 // RAPPORTO EXPORT
@@ -1790,7 +1982,7 @@ window.addEventListener('load',async()=>{
     }else if(isAdmin()){document.getElementById('operatore-display').textContent='Admin';document.getElementById('tab-registro').style.display=''}}
   else document.getElementById('pwd-input').focus();
   const n=new Date();document.getElementById('today-date').innerHTML=n.getDate()+' '+MESI[n.getMonth()]+' '+n.getFullYear()+'<br><small style="color:var(--muted);font-size:.75rem">'+GIORNI[n.getDay()]+'</small>';
-  renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();aggiornaNoteBadge();
+  renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();aggiornaNoteBadge();
   const savedPage=sessionStorage.getItem('pagina_corrente');if(savedPage&&savedPage!=='diario')switchPage(savedPage);
   setTimeout(checkQrHash,1200);
   // Polling note ogni 15 secondi
