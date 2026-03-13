@@ -19,7 +19,8 @@
   Applicazione web single-file (index.html) per la gestione del personale
   del Casino Lugano SA. Permette di registrare eventi, redigere rapporti
   giornalieri, inviare note tra colleghi, generare moduli disciplinari
-  con firma digitale e QR code, e consultare statistiche.
+  con firma digitale e QR code, consultare statistiche, generare riepilogo
+  mensile PDF, e gestire visibilita di pagine/funzioni per operatore.
 
   Tecnologie utilizzate:
   - HTML/CSS/JavaScript (tutto in un unico file)
@@ -80,6 +81,7 @@
      - Top 15 collaboratori per numero di registrazioni
      - Tabella dettagliata collaboratori x tipi con totali
      - Tabella errori con importi (CHF/EUR) e reparti
+     - Riepilogo mensile PDF (vedi punto 14)
 
   5. MODULI DISCIPLINARI
      - Tre moduli PDF generabili dall'app:
@@ -95,13 +97,14 @@
      - Salvataggio moduli nel database con lista filtrabile
      - QR Code univoco su ogni PDF (vedi punto 8)
      - Firma digitale integrata (vedi punto 9)
+     - Template rapidi precompilati (vedi punto 13)
 
   6. ASSISTENTE
      - Tab dedicato per riscrittura veloce testi (email, note, comunicazioni)
      - 7 tipi: Email formale, Comunicazione interna, Nota operativa,
        Rapporto evento, Risposta reclamo, Promemoria, Testo libero
      - 3 toni: Formale, Neutro, Informale
-     - Supporto foto: allega un'immagine per contestualizzare
+     - Supporto foto (modello vision)
      - L'AI conosce tutte le procedure del casino (80+ QM)
      - Nessun dato salvato (privacy completa)
 
@@ -144,24 +147,75 @@
   10. SCADENZE E PROMEMORIA
       - Creazione scadenze collegate a registrazioni
       - Campanella animata con badge nel header (numero scadenze attive)
-      - Animazione oscillazione al hover sulla campanella
+      - Animazione oscillazione al hover sulla campanella (solo icona)
       - Dropdown con lista scadenze imminenti
       - Completamento scadenza con nome operatore e data
       - Scadenze completate visibili con barrato
 
-  11. IMPOSTAZIONI (ADMIN)
+  11. RICERCA GLOBALE
+      - Barra di ricerca sopra i tab di navigazione
+      - Cerca contemporaneamente in: Diario, Moduli, Note, Registro
+      - Risultati raggruppati per sezione con badge colorati
+      - Cliccando su un risultato si apre la sezione corrispondente
+      - Ricerca in tempo reale (debounce 200ms, minimo 2 caratteri)
+      - Si chiude con Escape o cliccando fuori
+      - Nascondibile tramite impostazioni visibilita
+
+  12. ALERT COLLABORATORE A RISCHIO
+      - Banner viola quando un collaboratore ha 2+ allineamenti
+      - Avviso: "Prossimo allineamento scatta RDI"
+      - Pulsante "Crea RDI" per generare il modulo direttamente
+      - L'alert scompare quando viene creato un RDI successivo
+      - Dropdown con lista collaboratori a rischio e dettagli
+
+  13. TEMPLATE RAPIDI (MODULI)
+      - 8 bottoni precompilati nella sezione Moduli:
+        Allineamento: Errore cassa, Ritardo, Uniforme non conforme,
+                      Comportamento inadeguato, Mancato rispetto procedura
+        Apprezzamento: Prestazione eccellente, Feedback positivo cliente
+        RDI: Recidiva
+      - Ogni template pre-compila: non conformita/descrizione, obiettivo,
+        scadenza con testo professionale e data odierna
+      - Il collaboratore e le personalizzazioni vanno aggiunti manualmente
+
+  14. RIEPILOGO MENSILE PDF
+      - Bottone "Riepilogo mensile PDF" nella sezione Statistiche
+      - Genera PDF con logo Casino Lugano e titolo mese/anno
+      - Contenuto: panoramica (registrazioni, errori, malattie, importi,
+        moduli generati), top 10 collaboratori, dettaglio errori per
+        collaboratore con importi CHF
+      - Layout professionale con tabelle e footer paginato
+
+  15. VISIBILITA PAGINE E FUNZIONI
+      - Sezione in Impostazioni (solo admin)
+      - L'admin puo controllare la visibilita di:
+        Pagine: Rapporto, Note Colleghi, Statistiche, Moduli, Assistente
+        Funzioni: Ricerca globale, Alert cassa, Alert rischio,
+                  Template rapidi, Firma digitale, QR Code, AI moduli
+      - 4 opzioni per ogni voce:
+        1. Tutti — visibile a tutti gli operatori
+        2. Solo admin — solo chi accede con password master
+        3. Operatori selezionati — checkboxes per scegliere operatori
+           specifici (admin vede sempre)
+        4. Nascosto — non visibile a nessuno
+      - Config salvata in impostazioni DB (chiave 'visibilita', JSON)
+      - Applicata automaticamente al login e al caricamento pagina
+
+  16. IMPOSTAZIONI (ADMIN)
       - Gestione tipi di evento: aggiungere, rimuovere, cambiare colore
         (anche i tipi predefiniti possono essere nascosti/ripristinati)
       - Gestione campi rapporto giornaliero: aggiungere, rimuovere
         (anche i campi predefiniti possono essere nascosti/ripristinati)
       - Gestione operatori: creare, rimuovere, resettare password
       - Gestione collaboratori: aggiungere, rinominare, disattivare
+      - Visibilita pagine e funzioni (vedi punto 15)
       - Cambio password master
       - Tema chiaro/scuro per operatore
 
-  12. REGISTRO ATTIVITA (ADMIN)
+  17. REGISTRO ATTIVITA (ADMIN)
       - Log di tutte le azioni degli operatori
       - Filtri: operatore, categoria, cerca, periodo Dal/Al
+      - Date picker Flatpickr (gg/mm/aaaa) come nel Diario
 
 
 ================================================================================
@@ -195,18 +249,37 @@
 ================================================================================
 
   Icone navigazione:
-  - Diario (libro), Rapporto (calendario), Note (busta),
+  - Diario (libro), Rapporto (calendario), Note Colleghi (busta),
     Statistiche (grafico), Moduli (documento), Assistente (donna),
     Registro (clipboard), Impostazioni (ingranaggio)
 
   Pulsanti header:
-  - Campanella (animata al hover), Tema scuro/chiaro (luna/sole),
-    Stampa (stampante), Esci (porta)
+  - Campanella (animata al hover, solo icona oscilla), Tema scuro/chiaro
+    (luna/sole), Stampa (stampante), Esci (porta)
+
+  Ricerca globale:
+  - Barra di ricerca con icona lente sopra i tab
+  - Dropdown risultati raggruppati per sezione
 
   Temi:
   - Chiaro: sfondo carta pergamena, ink scuro
   - Scuro: sfondo blu notte, toni freddi
   - Salvato per operatore in localStorage
+
+  Responsive:
+  - Desktop (>1000px): layout pieno, tutti gli elementi visibili
+  - Tablet (700-1000px): layout adattato, calendario piu compatto
+  - Mobile (<700px): nav tabs scroll orizzontale, filtri in colonna,
+    canvas firma ridotto (220x80), risultati ricerca senza date
+  - Mobile piccolo (<400px): font ulteriormente ridotti,
+    canvas firma 180x65
+  - iPhone notch: viewport-fit=cover + safe-area-inset padding
+
+  Cross-browser:
+  - Safari: -webkit-backdrop-filter per blur su modali
+  - Scrollbar nascosta: scrollbar-width + ::-webkit-scrollbar
+  - Flatpickr calendario: dimensioni ingrandite per touch
+  - Print: nascosti elementi interattivi, layout pulito
 
 
 ================================================================================
@@ -221,11 +294,15 @@
   - Puo cambiare colori tipi e gestire campi rapporto
   - Puo resettare password operatori
   - Puo cambiare la password master
+  - Puo configurare visibilita pagine/funzioni
+  - Vede sempre tutto (tranne voci impostate su "Nascosto")
 
   OPERATORE (password personale)
   - Accesso alle funzionalita operative
   - Al primo accesso viene richiesto di cambiare la password temporanea
   - Puo cambiare la propria password
+  - Vede solo pagine/funzioni abilitate dall'admin
+  - Se selezionato in "Operatori selezionati", vede la voce specifica
 
   Sicurezza:
   - Password hashate con SHA-256
@@ -262,6 +339,10 @@
 
   impostazioni
     chiave (PK), valore
+    Chiavi usate: tipi_personalizzati, colori_override, operatori_lista,
+                  campi_rapporto_extra, tipi_nascosti, campi_nascosti,
+                  tipi_ordine, campi_ordine, campi_label_override,
+                  tipi_rinominati, visibilita
 
   note_colleghi
     id, da_operatore, a_operatore, messaggio, letta,
@@ -283,6 +364,13 @@
 
   log_attivita
     id, operatore, azione, dettagli, created_at
+
+  Config visibilita (in impostazioni, chiave 'visibilita'):
+    JSON con chiavi = nome funzione/pagina, valori:
+    - "tutti" (default, omesso dal JSON)
+    - "admin"
+    - "nascosto"
+    - {"tipo":"selezionati","operatori":["Nome1","Nome2"]}
 
 
 ================================================================================
@@ -445,6 +533,34 @@
        - Scelta cartacea/digitale
        - Firme salvate nel DB e inserite nel PDF
        - Libreria qrcode-generator (CDN)
+
+  [25] Fix campanella + Note Colleghi + tab Registro
+       - Animazione hover solo sull'icona campanella (non il bottone)
+       - Tab "Note" rinominato in "Note Colleghi"
+       - Fix tab Registro non visibile dopo refresh sessione admin
+       - Filtri date Registro con Flatpickr (gg/mm/aaaa) come Diario
+
+  [26] 4 nuove feature
+       - Ricerca globale: barra sopra i tab, cerca in tutte le sezioni
+       - Alert collaboratore a rischio: banner viola 2+ allineamenti
+       - Template rapidi: 8 bottoni precompilati per moduli
+       - Riepilogo mensile: PDF con panoramica, top collaboratori, errori
+
+  [27] Visibilita pagine e funzioni
+       - Nuova sezione Impostazioni (solo admin)
+       - 5 pagine + 7 funzioni configurabili
+       - 4 opzioni: Tutti / Solo admin / Operatori selezionati / Nascosto
+       - Operatori selezionati: checkboxes per scegliere chi vede cosa
+       - Admin vede sempre (tranne "Nascosto")
+       - Config salvata in impostazioni DB (JSON)
+
+  [28] Responsive e cross-browser
+       - Nav tabs: scroll orizzontale su mobile (no wrap 8 tab)
+       - Ricerca globale responsive (testo multi-riga, date nascoste)
+       - Canvas firma adattato mobile (220x80 / 180x65)
+       - Safari: -webkit-backdrop-filter per blur modali
+       - iPhone: viewport-fit=cover + safe-area-inset padding
+       - Print: nascosti elementi interattivi nuovi
 
 
 ================================================================================
