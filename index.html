@@ -14,6 +14,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <style>
 :root{--ink:#1a1208;--paper:#faf7f2;--paper2:#f3ede3;--line:#e8dfd0;--accent:#c0392b;--accent2:#8b6914;--muted:#8a7d6b;--shadow:rgba(26,18,8,0.1)}
 body.dark-theme{--ink:#e0d8c8;--paper:#1a1a2e;--paper2:#16213e;--line:#2a2a44;--accent:#e74c3c;--accent2:#d4a017;--muted:#9a9aaa;--shadow:rgba(0,0,0,0.3);background:#0f0f1a;background-image:repeating-linear-gradient(45deg,transparent,transparent 40px,rgba(255,255,255,0.015) 40px,rgba(255,255,255,0.015) 41px)}
@@ -65,7 +66,9 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 .bell-badge{position:absolute;top:-4px;right:-4px;background:var(--accent);color:white;font-size:.65rem;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px;line-height:1;font-family:'Source Sans 3',sans-serif}
 .btn-bell{border:none!important}
 .btn-bell.has-alerts{animation:bellShake 0.5s ease-in-out}
+.btn-bell:hover{animation:bellRing 0.6s ease-in-out}
 @keyframes bellShake{0%,100%{transform:rotate(0)}25%{transform:rotate(12deg)}50%{transform:rotate(-12deg)}75%{transform:rotate(6deg)}}
+@keyframes bellRing{0%{transform:rotate(0)}10%{transform:rotate(14deg)}20%{transform:rotate(-14deg)}30%{transform:rotate(10deg)}40%{transform:rotate(-10deg)}50%{transform:rotate(6deg)}60%{transform:rotate(-6deg)}70%{transform:rotate(3deg)}80%{transform:rotate(-3deg)}90%{transform:rotate(1deg)}100%{transform:rotate(0)}}
 /* SCADENZE BANNER */
 .scadenze-banner{width:100%;max-width:1280px;background:var(--accent);color:white;padding:10px 20px;border-radius:3px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;font-size:.85rem;font-weight:600}
 .scadenze-banner:hover{opacity:.9}
@@ -78,6 +81,26 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 .scad-item .scad-date.overdue{color:var(--accent)}
 .scad-item .scad-title{flex:1}
 .scad-item button{padding:3px 8px;font-size:.68rem;font-weight:700;cursor:pointer;border-radius:2px;font-family:'Source Sans 3',sans-serif;border:1px solid}
+/* CASSA ALERTS */
+.cassa-alert-banner{width:100%;max-width:1280px;color:white;padding:12px 20px;border-radius:3px;margin-bottom:10px;font-size:.85rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:space-between}
+.cassa-alert-banner:hover{opacity:.9}
+.cassa-alert-banner.allin{background:#e67e22}
+.cassa-alert-banner.rdi{background:#c0392b}
+.cassa-alert-banner.hidden{display:none}
+.cassa-alerts-dropdown{width:100%;max-width:1280px;background:var(--paper);border-radius:3px;box-shadow:2px 2px 0 #b8aa95;margin-bottom:12px;padding:16px;font-size:.85rem}
+.cassa-alerts-dropdown.hidden{display:none}
+.cassa-alert-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.cassa-alert-item:last-child{border-bottom:none}
+.cassa-alert-item .alert-name{font-weight:700;min-width:160px}
+.cassa-alert-item .alert-detail{flex:1;color:var(--muted);font-size:.82rem}
+.cassa-alert-item .alert-action{padding:5px 14px;font-size:.75rem;font-weight:700;cursor:pointer;border-radius:2px;font-family:'Source Sans 3',sans-serif;border:none;color:white;background:var(--accent)}
+/* FIRMA DIGITALE */
+.firma-canvas-wrap{display:flex;gap:20px;flex-wrap:wrap;margin-top:10px}
+.firma-canvas-box{display:flex;flex-direction:column;align-items:center;gap:6px}
+.firma-canvas-box small{font-size:.82rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+.firma-canvas{border:1.5px solid var(--line);border-radius:4px;cursor:crosshair;background:white;touch-action:none;width:280px;height:100px}
+.firma-canvas-box button{padding:4px 14px;font-size:.72rem;font-weight:600;cursor:pointer;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--muted);font-family:'Source Sans 3',sans-serif;text-transform:uppercase;letter-spacing:.06em}
+.firma-canvas-box button:hover{border-color:var(--accent);color:var(--accent)}
 /* NAV */
 .nav-tabs{width:100%;max-width:1280px;display:flex;gap:0;margin-bottom:24px}
 .nav-tab{flex:1;padding:14px 10px;text-align:center;font-size:.85rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;border:none;font-family:'Source Sans 3',sans-serif;background:var(--paper2);color:var(--muted);transition:all .15s;border-bottom:3px solid transparent}
@@ -266,7 +289,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 .loading::after{content:'';display:inline-block;width:18px;height:18px;border:2px solid var(--line);border-top-color:var(--ink);border-radius:50%;animation:spin .6s linear infinite;margin-left:8px;vertical-align:middle}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media print{
-  #login-overlay,.nav-tabs,.form-area,.filters,.entry-actions,.stats-bar,.btn-salva,.btn-export,.toast,#modal-overlay,#pwd-modal,#profilo-modal,#scadenza-modal,#operatore-modal,.scadenze-banner,.scadenze-dropdown,.header-btns,.btn-recupero{display:none!important}
+  #login-overlay,.nav-tabs,.form-area,.filters,.entry-actions,.stats-bar,.btn-salva,.btn-export,.toast,#modal-overlay,#pwd-modal,#profilo-modal,#scadenza-modal,#operatore-modal,.scadenze-banner,.scadenze-dropdown,.cassa-alert-banner,.cassa-alerts-dropdown,#cassa-alerts-container,.header-btns,.btn-recupero{display:none!important}
   body{background:white!important;padding:10px!important}
   .main-card,.stat,.chart-card,.settings-section,.rapporto-detail,.rapporto-calendar{box-shadow:none!important;border:1px solid #ccc}
   .entry{break-inside:avoid}
@@ -329,7 +352,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
   .pwd-modal-box{min-width:auto;width:90%;max-width:380px;padding:24px 20px}
   .modal-box{min-width:auto;width:90%;max-width:380px;padding:24px 20px}
   .login-box{min-width:auto;width:90%;max-width:380px;padding:30px 24px}
-  .scadenze-banner{font-size:.78rem;padding:8px 14px}
+  .scadenze-banner,.cassa-alert-banner{font-size:.78rem;padding:8px 14px}
   .stat{padding:10px 8px}
   .stat-num{font-size:1.5rem}
   .stat-label{font-size:.65rem}
@@ -374,25 +397,26 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
     <div class="operatore-badge" id="operatore-display"></div>
     <div class="header-btns">
       <button class="btn-header btn-bell" id="btn-bell" onclick="toggleScadenzeDropdown()" style="position:relative;font-size:1.2rem;padding:6px 12px" title="Scadenze / Promemoria">&#128276;<span class="bell-badge" id="bell-badge" style="display:none"></span></button>
-      <button class="btn-header" id="btn-tema" onclick="toggleTema()">Tema scuro</button>
-      <button class="btn-header" onclick="window.print()">Stampa</button>
-      <button class="btn-header" onclick="esci()" style="color:var(--accent)">Esci</button>
+      <button class="btn-header" id="btn-tema" onclick="toggleTema()">&#127761; Tema scuro</button>
+      <button class="btn-header" onclick="window.print()">&#128424; Stampa</button>
+      <button class="btn-header" onclick="esci()" style="color:var(--accent)">&#128682; Esci</button>
     </div>
   </div>
 </header>
 
 <div class="scadenze-banner hidden" id="scadenze-banner" onclick="toggleScadenzeDropdown()"></div>
 <div class="scadenze-dropdown hidden" id="scadenze-dropdown"></div>
+<div id="cassa-alerts-container"></div>
 
 <div class="nav-tabs">
-  <button class="nav-tab active" data-page="diario" onclick="switchPage('diario')">Diario</button>
-  <button class="nav-tab" data-page="rapporto" onclick="switchPage('rapporto')">Rapporto Giornaliero</button>
-  <button class="nav-tab" data-page="note-collega" onclick="switchPage('note-collega')">Note Colleghi <span id="note-badge" style="display:none;background:var(--accent);color:white;border-radius:9px;font-size:.7rem;padding:1px 6px;margin-left:4px;font-weight:700"></span></button>
-  <button class="nav-tab" data-page="statistiche" onclick="switchPage('statistiche')">Statistiche</button>
-  <button class="nav-tab" data-page="moduli" onclick="switchPage('moduli')">Moduli</button>
-  <button class="nav-tab" data-page="assistente" onclick="switchPage('assistente')">Assistente</button>
-  <button class="nav-tab" data-page="registro" onclick="switchPage('registro')" id="tab-registro" style="display:none">Registro Attività</button>
-  <button class="nav-tab" data-page="impostazioni" onclick="switchPage('impostazioni')">Impostazioni</button>
+  <button class="nav-tab active" data-page="diario" onclick="switchPage('diario')">&#128214; Diario</button>
+  <button class="nav-tab" data-page="rapporto" onclick="switchPage('rapporto')">&#128197; Rapporto</button>
+  <button class="nav-tab" data-page="note-collega" onclick="switchPage('note-collega')">&#9993;&#65039; Note <span id="note-badge" style="display:none;background:var(--accent);color:white;border-radius:9px;font-size:.7rem;padding:1px 6px;margin-left:4px;font-weight:700"></span></button>
+  <button class="nav-tab" data-page="statistiche" onclick="switchPage('statistiche')">&#128202; Statistiche</button>
+  <button class="nav-tab" data-page="moduli" onclick="switchPage('moduli')">&#128196; Moduli</button>
+  <button class="nav-tab" data-page="assistente" onclick="switchPage('assistente')">&#128113;&#8205;&#9792;&#65039; Assistente</button>
+  <button class="nav-tab" data-page="registro" onclick="switchPage('registro')" id="tab-registro" style="display:none">&#128203; Registro</button>
+  <button class="nav-tab" data-page="impostazioni" onclick="switchPage('impostazioni')">&#9881;&#65039; Impostazioni</button>
 </div>
 
 <!-- DIARIO -->
@@ -598,7 +622,8 @@ const DEFAULT_PWD_HASH='7310db08dd56916e4ded25837db6cf4ff5005c958fb53e405a62fd10
 const TIPI_DEFAULT=[{nome:'Attività',colore:'#1a4a7a'},{nome:'Richiesta',colore:'#2c6e49'},{nome:'Errore',colore:'#c0392b'},{nome:'Ammonimento Verbale',colore:'#7b2d8b'},{nome:'Malattia',colore:'#1a7a6d'},{nome:'Apprezzamento',colore:'#b8860b'},{nome:'Nota',colore:'#8b6914'},{nome:'Altro',colore:'#8a7d6b'}];
 let tipiPersonalizzati=[],coloriOverride={},tipoSelezionato='Attività',modalEntryId=null,modalTipoSel=null,datiCache=[],pinnedIds=new Set(),scadenzeCache=[],charts={},operatoriSalvati=[];
 let rapportoMese=new Date().getMonth(),rapportoAnno=new Date().getFullYear(),rapportoGiornoAperto=null,rapportiCache={},noteColleghiCache=[],operatoriAuthCache=[];
-const CAMPI_RAPPORTO_DEFAULT=[{key:'sup_note',label:'Supervisore',type:'input'},{key:'cassa_note',label:'Cassa',type:'text'},{key:'sala_note',label:'Sala',type:'text'},{key:'n_assegni',label:'Incasso Assegni',type:'text'},{key:'prelievi',label:'Prelievi',type:'text'},{key:'assenze',label:'Assenze',type:'text'}];
+const CAMPI_RAPPORTO_DEFAULT=[{key:'sup_note',label:'Supervisore',type:'input'},{key:'cassa_note',label:'Cassa',type:'text'},{key:'differenze_cassa',label:'Differenze Cassa',type:'text'},{key:'sala_note',label:'Sala',type:'text'},{key:'n_assegni',label:'Incasso Assegni',type:'text'},{key:'prelievi',label:'Prelievi',type:'text'},{key:'assenze',label:'Assenze',type:'text'}];
+const RAPPORTO_DB_COLS=['sup_note','cassa_note','sala_note','n_assegni','prelievi','assenze'];
 let campiRapportoExtra=[],tipiNascosti=[],campiNascosti=[],tipiOrdine=[],campiOrdine=[],campiLabelOverride={},tipiRinominati={};
 let collaboratoriCache=[],moduliCache=[],logCache=[];
 function nomeCorrente(orig){return tipiRinominati[orig]||orig}
@@ -775,8 +800,8 @@ function renderCampiRapportoUI(){const el=document.getElementById('rapporto-camp
 
 // TEMA
 function getTemaKey(){return'tema_'+(getOperatore()||'default')}
-function toggleTema(){document.body.classList.toggle('dark-theme');const isDark=document.body.classList.contains('dark-theme');localStorage.setItem(getTemaKey(),isDark?'dark':'light');document.getElementById('btn-tema').textContent=isDark?'Tema chiaro':'Tema scuro'}
-function applicaTemaOperatore(){const t=localStorage.getItem(getTemaKey())||localStorage.getItem('tema')||'light';if(t==='dark'){document.body.classList.add('dark-theme');document.getElementById('btn-tema').textContent='Tema chiaro'}else{document.body.classList.remove('dark-theme');document.getElementById('btn-tema').textContent='Tema scuro'}}
+function toggleTema(){document.body.classList.toggle('dark-theme');const isDark=document.body.classList.contains('dark-theme');localStorage.setItem(getTemaKey(),isDark?'dark':'light');document.getElementById('btn-tema').innerHTML=isDark?'&#9728;&#65039; Tema chiaro':'&#127761; Tema scuro'}
+function applicaTemaOperatore(){const t=localStorage.getItem(getTemaKey())||localStorage.getItem('tema')||'light';if(t==='dark'){document.body.classList.add('dark-theme');document.getElementById('btn-tema').innerHTML='\u2600\uFE0F Tema chiaro'}else{document.body.classList.remove('dark-theme');document.getElementById('btn-tema').innerHTML='\uD83C\uDF11 Tema scuro'}}
 
 // NAVIGATION
 function switchPage(name){flushRapportoSave();document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');document.querySelector('.nav-tab[data-page="'+name+'"]').classList.add('active');sessionStorage.setItem('pagina_corrente',name);
@@ -817,8 +842,8 @@ async function salva(){const nome=document.getElementById('inp-nome').value.trim
   const rec={id:Date.now(),nome,tipo:tipoSelezionato,testo,data:new Date().toISOString(),operatore:getOperatore(),importo,valuta,reparto};
   try{await sbPost('registrazioni',rec);datiCache.unshift(rec);document.getElementById('inp-testo').value='';document.getElementById('inp-importo').value='';document.getElementById('inp-reparto').value='';
     if(!collaboratoriCache.find(c=>c.nome.toLowerCase()===nome.toLowerCase())){try{const cr=await sbPost('collaboratori',{nome,attivo:true});collaboratoriCache.push(cr[0]);collaboratoriCache.sort((a,b)=>a.nome.localeCompare(b.nome))}catch(e2){}}
-    logAzione('Nuova registrazione',nome+' - '+tipoSelezionato+': '+testo.substring(0,60));toast('Registrato per '+nome);aggiornaNomi();render();updateStats()}catch(e){toast('Errore salvataggio')}}
-async function elimina(id){if(!confirm('Eliminare?'))return;const _e=datiCache.find(x=>x.id===id);try{await sbDel('registrazioni','id=eq.'+id);datiCache=datiCache.filter(e=>e.id!==id);pinnedIds.delete(id);if(_e)logAzione('Eliminata registrazione',_e.nome+' - '+_e.tipo);aggiornaNomi();render();updateStats();toast('Eliminata')}catch(e){toast('Errore')}}
+    logAzione('Nuova registrazione',nome+' - '+tipoSelezionato+': '+testo.substring(0,60));toast('Registrato per '+nome);aggiornaNomi();render();updateStats();renderCassaAlerts()}catch(e){toast('Errore salvataggio')}}
+async function elimina(id){if(!confirm('Eliminare?'))return;const _e=datiCache.find(x=>x.id===id);try{await sbDel('registrazioni','id=eq.'+id);datiCache=datiCache.filter(e=>e.id!==id);pinnedIds.delete(id);if(_e)logAzione('Eliminata registrazione',_e.nome+' - '+_e.tipo);aggiornaNomi();render();updateStats();renderCassaAlerts();toast('Eliminata')}catch(e){toast('Errore')}}
 async function togglePin(id){try{if(pinnedIds.has(id)){await sbDel('note_fissate','registrazione_id=eq.'+id);pinnedIds.delete(id)}else{await sbPost('note_fissate',{registrazione_id:id});pinnedIds.add(id)}render()}catch(e){toast('Errore')}}
 
 // MODIFICA REGISTRAZIONE
@@ -835,7 +860,7 @@ async function salvaModificaRegistrazione(id){const nome=document.getElementById
   const impEl=document.getElementById('edit-importo'),repEl=document.getElementById('edit-reparto'),valEl=document.getElementById('edit-valuta');
   if(impEl)update.importo=parseFloat(impEl.value)||0;if(repEl)update.reparto=repEl.value;if(valEl)update.valuta=update.importo?valEl.value:'';
   try{await sbPatch('registrazioni','id=eq.'+id,update);const e=datiCache.find(x=>x.id===id);if(e)Object.assign(e,update);
-    logAzione('Modifica registrazione',nome+' - '+tipo+': '+testo.substring(0,60));document.getElementById('pwd-modal').classList.add('hidden');render();updateStats();toast('Registrazione modificata')}catch(e){toast('Errore salvataggio')}}
+    logAzione('Modifica registrazione',nome+' - '+tipo+': '+testo.substring(0,60));document.getElementById('pwd-modal').classList.add('hidden');render();updateStats();renderCassaAlerts();toast('Registrazione modificata')}catch(e){toast('Errore salvataggio')}}
 
 // MODAL TIPO
 function apriModal(id,tipo){modalEntryId=id;modalTipoSel=tipo;renderTipiUI();document.getElementById('modal-overlay').classList.remove('hidden')}
@@ -868,6 +893,63 @@ function toggleScadenzeDropdown(){const dd=document.getElementById('scadenze-dro
 function renderScadenzeSettings(){const el=document.getElementById('scadenze-settings-list');if(!el)return;
   if(!scadenzeCache.length){el.innerHTML='<p style="color:var(--muted)">Nessuna scadenza attiva</p>';return}
   el.innerHTML=scadenzeCache.map(s=>'<div class="scad-item"><span class="scad-date">'+new Date(s.data_scadenza+'T12:00:00').toLocaleDateString('it-IT')+'</span><span class="scad-title"><strong>'+escP(s.titolo)+'</strong>'+(s.descrizione?' - '+escP(s.descrizione):'')+'</span><button style="color:#2c6e49;border-color:#2c6e49" onclick="completaScadenza('+s.id+');renderScadenzeSettings()">Fatto</button><button style="color:var(--accent);border-color:var(--accent)" onclick="eliminaScadenza('+s.id+');renderScadenzeSettings()">Elimina</button></div>').join('')}
+
+// CASSA ALERTS SYSTEM
+function matchCollaboratore(cognome){cognome=cognome.trim().toLowerCase();if(!cognome)return null;
+  const exact=collaboratoriCache.find(c=>c.nome.toLowerCase()===cognome);if(exact)return exact.nome;
+  for(const c of collaboratoriCache){const words=c.nome.toLowerCase().split(/\s+/);if(words.some(w=>w===cognome))return c.nome}
+  for(const c of collaboratoriCache){const words=c.nome.toLowerCase().split(/\s+/);if(words.some(w=>w.startsWith(cognome)&&cognome.length>=3))return c.nome}
+  return null}
+async function parseDifferenzeCassa(text,ds,turno){if(!text||!text.trim())return;
+  const entries=text.split(/[\n;]/).map(s=>s.trim()).filter(Boolean);
+  for(const entry of entries){
+    const parts=entry.split(',').map(s=>s.trim()).filter(Boolean);
+    for(const part of parts){
+      const m=part.match(/^([A-Za-zÀ-ü\s.'-]+?)\s*([+-])?\s*(\d+(?:[.,]\d{1,2})?)\s*$/);
+      if(!m)continue;const cognome=m[1].trim();const sign=m[2];const amount=parseFloat(m[3].replace(',','.'));
+      if(!amount||amount<0.01)continue;
+      const nomeCompleto=matchCollaboratore(cognome);
+      if(!nomeCompleto){toast('Differenza: "'+cognome+'" non trovato tra i collaboratori');continue}
+      const esiste=datiCache.find(e=>e.nome.toLowerCase()===nomeCompleto.toLowerCase()&&e.tipo===nomeCorrente('Errore')&&e.reparto==='Cassa'&&e.data.startsWith(ds)&&Math.abs(parseFloat(e.importo)||0)===amount);
+      if(esiste)continue;
+      const direction=sign==='+'?'eccedenza':'ammanco';
+      const rec={id:Date.now()+Math.floor(Math.random()*1000),nome:nomeCompleto,tipo:nomeCorrente('Errore'),testo:'Differenza cassa: '+direction+' di '+amount.toFixed(2)+' CHF (da rapporto '+turno+' del '+new Date(ds+'T12:00:00').toLocaleDateString('it-IT')+')',data:ds+'T'+new Date().toTimeString().slice(0,8)+'.000Z',operatore:getOperatore(),importo:amount,valuta:'CHF',reparto:'Cassa'};
+      try{await sbPost('registrazioni',rec);datiCache.unshift(rec);logAzione('Auto-registrazione differenza cassa',nomeCompleto+' '+amount.toFixed(2)+' CHF')}catch(e){}
+    }}render();updateStats()}
+function checkCassaAlerts(){
+  const alerts=[];const tipoErr=nomeCorrente('Errore');
+  const errori=datiCache.filter(e=>e.tipo===tipoErr&&e.reparto==='Cassa'&&(parseFloat(e.importo)||0)>0);
+  const byNome={};errori.forEach(e=>{const k=e.nome.toLowerCase();if(!byNome[k])byNome[k]={nome:e.nome,errs:[]};byNome[k].errs.push(e)});
+  Object.values(byNome).forEach(({nome,errs})=>{
+    const lastAllin=moduliCache.filter(m=>m.tipo==='allineamento'&&m.collaboratore.toLowerCase()===nome.toLowerCase()).sort((a,b)=>(b.created_at||b.data_modulo||'').localeCompare(a.created_at||a.data_modulo||''))[0];
+    const lastAllinDate=lastAllin?(lastAllin.created_at||lastAllin.data_modulo||''):'';
+    const lastRdi=moduliCache.filter(m=>m.tipo==='rdi'&&m.collaboratore.toLowerCase()===nome.toLowerCase()).sort((a,b)=>(b.created_at||b.data_modulo||'').localeCompare(a.created_at||a.data_modulo||''))[0];
+    const lastRdiDate=lastRdi?(lastRdi.created_at||lastRdi.data_modulo||''):'';
+    const errsSinceAllin=lastAllinDate?errs.filter(e=>(e.data||'')>lastAllinDate):errs;
+    const errsSinceRdi=lastRdiDate?errs.filter(e=>(e.data||'')>lastRdiDate):errs;
+    const maxSingle=Math.max(...errsSinceAllin.map(e=>parseFloat(e.importo)||0),0);
+    if(maxSingle>=90)alerts.push({type:'allineamento',nome,importo:maxSingle,count:errsSinceAllin.length});
+    const cumTotal=errsSinceRdi.reduce((s,e)=>s+(parseFloat(e.importo)||0),0);
+    if(cumTotal>=500)alerts.push({type:'rdi',nome,importo:cumTotal,count:errsSinceRdi.length})});
+  return alerts}
+function renderCassaAlerts(){const container=document.getElementById('cassa-alerts-container');if(!container)return;
+  const alerts=checkCassaAlerts();if(!alerts.length){container.innerHTML='';return}
+  const allinAlerts=alerts.filter(a=>a.type==='allineamento');
+  const rdiAlerts=alerts.filter(a=>a.type==='rdi');let html='';
+  if(allinAlerts.length){
+    html+='<div class="cassa-alert-banner allin" onclick="toggleCassaDD(\'allin\')">&#9888;&#65039; '+allinAlerts.length+' collaboratore/i con differenza cassa &#8805; CHF 90 &#8212; Preparare allineamento <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
+    html+='<div class="cassa-alerts-dropdown hidden" id="cassa-allin-dd">';
+    allinAlerts.forEach(a=>{html+='<div class="cassa-alert-item"><span class="alert-name">'+escP(a.nome)+'</span><span class="alert-detail">Max singola differenza: '+a.importo.toFixed(2)+' CHF ('+a.count+' errori dal ultimo allineamento)</span><button class="alert-action" onclick="apriModuloVeloce(\'allineamento\',\''+a.nome.replace(/'/g,"\\'")+'\')">Crea Allineamento</button></div>'});
+    html+='</div>'}
+  if(rdiAlerts.length){
+    html+='<div class="cassa-alert-banner rdi" onclick="toggleCassaDD(\'rdi\')">&#9888;&#65039; '+rdiAlerts.length+' collaboratore/i con differenze cumulative &#8805; CHF 500 &#8212; Fare RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
+    html+='<div class="cassa-alerts-dropdown hidden" id="cassa-rdi-dd">';
+    rdiAlerts.forEach(a=>{html+='<div class="cassa-alert-item"><span class="alert-name">'+escP(a.nome)+'</span><span class="alert-detail">Totale cumulativo: '+a.importo.toFixed(2)+' CHF ('+a.count+' errori dal ultimo RDI)</span><button class="alert-action" onclick="apriModuloVeloce(\'rdi\',\''+a.nome.replace(/'/g,"\\'")+'\')">Crea RDI</button></div>'});
+    html+='</div>'}
+  container.innerHTML=html}
+function toggleCassaDD(type){const dd=document.getElementById('cassa-'+type+'-dd');if(dd)dd.classList.toggle('hidden')}
+function apriModuloVeloce(tipo,nome){switchPage('moduli');
+  setTimeout(()=>{apriModulo(tipo);setTimeout(()=>{const ci=document.getElementById('mod-collaboratore');if(ci)ci.value=nome},100)},200)}
 
 // NOTE COLLEGHI
 function toggleTuttiDest(){const c=document.getElementById('nota-tutti').checked;document.querySelectorAll('#nota-dest-box input[type=checkbox]:not(#nota-tutti)').forEach(cb=>cb.checked=c)}
@@ -971,10 +1053,32 @@ function apriModulo(tipo){
     html+='<div class="modulo-field"><label>Scadenza (termine di verifica)</label><input type="text" id="mod-scadenza" placeholder="Termine di verifica..."></div>';
     html+='<div class="modulo-field"><label>Livello RDI</label><select id="mod-livello"><option value="I">I° livello</option><option value="II">II° livello (grave)</option></select></div>';
   }
+  html+='<div class="modulo-field" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)"><label>Modalit\u00E0 firma</label><div style="display:flex;gap:18px;margin-bottom:8px"><label style="display:flex;align-items:center;gap:5px;font-size:.88rem;cursor:pointer"><input type="radio" name="firma-tipo" value="cartacea" checked onchange="toggleFirmaDigitale()"> &#128221; Cartacea (stampa e firma a mano)</label><label style="display:flex;align-items:center;gap:5px;font-size:.88rem;cursor:pointer"><input type="radio" name="firma-tipo" value="digitale" onchange="toggleFirmaDigitale()"> &#9999;&#65039; Digitale (firma sullo schermo)</label></div><div id="firma-digitale-box" style="display:none"><div class="firma-canvas-wrap"><div class="firma-canvas-box"><small>Firma Resp. Settore</small><canvas id="firma-resp-canvas" class="firma-canvas" width="560" height="200"></canvas><button onclick="clearFirma(\'firma-resp-canvas\')">Cancella</button></div><div class="firma-canvas-box"><small>Firma Collaboratore</small><canvas id="firma-collab-canvas" class="firma-canvas" width="560" height="200"></canvas><button onclick="clearFirma(\'firma-collab-canvas\')">Cancella</button></div></div></div></div>';
   html+='<div style="display:flex;gap:12px;margin-top:18px"><button class="btn-salva" onclick="generaModuloPDF(\''+tipo+'\')">Genera PDF</button><button class="btn-modal-cancel" onclick="chiudiModulo()">Annulla</button></div>';
   html+='</div></div>';area.innerHTML=html;
   area.scrollIntoView({behavior:'smooth'})}
 function chiudiModulo(){document.getElementById('modulo-form-area').style.display='none';document.getElementById('modulo-form-area').innerHTML='';window._editModuloId=null}
+// FIRMA DIGITALE
+function toggleFirmaDigitale(){const d=document.querySelector('input[name="firma-tipo"][value="digitale"]');const box=document.getElementById('firma-digitale-box');
+  if(!d||!box)return;box.style.display=d.checked?'':'none';
+  if(d.checked)setTimeout(()=>{initFirmaCanvas('firma-resp-canvas');initFirmaCanvas('firma-collab-canvas')},50)}
+function initFirmaCanvas(canvasId){const c=document.getElementById(canvasId);if(!c||c._firmInit)return;c._firmInit=true;
+  const ctx=c.getContext('2d');ctx.strokeStyle='#1a1208';ctx.lineWidth=2.5;ctx.lineCap='round';ctx.lineJoin='round';
+  let drawing=false,lx=0,ly=0;
+  function gp(e){const r=c.getBoundingClientRect();const sx=c.width/r.width,sy=c.height/r.height;
+    if(e.touches){const t=e.touches[0];return[(t.clientX-r.left)*sx,(t.clientY-r.top)*sy]}return[e.offsetX*sx,e.offsetY*sy]}
+  c.addEventListener('mousedown',e=>{drawing=true;[lx,ly]=gp(e)});
+  c.addEventListener('mousemove',e=>{if(!drawing)return;const[x,y]=gp(e);ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(x,y);ctx.stroke();[lx,ly]=[x,y]});
+  c.addEventListener('mouseup',()=>drawing=false);c.addEventListener('mouseleave',()=>drawing=false);
+  c.addEventListener('touchstart',e=>{e.preventDefault();drawing=true;[lx,ly]=gp(e)},{passive:false});
+  c.addEventListener('touchmove',e=>{e.preventDefault();if(!drawing)return;const[x,y]=gp(e);ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(x,y);ctx.stroke();[lx,ly]=[x,y]},{passive:false});
+  c.addEventListener('touchend',e=>{e.preventDefault();drawing=false},{passive:false})}
+function clearFirma(canvasId){const c=document.getElementById(canvasId);if(!c)return;c.getContext('2d').clearRect(0,0,c.width,c.height)}
+function getFirmaB64(canvasId){const c=document.getElementById(canvasId);if(!c)return null;
+  const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
+  for(let i=3;i<d.length;i+=4){if(d[i]>0)return c.toDataURL('image/png')}return null}
+function loadFirmaToCanvas(canvasId,b64){const c=document.getElementById(canvasId);if(!c||!b64)return;
+  const ctx=c.getContext('2d');const img=new Image();img.onload=()=>{ctx.clearRect(0,0,c.width,c.height);ctx.drawImage(img,0,0,c.width,c.height)};img.src=b64}
 let _logoB64=null;
 async function _loadLogo(){try{const r=await fetch('logo_casino.png');if(!r.ok)return;const b=await r.blob();_logoB64=await new Promise(res=>{const rd=new FileReader();rd.onloadend=()=>res(rd.result);rd.readAsDataURL(b)})}catch(e){}}
 async function generaModuloPDF(tipo){
@@ -982,6 +1086,13 @@ async function generaModuloPDF(tipo){
   const resp=(document.getElementById('mod-resp')||{}).value||'';
   const data=(document.getElementById('mod-data')||{}).value||'';
   if(!collab){toast('Inserisci il nome del collaboratore');return}
+  // Firma digitale
+  const isDigFirma=document.querySelector('input[name="firma-tipo"][value="digitale"]');
+  const _fResp=isDigFirma&&isDigFirma.checked?getFirmaB64('firma-resp-canvas'):null;
+  const _fCollab=isDigFirma&&isDigFirma.checked?getFirmaB64('firma-collab-canvas'):null;
+  // QR code ID
+  const existingQr=window._editModuloId&&moduliCache.find(x=>x.id===window._editModuloId);
+  const moduloQrId=existingQr&&existingQr.dati&&existingQr.dati.qr_code?existingQr.dati.qr_code:Date.now().toString(36)+Math.random().toString(36).substr(2,4);
   const doc=new jspdf.jsPDF({unit:'mm',format:'a4'});const pw=doc.internal.pageSize.getWidth();const ph=doc.internal.pageSize.getHeight();const mx=20;let y=12;
   // Logo Casino Lugano (ratio 1.78:1)
   if(_logoB64)try{const lw=40,lh=lw/1.78;doc.addImage(_logoB64,'PNG',pw/2-lw/2,y,lw,lh)}catch(e){}
@@ -1033,7 +1144,7 @@ async function generaModuloPDF(tipo){
     checkPage(10);doc.setFontSize(9);doc.setFont('helvetica','italic');doc.setTextColor(60);
     const scadTxt=scad&&scad.toLowerCase()!=='a partire da subito'?scad:'a partire da subito';
     doc.text('Chiediamo che, '+scadTxt+', venga raggiunto l\'obiettivo di cui sopra.',mx,y);y+=10;
-    checkPage(25);const fy1=drawFirmePro(doc,mx,y,pw,false);y=fy1+14;
+    checkPage(25);const fy1=drawFirmePro(doc,mx,y,pw,false,_fResp,_fCollab);y=fy1+14;
     checkPage(15);drawDistribuzionePro(doc,mx,y,['Diario di bordo del collaboratore','Resp. Settore']);
   }else if(tipo==='apprezzamento'){
     doc.setFont('helvetica','bolditalic');doc.setFontSize(13);doc.setTextColor(0);
@@ -1044,7 +1155,7 @@ async function generaModuloPDF(tipo){
     const oss=(document.getElementById('mod-osservazioni')||{}).value||'';
     drawSection('Osservazioni da parte del Resp. Settore',oss);
     y+=6;
-    checkPage(30);const fy2=drawFirmePro(doc,mx,y,pw,false);y=fy2+20;
+    checkPage(30);const fy2=drawFirmePro(doc,mx,y,pw,false,_fResp,_fCollab);y=fy2+20;
     checkPage(15);drawDistribuzionePro(doc,mx,y,['Diario di bordo del collaboratore','Resp. Settore']);
   }else if(tipo==='rdi'){
     doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(0);
@@ -1075,21 +1186,28 @@ async function generaModuloPDF(tipo){
     doc.text('rapporto disciplinare interno di I\u00B0 livello',txtX,y);y+=6;
     doc.circle(cx1,y-1,rb,'S');if(livello==='II'){doc.circle(cx1,y-1,rb*0.55,'F')}
     doc.text('rapporto disciplinare interno grave (II\u00B0 livello)',txtX,y);y+=10;
-    checkPage(35);const firmaY=drawFirmePro(doc,mx,y,pw,true);y=firmaY+6;
+    checkPage(35);const firmaY=drawFirmePro(doc,mx,y,pw,true,_fResp,_fCollab);y=firmaY+6;
     const mid=pw/2;doc.setFontSize(7);doc.setFont('helvetica','italic');doc.setTextColor(80);
     const notaLines=doc.splitTextToSize('* il collaboratore che non vuole sottoscrivere il rapporto disciplinare lo deve espressamente dichiarare, scrivendolo al posto della firma.',pw-mid-10-mx);
     doc.text(notaLines,mid+10,y);y+=notaLines.length*3+8;
     checkPage(15);drawDistribuzionePro(doc,mx,y,['Resp. Settore','Resp. Risorse Umane']);
   }
+  // QR Code in basso a destra dell'ultima pagina
+  try{if(typeof qrcode==='function'){const qr=qrcode(0,'M');qr.addData('https://digit-diary.github.io/#modulo/'+moduloQrId);qr.make();
+    const qrImg=qr.createDataURL(4,0);const qrSz=22;const tp=doc.internal.getNumberOfPages();doc.setPage(tp);
+    doc.addImage(qrImg,'PNG',pw-mx-qrSz,ph-14-qrSz,qrSz,qrSz);
+    doc.setFontSize(5.5);doc.setTextColor(130);doc.setFont('helvetica','normal');
+    doc.text('Scansiona per verificare',pw-mx-qrSz,ph-11);doc.text('digit-diary.github.io/#modulo/'+moduloQrId,pw-mx-qrSz,ph-8)}}catch(e){}
   doc.save('Modulo_'+tipo.charAt(0).toUpperCase()+tipo.slice(1)+'_'+collab.replace(/\s+/g,'_')+'_'+data.replace(/\//g,'-')+'.pdf');
   // Salva/aggiorna nel database
-  const dati={};
+  const dati={qr_code:moduloQrId};
+  if(_fResp)dati.firma_resp=_fResp;if(_fCollab)dati.firma_collab=_fCollab;dati.firma_digitale=!!(isDigFirma&&isDigFirma.checked);
   if(tipo==='allineamento'||tipo==='rdi'){dati.non_conformita=(document.getElementById('mod-non-conf')||{}).value||'';dati.obiettivo=(document.getElementById('mod-obiettivo')||{}).value||'';dati.scadenza=(document.getElementById('mod-scadenza')||{}).value||'';if(tipo==='rdi')dati.livello=(document.getElementById('mod-livello')||{}).value||'I'}
   else if(tipo==='apprezzamento'){dati.descrizione=(document.getElementById('mod-descrizione')||{}).value||'';dati.osservazioni=(document.getElementById('mod-osservazioni')||{}).value||''}
   const isEdit=!!window._editModuloId;
   try{if(isEdit){await sbPatch('moduli','id=eq.'+window._editModuloId,{collaboratore:collab,resp_settore:resp,data_modulo:data,dati,operatore:getOperatore()});const idx=moduliCache.findIndex(x=>x.id===window._editModuloId);if(idx!==-1)Object.assign(moduliCache[idx],{collaboratore:collab,resp_settore:resp,data_modulo:data,dati});window._editModuloId=null;toast('Modulo aggiornato e PDF generato!')}
   else{const rec={tipo,collaboratore:collab,resp_settore:resp,data_modulo:data,dati,operatore:getOperatore()};const saved=await sbPost('moduli',rec);moduliCache.unshift(saved[0]);toast('PDF generato e modulo salvato!')}
-  window._importedFileData=null;logAzione((isEdit?'Modificato':'Creato')+' modulo '+tipo,collab+' - '+data);aggiornaModuliLista();const _cnt=document.getElementById('mod-list-count');if(_cnt)_cnt.textContent=moduliCache.length;chiudiModulo()}catch(e){console.error(e);toast('PDF generato (errore salvataggio DB)')}}
+  window._importedFileData=null;logAzione((isEdit?'Modificato':'Creato')+' modulo '+tipo,collab+' - '+data);aggiornaModuliLista();const _cnt=document.getElementById('mod-list-count');if(_cnt)_cnt.textContent=moduliCache.length;renderCassaAlerts();chiudiModulo()}catch(e){console.error(e);toast('PDF generato (errore salvataggio DB)')}}
 function drawFieldLine(doc,x,y,label,value,pw){doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0);
   doc.text(label+':',x,y);const lw=doc.getTextWidth(label+':  ');
   doc.setFont('helvetica','normal');doc.text(value,x+lw,y);
@@ -1101,13 +1219,17 @@ function drawBlockField(doc,x,y,label,value,pw){const maxW=pw-x*2;
   if(value){const lines=doc.splitTextToSize(value,maxW);doc.text(lines,x,y);y+=lines.length*5+3}
   else{y+=8}
   doc.setDrawColor(180);doc.line(x,y,pw-x,y);y+=2;return y}
-function drawFirmePro(doc,x,y,pw,isRdi){doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(0);
+function drawFirmePro(doc,x,y,pw,isRdi,firmaRespB64,firmaCollabB64){doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(0);
   const mid=pw/2;const lbl1='Firma del Resp. Settore';const lbl2=isRdi?'Firma del collaboratore*':'Firma del collaboratore';
   doc.text(lbl1,x,y);doc.text(lbl2,mid+10,y);
   doc.setDrawColor(0);doc.setLineWidth(0.3);const w1=doc.getTextWidth(lbl1);const w2=doc.getTextWidth(lbl2);
   doc.line(x,y+1.2,x+w1,y+1.2);doc.line(mid+10,y+1.2,mid+10+w2,y+1.2);
-  y+=12;doc.setDrawColor(150);const dots='....................................................';
-  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.text(dots,x,y);doc.text(dots,mid+10,y);return y}
+  y+=4;if(firmaRespB64){try{doc.addImage(firmaRespB64,'PNG',x,y,52,18)}catch(e){}}
+  if(firmaCollabB64){try{doc.addImage(firmaCollabB64,'PNG',mid+10,y,52,18)}catch(e){}}
+  y+=firmaRespB64||firmaCollabB64?20:8;
+  doc.setDrawColor(150);const dots='....................................................';
+  doc.setFont('helvetica','normal');doc.setFontSize(8);
+  if(!firmaRespB64)doc.text(dots,x,y);if(!firmaCollabB64)doc.text(dots,mid+10,y);return y}
 function drawDistribuzionePro(doc,x,y,items){doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(0);
   doc.text('Distribuzione:',x,y);const dw=doc.getTextWidth('Distribuzione:');doc.setDrawColor(0);doc.setLineWidth(0.3);doc.line(x,y+1.5,x+dw,y+1.5);
   y+=6;doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(0);
@@ -1159,7 +1281,12 @@ function apriModuloSalvato(id){const m=moduliCache.find(x=>x.id===id);if(!m)retu
       const sc=document.getElementById('mod-scadenza');if(sc)sc.value=dt.scadenza||'';
       if(m.tipo==='rdi'){const lv=document.getElementById('mod-livello');if(lv)lv.value=dt.livello||'I'}}
     else if(m.tipo==='apprezzamento'){const ds=document.getElementById('mod-descrizione');if(ds)ds.value=dt.descrizione||'';
-      const os=document.getElementById('mod-osservazioni');if(os)os.value=dt.osservazioni||''}},50)}
+      const os=document.getElementById('mod-osservazioni');if(os)os.value=dt.osservazioni||''}
+    // Ripristina firma digitale se presente
+    if(dt.firma_digitale){setTimeout(()=>{const radio=document.querySelector('input[name="firma-tipo"][value="digitale"]');
+      if(radio){radio.checked=true;toggleFirmaDigitale();
+        setTimeout(()=>{if(dt.firma_resp)loadFirmaToCanvas('firma-resp-canvas',dt.firma_resp);
+          if(dt.firma_collab)loadFirmaToCanvas('firma-collab-canvas',dt.firma_collab)},150)}},100)}},50)}
 function ristampaModuloPDF(id){apriModuloSalvato(id);setTimeout(()=>{const m=moduliCache.find(x=>x.id===id);if(m)generaModuloPDF(m.tipo)},150)}
 async function eliminaModulo(id){if(!confirm('Eliminare questo modulo?'))return;
   const _m=moduliCache.find(x=>x.id===id);try{await sbDel('moduli','id=eq.'+id);moduliCache=moduliCache.filter(x=>x.id!==id);if(_m)logAzione('Eliminato modulo',_m.tipo+' - '+_m.collaboratore);aggiornaModuliLista();const cnt=document.getElementById('mod-list-count');if(cnt)cnt.textContent=moduliCache.length;toast('Modulo eliminato')}catch(e){toast('Errore eliminazione')}}
@@ -1513,8 +1640,8 @@ async function apriGiorno(ds){flushRapportoSave();rapportoGiornoAperto=ds;const 
   function sf(id,label,val){return'<div class="turno-field"><label>'+label+'</label><input type="text" id="'+id+'" value="'+escP(val||'')+'" placeholder="Nome..." style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:2px;font-family:Source Sans 3,sans-serif;font-size:.88rem;background:var(--paper2);color:var(--ink);outline:none"></div>'}
   function nf(id,label,val){return'<div class="turno-field"><label>'+label+'</label><input type="number" id="'+id+'" value="'+(val||0)+'" min="0"></div>'}
   function turnoCol(turno,cls,data){const extra=data.note_extra?JSON.parse(data.note_extra||'{}'):{};
-    let fields='';getCampiRapporto().forEach(c=>{const isExtra=!CAMPI_RAPPORTO_DEFAULT.find(d=>d.key===c.key);const val=isExtra?extra[c.key]:data[c.key];
-      if(c.type==='number')fields+=nf(cls+'-'+c.key,c.label,val);else if(c.type==='input')fields+=sf(cls+'-'+c.key,c.label,val);else fields+=tf(cls+'-'+c.key,c.label,val)});
+    let fields='';getCampiRapporto().forEach(c=>{const isExtra=!RAPPORTO_DB_COLS.includes(c.key);const val=isExtra?extra[c.key]:data[c.key];
+      if(c.type==='number')fields+=nf(cls+'-'+c.key,c.label,val);else if(c.type==='input')fields+=sf(cls+'-'+c.key,c.label,val);else if(c.key==='differenze_cassa')fields+='<div class="turno-field"><label>'+c.label+'</label><textarea id="'+cls+'-'+c.key+'" placeholder="Cognome -100&#10;Cognome +50&#10;(auto-registra nel diario)">'+escP(val||'')+'</textarea></div>';else fields+=tf(cls+'-'+c.key,c.label,val)});
     return'<div class="turno-col"><div class="turno-header '+cls+'">'+turno+'</div><div class="turno-body">'+fields+'<div class="autosave-status" id="status-'+cls+'" style="text-align:center;font-size:.75rem;color:var(--muted);margin-top:8px;min-height:18px"></div></div></div>'}
   v.innerHTML='<button class="btn-back" onclick="flushRapportoSave();rapportoGiornoAperto=null;renderRapportoCalendario()">&larr; Torna al calendario</button><div class="rapporto-detail"><h3>Rapporto del '+d.getDate()+' '+MESI_FULL[d.getMonth()]+' '+d.getFullYear()+' — '+GIORNI[d.getDay()]+'</h3><div class="turno-columns">'+turnoCol('PRESTO','presto',p)+turnoCol('NOTTE','notte',n)+'</div><div style="display:flex;justify-content:center;gap:12px;margin-top:20px"><button class="btn-export" onclick="esportaRapportoCSV()" style="padding:10px 24px;font-size:.9rem">Esporta CSV</button><button class="btn-export btn-export-pdf" onclick="esportaRapportoPDF()" style="padding:10px 24px;font-size:.9rem">Esporta PDF</button></div></div>';
   // Autosave debounce
@@ -1524,7 +1651,7 @@ async function apriGiorno(ds){flushRapportoSave();rapportoGiornoAperto=ds;const 
 async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();const extra={};
   const data={data_rapporto:ds,turno,operatore:getOperatore(),updated_at:new Date().toISOString()};
   campi.forEach(c=>{const el=document.getElementById(cls+'-'+c.key);if(!el)return;const val=c.type==='number'?parseInt(el.value)||0:el.value;
-    if(CAMPI_RAPPORTO_DEFAULT.find(d=>d.key===c.key))data[c.key]=val;else extra[c.key]=val});
+    if(RAPPORTO_DB_COLS.includes(c.key))data[c.key]=val;else extra[c.key]=val});
   data.note_extra=JSON.stringify(extra);
   try{const r=await fetch(SB_URL+'/rest/v1/rapporti_giornalieri?on_conflict=data_rapporto,turno',{method:'POST',headers:sbH({'Prefer':'resolution=merge-duplicates,return=representation'}),body:JSON.stringify(data)}).then(r=>{if(!r.ok)throw new Error('save failed');return r.json()});if(!rapportiCache[ds])rapportiCache[ds]={};rapportiCache[ds][turno]=r[0];
     // Auto-malattia: parse assenze field
@@ -1533,6 +1660,10 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
         const esiste=datiCache.find(e=>e.nome.toLowerCase()===nome.toLowerCase()&&e.tipo===nomeCorrente('Malattia')&&e.data.startsWith(ds));
         if(!esiste){const rec={id:Date.now()+Math.floor(Math.random()*1000),nome,tipo:nomeCorrente('Malattia'),testo:'Assente per malattia (da rapporto '+turno+' del '+new Date(ds+'T12:00:00').toLocaleDateString('it-IT')+')',data:ds+'T'+new Date().toTimeString().slice(0,8)+'.000Z',operatore:getOperatore()};
           try{await sbPost('registrazioni',rec);datiCache.unshift(rec)}catch(e){}}}}}
+    // Auto-differenze cassa: parse differenze_cassa field
+    const diffExtra=data.note_extra?JSON.parse(data.note_extra):{};
+    const diffText=diffExtra.differenze_cassa||'';
+    if(diffText.trim()){await parseDifferenzeCassa(diffText,ds,turno);renderCassaAlerts()}
     }catch(e){console.error(e);toast('Errore salvataggio')}}
 
 // RAPPORTO EXPORT
@@ -1548,7 +1679,7 @@ async function esportaRapportoCSV(){const{dal,al}=getRapportoDateRange();const b
   const campi=getCampiRapporto();const rows=[['Data','Campo','PRESTO','NOTTE']];
   dates.forEach(ds=>{const d=new Date(ds+'T12:00:00');const dayLabel=d.toLocaleDateString('it-IT')+' '+GIORNI[d.getDay()];
     const p=byDate[ds].PRESTO||{},n=byDate[ds].NOTTE||{};const extraP=p.note_extra?JSON.parse(p.note_extra):{};const extraN=n.note_extra?JSON.parse(n.note_extra):{};
-    campi.forEach((c,i)=>{const isExtra=!CAMPI_RAPPORTO_DEFAULT.find(x=>x.key===c.key);
+    campi.forEach((c,i)=>{const isExtra=!RAPPORTO_DB_COLS.includes(c.key);
       const vP=(isExtra?(extraP[c.key]||''):(p[c.key]||'')).toString().replace(/"/g,'""').replace(/\n/g,' ');
       const vN=(isExtra?(extraN[c.key]||''):(n[c.key]||'')).toString().replace(/"/g,'""').replace(/\n/g,' ');
       rows.push([i===0?'"'+dayLabel+'"':'','"'+c.label+'"','"'+vP+'"','"'+vN+'"'])});
@@ -1565,7 +1696,7 @@ async function esportaRapportoPDF(){if(!window.jspdf){toast('Caricamento PDF...'
   let y=28;
   dates.forEach(ds=>{const d=new Date(ds+'T12:00:00');const dayLabel=d.getDate()+' '+MESI_FULL[d.getMonth()]+' '+d.getFullYear()+' — '+GIORNI[d.getDay()];
     const p=byDate[ds].PRESTO||{},n=byDate[ds].NOTTE||{};const extraP=p.note_extra?JSON.parse(p.note_extra):{};const extraN=n.note_extra?JSON.parse(n.note_extra):{};
-    const body=campi.map(c=>{const isExtra=!CAMPI_RAPPORTO_DEFAULT.find(x=>x.key===c.key);
+    const body=campi.map(c=>{const isExtra=!RAPPORTO_DB_COLS.includes(c.key);
       return[c.label,(isExtra?(extraP[c.key]||''):(p[c.key]||'')).toString(),(isExtra?(extraN[c.key]||''):(n[c.key]||'')).toString()]});
     const tableH=campi.length*9+18;if(y+tableH>doc.internal.pageSize.height-15){doc.addPage();y=15}
     doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(26,18,8);doc.text(dayLabel,14,y);doc.setTextColor(0);y+=2;
@@ -1654,8 +1785,13 @@ window.addEventListener('load',async()=>{
     }else if(isAdmin()){document.getElementById('operatore-display').textContent='Admin';document.getElementById('tab-registro').style.display=''}}
   else document.getElementById('pwd-input').focus();
   const n=new Date();document.getElementById('today-date').innerHTML=n.getDate()+' '+MESI[n.getMonth()]+' '+n.getFullYear()+'<br><small style="color:var(--muted);font-size:.75rem">'+GIORNI[n.getDay()]+'</small>';
-  renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();aggiornaNoteBadge();
+  renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();aggiornaNoteBadge();
   const savedPage=sessionStorage.getItem('pagina_corrente');if(savedPage&&savedPage!=='diario')switchPage(savedPage);
+  // QR hash routing: #modulo/CODE
+  setTimeout(()=>{const h=window.location.hash;if(h.startsWith('#modulo/')){const code=h.split('/')[1];
+    const mod=moduliCache.find(m=>m.dati&&m.dati.qr_code===code);
+    if(mod){switchPage('moduli');setTimeout(()=>apriModuloSalvato(mod.id),300)}else{toast('Modulo non trovato')}
+    history.replaceState(null,'',window.location.pathname)}},1200);
   // Polling note ogni 15 secondi
   setInterval(pollNuoveNote,15000);
   // Flatpickr date pickers
