@@ -772,20 +772,21 @@ async function eseguiResetPwdOp(nome){const p1=document.getElementById('reset-pw
   document.getElementById('pwd-modal-content').innerHTML='<h3>Password resettata!</h3><p style="text-align:center">'+escP(nome)+' dovrà cambiarla al prossimo accesso.</p><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">OK</button></div>';
   toast('Password di '+nome+' resettata')}catch(e){err.textContent='Errore'}}
 function isAdmin(){return sessionStorage.getItem('is_admin')==='1'}
-// VISIBILITA - 'tutti' (default) | 'admin' | 'nascosto'
+// VISIBILITA - 'tutti' | 'admin' | 'nascosto' | {tipo:'selezionati',operatori:['Nome1']}
 const VIS_ITEMS={
   pagine:{rapporto:'Rapporto',note_collega:'Note Colleghi',statistiche:'Statistiche',moduli:'Moduli',assistente:'Assistente'},
   funzioni:{ricerca_globale:'Ricerca globale',alert_cassa:'Alert cassa',alert_rischio:'Alert rischio',template_rapidi:'Template rapidi',firma_digitale:'Firma digitale',qr_code:'QR Code su PDF',ai_moduli:'AI (Genera + Migliora testo)'}
 };
 function visGet(key){return visibilitaConfig[key]||'tutti'}
-function isVis(key){const v=visGet(key);if(v==='nascosto')return false;if(v==='admin')return isAdmin();return true}
+function isVis(key){const v=visGet(key);if(v==='nascosto')return false;if(v==='admin')return isAdmin();
+  if(typeof v==='object'&&v.tipo==='selezionati'){if(isAdmin())return true;const op=getOperatore();return v.operatori&&v.operatori.includes(op)}
+  return true}
 function applicaVisibilita(){
   // Pagine
   Object.keys(VIS_ITEMS.pagine).forEach(k=>{
     const pageName=k.replace('_','-');
     const tab=document.querySelector('.nav-tab[data-page="'+pageName+'"]');
-    if(tab){if(k==='note_collega'){const pageName2='note-collega';tab.style.display=isVis(k)?'':'none'}
-    else tab.style.display=isVis(k)?'':'none'}});
+    if(tab)tab.style.display=isVis(k)?'':'none'});
   // Ricerca globale
   const rg=document.querySelector('.ricerca-globale-wrap');if(rg)rg.style.display=isVis('ricerca_globale')?'':'none';
   // Alert cassa
@@ -799,25 +800,43 @@ function applicaVisibilita(){
   // Firma digitale
   document.querySelectorAll('input[name="firma-tipo"][value="digitale"]').forEach(el=>{const lbl=el.closest('label');if(lbl)lbl.style.display=isVis('firma_digitale')?'':'none'});
 }
+function _visRadioHtml(k,v,opList){
+  let html='<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
+  const curTipo=typeof v==='object'?'selezionati':(v||'tutti');
+  ['tutti','admin','selezionati','nascosto'].forEach(opt=>{
+    const label=opt==='tutti'?'Tutti':opt==='admin'?'Solo admin':opt==='selezionati'?'Operatori selezionati':'Nascosto';
+    html+='<label style="display:flex;align-items:center;gap:4px;font-size:.85rem;cursor:pointer"><input type="radio" name="vis-'+k+'" value="'+opt+'"'+(curTipo===opt?' checked':'')+' onchange="cambiaVisibilita(\''+k+'\',this.value)"> '+label+'</label>'});
+  html+='</div>';
+  // Operatori checkboxes (visibili solo se selezionati)
+  const selOps=(typeof v==='object'&&v.operatori)?v.operatori:[];
+  html+='<div id="vis-ops-'+k+'" style="display:'+(curTipo==='selezionati'?'flex':'none')+';flex-wrap:wrap;gap:6px 14px;margin-top:8px;padding:8px 12px;background:var(--paper2);border-radius:3px">';
+  opList.forEach(nome=>{
+    html+='<label style="display:flex;align-items:center;gap:4px;font-size:.82rem;cursor:pointer"><input type="checkbox" value="'+escP(nome)+'"'+(selOps.includes(nome)?' checked':'')+' onchange="aggiornaVisOps(\''+k+'\')"> '+escP(nome)+'</label>'});
+  if(!opList.length)html+='<span style="color:var(--muted);font-size:.82rem">Nessun operatore creato</span>';
+  html+='</div>';
+  return html}
 function renderVisibilitaUI(){const el=document.getElementById('visibilita-list');if(!el)return;
+  const opList=operatoriAuthCache.map(o=>o.nome).sort();
   let html='';
   html+='<div style="margin-bottom:14px"><strong style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Pagine</strong></div>';
   Object.entries(VIS_ITEMS.pagine).forEach(([k,label])=>{
-    const v=visGet(k);
-    html+='<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)"><span style="min-width:160px;font-weight:600">'+label+'</span>';
-    ['tutti','admin','nascosto'].forEach(opt=>{
-      html+='<label style="display:flex;align-items:center;gap:4px;font-size:.85rem;cursor:pointer"><input type="radio" name="vis-'+k+'" value="'+opt+'"'+(v===opt?' checked':'')+' onchange="cambiaVisibilita(\''+k+'\',\''+opt+'\')"> '+(opt==='tutti'?'Tutti':opt==='admin'?'Solo admin':'Nascosto')+'</label>'});
-    html+='</div>'});
+    html+='<div style="padding:10px 0;border-bottom:1px solid var(--line)"><div style="font-weight:600;margin-bottom:6px">'+label+'</div>';
+    html+=_visRadioHtml(k,visGet(k),opList);html+='</div>'});
   html+='<div style="margin:18px 0 14px"><strong style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Funzioni</strong></div>';
   Object.entries(VIS_ITEMS.funzioni).forEach(([k,label])=>{
-    const v=visGet(k);
-    html+='<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)"><span style="min-width:160px;font-weight:600">'+label+'</span>';
-    ['tutti','admin','nascosto'].forEach(opt=>{
-      html+='<label style="display:flex;align-items:center;gap:4px;font-size:.85rem;cursor:pointer"><input type="radio" name="vis-'+k+'" value="'+opt+'"'+(v===opt?' checked':'')+' onchange="cambiaVisibilita(\''+k+'\',\''+opt+'\')"> '+(opt==='tutti'?'Tutti':opt==='admin'?'Solo admin':'Nascosto')+'</label>'});
-    html+='</div>'});
+    html+='<div style="padding:10px 0;border-bottom:1px solid var(--line)"><div style="font-weight:600;margin-bottom:6px">'+label+'</div>';
+    html+=_visRadioHtml(k,visGet(k),opList);html+='</div>'});
   el.innerHTML=html}
-async function cambiaVisibilita(key,val){if(val==='tutti')delete visibilitaConfig[key];else visibilitaConfig[key]=val;
+async function cambiaVisibilita(key,val){
+  if(val==='selezionati'){visibilitaConfig[key]={tipo:'selezionati',operatori:[]};
+    const box=document.getElementById('vis-ops-'+key);if(box)box.style.display='flex'}
+  else{if(val==='tutti')delete visibilitaConfig[key];else visibilitaConfig[key]=val;
+    const box=document.getElementById('vis-ops-'+key);if(box)box.style.display='none'}
   await setImp('visibilita',JSON.stringify(visibilitaConfig));applicaVisibilita();toast('Visibilità aggiornata')}
+async function aggiornaVisOps(key){const box=document.getElementById('vis-ops-'+key);if(!box)return;
+  const checked=[...box.querySelectorAll('input[type=checkbox]:checked')].map(cb=>cb.value);
+  visibilitaConfig[key]={tipo:'selezionati',operatori:checked};
+  await setImp('visibilita',JSON.stringify(visibilitaConfig));applicaVisibilita()}
 async function aggiungiOperatoreConPwd(){const n=document.getElementById('new-operatore-nome').value.trim(),p=document.getElementById('new-operatore-pwd').value,p2=document.getElementById('new-operatore-pwd2').value;
   if(!n){toast('Inserisci un nome');return}if(p.length<4){toast('Password minimo 4 caratteri');return}
   if(p!==p2){toast('Le password non coincidono');return}
