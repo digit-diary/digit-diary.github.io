@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Diario Collaboratori – Casinò Lugano SA</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -23,8 +23,8 @@ body.dark-theme .entry:hover{background:#1e1e36}
 body.dark-theme .card-header{background:#0d0d1a}
 body.dark-theme input,body.dark-theme textarea,body.dark-theme select{color:var(--ink);background:var(--paper2);border-color:var(--line)}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Source Sans 3',sans-serif;font-size:16px;background:#d4c9b5;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:30px 16px 60px;background-image:repeating-linear-gradient(45deg,transparent,transparent 40px,rgba(0,0,0,0.015) 40px,rgba(0,0,0,0.015) 41px)}
-#login-overlay{position:fixed;inset:0;background:rgba(26,18,8,0.92);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(4px)}
+body{font-family:'Source Sans 3',sans-serif;font-size:16px;background:#d4c9b5;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:30px 16px 60px;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));padding-bottom:max(60px,env(safe-area-inset-bottom));background-image:repeating-linear-gradient(45deg,transparent,transparent 40px,rgba(0,0,0,0.015) 40px,rgba(0,0,0,0.015) 41px)}
+#login-overlay{position:fixed;inset:0;background:rgba(26,18,8,0.92);display:flex;align-items:center;justify-content:center;z-index:9999;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
 #login-overlay.hidden,.authed #login-overlay{display:none}
 .login-box{background:var(--paper);padding:40px 48px;border-radius:3px;box-shadow:6px 6px 0 #b8aa95;text-align:center;min-width:320px;max-width:400px}
 .login-box h2{font-family:'Playfair Display',serif;font-size:1.6rem;margin-bottom:6px;color:var(--ink)}
@@ -36,10 +36,10 @@ body{font-family:'Source Sans 3',sans-serif;font-size:16px;background:#d4c9b5;mi
 .login-error{color:var(--accent);font-size:.8rem;margin-top:10px;min-height:18px}
 .login-hint{font-size:.72rem;color:var(--muted);margin-top:12px;line-height:1.4}
 /* OPERATORE MODAL */
-#operatore-modal{position:fixed;inset:0;background:rgba(26,18,8,0.72);display:flex;align-items:center;justify-content:center;z-index:9998;backdrop-filter:blur(3px)}
+#operatore-modal{position:fixed;inset:0;background:rgba(26,18,8,0.72);display:flex;align-items:center;justify-content:center;z-index:9998;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
 #operatore-modal.hidden{display:none}
 /* PWD MODAL */
-#pwd-modal{position:fixed;inset:0;background:rgba(26,18,8,0.72);display:flex;align-items:center;justify-content:center;z-index:10000;backdrop-filter:blur(3px)}
+#pwd-modal{position:fixed;inset:0;background:rgba(26,18,8,0.72);display:flex;align-items:center;justify-content:center;z-index:10000;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
 #pwd-modal.hidden{display:none}
 .pwd-modal-box{background:var(--paper);padding:32px 36px;border-radius:3px;box-shadow:6px 6px 0 #b8aa95;min-width:340px;max-width:420px}
 .pwd-modal-box h3{font-family:'Playfair Display',serif;font-size:1.3rem;margin-bottom:6px;color:var(--ink);text-align:center}
@@ -210,7 +210,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 .btn-act.scad{color:#7b2d8b;border-color:#7b2d8b}
 .btn-act.scad:hover{background:#7b2d8b;color:white}
 /* MODAL */
-#modal-overlay,#profilo-modal,#scadenza-modal,#note-modal{position:fixed;inset:0;background:rgba(26,18,8,.72);display:flex;align-items:center;justify-content:center;z-index:8888;backdrop-filter:blur(3px)}
+#modal-overlay,#profilo-modal,#scadenza-modal,#note-modal{position:fixed;inset:0;background:rgba(26,18,8,.72);display:flex;align-items:center;justify-content:center;z-index:8888;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
 #modal-overlay.hidden,#profilo-modal.hidden,#scadenza-modal.hidden,#note-modal.hidden{display:none}
 .modal-box{background:var(--paper);padding:32px 36px;border-radius:3px;box-shadow:6px 6px 0 #b8aa95;min-width:320px;text-align:center;max-height:90vh;overflow-y:auto}
 .modal-box h3{font-family:'Playfair Display',serif;font-size:1.3rem;margin-bottom:6px;color:var(--ink)}
@@ -311,7 +311,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 .loading::after{content:'';display:inline-block;width:18px;height:18px;border:2px solid var(--line);border-top-color:var(--ink);border-radius:50%;animation:spin .6s linear infinite;margin-left:8px;vertical-align:middle}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media print{
-  #login-overlay,.nav-tabs,.form-area,.filters,.entry-actions,.stats-bar,.btn-salva,.btn-export,.toast,#modal-overlay,#pwd-modal,#profilo-modal,#scadenza-modal,#operatore-modal,.scadenze-banner,.scadenze-dropdown,.cassa-alert-banner,.cassa-alerts-dropdown,#cassa-alerts-container,.header-btns,.btn-recupero{display:none!important}
+  #login-overlay,.nav-tabs,.form-area,.filters,.entry-actions,.stats-bar,.btn-salva,.btn-export,.toast,#modal-overlay,#pwd-modal,#profilo-modal,#scadenza-modal,#operatore-modal,.scadenze-banner,.scadenze-dropdown,.cassa-alert-banner,.cassa-alerts-dropdown,#cassa-alerts-container,#rischio-alerts-container,.ricerca-globale-wrap,.header-btns,.btn-recupero{display:none!important}
   body{background:white!important;padding:10px!important}
   .main-card,.stat,.chart-card,.settings-section,.rapporto-detail,.rapporto-calendar{box-shadow:none!important;border:1px solid #ccc}
   .entry{break-inside:avoid}
@@ -330,8 +330,9 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
   header h1 .subtitle{font-size:.75rem}
   header h1 .casino{font-size:.7rem}
   .header-right{align-items:flex-start;flex-direction:row;flex-wrap:wrap;gap:8px}
-  .nav-tabs{flex-wrap:wrap}
-  .nav-tab{font-size:.68rem;padding:10px 6px;letter-spacing:.04em;flex:1 1 auto;min-width:0}
+  .nav-tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .nav-tabs::-webkit-scrollbar{display:none}
+  .nav-tab{font-size:.68rem;padding:10px 8px;letter-spacing:.04em;flex:0 0 auto;min-width:0;white-space:nowrap}
   .form-row,.turno-columns{grid-template-columns:1fr}
   .stats-bar{grid-template-columns:repeat(3,1fr)}
   .stats-grid{grid-template-columns:1fr}
@@ -374,7 +375,16 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
   .pwd-modal-box{min-width:auto;width:90%;max-width:380px;padding:24px 20px}
   .modal-box{min-width:auto;width:90%;max-width:380px;padding:24px 20px}
   .login-box{min-width:auto;width:90%;max-width:380px;padding:30px 24px}
-  .scadenze-banner,.cassa-alert-banner{font-size:.78rem;padding:8px 14px}
+  .scadenze-banner,.cassa-alert-banner,.rischio-alert-banner{font-size:.78rem;padding:8px 14px}
+  .ricerca-globale-input{font-size:.9rem;padding:10px 14px 10px 36px}
+  .ricerca-globale-icon{left:10px;font-size:1rem}
+  .ricerca-globale-results{max-height:300px}
+  .rg-item{padding:8px 10px;font-size:.82rem;gap:6px}
+  .rg-item .rg-text{white-space:normal;-webkit-line-clamp:2;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}
+  .rg-item .rg-date{display:none}
+  .template-rapido-btn{padding:6px 10px;font-size:.72rem}
+  .firma-canvas{width:220px;height:80px}
+  .firma-canvas-wrap{gap:10px}
   .stat{padding:10px 8px}
   .stat-num{font-size:1.5rem}
   .stat-label{font-size:.65rem}
@@ -390,6 +400,9 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
   .entry-month{font-size:.6rem}
   .rapporto-day-cell{padding:6px 2px;min-height:46px}
   .rapporto-day-cell .day-num{font-size:.95rem}
+  .ricerca-globale-input{font-size:.85rem;padding:9px 12px 9px 32px}
+  .template-rapido-btn{padding:5px 8px;font-size:.68rem}
+  .firma-canvas{width:180px;height:65px}
   .stats-bar{grid-template-columns:repeat(2,1fr)}
 }
 </style>
