@@ -542,6 +542,16 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
       <div class="field" style="margin-bottom:16px"><label>Il tuo testo <small style="color:var(--muted);font-weight:300;text-transform:none;letter-spacing:0;font-size:.75rem">Scrivi in modo veloce, anche appunti – l'AI sistema tutto</small></label>
         <textarea id="assist-input" placeholder="Es: scrivi a hr che domani mario rossi è malato e serve sostituto per turno sera cassa..." style="min-height:120px"></textarea>
       </div>
+      <div class="field" style="margin-bottom:16px">
+        <label>Foto allegata <small style="color:var(--muted);font-weight:300;text-transform:none;letter-spacing:0;font-size:.75rem">Opzionale – l'AI analizzerà anche l'immagine</small></label>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="btn-salva" onclick="document.getElementById('assist-foto-input').click()" style="background:var(--accent2);font-size:.78rem;padding:8px 16px">Allega foto</button>
+          <input type="file" id="assist-foto-input" accept="image/*" style="display:none" onchange="assistenteFotoPreview(this)">
+          <span id="assist-foto-name" style="font-size:.82rem;color:var(--muted)">Nessuna foto</span>
+          <button id="assist-foto-remove" onclick="assistenteFotoRimuovi()" style="display:none;background:none;border:1px solid var(--accent);color:var(--accent);padding:4px 10px;border-radius:2px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:'Source Sans 3',sans-serif">Rimuovi</button>
+        </div>
+        <div id="assist-foto-preview" style="display:none;margin-top:10px"><img id="assist-foto-img" style="max-width:300px;max-height:200px;border-radius:3px;border:1px solid var(--line)"></div>
+      </div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <button class="btn-salva" id="btn-assist-gen" onclick="assistenteGenera()" style="background:linear-gradient(135deg,#667eea,#764ba2)">Riscrivi con AI</button>
         <span id="assist-status" style="font-size:.82rem;color:var(--muted)"></span>
@@ -1280,23 +1290,49 @@ async function generaModuloAI(tipo){
   if(btn){btn.disabled=false;btn.textContent='Genera tutti i campi'}}
 
 // ASSISTENTE TESTO
+let _assistFotoB64=null;
+function assistenteFotoPreview(inp){const file=inp.files[0];if(!file)return;
+  if(file.size>20*1024*1024){toast('Foto troppo grande (max 20MB)');inp.value='';return}
+  const reader=new FileReader();
+  reader.onload=function(e){
+    _assistFotoB64=e.target.result;
+    document.getElementById('assist-foto-img').src=_assistFotoB64;
+    document.getElementById('assist-foto-preview').style.display='block';
+    document.getElementById('assist-foto-name').textContent=file.name;
+    document.getElementById('assist-foto-remove').style.display='inline-block';
+  };reader.readAsDataURL(file)}
+function assistenteFotoRimuovi(){_assistFotoB64=null;
+  document.getElementById('assist-foto-input').value='';
+  document.getElementById('assist-foto-preview').style.display='none';
+  document.getElementById('assist-foto-name').textContent='Nessuna foto';
+  document.getElementById('assist-foto-remove').style.display='none'}
 async function assistenteGenera(){
   const input=document.getElementById('assist-input').value.trim();
-  if(!input){toast('Scrivi qualcosa da riscrivere');return}
+  if(!input&&!_assistFotoB64){toast('Scrivi qualcosa o allega una foto');return}
   if(!geminiKey){toast('Configura la chiave Groq nelle Impostazioni');return}
   const tipo=document.getElementById('assist-tipo').value;
   const tono=document.getElementById('assist-tono').value;
   const btn=document.getElementById('btn-assist-gen');
   const status=document.getElementById('assist-status');
   btn.disabled=true;btn.textContent='Elaborazione...';
-  if(status)status.textContent='L\'AI sta riscrivendo il testo...';
+  if(status)status.textContent=_assistFotoB64?'L\'AI sta analizzando foto e testo...':'L\'AI sta riscrivendo il testo...';
   const tipoLabels={mail_formale:'una mail formale (destinatario: Direzione, HR, CFCG o ente esterno)',mail_colleghi:'una comunicazione interna tra colleghi',nota_collaboratore:'una nota indirizzata a un collaboratore',comunicazione_servizio:'una comunicazione di servizio per il reparto',segnalazione:'una segnalazione o un rapporto interno',risposta:'una risposta formale a una richiesta o reclamo',libero:'un testo professionale (migliora solo la forma)'};
   const tonoLabels={formale:'Tono formale e istituzionale, tipico di documenti ufficiali.',cordiale:'Tono cordiale ma professionale, adatto a comunicazioni tra colleghi.',diretto:'Tono diretto e conciso, vai al punto senza giri di parole.'};
-  const prompt='Sei un assistente di redazione per Casinò Lugano SA (casa da gioco svizzera regolata dalla CFCG).\n\nRiscrivi il seguente testo come '+tipoLabels[tipo]+'.\n\n'+tonoLabels[tono]+'\n\nREGOLE:\n- Italiano corretto e professionale\n- Mantieni TUTTI i dettagli specifici (nomi, date, orari, importi, circostanze)\n- Se pertinente, usa terminologia corretta del casinò (SUP_FBS, SURV, CAS, REC, SA, ISP, CR, SIC, LRD, CFCG, QM, IR, ecc.)\n- NON inventare fatti non presenti nel testo originale\n- NON aggiungere saluti/chiusure se non richiesto\n- Rispondi SOLO con il testo riscritto, senza commenti o spiegazioni\n\nTesto originale:\n'+input;
+  let promptText='Sei un assistente di redazione per Casinò Lugano SA (casa da gioco svizzera regolata dalla CFCG).\n\nRiscrivi il seguente testo come '+tipoLabels[tipo]+'.\n\n'+tonoLabels[tono]+'\n\nREGOLE:\n- Italiano corretto e professionale\n- Mantieni TUTTI i dettagli specifici (nomi, date, orari, importi, circostanze)\n- Se pertinente, usa terminologia corretta del casinò (SUP_FBS, SURV, CAS, REC, SA, ISP, CR, SIC, LRD, CFCG, QM, IR, ecc.)\n- NON inventare fatti non presenti nel testo originale\n- NON aggiungere saluti/chiusure se non richiesto\n- Rispondi SOLO con il testo riscritto, senza commenti o spiegazioni';
+  if(_assistFotoB64)promptText+='\n\nHo allegato una foto. Analizzala e integra le informazioni visibili nella foto con il testo scritto. Se la foto mostra documenti, schermate, situazioni o dettagli rilevanti, includili nel testo riscritto.';
+  promptText+='\n\nTesto originale:\n'+(input||'[Vedi foto allegata - descrivi e riscrivi in base a ciò che vedi]');
+  let model='llama-3.3-70b-versatile';
+  let messages;
+  if(_assistFotoB64){
+    model='llama-3.2-90b-vision-preview';
+    messages=[{role:'user',content:[{type:'text',text:promptText},{type:'image_url',image_url:{url:_assistFotoB64}}]}];
+  }else{
+    messages=[{role:'user',content:promptText}];
+  }
   try{
     const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+geminiKey},
-      body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[{role:'user',content:prompt}],temperature:0.3,max_tokens:1500})});
-    if(!r.ok)throw new Error('API error '+r.status);
+      body:JSON.stringify({model:model,messages:messages,temperature:0.3,max_tokens:1500})});
+    if(!r.ok){const errTxt=await r.text();console.error('Groq error',r.status,errTxt);throw new Error('API error '+r.status)}
     const data=await r.json();const result=data.choices?.[0]?.message?.content;
     if(result){
       document.getElementById('assist-output').value=result.trim();
@@ -1307,7 +1343,7 @@ async function assistenteGenera(){
   }catch(e){console.error(e);if(status)status.innerHTML='<span style="color:#c0392b">Errore: verifica la chiave Groq</span>';toast('Errore AI: '+e.message)}
   btn.disabled=false;btn.textContent='Riscrivi con AI'}
 function assistenteCopia(){const t=document.getElementById('assist-output').value;if(t){navigator.clipboard.writeText(t).then(()=>toast('Copiato negli appunti!')).catch(()=>{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);toast('Copiato!')})}}
-function assistenteReset(){document.getElementById('assist-input').value='';document.getElementById('assist-output').value='';document.getElementById('assist-output-wrap').style.display='none';document.getElementById('assist-status').textContent='';toast('Pulito')}
+function assistenteReset(){document.getElementById('assist-input').value='';document.getElementById('assist-output').value='';document.getElementById('assist-output-wrap').style.display='none';document.getElementById('assist-status').textContent='';assistenteFotoRimuovi();toast('Pulito')}
 
 // IMPORTA MODULO DA WORD/PDF
 async function importaModuloFile(input){const file=input.files[0];if(!file)return;
