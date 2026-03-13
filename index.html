@@ -5,16 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Diario Collaboratori – Casinò Lugano SA</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
-<script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/it.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js" integrity="sha384-Xl/CUCfJbzsngMp0CFxkmF0VW/8C160IsGujqeQlIhaGxKz2+JsIGORFqtCPeldF" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css" integrity="sha384-RkASv+6KfBMW9eknReJIJ6b3UnjKOKC5bOUaNgIY778NFbQ8MtWq9Lr/khUgqtTt" crossorigin="anonymous">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js" integrity="sha384-5JqMv4L/Xa0hfvtF06qboNdhvuYXUku9ZrhZh3bSk8VXF0A/RuSLHpLsSV9Zqhl6" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/it.js" integrity="sha384-XmcRqh+m1SV0CoktEURItyTPYrm018EIiFIZnaIFP1lRvHRna9DduiTvO+TQzcTJ" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js" integrity="sha384-nFoSjZIoH3CCp8W639jJyQkuPHinJ2NHe7on1xvlUA7SuGfJAfvMldrsoAVm6ECz" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" integrity="sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js" integrity="sha384-lQXOAyZwHXE55JFyrOMB7nY2Wv+m5ZWNtJcHrd1rceRQXAYNLak8ukN5TjBTcIwz" crossorigin="anonymous"></script>
 <style>
 :root{--ink:#1a1208;--paper:#faf7f2;--paper2:#f3ede3;--line:#e8dfd0;--accent:#c0392b;--accent2:#8b6914;--muted:#8a7d6b;--shadow:rgba(26,18,8,0.1)}
 body.dark-theme{--ink:#e0d8c8;--paper:#1a1a2e;--paper2:#16213e;--line:#2a2a44;--accent:#e74c3c;--accent2:#d4a017;--muted:#9a9aaa;--shadow:rgba(0,0,0,0.3);background:#0f0f1a;background-image:repeating-linear-gradient(45deg,transparent,transparent 40px,rgba(255,255,255,0.015) 40px,rgba(255,255,255,0.015) 41px)}
@@ -664,7 +664,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
   <div class="settings-section" id="visibilita-section" style="display:none"><h4>Visibilità pagine e funzioni</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Controlla quali pagine e funzioni sono visibili agli operatori.</p><div id="visibilita-list"></div></div>
   <div class="settings-section"><h4>Sicurezza</h4><div class="settings-btn-row" id="sicurezza-btns"></div></div>
   <div class="settings-section" id="ai-section" style="display:none"><h4>Assistente AI (Groq)</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Migliora automaticamente i testi nei moduli disciplinari. Ottieni una chiave gratuita su <a href="https://console.groq.com/keys" target="_blank" style="color:var(--accent2)">console.groq.com</a>.</p>
-    <div class="add-tipo-row"><div class="field" style="flex:2"><label>Chiave API Groq</label><input type="password" id="gemini-key-input" placeholder="gsk_..."></div><button class="btn-add-tipo" onclick="salvaGeminiKey()">Salva</button></div><p id="gemini-status" style="font-size:.82rem;margin-top:8px"></p></div>
+    <div class="add-tipo-row"><div class="field" style="flex:2"><label>Chiave API Groq</label><input type="password" id="groq-key-input" placeholder="gsk_..."></div><button class="btn-add-tipo" onclick="salvaGroqKey()">Salva</button></div><p id="groq-status" style="font-size:.82rem;margin-top:8px"></p></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -691,6 +691,10 @@ function getTuttiTipi(){let list=[...TIPI_DEFAULT.filter(t=>!tipiNascosti.includ
 function getColore(n){return coloriOverride[n]||(getTuttiTipi().find(t=>t.nome===n)||{}).colore||'#8a7d6b'}
 function getOperatore(){return sessionStorage.getItem('operatore_corrente')||''}
 async function sha256(t){const d=new TextEncoder().encode(t),h=await crypto.subtle.digest('SHA-256',d);return Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,'0')).join('')}
+function _e(s){const r=[];for(let i=0;i<s.length;i++)r.push(String.fromCharCode(s.charCodeAt(i)^_k.charCodeAt(i%_k.length)));return btoa(r.join(''))}
+async function secureHash(password,salt){const enc=new TextEncoder();const km=await crypto.subtle.importKey('raw',enc.encode(password),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:enc.encode('DiarioCL26_v2_'+(salt||'').toLowerCase()),iterations:100000,hash:'SHA-256'},km,256);return Array.from(new Uint8Array(bits)).map(b=>b.toString(16).padStart(2,'0')).join('')}
+let _loginFailCount=0,_loginLockUntil=0;
+function getAdminToken(){return sessionStorage.getItem('admin_token')||''}
 function genCode(){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let r='';for(let i=0;i<8;i++)r+=c[Math.floor(Math.random()*c.length)];return r}
 
 // SUPABASE
@@ -705,58 +709,73 @@ async function setImp(k,v){await sbPost('impostazioni',{chiave:k,valore:v},{'Pre
 
 // DATA LOADING
 async function loadAll(){
-  // password_hash e recovery_code ora gestiti server-side via RPC
-  const tp=await getImp('tipi_personalizzati');if(tp)try{tipiPersonalizzati=JSON.parse(tp)}catch(e){}
-  const co=await getImp('colori_override');if(co)try{coloriOverride=JSON.parse(co)}catch(e){}
-  const ops=await getImp('operatori_lista');if(ops)try{operatoriSalvati=JSON.parse(ops)}catch(e){}
-  const cr=await getImp('campi_rapporto_extra');if(cr)try{campiRapportoExtra=JSON.parse(cr)}catch(e){}
-  const tn=await getImp('tipi_nascosti');if(tn)try{tipiNascosti=JSON.parse(tn)}catch(e){}
-  const cn=await getImp('campi_nascosti');if(cn)try{campiNascosti=JSON.parse(cn)}catch(e){}
-  const to=await getImp('tipi_ordine');if(to)try{tipiOrdine=JSON.parse(to)}catch(e){}
-  const cmo=await getImp('campi_ordine');if(cmo)try{campiOrdine=JSON.parse(cmo)}catch(e){}
-  const clo=await getImp('campi_label_override');if(clo)try{campiLabelOverride=JSON.parse(clo)}catch(e){}
-  const tr=await getImp('tipi_rinominati');if(tr)try{tipiRinominati=JSON.parse(tr)}catch(e){}
-  const vis=await getImp('visibilita');if(vis)try{visibilitaConfig=JSON.parse(vis)}catch(e){}
-  datiCache=await sbGet('registrazioni?order=data.desc');
-  const pins=await sbGet('note_fissate?select=registrazione_id');pinnedIds=new Set(pins.map(p=>p.registrazione_id));
-  scadenzeCache=await sbGet('scadenze?order=data_scadenza.asc');
-  noteColleghiCache=await sbGet('note_colleghi?order=created_at.desc');
-  operatoriAuthCache=await sbRpc('list_operators')||[];
-  collaboratoriCache=await sbGet('collaboratori?attivo=eq.true&order=nome.asc');
-  moduliCache=await sbGet('moduli?order=created_at.desc');
-  logCache=await sbGet('log_attivita?order=created_at.desc&limit=500');
-  await loadGeminiKey();
+  // Caricamento parallelo: impostazioni + dati + tabelle
+  const [tp,co,ops,cr,tn,cn,to,cmo,clo,tr,vis]=await Promise.all([
+    getImp('tipi_personalizzati'),getImp('colori_override'),getImp('operatori_lista'),
+    getImp('campi_rapporto_extra'),getImp('tipi_nascosti'),getImp('campi_nascosti'),
+    getImp('tipi_ordine'),getImp('campi_ordine'),getImp('campi_label_override'),
+    getImp('tipi_rinominati'),getImp('visibilita')]);
+  if(tp)try{tipiPersonalizzati=JSON.parse(tp)}catch(e){}
+  if(co)try{coloriOverride=JSON.parse(co)}catch(e){}
+  if(ops)try{operatoriSalvati=JSON.parse(ops)}catch(e){}
+  if(cr)try{campiRapportoExtra=JSON.parse(cr)}catch(e){}
+  if(tn)try{tipiNascosti=JSON.parse(tn)}catch(e){}
+  if(cn)try{campiNascosti=JSON.parse(cn)}catch(e){}
+  if(to)try{tipiOrdine=JSON.parse(to)}catch(e){}
+  if(cmo)try{campiOrdine=JSON.parse(cmo)}catch(e){}
+  if(clo)try{campiLabelOverride=JSON.parse(clo)}catch(e){}
+  if(tr)try{tipiRinominati=JSON.parse(tr)}catch(e){}
+  if(vis)try{visibilitaConfig=JSON.parse(vis)}catch(e){}
+  const [dati,pins,scadenze,noteC,opAuth,collabs,moduli,logs]=await Promise.all([
+    sbGet('registrazioni?order=data.desc'),
+    sbGet('note_fissate?select=registrazione_id'),
+    sbGet('scadenze?order=data_scadenza.asc'),
+    sbGet('note_colleghi?order=created_at.desc'),
+    sbRpc('list_operators'),
+    sbGet('collaboratori?attivo=eq.true&order=nome.asc'),
+    sbGet('moduli?order=created_at.desc'),
+    sbGet('log_attivita?order=created_at.desc&limit=500')]);
+  datiCache=dati;pinnedIds=new Set(pins.map(p=>p.registrazione_id));
+  scadenzeCache=scadenze;noteColleghiCache=noteC;operatoriAuthCache=opAuth||[];
+  collaboratoriCache=collabs;moduliCache=moduli;logCache=logs;
+  await loadGroqKey();
   _loadLogo();
 }
 
 // PASSWORD
-async function checkPwd(){const nome=document.getElementById('login-nome').value.trim(),v=document.getElementById('pwd-input').value,h=await sha256(v),err=document.getElementById('login-error');
-  // Try individual operator login first (server-side verification)
-  if(nome){const res=await sbRpc('verify_login',{p_nome:nome,p_hash:h});
-    if(res&&res.valid){sessionStorage.setItem('operatore_corrente',nome);sessionStorage.setItem('diario_auth','1');sessionStorage.removeItem('is_admin');document.getElementById('login-overlay').classList.add('hidden');document.getElementById('operatore-display').textContent='Operatore: '+nome;applicaTemaOperatore();applicaVisibilita();
+async function checkPwd(){const nome=document.getElementById('login-nome').value.trim(),v=document.getElementById('pwd-input').value,err=document.getElementById('login-error');
+  // Rate limiting client-side
+  if(_loginLockUntil&&Date.now()<_loginLockUntil){const secs=Math.ceil((_loginLockUntil-Date.now())/1000);err.textContent='Troppi tentativi. Riprova tra '+secs+'s';return}
+  const h=await secureHash(v,nome||'__master__');const legacyH=await sha256(v);
+  // Try individual operator login first
+  if(nome){const res=await sbRpc('verify_login',{p_nome:nome,p_hash:h,p_legacy_hash:legacyH});
+    if(res&&res.locked){err.textContent='Troppi tentativi. Riprova tra 1 minuto';return}
+    if(res&&res.valid){_loginFailCount=0;sessionStorage.setItem('operatore_corrente',nome);sessionStorage.setItem('diario_auth','1');sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token');document.getElementById('login-overlay').classList.add('hidden');document.getElementById('operatore-display').textContent='Operatore: '+nome;applicaTemaOperatore();applicaVisibilita();
       if(res.deve_cambiare_pwd)setTimeout(()=>forzaCambioPwdOperatore(nome),300);
       else{setTimeout(()=>mostraNoteNonLette(),500);setTimeout(checkQrHash,800)}return}
-    if(res&&res.found){err.textContent='Password errata per '+nome;document.getElementById('pwd-input').value='';document.getElementById('pwd-input').focus();setTimeout(()=>err.textContent='',2500);return}}
-  // Fallback: master password (admin) - server-side verification
-  const masterRes=await sbRpc('verify_master_pwd',{p_hash:h});
-  if(masterRes&&masterRes.valid){document.getElementById('login-overlay').classList.add('hidden');sessionStorage.setItem('diario_auth','1');sessionStorage.setItem('is_admin','1');
+    if(res&&res.found){_loginFailCount++;if(_loginFailCount>=5){_loginLockUntil=Date.now()+60000;_loginFailCount=0}err.textContent='Password errata per '+nome;document.getElementById('pwd-input').value='';document.getElementById('pwd-input').focus();setTimeout(()=>err.textContent='',2500);return}}
+  // Fallback: master password (admin)
+  const masterRes=await sbRpc('verify_master_pwd',{p_hash:h,p_legacy_hash:legacyH});
+  if(masterRes&&masterRes.locked){err.textContent='Troppi tentativi. Riprova tra 1 minuto';return}
+  if(masterRes&&masterRes.valid){_loginFailCount=0;document.getElementById('login-overlay').classList.add('hidden');sessionStorage.setItem('diario_auth','1');sessionStorage.setItem('is_admin','1');
+    if(masterRes.session_token)sessionStorage.setItem('admin_token',masterRes.session_token);
     if(nome){sessionStorage.setItem('operatore_corrente',nome);document.getElementById('operatore-display').textContent='Operatore: '+nome;setTimeout(()=>mostraNoteNonLette(),500)}
     else{sessionStorage.setItem('operatore_corrente','Admin');document.getElementById('operatore-display').textContent='Admin';}
     applicaTemaOperatore();renderTipiUI();renderOperatoriUI();renderCampiRapportoUI();document.getElementById('tab-registro').style.display='';applicaVisibilita();setTimeout(checkQrHash,800);
-  }else{err.textContent=nome?'Operatore non trovato o password errata':'Password errata';document.getElementById('pwd-input').value='';document.getElementById('pwd-input').focus();setTimeout(()=>err.textContent='',2500)}}
+  }else{_loginFailCount++;if(_loginFailCount>=5){_loginLockUntil=Date.now()+60000;_loginFailCount=0}err.textContent=nome?'Operatore non trovato o password errata':'Password errata';document.getElementById('pwd-input').value='';document.getElementById('pwd-input').focus();setTimeout(()=>err.textContent='',2500)}}
 function mostraForzaCambio(){const b=document.getElementById('pwd-modal-content');b.innerHTML='<h3>Cambia la password</h3><p>Password predefinita. Impostane una nuova.</p><div class="pwd-field"><label>Nuova password (min 4 car.)</label><input type="password" id="new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="eseguiPrimoCambio()">Imposta</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';document.getElementById('pwd-modal').classList.remove('hidden');setTimeout(()=>document.getElementById('new-pwd-1').focus(),100)}
 async function eseguiPrimoCambio(){const p1=document.getElementById('new-pwd-1').value,p2=document.getElementById('new-pwd-2').value,err=document.getElementById('pwd-modal-error');if(p1.length<4){err.textContent='Troppo corta';return}if(p1!==p2){err.textContent='Non coincidono';return}
-  const nh=await sha256(p1),nc=genCode();await sbRpc('setup_master_pwd',{p_default_hash:DEFAULT_PWD_HASH,p_new_hash:nh,p_new_recovery:nc});
+  const nh=await sha256(p1),nhV2=await secureHash(p1,'__master__'),nc=genCode();await sbRpc('setup_master_pwd',{p_default_hash:DEFAULT_PWD_HASH,p_new_hash:nh,p_new_recovery:nc,p_new_hash_v2:nhV2});
   document.getElementById('pwd-modal-content').innerHTML='<h3>Password impostata!</h3><div class="recovery-code-box"><div class="code">'+nc+'</div><small>Salvalo in un posto sicuro.</small></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\');chiediOperatore()">OK</button></div>';toast('Password impostata!')}
 function cambiaPassword(){const b=document.getElementById('pwd-modal-content');b.innerHTML='<h3>Cambia password</h3><p>Inserisci la password attuale</p><div class="pwd-field"><label>Password attuale</label><input type="password" id="old-pwd"></div><div class="pwd-field"><label>Nuova password</label><input type="password" id="new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiCambioPwd()">Conferma</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';document.getElementById('pwd-modal').classList.remove('hidden')}
 async function eseguiCambioPwd(){const o=document.getElementById('old-pwd').value,p1=document.getElementById('new-pwd-1').value,p2=document.getElementById('new-pwd-2').value,err=document.getElementById('pwd-modal-error');if(p1.length<4){err.textContent='Troppo corta';return}if(p1!==p2){err.textContent='Non coincidono';return}
-  const oh=await sha256(o),nh=await sha256(p1),nc=genCode();const res=await sbRpc('change_master_pwd',{p_old_hash:oh,p_new_hash:nh,p_new_recovery:nc});
+  const oh=await secureHash(o,'__master__'),ohL=await sha256(o),nh=await secureHash(p1,'__master__'),nc=genCode();const res=await sbRpc('change_master_pwd',{p_old_hash:oh,p_new_hash:nh,p_new_recovery:nc,p_old_legacy_hash:ohL,p_token:getAdminToken()});
   if(!res||!res.success){err.textContent='Password attuale errata';return}
   document.getElementById('pwd-modal-content').innerHTML='<h3>Aggiornata!</h3><div class="recovery-code-box"><div class="code">'+nc+'</div><small>Nuovo codice di recupero.</small></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">OK</button></div>';toast('Password aggiornata!')}
 async function recuperoPassword(){const rc=await sbRpc('has_recovery_code');if(!rc||!rc.exists){document.getElementById('login-error').textContent='Nessun codice di recupero';setTimeout(()=>document.getElementById('login-error').textContent='',3000);return}
   const b=document.getElementById('pwd-modal-content');b.innerHTML='<h3>Recupero</h3><div class="pwd-field"><label>Codice recupero</label><input type="text" id="recovery-input" style="text-transform:uppercase;letter-spacing:.2em;text-align:center"></div><div class="pwd-field"><label>Nuova password</label><input type="password" id="new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiRecupero()">Reimposta</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';document.getElementById('pwd-modal').classList.remove('hidden')}
 async function eseguiRecupero(){const c=document.getElementById('recovery-input').value.toUpperCase().trim(),p1=document.getElementById('new-pwd-1').value,p2=document.getElementById('new-pwd-2').value,err=document.getElementById('pwd-modal-error');if(p1.length<4){err.textContent='Troppo corta';return}if(p1!==p2){err.textContent='Non coincidono';return}
-  const nh=await sha256(p1),nc=genCode();const res=await sbRpc('recovery_master_pwd',{p_code:c,p_new_hash:nh,p_new_recovery:nc});
+  const nh=await sha256(p1),nhV2=await secureHash(p1,'__master__'),nc=genCode();const res=await sbRpc('recovery_master_pwd',{p_code:c,p_new_hash:nh,p_new_recovery:nc,p_new_hash_v2:nhV2});
   if(!res||!res.success){err.textContent='Codice errato';return}
   document.getElementById('pwd-modal-content').innerHTML='<h3>Reimpostata!</h3><div class="recovery-code-box"><div class="code">'+nc+'</div></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">OK</button></div>';toast('Password reimpostata!')}
 
@@ -772,16 +791,16 @@ function forzaCambioPwdOperatore(nome){const b=document.getElementById('pwd-moda
   document.getElementById('pwd-modal').classList.remove('hidden');setTimeout(()=>document.getElementById('op-new-pwd-1').focus(),100)}
 async function eseguiForzaCambioPwdOp(nome){const p1=document.getElementById('op-new-pwd-1').value,p2=document.getElementById('op-new-pwd-2').value,err=document.getElementById('pwd-modal-error');
   if(p1.length<4){err.textContent='Troppo corta (min 4)';return}if(p1!==p2){err.textContent='Le password non coincidono';return}
-  const nh=await sha256(p1);try{await sbRpc('force_change_pwd',{p_nome:nome,p_new_hash:nh,p_deve_cambiare:false});
+  const nh=await secureHash(p1,nome);try{await sbRpc('force_change_pwd',{p_nome:nome,p_new_hash:nh,p_deve_cambiare:false});
   document.getElementById('pwd-modal-content').innerHTML='<h3>Password impostata!</h3><p style="text-align:center;color:var(--muted)">Da ora accedi con la tua nuova password.</p><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\');mostraNoteNonLette()">OK</button></div>';
   toast('Password personale impostata!')}catch(e){err.textContent='Errore salvataggio'}}
-function esci(){sessionStorage.removeItem('diario_auth');sessionStorage.removeItem('operatore_corrente');sessionStorage.removeItem('is_admin');location.reload()}
+function esci(){const tk=getAdminToken();if(tk)sbRpc('invalidate_admin_session',{p_token:tk}).catch(()=>{});sessionStorage.removeItem('diario_auth');sessionStorage.removeItem('operatore_corrente');sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token');location.reload()}
 async function resetPasswordOperatore(nome){const b=document.getElementById('pwd-modal-content');
   b.innerHTML='<h3>Resetta password</h3><p>Imposta una nuova password temporanea per <strong>'+escP(nome)+'</strong></p><div class="pwd-field"><label>Nuova password</label><input type="password" id="reset-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="reset-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiResetPwdOp(\''+nome.replace(/'/g,"\\'")+'\')">Resetta</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';
   document.getElementById('pwd-modal').classList.remove('hidden')}
 async function eseguiResetPwdOp(nome){const p1=document.getElementById('reset-pwd-1').value,p2=document.getElementById('reset-pwd-2').value,err=document.getElementById('pwd-modal-error');
   if(p1.length<4){err.textContent='Minimo 4 caratteri';return}if(p1!==p2){err.textContent='Non coincidono';return}
-  const nh=await sha256(p1);try{await sbRpc('force_change_pwd',{p_nome:nome,p_new_hash:nh,p_deve_cambiare:true});
+  const nh=await secureHash(p1,nome);try{await sbRpc('force_change_pwd',{p_nome:nome,p_new_hash:nh,p_deve_cambiare:true,p_token:getAdminToken()});
   document.getElementById('pwd-modal-content').innerHTML='<h3>Password resettata!</h3><p style="text-align:center">'+escP(nome)+' dovrà cambiarla al prossimo accesso.</p><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">OK</button></div>';
   toast('Password di '+nome+' resettata')}catch(e){err.textContent='Errore'}}
 function isAdmin(){return sessionStorage.getItem('is_admin')==='1'}
@@ -854,17 +873,17 @@ async function aggiungiOperatoreConPwd(){const n=document.getElementById('new-op
   if(!n){toast('Inserisci un nome');return}if(p.length<4){toast('Password minimo 4 caratteri');return}
   if(p!==p2){toast('Le password non coincidono');return}
   if(operatoriAuthCache.find(o=>o.nome.toLowerCase()===n.toLowerCase())){toast('Operatore già esistente');return}
-  const h=await sha256(p);try{await sbRpc('add_operator',{p_nome:n,p_hash:h});operatoriAuthCache.push({nome:n,ruolo:'operatore'});
+  const h=await secureHash(p,n);try{await sbRpc('add_operator',{p_nome:n,p_hash:h,p_token:getAdminToken()});operatoriAuthCache.push({nome:n,ruolo:'operatore'});
   if(!operatoriSalvati.includes(n)){operatoriSalvati.push(n);operatoriSalvati.sort();await saveOperatori()}
   logAzione('Operatore creato',n);document.getElementById('new-operatore-nome').value='';document.getElementById('new-operatore-pwd').value='';document.getElementById('new-operatore-pwd2').value='';renderOperatoriUI();toast('Operatore "'+n+'" creato con password')}catch(e){toast('Errore creazione')}}
 async function rimuoviOperatore(n){if(!confirm('Rimuovere operatore "'+n+'"?'))return;operatoriSalvati=operatoriSalvati.filter(o=>o!==n);await saveOperatori();
-  try{await sbRpc('remove_operator',{p_nome:n});operatoriAuthCache=operatoriAuthCache.filter(o=>o.nome!==n)}catch(e){}logAzione('Operatore rimosso',n);renderOperatoriUI();toast('Rimosso')}
+  try{await sbRpc('remove_operator',{p_nome:n,p_token:getAdminToken()});operatoriAuthCache=operatoriAuthCache.filter(o=>o.nome!==n)}catch(e){}logAzione('Operatore rimosso',n);renderOperatoriUI();toast('Rimosso')}
 async function cambiaPasswordOperatore(){const op=getOperatore();if(!op){toast('Seleziona prima un operatore');return}
   const b=document.getElementById('pwd-modal-content');b.innerHTML='<h3>Cambia password operatore</h3><p>Operatore: <strong>'+escP(op)+'</strong></p><div class="pwd-field"><label>Password attuale</label><input type="password" id="op-old-pwd"></div><div class="pwd-field"><label>Nuova password (min 4)</label><input type="password" id="op-new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="op-new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiCambioPwdOp()">Conferma</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';
   document.getElementById('pwd-modal').classList.remove('hidden')}
 async function eseguiCambioPwdOp(){const op=getOperatore(),o=document.getElementById('op-old-pwd').value,p1=document.getElementById('op-new-pwd-1').value,p2=document.getElementById('op-new-pwd-2').value,err=document.getElementById('pwd-modal-error');
-  const oh=await sha256(o);if(p1.length<4){err.textContent='Troppo corta';return}if(p1!==p2){err.textContent='Non coincidono';return}
-  const nh=await sha256(p1);const res=await sbRpc('change_op_pwd',{p_nome:op,p_old_hash:oh,p_new_hash:nh});
+  const oh=await secureHash(o,op),ohL=await sha256(o);if(p1.length<4){err.textContent='Troppo corta';return}if(p1!==p2){err.textContent='Non coincidono';return}
+  const nh=await secureHash(p1,op);const res=await sbRpc('change_op_pwd',{p_nome:op,p_old_hash:oh,p_new_hash:nh,p_old_legacy_hash:ohL});
   if(!res||!res.success){err.textContent='Password attuale errata';return}
   try{
   document.getElementById('pwd-modal-content').innerHTML='<h3>Password aggiornata!</h3><p style="text-align:center;color:var(--muted)">La tua password è stata cambiata.</p><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">OK</button></div>';
@@ -931,7 +950,7 @@ function applicaTemaOperatore(){const t=localStorage.getItem(getTemaKey())||loca
 // NAVIGATION
 function switchPage(name){flushRapportoSave();document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');document.querySelector('.nav-tab[data-page="'+name+'"]').classList.add('active');sessionStorage.setItem('pagina_corrente',name);
   if(name==='statistiche')renderStatistiche();if(name==='rapporto'){if(!rapportoGiornoAperto){const gc=getGiornataCasino();const d=new Date(gc+'T12:00:00');rapportoMese=d.getMonth();rapportoAnno=d.getFullYear();rapportoGiornoAperto=gc}renderRapporto()}if(name==='note-collega')renderNoteCollega();if(name==='impostazioni'){renderTipiUI();renderScadenzeSettings();renderOperatoriUI();renderCampiRapportoUI();
-    const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}renderCollaboratoriUI();const ai=document.getElementById('ai-section');if(ai)ai.style.display=isAdmin()?'':'none';const visSec=document.getElementById('visibilita-section');if(visSec){visSec.style.display=isAdmin()?'':'none';if(isAdmin())renderVisibilitaUI()}if(isAdmin()&&geminiKey){const gs=document.getElementById('gemini-status');if(gs)gs.innerHTML='<span style="color:#2c6e49">Chiave configurata</span>'}}if(name==='moduli'){if(!document.getElementById('mod-list-results'))_modFiltInit=false;renderModuliList()};if(name==='registro')renderRegistro()}
+    const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}renderCollaboratoriUI();const ai=document.getElementById('ai-section');if(ai)ai.style.display=isAdmin()?'':'none';const visSec=document.getElementById('visibilita-section');if(visSec){visSec.style.display=isAdmin()?'':'none';if(isAdmin())renderVisibilitaUI()}if(isAdmin()&&groqKey){const gs=document.getElementById('groq-status');if(gs)gs.innerHTML='<span style="color:#2c6e49">Chiave configurata</span>'}}if(name==='moduli'){if(!document.getElementById('mod-list-results'))_modFiltInit=false;renderModuliList()};if(name==='registro')renderRegistro()}
 
 // TIPI
 async function saveTipiP(){await setImp('tipi_personalizzati',JSON.stringify(tipiPersonalizzati))}
@@ -1157,8 +1176,9 @@ async function generaRiepilogoMensile(){
   const now=new Date();const mese=now.getMonth(),anno=now.getFullYear();
   const meseName=MESI_FULL[mese]+' '+anno;
   const primoGiorno=anno+'-'+String(mese+1).padStart(2,'0')+'-01';
-  const meseData=datiCache.filter(e=>e.data>=primoGiorno&&e.data<anno+'-'+String(mese+2>12?1:mese+2).padStart(2,'0')+'-01');
-  const meseModuli=moduliCache.filter(m=>{const d=m.created_at||m.data_modulo||'';return d>=primoGiorno});
+  const nextAnno=mese===11?anno+1:anno,nextMese=mese===11?1:mese+2;
+  const meseData=datiCache.filter(e=>e.data>=primoGiorno&&e.data<nextAnno+'-'+String(nextMese).padStart(2,'0')+'-01');
+  const meseModuli=moduliCache.filter(m=>{const d=m.created_at||m.data_modulo||'';return d>=primoGiorno&&d<nextAnno+'-'+String(nextMese).padStart(2,'0')+'-01'});
   try{
     const{jsPDF}=window.jspdf;const doc=new jsPDF('portrait','mm','a4');const pw=doc.internal.pageSize.getWidth();const mx=16;let y=14;
     // Logo
@@ -1636,17 +1656,18 @@ async function importaCollaboratori(input){const file=input.files[0];if(!file)re
   if(aggiunti)logAzione('Importa collaboratori',aggiunti+' nomi importati da '+file.name)}
 
 // ASSISTENTE AI GROQ
-let geminiKey='';
-async function loadGeminiKey(){let k=await getImp('groq_api_key');if(!k)k=await getImp('gemini_api_key');if(k)geminiKey=k}
-async function salvaGeminiKey(){const k=document.getElementById('gemini-key-input').value.trim();if(!k){toast('Inserisci la chiave');return}
-  await setImp('groq_api_key',k);geminiKey=k;document.getElementById('gemini-key-input').value='';
-  document.getElementById('gemini-status').innerHTML='<span style="color:#2c6e49;font-weight:600">Chiave salvata</span>';toast('Chiave Groq salvata')}
+let groqKey='';
+async function loadGroqKey(){try{const res=await sbRpc('get_groq_key');if(res&&res.key){const k=res.key;if(k.startsWith('enc:')){groqKey=_d(k.substring(4))}else{groqKey=k;await sbRpc('set_groq_key',{p_key:'enc:'+_e(k),p_token:getAdminToken()}).catch(()=>{})}}}catch(e){let k=await getImp('groq_api_key');if(!k)k=await getImp('gemini_api_key');if(k){if(k.startsWith('enc:')){groqKey=_d(k.substring(4))}else{groqKey=k}}}}
+async function salvaGroqKey(){const k=document.getElementById('groq-key-input').value.trim();if(!k){toast('Inserisci la chiave');return}
+  try{await sbRpc('set_groq_key',{p_key:'enc:'+_e(k),p_token:getAdminToken()})}catch(e){await setImp('groq_api_key','enc:'+_e(k))}
+  groqKey=k;document.getElementById('groq-key-input').value='';
+  document.getElementById('groq-status').innerHTML='<span style="color:#2c6e49;font-weight:600">Chiave salvata</span>';toast('Chiave Groq salvata')}
 async function miglioraTesto(fieldId,contesto){const el=document.getElementById(fieldId);if(!el)return;
   const testo=el.value.trim();if(!testo){toast('Scrivi prima un testo da migliorare');return}
-  if(!geminiKey){toast('Configura la chiave Groq nelle Impostazioni');return}
+  if(!groqKey){toast('Configura la chiave Groq nelle Impostazioni');return}
   const btn=el.parentElement.querySelector('.btn-ai');if(btn){btn.disabled=true;btn.textContent='Elaborazione...'}
   try{const prompt='Sei il Responsabile del Settore Giochi del Casinò Lugano SA (Svizzera). Devi riscrivere il seguente testo per un documento formale di '+contesto+'.\n\nSTILE RICHIESTO:\n- Italiano formale e professionale, tipico di documenti disciplinari di un casinò svizzero\n- Terza persona: "il/la collaboratore/trice", "il Sig./la Sig.ra [Cognome Nome]"\n- MANTIENI tutti i dettagli specifici: date, orari, luoghi, importi, circostanze\n- Per fatti: "In data [data], durante il turno [turno], presso [luogo]..." → "si è verificato quanto segue:"\n- Per telecamere: "dalla revisione delle immagini del sistema di videosorveglianza risulta che..."\n- Per violazioni: "Tale comportamento costituisce una violazione del [regolamento/procedura specifica]"\n- Per obiettivi: "Si invita formalmente il/la collaboratore/trice a:" seguito da elenco puntato con -\n- Chiudi con: "consapevole che il ripetersi di tale comportamento potrà comportare l\'adozione di provvedimenti disciplinari più severi"\n- NON inventare fatti, migliora SOLO la forma professionale del testo esistente\n- Rispondi SOLO con il testo migliorato, senza commenti o spiegazioni\n\nTesto originale:\n'+testo;
-    const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+geminiKey},
+    const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+groqKey},
       body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[{role:'user',content:prompt}],temperature:0.3,max_tokens:1000})});
     if(!r.ok)throw new Error('API error '+r.status);
     const data=await r.json();const migliorato=data.choices?.[0]?.message?.content;
@@ -1671,7 +1692,7 @@ function moduloFotoRimuovi(){_moduloFotoB64=null;
 async function generaModuloAI(tipo){
   const prompt=(document.getElementById('ai-gen-prompt')||{}).value||'';
   if(!prompt.trim()&&!_moduloFotoB64){toast('Scrivi una descrizione o allega una foto');return}
-  if(!geminiKey){toast('Configura la chiave Groq nelle Impostazioni');return}
+  if(!groqKey){toast('Configura la chiave Groq nelle Impostazioni');return}
   const btn=document.getElementById('btn-ai-gen');const status=document.getElementById('ai-gen-status');
   if(btn){btn.disabled=true;btn.textContent='Generazione in corso...'}
   if(status)status.textContent=_moduloFotoB64?'L\'AI sta analizzando foto e dati...':'L\'AI sta compilando i campi...';
@@ -1691,7 +1712,7 @@ async function generaModuloAI(tipo){
       messages=[{role:'user',content:sysPrompt}];
       bodyOpts.response_format={type:'json_object'};
     }
-    const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+geminiKey},
+    const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+groqKey},
       body:JSON.stringify(Object.assign({model:model,messages:messages},bodyOpts))});
     if(!r.ok){const errTxt=await r.text();console.error('Groq API error',r.status,errTxt);throw new Error('API error '+r.status)}
     const data=await r.json();let txt=data.choices?.[0]?.message?.content;
@@ -1733,7 +1754,7 @@ function assistenteFotoRimuovi(){_assistFotoB64=null;
 async function assistenteGenera(){
   const input=document.getElementById('assist-input').value.trim();
   if(!input&&!_assistFotoB64){toast('Scrivi qualcosa o allega una foto');return}
-  if(!geminiKey){toast('Configura la chiave Groq nelle Impostazioni');return}
+  if(!groqKey){toast('Configura la chiave Groq nelle Impostazioni');return}
   const tipo=document.getElementById('assist-tipo').value;
   const tono=document.getElementById('assist-tono').value;
   const btn=document.getElementById('btn-assist-gen');
@@ -1754,7 +1775,7 @@ async function assistenteGenera(){
     messages=[{role:'user',content:promptText}];
   }
   try{
-    const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+geminiKey},
+    const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+groqKey},
       body:JSON.stringify({model:model,messages:messages,temperature:0.3,max_tokens:1500})});
     if(!r.ok){const errTxt=await r.text();console.error('Groq error',r.status,errTxt);throw new Error('API error '+r.status)}
     const data=await r.json();const result=data.choices?.[0]?.message?.content;
@@ -2030,8 +2051,8 @@ function esportaCSV(){const f=getFiltrati();if(!f.length){toast('Nessun dato');r
 
 // EXPORT PDF
 async function caricaJsPDF(){if(window.jspdf)return true;
-  try{await new Promise((ok,ko)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';s.onload=ok;s.onerror=ko;document.head.appendChild(s)});
-  await new Promise((ok,ko)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js';s.onload=ok;s.onerror=ko;document.head.appendChild(s)});return true}catch(e){return false}}
+  try{await new Promise((ok,ko)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';s.integrity='sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk';s.crossOrigin='anonymous';s.onload=ok;s.onerror=ko;document.head.appendChild(s)});
+  await new Promise((ok,ko)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js';s.integrity='sha384-Xl/CUCfJbzsngMp0CFxkmF0VW/8C160IsGujqeQlIhaGxKz2+JsIGORFqtCPeldF';s.crossOrigin='anonymous';s.onload=ok;s.onerror=ko;document.head.appendChild(s)});return true}catch(e){return false}}
 async function esportaPDF(){const f=getFiltrati();if(!f.length){toast('Nessun dato');return}
   if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore caricamento libreria PDF');return}}
   try{const{jsPDF}=window.jspdf;const doc=new jsPDF('landscape','mm','a4');
@@ -2054,6 +2075,8 @@ window.addEventListener('load',async()=>{
   const loginSel=document.getElementById('login-nome');if(loginSel){const ops=operatoriAuthCache.map(o=>o.nome).sort();
     loginSel.innerHTML='<option value="">-- Admin (password master) --</option>'+ops.map(n=>'<option value="'+escP(n)+'">'+escP(n)+'</option>').join('')}
   if(sessionStorage.getItem('diario_auth')==='1'){document.getElementById('login-overlay').classList.add('hidden');applicaTemaOperatore();
+    // Valida sessione admin se presente
+    if(isAdmin()){const tk=getAdminToken();if(tk){const sv=await sbRpc('validate_admin_session',{p_token:tk});if(!sv||!sv.valid){sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token')}}else{sessionStorage.removeItem('is_admin')}}
     if(getOperatore()){document.getElementById('operatore-display').textContent='Operatore: '+getOperatore();
       // Check se deve ancora cambiare password
       const authCheck=await sbRpc('check_deve_cambiare',{p_nome:getOperatore()});
