@@ -1117,14 +1117,13 @@ function renderModuliList(){
   let c=document.getElementById('moduli-list-section');
   if(!c){c=document.createElement('div');c.id='moduli-list-section';c.className='main-card';c.style.marginTop='20px';document.getElementById('page-moduli').appendChild(c)}
   if(!_modFiltInit){
-    const fStyle='padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)';
     let hdr='<div class="card-header">Moduli generati (<span id="mod-list-count">'+moduliCache.length+'</span>)</div>';
-    hdr+='<div style="padding:14px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--paper2)">';
-    hdr+='<div class="filter-group"><span class="filter-label">Collaboratore</span><input type="text" id="mod-filt-nome" placeholder="Cerca nome..." oninput="aggiornaModuliLista()" style="'+fStyle+'"></div>';
-    hdr+='<div class="filter-group"><span class="filter-label">Tipo</span><select id="mod-filt-tipo" onchange="aggiornaModuliLista()" style="'+fStyle+'"><option value="">Tutti</option><option value="allineamento">Allineamento</option><option value="apprezzamento">Apprezzamento</option><option value="rdi">RDI</option></select></div>';
-    hdr+='<div class="filter-group"><span class="filter-label">Dal</span><input type="text" id="mod-filt-dal" placeholder="Seleziona..." style="padding:10px 14px;border:1px solid var(--line);border-radius:2px;font-size:1rem;font-family:Source Sans 3,sans-serif;background:var(--paper);color:var(--ink);min-width:150px;cursor:pointer" readonly></div>';
-    hdr+='<div class="filter-group"><span class="filter-label">Al</span><input type="text" id="mod-filt-al" placeholder="Seleziona..." style="padding:10px 14px;border:1px solid var(--line);border-radius:2px;font-size:1rem;font-family:Source Sans 3,sans-serif;background:var(--paper);color:var(--ink);min-width:150px;cursor:pointer" readonly></div>';
-    hdr+='<button class="btn-act tipo" onclick="resetModuliFiltri()">Reset</button></div>';
+    hdr+='<div class="filters">';
+    hdr+='<div class="filter-group"><span class="filter-label">Collaboratore</span><input type="text" id="mod-filt-nome" placeholder="Cerca nome..." oninput="aggiornaModuliLista()"></div>';
+    hdr+='<div class="filter-group"><span class="filter-label">Tipo</span><select id="mod-filt-tipo" onchange="aggiornaModuliLista()"><option value="">Tutti</option><option value="allineamento">Allineamento</option><option value="apprezzamento">Apprezzamento</option><option value="rdi">RDI</option></select></div>';
+    hdr+='<div class="filter-group"><span class="filter-label">Dal</span><input type="text" id="mod-filt-dal" placeholder="Seleziona..." readonly style="cursor:pointer;min-width:150px"></div>';
+    hdr+='<div class="filter-group"><span class="filter-label">Al</span><input type="text" id="mod-filt-al" placeholder="Seleziona..." readonly style="cursor:pointer;min-width:150px"></div>';
+    hdr+='<button class="btn-reset" onclick="resetModuliFiltri()">Reset</button></div>';
     hdr+='<div id="mod-list-results" style="padding:10px"></div>';
     c.innerHTML=hdr;
     if(window.flatpickr){const fpOpts={locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,onChange:()=>aggiornaModuliLista()};flatpickr('#mod-filt-dal',fpOpts);flatpickr('#mod-filt-al',fpOpts)}
