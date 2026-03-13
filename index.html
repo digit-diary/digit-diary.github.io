@@ -390,6 +390,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
   <button class="nav-tab" data-page="note-collega" onclick="switchPage('note-collega')">Note Colleghi <span id="note-badge" style="display:none;background:var(--accent);color:white;border-radius:9px;font-size:.7rem;padding:1px 6px;margin-left:4px;font-weight:700"></span></button>
   <button class="nav-tab" data-page="statistiche" onclick="switchPage('statistiche')">Statistiche</button>
   <button class="nav-tab" data-page="moduli" onclick="switchPage('moduli')">Moduli</button>
+  <button class="nav-tab" data-page="assistente" onclick="switchPage('assistente')">Assistente</button>
   <button class="nav-tab" data-page="registro" onclick="switchPage('registro')" id="tab-registro" style="display:none">Registro Attività</button>
   <button class="nav-tab" data-page="impostazioni" onclick="switchPage('impostazioni')">Impostazioni</button>
 </div>
@@ -510,6 +511,52 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
     <div style="padding:0 16px 16px"><button class="btn-salva" onclick="document.getElementById('import-modulo-file').click()" style="background:var(--accent2)">Importa modulo esistente (Word/PDF)</button><input type="file" id="import-modulo-file" accept=".docx,.doc,.pdf" style="display:none" onchange="importaModuloFile(this)"></div>
   </div>
   <div id="modulo-form-area" style="display:none"></div>
+</div>
+
+<!-- ASSISTENTE -->
+<div class="page" id="page-assistente">
+  <div class="main-card">
+    <div class="card-header">Assistente – Scrittura veloce</div>
+    <div class="form-area">
+      <p style="color:var(--muted);font-size:.84rem;margin-bottom:16px">Scrivi un testo veloce e l'AI lo riscrive in modo formale e professionale, usando le procedure e regole del casinò. Nessun dato viene salvato.</p>
+      <div class="form-row">
+        <div class="field"><label>Tipo di testo</label>
+          <select id="assist-tipo">
+            <option value="mail_formale">Mail formale (a Direzione / HR / CFCG)</option>
+            <option value="mail_colleghi">Mail colleghi / comunicazione interna</option>
+            <option value="nota_collaboratore">Nota al collaboratore</option>
+            <option value="comunicazione_servizio">Comunicazione di servizio</option>
+            <option value="segnalazione">Segnalazione / rapporto</option>
+            <option value="risposta">Risposta a richiesta / reclamo</option>
+            <option value="libero">Testo libero (migliora solo la forma)</option>
+          </select>
+        </div>
+        <div class="field"><label>Tono</label>
+          <select id="assist-tono">
+            <option value="formale">Formale</option>
+            <option value="cordiale">Cordiale ma professionale</option>
+            <option value="diretto">Diretto e conciso</option>
+          </select>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:16px"><label>Il tuo testo <small style="color:var(--muted);font-weight:300;text-transform:none;letter-spacing:0;font-size:.75rem">Scrivi in modo veloce, anche appunti – l'AI sistema tutto</small></label>
+        <textarea id="assist-input" placeholder="Es: scrivi a hr che domani mario rossi è malato e serve sostituto per turno sera cassa..." style="min-height:120px"></textarea>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button class="btn-salva" id="btn-assist-gen" onclick="assistenteGenera()" style="background:linear-gradient(135deg,#667eea,#764ba2)">Riscrivi con AI</button>
+        <span id="assist-status" style="font-size:.82rem;color:var(--muted)"></span>
+      </div>
+      <div id="assist-output-wrap" style="display:none;margin-top:20px">
+        <div class="field"><label>Risultato</label>
+          <textarea id="assist-output" readonly style="min-height:180px;background:var(--paper2);font-size:.95rem;line-height:1.6"></textarea>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:10px">
+          <button class="btn-salva" onclick="assistenteCopia()" style="background:var(--ink);font-size:.78rem;padding:10px 20px">Copia negli appunti</button>
+          <button class="btn-salva" onclick="assistenteReset()" style="background:var(--paper2);color:var(--muted);border:1px solid var(--line);font-size:.78rem;padding:10px 20px;box-shadow:none">Pulisci tutto</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="page" id="page-impostazioni">
@@ -1231,6 +1278,36 @@ async function generaModuloAI(tipo){
     toast('Campi compilati dall\'AI!')
   }catch(e){console.error(e);const msg=e.message||'';if(status)status.innerHTML='<span style="color:#c0392b">'+(msg.includes('API error')?'Errore API: verifica la chiave Groq':msg.includes('non valida')?'Risposta AI non leggibile, riprova':'Errore: '+msg)+'</span>';toast('Errore AI: '+msg)}
   if(btn){btn.disabled=false;btn.textContent='Genera tutti i campi'}}
+
+// ASSISTENTE TESTO
+async function assistenteGenera(){
+  const input=document.getElementById('assist-input').value.trim();
+  if(!input){toast('Scrivi qualcosa da riscrivere');return}
+  if(!geminiKey){toast('Configura la chiave Groq nelle Impostazioni');return}
+  const tipo=document.getElementById('assist-tipo').value;
+  const tono=document.getElementById('assist-tono').value;
+  const btn=document.getElementById('btn-assist-gen');
+  const status=document.getElementById('assist-status');
+  btn.disabled=true;btn.textContent='Elaborazione...';
+  if(status)status.textContent='L\'AI sta riscrivendo il testo...';
+  const tipoLabels={mail_formale:'una mail formale (destinatario: Direzione, HR, CFCG o ente esterno)',mail_colleghi:'una comunicazione interna tra colleghi',nota_collaboratore:'una nota indirizzata a un collaboratore',comunicazione_servizio:'una comunicazione di servizio per il reparto',segnalazione:'una segnalazione o un rapporto interno',risposta:'una risposta formale a una richiesta o reclamo',libero:'un testo professionale (migliora solo la forma)'};
+  const tonoLabels={formale:'Tono formale e istituzionale, tipico di documenti ufficiali.',cordiale:'Tono cordiale ma professionale, adatto a comunicazioni tra colleghi.',diretto:'Tono diretto e conciso, vai al punto senza giri di parole.'};
+  const prompt='Sei un assistente di redazione per Casinò Lugano SA (casa da gioco svizzera regolata dalla CFCG).\n\nRiscrivi il seguente testo come '+tipoLabels[tipo]+'.\n\n'+tonoLabels[tono]+'\n\nREGOLE:\n- Italiano corretto e professionale\n- Mantieni TUTTI i dettagli specifici (nomi, date, orari, importi, circostanze)\n- Se pertinente, usa terminologia corretta del casinò (SUP_FBS, SURV, CAS, REC, SA, ISP, CR, SIC, LRD, CFCG, QM, IR, ecc.)\n- NON inventare fatti non presenti nel testo originale\n- NON aggiungere saluti/chiusure se non richiesto\n- Rispondi SOLO con il testo riscritto, senza commenti o spiegazioni\n\nTesto originale:\n'+input;
+  try{
+    const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+geminiKey},
+      body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[{role:'user',content:prompt}],temperature:0.3,max_tokens:1500})});
+    if(!r.ok)throw new Error('API error '+r.status);
+    const data=await r.json();const result=data.choices?.[0]?.message?.content;
+    if(result){
+      document.getElementById('assist-output').value=result.trim();
+      document.getElementById('assist-output-wrap').style.display='block';
+      if(status)status.innerHTML='<span style="color:#2c6e49">Testo riscritto!</span>';
+      toast('Testo riscritto!')
+    }else throw new Error('Nessuna risposta')
+  }catch(e){console.error(e);if(status)status.innerHTML='<span style="color:#c0392b">Errore: verifica la chiave Groq</span>';toast('Errore AI: '+e.message)}
+  btn.disabled=false;btn.textContent='Riscrivi con AI'}
+function assistenteCopia(){const t=document.getElementById('assist-output').value;if(t){navigator.clipboard.writeText(t).then(()=>toast('Copiato negli appunti!')).catch(()=>{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);toast('Copiato!')})}}
+function assistenteReset(){document.getElementById('assist-input').value='';document.getElementById('assist-output').value='';document.getElementById('assist-output-wrap').style.display='none';document.getElementById('assist-status').textContent='';toast('Pulito')}
 
 // IMPORTA MODULO DA WORD/PDF
 async function importaModuloFile(input){const file=input.files[0];if(!file)return;
