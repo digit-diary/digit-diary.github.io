@@ -648,6 +648,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
   <div class="settings-section"><h4>Scadenze attive</h4><div id="scadenze-settings-list"></div></div>
   <div class="settings-section"><h4>Operatori</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Operatore attuale: <strong id="op-attuale">—</strong>. Ogni operatore accede con il proprio nome e password.</p><div id="operatori-list" style="margin-bottom:14px"></div>
     <div class="add-tipo-row" style="align-items:flex-end"><div class="field"><label>Nome</label><input type="text" id="new-operatore-nome" placeholder="Nome..."></div><div class="field"><label>Password</label><input type="password" id="new-operatore-pwd" placeholder="Min 4 caratteri..."></div><div class="field"><label>Conferma password</label><input type="password" id="new-operatore-pwd2" placeholder="Ripeti..."></div><button class="btn-add-tipo" onclick="aggiungiOperatoreConPwd()">+ Crea operatore</button></div></div>
+  <div class="settings-section" id="visibilita-section" style="display:none"><h4>Visibilità pagine e funzioni</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Controlla quali pagine e funzioni sono visibili agli operatori.</p><div id="visibilita-list"></div></div>
   <div class="settings-section"><h4>Sicurezza</h4><div class="settings-btn-row" id="sicurezza-btns"></div></div>
   <div class="settings-section" id="ai-section" style="display:none"><h4>Assistente AI (Groq)</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Migliora automaticamente i testi nei moduli disciplinari. Ottieni una chiave gratuita su <a href="https://console.groq.com/keys" target="_blank" style="color:var(--accent2)">console.groq.com</a>.</p>
     <div class="add-tipo-row"><div class="field" style="flex:2"><label>Chiave API Groq</label><input type="password" id="gemini-key-input" placeholder="gsk_..."></div><button class="btn-add-tipo" onclick="salvaGeminiKey()">Salva</button></div><p id="gemini-status" style="font-size:.82rem;margin-top:8px"></p></div>
@@ -669,6 +670,7 @@ let rapportoMese=new Date().getMonth(),rapportoAnno=new Date().getFullYear(),rap
 const CAMPI_RAPPORTO_DEFAULT=[{key:'sup_note',label:'Supervisore',type:'input'},{key:'cassa_note',label:'Cassa',type:'text'},{key:'differenze_cassa',label:'Differenze Cassa',type:'text'},{key:'sala_note',label:'Sala',type:'text'},{key:'n_assegni',label:'Incasso Assegni',type:'text'},{key:'prelievi',label:'Prelievi',type:'text'},{key:'assenze',label:'Assenze',type:'text'}];
 const RAPPORTO_DB_COLS=['sup_note','cassa_note','sala_note','n_assegni','prelievi','assenze'];
 let campiRapportoExtra=[],tipiNascosti=[],campiNascosti=[],tipiOrdine=[],campiOrdine=[],campiLabelOverride={},tipiRinominati={};
+let visibilitaConfig={};
 let collaboratoriCache=[],moduliCache=[],logCache=[];
 function nomeCorrente(orig){return tipiRinominati[orig]||orig}
 function getTuttiTipi(){let list=[...TIPI_DEFAULT.filter(t=>!tipiNascosti.includes(t.nome)).map(t=>{const c=coloriOverride[t.nome]||t.colore;const n=tipiRinominati[t.nome]||t.nome;return{nome:n,colore:c,_orig:t.nome}}),...tipiPersonalizzati];
@@ -701,6 +703,7 @@ async function loadAll(){
   const cmo=await getImp('campi_ordine');if(cmo)try{campiOrdine=JSON.parse(cmo)}catch(e){}
   const clo=await getImp('campi_label_override');if(clo)try{campiLabelOverride=JSON.parse(clo)}catch(e){}
   const tr=await getImp('tipi_rinominati');if(tr)try{tipiRinominati=JSON.parse(tr)}catch(e){}
+  const vis=await getImp('visibilita');if(vis)try{visibilitaConfig=JSON.parse(vis)}catch(e){}
   datiCache=await sbGet('registrazioni?order=data.desc');
   const pins=await sbGet('note_fissate?select=registrazione_id');pinnedIds=new Set(pins.map(p=>p.registrazione_id));
   scadenzeCache=await sbGet('scadenze?order=data_scadenza.asc');
@@ -717,7 +720,7 @@ async function loadAll(){
 async function checkPwd(){const nome=document.getElementById('login-nome').value.trim(),v=document.getElementById('pwd-input').value,h=await sha256(v),err=document.getElementById('login-error');
   // Try individual operator login first (server-side verification)
   if(nome){const res=await sbRpc('verify_login',{p_nome:nome,p_hash:h});
-    if(res&&res.valid){sessionStorage.setItem('operatore_corrente',nome);sessionStorage.setItem('diario_auth','1');sessionStorage.removeItem('is_admin');document.getElementById('login-overlay').classList.add('hidden');document.getElementById('operatore-display').textContent='Operatore: '+nome;applicaTemaOperatore();
+    if(res&&res.valid){sessionStorage.setItem('operatore_corrente',nome);sessionStorage.setItem('diario_auth','1');sessionStorage.removeItem('is_admin');document.getElementById('login-overlay').classList.add('hidden');document.getElementById('operatore-display').textContent='Operatore: '+nome;applicaTemaOperatore();applicaVisibilita();
       if(res.deve_cambiare_pwd)setTimeout(()=>forzaCambioPwdOperatore(nome),300);
       else{setTimeout(()=>mostraNoteNonLette(),500);setTimeout(checkQrHash,800)}return}
     if(res&&res.found){err.textContent='Password errata per '+nome;document.getElementById('pwd-input').value='';document.getElementById('pwd-input').focus();setTimeout(()=>err.textContent='',2500);return}}
@@ -726,7 +729,7 @@ async function checkPwd(){const nome=document.getElementById('login-nome').value
   if(masterRes&&masterRes.valid){document.getElementById('login-overlay').classList.add('hidden');sessionStorage.setItem('diario_auth','1');sessionStorage.setItem('is_admin','1');
     if(nome){sessionStorage.setItem('operatore_corrente',nome);document.getElementById('operatore-display').textContent='Operatore: '+nome;setTimeout(()=>mostraNoteNonLette(),500)}
     else{sessionStorage.setItem('operatore_corrente','Admin');document.getElementById('operatore-display').textContent='Admin';}
-    applicaTemaOperatore();renderTipiUI();renderOperatoriUI();renderCampiRapportoUI();document.getElementById('tab-registro').style.display='';setTimeout(checkQrHash,800);
+    applicaTemaOperatore();renderTipiUI();renderOperatoriUI();renderCampiRapportoUI();document.getElementById('tab-registro').style.display='';applicaVisibilita();setTimeout(checkQrHash,800);
   }else{err.textContent=nome?'Operatore non trovato o password errata':'Password errata';document.getElementById('pwd-input').value='';document.getElementById('pwd-input').focus();setTimeout(()=>err.textContent='',2500)}}
 function mostraForzaCambio(){const b=document.getElementById('pwd-modal-content');b.innerHTML='<h3>Cambia la password</h3><p>Password predefinita. Impostane una nuova.</p><div class="pwd-field"><label>Nuova password (min 4 car.)</label><input type="password" id="new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="eseguiPrimoCambio()">Imposta</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';document.getElementById('pwd-modal').classList.remove('hidden');setTimeout(()=>document.getElementById('new-pwd-1').focus(),100)}
 async function eseguiPrimoCambio(){const p1=document.getElementById('new-pwd-1').value,p2=document.getElementById('new-pwd-2').value,err=document.getElementById('pwd-modal-error');if(p1.length<4){err.textContent='Troppo corta';return}if(p1!==p2){err.textContent='Non coincidono';return}
@@ -769,6 +772,52 @@ async function eseguiResetPwdOp(nome){const p1=document.getElementById('reset-pw
   document.getElementById('pwd-modal-content').innerHTML='<h3>Password resettata!</h3><p style="text-align:center">'+escP(nome)+' dovrà cambiarla al prossimo accesso.</p><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">OK</button></div>';
   toast('Password di '+nome+' resettata')}catch(e){err.textContent='Errore'}}
 function isAdmin(){return sessionStorage.getItem('is_admin')==='1'}
+// VISIBILITA - 'tutti' (default) | 'admin' | 'nascosto'
+const VIS_ITEMS={
+  pagine:{rapporto:'Rapporto',note_collega:'Note Colleghi',statistiche:'Statistiche',moduli:'Moduli',assistente:'Assistente'},
+  funzioni:{ricerca_globale:'Ricerca globale',alert_cassa:'Alert cassa',alert_rischio:'Alert rischio',template_rapidi:'Template rapidi',firma_digitale:'Firma digitale',qr_code:'QR Code su PDF',ai_moduli:'AI (Genera + Migliora testo)'}
+};
+function visGet(key){return visibilitaConfig[key]||'tutti'}
+function isVis(key){const v=visGet(key);if(v==='nascosto')return false;if(v==='admin')return isAdmin();return true}
+function applicaVisibilita(){
+  // Pagine
+  Object.keys(VIS_ITEMS.pagine).forEach(k=>{
+    const pageName=k.replace('_','-');
+    const tab=document.querySelector('.nav-tab[data-page="'+pageName+'"]');
+    if(tab){if(k==='note_collega'){const pageName2='note-collega';tab.style.display=isVis(k)?'':'none'}
+    else tab.style.display=isVis(k)?'':'none'}});
+  // Ricerca globale
+  const rg=document.querySelector('.ricerca-globale-wrap');if(rg)rg.style.display=isVis('ricerca_globale')?'':'none';
+  // Alert cassa
+  const ca=document.getElementById('cassa-alerts-container');if(ca)ca.style.display=isVis('alert_cassa')?'':'none';
+  // Alert rischio
+  const ra=document.getElementById('rischio-alerts-container');if(ra)ra.style.display=isVis('alert_rischio')?'':'none';
+  // Template rapidi
+  document.querySelectorAll('.template-rapidi-wrap').forEach(el=>{const par=el.parentElement;if(par)par.style.display=isVis('template_rapidi')?'':'none'});
+  // AI moduli
+  document.querySelectorAll('.ai-gen-box,.btn-ai-wrap,.btn-ai').forEach(el=>{el.style.display=isVis('ai_moduli')?'':'none'});
+  // Firma digitale
+  document.querySelectorAll('input[name="firma-tipo"][value="digitale"]').forEach(el=>{const lbl=el.closest('label');if(lbl)lbl.style.display=isVis('firma_digitale')?'':'none'});
+}
+function renderVisibilitaUI(){const el=document.getElementById('visibilita-list');if(!el)return;
+  let html='';
+  html+='<div style="margin-bottom:14px"><strong style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Pagine</strong></div>';
+  Object.entries(VIS_ITEMS.pagine).forEach(([k,label])=>{
+    const v=visGet(k);
+    html+='<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)"><span style="min-width:160px;font-weight:600">'+label+'</span>';
+    ['tutti','admin','nascosto'].forEach(opt=>{
+      html+='<label style="display:flex;align-items:center;gap:4px;font-size:.85rem;cursor:pointer"><input type="radio" name="vis-'+k+'" value="'+opt+'"'+(v===opt?' checked':'')+' onchange="cambiaVisibilita(\''+k+'\',\''+opt+'\')"> '+(opt==='tutti'?'Tutti':opt==='admin'?'Solo admin':'Nascosto')+'</label>'});
+    html+='</div>'});
+  html+='<div style="margin:18px 0 14px"><strong style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Funzioni</strong></div>';
+  Object.entries(VIS_ITEMS.funzioni).forEach(([k,label])=>{
+    const v=visGet(k);
+    html+='<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)"><span style="min-width:160px;font-weight:600">'+label+'</span>';
+    ['tutti','admin','nascosto'].forEach(opt=>{
+      html+='<label style="display:flex;align-items:center;gap:4px;font-size:.85rem;cursor:pointer"><input type="radio" name="vis-'+k+'" value="'+opt+'"'+(v===opt?' checked':'')+' onchange="cambiaVisibilita(\''+k+'\',\''+opt+'\')"> '+(opt==='tutti'?'Tutti':opt==='admin'?'Solo admin':'Nascosto')+'</label>'});
+    html+='</div>'});
+  el.innerHTML=html}
+async function cambiaVisibilita(key,val){if(val==='tutti')delete visibilitaConfig[key];else visibilitaConfig[key]=val;
+  await setImp('visibilita',JSON.stringify(visibilitaConfig));applicaVisibilita();toast('Visibilità aggiornata')}
 async function aggiungiOperatoreConPwd(){const n=document.getElementById('new-operatore-nome').value.trim(),p=document.getElementById('new-operatore-pwd').value,p2=document.getElementById('new-operatore-pwd2').value;
   if(!n){toast('Inserisci un nome');return}if(p.length<4){toast('Password minimo 4 caratteri');return}
   if(p!==p2){toast('Le password non coincidono');return}
@@ -850,7 +899,7 @@ function applicaTemaOperatore(){const t=localStorage.getItem(getTemaKey())||loca
 // NAVIGATION
 function switchPage(name){flushRapportoSave();document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');document.querySelector('.nav-tab[data-page="'+name+'"]').classList.add('active');sessionStorage.setItem('pagina_corrente',name);
   if(name==='statistiche')renderStatistiche();if(name==='rapporto'){if(!rapportoGiornoAperto){const gc=getGiornataCasino();const d=new Date(gc+'T12:00:00');rapportoMese=d.getMonth();rapportoAnno=d.getFullYear();rapportoGiornoAperto=gc}renderRapporto()}if(name==='note-collega')renderNoteCollega();if(name==='impostazioni'){renderTipiUI();renderScadenzeSettings();renderOperatoriUI();renderCampiRapportoUI();
-    const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}renderCollaboratoriUI();const ai=document.getElementById('ai-section');if(ai)ai.style.display=isAdmin()?'':'none';if(isAdmin()&&geminiKey){const gs=document.getElementById('gemini-status');if(gs)gs.innerHTML='<span style="color:#2c6e49">Chiave configurata</span>'}}if(name==='moduli'){if(!document.getElementById('mod-list-results'))_modFiltInit=false;renderModuliList()};if(name==='registro')renderRegistro()}
+    const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}renderCollaboratoriUI();const ai=document.getElementById('ai-section');if(ai)ai.style.display=isAdmin()?'':'none';const visSec=document.getElementById('visibilita-section');if(visSec){visSec.style.display=isAdmin()?'':'none';if(isAdmin())renderVisibilitaUI()}if(isAdmin()&&geminiKey){const gs=document.getElementById('gemini-status');if(gs)gs.innerHTML='<span style="color:#2c6e49">Chiave configurata</span>'}}if(name==='moduli'){if(!document.getElementById('mod-list-results'))_modFiltInit=false;renderModuliList()};if(name==='registro')renderRegistro()}
 
 // TIPI
 async function saveTipiP(){await setImp('tipi_personalizzati',JSON.stringify(tipiPersonalizzati))}
@@ -1248,7 +1297,7 @@ function apriModulo(tipo){
   html+='<div class="modulo-field" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)"><label>Modalit\u00E0 firma</label><div style="display:flex;gap:18px;margin-bottom:8px"><label style="display:flex;align-items:center;gap:5px;font-size:.88rem;cursor:pointer"><input type="radio" name="firma-tipo" value="cartacea" checked onchange="toggleFirmaDigitale()"> &#128221; Cartacea (stampa e firma a mano)</label><label style="display:flex;align-items:center;gap:5px;font-size:.88rem;cursor:pointer"><input type="radio" name="firma-tipo" value="digitale" onchange="toggleFirmaDigitale()"> &#9999;&#65039; Digitale (firma sullo schermo)</label></div><div id="firma-digitale-box" style="display:none"><div class="firma-canvas-wrap"><div class="firma-canvas-box"><small>Firma Resp. Settore</small><canvas id="firma-resp-canvas" class="firma-canvas" width="560" height="200"></canvas><button onclick="clearFirma(\'firma-resp-canvas\')">Cancella</button></div><div class="firma-canvas-box"><small>Firma Collaboratore</small><canvas id="firma-collab-canvas" class="firma-canvas" width="560" height="200"></canvas><button onclick="clearFirma(\'firma-collab-canvas\')">Cancella</button></div></div></div></div>';
   html+='<div style="display:flex;gap:12px;margin-top:18px"><button class="btn-salva" onclick="generaModuloPDF(\''+tipo+'\')">Genera PDF</button><button class="btn-modal-cancel" onclick="chiudiModulo()">Annulla</button></div>';
   html+='</div></div>';area.innerHTML=html;
-  area.scrollIntoView({behavior:'smooth'})}
+  area.scrollIntoView({behavior:'smooth'});applicaVisibilita()}
 function chiudiModulo(){document.getElementById('modulo-form-area').style.display='none';document.getElementById('modulo-form-area').innerHTML='';window._editModuloId=null}
 // FIRMA DIGITALE
 function toggleFirmaDigitale(){const d=document.querySelector('input[name="firma-tipo"][value="digitale"]');const box=document.getElementById('firma-digitale-box');
@@ -1385,7 +1434,7 @@ async function generaModuloPDF(tipo){
     checkPage(15);drawDistribuzionePro(doc,mx,y,['Resp. Settore','Resp. Risorse Umane']);
   }
   // QR Code in basso a destra dell'ultima pagina
-  try{if(typeof qrcode==='function'){const qr=qrcode(0,'M');qr.addData('https://digit-diary.github.io/#modulo/'+moduloQrId);qr.make();
+  try{if(isVis('qr_code')&&typeof qrcode==='function'){const qr=qrcode(0,'M');qr.addData('https://digit-diary.github.io/#modulo/'+moduloQrId);qr.make();
     const qrImg=qr.createDataURL(4,0);const qrSz=22;const tp=doc.internal.getNumberOfPages();doc.setPage(tp);
     doc.addImage(qrImg,'PNG',pw-mx-qrSz,ph-14-qrSz,qrSz,qrSz);
     doc.setFontSize(5.5);doc.setTextColor(130);doc.setFont('helvetica','normal');
@@ -1982,7 +2031,7 @@ window.addEventListener('load',async()=>{
     }else if(isAdmin()){document.getElementById('operatore-display').textContent='Admin';document.getElementById('tab-registro').style.display=''}}
   else document.getElementById('pwd-input').focus();
   const n=new Date();document.getElementById('today-date').innerHTML=n.getDate()+' '+MESI[n.getMonth()]+' '+n.getFullYear()+'<br><small style="color:var(--muted);font-size:.75rem">'+GIORNI[n.getDay()]+'</small>';
-  renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();aggiornaNoteBadge();
+  renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();aggiornaNoteBadge();applicaVisibilita();
   const savedPage=sessionStorage.getItem('pagina_corrente');if(savedPage&&savedPage!=='diario')switchPage(savedPage);
   setTimeout(checkQrHash,1200);
   // Polling note ogni 15 secondi
