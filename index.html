@@ -925,60 +925,82 @@ async function generaModuloPDF(tipo){
   const resp=(document.getElementById('mod-resp')||{}).value||'';
   const data=(document.getElementById('mod-data')||{}).value||'';
   if(!collab){toast('Inserisci il nome del collaboratore');return}
-  const doc=new jspdf.jsPDF({unit:'mm',format:'a4'});const pw=doc.internal.pageSize.getWidth();const ph=doc.internal.pageSize.getHeight();const mx=25;let y=12;
+  const doc=new jspdf.jsPDF({unit:'mm',format:'a4'});const pw=doc.internal.pageSize.getWidth();const ph=doc.internal.pageSize.getHeight();const mx=20;let y=12;
   // Logo Casino Lugano (ratio 1.78:1)
-  if(_logoB64)try{const lw=50,lh=lw/1.78;doc.addImage(_logoB64,'PNG',pw/2-lw/2,y,lw,lh)}catch(e){}
-  y+=36;
-  function checkPage(need){if(y+need>ph-30){doc.addPage();y=20;return true}return false}
+  if(_logoB64)try{const lw=48,lh=lw/1.78;doc.addImage(_logoB64,'PNG',pw/2-lw/2,y,lw,lh)}catch(e){}
+  y+=34;
+  function checkPage(need){if(y+need>ph-25){doc.addPage();y=20;return true}return false}
+  // Tabella intestazione (come Word)
+  function drawHeaderTable(){
+    const tw=pw-mx*2,col1=42;
+    doc.autoTable({startY:y,margin:{left:mx,right:mx},tableWidth:tw,
+      body:[['Collaboratore',collab],['Resp. Settore',resp],['Data',data]],
+      theme:'grid',styles:{font:'helvetica',fontSize:10,cellPadding:{top:3,bottom:3,left:4,right:4},textColor:[0,0,0],lineColor:[0,0,0],lineWidth:0.3},
+      columnStyles:{0:{fontStyle:'bold',cellWidth:col1},1:{fontStyle:'normal'}},
+      didDrawPage:function(){}});
+    y=doc.lastAutoTable.finalY+8;
+  }
+  // Sezione con titolo sottolineato
+  function drawSection(title,text){
+    const maxW=pw-mx*2;
+    checkPage(30);
+    doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0);
+    const titleLines=doc.splitTextToSize(title,maxW);
+    doc.text(titleLines,mx,y);
+    // Sottolineatura titolo
+    const titleH=titleLines.length*4.5;
+    doc.setDrawColor(0);doc.setLineWidth(0.3);
+    titleLines.forEach(function(line,i){const lw2=doc.getTextWidth(line);doc.line(mx,y+1.5+i*4.5,mx+lw2,y+1.5+i*4.5)});
+    y+=titleH+6;
+    if(text){
+      doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(30);
+      const lines=doc.splitTextToSize(text,maxW);doc.text(lines,mx,y);y+=lines.length*4.5+4;
+    }else{y+=6}
+    y+=4;
+  }
   if(tipo==='allineamento'){
-    doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(0);
-    const t1='Rilevamento di non conformità';const t2='e colloquio di allineamento';
-    doc.text(t1,pw/2,y,{align:'center'});y+=6;doc.text(t2,pw/2,y,{align:'center'});y+=14;
-    drawFieldLine(doc,mx,y,'Collaboratore',collab,pw);y+=10;
-    drawFieldLine(doc,mx,y,'Resp. Settore',resp,pw);y+=10;
-    drawFieldLine(doc,mx,y,'Data',data,pw);y+=14;
+    doc.setFont('helvetica','bold');doc.setFontSize(14);doc.setTextColor(0);
+    doc.text('Rilevamento di non conformit\u00E0 e colloquio di allineamento',pw/2,y,{align:'center'});y+=10;
+    drawHeaderTable();
     const nonConf=(document.getElementById('mod-non-conf')||{}).value||'';
-    checkPage(30);y=drawBlockField(doc,mx,y,'Non conformità rilevata (descrizione)',nonConf,pw);y+=10;
+    drawSection('Non conformit\u00E0 rilevata',nonConf);
     const obiettivo=(document.getElementById('mod-obiettivo')||{}).value||'';
-    checkPage(30);y=drawBlockField(doc,mx,y,'Obiettivo concordato tra Collaboratore e Resp. Settore onde evitare il ripetersi della non conformità',obiettivo,pw);y+=10;
+    drawSection('Obiettivo concordato tra Collaboratore e Resp. Settore onde evitare il ripetersi della non conformit\u00E0',obiettivo);
     const scad=(document.getElementById('mod-scadenza')||{}).value||'';
-    checkPage(20);y=drawBlockField(doc,mx,y,'Scadenza (termine di verifica entro il quale si è concordato di raggiungere l\'obiettivo di cui sopra)',scad,pw);y+=10;
-    checkPage(15);doc.setFontSize(9.5);doc.setFont('helvetica','italic');doc.setTextColor(60);
+    drawSection('Scadenza (termine di verifica entro il quale si \u00E8 concordato di raggiungere l\'obiettivo di cui sopra)',scad);
+    checkPage(12);doc.setFontSize(9.5);doc.setFont('helvetica','italic');doc.setTextColor(60);
     const scadTxt=scad&&scad.toLowerCase()!=='a partire da subito'?scad:'a partire da subito';
     const chiudiLines=doc.splitTextToSize('Chiediamo che, '+scadTxt+', venga raggiunto l\'obiettivo di cui sopra.',pw-mx*2);
-    doc.text(chiudiLines,mx,y);y+=chiudiLines.length*4.5+16;
+    doc.text(chiudiLines,mx,y);y+=chiudiLines.length*4.5+14;
     checkPage(30);drawFirmePro(doc,mx,y,pw);y+=30;
     checkPage(15);drawDistribuzionePro(doc,mx,y,['Diario di bordo del collaboratore','Resp. Settore']);
   }else if(tipo==='apprezzamento'){
-    doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(0);
-    doc.text('Colloquio di apprezzamento',pw/2,y,{align:'center'});y+=14;
-    drawFieldLine(doc,mx,y,'Collaboratore',collab,pw);y+=10;
-    drawFieldLine(doc,mx,y,'Resp. Settore',resp,pw);y+=10;
-    drawFieldLine(doc,mx,y,'Data',data,pw);y+=14;
+    doc.setFont('helvetica','bold');doc.setFontSize(14);doc.setTextColor(0);
+    doc.text('Colloquio di apprezzamento',pw/2,y,{align:'center'});y+=10;
+    drawHeaderTable();
     const desc=(document.getElementById('mod-descrizione')||{}).value||'';
-    checkPage(30);y=drawBlockField(doc,mx,y,'Descrizione',desc,pw);y+=10;
+    drawSection('Descrizione',desc);
     const oss=(document.getElementById('mod-osservazioni')||{}).value||'';
-    checkPage(30);y=drawBlockField(doc,mx,y,'Osservazioni da parte del Resp. Settore',oss,pw);y+=20;
+    drawSection('Osservazioni da parte del Resp. Settore',oss);
+    y+=6;
     checkPage(30);drawFirmePro(doc,mx,y,pw);y+=30;
     checkPage(15);drawDistribuzionePro(doc,mx,y,['Diario di bordo del collaboratore','Resp. Settore']);
   }else if(tipo==='rdi'){
-    doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(0);
-    doc.text('Rapporto disciplinare interno (RDI)',pw/2,y,{align:'center'});y+=14;
-    drawFieldLine(doc,mx,y,'Collaboratore',collab,pw);y+=10;
-    drawFieldLine(doc,mx,y,'Resp. Settore',resp,pw);y+=10;
-    drawFieldLine(doc,mx,y,'Data',data,pw);y+=14;
+    doc.setFont('helvetica','bold');doc.setFontSize(14);doc.setTextColor(0);
+    doc.text('Rapporto disciplinare interno (RDI)',pw/2,y,{align:'center'});y+=10;
+    drawHeaderTable();
     const nonConf=(document.getElementById('mod-non-conf')||{}).value||'';
-    checkPage(30);y=drawBlockField(doc,mx,y,'Non conformità rilevata',nonConf,pw);y+=10;
+    drawSection('Non conformit\u00E0 rilevata',nonConf);
     const obiettivo=(document.getElementById('mod-obiettivo')||{}).value||'';
-    checkPage(30);y=drawBlockField(doc,mx,y,'Obiettivo concordato tra Collaboratore e Resp. Settore onde evitare il ripetersi della non conformità',obiettivo,pw);y+=10;
+    drawSection('Obiettivo concordato tra Collaboratore e Resp. Settore onde evitare il ripetersi della non conformit\u00E0',obiettivo);
     const scad=(document.getElementById('mod-scadenza')||{}).value||'';
-    checkPage(20);y=drawBlockField(doc,mx,y,'Scadenza (termine di verifica entro il quale si è concordato di raggiungere l\'obiettivo di cui sopra)',scad,pw);y+=12;
+    drawSection('Scadenza (termine di verifica entro il quale si \u00E8 concordato di raggiungere l\'obiettivo di cui sopra)',scad);
     const livello=(document.getElementById('mod-livello')||{}).value||'I';
     checkPage(25);doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0);
     doc.text('Il presente RDI vale quale:',mx,y);y+=8;
     doc.setFont('helvetica','normal');doc.setFontSize(10);
-    doc.text((livello==='I'?'[X]':'[  ]')+' Rapporto disciplinare interno di I° livello',mx+4,y);y+=6;
-    doc.text((livello==='II'?'[X]':'[  ]')+' Rapporto disciplinare interno grave (II° livello)',mx+4,y);y+=16;
+    doc.text((livello==='I'?'[X]':'[  ]')+' Rapporto disciplinare interno di I\u00B0 livello',mx+4,y);y+=6;
+    doc.text((livello==='II'?'[X]':'[  ]')+' Rapporto disciplinare interno grave (II\u00B0 livello)',mx+4,y);y+=16;
     checkPage(30);drawFirmePro(doc,mx,y,pw);y+=14;
     doc.setFontSize(7.5);doc.setFont('helvetica','italic');doc.setTextColor(100);
     const notaLines=doc.splitTextToSize('* Il collaboratore che non vuole sottoscrivere il rapporto disciplinare lo deve espressamente dichiarare, scrivendolo al posto della firma.',pw-mx*2);
@@ -1009,9 +1031,10 @@ function drawFirmePro(doc,x,y,pw){doc.setFont('helvetica','normal');doc.setFontS
   const mid=pw/2;doc.text('Firma del Resp. Settore',x,y);doc.text('Firma del collaboratore',mid+10,y);y+=12;
   doc.setDrawColor(150);const dots='....................................';
   doc.setFontSize(8);doc.text(dots,x,y);doc.text(dots,mid+10,y)}
-function drawDistribuzionePro(doc,x,y,items){doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(0);
-  doc.text('Distribuzione:',x,y);y+=5;doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(60);
-  items.forEach(it=>{doc.text('\u25B8  '+it,x+4,y);y+=4.5})}
+function drawDistribuzionePro(doc,x,y,items){doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0);
+  doc.text('Distribuzione:',x,y);const dw=doc.getTextWidth('Distribuzione:');doc.setDrawColor(0);doc.setLineWidth(0.3);doc.line(x,y+1.5,x+dw,y+1.5);
+  y+=8;doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0);
+  items.forEach(it=>{doc.text('>       '+it,x,y);y+=5.5})}
 let _modFiltInit=false;
 function renderModuliList(){
   let c=document.getElementById('moduli-list-section');
@@ -1159,7 +1182,7 @@ async function generaModuloAI(tipo){
   if(status)status.textContent='L\'AI sta compilando i campi...';
   let sysPrompt='';
   if(tipo==='allineamento'||tipo==='rdi'){
-    sysPrompt='Sei un assistente aziendale incaricato di redigere documenti interni disciplinari per Casinò Lugano SA.\n\nDevi generare un "Rilevamento di non conformità e colloquio di allineamento".\n\nIl testo deve essere: formale, chiaro, sintetico, oggettivo, privo di opinioni personali, basato solo sui fatti. Il linguaggio deve essere coerente con documenti disciplinari aziendali.\n\nSEZIONE "Non conformità rilevata":\n- Descrivere l\'evento in modo cronologico e oggettivo\n- Utilizzare quando possibile queste formulazioni standard:\n  • "Nella giornata di gioco del …"\n  • "Dalla revisione delle immagini CCTV risulta che …"\n  • "Il collaboratore …"\n  • "…generando così una non conformità procedurale."\n- Non usare MAI: giudizi, opinioni, linguaggio emotivo\n- Se disponibile aggiungere: "Per i dettagli operativi si faccia riferimento al LOG / IR {numero}."\n\nSEZIONE "Obiettivo concordato tra Collaboratore e Resp. Settore onde evitare il ripetersi della non conformità":\n- Scrivere una frase breve che richiami il collaboratore al rispetto delle procedure\n- Esempio: "Si invita formalmente l\'impiegato a rispettare le procedure interne e a prestare maggiore attenzione durante lo svolgimento delle proprie mansioni."\n- Adattare la frase alla situazione specifica\n\nSEZIONE "Scadenza":\n- Scrivere SEMPRE: "A partire da subito"\n\nESEMPIO DI INPUT:\nDe Lima Marco – guardaroba – consegna errata numero 85/86 – 02:10 – 14.02.2026 – LOG 55212\n\nESEMPIO DI OUTPUT ATTESO:\ncollaboratore: "Sig. De Lima Marco"\nnon_conformita: "Nella giornata di gioco del 14.02.2026, alle ore 02:10, il collaboratore Sig. De Lima Marco, in servizio presso il Guardaroba, ha effettuato una consegna errata, consegnando al cliente con numero 85 i pacchetti corrispondenti al numero 86, generando così una non conformità procedurale.\\n\\nPer i dettagli operativi si faccia riferimento al LOG 55212."\nobiettivo: "Si invita formalmente l\'impiegato a prestare maggiore attenzione durante le operazioni di consegna al guardaroba, verificando con cura la corrispondenza tra il numero del cliente e il numero dei pacchetti."\nscadenza: "A partire da subito"\n\nREGOLE AGGIUNTIVE IMPORTANTI:\n- Il campo collaboratore DEVE avere il prefisso Sig./Sig.ra (es. "Sig. De Lima Marco", "Sig.ra Maisaia Teona")\n- Se è indicato un reparto (cassa, guardaroba, reception, valet, ecc.) menzionarlo: "in servizio presso la Cassa / il Guardaroba / la Reception…"\n- Per operazioni con importi usare il formato: "CHF X\'XXX.—"\n- Per documenti non verificati: "senza verificare il documento di identità del cliente"\n\nRispondi SOLO con un JSON valido con questi 4 campi: collaboratore, non_conformita, obiettivo, scadenza.\n\nDATI DEL CASO DA ELABORARE:\n'+prompt;
+    sysPrompt='Sei un assistente aziendale incaricato di redigere documenti interni disciplinari per Casinò Lugano SA.\n\nDevi generare un "Rilevamento di non conformità e colloquio di allineamento".\n\nIl testo deve essere: formale, chiaro, sintetico, oggettivo, privo di opinioni personali, basato solo sui fatti. Il linguaggio deve essere coerente con documenti disciplinari aziendali.\n\nSEZIONE "Non conformità rilevata":\n- Descrivere l\'evento in modo cronologico e oggettivo\n- Utilizzare quando possibile queste formulazioni standard:\n  • "Nella giornata di gioco del …"\n  • "Dalla revisione delle immagini CCTV risulta che …"\n  • "Il collaboratore …"\n  • "…generando così una non conformità procedurale."\n- Non usare MAI: giudizi, opinioni, linguaggio emotivo\n- Se disponibile aggiungere: "Per i dettagli operativi si faccia riferimento al LOG / IR {numero}."\n\nSEZIONE "Obiettivo concordato tra Collaboratore e Resp. Settore onde evitare il ripetersi della non conformità":\n- Scrivere una frase breve che richiami il collaboratore al rispetto delle procedure\n- Esempio: "Si invita formalmente l\'impiegato a rispettare le procedure interne e a prestare maggiore attenzione durante lo svolgimento delle proprie mansioni."\n- Adattare la frase alla situazione specifica\n\nSEZIONE "Scadenza":\n- Scrivere SEMPRE: "A partire da subito"\n\nESEMPIO DI INPUT:\nDe Lima Marco – guardaroba – consegna errata numero 85/86 – 02:10 – 14.02.2026 – LOG 55212\n\nESEMPIO DI OUTPUT ATTESO:\ncollaboratore: "Sig. De Lima Marco"\nnon_conformita: "Nella giornata di gioco del 14.02.2026, alle ore 02:10, il collaboratore Sig. De Lima Marco, in servizio presso il Guardaroba, ha effettuato una consegna errata, consegnando al cliente con numero 85 i pacchetti corrispondenti al numero 86, generando così una non conformità procedurale.\\n\\nPer i dettagli operativi si faccia riferimento al LOG 55212."\nobiettivo: "Si invita formalmente l\'impiegato a prestare maggiore attenzione durante le operazioni di consegna al guardaroba, verificando con cura la corrispondenza tra il numero del cliente e il numero dei pacchetti."\nscadenza: "A partire da subito"\n\nREGOLE AGGIUNTIVE IMPORTANTI:\n- Il campo collaboratore DEVE avere il prefisso Sig./Sig.ra (es. "Sig. De Lima Marco", "Sig.ra Maisaia Teona")\n- GENERE: se il collaboratore è donna (Sig.ra), usa SEMPRE il femminile: "la collaboratrice", "l\'impiegata". Se uomo (Sig.): "il collaboratore", "l\'impiegato". Mai mescolare generi!\n- Se è indicato un reparto (cassa, guardaroba, reception, valet, ecc.) menzionarlo: "in servizio presso la Cassa / il Guardaroba / la Reception…"\n- Per operazioni con importi usare il formato: "CHF X\'XXX.—"\n- Per documenti non verificati: "senza verificare il documento di identità del cliente"\n\nRispondi SOLO con un JSON valido con questi 4 campi: collaboratore, non_conformita, obiettivo, scadenza.\n\nDATI DEL CASO DA ELABORARE:\n'+prompt;
   }else if(tipo==='apprezzamento'){
     sysPrompt='Sei un assistente aziendale per Casinò Lugano SA. Scrivi un "Colloquio di apprezzamento".\nTono: formale, sintetico, professionale. Evidenzia il contributo positivo con fatti concreti. Frasi brevi.\n\nRispondi SOLO con un JSON valido con questi campi:\n- collaboratore: nome con prefisso Sig./Sig.ra\n- descrizione: testo del merito/apprezzamento\n- osservazioni: breve nota di apprezzamento del Resp. Settore\n\nDATI DA ELABORARE:\n'+prompt;
   }
