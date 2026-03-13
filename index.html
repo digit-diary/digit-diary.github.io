@@ -149,8 +149,8 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 .modulo-field textarea{min-height:80px;resize:vertical}
 .btn-ai{background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:3px;padding:4px 12px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:'Source Sans 3',sans-serif;letter-spacing:.02em;transition:opacity .2s;margin-top:4px}
 .btn-ai:hover{opacity:.85}.btn-ai:disabled{opacity:.5;cursor:wait}.btn-ai-wrap{display:flex;justify-content:flex-end}
-.ac-wrap{position:relative}.ac-drop{position:absolute;top:100%;left:0;width:220px;max-height:150px;overflow-y:auto;background:var(--paper);border:1.5px solid var(--accent2);border-top:none;border-radius:0 0 3px 3px;z-index:900;display:none;box-shadow:0 4px 12px rgba(0,0,0,.15)}
-.ac-drop.show{display:block}.ac-drop div{padding:5px 10px;cursor:pointer;font-size:.84rem;color:var(--ink)}.ac-drop div:hover,.ac-drop div.ac-active{background:var(--accent2);color:white}
+.ac-wrap{position:relative}.ac-drop{position:absolute;top:100%;left:0;width:260px;max-height:200px;overflow-y:auto;background:var(--paper);border:1.5px solid var(--accent2);border-top:none;border-radius:0 0 3px 3px;z-index:900;display:none;box-shadow:0 4px 12px rgba(0,0,0,.15)}
+.ac-drop.show{display:block}.ac-drop div{padding:8px 12px;cursor:pointer;font-size:1rem;color:var(--ink)}.ac-drop div:hover,.ac-drop div.ac-active{background:var(--accent2);color:white}
 .entry-actions{display:flex;flex-direction:row;align-items:center;justify-content:flex-end;gap:6px;padding:8px 18px 12px;grid-column:1/-1;opacity:0;transition:opacity .15s}
 .entry:hover .entry-actions{opacity:1}
 .btn-act{background:none;border:1px solid;border-radius:2px;cursor:pointer;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 9px;font-family:'Source Sans 3',sans-serif;transition:all .15s;white-space:nowrap}
@@ -1119,7 +1119,7 @@ function renderModuliList(){
   if(!_modFiltInit){
     let hdr='<div class="card-header">Moduli generati (<span id="mod-list-count">'+moduliCache.length+'</span>)</div>';
     hdr+='<div class="filters">';
-    hdr+='<div class="filter-group"><span class="filter-label">Collaboratore</span><input type="text" id="mod-filt-nome" placeholder="Cerca nome..." oninput="aggiornaModuliLista()"></div>';
+    hdr+='<div class="filter-group"><span class="filter-label">Collaboratore</span><div class="ac-wrap"><input type="text" id="mod-filt-nome" placeholder="Cerca nome..." oninput="acFiltraModuli(\'mod-filt-nome\',\'ac-mod-filt-nomi\')" onfocus="acFiltraModuli(\'mod-filt-nome\',\'ac-mod-filt-nomi\')"><div class="ac-drop" id="ac-mod-filt-nomi"></div></div></div>';
     hdr+='<div class="filter-group"><span class="filter-label">Tipo</span><select id="mod-filt-tipo" onchange="aggiornaModuliLista()"><option value="">Tutti</option><option value="allineamento">Allineamento</option><option value="apprezzamento">Apprezzamento</option><option value="rdi">RDI</option></select></div>';
     hdr+='<div class="filter-group"><span class="filter-label">Dal</span><input type="text" id="mod-filt-dal" placeholder="Seleziona..." readonly style="cursor:pointer;min-width:150px"></div>';
     hdr+='<div class="filter-group"><span class="filter-label">Al</span><input type="text" id="mod-filt-al" placeholder="Seleziona..." readonly style="cursor:pointer;min-width:150px"></div>';
@@ -1463,6 +1463,16 @@ function acFiltra(inputId,dropId){const inp=document.getElementById(inputId),dro
   drop.classList.add('show')}
 function acScegli(inputId,dropId,nome){const inp=document.getElementById(inputId),drop=document.getElementById(dropId);
   if(inp)inp.value=nome;if(drop)drop.classList.remove('show')}
+function acFiltraModuli(inputId,dropId){const inp=document.getElementById(inputId),drop=document.getElementById(dropId);if(!inp||!drop)return;
+  const v=inp.value.toLowerCase();
+  const nomiSet=new Set();moduliCache.forEach(m=>{if(m.collaboratore)nomiSet.add(m.collaboratore)});
+  const nomi=Array.from(nomiSet).sort();
+  const filtrati=v?nomi.filter(n=>n.toLowerCase().includes(v)):nomi;
+  if(!filtrati.length){drop.classList.remove('show');return}
+  drop.innerHTML=filtrati.slice(0,15).map(n=>'<div onmousedown="acScegliModuli(\''+inputId+'\',\''+dropId+'\',\''+n.replace(/'/g,"\\'")+'\')">'+escP(n)+'</div>').join('');
+  drop.classList.add('show')}
+function acScegliModuli(inputId,dropId,nome){const inp=document.getElementById(inputId),drop=document.getElementById(dropId);
+  if(inp)inp.value=nome;if(drop)drop.classList.remove('show');aggiornaModuliLista()}
 document.addEventListener('click',function(e){document.querySelectorAll('.ac-drop.show').forEach(d=>{if(!d.parentElement.contains(e.target))d.classList.remove('show')})})
 function resetFiltri(){['filt-persona','filt-tipo'].forEach(id=>document.getElementById(id).value='');['filt-cerca'].forEach(id=>document.getElementById(id).value='');const fd=document.getElementById('filt-dal'),fa=document.getElementById('filt-al');if(fd._flatpickr)fd._flatpickr.clear();else fd.value='';if(fa._flatpickr)fa._flatpickr.clear();else fa.value='';render()}
 function updateStats(){document.getElementById('stats-bar').innerHTML='<div class="stat"><div class="stat-num">'+datiCache.length+'</div><div class="stat-label">Totale</div></div><div class="stat"><div class="stat-num blue">'+new Set(datiCache.map(e=>e.nome)).size+'</div><div class="stat-label">Collaboratori</div></div><div class="stat"><div class="stat-num red">'+datiCache.filter(e=>e.tipo===nomeCorrente('Errore')).length+'</div><div class="stat-label">'+nomeCorrente('Errore')+'</div></div><div class="stat"><div class="stat-num teal">'+datiCache.filter(e=>e.tipo===nomeCorrente('Malattia')).length+'</div><div class="stat-label">'+nomeCorrente('Malattia')+'</div></div><div class="stat"><div class="stat-num gold">'+datiCache.filter(e=>e.tipo===nomeCorrente('Apprezzamento')).length+'</div><div class="stat-label">'+nomeCorrente('Apprezzamento')+'</div></div>'}
