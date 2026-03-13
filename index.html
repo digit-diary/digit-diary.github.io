@@ -675,14 +675,14 @@ async function checkPwd(){const nome=document.getElementById('login-nome').value
   if(nome){const res=await sbRpc('verify_login',{p_nome:nome,p_hash:h});
     if(res&&res.valid){sessionStorage.setItem('operatore_corrente',nome);sessionStorage.setItem('diario_auth','1');sessionStorage.removeItem('is_admin');document.getElementById('login-overlay').classList.add('hidden');document.getElementById('operatore-display').textContent='Operatore: '+nome;applicaTemaOperatore();
       if(res.deve_cambiare_pwd)setTimeout(()=>forzaCambioPwdOperatore(nome),300);
-      else setTimeout(()=>mostraNoteNonLette(),500);return}
+      else{setTimeout(()=>mostraNoteNonLette(),500);setTimeout(checkQrHash,800)}return}
     if(res&&res.found){err.textContent='Password errata per '+nome;document.getElementById('pwd-input').value='';document.getElementById('pwd-input').focus();setTimeout(()=>err.textContent='',2500);return}}
   // Fallback: master password (admin) - server-side verification
   const masterRes=await sbRpc('verify_master_pwd',{p_hash:h});
   if(masterRes&&masterRes.valid){document.getElementById('login-overlay').classList.add('hidden');sessionStorage.setItem('diario_auth','1');sessionStorage.setItem('is_admin','1');
     if(nome){sessionStorage.setItem('operatore_corrente',nome);document.getElementById('operatore-display').textContent='Operatore: '+nome;setTimeout(()=>mostraNoteNonLette(),500)}
     else{sessionStorage.setItem('operatore_corrente','Admin');document.getElementById('operatore-display').textContent='Admin';}
-    applicaTemaOperatore();renderTipiUI();renderOperatoriUI();renderCampiRapportoUI();document.getElementById('tab-registro').style.display='';
+    applicaTemaOperatore();renderTipiUI();renderOperatoriUI();renderCampiRapportoUI();document.getElementById('tab-registro').style.display='';setTimeout(checkQrHash,800);
   }else{err.textContent=nome?'Operatore non trovato o password errata':'Password errata';document.getElementById('pwd-input').value='';document.getElementById('pwd-input').focus();setTimeout(()=>err.textContent='',2500)}}
 function mostraForzaCambio(){const b=document.getElementById('pwd-modal-content');b.innerHTML='<h3>Cambia la password</h3><p>Password predefinita. Impostane una nuova.</p><div class="pwd-field"><label>Nuova password (min 4 car.)</label><input type="password" id="new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="eseguiPrimoCambio()">Imposta</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';document.getElementById('pwd-modal').classList.remove('hidden');setTimeout(()=>document.getElementById('new-pwd-1').focus(),100)}
 async function eseguiPrimoCambio(){const p1=document.getElementById('new-pwd-1').value,p2=document.getElementById('new-pwd-2').value,err=document.getElementById('pwd-modal-error');if(p1.length<4){err.textContent='Troppo corta';return}if(p1!==p2){err.textContent='Non coincidono';return}
@@ -1287,6 +1287,10 @@ function apriModuloSalvato(id){const m=moduliCache.find(x=>x.id===id);if(!m)retu
       if(radio){radio.checked=true;toggleFirmaDigitale();
         setTimeout(()=>{if(dt.firma_resp)loadFirmaToCanvas('firma-resp-canvas',dt.firma_resp);
           if(dt.firma_collab)loadFirmaToCanvas('firma-collab-canvas',dt.firma_collab)},150)}},100)}},50)}
+function checkQrHash(){const h=window.location.hash;if(!h.startsWith('#modulo/'))return;const code=h.split('/')[1];
+  const mod=moduliCache.find(m=>m.dati&&m.dati.qr_code===code);
+  if(mod){switchPage('moduli');setTimeout(()=>apriModuloSalvato(mod.id),300)}else{toast('Modulo non trovato')}
+  history.replaceState(null,'',window.location.pathname)}
 function ristampaModuloPDF(id){apriModuloSalvato(id);setTimeout(()=>{const m=moduliCache.find(x=>x.id===id);if(m)generaModuloPDF(m.tipo)},150)}
 async function eliminaModulo(id){if(!confirm('Eliminare questo modulo?'))return;
   const _m=moduliCache.find(x=>x.id===id);try{await sbDel('moduli','id=eq.'+id);moduliCache=moduliCache.filter(x=>x.id!==id);if(_m)logAzione('Eliminato modulo',_m.tipo+' - '+_m.collaboratore);aggiornaModuliLista();const cnt=document.getElementById('mod-list-count');if(cnt)cnt.textContent=moduliCache.length;toast('Modulo eliminato')}catch(e){toast('Errore eliminazione')}}
@@ -1787,11 +1791,7 @@ window.addEventListener('load',async()=>{
   const n=new Date();document.getElementById('today-date').innerHTML=n.getDate()+' '+MESI[n.getMonth()]+' '+n.getFullYear()+'<br><small style="color:var(--muted);font-size:.75rem">'+GIORNI[n.getDay()]+'</small>';
   renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();aggiornaNoteBadge();
   const savedPage=sessionStorage.getItem('pagina_corrente');if(savedPage&&savedPage!=='diario')switchPage(savedPage);
-  // QR hash routing: #modulo/CODE
-  setTimeout(()=>{const h=window.location.hash;if(h.startsWith('#modulo/')){const code=h.split('/')[1];
-    const mod=moduliCache.find(m=>m.dati&&m.dati.qr_code===code);
-    if(mod){switchPage('moduli');setTimeout(()=>apriModuloSalvato(mod.id),300)}else{toast('Modulo non trovato')}
-    history.replaceState(null,'',window.location.pathname)}},1200);
+  setTimeout(checkQrHash,1200);
   // Polling note ogni 15 secondi
   setInterval(pollNuoveNote,15000);
   // Flatpickr date pickers
