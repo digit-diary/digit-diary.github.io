@@ -984,62 +984,59 @@ async function generaModuloPDF(tipo){
   if(!collab){toast('Inserisci il nome del collaboratore');return}
   const doc=new jspdf.jsPDF({unit:'mm',format:'a4'});const pw=doc.internal.pageSize.getWidth();const ph=doc.internal.pageSize.getHeight();const mx=20;let y=12;
   // Logo Casino Lugano (ratio 1.78:1)
-  if(_logoB64)try{const lw=48,lh=lw/1.78;doc.addImage(_logoB64,'PNG',pw/2-lw/2,y,lw,lh)}catch(e){}
-  y+=34;
+  if(_logoB64)try{const lw=40,lh=lw/1.78;doc.addImage(_logoB64,'PNG',pw/2-lw/2,y,lw,lh)}catch(e){}
+  y+=28;
   function checkPage(need){if(y+need>ph-25){doc.addPage();y=20;return true}return false}
   // Tabella intestazione (come Word)
   function drawHeaderTable(){
     const tw=pw-mx*2,col1=42;
     doc.autoTable({startY:y,margin:{left:mx,right:mx},tableWidth:tw,
       body:[['Collaboratore',collab],['Resp. Settore',resp],['Data',data]],
-      theme:'grid',styles:{font:'helvetica',fontSize:10,cellPadding:{top:3,bottom:3,left:4,right:4},textColor:[0,0,0],lineColor:[0,0,0],lineWidth:0.3},
+      theme:'grid',styles:{font:'helvetica',fontSize:9.5,cellPadding:{top:2,bottom:2,left:4,right:4},textColor:[0,0,0],lineColor:[0,0,0],lineWidth:0.3},
       columnStyles:{0:{fontStyle:'bold',cellWidth:col1},1:{fontStyle:'normal'}},
       didDrawPage:function(){}});
-    y=doc.lastAutoTable.finalY+8;
+    y=doc.lastAutoTable.finalY+6;
   }
   // Sezione con titolo sottolineato (come Word)
   function drawSection(title,text){
     const maxW=pw-mx*2;
-    checkPage(30);
-    doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0);
+    checkPage(25);
+    doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0);
     const titleLines=doc.splitTextToSize(title,maxW);
     doc.text(titleLines,mx,y);
-    // Sottolineatura titolo
     doc.setDrawColor(0);doc.setLineWidth(0.3);
-    titleLines.forEach(function(line,i){const lw2=doc.getTextWidth(line);doc.line(mx,y+1.2+i*5,mx+lw2,y+1.2+i*5)});
-    y+=titleLines.length*5+6;
+    titleLines.forEach(function(line,i){const lw2=doc.getTextWidth(line);doc.line(mx,y+1.2+i*4.5,mx+lw2,y+1.2+i*4.5)});
+    y+=titleLines.length*4.5+4;
     if(text){
-      doc.setFont('helvetica','normal');doc.setFontSize(10.5);doc.setTextColor(0);
+      doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.setTextColor(0);
       const lines=doc.splitTextToSize(text,maxW);
-      doc.text(lines,mx,y,{align:'justify',maxWidth:maxW});y+=lines.length*4.5+4;
-    }else{y+=8}
-    y+=4;
+      lines.forEach(function(line){checkPage(5);doc.text(line,mx,y);y+=4});y+=2;
+    }else{y+=4}
+    y+=2;
   }
   if(tipo==='allineamento'){
-    doc.setFont('helvetica','bold');doc.setFontSize(14);doc.setTextColor(0);
-    doc.text('Rilevamento di non conformit\u00E0 e colloquio di allineamento',mx,y);y+=10;
+    doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(0);
+    doc.text('Rilevamento di non conformit\u00E0 e colloquio di allineamento',mx,y);y+=8;
     drawHeaderTable();
     const nonConf=(document.getElementById('mod-non-conf')||{}).value||'';
     drawSection('Non conformit\u00E0 rilevata',nonConf);
     const obiettivo=(document.getElementById('mod-obiettivo')||{}).value||'';
     drawSection('Obiettivo concordato tra Collaboratore e Resp. Settore onde evitare il ripetersi della non conformit\u00E0',obiettivo);
     const scad=(document.getElementById('mod-scadenza')||{}).value||'';
-    // Scadenza: solo "Scadenza" sottolineato, resto normale (come Word)
-    checkPage(20);doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0);
+    checkPage(16);doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0);
     const scLabel='Scadenza';doc.text(scLabel,mx,y);const scW=doc.getTextWidth(scLabel);
     doc.setDrawColor(0);doc.setLineWidth(0.3);doc.line(mx,y+1.2,mx+scW,y+1.2);
-    doc.setFont('helvetica','normal');doc.setFontSize(10);
-    doc.text(' (termine di verifica entro il quale si \u00E8 concordato di raggiungere l\'obiettivo di cui sopra)',mx+scW,y);y+=8;
-    if(scad){doc.setFont('helvetica','normal');doc.setFontSize(10.5);doc.setTextColor(0);const scLines=doc.splitTextToSize(scad,pw-mx*2);doc.text(scLines,mx,y,{align:'justify',maxWidth:pw-mx*2});y+=scLines.length*4.5+4}else{y+=6}
-    y+=4;
-    checkPage(12);doc.setFontSize(10);doc.setFont('helvetica','italic');doc.setTextColor(60);
+    doc.setFont('helvetica','normal');doc.setFontSize(9);
+    doc.text(' (termine di verifica entro il quale si \u00E8 concordato di raggiungere l\'obiettivo di cui sopra)',mx+scW,y);y+=6;
+    if(scad){doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.setTextColor(0);doc.text(scad,mx,y);y+=5}else{y+=4}
+    y+=3;
+    checkPage(10);doc.setFontSize(9);doc.setFont('helvetica','italic');doc.setTextColor(60);
     const scadTxt=scad&&scad.toLowerCase()!=='a partire da subito'?scad:'a partire da subito';
-    const chiudiLines=doc.splitTextToSize('Chiediamo che, '+scadTxt+', venga raggiunto l\'obiettivo di cui sopra.',pw-mx*2);
-    doc.text(chiudiLines,mx,y);y+=chiudiLines.length*4.5+14;
-    checkPage(30);const fy1=drawFirmePro(doc,mx,y,pw,false);y=fy1+20;
+    doc.text('Chiediamo che, '+scadTxt+', venga raggiunto l\'obiettivo di cui sopra.',mx,y);y+=10;
+    checkPage(25);const fy1=drawFirmePro(doc,mx,y,pw,false);y=fy1+14;
     checkPage(15);drawDistribuzionePro(doc,mx,y,['Diario di bordo del collaboratore','Resp. Settore']);
   }else if(tipo==='apprezzamento'){
-    doc.setFont('helvetica','bolditalic');doc.setFontSize(14);doc.setTextColor(0);
+    doc.setFont('helvetica','bolditalic');doc.setFontSize(13);doc.setTextColor(0);
     doc.text('Colloquio di apprezzamento',mx,y);y+=8;
     drawHeaderTable();
     const desc=(document.getElementById('mod-descrizione')||{}).value||'';
@@ -1050,38 +1047,38 @@ async function generaModuloPDF(tipo){
     checkPage(30);const fy2=drawFirmePro(doc,mx,y,pw,false);y=fy2+20;
     checkPage(15);drawDistribuzionePro(doc,mx,y,['Diario di bordo del collaboratore','Resp. Settore']);
   }else if(tipo==='rdi'){
-    doc.setFont('helvetica','bold');doc.setFontSize(14);doc.setTextColor(0);
-    doc.text('Rapporto disciplinare interno (RDI)',mx,y);y+=10;
+    doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(0);
+    doc.text('Rapporto disciplinare interno (RDI)',mx,y);y+=8;
     drawHeaderTable();
     const nonConf=(document.getElementById('mod-non-conf')||{}).value||'';
     drawSection('Non conformit\u00E0 rilevata',nonConf);
     const obiettivo=(document.getElementById('mod-obiettivo')||{}).value||'';
     drawSection('Obiettivo concordato tra Collaboratore e Resp. Settore onde evitare il ripetersi della non conformit\u00E0',obiettivo);
     const scad=(document.getElementById('mod-scadenza')||{}).value||'';
-    // Scadenza: solo "Scadenza" sottolineato (come Word)
-    checkPage(20);doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0);
+    checkPage(16);doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0);
     const scLbl2='Scadenza';doc.text(scLbl2,mx,y);const scW2=doc.getTextWidth(scLbl2);
     doc.setDrawColor(0);doc.setLineWidth(0.3);doc.line(mx,y+1.2,mx+scW2,y+1.2);
-    doc.setFont('helvetica','normal');doc.setFontSize(10);
-    doc.text(' (termine di verifica entro il quale si \u00E8 concordato di raggiungere l\'obiettivo di cui sopra)',mx+scW2,y);y+=8;
-    if(scad){doc.setFont('helvetica','normal');doc.setFontSize(10.5);doc.setTextColor(0);const scL2=doc.splitTextToSize(scad,pw-mx*2);doc.text(scL2,mx,y,{align:'justify',maxWidth:pw-mx*2});y+=scL2.length*4.5+4}else{y+=6}
-    y+=4;
+    doc.setFont('helvetica','normal');doc.setFontSize(9);
+    doc.text(' (termine di verifica entro il quale si \u00E8 concordato di raggiungere l\'obiettivo di cui sopra)',mx+scW2,y);y+=6;
+    if(scad){doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.setTextColor(0);doc.text(scad,mx,y);y+=5}else{y+=4}
+    y+=3;
     const livello=(document.getElementById('mod-livello')||{}).value||'I';
-    checkPage(25);
-    // "Il presente RDI vale quale" sottolineato + "(segnare ciò che fa al caso)" normale
-    doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0);
+    checkPage(20);
+    doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0);
     const rdiLabel='Il presente RDI vale quale';doc.text(rdiLabel,mx,y);
     const rdiLW=doc.getTextWidth(rdiLabel);doc.setDrawColor(0);doc.setLineWidth(0.3);doc.line(mx,y+1.2,mx+rdiLW,y+1.2);
-    doc.setFont('helvetica','normal');doc.setFontSize(10);doc.text(' (segnare ci\u00F2 che fa al caso)',mx+rdiLW,y);y+=8;
-    doc.setFont('helvetica','normal');doc.setFontSize(10.5);
-    const sel1=livello==='I'?'●':'○';const sel2=livello==='II'?'●':'○';
-    doc.text(sel1+'       rapporto disciplinare interno di I\u00B0 livello',mx,y);y+=6;
-    doc.text(sel2+'       rapporto disciplinare interno grave (II\u00B0 livello)',mx,y);y+=16;
-    checkPage(40);const firmaY=drawFirmePro(doc,mx,y,pw,true);y=firmaY+8;
-    // Nota * posizionata sotto firma destra
-    const mid=pw/2;doc.setFontSize(7.5);doc.setFont('helvetica','italic');doc.setTextColor(80);
+    doc.setFont('helvetica','normal');doc.setFontSize(9);doc.text(' (segnare ci\u00F2 che fa al caso)',mx+rdiLW,y);y+=7;
+    doc.setFont('helvetica','normal');doc.setFontSize(9.5);
+    const rb=1.8;const cx1=mx+rb;const txtX=mx+9;
+    doc.setDrawColor(0);doc.setLineWidth(0.3);doc.setFillColor(0);
+    doc.circle(cx1,y-1,rb,'S');if(livello==='I'){doc.circle(cx1,y-1,rb*0.55,'F')}
+    doc.text('rapporto disciplinare interno di I\u00B0 livello',txtX,y);y+=6;
+    doc.circle(cx1,y-1,rb,'S');if(livello==='II'){doc.circle(cx1,y-1,rb*0.55,'F')}
+    doc.text('rapporto disciplinare interno grave (II\u00B0 livello)',txtX,y);y+=10;
+    checkPage(35);const firmaY=drawFirmePro(doc,mx,y,pw,true);y=firmaY+6;
+    const mid=pw/2;doc.setFontSize(7);doc.setFont('helvetica','italic');doc.setTextColor(80);
     const notaLines=doc.splitTextToSize('* il collaboratore che non vuole sottoscrivere il rapporto disciplinare lo deve espressamente dichiarare, scrivendolo al posto della firma.',pw-mid-10-mx);
-    doc.text(notaLines,mid+10,y);y+=notaLines.length*3.5+10;
+    doc.text(notaLines,mid+10,y);y+=notaLines.length*3+8;
     checkPage(15);drawDistribuzionePro(doc,mx,y,['Resp. Settore','Resp. Risorse Umane']);
   }
   doc.save('Modulo_'+tipo.charAt(0).toUpperCase()+tipo.slice(1)+'_'+collab.replace(/\s+/g,'_')+'_'+data.replace(/\//g,'-')+'.pdf');
@@ -1104,17 +1101,17 @@ function drawBlockField(doc,x,y,label,value,pw){const maxW=pw-x*2;
   if(value){const lines=doc.splitTextToSize(value,maxW);doc.text(lines,x,y);y+=lines.length*5+3}
   else{y+=8}
   doc.setDrawColor(180);doc.line(x,y,pw-x,y);y+=2;return y}
-function drawFirmePro(doc,x,y,pw,isRdi){doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0);
+function drawFirmePro(doc,x,y,pw,isRdi){doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(0);
   const mid=pw/2;const lbl1='Firma del Resp. Settore';const lbl2=isRdi?'Firma del collaboratore*':'Firma del collaboratore';
   doc.text(lbl1,x,y);doc.text(lbl2,mid+10,y);
   doc.setDrawColor(0);doc.setLineWidth(0.3);const w1=doc.getTextWidth(lbl1);const w2=doc.getTextWidth(lbl2);
   doc.line(x,y+1.2,x+w1,y+1.2);doc.line(mid+10,y+1.2,mid+10+w2,y+1.2);
-  y+=14;doc.setDrawColor(150);const dots='....................................................';
+  y+=12;doc.setDrawColor(150);const dots='....................................................';
   doc.setFont('helvetica','normal');doc.setFontSize(8);doc.text(dots,x,y);doc.text(dots,mid+10,y);return y}
-function drawDistribuzionePro(doc,x,y,items){doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0);
+function drawDistribuzionePro(doc,x,y,items){doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(0);
   doc.text('Distribuzione:',x,y);const dw=doc.getTextWidth('Distribuzione:');doc.setDrawColor(0);doc.setLineWidth(0.3);doc.line(x,y+1.5,x+dw,y+1.5);
-  y+=8;doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0);
-  items.forEach(it=>{doc.text('>       '+it,x,y);y+=5.5})}
+  y+=6;doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(0);
+  items.forEach(it=>{doc.text('>       '+it,x,y);y+=5})}
 let _modFiltInit=false;
 function renderModuliList(){
   let c=document.getElementById('moduli-list-section');
