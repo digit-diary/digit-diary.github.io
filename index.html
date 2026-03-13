@@ -524,8 +524,8 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
   <div class="settings-section"><h4>Operatori</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Operatore attuale: <strong id="op-attuale">—</strong>. Ogni operatore accede con il proprio nome e password.</p><div id="operatori-list" style="margin-bottom:14px"></div>
     <div class="add-tipo-row" style="align-items:flex-end"><div class="field"><label>Nome</label><input type="text" id="new-operatore-nome" placeholder="Nome..."></div><div class="field"><label>Password</label><input type="password" id="new-operatore-pwd" placeholder="Min 4 caratteri..."></div><div class="field"><label>Conferma password</label><input type="password" id="new-operatore-pwd2" placeholder="Ripeti..."></div><button class="btn-add-tipo" onclick="aggiungiOperatoreConPwd()">+ Crea operatore</button></div></div>
   <div class="settings-section"><h4>Sicurezza</h4><div class="settings-btn-row" id="sicurezza-btns"></div></div>
-  <div class="settings-section" id="ai-section" style="display:none"><h4>Assistente AI (Gemini)</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Migliora automaticamente i testi nei moduli disciplinari. Ottieni una chiave gratuita su <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--accent2)">Google AI Studio</a>.</p>
-    <div class="add-tipo-row"><div class="field" style="flex:2"><label>Chiave API Gemini</label><input type="password" id="gemini-key-input" placeholder="AIza..."></div><button class="btn-add-tipo" onclick="salvaGeminiKey()">Salva</button></div><p id="gemini-status" style="font-size:.82rem;margin-top:8px"></p></div>
+  <div class="settings-section" id="ai-section" style="display:none"><h4>Assistente AI (Groq)</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Migliora automaticamente i testi nei moduli disciplinari. Ottieni una chiave gratuita su <a href="https://console.groq.com/keys" target="_blank" style="color:var(--accent2)">console.groq.com</a>.</p>
+    <div class="add-tipo-row"><div class="field" style="flex:2"><label>Chiave API Groq</label><input type="password" id="gemini-key-input" placeholder="gsk_..."></div><button class="btn-add-tipo" onclick="salvaGeminiKey()">Salva</button></div><p id="gemini-status" style="font-size:.82rem;margin-top:8px"></p></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -1133,28 +1133,28 @@ async function importaCollaboratori(input){const file=input.files[0];if(!file)re
   toast(aggiunti+' collaboratori importati'+(duplicati?' ('+duplicati+' già esistenti)':''));
   if(aggiunti)logAzione('Importa collaboratori',aggiunti+' nomi importati da '+file.name)}
 
-// ASSISTENTE AI GEMINI
+// ASSISTENTE AI GROQ
 let geminiKey='';
-async function loadGeminiKey(){const k=await getImp('gemini_api_key');if(k)geminiKey=k}
+async function loadGeminiKey(){let k=await getImp('groq_api_key');if(!k)k=await getImp('gemini_api_key');if(k)geminiKey=k}
 async function salvaGeminiKey(){const k=document.getElementById('gemini-key-input').value.trim();if(!k){toast('Inserisci la chiave');return}
-  await setImp('gemini_api_key',k);geminiKey=k;document.getElementById('gemini-key-input').value='';
-  document.getElementById('gemini-status').innerHTML='<span style="color:#2c6e49;font-weight:600">Chiave salvata</span>';toast('Chiave Gemini salvata')}
+  await setImp('groq_api_key',k);geminiKey=k;document.getElementById('gemini-key-input').value='';
+  document.getElementById('gemini-status').innerHTML='<span style="color:#2c6e49;font-weight:600">Chiave salvata</span>';toast('Chiave Groq salvata')}
 async function miglioraTesto(fieldId,contesto){const el=document.getElementById(fieldId);if(!el)return;
   const testo=el.value.trim();if(!testo){toast('Scrivi prima un testo da migliorare');return}
-  if(!geminiKey){toast('Configura la chiave Gemini nelle Impostazioni');return}
+  if(!geminiKey){toast('Configura la chiave Groq nelle Impostazioni');return}
   const btn=el.parentElement.querySelector('.btn-ai');if(btn){btn.disabled=true;btn.textContent='Elaborazione...'}
   try{const prompt='Sei un responsabile HR esperto del Casino Lugano SA, in Svizzera. Devi riscrivere il seguente testo per un documento formale disciplinare/di gestione del personale (contesto: '+contesto+').\n\nREGOLE DI STILE:\n- Usa italiano formale e professionale, tipico di documenti HR svizzeri\n- Scrivi in terza persona (\"il collaboratore\", \"il Sig./la Sig.ra\")\n- Sii dettagliato e preciso: includi date, orari, luoghi e circostanze specifiche se presenti nel testo originale\n- Usa espressioni come: \"dalla revisione delle immagini CCTV risulta che...\", \"si rileva che...\", \"in data...\", \"durante il turno di servizio...\"\n- Per le non conformità: descrivi chiaramente i fatti, poi la violazione delle procedure\n- Per gli obiettivi: usa \"Si invita formalmente il collaboratore a...\", \"Il collaboratore si impegna a...\"\n- Per gli apprezzamenti: evidenzia il contributo positivo e l\'impatto sul team/servizio\n- NON aggiungere informazioni inventate, migliora solo la forma del testo esistente\n- Rispondi SOLO con il testo migliorato, senza commenti, prefissi o spiegazioni\n\nTesto originale:\n'+testo;
-    const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+geminiKey,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.3,maxOutputTokens:500}})});
+    const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+geminiKey},
+      body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[{role:'user',content:prompt}],temperature:0.3,max_tokens:500})});
     if(!r.ok)throw new Error('API error '+r.status);
-    const data=await r.json();const migliorato=data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const data=await r.json();const migliorato=data.choices?.[0]?.message?.content;
     if(migliorato){el.value=migliorato.trim();toast('Testo migliorato!')}else throw new Error('Nessuna risposta')
-  }catch(e){console.error(e);toast('Errore AI: verifica la chiave Gemini')}
+  }catch(e){console.error(e);toast('Errore AI: verifica la chiave Groq')}
   if(btn){btn.disabled=false;btn.textContent='Migliora testo con AI'}}
 async function generaModuloAI(tipo){
   const prompt=(document.getElementById('ai-gen-prompt')||{}).value||'';
   if(!prompt.trim()){toast('Scrivi una descrizione della situazione');return}
-  if(!geminiKey){toast('Configura la chiave Gemini nelle Impostazioni');return}
+  if(!geminiKey){toast('Configura la chiave Groq nelle Impostazioni');return}
   const btn=document.getElementById('btn-ai-gen');const status=document.getElementById('ai-gen-status');
   if(btn){btn.disabled=true;btn.textContent='Generazione in corso...'}
   if(status)status.textContent='L\'AI sta compilando i campi...';
@@ -1166,10 +1166,10 @@ async function generaModuloAI(tipo){
   }
   const sysPrompt='Sei il responsabile HR del Casino Lugano SA, in Svizzera. Devi compilare un modulo '+tipo+' basandoti sulla descrizione fornita dall\'operatore.\n\nREGOLE:\n- Scrivi in italiano formale, in terza persona ("il collaboratore", "il Sig./la Sig.ra")\n- Sii dettagliato e preciso: usa date, orari, circostanze se presenti nella descrizione\n- Per le non conformità usa espressioni come "si rileva che...", "tale condotta non è conforme...", "dalla revisione risulta che..."\n- Per gli obiettivi usa "Si invita formalmente il collaboratore a:" seguito da elenco puntato\n- NON inventare fatti non presenti nella descrizione\n- Rispondi SOLO con un JSON valido con questi campi:\n'+fields+'\n\nDescrizione dell\'operatore:\n'+prompt;
   try{
-    const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+geminiKey,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({contents:[{parts:[{text:sysPrompt}]}],generationConfig:{temperature:0.4,maxOutputTokens:1500,responseMimeType:'application/json'}})});
-    if(!r.ok){const errTxt=await r.text();console.error('Gemini API error',r.status,errTxt);throw new Error('API error '+r.status)}
-    const data=await r.json();let txt=data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+geminiKey},
+      body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[{role:'user',content:sysPrompt}],temperature:0.4,max_tokens:1500,response_format:{type:'json_object'}})});
+    if(!r.ok){const errTxt=await r.text();console.error('Groq API error',r.status,errTxt);throw new Error('API error '+r.status)}
+    const data=await r.json();let txt=data.choices?.[0]?.message?.content;
     if(!txt)throw new Error('Nessuna risposta dall\'AI');
     txt=txt.replace(/```json\s*/g,'').replace(/```\s*/g,'').trim();
     const jsonMatch=txt.match(/\{[\s\S]*\}/);if(jsonMatch)txt=jsonMatch[0];
@@ -1185,7 +1185,7 @@ async function generaModuloAI(tipo){
     }
     if(status)status.innerHTML='<span style="color:#2c6e49">Campi compilati! Verifica e modifica se necessario.</span>';
     toast('Campi compilati dall\'AI!')
-  }catch(e){console.error(e);const msg=e.message||'';if(status)status.innerHTML='<span style="color:#c0392b">'+(msg.includes('API error')?'Errore API: verifica la chiave Gemini':msg.includes('non valida')?'Risposta AI non leggibile, riprova':'Errore: '+msg)+'</span>';toast('Errore AI: '+msg)}
+  }catch(e){console.error(e);const msg=e.message||'';if(status)status.innerHTML='<span style="color:#c0392b">'+(msg.includes('API error')?'Errore API: verifica la chiave Groq':msg.includes('non valida')?'Risposta AI non leggibile, riprova':'Errore: '+msg)+'</span>';toast('Errore AI: '+msg)}
   if(btn){btn.disabled=false;btn.textContent='Genera tutti i campi'}}
 
 // IMPORTA MODULO DA WORD/PDF
