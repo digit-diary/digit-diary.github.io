@@ -1167,12 +1167,13 @@ async function generaModuloAI(tipo){
   const sysPrompt='Sei il responsabile HR del Casino Lugano SA, in Svizzera. Devi compilare un modulo '+tipo+' basandoti sulla descrizione fornita dall\'operatore.\n\nREGOLE:\n- Scrivi in italiano formale, in terza persona ("il collaboratore", "il Sig./la Sig.ra")\n- Sii dettagliato e preciso: usa date, orari, circostanze se presenti nella descrizione\n- Per le non conformità usa espressioni come "si rileva che...", "tale condotta non è conforme...", "dalla revisione risulta che..."\n- Per gli obiettivi usa "Si invita formalmente il collaboratore a:" seguito da elenco puntato\n- NON inventare fatti non presenti nella descrizione\n- Rispondi SOLO con un JSON valido con questi campi:\n'+fields+'\n\nDescrizione dell\'operatore:\n'+prompt;
   try{
     const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+geminiKey,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({contents:[{parts:[{text:sysPrompt}]}],generationConfig:{temperature:0.4,maxOutputTokens:1500}})});
-    if(!r.ok)throw new Error('API error '+r.status);
+      body:JSON.stringify({contents:[{parts:[{text:sysPrompt}]}],generationConfig:{temperature:0.4,maxOutputTokens:1500,responseMimeType:'application/json'}})});
+    if(!r.ok){const errTxt=await r.text();console.error('Gemini API error',r.status,errTxt);throw new Error('API error '+r.status)}
     const data=await r.json();let txt=data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if(!txt)throw new Error('Nessuna risposta');
+    if(!txt)throw new Error('Nessuna risposta dall\'AI');
     txt=txt.replace(/```json\s*/g,'').replace(/```\s*/g,'').trim();
-    const parsed=JSON.parse(txt);
+    const jsonMatch=txt.match(/\{[\s\S]*\}/);if(jsonMatch)txt=jsonMatch[0];
+    let parsed;try{parsed=JSON.parse(txt)}catch(pe){console.error('JSON parse error:',txt);throw new Error('Risposta AI non valida')}
     if(parsed.collaboratore){const el=document.getElementById('mod-collaboratore');if(el)el.value=parsed.collaboratore}
     if(tipo==='allineamento'||tipo==='rdi'){
       if(parsed.non_conformita){const el=document.getElementById('mod-non-conf');if(el)el.value=parsed.non_conformita}
@@ -1184,7 +1185,7 @@ async function generaModuloAI(tipo){
     }
     if(status)status.innerHTML='<span style="color:#2c6e49">Campi compilati! Verifica e modifica se necessario.</span>';
     toast('Campi compilati dall\'AI!')
-  }catch(e){console.error(e);if(status)status.innerHTML='<span style="color:#c0392b">Errore: verifica la chiave Gemini</span>';toast('Errore AI')}
+  }catch(e){console.error(e);const msg=e.message||'';if(status)status.innerHTML='<span style="color:#c0392b">'+(msg.includes('API error')?'Errore API: verifica la chiave Gemini':msg.includes('non valida')?'Risposta AI non leggibile, riprova':'Errore: '+msg)+'</span>';toast('Errore AI: '+msg)}
   if(btn){btn.disabled=false;btn.textContent='Genera tutti i campi'}}
 
 // IMPORTA MODULO DA WORD/PDF
