@@ -1,8 +1,6 @@
--- ============================================================
 -- MIGRAZIONE SICUREZZA V2 - Diario Collaboratori
 -- Eseguire su Supabase Dashboard > SQL Editor
 -- PRIMA di aggiornare index.html
--- ============================================================
 
 -- 1. Tabella tentativi login (rate limiting)
 CREATE TABLE IF NOT EXISTS login_attempts (
@@ -29,9 +27,7 @@ ALTER TABLE admin_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE operatori_auth ADD COLUMN IF NOT EXISTS pwd_hash_v2 TEXT;
 ALTER TABLE operatori_auth ALTER COLUMN pwd_hash DROP NOT NULL;
 
--- ============================================================
 -- FUNZIONI HELPER (interne, usate dalle RPC)
--- ============================================================
 
 -- Helper: controlla rate limit (max 5 fallimenti per minuto per nome)
 CREATE OR REPLACE FUNCTION _check_rate_limit(p_nome TEXT)
@@ -65,9 +61,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- ============================================================
 -- RPC AGGIORNATE
--- ============================================================
 
 -- 1. verify_login: + rate limiting + dual hash (PBKDF2/SHA-256) + auto-upgrade
 CREATE OR REPLACE FUNCTION verify_login(p_nome TEXT, p_hash TEXT, p_legacy_hash TEXT DEFAULT NULL)
@@ -370,9 +364,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- ============================================================
 -- RLS: bloccare groq_api_key e password_hash_v2
--- ============================================================
 
 -- Aggiorna policy SELECT su impostazioni
 DROP POLICY IF EXISTS "safe_select" ON impostazioni;
@@ -395,9 +387,7 @@ DROP POLICY IF EXISTS "safe_delete" ON impostazioni;
 CREATE POLICY "safe_delete" ON impostazioni
   FOR DELETE USING (chiave NOT IN ('password_hash', 'password_hash_v2', 'recovery_code', 'groq_api_key'));
 
--- ============================================================
 -- RPC per Groq API key (accesso solo via RPC SECURITY DEFINER)
--- ============================================================
 
 CREATE OR REPLACE FUNCTION get_groq_key(p_token TEXT DEFAULT NULL)
 RETURNS JSON AS $$
@@ -424,6 +414,4 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- ============================================================
 -- FINE MIGRAZIONE V2
--- ============================================================
