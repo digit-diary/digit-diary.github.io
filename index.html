@@ -925,12 +925,10 @@ async function generaModuloPDF(tipo){
   const resp=(document.getElementById('mod-resp')||{}).value||'';
   const data=(document.getElementById('mod-data')||{}).value||'';
   if(!collab){toast('Inserisci il nome del collaboratore');return}
-  const doc=new jspdf.jsPDF({unit:'mm',format:'a4'});const pw=doc.internal.pageSize.getWidth();const ph=doc.internal.pageSize.getHeight();const mx=25;let y=15;
-  // Logo Casino Lugano
-  if(_logoB64)try{doc.addImage(_logoB64,'PNG',pw/2-40,y,80,15)}catch(e){}
-  y+=22;
-  // Linea sotto logo
-  doc.setDrawColor(180);doc.line(mx,y,pw-mx,y);y+=10;
+  const doc=new jspdf.jsPDF({unit:'mm',format:'a4'});const pw=doc.internal.pageSize.getWidth();const ph=doc.internal.pageSize.getHeight();const mx=25;let y=12;
+  // Logo Casino Lugano (ratio 1.78:1)
+  if(_logoB64)try{const lw=50,lh=lw/1.78;doc.addImage(_logoB64,'PNG',pw/2-lw/2,y,lw,lh)}catch(e){}
+  y+=36;
   function checkPage(need){if(y+need>ph-30){doc.addPage();y=20;return true}return false}
   if(tipo==='allineamento'){
     doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(0);
@@ -946,7 +944,8 @@ async function generaModuloPDF(tipo){
     const scad=(document.getElementById('mod-scadenza')||{}).value||'';
     checkPage(20);y=drawBlockField(doc,mx,y,'Scadenza (termine di verifica entro il quale si è concordato di raggiungere l\'obiettivo di cui sopra)',scad,pw);y+=10;
     checkPage(15);doc.setFontSize(9.5);doc.setFont('helvetica','italic');doc.setTextColor(60);
-    const chiudiLines=doc.splitTextToSize('Chiediamo che, a partire da subito, venga raggiunto l\'obiettivo di cui sopra.',pw-mx*2);
+    const scadTxt=scad&&scad.toLowerCase()!=='a partire da subito'?scad:'a partire da subito';
+    const chiudiLines=doc.splitTextToSize('Chiediamo che, '+scadTxt+', venga raggiunto l\'obiettivo di cui sopra.',pw-mx*2);
     doc.text(chiudiLines,mx,y);y+=chiudiLines.length*4.5+16;
     checkPage(30);drawFirmePro(doc,mx,y,pw);y+=30;
     checkPage(15);drawDistribuzionePro(doc,mx,y,['Diario di bordo del collaboratore','Resp. Settore']);
@@ -1010,9 +1009,9 @@ function drawFirmePro(doc,x,y,pw){doc.setFont('helvetica','normal');doc.setFontS
   const mid=pw/2;doc.text('Firma del Resp. Settore',x,y);doc.text('Firma del collaboratore',mid+10,y);y+=12;
   doc.setDrawColor(150);const dots='....................................';
   doc.setFontSize(8);doc.text(dots,x,y);doc.text(dots,mid+10,y)}
-function drawDistribuzionePro(doc,x,y,items){doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(80);
-  doc.text('Distribuzione:',x,y);doc.setFont('helvetica','normal');
-  doc.text(items.join(', '),x+doc.getTextWidth('Distribuzione:  '),y)}
+function drawDistribuzionePro(doc,x,y,items){doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(0);
+  doc.text('Distribuzione:',x,y);y+=5;doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(60);
+  items.forEach(it=>{doc.text('\u25B8  '+it,x+4,y);y+=4.5})}
 let _modFiltInit=false;
 function renderModuliList(){
   let c=document.getElementById('moduli-list-section');
@@ -1143,9 +1142,9 @@ async function miglioraTesto(fieldId,contesto){const el=document.getElementById(
   const testo=el.value.trim();if(!testo){toast('Scrivi prima un testo da migliorare');return}
   if(!geminiKey){toast('Configura la chiave Groq nelle Impostazioni');return}
   const btn=el.parentElement.querySelector('.btn-ai');if(btn){btn.disabled=true;btn.textContent='Elaborazione...'}
-  try{const prompt='Sei un responsabile HR esperto del Casino Lugano SA, in Svizzera. Devi riscrivere il seguente testo per un documento formale disciplinare/di gestione del personale (contesto: '+contesto+').\n\nREGOLE DI STILE:\n- Usa italiano formale e professionale, tipico di documenti HR svizzeri\n- Scrivi in terza persona (\"il collaboratore\", \"il Sig./la Sig.ra\")\n- Sii dettagliato e preciso: includi date, orari, luoghi e circostanze specifiche se presenti nel testo originale\n- Usa espressioni come: \"dalla revisione delle immagini CCTV risulta che...\", \"si rileva che...\", \"in data...\", \"durante il turno di servizio...\"\n- Per le non conformità: descrivi chiaramente i fatti, poi la violazione delle procedure\n- Per gli obiettivi: usa \"Si invita formalmente il collaboratore a...\", \"Il collaboratore si impegna a...\"\n- Per gli apprezzamenti: evidenzia il contributo positivo e l\'impatto sul team/servizio\n- NON aggiungere informazioni inventate, migliora solo la forma del testo esistente\n- Rispondi SOLO con il testo migliorato, senza commenti, prefissi o spiegazioni\n\nTesto originale:\n'+testo;
+  try{const prompt='Sei il Responsabile del Settore Giochi del Casinò Lugano SA (Svizzera). Devi riscrivere il seguente testo per un documento formale di '+contesto+'.\n\nSTILE RICHIESTO:\n- Italiano formale e professionale, tipico di documenti disciplinari di un casinò svizzero\n- Terza persona: "il/la collaboratore/trice", "il Sig./la Sig.ra [Cognome Nome]"\n- MANTIENI tutti i dettagli specifici: date, orari, luoghi, importi, circostanze\n- Per fatti: "In data [data], durante il turno [turno], presso [luogo]..." → "si è verificato quanto segue:"\n- Per telecamere: "dalla revisione delle immagini del sistema di videosorveglianza risulta che..."\n- Per violazioni: "Tale comportamento costituisce una violazione del [regolamento/procedura specifica]"\n- Per obiettivi: "Si invita formalmente il/la collaboratore/trice a:" seguito da elenco puntato con -\n- Chiudi con: "consapevole che il ripetersi di tale comportamento potrà comportare l\'adozione di provvedimenti disciplinari più severi"\n- NON inventare fatti, migliora SOLO la forma professionale del testo esistente\n- Rispondi SOLO con il testo migliorato, senza commenti o spiegazioni\n\nTesto originale:\n'+testo;
     const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+geminiKey},
-      body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[{role:'user',content:prompt}],temperature:0.3,max_tokens:500})});
+      body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[{role:'user',content:prompt}],temperature:0.3,max_tokens:1000})});
     if(!r.ok)throw new Error('API error '+r.status);
     const data=await r.json();const migliorato=data.choices?.[0]?.message?.content;
     if(migliorato){el.value=migliorato.trim();toast('Testo migliorato!')}else throw new Error('Nessuna risposta')
@@ -1164,7 +1163,7 @@ async function generaModuloAI(tipo){
   }else if(tipo==='apprezzamento'){
     fields='- collaboratore: nome completo del collaboratore\n- descrizione: descrizione dettagliata del merito/apprezzamento (2-3 paragrafi, formale, valorizzando il contributo)\n- osservazioni: osservazioni del Resp. Settore (commento positivo e incoraggiamento)';
   }
-  const sysPrompt='Sei il responsabile HR del Casino Lugano SA, in Svizzera. Devi compilare un modulo '+tipo+' basandoti sulla descrizione fornita dall\'operatore.\n\nREGOLE:\n- Scrivi in italiano formale, in terza persona ("il collaboratore", "il Sig./la Sig.ra")\n- Sii dettagliato e preciso: usa date, orari, circostanze se presenti nella descrizione\n- Per le non conformità usa espressioni come "si rileva che...", "tale condotta non è conforme...", "dalla revisione risulta che..."\n- Per gli obiettivi usa "Si invita formalmente il collaboratore a:" seguito da elenco puntato\n- NON inventare fatti non presenti nella descrizione\n- Rispondi SOLO con un JSON valido con questi campi:\n'+fields+'\n\nDescrizione dell\'operatore:\n'+prompt;
+  const sysPrompt='Sei il Responsabile del Settore Giochi del Casinò Lugano SA (Svizzera). Devi compilare un modulo di '+tipo+' basandoti sulla descrizione dell\'operatore.\n\nSTILE RICHIESTO (FONDAMENTALE - segui questo esempio di qualità):\nPer la non_conformita scrivi ESATTAMENTE in questo stile, con paragrafi separati da \\n\\n:\n"In data [data], durante il turno [turno] presso [luogo specifico], si è verificato quanto segue:\\n\\n[Descrizione dettagliata dei fatti con date, orari, luoghi, nomi precisi, cosa è successo passo per passo]\\n\\nTale comportamento costituisce una violazione [specificare regolamento/procedura violata]. Il collaboratore è tenuto a [obblighi specifici secondo le procedure interne del Casinò].\\n\\nSi rileva inoltre che [conseguenze o aggravanti se presenti nella descrizione]."\n\nPer l\'obiettivo scrivi ESATTAMENTE così:\n"Si invita formalmente il/la collaboratore/trice a:\\n- [Obiettivo specifico 1 legato alla non conformità]\\n- [Obiettivo specifico 2]\\n- [Obiettivo specifico 3]\\n\\nIl collaboratore si impegna a rispettare scrupolosamente le procedure operative del Casinò Lugano SA, consapevole che il ripetersi di tale comportamento potrà comportare l\'adozione di provvedimenti disciplinari più severi."\n\nREGOLE IMPORTANTI:\n- Usa SEMPRE il Sig./la Sig.ra davanti al cognome e nome\n- Scrivi in terza persona formale\n- Includi TUTTI i dettagli dalla descrizione (date, orari, luoghi, importi, circostanze)\n- Se la descrizione menziona CCTV/telecamere scrivi "dalla revisione delle immagini del sistema di videosorveglianza risulta che..."\n- Se la descrizione menziona conteggi/soldi scrivi importi esatti e la procedura violata\n- NON inventare fatti, ma espandi e formalizza quelli forniti\n- Per la scadenza: se non specificata, scrivi "A partire da subito"\n- Rispondi SOLO con JSON valido con questi campi:\n'+fields+'\n\nDescrizione dell\'operatore:\n'+prompt;
   try{
     const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+geminiKey},
       body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[{role:'user',content:sysPrompt}],temperature:0.4,max_tokens:1500,response_format:{type:'json_object'}})});
