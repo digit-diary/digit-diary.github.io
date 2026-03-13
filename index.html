@@ -506,8 +506,8 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
       <div class="filter-group"><span class="filter-label">Operatore</span><select id="log-filt-op" onchange="renderRegistro()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"><option value="">Tutti</option></select></div>
       <div class="filter-group"><span class="filter-label">Categoria</span><select id="log-filt-cat" onchange="renderRegistro()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"><option value="">Tutte</option><option value="registrazione">Registrazioni</option><option value="modulo">Moduli</option><option value="nota">Note</option><option value="collaboratore">Collaboratori</option><option value="operatore">Operatori</option><option value="scadenza">Scadenze</option><option value="tipo">Tipi evento</option></select></div>
       <div class="filter-group"><span class="filter-label">Cerca</span><input type="text" id="log-filt-cerca" placeholder="Cerca..." oninput="renderRegistro()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink);width:160px"></div>
-      <div class="filter-group"><span class="filter-label">Dal</span><input type="date" id="log-filt-dal" onchange="renderRegistro()" style="padding:10px 14px;border:1px solid var(--line);border-radius:2px;font-size:1rem;font-family:'Source Sans 3',sans-serif;background:var(--paper);color:var(--ink);min-width:150px"></div>
-      <div class="filter-group"><span class="filter-label">Al</span><input type="date" id="log-filt-al" onchange="renderRegistro()" style="padding:10px 14px;border:1px solid var(--line);border-radius:2px;font-size:1rem;font-family:'Source Sans 3',sans-serif;background:var(--paper);color:var(--ink);min-width:150px"></div>
+      <div class="filter-group"><span class="filter-label">Dal</span><input type="text" id="log-filt-dal" placeholder="Seleziona..." readonly style="cursor:pointer;min-width:150px"></div>
+      <div class="filter-group"><span class="filter-label">Al</span><input type="text" id="log-filt-al" placeholder="Seleziona..." readonly style="cursor:pointer;min-width:150px"></div>
     </div>
     <div id="registro-list" style="padding:12px 18px"></div>
   </div>
@@ -1796,7 +1796,7 @@ window.addEventListener('load',async()=>{
   // Polling note ogni 15 secondi
   setInterval(pollNuoveNote,15000);
   // Flatpickr date pickers
-  if(window.flatpickr){const fpOpts={locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,onChange:()=>render()};flatpickr('#filt-dal',fpOpts);flatpickr('#filt-al',fpOpts)}});
+  if(window.flatpickr){const fpOpts={locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,onChange:()=>render()};flatpickr('#filt-dal',fpOpts);flatpickr('#filt-al',fpOpts);const fpLog={locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,onChange:()=>renderRegistro()};flatpickr('#log-filt-dal',fpLog);flatpickr('#log-filt-al',fpLog)}});
 document.getElementById('pwd-modal').addEventListener('click',function(e){if(e.target===this){const c=document.getElementById('pwd-modal-content').innerHTML;if(c.includes('predefinita')||c.includes('Cambia la password')||c.includes('Password impostata')||c.includes('Reimpostata')||c.includes('Benvenuto')||c.includes('scegli una nuova'))return;this.classList.add('hidden')}});
 document.getElementById('operatore-modal').addEventListener('click',function(e){if(e.target===this){const inp=document.getElementById('inp-operatore');if(inp&&inp.value.trim())confermaOperatore();else this.classList.add('hidden')}});
 document.getElementById('modal-overlay').addEventListener('click',function(e){if(e.target===this)chiudiModal()});
