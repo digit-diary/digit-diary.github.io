@@ -1786,6 +1786,7 @@ window.addEventListener('load',async()=>{
       const authCheck=await sbRpc('check_deve_cambiare',{p_nome:getOperatore()});
       if(authCheck&&authCheck.deve_cambiare_pwd)setTimeout(()=>forzaCambioPwdOperatore(getOperatore()),300);
       else setTimeout(()=>mostraNoteNonLette(),800);
+      if(isAdmin())document.getElementById('tab-registro').style.display='';
     }else if(isAdmin()){document.getElementById('operatore-display').textContent='Admin';document.getElementById('tab-registro').style.display=''}}
   else document.getElementById('pwd-input').focus();
   const n=new Date();document.getElementById('today-date').innerHTML=n.getDate()+' '+MESI[n.getMonth()]+' '+n.getFullYear()+'<br><small style="color:var(--muted);font-size:.75rem">'+GIORNI[n.getDay()]+'</small>';
