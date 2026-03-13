@@ -66,7 +66,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 .bell-badge{position:absolute;top:-4px;right:-4px;background:var(--accent);color:white;font-size:.65rem;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px;line-height:1;font-family:'Source Sans 3',sans-serif}
 .btn-bell{border:none!important}
 .btn-bell.has-alerts{animation:bellShake 0.5s ease-in-out}
-.btn-bell:hover{animation:bellRing 0.6s ease-in-out}
+.btn-bell:hover .bell-icon{animation:bellRing 0.6s ease-in-out}
 @keyframes bellShake{0%,100%{transform:rotate(0)}25%{transform:rotate(12deg)}50%{transform:rotate(-12deg)}75%{transform:rotate(6deg)}}
 @keyframes bellRing{0%{transform:rotate(0)}10%{transform:rotate(14deg)}20%{transform:rotate(-14deg)}30%{transform:rotate(10deg)}40%{transform:rotate(-10deg)}50%{transform:rotate(6deg)}60%{transform:rotate(-6deg)}70%{transform:rotate(3deg)}80%{transform:rotate(-3deg)}90%{transform:rotate(1deg)}100%{transform:rotate(0)}}
 /* SCADENZE BANNER */
@@ -396,7 +396,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
     <div class="date-badge" id="today-date"></div>
     <div class="operatore-badge" id="operatore-display"></div>
     <div class="header-btns">
-      <button class="btn-header btn-bell" id="btn-bell" onclick="toggleScadenzeDropdown()" style="position:relative;font-size:1.2rem;padding:6px 12px" title="Scadenze / Promemoria">&#128276;<span class="bell-badge" id="bell-badge" style="display:none"></span></button>
+      <button class="btn-header btn-bell" id="btn-bell" onclick="toggleScadenzeDropdown()" style="position:relative;font-size:1.2rem;padding:6px 12px" title="Scadenze / Promemoria"><span class="bell-icon" style="display:inline-block">&#128276;</span><span class="bell-badge" id="bell-badge" style="display:none"></span></button>
       <button class="btn-header" id="btn-tema" onclick="toggleTema()">&#127761; Tema scuro</button>
       <button class="btn-header" onclick="window.print()">&#128424; Stampa</button>
       <button class="btn-header" onclick="esci()" style="color:var(--accent)">&#128682; Esci</button>
@@ -411,7 +411,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 <div class="nav-tabs">
   <button class="nav-tab active" data-page="diario" onclick="switchPage('diario')">&#128214; Diario</button>
   <button class="nav-tab" data-page="rapporto" onclick="switchPage('rapporto')">&#128197; Rapporto</button>
-  <button class="nav-tab" data-page="note-collega" onclick="switchPage('note-collega')">&#9993;&#65039; Note <span id="note-badge" style="display:none;background:var(--accent);color:white;border-radius:9px;font-size:.7rem;padding:1px 6px;margin-left:4px;font-weight:700"></span></button>
+  <button class="nav-tab" data-page="note-collega" onclick="switchPage('note-collega')">&#9993;&#65039; Note Colleghi <span id="note-badge" style="display:none;background:var(--accent);color:white;border-radius:9px;font-size:.7rem;padding:1px 6px;margin-left:4px;font-weight:700"></span></button>
   <button class="nav-tab" data-page="statistiche" onclick="switchPage('statistiche')">&#128202; Statistiche</button>
   <button class="nav-tab" data-page="moduli" onclick="switchPage('moduli')">&#128196; Moduli</button>
   <button class="nav-tab" data-page="assistente" onclick="switchPage('assistente')">&#128113;&#8205;&#9792;&#65039; Assistente</button>

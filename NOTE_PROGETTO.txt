@@ -18,7 +18,8 @@
 
   Applicazione web single-file (index.html) per la gestione del personale
   del Casino Lugano SA. Permette di registrare eventi, redigere rapporti
-  giornalieri, inviare note tra colleghi e consultare statistiche.
+  giornalieri, inviare note tra colleghi, generare moduli disciplinari
+  con firma digitale e QR code, e consultare statistiche.
 
   Tecnologie utilizzate:
   - HTML/CSS/JavaScript (tutto in un unico file)
@@ -26,6 +27,9 @@
   - jsPDF + AutoTable (esportazione PDF)
   - Chart.js (grafici statistiche)
   - Flatpickr (calendario date)
+  - Groq API (AI: llama-3.3-70b-versatile per testo,
+    llama-3.2-90b-vision-preview per immagini)
+  - qrcode-generator (QR code su PDF moduli)
 
 
 ================================================================================
@@ -41,18 +45,19 @@
      - Note fissate (pin) per evidenziare registrazioni importanti
      - Profilo collaboratore con cronologia e grafici
      - Esportazione CSV e PDF con layout professionale
+     - Autocomplete nomi collaboratori nei filtri
 
   2. RAPPORTO GIORNALIERO
      - Calendario mensile con navigazione mese/anno
      - Due turni per giorno: PRESTO e NOTTE
-     - Campi predefiniti: Supervisore, Cassa, Sala, Incasso Assegni,
-       Prelievi, Assenze (+ campi personalizzati dall'admin)
+     - Campi predefiniti: Supervisore, Cassa, Differenze Cassa, Sala,
+       Incasso Assegni, Prelievi, Assenze (+ campi personalizzati)
      - Salvataggio automatico silenzioso (autosave ogni 1.2 secondi)
      - Auto-rilevamento malattie dal campo assenze
-     - Esportazione PDF con layout identico al sito:
-       tabella per giorno con colonne Campo/PRESTO/NOTTE
-     - Esportazione CSV con stessa struttura
-     - Filtro Dal/Al per esportare un periodo specifico
+     - Auto-parsing differenze cassa: scrivendo "Cognome -100" nel campo
+       Differenze Cassa, il sistema riconosce il nome completo dal cognome
+       e crea automaticamente una registrazione Errore/Cassa nel diario
+     - Esportazione PDF e CSV con filtro Dal/Al
 
   3. NOTE COLLEGHI
      - Invio messaggi a uno o piu operatori contemporaneamente
@@ -66,7 +71,6 @@
      - Blocco modifica/annullamento quando la nota e stata letta
      - Eliminazione indipendente: mittente e destinatario gestiscono
        le proprie note separatamente
-     - Conferma prima di eliminare
 
   4. STATISTICHE
      - Riepilogo: totale registrazioni, collaboratori, errori, malattie
@@ -77,30 +81,132 @@
      - Tabella dettagliata collaboratori x tipi con totali
      - Tabella errori con importi (CHF/EUR) e reparti
 
-  5. SCADENZE E PROMEMORIA
-     - Creazione scadenze collegate a registrazioni
-     - Campanella con badge nel header (numero scadenze attive)
-     - Dropdown con lista scadenze imminenti
-     - Completamento scadenza con nome operatore e data
-     - Scadenze completate visibili con barrato
-
-  6. IMPOSTAZIONI (ADMIN)
-     - Gestione tipi di evento: aggiungere, rimuovere, cambiare colore
-       (anche i tipi predefiniti possono essere nascosti/ripristinati)
-     - Gestione campi rapporto giornaliero: aggiungere, rimuovere
-       (anche i campi predefiniti possono essere nascosti/ripristinati)
-     - Gestione operatori: creare, rimuovere, resettare password
-     - Cambio password master
-     - Tema chiaro/scuro
-
-  7. MODULI DISCIPLINARI
+  5. MODULI DISCIPLINARI
      - Tre moduli PDF generabili dall'app:
        1. Allineamento: rilevamento non conformita + colloquio
        2. Apprezzamento: colloquio di apprezzamento
        3. RDI: rapporto disciplinare interno (I° e II° livello)
-     - Campi compilabili con dati pre-compilati (data, resp. settore)
-     - Generazione PDF con layout professionale
-     - Firme e distribuzione automatiche
+     - Generazione AI: descrivi la situazione e l'AI compila tutti i campi
+       (Groq API con modello llama-3.3-70b-versatile)
+     - Supporto foto per AI: allega un'immagine e l'AI la analizza
+       (modello llama-3.2-90b-vision-preview)
+     - Pulsante "Migliora testo con AI" su ogni campo testuale
+     - Importazione moduli esistenti (Word .docx / PDF)
+     - Salvataggio moduli nel database con lista filtrabile
+     - QR Code univoco su ogni PDF (vedi punto 8)
+     - Firma digitale integrata (vedi punto 9)
+
+  6. ASSISTENTE
+     - Tab dedicato per riscrittura veloce testi (email, note, comunicazioni)
+     - 7 tipi: Email formale, Comunicazione interna, Nota operativa,
+       Rapporto evento, Risposta reclamo, Promemoria, Testo libero
+     - 3 toni: Formale, Neutro, Informale
+     - Supporto foto: allega un'immagine per contestualizzare
+     - L'AI conosce tutte le procedure del casino (80+ QM)
+     - Nessun dato salvato (privacy completa)
+
+  7. ALERT DIFFERENZE CASSA
+     - Monitoraggio automatico errori cassa per collaboratore
+     - Banner arancione: singola differenza >= CHF 90
+       -> "Preparare allineamento" con pulsante diretto
+     - Banner rosso: differenze cumulative >= CHF 500
+       -> "Fare RDI" con pulsante diretto
+     - Gli alert considerano solo errori successivi all'ultimo
+       allineamento/RDI creato per quel collaboratore
+     - Alert persistenti: appaiono ad ogni caricamento pagina
+       finche non viene creato il documento corrispondente
+     - Cliccando il banner si vede il dettaglio per collaboratore
+     - Pulsante "Crea Allineamento" / "Crea RDI" apre il modulo
+       pre-compilato con il nome del collaboratore
+
+  8. QR CODE SU PDF
+     - Ogni modulo generato (allineamento, RDI, apprezzamento)
+       contiene un QR code univoco stampato in basso a destra
+     - Il QR contiene l'URL: digit-diary.github.io/#modulo/CODICE
+     - Scansionando il QR con il telefono si apre l'app
+     - Dopo il login, il documento si apre automaticamente
+     - Serve per verificare autenticita di un documento cartaceo
+       e accedere rapidamente alla versione digitale
+     - Il codice QR viene salvato nel campo dati.qr_code del modulo
+     - Libreria: qrcode-generator (CDN, gratuita)
+
+  9. FIRMA DIGITALE
+     - Scelta tra firma cartacea e digitale prima di generare il PDF
+     - Firma cartacea: PDF con spazio firma vuoto (stampa e firma a mano)
+     - Firma digitale: canvas touch/mouse per firmare sullo schermo
+       - Due canvas separati: Resp. Settore e Collaboratore
+       - Supporto mouse (desktop) e touch (mobile/tablet)
+       - Pulsante "Cancella" per ricominciare
+     - Le firme digitali vengono inserite nel PDF al posto dei puntini
+     - Le firme vengono salvate come base64 nel DB (campo dati del modulo)
+     - Riaprendo un modulo salvato, le firme vengono ripristinate
+
+  10. SCADENZE E PROMEMORIA
+      - Creazione scadenze collegate a registrazioni
+      - Campanella animata con badge nel header (numero scadenze attive)
+      - Animazione oscillazione al hover sulla campanella
+      - Dropdown con lista scadenze imminenti
+      - Completamento scadenza con nome operatore e data
+      - Scadenze completate visibili con barrato
+
+  11. IMPOSTAZIONI (ADMIN)
+      - Gestione tipi di evento: aggiungere, rimuovere, cambiare colore
+        (anche i tipi predefiniti possono essere nascosti/ripristinati)
+      - Gestione campi rapporto giornaliero: aggiungere, rimuovere
+        (anche i campi predefiniti possono essere nascosti/ripristinati)
+      - Gestione operatori: creare, rimuovere, resettare password
+      - Gestione collaboratori: aggiungere, rinominare, disattivare
+      - Cambio password master
+      - Tema chiaro/scuro per operatore
+
+  12. REGISTRO ATTIVITA (ADMIN)
+      - Log di tutte le azioni degli operatori
+      - Filtri: operatore, categoria, cerca, periodo Dal/Al
+
+
+================================================================================
+  AI - BASE DI CONOSCENZA
+================================================================================
+
+  L'AI (Groq API) conosce tutte le procedure del Casino Lugano SA:
+
+  - LRD Identificazione (QM 3-002): soglie CHF 3'000/15'000/30'000/50'000
+  - LRD Registrazione (QM 3-003): Formulario III
+  - Cassa (QM 5-001/5-002/5-003/5-004): pulizia mani, doppia chiave,
+    quattro occhi, verifica UV, programma Asterix
+  - Reception (QM 4-001/4-002/4-004): VETO, Lugano Class, controllo
+    documenti (programma Reception)
+  - Guardaroba (QM 4-003): autosilo, divieto uso personale
+  - Croupier/Live Game (QM 8-001/8-002/8-003/8-014)
+  - Materiale di Gioco (QM 8-011)
+  - Slots/AAGA (QM 7-001/7-002/7-003): Kiosk (ex-NRT), jackpot, cashless
+  - Concezione Sociale (QM 2-001/2-002): LGD art. 52/80/81
+  - Sicurezza (QM 13-xxx): TRAKA, VETO, conflitti, denaro falso
+  - Sorveglianza/CCTV (QM 14-xxx): rapporti IR, CFCG
+  - HR (QM 16-003/16-005): timbrature, sistema disciplinare 4 livelli
+  - Caveau (QM 6-002): quattro occhi, assegni pre-firmati
+
+  Abbreviazioni: DIR, CO, RLRD, RCS, RSS, R_FBS, SUP_FBS, ecc.
+  Temperatura: 0.2, top_p: 0.9 (output consistente)
+
+
+================================================================================
+  INTERFACCIA UTENTE
+================================================================================
+
+  Icone navigazione:
+  - Diario (libro), Rapporto (calendario), Note (busta),
+    Statistiche (grafico), Moduli (documento), Assistente (donna),
+    Registro (clipboard), Impostazioni (ingranaggio)
+
+  Pulsanti header:
+  - Campanella (animata al hover), Tema scuro/chiaro (luna/sole),
+    Stampa (stampante), Esci (porta)
+
+  Temi:
+  - Chiaro: sfondo carta pergamena, ink scuro
+  - Scuro: sfondo blu notte, toni freddi
+  - Salvato per operatore in localStorage
 
 
 ================================================================================
@@ -115,20 +221,21 @@
   - Puo cambiare colori tipi e gestire campi rapporto
   - Puo resettare password operatori
   - Puo cambiare la password master
-  - Nelle impostazioni vede solo "Cambia password master"
 
   OPERATORE (password personale)
-  - Accesso alle funzionalita operative (diario, rapporto, note, statistiche)
+  - Accesso alle funzionalita operative
   - Al primo accesso viene richiesto di cambiare la password temporanea
   - Puo cambiare la propria password
-  - Non puo creare/rimuovere operatori ne modificare tipi/campi
-  - Nelle impostazioni vede solo "Cambia la mia password"
 
   Sicurezza:
   - Password hashate con SHA-256
   - Codice di recupero generato automaticamente
   - Prevenzione flash login al refresh (script inline pre-body)
   - Controllo deve_cambiare_pwd anche dopo refresh pagina
+  - Credenziali Supabase offuscate con XOR encoding
+  - Row Level Security (RLS) su tabelle sensibili
+  - Operazioni auth via RPC server-side (SECURITY DEFINER)
+  - pwd_hash e recovery_code mai accessibili via REST API
 
 
 ================================================================================
@@ -136,13 +243,15 @@
 ================================================================================
 
   registrazioni
-    id, nome, tipo, testo, data, created_at, operatore, importo, valuta, reparto
+    id, nome, tipo, testo, data, created_at, operatore,
+    importo, valuta, reparto, modificato_da
 
   rapporti_giornalieri
     id, data_rapporto, turno, sup_note, cassa_note, sala_note,
-    n_assegni, prelievi, assenze, operatore, note_extra,
+    n_assegni, prelievi, assenze, operatore, note_extra (JSONB),
     updated_at, created_at
     UNIQUE (data_rapporto, turno)
+    note_extra contiene: differenze_cassa + eventuali campi custom
 
   note_fissate
     registrazione_id (PK), fissata_at
@@ -156,7 +265,7 @@
 
   note_colleghi
     id, da_operatore, a_operatore, messaggio, letta,
-    nascosta_dest, nascosta_mitt, created_at
+    nascosta_dest, nascosta_mitt, gruppo_id, created_at
 
   operatori_auth
     nome (PK), pwd_hash, recovery_code, ruolo,
@@ -168,6 +277,12 @@
   moduli
     id, tipo (allineamento/apprezzamento/rdi), collaboratore,
     resp_settore, data_modulo, dati (JSONB), operatore, created_at
+    dati contiene: non_conformita, obiettivo, scadenza, livello,
+                   descrizione, osservazioni, qr_code,
+                   firma_digitale, firma_resp, firma_collab
+
+  log_attivita
+    id, operatore, azione, dettagli, created_at
 
 
 ================================================================================
@@ -189,6 +304,24 @@
     git push origin main
 
   Il sito si aggiorna automaticamente in 1-2 minuti dopo il push.
+
+
+================================================================================
+  LIBRERIE ESTERNE (CDN)
+================================================================================
+
+  jsPDF 2.5.1              - Generazione PDF
+  jsPDF-AutoTable 3.8.4    - Tabelle nei PDF
+  Chart.js 4.4.7           - Grafici statistiche
+  Flatpickr 4.6.13         - Date picker calendario
+  XLSX 0.18.5              - Import/export Excel
+  Mammoth 1.6.0            - Import documenti Word (.docx)
+  PDF.js 3.11.174          - Import documenti PDF
+  qrcode-generator 1.4.4   - QR code sui moduli PDF
+
+  API esterne:
+  - Supabase REST API (database + RPC)
+  - Groq API (AI generativa, piano gratuito ~14.400 req/giorno)
 
 
 ================================================================================
@@ -247,58 +380,71 @@
   [11] Admin puo gestire voci predefinite
        - Rimuovere/ripristinare tipi di evento predefiniti
        - Rimuovere/ripristinare campi rapporto predefiniti
-       - Fix: opzioni admin visibili subito dopo login (no refresh)
-       - Fix: admin vede solo "Cambia password master"
 
   [12] Riordinamento e rinomina tipi/campi
-       - Admin puo riordinare tipi di evento (drag & drop)
-       - Admin puo rinominare tipi di evento (incluso predefiniti)
-       - Admin puo riordinare campi rapporto giornaliero
-       - Admin puo rinominare campi rapporto giornaliero
+       - Admin puo riordinare e rinominare tipi di evento
+       - Admin puo riordinare e rinominare campi rapporto
 
   [13] Rinomina tipi + tema operatore + UI
-       - Rinomina tipi evento (incluso predefiniti) funzionante
-       - Tema chiaro/scuro salvato per ogni operatore
-       - Fix UI vari
 
   [14] Modifica registrazioni + tracciamento
-       - Operatori possono modificare le proprie registrazioni
-       - Tracciamento modifiche: data, operatore, testo originale
-       - Font migliorato per nomi operatori
 
   [15] Rapporto giornaliero migliorato
        - Apre direttamente il giorno corrente (giornata casino ore 6-6)
-       - Fix: rapporto non mostrava dati (fetch prima di aprire giorno)
        - Salvataggio immediato quando si esce dalla pagina
 
   [16] Hardening sicurezza
-       - Credenziali Supabase offuscate con XOR encoding (non piu in chiaro)
-       - 13 funzioni RPC server-side (SECURITY DEFINER) per tutte le
-         operazioni di autenticazione: login, cambio password, recupero,
-         gestione operatori
-       - Tabella operatori_auth bloccata: RLS senza policy = nessun accesso
-         diretto via REST API (pwd_hash mai esposto al client)
-       - Tabella impostazioni: policy RLS blocca accesso a password_hash
-         e recovery_code (le altre chiavi restano accessibili)
-       - Client usa esclusivamente sbRpc() per tutte le operazioni auth
-       - File migrate_security.sql con tutte le query di migrazione
+       - Credenziali Supabase offuscate con XOR encoding
+       - 13 funzioni RPC server-side (SECURITY DEFINER)
+       - RLS su tabelle sensibili
 
   [17] Note multi-destinatario + blocco modifica
-       - Invio note a piu destinatari contemporaneamente (checkboxes)
-       - Opzione "Tutti" per selezionare tutti gli operatori
-       - Note raggruppate per gruppo_id nelle note inviate
-       - Modifica/annullamento agisce su tutto il gruppo
-       - Blocco modifica e annullamento quando la nota e stata letta
-       - Nascondi gruppo per il mittente
 
   [18] Moduli disciplinari
-       - Nuovo tab "Moduli" con 3 moduli PDF generabili:
-         1. Allineamento: non conformita + obiettivo + scadenza
-         2. Apprezzamento: descrizione + osservazioni
-         3. RDI: non conformita + obiettivo + scadenza + livello I/II
-       - Layout PDF professionale con intestazione Casino Lugano SA
+       - Allineamento, Apprezzamento, RDI
+       - Layout PDF professionale
        - Firme e distribuzione automatiche
-       - Campi pre-compilati (data odierna, operatore come Resp. Settore)
+
+  [19] AI integrata nei moduli
+       - Generazione automatica campi con Groq API
+       - Base di conoscenza con 80+ procedure casino (QM)
+       - Pulsante "Migliora testo con AI" su ogni campo
+       - Importazione moduli Word/PDF esistenti
+
+  [20] Assistente
+       - Tab dedicato per riscrittura veloce testi
+       - 7 tipi testo, 3 toni
+       - Supporto foto (modello vision)
+       - Nessun dato salvato
+
+  [21] Supporto foto AI nei moduli
+       - Allega foto per generazione AI in moduli
+       - Modello vision per analisi immagini
+
+  [22] Fix PDF e filtri
+       - Fix radio buttons PDF (cerchi invece di Unicode)
+       - Fix testo giustificato con gap enormi
+       - Fix contenuto che non sta in una pagina
+       - Fix soglia LRD: "dai CHF 3'000" (non "superiore a")
+       - Filtri uniformi Dal/Al su tutte le pagine
+       - Autocomplete collaboratori nei filtri moduli
+
+  [23] Alert differenze cassa + icone navigazione
+       - Banner arancione >= CHF 90 -> "Preparare allineamento"
+       - Banner rosso cumulativo >= CHF 500 -> "Fare RDI"
+       - Alert persistenti fino a creazione documento
+       - Campo "Differenze Cassa" nel rapporto giornaliero
+       - Auto-parsing cognome -> nome completo dal rapporto
+       - Icone su tutti i tab e pulsanti header
+       - Animazione campanella al hover
+
+  [24] QR Code su PDF + Firma digitale
+       - QR code univoco su ogni modulo PDF
+       - Hash routing: scansione QR apre il documento dopo login
+       - Firma digitale con canvas touch/mouse
+       - Scelta cartacea/digitale
+       - Firme salvate nel DB e inserite nel PDF
+       - Libreria qrcode-generator (CDN)
 
 
 ================================================================================
@@ -306,11 +452,11 @@
 ================================================================================
 
   index.html            L'intera applicazione (HTML + CSS + JS)
+  logo_casino.png       Logo Casino Lugano SA (usato nei PDF)
   schema.sql            Schema iniziale tabella registrazioni
   migrate.sql           Migrazione: rapporti, note_fissate, scadenze
   migrate_security.sql  Migrazione sicurezza: 13 RPC + RLS policies
   migrazione.js         Script per migrare dati da localStorage a Supabase
-  netlify.toml          Vecchia configurazione Netlify (non piu usata)
   NOTE_PROGETTO.txt     Questo file
 
 
