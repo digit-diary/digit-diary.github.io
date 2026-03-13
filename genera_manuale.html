@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Genera Manuale</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js"></script>
+</head><body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f5f5f5">
+<div id="status" style="text-align:center;font-size:1.2rem;color:#333">Generazione manuale in corso...</div>
+<script>
+window.addEventListener('load', function(){
+const {jsPDF} = window.jspdf;
+const doc = new jsPDF('portrait','mm','a4');
+const pw = doc.internal.pageSize.getWidth();
+const ph = doc.internal.pageSize.getHeight();
+const mx = 18, mr = 18;
+const tw = pw - mx - mr;
+let y = 0;
+let pageNum = 1;
+const tocEntries = [];
+
+function addFooter(){
+  doc.setFontSize(7);doc.setFont('helvetica','normal');doc.setTextColor(150);
+  doc.text('Diario Collaboratori — Manuale Utente — Casino Lugano SA',mx,ph-8);
+  doc.text('Pag. '+pageNum,pw-mr,ph-8,{align:'right'});
+  doc.setDrawColor(200);doc.line(mx,ph-12,pw-mr,ph-12);
+}
+
+function newPage(){
+  addFooter();
+  doc.addPage();
+  pageNum++;
+  y = 20;
+}
+
+function checkPage(need){
+  if(y + need > ph - 20){newPage();return true}
+  return false;
+}
+
+function title(text, level){
+  if(level === 1){
+    checkPage(40);
+    doc.setFillColor(26,18,8);
+    doc.rect(mx,y,tw,12,'F');
+    doc.setFont('helvetica','bold');doc.setFontSize(14);doc.setTextColor(250,247,242);
+    doc.text(text,mx+4,y+8.5);
+    y += 16;
+    tocEntries.push({text, page: pageNum, level: 1});
+  } else if(level === 2){
+    checkPage(16);
+    doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(26,18,8);
+    doc.text(text,mx,y);
+    doc.setDrawColor(192,57,43);doc.setLineWidth(0.5);
+    doc.line(mx,y+1.5,mx+doc.getTextWidth(text),y+1.5);
+    y += 7;
+    tocEntries.push({text, page: pageNum, level: 2});
+  } else {
+    checkPage(12);
+    doc.setFont('helvetica','bold');doc.setFontSize(9.5);doc.setTextColor(139,105,20);
+    doc.text(text,mx,y);
+    y += 5.5;
+  }
+  doc.setTextColor(0);
+}
+
+function para(text, indent){
+  const x = mx + (indent||0);
+  const maxW = tw - (indent||0);
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(40);
+  const lines = doc.splitTextToSize(text, maxW);
+  lines.forEach(function(line){
+    checkPage(4.5);
+    doc.text(line, x, y);
+    y += 4;
+  });
+  y += 2;
+}
+
+function bullet(text, indent){
+  const x = mx + (indent||4);
+  const maxW = tw - (indent||4) - 4;
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(40);
+  checkPage(4.5);
+  doc.setFillColor(26,18,8);
+  doc.circle(x, y-1, 0.8, 'F');
+  const lines = doc.splitTextToSize(text, maxW);
+  lines.forEach(function(line, i){
+    checkPage(4.5);
+    doc.text(line, x+4, y);
+    y += 4;
+  });
+  y += 1;
+}
+
+function tip(text){
+  checkPage(14);
+  doc.setFillColor(255,248,230);
+  const lines = doc.splitTextToSize(text, tw-12);
+  const h = lines.length * 4 + 6;
+  doc.roundedRect(mx, y-2, tw, h, 1.5, 1.5, 'F');
+  doc.setDrawColor(184,134,11);doc.setLineWidth(0.3);
+  doc.roundedRect(mx, y-2, tw, h, 1.5, 1.5, 'S');
+  doc.setFont('helvetica','italic');doc.setFontSize(8.5);doc.setTextColor(139,105,20);
+  lines.forEach(function(line){
+    doc.text(line, mx+6, y+1);
+    y += 4;
+  });
+  y += 4;
+}
+
+function spacer(h){ y += (h||4); }
+
+// ===== COPERTINA =====
+y = 50;
+doc.setFont('helvetica','bold');doc.setFontSize(28);doc.setTextColor(26,18,8);
+doc.text('MANUALE UTENTE', pw/2, y, {align:'center'});
+y += 14;
+doc.setFontSize(16);doc.setFont('helvetica','normal');doc.setTextColor(100);
+doc.text('Diario Collaboratori', pw/2, y, {align:'center'});
+y += 10;
+doc.setFontSize(12);doc.setTextColor(139,105,20);doc.setFont('helvetica','bold');
+doc.text('Casino Lugano SA', pw/2, y, {align:'center'});
+y += 20;
+doc.setDrawColor(192,57,43);doc.setLineWidth(1);
+doc.line(pw/2-40, y, pw/2+40, y);
+y += 16;
+doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(100);
+doc.text('Versione: Marzo 2026', pw/2, y, {align:'center'});
+y += 6;
+doc.text('https://digit-diary.github.io', pw/2, y, {align:'center'});
+y += 30;
+doc.setFontSize(9);doc.setTextColor(120);
+doc.text('Questo manuale descrive tutte le funzionalita dell\'applicazione', pw/2, y, {align:'center'});
+y += 5;
+doc.text('Diario Collaboratori, dalla registrazione eventi alla generazione', pw/2, y, {align:'center'});
+y += 5;
+doc.text('di moduli disciplinari, statistiche e gestione del personale.', pw/2, y, {align:'center'});
+
+addFooter();
+
+// ===== INDICE (placeholder - compilato alla fine) =====
+newPage();
+const tocPageStart = pageNum;
+doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(26,18,8);
+doc.text('INDICE', pw/2, y, {align:'center'});
+y += 12;
+// Salvo posizione per riempire dopo
+const tocY = y;
+// Lascio 2 pagine per l'indice
+addFooter();newPage();addFooter();newPage();
+
+// ===== 1. ACCESSO =====
+title('1. ACCESSO ALL\'APPLICAZIONE', 1);
+spacer(2);
+para('L\'applicazione e accessibile all\'indirizzo https://digit-diary.github.io da qualsiasi browser (Chrome, Safari, Firefox, Edge) su computer, tablet o smartphone.');
+title('Login', 2);
+para('All\'apertura viene mostrata la schermata di login. Sono disponibili due modalita di accesso:');
+bullet('Admin: selezionare "Admin (password master)" dal menu a tendina e inserire la password master. L\'admin ha accesso completo a tutte le funzionalita.');
+bullet('Operatore: selezionare il proprio nome dal menu a tendina e inserire la propria password personale.');
+tip('Al primo accesso come operatore, il sistema chiede di impostare una nuova password. La password temporanea viene fornita dall\'admin.');
+title('Recupero password', 2);
+para('In caso di password dimenticata, cliccare su "Password dimenticata?" e inserire il codice di recupero fornito al momento della creazione dell\'account. Il codice e un codice alfanumerico di 8 caratteri.');
+title('Logout', 2);
+para('Per uscire dall\'applicazione, cliccare il pulsante "Esci" (icona porta) in alto a destra. La sessione viene cancellata e si torna alla schermata di login.');
+
+// ===== 2. PANORAMICA INTERFACCIA =====
+title('2. PANORAMICA DELL\'INTERFACCIA', 1);
+spacer(2);
+para('L\'interfaccia e composta da:');
+bullet('Header: titolo, data odierna, nome operatore, pulsanti (campanella, tema, stampa, esci).');
+bullet('Barra di ricerca globale: campo di ricerca che cerca in tutte le sezioni.');
+bullet('Tab di navigazione: 8 sezioni principali (Diario, Rapporto, Note Colleghi, Statistiche, Moduli, Assistente, Registro, Impostazioni).');
+bullet('Area contenuto: il contenuto della sezione attiva.');
+spacer(2);
+title('Tema chiaro/scuro', 2);
+para('Cliccare il pulsante luna/sole in alto a destra per alternare tra tema chiaro e scuro. La scelta viene salvata per ogni operatore.');
+title('Campanella', 2);
+para('La campanella in alto a destra mostra un badge rosso con il numero di scadenze attive. Cliccandola si apre il dropdown con le scadenze in scadenza e completate.');
+
+// ===== 3. RICERCA GLOBALE =====
+title('3. RICERCA GLOBALE', 1);
+spacer(2);
+para('La barra di ricerca si trova sopra i tab di navigazione. Permette di cercare contemporaneamente in tutte le sezioni dell\'applicazione.');
+title('Come funziona', 2);
+bullet('Digitare almeno 2 caratteri nel campo di ricerca.');
+bullet('I risultati appaiono in tempo reale, raggruppati per sezione: Diario, Moduli, Note Colleghi, Registro.');
+bullet('Ogni risultato mostra un badge colorato con il tipo, il testo e la data.');
+bullet('Cliccando su un risultato si apre direttamente la sezione corrispondente.');
+bullet('Premere Escape o cliccare fuori per chiudere i risultati.');
+tip('L\'admin puo nascondere la ricerca globale per alcuni o tutti gli operatori dalle Impostazioni > Visibilita.');
+
+// ===== 4. DIARIO =====
+title('4. DIARIO REGISTRAZIONI', 1);
+spacer(2);
+para('Il Diario e la sezione principale dell\'applicazione. Permette di registrare eventi relativi ai collaboratori.');
+title('Nuova registrazione', 2);
+bullet('Inserire il nome del collaboratore (con autocomplete).');
+bullet('Selezionare il tipo di evento cliccando su uno dei tag colorati.');
+bullet('Per il tipo "Errore" appaiono campi aggiuntivi: Reparto, Importo e Valuta.');
+bullet('Scrivere la descrizione dell\'evento.');
+bullet('Cliccare "Salva nel Diario" oppure premere Ctrl+Invio.');
+title('Filtri e ricerca', 2);
+bullet('Persona: filtrare per un collaboratore specifico.');
+bullet('Tipo: filtrare per tipo di evento.');
+bullet('Dal/Al: filtrare per periodo (calendario gg/mm/aaaa).');
+bullet('Cerca: ricerca testo libero nella descrizione.');
+bullet('Reset: ripristinare tutti i filtri.');
+title('Azioni sulle registrazioni', 2);
+para('Passando il mouse su una registrazione appaiono i pulsanti:');
+bullet('Fissa/Rimuovi pin: evidenzia la registrazione in cima alla lista.');
+bullet('Scadenza: crea un promemoria collegato alla registrazione.');
+bullet('Tipo: cambia il tipo di evento.');
+bullet('Modifica: modifica nome, tipo, descrizione, reparto, importo.');
+bullet('Elimina: cancella la registrazione (con conferma).');
+title('Profilo collaboratore', 2);
+para('Cliccando sul nome di un collaboratore si apre il suo profilo con: statistiche per tipo, grafico a ciambella e cronologia completa.');
+title('Esportazione', 2);
+bullet('CSV: esporta le registrazioni filtrate in formato CSV (apribile con Excel).');
+bullet('PDF: genera un PDF con tutte le registrazioni filtrate in formato tabellare.');
+
+// ===== 5. RAPPORTO =====
+title('5. RAPPORTO GIORNALIERO', 1);
+spacer(2);
+para('Il Rapporto Giornaliero permette di documentare le attivita di ogni turno. Si apre direttamente sul giorno corrente.');
+title('Navigazione calendario', 2);
+bullet('Usare le frecce < > per cambiare mese.');
+bullet('Selezionare l\'anno dal menu a tendina.');
+bullet('Cliccare su un giorno per aprirlo.');
+bullet('I pallini colorati indicano se un turno ha gia contenuto (verde = Presto, blu = Notte).');
+title('Compilazione turno', 2);
+para('Ogni giorno ha due colonne: PRESTO e NOTTE. I campi disponibili sono:');
+bullet('Supervisore: nome del supervisore di turno.');
+bullet('Cassa, Sala, Incasso Assegni, Prelievi, Assenze: note operative.');
+bullet('Differenze Cassa: campo speciale (vedi sotto).');
+bullet('Campi personalizzati: aggiunti dall\'admin nelle Impostazioni.');
+tip('Il salvataggio e automatico: ogni modifica viene salvata dopo 1.2 secondi di inattivita. Non serve cliccare alcun pulsante.');
+title('Differenze Cassa (auto-parsing)', 2);
+para('Nel campo "Differenze Cassa" e possibile scrivere le differenze in formato semplice. Il sistema le riconosce e crea automaticamente registrazioni nel Diario.');
+para('Formato: Cognome -importo oppure Cognome +importo');
+para('Esempio: "Rossi -100" crea una registrazione Errore/Cassa per "Rossi Mario" (riconosciuto dal cognome) con importo 100 CHF. Si possono inserire piu righe, una per riga.');
+title('Esportazione', 2);
+bullet('Selezionare il periodo Dal/Al in fondo al calendario.');
+bullet('Cliccare "Esporta CSV" o "Esporta PDF" per scaricare i rapporti del periodo.');
+
+// ===== 6. NOTE COLLEGHI =====
+title('6. NOTE COLLEGHI', 1);
+spacer(2);
+para('Permette di inviare messaggi interni tra operatori.');
+title('Inviare una nota', 2);
+bullet('Selezionare uno o piu destinatari con le checkboxes (oppure "Tutti").');
+bullet('Scrivere il messaggio.');
+bullet('Cliccare "Invia nota".');
+title('Note ricevute', 2);
+bullet('Le note ricevute appaiono nella sezione "Note ricevute".');
+bullet('"Segna letta": segna la nota come letta (il mittente vedra lo stato).');
+bullet('"Elimina": nasconde la nota solo per te (il mittente non lo sa).');
+title('Note inviate', 2);
+bullet('Le note inviate mostrano lo stato: Non letta / Letta da alcuni / Letta da tutti.');
+bullet('"Modifica": cambia il testo (solo se non ancora letta).');
+bullet('"Annulla invio": elimina la nota per tutti i destinatari (solo se non letta).');
+bullet('"Nascondi": nasconde la nota solo per te.');
+title('Notifiche', 2);
+para('Un badge sul tab "Note Colleghi" mostra il numero di note non lette. Al login, se ci sono note non lette, appare un popup con l\'anteprima.');
+
+// ===== 7. STATISTICHE =====
+title('7. STATISTICHE', 1);
+spacer(2);
+para('La sezione Statistiche fornisce una panoramica completa dell\'attivita registrata.');
+title('Contenuto', 2);
+bullet('Riepilogo numerico: totale registrazioni, collaboratori, errori, malattie, importo totale.');
+bullet('Grafico mensile: registrazioni e errori degli ultimi 12 mesi.');
+bullet('Grafico tipi: distribuzione per tipo di evento (ciambella).');
+bullet('Grafico giorni: attivita per giorno della settimana.');
+bullet('Top 15 collaboratori: classifica per numero di registrazioni.');
+bullet('Tabella completa: tutti i collaboratori con dettaglio per tipo.');
+bullet('Tabella errori: errori per collaboratore con importi CHF/EUR e reparti.');
+title('Riepilogo mensile PDF', 2);
+para('Cliccare il pulsante "Riepilogo mensile PDF" in alto a destra per generare un PDF professionale con:');
+bullet('Panoramica del mese corrente (registrazioni, errori, malattie, importi, moduli generati).');
+bullet('Top 10 collaboratori con piu registrazioni.');
+bullet('Dettaglio errori per collaboratore con importi.');
+para('Il PDF include il logo Casino Lugano e footer paginato.');
+
+// ===== 8. MODULI =====
+title('8. MODULI DISCIPLINARI', 1);
+spacer(2);
+para('La sezione Moduli permette di generare documenti PDF professionali per gestione disciplinare e apprezzamento.');
+title('Tipi di modulo', 2);
+bullet('Allineamento: rilevamento di non conformita e colloquio di allineamento.');
+bullet('Apprezzamento: colloquio di apprezzamento per prestazioni positive.');
+bullet('RDI: Rapporto Disciplinare Interno (I° o II° livello).');
+title('Template rapidi', 2);
+para('Sopra le card dei moduli ci sono 8 bottoni precompilati per situazioni comuni:');
+bullet('Errore cassa: differenza cassa con testo professionale.');
+bullet('Ritardo: ritardo al turno senza preavviso.');
+bullet('Uniforme non conforme: abbigliamento non regolamentare.');
+bullet('Comportamento inadeguato: comportamento non professionale.');
+bullet('Mancato rispetto procedura: violazione procedure operative.');
+bullet('Prestazione eccellente: apprezzamento per prestazione.');
+bullet('Feedback positivo cliente: apprezzamento da feedback cliente.');
+bullet('Recidiva (RDI): quando il collaboratore ha gia 2+ allineamenti.');
+tip('I template pre-compilano la non conformita/descrizione, l\'obiettivo e la scadenza. Il nome del collaboratore va inserito manualmente.');
+title('Compilazione manuale', 2);
+bullet('Cliccare su una card modulo (Allineamento, Apprezzamento, RDI).');
+bullet('Compilare i campi: Collaboratore, Resp. Settore, Data, campi specifici.');
+bullet('Opzionale: usare "Genera con AI" per compilare automaticamente tutti i campi.');
+bullet('Opzionale: usare "Migliora testo con AI" per riscrivere un singolo campo.');
+bullet('Scegliere modalita firma: cartacea o digitale.');
+bullet('Cliccare "Genera PDF" per creare e scaricare il documento.');
+title('Generazione AI', 2);
+para('Nel box "Genera con AI" in cima al form:');
+bullet('Scrivere una descrizione sintetica della situazione (anche informale).');
+bullet('Opzionale: allegare una foto per contesto.');
+bullet('Cliccare "Genera tutti i campi": l\'AI compila automaticamente tutti i campi del modulo con testo professionale e formale.');
+tip('L\'AI conosce tutte le procedure del Casino Lugano (80+ QM). I testi generati sono gia pronti per l\'uso.');
+title('Firma digitale', 2);
+para('Prima di generare il PDF, scegliere la modalita firma:');
+bullet('Cartacea: il PDF avra spazio vuoto per firma a mano dopo la stampa.');
+bullet('Digitale: appariranno due canvas per firmare sullo schermo con mouse o dito (Resp. Settore e Collaboratore). Le firme vengono inserite nel PDF.');
+title('QR Code', 2);
+para('Ogni PDF generato contiene un QR code univoco in basso a destra. Scansionandolo con un telefono si apre l\'app e, dopo il login, il documento si apre automaticamente. Utile per verificare l\'autenticita di un documento stampato.');
+title('Importazione moduli esistenti', 2);
+para('Cliccare "Importa modulo esistente (Word/PDF)" per caricare un documento .docx o .pdf. L\'app estrarra i campi e li inserira nel form.');
+title('Lista moduli salvati', 2);
+para('Sotto il form appare la lista di tutti i moduli generati, con filtri per collaboratore, tipo e periodo. Cliccando su un modulo salvato si riapre il form con tutti i dati.');
+
+// ===== 9. ASSISTENTE =====
+title('9. ASSISTENTE AI', 1);
+spacer(2);
+para('L\'Assistente e un tool di scrittura assistita dall\'intelligenza artificiale. Permette di riscrivere testi informali in modo professionale.');
+title('Utilizzo', 2);
+bullet('Scegliere il tipo di testo (es. Mail formale, Comunicazione di servizio).');
+bullet('Scegliere il tono (Formale, Cordiale, Diretto).');
+bullet('Scrivere il testo in modo veloce, anche come appunti.');
+bullet('Opzionale: allegare una foto per contesto.');
+bullet('Cliccare "Riscrivi con AI".');
+bullet('Il risultato appare nel campo sottostante, pronto per essere copiato.');
+tip('Nessun dato viene salvato. L\'Assistente e uno strumento di scrittura usa-e-getta.');
+
+// ===== 10. ALERT =====
+title('10. SISTEMA DI ALERT', 1);
+spacer(2);
+title('Alert differenze cassa', 2);
+para('Il sistema monitora automaticamente gli errori cassa per ogni collaboratore:');
+bullet('Banner arancione: appare quando un collaboratore ha una singola differenza cassa >= CHF 90. Suggerimento: "Preparare allineamento".');
+bullet('Banner rosso: appare quando le differenze cumulative >= CHF 500. Suggerimento: "Fare RDI".');
+para('Gli alert sono persistenti: restano visibili finche non viene creato il documento corrispondente. Il calcolo considera solo errori successivi all\'ultimo allineamento/RDI.');
+bullet('Cliccando il banner si apre il dettaglio per collaboratore.');
+bullet('Il pulsante "Crea Allineamento" o "Crea RDI" apre il modulo pre-compilato.');
+title('Alert collaboratore a rischio', 2);
+para('Un banner viola appare quando un collaboratore ha 2 o piu allineamenti senza un RDI successivo:');
+bullet('Significato: il prossimo provvedimento disciplinare dovra essere un RDI.');
+bullet('Cliccando si vede la lista dei collaboratori a rischio con numero di allineamenti.');
+bullet('Il pulsante "Crea RDI" apre direttamente il modulo.');
+
+// ===== 11. SCADENZE =====
+title('11. SCADENZE E PROMEMORIA', 1);
+spacer(2);
+para('Le scadenze permettono di impostare promemoria collegati a registrazioni del diario.');
+title('Creare una scadenza', 2);
+bullet('Nella lista registrazioni, passare il mouse su una voce e cliccare "Scadenza".');
+bullet('Inserire titolo, data e note opzionali.');
+bullet('Cliccare "Salva".');
+title('Gestione scadenze', 2);
+bullet('La campanella in alto mostra il numero di scadenze attive.');
+bullet('Cliccandola si apre la lista con scadenze attive e completate.');
+bullet('Ogni scadenza puo essere completata ("Fatto") o eliminata.');
+bullet('Le scadenze scadute sono evidenziate in rosso.');
+
+// ===== 12. REGISTRO =====
+title('12. REGISTRO ATTIVITA (ADMIN)', 1);
+spacer(2);
+para('Il Registro e visibile solo per l\'admin e mostra un log di tutte le azioni compiute dagli operatori nell\'applicazione.');
+title('Filtri disponibili', 2);
+bullet('Operatore: filtrare per un operatore specifico.');
+bullet('Categoria: Registrazioni, Moduli, Note, Collaboratori, Operatori, Scadenze, Tipi.');
+bullet('Cerca: ricerca testo libero.');
+bullet('Dal/Al: filtro per periodo con calendario.');
+para('Il registro mostra le ultime 500 azioni con data/ora, operatore, azione e dettaglio.');
+
+// ===== 13. IMPOSTAZIONI =====
+title('13. IMPOSTAZIONI', 1);
+spacer(2);
+para('Le Impostazioni sono parzialmente visibili a tutti gli operatori, ma le funzionalita avanzate sono riservate all\'admin.');
+title('Tipi di evento', 2);
+bullet('Aggiungere nuovi tipi con nome e colore personalizzato.');
+bullet('Admin: riordinare, rinominare, cambiare colore, nascondere/ripristinare tipi predefiniti.');
+title('Campi Rapporto Giornaliero', 2);
+bullet('Aggiungere campi personalizzati al rapporto.');
+bullet('Admin: riordinare, rinominare, nascondere/ripristinare campi predefiniti.');
+title('Gestione Collaboratori (admin)', 2);
+bullet('Aggiungere collaboratori manualmente.');
+bullet('Importare da file Excel/CSV.');
+bullet('Rinominare o disattivare collaboratori esistenti.');
+title('Gestione Operatori (admin)', 2);
+bullet('Creare nuovi operatori con nome e password temporanea.');
+bullet('Rimuovere operatori.');
+bullet('Resettare password operatore.');
+title('Visibilita pagine e funzioni (admin)', 2);
+para('L\'admin puo controllare cosa vedono gli operatori:');
+para('Pagine configurabili: Rapporto, Note Colleghi, Statistiche, Moduli, Assistente.');
+para('Funzioni configurabili: Ricerca globale, Alert cassa, Alert rischio, Template rapidi, Firma digitale, QR Code, AI (Genera + Migliora testo).');
+spacer(1);
+para('Per ogni voce ci sono 4 opzioni:');
+bullet('Tutti: visibile a tutti gli operatori.');
+bullet('Solo admin: visibile solo a chi accede come admin.');
+bullet('Operatori selezionati: spuntare i nomi degli operatori che possono vedere la funzione. L\'admin vede sempre.');
+bullet('Nascosto: non visibile a nessuno (neanche admin).');
+tip('La configurazione viene applicata immediatamente. Gli operatori vedranno le modifiche al prossimo caricamento della pagina.');
+title('Sicurezza', 2);
+bullet('Admin: pulsante per cambiare la password master.');
+bullet('Operatore: pulsante per cambiare la propria password.');
+title('Assistente AI (admin)', 2);
+para('Inserire la chiave API Groq per abilitare le funzionalita AI (generazione testi e analisi immagini nei moduli e nell\'Assistente). La chiave e gratuita su console.groq.com.');
+
+// ===== 14. USO MOBILE =====
+title('14. USO SU DISPOSITIVI MOBILI', 1);
+spacer(2);
+para('L\'applicazione e completamente responsive e funziona su smartphone e tablet.');
+title('Differenze su mobile', 2);
+bullet('I tab di navigazione scorrono orizzontalmente (swipe per vedere tutti i tab).');
+bullet('I filtri si impilano verticalmente.');
+bullet('Il canvas per la firma digitale e piu piccolo ma funzionale.');
+bullet('La ricerca globale mostra risultati senza date per risparmiare spazio.');
+bullet('I modali si adattano allo schermo.');
+title('Suggerimenti', 2);
+bullet('Per usare la firma digitale su tablet, ruotare il dispositivo in orizzontale.');
+bullet('Per scannerizzare un QR code, usare la fotocamera del telefono.');
+bullet('L\'app puo essere aggiunta alla schermata home come Progressive Web App.');
+
+// ===== 15. FAQ =====
+title('15. DOMANDE FREQUENTI', 1);
+spacer(2);
+
+title('Come faccio a cambiare la mia password?', 3);
+para('Andare in Impostazioni e cliccare "Cambia la mia password" nella sezione Sicurezza.');
+title('Ho dimenticato la password, cosa faccio?', 3);
+para('Cliccare "Password dimenticata?" nella schermata di login e inserire il codice di recupero. Se non si dispone del codice, contattare l\'admin.');
+title('Posso usare l\'app offline?', 3);
+para('No, l\'app richiede una connessione internet per accedere al database. Tuttavia i PDF generati possono essere salvati localmente.');
+title('I dati sono al sicuro?', 3);
+para('Si. Le password sono hashate (SHA-256), le credenziali del database sono offuscate, e le operazioni sensibili passano per funzioni server-side protette.');
+title('Quanto costa l\'app?', 3);
+para('L\'app e completamente gratuita. Il hosting (GitHub Pages) e il database (Supabase piano free) non hanno costi. L\'AI (Groq) ha un piano gratuito sufficiente (~14.400 richieste al giorno).');
+title('Le firme digitali sono valide legalmente?', 3);
+para('Le firme su canvas servono come evidenza interna del consenso. Per valore legale pieno, si consiglia la firma cartacea o un sistema di firma elettronica qualificata.');
+title('Come faccio a nascondere una funzione a un operatore?', 3);
+para('Come admin, andare in Impostazioni > Visibilita pagine e funzioni. Selezionare "Operatori selezionati" e spuntare solo gli operatori autorizzati, oppure "Nascosto" per nascondere a tutti.');
+
+// Ultima pagina footer
+addFooter();
+
+// ===== COMPILA INDICE =====
+doc.setPage(tocPageStart);
+let ty = tocY;
+doc.setTextColor(0);
+tocEntries.forEach(function(entry){
+  if(entry.level === 1){
+    doc.setFont('helvetica','bold');doc.setFontSize(10);
+    doc.text(entry.text, mx, ty);
+    doc.text(String(entry.page), pw-mr, ty, {align:'right'});
+    // Dots
+    const tw2 = doc.getTextWidth(entry.text);
+    const pw2 = doc.getTextWidth(String(entry.page));
+    doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(180);
+    const dotsW = pw - mr - mx - tw2 - pw2 - 8;
+    if(dotsW > 10){
+      const dots = '.'.repeat(Math.floor(dotsW / 1.3));
+      doc.text(dots, mx + tw2 + 3, ty);
+    }
+    doc.setTextColor(0);
+    ty += 6;
+  } else if(entry.level === 2){
+    doc.setFont('helvetica','normal');doc.setFontSize(9);
+    doc.text('    '+entry.text, mx+4, ty);
+    doc.text(String(entry.page), pw-mr, ty, {align:'right'});
+    ty += 5;
+  }
+  if(ty > ph - 25){
+    // Prossima pagina indice
+    doc.setPage(tocPageStart + 1);
+    ty = 20;
+  }
+});
+
+doc.save('Manuale_Diario_Collaboratori_Casino_Lugano.pdf');
+document.getElementById('status').innerHTML = '<div style="color:#2c6e49;font-size:1.4rem;font-weight:bold">Manuale generato!</div><div style="margin-top:10px;color:#666">Il file PDF e stato scaricato automaticamente.</div><div style="margin-top:20px"><a href="index.html" style="color:#c0392b;text-decoration:none;font-weight:bold">Torna all\'app</a></div>';
+});
+</script></body></html>
