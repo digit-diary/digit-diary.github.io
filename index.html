@@ -330,9 +330,10 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
   header h1 .subtitle{font-size:.75rem}
   header h1 .casino{font-size:.7rem}
   .header-right{align-items:flex-start;flex-direction:row;flex-wrap:wrap;gap:8px}
-  .nav-tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .nav-tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;position:relative;-webkit-mask-image:linear-gradient(to right,black 85%,transparent);mask-image:linear-gradient(to right,black 85%,transparent)}
   .nav-tabs::-webkit-scrollbar{display:none}
-  .nav-tab{font-size:.68rem;padding:10px 8px;letter-spacing:.04em;flex:0 0 auto;min-width:0;white-space:nowrap}
+  .nav-tabs.scrolled-end{-webkit-mask-image:none;mask-image:none}
+  .nav-tab{font-size:.62rem;padding:8px 6px;letter-spacing:.02em;flex:0 0 auto;min-width:0;white-space:nowrap}
   .form-row,.turno-columns{grid-template-columns:1fr}
   .stats-bar{grid-template-columns:repeat(3,1fr)}
   .stats-grid{grid-template-columns:1fr}
@@ -393,10 +394,12 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
   .chart-card{padding:14px}
   .chart-card h4{font-size:.9rem}
   .operatore-chip{padding:6px 10px;font-size:.8rem}
+  .add-tipo-row{flex-direction:column}
+  .add-tipo-row .field{min-width:100%}
 }
 @media(max-width:400px){
   header h1{font-size:1.3rem}
-  .nav-tab{font-size:.6rem;padding:8px 4px}
+  .nav-tab{font-size:.55rem;padding:7px 4px}
   .entry{grid-template-columns:60px 1fr}
   .entry-day{font-size:1rem}
   .entry-month{font-size:.6rem}
@@ -3010,6 +3013,8 @@ window.addEventListener('load',async()=>{
   setTimeout(checkQrHash,1200);
   // Polling note ogni 15 secondi
   setInterval(pollNuoveNote,15000);
+  // Indicatore scroll tab mobile
+  const navT=document.querySelector('.nav-tabs');if(navT)navT.addEventListener('scroll',function(){this.classList.toggle('scrolled-end',this.scrollLeft+this.clientWidth>=this.scrollWidth-10)});
   // Flatpickr date pickers
   if(window.flatpickr){const fpOpts={locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,onChange:()=>render()};flatpickr('#filt-dal',fpOpts);flatpickr('#filt-al',fpOpts);const fpLog={locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,onChange:()=>renderRegistro()};flatpickr('#log-filt-dal',fpLog);flatpickr('#log-filt-al',fpLog)}});
 document.getElementById('pwd-modal').addEventListener('click',function(e){if(e.target===this){const c=document.getElementById('pwd-modal-content').innerHTML;if(c.includes('predefinita')||c.includes('Cambia la password')||c.includes('Password impostata')||c.includes('Reimpostata')||c.includes('Benvenuto')||c.includes('scegli una nuova'))return;this.classList.add('hidden')}});
