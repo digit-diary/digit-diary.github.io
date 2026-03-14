@@ -3152,14 +3152,17 @@ async function esportaSpeseExtraPDF(){const data=getSpeseExtraFiltrate();if(!dat
     doc.save('spese_extra.pdf');toast('PDF esportato!')}catch(e){toast('Errore PDF')}}
 
 // REPARTO SWITCH
-async function aggiornaLoginOperatori(){var settore=document.getElementById('login-settore').value;
+function aggiornaLoginOperatori(){var settore=document.getElementById('login-settore').value;
   var loginNome=document.getElementById('login-nome');
   if(!settore){loginNome.innerHTML='<option value="">-- Seleziona operatore --</option>';return}
-  // Se operatori non ancora caricati, caricali ora
-  if(!operatoriAuthCache.length){try{operatoriAuthCache=await sbRpc('list_operators')||[];
-    var opRep=await getImp('operatori_reparto');if(opRep)try{operatoriRepartoMap=JSON.parse(opRep)}catch(e){}}catch(e){}}
-  var ops=operatoriAuthCache.map(function(o){return o.nome}).filter(function(n){var rep=operatoriRepartoMap[n]||'entrambi';return rep===settore||rep==='entrambi'}).sort();
-  loginNome.innerHTML='<option value="">-- Admin (password master) --</option>'+ops.map(function(n){return'<option value="'+escP(n)+'">'+escP(n)+'</option>'}).join('')}
+  function _popola(){
+    var ops=operatoriAuthCache.map(function(o){return o.nome}).filter(function(n){var rep=operatoriRepartoMap[n]||'entrambi';return rep===settore||rep==='entrambi'}).sort();
+    loginNome.innerHTML='<option value="">-- Admin (password master) --</option>'+ops.map(function(n){return'<option value="'+escP(n)+'">'+escP(n)+'</option>'}).join('')}
+  if(operatoriAuthCache.length){_popola()}
+  else{loginNome.innerHTML='<option value="">Caricamento...</option>';
+    sbRpc('list_operators').then(function(r){operatoriAuthCache=r||[];
+      getImp('operatori_reparto').then(function(v){if(v)try{operatoriRepartoMap=JSON.parse(v)}catch(e){}
+        _popola()}).catch(function(){_popola()})}).catch(function(){loginNome.innerHTML='<option value="">Errore caricamento</option>'})}}
 function setReparto(rep){currentReparto=rep;
   document.getElementById('btn-rep-slots').className='reparto-btn'+(rep==='slots'?' active-slots':'');
   document.getElementById('btn-rep-tavoli').className='reparto-btn'+(rep==='tavoli'?' active-tavoli':'');
