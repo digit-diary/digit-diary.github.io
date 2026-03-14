@@ -648,6 +648,9 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
       </div>
     </div>
   </div>
+  <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+    <button class="btn-export" onclick="apriListaClientiMaison()" style="padding:10px 20px;font-size:.88rem;border-color:var(--accent2);color:var(--accent2)">Lista Clienti Maison / Full Maison</button>
+  </div>
   <div id="maison-alerts-container" style="margin-top:16px"></div>
   <div class="main-card" style="margin-top:20px">
     <div class="card-header">Riepilogo Costi Maison</div>
@@ -2831,13 +2834,6 @@ function renderMaisonBudgetUI(){const el=document.getElementById('maison-budget-
     const ne=nome.replace(/'/g,"\\'");
     return'<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border-left:3px solid '+borderColor+';flex-wrap:wrap"><span style="font-weight:600;min-width:150px">'+escP(nome)+(isBday?' <span style="font-size:1.1rem">&#127874;</span>':'')+'</span>'+catBadge+(spent?'<span style="font-size:.82rem;color:var(--muted)">'+spent.toFixed(0)+' CHF</span>':'')+(b&&b.budget_chf?'<span style="font-size:.82rem;color:'+color+';font-weight:600">'+pct+'%</span>':'')+(nascitaLabel?'<span style="font-size:.82rem;color:var(--muted)">&#127874; '+nascitaLabel+'</span>':'')+(b?'<button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2);font-size:.72rem" onclick="modificaMaisonInfo('+b.id+')">Modifica</button>':'<button class="btn-del-tipo" style="color:#2980b9;border-color:#2980b9;font-size:.72rem" onclick="assegnaCatRapida(\''+ne+'\')">Assegna</button>')+(b?'<button class="btn-del-tipo" style="font-size:.72rem" onclick="rimuoviMaisonBudget('+b.id+')">Rimuovi</button>':'')+'</div>'}).join('');
   el.innerHTML=html}
-    const spent=maisonCache.filter(r=>r.nome.toLowerCase()===b.nome.toLowerCase()).reduce((s,r)=>s+parseFloat(r.costo||0),0);
-    const pct=b.budget_chf?Math.round(spent/b.budget_chf*100):0;
-    const color=pct>=100?'var(--accent)':pct>=80?'#e67e22':'#2c6e49';
-    const nascitaLabel=b.data_nascita?new Date(b.data_nascita+'T12:00:00').toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit'}):'';
-    const isBday=_isCompleannoOggi(b.data_nascita);
-    const catBadge=b.categoria==='full_maison'?'<span class="mini-badge" style="background:#b8860b">Full Maison</span>':b.categoria==='maison'?'<span class="mini-badge" style="background:#2980b9">Maison</span>':'';
-    return'<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border-left:3px solid '+(b.categoria==='full_maison'?'#b8860b':b.categoria==='maison'?'#2980b9':color)+'"><span style="flex:1;font-weight:600">'+escP(b.nome)+(isBday?' <span style="font-size:1.1rem">&#127874;</span>':'')+'</span>'+catBadge+(b.budget_chf?'<span style="font-size:.85rem">'+spent.toFixed(0)+' / '+parseFloat(b.budget_chf).toFixed(0)+' CHF <span style="color:'+color+';font-weight:700">('+pct+'%)</span></span>':'')+(b.budget_bu?'<span style="font-size:.82rem;color:var(--muted)">BU: max '+b.budget_bu+'</span>':'')+(b.budget_bl?'<span style="font-size:.82rem;color:var(--muted)">BL: max '+b.budget_bl+'</span>':'')+(nascitaLabel?'<span style="font-size:.82rem;color:var(--muted)">Nascita: '+nascitaLabel+'</span>':'')+'<button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2)" onclick="modificaMaisonInfo('+b.id+')">Modifica</button><button class="btn-del-tipo" onclick="rimuoviMaisonBudget('+b.id+')">Rimuovi</button></div>'}).join('')}
 async function salvaMaisonBudget(){const nome=capitalizzaNome(document.getElementById('maison-budget-nome').value.trim());
   const chf=parseFloat(document.getElementById('maison-budget-chf').value)||null;
   const bu=parseInt(document.getElementById('maison-budget-bu').value)||null;
@@ -2871,6 +2867,22 @@ async function salvaModificaMaisonInfo(id){
   try{await sbPatch('maison_budget','id=eq.'+id,{categoria:cat,budget_chf:chf,budget_bu:bu,budget_bl:bl,data_nascita:nascita});
     const b=maisonBudgetCache.find(x=>x.id===id);if(b){b.categoria=cat;b.budget_chf=chf;b.budget_bu=bu;b.budget_bl=bl;b.data_nascita=nascita}
     document.getElementById('pwd-modal').classList.add('hidden');renderMaisonBudgetUI();renderMaisonDashboard();toast('Info aggiornate')}catch(e){toast('Errore')}}
+function apriListaClientiMaison(){
+  const tuttiNomi=[...new Set([...maisonBudgetCache.map(b=>b.nome),...maisonCache.map(r=>r.nome)])].sort();
+  const fullM=tuttiNomi.filter(n=>{const b=maisonBudgetCache.find(x=>x.nome.toLowerCase()===n.toLowerCase());return b&&b.categoria==='full_maison'});
+  const maison=tuttiNomi.filter(n=>{const b=maisonBudgetCache.find(x=>x.nome.toLowerCase()===n.toLowerCase());return b&&b.categoria==='maison'});
+  const altri=tuttiNomi.filter(n=>!fullM.includes(n)&&!maison.includes(n));
+  let html='<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px"><div><h3 style="font-family:Playfair Display,serif;color:var(--ink);margin-bottom:4px">Clienti Maison</h3><p style="color:var(--muted);font-size:.82rem">'+tuttiNomi.length+' clienti — '+fullM.length+' Full Maison — '+maison.length+' Maison — '+altri.length+' non categorizzati</p></div><button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\')" style="padding:6px 12px;font-size:.75rem">Chiudi</button></div>';
+  html+='<div style="display:flex;gap:10px;margin-bottom:16px"><button class="btn-export" onclick="esportaListaMaisonCSV()" style="font-size:.78rem;padding:5px 14px">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaListaMaisonPDF()" style="font-size:.78rem;padding:5px 14px">PDF</button></div>';
+  if(fullM.length){html+='<div style="margin-bottom:16px"><div style="font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:#b8860b;font-weight:700;margin-bottom:8px;border-bottom:2px solid #b8860b;padding-bottom:4px">Full Maison ('+fullM.length+')</div>';
+    fullM.forEach(n=>{const b=maisonBudgetCache.find(x=>x.nome.toLowerCase()===n.toLowerCase());const nascita=b&&b.data_nascita?'  —  &#127874; '+new Date(b.data_nascita+'T12:00:00').toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit'}):'';
+      html+='<div style="padding:8px 12px;margin-bottom:4px;border-radius:3px;border-left:3px solid #b8860b;background:rgba(184,134,11,0.06);display:flex;align-items:center;gap:10px"><strong>'+escP(n)+'</strong>'+nascita+'</div>'});html+='</div>'}
+  if(maison.length){html+='<div style="margin-bottom:16px"><div style="font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:#2980b9;font-weight:700;margin-bottom:8px;border-bottom:2px solid #2980b9;padding-bottom:4px">Maison ('+maison.length+')</div>';
+    maison.forEach(n=>{const b=maisonBudgetCache.find(x=>x.nome.toLowerCase()===n.toLowerCase());const nascita=b&&b.data_nascita?'  —  &#127874; '+new Date(b.data_nascita+'T12:00:00').toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit'}):'';
+      html+='<div style="padding:8px 12px;margin-bottom:4px;border-radius:3px;border-left:3px solid #2980b9;background:rgba(41,128,185,0.06);display:flex;align-items:center;gap:10px"><strong>'+escP(n)+'</strong>'+nascita+'</div>'});html+='</div>'}
+  if(altri.length){html+='<div><div style="font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:8px;border-bottom:2px solid var(--line);padding-bottom:4px">Non categorizzati ('+altri.length+')</div>';
+    altri.forEach(n=>{html+='<div style="padding:8px 12px;margin-bottom:4px;border-radius:3px;border-left:3px solid var(--line);display:flex;align-items:center;gap:10px">'+escP(n)+'</div>'});html+='</div>'}
+  document.getElementById('profilo-content').innerHTML=html;document.getElementById('profilo-modal').classList.remove('hidden')}
 function esportaListaMaisonCSV(){if(!maisonBudgetCache.length){toast('Nessun cliente');return}
   const rows=[['Cliente','Categoria','Budget CHF','Max BU','Max BL','Data nascita']];
   maisonBudgetCache.forEach(b=>{rows.push([b.nome,b.categoria==='full_maison'?'Full Maison':b.categoria==='maison'?'Maison':'',b.budget_chf||'',b.budget_bu||'',b.budget_bl||'',b.data_nascita?new Date(b.data_nascita+'T12:00:00').toLocaleDateString('it-IT'):''])});
