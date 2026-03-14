@@ -3152,7 +3152,7 @@ async function esportaSpeseExtraPDF(){const data=getSpeseExtraFiltrate();if(!dat
     doc.save('spese_extra.pdf');toast('PDF esportato!')}catch(e){toast('Errore PDF')}}
 
 // REPARTO SWITCH
-function aggiornaLoginOperatori(){var settore=document.getElementById('login-settore').value;
+function aggiornaLoginOperatori(){console.log('aggiornaLoginOperatori chiamata');var settore=document.getElementById('login-settore').value;console.log('settore:',settore,'cache:',operatoriAuthCache.length);
   var loginNome=document.getElementById('login-nome');
   if(!settore){loginNome.innerHTML='<option value="">-- Seleziona operatore --</option>';return}
   function _popola(){
