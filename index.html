@@ -433,10 +433,10 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 <body>
 <script>if(sessionStorage.getItem('diario_auth')==='1')document.documentElement.classList.add('authed')</script>
 <div id="login-overlay"><div class="login-box">
-  <img src="logo_casino.png" alt="Casino Lugano SA" style="width:140px;margin-bottom:16px"><h2>Accesso Protetto</h2><p>Seleziona il settore e il tuo nome</p>
-  <select id="login-settore" onchange="aggiornaLoginOperatori()" style="margin-bottom:10px;text-align:left;letter-spacing:0;padding:11px 14px;width:100%;border:1.5px solid var(--line);border-radius:2px;font-size:1rem;font-family:'Source Sans 3',sans-serif;color:var(--ink);background:var(--paper2);cursor:pointer"><option value="">-- Seleziona settore --</option><option value="admin">Admin (password master)</option><option value="slots">Slots</option><option value="tavoli">Tavoli</option></select>
-  <select id="login-nome" style="margin-bottom:10px;text-align:left;letter-spacing:0;padding:11px 14px;width:100%;border:1.5px solid var(--line);border-radius:2px;font-size:1rem;font-family:'Source Sans 3',sans-serif;color:var(--ink);background:var(--paper2);cursor:pointer;display:none"><option value="">-- Seleziona operatore --</option></select>
-  <input type="password" id="pwd-input" placeholder="Password..." onkeydown="if(event.key==='Enter') checkPwd()" style="display:none;margin-bottom:10px">
+  <img src="logo_casino.png" alt="Casino Lugano SA" style="width:140px;margin-bottom:16px"><h2>Accesso Protetto</h2><p>Seleziona il tuo nome e inserisci la password</p>
+  <select id="login-settore" style="display:none"><option value=""></option></select>
+  <select id="login-nome" style="margin-bottom:8px;text-align:left;letter-spacing:0;padding:11px 14px;width:100%;border:1.5px solid var(--line);border-radius:2px;font-size:1rem;font-family:'Source Sans 3',sans-serif;color:var(--ink);background:var(--paper2);cursor:pointer"><option value="">-- Seleziona operatore --</option></select>
+  <input type="password" id="pwd-input" placeholder="Password..." onkeydown="if(event.key==='Enter') checkPwd()">
   <button class="btn-login" onclick="checkPwd()">Entra</button>
   <button class="btn-recupero" onclick="recuperoPassword()">Password dimenticata?</button>
   <div class="login-error" id="login-error"></div>
@@ -3225,7 +3225,9 @@ window.addEventListener('load',async()=>{
   const h=document.getElementById('login-hint');const defCheck=await sbRpc('is_default_master_pwd',{p_default_hash:DEFAULT_PWD_HASH});
   if((defCheck&&defCheck.is_default)||operatoriAuthCache.length)h.innerHTML='Accedi come Admin oppure seleziona il tuo nome';
   // Populate login dropdown
-  // Login: dropdown operatori appare dopo selezione settore
+  // Login: popola dropdown operatori
+  const loginSel=document.getElementById('login-nome');if(loginSel){const ops=operatoriAuthCache.map(o=>o.nome).sort();
+    loginSel.innerHTML='<option value="">-- Admin (password master) --</option>'+ops.map(n=>'<option value="'+escP(n)+'">'+escP(n)+'</option>').join('')}
   if(sessionStorage.getItem('diario_auth')==='1'){document.getElementById('login-overlay').classList.add('hidden');applicaTemaOperatore();
     // Valida sessione admin se presente
     if(isAdmin()){const tk=getAdminToken();if(tk){const sv=await sbRpc('validate_admin_session',{p_token:tk});if(!sv||!sv.valid){sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token')}}else{sessionStorage.removeItem('is_admin')}}
