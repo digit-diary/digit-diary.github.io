@@ -2493,6 +2493,8 @@ window.addEventListener('load',async()=>{
   renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();aggiornaNoteBadge();aggiornaPromemoriaBadge();applicaVisibilita();
   const savedPage=sessionStorage.getItem('pagina_corrente');if(savedPage&&savedPage!=='diario')switchPage(savedPage);
   setTimeout(checkQrHash,1200);
+  // Flush autosave e niente prompt al refresh
+  window.addEventListener('beforeunload',e=>{flushRapportoSave()});
   // Polling note ogni 15 secondi
   setInterval(pollNuoveNote,15000);
   // Flatpickr date pickers
