@@ -2811,8 +2811,26 @@ async function eliminaMaisonGiorno(){const sel=document.getElementById('maison-d
 
 // Budget
 function renderMaisonBudgetUI(){const el=document.getElementById('maison-budget-list');if(!el)return;
-  if(!maisonBudgetCache.length){el.innerHTML='<p style="color:var(--muted);font-size:.85rem">Nessun budget impostato.</p>';return}
-  el.innerHTML=maisonBudgetCache.map(b=>{
+  // Mostra TUTTI i clienti: quelli con scheda + quelli solo in costi_maison
+  const tuttiNomi=[...new Set([...maisonBudgetCache.map(b=>b.nome),...maisonCache.map(r=>r.nome)])].sort();
+  if(!tuttiNomi.length){el.innerHTML='<p style="color:var(--muted);font-size:.85rem">Nessun cliente. Carica un file Excel per iniziare.</p>';return}
+  // Filtro rapido per categoria
+  let filtCat=(document.getElementById('maison-filt-cat-lista')||{}).value||'';
+  let html='<div style="display:flex;gap:10px;margin-bottom:12px;align-items:center;flex-wrap:wrap"><select id="maison-filt-cat-lista" onchange="renderMaisonBudgetUI()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.85rem;background:var(--paper);color:var(--ink)"><option value="">Tutti ('+tuttiNomi.length+')</option><option value="full_maison"'+(filtCat==='full_maison'?' selected':'')+'>Full Maison</option><option value="maison"'+(filtCat==='maison'?' selected':'')+'>Maison</option><option value="nessuna"'+(filtCat==='nessuna'?' selected':'')+'>Non categorizzati</option></select></div>';
+  let filtered=tuttiNomi;
+  if(filtCat){filtered=tuttiNomi.filter(nome=>{const b=maisonBudgetCache.find(x=>x.nome.toLowerCase()===nome.toLowerCase());const cat=b?b.categoria||'':'';if(filtCat==='nessuna')return!cat;return cat===filtCat})}
+  html+=filtered.map(nome=>{
+    const b=maisonBudgetCache.find(x=>x.nome.toLowerCase()===nome.toLowerCase());
+    const spent=maisonCache.filter(r=>r.nome.toLowerCase()===nome.toLowerCase()).reduce((s,r)=>s+parseFloat(r.costo||0),0);
+    const cat=b?b.categoria||'':'';const pct=b&&b.budget_chf?Math.round(spent/b.budget_chf*100):0;
+    const color=pct>=100?'var(--accent)':pct>=80?'#e67e22':'#2c6e49';
+    const borderColor=cat==='full_maison'?'#b8860b':cat==='maison'?'#2980b9':'var(--line)';
+    const catBadge=cat==='full_maison'?'<span class="mini-badge" style="background:#b8860b">Full Maison</span>':cat==='maison'?'<span class="mini-badge" style="background:#2980b9">Maison</span>':'';
+    const nascitaLabel=b&&b.data_nascita?new Date(b.data_nascita+'T12:00:00').toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit'}):'';
+    const isBday=b?_isCompleannoOggi(b.data_nascita):false;
+    const ne=nome.replace(/'/g,"\\'");
+    return'<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border-left:3px solid '+borderColor+';flex-wrap:wrap"><span style="font-weight:600;min-width:150px">'+escP(nome)+(isBday?' <span style="font-size:1.1rem">&#127874;</span>':'')+'</span>'+catBadge+(spent?'<span style="font-size:.82rem;color:var(--muted)">'+spent.toFixed(0)+' CHF</span>':'')+(b&&b.budget_chf?'<span style="font-size:.82rem;color:'+color+';font-weight:600">'+pct+'%</span>':'')+(nascitaLabel?'<span style="font-size:.82rem;color:var(--muted)">&#127874; '+nascitaLabel+'</span>':'')+(b?'<button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2);font-size:.72rem" onclick="modificaMaisonInfo('+b.id+')">Modifica</button>':'<button class="btn-del-tipo" style="color:#2980b9;border-color:#2980b9;font-size:.72rem" onclick="assegnaCatRapida(\''+ne+'\')">Assegna</button>')+(b?'<button class="btn-del-tipo" style="font-size:.72rem" onclick="rimuoviMaisonBudget('+b.id+')">Rimuovi</button>':'')+'</div>'}).join('');
+  el.innerHTML=html}
     const spent=maisonCache.filter(r=>r.nome.toLowerCase()===b.nome.toLowerCase()).reduce((s,r)=>s+parseFloat(r.costo||0),0);
     const pct=b.budget_chf?Math.round(spent/b.budget_chf*100):0;
     const color=pct>=100?'var(--accent)':pct>=80?'#e67e22':'#2c6e49';
@@ -2833,6 +2851,12 @@ async function salvaMaisonBudget(){const nome=capitalizzaNome(document.getElemen
     maisonBudgetCache.push(r[0]);document.getElementById('maison-budget-nome').value='';
     document.getElementById('maison-budget-chf').value='';document.getElementById('maison-budget-bu').value='';document.getElementById('maison-budget-bl').value='';const nbFp=document.getElementById('maison-budget-nascita');if(nbFp&&nbFp._flatpickr)nbFp._flatpickr.clear();else if(nbFp)nbFp.value='';
     renderMaisonBudgetUI();renderMaisonDashboard();renderMaisonBudgetAlerts();toast('Budget impostato per '+nome)}catch(e){toast('Errore')}}
+function assegnaCatRapida(nome){const mc=document.getElementById('pwd-modal-content');
+  mc.innerHTML='<h3>Assegna categoria</h3><p style="color:var(--muted);margin-bottom:16px">'+escP(nome)+'</p><div style="display:flex;flex-direction:column;gap:10px"><button class="btn-salva" style="background:#b8860b" onclick="salvaAssegnaCat(\''+nome.replace(/'/g,"\\'")+'\',\'full_maison\')">Full Maison</button><button class="btn-salva" style="background:#2980b9" onclick="salvaAssegnaCat(\''+nome.replace(/'/g,"\\'")+'\',\'maison\')">Maison</button><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button></div>';
+  document.getElementById('pwd-modal').classList.remove('hidden')}
+async function salvaAssegnaCat(nome,cat){
+  try{const r=await sbPost('maison_budget',{nome,categoria:cat});maisonBudgetCache.push(r[0]);
+    document.getElementById('pwd-modal').classList.add('hidden');renderMaisonBudgetUI();renderMaisonDashboard();toast(nome+' → '+(cat==='full_maison'?'Full Maison':'Maison'))}catch(e){toast('Errore')}}
 function modificaMaisonInfo(id){const b=maisonBudgetCache.find(x=>x.id===id);if(!b)return;
   const mc=document.getElementById('pwd-modal-content');
   mc.innerHTML='<h3>Modifica info cliente</h3><div class="pwd-field"><label>Cliente</label><input type="text" value="'+escP(b.nome)+'" readonly style="background:var(--paper2);color:var(--muted)"></div><div class="pwd-field"><label>Categoria</label><select id="edit-mb-cat" style="width:100%;padding:8px"><option value=""'+(b.categoria===''||!b.categoria?' selected':'')+'>—</option><option value="maison"'+(b.categoria==='maison'?' selected':'')+'>Maison</option><option value="full_maison"'+(b.categoria==='full_maison'?' selected':'')+'>Full Maison</option></select></div><div style="display:flex;gap:10px"><div class="pwd-field" style="flex:1"><label>Budget CHF</label><input type="number" id="edit-mb-chf" value="'+(b.budget_chf||'')+'" step="0.01"></div><div class="pwd-field" style="flex:1"><label>Max BU</label><input type="number" id="edit-mb-bu" value="'+(b.budget_bu||'')+'"></div><div class="pwd-field" style="flex:1"><label>Max BL</label><input type="number" id="edit-mb-bl" value="'+(b.budget_bl||'')+'"></div></div><div class="pwd-field"><label>Data nascita</label><input type="text" id="edit-mb-nascita" value="'+(b.data_nascita||'')+'" readonly style="cursor:pointer"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaModificaMaisonInfo('+id+')">Salva</button></div>';
