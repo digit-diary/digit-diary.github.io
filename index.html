@@ -663,6 +663,34 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
       <button class="btn-add-tipo" onclick="salvaMaisonBudget()">+ Budget</button>
     </div>
   </div>
+  <div class="main-card" style="margin-top:20px">
+    <div class="card-header">Spese Extra (cene esterne, viaggi, rimborsi, biglietti)</div>
+    <div class="form-area">
+      <div class="form-row" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="field"><label>Beneficiario / Gruppo</label><div class="ac-wrap"><input type="text" id="se-beneficiario" placeholder="Nome o gruppo..." oninput="acFiltraSpeseExtra()" onfocus="acFiltraSpeseExtra()"><div class="ac-drop" id="ac-se-benef"></div></div></div>
+        <div class="field"><label>Tipo</label><select id="se-tipo" style="padding:11px 14px"><option value="cena_esterna">Cena esterna</option><option value="pranzo_esterno">Pranzo esterno</option><option value="rimborso">Rimborso spese</option><option value="viaggio">Viaggio</option><option value="biglietti">Biglietti</option><option value="regalo">Regalo</option><option value="altro">Altro</option></select></div>
+        <div class="field"><label>Data</label><input type="text" id="se-data" placeholder="Seleziona..." readonly style="cursor:pointer"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>Luogo / Ristorante</label><input type="text" id="se-luogo" placeholder="Es: Ristorante Da Mario, Zurigo..."></div>
+        <div class="field"><label>Importo CHF</label><input type="number" id="se-importo" placeholder="0.00" min="0" step="0.01"></div>
+      </div>
+      <div class="field" style="margin-bottom:16px"><label>Descrizione (opzionale)</label><input type="text" id="se-descrizione" placeholder="Dettagli aggiuntivi..."></div>
+      <button class="btn-salva" onclick="salvaSpeseExtra()">Aggiungi spesa</button>
+    </div>
+    <div class="filters">
+      <div class="filter-group"><span class="filter-label">Beneficiario</span><input type="text" id="se-filt-nome" placeholder="Cerca..." oninput="renderSpeseExtra()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink);width:160px"></div>
+      <div class="filter-group"><span class="filter-label">Tipo</span><select id="se-filt-tipo" onchange="renderSpeseExtra()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"><option value="">Tutti</option><option value="cena_esterna">Cena esterna</option><option value="pranzo_esterno">Pranzo esterno</option><option value="rimborso">Rimborso</option><option value="viaggio">Viaggio</option><option value="biglietti">Biglietti</option><option value="regalo">Regalo</option><option value="altro">Altro</option></select></div>
+      <div class="filter-group"><span class="filter-label">Dal</span><input type="text" id="se-filt-dal" placeholder="Seleziona..." readonly style="cursor:pointer;min-width:130px"></div>
+      <div class="filter-group"><span class="filter-label">Al</span><input type="text" id="se-filt-al" placeholder="Seleziona..." readonly style="cursor:pointer;min-width:130px"></div>
+      <button class="btn-reset" onclick="resetSpeseExtraFiltri()">Reset</button>
+      <div class="export-btns">
+        <button class="btn-export" onclick="esportaSpeseExtraCSV()">CSV</button>
+        <button class="btn-export btn-export-pdf" onclick="esportaSpeseExtraPDF()">PDF</button>
+      </div>
+    </div>
+    <div id="spese-extra-list" style="padding:16px"></div>
+  </div>
 </div>
 
 <!-- IMPOSTAZIONI -->
@@ -807,7 +835,7 @@ const CAMPI_RAPPORTO_DEFAULT=[{key:'sup_note',label:'Supervisore',type:'input'},
 const RAPPORTO_DB_COLS=['sup_note','cassa_note','sala_note','n_assegni','prelievi','assenze'];
 let campiRapportoExtra=[],tipiNascosti=[],campiNascosti=[],tipiOrdine=[],campiOrdine=[],campiLabelOverride={},tipiRinominati={};
 let visibilitaConfig={};
-let collaboratoriCache=[],moduliCache=[],logCache=[],maisonCache=[],maisonBudgetCache=[],promemoriaCache=[],consegneCache=[];
+let collaboratoriCache=[],moduliCache=[],logCache=[],maisonCache=[],maisonBudgetCache=[],promemoriaCache=[],consegneCache=[],speseExtraCache=[];
 function nomeCorrente(orig){return tipiRinominati[orig]||orig}
 function getTuttiTipi(){let list=[...TIPI_DEFAULT.filter(t=>!tipiNascosti.includes(t.nome)).map(t=>{const c=coloriOverride[t.nome]||t.colore;const n=tipiRinominati[t.nome]||t.nome;return{nome:n,colore:c,_orig:t.nome}}),...tipiPersonalizzati];
   if(tipiOrdine.length)list.sort((a,b)=>{const ia=tipiOrdine.indexOf(a.nome),ib=tipiOrdine.indexOf(b.nome);return(ia===-1?999:ia)-(ib===-1?999:ib)});return list}
@@ -849,7 +877,7 @@ async function loadAll(){
   if(clo)try{campiLabelOverride=JSON.parse(clo)}catch(e){}
   if(tr)try{tipiRinominati=JSON.parse(tr)}catch(e){}
   if(vis)try{visibilitaConfig=JSON.parse(vis)}catch(e){}
-  const [dati,pins,scadenze,noteC,opAuth,collabs,moduli,logs,maisonD,maisonB,promemoriaD,consegneD]=await Promise.all([
+  const [dati,pins,scadenze,noteC,opAuth,collabs,moduli,logs,maisonD,maisonB,promemoriaD,consegneD,speseD]=await Promise.all([
     sbGet('registrazioni?order=data.desc'),
     sbGet('note_fissate?select=registrazione_id'),
     sbGet('scadenze?order=data_scadenza.asc'),
@@ -861,12 +889,13 @@ async function loadAll(){
     sbGet('costi_maison?order=data_giornata.desc'),
     sbGet('maison_budget?order=nome.asc'),
     sbGet('promemoria?order=data_scadenza.asc'),
-    sbGet('consegne_turno?order=created_at.desc&limit=50')]);
+    sbGet('consegne_turno?order=created_at.desc&limit=50'),
+    sbGet('spese_extra?order=data_spesa.desc')]);
   datiCache=dati;pinnedIds=new Set(pins.map(p=>p.registrazione_id));
   scadenzeCache=scadenze;noteColleghiCache=noteC;operatoriAuthCache=opAuth||[];
   collaboratoriCache=collabs;moduliCache=moduli;logCache=logs;
   maisonCache=maisonD||[];maisonBudgetCache=maisonB||[];
-  promemoriaCache=promemoriaD||[];consegneCache=consegneD||[];
+  promemoriaCache=promemoriaD||[];consegneCache=consegneD||[];speseExtraCache=speseD||[];
   await loadGroqKey();
   _loadLogo();
 }
@@ -1079,7 +1108,7 @@ function applicaTemaOperatore(){const t=localStorage.getItem(getTemaKey())||loca
 // NAVIGATION
 function switchPage(name){flushRapportoSave();document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');document.querySelector('.nav-tab[data-page="'+name+'"]').classList.add('active');sessionStorage.setItem('pagina_corrente',name);
   if(name==='statistiche')renderStatistiche();if(name==='rapporto'){if(!rapportoGiornoAperto){const gc=getGiornataCasino();const d=new Date(gc+'T12:00:00');rapportoMese=d.getMonth();rapportoAnno=d.getFullYear();rapportoGiornoAperto=gc}renderRapporto()}if(name==='note-collega')renderNoteCollega();if(name==='impostazioni'){renderTipiUI();renderScadenzeSettings();renderOperatoriUI();renderCampiRapportoUI();
-    const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}renderCollaboratoriUI();const ai=document.getElementById('ai-section');if(ai)ai.style.display=isAdmin()?'':'none';const visSec=document.getElementById('visibilita-section');if(visSec){visSec.style.display=isAdmin()?'':'none';if(isAdmin())renderVisibilitaUI()}if(isAdmin()&&groqKey){const gs=document.getElementById('groq-status');if(gs)gs.innerHTML='<span style="color:#2c6e49">Chiave configurata</span>'}}if(name==='moduli'){if(!document.getElementById('mod-list-results'))_modFiltInit=false;renderModuliList()};if(name==='registro')renderRegistro();if(name==='maison'){renderMaisonDashboard();renderMaisonBudgetUI();initMaisonFlatpickr()}if(name==='promemoria'){renderPromemoria();initPromemoriaUI()}if(name==='dashboard')renderDashboard();if(name==='consegna'){renderConsegne();initConsegnaUI()}}
+    const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}renderCollaboratoriUI();const ai=document.getElementById('ai-section');if(ai)ai.style.display=isAdmin()?'':'none';const visSec=document.getElementById('visibilita-section');if(visSec){visSec.style.display=isAdmin()?'':'none';if(isAdmin())renderVisibilitaUI()}if(isAdmin()&&groqKey){const gs=document.getElementById('groq-status');if(gs)gs.innerHTML='<span style="color:#2c6e49">Chiave configurata</span>'}}if(name==='moduli'){if(!document.getElementById('mod-list-results'))_modFiltInit=false;renderModuliList()};if(name==='registro')renderRegistro();if(name==='maison'){renderMaisonDashboard();renderMaisonBudgetUI();initMaisonFlatpickr();renderSpeseExtra();initSpeseExtraFP()}if(name==='promemoria'){renderPromemoria();initPromemoriaUI()}if(name==='dashboard')renderDashboard();if(name==='consegna'){renderConsegne();initConsegnaUI()}}
 
 // TIPI
 async function saveTipiP(){await setImp('tipi_personalizzati',JSON.stringify(tipiPersonalizzati))}
@@ -1300,6 +1329,10 @@ function _eseguiRicercaGlobale(q){
   const pmRes=promemoriaCache.filter(p=>p.titolo.toLowerCase().includes(q)||(p.descrizione||'').toLowerCase().includes(q)||(p.assegnato_a||'').toLowerCase().includes(q)).slice(0,5);
   if(isVis('promemoria')&&pmRes.length){html+='<div class="rg-section">Promemoria ('+pmRes.length+(pmRes.length>=5?'+':'')+')</div>';
     pmRes.forEach(p=>{const scaduto=!p.completata&&p.data_scadenza<=new Date().toISOString().split('T')[0];html+='<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'promemoria\')"><span class="rg-badge" style="background:'+(p.completata?'#2c6e49':scaduto?'var(--accent)':'#8e44ad')+'">'+( p.completata?'Fatto':scaduto?'Scaduto':'Todo')+'</span><span class="rg-text"><strong>'+escP(p.titolo)+'</strong>'+(p.descrizione?' — '+escP(p.descrizione.substring(0,50)):'')+'</span><span class="rg-date">'+new Date(p.data_scadenza+'T12:00:00').toLocaleDateString('it-IT')+'</span></div>'});tot+=pmRes.length}
+  // Spese Extra
+  const seRes=speseExtraCache.filter(r=>r.beneficiario.toLowerCase().includes(q)||(r.luogo||'').toLowerCase().includes(q)||(r.descrizione||'').toLowerCase().includes(q)||(r.tipo||'').toLowerCase().includes(q)).slice(0,5);
+  if(isVis('maison')&&seRes.length){html+='<div class="rg-section">Spese Extra ('+seRes.length+(seRes.length>=5?'+':'')+')</div>';
+    seRes.forEach(r=>{const tc=SE_TIPI_COLOR[r.tipo]||'var(--muted)';html+='<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'maison\')"><span class="rg-badge" style="background:'+tc+'">'+(SE_TIPI_LABEL[r.tipo]||r.tipo)+'</span><span class="rg-text"><strong>'+escP(r.beneficiario)+'</strong>'+(r.luogo?' — '+escP(r.luogo):'')+' — '+parseFloat(r.importo).toFixed(2)+' CHF</span><span class="rg-date">'+new Date(r.data_spesa+'T12:00:00').toLocaleDateString('it-IT')+'</span></div>'});tot+=seRes.length}
   // Registro
   const logRes=logCache.filter(l=>l.azione.toLowerCase().includes(q)||(l.dettaglio||'').toLowerCase().includes(q)||(l.operatore||'').toLowerCase().includes(q)).slice(0,5);
   if(logRes.length){html+='<div class="rg-section">Registro ('+logRes.length+(logRes.length>=5?'+':'')+')</div>';
@@ -2405,6 +2438,14 @@ async function generaReportSettimanale(){
       doc.autoTable({startY:y,margin:{left:mx,right:mx},head:[['Titolo','Scadenza','Assegnato','Stato']],
         body:settPM.map(p=>[p.titolo,p.data_scadenza,p.assegnato_a,p.completata?'Completato'+(p.completata_da?' da '+p.completata_da:''):'In corso']),
         headStyles:{fillColor:[142,68,173]},styles:{fontSize:9,cellPadding:3},alternateRowStyles:{fillColor:[250,247,242]}});y=doc.lastAutoTable.finalY+8}
+    // Spese Extra
+    const settSE=speseExtraCache.filter(r=>r.data_spesa>=sett[0]&&r.data_spesa<=sett[6]);
+    if(settSE.length){const totSE=settSE.reduce((s,r)=>s+parseFloat(r.importo||0),0);
+      if(y+20>doc.internal.pageSize.getHeight()-20){doc.addPage();y=16}
+      doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text('Spese Extra ('+totSE.toFixed(2)+' CHF)',mx,y);y+=2;
+      doc.autoTable({startY:y,margin:{left:mx,right:mx},head:[['Data','Beneficiario','Tipo','Luogo','CHF']],
+        body:settSE.map(r=>[new Date(r.data_spesa+'T12:00:00').toLocaleDateString('it-IT'),r.beneficiario,SE_TIPI_LABEL[r.tipo]||r.tipo,r.luogo||'',parseFloat(r.importo).toFixed(2)]),
+        headStyles:{fillColor:[41,128,185]},styles:{fontSize:9,cellPadding:3},columnStyles:{4:{halign:'right'}},alternateRowStyles:{fillColor:[250,247,242]}});y=doc.lastAutoTable.finalY+8}
     // Footer
     const tp=doc.internal.getNumberOfPages();for(let i=1;i<=tp;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(150);
       doc.text('Casino Lugano SA — Report '+dalLabel+' / '+alLabel+' — Pag. '+i+'/'+tp,mx,doc.internal.pageSize.getHeight()-8)}
@@ -2779,6 +2820,82 @@ async function esportaMaisonPDF(){const data=getMaisonFiltrati();if(!data.length
     y=doc.lastAutoTable.finalY+6;
     const tp=doc.internal.getNumberOfPages();for(let i=1;i<=tp;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(150);doc.text('Casino Lugano SA — Costi Maison — Pag. '+i+'/'+tp,16,doc.internal.pageSize.getHeight()-8)}
     doc.save('costi_maison_'+_maisonFilePeriodo(data)+'.pdf');toast('PDF esportato!')}catch(e){console.error(e);toast('Errore PDF: '+e.message)}}
+
+// ========================
+// SPESE EXTRA
+// ========================
+const SE_TIPI_LABEL={cena_esterna:'Cena esterna',pranzo_esterno:'Pranzo esterno',rimborso:'Rimborso spese',viaggio:'Viaggio',biglietti:'Biglietti',regalo:'Regalo',altro:'Altro'};
+const SE_TIPI_COLOR={cena_esterna:'#c0392b',pranzo_esterno:'#e67e22',rimborso:'#2980b9',viaggio:'#8e44ad',biglietti:'#2c6e49',regalo:'#b8860b',altro:'#8a7d6b'};
+let _seFpInit=false;
+function initSpeseExtraFP(){if(_seFpInit||!window.flatpickr)return;_seFpInit=true;
+  flatpickr('#se-data',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false});
+  const o={locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,onChange:()=>renderSpeseExtra()};
+  flatpickr('#se-filt-dal',o);flatpickr('#se-filt-al',o)}
+function acFiltraSpeseExtra(){const inp=document.getElementById('se-beneficiario'),drop=document.getElementById('ac-se-benef');if(!inp||!drop)return;
+  const v=inp.value.toLowerCase();const nomi=[...new Set([...speseExtraCache.map(r=>r.beneficiario),...maisonCache.map(r=>r.nome)])].sort();
+  const f=v?nomi.filter(n=>n.toLowerCase().includes(v)):nomi;
+  if(!f.length){drop.classList.remove('show');return}
+  drop.innerHTML=f.slice(0,12).map(n=>'<div onmousedown="document.getElementById(\'se-beneficiario\').value=\''+n.replace(/'/g,"\\'")+'\';document.getElementById(\'ac-se-benef\').classList.remove(\'show\')">'+escP(n)+'</div>').join('');drop.classList.add('show')}
+async function salvaSpeseExtra(){const benef=capitalizzaNome(document.getElementById('se-beneficiario').value.trim());
+  const tipo=document.getElementById('se-tipo').value;const data=document.getElementById('se-data').value;
+  const luogo=document.getElementById('se-luogo').value.trim();const importo=parseFloat(document.getElementById('se-importo').value)||0;
+  const desc=document.getElementById('se-descrizione').value.trim();
+  if(!benef){toast('Inserisci il beneficiario');return}if(!data){toast('Seleziona la data');return}if(!importo){toast('Inserisci l\'importo');return}
+  try{const rec={beneficiario:benef,tipo,descrizione:desc,importo,data_spesa:data,luogo,operatore:getOperatore()};
+    const r=await sbPost('spese_extra',rec);speseExtraCache.unshift(r[0]);
+    document.getElementById('se-beneficiario').value='';document.getElementById('se-luogo').value='';
+    document.getElementById('se-importo').value='';document.getElementById('se-descrizione').value='';
+    const fp=document.getElementById('se-data');if(fp&&fp._flatpickr)fp._flatpickr.clear();
+    logAzione('Spesa extra',benef+' — '+SE_TIPI_LABEL[tipo]+' — '+importo.toFixed(2)+' CHF');
+    renderSpeseExtra();renderMaisonDashboard();toast('Spesa aggiunta')}catch(e){toast('Errore')}}
+async function eliminaSpeseExtra(id){if(!confirm('Eliminare questa spesa?'))return;
+  try{await sbDel('spese_extra','id=eq.'+id);speseExtraCache=speseExtraCache.filter(x=>x.id!==id);
+    renderSpeseExtra();renderMaisonDashboard();toast('Eliminata')}catch(e){toast('Errore')}}
+function modificaSpeseExtra(id){const s=speseExtraCache.find(x=>x.id===id);if(!s)return;
+  const b=document.getElementById('pwd-modal-content');
+  b.innerHTML='<h3>Modifica spesa extra</h3><div class="pwd-field"><label>Beneficiario</label><input type="text" id="edit-se-benef" value="'+escP(s.beneficiario)+'"></div><div class="pwd-field"><label>Luogo</label><input type="text" id="edit-se-luogo" value="'+escP(s.luogo||'')+'"></div><div class="pwd-field"><label>Importo CHF</label><input type="number" id="edit-se-importo" value="'+s.importo+'" step="0.01"></div><div class="pwd-field"><label>Descrizione</label><input type="text" id="edit-se-desc" value="'+escP(s.descrizione||'')+'"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaModificaSE('+id+')">Salva</button></div>';
+  document.getElementById('pwd-modal').classList.remove('hidden')}
+async function salvaModificaSE(id){const benef=capitalizzaNome(document.getElementById('edit-se-benef').value.trim());
+  const luogo=document.getElementById('edit-se-luogo').value.trim();const importo=parseFloat(document.getElementById('edit-se-importo').value)||0;
+  const desc=document.getElementById('edit-se-desc').value.trim();
+  if(!benef||!importo){toast('Compila beneficiario e importo');return}
+  try{await sbPatch('spese_extra','id=eq.'+id,{beneficiario:benef,luogo,importo,descrizione:desc});
+    const s=speseExtraCache.find(x=>x.id===id);if(s){s.beneficiario=benef;s.luogo=luogo;s.importo=importo;s.descrizione=desc}
+    document.getElementById('pwd-modal').classList.add('hidden');renderSpeseExtra();toast('Modificata')}catch(e){toast('Errore')}}
+function getSpeseExtraFiltrate(){const fn=(document.getElementById('se-filt-nome')||{}).value||'';
+  const ft=(document.getElementById('se-filt-tipo')||{}).value||'';
+  const fd=(document.getElementById('se-filt-dal')||{}).value||'';const fa=(document.getElementById('se-filt-al')||{}).value||'';
+  return speseExtraCache.filter(r=>{if(fn&&!r.beneficiario.toLowerCase().includes(fn.toLowerCase()))return false;
+    if(ft&&r.tipo!==ft)return false;if(fd&&r.data_spesa<fd)return false;if(fa&&r.data_spesa>fa)return false;return true})}
+function renderSpeseExtra(){const data=getSpeseExtraFiltrate();const el=document.getElementById('spese-extra-list');if(!el)return;
+  const tot=data.reduce((s,r)=>s+parseFloat(r.importo||0),0);
+  if(!data.length){el.innerHTML='<p style="color:var(--muted);text-align:center;padding:20px">Nessuna spesa extra registrata</p>';return}
+  let h='<div style="margin-bottom:10px;font-weight:600;color:var(--accent2)">Totale: '+tot.toFixed(2)+' CHF — '+data.length+' spese</div>';
+  h+='<table class="collab-table"><thead><tr><th>Data</th><th>Beneficiario</th><th>Tipo</th><th>Luogo</th><th>Descrizione</th><th class="num">CHF</th><th></th></tr></thead><tbody>';
+  data.forEach(r=>{const d=new Date(r.data_spesa+'T12:00:00');const tl=SE_TIPI_LABEL[r.tipo]||r.tipo;const tc=SE_TIPI_COLOR[r.tipo]||'var(--muted)';
+    h+='<tr><td style="font-weight:600;white-space:nowrap">'+d.getDate()+' '+MESI[d.getMonth()]+' '+d.getFullYear()+'</td><td><strong>'+escP(r.beneficiario)+'</strong></td><td><span class="mini-badge" style="background:'+tc+'">'+escP(tl)+'</span></td><td style="color:var(--muted);font-size:.85rem">'+escP(r.luogo||'')+'</td><td style="color:var(--muted);font-size:.85rem">'+escP(r.descrizione||'')+'</td><td class="num"><strong>'+parseFloat(r.importo).toFixed(2)+'</strong></td><td style="white-space:nowrap"><button class="btn-act edit" onclick="modificaSpeseExtra('+r.id+')" style="font-size:.7rem">Modifica</button> <button class="btn-act del" onclick="eliminaSpeseExtra('+r.id+')" style="font-size:.7rem">Elimina</button></td></tr>'});
+  h+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td colspan="5"><strong>TOTALE</strong></td><td class="num"><strong>'+tot.toFixed(2)+'</strong></td><td></td></tr></tbody></table>';
+  el.innerHTML=h}
+function resetSpeseExtraFiltri(){document.getElementById('se-filt-nome').value='';document.getElementById('se-filt-tipo').value='';
+  ['se-filt-dal','se-filt-al'].forEach(id=>{const el=document.getElementById(id);if(el){el.value='';if(el._flatpickr)el._flatpickr.clear()}});renderSpeseExtra()}
+function esportaSpeseExtraCSV(){const data=getSpeseExtraFiltrate();if(!data.length){toast('Nessun dato');return}
+  const rows=[['Data','Beneficiario','Tipo','Luogo','Descrizione','Importo CHF','Operatore']];
+  data.forEach(r=>{rows.push([new Date(r.data_spesa+'T12:00:00').toLocaleDateString('it-IT'),r.beneficiario,SE_TIPI_LABEL[r.tipo]||r.tipo,r.luogo||'',r.descrizione||'',r.importo,r.operatore||''])});
+  const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(c=>'\"'+String(c).replace(/\"/g,'\"\"')+'\"').join(';')).join('\n')],{type:'text/csv;charset=utf-8'});
+  Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'spese_extra_'+new Date().toLocaleDateString('it-IT').replace(/\//g,'-')+'.csv'}).click();toast('CSV esportato!')}
+async function esportaSpeseExtraPDF(){const data=getSpeseExtraFiltrate();if(!data.length){toast('Nessun dato');return}
+  if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore');return}}
+  const tot=data.reduce((s,r)=>s+parseFloat(r.importo||0),0);
+  try{const{jsPDF}=window.jspdf;const doc=new jsPDF('portrait','mm','a4');const pw=doc.internal.pageSize.getWidth();let y=14;
+    if(_logoB64)try{doc.addImage(_logoB64,'PNG',pw/2-20,y,40,22.5)}catch(e){}
+    y+=28;doc.setFont('helvetica','bold');doc.setFontSize(16);doc.text('Spese Extra',pw/2,y,{align:'center'});y+=7;
+    doc.setFontSize(10);doc.setFont('helvetica','normal');doc.setTextColor(100);doc.text('Casino Lugano SA — '+data.length+' spese — '+tot.toFixed(2)+' CHF',pw/2,y,{align:'center'});y+=10;doc.setTextColor(0);
+    doc.autoTable({startY:y,margin:{left:16,right:16},head:[['Data','Beneficiario','Tipo','Luogo','Descrizione','CHF']],
+      body:data.map(r=>[new Date(r.data_spesa+'T12:00:00').toLocaleDateString('it-IT'),r.beneficiario,SE_TIPI_LABEL[r.tipo]||r.tipo,r.luogo||'',r.descrizione||'',parseFloat(r.importo).toFixed(2)]),
+      foot:[['','','','','TOTALE',tot.toFixed(2)]],headStyles:{fillColor:[26,18,8]},footStyles:{fillColor:[245,243,238],textColor:[0,0,0],fontStyle:'bold'},
+      styles:{fontSize:8,cellPadding:3},columnStyles:{5:{halign:'right'}},alternateRowStyles:{fillColor:[250,247,242]}});
+    const tp=doc.internal.getNumberOfPages();for(let i=1;i<=tp;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(150);doc.text('Casino Lugano SA — Spese Extra — Pag. '+i+'/'+tp,16,doc.internal.pageSize.getHeight()-8)}
+    doc.save('spese_extra.pdf');toast('PDF esportato!')}catch(e){toast('Errore PDF')}}
 
 // INIT
 window.addEventListener('load',async()=>{
