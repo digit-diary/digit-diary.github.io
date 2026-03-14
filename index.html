@@ -1265,7 +1265,7 @@ async function parseDifferenzeCassa(text,ds,turno){if(!text||!text.trim())return
     }}render();updateStats()}
 function checkCassaAlerts(){
   const alerts=[];const tipoErr=nomeCorrente('Errore');
-  const errori=datiCache.filter(e=>e.tipo===tipoErr&&e.reparto==='Cassa'&&(parseFloat(e.importo)||0)>0);
+  const errori=getDatiReparto().filter(e=>e.tipo===tipoErr&&e.reparto==='Cassa'&&(parseFloat(e.importo)||0)>0);
   const byNome={};errori.forEach(e=>{const k=e.nome.toLowerCase();if(!byNome[k])byNome[k]={nome:e.nome,errs:[]};byNome[k].errs.push(e)});
   Object.values(byNome).forEach(({nome,errs})=>{
     const lastAllin=moduliCache.filter(m=>m.tipo==='allineamento'&&m.collaboratore.toLowerCase()===nome.toLowerCase()).sort((a,b)=>(b.created_at||b.data_modulo||'').localeCompare(a.created_at||a.data_modulo||''))[0];
@@ -1322,7 +1322,7 @@ function toggleRischioDD(){const dd=document.getElementById('rischio-dd');if(dd)
 // ALERT AMMONIMENTI VERBALI RECIDIVI (2+ → preparare allineamento)
 function checkAmmonimentiAlerts(){
   const tipoAmm=nomeCorrente('Ammonimento Verbale');const alerts=[];
-  const byNome={};datiCache.filter(e=>e.tipo===tipoAmm).forEach(e=>{if(!byNome[e.nome.toLowerCase()])byNome[e.nome.toLowerCase()]={nome:e.nome,count:0,last:''};byNome[e.nome.toLowerCase()].count++;if(e.data>byNome[e.nome.toLowerCase()].last)byNome[e.nome.toLowerCase()].last=e.data});
+  const byNome={};getDatiReparto().filter(e=>e.tipo===tipoAmm).forEach(e=>{if(!byNome[e.nome.toLowerCase()])byNome[e.nome.toLowerCase()]={nome:e.nome,count:0,last:''};byNome[e.nome.toLowerCase()].count++;if(e.data>byNome[e.nome.toLowerCase()].last)byNome[e.nome.toLowerCase()].last=e.data});
   Object.values(byNome).forEach(a=>{if(a.count<2)return;
     // Controlla se c'e gia un allineamento dopo l'ultimo ammonimento
     const hasAllin=moduliCache.some(m=>m.tipo==='allineamento'&&m.collaboratore.toLowerCase()===a.nome.toLowerCase()&&(m.created_at||m.data_modulo||'')>a.last);
@@ -1411,7 +1411,7 @@ async function generaRiepilogoMensile(){
   const meseName=MESI_FULL[mese]+' '+anno;
   const primoGiorno=anno+'-'+String(mese+1).padStart(2,'0')+'-01';
   const nextAnno=mese===11?anno+1:anno,nextMese=mese===11?1:mese+2;
-  const meseData=datiCache.filter(e=>e.data>=primoGiorno&&e.data<nextAnno+'-'+String(nextMese).padStart(2,'0')+'-01');
+  const meseData=getDatiReparto().filter(e=>e.data>=primoGiorno&&e.data<nextAnno+'-'+String(nextMese).padStart(2,'0')+'-01');
   const meseModuli=moduliCache.filter(m=>{const d=m.created_at||m.data_modulo||'';return d>=primoGiorno&&d<nextAnno+'-'+String(nextMese).padStart(2,'0')+'-01'});
   try{
     const{jsPDF}=window.jspdf;const doc=new jsPDF('portrait','mm','a4');const pw=doc.internal.pageSize.getWidth();const mx=16;let y=14;
@@ -2087,7 +2087,7 @@ function parseModuloTesto(testo,tipo){const r={};const lines=testo.split(/\n/);
   return r}
 
 // PROFILO COLLABORATORE
-function apriProfilo(nome){const entries=datiCache.filter(e=>e.nome===nome);const tipiCount={};entries.forEach(e=>{tipiCount[e.tipo]=(tipiCount[e.tipo]||0)+1});
+function apriProfilo(nome){const entries=getDatiReparto().filter(e=>e.nome===nome);const tipiCount={};entries.forEach(e=>{tipiCount[e.tipo]=(tipiCount[e.tipo]||0)+1});
   const first=entries.length?new Date(entries[entries.length-1].data).toLocaleDateString('it-IT'):'—';
   const last=entries.length?new Date(entries[0].data).toLocaleDateString('it-IT'):'—';
   let html='<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px"><div><h3>'+escP(nome)+'</h3><p style="color:var(--muted);font-size:.82rem">Prima registrazione: '+first+' — Ultima: '+last+'</p></div><button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\')" style="padding:6px 12px;font-size:.75rem">Chiudi</button></div>';
@@ -2113,7 +2113,7 @@ function render(){const f=getFiltrati(),el=document.getElementById('entries-list
     if(e.modificato_da)metaLines.push('Modificata da '+escP(e.modificato_da));
     const gdDiff=d.getHours()<6;const gdDate=gdDiff?new Date(d.getTime()-86400000):d;const gdBadge=gdDiff?'<span style="font-size:.72rem;padding:2px 7px;border-radius:2px;background:var(--accent2);color:white;font-weight:700">GD '+gdDate.getDate()+'.'+String(gdDate.getMonth()+1).padStart(2,'0')+'</span>':'';
     return'<div class="entry'+(pin?' pinned':'')+'"><div class="entry-date"><div class="entry-day">'+d.getDate()+'</div><div class="entry-month">'+MESI[d.getMonth()]+' '+d.getFullYear()+'</div><div class="entry-time">'+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})+'</div></div><div class="entry-body"><div class="entry-top"><span class="entry-name" onclick="apriProfilo(\''+e.nome.replace(/'/g,"\\'")+'\')">'+esc(e.nome)+'</span><span class="badge '+bc+'">'+escP(e.tipo)+'</span>'+gdBadge+rep+imp+'</div><div class="entry-text">'+esc(e.testo)+'</div>'+(metaLines.length?'<div class="entry-meta">'+metaLines.join(' · ')+'</div>':'')+'</div><div class="entry-actions"><button class="btn-act pin" onclick="togglePin('+e.id+')">'+(pin?'Rimuovi pin':'Fissa')+'</button><button class="btn-act scad" onclick="apriScadenza('+e.id+')">Scadenza</button><button class="btn-act tipo" onclick="apriModal('+e.id+',\''+te+'\')">Tipo</button><button class="btn-act edit" onclick="modificaRegistrazione('+e.id+')">Modifica</button><button class="btn-act del" onclick="elimina('+e.id+')">Elimina</button></div></div>'}).join('')}
-function getNomiLista(){return[...new Set([...collaboratoriCache.map(c=>c.nome),...datiCache.map(e=>e.nome)])].filter(Boolean).sort()}
+function getNomiLista(){return[...new Set([...collaboratoriCache.map(c=>c.nome),...getDatiReparto().map(e=>e.nome)])].filter(Boolean).sort()}
 function aggiornaNomi(){const nomi=getNomiLista();
   const sel=document.getElementById('filt-persona'),cur=sel.value;sel.innerHTML='<option value="">Tutte</option>'+nomi.map(n=>'<option'+(n===cur?' selected':'')+'>'+escP(n)+'</option>').join('')}
 function acFiltra(inputId,dropId){const inp=document.getElementById(inputId),drop=document.getElementById(dropId);if(!inp||!drop)return;
@@ -2248,31 +2248,31 @@ async function esportaRapportoPDF(){if(!window.jspdf){toast('Caricamento PDF...'
   doc.save('rapporto_'+dal+'_'+al+'.pdf');toast('PDF esportato!')}catch(e){console.error('PDF error:',e);toast('Errore generazione PDF: '+e.message)}}
 
 // STATISTICHE
-function renderStatistiche(){if(!datiCache.length){document.getElementById('stats-summary').innerHTML='<p style="color:var(--muted);text-align:center;padding:40px">Nessun dato da analizzare</p>';return}
+function renderStatistiche(){const _ds=getDatiReparto();if(!_ds.length){document.getElementById('stats-summary').innerHTML='<p style="color:var(--muted);text-align:center;padding:40px">Nessun dato da analizzare</p>';return}
   // Summary
-  const nCollab=new Set(datiCache.map(e=>e.nome)).size;const nErr=datiCache.filter(e=>e.tipo===nomeCorrente('Errore')).length;const totImp=datiCache.reduce((s,e)=>s+(parseFloat(e.importo)||0),0);
-  document.getElementById('stats-summary').innerHTML='<div class="stats-bar" style="margin-bottom:0"><div class="stat"><div class="stat-num">'+datiCache.length+'</div><div class="stat-label">Registrazioni totali</div></div><div class="stat"><div class="stat-num blue">'+nCollab+'</div><div class="stat-label">Collaboratori</div></div><div class="stat"><div class="stat-num red">'+nErr+'</div><div class="stat-label">'+nomeCorrente('Errore')+'</div></div><div class="stat"><div class="stat-num teal">'+datiCache.filter(e=>e.tipo===nomeCorrente('Malattia')).length+'</div><div class="stat-label">'+nomeCorrente('Malattia')+'</div></div><div class="stat"><div class="stat-num gold">'+(totImp?totImp.toFixed(2):'0')+'</div><div class="stat-label">Importo totale</div></div></div>';
+  const nCollab=new Set(_ds.map(e=>e.nome)).size;const nErr=_ds.filter(e=>e.tipo===nomeCorrente('Errore')).length;const totImp=_ds.reduce((s,e)=>s+(parseFloat(e.importo)||0),0);
+  document.getElementById('stats-summary').innerHTML='<div class="stats-bar" style="margin-bottom:0"><div class="stat"><div class="stat-num">'+_ds.length+'</div><div class="stat-label">Registrazioni totali</div></div><div class="stat"><div class="stat-num blue">'+nCollab+'</div><div class="stat-label">Collaboratori</div></div><div class="stat"><div class="stat-num red">'+nErr+'</div><div class="stat-label">'+nomeCorrente('Errore')+'</div></div><div class="stat"><div class="stat-num teal">'+_ds.filter(e=>e.tipo===nomeCorrente('Malattia')).length+'</div><div class="stat-label">'+nomeCorrente('Malattia')+'</div></div><div class="stat"><div class="stat-num gold">'+(totImp?totImp.toFixed(2):'0')+'</div><div class="stat-label">Importo totale</div></div></div>';
   // Grafico mensile (full width, primo)
-  const tipiCount={};datiCache.forEach(e=>{tipiCount[e.tipo]=(tipiCount[e.tipo]||0)+1});
+  const tipiCount={};_ds.forEach(e=>{tipiCount[e.tipo]=(tipiCount[e.tipo]||0)+1});
   const tl=Object.keys(tipiCount).sort((a,b)=>tipiCount[b]-tipiCount[a]);
-  const now=new Date(),ml=[],md=[],me=[];for(let i=11;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);ml.push(MESI[d.getMonth()]+' '+d.getFullYear());md.push(datiCache.filter(e=>{const ed=new Date(e.data);return ed.getMonth()===d.getMonth()&&ed.getFullYear()===d.getFullYear()}).length);me.push(datiCache.filter(e=>{const ed=new Date(e.data);return e.tipo===nomeCorrente('Errore')&&ed.getMonth()===d.getMonth()&&ed.getFullYear()===d.getFullYear()}).length)}
+  const now=new Date(),ml=[],md=[],me=[];for(let i=11;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);ml.push(MESI[d.getMonth()]+' '+d.getFullYear());md.push(_ds.filter(e=>{const ed=new Date(e.data);return ed.getMonth()===d.getMonth()&&ed.getFullYear()===d.getFullYear()}).length);me.push(_ds.filter(e=>{const ed=new Date(e.data);return e.tipo===nomeCorrente('Errore')&&ed.getMonth()===d.getMonth()&&ed.getFullYear()===d.getFullYear()}).length)}
   renderChart('chart-mesi','bar',{labels:ml,datasets:[{label:'Tutte le registrazioni',data:md,backgroundColor:'rgba(26,74,122,0.7)',borderRadius:4},{label:'Di cui errori',data:me,backgroundColor:'rgba(192,57,43,0.7)',borderRadius:4}]},{plugins:{legend:{position:'top',labels:{font:{size:13},padding:16}}},scales:{y:{beginAtZero:true,ticks:{stepSize:1,font:{size:12}}},x:{ticks:{font:{size:11}}}}});
   // Doughnut tipi
   renderChart('chart-tipi','doughnut',{labels:tl.map(t=>t+' ('+tipiCount[t]+')'),datasets:[{data:tl.map(t=>tipiCount[t]),backgroundColor:tl.map(t=>getColore(t)),borderWidth:2,borderColor:'white'}]},{plugins:{legend:{position:'bottom',labels:{font:{size:12},padding:12,usePointStyle:true}}}});
   // Giorni settimana
-  const gc=[0,0,0,0,0,0,0];datiCache.forEach(e=>{gc[new Date(e.data).getDay()]++});const go=[1,2,3,4,5,6,0];
+  const gc=[0,0,0,0,0,0,0];_ds.forEach(e=>{gc[new Date(e.data).getDay()]++});const go=[1,2,3,4,5,6,0];
   renderChart('chart-giorni','bar',{labels:go.map(i=>GIORNI[i]),datasets:[{label:'Eventi',data:go.map(i=>gc[i]),backgroundColor:go.map(i=>i===0||i===6?'rgba(192,57,43,0.7)':'rgba(44,110,73,0.7)'),borderRadius:4}]},{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1,font:{size:12}}},x:{ticks:{font:{size:12}}}}});
   // Top collaboratori
-  const cc={};datiCache.forEach(e=>{cc[e.nome]=(cc[e.nome]||0)+1});const cs=Object.entries(cc).sort((a,b)=>b[1]-a[1]).slice(0,15);
+  const cc={};_ds.forEach(e=>{cc[e.nome]=(cc[e.nome]||0)+1});const cs=Object.entries(cc).sort((a,b)=>b[1]-a[1]).slice(0,15);
   renderChart('chart-collab','bar',{labels:cs.map(c=>c[0]),datasets:[{label:'Registrazioni',data:cs.map(c=>c[1]),backgroundColor:'rgba(139,105,20,0.7)',borderRadius:4}]},{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1,font:{size:12}}},y:{ticks:{font:{size:13}}}}});
-  const tutti=getTuttiTipi(),cd={};datiCache.forEach(e=>{if(!cd[e.nome])cd[e.nome]={tot:0};cd[e.nome].tot++;cd[e.nome][e.tipo]=(cd[e.nome][e.tipo]||0)+1});
-  const cr=Object.entries(cd).sort((a,b)=>b[1].tot-a[1].tot),tp=tutti.filter(t=>datiCache.some(e=>e.tipo===t.nome));
+  const tutti=getTuttiTipi(),cd={};_ds.forEach(e=>{if(!cd[e.nome])cd[e.nome]={tot:0};cd[e.nome].tot++;cd[e.nome][e.tipo]=(cd[e.nome][e.tipo]||0)+1});
+  const cr=Object.entries(cd).sort((a,b)=>b[1].tot-a[1].tot),tp=tutti.filter(t=>_ds.some(e=>e.tipo===t.nome));
   let th='<table class="collab-table"><thead><tr><th>Collaboratore</th><th class="num">Tot</th>'+tp.map(t=>'<th class="num">'+t.nome+'</th>').join('')+'</tr></thead><tbody>';
   cr.forEach(([n,d])=>{th+='<tr><td><strong>'+escP(n)+'</strong></td><td class="num"><strong>'+d.tot+'</strong></td>'+tp.map(t=>{const v=d[t.nome]||0;return'<td class="num">'+(v?'<span class="mini-badge" style="background:'+t.colore+'">'+v+'</span>':'-')+'</td>'}).join('')+'</tr>'});
   const totGen=cr.reduce((s,c)=>s+c[1].tot,0);th+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td class="num"><strong>'+totGen+'</strong></td>'+tp.map(t=>{const v=cr.reduce((s,c)=>s+(c[1][t.nome]||0),0);return'<td class="num"><strong>'+(v?'<span class="mini-badge" style="background:'+t.colore+'">'+v+'</span>':'-')+'</strong></td>'}).join('')+'</tr>';
   th+='</tbody></table>';document.getElementById('collab-table-wrap').innerHTML=th;
   // Tabella errori con importi e reparto
-  const errori=datiCache.filter(e=>e.tipo===nomeCorrente('Errore'));const errMap={};
+  const errori=_ds.filter(e=>e.tipo===nomeCorrente('Errore'));const errMap={};
   errori.forEach(e=>{if(!errMap[e.nome])errMap[e.nome]={count:0,totCHF:0,totEUR:0,reparti:{}};errMap[e.nome].count++;const imp=parseFloat(e.importo)||0;if(imp){if(e.valuta==='EUR')errMap[e.nome].totEUR+=imp;else errMap[e.nome].totCHF+=imp}const rep=e.reparto||'N/D';errMap[e.nome].reparti[rep]=(errMap[e.nome].reparti[rep]||0)+1});
   const errSorted=Object.entries(errMap).sort((a,b)=>b[1].count-a[1].count);
   if(errSorted.length){let et='<table class="collab-table"><thead><tr><th>Collaboratore</th><th class="num">N. Errori</th><th>Reparti</th><th class="num">Totale CHF</th><th class="num">Totale EUR</th></tr></thead><tbody>';
@@ -2452,8 +2452,8 @@ async function generaReportSettimanale(){
   if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore');return}}
   const now=new Date();const sett=[];for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);sett.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'))}
   const dalLabel=new Date(sett[0]+'T12:00:00').toLocaleDateString('it-IT'),alLabel=new Date(sett[6]+'T12:00:00').toLocaleDateString('it-IT');
-  const settData=datiCache.filter(e=>e.data>=sett[0]&&e.data<=sett[6]+'T23:59:59');
-  const settMaison=maisonCache.filter(r=>r.data_giornata>=sett[0]&&r.data_giornata<=sett[6]);
+  const settData=getDatiReparto().filter(e=>e.data>=sett[0]&&e.data<=sett[6]+'T23:59:59');
+  const settMaison=getMaisonReparto().filter(r=>r.data_giornata>=sett[0]&&r.data_giornata<=sett[6]);
   const settModuli=moduliCache.filter(m=>(m.created_at||m.data_modulo||'')>=sett[0]);
   const settPM=promemoriaCache.filter(p=>p.data_scadenza>=sett[0]&&p.data_scadenza<=sett[6]);
   try{const{jsPDF}=window.jspdf;const doc=new jsPDF('portrait','mm','a4');const pw=doc.internal.pageSize.getWidth();const mx=16;let y=14;
@@ -2523,9 +2523,9 @@ async function generaReportSettimanale(){
 function generaReportSettimanaleCSV(){
   const sett=[];for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);sett.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'))}
   const dalL=new Date(sett[0]+'T12:00:00').toLocaleDateString('it-IT'),alL=new Date(sett[6]+'T12:00:00').toLocaleDateString('it-IT');
-  const settData=datiCache.filter(e=>e.data>=sett[0]&&e.data<=sett[6]+'T23:59:59');
-  const settMaison=maisonCache.filter(r=>r.data_giornata>=sett[0]&&r.data_giornata<=sett[6]);
-  const settSE=speseExtraCache.filter(r=>r.data_spesa>=sett[0]&&r.data_spesa<=sett[6]);
+  const settData=getDatiReparto().filter(e=>e.data>=sett[0]&&e.data<=sett[6]+'T23:59:59');
+  const settMaison=getMaisonReparto().filter(r=>r.data_giornata>=sett[0]&&r.data_giornata<=sett[6]);
+  const settSE=getSpeseReparto().filter(r=>r.data_spesa>=sett[0]&&r.data_spesa<=sett[6]);
   const rows=[['REPORT SETTIMANALE '+dalL+' - '+alL],[''],['REGISTRAZIONI'],['Data','Ora','Collaboratore','Tipo','Descrizione']];
   settData.forEach(e=>{const d=new Date(e.data);rows.push([d.toLocaleDateString('it-IT'),d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}),e.nome,e.tipo,e.testo.replace(/\n/g,' ')])});
   rows.push([''],['COSTI MAISON'],['Data','Cliente','PX','Costo CHF','Tipo']);
@@ -2538,9 +2538,9 @@ function generaReportSettimanaleCSV(){
 // REPORT ANNUALE
 function _getAnnoCorrente(){return new Date().getFullYear()}
 function _getDatiAnno(anno){const start=anno+'-01-01',end=anno+'-12-31';
-  return{data:datiCache.filter(e=>e.data>=start&&e.data<=end+'T23:59:59'),
-    maison:maisonCache.filter(r=>r.data_giornata>=start&&r.data_giornata<=end),
-    spese:speseExtraCache.filter(r=>r.data_spesa>=start&&r.data_spesa<=end),
+  return{data:getDatiReparto().filter(e=>e.data>=start&&e.data<=end+'T23:59:59'),
+    maison:getMaisonReparto().filter(r=>r.data_giornata>=start&&r.data_giornata<=end),
+    spese:getSpeseReparto().filter(r=>r.data_spesa>=start&&r.data_spesa<=end),
     moduli:moduliCache.filter(m=>(m.created_at||m.data_modulo||'')>=start&&(m.created_at||m.data_modulo||'')<=end+'T23:59:59')}}
 async function generaReportAnnuale(){
   if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore');return}}
