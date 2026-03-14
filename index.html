@@ -1370,7 +1370,7 @@ function cercaGlobale(q){clearTimeout(_rgTimeout);const dd=document.getElementBy
 function _eseguiRicercaGlobale(q){
   const dd=document.getElementById('ricerca-globale-results');let html='';let tot=0;
   // Diario
-  const diarioRes=datiCache.filter(e=>e.nome.toLowerCase().includes(q)||e.testo.toLowerCase().includes(q)||e.tipo.toLowerCase().includes(q)).slice(0,8);
+  const diarioRes=getDatiReparto().filter(e=>e.nome.toLowerCase().includes(q)||e.testo.toLowerCase().includes(q)||e.tipo.toLowerCase().includes(q)).slice(0,8);
   if(diarioRes.length){html+='<div class="rg-section">Diario ('+diarioRes.length+(diarioRes.length>=8?'+':'')+')</div>';
     diarioRes.forEach(e=>{const d=new Date(e.data);html+='<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'diario\');document.getElementById(\'filt-cerca\').value=\''+escP(q)+'\';render()"><span class="rg-badge" style="background:'+getColore(e.tipo)+'">'+escP(e.tipo)+'</span><span class="rg-text"><strong>'+escP(e.nome)+'</strong> — '+escP(e.testo.substring(0,80))+'</span><span class="rg-date">'+d.toLocaleDateString('it-IT')+'</span></div>'});tot+=diarioRes.length}
   // Moduli
@@ -1391,7 +1391,7 @@ function _eseguiRicercaGlobale(q){
   if(isVis('promemoria')&&pmRes.length){html+='<div class="rg-section">Promemoria ('+pmRes.length+(pmRes.length>=5?'+':'')+')</div>';
     pmRes.forEach(p=>{const scaduto=!p.completata&&p.data_scadenza<=new Date().toISOString().split('T')[0];html+='<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'promemoria\')"><span class="rg-badge" style="background:'+(p.completata?'#2c6e49':scaduto?'var(--accent)':'#8e44ad')+'">'+( p.completata?'Fatto':scaduto?'Scaduto':'Todo')+'</span><span class="rg-text"><strong>'+escP(p.titolo)+'</strong>'+(p.descrizione?' — '+escP(p.descrizione.substring(0,50)):'')+'</span><span class="rg-date">'+new Date(p.data_scadenza+'T12:00:00').toLocaleDateString('it-IT')+'</span></div>'});tot+=pmRes.length}
   // Spese Extra
-  const seRes=speseExtraCache.filter(r=>r.beneficiario.toLowerCase().includes(q)||(r.luogo||'').toLowerCase().includes(q)||(r.descrizione||'').toLowerCase().includes(q)||(r.tipo||'').toLowerCase().includes(q)).slice(0,5);
+  const seRes=getSpeseReparto().filter(r=>r.beneficiario.toLowerCase().includes(q)||(r.luogo||'').toLowerCase().includes(q)||(r.descrizione||'').toLowerCase().includes(q)||(r.tipo||'').toLowerCase().includes(q)).slice(0,5);
   if(isVis('maison')&&seRes.length){html+='<div class="rg-section">Spese Extra ('+seRes.length+(seRes.length>=5?'+':'')+')</div>';
     seRes.forEach(r=>{const tc=SE_TIPI_COLOR[r.tipo]||'var(--muted)';html+='<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'maison\')"><span class="rg-badge" style="background:'+tc+'">'+(SE_TIPI_LABEL[r.tipo]||r.tipo)+'</span><span class="rg-text"><strong>'+escP(r.beneficiario)+'</strong>'+(r.luogo?' — '+escP(r.luogo):'')+' — '+parseFloat(r.importo).toFixed(2)+' CHF</span><span class="rg-date">'+new Date(r.data_spesa+'T12:00:00').toLocaleDateString('it-IT')+'</span></div>'});tot+=seRes.length}
   // Registro
@@ -2387,9 +2387,10 @@ function renderDashboard(){
   const pmMiei=promemoriaCache.filter(p=>!p.completata&&(p.assegnato_a===op||p.assegnato_a==='tutti'));
   const pmScaduti=pmMiei.filter(p=>p.data_scadenza<=oggi);
   const noteNL=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.letta&&!n.nascosta_dest).length;
-  const maisonOggi=maisonCache.filter(r=>r.data_giornata===oggi).reduce((s,r)=>s+parseFloat(r.costo||0),0);
+  const _rd=getDatiReparto(),_rm=getMaisonReparto();
+  const maisonOggi=_rm.filter(r=>r.data_giornata===oggi).reduce((s,r)=>s+parseFloat(r.costo||0),0);
   const alertCassa=checkCassaAlerts().length;
-  const regOggi=datiCache.filter(e=>e.data&&e.data.startsWith(oggi)).length;
+  const regOggi=_rd.filter(e=>e.data&&e.data.startsWith(oggi)).length;
   const alertRischio=checkRischioAlerts().length;
   let statsH='';
   if(isVis('promemoria'))statsH+='<div class="stat"><div class="stat-num'+(pmScaduti.length?' red':'')+'">'+pmMiei.length+'</div><div class="stat-label">Promemoria'+(pmScaduti.length?' ('+pmScaduti.length+' scaduti)':'')+'</div></div>';
@@ -2416,17 +2417,17 @@ function renderDashboard(){
   const alertEl=document.getElementById('dash-alert-list');let alertH='';
   checkCassaAlerts().forEach(a=>{const ne=a.nome.replace(/'/g,"\\'");alertH+='<div style="padding:8px 0;border-bottom:1px solid var(--line)"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+(a.type==='rdi'?'var(--accent)':'#e67e22')+';margin-right:8px"></span><span class="entry-name" onclick="apriProfilo(\''+ne+'\')"><strong>'+escP(a.nome)+'</strong></span>: '+(a.type==='rdi'?'cumulativo '+a.importo.toFixed(0)+' CHF → RDI':'singola '+a.importo.toFixed(0)+' CHF → Allineamento')+'</div>'});
   checkRischioAlerts().forEach(a=>{const ne=a.nome.replace(/'/g,"\\'");alertH+='<div style="padding:8px 0;border-bottom:1px solid var(--line)"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8e44ad;margin-right:8px"></span><span class="entry-name" onclick="apriProfilo(\''+ne+'\')"><strong>'+escP(a.nome)+'</strong></span>: '+a.count+' allineamenti — rischio RDI</div>'});
-  maisonBudgetCache.forEach(b=>{const spent=maisonCache.filter(r=>r.nome.toLowerCase()===b.nome.toLowerCase()).reduce((s,r)=>s+parseFloat(r.costo||0),0);const ne=b.nome.replace(/'/g,"\\'");
+  getBudgetReparto().forEach(b=>{const spent=_rm.filter(r=>r.nome.toLowerCase()===b.nome.toLowerCase()).reduce((s,r)=>s+parseFloat(r.costo||0),0);const ne=b.nome.replace(/'/g,"\\'");
     if(b.budget_chf&&spent>=b.budget_chf*0.8){alertH+='<div style="padding:8px 0;border-bottom:1px solid var(--line)"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+(spent>=b.budget_chf?'var(--accent)':'#e67e22')+';margin-right:8px"></span><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')"><strong>'+escP(b.nome)+'</strong></span>: Maison '+spent.toFixed(0)+'/'+parseFloat(b.budget_chf).toFixed(0)+' CHF ('+(Math.round(spent/b.budget_chf*100))+'%)</div>'}});
   if(!alertH)alertH='<p style="color:#2c6e49;text-align:center;padding:20px;font-weight:600">Nessun alert attivo</p>';
   alertEl.innerHTML=alertH;
   // ULTIME REGISTRAZIONI
   const recEl=document.getElementById('dash-recenti-list');
-  const ultimi=datiCache.slice(0,8);
+  const ultimi=_rd.slice(0,8);
   recEl.innerHTML=ultimi.length?ultimi.map(e=>{const d=new Date(e.data);const ne=e.nome.replace(/'/g,"\\'");const gdD=d.getHours()<6;const gdDt=gdD?new Date(d.getTime()-86400000):null;const gdB=gdD?'<span class="mini-badge" style="background:var(--accent2)">GD '+gdDt.getDate()+'.'+String(gdDt.getMonth()+1).padStart(2,'0')+'</span>':'';return'<div style="padding:6px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:.88rem"><span style="color:var(--muted);font-size:.78rem;min-width:38px">'+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})+'</span><span class="mini-badge" style="background:'+getColore(e.tipo)+'">'+escP(e.tipo)+'</span>'+gdB+'<span class="entry-name" onclick="apriProfilo(\''+ne+'\')"><strong>'+escP(e.nome)+'</strong></span> <span style="color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escP(e.testo.substring(0,40))+'</span></div>'}).join(''):'<p style="color:var(--muted);text-align:center;padding:20px">Nessuna registrazione</p>';
   // MAISON OGGI
   const mEl=document.getElementById('dash-maison-content');
-  const maisonOggiRighe=maisonCache.filter(r=>r.data_giornata===oggi);
+  const maisonOggiRighe=_rm.filter(r=>r.data_giornata===oggi);
   if(maisonOggiRighe.length){const byN={};maisonOggiRighe.forEach(r=>{byN[r.nome]=(byN[r.nome]||0)+parseFloat(r.costo||0)});
     const sorted=Object.entries(byN).sort((a,b)=>b[1]-a[1]);
     mEl.innerHTML=sorted.map(([n,c])=>{const ne=n.replace(/'/g,"\\'");return'<div style="padding:5px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;font-size:.88rem"><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(n)+'</span><strong>'+c.toFixed(2)+' CHF</strong></div>'}).join('')+'<div style="padding:8px 0;display:flex;justify-content:space-between;font-weight:700;color:var(--accent2)"><span>Totale</span><span>'+maisonOggi.toFixed(2)+' CHF</span></div>'}
@@ -2437,8 +2438,8 @@ function renderDashboard(){
   const dashAlerts=document.getElementById('dash-alerts');if(dashAlerts){const hasCassa=isVis('alert_cassa'),hasRischio=isVis('alert_rischio');if(!hasCassa&&!hasRischio)dashAlerts.style.display='none';else dashAlerts.style.display=''}
   // GRAFICO SETTIMANALE
   const sett=[];for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);sett.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'))}
-  const regPerGiorno=sett.map(ds=>datiCache.filter(e=>e.data&&e.data.startsWith(ds)).length);
-  const maisonPerGiorno=sett.map(ds=>maisonCache.filter(r=>r.data_giornata===ds).reduce((s,r)=>s+parseFloat(r.costo||0),0));
+  const regPerGiorno=sett.map(ds=>_rd.filter(e=>e.data&&e.data.startsWith(ds)).length);
+  const maisonPerGiorno=sett.map(ds=>_rm.filter(r=>r.data_giornata===ds).reduce((s,r)=>s+parseFloat(r.costo||0),0));
   renderChart('chart-dash-settimana','bar',{labels:sett.map(ds=>{const d=new Date(ds+'T12:00:00');return d.getDate()+' '+MESI[d.getMonth()]}),
     datasets:[{label:'Registrazioni',data:regPerGiorno,backgroundColor:'rgba(26,74,122,0.7)',borderRadius:4,yAxisID:'y'},
       {label:'Maison CHF',data:maisonPerGiorno,backgroundColor:'rgba(184,134,11,0.4)',borderRadius:4,type:'line',borderColor:'#b8860b',tension:0.3,pointRadius:4,yAxisID:'y1'}]},
