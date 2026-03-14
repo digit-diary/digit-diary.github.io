@@ -740,13 +740,50 @@
        - Click fuori chiude il pannello
 
   [49] Reparto per operatore e login settore
-       - Login: selettore Settore (Admin/Slots/Tavoli)
-       - Selezione settore → appare dropdown con operatori di quel settore
-       - Admin: vede tutti gli operatori, switch Slots/Tavoli visibile
+       - Login: 3 campi (Settore → Operatore → Password)
+       - Selezione settore filtra lista operatori + Admin sempre presente
+       - Hash PBKDF2 separato: salt operatore per login, salt __master__ per admin
+       - Settore selezionato imposta currentReparto automaticamente
        - Creazione operatore: selettore Reparto (Slots/Tavoli/Entrambi)
-       - Lista operatori: badge reparto + dropdown per cambiare
+       - Lista operatori: badge reparto (blu/viola/oro) + dropdown cambio
        - Ogni operatore assegnato a un reparto vede solo i suoi dati
+       - Switch Slots/Tavoli nascosto se operatore ha solo un reparto
        - Mapping salvato in impostazioni (operatori_reparto JSON)
+
+  [50] Categoria Direzione per clienti maison
+       - Terza categoria (viola) oltre a Full Maison e Maison
+       - Direzione separata dai costi maison
+       - Lista clienti: mostra solo categorizzati (popup dedicato)
+       - Export CSV/PDF per categoria con colori
+
+  [51] Report Annuale PDF e CSV + Report Settimanale CSV
+       - 4 pulsanti nella Dashboard: settimanale PDF/CSV, annuale PDF/CSV
+       - Report annuale: panoramica, riepilogo 12 mesi, top clienti, spese extra
+
+  [52] Spese Extra con Hotel/Alloggio
+       - 8 tipi: cena/pranzo esterno, rimborso, viaggio, biglietti, regalo,
+         hotel/alloggio, altro
+       - Incluse nel dettaglio cliente maison (totale complessivo)
+       - Incluse nel report settimanale e annuale
+
+  [53] Compleanni clienti maison
+       - Campo data nascita nella scheda cliente
+       - Alert Dashboard: compleanni oggi e prossimi 7 giorni
+       - Visibilita: funzione 'Compleanni maison' configurabile admin
+
+  [54] Alert ammonimenti verbali recidivi
+       - 2+ ammonimenti → banner 'Preparare allineamento'
+       - Incluso nella Dashboard e nei banner
+
+  [55] Audit sicurezza finale: 40/40 test superati
+       - 4 RPC admin bloccate senza token
+       - 7 chiavi/tabelle bloccate da RLS
+       - Rate limiting funzionante
+       - Login PBKDF2 verificato
+       - Sintassi JS verificata (node --check)
+       - SRI su 12 risorse CDN
+       - Credenziali Supabase offuscate (no plaintext)
+       - Deploy sincronizzato
 
 
 ================================================================================
