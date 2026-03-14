@@ -2239,11 +2239,30 @@ async function segnaConsegnaLetta(id){const op=getOperatore();
     const c=consegneCache.find(x=>x.id===id);if(c){c.letto_da=op;c.letto_at=new Date().toISOString()}
     renderConsegne();aggiornaConsegnaBadge()}catch(e){toast('Errore')}}
 function renderConsegne(){const el=document.getElementById('consegne-list');if(!el)return;
+  const op=getOperatore();
   if(!consegneCache.length){el.innerHTML='<div class="empty-state"><p>Nessuna consegna</p><small>Le consegne appariranno qui dopo essere state inviate</small></div>';return}
   el.innerHTML=consegneCache.slice(0,20).map(c=>{const d=new Date(c.created_at);const isAlta=c.priorita==='alta';
-    const letto=!!c.letto_da;
+    const letto=!!c.letto_da;const isMia=c.operatore===op;const canEdit=isMia&&!letto;
     const destLabel=c.destinatario&&c.destinatario!=='tutti'?c.destinatario:'Tutti';
-    return'<div style="padding:14px;margin-bottom:12px;border-radius:3px;border-left:3px solid '+(isAlta?'var(--accent)':'var(--accent2)')+';background:var(--paper2);'+(letto?'opacity:.65':'')+'"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap"><span class="mini-badge" style="background:'+(c.turno_uscente==='PRESTO'?'#e67e22':'#2c3e50')+'">'+c.turno_uscente+'</span><strong>'+escP(c.operatore)+'</strong><span style="font-size:.78rem;color:#2980b9;font-weight:600">→ '+escP(destLabel)+'</span><span style="color:var(--muted);font-size:.78rem">'+d.toLocaleDateString('it-IT')+' '+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})+'</span>'+(isAlta?'<span style="color:var(--accent);font-size:.78rem;font-weight:700">PRIORITA ALTA</span>':'')+(letto?'<span style="color:#2c6e49;font-size:.78rem;font-weight:600">Letto da '+escP(c.letto_da)+' il '+new Date(c.letto_at).toLocaleDateString('it-IT')+'</span>':'<button class="btn-act pin" onclick="segnaConsegnaLetta('+c.id+')" style="color:#2c6e49;border-color:#2c6e49;font-size:.7rem">Ho letto</button>')+'</div><div style="white-space:pre-line;font-size:.92rem;line-height:1.5">'+esc(c.messaggio)+'</div></div>'}).join('')}
+    let btns='';
+    if(isMia){
+      if(canEdit){btns+='<button class="btn-act edit" onclick="modificaConsegna('+c.id+')" style="font-size:.7rem">Modifica</button>';
+        btns+='<button class="btn-act del" onclick="annullaConsegna('+c.id+')" style="font-size:.7rem">Annulla invio</button>'}
+      else if(letto){btns+='<span style="font-size:.72rem;color:var(--muted);font-style:italic">Non modificabile (letta)</span>'}}
+    if(!isMia&&!letto){btns+='<button class="btn-act pin" onclick="segnaConsegnaLetta('+c.id+')" style="color:#2c6e49;border-color:#2c6e49;font-size:.7rem">Ho letto</button>'}
+    return'<div style="padding:14px;margin-bottom:12px;border-radius:3px;border-left:3px solid '+(isAlta?'var(--accent)':'var(--accent2)')+';background:var(--paper2);'+(letto?'opacity:.65':'')+'"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap"><span class="mini-badge" style="background:'+(c.turno_uscente==='PRESTO'?'#e67e22':'#2c3e50')+'">'+c.turno_uscente+'</span><strong>'+escP(c.operatore)+'</strong><span style="font-size:.78rem;color:#2980b9;font-weight:600">→ '+escP(destLabel)+'</span><span style="color:var(--muted);font-size:.78rem">'+d.toLocaleDateString('it-IT')+' '+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})+'</span>'+(isAlta?'<span style="color:var(--accent);font-size:.78rem;font-weight:700">PRIORITA ALTA</span>':'')+(letto?'<span style="color:#2c6e49;font-size:.78rem;font-weight:600">Letto da '+escP(c.letto_da)+' il '+new Date(c.letto_at).toLocaleDateString('it-IT')+'</span>':'')+'<div style="display:flex;gap:6px">'+btns+'</div></div><div style="white-space:pre-line;font-size:.92rem;line-height:1.5">'+esc(c.messaggio)+'</div></div>'}).join('')}
+function modificaConsegna(id){const c=consegneCache.find(x=>x.id===id);if(!c||c.letto_da)return;
+  const b=document.getElementById('pwd-modal-content');
+  b.innerHTML='<h3>Modifica consegna</h3><div class="pwd-field"><label>Messaggio</label><textarea id="edit-cons-msg" style="width:100%;min-height:100px;padding:10px;font-family:Source Sans 3,sans-serif;font-size:.95rem;border:1.5px solid var(--line);border-radius:2px;resize:vertical">'+escP(c.messaggio)+'</textarea></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaModificaConsegna('+id+')">Salva</button></div>';
+  document.getElementById('pwd-modal').classList.remove('hidden')}
+async function salvaModificaConsegna(id){const msg=document.getElementById('edit-cons-msg').value.trim();if(!msg){toast('Scrivi un messaggio');return}
+  try{await sbPatch('consegne_turno','id=eq.'+id,{messaggio:msg});const c=consegneCache.find(x=>x.id===id);if(c)c.messaggio=msg;
+    document.getElementById('pwd-modal').classList.add('hidden');renderConsegne();toast('Consegna modificata')}catch(e){toast('Errore')}}
+async function annullaConsegna(id){const c=consegneCache.find(x=>x.id===id);if(!c)return;
+  if(c.letto_da){toast('Non puoi annullare: già letta da '+c.letto_da);return}
+  if(!confirm('Annullare l\'invio di questa consegna? Verrà eliminata.'))return;
+  try{await sbDel('consegne_turno','id=eq.'+id);consegneCache=consegneCache.filter(x=>x.id!==id);
+    logAzione('Consegna annullata',c.messaggio.substring(0,50));renderConsegne();aggiornaConsegnaBadge();toast('Consegna annullata')}catch(e){toast('Errore')}}
 function aggiornaConsegnaBadge(){const op=getOperatore();const badge=document.getElementById('consegna-badge');if(!badge||!op)return;
   const nonLette=consegneCache.filter(c=>!c.letto_da&&c.operatore!==op&&(c.destinatario==='tutti'||c.destinatario===op)).length;
   if(nonLette){badge.style.display='inline';badge.textContent=nonLette}else{badge.style.display='none'}}
