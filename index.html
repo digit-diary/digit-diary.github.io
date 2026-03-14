@@ -503,7 +503,10 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
     <div class="chart-card full"><h4>Andamento settimanale</h4><div class="chart-wrap" style="max-height:280px"><canvas id="chart-dash-settimana"></canvas></div></div>
   </div>
   <div style="text-align:center;margin-top:20px">
-    <button class="btn-export btn-export-pdf" onclick="generaReportSettimanale()" style="padding:12px 28px;font-size:.92rem">Genera Report Settimanale PDF</button>
+    <button class="btn-export btn-export-pdf" onclick="generaReportSettimanale()" style="padding:12px 28px;font-size:.92rem">Report Settimanale PDF</button>
+    <button class="btn-export" onclick="generaReportSettimanaleCSV()" style="padding:12px 28px;font-size:.92rem">Report Settimanale CSV</button>
+    <button class="btn-export btn-export-pdf" onclick="generaReportAnnuale()" style="padding:12px 28px;font-size:.92rem;border-color:#b8860b;color:#b8860b">Report Annuale PDF</button>
+    <button class="btn-export" onclick="generaReportAnnualeCSV()" style="padding:12px 28px;font-size:.92rem;border-color:#b8860b;color:#b8860b">Report Annuale CSV</button>
   </div>
 </div>
 
@@ -2499,6 +2502,95 @@ async function generaReportSettimanale(){
       doc.text('Casino Lugano SA — Report '+dalLabel+' / '+alLabel+' — Pag. '+i+'/'+tp,mx,doc.internal.pageSize.getHeight()-8)}
     doc.save('report_settimanale_'+dalLabel.replace(/\//g,'-')+'_'+alLabel.replace(/\//g,'-')+'.pdf');toast('Report settimanale generato!')}
   catch(e){console.error(e);toast('Errore PDF: '+e.message)}}
+
+// REPORT SETTIMANALE CSV
+function generaReportSettimanaleCSV(){
+  const sett=[];for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);sett.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'))}
+  const dalL=new Date(sett[0]+'T12:00:00').toLocaleDateString('it-IT'),alL=new Date(sett[6]+'T12:00:00').toLocaleDateString('it-IT');
+  const settData=datiCache.filter(e=>e.data>=sett[0]&&e.data<=sett[6]+'T23:59:59');
+  const settMaison=maisonCache.filter(r=>r.data_giornata>=sett[0]&&r.data_giornata<=sett[6]);
+  const settSE=speseExtraCache.filter(r=>r.data_spesa>=sett[0]&&r.data_spesa<=sett[6]);
+  const rows=[['REPORT SETTIMANALE '+dalL+' - '+alL],[''],['REGISTRAZIONI'],['Data','Ora','Collaboratore','Tipo','Descrizione']];
+  settData.forEach(e=>{const d=new Date(e.data);rows.push([d.toLocaleDateString('it-IT'),d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}),e.nome,e.tipo,e.testo.replace(/\n/g,' ')])});
+  rows.push([''],['COSTI MAISON'],['Data','Cliente','PX','Costo CHF','Tipo']);
+  settMaison.forEach(r=>{rows.push([new Date(r.data_giornata+'T12:00:00').toLocaleDateString('it-IT'),r.nome,r.px,r.costo,r.tipo_buono||''])});
+  if(settSE.length){rows.push([''],['SPESE EXTRA'],['Data','Beneficiario','Tipo','Luogo','CHF']);
+    settSE.forEach(r=>{rows.push([new Date(r.data_spesa+'T12:00:00').toLocaleDateString('it-IT'),r.beneficiario,SE_TIPI_LABEL[r.tipo]||r.tipo,r.luogo||'',r.importo])})}
+  const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c||'').replace(/"/g,'""')+'"').join(';')).join('\n')],{type:'text/csv;charset=utf-8'});
+  Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'report_settimanale_'+dalL.replace(/\//g,'-')+'_'+alL.replace(/\//g,'-')+'.csv'}).click();toast('Report settimanale CSV esportato!')}
+
+// REPORT ANNUALE
+function _getAnnoCorrente(){return new Date().getFullYear()}
+function _getDatiAnno(anno){const start=anno+'-01-01',end=anno+'-12-31';
+  return{data:datiCache.filter(e=>e.data>=start&&e.data<=end+'T23:59:59'),
+    maison:maisonCache.filter(r=>r.data_giornata>=start&&r.data_giornata<=end),
+    spese:speseExtraCache.filter(r=>r.data_spesa>=start&&r.data_spesa<=end),
+    moduli:moduliCache.filter(m=>(m.created_at||m.data_modulo||'')>=start&&(m.created_at||m.data_modulo||'')<=end+'T23:59:59')}}
+async function generaReportAnnuale(){
+  if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore');return}}
+  const anno=_getAnnoCorrente();const d=_getDatiAnno(anno);
+  const nErr=d.data.filter(e=>e.tipo===nomeCorrente('Errore')).length;
+  const nMal=d.data.filter(e=>e.tipo===nomeCorrente('Malattia')).length;
+  const totMaison=d.maison.reduce((s,r)=>s+parseFloat(r.costo||0),0);
+  const totSE=d.spese.reduce((s,r)=>s+parseFloat(r.importo||0),0);
+  try{const{jsPDF}=window.jspdf;const doc=new jsPDF('portrait','mm','a4');const pw=doc.internal.pageSize.getWidth();const mx=16;let y=14;
+    if(_logoB64)try{doc.addImage(_logoB64,'PNG',pw/2-20,y,40,22.5)}catch(e){}
+    y+=28;doc.setFont('helvetica','bold');doc.setFontSize(18);doc.text('Report Annuale '+anno,pw/2,y,{align:'center'});y+=7;
+    doc.setFontSize(10);doc.setFont('helvetica','normal');doc.setTextColor(100);doc.text('Casino Lugano SA',pw/2,y,{align:'center'});y+=10;doc.setTextColor(0);
+    // Panoramica
+    doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text('Panoramica',mx,y);y+=2;
+    doc.autoTable({startY:y,margin:{left:mx,right:mx},body:[
+      ['Registrazioni totali',d.data.length],['Errori',nErr],['Malattie',nMal],
+      ['Apprezzamenti',d.data.filter(e=>e.tipo===nomeCorrente('Apprezzamento')).length],
+      ['Costi Maison totali',totMaison.toFixed(2)+' CHF'],['Spese Extra totali',totSE.toFixed(2)+' CHF'],
+      ['Totale complessivo (Maison+Extra)',(totMaison+totSE).toFixed(2)+' CHF'],
+      ['Allineamenti',d.moduli.filter(m=>m.tipo==='allineamento').length],
+      ['RDI',d.moduli.filter(m=>m.tipo==='rdi').length]],
+      theme:'grid',styles:{fontSize:9,cellPadding:3},columnStyles:{0:{fontStyle:'bold',cellWidth:90},1:{halign:'center'}},
+      alternateRowStyles:{fillColor:[250,247,242]}});y=doc.lastAutoTable.finalY+8;
+    // Riepilogo mensile
+    doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text('Riepilogo per mese',mx,y);y+=2;
+    const mesiBody=[];for(let m=0;m<12;m++){const ms=anno+'-'+String(m+1).padStart(2,'0');
+      const mData=d.data.filter(e=>e.data.startsWith(ms));const mMaison=d.maison.filter(r=>r.data_giornata.startsWith(ms));
+      const mSE=d.spese.filter(r=>r.data_spesa.startsWith(ms));
+      if(mData.length||mMaison.length||mSE.length)mesiBody.push([MESI_FULL[m],mData.length,mData.filter(e=>e.tipo===nomeCorrente('Errore')).length,mMaison.reduce((s,r)=>s+parseFloat(r.costo||0),0).toFixed(0),mSE.reduce((s,r)=>s+parseFloat(r.importo||0),0).toFixed(0)])}
+    if(mesiBody.length){doc.autoTable({startY:y,margin:{left:mx,right:mx},head:[['Mese','Registr.','Errori','Maison CHF','Extra CHF']],body:mesiBody,
+      headStyles:{fillColor:[26,18,8]},styles:{fontSize:9,cellPadding:3},columnStyles:{1:{halign:'center'},2:{halign:'center'},3:{halign:'right'},4:{halign:'right'}},
+      alternateRowStyles:{fillColor:[250,247,242]}});y=doc.lastAutoTable.finalY+8}
+    // Top clienti maison
+    if(d.maison.length){const byN={};d.maison.forEach(r=>{if(!byN[r.nome])byN[r.nome]=0;byN[r.nome]+=parseFloat(r.costo||0)});
+      const top15=Object.entries(byN).sort((a,b)=>b[1]-a[1]).slice(0,15);
+      if(y+30>doc.internal.pageSize.getHeight()-20){doc.addPage();y=16}
+      doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text('Top 15 Clienti Maison',mx,y);y+=2;
+      doc.autoTable({startY:y,margin:{left:mx,right:mx},head:[['Cliente','Totale CHF']],
+        body:top15.map(function(x){return[x[0],x[1].toFixed(2)]}),
+        headStyles:{fillColor:[184,134,11]},styles:{fontSize:9,cellPadding:3},columnStyles:{1:{halign:'right'}},
+        alternateRowStyles:{fillColor:[250,247,242]}});y=doc.lastAutoTable.finalY+8}
+    // Footer
+    var tp=doc.internal.getNumberOfPages();for(var i=1;i<=tp;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(150);
+      doc.text('Casino Lugano SA — Report Annuale '+anno+' — Pag. '+i+'/'+tp,mx,doc.internal.pageSize.getHeight()-8)}
+    doc.save('report_annuale_'+anno+'.pdf');toast('Report annuale PDF generato!')}
+  catch(e){console.error(e);toast('Errore PDF: '+e.message)}}
+function generaReportAnnualeCSV(){
+  const anno=_getAnnoCorrente();const d=_getDatiAnno(anno);
+  const rows=[['REPORT ANNUALE '+anno+' — Casino Lugano SA'],['']];
+  // Riepilogo mensile
+  rows.push(['RIEPILOGO MENSILE'],['Mese','Registrazioni','Errori','Malattie','Maison CHF','Spese Extra CHF']);
+  for(var m=0;m<12;m++){var ms=anno+'-'+String(m+1).padStart(2,'0');
+    var mData=d.data.filter(function(e){return e.data.startsWith(ms)});var mMaison=d.maison.filter(function(r){return r.data_giornata.startsWith(ms)});
+    var mSE=d.spese.filter(function(r){return r.data_spesa.startsWith(ms)});
+    rows.push([MESI_FULL[m],mData.length,mData.filter(function(e){return e.tipo===nomeCorrente('Errore')}).length,mData.filter(function(e){return e.tipo===nomeCorrente('Malattia')}).length,mMaison.reduce(function(s,r){return s+parseFloat(r.costo||0)},0).toFixed(2),mSE.reduce(function(s,r){return s+parseFloat(r.importo||0)},0).toFixed(2)])}
+  // Registrazioni
+  rows.push([''],['REGISTRAZIONI'],['Data','Collaboratore','Tipo','Descrizione']);
+  d.data.forEach(function(e){var dt=new Date(e.data);rows.push([dt.toLocaleDateString('it-IT'),e.nome,e.tipo,e.testo.replace(/\n/g,' ')])});
+  // Costi Maison
+  rows.push([''],['COSTI MAISON'],['Data','Cliente','PX','Costo CHF','Tipo']);
+  d.maison.forEach(function(r){rows.push([new Date(r.data_giornata+'T12:00:00').toLocaleDateString('it-IT'),r.nome,r.px,r.costo,r.tipo_buono||''])});
+  // Spese Extra
+  if(d.spese.length){rows.push([''],['SPESE EXTRA'],['Data','Beneficiario','Tipo','Luogo','CHF']);
+    d.spese.forEach(function(r){rows.push([new Date(r.data_spesa+'T12:00:00').toLocaleDateString('it-IT'),r.beneficiario,SE_TIPI_LABEL[r.tipo]||r.tipo,r.luogo||'',r.importo])})}
+  var blob=new Blob(['\uFEFF'+rows.map(function(r){return r.map(function(c){return'"'+String(c||'').replace(/"/g,'""')+'"'}).join(';')}).join('\n')],{type:'text/csv;charset=utf-8'});
+  Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'report_annuale_'+anno+'.csv'}).click();toast('Report annuale CSV esportato!')}
 
 // ========================
 // PROMEMORIA OPERATORI
