@@ -575,8 +575,9 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
     <div class="card-header">Consegna turno</div>
     <div class="form-area">
       <p style="color:var(--muted);font-size:.84rem;margin-bottom:14px">Scrivi le informazioni importanti per il collega che prende il turno successivo.</p>
-      <div class="form-row">
+      <div class="form-row" style="grid-template-columns:1fr 1fr 1fr">
         <div class="field"><label>Turno uscente</label><select id="cons-turno" style="padding:11px 14px"><option value="PRESTO">PRESTO</option><option value="NOTTE">NOTTE</option></select></div>
+        <div class="field"><label>Destinatario</label><select id="cons-destinatario" style="padding:11px 14px"><option value="tutti">Tutti</option></select></div>
         <div class="field"><label>Priorita</label><select id="cons-priorita" style="padding:11px 14px"><option value="normale">Normale</option><option value="alta">Alta</option></select></div>
       </div>
       <div class="field" style="margin-bottom:16px"><label>Messaggio di consegna</label><textarea id="cons-messaggio" placeholder="- Cliente X al tavolo 5, monitorare&#10;- Cassa 3 fuori servizio&#10;- Nuovo dipendente da affiancare&#10;..." style="min-height:120px"></textarea></div>
@@ -2212,13 +2213,16 @@ async function esportaPDF(){const f=getFiltrati();if(!f.length){toast('Nessun da
 // ========================
 // CONSEGNA TURNO
 // ========================
-function initConsegnaUI(){const turno=_getTurnoCorrente();const sel=document.getElementById('cons-turno');if(sel)sel.value=turno}
+function initConsegnaUI(){const turno=_getTurnoCorrente();const sel=document.getElementById('cons-turno');if(sel)sel.value=turno;
+  const dSel=document.getElementById('cons-destinatario');if(dSel){const ops=operatoriAuthCache.map(o=>o.nome).sort();
+    dSel.innerHTML='<option value="tutti">Tutti</option>'+ops.map(n=>'<option>'+escP(n)+'</option>').join('')}}
 async function inviaConsegnaTurno(){const turno=document.getElementById('cons-turno').value;
   const msg=document.getElementById('cons-messaggio').value.trim();
   const priorita=document.getElementById('cons-priorita').value;
   if(!msg){toast('Scrivi un messaggio di consegna');return}
   const oggi=getGiornataCasino();
-  try{const rec={data_giornata:oggi,turno_uscente:turno,operatore:getOperatore(),messaggio:msg,priorita};
+  const destinatario=document.getElementById('cons-destinatario').value;
+  try{const rec={data_giornata:oggi,turno_uscente:turno,operatore:getOperatore(),messaggio:msg,priorita,destinatario};
     const r=await sbPost('consegne_turno',rec);consegneCache.unshift(r[0]);
     document.getElementById('cons-messaggio').value='';
     logAzione('Consegna turno',turno+' — '+msg.substring(0,50));
@@ -2231,12 +2235,13 @@ function renderConsegne(){const el=document.getElementById('consegne-list');if(!
   if(!consegneCache.length){el.innerHTML='<div class="empty-state"><p>Nessuna consegna</p><small>Le consegne appariranno qui dopo essere state inviate</small></div>';return}
   el.innerHTML=consegneCache.slice(0,20).map(c=>{const d=new Date(c.created_at);const isAlta=c.priorita==='alta';
     const letto=!!c.letto_da;
-    return'<div style="padding:14px;margin-bottom:12px;border-radius:3px;border-left:3px solid '+(isAlta?'var(--accent)':'var(--accent2)')+';background:var(--paper2);'+(letto?'opacity:.65':'')+'"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap"><span class="mini-badge" style="background:'+(c.turno_uscente==='PRESTO'?'#e67e22':'#2c3e50')+'">'+c.turno_uscente+'</span><strong>'+escP(c.operatore)+'</strong><span style="color:var(--muted);font-size:.78rem">'+d.toLocaleDateString('it-IT')+' '+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})+'</span>'+(isAlta?'<span style="color:var(--accent);font-size:.78rem;font-weight:700">PRIORITA ALTA</span>':'')+(letto?'<span style="color:#2c6e49;font-size:.78rem;font-weight:600">Letto da '+escP(c.letto_da)+' il '+new Date(c.letto_at).toLocaleDateString('it-IT')+'</span>':'<button class="btn-act pin" onclick="segnaConsegnaLetta('+c.id+')" style="color:#2c6e49;border-color:#2c6e49;font-size:.7rem">Ho letto</button>')+'</div><div style="white-space:pre-line;font-size:.92rem;line-height:1.5">'+esc(c.messaggio)+'</div></div>'}).join('')}
+    const destLabel=c.destinatario&&c.destinatario!=='tutti'?c.destinatario:'Tutti';
+    return'<div style="padding:14px;margin-bottom:12px;border-radius:3px;border-left:3px solid '+(isAlta?'var(--accent)':'var(--accent2)')+';background:var(--paper2);'+(letto?'opacity:.65':'')+'"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap"><span class="mini-badge" style="background:'+(c.turno_uscente==='PRESTO'?'#e67e22':'#2c3e50')+'">'+c.turno_uscente+'</span><strong>'+escP(c.operatore)+'</strong><span style="font-size:.78rem;color:#2980b9;font-weight:600">→ '+escP(destLabel)+'</span><span style="color:var(--muted);font-size:.78rem">'+d.toLocaleDateString('it-IT')+' '+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})+'</span>'+(isAlta?'<span style="color:var(--accent);font-size:.78rem;font-weight:700">PRIORITA ALTA</span>':'')+(letto?'<span style="color:#2c6e49;font-size:.78rem;font-weight:600">Letto da '+escP(c.letto_da)+' il '+new Date(c.letto_at).toLocaleDateString('it-IT')+'</span>':'<button class="btn-act pin" onclick="segnaConsegnaLetta('+c.id+')" style="color:#2c6e49;border-color:#2c6e49;font-size:.7rem">Ho letto</button>')+'</div><div style="white-space:pre-line;font-size:.92rem;line-height:1.5">'+esc(c.messaggio)+'</div></div>'}).join('')}
 function aggiornaConsegnaBadge(){const op=getOperatore();const badge=document.getElementById('consegna-badge');if(!badge||!op)return;
-  const nonLette=consegneCache.filter(c=>!c.letto_da&&c.operatore!==op).length;
+  const nonLette=consegneCache.filter(c=>!c.letto_da&&c.operatore!==op&&(c.destinatario==='tutti'||c.destinatario===op)).length;
   if(nonLette){badge.style.display='inline';badge.textContent=nonLette}else{badge.style.display='none'}}
 function mostraConsegnaLogin(){const op=getOperatore();if(!op)return;
-  const nonLette=consegneCache.filter(c=>!c.letto_da&&c.operatore!==op);
+  const nonLette=consegneCache.filter(c=>!c.letto_da&&c.operatore!==op&&(c.destinatario==='tutti'||c.destinatario===op));
   if(!nonLette.length)return;
   const ultima=nonLette[0];const isAlta=ultima.priorita==='alta';
   const mc=document.getElementById('note-modal-content');
