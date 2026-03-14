@@ -433,8 +433,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 <body>
 <script>if(sessionStorage.getItem('diario_auth')==='1')document.documentElement.classList.add('authed')</script>
 <div id="login-overlay"><div class="login-box">
-  <img src="logo_casino.png" alt="Casino Lugano SA" style="width:140px;margin-bottom:16px"><h2>Accesso Protetto</h2><p>Seleziona settore, operatore e password</p>
-  <select id="login-settore" onchange="aggiornaLoginOperatori()" style="margin-bottom:8px;text-align:left;letter-spacing:0;padding:11px 14px;width:100%;border:1.5px solid var(--line);border-radius:2px;font-size:1rem;font-family:'Source Sans 3',sans-serif;color:var(--ink);background:var(--paper2);cursor:pointer"><option value="">-- Seleziona settore --</option><option value="slots">Slots</option><option value="tavoli">Tavoli</option></select>
+  <img src="logo_casino.png" alt="Casino Lugano SA" style="width:140px;margin-bottom:16px"><h2>Accesso Protetto</h2><p>Seleziona il tuo nome e inserisci la password</p>
   <select id="login-nome" style="margin-bottom:8px;text-align:left;letter-spacing:0;padding:11px 14px;width:100%;border:1.5px solid var(--line);border-radius:2px;font-size:1rem;font-family:'Source Sans 3',sans-serif;color:var(--ink);background:var(--paper2);cursor:pointer"><option value="">-- Seleziona operatore --</option></select>
   <input type="password" id="pwd-input" placeholder="Password..." onkeydown="if(event.key==='Enter') checkPwd()">
   <button class="btn-login" onclick="checkPwd()">Entra</button>
@@ -3152,17 +3151,7 @@ async function esportaSpeseExtraPDF(){const data=getSpeseExtraFiltrate();if(!dat
     doc.save('spese_extra.pdf');toast('PDF esportato!')}catch(e){toast('Errore PDF')}}
 
 // REPARTO SWITCH
-function aggiornaLoginOperatori(){console.log('aggiornaLoginOperatori chiamata');var settore=document.getElementById('login-settore').value;console.log('settore:',settore,'cache:',operatoriAuthCache.length);
-  var loginNome=document.getElementById('login-nome');
-  if(!settore){loginNome.innerHTML='<option value="">-- Seleziona operatore --</option>';return}
-  function _popola(){
-    var ops=operatoriAuthCache.map(function(o){return o.nome}).filter(function(n){var rep=operatoriRepartoMap[n]||'entrambi';return rep===settore||rep==='entrambi'}).sort();
-    loginNome.innerHTML='<option value="">-- Admin (password master) --</option>'+ops.map(function(n){return'<option value="'+escP(n)+'">'+escP(n)+'</option>'}).join('')}
-  if(operatoriAuthCache.length){_popola()}
-  else{loginNome.innerHTML='<option value="">Caricamento...</option>';
-    sbRpc('list_operators').then(function(r){operatoriAuthCache=r||[];
-      getImp('operatori_reparto').then(function(v){if(v)try{operatoriRepartoMap=JSON.parse(v)}catch(e){}
-        _popola()}).catch(function(){_popola()})}).catch(function(){loginNome.innerHTML='<option value="">Errore caricamento</option>'})}}
+// aggiornaLoginOperatori rimossa - login semplice con populate dopo loadAll
 function setReparto(rep){currentReparto=rep;
   document.getElementById('btn-rep-slots').className='reparto-btn'+(rep==='slots'?' active-slots':'');
   document.getElementById('btn-rep-tavoli').className='reparto-btn'+(rep==='tavoli'?' active-tavoli':'');
@@ -3224,16 +3213,13 @@ function aggiornaMenuMobile(){try{
 window.addEventListener('load',async()=>{
   if(localStorage.getItem('tema')==='dark'){document.body.classList.add('dark-theme');document.getElementById('btn-tema').textContent='Tema chiaro'}// tema provvisorio, poi si applica quello dell'operatore
   document.getElementById('entries-list').innerHTML='<div class="loading">Caricamento...</div>';
-  // Carica operatori subito per il login (prima di loadAll)
-  try{operatoriAuthCache=await sbRpc('list_operators')||[];
-    var opRep=await getImp('operatori_reparto');if(opRep)try{operatoriRepartoMap=JSON.parse(opRep)}catch(e){}
-    aggiornaLoginOperatori()}catch(e){}
   await loadAll();
   const h=document.getElementById('login-hint');const defCheck=await sbRpc('is_default_master_pwd',{p_default_hash:DEFAULT_PWD_HASH});
   if((defCheck&&defCheck.is_default)||operatoriAuthCache.length)h.innerHTML='Accedi come Admin oppure seleziona il tuo nome';
   // Populate login dropdown
-  // Login: aggiorna operatori se settore gia selezionato
-  aggiornaLoginOperatori();
+  // Login: popola dropdown operatori
+  var loginSel=document.getElementById('login-nome');if(loginSel){var ops=operatoriAuthCache.map(function(o){return o.nome}).sort();
+    loginSel.innerHTML='<option value="">-- Admin (password master) --</option>'+ops.map(function(n){return'<option value="'+escP(n)+'">'+escP(n)+'</option>'}).join('')}
   if(sessionStorage.getItem('diario_auth')==='1'){document.getElementById('login-overlay').classList.add('hidden');applicaTemaOperatore();
     // Valida sessione admin se presente
     if(isAdmin()){const tk=getAdminToken();if(tk){const sv=await sbRpc('validate_admin_session',{p_token:tk});if(!sv||!sv.valid){sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token')}}else{sessionStorage.removeItem('is_admin')}}
