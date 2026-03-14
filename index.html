@@ -947,19 +947,21 @@ async function loadAll(){
 async function checkPwd(){const nome=document.getElementById('login-nome').value.trim(),v=document.getElementById('pwd-input').value,err=document.getElementById('login-error');
   // Rate limiting client-side
   if(_loginLockUntil&&Date.now()<_loginLockUntil){const secs=Math.ceil((_loginLockUntil-Date.now())/1000);err.textContent='Troppi tentativi. Riprova tra '+secs+'s';return}
-  const h=await secureHash(v,nome||'__master__');const legacyH=await sha256(v);
+  const legacyH=await sha256(v);
   // Try individual operator login first
-  if(nome){const res=await sbRpc('verify_login',{p_nome:nome,p_hash:h,p_legacy_hash:legacyH});
+  if(nome){const opH=await secureHash(v,nome);const res=await sbRpc('verify_login',{p_nome:nome,p_hash:opH,p_legacy_hash:legacyH});
     if(res&&res.locked){err.textContent='Troppi tentativi. Riprova tra 1 minuto';return}
     if(res&&res.valid){_loginFailCount=0;sessionStorage.setItem('operatore_corrente',nome);sessionStorage.setItem('diario_auth','1');sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token');document.getElementById('login-overlay').classList.add('hidden');document.getElementById('operatore-display').textContent='Operatore: '+nome;applicaTemaOperatore();applicaVisibilita();
       if(res.deve_cambiare_pwd)setTimeout(()=>forzaCambioPwdOperatore(nome),300);
       else{setTimeout(()=>mostraNoteNonLette(),500);setTimeout(()=>mostraPromemoriaLogin(),1200);setTimeout(()=>mostraConsegnaLogin(),1800);setTimeout(checkQrHash,800)}return}
     if(res&&res.found){_loginFailCount++;if(_loginFailCount>=5){_loginLockUntil=Date.now()+30000;_loginFailCount=0}err.textContent='Password errata per '+nome;document.getElementById('pwd-input').value='';document.getElementById('pwd-input').focus();setTimeout(()=>err.textContent='',2500);return}}
-  // Fallback: master password (admin)
-  const masterRes=await sbRpc('verify_master_pwd',{p_hash:h,p_legacy_hash:legacyH});
+  // Fallback: master password (admin) - salt sempre __master__
+  const masterH=await secureHash(v,'__master__');
+  const masterRes=await sbRpc('verify_master_pwd',{p_hash:masterH,p_legacy_hash:legacyH});
   if(masterRes&&masterRes.locked){err.textContent='Troppi tentativi. Riprova tra 1 minuto';return}
   if(masterRes&&masterRes.valid){_loginFailCount=0;document.getElementById('login-overlay').classList.add('hidden');sessionStorage.setItem('diario_auth','1');sessionStorage.setItem('is_admin','1');
     if(masterRes.session_token)sessionStorage.setItem('admin_token',masterRes.session_token);
+    var loginSettore=document.getElementById('login-settore');if(loginSettore&&loginSettore.value)currentReparto=loginSettore.value;
     if(nome){sessionStorage.setItem('operatore_corrente',nome);document.getElementById('operatore-display').textContent='Operatore: '+nome;setTimeout(()=>mostraNoteNonLette(),500)}
     else{sessionStorage.setItem('operatore_corrente','Admin');document.getElementById('operatore-display').textContent='Admin';}
     applicaTemaOperatore();renderTipiUI();renderOperatoriUI();renderCampiRapportoUI();document.getElementById('tab-registro').style.display='';applicaVisibilita();setTimeout(()=>mostraPromemoriaLogin(),1200);setTimeout(()=>mostraConsegnaLogin(),1800);setTimeout(checkQrHash,800);
