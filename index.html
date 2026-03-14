@@ -3156,7 +3156,7 @@ function aggiornaLoginOperatori(){const settore=document.getElementById('login-s
   const loginNome=document.getElementById('login-nome');
   if(!settore){loginNome.style.display='none';loginNome.value='';return}
   loginNome.style.display='';
-  const ops=operatoriAuthCache.map(o=>o.nome).filter(function(n){var rep=operatoriRepartoMap[n]||'entrambi';return rep===settore||rep==='entrambi'}).sort();
+  var ops=operatoriAuthCache.map(o=>o.nome).filter(function(n){var rep=operatoriRepartoMap[n]||'entrambi';return rep===settore||rep==='entrambi'}).sort();
   loginNome.innerHTML='<option value="">-- Seleziona operatore --</option>'+ops.map(function(n){return'<option value="'+escP(n)+'">'+escP(n)+'</option>'}).join('')}
 function setReparto(rep){currentReparto=rep;
   document.getElementById('btn-rep-slots').className='reparto-btn'+(rep==='slots'?' active-slots':'');
@@ -3223,7 +3223,7 @@ window.addEventListener('load',async()=>{
   const h=document.getElementById('login-hint');const defCheck=await sbRpc('is_default_master_pwd',{p_default_hash:DEFAULT_PWD_HASH});
   if((defCheck&&defCheck.is_default)||operatoriAuthCache.length)h.innerHTML='Accedi come Admin oppure seleziona il tuo nome';
   // Populate login dropdown
-  // Login: il dropdown operatori si popola quando si seleziona il settore
+  // Login: dropdown operatori appare dopo selezione settore
   if(sessionStorage.getItem('diario_auth')==='1'){document.getElementById('login-overlay').classList.add('hidden');applicaTemaOperatore();
     // Valida sessione admin se presente
     if(isAdmin()){const tk=getAdminToken();if(tk){const sv=await sbRpc('validate_admin_session',{p_token:tk});if(!sv||!sv.valid){sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token')}}else{sessionStorage.removeItem('is_admin')}}

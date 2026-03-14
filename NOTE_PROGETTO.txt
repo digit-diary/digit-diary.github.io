@@ -739,6 +739,15 @@
        - Mostra badge notifiche, rispetta visibilita admin
        - Click fuori chiude il pannello
 
+  [49] Reparto per operatore e login settore
+       - Login: selettore Settore (Admin/Slots/Tavoli)
+       - Selezione settore → appare dropdown con operatori di quel settore
+       - Admin: vede tutti gli operatori, switch Slots/Tavoli visibile
+       - Creazione operatore: selettore Reparto (Slots/Tavoli/Entrambi)
+       - Lista operatori: badge reparto + dropdown per cambiare
+       - Ogni operatore assegnato a un reparto vede solo i suoi dati
+       - Mapping salvato in impostazioni (operatori_reparto JSON)
+
 
 ================================================================================
   FILE DEL PROGETTO
