@@ -123,6 +123,14 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 .firma-canvas{border:1.5px solid var(--line);border-radius:4px;cursor:crosshair;background:white;touch-action:none;width:280px;height:100px}
 .firma-canvas-box button{padding:4px 14px;font-size:.72rem;font-weight:600;cursor:pointer;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--muted);font-family:'Source Sans 3',sans-serif;text-transform:uppercase;letter-spacing:.06em}
 .firma-canvas-box button:hover{border-color:var(--accent);color:var(--accent)}
+/* SWITCH REPARTO */
+.reparto-switch{width:100%;max-width:1280px;display:flex;justify-content:center;gap:0;margin-bottom:16px}
+.reparto-btn{padding:10px 28px;font-size:.85rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;border:2px solid var(--line);background:var(--paper2);color:var(--muted);font-family:'Source Sans 3',sans-serif;transition:all .15s}
+.reparto-btn:first-child{border-radius:3px 0 0 3px}
+.reparto-btn:last-child{border-radius:0 3px 0 3px}
+.reparto-btn.active-slots{background:#1a4a7a;color:white;border-color:#1a4a7a}
+.reparto-btn.active-tavoli{background:#8e44ad;color:white;border-color:#8e44ad}
+.reparto-switch.hidden{display:none}
 /* HAMBURGER MENU (mobile only) */
 .hamburger-btn{display:none;background:none;border:1.5px solid var(--line);color:var(--ink);font-size:1.4rem;padding:8px 14px;border-radius:3px;cursor:pointer;font-family:'Source Sans 3',sans-serif;width:100%;max-width:1280px;text-align:left;margin-bottom:16px;font-weight:600;letter-spacing:.08em}
 .hamburger-btn:hover{background:var(--paper2)}
@@ -464,6 +472,10 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
   <div class="ricerca-globale-results" id="ricerca-globale-results"></div>
 </div>
 
+<div class="reparto-switch" id="reparto-switch">
+  <button class="reparto-btn active-slots" id="btn-rep-slots" onclick="setReparto('slots')">Slots</button>
+  <button class="reparto-btn" id="btn-rep-tavoli" onclick="setReparto('tavoli')">Tavoli</button>
+</div>
 <button class="hamburger-btn" onclick="toggleMobileNav()" id="hamburger-btn">&#9776; Menu</button>
 <div class="mobile-nav" id="mobile-nav" onclick="if(event.target===this)chiudiMobileNav()">
   <div class="mobile-nav-panel">
@@ -863,6 +875,7 @@ const RAPPORTO_DB_COLS=['sup_note','cassa_note','sala_note','n_assegni','preliev
 let campiRapportoExtra=[],tipiNascosti=[],campiNascosti=[],tipiOrdine=[],campiOrdine=[],campiLabelOverride={},tipiRinominati={};
 let visibilitaConfig={};
 let collaboratoriCache=[],moduliCache=[],logCache=[],maisonCache=[],maisonBudgetCache=[],promemoriaCache=[],consegneCache=[],speseExtraCache=[];
+let currentReparto='slots';
 function nomeCorrente(orig){return tipiRinominati[orig]||orig}
 function getTuttiTipi(){let list=[...TIPI_DEFAULT.filter(t=>!tipiNascosti.includes(t.nome)).map(t=>{const c=coloriOverride[t.nome]||t.colore;const n=tipiRinominati[t.nome]||t.nome;return{nome:n,colore:c,_orig:t.nome}}),...tipiPersonalizzati];
   if(tipiOrdine.length)list.sort((a,b)=>{const ia=tipiOrdine.indexOf(a.nome),ib=tipiOrdine.indexOf(b.nome);return(ia===-1?999:ia)-(ib===-1?999:ib)});return list}
@@ -992,7 +1005,7 @@ function isAdmin(){return sessionStorage.getItem('is_admin')==='1'}
 // VISIBILITA - 'tutti' | 'admin' | 'nascosto' | {tipo:'selezionati',operatori:['Nome1']}
 const VIS_ITEMS={
   pagine:{rapporto:'Rapporto',note_collega:'Note Colleghi',statistiche:'Statistiche',moduli:'Moduli',assistente:'Assistente',consegna:'Consegna Turno',promemoria:'Promemoria',maison:'Costi Maison'},
-  funzioni:{ricerca_globale:'Ricerca globale',alert_cassa:'Alert cassa',alert_rischio:'Alert rischio',alert_compleanni:'Compleanni maison',template_rapidi:'Template rapidi',firma_digitale:'Firma digitale',qr_code:'QR Code su PDF',ai_moduli:'AI (Genera + Migliora testo)'}
+  funzioni:{ricerca_globale:'Ricerca globale',alert_cassa:'Alert cassa',alert_rischio:'Alert rischio',alert_compleanni:'Compleanni maison',reparto_slots:'Reparto Slots',reparto_tavoli:'Reparto Tavoli',template_rapidi:'Template rapidi',firma_digitale:'Firma digitale',qr_code:'QR Code su PDF',ai_moduli:'AI (Genera + Migliora testo)'}
 };
 function visGet(key){return visibilitaConfig[key]||'tutti'}
 function isVis(key){const v=visGet(key);if(v==='nascosto')return false;if(v==='admin')return isAdmin();
@@ -1016,6 +1029,7 @@ function applicaVisibilita(){
   document.querySelectorAll('.ai-gen-box,.btn-ai-wrap,.btn-ai').forEach(el=>{el.style.display=isVis('ai_moduli')?'':'none'});
   // Firma digitale
   document.querySelectorAll('input[name="firma-tipo"][value="digitale"]').forEach(el=>{const lbl=el.closest('label');if(lbl)lbl.style.display=isVis('firma_digitale')?'':'none'});
+  applicaRepartoVisibilita();
 }
 function _visRadioHtml(k,v,opList){
   let html='<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
@@ -1171,7 +1185,7 @@ function escP(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/
 // CORE CRUD
 async function salva(){const nome=capitalizzaNome(document.getElementById('inp-nome').value.trim()),testo=document.getElementById('inp-testo').value.trim();if(!nome){toast('Inserisci il nome');return}if(!testo){toast('Scrivi una descrizione');return}
   const importo=parseFloat(document.getElementById('inp-importo').value)||0;const valuta=importo?document.getElementById('inp-valuta').value:'';const reparto=document.getElementById('inp-reparto').value;
-  const rec={id:Date.now(),nome,tipo:tipoSelezionato,testo,data:new Date().toISOString(),operatore:getOperatore(),importo,valuta,reparto};
+  const rec={id:Date.now(),nome,tipo:tipoSelezionato,testo,data:new Date().toISOString(),operatore:getOperatore(),importo,valuta,reparto,reparto_dip:currentReparto};
   try{await sbPost('registrazioni',rec);datiCache.unshift(rec);document.getElementById('inp-testo').value='';document.getElementById('inp-importo').value='';document.getElementById('inp-reparto').value='';
     if(!collaboratoriCache.find(c=>c.nome.toLowerCase()===nome.toLowerCase())){try{const cr=await sbPost('collaboratori',{nome,attivo:true});collaboratoriCache.push(cr[0]);collaboratoriCache.sort((a,b)=>a.nome.localeCompare(b.nome))}catch(e2){}}
     logAzione('Nuova registrazione',nome+' - '+tipoSelezionato+': '+testo.substring(0,60));toast('Registrato per '+nome);aggiornaNomi();render();updateStats();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts()}catch(e){toast('Errore salvataggio')}}
@@ -2086,7 +2100,7 @@ function apriProfilo(nome){const entries=datiCache.filter(e=>e.nome===nome);cons
 
 // FILTER & RENDER
 function getFiltrati(){const p=document.getElementById('filt-persona').value,t=document.getElementById('filt-tipo').value,dal=document.getElementById('filt-dal').value,al=document.getElementById('filt-al').value,c=document.getElementById('filt-cerca').value.toLowerCase();
-  let list=datiCache.filter(e=>{const d=new Date(e.data);if(p&&e.nome!==p)return false;if(t&&e.tipo!==t)return false;if(dal&&d<new Date(dal))return false;if(al&&d>new Date(al+'T23:59:59'))return false;if(c&&!e.nome.toLowerCase().includes(c)&&!e.testo.toLowerCase().includes(c))return false;return true});
+  let list=getDatiReparto().filter(e=>{const d=new Date(e.data);if(p&&e.nome!==p)return false;if(t&&e.tipo!==t)return false;if(dal&&d<new Date(dal))return false;if(al&&d>new Date(al+'T23:59:59'))return false;if(c&&!e.nome.toLowerCase().includes(c)&&!e.testo.toLowerCase().includes(c))return false;return true});
   // Pinned first
   list.sort((a,b)=>{const pa=pinnedIds.has(a.id)?0:1,pb=pinnedIds.has(b.id)?0:1;return pa-pb||new Date(b.data)-new Date(a.data)});return list}
 function render(){const f=getFiltrati(),el=document.getElementById('entries-list');
@@ -2121,7 +2135,7 @@ function acScegliModuli(inputId,dropId,nome){const inp=document.getElementById(i
   if(inp)inp.value=nome;if(drop)drop.classList.remove('show');aggiornaModuliLista()}
 document.addEventListener('click',function(e){document.querySelectorAll('.ac-drop.show').forEach(d=>{if(!d.parentElement.contains(e.target))d.classList.remove('show')})})
 function resetFiltri(){['filt-persona','filt-tipo'].forEach(id=>document.getElementById(id).value='');['filt-cerca'].forEach(id=>document.getElementById(id).value='');const fd=document.getElementById('filt-dal'),fa=document.getElementById('filt-al');if(fd._flatpickr)fd._flatpickr.clear();else fd.value='';if(fa._flatpickr)fa._flatpickr.clear();else fa.value='';render()}
-function updateStats(){document.getElementById('stats-bar').innerHTML='<div class="stat"><div class="stat-num">'+datiCache.length+'</div><div class="stat-label">Totale</div></div><div class="stat"><div class="stat-num blue">'+new Set(datiCache.map(e=>e.nome)).size+'</div><div class="stat-label">Collaboratori</div></div><div class="stat"><div class="stat-num red">'+datiCache.filter(e=>e.tipo===nomeCorrente('Errore')).length+'</div><div class="stat-label">'+nomeCorrente('Errore')+'</div></div><div class="stat"><div class="stat-num teal">'+datiCache.filter(e=>e.tipo===nomeCorrente('Malattia')).length+'</div><div class="stat-label">'+nomeCorrente('Malattia')+'</div></div><div class="stat"><div class="stat-num gold">'+datiCache.filter(e=>e.tipo===nomeCorrente('Apprezzamento')).length+'</div><div class="stat-label">'+nomeCorrente('Apprezzamento')+'</div></div>'}
+function updateStats(){const rd=getDatiReparto();document.getElementById('stats-bar').innerHTML='<div class="stat"><div class="stat-num">'+rd.length+'</div><div class="stat-label">Totale</div></div><div class="stat"><div class="stat-num blue">'+new Set(rd.map(e=>e.nome)).size+'</div><div class="stat-label">Collaboratori</div></div><div class="stat"><div class="stat-num red">'+rd.filter(e=>e.tipo===nomeCorrente('Errore')).length+'</div><div class="stat-label">'+nomeCorrente('Errore')+'</div></div><div class="stat"><div class="stat-num teal">'+rd.filter(e=>e.tipo===nomeCorrente('Malattia')).length+'</div><div class="stat-label">'+nomeCorrente('Malattia')+'</div></div><div class="stat"><div class="stat-num gold">'+rd.filter(e=>e.tipo===nomeCorrente('Apprezzamento')).length+'</div><div class="stat-label">'+nomeCorrente('Apprezzamento')+'</div></div>'}
 
 // RAPPORTO GIORNALIERO
 function getGiornataCasino(){const now=new Date();if(now.getHours()<6)now.setDate(now.getDate()-1);return now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')}
@@ -2735,7 +2749,7 @@ async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0
           if(simile&&simile.tipo==='simile'){warnings.push(parsed.nome+' → forse intendi "'+simile.nome+'"?')}
           const rec={data_giornata:dataGiornata,nome:parsed.nome,px:Math.round(px/nNomi)||1,
             costo:Math.round(costo/nNomi*100)/100,tipo_buono:parsed.tipoBuono,note:parsed.note,
-            gruppo:nNomi>1?capitalizzaNome(rawNome):'',operatore:getOperatore()};
+            gruppo:nNomi>1?capitalizzaNome(rawNome):'',operatore:getOperatore(),reparto_dip:currentReparto};
           try{await sbPost('costi_maison',rec);totalRows++}catch(e){}}
       }}
     maisonCache=await sbGet('costi_maison?order=data_giornata.desc');
@@ -2757,7 +2771,7 @@ function getMaisonFiltrati(){const fn=(document.getElementById('maison-filt-nome
   const ft=(document.getElementById('maison-filt-tipo')||{}).value||'';
   const fd=(document.getElementById('maison-filt-dal')||{}).value||'';
   const fa=(document.getElementById('maison-filt-al')||{}).value||'';
-  return maisonCache.filter(r=>{
+  return getMaisonReparto().filter(r=>{
     if(fn&&!r.nome.toLowerCase().includes(fn.toLowerCase()))return false;
     if(ft==='BU'&&r.tipo_buono!=='BU')return false;
     if(ft==='BL'&&r.tipo_buono!=='BL')return false;
@@ -2907,7 +2921,7 @@ async function eliminaMaisonGiorno(){const sel=document.getElementById('maison-d
 // Budget
 function renderMaisonBudgetUI(){const el=document.getElementById('maison-budget-list');if(!el)return;
   // Mostra TUTTI i clienti: quelli con scheda + quelli solo in costi_maison
-  const tuttiNomi=[...new Set([...maisonBudgetCache.map(b=>b.nome),...maisonCache.map(r=>r.nome)])].sort();
+  const tuttiNomi=[...new Set([...getBudgetReparto().map(b=>b.nome),...getMaisonReparto().map(r=>r.nome)])].sort();
   if(!tuttiNomi.length){el.innerHTML='<p style="color:var(--muted);font-size:.85rem">Nessun cliente. Carica un file Excel per iniziare.</p>';return}
   // Filtro rapido per categoria
   let filtCat=(document.getElementById('maison-filt-cat-lista')||{}).value||'';
@@ -2935,7 +2949,7 @@ async function salvaMaisonBudget(){const nome=capitalizzaNome(document.getElemen
   if(!nome){toast('Inserisci il nome del cliente');return}
   if(!chf&&!bu&&!bl&&!nascita&&!cat){toast('Imposta almeno un campo');return}
   if(maisonBudgetCache.find(b=>b.nome.toLowerCase()===nome.toLowerCase())){toast('Già esistente per '+nome+'. Rimuovi prima il vecchio.');return}
-  try{const r=await sbPost('maison_budget',{nome,budget_chf:chf,budget_bu:bu,budget_bl:bl,data_nascita:nascita,categoria:cat});
+  try{const r=await sbPost('maison_budget',{nome,budget_chf:chf,budget_bu:bu,budget_bl:bl,data_nascita:nascita,categoria:cat,reparto_dip:currentReparto});
     maisonBudgetCache.push(r[0]);document.getElementById('maison-budget-nome').value='';
     document.getElementById('maison-budget-chf').value='';document.getElementById('maison-budget-bu').value='';document.getElementById('maison-budget-bl').value='';const nbFp=document.getElementById('maison-budget-nascita');if(nbFp&&nbFp._flatpickr)nbFp._flatpickr.clear();else if(nbFp)nbFp.value='';
     renderMaisonBudgetUI();renderMaisonDashboard();renderMaisonBudgetAlerts();toast('Budget impostato per '+nome)}catch(e){toast('Errore')}}
@@ -2943,7 +2957,7 @@ function assegnaCatRapida(nome){const mc=document.getElementById('pwd-modal-cont
   mc.innerHTML='<h3>Assegna categoria</h3><p style="color:var(--muted);margin-bottom:16px">'+escP(nome)+'</p><div style="display:flex;flex-direction:column;gap:10px"><button class="btn-salva" style="background:#b8860b" onclick="salvaAssegnaCat(\''+nome.replace(/'/g,"\\'")+'\',\'full_maison\')">Full Maison</button><button class="btn-salva" style="background:#2980b9" onclick="salvaAssegnaCat(\''+nome.replace(/'/g,"\\'")+'\',\'maison\')">Maison</button><button class="btn-salva" style="background:#8e44ad" onclick="salvaAssegnaCat(\''+nome.replace(/'/g,"\\'")+'\',\'direzione\')">Direzione</button><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden')}
 async function salvaAssegnaCat(nome,cat){
-  try{const r=await sbPost('maison_budget',{nome,categoria:cat});maisonBudgetCache.push(r[0]);
+  try{const r=await sbPost('maison_budget',{nome,categoria:cat,reparto_dip:currentReparto});maisonBudgetCache.push(r[0]);
     document.getElementById('pwd-modal').classList.add('hidden');renderMaisonBudgetUI();renderMaisonDashboard();toast(nome+' → '+(cat==='full_maison'?'Full Maison':'Maison'))}catch(e){toast('Errore')}}
 function modificaMaisonInfo(id){const b=maisonBudgetCache.find(x=>x.id===id);if(!b)return;
   const mc=document.getElementById('pwd-modal-content');
@@ -3072,7 +3086,7 @@ async function salvaSpeseExtra(){const benef=capitalizzaNome(document.getElement
   const luogo=document.getElementById('se-luogo').value.trim();const importo=parseFloat(document.getElementById('se-importo').value)||0;
   const desc=document.getElementById('se-descrizione').value.trim();
   if(!benef){toast('Inserisci il beneficiario');return}if(!data){toast('Seleziona la data');return}if(!importo){toast('Inserisci l\'importo');return}
-  try{const rec={beneficiario:benef,tipo,descrizione:desc,importo,data_spesa:data,luogo,operatore:getOperatore()};
+  try{const rec={beneficiario:benef,tipo,descrizione:desc,importo,data_spesa:data,luogo,operatore:getOperatore(),reparto_dip:currentReparto};
     const r=await sbPost('spese_extra',rec);speseExtraCache.unshift(r[0]);
     document.getElementById('se-beneficiario').value='';document.getElementById('se-luogo').value='';
     document.getElementById('se-importo').value='';document.getElementById('se-descrizione').value='';
@@ -3096,7 +3110,7 @@ async function salvaModificaSE(id){const benef=capitalizzaNome(document.getEleme
 function getSpeseExtraFiltrate(){const fn=(document.getElementById('se-filt-nome')||{}).value||'';
   const ft=(document.getElementById('se-filt-tipo')||{}).value||'';
   const fd=(document.getElementById('se-filt-dal')||{}).value||'';const fa=(document.getElementById('se-filt-al')||{}).value||'';
-  return speseExtraCache.filter(r=>{if(fn&&!r.beneficiario.toLowerCase().includes(fn.toLowerCase()))return false;
+  return getSpeseReparto().filter(r=>{if(fn&&!r.beneficiario.toLowerCase().includes(fn.toLowerCase()))return false;
     if(ft&&r.tipo!==ft)return false;if(fd&&r.data_spesa<fd)return false;if(fa&&r.data_spesa>fa)return false;return true})}
 function renderSpeseExtra(){const data=getSpeseExtraFiltrate();const el=document.getElementById('spese-extra-list');if(!el)return;
   const tot=data.reduce((s,r)=>s+parseFloat(r.importo||0),0);
@@ -3127,6 +3141,31 @@ async function esportaSpeseExtraPDF(){const data=getSpeseExtraFiltrate();if(!dat
       styles:{fontSize:8,cellPadding:3},columnStyles:{5:{halign:'right'}},alternateRowStyles:{fillColor:[250,247,242]}});
     const tp=doc.internal.getNumberOfPages();for(let i=1;i<=tp;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(150);doc.text('Casino Lugano SA — Spese Extra — Pag. '+i+'/'+tp,16,doc.internal.pageSize.getHeight()-8)}
     doc.save('spese_extra.pdf');toast('PDF esportato!')}catch(e){toast('Errore PDF')}}
+
+// REPARTO SWITCH
+function setReparto(rep){currentReparto=rep;
+  document.getElementById('btn-rep-slots').className='reparto-btn'+(rep==='slots'?' active-slots':'');
+  document.getElementById('btn-rep-tavoli').className='reparto-btn'+(rep==='tavoli'?' active-tavoli':'');
+  // Re-render pagina corrente
+  var pg=sessionStorage.getItem('pagina_corrente')||'dashboard';
+  if(pg==='diario'){render();updateStats()}
+  if(pg==='maison'){renderMaisonDashboard();renderMaisonBudgetUI();renderSpeseExtra()}
+  if(pg==='statistiche')renderStatistiche();
+  if(pg==='dashboard')renderDashboard()}
+function applicaRepartoVisibilita(){
+  var sw=document.getElementById('reparto-switch');if(!sw)return;
+  var vSlots=isVis('reparto_slots'),vTavoli=isVis('reparto_tavoli');
+  if(vSlots&&vTavoli){sw.classList.remove('hidden')}
+  else{sw.classList.add('hidden');
+    if(vSlots)currentReparto='slots';
+    else if(vTavoli)currentReparto='tavoli';
+    else currentReparto='slots'}
+  document.getElementById('btn-rep-slots').className='reparto-btn'+(currentReparto==='slots'?' active-slots':'');
+  document.getElementById('btn-rep-tavoli').className='reparto-btn'+(currentReparto==='tavoli'?' active-tavoli':'')}
+function getDatiReparto(){return datiCache.filter(function(e){return(e.reparto_dip||'slots')===currentReparto})}
+function getMaisonReparto(){return maisonCache.filter(function(r){return(r.reparto_dip||'slots')===currentReparto})}
+function getBudgetReparto(){return maisonBudgetCache.filter(function(b){return(b.reparto_dip||'slots')===currentReparto})}
+function getSpeseReparto(){return speseExtraCache.filter(function(r){return(r.reparto_dip||'slots')===currentReparto})}
 
 // MENU MOBILE
 function toggleMobileNav(){document.getElementById('mobile-nav').classList.toggle('show')}
