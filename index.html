@@ -3218,6 +3218,10 @@ function aggiornaMenuMobile(){try{
 window.addEventListener('load',async()=>{
   if(localStorage.getItem('tema')==='dark'){document.body.classList.add('dark-theme');document.getElementById('btn-tema').textContent='Tema chiaro'}// tema provvisorio, poi si applica quello dell'operatore
   document.getElementById('entries-list').innerHTML='<div class="loading">Caricamento...</div>';
+  // Carica operatori subito per il login (prima di loadAll)
+  try{operatoriAuthCache=await sbRpc('list_operators')||[];
+    var opRep=await getImp('operatori_reparto');if(opRep)try{operatoriRepartoMap=JSON.parse(opRep)}catch(e){}
+    aggiornaLoginOperatori()}catch(e){}
   await loadAll();
   const h=document.getElementById('login-hint');const defCheck=await sbRpc('is_default_master_pwd',{p_default_hash:DEFAULT_PWD_HASH});
   if((defCheck&&defCheck.is_default)||operatoriAuthCache.length)h.innerHTML='Accedi come Admin oppure seleziona il tuo nome';
