@@ -1320,12 +1320,14 @@ function checkRischioAlerts(){
     alerts.push({nome,count:allins.length,lastDate:allins[allins.length-1].data_modulo||allins[allins.length-1].created_at||''})});
   return alerts}
 function renderRischioAlerts(){const container=document.getElementById('rischio-alerts-container');if(!container)return;
-  const alerts=checkRischioAlerts();if(!alerts.length){container.innerHTML='';return}
-  let html='<div class="rischio-alert-banner" onclick="toggleRischioDD()">&#9888;&#65039; '+alerts.length+' collaboratore/i a rischio disciplinare (2+ allineamenti) — Prossimo allineamento scatta RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
+  // Rimuovi solo la parte rischio, non tutto il container
+  var oldRischio=document.getElementById('rischio-alerts-block');if(oldRischio)oldRischio.remove();
+  const alerts=checkRischioAlerts();if(!alerts.length)return;
+  let html='<div id="rischio-alerts-block"><div class="rischio-alert-banner" onclick="toggleRischioDD()">&#9888;&#65039; '+alerts.length+' collaboratore/i a rischio disciplinare (2+ allineamenti) — Prossimo allineamento scatta RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
   html+='<div class="rischio-alerts-dropdown hidden" id="rischio-dd">';
   alerts.forEach(a=>{const dt=a.lastDate?new Date(a.lastDate+'T12:00:00').toLocaleDateString('it-IT'):'';
     html+='<div class="cassa-alert-item"><span class="alert-name">'+escP(a.nome)+'</span><span class="alert-detail">'+a.count+' allineamenti'+' (ultimo: '+dt+'). Il prossimo provvedimento sarà un RDI.</span><button class="alert-action" style="background:#8e44ad" onclick="apriModuloVeloce(\'rdi\',\''+a.nome.replace(/'/g,"\\'")+'\')">Crea RDI</button></div>'});
-  html+='</div>';container.innerHTML=html}
+  html+='</div></div>';container.insertAdjacentHTML('beforeend',html)}
 function toggleRischioDD(){const dd=document.getElementById('rischio-dd');if(dd)dd.classList.toggle('hidden')}
 
 // ALERT AMMONIMENTI VERBALI RECIDIVI (2+ → preparare allineamento)
@@ -1337,14 +1339,15 @@ function checkAmmonimentiAlerts(){
     const hasAllin=moduliCache.some(m=>m.tipo==='allineamento'&&m.collaboratore.toLowerCase()===a.nome.toLowerCase()&&(m.created_at||m.data_modulo||'')>a.last);
     if(!hasAllin)alerts.push(a)});
   return alerts}
-function renderAmmonimentiAlerts(){const container=document.getElementById('rischio-alerts-container');if(!container)return;
+function renderAmmonimentiAlerts(){var old=document.getElementById('amm-alerts-block');if(old)old.remove();
+  const container=document.getElementById('rischio-alerts-container');if(!container)return;
   const ammAlerts=checkAmmonimentiAlerts();if(!ammAlerts.length)return;
-  let html=container.innerHTML;
+  let html='<div id="amm-alerts-block">';
   html+='<div class="cassa-alert-banner" style="background:#e67e22;margin-bottom:8px;cursor:pointer" onclick="toggleAmmDD()">&#9888; '+ammAlerts.length+' collaboratore/i con 2+ ammonimenti verbali — Preparare allineamento <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
   html+='<div class="cassa-alerts-dropdown hidden" id="amm-dd">';
   ammAlerts.forEach(a=>{const dt=a.last?new Date(a.last).toLocaleDateString('it-IT'):'';
     html+='<div class="cassa-alert-item"><span class="alert-name">'+escP(a.nome)+'</span><span class="alert-detail">'+a.count+' ammonimenti verbali (ultimo: '+dt+')</span><button class="alert-action" style="background:#e67e22" onclick="apriModuloVeloce(\'allineamento\',\''+a.nome.replace(/'/g,"\\'")+'\')">Crea Allineamento</button></div>'});
-  html+='</div>';container.innerHTML=html}
+  html+='</div></div>';container.insertAdjacentHTML('beforeend',html)}
 function toggleAmmDD(){const dd=document.getElementById('amm-dd');if(dd)dd.classList.toggle('hidden')}
 
 // TEMPLATE RAPIDI
@@ -3167,7 +3170,8 @@ function setReparto(rep){currentReparto=rep;
   if(pg==='diario'){render();updateStats()}
   if(pg==='maison'){renderMaisonDashboard();renderMaisonBudgetUI();renderSpeseExtra()}
   if(pg==='statistiche')renderStatistiche();
-  if(pg==='dashboard')renderDashboard()}
+  if(pg==='dashboard')renderDashboard();
+  renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts()}
 function applicaRepartoVisibilita(){
   var sw=document.getElementById('reparto-switch');if(!sw)return;
   var op=getOperatore();var opRep=operatoriRepartoMap[op]||'entrambi';
