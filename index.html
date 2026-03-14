@@ -1974,8 +1974,12 @@ function getRapportoDateRange(){const dalEl=document.getElementById('rapp-dal'),
   if(rapportoGiornoAperto)return{dal:rapportoGiornoAperto,al:rapportoGiornoAperto};
   const dal=rapportoAnno+'-'+String(rapportoMese+1).padStart(2,'0')+'-01';const ed=new Date(rapportoAnno,rapportoMese+1,0).getDate();
   return{dal,al:rapportoAnno+'-'+String(rapportoMese+1).padStart(2,'0')+'-'+String(ed).padStart(2,'0')}}
+function _rapportoHaDati(r){if(!r)return false;const skip=['id','data_rapporto','turno','operatore','updated_at','created_at'];
+  for(const k in r){if(skip.includes(k))continue;const v=r[k];if(k==='note_extra'){try{const ex=JSON.parse(v||'{}');if(Object.values(ex).some(x=>x&&String(x).trim()))return true}catch(e){}continue}if(v&&String(v).trim()&&v!=='0'&&v!==0)return true}return false}
 async function fetchRapportiRange(dal,al){const data=await sbGet('rapporti_giornalieri?data_rapporto=gte.'+dal+'&data_rapporto=lte.'+al+'&order=data_rapporto.asc');
-  const byDate={};data.forEach(r=>{if(!byDate[r.data_rapporto])byDate[r.data_rapporto]={};byDate[r.data_rapporto][r.turno]=r});return byDate}
+  const byDate={};data.forEach(r=>{if(!byDate[r.data_rapporto])byDate[r.data_rapporto]={};byDate[r.data_rapporto][r.turno]=r});
+  // Rimuovi giorni dove entrambi i turni sono vuoti
+  Object.keys(byDate).forEach(ds=>{const d=byDate[ds];if(!_rapportoHaDati(d.PRESTO)&&!_rapportoHaDati(d.NOTTE))delete byDate[ds]});return byDate}
 async function esportaRapportoCSV(){const{dal,al}=getRapportoDateRange();const byDate=await fetchRapportiRange(dal,al);
   const dates=Object.keys(byDate).sort();if(!dates.length){toast('Nessun rapporto nel periodo selezionato');return}
   const campi=getCampiRapporto();const rows=[['Data','Campo','PRESTO','NOTTE']];
