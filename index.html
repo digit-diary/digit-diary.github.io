@@ -2215,7 +2215,14 @@ async function esportaPDF(){const f=getFiltrati();if(!f.length){toast('Nessun da
 // ========================
 function initConsegnaUI(){const turno=_getTurnoCorrente();const sel=document.getElementById('cons-turno');if(sel)sel.value=turno;
   const dSel=document.getElementById('cons-destinatario');if(dSel){const ops=operatoriAuthCache.map(o=>o.nome).sort();
-    dSel.innerHTML='<option value="tutti">Tutti</option>'+ops.map(n=>'<option>'+escP(n)+'</option>').join('')}}
+    // Cerca supervisore turno successivo dal rapporto giornaliero
+    let suggerito='';const oggi=getGiornataCasino();const rapp=rapportiCache[oggi]||{};
+    if(turno==='PRESTO'&&rapp.NOTTE&&rapp.NOTTE.sup_note){suggerito=rapp.NOTTE.sup_note.trim()}
+    else if(turno==='NOTTE'){const domani=new Date(new Date(oggi+'T12:00:00').getTime()+86400000);const domaniStr=domani.getFullYear()+'-'+String(domani.getMonth()+1).padStart(2,'0')+'-'+String(domani.getDate()).padStart(2,'0');const rappD=rapportiCache[domaniStr]||{};if(rappD.PRESTO&&rappD.PRESTO.sup_note)suggerito=rappD.PRESTO.sup_note.trim()}
+    // Cerca match tra il nome supervisore e gli operatori
+    const sugMatch=suggerito?ops.find(n=>n.toLowerCase()===suggerito.toLowerCase()||n.toLowerCase().includes(suggerito.toLowerCase())||suggerito.toLowerCase().includes(n.toLowerCase())):'';
+    dSel.innerHTML='<option value="tutti">Tutti</option>'+ops.map(n=>'<option value="'+escP(n)+'"'+(sugMatch&&n===sugMatch?' selected':'')+'>'+escP(n)+'</option>').join('');
+    if(sugMatch){toast('Destinatario suggerito: '+sugMatch+' (dal rapporto)')}}}
 async function inviaConsegnaTurno(){const turno=document.getElementById('cons-turno').value;
   const msg=document.getElementById('cons-messaggio').value.trim();
   const priorita=document.getElementById('cons-priorita').value;
