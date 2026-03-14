@@ -705,6 +705,40 @@
        - Click su nome cliente: mostra ristorante + spese extra
        - Totale complessivo (ristorante + extra) in evidenza
 
+  [44] Categorie clienti Maison
+       - Full Maison (oro), Maison (blu), Direzione (viola)
+       - Badge colorati in tabella, dettaglio, scheda clienti
+       - Assegnazione rapida con popup (3 pulsanti)
+       - Modifica categoria, budget, data nascita
+       - Lista clienti categorizzati: popup + export CSV/PDF
+       - Direzione separata dai costi maison
+       - Filtro per categoria nella scheda clienti
+
+  [45] Report Annuale PDF e CSV
+       - Panoramica anno: registrazioni, errori, malattie, maison, spese extra
+       - Riepilogo per mese (tabella 12 mesi)
+       - Top 15 clienti Maison
+       - CSV con tutti i dati dettagliati
+
+  [46] Report Settimanale CSV
+       - Export CSV con registrazioni, costi maison, spese extra
+
+  [47] Switch Reparto Slots/Tavoli
+       - Switch [SLOTS | TAVOLI] sotto l'header
+       - Dati completamente separati per reparto
+       - Diario, Maison, Statistiche, Dashboard filtrati per reparto
+       - Admin controlla visibilita: Reparto Slots / Reparto Tavoli
+       - Solo Slots → switch nascosto
+       - Solo Tavoli → switch nascosto
+       - Entrambi → switch visibile
+       - Salvataggio con reparto_dip su registrazioni, costi_maison,
+         maison_budget, spese_extra
+
+  [48] Menu hamburger mobile
+       - Sotto 700px: tab nascosti, menu laterale con pannello
+       - Mostra badge notifiche, rispetta visibilita admin
+       - Click fuori chiude il pannello
+
 
 ================================================================================
   FILE DEL PROGETTO
