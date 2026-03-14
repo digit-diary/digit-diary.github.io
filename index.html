@@ -395,6 +395,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
   .pwd-modal-box{min-width:auto;width:90%;max-width:380px;padding:24px 20px}
   .modal-box{min-width:auto;width:90%;max-width:380px;padding:24px 20px}
   .login-box{min-width:auto;width:90%;max-width:380px;padding:30px 24px}
+  .login-box img{width:100px!important}
   .scadenze-banner,.cassa-alert-banner,.rischio-alert-banner{font-size:.78rem;padding:8px 14px}
   .ricerca-globale-input{font-size:.9rem;padding:10px 14px 10px 36px}
   .ricerca-globale-icon{left:10px;font-size:1rem}
@@ -432,7 +433,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 <body>
 <script>if(sessionStorage.getItem('diario_auth')==='1')document.documentElement.classList.add('authed')</script>
 <div id="login-overlay"><div class="login-box">
-  <h2>Accesso Protetto</h2><p>Seleziona il tuo nome e inserisci la password</p>
+  <img src="logo_casino.png" alt="Casino Lugano SA" style="width:140px;margin-bottom:16px"><h2>Accesso Protetto</h2><p>Seleziona il tuo nome e inserisci la password</p>
   <select id="login-nome" style="margin-bottom:8px;text-align:left;letter-spacing:0;padding:11px 14px;width:100%;border:1.5px solid var(--line);border-radius:2px;font-size:1rem;font-family:'Source Sans 3',sans-serif;color:var(--ink);background:var(--paper2);cursor:pointer"><option value="">-- Seleziona operatore --</option></select>
   <input type="password" id="pwd-input" placeholder="Password..." onkeydown="if(event.key==='Enter') checkPwd()">
   <button class="btn-login" onclick="checkPwd()">Entra</button>
