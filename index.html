@@ -975,13 +975,16 @@ function renderTipiUI(){const tutti=getTuttiTipi();
   let s=document.getElementById('dyn-styles');if(!s){s=document.createElement('style');s.id='dyn-styles';document.head.appendChild(s)}
   s.textContent=tutti.map(t=>'.badge-'+t.nome.replace(/ /g,'-')+'{background:'+t.colore+'}').join('\n')}
 
+// CAPITALIZZAZIONE NOMI
+function capitalizzaNome(s){return s.replace(/\S+/g,w=>{const l=w.toLowerCase();if(['di','da','de','del','della','dello','dei','degli','delle','dal','dalla','con','e','in','la','le','lo','il','gli','von','van','el','al','ben'].includes(l)&&s.indexOf(w)>0)return l;return l.replace(/(^|['-])(\w)/g,(m,sep,ch)=>sep+ch.toUpperCase())})}
+
 // TOAST & UTILS
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}
 function escP(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 
 // CORE CRUD
-async function salva(){const nome=document.getElementById('inp-nome').value.trim(),testo=document.getElementById('inp-testo').value.trim();if(!nome){toast('Inserisci il nome');return}if(!testo){toast('Scrivi una descrizione');return}
+async function salva(){const nome=capitalizzaNome(document.getElementById('inp-nome').value.trim()),testo=document.getElementById('inp-testo').value.trim();if(!nome){toast('Inserisci il nome');return}if(!testo){toast('Scrivi una descrizione');return}
   const importo=parseFloat(document.getElementById('inp-importo').value)||0;const valuta=importo?document.getElementById('inp-valuta').value:'';const reparto=document.getElementById('inp-reparto').value;
   const rec={id:Date.now(),nome,tipo:tipoSelezionato,testo,data:new Date().toISOString(),operatore:getOperatore(),importo,valuta,reparto};
   try{await sbPost('registrazioni',rec);datiCache.unshift(rec);document.getElementById('inp-testo').value='';document.getElementById('inp-importo').value='';document.getElementById('inp-reparto').value='';
@@ -1597,7 +1600,7 @@ async function renderCollaboratoriUI(){const section=document.getElementById('co
   let html=attivi.length?attivi.map(c=>'<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border:1px solid var(--line)"><span style="flex:1;font-weight:400">'+escP(c.nome)+'</span><button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2)" onclick="rinominaCollaboratore(\''+c.nome.replace(/'/g,"\\'")+'\')">Rinomina</button><button class="btn-del-tipo" onclick="disattivaCollaboratore(\''+c.nome.replace(/'/g,"\\'")+'\')">Rimuovi</button></div>').join(''):'<p style="color:var(--muted);font-size:.85rem">Nessun collaboratore.</p>';
   if(inattivi.length){html+='<div style="margin-top:12px;padding:10px;background:var(--paper2);border-radius:3px"><small style="color:var(--muted);display:block;margin-bottom:6px">Collaboratori disattivati (clicca per riattivare):</small><div style="display:flex;flex-wrap:wrap;gap:6px">'+inattivi.map(c=>'<button style="padding:4px 10px;font-size:.82rem;border:1px solid var(--line);border-radius:2px;cursor:pointer;background:var(--paper);color:var(--muted)" onclick="riattivaCollaboratore(\''+c.nome.replace(/'/g,"\\'")+'\')">+ '+escP(c.nome)+'</button>').join('')+'</div></div>'}
   el.innerHTML=html}
-async function aggiungiCollaboratore(){const nome=document.getElementById('new-collab-nome').value.trim();if(!nome){toast('Inserisci un nome');return}
+async function aggiungiCollaboratore(){const nome=capitalizzaNome(document.getElementById('new-collab-nome').value.trim());if(!nome){toast('Inserisci un nome');return}
   if(collaboratoriCache.find(c=>c.nome.toLowerCase()===nome.toLowerCase())){toast('Collaboratore già esistente');return}
   try{const r=await sbPost('collaboratori',{nome,attivo:true});collaboratoriCache.push(r[0]);collaboratoriCache.sort((a,b)=>a.nome.localeCompare(b.nome));
     logAzione('Collaboratore aggiunto',nome);document.getElementById('new-collab-nome').value='';renderCollaboratoriUI();aggiornaNomi();toast('Collaboratore aggiunto')}catch(e){if(e.message&&e.message.includes('duplicate'))toast('Nome già esistente');else toast('Errore')}}
@@ -1646,6 +1649,7 @@ async function importaCollaboratori(input){const file=input.files[0];if(!file)re
   else if(ext==='xlsx'||ext==='xls'){const buf=await file.arrayBuffer();const wb=XLSX.read(buf);const ws=wb.Sheets[wb.SheetNames[0]];const data=XLSX.utils.sheet_to_json(ws,{header:1});
     data.forEach(row=>{if(row[0]&&typeof row[0]==='string'){const n=row[0].trim();if(n&&n.length>1)nomi.push(n)}})
   }else{toast('Formato non supportato');input.value='';return}
+  nomi=nomi.map(n=>capitalizzaNome(n));
   if(!nomi.length){toast('Nessun nome trovato nel file');input.value='';return}
   let aggiunti=0,duplicati=0;
   for(const nome of nomi){if(collaboratoriCache.find(c=>c.nome.toLowerCase()===nome.toLowerCase())){duplicati++;continue}
