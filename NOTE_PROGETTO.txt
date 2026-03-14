@@ -189,12 +189,52 @@
         collaboratore con importi CHF
       - Layout professionale con tabelle e footer paginato
 
-  15. VISIBILITA PAGINE E FUNZIONI
+  15. DASHBOARD PANORAMICA (HOME)
+      - Homepage con 6 KPI in tempo reale
+      - Widget: Da fare oggi, Alert attivi, Ultime registrazioni, Maison oggi
+      - Nomi cliccabili (profilo collaboratore o dettaglio maison)
+      - Grafico settimanale registrazioni + maison
+      - Giornata di gioco (GD) nel titolo e badge
+      - Report Settimanale PDF (un click)
+
+  16. CONSEGNA TURNO
+      - Passaggio consegne PRESTO/NOTTE tra supervisori
+      - Destinatario specifico (auto-suggerito dal rapporto)
+      - Popup al login, badge, modifica/annulla (come Note Colleghi)
+
+  17. PROMEMORIA OPERATORI
+      - Task con scadenza assegnabili a operatori
+      - Badge, popup login, completamento con tracciamento
+
+  18. COSTI MAISON
+      - Upload Excel formulario ristorante
+      - Parsing: splitta /, estrae BU/BL, nomi simili (Levenshtein)
+      - Import intelligente (salta giorni esistenti)
+      - Statistiche, grafici, filtri, export CSV/PDF
+      - Scheda clienti: categoria Maison/Full Maison, budget, nascita
+      - Alert compleanni (prossimi 7 giorni)
+      - Alert budget (80%/100%)
+      - Rinomina, elimina cliente/giorno
+      - Dettaglio cliente con spese extra + totale complessivo
+      - Export lista clienti PDF (per categoria)
+
+  19. SPESE EXTRA
+      - Cene esterne, pranzi, rimborsi, viaggi, hotel, biglietti, regali
+      - Filtri, modifica, elimina, export CSV/PDF
+      - Incluse nel dettaglio cliente e report settimanale
+
+  20. ALERT AMMONIMENTI VERBALI
+      - 2+ ammonimenti verbali → banner "Preparare allineamento"
+      - Scompare dopo creazione allineamento
+
+  21. VISIBILITA PAGINE E FUNZIONI
       - Sezione in Impostazioni (solo admin)
       - L'admin puo controllare la visibilita di:
-        Pagine: Rapporto, Note Colleghi, Statistiche, Moduli, Assistente
+        Pagine: Rapporto, Note Colleghi, Statistiche, Moduli, Assistente,
+                Consegna Turno, Promemoria, Costi Maison
         Funzioni: Ricerca globale, Alert cassa, Alert rischio,
-                  Template rapidi, Firma digitale, QR Code, AI moduli
+                  Compleanni maison, Template rapidi, Firma digitale,
+                  QR Code, AI moduli
       - 4 opzioni per ogni voce:
         1. Tutti — visibile a tutti gli operatori
         2. Solo admin — solo chi accede con password master
@@ -204,7 +244,7 @@
       - Config salvata in impostazioni DB (chiave 'visibilita', JSON)
       - Applicata automaticamente al login e al caricamento pagina
 
-  16. IMPOSTAZIONI (ADMIN)
+  22. IMPOSTAZIONI (ADMIN)
       - Gestione tipi di evento: aggiungere, rimuovere, cambiare colore
         (anche i tipi predefiniti possono essere nascosti/ripristinati)
       - Gestione campi rapporto giornaliero: aggiungere, rimuovere
@@ -215,7 +255,7 @@
       - Cambio password master
       - Tema chiaro/scuro per operatore
 
-  17. REGISTRO ATTIVITA (ADMIN)
+  23. REGISTRO ATTIVITA (ADMIN)
       - Log di tutte le azioni degli operatori
       - Filtri: operatore, categoria, cerca, periodo Dal/Al
       - Date picker Flatpickr (gg/mm/aaaa) come nel Diario
