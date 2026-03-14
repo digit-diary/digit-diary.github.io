@@ -19,8 +19,11 @@
   Applicazione web single-file (index.html) per la gestione del personale
   del Casino Lugano SA. Permette di registrare eventi, redigere rapporti
   giornalieri, inviare note tra colleghi, generare moduli disciplinari
-  con firma digitale e QR code, consultare statistiche, generare riepilogo
-  mensile PDF, e gestire visibilita di pagine/funzioni per operatore.
+  con firma digitale e QR code, consultare statistiche, gestire costi
+  Maison con budget e grafici, assegnare promemoria con scadenze,
+  scrivere consegne turno, generare report settimanali PDF, e gestire
+  visibilita di pagine/funzioni per operatore. Include una Dashboard
+  panoramica come homepage con KPI in tempo reale.
 
   Tecnologie utilizzate:
   - HTML/CSS/JavaScript (tutto in un unico file)
@@ -562,32 +565,138 @@
        - iPhone: viewport-fit=cover + safe-area-inset padding
        - Print: nascosti elementi interattivi nuovi
 
+  [29] Sicurezza V2
+       - PBKDF2 100K iterazioni (sostituisce SHA-256) con auto-migrazione
+       - Rate limiting: 5 tentativi/minuto (client + server)
+       - Admin session tokens: RPC admin richiedono token
+       - SRI (Subresource Integrity) su tutti i CDN
+       - Chiave Groq API cifrata XOR nel DB
+       - Naming gemini → groq (pulizia codice)
+       - loadAll() parallelizzato con Promise.all
+
+  [30] Dashboard panoramica (Homepage)
+       - 6 KPI: promemoria, note, maison, alert cassa, registrazioni, rischio
+       - Widget: Da fare oggi, Alert attivi, Ultime registrazioni, Maison oggi
+       - Tutti i nomi cliccabili (profilo collaboratore o dettaglio maison)
+       - Grafico andamento settimanale (registrazioni + maison CHF)
+       - Giornata di gioco (GD) nel titolo e badge GD nelle registrazioni
+       - Widget nascosti automaticamente se funzione non visibile
+       - Report Settimanale PDF generabile dalla Dashboard
+
+  [31] Consegna Turno
+       - Passaggio consegne PRESTO/NOTTE tra supervisori
+       - Destinatario specifico o tutti gli operatori
+       - Auto-suggerimento destinatario dal rapporto giornaliero
+       - Popup al login per consegne non lette
+       - Badge contatore sul tab
+       - Modifica e annulla invio (bloccati se letta)
+       - Priorita normale/alta con evidenziazione
+
+  [32] Promemoria Operatori
+       - Creazione task con titolo, descrizione, scadenza, assegnazione
+       - "Per me" pre-selezionato nel dropdown
+       - Badge con contatore (rosso=scaduti, oro=attivi)
+       - Popup al login: promemoria scaduti e in scadenza 3 giorni
+       - Completamento con tracciamento chi/quando
+       - Filtri per stato e operatore
+
+  [33] Costi Maison
+       - Upload Excel formulario ristorante (multi-foglio per giorno)
+       - Auto-parsing: splitta nomi con /, estrae BU/BL, note
+       - Rilevamento nomi simili (Levenshtein)
+       - Import intelligente: salta giorni gia presenti, opzione sostituisci
+       - Dashboard: totali, top clienti, trend giornaliero, distribuzione tipi
+       - Click su nome cliente: dettaglio tutte le visite con export CSV/PDF
+       - Rinomina/elimina cliente, elimina giorno
+       - Budget opzionale per cliente (CHF, max BU, max BL)
+       - Alert 80%/100% budget con banner
+       - Export CSV/PDF con nome file costi_maison_mese_anno
+       - Capitalizzazione automatica nomi importati
+
+  [34] Auto-capitalizzazione nomi
+       - capitalizzaNome(): MARIO ROSSI → Mario Rossi
+       - Gestisce apostrofi (D'Amico, O'Brien), trattini (Jean-Pierre)
+       - Preposizioni italiane minuscole (della, del, von, van)
+       - Applicato a: import, aggiunta manuale, diario
+
+  [35] Visibilita coerente
+       - Se admin nasconde una funzione, sparisce ovunque:
+         Tab, Dashboard KPI, Dashboard widget, ricerca globale, banner
+       - 8 pagine + 7 funzioni configurabili
+       - 4 opzioni: Tutti / Solo admin / Operatori selezionati / Nascosto
+
+  [36] Badge GD (Giornata di Gioco)
+       - Registrazioni tra mezzanotte e le 06:00 mostrano badge GD
+       - Es: registrazione alle 02:54 del 14/03 → badge "GD 13.03"
+       - Visibile nel Diario e nella Dashboard
+
+  [37] Export rapporto migliorato
+       - Escludi giorni vuoti (toccati da autosave ma senza dati)
+
+  [38] Fix bug dicembre nel riepilogo mensile PDF
+
 
 ================================================================================
   FILE DEL PROGETTO
 ================================================================================
 
-  index.html            L'intera applicazione (HTML + CSS + JS)
-  logo_casino.png       Logo Casino Lugano SA (usato nei PDF)
-  schema.sql            Schema iniziale tabella registrazioni
-  migrate.sql           Migrazione: rapporti, note_fissate, scadenze
-  migrate_security.sql  Migrazione sicurezza: 13 RPC + RLS policies
-  migrazione.js         Script per migrare dati da localStorage a Supabase
-  NOTE_PROGETTO.txt     Questo file
+  index.html              L'intera applicazione (HTML + CSS + JS)
+  logo_casino.png         Logo Casino Lugano SA (usato nei PDF)
+  schema.sql              Schema iniziale tabella registrazioni
+  migrate.sql             Migrazione: rapporti, note_fissate, scadenze
+  migrate_security.sql    Migrazione sicurezza V1: 13 RPC + RLS policies
+  migrate_security_v2.sql Migrazione sicurezza V2: PBKDF2, rate limiting,
+                          admin tokens, sessioni, groq key RPC
+  migrate_costi_maison.sql Migrazione: costi_maison, maison_budget
+  migrazione.js           Script per migrare dati da localStorage a Supabase
+  genera_manuale.html     Generatore manuale PDF dell'app
+  NOTE_PROGETTO.txt       Questo file
 
 
 ================================================================================
-  CREDENZIALI SUPABASE
+  DATABASE SUPABASE - TABELLE (aggiornato)
+================================================================================
+
+  registrazioni           Diario eventi collaboratori
+  rapporti_giornalieri    Rapporto giornaliero PRESTO/NOTTE
+  note_fissate            Pin su registrazioni
+  scadenze                Scadenze/promemoria (vecchio sistema)
+  impostazioni            Configurazione app (chiave/valore)
+  note_colleghi           Note tra operatori
+  operatori_auth          Autenticazione operatori (RLS bloccato)
+  collaboratori           Lista master nomi collaboratori
+  moduli                  Moduli disciplinari (allineamento/RDI/apprezzamento)
+  log_attivita            Registro azioni operatori
+  login_attempts          Rate limiting tentativi login
+  admin_sessions          Sessioni admin con token
+  costi_maison            Costi ristorante maison per cliente/giorno
+  maison_budget           Budget opzionale per cliente maison
+  promemoria              Task/promemoria assegnati a operatori
+  consegne_turno          Consegne passaggio turno
+
+
+================================================================================
+  SICUREZZA (aggiornato)
 ================================================================================
 
   URL:      https://bdxqtzehoapilwzqlgnv.supabase.co
   Anon Key: offuscata nel codice (XOR encoding)
 
   La sicurezza e gestita su piu livelli:
-  - Credenziali offuscate (XOR, non in chiaro nel sorgente)
+  - Password: PBKDF2 con 100K iterazioni e salt per utente
+  - Auto-migrazione: login con SHA-256 → upgrade a PBKDF2, cancella v1
+  - Rate limiting: max 5 tentativi/minuto per utente (server-side)
+  - Admin session tokens: RPC admin (add/remove operator, force change pwd,
+    set groq key) richiedono token valido
+  - Sessione admin validata al reload, invalidata al logout (24h scadenza)
+  - Credenziali Supabase offuscate (XOR, non in chiaro nel sorgente)
+  - Chiave Groq API cifrata XOR nel DB, bloccata da RLS REST
   - Row Level Security (RLS) su tabelle sensibili
   - Operazioni auth via RPC server-side (SECURITY DEFINER)
-  - pwd_hash e recovery_code mai accessibili via REST API
+  - pwd_hash, pwd_hash_v2, recovery_code, groq_api_key bloccati da RLS
+  - admin_sessions e login_attempts non accessibili via REST
+  - SRI (Subresource Integrity) su tutti i 10 script/CSS CDN
+  - Rate limiting anche su change_op_pwd, recovery_master_pwd
 
 
 ================================================================================

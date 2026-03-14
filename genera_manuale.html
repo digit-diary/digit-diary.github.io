@@ -130,9 +130,9 @@ y += 30;
 doc.setFontSize(9);doc.setTextColor(120);
 doc.text('Questo manuale descrive tutte le funzionalita dell\'applicazione', pw/2, y, {align:'center'});
 y += 5;
-doc.text('Diario Collaboratori, dalla registrazione eventi alla generazione', pw/2, y, {align:'center'});
+doc.text('Diario Collaboratori: registrazione eventi, rapporti, moduli disciplinari,', pw/2, y, {align:'center'});
 y += 5;
-doc.text('di moduli disciplinari, statistiche e gestione del personale.', pw/2, y, {align:'center'});
+doc.text('costi maison, promemoria, consegne turno, statistiche e report.', pw/2, y, {align:'center'});
 
 addFooter();
 
@@ -167,7 +167,7 @@ spacer(2);
 para('L\'interfaccia e composta da:');
 bullet('Header: titolo, data odierna, nome operatore, pulsanti (campanella, tema, stampa, esci).');
 bullet('Barra di ricerca globale: campo di ricerca che cerca in tutte le sezioni.');
-bullet('Tab di navigazione: 8 sezioni principali (Diario, Rapporto, Note Colleghi, Statistiche, Moduli, Assistente, Registro, Impostazioni).');
+bullet('Tab di navigazione: Home (Dashboard), Diario, Rapporto, Note Colleghi, Statistiche, Moduli, Assistente, Consegna, Promemoria, Maison, Registro, Impostazioni.');
 bullet('Area contenuto: il contenuto della sezione attiva.');
 spacer(2);
 title('Tema chiaro/scuro', 2);
@@ -396,8 +396,9 @@ bullet('Rimuovere operatori.');
 bullet('Resettare password operatore.');
 title('Visibilita pagine e funzioni (admin)', 2);
 para('L\'admin puo controllare cosa vedono gli operatori:');
-para('Pagine configurabili: Rapporto, Note Colleghi, Statistiche, Moduli, Assistente.');
+para('Pagine configurabili: Rapporto, Note Colleghi, Statistiche, Moduli, Assistente, Consegna Turno, Promemoria, Costi Maison.');
 para('Funzioni configurabili: Ricerca globale, Alert cassa, Alert rischio, Template rapidi, Firma digitale, QR Code, AI (Genera + Migliora testo).');
+tip('Se una funzione viene nascosta, sparisce ovunque: tab, Dashboard, ricerca globale, banner alert.');
 spacer(1);
 para('Per ogni voce ci sono 4 opzioni:');
 bullet('Tutti: visibile a tutti gli operatori.');
@@ -411,8 +412,111 @@ bullet('Operatore: pulsante per cambiare la propria password.');
 title('Assistente AI (admin)', 2);
 para('Inserire la chiave API Groq per abilitare le funzionalita AI (generazione testi e analisi immagini nei moduli e nell\'Assistente). La chiave e gratuita su console.groq.com.');
 
-// ===== 14. USO MOBILE =====
-title('14. USO SU DISPOSITIVI MOBILI', 1);
+// ===== 14. DASHBOARD =====
+title('14. DASHBOARD (HOME)', 1);
+spacer(2);
+para('La Dashboard e la pagina iniziale dell\'applicazione. Offre una panoramica completa della giornata di gioco (GD) corrente.');
+title('KPI in tempo reale', 2);
+para('In cima alla pagina vengono mostrati i contatori principali:');
+bullet('Promemoria attivi (con scaduti evidenziati in rosso).');
+bullet('Note non lette da altri operatori.');
+bullet('Spesa Maison della giornata corrente in CHF.');
+bullet('Alert cassa e rischio disciplinare attivi.');
+bullet('Registrazioni inserite oggi.');
+title('Widget interattivi', 2);
+bullet('Da fare oggi: promemoria scaduti e in scadenza nei prossimi 3 giorni, note non lette. Cliccabili per andare alla sezione.');
+bullet('Alert attivi: differenze cassa, collaboratori a rischio, budget maison superati. Cliccando sul nome si apre il profilo.');
+bullet('Ultime registrazioni: le 8 registrazioni piu recenti con tipo e ora. Cliccando sul nome si apre il profilo.');
+bullet('Maison oggi: spesa per cliente della giornata. Cliccando sul nome si apre il dettaglio.');
+title('Grafico settimanale', 2);
+para('Un grafico combinato mostra l\'andamento degli ultimi 7 giorni: barre per registrazioni e linea per spesa Maison in CHF.');
+title('Giornata di gioco (GD)', 2);
+para('La Dashboard usa la logica della giornata di gioco: dalle 06:00 alle 06:00 del giorno dopo. Alle 02:00 del 15 marzo, la Dashboard mostra ancora i dati del 14 marzo.');
+para('Le registrazioni inserite tra mezzanotte e le 06:00 mostrano un badge "GD" con la data della giornata di gioco effettiva.');
+title('Report Settimanale PDF', 2);
+para('In fondo alla Dashboard si trova il pulsante "Genera Report Settimanale PDF". Genera un PDF professionale che include:');
+bullet('Panoramica: registrazioni, errori, malattie, apprezzamenti.');
+bullet('Differenze cassa con importi per collaboratore.');
+bullet('Top 10 clienti Maison con totali.');
+bullet('Moduli disciplinari generati nella settimana.');
+bullet('Stato promemoria (completati, scaduti, in corso).');
+tip('Il report copre gli ultimi 7 giorni. Ideale da stampare ogni lunedi per la Direzione.');
+
+// ===== 15. CONSEGNA TURNO =====
+title('15. CONSEGNA TURNO', 1);
+spacer(2);
+para('La Consegna Turno permette di passare informazioni importanti tra il supervisore uscente e quello entrante.');
+title('Scrivere una consegna', 2);
+bullet('Selezionare il turno uscente (PRESTO o NOTTE).');
+bullet('Selezionare il destinatario: un operatore specifico o "Tutti".');
+bullet('Il sistema suggerisce automaticamente il destinatario leggendo il supervisore dal rapporto giornaliero.');
+bullet('Scegliere la priorita: Normale o Alta (evidenziata in rosso).');
+bullet('Scrivere il messaggio con le informazioni da passare.');
+bullet('Cliccare "Invia consegna".');
+title('Notifica al destinatario', 2);
+para('Quando il destinatario accede all\'app, vede un popup con la consegna non letta. Un badge rosso sul tab "Consegna" indica il numero di consegne non lette.');
+tip('Solo il destinatario (o tutti se selezionato "Tutti") riceve il popup. Gli altri operatori possono vedere le consegne nella lista ma non vengono avvisati.');
+title('Modifica e annullamento', 2);
+bullet('Modifica: e possibile modificare il testo di una consegna solo se non e ancora stata letta.');
+bullet('Annulla invio: elimina la consegna per tutti, solo se non ancora letta.');
+bullet('Dopo la lettura: la consegna non e piu modificabile.');
+
+// ===== 16. PROMEMORIA =====
+title('16. PROMEMORIA', 1);
+spacer(2);
+para('I Promemoria permettono di assegnare compiti con scadenza a se stessi o ad altri operatori.');
+title('Creare un promemoria', 2);
+bullet('Inserire un titolo (es: "Verificare uniformi turno notte").');
+bullet('Selezionare la data di scadenza con il calendario.');
+bullet('Aggiungere una descrizione opzionale.');
+bullet('Selezionare l\'assegnatario: "Per me" (pre-selezionato), un altro operatore, o "Tutti".');
+bullet('Cliccare "Crea promemoria".');
+title('Gestione promemoria', 2);
+bullet('Badge sul tab: mostra il numero di promemoria attivi (rosso se scaduti).');
+bullet('Al login: popup con promemoria scaduti e in scadenza nei prossimi 3 giorni.');
+bullet('Completamento: cliccare "Fatto" per segnare come completato (con tracciamento chi e quando).');
+bullet('Riattivazione: e possibile riattivare un promemoria completato.');
+bullet('Filtri: per stato (attivi/completati/tutti) e per operatore.');
+tip('I promemoria appaiono anche nel widget "Da fare oggi" della Dashboard.');
+
+// ===== 17. COSTI MAISON =====
+title('17. COSTI MAISON', 1);
+spacer(2);
+para('La sezione Maison permette di gestire i costi del ristorante per i clienti maison del casino.');
+title('Caricamento dati', 2);
+para('Cliccare "Carica Excel ristorante" e selezionare il formulario ristorante (file .xlsx). Il sistema:');
+bullet('Legge ogni foglio come un giorno (nome foglio = data DD.MM.YYYY).');
+bullet('Riconosce automaticamente i nomi, le persone (PX) e i costi.');
+bullet('Divide i costi quando ci sono nomi multipli separati da / (es: "Bertaggia/Pegoraro").');
+bullet('Riconosce i buoni: BU (Buono Unico, 15 CHF) e BL (Buono Lounge, 40 CHF).');
+bullet('Capitalizza automaticamente i nomi (MARIO ROSSI → Mario Rossi).');
+bullet('Avvisa se un nome e simile a uno gia esistente (es: "Bureno" → "forse intendi Burino?").');
+tip('Se il file contiene giorni gia importati, il sistema li salta automaticamente. Appare un pulsante "Sostituisci tutto" per forzare l\'aggiornamento.');
+title('Dashboard e statistiche', 2);
+para('La pagina mostra:');
+bullet('Periodo visualizzato (es: "Marzo 2026") con totali: CHF, clienti, persone, giorni, buoni.');
+bullet('Tabella riepilogativa per cliente: visite, persone, BU, BL, totale CHF, media.');
+bullet('Grafici: spesa giornaliera (linea), top clienti (barre), distribuzione tipo pagamento (ciambella).');
+title('Dettaglio cliente', 2);
+para('Cliccando sul nome di un cliente nella tabella si apre il dettaglio con tutte le visite giorno per giorno, con data, giorno, PX, costo, tipo buono, gruppo e note.');
+bullet('Pulsanti CSV e PDF per esportare il dettaglio del singolo cliente.');
+title('Gestione dati', 2);
+bullet('Rinomina: aggiorna il nome del cliente in tutte le occorrenze.');
+bullet('Elimina cliente: rimuove tutte le registrazioni di quel nome.');
+bullet('Elimina giorno: selezionare un giorno e rimuovere tutti i dati.');
+title('Budget (opzionale)', 2);
+para('E possibile impostare un budget mensile per singoli clienti:');
+bullet('Budget CHF: tetto di spesa mensile.');
+bullet('Max BU / Max BL: numero massimo di buoni.');
+para('Se un cliente raggiunge l\'80% del budget appare un alert arancione. Al 100% l\'alert diventa rosso.');
+tip('I budget non sono obbligatori. Se non ne imposti nessuno, non appaiono alert.');
+title('Esportazione', 2);
+bullet('CSV/PDF dalla lista generale: include tutti i clienti del periodo selezionato.');
+bullet('CSV/PDF dal dettaglio cliente: include solo le visite del cliente selezionato.');
+bullet('Nome file automatico: costi_maison_marzo_2026.pdf (o da_marzo_a_aprile_2026 per piu mesi).');
+
+// ===== 18. USO MOBILE =====
+title('18. USO SU DISPOSITIVI MOBILI', 1);
 spacer(2);
 para('L\'applicazione e completamente responsive e funziona su smartphone e tablet.');
 title('Differenze su mobile', 2);
@@ -426,8 +530,8 @@ bullet('Per usare la firma digitale su tablet, ruotare il dispositivo in orizzon
 bullet('Per scannerizzare un QR code, usare la fotocamera del telefono.');
 bullet('L\'app puo essere aggiunta alla schermata home come Progressive Web App.');
 
-// ===== 15. FAQ =====
-title('15. DOMANDE FREQUENTI', 1);
+// ===== 19. FAQ =====
+title('19. DOMANDE FREQUENTI', 1);
 spacer(2);
 
 title('Come faccio a cambiare la mia password?', 3);
@@ -437,7 +541,7 @@ para('Cliccare "Password dimenticata?" nella schermata di login e inserire il co
 title('Posso usare l\'app offline?', 3);
 para('No, l\'app richiede una connessione internet per accedere al database. Tuttavia i PDF generati possono essere salvati localmente.');
 title('I dati sono al sicuro?', 3);
-para('Si. Le password sono hashate (SHA-256), le credenziali del database sono offuscate, e le operazioni sensibili passano per funzioni server-side protette.');
+para('Si. Le password sono protette con PBKDF2 (100.000 iterazioni), le credenziali del database sono offuscate, le operazioni admin richiedono un token di sessione, e tutte le funzioni sensibili passano per RPC server-side protette. Il rate limiting blocca i tentativi di accesso non autorizzati.');
 title('Quanto costa l\'app?', 3);
 para('L\'app e completamente gratuita. Il hosting (GitHub Pages) e il database (Supabase piano free) non hanno costi. L\'AI (Groq) ha un piano gratuito sufficiente (~14.400 richieste al giorno).');
 title('Le firme digitali sono valide legalmente?', 3);
