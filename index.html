@@ -2172,7 +2172,7 @@ function initPromemoriaUI(){
   // Popola select operatori con il proprio nome pre-selezionato
   const sel=document.getElementById('pm-assegnato');if(!sel)return;
   const ops=operatoriAuthCache.map(o=>o.nome).sort();const me=getOperatore();
-  const cv=sel.value||me;sel.innerHTML='<option value="tutti">Tutti gli operatori</option>'+ops.map(n=>'<option value="'+escP(n)+'"'+(n===cv?' selected':'')+'>'+escP(n)+'</option>').join('');
+  const cv=sel.value||me;sel.innerHTML='<option value="tutti">Tutti gli operatori</option>'+ops.map(n=>'<option value="'+escP(n)+'"'+(n===cv?' selected':'')+'>'+(n===me?'Per me':escP(n))+'</option>').join('');
   // Filtro operatori
   const fSel=document.getElementById('pm-filt-op');if(fSel){const fcv=fSel.value;fSel.innerHTML='<option value="">Tutti</option>'+ops.map(n=>'<option'+(n===fcv?' selected':'')+'>'+escP(n)+'</option>').join('')}}
 async function salvaPromemoria(){const titolo=document.getElementById('pm-titolo').value.trim();
