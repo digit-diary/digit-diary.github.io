@@ -433,8 +433,9 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 <body>
 <script>if(sessionStorage.getItem('diario_auth')==='1')document.documentElement.classList.add('authed')</script>
 <div id="login-overlay"><div class="login-box">
-  <img src="logo_casino.png" alt="Casino Lugano SA" style="width:140px;margin-bottom:16px"><h2>Accesso Protetto</h2><p>Seleziona il tuo nome e inserisci la password</p>
-  <select id="login-nome" style="margin-bottom:8px;text-align:left;letter-spacing:0;padding:11px 14px;width:100%;border:1.5px solid var(--line);border-radius:2px;font-size:1rem;font-family:'Source Sans 3',sans-serif;color:var(--ink);background:var(--paper2);cursor:pointer"><option value="">-- Seleziona operatore --</option></select>
+  <img src="logo_casino.png" alt="Casino Lugano SA" style="width:140px;margin-bottom:16px"><h2>Accesso Protetto</h2><p>Seleziona il settore e il tuo nome</p>
+  <select id="login-settore" onchange="aggiornaLoginOperatori()" style="margin-bottom:8px;text-align:left;letter-spacing:0;padding:11px 14px;width:100%;border:1.5px solid var(--line);border-radius:2px;font-size:1rem;font-family:'Source Sans 3',sans-serif;color:var(--ink);background:var(--paper2);cursor:pointer"><option value="">-- Admin (password master) --</option><option value="slots">Slots</option><option value="tavoli">Tavoli</option></select>
+  <select id="login-nome" style="margin-bottom:8px;text-align:left;letter-spacing:0;padding:11px 14px;width:100%;border:1.5px solid var(--line);border-radius:2px;font-size:1rem;font-family:'Source Sans 3',sans-serif;color:var(--ink);background:var(--paper2);cursor:pointer;display:none"><option value="">-- Seleziona operatore --</option></select>
   <input type="password" id="pwd-input" placeholder="Password..." onkeydown="if(event.key==='Enter') checkPwd()">
   <button class="btn-login" onclick="checkPwd()">Entra</button>
   <button class="btn-recupero" onclick="recuperoPassword()">Password dimenticata?</button>
@@ -851,7 +852,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
     <div class="add-tipo-row"><div class="field"><label>Nome nuovo collaboratore</label><input type="text" id="new-collab-nome" placeholder="Nome e Cognome..."></div><button class="btn-add-tipo" onclick="aggiungiCollaboratore()">+ Aggiungi</button><button class="btn-add-tipo" onclick="document.getElementById('import-collab-file').click()" style="background:var(--accent2)">Importa Excel/CSV</button><input type="file" id="import-collab-file" accept=".xlsx,.xls,.csv,.txt" style="display:none" onchange="importaCollaboratori(this)"></div></div>
   <div class="settings-section"><h4>Scadenze attive</h4><div id="scadenze-settings-list"></div></div>
   <div class="settings-section"><h4>Operatori</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Operatore attuale: <strong id="op-attuale">—</strong>. Ogni operatore accede con il proprio nome e password.</p><div id="operatori-list" style="margin-bottom:14px"></div>
-    <div class="add-tipo-row" style="align-items:flex-end"><div class="field"><label>Nome</label><input type="text" id="new-operatore-nome" placeholder="Nome..."></div><div class="field"><label>Password</label><input type="password" id="new-operatore-pwd" placeholder="Min 4 caratteri..."></div><div class="field"><label>Conferma password</label><input type="password" id="new-operatore-pwd2" placeholder="Ripeti..."></div><button class="btn-add-tipo" onclick="aggiungiOperatoreConPwd()">+ Crea operatore</button></div></div>
+    <div class="add-tipo-row" style="align-items:flex-end"><div class="field"><label>Nome</label><input type="text" id="new-operatore-nome" placeholder="Nome..."></div><div class="field"><label>Password</label><input type="password" id="new-operatore-pwd" placeholder="Min 4 caratteri..."></div><div class="field"><label>Conferma password</label><input type="password" id="new-operatore-pwd2" placeholder="Ripeti..."></div><div class="field"><label>Reparto</label><select id="new-operatore-rep" style="padding:10px"><option value="entrambi">Entrambi</option><option value="slots">Slots</option><option value="tavoli">Tavoli</option></select></div><button class="btn-add-tipo" onclick="aggiungiOperatoreConPwd()">+ Crea operatore</button></div></div>
   <div class="settings-section" id="visibilita-section" style="display:none"><h4>Visibilità pagine e funzioni</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Controlla quali pagine e funzioni sono visibili agli operatori.</p><div id="visibilita-list"></div></div>
   <div class="settings-section"><h4>Sicurezza</h4><div class="settings-btn-row" id="sicurezza-btns"></div></div>
   <div class="settings-section" id="ai-section" style="display:none"><h4>Assistente AI (Groq)</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Migliora automaticamente i testi nei moduli disciplinari. Ottieni una chiave gratuita su <a href="https://console.groq.com/keys" target="_blank" style="color:var(--accent2)">console.groq.com</a>.</p>
@@ -876,7 +877,7 @@ const RAPPORTO_DB_COLS=['sup_note','cassa_note','sala_note','n_assegni','preliev
 let campiRapportoExtra=[],tipiNascosti=[],campiNascosti=[],tipiOrdine=[],campiOrdine=[],campiLabelOverride={},tipiRinominati={};
 let visibilitaConfig={};
 let collaboratoriCache=[],moduliCache=[],logCache=[],maisonCache=[],maisonBudgetCache=[],promemoriaCache=[],consegneCache=[],speseExtraCache=[];
-let currentReparto='slots';
+let currentReparto='slots',operatoriRepartoMap={};
 function nomeCorrente(orig){return tipiRinominati[orig]||orig}
 function getTuttiTipi(){let list=[...TIPI_DEFAULT.filter(t=>!tipiNascosti.includes(t.nome)).map(t=>{const c=coloriOverride[t.nome]||t.colore;const n=tipiRinominati[t.nome]||t.nome;return{nome:n,colore:c,_orig:t.nome}}),...tipiPersonalizzati];
   if(tipiOrdine.length)list.sort((a,b)=>{const ia=tipiOrdine.indexOf(a.nome),ib=tipiOrdine.indexOf(b.nome);return(ia===-1?999:ia)-(ib===-1?999:ib)});return list}
@@ -918,6 +919,7 @@ async function loadAll(){
   if(clo)try{campiLabelOverride=JSON.parse(clo)}catch(e){}
   if(tr)try{tipiRinominati=JSON.parse(tr)}catch(e){}
   if(vis)try{visibilitaConfig=JSON.parse(vis)}catch(e){}
+  const opRep=await getImp('operatori_reparto');if(opRep)try{operatoriRepartoMap=JSON.parse(opRep)}catch(e){}
   const [dati,pins,scadenze,noteC,opAuth,collabs,moduli,logs,maisonD,maisonB,promemoriaD,consegneD,speseD]=await Promise.all([
     sbGet('registrazioni?order=data.desc'),
     sbGet('note_fissate?select=registrazione_id'),
@@ -1075,7 +1077,12 @@ async function aggiungiOperatoreConPwd(){const n=document.getElementById('new-op
   if(operatoriAuthCache.find(o=>o.nome.toLowerCase()===n.toLowerCase())){toast('Operatore già esistente');return}
   const h=await secureHash(p,n);try{await sbRpc('add_operator',{p_nome:n,p_hash:h,p_token:getAdminToken()});operatoriAuthCache.push({nome:n,ruolo:'operatore'});
   if(!operatoriSalvati.includes(n)){operatoriSalvati.push(n);operatoriSalvati.sort();await saveOperatori()}
-  logAzione('Operatore creato',n);document.getElementById('new-operatore-nome').value='';document.getElementById('new-operatore-pwd').value='';document.getElementById('new-operatore-pwd2').value='';renderOperatoriUI();toast('Operatore "'+n+'" creato con password')}catch(e){toast('Errore creazione')}}
+  const rep=document.getElementById('new-operatore-rep').value||'entrambi';
+  operatoriRepartoMap[n]=rep;await setImp('operatori_reparto',JSON.stringify(operatoriRepartoMap));
+  logAzione('Operatore creato',n+' ('+rep+')');document.getElementById('new-operatore-nome').value='';document.getElementById('new-operatore-pwd').value='';document.getElementById('new-operatore-pwd2').value='';renderOperatoriUI();toast('Operatore "'+n+'" creato ('+rep+')')}catch(e){toast('Errore creazione')}}
+async function cambiaRepartoOperatore(nome,rep){operatoriRepartoMap[nome]=rep;
+  await setImp('operatori_reparto',JSON.stringify(operatoriRepartoMap));
+  renderOperatoriUI();toast(nome+' → '+rep)}
 async function rimuoviOperatore(n){if(!confirm('Rimuovere operatore "'+n+'"?'))return;operatoriSalvati=operatoriSalvati.filter(o=>o!==n);await saveOperatori();
   try{await sbRpc('remove_operator',{p_nome:n,p_token:getAdminToken()});operatoriAuthCache=operatoriAuthCache.filter(o=>o.nome!==n)}catch(e){}logAzione('Operatore rimosso',n);renderOperatoriUI();toast('Rimosso')}
 async function cambiaPasswordOperatore(){const op=getOperatore();if(!op){toast('Seleziona prima un operatore');return}
@@ -1091,7 +1098,7 @@ async function eseguiCambioPwdOp(){const op=getOperatore(),o=document.getElement
 function selezionaOperatore(n){sessionStorage.setItem('operatore_corrente',n);chiudiTuttiModali();document.getElementById('operatore-display').textContent='Operatore: '+n;renderOperatoriUI();toast('Operatore: '+n)}
 function renderOperatoriUI(){const el=document.getElementById('operatori-list');if(!el)return;const cur=getOperatore();const admin=isAdmin();document.getElementById('op-attuale').textContent=cur||'Nessuno';
   const tutti=admin?[...new Set([...operatoriSalvati,...operatoriAuthCache.map(o=>o.nome)])].sort():[];
-  el.innerHTML=tutti.length?tutti.map(n=>{const hasAuth=operatoriAuthCache.find(o=>o.nome===n);return'<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border:1px solid '+(n===cur?'var(--accent2)':'var(--line)')+'"><span style="flex:1;font-weight:'+(n===cur?'700':'400')+'">'+escP(n)+'</span>'+(hasAuth?'<span style="font-size:.82rem;color:#2c6e49;font-weight:600">Con password</span>':'<span style="font-size:.82rem;color:var(--muted)">Solo master</span>')+(admin&&hasAuth?'<button style="font-size:.78rem;padding:4px 10px;cursor:pointer;border:1px solid var(--accent2);color:var(--accent2);background:none;border-radius:2px;font-family:\'Source Sans 3\',sans-serif;font-weight:600" onclick="resetPasswordOperatore(\''+n.replace(/'/g,"\\'")+'\')">Resetta pwd</button>':'')+(admin?'<button style="font-size:.78rem;padding:4px 10px;cursor:pointer;border:1px solid var(--accent);color:var(--accent);background:none;border-radius:2px;font-family:\'Source Sans 3\',sans-serif;font-weight:600" onclick="rimuoviOperatore(\''+n.replace(/'/g,"\\'")+'\')">Rimuovi</button>':'')+'</div>'}).join(''):'<p style="color:var(--muted);font-size:.85rem">Nessun operatore.</p>';
+  el.innerHTML=tutti.length?tutti.map(n=>{const hasAuth=operatoriAuthCache.find(o=>o.nome===n);const rep=operatoriRepartoMap[n]||'entrambi';const repBadge=rep==='slots'?'<span class="mini-badge" style="background:#1a4a7a">Slots</span>':rep==='tavoli'?'<span class="mini-badge" style="background:#8e44ad">Tavoli</span>':'<span class="mini-badge" style="background:var(--accent2)">Entrambi</span>';const ne=n.replace(/'/g,"\\'");return'<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border:1px solid '+(n===cur?'var(--accent2)':'var(--line))+';flex-wrap:wrap"><span style="font-weight:'+(n===cur?'700':'400')+'">'+escP(n)+'</span>'+repBadge+(hasAuth?'<span style="font-size:.82rem;color:#2c6e49;font-weight:600">Con password</span>':'')+(admin?'<select onchange="cambiaRepartoOperatore(\''+ne+'\',this.value)" style="font-size:.75rem;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><option value="entrambi"'+(rep==='entrambi'?' selected':'')+'>Entrambi</option><option value="slots"'+(rep==='slots'?' selected':'')+'>Slots</option><option value="tavoli"'+(rep==='tavoli'?' selected':'')+'>Tavoli</option></select>':'')+(admin&&hasAuth?'<button style="font-size:.75rem;padding:3px 8px;cursor:pointer;border:1px solid var(--accent2);color:var(--accent2);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif;font-weight:600" onclick="resetPasswordOperatore(\''+ne+'\')">Pwd</button>':'')+(admin?'<button style="font-size:.75rem;padding:3px 8px;cursor:pointer;border:1px solid var(--accent);color:var(--accent);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif;font-weight:600" onclick="rimuoviOperatore(\''+ne+'\')">Rimuovi</button>':'')+'</div>'}).join(''):'<p style="color:var(--muted);font-size:.85rem">Nessun operatore.</p>';
   // Nascondi form creazione se non admin
   const addRow=el.parentElement.querySelector('.add-tipo-row');if(addRow)addRow.style.display=admin?'':'none'}
 
@@ -3145,6 +3152,12 @@ async function esportaSpeseExtraPDF(){const data=getSpeseExtraFiltrate();if(!dat
     doc.save('spese_extra.pdf');toast('PDF esportato!')}catch(e){toast('Errore PDF')}}
 
 // REPARTO SWITCH
+function aggiornaLoginOperatori(){const settore=document.getElementById('login-settore').value;
+  const loginNome=document.getElementById('login-nome');
+  if(!settore){loginNome.style.display='none';loginNome.value='';return}
+  loginNome.style.display='';
+  const ops=operatoriAuthCache.map(o=>o.nome).filter(function(n){var rep=operatoriRepartoMap[n]||'entrambi';return rep===settore||rep==='entrambi'}).sort();
+  loginNome.innerHTML='<option value="">-- Seleziona operatore --</option>'+ops.map(function(n){return'<option value="'+escP(n)+'">'+escP(n)+'</option>'}).join('')}
 function setReparto(rep){currentReparto=rep;
   document.getElementById('btn-rep-slots').className='reparto-btn'+(rep==='slots'?' active-slots':'');
   document.getElementById('btn-rep-tavoli').className='reparto-btn'+(rep==='tavoli'?' active-tavoli':'');
@@ -3156,7 +3169,10 @@ function setReparto(rep){currentReparto=rep;
   if(pg==='dashboard')renderDashboard()}
 function applicaRepartoVisibilita(){
   var sw=document.getElementById('reparto-switch');if(!sw)return;
-  var vSlots=isVis('reparto_slots'),vTavoli=isVis('reparto_tavoli');
+  var op=getOperatore();var opRep=operatoriRepartoMap[op]||'entrambi';
+  if(isAdmin())opRep='entrambi';
+  var vSlots=opRep==='slots'||opRep==='entrambi';
+  var vTavoli=opRep==='tavoli'||opRep==='entrambi';
   if(vSlots&&vTavoli){sw.classList.remove('hidden')}
   else{sw.classList.add('hidden');
     if(vSlots)currentReparto='slots';
@@ -3207,8 +3223,7 @@ window.addEventListener('load',async()=>{
   const h=document.getElementById('login-hint');const defCheck=await sbRpc('is_default_master_pwd',{p_default_hash:DEFAULT_PWD_HASH});
   if((defCheck&&defCheck.is_default)||operatoriAuthCache.length)h.innerHTML='Accedi come Admin oppure seleziona il tuo nome';
   // Populate login dropdown
-  const loginSel=document.getElementById('login-nome');if(loginSel){const ops=operatoriAuthCache.map(o=>o.nome).sort();
-    loginSel.innerHTML='<option value="">-- Admin (password master) --</option>'+ops.map(n=>'<option value="'+escP(n)+'">'+escP(n)+'</option>').join('')}
+  // Login: il dropdown operatori si popola quando si seleziona il settore
   if(sessionStorage.getItem('diario_auth')==='1'){document.getElementById('login-overlay').classList.add('hidden');applicaTemaOperatore();
     // Valida sessione admin se presente
     if(isAdmin()){const tk=getAdminToken();if(tk){const sv=await sbRpc('validate_admin_session',{p_token:tk});if(!sv||!sv.valid){sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token')}}else{sessionStorage.removeItem('is_admin')}}
