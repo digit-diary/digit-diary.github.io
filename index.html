@@ -2252,9 +2252,10 @@ function mostraConsegnaLogin(){const op=getOperatore();if(!op)return;
 function _getTurnoCorrente(){const h=new Date().getHours();return h>=6&&h<18?'PRESTO':'NOTTE'}
 function renderDashboard(){
   const oggi=getGiornataCasino();const now=new Date();const turno=_getTurnoCorrente();
-  // Titolo
-  document.getElementById('dash-titolo').textContent='Dashboard — '+now.getDate()+' '+MESI_FULL[now.getMonth()]+' '+now.getFullYear();
-  document.getElementById('dash-sottotitolo').textContent=GIORNI[now.getDay()]+' — Turno '+turno+' — '+getOperatore();
+  const gd=new Date(oggi+'T12:00:00');
+  // Titolo: usa la giornata di gioco, non la data di sistema
+  document.getElementById('dash-titolo').textContent='Dashboard — GD '+gd.getDate()+' '+MESI_FULL[gd.getMonth()]+' '+gd.getFullYear();
+  document.getElementById('dash-sottotitolo').textContent=GIORNI[gd.getDay()]+' — Turno '+turno+' — '+getOperatore();
   // Stats bar: 6 KPI
   const op=getOperatore();
   const pmMiei=promemoriaCache.filter(p=>!p.completata&&(p.assegnato_a===op||p.assegnato_a==='tutti'));
