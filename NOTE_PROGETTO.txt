@@ -647,6 +647,24 @@
        - Visibilita legata alla sezione Maison
        - DB: tabella spese_extra
 
+  [40] Alert ammonimenti verbali recidivi
+       - 2+ ammonimenti verbali stesso collaboratore → banner arancione
+       - "Preparare allineamento" con pulsante diretto
+       - Alert scompare dopo creazione allineamento
+       - Incluso nella Dashboard (widget Da fare oggi + alert)
+
+  [41] Compleanni clienti maison
+       - Campo data_nascita nel form budget/info cliente
+       - Alert nella Dashboard: compleanni oggi e prossimi 7 giorni
+       - Torta emoji nel budget list per compleanno del giorno
+       - Visibilita: funzione "Compleanni maison" configurabile dall'admin
+
+  [42] Hotel/Alloggio nei tipi spese extra
+
+  [43] Dettaglio maison con spese extra
+       - Click su nome cliente: mostra ristorante + spese extra
+       - Totale complessivo (ristorante + extra) in evidenza
+
 
 ================================================================================
   FILE DEL PROGETTO
