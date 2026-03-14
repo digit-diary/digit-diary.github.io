@@ -3216,13 +3216,15 @@ function aggiornaMenuMobile(){try{
 window.addEventListener('load',async()=>{
   if(localStorage.getItem('tema')==='dark'){document.body.classList.add('dark-theme');document.getElementById('btn-tema').textContent='Tema chiaro'}// tema provvisorio, poi si applica quello dell'operatore
   document.getElementById('entries-list').innerHTML='<div class="loading">Caricamento...</div>';
-  await loadAll();
-  const h=document.getElementById('login-hint');const defCheck=await sbRpc('is_default_master_pwd',{p_default_hash:DEFAULT_PWD_HASH});
-  if((defCheck&&defCheck.is_default)||operatoriAuthCache.length)h.innerHTML='Accedi come Admin oppure seleziona il tuo nome';
-  // Populate login dropdown
-  // Login: popola dropdown operatori
-  var loginSel=document.getElementById('login-nome');if(loginSel){var ops=operatoriAuthCache.map(function(o){return o.nome}).sort();
-    loginSel.innerHTML='<option value="">-- Admin (password master) --</option>'+ops.map(function(n){return'<option value="'+escP(n)+'">'+escP(n)+'</option>'}).join('')}
+  try{await loadAll()}catch(e){console.error('loadAll error:',e)}
+  // Popola dropdown operatori SEMPRE (anche se loadAll fallisce parzialmente)
+  try{
+    if(!operatoriAuthCache.length)operatoriAuthCache=await sbRpc('list_operators')||[];
+    var loginSel=document.getElementById('login-nome');if(loginSel){var ops=operatoriAuthCache.map(function(o){return o.nome}).sort();
+      loginSel.innerHTML='<option value="">-- Admin (password master) --</option>'+ops.map(function(n){return'<option value="'+escP(n)+'">'+escP(n)+'</option>'}).join('')}
+  }catch(e){console.error('Login populate error:',e)}
+  try{const h=document.getElementById('login-hint');const defCheck=await sbRpc('is_default_master_pwd',{p_default_hash:DEFAULT_PWD_HASH});
+    if((defCheck&&defCheck.is_default)||operatoriAuthCache.length)h.innerHTML='Accedi come Admin oppure seleziona il tuo nome'}catch(e){}
   if(sessionStorage.getItem('diario_auth')==='1'){document.getElementById('login-overlay').classList.add('hidden');applicaTemaOperatore();
     // Valida sessione admin se presente
     if(isAdmin()){const tk=getAdminToken();if(tk){const sv=await sbRpc('validate_admin_session',{p_token:tk});if(!sv||!sv.valid){sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token')}}else{sessionStorage.removeItem('is_admin')}}
