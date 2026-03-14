@@ -2328,14 +2328,18 @@ function renderMaisonDashboard(){const data=getMaisonFiltrati();
   const sorted=Object.entries(byNome).sort((a,b)=>b[1].tot-a[1].tot);
   const tb=document.getElementById('maison-table');
   if(!sorted.length){tb.innerHTML='<p style="color:var(--muted);text-align:center;padding:20px">Nessun dato. Carica un file Excel per iniziare.</p>';return}
-  let thtml='<table class="collab-table"><thead><tr><th>Cliente</th><th class="num">Visite</th><th class="num">Persone</th><th class="num">BU</th><th class="num">BL</th><th class="num">Totale CHF</th><th class="num">Media CHF</th></tr></thead><tbody>';
+  // Gestione giorni per eliminazione
+  const giorniDisp=[...new Set(data.map(r=>r.data_giornata))].sort();
+  let thtml='<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px;flex-wrap:wrap"><select id="maison-del-giorno" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper);color:var(--ink)"><option value="">Seleziona giorno...</option>'+giorniDisp.map(d=>'<option value="'+d+'">'+new Date(d+'T12:00:00').toLocaleDateString('it-IT')+'</option>').join('')+'</select><button class="btn-act del" onclick="eliminaMaisonGiorno()" style="padding:5px 12px">Elimina giorno</button></div>';
+  thtml+='<table class="collab-table"><thead><tr><th>Cliente</th><th class="num">Visite</th><th class="num">Persone</th><th class="num">BU</th><th class="num">BL</th><th class="num">Totale CHF</th><th class="num">Media CHF</th><th></th></tr></thead><tbody>';
   sorted.forEach(([nome,d])=>{
     const budget=maisonBudgetCache.find(b=>b.nome.toLowerCase()===nome.toLowerCase());
     const overBudget=budget&&budget.budget_chf&&d.tot>=budget.budget_chf;
     const nearBudget=budget&&budget.budget_chf&&d.tot>=budget.budget_chf*0.8&&!overBudget;
     const rowStyle=overBudget?'background:rgba(192,57,43,0.1)':nearBudget?'background:rgba(230,126,34,0.1)':'';
-    thtml+='<tr style="'+rowStyle+'"><td><strong>'+escP(nome)+'</strong>'+(overBudget?' <span style="color:var(--accent);font-size:.75rem;font-weight:700">BUDGET SUPERATO</span>':nearBudget?' <span style="color:#e67e22;font-size:.75rem;font-weight:700">80% BUDGET</span>':'')+'</td><td class="num">'+d.visite+'</td><td class="num">'+d.px+'</td><td class="num">'+(d.bu||'-')+'</td><td class="num">'+(d.bl||'-')+'</td><td class="num"><strong>'+d.tot.toFixed(2)+'</strong></td><td class="num">'+(d.tot/d.visite).toFixed(2)+'</td></tr>'});
-  thtml+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td class="num"><strong>'+sorted.reduce((s,c)=>s+c[1].visite,0)+'</strong></td><td class="num"><strong>'+totPx+'</strong></td><td class="num"><strong>'+data.filter(r=>r.tipo_buono==='BU').length+'</strong></td><td class="num"><strong>'+data.filter(r=>r.tipo_buono==='BL').length+'</strong></td><td class="num"><strong>'+totCosto.toFixed(2)+'</strong></td><td></td></tr>';
+    const ne=nome.replace(/'/g,"\\'");
+    thtml+='<tr style="'+rowStyle+'"><td><strong>'+escP(nome)+'</strong>'+(overBudget?' <span style="color:var(--accent);font-size:.75rem;font-weight:700">BUDGET SUPERATO</span>':nearBudget?' <span style="color:#e67e22;font-size:.75rem;font-weight:700">80% BUDGET</span>':'')+'</td><td class="num">'+d.visite+'</td><td class="num">'+d.px+'</td><td class="num">'+(d.bu||'-')+'</td><td class="num">'+(d.bl||'-')+'</td><td class="num"><strong>'+d.tot.toFixed(2)+'</strong></td><td class="num">'+(d.tot/d.visite).toFixed(2)+'</td><td style="white-space:nowrap"><button class="btn-act edit" onclick="rinominaMaisonCliente(\''+ne+'\')" title="Rinomina">Rinomina</button> <button class="btn-act del" onclick="eliminaMaisonCliente(\''+ne+'\')" title="Elimina">Elimina</button></td></tr>'});
+  thtml+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td class="num"><strong>'+sorted.reduce((s,c)=>s+c[1].visite,0)+'</strong></td><td class="num"><strong>'+totPx+'</strong></td><td class="num"><strong>'+data.filter(r=>r.tipo_buono==='BU').length+'</strong></td><td class="num"><strong>'+data.filter(r=>r.tipo_buono==='BL').length+'</strong></td><td class="num"><strong>'+totCosto.toFixed(2)+'</strong></td><td></td><td></td></tr>';
   thtml+='</tbody></table>';tb.innerHTML=thtml;
   // Grafici
   renderMaisonCharts(data,sorted)}
@@ -2354,6 +2358,32 @@ function renderMaisonCharts(data,sorted){
   renderChart('chart-maison-tipi','doughnut',{labels:['Consumazione ('+normale.toFixed(0)+' CHF)','Buono Unico ('+buTot.toFixed(0)+' CHF)','Buono Lounge ('+blTot.toFixed(0)+' CHF)'],datasets:[{data:[normale,buTot,blTot],backgroundColor:['#b8860b','#e67e22','#2c6e49'],borderWidth:2,borderColor:'white'}]},{plugins:{legend:{position:'bottom',labels:{font:{size:12}}}}})}
 function resetMaisonFiltri(){document.getElementById('maison-filt-nome').value='';document.getElementById('maison-filt-tipo').value='';
   ['maison-filt-dal','maison-filt-al'].forEach(id=>{const el=document.getElementById(id);if(el){el.value='';if(el._flatpickr)el._flatpickr.clear()}});renderMaisonDashboard()}
+// Elimina singolo cliente (tutte le righe)
+async function eliminaMaisonCliente(nome){const count=maisonCache.filter(r=>r.nome===nome).length;
+  if(!confirm('Eliminare tutte le '+count+' registrazioni di "'+nome+'"?'))return;
+  try{await sbDel('costi_maison','nome=eq.'+encodeURIComponent(nome));maisonCache=maisonCache.filter(r=>r.nome!==nome);
+    logAzione('Maison: eliminato cliente',nome+' ('+count+' righe)');renderMaisonDashboard();renderMaisonBudgetAlerts();toast(nome+' eliminato ('+count+' righe)')}catch(e){toast('Errore')}}
+// Rinomina cliente (tutte le occorrenze)
+function rinominaMaisonCliente(nome){const b=document.getElementById('pwd-modal-content');
+  b.innerHTML='<h3>Rinomina cliente Maison</h3><div class="pwd-field"><label>Nome attuale</label><input type="text" value="'+escP(nome)+'" readonly style="background:var(--paper2);color:var(--muted)"></div><div class="pwd-field"><label>Nuovo nome</label><input type="text" id="rin-maison-nuovo" value="'+escP(nome)+'"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiRinominaMaison(\''+nome.replace(/'/g,"\\'")+'\')">Salva</button></div>';
+  document.getElementById('pwd-modal').classList.remove('hidden');setTimeout(()=>{const i=document.getElementById('rin-maison-nuovo');i.focus();i.select()},100)}
+async function eseguiRinominaMaison(vecchio){const nuovo=capitalizzaNome(document.getElementById('rin-maison-nuovo').value.trim());
+  if(!nuovo){toast('Inserisci un nome');return}if(nuovo===vecchio){document.getElementById('pwd-modal').classList.add('hidden');return}
+  try{await sbPatch('costi_maison','nome=eq.'+encodeURIComponent(vecchio),{nome:nuovo});
+    maisonCache.forEach(r=>{if(r.nome===vecchio)r.nome=nuovo});
+    // Aggiorna anche budget se presente
+    const bIdx=maisonBudgetCache.findIndex(b=>b.nome.toLowerCase()===vecchio.toLowerCase());
+    if(bIdx!==-1){await sbPatch('maison_budget','id=eq.'+maisonBudgetCache[bIdx].id,{nome:nuovo});maisonBudgetCache[bIdx].nome=nuovo}
+    logAzione('Maison: rinominato',vecchio+' → '+nuovo);document.getElementById('pwd-modal').classList.add('hidden');
+    renderMaisonDashboard();renderMaisonBudgetUI();renderMaisonBudgetAlerts();toast(vecchio+' → '+nuovo)}catch(e){toast('Errore')}}
+// Elimina tutti i dati di un giorno
+async function eliminaMaisonGiorno(){const sel=document.getElementById('maison-del-giorno');if(!sel||!sel.value){toast('Seleziona un giorno');return}
+  const giorno=sel.value;const label=new Date(giorno+'T12:00:00').toLocaleDateString('it-IT');
+  const count=maisonCache.filter(r=>r.data_giornata===giorno).length;
+  if(!confirm('Eliminare tutte le '+count+' registrazioni del '+label+'?'))return;
+  try{await sbDel('costi_maison','data_giornata=eq.'+giorno);maisonCache=maisonCache.filter(r=>r.data_giornata!==giorno);
+    logAzione('Maison: eliminato giorno',label+' ('+count+' righe)');renderMaisonDashboard();renderMaisonBudgetAlerts();toast('Giorno '+label+' eliminato')}catch(e){toast('Errore')}}
+
 // Budget
 function renderMaisonBudgetUI(){const el=document.getElementById('maison-budget-list');if(!el)return;
   if(!maisonBudgetCache.length){el.innerHTML='<p style="color:var(--muted);font-size:.85rem">Nessun budget impostato.</p>';return}
