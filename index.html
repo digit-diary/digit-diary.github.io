@@ -3005,31 +3005,32 @@ async function esportaSpeseExtraPDF(){const data=getSpeseExtraFiltrate();if(!dat
 // MENU MOBILE
 function toggleMobileNav(){document.getElementById('mobile-nav').classList.toggle('show')}
 function chiudiMobileNav(){document.getElementById('mobile-nav').classList.remove('show')}
-function aggiornaMenuMobile(){const items=document.getElementById('mobile-nav-items');if(!items)return;
+function aggiornaMenuMobile(){try{
+  const items=document.getElementById('mobile-nav-items');if(!items)return;
   const tabs=[{page:'dashboard',icon:'&#127968;',label:'Home'},
     {page:'diario',icon:'&#128214;',label:'Diario'},
-    {page:'rapporto',icon:'&#128197;',label:'Rapporto'},
-    {page:'note-collega',icon:'&#9993;&#65039;',label:'Note Colleghi',badgeId:'note-badge'},
-    {page:'statistiche',icon:'&#128202;',label:'Statistiche'},
-    {page:'moduli',icon:'&#128196;',label:'Moduli'},
-    {page:'assistente',icon:'&#128113;&#8205;&#9792;&#65039;',label:'Assistente'},
-    {page:'consegna',icon:'&#128221;',label:'Consegna Turno',badgeId:'consegna-badge'},
-    {page:'promemoria',icon:'&#128203;',label:'Promemoria',badgeId:'promemoria-badge'},
-    {page:'maison',icon:'&#127860;',label:'Costi Maison'},
+    {page:'rapporto',icon:'&#128197;',label:'Rapporto',vis:'rapporto'},
+    {page:'note-collega',icon:'&#9993;&#65039;',label:'Note Colleghi',vis:'note_collega',badgeId:'note-badge'},
+    {page:'statistiche',icon:'&#128202;',label:'Statistiche',vis:'statistiche'},
+    {page:'moduli',icon:'&#128196;',label:'Moduli',vis:'moduli'},
+    {page:'assistente',icon:'&#128113;&#8205;&#9792;&#65039;',label:'Assistente',vis:'assistente'},
+    {page:'consegna',icon:'&#128221;',label:'Consegna',vis:'consegna',badgeId:'consegna-badge'},
+    {page:'promemoria',icon:'&#128203;',label:'Promemoria',vis:'promemoria',badgeId:'promemoria-badge'},
+    {page:'maison',icon:'&#127860;',label:'Maison',vis:'maison'},
     {page:'registro',icon:'&#128203;',label:'Registro',adminOnly:true},
     {page:'impostazioni',icon:'&#9881;&#65039;',label:'Impostazioni'}];
   const cur=sessionStorage.getItem('pagina_corrente')||'dashboard';
-  let html='';tabs.forEach(t=>{
+  let html='';tabs.forEach(function(t){
     if(t.adminOnly&&!isAdmin())return;
-    const visKey=t.page.replace('-','_');if(VIS_ITEMS.pagine[visKey]&&!isVis(visKey))return;
-    const badge=t.badgeId?document.getElementById(t.badgeId):null;
-    const badgeHtml=badge&&badge.style.display!=='none'?'<span class="nav-badge">'+badge.textContent+'</span>':'';
-    html+='<button class="mobile-nav-item'+(cur===t.page?' active':'')+'" onclick="switchPage(\''+t.page+'\');chiudiMobileNav();aggiornaMenuMobile()">'+t.icon+' '+t.label+badgeHtml+'</button>'});
+    if(t.vis&&typeof isVis==='function'&&!isVis(t.vis))return;
+    var badge=t.badgeId?document.getElementById(t.badgeId):null;
+    var badgeHtml=badge&&badge.style.display!=='none'?'<span class="nav-badge">'+badge.textContent+'</span>':'';
+    html+='<button class="mobile-nav-item'+(cur===t.page?' active':'')+'" onclick="switchPage(\''+t.page+'\');chiudiMobileNav()">'+t.icon+' '+t.label+badgeHtml+'</button>'});
   items.innerHTML=html;
-  // Aggiorna testo hamburger con pagina corrente
-  const curTab=tabs.find(t=>t.page===cur);
-  const hBtn=document.getElementById('hamburger-btn');
-  if(hBtn&&curTab)hBtn.innerHTML='&#9776; '+curTab.icon+' '+curTab.label}
+  var curTab=tabs.find(function(t){return t.page===cur});
+  var hBtn=document.getElementById('hamburger-btn');
+  if(hBtn&&curTab)hBtn.innerHTML='&#9776; '+curTab.icon+' '+curTab.label;
+  }catch(e){console.error('Menu mobile error:',e)}}
 
 // INIT
 window.addEventListener('load',async()=>{
