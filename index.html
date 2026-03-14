@@ -660,7 +660,8 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
       <div class="field"><label>Budget CHF</label><input type="number" id="maison-budget-chf" placeholder="Es: 2000" min="0" step="0.01" style="width:120px"></div>
       <div class="field"><label>Max BU</label><input type="number" id="maison-budget-bu" placeholder="—" min="0" style="width:80px"></div>
       <div class="field"><label>Max BL</label><input type="number" id="maison-budget-bl" placeholder="—" min="0" style="width:80px"></div>
-      <button class="btn-add-tipo" onclick="salvaMaisonBudget()">+ Budget</button>
+      <div class="field"><label>Data nascita</label><input type="text" id="maison-budget-nascita" placeholder="gg/mm/aaaa" readonly style="cursor:pointer;width:120px"></div>
+      <button class="btn-add-tipo" onclick="salvaMaisonBudget()">+ Budget/Info</button>
     </div>
   </div>
   <div class="main-card" style="margin-top:20px">
@@ -668,7 +669,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
     <div class="form-area">
       <div class="form-row" style="grid-template-columns:1fr 1fr 1fr">
         <div class="field"><label>Beneficiario / Gruppo</label><div class="ac-wrap"><input type="text" id="se-beneficiario" placeholder="Nome o gruppo..." oninput="acFiltraSpeseExtra()" onfocus="acFiltraSpeseExtra()"><div class="ac-drop" id="ac-se-benef"></div></div></div>
-        <div class="field"><label>Tipo</label><select id="se-tipo" style="padding:11px 14px"><option value="cena_esterna">Cena esterna</option><option value="pranzo_esterno">Pranzo esterno</option><option value="rimborso">Rimborso spese</option><option value="viaggio">Viaggio</option><option value="biglietti">Biglietti</option><option value="regalo">Regalo</option><option value="altro">Altro</option></select></div>
+        <div class="field"><label>Tipo</label><select id="se-tipo" style="padding:11px 14px"><option value="cena_esterna">Cena esterna</option><option value="pranzo_esterno">Pranzo esterno</option><option value="rimborso">Rimborso spese</option><option value="viaggio">Viaggio</option><option value="biglietti">Biglietti</option><option value="regalo">Regalo</option><option value="hotel">Hotel / Alloggio</option><option value="altro">Altro</option></select></div>
         <div class="field"><label>Data</label><input type="text" id="se-data" placeholder="Seleziona..." readonly style="cursor:pointer"></div>
       </div>
       <div class="form-row">
@@ -680,7 +681,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
     </div>
     <div class="filters">
       <div class="filter-group"><span class="filter-label">Beneficiario</span><input type="text" id="se-filt-nome" placeholder="Cerca..." oninput="renderSpeseExtra()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink);width:160px"></div>
-      <div class="filter-group"><span class="filter-label">Tipo</span><select id="se-filt-tipo" onchange="renderSpeseExtra()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"><option value="">Tutti</option><option value="cena_esterna">Cena esterna</option><option value="pranzo_esterno">Pranzo esterno</option><option value="rimborso">Rimborso</option><option value="viaggio">Viaggio</option><option value="biglietti">Biglietti</option><option value="regalo">Regalo</option><option value="altro">Altro</option></select></div>
+      <div class="filter-group"><span class="filter-label">Tipo</span><select id="se-filt-tipo" onchange="renderSpeseExtra()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"><option value="">Tutti</option><option value="cena_esterna">Cena esterna</option><option value="pranzo_esterno">Pranzo esterno</option><option value="rimborso">Rimborso</option><option value="viaggio">Viaggio</option><option value="biglietti">Biglietti</option><option value="regalo">Regalo</option><option value="hotel">Hotel</option><option value="altro">Altro</option></select></div>
       <div class="filter-group"><span class="filter-label">Dal</span><input type="text" id="se-filt-dal" placeholder="Seleziona..." readonly style="cursor:pointer;min-width:130px"></div>
       <div class="filter-group"><span class="filter-label">Al</span><input type="text" id="se-filt-al" placeholder="Seleziona..." readonly style="cursor:pointer;min-width:130px"></div>
       <button class="btn-reset" onclick="resetSpeseExtraFiltri()">Reset</button>
@@ -965,7 +966,7 @@ function isAdmin(){return sessionStorage.getItem('is_admin')==='1'}
 // VISIBILITA - 'tutti' | 'admin' | 'nascosto' | {tipo:'selezionati',operatori:['Nome1']}
 const VIS_ITEMS={
   pagine:{rapporto:'Rapporto',note_collega:'Note Colleghi',statistiche:'Statistiche',moduli:'Moduli',assistente:'Assistente',consegna:'Consegna Turno',promemoria:'Promemoria',maison:'Costi Maison'},
-  funzioni:{ricerca_globale:'Ricerca globale',alert_cassa:'Alert cassa',alert_rischio:'Alert rischio',template_rapidi:'Template rapidi',firma_digitale:'Firma digitale',qr_code:'QR Code su PDF',ai_moduli:'AI (Genera + Migliora testo)'}
+  funzioni:{ricerca_globale:'Ricerca globale',alert_cassa:'Alert cassa',alert_rischio:'Alert rischio',alert_compleanni:'Compleanni maison',template_rapidi:'Template rapidi',firma_digitale:'Firma digitale',qr_code:'QR Code su PDF',ai_moduli:'AI (Genera + Migliora testo)'}
 };
 function visGet(key){return visibilitaConfig[key]||'tutti'}
 function isVis(key){const v=visGet(key);if(v==='nascosto')return false;if(v==='admin')return isAdmin();
@@ -1147,8 +1148,8 @@ async function salva(){const nome=capitalizzaNome(document.getElementById('inp-n
   const rec={id:Date.now(),nome,tipo:tipoSelezionato,testo,data:new Date().toISOString(),operatore:getOperatore(),importo,valuta,reparto};
   try{await sbPost('registrazioni',rec);datiCache.unshift(rec);document.getElementById('inp-testo').value='';document.getElementById('inp-importo').value='';document.getElementById('inp-reparto').value='';
     if(!collaboratoriCache.find(c=>c.nome.toLowerCase()===nome.toLowerCase())){try{const cr=await sbPost('collaboratori',{nome,attivo:true});collaboratoriCache.push(cr[0]);collaboratoriCache.sort((a,b)=>a.nome.localeCompare(b.nome))}catch(e2){}}
-    logAzione('Nuova registrazione',nome+' - '+tipoSelezionato+': '+testo.substring(0,60));toast('Registrato per '+nome);aggiornaNomi();render();updateStats();renderCassaAlerts();renderRischioAlerts()}catch(e){toast('Errore salvataggio')}}
-async function elimina(id){if(!confirm('Eliminare?'))return;const _e=datiCache.find(x=>x.id===id);try{await sbDel('registrazioni','id=eq.'+id);datiCache=datiCache.filter(e=>e.id!==id);pinnedIds.delete(id);if(_e)logAzione('Eliminata registrazione',_e.nome+' - '+_e.tipo);aggiornaNomi();render();updateStats();renderCassaAlerts();renderRischioAlerts();toast('Eliminata')}catch(e){toast('Errore')}}
+    logAzione('Nuova registrazione',nome+' - '+tipoSelezionato+': '+testo.substring(0,60));toast('Registrato per '+nome);aggiornaNomi();render();updateStats();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts()}catch(e){toast('Errore salvataggio')}}
+async function elimina(id){if(!confirm('Eliminare?'))return;const _e=datiCache.find(x=>x.id===id);try{await sbDel('registrazioni','id=eq.'+id);datiCache=datiCache.filter(e=>e.id!==id);pinnedIds.delete(id);if(_e)logAzione('Eliminata registrazione',_e.nome+' - '+_e.tipo);aggiornaNomi();render();updateStats();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();toast('Eliminata')}catch(e){toast('Errore')}}
 async function togglePin(id){try{if(pinnedIds.has(id)){await sbDel('note_fissate','registrazione_id=eq.'+id);pinnedIds.delete(id)}else{await sbPost('note_fissate',{registrazione_id:id});pinnedIds.add(id)}render()}catch(e){toast('Errore')}}
 
 // MODIFICA REGISTRAZIONE
@@ -1165,7 +1166,7 @@ async function salvaModificaRegistrazione(id){const nome=document.getElementById
   const impEl=document.getElementById('edit-importo'),repEl=document.getElementById('edit-reparto'),valEl=document.getElementById('edit-valuta');
   if(impEl)update.importo=parseFloat(impEl.value)||0;if(repEl)update.reparto=repEl.value;if(valEl)update.valuta=update.importo?valEl.value:'';
   try{await sbPatch('registrazioni','id=eq.'+id,update);const e=datiCache.find(x=>x.id===id);if(e)Object.assign(e,update);
-    logAzione('Modifica registrazione',nome+' - '+tipo+': '+testo.substring(0,60));document.getElementById('pwd-modal').classList.add('hidden');render();updateStats();renderCassaAlerts();renderRischioAlerts();toast('Registrazione modificata')}catch(e){toast('Errore salvataggio')}}
+    logAzione('Modifica registrazione',nome+' - '+tipo+': '+testo.substring(0,60));document.getElementById('pwd-modal').classList.add('hidden');render();updateStats();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();toast('Registrazione modificata')}catch(e){toast('Errore salvataggio')}}
 
 // MODAL TIPO
 function apriModal(id,tipo){modalEntryId=id;modalTipoSel=tipo;renderTipiUI();document.getElementById('modal-overlay').classList.remove('hidden')}
@@ -1268,7 +1269,7 @@ function checkRischioAlerts(){
     if(hasRdi)return;
     alerts.push({nome,count:allins.length,lastDate:allins[allins.length-1].data_modulo||allins[allins.length-1].created_at||''})});
   return alerts}
-function renderRischioAlerts(){const container=document.getElementById('rischio-alerts-container');if(!container)return;
+function renderRischioAlerts();renderAmmonimentiAlerts(){const container=document.getElementById('rischio-alerts-container');if(!container)return;
   const alerts=checkRischioAlerts();if(!alerts.length){container.innerHTML='';return}
   let html='<div class="rischio-alert-banner" onclick="toggleRischioDD()">&#9888;&#65039; '+alerts.length+' collaboratore/i a rischio disciplinare (2+ allineamenti) — Prossimo allineamento scatta RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
   html+='<div class="rischio-alerts-dropdown hidden" id="rischio-dd">';
@@ -1276,6 +1277,25 @@ function renderRischioAlerts(){const container=document.getElementById('rischio-
     html+='<div class="cassa-alert-item"><span class="alert-name">'+escP(a.nome)+'</span><span class="alert-detail">'+a.count+' allineamenti'+' (ultimo: '+dt+'). Il prossimo provvedimento sarà un RDI.</span><button class="alert-action" style="background:#8e44ad" onclick="apriModuloVeloce(\'rdi\',\''+a.nome.replace(/'/g,"\\'")+'\')">Crea RDI</button></div>'});
   html+='</div>';container.innerHTML=html}
 function toggleRischioDD(){const dd=document.getElementById('rischio-dd');if(dd)dd.classList.toggle('hidden')}
+
+// ALERT AMMONIMENTI VERBALI RECIDIVI (2+ → preparare allineamento)
+function checkAmmonimentiAlerts(){
+  const tipoAmm=nomeCorrente('Ammonimento Verbale');const alerts=[];
+  const byNome={};datiCache.filter(e=>e.tipo===tipoAmm).forEach(e=>{if(!byNome[e.nome.toLowerCase()])byNome[e.nome.toLowerCase()]={nome:e.nome,count:0,last:''};byNome[e.nome.toLowerCase()].count++;if(e.data>byNome[e.nome.toLowerCase()].last)byNome[e.nome.toLowerCase()].last=e.data});
+  Object.values(byNome).forEach(a=>{if(a.count<2)return;
+    // Controlla se c'e gia un allineamento dopo l'ultimo ammonimento
+    const hasAllin=moduliCache.some(m=>m.tipo==='allineamento'&&m.collaboratore.toLowerCase()===a.nome.toLowerCase()&&(m.created_at||m.data_modulo||'')>a.last);
+    if(!hasAllin)alerts.push(a)});
+  return alerts}
+function renderAmmonimentiAlerts(){const container=document.getElementById('rischio-alerts-container');if(!container)return;
+  const ammAlerts=checkAmmonimentiAlerts();if(!ammAlerts.length)return;
+  let html=container.innerHTML;
+  html+='<div class="cassa-alert-banner" style="background:#e67e22;margin-bottom:8px;cursor:pointer" onclick="toggleAmmDD()">&#9888; '+ammAlerts.length+' collaboratore/i con 2+ ammonimenti verbali — Preparare allineamento <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
+  html+='<div class="cassa-alerts-dropdown hidden" id="amm-dd">';
+  ammAlerts.forEach(a=>{const dt=a.last?new Date(a.last).toLocaleDateString('it-IT'):'';
+    html+='<div class="cassa-alert-item"><span class="alert-name">'+escP(a.nome)+'</span><span class="alert-detail">'+a.count+' ammonimenti verbali (ultimo: '+dt+')</span><button class="alert-action" style="background:#e67e22" onclick="apriModuloVeloce(\'allineamento\',\''+a.nome.replace(/'/g,"\\'")+'\')">Crea Allineamento</button></div>'});
+  html+='</div>';container.innerHTML=html}
+function toggleAmmDD(){const dd=document.getElementById('amm-dd');if(dd)dd.classList.toggle('hidden')}
 
 // TEMPLATE RAPIDI
 const TEMPLATES_RAPIDI={
@@ -1673,7 +1693,7 @@ async function generaModuloPDF(tipo){
   const isEdit=!!window._editModuloId;
   try{if(isEdit){await sbPatch('moduli','id=eq.'+window._editModuloId,{collaboratore:collab,resp_settore:resp,data_modulo:data,dati,operatore:getOperatore()});const idx=moduliCache.findIndex(x=>x.id===window._editModuloId);if(idx!==-1)Object.assign(moduliCache[idx],{collaboratore:collab,resp_settore:resp,data_modulo:data,dati});window._editModuloId=null;toast('Modulo aggiornato e PDF generato!')}
   else{const rec={tipo,collaboratore:collab,resp_settore:resp,data_modulo:data,dati,operatore:getOperatore()};const saved=await sbPost('moduli',rec);moduliCache.unshift(saved[0]);toast('PDF generato e modulo salvato!')}
-  window._importedFileData=null;logAzione((isEdit?'Modificato':'Creato')+' modulo '+tipo,collab+' - '+data);aggiornaModuliLista();const _cnt=document.getElementById('mod-list-count');if(_cnt)_cnt.textContent=moduliCache.length;renderCassaAlerts();renderRischioAlerts();chiudiModulo()}catch(e){console.error(e);toast('PDF generato (errore salvataggio DB)')}}
+  window._importedFileData=null;logAzione((isEdit?'Modificato':'Creato')+' modulo '+tipo,collab+' - '+data);aggiornaModuliLista();const _cnt=document.getElementById('mod-list-count');if(_cnt)_cnt.textContent=moduliCache.length;renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();chiudiModulo()}catch(e){console.error(e);toast('PDF generato (errore salvataggio DB)')}}
 function drawFieldLine(doc,x,y,label,value,pw){doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0);
   doc.text(label+':',x,y);const lw=doc.getTextWidth(label+':  ');
   doc.setFont('helvetica','normal');doc.text(value,x+lw,y);
@@ -2136,7 +2156,7 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
     // Auto-differenze cassa: parse differenze_cassa field
     const diffExtra=data.note_extra?JSON.parse(data.note_extra):{};
     const diffText=diffExtra.differenze_cassa||'';
-    if(diffText.trim()){await parseDifferenzeCassa(diffText,ds,turno);renderCassaAlerts();renderRischioAlerts()}
+    if(diffText.trim()){await parseDifferenzeCassa(diffText,ds,turno);renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts()}
     }catch(e){console.error(e);toast('Errore salvataggio')}}
 
 // RAPPORTO EXPORT
@@ -2344,6 +2364,11 @@ function renderDashboard(){
   const pmProssimi=pmMiei.filter(p=>!pmScaduti.includes(p)&&p.data_scadenza<=new Date(Date.now()+3*86400000).toISOString().split('T')[0]);
   pmProssimi.forEach(p=>{todoH+='<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="switchPage(\'promemoria\')"><span style="color:#e67e22;font-size:1.1rem">&#9679;</span><span style="flex:1"><strong>'+escP(p.titolo)+'</strong> <span style="color:var(--muted);font-size:.78rem">scade '+new Date(p.data_scadenza+'T12:00:00').toLocaleDateString('it-IT')+'</span></span></div>'});
   if(noteNL)todoH+='<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="switchPage(\'note-collega\')"><span style="color:#2980b9;font-size:1.1rem">&#9993;</span><span>'+noteNL+' nota/e non letta/e</span></div>';
+  // Compleanni prossimi 7 giorni (se visibile)
+  const bdays=isVis('alert_compleanni')?_getCompleanniProssimi(7):[];
+  bdays.forEach(bd=>{const ne=bd.nome.replace(/'/g,"\\'");todoH+='<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="font-size:1.1rem">&#127874;</span><span style="flex:1"><strong>'+escP(bd.nome)+'</strong> — '+(bd.giorni===0?'<span style="color:var(--accent2);font-weight:700">Compleanno OGGI!</span>':'compleanno tra '+bd.giorni+' giorno/i')+'</span></div>'});
+  // Ammonimenti verbali recidivi
+  const ammA=checkAmmonimentiAlerts();ammA.forEach(a=>{const ne=a.nome.replace(/'/g,"\\'");todoH+='<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="color:#e67e22;font-weight:700;font-size:1.1rem">!</span><span style="flex:1;cursor:pointer" onclick="apriProfilo(\''+ne+'\')"><strong>'+escP(a.nome)+'</strong> — '+a.count+' ammonimenti verbali, preparare allineamento</span></div>'});
   if(!todoH)todoH='<p style="color:var(--muted);text-align:center;padding:20px">Tutto in ordine!</p>';
   todoEl.innerHTML=todoH;
   // ALERT ATTIVI
@@ -2530,7 +2555,8 @@ function mostraPromemoriaLogin(){const op=getOperatore();if(!op)return;
 let _maisonFpInit=false;
 function initMaisonFlatpickr(){if(_maisonFpInit||!window.flatpickr)return;_maisonFpInit=true;
   const o={locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,onChange:()=>renderMaisonDashboard()};
-  flatpickr('#maison-filt-dal',o);flatpickr('#maison-filt-al',o)}
+  flatpickr('#maison-filt-dal',o);flatpickr('#maison-filt-al',o);
+  flatpickr('#maison-budget-nascita',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false})}
 function _levenshtein(a,b){const m=a.length,n=b.length,d=[];for(let i=0;i<=m;i++){d[i]=[i];for(let j=1;j<=n;j++)d[i][j]=i===0?j:0}for(let j=1;j<=n;j++)d[0][j]=j;for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]!==b[j-1]?1:0));return d[m][n]}
 function _trovaNomeSimileMaison(nome){const nomi=[...new Set(maisonCache.map(r=>r.nome))];const nl=nome.toLowerCase();
   const exact=nomi.find(n=>n.toLowerCase()===nl);if(exact)return{nome:exact,tipo:'esatto'};
@@ -2674,6 +2700,12 @@ function renderMaisonCharts(data,sorted){
   renderChart('chart-maison-tipi','doughnut',{labels:['Consumazione ('+normale.toFixed(0)+' CHF)','Buono Unico ('+buTot.toFixed(0)+' CHF)','Buono Lounge ('+blTot.toFixed(0)+' CHF)'],datasets:[{data:[normale,buTot,blTot],backgroundColor:['#b8860b','#e67e22','#2c6e49'],borderWidth:2,borderColor:'white'}]},{plugins:{legend:{position:'bottom',labels:{font:{size:12}}}}})}
 function resetMaisonFiltri(){document.getElementById('maison-filt-nome').value='';document.getElementById('maison-filt-tipo').value='';
   ['maison-filt-dal','maison-filt-al'].forEach(id=>{const el=document.getElementById(id);if(el){el.value='';if(el._flatpickr)el._flatpickr.clear()}});renderMaisonDashboard()}
+function _isCompleannoOggi(dataNascita){if(!dataNascita)return false;const oggi=new Date();const dn=new Date(dataNascita+'T12:00:00');return dn.getDate()===oggi.getDate()&&dn.getMonth()===oggi.getMonth()}
+function _getCompleanniProssimi(giorni){const now=new Date();const result=[];
+  maisonBudgetCache.forEach(b=>{if(!b.data_nascita)return;const dn=new Date(b.data_nascita+'T12:00:00');
+    const quest=new Date(now.getFullYear(),dn.getMonth(),dn.getDate());if(quest<new Date(now.getFullYear(),now.getMonth(),now.getDate()))quest.setFullYear(quest.getFullYear()+1);
+    const diff=Math.floor((quest-now)/(86400000));if(diff>=0&&diff<=giorni)result.push({nome:b.nome,data:quest,giorni:diff})});
+  return result.sort((a,b)=>a.giorni-b.giorni)}
 function _maisonFilePeriodo(data){if(!data||!data.length)return'';const mesi=[];data.forEach(r=>{const d=new Date((r.data_giornata||'')+'T12:00:00');if(!isNaN(d)){const k=MESI_FULL[d.getMonth()].toLowerCase()+'_'+d.getFullYear();if(!mesi.includes(k))mesi.push(k)}});if(mesi.length<=1)return mesi[0]||'';return'da_'+mesi[0]+'_a_'+mesi[mesi.length-1]}
 // Dettaglio cliente: mostra tutte le visite giorno per giorno
 function apriDettaglioMaison(nome){const righe=getMaisonFiltrati().filter(r=>r.nome===nome).sort((a,b)=>a.data_giornata.localeCompare(b.data_giornata));
@@ -2686,8 +2718,17 @@ function apriDettaglioMaison(nome){const righe=getMaisonFiltrati().filter(r=>r.n
   html+='<div style="overflow-x:auto"><table class="collab-table"><thead><tr><th>Data</th><th>Giorno</th><th class="num">PX</th><th class="num">Costo CHF</th><th>Tipo</th><th>Gruppo</th><th>Note</th></tr></thead><tbody>';
   righe.forEach(r=>{const d=new Date(r.data_giornata+'T12:00:00');
     html+='<tr><td style="font-weight:600">'+d.getDate()+' '+MESI[d.getMonth()]+'</td><td>'+GIORNI[d.getDay()]+'</td><td class="num">'+r.px+'</td><td class="num"><strong>'+parseFloat(r.costo).toFixed(2)+'</strong></td><td>'+(r.tipo_buono?'<span class="mini-badge" style="background:'+(r.tipo_buono==='BU'?'#e67e22':'#2c6e49')+'">'+r.tipo_buono+'</span>':'—')+'</td><td style="color:var(--muted);font-size:.85rem">'+escP(r.gruppo||'')+'</td><td style="color:var(--muted);font-size:.85rem">'+escP(r.note||'')+'</td></tr>'});
-  html+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td colspan="2"><strong>TOTALE</strong></td><td class="num"><strong>'+totPx+'</strong></td><td class="num"><strong>'+tot.toFixed(2)+'</strong></td><td colspan="3"></td></tr>';
+  html+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td colspan="2"><strong>TOTALE RISTORANTE</strong></td><td class="num"><strong>'+totPx+'</strong></td><td class="num"><strong>'+tot.toFixed(2)+'</strong></td><td colspan="3"></td></tr>';
   html+='</tbody></table></div>';
+  // Spese Extra per questo cliente
+  const seRighe=speseExtraCache.filter(r=>r.beneficiario.toLowerCase()===nome.toLowerCase()).sort((a,b)=>a.data_spesa.localeCompare(b.data_spesa));
+  if(seRighe.length){const totSE=seRighe.reduce((s,r)=>s+parseFloat(r.importo||0),0);
+    html+='<h4 style="font-family:Playfair Display,serif;margin:16px 0 8px;color:var(--ink)">Spese Extra ('+totSE.toFixed(2)+' CHF)</h4>';
+    html+='<div style="overflow-x:auto"><table class="collab-table"><thead><tr><th>Data</th><th>Tipo</th><th>Luogo</th><th>Descrizione</th><th class="num">CHF</th></tr></thead><tbody>';
+    seRighe.forEach(r=>{const d=new Date(r.data_spesa+'T12:00:00');const tc=SE_TIPI_COLOR[r.tipo]||'var(--muted)';
+      html+='<tr><td style="font-weight:600">'+d.getDate()+' '+MESI[d.getMonth()]+'</td><td><span class="mini-badge" style="background:'+tc+'">'+(SE_TIPI_LABEL[r.tipo]||r.tipo)+'</span></td><td style="font-size:.85rem">'+escP(r.luogo||'')+'</td><td style="font-size:.85rem;color:var(--muted)">'+escP(r.descrizione||'')+'</td><td class="num"><strong>'+parseFloat(r.importo).toFixed(2)+'</strong></td></tr>'});
+    html+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td colspan="4"><strong>TOTALE EXTRA</strong></td><td class="num"><strong>'+totSE.toFixed(2)+'</strong></td></tr></tbody></table></div>';
+    html+='<div style="margin-top:10px;padding:10px;background:var(--paper2);border-radius:3px;text-align:center;font-weight:700;font-size:1rem;color:var(--accent2)">TOTALE COMPLESSIVO: '+(tot+totSE).toFixed(2)+' CHF</div>'}
   html+='<div style="display:flex;gap:10px;justify-content:center;margin-top:14px"><button class="btn-export" onclick="esportaMaisonClienteCSV(\''+nome.replace(/'/g,"\\'")+'\')">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaMaisonClientePDF(\''+nome.replace(/'/g,"\\'")+'\')">PDF</button></div>';
   document.getElementById('profilo-content').innerHTML=html;document.getElementById('profilo-modal').classList.remove('hidden')}
 function esportaMaisonClienteCSV(nome){const righe=getMaisonFiltrati().filter(r=>r.nome===nome).sort((a,b)=>a.data_giornata.localeCompare(b.data_giornata));
@@ -2752,17 +2793,20 @@ function renderMaisonBudgetUI(){const el=document.getElementById('maison-budget-
     const spent=maisonCache.filter(r=>r.nome.toLowerCase()===b.nome.toLowerCase()).reduce((s,r)=>s+parseFloat(r.costo||0),0);
     const pct=b.budget_chf?Math.round(spent/b.budget_chf*100):0;
     const color=pct>=100?'var(--accent)':pct>=80?'#e67e22':'#2c6e49';
-    return'<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border-left:3px solid '+color+'"><span style="flex:1;font-weight:600">'+escP(b.nome)+'</span>'+(b.budget_chf?'<span style="font-size:.85rem">'+spent.toFixed(0)+' / '+parseFloat(b.budget_chf).toFixed(0)+' CHF <span style="color:'+color+';font-weight:700">('+pct+'%)</span></span>':'')+(b.budget_bu?'<span style="font-size:.82rem;color:var(--muted)">BU: max '+b.budget_bu+'</span>':'')+(b.budget_bl?'<span style="font-size:.82rem;color:var(--muted)">BL: max '+b.budget_bl+'</span>':'')+'<button class="btn-del-tipo" onclick="rimuoviMaisonBudget('+b.id+')">Rimuovi</button></div>'}).join('')}
+    const nascitaLabel=b.data_nascita?new Date(b.data_nascita+'T12:00:00').toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit'}):'';
+    const isBday=_isCompleannoOggi(b.data_nascita);
+    return'<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border-left:3px solid '+color+'"><span style="flex:1;font-weight:600">'+escP(b.nome)+(isBday?' <span style="font-size:1.1rem">&#127874;</span>':'')+'</span>'+(b.budget_chf?'<span style="font-size:.85rem">'+spent.toFixed(0)+' / '+parseFloat(b.budget_chf).toFixed(0)+' CHF <span style="color:'+color+';font-weight:700">('+pct+'%)</span></span>':'')+(b.budget_bu?'<span style="font-size:.82rem;color:var(--muted)">BU: max '+b.budget_bu+'</span>':'')+(b.budget_bl?'<span style="font-size:.82rem;color:var(--muted)">BL: max '+b.budget_bl+'</span>':'')+(nascitaLabel?'<span style="font-size:.82rem;color:var(--muted)">Nascita: '+nascitaLabel+'</span>':'')+'<button class="btn-del-tipo" onclick="rimuoviMaisonBudget('+b.id+')">Rimuovi</button></div>'}).join('')}
 async function salvaMaisonBudget(){const nome=capitalizzaNome(document.getElementById('maison-budget-nome').value.trim());
   const chf=parseFloat(document.getElementById('maison-budget-chf').value)||null;
   const bu=parseInt(document.getElementById('maison-budget-bu').value)||null;
   const bl=parseInt(document.getElementById('maison-budget-bl').value)||null;
+  const nascita=document.getElementById('maison-budget-nascita').value||null;
   if(!nome){toast('Inserisci il nome del cliente');return}
-  if(!chf&&!bu&&!bl){toast('Imposta almeno un limite');return}
-  if(maisonBudgetCache.find(b=>b.nome.toLowerCase()===nome.toLowerCase())){toast('Budget già esistente per '+nome);return}
-  try{const r=await sbPost('maison_budget',{nome,budget_chf:chf,budget_bu:bu,budget_bl:bl});
+  if(!chf&&!bu&&!bl&&!nascita){toast('Imposta almeno un campo');return}
+  if(maisonBudgetCache.find(b=>b.nome.toLowerCase()===nome.toLowerCase())){toast('Già esistente per '+nome+'. Rimuovi prima il vecchio.');return}
+  try{const r=await sbPost('maison_budget',{nome,budget_chf:chf,budget_bu:bu,budget_bl:bl,data_nascita:nascita});
     maisonBudgetCache.push(r[0]);document.getElementById('maison-budget-nome').value='';
-    document.getElementById('maison-budget-chf').value='';document.getElementById('maison-budget-bu').value='';document.getElementById('maison-budget-bl').value='';
+    document.getElementById('maison-budget-chf').value='';document.getElementById('maison-budget-bu').value='';document.getElementById('maison-budget-bl').value='';const nbFp=document.getElementById('maison-budget-nascita');if(nbFp&&nbFp._flatpickr)nbFp._flatpickr.clear();else if(nbFp)nbFp.value='';
     renderMaisonBudgetUI();renderMaisonDashboard();renderMaisonBudgetAlerts();toast('Budget impostato per '+nome)}catch(e){toast('Errore')}}
 async function rimuoviMaisonBudget(id){if(!confirm('Rimuovere questo budget?'))return;
   try{await sbDel('maison_budget','id=eq.'+id);maisonBudgetCache=maisonBudgetCache.filter(b=>b.id!==id);renderMaisonBudgetUI();renderMaisonDashboard();renderMaisonBudgetAlerts();toast('Budget rimosso')}catch(e){toast('Errore')}}
@@ -2824,8 +2868,8 @@ async function esportaMaisonPDF(){const data=getMaisonFiltrati();if(!data.length
 // ========================
 // SPESE EXTRA
 // ========================
-const SE_TIPI_LABEL={cena_esterna:'Cena esterna',pranzo_esterno:'Pranzo esterno',rimborso:'Rimborso spese',viaggio:'Viaggio',biglietti:'Biglietti',regalo:'Regalo',altro:'Altro'};
-const SE_TIPI_COLOR={cena_esterna:'#c0392b',pranzo_esterno:'#e67e22',rimborso:'#2980b9',viaggio:'#8e44ad',biglietti:'#2c6e49',regalo:'#b8860b',altro:'#8a7d6b'};
+const SE_TIPI_LABEL={cena_esterna:'Cena esterna',pranzo_esterno:'Pranzo esterno',rimborso:'Rimborso spese',viaggio:'Viaggio',biglietti:'Biglietti',regalo:'Regalo',hotel:'Hotel/Alloggio',altro:'Altro'};
+const SE_TIPI_COLOR={cena_esterna:'#c0392b',pranzo_esterno:'#e67e22',rimborso:'#2980b9',viaggio:'#8e44ad',biglietti:'#2c6e49',regalo:'#b8860b',hotel:'#1a4a7a',altro:'#8a7d6b'};
 let _seFpInit=false;
 function initSpeseExtraFP(){if(_seFpInit||!window.flatpickr)return;_seFpInit=true;
   flatpickr('#se-data',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false});
@@ -2919,7 +2963,7 @@ window.addEventListener('load',async()=>{
     }else if(isAdmin()){document.getElementById('operatore-display').textContent='Admin';document.getElementById('tab-registro').style.display=''}}
   else document.getElementById('pwd-input').focus();
   const n=new Date();document.getElementById('today-date').innerHTML=n.getDate()+' '+MESI[n.getMonth()]+' '+n.getFullYear()+'<br><small style="color:var(--muted);font-size:.75rem">'+GIORNI[n.getDay()]+'</small>';
-  renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();aggiornaNoteBadge();aggiornaPromemoriaBadge();aggiornaConsegnaBadge();applicaVisibilita();renderDashboard();
+  renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();aggiornaNoteBadge();aggiornaPromemoriaBadge();aggiornaConsegnaBadge();applicaVisibilita();renderDashboard();
   const savedPage=sessionStorage.getItem('pagina_corrente');if(savedPage&&savedPage!=='diario')switchPage(savedPage);
   setTimeout(checkQrHash,1200);
   // Polling note ogni 15 secondi
