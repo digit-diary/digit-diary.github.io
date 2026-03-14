@@ -1285,20 +1285,20 @@ function _eseguiRicercaGlobale(q){
     diarioRes.forEach(e=>{const d=new Date(e.data);html+='<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'diario\');document.getElementById(\'filt-cerca\').value=\''+escP(q)+'\';render()"><span class="rg-badge" style="background:'+getColore(e.tipo)+'">'+escP(e.tipo)+'</span><span class="rg-text"><strong>'+escP(e.nome)+'</strong> — '+escP(e.testo.substring(0,80))+'</span><span class="rg-date">'+d.toLocaleDateString('it-IT')+'</span></div>'});tot+=diarioRes.length}
   // Moduli
   const moduRes=moduliCache.filter(m=>(m.collaboratore||'').toLowerCase().includes(q)||(m.tipo||'').toLowerCase().includes(q)||JSON.stringify(m.dati||{}).toLowerCase().includes(q)).slice(0,6);
-  if(moduRes.length){html+='<div class="rg-section">Moduli ('+moduRes.length+(moduRes.length>=6?'+':'')+')</div>';
+  if(isVis('moduli')&&moduRes.length){html+='<div class="rg-section">Moduli ('+moduRes.length+(moduRes.length>=6?'+':'')+')</div>';
     moduRes.forEach(m=>{const colB={allineamento:'#e67e22',apprezzamento:'#b8860b',rdi:'#c0392b'}[m.tipo]||'var(--muted)';
       html+='<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'moduli\');setTimeout(()=>apriModuloSalvato('+m.id+'),300)"><span class="rg-badge" style="background:'+colB+'">'+escP(m.tipo)+'</span><span class="rg-text"><strong>'+escP(m.collaboratore)+'</strong> — '+escP(m.data_modulo||'')+'</span><span class="rg-date">'+(m.created_at?new Date(m.created_at).toLocaleDateString('it-IT'):'')+'</span></div>'});tot+=moduRes.length}
   // Note colleghi
   const noteRes=noteColleghiCache.filter(n=>n.messaggio.toLowerCase().includes(q)||n.da_operatore.toLowerCase().includes(q)||n.a_operatore.toLowerCase().includes(q)).slice(0,5);
-  if(noteRes.length){html+='<div class="rg-section">Note Colleghi ('+noteRes.length+(noteRes.length>=5?'+':'')+')</div>';
+  if(isVis('note_collega')&&noteRes.length){html+='<div class="rg-section">Note Colleghi ('+noteRes.length+(noteRes.length>=5?'+':'')+')</div>';
     noteRes.forEach(n=>{html+='<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'note-collega\')"><span class="rg-badge" style="background:#2980b9">Nota</span><span class="rg-text"><strong>'+escP(n.da_operatore)+'</strong> → '+escP(n.a_operatore)+' — '+escP(n.messaggio.substring(0,60))+'</span><span class="rg-date">'+new Date(n.created_at).toLocaleDateString('it-IT')+'</span></div>'});tot+=noteRes.length}
   // Maison
   const maisonRes=maisonCache.filter(r=>r.nome.toLowerCase().includes(q)||(r.note||'').toLowerCase().includes(q)||(r.gruppo||'').toLowerCase().includes(q)).slice(0,6);
-  if(maisonRes.length){html+='<div class="rg-section">Costi Maison ('+maisonRes.length+(maisonRes.length>=6?'+':'')+')</div>';
+  if(isVis('maison')&&maisonRes.length){html+='<div class="rg-section">Costi Maison ('+maisonRes.length+(maisonRes.length>=6?'+':'')+')</div>';
     maisonRes.forEach(r=>{html+='<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'maison\');document.getElementById(\'maison-filt-nome\').value=\''+escP(r.nome)+'\';renderMaisonDashboard()"><span class="rg-badge" style="background:#b8860b">Maison</span><span class="rg-text"><strong>'+escP(r.nome)+'</strong> — '+parseFloat(r.costo).toFixed(2)+' CHF'+(r.tipo_buono?' ('+r.tipo_buono+')':'')+'</span><span class="rg-date">'+new Date(r.data_giornata+'T12:00:00').toLocaleDateString('it-IT')+'</span></div>'});tot+=maisonRes.length}
   // Promemoria
   const pmRes=promemoriaCache.filter(p=>p.titolo.toLowerCase().includes(q)||(p.descrizione||'').toLowerCase().includes(q)||(p.assegnato_a||'').toLowerCase().includes(q)).slice(0,5);
-  if(pmRes.length){html+='<div class="rg-section">Promemoria ('+pmRes.length+(pmRes.length>=5?'+':'')+')</div>';
+  if(isVis('promemoria')&&pmRes.length){html+='<div class="rg-section">Promemoria ('+pmRes.length+(pmRes.length>=5?'+':'')+')</div>';
     pmRes.forEach(p=>{const scaduto=!p.completata&&p.data_scadenza<=new Date().toISOString().split('T')[0];html+='<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'promemoria\')"><span class="rg-badge" style="background:'+(p.completata?'#2c6e49':scaduto?'var(--accent)':'#8e44ad')+'">'+( p.completata?'Fatto':scaduto?'Scaduto':'Todo')+'</span><span class="rg-text"><strong>'+escP(p.titolo)+'</strong>'+(p.descrizione?' — '+escP(p.descrizione.substring(0,50)):'')+'</span><span class="rg-date">'+new Date(p.data_scadenza+'T12:00:00').toLocaleDateString('it-IT')+'</span></div>'});tot+=pmRes.length}
   // Registro
   const logRes=logCache.filter(l=>l.azione.toLowerCase().includes(q)||(l.dettaglio||'').toLowerCase().includes(q)||(l.operatore||'').toLowerCase().includes(q)).slice(0,5);
@@ -2297,13 +2297,14 @@ function renderDashboard(){
   const alertCassa=checkCassaAlerts().length;
   const regOggi=datiCache.filter(e=>e.data&&e.data.startsWith(oggi)).length;
   const alertRischio=checkRischioAlerts().length;
-  document.getElementById('dash-stats').innerHTML=
-    '<div class="stat"><div class="stat-num'+(pmScaduti.length?' red':'')+'">'+pmMiei.length+'</div><div class="stat-label">Promemoria'+(pmScaduti.length?' ('+pmScaduti.length+' scaduti)':'')+'</div></div>'+
-    '<div class="stat"><div class="stat-num'+(noteNL?' red':'')+'">'+noteNL+'</div><div class="stat-label">Note non lette</div></div>'+
-    '<div class="stat"><div class="stat-num gold">'+maisonOggi.toFixed(0)+'</div><div class="stat-label">Maison oggi CHF</div></div>'+
-    '<div class="stat"><div class="stat-num'+(alertCassa?' red':'')+'">'+alertCassa+'</div><div class="stat-label">Alert cassa</div></div>'+
-    '<div class="stat"><div class="stat-num blue">'+regOggi+'</div><div class="stat-label">Registrazioni oggi</div></div>'+
-    '<div class="stat"><div class="stat-num'+(alertRischio?' red':'')+'">'+alertRischio+'</div><div class="stat-label">A rischio</div></div>';
+  let statsH='';
+  if(isVis('promemoria'))statsH+='<div class="stat"><div class="stat-num'+(pmScaduti.length?' red':'')+'">'+pmMiei.length+'</div><div class="stat-label">Promemoria'+(pmScaduti.length?' ('+pmScaduti.length+' scaduti)':'')+'</div></div>';
+  if(isVis('note_collega'))statsH+='<div class="stat"><div class="stat-num'+(noteNL?' red':'')+'">'+noteNL+'</div><div class="stat-label">Note non lette</div></div>';
+  if(isVis('maison'))statsH+='<div class="stat"><div class="stat-num gold">'+maisonOggi.toFixed(0)+'</div><div class="stat-label">Maison oggi CHF</div></div>';
+  if(isVis('alert_cassa'))statsH+='<div class="stat"><div class="stat-num'+(alertCassa?' red':'')+'">'+alertCassa+'</div><div class="stat-label">Alert cassa</div></div>';
+  statsH+='<div class="stat"><div class="stat-num blue">'+regOggi+'</div><div class="stat-label">Registrazioni oggi</div></div>';
+  if(isVis('alert_rischio'))statsH+='<div class="stat"><div class="stat-num'+(alertRischio?' red':'')+'">'+alertRischio+'</div><div class="stat-label">A rischio</div></div>';
+  document.getElementById('dash-stats').innerHTML=statsH;
   // DA FARE OGGI
   const todoEl=document.getElementById('dash-todo-list');let todoH='';
   pmScaduti.forEach(p=>{todoH+='<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="color:var(--accent);font-weight:700;font-size:1.1rem">!</span><span style="flex:1;cursor:pointer" onclick="switchPage(\'promemoria\')"><strong>'+escP(p.titolo)+'</strong>'+(p.descrizione?' <span style="color:var(--muted);font-size:.82rem">— '+escP(p.descrizione.substring(0,50))+'</span>':'')+'</span><button class="btn-act pin" onclick="completaPromemoria('+p.id+');renderDashboard()" style="color:#2c6e49;border-color:#2c6e49;font-size:.7rem">Fatto</button></div>'});
