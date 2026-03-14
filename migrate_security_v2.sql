@@ -39,16 +39,17 @@ BEGIN
   DELETE FROM login_attempts WHERE attempted_at < (clock_timestamp() - interval '1 hour');
   SELECT COUNT(*) INTO cnt FROM login_attempts
     WHERE nome = p_nome AND success = false
-    AND attempted_at > (clock_timestamp() - interval '1 minute');
+    AND attempted_at > (clock_timestamp() - interval '30 seconds');
   RETURN cnt < 5;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Helper: registra tentativo
+-- Helper: registra tentativo (su successo, cancella fallimenti precedenti)
 CREATE OR REPLACE FUNCTION _record_attempt(p_nome TEXT, p_success BOOLEAN)
 RETURNS VOID AS $$
 BEGIN
   INSERT INTO login_attempts (nome, success, attempted_at) VALUES (p_nome, p_success, clock_timestamp());
+  IF p_success THEN DELETE FROM login_attempts WHERE nome = p_nome AND success = false; END IF;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
