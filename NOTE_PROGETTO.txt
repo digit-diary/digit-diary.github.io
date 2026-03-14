@@ -635,6 +635,18 @@
 
   [38] Fix bug dicembre nel riepilogo mensile PDF
 
+  [39] Spese Extra (nella sezione Maison)
+       - Registrazione spese esterne: cene, pranzi, rimborsi, viaggi, biglietti, regali
+       - Campi: beneficiario/gruppo, tipo, data, luogo/ristorante, importo, descrizione
+       - Autocomplete nomi da maison + spese precedenti
+       - Filtri: beneficiario, tipo, periodo Dal/Al
+       - Modifica e elimina singole spese
+       - Export CSV e PDF
+       - Incluso nella ricerca globale e nel report settimanale
+       - Capitalizzazione automatica nomi
+       - Visibilita legata alla sezione Maison
+       - DB: tabella spese_extra
+
 
 ================================================================================
   FILE DEL PROGETTO
@@ -673,6 +685,7 @@
   maison_budget           Budget opzionale per cliente maison
   promemoria              Task/promemoria assegnati a operatori
   consegne_turno          Consegne passaggio turno
+  spese_extra             Spese esterne (cene, viaggi, rimborsi, biglietti)
 
 
 ================================================================================
