@@ -1245,6 +1245,14 @@ function _eseguiRicercaGlobale(q){
   const noteRes=noteColleghiCache.filter(n=>n.messaggio.toLowerCase().includes(q)||n.da_operatore.toLowerCase().includes(q)||n.a_operatore.toLowerCase().includes(q)).slice(0,5);
   if(noteRes.length){html+='<div class="rg-section">Note Colleghi ('+noteRes.length+(noteRes.length>=5?'+':'')+')</div>';
     noteRes.forEach(n=>{html+='<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'note-collega\')"><span class="rg-badge" style="background:#2980b9">Nota</span><span class="rg-text"><strong>'+escP(n.da_operatore)+'</strong> → '+escP(n.a_operatore)+' — '+escP(n.messaggio.substring(0,60))+'</span><span class="rg-date">'+new Date(n.created_at).toLocaleDateString('it-IT')+'</span></div>'});tot+=noteRes.length}
+  // Maison
+  const maisonRes=maisonCache.filter(r=>r.nome.toLowerCase().includes(q)||(r.note||'').toLowerCase().includes(q)||(r.gruppo||'').toLowerCase().includes(q)).slice(0,6);
+  if(maisonRes.length){html+='<div class="rg-section">Costi Maison ('+maisonRes.length+(maisonRes.length>=6?'+':'')+')</div>';
+    maisonRes.forEach(r=>{html+='<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'maison\');document.getElementById(\'maison-filt-nome\').value=\''+escP(r.nome)+'\';renderMaisonDashboard()"><span class="rg-badge" style="background:#b8860b">Maison</span><span class="rg-text"><strong>'+escP(r.nome)+'</strong> — '+parseFloat(r.costo).toFixed(2)+' CHF'+(r.tipo_buono?' ('+r.tipo_buono+')':'')+'</span><span class="rg-date">'+new Date(r.data_giornata+'T12:00:00').toLocaleDateString('it-IT')+'</span></div>'});tot+=maisonRes.length}
+  // Promemoria
+  const pmRes=promemoriaCache.filter(p=>p.titolo.toLowerCase().includes(q)||(p.descrizione||'').toLowerCase().includes(q)||(p.assegnato_a||'').toLowerCase().includes(q)).slice(0,5);
+  if(pmRes.length){html+='<div class="rg-section">Promemoria ('+pmRes.length+(pmRes.length>=5?'+':'')+')</div>';
+    pmRes.forEach(p=>{const scaduto=!p.completata&&p.data_scadenza<=new Date().toISOString().split('T')[0];html+='<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'promemoria\')"><span class="rg-badge" style="background:'+(p.completata?'#2c6e49':scaduto?'var(--accent)':'#8e44ad')+'">'+( p.completata?'Fatto':scaduto?'Scaduto':'Todo')+'</span><span class="rg-text"><strong>'+escP(p.titolo)+'</strong>'+(p.descrizione?' — '+escP(p.descrizione.substring(0,50)):'')+'</span><span class="rg-date">'+new Date(p.data_scadenza+'T12:00:00').toLocaleDateString('it-IT')+'</span></div>'});tot+=pmRes.length}
   // Registro
   const logRes=logCache.filter(l=>l.azione.toLowerCase().includes(q)||(l.dettaglio||'').toLowerCase().includes(q)||(l.operatore||'').toLowerCase().includes(q)).slice(0,5);
   if(logRes.length){html+='<div class="rg-section">Registro ('+logRes.length+(logRes.length>=5?'+':'')+')</div>';
