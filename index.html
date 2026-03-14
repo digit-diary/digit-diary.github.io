@@ -2261,23 +2261,33 @@ function _parseMaisonNome(raw){let nome=raw.trim(),tipoBuono=null,note='';
   // Rimuovi "Gruppo"
   if(/^gruppo\s+/i.test(nome)){note=(note?note+', ':'')+'Gruppo';nome=nome.replace(/^gruppo\s+/i,'')}
   return{nome:capitalizzaNome(nome),tipoBuono,note}}
-async function caricaMaisonFile(input){const file=input.files[0];if(!file)return;
+async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0];if(!file&&!forzaSostituisci)return;
+  if(forzaSostituisci&&window._maisonPendingFile){/* usa file pendente */}else{window._maisonPendingFile=file}
+  const f=window._maisonPendingFile;if(!f)return;
   const status=document.getElementById('maison-upload-status');status.textContent='Lettura file...';
   try{
     const XLSX=window.XLSX;if(!XLSX){toast('Libreria XLSX non caricata');status.textContent='';return}
-    const buf=await file.arrayBuffer();const wb=XLSX.read(buf);
-    let totalRows=0,warnings=[];
+    const buf=await f.arrayBuffer();const wb=XLSX.read(buf);
+    let totalRows=0,warnings=[],giorniNuovi=0,giorniSaltati=[],giorniSostituiti=0;
+    // Rileva giorni già presenti nel DB
+    const giorniEsistenti=new Set(maisonCache.map(r=>r.data_giornata));
     for(const sheetName of wb.SheetNames){
-      // Estrai data dal nome foglio (DD.MM.YYYY)
       const dm=sheetName.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
       if(!dm)continue;
       const dataGiornata=dm[3]+'-'+dm[2].padStart(2,'0')+'-'+dm[1].padStart(2,'0');
       const data=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:''});
-      // Trova la riga header (NOME COGNOME | PX | COSTO)
+      // Controlla se ci sono dati nel foglio
       let startRow=-1;
       for(let i=0;i<Math.min(data.length,5);i++){
         const row=data[i];if(row.some(c=>String(c).toLowerCase().includes('cognome')||String(c).toLowerCase().includes('costo'))){startRow=i+1;break}}
       if(startRow===-1)startRow=3;
+      let hasDati=false;
+      for(let i=startRow;i<data.length;i++){const rn=String(data[i][0]||'').trim();const px=parseInt(data[i][1])||0;const co=parseFloat(String(data[i][2]).replace(',','.'))||0;if(rn&&(px||co)){hasDati=true;break}}
+      if(!hasDati)continue;
+      // Se giorno già esiste e non forzato → salta
+      if(giorniEsistenti.has(dataGiornata)&&!forzaSostituisci){
+        giorniSaltati.push(new Date(dataGiornata+'T12:00:00').toLocaleDateString('it-IT'));continue}
+      if(giorniEsistenti.has(dataGiornata)){giorniSostituiti++}else{giorniNuovi++}
       // Cancella dati esistenti per questa data
       await sbDel('costi_maison','data_giornata=eq.'+dataGiornata);
       // Parsing righe
@@ -2286,13 +2296,10 @@ async function caricaMaisonFile(input){const file=input.files[0];if(!file)return
         if(!rawNome)continue;
         const px=parseInt(row[1])||0;const costo=parseFloat(String(row[2]).replace(',','.'))||0;
         if(!px&&!costo)continue;
-        // Ultima riga = totale (no nome, solo costo)
         if(!rawNome&&costo)continue;
-        // Splitta nomi multipli con /
         const nomiRaw=rawNome.split(/\s*\/\s*/);const nNomi=nomiRaw.length;
         for(const nr of nomiRaw){
           const parsed=_parseMaisonNome(nr);if(!parsed.nome)continue;
-          // Cerca nome simile per warning
           const simile=_trovaNomeSimileMaison(parsed.nome);
           if(simile&&simile.tipo==='simile'){warnings.push(parsed.nome+' → forse intendi "'+simile.nome+'"?')}
           const rec={data_giornata:dataGiornata,nome:parsed.nome,px:Math.round(px/nNomi)||1,
@@ -2300,13 +2307,19 @@ async function caricaMaisonFile(input){const file=input.files[0];if(!file)return
             gruppo:nNomi>1?capitalizzaNome(rawNome):'',operatore:getOperatore()};
           try{await sbPost('costi_maison',rec);totalRows++}catch(e){}}
       }}
-    // Ricarica cache
     maisonCache=await sbGet('costi_maison?order=data_giornata.desc');
-    status.innerHTML='<span style="color:#2c6e49;font-weight:600">'+totalRows+' righe importate da '+wb.SheetNames.length+' giorni</span>';
+    // Riepilogo
+    let msg='';
+    if(totalRows)msg+='<span style="color:#2c6e49;font-weight:600">'+totalRows+' righe importate'+(giorniNuovi?' ('+giorniNuovi+' giorni nuovi)':'')+(giorniSostituiti?' ('+giorniSostituiti+' giorni aggiornati)':'')+'</span>';
+    if(giorniSaltati.length){msg+='<br><span style="color:var(--accent2);font-size:.82rem">Giorni già presenti (saltati): '+giorniSaltati.join(', ')+'</span>';
+      msg+=' <button onclick="caricaMaisonFile(document.getElementById(\'maison-file-input\'),true)" style="font-size:.78rem;padding:3px 10px;cursor:pointer;border:1px solid var(--accent);color:var(--accent);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif;font-weight:600;margin-left:6px">Sostituisci tutto</button>'}
+    if(!totalRows&&!giorniSaltati.length)msg='<span style="color:var(--muted)">Nessun dato nuovo trovato</span>';
     if(warnings.length){const uniq=[...new Set(warnings)];
-      status.innerHTML+='<br><span style="color:var(--accent);font-size:.82rem">Nomi simili trovati: '+uniq.slice(0,5).join('; ')+'</span>'}
-    toast(totalRows+' righe importate');
-    renderMaisonDashboard();renderMaisonBudgetAlerts();logAzione('Import Maison',totalRows+' righe da '+file.name);
+      msg+='<br><span style="color:var(--accent);font-size:.82rem">Nomi simili: '+uniq.slice(0,5).join('; ')+'</span>'}
+    status.innerHTML=msg;
+    if(totalRows){toast(totalRows+' righe importate');logAzione('Import Maison',totalRows+' righe da '+f.name)}
+    else if(giorniSaltati.length)toast(giorniSaltati.length+' giorni già presenti (saltati)');
+    renderMaisonDashboard();renderMaisonBudgetAlerts();window._maisonPendingFile=null;
   }catch(e){console.error(e);status.textContent='Errore: '+e.message;toast('Errore importazione')}
   input.value=''}
 function getMaisonFiltrati(){const fn=(document.getElementById('maison-filt-nome')||{}).value||'';
