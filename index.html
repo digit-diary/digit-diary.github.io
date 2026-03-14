@@ -1289,7 +1289,7 @@ function checkRischioAlerts(){
     if(hasRdi)return;
     alerts.push({nome,count:allins.length,lastDate:allins[allins.length-1].data_modulo||allins[allins.length-1].created_at||''})});
   return alerts}
-function renderRischioAlerts();renderAmmonimentiAlerts(){const container=document.getElementById('rischio-alerts-container');if(!container)return;
+function renderRischioAlerts(){const container=document.getElementById('rischio-alerts-container');if(!container)return;
   const alerts=checkRischioAlerts();if(!alerts.length){container.innerHTML='';return}
   let html='<div class="rischio-alert-banner" onclick="toggleRischioDD()">&#9888;&#65039; '+alerts.length+' collaboratore/i a rischio disciplinare (2+ allineamenti) — Prossimo allineamento scatta RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
   html+='<div class="rischio-alerts-dropdown hidden" id="rischio-dd">';
