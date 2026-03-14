@@ -433,10 +433,19 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 <body>
 <script>if(sessionStorage.getItem('diario_auth')==='1')document.documentElement.classList.add('authed')</script>
 <div id="login-overlay"><div class="login-box">
-  <img src="logo_casino.png" alt="Casino Lugano SA" style="width:140px;margin-bottom:16px"><h2>Accesso Protetto</h2><p>Seleziona il settore e il tuo nome</p>
-  <select id="login-settore" onchange="aggiornaLoginOperatori()" style="margin-bottom:8px;text-align:left;letter-spacing:0;padding:11px 14px;width:100%;border:1.5px solid var(--line);border-radius:2px;font-size:1rem;font-family:'Source Sans 3',sans-serif;color:var(--ink);background:var(--paper2);cursor:pointer"><option value="">-- Admin (password master) --</option><option value="slots">Slots</option><option value="tavoli">Tavoli</option></select>
-  <select id="login-nome" style="margin-bottom:8px;text-align:left;letter-spacing:0;padding:11px 14px;width:100%;border:1.5px solid var(--line);border-radius:2px;font-size:1rem;font-family:'Source Sans 3',sans-serif;color:var(--ink);background:var(--paper2);cursor:pointer;display:none"><option value="">-- Seleziona operatore --</option></select>
-  <input type="password" id="pwd-input" placeholder="Password..." onkeydown="if(event.key==='Enter') checkPwd()">
+  <img src="logo_casino.png" alt="Casino Lugano SA" style="width:140px;margin-bottom:16px"><h2>Accesso Protetto</h2>
+  <div style="text-align:left;margin-bottom:12px">
+    <label style="font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;display:block;margin-bottom:5px">Settore</label>
+    <select id="login-settore" onchange="aggiornaLoginOperatori()" style="text-align:left;letter-spacing:0;padding:11px 14px;width:100%;border:1.5px solid var(--line);border-radius:2px;font-size:1rem;font-family:'Source Sans 3',sans-serif;color:var(--ink);background:var(--paper2);cursor:pointer"><option value="">Admin (password master)</option><option value="slots">Slots</option><option value="tavoli">Tavoli</option></select>
+  </div>
+  <div id="login-op-wrap" style="text-align:left;margin-bottom:12px;display:none">
+    <label style="font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;display:block;margin-bottom:5px">Operatore</label>
+    <select id="login-nome" style="text-align:left;letter-spacing:0;padding:11px 14px;width:100%;border:1.5px solid var(--line);border-radius:2px;font-size:1rem;font-family:'Source Sans 3',sans-serif;color:var(--ink);background:var(--paper2);cursor:pointer"><option value="">-- Seleziona operatore --</option></select>
+  </div>
+  <div style="text-align:left;margin-bottom:12px">
+    <label style="font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;display:block;margin-bottom:5px">Password</label>
+    <input type="password" id="pwd-input" placeholder="Password..." onkeydown="if(event.key==='Enter') checkPwd()" style="width:100%;padding:11px 14px;border:1.5px solid var(--line);border-radius:2px;font-size:1rem;font-family:'Source Sans 3',sans-serif;color:var(--ink);background:var(--paper2)">
+  </div>
   <button class="btn-login" onclick="checkPwd()">Entra</button>
   <button class="btn-recupero" onclick="recuperoPassword()">Password dimenticata?</button>
   <div class="login-error" id="login-error"></div>
@@ -3153,9 +3162,9 @@ async function esportaSpeseExtraPDF(){const data=getSpeseExtraFiltrate();if(!dat
 
 // REPARTO SWITCH
 function aggiornaLoginOperatori(){const settore=document.getElementById('login-settore').value;
-  const loginNome=document.getElementById('login-nome');
-  if(!settore){loginNome.style.display='none';loginNome.value='';return}
-  loginNome.style.display='';
+  const wrap=document.getElementById('login-op-wrap');const loginNome=document.getElementById('login-nome');
+  if(!settore){wrap.style.display='none';loginNome.value='';return}
+  wrap.style.display='';
   var ops=operatoriAuthCache.map(o=>o.nome).filter(function(n){var rep=operatoriRepartoMap[n]||'entrambi';return rep===settore||rep==='entrambi'}).sort();
   loginNome.innerHTML='<option value="">-- Seleziona operatore --</option>'+ops.map(function(n){return'<option value="'+escP(n)+'">'+escP(n)+'</option>'}).join('')}
 function setReparto(rep){currentReparto=rep;
