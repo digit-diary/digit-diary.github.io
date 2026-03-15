@@ -475,7 +475,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
 </style>
 </head>
 <body>
-<script>(function(){var ts=parseInt(localStorage.getItem('diario_auth_ts')||'0');if(ts>0&&Date.now()-ts<28800000)document.documentElement.classList.add('authed')})()</script>
+<script>(function(){var ts=parseInt(localStorage.getItem('diario_auth_ts')||'0');var hasBio=!!localStorage.getItem('webauthn_cred');if(ts>0&&(hasBio||Date.now()-ts<28800000)&&!hasBio)document.documentElement.classList.add('authed')})()</script>
 <div id="login-overlay"><div class="login-box">
   <img src="logo_casino.png" alt="Casino Lugano SA" style="width:140px;margin-bottom:16px"><h2>Accesso Protetto</h2><p>Seleziona settore, operatore e password</p>
   <select id="login-settore" onchange="aggiornaLoginOperatori()" style="margin-bottom:8px;text-align:left;letter-spacing:0;padding:11px 14px;width:100%;border:1.5px solid var(--line);border-radius:2px;font-size:1rem;font-family:'Source Sans 3',sans-serif;color:var(--ink);background:var(--paper2);cursor:pointer"><option value="">-- Seleziona settore --</option><option value="slots">Slots</option><option value="tavoli">Tavoli</option></select>
@@ -3693,6 +3693,14 @@ window.addEventListener('load',async()=>{
   // Populate login dropdown (se settore gia selezionato)
   aggiornaLoginOperatori();
   if(_isSessionValid()){
+    // Se Face ID attivo: verifica PRIMA di entrare
+    if(localStorage.getItem('webauthn_cred')){
+      var bl=document.getElementById('biometric-login');if(bl)bl.style.display='block';
+      var bioOk=await loginBiometrico();
+      if(!bioOk){document.getElementById('pwd-input').focus();
+        var _sel=document.getElementById('login-nome');var _sop=localStorage.getItem('operatore_corrente');
+        if(_sel&&_sop){for(var i=0;i<_sel.options.length;i++){if(_sel.options[i].value===_sop){_sel.selectedIndex=i;break}}}
+        return}}
     document.getElementById('login-overlay').classList.add('hidden');applicaTemaOperatore();
     // Valida sessione admin se presente
     if(isAdmin()){const tk=getAdminToken();if(tk){const sv=await sbRpc('validate_admin_session',{p_token:tk});if(!sv||!sv.valid){sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token')}}else{sessionStorage.removeItem('is_admin')}}
