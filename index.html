@@ -3669,7 +3669,9 @@ document.getElementById('scadenza-modal').addEventListener('click',function(e){i
 document.getElementById('note-modal').addEventListener('click',function(e){if(e.target===this)this.classList.add('hidden')});
 document.getElementById('inp-testo').addEventListener('keydown',e=>{if(e.ctrlKey&&e.key==='Enter')salva()});
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});
-  navigator.serviceWorker.addEventListener('message',function(e){if(e.data&&e.data.action==='navigate'&&e.data.page)switchPage(e.data.page)})}
+  navigator.serviceWorker.addEventListener('message',function(e){
+    if(e.data&&e.data.action==='navigate'&&e.data.page)switchPage(e.data.page);
+    if(e.data&&e.data.action==='push'&&e.data.data){var d=e.data.data;toast(d.titolo+(d.corpo?' — '+d.corpo:''))}})}
 </script>
 </body>
 </html>

@@ -30,11 +30,19 @@ self.addEventListener('push', function(event) {
   if (!event.data) return;
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
-      // Skip push notification if app is visible (in-app notification handles it)
       var isVisible = clientList.some(function(c) { return c.visibilityState === 'visible'; });
-      if (isVisible) return;
       try {
         var data = event.data.json();
+        // If app visible: forward to client for in-app handling, skip system notification
+        // Exception: budget/consegna/promemoria always show system notification
+        if (isVisible && data.tipo === 'nota') {
+          clientList.forEach(function(c) { c.postMessage({ action: 'push', data: data }); });
+          return;
+        }
+        // For non-nota types when visible: still forward AND show system notification
+        if (isVisible) {
+          clientList.forEach(function(c) { c.postMessage({ action: 'push', data: data }); });
+        }
         var titolo = data.titolo || 'Diario Collaboratori';
         var options = {
           body: data.corpo || '',
