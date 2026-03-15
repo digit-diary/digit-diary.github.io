@@ -127,7 +127,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 .reparto-switch{width:100%;max-width:1280px;display:flex;justify-content:center;gap:0;margin-bottom:16px}
 .reparto-btn{padding:10px 28px;font-size:.85rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;border:2px solid var(--line);background:var(--paper2);color:var(--muted);font-family:'Source Sans 3',sans-serif;transition:all .15s}
 .reparto-btn:first-child{border-radius:3px 0 0 3px}
-.reparto-btn:last-child{border-radius:0 3px 0 3px}
+.reparto-btn:last-child{border-radius:0 3px 3px 0}
 .reparto-btn.active-slots{background:#1a4a7a;color:white;border-color:#1a4a7a}
 .reparto-btn.active-tavoli{background:#8e44ad;color:white;border-color:#8e44ad}
 .reparto-switch.hidden{display:none}
@@ -172,7 +172,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 .tipo-tag:hover{border-color:var(--accent2);color:var(--accent2)}
 .tipo-tag.active{color:white}
 .btn-salva{background:var(--accent);color:white;border:none;padding:13px 32px;font-family:'Source Sans 3',sans-serif;font-size:.85rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;border-radius:2px;margin-top:6px;box-shadow:2px 2px 0 rgba(0,0,0,.2)}
-.btn-salva:hover{background:#a93226}
+.btn-salva:hover{filter:brightness(0.85)}
 /* FILTERS */
 .filters{padding:18px 24px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--paper2)}
 .filter-group{display:flex;align-items:center;gap:6px}
@@ -438,6 +438,32 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 #regali-list::-webkit-scrollbar-track{background:var(--paper2);border-radius:4px}
 #regali-list::-webkit-scrollbar-thumb{background:var(--muted);border-radius:4px}
 #regali-list::-webkit-scrollbar-thumb:hover{background:var(--ink)}
+/* ZEBRA STRIPING TABLES */
+.collab-table tbody tr:nth-child(even){background:var(--paper2)}
+.collab-table tbody tr:hover{background:rgba(184,134,11,0.06)}
+/* MODAL HOVER STATES */
+.btn-modal-ok:hover{opacity:.85}
+.btn-modal-cancel:hover{background:var(--paper);border-color:var(--ink);color:var(--ink)}
+.btn-add-tipo:hover{opacity:.85}
+/* BUTTON VARIANTS */
+.btn-salva:hover{filter:brightness(0.85)}
+/* FOCUS VISIBLE - ACCESSIBILITY */
+button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva:focus-visible,.nav-tab:focus-visible,.reparto-btn:focus-visible,.btn-export:focus-visible,.btn-modal-ok:focus-visible,.btn-modal-cancel:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.entry:focus-within .entry-actions{opacity:1}
+/* BUDGET PROGRESS BAR */
+.budget-bar{height:4px;border-radius:2px;background:var(--line);margin-top:4px;overflow:hidden;min-width:60px}
+.budget-bar-fill{height:100%;border-radius:2px;transition:width .3s}
+/* CATEGORY GROUP HEADERS */
+.cat-group-header{font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;font-weight:700;padding:10px 12px 6px;margin-top:12px;border-bottom:2px solid;display:flex;align-items:center;gap:8px}
+.cat-group-header:first-child{margin-top:0}
+.cat-group-header .cat-count{font-size:.68rem;font-weight:600;padding:1px 8px;border-radius:9px;color:white}
+/* DASH WIDGET */
+.dash-widget-body{padding:14px;max-height:300px;overflow-y:auto}
+/* SPESE STATS */
+.mini-stats-bar{display:flex;gap:10px;flex-wrap:wrap;padding:12px 0;margin-bottom:8px}
+.mini-stat{background:var(--paper2);border-radius:3px;padding:8px 14px;text-align:center;flex:1;min-width:100px}
+.mini-stat-num{font-family:'Playfair Display',serif;font-size:1.3rem;font-weight:700;color:var(--ink);line-height:1}
+.mini-stat-label{font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px}
 </style>
 </head>
 <body>
@@ -516,7 +542,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
     <h2 style="font-family:'Playfair Display',serif;font-size:1.6rem;color:var(--ink);margin-bottom:4px" id="dash-titolo"></h2>
     <p style="color:var(--muted);font-size:.9rem" id="dash-sottotitolo"></p>
   </div>
-  <div class="stats-bar" id="dash-stats" style="grid-template-columns:repeat(6,1fr)"></div>
+  <div class="stats-bar" id="dash-stats" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr))"></div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px" id="dash-grid">
     <div class="main-card" id="dash-todo"><div class="card-header">Da fare oggi</div><div id="dash-todo-list" style="padding:14px;max-height:300px;overflow-y:auto"></div></div>
     <div class="main-card" id="dash-alerts"><div class="card-header">Alert attivi</div><div id="dash-alert-list" style="padding:14px;max-height:300px;overflow-y:auto"></div></div>
@@ -2886,9 +2912,10 @@ async function salvaRegalo(){
 async function eliminaRegalo(id){if(!confirm('Eliminare questo regalo?'))return;
   try{await sbDel('regali_maison','id=eq.'+id);regaliCache=regaliCache.filter(function(x){return x.id!==id});renderRegali();toast('Eliminato')}catch(e){toast('Errore')}}
 function renderRegali(){var data=getRegaliReparto();var el=document.getElementById('regali-list');if(!el)return;
-  if(!data.length){el.innerHTML='<p style="color:var(--muted);text-align:center">Nessun regalo registrato.</p>';return}
+  if(!data.length){el.innerHTML='<div class="empty-state"><p>Nessun regalo registrato</p><small>Aggiungi un regalo per un cliente Maison</small></div>';return}
   var totale=data.reduce(function(s,r){return s+parseFloat(r.importo||0)},0);
-  var html='<div style="margin-bottom:10px;font-size:.85rem;color:var(--muted)">'+data.length+' regali'+(totale?' — Totale: '+totale.toFixed(2)+' CHF':'')+'</div>';
+  var nClienti=new Set(data.map(function(r){return r.nome})).size;
+  var html='<div class="mini-stats-bar"><div class="mini-stat"><div class="mini-stat-num gold">'+(totale?totale.toFixed(2):'—')+'</div><div class="mini-stat-label">Totale CHF</div></div><div class="mini-stat"><div class="mini-stat-num blue">'+data.length+'</div><div class="mini-stat-label">Regali</div></div><div class="mini-stat"><div class="mini-stat-num">'+nClienti+'</div><div class="mini-stat-label">Clienti</div></div></div>';
   html+='<table class="collab-table"><thead><tr><th>Data</th><th>Cliente</th><th>Descrizione</th><th class="num">CHF</th><th>Operatore</th><th></th></tr></thead><tbody>';
   data.forEach(function(r){var d=new Date((r.data_regalo||r.created_at)+'T12:00:00');
     html+='<tr><td style="font-weight:600">'+d.toLocaleDateString('it-IT')+'</td><td><strong>'+escP(r.nome)+'</strong></td><td>'+escP(r.descrizione||'')+'</td><td class="num">'+(r.importo?parseFloat(r.importo).toFixed(2):'—')+'</td><td style="color:var(--muted);font-size:.82rem">'+escP(r.operatore||'')+'</td><td><button class="btn-act del" onclick="eliminaRegalo('+r.id+')">Elimina</button></td></tr>'});
@@ -3096,26 +3123,36 @@ async function eliminaMaisonGiorno(){const sel=document.getElementById('maison-d
 
 // Budget
 function renderMaisonBudgetUI(){const el=document.getElementById('maison-budget-list');if(!el)return;
-  // Mostra TUTTI i clienti: quelli con scheda + quelli solo in costi_maison
-  const tuttiNomi=[...new Set([...getBudgetReparto().map(b=>b.nome),...getMaisonReparto().map(r=>r.nome)])].sort();
-  if(!tuttiNomi.length){el.innerHTML='<p style="color:var(--muted);font-size:.85rem">Nessun cliente. Carica un file Excel per iniziare.</p>';return}
-  // Filtro rapido per categoria
+  const _br=getBudgetReparto(),_mr=getMaisonReparto();
+  const tuttiNomi=[...new Set([..._br.map(b=>b.nome),..._mr.map(r=>r.nome)])].sort();
+  if(!tuttiNomi.length){el.innerHTML='<div class="empty-state"><p>Nessun cliente</p><small>Carica un file Excel o aggiungi manualmente per iniziare</small></div>';return}
   let filtCat=(document.getElementById('maison-filt-cat-lista')||{}).value||'';
   let html='<div style="display:flex;gap:10px;margin-bottom:12px;align-items:center;flex-wrap:wrap"><select id="maison-filt-cat-lista" onchange="renderMaisonBudgetUI()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.85rem;background:var(--paper);color:var(--ink)"><option value="">Tutti ('+tuttiNomi.length+')</option><option value="full_maison"'+(filtCat==='full_maison'?' selected':'')+'>Full Maison</option><option value="maison"'+(filtCat==='maison'?' selected':'')+'>Maison</option><option value="direzione"'+(filtCat==='direzione'?' selected':'')+'>Direzione</option><option value="nessuna"'+(filtCat==='nessuna'?' selected':'')+'>Non categorizzati</option></select></div>';
-  let filtered=tuttiNomi;
-  if(filtCat){filtered=tuttiNomi.filter(nome=>{const b=getBudgetReparto().find(x=>x.nome.toLowerCase()===nome.toLowerCase());const cat=b?b.categoria||'':'';if(filtCat==='nessuna')return!cat;return cat===filtCat})}
-  const _mrBudget=getMaisonReparto();
-  html+=filtered.map(nome=>{
-    const b=getBudgetReparto().find(x=>x.nome.toLowerCase()===nome.toLowerCase());
-    const spent=_mrBudget.filter(r=>r.nome.toLowerCase()===nome.toLowerCase()).reduce((s,r)=>s+parseFloat(r.costo||0),0);
-    const cat=b?b.categoria||'':'';const pct=b&&b.budget_chf?Math.round(spent/b.budget_chf*100):0;
-    const color=pct>=100?'var(--accent)':pct>=80?'#e67e22':'#2c6e49';
-    const borderColor=cat==='full_maison'?'#b8860b':cat==='maison'?'#2980b9':cat==='direzione'?'#8e44ad':'var(--line)';
-    const catBadge=cat==='full_maison'?'<span class="mini-badge" style="background:#b8860b">Full Maison</span>':cat==='maison'?'<span class="mini-badge" style="background:#2980b9">Maison</span>':cat==='direzione'?'<span class="mini-badge" style="background:#8e44ad">Direzione</span>':'';
-    const nascitaLabel=b&&b.data_nascita?new Date(b.data_nascita+'T12:00:00').toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit'}):'';
-    const isBday=b?_isCompleannoOggi(b.data_nascita):false;
-    const ne=nome.replace(/'/g,"\\'");
-    return'<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border-left:3px solid '+borderColor+';flex-wrap:wrap"><span style="font-weight:600;min-width:150px">'+escP(nome)+(isBday?' <span style="font-size:1.1rem">&#127874;</span>':'')+'</span>'+catBadge+(spent?'<span style="font-size:.82rem;color:var(--muted)">'+spent.toFixed(0)+' CHF</span>':'')+(b&&b.budget_chf?'<span style="font-size:.82rem;color:'+color+';font-weight:600">'+pct+'%</span>':'')+(nascitaLabel?'<span style="font-size:.82rem;color:var(--muted)">&#127874; '+nascitaLabel+'</span>':'')+(b?'<button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2);font-size:.72rem" onclick="modificaMaisonInfo('+b.id+')">Modifica</button>':'<button class="btn-del-tipo" style="color:#2980b9;border-color:#2980b9;font-size:.72rem" onclick="assegnaCatRapida(\''+ne+'\')">Assegna</button>')+(b?'<button class="btn-del-tipo" style="font-size:.72rem" onclick="rimuoviMaisonBudget('+b.id+')">Rimuovi</button>':'')+'</div>'}).join('');
+  // Build client data
+  const clients=tuttiNomi.map(nome=>{
+    const b=_br.find(x=>x.nome.toLowerCase()===nome.toLowerCase());
+    const spent=_mr.filter(r=>r.nome.toLowerCase()===nome.toLowerCase()).reduce((s,r)=>s+parseFloat(r.costo||0),0);
+    const cat=b?b.categoria||'':'';
+    return{nome,b,spent,cat}});
+  // Filter
+  let filtered=clients;
+  if(filtCat){filtered=clients.filter(c=>{if(filtCat==='nessuna')return!c.cat;return c.cat===filtCat})}
+  // Group by category
+  const catDefs=[{key:'full_maison',label:'Full Maison',color:'#b8860b'},{key:'maison',label:'Maison',color:'#2980b9'},{key:'direzione',label:'Direzione',color:'#8e44ad'},{key:'',label:'Non categorizzati',color:'var(--muted)'}];
+  function renderClientRow(c){
+    const pct=c.b&&c.b.budget_chf?Math.round(c.spent/c.b.budget_chf*100):0;
+    const pctColor=pct>=100?'var(--accent)':pct>=80?'#e67e22':'#2c6e49';
+    const borderColor=c.cat==='full_maison'?'#b8860b':c.cat==='maison'?'#2980b9':c.cat==='direzione'?'#8e44ad':'var(--line)';
+    const nascitaLabel=c.b&&c.b.data_nascita?new Date(c.b.data_nascita+'T12:00:00').toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit'}):'';
+    const isBday=c.b?_isCompleannoOggi(c.b.data_nascita):false;
+    const ne=c.nome.replace(/'/g,"\\'");
+    const budgetBar=c.b&&c.b.budget_chf?'<div class="budget-bar"><div class="budget-bar-fill" style="width:'+Math.min(pct,100)+'%;background:'+pctColor+'"></div></div>':'';
+    return'<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--paper2);border-radius:3px;margin-bottom:4px;border-left:3px solid '+borderColor+';flex-wrap:wrap"><span style="font-weight:600;min-width:150px;cursor:pointer" class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(c.nome)+(isBday?' <span style="font-size:1.1rem">&#127874;</span>':'')+'</span>'+(c.spent?'<span style="font-size:.82rem;color:var(--muted)">'+c.spent.toFixed(0)+' CHF</span>':'')+(c.b&&c.b.budget_chf?'<span style="font-size:.82rem;color:'+pctColor+';font-weight:600">'+pct+'%</span>'+budgetBar:'')+(nascitaLabel?'<span style="font-size:.82rem;color:var(--muted)">&#127874; '+nascitaLabel+'</span>':'')+(c.b?'<button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2);font-size:.72rem" onclick="modificaMaisonInfo('+c.b.id+')">Modifica</button>':'<button class="btn-del-tipo" style="color:#2980b9;border-color:#2980b9;font-size:.72rem" onclick="assegnaCatRapida(\''+ne+'\')">Assegna</button>')+(c.b?'<button class="btn-del-tipo" style="font-size:.72rem" onclick="rimuoviMaisonBudget('+c.b.id+')">Rimuovi</button>':'')+'</div>'}
+  if(filtCat){html+=filtered.map(renderClientRow).join('')}
+  else{catDefs.forEach(cd=>{
+    const group=filtered.filter(c=>c.cat===cd.key);if(!group.length)return;
+    html+='<div class="cat-group-header" style="color:'+cd.color+';border-bottom-color:'+cd.color+'">'+cd.label+' <span class="cat-count" style="background:'+cd.color+'">'+group.length+'</span></div>';
+    html+=group.map(renderClientRow).join('')})}
   el.innerHTML=html}
 async function salvaMaisonBudget(){const nome=capitalizzaNome(document.getElementById('maison-budget-nome').value.trim());
   const chf=parseFloat(document.getElementById('maison-budget-chf').value)||null;
@@ -3292,8 +3329,11 @@ function getSpeseExtraFiltrate(){const fn=(document.getElementById('se-filt-nome
     if(ft&&r.tipo!==ft)return false;if(fd&&r.data_spesa<fd)return false;if(fa&&r.data_spesa>fa)return false;return true})}
 function renderSpeseExtra(){const data=getSpeseExtraFiltrate();const el=document.getElementById('spese-extra-list');if(!el)return;
   const tot=data.reduce((s,r)=>s+parseFloat(r.importo||0),0);
-  if(!data.length){el.innerHTML='<p style="color:var(--muted);text-align:center;padding:20px">Nessuna spesa extra registrata</p>';return}
-  let h='<div style="margin-bottom:10px;font-weight:600;color:var(--accent2)">Totale: '+tot.toFixed(2)+' CHF — '+data.length+' spese</div>';
+  if(!data.length){el.innerHTML='<div class="empty-state"><p>Nessuna spesa extra</p><small>Aggiungi una spesa compilando il form sopra</small></div>';return}
+  const nBenef=new Set(data.map(r=>r.beneficiario)).size;
+  const topTipo=data.reduce((m,r)=>{m[r.tipo]=(m[r.tipo]||0)+1;return m},{});
+  const topTipoLabel=Object.entries(topTipo).sort((a,b)=>b[1]-a[1]).slice(0,1).map(t=>SE_TIPI_LABEL[t[0]]||t[0])[0]||'';
+  let h='<div class="mini-stats-bar"><div class="mini-stat"><div class="mini-stat-num gold">'+tot.toFixed(2)+'</div><div class="mini-stat-label">Totale CHF</div></div><div class="mini-stat"><div class="mini-stat-num blue">'+data.length+'</div><div class="mini-stat-label">Spese</div></div><div class="mini-stat"><div class="mini-stat-num">'+nBenef+'</div><div class="mini-stat-label">Beneficiari</div></div>'+(topTipoLabel?'<div class="mini-stat"><div class="mini-stat-num" style="font-size:1rem">'+topTipoLabel+'</div><div class="mini-stat-label">Tipo frequente</div></div>':'')+'</div>';
   h+='<table class="collab-table"><thead><tr><th>Data</th><th>Beneficiario</th><th>Tipo</th><th>Luogo</th><th>Descrizione</th><th class="num">CHF</th><th></th></tr></thead><tbody>';
   data.forEach(r=>{const d=new Date(r.data_spesa+'T12:00:00');const tl=SE_TIPI_LABEL[r.tipo]||r.tipo;const tc=SE_TIPI_COLOR[r.tipo]||'var(--muted)';
     h+='<tr><td style="font-weight:600;white-space:nowrap">'+d.getDate()+' '+MESI[d.getMonth()]+' '+d.getFullYear()+'</td><td><strong>'+escP(r.beneficiario)+'</strong></td><td><span class="mini-badge" style="background:'+tc+'">'+escP(tl)+'</span></td><td style="color:var(--muted);font-size:.85rem">'+escP(r.luogo||'')+'</td><td style="color:var(--muted);font-size:.85rem">'+escP(r.descrizione||'')+'</td><td class="num"><strong>'+parseFloat(r.importo).toFixed(2)+'</strong></td><td style="white-space:nowrap"><button class="btn-act edit" onclick="modificaSpeseExtra('+r.id+')" style="font-size:.7rem">Modifica</button> <button class="btn-act del" onclick="eliminaSpeseExtra('+r.id+')" style="font-size:.7rem">Elimina</button></td></tr>'});
