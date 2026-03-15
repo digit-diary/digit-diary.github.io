@@ -1067,7 +1067,7 @@ async function eseguiRecupero(){const c=document.getElementById('recovery-input'
 function chiediOperatore(){const nomi=[...new Set([...operatoriSalvati,...operatoriAuthCache.map(o=>o.nome),...datiCache.map(e=>e.operatore).filter(Boolean)])].sort();
   document.getElementById('operatore-modal-content').innerHTML='<h3>Chi sei?</h3><p>Seleziona o inserisci il tuo nome (per tracciare chi inserisce)</p><div class="pwd-field"><label>Nome operatore</label><input type="text" id="inp-operatore" list="op-list" placeholder="Il tuo nome..."><datalist id="op-list">'+nomi.map(n=>'<option value="'+n+'">').join('')+'</datalist></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="confermaOperatore()">Conferma</button></div>';
   document.getElementById('operatore-modal').classList.remove('hidden');setTimeout(()=>document.getElementById('inp-operatore').focus(),100)}
-function confermaOperatore(){const n=document.getElementById('inp-operatore').value.trim();if(!n){toast('Inserisci un nome');return}localStorage.setItem('operatore_corrente',n);chiudiTuttiModali();document.getElementById('operatore-display').textContent='Operatore: '+n;setTimeout(()=>mostraNoteNonLette(),500)}
+function confermaOperatore(){const n=document.getElementById('inp-operatore').value.trim();if(!n){toast('Inserisci un nome');return}localStorage.setItem('operatore_corrente',n);sessionStorage.removeItem('bio_verified');chiudiTuttiModali();document.getElementById('operatore-display').textContent='Operatore: '+n;setTimeout(()=>mostraNoteNonLette(),500)}
 function chiudiTuttiModali(){['pwd-modal','operatore-modal','modal-overlay','profilo-modal','scadenza-modal','note-modal'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add('hidden')})}
 function cambiaOperatore(){chiediOperatore()}
 function forzaCambioPwdOperatore(nome){const b=document.getElementById('pwd-modal-content');
@@ -1089,7 +1089,11 @@ async function offriBiometrico(){if(!await biometricAvailable())return;if(_hasBi
   var bn=getBioName();b.innerHTML='<h3>Attivare '+bn+'?</h3><p style="color:var(--muted);font-size:.9rem">Accedi più velocemente la prossima volta senza inserire la password.</p><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">No grazie</button><button class="btn-modal-ok" onclick="registraBiometrico()">Attiva</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden')}
 async function registraBiometrico(){try{
-  var op=getOperatore();var userId=new TextEncoder().encode(op);
+  var op=getOperatore();if(!op){toast('Nessun operatore');return}
+  // Se esiste bio di un altro operatore, chiedi conferma prima di sovrascrivere
+  var existing=localStorage.getItem('webauthn_cred');
+  if(existing){var exOp=JSON.parse(existing).op;if(exOp!==op&&!confirm(getBioName()+' è attivo per '+exOp+' su questo dispositivo. Sostituire con il tuo?'))return}
+  var userId=new TextEncoder().encode(op);
   var cred=await navigator.credentials.create({publicKey:{
     challenge:crypto.getRandomValues(new Uint8Array(32)),
     rp:{name:'Diario Collaboratori',id:location.hostname},
@@ -1126,7 +1130,7 @@ async function tentaBiometrico(){var ok=await loginBiometrico();if(ok){
   if(_dcCheck&&_dcCheck.deve_cambiare_pwd){setTimeout(()=>forzaCambioPwdOperatore(stored.op),300)}
   else{setTimeout(()=>mostraNoteNonLette(),500);setTimeout(()=>mostraPromemoriaLogin(),1200);setTimeout(()=>mostraConsegnaLogin(),1800)}}
   else toast('Autenticazione fallita')}
-function disattivaBiometrico(){localStorage.removeItem('webauthn_cred');toast(getBioName()+' disattivato');renderBiometricSettings()}
+function disattivaBiometrico(){if(!_hasBioForCurrentOp()){toast('Non puoi disattivare il biometrico di un altro operatore');return}localStorage.removeItem('webauthn_cred');sessionStorage.removeItem('bio_verified');toast(getBioName()+' disattivato');renderBiometricSettings()}
 function renderBiometricSettings(){var el=document.getElementById('biometric-settings');if(!el)return;
   var cred=localStorage.getItem('webauthn_cred');var curOp=getOperatore();
   var bn=getBioName();
@@ -1233,7 +1237,7 @@ async function eseguiCambioPwdOp(){const op=getOperatore(),o=document.getElement
   try{
   document.getElementById('pwd-modal-content').innerHTML='<h3>Password aggiornata!</h3><p style="text-align:center;color:var(--muted)">La tua password è stata cambiata.</p><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">OK</button></div>';
   toast('Password operatore aggiornata!')}catch(e){err.textContent='Errore salvataggio'}}
-function selezionaOperatore(n){localStorage.setItem('operatore_corrente',n);chiudiTuttiModali();document.getElementById('operatore-display').textContent='Operatore: '+n;renderOperatoriUI();toast('Operatore: '+n)}
+function selezionaOperatore(n){localStorage.setItem('operatore_corrente',n);sessionStorage.removeItem('bio_verified');chiudiTuttiModali();document.getElementById('operatore-display').textContent='Operatore: '+n;renderOperatoriUI();toast('Operatore: '+n)}
 function renderOperatoriUI(){const el=document.getElementById('operatori-list');if(!el)return;const cur=getOperatore();const admin=isAdmin();document.getElementById('op-attuale').textContent=cur||'Nessuno';
   const tutti=admin?[...new Set([...operatoriSalvati,...operatoriAuthCache.map(o=>o.nome)])].sort():[];
   el.innerHTML=tutti.length?tutti.map(n=>{const hasAuth=operatoriAuthCache.find(o=>o.nome===n);const rep=operatoriRepartoMap[n]||'entrambi';const repBadge=rep==='slots'?'<span class="mini-badge" style="background:#1a4a7a">Slots</span>':rep==='tavoli'?'<span class="mini-badge" style="background:#8e44ad">Tavoli</span>':'<span class="mini-badge" style="background:var(--accent2)">Entrambi</span>';const ne=n.replace(/'/g,"\\'");return'<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border:1px solid '+(n===cur?'var(--accent2)':'var(--line)')+';flex-wrap:wrap"><span style="font-weight:'+(n===cur?'700':'400')+'">'+escP(n)+'</span>'+repBadge+(hasAuth?'<span style="font-size:.82rem;color:#2c6e49;font-weight:600">Con password</span>':'')+(admin?'<select onchange="cambiaRepartoOperatore(\''+ne+'\',this.value)" style="font-size:.75rem;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><option value="entrambi"'+(rep==='entrambi'?' selected':'')+'>Entrambi</option><option value="slots"'+(rep==='slots'?' selected':'')+'>Slots</option><option value="tavoli"'+(rep==='tavoli'?' selected':'')+'>Tavoli</option></select>':'')+(admin&&hasAuth?'<button style="font-size:.75rem;padding:3px 8px;cursor:pointer;border:1px solid var(--accent2);color:var(--accent2);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif;font-weight:600" onclick="resetPasswordOperatore(\''+ne+'\')">Pwd</button>':'')+(admin?'<button style="font-size:.75rem;padding:3px 8px;cursor:pointer;border:1px solid var(--accent);color:var(--accent);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif;font-weight:600" onclick="rimuoviOperatore(\''+ne+'\')">Rimuovi</button>':'')+'</div>'}).join(''):'<p style="color:var(--muted);font-size:.85rem">Nessun operatore.</p>';
