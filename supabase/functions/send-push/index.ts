@@ -17,6 +17,33 @@ const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
+// Map push tipo to visibilita page key
+const TIPO_TO_VIS_KEY: Record<string, string> = {
+  nota: "note_collega",
+  consegna: "consegna",
+  promemoria: "promemoria",
+  budget: "maison",
+};
+
+// Check if an operator can see a page based on visibilita config
+function canOperatorSee(
+  visConfig: Record<string, unknown>,
+  pageKey: string,
+  operatore: string
+): boolean {
+  const v = visConfig[pageKey];
+  if (!v || v === "tutti") return true;
+  if (v === "nascosto") return false;
+  if (v === "admin") return false; // operators are not admin
+  if (typeof v === "object" && v !== null) {
+    const obj = v as { tipo?: string; operatori?: string[] };
+    if (obj.tipo === "selezionati") {
+      return Array.isArray(obj.operatori) && obj.operatori.includes(operatore);
+    }
+  }
+  return true;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -37,6 +64,24 @@ Deno.serve(async (req) => {
     }
 
     const sb = createClient(SB_URL, SB_SERVICE_KEY);
+
+    // Load visibilita config to filter operators who can't see the page
+    let visConfig: Record<string, unknown> = {};
+    const visKey = TIPO_TO_VIS_KEY[tipo || ""];
+    if (visKey) {
+      const { data: visRows } = await sb
+        .from("impostazioni")
+        .select("valore")
+        .eq("chiave", "visibilita")
+        .limit(1);
+      if (visRows && visRows.length > 0 && visRows[0].valore) {
+        try {
+          visConfig = JSON.parse(visRows[0].valore);
+        } catch {
+          // ignore parse errors, treat as 'tutti'
+        }
+      }
+    }
 
     // Build query: get subscriptions for recipients in the correct reparto
     let query = sb
@@ -70,6 +115,20 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Filter out operators who can't see the relevant page
+    const filteredSubs = visKey
+      ? subs.filter((sub) =>
+          canOperatorSee(visConfig, visKey, sub.operatore)
+        )
+      : subs;
+
+    if (filteredSubs.length === 0) {
+      return new Response(
+        JSON.stringify({ sent: 0, failed: 0, cleaned: 0, filtered: subs.length }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const payload = JSON.stringify({
       titolo: titolo || "Diario Collaboratori",
       corpo: (corpo || "").substring(0, 200),
@@ -81,7 +140,7 @@ Deno.serve(async (req) => {
     let failed = 0;
     let cleaned = 0;
 
-    for (const sub of subs) {
+    for (const sub of filteredSubs) {
       try {
         await webpush.sendNotification(
           {
