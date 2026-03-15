@@ -1342,9 +1342,9 @@ function checkCassaAlerts(){
   const errori=getDatiReparto().filter(e=>e.tipo===tipoErr&&e.reparto==='Cassa'&&(parseFloat(e.importo)||0)>0);
   const byNome={};errori.forEach(e=>{const k=e.nome.toLowerCase();if(!byNome[k])byNome[k]={nome:e.nome,errs:[]};byNome[k].errs.push(e)});
   Object.values(byNome).forEach(({nome,errs})=>{
-    const lastAllin=moduliCache.filter(m=>m.tipo==='allineamento'&&m.collaboratore.toLowerCase()===nome.toLowerCase()).sort((a,b)=>(b.created_at||b.data_modulo||'').localeCompare(a.created_at||a.data_modulo||''))[0];
+    const lastAllin=getModuliReparto().filter(m=>m.tipo==='allineamento'&&m.collaboratore.toLowerCase()===nome.toLowerCase()).sort((a,b)=>(b.created_at||b.data_modulo||'').localeCompare(a.created_at||a.data_modulo||''))[0];
     const lastAllinDate=lastAllin?(lastAllin.created_at||lastAllin.data_modulo||''):'';
-    const lastRdi=moduliCache.filter(m=>m.tipo==='rdi'&&m.collaboratore.toLowerCase()===nome.toLowerCase()).sort((a,b)=>(b.created_at||b.data_modulo||'').localeCompare(a.created_at||a.data_modulo||''))[0];
+    const lastRdi=getModuliReparto().filter(m=>m.tipo==='rdi'&&m.collaboratore.toLowerCase()===nome.toLowerCase()).sort((a,b)=>(b.created_at||b.data_modulo||'').localeCompare(a.created_at||a.data_modulo||''))[0];
     const lastRdiDate=lastRdi?(lastRdi.created_at||lastRdi.data_modulo||''):'';
     const errsSinceAllin=lastAllinDate?errs.filter(e=>(e.data||'')>lastAllinDate):errs;
     const errsSinceRdi=lastRdiDate?errs.filter(e=>(e.data||'')>lastRdiDate):errs;
@@ -1375,12 +1375,12 @@ function apriModuloVeloce(tipo,nome){switchPage('moduli');
 // ALERT COLLABORATORE A RISCHIO (2+ allineamenti stessa ragione)
 function checkRischioAlerts(){
   const alerts=[];
-  const nomiSet=new Set(moduliCache.filter(m=>m.tipo==='allineamento').map(m=>m.collaboratore.toLowerCase()));
+  const nomiSet=new Set(getModuliReparto().filter(m=>m.tipo==='allineamento').map(m=>m.collaboratore.toLowerCase()));
   nomiSet.forEach(nomeLc=>{
-    const allins=moduliCache.filter(m=>m.tipo==='allineamento'&&m.collaboratore.toLowerCase()===nomeLc).sort((a,b)=>(a.created_at||a.data_modulo||'').localeCompare(b.created_at||b.data_modulo||''));
+    const allins=getModuliReparto().filter(m=>m.tipo==='allineamento'&&m.collaboratore.toLowerCase()===nomeLc).sort((a,b)=>(a.created_at||a.data_modulo||'').localeCompare(b.created_at||b.data_modulo||''));
     if(allins.length<2)return;
     const nome=allins[0].collaboratore;
-    const hasRdi=moduliCache.some(m=>m.tipo==='rdi'&&m.collaboratore.toLowerCase()===nomeLc&&(m.created_at||m.data_modulo||'')>(allins[allins.length-1].created_at||allins[allins.length-1].data_modulo||''));
+    const hasRdi=getModuliReparto().some(m=>m.tipo==='rdi'&&m.collaboratore.toLowerCase()===nomeLc&&(m.created_at||m.data_modulo||'')>(allins[allins.length-1].created_at||allins[allins.length-1].data_modulo||''));
     if(hasRdi)return;
     alerts.push({nome,count:allins.length,lastDate:allins[allins.length-1].data_modulo||allins[allins.length-1].created_at||''})});
   return alerts}
@@ -1401,7 +1401,7 @@ function checkAmmonimentiAlerts(){
   const byNome={};getDatiReparto().filter(e=>e.tipo===tipoAmm).forEach(e=>{if(!byNome[e.nome.toLowerCase()])byNome[e.nome.toLowerCase()]={nome:e.nome,count:0,last:''};byNome[e.nome.toLowerCase()].count++;if(e.data>byNome[e.nome.toLowerCase()].last)byNome[e.nome.toLowerCase()].last=e.data});
   Object.values(byNome).forEach(a=>{if(a.count<2)return;
     // Controlla se c'e gia un allineamento dopo l'ultimo ammonimento
-    const hasAllin=moduliCache.some(m=>m.tipo==='allineamento'&&m.collaboratore.toLowerCase()===a.nome.toLowerCase()&&(m.created_at||m.data_modulo||'')>a.last);
+    const hasAllin=getModuliReparto().some(m=>m.tipo==='allineamento'&&m.collaboratore.toLowerCase()===a.nome.toLowerCase()&&(m.created_at||m.data_modulo||'')>a.last);
     if(!hasAllin)alerts.push(a)});
   return alerts}
 function renderAmmonimentiAlerts(){var old=document.getElementById('amm-alerts-block');if(old)old.remove();
@@ -1451,7 +1451,7 @@ function _eseguiRicercaGlobale(q){
   if(diarioRes.length){html+='<div class="rg-section">Diario ('+diarioRes.length+(diarioRes.length>=8?'+':'')+')</div>';
     diarioRes.forEach(e=>{const d=new Date(e.data);html+='<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'diario\');document.getElementById(\'filt-cerca\').value=\''+escP(q)+'\';render()"><span class="rg-badge" style="background:'+getColore(e.tipo)+'">'+escP(e.tipo)+'</span><span class="rg-text"><strong>'+escP(e.nome)+'</strong> — '+escP(e.testo.substring(0,80))+'</span><span class="rg-date">'+d.toLocaleDateString('it-IT')+'</span></div>'});tot+=diarioRes.length}
   // Moduli
-  const moduRes=moduliCache.filter(m=>(m.collaboratore||'').toLowerCase().includes(q)||(m.tipo||'').toLowerCase().includes(q)||JSON.stringify(m.dati||{}).toLowerCase().includes(q)).slice(0,6);
+  const moduRes=getModuliReparto().filter(m=>(m.collaboratore||'').toLowerCase().includes(q)||(m.tipo||'').toLowerCase().includes(q)||JSON.stringify(m.dati||{}).toLowerCase().includes(q)).slice(0,6);
   if(isVis('moduli')&&moduRes.length){html+='<div class="rg-section">Moduli ('+moduRes.length+(moduRes.length>=6?'+':'')+')</div>';
     moduRes.forEach(m=>{const colB={allineamento:'#e67e22',apprezzamento:'#b8860b',rdi:'#c0392b'}[m.tipo]||'var(--muted)';
       html+='<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'moduli\');setTimeout(()=>apriModuloSalvato('+m.id+'),300)"><span class="rg-badge" style="background:'+colB+'">'+escP(m.tipo)+'</span><span class="rg-text"><strong>'+escP(m.collaboratore)+'</strong> — '+escP(m.data_modulo||'')+'</span><span class="rg-date">'+(m.created_at?new Date(m.created_at).toLocaleDateString('it-IT'):'')+'</span></div>'});tot+=moduRes.length}
@@ -1489,7 +1489,7 @@ async function generaRiepilogoMensile(){
   const primoGiorno=anno+'-'+String(mese+1).padStart(2,'0')+'-01';
   const nextAnno=mese===11?anno+1:anno,nextMese=mese===11?1:mese+2;
   const meseData=getDatiReparto().filter(e=>e.data>=primoGiorno&&e.data<nextAnno+'-'+String(nextMese).padStart(2,'0')+'-01');
-  const meseModuli=moduliCache.filter(m=>{const d=m.created_at||m.data_modulo||'';return d>=primoGiorno&&d<nextAnno+'-'+String(nextMese).padStart(2,'0')+'-01'});
+  const meseModuli=getModuliReparto().filter(m=>{const d=m.created_at||m.data_modulo||'';return d>=primoGiorno&&d<nextAnno+'-'+String(nextMese).padStart(2,'0')+'-01'});
   try{
     const{jsPDF}=window.jspdf;const doc=new jsPDF('portrait','mm','a4');const pw=doc.internal.pageSize.getWidth();const mx=16;let y=14;
     // Logo
@@ -1810,8 +1810,8 @@ async function generaModuloPDF(tipo){
   else if(tipo==='apprezzamento'){dati.descrizione=(document.getElementById('mod-descrizione')||{}).value||'';dati.osservazioni=(document.getElementById('mod-osservazioni')||{}).value||''}
   const isEdit=!!window._editModuloId;
   try{if(isEdit){await sbPatch('moduli','id=eq.'+window._editModuloId,{collaboratore:collab,resp_settore:resp,data_modulo:data,dati,operatore:getOperatore()});const idx=moduliCache.findIndex(x=>x.id===window._editModuloId);if(idx!==-1)Object.assign(moduliCache[idx],{collaboratore:collab,resp_settore:resp,data_modulo:data,dati});window._editModuloId=null;toast('Modulo aggiornato e PDF generato!')}
-  else{const rec={tipo,collaboratore:collab,resp_settore:resp,data_modulo:data,dati,operatore:getOperatore()};const saved=await sbPost('moduli',rec);moduliCache.unshift(saved[0]);toast('PDF generato e modulo salvato!')}
-  window._importedFileData=null;logAzione((isEdit?'Modificato':'Creato')+' modulo '+tipo,collab+' - '+data);aggiornaModuliLista();const _cnt=document.getElementById('mod-list-count');if(_cnt)_cnt.textContent=moduliCache.length;renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();chiudiModulo()}catch(e){console.error(e);toast('PDF generato (errore salvataggio DB)')}}
+  else{const rec={tipo,collaboratore:collab,resp_settore:resp,data_modulo:data,dati,operatore:getOperatore(),reparto_dip:currentReparto};const saved=await sbPost('moduli',rec);moduliCache.unshift(saved[0]);toast('PDF generato e modulo salvato!')}
+  window._importedFileData=null;logAzione((isEdit?'Modificato':'Creato')+' modulo '+tipo,collab+' - '+data);aggiornaModuliLista();const _cnt=document.getElementById('mod-list-count');if(_cnt)_cnt.textContent=getModuliReparto().length;renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();chiudiModulo()}catch(e){console.error(e);toast('PDF generato (errore salvataggio DB)')}}
 function drawFieldLine(doc,x,y,label,value,pw){doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0);
   doc.text(label+':',x,y);const lw=doc.getTextWidth(label+':  ');
   doc.setFont('helvetica','normal');doc.text(value,x+lw,y);
@@ -1843,7 +1843,7 @@ function renderModuliList(){
   let c=document.getElementById('moduli-list-section');
   if(!c){c=document.createElement('div');c.id='moduli-list-section';c.className='main-card';c.style.marginTop='20px';document.getElementById('page-moduli').appendChild(c)}
   if(!_modFiltInit){
-    let hdr='<div class="card-header">Moduli generati (<span id="mod-list-count">'+moduliCache.length+'</span>)</div>';
+    let hdr='<div class="card-header">Moduli generati (<span id="mod-list-count">'+getModuliReparto().length+'</span>)</div>';
     hdr+='<div class="filters">';
     hdr+='<div class="filter-group"><span class="filter-label">Collaboratore</span><div class="ac-wrap"><input type="text" id="mod-filt-nome" placeholder="Cerca nome..." oninput="acFiltraModuli(\'mod-filt-nome\',\'ac-mod-filt-nomi\')" onfocus="acFiltraModuli(\'mod-filt-nome\',\'ac-mod-filt-nomi\')"><div class="ac-drop" id="ac-mod-filt-nomi"></div></div></div>';
     hdr+='<div class="filter-group"><span class="filter-label">Tipo</span><select id="mod-filt-tipo" onchange="aggiornaModuliLista()"><option value="">Tutti</option><option value="allineamento">Allineamento</option><option value="apprezzamento">Apprezzamento</option><option value="rdi">RDI</option></select></div>';
@@ -1855,7 +1855,7 @@ function renderModuliList(){
     if(window.flatpickr){const fpOpts={locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,onChange:()=>aggiornaModuliLista()};flatpickr('#mod-filt-dal',fpOpts);flatpickr('#mod-filt-al',fpOpts)}
     _modFiltInit=true;
   }
-  const cnt=document.getElementById('mod-list-count');if(cnt)cnt.textContent=moduliCache.length;
+  const cnt=document.getElementById('mod-list-count');if(cnt)cnt.textContent=getModuliReparto().length;
   aggiornaModuliLista();
 }
 function resetModuliFiltri(){
@@ -1867,7 +1867,7 @@ function resetModuliFiltri(){
 function aggiornaModuliLista(){
   const fn=(document.getElementById('mod-filt-nome')||{}).value||'';const ft=(document.getElementById('mod-filt-tipo')||{}).value||'';
   const fd=(document.getElementById('mod-filt-dal')||{}).value||'';const fa=(document.getElementById('mod-filt-al')||{}).value||'';
-  let filtered=moduliCache.filter(m=>{if(fn&&!m.collaboratore.toLowerCase().includes(fn.toLowerCase()))return false;if(ft&&m.tipo!==ft)return false;
+  let filtered=getModuliReparto().filter(m=>{if(fn&&!m.collaboratore.toLowerCase().includes(fn.toLowerCase()))return false;if(ft&&m.tipo!==ft)return false;
     if(fd&&m.created_at<fd)return false;if(fa&&m.created_at>fa+'T23:59:59')return false;return true});
   const tl={allineamento:'Allineamento',apprezzamento:'Apprezzamento',rdi:'RDI'};
   const tc={allineamento:'#1a4a7a',apprezzamento:'#b8860b',rdi:'#c0392b'};
@@ -1897,7 +1897,7 @@ function checkQrHash(){const h=window.location.hash;if(!h.startsWith('#modulo/')
   history.replaceState(null,'',window.location.pathname)}
 function ristampaModuloPDF(id){apriModuloSalvato(id);setTimeout(()=>{const m=moduliCache.find(x=>x.id===id);if(m)generaModuloPDF(m.tipo)},150)}
 async function eliminaModulo(id){if(!confirm('Eliminare questo modulo?'))return;
-  const _m=moduliCache.find(x=>x.id===id);try{await sbDel('moduli','id=eq.'+id);moduliCache=moduliCache.filter(x=>x.id!==id);if(_m)logAzione('Eliminato modulo',_m.tipo+' - '+_m.collaboratore);aggiornaModuliLista();const cnt=document.getElementById('mod-list-count');if(cnt)cnt.textContent=moduliCache.length;toast('Modulo eliminato')}catch(e){toast('Errore eliminazione')}}
+  const _m=moduliCache.find(x=>x.id===id);try{await sbDel('moduli','id=eq.'+id);moduliCache=moduliCache.filter(x=>x.id!==id);if(_m)logAzione('Eliminato modulo',_m.tipo+' - '+_m.collaboratore);aggiornaModuliLista();const cnt=document.getElementById('mod-list-count');if(cnt)cnt.textContent=getModuliReparto().length;toast('Modulo eliminato')}catch(e){toast('Errore eliminazione')}}
 
 // GESTIONE COLLABORATORI
 async function renderCollaboratoriUI(){const section=document.getElementById('collab-section');if(!section)return;
@@ -2203,7 +2203,7 @@ function acScegli(inputId,dropId,nome){const inp=document.getElementById(inputId
   if(inp)inp.value=nome;if(drop)drop.classList.remove('show')}
 function acFiltraModuli(inputId,dropId){const inp=document.getElementById(inputId),drop=document.getElementById(dropId);if(!inp||!drop)return;
   const v=inp.value.toLowerCase();
-  const nomiSet=new Set();moduliCache.forEach(m=>{if(m.collaboratore)nomiSet.add(m.collaboratore)});
+  const nomiSet=new Set();getModuliReparto().forEach(m=>{if(m.collaboratore)nomiSet.add(m.collaboratore)});
   const nomi=Array.from(nomiSet).sort();
   const filtrati=v?nomi.filter(n=>n.toLowerCase().includes(v)):nomi;
   if(!filtrati.length){drop.classList.remove('show');return}
@@ -2218,7 +2218,7 @@ function updateStats(){const rd=getDatiReparto();document.getElementById('stats-
 // RAPPORTO GIORNALIERO
 function getGiornataCasino(){const now=new Date();if(now.getHours()<6)now.setDate(now.getDate()-1);return now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')}
 async function fetchRapportiMese(a,m){const start=a+'-'+String(m+1).padStart(2,'0')+'-01';const nm=m===11?new Date(a+1,0,1):new Date(a,m+1,1);const end=nm.getFullYear()+'-'+String(nm.getMonth()+1).padStart(2,'0')+'-01';
-  const data=await sbGet('rapporti_giornalieri?data_rapporto=gte.'+start+'&data_rapporto=lt.'+end);
+  rapportiCache={};const data=await sbGet('rapporti_giornalieri?data_rapporto=gte.'+start+'&data_rapporto=lt.'+end+'&reparto_dip=eq.'+currentReparto);
   data.forEach(r=>{const k=r.data_rapporto;if(!rapportiCache[k])rapportiCache[k]={};rapportiCache[k][r.turno]=r})}
 function flushRapportoSave(){if(!window._rappPending)return;Object.entries(window._rappPending).forEach(([cls,turno])=>{clearTimeout(window._rappTimers[cls]);salvaRapportoTurno(window._rappDs,turno,cls)});window._rappPending={}}
 async function renderRapporto(){if(rapportoGiornoAperto){await fetchRapportiMese(rapportoAnno,rapportoMese);apriGiorno(rapportoGiornoAperto)}else renderRapportoCalendario()}
@@ -2260,11 +2260,11 @@ async function apriGiorno(ds){flushRapportoSave();rapportoGiornoAperto=ds;const 
   function autoSave(turno,cls){clearTimeout(window._rappTimers[cls]);window._rappPending[cls]=turno;const st=document.getElementById('status-'+cls);if(st)st.textContent='Salvando...';window._rappTimers[cls]=setTimeout(()=>{delete window._rappPending[cls];salvaRapportoTurno(ds,turno,cls).then(()=>{if(st){st.textContent='Salvato';setTimeout(()=>{if(st)st.textContent=''},2000)}})},1200)}
   document.querySelectorAll('#rapporto-view .turno-body textarea, #rapporto-view .turno-body input').forEach(el=>{const cls=el.id.startsWith('presto')?'presto':'notte';const turno=cls==='presto'?'PRESTO':'NOTTE';el.addEventListener('input',()=>autoSave(turno,cls));el.addEventListener('change',()=>autoSave(turno,cls))})}
 async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();const extra={};
-  const data={data_rapporto:ds,turno,operatore:getOperatore(),updated_at:new Date().toISOString()};
+  const data={data_rapporto:ds,turno,operatore:getOperatore(),updated_at:new Date().toISOString(),reparto_dip:currentReparto};
   campi.forEach(c=>{const el=document.getElementById(cls+'-'+c.key);if(!el)return;const val=c.type==='number'?parseInt(el.value)||0:el.value;
     if(RAPPORTO_DB_COLS.includes(c.key))data[c.key]=val;else extra[c.key]=val});
   data.note_extra=JSON.stringify(extra);
-  try{const r=await fetch(SB_URL+'/rest/v1/rapporti_giornalieri?on_conflict=data_rapporto,turno',{method:'POST',headers:sbH({'Prefer':'resolution=merge-duplicates,return=representation'}),body:JSON.stringify(data)}).then(r=>{if(!r.ok)throw new Error('save failed');return r.json()});if(!rapportiCache[ds])rapportiCache[ds]={};rapportiCache[ds][turno]=r[0];
+  try{const r=await fetch(SB_URL+'/rest/v1/rapporti_giornalieri?on_conflict=data_rapporto,turno,reparto_dip',{method:'POST',headers:sbH({'Prefer':'resolution=merge-duplicates,return=representation'}),body:JSON.stringify(data)}).then(r=>{if(!r.ok)throw new Error('save failed');return r.json()});if(!rapportiCache[ds])rapportiCache[ds]={};rapportiCache[ds][turno]=r[0];
     // Auto-malattia: parse assenze field
     const assenzeText=data.assenze||'';if(assenzeText.trim()){const righe=assenzeText.split('\n').filter(r=>r.trim());
       for(const riga of righe){const m=riga.match(/^([A-ZÀ-Üa-zà-ü\s.'-]+?)\s*(assente|malattia|malato|malata)/i);if(m){const nome=m[1].trim();
@@ -2285,7 +2285,7 @@ function getRapportoDateRange(){const dalEl=document.getElementById('rapp-dal'),
   return{dal,al:rapportoAnno+'-'+String(rapportoMese+1).padStart(2,'0')+'-'+String(ed).padStart(2,'0')}}
 function _rapportoHaDati(r){if(!r)return false;const skip=['id','data_rapporto','turno','operatore','updated_at','created_at'];
   for(const k in r){if(skip.includes(k))continue;const v=r[k];if(k==='note_extra'){try{const ex=JSON.parse(v||'{}');if(Object.values(ex).some(x=>x&&String(x).trim()))return true}catch(e){}continue}if(v&&String(v).trim()&&v!=='0'&&v!==0)return true}return false}
-async function fetchRapportiRange(dal,al){const data=await sbGet('rapporti_giornalieri?data_rapporto=gte.'+dal+'&data_rapporto=lte.'+al+'&order=data_rapporto.asc');
+async function fetchRapportiRange(dal,al){const data=await sbGet('rapporti_giornalieri?data_rapporto=gte.'+dal+'&data_rapporto=lte.'+al+'&reparto_dip=eq.'+currentReparto+'&order=data_rapporto.asc');
   const byDate={};data.forEach(r=>{if(!byDate[r.data_rapporto])byDate[r.data_rapporto]={};byDate[r.data_rapporto][r.turno]=r});
   // Rimuovi giorni dove entrambi i turni sono vuoti
   Object.keys(byDate).forEach(ds=>{const d=byDate[ds];if(!_rapportoHaDati(d.PRESTO)&&!_rapportoHaDati(d.NOTTE))delete byDate[ds]});return byDate}
@@ -2545,7 +2545,7 @@ async function generaReportSettimanale(sez){
   const dalLabel=new Date(sett[0]+'T12:00:00').toLocaleDateString('it-IT'),alLabel=new Date(sett[6]+'T12:00:00').toLocaleDateString('it-IT');
   const settData=getDatiReparto().filter(e=>e.data>=sett[0]&&e.data<=sett[6]+'T23:59:59');
   const settMaison=getMaisonReparto().filter(r=>r.data_giornata>=sett[0]&&r.data_giornata<=sett[6]);
-  const settModuli=moduliCache.filter(m=>(m.created_at||m.data_modulo||'')>=sett[0]);
+  const settModuli=getModuliReparto().filter(m=>(m.created_at||m.data_modulo||'')>=sett[0]);
   const settPM=promemoriaCache.filter(p=>p.data_scadenza>=sett[0]&&p.data_scadenza<=sett[6]);
   try{const{jsPDF}=window.jspdf;const doc=new jsPDF('portrait','mm','a4');const pw=doc.internal.pageSize.getWidth();const mx=16;let y=14;
     if(_logoB64)try{doc.addImage(_logoB64,'PNG',pw/2-20,y,40,22.5)}catch(e){}
@@ -2640,7 +2640,7 @@ function _getDatiAnno(anno){const start=anno+'-01-01',end=anno+'-12-31';
   return{data:getDatiReparto().filter(e=>e.data>=start&&e.data<=end+'T23:59:59'),
     maison:getMaisonReparto().filter(r=>r.data_giornata>=start&&r.data_giornata<=end),
     spese:getSpeseReparto().filter(r=>r.data_spesa>=start&&r.data_spesa<=end),
-    moduli:moduliCache.filter(m=>(m.created_at||m.data_modulo||'')>=start&&(m.created_at||m.data_modulo||'')<=end+'T23:59:59')}}
+    moduli:getModuliReparto().filter(m=>(m.created_at||m.data_modulo||'')>=start&&(m.created_at||m.data_modulo||'')<=end+'T23:59:59')}}
 async function generaReportAnnuale(sez){
   if(!sez)sez={panoramica:true,cassa:true,maison:true,spese_extra:true,regali:true,moduli:true,promemoria:true,registrazioni:false};
   if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore');return}}
@@ -3375,6 +3375,8 @@ function setReparto(rep){currentReparto=rep;
   if(pg==='maison'){renderMaisonDashboard();renderMaisonBudgetUI();renderSpeseExtra();renderRegali()}
   if(pg==='statistiche')renderStatistiche();
   if(pg==='dashboard')renderDashboard();
+  if(pg==='moduli'){if(typeof renderModuliList==='function')renderModuliList()}
+  if(pg==='rapporto'){if(typeof renderRapporto==='function')renderRapporto()}
   renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts()}
 function applicaRepartoVisibilita(){
   var sw=document.getElementById('reparto-switch');if(!sw)return;
@@ -3393,6 +3395,7 @@ function getDatiReparto(){return datiCache.filter(function(e){return(e.reparto_d
 function getMaisonReparto(){return maisonCache.filter(function(r){return(r.reparto_dip||'slots')===currentReparto})}
 function getBudgetReparto(){return maisonBudgetCache.filter(function(b){return(b.reparto_dip||'slots')===currentReparto})}
 function getSpeseReparto(){return speseExtraCache.filter(function(r){return(r.reparto_dip||'slots')===currentReparto})}
+function getModuliReparto(){return moduliCache.filter(function(m){return(m.reparto_dip||'slots')===currentReparto})}
 
 // MENU MOBILE
 function toggleMobileNav(){document.getElementById('mobile-nav').classList.toggle('show')}
