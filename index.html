@@ -3030,23 +3030,78 @@ function apriDettaglioMaison(nome){const righe=getMaisonFiltrati().filter(r=>r.n
   const nascitaStr=budget&&budget.data_nascita?new Date(budget.data_nascita+'T12:00:00').toLocaleDateString('it-IT'):'';
   const ne=nome.replace(/'/g,"\\'");
   let html='<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px"><div><h3 style="font-family:Playfair Display,serif;color:var(--ink);margin-bottom:4px">'+escP(nome)+catBadgeD+'</h3><p style="color:var(--accent2);font-size:.9rem;font-weight:600;margin-bottom:2px">'+mesiCliente+'</p><p style="color:var(--muted);font-size:.82rem">'+righe.length+' visite — '+totPx+' persone — '+tot.toFixed(2)+' CHF'+(nBU?' — '+nBU+' BU':'')+(nBL?' — '+nBL+' BL':'')+'</p>'+(budget&&budget.budget_chf?'<p style="font-size:.82rem;color:'+(tot>=budget.budget_chf?'var(--accent)':tot>=budget.budget_chf*0.8?'#e67e22':'#2c6e49')+';font-weight:600">Budget: '+tot.toFixed(0)+' / '+parseFloat(budget.budget_chf).toFixed(0)+' CHF ('+Math.round(tot/budget.budget_chf*100)+'%)</p>':'')+'<div style="display:flex;align-items:center;gap:8px;margin-top:6px"><span style="font-size:.82rem;color:var(--muted)">Data nascita:</span><input type="text" id="detail-nascita" value="'+(budget&&budget.data_nascita||'')+'" placeholder="Seleziona..." readonly style="cursor:pointer;padding:4px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper2);color:var(--ink);width:120px"><button class="btn-salva" onclick="salvaDetailNascita(\''+ne+'\')" style="font-size:.72rem;padding:4px 12px;background:var(--accent2)">Salva</button>'+(nascitaStr?' <span style="font-size:.82rem;color:var(--muted)">Attuale: '+nascitaStr+'</span>':'')+'</div></div><button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\')" style="padding:6px 12px;font-size:.75rem">Chiudi</button></div>';
+  // Pre-compute spese extra e regali per KPI
+  const seRighe=getSpeseReparto().filter(r=>r.beneficiario.toLowerCase()===nome.toLowerCase()).sort((a,b)=>a.data_spesa.localeCompare(b.data_spesa));
+  const totSE=seRighe.reduce((s,r)=>s+parseFloat(r.importo||0),0);
+  var regRighe=getRegaliReparto().filter(function(r){return r.nome.toLowerCase()===nome.toLowerCase()}).sort(function(a,b){return(a.data_regalo||'').localeCompare(b.data_regalo||'')});
+  var totReg=regRighe.length?regRighe.reduce(function(s,r){return s+parseFloat(r.importo||0)},0):0;
+  // --- KPI Summary Cards ---
+  const _mediaVisita=righe.length?tot/righe.length:0;
+  const _dateSort=righe.map(r=>r.data_giornata).sort();
+  const _ultimoPass=_dateSort.length?new Date(_dateSort[_dateSort.length-1]+'T12:00:00'):null;
+  const _ultimoStr=_ultimoPass?_ultimoPass.getDate()+' '+MESI[_ultimoPass.getMonth()]+' '+_ultimoPass.getFullYear():'—';
+  html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">';
+  html+='<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.2rem;font-weight:700;color:#b8860b">'+tot.toFixed(0)+' CHF</div><div style="font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Totale Ristorante</div></div>';
+  html+='<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.2rem;font-weight:700;color:#2980b9">'+totSE.toFixed(0)+' CHF</div><div style="font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Totale Extra</div></div>';
+  html+='<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.2rem;font-weight:700;color:#1a7a6d">'+totReg.toFixed(0)+' CHF</div><div style="font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Totale Regali</div></div>';
+  html+='<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.2rem;font-weight:700;color:var(--ink)">'+_mediaVisita.toFixed(0)+' CHF</div><div style="font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Media/visita</div></div>';
+  html+='<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.2rem;font-weight:700;color:var(--ink)">'+righe.length+'</div><div style="font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Visite totali</div></div>';
+  html+='<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.2rem;font-weight:700;color:var(--ink)">'+_ultimoStr+'</div><div style="font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Ultimo passaggio</div></div>';
+  html+='</div>';
+  // --- Frequenza visite + giorno preferito ---
+  const _giorniCount=[0,0,0,0,0,0,0];
+  righe.forEach(r=>{const d=new Date(r.data_giornata+'T12:00:00');_giorniCount[d.getDay()]++});
+  const _giornoMaxIdx=_giorniCount.indexOf(Math.max(..._giorniCount));
+  const _giornoPreferito=GIORNI[_giornoMaxIdx];
+  let _freqStr='—';
+  if(_dateSort.length>=2){const _d0=new Date(_dateSort[0]+'T12:00:00');const _d1=new Date(_dateSort[_dateSort.length-1]+'T12:00:00');const _diffWeeks=Math.max(1,(_d1-_d0)/(7*86400000));_freqStr=(_dateSort.length/_diffWeeks).toFixed(1)+' visite/sett.'}
+  else if(_dateSort.length===1){_freqStr='1 visita'}
+  html+='<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;font-size:.85rem;color:var(--muted)">';
+  html+='<span>Ultimo passaggio: <strong style="color:var(--ink)">'+_ultimoStr+'</strong></span>';
+  html+='<span>Giorno preferito: <strong style="color:var(--ink)">'+_giornoPreferito+'</strong></span>';
+  html+='<span>Frequenza: <strong style="color:var(--ink)">'+_freqStr+'</strong></span>';
+  html+='</div>';
+  // --- Month-over-month comparison ---
+  const _byMese={};const _byMeseOrder=[];
+  righe.forEach(r=>{const d=new Date(r.data_giornata+'T12:00:00');const k=MESI[d.getMonth()]+' '+d.getFullYear();if(!_byMese[k]){_byMese[k]=0;_byMeseOrder.push(k)}_byMese[k]+=parseFloat(r.costo||0)});
+  const _mesiArr=_byMeseOrder.map(k=>[k,_byMese[k]]);
+  if(_mesiArr.length>0){
+    html+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;align-items:center">';
+    _mesiArr.forEach(function(m,i){
+      const val=m[1];const lbl=m[0];
+      let deltaHtml='';
+      if(i>0){const prev=_mesiArr[i-1][1];if(prev>0){const pct=((val-prev)/prev*100).toFixed(0);const isUp=val>prev;deltaHtml=' <span style="font-size:.7rem;font-weight:700;color:'+(isUp?'#c0392b':'#27ae60')+';background:'+(isUp?'#c0392b1a':'#27ae601a')+';padding:1px 5px;border-radius:2px">'+(isUp?'+':'')+pct+'%</span>'}}
+      html+='<div style="background:var(--paper2);border-radius:3px;padding:6px 12px;font-size:.82rem;color:var(--ink);white-space:nowrap"><strong>'+lbl+'</strong>: '+val.toFixed(0)+' CHF'+deltaHtml+'</div>';
+      if(i<_mesiArr.length-1)html+='<span style="color:var(--muted);font-size:.7rem">&rarr;</span>'});
+    html+='</div>'}
+  // --- Mini CSS bar chart ---
+  if(_mesiArr.length>1){
+    const _maxMese=Math.max(..._mesiArr.map(m=>m[1]));
+    html+='<div style="margin-bottom:16px;padding:10px;background:var(--paper2);border-radius:3px"><div style="font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Trend mensile</div>';
+    html+='<div style="display:flex;gap:4px;align-items:flex-end;height:120px">';
+    _mesiArr.forEach(function(m){
+      const h=_maxMese>0?Math.max(4,Math.round(m[1]/_maxMese*100)):4;
+      html+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;justify-content:flex-end;height:100%">';
+      html+='<div style="font-size:.68rem;color:var(--muted)">'+m[1].toFixed(0)+'</div>';
+      html+='<div style="width:100%;max-width:40px;background:#b8860b;border-radius:2px 2px 0 0;height:'+h+'px"></div>';
+      html+='<div style="font-size:.68rem;color:var(--muted);white-space:nowrap">'+m[0].split(' ')[0]+'</div>';
+      html+='</div>'});
+    html+='</div></div>'}
+  // --- Fine nuove sezioni KPI ---
   html+='<div style="overflow-x:auto"><table class="collab-table"><thead><tr><th>Data</th><th>Giorno</th><th class="num">PX</th><th class="num">Costo CHF</th><th>Tipo</th><th>Gruppo</th><th>Note</th></tr></thead><tbody>';
   righe.forEach(r=>{const d=new Date(r.data_giornata+'T12:00:00');
     html+='<tr><td style="font-weight:600">'+d.getDate()+' '+MESI[d.getMonth()]+'</td><td>'+GIORNI[d.getDay()]+'</td><td class="num">'+r.px+'</td><td class="num"><strong>'+parseFloat(r.costo).toFixed(2)+'</strong></td><td>'+(r.tipo_buono?'<span class="mini-badge" style="background:'+(r.tipo_buono==='BU'?'#e67e22':'#2c6e49')+'">'+r.tipo_buono+'</span>':'—')+'</td><td style="color:var(--muted);font-size:.85rem">'+escP(r.gruppo||'')+'</td><td style="color:var(--muted);font-size:.85rem">'+escP(r.note||'')+'</td></tr>'});
   html+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td colspan="2"><strong>TOTALE RISTORANTE</strong></td><td class="num"><strong>'+totPx+'</strong></td><td class="num"><strong>'+tot.toFixed(2)+'</strong></td><td colspan="3"></td></tr>';
   html+='</tbody></table></div>';
-  // Spese Extra per questo cliente
-  const seRighe=getSpeseReparto().filter(r=>r.beneficiario.toLowerCase()===nome.toLowerCase()).sort((a,b)=>a.data_spesa.localeCompare(b.data_spesa));
-  if(seRighe.length){const totSE=seRighe.reduce((s,r)=>s+parseFloat(r.importo||0),0);
+  // Spese Extra per questo cliente (seRighe/totSE already computed above for KPI)
+  if(seRighe.length){
     html+='<h4 style="font-family:Playfair Display,serif;margin:16px 0 8px;color:var(--ink)">Spese Extra ('+totSE.toFixed(2)+' CHF)</h4>';
     html+='<div style="overflow-x:auto"><table class="collab-table"><thead><tr><th>Data</th><th>Tipo</th><th>Luogo</th><th>Descrizione</th><th class="num">CHF</th></tr></thead><tbody>';
     seRighe.forEach(r=>{const d=new Date(r.data_spesa+'T12:00:00');const tc=SE_TIPI_COLOR[r.tipo]||'var(--muted)';
       html+='<tr><td style="font-weight:600">'+d.getDate()+' '+MESI[d.getMonth()]+'</td><td><span class="mini-badge" style="background:'+tc+'">'+(SE_TIPI_LABEL[r.tipo]||r.tipo)+'</span></td><td style="font-size:.85rem">'+escP(r.luogo||'')+'</td><td style="font-size:.85rem;color:var(--muted)">'+escP(r.descrizione||'')+'</td><td class="num"><strong>'+parseFloat(r.importo).toFixed(2)+'</strong></td></tr>'});
     html+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td colspan="4"><strong>TOTALE EXTRA</strong></td><td class="num"><strong>'+totSE.toFixed(2)+'</strong></td></tr></tbody></table></div>'}
-  // Regali per questo cliente
-  var regRighe=getRegaliReparto().filter(function(r){return r.nome.toLowerCase()===nome.toLowerCase()}).sort(function(a,b){return(a.data_regalo||'').localeCompare(b.data_regalo||'')});
-  var totReg=0;
-  if(regRighe.length){totReg=regRighe.reduce(function(s,r){return s+parseFloat(r.importo||0)},0);
+  // Regali per questo cliente (regRighe/totReg already computed above for KPI)
+  if(regRighe.length){
     html+='<h4 style="font-family:Playfair Display,serif;margin:16px 0 8px;color:var(--ink)">Regali'+(totReg?' ('+totReg.toFixed(2)+' CHF)':'')+'</h4>';
     html+='<div style="overflow-x:auto"><table class="collab-table"><thead><tr><th>Data</th><th>Descrizione</th><th class="num">CHF</th><th>Operatore</th></tr></thead><tbody>';
     regRighe.forEach(function(r){var d=new Date((r.data_regalo||r.created_at)+'T12:00:00');
