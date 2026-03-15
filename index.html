@@ -1226,7 +1226,7 @@ function applicaTemaOperatore(){const t=localStorage.getItem(getTemaKey())||loca
 
 // NAVIGATION
 function switchPage(name){flushRapportoSave();document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));const pg=document.getElementById('page-'+name);if(pg)pg.classList.add('active');const tb=document.querySelector('.nav-tab[data-page="'+name+'"]');if(tb)tb.classList.add('active');sessionStorage.setItem('pagina_corrente',name);if(typeof aggiornaMenuMobile==='function')aggiornaMenuMobile();
-  if(name==='statistiche')renderStatistiche();if(name==='rapporto'){if(!rapportoGiornoAperto){const gc=getGiornataCasino();const d=new Date(gc+'T12:00:00');rapportoMese=d.getMonth();rapportoAnno=d.getFullYear();rapportoGiornoAperto=gc}renderRapporto()}if(name==='note-collega')renderNoteCollega();if(name==='impostazioni'){renderTipiUI();renderScadenzeSettings();renderOperatoriUI();renderCampiRapportoUI();
+  if(name==='diario'){aggiornaNomi();render();updateStats()}if(name==='statistiche')renderStatistiche();if(name==='rapporto'){if(!rapportoGiornoAperto){const gc=getGiornataCasino();const d=new Date(gc+'T12:00:00');rapportoMese=d.getMonth();rapportoAnno=d.getFullYear();rapportoGiornoAperto=gc}renderRapporto()}if(name==='note-collega')renderNoteCollega();if(name==='impostazioni'){renderTipiUI();renderScadenzeSettings();renderOperatoriUI();renderCampiRapportoUI();
     const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}renderCollaboratoriUI();const ai=document.getElementById('ai-section');if(ai)ai.style.display=isAdmin()?'':'none';const visSec=document.getElementById('visibilita-section');if(visSec){visSec.style.display=isAdmin()?'':'none';if(isAdmin())renderVisibilitaUI()}if(isAdmin()&&groqKey){const gs=document.getElementById('groq-status');if(gs)gs.innerHTML='<span style="color:#2c6e49">Chiave configurata</span>'}}if(name==='moduli'){if(!document.getElementById('mod-list-results'))_modFiltInit=false;renderModuliList()};if(name==='registro')renderRegistro();if(name==='maison'){renderMaisonDashboard();renderMaisonBudgetUI();initMaisonFlatpickr();renderSpeseExtra();initSpeseExtraFP();renderRegali()}if(name==='promemoria'){renderPromemoria();initPromemoriaUI()}if(name==='dashboard')renderDashboard();if(name==='consegna'){renderConsegne();initConsegnaUI()}}
 
 // TIPI
@@ -3374,15 +3374,14 @@ function aggiornaLoginOperatori(){var settore=document.getElementById('login-set
 function setReparto(rep){currentReparto=rep;
   document.getElementById('btn-rep-slots').className='reparto-btn'+(rep==='slots'?' active-slots':'');
   document.getElementById('btn-rep-tavoli').className='reparto-btn'+(rep==='tavoli'?' active-tavoli':'');
-  // Re-render pagina corrente
-  var pg=sessionStorage.getItem('pagina_corrente')||'dashboard';
-  if(pg==='diario'){render();updateStats()}
-  if(pg==='maison'){renderMaisonDashboard();renderMaisonBudgetUI();renderSpeseExtra();renderRegali()}
-  if(pg==='statistiche')renderStatistiche();
-  if(pg==='dashboard')renderDashboard();
-  if(pg==='moduli'){if(typeof renderModuliList==='function')renderModuliList()}
-  if(pg==='rapporto'){if(typeof renderRapporto==='function')renderRapporto()}
-  renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts()}
+  // Re-render TUTTE le pagine (dati devono essere sempre freschi per il reparto)
+  aggiornaNomi();render();updateStats();
+  renderDashboard();renderStatistiche();
+  renderMaisonDashboard();renderMaisonBudgetUI();renderSpeseExtra();renderRegali();
+  if(typeof renderModuliList==='function')renderModuliList();
+  if(typeof renderRapporto==='function')renderRapporto();
+  renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();
+  renderScadenzeBanner()}
 function applicaRepartoVisibilita(){
   var sw=document.getElementById('reparto-switch');if(!sw)return;
   var op=getOperatore();var opRep=operatoriRepartoMap[op]||'entrambi';
