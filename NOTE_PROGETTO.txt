@@ -864,6 +864,36 @@
        - Sfondo colorato per categoria (oro/blu/viola) in scheda e tabella
        - Righe non categorizzate: zebra bianco/grigio neutro (non beige)
 
+  [62] Push Notifications reali (15 marzo 2026)
+       - Web Push via VAPID + Supabase Edge Function (send-push)
+       - Notifiche arrivano anche con app chiusa (come WhatsApp)
+       - Tabella push_subscriptions (endpoint, p256dh, auth, operatore, reparto)
+       - RLS zero-access: solo Edge Function (service_role_key) accede alla tabella
+       - API secret (x-push-secret) richiesto per tutte le chiamate
+       - CORS ristretto a digit-diary.github.io
+       - 4 trigger: nota collega, consegna turno, promemoria, budget superato
+       - Note/promemoria: cross-reparto (arrivano a tutti)
+       - Consegna/budget: filtrati per reparto
+       - Rispetta visibilita pagine admin (se maison nascosta, no push budget)
+       - Cleanup automatico subscription scadute (410/404)
+       - sw.js v3: push handler + notificationclick con navigazione
+       - App visibile: toast in-app. App chiusa: notifica di sistema
+       - Piattaforme: Chrome, Firefox, Edge, Safari 16.4+ (PWA), Android
+
+  [63] Face ID / Touch ID (WebAuthn) (15 marzo 2026)
+       - Sblocco biometrico al rientro nell'app (come WhatsApp)
+       - WebAuthn API: registra credenziale platform al primo login
+       - Rileva automaticamente: Face ID (iPhone X+), Touch ID (iPad/Mac),
+         Sblocco biometrico (Android), Windows Hello (PC)
+       - Prompt attivazione dopo primo login con password
+       - Ogni rientro nell'app (swipe o chiusura completa) → verifica biometrica
+       - Se biometrico fallisce → fallback a password
+       - Senza biometrico: sessione persistente (8h max)
+       - Con biometrico: sessione non scade (biometrico sufficiente)
+       - Disattivabile da Impostazioni > Sicurezza
+       - Logout (Esci) NON cancella credenziale biometrica
+       - Credenziale legata al dispositivo, non alla password
+
 
 ================================================================================
   FILE DEL PROGETTO
@@ -880,9 +910,12 @@
   migrazione.js           Script per migrare dati da localStorage a Supabase
   genera_manuale.html     Generatore manuale PDF dell'app
   manifest.json           PWA web app manifest
-  sw.js                   Service worker (cache + offline)
+  sw.js                   Service worker (cache + offline + push notifications)
   icon-192.png            Icona PWA 192x192
   icon-512.png            Icona PWA 512x512
+  migrate_push.sql        Migrazione: tabella push_subscriptions + RLS
+  supabase/functions/     Supabase Edge Functions
+    send-push/index.ts    Edge Function: invio push + registrazione subscription
   NOTE_PROGETTO.txt       Questo file
 
 
@@ -909,6 +942,7 @@
   spese_extra             Spese esterne (cene, viaggi, rimborsi, biglietti)
   regali_maison           Regali per clienti maison (con importo opzionale)
   note_clienti            Note private per cliente maison
+  push_subscriptions      Subscription Web Push per notifiche (RLS zero-access)
 
 
 ================================================================================
@@ -933,6 +967,10 @@
   - admin_sessions e login_attempts non accessibili via REST
   - SRI (Subresource Integrity) su tutti i 10 script/CSS CDN
   - Rate limiting anche su change_op_pwd, recovery_master_pwd
+  - Push notifications: API secret (x-push-secret) + CORS ristretto
+  - push_subscriptions: RLS zero-access (solo service_role_key via Edge Function)
+  - WebAuthn (Face ID/Touch ID): credenziale locale, verifica biometrica ad ogni rientro
+  - Sessione basata su timestamp localStorage (8h senza biometrico, illimitata con)
 
 
 ================================================================================
