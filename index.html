@@ -475,7 +475,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
 </style>
 </head>
 <body>
-<script>if(sessionStorage.getItem('diario_auth')==='1')document.documentElement.classList.add('authed')</script>
+<script>if(localStorage.getItem('diario_auth')==='1')document.documentElement.classList.add('authed')</script>
 <div id="login-overlay"><div class="login-box">
   <img src="logo_casino.png" alt="Casino Lugano SA" style="width:140px;margin-bottom:16px"><h2>Accesso Protetto</h2><p>Seleziona settore, operatore e password</p>
   <select id="login-settore" onchange="aggiornaLoginOperatori()" style="margin-bottom:8px;text-align:left;letter-spacing:0;padding:11px 14px;width:100%;border:1.5px solid var(--line);border-radius:2px;font-size:1rem;font-family:'Source Sans 3',sans-serif;color:var(--ink);background:var(--paper2);cursor:pointer"><option value="">-- Seleziona settore --</option><option value="slots">Slots</option><option value="tavoli">Tavoli</option></select>
@@ -952,12 +952,12 @@ function nomeCorrente(orig){return tipiRinominati[orig]||orig}
 function getTuttiTipi(){let list=[...TIPI_DEFAULT.filter(t=>!tipiNascosti.includes(t.nome)).map(t=>{const c=coloriOverride[t.nome]||t.colore;const n=tipiRinominati[t.nome]||t.nome;return{nome:n,colore:c,_orig:t.nome}}),...tipiPersonalizzati];
   if(tipiOrdine.length)list.sort((a,b)=>{const ia=tipiOrdine.indexOf(a.nome),ib=tipiOrdine.indexOf(b.nome);return(ia===-1?999:ia)-(ib===-1?999:ib)});return list}
 function getColore(n){return coloriOverride[n]||(getTuttiTipi().find(t=>t.nome===n)||{}).colore||'#8a7d6b'}
-function getOperatore(){return sessionStorage.getItem('operatore_corrente')||''}
+function getOperatore(){return localStorage.getItem('operatore_corrente')||''}
 async function sha256(t){const d=new TextEncoder().encode(t),h=await crypto.subtle.digest('SHA-256',d);return Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,'0')).join('')}
 function _e(s){const r=[];for(let i=0;i<s.length;i++)r.push(String.fromCharCode(s.charCodeAt(i)^_k.charCodeAt(i%_k.length)));return btoa(r.join(''))}
 async function secureHash(password,salt){const enc=new TextEncoder();const km=await crypto.subtle.importKey('raw',enc.encode(password),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:enc.encode('DiarioCL26_v2_'+(salt||'').toLowerCase()),iterations:100000,hash:'SHA-256'},km,256);return Array.from(new Uint8Array(bits)).map(b=>b.toString(16).padStart(2,'0')).join('')}
 let _loginFailCount=0,_loginLockUntil=0;
-function getAdminToken(){return sessionStorage.getItem('admin_token')||''}
+function getAdminToken(){return localStorage.getItem('admin_token')||''}
 function genCode(){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let r='';for(let i=0;i<8;i++)r+=c[Math.floor(Math.random()*c.length)];return r}
 
 // SUPABASE
@@ -1024,7 +1024,7 @@ async function checkPwd(){const nome=document.getElementById('login-nome').value
   // Try individual operator login first
   if(nome){const opH=await secureHash(v,nome);const res=await sbRpc('verify_login',{p_nome:nome,p_hash:opH,p_legacy_hash:legacyH});
     if(res&&res.locked){err.textContent='Troppi tentativi. Riprova tra 1 minuto';return}
-    if(res&&res.valid){_loginFailCount=0;sessionStorage.setItem('operatore_corrente',nome);sessionStorage.setItem('diario_auth','1');sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token');document.getElementById('login-overlay').classList.add('hidden');document.getElementById('operatore-display').textContent='Operatore: '+nome;applicaTemaOperatore();applicaVisibilita();registraPushSubscription();
+    if(res&&res.valid){_loginFailCount=0;localStorage.setItem('operatore_corrente',nome);localStorage.setItem('diario_auth','1');localStorage.removeItem('is_admin');localStorage.removeItem('admin_token');document.getElementById('login-overlay').classList.add('hidden');document.getElementById('operatore-display').textContent='Operatore: '+nome;applicaTemaOperatore();applicaVisibilita();registraPushSubscription();
       if(res.deve_cambiare_pwd)setTimeout(()=>forzaCambioPwdOperatore(nome),300);
       else{setTimeout(()=>mostraNoteNonLette(),500);setTimeout(()=>mostraPromemoriaLogin(),1200);setTimeout(()=>mostraConsegnaLogin(),1800);setTimeout(checkQrHash,800)}return}
     if(res&&res.found){_loginFailCount++;if(_loginFailCount>=5){_loginLockUntil=Date.now()+30000;_loginFailCount=0}err.textContent='Password errata per '+nome;document.getElementById('pwd-input').value='';document.getElementById('pwd-input').focus();setTimeout(()=>err.textContent='',2500);return}}
@@ -1032,11 +1032,11 @@ async function checkPwd(){const nome=document.getElementById('login-nome').value
   const masterH=await secureHash(v,'__master__');
   const masterRes=await sbRpc('verify_master_pwd',{p_hash:masterH,p_legacy_hash:legacyH});
   if(masterRes&&masterRes.locked){err.textContent='Troppi tentativi. Riprova tra 1 minuto';return}
-  if(masterRes&&masterRes.valid){_loginFailCount=0;document.getElementById('login-overlay').classList.add('hidden');sessionStorage.setItem('diario_auth','1');sessionStorage.setItem('is_admin','1');
-    if(masterRes.session_token)sessionStorage.setItem('admin_token',masterRes.session_token);
+  if(masterRes&&masterRes.valid){_loginFailCount=0;document.getElementById('login-overlay').classList.add('hidden');localStorage.setItem('diario_auth','1');localStorage.setItem('is_admin','1');
+    if(masterRes.session_token)localStorage.setItem('admin_token',masterRes.session_token);
     var loginSettore=document.getElementById('login-settore');if(loginSettore&&loginSettore.value)currentReparto=loginSettore.value;
-    if(nome){sessionStorage.setItem('operatore_corrente',nome);document.getElementById('operatore-display').textContent='Operatore: '+nome;setTimeout(()=>mostraNoteNonLette(),500)}
-    else{sessionStorage.setItem('operatore_corrente','Admin');document.getElementById('operatore-display').textContent='Admin';}
+    if(nome){localStorage.setItem('operatore_corrente',nome);document.getElementById('operatore-display').textContent='Operatore: '+nome;setTimeout(()=>mostraNoteNonLette(),500)}
+    else{localStorage.setItem('operatore_corrente','Admin');document.getElementById('operatore-display').textContent='Admin';}
     applicaTemaOperatore();renderTipiUI();renderOperatoriUI();renderCampiRapportoUI();document.getElementById('tab-registro').style.display='';applicaVisibilita();registraPushSubscription();setTimeout(()=>mostraPromemoriaLogin(),1200);setTimeout(()=>mostraConsegnaLogin(),1800);setTimeout(checkQrHash,800);
   }else{_loginFailCount++;if(_loginFailCount>=5){_loginLockUntil=Date.now()+30000;_loginFailCount=0}err.textContent=nome?'Operatore non trovato o password errata':'Password errata';document.getElementById('pwd-input').value='';document.getElementById('pwd-input').focus();setTimeout(()=>err.textContent='',2500)}}
 function mostraForzaCambio(){const b=document.getElementById('pwd-modal-content');b.innerHTML='<h3>Cambia la password</h3><p>Password predefinita. Impostane una nuova.</p><div class="pwd-field"><label>Nuova password (min 4 car.)</label><input type="password" id="new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="eseguiPrimoCambio()">Imposta</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';document.getElementById('pwd-modal').classList.remove('hidden');setTimeout(()=>document.getElementById('new-pwd-1').focus(),100)}
@@ -1059,7 +1059,7 @@ async function eseguiRecupero(){const c=document.getElementById('recovery-input'
 function chiediOperatore(){const nomi=[...new Set([...operatoriSalvati,...operatoriAuthCache.map(o=>o.nome),...datiCache.map(e=>e.operatore).filter(Boolean)])].sort();
   document.getElementById('operatore-modal-content').innerHTML='<h3>Chi sei?</h3><p>Seleziona o inserisci il tuo nome (per tracciare chi inserisce)</p><div class="pwd-field"><label>Nome operatore</label><input type="text" id="inp-operatore" list="op-list" placeholder="Il tuo nome..."><datalist id="op-list">'+nomi.map(n=>'<option value="'+n+'">').join('')+'</datalist></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="confermaOperatore()">Conferma</button></div>';
   document.getElementById('operatore-modal').classList.remove('hidden');setTimeout(()=>document.getElementById('inp-operatore').focus(),100)}
-function confermaOperatore(){const n=document.getElementById('inp-operatore').value.trim();if(!n){toast('Inserisci un nome');return}sessionStorage.setItem('operatore_corrente',n);chiudiTuttiModali();document.getElementById('operatore-display').textContent='Operatore: '+n;setTimeout(()=>mostraNoteNonLette(),500)}
+function confermaOperatore(){const n=document.getElementById('inp-operatore').value.trim();if(!n){toast('Inserisci un nome');return}localStorage.setItem('operatore_corrente',n);chiudiTuttiModali();document.getElementById('operatore-display').textContent='Operatore: '+n;setTimeout(()=>mostraNoteNonLette(),500)}
 function chiudiTuttiModali(){['pwd-modal','operatore-modal','modal-overlay','profilo-modal','scadenza-modal','note-modal'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add('hidden')})}
 function cambiaOperatore(){chiediOperatore()}
 function forzaCambioPwdOperatore(nome){const b=document.getElementById('pwd-modal-content');
@@ -1070,7 +1070,7 @@ async function eseguiForzaCambioPwdOp(nome){const p1=document.getElementById('op
   const nh=await secureHash(p1,nome);try{await sbRpc('force_change_pwd',{p_nome:nome,p_new_hash:nh,p_deve_cambiare:false});
   document.getElementById('pwd-modal-content').innerHTML='<h3>Password impostata!</h3><p style="text-align:center;color:var(--muted)">Da ora accedi con la tua nuova password.</p><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\');mostraNoteNonLette()">OK</button></div>';
   toast('Password personale impostata!')}catch(e){err.textContent='Errore salvataggio'}}
-function esci(){const tk=getAdminToken();if(tk)sbRpc('invalidate_admin_session',{p_token:tk}).catch(()=>{});sessionStorage.removeItem('diario_auth');sessionStorage.removeItem('operatore_corrente');sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token');location.reload()}
+function esci(){const tk=getAdminToken();if(tk)sbRpc('invalidate_admin_session',{p_token:tk}).catch(()=>{});localStorage.removeItem('diario_auth');localStorage.removeItem('operatore_corrente');localStorage.removeItem('is_admin');localStorage.removeItem('admin_token');location.reload()}
 async function resetPasswordOperatore(nome){const b=document.getElementById('pwd-modal-content');
   b.innerHTML='<h3>Resetta password</h3><p>Imposta una nuova password temporanea per <strong>'+escP(nome)+'</strong></p><div class="pwd-field"><label>Nuova password</label><input type="password" id="reset-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="reset-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiResetPwdOp(\''+nome.replace(/'/g,"\\'")+'\')">Resetta</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';
   document.getElementById('pwd-modal').classList.remove('hidden')}
@@ -1079,7 +1079,7 @@ async function eseguiResetPwdOp(nome){const p1=document.getElementById('reset-pw
   const nh=await secureHash(p1,nome);try{await sbRpc('force_change_pwd',{p_nome:nome,p_new_hash:nh,p_deve_cambiare:true,p_token:getAdminToken()});
   document.getElementById('pwd-modal-content').innerHTML='<h3>Password resettata!</h3><p style="text-align:center">'+escP(nome)+' dovrà cambiarla al prossimo accesso.</p><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">OK</button></div>';
   toast('Password di '+nome+' resettata')}catch(e){err.textContent='Errore'}}
-function isAdmin(){return sessionStorage.getItem('is_admin')==='1'}
+function isAdmin(){return localStorage.getItem('is_admin')==='1'}
 // VISIBILITA - 'tutti' | 'admin' | 'nascosto' | {tipo:'selezionati',operatori:['Nome1']}
 const VIS_ITEMS={
   pagine:{rapporto:'Rapporto',note_collega:'Note Colleghi',statistiche:'Statistiche',moduli:'Moduli',assistente:'Assistente',consegna:'Consegna Turno',promemoria:'Promemoria',maison:'Costi Maison'},
@@ -1170,7 +1170,7 @@ async function eseguiCambioPwdOp(){const op=getOperatore(),o=document.getElement
   try{
   document.getElementById('pwd-modal-content').innerHTML='<h3>Password aggiornata!</h3><p style="text-align:center;color:var(--muted)">La tua password è stata cambiata.</p><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">OK</button></div>';
   toast('Password operatore aggiornata!')}catch(e){err.textContent='Errore salvataggio'}}
-function selezionaOperatore(n){sessionStorage.setItem('operatore_corrente',n);chiudiTuttiModali();document.getElementById('operatore-display').textContent='Operatore: '+n;renderOperatoriUI();toast('Operatore: '+n)}
+function selezionaOperatore(n){localStorage.setItem('operatore_corrente',n);chiudiTuttiModali();document.getElementById('operatore-display').textContent='Operatore: '+n;renderOperatoriUI();toast('Operatore: '+n)}
 function renderOperatoriUI(){const el=document.getElementById('operatori-list');if(!el)return;const cur=getOperatore();const admin=isAdmin();document.getElementById('op-attuale').textContent=cur||'Nessuno';
   const tutti=admin?[...new Set([...operatoriSalvati,...operatoriAuthCache.map(o=>o.nome)])].sort():[];
   el.innerHTML=tutti.length?tutti.map(n=>{const hasAuth=operatoriAuthCache.find(o=>o.nome===n);const rep=operatoriRepartoMap[n]||'entrambi';const repBadge=rep==='slots'?'<span class="mini-badge" style="background:#1a4a7a">Slots</span>':rep==='tavoli'?'<span class="mini-badge" style="background:#8e44ad">Tavoli</span>':'<span class="mini-badge" style="background:var(--accent2)">Entrambi</span>';const ne=n.replace(/'/g,"\\'");return'<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border:1px solid '+(n===cur?'var(--accent2)':'var(--line)')+';flex-wrap:wrap"><span style="font-weight:'+(n===cur?'700':'400')+'">'+escP(n)+'</span>'+repBadge+(hasAuth?'<span style="font-size:.82rem;color:#2c6e49;font-weight:600">Con password</span>':'')+(admin?'<select onchange="cambiaRepartoOperatore(\''+ne+'\',this.value)" style="font-size:.75rem;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><option value="entrambi"'+(rep==='entrambi'?' selected':'')+'>Entrambi</option><option value="slots"'+(rep==='slots'?' selected':'')+'>Slots</option><option value="tavoli"'+(rep==='tavoli'?' selected':'')+'>Tavoli</option></select>':'')+(admin&&hasAuth?'<button style="font-size:.75rem;padding:3px 8px;cursor:pointer;border:1px solid var(--accent2);color:var(--accent2);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif;font-weight:600" onclick="resetPasswordOperatore(\''+ne+'\')">Pwd</button>':'')+(admin?'<button style="font-size:.75rem;padding:3px 8px;cursor:pointer;border:1px solid var(--accent);color:var(--accent);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif;font-weight:600" onclick="rimuoviOperatore(\''+ne+'\')">Rimuovi</button>':'')+'</div>'}).join(''):'<p style="color:var(--muted);font-size:.85rem">Nessun operatore.</p>';
@@ -1230,7 +1230,7 @@ function toggleTema(){document.body.classList.toggle('dark-theme');const isDark=
 function applicaTemaOperatore(){const t=localStorage.getItem(getTemaKey())||localStorage.getItem('tema')||'light';if(t==='dark'){document.body.classList.add('dark-theme');document.getElementById('btn-tema').innerHTML='\u2600\uFE0F Tema chiaro'}else{document.body.classList.remove('dark-theme');document.getElementById('btn-tema').innerHTML='\uD83C\uDF11 Tema scuro'}}
 
 // NAVIGATION
-function switchPage(name){flushRapportoSave();document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));const pg=document.getElementById('page-'+name);if(pg)pg.classList.add('active');const tb=document.querySelector('.nav-tab[data-page="'+name+'"]');if(tb)tb.classList.add('active');sessionStorage.setItem('pagina_corrente',name);if(typeof aggiornaMenuMobile==='function')aggiornaMenuMobile();
+function switchPage(name){flushRapportoSave();document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));const pg=document.getElementById('page-'+name);if(pg)pg.classList.add('active');const tb=document.querySelector('.nav-tab[data-page="'+name+'"]');if(tb)tb.classList.add('active');localStorage.setItem('pagina_corrente',name);if(typeof aggiornaMenuMobile==='function')aggiornaMenuMobile();
   if(name==='diario'){aggiornaNomi();render();updateStats()}if(name==='statistiche')renderStatistiche();if(name==='rapporto'){if(!rapportoGiornoAperto){const gc=getGiornataCasino();const d=new Date(gc+'T12:00:00');rapportoMese=d.getMonth();rapportoAnno=d.getFullYear();rapportoGiornoAperto=gc}renderRapporto()}if(name==='note-collega')renderNoteCollega();if(name==='impostazioni'){renderTipiUI();renderScadenzeSettings();renderOperatoriUI();renderCampiRapportoUI();
     const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}renderCollaboratoriUI();const ai=document.getElementById('ai-section');if(ai)ai.style.display=isAdmin()?'':'none';const visSec=document.getElementById('visibilita-section');if(visSec){visSec.style.display=isAdmin()?'':'none';if(isAdmin())renderVisibilitaUI()}if(isAdmin()&&groqKey){const gs=document.getElementById('groq-status');if(gs)gs.innerHTML='<span style="color:#2c6e49">Chiave configurata</span>'}}if(name==='moduli'){if(!document.getElementById('mod-list-results'))_modFiltInit=false;renderModuliList()};if(name==='registro')renderRegistro();if(name==='maison'){renderMaisonDashboard();renderMaisonBudgetUI();initMaisonFlatpickr();renderSpeseExtra();initSpeseExtraFP();renderRegali()}if(name==='promemoria'){renderPromemoria();initPromemoriaUI()}if(name==='dashboard')renderDashboard();if(name==='consegna'){renderConsegne();initConsegnaUI()}}
 
@@ -1642,7 +1642,7 @@ function inviaNotifica(titolo,corpo,onClick){
   if(!('Notification' in window)||Notification.permission!=='granted')return;
   try{const n=new Notification(titolo,{body:corpo,icon:'icon-192.png',badge:'icon-192.png'});
     if(onClick)n.onclick=function(){window.focus();onClick();n.close()}}catch(e){}}
-async function pollNuoveNote(){if(sessionStorage.getItem('diario_auth')!=='1')return;
+async function pollNuoveNote(){if(localStorage.getItem('diario_auth')!=='1')return;
   try{const nuove=await sbGet('note_colleghi?order=created_at.desc');
     const op=getOperatore();const vecchieNonLette=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.letta&&!n.nascosta_dest).length;
     noteColleghiCache=nuove;aggiornaNoteBadge();
@@ -1650,7 +1650,7 @@ async function pollNuoveNote(){if(sessionStorage.getItem('diario_auth')!=='1')re
     if(nuoveNonLette>vecchieNonLette){toast('Hai '+nuoveNonLette+' nota/e non letta/e!');
       const nuoveArr=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.letta&&!n.nascosta_dest);
       if(nuoveArr.length)inviaNotifica('Nuova nota da '+nuoveArr[0].da_operatore,nuoveArr[0].messaggio.substring(0,80))}
-    const pg=sessionStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();
+    const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();
   }catch(e){}}
 function mostraNoteNonLette(){const op=getOperatore();if(!op)return;
   const nonLette=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.letta&&!n.nascosta_dest);if(!nonLette.length)return;
@@ -3623,7 +3623,7 @@ function aggiornaMenuMobile(){try{
     {page:'maison',icon:'&#127860;',label:'Maison',vis:'maison'},
     {page:'registro',icon:'&#128203;',label:'Registro',adminOnly:true},
     {page:'impostazioni',icon:'&#9881;&#65039;',label:'Impostazioni'}];
-  const cur=sessionStorage.getItem('pagina_corrente')||'dashboard';
+  const cur=localStorage.getItem('pagina_corrente')||'dashboard';
   let html='';tabs.forEach(function(t){
     if(t.adminOnly&&!isAdmin())return;
     if(t.vis&&typeof isVis==='function'&&!isVis(t.vis))return;
@@ -3645,9 +3645,9 @@ window.addEventListener('load',async()=>{
   if((defCheck&&defCheck.is_default)||operatoriAuthCache.length)h.innerHTML='Accedi come Admin oppure seleziona il tuo nome';
   // Populate login dropdown (se settore gia selezionato)
   aggiornaLoginOperatori();
-  if(sessionStorage.getItem('diario_auth')==='1'){document.getElementById('login-overlay').classList.add('hidden');applicaTemaOperatore();
+  if(localStorage.getItem('diario_auth')==='1'){document.getElementById('login-overlay').classList.add('hidden');applicaTemaOperatore();
     // Valida sessione admin se presente
-    if(isAdmin()){const tk=getAdminToken();if(tk){const sv=await sbRpc('validate_admin_session',{p_token:tk});if(!sv||!sv.valid){sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token')}}else{sessionStorage.removeItem('is_admin')}}
+    if(isAdmin()){const tk=getAdminToken();if(tk){const sv=await sbRpc('validate_admin_session',{p_token:tk});if(!sv||!sv.valid){localStorage.removeItem('is_admin');localStorage.removeItem('admin_token')}}else{localStorage.removeItem('is_admin')}}
     if(getOperatore()){document.getElementById('operatore-display').textContent='Operatore: '+getOperatore();
       // Check se deve ancora cambiare password
       const authCheck=await sbRpc('check_deve_cambiare',{p_nome:getOperatore()});
@@ -3658,7 +3658,7 @@ window.addEventListener('load',async()=>{
   else document.getElementById('pwd-input').focus();
   const n=new Date();document.getElementById('today-date').innerHTML=n.getDate()+' '+MESI[n.getMonth()]+' '+n.getFullYear()+'<br><small style="color:var(--muted);font-size:.75rem">'+GIORNI[n.getDay()]+'</small>';
   renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();aggiornaNoteBadge();aggiornaPromemoriaBadge();aggiornaConsegnaBadge();applicaVisibilita();renderDashboard();
-  const savedPage=sessionStorage.getItem('pagina_corrente');if(savedPage&&savedPage!=='diario')switchPage(savedPage);
+  const savedPage=localStorage.getItem('pagina_corrente');if(savedPage&&savedPage!=='diario')switchPage(savedPage);
   setTimeout(checkQrHash,1200);
   // Polling note ogni 15 secondi
   setInterval(pollNuoveNote,15000);
