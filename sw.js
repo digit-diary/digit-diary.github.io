@@ -33,15 +33,10 @@ self.addEventListener('push', function(event) {
       var isVisible = clientList.some(function(c) { return c.visibilityState === 'visible'; });
       try {
         var data = event.data.json();
-        // If app visible: forward to client for in-app handling, skip system notification
-        // Exception: budget/consegna/promemoria always show system notification
-        if (isVisible && data.tipo === 'nota') {
-          clientList.forEach(function(c) { c.postMessage({ action: 'push', data: data }); });
-          return;
-        }
-        // For non-nota types when visible: still forward AND show system notification
+        // App visible: forward to client as toast, skip system notification
         if (isVisible) {
           clientList.forEach(function(c) { c.postMessage({ action: 'push', data: data }); });
+          return;
         }
         var titolo = data.titolo || 'Diario Collaboratori';
         var options = {

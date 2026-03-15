@@ -1570,7 +1570,7 @@ async function inviaNotaCollega(){const dests=getDestinatariSelezionati(),msg=do
   const gid=dests.length>1?crypto.randomUUID():null;
   try{for(const dest of dests){const r=await sbPost('note_colleghi',{da_operatore:da,a_operatore:dest,messaggio:msg,gruppo_id:gid});noteColleghiCache.unshift(r[0])}
   logAzione('Nota inviata','A: '+dests.join(', ')+' - '+msg.substring(0,50));document.getElementById('nota-msg').value='';document.querySelectorAll('#nota-dest-box input[type=checkbox]').forEach(cb=>cb.checked=false);renderNoteCollega();toast('Nota inviata a '+dests.join(', '));
-  inviaPush(dests,'Nota da '+da,msg.substring(0,120),'nota')}catch(e){toast('Errore invio')}}
+  inviaPush(dests,'Nota da '+da,msg.substring(0,120),'nota',true)}catch(e){toast('Errore invio')}}
 async function segnaNotaLetta(id){try{await sbPatch('note_colleghi','id=eq.'+id,{letta:true});const n=noteColleghiCache.find(n=>n.id===id);if(n)n.letta=true;renderNoteCollega()}catch(e){toast('Errore')}}
 async function eliminaNotaCollega(id,ruolo){if(!confirm('Eliminare questa nota?'))return;
   const campo=ruolo==='mitt'?'nascosta_mitt':'nascosta_dest';
@@ -1627,9 +1627,11 @@ async function registraPushSubscription(){
     await fetch(SB_URL+'/rest/v1/push_subscriptions',{method:'POST',headers:sbH({'Prefer':'resolution=merge-duplicates,return=representation'}),
       body:JSON.stringify({operatore:op,reparto_dip:currentReparto,endpoint:j.endpoint,p256dh:j.keys.p256dh,auth:j.keys.auth})});
   }catch(e){console.error('Push reg:',e)}}
-function inviaPush(destinatari,titolo,corpo,tipo){var op=getOperatore();if(!op)return;
+function inviaPush(destinatari,titolo,corpo,tipo,crossReparto){var op=getOperatore();if(!op)return;
+  var body={destinatari:Array.isArray(destinatari)?destinatari:[destinatari],titolo:titolo,corpo:(corpo||'').substring(0,200),mittente:op,tipo:tipo||'general'};
+  if(!crossReparto)body.reparto_dip=currentReparto;
   fetch(SB_URL+'/functions/v1/send-push',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY},
-    body:JSON.stringify({destinatari:Array.isArray(destinatari)?destinatari:[destinatari],titolo:titolo,corpo:(corpo||'').substring(0,200),mittente:op,reparto_dip:currentReparto,tipo:tipo||'general'})}).catch(function(){})}
+    body:JSON.stringify(body)}).catch(function(){})}
 function checkBudgetPushAfterInsert(nomeCliente){var budget=getBudgetReparto().find(function(b){return b.nome.toLowerCase()===nomeCliente.toLowerCase()});
   if(!budget||!budget.budget_chf)return;var now=new Date(),meseStart=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-01';
   var spent=getMaisonReparto().filter(function(r){return r.nome.toLowerCase()===nomeCliente.toLowerCase()&&r.data_giornata>=meseStart}).reduce(function(s,r){return s+parseFloat(r.costo||0)},0);
@@ -2768,7 +2770,7 @@ async function salvaPromemoria(){const titolo=document.getElementById('pm-titolo
     const fp=document.getElementById('pm-scadenza');if(fp&&fp._flatpickr)fp._flatpickr.clear();else fp.value='';
     logAzione('Promemoria creato',titolo+' → '+assegnato+' ('+scadenza+')');
     renderPromemoria();aggiornaPromemoriaBadge();toast('Promemoria creato');
-    inviaPush(assegnato==='tutti'?['tutti']:[assegnato],'Promemoria: '+titolo,(descrizione||titolo).substring(0,120),'promemoria')}catch(e){toast('Errore')}}
+    inviaPush(assegnato==='tutti'?['tutti']:[assegnato],'Promemoria: '+titolo,(descrizione||titolo).substring(0,120),'promemoria',true)}catch(e){toast('Errore')}}
 async function completaPromemoria(id){const op=getOperatore();
   try{await sbPatch('promemoria','id=eq.'+id,{completata:true,completata_da:op,completata_at:new Date().toISOString()});
     const p=promemoriaCache.find(x=>x.id===id);if(p){p.completata=true;p.completata_da=op;p.completata_at=new Date().toISOString()}
@@ -3572,6 +3574,7 @@ function aggiornaLoginOperatori(){var settore=document.getElementById('login-set
 function setReparto(rep){currentReparto=rep;
   document.getElementById('btn-rep-slots').className='reparto-btn'+(rep==='slots'?' active-slots':'');
   document.getElementById('btn-rep-tavoli').className='reparto-btn'+(rep==='tavoli'?' active-tavoli':'');
+  registraPushSubscription();
   // Re-render TUTTE le pagine (dati devono essere sempre freschi per il reparto)
   aggiornaNomi();render();updateStats();
   renderDashboard();renderStatistiche();
