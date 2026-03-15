@@ -1108,7 +1108,10 @@ async function loginBiometrico(){try{
     allowCredentials:[{id:rawId,type:'public-key',transports:['internal']}],
     userVerification:'required',
     timeout:60000}});
-  return true}catch(e){return false}}
+  return true}catch(e){
+  // Credenziale non trovata o invalida: rimuovi e non riprovare
+  if(e.name!=='NotAllowedError'){localStorage.removeItem('webauthn_cred');console.error('Bio credential invalid, removed')}
+  return false}}
 async function tentaBiometrico(){var ok=await loginBiometrico();if(ok){
   var stored=JSON.parse(localStorage.getItem('webauthn_cred'));
   // Sicurezza: verifica che la credenziale sia dell'operatore atteso
