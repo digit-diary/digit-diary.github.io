@@ -2,10 +2,11 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
 
+const ALLOWED_ORIGIN = "https://digit-diary.github.io";
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-push-secret",
 };
 
 const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY")!;
@@ -14,6 +15,7 @@ const VAPID_SUBJECT =
   Deno.env.get("VAPID_SUBJECT") || "mailto:admin@diariocl.ch";
 const SB_URL = Deno.env.get("SUPABASE_URL")!;
 const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const PUSH_API_SECRET = Deno.env.get("PUSH_API_SECRET") || "";
 
 webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
@@ -50,8 +52,48 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { destinatari, titolo, corpo, mittente, reparto_dip, tipo } =
-      await req.json();
+    // Verify API secret
+    const secret = req.headers.get("x-push-secret") || "";
+    if (!PUSH_API_SECRET || secret !== PUSH_API_SECRET) {
+      return new Response(
+        JSON.stringify({ error: "unauthorized" }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const body = await req.json();
+
+    // REGISTER: upsert push subscription (uses service_role_key, bypasses RLS)
+    if (body.action === "register") {
+      const { operatore, reparto_dip: rep, endpoint, p256dh, auth } = body;
+      if (!operatore || !endpoint || !p256dh || !auth) {
+        return new Response(
+          JSON.stringify({ error: "missing fields" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const sb = createClient(SB_URL, SB_SERVICE_KEY);
+      const { error } = await sb.from("push_subscriptions").upsert(
+        { operatore, reparto_dip: rep || "slots", endpoint, p256dh, auth },
+        { onConflict: "endpoint" }
+      );
+      if (error) {
+        return new Response(
+          JSON.stringify({ error: error.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      return new Response(
+        JSON.stringify({ ok: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // SEND: send push notification
+    const { destinatari, titolo, corpo, mittente, reparto_dip, tipo } = body;
 
     if (!destinatari || !titolo) {
       return new Response(
