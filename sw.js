@@ -1,4 +1,4 @@
-const CACHE_NAME = 'diario-cl-v3';
+const CACHE_NAME = 'diario-cl-v4';
 const SHELL_URLS = ['/', '/manifest.json', '/logo_casino.png', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -12,8 +12,14 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Always network-first for API calls
+  // Always network for API calls
   if (e.request.url.includes('supabase.co')) return;
+  // HTML pages: always network-first, never serve stale HTML
+  if (e.request.mode === 'navigate') {
+    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+    return;
+  }
+  // Assets (icons, manifest): network-first with cache fallback
   e.respondWith(
     fetch(e.request).then(r => {
       if (r.ok) {
