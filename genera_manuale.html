@@ -614,8 +614,33 @@ bullet('Deselezionare le sezioni che non si vogliono includere nel PDF.');
 bullet('Cliccare "Genera PDF" per procedere.');
 tip('Utile per report personalizzati: ad esempio, solo costi maison per la direzione, o solo differenze cassa per il controllo interno.');
 
-// ===== 19. USO MOBILE =====
-title('19. USO SU DISPOSITIVI MOBILI', 1);
+// ===== 19. REPARTI SLOTS / TAVOLI =====
+title('19. REPARTI SLOTS / TAVOLI', 1);
+spacer(2);
+para('L\'applicazione separa completamente i dati tra i due reparti: Slots e Tavoli.');
+title('Come funziona', 2);
+bullet('Sotto l\'header appare uno switch [SLOTS | TAVOLI]. Cliccando si cambia reparto.');
+bullet('TUTTI i dati sono separati: diario, rapporto, costi maison, spese extra, regali, note clienti, moduli disciplinari, statistiche, report, alert.');
+bullet('Se un operatore e assegnato a un solo reparto, lo switch non appare e vede solo i suoi dati.');
+bullet('L\'admin vede sempre lo switch e puo passare da un reparto all\'altro.');
+title('Cosa e separato', 2);
+bullet('Diario registrazioni: ogni voce appartiene al reparto in cui e stata creata.');
+bullet('Rapporto giornaliero: ogni rapporto PRESTO/NOTTE e per reparto.');
+bullet('Costi Maison: clienti, budget, schede, grafici tutti separati per reparto.');
+bullet('Spese Extra e Regali: separati per reparto.');
+bullet('Note private clienti: separate per reparto.');
+bullet('Moduli disciplinari: allineamenti, RDI, apprezzamenti separati per reparto.');
+bullet('Alert: differenze cassa, rischio, ammonimenti calcolati solo sul reparto corrente.');
+bullet('Report PDF/CSV: includono solo dati del reparto selezionato.');
+bullet('Ricerca globale: cerca solo nel reparto corrente.');
+tip('Attenzione: eliminare o rinominare un cliente Maison agisce SOLO sul reparto corrente. I dati dell\'altro reparto non vengono toccati.');
+title('Login e assegnazione', 2);
+bullet('Al login si seleziona il settore (Slots o Tavoli) prima dell\'operatore.');
+bullet('L\'admin puo assegnare ogni operatore a: Slots, Tavoli, o Entrambi.');
+bullet('Operatori con "Entrambi" vedono lo switch e possono cambiare reparto.');
+
+// ===== 20. USO MOBILE =====
+title('20. USO SU DISPOSITIVI MOBILI', 1);
 spacer(2);
 para('L\'applicazione e completamente responsive e funziona su smartphone e tablet.');
 title('Differenze su mobile', 2);
@@ -630,7 +655,7 @@ bullet('Per scannerizzare un QR code, usare la fotocamera del telefono.');
 bullet('L\'app puo essere aggiunta alla schermata home come Progressive Web App.');
 
 // ===== 20. FAQ =====
-title('20. DOMANDE FREQUENTI', 1);
+title('21. DOMANDE FREQUENTI', 1);
 spacer(2);
 
 title('Come faccio a cambiare la mia password?', 3);
