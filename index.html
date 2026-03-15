@@ -2325,7 +2325,8 @@ async function esportaRapportoPDF(){if(!window.jspdf){toast('Caricamento PDF...'
   doc.save('rapporto_'+dal+'_'+al+'.pdf');toast('PDF esportato!')}catch(e){console.error('PDF error:',e);toast('Errore generazione PDF: '+e.message)}}
 
 // STATISTICHE
-function renderStatistiche(){const _ds=getDatiReparto();if(!_ds.length){document.getElementById('stats-summary').innerHTML='<p style="color:var(--muted);text-align:center;padding:40px">Nessun dato da analizzare</p>';return}
+function renderStatistiche(){const _ds=getDatiReparto();if(!_ds.length){document.getElementById('stats-summary').innerHTML='<p style="color:var(--muted);text-align:center;padding:40px">Nessun dato da analizzare</p>';
+  ['chart-mesi','chart-tipi','chart-giorni','chart-collab'].forEach(function(id){if(charts[id]){charts[id].destroy();delete charts[id]}});return}
   // Summary
   const nCollab=new Set(_ds.map(e=>e.nome)).size;const nErr=_ds.filter(e=>e.tipo===nomeCorrente('Errore')).length;const totImp=_ds.reduce((s,e)=>s+(parseFloat(e.importo)||0),0);
   document.getElementById('stats-summary').innerHTML='<div class="stats-bar" style="margin-bottom:0"><div class="stat"><div class="stat-num">'+_ds.length+'</div><div class="stat-label">Registrazioni totali</div></div><div class="stat"><div class="stat-num blue">'+nCollab+'</div><div class="stat-label">Collaboratori</div></div><div class="stat"><div class="stat-num red">'+nErr+'</div><div class="stat-label">'+nomeCorrente('Errore')+'</div></div><div class="stat"><div class="stat-num teal">'+_ds.filter(e=>e.tipo===nomeCorrente('Malattia')).length+'</div><div class="stat-label">'+nomeCorrente('Malattia')+'</div></div><div class="stat"><div class="stat-num gold">'+(totImp?totImp.toFixed(2):'0')+'</div><div class="stat-label">Importo totale</div></div></div>';
@@ -2972,7 +2973,8 @@ function renderMaisonDashboard(){const data=getMaisonFiltrati();
   const byNome={};data.forEach(r=>{if(!byNome[r.nome])byNome[r.nome]={tot:0,px:0,visite:0,bu:0,bl:0};byNome[r.nome].tot+=parseFloat(r.costo||0);byNome[r.nome].px+=(r.px||0);byNome[r.nome].visite++;if(r.tipo_buono==='BU')byNome[r.nome].bu++;if(r.tipo_buono==='BL')byNome[r.nome].bl++});
   const sorted=Object.entries(byNome).sort((a,b)=>b[1].tot-a[1].tot);
   const tb=document.getElementById('maison-table');
-  if(!sorted.length){tb.innerHTML='<p style="color:var(--muted);text-align:center;padding:20px">Nessun dato. Carica un file Excel per iniziare.</p>';return}
+  if(!sorted.length){tb.innerHTML='<p style="color:var(--muted);text-align:center;padding:20px">Nessun dato. Carica un file Excel per iniziare.</p>';
+    ['chart-maison-trend','chart-maison-top','chart-maison-tipi'].forEach(function(id){if(charts[id]){charts[id].destroy();delete charts[id]}});return}
   // Gestione giorni per eliminazione
   const giorniDisp=[...new Set(data.map(r=>r.data_giornata))].sort();
   let thtml='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h4 style="font-family:Playfair Display,serif;margin:0;color:var(--ink)">Dettaglio per cliente</h4><button class="btn-reset" onclick="toggleSezione(\'maison-table-inner\',this)" style="font-size:.92rem;padding:6px 16px">&#9650; Nascondi</button></div><div id="maison-table-inner"><div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px;flex-wrap:wrap"><select id="maison-del-giorno" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper);color:var(--ink)"><option value="">Seleziona giorno...</option>'+giorniDisp.map(d=>'<option value="'+d+'">'+new Date(d+'T12:00:00').toLocaleDateString('it-IT')+'</option>').join('')+'</select><button class="btn-act del" onclick="eliminaMaisonGiorno()" style="padding:5px 12px">Elimina giorno</button></div>';

@@ -725,14 +725,23 @@
 
   [47] Switch Reparto Slots/Tavoli
        - Switch [SLOTS | TAVOLI] sotto l'header
-       - Dati completamente separati per reparto
-       - Diario, Maison, Statistiche, Dashboard filtrati per reparto
+       - Dati completamente separati per reparto su TUTTE le pagine
+       - TUTTE le pagine filtrate: Diario, Maison, Statistiche, Dashboard,
+         Moduli, Rapporto, Spese Extra, Regali, Note clienti
        - Admin controlla visibilita: Reparto Slots / Reparto Tavoli
        - Solo Slots → switch nascosto
        - Solo Tavoli → switch nascosto
        - Entrambi → switch visibile
-       - Salvataggio con reparto_dip su registrazioni, costi_maison,
-         maison_budget, spese_extra
+       - Salvataggio con reparto_dip su: registrazioni, costi_maison,
+         maison_budget, spese_extra, regali_maison, note_clienti,
+         moduli, rapporti_giornalieri
+       - REGOLA: ogni nuova tabella DEVE avere reparto_dip
+       - REGOLA: usare SEMPRE get*Reparto() per display, MAI cache raw
+       - Funzioni filtro: getDatiReparto(), getMaisonReparto(),
+         getBudgetReparto(), getSpeseReparto(), getRegaliReparto(),
+         getNoteClientiReparto(), getModuliReparto()
+       - DELETE/PATCH su DB: SEMPRE con &reparto_dip=eq.currentReparto
+       - INSERT su DB: SEMPRE con reparto_dip:currentReparto
 
   [48] Menu hamburger mobile
        - Sotto 700px: tab nascosti, menu laterale con pannello
@@ -796,6 +805,36 @@
        8. Feature: Dettaglio cliente completo (regali + note private + totale complessivo)
        9. Feature: Confronto mese su mese nei costi maison (+/- % vs mese precedente)
        10. Feature: Note private per cliente maison (DB: note_clienti)
+
+  [57] Fix COMPLETO separazione Slots/Tavoli (15 marzo 2026)
+       - DB: aggiunto reparto_dip a tabelle moduli e rapporti_giornalieri
+       - Nuovo getModuliReparto() filtra moduli per reparto corrente
+       - Moduli: salvataggio, lista, conteggio, autocomplete, ricerca filtrati
+       - Rapporto: fetchRapportiMese/Range filtrano per reparto_dip
+       - Rapporto: salvataggio con reparto_dip, on_conflict aggiornato
+       - Alert cassa/rischio/ammonimenti: usano getModuliReparto()
+       - Report settimanale/annuale PDF: moduli filtrati per reparto
+       - Profilo collaboratore PDF: moduli filtrati per reparto
+       - setReparto() ri-renderizza anche moduli e rapporto
+       - eliminaMaisonCliente/Giorno: DELETE con filtro reparto_dip
+       - eseguiRinominaMaison: PATCH con filtro reparto_dip
+       - caricaMaisonFile: DELETE esistenti con filtro reparto_dip
+       - 30+ punti corretti in totale tra sessioni precedenti e questa
+
+  [58] UX professionale (15 marzo 2026)
+       - Zebra striping su tutte le tabelle (righe alternate)
+       - Hover dorato sulle righe tabella
+       - Hover states su btn-modal-ok/cancel, btn-add-tipo
+       - btn-salva hover con filter:brightness (funziona su tutte le varianti)
+       - Focus-visible accessibilita su tutti i bottoni
+       - Scheda clienti raggruppata per categoria con header colorati
+       - Progress bar budget (4px verde/arancio/rosso)
+       - Nomi cliccabili nella scheda clienti
+       - Mini stats bar per Spese Extra e Regali
+       - Dashboard stats bar auto-fill (si adatta ai KPI visibili)
+       - Empty states professionali ovunque
+       - Fix border-radius bottone Tavoli
+       - Data nascita editabile nel popup dettaglio cliente
 
 
 ================================================================================
