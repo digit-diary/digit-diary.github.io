@@ -1115,10 +1115,13 @@ async function tentaBiometrico(){var ok=await loginBiometrico();if(ok){
   var expectedOp=localStorage.getItem('operatore_corrente');
   if(expectedOp&&stored.op!==expectedOp){toast('Credenziale non valida per questo operatore');return}
   localStorage.setItem('diario_auth_ts',String(Date.now()));localStorage.setItem('operatore_corrente',stored.op);sessionStorage.setItem('bio_verified','1');
-    document.getElementById('login-overlay').classList.add('hidden');
+  document.getElementById('login-overlay').classList.add('hidden');
   document.getElementById('operatore-display').textContent='Operatore: '+stored.op;
   applicaTemaOperatore();applicaVisibilita();registraPushSubscription();
-  setTimeout(()=>mostraNoteNonLette(),500);setTimeout(()=>mostraPromemoriaLogin(),1200);setTimeout(()=>mostraConsegnaLogin(),1800)}
+  // Controlla se admin ha resettato la password → forza cambio
+  var _dcCheck=await sbRpc('check_deve_cambiare',{p_nome:stored.op});
+  if(_dcCheck&&_dcCheck.deve_cambiare_pwd){setTimeout(()=>forzaCambioPwdOperatore(stored.op),300)}
+  else{setTimeout(()=>mostraNoteNonLette(),500);setTimeout(()=>mostraPromemoriaLogin(),1200);setTimeout(()=>mostraConsegnaLogin(),1800)}}
   else toast('Autenticazione fallita')}
 function disattivaBiometrico(){localStorage.removeItem('webauthn_cred');toast(getBioName()+' disattivato');renderBiometricSettings()}
 function renderBiometricSettings(){var el=document.getElementById('biometric-settings');if(!el)return;
