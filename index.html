@@ -2986,7 +2986,7 @@ function renderMaisonDashboard(){const data=getMaisonFiltrati();
     const budget=_brDash.find(b=>b.nome.toLowerCase()===nome.toLowerCase());
     const overBudget=budget&&budget.budget_chf&&d.tot>=budget.budget_chf;
     const nearBudget=budget&&budget.budget_chf&&d.tot>=budget.budget_chf*0.8&&!overBudget;
-    const catBg=budget&&budget.categoria==='full_maison'?'background:rgba(184,134,11,0.12)':budget&&budget.categoria==='maison'?'background:rgba(41,128,185,0.12)':budget&&budget.categoria==='direzione'?'background:rgba(142,68,173,0.12)':(_idx%2?'background:rgba(0,0,0,0.04)':'');
+    const catBg=budget&&budget.categoria==='full_maison'?'background:rgba(184,134,11,0.12)':budget&&budget.categoria==='maison'?'background:rgba(41,128,185,0.12)':budget&&budget.categoria==='direzione'?'background:rgba(142,68,173,0.12)':(_idx%2?'background:rgba(0,0,0,0.04)':'background:var(--paper)');
     const rowStyle=overBudget?'background:rgba(192,57,43,0.1)':nearBudget?'background:rgba(230,126,34,0.1)':catBg;
     const ne=nome.replace(/'/g,"\\'");
     const clientInfo=budget;
