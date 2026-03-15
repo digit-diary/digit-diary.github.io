@@ -1434,7 +1434,7 @@ function _eseguiRicercaGlobale(q){
   if(isVis('note_collega')&&noteRes.length){html+='<div class="rg-section">Note Colleghi ('+noteRes.length+(noteRes.length>=5?'+':'')+')</div>';
     noteRes.forEach(n=>{html+='<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'note-collega\')"><span class="rg-badge" style="background:#2980b9">Nota</span><span class="rg-text"><strong>'+escP(n.da_operatore)+'</strong> → '+escP(n.a_operatore)+' — '+escP(n.messaggio.substring(0,60))+'</span><span class="rg-date">'+new Date(n.created_at).toLocaleDateString('it-IT')+'</span></div>'});tot+=noteRes.length}
   // Maison
-  const maisonRes=maisonCache.filter(r=>r.nome.toLowerCase().includes(q)||(r.note||'').toLowerCase().includes(q)||(r.gruppo||'').toLowerCase().includes(q)).slice(0,6);
+  const maisonRes=getMaisonReparto().filter(r=>r.nome.toLowerCase().includes(q)||(r.note||'').toLowerCase().includes(q)||(r.gruppo||'').toLowerCase().includes(q)).slice(0,6);
   if(isVis('maison')&&maisonRes.length){html+='<div class="rg-section">Costi Maison ('+maisonRes.length+(maisonRes.length>=6?'+':'')+')</div>';
     maisonRes.forEach(r=>{html+='<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'maison\');document.getElementById(\'maison-filt-nome\').value=\''+escP(r.nome)+'\';renderMaisonDashboard()"><span class="rg-badge" style="background:#b8860b">Maison</span><span class="rg-text"><strong>'+escP(r.nome)+'</strong> — '+parseFloat(r.costo).toFixed(2)+' CHF'+(r.tipo_buono?' ('+r.tipo_buono+')':'')+'</span><span class="rg-date">'+new Date(r.data_giornata+'T12:00:00').toLocaleDateString('it-IT')+'</span></div>'});tot+=maisonRes.length}
   // Promemoria
@@ -2765,7 +2765,7 @@ function initMaisonFlatpickr(){if(_maisonFpInit||!window.flatpickr)return;_maiso
   flatpickr('#maison-man-data',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,defaultDate:'today'});
   flatpickr('#regalo-data',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false})}
 function _levenshtein(a,b){const m=a.length,n=b.length,d=[];for(let i=0;i<=m;i++){d[i]=[i];for(let j=1;j<=n;j++)d[i][j]=i===0?j:0}for(let j=1;j<=n;j++)d[0][j]=j;for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]!==b[j-1]?1:0));return d[m][n]}
-function _trovaNomeSimileMaison(nome){const nomi=[...new Set(maisonCache.map(r=>r.nome))];const nl=nome.toLowerCase();
+function _trovaNomeSimileMaison(nome){const nomi=[...new Set(getMaisonReparto().map(r=>r.nome))];const nl=nome.toLowerCase();
   const exact=nomi.find(n=>n.toLowerCase()===nl);if(exact)return{nome:exact,tipo:'esatto'};
   for(const n of nomi){if(_levenshtein(nl,n.toLowerCase())<=1&&nl.length>3)return{nome:n,tipo:'simile'}}
   for(const n of nomi){if(nl.length>=4&&(n.toLowerCase().includes(nl)||nl.includes(n.toLowerCase()))&&Math.abs(n.length-nome.length)<=3)return{nome:n,tipo:'simile'}}
@@ -2793,7 +2793,7 @@ async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0
     const buf=await f.arrayBuffer();const wb=XLSX.read(buf);
     let totalRows=0,warnings=[],giorniNuovi=0,giorniSaltati=[],giorniSostituiti=0,sevenCount=0;
     // Rileva giorni già presenti nel DB
-    const giorniEsistenti=new Set(maisonCache.map(r=>r.data_giornata));
+    const giorniEsistenti=new Set(getMaisonReparto().map(r=>r.data_giornata));
     for(const sheetName of wb.SheetNames){
       const dm=sheetName.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
       if(!dm)continue;
@@ -2811,8 +2811,8 @@ async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0
       if(giorniEsistenti.has(dataGiornata)&&!forzaSostituisci){
         giorniSaltati.push(new Date(dataGiornata+'T12:00:00').toLocaleDateString('it-IT'));continue}
       if(giorniEsistenti.has(dataGiornata)){giorniSostituiti++}else{giorniNuovi++}
-      // Cancella dati esistenti per questa data
-      await sbDel('costi_maison','data_giornata=eq.'+dataGiornata);
+      // Cancella dati esistenti per questa data (solo reparto corrente)
+      await sbDel('costi_maison','data_giornata=eq.'+dataGiornata+'&reparto_dip=eq.'+currentReparto);
       // Parsing righe
       for(let i=startRow;i<data.length;i++){
         const row=data[i];const rawNome=String(row[0]||'').trim();
@@ -2950,13 +2950,14 @@ function renderMaisonDashboard(){const data=getMaisonFiltrati();
   const giorniDisp=[...new Set(data.map(r=>r.data_giornata))].sort();
   let thtml='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h4 style="font-family:Playfair Display,serif;margin:0;color:var(--ink)">Dettaglio per cliente</h4><button class="btn-reset" onclick="toggleSezione(\'maison-table-inner\',this)" style="font-size:.92rem;padding:6px 16px">&#9650; Nascondi</button></div><div id="maison-table-inner"><div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px;flex-wrap:wrap"><select id="maison-del-giorno" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper);color:var(--ink)"><option value="">Seleziona giorno...</option>'+giorniDisp.map(d=>'<option value="'+d+'">'+new Date(d+'T12:00:00').toLocaleDateString('it-IT')+'</option>').join('')+'</select><button class="btn-act del" onclick="eliminaMaisonGiorno()" style="padding:5px 12px">Elimina giorno</button></div>';
   thtml+='<table class="collab-table"><thead><tr><th>Cliente</th><th class="num">Visite</th><th class="num">Persone</th><th class="num">BU</th><th class="num">BL</th><th class="num">Totale CHF</th><th class="num">Media CHF</th><th></th></tr></thead><tbody>';
+  const _brDash=getBudgetReparto();
   sorted.forEach(([nome,d])=>{
-    const budget=maisonBudgetCache.find(b=>b.nome.toLowerCase()===nome.toLowerCase());
+    const budget=_brDash.find(b=>b.nome.toLowerCase()===nome.toLowerCase());
     const overBudget=budget&&budget.budget_chf&&d.tot>=budget.budget_chf;
     const nearBudget=budget&&budget.budget_chf&&d.tot>=budget.budget_chf*0.8&&!overBudget;
     const rowStyle=overBudget?'background:rgba(192,57,43,0.1)':nearBudget?'background:rgba(230,126,34,0.1)':'';
     const ne=nome.replace(/'/g,"\\'");
-    const clientInfo=maisonBudgetCache.find(b=>b.nome.toLowerCase()===nome.toLowerCase());
+    const clientInfo=budget;
     const catBadge=clientInfo&&clientInfo.categoria==='full_maison'?'<span class="mini-badge" style="background:#b8860b;margin-left:6px">Full Maison</span>':clientInfo&&clientInfo.categoria==='maison'?'<span class="mini-badge" style="background:#2980b9;margin-left:6px">Maison</span>':clientInfo&&clientInfo.categoria==='direzione'?'<span class="mini-badge" style="background:#8e44ad;margin-left:6px">Direzione</span>':'';
     thtml+='<tr style="'+rowStyle+'"><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(nome)+'</span></strong>'+catBadge+(overBudget?' <span style="color:var(--accent);font-size:.75rem;font-weight:700">BUDGET SUPERATO</span>':nearBudget?' <span style="color:#e67e22;font-size:.75rem;font-weight:700">80% BUDGET</span>':'')+'</td><td class="num">'+d.visite+'</td><td class="num">'+d.px+'</td><td class="num">'+(d.bu||'-')+'</td><td class="num">'+(d.bl||'-')+'</td><td class="num"><strong>'+d.tot.toFixed(2)+'</strong></td><td class="num">'+(d.tot/d.visite).toFixed(2)+'</td><td style="white-space:nowrap"><button class="btn-act edit" onclick="rinominaMaisonCliente(\''+ne+'\')" title="Rinomina">Rinomina</button> <button class="btn-act del" onclick="eliminaMaisonCliente(\''+ne+'\')" title="Elimina">Elimina</button></td></tr>'});
   thtml+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td class="num"><strong>'+sorted.reduce((s,c)=>s+c[1].visite,0)+'</strong></td><td class="num"><strong>'+totPx+'</strong></td><td class="num"><strong>'+data.filter(r=>r.tipo_buono==='BU').length+'</strong></td><td class="num"><strong>'+data.filter(r=>r.tipo_buono==='BL').length+'</strong></td><td class="num"><strong>'+totCosto.toFixed(2)+'</strong></td><td></td><td></td></tr>';
@@ -2980,7 +2981,7 @@ function resetMaisonFiltri(){document.getElementById('maison-filt-nome').value='
   ['maison-filt-dal','maison-filt-al'].forEach(id=>{const el=document.getElementById(id);if(el){el.value='';if(el._flatpickr)el._flatpickr.clear()}});renderMaisonDashboard()}
 function _isCompleannoOggi(dataNascita){if(!dataNascita)return false;const oggi=new Date();const dn=new Date(dataNascita+'T12:00:00');return dn.getDate()===oggi.getDate()&&dn.getMonth()===oggi.getMonth()}
 function _getCompleanniProssimi(giorni){const now=new Date();const result=[];
-  maisonBudgetCache.forEach(b=>{if(!b.data_nascita)return;const dn=new Date(b.data_nascita+'T12:00:00');
+  getBudgetReparto().forEach(b=>{if(!b.data_nascita)return;const dn=new Date(b.data_nascita+'T12:00:00');
     const quest=new Date(now.getFullYear(),dn.getMonth(),dn.getDate());if(quest<new Date(now.getFullYear(),now.getMonth(),now.getDate()))quest.setFullYear(quest.getFullYear()+1);
     const diff=Math.floor((quest-now)/(86400000));if(diff>=0&&diff<=giorni)result.push({nome:b.nome,data:quest,giorni:diff})});
   return result.sort((a,b)=>a.giorni-b.giorni)}
@@ -2990,7 +2991,7 @@ function apriDettaglioMaison(nome){const righe=getMaisonFiltrati().filter(r=>r.n
   if(!righe.length){toast('Nessun dato per '+nome);return}
   const tot=righe.reduce((s,r)=>s+parseFloat(r.costo||0),0);const totPx=righe.reduce((s,r)=>s+(r.px||0),0);
   const nBU=righe.filter(r=>r.tipo_buono==='BU').length,nBL=righe.filter(r=>r.tipo_buono==='BL').length;
-  const budget=maisonBudgetCache.find(b=>b.nome.toLowerCase()===nome.toLowerCase());
+  const budget=getBudgetReparto().find(b=>b.nome.toLowerCase()===nome.toLowerCase());
   const mesiCliente=[...new Set(righe.map(r=>{const d=new Date(r.data_giornata+'T12:00:00');return MESI_FULL[d.getMonth()]+' '+d.getFullYear()}))].join(', ');
   const catBadgeD=budget&&budget.categoria==='full_maison'?' <span class="mini-badge" style="background:#b8860b;font-size:.78rem">Full Maison</span>':budget&&budget.categoria==='maison'?' <span class="mini-badge" style="background:#2980b9;font-size:.78rem">Maison</span>':budget&&budget.categoria==='direzione'?' <span class="mini-badge" style="background:#8e44ad;font-size:.78rem">Direzione</span>':'';
   const nascitaStr=budget&&budget.data_nascita?new Date(budget.data_nascita+'T12:00:00').toLocaleDateString('it-IT'):'';
@@ -3068,30 +3069,30 @@ async function esportaMaisonClientePDF(nome){const righe=getMaisonFiltrati().fil
     doc.save('maison_'+nome.replace(/\s+/g,'_')+'_'+_maisonFilePeriodo(righe)+'.pdf');toast('PDF esportato!')}catch(e){console.error(e);toast('Errore PDF')}}
 
 // Elimina singolo cliente (tutte le righe)
-async function eliminaMaisonCliente(nome){const count=maisonCache.filter(r=>r.nome===nome).length;
-  if(!confirm('Eliminare tutte le '+count+' registrazioni di "'+nome+'"?'))return;
-  try{await sbDel('costi_maison','nome=eq.'+encodeURIComponent(nome));maisonCache=maisonCache.filter(r=>r.nome!==nome);
-    logAzione('Maison: eliminato cliente',nome+' ('+count+' righe)');renderMaisonDashboard();renderMaisonBudgetAlerts();toast(nome+' eliminato ('+count+' righe)')}catch(e){toast('Errore')}}
+async function eliminaMaisonCliente(nome){const count=getMaisonReparto().filter(r=>r.nome===nome).length;
+  if(!confirm('Eliminare tutte le '+count+' registrazioni di "'+nome+'" ('+currentReparto+')?'))return;
+  try{await sbDel('costi_maison','nome=eq.'+encodeURIComponent(nome)+'&reparto_dip=eq.'+currentReparto);maisonCache=maisonCache.filter(r=>!(r.nome===nome&&(r.reparto_dip||'slots')===currentReparto));
+    logAzione('Maison: eliminato cliente',nome+' ('+count+' righe, '+currentReparto+')');renderMaisonDashboard();renderMaisonBudgetAlerts();toast(nome+' eliminato ('+count+' righe)')}catch(e){toast('Errore')}}
 // Rinomina cliente (tutte le occorrenze)
 function rinominaMaisonCliente(nome){const b=document.getElementById('pwd-modal-content');
   b.innerHTML='<h3>Rinomina cliente Maison</h3><div class="pwd-field"><label>Nome attuale</label><input type="text" value="'+escP(nome)+'" readonly style="background:var(--paper2);color:var(--muted)"></div><div class="pwd-field"><label>Nuovo nome</label><input type="text" id="rin-maison-nuovo" value="'+escP(nome)+'"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiRinominaMaison(\''+nome.replace(/'/g,"\\'")+'\')">Salva</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');setTimeout(()=>{const i=document.getElementById('rin-maison-nuovo');i.focus();i.select()},100)}
 async function eseguiRinominaMaison(vecchio){const nuovo=capitalizzaNome(document.getElementById('rin-maison-nuovo').value.trim());
   if(!nuovo){toast('Inserisci un nome');return}if(nuovo===vecchio){document.getElementById('pwd-modal').classList.add('hidden');return}
-  try{await sbPatch('costi_maison','nome=eq.'+encodeURIComponent(vecchio),{nome:nuovo});
-    maisonCache.forEach(r=>{if(r.nome===vecchio)r.nome=nuovo});
-    // Aggiorna anche budget se presente
-    const bIdx=maisonBudgetCache.findIndex(b=>b.nome.toLowerCase()===vecchio.toLowerCase());
+  try{await sbPatch('costi_maison','nome=eq.'+encodeURIComponent(vecchio)+'&reparto_dip=eq.'+currentReparto,{nome:nuovo});
+    maisonCache.forEach(r=>{if(r.nome===vecchio&&(r.reparto_dip||'slots')===currentReparto)r.nome=nuovo});
+    // Aggiorna anche budget se presente (solo reparto corrente)
+    const bIdx=maisonBudgetCache.findIndex(b=>b.nome.toLowerCase()===vecchio.toLowerCase()&&(b.reparto_dip||'slots')===currentReparto);
     if(bIdx!==-1){await sbPatch('maison_budget','id=eq.'+maisonBudgetCache[bIdx].id,{nome:nuovo});maisonBudgetCache[bIdx].nome=nuovo}
     logAzione('Maison: rinominato',vecchio+' → '+nuovo);document.getElementById('pwd-modal').classList.add('hidden');
     renderMaisonDashboard();renderMaisonBudgetUI();renderMaisonBudgetAlerts();toast(vecchio+' → '+nuovo)}catch(e){toast('Errore')}}
 // Elimina tutti i dati di un giorno
 async function eliminaMaisonGiorno(){const sel=document.getElementById('maison-del-giorno');if(!sel||!sel.value){toast('Seleziona un giorno');return}
   const giorno=sel.value;const label=new Date(giorno+'T12:00:00').toLocaleDateString('it-IT');
-  const count=maisonCache.filter(r=>r.data_giornata===giorno).length;
-  if(!confirm('Eliminare tutte le '+count+' registrazioni del '+label+'?'))return;
-  try{await sbDel('costi_maison','data_giornata=eq.'+giorno);maisonCache=maisonCache.filter(r=>r.data_giornata!==giorno);
-    logAzione('Maison: eliminato giorno',label+' ('+count+' righe)');renderMaisonDashboard();renderMaisonBudgetAlerts();toast('Giorno '+label+' eliminato')}catch(e){toast('Errore')}}
+  const count=getMaisonReparto().filter(r=>r.data_giornata===giorno).length;
+  if(!confirm('Eliminare tutte le '+count+' registrazioni del '+label+' ('+currentReparto+')?'))return;
+  try{await sbDel('costi_maison','data_giornata=eq.'+giorno+'&reparto_dip=eq.'+currentReparto);maisonCache=maisonCache.filter(r=>!(r.data_giornata===giorno&&(r.reparto_dip||'slots')===currentReparto));
+    logAzione('Maison: eliminato giorno',label+' ('+count+' righe, '+currentReparto+')');renderMaisonDashboard();renderMaisonBudgetAlerts();toast('Giorno '+label+' eliminato')}catch(e){toast('Errore')}}
 
 // Budget
 function renderMaisonBudgetUI(){const el=document.getElementById('maison-budget-list');if(!el)return;
@@ -3124,7 +3125,7 @@ async function salvaMaisonBudget(){const nome=capitalizzaNome(document.getElemen
   const cat=document.getElementById('maison-budget-cat').value||'';
   if(!nome){toast('Inserisci il nome del cliente');return}
   if(!chf&&!bu&&!bl&&!nascita&&!cat){toast('Imposta almeno un campo');return}
-  if(maisonBudgetCache.find(b=>b.nome.toLowerCase()===nome.toLowerCase())){toast('Già esistente per '+nome+'. Rimuovi prima il vecchio.');return}
+  if(getBudgetReparto().find(b=>b.nome.toLowerCase()===nome.toLowerCase())){toast('Già esistente per '+nome+'. Rimuovi prima il vecchio.');return}
   try{const r=await sbPost('maison_budget',{nome,budget_chf:chf,budget_bu:bu,budget_bl:bl,data_nascita:nascita,categoria:cat,reparto_dip:currentReparto});
     maisonBudgetCache.push(r[0]);document.getElementById('maison-budget-nome').value='';
     document.getElementById('maison-budget-chf').value='';document.getElementById('maison-budget-bu').value='';document.getElementById('maison-budget-bl').value='';const nbFp=document.getElementById('maison-budget-nascita');if(nbFp&&nbFp._flatpickr)nbFp._flatpickr.clear();else if(nbFp)nbFp.value='';
