@@ -933,6 +933,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
 const _k='DiarioCL26',_a='IRArGgsoICV9Xw4gNAggXg0le0UNBzNHCiwKentdNDE3MSNWbSlLfDQKUj8AICoGSFIcKwkrBCk5FmF/NyAPOAU1KgUEfykjChchKXMpX2ArC1M0Hg4UNAFTKi8SKFtacQVbQS0KDEsaNRAFBH8pLxQQW1sqAHF8NDA5IwAgKQkBeD4kGDwDJnYBZnc3IAwkXQwABQR7LihVPS0IOQN2XTwkKUJHNXYJd1MmMQw6NgoWDkhwFSQZQ10uNQICQS8uAkIvCyIBakARACc+IAcTfA==',_u='LB0VAhpVbGNQUjwYFQgMBywtQl8oHhsDBQgtOhxFMRkAEAgcJmJRWQ==';function _d(e){const b=atob(e),r=[];for(let i=0;i<b.length;i++)r.push(String.fromCharCode(b.charCodeAt(i)^_k.charCodeAt(i%_k.length)));return r.join('')}
 const SB_URL=_d(_u),SB_KEY=_d(_a);
 const VAPID_PUBLIC_KEY='BLWf5mPlI4UySMKuPkj6O7nTxXbocOu8ggabz8Lit4MsgDuYHAkh49V4TH2dk8fuFu-gvDH1MYHSsdbNfIdPF_E';
+const _ps='cVEDSllXIXQGAHZZAEULW3MuAQUgCFRDXgkmLQEBcVxTFFhbey4AAnYIUhZcCSF/A1NxDwNAUV4iLgoCdAsERw==';const PUSH_SECRET=_d(_ps);
 const MESI=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
 const MESI_FULL=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 const GIORNI=['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
@@ -1624,13 +1625,14 @@ async function registraPushSubscription(){
     var sub=await reg.pushManager.getSubscription();
     if(!sub){sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)})}
     var j=sub.toJSON();var op=getOperatore();if(!op||!j.endpoint||!j.keys)return;
-    await fetch(SB_URL+'/rest/v1/push_subscriptions',{method:'POST',headers:sbH({'Prefer':'resolution=merge-duplicates,return=representation'}),
-      body:JSON.stringify({operatore:op,reparto_dip:currentReparto,endpoint:j.endpoint,p256dh:j.keys.p256dh,auth:j.keys.auth})});
+    await fetch(SB_URL+'/functions/v1/send-push',{method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY,'x-push-secret':PUSH_SECRET},
+      body:JSON.stringify({action:'register',operatore:op,reparto_dip:currentReparto,endpoint:j.endpoint,p256dh:j.keys.p256dh,auth:j.keys.auth})})
   }catch(e){console.error('Push reg:',e)}}
 function inviaPush(destinatari,titolo,corpo,tipo,crossReparto){var op=getOperatore();if(!op)return;
   var body={destinatari:Array.isArray(destinatari)?destinatari:[destinatari],titolo:titolo,corpo:(corpo||'').substring(0,200),mittente:op,tipo:tipo||'general'};
   if(!crossReparto)body.reparto_dip=currentReparto;
-  fetch(SB_URL+'/functions/v1/send-push',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY},
+  fetch(SB_URL+'/functions/v1/send-push',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY,'x-push-secret':PUSH_SECRET},
     body:JSON.stringify(body)}).catch(function(){})}
 function checkBudgetPushAfterInsert(nomeCliente){var budget=getBudgetReparto().find(function(b){return b.nome.toLowerCase()===nomeCliente.toLowerCase()});
   if(!budget||!budget.budget_chf)return;var now=new Date(),meseStart=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-01';
