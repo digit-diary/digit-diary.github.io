@@ -1,4 +1,4 @@
-const CACHE_NAME = 'diario-cl-v2';
+const CACHE_NAME = 'diario-cl-v3';
 const SHELL_URLS = ['/', '/manifest.json', '/logo_casino.png', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -22,5 +22,60 @@ self.addEventListener('fetch', e => {
       }
       return r;
     }).catch(() => caches.match(e.request))
+  );
+});
+
+// PUSH NOTIFICATION HANDLER
+self.addEventListener('push', function(event) {
+  if (!event.data) return;
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+      // Skip push notification if app is visible (in-app notification handles it)
+      var isVisible = clientList.some(function(c) { return c.visibilityState === 'visible'; });
+      if (isVisible) return;
+      try {
+        var data = event.data.json();
+        var titolo = data.titolo || 'Diario Collaboratori';
+        var options = {
+          body: data.corpo || '',
+          icon: 'icon-192.png',
+          badge: 'icon-192.png',
+          tag: data.tipo || 'general',
+          renotify: true,
+          data: { tipo: data.tipo, mittente: data.mittente }
+        };
+        return self.registration.showNotification(titolo, options);
+      } catch (e) {
+        return self.registration.showNotification('Diario Collaboratori', {
+          body: event.data.text(),
+          icon: 'icon-192.png'
+        });
+      }
+    })
+  );
+});
+
+// NOTIFICATION CLICK HANDLER
+self.addEventListener('notificationclick', function(event) {
+  event.notification.close();
+  var tipo = event.notification.data ? event.notification.data.tipo : '';
+  var page = '';
+  if (tipo === 'nota') page = 'note-collega';
+  else if (tipo === 'consegna') page = 'consegna';
+  else if (tipo === 'promemoria') page = 'promemoria';
+  else if (tipo === 'budget') page = 'maison';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+      for (var i = 0; i < clientList.length; i++) {
+        var client = clientList[i];
+        if ('focus' in client) {
+          client.focus();
+          if (page) client.postMessage({ action: 'navigate', page: page });
+          return;
+        }
+      }
+      return self.clients.openWindow('/' + (page ? '#' + page : ''));
+    })
   );
 });
