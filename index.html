@@ -932,6 +932,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
 <script>
 const _k='DiarioCL26',_a='IRArGgsoICV9Xw4gNAggXg0le0UNBzNHCiwKentdNDE3MSNWbSlLfDQKUj8AICoGSFIcKwkrBCk5FmF/NyAPOAU1KgUEfykjChchKXMpX2ArC1M0Hg4UNAFTKi8SKFtacQVbQS0KDEsaNRAFBH8pLxQQW1sqAHF8NDA5IwAgKQkBeD4kGDwDJnYBZnc3IAwkXQwABQR7LihVPS0IOQN2XTwkKUJHNXYJd1MmMQw6NgoWDkhwFSQZQ10uNQICQS8uAkIvCyIBakARACc+IAcTfA==',_u='LB0VAhpVbGNQUjwYFQgMBywtQl8oHhsDBQgtOhxFMRkAEAgcJmJRWQ==';function _d(e){const b=atob(e),r=[];for(let i=0;i<b.length;i++)r.push(String.fromCharCode(b.charCodeAt(i)^_k.charCodeAt(i%_k.length)));return r.join('')}
 const SB_URL=_d(_u),SB_KEY=_d(_a);
+const VAPID_PUBLIC_KEY='BLWf5mPlI4UySMKuPkj6O7nTxXbocOu8ggabz8Lit4MsgDuYHAkh49V4TH2dk8fuFu-gvDH1MYHSsdbNfIdPF_E';
 const MESI=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
 const MESI_FULL=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 const GIORNI=['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
@@ -1022,7 +1023,7 @@ async function checkPwd(){const nome=document.getElementById('login-nome').value
   // Try individual operator login first
   if(nome){const opH=await secureHash(v,nome);const res=await sbRpc('verify_login',{p_nome:nome,p_hash:opH,p_legacy_hash:legacyH});
     if(res&&res.locked){err.textContent='Troppi tentativi. Riprova tra 1 minuto';return}
-    if(res&&res.valid){_loginFailCount=0;sessionStorage.setItem('operatore_corrente',nome);sessionStorage.setItem('diario_auth','1');sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token');document.getElementById('login-overlay').classList.add('hidden');document.getElementById('operatore-display').textContent='Operatore: '+nome;applicaTemaOperatore();applicaVisibilita();chiediPermessoNotifiche();
+    if(res&&res.valid){_loginFailCount=0;sessionStorage.setItem('operatore_corrente',nome);sessionStorage.setItem('diario_auth','1');sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token');document.getElementById('login-overlay').classList.add('hidden');document.getElementById('operatore-display').textContent='Operatore: '+nome;applicaTemaOperatore();applicaVisibilita();registraPushSubscription();
       if(res.deve_cambiare_pwd)setTimeout(()=>forzaCambioPwdOperatore(nome),300);
       else{setTimeout(()=>mostraNoteNonLette(),500);setTimeout(()=>mostraPromemoriaLogin(),1200);setTimeout(()=>mostraConsegnaLogin(),1800);setTimeout(checkQrHash,800)}return}
     if(res&&res.found){_loginFailCount++;if(_loginFailCount>=5){_loginLockUntil=Date.now()+30000;_loginFailCount=0}err.textContent='Password errata per '+nome;document.getElementById('pwd-input').value='';document.getElementById('pwd-input').focus();setTimeout(()=>err.textContent='',2500);return}}
@@ -1035,7 +1036,7 @@ async function checkPwd(){const nome=document.getElementById('login-nome').value
     var loginSettore=document.getElementById('login-settore');if(loginSettore&&loginSettore.value)currentReparto=loginSettore.value;
     if(nome){sessionStorage.setItem('operatore_corrente',nome);document.getElementById('operatore-display').textContent='Operatore: '+nome;setTimeout(()=>mostraNoteNonLette(),500)}
     else{sessionStorage.setItem('operatore_corrente','Admin');document.getElementById('operatore-display').textContent='Admin';}
-    applicaTemaOperatore();renderTipiUI();renderOperatoriUI();renderCampiRapportoUI();document.getElementById('tab-registro').style.display='';applicaVisibilita();chiediPermessoNotifiche();setTimeout(()=>mostraPromemoriaLogin(),1200);setTimeout(()=>mostraConsegnaLogin(),1800);setTimeout(checkQrHash,800);
+    applicaTemaOperatore();renderTipiUI();renderOperatoriUI();renderCampiRapportoUI();document.getElementById('tab-registro').style.display='';applicaVisibilita();registraPushSubscription();setTimeout(()=>mostraPromemoriaLogin(),1200);setTimeout(()=>mostraConsegnaLogin(),1800);setTimeout(checkQrHash,800);
   }else{_loginFailCount++;if(_loginFailCount>=5){_loginLockUntil=Date.now()+30000;_loginFailCount=0}err.textContent=nome?'Operatore non trovato o password errata':'Password errata';document.getElementById('pwd-input').value='';document.getElementById('pwd-input').focus();setTimeout(()=>err.textContent='',2500)}}
 function mostraForzaCambio(){const b=document.getElementById('pwd-modal-content');b.innerHTML='<h3>Cambia la password</h3><p>Password predefinita. Impostane una nuova.</p><div class="pwd-field"><label>Nuova password (min 4 car.)</label><input type="password" id="new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="eseguiPrimoCambio()">Imposta</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';document.getElementById('pwd-modal').classList.remove('hidden');setTimeout(()=>document.getElementById('new-pwd-1').focus(),100)}
 async function eseguiPrimoCambio(){const p1=document.getElementById('new-pwd-1').value,p2=document.getElementById('new-pwd-2').value,err=document.getElementById('pwd-modal-error');if(p1.length<4){err.textContent='Troppo corta';return}if(p1!==p2){err.textContent='Non coincidono';return}
@@ -1568,7 +1569,8 @@ async function inviaNotaCollega(){const dests=getDestinatariSelezionati(),msg=do
   if(!da){toast('Seleziona prima un operatore (in alto)');return}if(!dests.length){toast('Seleziona almeno un destinatario');return}if(!msg){toast('Scrivi un messaggio');return}
   const gid=dests.length>1?crypto.randomUUID():null;
   try{for(const dest of dests){const r=await sbPost('note_colleghi',{da_operatore:da,a_operatore:dest,messaggio:msg,gruppo_id:gid});noteColleghiCache.unshift(r[0])}
-  logAzione('Nota inviata','A: '+dests.join(', ')+' - '+msg.substring(0,50));document.getElementById('nota-msg').value='';document.querySelectorAll('#nota-dest-box input[type=checkbox]').forEach(cb=>cb.checked=false);renderNoteCollega();toast('Nota inviata a '+dests.join(', '))}catch(e){toast('Errore invio')}}
+  logAzione('Nota inviata','A: '+dests.join(', ')+' - '+msg.substring(0,50));document.getElementById('nota-msg').value='';document.querySelectorAll('#nota-dest-box input[type=checkbox]').forEach(cb=>cb.checked=false);renderNoteCollega();toast('Nota inviata a '+dests.join(', '));
+  inviaPush(dests,'Nota da '+da,msg.substring(0,120),'nota')}catch(e){toast('Errore invio')}}
 async function segnaNotaLetta(id){try{await sbPatch('note_colleghi','id=eq.'+id,{letta:true});const n=noteColleghiCache.find(n=>n.id===id);if(n)n.letta=true;renderNoteCollega()}catch(e){toast('Errore')}}
 async function eliminaNotaCollega(id,ruolo){if(!confirm('Eliminare questa nota?'))return;
   const campo=ruolo==='mitt'?'nascosta_mitt':'nascosta_dest';
@@ -1613,10 +1615,25 @@ function renderNoteCollega(){const op=getOperatore();
 function aggiornaNoteBadge(){const op=getOperatore();const badge=document.getElementById('note-badge');if(!badge||!op)return;
   const nonLette=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.letta&&!n.nascosta_dest).length;
   if(nonLette>0){badge.style.display='inline';badge.textContent=nonLette}else{badge.style.display='none'}}
-// NOTIFICHE BROWSER
-function chiediPermessoNotifiche(){
-  if(!('Notification' in window))return;
-  if(Notification.permission==='default'){Notification.requestPermission()}}
+// NOTIFICHE BROWSER + WEB PUSH
+function urlBase64ToUint8Array(b){var p='='.repeat((4-b.length%4)%4);var b64=(b+p).replace(/-/g,'+').replace(/_/g,'/');var raw=atob(b64);var arr=new Uint8Array(raw.length);for(var i=0;i<raw.length;i++)arr[i]=raw.charCodeAt(i);return arr}
+async function registraPushSubscription(){
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)){if('Notification' in window&&Notification.permission==='default')Notification.requestPermission();return}
+  var perm=await Notification.requestPermission();if(perm!=='granted')return;
+  try{var reg=await navigator.serviceWorker.ready;
+    var sub=await reg.pushManager.getSubscription();
+    if(!sub){sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)})}
+    var j=sub.toJSON();var op=getOperatore();if(!op||!j.endpoint||!j.keys)return;
+    await fetch(SB_URL+'/rest/v1/push_subscriptions',{method:'POST',headers:sbH({'Prefer':'resolution=merge-duplicates,return=representation'}),
+      body:JSON.stringify({operatore:op,reparto_dip:currentReparto,endpoint:j.endpoint,p256dh:j.keys.p256dh,auth:j.keys.auth})});
+  }catch(e){console.error('Push reg:',e)}}
+function inviaPush(destinatari,titolo,corpo,tipo){var op=getOperatore();if(!op)return;
+  fetch(SB_URL+'/functions/v1/send-push',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY},
+    body:JSON.stringify({destinatari:Array.isArray(destinatari)?destinatari:[destinatari],titolo:titolo,corpo:(corpo||'').substring(0,200),mittente:op,reparto_dip:currentReparto,tipo:tipo||'general'})}).catch(function(){})}
+function checkBudgetPushAfterInsert(nomeCliente){var budget=getBudgetReparto().find(function(b){return b.nome.toLowerCase()===nomeCliente.toLowerCase()});
+  if(!budget||!budget.budget_chf)return;var now=new Date(),meseStart=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-01';
+  var spent=getMaisonReparto().filter(function(r){return r.nome.toLowerCase()===nomeCliente.toLowerCase()&&r.data_giornata>=meseStart}).reduce(function(s,r){return s+parseFloat(r.costo||0)},0);
+  if(spent>=budget.budget_chf)inviaPush(['tutti'],'Budget superato: '+nomeCliente,nomeCliente+' '+spent.toFixed(0)+'/'+budget.budget_chf.toFixed(0)+' CHF','budget')}
 function inviaNotifica(titolo,corpo,onClick){
   if(!('Notification' in window)||Notification.permission!=='granted')return;
   try{const n=new Notification(titolo,{body:corpo,icon:'icon-192.png',badge:'icon-192.png'});
@@ -2421,7 +2438,8 @@ async function inviaConsegnaTurno(){const turno=document.getElementById('cons-tu
     const r=await sbPost('consegne_turno',rec);consegneCache.unshift(r[0]);
     document.getElementById('cons-messaggio').value='';
     logAzione('Consegna turno',turno+' — '+msg.substring(0,50));
-    renderConsegne();aggiornaConsegnaBadge();toast('Consegna inviata!')}catch(e){toast('Errore')}}
+    renderConsegne();aggiornaConsegnaBadge();toast('Consegna inviata!');
+    inviaPush(destinatario==='tutti'?['tutti']:[destinatario],'Consegna '+turno+' da '+getOperatore(),msg.substring(0,120),'consegna')}catch(e){toast('Errore')}}
 async function segnaConsegnaLetta(id){const op=getOperatore();
   try{await sbPatch('consegne_turno','id=eq.'+id,{letto_da:op,letto_at:new Date().toISOString()});
     const c=consegneCache.find(x=>x.id===id);if(c){c.letto_da=op;c.letto_at=new Date().toISOString()}
@@ -2749,7 +2767,8 @@ async function salvaPromemoria(){const titolo=document.getElementById('pm-titolo
     document.getElementById('pm-titolo').value='';document.getElementById('pm-descrizione').value='';
     const fp=document.getElementById('pm-scadenza');if(fp&&fp._flatpickr)fp._flatpickr.clear();else fp.value='';
     logAzione('Promemoria creato',titolo+' → '+assegnato+' ('+scadenza+')');
-    renderPromemoria();aggiornaPromemoriaBadge();toast('Promemoria creato')}catch(e){toast('Errore')}}
+    renderPromemoria();aggiornaPromemoriaBadge();toast('Promemoria creato');
+    inviaPush(assegnato==='tutti'?['tutti']:[assegnato],'Promemoria: '+titolo,(descrizione||titolo).substring(0,120),'promemoria')}catch(e){toast('Errore')}}
 async function completaPromemoria(id){const op=getOperatore();
   try{await sbPatch('promemoria','id=eq.'+id,{completata:true,completata_da:op,completata_at:new Date().toISOString()});
     const p=promemoriaCache.find(x=>x.id===id);if(p){p.completata=true;p.completata_da=op;p.completata_at=new Date().toISOString()}
@@ -2895,7 +2914,9 @@ async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0
     status.innerHTML=msg;
     if(totalRows){toast(totalRows+' righe importate');logAzione('Import Maison',totalRows+' righe da '+f.name)}
     else if(giorniSaltati.length)toast(giorniSaltati.length+' giorni già presenti (saltati)');
-    renderMaisonDashboard();renderMaisonBudgetAlerts();if(forzaSostituisci||!giorniSaltati.length)window._maisonPendingFile=null;
+    renderMaisonDashboard();renderMaisonBudgetAlerts();
+    if(totalRows)getBudgetReparto().forEach(function(b){checkBudgetPushAfterInsert(b.nome)});
+    if(forzaSostituisci||!giorniSaltati.length)window._maisonPendingFile=null;
   }catch(e){console.error(e);status.textContent='Errore: '+e.message;toast('Errore importazione')}
   input.value=''}
 // TOGGLE SEZIONI
@@ -2914,7 +2935,7 @@ async function salvaMaisonManuale(){
     document.getElementById('maison-man-nome').value='';document.getElementById('maison-man-importo').value='';
     document.getElementById('maison-man-px').value='1';document.getElementById('maison-man-tipo').value='';
     const fp=document.getElementById('maison-man-data');if(fp&&fp._flatpickr)fp._flatpickr.clear();
-    renderMaisonDashboard();renderMaisonBudgetAlerts();logAzione('Maison manuale',nome+' '+importo+' CHF');toast('Spesa aggiunta per '+nome)}catch(e){toast('Errore: '+e.message)}}
+    renderMaisonDashboard();renderMaisonBudgetAlerts();logAzione('Maison manuale',nome+' '+importo+' CHF');toast('Spesa aggiunta per '+nome);checkBudgetPushAfterInsert(nome)}catch(e){toast('Errore: '+e.message)}}
 // REGALI MAISON
 function getRegaliReparto(){return regaliCache.filter(function(r){return(r.reparto_dip||'slots')===currentReparto})}
 async function salvaRegalo(){
@@ -3647,7 +3668,8 @@ document.getElementById('profilo-modal').addEventListener('click',function(e){if
 document.getElementById('scadenza-modal').addEventListener('click',function(e){if(e.target===this)this.classList.add('hidden')});
 document.getElementById('note-modal').addEventListener('click',function(e){if(e.target===this)this.classList.add('hidden')});
 document.getElementById('inp-testo').addEventListener('keydown',e=>{if(e.ctrlKey&&e.key==='Enter')salva()});
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});
+  navigator.serviceWorker.addEventListener('message',function(e){if(e.data&&e.data.action==='navigate'&&e.data.page)switchPage(e.data.page)})}
 </script>
 </body>
 </html>
