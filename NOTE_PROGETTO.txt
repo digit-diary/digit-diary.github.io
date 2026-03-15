@@ -785,6 +785,18 @@
        - Credenziali Supabase offuscate (no plaintext)
        - Deploy sincronizzato
 
+  [56] 10 modifiche DiarioCollaboratori (15 marzo 2026)
+       1. Fix: Sovrascrivi lista maison (file reference preservata)
+       2. UX: Mostra/Nascondi toggle per liste lunghe (scheda clienti, tabella, spese)
+       3. UX: Scrollbar visibile sulle liste (styled webkit + firefox)
+       4. Feature: "Seven" / "(Se" auto-detected come Ristorante Seven → spese extra
+       5. Feature: Form inserimento manuale spesa maison (nome, PX, importo, BU/BL, data)
+       6. Feature: Regali per clienti maison (DB: regali_maison)
+       7. Feature: Report personalizzabile - scegli sezioni prima del download PDF
+       8. Feature: Dettaglio cliente completo (regali + note private + totale complessivo)
+       9. Feature: Confronto mese su mese nei costi maison (+/- % vs mese precedente)
+       10. Feature: Note private per cliente maison (DB: note_clienti)
+
 
 ================================================================================
   FILE DEL PROGETTO
@@ -824,6 +836,8 @@
   promemoria              Task/promemoria assegnati a operatori
   consegne_turno          Consegne passaggio turno
   spese_extra             Spese esterne (cene, viaggi, rimborsi, biglietti)
+  regali_maison           Regali per clienti maison (con importo opzionale)
+  note_clienti            Note private per cliente maison
 
 
 ================================================================================

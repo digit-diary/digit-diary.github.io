@@ -555,6 +555,65 @@ bullet('Mostra un avviso nella Dashboard quando un compleanno e oggi o nei pross
 bullet('Mostra una torta emoji accanto al nome nella lista budget il giorno del compleanno.');
 tip('L\'admin puo controllare chi vede gli avvisi compleanni dalla sezione Visibilita > "Compleanni maison".');
 
+// ===== 18b. INSERIMENTO MANUALE SPESA MAISON =====
+title('Inserimento manuale spesa maison', 2);
+para('Oltre al caricamento Excel, e possibile aggiungere singole spese maison manualmente:');
+bullet('Compilare il form con: nome cliente (autocomplete), numero persone (PX), importo CHF, tipo (Normale/BU/BL), data.');
+bullet('Cliccare "Aggiungi spesa maison" per salvare.');
+tip('Utile per inserire spese non presenti nel formulario Excel o per correzioni rapide.');
+
+// ===== 18c. RICONOSCIMENTO "SEVEN" =====
+title('Riconoscimento Ristorante Seven', 2);
+para('Il sistema riconosce automaticamente "Seven" o "(Se" nei nomi del formulario Excel come Ristorante Seven (esterno).');
+bullet('Le righe con questi nomi vengono automaticamente spostate nelle Spese Extra come "Cena esterna".');
+bullet('Il luogo viene impostato automaticamente a "Ristorante Seven".');
+bullet('Un messaggio viola nel riepilogo mostra quante righe sono state spostate.');
+
+// ===== 18d. CONFRONTO MESE SU MESE =====
+title('Confronto mese su mese', 2);
+para('Nel riepilogo costi maison, il sistema mostra automaticamente il confronto con il mese precedente:');
+bullet('Percentuale di variazione (+/-) con colore: rosso se aumentato, verde se diminuito.');
+bullet('Importi del mese corrente e precedente visualizzati.');
+
+// ===== 18e. MOSTRA/NASCONDI SEZIONI =====
+title('Mostra/Nascondi sezioni', 2);
+para('Le liste lunghe (scheda clienti, tabella costi) hanno un pulsante toggle per nasconderle e risparmiare spazio.');
+bullet('Cliccare "Nascondi" per chiudere la sezione, "Mostra" per riaprirla.');
+
+// ===== 18f. REGALI PER CLIENTI =====
+title('Regali per clienti Maison', 2);
+para('Nella sezione Maison e presente un modulo per registrare regali offerti ai clienti:');
+bullet('Compilare: nome cliente (autocomplete), descrizione del regalo, importo CHF (opzionale), data.');
+bullet('Cliccare "Aggiungi regalo" per salvare.');
+bullet('I regali appaiono nel dettaglio cliente e nei report personalizzabili.');
+tip('L\'importo e opzionale: utile per tracciare regali anche senza valore monetario (es: torta compleanno).');
+
+// ===== 18g. NOTE PRIVATE =====
+title('Note private per cliente', 2);
+para('Nel dettaglio di un cliente maison e possibile aggiungere note private:');
+bullet('Le note sono visibili solo nell\'app (NON vengono incluse nei report PDF).');
+bullet('Per aggiungere una nota: aprire il dettaglio cliente, scrivere nel campo "Aggiungi nota privata" e cliccare "Salva nota".');
+bullet('Ogni nota mostra operatore e data. Possono essere eliminate singolarmente.');
+tip('Le note private sono utili per appunti interni su preferenze, abitudini o situazioni particolari del cliente.');
+
+// ===== 18h. DETTAGLIO CLIENTE COMPLETO =====
+title('Dettaglio cliente completo', 2);
+para('Cliccando sul nome di un cliente nella tabella maison si apre un popup con tutto:');
+bullet('Visite ristorante con dettaglio giorno per giorno.');
+bullet('Spese extra (cene esterne, viaggi, rimborsi, ecc.).');
+bullet('Regali registrati (con importi e date).');
+bullet('Note private.');
+bullet('Totale complessivo (ristorante + spese extra + regali).');
+bullet('Pulsanti CSV/PDF per esportare il dettaglio.');
+
+// ===== 18i. REPORT PERSONALIZZABILE =====
+title('Report personalizzabile', 2);
+para('I pulsanti Report Settimanale/Annuale ora mostrano una finestra per scegliere le sezioni da includere:');
+bullet('Panoramica, Differenze Cassa, Costi Maison, Spese Extra, Regali, Moduli, Promemoria, Registrazioni.');
+bullet('Deselezionare le sezioni che non si vogliono includere nel PDF.');
+bullet('Cliccare "Genera PDF" per procedere.');
+tip('Utile per report personalizzati: ad esempio, solo costi maison per la direzione, o solo differenze cassa per il controllo interno.');
+
 // ===== 19. USO MOBILE =====
 title('19. USO SU DISPOSITIVI MOBILI', 1);
 spacer(2);
