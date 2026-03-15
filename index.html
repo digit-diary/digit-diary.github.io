@@ -1092,7 +1092,7 @@ async function registraBiometrico(){try{
     rp:{name:'Diario Collaboratori',id:location.hostname},
     user:{id:userId,name:op,displayName:op},
     pubKeyCredParams:[{alg:-7,type:'public-key'},{alg:-257,type:'public-key'}],
-    authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'preferred'},
+    authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'discouraged'},
     timeout:60000}});
   var credId=btoa(String.fromCharCode.apply(null,new Uint8Array(cred.rawId)));
   localStorage.setItem('webauthn_cred',JSON.stringify({id:credId,op:op}));
