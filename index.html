@@ -2982,11 +2982,11 @@ function renderMaisonDashboard(){const data=getMaisonFiltrati();
   let thtml='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h4 style="font-family:Playfair Display,serif;margin:0;color:var(--ink)">Dettaglio per cliente</h4><button class="btn-reset" onclick="toggleSezione(\'maison-table-inner\',this)" style="font-size:.92rem;padding:6px 16px">&#9650; Nascondi</button></div><div id="maison-table-inner"><div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px;flex-wrap:wrap"><select id="maison-del-giorno" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper);color:var(--ink)"><option value="">Seleziona giorno...</option>'+giorniDisp.map(d=>'<option value="'+d+'">'+new Date(d+'T12:00:00').toLocaleDateString('it-IT')+'</option>').join('')+'</select><button class="btn-act del" onclick="eliminaMaisonGiorno()" style="padding:5px 12px">Elimina giorno</button></div>';
   thtml+='<table class="collab-table"><thead><tr><th>Cliente</th><th class="num">Visite</th><th class="num">Persone</th><th class="num">BU</th><th class="num">BL</th><th class="num">Totale CHF</th><th class="num">Media CHF</th><th></th></tr></thead><tbody>';
   const _brDash=getBudgetReparto();
-  sorted.forEach(([nome,d])=>{
+  sorted.forEach(([nome,d],_idx)=>{
     const budget=_brDash.find(b=>b.nome.toLowerCase()===nome.toLowerCase());
     const overBudget=budget&&budget.budget_chf&&d.tot>=budget.budget_chf;
     const nearBudget=budget&&budget.budget_chf&&d.tot>=budget.budget_chf*0.8&&!overBudget;
-    const catBg=budget&&budget.categoria==='full_maison'?'background:rgba(184,134,11,0.12)':budget&&budget.categoria==='maison'?'background:rgba(41,128,185,0.12)':budget&&budget.categoria==='direzione'?'background:rgba(142,68,173,0.12)':'';
+    const catBg=budget&&budget.categoria==='full_maison'?'background:rgba(184,134,11,0.12)':budget&&budget.categoria==='maison'?'background:rgba(41,128,185,0.12)':budget&&budget.categoria==='direzione'?'background:rgba(142,68,173,0.12)':(_idx%2?'background:rgba(0,0,0,0.04)':'');
     const rowStyle=overBudget?'background:rgba(192,57,43,0.1)':nearBudget?'background:rgba(230,126,34,0.1)':catBg;
     const ne=nome.replace(/'/g,"\\'");
     const clientInfo=budget;
