@@ -1076,7 +1076,7 @@ async function eseguiForzaCambioPwdOp(nome){const p1=document.getElementById('op
   const nh=await secureHash(p1,nome);try{await sbRpc('force_change_pwd',{p_nome:nome,p_new_hash:nh,p_deve_cambiare:false});
   document.getElementById('pwd-modal-content').innerHTML='<h3>Password impostata!</h3><p style="text-align:center;color:var(--muted)">Da ora accedi con la tua nuova password.</p><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\');mostraNoteNonLette()">OK</button></div>';
   toast('Password personale impostata!')}catch(e){err.textContent='Errore salvataggio'}}
-function esci(){const tk=getAdminToken();if(tk)sbRpc('invalidate_admin_session',{p_token:tk}).catch(()=>{});localStorage.removeItem('diario_auth_ts');localStorage.removeItem('operatore_corrente');sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token');localStorage.removeItem('webauthn_cred');location.reload()}
+function esci(){const tk=getAdminToken();if(tk)sbRpc('invalidate_admin_session',{p_token:tk}).catch(()=>{});localStorage.removeItem('diario_auth_ts');sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token');location.reload()}
 // FACE ID / TOUCH ID (WebAuthn)
 async function biometricAvailable(){if(!window.PublicKeyCredential)return false;try{return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()}catch(e){return false}}
 async function offriBiometrico(){if(!await biometricAvailable())return;if(localStorage.getItem('webauthn_cred'))return;
