@@ -83,11 +83,15 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Build query: get subscriptions for recipients in the correct reparto
+    // Build query: get subscriptions for recipients
+    // reparto_dip filter only for reparto-specific types (consegna, budget)
     let query = sb
       .from("push_subscriptions")
-      .select("*")
-      .eq("reparto_dip", reparto_dip || "slots");
+      .select("*");
+
+    if (reparto_dip) {
+      query = query.eq("reparto_dip", reparto_dip);
+    }
 
     // Exclude the sender
     if (mittente) {
