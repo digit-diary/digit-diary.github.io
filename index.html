@@ -1086,10 +1086,11 @@ function esci(){const tk=getAdminToken();if(tk)sbRpc('invalidate_admin_session',
 async function biometricAvailable(){if(!window.PublicKeyCredential)return false;try{return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()}catch(e){return false}}
 function getBioName(){var ua=navigator.userAgent||'';if(/iPhone/.test(ua)){var h=window.screen.height;return h>=812?'Face ID':'Touch ID'}if(/iPad|Macintosh/.test(ua)&&navigator.maxTouchPoints>0)return'Touch ID';if(/Mac/.test(ua))return'Touch ID';if(/Android/.test(ua))return'Sblocco biometrico';if(/Windows/.test(ua))return'Windows Hello';return'Face ID / Touch ID'}
 async function offriBiometrico(){if(!await biometricAvailable())return;if(_hasBioForCurrentOp())return;
-  // Se bio esiste per altro operatore, sovrascrive
   var op=getOperatore();if(!op)return;
+  // Se l'operatore ha gia rifiutato, non chiedere piu
+  if(localStorage.getItem('bio_declined_'+op))return;
   var b=document.getElementById('pwd-modal-content');
-  var bn=getBioName();b.innerHTML='<h3>Attivare '+bn+'?</h3><p style="color:var(--muted);font-size:.9rem">Accedi più velocemente la prossima volta senza inserire la password.</p><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">No grazie</button><button class="btn-modal-ok" onclick="registraBiometrico()">Attiva</button></div>';
+  var bn=getBioName();b.innerHTML='<h3>Attivare '+bn+'?</h3><p style="color:var(--muted);font-size:.9rem">Accedi più velocemente la prossima volta senza inserire la password.</p><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="localStorage.setItem(\'bio_declined_\'+getOperatore(),\'1\');document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">No grazie</button><button class="btn-modal-ok" onclick="registraBiometrico()">Attiva</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden')}
 async function registraBiometrico(){try{
   var op=getOperatore();if(!op){toast('Nessun operatore');return}
@@ -1106,6 +1107,7 @@ async function registraBiometrico(){try{
     timeout:60000}});
   var credId=btoa(String.fromCharCode.apply(null,new Uint8Array(cred.rawId)));
   localStorage.setItem('webauthn_cred',JSON.stringify({id:credId,op:op}));
+  localStorage.removeItem('bio_declined_'+op);
   document.getElementById('pwd-modal').classList.add('hidden');toast(getBioName()+' attivato!')}catch(e){document.getElementById('pwd-modal').classList.add('hidden');if(e.name!=='NotAllowedError')toast('Non disponibile su questo dispositivo')}}
 async function loginBiometrico(){try{
   var stored=JSON.parse(localStorage.getItem('webauthn_cred'));if(!stored)return false;
