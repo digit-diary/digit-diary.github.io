@@ -3768,13 +3768,9 @@ document.getElementById('profilo-modal').addEventListener('click',function(e){if
 document.getElementById('scadenza-modal').addEventListener('click',function(e){if(e.target===this)this.classList.add('hidden')});
 document.getElementById('note-modal').addEventListener('click',function(e){if(e.target===this)this.classList.add('hidden')});
 document.getElementById('inp-testo').addEventListener('keydown',e=>{if(e.ctrlKey&&e.key==='Enter')salva()});
-// LOCK SCREEN: solo se Face ID attivato — blocca ad ogni rientro (non su refresh)
-var _lockHiddenAt=0;
+// LOCK SCREEN: solo se Face ID attivato — blocca ad ogni rientro
 document.addEventListener('visibilitychange',function(){
-  if(document.hidden){_lockHiddenAt=Date.now();return}
-  // Ignora se nascosto per meno di 2s (refresh, cambio tab veloce)
-  if(!_lockHiddenAt||Date.now()-_lockHiddenAt<2000)return;
-  _lockHiddenAt=0;
+  if(document.hidden)return;
   if(_isSessionValid()&&_hasBioForCurrentOp()){
     sessionStorage.removeItem('bio_verified');
     document.getElementById('login-overlay').classList.remove('hidden');
