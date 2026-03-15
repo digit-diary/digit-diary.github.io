@@ -2404,7 +2404,7 @@ async function inviaConsegnaTurno(){const turno=document.getElementById('cons-tu
   if(!msg){toast('Scrivi un messaggio di consegna');return}
   const oggi=getGiornataCasino();
   const destinatario=document.getElementById('cons-destinatario').value;
-  try{const rec={data_giornata:oggi,turno_uscente:turno,operatore:getOperatore(),messaggio:msg,priorita,destinatario};
+  try{const rec={data_giornata:oggi,turno_uscente:turno,operatore:getOperatore(),messaggio:msg,priorita,destinatario,reparto_dip:currentReparto};
     const r=await sbPost('consegne_turno',rec);consegneCache.unshift(r[0]);
     document.getElementById('cons-messaggio').value='';
     logAzione('Consegna turno',turno+' — '+msg.substring(0,50));
@@ -2415,8 +2415,9 @@ async function segnaConsegnaLetta(id){const op=getOperatore();
     renderConsegne();aggiornaConsegnaBadge()}catch(e){toast('Errore')}}
 function renderConsegne(){const el=document.getElementById('consegne-list');if(!el)return;
   const op=getOperatore();
-  if(!consegneCache.length){el.innerHTML='<div class="empty-state"><p>Nessuna consegna</p><small>Le consegne appariranno qui dopo essere state inviate</small></div>';return}
-  el.innerHTML=consegneCache.slice(0,20).map(c=>{const d=new Date(c.created_at);const isAlta=c.priorita==='alta';
+  var _cr=getConsegneReparto();
+  if(!_cr.length){el.innerHTML='<div class="empty-state"><p>Nessuna consegna</p><small>Le consegne appariranno qui dopo essere state inviate</small></div>';return}
+  el.innerHTML=_cr.slice(0,20).map(c=>{const d=new Date(c.created_at);const isAlta=c.priorita==='alta';
     const letto=!!c.letto_da;const isMia=c.operatore===op;const canEdit=isMia&&!letto;
     const destLabel=c.destinatario&&c.destinatario!=='tutti'?c.destinatario:'Tutti';
     let btns='';
@@ -2439,10 +2440,10 @@ async function annullaConsegna(id){const c=consegneCache.find(x=>x.id===id);if(!
   try{await sbDel('consegne_turno','id=eq.'+id);consegneCache=consegneCache.filter(x=>x.id!==id);
     logAzione('Consegna annullata',c.messaggio.substring(0,50));renderConsegne();aggiornaConsegnaBadge();toast('Consegna annullata')}catch(e){toast('Errore')}}
 function aggiornaConsegnaBadge(){const op=getOperatore();const badge=document.getElementById('consegna-badge');if(!badge||!op)return;
-  const nonLette=consegneCache.filter(c=>!c.letto_da&&c.operatore!==op&&(c.destinatario==='tutti'||c.destinatario===op)).length;
+  const nonLette=getConsegneReparto().filter(c=>!c.letto_da&&c.operatore!==op&&(c.destinatario==='tutti'||c.destinatario===op)).length;
   if(nonLette){badge.style.display='inline';badge.textContent=nonLette}else{badge.style.display='none'}}
 function mostraConsegnaLogin(){const op=getOperatore();if(!op)return;
-  const nonLette=consegneCache.filter(c=>!c.letto_da&&c.operatore!==op&&(c.destinatario==='tutti'||c.destinatario===op));
+  const nonLette=getConsegneReparto().filter(c=>!c.letto_da&&c.operatore!==op&&(c.destinatario==='tutti'||c.destinatario===op));
   if(!nonLette.length)return;
   const ultima=nonLette[0];const isAlta=ultima.priorita==='alta';
   const mc=document.getElementById('note-modal-content');
@@ -3380,6 +3381,7 @@ function setReparto(rep){currentReparto=rep;
   renderMaisonDashboard();renderMaisonBudgetUI();renderSpeseExtra();renderRegali();
   if(typeof renderModuliList==='function')renderModuliList();
   if(typeof renderRapporto==='function')renderRapporto();
+  renderConsegne();aggiornaConsegnaBadge();
   renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();
   renderScadenzeBanner()}
 function applicaRepartoVisibilita(){
@@ -3400,6 +3402,7 @@ function getMaisonReparto(){return maisonCache.filter(function(r){return(r.repar
 function getBudgetReparto(){return maisonBudgetCache.filter(function(b){return(b.reparto_dip||'slots')===currentReparto})}
 function getSpeseReparto(){return speseExtraCache.filter(function(r){return(r.reparto_dip||'slots')===currentReparto})}
 function getModuliReparto(){return moduliCache.filter(function(m){return(m.reparto_dip||'slots')===currentReparto})}
+function getConsegneReparto(){return consegneCache.filter(function(c){return(c.reparto_dip||'slots')===currentReparto})}
 
 // MENU MOBILE
 function toggleMobileNav(){document.getElementById('mobile-nav').classList.toggle('show')}
