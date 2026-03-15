@@ -3768,9 +3768,10 @@ document.getElementById('profilo-modal').addEventListener('click',function(e){if
 document.getElementById('scadenza-modal').addEventListener('click',function(e){if(e.target===this)this.classList.add('hidden')});
 document.getElementById('note-modal').addEventListener('click',function(e){if(e.target===this)this.classList.add('hidden')});
 document.getElementById('inp-testo').addEventListener('keydown',e=>{if(e.ctrlKey&&e.key==='Enter')salva()});
-// LOCK SCREEN: solo se Face ID attivato — blocca ad ogni rientro
+// LOCK SCREEN: solo su PWA installata (mobile), non su browser desktop
+var _isPWA=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone;
 document.addEventListener('visibilitychange',function(){
-  if(document.hidden)return;
+  if(document.hidden||!_isPWA)return;
   if(_isSessionValid()&&_hasBioForCurrentOp()){
     sessionStorage.removeItem('bio_verified');
     document.getElementById('login-overlay').classList.remove('hidden');
