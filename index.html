@@ -3737,12 +3737,18 @@ window.addEventListener('load',async()=>{
       if(isAdmin())document.getElementById('tab-registro').style.display='';
     }else if(isAdmin()){document.getElementById('operatore-display').textContent='Admin';document.getElementById('tab-registro').style.display=''}}
   else{
-    // Pre-compila operatore se salvato
-    var savedOp=localStorage.getItem('operatore_corrente');
-    if(savedOp){var sel=document.getElementById('login-nome');if(sel){for(var i=0;i<sel.options.length;i++){if(sel.options[i].value===savedOp){sel.selectedIndex=i;break}}}}
-    // Face ID auto-trigger se credenziale salvata per l'operatore corrente
-    if(_hasBioForCurrentOp()){var bl=document.getElementById('biometric-login');if(bl){bl.style.display='block';var _bb=document.getElementById('bio-login-btn');if(_bb)_bb.textContent='\u{1F512} '+getBioName()}setTimeout(()=>tentaBiometrico(),500)}
-    else document.getElementById('pwd-input').focus()}
+    // Face ID auto-trigger se QUALSIASI credenziale esiste (login screen)
+    if(_hasBioForAnyOp()){
+      // Imposta operatore_corrente dalla credenziale per far funzionare tentaBiometrico
+      var _bioC=JSON.parse(localStorage.getItem('webauthn_cred'));
+      localStorage.setItem('operatore_corrente',_bioC.op);
+      var bl=document.getElementById('biometric-login');if(bl){bl.style.display='block';var _bb=document.getElementById('bio-login-btn');if(_bb)_bb.textContent='\u{1F512} '+getBioName()+' ('+_bioC.op+')'}
+      setTimeout(()=>tentaBiometrico(),500)}
+    else{
+      // Pre-compila operatore se salvato
+      var savedOp=localStorage.getItem('operatore_corrente');
+      if(savedOp){var sel=document.getElementById('login-nome');if(sel){for(var i=0;i<sel.options.length;i++){if(sel.options[i].value===savedOp){sel.selectedIndex=i;break}}}}
+      document.getElementById('pwd-input').focus()}}
   const n=new Date();document.getElementById('today-date').innerHTML=n.getDate()+' '+MESI[n.getMonth()]+' '+n.getFullYear()+'<br><small style="color:var(--muted);font-size:.75rem">'+GIORNI[n.getDay()]+'</small>';
   // Render solo se autenticato (evita mostrare dati del vecchio operatore dietro il login)
   if(_isSessionValid()||sessionStorage.getItem('bio_verified')==='1'){
