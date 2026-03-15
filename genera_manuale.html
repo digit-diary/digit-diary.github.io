@@ -654,8 +654,40 @@ bullet('Per usare la firma digitale su tablet, ruotare il dispositivo in orizzon
 bullet('Per scannerizzare un QR code, usare la fotocamera del telefono.');
 bullet('L\'app puo essere aggiunta alla schermata home come Progressive Web App.');
 
-// ===== 20. FAQ =====
-title('21. DOMANDE FREQUENTI', 1);
+// ===== 21. PWA E NOTIFICHE =====
+title('21. APP INSTALLABILE E NOTIFICHE', 1);
+spacer(2);
+para('L\'applicazione puo essere installata come app nativa sul telefono, tablet o computer.');
+title('Installazione', 2);
+bullet('iPhone/iPad: aprire l\'app in Safari, toccare il pulsante Condividi, poi "Aggiungi alla schermata Home".');
+bullet('Android: aprire in Chrome, il browser propone automaticamente "Installa app". Oppure: menu ⋮ → "Aggiungi a schermata Home".');
+bullet('Desktop (Chrome/Edge): cliccare l\'icona di installazione nella barra degli indirizzi.');
+para('Una volta installata, l\'app si apre a schermo intero senza barra del browser, come un\'app nativa.');
+title('Notifiche', 2);
+para('Al primo login, l\'app chiede il permesso di inviare notifiche. Se accettato:');
+bullet('Nuove note da colleghi: notifica con nome mittente e anteprima messaggio.');
+bullet('Promemoria scaduti: notifica al login con titoli dei promemoria.');
+bullet('Le notifiche appaiono anche quando il tab del browser non e attivo.');
+tip('Su iPhone le notifiche funzionano solo se l\'app e installata (aggiunta alla schermata Home) e il dispositivo ha iOS 16.4 o successivo.');
+
+// ===== 22. STAMPA E CONFRONTO =====
+title('22. STAMPA SCHEDA E CONFRONTO CLIENTI', 1);
+spacer(2);
+title('Stampa scheda cliente', 2);
+para('Nel popup dettaglio di un cliente Maison, accanto ai pulsanti CSV e PDF, c\'e il pulsante "Stampa":');
+bullet('Apre una finestra di stampa con layout pulito (senza pulsanti ne form).');
+bullet('Include: header Casino Lugano, tutti i dati del cliente, tabelle, e timestamp.');
+bullet('Utile per avere una copia cartacea della scheda cliente.');
+title('Confronto tra clienti', 2);
+para('Nella sezione "Scheda clienti Maison" c\'e il pulsante "Confronta clienti":');
+bullet('Selezionare 2 o 3 clienti dai menu a tendina.');
+bullet('Cliccare "Confronta" per visualizzare una tabella con 10 indicatori (KPI).');
+bullet('I valori piu alti sono evidenziati nel colore del cliente.');
+bullet('Sotto la tabella appare un grafico a barre del trend mensile di ciascun cliente.');
+tip('Il confronto usa solo i dati del reparto corrente (Slots o Tavoli). Cambiando reparto, i clienti disponibili cambiano.');
+
+// ===== 23. FAQ =====
+title('23. DOMANDE FREQUENTI', 1);
 spacer(2);
 
 title('Come faccio a cambiare la mia password?', 3);
@@ -663,7 +695,7 @@ para('Andare in Impostazioni e cliccare "Cambia la mia password" nella sezione S
 title('Ho dimenticato la password, cosa faccio?', 3);
 para('Cliccare "Password dimenticata?" nella schermata di login e inserire il codice di recupero. Se non si dispone del codice, contattare l\'admin.');
 title('Posso usare l\'app offline?', 3);
-para('No, l\'app richiede una connessione internet per accedere al database. Tuttavia i PDF generati possono essere salvati localmente.');
+para('L\'app puo essere aperta offline se installata come PWA (la pagina viene caricata dalla cache). Tuttavia per leggere o scrivere dati serve la connessione internet (database cloud). I PDF generati possono essere salvati localmente.');
 title('I dati sono al sicuro?', 3);
 para('Si. Le password sono protette con PBKDF2 (100.000 iterazioni), le credenziali del database sono offuscate, le operazioni admin richiedono un token di sessione, e tutte le funzioni sensibili passano per RPC server-side protette. Il rate limiting blocca i tentativi di accesso non autorizzati.');
 title('Quanto costa l\'app?', 3);
