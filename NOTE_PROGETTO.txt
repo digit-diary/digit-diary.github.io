@@ -836,6 +836,34 @@
        - Fix border-radius bottone Tavoli
        - Data nascita editabile nel popup dettaglio cliente
 
+  [59] PWA installabile + Notifiche browser (15 marzo 2026)
+       - manifest.json: nome app, colori, icone 192/512px, standalone
+       - sw.js: service worker cache-first (app shell) + network-first (API)
+       - Meta tags Apple mobile web app per iPhone
+       - Icone PWA quadrate create da logo (icon-192.png, icon-512.png)
+       - Notification API: chiede permesso al login
+       - Notifica automatica nuove note colleghi (polling 15s)
+       - Notifica promemoria scaduti al login
+       - Funziona su: Chrome, Firefox, Edge, Safari, Android, iPhone (PWA)
+
+  [60] Stampa scheda cliente + Confronto clienti (15 marzo 2026)
+       - Stampa: bottone verde nel popup dettaglio, apre finestra print-friendly
+         CSS dedicato (nasconde bottoni/input, header Casino, timestamp footer)
+       - Confronto: bottone teal nella scheda clienti Maison
+         Selettore 2-3 clienti con dropdown
+         Tabella 10 KPI (categoria, ristorante, extra, regali, totale, visite,
+         PX, media, BU, BL) con evidenziazione valore massimo
+         Grafico trend mensile a barre con legenda colori
+         Tutto filtrato per reparto (getMaisonReparto, getSpeseReparto, etc.)
+
+  [61] Scheda cliente Maison professionale (15 marzo 2026)
+       - 6 KPI cards: Ristorante, Extra, Regali, Media/visita, Visite, Ultimo
+       - Info frequenza: giorno preferito, visite/settimana, ultimo passaggio
+       - Confronto mese su mese per cliente con pills colorate (+/- %)
+       - Mini bar chart CSS trend mensile (puro HTML, no Chart.js)
+       - Sfondo colorato per categoria (oro/blu/viola) in scheda e tabella
+       - Righe non categorizzate: zebra bianco/grigio neutro (non beige)
+
 
 ================================================================================
   FILE DEL PROGETTO
@@ -851,6 +879,10 @@
   migrate_costi_maison.sql Migrazione: costi_maison, maison_budget
   migrazione.js           Script per migrare dati da localStorage a Supabase
   genera_manuale.html     Generatore manuale PDF dell'app
+  manifest.json           PWA web app manifest
+  sw.js                   Service worker (cache + offline)
+  icon-192.png            Icona PWA 192x192
+  icon-512.png            Icona PWA 512x512
   NOTE_PROGETTO.txt       Questo file
 
 
