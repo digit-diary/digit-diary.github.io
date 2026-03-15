@@ -3199,15 +3199,15 @@ function renderMaisonBudgetUI(){const el=document.getElementById('maison-budget-
   if(filtCat){filtered=clients.filter(c=>{if(filtCat==='nessuna')return!c.cat;return c.cat===filtCat})}
   // Group by category
   const catDefs=[{key:'full_maison',label:'Full Maison',color:'#b8860b'},{key:'maison',label:'Maison',color:'#2980b9'},{key:'direzione',label:'Direzione',color:'#8e44ad'},{key:'',label:'Non categorizzati',color:'var(--muted)'}];
-  function renderClientRow(c){
+  function renderClientRow(c,idx){
     const pct=c.b&&c.b.budget_chf?Math.round(c.spent/c.b.budget_chf*100):0;
     const pctColor=pct>=100?'var(--accent)':pct>=80?'#e67e22':'#2c6e49';
-    const borderColor=c.cat==='full_maison'?'#b8860b':c.cat==='maison'?'#2980b9':c.cat==='direzione'?'#8e44ad':'var(--line)';
+    const borderColor=c.cat==='full_maison'?'#b8860b':c.cat==='maison'?'#2980b9':c.cat==='direzione'?'#8e44ad':'var(--muted)';
     const nascitaLabel=c.b&&c.b.data_nascita?new Date(c.b.data_nascita+'T12:00:00').toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit'}):'';
     const isBday=c.b?_isCompleannoOggi(c.b.data_nascita):false;
     const ne=c.nome.replace(/'/g,"\\'");
     const budgetBar=c.b&&c.b.budget_chf?'<div class="budget-bar"><div class="budget-bar-fill" style="width:'+Math.min(pct,100)+'%;background:'+pctColor+'"></div></div>':'';
-    const bgColor=c.cat==='full_maison'?'rgba(184,134,11,0.15)':c.cat==='maison'?'rgba(41,128,185,0.15)':c.cat==='direzione'?'rgba(142,68,173,0.15)':'var(--paper2)';
+    const bgColor=c.cat==='full_maison'?'rgba(184,134,11,0.15)':c.cat==='maison'?'rgba(41,128,185,0.15)':c.cat==='direzione'?'rgba(142,68,173,0.15)':(idx%2?'rgba(0,0,0,0.03)':'var(--paper)');
     return'<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:'+bgColor+';border-radius:3px;margin-bottom:4px;border-left:3px solid '+borderColor+';flex-wrap:wrap"><span style="font-weight:600;min-width:150px;cursor:pointer" class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(c.nome)+(isBday?' <span style="font-size:1.1rem">&#127874;</span>':'')+'</span>'+(c.spent?'<span style="font-size:.82rem;color:var(--muted)">'+c.spent.toFixed(0)+' CHF</span>':'')+(c.b&&c.b.budget_chf?'<span style="font-size:.82rem;color:'+pctColor+';font-weight:600">'+pct+'%</span>'+budgetBar:'')+(nascitaLabel?'<span style="font-size:.82rem;color:var(--muted)">&#127874; '+nascitaLabel+'</span>':'')+(c.b?'<button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2);font-size:.72rem" onclick="modificaMaisonInfo('+c.b.id+')">Modifica</button>':'<button class="btn-del-tipo" style="color:#2980b9;border-color:#2980b9;font-size:.72rem" onclick="assegnaCatRapida(\''+ne+'\')">Assegna</button>')+(c.b?'<button class="btn-del-tipo" style="font-size:.72rem" onclick="rimuoviMaisonBudget('+c.b.id+')">Rimuovi</button>':'')+'</div>'}
   if(filtCat){html+=filtered.map(renderClientRow).join('')}
   else{catDefs.forEach(cd=>{
