@@ -1111,6 +1111,9 @@ async function loginBiometrico(){try{
   return true}catch(e){return false}}
 async function tentaBiometrico(){var ok=await loginBiometrico();if(ok){
   var stored=JSON.parse(localStorage.getItem('webauthn_cred'));
+  // Sicurezza: verifica che la credenziale sia dell'operatore atteso
+  var expectedOp=localStorage.getItem('operatore_corrente');
+  if(expectedOp&&stored.op!==expectedOp){toast('Credenziale non valida per questo operatore');return}
   localStorage.setItem('diario_auth_ts',String(Date.now()));localStorage.setItem('operatore_corrente',stored.op);sessionStorage.setItem('bio_verified','1');
     document.getElementById('login-overlay').classList.add('hidden');
   document.getElementById('operatore-display').textContent='Operatore: '+stored.op;
