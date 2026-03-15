@@ -715,9 +715,6 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
       <button class="btn-salva" onclick="salvaMaisonManuale()" style="background:var(--accent2)">+ Aggiungi spesa maison</button>
     </div>
   </div>
-  <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
-    <button class="btn-export" onclick="apriListaClientiMaison()" style="padding:10px 20px;font-size:.88rem;border-color:var(--accent2);color:var(--accent2)">Lista Clienti Maison / Full Maison</button>
-  </div>
   <div id="maison-alerts-container" style="margin-top:16px"></div>
   <div class="main-card" style="margin-top:20px">
     <div class="card-header">Riepilogo Costi Maison</div>
@@ -742,7 +739,8 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
   </div>
   <div class="settings-section" style="margin-top:20px" id="maison-budget-section">
     <h4 style="display:flex;justify-content:space-between;align-items:center">Scheda clienti Maison <button class="btn-reset" onclick="toggleSezione('maison-budget-list',this)" style="font-size:.92rem;padding:6px 16px">&#9650; Nascondi</button></h4>
-    <p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Gestisci categoria (Maison/Full Maison), budget, data nascita. <span style="display:inline-flex;gap:6px;margin-left:8px"><button class="btn-export" onclick="esportaListaMaisonCSV()" style="font-size:.72rem;padding:3px 10px">Lista CSV</button><button class="btn-export btn-export-pdf" onclick="esportaListaMaisonPDF()" style="font-size:.72rem;padding:3px 10px">Lista PDF</button></span></p>
+    <p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Gestisci categoria (Maison/Full Maison), budget, data nascita.</p>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><button class="btn-export" onclick="esportaListaMaisonCSV()" style="font-size:.78rem;padding:5px 14px">Scarica CSV</button><button class="btn-export btn-export-pdf" onclick="esportaListaMaisonPDF()" style="font-size:.78rem;padding:5px 14px">Scarica PDF</button><button class="btn-export" onclick="apriListaClientiMaison()" style="font-size:.78rem;padding:5px 14px;border-color:var(--accent2);color:var(--accent2)">Mostra Lista</button></div>
     <div id="maison-budget-list" style="margin-bottom:14px"></div>
     <div class="add-tipo-row" style="align-items:flex-end">
       <div class="field"><label>Cliente</label><div class="ac-wrap"><input type="text" id="maison-budget-nome" placeholder="Nome..." oninput="acFiltraMaison('maison-budget-nome','ac-maison-budget')" onfocus="acFiltraMaison('maison-budget-nome','ac-maison-budget')"><div class="ac-drop" id="ac-maison-budget"></div></div></div>
@@ -2988,7 +2986,7 @@ function renderMaisonDashboard(){const data=getMaisonFiltrati();
     const budget=_brDash.find(b=>b.nome.toLowerCase()===nome.toLowerCase());
     const overBudget=budget&&budget.budget_chf&&d.tot>=budget.budget_chf;
     const nearBudget=budget&&budget.budget_chf&&d.tot>=budget.budget_chf*0.8&&!overBudget;
-    const catBg=budget&&budget.categoria==='full_maison'?'background:rgba(184,134,11,0.07)':budget&&budget.categoria==='maison'?'background:rgba(41,128,185,0.07)':budget&&budget.categoria==='direzione'?'background:rgba(142,68,173,0.07)':'';
+    const catBg=budget&&budget.categoria==='full_maison'?'background:rgba(184,134,11,0.12)':budget&&budget.categoria==='maison'?'background:rgba(41,128,185,0.12)':budget&&budget.categoria==='direzione'?'background:rgba(142,68,173,0.12)':'';
     const rowStyle=overBudget?'background:rgba(192,57,43,0.1)':nearBudget?'background:rgba(230,126,34,0.1)':catBg;
     const ne=nome.replace(/'/g,"\\'");
     const clientInfo=budget;
@@ -3209,7 +3207,7 @@ function renderMaisonBudgetUI(){const el=document.getElementById('maison-budget-
     const isBday=c.b?_isCompleannoOggi(c.b.data_nascita):false;
     const ne=c.nome.replace(/'/g,"\\'");
     const budgetBar=c.b&&c.b.budget_chf?'<div class="budget-bar"><div class="budget-bar-fill" style="width:'+Math.min(pct,100)+'%;background:'+pctColor+'"></div></div>':'';
-    const bgColor=c.cat==='full_maison'?'rgba(184,134,11,0.08)':c.cat==='maison'?'rgba(41,128,185,0.08)':c.cat==='direzione'?'rgba(142,68,173,0.08)':'var(--paper2)';
+    const bgColor=c.cat==='full_maison'?'rgba(184,134,11,0.15)':c.cat==='maison'?'rgba(41,128,185,0.15)':c.cat==='direzione'?'rgba(142,68,173,0.15)':'var(--paper2)';
     return'<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:'+bgColor+';border-radius:3px;margin-bottom:4px;border-left:3px solid '+borderColor+';flex-wrap:wrap"><span style="font-weight:600;min-width:150px;cursor:pointer" class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(c.nome)+(isBday?' <span style="font-size:1.1rem">&#127874;</span>':'')+'</span>'+(c.spent?'<span style="font-size:.82rem;color:var(--muted)">'+c.spent.toFixed(0)+' CHF</span>':'')+(c.b&&c.b.budget_chf?'<span style="font-size:.82rem;color:'+pctColor+';font-weight:600">'+pct+'%</span>'+budgetBar:'')+(nascitaLabel?'<span style="font-size:.82rem;color:var(--muted)">&#127874; '+nascitaLabel+'</span>':'')+(c.b?'<button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2);font-size:.72rem" onclick="modificaMaisonInfo('+c.b.id+')">Modifica</button>':'<button class="btn-del-tipo" style="color:#2980b9;border-color:#2980b9;font-size:.72rem" onclick="assegnaCatRapida(\''+ne+'\')">Assegna</button>')+(c.b?'<button class="btn-del-tipo" style="font-size:.72rem" onclick="rimuoviMaisonBudget('+c.b.id+')">Rimuovi</button>':'')+'</div>'}
   if(filtCat){html+=filtered.map(renderClientRow).join('')}
   else{catDefs.forEach(cd=>{
