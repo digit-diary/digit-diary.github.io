@@ -483,6 +483,10 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
   <input type="password" id="pwd-input" placeholder="Password..." onkeydown="if(event.key==='Enter') checkPwd()">
   <button class="btn-login" onclick="checkPwd()">Entra</button>
   <button class="btn-recupero" onclick="recuperoPassword()">Password dimenticata?</button>
+  <div id="biometric-login" style="display:none;margin-top:12px;text-align:center">
+    <div style="width:100%;height:1px;background:var(--line);margin:8px 0 14px"></div>
+    <button onclick="tentaBiometrico()" style="padding:12px 28px;font-size:1rem;font-family:'Source Sans 3',sans-serif;font-weight:600;border:1.5px solid var(--accent2);color:var(--accent2);background:none;border-radius:3px;cursor:pointer;letter-spacing:.02em">&#128274; Face ID / Touch ID</button>
+  </div>
   <div class="login-error" id="login-error"></div>
   <div class="login-hint" id="login-hint"></div>
 </div></div>
@@ -922,7 +926,8 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
   <div class="settings-section"><h4>Operatori</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Operatore attuale: <strong id="op-attuale">—</strong>. Ogni operatore accede con il proprio nome e password.</p><div id="operatori-list" style="margin-bottom:14px"></div>
     <div class="add-tipo-row" style="align-items:flex-end"><div class="field"><label>Nome</label><input type="text" id="new-operatore-nome" placeholder="Nome..."></div><div class="field"><label>Password</label><input type="password" id="new-operatore-pwd" placeholder="Min 4 caratteri..."></div><div class="field"><label>Conferma password</label><input type="password" id="new-operatore-pwd2" placeholder="Ripeti..."></div><div class="field"><label>Reparto</label><select id="new-operatore-rep" style="padding:10px"><option value="entrambi">Entrambi</option><option value="slots">Slots</option><option value="tavoli">Tavoli</option></select></div><button class="btn-add-tipo" onclick="aggiungiOperatoreConPwd()">+ Crea operatore</button></div></div>
   <div class="settings-section" id="visibilita-section" style="display:none"><h4>Visibilità pagine e funzioni</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Controlla quali pagine e funzioni sono visibili agli operatori.</p><div id="visibilita-list"></div></div>
-  <div class="settings-section"><h4>Sicurezza</h4><div class="settings-btn-row" id="sicurezza-btns"></div></div>
+  <div class="settings-section"><h4>Sicurezza</h4><div class="settings-btn-row" id="sicurezza-btns"></div>
+    <div id="biometric-settings" style="margin-top:14px;padding:12px 16px;background:var(--paper2);border-radius:3px"></div></div>
   <div class="settings-section" id="ai-section" style="display:none"><h4>Assistente AI (Groq)</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Migliora automaticamente i testi nei moduli disciplinari. Ottieni una chiave gratuita su <a href="https://console.groq.com/keys" target="_blank" style="color:var(--accent2)">console.groq.com</a>.</p>
     <div class="add-tipo-row"><div class="field" style="flex:2"><label>Chiave API Groq</label><input type="password" id="groq-key-input" placeholder="gsk_..."></div><button class="btn-add-tipo" onclick="salvaGroqKey()">Salva</button></div><p id="groq-status" style="font-size:.82rem;margin-top:8px"></p></div>
 </div>
@@ -1026,7 +1031,7 @@ async function checkPwd(){const nome=document.getElementById('login-nome').value
     if(res&&res.locked){err.textContent='Troppi tentativi. Riprova tra 1 minuto';return}
     if(res&&res.valid){_loginFailCount=0;localStorage.setItem('operatore_corrente',nome);localStorage.setItem('diario_auth','1');localStorage.removeItem('is_admin');localStorage.removeItem('admin_token');document.getElementById('login-overlay').classList.add('hidden');document.getElementById('operatore-display').textContent='Operatore: '+nome;applicaTemaOperatore();applicaVisibilita();registraPushSubscription();
       if(res.deve_cambiare_pwd)setTimeout(()=>forzaCambioPwdOperatore(nome),300);
-      else{setTimeout(()=>mostraNoteNonLette(),500);setTimeout(()=>mostraPromemoriaLogin(),1200);setTimeout(()=>mostraConsegnaLogin(),1800);setTimeout(checkQrHash,800)}return}
+      else{setTimeout(()=>mostraNoteNonLette(),500);setTimeout(()=>mostraPromemoriaLogin(),1200);setTimeout(()=>mostraConsegnaLogin(),1800);setTimeout(checkQrHash,800);setTimeout(()=>offriBiometrico(),2500)}return}
     if(res&&res.found){_loginFailCount++;if(_loginFailCount>=5){_loginLockUntil=Date.now()+30000;_loginFailCount=0}err.textContent='Password errata per '+nome;document.getElementById('pwd-input').value='';document.getElementById('pwd-input').focus();setTimeout(()=>err.textContent='',2500);return}}
   // Fallback: master password (admin) - salt sempre __master__
   const masterH=await secureHash(v,'__master__');
@@ -1070,7 +1075,48 @@ async function eseguiForzaCambioPwdOp(nome){const p1=document.getElementById('op
   const nh=await secureHash(p1,nome);try{await sbRpc('force_change_pwd',{p_nome:nome,p_new_hash:nh,p_deve_cambiare:false});
   document.getElementById('pwd-modal-content').innerHTML='<h3>Password impostata!</h3><p style="text-align:center;color:var(--muted)">Da ora accedi con la tua nuova password.</p><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\');mostraNoteNonLette()">OK</button></div>';
   toast('Password personale impostata!')}catch(e){err.textContent='Errore salvataggio'}}
-function esci(){const tk=getAdminToken();if(tk)sbRpc('invalidate_admin_session',{p_token:tk}).catch(()=>{});localStorage.removeItem('diario_auth');localStorage.removeItem('operatore_corrente');localStorage.removeItem('is_admin');localStorage.removeItem('admin_token');location.reload()}
+function esci(){const tk=getAdminToken();if(tk)sbRpc('invalidate_admin_session',{p_token:tk}).catch(()=>{});localStorage.removeItem('diario_auth');localStorage.removeItem('operatore_corrente');localStorage.removeItem('is_admin');localStorage.removeItem('admin_token');localStorage.removeItem('webauthn_cred');location.reload()}
+// FACE ID / TOUCH ID (WebAuthn)
+async function biometricAvailable(){if(!window.PublicKeyCredential)return false;try{return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()}catch(e){return false}}
+async function offriBiometrico(){if(!await biometricAvailable())return;if(localStorage.getItem('webauthn_cred'))return;
+  var op=getOperatore();if(!op)return;
+  var b=document.getElementById('pwd-modal-content');
+  b.innerHTML='<h3>Attivare Face ID / Touch ID?</h3><p style="color:var(--muted);font-size:.9rem">Accedi più velocemente la prossima volta senza inserire la password.</p><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">No grazie</button><button class="btn-modal-ok" onclick="registraBiometrico()">Attiva</button></div>';
+  document.getElementById('pwd-modal').classList.remove('hidden')}
+async function registraBiometrico(){try{
+  var op=getOperatore();var userId=new TextEncoder().encode(op);
+  var cred=await navigator.credentials.create({publicKey:{
+    challenge:crypto.getRandomValues(new Uint8Array(32)),
+    rp:{name:'Diario Collaboratori',id:location.hostname},
+    user:{id:userId,name:op,displayName:op},
+    pubKeyCredParams:[{alg:-7,type:'public-key'},{alg:-257,type:'public-key'}],
+    authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'preferred'},
+    timeout:60000}});
+  var credId=btoa(String.fromCharCode.apply(null,new Uint8Array(cred.rawId)));
+  localStorage.setItem('webauthn_cred',JSON.stringify({id:credId,op:op}));
+  document.getElementById('pwd-modal').classList.add('hidden');toast('Face ID / Touch ID attivato!')}catch(e){document.getElementById('pwd-modal').classList.add('hidden');if(e.name!=='NotAllowedError')toast('Non disponibile su questo dispositivo')}}
+async function loginBiometrico(){try{
+  var stored=JSON.parse(localStorage.getItem('webauthn_cred'));if(!stored)return false;
+  var rawId=Uint8Array.from(atob(stored.id),function(c){return c.charCodeAt(0)});
+  await navigator.credentials.get({publicKey:{
+    challenge:crypto.getRandomValues(new Uint8Array(32)),
+    allowCredentials:[{id:rawId,type:'public-key',transports:['internal']}],
+    userVerification:'required',
+    timeout:60000}});
+  return true}catch(e){return false}}
+async function tentaBiometrico(){var ok=await loginBiometrico();if(ok){
+  var stored=JSON.parse(localStorage.getItem('webauthn_cred'));
+  localStorage.setItem('diario_auth','1');localStorage.setItem('operatore_corrente',stored.op);
+  document.getElementById('login-overlay').classList.add('hidden');
+  document.getElementById('operatore-display').textContent='Operatore: '+stored.op;
+  applicaTemaOperatore();applicaVisibilita();registraPushSubscription();
+  setTimeout(()=>mostraNoteNonLette(),500);setTimeout(()=>mostraPromemoriaLogin(),1200);setTimeout(()=>mostraConsegnaLogin(),1800)}
+  else toast('Autenticazione fallita')}
+function disattivaBiometrico(){localStorage.removeItem('webauthn_cred');toast('Face ID / Touch ID disattivato');renderBiometricSettings()}
+function renderBiometricSettings(){var el=document.getElementById('biometric-settings');if(!el)return;
+  var cred=localStorage.getItem('webauthn_cred');
+  if(cred){var op=JSON.parse(cred).op;el.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between"><div><strong>Face ID / Touch ID</strong><br><span style="font-size:.84rem;color:var(--muted)">Attivo per: '+escP(op)+'</span></div><button onclick="disattivaBiometrico()" style="padding:8px 16px;font-size:.85rem;font-family:Source Sans 3,sans-serif;font-weight:600;border:1.5px solid #c0392b;color:#c0392b;background:none;border-radius:2px;cursor:pointer">Disattiva</button></div>'}
+  else{biometricAvailable().then(function(ok){el.innerHTML=ok?'<div style="display:flex;align-items:center;justify-content:space-between"><div><strong>Face ID / Touch ID</strong><br><span style="font-size:.84rem;color:var(--muted)">Non attivo</span></div><button onclick="offriBiometrico()" style="padding:8px 16px;font-size:.85rem;font-family:Source Sans 3,sans-serif;font-weight:600;border:1.5px solid var(--accent2);color:var(--accent2);background:none;border-radius:2px;cursor:pointer">Attiva</button></div>':'<span style="font-size:.84rem;color:var(--muted)">Face ID / Touch ID non disponibile su questo dispositivo</span>'})}}
 async function resetPasswordOperatore(nome){const b=document.getElementById('pwd-modal-content');
   b.innerHTML='<h3>Resetta password</h3><p>Imposta una nuova password temporanea per <strong>'+escP(nome)+'</strong></p><div class="pwd-field"><label>Nuova password</label><input type="password" id="reset-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="reset-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiResetPwdOp(\''+nome.replace(/'/g,"\\'")+'\')">Resetta</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';
   document.getElementById('pwd-modal').classList.remove('hidden')}
@@ -1232,7 +1278,7 @@ function applicaTemaOperatore(){const t=localStorage.getItem(getTemaKey())||loca
 // NAVIGATION
 function switchPage(name){flushRapportoSave();document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));const pg=document.getElementById('page-'+name);if(pg)pg.classList.add('active');const tb=document.querySelector('.nav-tab[data-page="'+name+'"]');if(tb)tb.classList.add('active');localStorage.setItem('pagina_corrente',name);if(typeof aggiornaMenuMobile==='function')aggiornaMenuMobile();
   if(name==='diario'){aggiornaNomi();render();updateStats()}if(name==='statistiche')renderStatistiche();if(name==='rapporto'){if(!rapportoGiornoAperto){const gc=getGiornataCasino();const d=new Date(gc+'T12:00:00');rapportoMese=d.getMonth();rapportoAnno=d.getFullYear();rapportoGiornoAperto=gc}renderRapporto()}if(name==='note-collega')renderNoteCollega();if(name==='impostazioni'){renderTipiUI();renderScadenzeSettings();renderOperatoriUI();renderCampiRapportoUI();
-    const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}renderCollaboratoriUI();const ai=document.getElementById('ai-section');if(ai)ai.style.display=isAdmin()?'':'none';const visSec=document.getElementById('visibilita-section');if(visSec){visSec.style.display=isAdmin()?'':'none';if(isAdmin())renderVisibilitaUI()}if(isAdmin()&&groqKey){const gs=document.getElementById('groq-status');if(gs)gs.innerHTML='<span style="color:#2c6e49">Chiave configurata</span>'}}if(name==='moduli'){if(!document.getElementById('mod-list-results'))_modFiltInit=false;renderModuliList()};if(name==='registro')renderRegistro();if(name==='maison'){renderMaisonDashboard();renderMaisonBudgetUI();initMaisonFlatpickr();renderSpeseExtra();initSpeseExtraFP();renderRegali()}if(name==='promemoria'){renderPromemoria();initPromemoriaUI()}if(name==='dashboard')renderDashboard();if(name==='consegna'){renderConsegne();initConsegnaUI()}}
+    const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}renderCollaboratoriUI();renderBiometricSettings();const ai=document.getElementById('ai-section');if(ai)ai.style.display=isAdmin()?'':'none';const visSec=document.getElementById('visibilita-section');if(visSec){visSec.style.display=isAdmin()?'':'none';if(isAdmin())renderVisibilitaUI()}if(isAdmin()&&groqKey){const gs=document.getElementById('groq-status');if(gs)gs.innerHTML='<span style="color:#2c6e49">Chiave configurata</span>'}}if(name==='moduli'){if(!document.getElementById('mod-list-results'))_modFiltInit=false;renderModuliList()};if(name==='registro')renderRegistro();if(name==='maison'){renderMaisonDashboard();renderMaisonBudgetUI();initMaisonFlatpickr();renderSpeseExtra();initSpeseExtraFP();renderRegali()}if(name==='promemoria'){renderPromemoria();initPromemoriaUI()}if(name==='dashboard')renderDashboard();if(name==='consegna'){renderConsegne();initConsegnaUI()}}
 
 // TIPI
 async function saveTipiP(){await setImp('tipi_personalizzati',JSON.stringify(tipiPersonalizzati))}
@@ -3655,7 +3701,9 @@ window.addEventListener('load',async()=>{
       else{setTimeout(()=>mostraNoteNonLette(),800);setTimeout(()=>mostraPromemoriaLogin(),1500);setTimeout(()=>mostraConsegnaLogin(),2100)}
       if(isAdmin())document.getElementById('tab-registro').style.display='';
     }else if(isAdmin()){document.getElementById('operatore-display').textContent='Admin';document.getElementById('tab-registro').style.display=''}}
-  else document.getElementById('pwd-input').focus();
+  else{document.getElementById('pwd-input').focus();
+    // Mostra pulsante Face ID e auto-trigger se credenziale salvata
+    if(localStorage.getItem('webauthn_cred')){var bl=document.getElementById('biometric-login');if(bl)bl.style.display='block';setTimeout(()=>tentaBiometrico(),500)}}
   const n=new Date();document.getElementById('today-date').innerHTML=n.getDate()+' '+MESI[n.getMonth()]+' '+n.getFullYear()+'<br><small style="color:var(--muted);font-size:.75rem">'+GIORNI[n.getDay()]+'</small>';
   renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();aggiornaNoteBadge();aggiornaPromemoriaBadge();aggiornaConsegnaBadge();applicaVisibilita();renderDashboard();
   const savedPage=localStorage.getItem('pagina_corrente');if(savedPage&&savedPage!=='diario')switchPage(savedPage);
