@@ -475,7 +475,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
 </style>
 </head>
 <body>
-<script>(function(){var ts=parseInt(localStorage.getItem('diario_auth_ts')||'0');var c=localStorage.getItem('webauthn_cred');var op=localStorage.getItem('operatore_corrente');var hasBio=false;try{hasBio=c&&JSON.parse(c).op===op}catch(e){}var verified=sessionStorage.getItem('bio_verified')==='1';if(ts>0&&((hasBio&&verified)||(!hasBio&&Date.now()-ts<28800000)))document.documentElement.classList.add('authed')})()</script>
+<script>(function(){var ts=parseInt(localStorage.getItem('diario_auth_ts')||'0');var c=localStorage.getItem('webauthn_cred');var op=localStorage.getItem('operatore_corrente');var hasBio=false;try{hasBio=c&&JSON.parse(c).op===op}catch(e){}var verified=sessionStorage.getItem('bio_verified')==='1';var active=sessionStorage.getItem('session_active')==='1';if(ts>0&&((hasBio&&verified)||(!hasBio&&active&&Date.now()-ts<28800000)))document.documentElement.classList.add('authed')})()</script>
 <div id="login-overlay"><div class="login-box">
   <img src="logo_casino.png" alt="Casino Lugano SA" style="width:140px;margin-bottom:16px"><h2>Accesso Protetto</h2><p>Seleziona settore, operatore e password</p>
   <select id="login-settore" onchange="aggiornaLoginOperatori()" style="margin-bottom:8px;text-align:left;letter-spacing:0;padding:11px 14px;width:100%;border:1.5px solid var(--line);border-radius:2px;font-size:1rem;font-family:'Source Sans 3',sans-serif;color:var(--ink);background:var(--paper2);cursor:pointer"><option value="">-- Seleziona settore --</option><option value="slots">Slots</option><option value="tavoli">Tavoli</option></select>
@@ -958,7 +958,7 @@ function getTuttiTipi(){let list=[...TIPI_DEFAULT.filter(t=>!tipiNascosti.includ
   if(tipiOrdine.length)list.sort((a,b)=>{const ia=tipiOrdine.indexOf(a.nome),ib=tipiOrdine.indexOf(b.nome);return(ia===-1?999:ia)-(ib===-1?999:ib)});return list}
 function getColore(n){return coloriOverride[n]||(getTuttiTipi().find(t=>t.nome===n)||{}).colore||'#8a7d6b'}
 function getOperatore(){return localStorage.getItem('operatore_corrente')||''}
-function _isSessionValid(){var ts=parseInt(localStorage.getItem('diario_auth_ts')||'0');if(!ts)return false;if(_hasBioForCurrentOp())return true;return Date.now()-ts<28800000}
+function _isSessionValid(){var ts=parseInt(localStorage.getItem('diario_auth_ts')||'0');if(!ts)return false;if(_hasBioForCurrentOp())return true;return sessionStorage.getItem('session_active')==='1'&&Date.now()-ts<28800000}
 function _hasBioForCurrentOp(){var c=localStorage.getItem('webauthn_cred');if(!c)return false;try{var op=JSON.parse(c).op;return op===localStorage.getItem('operatore_corrente')}catch(e){return false}}
 function _hasBioForAnyOp(){return!!localStorage.getItem('webauthn_cred')}
 async function sha256(t){const d=new TextEncoder().encode(t),h=await crypto.subtle.digest('SHA-256',d);return Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,'0')).join('')}
@@ -1032,7 +1032,7 @@ async function checkPwd(){const nome=document.getElementById('login-nome').value
   // Try individual operator login first
   if(nome){const opH=await secureHash(v,nome);const res=await sbRpc('verify_login',{p_nome:nome,p_hash:opH,p_legacy_hash:legacyH});
     if(res&&res.locked){err.textContent='Troppi tentativi. Riprova tra 1 minuto';return}
-    if(res&&res.valid){_loginFailCount=0;localStorage.setItem('operatore_corrente',nome);localStorage.setItem('diario_auth_ts',String(Date.now()));sessionStorage.setItem('bio_verified','1');sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token');document.getElementById('login-overlay').classList.add('hidden');document.getElementById('operatore-display').textContent='Operatore: '+nome;applicaTemaOperatore();applicaVisibilita();registraPushSubscription();
+    if(res&&res.valid){_loginFailCount=0;localStorage.setItem('operatore_corrente',nome);localStorage.setItem('diario_auth_ts',String(Date.now()));sessionStorage.setItem('bio_verified','1');sessionStorage.setItem('session_active','1');sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token');document.getElementById('login-overlay').classList.add('hidden');document.getElementById('operatore-display').textContent='Operatore: '+nome;applicaTemaOperatore();applicaVisibilita();registraPushSubscription();
       renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();aggiornaNoteBadge();aggiornaPromemoriaBadge();aggiornaConsegnaBadge();renderDashboard();
       if(res.deve_cambiare_pwd)setTimeout(()=>forzaCambioPwdOperatore(nome),300);
       else{setTimeout(()=>mostraNoteNonLette(),500);setTimeout(()=>mostraPromemoriaLogin(),1200);setTimeout(()=>mostraConsegnaLogin(),1800);setTimeout(checkQrHash,800);setTimeout(()=>offriBiometrico(),600)}return}
@@ -1041,7 +1041,7 @@ async function checkPwd(){const nome=document.getElementById('login-nome').value
   const masterH=await secureHash(v,'__master__');
   const masterRes=await sbRpc('verify_master_pwd',{p_hash:masterH,p_legacy_hash:legacyH});
   if(masterRes&&masterRes.locked){err.textContent='Troppi tentativi. Riprova tra 1 minuto';return}
-  if(masterRes&&masterRes.valid){_loginFailCount=0;document.getElementById('login-overlay').classList.add('hidden');localStorage.setItem('diario_auth_ts',String(Date.now()));sessionStorage.setItem('bio_verified','1');sessionStorage.setItem('is_admin','1');
+  if(masterRes&&masterRes.valid){_loginFailCount=0;document.getElementById('login-overlay').classList.add('hidden');localStorage.setItem('diario_auth_ts',String(Date.now()));sessionStorage.setItem('bio_verified','1');sessionStorage.setItem('session_active','1');sessionStorage.setItem('is_admin','1');
     if(masterRes.session_token)sessionStorage.setItem('admin_token',masterRes.session_token);
     var loginSettore=document.getElementById('login-settore');if(loginSettore&&loginSettore.value)currentReparto=loginSettore.value;
     if(nome){localStorage.setItem('operatore_corrente',nome);document.getElementById('operatore-display').textContent='Operatore: '+nome;setTimeout(()=>mostraNoteNonLette(),500)}
@@ -1124,7 +1124,7 @@ async function tentaBiometrico(){var ok=await loginBiometrico();if(ok){
   // Sicurezza: verifica che la credenziale sia dell'operatore atteso
   var expectedOp=localStorage.getItem('operatore_corrente');
   if(expectedOp&&stored.op!==expectedOp){toast('Credenziale non valida per questo operatore');return}
-  localStorage.setItem('diario_auth_ts',String(Date.now()));localStorage.setItem('operatore_corrente',stored.op);sessionStorage.setItem('bio_verified','1');
+  localStorage.setItem('diario_auth_ts',String(Date.now()));localStorage.setItem('operatore_corrente',stored.op);sessionStorage.setItem('bio_verified','1');sessionStorage.setItem('session_active','1');
   document.getElementById('login-overlay').classList.add('hidden');
   document.getElementById('operatore-display').textContent='Operatore: '+stored.op;
   applicaTemaOperatore();applicaVisibilita();registraPushSubscription();
@@ -3721,7 +3721,7 @@ window.addEventListener('load',async()=>{
     if(_hasBioForCurrentOp()&&!sessionStorage.getItem('bio_verified')){
       var bl=document.getElementById('biometric-login');if(bl){bl.style.display='block';var _bb=document.getElementById('bio-login-btn');if(_bb)_bb.textContent='\u{1F512} '+getBioName()}
       var bioOk=await loginBiometrico();
-      if(bioOk){sessionStorage.setItem('bio_verified','1')}
+      if(bioOk){sessionStorage.setItem('bio_verified','1');sessionStorage.setItem('session_active','1')}
       else{document.getElementById('pwd-input').focus();
         var _sel=document.getElementById('login-nome');var _sop=localStorage.getItem('operatore_corrente');
         if(_sel&&_sop){for(var i=0;i<_sel.options.length;i++){if(_sel.options[i].value===_sop){_sel.selectedIndex=i;break}}}
