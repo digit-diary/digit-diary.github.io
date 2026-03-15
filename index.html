@@ -475,7 +475,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
 </style>
 </head>
 <body>
-<script>(function(){var ts=parseInt(localStorage.getItem('diario_auth_ts')||'0');var hasBio=!!localStorage.getItem('webauthn_cred');var verified=sessionStorage.getItem('bio_verified')==='1';if(ts>0&&((hasBio&&verified)||(!hasBio&&Date.now()-ts<28800000)))document.documentElement.classList.add('authed')})()</script>
+<script>(function(){var ts=parseInt(localStorage.getItem('diario_auth_ts')||'0');var c=localStorage.getItem('webauthn_cred');var op=localStorage.getItem('operatore_corrente');var hasBio=false;try{hasBio=c&&JSON.parse(c).op===op}catch(e){}var verified=sessionStorage.getItem('bio_verified')==='1';if(ts>0&&((hasBio&&verified)||(!hasBio&&Date.now()-ts<28800000)))document.documentElement.classList.add('authed')})()</script>
 <div id="login-overlay"><div class="login-box">
   <img src="logo_casino.png" alt="Casino Lugano SA" style="width:140px;margin-bottom:16px"><h2>Accesso Protetto</h2><p>Seleziona settore, operatore e password</p>
   <select id="login-settore" onchange="aggiornaLoginOperatori()" style="margin-bottom:8px;text-align:left;letter-spacing:0;padding:11px 14px;width:100%;border:1.5px solid var(--line);border-radius:2px;font-size:1rem;font-family:'Source Sans 3',sans-serif;color:var(--ink);background:var(--paper2);cursor:pointer"><option value="">-- Seleziona settore --</option><option value="slots">Slots</option><option value="tavoli">Tavoli</option></select>
@@ -958,7 +958,9 @@ function getTuttiTipi(){let list=[...TIPI_DEFAULT.filter(t=>!tipiNascosti.includ
   if(tipiOrdine.length)list.sort((a,b)=>{const ia=tipiOrdine.indexOf(a.nome),ib=tipiOrdine.indexOf(b.nome);return(ia===-1?999:ia)-(ib===-1?999:ib)});return list}
 function getColore(n){return coloriOverride[n]||(getTuttiTipi().find(t=>t.nome===n)||{}).colore||'#8a7d6b'}
 function getOperatore(){return localStorage.getItem('operatore_corrente')||''}
-function _isSessionValid(){var ts=parseInt(localStorage.getItem('diario_auth_ts')||'0');if(!ts)return false;if(localStorage.getItem('webauthn_cred'))return true;return Date.now()-ts<28800000}
+function _isSessionValid(){var ts=parseInt(localStorage.getItem('diario_auth_ts')||'0');if(!ts)return false;if(_hasBioForCurrentOp())return true;return Date.now()-ts<28800000}
+function _hasBioForCurrentOp(){var c=localStorage.getItem('webauthn_cred');if(!c)return false;try{var op=JSON.parse(c).op;return op===localStorage.getItem('operatore_corrente')}catch(e){return false}}
+function _hasBioForAnyOp(){return!!localStorage.getItem('webauthn_cred')}
 async function sha256(t){const d=new TextEncoder().encode(t),h=await crypto.subtle.digest('SHA-256',d);return Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,'0')).join('')}
 function _e(s){const r=[];for(let i=0;i<s.length;i++)r.push(String.fromCharCode(s.charCodeAt(i)^_k.charCodeAt(i%_k.length)));return btoa(r.join(''))}
 async function secureHash(password,salt){const enc=new TextEncoder();const km=await crypto.subtle.importKey('raw',enc.encode(password),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:enc.encode('DiarioCL26_v2_'+(salt||'').toLowerCase()),iterations:100000,hash:'SHA-256'},km,256);return Array.from(new Uint8Array(bits)).map(b=>b.toString(16).padStart(2,'0')).join('')}
@@ -1080,7 +1082,8 @@ function esci(){const tk=getAdminToken();if(tk)sbRpc('invalidate_admin_session',
 // FACE ID / TOUCH ID (WebAuthn)
 async function biometricAvailable(){if(!window.PublicKeyCredential)return false;try{return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()}catch(e){return false}}
 function getBioName(){var ua=navigator.userAgent||'';if(/iPhone/.test(ua)){var h=window.screen.height;return h>=812?'Face ID':'Touch ID'}if(/iPad|Macintosh/.test(ua)&&navigator.maxTouchPoints>0)return'Touch ID';if(/Mac/.test(ua))return'Touch ID';if(/Android/.test(ua))return'Sblocco biometrico';if(/Windows/.test(ua))return'Windows Hello';return'Face ID / Touch ID'}
-async function offriBiometrico(){if(!await biometricAvailable())return;if(localStorage.getItem('webauthn_cred'))return;
+async function offriBiometrico(){if(!await biometricAvailable())return;if(_hasBioForCurrentOp())return;
+  // Se bio esiste per altro operatore, sovrascrive
   var op=getOperatore();if(!op)return;
   var b=document.getElementById('pwd-modal-content');
   var bn=getBioName();b.innerHTML='<h3>Attivare '+bn+'?</h3><p style="color:var(--muted);font-size:.9rem">Accedi più velocemente la prossima volta senza inserire la password.</p><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">No grazie</button><button class="btn-modal-ok" onclick="registraBiometrico()">Attiva</button></div>';
@@ -1116,9 +1119,10 @@ async function tentaBiometrico(){var ok=await loginBiometrico();if(ok){
   else toast('Autenticazione fallita')}
 function disattivaBiometrico(){localStorage.removeItem('webauthn_cred');toast(getBioName()+' disattivato');renderBiometricSettings()}
 function renderBiometricSettings(){var el=document.getElementById('biometric-settings');if(!el)return;
-  var cred=localStorage.getItem('webauthn_cred');
+  var cred=localStorage.getItem('webauthn_cred');var curOp=getOperatore();
   var bn=getBioName();
-  if(cred){var op=JSON.parse(cred).op;el.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between"><div><strong>'+bn+'</strong><br><span style="font-size:.84rem;color:var(--muted)">Attivo per: '+escP(op)+'</span></div><button onclick="disattivaBiometrico()" style="padding:8px 16px;font-size:.85rem;font-family:Source Sans 3,sans-serif;font-weight:600;border:1.5px solid #c0392b;color:#c0392b;background:none;border-radius:2px;cursor:pointer">Disattiva</button></div>'}
+  if(cred){var credOp=JSON.parse(cred).op;var isMine=credOp===curOp;
+    el.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between"><div><strong>'+bn+'</strong><br><span style="font-size:.84rem;color:var(--muted)">Attivo per: '+escP(credOp)+(isMine?'':' (altro operatore)')+'</span></div><div style="display:flex;gap:8px">'+(!isMine?'<button onclick="offriBiometrico()" style="padding:8px 16px;font-size:.85rem;font-family:Source Sans 3,sans-serif;font-weight:600;border:1.5px solid var(--accent2);color:var(--accent2);background:none;border-radius:2px;cursor:pointer">Attiva per me</button>':'')+'<button onclick="disattivaBiometrico()" style="padding:8px 16px;font-size:.85rem;font-family:Source Sans 3,sans-serif;font-weight:600;border:1.5px solid #c0392b;color:#c0392b;background:none;border-radius:2px;cursor:pointer">Disattiva</button></div></div>'}
   else{biometricAvailable().then(function(ok){el.innerHTML=ok?'<div style="display:flex;align-items:center;justify-content:space-between"><div><strong>'+bn+'</strong><br><span style="font-size:.84rem;color:var(--muted)">Non attivo</span></div><button onclick="offriBiometrico()" style="padding:8px 16px;font-size:.85rem;font-family:Source Sans 3,sans-serif;font-weight:600;border:1.5px solid var(--accent2);color:var(--accent2);background:none;border-radius:2px;cursor:pointer">Attiva</button></div>':'<span style="font-size:.84rem;color:var(--muted)">'+bn+' non disponibile su questo dispositivo</span>'})}}
 async function resetPasswordOperatore(nome){const b=document.getElementById('pwd-modal-content');
   b.innerHTML='<h3>Resetta password</h3><p>Imposta una nuova password temporanea per <strong>'+escP(nome)+'</strong></p><div class="pwd-field"><label>Nuova password</label><input type="password" id="reset-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="reset-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiResetPwdOp(\''+nome.replace(/'/g,"\\'")+'\')">Resetta</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';
@@ -3696,7 +3700,7 @@ window.addEventListener('load',async()=>{
   aggiornaLoginOperatori();
   if(_isSessionValid()){
     // Se Face ID attivo e non gia verificato in questa tab (refresh): verifica PRIMA di entrare
-    if(localStorage.getItem('webauthn_cred')&&!sessionStorage.getItem('bio_verified')){
+    if(_hasBioForCurrentOp()&&!sessionStorage.getItem('bio_verified')){
       var bl=document.getElementById('biometric-login');if(bl){bl.style.display='block';var _bb=document.getElementById('bio-login-btn');if(_bb)_bb.textContent='\u{1F512} '+getBioName()}
       var bioOk=await loginBiometrico();
       if(bioOk){sessionStorage.setItem('bio_verified','1')}
@@ -3718,8 +3722,8 @@ window.addEventListener('load',async()=>{
     // Pre-compila operatore se salvato
     var savedOp=localStorage.getItem('operatore_corrente');
     if(savedOp){var sel=document.getElementById('login-nome');if(sel){for(var i=0;i<sel.options.length;i++){if(sel.options[i].value===savedOp){sel.selectedIndex=i;break}}}}
-    // Face ID auto-trigger se credenziale salvata
-    if(localStorage.getItem('webauthn_cred')){var bl=document.getElementById('biometric-login');if(bl){bl.style.display='block';var _bb=document.getElementById('bio-login-btn');if(_bb)_bb.textContent='\u{1F512} '+getBioName()}setTimeout(()=>tentaBiometrico(),500)}
+    // Face ID auto-trigger se credenziale salvata per l'operatore corrente
+    if(_hasBioForCurrentOp()){var bl=document.getElementById('biometric-login');if(bl){bl.style.display='block';var _bb=document.getElementById('bio-login-btn');if(_bb)_bb.textContent='\u{1F512} '+getBioName()}setTimeout(()=>tentaBiometrico(),500)}
     else document.getElementById('pwd-input').focus()}
   const n=new Date();document.getElementById('today-date').innerHTML=n.getDate()+' '+MESI[n.getMonth()]+' '+n.getFullYear()+'<br><small style="color:var(--muted);font-size:.75rem">'+GIORNI[n.getDay()]+'</small>';
   renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();aggiornaNoteBadge();aggiornaPromemoriaBadge();aggiornaConsegnaBadge();applicaVisibilita();renderDashboard();
@@ -3745,7 +3749,7 @@ document.addEventListener('visibilitychange',function(){
   // Ignora se nascosto per meno di 2s (refresh, cambio tab veloce)
   if(!_lockHiddenAt||Date.now()-_lockHiddenAt<2000)return;
   _lockHiddenAt=0;
-  if(_isSessionValid()&&localStorage.getItem('webauthn_cred')){
+  if(_isSessionValid()&&_hasBioForCurrentOp()){
     sessionStorage.removeItem('bio_verified');
     document.getElementById('login-overlay').classList.remove('hidden');
     document.documentElement.classList.remove('authed');
