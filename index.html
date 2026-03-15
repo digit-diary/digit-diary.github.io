@@ -2571,7 +2571,7 @@ async function generaReportSettimanale(sez){
         body:settPM.map(p=>[p.titolo,p.data_scadenza,p.assegnato_a,p.completata?'Completato'+(p.completata_da?' da '+p.completata_da:''):'In corso']),
         headStyles:{fillColor:[142,68,173]},styles:{fontSize:9,cellPadding:3},alternateRowStyles:{fillColor:[250,247,242]}});y=doc.lastAutoTable.finalY+8}
     // Spese Extra
-    if(sez.spese_extra){const settSE=speseExtraCache.filter(r=>r.data_spesa>=sett[0]&&r.data_spesa<=sett[6]);
+    if(sez.spese_extra){const settSE=getSpeseReparto().filter(r=>r.data_spesa>=sett[0]&&r.data_spesa<=sett[6]);
     if(settSE.length){const totSE=settSE.reduce((s,r)=>s+parseFloat(r.importo||0),0);
       if(y+20>doc.internal.pageSize.getHeight()-20){doc.addPage();y=16}
       doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text('Spese Extra ('+totSE.toFixed(2)+' CHF)',mx,y);y+=2;
@@ -2579,7 +2579,7 @@ async function generaReportSettimanale(sez){
         body:settSE.map(r=>[new Date(r.data_spesa+'T12:00:00').toLocaleDateString('it-IT'),r.beneficiario,SE_TIPI_LABEL[r.tipo]||r.tipo,r.luogo||'',parseFloat(r.importo).toFixed(2)]),
         headStyles:{fillColor:[41,128,185]},styles:{fontSize:9,cellPadding:3},columnStyles:{4:{halign:'right'}},alternateRowStyles:{fillColor:[250,247,242]}});y=doc.lastAutoTable.finalY+8}}
     // Regali
-    if(sez.regali){const settReg=regaliCache.filter(r=>(r.data_regalo||'')>=sett[0]&&(r.data_regalo||'')<=sett[6]);
+    if(sez.regali){const settReg=getRegaliReparto().filter(r=>(r.data_regalo||'')>=sett[0]&&(r.data_regalo||'')<=sett[6]);
     if(settReg.length){const totReg=settReg.reduce((s,r)=>s+parseFloat(r.importo||0),0);
       if(y+20>doc.internal.pageSize.getHeight()-20){doc.addPage();y=16}
       doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text('Regali'+(totReg?' ('+totReg.toFixed(2)+' CHF)':''),mx,y);y+=2;
@@ -3000,7 +3000,7 @@ function apriDettaglioMaison(nome){const righe=getMaisonFiltrati().filter(r=>r.n
   html+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td colspan="2"><strong>TOTALE RISTORANTE</strong></td><td class="num"><strong>'+totPx+'</strong></td><td class="num"><strong>'+tot.toFixed(2)+'</strong></td><td colspan="3"></td></tr>';
   html+='</tbody></table></div>';
   // Spese Extra per questo cliente
-  const seRighe=speseExtraCache.filter(r=>r.beneficiario.toLowerCase()===nome.toLowerCase()).sort((a,b)=>a.data_spesa.localeCompare(b.data_spesa));
+  const seRighe=getSpeseReparto().filter(r=>r.beneficiario.toLowerCase()===nome.toLowerCase()).sort((a,b)=>a.data_spesa.localeCompare(b.data_spesa));
   if(seRighe.length){const totSE=seRighe.reduce((s,r)=>s+parseFloat(r.importo||0),0);
     html+='<h4 style="font-family:Playfair Display,serif;margin:16px 0 8px;color:var(--ink)">Spese Extra ('+totSE.toFixed(2)+' CHF)</h4>';
     html+='<div style="overflow-x:auto"><table class="collab-table"><thead><tr><th>Data</th><th>Tipo</th><th>Luogo</th><th>Descrizione</th><th class="num">CHF</th></tr></thead><tbody>';
@@ -3008,7 +3008,7 @@ function apriDettaglioMaison(nome){const righe=getMaisonFiltrati().filter(r=>r.n
       html+='<tr><td style="font-weight:600">'+d.getDate()+' '+MESI[d.getMonth()]+'</td><td><span class="mini-badge" style="background:'+tc+'">'+(SE_TIPI_LABEL[r.tipo]||r.tipo)+'</span></td><td style="font-size:.85rem">'+escP(r.luogo||'')+'</td><td style="font-size:.85rem;color:var(--muted)">'+escP(r.descrizione||'')+'</td><td class="num"><strong>'+parseFloat(r.importo).toFixed(2)+'</strong></td></tr>'});
     html+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td colspan="4"><strong>TOTALE EXTRA</strong></td><td class="num"><strong>'+totSE.toFixed(2)+'</strong></td></tr></tbody></table></div>'}
   // Regali per questo cliente
-  var regRighe=regaliCache.filter(function(r){return r.nome.toLowerCase()===nome.toLowerCase()}).sort(function(a,b){return(a.data_regalo||'').localeCompare(b.data_regalo||'')});
+  var regRighe=getRegaliReparto().filter(function(r){return r.nome.toLowerCase()===nome.toLowerCase()}).sort(function(a,b){return(a.data_regalo||'').localeCompare(b.data_regalo||'')});
   var totReg=0;
   if(regRighe.length){totReg=regRighe.reduce(function(s,r){return s+parseFloat(r.importo||0)},0);
     html+='<h4 style="font-family:Playfair Display,serif;margin:16px 0 8px;color:var(--ink)">Regali'+(totReg?' ('+totReg.toFixed(2)+' CHF)':'')+'</h4>';
@@ -3017,7 +3017,7 @@ function apriDettaglioMaison(nome){const righe=getMaisonFiltrati().filter(r=>r.n
       html+='<tr><td style="font-weight:600">'+d.toLocaleDateString('it-IT')+'</td><td>'+escP(r.descrizione||'')+'</td><td class="num">'+(r.importo?parseFloat(r.importo).toFixed(2):'—')+'</td><td style="color:var(--muted);font-size:.82rem">'+escP(r.operatore||'')+'</td></tr>'});
     html+='</tbody></table></div>'}
   // Note private
-  var noteRighe=noteClientiCache.filter(function(r){return r.nome.toLowerCase()===nome.toLowerCase()});
+  var noteRighe=getNoteClientiReparto().filter(function(r){return r.nome.toLowerCase()===nome.toLowerCase()});
   if(noteRighe.length){
     html+='<h4 style="font-family:Playfair Display,serif;margin:16px 0 8px;color:var(--ink)">Note Private</h4>';
     noteRighe.forEach(function(r){var ne2=r.nome.replace(/'/g,"\\'");html+='<div style="padding:10px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border-left:3px solid var(--accent2);display:flex;justify-content:space-between;align-items:start"><div><p style="margin-bottom:4px">'+esc(r.nota)+'</p><small style="color:var(--muted)">'+escP(r.operatore||'')+' — '+new Date(r.created_at).toLocaleDateString('it-IT')+'</small></div><button class="btn-act del" onclick="eliminaNotaCliente('+r.id+',\''+ne2+'\')" style="font-size:.68rem;flex-shrink:0">Elimina</button></div>'})}
@@ -3093,10 +3093,11 @@ function renderMaisonBudgetUI(){const el=document.getElementById('maison-budget-
   let filtCat=(document.getElementById('maison-filt-cat-lista')||{}).value||'';
   let html='<div style="display:flex;gap:10px;margin-bottom:12px;align-items:center;flex-wrap:wrap"><select id="maison-filt-cat-lista" onchange="renderMaisonBudgetUI()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.85rem;background:var(--paper);color:var(--ink)"><option value="">Tutti ('+tuttiNomi.length+')</option><option value="full_maison"'+(filtCat==='full_maison'?' selected':'')+'>Full Maison</option><option value="maison"'+(filtCat==='maison'?' selected':'')+'>Maison</option><option value="direzione"'+(filtCat==='direzione'?' selected':'')+'>Direzione</option><option value="nessuna"'+(filtCat==='nessuna'?' selected':'')+'>Non categorizzati</option></select></div>';
   let filtered=tuttiNomi;
-  if(filtCat){filtered=tuttiNomi.filter(nome=>{const b=maisonBudgetCache.find(x=>x.nome.toLowerCase()===nome.toLowerCase());const cat=b?b.categoria||'':'';if(filtCat==='nessuna')return!cat;return cat===filtCat})}
+  if(filtCat){filtered=tuttiNomi.filter(nome=>{const b=getBudgetReparto().find(x=>x.nome.toLowerCase()===nome.toLowerCase());const cat=b?b.categoria||'':'';if(filtCat==='nessuna')return!cat;return cat===filtCat})}
+  const _mrBudget=getMaisonReparto();
   html+=filtered.map(nome=>{
-    const b=maisonBudgetCache.find(x=>x.nome.toLowerCase()===nome.toLowerCase());
-    const spent=maisonCache.filter(r=>r.nome.toLowerCase()===nome.toLowerCase()).reduce((s,r)=>s+parseFloat(r.costo||0),0);
+    const b=getBudgetReparto().find(x=>x.nome.toLowerCase()===nome.toLowerCase());
+    const spent=_mrBudget.filter(r=>r.nome.toLowerCase()===nome.toLowerCase()).reduce((s,r)=>s+parseFloat(r.costo||0),0);
     const cat=b?b.categoria||'':'';const pct=b&&b.budget_chf?Math.round(spent/b.budget_chf*100):0;
     const color=pct>=100?'var(--accent)':pct>=80?'#e67e22':'#2c6e49';
     const borderColor=cat==='full_maison'?'#b8860b':cat==='maison'?'#2980b9':cat==='direzione'?'#8e44ad':'var(--line)';
@@ -3140,9 +3141,10 @@ async function salvaModificaMaisonInfo(id){
     const b=maisonBudgetCache.find(x=>x.id===id);if(b){b.categoria=cat;b.budget_chf=chf;b.budget_bu=bu;b.budget_bl=bl;b.data_nascita=nascita}
     document.getElementById('pwd-modal').classList.add('hidden');renderMaisonBudgetUI();renderMaisonDashboard();toast('Info aggiornate')}catch(e){toast('Errore')}}
 function apriListaClientiMaison(){
-  const fullM=maisonBudgetCache.filter(b=>b.categoria==='full_maison').map(b=>b).sort((a,b)=>a.nome.localeCompare(b.nome));
-  const maison=maisonBudgetCache.filter(b=>b.categoria==='maison').map(b=>b).sort((a,b)=>a.nome.localeCompare(b.nome));
-  const direz=maisonBudgetCache.filter(b=>b.categoria==='direzione').map(b=>b).sort((a,b)=>a.nome.localeCompare(b.nome));
+  const _br=getBudgetReparto();
+  const fullM=_br.filter(b=>b.categoria==='full_maison').sort((a,b)=>a.nome.localeCompare(b.nome));
+  const maison=_br.filter(b=>b.categoria==='maison').sort((a,b)=>a.nome.localeCompare(b.nome));
+  const direz=_br.filter(b=>b.categoria==='direzione').sort((a,b)=>a.nome.localeCompare(b.nome));
   const tot=fullM.length+maison.length+direz.length;
   let html='<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px"><div><h3 style="font-family:Playfair Display,serif;color:var(--ink);margin-bottom:4px">Clienti Categorizzati</h3><p style="color:var(--muted);font-size:.82rem">'+tot+' clienti — '+fullM.length+' Full Maison — '+maison.length+' Maison — '+direz.length+' Direzione</p></div><button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\')" style="padding:6px 12px;font-size:.75rem">Chiudi</button></div>';
   html+='<div style="display:flex;gap:10px;margin-bottom:16px"><button class="btn-export" onclick="esportaListaMaisonCSV()" style="font-size:.78rem;padding:5px 14px">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaListaMaisonPDF()" style="font-size:.78rem;padding:5px 14px">PDF</button></div>';
@@ -3155,19 +3157,19 @@ function apriListaClientiMaison(){
   html+=renderCatBlock(direz,'Direzione','#8e44ad');
   if(!tot)html+='<p style="color:var(--muted);text-align:center;padding:20px">Nessun cliente categorizzato. Assegna le categorie dalla scheda clienti.</p>';
   document.getElementById('profilo-content').innerHTML=html;document.getElementById('profilo-modal').classList.remove('hidden')}
-function esportaListaMaisonCSV(){if(!maisonBudgetCache.length){toast('Nessun cliente');return}
+function esportaListaMaisonCSV(){const _br=getBudgetReparto();if(!_br.length){toast('Nessun cliente');return}
   const rows=[['Cliente','Categoria','Budget CHF','Max BU','Max BL','Data nascita']];
-  maisonBudgetCache.forEach(b=>{rows.push([b.nome,b.categoria==='full_maison'?'Full Maison':b.categoria==='maison'?'Maison':'',b.budget_chf||'',b.budget_bu||'',b.budget_bl||'',b.data_nascita?new Date(b.data_nascita+'T12:00:00').toLocaleDateString('it-IT'):''])});
+  _br.forEach(b=>{rows.push([b.nome,b.categoria==='full_maison'?'Full Maison':b.categoria==='maison'?'Maison':'',b.budget_chf||'',b.budget_bu||'',b.budget_bl||'',b.data_nascita?new Date(b.data_nascita+'T12:00:00').toLocaleDateString('it-IT'):''])});
   const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\n')],{type:'text/csv;charset=utf-8'});
   Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'clienti_maison.csv'}).click();toast('Lista CSV esportata!')}
-async function esportaListaMaisonPDF(){if(!maisonBudgetCache.length){toast('Nessun cliente');return}
+async function esportaListaMaisonPDF(){const _br=getBudgetReparto();if(!_br.length){toast('Nessun cliente');return}
   if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore');return}}
   try{const{jsPDF}=window.jspdf;const doc=new jsPDF('portrait','mm','a4');const pw=doc.internal.pageSize.getWidth();let y=14;
     if(_logoB64)try{doc.addImage(_logoB64,'PNG',pw/2-20,y,40,22.5)}catch(e){}
     y+=28;doc.setFont('helvetica','bold');doc.setFontSize(16);doc.text('Clienti Maison',pw/2,y,{align:'center'});y+=7;
-    doc.setFontSize(10);doc.setFont('helvetica','normal');doc.setTextColor(100);doc.text('Casino Lugano SA — '+maisonBudgetCache.length+' clienti',pw/2,y,{align:'center'});y+=10;doc.setTextColor(0);
+    doc.setFontSize(10);doc.setFont('helvetica','normal');doc.setTextColor(100);doc.text('Casino Lugano SA — '+_br.length+' clienti',pw/2,y,{align:'center'});y+=10;doc.setTextColor(0);
     const catOrder=['full_maison','maison','direzione'];
-    const sorted=maisonBudgetCache.filter(b=>b.categoria).sort((a,b)=>catOrder.indexOf(a.categoria)-catOrder.indexOf(b.categoria)||a.nome.localeCompare(b.nome));
+    const sorted=_br.filter(b=>b.categoria).sort((a,b)=>catOrder.indexOf(a.categoria)-catOrder.indexOf(b.categoria)||a.nome.localeCompare(b.nome));
     const body=sorted.map(b=>[b.nome,b.categoria==='full_maison'?'Full Maison':b.categoria==='maison'?'Maison':b.categoria==='direzione'?'Direzione':'—',b.budget_chf?parseFloat(b.budget_chf).toFixed(0):'—',b.data_nascita?new Date(b.data_nascita+'T12:00:00').toLocaleDateString('it-IT'):'']);
     doc.autoTable({startY:y,margin:{left:16,right:16},head:[['Cliente','Categoria','Budget CHF','Nascita']],body,
       headStyles:{fillColor:[26,18,8]},styles:{fontSize:10,cellPadding:4},
@@ -3180,9 +3182,9 @@ async function rimuoviMaisonBudget(id){if(!confirm('Rimuovere questo budget?'))r
 function renderMaisonBudgetAlerts(){const container=document.getElementById('maison-alerts-container');if(!container)return;
   const now=new Date(),mese=now.getMonth(),anno=now.getFullYear();
   const meseStart=anno+'-'+String(mese+1).padStart(2,'0')+'-01';
-  const alerts=[];
-  maisonBudgetCache.forEach(b=>{
-    const meseData=maisonCache.filter(r=>r.nome.toLowerCase()===b.nome.toLowerCase()&&r.data_giornata>=meseStart);
+  const alerts=[];const _mrAlerts=getMaisonReparto();
+  getBudgetReparto().forEach(b=>{
+    const meseData=_mrAlerts.filter(r=>r.nome.toLowerCase()===b.nome.toLowerCase()&&r.data_giornata>=meseStart);
     const spent=meseData.reduce((s,r)=>s+parseFloat(r.costo||0),0);
     const nBU=meseData.filter(r=>r.tipo_buono==='BU').length;
     const nBL=meseData.filter(r=>r.tipo_buono==='BL').length;
@@ -3198,7 +3200,7 @@ function renderMaisonBudgetAlerts(){const container=document.getElementById('mai
   if(nearAlerts.length){html+='<div class="cassa-alert-banner allin" style="margin-bottom:8px;cursor:default">&#9888; Quasi al budget (80%+): '+nearAlerts.map(a=>escP(a.nome)+' ('+a.spent.toFixed(0)+'/'+a.budget.toFixed(0)+' CHF)').join(' — ')+'</div>'}
   container.innerHTML=html}
 function acFiltraMaison(inputId,dropId){const inp=document.getElementById(inputId),drop=document.getElementById(dropId);if(!inp||!drop)return;
-  const v=inp.value.toLowerCase(),nomi=[...new Set(maisonCache.map(r=>r.nome))].sort();
+  const v=inp.value.toLowerCase(),nomi=[...new Set(getMaisonReparto().map(r=>r.nome))].sort();
   const filtrati=v?nomi.filter(n=>n.toLowerCase().includes(v)):nomi;
   if(!filtrati.length){drop.classList.remove('show');return}
   drop.innerHTML=filtrati.slice(0,15).map(n=>'<div onmousedown="document.getElementById(\''+inputId+'\').value=\''+n.replace(/'/g,"\\'")+'\';document.getElementById(\''+dropId+'\').classList.remove(\'show\')">'+escP(n)+'</div>').join('');
@@ -3243,7 +3245,7 @@ function initSpeseExtraFP(){if(_seFpInit||!window.flatpickr)return;_seFpInit=tru
   const o={locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,onChange:()=>renderSpeseExtra()};
   flatpickr('#se-filt-dal',o);flatpickr('#se-filt-al',o)}
 function acFiltraSpeseExtra(){const inp=document.getElementById('se-beneficiario'),drop=document.getElementById('ac-se-benef');if(!inp||!drop)return;
-  const v=inp.value.toLowerCase();const nomi=[...new Set([...speseExtraCache.map(r=>r.beneficiario),...maisonCache.map(r=>r.nome)])].sort();
+  const v=inp.value.toLowerCase();const nomi=[...new Set([...getSpeseReparto().map(r=>r.beneficiario),...getMaisonReparto().map(r=>r.nome)])].sort();
   const f=v?nomi.filter(n=>n.toLowerCase().includes(v)):nomi;
   if(!f.length){drop.classList.remove('show');return}
   drop.innerHTML=f.slice(0,12).map(n=>'<div onmousedown="document.getElementById(\'se-beneficiario\').value=\''+n.replace(/'/g,"\\'")+'\';document.getElementById(\'ac-se-benef\').classList.remove(\'show\')">'+escP(n)+'</div>').join('');drop.classList.add('show')}
