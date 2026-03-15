@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Diario CL">
-<link rel="apple-touch-icon" href="logo_casino.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>Diario Collaboratori – Casinò Lugano SA</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk" crossorigin="anonymous"></script>
@@ -1619,7 +1619,7 @@ function chiediPermessoNotifiche(){
   if(Notification.permission==='default'){Notification.requestPermission()}}
 function inviaNotifica(titolo,corpo,onClick){
   if(!('Notification' in window)||Notification.permission!=='granted')return;
-  try{const n=new Notification(titolo,{body:corpo,icon:'logo_casino.png',badge:'logo_casino.png'});
+  try{const n=new Notification(titolo,{body:corpo,icon:'icon-192.png',badge:'icon-192.png'});
     if(onClick)n.onclick=function(){window.focus();onClick();n.close()}}catch(e){}}
 async function pollNuoveNote(){if(sessionStorage.getItem('diario_auth')!=='1')return;
   try{const nuove=await sbGet('note_colleghi?order=created_at.desc');
