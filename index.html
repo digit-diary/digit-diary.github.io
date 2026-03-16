@@ -1111,6 +1111,8 @@ async function registraBiometrico(){try{
   document.getElementById('pwd-modal').classList.add('hidden');toast(getBioName()+' attivato!')}catch(e){document.getElementById('pwd-modal').classList.add('hidden');if(e.name!=='NotAllowedError')toast('Non disponibile su questo dispositivo')}}
 async function loginBiometrico(){try{
   var stored=JSON.parse(localStorage.getItem('webauthn_cred'));if(!stored)return false;
+  // Rimuovi credenziali vecchie (senza v:2) PRIMA di tentare
+  if(!stored.v||stored.v<2){localStorage.removeItem('webauthn_cred');return false}
   var rawId=Uint8Array.from(atob(stored.id),function(c){return c.charCodeAt(0)});
   await navigator.credentials.get({publicKey:{
     challenge:crypto.getRandomValues(new Uint8Array(32)),
