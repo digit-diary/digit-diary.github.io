@@ -959,8 +959,8 @@ function getTuttiTipi(){let list=[...TIPI_DEFAULT.filter(t=>!tipiNascosti.includ
 function getColore(n){return coloriOverride[n]||(getTuttiTipi().find(t=>t.nome===n)||{}).colore||'#8a7d6b'}
 function getOperatore(){return localStorage.getItem('operatore_corrente')||''}
 function _isSessionValid(){var ts=parseInt(localStorage.getItem('diario_auth_ts')||'0');if(!ts)return false;if(_hasBioForCurrentOp())return true;return sessionStorage.getItem('session_active')==='1'&&Date.now()-ts<28800000}
-function _hasBioForCurrentOp(){var c=localStorage.getItem('webauthn_cred');if(!c)return false;try{var o=JSON.parse(c);if(!o.v||o.v<2){localStorage.removeItem('webauthn_cred');return false}return o.op===localStorage.getItem('operatore_corrente')}catch(e){localStorage.removeItem('webauthn_cred');return false}}
-function _hasBioForAnyOp(){var c=localStorage.getItem('webauthn_cred');if(!c)return false;try{var o=JSON.parse(c);if(!o.v||o.v<2){localStorage.removeItem('webauthn_cred');return false}return true}catch(e){localStorage.removeItem('webauthn_cred');return false}}
+function _hasBioForCurrentOp(){var c=localStorage.getItem('webauthn_cred');if(!c)return false;try{var o=JSON.parse(c);if(!o.v||o.v<3){localStorage.removeItem('webauthn_cred');return false}return o.op===localStorage.getItem('operatore_corrente')}catch(e){localStorage.removeItem('webauthn_cred');return false}}
+function _hasBioForAnyOp(){var c=localStorage.getItem('webauthn_cred');if(!c)return false;try{var o=JSON.parse(c);if(!o.v||o.v<3){localStorage.removeItem('webauthn_cred');return false}return true}catch(e){localStorage.removeItem('webauthn_cred');return false}}
 async function sha256(t){const d=new TextEncoder().encode(t),h=await crypto.subtle.digest('SHA-256',d);return Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,'0')).join('')}
 function _e(s){const r=[];for(let i=0;i<s.length;i++)r.push(String.fromCharCode(s.charCodeAt(i)^_k.charCodeAt(i%_k.length)));return btoa(r.join(''))}
 async function secureHash(password,salt){const enc=new TextEncoder();const km=await crypto.subtle.importKey('raw',enc.encode(password),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:enc.encode('DiarioCL26_v2_'+(salt||'').toLowerCase()),iterations:100000,hash:'SHA-256'},km,256);return Array.from(new Uint8Array(bits)).map(b=>b.toString(16).padStart(2,'0')).join('')}
@@ -1103,25 +1103,23 @@ async function registraBiometrico(){try{
     rp:{name:'Diario Collaboratori',id:location.hostname},
     user:{id:userId,name:op,displayName:op},
     pubKeyCredParams:[{alg:-7,type:'public-key'},{alg:-257,type:'public-key'}],
-    authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'discouraged'},
+    authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'preferred'},
     timeout:60000}});
   var credId=btoa(String.fromCharCode.apply(null,new Uint8Array(cred.rawId)));
-  localStorage.setItem('webauthn_cred',JSON.stringify({id:credId,op:op,v:2}));
+  localStorage.setItem('webauthn_cred',JSON.stringify({id:credId,op:op,v:3}));
   localStorage.removeItem('bio_declined_'+op);
   document.getElementById('pwd-modal').classList.add('hidden');toast(getBioName()+' attivato!')}catch(e){document.getElementById('pwd-modal').classList.add('hidden');if(e.name!=='NotAllowedError')toast('Non disponibile su questo dispositivo')}}
 async function loginBiometrico(){try{
   var stored=JSON.parse(localStorage.getItem('webauthn_cred'));if(!stored)return false;
-  // Rimuovi credenziali vecchie (senza v:2) PRIMA di tentare
-  if(!stored.v||stored.v<2){localStorage.removeItem('webauthn_cred');return false}
-  var rawId=Uint8Array.from(atob(stored.id),function(c){return c.charCodeAt(0)});
+  // Rimuovi credenziali vecchie PRIMA di tentare
+  if(!stored.v||stored.v<3){localStorage.removeItem('webauthn_cred');return false}
   await navigator.credentials.get({publicKey:{
     challenge:crypto.getRandomValues(new Uint8Array(32)),
-    allowCredentials:[{id:rawId,type:'public-key',transports:['internal']}],
+    rpId:location.hostname,
     userVerification:'required',
     timeout:60000}});
   return true}catch(e){
-  // Credenziale non trovata o invalida: rimuovi e non riprovare
-  if(e.name!=='NotAllowedError'){localStorage.removeItem('webauthn_cred');console.error('Bio credential invalid, removed')}
+  if(e.name!=='NotAllowedError'){localStorage.removeItem('webauthn_cred')}
   return false}}
 async function tentaBiometrico(){var ok=await loginBiometrico();if(ok){
   var stored=JSON.parse(localStorage.getItem('webauthn_cred'));
