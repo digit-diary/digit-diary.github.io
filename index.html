@@ -522,7 +522,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
   <div class="ricerca-globale-results" id="ricerca-globale-results"></div>
 </div>
 
-<div class="reparto-switch" id="reparto-switch">
+<div class="reparto-switch" id="reparto-switch" style="display:none">
   <button class="reparto-btn active-slots" id="btn-rep-slots" onclick="setReparto('slots')">Slots</button>
   <button class="reparto-btn" id="btn-rep-tavoli" onclick="setReparto('tavoli')">Tavoli</button>
 </div>
@@ -3667,8 +3667,8 @@ function applicaRepartoVisibilita(){
   if(isAdmin())opRep='entrambi';
   var vSlots=opRep==='slots'||opRep==='entrambi';
   var vTavoli=opRep==='tavoli'||opRep==='entrambi';
-  if(vSlots&&vTavoli){sw.classList.remove('hidden')}
-  else{sw.classList.add('hidden');
+  if(vSlots&&vTavoli){sw.style.display='flex';sw.classList.remove('hidden')}
+  else{sw.style.display='none';sw.classList.add('hidden');
     if(vSlots)currentReparto='slots';
     else if(vTavoli)currentReparto='tavoli';
     else currentReparto='slots'}
