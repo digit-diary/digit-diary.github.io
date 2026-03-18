@@ -1302,7 +1302,7 @@ function isAdmin(){return sessionStorage.getItem('is_admin')==='1'}
 // VISIBILITA - 'tutti' | 'admin' | 'nascosto' | {tipo:'selezionati',operatori:['Nome1']}
 const VIS_ITEMS={
   pagine:{rapporto:'Rapporto',note_collega:'Note Colleghi',statistiche:'Statistiche',moduli:'Moduli',assistente:'Assistente',consegna:'Consegna Turno',promemoria:'Promemoria',maison:'Costi Maison'},
-  funzioni:{ricerca_globale:'Ricerca globale',alert_cassa:'Alert cassa',alert_rischio:'Alert rischio',alert_compleanni:'Compleanni maison',reparto_slots:'Reparto Slots',reparto_tavoli:'Reparto Tavoli',template_rapidi:'Template rapidi',firma_digitale:'Firma digitale',qr_code:'QR Code su PDF',ai_moduli:'AI (Genera + Migliora testo)'}
+  funzioni:{ricerca_globale:'Ricerca globale',alert_cassa:'Alert cassa',alert_rischio:'Alert rischio',alert_compleanni:'Compleanni maison',template_rapidi:'Template rapidi',firma_digitale:'Firma digitale',qr_code:'QR Code su PDF',ai_moduli:'AI (Genera + Migliora testo)'}
 };
 function visGet(key){return visibilitaConfig[key]||'tutti'}
 function isVis(key){const v=visGet(key);if(v==='nascosto')return false;if(v==='admin')return isAdmin();
@@ -4345,18 +4345,12 @@ function applicaRepartoVisibilita(){
   var sw=document.getElementById('reparto-switch');if(!sw)return;
   var op=getOperatore();var opRep=operatoriRepartoMap[op]||'entrambi';
   if(isAdmin())opRep='entrambi';
-  var assignedSlots=opRep==='slots'||opRep==='entrambi';
-  var assignedTavoli=opRep==='tavoli'||opRep==='entrambi';
-  // Visibilità bottoni: assegnazione operatore + impostazioni admin
-  var btnSlots=assignedSlots&&isVis('reparto_slots');
-  var btnTavoli=assignedTavoli&&isVis('reparto_tavoli');
-  if(btnSlots&&btnTavoli){sw.style.display='flex';sw.classList.remove('hidden')}
+  var vSlots=opRep==='slots'||opRep==='entrambi';
+  var vTavoli=opRep==='tavoli'||opRep==='entrambi';
+  if(vSlots&&vTavoli){sw.style.display='flex';sw.classList.remove('hidden')}
   else{sw.style.display='none';sw.classList.add('hidden');
-    // Reparto corrente: primo bottone visibile, altrimenti il reparto assegnato
-    if(btnSlots)currentReparto='slots';
-    else if(btnTavoli)currentReparto='tavoli';
-    else if(assignedSlots)currentReparto='slots';
-    else if(assignedTavoli)currentReparto='tavoli';
+    if(vSlots)currentReparto='slots';
+    else if(vTavoli)currentReparto='tavoli';
     else currentReparto='slots'}
   document.getElementById('btn-rep-slots').className='reparto-btn'+(currentReparto==='slots'?' active-slots':'');
   document.getElementById('btn-rep-tavoli').className='reparto-btn'+(currentReparto==='tavoli'?' active-tavoli':'')}
