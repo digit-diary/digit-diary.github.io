@@ -3808,7 +3808,7 @@ function renderMaisonCharts(data,sorted){
   renderChart('chart-maison-trend','line',{labels:days.map(d=>{const dt=new Date(d+'T12:00:00');return _giorniAbbr[dt.getDay()]+' '+dt.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit'})}),datasets:[{label:'Spesa CHF',data:days.map(d=>byDay[d]),borderColor:'#b8860b',backgroundColor:'rgba(184,134,11,0.15)',fill:true,tension:0.3,pointRadius:4}]},{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}});
   // Top clienti
   const top15=sorted.slice(0,15);
-  renderChart('chart-maison-top','bar',{labels:top15.map(c=>c[0]),datasets:[{label:'CHF',data:top15.map(c=>c[1].tot),backgroundColor:'rgba(184,134,11,0.7)',borderRadius:4}]},{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true}}});
+  renderChart('chart-maison-top','bar',{labels:top15.map(c=>c[0]),datasets:[{label:'CHF',data:top15.map(c=>c[1].tot),backgroundColor:'rgba(184,134,11,0.7)',borderRadius:4}]},{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true},y:{ticks:{autoSkip:false,font:{size:11}}}}});
   // Distribuzione tipo
   const normale=data.filter(r=>!r.tipo_buono).reduce((s,r)=>s+parseFloat(r.costo||0),0);
   const buTot=data.filter(r=>r.tipo_buono==='BU').reduce((s,r)=>s+parseFloat(r.costo||0),0);
