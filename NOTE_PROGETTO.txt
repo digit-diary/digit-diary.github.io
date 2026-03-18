@@ -1060,6 +1060,9 @@
        - visibilitychange (tab torna attivo): rinnova token prima di risincronizzare
        - Risolve il problema della pagina vuota dopo inattivita prolungata
        - Aggiunto meta mobile-web-app-capable (standard cross-browser)
+       - Health check silenzioso all'avvio: verifica Supabase, librerie CDN
+         (jsPDF, Chart.js, Flatpickr, XLSX), API Groq, token sessione, dati.
+         Se tutto OK → silenzio. Se problema → toast avviso + log console.
 
 
 ================================================================================
