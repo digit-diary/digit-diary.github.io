@@ -355,6 +355,17 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 .empty-state small{font-size:.83rem;margin-top:6px;display:block}
 .toast{position:fixed;bottom:30px;right:30px;background:var(--ink);color:var(--paper);padding:14px 24px;border-radius:2px;font-size:.95rem;font-weight:500;opacity:0;transform:translateY(10px);transition:all .3s;pointer-events:none;z-index:9998}
 .toast.show{opacity:1;transform:translateY(0)}
+.notif-banner{position:fixed;top:-80px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:14px 24px;border-radius:0 0 6px 6px;font-size:.95rem;font-weight:500;z-index:9999;transition:top .4s cubic-bezier(.22,.68,0,1.1);cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.25);display:flex;align-items:center;gap:12px;max-width:500px;min-width:300px}
+.notif-banner.show{top:0}
+.notif-banner .notif-icon{font-size:1.4rem;flex-shrink:0}
+.notif-banner .notif-body{flex:1;overflow:hidden}
+.notif-banner .notif-title{font-weight:700;font-size:.88rem;letter-spacing:.04em}
+.notif-banner .notif-text{font-size:.82rem;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.notif-banner .notif-close{background:none;border:none;color:var(--paper);opacity:.6;font-size:1.2rem;cursor:pointer;padding:0 4px;flex-shrink:0}
+.notif-banner .notif-close:hover{opacity:1}
+.notif-banner.nota{background:#2980b9}
+.notif-banner.consegna{background:#8e44ad}
+.notif-banner.promemoria{background:#e67e22}
 .loading{text-align:center;padding:40px;color:var(--muted)}
 .loading::after{content:'';display:inline-block;width:18px;height:18px;border:2px solid var(--line);border-top-color:var(--ink);border-radius:50%;animation:spin .6s linear infinite;margin-left:8px;vertical-align:middle}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -372,6 +383,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
   .rapporto-calendar{max-width:100%}
 }
 @media(max-width:700px){
+  .notif-banner{left:8px;right:8px;transform:none;max-width:none;min-width:0;border-radius:0 0 6px 6px}
   body{padding:14px 6px 40px}
   header{flex-direction:column;align-items:flex-start;gap:8px}
   header h1{font-size:1.5rem}
@@ -1022,6 +1034,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="notif-banner" id="notif-banner" onclick="notifBannerClick()"><span class="notif-icon" id="notif-icon"></span><div class="notif-body"><div class="notif-title" id="notif-title"></div><div class="notif-text" id="notif-text"></div></div><button class="notif-close" onclick="event.stopPropagation();chiudiNotifBanner()">&#10005;</button></div>
 
 <script>
 const _k='DiarioCL26',_a='IRArGgsoICV9Xw4gNAggXg0le0UNBzNHCiwKentdNDE3MSNWbSlLfDQKUj8AICoGSFIcKwkrBCk5FmF/NyAPOAU1KgUEfykjChchKXMpX2ArC1M0Hg4UNAFTKi8SKFtacQVbQS0KDEsaNRAFBH8pLxQQW1sqAHF8NDA5IwAgKQkBeD4kGDwDJnYBZnc3IAwkXQwABQR7LihVPS0IOQN2XTwkKUJHNXYJd1MmMQw6NgoWDkhwFSQZQ10uNQICQS8uAkIvCyIBakARACc+IAcTfA==',_u='LB0VAhpVbGNQUjwYFQgMBywtQl8oHhsDBQgtOhxFMRkAEAgcJmJRWQ==';function _d(e){const b=atob(e),r=[];for(let i=0;i<b.length;i++)r.push(String.fromCharCode(b.charCodeAt(i)^_k.charCodeAt(i%_k.length)));return r.join('')}
@@ -1049,7 +1062,7 @@ function _getSbClient(){if(_sbClient)return _sbClient;if(typeof supabase!=='unde
 function _initNoteRealtime(){const sb=_getSbClient();if(!sb){console.warn('Supabase client non disponibile, fallback a polling');setInterval(pollNuoveNote,15000);return}
   _noteChannel=sb.channel('note-colleghi-changes').on('postgres_changes',{event:'*',schema:'public',table:'note_colleghi'},async function(payload){
     const op=getOperatore();if(!op)return;
-    if(payload.eventType==='INSERT'){const n=payload.new;if(n.a_operatore===op||n.da_operatore===op){if(n.messaggio&&n.messaggio.startsWith('ENC:'))n.messaggio=await decryptNota(n.messaggio);n._decrypted=true;noteColleghiCache.unshift(n);aggiornaNoteBadge();const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();if(n.a_operatore===op&&!n.letta){toast('Nuova nota da '+n.da_operatore);inviaNotifica('Nota da '+n.da_operatore,n.messaggio.substring(0,80))}}}
+    if(payload.eventType==='INSERT'){const n=payload.new;if(n.a_operatore===op||n.da_operatore===op){if(n.messaggio&&n.messaggio.startsWith('ENC:'))n.messaggio=await decryptNota(n.messaggio);n._decrypted=true;noteColleghiCache.unshift(n);aggiornaNoteBadge();const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();if(n.a_operatore===op&&!n.letta){mostraNotifBanner('nota','Nota da '+n.da_operatore,n.messaggio.substring(0,80),()=>switchPage('note-collega'));inviaNotifica('Nota da '+n.da_operatore,n.messaggio.substring(0,80))}}}
     else if(payload.eventType==='UPDATE'){const n=payload.new;const op=getOperatore();
       // Se la nota è stata nascosta per questo operatore, rimuovila dalla cache
       if((n.a_operatore===op&&n.nascosta_dest)||(n.da_operatore===op&&n.nascosta_mitt)){noteColleghiCache=noteColleghiCache.filter(x=>x.id!==n.id);aggiornaNoteBadge();const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();return}
@@ -1538,6 +1551,25 @@ function _initMalFlatpickr(){if(_malFpInit||!window.flatpickr)return;_malFpInit=
   flatpickr('#inp-mal-dal',o);flatpickr('#inp-mal-al',o)}
 function resetMalFiltri(){['inp-mal-dal','inp-mal-al'].forEach(id=>{const el=document.getElementById(id);if(el){el.value='';if(el._flatpickr)el._flatpickr.clear()}})}
 // CORE CRUD
+// NOTIFICA BANNER + SUONO
+let _notifTimeout=null,_notifAction=null;
+function _playNotifSound(){try{const ctx=new(window.AudioContext||window.webkitAudioContext)();const osc=ctx.createOscillator();const gain=ctx.createGain();osc.connect(gain);gain.connect(ctx.destination);osc.frequency.value=880;osc.type='sine';gain.gain.value=0.15;osc.start();gain.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.3);osc.stop(ctx.currentTime+0.3)}catch(e){}}
+function mostraNotifBanner(tipo,titolo,testo,azione){
+  const icons={nota:'&#9993;',consegna:'&#128221;',promemoria:'&#128203;'};
+  const b=document.getElementById('notif-banner');
+  b.className='notif-banner '+(tipo||'nota');
+  document.getElementById('notif-icon').innerHTML=icons[tipo]||'&#128276;';
+  document.getElementById('notif-title').textContent=titolo;
+  document.getElementById('notif-text').textContent=testo;
+  _notifAction=azione||null;
+  clearTimeout(_notifTimeout);
+  b.classList.add('show');
+  _playNotifSound();
+  _notifTimeout=setTimeout(()=>b.classList.remove('show'),6000);
+}
+function chiudiNotifBanner(){clearTimeout(_notifTimeout);document.getElementById('notif-banner').classList.remove('show')}
+function notifBannerClick(){chiudiNotifBanner();if(_notifAction)_notifAction()}
+
 function _highlightField(id){const el=document.getElementById(id);if(!el)return;el.style.transition='border-color .2s,box-shadow .2s';el.style.borderColor='var(--accent)';el.style.boxShadow='0 0 0 2px rgba(192,57,43,0.2)';setTimeout(()=>{el.style.borderColor='';el.style.boxShadow=''},2000);el.focus()}
 async function salva(){const nome=capitalizzaNome(document.getElementById('inp-nome').value.trim()),testo=document.getElementById('inp-testo').value.trim();if(!nome){toast('Inserisci il nome');_highlightField('inp-nome');return}if(!testo){toast('Scrivi una descrizione');_highlightField('inp-testo');return}
   const importo=parseFloat(document.getElementById('inp-importo').value)||0;const valuta=importo?document.getElementById('inp-valuta').value:'';const reparto=document.getElementById('inp-reparto').value;
@@ -3245,6 +3277,7 @@ function mostraConsegnaLogin(){const op=getOperatore();if(!op)return;
   const nonLette=getConsegneReparto().filter(c=>!c.letto_da&&c.operatore!==op&&(c.destinatario==='tutti'||c.destinatario===op));
   if(!nonLette.length)return;
   const ultima=nonLette[0];const isAlta=ultima.priorita==='alta';
+  mostraNotifBanner('consegna','Consegna da '+ultima.operatore,ultima.messaggio.substring(0,80),()=>switchPage('consegna'));
   const mc=document.getElementById('note-modal-content');
   let html='<h3 style="margin-bottom:4px">'+(isAlta?'<span style="color:var(--accent)">&#9888;</span> ':'')+'Consegna dal turno '+ultima.turno_uscente+'</h3><p style="color:var(--accent2);font-size:.85rem;margin-bottom:12px">da '+escP(ultima.operatore)+' — '+new Date(ultima.created_at).toLocaleDateString('it-IT')+' '+new Date(ultima.created_at).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})+'</p>';
   if(isAlta)html+='<p style="color:var(--accent);font-size:.82rem;font-weight:700;margin-bottom:10px">PRIORITA ALTA</p>';
@@ -3584,7 +3617,7 @@ function mostraPromemoriaLogin(){const op=getOperatore();if(!op)return;
   const scaduti=miei.filter(p=>p.data_scadenza<=oggi);
   const prossimi=miei.filter(p=>p.data_scadenza>oggi&&p.data_scadenza<=new Date(Date.now()+3*86400000).toISOString().split('T')[0]);
   if(!scaduti.length&&!prossimi.length)return;
-  if(scaduti.length)inviaNotifica('Promemoria scaduti',scaduti.length+' promemoria scadut'+(scaduti.length===1?'o':'i')+': '+scaduti.map(p=>p.titolo).join(', ').substring(0,80));
+  if(scaduti.length){mostraNotifBanner('promemoria','Promemoria scaduti',scaduti.length+' scadut'+(scaduti.length===1?'o':'i')+': '+scaduti.map(p=>p.titolo).join(', ').substring(0,60),()=>switchPage('promemoria'));inviaNotifica('Promemoria scaduti',scaduti.length+' promemoria scadut'+(scaduti.length===1?'o':'i')+': '+scaduti.map(p=>p.titolo).join(', ').substring(0,80))}
   const mc=document.getElementById('note-modal-content');
   let html='<h3 style="margin-bottom:4px">Promemoria</h3>';
   if(scaduti.length)html+='<p style="color:var(--accent);font-size:.85rem;margin-bottom:12px;font-weight:600">'+scaduti.length+' promemoria scadut'+(scaduti.length===1?'o':'i')+'!</p>';
