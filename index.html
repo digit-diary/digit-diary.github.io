@@ -1226,7 +1226,7 @@ async function caricaDbStats(){const el=document.getElementById('db-stats-conten
   el.innerHTML=h}
 async function _healthCheck(){const problems=[];
   // 1. Supabase connessione
-  try{const r=await fetch(SB_URL+'/rest/v1/',{headers:{apikey:SB_KEY},method:'HEAD'});
+  try{const r=await fetch(SB_URL+'/rest/v1/',{headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}});
     if(!r.ok)problems.push('Database Supabase non raggiungibile')}catch(e){problems.push('Connessione database assente')}
   // 2. Librerie CDN
   if(!window.jspdf&&!document.querySelector('script[src*="jspdf"]'))problems.push('Libreria PDF (jsPDF) non caricata');
