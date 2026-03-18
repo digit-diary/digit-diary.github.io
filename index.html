@@ -89,7 +89,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 .scad-item .scad-date{font-weight:700;min-width:80px;font-size:.8rem}
 .scad-item .scad-date.overdue{color:var(--accent)}
 .scad-item .scad-title{flex:1}
-.scad-item button{padding:3px 8px;font-size:.68rem;font-weight:700;cursor:pointer;border-radius:2px;font-family:'Source Sans 3',sans-serif;border:1px solid}
+.scad-item button{padding:3px 8px;font-size:.78rem;font-weight:700;cursor:pointer;border-radius:2px;font-family:'Source Sans 3',sans-serif;border:1px solid}
 /* CASSA ALERTS */
 .cassa-alert-banner{width:100%;max-width:1280px;color:white;padding:12px 20px;border-radius:3px;margin-bottom:10px;font-size:.85rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:space-between}
 .cassa-alert-banner:hover{opacity:.9}
@@ -266,7 +266,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 .scheda-kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin:14px 0 18px}
 .scheda-kpi{background:var(--paper2);border-radius:3px;padding:10px 12px;text-align:center}
 .scheda-kpi .kpi-val{font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:700;line-height:1.1}
-.scheda-kpi .kpi-lbl{font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:3px}
+.scheda-kpi .kpi-lbl{font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:3px}
 .scheda-section{margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
 .scheda-section h4{font-family:'Playfair Display',serif;font-size:1rem;color:var(--ink);margin-bottom:10px}
 .scheda-timeline-item{padding:8px 12px;border-bottom:1px solid var(--line);font-size:.84rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -457,7 +457,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
   .rapporto-day-cell{padding:6px 2px;min-height:46px}
   .rapporto-day-cell .day-num{font-size:.95rem}
   .ricerca-globale-input{font-size:.85rem;padding:9px 12px 9px 32px}
-  .template-rapido-btn{padding:5px 8px;font-size:.68rem}
+  .template-rapido-btn{padding:5px 8px;font-size:.78rem}
   .firma-canvas{width:180px;height:65px}
   .stats-bar{grid-template-columns:repeat(2,1fr)}
 }
@@ -489,7 +489,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
 /* CATEGORY GROUP HEADERS */
 .cat-group-header{font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;font-weight:700;padding:10px 12px 6px;margin-top:12px;border-bottom:2px solid;display:flex;align-items:center;gap:8px}
 .cat-group-header:first-child{margin-top:0}
-.cat-group-header .cat-count{font-size:.68rem;font-weight:600;padding:1px 8px;border-radius:9px;color:white}
+.cat-group-header .cat-count{font-size:.78rem;font-weight:600;padding:1px 8px;border-radius:9px;color:white}
 /* DASH WIDGET */
 .dash-widget-body{padding:14px;max-height:300px;overflow-y:auto}
 /* SPESE STATS */
@@ -1535,8 +1535,8 @@ async function salva(){const nome=capitalizzaNome(document.getElementById('inp-n
   try{await secPost('registrazioni',rec);datiCache.unshift(rec);document.getElementById('inp-testo').value='';document.getElementById('inp-importo').value='';document.getElementById('inp-reparto').value='';
     if(!collaboratoriCache.find(c=>c.nome.toLowerCase()===nome.toLowerCase())){try{const cr=await secPost('collaboratori',{nome,attivo:true});collaboratoriCache.push(cr[0]);collaboratoriCache.sort((a,b)=>a.nome.localeCompare(b.nome))}catch(e2){}}
     logAzione('Nuova registrazione',nome+' - '+tipoSelezionato+': '+testo.substring(0,60));toast('Registrato per '+nome);aggiornaNomi();render();updateStats();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts()}catch(e){toast('Errore salvataggio')}}
-async function elimina(id){if(!confirm('Eliminare?'))return;const _e=datiCache.find(x=>x.id===id);try{await secDel('registrazioni','id=eq.'+id);datiCache=datiCache.filter(e=>e.id!==id);pinnedIds.delete(id);if(_e)logAzione('Eliminata registrazione',_e.nome+' - '+_e.tipo);aggiornaNomi();render();updateStats();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();toast('Eliminata')}catch(e){toast('Errore')}}
-async function togglePin(id){try{if(pinnedIds.has(id)){await secDel('note_fissate','registrazione_id=eq.'+id);pinnedIds.delete(id)}else{await secPost('note_fissate',{registrazione_id:id});pinnedIds.add(id)}render()}catch(e){toast('Errore')}}
+async function elimina(id){if(!confirm('Eliminare?'))return;const _e=datiCache.find(x=>x.id===id);try{await secDel('registrazioni','id=eq.'+id);datiCache=datiCache.filter(e=>e.id!==id);pinnedIds.delete(id);if(_e)logAzione('Eliminata registrazione',_e.nome+' - '+_e.tipo);aggiornaNomi();render();updateStats();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();toast('Eliminata')}catch(e){toast('Errore eliminazione')}}
+async function togglePin(id){try{if(pinnedIds.has(id)){await secDel('note_fissate','registrazione_id=eq.'+id);pinnedIds.delete(id)}else{await secPost('note_fissate',{registrazione_id:id});pinnedIds.add(id)}render()}catch(e){toast('Errore fissaggio nota')}}
 
 // MODIFICA REGISTRAZIONE
 function modificaRegistrazione(id){const e=datiCache.find(x=>x.id===id);if(!e)return;
@@ -1558,7 +1558,7 @@ async function salvaModificaRegistrazione(id){const nome=document.getElementById
 function apriModal(id,tipo){modalEntryId=id;modalTipoSel=tipo;renderTipiUI();document.getElementById('modal-overlay').classList.remove('hidden')}
 function chiudiModal(){document.getElementById('modal-overlay').classList.add('hidden');modalEntryId=null;modalTipoSel=null}
 async function confermaCambioTipo(){if(!modalEntryId||!modalTipoSel)return;const op=getOperatore();const now=new Date();const mod=op+' il '+now.toLocaleDateString('it-IT')+' alle '+now.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
-  try{await secPatch('registrazioni','id=eq.'+modalEntryId,{tipo:modalTipoSel,modificato_da:mod});const e=datiCache.find(e=>e.id===modalEntryId);if(e){e.tipo=modalTipoSel;e.modificato_da=mod}render();updateStats();toast('Tipo aggiornato')}catch(e){toast('Errore')}chiudiModal()}
+  try{await secPatch('registrazioni','id=eq.'+modalEntryId,{tipo:modalTipoSel,modificato_da:mod});const e=datiCache.find(e=>e.id===modalEntryId);if(e){e.tipo=modalTipoSel;e.modificato_da=mod}render();updateStats();toast('Tipo aggiornato')}catch(e){toast('Errore cambio tipo')}chiudiModal()}
 
 // SCADENZE
 function apriScadenza(id){const b=document.getElementById('scadenza-content');b.innerHTML='<h3>Nuova scadenza</h3><p>Imposta un promemoria per questa registrazione</p><div class="pwd-field"><label>Titolo</label><input type="text" id="scad-titolo" placeholder="es. Follow-up ammonimento..."></div><div class="pwd-field"><label>Data scadenza</label><input type="text" id="scad-data" placeholder="Seleziona data..." readonly style="cursor:pointer;min-width:200px"></div><div class="pwd-field"><label>Note (opzionale)</label><input type="text" id="scad-desc" placeholder="Dettagli..."></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'scadenza-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaScadenza('+id+')">Salva</button></div>';
@@ -1566,9 +1566,9 @@ function apriScadenza(id){const b=document.getElementById('scadenza-content');b.
   if(window.flatpickr)flatpickr('#scad-data',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,minDate:'today'})}
 async function salvaScadenza(regId){const t=document.getElementById('scad-titolo').value.trim(),d=document.getElementById('scad-data').value,desc=document.getElementById('scad-desc').value.trim();
   if(!t||!d){toast('Compila titolo e data');return}
-  try{const r=await secPost('scadenze',{registrazione_id:regId,titolo:t,data_scadenza:d,descrizione:desc});scadenzeCache.push(r[0]);logAzione('Scadenza creata',t+' - '+d);renderScadenzeBanner();document.getElementById('scadenza-modal').classList.add('hidden');toast('Scadenza impostata')}catch(e){toast('Errore')}}
-async function completaScadenza(id){try{await secPatch('scadenze','id=eq.'+id,{completata:true,completata_da:getOperatore()||'?'});const s=scadenzeCache.find(s=>s.id===id);if(s){s.completata=true;s.completata_da=getOperatore()||'?';logAzione('Scadenza completata',s.titolo)}renderScadenzeBanner();renderScadenzeSettings();toggleScadenzeDropdown();toggleScadenzeDropdown();toast('Completata')}catch(e){toast('Errore')}}
-async function eliminaScadenza(id){try{await secDel('scadenze','id=eq.'+id);scadenzeCache=scadenzeCache.filter(s=>s.id!==id);renderScadenzeBanner();renderScadenzeSettings();toast('Eliminata')}catch(e){toast('Errore')}}
+  try{const r=await secPost('scadenze',{registrazione_id:regId,titolo:t,data_scadenza:d,descrizione:desc});scadenzeCache.push(r[0]);logAzione('Scadenza creata',t+' - '+d);renderScadenzeBanner();document.getElementById('scadenza-modal').classList.add('hidden');toast('Scadenza impostata')}catch(e){toast('Errore creazione scadenza')}}
+async function completaScadenza(id){try{await secPatch('scadenze','id=eq.'+id,{completata:true,completata_da:getOperatore()||'?'});const s=scadenzeCache.find(s=>s.id===id);if(s){s.completata=true;s.completata_da=getOperatore()||'?';logAzione('Scadenza completata',s.titolo)}renderScadenzeBanner();renderScadenzeSettings();toggleScadenzeDropdown();toggleScadenzeDropdown();toast('Completata')}catch(e){toast('Errore completamento scadenza')}}
+async function eliminaScadenza(id){try{await secDel('scadenze','id=eq.'+id);scadenzeCache=scadenzeCache.filter(s=>s.id!==id);renderScadenzeBanner();renderScadenzeSettings();toast('Eliminata')}catch(e){toast('Errore eliminazione scadenza')}}
 function renderScadenzeBanner(){const banner=document.getElementById('scadenze-banner'),dd=document.getElementById('scadenze-dropdown');
   const oggi=new Date().toISOString().split('T')[0];const attive=scadenzeCache.filter(s=>!s.completata);const scadute=attive.filter(s=>s.data_scadenza<=oggi);const prossime=attive.filter(s=>s.data_scadenza>oggi);
   const tot=attive.length;const bell=document.getElementById('bell-badge'),btnBell=document.getElementById('btn-bell');
@@ -1837,7 +1837,7 @@ async function inviaNotaCollega(){const dests=getDestinatariSelezionati(),msg=do
   try{for(const dest of dests){const r=await secPost('note_colleghi',{da_operatore:da,a_operatore:dest,messaggio:msgEnc,gruppo_id:gid});r[0].messaggio=msg;r[0]._decrypted=true;noteColleghiCache.unshift(r[0])}
   logAzione('Nota inviata','A: '+dests.join(', ')+' - '+msg.substring(0,50));document.getElementById('nota-msg').value='';document.querySelectorAll('#nota-dest-box input[type=checkbox]').forEach(cb=>cb.checked=false);renderNoteCollega();toast('Nota inviata a '+dests.join(', '));
   inviaPush(dests,'Nota da '+da,msg.substring(0,120),'nota',true)}catch(e){toast('Errore invio')}}
-async function segnaNotaLetta(id){try{const ora=new Date().toISOString();await secPatch('note_colleghi','id=eq.'+id,{letta:true,letta_at:ora});const n=noteColleghiCache.find(n=>n.id===id);if(n){n.letta=true;n.letta_at=ora}renderNoteCollega()}catch(e){toast('Errore')}}
+async function segnaNotaLetta(id){try{const ora=new Date().toISOString();await secPatch('note_colleghi','id=eq.'+id,{letta:true,letta_at:ora});const n=noteColleghiCache.find(n=>n.id===id);if(n){n.letta=true;n.letta_at=ora}renderNoteCollega()}catch(e){toast('Errore aggiornamento nota')}}
 function rispondiNota(mittente,notaId){
   // Segna come letta se non lo è
   const nota=noteColleghiCache.find(n=>n.id===notaId);
@@ -1852,7 +1852,7 @@ async function eliminaNotaCollega(id,ruolo){if(!confirm('Eliminare questa nota?'
   const campo=ruolo==='mitt'?'nascosta_mitt':'nascosta_dest';
   const n=noteColleghiCache.find(x=>x.id===id);
   const ids=(ruolo==='mitt'&&n&&n.gruppo_id)?noteColleghiCache.filter(x=>x.gruppo_id===n.gruppo_id&&x.da_operatore===n.da_operatore).map(x=>x.id):[id];
-  try{for(const nid of ids){await secPatch('note_colleghi','id=eq.'+nid,{[campo]:true});const c=noteColleghiCache.find(x=>x.id===nid);if(c)c[campo]=true}renderNoteCollega();toast('Nota rimossa')}catch(e){toast('Errore')}}
+  try{for(const nid of ids){await secPatch('note_colleghi','id=eq.'+nid,{[campo]:true});const c=noteColleghiCache.find(x=>x.id===nid);if(c)c[campo]=true}renderNoteCollega();toast('Nota rimossa')}catch(e){toast('Errore rimozione nota')}}
 function modificaNotaCollega(id){const n=noteColleghiCache.find(n=>n.id===id);if(!n)return;
   const gid=n.gruppo_id;const gruppo=gid?noteColleghiCache.filter(x=>x.gruppo_id===gid&&x.da_operatore===n.da_operatore):null;
   const destLabel=gruppo&&gruppo.length>1?gruppo.map(x=>escP(x.a_operatore)).join(', '):escP(n.a_operatore);
@@ -1864,12 +1864,12 @@ async function salvaModificaNota(id){const msg=document.getElementById('edit-not
   const ids=gid?noteColleghiCache.filter(x=>x.gruppo_id===gid&&x.da_operatore===n.da_operatore).map(x=>x.id):[id];
   const msgEnc=await encryptNota(msg);
   try{for(const nid of ids){await secPatch('note_colleghi','id=eq.'+nid,{messaggio:msgEnc});const c=noteColleghiCache.find(x=>x.id===nid);if(c){c.messaggio=msg;c._decrypted=true}}
-  logAzione('Nota modificata',msg.substring(0,50));document.getElementById('pwd-modal').classList.add('hidden');renderNoteCollega();toast('Nota modificata')}catch(e){toast('Errore')}}
+  logAzione('Nota modificata',msg.substring(0,50));document.getElementById('pwd-modal').classList.add('hidden');renderNoteCollega();toast('Nota modificata')}catch(e){toast('Errore modifica nota')}}
 async function annullaInvioNota(id){const n=noteColleghiCache.find(n=>n.id===id);const gid=n?n.gruppo_id:null;
   const ids=gid?noteColleghiCache.filter(x=>x.gruppo_id===gid&&x.da_operatore===n.da_operatore).map(x=>x.id):[id];
   const label=ids.length>1?'Annullare l\'invio di '+ids.length+' note? Verranno eliminate per tutti i destinatari.':'Annullare l\'invio? La nota verrà eliminata anche per il destinatario.';
   if(!confirm(label))return;
-  try{for(const nid of ids){await secDel('note_colleghi','id=eq.'+nid)}noteColleghiCache=noteColleghiCache.filter(x=>!ids.includes(x.id));logAzione('Annullamento nota','Nota annullata ('+ids.length+' destinatari)');renderNoteCollega();toast('Invio annullato')}catch(e){toast('Errore')}}
+  try{for(const nid of ids){await secDel('note_colleghi','id=eq.'+nid)}noteColleghiCache=noteColleghiCache.filter(x=>!ids.includes(x.id));logAzione('Annullamento nota','Nota annullata ('+ids.length+' destinatari)');renderNoteCollega();toast('Invio annullato')}catch(e){toast('Errore annullamento invio')}}
 function renderNoteCollega(){const op=getOperatore();
   // Populate destinatari checkboxes
   const box=document.getElementById('nota-dest-box');if(box){const checked=new Set(getDestinatariSelezionati());const tutti=operatoriAuthCache.map(o=>o.nome).sort().filter(n=>n&&n!==op);
@@ -1954,11 +1954,11 @@ function apriSchedaCollaboratore(nome){
   html+='<div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap">';
   html+='<span style="font-size:.82rem;color:var(--muted)">Data di nascita:</span>';
   html+='<input type="text" id="scheda-nascita" value="'+escP(dataNascita)+'" placeholder="Seleziona..." readonly style="cursor:pointer;padding:4px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper2);color:var(--ink);width:120px">';
-  html+='<button class="btn-salva" onclick="salvaSchedaNascita(\''+neS+'\')" style="font-size:.72rem;padding:4px 12px;background:var(--accent2)">Salva</button>';
+  html+='<button class="btn-salva" onclick="salvaSchedaNascita(\''+neS+'\')" style="font-size:.78rem;padding:5px 14px;background:var(--accent2)">Salva</button>';
   if(dataNascita){html+='<span style="font-size:.82rem;color:var(--muted)">'+new Date(dataNascita+'T12:00:00').toLocaleDateString('it-IT')+'</span>'}
   html+='</div></div>';
-  html+='<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-export btn-export-pdf" onclick="stampaSchedaPDF(\''+neS+'\')" style="font-size:.72rem;padding:5px 12px">PDF</button>';
-  html+='<button class="btn-export" onclick="apriConfrontoScheda(\''+neS+'\')" style="font-size:.72rem;padding:5px 12px;border-color:#1a7a6d;color:#1a7a6d">Confronta</button>';
+  html+='<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-export btn-export-pdf" onclick="stampaSchedaPDF(\''+neS+'\')" style="font-size:.78rem;padding:5px 14px">PDF</button>';
+  html+='<button class="btn-export" onclick="apriConfrontoScheda(\''+neS+'\')" style="font-size:.78rem;padding:5px 14px;border-color:#1a7a6d;color:#1a7a6d">Confronta</button>';
   html+='<button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\');_destroySchedaCharts()" style="padding:6px 12px;font-size:.75rem">Chiudi</button></div></div>';
 
   // KPI CARDS
@@ -2618,7 +2618,7 @@ async function renderCollaboratoriUI(){const section=document.getElementById('co
 async function aggiungiCollaboratore(){const nome=capitalizzaNome(document.getElementById('new-collab-nome').value.trim());if(!nome){toast('Inserisci un nome');return}
   if(collaboratoriCache.find(c=>c.nome.toLowerCase()===nome.toLowerCase())){toast('Collaboratore già esistente');return}
   try{const r=await secPost('collaboratori',{nome,attivo:true});collaboratoriCache.push(r[0]);collaboratoriCache.sort((a,b)=>a.nome.localeCompare(b.nome));
-    logAzione('Collaboratore aggiunto',nome);document.getElementById('new-collab-nome').value='';renderCollaboratoriUI();aggiornaNomi();toast('Collaboratore aggiunto')}catch(e){if(e.message&&e.message.includes('duplicate'))toast('Nome già esistente');else toast('Errore')}}
+    logAzione('Collaboratore aggiunto',nome);document.getElementById('new-collab-nome').value='';renderCollaboratoriUI();aggiornaNomi();toast('Collaboratore aggiunto')}catch(e){if(e.message&&e.message.includes('duplicate'))toast('Nome già esistente');else toast('Errore aggiunta collaboratore')}}
 function rinominaCollaboratore(nome){const b=document.getElementById('pwd-modal-content');
   b.innerHTML='<h3>Rinomina collaboratore</h3><div class="pwd-field"><label>Nome attuale</label><input type="text" value="'+escP(nome)+'" readonly style="background:var(--paper2);color:var(--muted)"></div><div class="pwd-field"><label>Nuovo nome</label><input type="text" id="rin-collab-nuovo" value="'+escP(nome)+'"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaRinominaCollaboratore(\''+nome.replace(/'/g,"\\'")+'\')">Salva</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');setTimeout(()=>{const i=document.getElementById('rin-collab-nuovo');if(i){i.focus();i.select()}},100)}
@@ -2634,9 +2634,9 @@ async function salvaRinominaCollaboratore(vecchio){const nuovo=document.getEleme
     collaboratoriCache.sort((a,b)=>a.nome.localeCompare(b.nome));
     logAzione('Rinomina collaboratore',vecchio+' → '+nuovo);document.getElementById('pwd-modal').classList.add('hidden');renderCollaboratoriUI();aggiornaNomi();render();toast('Collaboratore rinominato')}catch(e){toast('Errore: nome già esistente?')}}
 async function disattivaCollaboratore(nome){if(!confirm('Disattivare "'+nome+'"? Non apparirà più nell\'autocomplete.'))return;
-  try{await secPatch('collaboratori','nome=eq.'+encodeURIComponent(nome),{attivo:false});collaboratoriCache=collaboratoriCache.filter(c=>c.nome!==nome);logAzione('Collaboratore disattivato',nome);renderCollaboratoriUI();aggiornaNomi();toast('Collaboratore disattivato')}catch(e){toast('Errore')}}
+  try{await secPatch('collaboratori','nome=eq.'+encodeURIComponent(nome),{attivo:false});collaboratoriCache=collaboratoriCache.filter(c=>c.nome!==nome);logAzione('Collaboratore disattivato',nome);renderCollaboratoriUI();aggiornaNomi();toast('Collaboratore disattivato')}catch(e){toast('Errore disattivazione')}}
 async function riattivaCollaboratore(nome){try{await secPatch('collaboratori','nome=eq.'+encodeURIComponent(nome),{attivo:true});
-  collaboratoriCache.push({nome,attivo:true});collaboratoriCache.sort((a,b)=>a.nome.localeCompare(b.nome));renderCollaboratoriUI();aggiornaNomi();toast('Collaboratore riattivato')}catch(e){toast('Errore')}}
+  collaboratoriCache.push({nome,attivo:true});collaboratoriCache.sort((a,b)=>a.nome.localeCompare(b.nome));renderCollaboratoriUI();aggiornaNomi();toast('Collaboratore riattivato')}catch(e){toast('Errore riattivazione')}}
 
 // LOG ATTIVITA
 async function logAzione(azione,dettaglio){try{const rec={operatore:getOperatore()||'Admin',azione,dettaglio:dettaglio||''};await secPost('log_attivita',rec);logCache.unshift(Object.assign(rec,{created_at:new Date().toISOString()}))}catch(e){}}
@@ -3134,11 +3134,11 @@ async function inviaConsegnaTurno(){const turno=document.getElementById('cons-tu
     document.getElementById('cons-messaggio').value='';
     logAzione('Consegna turno',turno+' — '+msg.substring(0,50));
     renderConsegne();aggiornaConsegnaBadge();toast('Consegna inviata!');
-    inviaPush(destinatario==='tutti'?['tutti']:[destinatario],'Consegna '+turno+' da '+getOperatore(),msg.substring(0,120),'consegna')}catch(e){toast('Errore')}}
+    inviaPush(destinatario==='tutti'?['tutti']:[destinatario],'Consegna '+turno+' da '+getOperatore(),msg.substring(0,120),'consegna')}catch(e){toast('Errore invio consegna')}}
 async function segnaConsegnaLetta(id){const op=getOperatore();
   try{await secPatch('consegne_turno','id=eq.'+id,{letto_da:op,letto_at:new Date().toISOString()});
     const c=consegneCache.find(x=>x.id===id);if(c){c.letto_da=op;c.letto_at=new Date().toISOString()}
-    renderConsegne();aggiornaConsegnaBadge()}catch(e){toast('Errore')}}
+    renderConsegne();aggiornaConsegnaBadge()}catch(e){toast('Errore aggiornamento consegna')}}
 function renderConsegne(){const el=document.getElementById('consegne-list');if(!el)return;
   const op=getOperatore();
   const _consDal=(document.getElementById('cons-filt-dal')||{}).value||'';
@@ -3162,12 +3162,12 @@ function modificaConsegna(id){const c=consegneCache.find(x=>x.id===id);if(!c||c.
   document.getElementById('pwd-modal').classList.remove('hidden')}
 async function salvaModificaConsegna(id){const msg=document.getElementById('edit-cons-msg').value.trim();if(!msg){toast('Scrivi un messaggio');return}
   try{await secPatch('consegne_turno','id=eq.'+id,{messaggio:msg});const c=consegneCache.find(x=>x.id===id);if(c)c.messaggio=msg;
-    document.getElementById('pwd-modal').classList.add('hidden');renderConsegne();toast('Consegna modificata')}catch(e){toast('Errore')}}
+    document.getElementById('pwd-modal').classList.add('hidden');renderConsegne();toast('Consegna modificata')}catch(e){toast('Errore modifica consegna')}}
 async function annullaConsegna(id){const c=consegneCache.find(x=>x.id===id);if(!c)return;
   if(c.letto_da){toast('Non puoi annullare: già letta da '+c.letto_da);return}
   if(!confirm('Annullare l\'invio di questa consegna? Verrà eliminata.'))return;
   try{await secDel('consegne_turno','id=eq.'+id);consegneCache=consegneCache.filter(x=>x.id!==id);
-    logAzione('Consegna annullata',c.messaggio.substring(0,50));renderConsegne();aggiornaConsegnaBadge();toast('Consegna annullata')}catch(e){toast('Errore')}}
+    logAzione('Consegna annullata',c.messaggio.substring(0,50));renderConsegne();aggiornaConsegnaBadge();toast('Consegna annullata')}catch(e){toast('Errore annullamento consegna')}}
 function aggiornaConsegnaBadge(){const op=getOperatore();const badge=document.getElementById('consegna-badge');if(!badge||!op)return;
   const nonLette=getConsegneReparto().filter(c=>!c.letto_da&&c.operatore!==op&&(c.destinatario==='tutti'||c.destinatario===op)).length;
   if(nonLette){badge.style.display='inline';badge.textContent=nonLette}else{badge.style.display='none'}}
@@ -3274,7 +3274,7 @@ function eseguiReport(tipo){document.getElementById('pwd-modal').classList.add('
 // ========================
 async function generaReportSettimanale(sez){
   if(!sez)sez={panoramica:true,cassa:true,maison:true,spese_extra:true,regali:true,moduli:true,promemoria:true,registrazioni:false};
-  if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore');return}}
+  if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore caricamento libreria PDF');return}}
   const now=new Date();const sett=[];for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);sett.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'))}
   const dalLabel=new Date(sett[0]+'T12:00:00').toLocaleDateString('it-IT'),alLabel=new Date(sett[6]+'T12:00:00').toLocaleDateString('it-IT');
   const settData=getDatiReparto().filter(e=>e.data>=sett[0]&&e.data<=sett[6]+'T23:59:59');
@@ -3377,7 +3377,7 @@ function _getDatiAnno(anno){const start=anno+'-01-01',end=anno+'-12-31';
     moduli:getModuliReparto().filter(m=>(m.created_at||m.data_modulo||'')>=start&&(m.created_at||m.data_modulo||'')<=end+'T23:59:59')}}
 async function generaReportAnnuale(sez){
   if(!sez)sez={panoramica:true,cassa:true,maison:true,spese_extra:true,regali:true,moduli:true,promemoria:true,registrazioni:false};
-  if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore');return}}
+  if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore caricamento libreria PDF');return}}
   const anno=_getAnnoCorrente();const d=_getDatiAnno(anno);
   const nErr=d.data.filter(e=>e.tipo===nomeCorrente('Errore')).length;
   const nMal=d.data.filter(e=>e.tipo===nomeCorrente('Malattia')).length;
@@ -3466,18 +3466,18 @@ async function salvaPromemoria(){const titolo=document.getElementById('pm-titolo
     const fp=document.getElementById('pm-scadenza');if(fp&&fp._flatpickr)fp._flatpickr.clear();else fp.value='';
     logAzione('Promemoria creato',titolo+' → '+assegnato+' ('+scadenza+')');
     renderPromemoria();aggiornaPromemoriaBadge();toast('Promemoria creato');
-    inviaPush(assegnato==='tutti'?['tutti']:[assegnato],'Promemoria: '+titolo,(descrizione||titolo).substring(0,120),'promemoria',true)}catch(e){toast('Errore')}}
+    inviaPush(assegnato==='tutti'?['tutti']:[assegnato],'Promemoria: '+titolo,(descrizione||titolo).substring(0,120),'promemoria',true)}catch(e){toast('Errore creazione promemoria')}}
 async function completaPromemoria(id){const op=getOperatore();
   try{await secPatch('promemoria','id=eq.'+id,{completata:true,completata_da:op,completata_at:new Date().toISOString()});
     const p=promemoriaCache.find(x=>x.id===id);if(p){p.completata=true;p.completata_da=op;p.completata_at=new Date().toISOString()}
-    logAzione('Promemoria completato',p?p.titolo:'');renderPromemoria();aggiornaPromemoriaBadge();toast('Completato!')}catch(e){toast('Errore')}}
+    logAzione('Promemoria completato',p?p.titolo:'');renderPromemoria();aggiornaPromemoriaBadge();toast('Completato!')}catch(e){toast('Errore completamento')}}
 async function riattivaPromemoria(id){
   try{await secPatch('promemoria','id=eq.'+id,{completata:false,completata_da:null,completata_at:null});
     const p=promemoriaCache.find(x=>x.id===id);if(p){p.completata=false;p.completata_da=null;p.completata_at=null}
-    renderPromemoria();aggiornaPromemoriaBadge()}catch(e){toast('Errore')}}
+    renderPromemoria();aggiornaPromemoriaBadge()}catch(e){toast('Errore aggiornamento promemoria')}}
 async function eliminaPromemoria(id){if(!confirm('Eliminare questo promemoria?'))return;
   try{await secDel('promemoria','id=eq.'+id);promemoriaCache=promemoriaCache.filter(x=>x.id!==id);
-    renderPromemoria();aggiornaPromemoriaBadge();toast('Eliminato')}catch(e){toast('Errore')}}
+    renderPromemoria();aggiornaPromemoriaBadge();toast('Eliminato')}catch(e){toast('Errore eliminazione promemoria')}}
 function getPromemoriaFiltrati(){const op=getOperatore();const stato=(document.getElementById('pm-filt-stato')||{}).value||'attivi';
   const filtOp=(document.getElementById('pm-filt-op')||{}).value||'';
   return promemoriaCache.filter(p=>{
@@ -3657,9 +3657,9 @@ async function salvaRegalo(){
   try{const r=await secPost('regali_maison',{nome:nome,descrizione:desc,importo:importo,data_regalo:data,operatore:getOperatore(),reparto_dip:currentReparto});
     regaliCache.unshift(r[0]);document.getElementById('regalo-nome').value='';document.getElementById('regalo-desc').value='';
     document.getElementById('regalo-importo').value='';var fp=document.getElementById('regalo-data');if(fp&&fp._flatpickr)fp._flatpickr.clear();
-    renderRegali();logAzione('Regalo aggiunto',nome+' - '+desc);toast('Regalo registrato')}catch(e){toast('Errore')}}
+    renderRegali();logAzione('Regalo aggiunto',nome+' - '+desc);toast('Regalo registrato')}catch(e){toast('Errore aggiunta regalo')}}
 async function eliminaRegalo(id){if(!confirm('Eliminare questo regalo?'))return;
-  try{await secDel('regali_maison','id=eq.'+id);regaliCache=regaliCache.filter(function(x){return x.id!==id});renderRegali();toast('Eliminato')}catch(e){toast('Errore')}}
+  try{await secDel('regali_maison','id=eq.'+id);regaliCache=regaliCache.filter(function(x){return x.id!==id});renderRegali();toast('Eliminato')}catch(e){toast('Errore eliminazione regalo')}}
 function renderRegali(){var data=getRegaliReparto();var el=document.getElementById('regali-list');if(!el)return;
   if(!data.length){el.innerHTML='<div class="empty-state"><p>Nessun regalo registrato</p><small>Aggiungi un regalo per un cliente Maison</small></div>';return}
   var totale=data.reduce(function(s,r){return s+parseFloat(r.importo||0)},0);
@@ -3676,10 +3676,10 @@ async function salvaNotaCliente(nome){
   if(!nota){toast('Scrivi una nota');return}
   try{var r=await secPost('note_clienti',{nome:nome,nota:nota,operatore:getOperatore(),reparto_dip:currentReparto});
     noteClientiCache.unshift(r[0]);document.getElementById('detail-nota-input').value='';
-    apriDettaglioMaison(nome);toast('Nota salvata')}catch(e){toast('Errore')}}
+    apriDettaglioMaison(nome);toast('Nota salvata')}catch(e){toast('Errore salvataggio nota')}}
 async function eliminaNotaCliente(id,nome){if(!confirm('Eliminare questa nota?'))return;
   try{await secDel('note_clienti','id=eq.'+id);noteClientiCache=noteClientiCache.filter(function(x){return x.id!==id});
-    apriDettaglioMaison(nome);toast('Nota eliminata')}catch(e){toast('Errore')}}
+    apriDettaglioMaison(nome);toast('Nota eliminata')}catch(e){toast('Errore eliminazione nota')}}
 function getMaisonFiltrati(){const fn=(document.getElementById('maison-filt-nome')||{}).value||'';
   const ft=(document.getElementById('maison-filt-tipo')||{}).value||'';
   const fd=(document.getElementById('maison-filt-dal')||{}).value||'';
@@ -3737,7 +3737,7 @@ function renderMaisonDashboard(){const data=getMaisonFiltrati();
     const ne=nome.replace(/'/g,"\\'");
     const clientInfo=budget;
     const catBadge=clientInfo&&clientInfo.categoria==='full_maison'?'<span class="mini-badge" style="background:#b8860b;margin-left:6px">Full Maison</span>':clientInfo&&clientInfo.categoria==='maison'?'<span class="mini-badge" style="background:#2980b9;margin-left:6px">Maison</span>':clientInfo&&clientInfo.categoria==='direzione'?'<span class="mini-badge" style="background:#8e44ad;margin-left:6px">Direzione</span>':'';
-    const condBadge=d.condivise?' <span title="'+d.condivise+' voci condivise (costo diviso)" style="font-size:.68rem;color:var(--accent2);font-weight:600;cursor:help">÷'+[...new Set(d.condivisiGruppi)].length+'</span>':'';
+    const condBadge=d.condivise?' <span title="'+d.condivise+' voci condivise (costo diviso)" style="font-size:.78rem;color:var(--accent2);font-weight:600;cursor:help">÷'+[...new Set(d.condivisiGruppi)].length+'</span>':'';
     thtml+='<tr style="'+rowStyle+'"><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(nome)+'</span></strong>'+catBadge+(overBudget?' <span style="color:var(--accent);font-size:.75rem;font-weight:700">BUDGET SUPERATO</span>':nearBudget?' <span style="color:#e67e22;font-size:.75rem;font-weight:700">80% BUDGET</span>':'')+'</td><td class="num">'+d.visite+'</td><td class="num">'+d.px+'</td><td class="num">'+(d.bu||'-')+'</td><td class="num">'+(d.bl||'-')+'</td><td class="num"><strong>'+d.tot.toFixed(2)+'</strong>'+condBadge+'</td><td class="num">'+(d.tot/d.visite).toFixed(2)+'</td><td style="white-space:nowrap"><button class="btn-act edit" onclick="rinominaMaisonCliente(\''+ne+'\')" title="Rinomina">Rinomina</button> <button class="btn-act del" onclick="eliminaMaisonCliente(\''+ne+'\')" title="Elimina">Elimina</button></td></tr>'});
   thtml+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td class="num"><strong>'+sorted.reduce((s,c)=>s+c[1].visite,0)+'</strong></td><td class="num"><strong>'+totPx+'</strong></td><td class="num"><strong>'+data.filter(r=>r.tipo_buono==='BU').length+'</strong></td><td class="num"><strong>'+data.filter(r=>r.tipo_buono==='BL').length+'</strong></td><td class="num"><strong>'+totCosto.toFixed(2)+'</strong></td><td></td><td></td></tr>';
   thtml+='</tbody></table></div>';tb.innerHTML=thtml;
@@ -3775,7 +3775,7 @@ function apriDettaglioMaison(nome){const righe=getMaisonFiltrati().filter(r=>r.n
   const catBadgeD=budget&&budget.categoria==='full_maison'?' <span class="mini-badge" style="background:#b8860b;font-size:.78rem">Full Maison</span>':budget&&budget.categoria==='maison'?' <span class="mini-badge" style="background:#2980b9;font-size:.78rem">Maison</span>':budget&&budget.categoria==='direzione'?' <span class="mini-badge" style="background:#8e44ad;font-size:.78rem">Direzione</span>':'';
   const nascitaStr=budget&&budget.data_nascita?new Date(budget.data_nascita+'T12:00:00').toLocaleDateString('it-IT'):'';
   const ne=nome.replace(/'/g,"\\'");
-  let html='<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px"><div><h3 style="font-family:Playfair Display,serif;color:var(--ink);margin-bottom:4px">'+escP(nome)+catBadgeD+'</h3><p style="color:var(--accent2);font-size:.9rem;font-weight:600;margin-bottom:2px">'+mesiCliente+'</p><p style="color:var(--muted);font-size:.82rem">'+righe.length+' visite — '+totPx+' persone — '+tot.toFixed(2)+' CHF'+(nBU?' — '+nBU+' BU':'')+(nBL?' — '+nBL+' BL':'')+'</p>'+(budget&&budget.budget_chf?'<p style="font-size:.82rem;color:'+(tot>=budget.budget_chf?'var(--accent)':tot>=budget.budget_chf*0.8?'#e67e22':'#2c6e49')+';font-weight:600">Budget: '+tot.toFixed(0)+' / '+parseFloat(budget.budget_chf).toFixed(0)+' CHF ('+Math.round(tot/budget.budget_chf*100)+'%)</p>':'')+'<div style="display:flex;align-items:center;gap:8px;margin-top:6px"><span style="font-size:.82rem;color:var(--muted)">Data nascita:</span><input type="text" id="detail-nascita" value="'+(budget&&budget.data_nascita||'')+'" placeholder="Seleziona..." readonly style="cursor:pointer;padding:4px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper2);color:var(--ink);width:120px"><button class="btn-salva" onclick="salvaDetailNascita(\''+ne+'\')" style="font-size:.72rem;padding:4px 12px;background:var(--accent2)">Salva</button>'+(nascitaStr?' <span style="font-size:.82rem;color:var(--muted)">Attuale: '+nascitaStr+'</span>':'')+'</div></div><button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\')" style="padding:6px 12px;font-size:.75rem">Chiudi</button></div>';
+  let html='<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px"><div><h3 style="font-family:Playfair Display,serif;color:var(--ink);margin-bottom:4px">'+escP(nome)+catBadgeD+'</h3><p style="color:var(--accent2);font-size:.9rem;font-weight:600;margin-bottom:2px">'+mesiCliente+'</p><p style="color:var(--muted);font-size:.82rem">'+righe.length+' visite — '+totPx+' persone — '+tot.toFixed(2)+' CHF'+(nBU?' — '+nBU+' BU':'')+(nBL?' — '+nBL+' BL':'')+'</p>'+(budget&&budget.budget_chf?'<p style="font-size:.82rem;color:'+(tot>=budget.budget_chf?'var(--accent)':tot>=budget.budget_chf*0.8?'#e67e22':'#2c6e49')+';font-weight:600">Budget: '+tot.toFixed(0)+' / '+parseFloat(budget.budget_chf).toFixed(0)+' CHF ('+Math.round(tot/budget.budget_chf*100)+'%)</p>':'')+'<div style="display:flex;align-items:center;gap:8px;margin-top:6px"><span style="font-size:.82rem;color:var(--muted)">Data nascita:</span><input type="text" id="detail-nascita" value="'+(budget&&budget.data_nascita||'')+'" placeholder="Seleziona..." readonly style="cursor:pointer;padding:4px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper2);color:var(--ink);width:120px"><button class="btn-salva" onclick="salvaDetailNascita(\''+ne+'\')" style="font-size:.78rem;padding:5px 14px;background:var(--accent2)">Salva</button>'+(nascitaStr?' <span style="font-size:.82rem;color:var(--muted)">Attuale: '+nascitaStr+'</span>':'')+'</div></div><button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\')" style="padding:6px 12px;font-size:.75rem">Chiudi</button></div>';
   // Pre-compute spese extra e regali per KPI
   const seRighe=getSpeseReparto().filter(r=>r.beneficiario.toLowerCase()===nome.toLowerCase()).sort((a,b)=>a.data_spesa.localeCompare(b.data_spesa));
   const totSE=seRighe.reduce((s,r)=>s+parseFloat(r.importo||0),0);
@@ -3828,16 +3828,16 @@ function apriDettaglioMaison(nome){const righe=getMaisonFiltrati().filter(r=>r.n
     _mesiArr.forEach(function(m){
       const h=_maxMese>0?Math.max(4,Math.round(m[1]/_maxMese*100)):4;
       html+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;justify-content:flex-end;height:100%">';
-      html+='<div style="font-size:.68rem;color:var(--muted)">'+m[1].toFixed(0)+'</div>';
+      html+='<div style="font-size:.78rem;color:var(--muted)">'+m[1].toFixed(0)+'</div>';
       html+='<div style="width:100%;max-width:40px;background:#b8860b;border-radius:2px 2px 0 0;height:'+h+'px"></div>';
-      html+='<div style="font-size:.68rem;color:var(--muted);white-space:nowrap">'+m[0].split(' ')[0]+'</div>';
+      html+='<div style="font-size:.78rem;color:var(--muted);white-space:nowrap">'+m[0].split(' ')[0]+'</div>';
       html+='</div>'});
     html+='</div></div>'}
   // --- Fine nuove sezioni KPI ---
   html+='<div style="overflow-x:auto"><table class="collab-table"><thead><tr><th>Data</th><th>Giorno</th><th class="num">PX</th><th class="num">Costo CHF</th><th>Tipo</th><th>Gruppo</th><th>Note</th></tr></thead><tbody>';
   righe.forEach(r=>{const d=new Date(r.data_giornata+'T12:00:00');
     const costoTip=r._costoOriginale?' title="'+r._costoOriginale.toFixed(2)+'/'+r._nCondiviso+' ('+escP(r._gruppoOriginale)+')" style="cursor:help"':'';
-    html+='<tr><td style="font-weight:600">'+d.getDate()+' '+MESI[d.getMonth()]+'</td><td>'+GIORNI[d.getDay()]+'</td><td class="num">'+r.px+'</td><td class="num"><strong'+costoTip+'>'+parseFloat(r.costo).toFixed(2)+(r._costoOriginale?' <span style="font-size:.68rem;color:var(--accent2)">÷'+r._nCondiviso+'</span>':'')+'</strong></td><td>'+(r.tipo_buono?'<span class="mini-badge" style="background:'+(r.tipo_buono==='BU'?'#e67e22':'#2c6e49')+'">'+r.tipo_buono+'</span>':'—')+'</td><td style="color:var(--muted);font-size:.85rem">'+escP(r._gruppoOriginale||r.gruppo||'')+'</td><td style="color:var(--muted);font-size:.85rem">'+escP(r.note||'')+'</td></tr>'});
+    html+='<tr><td style="font-weight:600">'+d.getDate()+' '+MESI[d.getMonth()]+'</td><td>'+GIORNI[d.getDay()]+'</td><td class="num">'+r.px+'</td><td class="num"><strong'+costoTip+'>'+parseFloat(r.costo).toFixed(2)+(r._costoOriginale?' <span style="font-size:.78rem;color:var(--accent2)">÷'+r._nCondiviso+'</span>':'')+'</strong></td><td>'+(r.tipo_buono?'<span class="mini-badge" style="background:'+(r.tipo_buono==='BU'?'#e67e22':'#2c6e49')+'">'+r.tipo_buono+'</span>':'—')+'</td><td style="color:var(--muted);font-size:.85rem">'+escP(r._gruppoOriginale||r.gruppo||'')+'</td><td style="color:var(--muted);font-size:.85rem">'+escP(r.note||'')+'</td></tr>'});
   html+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td colspan="2"><strong>TOTALE RISTORANTE</strong></td><td class="num"><strong>'+totPx+'</strong></td><td class="num"><strong>'+tot.toFixed(2)+'</strong></td><td colspan="3"></td></tr>';
   html+='</tbody></table></div>';
   // Spese Extra per questo cliente (seRighe/totSE already computed above for KPI)
@@ -3858,7 +3858,7 @@ function apriDettaglioMaison(nome){const righe=getMaisonFiltrati().filter(r=>r.n
   var noteRighe=getNoteClientiReparto().filter(function(r){return r.nome.toLowerCase()===nome.toLowerCase()});
   if(noteRighe.length){
     html+='<h4 style="font-family:Playfair Display,serif;margin:16px 0 8px;color:var(--ink)">Note Private</h4>';
-    noteRighe.forEach(function(r){var ne2=r.nome.replace(/'/g,"\\'");html+='<div style="padding:10px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border-left:3px solid var(--accent2);display:flex;justify-content:space-between;align-items:start"><div><p style="margin-bottom:4px">'+esc(r.nota)+'</p><small style="color:var(--muted)">'+escP(r.operatore||'')+' — '+new Date(r.created_at).toLocaleDateString('it-IT')+'</small></div><button class="btn-act del" onclick="eliminaNotaCliente('+r.id+',\''+ne2+'\')" style="font-size:.68rem;flex-shrink:0">Elimina</button></div>'})}
+    noteRighe.forEach(function(r){var ne2=r.nome.replace(/'/g,"\\'");html+='<div style="padding:10px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border-left:3px solid var(--accent2);display:flex;justify-content:space-between;align-items:start"><div><p style="margin-bottom:4px">'+esc(r.nota)+'</p><small style="color:var(--muted)">'+escP(r.operatore||'')+' — '+new Date(r.created_at).toLocaleDateString('it-IT')+'</small></div><button class="btn-act del" onclick="eliminaNotaCliente('+r.id+',\''+ne2+'\')" style="font-size:.78rem;flex-shrink:0">Elimina</button></div>'})}
   // Totale complessivo aggiornato
   var grandTotal=tot+(seRighe.length?seRighe.reduce(function(s,r){return s+parseFloat(r.importo||0)},0):0)+totReg;
   if(grandTotal>tot){html+='<div style="margin-top:10px;padding:10px;background:var(--paper2);border-radius:3px;text-align:center;font-weight:700;font-size:1rem;color:var(--accent2)">TOTALE COMPLESSIVO: '+grandTotal.toFixed(2)+' CHF</div>'}
@@ -3871,9 +3871,9 @@ async function salvaDetailNascita(nome){var val=document.getElementById('detail-
   if(!val){toast('Seleziona una data');return}
   var b=maisonBudgetCache.find(function(x){return x.nome.toLowerCase()===nome.toLowerCase()&&(x.reparto_dip||'slots')===currentReparto});
   if(b){try{await secPatch('maison_budget','id=eq.'+b.id,{data_nascita:val});b.data_nascita=val;
-    renderMaisonBudgetUI();toast('Data nascita salvata per '+nome)}catch(e){toast('Errore')}}
+    renderMaisonBudgetUI();toast('Data nascita salvata per '+nome)}catch(e){toast('Errore salvataggio data nascita')}}
   else{try{var r=await secPost('maison_budget',{nome:nome,data_nascita:val,reparto_dip:currentReparto});
-    maisonBudgetCache.push(r[0]);renderMaisonBudgetUI();toast('Data nascita salvata per '+nome)}catch(e){toast('Errore')}}}
+    maisonBudgetCache.push(r[0]);renderMaisonBudgetUI();toast('Data nascita salvata per '+nome)}catch(e){toast('Errore salvataggio data nascita')}}}
 function stampaSchedaCliente(){
   var content=document.getElementById('profilo-content').innerHTML;
   var win=window.open('','_blank','width=800,height=600');
@@ -3973,7 +3973,7 @@ function eseguiConfronto(){
       h+='</div>'});
     h+='</div>';
     h+='<div style="display:flex;gap:4px">';
-    mesiOrd.forEach(function(m){var parts=m.split('-');h+='<div style="flex:1;text-align:center;font-size:.68rem;color:var(--muted)">'+MESI[parseInt(parts[1])-1]+'</div>'});
+    mesiOrd.forEach(function(m){var parts=m.split('-');h+='<div style="flex:1;text-align:center;font-size:.78rem;color:var(--muted)">'+MESI[parseInt(parts[1])-1]+'</div>'});
     h+='</div>';
     h+='<div style="display:flex;gap:14px;justify-content:center;margin-top:8px">';
     dati.forEach(function(d){h+='<span style="font-size:.78rem;color:'+d.color+';font-weight:600">&#9632; '+escP(d.nome)+'</span>'});
@@ -3988,7 +3988,7 @@ function esportaMaisonClienteCSV(nome){const righe=getMaisonFiltrati().filter(r=
   Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'maison_'+nome.replace(/\s+/g,'_')+'_'+_maisonFilePeriodo(righe)+'.csv'}).click();toast('CSV esportato!')}
 async function esportaMaisonClientePDF(nome){const righe=getMaisonFiltrati().filter(r=>r.nome===nome).sort((a,b)=>a.data_giornata.localeCompare(b.data_giornata));
   if(!righe.length){toast('Nessun dato');return}
-  if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore');return}}
+  if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore caricamento libreria PDF');return}}
   const tot=righe.reduce((s,r)=>s+parseFloat(r.costo||0),0);const totPx=righe.reduce((s,r)=>s+(r.px||0),0);
   const mesi=[...new Set(righe.map(r=>{const d=new Date(r.data_giornata+'T12:00:00');return MESI_FULL[d.getMonth()]+' '+d.getFullYear()}))].join(', ');
   try{const{jsPDF}=window.jspdf;const doc=new jsPDF('portrait','mm','a4');const pw=doc.internal.pageSize.getWidth();let y=14;
@@ -4018,7 +4018,7 @@ async function eliminaMaisonCliente(nome){
   if(!count){toast('Nessun record trovato per '+nome);return}
   if(!confirm('Eliminare tutte le '+count+' registrazioni di "'+nome+'" ('+currentReparto+')?'))return;
   try{await secDel('costi_maison','nome=eq.'+encodeURIComponent(nome)+'&reparto_dip=eq.'+currentReparto);maisonCache=maisonCache.filter(r=>!(r.nome===nome&&(r.reparto_dip||'slots')===currentReparto));
-    logAzione('Maison: eliminato cliente',nome+' ('+count+' righe, '+currentReparto+')');renderMaisonDashboard();renderMaisonBudgetAlerts();toast(nome+' eliminato ('+count+' righe)')}catch(e){toast('Errore')}}
+    logAzione('Maison: eliminato cliente',nome+' ('+count+' righe, '+currentReparto+')');renderMaisonDashboard();renderMaisonBudgetAlerts();toast(nome+' eliminato ('+count+' righe)')}catch(e){toast('Errore eliminazione cliente')}}
 function _eliminaCondivisoModal(nome){const orig=_getNomiCondivisiOriginali(nome);
   const altri=orig.map(o=>o.split(/\s*\/\s*/).filter(n=>capitalizzaNome(n.trim())!==nome).map(n=>capitalizzaNome(n.trim())).join(', '));
   const count=getMaisonReparto().filter(r=>orig.includes(r.nome)).length;
@@ -4051,7 +4051,7 @@ async function eseguiRinominaMaison(vecchio){const nuovo=capitalizzaNome(documen
     const bIdx=maisonBudgetCache.findIndex(b=>b.nome.toLowerCase()===vecchio.toLowerCase()&&(b.reparto_dip||'slots')===currentReparto);
     if(bIdx!==-1){await secPatch('maison_budget','id=eq.'+maisonBudgetCache[bIdx].id,{nome:nuovo});maisonBudgetCache[bIdx].nome=nuovo}
     logAzione('Maison: rinominato',vecchio+' → '+nuovo);document.getElementById('pwd-modal').classList.add('hidden');
-    renderMaisonDashboard();renderMaisonBudgetUI();renderMaisonBudgetAlerts();toast(vecchio+' → '+nuovo)}catch(e){toast('Errore')}}
+    renderMaisonDashboard();renderMaisonBudgetUI();renderMaisonBudgetAlerts();toast(vecchio+' → '+nuovo)}catch(e){toast('Errore rinomina')}}
 async function _eseguiRinominaCondiviso(vecchio){const nuovo=capitalizzaNome(document.getElementById('rin-maison-nuovo').value.trim());
   if(!nuovo){toast('Inserisci un nome');return}if(nuovo===vecchio){document.getElementById('pwd-modal').classList.add('hidden');return}
   const orig=_getNomiCondivisiOriginali(vecchio);
@@ -4060,14 +4060,14 @@ async function _eseguiRinominaCondiviso(vecchio){const nuovo=capitalizzaNome(doc
     const nuovoNome=rec.nome.split(/\s*\/\s*/).map(n=>capitalizzaNome(n.trim())===vecchio?nuovo:capitalizzaNome(n.trim())).join(' / ');
     await secPatch('costi_maison','id=eq.'+id,{nome:nuovoNome});rec.nome=nuovoNome}
   logAzione('Maison: rinominato condiviso',vecchio+' → '+nuovo);document.getElementById('pwd-modal').classList.add('hidden');
-  renderMaisonDashboard();renderMaisonBudgetUI();renderMaisonBudgetAlerts();toast(vecchio+' → '+nuovo)}catch(e){toast('Errore')}}
+  renderMaisonDashboard();renderMaisonBudgetUI();renderMaisonBudgetAlerts();toast(vecchio+' → '+nuovo)}catch(e){toast('Errore rinomina')}}
 // Elimina tutti i dati di un giorno
 async function eliminaMaisonGiorno(){const sel=document.getElementById('maison-del-giorno');if(!sel||!sel.value){toast('Seleziona un giorno');return}
   const giorno=sel.value;const label=new Date(giorno+'T12:00:00').toLocaleDateString('it-IT');
   const count=getMaisonReparto().filter(r=>r.data_giornata===giorno).length;
   if(!confirm('Eliminare tutte le '+count+' registrazioni del '+label+' ('+currentReparto+')?'))return;
   try{await secDel('costi_maison','data_giornata=eq.'+giorno+'&reparto_dip=eq.'+currentReparto);maisonCache=maisonCache.filter(r=>!(r.data_giornata===giorno&&(r.reparto_dip||'slots')===currentReparto));
-    logAzione('Maison: eliminato giorno',label+' ('+count+' righe, '+currentReparto+')');renderMaisonDashboard();renderMaisonBudgetAlerts();toast('Giorno '+label+' eliminato')}catch(e){toast('Errore')}}
+    logAzione('Maison: eliminato giorno',label+' ('+count+' righe, '+currentReparto+')');renderMaisonDashboard();renderMaisonBudgetAlerts();toast('Giorno '+label+' eliminato')}catch(e){toast('Errore eliminazione giorno')}}
 
 // Budget
 function renderMaisonBudgetUI(){const el=document.getElementById('maison-budget-list');if(!el)return;
@@ -4115,13 +4115,13 @@ async function salvaMaisonBudget(){const nome=capitalizzaNome(document.getElemen
   try{const r=await secPost('maison_budget',{nome,budget_chf:chf,budget_bu:bu,budget_bl:bl,data_nascita:nascita,categoria:cat,reparto_dip:currentReparto});
     maisonBudgetCache.push(r[0]);document.getElementById('maison-budget-nome').value='';
     document.getElementById('maison-budget-chf').value='';document.getElementById('maison-budget-bu').value='';document.getElementById('maison-budget-bl').value='';const nbFp=document.getElementById('maison-budget-nascita');if(nbFp&&nbFp._flatpickr)nbFp._flatpickr.clear();else if(nbFp)nbFp.value='';
-    renderMaisonBudgetUI();renderMaisonDashboard();renderMaisonBudgetAlerts();toast('Budget impostato per '+nome)}catch(e){toast('Errore')}}
+    renderMaisonBudgetUI();renderMaisonDashboard();renderMaisonBudgetAlerts();toast('Budget impostato per '+nome)}catch(e){toast('Errore salvataggio budget')}}
 function assegnaCatRapida(nome){const mc=document.getElementById('pwd-modal-content');
   mc.innerHTML='<h3>Assegna categoria</h3><p style="color:var(--muted);margin-bottom:16px">'+escP(nome)+'</p><div style="display:flex;flex-direction:column;gap:10px"><button class="btn-salva" style="background:#b8860b" onclick="salvaAssegnaCat(\''+nome.replace(/'/g,"\\'")+'\',\'full_maison\')">Full Maison</button><button class="btn-salva" style="background:#2980b9" onclick="salvaAssegnaCat(\''+nome.replace(/'/g,"\\'")+'\',\'maison\')">Maison</button><button class="btn-salva" style="background:#8e44ad" onclick="salvaAssegnaCat(\''+nome.replace(/'/g,"\\'")+'\',\'direzione\')">Direzione</button><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden')}
 async function salvaAssegnaCat(nome,cat){
   try{const r=await secPost('maison_budget',{nome,categoria:cat,reparto_dip:currentReparto});maisonBudgetCache.push(r[0]);
-    document.getElementById('pwd-modal').classList.add('hidden');renderMaisonBudgetUI();renderMaisonDashboard();toast(nome+' → '+(cat==='full_maison'?'Full Maison':'Maison'))}catch(e){toast('Errore')}}
+    document.getElementById('pwd-modal').classList.add('hidden');renderMaisonBudgetUI();renderMaisonDashboard();toast(nome+' → '+(cat==='full_maison'?'Full Maison':'Maison'))}catch(e){toast('Errore assegnazione categoria')}}
 function modificaMaisonInfo(id){const b=maisonBudgetCache.find(x=>x.id===id);if(!b)return;
   const mc=document.getElementById('pwd-modal-content');
   mc.innerHTML='<h3>Modifica info cliente</h3><div class="pwd-field"><label>Cliente</label><input type="text" value="'+escP(b.nome)+'" readonly style="background:var(--paper2);color:var(--muted)"></div><div class="pwd-field"><label>Categoria</label><select id="edit-mb-cat" style="width:100%;padding:8px"><option value=""'+(b.categoria===''||!b.categoria?' selected':'')+'>—</option><option value="maison"'+(b.categoria==='maison'?' selected':'')+'>Maison</option><option value="full_maison"'+(b.categoria==='full_maison'?' selected':'')+'>Full Maison</option><option value="direzione"'+(b.categoria==='direzione'?' selected':'')+'>Direzione</option></select></div><div style="display:flex;gap:10px"><div class="pwd-field" style="flex:1"><label>Budget CHF</label><input type="number" id="edit-mb-chf" value="'+(b.budget_chf||'')+'" step="0.01"></div><div class="pwd-field" style="flex:1"><label>Max BU</label><input type="number" id="edit-mb-bu" value="'+(b.budget_bu||'')+'"></div><div class="pwd-field" style="flex:1"><label>Max BL</label><input type="number" id="edit-mb-bl" value="'+(b.budget_bl||'')+'"></div></div><div class="pwd-field"><label>Data nascita</label><input type="text" id="edit-mb-nascita" value="'+(b.data_nascita||'')+'" readonly style="cursor:pointer"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaModificaMaisonInfo('+id+')">Salva</button></div>';
@@ -4135,7 +4135,7 @@ async function salvaModificaMaisonInfo(id){
   const nascita=document.getElementById('edit-mb-nascita').value||null;
   try{await secPatch('maison_budget','id=eq.'+id,{categoria:cat,budget_chf:chf,budget_bu:bu,budget_bl:bl,data_nascita:nascita});
     const b=maisonBudgetCache.find(x=>x.id===id);if(b){b.categoria=cat;b.budget_chf=chf;b.budget_bu=bu;b.budget_bl=bl;b.data_nascita=nascita}
-    document.getElementById('pwd-modal').classList.add('hidden');renderMaisonBudgetUI();renderMaisonDashboard();toast('Info aggiornate')}catch(e){toast('Errore')}}
+    document.getElementById('pwd-modal').classList.add('hidden');renderMaisonBudgetUI();renderMaisonDashboard();toast('Info aggiornate')}catch(e){toast('Errore aggiornamento info')}}
 function apriListaClientiMaison(){
   const _br=getBudgetReparto();
   const fullM=_br.filter(b=>b.categoria==='full_maison').sort((a,b)=>a.nome.localeCompare(b.nome));
@@ -4159,7 +4159,7 @@ function esportaListaMaisonCSV(){const _br=getBudgetReparto();if(!_br.length){to
   const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\n')],{type:'text/csv;charset=utf-8'});
   Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'clienti_maison.csv'}).click();toast('Lista CSV esportata!')}
 async function esportaListaMaisonPDF(){const _br=getBudgetReparto();if(!_br.length){toast('Nessun cliente');return}
-  if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore');return}}
+  if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore caricamento libreria PDF');return}}
   try{const{jsPDF}=window.jspdf;const doc=new jsPDF('portrait','mm','a4');const pw=doc.internal.pageSize.getWidth();let y=14;
     if(_logoB64)try{doc.addImage(_logoB64,'PNG',pw/2-20,y,40,22.5)}catch(e){}
     y+=28;doc.setFont('helvetica','bold');doc.setFontSize(16);doc.text('Clienti Maison',pw/2,y,{align:'center'});y+=7;
@@ -4174,7 +4174,7 @@ async function esportaListaMaisonPDF(){const _br=getBudgetReparto();if(!_br.leng
     const tp=doc.internal.getNumberOfPages();for(let i=1;i<=tp;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(150);doc.text('Casino Lugano SA — Clienti Maison — Pag. '+i+'/'+tp,16,doc.internal.pageSize.getHeight()-8)}
     mostraPdfPreview(doc,'clienti_maison.pdf','Lista Clienti Maison')}catch(e){toast('Errore PDF')}}
 async function rimuoviMaisonBudget(id){if(!confirm('Rimuovere questo budget?'))return;
-  try{await secDel('maison_budget','id=eq.'+id);maisonBudgetCache=maisonBudgetCache.filter(b=>b.id!==id);renderMaisonBudgetUI();renderMaisonDashboard();renderMaisonBudgetAlerts();toast('Budget rimosso')}catch(e){toast('Errore')}}
+  try{await secDel('maison_budget','id=eq.'+id);maisonBudgetCache=maisonBudgetCache.filter(b=>b.id!==id);renderMaisonBudgetUI();renderMaisonDashboard();renderMaisonBudgetAlerts();toast('Budget rimosso')}catch(e){toast('Errore rimozione budget')}}
 function renderMaisonBudgetAlerts(){const container=document.getElementById('maison-alerts-container');if(!container)return;
   const now=new Date(),mese=now.getMonth(),anno=now.getFullYear();
   const meseStart=anno+'-'+String(mese+1).padStart(2,'0')+'-01';
@@ -4209,7 +4209,7 @@ function esportaMaisonCSV(){const data=getMaisonFiltrati();if(!data.length){toas
   const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\n')],{type:'text/csv;charset=utf-8'});
   Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'costi_maison_'+_maisonFilePeriodo(data)+'.csv'}).click();toast('CSV esportato!')}
 async function esportaMaisonPDF(){const data=getMaisonFiltrati();if(!data.length){toast('Nessun dato');return}
-  if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore');return}}
+  if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore caricamento libreria PDF');return}}
   const byNome={};data.forEach(r=>{if(!byNome[r.nome])byNome[r.nome]={tot:0,px:0,visite:0};byNome[r.nome].tot+=parseFloat(r.costo||0);byNome[r.nome].px+=(r.px||0);byNome[r.nome].visite++});
   const sorted=Object.entries(byNome).sort((a,b)=>b[1].tot-a[1].tot);
   const totale=sorted.reduce((s,c)=>s+c[1].tot,0);
@@ -4259,10 +4259,10 @@ async function salvaSpeseExtra(){const benef=capitalizzaNome(document.getElement
     document.getElementById('se-importo').value='';document.getElementById('se-descrizione').value='';
     const fp=document.getElementById('se-data');if(fp&&fp._flatpickr)fp._flatpickr.clear();
     logAzione('Spesa extra',benef+' — '+SE_TIPI_LABEL[tipo]+' — '+importo.toFixed(2)+' CHF');
-    renderSpeseExtra();renderMaisonDashboard();toast('Spesa aggiunta')}catch(e){toast('Errore')}}
+    renderSpeseExtra();renderMaisonDashboard();toast('Spesa aggiunta')}catch(e){toast('Errore aggiunta spesa')}}
 async function eliminaSpeseExtra(id){if(!confirm('Eliminare questa spesa?'))return;
   try{await secDel('spese_extra','id=eq.'+id);speseExtraCache=speseExtraCache.filter(x=>x.id!==id);
-    renderSpeseExtra();renderMaisonDashboard();toast('Eliminata')}catch(e){toast('Errore')}}
+    renderSpeseExtra();renderMaisonDashboard();toast('Eliminata')}catch(e){toast('Errore eliminazione spesa')}}
 function modificaSpeseExtra(id){const s=speseExtraCache.find(x=>x.id===id);if(!s)return;
   const b=document.getElementById('pwd-modal-content');
   b.innerHTML='<h3>Modifica spesa extra</h3><div class="pwd-field"><label>Beneficiario</label><input type="text" id="edit-se-benef" value="'+escP(s.beneficiario)+'"></div><div class="pwd-field"><label>Luogo</label><input type="text" id="edit-se-luogo" value="'+escP(s.luogo||'')+'"></div><div class="pwd-field"><label>Importo CHF</label><input type="number" id="edit-se-importo" value="'+s.importo+'" step="0.01"></div><div class="pwd-field"><label>Descrizione</label><input type="text" id="edit-se-desc" value="'+escP(s.descrizione||'')+'"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaModificaSE('+id+')">Salva</button></div>';
@@ -4273,7 +4273,7 @@ async function salvaModificaSE(id){const benef=capitalizzaNome(document.getEleme
   if(!benef||!importo){toast('Compila beneficiario e importo');return}
   try{await secPatch('spese_extra','id=eq.'+id,{beneficiario:benef,luogo,importo,descrizione:desc});
     const s=speseExtraCache.find(x=>x.id===id);if(s){s.beneficiario=benef;s.luogo=luogo;s.importo=importo;s.descrizione=desc}
-    document.getElementById('pwd-modal').classList.add('hidden');renderSpeseExtra();toast('Modificata')}catch(e){toast('Errore')}}
+    document.getElementById('pwd-modal').classList.add('hidden');renderSpeseExtra();toast('Modificata')}catch(e){toast('Errore modifica spesa')}}
 function getSpeseExtraFiltrate(){const fn=(document.getElementById('se-filt-nome')||{}).value||'';
   const ft=(document.getElementById('se-filt-tipo')||{}).value||'';
   const fd=(document.getElementById('se-filt-dal')||{}).value||'';const fa=(document.getElementById('se-filt-al')||{}).value||'';
@@ -4299,7 +4299,7 @@ function esportaSpeseExtraCSV(){const data=getSpeseExtraFiltrate();if(!data.leng
   const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(c=>'\"'+String(c).replace(/\"/g,'\"\"')+'\"').join(';')).join('\n')],{type:'text/csv;charset=utf-8'});
   Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'spese_extra_'+new Date().toLocaleDateString('it-IT').replace(/\//g,'-')+'.csv'}).click();toast('CSV esportato!')}
 async function esportaSpeseExtraPDF(){const data=getSpeseExtraFiltrate();if(!data.length){toast('Nessun dato');return}
-  if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore');return}}
+  if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore caricamento libreria PDF');return}}
   const tot=data.reduce((s,r)=>s+parseFloat(r.importo||0),0);
   try{const{jsPDF}=window.jspdf;const doc=new jsPDF('portrait','mm','a4');const pw=doc.internal.pageSize.getWidth();let y=14;
     if(_logoB64)try{doc.addImage(_logoB64,'PNG',pw/2-20,y,40,22.5)}catch(e){}
