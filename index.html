@@ -3605,7 +3605,7 @@ async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0
         if(!rawNome&&costo)continue;
         const nomiRaw=rawNome.split(/\s*\/\s*/);
         const nNomiNoSeven=nomiRaw.filter(n=>!/\bSeven\b|\(Se/i.test(n)).length;
-        const nNomi=nNomiNoSeven||nomiRaw.length;
+        const nNomi=nNomiNoSeven||1;
         for(const nr of nomiRaw){
           const parsed=_parseMaisonNome(nr);if(!parsed.nome)continue;
           if(/\bSeven\b|\(Se/i.test(nr)){
