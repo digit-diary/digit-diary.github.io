@@ -2987,15 +2987,26 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
     if(existing){await secPatch('rapporti_giornalieri',filtro,data)}
     else{try{await secPost('rapporti_giornalieri',data)}catch(e2){await secPatch('rapporti_giornalieri',filtro,data)}}
     if(!rapportiCache[ds])rapportiCache[ds]={};rapportiCache[ds][turno]=data;
-    // Auto-malattia: parse assenze field (supporta "fino al 27", "dal 20 al 27", "fino al 27/03")
+    // Auto-malattia: parse assenze field
+    // Supporta: "Tonati assente", "Tonati malattia", "Tonati x1" (domani),
+    // "Tonati x3" (3 giorni), "Tonati assente fino al 27", "Tonati dal 20 al 27"
     const assenzeText=data.assenze||'';if(assenzeText.trim()){const righe=assenzeText.split('\n').filter(r=>r.trim());
-      for(const riga of righe){const m=riga.match(/^([A-ZÀ-Üa-zà-ü\s.'-]+?)\s*(assente|malattia|malato|malata)/i);if(m){const nome=capitalizzaNome(m[1].trim());
-        // Cerca "fino al DD", "fino DD.MM", "fino al 5.5", "dal DD al DD", ecc.
+      for(const riga of righe){
+        // Match: nome + (assente|malattia|malato|malata|x1|x2|x3...)
+        const m=riga.match(/^([A-ZÀ-Üa-zà-ü\s.'-]+?)\s*(assente|malattia|malato|malata|x\s*(\d{1,2}))\b/i);
+        if(!m)continue;
+        const nome=capitalizzaNome(m[1].trim());
+        const xMatch=m[3]?parseInt(m[3]):0;// x1=1 giorno avanti, x2=2 giorni, ecc.
+        // Cerca "fino al DD", "fino DD.MM", "dal DD al DD"
         const finoMatch=riga.match(/fino\s+(?:al\s+)?(\d{1,2})(?:[\/\.\-](\d{1,2}))?/i);
         const dalAlMatch=riga.match(/dal\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?\s+al\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?/i);
         const dataRapp=new Date(ds+'T12:00:00');
         let dataInizio=new Date(ds+'T12:00:00'),dataFine=new Date(ds+'T12:00:00');
-        if(dalAlMatch){
+        if(xMatch){
+          // x1 = assente da domani per 1 giorno, x3 = per 3 giorni
+          dataInizio=new Date(dataRapp);dataInizio.setDate(dataInizio.getDate()+1);
+          dataFine=new Date(dataInizio);dataFine.setDate(dataFine.getDate()+xMatch-1);
+        }else if(dalAlMatch){
           const gInizio=parseInt(dalAlMatch[1]),mInizio=dalAlMatch[2]?parseInt(dalAlMatch[2])-1:dataRapp.getMonth();
           const gFine=parseInt(dalAlMatch[3]),mFine=dalAlMatch[4]?parseInt(dalAlMatch[4])-1:dataRapp.getMonth();
           dataInizio=new Date(dataRapp.getFullYear(),mInizio,gInizio,12);
@@ -3005,23 +3016,25 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
           dataFine=new Date(dataRapp.getFullYear(),mFine,gFine,12);
           if(dataFine<dataInizio)dataFine.setFullYear(dataFine.getFullYear()+1);
         }
-        // Cerca nome completo tra i collaboratori (cognome, nome, o parte)
+        // Cerca nome completo tra collaboratori (cognome parziale, nome parziale)
         const _nn=nome.toLowerCase(),_nWords=_nn.split(/\s+/).filter(w=>w.length>1);
         const nomeCompleto=collaboratoriCache.find(c=>{if(!c.attivo)return false;const cn=c.nome.toLowerCase(),cWords=cn.split(/\s+/);
-          if(cn===_nn)return true;// esatto
-          if(cn.startsWith(_nn)||_nn.startsWith(cn))return true;// prefisso
-          if(cWords.some(cw=>cw===_nn))return true;// cognome o nome singolo esatto
-          if(_nWords.length&&_nWords.every(w=>cWords.some(cw=>cw.startsWith(w)||w.startsWith(cw))))return true;// tutte le parole matchano
+          if(cn===_nn)return true;
+          if(cn.startsWith(_nn)||_nn.startsWith(cn))return true;
+          if(cWords.some(cw=>cw===_nn))return true;// cognome singolo esatto
+          if(_nWords.length&&_nWords.every(w=>cWords.some(cw=>cw.startsWith(w)||w.startsWith(cw))))return true;
+          // Match parziale cognome (minimo 3 caratteri)
+          if(_nn.length>=3&&cWords.some(cw=>cw.startsWith(_nn)))return true;
           return false});
         const nomeFinale=nomeCompleto?nomeCompleto.nome:capitalizzaNome(nome);
-        // Crea registrazione per ogni giorno del range
+        // Crea registrazione per ogni giorno (skip duplicati)
         let giorniCreati=0;
         for(let d=new Date(dataInizio);d<=dataFine;d.setDate(d.getDate()+1)){
           const dStr=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
           const esiste=datiCache.find(e=>e.nome.toLowerCase()===nomeFinale.toLowerCase()&&e.tipo===nomeCorrente('Malattia')&&e.data.startsWith(dStr));
-          if(!esiste){const rec={id:Date.now()+Math.floor(Math.random()*1000+giorniCreati),nome:nomeFinale,tipo:nomeCorrente('Malattia'),testo:'Assente per malattia'+(dataFine>dataInizio?' (dal '+dataInizio.toLocaleDateString('it-IT')+' al '+dataFine.toLocaleDateString('it-IT')+', da rapporto '+turno+')':' (da rapporto '+turno+' del '+new Date(ds+'T12:00:00').toLocaleDateString('it-IT')+')'),data:dStr+'T'+new Date().toTimeString().slice(0,8)+'.000Z',operatore:getOperatore(),reparto_dip:currentReparto};
+          if(!esiste){const rec={id:Date.now()+Math.floor(Math.random()*1000+giorniCreati),nome:nomeFinale,tipo:nomeCorrente('Malattia'),testo:'Assente per malattia'+(dataFine>dataInizio?' (dal '+dataInizio.toLocaleDateString('it-IT')+' al '+dataFine.toLocaleDateString('it-IT')+', da rapporto '+turno+')':xMatch?' (x'+xMatch+', da rapporto '+turno+')':' (da rapporto '+turno+' del '+new Date(ds+'T12:00:00').toLocaleDateString('it-IT')+')'),data:dStr+'T08:00:00.000Z',operatore:getOperatore(),reparto_dip:currentReparto};
             try{await secPost('registrazioni',rec);datiCache.unshift(rec);giorniCreati++}catch(e){}}}
-        if(giorniCreati>1)toast(nomeFinale+': '+giorniCreati+' giorni malattia registrati')}}}
+        if(giorniCreati>0)toast(nomeFinale+': '+(giorniCreati>1?giorniCreati+' giorni':'1 giorno')+' malattia registrato'+(xMatch?' (da domani)':''))}}
     // Auto-differenze cassa: parse differenze_cassa field
     const diffExtra=data.note_extra?JSON.parse(data.note_extra):{};
     const diffText=diffExtra.differenze_cassa||'';
