@@ -1223,6 +1223,10 @@ async function caricaDbStats(){const el=document.getElementById('db-stats-conten
   h+='<div style="background:var(--line);border-radius:4px;height:8px;overflow:hidden"><div style="background:'+barColor+';height:100%;width:'+pct+'%;border-radius:4px;transition:width .5s"></div></div></div>';
   const tables=r.tables||[];
   const labelMap={registrazioni:'Registrazioni',costi_maison:'Costi Maison',moduli:'Moduli',note_colleghi:'Note Colleghi',consegne_turno:'Consegne',promemoria:'Promemoria',spese_extra:'Spese Extra',log_attivita:'Log Attivita',operatori_auth:'Operatori',operator_sessions:'Sessioni',impostazioni:'Impostazioni',maison_budget:'Budget Maison',regali_maison:'Regali',note_clienti:'Note Clienti',rapporti_giornalieri:'Rapporti',collaboratori:'Collaboratori',scadenze:'Scadenze',note_fissate:'Note Fissate',push_subscriptions:'Push',login_attempts:'Tentativi Login'};
+  // Calcola totale dati reali (somma dimensioni tabelle)
+  const totalDataBytes=tables.reduce((s,t)=>s+(t.bytes||0),0);
+  const totalDataMB=(totalDataBytes/1024/1024).toFixed(1);
+  h+='<p style="color:var(--muted);font-size:.85rem;margin-bottom:14px">Di cui dati reali: <strong style="color:var(--ink)">'+totalDataMB+' MB</strong> — il resto e overhead PostgreSQL (fisso, non cresce)</p>';
   // Card grid con conteggio + dimensione
   h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px">';
   tables.forEach(t=>{h+='<div style="background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.3rem;font-weight:700;color:var(--ink)">'+t.righe+'</div><div style="font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">'+(labelMap[t.nome]||t.nome)+'</div><div style="font-size:.72rem;color:var(--accent2);font-weight:600;margin-top:3px">'+t.dimensione+'</div></div>'});
