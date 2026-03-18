@@ -3858,10 +3858,10 @@ function apriDettaglioMaison(nome){const righe=getMaisonFiltrati().filter(r=>r.n
       html+='</div>'});
     html+='</div></div>'}
   // --- Fine nuove sezioni KPI ---
-  html+='<div style="overflow-x:auto"><table class="collab-table"><thead><tr><th>Data</th><th>Giorno</th><th class="num">PX</th><th class="num">Costo CHF</th><th>Tipo</th><th>Gruppo</th><th>Note</th></tr></thead><tbody>';
+  html+='<div style="overflow-x:auto"><table class="collab-table"><thead><tr><th>Data</th><th>Giorno</th><th class="num">PX</th><th class="num">Costo CHF</th><th>Tipo</th><th>Gruppo</th><th>Note</th><th></th></tr></thead><tbody>';
   righe.forEach(r=>{const d=new Date(r.data_giornata+'T12:00:00');
     const costoTip=r._costoOriginale?' title="'+r._costoOriginale.toFixed(2)+'/'+r._nCondiviso+' ('+escP(r._gruppoOriginale)+')" style="cursor:help"':'';
-    html+='<tr><td style="font-weight:600">'+d.getDate()+' '+MESI[d.getMonth()]+'</td><td>'+GIORNI[d.getDay()]+'</td><td class="num">'+r.px+'</td><td class="num"><strong'+costoTip+'>'+parseFloat(r.costo).toFixed(2)+(r._costoOriginale?' <span style="font-size:.78rem;color:var(--accent2)">÷'+r._nCondiviso+'</span>':'')+'</strong></td><td>'+(r.tipo_buono?'<span class="mini-badge" style="background:'+(r.tipo_buono==='BU'?'#e67e22':'#2c6e49')+'">'+r.tipo_buono+'</span>':'—')+'</td><td style="color:var(--muted);font-size:.85rem">'+escP(r._gruppoOriginale||r.gruppo||'')+'</td><td style="color:var(--muted);font-size:.85rem">'+escP(r.note||'')+'</td></tr>'});
+    html+='<tr><td style="font-weight:600">'+d.getDate()+' '+MESI[d.getMonth()]+'</td><td>'+GIORNI[d.getDay()]+'</td><td class="num">'+r.px+'</td><td class="num"><strong'+costoTip+'>'+parseFloat(r.costo).toFixed(2)+(r._costoOriginale?' <span style="font-size:.78rem;color:var(--accent2)">÷'+r._nCondiviso+'</span>':'')+'</strong></td><td>'+(r.tipo_buono?'<span class="mini-badge" style="background:'+(r.tipo_buono==='BU'?'#e67e22':'#2c6e49')+'">'+r.tipo_buono+'</span>':'—')+'</td><td style="color:var(--muted);font-size:.85rem">'+escP(r._gruppoOriginale||r.gruppo||'')+'</td><td style="color:var(--muted);font-size:.85rem">'+escP(r.note||'')+'</td><td><button class="btn-act" onclick="spostaMaisonToExtra('+r.id+',\''+ne+'\')" style="font-size:.78rem;padding:3px 8px;color:#e67e22;border-color:#e67e22" title="Sposta in Spese Extra">&#8594; Extra</button></td></tr>'});
   html+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td colspan="2"><strong>TOTALE RISTORANTE</strong></td><td class="num"><strong>'+totPx+'</strong></td><td class="num"><strong>'+tot.toFixed(2)+'</strong></td><td colspan="3"></td></tr>';
   html+='</tbody></table></div>';
   // Spese Extra per questo cliente (seRighe/totSE already computed above for KPI)
@@ -3869,7 +3869,7 @@ function apriDettaglioMaison(nome){const righe=getMaisonFiltrati().filter(r=>r.n
     html+='<h4 style="font-family:Playfair Display,serif;margin:16px 0 8px;color:var(--ink)">Spese Extra ('+totSE.toFixed(2)+' CHF)</h4>';
     html+='<div style="overflow-x:auto"><table class="collab-table"><thead><tr><th>Data</th><th>Tipo</th><th>Luogo</th><th>Descrizione</th><th class="num">CHF</th></tr></thead><tbody>';
     seRighe.forEach(r=>{const d=new Date(r.data_spesa+'T12:00:00');const tc=SE_TIPI_COLOR[r.tipo]||'var(--muted)';
-      html+='<tr><td style="font-weight:600">'+d.getDate()+' '+MESI[d.getMonth()]+'</td><td><span class="mini-badge" style="background:'+tc+'">'+(SE_TIPI_LABEL[r.tipo]||r.tipo)+'</span></td><td style="font-size:.85rem">'+escP(r.luogo||'')+'</td><td style="font-size:.85rem;color:var(--muted)">'+escP(r.descrizione||'')+'</td><td class="num"><strong>'+parseFloat(r.importo).toFixed(2)+'</strong></td></tr>'});
+      html+='<tr><td style="font-weight:600">'+d.getDate()+' '+MESI[d.getMonth()]+'</td><td><span class="mini-badge" style="background:'+tc+'">'+(SE_TIPI_LABEL[r.tipo]||r.tipo)+'</span></td><td style="font-size:.85rem">'+escP(r.luogo||'')+'</td><td style="font-size:.85rem;color:var(--muted)">'+escP(r.descrizione||'')+'</td><td class="num"><strong>'+parseFloat(r.importo).toFixed(2)+'</strong></td><td><button class="btn-act" onclick="spostaExtraToMaison('+r.id+',\''+ne+'\')" style="font-size:.78rem;padding:3px 8px;color:#2c6e49;border-color:#2c6e49" title="Sposta in Costi Maison">&#8594; Maison</button></td></tr>'});
     html+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td colspan="4"><strong>TOTALE EXTRA</strong></td><td class="num"><strong>'+totSE.toFixed(2)+'</strong></td></tr></tbody></table></div>'}
   // Regali per questo cliente (regRighe/totReg already computed above for KPI)
   if(regRighe.length){
@@ -4085,6 +4085,18 @@ async function _eseguiRinominaCondiviso(vecchio){const nuovo=capitalizzaNome(doc
     await secPatch('costi_maison','id=eq.'+id,{nome:nuovoNome});rec.nome=nuovoNome}
   logAzione('Maison: rinominato condiviso',vecchio+' → '+nuovo);document.getElementById('pwd-modal').classList.add('hidden');
   renderMaisonDashboard();renderMaisonBudgetUI();renderMaisonBudgetAlerts();toast(vecchio+' → '+nuovo)}catch(e){toast('Errore rinomina')}}
+// Sposta da costi_maison a spese_extra
+async function spostaMaisonToExtra(id,nome){const r=maisonCache.find(x=>x.id===id);if(!r)return;
+  if(!confirm('Spostare '+r.nome+' ('+parseFloat(r.costo).toFixed(2)+' CHF, '+r.data_giornata+') in Spese Extra?'))return;
+  try{await secPost('spese_extra',{beneficiario:r.nome,tipo:'cena_esterna',importo:r.costo,data_spesa:r.data_giornata,luogo:r.note||'',descrizione:'Spostato da Costi Maison',operatore:getOperatore(),reparto_dip:currentReparto});
+    await secDel('costi_maison','id=eq.'+id);maisonCache=maisonCache.filter(x=>x.id!==id);speseExtraCache=await secGet('spese_extra?order=data_spesa.desc');
+    logAzione('Maison → Extra',r.nome+' '+parseFloat(r.costo).toFixed(2)+' CHF');toast('Spostato in Spese Extra');apriDettaglioMaison(nome);renderMaisonDashboard()}catch(e){toast('Errore spostamento')}}
+// Sposta da spese_extra a costi_maison
+async function spostaExtraToMaison(id,nome){const r=speseExtraCache.find(x=>x.id===id);if(!r)return;
+  if(!confirm('Spostare '+r.beneficiario+' ('+parseFloat(r.importo).toFixed(2)+' CHF, '+r.data_spesa+') in Costi Maison?'))return;
+  try{await secPost('costi_maison',{nome:r.beneficiario,costo:r.importo,data_giornata:r.data_spesa,px:1,tipo_buono:'',note:r.luogo||r.descrizione||'',gruppo:'',operatore:getOperatore(),reparto_dip:currentReparto});
+    await secDel('spese_extra','id=eq.'+id);speseExtraCache=speseExtraCache.filter(x=>x.id!==id);maisonCache=await secGet('costi_maison?order=data_giornata.desc');
+    logAzione('Extra → Maison',r.beneficiario+' '+parseFloat(r.importo).toFixed(2)+' CHF');toast('Spostato in Costi Maison');apriDettaglioMaison(nome);renderMaisonDashboard()}catch(e){toast('Errore spostamento')}}
 // Elimina tutti i dati di un giorno
 async function eliminaMaisonGiorno(){const sel=document.getElementById('maison-del-giorno');if(!sel||!sel.value){toast('Seleziona un giorno');return}
   const giorno=sel.value;const label=new Date(giorno+'T12:00:00').toLocaleDateString('it-IT');
