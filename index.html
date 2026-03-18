@@ -1071,8 +1071,8 @@ function _initNoteRealtime(){const sb=_getSbClient();if(!sb){console.warn('Supab
     else if(payload.eventType==='DELETE'){const old=payload.old;noteColleghiCache=noteColleghiCache.filter(x=>x.id!==old.id);aggiornaNoteBadge();const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega()}
   }).subscribe(function(status){if(status==='SUBSCRIBED')console.log('Realtime note: connesso');
     if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){console.warn('Realtime note: errore, risincronizzazione...');setTimeout(_resyncNote,3000)}});
-  // Riconnessione: quando il tab torna attivo, risincronizza
-  document.addEventListener('visibilitychange',function(){if(!document.hidden)_resyncNote()})}
+  // Riconnessione: quando il tab torna attivo, rinnova token e risincronizza
+  document.addEventListener('visibilitychange',async function(){if(!document.hidden){await _ensureToken();_resyncNote()}})}
 async function _resyncNote(){try{const nuove=await secGet('note_colleghi?order=created_at.desc');if(nuove&&nuove.length!==undefined){noteColleghiCache=nuove;await decryptNoteCache();aggiornaNoteBadge();const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega()}}catch(e){}}
 const CAMPI_RAPPORTO_DEFAULT=[{key:'sup_note',label:'Supervisore',type:'input'},{key:'cassa_note',label:'Cassa',type:'text'},{key:'differenze_cassa',label:'Differenze Cassa',type:'text'},{key:'sala_note',label:'Sala',type:'text'},{key:'n_assegni',label:'Incasso Assegni',type:'text'},{key:'prelievi',label:'Prelievi',type:'text'},{key:'assenze',label:'Assenze',type:'text'}];
 const RAPPORTO_DB_COLS=['sup_note','cassa_note','sala_note','n_assegni','prelievi','assenze'];
@@ -1095,6 +1095,13 @@ let _loginFailCount=0,_loginLockUntil=0;
 function getAdminToken(){return sessionStorage.getItem('op_token')||sessionStorage.getItem('admin_token')||''}
 function getOpToken(){return sessionStorage.getItem('op_token')||''}
 function setOpToken(t){if(t)sessionStorage.setItem('op_token',t);}
+async function _renewToken(){const op=getOperatore();if(!op)return false;
+  try{const r=await sbRpc('create_bio_session',{p_nome:op});
+    if(r&&r.session_token){setOpToken(r.session_token);return true}}catch(e){}return false}
+let _renewingToken=false;
+async function _ensureToken(){if(_renewingToken)return;const tk=getOpToken();if(tk){
+  const v=await sbRpc('validate_op_session',{p_token:tk});if(v&&v.valid)return}
+  _renewingToken=true;await _renewToken();_renewingToken=false}
 function genCode(){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let r='';for(let i=0;i<8;i++)r+=c[Math.floor(Math.random()*c.length)];return r}
 
 // SUPABASE
@@ -1120,8 +1127,11 @@ function _parseRestFilter(path){
         const val=m[2]==='true'?'TRUE':m[2]==='false'?'FALSE':m[2]==='null'?'NULL':("'"+m[2].replace(/'/g,"''")+"'");
         filters.push(k+' '+op+' '+val)}}}
   return{table,filter:filters.join(' AND '),order,limit}}
-async function secGet(path){const tk=getOpToken();
-  if(tk){try{const p=_parseRestFilter(path);const r=await sbRpc('secure_read',{p_token:tk,p_table:p.table,p_filter:p.filter,p_order:p.order,p_limit:p.limit});return r||[]}catch(e){console.warn('secGet fallback:',e.message);return sbGet(path)}}
+async function secGet(path){let tk=getOpToken();
+  if(tk){try{const p=_parseRestFilter(path);const r=await sbRpc('secure_read',{p_token:tk,p_table:p.table,p_filter:p.filter,p_order:p.order,p_limit:p.limit});return r||[]}catch(e){
+    // Token scaduto → rinnova e riprova
+    if(await _renewToken()){tk=getOpToken();try{const p=_parseRestFilter(path);const r=await sbRpc('secure_read',{p_token:tk,p_table:p.table,p_filter:p.filter,p_order:p.order,p_limit:p.limit});return r||[]}catch(e2){}}
+    console.warn('secGet fallback:',e.message);return sbGet(path)}}
   return sbGet(path)}
 async function secPost(table,data){const tk=getOpToken();
   if(tk){try{const r=await sbRpc('secure_insert',{p_token:tk,p_table:table,p_data:data});return r?[r]:[]}catch(e){console.warn('secPost fallback:',e.message);return sbPost(table,data)}}
