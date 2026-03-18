@@ -968,7 +968,7 @@ function _initNoteRealtime(){const sb=_getSbClient();if(!sb){console.warn('Supab
     if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){console.warn('Realtime note: errore, risincronizzazione...');setTimeout(_resyncNote,3000)}});
   // Riconnessione: quando il tab torna attivo, risincronizza
   document.addEventListener('visibilitychange',function(){if(!document.hidden)_resyncNote()})}
-async function _resyncNote(){try{const op=getOperatore();if(!op)return;const nuove=await sbRpc('get_my_notes',{p_operatore:op});if(nuove){noteColleghiCache=nuove;await decryptNoteCache();aggiornaNoteBadge();const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega()}}catch(e){try{const nuove=await sbGet('note_colleghi?order=created_at.desc');if(nuove){noteColleghiCache=nuove;await decryptNoteCache();aggiornaNoteBadge()}}catch(e2){}}}
+async function _resyncNote(){try{const nuove=await secGet('note_colleghi?order=created_at.desc');if(nuove&&nuove.length!==undefined){noteColleghiCache=nuove;await decryptNoteCache();aggiornaNoteBadge();const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega()}}catch(e){}}
 const CAMPI_RAPPORTO_DEFAULT=[{key:'sup_note',label:'Supervisore',type:'input'},{key:'cassa_note',label:'Cassa',type:'text'},{key:'differenze_cassa',label:'Differenze Cassa',type:'text'},{key:'sala_note',label:'Sala',type:'text'},{key:'n_assegni',label:'Incasso Assegni',type:'text'},{key:'prelievi',label:'Prelievi',type:'text'},{key:'assenze',label:'Assenze',type:'text'}];
 const RAPPORTO_DB_COLS=['sup_note','cassa_note','sala_note','n_assegni','prelievi','assenze'];
 let campiRapportoExtra=[],tipiNascosti=[],campiNascosti=[],tipiOrdine=[],campiOrdine=[],campiLabelOverride={},tipiRinominati={};
@@ -1059,7 +1059,7 @@ async function loadAll(){
     secGet('registrazioni?order=data.desc'),
     secGet('note_fissate?select=registrazione_id'),
     secGet('scadenze?order=data_scadenza.asc'),
-    (getOperatore()?sbRpc('get_my_notes',{p_operatore:getOperatore()}):secGet('note_colleghi?order=created_at.desc')).catch(()=>secGet('note_colleghi?order=created_at.desc')),
+    secGet('note_colleghi?order=created_at.desc'),
     sbRpc('list_operators'),
     secGet('collaboratori?attivo=eq.true&order=nome.asc'),
     secGet('moduli?order=created_at.desc'),
@@ -1812,7 +1812,7 @@ function inviaNotifica(titolo,corpo,onClick){
     if(onClick)n.onclick=function(){window.focus();onClick();n.close()}}catch(e){}}
 async function pollNuoveNote(){if(sessionStorage.getItem('diario_auth')!=='1')return;
   try{const op=getOperatore();
-    const nuove=op?await sbRpc('get_my_notes',{p_operatore:op}).catch(()=>sbGet('note_colleghi?order=created_at.desc')):await sbGet('note_colleghi?order=created_at.desc');
+    const nuove=await secGet('note_colleghi?order=created_at.desc');
     const vecchieNonLette=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.letta&&!n.nascosta_dest).length;
     noteColleghiCache=nuove||[];await decryptNoteCache();aggiornaNoteBadge();
     const nuoveNonLette=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.letta&&!n.nascosta_dest).length;
