@@ -3675,7 +3675,7 @@ async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0
     status.innerHTML=msg;
     if(totalRows){toast(totalRows+' righe importate');logAzione('Import Maison',totalRows+' righe da '+f.name)}
     else if(giorniSaltati.length)toast(giorniSaltati.length+' giorni già presenti (saltati)');
-    renderMaisonDashboard();renderMaisonBudgetAlerts();
+    renderMaisonDashboard();renderMaisonBudgetUI();renderMaisonBudgetAlerts();renderSpeseExtra();
     if(totalRows)getBudgetReparto().forEach(function(b){checkBudgetPushAfterInsert(b.nome)});
     if(forzaSostituisci||!giorniSaltati.length)window._maisonPendingFile=null;
   }catch(e){console.error(e);status.textContent='Errore: '+e.message;toast('Errore importazione')}
