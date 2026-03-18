@@ -1033,6 +1033,8 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
     <div id="biometric-settings" style="margin-top:14px;padding:12px 16px;background:var(--paper2);border-radius:3px"></div></div>
   <div class="settings-section" id="ai-section" style="display:none"><h4>Assistente AI (Groq)</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Migliora automaticamente i testi nei moduli disciplinari. Ottieni una chiave gratuita su <a href="https://console.groq.com/keys" target="_blank" style="color:var(--accent2)">console.groq.com</a>.</p>
     <div class="add-tipo-row"><div class="field" style="flex:2"><label>Chiave API Groq</label><input type="password" id="groq-key-input" placeholder="gsk_..."></div><button class="btn-add-tipo" onclick="salvaGroqKey()">Salva</button></div><p id="groq-status" style="font-size:.82rem;margin-top:8px"></p></div>
+  <div class="settings-section" id="db-stats-section" style="display:none"><h4>Stato Database</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Supabase piano gratuito: 500 MB database.</p>
+    <div id="db-stats-content" style="padding:12px 0"><button class="btn-salva" onclick="caricaDbStats()" style="background:var(--ink);font-size:.82rem;padding:8px 20px">Verifica stato</button></div></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -1204,6 +1206,20 @@ async function loadAll(){
   // Health check silenzioso
   _healthCheck();
 }
+async function caricaDbStats(){const el=document.getElementById('db-stats-content');if(!el)return;
+  el.innerHTML='<p style="color:var(--muted)">Caricamento...</p>';
+  const tk=getAdminToken();const r=await sbRpc('get_db_stats',{p_token:tk});
+  if(!r){el.innerHTML='<p style="color:var(--accent)">Errore caricamento statistiche</p>';return}
+  const sizeMatch=(r.db_size||'').match(/([\d.]+)\s*(MB|GB|kB)/);
+  let usedMB=0;if(sizeMatch){usedMB=parseFloat(sizeMatch[1]);if(sizeMatch[2]==='GB')usedMB*=1024;if(sizeMatch[2]==='kB')usedMB/=1024}
+  const pct=Math.min(Math.round(usedMB/500*100),100);
+  const barColor=pct>=90?'var(--accent)':pct>=70?'#e67e22':'#2c6e49';
+  let h='<div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><strong>'+r.db_size+' / 500 MB</strong><span style="color:'+barColor+';font-weight:700">'+pct+'%</span></div>';
+  h+='<div style="background:var(--line);border-radius:4px;height:8px;overflow:hidden"><div style="background:'+barColor+';height:100%;width:'+pct+'%;border-radius:4px;transition:width .5s"></div></div></div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px">';
+  const items=[['Registrazioni',r.registrazioni],['Costi Maison',r.costi_maison],['Moduli',r.moduli],['Note colleghi',r.note_colleghi],['Consegne',r.consegne],['Promemoria',r.promemoria],['Spese extra',r.spese_extra],['Log attivita',r.log_attivita],['Operatori',r.operatori],['Sessioni attive',r.sessioni_attive]];
+  items.forEach(([label,val])=>{h+='<div style="background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.3rem;font-weight:700;color:var(--ink)">'+val+'</div><div style="font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">'+label+'</div></div>'});
+  h+='</div>';el.innerHTML=h}
 async function _healthCheck(){const problems=[];
   // 1. Supabase connessione
   try{const r=await fetch(SB_URL+'/rest/v1/',{headers:{apikey:SB_KEY},method:'HEAD'});
@@ -1529,7 +1545,7 @@ function switchPage(name){flushRapportoSave();
   if(!_pagesAlwaysVisible.includes(name)&&typeof isVis==='function'&&!isVis(_visKey)){name='dashboard'}
   var _epf=document.getElementById('early-page-fix');if(_epf)_epf.remove();document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));const pg=document.getElementById('page-'+name);if(pg)pg.classList.add('active');const tb=document.querySelector('.nav-tab[data-page="'+name+'"]');if(tb)tb.classList.add('active');localStorage.setItem('pagina_corrente',name);if(typeof aggiornaMenuMobile==='function')aggiornaMenuMobile();
   if(name==='diario'){aggiornaNomi();_restoreFiltri();render();updateStats()}if(name==='statistiche')renderStatistiche();if(name==='rapporto'){if(!rapportoGiornoAperto){const gc=getGiornataCasino();const d=new Date(gc+'T12:00:00');rapportoMese=d.getMonth();rapportoAnno=d.getFullYear();rapportoGiornoAperto=gc}renderRapporto()}if(name==='note-collega'){initNoteFlatpickr();renderNoteCollega()}if(name==='impostazioni'){renderTipiUI();renderScadenzeSettings();renderOperatoriUI();renderCampiRapportoUI();
-    const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}renderCollaboratoriUI();renderBiometricSettings();const ai=document.getElementById('ai-section');if(ai)ai.style.display=isAdmin()?'':'none';const visSec=document.getElementById('visibilita-section');if(visSec){visSec.style.display=isAdmin()?'':'none';if(isAdmin())renderVisibilitaUI()}if(isAdmin()&&groqKey){const gs=document.getElementById('groq-status');if(gs)gs.innerHTML='<span style="color:#2c6e49">Chiave configurata</span>'}}if(name==='moduli'){if(!document.getElementById('mod-list-results'))_modFiltInit=false;renderModuliList()};if(name==='registro')renderRegistro();if(name==='maison'){renderMaisonDashboard();renderMaisonBudgetUI();initMaisonFlatpickr();renderSpeseExtra();initSpeseExtraFP();renderRegali()}if(name==='promemoria'){renderPromemoria();initPromemoriaUI()}if(name==='dashboard')renderDashboard();if(name==='consegna'){initConsFlatpickr();renderConsegne();initConsegnaUI()}}
+    const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}renderCollaboratoriUI();renderBiometricSettings();const ai=document.getElementById('ai-section');if(ai)ai.style.display=isAdmin()?'':'none';const dbSec=document.getElementById('db-stats-section');if(dbSec)dbSec.style.display=isAdmin()?'':'none';const visSec=document.getElementById('visibilita-section');if(visSec){visSec.style.display=isAdmin()?'':'none';if(isAdmin())renderVisibilitaUI()}if(isAdmin()&&groqKey){const gs=document.getElementById('groq-status');if(gs)gs.innerHTML='<span style="color:#2c6e49">Chiave configurata</span>'}}if(name==='moduli'){if(!document.getElementById('mod-list-results'))_modFiltInit=false;renderModuliList()};if(name==='registro')renderRegistro();if(name==='maison'){renderMaisonDashboard();renderMaisonBudgetUI();initMaisonFlatpickr();renderSpeseExtra();initSpeseExtraFP();renderRegali()}if(name==='promemoria'){renderPromemoria();initPromemoriaUI()}if(name==='dashboard')renderDashboard();if(name==='consegna'){initConsFlatpickr();renderConsegne();initConsegnaUI()}}
 
 // TIPI
 async function saveTipiP(){await setImp('tipi_personalizzati',JSON.stringify(tipiPersonalizzati))}
