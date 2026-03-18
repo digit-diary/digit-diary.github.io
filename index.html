@@ -2891,12 +2891,35 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
     if(RAPPORTO_DB_COLS.includes(c.key))data[c.key]=val;else extra[c.key]=val});
   data.note_extra=JSON.stringify(extra);
   try{const r=await fetch(SB_URL+'/rest/v1/rapporti_giornalieri?on_conflict=data_rapporto,turno,reparto_dip',{method:'POST',headers:sbH({'Prefer':'resolution=merge-duplicates,return=representation'}),body:JSON.stringify(data)}).then(r=>{if(!r.ok)throw new Error('save failed');return r.json()});if(!rapportiCache[ds])rapportiCache[ds]={};rapportiCache[ds][turno]=r[0];
-    // Auto-malattia: parse assenze field
+    // Auto-malattia: parse assenze field (supporta "fino al 27", "dal 20 al 27", "fino al 27/03")
     const assenzeText=data.assenze||'';if(assenzeText.trim()){const righe=assenzeText.split('\n').filter(r=>r.trim());
-      for(const riga of righe){const m=riga.match(/^([A-ZÀ-Üa-zà-ü\s.'-]+?)\s*(assente|malattia|malato|malata)/i);if(m){const nome=m[1].trim();
-        const esiste=datiCache.find(e=>e.nome.toLowerCase()===nome.toLowerCase()&&e.tipo===nomeCorrente('Malattia')&&e.data.startsWith(ds));
-        if(!esiste){const rec={id:Date.now()+Math.floor(Math.random()*1000),nome,tipo:nomeCorrente('Malattia'),testo:'Assente per malattia (da rapporto '+turno+' del '+new Date(ds+'T12:00:00').toLocaleDateString('it-IT')+')',data:ds+'T'+new Date().toTimeString().slice(0,8)+'.000Z',operatore:getOperatore()};
-          try{await secPost('registrazioni',rec);datiCache.unshift(rec)}catch(e){}}}}}
+      for(const riga of righe){const m=riga.match(/^([A-ZÀ-Üa-zà-ü\s.'-]+?)\s*(assente|malattia|malato|malata)/i);if(m){const nome=capitalizzaNome(m[1].trim());
+        // Cerca "fino al DD" o "fino al DD/MM" o "dal DD al DD"
+        const finoMatch=riga.match(/fino\s+al\s+(\d{1,2})(?:[\/\.](\d{1,2}))?/i);
+        const dalAlMatch=riga.match(/dal\s+(\d{1,2})(?:[\/\.](\d{1,2}))?\s+al\s+(\d{1,2})(?:[\/\.](\d{1,2}))?/i);
+        const dataRapp=new Date(ds+'T12:00:00');
+        let dataInizio=new Date(ds+'T12:00:00'),dataFine=new Date(ds+'T12:00:00');
+        if(dalAlMatch){
+          const gInizio=parseInt(dalAlMatch[1]),mInizio=dalAlMatch[2]?parseInt(dalAlMatch[2])-1:dataRapp.getMonth();
+          const gFine=parseInt(dalAlMatch[3]),mFine=dalAlMatch[4]?parseInt(dalAlMatch[4])-1:dataRapp.getMonth();
+          dataInizio=new Date(dataRapp.getFullYear(),mInizio,gInizio,12);
+          dataFine=new Date(dataRapp.getFullYear(),mFine,gFine,12);
+        }else if(finoMatch){
+          const gFine=parseInt(finoMatch[1]),mFine=finoMatch[2]?parseInt(finoMatch[2])-1:dataRapp.getMonth();
+          dataFine=new Date(dataRapp.getFullYear(),mFine,gFine,12);
+          if(dataFine<dataInizio)dataFine.setFullYear(dataFine.getFullYear()+1);
+        }
+        // Cerca nome completo tra i collaboratori
+        const nomeCompleto=collaboratoriCache.find(c=>c.attivo&&(c.nome.toLowerCase()===nome.toLowerCase()||c.nome.toLowerCase().startsWith(nome.toLowerCase())||nome.toLowerCase().includes(c.nome.split(' ')[0].toLowerCase())));
+        const nomeFinale=nomeCompleto?nomeCompleto.nome:nome;
+        // Crea registrazione per ogni giorno del range
+        let giorniCreati=0;
+        for(let d=new Date(dataInizio);d<=dataFine;d.setDate(d.getDate()+1)){
+          const dStr=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+          const esiste=datiCache.find(e=>e.nome.toLowerCase()===nomeFinale.toLowerCase()&&e.tipo===nomeCorrente('Malattia')&&e.data.startsWith(dStr));
+          if(!esiste){const rec={id:Date.now()+Math.floor(Math.random()*1000+giorniCreati),nome:nomeFinale,tipo:nomeCorrente('Malattia'),testo:'Assente per malattia'+(dataFine>dataInizio?' (dal '+dataInizio.toLocaleDateString('it-IT')+' al '+dataFine.toLocaleDateString('it-IT')+', da rapporto '+turno+')':' (da rapporto '+turno+' del '+new Date(ds+'T12:00:00').toLocaleDateString('it-IT')+')'),data:dStr+'T'+new Date().toTimeString().slice(0,8)+'.000Z',operatore:getOperatore(),reparto_dip:currentReparto};
+            try{await secPost('registrazioni',rec);datiCache.unshift(rec);giorniCreati++}catch(e){}}}
+        if(giorniCreati>1)toast(nomeFinale+': '+giorniCreati+' giorni malattia registrati')}}}
     // Auto-differenze cassa: parse differenze_cassa field
     const diffExtra=data.note_extra?JSON.parse(data.note_extra):{};
     const diffText=diffExtra.differenze_cassa||'';
