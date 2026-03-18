@@ -438,10 +438,12 @@ bullet('Spesa Maison della giornata corrente in CHF.');
 bullet('Alert cassa e rischio disciplinare attivi.');
 bullet('Registrazioni inserite oggi.');
 title('Widget interattivi', 2);
-bullet('Da fare oggi: promemoria scaduti e in scadenza nei prossimi 3 giorni, note non lette. Cliccabili per andare alla sezione.');
+bullet('Da fare oggi: promemoria scaduti, promemoria il cui reminder e per oggi, note non lette, compleanni oggi, ammonimenti da gestire. Tutto cliccabile.');
+bullet('Da fare domani: promemoria con scadenza o reminder per domani, compleanni domani. Utile per il supervisore che chiude il turno.');
 bullet('Alert attivi: differenze cassa, collaboratori a rischio, budget maison superati. Cliccando sul nome si apre il profilo.');
 bullet('Ultime registrazioni: le 8 registrazioni piu recenti con tipo e ora. Cliccando sul nome si apre il profilo.');
 bullet('Maison oggi: spesa per cliente della giornata. Cliccando sul nome si apre il dettaglio.');
+tip('I widget "Da fare oggi" e "Da fare domani" usano la giornata di gioco (dalle 06:00 alle 06:00). Alle 02:00 del 19 marzo, "oggi" e ancora il 18 marzo. I compleanni invece seguono la data di calendario reale.');
 title('Grafico settimanale', 2);
 para('Un grafico combinato mostra l\'andamento degli ultimi 7 giorni: barre per registrazioni e linea per spesa Maison in CHF.');
 title('Giornata di gioco (GD)', 2);
@@ -493,7 +495,7 @@ bullet('Al login: banner animato arancione + popup con promemoria scaduti e in s
 bullet('Completamento: cliccare "Fatto" per segnare come completato (con tracciamento chi e quando).');
 bullet('Riattivazione: e possibile riattivare un promemoria completato.');
 bullet('Filtri: per stato (attivi/completati/tutti) e per operatore.');
-tip('I promemoria appaiono anche nel widget "Da fare oggi" della Dashboard.');
+tip('I promemoria appaiono nella Dashboard: in "Da fare oggi" se il reminder e per oggi, in "Da fare domani" se il reminder e per domani. Un promemoria con scadenza venerdi e reminder "1 giorno prima" appare in "Da fare domani" il mercoledi e in "Da fare oggi" il giovedi.');
 
 // ===== 17. COSTI MAISON =====
 title('17. COSTI MAISON', 1);

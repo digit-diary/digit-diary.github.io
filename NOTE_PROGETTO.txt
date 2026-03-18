@@ -1043,6 +1043,16 @@
        - Attivato per: nota in tempo reale (WebSocket),
          consegna al login, promemoria scaduti al login
 
+  [69] Dashboard "Da fare domani" + logica reminder (18 marzo 2026)
+       - Nuovo widget "Da fare domani" nella Dashboard:
+         promemoria per domani + compleanni domani
+       - "Da fare oggi" migliorato: mostra promemoria il cui reminder
+         e' per oggi (es. "1 giorno prima" con scadenza domani → oggi)
+       - Entrambi basati sulla giornata di gioco (getGiornataCasino)
+       - Compleanni basati sulla data di calendario reale
+       - Promemoria completati: mostra "Fatto da X il DD/MM" (gia presente)
+       - Layout Dashboard: 5 widget (oggi, domani, alert, registrazioni, maison)
+
 
 ================================================================================
   FILE DEL PROGETTO
