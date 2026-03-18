@@ -2981,7 +2981,10 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
   campi.forEach(c=>{const el=document.getElementById(cls+'-'+c.key);if(!el)return;const val=c.type==='number'?parseInt(el.value)||0:el.value;
     if(RAPPORTO_DB_COLS.includes(c.key))data[c.key]=val;else extra[c.key]=val});
   data.note_extra=JSON.stringify(extra);
-  try{const tk=getOpToken();const r=await sbRpc('upsert_rapporto',{p_token:tk,p_data:data});if(!r)throw new Error('Nessuna risposta');if(!rapportiCache[ds])rapportiCache[ds]={};rapportiCache[ds][turno]=r;
+  try{const tk=getOpToken();if(!tk)throw new Error('Nessun token sessione');
+    const rpcR=await fetch(SB_URL+'/rest/v1/rpc/upsert_rapporto',{method:'POST',headers:sbH(),body:JSON.stringify({p_token:tk,p_data:data})});
+    if(!rpcR.ok){const errTxt=await rpcR.text();console.error('Rapporto save error:',errTxt);throw new Error('Salvataggio fallito')}
+    const r=await rpcR.json();if(!rapportiCache[ds])rapportiCache[ds]={};rapportiCache[ds][turno]=r;
     // Auto-malattia: parse assenze field (supporta "fino al 27", "dal 20 al 27", "fino al 27/03")
     const assenzeText=data.assenze||'';if(assenzeText.trim()){const righe=assenzeText.split('\n').filter(r=>r.trim());
       for(const riga of righe){const m=riga.match(/^([A-ZÀ-Üa-zà-ü\s.'-]+?)\s*(assente|malattia|malato|malata)/i);if(m){const nome=capitalizzaNome(m[1].trim());
