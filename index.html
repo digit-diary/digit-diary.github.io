@@ -1216,13 +1216,13 @@ async function caricaDbStats(){const el=document.getElementById('db-stats-conten
   const barColor=pct>=90?'var(--accent)':pct>=70?'#e67e22':'#2c6e49';
   let h='<div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><strong>'+r.db_size+' / 500 MB</strong><span style="color:'+barColor+';font-weight:700">'+pct+'%</span></div>';
   h+='<div style="background:var(--line);border-radius:4px;height:8px;overflow:hidden"><div style="background:'+barColor+';height:100%;width:'+pct+'%;border-radius:4px;transition:width .5s"></div></div></div>';
-  // Tabella dettagliata per tabella
   const tables=r.tables||[];
   const labelMap={registrazioni:'Registrazioni',costi_maison:'Costi Maison',moduli:'Moduli',note_colleghi:'Note Colleghi',consegne_turno:'Consegne',promemoria:'Promemoria',spese_extra:'Spese Extra',log_attivita:'Log Attivita',operatori_auth:'Operatori',operator_sessions:'Sessioni',impostazioni:'Impostazioni',maison_budget:'Budget Maison',regali_maison:'Regali',note_clienti:'Note Clienti',rapporti_giornalieri:'Rapporti',collaboratori:'Collaboratori',scadenze:'Scadenze',note_fissate:'Note Fissate',push_subscriptions:'Push',login_attempts:'Tentativi Login'};
-  h+='<div style="overflow-x:auto"><table class="collab-table"><thead><tr><th>Tabella</th><th class="num">Righe</th><th class="num">Dimensione</th></tr></thead><tbody>';
-  tables.forEach(t=>{h+='<tr><td>'+(labelMap[t.nome]||t.nome)+'</td><td class="num"><strong>'+t.righe+'</strong></td><td class="num">'+t.dimensione+'</td></tr>'});
-  h+='</tbody></table></div>';
-  h+='<p style="color:var(--muted);font-size:.78rem;margin-top:10px">Sessioni attive: '+r.sessioni_attive+'</p>';
+  // Card grid con conteggio + dimensione
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px">';
+  tables.forEach(t=>{h+='<div style="background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.3rem;font-weight:700;color:var(--ink)">'+t.righe+'</div><div style="font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">'+(labelMap[t.nome]||t.nome)+'</div><div style="font-size:.72rem;color:var(--accent2);font-weight:600;margin-top:3px">'+t.dimensione+'</div></div>'});
+  h+='</div>';
+  h+='<p style="color:var(--muted);font-size:.78rem">Sessioni attive: '+r.sessioni_attive+'</p>';
   el.innerHTML=h}
 async function _healthCheck(){const problems=[];
   // 1. Supabase connessione
