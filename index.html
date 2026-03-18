@@ -4426,8 +4426,13 @@ window.addEventListener('load',async()=>{
     document.getElementById('login-overlay').classList.add('hidden');applicaTemaOperatore();
     // Valida sessione admin se presente
     if(isAdmin()){const tk=getAdminToken();if(tk){const sv=await sbRpc('validate_admin_session',{p_token:tk});if(!sv||!sv.valid){sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token')}}else{sessionStorage.removeItem('is_admin')}}
+    // Verifica/rinnova token sessione per caricare dati
+    var _opTk=getOpToken();
+    if(!_opTk){var _ropN=getOperatore();if(_ropN){var _bioS=await sbRpc('create_bio_session',{p_nome:_ropN});if(_bioS&&_bioS.session_token)setOpToken(_bioS.session_token)}}
+    await loadAll();_initNoteRealtime();applicaVisibilita();
+    var _sp=localStorage.getItem('pagina_corrente');switchPage(_sp||'dashboard');
+    renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();aggiornaNoteBadge();aggiornaPromemoriaBadge();aggiornaConsegnaBadge();renderDashboard();checkCompleanniBanner();
     if(getOperatore()){document.getElementById('operatore-display').textContent='Operatore: '+getOperatore();
-      // Check se deve ancora cambiare password
       const authCheck=await sbRpc('check_deve_cambiare',{p_nome:getOperatore()});
       if(authCheck&&authCheck.deve_cambiare_pwd)setTimeout(()=>forzaCambioPwdOperatore(getOperatore()),300);
       else{setTimeout(()=>mostraNoteNonLette(),800);setTimeout(()=>mostraPromemoriaLogin(),1500);setTimeout(()=>mostraConsegnaLogin(),2100)}
