@@ -2909,9 +2909,15 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
           dataFine=new Date(dataRapp.getFullYear(),mFine,gFine,12);
           if(dataFine<dataInizio)dataFine.setFullYear(dataFine.getFullYear()+1);
         }
-        // Cerca nome completo tra i collaboratori
-        const nomeCompleto=collaboratoriCache.find(c=>c.attivo&&(c.nome.toLowerCase()===nome.toLowerCase()||c.nome.toLowerCase().startsWith(nome.toLowerCase())||nome.toLowerCase().includes(c.nome.split(' ')[0].toLowerCase())));
-        const nomeFinale=nomeCompleto?nomeCompleto.nome:nome;
+        // Cerca nome completo tra i collaboratori (cognome, nome, o parte)
+        const _nn=nome.toLowerCase(),_nWords=_nn.split(/\s+/).filter(w=>w.length>1);
+        const nomeCompleto=collaboratoriCache.find(c=>{if(!c.attivo)return false;const cn=c.nome.toLowerCase(),cWords=cn.split(/\s+/);
+          if(cn===_nn)return true;// esatto
+          if(cn.startsWith(_nn)||_nn.startsWith(cn))return true;// prefisso
+          if(cWords.some(cw=>cw===_nn))return true;// cognome o nome singolo esatto
+          if(_nWords.length&&_nWords.every(w=>cWords.some(cw=>cw.startsWith(w)||w.startsWith(cw))))return true;// tutte le parole matchano
+          return false});
+        const nomeFinale=nomeCompleto?nomeCompleto.nome:capitalizzaNome(nome);
         // Crea registrazione per ogni giorno del range
         let giorniCreati=0;
         for(let d=new Date(dataInizio);d<=dataFine;d.setDate(d.getDate()+1)){
