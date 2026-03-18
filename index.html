@@ -252,6 +252,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 .btn-modal-cancel{background:var(--paper2);color:var(--muted);border:1px solid var(--line)}
 /* PROFILO */
 .profilo-box{background:var(--paper);padding:32px;border-radius:3px;box-shadow:6px 6px 0 #b8aa95;width:90%;max-width:700px;max-height:85vh;overflow-y:auto;text-align:left}
+.profilo-box.scheda-wide{max-width:960px}
 .profilo-box h3{font-family:'Playfair Display',serif;font-size:1.5rem;color:var(--ink);margin-bottom:4px}
 .profilo-stats{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 16px}
 .profilo-stat{padding:6px 12px;background:var(--paper2);border-radius:2px;font-size:.8rem}
@@ -260,6 +261,24 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 .profilo-entry{padding:10px 14px;border-bottom:1px solid var(--line);font-size:.85rem}
 .profilo-entry:last-child{border-bottom:none}
 .profilo-chart-wrap{margin:12px 0;max-height:200px}
+/* SCHEDA COLLABORATORE */
+.scheda-kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin:14px 0 18px}
+.scheda-kpi{background:var(--paper2);border-radius:3px;padding:10px 12px;text-align:center}
+.scheda-kpi .kpi-val{font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:700;line-height:1.1}
+.scheda-kpi .kpi-lbl{font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:3px}
+.scheda-section{margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
+.scheda-section h4{font-family:'Playfair Display',serif;font-size:1rem;color:var(--ink);margin-bottom:10px}
+.scheda-timeline-item{padding:8px 12px;border-bottom:1px solid var(--line);font-size:.84rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.scheda-timeline-item:last-child{border-bottom:none}
+.scheda-path-step{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:3px;font-size:.82rem;font-weight:600}
+.scheda-path-arrow{color:var(--muted);font-size:1.2rem;margin:0 4px}
+.scheda-suggestion{padding:10px 14px;border-radius:3px;font-size:.84rem;font-weight:600;margin-top:8px;display:flex;align-items:center;gap:8px}
+.scheda-mom{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:10px 0}
+.scheda-mom-card{padding:8px 14px;border-radius:3px;font-size:.88rem;font-weight:600}
+.scheda-chart-wrap{position:relative;max-height:220px;margin:10px 0}
+.scheda-sick-flag{padding:6px 12px;border-radius:3px;font-size:.82rem;font-weight:600;margin-top:6px}
+.scheda-compare-wrap{margin-top:20px;padding:20px;background:var(--paper2);border-radius:3px}
+.scheda-compare-wrap h4{margin-bottom:12px}
 /* RAPPORTO */
 .rapporto-nav{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:20px}
 .rapporto-nav button{background:none;border:1.5px solid var(--ink);color:var(--ink);width:36px;height:36px;border-radius:2px;cursor:pointer;font-size:1.2rem;font-weight:700;display:flex;align-items:center;justify-content:center}
@@ -399,8 +418,12 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
   .add-tipo-row .field{min-width:100%}
   .btn-add-tipo{width:100%}
   .profilo-box{width:95%;padding:20px;max-height:90vh}
+  .profilo-box.scheda-wide{max-width:95%}
   .profilo-box h3{font-size:1.2rem}
   .profilo-entries{max-height:300px}
+  .scheda-kpi-grid{grid-template-columns:repeat(3,1fr);gap:6px}
+  .scheda-kpi .kpi-val{font-size:1.1rem}
+  .scheda-kpi .kpi-lbl{font-size:.6rem}
   .pwd-modal-box{min-width:auto;width:90%;max-width:380px;padding:24px 20px}
   .modal-box{min-width:auto;width:90%;max-width:380px;padding:24px 20px}
   .login-box{min-width:auto;width:90%;max-width:380px;padding:30px 24px}
@@ -514,6 +537,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
 
 <div class="scadenze-banner hidden" id="scadenze-banner" onclick="toggleScadenzeDropdown()"></div>
 <div class="scadenze-dropdown hidden" id="scadenze-dropdown"></div>
+<div class="scadenze-banner hidden" id="compleanni-banner" style="background:#b8860b;cursor:default" onclick=""></div>
 <div id="cassa-alerts-container"></div>
 <div id="rischio-alerts-container"></div>
 
@@ -1109,7 +1133,7 @@ async function checkPwd(){const nome=document.getElementById('login-nome').value
     if(res&&res.locked){err.textContent='Troppi tentativi. Riprova tra 1 minuto';return}
     if(res&&res.valid){_loginFailCount=0;localStorage.setItem('operatore_corrente',nome);localStorage.setItem('diario_auth_ts',String(Date.now()));sessionStorage.setItem('bio_verified','1');sessionStorage.setItem('session_active','1');sessionStorage.setItem('diario_auth','1');sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token');if(res.session_token)setOpToken(res.session_token);document.getElementById('login-overlay').classList.add('hidden');document.getElementById('operatore-display').textContent='Operatore: '+nome;applicaTemaOperatore();applicaVisibilita();registraPushSubscription();
       await loadAll();_initNoteRealtime();
-      switchPage('diario');renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();aggiornaNoteBadge();aggiornaPromemoriaBadge();aggiornaConsegnaBadge();renderDashboard();
+      switchPage('diario');renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();aggiornaNoteBadge();aggiornaPromemoriaBadge();aggiornaConsegnaBadge();renderDashboard();checkCompleanniBanner();
       if(res.deve_cambiare_pwd)setTimeout(()=>forzaCambioPwdOperatore(nome),300);
       else{setTimeout(()=>mostraNoteNonLette(),500);setTimeout(()=>mostraPromemoriaLogin(),1200);setTimeout(()=>mostraConsegnaLogin(),1800);setTimeout(checkQrHash,800);setTimeout(()=>offriBiometrico(),600)}return}
     if(res&&res.found){_loginFailCount++;if(_loginFailCount>=5){_loginLockUntil=Date.now()+30000;_loginFailCount=0}err.textContent='Password errata per '+nome;document.getElementById('pwd-input').value='';document.getElementById('pwd-input').focus();setTimeout(()=>err.textContent='',2500);return}}
@@ -1124,7 +1148,7 @@ async function checkPwd(){const nome=document.getElementById('login-nome').value
     else{localStorage.setItem('operatore_corrente','Admin');document.getElementById('operatore-display').textContent='Admin';}
     await loadAll();_initNoteRealtime();
     applicaTemaOperatore();renderTipiUI();renderOperatoriUI();renderCampiRapportoUI();document.getElementById('tab-registro').style.display='';applicaVisibilita();registraPushSubscription();
-    switchPage('diario');aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();aggiornaNoteBadge();aggiornaPromemoriaBadge();aggiornaConsegnaBadge();renderDashboard();
+    switchPage('diario');aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();aggiornaNoteBadge();aggiornaPromemoriaBadge();aggiornaConsegnaBadge();renderDashboard();checkCompleanniBanner();
     setTimeout(()=>mostraNoteNonLette(),500);setTimeout(()=>mostraPromemoriaLogin(),1200);setTimeout(()=>mostraConsegnaLogin(),1800);setTimeout(checkQrHash,800);
   }else{_loginFailCount++;if(_loginFailCount>=5){_loginLockUntil=Date.now()+30000;_loginFailCount=0}err.textContent=nome?'Operatore non trovato o password errata':'Password errata';document.getElementById('pwd-input').value='';document.getElementById('pwd-input').focus();setTimeout(()=>err.textContent='',2500)}}
 function mostraForzaCambio(){const b=document.getElementById('pwd-modal-content');b.innerHTML='<h3>Cambia la password</h3><p>Password predefinita. Impostane una nuova.</p><div class="pwd-field"><label>Nuova password (min 4 car.)</label><input type="password" id="new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="eseguiPrimoCambio()">Imposta</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';document.getElementById('pwd-modal').classList.remove('hidden');setTimeout(()=>document.getElementById('new-pwd-1').focus(),100)}
@@ -1213,7 +1237,7 @@ async function tentaBiometrico(){var ok=await loginBiometrico();if(ok){
   document.getElementById('login-overlay').classList.add('hidden');
   document.getElementById('operatore-display').textContent='Operatore: '+stored.op;
   applicaTemaOperatore();applicaVisibilita();registraPushSubscription();
-  renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();aggiornaNoteBadge();aggiornaPromemoriaBadge();aggiornaConsegnaBadge();renderDashboard();
+  renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();aggiornaNoteBadge();aggiornaPromemoriaBadge();aggiornaConsegnaBadge();renderDashboard();checkCompleanniBanner();
   // Controlla se admin ha resettato la password → forza cambio
   var _dcCheck=await sbRpc('check_deve_cambiare',{p_nome:stored.op});
   if(_dcCheck&&_dcCheck.deve_cambiare_pwd){setTimeout(()=>forzaCambioPwdOperatore(stored.op),300)}
@@ -1817,6 +1841,375 @@ function resetConsFiltri(){['cons-filt-dal','cons-filt-al'].forEach(id=>{const e
 function aggiornaNoteBadge(){const op=getOperatore();const badge=document.getElementById('note-badge');if(!badge||!op)return;
   const nonLette=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.letta&&!n.nascosta_dest).length;
   if(nonLette>0){badge.style.display='inline';badge.textContent=nonLette}else{badge.style.display='none'}}
+// ========================
+// SCHEDA COLLABORATORE
+// ========================
+let _schedaCharts={};
+function _destroySchedaCharts(){Object.values(_schedaCharts).forEach(c=>{try{c.destroy()}catch(e){}});_schedaCharts={}}
+
+function apriSchedaCollaboratore(nome){
+  _destroySchedaCharts();
+  const allData=getDatiReparto();
+  const entries=allData.filter(e=>e.nome===nome);
+  const moduli=getModuliReparto().filter(m=>m.collaboratore&&m.collaboratore.toLowerCase()===nome.toLowerCase());
+  const now=new Date();
+  const tipoErr=nomeCorrente('Errore'),tipoMal=nomeCorrente('Malattia'),tipoAmm=nomeCorrente('Ammonimento Verbale'),tipoAppr=nomeCorrente('Apprezzamento');
+
+  // KPI counts
+  const totReg=entries.length;
+  const errori=entries.filter(e=>e.tipo===tipoErr);
+  const totErr=errori.length;
+  const totErrCost=errori.reduce((s,e)=>s+(parseFloat(e.importo)||0),0);
+  const totMal=entries.filter(e=>e.tipo===tipoMal).length;
+  const totAmm=entries.filter(e=>e.tipo===tipoAmm).length;
+  const totApprReg=entries.filter(e=>e.tipo===tipoAppr).length;
+  const allineamenti=moduli.filter(m=>m.tipo==='allineamento').length;
+  const apprezzamenti=moduli.filter(m=>m.tipo==='apprezzamento').length;
+  const rdiCount=moduli.filter(m=>m.tipo==='rdi').length;
+  const totApprAll=totApprReg+apprezzamenti;
+  const totNeg=totErr+totAmm+allineamenti+rdiCount;
+  const ratio=totNeg>0?(totApprAll/totNeg):totApprAll>0?999:0;
+
+  // Birthday - check collaboratoriCache
+  const collabRec=collaboratoriCache.find(c=>c.nome===nome);
+  const dataNascita=collabRec&&collabRec.data_nascita?collabRec.data_nascita:'';
+  const isBirthday=dataNascita?_isCompleannoOggi(dataNascita):false;
+  const neS=nome.replace(/'/g,"\\'");
+
+  // HEADER
+  let html='<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px;flex-wrap:wrap;gap:8px">';
+  html+='<div><h3 style="font-size:1.6rem">'+escP(nome)+(isBirthday?' <span style="font-size:1.2rem" title="Compleanno oggi!">&#127874;</span>':'')+'</h3>';
+  html+='<div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap">';
+  html+='<span style="font-size:.82rem;color:var(--muted)">Data di nascita:</span>';
+  html+='<input type="text" id="scheda-nascita" value="'+escP(dataNascita)+'" placeholder="Seleziona..." readonly style="cursor:pointer;padding:4px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper2);color:var(--ink);width:120px">';
+  html+='<button class="btn-salva" onclick="salvaSchedaNascita(\''+neS+'\')" style="font-size:.72rem;padding:4px 12px;background:var(--accent2)">Salva</button>';
+  if(dataNascita){html+='<span style="font-size:.82rem;color:var(--muted)">'+new Date(dataNascita+'T12:00:00').toLocaleDateString('it-IT')+'</span>'}
+  html+='</div></div>';
+  html+='<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-export btn-export-pdf" onclick="stampaSchedaPDF(\''+neS+'\')" style="font-size:.72rem;padding:5px 12px">PDF</button>';
+  html+='<button class="btn-export" onclick="apriConfrontoScheda(\''+neS+'\')" style="font-size:.72rem;padding:5px 12px;border-color:#1a7a6d;color:#1a7a6d">Confronta</button>';
+  html+='<button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\');_destroySchedaCharts()" style="padding:6px 12px;font-size:.75rem">Chiudi</button></div></div>';
+
+  // KPI CARDS
+  html+='<div class="scheda-kpi-grid">';
+  html+='<div class="scheda-kpi"><div class="kpi-val" style="color:var(--ink)">'+totReg+'</div><div class="kpi-lbl">Registrazioni</div></div>';
+  html+='<div class="scheda-kpi"><div class="kpi-val" style="color:var(--accent)">'+totErr+'</div><div class="kpi-lbl">Errori</div></div>';
+  html+='<div class="scheda-kpi"><div class="kpi-val" style="color:var(--accent)">'+(totErrCost?totErrCost.toFixed(0)+' CHF':'0')+'</div><div class="kpi-lbl">Costo errori</div></div>';
+  html+='<div class="scheda-kpi"><div class="kpi-val" style="color:#1a7a6d">'+totMal+'</div><div class="kpi-lbl">Malattie</div></div>';
+  html+='<div class="scheda-kpi"><div class="kpi-val" style="color:#7b2d8b">'+totAmm+'</div><div class="kpi-lbl">Amm. verbali</div></div>';
+  html+='<div class="scheda-kpi"><div class="kpi-val" style="color:#1a4a7a">'+allineamenti+'</div><div class="kpi-lbl">Allineamenti</div></div>';
+  html+='<div class="scheda-kpi"><div class="kpi-val" style="color:#b8860b">'+totApprAll+'</div><div class="kpi-lbl">Apprezzamenti</div></div>';
+  const ratioColor=ratio>=1?'#2c6e49':'var(--accent)';
+  html+='<div class="scheda-kpi"><div class="kpi-val" style="color:'+ratioColor+'">'+(ratio>=999?'&#8734;':ratio.toFixed(1))+'</div><div class="kpi-lbl">Pos/Neg ratio</div></div>';
+  html+='</div>';
+
+  // MONTHLY TREND CHART (last 6 months)
+  html+='<div class="scheda-section"><h4>Andamento mensile (ultimi 6 mesi)</h4>';
+  html+='<div class="scheda-chart-wrap"><canvas id="scheda-chart-trend"></canvas></div>';
+
+  // Month-over-month comparison
+  const curMonth=new Date(now.getFullYear(),now.getMonth(),1);
+  const prevMonth=new Date(now.getFullYear(),now.getMonth()-1,1);
+  const errCur=entries.filter(e=>{const d=new Date(e.data);return e.tipo===tipoErr&&d.getMonth()===curMonth.getMonth()&&d.getFullYear()===curMonth.getFullYear()}).length;
+  const errPrev=entries.filter(e=>{const d=new Date(e.data);return e.tipo===tipoErr&&d.getMonth()===prevMonth.getMonth()&&d.getFullYear()===prevMonth.getFullYear()}).length;
+  const momDiff=errPrev>0?Math.round((errCur-errPrev)/errPrev*100):errCur>0?100:0;
+  html+='<div class="scheda-mom">';
+  html+='<div class="scheda-mom-card" style="background:'+(momDiff>0?'rgba(192,57,43,0.1);color:var(--accent)':momDiff<0?'rgba(44,110,73,0.1);color:#2c6e49':'rgba(138,125,107,0.1);color:var(--muted)')+'">'+MESI[curMonth.getMonth()]+' vs '+MESI[prevMonth.getMonth()]+': '+(momDiff>0?'+':'')+momDiff+'% errori</div>';
+  html+='<span style="font-size:.82rem;color:var(--muted)">'+errCur+' errori questo mese, '+errPrev+' il mese scorso</span>';
+  html+='</div></div>';
+
+  // DISCIPLINARY PATH
+  html+='<div class="scheda-section"><h4>Percorso disciplinare</h4>';
+  html+='<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">';
+  html+='<span class="scheda-path-step" style="background:rgba(123,45,139,0.12);color:#7b2d8b">'+totAmm+' Amm. verbali</span>';
+  html+='<span class="scheda-path-arrow">&#10132;</span>';
+  html+='<span class="scheda-path-step" style="background:rgba(26,74,122,0.12);color:#1a4a7a">'+allineamenti+' Allineamenti</span>';
+  html+='<span class="scheda-path-arrow">&#10132;</span>';
+  html+='<span class="scheda-path-step" style="background:rgba(192,57,43,0.12);color:var(--accent)">'+rdiCount+' RDI</span>';
+  html+='</div>';
+
+  // Auto-suggestions
+  if(totAmm>=2&&allineamenti===0){
+    html+='<div class="scheda-suggestion" style="background:rgba(230,126,34,0.12);color:#e67e22">&#9888; '+totAmm+' ammonimenti senza allineamento &#8594; Preparare allineamento</div>';
+  }else if(totAmm>=3&&allineamenti>0&&rdiCount===0){
+    html+='<div class="scheda-suggestion" style="background:rgba(192,57,43,0.12);color:var(--accent)">&#9888; '+totAmm+' ammonimenti + '+allineamenti+' allineamento/i senza RDI &#8594; Valutare RDI</div>';
+  }
+  // Check last 3 months for 0 errors + appreciations
+  const threeMonthsAgo=new Date(now.getFullYear(),now.getMonth()-3,1);
+  const recentErr=entries.filter(e=>e.tipo===tipoErr&&new Date(e.data)>=threeMonthsAgo).length;
+  const recentAppr=entries.filter(e=>e.tipo===tipoAppr&&new Date(e.data)>=threeMonthsAgo).length;
+  if(recentErr===0&&recentAppr>0){
+    html+='<div class="scheda-suggestion" style="background:rgba(44,110,73,0.12);color:#2c6e49">&#11088; 0 errori da 3 mesi + '+recentAppr+' apprezzamenti &#8594; Candidato per premio</div>';
+  }else if(recentErr===0&&totReg>5){
+    html+='<div class="scheda-suggestion" style="background:rgba(44,110,73,0.12);color:#2c6e49">&#9989; 0 errori negli ultimi 3 mesi</div>';
+  }
+  html+='</div>';
+
+  // SICK DAY PATTERNS
+  if(totMal>0){
+    html+='<div class="scheda-section"><h4>Pattern malattie</h4>';
+    const malEntries=entries.filter(e=>e.tipo===tipoMal);
+    const dayDist=[0,0,0,0,0,0,0];
+    malEntries.forEach(e=>{dayDist[new Date(e.data).getDay()]++});
+    const lunVen=dayDist[1]+dayDist[5];
+    const lunVenPct=totMal>0?Math.round(lunVen/totMal*100):0;
+    html+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin:8px 0">';
+    const go=[1,2,3,4,5,6,0];
+    go.forEach(i=>{
+      const pct=totMal>0?Math.round(dayDist[i]/totMal*100):0;
+      html+='<div style="text-align:center;min-width:45px"><div style="font-weight:700;font-size:.9rem;color:var(--ink)">'+dayDist[i]+'</div><div style="font-size:.7rem;color:var(--muted)">'+GIORNI_SHORT[i]+'</div><div style="font-size:.65rem;color:var(--muted)">'+pct+'%</div></div>';
+    });
+    html+='</div>';
+    if(lunVenPct>50){
+      html+='<div class="scheda-sick-flag" style="background:rgba(192,57,43,0.1);color:var(--accent)">&#9888; '+lunVenPct+'% delle malattie cade di Lunedi o Venerdi ('+lunVen+'/'+totMal+')</div>';
+    }
+    // Team average comparison
+    const teamMal=allData.filter(e=>e.tipo===tipoMal).length;
+    const teamCollabs=new Set(allData.map(e=>e.nome)).size;
+    const avgMal=teamCollabs>0?(teamMal/teamCollabs):0;
+    html+='<div style="font-size:.82rem;color:var(--muted);margin-top:6px">Media team: '+avgMal.toFixed(1)+' malattie/collaboratore — '+(totMal>avgMal?'<span style="color:var(--accent);font-weight:600">Sopra media</span>':'<span style="color:#2c6e49;font-weight:600">Nella norma</span>')+'</div>';
+    html+='</div>';
+  }
+
+  // TIMELINE with date filter
+  html+='<div class="scheda-section"><h4>Cronologia completa</h4>';
+  html+='<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">';
+  html+='<span style="font-size:.78rem;color:var(--muted);font-weight:600">FILTRO:</span>';
+  html+='<input type="text" id="scheda-tl-dal" placeholder="Dal..." readonly style="cursor:pointer;padding:4px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper2);color:var(--ink);width:120px">';
+  html+='<input type="text" id="scheda-tl-al" placeholder="Al..." readonly style="cursor:pointer;padding:4px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper2);color:var(--ink);width:120px">';
+  html+='<button class="btn-reset" onclick="schedaResetTlFilter(\''+neS+'\')">Reset</button>';
+  html+='</div>';
+  html+='<div id="scheda-timeline" class="profilo-entries" style="max-height:350px">'+_renderSchedaTimeline(nome,entries,moduli,'','')+'</div>';
+  html+='</div>';
+
+  const box=document.getElementById('profilo-content');
+  box.className='profilo-box scheda-wide';
+  box.innerHTML=html;
+  document.getElementById('profilo-modal').classList.remove('hidden');
+
+  // Init flatpickrs
+  setTimeout(function(){
+    if(window.flatpickr){
+      flatpickr('#scheda-nascita',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,defaultDate:dataNascita||null});
+      var tlOpts={locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,
+        onChange:function(){_schedaFilterTimeline(nome)}};
+      flatpickr('#scheda-tl-dal',tlOpts);
+      flatpickr('#scheda-tl-al',tlOpts);
+    }
+    // Render trend chart
+    _renderSchedaTrendChart(nome,entries);
+  },120);
+}
+
+function _renderSchedaTimeline(nome,entries,moduli,dal,al){
+  // Merge entries + moduli into unified timeline
+  var items=[];
+  entries.forEach(function(e){items.push({date:e.data,tipo:e.tipo,text:e.testo,source:'reg',operatore:e.operatore||'',importo:e.importo,valuta:e.valuta,reparto:e.reparto})});
+  moduli.forEach(function(m){var label={allineamento:'Allineamento',apprezzamento:'Apprezzamento',rdi:'RDI'}[m.tipo]||m.tipo;
+    items.push({date:m.created_at||m.data_modulo,tipo:label,text:'Modulo '+label+(m.resp_settore?' — Resp: '+m.resp_settore:''),source:'mod',operatore:m.operatore||''})});
+  items.sort(function(a,b){return b.date.localeCompare(a.date)});
+  if(dal)items=items.filter(function(i){return i.date>=dal});
+  if(al)items=items.filter(function(i){return i.date<=al+'T23:59:59'});
+  if(!items.length)return'<div style="padding:14px;text-align:center;color:var(--muted)">Nessun evento nel periodo selezionato</div>';
+  return items.map(function(i){
+    var d=new Date(i.date);
+    var dateStr=d.toLocaleDateString('it-IT')+' '+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+    var bgCol=i.source==='mod'?(i.tipo==='RDI'?'#c0392b':i.tipo==='Allineamento'?'#1a4a7a':'#b8860b'):getColore(i.tipo);
+    var impBadge=i.importo&&parseFloat(i.importo)?'<span style="margin-left:4px;padding:1px 6px;background:var(--accent);color:white;border-radius:2px;font-size:.72rem;font-weight:700">'+parseFloat(i.importo).toFixed(2)+' '+(i.valuta||'CHF')+'</span>':'';
+    var repBadge=i.reparto?'<span style="margin-left:4px;padding:1px 6px;background:var(--muted);color:white;border-radius:2px;font-size:.72rem">'+escP(i.reparto)+'</span>':'';
+    var srcBadge=i.source==='mod'?'<span style="margin-left:4px;padding:1px 5px;border:1px solid var(--line);border-radius:2px;font-size:.65rem;color:var(--muted)">MODULO</span>':'';
+    return'<div class="scheda-timeline-item"><span style="font-size:.78rem;color:var(--muted);min-width:100px">'+dateStr+'</span><span class="mini-badge" style="background:'+bgCol+'">'+escP(i.tipo)+'</span>'+srcBadge+repBadge+impBadge+'<span style="flex:1;overflow:hidden;text-overflow:ellipsis">'+esc(i.text)+'</span>'+(i.operatore?'<span style="font-size:.72rem;color:var(--accent2)">'+escP(i.operatore)+'</span>':'')+'</div>'}).join('');
+}
+
+function _schedaFilterTimeline(nome){
+  var dalEl=document.getElementById('scheda-tl-dal'),alEl=document.getElementById('scheda-tl-al');
+  var dal=dalEl?dalEl.value:'',al=alEl?alEl.value:'';
+  var entries=getDatiReparto().filter(function(e){return e.nome===nome});
+  var moduli=getModuliReparto().filter(function(m){return m.collaboratore&&m.collaboratore.toLowerCase()===nome.toLowerCase()});
+  var tl=document.getElementById('scheda-timeline');
+  if(tl)tl.innerHTML=_renderSchedaTimeline(nome,entries,moduli,dal,al);
+}
+
+function schedaResetTlFilter(nome){
+  ['scheda-tl-dal','scheda-tl-al'].forEach(function(id){var el=document.getElementById(id);if(el){el.value='';if(el._flatpickr)el._flatpickr.clear()}});
+  _schedaFilterTimeline(nome);
+}
+
+function _renderSchedaTrendChart(nome,entries){
+  var tipoErr=nomeCorrente('Errore'),tipoAppr=nomeCorrente('Apprezzamento');
+  var now=new Date();var labels=[],errData=[],apprData=[];
+  for(var i=5;i>=0;i--){
+    var d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    labels.push(MESI[d.getMonth()]+' '+d.getFullYear());
+    var mErr=0,mAppr=0;
+    entries.forEach(function(e){var ed=new Date(e.data);
+      if(ed.getMonth()===d.getMonth()&&ed.getFullYear()===d.getFullYear()){
+        if(e.tipo===tipoErr)mErr++;if(e.tipo===tipoAppr)mAppr++}});
+    errData.push(mErr);apprData.push(mAppr);
+  }
+  // Trend direction
+  var trendImproving=errData.length>=2&&errData[errData.length-1]<=errData[errData.length-2];
+  var el=document.getElementById('scheda-chart-trend');
+  if(!el)return;
+  if(_schedaCharts.trend)_schedaCharts.trend.destroy();
+  _schedaCharts.trend=new Chart(el,{type:'line',data:{labels:labels,
+    datasets:[{label:'Errori',data:errData,borderColor:'#c0392b',backgroundColor:'rgba(192,57,43,0.1)',fill:true,tension:0.3,pointRadius:4,pointBackgroundColor:'#c0392b'},
+      {label:'Apprezzamenti',data:apprData,borderColor:'#b8860b',backgroundColor:'rgba(184,134,11,0.1)',fill:true,tension:0.3,pointRadius:4,pointBackgroundColor:'#b8860b'}]},
+    options:{responsive:true,maintainAspectRatio:true,animation:{duration:400},plugins:{legend:{position:'top',labels:{font:{size:11}}}},
+      scales:{y:{beginAtZero:true,ticks:{stepSize:1,font:{size:11}}},x:{ticks:{font:{size:10}}}}}});
+}
+
+async function salvaSchedaNascita(nome){
+  var inp=document.getElementById('scheda-nascita');if(!inp)return;
+  var val=inp.value;
+  var coll=collaboratoriCache.find(function(c){return c.nome===nome});
+  if(coll){
+    try{await secPatch('collaboratori','id=eq.'+coll.id,{data_nascita:val||null});coll.data_nascita=val||null;toast('Data nascita salvata')}
+    catch(e){toast('Errore salvataggio')}
+  }else{
+    try{var r=await secPost('collaboratori',{nome:nome,attivo:true,data_nascita:val||null});if(r&&r[0])collaboratoriCache.push(r[0]);toast('Data nascita salvata')}
+    catch(e){toast('Errore salvataggio')}
+  }
+}
+
+function stampaSchedaPDF(nome){
+  if(!window.jspdf){toast('Libreria PDF non caricata');return}
+  var allData=getDatiReparto();
+  var entries=allData.filter(function(e){return e.nome===nome});
+  var moduli=getModuliReparto().filter(function(m){return m.collaboratore&&m.collaboratore.toLowerCase()===nome.toLowerCase()});
+  var tipoErr=nomeCorrente('Errore'),tipoMal=nomeCorrente('Malattia'),tipoAmm=nomeCorrente('Ammonimento Verbale'),tipoAppr=nomeCorrente('Apprezzamento');
+  var totErr=entries.filter(function(e){return e.tipo===tipoErr}).length;
+  var totMal=entries.filter(function(e){return e.tipo===tipoMal}).length;
+  var totAmm=entries.filter(function(e){return e.tipo===tipoAmm}).length;
+  var totAppr=entries.filter(function(e){return e.tipo===tipoAppr}).length;
+  var totErrCost=entries.filter(function(e){return e.tipo===tipoErr}).reduce(function(s,e){return s+(parseFloat(e.importo)||0)},0);
+  var allin=moduli.filter(function(m){return m.tipo==='allineamento'}).length;
+  var apprMod=moduli.filter(function(m){return m.tipo==='apprezzamento'}).length;
+  var rdi=moduli.filter(function(m){return m.tipo==='rdi'}).length;
+
+  // Optional date range filter
+  var dal=document.getElementById('scheda-tl-dal')?document.getElementById('scheda-tl-dal').value:'';
+  var al=document.getElementById('scheda-tl-al')?document.getElementById('scheda-tl-al').value:'';
+
+  var jsPDF=window.jspdf.jsPDF;var doc=new jsPDF('portrait','mm','a4');
+  doc.setFontSize(16);doc.setFont('helvetica','bold');
+  doc.text('Scheda Collaboratore',14,18);
+  doc.setFontSize(11);doc.setFont('helvetica','normal');
+  doc.text('Casino Lugano SA — '+new Date().toLocaleDateString('it-IT'),14,25);
+  doc.setFontSize(14);doc.setFont('helvetica','bold');
+  doc.text(nome,14,35);
+  if(dal||al){doc.setFontSize(9);doc.setFont('helvetica','normal');doc.text('Periodo: '+(dal||'inizio')+' — '+(al||'oggi'),14,41)}
+
+  // KPI table
+  doc.autoTable({startY:dal||al?45:40,head:[['Registrazioni','Errori','Costo Errori','Malattie','Amm. Verbali','Allineamenti','Apprezzamenti','RDI']],
+    body:[[entries.length,totErr,totErrCost?totErrCost.toFixed(2)+' CHF':'0',totMal,totAmm,allin,totAppr+apprMod,rdi]],
+    theme:'grid',headStyles:{fillColor:[26,74,122],fontSize:7},bodyStyles:{fontSize:8},margin:{left:14,right:14}});
+
+  // Timeline table
+  var items=[];
+  var filteredEntries=entries;var filteredModuli=moduli;
+  if(dal){filteredEntries=filteredEntries.filter(function(e){return e.data>=dal});filteredModuli=filteredModuli.filter(function(m){return(m.created_at||m.data_modulo)>=dal})}
+  if(al){filteredEntries=filteredEntries.filter(function(e){return e.data<=al+'T23:59:59'});filteredModuli=filteredModuli.filter(function(m){return(m.created_at||m.data_modulo)<=al+'T23:59:59'})}
+  filteredEntries.forEach(function(e){items.push([new Date(e.data).toLocaleDateString('it-IT'),e.tipo,e.testo.substring(0,80),e.operatore||''])});
+  filteredModuli.forEach(function(m){var label={allineamento:'Allineamento',apprezzamento:'Apprezzamento',rdi:'RDI'}[m.tipo]||m.tipo;
+    items.push([new Date(m.created_at||m.data_modulo).toLocaleDateString('it-IT'),'[Modulo] '+label,m.resp_settore||'',m.operatore||''])});
+  items.sort(function(a,b){return b[0].split('/').reverse().join('').localeCompare(a[0].split('/').reverse().join(''))});
+
+  if(items.length){doc.autoTable({startY:doc.lastAutoTable.finalY+6,head:[['Data','Tipo','Descrizione','Operatore']],body:items,
+    theme:'striped',headStyles:{fillColor:[26,74,122],fontSize:7},bodyStyles:{fontSize:7},columnStyles:{2:{cellWidth:80}},margin:{left:14,right:14}})}
+
+  doc.save('scheda_'+nome.replace(/\s+/g,'_')+'_'+new Date().toLocaleDateString('it-IT').replace(/\//g,'-')+'.pdf');
+  toast('PDF generato!');
+}
+
+// CONFRONTO COLLABORATORI
+function apriConfrontoScheda(nomeIniziale){
+  var nomi=getNomiLista();
+  var mc=document.getElementById('pwd-modal-content');
+  var optHtml=nomi.map(function(n){return'<option value="'+escP(n)+'"'+(n===nomeIniziale?' selected':'')+'>'+escP(n)+'</option>'}).join('');
+  var h='<h3>Confronta collaboratori</h3><p style="color:var(--muted);margin-bottom:14px">Seleziona 2-3 collaboratori da confrontare</p>';
+  h+='<div class="modulo-field"><label>Collaboratore 1</label><select id="conf-c1" style="padding:10px">'+optHtml+'</select></div>';
+  h+='<div class="modulo-field"><label>Collaboratore 2</label><select id="conf-c2" style="padding:10px"><option value="">&#8212; Seleziona &#8212;</option>'+optHtml+'</select></div>';
+  h+='<div class="modulo-field"><label>Collaboratore 3 (opzionale)</label><select id="conf-c3" style="padding:10px"><option value="">&#8212; Nessuno &#8212;</option>'+optHtml+'</select></div>';
+  h+='<div class="pwd-modal-btns" style="margin-top:14px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiConfronto()">Confronta</button></div>';
+  mc.innerHTML=h;
+  document.getElementById('pwd-modal').classList.remove('hidden');
+}
+
+function eseguiConfronto(){
+  var c1=(document.getElementById('conf-c1')||{}).value||'';
+  var c2=(document.getElementById('conf-c2')||{}).value||'';
+  var c3=(document.getElementById('conf-c3')||{}).value||'';
+  if(!c1||!c2){toast('Seleziona almeno 2 collaboratori');return}
+  document.getElementById('pwd-modal').classList.add('hidden');
+  var selezione=[c1,c2];if(c3)selezione.push(c3);
+  _mostraConfronto(selezione);
+}
+
+function _mostraConfronto(nomi){
+  _destroySchedaCharts();
+  var allData=getDatiReparto();
+  var tipoErr=nomeCorrente('Errore');
+  var now=new Date();var labels=[];
+  var datasets=[];
+  var colors=['#c0392b','#1a4a7a','#b8860b'];
+  for(var i=5;i>=0;i--){var d=new Date(now.getFullYear(),now.getMonth()-i,1);labels.push(MESI[d.getMonth()]+' '+d.getFullYear())}
+  nomi.forEach(function(nome,idx){
+    var entries=allData.filter(function(e){return e.nome===nome});
+    var data=[];
+    for(var i=5;i>=0;i--){
+      var d=new Date(now.getFullYear(),now.getMonth()-i,1);
+      data.push(entries.filter(function(e){var ed=new Date(e.data);return e.tipo===tipoErr&&ed.getMonth()===d.getMonth()&&ed.getFullYear()===d.getFullYear()}).length);
+    }
+    datasets.push({label:nome,data:data,borderColor:colors[idx],backgroundColor:'transparent',tension:0.3,pointRadius:4,pointBackgroundColor:colors[idx]});
+  });
+
+  // Build KPI comparison table
+  var tipoMal=nomeCorrente('Malattia'),tipoAmm=nomeCorrente('Ammonimento Verbale'),tipoAppr=nomeCorrente('Apprezzamento');
+  var tableRows=nomi.map(function(nome){
+    var entries=allData.filter(function(e){return e.nome===nome});
+    var moduli=getModuliReparto().filter(function(m){return m.collaboratore&&m.collaboratore.toLowerCase()===nome.toLowerCase()});
+    return'<tr><td><strong>'+escP(nome)+'</strong></td><td class="num">'+entries.length+'</td><td class="num">'+entries.filter(function(e){return e.tipo===tipoErr}).length+'</td><td class="num">'+entries.filter(function(e){return e.tipo===tipoMal}).length+'</td><td class="num">'+entries.filter(function(e){return e.tipo===tipoAmm}).length+'</td><td class="num">'+moduli.filter(function(m){return m.tipo==='allineamento'}).length+'</td><td class="num">'+entries.filter(function(e){return e.tipo===tipoAppr}).length+'</td></tr>';
+  }).join('');
+
+  var html='<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px"><div><h3>Confronto collaboratori</h3><p style="color:var(--muted);font-size:.82rem">'+nomi.join(' vs ')+'</p></div>';
+  html+='<button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\');_destroySchedaCharts()" style="padding:6px 12px;font-size:.75rem">Chiudi</button></div>';
+  html+='<table class="collab-table" style="margin-bottom:16px"><thead><tr><th>Collaboratore</th><th class="num">Tot</th><th class="num">Errori</th><th class="num">Malattie</th><th class="num">Amm. Verb.</th><th class="num">Allineam.</th><th class="num">Appr.</th></tr></thead><tbody>'+tableRows+'</tbody></table>';
+  html+='<h4 style="font-family:Playfair Display,serif;color:var(--ink);margin-bottom:8px">Errori/mese (ultimi 6 mesi)</h4>';
+  html+='<div class="scheda-chart-wrap"><canvas id="scheda-chart-confronto"></canvas></div>';
+
+  var box=document.getElementById('profilo-content');
+  box.className='profilo-box scheda-wide';
+  box.innerHTML=html;
+  document.getElementById('profilo-modal').classList.remove('hidden');
+  setTimeout(function(){
+    var el=document.getElementById('scheda-chart-confronto');if(!el)return;
+    if(_schedaCharts.confronto)_schedaCharts.confronto.destroy();
+    _schedaCharts.confronto=new Chart(el,{type:'line',data:{labels:labels,datasets:datasets},
+      options:{responsive:true,maintainAspectRatio:true,animation:{duration:400},plugins:{legend:{position:'top',labels:{font:{size:11}}}},
+        scales:{y:{beginAtZero:true,ticks:{stepSize:1}},x:{ticks:{font:{size:10}}}}}});
+  },100);
+}
+
+// BIRTHDAY ALERTS BANNER
+function checkCompleanniBanner(){
+  var banner=document.getElementById('compleanni-banner');
+  if(!banner)return;
+  var compleanni=[];
+  collaboratoriCache.forEach(function(c){
+    if(!c.data_nascita)return;
+    if(_isCompleannoOggi(c.data_nascita))compleanni.push(c.nome);
+  });
+  if(compleanni.length){
+    banner.textContent='&#127874; Buon compleanno a: '+compleanni.join(', ')+'!';
+    banner.innerHTML='&#127874; Buon compleanno a: <strong>'+compleanni.map(function(n){return escP(n)}).join(', ')+'</strong>!';
+    banner.classList.remove('hidden');
+    banner.style.display='flex';
+  }else{
+    banner.classList.add('hidden');
+    banner.style.display='none';
+  }
+}
+
 // NOTIFICHE BROWSER + WEB PUSH
 function urlBase64ToUint8Array(b){var p='='.repeat((4-b.length%4)%4);var b64=(b+p).replace(/-/g,'+').replace(/_/g,'/');var raw=atob(b64);var arr=new Uint8Array(raw.length);for(var i=0;i<raw.length;i++)arr[i]=raw.charCodeAt(i);return arr}
 async function registraPushSubscription(){
@@ -2117,7 +2510,7 @@ function aggiornaModuliLista(){
   const box=document.getElementById('mod-list-results');if(!box)return;
   if(!filtered.length){box.innerHTML='<div style="padding:14px;text-align:center;color:var(--muted)">Nessun modulo trovato</div>';return}
   box.innerHTML=filtered.slice(0,50).map(m=>{const d=new Date(m.created_at);
-    return'<div class="scad-item" style="flex-wrap:wrap;padding:12px 0"><div style="display:flex;align-items:center;gap:10px;width:100%;flex-wrap:wrap"><span class="scad-date">'+d.toLocaleDateString('it-IT')+'</span><strong>'+escP(m.collaboratore)+'</strong><span class="badge" style="background:'+tc[m.tipo]+';color:white;padding:2px 10px;border-radius:2px;font-size:.78rem">'+tl[m.tipo]+'</span><span style="font-size:.78rem;color:var(--muted)">Resp: '+escP(m.resp_settore)+(m.operatore?' — da '+escP(m.operatore):'')+'</span><div style="margin-left:auto;display:flex;gap:6px"><button class="btn-act edit" onclick="apriModuloSalvato('+m.id+')">Apri</button><button class="btn-act tipo" onclick="ristampaModuloPDF('+m.id+')">PDF</button><button class="btn-act del" onclick="eliminaModulo('+m.id+')">Elimina</button></div></div></div>'}).join('')}
+    const me=m.collaboratore.replace(/'/g,"\\'");return'<div class="scad-item" style="flex-wrap:wrap;padding:12px 0"><div style="display:flex;align-items:center;gap:10px;width:100%;flex-wrap:wrap"><span class="scad-date">'+d.toLocaleDateString('it-IT')+'</span><span class="entry-name" onclick="apriSchedaCollaboratore(\''+me+'\')"><strong>'+escP(m.collaboratore)+'</strong></span><span class="badge" style="background:'+tc[m.tipo]+';color:white;padding:2px 10px;border-radius:2px;font-size:.78rem">'+tl[m.tipo]+'</span><span style="font-size:.78rem;color:var(--muted)">Resp: '+escP(m.resp_settore)+(m.operatore?' — da '+escP(m.operatore):'')+'</span><div style="margin-left:auto;display:flex;gap:6px"><button class="btn-act edit" onclick="apriModuloSalvato('+m.id+')">Apri</button><button class="btn-act tipo" onclick="ristampaModuloPDF('+m.id+')">PDF</button><button class="btn-act del" onclick="eliminaModulo('+m.id+')">Elimina</button></div></div></div>'}).join('')}
 function apriModuloSalvato(id){const m=moduliCache.find(x=>x.id===id);if(!m)return;
   apriModulo(m.tipo);window._editModuloId=id;
   setTimeout(()=>{const ce=document.getElementById('mod-collaboratore');if(ce)ce.value=m.collaboratore;
@@ -2407,17 +2800,7 @@ function parseModuloTesto(testo,tipo){const r={};const lines=testo.split(/\n/);
   return r}
 
 // PROFILO COLLABORATORE
-function apriProfilo(nome){const entries=getDatiReparto().filter(e=>e.nome===nome);const tipiCount={};entries.forEach(e=>{tipiCount[e.tipo]=(tipiCount[e.tipo]||0)+1});
-  const first=entries.length?new Date(entries[entries.length-1].data).toLocaleDateString('it-IT'):'—';
-  const last=entries.length?new Date(entries[0].data).toLocaleDateString('it-IT'):'—';
-  let html='<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px"><div><h3>'+escP(nome)+'</h3><p style="color:var(--muted);font-size:.82rem">Prima registrazione: '+first+' — Ultima: '+last+'</p></div><button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\')" style="padding:6px 12px;font-size:.75rem">Chiudi</button></div>';
-  html+='<div class="profilo-stats">'+Object.entries(tipiCount).map(([t,c])=>'<div class="profilo-stat"><span class="mini-badge" style="background:'+getColore(t)+'">'+t+'</span> <strong>'+c+'</strong></div>').join('')+'<div class="profilo-stat"><strong>'+entries.length+'</strong> totali</div></div>';
-  html+='<div class="profilo-chart-wrap"><canvas id="chart-profilo"></canvas></div>';
-  html+='<h4 style="font-family:Playfair Display,serif;margin:16px 0 8px;color:var(--ink)">Cronologia</h4><div class="profilo-entries">'+entries.map(e=>{const d=new Date(e.data);return'<div class="profilo-entry"><span class="badge badge-'+e.tipo.replace(/ /g,'-')+'" style="margin-right:8px">'+e.tipo+'</span><strong>'+d.toLocaleDateString('it-IT')+'</strong> '+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})+' — '+esc(e.testo)+(e.operatore?' <span style="color:var(--accent2);font-size:.78rem;font-style:normal"> — inserita da '+escP(e.operatore)+'</span>':'')+(e.modificato_da?' <span style="color:var(--muted);font-size:.75rem;font-style:italic">mod. '+escP(e.modificato_da)+'</span>':'')+'</div>'}).join('')+'</div>';
-  document.getElementById('profilo-content').innerHTML=html;document.getElementById('profilo-modal').classList.remove('hidden');
-  setTimeout(()=>{const labels=Object.keys(tipiCount),colors=labels.map(t=>getColore(t));
-    if(charts.profilo)charts.profilo.destroy();
-    charts.profilo=new Chart(document.getElementById('chart-profilo'),{type:'doughnut',data:{labels,datasets:[{data:labels.map(t=>tipiCount[t]),backgroundColor:colors,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{position:'right',labels:{font:{size:10}}}}}})},100)}
+function apriProfilo(nome){apriSchedaCollaboratore(nome)}
 
 // FILTER & RENDER
 function getFiltrati(){const p=document.getElementById('filt-persona').value,t=document.getElementById('filt-tipo').value,dal=document.getElementById('filt-dal').value,al=document.getElementById('filt-al').value,c=document.getElementById('filt-cerca').value.toLowerCase();
@@ -2589,7 +2972,7 @@ function renderStatistiche(){const _ds=getDatiReparto();if(!_ds.length){document
   const tutti=getTuttiTipi(),cd={};_ds.forEach(e=>{if(!cd[e.nome])cd[e.nome]={tot:0};cd[e.nome].tot++;cd[e.nome][e.tipo]=(cd[e.nome][e.tipo]||0)+1});
   const cr=Object.entries(cd).sort((a,b)=>b[1].tot-a[1].tot),tp=tutti.filter(t=>_ds.some(e=>e.tipo===t.nome));
   let th='<table class="collab-table"><thead><tr><th>Collaboratore</th><th class="num">Tot</th>'+tp.map(t=>'<th class="num">'+t.nome+'</th>').join('')+'</tr></thead><tbody>';
-  cr.forEach(([n,d])=>{th+='<tr><td><strong>'+escP(n)+'</strong></td><td class="num"><strong>'+d.tot+'</strong></td>'+tp.map(t=>{const v=d[t.nome]||0;return'<td class="num">'+(v?'<span class="mini-badge" style="background:'+t.colore+'">'+v+'</span>':'-')+'</td>'}).join('')+'</tr>'});
+  cr.forEach(([n,d])=>{const ne=n.replace(/'/g,"\\'");th+='<tr><td><span class="entry-name" onclick="apriSchedaCollaboratore(\''+ne+'\')"><strong>'+escP(n)+'</strong></span></td><td class="num"><strong>'+d.tot+'</strong></td>'+tp.map(t=>{const v=d[t.nome]||0;return'<td class="num">'+(v?'<span class="mini-badge" style="background:'+t.colore+'">'+v+'</span>':'-')+'</td>'}).join('')+'</tr>'});
   const totGen=cr.reduce((s,c)=>s+c[1].tot,0);th+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td class="num"><strong>'+totGen+'</strong></td>'+tp.map(t=>{const v=cr.reduce((s,c)=>s+(c[1][t.nome]||0),0);return'<td class="num"><strong>'+(v?'<span class="mini-badge" style="background:'+t.colore+'">'+v+'</span>':'-')+'</strong></td>'}).join('')+'</tr>';
   th+='</tbody></table>';document.getElementById('collab-table-wrap').innerHTML=th;
   // Tabella errori con importi e reparto
@@ -2600,7 +2983,7 @@ function renderStatistiche(){const _ds=getDatiReparto();if(!_ds.length){document
     let gCHF=0,gEUR=0,gCount=0;
     errSorted.forEach(([n,d])=>{gCHF+=d.totCHF;gEUR+=d.totEUR;gCount+=d.count;
       const reps=Object.entries(d.reparti).map(([r,c])=>'<span class="mini-badge" style="background:var(--muted)">'+r+': '+c+'</span>').join(' ');
-      et+='<tr><td><strong>'+escP(n)+'</strong></td><td class="num"><span class="mini-badge" style="background:var(--accent)">'+d.count+'</span></td><td>'+reps+'</td><td class="num">'+(d.totCHF?d.totCHF.toFixed(2):'-')+'</td><td class="num">'+(d.totEUR?d.totEUR.toFixed(2):'-')+'</td></tr>'});
+      const ne=n.replace(/'/g,"\\'");et+='<tr><td><span class="entry-name" onclick="apriSchedaCollaboratore(\''+ne+'\')"><strong>'+escP(n)+'</strong></span></td><td class="num"><span class="mini-badge" style="background:var(--accent)">'+d.count+'</span></td><td>'+reps+'</td><td class="num">'+(d.totCHF?d.totCHF.toFixed(2):'-')+'</td><td class="num">'+(d.totEUR?d.totEUR.toFixed(2):'-')+'</td></tr>'});
     et+='<tr style="border-top:2px solid var(--ink)"><td><strong>TOTALE</strong></td><td class="num"><strong>'+gCount+'</strong></td><td></td><td class="num"><strong>'+(gCHF?gCHF.toFixed(2)+' CHF':'-')+'</strong></td><td class="num"><strong>'+(gEUR?gEUR.toFixed(2)+' EUR':'-')+'</strong></td></tr>';
     et+='</tbody></table>';document.getElementById('errori-table-wrap').innerHTML=et}
   else document.getElementById('errori-table-wrap').innerHTML='<p style="color:var(--muted)">Nessun errore registrato</p>'}
@@ -3380,7 +3763,7 @@ function apriDettaglioMaison(nome){const righe=getMaisonFiltrati().filter(r=>r.n
   // Form aggiungi nota
   html+='<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--line)"><h4 style="font-family:Playfair Display,serif;margin-bottom:8px;color:var(--ink)">Aggiungi nota privata</h4><textarea id="detail-nota-input" rows="2" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:2px;font-family:Source Sans 3,sans-serif;font-size:.9rem;resize:vertical;background:var(--paper2);color:var(--ink)" placeholder="Scrivi una nota..."></textarea><button class="btn-salva" onclick="salvaNotaCliente(\''+ne+'\')" style="margin-top:6px;font-size:.78rem;padding:8px 16px">Salva nota</button></div>';
   html+='<div style="display:flex;gap:10px;justify-content:center;margin-top:14px"><button class="btn-export" onclick="esportaMaisonClienteCSV(\''+nome.replace(/'/g,"\\'")+'\')">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaMaisonClientePDF(\''+nome.replace(/'/g,"\\'")+'\')">PDF</button><button class="btn-export" onclick="stampaSchedaCliente()" style="border-color:#2c6e49;color:#2c6e49">Stampa</button></div>';
-  document.getElementById('profilo-content').innerHTML=html;document.getElementById('profilo-modal').classList.remove('hidden');
+  var _pb=document.getElementById('profilo-content');_pb.className='profilo-box';_pb.innerHTML=html;document.getElementById('profilo-modal').classList.remove('hidden');
   if(window.flatpickr){var dnEl=document.getElementById('detail-nascita');if(dnEl)flatpickr(dnEl,{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,defaultDate:budget&&budget.data_nascita||null})}}
 async function salvaDetailNascita(nome){var val=document.getElementById('detail-nascita').value;
   if(!val){toast('Seleziona una data');return}
