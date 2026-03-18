@@ -3608,9 +3608,11 @@ async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0
         const nNomi=nNomiNoSeven||1;
         for(const nr of nomiRaw){
           const parsed=_parseMaisonNome(nr);if(!parsed.nome)continue;
-          if(/\bSeven\b|\(Se/i.test(nr)){
+          if(/\bSeven\b|\(Se/i.test(nr)){continue}
+          // Se la riga contiene Seven → tutti i nomi vanno in spese_extra (ristorante esterno)
+          if(/\bSeven\b|\(Se/i.test(rawNome)){
             const seRec={beneficiario:parsed.nome,tipo:'cena_esterna',descrizione:'Ristorante Seven (da formulario)',
-              importo:costo,data_spesa:dataGiornata,luogo:'Ristorante Seven',
+              importo:Math.round(costo/nNomi*100)/100,data_spesa:dataGiornata,luogo:'Ristorante Seven',
               operatore:getOperatore(),reparto_dip:currentReparto};
             try{await secPost('spese_extra',seRec);totalRows++;sevenCount++}catch(e){}
             continue}
