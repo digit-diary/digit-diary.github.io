@@ -2626,7 +2626,8 @@ async function segnaConsegnaLetta(id){const op=getOperatore();
     renderConsegne();aggiornaConsegnaBadge()}catch(e){toast('Errore')}}
 function renderConsegne(){const el=document.getElementById('consegne-list');if(!el)return;
   const op=getOperatore();
-  var _cr=getConsegneReparto();
+  // Mostra solo: consegne che hai inviato tu, destinate a te, o destinate a tutti
+  var _cr=getConsegneReparto().filter(c=>c.operatore===op||c.destinatario==='tutti'||c.destinatario===op||(isAdmin()&&!c.destinatario));
   if(!_cr.length){el.innerHTML='<div class="empty-state"><p>Nessuna consegna</p><small>Le consegne appariranno qui dopo essere state inviate</small></div>';return}
   el.innerHTML=_cr.slice(0,20).map(c=>{const d=new Date(c.created_at);const isAlta=c.priorita==='alta';
     const letto=!!c.letto_da;const isMia=c.operatore===op;const canEdit=isMia&&!letto;
