@@ -1203,8 +1203,8 @@ async function loadAll(){
   _loadLogo();
   // Pulizia automatica: sessioni scadute + log > 12 mesi
   sbRpc('cleanup_old_data').catch(()=>{});
-  // Health check silenzioso
-  _healthCheck();
+  // Health check silenzioso (solo se loggato)
+  if(getOpToken())_healthCheck();
 }
 async function caricaDbStats(){const el=document.getElementById('db-stats-content');if(!el)return;
   el.innerHTML='<p style="color:var(--muted)">Caricamento...</p>';
