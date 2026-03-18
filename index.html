@@ -998,7 +998,7 @@ async function sbGet(path){const r=await fetch(SB_URL+'/rest/v1/'+path,{headers:
 async function sbPost(table,data,extra){const r=await fetch(SB_URL+'/rest/v1/'+table,{method:'POST',headers:sbH(Object.assign({'Prefer':'return=representation'},extra||{})),body:JSON.stringify(data)});if(!r.ok)throw new Error(await r.text());return r.json()}
 async function sbPatch(table,filter,data){const r=await fetch(SB_URL+'/rest/v1/'+table+'?'+filter,{method:'PATCH',headers:sbH({'Prefer':'return=representation'}),body:JSON.stringify(data)});if(!r.ok)throw new Error(await r.text())}
 async function sbDel(table,filter){await fetch(SB_URL+'/rest/v1/'+table+'?'+filter,{method:'DELETE',headers:sbH()})}
-async function sbRpc(fn,params){const r=await fetch(SB_URL+'/rest/v1/rpc/'+fn,{method:'POST',headers:sbH(),body:JSON.stringify(params||{})});return r.ok?r.json():null}
+async function sbRpc(fn,params){const r=await fetch(SB_URL+'/rest/v1/rpc/'+fn,{method:'POST',headers:sbH(),body:JSON.stringify(params||{})});if(!r.ok)return null;const txt=await r.text();if(!txt)return null;try{return JSON.parse(txt)}catch(e){return null}}
 // --- FUNZIONI SICURE (token-based) con fallback a sbGet/sbPost/etc ---
 function _parseRestFilter(path){
   // Converte 'table?col=eq.val&col2=gte.val2' in {table, filter SQL, order, limit}
@@ -1146,7 +1146,7 @@ async function eseguiForzaCambioPwdOp(nome){const p1=document.getElementById('op
 function esci(){const tk=getOpToken()||getAdminToken();if(tk){sbRpc('invalidate_op_session',{p_token:tk}).catch(()=>{});sbRpc('invalidate_admin_session',{p_token:tk}).catch(()=>{})}
   // Pulisci TUTTO: sessione, operatore, pagina, cache
   localStorage.removeItem('diario_auth_ts');localStorage.removeItem('pagina_corrente');
-  sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token');sessionStorage.removeItem('op_token');sessionStorage.removeItem('diario_auth');sessionStorage.removeItem('session_active');sessionStorage.removeItem('bio_verified');
+  sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token');sessionStorage.removeItem('op_token');sessionStorage.removeItem('diario_auth');sessionStorage.removeItem('session_active');sessionStorage.removeItem('bio_verified');sessionStorage.removeItem('note_popup_shown');
   // Svuota cache in memoria
   noteColleghiCache=[];datiCache=[];moduliCache=[];logCache=[];maisonCache=[];promemoriaCache=[];consegneCache=[];speseExtraCache=[];regaliCache=[];noteClientiCache=[];scadenzeCache=[];
   location.reload()}
@@ -1822,9 +1822,13 @@ async function pollNuoveNote(){if(sessionStorage.getItem('diario_auth')!=='1')re
     const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();
   }catch(e){}}
 function mostraNoteNonLette(){const op=getOperatore();if(!op)return;
+  if(sessionStorage.getItem('note_popup_shown'))return;
   const nonLette=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.letta&&!n.nascosta_dest);if(!nonLette.length)return;
+  sessionStorage.setItem('note_popup_shown','1');
   const mc=document.getElementById('note-modal-content');
-  mc.innerHTML='<h3 style="margin-bottom:4px">Hai '+nonLette.length+' nota/e non letta/e</h3><p style="color:var(--muted);font-size:.82rem;margin-bottom:16px">Messaggi dai tuoi colleghi</p>'+nonLette.map(n=>'<div style="background:var(--paper2);border-radius:3px;padding:12px;margin-bottom:10px;border-left:3px solid var(--accent2)"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><strong style="color:var(--accent2)">Da: '+escP(n.da_operatore)+'</strong><span style="font-size:.75rem;color:var(--muted)">'+new Date(n.created_at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</span></div><div style="font-size:.95rem">'+esc(n.messaggio)+'</div><button style="margin-top:8px;color:var(--accent2);border:1px solid var(--accent2);background:none;padding:4px 14px;border-radius:2px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:Source Sans 3,sans-serif" onclick="segnaNoteLette();document.getElementById(\'note-modal\').classList.add(\'hidden\');switchPage(\'note-collega\');setTimeout(function(){rispondiNota(\''+escP(n.da_operatore).replace(/'/g,"\\'")+'\','+n.id+')},300)">Rispondi</button></div>').join('')+'<div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="segnaNoteLette();document.getElementById(\'note-modal\').classList.add(\'hidden\')">Ho letto tutto</button></div>';
+  // Segna tutte come lette automaticamente all'apertura del popup
+  segnaNoteLette();
+  mc.innerHTML='<h3 style="margin-bottom:4px">Hai '+nonLette.length+' nota/e non letta/e</h3><p style="color:var(--muted);font-size:.82rem;margin-bottom:16px">Messaggi dai tuoi colleghi</p>'+nonLette.map(n=>'<div style="background:var(--paper2);border-radius:3px;padding:12px;margin-bottom:10px;border-left:3px solid var(--accent2)"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><strong style="color:var(--accent2)">Da: '+escP(n.da_operatore)+'</strong><span style="font-size:.75rem;color:var(--muted)">'+new Date(n.created_at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</span></div><div style="font-size:.95rem">'+esc(n.messaggio)+'</div><button style="margin-top:8px;color:var(--accent2);border:1px solid var(--accent2);background:none;padding:4px 14px;border-radius:2px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:Source Sans 3,sans-serif" onclick="document.getElementById(\'note-modal\').classList.add(\'hidden\');switchPage(\'note-collega\');setTimeout(function(){rispondiNota(\''+escP(n.da_operatore).replace(/'/g,"\\'")+'\','+n.id+')},300)">Rispondi</button></div>').join('')+'<div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'note-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
   document.getElementById('note-modal').classList.remove('hidden')}
 async function segnaNoteLette(){const op=getOperatore();const nonLette=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.letta);const ora=new Date().toISOString();
   for(const n of nonLette){try{await secPatch('note_colleghi','id=eq.'+n.id,{letta:true,letta_at:ora});n.letta=true;n.letta_at=ora}catch(e){}}renderNoteCollega()}
