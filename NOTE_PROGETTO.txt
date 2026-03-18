@@ -49,6 +49,8 @@
      - Tipi di evento: Attivita, Richiesta, Errore, Ammonimento Verbale,
        Malattia, Apprezzamento, Nota, Altro (+ tipi personalizzati)
      - Per il tipo "Errore": campi extra Reparto, Importo e Valuta
+     - Per il tipo "Malattia": campi Dal/Al per registrare range di giorni
+       (crea automaticamente una registrazione per ogni giorno del periodo)
      - Filtri: per persona, tipo, periodo (Dal/Al), ricerca testo
      - Note fissate (pin) per evidenziare registrazioni importanti
      - Profilo collaboratore con cronologia e grafici
@@ -116,6 +118,8 @@
      - 7 tipi: Email formale, Comunicazione interna, Nota operativa,
        Rapporto evento, Risposta reclamo, Promemoria, Testo libero
      - 3 toni: Formale, Neutro, Informale
+     - 4 lunghezze: Automatica, Breve, Media, Dettagliata
+     - Bottone "Riprova" per rigenerare il testo
      - Supporto foto (modello vision)
      - L'AI conosce tutte le procedure del casino (80+ QM)
      - Nessun dato salvato (privacy completa)
@@ -262,14 +266,27 @@
   25. SICUREZZA
       - Autenticazione: password PBKDF2 (100k iterazioni, salt per operatore)
       - Token di sessione per ogni operatore (24h, generato al login)
+      - Sessione creata per TUTTI i flussi di login:
+        1. Login con password (verify_login RPC)
+        2. Login biometrico Face ID/Touch ID (create_bio_session RPC)
+        3. Auto-reconnessione al refresh pagina (create_bio_session RPC)
       - Tutte le query DB passano da RPC autenticate (secure_read/insert/update/delete)
-      - RLS (Row Level Security) attivo su TUTTE le tabelle:
-        chiave anon da sola = 0 risultati
+      - RLS (Row Level Security) deny_all_anon su TUTTE le tabelle:
+        chiave anon da sola = 0 risultati (verificato)
+      - Salvataggio impostazioni via upsert_impostazione RPC (INSERT ON CONFLICT UPDATE)
       - Note colleghi criptate AES-256-GCM nel database
+      - Realtime UPDATE handler: note nascoste rimosse dalla cache
       - Supabase Realtime via WebSocket (sostituisce polling)
       - Rate limiting login (5 tentativi / 30 secondi)
       - Sessioni invalidate al logout
       - Pulizia automatica: sessioni scadute + log > 12 mesi
+
+  25b. ANTEPRIMA PDF
+      - Tutti gli 11 bottoni PDF mostrano anteprima in modal prima del download
+      - Modal con iframe, titolo contestuale, bottone "Scarica PDF" e "Chiudi"
+      - Click fuori dal modal per chiudere
+      - Funziona su: Diario, Rapporto, Statistiche, Moduli, Scheda collaboratore,
+        Report settimanale/annuale, Maison (costi, clienti, lista), Spese Extra
 
   26. CONTROLLO DUPLICATI
       - Diario: blocca registrazioni identiche (nome+tipo+testo+oggi)
@@ -288,14 +305,18 @@
         Funzioni: Ricerca globale, Alert cassa, Alert rischio,
                   Compleanni maison, Template rapidi, Firma digitale,
                   QR Code, AI moduli
+      - Reparto Slots/Tavoli NON in visibilita (controllato solo da
+        assegnazione operatore nella sezione Operatori)
       - 4 opzioni per ogni voce:
         1. Tutti — visibile a tutti gli operatori
         2. Solo admin — solo chi accede con password master
         3. Operatori selezionati — checkboxes per scegliere operatori
            specifici (admin vede sempre)
         4. Nascosto — non visibile a nessuno
-      - Config salvata in impostazioni DB (chiave 'visibilita', JSON)
-      - Applicata automaticamente al login e al caricamento pagina
+      - Config salvata in impostazioni DB via RPC upsert_impostazione
+      - Applicata automaticamente al login, al refresh e al caricamento
+      - switchPage() blocca accesso a pagine nascoste (redirect a dashboard)
+      - Dashboard KPI, widget, ricerca globale, menu mobile: tutto rispetta isVis()
 
   22. IMPOSTAZIONI (ADMIN)
       - Gestione tipi di evento: aggiungere, rimuovere, cambiare colore
@@ -934,6 +955,8 @@
        - Piattaforme: Chrome, Firefox, Edge, Safari 16.4+ (PWA), Android
 
   [63] Face ID / Touch ID (WebAuthn) (15 marzo 2026)
+       (NOTA: aggiornato in [65] con sessione server per compatibilita RLS)
+
        - Sblocco biometrico al rientro nell'app (come WhatsApp)
        - WebAuthn API: registra credenziale platform al primo login
        - Rileva automaticamente: Face ID (iPhone X+), Touch ID (iPad/Mac),
@@ -947,6 +970,35 @@
        - Logout (Esci) NON cancella credenziale biometrica
        - Credenziale legata al dispositivo, non alla password
 
+
+  [64] Malattia Dal/Al + Anteprima PDF + Assistente migliorato (18 marzo 2026)
+       - Malattia: campi Dal/Al con Flatpickr per registrare range di giorni
+         (crea N registrazioni automatiche con controllo duplicati e conferma)
+       - Anteprima PDF: tutti gli 11 bottoni PDF mostrano preview in modal
+         prima del download (iframe + bottone Scarica + Chiudi)
+       - Assistente: selettore lunghezza (Breve/Media/Lunga/Auto),
+         bottone "Riprova" per rigenerare, stile coerente (rimosso gradiente)
+       - Tooltip su tutte le tab navigazione e badge notifiche
+       - Terminologia export unificata (CSV/PDF ovunque, rimosso "Scarica")
+       - 44 messaggi d'errore generici contestualizzati
+       - Font troppo piccoli su bottoni (.7rem/.68rem) portati a .78rem
+
+  [65] Sicurezza RLS completa + Fix sessioni (18 marzo 2026)
+       - RLS deny_all_anon attivato su TUTTE le tabelle (verificato con test REST)
+       - setImp: creata RPC upsert_impostazione (INSERT ON CONFLICT UPDATE)
+         perche il vecchio INSERT falliva su chiavi esistenti
+       - Login biometrico: creata RPC create_bio_session per generare token
+         sessione dopo verifica WebAuthn (prima non creava token → dati vuoti)
+       - Auto-reconnessione (refresh): aggiunto loadAll() + creazione token
+         (prima il refresh mostrava pagina autenticata ma senza dati)
+       - applicaVisibilita() spostato DOPO loadAll() nel login operatore
+         (prima veniva chiamato con visibilitaConfig vuota)
+       - switchPage() ora blocca accesso a pagine nascoste (redirect dashboard)
+       - Early page fix script: aggiunta whitelist pagine valide
+       - Realtime UPDATE handler: note nascoste rimosse dalla cache
+       - Rimosso Reparto Slots/Tavoli dalla sezione visibilita
+         (ridondante con assegnazione operatore, creava conflitti)
+       - Funzione diagnostica _diag_check() per verifica stato DB
 
 ================================================================================
   FILE DEL PROGETTO
@@ -967,6 +1019,20 @@
   icon-192.png            Icona PWA 192x192
   icon-512.png            Icona PWA 512x512
   migrate_push.sql        Migrazione: tabella push_subscriptions + RLS
+  migrate_realtime_encryption.sql  Realtime + RLS su note_colleghi
+  migrate_secure_all.sql  Sicurezza totale: operator_sessions, secure CRUD,
+                          RLS deny_all su tutte le tabelle
+  supabase/migrations/    Migrazioni gestite da Supabase CLI:
+    20260318_secure_all.sql         Sessioni + RPC sicure
+    20260319_realtime_encryption.sql Realtime + crittografia
+    20260320_letta_at.sql           Campo letta_at su note
+    20260321_cleanup_seven_dupes.sql Pulizia duplicati Seven
+    20260322_collaboratori_nascita.sql Data nascita collaboratori
+    20260323_enable_rls_all.sql     RLS deny_all su tutte le tabelle
+    20260324_fix_rls.sql            Fix policy RLS
+    20260325_upsert_impostazione.sql RPC upsert per impostazioni
+    20260326_diag_check.sql         Funzione diagnostica
+    20260327_create_bio_session.sql RPC sessione biometrica
   supabase/functions/     Supabase Edge Functions
     send-push/index.ts    Edge Function: invio push + registrazione subscription
   NOTE_PROGETTO.txt       Questo file
@@ -996,6 +1062,16 @@
   regali_maison           Regali per clienti maison (con importo opzionale)
   note_clienti            Note private per cliente maison
   push_subscriptions      Subscription Web Push per notifiche (RLS zero-access)
+  operator_sessions       Sessioni operatore con token (24h, RLS bloccato)
+
+  RPC principali:
+  - verify_login / verify_master_pwd    Login con password
+  - create_bio_session                  Sessione per login biometrico
+  - secure_read/insert/update/delete    CRUD autenticato (SECURITY DEFINER)
+  - upsert_impostazione                 Salvataggio impostazioni (INSERT ON CONFLICT)
+  - validate_op_session                 Verifica token sessione
+  - invalidate_op_session               Logout
+  - _diag_check                         Diagnostica stato DB
 
 
 ================================================================================
@@ -1014,10 +1090,12 @@
   - Sessione admin validata al reload, invalidata al logout (24h scadenza)
   - Credenziali Supabase offuscate (XOR, non in chiaro nel sorgente)
   - Chiave Groq API cifrata XOR nel DB, bloccata da RLS REST
-  - Row Level Security (RLS) su tabelle sensibili
-  - Operazioni auth via RPC server-side (SECURITY DEFINER)
+  - RLS deny_all_anon su TUTTE le tabelle (non solo sensibili)
+  - Tutte le operazioni via RPC server-side (SECURITY DEFINER)
   - pwd_hash, pwd_hash_v2, recovery_code, groq_api_key bloccati da RLS
-  - admin_sessions e login_attempts non accessibili via REST
+  - admin_sessions, operator_sessions, login_attempts non accessibili via REST
+  - Token sessione per tutti i flussi di login (password, biometrico, refresh)
+  - upsert_impostazione RPC per salvataggio affidabile impostazioni
   - SRI (Subresource Integrity) su tutti i 10 script/CSS CDN
   - Rate limiting anche su change_op_pwd, recovery_master_pwd
   - Push notifications: API secret (x-push-secret) + CORS ristretto
