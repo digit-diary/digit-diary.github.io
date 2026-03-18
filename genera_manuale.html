@@ -195,6 +195,7 @@ title('Nuova registrazione', 2);
 bullet('Inserire il nome del collaboratore (con autocomplete).');
 bullet('Selezionare il tipo di evento cliccando su uno dei tag colorati.');
 bullet('Per il tipo "Errore" appaiono campi aggiuntivi: Reparto, Importo e Valuta.');
+bullet('Per il tipo "Malattia" appaiono campi Dal/Al: specificando un periodo, il sistema crea automaticamente una registrazione per ogni giorno (con controllo duplicati e conferma).');
 bullet('Scrivere la descrizione dell\'evento.');
 bullet('Cliccare "Salva nel Diario" oppure premere Ctrl+Invio.');
 title('Filtri e ricerca', 2);
@@ -214,7 +215,7 @@ title('Profilo collaboratore', 2);
 para('Cliccando sul nome di un collaboratore si apre il suo profilo con: statistiche per tipo, grafico a ciambella e cronologia completa.');
 title('Esportazione', 2);
 bullet('CSV: esporta le registrazioni filtrate in formato CSV (apribile con Excel).');
-bullet('PDF: genera un PDF con tutte le registrazioni filtrate in formato tabellare.');
+bullet('PDF: mostra un\'anteprima del PDF con possibilita di scaricarlo. Tutti i PDF dell\'app funzionano cosi: prima anteprima, poi download.');
 
 // ===== 5. RAPPORTO =====
 title('5. RAPPORTO GIORNALIERO', 1);
@@ -329,10 +330,12 @@ para('L\'Assistente e un tool di scrittura assistita dall\'intelligenza artifici
 title('Utilizzo', 2);
 bullet('Scegliere il tipo di testo (es. Mail formale, Comunicazione di servizio).');
 bullet('Scegliere il tono (Formale, Cordiale, Diretto).');
+bullet('Scegliere la lunghezza desiderata (Automatica, Breve, Media, Dettagliata).');
 bullet('Scrivere il testo in modo veloce, anche come appunti.');
 bullet('Opzionale: allegare una foto per contesto.');
 bullet('Cliccare "Riscrivi con AI".');
 bullet('Il risultato appare nel campo sottostante, pronto per essere copiato.');
+bullet('Se il risultato non convince, cliccare "Riprova" per rigenerare.');
 tip('Nessun dato viene salvato. L\'Assistente e uno strumento di scrittura usa-e-getta.');
 
 // ===== 10. ALERT =====
@@ -394,18 +397,19 @@ title('Gestione Operatori (admin)', 2);
 bullet('Creare nuovi operatori con nome e password temporanea.');
 bullet('Rimuovere operatori.');
 bullet('Resettare password operatore.');
+bullet('Assegnare reparto (Slots / Tavoli / Entrambi): controlla quali dati vede l\'operatore e se puo switchare tra i due reparti.');
 title('Visibilita pagine e funzioni (admin)', 2);
 para('L\'admin puo controllare cosa vedono gli operatori:');
 para('Pagine configurabili: Rapporto, Note Colleghi, Statistiche, Moduli, Assistente, Consegna Turno, Promemoria, Costi Maison.');
 para('Funzioni configurabili: Ricerca globale, Alert cassa, Alert rischio, Compleanni maison, Template rapidi, Firma digitale, QR Code, AI (Genera + Migliora testo).');
-tip('Se una funzione viene nascosta, sparisce ovunque: tab, Dashboard, ricerca globale, banner alert.');
+tip('La visibilita dei reparti (Slots/Tavoli) e controllata dall\'assegnazione operatore, non dalla sezione visibilita. Se un operatore ha "Slots", vede solo dati Slots.');
 spacer(1);
 para('Per ogni voce ci sono 4 opzioni:');
 bullet('Tutti: visibile a tutti gli operatori.');
 bullet('Solo admin: visibile solo a chi accede come admin.');
 bullet('Operatori selezionati: spuntare i nomi degli operatori che possono vedere la funzione. L\'admin vede sempre.');
 bullet('Nascosto: non visibile a nessuno (neanche admin).');
-tip('La configurazione viene applicata immediatamente. Gli operatori vedranno le modifiche al prossimo caricamento della pagina.');
+tip('La configurazione viene applicata immediatamente e si riflette ovunque: tab, Dashboard, ricerca globale, menu mobile, banner alert. Le pagine nascoste non sono accessibili neanche digitando l\'URL.');
 title('Sicurezza', 2);
 bullet('Admin: pulsante per cambiare la password master.');
 bullet('Operatore: pulsante per cambiare la propria password.');
@@ -697,7 +701,7 @@ para('Cliccare "Password dimenticata?" nella schermata di login e inserire il co
 title('Posso usare l\'app offline?', 3);
 para('L\'app puo essere aperta offline se installata come PWA (la pagina viene caricata dalla cache). Tuttavia per leggere o scrivere dati serve la connessione internet (database cloud). I PDF generati possono essere salvati localmente.');
 title('I dati sono al sicuro?', 3);
-para('Si. Le password sono protette con PBKDF2 (100.000 iterazioni), le credenziali del database sono offuscate, le operazioni admin richiedono un token di sessione, e tutte le funzioni sensibili passano per RPC server-side protette. Il rate limiting blocca i tentativi di accesso non autorizzati.');
+para('Si. Le password sono protette con PBKDF2 (100.000 iterazioni), le credenziali del database sono offuscate, tutte le tabelle hanno Row Level Security (RLS) attivo con policy deny-all per accesso anonimo, e tutte le operazioni passano per RPC server-side autenticate con token di sessione. Il rate limiting blocca i tentativi di accesso non autorizzati. Ogni login (password, Face ID, refresh pagina) crea un token di sessione valido 24 ore.');
 title('Quanto costa l\'app?', 3);
 para('L\'app e completamente gratuita. Il hosting (GitHub Pages) e il database (Supabase piano free) non hanno costi. L\'AI (Groq) ha un piano gratuito sufficiente (~14.400 richieste al giorno).');
 title('Le firme digitali sono valide legalmente?', 3);
