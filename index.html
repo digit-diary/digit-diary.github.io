@@ -2981,7 +2981,7 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
   campi.forEach(c=>{const el=document.getElementById(cls+'-'+c.key);if(!el)return;const val=c.type==='number'?parseInt(el.value)||0:el.value;
     if(RAPPORTO_DB_COLS.includes(c.key))data[c.key]=val;else extra[c.key]=val});
   data.note_extra=JSON.stringify(extra);
-  try{const r=await fetch(SB_URL+'/rest/v1/rapporti_giornalieri?on_conflict=data_rapporto,turno,reparto_dip',{method:'POST',headers:sbH({'Prefer':'resolution=merge-duplicates,return=representation'}),body:JSON.stringify(data)}).then(r=>{if(!r.ok)throw new Error('save failed');return r.json()});if(!rapportiCache[ds])rapportiCache[ds]={};rapportiCache[ds][turno]=r[0];
+  try{const tk=getOpToken();const r=await sbRpc('upsert_rapporto',{p_token:tk,p_data:data});if(!r)throw new Error('Nessuna risposta');if(!rapportiCache[ds])rapportiCache[ds]={};rapportiCache[ds][turno]=r;
     // Auto-malattia: parse assenze field (supporta "fino al 27", "dal 20 al 27", "fino al 27/03")
     const assenzeText=data.assenze||'';if(assenzeText.trim()){const righe=assenzeText.split('\n').filter(r=>r.trim());
       for(const riga of righe){const m=riga.match(/^([A-ZÀ-Üa-zà-ü\s.'-]+?)\s*(assente|malattia|malato|malata)/i);if(m){const nome=capitalizzaNome(m[1].trim());
@@ -3603,12 +3603,14 @@ async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0
         const px=parseInt(row[1])||0;const costo=parseFloat(String(row[2]).replace(',','.'))||0;
         if(!px&&!costo)continue;
         if(!rawNome&&costo)continue;
-        const nomiRaw=rawNome.split(/\s*\/\s*/);const nNomi=nomiRaw.length;
+        const nomiRaw=rawNome.split(/\s*\/\s*/);
+        const nNomiNoSeven=nomiRaw.filter(n=>!/\bSeven\b|\(Se/i.test(n)).length;
+        const nNomi=nNomiNoSeven||nomiRaw.length;
         for(const nr of nomiRaw){
           const parsed=_parseMaisonNome(nr);if(!parsed.nome)continue;
           if(/\bSeven\b|\(Se/i.test(nr)){
             const seRec={beneficiario:parsed.nome,tipo:'cena_esterna',descrizione:'Ristorante Seven (da formulario)',
-              importo:Math.round(costo/nNomi*100)/100,data_spesa:dataGiornata,luogo:'Ristorante Seven',
+              importo:costo,data_spesa:dataGiornata,luogo:'Ristorante Seven',
               operatore:getOperatore(),reparto_dip:currentReparto};
             try{await secPost('spese_extra',seRec);totalRows++;sevenCount++}catch(e){}
             continue}
@@ -3743,7 +3745,9 @@ function renderMaisonDashboard(){const data=getMaisonFiltrati();
     ['chart-maison-trend','chart-maison-top','chart-maison-tipi'].forEach(function(id){if(charts[id]){charts[id].destroy();delete charts[id]}});return}
   // Gestione giorni per eliminazione
   const giorniDisp=[...new Set(data.map(r=>r.data_giornata))].sort();
-  let thtml='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h4 style="font-family:Playfair Display,serif;margin:0;color:var(--ink)">Dettaglio per cliente</h4><button class="btn-reset" onclick="toggleSezione(\'maison-table-inner\',this)" style="font-size:.92rem;padding:6px 16px">&#9650; Nascondi</button></div><div id="maison-table-inner"><div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px;flex-wrap:wrap"><select id="maison-del-giorno" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper);color:var(--ink)"><option value="">Seleziona giorno...</option>'+giorniDisp.map(d=>'<option value="'+d+'">'+new Date(d+'T12:00:00').toLocaleDateString('it-IT')+'</option>').join('')+'</select><button class="btn-act del" onclick="eliminaMaisonGiorno()" style="padding:5px 12px">Elimina giorno</button></div>';
+  const mesiDisp=[...new Set(data.map(r=>r.data_giornata.substring(0,7)))].sort();
+  const MESI_SHORT_M=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+  let thtml='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h4 style="font-family:Playfair Display,serif;margin:0;color:var(--ink)">Dettaglio per cliente</h4><button class="btn-reset" onclick="toggleSezione(\'maison-table-inner\',this)" style="font-size:.92rem;padding:6px 16px">&#9650; Nascondi</button></div><div id="maison-table-inner"><div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px;flex-wrap:wrap"><select id="maison-del-giorno" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper);color:var(--ink)"><option value="">Seleziona giorno...</option>'+giorniDisp.map(d=>'<option value="'+d+'">'+new Date(d+'T12:00:00').toLocaleDateString('it-IT')+'</option>').join('')+'</select><button class="btn-act del" onclick="eliminaMaisonGiorno()" style="padding:5px 12px">Elimina giorno</button><select id="maison-del-mese" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper);color:var(--ink)"><option value="">Seleziona mese...</option>'+mesiDisp.map(m=>'<option value="'+m+'">'+MESI_SHORT_M[parseInt(m.split('-')[1])-1]+' '+m.split('-')[0]+'</option>').join('')+'</select><button class="btn-act del" onclick="eliminaMaisonMese()" style="padding:5px 12px">Elimina mese</button></div>';
   thtml+='<table class="collab-table"><thead><tr><th>Cliente</th><th class="num">Visite</th><th class="num">Persone</th><th class="num">BU</th><th class="num">BL</th><th class="num">Totale CHF</th><th class="num">Media CHF</th><th></th></tr></thead><tbody>';
   const _brDash=getBudgetReparto();
   sorted.forEach(([nome,d],_idx)=>{
@@ -4086,6 +4090,15 @@ async function eliminaMaisonGiorno(){const sel=document.getElementById('maison-d
   if(!confirm('Eliminare tutte le '+count+' registrazioni del '+label+' ('+currentReparto+')?'))return;
   try{await secDel('costi_maison','data_giornata=eq.'+giorno+'&reparto_dip=eq.'+currentReparto);maisonCache=maisonCache.filter(r=>!(r.data_giornata===giorno&&(r.reparto_dip||'slots')===currentReparto));
     logAzione('Maison: eliminato giorno',label+' ('+count+' righe, '+currentReparto+')');renderMaisonDashboard();renderMaisonBudgetAlerts();toast('Giorno '+label+' eliminato')}catch(e){toast('Errore eliminazione giorno')}}
+async function eliminaMaisonMese(){const sel=document.getElementById('maison-del-mese');if(!sel||!sel.value){toast('Seleziona un mese');return}
+  const mese=sel.value;const meseStart=mese+'-01';const meseEnd=mese+'-31';
+  const label=MESI_FULL[parseInt(mese.split('-')[1])-1]+' '+mese.split('-')[0];
+  const count=getMaisonReparto().filter(r=>r.data_giornata>=meseStart&&r.data_giornata<=meseEnd).length;
+  if(!count){toast('Nessun dato per '+label);return}
+  if(!confirm('Eliminare tutte le '+count+' registrazioni di '+label+' ('+currentReparto+')?'))return;
+  try{await secDel('costi_maison','data_giornata=gte.'+meseStart+'&data_giornata=lte.'+meseEnd+'&reparto_dip=eq.'+currentReparto);
+    maisonCache=maisonCache.filter(r=>!(r.data_giornata>=meseStart&&r.data_giornata<=meseEnd&&(r.reparto_dip||'slots')===currentReparto));
+    logAzione('Maison: eliminato mese',label+' ('+count+' righe, '+currentReparto+')');renderMaisonDashboard();renderMaisonBudgetAlerts();toast(label+' eliminato ('+count+' righe)')}catch(e){toast('Errore eliminazione mese')}}
 
 // Budget
 function renderMaisonBudgetUI(){const el=document.getElementById('maison-budget-list');if(!el)return;
@@ -4283,14 +4296,15 @@ async function eliminaSpeseExtra(id){if(!confirm('Eliminare questa spesa?'))retu
     renderSpeseExtra();renderMaisonDashboard();toast('Eliminata')}catch(e){toast('Errore eliminazione spesa')}}
 function modificaSpeseExtra(id){const s=speseExtraCache.find(x=>x.id===id);if(!s)return;
   const b=document.getElementById('pwd-modal-content');
-  b.innerHTML='<h3>Modifica spesa extra</h3><div class="pwd-field"><label>Beneficiario</label><input type="text" id="edit-se-benef" value="'+escP(s.beneficiario)+'"></div><div class="pwd-field"><label>Luogo</label><input type="text" id="edit-se-luogo" value="'+escP(s.luogo||'')+'"></div><div class="pwd-field"><label>Importo CHF</label><input type="number" id="edit-se-importo" value="'+s.importo+'" step="0.01"></div><div class="pwd-field"><label>Descrizione</label><input type="text" id="edit-se-desc" value="'+escP(s.descrizione||'')+'"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaModificaSE('+id+')">Salva</button></div>';
+  b.innerHTML='<h3>Modifica spesa extra</h3><div class="pwd-field"><label>Beneficiario</label><input type="text" id="edit-se-benef" value="'+escP(s.beneficiario)+'"></div><div class="pwd-field"><label>Tipo</label><select id="edit-se-tipo" style="padding:10px;width:100%"><option value="cena_esterna"'+(s.tipo==='cena_esterna'?' selected':'')+'>Cena esterna</option><option value="pranzo_esterno"'+(s.tipo==='pranzo_esterno'?' selected':'')+'>Pranzo esterno</option><option value="rimborso"'+(s.tipo==='rimborso'?' selected':'')+'>Rimborso spese</option><option value="viaggio"'+(s.tipo==='viaggio'?' selected':'')+'>Viaggio</option><option value="biglietti"'+(s.tipo==='biglietti'?' selected':'')+'>Biglietti</option><option value="regalo"'+(s.tipo==='regalo'?' selected':'')+'>Regalo</option><option value="hotel"'+(s.tipo==='hotel'?' selected':'')+'>Hotel / Alloggio</option><option value="altro"'+(s.tipo==='altro'?' selected':'')+'>Altro</option></select></div><div class="pwd-field"><label>Luogo</label><input type="text" id="edit-se-luogo" value="'+escP(s.luogo||'')+'"></div><div class="pwd-field"><label>Importo CHF</label><input type="number" id="edit-se-importo" value="'+s.importo+'" step="0.01"></div><div class="pwd-field"><label>Descrizione</label><input type="text" id="edit-se-desc" value="'+escP(s.descrizione||'')+'"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaModificaSE('+id+')">Salva</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden')}
 async function salvaModificaSE(id){const benef=capitalizzaNome(document.getElementById('edit-se-benef').value.trim());
+  const tipo=document.getElementById('edit-se-tipo').value;
   const luogo=document.getElementById('edit-se-luogo').value.trim();const importo=parseFloat(document.getElementById('edit-se-importo').value)||0;
   const desc=document.getElementById('edit-se-desc').value.trim();
   if(!benef||!importo){toast('Compila beneficiario e importo');return}
-  try{await secPatch('spese_extra','id=eq.'+id,{beneficiario:benef,luogo,importo,descrizione:desc});
-    const s=speseExtraCache.find(x=>x.id===id);if(s){s.beneficiario=benef;s.luogo=luogo;s.importo=importo;s.descrizione=desc}
+  try{await secPatch('spese_extra','id=eq.'+id,{beneficiario:benef,tipo,luogo,importo,descrizione:desc});
+    const s=speseExtraCache.find(x=>x.id===id);if(s){s.beneficiario=benef;s.tipo=tipo;s.luogo=luogo;s.importo=importo;s.descrizione=desc}
     document.getElementById('pwd-modal').classList.add('hidden');renderSpeseExtra();toast('Modificata')}catch(e){toast('Errore modifica spesa')}}
 function getSpeseExtraFiltrate(){const fn=(document.getElementById('se-filt-nome')||{}).value||'';
   const ft=(document.getElementById('se-filt-tipo')||{}).value||'';
