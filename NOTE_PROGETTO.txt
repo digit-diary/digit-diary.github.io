@@ -1053,6 +1053,14 @@
        - Promemoria completati: mostra "Fatto da X il DD/MM" (gia presente)
        - Layout Dashboard: 5 widget (oggi, domani, alert, registrazioni, maison)
 
+  [70] Rinnovo automatico token sessione (18 marzo 2026)
+       - Quando il token scade (24h) o viene invalidato (altro login):
+         secGet rileva il fallimento, rinnova il token via create_bio_session,
+         e riprova la query automaticamente. L'utente non se ne accorge.
+       - visibilitychange (tab torna attivo): rinnova token prima di risincronizzare
+       - Risolve il problema della pagina vuota dopo inattivita prolungata
+       - Aggiunto meta mobile-web-app-capable (standard cross-browser)
+
 
 ================================================================================
   FILE DEL PROGETTO
