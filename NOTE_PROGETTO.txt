@@ -27,9 +27,13 @@
 
   Tecnologie utilizzate:
   - HTML/CSS/JavaScript (tutto in un unico file)
-  - Supabase REST API (database PostgreSQL cloud)
+  - Supabase REST API + RPC autenticate (database PostgreSQL cloud)
+  - Supabase Realtime (WebSocket per note istantanee)
+  - Supabase JS Client v2 (per Realtime)
+  - Web Crypto API: AES-256-GCM (crittografia note), PBKDF2 (password)
+  - RLS (Row Level Security) su tutte le tabelle
   - jsPDF + AutoTable (esportazione PDF)
-  - Chart.js (grafici statistiche)
+  - Chart.js (grafici statistiche + scheda collaboratore)
   - Flatpickr (calendario date)
   - Groq API (AI: llama-3.3-70b-versatile per testo,
     llama-3.2-90b-vision-preview per immagini)
@@ -67,14 +71,19 @@
      - Invio messaggi a uno o piu operatori contemporaneamente
      - Checkboxes per destinatari + opzione "Tutti"
      - Note multi-destinatario raggruppate per gruppo_id
-     - Notifiche in tempo reale (polling ogni 15 secondi)
+     - Supabase Realtime (WebSocket): notifiche istantanee (<1 secondo)
+     - Crittografia AES-256-GCM: messaggi criptati nel DB
      - Badge con contatore note non lette sul tab
-     - Popup automatico note non lette al login
+     - Popup automatico note non lette al login (segnate come lette automaticamente)
+     - Bottone "Rispondi" su ogni nota ricevuta + nel popup login
+     - Orario di lettura visibile al mittente (es. "Letta 18/03 14:30")
      - Modifica messaggio inviato (agisce su tutto il gruppo)
      - Annullamento invio (elimina per tutti i destinatari)
-     - Blocco modifica/annullamento quando la nota e stata letta
+     - Modifica/Annulla spariscono istantaneamente quando la nota viene letta
      - Eliminazione indipendente: mittente e destinatario gestiscono
        le proprie note separatamente
+     - Filtri Dal/Al con calendario per note ricevute e inviate
+     - Privacy: ogni operatore vede solo le proprie note (filtro server-side)
 
   4. STATISTICHE
      - Riepilogo: totale registrazioni, collaboratori, errori, malattie
@@ -157,12 +166,14 @@
 
   11. RICERCA GLOBALE
       - Barra di ricerca sopra i tab di navigazione
-      - Cerca contemporaneamente in: Diario, Moduli, Note, Registro
+      - Cerca contemporaneamente in: Diario, Moduli, Note, Maison, Promemoria, Spese Extra, Registro
       - Risultati raggruppati per sezione con badge colorati
       - Cliccando su un risultato si apre la sezione corrispondente
       - Ricerca in tempo reale (debounce 200ms, minimo 2 caratteri)
       - Si chiude con Escape o cliccando fuori
       - Nascondibile tramite impostazioni visibilita
+      - Privacy: note filtrate per operatore, registro solo admin
+      - Ogni sezione rispetta le impostazioni di visibilita (isVis)
 
   12. ALERT COLLABORATORE A RISCHIO
       - Banner viola quando un collaboratore ha 2+ allineamenti
@@ -200,6 +211,8 @@
   16. CONSEGNA TURNO
       - Passaggio consegne PRESTO/NOTTE tra supervisori
       - Destinatario specifico (auto-suggerito dal rapporto)
+      - Privacy: ogni operatore vede solo consegne proprie, destinate a lui, o "Tutti"
+      - Filtri Dal/Al con calendario
       - Popup al login, badge, modifica/annulla (come Note Colleghi)
 
   17. PROMEMORIA OPERATORI
@@ -209,7 +222,11 @@
   18. COSTI MAISON
       - Upload Excel formulario ristorante
       - Parsing: splitta /, estrae BU/BL, nomi simili (Levenshtein)
-      - Import intelligente (salta giorni esistenti)
+      - Split nomi condivisi: "Bertaggia/Pegoraro" → costo diviso a meta
+        con tooltip e badge ÷2, gestione elimina/rinomina condivisi
+      - Import intelligente (salta giorni esistenti, controllo duplicati,
+        pulizia Seven su reimport)
+      - Controllo duplicati su inserimento manuale
       - Statistiche, grafici, filtri, export CSV/PDF
       - Scheda clienti: categoria Maison/Full Maison, budget, nascita
       - Alert compleanni (prossimi 7 giorni)
@@ -226,6 +243,42 @@
   20. ALERT AMMONIMENTI VERBALI
       - 2+ ammonimenti verbali → banner "Preparare allineamento"
       - Scompare dopo creazione allineamento
+
+  24. SCHEDA COLLABORATORE
+      - Click su qualsiasi nome nell'app apre il profilo completo
+      - 8 KPI: registrazioni, errori+costo, malattie, ammonimenti,
+        allineamenti, apprezzamenti, rapporto positivo/negativo
+      - Grafico trend mensile (errori vs apprezzamenti, 6 mesi)
+      - Confronto mese corrente vs precedente (+/-% errori)
+      - Percorso disciplinare visuale (ammonimenti → allineamenti → RDI)
+      - Suggerimenti automatici:
+        "Preparare allineamento" / "Valutare RDI" / "Candidato per premio"
+      - Pattern malattia (distribuzione giorni settimana, flag lun/ven)
+      - Timeline completa con filtro Dal/Al
+      - Stampa PDF della scheda con filtro date opzionale
+      - Data di nascita collaboratore + alert compleanno
+      - Confronto tra 2-3 collaboratori con grafici sovrapposti
+
+  25. SICUREZZA
+      - Autenticazione: password PBKDF2 (100k iterazioni, salt per operatore)
+      - Token di sessione per ogni operatore (24h, generato al login)
+      - Tutte le query DB passano da RPC autenticate (secure_read/insert/update/delete)
+      - RLS (Row Level Security) attivo su TUTTE le tabelle:
+        chiave anon da sola = 0 risultati
+      - Note colleghi criptate AES-256-GCM nel database
+      - Supabase Realtime via WebSocket (sostituisce polling)
+      - Rate limiting login (5 tentativi / 30 secondi)
+      - Sessioni invalidate al logout
+      - Pulizia automatica: sessioni scadute + log > 12 mesi
+
+  26. CONTROLLO DUPLICATI
+      - Diario: blocca registrazioni identiche (nome+tipo+testo+oggi)
+        Avvisa se stesso nome+tipo gia registrato oggi
+        Suggerisce allineamento se 2+ ammonimenti verbali
+      - Maison manuale: avvisa se stesso nome+data gia presente
+      - Spese Extra: avvisa se stesso beneficiario+data+importo
+      - Import Excel: segnala duplicati nello stesso foglio
+      - Import Seven: cancella vecchi prima di reinserire
 
   21. VISIBILITA PAGINE E FUNZIONI
       - Sezione in Impostazioni (solo admin)
