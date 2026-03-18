@@ -1167,8 +1167,11 @@ async function checkPwd(){const nome=document.getElementById('login-nome').value
   // Try individual operator login first
   if(nome){const opH=await secureHash(v,nome);const res=await sbRpc('verify_login',{p_nome:nome,p_hash:opH,p_legacy_hash:legacyH});
     if(res&&res.locked){err.textContent='Troppi tentativi. Riprova tra 1 minuto';return}
-    if(res&&res.valid){_loginFailCount=0;localStorage.setItem('operatore_corrente',nome);localStorage.setItem('diario_auth_ts',String(Date.now()));sessionStorage.setItem('bio_verified','1');sessionStorage.setItem('session_active','1');sessionStorage.setItem('diario_auth','1');sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token');if(res.session_token)setOpToken(res.session_token);document.getElementById('login-overlay').classList.add('hidden');document.getElementById('operatore-display').textContent='Operatore: '+nome;applicaTemaOperatore();applicaVisibilita();registraPushSubscription();
+    if(res&&res.valid){_loginFailCount=0;localStorage.setItem('operatore_corrente',nome);localStorage.setItem('diario_auth_ts',String(Date.now()));sessionStorage.setItem('bio_verified','1');sessionStorage.setItem('session_active','1');sessionStorage.setItem('diario_auth','1');sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token');if(res.session_token)setOpToken(res.session_token);document.getElementById('login-overlay').classList.add('hidden');document.getElementById('operatore-display').textContent='Operatore: '+nome;
+      var loginSettore=document.getElementById('login-settore');if(loginSettore&&loginSettore.value)currentReparto=loginSettore.value;
+      applicaTemaOperatore();registraPushSubscription();
       await loadAll();_initNoteRealtime();
+      applicaVisibilita();
       switchPage('diario');renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();aggiornaNoteBadge();aggiornaPromemoriaBadge();aggiornaConsegnaBadge();renderDashboard();checkCompleanniBanner();
       if(res.deve_cambiare_pwd)setTimeout(()=>forzaCambioPwdOperatore(nome),300);
       else{setTimeout(()=>mostraNoteNonLette(),500);setTimeout(()=>mostraPromemoriaLogin(),1200);setTimeout(()=>mostraConsegnaLogin(),1800);setTimeout(checkQrHash,800);setTimeout(()=>offriBiometrico(),600)}return}
