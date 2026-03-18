@@ -1060,9 +1060,20 @@
        - visibilitychange (tab torna attivo): rinnova token prima di risincronizzare
        - Risolve il problema della pagina vuota dopo inattivita prolungata
        - Aggiunto meta mobile-web-app-capable (standard cross-browser)
-       - Health check silenzioso all'avvio: verifica Supabase, librerie CDN
-         (jsPDF, Chart.js, Flatpickr, XLSX), API Groq, token sessione, dati.
+       - Health check silenzioso all'avvio (solo dopo login): verifica
+         librerie CDN, API Groq, token sessione, dati caricati.
          Se tutto OK → silenzio. Se problema → toast avviso + log console.
+       - Stato Database per admin nelle impostazioni:
+         barra progresso spazio usato / 500 MB con percentuale,
+         card per ogni tabella con righe + dimensione (ordinate per peso),
+         "Di cui dati reali: X MB" separato dall'overhead PostgreSQL,
+         sessioni attive. Bottone "Verifica stato" on demand.
+       - Verifica nomi anti-doppioni su diario, moduli, maison, regali, spese:
+         se il nome non esiste, suggerisce nome simile (Levenshtein) o
+         chiede di aggiungere alla lista collaboratori.
+       - Fix create_bio_session: preserva is_admin nel rinnovo token.
+       - Stima autonomia piano free: ~15-20 anni uso intenso (~2-3 MB/mese
+         a regime pieno con 7 operatori, 487 MB disponibili).
 
 
 ================================================================================
