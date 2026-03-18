@@ -146,8 +146,8 @@ doc.text('INDICE', pw/2, y, {align:'center'});
 y += 12;
 // Salvo posizione per riempire dopo
 const tocY = y;
-// Lascio 2 pagine per l'indice
-addFooter();newPage();addFooter();newPage();
+// Lascio 3 pagine per l'indice
+addFooter();newPage();addFooter();newPage();addFooter();newPage();
 
 // ===== 1. ACCESSO =====
 title('1. ACCESSO ALL\'APPLICAZIONE', 1);
@@ -718,6 +718,7 @@ addFooter();
 doc.setPage(tocPageStart);
 let ty = tocY;
 doc.setTextColor(0);
+let tocExtraPage = 0;
 tocEntries.forEach(function(entry){
   if(entry.level === 1){
     doc.setFont('helvetica','bold');doc.setFontSize(10);
@@ -741,8 +742,8 @@ tocEntries.forEach(function(entry){
     ty += 5;
   }
   if(ty > ph - 25){
-    // Prossima pagina indice
-    doc.setPage(tocPageStart + 1);
+    tocExtraPage++;
+    doc.setPage(tocPageStart + tocExtraPage);
     ty = 20;
   }
 });
