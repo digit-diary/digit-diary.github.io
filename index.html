@@ -748,6 +748,25 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
         <div class="field"><label>Descrizione (opzionale)</label><textarea id="pm-descrizione" placeholder="Dettagli aggiuntivi..." style="min-height:60px"></textarea></div>
         <div class="field"><label>Assegnato a</label><select id="pm-assegnato" style="padding:11px 14px"><option value="tutti">Tutti gli operatori</option></select></div>
       </div>
+      <div class="form-row">
+        <div class="field"><label>Ricordami</label>
+          <select id="pm-remind" style="padding:11px 14px">
+            <option value="0">Il giorno della scadenza</option>
+            <option value="1" selected>1 giorno prima</option>
+            <option value="3">3 giorni prima</option>
+            <option value="7">1 settimana prima</option>
+          </select>
+        </div>
+        <div class="field"><label>Ora promemoria</label>
+          <select id="pm-remind-ora" style="padding:11px 14px">
+            <option value="08:00">08:00 (inizio turno PRESTO)</option>
+            <option value="10:00">10:00</option>
+            <option value="14:00">14:00</option>
+            <option value="18:00">18:00 (inizio turno NOTTE)</option>
+            <option value="20:00">20:00</option>
+          </select>
+        </div>
+      </div>
       <button class="btn-salva" onclick="salvaPromemoria()">Crea promemoria</button>
     </div>
   </div>
@@ -3510,8 +3529,15 @@ async function salvaPromemoria(){const titolo=document.getElementById('pm-titolo
   const scadenza=document.getElementById('pm-scadenza').value;
   const descrizione=document.getElementById('pm-descrizione').value.trim();
   const assegnato=document.getElementById('pm-assegnato').value;
-  if(!titolo){toast('Inserisci un titolo');return}if(!scadenza){toast('Seleziona una data di scadenza');return}
-  try{const rec={titolo,descrizione,data_scadenza:scadenza,assegnato_a:assegnato,creato_da:getOperatore()};
+  const remindGiorni=parseInt((document.getElementById('pm-remind')||{}).value)||0;
+  const remindOra=(document.getElementById('pm-remind-ora')||{}).value||'08:00';
+  if(!titolo){toast('Inserisci un titolo');_highlightField('pm-titolo');return}if(!scadenza){toast('Seleziona una data di scadenza');_highlightField('pm-scadenza');return}
+  // Calcola data promemoria effettiva
+  const dScad=new Date(scadenza+'T12:00:00');dScad.setDate(dScad.getDate()-remindGiorni);
+  const dataRemind=dScad.getFullYear()+'-'+String(dScad.getMonth()+1).padStart(2,'0')+'-'+String(dScad.getDate()).padStart(2,'0');
+  const remindLabel=remindGiorni===0?'il giorno stesso alle '+remindOra:remindGiorni+' giorno/i prima alle '+remindOra;
+  const descFull=descrizione+(descrizione?'\n':'')+'Promemoria: '+remindLabel;
+  try{const rec={titolo,descrizione:descFull,data_scadenza:scadenza,assegnato_a:assegnato,creato_da:getOperatore()};
     const r=await secPost('promemoria',rec);promemoriaCache.push(r[0]);promemoriaCache.sort((a,b)=>a.data_scadenza.localeCompare(b.data_scadenza));
     document.getElementById('pm-titolo').value='';document.getElementById('pm-descrizione').value='';
     const fp=document.getElementById('pm-scadenza');if(fp&&fp._flatpickr)fp._flatpickr.clear();else fp.value='';
@@ -3760,7 +3786,7 @@ function renderMaisonDashboard(){const data=getMaisonFiltrati();
   const fd=(document.getElementById('maison-filt-dal')||{}).value,fa=(document.getElementById('maison-filt-al')||{}).value;
   let periodoLabel='';
   if(fd&&fa){periodoLabel=new Date(fd+'T12:00:00').toLocaleDateString('it-IT')+' — '+new Date(fa+'T12:00:00').toLocaleDateString('it-IT')}
-  else if(data.length){const mesi=new Set(data.map(r=>{const d=new Date(r.data_giornata+'T12:00:00');return MESI_FULL[d.getMonth()]+' '+d.getFullYear()}));periodoLabel=[...mesi].join(', ')}
+  else if(data.length){const _mesiMap={};data.forEach(r=>{const d=new Date(r.data_giornata+'T12:00:00');const label=MESI_FULL[d.getMonth()]+' '+d.getFullYear();const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');_mesiMap[key]=label});periodoLabel=Object.keys(_mesiMap).sort().map(k=>_mesiMap[k]).join(', ')}
   // Month comparison
   const oggi=new Date();const meseCorr=oggi.getFullYear()+'-'+String(oggi.getMonth()+1).padStart(2,'0');
   const mesePrecDate=new Date(oggi.getFullYear(),oggi.getMonth()-1,1);
