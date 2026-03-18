@@ -1201,7 +1201,28 @@ async function loadAll(){
   _loadLogo();
   // Pulizia automatica: sessioni scadute + log > 12 mesi
   sbRpc('cleanup_old_data').catch(()=>{});
+  // Health check silenzioso
+  _healthCheck();
 }
+async function _healthCheck(){const problems=[];
+  // 1. Supabase connessione
+  try{const r=await fetch(SB_URL+'/rest/v1/',{headers:{apikey:SB_KEY},method:'HEAD'});
+    if(!r.ok)problems.push('Database Supabase non raggiungibile')}catch(e){problems.push('Connessione database assente')}
+  // 2. Librerie CDN
+  if(!window.jspdf&&!document.querySelector('script[src*="jspdf"]'))problems.push('Libreria PDF (jsPDF) non caricata');
+  if(!window.Chart)problems.push('Libreria grafici (Chart.js) non caricata');
+  if(!window.flatpickr)problems.push('Libreria calendario (Flatpickr) non caricata');
+  if(!window.XLSX)problems.push('Libreria Excel (XLSX) non caricata');
+  // 3. Groq AI (solo se configurata)
+  if(groqKey){try{const r=await fetch('https://api.groq.com/openai/v1/models',{headers:{'Authorization':'Bearer '+groqKey}});
+    if(!r.ok)problems.push('API Groq AI non risponde (chiave scaduta?)')}catch(e){problems.push('API Groq AI non raggiungibile')}}
+  // 4. Token sessione
+  const tk=getOpToken();if(!tk)problems.push('Nessun token sessione attivo');
+  // 5. Dati caricati
+  if(!datiCache.length&&!maisonCache.length&&!collaboratoriCache.length)problems.push('Nessun dato caricato (verifica connessione)');
+  // Mostra avviso solo se ci sono problemi
+  if(problems.length){console.warn('Health check:',problems);
+    toast('Attenzione: '+problems[0])}}
 
 // PASSWORD
 async function checkPwd(){const nome=document.getElementById('login-nome').value.trim(),v=document.getElementById('pwd-input').value,err=document.getElementById('login-error');
