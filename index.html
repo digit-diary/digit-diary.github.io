@@ -1184,7 +1184,7 @@ async function eseguiForzaCambioPwdOp(nome){const p1=document.getElementById('op
   toast('Password personale impostata!')}catch(e){err.textContent='Errore salvataggio'}}
 function esci(){const tk=getOpToken()||getAdminToken();if(tk){sbRpc('invalidate_op_session',{p_token:tk}).catch(()=>{});sbRpc('invalidate_admin_session',{p_token:tk}).catch(()=>{})}
   // Pulisci TUTTO: sessione, operatore, pagina, cache
-  localStorage.removeItem('diario_auth_ts');localStorage.removeItem('pagina_corrente');
+  localStorage.removeItem('diario_auth_ts');localStorage.removeItem('pagina_corrente');localStorage.removeItem('operatore_corrente');
   sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token');sessionStorage.removeItem('op_token');sessionStorage.removeItem('diario_auth');sessionStorage.removeItem('session_active');sessionStorage.removeItem('bio_verified');sessionStorage.removeItem('note_popup_shown');
   // Svuota cache in memoria
   noteColleghiCache=[];datiCache=[];moduliCache=[];logCache=[];maisonCache=[];promemoriaCache=[];consegneCache=[];speseExtraCache=[];regaliCache=[];noteClientiCache=[];scadenzeCache=[];
