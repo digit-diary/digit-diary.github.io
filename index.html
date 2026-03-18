@@ -1273,10 +1273,18 @@ async function tentaBiometrico(){var ok=await loginBiometrico();if(ok){
   var expectedOp=localStorage.getItem('operatore_corrente');
   if(expectedOp&&stored.op!==expectedOp){toast('Credenziale non valida per questo operatore');return}
   localStorage.setItem('diario_auth_ts',String(Date.now()));localStorage.setItem('operatore_corrente',stored.op);sessionStorage.setItem('bio_verified','1');sessionStorage.setItem('session_active','1');
+  // Crea sessione server per il login biometrico
+  var bioSession=await sbRpc('create_bio_session',{p_nome:stored.op});
+  if(bioSession&&bioSession.session_token){setOpToken(bioSession.session_token)}
+  else{var bioH=await secureHash('__bio_fallback__',stored.op);var bioRes=await sbRpc('verify_login',{p_nome:stored.op,p_hash:bioH,p_legacy_hash:null});
+    if(bioRes&&bioRes.session_token)setOpToken(bioRes.session_token)}
+  var loginSettore=document.getElementById('login-settore');if(loginSettore&&loginSettore.value)currentReparto=loginSettore.value;
   document.getElementById('login-overlay').classList.add('hidden');
   document.getElementById('operatore-display').textContent='Operatore: '+stored.op;
-  applicaTemaOperatore();applicaVisibilita();registraPushSubscription();
-  renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();aggiornaNoteBadge();aggiornaPromemoriaBadge();aggiornaConsegnaBadge();renderDashboard();checkCompleanniBanner();
+  applicaTemaOperatore();registraPushSubscription();
+  await loadAll();_initNoteRealtime();
+  applicaVisibilita();
+  switchPage('diario');renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();aggiornaNoteBadge();aggiornaPromemoriaBadge();aggiornaConsegnaBadge();renderDashboard();checkCompleanniBanner();
   // Controlla se admin ha resettato la password → forza cambio
   var _dcCheck=await sbRpc('check_deve_cambiare',{p_nome:stored.op});
   if(_dcCheck&&_dcCheck.deve_cambiare_pwd){setTimeout(()=>forzaCambioPwdOperatore(stored.op),300)}
