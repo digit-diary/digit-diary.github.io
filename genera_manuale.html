@@ -45,7 +45,8 @@ function title(text, level){
     y += 16;
     tocEntries.push({text, page: pageNum, level: 1});
   } else if(level === 2){
-    checkPage(16);
+    y += 4;
+    checkPage(20);
     doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(26,18,8);
     doc.text(text,mx,y);
     doc.setDrawColor(192,57,43);doc.setLineWidth(0.5);
@@ -53,7 +54,8 @@ function title(text, level){
     y += 7;
     tocEntries.push({text, page: pageNum, level: 2});
   } else {
-    checkPage(12);
+    y += 3;
+    checkPage(14);
     doc.setFont('helvetica','bold');doc.setFontSize(9.5);doc.setTextColor(139,105,20);
     doc.text(text,mx,y);
     y += 5.5;
