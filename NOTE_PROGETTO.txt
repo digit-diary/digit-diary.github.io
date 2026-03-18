@@ -1000,6 +1000,50 @@
          (ridondante con assegnazione operatore, creava conflitti)
        - Funzione diagnostica _diag_check() per verifica stato DB
 
+  [66] Rapporto + Import Maison + Assenze intelligenti (18 marzo 2026)
+       - Rapporto giornaliero: salvataggio via secPatch/secPost (fix RLS)
+         Constraint UNIQUE aggiornato a (data_rapporto, turno, reparto_dip)
+       - Import Maison Seven: tutto in spese_extra diviso tra clienti
+         bertaggia/pegoraro (seven) 1244 → 622+622 in spese_extra
+         bertaggia (seven) 200 → 200 in spese_extra
+       - Cancella mese: selettore mese + bottone "Elimina mese"
+       - Modifica tipo spese extra: selettore tipo nel form modifica
+       - Sposta voci: bottone "→ Extra" e "→ Maison" nel dettaglio cliente
+       - Aggiornamento automatico UI dopo import Excel
+       - Assenze intelligenti nel rapporto giornaliero:
+         "Tonati assente" → trova "Tonati Edoardo" automaticamente
+         "Tonati x1", "Rossi r2", "Bianchi c0" → codici turno riconosciuti
+         "Tonati assente fino al 27" → range di giorni
+         Duplicati: se malattia gia registrata per quella data, salta
+       - Match nomi fuzzy (Levenshtein max 2 errori):
+         "Tonoti -100" → corregge in "Tonati Edoardo" con toast di avviso
+         Usato sia per differenze cassa che per assenze
+
+  [67] UX migliorata (18 marzo 2026)
+       - Consegna turno smart: pre-seleziona destinatario dal rapporto
+         PRESTO → suggerisce supervisore NOTTE, NOTTE → supervisore PRESTO
+       - Consegne: lettura automatica (come le note, rimosso "Ho letto")
+       - Filtri diario persistenti in localStorage
+       - Highlight campi obbligatori vuoti (bordo rosso + animazione)
+       - Ctrl+Invio per salvare in: Diario, Note, Consegna, Assistente
+       - Grafico Maison con giorno settimana ("Sab 14/02")
+       - Grafico top clienti: tutti i nomi visibili (autoSkip disabilitato)
+       - Mesi ordinati cronologicamente ovunque (Gen → Feb → Mar)
+       - Promemoria con reminder: giorno stesso / 1-3-7 giorni prima
+         + selettore ora (08:00, 10:00, 14:00, 18:00, 20:00)
+
+  [68] Notifiche in-app con banner animato e suono (18 marzo 2026)
+       - Banner colorato che scende dall'alto con animazione CSS:
+         Blu per note colleghi, viola per consegne, arancione per promemoria
+       - Suono breve (880Hz sine wave via Web Audio API)
+         Rispetta il silenzioso del dispositivo
+       - Click sul banner → apre la sezione corrispondente
+       - Bottone X per chiudere, auto-chiusura dopo 6 secondi
+       - Responsive: su mobile il banner occupa tutta la larghezza
+       - Attivato per: nota in tempo reale (WebSocket),
+         consegna al login, promemoria scaduti al login
+
+
 ================================================================================
   FILE DEL PROGETTO
 ================================================================================
@@ -1033,6 +1077,9 @@
     20260325_upsert_impostazione.sql RPC upsert per impostazioni
     20260326_diag_check.sql         Funzione diagnostica
     20260327_create_bio_session.sql RPC sessione biometrica
+    20260328_upsert_rapporto.sql   RPC upsert rapporto giornaliero
+    20260329_fix_rapporto_constraint.sql  UNIQUE con reparto_dip
+    20260330_fix_upsert_rapporto.sql  Fix cast note_extra JSONB
   supabase/functions/     Supabase Edge Functions
     send-push/index.ts    Edge Function: invio push + registrazione subscription
   NOTE_PROGETTO.txt       Questo file
