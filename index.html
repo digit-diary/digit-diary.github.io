@@ -608,6 +608,14 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
         <div class="field"><label>Tipo evento</label><div class="tipo-tags" id="form-tipo-tags"></div></div>
       </div>
       <div class="field" style="margin-bottom:16px"><label>Descrizione <small style="color:var(--muted);font-weight:300;text-transform:none;letter-spacing:0;font-size:.75rem">Ctrl+Invio per salvare</small></label><textarea id="inp-testo" placeholder="Descrivi brevemente l'evento..."></textarea></div>
+      <div id="malattia-extra-row" style="margin-bottom:16px;display:none">
+        <div class="form-row" style="grid-template-columns:1fr 1fr auto;gap:10px;align-items:flex-end">
+          <div class="field"><label>Dal</label><input type="text" id="inp-mal-dal" placeholder="Seleziona..." readonly style="cursor:pointer"></div>
+          <div class="field"><label>Al</label><input type="text" id="inp-mal-al" placeholder="Seleziona..." readonly style="cursor:pointer"></div>
+          <div class="field"><label style="visibility:hidden">x</label><button class="btn-reset" onclick="resetMalFiltri()" style="padding:8px 14px">Reset</button></div>
+        </div>
+        <p style="color:var(--muted);font-size:.78rem;margin-top:6px">Se specifichi un periodo, verrà creata una registrazione per ogni giorno</p>
+      </div>
       <div id="errore-extra-row" style="margin-bottom:16px;display:none">
         <div class="form-row" style="grid-template-columns:auto auto auto auto;gap:10px;align-items:flex-end">
           <div class="field"><label>Reparto</label><select id="inp-reparto"><option value="">—</option><option>Cassa</option><option>Sala</option><option>Rec</option><option>Guardaroba</option><option>Clientela</option><option>Staff</option><option>Altro</option></select></div>
@@ -1427,6 +1435,7 @@ function renderTipiUI(){const tutti=getTuttiTipi();
   document.getElementById('form-tipo-tags').innerHTML=tutti.map(t=>'<button class="tipo-tag'+(tipoSelezionato===t.nome?' active':'')+'" data-tipo="'+esc(t.nome)+'" style="'+(tipoSelezionato===t.nome?'background:'+t.colore+';border-color:'+t.colore:'')+'">'+esc(t.nome)+'</button>').join('');
   document.getElementById('form-tipo-tags').querySelectorAll('.tipo-tag').forEach(b=>{b.onclick=()=>{tipoSelezionato=b.dataset.tipo;renderTipiUI()}});
   const errRow=document.getElementById('errore-extra-row');if(errRow)errRow.style.display=tipoSelezionato===nomeCorrente('Errore')?'block':'none';
+  const malRow=document.getElementById('malattia-extra-row');if(malRow){malRow.style.display=tipoSelezionato===nomeCorrente('Malattia')?'block':'none';_initMalFlatpickr()}
   const fs=document.getElementById('filt-tipo');if(fs){const cv=fs.value;fs.innerHTML='<option value="">Tutti</option>'+tutti.map(t=>'<option'+(t.nome===cv?' selected':'')+'>'+esc(t.nome)+'</option>').join('')}
   document.getElementById('modal-tipo-tags').innerHTML=tutti.map(t=>'<button class="modal-tipo-tag'+(modalTipoSel===t.nome?' selected':'')+'" data-tipo="'+esc(t.nome)+'" style="'+(modalTipoSel===t.nome?'background:'+t.colore+';border-color:'+t.colore:'')+'">'+esc(t.nome)+'</button>').join('');
   document.getElementById('modal-tipo-tags').querySelectorAll('.modal-tipo-tag').forEach(b=>{b.onclick=()=>{modalTipoSel=b.dataset.tipo;renderTipiUI()}});
@@ -1445,9 +1454,32 @@ function toast(m){const t=document.getElementById('toast');t.textContent=m;t.cla
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}
 function escP(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 
+// MALATTIA DAL/AL
+let _malFpInit=false;
+function _initMalFlatpickr(){if(_malFpInit||!window.flatpickr)return;_malFpInit=true;
+  const o={locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false};
+  flatpickr('#inp-mal-dal',o);flatpickr('#inp-mal-al',o)}
+function resetMalFiltri(){['inp-mal-dal','inp-mal-al'].forEach(id=>{const el=document.getElementById(id);if(el){el.value='';if(el._flatpickr)el._flatpickr.clear()}})}
 // CORE CRUD
 async function salva(){const nome=capitalizzaNome(document.getElementById('inp-nome').value.trim()),testo=document.getElementById('inp-testo').value.trim();if(!nome){toast('Inserisci il nome');return}if(!testo){toast('Scrivi una descrizione');return}
   const importo=parseFloat(document.getElementById('inp-importo').value)||0;const valuta=importo?document.getElementById('inp-valuta').value:'';const reparto=document.getElementById('inp-reparto').value;
+  // Malattia con range Dal/Al → crea registrazione per ogni giorno
+  if(tipoSelezionato===nomeCorrente('Malattia')){
+    const malDal=(document.getElementById('inp-mal-dal')||{}).value;
+    const malAl=(document.getElementById('inp-mal-al')||{}).value;
+    if(malDal&&malAl&&malDal<=malAl){
+      const dInizio=new Date(malDal+'T12:00:00'),dFine=new Date(malAl+'T12:00:00');
+      const nGiorni=Math.round((dFine-dInizio)/(86400000))+1;
+      if(!confirm(nome+': registrare '+nGiorni+' giorni di malattia dal '+dInizio.toLocaleDateString('it-IT')+' al '+dFine.toLocaleDateString('it-IT')+'?'))return;
+      let creati=0;
+      for(let d=new Date(dInizio);d<=dFine;d.setDate(d.getDate()+1)){
+        const dStr=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+        const esiste=datiCache.find(e=>e.nome.toLowerCase()===nome.toLowerCase()&&e.tipo===nomeCorrente('Malattia')&&e.data.startsWith(dStr));
+        if(!esiste){const rec={id:Date.now()+creati,nome,tipo:tipoSelezionato,testo:testo+' (dal '+dInizio.toLocaleDateString('it-IT')+' al '+dFine.toLocaleDateString('it-IT')+')',data:dStr+'T08:00:00.000Z',operatore:getOperatore(),reparto_dip:currentReparto};
+          try{await secPost('registrazioni',rec);datiCache.unshift(rec);creati++}catch(e){}}}
+      if(!collaboratoriCache.find(c=>c.nome.toLowerCase()===nome.toLowerCase())){try{const cr=await secPost('collaboratori',{nome,attivo:true});collaboratoriCache.push(cr[0])}catch(e2){}}
+      document.getElementById('inp-testo').value='';resetMalFiltri();
+      logAzione('Malattia range',nome+' — '+creati+' giorni');toast(nome+': '+creati+' giorni malattia registrati');aggiornaNomi();render();updateStats();return}}
   // Controllo duplicati: stesso nome + stesso tipo + oggi
   const oggi=new Date().toISOString().split('T')[0];
   const dupExact=getDatiReparto().find(e=>e.nome.toLowerCase()===nome.toLowerCase()&&e.tipo===tipoSelezionato&&e.testo===testo&&e.data.startsWith(oggi));
