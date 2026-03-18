@@ -3804,7 +3804,8 @@ function renderMaisonCharts(data,sorted){
   // Trend giornaliero
   const byDay={};data.forEach(r=>{byDay[r.data_giornata]=(byDay[r.data_giornata]||0)+parseFloat(r.costo||0)});
   const days=Object.keys(byDay).sort();
-  renderChart('chart-maison-trend','line',{labels:days.map(d=>new Date(d+'T12:00:00').toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit'})),datasets:[{label:'Spesa CHF',data:days.map(d=>byDay[d]),borderColor:'#b8860b',backgroundColor:'rgba(184,134,11,0.15)',fill:true,tension:0.3,pointRadius:4}]},{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}});
+  const _giorniAbbr=['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
+  renderChart('chart-maison-trend','line',{labels:days.map(d=>{const dt=new Date(d+'T12:00:00');return _giorniAbbr[dt.getDay()]+' '+dt.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit'})}),datasets:[{label:'Spesa CHF',data:days.map(d=>byDay[d]),borderColor:'#b8860b',backgroundColor:'rgba(184,134,11,0.15)',fill:true,tension:0.3,pointRadius:4}]},{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}});
   // Top clienti
   const top15=sorted.slice(0,15);
   renderChart('chart-maison-top','bar',{labels:top15.map(c=>c[0]),datasets:[{label:'CHF',data:top15.map(c=>c[1].tot),backgroundColor:'rgba(184,134,11,0.7)',borderRadius:4}]},{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true}}});
@@ -3865,9 +3866,9 @@ function apriDettaglioMaison(nome){const righe=getMaisonFiltrati().filter(r=>r.n
   html+='<span>Frequenza: <strong style="color:var(--ink)">'+_freqStr+'</strong></span>';
   html+='</div>';
   // --- Month-over-month comparison ---
-  const _byMese={};const _byMeseOrder=[];
-  righe.forEach(r=>{const d=new Date(r.data_giornata+'T12:00:00');const k=MESI[d.getMonth()]+' '+d.getFullYear();if(!_byMese[k]){_byMese[k]=0;_byMeseOrder.push(k)}_byMese[k]+=parseFloat(r.costo||0)});
-  const _mesiArr=_byMeseOrder.map(k=>[k,_byMese[k]]);
+  const _byMese={};const _byMeseKeys={};
+  righe.forEach(r=>{const d=new Date(r.data_giornata+'T12:00:00');const k=MESI[d.getMonth()]+' '+d.getFullYear();const sortKey=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');if(!_byMese[k]){_byMese[k]=0;_byMeseKeys[k]=sortKey}_byMese[k]+=parseFloat(r.costo||0)});
+  const _mesiArr=Object.keys(_byMese).sort((a,b)=>_byMeseKeys[a].localeCompare(_byMeseKeys[b])).map(k=>[k,_byMese[k]]);
   if(_mesiArr.length>0){
     html+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;align-items:center">';
     _mesiArr.forEach(function(m,i){
