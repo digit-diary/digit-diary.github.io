@@ -669,7 +669,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
         <div class="field" style="flex:2"><label>Destinatari</label><div id="nota-dest-box" style="display:flex;flex-wrap:wrap;gap:6px 12px;padding:8px 10px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);min-height:38px"><label style="font-size:.82rem;font-weight:700;color:var(--accent2);cursor:pointer;display:flex;align-items:center;gap:4px;margin-right:8px"><input type="checkbox" id="nota-tutti" onchange="toggleTuttiDest()"> Tutti</label></div></div>
         <div class="field"><label>Da</label><input type="text" id="nota-da" readonly style="background:var(--paper2);color:var(--muted)"></div>
       </div>
-      <div class="field" style="margin-bottom:16px"><label>Messaggio</label><textarea id="nota-msg" placeholder="Scrivi il messaggio per il collega..." style="min-height:100px"></textarea></div>
+      <div class="field" style="margin-bottom:16px"><label>Messaggio <small style="color:var(--muted);font-weight:300;text-transform:none;letter-spacing:0;font-size:.75rem">Ctrl+Invio per inviare</small></label><textarea id="nota-msg" placeholder="Scrivi il messaggio per il collega..." style="min-height:100px"></textarea></div>
       <button class="btn-salva" onclick="inviaNotaCollega()">Invia nota</button>
     </div>
   </div>
@@ -720,7 +720,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
         <div class="field"><label>Destinatario</label><select id="cons-destinatario" style="padding:11px 14px"><option value="tutti">Tutti</option></select></div>
         <div class="field"><label>Priorita</label><select id="cons-priorita" style="padding:11px 14px"><option value="normale">Normale</option><option value="alta">Alta</option></select></div>
       </div>
-      <div class="field" style="margin-bottom:16px"><label>Messaggio di consegna</label><textarea id="cons-messaggio" placeholder="- Cliente X al tavolo 5, monitorare&#10;- Cassa 3 fuori servizio&#10;- Nuovo dipendente da affiancare&#10;..." style="min-height:120px"></textarea></div>
+      <div class="field" style="margin-bottom:16px"><label>Messaggio di consegna <small style="color:var(--muted);font-weight:300;text-transform:none;letter-spacing:0;font-size:.75rem">Ctrl+Invio per inviare</small></label><textarea id="cons-messaggio" placeholder="- Cliente X al tavolo 5, monitorare&#10;- Cassa 3 fuori servizio&#10;- Nuovo dipendente da affiancare&#10;..." style="min-height:120px"></textarea></div>
       <button class="btn-salva" onclick="inviaConsegnaTurno()">Invia consegna</button>
     </div>
   </div>
@@ -1463,7 +1463,7 @@ function switchPage(name){flushRapportoSave();
   const _visKey=name.replace(/-/g,'_');
   if(!_pagesAlwaysVisible.includes(name)&&typeof isVis==='function'&&!isVis(_visKey)){name='dashboard'}
   var _epf=document.getElementById('early-page-fix');if(_epf)_epf.remove();document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));const pg=document.getElementById('page-'+name);if(pg)pg.classList.add('active');const tb=document.querySelector('.nav-tab[data-page="'+name+'"]');if(tb)tb.classList.add('active');localStorage.setItem('pagina_corrente',name);if(typeof aggiornaMenuMobile==='function')aggiornaMenuMobile();
-  if(name==='diario'){aggiornaNomi();render();updateStats()}if(name==='statistiche')renderStatistiche();if(name==='rapporto'){if(!rapportoGiornoAperto){const gc=getGiornataCasino();const d=new Date(gc+'T12:00:00');rapportoMese=d.getMonth();rapportoAnno=d.getFullYear();rapportoGiornoAperto=gc}renderRapporto()}if(name==='note-collega'){initNoteFlatpickr();renderNoteCollega()}if(name==='impostazioni'){renderTipiUI();renderScadenzeSettings();renderOperatoriUI();renderCampiRapportoUI();
+  if(name==='diario'){aggiornaNomi();_restoreFiltri();render();updateStats()}if(name==='statistiche')renderStatistiche();if(name==='rapporto'){if(!rapportoGiornoAperto){const gc=getGiornataCasino();const d=new Date(gc+'T12:00:00');rapportoMese=d.getMonth();rapportoAnno=d.getFullYear();rapportoGiornoAperto=gc}renderRapporto()}if(name==='note-collega'){initNoteFlatpickr();renderNoteCollega()}if(name==='impostazioni'){renderTipiUI();renderScadenzeSettings();renderOperatoriUI();renderCampiRapportoUI();
     const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}renderCollaboratoriUI();renderBiometricSettings();const ai=document.getElementById('ai-section');if(ai)ai.style.display=isAdmin()?'':'none';const visSec=document.getElementById('visibilita-section');if(visSec){visSec.style.display=isAdmin()?'':'none';if(isAdmin())renderVisibilitaUI()}if(isAdmin()&&groqKey){const gs=document.getElementById('groq-status');if(gs)gs.innerHTML='<span style="color:#2c6e49">Chiave configurata</span>'}}if(name==='moduli'){if(!document.getElementById('mod-list-results'))_modFiltInit=false;renderModuliList()};if(name==='registro')renderRegistro();if(name==='maison'){renderMaisonDashboard();renderMaisonBudgetUI();initMaisonFlatpickr();renderSpeseExtra();initSpeseExtraFP();renderRegali()}if(name==='promemoria'){renderPromemoria();initPromemoriaUI()}if(name==='dashboard')renderDashboard();if(name==='consegna'){initConsFlatpickr();renderConsegne();initConsegnaUI()}}
 
 // TIPI
@@ -1519,7 +1519,8 @@ function _initMalFlatpickr(){if(_malFpInit||!window.flatpickr)return;_malFpInit=
   flatpickr('#inp-mal-dal',o);flatpickr('#inp-mal-al',o)}
 function resetMalFiltri(){['inp-mal-dal','inp-mal-al'].forEach(id=>{const el=document.getElementById(id);if(el){el.value='';if(el._flatpickr)el._flatpickr.clear()}})}
 // CORE CRUD
-async function salva(){const nome=capitalizzaNome(document.getElementById('inp-nome').value.trim()),testo=document.getElementById('inp-testo').value.trim();if(!nome){toast('Inserisci il nome');return}if(!testo){toast('Scrivi una descrizione');return}
+function _highlightField(id){const el=document.getElementById(id);if(!el)return;el.style.transition='border-color .2s,box-shadow .2s';el.style.borderColor='var(--accent)';el.style.boxShadow='0 0 0 2px rgba(192,57,43,0.2)';setTimeout(()=>{el.style.borderColor='';el.style.boxShadow=''},2000);el.focus()}
+async function salva(){const nome=capitalizzaNome(document.getElementById('inp-nome').value.trim()),testo=document.getElementById('inp-testo').value.trim();if(!nome){toast('Inserisci il nome');_highlightField('inp-nome');return}if(!testo){toast('Scrivi una descrizione');_highlightField('inp-testo');return}
   const importo=parseFloat(document.getElementById('inp-importo').value)||0;const valuta=importo?document.getElementById('inp-valuta').value:'';const reparto=document.getElementById('inp-reparto').value;
   // Malattia con range Dal/Al → crea registrazione per ogni giorno
   if(tipoSelezionato===nomeCorrente('Malattia')){
@@ -1860,7 +1861,7 @@ async function generaRiepilogoMensile(){
 function toggleTuttiDest(){const c=document.getElementById('nota-tutti').checked;document.querySelectorAll('#nota-dest-box input[type=checkbox]:not(#nota-tutti)').forEach(cb=>cb.checked=c)}
 function getDestinatariSelezionati(){return[...document.querySelectorAll('#nota-dest-box input[type=checkbox]:not(#nota-tutti)')].filter(cb=>cb.checked).map(cb=>cb.value)}
 async function inviaNotaCollega(){const dests=getDestinatariSelezionati(),msg=document.getElementById('nota-msg').value.trim(),da=getOperatore();
-  if(!da){toast('Seleziona prima un operatore (in alto)');return}if(!dests.length){toast('Seleziona almeno un destinatario');return}if(!msg){toast('Scrivi un messaggio');return}
+  if(!da){toast('Seleziona prima un operatore (in alto)');return}if(!dests.length){toast('Seleziona almeno un destinatario');return}if(!msg){toast('Scrivi un messaggio');_highlightField('nota-msg');return}
   const gid=dests.length>1?crypto.randomUUID():null;
   const msgEnc=await encryptNota(msg);
   try{for(const dest of dests){const r=await secPost('note_colleghi',{da_operatore:da,a_operatore:dest,messaggio:msgEnc,gruppo_id:gid});r[0].messaggio=msg;r[0]._decrypted=true;noteColleghiCache.unshift(r[0])}
@@ -2917,7 +2918,7 @@ function render(){const f=getFiltrati(),el=document.getElementById('entries-list
     const metaLines=[];if(e.operatore)metaLines.push('Inserita da '+escP(e.operatore));
     if(e.modificato_da)metaLines.push('Modificata da '+escP(e.modificato_da));
     const gdDiff=d.getHours()<6;const gdDate=gdDiff?new Date(d.getTime()-86400000):d;const gdBadge=gdDiff?'<span style="font-size:.72rem;padding:2px 7px;border-radius:2px;background:var(--accent2);color:white;font-weight:700">GD '+gdDate.getDate()+'.'+String(gdDate.getMonth()+1).padStart(2,'0')+'</span>':'';
-    return'<div class="entry'+(pin?' pinned':'')+'"><div class="entry-date"><div class="entry-day">'+d.getDate()+'</div><div class="entry-month">'+MESI[d.getMonth()]+' '+d.getFullYear()+'</div><div class="entry-time">'+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})+'</div></div><div class="entry-body"><div class="entry-top"><span class="entry-name" onclick="apriProfilo(\''+e.nome.replace(/'/g,"\\'")+'\')">'+esc(e.nome)+'</span><span class="badge '+bc+'">'+escP(e.tipo)+'</span>'+gdBadge+rep+imp+'</div><div class="entry-text">'+esc(e.testo)+'</div>'+(metaLines.length?'<div class="entry-meta">'+metaLines.join(' · ')+'</div>':'')+'</div><div class="entry-actions"><button class="btn-act pin" onclick="togglePin('+e.id+')">'+(pin?'Rimuovi pin':'Fissa')+'</button><button class="btn-act scad" onclick="apriScadenza('+e.id+')">Scadenza</button><button class="btn-act tipo" onclick="apriModal('+e.id+',\''+te+'\')">Tipo</button><button class="btn-act edit" onclick="modificaRegistrazione('+e.id+')">Modifica</button><button class="btn-act del" onclick="elimina('+e.id+')">Elimina</button></div></div>'}).join('')}
+    return'<div class="entry'+(pin?' pinned':'')+'"><div class="entry-date"><div class="entry-day">'+d.getDate()+'</div><div class="entry-month">'+MESI[d.getMonth()]+' '+d.getFullYear()+'</div><div class="entry-time">'+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})+'</div></div><div class="entry-body"><div class="entry-top"><span class="entry-name" onclick="apriProfilo(\''+e.nome.replace(/'/g,"\\'")+'\')">'+esc(e.nome)+'</span><span class="badge '+bc+'">'+escP(e.tipo)+'</span>'+gdBadge+rep+imp+'</div><div class="entry-text">'+esc(e.testo)+'</div>'+(metaLines.length?'<div class="entry-meta">'+metaLines.join(' · ')+'</div>':'')+'</div><div class="entry-actions"><button class="btn-act pin" onclick="togglePin('+e.id+')">'+(pin?'Rimuovi pin':'Fissa')+'</button><button class="btn-act scad" onclick="apriScadenza('+e.id+')">Scadenza</button><button class="btn-act tipo" onclick="apriModal('+e.id+',\''+te+'\')">Tipo</button><button class="btn-act edit" onclick="modificaRegistrazione('+e.id+')">Modifica</button><button class="btn-act del" onclick="elimina('+e.id+')">Elimina</button></div></div>'}).join('');_saveFiltri()}
 function getNomiLista(){return[...new Set([...collaboratoriCache.map(c=>c.nome),...getDatiReparto().map(e=>e.nome)])].filter(Boolean).sort()}
 function aggiornaNomi(){const nomi=getNomiLista();
   const sel=document.getElementById('filt-persona'),cur=sel.value;sel.innerHTML='<option value="">Tutte</option>'+nomi.map(n=>'<option'+(n===cur?' selected':'')+'>'+escP(n)+'</option>').join('')}
@@ -2940,7 +2941,9 @@ function acFiltraModuli(inputId,dropId){const inp=document.getElementById(inputI
 function acScegliModuli(inputId,dropId,nome){const inp=document.getElementById(inputId),drop=document.getElementById(dropId);
   if(inp)inp.value=nome;if(drop)drop.classList.remove('show');aggiornaModuliLista()}
 document.addEventListener('click',function(e){document.querySelectorAll('.ac-drop.show').forEach(d=>{if(!d.parentElement.contains(e.target))d.classList.remove('show')})})
-function resetFiltri(){['filt-persona','filt-tipo'].forEach(id=>document.getElementById(id).value='');['filt-cerca'].forEach(id=>document.getElementById(id).value='');const fd=document.getElementById('filt-dal'),fa=document.getElementById('filt-al');if(fd._flatpickr)fd._flatpickr.clear();else fd.value='';if(fa._flatpickr)fa._flatpickr.clear();else fa.value='';render()}
+function _saveFiltri(){try{localStorage.setItem('diario_filtri',JSON.stringify({persona:(document.getElementById('filt-persona')||{}).value||'',tipo:(document.getElementById('filt-tipo')||{}).value||'',cerca:(document.getElementById('filt-cerca')||{}).value||'',dal:(document.getElementById('filt-dal')||{}).value||'',al:(document.getElementById('filt-al')||{}).value||''}))}catch(e){}}
+function _restoreFiltri(){try{const f=JSON.parse(localStorage.getItem('diario_filtri')||'{}');if(f.persona){const s=document.getElementById('filt-persona');if(s)s.value=f.persona}if(f.tipo){const s=document.getElementById('filt-tipo');if(s)s.value=f.tipo}if(f.cerca){const s=document.getElementById('filt-cerca');if(s)s.value=f.cerca}if(f.dal){const s=document.getElementById('filt-dal');if(s){s.value=f.dal;if(s._flatpickr)s._flatpickr.setDate(f.dal)}}if(f.al){const s=document.getElementById('filt-al');if(s){s.value=f.al;if(s._flatpickr)s._flatpickr.setDate(f.al)}}}catch(e){}}
+function resetFiltri(){['filt-persona','filt-tipo'].forEach(id=>document.getElementById(id).value='');['filt-cerca'].forEach(id=>document.getElementById(id).value='');const fd=document.getElementById('filt-dal'),fa=document.getElementById('filt-al');if(fd._flatpickr)fd._flatpickr.clear();else fd.value='';if(fa._flatpickr)fa._flatpickr.clear();else fa.value='';_saveFiltri();render()}
 function updateStats(){const rd=getDatiReparto();document.getElementById('stats-bar').innerHTML='<div class="stat"><div class="stat-num">'+rd.length+'</div><div class="stat-label">Totale</div></div><div class="stat"><div class="stat-num blue">'+new Set(rd.map(e=>e.nome)).size+'</div><div class="stat-label">Collaboratori</div></div><div class="stat"><div class="stat-num red">'+rd.filter(e=>e.tipo===nomeCorrente('Errore')).length+'</div><div class="stat-label">'+nomeCorrente('Errore')+'</div></div><div class="stat"><div class="stat-num teal">'+rd.filter(e=>e.tipo===nomeCorrente('Malattia')).length+'</div><div class="stat-label">'+nomeCorrente('Malattia')+'</div></div><div class="stat"><div class="stat-num gold">'+rd.filter(e=>e.tipo===nomeCorrente('Apprezzamento')).length+'</div><div class="stat-label">'+nomeCorrente('Apprezzamento')+'</div></div>'}
 
 // RAPPORTO GIORNALIERO
@@ -3150,14 +3153,27 @@ async function esportaPDF(){const f=getFiltrati();if(!f.length){toast('Nessun da
 // ========================
 function initConsegnaUI(){const turno=_getTurnoCorrente();const sel=document.getElementById('cons-turno');if(sel)sel.value=turno;
   const dSel=document.getElementById('cons-destinatario');if(dSel){const ops=operatoriAuthCache.map(o=>o.nome).sort();
-    // Cerca supervisore turno successivo dal rapporto giornaliero
+    // Cerca supervisore dell'altro turno dal rapporto giornaliero
     let suggerito='';const oggi=getGiornataCasino();const rapp=rapportiCache[oggi]||{};
-    if(turno==='PRESTO'&&rapp.NOTTE&&rapp.NOTTE.sup_note){suggerito=rapp.NOTTE.sup_note.trim()}
-    else if(turno==='NOTTE'){const domani=new Date(new Date(oggi+'T12:00:00').getTime()+86400000);const domaniStr=domani.getFullYear()+'-'+String(domani.getMonth()+1).padStart(2,'0')+'-'+String(domani.getDate()).padStart(2,'0');const rappD=rapportiCache[domaniStr]||{};if(rappD.PRESTO&&rappD.PRESTO.sup_note)suggerito=rappD.PRESTO.sup_note.trim()}
-    // Cerca match tra il nome supervisore e gli operatori
-    const sugMatch=suggerito?ops.find(n=>n.toLowerCase()===suggerito.toLowerCase()||n.toLowerCase().includes(suggerito.toLowerCase())||suggerito.toLowerCase().includes(n.toLowerCase())):'';
+    const op=getOperatore();
+    // Se sono su PRESTO → cerco chi fa NOTTE (destinatario)
+    // Se sono su NOTTE → cerco chi fa PRESTO di domani (destinatario)
+    if(turno==='PRESTO'){
+      if(rapp.NOTTE&&rapp.NOTTE.sup_note)suggerito=rapp.NOTTE.sup_note.trim();
+    }else{
+      // Cerco PRESTO di domani
+      const domani=new Date(new Date(oggi+'T12:00:00').getTime()+86400000);const domaniStr=domani.getFullYear()+'-'+String(domani.getMonth()+1).padStart(2,'0')+'-'+String(domani.getDate()).padStart(2,'0');
+      const rappD=rapportiCache[domaniStr]||{};
+      if(rappD.PRESTO&&rappD.PRESTO.sup_note)suggerito=rappD.PRESTO.sup_note.trim();
+      // Fallback: cerco PRESTO di oggi
+      if(!suggerito&&rapp.PRESTO&&rapp.PRESTO.sup_note)suggerito=rapp.PRESTO.sup_note.trim();
+    }
+    // Match nome supervisore con operatori registrati
+    const sugMatch=suggerito?matchCollaboratoreOps(suggerito,ops):'';
     dSel.innerHTML='<option value="tutti">Tutti</option>'+ops.map(n=>'<option value="'+escP(n)+'"'+(sugMatch&&n===sugMatch?' selected':'')+'>'+escP(n)+'</option>').join('');
-    if(sugMatch){toast('Destinatario suggerito: '+sugMatch+' (dal rapporto)')}}}
+    if(sugMatch)toast('Destinatario: '+sugMatch+' (dal rapporto)')}}
+function matchCollaboratoreOps(nome,ops){nome=nome.toLowerCase();
+  return ops.find(n=>n.toLowerCase()===nome)||ops.find(n=>{const w=n.toLowerCase().split(/\s+/);return w.some(p=>p===nome||nome===p)})||ops.find(n=>n.toLowerCase().includes(nome)||nome.includes(n.toLowerCase()))||''}
 async function inviaConsegnaTurno(){const turno=document.getElementById('cons-turno').value;
   const msg=document.getElementById('cons-messaggio').value.trim();
   const priorita=document.getElementById('cons-priorita').value;
@@ -4515,6 +4531,11 @@ document.getElementById('profilo-modal').addEventListener('click',function(e){if
 document.getElementById('scadenza-modal').addEventListener('click',function(e){if(e.target===this)this.classList.add('hidden')});
 document.getElementById('note-modal').addEventListener('click',function(e){if(e.target===this)this.classList.add('hidden')});
 document.getElementById('inp-testo').addEventListener('keydown',e=>{if(e.ctrlKey&&e.key==='Enter')salva()});
+// Ctrl+Invio per note colleghi, consegne, promemoria
+document.addEventListener('keydown',e=>{if(!e.ctrlKey||e.key!=='Enter')return;
+  const id=e.target.id;if(id==='nota-msg')inviaNotaCollega();
+  else if(id==='cons-messaggio')inviaConsegnaTurno();
+  else if(id==='assist-input')assistenteGenera()});
 // LOCK SCREEN: solo su PWA installata (mobile), non su browser desktop
 var _isPWA=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone;
 document.addEventListener('visibilitychange',function(){
