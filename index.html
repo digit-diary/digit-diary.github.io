@@ -1208,8 +1208,13 @@ async function loadAll(){
 }
 async function caricaDbStats(){const el=document.getElementById('db-stats-content');if(!el)return;
   el.innerHTML='<p style="color:var(--muted)">Caricamento...</p>';
-  const tk=getAdminToken();const r=await sbRpc('get_db_stats',{p_token:tk});
-  if(!r){el.innerHTML='<p style="color:var(--accent)">Errore caricamento statistiche</p>';return}
+  const tk=getAdminToken();if(!tk){el.innerHTML='<p style="color:var(--accent)">Nessun token admin. Esci e rientra come admin.</p>';return}
+  const rpcR=await fetch(SB_URL+'/rest/v1/rpc/get_db_stats',{method:'POST',headers:sbH(),body:JSON.stringify({p_token:tk})});
+  if(!rpcR.ok){const errTxt=await rpcR.text();console.error('DB stats error:',errTxt);
+    if(errTxt.includes('Solo admin')){el.innerHTML='<p style="color:var(--accent)">Sessione admin scaduta. Esci e rientra come admin.</p>'}
+    else{el.innerHTML='<p style="color:var(--accent)">Errore: '+(JSON.parse(errTxt).message||'sconosciuto')+'</p>'}return}
+  const r=await rpcR.json();
+  if(!r){el.innerHTML='<p style="color:var(--accent)">Nessun dato ricevuto</p>';return}
   const sizeMatch=(r.db_size||'').match(/([\d.]+)\s*(MB|GB|kB)/);
   let usedMB=0;if(sizeMatch){usedMB=parseFloat(sizeMatch[1]);if(sizeMatch[2]==='GB')usedMB*=1024;if(sizeMatch[2]==='kB')usedMB/=1024}
   const pct=Math.min(Math.round(usedMB/500*100),100);
@@ -1225,9 +1230,7 @@ async function caricaDbStats(){const el=document.getElementById('db-stats-conten
   h+='<p style="color:var(--muted);font-size:.78rem">Sessioni attive: '+r.sessioni_attive+'</p>';
   el.innerHTML=h}
 async function _healthCheck(){const problems=[];
-  // 1. Supabase connessione
-  try{const r=await fetch(SB_URL+'/rest/v1/',{headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}});
-    if(!r.ok)problems.push('Database Supabase non raggiungibile')}catch(e){problems.push('Connessione database assente')}
+  // 1. Supabase connessione (verifica tramite dati caricati, no fetch extra)
   // 2. Librerie CDN
   if(!window.jspdf&&!document.querySelector('script[src*="jspdf"]'))problems.push('Libreria PDF (jsPDF) non caricata');
   if(!window.Chart)problems.push('Libreria grafici (Chart.js) non caricata');
