@@ -1619,8 +1619,40 @@ function mostraNotifBanner(tipo,titolo,testo,azione){
 function chiudiNotifBanner(){clearTimeout(_notifTimeout);document.getElementById('notif-banner').classList.remove('show')}
 function notifBannerClick(){chiudiNotifBanner();if(_notifAction)_notifAction()}
 
+// VERIFICA NOME COLLABORATORE (anti-doppioni)
+async function _verificaNome(nome){
+  if(!nome)return nome;
+  const nl=nome.toLowerCase();
+  // Esiste esattamente?
+  if(collaboratoriCache.find(c=>c.nome.toLowerCase()===nl))return nome;
+  // Cerca simile (Levenshtein ≤ 2)
+  let best=null,bestDist=3;
+  for(const c of collaboratoriCache){
+    const dist=_levenshtein(nl,c.nome.toLowerCase());
+    if(dist<bestDist){bestDist=dist;best=c.nome}
+    // Anche per singole parole (cognome)
+    const words=c.nome.toLowerCase().split(/\s+/);const nWords=nl.split(/\s+/);
+    for(const w of nWords){for(const cw of words){const wd=_levenshtein(w,cw);if(wd<bestDist&&w.length>=3){bestDist=wd;best=c.nome}}}}
+  if(best&&bestDist<=2){
+    return new Promise(res=>{
+      const b=document.getElementById('pwd-modal-content');
+      b.innerHTML='<h3>Nome simile trovato</h3><p style="margin-bottom:16px">Hai scritto <strong>"'+escP(nome)+'"</strong> ma esiste gia un collaboratore simile:</p><div style="text-align:center;margin-bottom:20px"><button class="btn-salva" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\');document.querySelector(\'[data-verify-resolve]\').dataset.result=\''+escP(best)+'\';document.querySelector(\'[data-verify-resolve]\').click()" style="background:#2c6e49;padding:12px 24px;font-size:1rem">Usa "'+escP(best)+'"</button></div><div style="text-align:center"><button class="btn-salva" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\');document.querySelector(\'[data-verify-resolve]\').dataset.result=\''+escP(nome)+'\';document.querySelector(\'[data-verify-resolve]\').click()" style="background:var(--paper2);color:var(--muted);border:1px solid var(--line);padding:10px 20px;font-size:.88rem;box-shadow:none">No, usa "'+escP(nome)+'" cosi com\'e</button></div>';
+      const resolver=document.createElement('button');resolver.style.display='none';resolver.dataset.verifyResolve='1';
+      resolver.onclick=function(){res(this.dataset.result);this.remove()};document.body.appendChild(resolver);
+      document.getElementById('pwd-modal').classList.remove('hidden')})}
+  // Non esiste e nessun simile → chiedi se aggiungere
+  return new Promise(res=>{
+    const b=document.getElementById('pwd-modal-content');
+    b.innerHTML='<h3>Collaboratore non trovato</h3><p style="margin-bottom:16px"><strong>"'+escP(nome)+'"</strong> non e nella lista collaboratori.</p><div style="text-align:center;margin-bottom:16px"><button class="btn-salva" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\');document.querySelector(\'[data-verify-resolve]\').dataset.result=\'add\';document.querySelector(\'[data-verify-resolve]\').click()" style="background:#2c6e49;padding:12px 24px;font-size:.95rem">Aggiungi "'+escP(nome)+'" alla lista</button></div><div style="text-align:center"><button class="btn-salva" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\');document.querySelector(\'[data-verify-resolve]\').dataset.result=\'use\';document.querySelector(\'[data-verify-resolve]\').click()" style="background:var(--paper2);color:var(--muted);border:1px solid var(--line);padding:10px 20px;font-size:.88rem;box-shadow:none">Usa senza aggiungere</button></div>';
+    const resolver=document.createElement('button');resolver.style.display='none';resolver.dataset.verifyResolve='1';
+    resolver.onclick=async function(){
+      if(this.dataset.result==='add'){try{await secPost('collaboratori',{nome,attivo:true});collaboratoriCache.push({nome,attivo:true});collaboratoriCache.sort((a,b)=>a.nome.localeCompare(b.nome));aggiornaNomi();toast(nome+' aggiunto alla lista')}catch(e){}}
+      res(nome);this.remove()};document.body.appendChild(resolver);
+    document.getElementById('pwd-modal').classList.remove('hidden')})}
+
 function _highlightField(id){const el=document.getElementById(id);if(!el)return;el.style.transition='border-color .2s,box-shadow .2s';el.style.borderColor='var(--accent)';el.style.boxShadow='0 0 0 2px rgba(192,57,43,0.2)';setTimeout(()=>{el.style.borderColor='';el.style.boxShadow=''},2000);el.focus()}
-async function salva(){const nome=capitalizzaNome(document.getElementById('inp-nome').value.trim()),testo=document.getElementById('inp-testo').value.trim();if(!nome){toast('Inserisci il nome');_highlightField('inp-nome');return}if(!testo){toast('Scrivi una descrizione');_highlightField('inp-testo');return}
+async function salva(){let nome=capitalizzaNome(document.getElementById('inp-nome').value.trim());const testo=document.getElementById('inp-testo').value.trim();if(!nome){toast('Inserisci il nome');_highlightField('inp-nome');return}if(!testo){toast('Scrivi una descrizione');_highlightField('inp-testo');return}
+  nome=await _verificaNome(nome);document.getElementById('inp-nome').value=nome;
   const importo=parseFloat(document.getElementById('inp-importo').value)||0;const valuta=importo?document.getElementById('inp-valuta').value:'';const reparto=document.getElementById('inp-reparto').value;
   // Malattia con range Dal/Al → crea registrazione per ogni giorno
   if(tipoSelezionato===nomeCorrente('Malattia')){
@@ -2523,10 +2555,11 @@ function loadFirmaToCanvas(canvasId,b64){const c=document.getElementById(canvasI
 let _logoB64=null;
 async function _loadLogo(){try{const r=await fetch('logo_casino.png');if(!r.ok)return;const b=await r.blob();_logoB64=await new Promise(res=>{const rd=new FileReader();rd.onloadend=()=>res(rd.result);rd.readAsDataURL(b)})}catch(e){}}
 async function generaModuloPDF(tipo){
-  const collab=(document.getElementById('mod-collaboratore')||{}).value||'';
+  let collab=capitalizzaNome((document.getElementById('mod-collaboratore')||{}).value||'');
   const resp=(document.getElementById('mod-resp')||{}).value||'';
   const data=(document.getElementById('mod-data')||{}).value||'';
-  if(!collab){toast('Inserisci il nome del collaboratore');return}
+  if(!collab){toast('Inserisci il nome del collaboratore');_highlightField('mod-collaboratore');return}
+  collab=await _verificaNome(collab);document.getElementById('mod-collaboratore').value=collab;
   // Firma digitale
   const isDigFirma=document.querySelector('input[name="firma-tipo"][value="digitale"]');
   const _fResp=isDigFirma&&isDigFirma.checked?getFirmaB64('firma-resp-canvas'):null;
@@ -3807,8 +3840,12 @@ async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0
 function toggleSezione(id,btn){var el=document.getElementById(id);if(!el)return;var hidden=el.style.display==='none';el.style.display=hidden?'':'none';if(btn)btn.innerHTML=hidden?'&#9650; Nascondi':'&#9660; Mostra'}
 // MAISON MANUALE
 async function salvaMaisonManuale(){
-  const nome=capitalizzaNome(document.getElementById('maison-man-nome').value.trim());
-  if(!nome){toast('Inserisci il nome');return}
+  let nome=capitalizzaNome(document.getElementById('maison-man-nome').value.trim());
+  if(!nome){toast('Inserisci il nome');_highlightField('maison-man-nome');return}
+  // Verifica nome tra clienti maison esistenti
+  const nomeEsistente=getMaisonRepartoExpanded().find(r=>r.nome.toLowerCase()===nome.toLowerCase());
+  if(!nomeEsistente){const simile=_trovaNomeSimileMaison(nome);
+    if(simile&&simile.tipo==='simile'){if(!confirm('Hai scritto "'+nome+'" ma esiste "'+simile.nome+'". Usare "'+simile.nome+'"?')){/* usa il nome inserito */}else{nome=simile.nome}}}
   const px=parseInt(document.getElementById('maison-man-px').value)||1;
   const importo=parseFloat(document.getElementById('maison-man-importo').value)||0;
   if(!importo){toast('Inserisci un importo');return}
@@ -3826,8 +3863,11 @@ async function salvaMaisonManuale(){
 // REGALI MAISON
 function getRegaliReparto(){return regaliCache.filter(function(r){return(r.reparto_dip||'slots')===currentReparto})}
 async function salvaRegalo(){
-  const nome=capitalizzaNome(document.getElementById('regalo-nome').value.trim());
-  if(!nome){toast('Inserisci il nome del cliente');return}
+  let nome=capitalizzaNome(document.getElementById('regalo-nome').value.trim());
+  if(!nome){toast('Inserisci il nome del cliente');_highlightField('regalo-nome');return}
+  const nomeEsistente=getMaisonRepartoExpanded().find(r=>r.nome.toLowerCase()===nome.toLowerCase());
+  if(!nomeEsistente){const simile=_trovaNomeSimileMaison(nome);
+    if(simile&&simile.tipo==='simile'){if(confirm('Hai scritto "'+nome+'" ma esiste "'+simile.nome+'". Usare "'+simile.nome+'"?'))nome=simile.nome}}
   const desc=document.getElementById('regalo-desc').value.trim();
   if(!desc){toast('Inserisci una descrizione');return}
   const importo=parseFloat(document.getElementById('regalo-importo').value)||null;
@@ -4447,11 +4487,14 @@ function acFiltraSpeseExtra(){const inp=document.getElementById('se-beneficiario
   const f=v?nomi.filter(n=>n.toLowerCase().includes(v)):nomi;
   if(!f.length){drop.classList.remove('show');return}
   drop.innerHTML=f.slice(0,12).map(n=>'<div onmousedown="document.getElementById(\'se-beneficiario\').value=\''+n.replace(/'/g,"\\'")+'\';document.getElementById(\'ac-se-benef\').classList.remove(\'show\')">'+escP(n)+'</div>').join('');drop.classList.add('show')}
-async function salvaSpeseExtra(){const benef=capitalizzaNome(document.getElementById('se-beneficiario').value.trim());
+async function salvaSpeseExtra(){let benef=capitalizzaNome(document.getElementById('se-beneficiario').value.trim());
   const tipo=document.getElementById('se-tipo').value;const data=document.getElementById('se-data').value;
   const luogo=document.getElementById('se-luogo').value.trim();const importo=parseFloat(document.getElementById('se-importo').value)||0;
   const desc=document.getElementById('se-descrizione').value.trim();
-  if(!benef){toast('Inserisci il beneficiario');return}if(!data){toast('Seleziona la data');return}if(!importo){toast('Inserisci l\'importo');return}
+  if(!benef){toast('Inserisci il beneficiario');_highlightField('se-beneficiario');return}
+  const nomeEsistente=getMaisonRepartoExpanded().find(r=>r.nome.toLowerCase()===benef.toLowerCase())||getSpeseReparto().find(r=>r.beneficiario.toLowerCase()===benef.toLowerCase());
+  if(!nomeEsistente){const simile=_trovaNomeSimileMaison(benef);
+    if(simile&&simile.tipo==='simile'){if(confirm('Hai scritto "'+benef+'" ma esiste "'+simile.nome+'". Usare "'+simile.nome+'"?'))benef=simile.nome}}if(!data){toast('Seleziona la data');return}if(!importo){toast('Inserisci l\'importo');return}
   // Controllo duplicati: stesso beneficiario + stessa data + stesso importo
   const seDup=getSpeseReparto().find(r=>r.beneficiario.toLowerCase()===benef.toLowerCase()&&r.data_spesa===data&&parseFloat(r.importo)===importo);
   if(seDup){if(!confirm(benef+' ha già una spesa di '+importo.toFixed(2)+' CHF il '+new Date(data+'T12:00:00').toLocaleDateString('it-IT')+'.\n\nVuoi aggiungere comunque?'))return}
