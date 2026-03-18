@@ -607,6 +607,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
   <div class="stats-bar" id="dash-stats" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr))"></div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px" id="dash-grid">
     <div class="main-card" id="dash-todo"><div class="card-header">Da fare oggi</div><div id="dash-todo-list" style="padding:14px;max-height:300px;overflow-y:auto"></div></div>
+    <div class="main-card" id="dash-domani"><div class="card-header">Da fare domani</div><div id="dash-domani-list" style="padding:14px;max-height:300px;overflow-y:auto"></div></div>
     <div class="main-card" id="dash-alerts"><div class="card-header">Alert attivi</div><div id="dash-alert-list" style="padding:14px;max-height:300px;overflow-y:auto"></div></div>
     <div class="main-card" id="dash-recenti"><div class="card-header">Ultime registrazioni</div><div id="dash-recenti-list" style="padding:14px;max-height:300px;overflow-y:auto"></div></div>
     <div class="main-card" id="dash-maison"><div class="card-header">Maison oggi</div><div id="dash-maison-content" style="padding:14px;max-height:300px;overflow-y:auto"></div></div>
@@ -3316,19 +3317,32 @@ function renderDashboard(){
   statsH+='<div class="stat"><div class="stat-num blue">'+regOggi+'</div><div class="stat-label">Registrazioni oggi</div></div>';
   if(isVis('alert_rischio'))statsH+='<div class="stat"><div class="stat-num'+(alertRischio?' red':'')+'">'+alertRischio+'</div><div class="stat-label">A rischio</div></div>';
   document.getElementById('dash-stats').innerHTML=statsH;
-  // DA FARE OGGI
+  // Helper: estrai data reminder dalla descrizione del promemoria
+  function _getDataRemind(p){const m=(p.descrizione||'').match(/Promemoria: (\d+) giorno\/i prima/);
+    if(m){const d=new Date(p.data_scadenza+'T12:00:00');d.setDate(d.getDate()-parseInt(m[1]));return d.toISOString().split('T')[0]}
+    if((p.descrizione||'').includes('il giorno stesso'))return p.data_scadenza;
+    return p.data_scadenza}
+  const domani=new Date(new Date(oggi+'T12:00:00').getTime()+86400000).toISOString().split('T')[0];
+  // DA FARE OGGI: scaduti + reminder di oggi + note non lette + compleanni oggi + ammonimenti
   const todoEl=document.getElementById('dash-todo-list');let todoH='';
-  pmScaduti.forEach(p=>{todoH+='<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="color:var(--accent);font-weight:700;font-size:1.1rem">!</span><span style="flex:1;cursor:pointer" onclick="switchPage(\'promemoria\')"><strong>'+escP(p.titolo)+'</strong>'+(p.descrizione?' <span style="color:var(--muted);font-size:.82rem">— '+escP(p.descrizione.substring(0,50))+'</span>':'')+'</span><button class="btn-act pin" onclick="completaPromemoria('+p.id+');renderDashboard()" style="color:#2c6e49;border-color:#2c6e49;font-size:.7rem">Fatto</button></div>'});
-  const pmProssimi=pmMiei.filter(p=>!pmScaduti.includes(p)&&p.data_scadenza<=new Date(Date.now()+3*86400000).toISOString().split('T')[0]);
-  pmProssimi.forEach(p=>{todoH+='<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="switchPage(\'promemoria\')"><span style="color:#e67e22;font-size:1.1rem">&#9679;</span><span style="flex:1"><strong>'+escP(p.titolo)+'</strong> <span style="color:var(--muted);font-size:.78rem">scade '+new Date(p.data_scadenza+'T12:00:00').toLocaleDateString('it-IT')+'</span></span></div>'});
+  const pmOggi=pmMiei.filter(p=>{const dr=_getDataRemind(p);return p.data_scadenza<=oggi||dr<=oggi});
+  pmOggi.forEach(p=>{const isScaduto=p.data_scadenza<oggi;
+    todoH+='<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="color:'+(isScaduto?'var(--accent)':'#e67e22')+';font-weight:700;font-size:1.1rem">'+(isScaduto?'!':'&#9679;')+'</span><span style="flex:1;cursor:pointer" onclick="switchPage(\'promemoria\')"><strong>'+escP(p.titolo)+'</strong>'+(p.data_scadenza!==oggi?' <span style="color:var(--muted);font-size:.78rem">scade '+new Date(p.data_scadenza+'T12:00:00').toLocaleDateString('it-IT')+'</span>':'')+'</span><button class="btn-act pin" onclick="completaPromemoria('+p.id+');renderDashboard()" style="color:#2c6e49;border-color:#2c6e49;font-size:.78rem">Fatto</button></div>'});
   if(noteNL)todoH+='<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="switchPage(\'note-collega\')"><span style="color:#2980b9;font-size:1.1rem">&#9993;</span><span>'+noteNL+' nota/e non letta/e</span></div>';
-  // Compleanni prossimi 7 giorni (se visibile)
-  const bdays=isVis('alert_compleanni')?_getCompleanniProssimi(7):[];
-  bdays.forEach(bd=>{const ne=bd.nome.replace(/'/g,"\\'");todoH+='<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="font-size:1.1rem">&#127874;</span><span style="flex:1"><strong>'+escP(bd.nome)+'</strong> — '+(bd.giorni===0?'<span style="color:var(--accent2);font-weight:700">Compleanno OGGI!</span>':'compleanno tra '+bd.giorni+' giorno/i')+'</span></div>'});
-  // Ammonimenti verbali recidivi
-  const ammA=checkAmmonimentiAlerts();ammA.forEach(a=>{const ne=a.nome.replace(/'/g,"\\'");todoH+='<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="color:#e67e22;font-weight:700;font-size:1.1rem">!</span><span style="flex:1;cursor:pointer" onclick="apriProfilo(\''+ne+'\')"><strong>'+escP(a.nome)+'</strong> — '+a.count+' ammonimenti verbali, preparare allineamento</span></div>'});
-  if(!todoH)todoH='<p style="color:var(--muted);text-align:center;padding:20px">Tutto in ordine!</p>';
+  const bdays=isVis('alert_compleanni')?_getCompleanniProssimi(0):[];
+  bdays.forEach(bd=>{todoH+='<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="font-size:1.1rem">&#127874;</span><span style="flex:1"><strong>'+escP(bd.nome)+'</strong> — <span style="color:var(--accent2);font-weight:700">Compleanno OGGI!</span></span></div>'});
+  const ammA=checkAmmonimentiAlerts();ammA.forEach(a=>{const ne=a.nome.replace(/'/g,"\\'");todoH+='<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="color:#e67e22;font-weight:700;font-size:1.1rem">!</span><span style="flex:1;cursor:pointer" onclick="apriProfilo(\''+ne+'\')"><strong>'+escP(a.nome)+'</strong> — '+a.count+' ammonimenti verbali</span></div>'});
+  if(!todoH)todoH='<p style="color:#2c6e49;text-align:center;padding:20px;font-weight:600">Tutto in ordine!</p>';
   todoEl.innerHTML=todoH;
+  // DA FARE DOMANI: reminder di domani + scadenze domani + compleanni domani
+  const domaniEl=document.getElementById('dash-domani-list');let domH='';
+  const pmDomani=pmMiei.filter(p=>{const dr=_getDataRemind(p);return(p.data_scadenza===domani||dr===domani)&&!pmOggi.includes(p)});
+  pmDomani.forEach(p=>{domH+='<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="switchPage(\'promemoria\')"><span style="color:#8e44ad;font-size:1.1rem">&#9679;</span><span style="flex:1"><strong>'+escP(p.titolo)+'</strong> <span style="color:var(--muted);font-size:.78rem">scade '+new Date(p.data_scadenza+'T12:00:00').toLocaleDateString('it-IT')+'</span></span></div>'});
+  const bdaysDomani=isVis('alert_compleanni')?_getCompleanniProssimi(1).filter(b=>b.giorni===1):[];
+  bdaysDomani.forEach(bd=>{domH+='<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="font-size:1.1rem">&#127874;</span><span style="flex:1"><strong>'+escP(bd.nome)+'</strong> — compleanno domani</span></div>'});
+  if(!domH)domH='<p style="color:var(--muted);text-align:center;padding:20px">Niente in programma</p>';
+  domaniEl.innerHTML=domH;
+  const dashDomani=document.getElementById('dash-domani');if(dashDomani)dashDomani.style.display=isVis('promemoria')?'':'';
   // ALERT ATTIVI
   const alertEl=document.getElementById('dash-alert-list');let alertH='';
   checkCassaAlerts().forEach(a=>{const ne=a.nome.replace(/'/g,"\\'");alertH+='<div style="padding:8px 0;border-bottom:1px solid var(--line)"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+(a.type==='rdi'?'var(--accent)':'#e67e22')+';margin-right:8px"></span><span class="entry-name" onclick="apriProfilo(\''+ne+'\')"><strong>'+escP(a.nome)+'</strong></span>: '+(a.type==='rdi'?'cumulativo '+a.importo.toFixed(0)+' CHF → RDI':'singola '+a.importo.toFixed(0)+' CHF → Allineamento')+'</div>'});
