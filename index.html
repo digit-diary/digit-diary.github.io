@@ -1105,7 +1105,9 @@ async function secDel(table,filter){const tk=getOpToken();
     await sbRpc('secure_delete',{p_token:tk,p_table:table,p_filter:parts})}catch(e){console.warn('secDel fallback:',e.message);await sbDel(table,filter)}}
   else{await sbDel(table,filter)}}
 async function getImp(k){const d=await secGet('impostazioni?chiave=eq.'+k+'&select=valore');return d.length?d[0].valore:null}
-async function setImp(k,v){try{await secPatch('impostazioni','chiave=eq.'+k,{valore:v})}catch(e){}
+async function setImp(k,v){const tk=getOpToken();
+  if(tk){try{await sbRpc('upsert_impostazione',{p_token:tk,p_chiave:k,p_valore:v});return}catch(e){console.warn('setImp upsert error:',e.message)}}
+  try{await secPatch('impostazioni','chiave=eq.'+k,{valore:v})}catch(e){}
   const check=await getImp(k);if(check!==v){try{await secPost('impostazioni',{chiave:k,valore:v})}catch(e2){}}}
 
 // DATA LOADING
