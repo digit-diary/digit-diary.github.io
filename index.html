@@ -240,6 +240,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 /* MODAL */
 #modal-overlay,#profilo-modal,#scadenza-modal,#note-modal{position:fixed;inset:0;background:rgba(26,18,8,.72);display:flex;align-items:center;justify-content:center;z-index:8888;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
 #modal-overlay.hidden,#profilo-modal.hidden,#scadenza-modal.hidden,#note-modal.hidden,#pdf-preview-modal.hidden{display:none}
+#pdf-preview-modal{position:fixed;inset:0;background:rgba(26,18,8,0.82);display:flex;align-items:center;justify-content:center;z-index:9997;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
 .modal-box{background:var(--paper);padding:32px 36px;border-radius:3px;box-shadow:6px 6px 0 #b8aa95;min-width:320px;text-align:center;max-height:90vh;overflow-y:auto}
 .modal-box h3{font-family:'Playfair Display',serif;font-size:1.3rem;margin-bottom:6px;color:var(--ink)}
 .modal-box p{color:var(--muted);font-size:.82rem;margin-bottom:20px}
@@ -520,7 +521,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
 <div id="profilo-modal" class="hidden"><div class="profilo-box" id="profilo-content"></div></div>
 <div id="scadenza-modal" class="hidden"><div class="pwd-modal-box" id="scadenza-content"></div></div>
 <div id="note-modal" class="hidden"><div class="pwd-modal-box" id="note-modal-content" style="max-width:500px;max-height:80vh;overflow-y:auto"></div></div>
-<div id="pdf-preview-modal" class="hidden" onclick="if(event.target===this)chiudiPdfPreview()" style="position:fixed;inset:0;background:rgba(26,18,8,0.82);display:flex;align-items:center;justify-content:center;z-index:9997;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)">
+<div id="pdf-preview-modal" class="hidden" onclick="if(event.target===this)chiudiPdfPreview()">
   <div style="background:var(--paper);border-radius:4px;box-shadow:6px 6px 0 rgba(0,0,0,.15);width:94vw;max-width:900px;height:88vh;display:flex;flex-direction:column;overflow:hidden">
     <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--paper2)">
       <span id="pdf-preview-title" style="font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:600;color:var(--ink)">Anteprima PDF</span>
