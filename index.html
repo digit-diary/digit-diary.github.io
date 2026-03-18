@@ -2894,9 +2894,9 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
     // Auto-malattia: parse assenze field (supporta "fino al 27", "dal 20 al 27", "fino al 27/03")
     const assenzeText=data.assenze||'';if(assenzeText.trim()){const righe=assenzeText.split('\n').filter(r=>r.trim());
       for(const riga of righe){const m=riga.match(/^([A-ZÀ-Üa-zà-ü\s.'-]+?)\s*(assente|malattia|malato|malata)/i);if(m){const nome=capitalizzaNome(m[1].trim());
-        // Cerca "fino al DD" o "fino al DD/MM" o "dal DD al DD"
-        const finoMatch=riga.match(/fino\s+al\s+(\d{1,2})(?:[\/\.](\d{1,2}))?/i);
-        const dalAlMatch=riga.match(/dal\s+(\d{1,2})(?:[\/\.](\d{1,2}))?\s+al\s+(\d{1,2})(?:[\/\.](\d{1,2}))?/i);
+        // Cerca "fino al DD", "fino DD.MM", "fino al 5.5", "dal DD al DD", ecc.
+        const finoMatch=riga.match(/fino\s+(?:al\s+)?(\d{1,2})(?:[\/\.\-](\d{1,2}))?/i);
+        const dalAlMatch=riga.match(/dal\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?\s+al\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?/i);
         const dataRapp=new Date(ds+'T12:00:00');
         let dataInizio=new Date(ds+'T12:00:00'),dataFine=new Date(ds+'T12:00:00');
         if(dalAlMatch){
