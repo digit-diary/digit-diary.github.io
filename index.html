@@ -3224,7 +3224,7 @@ function renderConsegne(){const el=document.getElementById('consegne-list');if(!
       if(canEdit){btns+='<button class="btn-act edit" onclick="modificaConsegna('+c.id+')" style="font-size:.7rem">Modifica</button>';
         btns+='<button class="btn-act del" onclick="annullaConsegna('+c.id+')" style="font-size:.7rem">Annulla invio</button>'}
       else if(letto){btns+='<span style="font-size:.72rem;color:var(--muted);font-style:italic">Non modificabile (letta)</span>'}}
-    if(!isMia&&!letto){btns+='<button class="btn-act pin" onclick="segnaConsegnaLetta('+c.id+')" style="color:#2c6e49;border-color:#2c6e49;font-size:.7rem">Ho letto</button>'}
+    if(!isMia&&!letto){segnaConsegnaLetta(c.id)}
     return'<div style="padding:14px;margin-bottom:12px;border-radius:3px;border-left:3px solid '+(isAlta?'var(--accent)':'var(--accent2)')+';background:var(--paper2);'+(letto?'opacity:.65':'')+'"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap"><span class="mini-badge" style="background:'+(c.turno_uscente==='PRESTO'?'#e67e22':'#2c3e50')+'">'+c.turno_uscente+'</span><strong>'+escP(c.operatore)+'</strong><span style="font-size:.78rem;color:#2980b9;font-weight:600">→ '+escP(destLabel)+'</span><span style="color:var(--muted);font-size:.78rem">'+d.toLocaleDateString('it-IT')+' '+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})+'</span>'+(isAlta?'<span style="color:var(--accent);font-size:.78rem;font-weight:700">PRIORITA ALTA</span>':'')+(letto?'<span style="color:#2c6e49;font-size:.78rem;font-weight:600">Letto da '+escP(c.letto_da)+' il '+new Date(c.letto_at).toLocaleDateString('it-IT')+'</span>':'')+'<div style="display:flex;gap:6px">'+btns+'</div></div><div style="white-space:pre-line;font-size:.92rem;line-height:1.5">'+esc(c.messaggio)+'</div></div>'}).join('')}
 function modificaConsegna(id){const c=consegneCache.find(x=>x.id===id);if(!c||c.letto_da)return;
   const b=document.getElementById('pwd-modal-content');
@@ -3250,8 +3250,10 @@ function mostraConsegnaLogin(){const op=getOperatore();if(!op)return;
   if(isAlta)html+='<p style="color:var(--accent);font-size:.82rem;font-weight:700;margin-bottom:10px">PRIORITA ALTA</p>';
   html+='<div style="background:var(--paper2);border-radius:3px;padding:14px;border-left:3px solid '+(isAlta?'var(--accent)':'var(--accent2)')+';white-space:pre-line;font-size:.95rem;line-height:1.6;margin-bottom:16px">'+esc(ultima.messaggio)+'</div>';
   if(nonLette.length>1)html+='<p style="color:var(--muted);font-size:.82rem;margin-bottom:12px">+ altre '+(nonLette.length-1)+' consegne non lette</p>';
-  html+='<div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="segnaConsegnaLetta('+ultima.id+');document.getElementById(\'note-modal\').classList.add(\'hidden\')">Ho letto</button><button class="btn-modal-cancel" onclick="document.getElementById(\'note-modal\').classList.add(\'hidden\');switchPage(\'consegna\')">Vedi tutte</button></div>';
-  mc.innerHTML=html;document.getElementById('note-modal').classList.remove('hidden')}
+  html+='<div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'note-modal\').classList.add(\'hidden\')">OK</button><button class="btn-modal-cancel" onclick="document.getElementById(\'note-modal\').classList.add(\'hidden\');switchPage(\'consegna\')">Vedi tutte</button></div>';
+  mc.innerHTML=html;document.getElementById('note-modal').classList.remove('hidden');
+  // Segna come letta automaticamente quando il popup si apre
+  segnaConsegnaLetta(ultima.id)}
 
 // ========================
 // DASHBOARD PANORAMICA
