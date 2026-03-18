@@ -239,7 +239,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 .btn-act.scad:hover{background:#7b2d8b;color:white}
 /* MODAL */
 #modal-overlay,#profilo-modal,#scadenza-modal,#note-modal{position:fixed;inset:0;background:rgba(26,18,8,.72);display:flex;align-items:center;justify-content:center;z-index:8888;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
-#modal-overlay.hidden,#profilo-modal.hidden,#scadenza-modal.hidden,#note-modal.hidden{display:none}
+#modal-overlay.hidden,#profilo-modal.hidden,#scadenza-modal.hidden,#note-modal.hidden,#pdf-preview-modal.hidden{display:none}
 .modal-box{background:var(--paper);padding:32px 36px;border-radius:3px;box-shadow:6px 6px 0 #b8aa95;min-width:320px;text-align:center;max-height:90vh;overflow-y:auto}
 .modal-box h3{font-family:'Playfair Display',serif;font-size:1.3rem;margin-bottom:6px;color:var(--ink)}
 .modal-box p{color:var(--muted);font-size:.82rem;margin-bottom:20px}
@@ -520,6 +520,18 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
 <div id="profilo-modal" class="hidden"><div class="profilo-box" id="profilo-content"></div></div>
 <div id="scadenza-modal" class="hidden"><div class="pwd-modal-box" id="scadenza-content"></div></div>
 <div id="note-modal" class="hidden"><div class="pwd-modal-box" id="note-modal-content" style="max-width:500px;max-height:80vh;overflow-y:auto"></div></div>
+<div id="pdf-preview-modal" class="hidden" onclick="if(event.target===this)chiudiPdfPreview()" style="position:fixed;inset:0;background:rgba(26,18,8,0.82);display:flex;align-items:center;justify-content:center;z-index:9997;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)">
+  <div style="background:var(--paper);border-radius:4px;box-shadow:6px 6px 0 rgba(0,0,0,.15);width:94vw;max-width:900px;height:88vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--paper2)">
+      <span id="pdf-preview-title" style="font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:600;color:var(--ink)">Anteprima PDF</span>
+      <div style="display:flex;gap:8px">
+        <button class="btn-export btn-export-pdf" onclick="scaricaPdfPreview()" style="padding:8px 18px;font-size:.82rem">Scarica PDF</button>
+        <button onclick="chiudiPdfPreview()" style="background:none;border:1px solid var(--line);color:var(--muted);padding:8px 14px;border-radius:2px;cursor:pointer;font-family:'Source Sans 3',sans-serif;font-size:.82rem">Chiudi</button>
+      </div>
+    </div>
+    <iframe id="pdf-preview-iframe" style="flex:1;border:none;background:#525659"></iframe>
+  </div>
+</div>
 
 <header>
   <h1><span class="subtitle">Registro Aziendale</span>Diario Collaboratori<span class="casino">Casinò Lugano SA</span></h1>
@@ -561,14 +573,14 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
 <div class="nav-tabs">
   <button class="nav-tab active" data-page="dashboard" onclick="switchPage('dashboard')">&#127968; Home</button>
   <button class="nav-tab" data-page="diario" onclick="switchPage('diario')">&#128214; Diario</button>
-  <button class="nav-tab" data-page="rapporto" onclick="switchPage('rapporto')">&#128197; Rapporto</button>
-  <button class="nav-tab" data-page="note-collega" onclick="switchPage('note-collega')">&#9993;&#65039; Note Colleghi <span id="note-badge" style="display:none;background:var(--accent);color:white;border-radius:9px;font-size:.7rem;padding:1px 6px;margin-left:4px;font-weight:700"></span></button>
+  <button class="nav-tab" data-page="rapporto" onclick="switchPage('rapporto')" title="Rapporto giornaliero di turno">&#128197; Rapporto</button>
+  <button class="nav-tab" data-page="note-collega" onclick="switchPage('note-collega')" title="Messaggi tra colleghi">&#9993;&#65039; Note Colleghi <span id="note-badge" style="display:none;background:var(--accent);color:white;border-radius:9px;font-size:.7rem;padding:1px 6px;margin-left:4px;font-weight:700" title="Note non lette"></span></button>
   <button class="nav-tab" data-page="statistiche" onclick="switchPage('statistiche')">&#128202; Statistiche</button>
-  <button class="nav-tab" data-page="moduli" onclick="switchPage('moduli')">&#128196; Moduli</button>
-  <button class="nav-tab" data-page="assistente" onclick="switchPage('assistente')">&#128113;&#8205;&#9792;&#65039; Assistente</button>
-  <button class="nav-tab" data-page="consegna" onclick="switchPage('consegna')">&#128221; Consegna <span id="consegna-badge" style="display:none;background:var(--accent);color:white;border-radius:9px;font-size:.7rem;padding:1px 6px;margin-left:4px;font-weight:700"></span></button>
-  <button class="nav-tab" data-page="promemoria" onclick="switchPage('promemoria')">&#128203; Promemoria <span id="promemoria-badge" style="display:none;background:var(--accent);color:white;border-radius:9px;font-size:.7rem;padding:1px 6px;margin-left:4px;font-weight:700"></span></button>
-  <button class="nav-tab" data-page="maison" onclick="switchPage('maison')">&#127860; Maison</button>
+  <button class="nav-tab" data-page="moduli" onclick="switchPage('moduli')" title="Moduli disciplinari e apprezzamento">&#128196; Moduli</button>
+  <button class="nav-tab" data-page="assistente" onclick="switchPage('assistente')" title="Assistente AI per scrittura professionale">&#128113;&#8205;&#9792;&#65039; Assistente</button>
+  <button class="nav-tab" data-page="consegna" onclick="switchPage('consegna')" title="Consegne turno tra operatori">&#128221; Consegna <span id="consegna-badge" style="display:none;background:var(--accent);color:white;border-radius:9px;font-size:.7rem;padding:1px 6px;margin-left:4px;font-weight:700" title="Consegne non lette"></span></button>
+  <button class="nav-tab" data-page="promemoria" onclick="switchPage('promemoria')" title="Promemoria con scadenze">&#128203; Promemoria <span id="promemoria-badge" style="display:none;background:var(--accent);color:white;border-radius:9px;font-size:.7rem;padding:1px 6px;margin-left:4px;font-weight:700" title="Promemoria in scadenza"></span></button>
+  <button class="nav-tab" data-page="maison" onclick="switchPage('maison')" title="Gestione costi e clienti Maison">&#127860; Maison</button>
   <button class="nav-tab" data-page="registro" onclick="switchPage('registro')" id="tab-registro" style="display:none">&#128203; Registro</button>
   <button class="nav-tab" data-page="impostazioni" onclick="switchPage('impostazioni')">&#9881;&#65039; Impostazioni</button>
 </div>
@@ -797,7 +809,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
   <div class="settings-section" style="margin-top:20px" id="maison-budget-section">
     <h4 style="display:flex;justify-content:space-between;align-items:center">Scheda clienti Maison <button class="btn-reset" onclick="toggleSezione('maison-budget-list',this)" style="font-size:.92rem;padding:6px 16px">&#9650; Nascondi</button></h4>
     <p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Gestisci categoria (Maison/Full Maison), budget, data nascita.</p>
-    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><button class="btn-export" onclick="esportaListaMaisonCSV()" style="font-size:.78rem;padding:5px 14px">Scarica CSV</button><button class="btn-export btn-export-pdf" onclick="esportaListaMaisonPDF()" style="font-size:.78rem;padding:5px 14px">Scarica PDF</button><button class="btn-export" onclick="apriListaClientiMaison()" style="font-size:.78rem;padding:5px 14px;border-color:var(--accent2);color:var(--accent2)">Mostra Lista</button><button class="btn-export" onclick="apriConfrontoClienti()" style="font-size:.78rem;padding:5px 14px;border-color:#1a7a6d;color:#1a7a6d">Confronta clienti</button></div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><button class="btn-export" onclick="esportaListaMaisonCSV()" style="font-size:.78rem;padding:5px 14px">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaListaMaisonPDF()" style="font-size:.78rem;padding:5px 14px">PDF</button><button class="btn-export" onclick="apriListaClientiMaison()" style="font-size:.78rem;padding:5px 14px;border-color:var(--accent2);color:var(--accent2)">Mostra Lista</button><button class="btn-export" onclick="apriConfrontoClienti()" style="font-size:.78rem;padding:5px 14px;border-color:#1a7a6d;color:#1a7a6d">Confronta clienti</button></div>
     <div id="maison-budget-list" style="margin-bottom:14px"></div>
     <div class="add-tipo-row" style="align-items:flex-end">
       <div class="field"><label>Cliente</label><div class="ac-wrap"><input type="text" id="maison-budget-nome" placeholder="Nome..." oninput="acFiltraMaison('maison-budget-nome','ac-maison-budget')" onfocus="acFiltraMaison('maison-budget-nome','ac-maison-budget')"><div class="ac-drop" id="ac-maison-budget"></div></div></div>
@@ -931,6 +943,14 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
             <option value="diretto">Diretto e conciso</option>
           </select>
         </div>
+        <div class="field"><label>Lunghezza</label>
+          <select id="assist-lunghezza">
+            <option value="auto">Automatica</option>
+            <option value="breve">Breve (poche righe)</option>
+            <option value="media">Media</option>
+            <option value="lunga">Dettagliata</option>
+          </select>
+        </div>
       </div>
       <div class="field" style="margin-bottom:16px"><label>Il tuo testo <small style="color:var(--muted);font-weight:300;text-transform:none;letter-spacing:0;font-size:.75rem">Scrivi in modo veloce, anche appunti – l'AI sistema tutto</small></label>
         <textarea id="assist-input" placeholder="Es: scrivi a hr che domani mario rossi è malato e serve sostituto per turno sera cassa..." style="min-height:120px"></textarea>
@@ -946,15 +966,16 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
         <div id="assist-foto-preview" style="display:none;margin-top:10px"><img id="assist-foto-img" style="max-width:300px;max-height:200px;border-radius:3px;border:1px solid var(--line)"></div>
       </div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <button class="btn-salva" id="btn-assist-gen" onclick="assistenteGenera()" style="background:linear-gradient(135deg,#667eea,#764ba2)">Riscrivi con AI</button>
+        <button class="btn-salva" id="btn-assist-gen" onclick="assistenteGenera()" style="background:var(--ink)">Riscrivi con AI</button>
         <span id="assist-status" style="font-size:.82rem;color:var(--muted)"></span>
       </div>
       <div id="assist-output-wrap" style="display:none;margin-top:20px">
         <div class="field"><label>Risultato</label>
           <textarea id="assist-output" readonly style="min-height:180px;background:var(--paper2);font-size:.95rem;line-height:1.6"></textarea>
         </div>
-        <div style="display:flex;gap:10px;margin-top:10px">
+        <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
           <button class="btn-salva" onclick="assistenteCopia()" style="background:var(--ink);font-size:.78rem;padding:10px 20px">Copia negli appunti</button>
+          <button class="btn-salva" onclick="assistenteGenera()" style="background:var(--accent2);font-size:.78rem;padding:10px 20px">Riprova</button>
           <button class="btn-salva" onclick="assistenteReset()" style="background:var(--paper2);color:var(--muted);border:1px solid var(--line);font-size:.78rem;padding:10px 20px;box-shadow:none">Pulisci tutto</button>
         </div>
       </div>
@@ -1454,6 +1475,20 @@ function toast(m){const t=document.getElementById('toast');t.textContent=m;t.cla
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}
 function escP(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 
+// PDF PREVIEW
+let _pdfPreviewBlob=null,_pdfPreviewName='';
+function mostraPdfPreview(doc,filename,titolo){
+  _pdfPreviewName=filename;
+  const blob=doc.output('blob');
+  _pdfPreviewBlob=blob;
+  const url=URL.createObjectURL(blob);
+  document.getElementById('pdf-preview-title').textContent=titolo||'Anteprima PDF';
+  document.getElementById('pdf-preview-iframe').src=url;
+  document.getElementById('pdf-preview-modal').classList.remove('hidden');
+}
+function scaricaPdfPreview(){if(!_pdfPreviewBlob)return;const a=document.createElement('a');a.href=URL.createObjectURL(_pdfPreviewBlob);a.download=_pdfPreviewName||'documento.pdf';a.click();toast('PDF scaricato!')}
+function chiudiPdfPreview(){document.getElementById('pdf-preview-modal').classList.add('hidden');const iframe=document.getElementById('pdf-preview-iframe');if(iframe.src){URL.revokeObjectURL(iframe.src);iframe.src=''}}_pdfPreviewBlob=null;
+
 // MALATTIA DAL/AL
 let _malFpInit=false;
 function _initMalFlatpickr(){if(_malFpInit||!window.flatpickr)return;_malFpInit=true;
@@ -1784,7 +1819,7 @@ async function generaRiepilogoMensile(){
     // Footer
     const tp=doc.internal.getNumberOfPages();for(let i=1;i<=tp;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(150);
       doc.text('Casino Lugano SA — Riepilogo '+meseName+' — Pag. '+i+'/'+tp,mx,doc.internal.pageSize.getHeight()-8)}
-    doc.save('Riepilogo_'+meseName.replace(/\s/g,'_')+'.pdf');toast('Riepilogo mensile PDF generato!')
+    mostraPdfPreview(doc,'Riepilogo_'+meseName.replace(/\s/g,'_')+'.pdf','Riepilogo '+meseName)
   }catch(e){console.error(e);toast('Errore generazione PDF: '+e.message)}}
 
 // NOTE COLLEGHI
@@ -2149,8 +2184,7 @@ function stampaSchedaPDF(nome){
   if(items.length){doc.autoTable({startY:doc.lastAutoTable.finalY+6,head:[['Data','Tipo','Descrizione','Operatore']],body:items,
     theme:'striped',headStyles:{fillColor:[26,74,122],fontSize:7},bodyStyles:{fontSize:7},columnStyles:{2:{cellWidth:80}},margin:{left:14,right:14}})}
 
-  doc.save('scheda_'+nome.replace(/\s+/g,'_')+'_'+new Date().toLocaleDateString('it-IT').replace(/\//g,'-')+'.pdf');
-  toast('PDF generato!');
+  mostraPdfPreview(doc,'scheda_'+nome.replace(/\s+/g,'_')+'_'+new Date().toLocaleDateString('it-IT').replace(/\//g,'-')+'.pdf','Scheda '+nome);
 }
 
 // CONFRONTO COLLABORATORI
@@ -2470,7 +2504,7 @@ async function generaModuloPDF(tipo){
     doc.addImage(qrImg,'PNG',pw-mx-qrSz,ph-14-qrSz,qrSz,qrSz);
     doc.setFontSize(5.5);doc.setTextColor(130);doc.setFont('helvetica','normal');
     doc.text('Scansiona per verificare',pw-mx-qrSz,ph-11);doc.text('digit-diary.github.io/#modulo/'+moduloQrId,pw-mx-qrSz,ph-8)}}catch(e){}
-  doc.save('Modulo_'+tipo.charAt(0).toUpperCase()+tipo.slice(1)+'_'+collab.replace(/\s+/g,'_')+'_'+data.replace(/\//g,'-')+'.pdf');
+  mostraPdfPreview(doc,'Modulo_'+tipo.charAt(0).toUpperCase()+tipo.slice(1)+'_'+collab.replace(/\s+/g,'_')+'_'+data.replace(/\//g,'-')+'.pdf','Modulo '+tipo.charAt(0).toUpperCase()+tipo.slice(1)+' — '+collab);
   // Salva/aggiorna nel database
   const dati={qr_code:moduloQrId};
   if(_fResp)dati.firma_resp=_fResp;if(_fCollab)dati.firma_collab=_fCollab;dati.firma_digitale=!!(isDigFirma&&isDigFirma.checked);
@@ -2737,13 +2771,15 @@ async function assistenteGenera(){
   if(!groqKey){toast('Configura la chiave Groq nelle Impostazioni');return}
   const tipo=document.getElementById('assist-tipo').value;
   const tono=document.getElementById('assist-tono').value;
+  const lunghezza=(document.getElementById('assist-lunghezza')||{}).value||'auto';
   const btn=document.getElementById('btn-assist-gen');
   const status=document.getElementById('assist-status');
   btn.disabled=true;btn.textContent='Elaborazione...';
   if(status)status.textContent=_assistFotoB64?'L\'AI sta analizzando foto e testo...':'L\'AI sta riscrivendo il testo...';
   const tipoLabels={mail_formale:'una mail formale (destinatario: Direzione, HR, CFCG o ente esterno)',mail_colleghi:'una comunicazione interna tra colleghi',nota_collaboratore:'una nota indirizzata a un collaboratore',comunicazione_servizio:'una comunicazione di servizio per il reparto',segnalazione:'una segnalazione o un rapporto interno',risposta:'una risposta formale a una richiesta o reclamo',libero:'un testo professionale (migliora solo la forma)'};
   const tonoLabels={formale:'Tono formale e istituzionale, tipico di documenti ufficiali.',cordiale:'Tono cordiale ma professionale, adatto a comunicazioni tra colleghi.',diretto:'Tono diretto e conciso, vai al punto senza giri di parole.'};
-  let promptText='Sei un assistente di redazione per Casinò Lugano SA (casa da gioco svizzera regolata dalla CFCG).\n\nRiscrivi il seguente testo come '+tipoLabels[tipo]+'.\n\n'+tonoLabels[tono]+'\n\nREGOLE:\n- Italiano corretto e professionale\n- Mantieni TUTTI i dettagli specifici (nomi, date, orari, importi, circostanze)\n- Se pertinente, usa terminologia corretta del casinò (SUP_FBS, SURV, CAS, REC, SA, ISP, CR, SIC, LRD, CFCG, QM, IR, GD, CD, ecc.)\n- NON inventare fatti non presenti nel testo originale\n- NON aggiungere saluti/chiusure se non richiesto\n- Rispondi SOLO con il testo riscritto, senza commenti o spiegazioni';
+  const lunghLabels={auto:'',breve:'\n- Il testo deve essere BREVE: massimo 3-5 righe, vai dritto al punto.',media:'\n- Lunghezza MEDIA: copri tutti i punti ma senza dilungarti.',lunga:'\n- Testo DETTAGLIATO: sviluppa ogni punto in modo completo e articolato.'};
+  let promptText='Sei un assistente di redazione per Casinò Lugano SA (casa da gioco svizzera regolata dalla CFCG).\n\nRiscrivi il seguente testo come '+tipoLabels[tipo]+'.\n\n'+tonoLabels[tono]+'\n\nREGOLE:\n- Italiano corretto e professionale\n- Mantieni TUTTI i dettagli specifici (nomi, date, orari, importi, circostanze)\n- Se pertinente, usa terminologia corretta del casinò (SUP_FBS, SURV, CAS, REC, SA, ISP, CR, SIC, LRD, CFCG, QM, IR, GD, CD, ecc.)\n- NON inventare fatti non presenti nel testo originale\n- NON aggiungere saluti/chiusure se non richiesto\n- Rispondi SOLO con il testo riscritto, senza commenti o spiegazioni'+(lunghLabels[lunghezza]||'');
   if(_assistFotoB64)promptText+='\n\nHo allegato una foto. Analizzala e integra le informazioni visibili nella foto con il testo scritto. Se la foto mostra documenti, schermate, situazioni o dettagli rilevanti, includili nel testo riscritto.';
   promptText+='\n\nTesto originale:\n'+(input||'[Vedi foto allegata - descrivi e riscrivi in base a ciò che vedi]');
   let model='llama-3.3-70b-versatile';
@@ -3009,7 +3045,7 @@ async function esportaRapportoPDF(){if(!window.jspdf){toast('Caricamento PDF...'
       alternateRowStyles:{fillColor:[250,247,242]},margin:{left:14,right:14},theme:'grid'});
     y=doc.lastAutoTable.finalY+10});
   const tp=doc.internal.getNumberOfPages();for(let i=1;i<=tp;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(150);doc.text('Casinò Lugano SA — Pag. '+i+'/'+tp,14,doc.internal.pageSize.height-8)}
-  doc.save('rapporto_'+dal+'_'+al+'.pdf');toast('PDF esportato!')}catch(e){console.error('PDF error:',e);toast('Errore generazione PDF: '+e.message)}}
+  mostraPdfPreview(doc,'rapporto_'+dal+'_'+al+'.pdf','Rapporto '+dal+' — '+al)}catch(e){console.error('PDF error:',e);toast('Errore generazione PDF: '+e.message)}}
 
 // STATISTICHE
 function renderStatistiche(){const _ds=getDatiReparto();if(!_ds.length){document.getElementById('stats-summary').innerHTML='<p style="color:var(--muted);text-align:center;padding:40px">Nessun dato da analizzare</p>';
@@ -3067,7 +3103,7 @@ async function esportaPDF(){const f=getFiltrati();if(!f.length){toast('Nessun da
     styles:{fontSize:8,cellPadding:2,overflow:'linebreak'},headStyles:{fillColor:[26,18,8],textColor:[250,247,242],fontStyle:'bold'},columnStyles:{0:{cellWidth:22},1:{cellWidth:15},2:{cellWidth:35},3:{cellWidth:30},4:{cellWidth:'auto'}},alternateRowStyles:{fillColor:[250,247,242]},
     didParseCell:function(d){if(d.section==='body'&&d.column.index===3){var c=getColore(d.cell.raw);if(c){var r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16);d.cell.styles.textColor=[r,g,b]}d.cell.styles.fontStyle='bold'}},
     margin:{top:26,left:14,right:14},didDrawPage:function(){doc.setFontSize(7);doc.setTextColor(150);doc.text('Casino Lugano SA - Pag. '+doc.internal.getNumberOfPages(),14,doc.internal.pageSize.height-8)}});
-  doc.save('diario_'+new Date().toLocaleDateString('it-IT').replace(/\//g,'-')+'.pdf');toast('PDF esportato!')}catch(e){console.error('PDF error:',e);toast('Errore generazione PDF: '+e.message)}}
+  mostraPdfPreview(doc,'diario_'+new Date().toLocaleDateString('it-IT').replace(/\//g,'-')+'.pdf','Diario Collaboratori')}catch(e){console.error('PDF error:',e);toast('Errore generazione PDF: '+e.message)}}
 
 // ========================
 // CONSEGNA TURNO
@@ -3308,7 +3344,7 @@ async function generaReportSettimanale(sez){
     // Footer
     const tp=doc.internal.getNumberOfPages();for(let i=1;i<=tp;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(150);
       doc.text('Casino Lugano SA — Report '+dalLabel+' / '+alLabel+' — Pag. '+i+'/'+tp,mx,doc.internal.pageSize.getHeight()-8)}
-    doc.save('report_settimanale_'+dalLabel.replace(/\//g,'-')+'_'+alLabel.replace(/\//g,'-')+'.pdf');toast('Report settimanale generato!')}
+    mostraPdfPreview(doc,'report_settimanale_'+dalLabel.replace(/\//g,'-')+'_'+alLabel.replace(/\//g,'-')+'.pdf','Report Settimanale')}
   catch(e){console.error(e);toast('Errore PDF: '+e.message)}}
 
 // REPORT SETTIMANALE CSV
@@ -3378,7 +3414,7 @@ async function generaReportAnnuale(sez){
     // Footer
     var tp=doc.internal.getNumberOfPages();for(var i=1;i<=tp;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(150);
       doc.text('Casino Lugano SA — Report Annuale '+anno+' — Pag. '+i+'/'+tp,mx,doc.internal.pageSize.getHeight()-8)}
-    doc.save('report_annuale_'+anno+'.pdf');toast('Report annuale PDF generato!')}
+    mostraPdfPreview(doc,'report_annuale_'+anno+'.pdf','Report Annuale '+anno)}
   catch(e){console.error(e);toast('Errore PDF: '+e.message)}}
 function generaReportAnnualeCSV(){
   const anno=_getAnnoCorrente();const d=_getDatiAnno(anno);
@@ -3965,7 +4001,7 @@ async function esportaMaisonClientePDF(nome){const righe=getMaisonFiltrati().fil
       styles:{fontSize:9,cellPadding:3},columnStyles:{2:{halign:'center'},3:{halign:'right'}},
       alternateRowStyles:{fillColor:[250,247,242]}});
     const tp=doc.internal.getNumberOfPages();for(let i=1;i<=tp;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(150);doc.text('Casino Lugano SA — '+nome+' — Pag. '+i+'/'+tp,16,doc.internal.pageSize.getHeight()-8)}
-    doc.save('maison_'+nome.replace(/\s+/g,'_')+'_'+_maisonFilePeriodo(righe)+'.pdf');toast('PDF esportato!')}catch(e){console.error(e);toast('Errore PDF')}}
+    mostraPdfPreview(doc,'maison_'+nome.replace(/\s+/g,'_')+'_'+_maisonFilePeriodo(righe)+'.pdf','Maison — '+nome)}catch(e){console.error(e);toast('Errore PDF')}}
 
 // Controlla se un nome esiste solo come parte di nomi condivisi (es. "Bertaggia" da "Bertaggia/Pegoraro")
 function _isSoloCondiviso(nome){return!getMaisonReparto().some(r=>r.nome===nome)&&getMaisonReparto().some(r=>r.nome.includes('/')&&r.nome.split(/\s*\/\s*/).some(n=>capitalizzaNome(n.trim())===nome))}
@@ -4131,7 +4167,7 @@ async function esportaListaMaisonPDF(){const _br=getBudgetReparto();if(!_br.leng
       didParseCell:function(d){if(d.section==='body'&&d.column.index===1){if(d.cell.raw==='Full Maison'){d.cell.styles.textColor=[184,134,11];d.cell.styles.fontStyle='bold'}else if(d.cell.raw==='Maison'){d.cell.styles.textColor=[41,128,185];d.cell.styles.fontStyle='bold'}else if(d.cell.raw==='Direzione'){d.cell.styles.textColor=[142,68,173];d.cell.styles.fontStyle='bold'}}},
       alternateRowStyles:{fillColor:[250,247,242]}});
     const tp=doc.internal.getNumberOfPages();for(let i=1;i<=tp;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(150);doc.text('Casino Lugano SA — Clienti Maison — Pag. '+i+'/'+tp,16,doc.internal.pageSize.getHeight()-8)}
-    doc.save('clienti_maison.pdf');toast('Lista PDF esportata!')}catch(e){toast('Errore PDF')}}
+    mostraPdfPreview(doc,'clienti_maison.pdf','Lista Clienti Maison')}catch(e){toast('Errore PDF')}}
 async function rimuoviMaisonBudget(id){if(!confirm('Rimuovere questo budget?'))return;
   try{await secDel('maison_budget','id=eq.'+id);maisonBudgetCache=maisonBudgetCache.filter(b=>b.id!==id);renderMaisonBudgetUI();renderMaisonDashboard();renderMaisonBudgetAlerts();toast('Budget rimosso')}catch(e){toast('Errore')}}
 function renderMaisonBudgetAlerts(){const container=document.getElementById('maison-alerts-container');if(!container)return;
@@ -4187,7 +4223,7 @@ async function esportaMaisonPDF(){const data=getMaisonFiltrati();if(!data.length
       alternateRowStyles:{fillColor:[250,247,242]}});
     y=doc.lastAutoTable.finalY+6;
     const tp=doc.internal.getNumberOfPages();for(let i=1;i<=tp;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(150);doc.text('Casino Lugano SA — Costi Maison — Pag. '+i+'/'+tp,16,doc.internal.pageSize.getHeight()-8)}
-    doc.save('costi_maison_'+_maisonFilePeriodo(data)+'.pdf');toast('PDF esportato!')}catch(e){console.error(e);toast('Errore PDF: '+e.message)}}
+    mostraPdfPreview(doc,'costi_maison_'+_maisonFilePeriodo(data)+'.pdf','Costi Maison')}catch(e){console.error(e);toast('Errore PDF: '+e.message)}}
 
 // ========================
 // SPESE EXTRA
@@ -4269,7 +4305,7 @@ async function esportaSpeseExtraPDF(){const data=getSpeseExtraFiltrate();if(!dat
       foot:[['','','','','TOTALE',tot.toFixed(2)]],headStyles:{fillColor:[26,18,8]},footStyles:{fillColor:[245,243,238],textColor:[0,0,0],fontStyle:'bold'},
       styles:{fontSize:8,cellPadding:3},columnStyles:{5:{halign:'right'}},alternateRowStyles:{fillColor:[250,247,242]}});
     const tp=doc.internal.getNumberOfPages();for(let i=1;i<=tp;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(150);doc.text('Casino Lugano SA — Spese Extra — Pag. '+i+'/'+tp,16,doc.internal.pageSize.getHeight()-8)}
-    doc.save('spese_extra.pdf');toast('PDF esportato!')}catch(e){toast('Errore PDF')}}
+    mostraPdfPreview(doc,'spese_extra.pdf','Spese Extra')}catch(e){toast('Errore PDF')}}
 
 // REPARTO SWITCH
 function aggiornaLoginOperatori(){var settore=document.getElementById('login-settore').value;
