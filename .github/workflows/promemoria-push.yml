@@ -1,4 +1,4 @@
-name: Promemoria Push Notifications
+name: Promemoria e Compleanni Push
 
 on:
   schedule:
@@ -7,12 +7,11 @@ on:
   workflow_dispatch: # Permette esecuzione manuale
 
 jobs:
-  check-promemoria:
+  check-notifications:
     runs-on: ubuntu-latest
     steps:
-      - name: Check due promemoria and send push
+      - name: Check promemoria
         run: |
-          # 1. Chiama RPC per ottenere promemoria da notificare
           RESPONSE=$(curl -s -X POST \
             "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/get_due_promemoria" \
             -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
@@ -20,38 +19,60 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{}')
 
-          echo "Promemoria trovati: $RESPONSE"
+          echo "Promemoria: $RESPONSE"
 
-          # 2. Se ci sono promemoria, manda push per ognuno
-          if [ "$RESPONSE" = "[]" ] || [ -z "$RESPONSE" ]; then
-            echo "Nessun promemoria da notificare"
+          if [ "$RESPONSE" != "[]" ] && [ -n "$RESPONSE" ] && [ "$RESPONSE" != "null" ]; then
+            echo "$RESPONSE" | jq -c '.[]' 2>/dev/null | while read -r PM; do
+              TITOLO=$(echo "$PM" | jq -r '.titolo')
+              ASSEGNATO=$(echo "$PM" | jq -r '.assegnato_a')
+              DESCRIZIONE=$(echo "$PM" | jq -r '.descrizione // "" | .[0:100]')
+
+              if [ "$ASSEGNATO" = "tutti" ]; then
+                TARGETS='["tutti"]'
+              else
+                TARGETS="[\"$ASSEGNATO\"]"
+              fi
+
+              curl -s -X POST \
+                "${{ secrets.SUPABASE_URL }}/functions/v1/send-push" \
+                -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+                -H "Content-Type: application/json" \
+                -H "x-push-secret: ${{ secrets.PUSH_SECRET }}" \
+                -d "{\"action\":\"send\",\"operatori\":$TARGETS,\"titolo\":\"Promemoria: $TITOLO\",\"corpo\":\"$DESCRIZIONE\",\"tipo\":\"promemoria\"}"
+
+              echo "Push promemoria: $TITOLO -> $ASSEGNATO"
+            done
+          fi
+
+      - name: Check compleanni (solo alle 08:00)
+        run: |
+          HOUR=$(date -u +%H)
+          if [ "$HOUR" != "07" ]; then
+            echo "Non sono le 08:00 CET, skip compleanni"
             exit 0
           fi
 
-          # Parse JSON e manda push per ogni promemoria
-          echo "$RESPONSE" | jq -c '.[]' | while read -r PM; do
-            TITOLO=$(echo "$PM" | jq -r '.titolo')
-            ASSEGNATO=$(echo "$PM" | jq -r '.assegnato_a')
-            DESCRIZIONE=$(echo "$PM" | jq -r '.descrizione // "" | .[0:100]')
+          RESPONSE=$(curl -s -X POST \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/get_today_birthdays" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{}')
 
-            echo "Invio push: $TITOLO -> $ASSEGNATO"
+          echo "Compleanni: $RESPONSE"
 
-            # Determina destinatari
-            if [ "$ASSEGNATO" = "tutti" ]; then
-              TARGETS='["tutti"]'
-            else
-              TARGETS="[\"$ASSEGNATO\"]"
-            fi
+          if [ "$RESPONSE" != "[]" ] && [ -n "$RESPONSE" ] && [ "$RESPONSE" != "null" ]; then
+            NOMI=$(echo "$RESPONSE" | jq -r '.[].nome' | paste -sd ', ')
+            COUNT=$(echo "$RESPONSE" | jq 'length')
 
-            # Chiama Edge Function send-push
             curl -s -X POST \
               "${{ secrets.SUPABASE_URL }}/functions/v1/send-push" \
               -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
               -H "Content-Type: application/json" \
               -H "x-push-secret: ${{ secrets.PUSH_SECRET }}" \
-              -d "{\"action\":\"send\",\"operatori\":$TARGETS,\"titolo\":\"Promemoria: $TITOLO\",\"corpo\":\"$DESCRIZIONE\",\"tipo\":\"promemoria\"}"
+              -d "{\"action\":\"send\",\"operatori\":[\"tutti\"],\"titolo\":\"Compleanno oggi\",\"corpo\":\"$NOMI\",\"tipo\":\"promemoria\"}"
 
-            echo " -> Push inviata"
-          done
+            echo "Push compleanni: $NOMI"
+          fi
 
           echo "Completato"
