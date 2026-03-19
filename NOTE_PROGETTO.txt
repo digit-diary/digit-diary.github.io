@@ -1126,6 +1126,13 @@
        - RPC get_today_birthdays: cerca compleanni in maison_budget
          e collaboratori per giorno/mese corrente.
 
+  [74] Moduli: tracciamento Creato da / Modificato da (19 marzo 2026)
+       - Quando un operatore modifica un modulo creato da un altro,
+         l'operatore originale resta come "Creato da" e chi modifica
+         viene salvato come "Modificato da".
+       - Lista moduli: mostra "Creato da X — Modificato da Y".
+       - Colonna modificato_da aggiunta alla tabella moduli.
+
 
 ================================================================================
   FILE DEL PROGETTO
