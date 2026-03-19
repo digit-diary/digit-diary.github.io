@@ -3714,12 +3714,15 @@ async function riattivaPromemoria(id){
 async function eliminaPromemoria(id){if(!confirm('Eliminare questo promemoria?'))return;
   try{await secDel('promemoria','id=eq.'+id);promemoriaCache=promemoriaCache.filter(x=>x.id!==id);
     renderPromemoria();aggiornaPromemoriaBadge();toast('Eliminato')}catch(e){toast('Errore eliminazione promemoria')}}
-function getPromemoriaFiltrati(){const op=getOperatore();const stato=(document.getElementById('pm-filt-stato')||{}).value||'attivi';
+function getPromemoriaFiltrati(){const op=getOperatore();const admin=isAdmin();const stato=(document.getElementById('pm-filt-stato')||{}).value||'attivi';
   const filtOp=(document.getElementById('pm-filt-op')||{}).value||'';
   return promemoriaCache.filter(p=>{
     if(stato==='attivi'&&p.completata)return false;
     if(stato==='completati'&&!p.completata)return false;
     if(filtOp&&p.assegnato_a!==filtOp&&p.assegnato_a!=='tutti')return false;
+    // Operatore: vede solo i suoi (assegnati a lui o a "tutti")
+    // Admin: vede tutto
+    if(!admin&&p.assegnato_a!==op&&p.assegnato_a!=='tutti')return false;
     return true})}
 function renderPromemoria(){const data=getPromemoriaFiltrati();const el=document.getElementById('promemoria-list');if(!el)return;
   const oggi=new Date().toISOString().split('T')[0];const op=getOperatore();const admin=isAdmin();
