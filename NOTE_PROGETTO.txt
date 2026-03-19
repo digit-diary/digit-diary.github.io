@@ -1132,6 +1132,10 @@
          viene salvato come "Modificato da".
        - Lista moduli: mostra "Creato da X — Modificato da Y".
        - Colonna modificato_da aggiunta alla tabella moduli.
+       - Ristampa PDF (bottone "PDF" nella lista): genera solo il PDF,
+         non salva nel DB, non cambia Creato da / Modificato da.
+       - Coerente con il diario: modifica tracciata solo se si cambiano
+         effettivamente dati nel form.
 
 
 ================================================================================
