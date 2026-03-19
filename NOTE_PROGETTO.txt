@@ -1133,6 +1133,10 @@
        - Lista moduli: mostra "Creato da X — Modificato da Y".
        - Colonna modificato_da aggiunta alla tabella moduli.
        - Ristampa PDF (bottone "PDF" nella lista): genera solo il PDF,
+       - Scheda maison: "Ultimo aggiornamento: Fattorini — 19/03 14:30"
+         visibile a tutti (campo aggiornato_da + aggiornato_at).
+       - PDF scheda cliente personalizzabile: popup per scegliere sezioni
+         (KPI, dettaglio visite, trend mensile, spese extra, regali).
          non salva nel DB, non cambia Creato da / Modificato da.
        - Coerente con il diario: modifica tracciata solo se si cambiano
          effettivamente dati nel form.
