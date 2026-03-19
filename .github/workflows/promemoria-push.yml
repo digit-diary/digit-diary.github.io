@@ -38,7 +38,7 @@ jobs:
                 -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
                 -H "Content-Type: application/json" \
                 -H "x-push-secret: ${{ secrets.PUSH_SECRET }}" \
-                -d "{\"action\":\"send\",\"operatori\":$TARGETS,\"titolo\":\"Promemoria: $TITOLO\",\"corpo\":\"$DESCRIZIONE\",\"tipo\":\"promemoria\"}"
+                -d "{\"action\":\"send\",\"destinatari\":$TARGETS,\"titolo\":\"Promemoria: $TITOLO\",\"corpo\":\"$DESCRIZIONE\",\"tipo\":\"promemoria\"}"
 
               echo "Push promemoria: $TITOLO -> $ASSEGNATO"
             done
@@ -70,7 +70,7 @@ jobs:
               -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
               -H "Content-Type: application/json" \
               -H "x-push-secret: ${{ secrets.PUSH_SECRET }}" \
-              -d "{\"action\":\"send\",\"operatori\":[\"tutti\"],\"titolo\":\"Compleanno oggi\",\"corpo\":\"$NOMI\",\"tipo\":\"promemoria\"}"
+              -d "{\"action\":\"send\",\"destinatari\":[\"tutti\"],\"titolo\":\"Compleanno oggi\",\"corpo\":\"$NOMI\",\"tipo\":\"promemoria\"}"
 
             echo "Push compleanni: $NOMI"
           fi
