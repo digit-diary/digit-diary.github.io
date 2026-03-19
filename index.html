@@ -610,6 +610,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
     <div class="main-card" id="dash-todo"><div class="card-header">Da fare oggi</div><div id="dash-todo-list" style="padding:14px;max-height:300px;overflow-y:auto"></div></div>
     <div class="main-card" id="dash-domani"><div class="card-header">Da fare domani</div><div id="dash-domani-list" style="padding:14px;max-height:300px;overflow-y:auto"></div></div>
     <div class="main-card" id="dash-alerts"><div class="card-header">Alert attivi</div><div id="dash-alert-list" style="padding:14px;max-height:300px;overflow-y:auto"></div></div>
+    <div class="main-card" id="dash-compleanni"><div class="card-header">&#127874; Compleanni</div><div id="dash-compleanni-list" style="padding:14px;max-height:300px;overflow-y:auto"></div></div>
     <div class="main-card" id="dash-recenti"><div class="card-header">Ultime registrazioni</div><div id="dash-recenti-list" style="padding:14px;max-height:300px;overflow-y:auto"></div></div>
     <div class="main-card" id="dash-maison"><div class="card-header">Maison oggi</div><div id="dash-maison-content" style="padding:14px;max-height:300px;overflow-y:auto"></div></div>
   </div>
@@ -3492,6 +3493,18 @@ function renderDashboard(){
   if(!domH)domH='<p style="color:var(--muted);text-align:center;padding:20px">Niente in programma</p>';
   domaniEl.innerHTML=domH;
   const dashDomani=document.getElementById('dash-domani');if(dashDomani)dashDomani.style.display=isVis('promemoria')?'':'';
+  // COMPLEANNI (oggi + prossimi 7 giorni)
+  const compEl=document.getElementById('dash-compleanni-list');
+  const dashComp=document.getElementById('dash-compleanni');
+  if(compEl&&isVis('alert_compleanni')){
+    const bdaysAll=_getCompleanniProssimi(7);let compH='';
+    bdaysAll.forEach(bd=>{const ne=bd.nome.replace(/'/g,"\\'");
+      const isOggi=bd.giorni===0;const dataStr=bd.data.toLocaleDateString('it-IT',{day:'2-digit',month:'long'});
+      compH+='<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px"><span style="font-size:1.4rem">&#127874;</span><div style="flex:1"><strong class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(bd.nome)+'</strong><div style="font-size:.82rem;color:'+(isOggi?'var(--accent2)':'var(--muted)')+'">'+
+        (isOggi?'Compleanno OGGI!':'Tra '+bd.giorni+' giorno/i — '+dataStr)+'</div></div></div>'});
+    if(!compH)compH='<p style="color:var(--muted);text-align:center;padding:20px">Nessun compleanno nei prossimi 7 giorni</p>';
+    compEl.innerHTML=compH;if(dashComp)dashComp.style.display=''}
+  else{if(dashComp)dashComp.style.display='none'}
   // ALERT ATTIVI
   const alertEl=document.getElementById('dash-alert-list');let alertH='';
   checkCassaAlerts().forEach(a=>{const ne=a.nome.replace(/'/g,"\\'");alertH+='<div style="padding:8px 0;border-bottom:1px solid var(--line)"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+(a.type==='rdi'?'var(--accent)':'#e67e22')+';margin-right:8px"></span><span class="entry-name" onclick="apriProfilo(\''+ne+'\')"><strong>'+escP(a.nome)+'</strong></span>: '+(a.type==='rdi'?'cumulativo '+a.importo.toFixed(0)+' CHF → RDI':'singola '+a.importo.toFixed(0)+' CHF → Allineamento')+'</div>'});
