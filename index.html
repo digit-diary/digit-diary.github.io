@@ -3365,10 +3365,14 @@ async function esportaPDF(){const f=getFiltrati();if(!f.length){toast('Nessun da
 // ========================
 // CONSEGNA TURNO
 // ========================
-function initConsegnaUI(){const turno=_getTurnoCorrente();const sel=document.getElementById('cons-turno');if(sel)sel.value=turno;
+async function initConsegnaUI(){const turno=_getTurnoCorrente();const sel=document.getElementById('cons-turno');if(sel)sel.value=turno;
   const dSel=document.getElementById('cons-destinatario');if(dSel){const ops=operatoriAuthCache.map(o=>o.nome).sort();
+    // Carica rapporto di oggi se non in cache
+    const oggi=getGiornataCasino();
+    if(!rapportiCache[oggi]){try{const rData=await secGet('rapporti_giornalieri?data_rapporto=eq.'+oggi+'&reparto_dip=eq.'+currentReparto);
+      if(rData&&rData.length){if(!rapportiCache[oggi])rapportiCache[oggi]={};rData.forEach(r=>{rapportiCache[oggi][r.turno]=r})}}catch(e){}}
     // Cerca supervisore dell'altro turno dal rapporto giornaliero
-    let suggerito='';const oggi=getGiornataCasino();const rapp=rapportiCache[oggi]||{};
+    let suggerito='';const rapp=rapportiCache[oggi]||{};
     const op=getOperatore();
     // Se sono su PRESTO → cerco chi fa NOTTE (destinatario)
     // Se sono su NOTTE → cerco chi fa PRESTO di domani (destinatario)
