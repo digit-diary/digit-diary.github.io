@@ -1,4 +1,4 @@
-const CACHE_NAME = 'diario-cl-v4';
+const CACHE_NAME = 'diario-cl-v5';
 const SHELL_URLS = ['/', '/manifest.json', '/logo_casino.png', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -73,6 +73,7 @@ self.addEventListener('notificationclick', function(event) {
   else if (tipo === 'consegna') page = 'consegna';
   else if (tipo === 'promemoria') page = 'promemoria';
   else if (tipo === 'budget') page = 'maison';
+  else if (tipo === 'compleanno') page = 'dashboard';
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
