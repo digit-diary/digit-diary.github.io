@@ -1,0 +1,57 @@
+name: Promemoria Push Notifications
+
+on:
+  schedule:
+    # Ogni ora dalle 6 alle 22 (orari lavorativi casino)
+    - cron: '0 6-22 * * *'
+  workflow_dispatch: # Permette esecuzione manuale
+
+jobs:
+  check-promemoria:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check due promemoria and send push
+        run: |
+          # 1. Chiama RPC per ottenere promemoria da notificare
+          RESPONSE=$(curl -s -X POST \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/get_due_promemoria" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+
+          echo "Promemoria trovati: $RESPONSE"
+
+          # 2. Se ci sono promemoria, manda push per ognuno
+          if [ "$RESPONSE" = "[]" ] || [ -z "$RESPONSE" ]; then
+            echo "Nessun promemoria da notificare"
+            exit 0
+          fi
+
+          # Parse JSON e manda push per ogni promemoria
+          echo "$RESPONSE" | jq -c '.[]' | while read -r PM; do
+            TITOLO=$(echo "$PM" | jq -r '.titolo')
+            ASSEGNATO=$(echo "$PM" | jq -r '.assegnato_a')
+            DESCRIZIONE=$(echo "$PM" | jq -r '.descrizione // "" | .[0:100]')
+
+            echo "Invio push: $TITOLO -> $ASSEGNATO"
+
+            # Determina destinatari
+            if [ "$ASSEGNATO" = "tutti" ]; then
+              TARGETS='["tutti"]'
+            else
+              TARGETS="[\"$ASSEGNATO\"]"
+            fi
+
+            # Chiama Edge Function send-push
+            curl -s -X POST \
+              "${{ secrets.SUPABASE_URL }}/functions/v1/send-push" \
+              -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+              -H "Content-Type: application/json" \
+              -H "x-push-secret: ${{ secrets.PUSH_SECRET }}" \
+              -d "{\"action\":\"send\",\"operatori\":$TARGETS,\"titolo\":\"Promemoria: $TITOLO\",\"corpo\":\"$DESCRIZIONE\",\"tipo\":\"promemoria\"}"
+
+            echo " -> Push inviata"
+          done
+
+          echo "Completato"
