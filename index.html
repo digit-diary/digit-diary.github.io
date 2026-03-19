@@ -554,7 +554,6 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
     <div class="date-badge" id="today-date"></div>
     <div class="operatore-badge" id="operatore-display"></div>
     <div class="header-btns">
-      <button class="btn-header btn-bell" id="btn-bell" onclick="toggleScadenzeDropdown()" style="position:relative;font-size:1.2rem;padding:6px 12px" title="Scadenze / Promemoria"><span class="bell-icon" style="display:inline-block">&#128276;</span><span class="bell-badge" id="bell-badge" style="display:none"></span></button>
       <button class="btn-header" id="btn-tema" onclick="toggleTema()">&#127761; Tema scuro</button>
       <button class="btn-header" onclick="window.print()">&#128424; Stampa</button>
       <button class="btn-header" onclick="esci()" style="color:var(--accent)">&#128682; Esci</button>
@@ -1701,7 +1700,21 @@ async function salva(){let nome=capitalizzaNome(document.getElementById('inp-nom
   const rec={id:Date.now(),nome,tipo:tipoSelezionato,testo,data:new Date().toISOString(),operatore:getOperatore(),importo,valuta,reparto,reparto_dip:currentReparto};
   try{await secPost('registrazioni',rec);datiCache.unshift(rec);document.getElementById('inp-testo').value='';document.getElementById('inp-importo').value='';document.getElementById('inp-reparto').value='';
     if(!collaboratoriCache.find(c=>c.nome.toLowerCase()===nome.toLowerCase())){try{const cr=await secPost('collaboratori',{nome,attivo:true});collaboratoriCache.push(cr[0]);collaboratoriCache.sort((a,b)=>a.nome.localeCompare(b.nome))}catch(e2){}}
-    logAzione('Nuova registrazione',nome+' - '+tipoSelezionato+': '+testo.substring(0,60));toast('Registrato per '+nome);aggiornaNomi();render();updateStats();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts()}catch(e){toast('Errore salvataggio')}}
+    logAzione('Nuova registrazione',nome+' - '+tipoSelezionato+': '+testo.substring(0,60));toast('Registrato per '+nome);aggiornaNomi();render();updateStats();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();
+    // Richiesta → suggerisci promemoria di follow-up
+    if(tipoSelezionato===nomeCorrente('Richiesta')){_suggerisciFollowUp(nome,testo)}}catch(e){toast('Errore salvataggio')}}
+function _suggerisciFollowUp(nome,testo){
+  const b=document.getElementById('pwd-modal-content');
+  const fra3gg=new Date(Date.now()+3*86400000).toISOString().split('T')[0];
+  b.innerHTML='<h3>Promemoria di follow-up?</h3><p style="margin-bottom:12px">Hai registrato una richiesta per <strong>'+escP(nome)+'</strong>. Vuoi creare un promemoria per il follow-up?</p><div class="pwd-field"><label>Scadenza</label><input type="text" id="followup-data" value="'+fra3gg+'" readonly style="cursor:pointer"></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="_creaFollowUp(\''+nome.replace(/'/g,"\\'")+'\',\''+escP(testo.substring(0,80).replace(/'/g,"\\'"))+'\')">Crea promemoria</button><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">No grazie</button></div>';
+  document.getElementById('pwd-modal').classList.remove('hidden');
+  if(window.flatpickr)flatpickr('#followup-data',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',minDate:'today',defaultDate:fra3gg})}
+async function _creaFollowUp(nome,testo){
+  const data=document.getElementById('followup-data').value;if(!data)return;
+  try{const rec={titolo:'Follow-up: '+nome,descrizione:testo+'\nPromemoria: 1 giorno prima alle 08:00',data_scadenza:data,assegnato_a:getOperatore(),creato_da:getOperatore()};
+    const r=await secPost('promemoria',rec);promemoriaCache.push(r[0]);
+    document.getElementById('pwd-modal').classList.add('hidden');
+    aggiornaPromemoriaBadge();toast('Promemoria follow-up creato per '+nome)}catch(e){toast('Errore creazione promemoria')}}
 async function elimina(id){if(!confirm('Eliminare?'))return;const _e=datiCache.find(x=>x.id===id);try{await secDel('registrazioni','id=eq.'+id);datiCache=datiCache.filter(e=>e.id!==id);pinnedIds.delete(id);if(_e)logAzione('Eliminata registrazione',_e.nome+' - '+_e.tipo);aggiornaNomi();render();updateStats();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();toast('Eliminata')}catch(e){toast('Errore eliminazione')}}
 async function togglePin(id){try{if(pinnedIds.has(id)){await secDel('note_fissate','registrazione_id=eq.'+id);pinnedIds.delete(id)}else{await secPost('note_fissate',{registrazione_id:id});pinnedIds.add(id)}render()}catch(e){toast('Errore fissaggio nota')}}
 
@@ -3067,7 +3080,7 @@ function render(){const f=getFiltrati(),el=document.getElementById('entries-list
     const metaLines=[];if(e.operatore)metaLines.push('Inserita da '+escP(e.operatore));
     if(e.modificato_da)metaLines.push('Modificata da '+escP(e.modificato_da));
     const gdDiff=d.getHours()<6;const gdDate=gdDiff?new Date(d.getTime()-86400000):d;const gdBadge=gdDiff?'<span style="font-size:.72rem;padding:2px 7px;border-radius:2px;background:var(--accent2);color:white;font-weight:700">GD '+gdDate.getDate()+'.'+String(gdDate.getMonth()+1).padStart(2,'0')+'</span>':'';
-    return'<div class="entry'+(pin?' pinned':'')+'"><div class="entry-date"><div class="entry-day">'+d.getDate()+'</div><div class="entry-month">'+MESI[d.getMonth()]+' '+d.getFullYear()+'</div><div class="entry-time">'+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})+'</div></div><div class="entry-body"><div class="entry-top"><span class="entry-name" onclick="apriProfilo(\''+e.nome.replace(/'/g,"\\'")+'\')">'+esc(e.nome)+'</span><span class="badge '+bc+'">'+escP(e.tipo)+'</span>'+gdBadge+rep+imp+'</div><div class="entry-text">'+esc(e.testo)+'</div>'+(metaLines.length?'<div class="entry-meta">'+metaLines.join(' · ')+'</div>':'')+'</div><div class="entry-actions"><button class="btn-act pin" onclick="togglePin('+e.id+')">'+(pin?'Rimuovi pin':'Fissa')+'</button><button class="btn-act scad" onclick="apriScadenza('+e.id+')">Scadenza</button><button class="btn-act tipo" onclick="apriModal('+e.id+',\''+te+'\')">Tipo</button><button class="btn-act edit" onclick="modificaRegistrazione('+e.id+')">Modifica</button><button class="btn-act del" onclick="elimina('+e.id+')">Elimina</button></div></div>'}).join('');_saveFiltri()}
+    return'<div class="entry'+(pin?' pinned':'')+'"><div class="entry-date"><div class="entry-day">'+d.getDate()+'</div><div class="entry-month">'+MESI[d.getMonth()]+' '+d.getFullYear()+'</div><div class="entry-time">'+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})+'</div></div><div class="entry-body"><div class="entry-top"><span class="entry-name" onclick="apriProfilo(\''+e.nome.replace(/'/g,"\\'")+'\')">'+esc(e.nome)+'</span><span class="badge '+bc+'">'+escP(e.tipo)+'</span>'+gdBadge+rep+imp+'</div><div class="entry-text">'+esc(e.testo)+'</div>'+(metaLines.length?'<div class="entry-meta">'+metaLines.join(' · ')+'</div>':'')+'</div><div class="entry-actions"><button class="btn-act pin" onclick="togglePin('+e.id+')">'+(pin?'Rimuovi pin':'Fissa')+'</button><button class="btn-act tipo" onclick="apriModal('+e.id+',\''+te+'\')">Tipo</button><button class="btn-act edit" onclick="modificaRegistrazione('+e.id+')">Modifica</button><button class="btn-act del" onclick="elimina('+e.id+')">Elimina</button></div></div>'}).join('');_saveFiltri()}
 function getNomiLista(){return[...new Set([...collaboratoriCache.map(c=>c.nome),...getDatiReparto().map(e=>e.nome)])].filter(Boolean).sort()}
 function aggiornaNomi(){const nomi=getNomiLista();
   const sel=document.getElementById('filt-persona'),cur=sel.value;sel.innerHTML='<option value="">Tutte</option>'+nomi.map(n=>'<option'+(n===cur?' selected':'')+'>'+escP(n)+'</option>').join('')}
