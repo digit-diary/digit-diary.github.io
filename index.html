@@ -1751,9 +1751,8 @@ async function completaScadenza(id){try{await secPatch('scadenze','id=eq.'+id,{c
 async function eliminaScadenza(id){try{await secDel('scadenze','id=eq.'+id);scadenzeCache=scadenzeCache.filter(s=>s.id!==id);renderScadenzeBanner();renderScadenzeSettings();toast('Eliminata')}catch(e){toast('Errore eliminazione scadenza')}}
 function renderScadenzeBanner(){const banner=document.getElementById('scadenze-banner'),dd=document.getElementById('scadenze-dropdown');
   const oggi=new Date().toISOString().split('T')[0];const attive=scadenzeCache.filter(s=>!s.completata);const scadute=attive.filter(s=>s.data_scadenza<oggi);const prossime=attive.filter(s=>s.data_scadenza>oggi);
-  const tot=attive.length;const bell=document.getElementById('bell-badge'),btnBell=document.getElementById('btn-bell');
-  if(bell){if(tot>0){bell.style.display='flex';bell.textContent=tot;bell.style.background=scadute.length?'var(--accent)':'var(--accent2)';btnBell.classList.add('has-alerts');setTimeout(()=>btnBell.classList.remove('has-alerts'),600)}else{bell.style.display='none'}}
-  if(!tot){banner.classList.add('hidden');dd.classList.add('hidden');return}
+  const tot=attive.length;
+  if(!tot){if(banner)banner.classList.add('hidden');if(dd)dd.classList.add('hidden');return}
   banner.classList.remove('hidden');banner.innerHTML=(scadute.length?'&#9888;&#65039; '+scadute.length+' scadenza/e scaduta/e! ':'')+(prossime.length?prossime.length+' in arrivo':'');banner.style.background=scadute.length?'var(--accent)':'var(--accent2)'}
 function toggleScadenzeDropdown(){const dd=document.getElementById('scadenze-dropdown');dd.classList.toggle('hidden');if(!dd.classList.contains('hidden')){const oggi=new Date().toISOString().split('T')[0];
   const attive=scadenzeCache.filter(s=>!s.completata);const fatte=scadenzeCache.filter(s=>s.completata).slice(0,10);
