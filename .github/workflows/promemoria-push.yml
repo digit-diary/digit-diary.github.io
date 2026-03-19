@@ -2,8 +2,8 @@ name: Promemoria e Compleanni Push
 
 on:
   schedule:
-    # Ogni ora dalle 6 alle 22 (orari lavorativi casino)
-    - cron: '0 6-22 * * *'
+    # Ogni ora, 24/7
+    - cron: '0 * * * *'
   workflow_dispatch: # Permette esecuzione manuale
 
 jobs:
