@@ -3884,11 +3884,13 @@ function _parseMaisonNome(raw){let nome=raw.trim(),tipoBuono=null,note='',isSeve
   // Estrai coup, direzione, pranzo, GD come note
   const noteMatch=nome.match(/\b(coup|direzione|pranzo\s*\w*|GD)\b/gi);
   if(noteMatch){note=(note?note+', ':'')+noteMatch.join(', ');noteMatch.forEach(m=>{nome=nome.replace(new RegExp('\\b'+m.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','gi'),'')});nome=nome.trim()}
-  // Estrai BU/BL con quantità — formati: BU, BL, 2BL, 3BU, +BU, B.L, B.Ll, B.U, b.l
-  const buMatch=nome.match(/\+?\s*(\d*)\s*B\.?U\b/i);if(buMatch){tipoBuono='BU';note=(note?note+', ':'')+(buMatch[1]||'1')+'BU';nome=nome.replace(buMatch[0],'').trim()}
-  if(!tipoBuono){const blMatch=nome.match(/\+?\s*(\d*)\s*B\.?L+\b/i);if(blMatch){tipoBuono='BL';note=(note?note+', ':'')+(blMatch[1]||'1')+'BL';nome=nome.replace(blMatch[0],'').trim()}}
-  // Normalizza spazi nel nome (DelleDonne → Delle Donne non possibile automaticamente)
-  nome=nome.replace(/\b\d+\b/g,'').replace(/\s{2,}/g,' ').trim();
+  // Estrai BU/BL con quantità — formati: BU, BL, 2BL, 3BU, +BU, +BL, + BL, B.L, B.Ll, B.U
+  const buMatch=nome.match(/\s*\+?\s*(\d*)\s*B\.?U\b/i);if(buMatch){tipoBuono='BU';note=(note?note+', ':'')+(buMatch[1]||'1')+'BU';nome=nome.replace(buMatch[0],'').trim()}
+  if(!tipoBuono){const blMatch=nome.match(/\s*\+?\s*(\d*)\s*B\.?L+\b/i);if(blMatch){tipoBuono='BL';note=(note?note+', ':'')+(blMatch[1]||'1')+'BL';nome=nome.replace(blMatch[0],'').trim()}}
+  // Rimuovi numeri isolati e + isolati
+  nome=nome.replace(/\b\d+\b/g,'').replace(/\+/g,'').replace(/\s{2,}/g,' ').trim();
+  // Se il nome rimasto è solo una keyword (coupon, gourmet, ecc.) → vuoto
+  if(/^(coupon|gourmet|cena|pranzo|coup|direzione|gd)$/i.test(nome))nome='';
   // Flag Seven sul risultato
   if(isSeven)nome='__SEVEN__'+nome;
   // Rimuovi "Gruppo"
