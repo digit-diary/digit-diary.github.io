@@ -1149,6 +1149,13 @@
          cross-reparto (visibili su tutti i reparti).
        - Compleanni oggi evidenziati: sfondo dorato, bordo laterale,
          "COMPLEANNO OGGI!" in bold. Prossimi in stile normale.
+       - Coupon Gourmet (CG) come categoria separata da BU e BL:
+         colonna CG in tabella, filtro, grafico, badge viola.
+         Parser: "Bressani Coupon Gourmet" → Bressani, tipo CG.
+       - "Ceschetti + BL" → Ceschetti, tipo BL.
+       - "Delle Donne" / "Delledonne" → match senza spazi.
+       - Fix consegna: carica rapporto di oggi per suggerire destinatario.
+       - Fix turno: PRESTO fino 20:00 (dom-gio) o 20:45 (ven-sab).
 
   [74] Moduli: tracciamento Creato da / Modificato da (19 marzo 2026)
        - Quando un operatore modifica un modulo creato da un altro,
