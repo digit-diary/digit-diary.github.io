@@ -1125,6 +1125,14 @@
          festeggiati (clienti maison + collaboratori). Inviata a tutti.
        - RPC get_today_birthdays: cerca compleanni in maison_budget
          e collaboratori per giorno/mese corrente.
+       - Cron 24/7 (ogni ora): promemoria e compleanni anche di notte.
+       - Fix RPC get_due_promemoria: cast date::text per confronto.
+       - Rimossa sezione "Scadenze attive" dalle impostazioni (residuo).
+       - Nomi lunghi: word-break nelle tabelle (no troncamento).
+       - PDF scheda cliente personalizzabile: popup sezioni
+         (KPI, visite, trend, spese extra, regali).
+       - "Ultimo aggiornamento" visibile nella scheda maison
+         (aggiornato_da + aggiornato_at su maison_budget).
 
   [74] Moduli: tracciamento Creato da / Modificato da (19 marzo 2026)
        - Quando un operatore modifica un modulo creato da un altro,
