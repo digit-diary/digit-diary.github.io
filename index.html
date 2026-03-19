@@ -1677,13 +1677,17 @@ function _parseDataNascita(input){if(!input)return'';
   if(a<100){a=a<=30?2000+a:1900+a}// 97→1997, 05→2005
   if(g<1||g>31||me<1||me>12||a<1900||a>2030)return'';
   return a+'-'+String(me).padStart(2,'0')+'-'+String(g).padStart(2,'0')}
-function _initNascitaInput(id){const el=document.getElementById(id);if(!el||el._nascitaInit)return;el._nascitaInit=true;
-  el.removeAttribute('readonly');el.style.cursor='text';el.placeholder='es: 12.01.1997';
-  el.addEventListener('blur',function(){const parsed=_parseDataNascita(this.value);
-    if(parsed){this.value=new Date(parsed+'T12:00:00').toLocaleDateString('it-IT');this.dataset.isoValue=parsed}
-    else if(this.value.trim()){toast('Formato data non valido');this.value='';this.dataset.isoValue=''}});
-  // Rimuovi flatpickr se presente
-  if(el._flatpickr){el._flatpickr.destroy();delete el._flatpickr}}
+function _initNascitaInput(id){const el=document.getElementById(id);if(!el)return;
+  // Rimuovi flatpickr se presente (prima di tutto)
+  if(el._flatpickr){el._flatpickr.destroy();delete el._flatpickr}
+  // Rimuovi altInput creato da flatpickr
+  const altInput=el.nextElementSibling;if(altInput&&altInput.classList&&altInput.classList.contains('flatpickr-input'))altInput.remove();
+  el.removeAttribute('readonly');el.style.cursor='text';el.style.display='';el.placeholder='es: 12.01.1997';
+  if(!el._nascitaInit){el._nascitaInit=true;
+    el.addEventListener('blur',function(){const parsed=_parseDataNascita(this.value);
+      if(parsed){this.value=new Date(parsed+'T12:00:00').toLocaleDateString('it-IT');this.dataset.isoValue=parsed}
+      else if(this.value.trim()){toast('Formato data non valido');this.value='';this.dataset.isoValue=''}});
+    el.addEventListener('click',function(e){e.stopPropagation()})}}
 function _getNascitaValue(id){const el=document.getElementById(id);if(!el)return'';
   if(el.dataset.isoValue)return el.dataset.isoValue;
   return _parseDataNascita(el.value)}
