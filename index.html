@@ -3857,9 +3857,13 @@ function initMaisonFlatpickr(){if(_maisonFpInit||!window.flatpickr)return;_maiso
   flatpickr('#maison-man-data',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,defaultDate:'today'});
   flatpickr('#regalo-data',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false})}
 function _levenshtein(a,b){const m=a.length,n=b.length,d=[];for(let i=0;i<=m;i++){d[i]=[i];for(let j=1;j<=n;j++)d[i][j]=i===0?j:0}for(let j=1;j<=n;j++)d[0][j]=j;for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]!==b[j-1]?1:0));return d[m][n]}
-function _trovaNomeSimileMaison(nome){const nomi=[...new Set(getMaisonReparto().map(r=>r.nome))];const nl=nome.toLowerCase();
+function _trovaNomeSimileMaison(nome){const nomi=[...new Set(getMaisonReparto().map(r=>r.nome))];const nl=nome.toLowerCase();const nlNoSp=nl.replace(/\s/g,'');
   const exact=nomi.find(n=>n.toLowerCase()===nl);if(exact)return{nome:exact,tipo:'esatto'};
-  for(const n of nomi){if(_levenshtein(nl,n.toLowerCase())<=1&&nl.length>3)return{nome:n,tipo:'simile'}}
+  // Match senza spazi (Delledonne = Delle Donne)
+  for(const n of nomi){if(n.toLowerCase().replace(/\s/g,'')===nlNoSp)return{nome:n,tipo:'simile'}}
+  // Levenshtein ≤ 2
+  for(const n of nomi){if(_levenshtein(nl,n.toLowerCase())<=2&&nl.length>3)return{nome:n,tipo:'simile'}}
+  // Contenuto parziale
   for(const n of nomi){if(nl.length>=4&&(n.toLowerCase().includes(nl)||nl.includes(n.toLowerCase()))&&Math.abs(n.length-nome.length)<=3)return{nome:n,tipo:'simile'}}
   return null}
 function _parseMaisonNome(raw){let nome=raw.trim(),tipoBuono=null,note='',isSeven=false;
@@ -3867,16 +3871,19 @@ function _parseMaisonNome(raw){let nome=raw.trim(),tipoBuono=null,note='',isSeve
   const pMatch=nome.match(/\(([^)]+)\)/);if(pMatch){note=pMatch[1].trim();nome=nome.replace(pMatch[0],'').trim()}
   // Rileva Seven (anche attaccato: BonomelliSeven, Bonomelli Seven, (Seven), (Se)
   if(/seven/i.test(nome)){isSeven=true;nome=nome.replace(/\s*seven\b/gi,'').replace(/seven/gi,'').trim()}
+  // Coupon Gourmet / Cena Gourmet → tipo BL, nota "C. Gourmet"
+  const gourmetMatch=nome.match(/\b(coupon\s+gourmet|cena\s+gourmet|c\.?\s*gourmet)\b/gi);
+  if(gourmetMatch){tipoBuono='BL';note=(note?note+', ':'')+'C. Gourmet';nome=nome.replace(gourmetMatch[0],'').trim()}
   // Estrai COUPON con tutto il testo dopo (coupon omaggio, coupon 50%, ecc.)
-  const coupMatch=nome.match(/\b(coupon\s*.*)$/i);
-  if(coupMatch){note=(note?note+', ':'')+coupMatch[1].trim();nome=nome.replace(coupMatch[0],'').trim()}
+  if(!gourmetMatch){const coupMatch=nome.match(/\b(coupon\s*.*)$/i);
+    if(coupMatch){note=(note?note+', ':'')+coupMatch[1].trim();nome=nome.replace(coupMatch[0],'').trim()}}
   // Estrai coup, direzione, pranzo, GD come note
   const noteMatch=nome.match(/\b(coup|direzione|pranzo\s*\w*|GD)\b/gi);
   if(noteMatch){note=(note?note+', ':'')+noteMatch.join(', ');noteMatch.forEach(m=>{nome=nome.replace(new RegExp('\\b'+m.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','gi'),'')});nome=nome.trim()}
   // Estrai BU/BL con quantità — formati: BU, BL, 2BL, 3BU, +BU, B.L, B.Ll, B.U, b.l
   const buMatch=nome.match(/\+?\s*(\d*)\s*B\.?U\b/i);if(buMatch){tipoBuono='BU';note=(note?note+', ':'')+(buMatch[1]||'1')+'BU';nome=nome.replace(buMatch[0],'').trim()}
-  const blMatch=nome.match(/\+?\s*(\d*)\s*B\.?L+\b/i);if(blMatch){tipoBuono='BL';note=(note?note+', ':'')+(blMatch[1]||'1')+'BL';nome=nome.replace(blMatch[0],'').trim()}
-  // Rimuovi numeri isolati (px ripetuto nel nome)
+  if(!tipoBuono){const blMatch=nome.match(/\+?\s*(\d*)\s*B\.?L+\b/i);if(blMatch){tipoBuono='BL';note=(note?note+', ':'')+(blMatch[1]||'1')+'BL';nome=nome.replace(blMatch[0],'').trim()}}
+  // Normalizza spazi nel nome (DelleDonne → Delle Donne non possibile automaticamente)
   nome=nome.replace(/\b\d+\b/g,'').replace(/\s{2,}/g,' ').trim();
   // Flag Seven sul risultato
   if(isSeven)nome='__SEVEN__'+nome;
