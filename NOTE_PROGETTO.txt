@@ -1133,6 +1133,10 @@
          (KPI, visite, trend, spese extra, regali).
        - "Ultimo aggiornamento" visibile nella scheda maison
          (aggiornato_da + aggiornato_at su maison_budget).
+       - Parser nomi migliorato: "Bonomelli GD" → nome: Bonomelli,
+         "Bussien 2BL" → nome: Bussien tipo: BL.
+       - Fix push notifications: campo 'destinatari' corretto.
+       - Compleanni testati: push inviata a 6 dispositivi con successo.
 
   [74] Moduli: tracciamento Creato da / Modificato da (19 marzo 2026)
        - Quando un operatore modifica un modulo creato da un altro,
