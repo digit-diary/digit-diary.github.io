@@ -1080,6 +1080,22 @@
        - Fix create_bio_session: preserva is_admin nel rinnovo token.
        - Stima autonomia piano free: ~15-20 anni uso intenso (~2-3 MB/mese
          a regime pieno con 7 operatori, 487 MB disponibili).
+       - Fix AudioContext: suono notifica solo dopo interazione utente.
+       - Aggiunto favicon (icon-192.png) per eliminare 404.
+       - Fix promemoria: oggi non e' "SCADUTO" (solo ieri o prima).
+
+  [71] Richieste con follow-up + rimozione scadenze (19 marzo 2026)
+       - Rimosso sistema scadenze del diario (bottone + campanella):
+         sostituito completamente dai Promemoria (piu completi).
+       - Tipo "Richiesta": dopo il salvataggio, popup chiede
+         "Vuoi creare un promemoria di follow-up?" con:
+         scadenza default 3 giorni, reminder 1 giorno prima alle 08:00,
+         assegnato all'operatore corrente, calendario modificabile.
+       - Le richieste sono visibili a tutti i supervisori del reparto
+         (utile per continuita tra turni). Informazioni sensibili
+         vanno gestite con le Note Colleghi (private e crittografate).
+       - Il promemoria puo essere completato da qualsiasi supervisore
+         con tracciamento di chi/quando.
 
 
 ================================================================================
