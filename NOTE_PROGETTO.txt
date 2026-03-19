@@ -1136,7 +1136,15 @@
        - Parser nomi migliorato: "Bonomelli GD" → nome: Bonomelli,
          "Bussien 2BL" → nome: Bussien tipo: BL.
        - Fix push notifications: campo 'destinatari' corretto.
-       - Compleanni testati: push inviata a 6 dispositivi con successo.
+       - Compleanni testati: push inviata a 7 dispositivi con successo.
+       - Dashboard: compleanni separati "Collaboratori" e "Clienti Maison".
+       - Promemoria ripetitivi: ogni giorno/settimana/mese/6 mesi/anno.
+         Quando completato, crea automaticamente la prossima occorrenza.
+       - Push notification click: apre pagina corretta (note, consegna,
+         promemoria, maison, dashboard per compleanni).
+       - Service worker aggiornato a v5.
+       - Modifica riga maison nel dettaglio: PX, costo, tipo, note.
+       - Header tabelle sticky (fisso durante scroll).
 
   [74] Moduli: tracciamento Creato da / Modificato da (19 marzo 2026)
        - Quando un operatore modifica un modulo creato da un altro,
