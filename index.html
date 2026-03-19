@@ -782,6 +782,18 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
           </select>
         </div>
       </div>
+      <div class="form-row">
+        <div class="field"><label>Ripeti</label>
+          <select id="pm-ripetizione" style="padding:11px 14px">
+            <option value="">Mai (una tantum)</option>
+            <option value="giornaliero">Ogni giorno</option>
+            <option value="settimanale">Ogni settimana</option>
+            <option value="mensile">Ogni mese</option>
+            <option value="semestrale">Ogni 6 mesi</option>
+            <option value="annuale">Ogni anno</option>
+          </select>
+        </div>
+      </div>
       <button class="btn-salva" onclick="salvaPromemoria()">Crea promemoria</button>
     </div>
   </div>
@@ -3497,11 +3509,21 @@ function renderDashboard(){
   const compEl=document.getElementById('dash-compleanni-list');
   const dashComp=document.getElementById('dash-compleanni');
   if(compEl&&isVis('alert_compleanni')){
-    const bdaysAll=_getCompleanniProssimi(7);let compH='';
-    bdaysAll.forEach(bd=>{const ne=bd.nome.replace(/'/g,"\\'");
-      const isOggi=bd.giorni===0;const dataStr=bd.data.toLocaleDateString('it-IT',{day:'2-digit',month:'long'});
-      compH+='<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px"><span style="font-size:1.4rem">&#127874;</span><div style="flex:1"><strong class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(bd.nome)+'</strong><div style="font-size:.82rem;color:'+(isOggi?'var(--accent2)':'var(--muted)')+'">'+
-        (isOggi?'Compleanno OGGI!':'Tra '+bd.giorni+' giorno/i — '+dataStr)+'</div></div></div>'});
+    // Compleanni clienti maison
+    const bdaysMaison=[];getBudgetReparto().forEach(b=>{if(!b.data_nascita)return;const dn=new Date(b.data_nascita+'T12:00:00');
+      const quest=new Date(now.getFullYear(),dn.getMonth(),dn.getDate());if(quest<new Date(now.getFullYear(),now.getMonth(),now.getDate()))quest.setFullYear(quest.getFullYear()+1);
+      const diff=Math.floor((quest-now)/(86400000));if(diff>=0&&diff<=7)bdaysMaison.push({nome:b.nome,data:quest,giorni:diff,tipo:'cliente'})});
+    // Compleanni collaboratori
+    const bdaysCollab=[];collaboratoriCache.forEach(c=>{if(!c.attivo||!c.data_nascita)return;const dn=new Date(c.data_nascita+'T12:00:00');
+      const quest=new Date(now.getFullYear(),dn.getMonth(),dn.getDate());if(quest<new Date(now.getFullYear(),now.getMonth(),now.getDate()))quest.setFullYear(quest.getFullYear()+1);
+      const diff=Math.floor((quest-now)/(86400000));if(diff>=0&&diff<=7)bdaysCollab.push({nome:c.nome,data:quest,giorni:diff,tipo:'collaboratore'})});
+    let compH='';
+    if(bdaysCollab.length){compH+='<div style="font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;font-weight:600">Collaboratori</div>';
+      bdaysCollab.sort((a,b)=>a.giorni-b.giorni).forEach(bd=>{const isOggi=bd.giorni===0;
+        compH+='<div style="padding:6px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px"><span style="font-size:1.2rem">&#127874;</span><div style="flex:1"><strong>'+escP(bd.nome)+'</strong> <span style="font-size:.82rem;color:'+(isOggi?'var(--accent2)':'var(--muted)')+'">'+(isOggi?'OGGI!':'tra '+bd.giorni+'g')+'</span></div></div>'})}
+    if(bdaysMaison.length){compH+='<div style="font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent2);margin:'+(bdaysCollab.length?'10px':'0')+' 0 6px;font-weight:600">Clienti Maison</div>';
+      bdaysMaison.sort((a,b)=>a.giorni-b.giorni).forEach(bd=>{const ne=bd.nome.replace(/'/g,"\\'");const isOggi=bd.giorni===0;
+        compH+='<div style="padding:6px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px"><span style="font-size:1.2rem">&#127874;</span><div style="flex:1"><strong class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(bd.nome)+'</strong> <span style="font-size:.82rem;color:'+(isOggi?'var(--accent2)':'var(--muted)')+'">'+(isOggi?'OGGI!':'tra '+bd.giorni+'g')+'</span></div></div>'})}
     if(!compH)compH='<p style="color:var(--muted);text-align:center;padding:20px">Nessun compleanno nei prossimi 7 giorni</p>';
     compEl.innerHTML=compH;if(dashComp)dashComp.style.display=''}
   else{if(dashComp)dashComp.style.display='none'}
@@ -3746,9 +3768,11 @@ async function salvaPromemoria(){const titolo=document.getElementById('pm-titolo
   // Calcola data promemoria effettiva
   const dScad=new Date(scadenza+'T12:00:00');dScad.setDate(dScad.getDate()-remindGiorni);
   const dataRemind=dScad.getFullYear()+'-'+String(dScad.getMonth()+1).padStart(2,'0')+'-'+String(dScad.getDate()).padStart(2,'0');
+  const ripetizione=(document.getElementById('pm-ripetizione')||{}).value||null;
   const remindLabel=remindGiorni===0?'il giorno stesso alle '+remindOra:remindGiorni+' giorno/i prima alle '+remindOra;
-  const descFull=descrizione+(descrizione?'\n':'')+'Promemoria: '+remindLabel;
-  try{const rec={titolo,descrizione:descFull,data_scadenza:scadenza,assegnato_a:assegnato,creato_da:getOperatore()};
+  const ripLabel=ripetizione?{giornaliero:'ogni giorno',settimanale:'ogni settimana',mensile:'ogni mese',semestrale:'ogni 6 mesi',annuale:'ogni anno'}[ripetizione]:'';
+  const descFull=descrizione+(descrizione?'\n':'')+'Promemoria: '+remindLabel+(ripLabel?'\nRipeti: '+ripLabel:'');
+  try{const rec={titolo,descrizione:descFull,data_scadenza:scadenza,assegnato_a:assegnato,creato_da:getOperatore(),ripetizione};
     const r=await secPost('promemoria',rec);promemoriaCache.push(r[0]);promemoriaCache.sort((a,b)=>a.data_scadenza.localeCompare(b.data_scadenza));
     document.getElementById('pm-titolo').value='';document.getElementById('pm-descrizione').value='';
     const fp=document.getElementById('pm-scadenza');if(fp&&fp._flatpickr)fp._flatpickr.clear();else fp.value='';
@@ -3757,7 +3781,17 @@ async function salvaPromemoria(){const titolo=document.getElementById('pm-titolo
     inviaPush(assegnato==='tutti'?['tutti']:[assegnato],'Promemoria: '+titolo,(descrizione||titolo).substring(0,120),'promemoria',true)}catch(e){toast('Errore creazione promemoria')}}
 async function completaPromemoria(id){const op=getOperatore();
   try{await secPatch('promemoria','id=eq.'+id,{completata:true,completata_da:op,completata_at:new Date().toISOString()});
-    const p=promemoriaCache.find(x=>x.id===id);if(p){p.completata=true;p.completata_da=op;p.completata_at=new Date().toISOString()}
+    const p=promemoriaCache.find(x=>x.id===id);if(p){p.completata=true;p.completata_da=op;p.completata_at=new Date().toISOString();
+      // Se ripetitivo → crea prossima occorrenza
+      if(p.ripetizione){const d=new Date(p.data_scadenza+'T12:00:00');
+        if(p.ripetizione==='giornaliero')d.setDate(d.getDate()+1);
+        else if(p.ripetizione==='settimanale')d.setDate(d.getDate()+7);
+        else if(p.ripetizione==='mensile')d.setMonth(d.getMonth()+1);
+        else if(p.ripetizione==='semestrale')d.setMonth(d.getMonth()+6);
+        else if(p.ripetizione==='annuale')d.setFullYear(d.getFullYear()+1);
+        const nuovaData=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+        try{const nr=await secPost('promemoria',{titolo:p.titolo,descrizione:p.descrizione,data_scadenza:nuovaData,assegnato_a:p.assegnato_a,creato_da:p.creato_da,ripetizione:p.ripetizione});
+          promemoriaCache.push(nr[0]);toast('Prossimo: '+nuovaData)}catch(e){}}}
     logAzione('Promemoria completato',p?p.titolo:'');renderPromemoria();aggiornaPromemoriaBadge();toast('Completato!')}catch(e){toast('Errore completamento')}}
 async function riattivaPromemoria(id){
   try{await secPatch('promemoria','id=eq.'+id,{completata:false,completata_da:null,completata_at:null});
