@@ -1042,6 +1042,12 @@
        - Responsive: su mobile il banner occupa tutta la larghezza
        - Attivato per: nota in tempo reale (WebSocket),
          consegna al login, promemoria scaduti al login
+       - Suono: solo dopo prima interazione utente (click/touch/tasto)
+         per rispettare la politica autoplay dei browser.
+         Al login il banner appare senza suono, dopo il primo click
+         tutte le notifiche successive suonano.
+         Le push notifications (app chiusa) suonano sempre con il
+         suono di sistema del telefono (gestite dal SO, non dal browser).
 
   [69] Dashboard "Da fare domani" + logica reminder (18 marzo 2026)
        - Nuovo widget "Da fare domani" nella Dashboard:
