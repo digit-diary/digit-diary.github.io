@@ -1121,6 +1121,10 @@
        - Secrets (URL, KEY, PUSH_SECRET) in GitHub Secrets (criptati)
        - Repo pubblico sicuro: chiavi mai nel codice, RLS blocca tutto,
          la chiave anon da sola non permette accesso ai dati.
+       - Compleanni: push notification alle 08:00 con nomi dei
+         festeggiati (clienti maison + collaboratori). Inviata a tutti.
+       - RPC get_today_birthdays: cerca compleanni in maison_budget
+         e collaboratori per giorno/mese corrente.
 
 
 ================================================================================
