@@ -1460,7 +1460,7 @@ async function cambiaVisibilita(key,val){
     const box=document.getElementById('vis-ops-'+key);if(box)box.style.display='flex'}
   else{if(val==='tutti')delete visibilitaConfig[key];else visibilitaConfig[key]=val;
     const box=document.getElementById('vis-ops-'+key);if(box)box.style.display='none'}
-  await setImp('visibilita',JSON.stringify(visibilitaConfig));applicaVisibilita();logAzione('Visibilità modificata',key+' → '+val);toast('Visibilità aggiornata')}
+  await setImp('visibilita',JSON.stringify(visibilitaConfig));applicaVisibilita();toast('Visibilità aggiornata')}
 async function aggiornaVisOps(key){const box=document.getElementById('vis-ops-'+key);if(!box)return;
   const checked=[...box.querySelectorAll('input[type=checkbox]:checked')].map(cb=>cb.value);
   visibilitaConfig[key]={tipo:'selezionati',operatori:checked};
@@ -1474,7 +1474,7 @@ async function aggiungiOperatoreConPwd(){const n=document.getElementById('new-op
   const rep=document.getElementById('new-operatore-rep').value||'entrambi';
   operatoriRepartoMap[n]=rep;await setImp('operatori_reparto',JSON.stringify(operatoriRepartoMap));
   logAzione('Operatore creato',n+' ('+rep+')');document.getElementById('new-operatore-nome').value='';document.getElementById('new-operatore-pwd').value='';document.getElementById('new-operatore-pwd2').value='';renderOperatoriUI();toast('Operatore "'+n+'" creato ('+rep+')')}catch(e){toast('Errore creazione')}}
-async function cambiaRepartoOperatore(nome,rep){operatoriRepartoMap[nome]=rep;logAzione('Reparto operatore',nome+' → '+rep);
+async function cambiaRepartoOperatore(nome,rep){operatoriRepartoMap[nome]=rep;
   await setImp('operatori_reparto',JSON.stringify(operatoriRepartoMap));
   renderOperatoriUI();toast(nome+' → '+rep)}
 async function rimuoviOperatore(n){if(!confirm('Rimuovere operatore "'+n+'"?'))return;operatoriSalvati=operatoriSalvati.filter(o=>o!==n);await saveOperatori();
