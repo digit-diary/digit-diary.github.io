@@ -3806,12 +3806,12 @@ function _trovaNomeSimileMaison(nome){const nomi=[...new Set(getMaisonReparto().
 function _parseMaisonNome(raw){let nome=raw.trim(),tipoBuono=null,note='';
   // Estrai note tra parentesi
   const pMatch=nome.match(/\(([^)]+)\)/);if(pMatch){note=pMatch[1].trim();nome=nome.replace(pMatch[0],'').trim()}
-  // Estrai COUPON, coup, Direzione etc
-  const noteMatch=nome.match(/\b(coupon\s*\w*|coup|direzione|pranzo\s*\w*)\b/gi);
-  if(noteMatch){note=(note?note+', ':'')+noteMatch.join(', ');noteMatch.forEach(m=>{nome=nome.replace(m,'')});nome=nome.trim()}
-  // Estrai BU/BL (anche con + davanti)
-  if(/\bBU\b/i.test(nome)){tipoBuono='BU';nome=nome.replace(/\+?\s*BU\b/gi,'').trim()}
-  if(/\bBL\b/i.test(nome)){tipoBuono='BL';nome=nome.replace(/\+?\s*BL\b/gi,'').trim()}
+  // Estrai COUPON, coup, Direzione, GD etc
+  const noteMatch=nome.match(/\b(coupon\s*\w*|coup|direzione|pranzo\s*\w*|GD)\b/gi);
+  if(noteMatch){note=(note?note+', ':'')+noteMatch.join(', ');noteMatch.forEach(m=>{nome=nome.replace(new RegExp('\\b'+m.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','gi'),'')});nome=nome.trim()}
+  // Estrai BU/BL con quantità (2BL, 3BU, BU, BL, +BU, +BL)
+  const buMatch=nome.match(/\+?\s*(\d*)\s*BU\b/i);if(buMatch){tipoBuono='BU';note=(note?note+', ':'')+(buMatch[1]||'1')+'BU';nome=nome.replace(buMatch[0],'').trim()}
+  const blMatch=nome.match(/\+?\s*(\d*)\s*BL\b/i);if(blMatch){tipoBuono='BL';note=(note?note+', ':'')+(blMatch[1]||'1')+'BL';nome=nome.replace(blMatch[0],'').trim()}
   // Rimuovi numeri isolati (px ripetuto nel nome)
   nome=nome.replace(/\b\d+\b/g,'').replace(/\s{2,}/g,' ').trim();
   // Rimuovi "Gruppo"

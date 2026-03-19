@@ -47,8 +47,8 @@ jobs:
       - name: Check compleanni (solo alle 08:00)
         run: |
           HOUR=$(date -u +%H)
-          if [ "$HOUR" != "07" ]; then
-            echo "Non sono le 08:00 CET, skip compleanni"
+          if [ "$HOUR" != "06" ] && [ "$HOUR" != "07" ] && [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
+            echo "Non sono le 07-08:00 CET, skip compleanni"
             exit 0
           fi
 
