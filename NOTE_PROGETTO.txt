@@ -1145,6 +1145,10 @@
        - Service worker aggiornato a v5.
        - Modifica riga maison nel dettaglio: PX, costo, tipo, note.
        - Header tabelle sticky (fisso durante scroll).
+       - Fix compleanni dashboard: confronto date senza ora,
+         cross-reparto (visibili su tutti i reparti).
+       - Compleanni oggi evidenziati: sfondo dorato, bordo laterale,
+         "COMPLEANNO OGGI!" in bold. Prossimi in stile normale.
 
   [74] Moduli: tracciamento Creato da / Modificato da (19 marzo 2026)
        - Quando un operatore modifica un modulo creato da un altro,
