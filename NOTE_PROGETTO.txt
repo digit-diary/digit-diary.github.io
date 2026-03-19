@@ -1156,6 +1156,8 @@
        - "Delle Donne" / "Delledonne" → match senza spazi.
        - Fix consegna: carica rapporto di oggi per suggerire destinatario.
        - Fix turno: PRESTO fino 20:00 (dom-gio) o 20:45 (ven-sab).
+       - Import: nomi simili corretti automaticamente (Karapetian → Karapetyan)
+         con avviso nel riepilogo.
 
   [74] Moduli: tracciamento Creato da / Modificato da (19 marzo 2026)
        - Quando un operatore modifica un modulo creato da un altro,

@@ -3956,7 +3956,7 @@ async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0
             try{await secPost('spese_extra',seRec);totalRows++;sevenCount++}catch(e){}
             continue}
           const simile=_trovaNomeSimileMaison(parsed.nome);
-          if(simile&&simile.tipo==='simile'){warnings.push(parsed.nome+' → forse intendi "'+simile.nome+'"?')}
+          if(simile&&simile.tipo==='simile'){warnings.push(parsed.nome+' → corretto in "'+simile.nome+'"');parsed.nome=simile.nome}
           const _dupKey=parsed.nome.toLowerCase()+'|'+dataGiornata;
           if(_giornoDuplicati.has(_dupKey)){dupCount++;warnings.push('Duplicato: '+parsed.nome+' ('+new Date(dataGiornata+'T12:00:00').toLocaleDateString('it-IT')+')')
           }else{_giornoDuplicati.add(_dupKey)}
