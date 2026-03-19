@@ -2735,7 +2735,9 @@ async function generaModuloPDF(tipo){
   if(_fResp)dati.firma_resp=_fResp;if(_fCollab)dati.firma_collab=_fCollab;dati.firma_digitale=!!(isDigFirma&&isDigFirma.checked);
   if(tipo==='allineamento'||tipo==='rdi'){dati.non_conformita=(document.getElementById('mod-non-conf')||{}).value||'';dati.obiettivo=(document.getElementById('mod-obiettivo')||{}).value||'';dati.scadenza=(document.getElementById('mod-scadenza')||{}).value||'';if(tipo==='rdi')dati.livello=(document.getElementById('mod-livello')||{}).value||'I'}
   else if(tipo==='apprezzamento'){dati.descrizione=(document.getElementById('mod-descrizione')||{}).value||'';dati.osservazioni=(document.getElementById('mod-osservazioni')||{}).value||''}
-  const isEdit=!!window._editModuloId;
+  const isEdit=!!window._editModuloId;const isRistampa=!!window._isRistampa;
+  // Ristampa: solo PDF, non salva nel DB
+  if(isRistampa){window._editModuloId=null;chiudiModulo();return}
   try{if(isEdit){const origMod=moduliCache.find(x=>x.id===window._editModuloId);const origOp=origMod?origMod.operatore:getOperatore();const modBy=origOp!==getOperatore()?getOperatore():null;
     await secPatch('moduli','id=eq.'+window._editModuloId,{collaboratore:collab,resp_settore:resp,data_modulo:data,dati,operatore:origOp,modificato_da:modBy});const idx=moduliCache.findIndex(x=>x.id===window._editModuloId);if(idx!==-1)Object.assign(moduliCache[idx],{collaboratore:collab,resp_settore:resp,data_modulo:data,dati,modificato_da:modBy});window._editModuloId=null;toast('Modulo aggiornato e PDF generato!')}
   else{const rec={tipo,collaboratore:collab,resp_settore:resp,data_modulo:data,dati,operatore:getOperatore(),reparto_dip:currentReparto};const saved=await secPost('moduli',rec);moduliCache.unshift(saved[0]);toast('PDF generato e modulo salvato!')}
@@ -2823,7 +2825,7 @@ function checkQrHash(){const h=window.location.hash;if(!h.startsWith('#modulo/')
   const mod=moduliCache.find(m=>m.dati&&m.dati.qr_code===code);
   if(mod){switchPage('moduli');setTimeout(()=>apriModuloSalvato(mod.id),300)}else{toast('Modulo non trovato')}
   history.replaceState(null,'',window.location.pathname)}
-function ristampaModuloPDF(id){apriModuloSalvato(id);setTimeout(()=>{const m=moduliCache.find(x=>x.id===id);if(m)generaModuloPDF(m.tipo)},150)}
+function ristampaModuloPDF(id){window._isRistampa=true;apriModuloSalvato(id);setTimeout(()=>{const m=moduliCache.find(x=>x.id===id);if(m)generaModuloPDF(m.tipo);window._isRistampa=false},150)}
 async function eliminaModulo(id){if(!confirm('Eliminare questo modulo?'))return;
   const _m=moduliCache.find(x=>x.id===id);try{await secDel('moduli','id=eq.'+id);moduliCache=moduliCache.filter(x=>x.id!==id);if(_m)logAzione('Eliminato modulo',_m.tipo+' - '+_m.collaboratore);aggiornaModuliLista();const cnt=document.getElementById('mod-list-count');if(cnt)cnt.textContent=getModuliReparto().length;toast('Modulo eliminato')}catch(e){toast('Errore eliminazione')}}
 
