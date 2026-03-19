@@ -1737,7 +1737,7 @@ async function salvaScadenza(regId){const t=document.getElementById('scad-titolo
 async function completaScadenza(id){try{await secPatch('scadenze','id=eq.'+id,{completata:true,completata_da:getOperatore()||'?'});const s=scadenzeCache.find(s=>s.id===id);if(s){s.completata=true;s.completata_da=getOperatore()||'?';logAzione('Scadenza completata',s.titolo)}renderScadenzeBanner();renderScadenzeSettings();toggleScadenzeDropdown();toggleScadenzeDropdown();toast('Completata')}catch(e){toast('Errore completamento scadenza')}}
 async function eliminaScadenza(id){try{await secDel('scadenze','id=eq.'+id);scadenzeCache=scadenzeCache.filter(s=>s.id!==id);renderScadenzeBanner();renderScadenzeSettings();toast('Eliminata')}catch(e){toast('Errore eliminazione scadenza')}}
 function renderScadenzeBanner(){const banner=document.getElementById('scadenze-banner'),dd=document.getElementById('scadenze-dropdown');
-  const oggi=new Date().toISOString().split('T')[0];const attive=scadenzeCache.filter(s=>!s.completata);const scadute=attive.filter(s=>s.data_scadenza<=oggi);const prossime=attive.filter(s=>s.data_scadenza>oggi);
+  const oggi=new Date().toISOString().split('T')[0];const attive=scadenzeCache.filter(s=>!s.completata);const scadute=attive.filter(s=>s.data_scadenza<oggi);const prossime=attive.filter(s=>s.data_scadenza>oggi);
   const tot=attive.length;const bell=document.getElementById('bell-badge'),btnBell=document.getElementById('btn-bell');
   if(bell){if(tot>0){bell.style.display='flex';bell.textContent=tot;bell.style.background=scadute.length?'var(--accent)':'var(--accent2)';btnBell.classList.add('has-alerts');setTimeout(()=>btnBell.classList.remove('has-alerts'),600)}else{bell.style.display='none'}}
   if(!tot){banner.classList.add('hidden');dd.classList.add('hidden');return}
@@ -3712,20 +3712,20 @@ function renderPromemoria(){const data=getPromemoriaFiltrati();const el=document
   const oggi=new Date().toISOString().split('T')[0];const op=getOperatore();const admin=isAdmin();
   if(!data.length){el.innerHTML='<div class="empty-state"><p>Nessun promemoria</p><small>Crea un nuovo promemoria per assegnare compiti agli operatori</small></div>';return}
   el.innerHTML=data.map(p=>{
-    const scaduto=!p.completata&&p.data_scadenza<=oggi;
+    const scaduto=!p.completata&&p.data_scadenza<oggi;
     const prossimo=!p.completata&&!scaduto&&p.data_scadenza<=new Date(Date.now()+3*86400000).toISOString().split('T')[0];
     const mio=p.assegnato_a===op||p.assegnato_a==='tutti';
     const bgStyle=p.completata?'opacity:.6;border-left:3px solid #2c6e49':scaduto?'border-left:3px solid var(--accent);background:rgba(192,57,43,0.05)':prossimo?'border-left:3px solid #e67e22;background:rgba(230,126,34,0.05)':'border-left:3px solid var(--line)';
     return'<div class="scad-item" style="'+bgStyle+';padding:14px 0;flex-wrap:wrap"><div style="display:flex;align-items:center;gap:10px;width:100%;flex-wrap:wrap"><span class="scad-date'+(scaduto?' overdue':'')+'">'+new Date(p.data_scadenza+'T12:00:00').toLocaleDateString('it-IT')+'</span><strong style="flex:1;font-size:1rem;'+(p.completata?'text-decoration:line-through':'')+'">'+escP(p.titolo)+'</strong><span style="font-size:.78rem;padding:2px 8px;border-radius:2px;background:'+(p.assegnato_a==='tutti'?'var(--accent2)':'#2980b9')+';color:white;font-weight:600">'+escP(p.assegnato_a==='tutti'?'Tutti':p.assegnato_a)+'</span>'+(scaduto?'<span style="font-size:.75rem;color:var(--accent);font-weight:700">SCADUTO</span>':'')+(p.completata?'<span style="font-size:.78rem;color:#2c6e49;font-weight:600">Fatto da '+escP(p.completata_da||'?')+' il '+new Date(p.completata_at).toLocaleDateString('it-IT')+'</span>':'')+'<div style="display:flex;gap:6px">'+(!p.completata?'<button class="btn-act pin" onclick="completaPromemoria('+p.id+')" style="color:#2c6e49;border-color:#2c6e49">Fatto</button>':'<button class="btn-act tipo" onclick="riattivaPromemoria('+p.id+')">Riattiva</button>')+(admin?'<button class="btn-act del" onclick="eliminaPromemoria('+p.id+')">Elimina</button>':'')+'</div></div>'+(p.descrizione?'<div style="width:100%;padding:6px 0 0;color:var(--muted);font-size:.88rem">'+esc(p.descrizione)+'</div>':'')+'<div style="width:100%;font-size:.72rem;color:var(--muted);margin-top:4px">Creato da '+escP(p.creato_da||'Admin')+'</div></div>'}).join('')}
 function aggiornaPromemoriaBadge(){const op=getOperatore();const oggi=new Date().toISOString().split('T')[0];
   const miei=promemoriaCache.filter(p=>!p.completata&&(p.assegnato_a===op||p.assegnato_a==='tutti'));
-  const scaduti=miei.filter(p=>p.data_scadenza<=oggi);
+  const scaduti=miei.filter(p=>p.data_scadenza<oggi);
   const badge=document.getElementById('promemoria-badge');if(!badge)return;
   if(miei.length){badge.style.display='inline';badge.textContent=miei.length;badge.style.background=scaduti.length?'var(--accent)':'var(--accent2)'}else{badge.style.display='none'}}
 function mostraPromemoriaLogin(){const op=getOperatore();if(!op)return;
   const oggi=new Date().toISOString().split('T')[0];
   const miei=promemoriaCache.filter(p=>!p.completata&&(p.assegnato_a===op||p.assegnato_a==='tutti'));
-  const scaduti=miei.filter(p=>p.data_scadenza<=oggi);
+  const scaduti=miei.filter(p=>p.data_scadenza<oggi);
   const prossimi=miei.filter(p=>p.data_scadenza>oggi&&p.data_scadenza<=new Date(Date.now()+3*86400000).toISOString().split('T')[0]);
   if(!scaduti.length&&!prossimi.length)return;
   if(scaduti.length){mostraNotifBanner('promemoria','Promemoria scaduti',scaduti.length+' scadut'+(scaduti.length===1?'o':'i')+': '+scaduti.map(p=>p.titolo).join(', ').substring(0,60),()=>switchPage('promemoria'));inviaNotifica('Promemoria scaduti',scaduti.length+' promemoria scadut'+(scaduti.length===1?'o':'i')+': '+scaduti.map(p=>p.titolo).join(', ').substring(0,80))}
@@ -3734,7 +3734,7 @@ function mostraPromemoriaLogin(){const op=getOperatore();if(!op)return;
   if(scaduti.length)html+='<p style="color:var(--accent);font-size:.85rem;margin-bottom:12px;font-weight:600">'+scaduti.length+' promemoria scadut'+(scaduti.length===1?'o':'i')+'!</p>';
   else html+='<p style="color:var(--muted);font-size:.82rem;margin-bottom:12px">'+prossimi.length+' promemoria in scadenza nei prossimi 3 giorni</p>';
   const lista=[...scaduti,...prossimi];
-  html+=lista.map(p=>{const scaduto=p.data_scadenza<=oggi;
+  html+=lista.map(p=>{const scaduto=p.data_scadenza<oggi;
     return'<div style="background:var(--paper2);border-radius:3px;padding:12px;margin-bottom:8px;border-left:3px solid '+(scaduto?'var(--accent)':'#e67e22')+'"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><strong>'+escP(p.titolo)+'</strong><span style="font-size:.78rem;color:'+(scaduto?'var(--accent)':'#e67e22')+';font-weight:600">'+new Date(p.data_scadenza+'T12:00:00').toLocaleDateString('it-IT')+'</span></div>'+(p.descrizione?'<div style="font-size:.85rem;color:var(--muted)">'+esc(p.descrizione)+'</div>':'')+'</div>'}).join('');
   html+='<div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'note-modal\').classList.add(\'hidden\');switchPage(\'promemoria\')">Vedi tutti</button><button class="btn-modal-cancel" onclick="document.getElementById(\'note-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
   mc.innerHTML=html;document.getElementById('note-modal').classList.remove('hidden')}
