@@ -851,7 +851,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
       <div class="field"><label>Max BU</label><input type="number" id="maison-budget-bu" placeholder="—" min="0" style="width:80px"></div>
       <div class="field"><label>Max BL</label><input type="number" id="maison-budget-bl" placeholder="—" min="0" style="width:80px"></div>
       <div class="field"><label>Categoria</label><select id="maison-budget-cat" style="padding:10px;width:130px"><option value="">—</option><option value="maison">Maison</option><option value="full_maison">Full Maison</option><option value="direzione">Direzione</option></select></div>
-      <div class="field"><label>Data nascita</label><input type="text" id="maison-budget-nascita" placeholder="gg/mm/aaaa" readonly style="cursor:pointer;width:120px"></div>
+      <div class="field"><label>Data nascita</label><input type="text" id="maison-budget-nascita" placeholder="es: 12.01.1997" style="width:120px"></div>
       <button class="btn-add-tipo" onclick="salvaMaisonBudget()">+ Salva</button>
     </div>
   </div>
@@ -1665,6 +1665,29 @@ async function _verificaNome(nome){
       res(nome);this.remove()};document.body.appendChild(resolver);
     document.getElementById('pwd-modal').classList.remove('hidden')})}
 
+// PARSER DATA NASCITA FLESSIBILE
+function _parseDataNascita(input){if(!input)return'';
+  input=input.trim();
+  // Prova formato ISO (YYYY-MM-DD) già valido
+  if(/^\d{4}-\d{2}-\d{2}$/.test(input))return input;
+  // Match: gg.mm.aaaa, gg/mm/aaaa, gg-mm-aaaa, gg.mm.aa, gg/mm/aa, ecc.
+  const m=input.match(/^(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{2,4})$/);
+  if(!m)return'';
+  const g=parseInt(m[1]),me=parseInt(m[2]);let a=parseInt(m[3]);
+  if(a<100){a=a<=30?2000+a:1900+a}// 97→1997, 05→2005
+  if(g<1||g>31||me<1||me>12||a<1900||a>2030)return'';
+  return a+'-'+String(me).padStart(2,'0')+'-'+String(g).padStart(2,'0')}
+function _initNascitaInput(id){const el=document.getElementById(id);if(!el||el._nascitaInit)return;el._nascitaInit=true;
+  el.removeAttribute('readonly');el.style.cursor='text';el.placeholder='es: 12.01.1997';
+  el.addEventListener('blur',function(){const parsed=_parseDataNascita(this.value);
+    if(parsed){this.value=new Date(parsed+'T12:00:00').toLocaleDateString('it-IT');this.dataset.isoValue=parsed}
+    else if(this.value.trim()){toast('Formato data non valido');this.value='';this.dataset.isoValue=''}});
+  // Rimuovi flatpickr se presente
+  if(el._flatpickr){el._flatpickr.destroy();delete el._flatpickr}}
+function _getNascitaValue(id){const el=document.getElementById(id);if(!el)return'';
+  if(el.dataset.isoValue)return el.dataset.isoValue;
+  return _parseDataNascita(el.value)}
+
 function _highlightField(id){const el=document.getElementById(id);if(!el)return;el.style.transition='border-color .2s,box-shadow .2s';el.style.borderColor='var(--accent)';el.style.boxShadow='0 0 0 2px rgba(192,57,43,0.2)';setTimeout(()=>{el.style.borderColor='';el.style.boxShadow=''},2000);el.focus()}
 async function salva(){let nome=capitalizzaNome(document.getElementById('inp-nome').value.trim());const testo=document.getElementById('inp-testo').value.trim();if(!nome){toast('Inserisci il nome');_highlightField('inp-nome');return}if(!testo){toast('Scrivi una descrizione');_highlightField('inp-testo');return}
   nome=await _verificaNome(nome);document.getElementById('inp-nome').value=nome;
@@ -2143,7 +2166,8 @@ function apriSchedaCollaboratore(nome){
   html+='<div><h3 style="font-size:1.6rem">'+escP(nome)+(isBirthday?' <span style="font-size:1.2rem" title="Compleanno oggi!">&#127874;</span>':'')+'</h3>';
   html+='<div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap">';
   html+='<span style="font-size:.82rem;color:var(--muted)">Data di nascita:</span>';
-  html+='<input type="text" id="scheda-nascita" value="'+escP(dataNascita)+'" placeholder="Seleziona..." readonly style="cursor:pointer;padding:4px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper2);color:var(--ink);width:120px">';
+  const dnDisplay=dataNascita?new Date(dataNascita+'T12:00:00').toLocaleDateString('it-IT'):'';
+  html+='<input type="text" id="scheda-nascita" value="'+escP(dnDisplay)+'" data-iso-value="'+escP(dataNascita)+'" placeholder="es: 12.01.1997" style="padding:4px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper2);color:var(--ink);width:120px">';
   html+='<button class="btn-salva" onclick="salvaSchedaNascita(\''+neS+'\')" style="font-size:.78rem;padding:5px 14px;background:var(--accent2)">Salva</button>';
   if(dataNascita){html+='<span style="font-size:.82rem;color:var(--muted)">'+new Date(dataNascita+'T12:00:00').toLocaleDateString('it-IT')+'</span>'}
   html+='</div></div>';
@@ -2251,7 +2275,7 @@ function apriSchedaCollaboratore(nome){
   // Init flatpickrs
   setTimeout(function(){
     if(window.flatpickr){
-      flatpickr('#scheda-nascita',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,defaultDate:dataNascita||null});
+      _initNascitaInput('scheda-nascita');
       var tlOpts={locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,
         onChange:function(){_schedaFilterTimeline(nome)}};
       flatpickr('#scheda-tl-dal',tlOpts);
@@ -2322,7 +2346,8 @@ function _renderSchedaTrendChart(nome,entries){
 
 async function salvaSchedaNascita(nome){
   var inp=document.getElementById('scheda-nascita');if(!inp)return;
-  var val=inp.value;
+  var val=_parseDataNascita(inp.value)||inp.dataset.isoValue||'';
+  if(inp.value.trim()&&!val){toast('Formato data non valido');return}
   var coll=collaboratoriCache.find(function(c){return c.nome===nome});
   if(coll){
     try{await secPatch('collaboratori','id=eq.'+coll.id,{data_nascita:val||null});coll.data_nascita=val||null;toast('Data nascita salvata')}
@@ -3167,6 +3192,8 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
     // "Tonati x3" (3 giorni), "Tonati assente fino al 27", "Tonati dal 20 al 27"
     const assenzeText=data.assenze||'';if(assenzeText.trim()){const righe=assenzeText.split('\n').filter(r=>r.trim());
       for(const riga of righe){
+        // Skip: lutto, ferie, vacanza, infortunio (non sono malattia)
+        if(/\b(lutto|ferie|vacanza|vacanze|infortunio)\b/i.test(riga))continue;
         // Match: nome + (assente|malattia|malato|malata|codice turno come x1,r2,c0,s1,s7...)
         const m=riga.match(/^([A-ZÀ-Üa-zà-ü\s.'-]+?)\s*(assente|malattia|malato|malata|([a-zA-Z])\s*(\d{1,2}))\b/i);
         if(!m)continue;
@@ -3761,7 +3788,7 @@ let _maisonFpInit=false;
 function initMaisonFlatpickr(){if(_maisonFpInit||!window.flatpickr)return;_maisonFpInit=true;
   const o={locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,onChange:()=>renderMaisonDashboard()};
   flatpickr('#maison-filt-dal',o);flatpickr('#maison-filt-al',o);
-  flatpickr('#maison-budget-nascita',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false});
+  _initNascitaInput('maison-budget-nascita');
   flatpickr('#maison-man-data',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,defaultDate:'today'});
   flatpickr('#regalo-data',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false})}
 function _levenshtein(a,b){const m=a.length,n=b.length,d=[];for(let i=0;i<=m;i++){d[i]=[i];for(let j=1;j<=n;j++)d[i][j]=i===0?j:0}for(let j=1;j<=n;j++)d[0][j]=j;for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]!==b[j-1]?1:0));return d[m][n]}
@@ -4118,9 +4145,10 @@ function apriDettaglioMaison(nome){const righe=getMaisonFiltrati().filter(r=>r.n
   html+='<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--line)"><h4 style="font-family:Playfair Display,serif;margin-bottom:8px;color:var(--ink)">Aggiungi nota privata</h4><textarea id="detail-nota-input" rows="2" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:2px;font-family:Source Sans 3,sans-serif;font-size:.9rem;resize:vertical;background:var(--paper2);color:var(--ink)" placeholder="Scrivi una nota..."></textarea><button class="btn-salva" onclick="salvaNotaCliente(\''+ne+'\')" style="margin-top:6px;font-size:.78rem;padding:8px 16px">Salva nota</button></div>';
   html+='<div style="display:flex;gap:10px;justify-content:center;margin-top:14px"><button class="btn-export" onclick="esportaMaisonClienteCSV(\''+nome.replace(/'/g,"\\'")+'\')">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaMaisonClientePDF(\''+nome.replace(/'/g,"\\'")+'\')">PDF</button><button class="btn-export" onclick="stampaSchedaCliente()" style="border-color:#2c6e49;color:#2c6e49">Stampa</button></div>';
   var _pb=document.getElementById('profilo-content');_pb.className='profilo-box';_pb.innerHTML=html;document.getElementById('profilo-modal').classList.remove('hidden');
-  if(window.flatpickr){var dnEl=document.getElementById('detail-nascita');if(dnEl)flatpickr(dnEl,{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,defaultDate:budget&&budget.data_nascita||null})}}
-async function salvaDetailNascita(nome){var val=document.getElementById('detail-nascita').value;
-  if(!val){toast('Seleziona una data');return}
+  _initNascitaInput('detail-nascita');
+  var dnEl=document.getElementById('detail-nascita');if(dnEl&&budget&&budget.data_nascita){dnEl.value=new Date(budget.data_nascita+'T12:00:00').toLocaleDateString('it-IT');dnEl.dataset.isoValue=budget.data_nascita}}
+async function salvaDetailNascita(nome){var val=_getNascitaValue('detail-nascita');
+  if(!val){toast('Inserisci una data valida');return}
   var b=maisonBudgetCache.find(function(x){return x.nome.toLowerCase()===nome.toLowerCase()&&(x.reparto_dip||'slots')===currentReparto});
   if(b){try{await secPatch('maison_budget','id=eq.'+b.id,{data_nascita:val});b.data_nascita=val;
     renderMaisonBudgetUI();toast('Data nascita salvata per '+nome)}catch(e){toast('Errore salvataggio data nascita')}}
@@ -4380,7 +4408,7 @@ async function salvaMaisonBudget(){const nome=capitalizzaNome(document.getElemen
   const chf=parseFloat(document.getElementById('maison-budget-chf').value)||null;
   const bu=parseInt(document.getElementById('maison-budget-bu').value)||null;
   const bl=parseInt(document.getElementById('maison-budget-bl').value)||null;
-  const nascita=document.getElementById('maison-budget-nascita').value||null;
+  const nascita=_getNascitaValue('maison-budget-nascita')||null;
   const cat=document.getElementById('maison-budget-cat').value||'';
   if(!nome){toast('Inserisci il nome del cliente');return}
   if(!chf&&!bu&&!bl&&!nascita&&!cat){toast('Imposta almeno un campo');return}
@@ -4397,15 +4425,17 @@ async function salvaAssegnaCat(nome,cat){
     document.getElementById('pwd-modal').classList.add('hidden');renderMaisonBudgetUI();renderMaisonDashboard();toast(nome+' → '+(cat==='full_maison'?'Full Maison':'Maison'))}catch(e){toast('Errore assegnazione categoria')}}
 function modificaMaisonInfo(id){const b=maisonBudgetCache.find(x=>x.id===id);if(!b)return;
   const mc=document.getElementById('pwd-modal-content');
-  mc.innerHTML='<h3>Modifica info cliente</h3><div class="pwd-field"><label>Cliente</label><input type="text" value="'+escP(b.nome)+'" readonly style="background:var(--paper2);color:var(--muted)"></div><div class="pwd-field"><label>Categoria</label><select id="edit-mb-cat" style="width:100%;padding:8px"><option value=""'+(b.categoria===''||!b.categoria?' selected':'')+'>—</option><option value="maison"'+(b.categoria==='maison'?' selected':'')+'>Maison</option><option value="full_maison"'+(b.categoria==='full_maison'?' selected':'')+'>Full Maison</option><option value="direzione"'+(b.categoria==='direzione'?' selected':'')+'>Direzione</option></select></div><div style="display:flex;gap:10px"><div class="pwd-field" style="flex:1"><label>Budget CHF</label><input type="number" id="edit-mb-chf" value="'+(b.budget_chf||'')+'" step="0.01"></div><div class="pwd-field" style="flex:1"><label>Max BU</label><input type="number" id="edit-mb-bu" value="'+(b.budget_bu||'')+'"></div><div class="pwd-field" style="flex:1"><label>Max BL</label><input type="number" id="edit-mb-bl" value="'+(b.budget_bl||'')+'"></div></div><div class="pwd-field"><label>Data nascita</label><input type="text" id="edit-mb-nascita" value="'+(b.data_nascita||'')+'" readonly style="cursor:pointer"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaModificaMaisonInfo('+id+')">Salva</button></div>';
+  const nascitaDisplay=b.data_nascita?new Date(b.data_nascita+'T12:00:00').toLocaleDateString('it-IT'):'';
+  mc.innerHTML='<h3>Modifica info cliente</h3><div class="pwd-field"><label>Cliente</label><input type="text" value="'+escP(b.nome)+'" readonly style="background:var(--paper2);color:var(--muted)"></div><div class="pwd-field"><label>Categoria</label><select id="edit-mb-cat" style="width:100%;padding:8px"><option value=""'+(b.categoria===''||!b.categoria?' selected':'')+'>—</option><option value="maison"'+(b.categoria==='maison'?' selected':'')+'>Maison</option><option value="full_maison"'+(b.categoria==='full_maison'?' selected':'')+'>Full Maison</option><option value="direzione"'+(b.categoria==='direzione'?' selected':'')+'>Direzione</option></select></div><div style="display:flex;gap:10px"><div class="pwd-field" style="flex:1"><label>Budget CHF</label><input type="number" id="edit-mb-chf" value="'+(b.budget_chf||'')+'" step="0.01"></div><div class="pwd-field" style="flex:1"><label>Max BU</label><input type="number" id="edit-mb-bu" value="'+(b.budget_bu||'')+'"></div><div class="pwd-field" style="flex:1"><label>Max BL</label><input type="number" id="edit-mb-bl" value="'+(b.budget_bl||'')+'"></div></div><div class="pwd-field"><label>Data nascita</label><input type="text" id="edit-mb-nascita" value="'+nascitaDisplay+'" placeholder="es: 12.01.1997"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaModificaMaisonInfo('+id+')">Salva</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
-  if(window.flatpickr)flatpickr('#edit-mb-nascita',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,defaultDate:b.data_nascita||null})}
+  _initNascitaInput('edit-mb-nascita');
+  if(b.data_nascita){const el=document.getElementById('edit-mb-nascita');if(el)el.dataset.isoValue=b.data_nascita}}
 async function salvaModificaMaisonInfo(id){
   const cat=document.getElementById('edit-mb-cat').value||'';
   const chf=parseFloat(document.getElementById('edit-mb-chf').value)||null;
   const bu=parseInt(document.getElementById('edit-mb-bu').value)||null;
   const bl=parseInt(document.getElementById('edit-mb-bl').value)||null;
-  const nascita=document.getElementById('edit-mb-nascita').value||null;
+  const nascita=_getNascitaValue('edit-mb-nascita')||null;
   try{await secPatch('maison_budget','id=eq.'+id,{categoria:cat,budget_chf:chf,budget_bu:bu,budget_bl:bl,data_nascita:nascita});
     const b=maisonBudgetCache.find(x=>x.id===id);if(b){b.categoria=cat;b.budget_chf=chf;b.budget_bu=bu;b.budget_bl=bl;b.data_nascita=nascita}
     document.getElementById('pwd-modal').classList.add('hidden');renderMaisonBudgetUI();renderMaisonDashboard();toast('Info aggiornate')}catch(e){toast('Errore aggiornamento info')}}
