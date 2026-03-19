@@ -1113,6 +1113,15 @@
        - Richieste con follow-up automatico (promemoria 3 giorni).
        - Privacy promemoria: operatore vede solo i suoi, admin tutto.
 
+  [73] Push notifications schedulate per promemoria (19 marzo 2026)
+       - GitHub Actions workflow: gira ogni ora (06:00-22:00)
+       - Controlla promemoria con reminder scaduto o in orario
+       - Invia push notification via Edge Function send-push
+       - Campo push_sent_at: traccia invio per evitare duplicati
+       - Secrets (URL, KEY, PUSH_SECRET) in GitHub Secrets (criptati)
+       - Repo pubblico sicuro: chiavi mai nel codice, RLS blocca tutto,
+         la chiave anon da sola non permette accesso ai dati.
+
 
 ================================================================================
   FILE DEL PROGETTO
