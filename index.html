@@ -3803,17 +3803,24 @@ function _trovaNomeSimileMaison(nome){const nomi=[...new Set(getMaisonReparto().
   for(const n of nomi){if(_levenshtein(nl,n.toLowerCase())<=1&&nl.length>3)return{nome:n,tipo:'simile'}}
   for(const n of nomi){if(nl.length>=4&&(n.toLowerCase().includes(nl)||nl.includes(n.toLowerCase()))&&Math.abs(n.length-nome.length)<=3)return{nome:n,tipo:'simile'}}
   return null}
-function _parseMaisonNome(raw){let nome=raw.trim(),tipoBuono=null,note='';
+function _parseMaisonNome(raw){let nome=raw.trim(),tipoBuono=null,note='',isSeven=false;
   // Estrai note tra parentesi
   const pMatch=nome.match(/\(([^)]+)\)/);if(pMatch){note=pMatch[1].trim();nome=nome.replace(pMatch[0],'').trim()}
-  // Estrai COUPON, coup, Direzione, GD etc
-  const noteMatch=nome.match(/\b(coupon\s*\w*|coup|direzione|pranzo\s*\w*|GD)\b/gi);
+  // Rileva Seven (anche attaccato: BonomelliSeven, Bonomelli Seven, (Seven), (Se)
+  if(/seven/i.test(nome)){isSeven=true;nome=nome.replace(/\s*seven\b/gi,'').replace(/seven/gi,'').trim()}
+  // Estrai COUPON con tutto il testo dopo (coupon omaggio, coupon 50%, ecc.)
+  const coupMatch=nome.match(/\b(coupon\s*.*)$/i);
+  if(coupMatch){note=(note?note+', ':'')+coupMatch[1].trim();nome=nome.replace(coupMatch[0],'').trim()}
+  // Estrai coup, direzione, pranzo, GD come note
+  const noteMatch=nome.match(/\b(coup|direzione|pranzo\s*\w*|GD)\b/gi);
   if(noteMatch){note=(note?note+', ':'')+noteMatch.join(', ');noteMatch.forEach(m=>{nome=nome.replace(new RegExp('\\b'+m.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','gi'),'')});nome=nome.trim()}
-  // Estrai BU/BL con quantità (2BL, 3BU, BU, BL, +BU, +BL)
-  const buMatch=nome.match(/\+?\s*(\d*)\s*BU\b/i);if(buMatch){tipoBuono='BU';note=(note?note+', ':'')+(buMatch[1]||'1')+'BU';nome=nome.replace(buMatch[0],'').trim()}
-  const blMatch=nome.match(/\+?\s*(\d*)\s*BL\b/i);if(blMatch){tipoBuono='BL';note=(note?note+', ':'')+(blMatch[1]||'1')+'BL';nome=nome.replace(blMatch[0],'').trim()}
+  // Estrai BU/BL con quantità — formati: BU, BL, 2BL, 3BU, +BU, B.L, B.Ll, B.U, b.l
+  const buMatch=nome.match(/\+?\s*(\d*)\s*B\.?U\b/i);if(buMatch){tipoBuono='BU';note=(note?note+', ':'')+(buMatch[1]||'1')+'BU';nome=nome.replace(buMatch[0],'').trim()}
+  const blMatch=nome.match(/\+?\s*(\d*)\s*B\.?L+\b/i);if(blMatch){tipoBuono='BL';note=(note?note+', ':'')+(blMatch[1]||'1')+'BL';nome=nome.replace(blMatch[0],'').trim()}
   // Rimuovi numeri isolati (px ripetuto nel nome)
   nome=nome.replace(/\b\d+\b/g,'').replace(/\s{2,}/g,' ').trim();
+  // Flag Seven sul risultato
+  if(isSeven)nome='__SEVEN__'+nome;
   // Rimuovi "Gruppo"
   if(/^gruppo\s+/i.test(nome)){note=(note?note+', ':'')+'Gruppo';nome=nome.replace(/^gruppo\s+/i,'')}
   return{nome:capitalizzaNome(nome),tipoBuono,note}}
@@ -3857,14 +3864,21 @@ async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0
         if(!px&&!costo)continue;
         if(!rawNome&&costo)continue;
         const nomiRaw=rawNome.split(/\s*\/\s*/);
-        const nNomiNoSeven=nomiRaw.filter(n=>!/\bSeven\b|\(Se/i.test(n)).length;
+        // Parsa tutti i nomi e conta quelli non-Seven
+        const parsedAll=nomiRaw.map(nr=>_parseMaisonNome(nr));
+        const nNomiNoSeven=parsedAll.filter(p=>!p.nome.startsWith('__SEVEN__')).length;
         const nNomi=nNomiNoSeven||1;
-        for(const nr of nomiRaw){
-          const parsed=_parseMaisonNome(nr);if(!parsed.nome)continue;
-          if(/\bSeven\b|\(Se/i.test(nr)){continue}
-          // Se la riga contiene Seven → tutti i nomi vanno in spese_extra (ristorante esterno)
-          if(/\bSeven\b|\(Se/i.test(rawNome)){
-            const seRec={beneficiario:parsed.nome,tipo:'cena_esterna',descrizione:'Ristorante Seven (da formulario)',
+        const rigaHaSeven=parsedAll.some(p=>p.nome.startsWith('__SEVEN__'));
+        for(let _ni=0;_ni<nomiRaw.length;_ni++){
+          const parsed=parsedAll[_ni];let pNome=parsed.nome;if(!pNome)continue;
+          // Se questo nome è Seven stesso → skip
+          if(pNome.startsWith('__SEVEN__')){pNome=pNome.replace('__SEVEN__','').trim();
+            if(!pNome)continue;// era solo "Seven"
+          }
+          parsed.nome=pNome;
+          // Se la riga contiene Seven → tutti i nomi vanno in spese_extra
+          if(rigaHaSeven){
+            const seRec={beneficiario:parsed.nome,tipo:'cena_esterna',descrizione:'Ristorante Seven (da formulario)'+(parsed.note?', '+parsed.note:''),
               importo:Math.round(costo/nNomi*100)/100,data_spesa:dataGiornata,luogo:'Ristorante Seven',
               operatore:getOperatore(),reparto_dip:currentReparto};
             try{await secPost('spese_extra',seRec);totalRows++;sevenCount++}catch(e){}
