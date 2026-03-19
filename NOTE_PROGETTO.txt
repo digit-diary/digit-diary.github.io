@@ -1096,6 +1096,9 @@
          vanno gestite con le Note Colleghi (private e crittografate).
        - Il promemoria puo essere completato da qualsiasi supervisore
          con tracciamento di chi/quando.
+       - Privacy promemoria: ogni operatore vede solo i promemoria
+         assegnati a lui o a "tutti". Admin vede tutto.
+         Prima tutti vedevano tutto → ora filtro automatico.
 
 
 ================================================================================
