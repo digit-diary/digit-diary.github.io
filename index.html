@@ -3510,8 +3510,8 @@ function renderDashboard(){
   const dashComp=document.getElementById('dash-compleanni');
   if(compEl&&isVis('alert_compleanni')){
     const _oggiDate=new Date(now.getFullYear(),now.getMonth(),now.getDate());
-    // Compleanni clienti maison
-    const bdaysMaison=[];getBudgetReparto().forEach(b=>{if(!b.data_nascita)return;const dn=new Date(b.data_nascita+'T12:00:00');
+    // Compleanni clienti maison (cross-reparto)
+    const bdaysMaison=[];maisonBudgetCache.forEach(b=>{if(!b.data_nascita)return;const dn=new Date(b.data_nascita+'T12:00:00');
       const quest=new Date(now.getFullYear(),dn.getMonth(),dn.getDate());if(quest<_oggiDate)quest.setFullYear(quest.getFullYear()+1);
       const diff=Math.round((quest-_oggiDate)/(86400000));if(diff>=0&&diff<=7)bdaysMaison.push({nome:b.nome,data:quest,giorni:diff,tipo:'cliente'})});
     // Compleanni collaboratori
