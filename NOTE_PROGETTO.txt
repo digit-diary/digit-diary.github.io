@@ -1100,6 +1100,19 @@
          assegnati a lui o a "tutti". Admin vede tutto.
          Prima tutti vedevano tutto → ora filtro automatico.
 
+  [72] Data nascita manuale + esclusione lutto (19 marzo 2026)
+       - Data nascita: rimosso calendario, si scrive a mano.
+         Riconosce tutti i formati: 12.01.97, 12/1/1997, 1.2.85, ecc.
+         Auto-corregge e mostra in gg/mm/aaaa.
+         Anno a 2 cifre: 00-30 → 2000, 31-99 → 1900.
+         Applicato a: profilo collaboratore, budget maison, modifica info.
+       - Assenze nel rapporto: parole "lutto", "ferie", "vacanza",
+         "infortunio" nella riga → NON crea registrazione malattia.
+         Es: "Tonati assente per lutto" → salta.
+       - Rimosso sistema scadenze diario (bottone + campanella).
+       - Richieste con follow-up automatico (promemoria 3 giorni).
+       - Privacy promemoria: operatore vede solo i suoi, admin tutto.
+
 
 ================================================================================
   FILE DEL PROGETTO

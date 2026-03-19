@@ -1,0 +1,109 @@
+Oggetto: Diario Collaboratori — Il nuovo strumento digitale per la gestione del personale
+
+
+Gentile Responsabile, cari colleghi,
+
+sono lieto di presentarvi il Diario Collaboratori, un'applicazione web che ho
+sviluppato per semplificare e professionalizzare la gestione quotidiana del
+nostro reparto.
+
+
+PERCHE QUESTO STRUMENTO?
+
+Fino ad oggi abbiamo gestito le informazioni del personale con metodi che
+conosciamo bene: file sparsi sul desktop, fogli Excel condivisi che si
+sovrascrivono, bigliettini per il cambio turno, moduli cartacei da compilare
+a mano, e quella sensazione al rientro dalle ferie di non sapere cosa sia
+successo in nostra assenza.
+
+Il Diario Collaboratori risolve tutto questo in un unico punto di accesso,
+disponibile da computer, tablet e smartphone.
+
+
+COSA FA IN PRATICA
+
+1. DIARIO REGISTRAZIONI
+   Ogni evento viene registrato con nome, tipo e descrizione. Niente piu
+   fogli volanti. Tutto e ricercabile, filtrabile per persona, tipo e periodo,
+   ed esportabile in PDF e CSV. I filtri si mantengono anche quando si cambia
+   pagina.
+
+2. RAPPORTO GIORNALIERO
+   Il rapporto di turno si compila direttamente nell'app. Due colonne
+   (PRESTO e NOTTE) con salvataggio automatico. Le differenze cassa si
+   scrivono in modo naturale ("Rossi -100") e il sistema crea automaticamente
+   le registrazioni nel diario. Le assenze vengono riconosciute ("Tonati
+   assente", "Rossi x1") e registrate come malattia, con riconoscimento
+   intelligente del nome anche se scritto con errori di battitura.
+
+3. CONSEGNA TURNO
+   Niente piu bigliettini. Scrivi la consegna, il destinatario viene
+   suggerito automaticamente dal rapporto giornaliero. Il collega riceve
+   una notifica (anche con app chiusa) e la consegna viene segnata come
+   letta automaticamente.
+
+4. NOTE TRA COLLEGHI
+   Messaggi interni crittografati. Arrivano in tempo reale con un banner
+   animato e un suono. Rispondi con un click. Tutto privato — ogni
+   operatore vede solo le proprie note.
+
+5. MODULI DISCIPLINARI E APPREZZAMENTO
+   Allineamento, RDI, Apprezzamento: compila i campi (o lascia che l'AI
+   li generi automaticamente dalla tua descrizione) e genera un PDF
+   professionale con firma digitale e QR code di verifica. 8 template
+   rapidi per le situazioni piu comuni.
+
+6. PROMEMORIA INTELLIGENTI
+   Crea promemoria con scadenza e scegli quando essere avvisato: il giorno
+   stesso, 1 giorno prima, 3 giorni prima o 1 settimana prima. Ogni
+   operatore vede solo i propri promemoria. Quando registri una "Richiesta",
+   il sistema ti propone automaticamente di creare un follow-up.
+
+7. COSTI MAISON
+   Carica il formulario ristorante (Excel) e il sistema fa tutto: divide
+   i costi tra clienti condivisi, riconosce il Ristorante Seven come
+   spesa esterna, mostra grafici e statistiche per cliente, monitora i
+   budget con alert automatici. Gestione completa con categorie
+   (Full Maison, Maison, Direzione), compleanni e confronti.
+
+8. DASHBOARD
+   La homepage mostra tutto a colpo d'occhio: cosa fare oggi, cosa fare
+   domani, alert attivi, ultime registrazioni, spesa Maison del giorno.
+   Tutto basato sulla giornata di gioco (dalle 06:00 alle 06:00).
+
+9. STATISTICHE E REPORT
+   Grafici interattivi, scheda collaboratore con KPI e percorso
+   disciplinare, riepilogo mensile, report settimanale e annuale
+   personalizzabili — tutto esportabile in PDF con anteprima.
+
+10. ASSISTENTE AI
+    Scrivi un appunto veloce e l'AI lo trasforma in una comunicazione
+    professionale. Scegli tipo, tono e lunghezza. Supporta anche foto.
+
+
+SICUREZZA
+
+L'applicazione e protetta su piu livelli:
+- Ogni operatore accede con la propria password personale
+- Face ID / Touch ID per lo sblocco rapido
+- Tutti i dati sono protetti con Row Level Security
+- Le note tra colleghi sono crittografate
+- L'admin controlla cosa puo vedere ogni operatore
+
+I dati sono ospitati su server europei (Irlanda) e il sistema e
+autonomo per almeno 15-20 anni senza costi aggiuntivi.
+
+
+COME ACCEDERE
+
+Aprite il link: https://digit-diary.github.io
+Potete anche installare l'app sul telefono (Aggiungi alla schermata Home)
+per averla sempre disponibile come un'app nativa.
+
+In allegato trovate il Manuale Utente completo con tutte le istruzioni
+dettagliate per ogni funzione.
+
+Resto a disposizione per qualsiasi domanda o dimostrazione.
+
+Cordiali saluti,
+Musa Bushi
