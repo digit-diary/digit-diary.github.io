@@ -3454,7 +3454,11 @@ function mostraConsegnaLogin(){const op=getOperatore();if(!op)return;
 // ========================
 // DASHBOARD PANORAMICA
 // ========================
-function _getTurnoCorrente(){const h=new Date().getHours();return h>=6&&h<18?'PRESTO':'NOTTE'}
+function _getTurnoCorrente(){const now=new Date();const h=now.getHours();const m=now.getMinutes();const day=now.getDay();// 0=dom,5=ven,6=sab
+  // PRESTO: 06:00 - 20:00 (dom-gio) o 06:00 - 20:45 (ven-sab)
+  const finePresto=(day===5||day===6)?20.75:20;// 20:45 = 20.75
+  const oraDecimale=h+m/60;
+  return oraDecimale>=6&&oraDecimale<finePresto?'PRESTO':'NOTTE'}
 function renderDashboard(){
   const oggi=getGiornataCasino();const now=new Date();const turno=_getTurnoCorrente();
   const gd=new Date(oggi+'T12:00:00');
