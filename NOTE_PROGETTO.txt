@@ -1136,6 +1136,11 @@
          non salva nel DB, non cambia Creato da / Modificato da.
        - Coerente con il diario: modifica tracciata solo se si cambiano
          effettivamente dati nel form.
+       - Log completo azioni operatori nel Registro:
+         data nascita, modifica info/spese/budget maison, eliminazioni,
+         assegnazione categoria, spostamenti Maison ↔ Extra.
+         Configurazioni admin (visibilita, reparto) non loggate
+         perche non sono azioni operative.
 
 
 ================================================================================
