@@ -3392,7 +3392,7 @@ async function initConsegnaUI(){const turno=_getTurnoCorrente();const sel=docume
     }
     // Match nome supervisore con operatori registrati
     const sugMatch=suggerito?matchCollaboratoreOps(suggerito,ops):'';
-    dSel.innerHTML='<option value="tutti">Tutti</option>'+ops.map(n=>'<option value="'+escP(n)+'"'+(sugMatch&&n===sugMatch?' selected':'')+'>'+escP(n)+'</option>').join('');
+    dSel.innerHTML='<option value="tutti">Tutti</option>'+ops.filter(n=>n!==op).map(n=>'<option value="'+escP(n)+'"'+(sugMatch&&n===sugMatch?' selected':'')+'>'+escP(n)+'</option>').join('');
     if(sugMatch)toast('Destinatario: '+sugMatch+' (dal rapporto)')}}
 function matchCollaboratoreOps(nome,ops){nome=nome.toLowerCase();
   return ops.find(n=>n.toLowerCase()===nome)||ops.find(n=>{const w=n.toLowerCase().split(/\s+/);return w.some(p=>p===nome||nome===p)})||ops.find(n=>n.toLowerCase().includes(nome)||nome.includes(n.toLowerCase()))||''}
