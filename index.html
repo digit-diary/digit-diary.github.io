@@ -4547,10 +4547,16 @@ async function eliminaMaisonMese(){const sel=document.getElementById('maison-del
 // Budget
 function renderMaisonBudgetUI(){const el=document.getElementById('maison-budget-list');if(!el)return;
   const _br=getBudgetReparto(),_mr=getMaisonRepartoExpanded();
-  const tuttiNomi=[...new Set([..._br.map(b=>b.nome),..._mr.map(r=>r.nome)])].sort();
-  if(!tuttiNomi.length){el.innerHTML='<div class="empty-state"><p>Nessun cliente</p><small>Carica un file Excel o aggiungi manualmente per iniziare</small></div>';return}
+  // Solo clienti con categoria assegnata (+ opzione per vedere tutti)
+  const clientiCat=_br.filter(b=>b.categoria);
+  const tuttiNomi=[...new Set(clientiCat.map(b=>b.nome))].sort();
+  const nTotali=[...new Set([..._br.map(b=>b.nome),..._mr.map(r=>r.nome)])].length;
+  if(!tuttiNomi.length&&!_mr.length){el.innerHTML='<div class="empty-state"><p>Nessun cliente categorizzato</p><small>Clicca sul nome di un cliente nella tabella sopra per assegnare una categoria</small></div>';return}
   let filtCat=(document.getElementById('maison-filt-cat-lista')||{}).value||'';
-  let html='<div style="display:flex;gap:10px;margin-bottom:12px;align-items:center;flex-wrap:wrap"><select id="maison-filt-cat-lista" onchange="renderMaisonBudgetUI()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.85rem;background:var(--paper);color:var(--ink)"><option value="">Tutti ('+tuttiNomi.length+')</option><option value="full_maison"'+(filtCat==='full_maison'?' selected':'')+'>Full Maison</option><option value="maison"'+(filtCat==='maison'?' selected':'')+'>Maison</option><option value="direzione"'+(filtCat==='direzione'?' selected':'')+'>Direzione</option><option value="nessuna"'+(filtCat==='nessuna'?' selected':'')+'>Non categorizzati</option></select></div>';
+  const nFM=clientiCat.filter(b=>b.categoria==='full_maison').length;
+  const nM=clientiCat.filter(b=>b.categoria==='maison').length;
+  const nD=clientiCat.filter(b=>b.categoria==='direzione').length;
+  let html='<div style="display:flex;gap:10px;margin-bottom:12px;align-items:center;flex-wrap:wrap"><select id="maison-filt-cat-lista" onchange="renderMaisonBudgetUI()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.85rem;background:var(--paper);color:var(--ink)"><option value="">Tutti categorizzati ('+tuttiNomi.length+')</option><option value="full_maison"'+(filtCat==='full_maison'?' selected':'')+'>Full Maison ('+nFM+')</option><option value="maison"'+(filtCat==='maison'?' selected':'')+'>Maison ('+nM+')</option><option value="direzione"'+(filtCat==='direzione'?' selected':'')+'>Direzione ('+nD+')</option></select></div>';
   // Build client data
   const clients=tuttiNomi.map(nome=>{
     const b=_br.find(x=>x.nome.toLowerCase()===nome.toLowerCase());
@@ -4559,9 +4565,9 @@ function renderMaisonBudgetUI(){const el=document.getElementById('maison-budget-
     return{nome,b,spent,cat}});
   // Filter
   let filtered=clients;
-  if(filtCat){filtered=clients.filter(c=>{if(filtCat==='nessuna')return!c.cat;return c.cat===filtCat})}
+  if(filtCat){filtered=clients.filter(c=>c.cat===filtCat)}
   // Group by category
-  const catDefs=[{key:'full_maison',label:'Full Maison',color:'#b8860b'},{key:'maison',label:'Maison',color:'#2980b9'},{key:'direzione',label:'Direzione',color:'#8e44ad'},{key:'',label:'Non categorizzati',color:'var(--muted)'}];
+  const catDefs=[{key:'full_maison',label:'Full Maison',color:'#b8860b'},{key:'maison',label:'Maison',color:'#2980b9'},{key:'direzione',label:'Direzione',color:'#8e44ad'}];
   function renderClientRow(c,idx){
     const pct=c.b&&c.b.budget_chf?Math.round(c.spent/c.b.budget_chf*100):0;
     const pctColor=pct>=100?'var(--accent)':pct>=80?'#e67e22':'#2c6e49';
