@@ -3472,7 +3472,7 @@ function renderDashboard(){
   // Stats bar: 6 KPI
   const op=getOperatore();
   const pmMiei=promemoriaCache.filter(p=>!p.completata&&(p.assegnato_a===op||p.assegnato_a==='tutti'));
-  const pmScaduti=pmMiei.filter(p=>p.data_scadenza<=oggi);
+  const pmScaduti=pmMiei.filter(p=>p.data_scadenza<oggi);
   const noteNL=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.letta&&!n.nascosta_dest).length;
   const _rd=getDatiReparto(),_rm=getMaisonRepartoExpanded();
   const maisonOggi=_rm.filter(r=>r.data_giornata===oggi).reduce((s,r)=>s+parseFloat(r.costo||0),0);
@@ -3833,18 +3833,24 @@ function aggiornaPromemoriaBadge(){const op=getOperatore();const oggi=new Date()
   const scaduti=miei.filter(p=>p.data_scadenza<oggi);
   const badge=document.getElementById('promemoria-badge');if(!badge)return;
   if(miei.length){badge.style.display='inline';badge.textContent=miei.length;badge.style.background=scaduti.length?'var(--accent)':'var(--accent2)'}else{badge.style.display='none'}}
+function _getDataRemindGlobal(p){const m=(p.descrizione||'').match(/Promemoria: (\d+) giorno\/i prima/);
+  if(m){const d=new Date(p.data_scadenza+'T12:00:00');d.setDate(d.getDate()-parseInt(m[1]));return d.toISOString().split('T')[0]}
+  if((p.descrizione||'').includes('il giorno stesso'))return p.data_scadenza;
+  return p.data_scadenza}
 function mostraPromemoriaLogin(){const op=getOperatore();if(!op)return;
   const oggi=new Date().toISOString().split('T')[0];
   const miei=promemoriaCache.filter(p=>!p.completata&&(p.assegnato_a===op||p.assegnato_a==='tutti'));
+  // Solo scaduti (data passata) + quelli il cui reminder è per oggi
   const scaduti=miei.filter(p=>p.data_scadenza<oggi);
-  const prossimi=miei.filter(p=>p.data_scadenza>oggi&&p.data_scadenza<=new Date(Date.now()+3*86400000).toISOString().split('T')[0]);
-  if(!scaduti.length&&!prossimi.length)return;
+  const reminderOggi=miei.filter(p=>{const dr=_getDataRemindGlobal(p);return dr<=oggi&&p.data_scadenza>=oggi});
+  const lista=[...scaduti,...reminderOggi];
+  if(!lista.length)return;
   if(scaduti.length){mostraNotifBanner('promemoria','Promemoria scaduti',scaduti.length+' scadut'+(scaduti.length===1?'o':'i')+': '+scaduti.map(p=>p.titolo).join(', ').substring(0,60),()=>switchPage('promemoria'));inviaNotifica('Promemoria scaduti',scaduti.length+' promemoria scadut'+(scaduti.length===1?'o':'i')+': '+scaduti.map(p=>p.titolo).join(', ').substring(0,80))}
+  else if(reminderOggi.length){mostraNotifBanner('promemoria','Promemoria',reminderOggi.map(p=>p.titolo).join(', ').substring(0,60),()=>switchPage('promemoria'))}
   const mc=document.getElementById('note-modal-content');
   let html='<h3 style="margin-bottom:4px">Promemoria</h3>';
   if(scaduti.length)html+='<p style="color:var(--accent);font-size:.85rem;margin-bottom:12px;font-weight:600">'+scaduti.length+' promemoria scadut'+(scaduti.length===1?'o':'i')+'!</p>';
-  else html+='<p style="color:var(--muted);font-size:.82rem;margin-bottom:12px">'+prossimi.length+' promemoria in scadenza nei prossimi 3 giorni</p>';
-  const lista=[...scaduti,...prossimi];
+  else html+='<p style="color:var(--muted);font-size:.82rem;margin-bottom:12px">Promemoria per oggi</p>';
   html+=lista.map(p=>{const scaduto=p.data_scadenza<oggi;
     return'<div style="background:var(--paper2);border-radius:3px;padding:12px;margin-bottom:8px;border-left:3px solid '+(scaduto?'var(--accent)':'#e67e22')+'"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><strong>'+escP(p.titolo)+'</strong><span style="font-size:.78rem;color:'+(scaduto?'var(--accent)':'#e67e22')+';font-weight:600">'+new Date(p.data_scadenza+'T12:00:00').toLocaleDateString('it-IT')+'</span></div>'+(p.descrizione?'<div style="font-size:.85rem;color:var(--muted)">'+esc(p.descrizione)+'</div>':'')+'</div>'}).join('');
   html+='<div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'note-modal\').classList.add(\'hidden\');switchPage(\'promemoria\')">Vedi tutti</button><button class="btn-modal-cancel" onclick="document.getElementById(\'note-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
