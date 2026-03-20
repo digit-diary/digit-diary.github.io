@@ -1188,6 +1188,11 @@
        - Fix mobile: tabelle con scroll orizzontale, form responsive,
          nomi e badge non vanno a capo (white-space:nowrap).
        - Import buoni divisi tra nomi del gruppo.
+       - Malattia da rapporto: una registrazione unica con range giorni
+         e orario reale. "De Masi assente fino al 22" → 1 riga con
+         "dal 20/03 al 22/03 (3 giorni)".
+       - Conteggio malattie: somma giorni reali (non righe).
+         Applicato a scheda, statistiche, riepilogo, report, confronto.
        - Compleanni separati per reparto: clienti maison filtrati per
          reparto, collaboratori filtrati per registrazioni nel reparto,
          push cron inviate separatamente per slots e tavoli.
