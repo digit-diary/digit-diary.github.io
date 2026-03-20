@@ -1158,6 +1158,17 @@
        - Fix turno: PRESTO fino 20:00 (dom-gio) o 20:45 (ven-sab).
        - Import: nomi simili corretti automaticamente (Karapetian → Karapetyan)
          con avviso nel riepilogo.
+       - Fix promemoria: popup e push rispettano il reminder impostato.
+         Non mostra piu "in scadenza nei prossimi 3 giorni" ignorando
+         il reminder. Scaduti solo se data passata (non oggi).
+       - Orari promemoria: 9 opzioni (06-08-10-12-14-16-18-20-22).
+       - Login settore: mostra solo operatori del reparto selezionato.
+       - Consegna: nasconde proprio nome dalla lista destinatari.
+       - Spese extra raggruppate per beneficiario + rinomina in blocco.
+       - Edit/Delete su spese extra nel popup dettaglio cliente.
+       - WL (Welcome Lounge) come categoria buono separata.
+       - Parser nomi riscritto: riconosce qualsiasi variante di
+         Seven, BU, BL, CG, WL, GD, Coupon a prescindere dalla scrittura.
 
   [74] Moduli: tracciamento Creato da / Modificato da (19 marzo 2026)
        - Quando un operatore modifica un modulo creato da un altro,
