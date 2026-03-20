@@ -1174,6 +1174,10 @@
        - Cache localStorage per operatori e mappa reparti: login funziona
          anche con token scaduto o Touch ID annullato.
        - Consegna destinatari: fallback sicuro + filtro per reparto.
+       - Compleanni separati per reparto: clienti maison filtrati per
+         reparto, collaboratori filtrati per registrazioni nel reparto,
+         push cron inviate separatamente per slots e tavoli.
+       - Promemoria: lista operatori filtrata per reparto corrente.
 
   [74] Moduli: tracciamento Creato da / Modificato da (19 marzo 2026)
        - Quando un operatore modifica un modulo creato da un altro,
