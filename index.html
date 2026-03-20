@@ -2280,7 +2280,13 @@ function apriSchedaCollaboratore(nome){
     html+='<div class="scheda-section"><h4>Pattern malattie</h4>';
     const malEntries=entries.filter(e=>e.tipo===tipoMal);
     const dayDist=[0,0,0,0,0,0,0];
-    malEntries.forEach(e=>{dayDist[new Date(e.data).getDay()]++});
+    malEntries.forEach(e=>{
+      // Espandi range: "dal DD/MM/YYYY al DD/MM/YYYY (N giorni)"
+      const rangeM=(e.testo||'').match(/dal\s+(\d{2})\/(\d{2})\/(\d{4})\s+al\s+(\d{2})\/(\d{2})\/(\d{4})/);
+      if(rangeM){const dI=new Date(rangeM[3]+'-'+rangeM[2]+'-'+rangeM[1]+'T12:00:00');
+        const dF=new Date(rangeM[6]+'-'+rangeM[5]+'-'+rangeM[4]+'T12:00:00');
+        for(let d=new Date(dI);d<=dF;d.setDate(d.getDate()+1))dayDist[d.getDay()]++}
+      else{dayDist[new Date(e.data).getDay()]++}});
     const lunVen=dayDist[1]+dayDist[5];
     const lunVenPct=totMal>0?Math.round(lunVen/totMal*100):0;
     html+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin:8px 0">';
