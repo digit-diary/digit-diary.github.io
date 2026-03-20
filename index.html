@@ -681,7 +681,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
     <div class="card-header">Invia nota ai colleghi</div>
     <div class="form-area">
       <div class="form-row">
-        <div class="field" style="flex:2"><label>Destinatari</label><div id="nota-dest-box" style="display:flex;flex-wrap:wrap;gap:6px 12px;padding:8px 10px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);min-height:38px"><label style="font-size:.82rem;font-weight:700;color:var(--accent2);cursor:pointer;display:flex;align-items:center;gap:4px;margin-right:8px"><input type="checkbox" id="nota-tutti" onchange="toggleTuttiDest()"> Tutti</label></div></div>
+        <div class="field" style="flex:2"><label>Destinatari</label><div id="nota-dest-box" style="display:flex;flex-wrap:wrap;gap:6px 12px;padding:8px 10px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);min-height:38px"></div></div>
         <div class="field"><label>Da</label><input type="text" id="nota-da" readonly style="background:var(--paper2);color:var(--muted)"></div>
       </div>
       <div class="field" style="margin-bottom:16px"><label>Messaggio <small style="color:var(--muted);font-weight:300;text-transform:none;letter-spacing:0;font-size:.75rem">Ctrl+Invio per inviare</small></label><textarea id="nota-msg" placeholder="Scrivi il messaggio per il collega..." style="min-height:100px"></textarea></div>
@@ -2072,7 +2072,10 @@ async function generaRiepilogoMensile(){
   }catch(e){console.error(e);toast('Errore generazione PDF: '+e.message)}}
 
 // NOTE COLLEGHI
-function toggleTuttiDest(){const c=document.getElementById('nota-tutti').checked;document.querySelectorAll('#nota-dest-box input[type=checkbox]:not(#nota-tutti)').forEach(cb=>cb.checked=c)}
+function toggleTuttiDest(){const c=document.getElementById('nota-tutti').checked;document.querySelectorAll('#nota-dest-box input[type=checkbox]:not(#nota-tutti):not(.nota-gruppo)').forEach(cb=>cb.checked=c)}
+function toggleGruppoDest(reparto){const c=document.querySelector('#nota-dest-box .nota-gruppo[data-rep="'+reparto+'"]');if(!c)return;
+  document.querySelectorAll('#nota-dest-box input[type=checkbox]:not(#nota-tutti):not(.nota-gruppo)').forEach(cb=>{
+    const rep=operatoriRepartoMap[cb.value]||'entrambi';if(rep===reparto||rep==='entrambi')cb.checked=c.checked})}
 function getDestinatariSelezionati(){return[...document.querySelectorAll('#nota-dest-box input[type=checkbox]:not(#nota-tutti)')].filter(cb=>cb.checked).map(cb=>cb.value)}
 async function inviaNotaCollega(){const dests=getDestinatariSelezionati(),msg=document.getElementById('nota-msg').value.trim(),da=getOperatore();
   if(!da){toast('Seleziona prima un operatore (in alto)');return}if(!dests.length){toast('Seleziona almeno un destinatario');return}if(!msg){toast('Scrivi un messaggio');_highlightField('nota-msg');return}
@@ -2117,7 +2120,12 @@ async function annullaInvioNota(id){const n=noteColleghiCache.find(n=>n.id===id)
 function renderNoteCollega(){const op=getOperatore();
   // Populate destinatari checkboxes
   const box=document.getElementById('nota-dest-box');if(box){const checked=new Set(getDestinatariSelezionati());const tutti=operatoriAuthCache.map(o=>o.nome).sort().filter(n=>n&&n!==op);
-    box.innerHTML='<label style="font-size:.82rem;font-weight:700;color:var(--accent2);cursor:pointer;display:flex;align-items:center;gap:4px;margin-right:8px"><input type="checkbox" id="nota-tutti" onchange="toggleTuttiDest()"> Tutti</label>'+tutti.map(n=>'<label style="font-size:.82rem;cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" value="'+escP(n)+'"'+(checked.has(n)?' checked':'')+'> '+escP(n)+'</label>').join('')}
+    // Bottoni gruppo per reparto
+    const myRep=operatoriRepartoMap[op]||'entrambi';
+    let gruppiHtml='';
+    if(myRep==='slots'||myRep==='entrambi')gruppiHtml+='<label style="font-size:.82rem;font-weight:700;color:#1a4a7a;cursor:pointer;display:flex;align-items:center;gap:4px;margin-right:6px"><input type="checkbox" class="nota-gruppo" data-rep="slots" onchange="toggleGruppoDest(\'slots\')"> Tutti Slots</label>';
+    if(myRep==='tavoli'||myRep==='entrambi')gruppiHtml+='<label style="font-size:.82rem;font-weight:700;color:#8e44ad;cursor:pointer;display:flex;align-items:center;gap:4px;margin-right:6px"><input type="checkbox" class="nota-gruppo" data-rep="tavoli" onchange="toggleGruppoDest(\'tavoli\')"> Tutti Tavoli</label>';
+    box.innerHTML=gruppiHtml+'<span style="display:block;width:100%;height:1px;background:var(--line);margin:4px 0"></span>'+tutti.map(n=>{const rep=operatoriRepartoMap[n]||'entrambi';const repBadge=rep==='slots'?'<span style="font-size:.65rem;color:#1a4a7a;font-weight:700">S</span>':rep==='tavoli'?'<span style="font-size:.65rem;color:#8e44ad;font-weight:700">T</span>':'';return'<label style="font-size:.82rem;cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" value="'+escP(n)+'"'+(checked.has(n)?' checked':'')+'> '+escP(n)+' '+repBadge+'</label>'}).join('')}
   const da=document.getElementById('nota-da');if(da)da.value=op||'(nessun operatore)';
   // Filtri date
   const _ricDal=(document.getElementById('note-ric-dal')||{}).value||'';
