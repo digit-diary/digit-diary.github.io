@@ -3871,39 +3871,30 @@ function _trovaNomeSimileMaison(nome){const nomi=[...new Set(getMaisonReparto().
   for(const n of nomi){if(nl.length>=4&&(n.toLowerCase().includes(nl)||nl.includes(n.toLowerCase()))&&Math.abs(n.length-nome.length)<=3)return{nome:n,tipo:'simile'}}
   return null}
 function _parseMaisonNome(raw){let nome=raw.trim(),tipoBuono=null,note='',isSeven=false;
-  // Estrai note tra parentesi
+  // 1. Estrai note tra parentesi
   const pMatch=nome.match(/\(([^)]+)\)/);if(pMatch){note=pMatch[1].trim();nome=nome.replace(pMatch[0],'').trim()}
-  // Rileva Seven (anche attaccato: BonomelliSeven, Bonomelli Seven, (Seven), (Se)
-  if(/seven/i.test(nome)){isSeven=true;nome=nome.replace(/\s*seven\b/gi,'').replace(/seven/gi,'').trim()}
-  // Coupon Gourmet / Cena Gourmet → tipo CG
-  const gourmetMatch=nome.match(/\b(coupon\s+gourmet|cena\s+gourmet|c\.?\s*gourmet)\b/gi);
-  if(gourmetMatch){tipoBuono='CG';note=(note?note+', ':'')+'C. Gourmet';nome=nome.replace(gourmetMatch[0],'').trim()}
-  // Estrai COUPON con tutto il testo dopo (coupon omaggio, coupon 50%, ecc.)
-  if(!gourmetMatch){const coupMatch=nome.match(/\b(coupon\s*.*)$/i);
-    if(coupMatch){note=(note?note+', ':'')+coupMatch[1].trim();nome=nome.replace(coupMatch[0],'').trim()}}
-  // Estrai coup, direzione, pranzo, GD come note
-  const noteMatch=nome.match(/\b(coup|direzione|pranzo\s*\w*|GD)\b/gi);
-  if(noteMatch){note=(note?note+', ':'')+noteMatch.join(', ');noteMatch.forEach(m=>{nome=nome.replace(new RegExp('\\b'+m.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','gi'),'')});nome=nome.trim()}
-  // Estrai BU/BL con quantità — formati: BU, BL, 2BL, 3BU, +BU, +BL, + BL, B.L, B.Ll, B.U
-  const buMatch=nome.match(/\s*\+?\s*(\d*)\s*B\.?U\b/i);if(buMatch){tipoBuono='BU';note=(note?note+', ':'')+(buMatch[1]||'1')+'BU';nome=nome.replace(buMatch[0],'').trim()}
-  if(!tipoBuono){const blMatch=nome.match(/\s*\+?\s*(\d*)\s*B\.?L+\b/i);if(blMatch){tipoBuono='BL';note=(note?note+', ':'')+(blMatch[1]||'1')+'BL';nome=nome.replace(blMatch[0],'').trim()}}
-  // Rimuovi numeri isolati, + isolati, virgolette
-  nome=nome.replace(/\b\d+\b/g,'').replace(/\+/g,'').replace(/["''""]/g,'').replace(/\s{2,}/g,' ').trim();
-  // Rimuovi "gruppo" da inizio nome
+  // 2. SEVEN — qualsiasi variante (seven, Seven, SEVEN, attaccato, separato)
+  if(/seven/i.test(nome)||/\(se\b/i.test(raw)){isSeven=true;nome=nome.replace(/seven/gi,'').trim()}
+  // 3. WELCOME LOUNGE — qualsiasi variante
+  if(/welcome\s*lounge|w\.?\s*lounge/i.test(nome)){tipoBuono='WL';note=(note?note+', ':'')+'Welcome Lounge';nome=nome.replace(/welcome\s*lounge|w\.?\s*lounge/gi,'').trim()}
+  // 4. COUPON GOURMET — qualsiasi variante (coupon, cupon, cpupon, c., cena + gourmet, b gourmet)
+  if(!tipoBuono&&/gourmet/i.test(nome)){tipoBuono='CG';note=(note?note+', ':'')+'C. Gourmet';nome=nome.replace(/\b\S*\s*gourmet\b/gi,'').trim()}
+  // 5. COUPON (senza gourmet) — coupon omaggio, coup, ecc.
+  if(!tipoBuono){const coupM=nome.match(/\b(coupon\s*\S*|coup)\b/gi);if(coupM){note=(note?note+', ':'')+coupM[0].trim();nome=nome.replace(coupM[0],'').trim()}}
+  // 6. BU — qualsiasi variante (BU, B.U, bu, b.u, +BU, 2BU, buono unico)
+  if(!tipoBuono){const buM=nome.match(/\s*\+?\s*(\d*)\s*b\.?\s*u(?:nico)?\b/i);
+    if(buM){tipoBuono='BU';note=(note?note+', ':'')+(buM[1]||'1')+'BU';nome=nome.replace(buM[0],'').trim()}}
+  // 7. BL — qualsiasi variante (BL, B.L, B.Ll, bl, b.l, +BL, 2BL, buono lounge)
+  if(!tipoBuono){const blM=nome.match(/\s*\+?\s*(\d*)\s*b\.?\s*l+(?:ounge)?\b/i);
+    if(blM){tipoBuono='BL';note=(note?note+', ':'')+(blM[1]||'1')+'BL';nome=nome.replace(blM[0],'').trim()}}
+  // 8. Note aggiuntive: direzione, pranzo, GD
+  const noteM=nome.match(/\b(direzione|pranzo\s*\w*|GD)\b/gi);
+  if(noteM){note=(note?note+', ':'')+noteM.join(', ');noteM.forEach(m=>{nome=nome.replace(new RegExp(m.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi'),'')});nome=nome.trim()}
+  // 9. Pulizia: numeri isolati, +, virgolette, "gruppo"
+  nome=nome.replace(/\b\d+\b/g,'').replace(/\+/g,'').replace(/["''""«»]/g,'').replace(/\s{2,}/g,' ').trim();
   nome=nome.replace(/^gruppo\s+/i,'').trim();
-  // Se il nome rimasto è solo una keyword → vuoto
-  if(/^(coupon|gourmet|cena|pranzo|coup|direzione|gd|cupon|cpupon|c\s*gourmet|b\s*gourmet|welcome|lounge)$/i.test(nome))nome='';
-  // Welcome Lounge → tipo WL
-  const wlMatch=nome.match(/\b(welcome\s+lounge)\b/gi);
-  if(wlMatch){tipoBuono='WL';note=(note?note+', ':'')+'Welcome Lounge';nome=nome.replace(wlMatch[0],'').trim()}
-  // Coupon Gourmet varianti typo: Cupon, Cpupon, B Gourmet
-  if(!tipoBuono){const cgTypo=nome.match(/\b(cupon\s+gourmet|cpupon\s+gourmet|b\s+gourmet)\b/gi);
-    if(cgTypo){tipoBuono='CG';note=(note?note+', ':'')+'C. Gourmet';nome=nome.replace(cgTypo[0],'').trim()}}
-  // Rimuovi "Gruppo"
-  if(/^gruppo\s+/i.test(nome)){note=(note?note+', ':'')+'Gruppo';nome=nome.replace(/^gruppo\s+/i,'')}
-  // Pulizia finale nome
-  nome=nome.replace(/\s{2,}/g,' ').trim();
-  if(/^(coupon|gourmet|cena|pranzo|coup|direzione|gd|cupon|cpupon|welcome|lounge|gruppo)$/i.test(nome))nome='';
+  // 10. Se resta solo keyword → vuoto
+  if(/^(coupon|gourmet|cena|pranzo|coup|direzione|gd|cupon|cpupon|welcome|lounge|gruppo|seven|buono|unico)$/i.test(nome))nome='';
   return{nome:nome?capitalizzaNome(nome):'',tipoBuono,note,isSeven}}
 async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0];if(!file&&!forzaSostituisci)return;
   if(forzaSostituisci&&window._maisonPendingFile){/* usa file pendente */}else{window._maisonPendingFile=file}
