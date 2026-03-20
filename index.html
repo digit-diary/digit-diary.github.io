@@ -3347,7 +3347,8 @@ function renderStatistiche(){const _ds=getDatiReparto();if(!_ds.length){document
   ['chart-mesi','chart-tipi','chart-giorni','chart-collab'].forEach(function(id){if(charts[id]){charts[id].destroy();delete charts[id]}});return}
   // Summary
   const nCollab=new Set(_ds.map(e=>e.nome)).size;const nErr=_ds.filter(e=>e.tipo===nomeCorrente('Errore')).length;const totImp=_ds.reduce((s,e)=>s+(parseFloat(e.importo)||0),0);
-  document.getElementById('stats-summary').innerHTML='<div class="stats-bar" style="margin-bottom:0"><div class="stat"><div class="stat-num">'+_ds.length+'</div><div class="stat-label">Registrazioni totali</div></div><div class="stat"><div class="stat-num blue">'+nCollab+'</div><div class="stat-label">Collaboratori</div></div><div class="stat"><div class="stat-num red">'+nErr+'</div><div class="stat-label">'+nomeCorrente('Errore')+'</div></div><div class="stat"><div class="stat-num teal">'+_ds.filter(e=>e.tipo===nomeCorrente('Malattia')).length+'</div><div class="stat-label">'+nomeCorrente('Malattia')+'</div></div><div class="stat"><div class="stat-num gold">'+(totImp?totImp.toFixed(2):'0')+'</div><div class="stat-label">Importo totale</div></div></div>';
+  const _nMalStat=_contaTotaleMalattie(_ds,nomeCorrente('Malattia'));
+  document.getElementById('stats-summary').innerHTML='<div class="stats-bar" style="margin-bottom:0"><div class="stat"><div class="stat-num">'+_ds.length+'</div><div class="stat-label">Registrazioni totali</div></div><div class="stat"><div class="stat-num blue">'+nCollab+'</div><div class="stat-label">Collaboratori</div></div><div class="stat"><div class="stat-num red">'+nErr+'</div><div class="stat-label">'+nomeCorrente('Errore')+'</div></div><div class="stat"><div class="stat-num teal">'+_nMalStat+'</div><div class="stat-label">'+nomeCorrente('Malattia')+' (giorni)</div></div><div class="stat"><div class="stat-num gold">'+(totImp?totImp.toFixed(2):'0')+'</div><div class="stat-label">Importo totale</div></div></div>';
   // Grafico mensile (full width, primo)
   const tipiCount={};_ds.forEach(e=>{tipiCount[e.tipo]=(tipiCount[e.tipo]||0)+1});
   const tl=Object.keys(tipiCount).sort((a,b)=>tipiCount[b]-tipiCount[a]);
@@ -3361,7 +3362,10 @@ function renderStatistiche(){const _ds=getDatiReparto();if(!_ds.length){document
   // Top collaboratori
   const cc={};_ds.forEach(e=>{cc[e.nome]=(cc[e.nome]||0)+1});const cs=Object.entries(cc).sort((a,b)=>b[1]-a[1]).slice(0,15);
   renderChart('chart-collab','bar',{labels:cs.map(c=>c[0]),datasets:[{label:'Registrazioni',data:cs.map(c=>c[1]),backgroundColor:'rgba(139,105,20,0.7)',borderRadius:4}]},{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1,font:{size:12}}},y:{ticks:{font:{size:13}}}}});
-  const tutti=getTuttiTipi(),cd={};_ds.forEach(e=>{if(!cd[e.nome])cd[e.nome]={tot:0};cd[e.nome].tot++;cd[e.nome][e.tipo]=(cd[e.nome][e.tipo]||0)+1});
+  const _tipoMalStat=nomeCorrente('Malattia');
+  const tutti=getTuttiTipi(),cd={};_ds.forEach(e=>{if(!cd[e.nome])cd[e.nome]={tot:0};cd[e.nome].tot++;
+    if(e.tipo===_tipoMalStat){cd[e.nome][e.tipo]=(cd[e.nome][e.tipo]||0)+_contaGiorniMalattia(e)}
+    else{cd[e.nome][e.tipo]=(cd[e.nome][e.tipo]||0)+1}});
   const cr=Object.entries(cd).sort((a,b)=>b[1].tot-a[1].tot),tp=tutti.filter(t=>_ds.some(e=>e.tipo===t.nome));
   let th='<table class="collab-table"><thead><tr><th>Collaboratore</th><th class="num">Tot</th>'+tp.map(t=>'<th class="num">'+t.nome+'</th>').join('')+'</tr></thead><tbody>';
   cr.forEach(([n,d])=>{const ne=n.replace(/'/g,"\\'");th+='<tr><td><span class="entry-name" onclick="apriSchedaCollaboratore(\''+ne+'\')"><strong>'+escP(n)+'</strong></span></td><td class="num"><strong>'+d.tot+'</strong></td>'+tp.map(t=>{const v=d[t.nome]||0;return'<td class="num">'+(v?'<span class="mini-badge" style="background:'+t.colore+'">'+v+'</span>':'-')+'</td>'}).join('')+'</tr>'});
