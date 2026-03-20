@@ -1721,6 +1721,10 @@ function _getNascitaValue(id){const el=document.getElementById(id);if(!el)return
   if(el.dataset.isoValue)return el.dataset.isoValue;
   return _parseDataNascita(el.value)}
 
+// Conta giorni malattia da una registrazione (1 se singola, N se range)
+function _contaGiorniMalattia(entry){const m=(entry.testo||'').match(/\((\d+)\s*giorni/);return m?parseInt(m[1]):1}
+function _contaTotaleMalattie(entries,tipoMal){return entries.filter(e=>e.tipo===tipoMal).reduce((s,e)=>s+_contaGiorniMalattia(e),0)}
+
 function _highlightField(id){const el=document.getElementById(id);if(!el)return;el.style.transition='border-color .2s,box-shadow .2s';el.style.borderColor='var(--accent)';el.style.boxShadow='0 0 0 2px rgba(192,57,43,0.2)';setTimeout(()=>{el.style.borderColor='';el.style.boxShadow=''},2000);el.focus()}
 async function salva(){let nome=capitalizzaNome(document.getElementById('inp-nome').value.trim());const testo=document.getElementById('inp-testo').value.trim();if(!nome){toast('Inserisci il nome');_highlightField('inp-nome');return}if(!testo){toast('Scrivi una descrizione');_highlightField('inp-testo');return}
   nome=await _verificaNome(nome);document.getElementById('inp-nome').value=nome;
@@ -2021,7 +2025,7 @@ async function generaRiepilogoMensile(){
     // Statistiche generali
     const nCollab=new Set(meseData.map(e=>e.nome)).size;
     const nErr=meseData.filter(e=>e.tipo===nomeCorrente('Errore')).length;
-    const nMal=meseData.filter(e=>e.tipo===nomeCorrente('Malattia')).length;
+    const nMal=_contaTotaleMalattie(meseData,nomeCorrente('Malattia'));
     const nAppr=meseData.filter(e=>e.tipo===nomeCorrente('Apprezzamento')).length;
     const totImp=meseData.reduce((s,e)=>s+(parseFloat(e.importo)||0),0);
     const nAllin=meseModuli.filter(m=>m.tipo==='allineamento').length;
@@ -2186,7 +2190,7 @@ function apriSchedaCollaboratore(nome){
   const errori=entries.filter(e=>e.tipo===tipoErr);
   const totErr=errori.length;
   const totErrCost=errori.reduce((s,e)=>s+(parseFloat(e.importo)||0),0);
-  const totMal=entries.filter(e=>e.tipo===tipoMal).length;
+  const totMal=_contaTotaleMalattie(entries,tipoMal);
   const totAmm=entries.filter(e=>e.tipo===tipoAmm).length;
   const totApprReg=entries.filter(e=>e.tipo===tipoAppr).length;
   const allineamenti=moduli.filter(m=>m.tipo==='allineamento').length;
@@ -2290,7 +2294,7 @@ function apriSchedaCollaboratore(nome){
       html+='<div class="scheda-sick-flag" style="background:rgba(192,57,43,0.1);color:var(--accent)">&#9888; '+lunVenPct+'% delle malattie cade di Lunedi o Venerdi ('+lunVen+'/'+totMal+')</div>';
     }
     // Team average comparison
-    const teamMal=allData.filter(e=>e.tipo===tipoMal).length;
+    const teamMal=_contaTotaleMalattie(allData,tipoMal);
     const teamCollabs=new Set(allData.map(e=>e.nome)).size;
     const avgMal=teamCollabs>0?(teamMal/teamCollabs):0;
     html+='<div style="font-size:.82rem;color:var(--muted);margin-top:6px">Media team: '+avgMal.toFixed(1)+' malattie/collaboratore — '+(totMal>avgMal?'<span style="color:var(--accent);font-weight:600">Sopra media</span>':'<span style="color:#2c6e49;font-weight:600">Nella norma</span>')+'</div>';
@@ -2406,7 +2410,7 @@ function stampaSchedaPDF(nome){
   var moduli=getModuliReparto().filter(function(m){return m.collaboratore&&m.collaboratore.toLowerCase()===nome.toLowerCase()});
   var tipoErr=nomeCorrente('Errore'),tipoMal=nomeCorrente('Malattia'),tipoAmm=nomeCorrente('Ammonimento Verbale'),tipoAppr=nomeCorrente('Apprezzamento');
   var totErr=entries.filter(function(e){return e.tipo===tipoErr}).length;
-  var totMal=entries.filter(function(e){return e.tipo===tipoMal}).length;
+  var totMal=_contaTotaleMalattie(entries,tipoMal);
   var totAmm=entries.filter(function(e){return e.tipo===tipoAmm}).length;
   var totAppr=entries.filter(function(e){return e.tipo===tipoAppr}).length;
   var totErrCost=entries.filter(function(e){return e.tipo===tipoErr}).reduce(function(s,e){return s+(parseFloat(e.importo)||0)},0);
@@ -3632,7 +3636,7 @@ async function generaReportSettimanale(sez){
     // PANORAMICA
     const totMaison=settMaison.reduce((s,r)=>s+parseFloat(r.costo||0),0);
     if(sez.panoramica){const nErr=settData.filter(e=>e.tipo===nomeCorrente('Errore')).length;
-    const nMal=settData.filter(e=>e.tipo===nomeCorrente('Malattia')).length;
+    const nMal=_contaTotaleMalattie(settData,nomeCorrente('Malattia'));
     const nAppr=settData.filter(e=>e.tipo===nomeCorrente('Apprezzamento')).length;
     const nAllin=settModuli.filter(m=>m.tipo==='allineamento').length;
     const nRdi=settModuli.filter(m=>m.tipo==='rdi').length;
@@ -3723,7 +3727,7 @@ async function generaReportAnnuale(sez){
   if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore caricamento libreria PDF');return}}
   const anno=_getAnnoCorrente();const d=_getDatiAnno(anno);
   const nErr=d.data.filter(e=>e.tipo===nomeCorrente('Errore')).length;
-  const nMal=d.data.filter(e=>e.tipo===nomeCorrente('Malattia')).length;
+  const nMal=_contaTotaleMalattie(d.data,nomeCorrente('Malattia'));
   const totMaison=d.maison.reduce((s,r)=>s+parseFloat(r.costo||0),0);
   const totSE=d.spese.reduce((s,r)=>s+parseFloat(r.importo||0),0);
   try{const{jsPDF}=window.jspdf;const doc=new jsPDF('portrait','mm','a4');const pw=doc.internal.pageSize.getWidth();const mx=16;let y=14;
