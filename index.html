@@ -836,7 +836,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
     <div class="card-header">Riepilogo Costi Maison</div>
     <div class="filters">
       <div class="filter-group"><span class="filter-label">Cliente</span><input type="text" id="maison-filt-nome" placeholder="Cerca nome..." oninput="renderMaisonDashboard()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink);width:180px"></div>
-      <div class="filter-group"><span class="filter-label">Tipo</span><select id="maison-filt-tipo" onchange="renderMaisonDashboard()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"><option value="">Tutti</option><option value="normale">Normale</option><option value="BU">Buono Unico</option><option value="BL">Buono Lounge</option><option value="CG">C. Gourmet</option></select></div>
+      <div class="filter-group"><span class="filter-label">Tipo</span><select id="maison-filt-tipo" onchange="renderMaisonDashboard()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"><option value="">Tutti</option><option value="normale">Normale</option><option value="BU">Buono Unico</option><option value="BL">Buono Lounge</option><option value="CG">C. Gourmet</option><option value="WL">Welcome Lounge</option></select></div>
       <div class="filter-group"><span class="filter-label">Dal</span><input type="text" id="maison-filt-dal" placeholder="Seleziona..." readonly style="cursor:pointer;min-width:150px"></div>
       <div class="filter-group"><span class="filter-label">Al</span><input type="text" id="maison-filt-al" placeholder="Seleziona..." readonly style="cursor:pointer;min-width:150px"></div>
       <button class="btn-reset" onclick="resetMaisonFiltri()">Reset</button>
@@ -3887,15 +3887,24 @@ function _parseMaisonNome(raw){let nome=raw.trim(),tipoBuono=null,note='',isSeve
   // Estrai BU/BL con quantità — formati: BU, BL, 2BL, 3BU, +BU, +BL, + BL, B.L, B.Ll, B.U
   const buMatch=nome.match(/\s*\+?\s*(\d*)\s*B\.?U\b/i);if(buMatch){tipoBuono='BU';note=(note?note+', ':'')+(buMatch[1]||'1')+'BU';nome=nome.replace(buMatch[0],'').trim()}
   if(!tipoBuono){const blMatch=nome.match(/\s*\+?\s*(\d*)\s*B\.?L+\b/i);if(blMatch){tipoBuono='BL';note=(note?note+', ':'')+(blMatch[1]||'1')+'BL';nome=nome.replace(blMatch[0],'').trim()}}
-  // Rimuovi numeri isolati e + isolati
-  nome=nome.replace(/\b\d+\b/g,'').replace(/\+/g,'').replace(/\s{2,}/g,' ').trim();
-  // Se il nome rimasto è solo una keyword (coupon, gourmet, ecc.) → vuoto
-  if(/^(coupon|gourmet|cena|pranzo|coup|direzione|gd)$/i.test(nome))nome='';
-  // Flag Seven sul risultato
-  if(isSeven)nome='__SEVEN__'+nome;
+  // Rimuovi numeri isolati, + isolati, virgolette
+  nome=nome.replace(/\b\d+\b/g,'').replace(/\+/g,'').replace(/["''""]/g,'').replace(/\s{2,}/g,' ').trim();
+  // Rimuovi "gruppo" da inizio nome
+  nome=nome.replace(/^gruppo\s+/i,'').trim();
+  // Se il nome rimasto è solo una keyword → vuoto
+  if(/^(coupon|gourmet|cena|pranzo|coup|direzione|gd|cupon|cpupon|c\s*gourmet|b\s*gourmet|welcome|lounge)$/i.test(nome))nome='';
+  // Welcome Lounge → tipo WL
+  const wlMatch=nome.match(/\b(welcome\s+lounge)\b/gi);
+  if(wlMatch){tipoBuono='WL';note=(note?note+', ':'')+'Welcome Lounge';nome=nome.replace(wlMatch[0],'').trim()}
+  // Coupon Gourmet varianti typo: Cupon, Cpupon, B Gourmet
+  if(!tipoBuono){const cgTypo=nome.match(/\b(cupon\s+gourmet|cpupon\s+gourmet|b\s+gourmet)\b/gi);
+    if(cgTypo){tipoBuono='CG';note=(note?note+', ':'')+'C. Gourmet';nome=nome.replace(cgTypo[0],'').trim()}}
   // Rimuovi "Gruppo"
   if(/^gruppo\s+/i.test(nome)){note=(note?note+', ':'')+'Gruppo';nome=nome.replace(/^gruppo\s+/i,'')}
-  return{nome:capitalizzaNome(nome),tipoBuono,note}}
+  // Pulizia finale nome
+  nome=nome.replace(/\s{2,}/g,' ').trim();
+  if(/^(coupon|gourmet|cena|pranzo|coup|direzione|gd|cupon|cpupon|welcome|lounge|gruppo)$/i.test(nome))nome='';
+  return{nome:nome?capitalizzaNome(nome):'',tipoBuono,note,isSeven}}
 async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0];if(!file&&!forzaSostituisci)return;
   if(forzaSostituisci&&window._maisonPendingFile){/* usa file pendente */}else{window._maisonPendingFile=file}
   const f=window._maisonPendingFile;if(!f)return;
@@ -3938,16 +3947,13 @@ async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0
         const nomiRaw=rawNome.split(/\s*\/\s*/);
         // Parsa tutti i nomi e conta quelli non-Seven
         const parsedAll=nomiRaw.map(nr=>_parseMaisonNome(nr));
-        const nNomiNoSeven=parsedAll.filter(p=>!p.nome.startsWith('__SEVEN__')).length;
+        const nNomiNoSeven=parsedAll.filter(p=>!p.isSeven&&p.nome).length;
         const nNomi=nNomiNoSeven||1;
-        const rigaHaSeven=parsedAll.some(p=>p.nome.startsWith('__SEVEN__'));
+        const rigaHaSeven=parsedAll.some(p=>p.isSeven);
         for(let _ni=0;_ni<nomiRaw.length;_ni++){
-          const parsed=parsedAll[_ni];let pNome=parsed.nome;if(!pNome)continue;
-          // Se questo nome è Seven stesso → skip
-          if(pNome.startsWith('__SEVEN__')){pNome=pNome.replace('__SEVEN__','').trim();
-            if(!pNome)continue;// era solo "Seven"
-          }
-          parsed.nome=pNome;
+          const parsed=parsedAll[_ni];if(!parsed.nome)continue;
+          // Se questo nome è Seven stesso (solo "Seven" senza cognome) → skip
+          if(parsed.isSeven&&!parsed.nome)continue;
           // Se la riga contiene Seven → tutti i nomi vanno in spese_extra
           if(rigaHaSeven){
             const seRec={beneficiario:parsed.nome,tipo:'cena_esterna',descrizione:'Ristorante Seven (da formulario)'+(parsed.note?', '+parsed.note:''),
