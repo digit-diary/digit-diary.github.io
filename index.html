@@ -3370,7 +3370,7 @@ async function esportaPDF(){const f=getFiltrati();if(!f.length){toast('Nessun da
 // CONSEGNA TURNO
 // ========================
 async function initConsegnaUI(){const turno=_getTurnoCorrente();const sel=document.getElementById('cons-turno');if(sel)sel.value=turno;
-  const dSel=document.getElementById('cons-destinatario');if(dSel){const ops=operatoriAuthCache.map(o=>o.nome).sort();
+  const dSel=document.getElementById('cons-destinatario');if(dSel){const ops=operatoriAuthCache.map(o=>o.nome).filter(n=>{const rep=operatoriRepartoMap[n];return rep===currentReparto||rep==='entrambi'}).sort();
     // Carica rapporto di oggi se non in cache
     const oggi=getGiornataCasino();
     if(!rapportiCache[oggi]){try{const rData=await secGet('rapporti_giornalieri?data_rapporto=eq.'+oggi+'&reparto_dip=eq.'+currentReparto);
