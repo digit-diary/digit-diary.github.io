@@ -1191,7 +1191,8 @@ async function loadAll(){
   if(clo)try{campiLabelOverride=JSON.parse(clo)}catch(e){}
   if(tr)try{tipiRinominati=JSON.parse(tr)}catch(e){}
   if(vis)try{visibilitaConfig=JSON.parse(vis)}catch(e){}
-  const opRep=await getImp('operatori_reparto');if(opRep)try{operatoriRepartoMap=JSON.parse(opRep)}catch(e){}
+  const opRep=await getImp('operatori_reparto');if(opRep){try{operatoriRepartoMap=JSON.parse(opRep);localStorage.setItem('_cache_operatori_reparto',opRep)}catch(e){}}
+  else{try{const cached=localStorage.getItem('_cache_operatori_reparto');if(cached)operatoriRepartoMap=JSON.parse(cached)}catch(e){}}
   const [dati,pins,scadenze,noteC,opAuth,collabs,moduli,logs,maisonD,maisonB,promemoriaD,consegneD,speseD,regaliD,noteClD]=await Promise.all([
     secGet('registrazioni?order=data.desc'),
     secGet('note_fissate?select=registrazione_id'),
@@ -4879,6 +4880,8 @@ window.addEventListener('load',async()=>{
   await loadAll();
   const h=document.getElementById('login-hint');const defCheck=await sbRpc('is_default_master_pwd',{p_default_hash:DEFAULT_PWD_HASH});
   if((defCheck&&defCheck.is_default)||operatoriAuthCache.length)h.innerHTML='Accedi come Admin oppure seleziona il tuo nome';
+  // Carica mappa reparti da cache se non disponibile dal DB
+  if(!Object.keys(operatoriRepartoMap).length){try{const cached=localStorage.getItem('_cache_operatori_reparto');if(cached)operatoriRepartoMap=JSON.parse(cached)}catch(e){}}
   // Populate login dropdown (se settore gia selezionato)
   aggiornaLoginOperatori();
   if(_isSessionValid()){
