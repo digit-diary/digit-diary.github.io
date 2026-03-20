@@ -1182,6 +1182,11 @@
          elimina beneficiario in blocco, rinomina in blocco.
        - Cache localStorage per operatori + mappa reparti: login funziona
          anche con Touch ID annullato o token scaduto.
+       - Note colleghi: checkbox "Tutti Slots" / "Tutti Tavoli" per
+         selezionare per reparto. Badge S/T accanto ai nomi.
+         Nomi singoli sempre selezionabili cross-reparto.
+       - Fix mobile: tabelle con scroll orizzontale, form responsive.
+       - Import buoni divisi tra nomi del gruppo.
        - Compleanni separati per reparto: clienti maison filtrati per
          reparto, collaboratori filtrati per registrazioni nel reparto,
          push cron inviate separatamente per slots e tavoli.
