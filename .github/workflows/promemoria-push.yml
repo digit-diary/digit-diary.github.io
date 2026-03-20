@@ -62,17 +62,28 @@ jobs:
           echo "Compleanni: $RESPONSE"
 
           if [ "$RESPONSE" != "[]" ] && [ -n "$RESPONSE" ] && [ "$RESPONSE" != "null" ]; then
-            NOMI=$(echo "$RESPONSE" | jq -r '.[].nome' | paste -sd ', ')
-            COUNT=$(echo "$RESPONSE" | jq 'length')
-
-            curl -s -X POST \
-              "${{ secrets.SUPABASE_URL }}/functions/v1/send-push" \
-              -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
-              -H "Content-Type: application/json" \
-              -H "x-push-secret: ${{ secrets.PUSH_SECRET }}" \
-              -d "{\"action\":\"send\",\"destinatari\":[\"tutti\"],\"titolo\":\"Compleanno oggi\",\"corpo\":\"$NOMI\",\"tipo\":\"promemoria\"}"
-
-            echo "Push compleanni: $NOMI"
+            # Compleanni per reparto slots
+            NOMI_SLOTS=$(echo "$RESPONSE" | jq -r '[.[] | select(.reparto_dip == "slots" or .reparto_dip == "tutti")] | .[].nome' 2>/dev/null | paste -sd ', ')
+            if [ -n "$NOMI_SLOTS" ]; then
+              curl -s -X POST \
+                "${{ secrets.SUPABASE_URL }}/functions/v1/send-push" \
+                -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+                -H "Content-Type: application/json" \
+                -H "x-push-secret: ${{ secrets.PUSH_SECRET }}" \
+                -d "{\"action\":\"send\",\"destinatari\":[\"tutti\"],\"titolo\":\"Compleanno oggi\",\"corpo\":\"$NOMI_SLOTS\",\"tipo\":\"promemoria\",\"reparto_dip\":\"slots\"}"
+              echo "Push compleanni slots: $NOMI_SLOTS"
+            fi
+            # Compleanni per reparto tavoli
+            NOMI_TAVOLI=$(echo "$RESPONSE" | jq -r '[.[] | select(.reparto_dip == "tavoli" or .reparto_dip == "tutti")] | .[].nome' 2>/dev/null | paste -sd ', ')
+            if [ -n "$NOMI_TAVOLI" ]; then
+              curl -s -X POST \
+                "${{ secrets.SUPABASE_URL }}/functions/v1/send-push" \
+                -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+                -H "Content-Type: application/json" \
+                -H "x-push-secret: ${{ secrets.PUSH_SECRET }}" \
+                -d "{\"action\":\"send\",\"destinatari\":[\"tutti\"],\"titolo\":\"Compleanno oggi\",\"corpo\":\"$NOMI_TAVOLI\",\"tipo\":\"promemoria\",\"reparto_dip\":\"tavoli\"}"
+              echo "Push compleanni tavoli: $NOMI_TAVOLI"
+            fi
           fi
 
           echo "Completato"
