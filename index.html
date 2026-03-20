@@ -4786,7 +4786,7 @@ async function esportaSpeseExtraPDF(){const data=getSpeseExtraFiltrate();if(!dat
 function aggiornaLoginOperatori(){var settore=document.getElementById('login-settore').value;
   var loginNome=document.getElementById('login-nome');
   if(!settore){loginNome.innerHTML='<option value="">-- Seleziona operatore --</option>';return}
-  var ops=operatoriAuthCache.map(function(o){return o.nome}).filter(function(n){var rep=operatoriRepartoMap[n]||'entrambi';return rep===settore||rep==='entrambi'}).sort();
+  var ops=operatoriAuthCache.map(function(o){return o.nome}).filter(function(n){var rep=operatoriRepartoMap[n];if(!rep)return false;return rep===settore||rep==='entrambi'}).sort();
   loginNome.innerHTML='<option value="">-- Admin (password master) --</option>'+ops.map(function(n){return'<option value="'+escP(n)+'">'+escP(n)+'</option>'}).join('')}
 function setReparto(rep){currentReparto=rep;
   document.getElementById('btn-rep-slots').className='reparto-btn'+(rep==='slots'?' active-slots':'');
