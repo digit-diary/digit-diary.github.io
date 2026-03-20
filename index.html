@@ -4746,11 +4746,21 @@ function renderSpeseExtra(){const data=getSpeseExtraFiltrate();const el=document
   // Raggruppato per beneficiario
   const byBenef={};data.forEach(r=>{const k=r.beneficiario;if(!byBenef[k])byBenef[k]={tot:0,visite:0};byBenef[k].tot+=parseFloat(r.importo||0);byBenef[k].visite++});
   const sorted=Object.entries(byBenef).sort((a,b)=>b[1].tot-a[1].tot);
-  h+='<table class="collab-table"><thead><tr><th>Beneficiario</th><th class="num">Visite</th><th class="num">Totale CHF</th><th class="num">Media CHF</th></tr></thead><tbody>';
+  h+='<table class="collab-table"><thead><tr><th>Beneficiario</th><th class="num">Visite</th><th class="num">Totale CHF</th><th class="num">Media CHF</th><th></th></tr></thead><tbody>';
   sorted.forEach(([nome,d],idx)=>{const ne=nome.replace(/'/g,"\\'");
-    h+='<tr style="'+(idx%2?'background:rgba(0,0,0,0.03)':'')+'"><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(nome)+'</span></strong></td><td class="num">'+d.visite+'</td><td class="num"><strong>'+d.tot.toFixed(2)+'</strong></td><td class="num">'+(d.tot/d.visite).toFixed(2)+'</td></tr>'});
+    h+='<tr style="'+(idx%2?'background:rgba(0,0,0,0.03)':'')+'"><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(nome)+'</span></strong></td><td class="num">'+d.visite+'</td><td class="num"><strong>'+d.tot.toFixed(2)+'</strong></td><td class="num">'+(d.tot/d.visite).toFixed(2)+'</td><td style="white-space:nowrap"><button class="btn-act edit" onclick="rinominaSpeseExtraBenef(\''+ne+'\')" style="font-size:.78rem;padding:3px 8px">Rinomina</button></td></tr>'});
   h+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td class="num"><strong>'+data.length+'</strong></td><td class="num"><strong>'+tot.toFixed(2)+'</strong></td><td></td></tr></tbody></table>';
   el.innerHTML=h}
+function rinominaSpeseExtraBenef(vecchio){const mc=document.getElementById('pwd-modal-content');
+  mc.innerHTML='<h3>Rinomina beneficiario</h3><p style="color:var(--muted);font-size:.85rem;margin-bottom:12px">Rinomina tutte le spese extra di <strong>'+escP(vecchio)+'</strong></p><div class="pwd-field"><label>Nuovo nome</label><input type="text" id="se-rename-nuovo" value="'+escP(vecchio)+'"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiRinominaSE(\''+vecchio.replace(/'/g,"\\'")+'\')">Rinomina tutti</button></div>';
+  document.getElementById('pwd-modal').classList.remove('hidden');setTimeout(()=>{const i=document.getElementById('se-rename-nuovo');if(i){i.focus();i.select()}},100)}
+async function eseguiRinominaSE(vecchio){const nuovo=capitalizzaNome(document.getElementById('se-rename-nuovo').value.trim());
+  if(!nuovo){toast('Inserisci un nome');return}if(nuovo===vecchio){document.getElementById('pwd-modal').classList.add('hidden');return}
+  const ids=speseExtraCache.filter(r=>r.beneficiario===vecchio&&(r.reparto_dip||'slots')===currentReparto).map(r=>r.id);
+  try{for(const id of ids){await secPatch('spese_extra','id=eq.'+id,{beneficiario:nuovo})}
+    speseExtraCache.forEach(r=>{if(r.beneficiario===vecchio&&(r.reparto_dip||'slots')===currentReparto)r.beneficiario=nuovo});
+    logAzione('Rinomina spese extra',vecchio+' → '+nuovo+' ('+ids.length+' righe)');
+    document.getElementById('pwd-modal').classList.add('hidden');renderSpeseExtra();toast(vecchio+' → '+nuovo+' ('+ids.length+' righe)')}catch(e){toast('Errore rinomina')}}
 function resetSpeseExtraFiltri(){document.getElementById('se-filt-nome').value='';document.getElementById('se-filt-tipo').value='';
   ['se-filt-dal','se-filt-al'].forEach(id=>{const el=document.getElementById(id);if(el){el.value='';if(el._flatpickr)el._flatpickr.clear()}});renderSpeseExtra()}
 function esportaSpeseExtraCSV(){const data=getSpeseExtraFiltrate();if(!data.length){toast('Nessun dato');return}
