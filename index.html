@@ -4030,13 +4030,10 @@ function renderRegali(){var data=getRegaliReparto();var el=document.getElementBy
   var totale=data.reduce(function(s,r){return s+parseFloat(r.importo||0)},0);
   var nClienti=new Set(data.map(function(r){return r.nome})).size;
   var html='<div class="mini-stats-bar"><div class="mini-stat"><div class="mini-stat-num gold">'+(totale?totale.toFixed(2):'—')+'</div><div class="mini-stat-label">Totale CHF</div></div><div class="mini-stat"><div class="mini-stat-num blue">'+data.length+'</div><div class="mini-stat-label">Regali</div></div><div class="mini-stat"><div class="mini-stat-num">'+nClienti+'</div><div class="mini-stat-label">Clienti</div></div></div>';
-  // Raggruppa per cliente
-  var byNome={};data.forEach(function(r){var k=r.nome;if(!byNome[k])byNome[k]={tot:0,count:0};byNome[k].tot+=parseFloat(r.importo||0);byNome[k].count++});
-  var sorted=Object.entries(byNome).sort(function(a,b){return b[1].tot-a[1].tot});
-  html+='<table class="collab-table"><thead><tr><th>Cliente</th><th class="num">Regali</th><th class="num">Totale CHF</th></tr></thead><tbody>';
-  sorted.forEach(function(item,idx){var nome=item[0],d=item[1];var ne=nome.replace(/'/g,"\\'");
-    html+='<tr style="'+(idx%2?'background:rgba(0,0,0,0.03)':'')+'"><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(nome)+'</span></strong></td><td class="num">'+d.count+'</td><td class="num"><strong>'+(d.tot?d.tot.toFixed(2):'—')+'</strong></td></tr>'});
-  html+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td class="num"><strong>'+data.length+'</strong></td><td class="num"><strong>'+(totale?totale.toFixed(2):'—')+'</strong></td></tr></tbody></table>';
+  html+='<table class="collab-table"><thead><tr><th>Data</th><th>Cliente</th><th>Descrizione</th><th class="num">CHF</th><th>Operatore</th><th></th></tr></thead><tbody>';
+  data.forEach(function(r){var d=new Date((r.data_regalo||r.created_at)+'T12:00:00');var ne=r.nome.replace(/'/g,"\\'");
+    html+='<tr><td style="font-weight:600">'+d.toLocaleDateString('it-IT')+'</td><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(r.nome)+'</span></strong></td><td>'+escP(r.descrizione||'')+'</td><td class="num">'+(r.importo?parseFloat(r.importo).toFixed(2):'—')+'</td><td style="color:var(--muted);font-size:.82rem">'+escP(r.operatore||'')+'</td><td><button class="btn-act del" onclick="eliminaRegalo('+r.id+')">Elimina</button></td></tr>'});
+  html+='</tbody></table>';
   el.innerHTML=html}
 // NOTE PRIVATE CLIENTI
 function getNoteClientiReparto(){return noteClientiCache.filter(function(r){return(r.reparto_dip||'slots')===currentReparto})}
@@ -4746,13 +4743,11 @@ function renderSpeseExtra(){const data=getSpeseExtraFiltrate();const el=document
   const topTipo=data.reduce((m,r)=>{m[r.tipo]=(m[r.tipo]||0)+1;return m},{});
   const topTipoLabel=Object.entries(topTipo).sort((a,b)=>b[1]-a[1]).slice(0,1).map(t=>SE_TIPI_LABEL[t[0]]||t[0])[0]||'';
   let h='<div class="mini-stats-bar"><div class="mini-stat"><div class="mini-stat-num gold">'+tot.toFixed(2)+'</div><div class="mini-stat-label">Totale CHF</div></div><div class="mini-stat"><div class="mini-stat-num blue">'+data.length+'</div><div class="mini-stat-label">Spese</div></div><div class="mini-stat"><div class="mini-stat-num">'+nBenef+'</div><div class="mini-stat-label">Beneficiari</div></div>'+(topTipoLabel?'<div class="mini-stat"><div class="mini-stat-num" style="font-size:1rem">'+topTipoLabel+'</div><div class="mini-stat-label">Tipo frequente</div></div>':'')+'</div>';
-  // Raggruppa per beneficiario (come tabella maison)
-  const byBenef={};data.forEach(r=>{const k=r.beneficiario;if(!byBenef[k])byBenef[k]={tot:0,visite:0};byBenef[k].tot+=parseFloat(r.importo||0);byBenef[k].visite++});
-  const sorted=Object.entries(byBenef).sort((a,b)=>b[1].tot-a[1].tot);
-  h+='<table class="collab-table"><thead><tr><th>Beneficiario</th><th class="num">Visite</th><th class="num">Totale CHF</th><th class="num">Media CHF</th></tr></thead><tbody>';
-  sorted.forEach(([nome,d],idx)=>{const ne=nome.replace(/'/g,"\\'");
-    h+='<tr style="'+(idx%2?'background:rgba(0,0,0,0.03)':'')+'"><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(nome)+'</span></strong></td><td class="num">'+d.visite+'</td><td class="num"><strong>'+d.tot.toFixed(2)+'</strong></td><td class="num">'+(d.tot/d.visite).toFixed(2)+'</td></tr>'});
-  h+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td class="num"><strong>'+data.length+'</strong></td><td class="num"><strong>'+tot.toFixed(2)+'</strong></td><td></td></tr></tbody></table>';
+  h+='<table class="collab-table"><thead><tr><th>Data</th><th>Beneficiario</th><th>Tipo</th><th>Luogo</th><th>Descrizione</th><th class="num">CHF</th><th></th></tr></thead><tbody>';
+  data.forEach(r=>{const d=new Date(r.data_spesa+'T12:00:00');const tl=SE_TIPI_LABEL[r.tipo]||r.tipo;const tc=SE_TIPI_COLOR[r.tipo]||'var(--muted)';
+    const ne=r.beneficiario.replace(/'/g,"\\'");
+    h+='<tr><td style="font-weight:600;white-space:nowrap">'+d.getDate()+' '+MESI[d.getMonth()]+' '+d.getFullYear()+'</td><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(r.beneficiario)+'</span></strong></td><td><span class="mini-badge" style="background:'+tc+'">'+escP(tl)+'</span></td><td style="color:var(--muted);font-size:.85rem">'+escP(r.luogo||'')+'</td><td style="color:var(--muted);font-size:.85rem">'+escP(r.descrizione||'')+'</td><td class="num"><strong>'+parseFloat(r.importo).toFixed(2)+'</strong></td><td style="white-space:nowrap"><button class="btn-act edit" onclick="modificaSpeseExtra('+r.id+')" style="font-size:.7rem">Modifica</button> <button class="btn-act del" onclick="eliminaSpeseExtra('+r.id+')" style="font-size:.7rem">Elimina</button></td></tr>'});
+  h+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td colspan="5"><strong>TOTALE</strong></td><td class="num"><strong>'+tot.toFixed(2)+'</strong></td><td></td></tr></tbody></table>';
   el.innerHTML=h}
 function resetSpeseExtraFiltri(){document.getElementById('se-filt-nome').value='';document.getElementById('se-filt-tipo').value='';
   ['se-filt-dal','se-filt-al'].forEach(id=>{const el=document.getElementById(id);if(el){el.value='';if(el._flatpickr)el._flatpickr.clear()}});renderSpeseExtra()}
