@@ -1169,6 +1169,8 @@
        - WL (Welcome Lounge) come categoria buono separata.
        - Parser nomi riscritto: riconosce qualsiasi variante di
          Seven, BU, BL, CG, WL, GD, Coupon a prescindere dalla scrittura.
+       - Import: BU/BL/CG/WL divisi tra tutti i nomi del gruppo.
+         Es: "Aili/Buccoliero 4 BL" → Aili 2BL + Buccoliero 2BL.
        - Fix eliminazione operatore: ora rimuove anche dalla mappa reparti.
        - Auto-sync: operatori mancanti dalla mappa aggiunti come 'entrambi'.
        - Cache localStorage per operatori e mappa reparti: login funziona
