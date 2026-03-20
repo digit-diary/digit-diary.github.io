@@ -3249,9 +3249,18 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
     else{try{await secPost('rapporti_giornalieri',data)}catch(e2){await secPatch('rapporti_giornalieri',filtro,data)}}
     if(!rapportiCache[ds])rapportiCache[ds]={};rapportiCache[ds][turno]=data;
     // Auto-malattia: parse assenze field
-    // Supporta: "Tonati assente", "Tonati malattia", "Tonati x1" (domani),
-    // "Tonati x3" (3 giorni), "Tonati assente fino al 27", "Tonati dal 20 al 27"
-    const assenzeText=data.assenze||'';if(assenzeText.trim()){const righe=assenzeText.split('\n').filter(r=>r.trim());
+    // Supporta: "Tonati assente", "Tonati malattia", "Tonati x1",
+    // "Tonati assente domani", "Tonati assente dopodomani",
+    // "Tonati assente fino al 27", "Tonati dal 20 al 27"
+    // Se assenze cancellate → rimuovi malattie create da questo rapporto
+    const _rapLabel='da rapporto '+turno;
+    const assenzeText=data.assenze||'';
+    if(!assenzeText.trim()){
+      // Campo assenze vuoto → rimuovi malattie create da questo rapporto per oggi
+      const vecchie=datiCache.filter(e=>e.tipo===nomeCorrente('Malattia')&&e.testo.includes(_rapLabel)&&e.data.startsWith(ds));
+      for(const v of vecchie){try{await secDel('registrazioni','id=eq.'+v.id);datiCache=datiCache.filter(x=>x.id!==v.id)}catch(e){}}
+    }
+    if(assenzeText.trim()){const righe=assenzeText.split('\n').filter(r=>r.trim());
       for(const riga of righe){
         // Skip: lutto, ferie, vacanza, infortunio (non sono malattia)
         if(/\b(lutto|ferie|vacanza|vacanze|infortunio)\b/i.test(riga))continue;
@@ -3261,12 +3270,16 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
         const nome=capitalizzaNome(m[1].trim());
         const isCodice=!!m[3];// è un codice turno (x1, r2, c0, s1, s7, ecc.)
         const codiceNum=m[4]?parseInt(m[4]):0;
-        // Cerca "fino al DD", "fino DD.MM", "dal DD al DD"
-        const finoMatch=riga.match(/fino\s+(?:al\s+)?(\d{1,2})(?:[\/\.\-](\d{1,2}))?/i);
+        // Cerca "domani", "dopodomani", "fino al DD", "dal DD al DD"
+        const domaniMatch=/\bdomani\b/i.test(riga);
+        const dopodomaniMatch=/\bdopodomani\b/i.test(riga);
+        const finoMatch=riga.match(/fino\s+(?:al\s+)?(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?/i);
         const dalAlMatch=riga.match(/dal\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?\s+al\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?/i);
         const dataRapp=new Date(ds+'T12:00:00');
         let dataInizio=new Date(ds+'T12:00:00'),dataFine=new Date(ds+'T12:00:00');
-        if(dalAlMatch){
+        if(dopodomaniMatch){dataInizio=new Date(dataRapp);dataInizio.setDate(dataInizio.getDate()+1);dataFine=new Date(dataRapp);dataFine.setDate(dataFine.getDate()+2)}
+        else if(domaniMatch){dataInizio=new Date(dataRapp);dataInizio.setDate(dataInizio.getDate()+1);dataFine=new Date(dataInizio)}
+        else if(dalAlMatch){
           const gInizio=parseInt(dalAlMatch[1]),mInizio=dalAlMatch[2]?parseInt(dalAlMatch[2])-1:dataRapp.getMonth();
           const gFine=parseInt(dalAlMatch[3]),mFine=dalAlMatch[4]?parseInt(dalAlMatch[4])-1:dataRapp.getMonth();
           dataInizio=new Date(dataRapp.getFullYear(),mInizio,gInizio,12);
@@ -3282,10 +3295,13 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
         const nGiorni=Math.round((dataFine-dataInizio)/(86400000))+1;
         const dalStr=dataInizio.toLocaleDateString('it-IT');const alStr=dataFine.toLocaleDateString('it-IT');
         const codeTxt=isCodice?' ('+m[2].toUpperCase()+')':'';
-        // Check duplicato: esiste gia una malattia per questo nome con lo stesso range?
-        const esiste=datiCache.find(e=>e.nome.toLowerCase()===nomeFinale.toLowerCase()&&e.tipo===nomeCorrente('Malattia')&&e.testo.includes(dalStr)&&e.testo.includes(alStr));
-        if(!esiste){
-          const testo=nGiorni>1?'Assente per malattia'+codeTxt+' dal '+dalStr+' al '+alStr+' ('+nGiorni+' giorni, da rapporto '+turno+')':'Assente per malattia'+codeTxt+' (da rapporto '+turno+' del '+new Date(ds+'T12:00:00').toLocaleDateString('it-IT')+')';
+        // Check: esiste gia una malattia per questo nome da questo rapporto?
+        const testo=nGiorni>1?'Assente per malattia'+codeTxt+' dal '+dalStr+' al '+alStr+' ('+nGiorni+' giorni, da rapporto '+turno+')':'Assente per malattia'+codeTxt+' (da rapporto '+turno+' del '+new Date(ds+'T12:00:00').toLocaleDateString('it-IT')+')';
+        const esiste=datiCache.find(e=>e.nome.toLowerCase()===nomeFinale.toLowerCase()&&e.tipo===nomeCorrente('Malattia')&&e.testo.includes(_rapLabel));
+        if(esiste){
+          // Aggiorna se il testo è cambiato
+          if(esiste.testo!==testo){try{await secPatch('registrazioni','id=eq.'+esiste.id,{testo});esiste.testo=testo}catch(e){}}
+        }else{
           const rec={id:Date.now()+Math.floor(Math.random()*1000),nome:nomeFinale,tipo:nomeCorrente('Malattia'),testo,data:new Date().toISOString(),operatore:getOperatore(),reparto_dip:currentReparto};
           try{await secPost('registrazioni',rec);datiCache.unshift(rec);
             toast(nomeFinale+': '+(nGiorni>1?nGiorni+' giorni malattia registrati':'malattia registrata'))}catch(e){}}}}
