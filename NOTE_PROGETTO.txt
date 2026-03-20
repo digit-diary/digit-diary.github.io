@@ -1169,6 +1169,11 @@
        - WL (Welcome Lounge) come categoria buono separata.
        - Parser nomi riscritto: riconosce qualsiasi variante di
          Seven, BU, BL, CG, WL, GD, Coupon a prescindere dalla scrittura.
+       - Fix eliminazione operatore: ora rimuove anche dalla mappa reparti.
+       - Auto-sync: operatori mancanti dalla mappa aggiunti come 'entrambi'.
+       - Cache localStorage per operatori e mappa reparti: login funziona
+         anche con token scaduto o Touch ID annullato.
+       - Consegna destinatari: fallback sicuro + filtro per reparto.
 
   [74] Moduli: tracciamento Creato da / Modificato da (19 marzo 2026)
        - Quando un operatore modifica un modulo creato da un altro,
