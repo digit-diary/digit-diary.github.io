@@ -1185,7 +1185,8 @@
        - Note colleghi: checkbox "Tutti Slots" / "Tutti Tavoli" per
          selezionare per reparto. Badge S/T accanto ai nomi.
          Nomi singoli sempre selezionabili cross-reparto.
-       - Fix mobile: tabelle con scroll orizzontale, form responsive.
+       - Fix mobile: tabelle con scroll orizzontale, form responsive,
+         nomi e badge non vanno a capo (white-space:nowrap).
        - Import buoni divisi tra nomi del gruppo.
        - Compleanni separati per reparto: clienti maison filtrati per
          reparto, collaboratori filtrati per registrazioni nel reparto,
