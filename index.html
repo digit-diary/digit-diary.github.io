@@ -3533,12 +3533,15 @@ function renderDashboard(){
   const dashComp=document.getElementById('dash-compleanni');
   if(compEl&&isVis('alert_compleanni')){
     const _oggiDate=new Date(now.getFullYear(),now.getMonth(),now.getDate());
-    // Compleanni clienti maison (cross-reparto)
-    const bdaysMaison=[];maisonBudgetCache.forEach(b=>{if(!b.data_nascita)return;const dn=new Date(b.data_nascita+'T12:00:00');
+    // Compleanni clienti maison (filtrati per reparto)
+    const bdaysMaison=[];getBudgetReparto().forEach(b=>{if(!b.data_nascita)return;const dn=new Date(b.data_nascita+'T12:00:00');
       const quest=new Date(now.getFullYear(),dn.getMonth(),dn.getDate());if(quest<_oggiDate)quest.setFullYear(quest.getFullYear()+1);
       const diff=Math.round((quest-_oggiDate)/(86400000));if(diff>=0&&diff<=7)bdaysMaison.push({nome:b.nome,data:quest,giorni:diff,tipo:'cliente'})});
-    // Compleanni collaboratori
-    const bdaysCollab=[];collaboratoriCache.forEach(c=>{if(!c.attivo||!c.data_nascita)return;const dn=new Date(c.data_nascita+'T12:00:00');
+    // Compleanni collaboratori (filtrati per reparto: solo quelli con registrazioni nel reparto corrente)
+    const _collabReparto=new Set(getDatiReparto().map(e=>e.nome));
+    const bdaysCollab=[];collaboratoriCache.forEach(c=>{if(!c.attivo||!c.data_nascita)return;
+      if(_collabReparto.size&&!_collabReparto.has(c.nome))return;
+      const dn=new Date(c.data_nascita+'T12:00:00');
       const quest=new Date(now.getFullYear(),dn.getMonth(),dn.getDate());if(quest<_oggiDate)quest.setFullYear(quest.getFullYear()+1);
       const diff=Math.round((quest-_oggiDate)/(86400000));if(diff>=0&&diff<=7)bdaysCollab.push({nome:c.nome,data:quest,giorni:diff,tipo:'collaboratore'})});
     let compH='';
