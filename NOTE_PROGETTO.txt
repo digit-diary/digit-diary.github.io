@@ -1193,6 +1193,10 @@
          "dal 20/03 al 22/03 (3 giorni)".
        - Conteggio malattie: somma giorni reali (non righe).
          Applicato a scheda, statistiche, riepilogo, report, confronto.
+       - Pattern malattie: espande range per distribuzione giorni settimana.
+       - Assenze: riconosce "domani" e "dopodomani".
+       - Se assenze cancellate dal rapporto → elimina malattia dal diario.
+       - Se assenze modificate → aggiorna registrazione (no duplicati).
        - Compleanni separati per reparto: clienti maison filtrati per
          reparto, collaboratori filtrati per registrazioni nel reparto,
          push cron inviate separatamente per slots e tavoli.
