@@ -3965,6 +3965,11 @@ async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0
         const nNomiNoSeven=parsedAll.filter(p=>!p.isSeven&&p.nome).length;
         const nNomi=nNomiNoSeven||1;
         const rigaHaSeven=parsedAll.some(p=>p.isSeven);
+        // Se un nome nel gruppo ha tipo_buono, applicalo a tutti e dividi quantità
+        const gruppoTipo=parsedAll.find(p=>p.tipoBuono);
+        if(gruppoTipo&&nNomi>1){const qMatch=(gruppoTipo.note||'').match(/(\d+)\s*(BU|BL|CG|WL)/i);
+          const qTot=qMatch?parseInt(qMatch[1]):1;const qPer=Math.round(qTot/nNomi)||1;
+          parsedAll.forEach(p=>{if(p.nome&&!p.isSeven&&!p.tipoBuono){p.tipoBuono=gruppoTipo.tipoBuono;p.note=(p.note?p.note+', ':'')+qPer+gruppoTipo.tipoBuono}})}
         for(let _ni=0;_ni<nomiRaw.length;_ni++){
           const parsed=parsedAll[_ni];if(!parsed.nome)continue;
           // Se questo nome è Seven stesso (solo "Seven" senza cognome) → skip
