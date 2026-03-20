@@ -4773,14 +4773,21 @@ function renderSpeseExtra(){const data=getSpeseExtraFiltrate();const el=document
   const topTipo=data.reduce((m,r)=>{m[r.tipo]=(m[r.tipo]||0)+1;return m},{});
   const topTipoLabel=Object.entries(topTipo).sort((a,b)=>b[1]-a[1]).slice(0,1).map(t=>SE_TIPI_LABEL[t[0]]||t[0])[0]||'';
   let h='<div class="mini-stats-bar"><div class="mini-stat"><div class="mini-stat-num gold">'+tot.toFixed(2)+'</div><div class="mini-stat-label">Totale CHF</div></div><div class="mini-stat"><div class="mini-stat-num blue">'+data.length+'</div><div class="mini-stat-label">Spese</div></div><div class="mini-stat"><div class="mini-stat-num">'+nBenef+'</div><div class="mini-stat-label">Beneficiari</div></div>'+(topTipoLabel?'<div class="mini-stat"><div class="mini-stat-num" style="font-size:1rem">'+topTipoLabel+'</div><div class="mini-stat-label">Tipo frequente</div></div>':'')+'</div>';
-  // Raggruppato per beneficiario
-  const byBenef={};data.forEach(r=>{const k=r.beneficiario;if(!byBenef[k])byBenef[k]={tot:0,visite:0};byBenef[k].tot+=parseFloat(r.importo||0);byBenef[k].visite++});
+  // Raggruppato per beneficiario con dettaglio tipi
+  const byBenef={};data.forEach(r=>{const k=r.beneficiario;if(!byBenef[k])byBenef[k]={tot:0,visite:0,tipi:{}};byBenef[k].tot+=parseFloat(r.importo||0);byBenef[k].visite++;byBenef[k].tipi[r.tipo]=(byBenef[k].tipi[r.tipo]||0)+1});
   const sorted=Object.entries(byBenef).sort((a,b)=>b[1].tot-a[1].tot);
-  h+='<table class="collab-table"><thead><tr><th>Beneficiario</th><th class="num">Visite</th><th class="num">Totale CHF</th><th class="num">Media CHF</th><th></th></tr></thead><tbody>';
+  h+='<table class="collab-table"><thead><tr><th>Beneficiario</th><th class="num">Visite</th><th>Tipi</th><th class="num">Totale CHF</th><th class="num">Media CHF</th><th></th></tr></thead><tbody>';
   sorted.forEach(([nome,d],idx)=>{const ne=nome.replace(/'/g,"\\'");
-    h+='<tr style="'+(idx%2?'background:rgba(0,0,0,0.03)':'')+'"><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(nome)+'</span></strong></td><td class="num">'+d.visite+'</td><td class="num"><strong>'+d.tot.toFixed(2)+'</strong></td><td class="num">'+(d.tot/d.visite).toFixed(2)+'</td><td style="white-space:nowrap"><button class="btn-act edit" onclick="rinominaSpeseExtraBenef(\''+ne+'\')" style="font-size:.78rem;padding:3px 8px">Rinomina</button></td></tr>'});
-  h+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td class="num"><strong>'+data.length+'</strong></td><td class="num"><strong>'+tot.toFixed(2)+'</strong></td><td></td></tr></tbody></table>';
+    const tipiBadges=Object.entries(d.tipi).map(([t,n])=>'<span class="mini-badge" style="background:'+(SE_TIPI_COLOR[t]||'var(--muted)')+';font-size:.7rem">'+n+' '+(SE_TIPI_LABEL[t]||t)+'</span>').join(' ');
+    h+='<tr style="'+(idx%2?'background:rgba(0,0,0,0.03)':'')+'"><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(nome)+'</span></strong></td><td class="num">'+d.visite+'</td><td>'+tipiBadges+'</td><td class="num"><strong>'+d.tot.toFixed(2)+'</strong></td><td class="num">'+(d.tot/d.visite).toFixed(2)+'</td><td style="white-space:nowrap"><button class="btn-act edit" onclick="rinominaSpeseExtraBenef(\''+ne+'\')" style="font-size:.78rem;padding:3px 8px">Rinomina</button> <button class="btn-act del" onclick="eliminaSpeseExtraBenef(\''+ne+'\')" style="font-size:.78rem;padding:3px 8px">Elimina</button></td></tr>'});
+  h+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td class="num"><strong>'+data.length+'</strong></td><td></td><td class="num"><strong>'+tot.toFixed(2)+'</strong></td><td></td><td></td></tr></tbody></table>';
   el.innerHTML=h}
+async function eliminaSpeseExtraBenef(nome){const ids=speseExtraCache.filter(r=>r.beneficiario===nome&&(r.reparto_dip||'slots')===currentReparto);
+  if(!ids.length){toast('Nessuna spesa');return}
+  if(!confirm('Eliminare tutte le '+ids.length+' spese extra di "'+nome+'"?'))return;
+  try{for(const r of ids){await secDel('spese_extra','id=eq.'+r.id)}
+    speseExtraCache=speseExtraCache.filter(r=>!(r.beneficiario===nome&&(r.reparto_dip||'slots')===currentReparto));
+    logAzione('Eliminato spese extra',nome+' ('+ids.length+' righe)');renderSpeseExtra();renderMaisonDashboard();toast(nome+' eliminato ('+ids.length+' spese)')}catch(e){toast('Errore eliminazione')}}
 function rinominaSpeseExtraBenef(vecchio){const mc=document.getElementById('pwd-modal-content');
   mc.innerHTML='<h3>Rinomina beneficiario</h3><p style="color:var(--muted);font-size:.85rem;margin-bottom:12px">Rinomina tutte le spese extra di <strong>'+escP(vecchio)+'</strong></p><div class="pwd-field"><label>Nuovo nome</label><input type="text" id="se-rename-nuovo" value="'+escP(vecchio)+'"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiRinominaSE(\''+vecchio.replace(/'/g,"\\'")+'\')">Rinomina tutti</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');setTimeout(()=>{const i=document.getElementById('se-rename-nuovo');if(i){i.focus();i.select()}},100)}
