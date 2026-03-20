@@ -1498,7 +1498,9 @@ async function cambiaRepartoOperatore(nome,rep){operatoriRepartoMap[nome]=rep;
   await setImp('operatori_reparto',JSON.stringify(operatoriRepartoMap));
   renderOperatoriUI();toast(nome+' → '+rep)}
 async function rimuoviOperatore(n){if(!confirm('Rimuovere operatore "'+n+'"?'))return;operatoriSalvati=operatoriSalvati.filter(o=>o!==n);await saveOperatori();
-  try{await sbRpc('remove_operator',{p_nome:n,p_token:getAdminToken()});operatoriAuthCache=operatoriAuthCache.filter(o=>o.nome!==n)}catch(e){}logAzione('Operatore rimosso',n);renderOperatoriUI();toast('Rimosso')}
+  try{await sbRpc('remove_operator',{p_nome:n,p_token:getAdminToken()});operatoriAuthCache=operatoriAuthCache.filter(o=>o.nome!==n)}catch(e){}
+  delete operatoriRepartoMap[n];await setImp('operatori_reparto',JSON.stringify(operatoriRepartoMap));
+  logAzione('Operatore rimosso',n);renderOperatoriUI();toast('Rimosso')}
 async function cambiaPasswordOperatore(){const op=getOperatore();if(!op){toast('Seleziona prima un operatore');return}
   const b=document.getElementById('pwd-modal-content');b.innerHTML='<h3>Cambia password operatore</h3><p>Operatore: <strong>'+escP(op)+'</strong></p><div class="pwd-field"><label>Password attuale</label><input type="password" id="op-old-pwd"></div><div class="pwd-field"><label>Nuova password (min 4)</label><input type="password" id="op-new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="op-new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiCambioPwdOp()">Conferma</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';
   document.getElementById('pwd-modal').classList.remove('hidden')}
@@ -3374,7 +3376,7 @@ async function esportaPDF(){const f=getFiltrati();if(!f.length){toast('Nessun da
 // CONSEGNA TURNO
 // ========================
 async function initConsegnaUI(){const turno=_getTurnoCorrente();const sel=document.getElementById('cons-turno');if(sel)sel.value=turno;
-  const dSel=document.getElementById('cons-destinatario');if(dSel){const ops=operatoriAuthCache.map(o=>o.nome).filter(n=>{const rep=operatoriRepartoMap[n];return rep===currentReparto||rep==='entrambi'}).sort();
+  const dSel=document.getElementById('cons-destinatario');if(dSel){const ops=operatoriAuthCache.map(o=>o.nome).filter(n=>{const rep=operatoriRepartoMap[n]||'entrambi';return rep===currentReparto||rep==='entrambi'}).sort();
     // Carica rapporto di oggi se non in cache
     const oggi=getGiornataCasino();
     if(!rapportiCache[oggi]){try{const rData=await secGet('rapporti_giornalieri?data_rapporto=eq.'+oggi+'&reparto_dip=eq.'+currentReparto);
