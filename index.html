@@ -1210,6 +1210,10 @@ async function loadAll(){
     secGet('note_clienti?order=created_at.desc')]);
   datiCache=dati;pinnedIds=new Set(pins.map(p=>p.registrazione_id));
   scadenzeCache=scadenze;noteColleghiCache=noteC||[];operatoriAuthCache=opAuth||[];
+  // Sync: assicura che tutti gli operatori abbiano un reparto nella mappa
+  let _mapChanged=false;
+  operatoriAuthCache.forEach(o=>{if(!operatoriRepartoMap[o.nome]){operatoriRepartoMap[o.nome]='entrambi';_mapChanged=true}});
+  if(_mapChanged)setImp('operatori_reparto',JSON.stringify(operatoriRepartoMap));
   collaboratoriCache=collabs;moduliCache=moduli;logCache=logs;
   maisonCache=maisonD||[];maisonBudgetCache=maisonB||[];
   promemoriaCache=promemoriaD||[];consegneCache=consegneD||[];speseExtraCache=speseD||[];
