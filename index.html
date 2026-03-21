@@ -4690,8 +4690,10 @@ function apriListaClientiMaison(){
   const fullM=_br.filter(b=>b.categoria==='full_maison').sort((a,b)=>a.nome.localeCompare(b.nome));
   const maison=_br.filter(b=>b.categoria==='maison').sort((a,b)=>a.nome.localeCompare(b.nome));
   const direz=_br.filter(b=>b.categoria==='direzione').sort((a,b)=>a.nome.localeCompare(b.nome));
-  const tot=fullM.length+maison.length+direz.length;
-  let html='<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px"><div><h3 style="font-family:Playfair Display,serif;color:var(--ink);margin-bottom:4px">Clienti Categorizzati</h3><p style="color:var(--muted);font-size:.82rem">'+tot+' clienti — '+fullM.length+' Full Maison — '+maison.length+' Maison — '+direz.length+' Direzione</p></div><button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\')" style="padding:6px 12px;font-size:.75rem">Chiudi</button></div>';
+  const buCat=_br.filter(b=>b.categoria==='bu').sort((a,b)=>a.nome.localeCompare(b.nome));
+  const blCat=_br.filter(b=>b.categoria==='bl').sort((a,b)=>a.nome.localeCompare(b.nome));
+  const tot=fullM.length+maison.length+direz.length+buCat.length+blCat.length;
+  let html='<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px"><div><h3 style="font-family:Playfair Display,serif;color:var(--ink);margin-bottom:4px">Clienti Categorizzati</h3><p style="color:var(--muted);font-size:.82rem">'+tot+' clienti — '+fullM.length+' Full Maison — '+maison.length+' Maison — '+direz.length+' Direzione — '+buCat.length+' BU — '+blCat.length+' BL</p></div><button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\')" style="padding:6px 12px;font-size:.75rem">Chiudi</button></div>';
   html+='<div style="display:flex;gap:10px;margin-bottom:16px"><button class="btn-export" onclick="esportaListaMaisonCSV()" style="font-size:.78rem;padding:5px 14px">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaListaMaisonPDF()" style="font-size:.78rem;padding:5px 14px">PDF</button></div>';
   function renderCatBlock(items,label,color){if(!items.length)return'';
     let h='<div style="margin-bottom:16px"><div style="font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:'+color+';font-weight:700;margin-bottom:8px;border-bottom:2px solid '+color+';padding-bottom:4px">'+label+' ('+items.length+')</div>';
@@ -4700,6 +4702,8 @@ function apriListaClientiMaison(){
   html+=renderCatBlock(fullM,'Full Maison','#b8860b');
   html+=renderCatBlock(maison,'Maison','#2980b9');
   html+=renderCatBlock(direz,'Direzione','#8e44ad');
+  html+=renderCatBlock(buCat,'Buono Unico','#e67e22');
+  html+=renderCatBlock(blCat,'Buono Lounge','#2c6e49');
   if(!tot)html+='<p style="color:var(--muted);text-align:center;padding:20px">Nessun cliente categorizzato. Assegna le categorie dalla scheda clienti.</p>';
   document.getElementById('profilo-content').innerHTML=html;document.getElementById('profilo-modal').classList.remove('hidden')}
 function esportaListaMaisonCSV(){const _br=getBudgetReparto();if(!_br.length){toast('Nessun cliente');return}
