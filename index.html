@@ -862,7 +862,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
   <div class="settings-section" style="margin-top:20px" id="maison-budget-section">
     <h4 style="display:flex;justify-content:space-between;align-items:center">Scheda clienti Maison <button class="btn-reset" onclick="toggleSezione('maison-budget-list',this)" style="font-size:.92rem;padding:6px 16px">&#9650; Nascondi</button></h4>
     <p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Gestisci categoria (Maison/Full Maison), budget, data nascita.</p>
-    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><button class="btn-export" onclick="esportaListaMaisonCSV()" style="font-size:.78rem;padding:5px 14px">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaListaMaisonPDF()" style="font-size:.78rem;padding:5px 14px">PDF</button><button class="btn-export" onclick="apriListaClientiMaison()" style="font-size:.78rem;padding:5px 14px;border-color:var(--accent2);color:var(--accent2)">Mostra Lista</button><button class="btn-export" onclick="apriConfrontoClienti()" style="font-size:.78rem;padding:5px 14px;border-color:#1a7a6d;color:#1a7a6d">Confronta clienti</button></div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><button class="btn-export" onclick="esportaListaMaisonCSV()" style="font-size:.78rem;padding:5px 14px">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaListaMaisonPDF()" style="font-size:.78rem;padding:5px 14px">PDF</button><button class="btn-export" onclick="apriListaClientiMaison()" style="font-size:.78rem;padding:5px 14px;border-color:var(--accent2);color:var(--accent2)">Mostra Lista</button><button class="btn-export" onclick="apriConfrontoClienti()" style="font-size:.78rem;padding:5px 14px;border-color:#1a7a6d;color:#1a7a6d">Confronta clienti</button><button class="btn-export" onclick="document.getElementById('import-cat-file').click()" style="font-size:.78rem;padding:5px 14px;border-color:#b8860b;color:#b8860b">&#128229; Importa Categorie</button><input type="file" id="import-cat-file" accept=".xlsx,.xls" style="display:none" onchange="importaCategorieMaison(this)"><button class="btn-export" onclick="document.getElementById('import-compl-file').click()" style="font-size:.78rem;padding:5px 14px;border-color:#8e44ad;color:#8e44ad">&#127874; Importa Compleanni</button><input type="file" id="import-compl-file" accept=".xlsx,.xls" style="display:none" onchange="importaCompleanniMaison(this)"></div>
     <div id="maison-budget-list" style="margin-bottom:14px"></div>
     <div class="add-tipo-row" style="align-items:flex-end">
       <div class="field"><label>Cliente</label><div class="ac-wrap"><input type="text" id="maison-budget-nome" placeholder="Nome..." oninput="acFiltraMaison('maison-budget-nome','ac-maison-budget')" onfocus="acFiltraMaison('maison-budget-nome','ac-maison-budget')"><div class="ac-drop" id="ac-maison-budget"></div></div></div>
@@ -4726,6 +4726,192 @@ async function esportaListaMaisonPDF(){const _br=getBudgetReparto();if(!_br.leng
       alternateRowStyles:{fillColor:[250,247,242]}});
     const tp=doc.internal.getNumberOfPages();for(let i=1;i<=tp;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(150);doc.text('Casino Lugano SA — Clienti Maison — Pag. '+i+'/'+tp,16,doc.internal.pageSize.getHeight()-8)}
     mostraPdfPreview(doc,'clienti_maison.pdf','Lista Clienti Maison')}catch(e){toast('Errore PDF')}}
+// IMPORTA CATEGORIE DA FILE EXCEL (Maison slots)
+async function importaCategorieMaison(input){const file=input.files[0];if(!file)return;input.value='';
+  const XLSX=window.XLSX;if(!XLSX){toast('Libreria XLSX non caricata');return}
+  try{const buf=await file.arrayBuffer();const wb=XLSX.read(buf);
+  const catMap={};// {nome: categoria}
+  // Cerca in tutti i fogli
+  for(const sn of wb.SheetNames){
+    const data=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:''});
+    if(!data.length)continue;
+    // Trova riga intestazione con le categorie
+    let catCols={};// {colIdx: categoria}
+    for(let i=0;i<Math.min(data.length,5);i++){
+      const row=data[i];
+      for(let j=0;j<row.length;j++){
+        const v=String(row[j]).trim().toUpperCase();
+        if(v.includes('FULL MAISON'))catCols[j]='full_maison';
+        else if(v==='MAISON'||v.includes('MAISON')&&!v.includes('FULL')&&!v.includes('BUON'))catCols[j]='maison';
+        else if(v.includes('BUONI LOUNGE')||v.includes('BUONO LOUNGE')||v==='BL')catCols[j]='bl';
+        else if(v.includes('BUONO UNICO')||v.includes('BUONI UNICI')||v==='BU')catCols[j]='bu';
+        else if(v.includes('DIREZIONE'))catCols[j]='direzione';
+      }
+    }
+    if(!Object.keys(catCols).length)continue;
+    // Per ogni colonna categoria, leggi i nomi sotto (e nelle colonne adiacenti)
+    // Trova le colonne che contengono nomi per ogni categoria
+    const catGroups={};
+    for(const[ci,cat]of Object.entries(catCols)){
+      const colIdx=parseInt(ci);
+      if(!catGroups[cat])catGroups[cat]=new Set();
+      // Cerca nomi nella stessa colonna e nella colonna successiva (se non è un'altra categoria)
+      const checkCols=[colIdx];
+      // Controlla colonna prima e dopo per nomi extra
+      if(colIdx>0&&!catCols[colIdx-1])checkCols.push(colIdx-1);
+      if(!catCols[colIdx+1])checkCols.push(colIdx+1);
+      if(!catCols[colIdx+2])checkCols.push(colIdx+2);
+      for(let i=1;i<data.length;i++){
+        for(const cc of checkCols){
+          const v=String(data[i][cc]||'').trim();
+          if(!v||v==='BL'||v==='BU'||v==='CG'||v==='WL')continue;
+          if(/^(SLOT|BUONI|FULL|MAISON|DIREZIONE|BUONO|LOUNGE|UNICO|UNICI)/i.test(v))continue;
+          // Pulisci asterischi e spazi
+          let nome=v.replace(/\*+/g,'').trim();
+          if(!nome)continue;
+          // Nomi con / → separa
+          if(nome.includes('/')){
+            nome.split('/').forEach(n=>{n=n.trim();if(n)catGroups[cat].add(capitalizzaNome(n))});
+          }else{catGroups[cat].add(capitalizzaNome(nome))}
+        }
+      }
+    }
+    for(const[cat,nomi]of Object.entries(catGroups)){
+      for(const nome of nomi){if(nome.length>1)catMap[nome]=cat}
+    }
+  }
+  const nomi=Object.keys(catMap);
+  if(!nomi.length){toast('Nessun cliente trovato nel file');return}
+  // Mostra anteprima
+  const mc=document.getElementById('pwd-modal-content');
+  let prev='<h3>Importa Categorie</h3><p style="color:var(--muted);margin-bottom:12px">Trovati <strong>'+nomi.length+'</strong> clienti nel file</p>';
+  const byCat={};nomi.forEach(n=>{const c=catMap[n];if(!byCat[c])byCat[c]=[];byCat[c].push(n)});
+  const catLabels={full_maison:'Full Maison',maison:'Maison',bl:'Buono Lounge',bu:'Buono Unico',direzione:'Direzione'};
+  const catColors={full_maison:'#b8860b',maison:'#2980b9',bl:'#2c6e49',bu:'#e67e22',direzione:'#8e44ad'};
+  for(const[cat,lista]of Object.entries(byCat)){
+    prev+='<div style="margin-bottom:8px"><span class="mini-badge" style="background:'+catColors[cat]+'">'+catLabels[cat]+' ('+lista.length+')</span>';
+    prev+='<span style="font-size:.82rem;color:var(--muted);margin-left:8px">'+lista.slice(0,5).join(', ')+(lista.length>5?' ...':'')+'</span></div>';
+  }
+  const esist=nomi.filter(n=>maisonBudgetCache.find(b=>b.nome.toLowerCase()===n.toLowerCase()&&(b.reparto_dip||'slots')===currentReparto));
+  if(esist.length)prev+='<p style="font-size:.82rem;color:var(--accent2);margin-top:8px">'+esist.length+' clienti già presenti → verranno aggiornati (solo categoria, budget e nascita invariati)</p>';
+  prev+='<div class="pwd-modal-btns" style="margin-top:16px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" id="btn-conf-import-cat">Importa</button></div>';
+  mc.innerHTML=prev;document.getElementById('pwd-modal').classList.remove('hidden');
+  document.getElementById('btn-conf-import-cat').onclick=async function(){
+    let nuovi=0,aggiornati=0;
+    for(const nome of nomi){
+      const cat=catMap[nome];
+      const existing=maisonBudgetCache.find(b=>b.nome.toLowerCase()===nome.toLowerCase()&&(b.reparto_dip||'slots')===currentReparto);
+      if(existing){
+        if(existing.categoria!==cat){
+          try{await secPatch('maison_budget','id=eq.'+existing.id,{categoria:cat,aggiornato_da:getOperatore(),aggiornato_at:new Date().toISOString()});
+          existing.categoria=cat;aggiornati++}catch(e){}
+        }
+      }else{
+        try{const r=await secPost('maison_budget',{nome,categoria:cat,reparto_dip:currentReparto,aggiornato_da:getOperatore(),aggiornato_at:new Date().toISOString()});
+        maisonBudgetCache.push(r[0]);nuovi++}catch(e){}
+      }
+    }
+    document.getElementById('pwd-modal').classList.add('hidden');
+    renderMaisonBudgetUI();renderMaisonDashboard();
+    logAzione('Importa categorie',nomi.length+' clienti ('+nuovi+' nuovi, '+aggiornati+' aggiornati)');
+    toast(nuovi+' nuovi + '+aggiornati+' aggiornati — '+nomi.length+' clienti importati')};
+  }catch(e){toast('Errore lettura file: '+e.message)}}
+// IMPORTA COMPLEANNI DA FILE EXCEL
+async function importaCompleanniMaison(input){const file=input.files[0];if(!file)return;input.value='';
+  const XLSX=window.XLSX;if(!XLSX){toast('Libreria XLSX non caricata');return}
+  try{const buf=await file.arrayBuffer();const wb=XLSX.read(buf);
+  const compleanni=[];// [{nome, data}]
+  const mesiIt=['GENNAIO','FEBBRAIO','MARZO','APRILE','MAGGIO','GIUGNO','LUGLIO','AGOSTO','SETTEMBRE','OTTOBRE','NOVEMBRE','DICEMBRE'];
+  for(const sn of wb.SheetNames){
+    const data=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:'',raw:false});
+    if(!data.length)continue;
+    // Formato: coppie colonne (nome, data) per ogni mese
+    // Identifica colonne con date di nascita
+    for(let i=0;i<data.length;i++){
+      const row=data[i];
+      for(let j=0;j<row.length;j+=2){
+        const nomeRaw=String(row[j]||'').trim();
+        const dataRaw=String(row[j+1]||'').trim();
+        // Salta intestazioni mese
+        if(!nomeRaw||mesiIt.includes(nomeRaw.toUpperCase())||nomeRaw.toUpperCase()==='COMPLEANNI')continue;
+        if(!dataRaw)continue;
+        // Parsa la data
+        let isoDate=null;
+        // Formato: YYYY-MM-DD HH:MM:SS o YYYY-MM-DD
+        const dm=dataRaw.match(/(\d{4})-(\d{2})-(\d{2})/);
+        if(dm)isoDate=dm[1]+'-'+dm[2]+'-'+dm[3];
+        // Formato: DD.MM.YYYY o DD/MM/YYYY
+        if(!isoDate){const dm2=dataRaw.match(/(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})/);if(dm2)isoDate=dm2[3]+'-'+dm2[2].padStart(2,'0')+'-'+dm2[1].padStart(2,'0')}
+        // Formato: numero seriale Excel
+        if(!isoDate&&/^\d{5}$/.test(dataRaw)){const d=new Date((parseInt(dataRaw)-25569)*86400000);if(!isNaN(d))isoDate=d.toISOString().split('T')[0]}
+        if(!isoDate)continue;
+        // Pulisci nome
+        let nome=capitalizzaNome(nomeRaw.replace(/\*+/g,'').trim());
+        if(nome.length<2)continue;
+        compleanni.push({nome,data:isoDate});
+      }
+    }
+  }
+  if(!compleanni.length){toast('Nessun compleanno trovato nel file');return}
+  // Fuzzy match con nomi esistenti in maison_budget
+  const matched=[];const nonTrovati=[];
+  compleanni.forEach(c=>{
+    // Match esatto
+    let found=maisonBudgetCache.find(b=>b.nome.toLowerCase()===c.nome.toLowerCase()&&(b.reparto_dip||'slots')===currentReparto);
+    if(!found){
+      // Fuzzy match con Levenshtein
+      const sim=_trovaNomeSimileMaison(c.nome);
+      if(sim)found=maisonBudgetCache.find(b=>b.nome.toLowerCase()===sim.toLowerCase()&&(b.reparto_dip||'slots')===currentReparto);
+    }
+    if(found)matched.push({...c,budgetId:found.id,nomeDB:found.nome,isNew:false});
+    else matched.push({...c,budgetId:null,nomeDB:null,isNew:true});
+  });
+  const nuovi=matched.filter(m=>m.isNew);
+  const esistenti=matched.filter(m=>!m.isNew);
+  // Mostra anteprima
+  const mc=document.getElementById('pwd-modal-content');
+  let prev='<h3>Importa Compleanni</h3><p style="color:var(--muted);margin-bottom:12px">Trovati <strong>'+compleanni.length+'</strong> compleanni nel file</p>';
+  if(esistenti.length)prev+='<p style="font-size:.82rem;color:#2c6e49;margin-bottom:4px"><strong>'+esistenti.length+'</strong> clienti già presenti → aggiornamento data nascita</p>';
+  if(nuovi.length)prev+='<p style="font-size:.82rem;color:#2980b9;margin-bottom:4px"><strong>'+nuovi.length+'</strong> nuovi (familiari/altri) → verranno creati con solo compleanno</p>';
+  prev+='<div style="max-height:300px;overflow-y:auto;margin-top:10px;border:1px solid var(--line);border-radius:3px;padding:8px">';
+  prev+='<table style="width:100%;font-size:.82rem;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:4px;border-bottom:1px solid var(--line)">Nome</th><th style="text-align:left;padding:4px;border-bottom:1px solid var(--line)">Data</th><th style="text-align:left;padding:4px;border-bottom:1px solid var(--line)">Stato</th></tr></thead><tbody>';
+  matched.forEach(m=>{
+    const dStr=new Date(m.data+'T12:00:00').toLocaleDateString('it-IT');
+    const stato=m.isNew?'<span style="color:#2980b9">Nuovo</span>':'<span style="color:#2c6e49">Aggiorna</span>'+(m.nome!==m.nomeDB?' <span style="color:var(--accent2);font-size:.78rem">('+escP(m.nomeDB)+')</span>':'');
+    prev+='<tr><td style="padding:3px 4px;border-bottom:1px solid var(--paper2)">'+escP(m.nome)+'</td><td style="padding:3px 4px;border-bottom:1px solid var(--paper2)">'+dStr+'</td><td style="padding:3px 4px;border-bottom:1px solid var(--paper2)">'+stato+'</td></tr>';
+  });
+  prev+='</tbody></table></div>';
+  prev+='<div class="pwd-modal-btns" style="margin-top:16px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" id="btn-conf-import-compl">Importa</button></div>';
+  mc.innerHTML=prev;document.getElementById('pwd-modal').classList.remove('hidden');
+  document.getElementById('btn-conf-import-compl').onclick=async function(){
+    let nAggiornati=0,nNuovi=0;
+    for(const m of matched){
+      if(m.budgetId){
+        try{await secPatch('maison_budget','id=eq.'+m.budgetId,{data_nascita:m.data,aggiornato_da:getOperatore(),aggiornato_at:new Date().toISOString()});
+        const b=maisonBudgetCache.find(x=>x.id===m.budgetId);if(b){b.data_nascita=m.data}nAggiornati++}catch(e){}
+      }else{
+        try{const r=await secPost('maison_budget',{nome:m.nome,data_nascita:m.data,reparto_dip:currentReparto,aggiornato_da:getOperatore(),aggiornato_at:new Date().toISOString()});
+        maisonBudgetCache.push(r[0]);nNuovi++}catch(e){}
+      }
+    }
+    document.getElementById('pwd-modal').classList.add('hidden');
+    renderMaisonBudgetUI();renderMaisonDashboard();
+    logAzione('Importa compleanni',compleanni.length+' ('+nAggiornati+' aggiornati, '+nNuovi+' nuovi)');
+    toast(nAggiornati+' aggiornati + '+nNuovi+' nuovi — '+compleanni.length+' compleanni importati')};
+  }catch(e){toast('Errore lettura file: '+e.message)}}
+// Trova nome simile tra clienti maison budget (per compleanni)
+function _trovaNomeSimileMaison(nome){
+  const nomi=maisonBudgetCache.filter(b=>(b.reparto_dip||'slots')===currentReparto).map(b=>b.nome);
+  const nl=nome.toLowerCase().replace(/\s+/g,'');
+  // Esatto senza spazi
+  const ex=nomi.find(n=>n.toLowerCase().replace(/\s+/g,'')===nl);
+  if(ex)return ex;
+  // Levenshtein <= 2
+  if(nome.length>=3){const sim=nomi.find(n=>_levenshtein(n.toLowerCase(),nome.toLowerCase())<=2);if(sim)return sim}
+  // Cognome match (primo token)
+  const cognome=nome.split(/\s+/)[0].toLowerCase();
+  if(cognome.length>=3){const cm=nomi.find(n=>n.split(/\s+/)[0].toLowerCase()===cognome);if(cm)return cm}
+  return null}
 async function rimuoviMaisonBudget(id){if(!confirm('Rimuovere questo budget?'))return;
   try{await secDel('maison_budget','id=eq.'+id);maisonBudgetCache=maisonBudgetCache.filter(b=>b.id!==id);logAzione('Budget maison rimosso','ID '+id);renderMaisonBudgetUI();renderMaisonDashboard();renderMaisonBudgetAlerts();toast('Budget rimosso')}catch(e){toast('Errore rimozione budget')}}
 function renderMaisonBudgetAlerts(){const container=document.getElementById('maison-alerts-container');if(!container)return;
