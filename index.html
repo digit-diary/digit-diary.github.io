@@ -4012,7 +4012,7 @@ function initMaisonFlatpickr(){if(_maisonFpInit||!window.flatpickr)return;_maiso
   flatpickr('#maison-man-data',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,defaultDate:'today'});
   flatpickr('#regalo-data',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false})}
 function _levenshtein(a,b){const m=a.length,n=b.length,d=[];for(let i=0;i<=m;i++){d[i]=[i];for(let j=1;j<=n;j++)d[i][j]=i===0?j:0}for(let j=1;j<=n;j++)d[0][j]=j;for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]!==b[j-1]?1:0));return d[m][n]}
-function _trovaNomeSimileMaison(nome){const nomi=[...new Set(getMaisonReparto().map(r=>r.nome))];const nl=nome.toLowerCase();const nlNoSp=nl.replace(/\s/g,'');
+function _trovaNomeSimileMaison(nome){const nomi=[...new Set(getMaisonReparto().map(r=>r.nome).concat(getBudgetReparto().map(b=>b.nome)))];const nl=nome.toLowerCase();const nlNoSp=nl.replace(/\s/g,'');
   const exact=nomi.find(n=>n.toLowerCase()===nl);if(exact)return{nome:exact,tipo:'esatto'};
   // Match senza spazi (Delledonne = Delle Donne)
   for(const n of nomi){if(n.toLowerCase().replace(/\s/g,'')===nlNoSp)return{nome:n,tipo:'simile'}}
@@ -4199,6 +4199,7 @@ function renderRegali(){var data=getRegaliReparto();var el=document.getElementBy
   html+='<table class="collab-table"><thead><tr><th>Data</th><th>Cliente</th><th>Descrizione</th><th class="num">CHF</th><th>Operatore</th><th></th></tr></thead><tbody>';
   data.forEach(function(r){var d=new Date((r.data_regalo||r.created_at)+'T12:00:00');var ne=r.nome.replace(/'/g,"\\'");
     var _regBudget=getBudgetReparto().find(function(b){return b.nome.toLowerCase()===r.nome.toLowerCase()});
+    if(!_regBudget){var _rc=r.nome.toLowerCase().split(/\s+/)[0];if(_rc.length>=3)_regBudget=getBudgetReparto().find(function(b){return b.nome.toLowerCase().split(/\s+/)[0]===_rc})}
     var _regCatBadge=_regBudget&&_regBudget.categoria==='full_maison'?' <span class="mini-badge" style="background:#b8860b;font-size:.7rem">Full Maison</span>':_regBudget&&_regBudget.categoria==='maison'?' <span class="mini-badge" style="background:#2980b9;font-size:.7rem">Maison</span>':_regBudget&&_regBudget.categoria==='direzione'?' <span class="mini-badge" style="background:#8e44ad;font-size:.7rem">Direzione</span>':_regBudget&&_regBudget.categoria==='bu'?' <span class="mini-badge" style="background:#e67e22;font-size:.7rem">Buono Unico</span>':_regBudget&&_regBudget.categoria==='bl'?' <span class="mini-badge" style="background:#2c6e49;font-size:.7rem">Buono Lounge</span>':'';
     html+='<tr><td style="font-weight:600">'+d.toLocaleDateString('it-IT')+'</td><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(r.nome)+'</span></strong>'+_regCatBadge+'</td><td>'+escP(r.descrizione||'')+'</td><td class="num">'+(r.importo?parseFloat(r.importo).toFixed(2):'—')+'</td><td style="color:var(--muted);font-size:.82rem">'+escP(r.operatore||'')+'</td><td><button class="btn-act del" onclick="eliminaRegalo('+r.id+')">Elimina</button></td></tr>'});
   html+='</tbody></table>';
@@ -4267,7 +4268,9 @@ function renderMaisonDashboard(){const data=getMaisonFiltrati();
   thtml+='<div style="overflow-x:auto"><table class="collab-table"><thead style="position:sticky;top:0;z-index:2"><tr><th style="background:var(--paper)">Cliente</th><th class="num" style="background:var(--paper)">Visite</th><th class="num" style="background:var(--paper)">Persone</th><th class="num" style="background:var(--paper)">BU</th><th class="num" style="background:var(--paper)">BL</th><th class="num" style="background:var(--paper)">CG</th><th class="num" style="background:var(--paper)">WL</th><th class="num" style="background:var(--paper)">Totale CHF</th><th class="num" style="background:var(--paper)">Media CHF</th><th style="background:var(--paper)"></th></tr></thead><tbody>';
   const _brDash=getBudgetReparto();
   sorted.forEach(([nome,d],_idx)=>{
-    const budget=_brDash.find(b=>b.nome.toLowerCase()===nome.toLowerCase());
+    let budget=_brDash.find(b=>b.nome.toLowerCase()===nome.toLowerCase());
+    // Fallback: match per cognome (primo token)
+    if(!budget){const _cog=nome.toLowerCase().split(/\s+/)[0];if(_cog.length>=3)budget=_brDash.find(b=>b.nome.toLowerCase().split(/\s+/)[0]===_cog)}
     const overBudget=budget&&budget.budget_chf&&d.tot>=budget.budget_chf;
     const nearBudget=budget&&budget.budget_chf&&d.tot>=budget.budget_chf*0.8&&!overBudget;
     const catBg=budget&&budget.categoria==='full_maison'?'background:rgba(184,134,11,0.12)':budget&&budget.categoria==='maison'?'background:rgba(41,128,185,0.12)':budget&&budget.categoria==='direzione'?'background:rgba(142,68,173,0.12)':budget&&budget.categoria==='bu'?'background:rgba(230,126,34,0.12)':budget&&budget.categoria==='bl'?'background:rgba(44,110,73,0.12)':(_idx%2?'background:rgba(0,0,0,0.04)':'background:var(--paper)');
@@ -4308,7 +4311,8 @@ function _getCompleanniProssimi(giorni){const now=new Date();const result=[];
 function _maisonFilePeriodo(data){if(!data||!data.length)return'';const mesi=[];data.forEach(r=>{const d=new Date((r.data_giornata||'')+'T12:00:00');if(!isNaN(d)){const k=MESI_FULL[d.getMonth()].toLowerCase()+'_'+d.getFullYear();if(!mesi.includes(k))mesi.push(k)}});if(mesi.length<=1)return mesi[0]||'';return'da_'+mesi[0]+'_a_'+mesi[mesi.length-1]}
 // Dettaglio cliente: mostra tutte le visite giorno per giorno
 function apriDettaglioMaison(nome){const righe=getMaisonFiltrati().filter(r=>r.nome===nome).sort((a,b)=>a.data_giornata.localeCompare(b.data_giornata));
-  const budget=getBudgetReparto().find(b=>b.nome.toLowerCase()===nome.toLowerCase());
+  let budget=getBudgetReparto().find(b=>b.nome.toLowerCase()===nome.toLowerCase());
+  if(!budget){const _cog=nome.toLowerCase().split(/\s+/)[0];if(_cog.length>=3)budget=getBudgetReparto().find(b=>b.nome.toLowerCase().split(/\s+/)[0]===_cog)}
   const _seCheck=getSpeseReparto().filter(r=>r.beneficiario.toLowerCase()===nome.toLowerCase());
   const _regCheck=getRegaliReparto().filter(function(r){return r.nome.toLowerCase()===nome.toLowerCase()});
   if(!righe.length&&!_seCheck.length&&!_regCheck.length&&!budget){toast('Nessun dato per '+nome);return}
@@ -5352,7 +5356,8 @@ function renderSpeseExtra(){const data=getSpeseExtraFiltrate();const el=document
   const sorted=Object.entries(byBenef).sort((a,b)=>b[1].tot-a[1].tot);
   h+='<div style="overflow-x:auto"><table class="collab-table"><thead><tr><th>Beneficiario</th><th class="num">Visite</th><th>Tipi</th><th class="num">Totale CHF</th><th class="num">Media CHF</th><th></th></tr></thead><tbody>';
   sorted.forEach(([nome,d],idx)=>{const ne=nome.replace(/'/g,"\\'");
-    const _seBudget=getBudgetReparto().find(b=>b.nome.toLowerCase()===nome.toLowerCase());
+    let _seBudget=getBudgetReparto().find(b=>b.nome.toLowerCase()===nome.toLowerCase());
+    if(!_seBudget){const _cog=nome.toLowerCase().split(/\s+/)[0];if(_cog.length>=3)_seBudget=getBudgetReparto().find(b=>b.nome.toLowerCase().split(/\s+/)[0]===_cog)}
     const _seCatBadge=_seBudget&&_seBudget.categoria==='full_maison'?' <span class="mini-badge" style="background:#b8860b;font-size:.7rem">Full Maison</span>':_seBudget&&_seBudget.categoria==='maison'?' <span class="mini-badge" style="background:#2980b9;font-size:.7rem">Maison</span>':_seBudget&&_seBudget.categoria==='direzione'?' <span class="mini-badge" style="background:#8e44ad;font-size:.7rem">Direzione</span>':_seBudget&&_seBudget.categoria==='bu'?' <span class="mini-badge" style="background:#e67e22;font-size:.7rem">Buono Unico</span>':_seBudget&&_seBudget.categoria==='bl'?' <span class="mini-badge" style="background:#2c6e49;font-size:.7rem">Buono Lounge</span>':'';
     const tipiBadges=Object.entries(d.tipi).map(([t,n])=>'<span class="mini-badge" style="background:'+(SE_TIPI_COLOR[t]||'var(--muted)')+';font-size:.7rem">'+n+' '+(SE_TIPI_LABEL[t]||t)+'</span>').join(' ');
     h+='<tr style="'+(idx%2?'background:rgba(0,0,0,0.03)':'')+'"><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(nome)+'</span></strong>'+_seCatBadge+'</td><td class="num">'+d.visite+'</td><td>'+tipiBadges+'</td><td class="num"><strong>'+d.tot.toFixed(2)+'</strong></td><td class="num">'+(d.tot/d.visite).toFixed(2)+'</td><td style="white-space:nowrap"><button class="btn-act edit" onclick="rinominaSpeseExtraBenef(\''+ne+'\')" style="font-size:.78rem;padding:3px 8px">Rinomina</button> <button class="btn-act del" onclick="eliminaSpeseExtraBenef(\''+ne+'\')" style="font-size:.78rem;padding:3px 8px">Elimina</button></td></tr>'});
