@@ -1155,7 +1155,7 @@ async function secGet(path){let tk=getOpToken();
     console.warn('secGet fallback:',e.message);return sbGet(path)}}
   return sbGet(path)}
 async function secPost(table,data){const tk=getOpToken();
-  if(tk){try{const r=await sbRpc('secure_insert',{p_token:tk,p_table:table,p_data:data});return r?[r]:[]}catch(e){console.warn('secPost fallback:',e.message);return sbPost(table,data)}}
+  if(tk){try{const r=await sbRpc('secure_insert',{p_token:tk,p_table:table,p_data:data});if(r)return[r];console.warn('secPost: secure_insert null, fallback');return sbPost(table,data)}catch(e){console.warn('secPost fallback:',e.message);return sbPost(table,data)}}
   return sbPost(table,data)}
 async function secPatch(table,filter,data){const tk=getOpToken();
   if(tk){try{
