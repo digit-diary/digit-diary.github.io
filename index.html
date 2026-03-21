@@ -3266,14 +3266,14 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
     }
     if(assenzeText.trim()){const righe=assenzeText.split('\n').filter(r=>r.trim());
       for(const riga of righe){
-        // Skip: lutto, ferie, vacanza, infortunio (non sono malattia)
-        if(/\b(lutto|ferie|vacanza|vacanze|infortunio)\b/i.test(riga))continue;
+        // Skip: non sono malattia
+        if(/\b(lutto|ferie|vacanza|vacanze|infortunio|permesso|giorno libero|riposo|congedo|ritardo|in ritardo)\b/i.test(riga))continue;
         // Match: nome + (assente|malattia|malato|malata|codice turno come x1,r2,c0,s1,s7...)
         let m=riga.match(/^([A-ZÀ-Üa-zà-ü\s.'-]+?)\s*(assente|malattia|malato|malata|([a-zA-Z])\s*(\d{1,2}))\b/i);
         // Scarta se il "nome" è troppo lungo (frase intera, non un nome)
         if(m&&m[1].trim().split(/\s+/).length>4)m=null;
         // Fallback: cerca cognome collaboratore nella frase + keyword assenza
-        if(!m&&/\b(assente|malattia|malato|malata|malessere|non.{0,10}present[ei]|non.{0,10}vien[ei]|chiamat[oa]|si è sentit[oa]|non.{0,10}sar[àa])\b/i.test(riga)){
+        if(!m&&/\b(assente|malattia|malato|malata|malessere|non.{0,10}present[ei]|non.{0,10}vien[ei]|chiamat[oa]|si è sentit[oa]|non.{0,10}sar[àa]|non sta bene|sta male|ricoverat[oa]|ospedale|pronto soccorso|visita medica|controllo medico|certificato medico)\b/i.test(riga)){
           let _foundNome=null,_codice=null;
           // Cerca cognome di un collaboratore nella frase
           for(const c of collaboratoriCache){
