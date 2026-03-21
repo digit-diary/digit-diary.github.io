@@ -4856,31 +4856,39 @@ async function importaCategorieMaison(input){const file=input.files[0];if(!file)
 // IMPORTA COMPLEANNI DA FILE EXCEL
 async function importaCompleanniMaison(input){const file=input.files[0];if(!file)return;input.value='';
   const XLSX=window.XLSX;if(!XLSX){toast('Libreria XLSX non caricata');return}
-  try{const buf=await file.arrayBuffer();const wb=XLSX.read(buf);
+  try{const buf=await file.arrayBuffer();const wb=XLSX.read(buf,{cellDates:true});
   const compleanni=[];// [{nome, data}]
   const mesiIt=['GENNAIO','FEBBRAIO','MARZO','APRILE','MAGGIO','GIUGNO','LUGLIO','AGOSTO','SETTEMBRE','OTTOBRE','NOVEMBRE','DICEMBRE'];
   for(const sn of wb.SheetNames){
-    const data=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:'',raw:false});
+    // Leggi sia raw (per numeri seriali) che con cellDates
+    const data=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:'',raw:true});
     if(!data.length)continue;
     // Formato: coppie colonne (nome, data) per ogni mese
-    // Identifica colonne con date di nascita
     for(let i=0;i<data.length;i++){
       const row=data[i];
       for(let j=0;j<row.length;j+=2){
         const nomeRaw=String(row[j]||'').trim();
-        const dataRaw=String(row[j+1]||'').trim();
+        const cellVal=row[j+1];
         // Salta intestazioni mese
         if(!nomeRaw||mesiIt.includes(nomeRaw.toUpperCase())||nomeRaw.toUpperCase()==='COMPLEANNI')continue;
-        if(!dataRaw)continue;
-        // Parsa la data
+        if(cellVal===undefined||cellVal===null||cellVal==='')continue;
+        // Parsa la data in vari formati
         let isoDate=null;
-        // Formato: YYYY-MM-DD HH:MM:SS o YYYY-MM-DD
-        const dm=dataRaw.match(/(\d{4})-(\d{2})-(\d{2})/);
-        if(dm)isoDate=dm[1]+'-'+dm[2]+'-'+dm[3];
-        // Formato: DD.MM.YYYY o DD/MM/YYYY
-        if(!isoDate){const dm2=dataRaw.match(/(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})/);if(dm2)isoDate=dm2[3]+'-'+dm2[2].padStart(2,'0')+'-'+dm2[1].padStart(2,'0')}
-        // Formato: numero seriale Excel
-        if(!isoDate&&/^\d{5}$/.test(dataRaw)){const d=new Date((parseInt(dataRaw)-25569)*86400000);if(!isNaN(d))isoDate=d.toISOString().split('T')[0]}
+        // Se è un oggetto Date (cellDates:true)
+        if(cellVal instanceof Date&&!isNaN(cellVal)){isoDate=cellVal.toISOString().split('T')[0]}
+        // Se è un numero seriale Excel
+        if(!isoDate&&typeof cellVal==='number'&&cellVal>1000&&cellVal<100000){const d=new Date((cellVal-25569)*86400000);if(!isNaN(d))isoDate=d.toISOString().split('T')[0]}
+        // Se è stringa
+        if(!isoDate&&typeof cellVal==='string'){
+          const dataRaw=cellVal.trim();
+          // YYYY-MM-DD HH:MM:SS o YYYY-MM-DD
+          const dm=dataRaw.match(/(\d{4})-(\d{2})-(\d{2})/);
+          if(dm)isoDate=dm[1]+'-'+dm[2]+'-'+dm[3];
+          // DD.MM.YYYY o DD/MM/YYYY
+          if(!isoDate){const dm2=dataRaw.match(/(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})/);if(dm2)isoDate=dm2[3]+'-'+dm2[2].padStart(2,'0')+'-'+dm2[1].padStart(2,'0')}
+          // MM-DD-YY o MM/DD/YY (formato mm-dd-yy di Excel)
+          if(!isoDate){const dm3=dataRaw.match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})/);if(dm3){let y=parseInt(dm3[3]);if(y<100)y+=y>50?1900:2000;isoDate=y+'-'+dm3[1].padStart(2,'0')+'-'+dm3[2].padStart(2,'0')}}
+        }
         if(!isoDate)continue;
         // Pulisci nome
         let nome=capitalizzaNome(nomeRaw.replace(/\*+/g,'').trim());
