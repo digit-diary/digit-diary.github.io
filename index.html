@@ -4839,6 +4839,9 @@ async function importaCategorieMaison(input){const file=input.files[0];if(!file)
     document.getElementById('import-cat-btns').style.display='none';
     document.getElementById('import-cat-progress').style.display='block';
     const bar=document.getElementById('import-cat-bar');const status=document.getElementById('import-cat-status');
+    // Refresh cache dal server per evitare duplicati
+    status.textContent='Caricamento dati...';
+    try{maisonBudgetCache=await secGet('maison_budget?order=nome.asc')}catch(e){}
     let nuovi=0,aggiornati=0,errori=0,done=0;
     for(const nome of nomi){
       const cat=catMap[nome];
@@ -4849,8 +4852,14 @@ async function importaCategorieMaison(input){const file=input.files[0];if(!file)
           existing.categoria=cat;aggiornati++}catch(e){errori++}
         }
       }else{
-        try{const r=await secPost('maison_budget',{nome:nome,categoria:cat,reparto_dip:currentReparto,aggiornato_da:getOperatore(),aggiornato_at:new Date().toISOString()});
-        if(r&&r.length&&r[0]&&r[0].id)maisonBudgetCache.push(r[0]);nuovi++}catch(e){errori++}
+        try{const postData={nome:nome,categoria:cat,reparto_dip:currentReparto};
+        try{postData.aggiornato_da=getOperatore();postData.aggiornato_at=new Date().toISOString()}catch(e2){}
+        const r=await secPost('maison_budget',postData);
+        if(r&&r.length&&r[0]&&r[0].id){maisonBudgetCache.push(r[0]);nuovi++}
+        else{// secPost ritornò dati vuoti, riprova senza campi extra
+          const r2=await secPost('maison_budget',{nome:nome,categoria:cat,reparto_dip:currentReparto});
+          if(r2&&r2.length&&r2[0]&&r2[0].id){maisonBudgetCache.push(r2[0]);nuovi++}else{errori++}}
+        }catch(e){console.error('Import cat errore:',nome,e.message);errori++}
       }
       done++;bar.style.width=Math.round(done/nomi.length*100)+'%';status.textContent=done+'/'+nomi.length+' — '+escP(nome);
       if(done%5===0)await new Promise(r=>setTimeout(r,50));
