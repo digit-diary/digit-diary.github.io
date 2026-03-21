@@ -2371,17 +2371,20 @@ function schedaResetTlFilter(nome){
 function _renderSchedaTrendChart(nome,entries){
   var tipoErr=nomeCorrente('Errore');
   var moduli=getModuliReparto().filter(function(m){return m.collaboratore&&m.collaboratore.toLowerCase()===nome.toLowerCase()});
-  var now=new Date();var labels=[],errData=[],apprData=[];
+  var now=new Date();var labels=[],errData=[],apprData=[],allinData=[],rdiData=[];
   for(var i=5;i>=0;i--){
     var d=new Date(now.getFullYear(),now.getMonth()-i,1);
     labels.push(MESI[d.getMonth()]+' '+d.getFullYear());
-    var mErr=0,mAppr=0;
+    var mErr=0,mAppr=0,mAllin=0,mRdi=0;
     entries.forEach(function(e){var ed=new Date(e.data);
       if(ed.getMonth()===d.getMonth()&&ed.getFullYear()===d.getFullYear()){
         if(e.tipo===tipoErr)mErr++}});
     moduli.forEach(function(m){var md=new Date(m.created_at);
-      if(md.getMonth()===d.getMonth()&&md.getFullYear()===d.getFullYear()&&m.tipo==='apprezzamento')mAppr++});
-    errData.push(mErr);apprData.push(mAppr);
+      if(md.getMonth()===d.getMonth()&&md.getFullYear()===d.getFullYear()){
+        if(m.tipo==='apprezzamento')mAppr++;
+        else if(m.tipo==='allineamento')mAllin++;
+        else if(m.tipo==='rdi')mRdi++}});
+    errData.push(mErr);apprData.push(mAppr);allinData.push(mAllin);rdiData.push(mRdi);
   }
   // Trend direction
   var trendImproving=errData.length>=2&&errData[errData.length-1]<=errData[errData.length-2];
@@ -2390,6 +2393,8 @@ function _renderSchedaTrendChart(nome,entries){
   if(_schedaCharts.trend)_schedaCharts.trend.destroy();
   _schedaCharts.trend=new Chart(el,{type:'line',data:{labels:labels,
     datasets:[{label:'Errori',data:errData,borderColor:'#c0392b',backgroundColor:'rgba(192,57,43,0.1)',fill:true,tension:0.3,pointRadius:4,pointBackgroundColor:'#c0392b'},
+      {label:'Allineamenti',data:allinData,borderColor:'#1a4a7a',backgroundColor:'rgba(26,74,122,0.1)',fill:false,tension:0.3,pointRadius:4,pointBackgroundColor:'#1a4a7a',borderDash:[5,3]},
+      {label:'RDI',data:rdiData,borderColor:'#7b2d8b',backgroundColor:'rgba(123,45,139,0.1)',fill:false,tension:0.3,pointRadius:4,pointBackgroundColor:'#7b2d8b',borderDash:[2,2]},
       {label:'Apprezzamenti',data:apprData,borderColor:'#b8860b',backgroundColor:'rgba(184,134,11,0.1)',fill:true,tension:0.3,pointRadius:4,pointBackgroundColor:'#b8860b'}]},
     options:{responsive:true,maintainAspectRatio:true,animation:{duration:400},plugins:{legend:{position:'top',labels:{font:{size:11}}}},
       scales:{y:{beginAtZero:true,ticks:{stepSize:1,font:{size:11}}},x:{ticks:{font:{size:10}}}}}});
