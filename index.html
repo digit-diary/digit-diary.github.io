@@ -1131,7 +1131,7 @@ async function sbGet(path){const r=await fetch(SB_URL+'/rest/v1/'+path,{headers:
 async function sbPost(table,data,extra){const r=await fetch(SB_URL+'/rest/v1/'+table,{method:'POST',headers:sbH(Object.assign({'Prefer':'return=representation'},extra||{})),body:JSON.stringify(data)});if(!r.ok)throw new Error(await r.text());return r.json()}
 async function sbPatch(table,filter,data){const r=await fetch(SB_URL+'/rest/v1/'+table+'?'+filter,{method:'PATCH',headers:sbH({'Prefer':'return=representation'}),body:JSON.stringify(data)});if(!r.ok)throw new Error(await r.text())}
 async function sbDel(table,filter){await fetch(SB_URL+'/rest/v1/'+table+'?'+filter,{method:'DELETE',headers:sbH()})}
-async function sbRpc(fn,params){const r=await fetch(SB_URL+'/rest/v1/rpc/'+fn,{method:'POST',headers:sbH(),body:JSON.stringify(params||{})});if(!r.ok)return null;const txt=await r.text();if(!txt)return null;try{return JSON.parse(txt)}catch(e){return null}}
+async function sbRpc(fn,params){const r=await fetch(SB_URL+'/rest/v1/rpc/'+fn,{method:'POST',headers:sbH(),body:JSON.stringify(params||{})});if(!r.ok){try{const errTxt=await r.text();console.error('sbRpc '+fn+' '+r.status+':',errTxt)}catch(e){}return null}const txt=await r.text();if(!txt)return null;try{return JSON.parse(txt)}catch(e){return null}}
 // --- FUNZIONI SICURE (token-based) con fallback a sbGet/sbPost/etc ---
 function _parseRestFilter(path){
   // Converte 'table?col=eq.val&col2=gte.val2' in {table, filter SQL, order, limit}
