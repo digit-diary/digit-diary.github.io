@@ -4112,8 +4112,6 @@ async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0
         const nomiRaw=rawNome.split(/\s*\/\s*/);
         // Parsa tutti i nomi e conta quelli non-Seven
         const parsedAll=nomiRaw.map(nr=>_parseMaisonNome(nr));
-        // Debug: log CG/WL/BU/BL riconosciuti
-        parsedAll.forEach(p=>{if(p.tipoBuono)console.log('TIPO BUONO:',p.nome,'→',p.tipoBuono,p.note)});
         const nNomiNoSeven=parsedAll.filter(p=>!p.isSeven&&p.nome).length;
         const nNomi=nNomiNoSeven||1;
         const rigaHaSeven=parsedAll.some(p=>p.isSeven);
