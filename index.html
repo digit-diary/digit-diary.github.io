@@ -2257,7 +2257,7 @@ function apriSchedaCollaboratore(nome){
   if(totAmm)html+='<div class="scheda-kpi"><div class="kpi-val" style="color:#7b2d8b">'+totAmm+'</div><div class="kpi-lbl">Amm. verbali</div></div>';
   if(allineamenti)html+='<div class="scheda-kpi"><div class="kpi-val" style="color:#1a4a7a">'+allineamenti+'</div><div class="kpi-lbl">Allineamenti</div></div>';
   if(apprezzamenti)html+='<div class="scheda-kpi"><div class="kpi-val" style="color:#b8860b">'+apprezzamenti+'</div><div class="kpi-lbl">Apprezzamenti</div></div>';
-  if(totNeg||apprezzamenti){const ratioColor=ratio>=1?'#2c6e49':'var(--accent)';
+  if(apprezzamenti&&totNeg){const ratioColor=ratio>=1?'#2c6e49':'var(--accent)';
   html+='<div class="scheda-kpi"><div class="kpi-val" style="color:'+ratioColor+'">'+(ratio>=999?'&#8734;':ratio.toFixed(1))+'</div><div class="kpi-lbl">Pos/Neg ratio</div></div>'}
   if(_lastEntry)html+='<div class="scheda-kpi"><div class="kpi-val" style="color:var(--ink);font-size:.9rem">'+_lastDateStr+'</div><div class="kpi-lbl">Ultima reg. ('+_lastTipo+')</div></div>';
   html+='</div>';
