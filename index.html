@@ -3269,10 +3269,25 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
         // Skip: lutto, ferie, vacanza, infortunio (non sono malattia)
         if(/\b(lutto|ferie|vacanza|vacanze|infortunio)\b/i.test(riga))continue;
         // Match: nome + (assente|malattia|malato|malata|codice turno come x1,r2,c0,s1,s7...)
-        const m=riga.match(/^([A-ZÀ-Üa-zà-ü\s.'-]+?)\s*(assente|malattia|malato|malata|([a-zA-Z])\s*(\d{1,2}))\b/i);
+        let m=riga.match(/^([A-ZÀ-Üa-zà-ü\s.'-]+?)\s*(assente|malattia|malato|malata|([a-zA-Z])\s*(\d{1,2}))\b/i);
+        // Fallback: cerca cognome collaboratore nella frase + keyword assenza
+        if(!m&&/\b(assente|malattia|malato|malata|malessere|non.{0,10}present[ei]|non.{0,10}vien[ei]|chiamat[oa]|si è sentit[oa])\b/i.test(riga)){
+          let _foundNome=null,_codice=null;
+          // Cerca cognome di un collaboratore nella frase
+          for(const c of collaboratoriCache){
+            const words=c.nome.toLowerCase().split(/\s+/);
+            for(const w of words){
+              if(w.length>=3&&new RegExp('\\b'+w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','i').test(riga)){
+                _foundNome=c.nome;break}}
+            if(_foundNome)break}
+          if(_foundNome){
+            // Cerca codice turno nella frase (R23, X1, S7, C0, ecc.)
+            const _cm=riga.match(/\b([A-Z])\s*(\d{1,2})\b/);
+            if(_cm)_codice=_cm;
+            m=[riga,_foundNome,_codice?_cm[0]:'assente',_codice?_cm[1]:null,_codice?_cm[2]:null]}}
         if(!m)continue;
-        const nome=capitalizzaNome(m[1].trim());
-        const isCodice=!!m[3];// è un codice turno (x1, r2, c0, s1, s7, ecc.)
+        const nome=m[1]&&m[1]===m[1]?capitalizzaNome(m[1].trim()):capitalizzaNome(m[1]);
+        const isCodice=!!m[3]&&/^[a-zA-Z]$/.test(m[3]);// è un codice turno
         const codiceNum=m[4]?parseInt(m[4]):0;
         // Cerca "domani", "dopodomani", "fino al DD", "dal DD al DD"
         const domaniMatch=/\bdomani\b/i.test(riga);
