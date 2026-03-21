@@ -5068,50 +5068,79 @@ async function riallineaNomiMaison(){
     }
   });
   if(!correzioni.length){toast('Tutti i nomi sono già allineati!');return}
-  // Anteprima
-  const mc=document.getElementById('pwd-modal-content');
-  const totVoci=correzioni.reduce((s,c)=>s+c.costiCount+c.extraCount,0);
-  let prev='<div style="text-align:center;margin-bottom:16px"><h3 style="font-family:Playfair Display,serif;margin-bottom:4px">Riallinea Nomi</h3><p style="color:var(--muted);font-size:.84rem">'+correzioni.length+' nomi da correggere — '+totVoci+' voci coinvolte</p></div>';
-  prev+='<div style="max-height:400px;overflow-y:auto">';
   correzioni.sort((a,b)=>(b.costiCount+b.extraCount)-(a.costiCount+a.extraCount));
-  correzioni.forEach(c=>{
-    prev+='<div style="padding:8px 12px;margin-bottom:4px;border-radius:3px;background:var(--paper2);display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
-    prev+='<span style="font-size:.85rem;color:var(--accent);text-decoration:line-through">'+escP(c.vecchio)+'</span>';
-    prev+='<span style="color:var(--muted)">&#8594;</span>';
-    prev+='<strong style="font-size:.85rem;color:#2c6e49">'+escP(c.nuovo)+'</strong>';
-    prev+='<span style="font-size:.75rem;color:var(--muted);margin-left:auto">';
-    if(c.costiCount)prev+=c.costiCount+' costi';
-    if(c.costiCount&&c.extraCount)prev+=' + ';
-    if(c.extraCount)prev+=c.extraCount+' extra';
-    prev+='</span></div>';
-  });
-  prev+='</div>';
-  prev+='<div id="riallinea-progress" style="display:none;margin-top:12px"><div style="height:6px;border-radius:3px;background:var(--line);overflow:hidden"><div id="riallinea-bar" style="height:100%;width:0%;background:#c0392b;border-radius:3px;transition:width .2s"></div></div><p id="riallinea-status" style="text-align:center;font-size:.82rem;color:var(--muted);margin-top:4px"></p></div>';
-  prev+='<div id="riallinea-btns" class="pwd-modal-btns" style="margin-top:16px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" id="btn-conf-riallinea" style="background:#c0392b">Correggi '+correzioni.length+' nomi</button></div>';
-  mc.innerHTML=prev;document.getElementById('pwd-modal').classList.remove('hidden');
-  document.getElementById('btn-conf-riallinea').onclick=async function(){
-    document.getElementById('riallinea-btns').style.display='none';
-    document.getElementById('riallinea-progress').style.display='block';
-    const bar=document.getElementById('riallinea-bar');const status=document.getElementById('riallinea-status');
-    let done=0,totCorr=0,errori=0;
-    for(const c of correzioni){
-      status.textContent=escP(c.vecchio)+' → '+escP(c.nuovo);
-      // Aggiorna costi_maison
-      const costiIds=maisonCache.filter(r=>r.nome===c.vecchio&&(r.reparto_dip||'slots')===currentReparto);
-      for(const r of costiIds){
-        try{await secPatch('costi_maison','id=eq.'+r.id,{nome:c.nuovo});r.nome=c.nuovo;totCorr++}catch(e){errori++}
-      }
-      // Aggiorna spese_extra
-      const extraIds=speseExtraCache.filter(r=>r.beneficiario===c.vecchio&&(r.reparto_dip||'slots')===currentReparto);
-      for(const r of extraIds){
-        try{await secPatch('spese_extra','id=eq.'+r.id,{beneficiario:c.nuovo});r.beneficiario=c.nuovo;totCorr++}catch(e){errori++}
-      }
-      done++;bar.style.width=Math.round(done/correzioni.length*100)+'%';
-      if(done%3===0)await new Promise(r=>setTimeout(r,50));
-    }
-    mc.innerHTML='<div style="text-align:center;padding:20px"><div style="font-size:2.5rem;margin-bottom:8px">'+(errori?'&#9888;':'&#9989;')+'</div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Nomi riallineati</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:#2c6e49">'+correzioni.length+'</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Nomi corretti</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--ink)">'+totCorr+'</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Voci aggiornate</div></div>'+(errori?'<div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--accent)">'+errori+'</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Errori</div></div>':'')+'</div><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
+  // Stato globale per il riallineamento interattivo
+  window._riallineaState={correzioni,confermati:0,saltati:0,errori:0,vociCorr:0};
+  _renderRiallineaUI();}
+function _renderRiallineaUI(){
+  const st=window._riallineaState;const mc=document.getElementById('pwd-modal-content');
+  const rimaste=st.correzioni.filter(c=>!c._done);
+  if(!rimaste.length){
+    // Riepilogo finale
+    mc.innerHTML='<div style="text-align:center;padding:20px"><div style="font-size:2.5rem;margin-bottom:8px">&#9989;</div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Riallineamento completato</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:#2c6e49">'+st.confermati+'</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Confermati</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--muted)">'+st.saltati+'</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Saltati</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--ink)">'+st.vociCorr+'</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Voci corrette</div></div></div><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
     renderMaisonDashboard();renderSpeseExtra();
-    logAzione('Riallinea nomi',correzioni.length+' nomi, '+totCorr+' voci');};}
+    logAzione('Riallinea nomi',st.confermati+' confermati, '+st.saltati+' saltati, '+st.vociCorr+' voci');
+    return}
+  const totOrig=st.correzioni.length;
+  let html='<div style="text-align:center;margin-bottom:12px"><h3 style="font-family:Playfair Display,serif;margin-bottom:4px">Riallinea Nomi</h3><p style="color:var(--muted);font-size:.84rem">'+rimaste.length+' di '+totOrig+' rimaste</p></div>';
+  // Contatori
+  html+='<div style="display:flex;gap:8px;margin-bottom:12px;justify-content:center">';
+  html+='<span style="font-size:.82rem;color:#2c6e49;font-weight:600">'+st.confermati+' confermati</span>';
+  html+='<span style="font-size:.82rem;color:var(--muted)">'+st.saltati+' saltati</span>';
+  html+='</div>';
+  // Lista con bottoni per ogni voce
+  html+='<div id="riallinea-lista" style="max-height:400px;overflow-y:auto">';
+  rimaste.forEach((c,i)=>{
+    const idx=st.correzioni.indexOf(c);
+    html+='<div id="riallinea-row-'+idx+'" style="padding:10px 12px;margin-bottom:6px;border-radius:3px;background:var(--paper2);display:flex;align-items:center;gap:8px;flex-wrap:wrap;transition:all .3s">';
+    html+='<span style="font-size:.85rem;color:var(--accent);text-decoration:line-through">'+escP(c.vecchio)+'</span>';
+    html+='<span style="color:var(--muted)">&#8594;</span>';
+    html+='<strong style="font-size:.85rem;color:#2c6e49">'+escP(c.nuovo)+'</strong>';
+    html+='<span style="font-size:.75rem;color:var(--muted)">';
+    if(c.costiCount)html+=c.costiCount+' costi';
+    if(c.costiCount&&c.extraCount)html+=' + ';
+    if(c.extraCount)html+=c.extraCount+' extra';
+    html+='</span>';
+    html+='<div style="margin-left:auto;display:flex;gap:6px;flex-shrink:0">';
+    html+='<button class="btn-salva" style="font-size:.75rem;padding:5px 12px;background:#2c6e49" onclick="confermaRiallinea('+idx+')">Conferma</button>';
+    html+='<button class="btn-modal-cancel" style="font-size:.75rem;padding:5px 12px" onclick="saltaRiallinea('+idx+')">Salta</button>';
+    html+='</div></div>';
+  });
+  html+='</div>';
+  html+='<div class="pwd-modal-btns" style="margin-top:16px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
+  mc.innerHTML=html;document.getElementById('pwd-modal').classList.remove('hidden')}
+async function confermaRiallinea(idx){
+  const st=window._riallineaState;const c=st.correzioni[idx];
+  const row=document.getElementById('riallinea-row-'+idx);
+  if(row)row.style.opacity='0.5';
+  // Aggiorna costi_maison
+  const costiIds=maisonCache.filter(r=>r.nome===c.vecchio&&(r.reparto_dip||'slots')===currentReparto);
+  for(const r of costiIds){
+    try{await secPatch('costi_maison','id=eq.'+r.id,{nome:c.nuovo});r.nome=c.nuovo;st.vociCorr++}catch(e){st.errori++}
+  }
+  // Aggiorna spese_extra
+  const extraIds=speseExtraCache.filter(r=>r.beneficiario===c.vecchio&&(r.reparto_dip||'slots')===currentReparto);
+  for(const r of extraIds){
+    try{await secPatch('spese_extra','id=eq.'+r.id,{beneficiario:c.nuovo});r.beneficiario=c.nuovo;st.vociCorr++}catch(e){st.errori++}
+  }
+  c._done=true;st.confermati++;
+  if(row){row.style.background='rgba(44,110,73,0.1)';row.innerHTML='<span style="color:#2c6e49;font-size:.85rem">&#9989; '+escP(c.vecchio)+' → <strong>'+escP(c.nuovo)+'</strong></span>';
+    setTimeout(()=>{row.style.maxHeight='0';row.style.padding='0';row.style.margin='0';row.style.overflow='hidden';setTimeout(()=>_checkRiallineaDone(),300)},800)}
+  else _checkRiallineaDone()}
+function saltaRiallinea(idx){
+  const st=window._riallineaState;const c=st.correzioni[idx];
+  c._done=true;st.saltati++;
+  const row=document.getElementById('riallinea-row-'+idx);
+  if(row){row.style.opacity='0.3';row.innerHTML='<span style="color:var(--muted);font-size:.85rem">&#10060; '+escP(c.vecchio)+' — saltato</span>';
+    setTimeout(()=>{row.style.maxHeight='0';row.style.padding='0';row.style.margin='0';row.style.overflow='hidden';setTimeout(()=>_checkRiallineaDone(),300)},500)}
+  else _checkRiallineaDone()}
+function _checkRiallineaDone(){
+  const st=window._riallineaState;
+  const rimaste=st.correzioni.filter(c=>!c._done);
+  // Aggiorna contatori
+  const cntEl=document.querySelector('#riallinea-lista');
+  if(cntEl&&cntEl.parentElement){const p=cntEl.parentElement.querySelector('p');if(p)p.textContent=rimaste.length+' di '+st.correzioni.length+' rimaste'}
+  if(!rimaste.length)_renderRiallineaUI();}
 async function rimuoviMaisonBudget(id){if(!confirm('Rimuovere questo budget?'))return;
   try{await secDel('maison_budget','id=eq.'+id);maisonBudgetCache=maisonBudgetCache.filter(b=>b.id!==id);logAzione('Budget maison rimosso','ID '+id);renderMaisonBudgetUI();renderMaisonDashboard();renderMaisonBudgetAlerts();toast('Budget rimosso')}catch(e){toast('Errore rimozione budget')}}
 function renderMaisonBudgetAlerts(){const container=document.getElementById('maison-alerts-container');if(!container)return;
