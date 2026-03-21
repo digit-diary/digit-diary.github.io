@@ -862,7 +862,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
   <div class="settings-section" style="margin-top:20px" id="maison-budget-section">
     <h4 style="display:flex;justify-content:space-between;align-items:center">Scheda clienti Maison <button class="btn-reset" onclick="toggleSezione('maison-budget-list',this)" style="font-size:.92rem;padding:6px 16px">&#9650; Nascondi</button></h4>
     <p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Gestisci categoria (Maison/Full Maison), budget, data nascita.</p>
-    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><button class="btn-export" onclick="esportaListaMaisonCSV()" style="font-size:.78rem;padding:5px 14px">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaListaMaisonPDF()" style="font-size:.78rem;padding:5px 14px">PDF</button><button class="btn-export" onclick="apriListaClientiMaison()" style="font-size:.78rem;padding:5px 14px;border-color:var(--accent2);color:var(--accent2)">Mostra Lista</button><button class="btn-export" onclick="apriConfrontoClienti()" style="font-size:.78rem;padding:5px 14px;border-color:#1a7a6d;color:#1a7a6d">Confronta clienti</button><button class="btn-export" onclick="document.getElementById('import-cat-file').click()" style="font-size:.78rem;padding:5px 14px;border-color:#b8860b;color:#b8860b">&#128229; Importa Categorie</button><input type="file" id="import-cat-file" accept=".xlsx,.xls" style="display:none" onchange="importaCategorieMaison(this)"><button class="btn-export" onclick="document.getElementById('import-compl-file').click()" style="font-size:.78rem;padding:5px 14px;border-color:#8e44ad;color:#8e44ad">&#127874; Importa Compleanni</button><input type="file" id="import-compl-file" accept=".xlsx,.xls" style="display:none" onchange="importaCompleanniMaison(this)"></div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><button class="btn-export" onclick="esportaListaMaisonCSV()" style="font-size:.78rem;padding:5px 14px">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaListaMaisonPDF()" style="font-size:.78rem;padding:5px 14px">PDF</button><button class="btn-export" onclick="apriListaClientiMaison()" style="font-size:.78rem;padding:5px 14px;border-color:var(--accent2);color:var(--accent2)">Mostra Lista</button><button class="btn-export" onclick="apriConfrontoClienti()" style="font-size:.78rem;padding:5px 14px;border-color:#1a7a6d;color:#1a7a6d">Confronta clienti</button><button class="btn-export" onclick="document.getElementById('import-cat-file').click()" style="font-size:.78rem;padding:5px 14px;border-color:#b8860b;color:#b8860b">&#128229; Importa Categorie</button><input type="file" id="import-cat-file" accept=".xlsx,.xls" style="display:none" onchange="importaCategorieMaison(this)"><button class="btn-export" onclick="document.getElementById('import-compl-file').click()" style="font-size:.78rem;padding:5px 14px;border-color:#8e44ad;color:#8e44ad">&#127874; Importa Compleanni</button><input type="file" id="import-compl-file" accept=".xlsx,.xls" style="display:none" onchange="importaCompleanniMaison(this)"><button class="btn-export" onclick="riallineaNomiMaison()" style="font-size:.78rem;padding:5px 14px;border-color:#c0392b;color:#c0392b">&#128260; Riallinea Nomi</button></div>
     <div id="maison-budget-list" style="margin-bottom:14px"></div>
     <div class="add-tipo-row" style="align-items:flex-end">
       <div class="field"><label>Cliente</label><div class="ac-wrap"><input type="text" id="maison-budget-nome" placeholder="Nome..." oninput="acFiltraMaison('maison-budget-nome','ac-maison-budget')" onfocus="acFiltraMaison('maison-budget-nome','ac-maison-budget')"><div class="ac-drop" id="ac-maison-budget"></div></div></div>
@@ -4987,6 +4987,95 @@ function _trovaNomeSimileMaison(nome){
   const cognome=nome.split(/\s+/)[0].toLowerCase();
   if(cognome.length>=3){const cm=nomi.find(n=>n.split(/\s+/)[0].toLowerCase()===cognome);if(cm)return cm}
   return null}
+// RIALLINEA NOMI: corregge nomi vecchi in costi_maison e spese_extra usando maison_budget come riferimento
+async function riallineaNomiMaison(){
+  const budget=getBudgetReparto();
+  if(!budget.length){toast('Nessun cliente categorizzato. Importa prima le categorie.');return}
+  // Trova nomi in costi_maison che non matchano esattamente nessun budget
+  const costiNomi=[...new Set(getMaisonReparto().map(r=>r.nome))];
+  const extraNomi=[...new Set(getSpeseReparto().map(r=>r.beneficiario))];
+  const budgetNomi=budget.map(b=>b.nome);
+  const correzioni=[];// {vecchio, nuovo, costiCount, extraCount}
+  // Controlla costi maison
+  costiNomi.forEach(nome=>{
+    if(budgetNomi.find(b=>b.toLowerCase()===nome.toLowerCase()))return;// match esatto, ok
+    // Cerca match fuzzy
+    const nl=nome.toLowerCase();const nlNoSp=nl.replace(/\s/g,'');
+    let match=null;
+    // Senza spazi
+    match=budgetNomi.find(b=>b.toLowerCase().replace(/\s/g,'')===nlNoSp);
+    // Levenshtein
+    if(!match&&nl.length>3)match=budgetNomi.find(b=>_levenshtein(nl,b.toLowerCase())<=2);
+    // Cognome
+    if(!match){const cog=nl.split(/\s+/)[0];if(cog.length>=3)match=budgetNomi.find(b=>b.toLowerCase().split(/\s+/)[0]===cog)}
+    if(match&&match.toLowerCase()!==nome.toLowerCase()){
+      const existing=correzioni.find(c=>c.vecchio===nome&&c.nuovo===match);
+      if(!existing){
+        const cc=getMaisonReparto().filter(r=>r.nome===nome).length;
+        const ec=getSpeseReparto().filter(r=>r.beneficiario===nome).length;
+        correzioni.push({vecchio:nome,nuovo:match,costiCount:cc,extraCount:ec});
+      }
+    }
+  });
+  // Controlla spese extra
+  extraNomi.forEach(nome=>{
+    if(budgetNomi.find(b=>b.toLowerCase()===nome.toLowerCase()))return;
+    if(correzioni.find(c=>c.vecchio===nome))return;// già trovato sopra
+    const nl=nome.toLowerCase();const nlNoSp=nl.replace(/\s/g,'');
+    let match=null;
+    match=budgetNomi.find(b=>b.toLowerCase().replace(/\s/g,'')===nlNoSp);
+    if(!match&&nl.length>3)match=budgetNomi.find(b=>_levenshtein(nl,b.toLowerCase())<=2);
+    if(!match){const cog=nl.split(/\s+/)[0];if(cog.length>=3)match=budgetNomi.find(b=>b.toLowerCase().split(/\s+/)[0]===cog)}
+    if(match&&match.toLowerCase()!==nome.toLowerCase()){
+      const ec=getSpeseReparto().filter(r=>r.beneficiario===nome).length;
+      correzioni.push({vecchio:nome,nuovo:match,costiCount:0,extraCount:ec});
+    }
+  });
+  if(!correzioni.length){toast('Tutti i nomi sono già allineati!');return}
+  // Anteprima
+  const mc=document.getElementById('pwd-modal-content');
+  const totVoci=correzioni.reduce((s,c)=>s+c.costiCount+c.extraCount,0);
+  let prev='<div style="text-align:center;margin-bottom:16px"><h3 style="font-family:Playfair Display,serif;margin-bottom:4px">Riallinea Nomi</h3><p style="color:var(--muted);font-size:.84rem">'+correzioni.length+' nomi da correggere — '+totVoci+' voci coinvolte</p></div>';
+  prev+='<div style="max-height:400px;overflow-y:auto">';
+  correzioni.sort((a,b)=>(b.costiCount+b.extraCount)-(a.costiCount+a.extraCount));
+  correzioni.forEach(c=>{
+    prev+='<div style="padding:8px 12px;margin-bottom:4px;border-radius:3px;background:var(--paper2);display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+    prev+='<span style="font-size:.85rem;color:var(--accent);text-decoration:line-through">'+escP(c.vecchio)+'</span>';
+    prev+='<span style="color:var(--muted)">&#8594;</span>';
+    prev+='<strong style="font-size:.85rem;color:#2c6e49">'+escP(c.nuovo)+'</strong>';
+    prev+='<span style="font-size:.75rem;color:var(--muted);margin-left:auto">';
+    if(c.costiCount)prev+=c.costiCount+' costi';
+    if(c.costiCount&&c.extraCount)prev+=' + ';
+    if(c.extraCount)prev+=c.extraCount+' extra';
+    prev+='</span></div>';
+  });
+  prev+='</div>';
+  prev+='<div id="riallinea-progress" style="display:none;margin-top:12px"><div style="height:6px;border-radius:3px;background:var(--line);overflow:hidden"><div id="riallinea-bar" style="height:100%;width:0%;background:#c0392b;border-radius:3px;transition:width .2s"></div></div><p id="riallinea-status" style="text-align:center;font-size:.82rem;color:var(--muted);margin-top:4px"></p></div>';
+  prev+='<div id="riallinea-btns" class="pwd-modal-btns" style="margin-top:16px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" id="btn-conf-riallinea" style="background:#c0392b">Correggi '+correzioni.length+' nomi</button></div>';
+  mc.innerHTML=prev;document.getElementById('pwd-modal').classList.remove('hidden');
+  document.getElementById('btn-conf-riallinea').onclick=async function(){
+    document.getElementById('riallinea-btns').style.display='none';
+    document.getElementById('riallinea-progress').style.display='block';
+    const bar=document.getElementById('riallinea-bar');const status=document.getElementById('riallinea-status');
+    let done=0,totCorr=0,errori=0;
+    for(const c of correzioni){
+      status.textContent=escP(c.vecchio)+' → '+escP(c.nuovo);
+      // Aggiorna costi_maison
+      const costiIds=maisonCache.filter(r=>r.nome===c.vecchio&&(r.reparto_dip||'slots')===currentReparto);
+      for(const r of costiIds){
+        try{await secPatch('costi_maison','id=eq.'+r.id,{nome:c.nuovo});r.nome=c.nuovo;totCorr++}catch(e){errori++}
+      }
+      // Aggiorna spese_extra
+      const extraIds=speseExtraCache.filter(r=>r.beneficiario===c.vecchio&&(r.reparto_dip||'slots')===currentReparto);
+      for(const r of extraIds){
+        try{await secPatch('spese_extra','id=eq.'+r.id,{beneficiario:c.nuovo});r.beneficiario=c.nuovo;totCorr++}catch(e){errori++}
+      }
+      done++;bar.style.width=Math.round(done/correzioni.length*100)+'%';
+      if(done%3===0)await new Promise(r=>setTimeout(r,50));
+    }
+    mc.innerHTML='<div style="text-align:center;padding:20px"><div style="font-size:2.5rem;margin-bottom:8px">'+(errori?'&#9888;':'&#9989;')+'</div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Nomi riallineati</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:#2c6e49">'+correzioni.length+'</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Nomi corretti</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--ink)">'+totCorr+'</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Voci aggiornate</div></div>'+(errori?'<div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--accent)">'+errori+'</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Errori</div></div>':'')+'</div><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
+    renderMaisonDashboard();renderSpeseExtra();
+    logAzione('Riallinea nomi',correzioni.length+' nomi, '+totCorr+' voci');};}
 async function rimuoviMaisonBudget(id){if(!confirm('Rimuovere questo budget?'))return;
   try{await secDel('maison_budget','id=eq.'+id);maisonBudgetCache=maisonBudgetCache.filter(b=>b.id!==id);logAzione('Budget maison rimosso','ID '+id);renderMaisonBudgetUI();renderMaisonDashboard();renderMaisonBudgetAlerts();toast('Budget rimosso')}catch(e){toast('Errore rimozione budget')}}
 function renderMaisonBudgetAlerts(){const container=document.getElementById('maison-alerts-container');if(!container)return;
