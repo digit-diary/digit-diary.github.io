@@ -4782,22 +4782,43 @@ async function importaCategorieMaison(input){const file=input.files[0];if(!file)
   }
   const nomi=Object.keys(catMap);
   if(!nomi.length){toast('Nessun cliente trovato nel file');return}
-  // Mostra anteprima
+  // Mostra anteprima professionale
   const mc=document.getElementById('pwd-modal-content');
-  let prev='<h3>Importa Categorie</h3><p style="color:var(--muted);margin-bottom:12px">Trovati <strong>'+nomi.length+'</strong> clienti nel file</p>';
-  const byCat={};nomi.forEach(n=>{const c=catMap[n];if(!byCat[c])byCat[c]=[];byCat[c].push(n)});
+  const byCat={};nomi.forEach(n=>{const c=catMap[n];if(!byCat[c])byCat[c]=[];byCat[c].push(n.trim())});
   const catLabels={full_maison:'Full Maison',maison:'Maison',bl:'Buono Lounge',bu:'Buono Unico',direzione:'Direzione'};
   const catColors={full_maison:'#b8860b',maison:'#2980b9',bl:'#2c6e49',bu:'#e67e22',direzione:'#8e44ad'};
-  for(const[cat,lista]of Object.entries(byCat)){
-    prev+='<div style="margin-bottom:8px"><span class="mini-badge" style="background:'+catColors[cat]+'">'+catLabels[cat]+' ('+lista.length+')</span>';
-    prev+='<span style="font-size:.82rem;color:var(--muted);margin-left:8px">'+lista.slice(0,5).join(', ')+(lista.length>5?' ...':'')+'</span></div>';
-  }
   const esist=nomi.filter(n=>maisonBudgetCache.find(b=>b.nome.toLowerCase()===n.toLowerCase()&&(b.reparto_dip||'slots')===currentReparto));
-  if(esist.length)prev+='<p style="font-size:.82rem;color:var(--accent2);margin-top:8px">'+esist.length+' clienti già presenti → verranno aggiornati (solo categoria, budget e nascita invariati)</p>';
-  prev+='<div class="pwd-modal-btns" style="margin-top:16px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" id="btn-conf-import-cat">Importa</button></div>';
+  const nNuovi=nomi.length-esist.length;
+  let prev='<div style="text-align:center;margin-bottom:16px"><h3 style="font-family:Playfair Display,serif;margin-bottom:4px">Importa Categorie Clienti</h3><p style="color:var(--muted);font-size:.84rem">File: '+escP(file.name)+'</p></div>';
+  // KPI cards
+  prev+='<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">';
+  prev+='<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.3rem;font-weight:700;color:var(--ink)">'+nomi.length+'</div><div style="font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Totale</div></div>';
+  prev+='<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.3rem;font-weight:700;color:#2c6e49">'+nNuovi+'</div><div style="font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Nuovi</div></div>';
+  prev+='<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.3rem;font-weight:700;color:var(--accent2)">'+esist.length+'</div><div style="font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Aggiornati</div></div>';
+  prev+='</div>';
+  // Categorie con lista espandibile
+  prev+='<div style="max-height:350px;overflow-y:auto">';
+  for(const[cat,lista]of Object.entries(byCat)){
+    lista.sort();
+    prev+='<div style="margin-bottom:12px;border-left:3px solid '+catColors[cat]+';padding-left:12px">';
+    prev+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span class="mini-badge" style="background:'+catColors[cat]+';font-size:.82rem;padding:3px 10px">'+catLabels[cat]+'</span><span style="font-size:.82rem;color:var(--muted)">'+lista.length+' clienti</span></div>';
+    prev+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
+    lista.forEach(n=>{
+      const isExist=esist.includes(n);
+      prev+='<span style="font-size:.78rem;padding:2px 8px;border-radius:2px;background:'+(isExist?catColors[cat]+'15':'var(--paper2)')+';color:'+(isExist?catColors[cat]:'var(--ink)')+';border:1px solid '+(isExist?catColors[cat]+'40':'var(--line)')+'">'+escP(n)+(isExist?' &#8635;':'')+'</span>';
+    });
+    prev+='</div></div>';
+  }
+  prev+='</div>';
+  // Barra progresso (nascosta)
+  prev+='<div id="import-cat-progress" style="display:none;margin-top:12px"><div style="height:6px;border-radius:3px;background:var(--line);overflow:hidden"><div id="import-cat-bar" style="height:100%;width:0%;background:#b8860b;border-radius:3px;transition:width .2s"></div></div><p id="import-cat-status" style="text-align:center;font-size:.82rem;color:var(--muted);margin-top:4px"></p></div>';
+  prev+='<div id="import-cat-btns" class="pwd-modal-btns" style="margin-top:16px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" id="btn-conf-import-cat">Importa '+nomi.length+' clienti</button></div>';
   mc.innerHTML=prev;document.getElementById('pwd-modal').classList.remove('hidden');
   document.getElementById('btn-conf-import-cat').onclick=async function(){
-    let nuovi=0,aggiornati=0;
+    document.getElementById('import-cat-btns').style.display='none';
+    document.getElementById('import-cat-progress').style.display='block';
+    const bar=document.getElementById('import-cat-bar');const status=document.getElementById('import-cat-status');
+    let nuovi=0,aggiornati=0,done=0;
     for(const nome of nomi){
       const cat=catMap[nome];
       const existing=maisonBudgetCache.find(b=>b.nome.toLowerCase()===nome.toLowerCase()&&(b.reparto_dip||'slots')===currentReparto);
@@ -4810,11 +4831,12 @@ async function importaCategorieMaison(input){const file=input.files[0];if(!file)
         try{const r=await secPost('maison_budget',{nome,categoria:cat,reparto_dip:currentReparto,aggiornato_da:getOperatore(),aggiornato_at:new Date().toISOString()});
         maisonBudgetCache.push(r[0]);nuovi++}catch(e){}
       }
+      done++;bar.style.width=Math.round(done/nomi.length*100)+'%';status.textContent=done+'/'+nomi.length+' — '+escP(nome);
     }
-    document.getElementById('pwd-modal').classList.add('hidden');
+    // Riepilogo finale
+    mc.innerHTML='<div style="text-align:center;padding:20px"><div style="font-size:2.5rem;margin-bottom:8px">&#9989;</div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Importazione completata</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:#2c6e49">'+nuovi+'</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Nuovi</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--accent2)">'+aggiornati+'</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Aggiornati</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--ink)">'+(nomi.length-nuovi-aggiornati)+'</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Invariati</div></div></div><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
     renderMaisonBudgetUI();renderMaisonDashboard();
-    logAzione('Importa categorie',nomi.length+' clienti ('+nuovi+' nuovi, '+aggiornati+' aggiornati)');
-    toast(nuovi+' nuovi + '+aggiornati+' aggiornati — '+nomi.length+' clienti importati')};
+    logAzione('Importa categorie',nomi.length+' clienti ('+nuovi+' nuovi, '+aggiornati+' aggiornati)');};
   }catch(e){toast('Errore lettura file: '+e.message)}}
 // IMPORTA COMPLEANNI DA FILE EXCEL
 async function importaCompleanniMaison(input){const file=input.files[0];if(!file)return;input.value='';
@@ -4868,23 +4890,43 @@ async function importaCompleanniMaison(input){const file=input.files[0];if(!file
   });
   const nuovi=matched.filter(m=>m.isNew);
   const esistenti=matched.filter(m=>!m.isNew);
-  // Mostra anteprima
+  // Mostra anteprima professionale
   const mc=document.getElementById('pwd-modal-content');
-  let prev='<h3>Importa Compleanni</h3><p style="color:var(--muted);margin-bottom:12px">Trovati <strong>'+compleanni.length+'</strong> compleanni nel file</p>';
-  if(esistenti.length)prev+='<p style="font-size:.82rem;color:#2c6e49;margin-bottom:4px"><strong>'+esistenti.length+'</strong> clienti già presenti → aggiornamento data nascita</p>';
-  if(nuovi.length)prev+='<p style="font-size:.82rem;color:#2980b9;margin-bottom:4px"><strong>'+nuovi.length+'</strong> nuovi (familiari/altri) → verranno creati con solo compleanno</p>';
-  prev+='<div style="max-height:300px;overflow-y:auto;margin-top:10px;border:1px solid var(--line);border-radius:3px;padding:8px">';
-  prev+='<table style="width:100%;font-size:.82rem;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:4px;border-bottom:1px solid var(--line)">Nome</th><th style="text-align:left;padding:4px;border-bottom:1px solid var(--line)">Data</th><th style="text-align:left;padding:4px;border-bottom:1px solid var(--line)">Stato</th></tr></thead><tbody>';
-  matched.forEach(m=>{
-    const dStr=new Date(m.data+'T12:00:00').toLocaleDateString('it-IT');
-    const stato=m.isNew?'<span style="color:#2980b9">Nuovo</span>':'<span style="color:#2c6e49">Aggiorna</span>'+(m.nome!==m.nomeDB?' <span style="color:var(--accent2);font-size:.78rem">('+escP(m.nomeDB)+')</span>':'');
-    prev+='<tr><td style="padding:3px 4px;border-bottom:1px solid var(--paper2)">'+escP(m.nome)+'</td><td style="padding:3px 4px;border-bottom:1px solid var(--paper2)">'+dStr+'</td><td style="padding:3px 4px;border-bottom:1px solid var(--paper2)">'+stato+'</td></tr>';
-  });
-  prev+='</tbody></table></div>';
-  prev+='<div class="pwd-modal-btns" style="margin-top:16px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" id="btn-conf-import-compl">Importa</button></div>';
+  const mesiNomi=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+  let prev='<div style="text-align:center;margin-bottom:16px"><h3 style="font-family:Playfair Display,serif;margin-bottom:4px">Importa Compleanni</h3><p style="color:var(--muted);font-size:.84rem">File: '+escP(file.name)+'</p></div>';
+  // KPI cards
+  prev+='<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">';
+  prev+='<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.3rem;font-weight:700;color:var(--ink)">'+compleanni.length+'</div><div style="font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Compleanni</div></div>';
+  prev+='<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.3rem;font-weight:700;color:#2c6e49">'+esistenti.length+'</div><div style="font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Clienti esistenti</div></div>';
+  prev+='<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.3rem;font-weight:700;color:#2980b9">'+nuovi.length+'</div><div style="font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Familiari / Nuovi</div></div>';
+  prev+='</div>';
+  // Raggruppa per mese
+  const byMese={};matched.forEach(m=>{const d=new Date(m.data+'T12:00:00');const k=d.getMonth();if(!byMese[k])byMese[k]=[];byMese[k].push(m)});
+  prev+='<div style="max-height:350px;overflow-y:auto">';
+  for(let mi=0;mi<12;mi++){
+    if(!byMese[mi]||!byMese[mi].length)continue;
+    const lista=byMese[mi].sort((a,b)=>{const da=new Date(a.data+'T12:00:00').getDate();const db=new Date(b.data+'T12:00:00').getDate();return da-db});
+    prev+='<div style="margin-bottom:12px"><div style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:#b8860b;font-weight:700;margin-bottom:6px;border-bottom:1px solid var(--line);padding-bottom:4px">'+mesiNomi[mi]+' ('+lista.length+')</div>';
+    prev+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
+    lista.forEach(m=>{
+      const d=new Date(m.data+'T12:00:00');const giorno=d.getDate();
+      const bg=m.isNew?'rgba(41,128,185,0.1)':'rgba(44,110,73,0.1)';
+      const border=m.isNew?'#2980b9':'#2c6e49';
+      const fuzzyNote=!m.isNew&&m.nome!==m.nomeDB?' title="'+escP(m.nomeDB)+'" style="cursor:help"':'';
+      prev+='<span style="font-size:.78rem;padding:3px 8px;border-radius:2px;background:'+bg+';border:1px solid '+border+'30;display:inline-flex;align-items:center;gap:4px"'+fuzzyNote+'><strong style="color:'+border+'">'+giorno+'</strong> '+escP(m.nome)+(m.isNew?' <span style="font-size:.65rem;color:#2980b9;font-weight:700">NEW</span>':'')+'</span>';
+    });
+    prev+='</div></div>';
+  }
+  prev+='</div>';
+  // Barra progresso
+  prev+='<div id="import-compl-progress" style="display:none;margin-top:12px"><div style="height:6px;border-radius:3px;background:var(--line);overflow:hidden"><div id="import-compl-bar" style="height:100%;width:0%;background:#8e44ad;border-radius:3px;transition:width .2s"></div></div><p id="import-compl-status" style="text-align:center;font-size:.82rem;color:var(--muted);margin-top:4px"></p></div>';
+  prev+='<div id="import-compl-btns" class="pwd-modal-btns" style="margin-top:16px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" id="btn-conf-import-compl">Importa '+compleanni.length+' compleanni</button></div>';
   mc.innerHTML=prev;document.getElementById('pwd-modal').classList.remove('hidden');
   document.getElementById('btn-conf-import-compl').onclick=async function(){
-    let nAggiornati=0,nNuovi=0;
+    document.getElementById('import-compl-btns').style.display='none';
+    document.getElementById('import-compl-progress').style.display='block';
+    const bar=document.getElementById('import-compl-bar');const status=document.getElementById('import-compl-status');
+    let nAggiornati=0,nNuovi=0,done=0;
     for(const m of matched){
       if(m.budgetId){
         try{await secPatch('maison_budget','id=eq.'+m.budgetId,{data_nascita:m.data,aggiornato_da:getOperatore(),aggiornato_at:new Date().toISOString()});
@@ -4893,11 +4935,12 @@ async function importaCompleanniMaison(input){const file=input.files[0];if(!file
         try{const r=await secPost('maison_budget',{nome:m.nome,data_nascita:m.data,reparto_dip:currentReparto,aggiornato_da:getOperatore(),aggiornato_at:new Date().toISOString()});
         maisonBudgetCache.push(r[0]);nNuovi++}catch(e){}
       }
+      done++;bar.style.width=Math.round(done/matched.length*100)+'%';status.textContent=done+'/'+matched.length+' — '+escP(m.nome);
     }
-    document.getElementById('pwd-modal').classList.add('hidden');
+    // Riepilogo finale
+    mc.innerHTML='<div style="text-align:center;padding:20px"><div style="font-size:2.5rem;margin-bottom:8px">&#127874;</div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Compleanni importati</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:#2c6e49">'+nAggiornati+'</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Aggiornati</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:#2980b9">'+nNuovi+'</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Nuovi / Familiari</div></div></div><p style="font-size:.84rem;color:var(--muted)">I compleanni appariranno nella dashboard e nelle notifiche.</p><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')" style="margin-top:12px">Chiudi</button></div>';
     renderMaisonBudgetUI();renderMaisonDashboard();
-    logAzione('Importa compleanni',compleanni.length+' ('+nAggiornati+' aggiornati, '+nNuovi+' nuovi)');
-    toast(nAggiornati+' aggiornati + '+nNuovi+' nuovi — '+compleanni.length+' compleanni importati')};
+    logAzione('Importa compleanni',compleanni.length+' ('+nAggiornati+' aggiornati, '+nNuovi+' nuovi)');};
   }catch(e){toast('Errore lettura file: '+e.message)}}
 // Trova nome simile tra clienti maison budget (per compleanni)
 function _trovaNomeSimileMaison(nome){
