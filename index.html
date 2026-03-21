@@ -4998,24 +4998,42 @@ async function riallineaNomiMaison(){
   const extraNomi=[...new Set(getSpeseReparto().map(r=>r.beneficiario))];
   const budgetNomi=budget.map(b=>b.nome);
   const correzioni=[];// {vecchio, nuovo, costiCount, extraCount}
+  // Funzione: dal match budget estrai solo il cognome corretto (non nome+cognome)
+  function _soloCorrezioneCognome(nomeVecchio,matchBudget){
+    const tokensVecchio=nomeVecchio.trim().split(/\s+/);
+    const tokensBudget=matchBudget.trim().split(/\s+/);
+    // Se il vecchio ha solo 1 token (solo cognome) → usa solo il cognome del budget
+    if(tokensVecchio.length===1)return capitalizzaNome(tokensBudget[0]);
+    // Se il vecchio ha più token → correggi solo l'ortografia mantenendo la struttura
+    // Mappa ogni token vecchio al token budget più simile
+    return tokensVecchio.map(tv=>{
+      const best=tokensBudget.find(tb=>tb.toLowerCase()===tv.toLowerCase())||
+        tokensBudget.find(tb=>_levenshtein(tv.toLowerCase(),tb.toLowerCase())<=1)||
+        tokensBudget.find(tb=>tb.toLowerCase().replace(/\s/g,'')===tv.toLowerCase().replace(/\s/g,''));
+      return best?capitalizzaNome(best):capitalizzaNome(tv);
+    }).join(' ');
+  }
   // Controlla costi maison
   costiNomi.forEach(nome=>{
     if(budgetNomi.find(b=>b.toLowerCase()===nome.toLowerCase()))return;// match esatto, ok
+    // Match anche solo cognome (il costo ha solo cognome, budget ha cognome+nome)
+    if(budgetNomi.find(b=>b.toLowerCase().split(/\s+/)[0]===nome.toLowerCase().split(/\s+/)[0]&&nome.split(/\s+/).length<=1))return;// cognome uguale, non serve correggere
     // Cerca match fuzzy
     const nl=nome.toLowerCase();const nlNoSp=nl.replace(/\s/g,'');
-    let match=null;
-    // Senza spazi
-    match=budgetNomi.find(b=>b.toLowerCase().replace(/\s/g,'')===nlNoSp);
-    // Levenshtein
-    if(!match&&nl.length>3)match=budgetNomi.find(b=>_levenshtein(nl,b.toLowerCase())<=2);
-    // Cognome
-    if(!match){const cog=nl.split(/\s+/)[0];if(cog.length>=3)match=budgetNomi.find(b=>b.toLowerCase().split(/\s+/)[0]===cog)}
-    if(match&&match.toLowerCase()!==nome.toLowerCase()){
-      const existing=correzioni.find(c=>c.vecchio===nome&&c.nuovo===match);
+    let matchBudget=null;
+    // Senza spazi (Dalozzo → Da Lozzo)
+    matchBudget=budgetNomi.find(b=>b.toLowerCase().replace(/\s/g,'')===nlNoSp);
+    // Levenshtein (Armelin → Armellin)
+    if(!matchBudget&&nl.length>3)matchBudget=budgetNomi.find(b=>_levenshtein(nl,b.toLowerCase().split(/\s+/)[0])<=2&&nl.length<=b.split(/\s+/)[0].length+2);
+    if(!matchBudget&&nl.length>3)matchBudget=budgetNomi.find(b=>_levenshtein(nl,b.toLowerCase())<=2);
+    if(matchBudget&&matchBudget.toLowerCase()!==nome.toLowerCase()){
+      const nuovoNome=_soloCorrezioneCognome(nome,matchBudget);
+      if(nuovoNome.toLowerCase()===nome.toLowerCase())return;// nessuna correzione necessaria
+      const existing=correzioni.find(c=>c.vecchio===nome&&c.nuovo===nuovoNome);
       if(!existing){
         const cc=getMaisonReparto().filter(r=>r.nome===nome).length;
         const ec=getSpeseReparto().filter(r=>r.beneficiario===nome).length;
-        correzioni.push({vecchio:nome,nuovo:match,costiCount:cc,extraCount:ec});
+        correzioni.push({vecchio:nome,nuovo:nuovoNome,costiCount:cc,extraCount:ec});
       }
     }
   });
@@ -5023,14 +5041,18 @@ async function riallineaNomiMaison(){
   extraNomi.forEach(nome=>{
     if(budgetNomi.find(b=>b.toLowerCase()===nome.toLowerCase()))return;
     if(correzioni.find(c=>c.vecchio===nome))return;// già trovato sopra
+    // Cognome uguale → ok, non serve correggere
+    if(budgetNomi.find(b=>b.toLowerCase().split(/\s+/)[0]===nome.toLowerCase().split(/\s+/)[0]&&nome.split(/\s+/).length<=1))return;
     const nl=nome.toLowerCase();const nlNoSp=nl.replace(/\s/g,'');
-    let match=null;
-    match=budgetNomi.find(b=>b.toLowerCase().replace(/\s/g,'')===nlNoSp);
-    if(!match&&nl.length>3)match=budgetNomi.find(b=>_levenshtein(nl,b.toLowerCase())<=2);
-    if(!match){const cog=nl.split(/\s+/)[0];if(cog.length>=3)match=budgetNomi.find(b=>b.toLowerCase().split(/\s+/)[0]===cog)}
-    if(match&&match.toLowerCase()!==nome.toLowerCase()){
+    let matchBudget=null;
+    matchBudget=budgetNomi.find(b=>b.toLowerCase().replace(/\s/g,'')===nlNoSp);
+    if(!matchBudget&&nl.length>3)matchBudget=budgetNomi.find(b=>_levenshtein(nl,b.toLowerCase().split(/\s+/)[0])<=2&&nl.length<=b.split(/\s+/)[0].length+2);
+    if(!matchBudget&&nl.length>3)matchBudget=budgetNomi.find(b=>_levenshtein(nl,b.toLowerCase())<=2);
+    if(matchBudget&&matchBudget.toLowerCase()!==nome.toLowerCase()){
+      const nuovoNome=_soloCorrezioneCognome(nome,matchBudget);
+      if(nuovoNome.toLowerCase()===nome.toLowerCase())return;
       const ec=getSpeseReparto().filter(r=>r.beneficiario===nome).length;
-      correzioni.push({vecchio:nome,nuovo:match,costiCount:0,extraCount:ec});
+      correzioni.push({vecchio:nome,nuovo:nuovoNome,costiCount:0,extraCount:ec});
     }
   });
   if(!correzioni.length){toast('Tutti i nomi sono già allineati!');return}
