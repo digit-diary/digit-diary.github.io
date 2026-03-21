@@ -1068,7 +1068,7 @@ const MESI_FULL=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio
 const GIORNI=['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
 const GIORNI_SHORT=['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
 const DEFAULT_PWD_HASH='7310db08dd56916e4ded25837db6cf4ff5005c958fb53e405a62fd10d2009cce';
-const TIPI_DEFAULT=[{nome:'Attività',colore:'#1a4a7a'},{nome:'Richiesta',colore:'#2c6e49'},{nome:'Errore',colore:'#c0392b'},{nome:'Ammonimento Verbale',colore:'#7b2d8b'},{nome:'Malattia',colore:'#1a7a6d'},{nome:'Apprezzamento',colore:'#b8860b'},{nome:'Nota',colore:'#8b6914'},{nome:'Altro',colore:'#8a7d6b'}];
+const TIPI_DEFAULT=[{nome:'Attività',colore:'#1a4a7a'},{nome:'Richiesta',colore:'#2c6e49'},{nome:'Errore',colore:'#c0392b'},{nome:'Ammonimento Verbale',colore:'#7b2d8b'},{nome:'Malattia',colore:'#1a7a6d'},{nome:'Nota',colore:'#8b6914'},{nome:'Altro',colore:'#8a7d6b'}];
 let tipiPersonalizzati=[],coloriOverride={},tipoSelezionato='Attività',modalEntryId=null,modalTipoSel=null,datiCache=[],pinnedIds=new Set(),scadenzeCache=[],charts={},operatoriSalvati=[];
 let rapportoMese=new Date().getMonth(),rapportoAnno=new Date().getFullYear(),rapportoGiornoAperto=null,rapportiCache={},noteColleghiCache=[],operatoriAuthCache=[];
 // --- CRITTOGRAFIA NOTE AES-GCM ---
@@ -2026,7 +2026,6 @@ async function generaRiepilogoMensile(){
     const nCollab=new Set(meseData.map(e=>e.nome)).size;
     const nErr=meseData.filter(e=>e.tipo===nomeCorrente('Errore')).length;
     const nMal=_contaTotaleMalattie(meseData,nomeCorrente('Malattia'));
-    const nAppr=meseData.filter(e=>e.tipo===nomeCorrente('Apprezzamento')).length;
     const totImp=meseData.reduce((s,e)=>s+(parseFloat(e.importo)||0),0);
     const nAllin=meseModuli.filter(m=>m.tipo==='allineamento').length;
     const nRdi=meseModuli.filter(m=>m.tipo==='rdi').length;
@@ -2035,7 +2034,7 @@ async function generaRiepilogoMensile(){
     doc.setFont('helvetica','normal');doc.setFontSize(9.5);
     const stats=[
       ['Registrazioni totali',meseData.length],['Collaboratori coinvolti',nCollab],
-      ['Errori',nErr],['Malattie',nMal],['Apprezzamenti',nAppr],
+      ['Errori',nErr],['Malattie',nMal],
       ['Importo totale errori',totImp.toFixed(2)+' CHF'],
       ['Moduli allineamento generati',nAllin],['Moduli RDI generati',nRdi],['Moduli apprezzamento generati',nApprM]
     ];
@@ -2183,7 +2182,7 @@ function apriSchedaCollaboratore(nome){
   const entries=allData.filter(e=>e.nome===nome);
   const moduli=getModuliReparto().filter(m=>m.collaboratore&&m.collaboratore.toLowerCase()===nome.toLowerCase());
   const now=new Date();
-  const tipoErr=nomeCorrente('Errore'),tipoMal=nomeCorrente('Malattia'),tipoAmm=nomeCorrente('Ammonimento Verbale'),tipoAppr=nomeCorrente('Apprezzamento');
+  const tipoErr=nomeCorrente('Errore'),tipoMal=nomeCorrente('Malattia'),tipoAmm=nomeCorrente('Ammonimento Verbale');
 
   // KPI counts
   const totReg=entries.length;
@@ -2192,13 +2191,11 @@ function apriSchedaCollaboratore(nome){
   const totErrCost=errori.reduce((s,e)=>s+(parseFloat(e.importo)||0),0);
   const totMal=_contaTotaleMalattie(entries,tipoMal);
   const totAmm=entries.filter(e=>e.tipo===tipoAmm).length;
-  const totApprReg=entries.filter(e=>e.tipo===tipoAppr).length;
   const allineamenti=moduli.filter(m=>m.tipo==='allineamento').length;
   const apprezzamenti=moduli.filter(m=>m.tipo==='apprezzamento').length;
   const rdiCount=moduli.filter(m=>m.tipo==='rdi').length;
-  const totApprAll=totApprReg+apprezzamenti;
   const totNeg=totErr+totAmm+allineamenti+rdiCount;
-  const ratio=totNeg>0?(totApprAll/totNeg):totApprAll>0?999:0;
+  const ratio=totNeg>0?(apprezzamenti/totNeg):apprezzamenti>0?999:0;
 
   // Birthday - check collaboratoriCache
   const collabRec=collaboratoriCache.find(c=>c.nome===nome);
@@ -2228,7 +2225,7 @@ function apriSchedaCollaboratore(nome){
   html+='<div class="scheda-kpi"><div class="kpi-val" style="color:#1a7a6d">'+totMal+'</div><div class="kpi-lbl">Malattie</div></div>';
   html+='<div class="scheda-kpi"><div class="kpi-val" style="color:#7b2d8b">'+totAmm+'</div><div class="kpi-lbl">Amm. verbali</div></div>';
   html+='<div class="scheda-kpi"><div class="kpi-val" style="color:#1a4a7a">'+allineamenti+'</div><div class="kpi-lbl">Allineamenti</div></div>';
-  html+='<div class="scheda-kpi"><div class="kpi-val" style="color:#b8860b">'+totApprAll+'</div><div class="kpi-lbl">Apprezzamenti</div></div>';
+  html+='<div class="scheda-kpi"><div class="kpi-val" style="color:#b8860b">'+apprezzamenti+'</div><div class="kpi-lbl">Apprezzamenti</div></div>';
   const ratioColor=ratio>=1?'#2c6e49':'var(--accent)';
   html+='<div class="scheda-kpi"><div class="kpi-val" style="color:'+ratioColor+'">'+(ratio>=999?'&#8734;':ratio.toFixed(1))+'</div><div class="kpi-lbl">Pos/Neg ratio</div></div>';
   html+='</div>';
@@ -2267,9 +2264,9 @@ function apriSchedaCollaboratore(nome){
   // Check last 3 months for 0 errors + appreciations
   const threeMonthsAgo=new Date(now.getFullYear(),now.getMonth()-3,1);
   const recentErr=entries.filter(e=>e.tipo===tipoErr&&new Date(e.data)>=threeMonthsAgo).length;
-  const recentAppr=entries.filter(e=>e.tipo===tipoAppr&&new Date(e.data)>=threeMonthsAgo).length;
-  if(recentErr===0&&recentAppr>0){
-    html+='<div class="scheda-suggestion" style="background:rgba(44,110,73,0.12);color:#2c6e49">&#11088; 0 errori da 3 mesi + '+recentAppr+' apprezzamenti &#8594; Candidato per premio</div>';
+  const recentApprMod=moduli.filter(m=>m.tipo==='apprezzamento'&&new Date(m.created_at)>=threeMonthsAgo).length;
+  if(recentErr===0&&recentApprMod>0){
+    html+='<div class="scheda-suggestion" style="background:rgba(44,110,73,0.12);color:#2c6e49">&#11088; 0 errori da 3 mesi + '+recentApprMod+' apprezzamenti &#8594; Candidato per premio</div>';
   }else if(recentErr===0&&totReg>5){
     html+='<div class="scheda-suggestion" style="background:rgba(44,110,73,0.12);color:#2c6e49">&#9989; 0 errori negli ultimi 3 mesi</div>';
   }
@@ -2372,7 +2369,8 @@ function schedaResetTlFilter(nome){
 }
 
 function _renderSchedaTrendChart(nome,entries){
-  var tipoErr=nomeCorrente('Errore'),tipoAppr=nomeCorrente('Apprezzamento');
+  var tipoErr=nomeCorrente('Errore');
+  var moduli=getModuliReparto().filter(function(m){return m.collaboratore&&m.collaboratore.toLowerCase()===nome.toLowerCase()});
   var now=new Date();var labels=[],errData=[],apprData=[];
   for(var i=5;i>=0;i--){
     var d=new Date(now.getFullYear(),now.getMonth()-i,1);
@@ -2380,7 +2378,9 @@ function _renderSchedaTrendChart(nome,entries){
     var mErr=0,mAppr=0;
     entries.forEach(function(e){var ed=new Date(e.data);
       if(ed.getMonth()===d.getMonth()&&ed.getFullYear()===d.getFullYear()){
-        if(e.tipo===tipoErr)mErr++;if(e.tipo===tipoAppr)mAppr++}});
+        if(e.tipo===tipoErr)mErr++}});
+    moduli.forEach(function(m){var md=new Date(m.created_at);
+      if(md.getMonth()===d.getMonth()&&md.getFullYear()===d.getFullYear()&&m.tipo==='apprezzamento')mAppr++});
     errData.push(mErr);apprData.push(mAppr);
   }
   // Trend direction
@@ -2414,11 +2414,10 @@ function stampaSchedaPDF(nome){
   var allData=getDatiReparto();
   var entries=allData.filter(function(e){return e.nome===nome});
   var moduli=getModuliReparto().filter(function(m){return m.collaboratore&&m.collaboratore.toLowerCase()===nome.toLowerCase()});
-  var tipoErr=nomeCorrente('Errore'),tipoMal=nomeCorrente('Malattia'),tipoAmm=nomeCorrente('Ammonimento Verbale'),tipoAppr=nomeCorrente('Apprezzamento');
+  var tipoErr=nomeCorrente('Errore'),tipoMal=nomeCorrente('Malattia'),tipoAmm=nomeCorrente('Ammonimento Verbale');
   var totErr=entries.filter(function(e){return e.tipo===tipoErr}).length;
   var totMal=_contaTotaleMalattie(entries,tipoMal);
   var totAmm=entries.filter(function(e){return e.tipo===tipoAmm}).length;
-  var totAppr=entries.filter(function(e){return e.tipo===tipoAppr}).length;
   var totErrCost=entries.filter(function(e){return e.tipo===tipoErr}).reduce(function(s,e){return s+(parseFloat(e.importo)||0)},0);
   var allin=moduli.filter(function(m){return m.tipo==='allineamento'}).length;
   var apprMod=moduli.filter(function(m){return m.tipo==='apprezzamento'}).length;
@@ -2439,7 +2438,7 @@ function stampaSchedaPDF(nome){
 
   // KPI table
   doc.autoTable({startY:dal||al?45:40,head:[['Registrazioni','Errori','Costo Errori','Malattie','Amm. Verbali','Allineamenti','Apprezzamenti','RDI']],
-    body:[[entries.length,totErr,totErrCost?totErrCost.toFixed(2)+' CHF':'0',totMal,totAmm,allin,totAppr+apprMod,rdi]],
+    body:[[entries.length,totErr,totErrCost?totErrCost.toFixed(2)+' CHF':'0',totMal,totAmm,allin,apprMod,rdi]],
     theme:'grid',headStyles:{fillColor:[26,74,122],fontSize:7},bodyStyles:{fontSize:8},margin:{left:14,right:14}});
 
   // Timeline table
@@ -2501,11 +2500,11 @@ function _mostraConfronto(nomi){
   });
 
   // Build KPI comparison table
-  var tipoMal=nomeCorrente('Malattia'),tipoAmm=nomeCorrente('Ammonimento Verbale'),tipoAppr=nomeCorrente('Apprezzamento');
+  var tipoMal=nomeCorrente('Malattia'),tipoAmm=nomeCorrente('Ammonimento Verbale');
   var tableRows=nomi.map(function(nome){
     var entries=allData.filter(function(e){return e.nome===nome});
     var moduli=getModuliReparto().filter(function(m){return m.collaboratore&&m.collaboratore.toLowerCase()===nome.toLowerCase()});
-    return'<tr><td><strong>'+escP(nome)+'</strong></td><td class="num">'+entries.length+'</td><td class="num">'+entries.filter(function(e){return e.tipo===tipoErr}).length+'</td><td class="num">'+entries.filter(function(e){return e.tipo===tipoMal}).length+'</td><td class="num">'+entries.filter(function(e){return e.tipo===tipoAmm}).length+'</td><td class="num">'+moduli.filter(function(m){return m.tipo==='allineamento'}).length+'</td><td class="num">'+entries.filter(function(e){return e.tipo===tipoAppr}).length+'</td></tr>';
+    return'<tr><td><strong>'+escP(nome)+'</strong></td><td class="num">'+entries.length+'</td><td class="num">'+entries.filter(function(e){return e.tipo===tipoErr}).length+'</td><td class="num">'+entries.filter(function(e){return e.tipo===tipoMal}).length+'</td><td class="num">'+entries.filter(function(e){return e.tipo===tipoAmm}).length+'</td><td class="num">'+moduli.filter(function(m){return m.tipo==='allineamento'}).length+'</td><td class="num">'+moduli.filter(function(m){return m.tipo==='apprezzamento'}).length+'</td></tr>';
   }).join('');
 
   var html='<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px"><div><h3>Confronto collaboratori</h3><p style="color:var(--muted);font-size:.82rem">'+nomi.join(' vs ')+'</p></div>';
@@ -3191,7 +3190,7 @@ document.addEventListener('click',function(e){document.querySelectorAll('.ac-dro
 function _saveFiltri(){try{localStorage.setItem('diario_filtri',JSON.stringify({persona:(document.getElementById('filt-persona')||{}).value||'',tipo:(document.getElementById('filt-tipo')||{}).value||'',cerca:(document.getElementById('filt-cerca')||{}).value||'',dal:(document.getElementById('filt-dal')||{}).value||'',al:(document.getElementById('filt-al')||{}).value||''}))}catch(e){}}
 function _restoreFiltri(){try{const f=JSON.parse(localStorage.getItem('diario_filtri')||'{}');if(f.persona){const s=document.getElementById('filt-persona');if(s)s.value=f.persona}if(f.tipo){const s=document.getElementById('filt-tipo');if(s)s.value=f.tipo}if(f.cerca){const s=document.getElementById('filt-cerca');if(s)s.value=f.cerca}if(f.dal){const s=document.getElementById('filt-dal');if(s){s.value=f.dal;if(s._flatpickr)s._flatpickr.setDate(f.dal)}}if(f.al){const s=document.getElementById('filt-al');if(s){s.value=f.al;if(s._flatpickr)s._flatpickr.setDate(f.al)}}}catch(e){}}
 function resetFiltri(){['filt-persona','filt-tipo'].forEach(id=>document.getElementById(id).value='');['filt-cerca'].forEach(id=>document.getElementById(id).value='');const fd=document.getElementById('filt-dal'),fa=document.getElementById('filt-al');if(fd._flatpickr)fd._flatpickr.clear();else fd.value='';if(fa._flatpickr)fa._flatpickr.clear();else fa.value='';_saveFiltri();render()}
-function updateStats(){const rd=getDatiReparto();document.getElementById('stats-bar').innerHTML='<div class="stat"><div class="stat-num">'+rd.length+'</div><div class="stat-label">Totale</div></div><div class="stat"><div class="stat-num blue">'+new Set(rd.map(e=>e.nome)).size+'</div><div class="stat-label">Collaboratori</div></div><div class="stat"><div class="stat-num red">'+rd.filter(e=>e.tipo===nomeCorrente('Errore')).length+'</div><div class="stat-label">'+nomeCorrente('Errore')+'</div></div><div class="stat"><div class="stat-num teal">'+rd.filter(e=>e.tipo===nomeCorrente('Malattia')).length+'</div><div class="stat-label">'+nomeCorrente('Malattia')+'</div></div><div class="stat"><div class="stat-num gold">'+rd.filter(e=>e.tipo===nomeCorrente('Apprezzamento')).length+'</div><div class="stat-label">'+nomeCorrente('Apprezzamento')+'</div></div>'}
+function updateStats(){const rd=getDatiReparto();document.getElementById('stats-bar').innerHTML='<div class="stat"><div class="stat-num">'+rd.length+'</div><div class="stat-label">Totale</div></div><div class="stat"><div class="stat-num blue">'+new Set(rd.map(e=>e.nome)).size+'</div><div class="stat-label">Collaboratori</div></div><div class="stat"><div class="stat-num red">'+rd.filter(e=>e.tipo===nomeCorrente('Errore')).length+'</div><div class="stat-label">'+nomeCorrente('Errore')+'</div></div><div class="stat"><div class="stat-num teal">'+rd.filter(e=>e.tipo===nomeCorrente('Malattia')).length+'</div><div class="stat-label">'+nomeCorrente('Malattia')+'</div></div>'}
 
 // RAPPORTO GIORNALIERO
 function getGiornataCasino(){const now=new Date();if(now.getHours()<6)now.setDate(now.getDate()-1);return now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')}
@@ -3663,13 +3662,13 @@ async function generaReportSettimanale(sez){
     const totMaison=settMaison.reduce((s,r)=>s+parseFloat(r.costo||0),0);
     if(sez.panoramica){const nErr=settData.filter(e=>e.tipo===nomeCorrente('Errore')).length;
     const nMal=_contaTotaleMalattie(settData,nomeCorrente('Malattia'));
-    const nAppr=settData.filter(e=>e.tipo===nomeCorrente('Apprezzamento')).length;
     const nAllin=settModuli.filter(m=>m.tipo==='allineamento').length;
     const nRdi=settModuli.filter(m=>m.tipo==='rdi').length;
+    const nApprMod=settModuli.filter(m=>m.tipo==='apprezzamento').length;
     doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text('Panoramica',mx,y);y+=2;
     doc.autoTable({startY:y,margin:{left:mx,right:mx},
-      body:[['Registrazioni',settData.length],['Errori',nErr],['Malattie',nMal],['Apprezzamenti',nAppr],
-        ['Costi Maison',totMaison.toFixed(2)+' CHF'],['Allineamenti generati',nAllin],['RDI generati',nRdi]],
+      body:[['Registrazioni',settData.length],['Errori',nErr],['Malattie',nMal],
+        ['Costi Maison',totMaison.toFixed(2)+' CHF'],['Allineamenti generati',nAllin],['Apprezzamenti (moduli)',nApprMod],['RDI generati',nRdi]],
       theme:'grid',styles:{fontSize:9,cellPadding:3},columnStyles:{0:{fontStyle:'bold',cellWidth:80},1:{halign:'center'}},
       alternateRowStyles:{fillColor:[250,247,242]}});y=doc.lastAutoTable.finalY+8}
     // DIFFERENZE CASSA
@@ -3764,7 +3763,7 @@ async function generaReportAnnuale(sez){
     doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text('Panoramica',mx,y);y+=2;
     doc.autoTable({startY:y,margin:{left:mx,right:mx},body:[
       ['Registrazioni totali',d.data.length],['Errori',nErr],['Malattie',nMal],
-      ['Apprezzamenti',d.data.filter(e=>e.tipo===nomeCorrente('Apprezzamento')).length],
+      ['Apprezzamenti (moduli)',d.moduli.filter(m=>m.tipo==='apprezzamento').length],
       ['Costi Maison totali',totMaison.toFixed(2)+' CHF'],['Spese Extra totali',totSE.toFixed(2)+' CHF'],
       ['Totale complessivo (Maison+Extra)',(totMaison+totSE).toFixed(2)+' CHF'],
       ['Allineamenti',d.moduli.filter(m=>m.tipo==='allineamento').length],
