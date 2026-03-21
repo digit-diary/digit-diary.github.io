@@ -3289,16 +3289,57 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
         const nome=m[1]&&m[1]===m[1]?capitalizzaNome(m[1].trim()):capitalizzaNome(m[1]);
         const isCodice=!!m[3]&&/^[a-zA-Z]$/.test(m[3]);// è un codice turno
         const codiceNum=m[4]?parseInt(m[4]):0;
-        // Cerca "domani", "dopodomani", "fino al DD", "dal DD al DD"
+        // Cerca date: "domani", "dopodomani", "fino al DD", "dal DD al DD", giorni settimana, "domani e lunedì"
         const domaniMatch=/\bdomani\b/i.test(riga);
         const dopodomaniMatch=/\bdopodomani\b/i.test(riga);
-        const finoMatch=riga.match(/fino\s+(?:al\s+)?(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?/i);
+        const oggiMatch=/\b(oggi|stasera|questa sera)\b/i.test(riga);
+        const finoMatch=riga.match(/fino\s+(?:al?\s+)?(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?/i);
         const dalAlMatch=riga.match(/dal\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?\s+al\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?/i);
+        // Giorni della settimana
+        const _giorniSett={lunedi:1,lunedì:1,martedi:2,martedì:2,mercoledi:3,mercoledì:3,giovedi:4,giovedì:4,venerdi:5,venerdì:5,sabato:6,domenica:0};
+        const _giorniTrovati=[];
+        const rigaLow=riga.toLowerCase();
+        for(const[g,idx]of Object.entries(_giorniSett)){
+          if(rigaLow.includes(g))_giorniTrovati.push(idx)}
+        // Anche "fino a lunedì", "fino a mercoledì"
+        const finoGiornoMatch=riga.match(/fino\s+(?:a\s+)?(luned[iì]|marted[iì]|mercoled[iì]|gioved[iì]|venerd[iì]|sabato|domenica)/i);
         const dataRapp=new Date(ds+'T12:00:00');
         let dataInizio=new Date(ds+'T12:00:00'),dataFine=new Date(ds+'T12:00:00');
-        if(dopodomaniMatch){dataInizio=new Date(dataRapp);dataInizio.setDate(dataInizio.getDate()+1);dataFine=new Date(dataRapp);dataFine.setDate(dataFine.getDate()+2)}
-        else if(domaniMatch){dataInizio=new Date(dataRapp);dataInizio.setDate(dataInizio.getDate()+1);dataFine=new Date(dataInizio)}
-        else if(dalAlMatch){
+        if(dopodomaniMatch&&domaniMatch){
+          // "domani e dopodomani" = 2 giorni
+          dataInizio=new Date(dataRapp);dataInizio.setDate(dataInizio.getDate()+1);
+          dataFine=new Date(dataRapp);dataFine.setDate(dataFine.getDate()+2);
+        }else if(domaniMatch&&_giorniTrovati.length){
+          // "domani e lunedì" = da domani fino al giorno della settimana
+          dataInizio=new Date(dataRapp);dataInizio.setDate(dataInizio.getDate()+1);
+          const targetDay=_giorniTrovati[0];
+          dataFine=new Date(dataRapp);
+          let diff=(targetDay-dataFine.getDay()+7)%7;if(diff===0)diff=7;
+          dataFine.setDate(dataFine.getDate()+diff);
+          if(dataFine<dataInizio)dataFine.setDate(dataFine.getDate()+7);
+        }else if(finoGiornoMatch){
+          // "fino a lunedì"
+          const targetDay=_giorniSett[finoGiornoMatch[1].toLowerCase()];
+          dataFine=new Date(dataRapp);
+          let diff=(targetDay-dataFine.getDay()+7)%7;if(diff===0)diff=7;
+          dataFine.setDate(dataFine.getDate()+diff);
+        }else if(_giorniTrovati.length>=2){
+          // "lunedì e martedì" = range tra i due giorni
+          const dates=_giorniTrovati.map(g=>{const d=new Date(dataRapp);let diff=(g-d.getDay()+7)%7;if(diff===0)diff=7;d.setDate(d.getDate()+diff);return d}).sort((a,b)=>a-b);
+          dataInizio=dates[0];dataFine=dates[dates.length-1];
+        }else if(_giorniTrovati.length===1){
+          // "lunedì assente" = quel giorno specifico
+          const targetDay=_giorniTrovati[0];
+          dataInizio=new Date(dataRapp);
+          let diff=(targetDay-dataInizio.getDay()+7)%7;if(diff===0)diff=7;
+          dataInizio.setDate(dataInizio.getDate()+diff);
+          dataFine=new Date(dataInizio);
+        }else if(dopodomaniMatch){
+          dataInizio=new Date(dataRapp);dataInizio.setDate(dataInizio.getDate()+1);
+          dataFine=new Date(dataRapp);dataFine.setDate(dataFine.getDate()+2);
+        }else if(domaniMatch){
+          dataInizio=new Date(dataRapp);dataInizio.setDate(dataInizio.getDate()+1);dataFine=new Date(dataInizio);
+        }else if(dalAlMatch){
           const gInizio=parseInt(dalAlMatch[1]),mInizio=dalAlMatch[2]?parseInt(dalAlMatch[2])-1:dataRapp.getMonth();
           const gFine=parseInt(dalAlMatch[3]),mFine=dalAlMatch[4]?parseInt(dalAlMatch[4])-1:dataRapp.getMonth();
           dataInizio=new Date(dataRapp.getFullYear(),mInizio,gInizio,12);
