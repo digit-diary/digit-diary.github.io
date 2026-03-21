@@ -1847,7 +1847,29 @@ async function parseDifferenzeCassa(text,ds,turno){if(!text||!text.trim())return
   for(const entry of entries){
     const parts=entry.split(',').map(s=>s.trim()).filter(Boolean);
     for(const part of parts){
-      const m=part.match(/^([A-Za-zÀ-ü\s.'-]+?)\s*([+-])?\s*(\d+(?:[.,]\d{1,2})?)\s*$/);
+      // 1. Formato classico: "Cognome +/-importo" o "Cognome importo"
+      let m=part.match(/^([A-Za-zÀ-ü\s.'-]+?)\s*([+-])?\s*(\d+(?:[.,]\d{1,2})?)\s*$/);
+      // 2. Formato con CHF: "Cognome 50 CHF" o "Cognome 50 chf"
+      if(!m)m=part.match(/^([A-Za-zÀ-ü\s.'-]+?)\s*([+-])?\s*(\d+(?:[.,]\d{1,2})?)\s*(?:chf|fr\.?|franchi)?\s*$/i);
+      // 3. Frase libera: cerca cognome collaboratore + importo nella stessa riga
+      if(!m){
+        // Cerca importo nella riga
+        const impMatch=part.match(/([+-])?\s*(\d+(?:[.,]\d{1,2})?)\s*(?:chf|fr\.?|franchi)?/i);
+        if(impMatch&&parseFloat(impMatch[2].replace(',','.'))>=0.01){
+          // Cerca cognome collaboratore nella riga
+          let _foundCassa=null;
+          for(const c of collaboratoriCache){
+            const words=c.nome.toLowerCase().split(/\s+/);
+            for(const w of words){
+              if(w.length>=3&&new RegExp('\\b'+w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','i').test(part)){
+                _foundCassa=c.nome;break}}
+            if(_foundCassa)break}
+          if(_foundCassa){
+            // Determina segno da keyword
+            let _sign=impMatch[1]||null;
+            if(!_sign&&/\b(ammanco|mancante|mancanza|manca|negativ[oa]|meno|sotto)\b/i.test(part))_sign='-';
+            if(!_sign&&/\b(eccedenza|eccesso|positiv[oa]|più|piu|sopra|avanzo|avanza)\b/i.test(part))_sign='+';
+            m=[part,_foundCassa,_sign,impMatch[2]]}}}
       if(!m)continue;const cognome=m[1].trim();const sign=m[2];const amount=parseFloat(m[3].replace(',','.'));
       if(!amount||amount<0.01)continue;
       const nomeCompleto=matchCollaboratore(cognome);
