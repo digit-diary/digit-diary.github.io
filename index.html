@@ -2239,20 +2239,32 @@ function apriSchedaCollaboratore(nome){
   html+='<button class="btn-export" onclick="apriConfrontoScheda(\''+neS+'\')" style="font-size:.78rem;padding:5px 14px;border-color:#1a7a6d;color:#1a7a6d">Confronta</button>';
   html+='<button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\');_destroySchedaCharts()" style="padding:6px 12px;font-size:.75rem">Chiudi</button></div></div>';
 
+  // Calcola giorni malattia totali
+  const _malEntries=entries.filter(e=>e.tipo===tipoMal);
+  let _totGiorniMal=0;
+  _malEntries.forEach(e=>{const rm=(e.testo||'').match(/(\d+)\s*giorni/);if(rm)_totGiorniMal+=parseInt(rm[1]);else _totGiorniMal++});
+  const _malColor=totMal>=5?'var(--accent)':totMal>=3?'#e67e22':'#1a7a6d';
+  // Ultima registrazione
+  const _lastEntry=entries.length?entries.sort((a,b)=>(b.data||'').localeCompare(a.data||''))[0]:null;
+  const _lastDateStr=_lastEntry?new Date(_lastEntry.data).toLocaleDateString('it-IT'):'—';
+  const _lastTipo=_lastEntry?_lastEntry.tipo:'';
   // KPI CARDS
   html+='<div class="scheda-kpi-grid">';
   html+='<div class="scheda-kpi"><div class="kpi-val" style="color:var(--ink)">'+totReg+'</div><div class="kpi-lbl">Registrazioni</div></div>';
   html+='<div class="scheda-kpi"><div class="kpi-val" style="color:var(--accent)">'+totErr+'</div><div class="kpi-lbl">Errori</div></div>';
-  html+='<div class="scheda-kpi"><div class="kpi-val" style="color:var(--accent)">'+(totErrCost?totErrCost.toFixed(0)+' CHF':'0')+'</div><div class="kpi-lbl">Costo errori</div></div>';
-  html+='<div class="scheda-kpi"><div class="kpi-val" style="color:#1a7a6d">'+totMal+'</div><div class="kpi-lbl">Malattie</div></div>';
-  html+='<div class="scheda-kpi"><div class="kpi-val" style="color:#7b2d8b">'+totAmm+'</div><div class="kpi-lbl">Amm. verbali</div></div>';
-  html+='<div class="scheda-kpi"><div class="kpi-val" style="color:#1a4a7a">'+allineamenti+'</div><div class="kpi-lbl">Allineamenti</div></div>';
-  html+='<div class="scheda-kpi"><div class="kpi-val" style="color:#b8860b">'+apprezzamenti+'</div><div class="kpi-lbl">Apprezzamenti</div></div>';
-  const ratioColor=ratio>=1?'#2c6e49':'var(--accent)';
-  html+='<div class="scheda-kpi"><div class="kpi-val" style="color:'+ratioColor+'">'+(ratio>=999?'&#8734;':ratio.toFixed(1))+'</div><div class="kpi-lbl">Pos/Neg ratio</div></div>';
+  if(totErrCost)html+='<div class="scheda-kpi"><div class="kpi-val" style="color:var(--accent)">'+totErrCost.toFixed(0)+' CHF</div><div class="kpi-lbl">Costo errori</div></div>';
+  html+='<div class="scheda-kpi"><div class="kpi-val" style="color:'+_malColor+'">'+totMal+(_totGiorniMal>totMal?' <span style="font-size:.7rem;font-weight:400">('+_totGiorniMal+'gg)</span>':'')+'</div><div class="kpi-lbl">Malattie</div></div>';
+  if(totAmm)html+='<div class="scheda-kpi"><div class="kpi-val" style="color:#7b2d8b">'+totAmm+'</div><div class="kpi-lbl">Amm. verbali</div></div>';
+  if(allineamenti)html+='<div class="scheda-kpi"><div class="kpi-val" style="color:#1a4a7a">'+allineamenti+'</div><div class="kpi-lbl">Allineamenti</div></div>';
+  if(apprezzamenti)html+='<div class="scheda-kpi"><div class="kpi-val" style="color:#b8860b">'+apprezzamenti+'</div><div class="kpi-lbl">Apprezzamenti</div></div>';
+  if(totNeg||apprezzamenti){const ratioColor=ratio>=1?'#2c6e49':'var(--accent)';
+  html+='<div class="scheda-kpi"><div class="kpi-val" style="color:'+ratioColor+'">'+(ratio>=999?'&#8734;':ratio.toFixed(1))+'</div><div class="kpi-lbl">Pos/Neg ratio</div></div>'}
+  if(_lastEntry)html+='<div class="scheda-kpi"><div class="kpi-val" style="color:var(--ink);font-size:.9rem">'+_lastDateStr+'</div><div class="kpi-lbl">Ultima reg. ('+_lastTipo+')</div></div>';
   html+='</div>';
 
-  // MONTHLY TREND CHART (last 6 months)
+  // MONTHLY TREND CHART (last 6 months) — solo se ci sono dati significativi
+  const _hasChartData=totErr>0||allineamenti>0||rdiCount>0||apprezzamenti>0||totReg>=3;
+  if(_hasChartData){
   html+='<div class="scheda-section"><h4>Andamento mensile (ultimi 6 mesi)</h4>';
   html+='<div class="scheda-chart-wrap"><canvas id="scheda-chart-trend"></canvas></div>';
 
@@ -2266,8 +2278,10 @@ function apriSchedaCollaboratore(nome){
   html+='<div class="scheda-mom-card" style="background:'+(momDiff>0?'rgba(192,57,43,0.1);color:var(--accent)':momDiff<0?'rgba(44,110,73,0.1);color:#2c6e49':'rgba(138,125,107,0.1);color:var(--muted)')+'">'+MESI[curMonth.getMonth()]+' vs '+MESI[prevMonth.getMonth()]+': '+(momDiff>0?'+':'')+momDiff+'% errori</div>';
   html+='<span style="font-size:.82rem;color:var(--muted)">'+errCur+' errori questo mese, '+errPrev+' il mese scorso</span>';
   html+='</div></div>';
+  }// fine _hasChartData
 
-  // DISCIPLINARY PATH
+  // DISCIPLINARY PATH — solo se c'è almeno 1 evento
+  if(totAmm||allineamenti||rdiCount){
   html+='<div class="scheda-section"><h4>Percorso disciplinare</h4>';
   html+='<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">';
   html+='<span class="scheda-path-step" style="background:rgba(123,45,139,0.12);color:#7b2d8b">'+totAmm+' Amm. verbali</span>';
@@ -2293,6 +2307,7 @@ function apriSchedaCollaboratore(nome){
     html+='<div class="scheda-suggestion" style="background:rgba(44,110,73,0.12);color:#2c6e49">&#9989; 0 errori negli ultimi 3 mesi</div>';
   }
   html+='</div>';
+  }// fine percorso disciplinare
 
   // SICK DAY PATTERNS
   if(totMal>0){
@@ -2351,8 +2366,8 @@ function apriSchedaCollaboratore(nome){
       flatpickr('#scheda-tl-dal',tlOpts);
       flatpickr('#scheda-tl-al',tlOpts);
     }
-    // Render trend chart
-    _renderSchedaTrendChart(nome,entries);
+    // Render trend chart (solo se canvas esiste)
+    if(document.getElementById('scheda-chart-trend'))_renderSchedaTrendChart(nome,entries);
   },120);
 }
 
