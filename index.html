@@ -3945,10 +3945,12 @@ function _parseMaisonNome(raw){let nome=raw.trim(),tipoBuono=null,note='',isSeve
   const pMatch=nome.match(/\(([^)]+)\)/);if(pMatch){note=pMatch[1].trim();nome=nome.replace(pMatch[0],'').trim()}
   // 2. SEVEN — qualsiasi variante (seven, Seven, SEVEN, attaccato, separato)
   if(/seven/i.test(nome)||/\(se\b/i.test(raw)){isSeven=true;nome=nome.replace(/seven/gi,'').trim()}
-  // 3. WELCOME LOUNGE — qualsiasi variante (welcome lounge, w. lounge, wl, w.l, W.L.)
-  if(/welcome\s*lounge|w\.?\s*lounge|\bw\.?\s*l\.?\b/i.test(nome)){tipoBuono='WL';note=(note?note+', ':'')+'Welcome Lounge';nome=nome.replace(/\d*\s*(?:welcome\s*lounge|w\.?\s*lounge|\bw\.?\s*l\.?\b)/gi,'').trim()}
-  // 4. COUPON GOURMET — qualsiasi variante (coupon, cupon, cpupon, c., cena + gourmet, b gourmet, gouret, gourme)
-  if(!tipoBuono&&/gou?r?met|gouret|gourme\b/i.test(nome)){tipoBuono='CG';note=(note?note+', ':'')+'C. Gourmet';nome=nome.replace(/\d*\s*\b\S*\s*(?:gou?r?met|gouret|gourme)\b/gi,'').trim()}
+  // 3. WELCOME LOUNGE — qualsiasi variante (welcome lounge, w. lounge, wl, w.l, W.L.) — cerca in nome, note e raw
+  const _checkWL=nome+' '+note+' '+raw;
+  if(/welcome\s*lounge|w\.?\s*lounge|\bw\.?\s*l\.?\b/i.test(_checkWL)){tipoBuono='WL';note='Welcome Lounge';nome=nome.replace(/\d*\s*(?:welcome\s*lounge|w\.?\s*lounge|\bw\.?\s*l\.?\b)/gi,'').trim()}
+  // 4. COUPON GOURMET — qualsiasi variante — cerca in nome, note e raw
+  const _checkCG=nome+' '+note;
+  if(!tipoBuono&&/gou?r?met|gouret|gourme\b/i.test(_checkCG)){tipoBuono='CG';note='C. Gourmet';nome=nome.replace(/\d*\s*\b\S*\s*(?:gou?r?met|gouret|gourme)\b/gi,'').trim()}
   // 5. COUPON (senza gourmet) — coupon omaggio, coup, ecc.
   if(!tipoBuono){const coupM=nome.match(/\b(coupon\s*\S*|coup)\b/gi);if(coupM){note=(note?note+', ':'')+coupM[0].trim();nome=nome.replace(coupM[0],'').trim()}}
   // 6. BU — qualsiasi variante (BU, B.U, bu, b.u, +BU, 2BU, buono unico)
