@@ -4089,7 +4089,6 @@ function initMaisonFlatpickr(){if(_maisonFpInit||!window.flatpickr)return;_maiso
   _initNascitaInput('maison-budget-nascita');
   flatpickr('#maison-man-data',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,defaultDate:'today'});
   flatpickr('#regalo-data',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false})}
-function _levenshtein(a,b){const m=a.length,n=b.length,d=[];for(let i=0;i<=m;i++){d[i]=[i];for(let j=1;j<=n;j++)d[i][j]=i===0?j:0}for(let j=1;j<=n;j++)d[0][j]=j;for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]!==b[j-1]?1:0));return d[m][n]}
 function _trovaNomeSimileMaison(nome){const nomi=[...new Set(getMaisonReparto().map(r=>r.nome).concat(getBudgetReparto().map(b=>b.nome)))];const nl=nome.toLowerCase();const nlNoSp=nl.replace(/\s/g,'');
   const exact=nomi.find(n=>n.toLowerCase()===nl);if(exact)return{nome:exact,tipo:'esatto'};
   // Match senza spazi (Delledonne = Delle Donne)
@@ -4550,10 +4549,10 @@ function apriConfrontoClienti(){
   html+='<select id="conf-cl-1" style="padding:8px 12px;border:1.5px solid var(--line);border-radius:2px;font-size:.9rem;background:var(--paper2);color:var(--ink);min-width:180px"><option value="">-- Cliente 1 --</option>'+nomi.map(function(n){return'<option value="'+escP(n)+'">'+escP(n)+'</option>'}).join('')+'</select>';
   html+='<select id="conf-cl-2" style="padding:8px 12px;border:1.5px solid var(--line);border-radius:2px;font-size:.9rem;background:var(--paper2);color:var(--ink);min-width:180px"><option value="">-- Cliente 2 --</option>'+nomi.map(function(n){return'<option value="'+escP(n)+'">'+escP(n)+'</option>'}).join('')+'</select>';
   html+='<select id="conf-cl-3" style="padding:8px 12px;border:1.5px solid var(--line);border-radius:2px;font-size:.9rem;background:var(--paper2);color:var(--ink);min-width:180px"><option value="">-- Cliente 3 (opz.) --</option>'+nomi.map(function(n){return'<option value="'+escP(n)+'">'+escP(n)+'</option>'}).join('')+'</select>';
-  html+='<button class="btn-salva" onclick="eseguiConfronto()" style="padding:8px 20px;font-size:.82rem">Confronta</button></div>';
+  html+='<button class="btn-salva" onclick="eseguiConfrontoMaison()" style="padding:8px 20px;font-size:.82rem">Confronta</button></div>';
   html+='<div id="conf-risultato"></div>';
   mc.innerHTML=html;document.getElementById('profilo-modal').classList.remove('hidden')}
-function eseguiConfronto(){
+function eseguiConfrontoMaison(){
   var n1=(document.getElementById('conf-cl-1')||{}).value;
   var n2=(document.getElementById('conf-cl-2')||{}).value;
   var n3=(document.getElementById('conf-cl-3')||{}).value;
@@ -5165,19 +5164,6 @@ async function importaCompleanniMaison(input){const file=input.files[0];if(!file
     renderMaisonBudgetUI();renderMaisonDashboard();
     logAzione('Importa compleanni',compleanni.length+' ('+nAggiornati+' aggiornati, '+nNuovi+' nuovi)');};
   }catch(e){toast('Errore lettura file: '+e.message)}}
-// Trova nome simile tra clienti maison budget (per compleanni)
-function _trovaNomeSimileMaison(nome){
-  const nomi=maisonBudgetCache.filter(b=>(b.reparto_dip||'slots')===currentReparto).map(b=>b.nome);
-  const nl=nome.toLowerCase().replace(/\s+/g,'');
-  // Esatto senza spazi
-  const ex=nomi.find(n=>n.toLowerCase().replace(/\s+/g,'')===nl);
-  if(ex)return ex;
-  // Levenshtein <= 2
-  if(nome.length>=3){const sim=nomi.find(n=>_levenshtein(n.toLowerCase(),nome.toLowerCase())<=2);if(sim)return sim}
-  // Cognome match (primo token)
-  const cognome=nome.split(/\s+/)[0].toLowerCase();
-  if(cognome.length>=3){const cm=nomi.find(n=>n.split(/\s+/)[0].toLowerCase()===cognome);if(cm)return cm}
-  return null}
 // RIALLINEA NOMI: corregge nomi vecchi in costi_maison e spese_extra usando maison_budget come riferimento
 // Correggi solo il cognome, non aggiungere nome di battesimo
 function _soloCorrezioneCognome(nomeVecchio,matchBudget){
