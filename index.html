@@ -4065,8 +4065,8 @@ function _parseMaisonNome(raw){let nome=raw.trim(),tipoBuono=null,note='',isSeve
   // 8. Note aggiuntive: direzione, pranzo, GD
   const noteM=nome.match(/\b(direzione|pranzo\s*\w*|GD)\b/gi);
   if(noteM){note=(note?note+', ':'')+noteM.join(', ');noteM.forEach(m=>{nome=nome.replace(new RegExp(m.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi'),'')});nome=nome.trim()}
-  // 9. Pulizia: numeri isolati, +, virgolette, "gruppo", e keyword buono rimaste
-  nome=nome.replace(/\b\d+\b/g,'').replace(/\+/g,'').replace(/["''""«»]/g,'').trim();
+  // 9. Pulizia: numeri isolati, +, virgolette, punti finali, "gruppo", e keyword buono rimaste
+  nome=nome.replace(/\b\d+\b/g,'').replace(/\+/g,'').replace(/["''""«»]/g,'').replace(/\.{2,}/g,'').replace(/\.\s*$/,'').trim();
   // Rimuovi keyword tipo buono rimaste nel nome (coupon, cena, gourmet, welcome, lounge, bl, bu, ecc.)
   nome=nome.replace(/\b(coupon[ea]?|cpupon|cupon|coup|cena|gourmet|gouret|gourme\w*|welcome|lounge|buono|b\.?u\.?|b\.?l\.?)\b/gi,'').trim();
   nome=nome.replace(/^gruppo\s+/i,'').trim();
