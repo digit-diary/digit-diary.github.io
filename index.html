@@ -4103,7 +4103,7 @@ function _trovaNomeSimileMaison(nome){const nomi=[...new Set(getMaisonReparto().
   return null}
 function _parseMaisonNome(raw){let nome=raw.trim(),tipoBuono=null,note='',isSeven=false;
   // 0. Rimuovi info prezzo tra parentesi: (CHF 202.15 + CHF 50.40), (chf..), ecc.
-  nome=nome.replace(/\([\s]*(?:chf|fr\.?)[\s\d.,+]+\)/gi,'').trim();
+  nome=nome.replace(/\([^)]*(?:chf|fr\.?)[^)]*\)/gi,'').trim();
   // 0b. Rimuovi "del DD.MM.YYYY" o "del DD/MM" alla fine (es. "Degustazione Giapponese del 14.02.2026")
   nome=nome.replace(/\s+del\s+\d{1,2}[.\/]\d{1,2}(?:[.\/]\d{2,4})?\s*$/i,'').trim();
   // 1. Estrai note tra parentesi (quelle rimaste dopo step 0)
