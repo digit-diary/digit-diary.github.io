@@ -2412,8 +2412,8 @@ function renderNoteChat(partner){
     html+=actions;
     html+='</div>'});
   msgsEl.innerHTML=html;
-  // Auto-scroll to bottom
-  msgsEl.scrollTop=msgsEl.scrollHeight}
+  // Auto-scroll to bottom (con delay per rendering DOM)
+  requestAnimationFrame(()=>{msgsEl.scrollTop=msgsEl.scrollHeight})}
 // Reply state
 let _replyToNote=null;
 function rispondiAMessaggio(noteId){
