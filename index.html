@@ -5546,9 +5546,12 @@ window.addEventListener('load',async()=>{
   document.getElementById('entries-list').innerHTML='<div class="loading">Caricamento...</div>';
   const h=document.getElementById('login-hint');const defCheck=await sbRpc('is_default_master_pwd',{p_default_hash:DEFAULT_PWD_HASH});
   if((defCheck&&defCheck.is_default)||operatoriAuthCache.length)h.innerHTML='Accedi come Admin oppure seleziona il tuo nome';
-  // Carica mappa reparti da cache se non disponibile dal DB
+  // Carica mappa reparti e operatori da cache per il login
   if(!Object.keys(operatoriRepartoMap).length){try{const cached=localStorage.getItem('_cache_operatori_reparto');if(cached)operatoriRepartoMap=JSON.parse(cached)}catch(e){}}
-  // Populate login dropdown (se settore gia selezionato)
+  if(!operatoriAuthCache.length){try{const cached=localStorage.getItem('_cache_operatori_auth');if(cached)operatoriAuthCache=JSON.parse(cached)}catch(e){}}
+  // Carica operatori dal DB per il login (leggero, senza loadAll)
+  try{const _opLogin=await sbGet('operatori_auth?select=nome,reparto&order=nome.asc');if(_opLogin&&_opLogin.length){operatoriAuthCache=_opLogin;localStorage.setItem('_cache_operatori_auth',JSON.stringify(_opLogin))}}catch(e){}
+  // Populate login dropdown
   aggiornaLoginOperatori();
   if(_isSessionValid()){
     // Se Face ID attivo e non gia verificato in questa tab (refresh): verifica PRIMA di entrare
