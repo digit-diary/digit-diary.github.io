@@ -2230,10 +2230,8 @@ function renderNoteCollega(){const op=getOperatore();if(!op)return;
     if(!convMap[key].notes.find(x=>x.id===n.id))convMap[key].notes.push(n);
     if(n.a_operatore===op&&!n.letta)convMap[key].unread++;
     const t=n.created_at||'';if(t>convMap[key].lastTime)convMap[key].lastTime=t});
-  // Sort: unread first, then by last message time
-  const convs=Object.values(convMap).sort((a,b)=>{
-    if(a.unread>0&&b.unread===0)return -1;if(b.unread>0&&a.unread===0)return 1;
-    return b.lastTime.localeCompare(a.lastTime)});
+  // Sort: solo per data ultimo messaggio (come WhatsApp)
+  const convs=Object.values(convMap).sort((a,b)=>b.lastTime.localeCompare(a.lastTime));
   // Render conversation list
   let html='<div class="conv-new-btn" style="position:relative" id="conv-new-wrap" onclick="toggleConvNewDropdown(event)">&#43; Nuova conversazione</div>';
   html+='<div id="conv-new-dropdown" class="conv-new-dropdown" style="display:none"></div>';
