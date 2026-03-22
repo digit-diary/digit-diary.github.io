@@ -525,7 +525,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
 .conv-item:hover{background:rgba(0,0,0,0.04)}
 .conv-item.active{background:rgba(184,134,11,0.1);border-left:3px solid var(--accent2)}
 .conv-badge{background:var(--accent2);color:white;border-radius:50%;min-width:20px;height:20px;font-size:.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.chat-container{display:flex;height:calc(100vh - 120px);gap:0;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.chat-container{display:flex;height:calc(100dvh - 120px);height:calc(100vh - 140px);gap:0;border:1px solid var(--line);border-radius:4px;overflow:hidden}
 .chat-conv-list{width:280px;min-width:280px;border-right:1px solid var(--line);overflow-y:auto;background:var(--paper2);display:flex;flex-direction:column}
 .chat-area{flex:1;display:flex;flex-direction:column;background:var(--paper)}
 .chat-date-sep{text-align:center;margin:12px 0 6px;font-size:.72rem;color:var(--muted);font-weight:600;letter-spacing:.06em}
@@ -540,11 +540,13 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
 .conv-new-dropdown div{padding:8px 14px;cursor:pointer;font-size:.88rem}
 .conv-new-dropdown div:hover{background:var(--accent2);color:white}
 @media(max-width:700px){
-.chat-container{flex-direction:column;height:calc(100vh - 100px)}
+.chat-container{flex-direction:column;height:calc(100dvh - 110px);height:calc(100vh - 160px)}
 .chat-conv-list{width:100%;min-width:100%;border-right:none;border-bottom:1px solid var(--line)}
 .chat-conv-list.chat-hidden{display:none}
 .chat-area.chat-hidden{display:none}
+.chat-area{height:calc(100dvh - 110px);height:calc(100vh - 160px)}
 .chat-back-btn{display:flex!important}
+.chat-bubble{max-width:85%}
 }
 </style>
 </head>
@@ -723,6 +725,13 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
     <!-- Right: chat area -->
     <div id="note-chat-area" class="chat-area chat-hidden">
       <div id="note-chat-header" style="padding:12px 16px;border-bottom:1px solid var(--line);background:var(--paper2);font-weight:600;display:flex;align-items:center;gap:10px"></div>
+      <div id="note-chat-search-bar" style="display:none;padding:8px 16px;border-bottom:1px solid var(--line);background:var(--paper2);display:none;gap:8px;align-items:center">
+        <input type="text" id="note-chat-search" placeholder="Cerca nei messaggi..." oninput="cercaInChat()" style="flex:1;padding:8px 14px;border:1px solid var(--line);border-radius:18px;font-size:.85rem;background:var(--paper);color:var(--ink);font-family:Source Sans 3,sans-serif">
+        <span id="note-search-count" style="font-size:.78rem;color:var(--muted);white-space:nowrap"></span>
+        <button onclick="cercaInChatNav(-1)" style="background:none;border:1px solid var(--line);border-radius:50%;width:28px;height:28px;cursor:pointer;color:var(--ink);font-size:.85rem" title="Precedente">&#9650;</button>
+        <button onclick="cercaInChatNav(1)" style="background:none;border:1px solid var(--line);border-radius:50%;width:28px;height:28px;cursor:pointer;color:var(--ink);font-size:.85rem" title="Successivo">&#9660;</button>
+        <button onclick="chiudiCercaChat()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:1.1rem" title="Chiudi">&#10005;</button>
+      </div>
       <div id="note-chat-messages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px"></div>
       <div id="note-chat-input" style="padding:12px 16px;border-top:1px solid var(--line);display:none;gap:8px;align-items:flex-end">
         <textarea id="nota-msg-chat" placeholder="Scrivi un messaggio..." style="flex:1;padding:10px;border:1px solid var(--line);border-radius:18px;font-family:Source Sans 3,sans-serif;font-size:.9rem;resize:none;max-height:100px;min-height:40px;background:var(--paper2);color:var(--ink)" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();inviaNotaChat()}" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"></textarea>
@@ -2345,7 +2354,8 @@ function renderNoteChat(partner){
   else if(isGroup){const conv=_getConvNotes(partner,op);const partners=new Set();conv.forEach(n=>{if(n.da_operatore!==op)partners.add(n.da_operatore);if(n.a_operatore!==op)partners.add(n.a_operatore)});headerLabel=[...partners].join(', ')}
   else{headerLabel=escP(partner)}
   const backBtn='<button class="chat-back-btn" onclick="_chatBackToList()" style="display:none;background:none;border:none;cursor:pointer;font-size:1.2rem;color:var(--ink);padding:4px 8px" title="Indietro">&#8592;</button>';
-  header.innerHTML=backBtn+'<span>'+headerLabel+'</span>';
+  const searchBtn='<button onclick="apriCercaChat()" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:1.1rem;color:var(--muted);padding:4px 8px" title="Cerca">&#128269;</button>';
+  header.innerHTML=backBtn+'<span style="flex:1">'+headerLabel+'</span>'+searchBtn;
   // Show input
   inp.style.display='flex';
   // Messages
@@ -2417,6 +2427,36 @@ async function inviaNotaChat(){
   renderNoteCollega();
   toast('Nota inviata');
   inviaPush(dests,'Nota da '+op,msg.substring(0,120),'nota',true)}catch(e){toast('Errore invio')}}
+// Ricerca nella chat
+let _chatSearchResults=[],_chatSearchIdx=-1;
+function apriCercaChat(){const bar=document.getElementById('note-chat-search-bar');if(bar){bar.style.display='flex';document.getElementById('note-chat-search').focus()}}
+function chiudiCercaChat(){const bar=document.getElementById('note-chat-search-bar');if(bar){bar.style.display='none';document.getElementById('note-chat-search').value=''}
+  _chatSearchResults=[];_chatSearchIdx=-1;document.getElementById('note-search-count').textContent='';
+  // Rimuovi evidenziazioni
+  document.querySelectorAll('.chat-bubble .chat-highlight').forEach(el=>{el.outerHTML=el.textContent})}
+function cercaInChat(){const q=(document.getElementById('note-chat-search').value||'').trim().toLowerCase();
+  const countEl=document.getElementById('note-search-count');
+  // Pulisci precedenti
+  document.querySelectorAll('.chat-bubble .chat-highlight').forEach(el=>{el.outerHTML=el.textContent});
+  _chatSearchResults=[];_chatSearchIdx=-1;
+  if(!q||q.length<2){countEl.textContent='';return}
+  // Evidenzia e raccogli risultati
+  document.querySelectorAll('.chat-bubble').forEach(bubble=>{
+    const textNodes=[];const walker=document.createTreeWalker(bubble,NodeFilter.SHOW_TEXT);
+    let node;while(node=walker.nextNode()){if(node.parentElement.classList.contains('chat-time')||node.parentElement.classList.contains('chat-ticks'))continue;
+      if(node.textContent.toLowerCase().includes(q))textNodes.push(node)}
+    textNodes.forEach(tn=>{const txt=tn.textContent;const idx=txt.toLowerCase().indexOf(q);if(idx===-1)return;
+      const before=txt.substring(0,idx);const match=txt.substring(idx,idx+q.length);const after=txt.substring(idx+q.length);
+      const span=document.createElement('span');span.innerHTML=escP(before)+'<mark class="chat-highlight" style="background:#f1c40f;padding:0 2px;border-radius:2px">'+escP(match)+'</mark>'+escP(after);
+      tn.parentNode.replaceChild(span,tn);_chatSearchResults.push(span.querySelector('.chat-highlight'))})});
+  countEl.textContent=_chatSearchResults.length?(_chatSearchIdx+1<1?1:_chatSearchIdx+1)+'/'+_chatSearchResults.length:'0 risultati';
+  if(_chatSearchResults.length){_chatSearchIdx=0;_chatSearchResults[0].scrollIntoView({behavior:'smooth',block:'center'})}}
+function cercaInChatNav(dir){if(!_chatSearchResults.length)return;
+  if(_chatSearchResults[_chatSearchIdx])_chatSearchResults[_chatSearchIdx].style.background='#f1c40f';
+  _chatSearchIdx=(_chatSearchIdx+dir+_chatSearchResults.length)%_chatSearchResults.length;
+  _chatSearchResults[_chatSearchIdx].style.background='#e67e22';
+  _chatSearchResults[_chatSearchIdx].scrollIntoView({behavior:'smooth',block:'center'});
+  document.getElementById('note-search-count').textContent=(_chatSearchIdx+1)+'/'+_chatSearchResults.length}
 let _noteFpInit=false;
 function initNoteFlatpickr(){_noteFpInit=true}
 function resetNoteFiltri(tipo){renderNoteCollega()}
