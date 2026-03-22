@@ -4970,12 +4970,12 @@ async function importaCategorieMaison(input){const file=input.files[0];if(!file)
         if(!cat)continue;
         if(!catGroups[cat])catGroups[cat]=new Set();
         if(nome.includes('/')){
-          nome.split('/').forEach(n=>{n=n.trim();if(n&&n.length>1&&!_escludiNomi.test(n))catGroups[cat].add(capitalizzaNome(n))});
-        }else{catGroups[cat].add(capitalizzaNome(nome))}
+          nome.split('/').forEach(n=>{n=n.trim();if(n&&n.length>=3&&!_escludiNomi.test(n))catGroups[cat].add(capitalizzaNome(n))});
+        }else if(nome.length>=3){catGroups[cat].add(capitalizzaNome(nome))}
       }
     }
     for(const[cat,nomi]of Object.entries(catGroups)){
-      for(const nome of nomi){if(nome.length>1)catMap[nome]=cat}
+      for(const nome of nomi){if(nome.length>=3)catMap[nome]=cat}
     }
   }
   const nomi=Object.keys(catMap);
