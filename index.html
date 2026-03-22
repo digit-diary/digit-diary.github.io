@@ -541,9 +541,9 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
 .chat-quote .quote-name{font-weight:600;color:var(--accent2);font-size:.75rem}
 .conv-new-btn{padding:10px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--accent2);font-weight:700;font-size:.85rem;transition:background .15s}
 .conv-new-btn:hover{background:rgba(184,134,11,0.08)}
-.conv-new-dropdown{position:absolute;top:100%;left:0;right:0;background:var(--paper);border:1px solid var(--line);border-radius:0 0 4px 4px;max-height:300px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.12)}
-.conv-new-dropdown div{padding:8px 14px;cursor:pointer;font-size:.88rem}
-.conv-new-dropdown div:hover{background:var(--accent2);color:white}
+.conv-new-dropdown{background:var(--paper);border-bottom:1px solid var(--line);max-height:250px;overflow-y:auto}
+.conv-new-dropdown div{padding:10px 14px;cursor:pointer;font-size:.88rem;border-bottom:1px solid var(--paper2);display:flex;align-items:center;gap:8px}
+.conv-new-dropdown div:hover{background:rgba(184,134,11,0.08)}
 @media(max-width:700px){
 .chat-container{flex-direction:column;height:calc(100dvh - 110px);height:calc(100vh - 160px)}
 .chat-conv-list{width:100%;min-width:100%;border-right:none;border-bottom:1px solid var(--line)}
@@ -2236,7 +2236,8 @@ function renderNoteCollega(){const op=getOperatore();if(!op)return;
     return b.lastTime.localeCompare(a.lastTime)});
   // Render conversation list
   let html='<div class="conv-new-btn" style="position:relative" id="conv-new-wrap" onclick="toggleConvNewDropdown(event)">&#43; Nuova conversazione</div>';
-  html+='<div id="conv-new-dropdown" class="conv-new-dropdown" style="display:none;position:absolute;z-index:50"></div>';
+  html+='<div id="conv-new-dropdown" class="conv-new-dropdown" style="display:none"></div>';
+  html+='<div style="padding:8px 10px;border-bottom:1px solid var(--line)"><input type="text" id="conv-search-input" placeholder="&#128269; Cerca conversazione..." oninput="filtraConversazioni()" style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:18px;font-size:.84rem;background:var(--paper);color:var(--ink);font-family:Source Sans 3,sans-serif;box-sizing:border-box"></div>';
   if(!convs.length){html+='<div style="padding:20px;text-align:center;color:var(--muted);font-size:.88rem">Nessuna conversazione</div>'}
   convs.forEach(c=>{
     const isActive=window._noteConvAttiva===c.partner;
@@ -2247,7 +2248,7 @@ function renderNoteCollega(){const op=getOperatore();if(!op)return;
     const timeStr=lastNote?_chatTimeShort(lastNote.created_at):'';
     const rep=!isGroup?(operatoriRepartoMap[c.partner]||''):'';
     const repBadge=rep==='slots'?'<span style="font-size:.6rem;color:#1a4a7a;font-weight:700;margin-left:4px">S</span>':rep==='tavoli'?'<span style="font-size:.6rem;color:#8e44ad;font-weight:700;margin-left:4px">T</span>':'';
-    html+='<div class="conv-item'+(isActive?' active':'')+'" onclick="apriConversazione(\''+escP(c.partner).replace(/'/g,"\\'")+'\')">';
+    html+='<div class="conv-item'+(isActive?' active':'')+'" data-conv-name="'+escP(c.partner).toLowerCase()+'" onclick="apriConversazione(\''+escP(c.partner).replace(/'/g,"\\'")+'\')">';
     html+='<div style="display:flex;justify-content:space-between;align-items:center">';
     html+='<div style="font-weight:'+(c.unread>0?'700':'600')+';font-size:.9rem;color:var(--ink)">'+partnerLabel+repBadge+'</div>';
     html+='<div style="display:flex;align-items:center;gap:6px">';
@@ -2458,6 +2459,12 @@ async function inviaNotaChat(){
   renderNoteCollega();
   toast('Nota inviata');
   inviaPush(dests,'Nota da '+op,msg.substring(0,120),'nota',true)}catch(e){toast('Errore invio')}}
+// Filtra conversazioni nella lista
+function filtraConversazioni(){const q=(document.getElementById('conv-search-input')||{}).value||'';
+  const ql=q.trim().toLowerCase();
+  document.querySelectorAll('.conv-item').forEach(el=>{
+    const name=el.getAttribute('data-conv-name')||'';
+    el.style.display=!ql||name.includes(ql)?'':'none'})}
 // Ricerca nella chat
 let _chatSearchResults=[],_chatSearchIdx=-1;
 function apriCercaChat(){const bar=document.getElementById('note-chat-search-bar');if(bar){bar.style.display='flex';document.getElementById('note-chat-search').focus()}}
