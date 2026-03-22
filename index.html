@@ -2328,7 +2328,23 @@ function apriConversazione(partner){
   if(daLeggere.length){daLeggere.forEach(n=>{n.letta=true;n.letta_at=ora;secPatch('note_colleghi','id=eq.'+n.id,{letta:true,letta_at:ora}).catch(()=>{})});aggiornaNoteBadge()}
   // Show chat area on mobile
   _chatShowArea();
-  renderNoteChat(partner);renderNoteCollega()}
+  renderNoteChat(partner);renderNoteCollega();
+  // Se c'è una ricerca attiva, trova e scrolla al primo messaggio che matcha
+  if(_convSearchQuery){
+    const ql=_convSearchQuery;
+    requestAnimationFrame(()=>{
+      const bubbles=document.querySelectorAll('.chat-bubble');
+      let found=null;
+      bubbles.forEach(b=>{if(found)return;
+        const txt=(b.textContent||'').toLowerCase();
+        if(txt.includes(ql))found=b});
+      if(found){found.scrollIntoView({behavior:'smooth',block:'center'});
+        found.style.transition='background .3s';found.style.background='rgba(241,196,15,0.3)';
+        setTimeout(()=>{found.style.background=''},2000)}
+      // Pulisci la ricerca dopo
+      _convSearchQuery='';const si=document.getElementById('conv-search-input');if(si)si.value='';
+      document.querySelectorAll('.conv-item').forEach(el=>el.style.display='')})
+  }}
 function _chatShowArea(){
   if(window.innerWidth<=700){
     document.getElementById('note-conv-list').classList.add('chat-hidden');
@@ -2458,8 +2474,10 @@ async function inviaNotaChat(){
   toast('Nota inviata');
   inviaPush(dests,'Nota da '+op,msg.substring(0,120),'nota',true)}catch(e){toast('Errore invio')}}
 // Filtra conversazioni nella lista (cerca in nome + tutti i messaggi)
+let _convSearchQuery='';
 function filtraConversazioni(){const q=(document.getElementById('conv-search-input')||{}).value||'';
   const ql=q.trim().toLowerCase();
+  _convSearchQuery=ql;
   if(!ql){document.querySelectorAll('.conv-item').forEach(el=>el.style.display='');return}
   const op=getOperatore();
   // Trova quali partner hanno messaggi che contengono la query
