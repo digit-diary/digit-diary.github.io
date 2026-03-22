@@ -4040,10 +4040,14 @@ function _trovaNomeSimileMaison(nome){const nomi=[...new Set(getMaisonReparto().
   if(_cognome.length>=3){for(const n of nomi){if(n.toLowerCase().split(/\s+/)[0]===_cognome)return{nome:n,tipo:'simile'}}}
   return null}
 function _parseMaisonNome(raw){let nome=raw.trim(),tipoBuono=null,note='',isSeven=false;
-  // 1. Estrai note tra parentesi
+  // 0. Rimuovi info prezzo tra parentesi: (CHF 202.15 + CHF 50.40), (chf..), ecc.
+  nome=nome.replace(/\([\s]*(?:chf|fr\.?)[\s\d.,+]+\)/gi,'').trim();
+  // 0b. Rimuovi "del DD.MM.YYYY" o "del DD/MM" alla fine (es. "Degustazione Giapponese del 14.02.2026")
+  nome=nome.replace(/\s+del\s+\d{1,2}[.\/]\d{1,2}(?:[.\/]\d{2,4})?\s*$/i,'').trim();
+  // 1. Estrai note tra parentesi (quelle rimaste dopo step 0)
   const pMatch=nome.match(/\(([^)]+)\)/);if(pMatch){note=pMatch[1].trim();nome=nome.replace(pMatch[0],'').trim()}
-  // 2. SEVEN — qualsiasi variante (seven, Seven, SEVEN, attaccato, separato)
-  if(/seven/i.test(nome)||/\(se\b/i.test(raw)){isSeven=true;nome=nome.replace(/seven/gi,'').trim()}
+  // 2. SEVEN — qualsiasi variante (seven, Seven, SEVEN, attaccato, separato) — cerca anche in note
+  if(/seven/i.test(nome)||/seven/i.test(note)||/\(se\b/i.test(raw)){isSeven=true;nome=nome.replace(/seven/gi,'').trim()}
   // 3. WELCOME LOUNGE — qualsiasi variante (welcome lounge, w. lounge, wl, w.l, W.L.) — cerca in nome, note e raw
   const _checkWL=nome+' '+note+' '+raw;
   if(/welcome\s*lounge|w\.?\s*lounge|\bw\.?\s*l\.?\b/i.test(_checkWL)){tipoBuono='WL';note='Welcome Lounge';nome=nome.replace(/\d*\s*(?:welcome\s*lounge|w\.?\s*lounge|\bw\.?\s*l\.?\b)/gi,'').trim()}
@@ -4126,7 +4130,8 @@ async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0
           if(parsed.isSeven&&!parsed.nome)continue;
           // Se la riga contiene Seven → tutti i nomi vanno in spese_extra
           if(rigaHaSeven){
-            const seRec={beneficiario:parsed.nome,tipo:'cena_esterna',descrizione:'Ristorante Seven (da formulario)'+(parsed.note?', '+parsed.note:''),
+            const _isPranzo=/pranzo/i.test(rawNome)||/pranzo/i.test(parsed.note);
+            const seRec={beneficiario:parsed.nome,tipo:_isPranzo?'pranzo_esterno':'cena_esterna',descrizione:'Ristorante Seven'+(_isPranzo?' (pranzo)':'')+' (da formulario)'+(parsed.note?', '+parsed.note:''),
               importo:Math.round(costo/nNomi*100)/100,data_spesa:dataGiornata,luogo:'Ristorante Seven',
               operatore:getOperatore(),reparto_dip:currentReparto};
             try{await secPost('spese_extra',seRec);totalRows++;sevenCount++}catch(e){}
