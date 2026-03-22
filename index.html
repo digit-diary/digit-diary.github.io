@@ -2339,7 +2339,7 @@ function apriConversazione(partner){
         const txt=(b.textContent||'').toLowerCase();
         if(txt.includes(ql))found=b});
       if(found){found.scrollIntoView({behavior:'smooth',block:'center'});
-        found.style.transition='background .3s';found.style.background='rgba(241,196,15,0.3)';
+        found.style.transition='background .3s';found.style.background='rgba(241,196,15,0.6)';
         setTimeout(()=>{found.style.background=''},2000)}
       // Pulisci la ricerca dopo
       _convSearchQuery='';const si=document.getElementById('conv-search-input');if(si)si.value='';
