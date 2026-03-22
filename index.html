@@ -5550,7 +5550,7 @@ window.addEventListener('load',async()=>{
   if(!Object.keys(operatoriRepartoMap).length){try{const cached=localStorage.getItem('_cache_operatori_reparto');if(cached)operatoriRepartoMap=JSON.parse(cached)}catch(e){}}
   if(!operatoriAuthCache.length){try{const cached=localStorage.getItem('_cache_operatori_auth');if(cached)operatoriAuthCache=JSON.parse(cached)}catch(e){}}
   // Carica operatori dal DB per il login (leggero, senza loadAll)
-  try{const _opLogin=await sbGet('operatori_auth?select=nome,reparto&order=nome.asc');if(_opLogin&&_opLogin.length){operatoriAuthCache=_opLogin;localStorage.setItem('_cache_operatori_auth',JSON.stringify(_opLogin))}}catch(e){}
+  try{const _opLogin=await sbRpc('list_operators');if(_opLogin&&_opLogin.length){operatoriAuthCache=_opLogin;localStorage.setItem('_cache_operatori_auth',JSON.stringify(_opLogin))}}catch(e){}
   // Populate login dropdown
   aggiornaLoginOperatori();
   if(_isSessionValid()){
