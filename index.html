@@ -4742,10 +4742,10 @@ function renderMaisonCharts(data,sorted){
 function resetMaisonFiltri(){document.getElementById('maison-filt-nome').value='';document.getElementById('maison-filt-tipo').value='';
   ['maison-filt-dal','maison-filt-al'].forEach(id=>{const el=document.getElementById(id);if(el){el.value='';if(el._flatpickr)el._flatpickr.clear()}});renderMaisonDashboard()}
 function _isCompleannoOggi(dataNascita){if(!dataNascita)return false;const oggi=new Date();const dn=new Date(dataNascita+'T12:00:00');return dn.getDate()===oggi.getDate()&&dn.getMonth()===oggi.getMonth()}
-function _getCompleanniProssimi(giorni){const now=new Date();const result=[];
+function _getCompleanniProssimi(giorni){const now=new Date();const oggi=new Date(now.getFullYear(),now.getMonth(),now.getDate());const result=[];
   getBudgetReparto().forEach(b=>{if(!b.data_nascita)return;const dn=new Date(b.data_nascita+'T12:00:00');
-    const quest=new Date(now.getFullYear(),dn.getMonth(),dn.getDate());if(quest<new Date(now.getFullYear(),now.getMonth(),now.getDate()))quest.setFullYear(quest.getFullYear()+1);
-    const diff=Math.floor((quest-now)/(86400000));if(diff>=0&&diff<=giorni)result.push({nome:b.nome,data:quest,giorni:diff})});
+    const quest=new Date(now.getFullYear(),dn.getMonth(),dn.getDate());if(quest<oggi)quest.setFullYear(quest.getFullYear()+1);
+    const diff=Math.round((quest-oggi)/(86400000));if(diff>=0&&diff<=giorni)result.push({nome:b.nome,data:quest,giorni:diff})});
   return result.sort((a,b)=>a.giorni-b.giorni)}
 function _maisonFilePeriodo(data){if(!data||!data.length)return'';const mesi=[];data.forEach(r=>{const d=new Date((r.data_giornata||'')+'T12:00:00');if(!isNaN(d)){const k=MESI_FULL[d.getMonth()].toLowerCase()+'_'+d.getFullYear();if(!mesi.includes(k))mesi.push(k)}});if(mesi.length<=1)return mesi[0]||'';return'da_'+mesi[0]+'_a_'+mesi[mesi.length-1]}
 // Dettaglio cliente: mostra tutte le visite giorno per giorno
