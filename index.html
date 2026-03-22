@@ -2248,7 +2248,7 @@ function renderNoteCollega(){const op=getOperatore();if(!op)return;
     const timeStr=lastNote?_chatTimeShort(lastNote.created_at):'';
     const rep=!isGroup?(operatoriRepartoMap[c.partner]||''):'';
     const repBadge=rep==='slots'?'<span style="font-size:.6rem;color:#1a4a7a;font-weight:700;margin-left:4px">S</span>':rep==='tavoli'?'<span style="font-size:.6rem;color:#8e44ad;font-weight:700;margin-left:4px">T</span>':'';
-    html+='<div class="conv-item'+(isActive?' active':'')+'" data-conv-name="'+escP(c.partner).toLowerCase()+'" onclick="apriConversazione(\''+escP(c.partner).replace(/'/g,"\\'")+'\')">';
+    html+='<div class="conv-item'+(isActive?' active':'')+'" data-conv-name="'+(c.partner+' '+preview).toLowerCase().replace(/"/g,'')+'" onclick="apriConversazione(\''+escP(c.partner).replace(/'/g,"\\'")+'\')">';
     html+='<div style="display:flex;justify-content:space-between;align-items:center">';
     html+='<div style="font-weight:'+(c.unread>0?'700':'600')+';font-size:.9rem;color:var(--ink)">'+partnerLabel+repBadge+'</div>';
     html+='<div style="display:flex;align-items:center;gap:6px">';
