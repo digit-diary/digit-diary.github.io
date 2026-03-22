@@ -4137,7 +4137,10 @@ async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0
             try{await secPost('spese_extra',seRec);totalRows++;sevenCount++}catch(e){}
             continue}
           const simile=_trovaNomeSimileMaison(parsed.nome);
-          if(simile&&simile.tipo==='simile'){warnings.push(parsed.nome+' → corretto in "'+simile.nome+'"');parsed.nome=simile.nome}
+          if(simile&&simile.tipo==='simile'){
+            // Correggi solo il cognome, non aggiungere il nome di battesimo
+            const _corretto=_soloCorrezioneCognome(parsed.nome,simile.nome);
+            if(_corretto.toLowerCase()!==parsed.nome.toLowerCase()){warnings.push(parsed.nome+' → corretto in "'+_corretto+'"');parsed.nome=_corretto}}
           const _dupKey=parsed.nome.toLowerCase()+'|'+dataGiornata;
           if(_giornoDuplicati.has(_dupKey)){dupCount++;warnings.push('Duplicato: '+parsed.nome+' ('+new Date(dataGiornata+'T12:00:00').toLocaleDateString('it-IT')+')')
           }else{_giornoDuplicati.add(_dupKey)}
@@ -5113,6 +5116,17 @@ function _trovaNomeSimileMaison(nome){
   if(cognome.length>=3){const cm=nomi.find(n=>n.split(/\s+/)[0].toLowerCase()===cognome);if(cm)return cm}
   return null}
 // RIALLINEA NOMI: corregge nomi vecchi in costi_maison e spese_extra usando maison_budget come riferimento
+// Correggi solo il cognome, non aggiungere nome di battesimo
+function _soloCorrezioneCognome(nomeVecchio,matchBudget){
+  const tokensVecchio=nomeVecchio.trim().split(/\s+/);
+  const tokensBudget=matchBudget.trim().split(/\s+/);
+  if(tokensVecchio.length===1)return capitalizzaNome(tokensBudget[0]);
+  return tokensVecchio.map(tv=>{
+    const best=tokensBudget.find(tb=>tb.toLowerCase()===tv.toLowerCase())||
+      tokensBudget.find(tb=>_levenshtein(tv.toLowerCase(),tb.toLowerCase())<=1)||
+      tokensBudget.find(tb=>tb.toLowerCase().replace(/\s/g,'')===tv.toLowerCase().replace(/\s/g,''));
+    return best?capitalizzaNome(best):capitalizzaNome(tv);
+  }).join(' ')}
 async function riallineaNomiMaison(){
   const budget=getBudgetReparto();
   if(!budget.length){toast('Nessun cliente categorizzato. Importa prima le categorie.');return}
@@ -5121,21 +5135,6 @@ async function riallineaNomiMaison(){
   const extraNomi=[...new Set(getSpeseReparto().map(r=>r.beneficiario))];
   const budgetNomi=budget.map(b=>b.nome);
   const correzioni=[];// {vecchio, nuovo, costiCount, extraCount}
-  // Funzione: dal match budget estrai solo il cognome corretto (non nome+cognome)
-  function _soloCorrezioneCognome(nomeVecchio,matchBudget){
-    const tokensVecchio=nomeVecchio.trim().split(/\s+/);
-    const tokensBudget=matchBudget.trim().split(/\s+/);
-    // Se il vecchio ha solo 1 token (solo cognome) → usa solo il cognome del budget
-    if(tokensVecchio.length===1)return capitalizzaNome(tokensBudget[0]);
-    // Se il vecchio ha più token → correggi solo l'ortografia mantenendo la struttura
-    // Mappa ogni token vecchio al token budget più simile
-    return tokensVecchio.map(tv=>{
-      const best=tokensBudget.find(tb=>tb.toLowerCase()===tv.toLowerCase())||
-        tokensBudget.find(tb=>_levenshtein(tv.toLowerCase(),tb.toLowerCase())<=1)||
-        tokensBudget.find(tb=>tb.toLowerCase().replace(/\s/g,'')===tv.toLowerCase().replace(/\s/g,''));
-      return best?capitalizzaNome(best):capitalizzaNome(tv);
-    }).join(' ');
-  }
   // Controlla costi maison
   costiNomi.forEach(nome=>{
     if(budgetNomi.find(b=>b.toLowerCase()===nome.toLowerCase()))return;// match esatto, ok
