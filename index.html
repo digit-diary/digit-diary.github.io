@@ -4102,6 +4102,7 @@ function _trovaNomeSimileMaison(nome){const nomi=[...new Set(getMaisonReparto().
   if(_cognome.length>=3){for(const n of nomi){if(n.toLowerCase().split(/\s+/)[0]===_cognome)return{nome:n,tipo:'simile'}}}
   return null}
 function _parseMaisonNome(raw){let nome=raw.trim(),tipoBuono=null,note='',isSeven=false;
+  const tipiBuono=[];// Array di {tipo, qty} per righe con più tipi
   // 0. Rimuovi info prezzo tra parentesi: (CHF 202.15 + CHF 50.40), (chf..), ecc.
   nome=nome.replace(/\([^)]*(?:chf|fr\.?)[^)]*\)/gi,'').trim();
   // 0b. Rimuovi "del DD.MM.YYYY" o "del DD/MM" alla fine (es. "Degustazione Giapponese del 14.02.2026")
@@ -4110,20 +4111,32 @@ function _parseMaisonNome(raw){let nome=raw.trim(),tipoBuono=null,note='',isSeve
   const pMatch=nome.match(/\(([^)]+)\)/);if(pMatch){note=pMatch[1].trim();nome=nome.replace(pMatch[0],'').trim()}
   // 2. SEVEN — qualsiasi variante (seven, Seven, SEVEN, attaccato, separato) — cerca anche in note
   if(/seven/i.test(nome)||/seven/i.test(note)||/\(se\b/i.test(raw)){isSeven=true;nome=nome.replace(/seven/gi,'').trim()}
-  // 3. WELCOME LOUNGE — qualsiasi variante (welcome lounge, w. lounge, wl, w.l, W.L.) — cerca in nome, note e raw
+  // 3. WELCOME LOUNGE — cerca in nome, note e raw
   const _checkWL=nome+' '+note+' '+raw;
-  if(/welcome\s*lounge|w\.?\s*lounge|\bw\.?\s*l\.?\b/i.test(_checkWL)){tipoBuono='WL';note='Welcome Lounge';nome=nome.replace(/\d*\s*(?:welcome\s*lounge|w\.?\s*lounge|\bw\.?\s*l\.?\b)/gi,'').trim()}
-  // 4. COUPON GOURMET — qualsiasi variante — cerca in nome, note e raw
+  const _wlM=(nome+' '+note).match(/(\d*)\s*(?:welcome\s*lounge|w\.?\s*lounge|\bw\.?\s*l\.?\b)/i);
+  if(_wlM||/welcome\s*lounge|w\.?\s*lounge|\bw\.?\s*l\.?\b/i.test(_checkWL)){
+    const _wlQty=_wlM&&_wlM[1]?parseInt(_wlM[1]):1;
+    tipiBuono.push({tipo:'WL',qty:_wlQty});if(!tipoBuono)tipoBuono='WL';
+    note=(note?note+', ':'')+'Welcome Lounge';nome=nome.replace(/\d*\s*(?:welcome\s*lounge|w\.?\s*lounge|\bw\.?\s*l\.?\b)/gi,'').trim()}
+  // 4. COUPON GOURMET — cerca in nome, note e raw
   const _checkCG=nome+' '+note;
-  if(!tipoBuono&&/gou?r?met|gouret|gourme\w?t?\b/i.test(_checkCG)){tipoBuono='CG';note='C. Gourmet';nome=nome.replace(/\d*\s*(?:\b(?:coupon[ea]?|cpupon|cupon|coup|cena|buono|b\.?)\s*)*(?:gou?r?met|gouret|gourme\w?t?)\b/gi,'').trim()}
+  const _cgM=(nome+' '+note).match(/(\d*)\s*(?:\b(?:coupon[ea]?|cpupon|cupon|coup|cena|buono|b\.?)\s*)*(?:gou?r?met|gouret|gourme\w?t?)\b/i);
+  if(_cgM||/gou?r?met|gouret|gourme\w?t?\b/i.test(_checkCG)){
+    const _cgQty=_cgM&&_cgM[1]?parseInt(_cgM[1]):1;
+    tipiBuono.push({tipo:'CG',qty:_cgQty||1});if(!tipoBuono)tipoBuono='CG';
+    note=(note?note+', ':'')+'C. Gourmet';nome=nome.replace(/\d*\s*(?:\b(?:coupon[ea]?|cpupon|cupon|coup|cena|buono|b\.?)\s*)*(?:gou?r?met|gouret|gourme\w?t?)\b/gi,'').trim()}
   // 5. COUPON (senza gourmet) — coupon omaggio, coup, ecc.
   if(!tipoBuono){const coupM=nome.match(/\b(coupon\s*\S*|coup)\b/gi);if(coupM){note=(note?note+', ':'')+coupM[0].trim();nome=nome.replace(coupM[0],'').trim()}}
-  // 6. BU — qualsiasi variante (BU, B.U, bu, b.u, +BU, 2BU, buono unico)
-  if(!tipoBuono){const buM=nome.match(/\s*\+?\s*(\d*)\s*b\.?\s*u(?:nico)?\b/i);
-    if(buM){tipoBuono='BU';note=(note?note+', ':'')+(buM[1]||'1')+'BU';nome=nome.replace(buM[0],'').trim()}}
-  // 7. BL — qualsiasi variante (BL, B.L, B.Ll, bl, b.l, +BL, 2BL, buono lounge)
-  if(!tipoBuono){const blM=nome.match(/\s*\+?\s*(\d*)\s*b\.?\s*l+(?:ounge)?\b/i);
-    if(blM){tipoBuono='BL';note=(note?note+', ':'')+(blM[1]||'1')+'BL';nome=nome.replace(blM[0],'').trim()}}
+  // 6. BU — qualsiasi variante
+  const buM=nome.match(/\s*\+?\s*(\d*)\s*b\.?\s*u(?:nico)?\b/i);
+  if(buM){const _buQty=buM[1]?parseInt(buM[1]):1;
+    tipiBuono.push({tipo:'BU',qty:_buQty||1});if(!tipoBuono)tipoBuono='BU';
+    note=(note?note+', ':'')+(_buQty||1)+'BU';nome=nome.replace(buM[0],'').trim()}
+  // 7. BL — qualsiasi variante
+  const blM=nome.match(/\s*\+?\s*(\d*)\s*b\.?\s*l+(?:ounge)?\b/i);
+  if(blM){const _blQty=blM[1]?parseInt(blM[1]):1;
+    tipiBuono.push({tipo:'BL',qty:_blQty||1});if(!tipoBuono)tipoBuono='BL';
+    note=(note?note+', ':'')+(_blQty||1)+'BL';nome=nome.replace(blM[0],'').trim()}
   // 8. Note aggiuntive: direzione, pranzo, GD
   const noteM=nome.match(/\b(direzione|pranzo\s*\w*|GD)\b/gi);
   if(noteM){note=(note?note+', ':'')+noteM.join(', ');noteM.forEach(m=>{nome=nome.replace(new RegExp(m.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi'),'')});nome=nome.trim()}
@@ -4135,7 +4148,7 @@ function _parseMaisonNome(raw){let nome=raw.trim(),tipoBuono=null,note='',isSeve
   nome=nome.replace(/\s{2,}/g,' ').trim();
   // 10. Se resta solo keyword → vuoto
   if(/^(coupon|gourmet|cena|pranzo|coup|direzione|gd|cupon|cpupon|welcome|lounge|gruppo|seven|buono|unico)$/i.test(nome))nome='';
-  return{nome:nome?capitalizzaNome(nome):'',tipoBuono,note,isSeven}}
+  return{nome:nome?capitalizzaNome(nome):'',tipoBuono,tipiBuono,note,isSeven}}
 async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0];if(!file&&!forzaSostituisci)return;
   if(forzaSostituisci&&window._maisonPendingFile){/* usa file pendente */}else{window._maisonPendingFile=file}
   const f=window._maisonPendingFile;if(!f)return;
@@ -4206,10 +4219,21 @@ async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0
           const _dupKey=parsed.nome.toLowerCase()+'|'+dataGiornata;
           if(_giornoDuplicati.has(_dupKey)){dupCount++;warnings.push('Duplicato: '+parsed.nome+' ('+new Date(dataGiornata+'T12:00:00').toLocaleDateString('it-IT')+')')
           }else{_giornoDuplicati.add(_dupKey)}
-          const rec={data_giornata:dataGiornata,nome:parsed.nome,px:Math.round(px/nNomi)||1,
-            costo:Math.round(costo/nNomi*100)/100,tipo_buono:parsed.tipoBuono,note:parsed.note,
-            gruppo:nNomi>1?capitalizzaNome(rawNome):'',operatore:getOperatore(),reparto_dip:currentReparto};
-          try{await secPost('costi_maison',rec);totalRows++}catch(e){}}
+          // Se ha più tipi buono (es. 1BL + 2CG), crea righe separate
+          if(parsed.tipiBuono&&parsed.tipiBuono.length>1){
+            const totQty=parsed.tipiBuono.reduce((s,t)=>s+t.qty,0);
+            const costoBase=Math.round(costo/nNomi*100)/100;
+            for(const tb of parsed.tipiBuono){
+              const quotaCosto=Math.round(costoBase*tb.qty/totQty*100)/100;
+              const rec={data_giornata:dataGiornata,nome:parsed.nome,px:Math.round((px/nNomi)*tb.qty/totQty)||1,
+                costo:quotaCosto,tipo_buono:tb.tipo,note:tb.qty+tb.tipo+(parsed.tipiBuono.length>1?' (da '+parsed.tipiBuono.map(t=>t.qty+t.tipo).join('+')+')':''),
+                gruppo:nNomi>1?capitalizzaNome(rawNome):'',operatore:getOperatore(),reparto_dip:currentReparto};
+              try{await secPost('costi_maison',rec);totalRows++}catch(e){}}
+          }else{
+            const rec={data_giornata:dataGiornata,nome:parsed.nome,px:Math.round(px/nNomi)||1,
+              costo:Math.round(costo/nNomi*100)/100,tipo_buono:parsed.tipoBuono,note:parsed.note,
+              gruppo:nNomi>1?capitalizzaNome(rawNome):'',operatore:getOperatore(),reparto_dip:currentReparto};
+            try{await secPost('costi_maison',rec);totalRows++}catch(e){}}}
       }}
     maisonCache=await secGet('costi_maison?order=data_giornata.desc');
     if(sevenCount)speseExtraCache=await secGet('spese_extra?order=data_spesa.desc');
