@@ -4082,8 +4082,10 @@ function renderDashboard(){
   checkRischioAlerts().forEach(a=>{const ne=a.nome.replace(/'/g,"\\'");alertH+='<div style="padding:8px 0;border-bottom:1px solid var(--line)"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8e44ad;margin-right:8px"></span><span class="entry-name" onclick="apriProfilo(\''+ne+'\')"><strong>'+escP(a.nome)+'</strong></span>: '+a.count+' allineamenti — rischio RDI</div>'});
   getBudgetReparto().forEach(b=>{const spent=_rm.filter(r=>r.nome.toLowerCase()===b.nome.toLowerCase()).reduce((s,r)=>s+parseFloat(r.costo||0),0);const ne=b.nome.replace(/'/g,"\\'");
     if(b.budget_chf&&spent>=b.budget_chf*0.8){alertH+='<div style="padding:8px 0;border-bottom:1px solid var(--line)"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+(spent>=b.budget_chf?'var(--accent)':'#e67e22')+';margin-right:8px"></span><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')"><strong>'+escP(b.nome)+'</strong></span>: Maison '+spent.toFixed(0)+'/'+parseFloat(b.budget_chf).toFixed(0)+' CHF ('+(Math.round(spent/b.budget_chf*100))+'%)</div>'}});
-  // Stato rapporto giornaliero — mostra solo se NON compilato
-  if(isVis('rapporto')){const rapp=rapportiCache[oggi]||{};
+  // Stato rapporto giornaliero — carica da DB se non in cache, mostra solo se NON compilato
+  if(isVis('rapporto')){
+    if(!rapportiCache[oggi]){secGet('rapporti_giornalieri?data_rapporto=eq.'+oggi+'&reparto_dip=eq.'+currentReparto).then(rData=>{if(rData&&rData.length){if(!rapportiCache[oggi])rapportiCache[oggi]={};rData.forEach(r=>{rapportiCache[oggi][r.turno]=r});renderDashboard()}}).catch(()=>{})}
+    const rapp=rapportiCache[oggi]||{};
     if(!rapp.PRESTO)alertH+='<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="switchPage(\'rapporto\')"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#e67e22;margin-right:8px"></span><strong>Rapporto PRESTO:</strong> <span style="color:#e67e22;font-weight:700">da compilare</span></div>';
     if(!rapp.NOTTE)alertH+='<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="switchPage(\'rapporto\')"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#e67e22;margin-right:8px"></span><strong>Rapporto NOTTE:</strong> <span style="color:#e67e22;font-weight:700">da compilare</span></div>'}
   // Consegne recenti
