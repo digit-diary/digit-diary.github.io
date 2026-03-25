@@ -881,6 +881,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
         <div class="field"><label>PX</label><input type="number" id="maison-man-px" value="1" min="1" style="width:80px"></div>
         <div class="field"><label>Importo CHF</label><input type="number" id="maison-man-importo" placeholder="0.00" min="0" step="0.01"></div>
         <div class="field"><label>Tipo</label><select id="maison-man-tipo" style="padding:11px"><option value="">Normale</option><option value="BU">BU</option><option value="BL">BL</option><option value="CG">C. Gourmet</option><option value="WL">Welcome Lounge</option></select></div>
+        <div class="field"><label>N° buoni</label><input type="number" id="maison-man-qty" value="1" min="1" max="10" style="width:70px"></div>
         <div class="field"><label>Data</label><input type="text" id="maison-man-data" placeholder="Oggi" readonly style="cursor:pointer"></div>
       </div>
       <button class="btn-salva" onclick="salvaMaisonManuale()" style="background:var(--accent2)">+ Aggiungi spesa maison</button>
@@ -4604,14 +4605,16 @@ async function salvaMaisonManuale(){
   const importo=parseFloat(document.getElementById('maison-man-importo').value)||0;
   if(!importo){toast('Inserisci un importo');return}
   const tipo=document.getElementById('maison-man-tipo').value||null;
+  const qty=parseInt(document.getElementById('maison-man-qty').value)||1;
   const dataVal=document.getElementById('maison-man-data').value||new Date().toISOString().split('T')[0];
   // Controllo duplicati: stesso nome + stessa data
   const duplicato=getMaisonReparto().find(r=>r.nome.toLowerCase()===nome.toLowerCase()&&r.data_giornata===dataVal);
   if(duplicato){if(!confirm(nome+' ha già una registrazione il '+new Date(dataVal+'T12:00:00').toLocaleDateString('it-IT')+' ('+parseFloat(duplicato.costo).toFixed(2)+' CHF).\n\nVuoi aggiungere comunque?'))return}
-  const rec={data_giornata:dataVal,nome:nome,px:px,costo:importo,tipo_buono:tipo,note:'Inserimento manuale',gruppo:'',operatore:getOperatore(),reparto_dip:currentReparto};
+  const _noteMan=tipo&&qty>1?qty+tipo:'Inserimento manuale';
+  const rec={data_giornata:dataVal,nome:nome,px:px,costo:importo,tipo_buono:tipo,note:_noteMan,gruppo:'',operatore:getOperatore(),reparto_dip:currentReparto};
   try{const r=await secPost('costi_maison',rec);maisonCache.unshift(r[0]);
     document.getElementById('maison-man-nome').value='';document.getElementById('maison-man-importo').value='';
-    document.getElementById('maison-man-px').value='1';document.getElementById('maison-man-tipo').value='';
+    document.getElementById('maison-man-px').value='1';document.getElementById('maison-man-tipo').value='';document.getElementById('maison-man-qty').value='1';
     const fp=document.getElementById('maison-man-data');if(fp&&fp._flatpickr)fp._flatpickr.clear();
     renderMaisonDashboard();renderMaisonBudgetAlerts();logAzione('Maison manuale',nome+' '+importo+' CHF');toast('Spesa aggiunta per '+nome);checkBudgetPushAfterInsert(nome)}catch(e){toast('Errore: '+e.message)}}
 // REGALI MAISON
@@ -4737,7 +4740,7 @@ function renderMaisonGdOggi(){
   const GIORNI=['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
   const dataFmt=dt.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'});
   const _brGd=getBudgetReparto();
-  let h='<div class="card-header">GD '+dataFmt+' &mdash; '+GIORNI[dt.getDay()]+' <span style="font-weight:400;font-size:.88rem;color:var(--muted);margin-left:12px">'+totCHF.toFixed(2)+' CHF &middot; '+totPX+' PX</span></div>';
+  let h='<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap">GD '+dataFmt+' &mdash; '+GIORNI[dt.getDay()]+' <span style="font-weight:400;font-size:.88rem;color:var(--muted);margin-left:12px">'+totCHF.toFixed(2)+' CHF &middot; '+totPX+' PX</span><div style="display:flex;gap:6px"><button class="btn-export" onclick="esportaGdOggiCSV()" style="font-size:.72rem;padding:4px 10px">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaGdOggiPDF()" style="font-size:.72rem;padding:4px 10px">PDF</button></div></div>';
   h+='<div style="padding:0 16px 16px;overflow-x:auto"><table class="collab-table"><thead><tr><th style="background:var(--paper)">Cliente</th><th style="background:var(--paper)">Tipo</th><th class="num" style="background:var(--paper)">PX</th><th class="num" style="background:var(--paper)">Costo CHF</th><th style="background:var(--paper)"></th></tr></thead><tbody>';
   righe.forEach(function(r){
     var ne=r.nome.replace(/'/g,"\\'");
@@ -4755,6 +4758,40 @@ async function eliminaMaisonRigaGd(id){
     maisonCache=maisonCache.filter(function(r){return r.id!==id});
     logAzione('Maison: eliminata riga GD','ID '+id);
     renderMaisonGdOggi();renderMaisonDashboard();toast('Riga eliminata')}catch(e){toast('Errore: '+e.message)}}
+function esportaGdOggiCSV(){const oggi=getGiornataCasino();const righe=getMaisonRepartoExpanded().filter(r=>r.data_giornata===oggi).sort((a,b)=>a.nome.localeCompare(b.nome));
+  if(!righe.length){toast('Nessun dato');return}
+  const dt=new Date(oggi+'T12:00:00');const _catL={full_maison:'Full Maison',maison:'Maison',direzione:'Direzione',bu:'Buono Unico',bl:'Buono Lounge'};
+  const rows=[['GD '+dt.toLocaleDateString('it-IT')+' — '+GIORNI[dt.getDay()]],['Cliente','Categoria','Tipo','PX','Costo CHF']];
+  const _br=getBudgetReparto();
+  righe.forEach(r=>{let b=_br.find(x=>x.nome.toLowerCase()===r.nome.toLowerCase());if(!b){const c=r.nome.toLowerCase().split(/\s+/)[0];if(c.length>=3)b=_br.find(x=>x.nome.toLowerCase().split(/\s+/)[0]===c)}
+    rows.push([r.nome,b&&b.categoria?_catL[b.categoria]||'':'',r.tipo_buono||'—',r.px,parseFloat(r.costo).toFixed(2)])});
+  const tot=righe.reduce((s,r)=>s+parseFloat(r.costo||0),0);
+  rows.push(['TOTALE','','',righe.reduce((s,r)=>s+(r.px||0),0),tot.toFixed(2)]);
+  const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\n')],{type:'text/csv;charset=utf-8'});
+  Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'maison_gd_'+oggi+'.csv'}).click();toast('CSV GD esportato!')}
+async function esportaGdOggiPDF(){const oggi=getGiornataCasino();const righe=getMaisonRepartoExpanded().filter(r=>r.data_giornata===oggi).sort((a,b)=>a.nome.localeCompare(b.nome));
+  if(!righe.length){toast('Nessun dato');return}
+  if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore');return}}
+  const dt=new Date(oggi+'T12:00:00');const tot=righe.reduce((s,r)=>s+parseFloat(r.costo||0),0);const totPx=righe.reduce((s,r)=>s+(r.px||0),0);
+  const _catL={full_maison:'Full Maison',maison:'Maison',direzione:'Direzione',bu:'Buono Unico',bl:'Buono Lounge'};
+  const _catC={full_maison:[184,134,11],maison:[41,128,185],direzione:[142,68,173],bu:[230,126,34],bl:[44,110,73]};
+  const _br=getBudgetReparto();
+  try{const{jsPDF}=window.jspdf;const doc=new jsPDF('portrait','mm','a4');const pw=doc.internal.pageSize.getWidth();let y=14;
+    if(_logoB64)try{doc.addImage(_logoB64,'PNG',pw/2-20,y,40,22.5)}catch(e){}
+    y+=28;doc.setFont('helvetica','bold');doc.setFontSize(16);doc.text('Formulario Ristorante',pw/2,y,{align:'center'});y+=7;
+    doc.setFontSize(11);doc.setFont('helvetica','normal');doc.setTextColor(100);
+    doc.text('GD '+dt.toLocaleDateString('it-IT')+' — '+GIORNI[dt.getDay()]+' — Casino Lugano SA',pw/2,y,{align:'center'});y+=5;
+    doc.text(righe.length+' clienti — '+totPx+' persone — '+tot.toFixed(2)+' CHF',pw/2,y,{align:'center'});y+=10;doc.setTextColor(0);
+    doc.autoTable({startY:y,margin:{left:16,right:16},head:[['Cliente','Categoria','Tipo','PX','Costo CHF']],
+      body:righe.map(r=>{let b=_br.find(x=>x.nome.toLowerCase()===r.nome.toLowerCase());if(!b){const c=r.nome.toLowerCase().split(/\s+/)[0];if(c.length>=3)b=_br.find(x=>x.nome.toLowerCase().split(/\s+/)[0]===c)}
+        return[r.nome,b&&b.categoria?_catL[b.categoria]||'':'',r.tipo_buono||'—',r.px,parseFloat(r.costo).toFixed(2)]}),
+      foot:[['TOTALE','','',totPx,tot.toFixed(2)]],
+      headStyles:{fillColor:[184,134,11]},footStyles:{fillColor:[245,243,238],textColor:[0,0,0],fontStyle:'bold'},
+      styles:{fontSize:9,cellPadding:3},columnStyles:{3:{halign:'center'},4:{halign:'right'}},
+      didParseCell:function(d){if(d.section==='body'&&d.column.index===1){const c=Object.entries(_catL).find(([k,v])=>v===d.cell.raw);if(c&&_catC[c[0]]){d.cell.styles.textColor=_catC[c[0]];d.cell.styles.fontStyle='bold'}}},
+      alternateRowStyles:{fillColor:[250,247,242]}});
+    doc.setFontSize(7);doc.setTextColor(150);doc.text('Casino Lugano SA — Formulario Ristorante GD '+dt.toLocaleDateString('it-IT'),16,doc.internal.pageSize.getHeight()-8);
+    mostraPdfPreview(doc,'formulario_gd_'+oggi+'.pdf','Formulario GD '+dt.toLocaleDateString('it-IT'))}catch(e){toast('Errore PDF')}}
 function renderMaisonCharts(data,sorted){
   // Trend giornaliero
   const byDay={};data.forEach(r=>{byDay[r.data_giornata]=(byDay[r.data_giornata]||0)+parseFloat(r.costo||0)});
