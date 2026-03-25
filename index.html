@@ -887,6 +887,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
     </div>
   </div>
   <div id="maison-alerts-container" style="margin-top:16px"></div>
+  <div id="maison-gd-oggi" class="main-card" style="margin-top:16px"></div>
   <div class="main-card" style="margin-top:20px">
     <div class="card-header">Riepilogo Costi Maison</div>
     <div class="filters">
@@ -4697,7 +4698,7 @@ function renderMaisonDashboard(){const data=getMaisonFiltrati();
   const sorted=Object.entries(byNome).sort((a,b)=>b[1].tot-a[1].tot);
   const tb=document.getElementById('maison-table');
   if(!sorted.length){tb.innerHTML='<p style="color:var(--muted);text-align:center;padding:20px">Nessun dato. Carica un file Excel per iniziare.</p>';
-    ['chart-maison-trend','chart-maison-top','chart-maison-tipi'].forEach(function(id){if(charts[id]){charts[id].destroy();delete charts[id]}});return}
+    ['chart-maison-trend','chart-maison-top','chart-maison-tipi'].forEach(function(id){if(charts[id]){charts[id].destroy();delete charts[id]}});renderMaisonGdOggi();return}
   // Gestione giorni per eliminazione
   const giorniDisp=[...new Set(data.map(r=>r.data_giornata))].sort();
   const mesiDisp=[...new Set(data.map(r=>r.data_giornata.substring(0,7)))].sort();
@@ -4721,7 +4722,37 @@ function renderMaisonDashboard(){const data=getMaisonFiltrati();
   thtml+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td class="num"><strong>'+sorted.reduce((s,c)=>s+c[1].visite,0)+'</strong></td><td class="num"><strong>'+totPx+'</strong></td><td class="num"><strong>'+data.filter(r=>r.tipo_buono==='BU').length+'</strong></td><td class="num"><strong>'+data.filter(r=>r.tipo_buono==='BL').length+'</strong></td><td class="num"><strong>'+data.filter(r=>r.tipo_buono==='CG').length+'</strong></td><td class="num"><strong>'+data.filter(r=>r.tipo_buono==='WL').length+'</strong></td><td class="num"><strong>'+totCosto.toFixed(2)+'</strong></td><td></td><td></td></tr>';
   thtml+='</tbody></table></div></div>';tb.innerHTML=thtml;
   // Grafici
-  renderMaisonCharts(data,sorted)}
+  renderMaisonCharts(data,sorted);renderMaisonGdOggi()}
+function renderMaisonGdOggi(){
+  const container=document.getElementById('maison-gd-oggi');if(!container)return;
+  const oggi=getGiornataCasino();
+  const righe=getMaisonRepartoExpanded().filter(r=>r.data_giornata===oggi);
+  if(!righe.length){container.innerHTML='<div style="padding:16px;text-align:center;color:var(--muted);font-size:.88rem">Nessun costo Maison per la GD di oggi</div>';container.style.display='';return}
+  righe.sort((a,b)=>a.nome.localeCompare(b.nome,'it'));
+  const totCHF=righe.reduce((s,r)=>s+parseFloat(r.costo||0),0);
+  const totPX=righe.reduce((s,r)=>s+(r.px||0),0);
+  const dt=new Date(oggi+'T12:00:00');
+  const GIORNI=['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
+  const dataFmt=dt.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const _brGd=getBudgetReparto();
+  let h='<div class="card-header">GD '+dataFmt+' &mdash; '+GIORNI[dt.getDay()]+' <span style="font-weight:400;font-size:.88rem;color:var(--muted);margin-left:12px">'+totCHF.toFixed(2)+' CHF &middot; '+totPX+' PX</span></div>';
+  h+='<div style="padding:0 16px 16px;overflow-x:auto"><table class="collab-table"><thead><tr><th style="background:var(--paper)">Cliente</th><th style="background:var(--paper)">Tipo</th><th class="num" style="background:var(--paper)">PX</th><th class="num" style="background:var(--paper)">Costo CHF</th><th style="background:var(--paper)"></th></tr></thead><tbody>';
+  righe.forEach(function(r){
+    var ne=r.nome.replace(/'/g,"\\'");
+    var budget=_brGd.find(function(b){return b.nome.toLowerCase()===r.nome.toLowerCase()});
+    if(!budget){var _cog=r.nome.toLowerCase().split(/\s+/)[0];if(_cog.length>=3)budget=_brGd.find(function(b){return b.nome.toLowerCase().split(/\s+/)[0]===_cog})}
+    var catBadge=budget&&budget.categoria==='full_maison'?'<span class="mini-badge" style="background:#b8860b;margin-left:6px">Full Maison</span>':budget&&budget.categoria==='maison'?'<span class="mini-badge" style="background:#2980b9;margin-left:6px">Maison</span>':budget&&budget.categoria==='direzione'?'<span class="mini-badge" style="background:#8e44ad;margin-left:6px">Direzione</span>':budget&&budget.categoria==='bu'?'<span class="mini-badge" style="background:#e67e22;margin-left:6px">Buono Unico</span>':budget&&budget.categoria==='bl'?'<span class="mini-badge" style="background:#2c6e49;margin-left:6px">Buono Lounge</span>':'';
+    var tipoBadge=r.tipo_buono==='BU'?'<span class="mini-badge" style="background:#e67e22">BU</span>':r.tipo_buono==='BL'?'<span class="mini-badge" style="background:#2c6e49">BL</span>':r.tipo_buono==='CG'?'<span class="mini-badge" style="background:#8e44ad">CG</span>':r.tipo_buono==='WL'?'<span class="mini-badge" style="background:#2980b9">WL</span>':'<span style="color:var(--muted)">&mdash;</span>';
+    h+='<tr><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(r.nome)+'</span></strong>'+catBadge+'</td><td>'+tipoBadge+'</td><td class="num">'+r.px+'</td><td class="num">'+parseFloat(r.costo||0).toFixed(2)+'</td><td style="white-space:nowrap"><button class="btn-act del" onclick="eliminaMaisonRigaGd('+r.id+')" title="Elimina">Elimina</button></td></tr>'});
+  h+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td></td><td class="num"><strong>'+totPX+'</strong></td><td class="num"><strong>'+totCHF.toFixed(2)+'</strong></td><td></td></tr>';
+  h+='</tbody></table></div>';
+  container.innerHTML=h;container.style.display=''}
+async function eliminaMaisonRigaGd(id){
+  if(!confirm('Eliminare questa riga?'))return;
+  try{await secDel('costi_maison','id=eq.'+id);
+    maisonCache=maisonCache.filter(function(r){return r.id!==id});
+    logAzione('Maison: eliminata riga GD','ID '+id);
+    renderMaisonGdOggi();renderMaisonDashboard();toast('Riga eliminata')}catch(e){toast('Errore: '+e.message)}}
 function renderMaisonCharts(data,sorted){
   // Trend giornaliero
   const byDay={};data.forEach(r=>{byDay[r.data_giornata]=(byDay[r.data_giornata]||0)+parseFloat(r.costo||0)});
