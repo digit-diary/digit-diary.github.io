@@ -4771,7 +4771,7 @@ function renderMaisonGdOggi(){
         return escP(x.nome)+cBadge}).join(' / ');
       var tipoBadge=r.tipo_buono?'<span class="mini-badge" style="background:'+({BU:'#e67e22',BL:'#2c6e49',CG:'#8e44ad',WL:'#2980b9'}[r.tipo_buono]||'var(--muted)')+'">'+r.tipo_buono+'</span>':'<span style="color:var(--muted)">&mdash;</span>';
       const idsGruppo=gruppoRighe.map(x=>x.id).join(',');
-      h+='<tr><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+neP+'\')">'+escP(primoNome)+'</span></strong>'+catBadge+(altriNomi?' <span style="color:var(--muted);font-size:.82rem">/'+escP(altriNomi)+'</span>':'')+'</td><td>'+tipoBadge+'</td><td class="num">'+totPxGruppo+'</td><td class="num">'+totGruppo.toFixed(2)+'</td><td style="white-space:nowrap"><button class="btn-act del" onclick="eliminaMaisonGruppoGd(\''+idsGruppo+'\')" title="Elimina gruppo">Elimina</button></td></tr>';
+      h+='<tr><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+neP+'\')">'+escP(primoNome)+'</span></strong>'+catBadge+(altriNomi?' <span style="color:var(--muted);font-size:.82rem"> /'+altriNomi+'</span>':'')+'</td><td>'+tipoBadge+'</td><td class="num">'+totPxGruppo+'</td><td class="num">'+totGruppo.toFixed(2)+'</td><td style="white-space:nowrap"><button class="btn-act del" onclick="eliminaMaisonGruppoGd(\''+idsGruppo+'\')" title="Elimina gruppo">Elimina</button></td></tr>';
     }else{
       _gdVisti.add(r.id);
       var budget=_brGd.find(function(b){return b.nome.toLowerCase()===r.nome.toLowerCase()});
