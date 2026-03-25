@@ -880,8 +880,8 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
         <div class="field"><label>Cliente</label><div class="ac-wrap"><input type="text" id="maison-man-nome" placeholder="Nome..." oninput="acFiltraMaison('maison-man-nome','ac-maison-man')" onfocus="acFiltraMaison('maison-man-nome','ac-maison-man')"><div class="ac-drop" id="ac-maison-man"></div></div></div>
         <div class="field"><label>PX</label><input type="number" id="maison-man-px" value="1" min="1" style="width:80px"></div>
         <div class="field"><label>Importo CHF</label><input type="number" id="maison-man-importo" placeholder="0.00" min="0" step="0.01"></div>
-        <div class="field"><label>Tipo</label><select id="maison-man-tipo" style="padding:11px"><option value="">Normale</option><option value="BU">BU</option><option value="BL">BL</option><option value="CG">C. Gourmet</option><option value="WL">Welcome Lounge</option></select></div>
-        <div class="field"><label>N° buoni</label><input type="number" id="maison-man-qty" value="1" min="1" max="10" style="width:70px"></div>
+        <div class="field"><label>Tipo</label><select id="maison-man-tipo" style="padding:11px" onchange="document.getElementById('maison-man-qty-wrap').style.display=this.value?'':'none'"><option value="">Normale</option><option value="BU">BU</option><option value="BL">BL</option><option value="CG">C. Gourmet</option><option value="WL">Welcome Lounge</option></select></div>
+        <div class="field" id="maison-man-qty-wrap" style="display:none"><label>N° buoni</label><input type="number" id="maison-man-qty" value="1" min="1" max="10" style="width:70px"></div>
         <div class="field"><label>Data</label><input type="text" id="maison-man-data" placeholder="Oggi" readonly style="cursor:pointer"></div>
       </div>
       <button class="btn-salva" onclick="salvaMaisonManuale()" style="background:var(--accent2)">+ Aggiungi spesa maison</button>
