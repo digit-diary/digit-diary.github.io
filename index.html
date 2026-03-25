@@ -5010,9 +5010,15 @@ function eseguiConfrontoMaison(){
   document.getElementById('conf-risultato').innerHTML=h}
 function esportaMaisonClienteCSV(nome){const righe=getMaisonFiltrati().filter(r=>r.nome===nome).sort((a,b)=>a.data_giornata.localeCompare(b.data_giornata));
   if(!righe.length){toast('Nessun dato');return}
-  const rows=[['Data','Giorno','PX','Costo CHF','Tipo','Gruppo','Note']];
+  const _csvCatLabels={full_maison:'Full Maison',maison:'Maison',direzione:'Direzione',bu:'Buono Unico',bl:'Buono Lounge'};
+  let _csvBudget=getBudgetReparto().find(b=>b.nome.toLowerCase()===nome.toLowerCase());
+  if(!_csvBudget){const _cog=nome.toLowerCase().split(/\s+/)[0];if(_cog.length>=3)_csvBudget=getBudgetReparto().find(b=>b.nome.toLowerCase().split(/\s+/)[0]===_cog)}
+  const _csvCat=_csvBudget&&_csvBudget.categoria?_csvCatLabels[_csvBudget.categoria]:'';
+  const rows=[[nome+(_csvCat?' — '+_csvCat:'')],['Data','Giorno','PX','Costo CHF','Tipo','Gruppo','Note']];
   righe.forEach(r=>{const d=new Date(r.data_giornata+'T12:00:00');rows.push([d.toLocaleDateString('it-IT'),GIORNI[d.getDay()],r.px,r.costo,r.tipo_buono||'',r.gruppo||'',r.note||''])});
-  const tot=righe.reduce((s,r)=>s+parseFloat(r.costo||0),0);rows.push(['TOTALE','',righe.reduce((s,r)=>s+(r.px||0),0),tot.toFixed(2),'','','']);
+  const tot=righe.reduce((s,r)=>s+parseFloat(r.costo||0),0);
+  const _nBU=righe.filter(r=>r.tipo_buono==='BU').length,_nBL=righe.filter(r=>r.tipo_buono==='BL').length,_nCG=righe.filter(r=>r.tipo_buono==='CG').length,_nWL=righe.filter(r=>r.tipo_buono==='WL').length;
+  rows.push(['TOTALE','',righe.reduce((s,r)=>s+(r.px||0),0),tot.toFixed(2),'BU:'+_nBU+' BL:'+_nBL+' CG:'+_nCG+' WL:'+_nWL,'','']);
   const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\n')],{type:'text/csv;charset=utf-8'});
   Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'maison_'+nome.replace(/\s+/g,'_')+'_'+_maisonFilePeriodo(righe)+'.csv'}).click();toast('CSV esportato!')}
 function apriPdfSchedaMaison(nome){const mc=document.getElementById('pwd-modal-content');
@@ -5037,15 +5043,22 @@ async function esportaMaisonClientePDF(nome){
   const budget=getBudgetReparto().find(b=>b.nome.toLowerCase()===nome.toLowerCase());
   try{const{jsPDF}=window.jspdf;const doc=new jsPDF('portrait','mm','a4');const pw=doc.internal.pageSize.getWidth();let y=14;
     if(_logoB64)try{doc.addImage(_logoB64,'PNG',pw/2-20,y,40,22.5)}catch(e){}
-    y+=28;doc.setFont('helvetica','bold');doc.setFontSize(14);doc.text('Scheda Cliente — '+nome,pw/2,y,{align:'center'});y+=7;
+    y+=28;doc.setFont('helvetica','bold');doc.setFontSize(14);
+    const _clCatLabels={full_maison:'Full Maison',maison:'Maison',direzione:'Direzione',bu:'Buono Unico',bl:'Buono Lounge'};
+    const _clCatColors={full_maison:[184,134,11],maison:[41,128,185],direzione:[142,68,173],bu:[230,126,34],bl:[44,110,73]};
+    let _clBudget=budget;if(!_clBudget){const _cog=nome.toLowerCase().split(/\s+/)[0];if(_cog.length>=3)_clBudget=getBudgetReparto().find(b=>b.nome.toLowerCase().split(/\s+/)[0]===_cog)}
+    const _clCat=_clBudget&&_clBudget.categoria?_clCatLabels[_clBudget.categoria]:'';
+    doc.text('Scheda Cliente — '+nome,pw/2,y,{align:'center'});y+=7;
+    if(_clCat){doc.setFontSize(11);const _cc=_clCatColors[_clBudget.categoria]||[100,100,100];doc.setTextColor(_cc[0],_cc[1],_cc[2]);doc.text(_clCat,pw/2,y,{align:'center'});y+=6;doc.setTextColor(0)}
     doc.setFontSize(10);doc.setFont('helvetica','normal');doc.setTextColor(100);
     doc.text(mesi+' — Casino Lugano SA',pw/2,y,{align:'center'});y+=8;doc.setTextColor(0);
     // KPI
+    const nCG=righe.filter(r=>r.tipo_buono==='CG').length,nWL=righe.filter(r=>r.tipo_buono==='WL').length;
     if(sez.kpi){const media=righe.length?(tot/righe.length).toFixed(2):'0';
-      doc.autoTable({startY:y,margin:{left:16,right:16},head:[['Visite','Persone','BU','BL','Totale CHF','Media/visita']],
-        body:[[righe.length,totPx,nBU||'-',nBL||'-',tot.toFixed(2),media]],
-        headStyles:{fillColor:[184,134,11]},styles:{fontSize:10,cellPadding:4,halign:'center'},
-        columnStyles:{4:{fontStyle:'bold'}}});y=doc.lastAutoTable.finalY+8}
+      doc.autoTable({startY:y,margin:{left:16,right:16},head:[['Visite','Persone','BU','BL','CG','WL','Totale CHF','Media/visita']],
+        body:[[righe.length,totPx,nBU||'-',nBL||'-',nCG||'-',nWL||'-',tot.toFixed(2),media]],
+        headStyles:{fillColor:[184,134,11]},styles:{fontSize:9,cellPadding:4,halign:'center'},
+        columnStyles:{6:{fontStyle:'bold'}}});y=doc.lastAutoTable.finalY+8}
     // Trend mensile
     if(sez.trend){const byMese={};righe.forEach(r=>{const d=new Date(r.data_giornata+'T12:00:00');const k=MESI[d.getMonth()]+' '+d.getFullYear();byMese[k]=(byMese[k]||0)+parseFloat(r.costo||0)});
       const mesiArr=Object.entries(byMese);if(mesiArr.length>1){
