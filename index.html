@@ -4794,15 +4794,23 @@ async function eliminaMaisonGruppoGd(idsStr){const ids=idsStr.split(',').map(Num
   try{for(const id of ids){await secDel('costi_maison','id=eq.'+id);maisonCache=maisonCache.filter(r=>r.id!==id)}
     logAzione('Maison: eliminato gruppo GD',ids.length+' righe');
     renderMaisonGdOggi();renderMaisonDashboard();toast('Gruppo eliminato')}catch(e){toast('Errore: '+e.message)}}
+function _raggruppaGdRighe(righe){const result=[];const visti=new Set();
+  righe.forEach(r=>{if(visti.has(r.id))return;
+    if(r.gruppo&&r.gruppo.length>1){const gr=righe.filter(x=>x.gruppo===r.gruppo);gr.forEach(x=>visti.add(x.id));
+      result.push({nome:gr[0].nome,altriNomi:gr.slice(1).map(x=>x.nome),tipo_buono:r.tipo_buono,px:gr.reduce((s,x)=>s+(x.px||0),0),costo:gr.reduce((s,x)=>s+parseFloat(x.costo||0),0),ids:gr.map(x=>x.id)});
+    }else{visti.add(r.id);result.push({nome:r.nome,altriNomi:[],tipo_buono:r.tipo_buono,px:r.px,costo:parseFloat(r.costo||0),ids:[r.id]})}});
+  return result}
 function esportaGdOggiCSV(){const oggi=getGiornataCasino();const righe=getMaisonRepartoExpanded().filter(r=>r.data_giornata===oggi).sort((a,b)=>a.nome.localeCompare(b.nome));
   if(!righe.length){toast('Nessun dato');return}
+  const grouped=_raggruppaGdRighe(righe);
   const dt=new Date(oggi+'T12:00:00');const _catL={full_maison:'Full Maison',maison:'Maison',direzione:'Direzione',bu:'Buono Unico',bl:'Buono Lounge'};
   const rows=[['GD '+dt.toLocaleDateString('it-IT')+' — '+GIORNI[dt.getDay()]],['Cliente','Categoria','Tipo','PX','Costo CHF']];
   const _br=getBudgetReparto();
-  righe.forEach(r=>{let b=_br.find(x=>x.nome.toLowerCase()===r.nome.toLowerCase());if(!b){const c=r.nome.toLowerCase().split(/\s+/)[0];if(c.length>=3)b=_br.find(x=>x.nome.toLowerCase().split(/\s+/)[0]===c)}
-    rows.push([r.nome,b&&b.categoria?_catL[b.categoria]||'':'',r.tipo_buono||'—',r.px,parseFloat(r.costo).toFixed(2)])});
-  const tot=righe.reduce((s,r)=>s+parseFloat(r.costo||0),0);
-  rows.push(['TOTALE','','',righe.reduce((s,r)=>s+(r.px||0),0),tot.toFixed(2)]);
+  grouped.forEach(g=>{let b=_br.find(x=>x.nome.toLowerCase()===g.nome.toLowerCase());if(!b){const c=g.nome.toLowerCase().split(/\s+/)[0];if(c.length>=3)b=_br.find(x=>x.nome.toLowerCase().split(/\s+/)[0]===c)}
+    const label=g.nome+(g.altriNomi.length?'/'+g.altriNomi.join('/'):'');
+    rows.push([label,b&&b.categoria?_catL[b.categoria]||'':'',g.tipo_buono||'—',g.px,g.costo.toFixed(2)])});
+  const tot=grouped.reduce((s,g)=>s+g.costo,0);
+  rows.push(['TOTALE','','',grouped.reduce((s,g)=>s+g.px,0),tot.toFixed(2)]);
   const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\n')],{type:'text/csv;charset=utf-8'});
   Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'maison_gd_'+oggi+'.csv'}).click();toast('CSV GD esportato!')}
 async function esportaGdOggiPDF(){const oggi=getGiornataCasino();const righe=getMaisonRepartoExpanded().filter(r=>r.data_giornata===oggi).sort((a,b)=>a.nome.localeCompare(b.nome));
@@ -4818,9 +4826,11 @@ async function esportaGdOggiPDF(){const oggi=getGiornataCasino();const righe=get
     doc.setFontSize(11);doc.setFont('helvetica','normal');doc.setTextColor(100);
     doc.text('GD '+dt.toLocaleDateString('it-IT')+' — '+GIORNI[dt.getDay()]+' — Casino Lugano SA',pw/2,y,{align:'center'});y+=5;
     doc.text(righe.length+' clienti — '+totPx+' persone — '+tot.toFixed(2)+' CHF',pw/2,y,{align:'center'});y+=10;doc.setTextColor(0);
+    const grouped=_raggruppaGdRighe(righe);
     doc.autoTable({startY:y,margin:{left:16,right:16},head:[['Cliente','Categoria','Tipo','PX','Costo CHF']],
-      body:righe.map(r=>{let b=_br.find(x=>x.nome.toLowerCase()===r.nome.toLowerCase());if(!b){const c=r.nome.toLowerCase().split(/\s+/)[0];if(c.length>=3)b=_br.find(x=>x.nome.toLowerCase().split(/\s+/)[0]===c)}
-        return[r.nome,b&&b.categoria?_catL[b.categoria]||'':'',r.tipo_buono||'—',r.px,parseFloat(r.costo).toFixed(2)]}),
+      body:grouped.map(g=>{let b=_br.find(x=>x.nome.toLowerCase()===g.nome.toLowerCase());if(!b){const c=g.nome.toLowerCase().split(/\s+/)[0];if(c.length>=3)b=_br.find(x=>x.nome.toLowerCase().split(/\s+/)[0]===c)}
+        const label=g.nome+(g.altriNomi.length?'/'+g.altriNomi.join('/'):'');
+        return[label,b&&b.categoria?_catL[b.categoria]||'':'',g.tipo_buono||'—',g.px,g.costo.toFixed(2)]}),
       foot:[['TOTALE','','',totPx,tot.toFixed(2)]],
       headStyles:{fillColor:[184,134,11]},footStyles:{fillColor:[245,243,238],textColor:[0,0,0],fontStyle:'bold'},
       styles:{fontSize:9,cellPadding:3},columnStyles:{3:{halign:'center'},4:{halign:'right'}},
