@@ -4749,13 +4749,37 @@ function renderMaisonGdOggi(){
   const _brGd=getBudgetReparto();
   let h='<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap">GD '+dataFmt+' &mdash; '+GIORNI[dt.getDay()]+' <span style="font-weight:400;font-size:.88rem;color:var(--muted);margin-left:12px">'+totCHF.toFixed(2)+' CHF &middot; '+totPX+' PX</span><div style="display:flex;gap:6px"><button class="btn-export" onclick="esportaGdOggiCSV()" style="font-size:.72rem;padding:4px 10px">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaGdOggiPDF()" style="font-size:.72rem;padding:4px 10px">PDF</button></div></div>';
   h+='<div style="padding:0 16px 16px;overflow-x:auto"><table class="collab-table"><thead><tr><th style="background:var(--paper)">Cliente</th><th style="background:var(--paper)">Tipo</th><th class="num" style="background:var(--paper)">PX</th><th class="num" style="background:var(--paper)">Costo CHF</th><th style="background:var(--paper)"></th></tr></thead><tbody>';
+  // Raggruppa righe con stesso gruppo (es. Bonomelli/Grignani)
+  const _gdVisti=new Set();
   righe.forEach(function(r){
+    if(_gdVisti.has(r.id))return;
     var ne=r.nome.replace(/'/g,"\\'");
-    var budget=_brGd.find(function(b){return b.nome.toLowerCase()===r.nome.toLowerCase()});
-    if(!budget){var _cog=r.nome.toLowerCase().split(/\s+/)[0];if(_cog.length>=3)budget=_brGd.find(function(b){return b.nome.toLowerCase().split(/\s+/)[0]===_cog})}
-    var catBadge=budget&&budget.categoria==='full_maison'?'<span class="mini-badge" style="background:#b8860b;margin-left:6px">Full Maison</span>':budget&&budget.categoria==='maison'?'<span class="mini-badge" style="background:#2980b9;margin-left:6px">Maison</span>':budget&&budget.categoria==='direzione'?'<span class="mini-badge" style="background:#8e44ad;margin-left:6px">Direzione</span>':budget&&budget.categoria==='bu'?'<span class="mini-badge" style="background:#e67e22;margin-left:6px">Buono Unico</span>':budget&&budget.categoria==='bl'?'<span class="mini-badge" style="background:#2c6e49;margin-left:6px">Buono Lounge</span>':'';
-    var tipoBadge=r.tipo_buono==='BU'?'<span class="mini-badge" style="background:#e67e22">BU</span>':r.tipo_buono==='BL'?'<span class="mini-badge" style="background:#2c6e49">BL</span>':r.tipo_buono==='CG'?'<span class="mini-badge" style="background:#8e44ad">CG</span>':r.tipo_buono==='WL'?'<span class="mini-badge" style="background:#2980b9">WL</span>':'<span style="color:var(--muted)">&mdash;</span>';
-    h+='<tr><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(r.nome)+'</span></strong>'+catBadge+'</td><td>'+tipoBadge+'</td><td class="num">'+r.px+'</td><td class="num">'+parseFloat(r.costo||0).toFixed(2)+'</td><td style="white-space:nowrap"><button class="btn-act del" onclick="eliminaMaisonRigaGd('+r.id+')" title="Elimina">Elimina</button></td></tr>'});
+    // Se ha un gruppo, mostra la riga raggruppata
+    if(r.gruppo&&r.gruppo.length>1){
+      const gruppoRighe=righe.filter(x=>x.gruppo===r.gruppo);
+      gruppoRighe.forEach(x=>_gdVisti.add(x.id));
+      const totGruppo=gruppoRighe.reduce((s,x)=>s+parseFloat(x.costo||0),0);
+      const totPxGruppo=gruppoRighe.reduce((s,x)=>s+(x.px||0),0);
+      const primoNome=gruppoRighe[0].nome;const neP=primoNome.replace(/'/g,"\\'");
+      var budget=_brGd.find(function(b){return b.nome.toLowerCase()===primoNome.toLowerCase()});
+      if(!budget){var _cog=primoNome.toLowerCase().split(/\s+/)[0];if(_cog.length>=3)budget=_brGd.find(function(b){return b.nome.toLowerCase().split(/\s+/)[0]===_cog})}
+      var catBadge=budget&&budget.categoria?'<span class="mini-badge" style="background:'+({full_maison:'#b8860b',maison:'#2980b9',direzione:'#8e44ad',bu:'#e67e22',bl:'#2c6e49'}[budget.categoria]||'var(--muted)')+';margin-left:6px">'+({full_maison:'Full Maison',maison:'Maison',direzione:'Direzione',bu:'Buono Unico',bl:'Buono Lounge'}[budget.categoria]||'')+'</span>':'';
+      const altriNomi=gruppoRighe.slice(1).map(x=>{
+        let bAltro=_brGd.find(b=>b.nome.toLowerCase()===x.nome.toLowerCase());
+        if(!bAltro){const c=x.nome.toLowerCase().split(/\s+/)[0];if(c.length>=3)bAltro=_brGd.find(b=>b.nome.toLowerCase().split(/\s+/)[0]===c)}
+        const cBadge=bAltro&&bAltro.categoria?' <span class="mini-badge" style="background:'+({full_maison:'#b8860b',maison:'#2980b9',direzione:'#8e44ad',bu:'#e67e22',bl:'#2c6e49'}[bAltro.categoria]||'var(--muted)')+';font-size:.65rem">'+({full_maison:'FM',maison:'M',direzione:'D',bu:'BU',bl:'BL'}[bAltro.categoria]||'')+'</span>':'';
+        return escP(x.nome)+cBadge}).join(' / ');
+      var tipoBadge=r.tipo_buono?'<span class="mini-badge" style="background:'+({BU:'#e67e22',BL:'#2c6e49',CG:'#8e44ad',WL:'#2980b9'}[r.tipo_buono]||'var(--muted)')+'">'+r.tipo_buono+'</span>':'<span style="color:var(--muted)">&mdash;</span>';
+      const idsGruppo=gruppoRighe.map(x=>x.id).join(',');
+      h+='<tr><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+neP+'\')">'+escP(primoNome)+'</span></strong>'+catBadge+(altriNomi?' <span style="color:var(--muted);font-size:.82rem">/'+escP(altriNomi)+'</span>':'')+'</td><td>'+tipoBadge+'</td><td class="num">'+totPxGruppo+'</td><td class="num">'+totGruppo.toFixed(2)+'</td><td style="white-space:nowrap"><button class="btn-act del" onclick="eliminaMaisonGruppoGd(\''+idsGruppo+'\')" title="Elimina gruppo">Elimina</button></td></tr>';
+    }else{
+      _gdVisti.add(r.id);
+      var budget=_brGd.find(function(b){return b.nome.toLowerCase()===r.nome.toLowerCase()});
+      if(!budget){var _cog=r.nome.toLowerCase().split(/\s+/)[0];if(_cog.length>=3)budget=_brGd.find(function(b){return b.nome.toLowerCase().split(/\s+/)[0]===_cog})}
+      var catBadge=budget&&budget.categoria?'<span class="mini-badge" style="background:'+({full_maison:'#b8860b',maison:'#2980b9',direzione:'#8e44ad',bu:'#e67e22',bl:'#2c6e49'}[budget.categoria]||'var(--muted)')+';margin-left:6px">'+({full_maison:'Full Maison',maison:'Maison',direzione:'Direzione',bu:'Buono Unico',bl:'Buono Lounge'}[budget.categoria]||'')+'</span>':'';
+      var tipoBadge=r.tipo_buono?'<span class="mini-badge" style="background:'+({BU:'#e67e22',BL:'#2c6e49',CG:'#8e44ad',WL:'#2980b9'}[r.tipo_buono]||'var(--muted)')+'">'+r.tipo_buono+'</span>':'<span style="color:var(--muted)">&mdash;</span>';
+      h+='<tr><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(r.nome)+'</span></strong>'+catBadge+'</td><td>'+tipoBadge+'</td><td class="num">'+r.px+'</td><td class="num">'+parseFloat(r.costo||0).toFixed(2)+'</td><td style="white-space:nowrap"><button class="btn-act del" onclick="eliminaMaisonRigaGd('+r.id+')" title="Elimina">Elimina</button></td></tr>'}}
+  );
   h+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td></td><td class="num"><strong>'+totPX+'</strong></td><td class="num"><strong>'+totCHF.toFixed(2)+'</strong></td><td></td></tr>';
   h+='</tbody></table></div>';
   container.innerHTML=h;container.style.display=''}
@@ -4765,6 +4789,11 @@ async function eliminaMaisonRigaGd(id){
     maisonCache=maisonCache.filter(function(r){return r.id!==id});
     logAzione('Maison: eliminata riga GD','ID '+id);
     renderMaisonGdOggi();renderMaisonDashboard();toast('Riga eliminata')}catch(e){toast('Errore: '+e.message)}}
+async function eliminaMaisonGruppoGd(idsStr){const ids=idsStr.split(',').map(Number);
+  if(!confirm('Eliminare questo gruppo ('+ids.length+' righe)?'))return;
+  try{for(const id of ids){await secDel('costi_maison','id=eq.'+id);maisonCache=maisonCache.filter(r=>r.id!==id)}
+    logAzione('Maison: eliminato gruppo GD',ids.length+' righe');
+    renderMaisonGdOggi();renderMaisonDashboard();toast('Gruppo eliminato')}catch(e){toast('Errore: '+e.message)}}
 function esportaGdOggiCSV(){const oggi=getGiornataCasino();const righe=getMaisonRepartoExpanded().filter(r=>r.data_giornata===oggi).sort((a,b)=>a.nome.localeCompare(b.nome));
   if(!righe.length){toast('Nessun dato');return}
   const dt=new Date(oggi+'T12:00:00');const _catL={full_maison:'Full Maison',maison:'Maison',direzione:'Direzione',bu:'Buono Unico',bl:'Buono Lounge'};
