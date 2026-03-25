@@ -5740,7 +5740,7 @@ async function esportaMaisonPDF(){const data=getMaisonFiltrati();if(!data.length
   const byNome={};data.forEach(r=>{if(!byNome[r.nome])byNome[r.nome]={tot:0,px:0,visite:0,bu:0,bl:0,cg:0,wl:0};const d=byNome[r.nome];d.tot+=parseFloat(r.costo||0);d.px+=(r.px||0);d.visite++;if(r.tipo_buono==='BU')d.bu++;if(r.tipo_buono==='BL')d.bl++;if(r.tipo_buono==='CG')d.cg++;if(r.tipo_buono==='WL')d.wl++});
   const sorted=Object.entries(byNome).sort((a,b)=>b[1].tot-a[1].tot);
   const totale=sorted.reduce((s,c)=>s+c[1].tot,0);
-  try{const{jsPDF}=window.jspdf;const doc=new jsPDF('landscape','mm','a4');const pw=doc.internal.pageSize.getWidth();let y=14;
+  try{const{jsPDF}=window.jspdf;const doc=new jsPDF('portrait','mm','a4');const pw=doc.internal.pageSize.getWidth();let y=14;
     if(_logoB64)try{doc.addImage(_logoB64,'PNG',pw/2-20,y,40,22.5)}catch(e){}
     y+=28;doc.setFont('helvetica','bold');doc.setFontSize(16);doc.text('Costi Maison',pw/2,y,{align:'center'});y+=7;
     doc.setFontSize(10);doc.setFont('helvetica','normal');doc.setTextColor(100);
@@ -5754,7 +5754,7 @@ async function esportaMaisonPDF(){const data=getMaisonFiltrati();if(!data.length
         return[n,cat,d.visite,d.px,d.bu||'',d.bl||'',d.cg||'',d.wl||'',d.tot.toFixed(2),(d.tot/d.visite).toFixed(2)]}),
       foot:[['TOTALE','',sorted.reduce((s,c)=>s+c[1].visite,0),'',sorted.reduce((s,c)=>s+c[1].bu,0),sorted.reduce((s,c)=>s+c[1].bl,0),sorted.reduce((s,c)=>s+c[1].cg,0),sorted.reduce((s,c)=>s+c[1].wl,0),totale.toFixed(2),'']],
       headStyles:{fillColor:[26,18,8]},footStyles:{fillColor:[245,243,238],textColor:[0,0,0],fontStyle:'bold'},
-      styles:{fontSize:8,cellPadding:3},columnStyles:{3:{halign:'center'},4:{halign:'center'},5:{halign:'center'},6:{halign:'center'},7:{halign:'center'},8:{halign:'right'},9:{halign:'right'}},
+      styles:{fontSize:7.5,cellPadding:2.5},columnStyles:{0:{cellWidth:38},1:{cellWidth:28},2:{halign:'center',cellWidth:14},3:{halign:'center',cellWidth:12},4:{halign:'center',cellWidth:10},5:{halign:'center',cellWidth:10},6:{halign:'center',cellWidth:10},7:{halign:'center',cellWidth:10},8:{halign:'right',cellWidth:22},9:{halign:'right',cellWidth:18}},
       didParseCell:function(d){if(d.section==='body'&&d.column.index===1){const c=Object.entries(_catLabels).find(([k,v])=>v===d.cell.raw);if(c&&_catColors[c[0]]){d.cell.styles.textColor=_catColors[c[0]];d.cell.styles.fontStyle='bold'}}},
       alternateRowStyles:{fillColor:[250,247,242]}});
     y=doc.lastAutoTable.finalY+6;
