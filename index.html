@@ -5721,28 +5721,41 @@ function acFiltraMaison(inputId,dropId){const inp=document.getElementById(inputI
   drop.classList.add('show')}
 // Export
 function esportaMaisonCSV(){const data=getMaisonFiltrati();if(!data.length){toast('Nessun dato');return}
-  const rows=[['Data','Cliente','PX','Costo CHF','Tipo','Gruppo','Note']];
-  data.sort((a,b)=>a.data_giornata.localeCompare(b.data_giornata)||a.nome.localeCompare(b.nome))
-    .forEach(r=>{rows.push([new Date(r.data_giornata+'T12:00:00').toLocaleDateString('it-IT'),r.nome,r.px,r.costo,r.tipo_buono||'',r.gruppo||'',r.note||''])});
+  // Raggruppato per cliente con buoni e categoria
+  const _catLabels={full_maison:'Full Maison',maison:'Maison',direzione:'Direzione',bu:'Buono Unico',bl:'Buono Lounge'};
+  const byNome={};data.forEach(r=>{if(!byNome[r.nome])byNome[r.nome]={tot:0,px:0,visite:0,bu:0,bl:0,cg:0,wl:0};const d=byNome[r.nome];d.tot+=parseFloat(r.costo||0);d.px+=(r.px||0);d.visite++;if(r.tipo_buono==='BU')d.bu++;if(r.tipo_buono==='BL')d.bl++;if(r.tipo_buono==='CG')d.cg++;if(r.tipo_buono==='WL')d.wl++});
+  const sorted=Object.entries(byNome).sort((a,b)=>b[1].tot-a[1].tot);
+  const rows=[['Cliente','Categoria','Visite','PX','BU','BL','CG','WL','Totale CHF','Media CHF']];
+  sorted.forEach(([n,d])=>{let budget=getBudgetReparto().find(b=>b.nome.toLowerCase()===n.toLowerCase());
+    if(!budget){const _cog=n.toLowerCase().split(/\s+/)[0];if(_cog.length>=3)budget=getBudgetReparto().find(b=>b.nome.toLowerCase().split(/\s+/)[0]===_cog)}
+    const cat=budget&&budget.categoria?_catLabels[budget.categoria]||'':'';
+    rows.push([n,cat,d.visite,d.px,d.bu||'',d.bl||'',d.cg||'',d.wl||'',d.tot.toFixed(2),(d.tot/d.visite).toFixed(2)])});
+  rows.push(['TOTALE','',sorted.reduce((s,c)=>s+c[1].visite,0),'',sorted.reduce((s,c)=>s+c[1].bu,0),sorted.reduce((s,c)=>s+c[1].bl,0),sorted.reduce((s,c)=>s+c[1].cg,0),sorted.reduce((s,c)=>s+c[1].wl,0),sorted.reduce((s,c)=>s+c[1].tot,0).toFixed(2),'']);
   const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\n')],{type:'text/csv;charset=utf-8'});
   Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'costi_maison_'+_maisonFilePeriodo(data)+'.csv'}).click();toast('CSV esportato!')}
 async function esportaMaisonPDF(){const data=getMaisonFiltrati();if(!data.length){toast('Nessun dato');return}
   if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore caricamento libreria PDF');return}}
-  const byNome={};data.forEach(r=>{if(!byNome[r.nome])byNome[r.nome]={tot:0,px:0,visite:0};byNome[r.nome].tot+=parseFloat(r.costo||0);byNome[r.nome].px+=(r.px||0);byNome[r.nome].visite++});
+  const _catLabels={full_maison:'Full Maison',maison:'Maison',direzione:'Direzione',bu:'Buono Unico',bl:'Buono Lounge'};
+  const _catColors={full_maison:[184,134,11],maison:[41,128,185],direzione:[142,68,173],bu:[230,126,34],bl:[44,110,73]};
+  const byNome={};data.forEach(r=>{if(!byNome[r.nome])byNome[r.nome]={tot:0,px:0,visite:0,bu:0,bl:0,cg:0,wl:0};const d=byNome[r.nome];d.tot+=parseFloat(r.costo||0);d.px+=(r.px||0);d.visite++;if(r.tipo_buono==='BU')d.bu++;if(r.tipo_buono==='BL')d.bl++;if(r.tipo_buono==='CG')d.cg++;if(r.tipo_buono==='WL')d.wl++});
   const sorted=Object.entries(byNome).sort((a,b)=>b[1].tot-a[1].tot);
   const totale=sorted.reduce((s,c)=>s+c[1].tot,0);
-  try{const{jsPDF}=window.jspdf;const doc=new jsPDF('portrait','mm','a4');const pw=doc.internal.pageSize.getWidth();let y=14;
+  try{const{jsPDF}=window.jspdf;const doc=new jsPDF('landscape','mm','a4');const pw=doc.internal.pageSize.getWidth();let y=14;
     if(_logoB64)try{doc.addImage(_logoB64,'PNG',pw/2-20,y,40,22.5)}catch(e){}
     y+=28;doc.setFont('helvetica','bold');doc.setFontSize(16);doc.text('Costi Maison',pw/2,y,{align:'center'});y+=7;
     doc.setFontSize(10);doc.setFont('helvetica','normal');doc.setTextColor(100);
     const fd=(document.getElementById('maison-filt-dal')||{}).value,fa=(document.getElementById('maison-filt-al')||{}).value;
     doc.text((fd&&fa?new Date(fd+'T12:00:00').toLocaleDateString('it-IT')+' - '+new Date(fa+'T12:00:00').toLocaleDateString('it-IT'):'Tutti i dati')+' — Casino Lugano SA',pw/2,y,{align:'center'});y+=10;
     doc.setTextColor(0);
-    doc.autoTable({startY:y,margin:{left:16,right:16},head:[['Cliente','Visite','PX','Totale CHF','Media CHF']],
-      body:sorted.map(([n,d])=>[n,d.visite,d.px,d.tot.toFixed(2),(d.tot/d.visite).toFixed(2)]),
-      foot:[['TOTALE',sorted.reduce((s,c)=>s+c[1].visite,0),'',totale.toFixed(2),'']],
+    doc.autoTable({startY:y,margin:{left:16,right:16},head:[['Cliente','Categoria','Visite','PX','BU','BL','CG','WL','Totale CHF','Media CHF']],
+      body:sorted.map(([n,d])=>{let budget=getBudgetReparto().find(b=>b.nome.toLowerCase()===n.toLowerCase());
+        if(!budget){const _cog=n.toLowerCase().split(/\s+/)[0];if(_cog.length>=3)budget=getBudgetReparto().find(b=>b.nome.toLowerCase().split(/\s+/)[0]===_cog)}
+        const cat=budget&&budget.categoria?_catLabels[budget.categoria]||'':'';
+        return[n,cat,d.visite,d.px,d.bu||'',d.bl||'',d.cg||'',d.wl||'',d.tot.toFixed(2),(d.tot/d.visite).toFixed(2)]}),
+      foot:[['TOTALE','',sorted.reduce((s,c)=>s+c[1].visite,0),'',sorted.reduce((s,c)=>s+c[1].bu,0),sorted.reduce((s,c)=>s+c[1].bl,0),sorted.reduce((s,c)=>s+c[1].cg,0),sorted.reduce((s,c)=>s+c[1].wl,0),totale.toFixed(2),'']],
       headStyles:{fillColor:[26,18,8]},footStyles:{fillColor:[245,243,238],textColor:[0,0,0],fontStyle:'bold'},
-      styles:{fontSize:9,cellPadding:3},columnStyles:{2:{halign:'center'},3:{halign:'right'},4:{halign:'right'}},
+      styles:{fontSize:8,cellPadding:3},columnStyles:{3:{halign:'center'},4:{halign:'center'},5:{halign:'center'},6:{halign:'center'},7:{halign:'center'},8:{halign:'right'},9:{halign:'right'}},
+      didParseCell:function(d){if(d.section==='body'&&d.column.index===1){const c=Object.entries(_catLabels).find(([k,v])=>v===d.cell.raw);if(c&&_catColors[c[0]]){d.cell.styles.textColor=_catColors[c[0]];d.cell.styles.fontStyle='bold'}}},
       alternateRowStyles:{fillColor:[250,247,242]}});
     y=doc.lastAutoTable.finalY+6;
     const tp=doc.internal.getNumberOfPages();for(let i=1;i<=tp;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(150);doc.text('Casino Lugano SA — Costi Maison — Pag. '+i+'/'+tp,16,doc.internal.pageSize.getHeight()-8)}
