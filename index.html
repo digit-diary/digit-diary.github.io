@@ -5745,7 +5745,13 @@ async function esportaMaisonPDF(){const data=getMaisonFiltrati();if(!data.length
     y+=28;doc.setFont('helvetica','bold');doc.setFontSize(16);doc.text('Costi Maison',pw/2,y,{align:'center'});y+=7;
     doc.setFontSize(10);doc.setFont('helvetica','normal');doc.setTextColor(100);
     const fd=(document.getElementById('maison-filt-dal')||{}).value,fa=(document.getElementById('maison-filt-al')||{}).value;
-    doc.text((fd&&fa?new Date(fd+'T12:00:00').toLocaleDateString('it-IT')+' - '+new Date(fa+'T12:00:00').toLocaleDateString('it-IT'):'Tutti i dati')+' — Casino Lugano SA',pw/2,y,{align:'center'});y+=10;
+    let _periodoLabel='';
+    if(fd&&fa){_periodoLabel=new Date(fd+'T12:00:00').toLocaleDateString('it-IT')+' — '+new Date(fa+'T12:00:00').toLocaleDateString('it-IT')}
+    else if(data.length){const _dates=data.map(r=>r.data_giornata).sort();const _d1=new Date(_dates[0]+'T12:00:00');const _d2=new Date(_dates[_dates.length-1]+'T12:00:00');
+      if(_d1.getMonth()===_d2.getMonth()&&_d1.getFullYear()===_d2.getFullYear())_periodoLabel=MESI_FULL[_d1.getMonth()]+' '+_d1.getFullYear();
+      else _periodoLabel=MESI_FULL[_d1.getMonth()]+' '+_d1.getFullYear()+' — '+MESI_FULL[_d2.getMonth()]+' '+_d2.getFullYear()}
+    else{_periodoLabel='Tutti i dati'}
+    doc.text(_periodoLabel+' — Casino Lugano SA',pw/2,y,{align:'center'});y+=10;
     doc.setTextColor(0);
     doc.autoTable({startY:y,margin:{left:16,right:16},head:[['Cliente','Categoria','Visite','PX','BU','BL','CG','WL','Totale CHF','Media CHF']],
       body:sorted.map(([n,d])=>{let budget=getBudgetReparto().find(b=>b.nome.toLowerCase()===n.toLowerCase());
