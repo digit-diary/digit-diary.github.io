@@ -4595,24 +4595,31 @@ async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0
 function toggleSezione(id,btn){var el=document.getElementById(id);if(!el)return;var hidden=el.style.display==='none';el.style.display=hidden?'':'none';if(btn)btn.innerHTML=hidden?'&#9650; Nascondi':'&#9660; Mostra'}
 // MAISON MANUALE
 async function salvaMaisonManuale(){
-  let nome=capitalizzaNome(document.getElementById('maison-man-nome').value.trim());
-  if(!nome){toast('Inserisci il nome');_highlightField('maison-man-nome');return}
-  // Verifica nome tra clienti maison esistenti
-  const nomeEsistente=getMaisonRepartoExpanded().find(r=>r.nome.toLowerCase()===nome.toLowerCase());
-  if(!nomeEsistente){const simile=_trovaNomeSimileMaison(nome);
-    if(simile&&simile.tipo==='simile'){if(!confirm('Hai scritto "'+nome+'" ma esiste "'+simile.nome+'". Usare "'+simile.nome+'"?')){/* usa il nome inserito */}else{nome=simile.nome}}}
+  const rawNome=document.getElementById('maison-man-nome').value.trim();
+  if(!rawNome){toast('Inserisci il nome');_highlightField('maison-man-nome');return}
   const px=parseInt(document.getElementById('maison-man-px').value)||1;
   const importo=parseFloat(document.getElementById('maison-man-importo').value)||0;
   if(!importo){toast('Inserisci un importo');return}
   const tipo=document.getElementById('maison-man-tipo').value||null;
   const qty=parseInt(document.getElementById('maison-man-qty').value)||1;
   const dataVal=document.getElementById('maison-man-data').value||new Date().toISOString().split('T')[0];
-  // Controllo duplicati: stesso nome + stessa data
-  const duplicato=getMaisonReparto().find(r=>r.nome.toLowerCase()===nome.toLowerCase()&&r.data_giornata===dataVal);
-  if(duplicato){if(!confirm(nome+' ha già una registrazione il '+new Date(dataVal+'T12:00:00').toLocaleDateString('it-IT')+' ('+parseFloat(duplicato.costo).toFixed(2)+' CHF).\n\nVuoi aggiungere comunque?'))return}
-  const _noteMan=tipo&&qty>1?qty+tipo:'Inserimento manuale';
-  const rec={data_giornata:dataVal,nome:nome,px:px,costo:importo,tipo_buono:tipo,note:_noteMan,gruppo:'',operatore:getOperatore(),reparto_dip:currentReparto};
-  try{const r=await secPost('costi_maison',rec);maisonCache.unshift(r[0]);
+  // Gestione nomi multipli con /
+  const nomiRaw=rawNome.split(/\s*\/\s*/).map(n=>capitalizzaNome(n.trim())).filter(n=>n);
+  const nNomi=nomiRaw.length;
+  const gruppoLabel=nNomi>1?capitalizzaNome(rawNome):'';
+  // Correggi ogni nome
+  const nomiFinali=nomiRaw.map(n=>{
+    const simile=_trovaNomeSimileMaison(n);
+    if(simile&&simile.tipo==='simile'){const corretto=_soloCorrezioneCognome(n,simile.nome);return corretto}
+    return n});
+  const _noteMan=tipo&&qty>1?qty+tipo:'';
+  try{for(let i=0;i<nomiFinali.length;i++){
+    const nome=nomiFinali[i];
+    const rec={data_giornata:dataVal,nome:nome,px:Math.round(px/nNomi)||1,
+      costo:Math.round(importo/nNomi*100)/100,tipo_buono:tipo,
+      note:(_noteMan||'')+(gruppoLabel?' '+gruppoLabel:''),
+      gruppo:gruppoLabel,operatore:getOperatore(),reparto_dip:currentReparto};
+    const r=await secPost('costi_maison',rec);if(r&&r[0])maisonCache.unshift(r[0])}
     document.getElementById('maison-man-nome').value='';document.getElementById('maison-man-importo').value='';
     document.getElementById('maison-man-px').value='1';document.getElementById('maison-man-tipo').value='';document.getElementById('maison-man-qty').value='1';
     const fp=document.getElementById('maison-man-data');if(fp&&fp._flatpickr)fp._flatpickr.clear();
