@@ -4993,8 +4993,8 @@ async function esportaGdOggiPDF(){const oggi=_gdSelezionata||getGiornataCasino()
         const _qm=(g.note||'').match(/(\d+)\s*(BU|BL|CG|WL)/i);const _qn=_qm?parseInt(_qm[1]):1;
         return[label,b&&b.categoria?_catL[b.categoria]||'':'',g.tipo_buono?_qn+' '+g.tipo_buono:'—',g.px,g.costo.toFixed(2)]}),
       foot:[['TOTALE','',righe.filter(r=>r.tipo_buono).length?[_contaBuoni(righe,'BU')?_contaBuoni(righe,'BU')+'BU':'',_contaBuoni(righe,'BL')?_contaBuoni(righe,'BL')+'BL':'',_contaBuoni(righe,'CG')?_contaBuoni(righe,'CG')+'CG':'',_contaBuoni(righe,'WL')?_contaBuoni(righe,'WL')+'WL':''].filter(Boolean).join(' '):'',totPx,tot.toFixed(2)]],
-      headStyles:{fillColor:[184,134,11]},footStyles:{fillColor:[245,243,238],textColor:[0,0,0],fontStyle:'bold'},
-      styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:3},columnStyles:{2:{halign:'center'},3:{halign:'center'},4:{halign:'right'}},
+      headStyles:{fillColor:[184,134,11],halign:'center'},footStyles:{fillColor:[245,243,238],textColor:[0,0,0],fontStyle:'bold'},
+      styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:3},columnStyles:{0:{halign:'left',cellWidth:50},1:{halign:'left',cellWidth:30},2:{halign:'center',cellWidth:22},3:{halign:'center',cellWidth:18},4:{halign:'right',cellWidth:28}},
       didParseCell:function(d){if(d.section==='body'&&d.column.index===1){const c=Object.entries(_catL).find(([k,v])=>v===d.cell.raw);if(c&&_catC[c[0]]){d.cell.styles.textColor=_catC[c[0]];d.cell.styles.fontStyle='bold'}}},
       alternateRowStyles:{fillColor:[250,247,242]}});
     doc.setFontSize(7);doc.setTextColor(150);doc.text('Casino Lugano SA — Formulario Ristorante GD '+dt.toLocaleDateString('it-IT'),16,doc.internal.pageSize.getHeight()-8);
