@@ -913,7 +913,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
   <div class="settings-section" style="margin-top:20px" id="maison-budget-section">
     <h4 style="display:flex;justify-content:space-between;align-items:center">Scheda clienti Maison <button class="btn-reset" onclick="toggleSezione('maison-budget-list',this)" style="font-size:.92rem;padding:6px 16px">&#9650; Nascondi</button></h4>
     <p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Gestisci categoria (Maison/Full Maison), budget, data nascita.</p>
-    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><button class="btn-export" onclick="esportaListaMaisonCSV()" style="font-size:.78rem;padding:5px 14px">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaListaMaisonPDF()" style="font-size:.78rem;padding:5px 14px">PDF</button><button class="btn-export" onclick="apriListaClientiMaison()" style="font-size:.78rem;padding:5px 14px;border-color:var(--accent2);color:var(--accent2)">Mostra Lista</button><button class="btn-export" onclick="apriConfrontoClienti()" style="font-size:.78rem;padding:5px 14px;border-color:#1a7a6d;color:#1a7a6d">Confronta clienti</button><button class="btn-export" onclick="document.getElementById('import-cat-file').click()" style="font-size:.78rem;padding:5px 14px;border-color:#b8860b;color:#b8860b">&#128229; Importa Categorie</button><input type="file" id="import-cat-file" accept=".xlsx,.xls" style="display:none" onchange="importaCategorieMaison(this)"><button class="btn-export" onclick="document.getElementById('import-compl-file').click()" style="font-size:.78rem;padding:5px 14px;border-color:#8e44ad;color:#8e44ad">&#127874; Importa Compleanni</button><input type="file" id="import-compl-file" accept=".xlsx,.xls" style="display:none" onchange="importaCompleanniMaison(this)"><button class="btn-export" onclick="riallineaNomiMaison()" style="font-size:.78rem;padding:5px 14px;border-color:#c0392b;color:#c0392b">&#128260; Riallinea Nomi</button></div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><button class="btn-export" onclick="esportaListaMaisonCSV()" style="font-size:.78rem;padding:5px 14px">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaListaMaisonPDF()" style="font-size:.78rem;padding:5px 14px">PDF</button><button class="btn-export" onclick="apriListaClientiMaison()" style="font-size:.78rem;padding:5px 14px;border-color:var(--accent2);color:var(--accent2)">Mostra Lista</button><button class="btn-export" onclick="apriConfrontoClienti()" style="font-size:.78rem;padding:5px 14px;border-color:#1a7a6d;color:#1a7a6d">Confronta clienti</button><button class="btn-export" onclick="document.getElementById('import-cat-file').click()" style="font-size:.78rem;padding:5px 14px;border-color:#b8860b;color:#b8860b">&#128229; Importa Categorie</button><input type="file" id="import-cat-file" accept=".xlsx,.xls" style="display:none" onchange="importaCategorieMaison(this)"><button class="btn-export" onclick="document.getElementById('import-compl-file').click()" style="font-size:.78rem;padding:5px 14px;border-color:#8e44ad;color:#8e44ad">&#127874; Importa Compleanni</button><input type="file" id="import-compl-file" accept=".xlsx,.xls" style="display:none" onchange="importaCompleanniMaison(this)"><button class="btn-export" onclick="riallineaNomiMaison()" style="font-size:.78rem;padding:5px 14px;border-color:#c0392b;color:#c0392b">&#128260; Riallinea Nomi</button><button class="btn-export" onclick="unisciDuplicatiMaison()" style="font-size:.78rem;padding:5px 14px;border-color:#1a4a7a;color:#1a4a7a">&#128279; Unisci Duplicati</button></div>
     <div id="maison-budget-list" style="margin-bottom:14px"></div>
     <div class="add-tipo-row" style="align-items:flex-end">
       <div class="field"><label>Cliente</label><div class="ac-wrap"><input type="text" id="maison-budget-nome" placeholder="Nome..." oninput="acFiltraMaison('maison-budget-nome','ac-maison-budget')" onfocus="acFiltraMaison('maison-budget-nome','ac-maison-budget')"><div class="ac-drop" id="ac-maison-budget"></div></div></div>
@@ -5947,6 +5947,136 @@ function _checkRiallineaDone(){
   const cntEl=document.querySelector('#riallinea-lista');
   if(cntEl&&cntEl.parentElement){const p=cntEl.parentElement.querySelector('p');if(p)p.textContent=rimaste.length+' di '+st.correzioni.length+' rimaste'}
   if(!rimaste.length)_renderRiallineaUI();}
+async function unisciDuplicatiMaison(){
+  const budget=getBudgetReparto();
+  if(!budget.length){toast('Nessun cliente nel budget.');return}
+  // Raggruppa per cognome (primo token)
+  const byCognome={};
+  budget.forEach(b=>{const cogn=b.nome.trim().split(/\s+/)[0].toLowerCase();if(!byCognome[cogn])byCognome[cogn]=[];byCognome[cogn].push(b)});
+  const coppie=[];
+  Object.keys(byCognome).forEach(cogn=>{
+    const gruppo=byCognome[cogn];
+    if(gruppo.length<2)return;
+    // Trova coppie dove i nomi NON sono identici (case-insensitive)
+    for(let i=0;i<gruppo.length;i++){
+      for(let j=i+1;j<gruppo.length;j++){
+        if(gruppo[i].nome.toLowerCase()===gruppo[j].nome.toLowerCase())continue;
+        // Determina quale ha il nome piu lungo (nome+cognome)
+        let longer=gruppo[i],shorter=gruppo[j];
+        if(gruppo[j].nome.trim().split(/\s+/).length>gruppo[i].nome.trim().split(/\s+/).length||(gruppo[j].nome.trim().split(/\s+/).length===gruppo[i].nome.trim().split(/\s+/).length&&gruppo[j].nome.length>gruppo[i].nome.length)){
+          longer=gruppo[j];shorter=gruppo[i]}
+        // Merge: nome dal piu lungo, dati dal piu ricco
+        const merged={
+          nome:longer.nome,
+          categoria:longer.categoria||shorter.categoria||null,
+          data_nascita:longer.data_nascita||shorter.data_nascita||null,
+          budget_chf:longer.budget_chf||shorter.budget_chf||null,
+          budget_bu:longer.budget_bu||shorter.budget_bu||null,
+          budget_bl:longer.budget_bl||shorter.budget_bl||null
+        };
+        // Se il corto ha costi e il lungo no, prendi budget dal corto
+        if(!longer.budget_chf&&shorter.budget_chf)merged.budget_chf=shorter.budget_chf;
+        if(!longer.budget_bu&&shorter.budget_bu)merged.budget_bu=shorter.budget_bu;
+        if(!longer.budget_bl&&shorter.budget_bl)merged.budget_bl=shorter.budget_bl;
+        if(!longer.categoria&&shorter.categoria)merged.categoria=shorter.categoria;
+        // data_nascita: preferisci dal nome lungo (import compleanni piu accurato)
+        if(longer.data_nascita)merged.data_nascita=longer.data_nascita;
+        else if(shorter.data_nascita)merged.data_nascita=shorter.data_nascita;
+        coppie.push({keep:longer,remove:shorter,merged});
+      }
+    }
+  });
+  if(!coppie.length){toast('Nessun duplicato trovato!');return}
+  window._unisciState={coppie,confermati:0,saltati:0,errori:0,vociCorr:0};
+  _renderUnisciUI()}
+function _renderUnisciUI(){
+  const st=window._unisciState;const mc=document.getElementById('pwd-modal-content');
+  const rimaste=st.coppie.filter(c=>!c._done);
+  if(!rimaste.length){
+    mc.innerHTML='<div style="text-align:center;padding:20px"><div style="font-size:2.5rem;margin-bottom:8px">&#9989;</div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Unione duplicati completata</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:#2c6e49">'+st.confermati+'</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Uniti</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--muted)">'+st.saltati+'</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Saltati</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--ink)">'+st.vociCorr+'</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Voci aggiornate</div></div></div><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
+    renderMaisonBudgetUI();renderMaisonDashboard();renderSpeseExtra();
+    logAzione('Unisci duplicati maison',st.confermati+' uniti, '+st.saltati+' saltati, '+st.vociCorr+' voci');
+    return}
+  const totOrig=st.coppie.length;
+  const _catLabel=function(c){return c==='full_maison'?'Full Maison':c==='maison'?'Maison':c==='direzione'?'Direzione':c==='bu'?'Buono Unico':c==='bl'?'Buono Lounge':''};
+  const _fmtDn=function(d){if(!d)return'';const p=d.split('-');return p[2]+'/'+p[1]};
+  let html='<div style="text-align:center;margin-bottom:12px"><h3 style="font-family:Playfair Display,serif;margin-bottom:4px">Unisci Duplicati</h3><p style="color:var(--muted);font-size:.84rem">'+rimaste.length+' di '+totOrig+' coppie</p></div>';
+  html+='<div style="display:flex;gap:8px;margin-bottom:12px;justify-content:center">';
+  html+='<span style="font-size:.82rem;color:#2c6e49;font-weight:600">'+st.confermati+' uniti</span>';
+  html+='<span style="font-size:.82rem;color:var(--muted)">'+st.saltati+' saltati</span>';
+  html+='</div>';
+  html+='<div id="unisci-lista" style="max-height:400px;overflow-y:auto">';
+  rimaste.forEach(function(c){
+    const idx=st.coppie.indexOf(c);
+    const kInfo=[];const rInfo=[];
+    if(c.keep.budget_chf)kInfo.push(parseFloat(c.keep.budget_chf).toFixed(0)+' CHF');
+    if(c.keep.categoria)kInfo.push(_catLabel(c.keep.categoria));
+    if(c.keep.data_nascita)kInfo.push('&#127874; '+_fmtDn(c.keep.data_nascita));
+    if(c.remove.budget_chf)rInfo.push(parseFloat(c.remove.budget_chf).toFixed(0)+' CHF');
+    if(c.remove.categoria)rInfo.push(_catLabel(c.remove.categoria));
+    if(c.remove.data_nascita)rInfo.push('&#127874; '+_fmtDn(c.remove.data_nascita));
+    const mInfo=[];
+    if(c.merged.categoria)mInfo.push(_catLabel(c.merged.categoria));
+    if(c.merged.budget_chf)mInfo.push(parseFloat(c.merged.budget_chf).toFixed(0)+' CHF');
+    if(c.merged.data_nascita)mInfo.push('&#127874; '+_fmtDn(c.merged.data_nascita));
+    html+='<div id="unisci-row-'+idx+'" style="padding:10px 12px;margin-bottom:8px;border-radius:3px;background:var(--paper2);transition:all .3s">';
+    html+='<div style="font-size:.85rem;margin-bottom:4px"><strong>'+escP(c.remove.nome)+'</strong>'+(rInfo.length?' <span style="color:var(--muted);font-size:.78rem">('+rInfo.join(', ')+')</span>':'')+' <span style="color:var(--muted)">+</span> <strong>'+escP(c.keep.nome)+'</strong>'+(kInfo.length?' <span style="color:var(--muted);font-size:.78rem">('+kInfo.join(', ')+')</span>':'')+'</div>';
+    html+='<div style="font-size:.82rem;color:#1a4a7a;margin-bottom:8px">&#8594; Unisci in: <strong>'+escP(c.merged.nome)+'</strong>'+(mInfo.length?' ('+mInfo.join(', ')+')':'')+'</div>';
+    html+='<div style="display:flex;gap:6px;justify-content:flex-end">';
+    html+='<button class="btn-salva" style="font-size:.75rem;padding:5px 12px;background:#2c6e49" onclick="confermaUnisci('+idx+')">Conferma</button>';
+    html+='<button class="btn-modal-cancel" style="font-size:.75rem;padding:5px 12px" onclick="saltaUnisci('+idx+')">Salta</button>';
+    html+='</div></div>';
+  });
+  html+='</div>';
+  html+='<div class="pwd-modal-btns" style="margin-top:16px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
+  mc.innerHTML=html;document.getElementById('pwd-modal').classList.remove('hidden')}
+async function confermaUnisci(idx){
+  const st=window._unisciState;const c=st.coppie[idx];
+  const row=document.getElementById('unisci-row-'+idx);
+  if(row)row.style.opacity='0.5';
+  try{
+    // 1) Aggiorna il record KEEP con i dati merged
+    const patchData={nome:c.merged.nome};
+    if(c.merged.categoria)patchData.categoria=c.merged.categoria;
+    if(c.merged.data_nascita)patchData.data_nascita=c.merged.data_nascita;
+    if(c.merged.budget_chf)patchData.budget_chf=c.merged.budget_chf;
+    if(c.merged.budget_bu)patchData.budget_bu=c.merged.budget_bu;
+    if(c.merged.budget_bl)patchData.budget_bl=c.merged.budget_bl;
+    await secPatch('maison_budget','id=eq.'+c.keep.id,patchData);
+    // Aggiorna cache locale
+    const kIdx=maisonBudgetCache.findIndex(b=>b.id===c.keep.id);
+    if(kIdx!==-1)Object.assign(maisonBudgetCache[kIdx],patchData);
+    // 2) Aggiorna costi_maison: rinomina dal nome corto al nome lungo
+    const costiShort=maisonCache.filter(r=>r.nome===c.remove.nome&&(r.reparto_dip||'slots')===currentReparto);
+    for(const r of costiShort){
+      try{await secPatch('costi_maison','id=eq.'+r.id,{nome:c.merged.nome});r.nome=c.merged.nome;st.vociCorr++}catch(e){st.errori++}
+    }
+    // 3) Aggiorna spese_extra: rinomina beneficiario dal nome corto
+    const extraShort=speseExtraCache.filter(r=>r.beneficiario===c.remove.nome&&(r.reparto_dip||'slots')===currentReparto);
+    for(const r of extraShort){
+      try{await secPatch('spese_extra','id=eq.'+r.id,{beneficiario:c.merged.nome});r.beneficiario=c.merged.nome;st.vociCorr++}catch(e){st.errori++}
+    }
+    // 4) Elimina il record REMOVE
+    await secDel('maison_budget','id=eq.'+c.remove.id);
+    maisonBudgetCache=maisonBudgetCache.filter(b=>b.id!==c.remove.id);
+    c._done=true;st.confermati++;
+    if(row){row.style.background='rgba(44,110,73,0.1)';row.innerHTML='<span style="color:#2c6e49;font-size:.85rem">&#9989; '+escP(c.remove.nome)+' unito in <strong>'+escP(c.merged.nome)+'</strong></span>';
+      setTimeout(function(){row.style.maxHeight='0';row.style.padding='0';row.style.margin='0';row.style.overflow='hidden';setTimeout(function(){_checkUnisciDone()},300)},800)}
+    else _checkUnisciDone();
+  }catch(e){st.errori++;toast('Errore unione: '+e.message);if(row)row.style.opacity='1';c._done=true;_checkUnisciDone()}}
+function saltaUnisci(idx){
+  const st=window._unisciState;const c=st.coppie[idx];
+  c._done=true;st.saltati++;
+  const row=document.getElementById('unisci-row-'+idx);
+  if(row){row.style.opacity='0.3';row.innerHTML='<span style="color:var(--muted);font-size:.85rem">&#10060; '+escP(c.remove.nome)+' / '+escP(c.keep.nome)+' — saltato</span>';
+    setTimeout(function(){row.style.maxHeight='0';row.style.padding='0';row.style.margin='0';row.style.overflow='hidden';setTimeout(function(){_checkUnisciDone()},300)},500)}
+  else _checkUnisciDone()}
+function _checkUnisciDone(){
+  const st=window._unisciState;
+  const rimaste=st.coppie.filter(c=>!c._done);
+  const cntEl=document.querySelector('#unisci-lista');
+  if(cntEl&&cntEl.parentElement){const p=cntEl.parentElement.querySelector('p');if(p)p.textContent=rimaste.length+' di '+st.coppie.length+' coppie'}
+  if(!rimaste.length)_renderUnisciUI()}
 async function rimuoviMaisonBudget(id){if(!confirm('Rimuovere questo budget?'))return;
   try{await secDel('maison_budget','id=eq.'+id);maisonBudgetCache=maisonBudgetCache.filter(b=>b.id!==id);logAzione('Budget maison rimosso','ID '+id);renderMaisonBudgetUI();renderMaisonDashboard();renderMaisonBudgetAlerts();toast('Budget rimosso')}catch(e){toast('Errore rimozione budget')}}
 function renderMaisonBudgetAlerts(){const container=document.getElementById('maison-alerts-container');if(!container)return;
