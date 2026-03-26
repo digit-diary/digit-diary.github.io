@@ -4559,17 +4559,10 @@ async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0
         // Auto-calcola quantità buoni dal costo se non specificata nel testo
         parsedAll.forEach(p=>{if(p.tipoBuono&&BUONO_VALORI[p.tipoBuono]){
           const valBuono=BUONO_VALORI[p.tipoBuono];
-          // Se la qty è 1 (default) ma il costo suggerisce di più, ricalcola
-          if(p.tipiBuono&&p.tipiBuono.length===1&&p.tipiBuono[0].qty===1){
-            // Per singolo: costo/valore_buono = qty (se intero e > 1)
-            const costoPersona=nNomi>1?costo:costo;// per ora usa costo totale
-            const calcQty=Math.round(costoPersona/valBuono);
-            if(calcQty>1&&Math.abs(calcQty*valBuono-costoPersona)<1){
-              p.tipiBuono[0].qty=calcQty;p.note=calcQty+p.tipoBuono}}
-          // Anche se px > 1 e qty === 1 e costo = px * valore_buono
-          if(p.tipiBuono&&p.tipiBuono.length===1&&p.tipiBuono[0].qty===1&&px>1){
-            const calcQty=Math.round(costo/valBuono);
-            if(calcQty===px){p.tipiBuono[0].qty=calcQty;p.note=calcQty+p.tipoBuono}}}});
+          // Calcola qty dal costo: se supera il valore di 1 buono, sono 2+
+          if(p.tipiBuono&&p.tipiBuono.length===1&&p.tipiBuono[0].qty<=1){
+            const calcQty=Math.ceil(costo/valBuono);
+            if(calcQty>=1){p.tipiBuono[0].qty=calcQty;p.note=calcQty+p.tipoBuono}}}});
         // Se un nome nel gruppo ha tipo_buono, calcola splitting intelligente
         const gruppoTipo=parsedAll.find(p=>p.tipoBuono);
         let _grpBuonoCosto=0,_grpRestoCosto=costo;
@@ -4651,7 +4644,7 @@ async function salvaMaisonManuale(){
   const tipo=document.getElementById('maison-man-tipo').value||null;
   let qty=parseInt(document.getElementById('maison-man-qty').value)||1;
   // Auto-calcola qty se l'utente lascia 1 ma il costo suggerisce di più
-  if(tipo&&qty===1&&BUONO_VALORI[tipo]){const calcQ=Math.round(importo/BUONO_VALORI[tipo]);if(calcQ>1&&Math.abs(calcQ*BUONO_VALORI[tipo]-importo)<1)qty=calcQ}
+  if(tipo&&qty===1&&BUONO_VALORI[tipo]){const calcQ=Math.ceil(importo/BUONO_VALORI[tipo]);if(calcQ>=1)qty=calcQ}
   const dataVal=document.getElementById('maison-man-data').value||new Date().toISOString().split('T')[0];
   // Gestione nomi multipli con /
   const nomiRaw=rawNome.split(/\s*\/\s*/).map(n=>capitalizzaNome(n.trim())).filter(n=>n);
