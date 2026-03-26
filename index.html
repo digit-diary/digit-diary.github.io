@@ -5483,7 +5483,9 @@ function renderMaisonBudgetUI(){const el=document.getElementById('maison-budget-
     const group=filtered.filter(c=>c.cat===cd.key);if(!group.length)return;
     html+='<div class="cat-group-header" style="color:'+cd.color+';border-bottom-color:'+cd.color+'">'+cd.label+' <span class="cat-count" style="background:'+cd.color+'">'+group.length+'</span></div>';
     html+=group.map(renderClientRow).join('')})}
-  el.innerHTML=html}
+  el.innerHTML=html;
+  // Ripristina focus sul campo ricerca se era attivo
+  if(_filtNomeBudget){const _ri=document.getElementById('maison-filt-nome-budget');if(_ri){_ri.focus();_ri.setSelectionRange(_ri.value.length,_ri.value.length)}}}
 async function salvaMaisonBudget(){const nome=capitalizzaNome(document.getElementById('maison-budget-nome').value.trim());
   const chf=parseFloat(document.getElementById('maison-budget-chf').value)||null;
   const bu=parseInt(document.getElementById('maison-budget-bu').value)||null;
