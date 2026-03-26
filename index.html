@@ -4456,6 +4456,13 @@ function _trovaNomeSimileMaison(nome){const nomi=[...new Set(getMaisonReparto().
   const _cognome=nl.split(/\s+/)[0];
   if(_cognome.length>=3){for(const n of nomi){if(n.toLowerCase().split(/\s+/)[0]===_cognome)return{nome:n,tipo:'simile'}}}
   return null}
+const BUONO_VALORI={BU:15,BL:40,CG:40,WL:40};
+function _contaBuoni(righe,tipo){
+  return righe.filter(r=>r.tipo_buono===tipo).reduce((s,r)=>{
+    const m=(r.note||'').match(/(\d+)\s*(?:BU|BL|CG|WL)/i);
+    return s+(m?parseInt(m[1]):1);
+  },0);
+}
 function _parseMaisonNome(raw){let nome=raw.trim(),tipoBuono=null,note='',isSeven=false;
   const tipiBuono=[];// Array di {tipo, qty} per righe con più tipi
   // 0. Rimuovi info prezzo tra parentesi: (CHF 202.15 + CHF 50.40), (chf..), ecc.
@@ -4549,11 +4556,14 @@ async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0
         const nNomiNoSeven=parsedAll.filter(p=>!p.isSeven&&p.nome).length;
         const nNomi=nNomiNoSeven||1;
         const rigaHaSeven=parsedAll.some(p=>p.isSeven);
-        // Se un nome nel gruppo ha tipo_buono, applicalo a tutti e dividi quantità
+        // Se un nome nel gruppo ha tipo_buono, calcola splitting intelligente
         const gruppoTipo=parsedAll.find(p=>p.tipoBuono);
-        if(gruppoTipo&&nNomi>1){const qMatch=(gruppoTipo.note||'').match(/(\d+)\s*(BU|BL|CG|WL)/i);
-          const qTot=qMatch?parseInt(qMatch[1]):1;const qPer=Math.round(qTot/nNomi)||1;
-          parsedAll.forEach(p=>{if(p.nome&&!p.isSeven&&!p.tipoBuono){p.tipoBuono=gruppoTipo.tipoBuono;p.note=(p.note?p.note+', ':'')+qPer+gruppoTipo.tipoBuono}})}
+        let _grpBuonoCosto=0,_grpRestoCosto=costo;
+        if(gruppoTipo&&nNomi>1&&BUONO_VALORI[gruppoTipo.tipoBuono]){
+          const qMatch=(gruppoTipo.note||'').match(/(\d+)\s*(BU|BL|CG|WL)/i);
+          const qTot=qMatch?parseInt(qMatch[1]):1;
+          _grpBuonoCosto=Math.min(qTot*BUONO_VALORI[gruppoTipo.tipoBuono],costo);
+          _grpRestoCosto=costo-_grpBuonoCosto}
         for(let _ni=0;_ni<nomiRaw.length;_ni++){
           const parsed=parsedAll[_ni];if(!parsed.nome)continue;
           // Se questo nome è Seven stesso (solo "Seven" senza cognome) → skip
@@ -4574,19 +4584,23 @@ async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0
           const _dupKey=parsed.nome.toLowerCase()+'|'+dataGiornata;
           if(_giornoDuplicati.has(_dupKey)){dupCount++;warnings.push('Duplicato: '+parsed.nome+' ('+new Date(dataGiornata+'T12:00:00').toLocaleDateString('it-IT')+')')
           }else{_giornoDuplicati.add(_dupKey)}
+          // Calcola costo per questo nome nel gruppo
+          let _nomeCosto;
+          if(gruppoTipo&&nNomi>1&&BUONO_VALORI[gruppoTipo.tipoBuono]){
+            _nomeCosto=parsed.tipoBuono?Math.round(_grpBuonoCosto*100)/100:Math.round(_grpRestoCosto/(nNomi-1)*100)/100;
+          }else{_nomeCosto=Math.round(costo/nNomi*100)/100}
           // Se ha più tipi buono (es. 1BL + 2CG), crea righe separate
           if(parsed.tipiBuono&&parsed.tipiBuono.length>1){
             const totQty=parsed.tipiBuono.reduce((s,t)=>s+t.qty,0);
-            const costoBase=Math.round(costo/nNomi*100)/100;
             for(const tb of parsed.tipiBuono){
-              const quotaCosto=Math.round(costoBase*tb.qty/totQty*100)/100;
+              const quotaCosto=Math.round(_nomeCosto*tb.qty/totQty*100)/100;
               const rec={data_giornata:dataGiornata,nome:parsed.nome,px:Math.round((px/nNomi)*tb.qty/totQty)||1,
                 costo:quotaCosto,tipo_buono:tb.tipo,note:tb.qty+tb.tipo+(parsed.tipiBuono.length>1?' (da '+parsed.tipiBuono.map(t=>t.qty+t.tipo).join('+')+')':''),
                 gruppo:nNomi>1?capitalizzaNome(rawNome):'',operatore:getOperatore(),reparto_dip:currentReparto};
               try{await secPost('costi_maison',rec);totalRows++}catch(e){}}
           }else{
             const rec={data_giornata:dataGiornata,nome:parsed.nome,px:Math.round(px/nNomi)||1,
-              costo:Math.round(costo/nNomi*100)/100,tipo_buono:parsed.tipoBuono,note:parsed.note,
+              costo:_nomeCosto,tipo_buono:parsed.tipoBuono,note:parsed.note,
               gruppo:nNomi>1?capitalizzaNome(rawNome):'',operatore:getOperatore(),reparto_dip:currentReparto};
             try{await secPost('costi_maison',rec);totalRows++}catch(e){}}}
       }}
@@ -4633,10 +4647,20 @@ async function salvaMaisonManuale(){
     if(simile&&simile.tipo==='simile'){const corretto=_soloCorrezioneCognome(n,simile.nome);return corretto}
     return n});
   const _noteMan=tipo&&qty>1?qty+tipo:'';
+  // Calcola costo buono per splitting intelligente
+  let _buonoCosto=0,_restoCosto=importo;
+  if(tipo&&nNomi>1&&BUONO_VALORI[tipo]){
+    _buonoCosto=Math.min(qty*(BUONO_VALORI[tipo]),importo);
+    _restoCosto=importo-_buonoCosto}
   try{for(let i=0;i<nomiFinali.length;i++){
     const nome=nomiFinali[i];
+    // Se gruppo con buono: primo nome (quello che ha il buono) prende il costo buono, gli altri si dividono il resto
+    let _costo;
+    if(tipo&&nNomi>1&&BUONO_VALORI[tipo]){
+      _costo=i===0?Math.round(_buonoCosto*100)/100:Math.round(_restoCosto/(nNomi-1)*100)/100;
+    }else{_costo=Math.round(importo/nNomi*100)/100}
     const rec={data_giornata:dataVal,nome:nome,px:Math.round(px/nNomi)||1,
-      costo:Math.round(importo/nNomi*100)/100,tipo_buono:tipo,
+      costo:_costo,tipo_buono:i===0?tipo:null,
       note:(_noteMan||'')+(gruppoLabel?' '+gruppoLabel:''),
       gruppo:gruppoLabel,operatore:getOperatore(),reparto_dip:currentReparto};
     const r=await secPost('costi_maison',rec);if(r&&r[0])maisonCache.unshift(r[0])}
@@ -4704,10 +4728,10 @@ function renderMaisonDashboard(){const data=getMaisonFiltrati();
   const totPx=data.reduce((s,r)=>s+(r.px||0),0);
   const nClienti=new Set(data.map(r=>r.nome)).size;
   const nGiorni=new Set(data.map(r=>r.data_giornata)).size;
-  const nBU=data.filter(r=>r.tipo_buono==='BU').length;
-  const nBL=data.filter(r=>r.tipo_buono==='BL').length;
-  const nCG=data.filter(r=>r.tipo_buono==='CG').length;
-  const nWL=data.filter(r=>r.tipo_buono==='WL').length;
+  const nBU=_contaBuoni(data,'BU');
+  const nBL=_contaBuoni(data,'BL');
+  const nCG=_contaBuoni(data,'CG');
+  const nWL=_contaBuoni(data,'WL');
   const sb=document.getElementById('maison-stats-bar');
   // Determina periodo visualizzato
   const fd=(document.getElementById('maison-filt-dal')||{}).value,fa=(document.getElementById('maison-filt-al')||{}).value;
@@ -4726,7 +4750,7 @@ function renderMaisonDashboard(){const data=getMaisonFiltrati();
     confrontoHtml='<div style="text-align:center;margin-bottom:10px;font-size:.88rem;color:'+colore+';font-weight:600">'+(delta>0?'+':'')+delta+'% vs mese precedente ('+costoMesePrec.toFixed(0)+' CHF &#8594; '+costoMeseCorr.toFixed(0)+' CHF)</div>'}
   sb.innerHTML=(periodoLabel?'<div style="text-align:center;margin-bottom:10px;font-family:Playfair Display,serif;font-size:1.2rem;color:var(--ink)">'+periodoLabel+'</div>':'')+confrontoHtml+'<div class="stats-bar" style="margin:0"><div class="stat"><div class="stat-num gold">'+totCosto.toFixed(2)+'</div><div class="stat-label">Totale CHF</div></div><div class="stat"><div class="stat-num blue">'+nClienti+'</div><div class="stat-label">Clienti</div></div><div class="stat"><div class="stat-num">'+totPx+'</div><div class="stat-label">Persone</div></div><div class="stat"><div class="stat-num teal">'+nGiorni+'</div><div class="stat-label">Giorni</div></div><div class="stat"><div class="stat-num red">'+nBU+' BU / '+nBL+' BL / '+nCG+' CG / '+nWL+' WL</div><div class="stat-label">Buoni</div></div></div>';
   // Tabella
-  const byNome={};data.forEach(r=>{if(!byNome[r.nome])byNome[r.nome]={tot:0,px:0,visite:0,bu:0,bl:0,cg:0,wl:0,condivise:0,condivisiGruppi:[]};byNome[r.nome].tot+=parseFloat(r.costo||0);byNome[r.nome].px+=(r.px||0);byNome[r.nome].visite++;if(r.tipo_buono==='BU')byNome[r.nome].bu++;if(r.tipo_buono==='BL')byNome[r.nome].bl++;if(r.tipo_buono==='CG')byNome[r.nome].cg++;if(r.tipo_buono==='WL')byNome[r.nome].wl++;if(r._costoOriginale){byNome[r.nome].condivise++;byNome[r.nome].condivisiGruppi.push(r._gruppoOriginale)}});
+  const byNome={};data.forEach(r=>{if(!byNome[r.nome])byNome[r.nome]={tot:0,px:0,visite:0,bu:0,bl:0,cg:0,wl:0,condivise:0,condivisiGruppi:[]};const _bn=byNome[r.nome];_bn.tot+=parseFloat(r.costo||0);_bn.px+=(r.px||0);_bn.visite++;const _bq=(()=>{const m=(r.note||'').match(/(\d+)\s*(?:BU|BL|CG|WL)/i);return m?parseInt(m[1]):1})();if(r.tipo_buono==='BU')_bn.bu+=_bq;if(r.tipo_buono==='BL')_bn.bl+=_bq;if(r.tipo_buono==='CG')_bn.cg+=_bq;if(r.tipo_buono==='WL')_bn.wl+=_bq;if(r._costoOriginale){_bn.condivise++;_bn.condivisiGruppi.push(r._gruppoOriginale)}});
   const sorted=Object.entries(byNome).sort((a,b)=>b[1].tot-a[1].tot);
   const tb=document.getElementById('maison-table');
   if(!sorted.length){tb.innerHTML='<p style="color:var(--muted);text-align:center;padding:20px">Nessun dato. Carica un file Excel per iniziare.</p>';
@@ -4751,7 +4775,7 @@ function renderMaisonDashboard(){const data=getMaisonFiltrati();
     const catBadge=clientInfo&&clientInfo.categoria==='full_maison'?'<span class="mini-badge" style="background:#b8860b;margin-left:6px">Full Maison</span>':clientInfo&&clientInfo.categoria==='maison'?'<span class="mini-badge" style="background:#2980b9;margin-left:6px">Maison</span>':clientInfo&&clientInfo.categoria==='direzione'?'<span class="mini-badge" style="background:#8e44ad;margin-left:6px">Direzione</span>':clientInfo&&clientInfo.categoria==='bu'?'<span class="mini-badge" style="background:#e67e22;margin-left:6px">Buono Unico</span>':clientInfo&&clientInfo.categoria==='bl'?'<span class="mini-badge" style="background:#2c6e49;margin-left:6px">Buono Lounge</span>':'';
     const condBadge=d.condivise?' <span title="'+d.condivise+' voci condivise (costo diviso)" style="font-size:.78rem;color:var(--accent2);font-weight:600;cursor:help">÷'+[...new Set(d.condivisiGruppi)].length+'</span>':'';
     thtml+='<tr style="'+rowStyle+'"><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(nome)+'</span></strong>'+catBadge+(overBudget?' <span style="color:var(--accent);font-size:.75rem;font-weight:700">BUDGET SUPERATO</span>':nearBudget?' <span style="color:#e67e22;font-size:.75rem;font-weight:700">80% BUDGET</span>':'')+'</td><td class="num">'+d.visite+'</td><td class="num">'+d.px+'</td><td class="num">'+(d.bu||'-')+'</td><td class="num">'+(d.bl||'-')+'</td><td class="num">'+(d.cg||'-')+'</td><td class="num">'+(d.wl||'-')+'</td><td class="num"><strong>'+d.tot.toFixed(2)+'</strong>'+condBadge+'</td><td class="num">'+(d.tot/d.visite).toFixed(2)+'</td><td style="white-space:nowrap"><button class="btn-act edit" onclick="rinominaMaisonCliente(\''+ne+'\')" title="Rinomina">Rinomina</button> <button class="btn-act del" onclick="eliminaMaisonCliente(\''+ne+'\')" title="Elimina">Elimina</button></td></tr>'});
-  thtml+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td class="num"><strong>'+sorted.reduce((s,c)=>s+c[1].visite,0)+'</strong></td><td class="num"><strong>'+totPx+'</strong></td><td class="num"><strong>'+data.filter(r=>r.tipo_buono==='BU').length+'</strong></td><td class="num"><strong>'+data.filter(r=>r.tipo_buono==='BL').length+'</strong></td><td class="num"><strong>'+data.filter(r=>r.tipo_buono==='CG').length+'</strong></td><td class="num"><strong>'+data.filter(r=>r.tipo_buono==='WL').length+'</strong></td><td class="num"><strong>'+totCosto.toFixed(2)+'</strong></td><td></td><td></td></tr>';
+  thtml+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td class="num"><strong>'+sorted.reduce((s,c)=>s+c[1].visite,0)+'</strong></td><td class="num"><strong>'+totPx+'</strong></td><td class="num"><strong>'+_contaBuoni(data,'BU')+'</strong></td><td class="num"><strong>'+_contaBuoni(data,'BL')+'</strong></td><td class="num"><strong>'+_contaBuoni(data,'CG')+'</strong></td><td class="num"><strong>'+_contaBuoni(data,'WL')+'</strong></td><td class="num"><strong>'+totCosto.toFixed(2)+'</strong></td><td></td><td></td></tr>';
   thtml+='</tbody></table></div></div>';tb.innerHTML=thtml;
   // Grafici
   renderMaisonCharts(data,sorted);renderMaisonGdOggi()}
@@ -4793,13 +4817,13 @@ function renderMaisonGdOggi(){
   const dataFmt=dt.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'});
   const _brGd=getBudgetReparto();
   // Conteggio buoni per l'header
-  const _gdBU=righe.filter(r=>r.tipo_buono==='BU').length,_gdBL=righe.filter(r=>r.tipo_buono==='BL').length;
-  const _gdCG=righe.filter(r=>r.tipo_buono==='CG').length,_gdWL=righe.filter(r=>r.tipo_buono==='WL').length;
+  const _gdBU=_contaBuoni(righe,'BU'),_gdBL=_contaBuoni(righe,'BL');
+  const _gdCG=_contaBuoni(righe,'CG'),_gdWL=_contaBuoni(righe,'WL');
   let h='<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
   h+='<div style="display:flex;align-items:center;gap:6px">';
-  h+='<button onclick="cambiaGdMaison(-1)" style="background:var(--paper2);border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:5px 12px;color:var(--ink);font-size:1rem;font-weight:700;line-height:1" title="Giorno precedente">&#8249;</button>';
+  h+='<button onclick="cambiaGdMaison(-1)" style="background:var(--accent2);color:white;border:none;border-radius:2px;cursor:pointer;padding:6px 14px;font-size:.9rem;font-weight:700" title="Giorno precedente">&#9664;</button>';
   h+='<input type="text" id="gd-date-picker" value="'+dataFmt+'" readonly style="cursor:pointer;padding:5px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink);width:130px;text-align:center;font-weight:600">';
-  h+='<button onclick="cambiaGdMaison(1)" style="background:var(--paper2);border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:5px 12px;color:var(--ink);font-size:1rem;font-weight:700;line-height:1" title="Giorno successivo">&#8250;</button>';
+  h+='<button onclick="cambiaGdMaison(1)" style="background:var(--accent2);color:white;border:none;border-radius:2px;cursor:pointer;padding:6px 14px;font-size:.9rem;font-weight:700" title="Giorno successivo">&#9654;</button>';
   h+='<span style="font-weight:400;font-size:.85rem;color:var(--muted)">'+GIORNI[dt.getDay()]+'</span>';
   if(!isOggi)h+='<button onclick="cambiaGdMaison(0)" style="background:none;border:1px solid var(--accent2);border-radius:2px;cursor:pointer;padding:4px 10px;color:var(--accent2);font-size:.78rem;font-weight:600">Oggi</button>';
   h+='</div>';
@@ -4897,7 +4921,7 @@ async function esportaGdOggiPDF(){const oggi=_gdSelezionata||getGiornataCasino()
         const label=g.nome+(g.altriNomi.length?'/'+g.altriNomi.join('/'):'');
         const _qm=(g.note||'').match(/(\d+)\s*(BU|BL|CG|WL)/i);const _qn=_qm?parseInt(_qm[1]):1;
         return[label,b&&b.categoria?_catL[b.categoria]||'':'',g.tipo_buono?_qn+' '+g.tipo_buono:'—',g.px,g.costo.toFixed(2)]}),
-      foot:[['TOTALE','',righe.filter(r=>r.tipo_buono).length?[righe.filter(r=>r.tipo_buono==='BU').length?righe.filter(r=>r.tipo_buono==='BU').length+'BU':'',righe.filter(r=>r.tipo_buono==='BL').length?righe.filter(r=>r.tipo_buono==='BL').length+'BL':'',righe.filter(r=>r.tipo_buono==='CG').length?righe.filter(r=>r.tipo_buono==='CG').length+'CG':'',righe.filter(r=>r.tipo_buono==='WL').length?righe.filter(r=>r.tipo_buono==='WL').length+'WL':''].filter(Boolean).join(' '):'',totPx,tot.toFixed(2)]],
+      foot:[['TOTALE','',righe.filter(r=>r.tipo_buono).length?[_contaBuoni(righe,'BU')?_contaBuoni(righe,'BU')+'BU':'',_contaBuoni(righe,'BL')?_contaBuoni(righe,'BL')+'BL':'',_contaBuoni(righe,'CG')?_contaBuoni(righe,'CG')+'CG':'',_contaBuoni(righe,'WL')?_contaBuoni(righe,'WL')+'WL':''].filter(Boolean).join(' '):'',totPx,tot.toFixed(2)]],
       headStyles:{fillColor:[184,134,11]},footStyles:{fillColor:[245,243,238],textColor:[0,0,0],fontStyle:'bold'},
       styles:{fontSize:9,cellPadding:3},columnStyles:{3:{halign:'center'},4:{halign:'right'}},
       didParseCell:function(d){if(d.section==='body'&&d.column.index===1){const c=Object.entries(_catL).find(([k,v])=>v===d.cell.raw);if(c&&_catC[c[0]]){d.cell.styles.textColor=_catC[c[0]];d.cell.styles.fontStyle='bold'}}},
@@ -4937,7 +4961,7 @@ function apriDettaglioMaison(nome){const righe=getMaisonFiltrati().filter(r=>r.n
   const _regCheck=getRegaliReparto().filter(function(r){return r.nome.toLowerCase()===nome.toLowerCase()});
   if(!righe.length&&!_seCheck.length&&!_regCheck.length&&!budget){toast('Nessun dato per '+nome);return}
   const tot=righe.reduce((s,r)=>s+parseFloat(r.costo||0),0);const totPx=righe.reduce((s,r)=>s+(r.px||0),0);
-  const nBU=righe.filter(r=>r.tipo_buono==='BU').length,nBL=righe.filter(r=>r.tipo_buono==='BL').length;
+  const nBU=_contaBuoni(righe,'BU'),nBL=_contaBuoni(righe,'BL');
   const mesiCliente=righe.length?[...new Set(righe.map(r=>{const d=new Date(r.data_giornata+'T12:00:00');return MESI_FULL[d.getMonth()]+' '+d.getFullYear()}))].join(', '):'';
   const catBadgeD=budget&&budget.categoria==='full_maison'?' <span class="mini-badge" style="background:#b8860b;font-size:.78rem">Full Maison</span>':budget&&budget.categoria==='maison'?' <span class="mini-badge" style="background:#2980b9;font-size:.78rem">Maison</span>':budget&&budget.categoria==='direzione'?' <span class="mini-badge" style="background:#8e44ad;font-size:.78rem">Direzione</span>':budget&&budget.categoria==='bu'?' <span class="mini-badge" style="background:#e67e22;font-size:.78rem">Buono Unico</span>':budget&&budget.categoria==='bl'?' <span class="mini-badge" style="background:#2c6e49;font-size:.78rem">Buono Lounge</span>':'';
   const nascitaStr=budget&&budget.data_nascita?new Date(budget.data_nascita+'T12:00:00').toLocaleDateString('it-IT'):'';
@@ -5108,8 +5132,8 @@ function eseguiConfrontoMaison(){
     var totRegali=reg.reduce(function(s,r){return s+parseFloat(r.importo||0)},0);
     var visite=righe.length;
     var px=righe.reduce(function(s,r){return s+(r.px||0)},0);
-    var nBU=righe.filter(function(r){return r.tipo_buono==='BU'}).length;
-    var nBL=righe.filter(function(r){return r.tipo_buono==='BL'}).length;
+    var nBU=_contaBuoni(righe,'BU');
+    var nBL=_contaBuoni(righe,'BL');
     var cat=budget?budget.categoria||'':'';
     var byMese={};righe.forEach(function(r){var d=new Date(r.data_giornata+'T12:00:00');var k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');byMese[k]=(byMese[k]||0)+parseFloat(r.costo||0)});
     return{nome:nome,color:colors[i],totRist:totRist,totExtra:totExtra,totRegali:totRegali,totale:totRist+totExtra+totRegali,visite:visite,px:px,nBU:nBU,nBL:nBL,cat:cat,media:visite?totRist/visite:0,byMese:byMese}});
@@ -5168,7 +5192,7 @@ function esportaMaisonClienteCSV(nome){const righe=getMaisonFiltrati().filter(r=
   const rows=[[nome+(_csvCat?' — '+_csvCat:'')],['Data','Giorno','PX','Costo CHF','Tipo','Gruppo','Note']];
   righe.forEach(r=>{const d=new Date(r.data_giornata+'T12:00:00');rows.push([d.toLocaleDateString('it-IT'),GIORNI[d.getDay()],r.px,r.costo,r.tipo_buono||'',r.gruppo||'',r.note||''])});
   const tot=righe.reduce((s,r)=>s+parseFloat(r.costo||0),0);
-  const _nBU=righe.filter(r=>r.tipo_buono==='BU').length,_nBL=righe.filter(r=>r.tipo_buono==='BL').length,_nCG=righe.filter(r=>r.tipo_buono==='CG').length,_nWL=righe.filter(r=>r.tipo_buono==='WL').length;
+  const _nBU=_contaBuoni(righe,'BU'),_nBL=_contaBuoni(righe,'BL'),_nCG=_contaBuoni(righe,'CG'),_nWL=_contaBuoni(righe,'WL');
   rows.push(['TOTALE','',righe.reduce((s,r)=>s+(r.px||0),0),tot.toFixed(2),'BU:'+_nBU+' BL:'+_nBL+' CG:'+_nCG+' WL:'+_nWL,'','']);
   const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\n')],{type:'text/csv;charset=utf-8'});
   Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'maison_'+nome.replace(/\s+/g,'_')+'_'+_maisonFilePeriodo(righe)+'.csv'}).click();toast('CSV esportato!')}
@@ -5188,7 +5212,7 @@ async function esportaMaisonClientePDF(nome){
   if(!righe.length){toast('Nessun dato');return}
   if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore caricamento libreria PDF');return}}
   const tot=righe.reduce((s,r)=>s+parseFloat(r.costo||0),0);const totPx=righe.reduce((s,r)=>s+(r.px||0),0);
-  const nBU=righe.filter(r=>r.tipo_buono==='BU').length,nBL=righe.filter(r=>r.tipo_buono==='BL').length;
+  const nBU=_contaBuoni(righe,'BU'),nBL=_contaBuoni(righe,'BL');
   const _mesiMap={};righe.forEach(r=>{const d=new Date(r.data_giornata+'T12:00:00');const label=MESI_FULL[d.getMonth()]+' '+d.getFullYear();const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');_mesiMap[key]=label});
   const mesi=Object.keys(_mesiMap).sort().map(k=>_mesiMap[k]).join(', ');
   const budget=getBudgetReparto().find(b=>b.nome.toLowerCase()===nome.toLowerCase());
@@ -5204,7 +5228,7 @@ async function esportaMaisonClientePDF(nome){
     doc.setFontSize(10);doc.setFont('helvetica','normal');doc.setTextColor(100);
     doc.text(mesi+' — Casino Lugano SA',pw/2,y,{align:'center'});y+=8;doc.setTextColor(0);
     // KPI
-    const nCG=righe.filter(r=>r.tipo_buono==='CG').length,nWL=righe.filter(r=>r.tipo_buono==='WL').length;
+    const nCG=_contaBuoni(righe,'CG'),nWL=_contaBuoni(righe,'WL');
     if(sez.kpi){const media=righe.length?(tot/righe.length).toFixed(2):'0';
       doc.autoTable({startY:y,margin:{left:16,right:16},head:[['Visite','Persone','BU','BL','CG','WL','Totale CHF','Media/visita']],
         body:[[righe.length,totPx,nBU||'-',nBL||'-',nCG||'-',nWL||'-',tot.toFixed(2),media]],
@@ -5863,8 +5887,8 @@ function renderMaisonBudgetAlerts(){const container=document.getElementById('mai
   getBudgetReparto().forEach(b=>{
     const meseData=_mrAlerts.filter(r=>r.nome.toLowerCase()===b.nome.toLowerCase()&&r.data_giornata>=meseStart);
     const spent=meseData.reduce((s,r)=>s+parseFloat(r.costo||0),0);
-    const nBU=meseData.filter(r=>r.tipo_buono==='BU').length;
-    const nBL=meseData.filter(r=>r.tipo_buono==='BL').length;
+    const nBU=_contaBuoni(meseData,'BU');
+    const nBL=_contaBuoni(meseData,'BL');
     if(b.budget_chf&&spent>=b.budget_chf)alerts.push({nome:b.nome,tipo:'chf_over',spent,budget:b.budget_chf});
     else if(b.budget_chf&&spent>=b.budget_chf*0.8)alerts.push({nome:b.nome,tipo:'chf_near',spent,budget:b.budget_chf});
     if(b.budget_bu&&nBU>=b.budget_bu)alerts.push({nome:b.nome,tipo:'bu_over',count:nBU,max:b.budget_bu});
@@ -5886,7 +5910,7 @@ function acFiltraMaison(inputId,dropId){const inp=document.getElementById(inputI
 function esportaMaisonCSV(){const data=getMaisonFiltrati();if(!data.length){toast('Nessun dato');return}
   // Raggruppato per cliente con buoni e categoria
   const _catLabels={full_maison:'Full Maison',maison:'Maison',direzione:'Direzione',bu:'Buono Unico',bl:'Buono Lounge'};
-  const byNome={};data.forEach(r=>{if(!byNome[r.nome])byNome[r.nome]={tot:0,px:0,visite:0,bu:0,bl:0,cg:0,wl:0};const d=byNome[r.nome];d.tot+=parseFloat(r.costo||0);d.px+=(r.px||0);d.visite++;if(r.tipo_buono==='BU')d.bu++;if(r.tipo_buono==='BL')d.bl++;if(r.tipo_buono==='CG')d.cg++;if(r.tipo_buono==='WL')d.wl++});
+  const byNome={};data.forEach(r=>{if(!byNome[r.nome])byNome[r.nome]={tot:0,px:0,visite:0,bu:0,bl:0,cg:0,wl:0};const d=byNome[r.nome];d.tot+=parseFloat(r.costo||0);d.px+=(r.px||0);d.visite++;const _bq=(()=>{const m=(r.note||'').match(/(\d+)\s*(?:BU|BL|CG|WL)/i);return m?parseInt(m[1]):1})();if(r.tipo_buono==='BU')d.bu+=_bq;if(r.tipo_buono==='BL')d.bl+=_bq;if(r.tipo_buono==='CG')d.cg+=_bq;if(r.tipo_buono==='WL')d.wl+=_bq});
   const sorted=Object.entries(byNome).sort((a,b)=>b[1].tot-a[1].tot);
   const rows=[['Cliente','Categoria','Visite','PX','BU','BL','CG','WL','Totale CHF','Media CHF']];
   sorted.forEach(([n,d])=>{let budget=getBudgetReparto().find(b=>b.nome.toLowerCase()===n.toLowerCase());
@@ -5900,7 +5924,7 @@ async function esportaMaisonPDF(){const data=getMaisonFiltrati();if(!data.length
   if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore caricamento libreria PDF');return}}
   const _catLabels={full_maison:'Full Maison',maison:'Maison',direzione:'Direzione',bu:'Buono Unico',bl:'Buono Lounge'};
   const _catColors={full_maison:[184,134,11],maison:[41,128,185],direzione:[142,68,173],bu:[230,126,34],bl:[44,110,73]};
-  const byNome={};data.forEach(r=>{if(!byNome[r.nome])byNome[r.nome]={tot:0,px:0,visite:0,bu:0,bl:0,cg:0,wl:0};const d=byNome[r.nome];d.tot+=parseFloat(r.costo||0);d.px+=(r.px||0);d.visite++;if(r.tipo_buono==='BU')d.bu++;if(r.tipo_buono==='BL')d.bl++;if(r.tipo_buono==='CG')d.cg++;if(r.tipo_buono==='WL')d.wl++});
+  const byNome={};data.forEach(r=>{if(!byNome[r.nome])byNome[r.nome]={tot:0,px:0,visite:0,bu:0,bl:0,cg:0,wl:0};const d=byNome[r.nome];d.tot+=parseFloat(r.costo||0);d.px+=(r.px||0);d.visite++;const _bq=(()=>{const m=(r.note||'').match(/(\d+)\s*(?:BU|BL|CG|WL)/i);return m?parseInt(m[1]):1})();if(r.tipo_buono==='BU')d.bu+=_bq;if(r.tipo_buono==='BL')d.bl+=_bq;if(r.tipo_buono==='CG')d.cg+=_bq;if(r.tipo_buono==='WL')d.wl+=_bq});
   const sorted=Object.entries(byNome).sort((a,b)=>b[1].tot-a[1].tot);
   const totale=sorted.reduce((s,c)=>s+c[1].tot,0);
   try{const{jsPDF}=window.jspdf;const doc=new jsPDF('portrait','mm','a4');const pw=doc.internal.pageSize.getWidth();let y=14;
