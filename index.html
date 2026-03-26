@@ -4770,8 +4770,18 @@ function renderMaisonGdOggi(){
   const gdData=_gdSelezionata||getGiornataCasino();
   const righe=getMaisonRepartoExpanded().filter(r=>r.data_giornata===gdData);
   const isOggi=gdData===getGiornataCasino();
-  if(!righe.length&&isOggi){container.innerHTML='<div style="padding:16px;text-align:center;color:var(--muted);font-size:.88rem">Nessun costo Maison per la GD di oggi</div>';container.style.display='';return}
-  if(!righe.length){container.innerHTML='<div style="padding:16px;text-align:center;color:var(--muted);font-size:.88rem">Nessun dato per questa data</div>';container.style.display='';return}
+  const tutteDate=[...new Set(getMaisonRepartoExpanded().map(r=>r.data_giornata))].sort();
+  const haAltriDati=tutteDate.length>0;
+  if(!righe.length){
+    const dt=new Date(gdData+'T12:00:00');const GIORNI=['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
+    const dataFmt=dt.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'});
+    let emptyH='<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div style="display:flex;align-items:center;gap:8px">';
+    if(haAltriDati)emptyH+='<button onclick="cambiaGdMaison(-1)" style="background:none;border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:4px 8px;color:var(--ink);font-size:.9rem">&#9664;</button>';
+    emptyH+='<span>GD '+dataFmt+' &mdash; '+GIORNI[dt.getDay()]+'</span>';
+    if(haAltriDati)emptyH+='<button onclick="cambiaGdMaison(1)" style="background:none;border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:4px 8px;color:var(--ink);font-size:.9rem">&#9654;</button>';
+    if(!isOggi)emptyH+='<button onclick="cambiaGdMaison(0)" style="background:none;border:1px solid var(--accent2);border-radius:2px;cursor:pointer;padding:4px 8px;color:var(--accent2);font-size:.78rem;font-weight:600">Oggi</button>';
+    emptyH+='</div></div><div style="padding:16px;text-align:center;color:var(--muted);font-size:.88rem">Nessun costo Maison per questa GD</div>';
+    container.innerHTML=emptyH;container.style.display='';return}
   righe.sort((a,b)=>a.nome.localeCompare(b.nome,'it'));
   const totCHF=righe.reduce((s,r)=>s+parseFloat(r.costo||0),0);
   const totPX=righe.reduce((s,r)=>s+(r.px||0),0);
