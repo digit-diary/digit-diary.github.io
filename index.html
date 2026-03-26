@@ -1115,6 +1115,7 @@ const _k='DiarioCL26',_a='IRArGgsoICV9Xw4gNAggXg0le0UNBzNHCiwKentdNDE3MSNWbSlLfD
 const SB_URL=_d(_u),SB_KEY=_d(_a);
 const VAPID_PUBLIC_KEY='BLWf5mPlI4UySMKuPkj6O7nTxXbocOu8ggabz8Lit4MsgDuYHAkh49V4TH2dk8fuFu-gvDH1MYHSsdbNfIdPF_E';
 const _ps='cVEDSllXIXQGAHZZAEULW3MuAQUgCFRDXgkmLQEBcVxTFFhbey4AAnYIUhZcCSF/A1NxDwNAUV4iLgoCdAsERw==';const PUSH_SECRET=_d(_ps);
+function fmtCHF(n){if(!n&&n!==0)return'—';return parseFloat(n).toLocaleString('de-CH',{minimumFractionDigits:2,maximumFractionDigits:2})}
 const MESI=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
 const MESI_FULL=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 const GIORNI=['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
@@ -1975,12 +1976,12 @@ function renderCassaAlerts(){const container=document.getElementById('cassa-aler
   if(allinAlerts.length){
     html+='<div class="cassa-alert-banner allin" onclick="toggleCassaDD(\'allin\')">&#9888;&#65039; '+allinAlerts.length+' collaboratore/i con differenza cassa &#8805; CHF 90 &#8212; Preparare allineamento <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
     html+='<div class="cassa-alerts-dropdown hidden" id="cassa-allin-dd">';
-    allinAlerts.forEach(a=>{html+='<div class="cassa-alert-item"><span class="alert-name">'+escP(a.nome)+'</span><span class="alert-detail">Max singola differenza: '+a.importo.toFixed(2)+' CHF ('+a.count+' errori dal ultimo allineamento)</span><button class="alert-action" onclick="apriModuloVeloce(\'allineamento\',\''+a.nome.replace(/'/g,"\\'")+'\')">Crea Allineamento</button></div>'});
+    allinAlerts.forEach(a=>{html+='<div class="cassa-alert-item"><span class="alert-name">'+escP(a.nome)+'</span><span class="alert-detail">Max singola differenza: '+fmtCHF(a.importo)+' CHF ('+a.count+' errori dal ultimo allineamento)</span><button class="alert-action" onclick="apriModuloVeloce(\'allineamento\',\''+a.nome.replace(/'/g,"\\'")+'\')">Crea Allineamento</button></div>'});
     html+='</div>'}
   if(rdiAlerts.length){
     html+='<div class="cassa-alert-banner rdi" onclick="toggleCassaDD(\'rdi\')">&#9888;&#65039; '+rdiAlerts.length+' collaboratore/i con differenze cumulative &#8805; CHF 500 &#8212; Fare RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
     html+='<div class="cassa-alerts-dropdown hidden" id="cassa-rdi-dd">';
-    rdiAlerts.forEach(a=>{html+='<div class="cassa-alert-item"><span class="alert-name">'+escP(a.nome)+'</span><span class="alert-detail">Totale cumulativo: '+a.importo.toFixed(2)+' CHF ('+a.count+' errori dal ultimo RDI)</span><button class="alert-action" onclick="apriModuloVeloce(\'rdi\',\''+a.nome.replace(/'/g,"\\'")+'\')">Crea RDI</button></div>'});
+    rdiAlerts.forEach(a=>{html+='<div class="cassa-alert-item"><span class="alert-name">'+escP(a.nome)+'</span><span class="alert-detail">Totale cumulativo: '+fmtCHF(a.importo)+' CHF ('+a.count+' errori dal ultimo RDI)</span><button class="alert-action" onclick="apriModuloVeloce(\'rdi\',\''+a.nome.replace(/'/g,"\\'")+'\')">Crea RDI</button></div>'});
     html+='</div>'}
   container.innerHTML=html}
 function toggleCassaDD(type){const dd=document.getElementById('cassa-'+type+'-dd');if(dd)dd.classList.toggle('hidden')}
@@ -2078,7 +2079,7 @@ function _eseguiRicercaGlobale(q){
   // Maison
   const maisonRes=getMaisonRepartoExpanded().filter(r=>r.nome.toLowerCase().includes(q)||(r.note||'').toLowerCase().includes(q)||(r.gruppo||'').toLowerCase().includes(q)).slice(0,6);
   if(isVis('maison')&&maisonRes.length){html+='<div class="rg-section">Costi Maison ('+maisonRes.length+(maisonRes.length>=6?'+':'')+')</div>';
-    maisonRes.forEach(r=>{html+='<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'maison\');document.getElementById(\'maison-filt-nome\').value=\''+escP(r.nome)+'\';renderMaisonDashboard()"><span class="rg-badge" style="background:#b8860b">Maison</span><span class="rg-text"><strong>'+escP(r.nome)+'</strong> — '+parseFloat(r.costo).toFixed(2)+' CHF'+(r.tipo_buono?' ('+r.tipo_buono+')':'')+'</span><span class="rg-date">'+new Date(r.data_giornata+'T12:00:00').toLocaleDateString('it-IT')+'</span></div>'});tot+=maisonRes.length}
+    maisonRes.forEach(r=>{html+='<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'maison\');document.getElementById(\'maison-filt-nome\').value=\''+escP(r.nome)+'\';renderMaisonDashboard()"><span class="rg-badge" style="background:#b8860b">Maison</span><span class="rg-text"><strong>'+escP(r.nome)+'</strong> — '+fmtCHF(r.costo)+' CHF'+(r.tipo_buono?' ('+r.tipo_buono+')':'')+'</span><span class="rg-date">'+new Date(r.data_giornata+'T12:00:00').toLocaleDateString('it-IT')+'</span></div>'});tot+=maisonRes.length}
   // Promemoria
   const pmRes=promemoriaCache.filter(p=>p.titolo.toLowerCase().includes(q)||(p.descrizione||'').toLowerCase().includes(q)||(p.assegnato_a||'').toLowerCase().includes(q)).slice(0,5);
   if(isVis('promemoria')&&pmRes.length){html+='<div class="rg-section">Promemoria ('+pmRes.length+(pmRes.length>=5?'+':'')+')</div>';
@@ -2086,7 +2087,7 @@ function _eseguiRicercaGlobale(q){
   // Spese Extra
   const seRes=getSpeseReparto().filter(r=>r.beneficiario.toLowerCase().includes(q)||(r.luogo||'').toLowerCase().includes(q)||(r.descrizione||'').toLowerCase().includes(q)||(r.tipo||'').toLowerCase().includes(q)).slice(0,5);
   if(isVis('maison')&&seRes.length){html+='<div class="rg-section">Spese Extra ('+seRes.length+(seRes.length>=5?'+':'')+')</div>';
-    seRes.forEach(r=>{const tc=SE_TIPI_COLOR[r.tipo]||'var(--muted)';html+='<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'maison\')"><span class="rg-badge" style="background:'+tc+'">'+(SE_TIPI_LABEL[r.tipo]||r.tipo)+'</span><span class="rg-text"><strong>'+escP(r.beneficiario)+'</strong>'+(r.luogo?' — '+escP(r.luogo):'')+' — '+parseFloat(r.importo).toFixed(2)+' CHF</span><span class="rg-date">'+new Date(r.data_spesa+'T12:00:00').toLocaleDateString('it-IT')+'</span></div>'});tot+=seRes.length}
+    seRes.forEach(r=>{const tc=SE_TIPI_COLOR[r.tipo]||'var(--muted)';html+='<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'maison\')"><span class="rg-badge" style="background:'+tc+'">'+(SE_TIPI_LABEL[r.tipo]||r.tipo)+'</span><span class="rg-text"><strong>'+escP(r.beneficiario)+'</strong>'+(r.luogo?' — '+escP(r.luogo):'')+' — '+fmtCHF(r.importo)+' CHF</span><span class="rg-date">'+new Date(r.data_spesa+'T12:00:00').toLocaleDateString('it-IT')+'</span></div>'});tot+=seRes.length}
   // Registro (solo admin)
   const logRes=logCache.filter(l=>l.azione.toLowerCase().includes(q)||(l.dettaglio||'').toLowerCase().includes(q)||(l.operatore||'').toLowerCase().includes(q)).slice(0,5);
   if(isAdmin()&&logRes.length){html+='<div class="rg-section">Registro ('+logRes.length+(logRes.length>=5?'+':'')+')</div>';
@@ -2129,7 +2130,7 @@ async function generaRiepilogoMensile(){
     const stats=[
       ['Registrazioni totali',meseData.length],['Collaboratori coinvolti',nCollab],
       ['Errori',nErr],['Malattie',nMal],
-      ['Importo totale errori',totImp.toFixed(2)+' CHF'],
+      ['Importo totale errori','CHF '+fmtCHF(totImp)],
       ['Moduli allineamento generati',nAllin],['Moduli RDI generati',nRdi],['Moduli apprezzamento generati',nApprM]
     ];
     doc.autoTable({theme:'grid',startY:y,margin:{left:mx,right:mx},
@@ -2159,7 +2160,7 @@ async function generaRiepilogoMensile(){
       doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text('Dettaglio errori per collaboratore',mx,y);y+=2;
       doc.autoTable({theme:'grid',startY:y,margin:{left:mx,right:mx},
         head:[['Collaboratore','N. errori','Importo totale']],
-        body:errSorted.map(([n,d])=>[n,String(d.count),d.tot.toFixed(2)+' CHF']),
+        body:errSorted.map(([n,d])=>[n,String(d.count),'CHF '+fmtCHF(d.tot)]),
         headStyles:{fillColor:[192,57,43],textColor:[255,255,255]},
         styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:3},columnStyles:{1:{halign:'center'},2:{halign:'right'}},
         alternateRowStyles:{fillColor:[250,247,242]}});
@@ -2174,7 +2175,7 @@ async function generaRiepilogoMensile(){
       const speseTot=_pdfSpese.reduce((s,r)=>s+parseFloat(r.importo||0),0);
       const maisonClienti=new Set(_pdfMaison.map(r=>r.nome)).size;
       doc.autoTable({theme:'grid',startY:y,margin:{left:mx,right:mx},
-        body:[['Costo totale Maison',maisonTot.toFixed(2)+' CHF'],['Spese Extra totali',speseTot.toFixed(2)+' CHF'],['Clienti Maison',String(maisonClienti)]],
+        body:[['Costo totale Maison','CHF '+fmtCHF(maisonTot)],['Spese Extra totali','CHF '+fmtCHF(speseTot)],['Clienti Maison',String(maisonClienti)]],
         theme:'grid',styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:3},
         columnStyles:{0:{fontStyle:'bold',cellWidth:90},1:{halign:'center'}},
         alternateRowStyles:{fillColor:[250,247,242]}});
@@ -2765,7 +2766,7 @@ function _renderSchedaTimeline(nome,entries,moduli,dal,al){
     var d=new Date(i.date);
     var dateStr=d.toLocaleDateString('it-IT')+' '+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
     var bgCol=i.source==='mod'?(i.tipo==='RDI'?'#c0392b':i.tipo==='Allineamento'?'#1a4a7a':'#b8860b'):getColore(i.tipo);
-    var impBadge=i.importo&&parseFloat(i.importo)?'<span style="margin-left:4px;padding:1px 6px;background:var(--accent);color:white;border-radius:2px;font-size:.72rem;font-weight:700">'+parseFloat(i.importo).toFixed(2)+' '+(i.valuta||'CHF')+'</span>':'';
+    var impBadge=i.importo&&parseFloat(i.importo)?'<span style="margin-left:4px;padding:1px 6px;background:var(--accent);color:white;border-radius:2px;font-size:.72rem;font-weight:700">'+fmtCHF(i.importo)+' '+(i.valuta||'CHF')+'</span>':'';
     var repBadge=i.reparto?'<span style="margin-left:4px;padding:1px 6px;background:var(--muted);color:white;border-radius:2px;font-size:.72rem">'+escP(i.reparto)+'</span>':'';
     var srcBadge=i.source==='mod'?'<span style="margin-left:4px;padding:1px 5px;border:1px solid var(--line);border-radius:2px;font-size:.65rem;color:var(--muted)">MODULO</span>':'';
     return'<div class="scheda-timeline-item"><span style="font-size:.78rem;color:var(--muted);min-width:100px">'+dateStr+'</span><span class="mini-badge" style="background:'+bgCol+'">'+escP(i.tipo)+'</span>'+srcBadge+repBadge+impBadge+'<span style="flex:1;overflow:hidden;text-overflow:ellipsis">'+esc(i.text)+'</span>'+(i.operatore?'<span style="font-size:.72rem;color:var(--accent2)">'+escP(i.operatore)+'</span>':'')+'</div>'}).join('');
@@ -2860,7 +2861,7 @@ function stampaSchedaPDF(nome){
 
   // KPI table
   doc.autoTable({theme:'grid',startY:dal||al?45:40,head:[['Registrazioni','Errori','Costo Errori','Malattie','Amm. Verbali','Allineamenti','Apprezzamenti','RDI']],
-    body:[[entries.length,totErr,totErrCost?totErrCost.toFixed(2)+' CHF':'0',totMal,totAmm,allin,apprMod,rdi]],
+    body:[[entries.length,totErr,totErrCost?'CHF '+fmtCHF(totErrCost):'0',totMal,totAmm,allin,apprMod,rdi]],
     theme:'grid',headStyles:{fillColor:[26,74,122],fontSize:7},bodyStyles:{fontSize:8},margin:{left:14,right:14}});
 
   // Timeline table
@@ -3588,7 +3589,7 @@ function render(){const f=getFiltrati(),el=document.getElementById('entries-list
   if(!f.length){el.innerHTML='<div class="empty-state"><p>Nessuna registrazione</p><small>Modifica i filtri o aggiungi voci</small></div>';return}
   el.innerHTML=f.map(e=>{const d=new Date(e.data),bc='badge-'+e.tipo.replace(/ /g,'-'),te=e.tipo.replace(/'/g,"\\'"),pin=pinnedIds.has(e.id);
     const rep=e.reparto?'<span style="display:inline-block;margin-left:6px;padding:2px 8px;background:var(--muted);color:white;border-radius:2px;font-size:.78rem;font-weight:600">'+escP(e.reparto)+'</span>':'';
-    const imp=e.importo&&parseFloat(e.importo)?'<span style="display:inline-block;margin-left:6px;padding:2px 8px;background:var(--accent);color:white;border-radius:2px;font-size:.82rem;font-weight:700">'+parseFloat(e.importo).toFixed(2)+' '+(e.valuta||'CHF')+'</span>':'';
+    const imp=e.importo&&parseFloat(e.importo)?'<span style="display:inline-block;margin-left:6px;padding:2px 8px;background:var(--accent);color:white;border-radius:2px;font-size:.82rem;font-weight:700">'+fmtCHF(e.importo)+' '+(e.valuta||'CHF')+'</span>':'';
     const metaLines=[];if(e.operatore)metaLines.push('Inserita da '+escP(e.operatore));
     if(e.modificato_da)metaLines.push('Modificata da '+escP(e.modificato_da));
     const gdDiff=d.getHours()<6;const gdDate=gdDiff?new Date(d.getTime()-86400000):d;const gdBadge=gdDiff?'<span style="font-size:.72rem;padding:2px 7px;border-radius:2px;background:var(--accent2);color:white;font-weight:700">GD '+gdDate.getDate()+'.'+String(gdDate.getMonth()+1).padStart(2,'0')+'</span>':'';
@@ -3864,7 +3865,7 @@ function renderStatistiche(){const _dsAll=getDatiReparto();
   const _malCurr=_contaTotaleMalattie(_dsAll.filter(e=>(e.data||'').startsWith(_tCurrM)),nomeCorrente('Malattia'));
   const _malPrev=_contaTotaleMalattie(_dsAll.filter(e=>(e.data||'').startsWith(_tPrevM)),nomeCorrente('Malattia'));
   function _trendBadge(curr,prev,label){const d=curr-prev;if(d===0)return'';const col=d>0?'var(--accent)':'#2c6e49';const sign=d>0?'+':'';return' <span style="font-size:.72rem;font-weight:600;color:'+col+';background:'+col+'15;padding:1px 6px;border-radius:8px">'+sign+d+' vs '+label+'</span>'}
-  document.getElementById('stats-summary').innerHTML='<div class="stats-bar" style="margin-bottom:0"><div class="stat"><div class="stat-num">'+_ds.length+'</div><div class="stat-label">Registrazioni totali</div></div><div class="stat"><div class="stat-num blue">'+nCollab+'</div><div class="stat-label">Collaboratori</div></div><div class="stat"><div class="stat-num red">'+nErr+'</div><div class="stat-label">'+nomeCorrente('Errore')+_trendBadge(_errCurr,_errPrev,_tPrevName)+'</div></div><div class="stat"><div class="stat-num teal">'+_nMalStat+'</div><div class="stat-label">'+nomeCorrente('Malattia')+' (giorni)'+_trendBadge(_malCurr,_malPrev,_tPrevName)+'</div></div><div class="stat"><div class="stat-num gold">'+(totImp?totImp.toFixed(2):'0')+'</div><div class="stat-label">Importo totale</div></div></div>';
+  document.getElementById('stats-summary').innerHTML='<div class="stats-bar" style="margin-bottom:0"><div class="stat"><div class="stat-num">'+_ds.length+'</div><div class="stat-label">Registrazioni totali</div></div><div class="stat"><div class="stat-num blue">'+nCollab+'</div><div class="stat-label">Collaboratori</div></div><div class="stat"><div class="stat-num red">'+nErr+'</div><div class="stat-label">'+nomeCorrente('Errore')+_trendBadge(_errCurr,_errPrev,_tPrevName)+'</div></div><div class="stat"><div class="stat-num teal">'+_nMalStat+'</div><div class="stat-label">'+nomeCorrente('Malattia')+' (giorni)'+_trendBadge(_malCurr,_malPrev,_tPrevName)+'</div></div><div class="stat"><div class="stat-num gold">'+(totImp?fmtCHF(totImp):'0')+'</div><div class="stat-label">Importo totale</div></div></div>';
   // Grafico mensile (full width, primo)
   const tipiCount={};_ds.forEach(e=>{tipiCount[e.tipo]=(tipiCount[e.tipo]||0)+1});
   const tl=Object.keys(tipiCount).sort((a,b)=>tipiCount[b]-tipiCount[a]);
@@ -3895,8 +3896,8 @@ function renderStatistiche(){const _dsAll=getDatiReparto();
     let gCHF=0,gEUR=0,gCount=0;
     errSorted.forEach(([n,d])=>{gCHF+=d.totCHF;gEUR+=d.totEUR;gCount+=d.count;
       const reps=Object.entries(d.reparti).map(([r,c])=>'<span class="mini-badge" style="background:var(--muted)">'+r+': '+c+'</span>').join(' ');
-      const ne=n.replace(/'/g,"\\'");et+='<tr><td><span class="entry-name" onclick="apriSchedaCollaboratore(\''+ne+'\')"><strong>'+escP(n)+'</strong></span></td><td class="num"><span class="mini-badge" style="background:var(--accent)">'+d.count+'</span></td><td>'+reps+'</td><td class="num">'+(d.totCHF?d.totCHF.toFixed(2):'-')+'</td><td class="num">'+(d.totEUR?d.totEUR.toFixed(2):'-')+'</td></tr>'});
-    et+='<tr style="border-top:2px solid var(--ink)"><td><strong>TOTALE</strong></td><td class="num"><strong>'+gCount+'</strong></td><td></td><td class="num"><strong>'+(gCHF?gCHF.toFixed(2)+' CHF':'-')+'</strong></td><td class="num"><strong>'+(gEUR?gEUR.toFixed(2)+' EUR':'-')+'</strong></td></tr>';
+      const ne=n.replace(/'/g,"\\'");et+='<tr><td><span class="entry-name" onclick="apriSchedaCollaboratore(\''+ne+'\')"><strong>'+escP(n)+'</strong></span></td><td class="num"><span class="mini-badge" style="background:var(--accent)">'+d.count+'</span></td><td>'+reps+'</td><td class="num">'+(d.totCHF?fmtCHF(d.totCHF):'-')+'</td><td class="num">'+(d.totEUR?d.totEUR.toFixed(2):'-')+'</td></tr>'});
+    et+='<tr style="border-top:2px solid var(--ink)"><td><strong>TOTALE</strong></td><td class="num"><strong>'+gCount+'</strong></td><td></td><td class="num"><strong>'+(gCHF?fmtCHF(gCHF)+' CHF':'-')+'</strong></td><td class="num"><strong>'+(gEUR?gEUR.toFixed(2)+' EUR':'-')+'</strong></td></tr>';
     et+='</tbody></table>';document.getElementById('errori-table-wrap').innerHTML=et}
   else document.getElementById('errori-table-wrap').innerHTML='<p style="color:var(--muted)">Nessun errore registrato</p>'}
 function renderChart(id,type,data,opts){if(charts[id])charts[id].destroy();charts[id]=new Chart(document.getElementById(id),{type,data,options:Object.assign({responsive:true,maintainAspectRatio:true,animation:{duration:600}},opts||{})})}
@@ -3914,7 +3915,7 @@ async function esportaPDF(){const f=getFiltrati();if(!f.length){toast('Nessun da
   try{const{jsPDF}=window.jspdf;const doc=new jsPDF('landscape','mm','a4');
   doc.setFontSize(16);doc.setFont('helvetica','bold');doc.text('Diario Collaboratori - Casino Lugano SA',14,15);
   doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(120);doc.text('Generato il '+new Date().toLocaleDateString('it-IT')+' - '+f.length+' registrazioni',14,21);doc.setTextColor(0);
-  doc.autoTable({theme:'grid',startY:26,head:[['Data','Ora','Collaboratore','Tipo','Reparto','Descrizione','Importo']],body:f.map(e=>{const d=new Date(e.data);return[d.toLocaleDateString('it-IT'),d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}),e.nome,e.tipo,e.reparto||'',e.testo.replace(/\n/g,' '),e.importo?(parseFloat(e.importo).toFixed(2)+' '+(e.valuta||'CHF')):'']}),
+  doc.autoTable({theme:'grid',startY:26,head:[['Data','Ora','Collaboratore','Tipo','Reparto','Descrizione','Importo']],body:f.map(e=>{const d=new Date(e.data);return[d.toLocaleDateString('it-IT'),d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}),e.nome,e.tipo,e.reparto||'',e.testo.replace(/\n/g,' '),e.importo?(fmtCHF(e.importo)+' '+(e.valuta||'CHF')):'']}),
     styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:8,cellPadding:2,overflow:'linebreak'},headStyles:{fillColor:[26,18,8],textColor:[250,247,242],fontStyle:'bold'},columnStyles:{0:{cellWidth:22},1:{cellWidth:15},2:{cellWidth:30},3:{cellWidth:25},4:{cellWidth:18},5:{cellWidth:'auto'},6:{cellWidth:22}},alternateRowStyles:{fillColor:[250,247,242]},
     didParseCell:function(d){if(d.section==='body'&&d.column.index===3){var c=getColore(d.cell.raw);if(c){var r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16);d.cell.styles.textColor=[r,g,b]}d.cell.styles.fontStyle='bold'}},
     margin:{top:26,left:14,right:14},didDrawPage:function(){doc.setFontSize(7);doc.setTextColor(150);doc.text('Casino Lugano SA - Pag. '+doc.internal.getNumberOfPages(),14,doc.internal.pageSize.height-8)}});
@@ -4125,7 +4126,7 @@ function renderDashboard(){
   const maisonOggiRighe=_rm.filter(r=>r.data_giornata===oggi);
   if(maisonOggiRighe.length){const byN={};maisonOggiRighe.forEach(r=>{byN[r.nome]=(byN[r.nome]||0)+parseFloat(r.costo||0)});
     const sorted=Object.entries(byN).sort((a,b)=>b[1]-a[1]);
-    mEl.innerHTML=sorted.map(([n,c])=>{const ne=n.replace(/'/g,"\\'");return'<div style="padding:5px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;font-size:.88rem"><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(n)+'</span><strong>'+c.toFixed(2)+' CHF</strong></div>'}).join('')+'<div style="padding:8px 0;display:flex;justify-content:space-between;font-weight:700;color:var(--accent2)"><span>Totale</span><span>'+maisonOggi.toFixed(2)+' CHF</span></div>'}
+    mEl.innerHTML=sorted.map(([n,c])=>{const ne=n.replace(/'/g,"\\'");return'<div style="padding:5px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;font-size:.88rem"><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(n)+'</span><strong>'+fmtCHF(c)+' CHF</strong></div>'}).join('')+'<div style="padding:8px 0;display:flex;justify-content:space-between;font-weight:700;color:var(--accent2)"><span>Totale</span><span>CHF '+fmtCHF(maisonOggi)+'</span></div>'}
   else{mEl.innerHTML='<p style="color:var(--muted);text-align:center;padding:20px">Nessun dato Maison oggi</p>'}
   // Visibilita widget Dashboard in base alle impostazioni admin
   const dashMaison=document.getElementById('dash-maison');if(dashMaison)dashMaison.style.display=isVis('maison')?'':'none';
@@ -4186,14 +4187,14 @@ async function generaReportSettimanale(sez){
     doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text('Panoramica',mx,y);y+=2;
     doc.autoTable({theme:'grid',startY:y,margin:{left:mx,right:mx},
       body:[['Registrazioni',settData.length],['Errori',nErr],['Malattie',nMal],
-        ['Costi Maison',totMaison.toFixed(2)+' CHF'],['Allineamenti generati',nAllin],['Apprezzamenti (moduli)',nApprMod],['RDI generati',nRdi]],
+        ['Costi Maison','CHF '+fmtCHF(totMaison)],['Allineamenti generati',nAllin],['Apprezzamenti (moduli)',nApprMod],['RDI generati',nRdi]],
       theme:'grid',styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:3},columnStyles:{0:{fontStyle:'bold',cellWidth:80},1:{halign:'center'}},
       alternateRowStyles:{fillColor:[250,247,242]}});y=doc.lastAutoTable.finalY+8}
     // DIFFERENZE CASSA
     if(sez.cassa){const errCassa=settData.filter(e=>e.tipo===nomeCorrente('Errore')&&e.reparto==='Cassa'&&parseFloat(e.importo)>0);
     if(errCassa.length){doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text('Differenze Cassa',mx,y);y+=2;
       doc.autoTable({theme:'grid',startY:y,margin:{left:mx,right:mx},head:[['Data','Collaboratore','Importo']],
-        body:errCassa.map(e=>{const d=new Date(e.data);return[d.toLocaleDateString('it-IT'),e.nome,parseFloat(e.importo).toFixed(2)+' '+(e.valuta||'CHF')]}),
+        body:errCassa.map(e=>{const d=new Date(e.data);return[d.toLocaleDateString('it-IT'),e.nome,fmtCHF(e.importo)+' '+(e.valuta||'CHF')]}),
         headStyles:{fillColor:[192,57,43]},styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:3},alternateRowStyles:{fillColor:[250,247,242]}});y=doc.lastAutoTable.finalY+8}}
     // COSTI MAISON
     if(sez.maison&&settMaison.length){const byN={};settMaison.forEach(r=>{if(!byN[r.nome])byN[r.nome]={tot:0,visite:0};byN[r.nome].tot+=parseFloat(r.costo||0);byN[r.nome].visite++});
@@ -4201,8 +4202,8 @@ async function generaReportSettimanale(sez){
       if(y+30>doc.internal.pageSize.getHeight()-20){doc.addPage();y=16}
       doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text('Top Clienti Maison',mx,y);y+=2;
       doc.autoTable({theme:'grid',startY:y,margin:{left:mx,right:mx},head:[['Cliente','Visite','Totale CHF']],
-        body:top10.map(([n,d])=>[n,d.visite,d.tot.toFixed(2)]),
-        foot:[['TOTALE','',totMaison.toFixed(2)]],
+        body:top10.map(([n,d])=>[n,d.visite,fmtCHF(d.tot)]),
+        foot:[['TOTALE','','CHF '+fmtCHF(totMaison)]],
         headStyles:{fillColor:[184,134,11]},footStyles:{fillColor:[245,243,238],textColor:[0,0,0],fontStyle:'bold'},
         styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:3},columnStyles:{1:{halign:'center'},2:{halign:'right'}},
         alternateRowStyles:{fillColor:[250,247,242]}});y=doc.lastAutoTable.finalY+8}
@@ -4224,17 +4225,17 @@ async function generaReportSettimanale(sez){
     if(sez.spese_extra){const settSE=getSpeseReparto().filter(r=>r.data_spesa>=sett[0]&&r.data_spesa<=sett[6]);
     if(settSE.length){const totSE=settSE.reduce((s,r)=>s+parseFloat(r.importo||0),0);
       if(y+20>doc.internal.pageSize.getHeight()-20){doc.addPage();y=16}
-      doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text('Spese Extra ('+totSE.toFixed(2)+' CHF)',mx,y);y+=2;
+      doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text('Spese Extra (CHF '+fmtCHF(totSE)+')',mx,y);y+=2;
       doc.autoTable({theme:'grid',startY:y,margin:{left:mx,right:mx},head:[['Data','Beneficiario','Tipo','Luogo','CHF']],
-        body:settSE.map(r=>[new Date(r.data_spesa+'T12:00:00').toLocaleDateString('it-IT'),r.beneficiario,SE_TIPI_LABEL[r.tipo]||r.tipo,r.luogo||'',parseFloat(r.importo).toFixed(2)]),
+        body:settSE.map(r=>[new Date(r.data_spesa+'T12:00:00').toLocaleDateString('it-IT'),r.beneficiario,SE_TIPI_LABEL[r.tipo]||r.tipo,r.luogo||'',fmtCHF(r.importo)]),
         headStyles:{fillColor:[41,128,185]},styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:3},columnStyles:{4:{halign:'right'}},alternateRowStyles:{fillColor:[250,247,242]}});y=doc.lastAutoTable.finalY+8}}
     // Regali
     if(sez.regali){const settReg=getRegaliReparto().filter(r=>(r.data_regalo||'')>=sett[0]&&(r.data_regalo||'')<=sett[6]);
     if(settReg.length){const totReg=settReg.reduce((s,r)=>s+parseFloat(r.importo||0),0);
       if(y+20>doc.internal.pageSize.getHeight()-20){doc.addPage();y=16}
-      doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text('Regali'+(totReg?' ('+totReg.toFixed(2)+' CHF)':''),mx,y);y+=2;
+      doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text('Regali'+(totReg?' (CHF '+fmtCHF(totReg)+')':''),mx,y);y+=2;
       doc.autoTable({theme:'grid',startY:y,margin:{left:mx,right:mx},head:[['Data','Cliente','Descrizione','CHF']],
-        body:settReg.map(r=>[new Date((r.data_regalo||r.created_at)+'T12:00:00').toLocaleDateString('it-IT'),r.nome,r.descrizione||'',r.importo?parseFloat(r.importo).toFixed(2):'—']),
+        body:settReg.map(r=>[new Date((r.data_regalo||r.created_at)+'T12:00:00').toLocaleDateString('it-IT'),r.nome,r.descrizione||'',r.importo?fmtCHF(r.importo):'—']),
         headStyles:{fillColor:[139,105,20]},styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:3},alternateRowStyles:{fillColor:[250,247,242]}});y=doc.lastAutoTable.finalY+8}}
     // Footer
     const tp=doc.internal.getNumberOfPages();for(let i=1;i<=tp;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(150);
@@ -4282,8 +4283,8 @@ async function generaReportAnnuale(sez){
     doc.autoTable({theme:'grid',startY:y,margin:{left:mx,right:mx},body:[
       ['Registrazioni totali',d.data.length],['Errori',nErr],['Malattie',nMal],
       ['Apprezzamenti (moduli)',d.moduli.filter(m=>m.tipo==='apprezzamento').length],
-      ['Costi Maison totali',totMaison.toFixed(2)+' CHF'],['Spese Extra totali',totSE.toFixed(2)+' CHF'],
-      ['Totale complessivo (Maison+Extra)',(totMaison+totSE).toFixed(2)+' CHF'],
+      ['Costi Maison totali','CHF '+fmtCHF(totMaison)],['Spese Extra totali','CHF '+fmtCHF(totSE)],
+      ['Totale complessivo (Maison+Extra)','CHF '+fmtCHF(totMaison+totSE)],
       ['Allineamenti',d.moduli.filter(m=>m.tipo==='allineamento').length],
       ['RDI',d.moduli.filter(m=>m.tipo==='rdi').length]],
       theme:'grid',styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:3},columnStyles:{0:{fontStyle:'bold',cellWidth:90},1:{halign:'center'}},
@@ -4303,7 +4304,7 @@ async function generaReportAnnuale(sez){
       if(y+30>doc.internal.pageSize.getHeight()-20){doc.addPage();y=16}
       doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text('Top 15 Clienti Maison',mx,y);y+=2;
       doc.autoTable({theme:'grid',startY:y,margin:{left:mx,right:mx},head:[['Cliente','Totale CHF']],
-        body:top15.map(function(x){return[x[0],x[1].toFixed(2)]}),
+        body:top15.map(function(x){return[x[0],fmtCHF(x[1])]}),
         headStyles:{fillColor:[184,134,11]},styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:3},columnStyles:{1:{halign:'right'}},
         alternateRowStyles:{fillColor:[250,247,242]}});y=doc.lastAutoTable.finalY+8}
     // Footer
@@ -4319,7 +4320,7 @@ function generaReportAnnualeCSV(){
   for(var m=0;m<12;m++){var ms=anno+'-'+String(m+1).padStart(2,'0');
     var mData=d.data.filter(function(e){return e.data.startsWith(ms)});var mMaison=d.maison.filter(function(r){return r.data_giornata.startsWith(ms)});
     var mSE=d.spese.filter(function(r){return r.data_spesa.startsWith(ms)});
-    rows.push([MESI_FULL[m],mData.length,mData.filter(function(e){return e.tipo===nomeCorrente('Errore')}).length,mData.filter(function(e){return e.tipo===nomeCorrente('Malattia')}).length,mMaison.reduce(function(s,r){return s+parseFloat(r.costo||0)},0).toFixed(2),mSE.reduce(function(s,r){return s+parseFloat(r.importo||0)},0).toFixed(2)])}
+    rows.push([MESI_FULL[m],mData.length,mData.filter(function(e){return e.tipo===nomeCorrente('Errore')}).length,mData.filter(function(e){return e.tipo===nomeCorrente('Malattia')}).length,fmtCHF(mMaison.reduce(function(s,r){return s+parseFloat(r.costo||0)},0)),fmtCHF(mSE.reduce(function(s,r){return s+parseFloat(r.importo||0)},0))])}
   // Registrazioni
   rows.push([''],['REGISTRAZIONI'],['Data','Collaboratore','Tipo','Descrizione']);
   d.data.forEach(function(e){var dt=new Date(e.data);rows.push([dt.toLocaleDateString('it-IT'),e.nome,e.tipo,e.testo.replace(/\n/g,' ')])});
@@ -4761,13 +4762,13 @@ function renderRegali(){var data=getRegaliReparto();var el=document.getElementBy
   if(!data.length){el.innerHTML='<div class="empty-state"><p>Nessun regalo registrato</p><small>Aggiungi un regalo per un cliente Maison</small></div>';return}
   var totale=data.reduce(function(s,r){return s+parseFloat(r.importo||0)},0);
   var nClienti=new Set(data.map(function(r){return r.nome})).size;
-  var html='<div class="mini-stats-bar"><div class="mini-stat"><div class="mini-stat-num gold">'+(totale?totale.toFixed(2):'—')+'</div><div class="mini-stat-label">Totale CHF</div></div><div class="mini-stat"><div class="mini-stat-num blue">'+data.length+'</div><div class="mini-stat-label">Regali</div></div><div class="mini-stat"><div class="mini-stat-num">'+nClienti+'</div><div class="mini-stat-label">Clienti</div></div></div>';
+  var html='<div class="mini-stats-bar"><div class="mini-stat"><div class="mini-stat-num gold">'+(totale?fmtCHF(totale):'—')+'</div><div class="mini-stat-label">Totale CHF</div></div><div class="mini-stat"><div class="mini-stat-num blue">'+data.length+'</div><div class="mini-stat-label">Regali</div></div><div class="mini-stat"><div class="mini-stat-num">'+nClienti+'</div><div class="mini-stat-label">Clienti</div></div></div>';
   html+='<table class="collab-table"><thead><tr><th>Data</th><th>Cliente</th><th>Descrizione</th><th class="num">CHF</th><th>Operatore</th><th></th></tr></thead><tbody>';
   data.forEach(function(r){var d=new Date((r.data_regalo||r.created_at)+'T12:00:00');var ne=r.nome.replace(/'/g,"\\'");
     var _regBudget=getBudgetReparto().find(function(b){return b.nome.toLowerCase()===r.nome.toLowerCase()});
     if(!_regBudget){var _rc=r.nome.toLowerCase().split(/\s+/)[0];if(_rc.length>=3)_regBudget=getBudgetReparto().find(function(b){return b.nome.toLowerCase().split(/\s+/)[0]===_rc})}
     var _regCatBadge=_regBudget&&_regBudget.categoria==='full_maison'?' <span class="mini-badge" style="background:#b8860b;font-size:.7rem">Full Maison</span>':_regBudget&&_regBudget.categoria==='maison'?' <span class="mini-badge" style="background:#2980b9;font-size:.7rem">Maison</span>':_regBudget&&_regBudget.categoria==='direzione'?' <span class="mini-badge" style="background:#8e44ad;font-size:.7rem">Direzione</span>':_regBudget&&_regBudget.categoria==='bu'?' <span class="mini-badge" style="background:#e67e22;font-size:.7rem">Buono Unico</span>':_regBudget&&_regBudget.categoria==='bl'?' <span class="mini-badge" style="background:#2c6e49;font-size:.7rem">Buono Lounge</span>':'';
-    html+='<tr><td style="font-weight:600">'+d.toLocaleDateString('it-IT')+'</td><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(r.nome)+'</span></strong>'+_regCatBadge+'</td><td>'+escP(r.descrizione||'')+'</td><td class="num">'+(r.importo?parseFloat(r.importo).toFixed(2):'—')+'</td><td style="color:var(--muted);font-size:.82rem">'+escP(r.operatore||'')+'</td><td><button class="btn-act del" onclick="eliminaRegalo('+r.id+')">Elimina</button></td></tr>'});
+    html+='<tr><td style="font-weight:600">'+d.toLocaleDateString('it-IT')+'</td><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(r.nome)+'</span></strong>'+_regCatBadge+'</td><td>'+escP(r.descrizione||'')+'</td><td class="num">'+(r.importo?fmtCHF(r.importo):'—')+'</td><td style="color:var(--muted);font-size:.82rem">'+escP(r.operatore||'')+'</td><td><button class="btn-act del" onclick="eliminaRegalo('+r.id+')">Elimina</button></td></tr>'});
   html+='</tbody></table>';
   el.innerHTML=html}
 // NOTE PRIVATE CLIENTI
@@ -4819,7 +4820,7 @@ function renderMaisonDashboard(){const data=getMaisonFiltrati();
   if(costoMesePrec>0){const delta=((costoMeseCorr-costoMesePrec)/costoMesePrec*100).toFixed(1);
     const colore=delta>0?'var(--accent)':delta<0?'#2c6e49':'var(--muted)';
     confrontoHtml='<div style="text-align:center;margin-bottom:10px;font-size:.88rem;color:'+colore+';font-weight:600">'+(delta>0?'+':'')+delta+'% vs mese precedente ('+costoMesePrec.toFixed(0)+' CHF &#8594; '+costoMeseCorr.toFixed(0)+' CHF)</div>'}
-  sb.innerHTML=(periodoLabel?'<div style="text-align:center;margin-bottom:10px;font-family:Playfair Display,serif;font-size:1.2rem;color:var(--ink)">'+periodoLabel+'</div>':'')+confrontoHtml+'<div class="stats-bar" style="margin:0"><div class="stat"><div class="stat-num gold">'+totCosto.toFixed(2)+'</div><div class="stat-label">Totale CHF</div></div><div class="stat"><div class="stat-num blue">'+nClienti+'</div><div class="stat-label">Clienti</div></div><div class="stat"><div class="stat-num">'+totPx+'</div><div class="stat-label">Persone</div></div><div class="stat"><div class="stat-num teal">'+nGiorni+'</div><div class="stat-label">Giorni</div></div><div class="stat"><div class="stat-num red">'+nBU+' BU / '+nBL+' BL / '+nCG+' CG / '+nWL+' WL</div><div class="stat-label">Buoni</div></div></div>';
+  sb.innerHTML=(periodoLabel?'<div style="text-align:center;margin-bottom:10px;font-family:Playfair Display,serif;font-size:1.2rem;color:var(--ink)">'+periodoLabel+'</div>':'')+confrontoHtml+'<div class="stats-bar" style="margin:0"><div class="stat"><div class="stat-num gold">'+fmtCHF(totCosto)+'</div><div class="stat-label">Totale CHF</div></div><div class="stat"><div class="stat-num blue">'+nClienti+'</div><div class="stat-label">Clienti</div></div><div class="stat"><div class="stat-num">'+totPx+'</div><div class="stat-label">Persone</div></div><div class="stat"><div class="stat-num teal">'+nGiorni+'</div><div class="stat-label">Giorni</div></div><div class="stat"><div class="stat-num red">'+nBU+' BU / '+nBL+' BL / '+nCG+' CG / '+nWL+' WL</div><div class="stat-label">Buoni</div></div></div>';
   // Tabella
   const byNome={};data.forEach(r=>{if(!byNome[r.nome])byNome[r.nome]={tot:0,px:0,visite:0,bu:0,bl:0,cg:0,wl:0,condivise:0,condivisiGruppi:[]};const _bn=byNome[r.nome];_bn.tot+=parseFloat(r.costo||0);_bn.px+=(r.px||0);_bn.visite++;const _bq=(()=>{const m=(r.note||'').match(/(\d+)\s*(?:BU|BL|CG|WL)/i);return m?parseInt(m[1]):1})();if(r.tipo_buono==='BU')_bn.bu+=_bq;if(r.tipo_buono==='BL')_bn.bl+=_bq;if(r.tipo_buono==='CG')_bn.cg+=_bq;if(r.tipo_buono==='WL')_bn.wl+=_bq;if(r._costoOriginale){_bn.condivise++;_bn.condivisiGruppi.push(r._gruppoOriginale)}});
   const sorted=Object.entries(byNome).sort((a,b)=>b[1].tot-a[1].tot);
@@ -4845,8 +4846,8 @@ function renderMaisonDashboard(){const data=getMaisonFiltrati();
     const clientInfo=budget;
     const catBadge=clientInfo&&clientInfo.categoria==='full_maison'?'<span class="mini-badge" style="background:#b8860b;margin-left:6px">Full Maison</span>':clientInfo&&clientInfo.categoria==='maison'?'<span class="mini-badge" style="background:#2980b9;margin-left:6px">Maison</span>':clientInfo&&clientInfo.categoria==='direzione'?'<span class="mini-badge" style="background:#8e44ad;margin-left:6px">Direzione</span>':clientInfo&&clientInfo.categoria==='bu'?'<span class="mini-badge" style="background:#e67e22;margin-left:6px">Buono Unico</span>':clientInfo&&clientInfo.categoria==='bl'?'<span class="mini-badge" style="background:#2c6e49;margin-left:6px">Buono Lounge</span>':'';
     const condBadge=d.condivise?' <span title="'+d.condivise+' voci condivise (costo diviso)" style="font-size:.78rem;color:var(--accent2);font-weight:600;cursor:help">÷'+[...new Set(d.condivisiGruppi)].length+'</span>':'';
-    thtml+='<tr style="'+rowStyle+'"><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(nome)+'</span></strong>'+catBadge+(overBudget?' <span style="color:var(--accent);font-size:.75rem;font-weight:700">BUDGET SUPERATO</span>':nearBudget?' <span style="color:#e67e22;font-size:.75rem;font-weight:700">80% BUDGET</span>':'')+'</td><td class="num">'+d.visite+'</td><td class="num">'+d.px+'</td><td class="num">'+(d.bu||'-')+'</td><td class="num">'+(d.bl||'-')+'</td><td class="num">'+(d.cg||'-')+'</td><td class="num">'+(d.wl||'-')+'</td><td class="num"><strong>'+d.tot.toFixed(2)+'</strong>'+condBadge+'</td><td class="num">'+(d.tot/d.visite).toFixed(2)+'</td><td style="white-space:nowrap"><button class="btn-act edit" onclick="rinominaMaisonCliente(\''+ne+'\')" title="Rinomina">Rinomina</button> <button class="btn-act del" onclick="eliminaMaisonCliente(\''+ne+'\')" title="Elimina">Elimina</button></td></tr>'});
-  thtml+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td class="num"><strong>'+sorted.reduce((s,c)=>s+c[1].visite,0)+'</strong></td><td class="num"><strong>'+totPx+'</strong></td><td class="num"><strong>'+_contaBuoni(data,'BU')+'</strong></td><td class="num"><strong>'+_contaBuoni(data,'BL')+'</strong></td><td class="num"><strong>'+_contaBuoni(data,'CG')+'</strong></td><td class="num"><strong>'+_contaBuoni(data,'WL')+'</strong></td><td class="num"><strong>'+totCosto.toFixed(2)+'</strong></td><td></td><td></td></tr>';
+    thtml+='<tr style="'+rowStyle+'"><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(nome)+'</span></strong>'+catBadge+(overBudget?' <span style="color:var(--accent);font-size:.75rem;font-weight:700">BUDGET SUPERATO</span>':nearBudget?' <span style="color:#e67e22;font-size:.75rem;font-weight:700">80% BUDGET</span>':'')+'</td><td class="num">'+d.visite+'</td><td class="num">'+d.px+'</td><td class="num">'+(d.bu||'-')+'</td><td class="num">'+(d.bl||'-')+'</td><td class="num">'+(d.cg||'-')+'</td><td class="num">'+(d.wl||'-')+'</td><td class="num"><strong>'+fmtCHF(d.tot)+'</strong>'+condBadge+'</td><td class="num">'+fmtCHF(d.tot/d.visite)+'</td><td style="white-space:nowrap"><button class="btn-act edit" onclick="rinominaMaisonCliente(\''+ne+'\')" title="Rinomina">Rinomina</button> <button class="btn-act del" onclick="eliminaMaisonCliente(\''+ne+'\')" title="Elimina">Elimina</button></td></tr>'});
+  thtml+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td class="num"><strong>'+sorted.reduce((s,c)=>s+c[1].visite,0)+'</strong></td><td class="num"><strong>'+totPx+'</strong></td><td class="num"><strong>'+_contaBuoni(data,'BU')+'</strong></td><td class="num"><strong>'+_contaBuoni(data,'BL')+'</strong></td><td class="num"><strong>'+_contaBuoni(data,'CG')+'</strong></td><td class="num"><strong>'+_contaBuoni(data,'WL')+'</strong></td><td class="num"><strong>'+fmtCHF(totCosto)+'</strong></td><td></td><td></td></tr>';
   thtml+='</tbody></table></div></div>';tb.innerHTML=thtml;
   // Grafici
   renderMaisonCharts(data,sorted);renderMaisonGdOggi()}
@@ -4898,7 +4899,7 @@ function renderMaisonGdOggi(){
   h+='<span style="font-weight:400;font-size:.85rem;color:var(--muted)">'+GIORNI[dt.getDay()]+'</span>';
   if(!isOggi)h+='<button onclick="cambiaGdMaison(0)" style="background:none;border:1px solid var(--accent2);border-radius:2px;cursor:pointer;padding:4px 10px;color:var(--accent2);font-size:.78rem;font-weight:600">Oggi</button>';
   h+='</div>';
-  h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-weight:400;font-size:.85rem;color:var(--muted)">'+totCHF.toFixed(2)+' CHF &middot; '+totPX+' PX'+(_gdBU?' &middot; '+_gdBU+'BU':'')+(_gdBL?' &middot; '+_gdBL+'BL':'')+(_gdCG?' &middot; '+_gdCG+'CG':'')+(_gdWL?' &middot; '+_gdWL+'WL':'')+'</span>';
+  h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-weight:400;font-size:.85rem;color:var(--muted)">'+fmtCHF(totCHF)+' CHF &middot; '+totPX+' PX'+(_gdBU?' &middot; '+_gdBU+'BU':'')+(_gdBL?' &middot; '+_gdBL+'BL':'')+(_gdCG?' &middot; '+_gdCG+'CG':'')+(_gdWL?' &middot; '+_gdWL+'WL':'')+'</span>';
   h+='<button onclick="esportaGdOggiCSV()" style="font-size:.72rem;padding:4px 10px;background:none;border:1px solid white;color:white;border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif;font-weight:600">CSV</button>';
   h+='<button onclick="esportaGdOggiPDF()" style="font-size:.72rem;padding:4px 10px;background:none;border:1px solid #c0392b;color:#c0392b;border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif;font-weight:600">PDF</button></div></div>';
   h+='<div style="padding:0 16px 16px;overflow-x:auto"><table class="collab-table"><thead><tr><th style="background:var(--paper)">Cliente</th><th style="background:var(--paper)">Tipo</th><th class="num" style="background:var(--paper)">PX</th><th class="num" style="background:var(--paper)">Costo CHF</th><th style="background:var(--paper)"></th></tr></thead><tbody>';
@@ -4925,7 +4926,7 @@ function renderMaisonGdOggi(){
       var _qtyM=(r.note||'').match(/(\d+)\s*(BU|BL|CG|WL)/i);var _qtyN=_qtyM?parseInt(_qtyM[1]):1;
       var tipoBadge=r.tipo_buono?'<span class="mini-badge" style="background:'+({BU:'#e67e22',BL:'#2c6e49',CG:'#8e44ad',WL:'#2980b9'}[r.tipo_buono]||'var(--muted)')+'">'+_qtyN+' '+r.tipo_buono+'</span>':'<span style="color:var(--muted)">&mdash;</span>';
       const idsGruppo=gruppoRighe.map(x=>x.id).join(',');
-      h+='<tr><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+neP+'\')">'+escP(primoNome)+'</span></strong>'+catBadge+(altriNomi?' <span style="color:var(--muted);font-size:.82rem"> /'+altriNomi+'</span>':'')+'</td><td>'+tipoBadge+'</td><td class="num">'+totPxGruppo+'</td><td class="num">'+totGruppo.toFixed(2)+'</td><td style="white-space:nowrap"><button class="btn-act del" onclick="eliminaMaisonGruppoGd(\''+idsGruppo+'\')" title="Elimina gruppo">Elimina</button></td></tr>';
+      h+='<tr><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+neP+'\')">'+escP(primoNome)+'</span></strong>'+catBadge+(altriNomi?' <span style="color:var(--muted);font-size:.82rem"> /'+altriNomi+'</span>':'')+'</td><td>'+tipoBadge+'</td><td class="num">'+totPxGruppo+'</td><td class="num">'+fmtCHF(totGruppo)+'</td><td style="white-space:nowrap"><button class="btn-act del" onclick="eliminaMaisonGruppoGd(\''+idsGruppo+'\')" title="Elimina gruppo">Elimina</button></td></tr>';
     }else{
       _gdVisti.add(r.id);
       var budget=_brGd.find(function(b){return b.nome.toLowerCase()===r.nome.toLowerCase()});
@@ -4933,10 +4934,10 @@ function renderMaisonGdOggi(){
       var catBadge=budget&&budget.categoria?'<span class="mini-badge" style="background:'+({full_maison:'#b8860b',maison:'#2980b9',direzione:'#8e44ad',bu:'#e67e22',bl:'#2c6e49'}[budget.categoria]||'var(--muted)')+';margin-left:6px">'+({full_maison:'Full Maison',maison:'Maison',direzione:'Direzione',bu:'Buono Unico',bl:'Buono Lounge'}[budget.categoria]||'')+'</span>':'';
       var _qtyM=(r.note||'').match(/(\d+)\s*(BU|BL|CG|WL)/i);var _qtyN=_qtyM?parseInt(_qtyM[1]):1;
       var tipoBadge=r.tipo_buono?'<span class="mini-badge" style="background:'+({BU:'#e67e22',BL:'#2c6e49',CG:'#8e44ad',WL:'#2980b9'}[r.tipo_buono]||'var(--muted)')+'">'+_qtyN+' '+r.tipo_buono+'</span>':'<span style="color:var(--muted)">&mdash;</span>';
-      h+='<tr><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(r.nome)+'</span></strong>'+catBadge+'</td><td>'+tipoBadge+'</td><td class="num">'+r.px+'</td><td class="num">'+parseFloat(r.costo||0).toFixed(2)+'</td><td style="white-space:nowrap"><button class="btn-act del" onclick="eliminaMaisonRigaGd('+r.id+')" title="Elimina">Elimina</button></td></tr>'}}
+      h+='<tr><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(r.nome)+'</span></strong>'+catBadge+'</td><td>'+tipoBadge+'</td><td class="num">'+r.px+'</td><td class="num">'+fmtCHF(r.costo)+'</td><td style="white-space:nowrap"><button class="btn-act del" onclick="eliminaMaisonRigaGd('+r.id+')" title="Elimina">Elimina</button></td></tr>'}}
   );
   const _totBuoni=[_gdBU?_gdBU+'BU':'',_gdBL?_gdBL+'BL':'',_gdCG?_gdCG+'CG':'',_gdWL?_gdWL+'WL':''].filter(Boolean).join(' · ');
-  h+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td style="font-size:.78rem;color:var(--muted)">'+(_totBuoni||'')+'</td><td class="num"><strong>'+totPX+'</strong></td><td class="num"><strong>'+totCHF.toFixed(2)+'</strong></td><td></td></tr>';
+  h+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td style="font-size:.78rem;color:var(--muted)">'+(_totBuoni||'')+'</td><td class="num"><strong>'+totPX+'</strong></td><td class="num"><strong>CHF '+fmtCHF(totCHF)+'</strong></td><td></td></tr>';
   h+='</tbody></table></div>';
   container.innerHTML=h;container.style.display='';
   // Init flatpickr sul date picker
@@ -4968,9 +4969,9 @@ function esportaGdOggiCSV(){const oggi=_gdSelezionata||getGiornataCasino();const
   grouped.forEach(g=>{let b=_br.find(x=>x.nome.toLowerCase()===g.nome.toLowerCase());if(!b){const c=g.nome.toLowerCase().split(/\s+/)[0];if(c.length>=3)b=_br.find(x=>x.nome.toLowerCase().split(/\s+/)[0]===c)}
     const label=g.nome+(g.altriNomi.length?'/'+g.altriNomi.join('/'):'');
     const _qm=(g.note||'').match(/(\d+)\s*(BU|BL|CG|WL)/i);const _qn=_qm?parseInt(_qm[1]):1;
-    rows.push([label,b&&b.categoria?_catL[b.categoria]||'':'',g.tipo_buono?_qn+' '+g.tipo_buono:'—',g.px,g.costo.toFixed(2)])});
+    rows.push([label,b&&b.categoria?_catL[b.categoria]||'':'',g.tipo_buono?_qn+' '+g.tipo_buono:'—',g.px,fmtCHF(g.costo)])});
   const tot=grouped.reduce((s,g)=>s+g.costo,0);
-  rows.push(['TOTALE','','',grouped.reduce((s,g)=>s+g.px,0),tot.toFixed(2)]);
+  rows.push(['TOTALE','','',grouped.reduce((s,g)=>s+g.px,0),fmtCHF(tot)]);
   const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\n')],{type:'text/csv;charset=utf-8'});
   Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'maison_gd_'+oggi+'.csv'}).click();toast('CSV GD esportato!')}
 async function esportaGdOggiPDF(){const oggi=_gdSelezionata||getGiornataCasino();const righe=getMaisonRepartoExpanded().filter(r=>r.data_giornata===oggi).sort((a,b)=>a.nome.localeCompare(b.nome));
@@ -4985,14 +4986,14 @@ async function esportaGdOggiPDF(){const oggi=_gdSelezionata||getGiornataCasino()
     y+=28;doc.setFont('helvetica','bold');doc.setFontSize(16);doc.text('Formulario Ristorante',pw/2,y,{align:'center'});y+=7;
     doc.setFontSize(11);doc.setFont('helvetica','normal');doc.setTextColor(100);
     doc.text('GD '+dt.toLocaleDateString('it-IT')+' — '+GIORNI[dt.getDay()]+' — Casino Lugano SA',pw/2,y,{align:'center'});y+=5;
-    doc.text(righe.length+' clienti — '+totPx+' persone — '+tot.toFixed(2)+' CHF',pw/2,y,{align:'center'});y+=10;doc.setTextColor(0);
+    doc.text(righe.length+' clienti — '+totPx+' persone — CHF '+fmtCHF(tot),pw/2,y,{align:'center'});y+=10;doc.setTextColor(0);
     const grouped=_raggruppaGdRighe(righe);
     doc.autoTable({theme:'grid',startY:y,margin:{left:16,right:16},head:[['Cliente','Categoria','Tipo','PX','Costo CHF']],
       body:grouped.map(g=>{let b=_br.find(x=>x.nome.toLowerCase()===g.nome.toLowerCase());if(!b){const c=g.nome.toLowerCase().split(/\s+/)[0];if(c.length>=3)b=_br.find(x=>x.nome.toLowerCase().split(/\s+/)[0]===c)}
         const label=g.nome+(g.altriNomi.length?'/'+g.altriNomi.join('/'):'');
         const _qm=(g.note||'').match(/(\d+)\s*(BU|BL|CG|WL)/i);const _qn=_qm?parseInt(_qm[1]):1;
-        return[label,b&&b.categoria?_catL[b.categoria]||'':'',g.tipo_buono?_qn+' '+g.tipo_buono:'—',g.px,g.costo.toFixed(2)]}),
-      foot:[['TOTALE','',righe.filter(r=>r.tipo_buono).length?[_contaBuoni(righe,'BU')?_contaBuoni(righe,'BU')+'BU':'',_contaBuoni(righe,'BL')?_contaBuoni(righe,'BL')+'BL':'',_contaBuoni(righe,'CG')?_contaBuoni(righe,'CG')+'CG':'',_contaBuoni(righe,'WL')?_contaBuoni(righe,'WL')+'WL':''].filter(Boolean).join(' '):'',totPx,tot.toFixed(2)]],
+        return[label,b&&b.categoria?_catL[b.categoria]||'':'',g.tipo_buono?_qn+' '+g.tipo_buono:'—',g.px,fmtCHF(g.costo)]}),
+      foot:[['TOTALE','',righe.filter(r=>r.tipo_buono).length?[_contaBuoni(righe,'BU')?_contaBuoni(righe,'BU')+'BU':'',_contaBuoni(righe,'BL')?_contaBuoni(righe,'BL')+'BL':'',_contaBuoni(righe,'CG')?_contaBuoni(righe,'CG')+'CG':'',_contaBuoni(righe,'WL')?_contaBuoni(righe,'WL')+'WL':''].filter(Boolean).join(' '):'',totPx,'CHF '+fmtCHF(tot)]],
       headStyles:{fillColor:[184,134,11],halign:'center'},footStyles:{fillColor:[245,243,238],textColor:[0,0,0],fontStyle:'bold'},
       styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:3},columnStyles:{0:{halign:'left',cellWidth:50},1:{halign:'left',cellWidth:30},2:{halign:'center',cellWidth:22},3:{halign:'center',cellWidth:18},4:{halign:'right',cellWidth:28}},
       didParseCell:function(d){if(d.section==='body'&&d.column.index===1){const c=Object.entries(_catL).find(([k,v])=>v===d.cell.raw);if(c&&_catC[c[0]]){d.cell.styles.textColor=_catC[c[0]];d.cell.styles.fontStyle='bold'}}},
@@ -5039,7 +5040,7 @@ function apriDettaglioMaison(nome){const righe=getMaisonFiltrati().filter(r=>r.n
   const ne=nome.replace(/'/g,"\\'");
   const _curCat=budget&&budget.categoria||'';
   const catSelect=' <select id="detail-cat-select" onchange="salvaDetailCat(\''+ne+'\')" style="font-size:.78rem;padding:3px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink);vertical-align:middle;cursor:pointer"><option value=""'+(!_curCat?' selected':'')+'>— Categoria —</option><option value="full_maison"'+(_curCat==='full_maison'?' selected':'')+'>Full Maison</option><option value="maison"'+(_curCat==='maison'?' selected':'')+'>Maison</option><option value="direzione"'+(_curCat==='direzione'?' selected':'')+'>Direzione</option><option value="bu"'+(_curCat==='bu'?' selected':'')+'>Buono Unico</option><option value="bl"'+(_curCat==='bl'?' selected':'')+'>Buono Lounge</option></select>';
-  let html='<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px"><div><h3 style="font-family:Playfair Display,serif;color:var(--ink);margin-bottom:4px">'+escP(nome)+catBadgeD+catSelect+'</h3><p style="color:var(--accent2);font-size:.9rem;font-weight:600;margin-bottom:2px">'+mesiCliente+'</p><p style="color:var(--muted);font-size:.82rem">'+righe.length+' visite — '+totPx+' persone — '+tot.toFixed(2)+' CHF'+(nBU?' — '+nBU+' BU':'')+(nBL?' — '+nBL+' BL':'')+'</p>'+(budget&&budget.budget_chf?'<p style="font-size:.82rem;color:'+(tot>=budget.budget_chf?'var(--accent)':tot>=budget.budget_chf*0.8?'#e67e22':'#2c6e49')+';font-weight:600">Budget: '+tot.toFixed(0)+' / '+parseFloat(budget.budget_chf).toFixed(0)+' CHF ('+Math.round(tot/budget.budget_chf*100)+'%)</p>':'')+'<div style="display:flex;align-items:center;gap:8px;margin-top:6px"><span style="font-size:.82rem;color:var(--muted)">Data nascita:</span><input type="text" id="detail-nascita" value="'+(budget&&budget.data_nascita||'')+'" placeholder="Seleziona..." readonly style="cursor:pointer;padding:4px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper2);color:var(--ink);width:120px"><button class="btn-salva" onclick="salvaDetailNascita(\''+ne+'\')" style="font-size:.78rem;padding:5px 14px;background:var(--accent2)">Salva</button>'+(nascitaStr?' <span style="font-size:.82rem;color:var(--muted)">Attuale: '+nascitaStr+'</span>':'')+'</div>'+(budget&&budget.aggiornato_da?'<p style="font-size:.78rem;color:var(--muted);margin-top:4px">Ultimo aggiornamento: '+escP(budget.aggiornato_da)+(budget.aggiornato_at?' — '+new Date(budget.aggiornato_at).toLocaleDateString('it-IT')+' '+new Date(budget.aggiornato_at).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}):'')+'</p>':'')+'</div><button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\')" style="padding:6px 12px;font-size:.75rem">Chiudi</button></div>';
+  let html='<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px"><div><h3 style="font-family:Playfair Display,serif;color:var(--ink);margin-bottom:4px">'+escP(nome)+catBadgeD+catSelect+'</h3><p style="color:var(--accent2);font-size:.9rem;font-weight:600;margin-bottom:2px">'+mesiCliente+'</p><p style="color:var(--muted);font-size:.82rem">'+righe.length+' visite — '+totPx+' persone — '+fmtCHF(tot)+' CHF'+(nBU?' — '+nBU+' BU':'')+(nBL?' — '+nBL+' BL':'')+'</p>'+(budget&&budget.budget_chf?'<p style="font-size:.82rem;color:'+(tot>=budget.budget_chf?'var(--accent)':tot>=budget.budget_chf*0.8?'#e67e22':'#2c6e49')+';font-weight:600">Budget: '+tot.toFixed(0)+' / '+parseFloat(budget.budget_chf).toFixed(0)+' CHF ('+Math.round(tot/budget.budget_chf*100)+'%)</p>':'')+'<div style="display:flex;align-items:center;gap:8px;margin-top:6px"><span style="font-size:.82rem;color:var(--muted)">Data nascita:</span><input type="text" id="detail-nascita" value="'+(budget&&budget.data_nascita||'')+'" placeholder="Seleziona..." readonly style="cursor:pointer;padding:4px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper2);color:var(--ink);width:120px"><button class="btn-salva" onclick="salvaDetailNascita(\''+ne+'\')" style="font-size:.78rem;padding:5px 14px;background:var(--accent2)">Salva</button>'+(nascitaStr?' <span style="font-size:.82rem;color:var(--muted)">Attuale: '+nascitaStr+'</span>':'')+'</div>'+(budget&&budget.aggiornato_da?'<p style="font-size:.78rem;color:var(--muted);margin-top:4px">Ultimo aggiornamento: '+escP(budget.aggiornato_da)+(budget.aggiornato_at?' — '+new Date(budget.aggiornato_at).toLocaleDateString('it-IT')+' '+new Date(budget.aggiornato_at).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}):'')+'</p>':'')+'</div><button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\')" style="padding:6px 12px;font-size:.75rem">Chiudi</button></div>';
   // Pre-compute spese extra e regali per KPI (riusa dati gia calcolati sopra)
   const seRighe=_seCheck.sort((a,b)=>a.data_spesa.localeCompare(b.data_spesa));
   const totSE=seRighe.reduce((s,r)=>s+parseFloat(r.importo||0),0);
@@ -5103,24 +5104,24 @@ function apriDettaglioMaison(nome){const righe=getMaisonFiltrati().filter(r=>r.n
   if(righe.length){
   html+='<div style="overflow-x:auto"><table class="collab-table"><thead><tr><th>Data</th><th>Giorno</th><th class="num">PX</th><th class="num">Costo CHF</th><th>Tipo</th><th>Gruppo</th><th>Note</th><th></th></tr></thead><tbody>';
   righe.forEach(r=>{const d=new Date(r.data_giornata+'T12:00:00');
-    const costoTip=r._costoOriginale?' title="'+r._costoOriginale.toFixed(2)+'/'+r._nCondiviso+' ('+escP(r._gruppoOriginale)+')" style="cursor:help"':'';
-    html+='<tr><td style="font-weight:600">'+d.getDate()+' '+MESI[d.getMonth()]+'</td><td>'+GIORNI[d.getDay()]+'</td><td class="num">'+r.px+'</td><td class="num"><strong'+costoTip+'>'+parseFloat(r.costo).toFixed(2)+(r._costoOriginale?' <span style="font-size:.78rem;color:var(--accent2)">÷'+r._nCondiviso+'</span>':'')+'</strong></td><td>'+(r.tipo_buono?'<span class="mini-badge" style="background:'+(r.tipo_buono==='BU'?'#e67e22':r.tipo_buono==='CG'?'#8e44ad':r.tipo_buono==='WL'?'#2980b9':'#2c6e49')+'">'+r.tipo_buono+'</span>':'—')+'</td><td style="color:var(--muted);font-size:.85rem">'+escP(r._gruppoOriginale||r.gruppo||'')+'</td><td style="color:var(--muted);font-size:.85rem">'+escP(r.note||'')+'</td><td style="white-space:nowrap"><button class="btn-act edit" onclick="modificaMaisonRiga('+r.id+',\''+ne+'\')" style="font-size:.78rem;padding:3px 8px">Modifica</button> <button class="btn-act" onclick="spostaMaisonToExtra('+r.id+',\''+ne+'\')" style="font-size:.78rem;padding:3px 8px;color:#e67e22;border-color:#e67e22" title="Sposta in Spese Extra">&#8594; Extra</button> <button class="btn-act del" onclick="eliminaMaisonRigaDettaglio('+r.id+',\''+ne+'\')" style="font-size:.78rem;padding:3px 8px">Elimina</button></td></tr>'});
-  html+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td colspan="2"><strong>TOTALE RISTORANTE</strong></td><td class="num"><strong>'+totPx+'</strong></td><td class="num"><strong>'+tot.toFixed(2)+'</strong></td><td colspan="3"></td></tr>';
+    const costoTip=r._costoOriginale?' title="'+fmtCHF(r._costoOriginale)+'/'+r._nCondiviso+' ('+escP(r._gruppoOriginale)+')" style="cursor:help"':'';
+    html+='<tr><td style="font-weight:600">'+d.getDate()+' '+MESI[d.getMonth()]+'</td><td>'+GIORNI[d.getDay()]+'</td><td class="num">'+r.px+'</td><td class="num"><strong'+costoTip+'>'+fmtCHF(r.costo)+(r._costoOriginale?' <span style="font-size:.78rem;color:var(--accent2)">÷'+r._nCondiviso+'</span>':'')+'</strong></td><td>'+(r.tipo_buono?'<span class="mini-badge" style="background:'+(r.tipo_buono==='BU'?'#e67e22':r.tipo_buono==='CG'?'#8e44ad':r.tipo_buono==='WL'?'#2980b9':'#2c6e49')+'">'+r.tipo_buono+'</span>':'—')+'</td><td style="color:var(--muted);font-size:.85rem">'+escP(r._gruppoOriginale||r.gruppo||'')+'</td><td style="color:var(--muted);font-size:.85rem">'+escP(r.note||'')+'</td><td style="white-space:nowrap"><button class="btn-act edit" onclick="modificaMaisonRiga('+r.id+',\''+ne+'\')" style="font-size:.78rem;padding:3px 8px">Modifica</button> <button class="btn-act" onclick="spostaMaisonToExtra('+r.id+',\''+ne+'\')" style="font-size:.78rem;padding:3px 8px;color:#e67e22;border-color:#e67e22" title="Sposta in Spese Extra">&#8594; Extra</button> <button class="btn-act del" onclick="eliminaMaisonRigaDettaglio('+r.id+',\''+ne+'\')" style="font-size:.78rem;padding:3px 8px">Elimina</button></td></tr>'});
+  html+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td colspan="2"><strong>TOTALE RISTORANTE</strong></td><td class="num"><strong>'+totPx+'</strong></td><td class="num"><strong>CHF '+fmtCHF(tot)+'</strong></td><td colspan="3"></td></tr>';
   html+='</tbody></table></div>';
   }else{html+='<p style="color:var(--muted);text-align:center;padding:12px;font-size:.9rem">Nessun costo ristorante (tutte le voci sono in Spese Extra)</p>'}
   // Spese Extra per questo cliente (seRighe/totSE already computed above for KPI)
   if(seRighe.length){
-    html+='<h4 style="font-family:Playfair Display,serif;margin:16px 0 8px;color:var(--ink)">Spese Extra ('+totSE.toFixed(2)+' CHF)</h4>';
+    html+='<h4 style="font-family:Playfair Display,serif;margin:16px 0 8px;color:var(--ink)">Spese Extra (CHF '+fmtCHF(totSE)+')</h4>';
     html+='<div style="overflow-x:auto"><table class="collab-table"><thead><tr><th>Data</th><th>Tipo</th><th>Luogo</th><th>Descrizione</th><th class="num">CHF</th><th></th></tr></thead><tbody>';
     seRighe.forEach(r=>{const d=new Date(r.data_spesa+'T12:00:00');const tc=SE_TIPI_COLOR[r.tipo]||'var(--muted)';
-      html+='<tr><td style="font-weight:600">'+d.getDate()+' '+MESI[d.getMonth()]+'</td><td><span class="mini-badge" style="background:'+tc+'">'+(SE_TIPI_LABEL[r.tipo]||r.tipo)+'</span></td><td style="font-size:.85rem">'+escP(r.luogo||'')+'</td><td style="font-size:.85rem;color:var(--muted)">'+escP(r.descrizione||'')+'</td><td class="num"><strong>'+parseFloat(r.importo).toFixed(2)+'</strong></td><td style="white-space:nowrap"><button class="btn-act edit" onclick="modificaSpeseExtra('+r.id+')" style="font-size:.78rem;padding:3px 8px">Modifica</button> <button class="btn-act del" onclick="eliminaSpeseExtra('+r.id+');apriDettaglioMaison(\''+ne+'\')" style="font-size:.78rem;padding:3px 8px">Elimina</button> <button class="btn-act" onclick="spostaExtraToMaison('+r.id+',\''+ne+'\')" style="font-size:.78rem;padding:3px 8px;color:#2c6e49;border-color:#2c6e49" title="Sposta in Costi Maison">&#8594; Maison</button></td></tr>'});
-    html+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td colspan="4"><strong>TOTALE EXTRA</strong></td><td class="num"><strong>'+totSE.toFixed(2)+'</strong></td></tr></tbody></table></div>'}
+      html+='<tr><td style="font-weight:600">'+d.getDate()+' '+MESI[d.getMonth()]+'</td><td><span class="mini-badge" style="background:'+tc+'">'+(SE_TIPI_LABEL[r.tipo]||r.tipo)+'</span></td><td style="font-size:.85rem">'+escP(r.luogo||'')+'</td><td style="font-size:.85rem;color:var(--muted)">'+escP(r.descrizione||'')+'</td><td class="num"><strong>'+fmtCHF(r.importo)+'</strong></td><td style="white-space:nowrap"><button class="btn-act edit" onclick="modificaSpeseExtra('+r.id+')" style="font-size:.78rem;padding:3px 8px">Modifica</button> <button class="btn-act del" onclick="eliminaSpeseExtra('+r.id+');apriDettaglioMaison(\''+ne+'\')" style="font-size:.78rem;padding:3px 8px">Elimina</button> <button class="btn-act" onclick="spostaExtraToMaison('+r.id+',\''+ne+'\')" style="font-size:.78rem;padding:3px 8px;color:#2c6e49;border-color:#2c6e49" title="Sposta in Costi Maison">&#8594; Maison</button></td></tr>'});
+    html+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td colspan="4"><strong>TOTALE EXTRA</strong></td><td class="num"><strong>CHF '+fmtCHF(totSE)+'</strong></td></tr></tbody></table></div>'}
   // Regali per questo cliente (regRighe/totReg already computed above for KPI)
   if(regRighe.length){
-    html+='<h4 style="font-family:Playfair Display,serif;margin:16px 0 8px;color:var(--ink)">Regali'+(totReg?' ('+totReg.toFixed(2)+' CHF)':'')+'</h4>';
+    html+='<h4 style="font-family:Playfair Display,serif;margin:16px 0 8px;color:var(--ink)">Regali'+(totReg?' (CHF '+fmtCHF(totReg)+')':'')+'</h4>';
     html+='<div style="overflow-x:auto"><table class="collab-table"><thead><tr><th>Data</th><th>Descrizione</th><th class="num">CHF</th><th>Operatore</th></tr></thead><tbody>';
     regRighe.forEach(function(r){var d=new Date((r.data_regalo||r.created_at)+'T12:00:00');
-      html+='<tr><td style="font-weight:600">'+d.toLocaleDateString('it-IT')+'</td><td>'+escP(r.descrizione||'')+'</td><td class="num">'+(r.importo?parseFloat(r.importo).toFixed(2):'—')+'</td><td style="color:var(--muted);font-size:.82rem">'+escP(r.operatore||'')+'</td></tr>'});
+      html+='<tr><td style="font-weight:600">'+d.toLocaleDateString('it-IT')+'</td><td>'+escP(r.descrizione||'')+'</td><td class="num">'+(r.importo?fmtCHF(r.importo):'—')+'</td><td style="color:var(--muted);font-size:.82rem">'+escP(r.operatore||'')+'</td></tr>'});
     html+='</tbody></table></div>'}
   // Note private
   var noteRighe=getNoteClientiReparto().filter(function(r){return r.nome.toLowerCase()===nome.toLowerCase()});
@@ -5129,7 +5130,7 @@ function apriDettaglioMaison(nome){const righe=getMaisonFiltrati().filter(r=>r.n
     noteRighe.forEach(function(r){var ne2=r.nome.replace(/'/g,"\\'");html+='<div style="padding:10px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border-left:3px solid var(--accent2);display:flex;justify-content:space-between;align-items:start"><div><p style="margin-bottom:4px">'+esc(r.nota)+'</p><small style="color:var(--muted)">'+escP(r.operatore||'')+' — '+new Date(r.created_at).toLocaleDateString('it-IT')+'</small></div><button class="btn-act del" onclick="eliminaNotaCliente('+r.id+',\''+ne2+'\')" style="font-size:.78rem;flex-shrink:0">Elimina</button></div>'})}
   // Totale complessivo aggiornato
   var grandTotal=tot+(seRighe.length?seRighe.reduce(function(s,r){return s+parseFloat(r.importo||0)},0):0)+totReg;
-  if(grandTotal>tot){html+='<div style="margin-top:10px;padding:10px;background:var(--paper2);border-radius:3px;text-align:center;font-weight:700;font-size:1rem;color:var(--accent2)">TOTALE COMPLESSIVO: '+grandTotal.toFixed(2)+' CHF</div>'}
+  if(grandTotal>tot){html+='<div style="margin-top:10px;padding:10px;background:var(--paper2);border-radius:3px;text-align:center;font-weight:700;font-size:1rem;color:var(--accent2)">TOTALE COMPLESSIVO: CHF '+fmtCHF(grandTotal)+'</div>'}
   // Form aggiungi nota
   html+='<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--line)"><h4 style="font-family:Playfair Display,serif;margin-bottom:8px;color:var(--ink)">Aggiungi nota privata</h4><textarea id="detail-nota-input" rows="2" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:2px;font-family:Source Sans 3,sans-serif;font-size:.9rem;resize:vertical;background:var(--paper2);color:var(--ink)" placeholder="Scrivi una nota..."></textarea><button class="btn-salva" onclick="salvaNotaCliente(\''+ne+'\')" style="margin-top:6px;font-size:.78rem;padding:8px 16px">Salva nota</button></div>';
   html+='<div style="display:flex;gap:10px;justify-content:center;margin-top:14px"><button class="btn-export" onclick="esportaMaisonClienteCSV(\''+nome.replace(/'/g,"\\'")+'\')">CSV</button><button class="btn-export btn-export-pdf" onclick="apriPdfSchedaMaison(\''+nome.replace(/'/g,"\\'")+'\')">PDF</button><button class="btn-export" onclick="stampaSchedaCliente()" style="border-color:#2c6e49;color:#2c6e49">Stampa</button></div>';
@@ -5216,13 +5217,13 @@ function eseguiConfrontoMaison(){
   h+='</tr></thead><tbody>';
   var righeConf=[
     {label:'Categoria',fn:function(d){var c=d.cat;return c==='full_maison'?'Full Maison':c==='maison'?'Maison':c==='direzione'?'Direzione':c==='bu'?'Buono Unico':c==='bl'?'Buono Lounge':'—'}},
-    {label:'Totale ristorante',fn:function(d){return d.totRist.toFixed(2)+' CHF'}},
-    {label:'Totale extra',fn:function(d){return d.totExtra.toFixed(2)+' CHF'}},
-    {label:'Totale regali',fn:function(d){return d.totRegali.toFixed(2)+' CHF'}},
-    {label:'TOTALE COMPLESSIVO',fn:function(d){return'<strong>'+d.totale.toFixed(2)+' CHF</strong>'},bold:true},
+    {label:'Totale ristorante',fn:function(d){return fmtCHF(d.totRist)+' CHF'}},
+    {label:'Totale extra',fn:function(d){return fmtCHF(d.totExtra)+' CHF'}},
+    {label:'Totale regali',fn:function(d){return fmtCHF(d.totRegali)+' CHF'}},
+    {label:'TOTALE COMPLESSIVO',fn:function(d){return'<strong>'+fmtCHF(d.totale)+' CHF</strong>'},bold:true},
     {label:'Visite',fn:function(d){return d.visite}},
     {label:'Persone (PX)',fn:function(d){return d.px}},
-    {label:'Media/visita',fn:function(d){return d.media.toFixed(2)+' CHF'}},
+    {label:'Media/visita',fn:function(d){return fmtCHF(d.media)+' CHF'}},
     {label:'Buoni BU',fn:function(d){return d.nBU||'—'}},
     {label:'Buoni BL',fn:function(d){return d.nBL||'—'}}
   ];
@@ -5264,7 +5265,7 @@ function esportaMaisonClienteCSV(nome){const righe=getMaisonFiltrati().filter(r=
   righe.forEach(r=>{const d=new Date(r.data_giornata+'T12:00:00');rows.push([d.toLocaleDateString('it-IT'),GIORNI[d.getDay()],r.px,r.costo,r.tipo_buono||'',r.gruppo||'',r.note||''])});
   const tot=righe.reduce((s,r)=>s+parseFloat(r.costo||0),0);
   const _nBU=_contaBuoni(righe,'BU'),_nBL=_contaBuoni(righe,'BL'),_nCG=_contaBuoni(righe,'CG'),_nWL=_contaBuoni(righe,'WL');
-  rows.push(['TOTALE','',righe.reduce((s,r)=>s+(r.px||0),0),tot.toFixed(2),'BU:'+_nBU+' BL:'+_nBL+' CG:'+_nCG+' WL:'+_nWL,'','']);
+  rows.push(['TOTALE','',righe.reduce((s,r)=>s+(r.px||0),0),fmtCHF(tot),'BU:'+_nBU+' BL:'+_nBL+' CG:'+_nCG+' WL:'+_nWL,'','']);
   const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\n')],{type:'text/csv;charset=utf-8'});
   Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'maison_'+nome.replace(/\s+/g,'_')+'_'+_maisonFilePeriodo(righe)+'.csv'}).click();toast('CSV esportato!')}
 function apriPdfSchedaMaison(nome){const mc=document.getElementById('pwd-modal-content');
@@ -5300,23 +5301,23 @@ async function esportaMaisonClientePDF(nome){
     doc.text(mesi+' — Casino Lugano SA',pw/2,y,{align:'center'});y+=8;doc.setTextColor(0);
     // KPI
     const nCG=_contaBuoni(righe,'CG'),nWL=_contaBuoni(righe,'WL');
-    if(sez.kpi){const media=righe.length?(tot/righe.length).toFixed(2):'0';
+    if(sez.kpi){const media=righe.length?fmtCHF(tot/righe.length):'0';
       doc.autoTable({theme:'grid',startY:y,margin:{left:16,right:16},head:[['Visite','Persone','BU','BL','CG','WL','Totale CHF','Media/visita']],
-        body:[[righe.length,totPx,nBU||'-',nBL||'-',nCG||'-',nWL||'-',tot.toFixed(2),media]],
+        body:[[righe.length,totPx,nBU||'-',nBL||'-',nCG||'-',nWL||'-','CHF '+fmtCHF(tot),media]],
         headStyles:{fillColor:[184,134,11]},styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:4,halign:'center'},
         columnStyles:{6:{fontStyle:'bold'}}});y=doc.lastAutoTable.finalY+8}
     // Trend mensile
     if(sez.trend){const byMese={};righe.forEach(r=>{const d=new Date(r.data_giornata+'T12:00:00');const k=MESI[d.getMonth()]+' '+d.getFullYear();byMese[k]=(byMese[k]||0)+parseFloat(r.costo||0)});
       const mesiArr=Object.entries(byMese);if(mesiArr.length>1){
         doc.autoTable({theme:'grid',startY:y,margin:{left:16,right:16},head:[['Mese','Totale CHF','Variazione']],
-          body:mesiArr.map(([m,v],i)=>{const delta=i>0?((v-mesiArr[i-1][1])/mesiArr[i-1][1]*100).toFixed(1)+'%':'—';return[m,v.toFixed(2),delta]}),
+          body:mesiArr.map(([m,v],i)=>{const delta=i>0?((v-mesiArr[i-1][1])/mesiArr[i-1][1]*100).toFixed(1)+'%':'—';return[m,fmtCHF(v),delta]}),
           headStyles:{fillColor:[26,74,122]},styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:3},alternateRowStyles:{fillColor:[250,247,242]}});
         y=doc.lastAutoTable.finalY+8}}
     // Dettaglio visite
     if(sez.visite){doc.autoTable({theme:'grid',startY:y,margin:{left:16,right:16},
       head:[['Data','Giorno','PX','Costo CHF','Tipo','Gruppo','Note']],
-      body:righe.map(r=>{const d=new Date(r.data_giornata+'T12:00:00');return[d.getDate()+' '+MESI[d.getMonth()],GIORNI[d.getDay()],r.px,parseFloat(r.costo).toFixed(2),r.tipo_buono||'',r.gruppo||'',r.note||'']}),
-      foot:[['TOTALE','',totPx,tot.toFixed(2),'','','']],
+      body:righe.map(r=>{const d=new Date(r.data_giornata+'T12:00:00');return[d.getDate()+' '+MESI[d.getMonth()],GIORNI[d.getDay()],r.px,fmtCHF(r.costo),r.tipo_buono||'',r.gruppo||'',r.note||'']}),
+      foot:[['TOTALE','',totPx,'CHF '+fmtCHF(tot),'','','']],
       headStyles:{fillColor:[26,18,8]},footStyles:{fillColor:[245,243,238],textColor:[0,0,0],fontStyle:'bold'},
       styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:8,cellPadding:3},columnStyles:{2:{halign:'center'},3:{halign:'right'}},
       alternateRowStyles:{fillColor:[250,247,242]}});y=doc.lastAutoTable.finalY+8}
@@ -5324,14 +5325,14 @@ async function esportaMaisonClientePDF(nome){
     if(sez.extra){const seR=getSpeseReparto().filter(r=>r.beneficiario.toLowerCase()===nome.toLowerCase());
       if(seR.length){const totSE=seR.reduce((s,r)=>s+parseFloat(r.importo||0),0);
         doc.autoTable({theme:'grid',startY:y,margin:{left:16,right:16},head:[['Data','Tipo','Luogo','Descrizione','CHF']],
-          body:seR.map(r=>{const d=new Date(r.data_spesa+'T12:00:00');return[d.toLocaleDateString('it-IT'),SE_TIPI_LABEL[r.tipo]||r.tipo,r.luogo||'',r.descrizione||'',parseFloat(r.importo).toFixed(2)]}),
-          foot:[['TOTALE EXTRA','','','',totSE.toFixed(2)]],
+          body:seR.map(r=>{const d=new Date(r.data_spesa+'T12:00:00');return[d.toLocaleDateString('it-IT'),SE_TIPI_LABEL[r.tipo]||r.tipo,r.luogo||'',r.descrizione||'',fmtCHF(r.importo)]}),
+          foot:[['TOTALE EXTRA','','','','CHF '+fmtCHF(totSE)]],
           headStyles:{fillColor:[142,68,173]},footStyles:{fillColor:[245,243,238],textColor:[0,0,0],fontStyle:'bold'},
           styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:8,cellPadding:3},alternateRowStyles:{fillColor:[250,247,242]}});y=doc.lastAutoTable.finalY+8}}
     // Regali
     if(sez.regali){const regR=getRegaliReparto().filter(r=>r.nome.toLowerCase()===nome.toLowerCase());
       if(regR.length){doc.autoTable({theme:'grid',startY:y,margin:{left:16,right:16},head:[['Data','Descrizione','CHF','Operatore']],
-          body:regR.map(r=>[new Date((r.data_regalo||r.created_at)+'T12:00:00').toLocaleDateString('it-IT'),r.descrizione||'',r.importo?parseFloat(r.importo).toFixed(2):'—',r.operatore||'']),
+          body:regR.map(r=>[new Date((r.data_regalo||r.created_at)+'T12:00:00').toLocaleDateString('it-IT'),r.descrizione||'',r.importo?fmtCHF(r.importo):'—',r.operatore||'']),
           headStyles:{fillColor:[184,134,11]},styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:8,cellPadding:3},alternateRowStyles:{fillColor:[250,247,242]}});y=doc.lastAutoTable.finalY+8}}
     const tp=doc.internal.getNumberOfPages();for(let i=1;i<=tp;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(150);doc.text('Casino Lugano SA — '+nome+' — Pag. '+i+'/'+tp,16,doc.internal.pageSize.getHeight()-8)}
     mostraPdfPreview(doc,'scheda_'+nome.replace(/\s+/g,'_')+'_'+_maisonFilePeriodo(righe)+'.pdf','Scheda — '+nome)}catch(e){console.error(e);toast('Errore PDF')}}
@@ -6156,8 +6157,8 @@ function esportaMaisonCSV(){const data=getMaisonFiltrati();if(!data.length){toas
   sorted.forEach(([n,d])=>{let budget=getBudgetReparto().find(b=>b.nome.toLowerCase()===n.toLowerCase());
     if(!budget){const _cog=n.toLowerCase().split(/\s+/)[0];if(_cog.length>=3)budget=getBudgetReparto().find(b=>b.nome.toLowerCase().split(/\s+/)[0]===_cog)}
     const cat=budget&&budget.categoria?_catLabels[budget.categoria]||'':'';
-    rows.push([n,cat,d.visite,d.px,d.bu||'',d.bl||'',d.cg||'',d.wl||'',d.tot.toFixed(2),(d.tot/d.visite).toFixed(2)])});
-  rows.push(['TOTALE','',sorted.reduce((s,c)=>s+c[1].visite,0),'',sorted.reduce((s,c)=>s+c[1].bu,0),sorted.reduce((s,c)=>s+c[1].bl,0),sorted.reduce((s,c)=>s+c[1].cg,0),sorted.reduce((s,c)=>s+c[1].wl,0),sorted.reduce((s,c)=>s+c[1].tot,0).toFixed(2),'']);
+    rows.push([n,cat,d.visite,d.px,d.bu||'',d.bl||'',d.cg||'',d.wl||'',fmtCHF(d.tot),fmtCHF(d.tot/d.visite)])});
+  rows.push(['TOTALE','',sorted.reduce((s,c)=>s+c[1].visite,0),'',sorted.reduce((s,c)=>s+c[1].bu,0),sorted.reduce((s,c)=>s+c[1].bl,0),sorted.reduce((s,c)=>s+c[1].cg,0),sorted.reduce((s,c)=>s+c[1].wl,0),fmtCHF(sorted.reduce((s,c)=>s+c[1].tot,0)),'']);
   const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\n')],{type:'text/csv;charset=utf-8'});
   Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'costi_maison_'+_maisonFilePeriodo(data)+'.csv'}).click();toast('CSV esportato!')}
 async function esportaMaisonPDF(){const data=getMaisonFiltrati();if(!data.length){toast('Nessun dato');return}
@@ -6184,8 +6185,8 @@ async function esportaMaisonPDF(){const data=getMaisonFiltrati();if(!data.length
       body:sorted.map(([n,d])=>{let budget=getBudgetReparto().find(b=>b.nome.toLowerCase()===n.toLowerCase());
         if(!budget){const _cog=n.toLowerCase().split(/\s+/)[0];if(_cog.length>=3)budget=getBudgetReparto().find(b=>b.nome.toLowerCase().split(/\s+/)[0]===_cog)}
         const cat=budget&&budget.categoria?_catLabels[budget.categoria]||'':'';
-        return[n,cat,d.visite,d.px,d.bu||'',d.bl||'',d.cg||'',d.wl||'',d.tot.toFixed(2),(d.tot/d.visite).toFixed(2)]}),
-      foot:[['TOTALE','',sorted.reduce((s,c)=>s+c[1].visite,0),sorted.reduce((s,c)=>s+c[1].px,0),sorted.reduce((s,c)=>s+c[1].bu,0)||'',sorted.reduce((s,c)=>s+c[1].bl,0)||'',sorted.reduce((s,c)=>s+c[1].cg,0)||'',sorted.reduce((s,c)=>s+c[1].wl,0)||'',totale.toFixed(2),'']],
+        return[n,cat,d.visite,d.px,d.bu||'',d.bl||'',d.cg||'',d.wl||'',fmtCHF(d.tot),fmtCHF(d.tot/d.visite)]}),
+      foot:[['TOTALE','',sorted.reduce((s,c)=>s+c[1].visite,0),sorted.reduce((s,c)=>s+c[1].px,0),sorted.reduce((s,c)=>s+c[1].bu,0)||'',sorted.reduce((s,c)=>s+c[1].bl,0)||'',sorted.reduce((s,c)=>s+c[1].cg,0)||'',sorted.reduce((s,c)=>s+c[1].wl,0)||'','CHF '+fmtCHF(totale),'']],
       headStyles:{fillColor:[26,18,8],halign:'center'},footStyles:{fillColor:[245,243,238],textColor:[0,0,0],fontStyle:'bold'},
       styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:7.5,cellPadding:2.5,lineColor:[220,215,205],lineWidth:0.15},columnStyles:{0:{cellWidth:38,halign:'left'},1:{cellWidth:28,halign:'left'},2:{halign:'center',cellWidth:14},3:{halign:'center',cellWidth:12},4:{halign:'center',cellWidth:10},5:{halign:'center',cellWidth:10},6:{halign:'center',cellWidth:10},7:{halign:'center',cellWidth:10},8:{halign:'right',cellWidth:22},9:{halign:'right',cellWidth:18}},
       didParseCell:function(d){if(d.section==='body'&&d.column.index===1){const c=Object.entries(_catLabels).find(([k,v])=>v===d.cell.raw);if(c&&_catColors[c[0]]){d.cell.styles.textColor=_catColors[c[0]];d.cell.styles.fontStyle='bold'}}},
@@ -6253,7 +6254,7 @@ function renderSpeseExtra(){const data=getSpeseExtraFiltrate();const el=document
   const nBenef=new Set(data.map(r=>r.beneficiario)).size;
   const topTipo=data.reduce((m,r)=>{m[r.tipo]=(m[r.tipo]||0)+1;return m},{});
   const topTipoLabel=Object.entries(topTipo).sort((a,b)=>b[1]-a[1]).slice(0,1).map(t=>SE_TIPI_LABEL[t[0]]||t[0])[0]||'';
-  let h='<div class="mini-stats-bar"><div class="mini-stat"><div class="mini-stat-num gold">'+tot.toFixed(2)+'</div><div class="mini-stat-label">Totale CHF</div></div><div class="mini-stat"><div class="mini-stat-num blue">'+data.length+'</div><div class="mini-stat-label">Spese</div></div><div class="mini-stat"><div class="mini-stat-num">'+nBenef+'</div><div class="mini-stat-label">Beneficiari</div></div>'+(topTipoLabel?'<div class="mini-stat"><div class="mini-stat-num" style="font-size:1rem">'+topTipoLabel+'</div><div class="mini-stat-label">Tipo frequente</div></div>':'')+'</div>';
+  let h='<div class="mini-stats-bar"><div class="mini-stat"><div class="mini-stat-num gold">'+fmtCHF(tot)+'</div><div class="mini-stat-label">Totale CHF</div></div><div class="mini-stat"><div class="mini-stat-num blue">'+data.length+'</div><div class="mini-stat-label">Spese</div></div><div class="mini-stat"><div class="mini-stat-num">'+nBenef+'</div><div class="mini-stat-label">Beneficiari</div></div>'+(topTipoLabel?'<div class="mini-stat"><div class="mini-stat-num" style="font-size:1rem">'+topTipoLabel+'</div><div class="mini-stat-label">Tipo frequente</div></div>':'')+'</div>';
   // Raggruppato per beneficiario con dettaglio tipi
   const byBenef={};data.forEach(r=>{const k=r.beneficiario;if(!byBenef[k])byBenef[k]={tot:0,visite:0,tipi:{}};byBenef[k].tot+=parseFloat(r.importo||0);byBenef[k].visite++;byBenef[k].tipi[r.tipo]=(byBenef[k].tipi[r.tipo]||0)+1});
   const sorted=Object.entries(byBenef).sort((a,b)=>b[1].tot-a[1].tot);
@@ -6263,8 +6264,8 @@ function renderSpeseExtra(){const data=getSpeseExtraFiltrate();const el=document
     if(!_seBudget){const _cog=nome.toLowerCase().split(/\s+/)[0];if(_cog.length>=3)_seBudget=getBudgetReparto().find(b=>b.nome.toLowerCase().split(/\s+/)[0]===_cog)}
     const _seCatBadge=_seBudget&&_seBudget.categoria==='full_maison'?' <span class="mini-badge" style="background:#b8860b;font-size:.7rem">Full Maison</span>':_seBudget&&_seBudget.categoria==='maison'?' <span class="mini-badge" style="background:#2980b9;font-size:.7rem">Maison</span>':_seBudget&&_seBudget.categoria==='direzione'?' <span class="mini-badge" style="background:#8e44ad;font-size:.7rem">Direzione</span>':_seBudget&&_seBudget.categoria==='bu'?' <span class="mini-badge" style="background:#e67e22;font-size:.7rem">Buono Unico</span>':_seBudget&&_seBudget.categoria==='bl'?' <span class="mini-badge" style="background:#2c6e49;font-size:.7rem">Buono Lounge</span>':'';
     const tipiBadges=Object.entries(d.tipi).map(([t,n])=>'<span class="mini-badge" style="background:'+(SE_TIPI_COLOR[t]||'var(--muted)')+';font-size:.7rem">'+n+' '+(SE_TIPI_LABEL[t]||t)+'</span>').join(' ');
-    h+='<tr style="'+(idx%2?'background:rgba(0,0,0,0.03)':'')+'"><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(nome)+'</span></strong>'+_seCatBadge+'</td><td class="num">'+d.visite+'</td><td>'+tipiBadges+'</td><td class="num"><strong>'+d.tot.toFixed(2)+'</strong></td><td class="num">'+(d.tot/d.visite).toFixed(2)+'</td><td style="white-space:nowrap"><button class="btn-act edit" onclick="rinominaSpeseExtraBenef(\''+ne+'\')" style="font-size:.78rem;padding:3px 8px">Rinomina</button> <button class="btn-act del" onclick="eliminaSpeseExtraBenef(\''+ne+'\')" style="font-size:.78rem;padding:3px 8px">Elimina</button></td></tr>'});
-  h+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td class="num"><strong>'+data.length+'</strong></td><td></td><td class="num"><strong>'+tot.toFixed(2)+'</strong></td><td></td><td></td></tr></tbody></table></div>';
+    h+='<tr style="'+(idx%2?'background:rgba(0,0,0,0.03)':'')+'"><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(nome)+'</span></strong>'+_seCatBadge+'</td><td class="num">'+d.visite+'</td><td>'+tipiBadges+'</td><td class="num"><strong>'+fmtCHF(d.tot)+'</strong></td><td class="num">'+fmtCHF(d.tot/d.visite)+'</td><td style="white-space:nowrap"><button class="btn-act edit" onclick="rinominaSpeseExtraBenef(\''+ne+'\')" style="font-size:.78rem;padding:3px 8px">Rinomina</button> <button class="btn-act del" onclick="eliminaSpeseExtraBenef(\''+ne+'\')" style="font-size:.78rem;padding:3px 8px">Elimina</button></td></tr>'});
+  h+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td class="num"><strong>'+data.length+'</strong></td><td></td><td class="num"><strong>CHF '+fmtCHF(tot)+'</strong></td><td></td><td></td></tr></tbody></table></div>';
   el.innerHTML=h}
 async function eliminaSpeseExtraBenef(nome){const ids=speseExtraCache.filter(r=>r.beneficiario===nome&&(r.reparto_dip||'slots')===currentReparto);
   if(!ids.length){toast('Nessuna spesa');return}
@@ -6286,7 +6287,7 @@ function resetSpeseExtraFiltri(){document.getElementById('se-filt-nome').value='
   ['se-filt-dal','se-filt-al'].forEach(id=>{const el=document.getElementById(id);if(el){el.value='';if(el._flatpickr)el._flatpickr.clear()}});renderSpeseExtra()}
 function esportaSpeseExtraCSV(){const data=getSpeseExtraFiltrate();if(!data.length){toast('Nessun dato');return}
   const rows=[['Data','Beneficiario','Tipo','Luogo','Descrizione','Importo CHF','Operatore']];
-  data.forEach(r=>{rows.push([new Date(r.data_spesa+'T12:00:00').toLocaleDateString('it-IT'),r.beneficiario,SE_TIPI_LABEL[r.tipo]||r.tipo,r.luogo||'',r.descrizione||'',r.importo,r.operatore||''])});
+  data.forEach(r=>{rows.push([new Date(r.data_spesa+'T12:00:00').toLocaleDateString('it-IT'),r.beneficiario,SE_TIPI_LABEL[r.tipo]||r.tipo,r.luogo||'',r.descrizione||'',fmtCHF(r.importo),r.operatore||''])});
   const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(c=>'\"'+String(c).replace(/\"/g,'\"\"')+'\"').join(';')).join('\n')],{type:'text/csv;charset=utf-8'});
   Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'spese_extra_'+new Date().toLocaleDateString('it-IT').replace(/\//g,'-')+'.csv'}).click();toast('CSV esportato!')}
 async function esportaSpeseExtraPDF(){const data=getSpeseExtraFiltrate();if(!data.length){toast('Nessun dato');return}
@@ -6295,10 +6296,10 @@ async function esportaSpeseExtraPDF(){const data=getSpeseExtraFiltrate();if(!dat
   try{const{jsPDF}=window.jspdf;const doc=new jsPDF('portrait','mm','a4');const pw=doc.internal.pageSize.getWidth();let y=14;
     if(_logoB64)try{doc.addImage(_logoB64,'PNG',pw/2-20,y,40,22.5)}catch(e){}
     y+=28;doc.setFont('helvetica','bold');doc.setFontSize(16);doc.text('Spese Extra',pw/2,y,{align:'center'});y+=7;
-    doc.setFontSize(10);doc.setFont('helvetica','normal');doc.setTextColor(100);doc.text('Casino Lugano SA — '+data.length+' spese — '+tot.toFixed(2)+' CHF',pw/2,y,{align:'center'});y+=10;doc.setTextColor(0);
+    doc.setFontSize(10);doc.setFont('helvetica','normal');doc.setTextColor(100);doc.text('Casino Lugano SA — '+data.length+' spese — CHF '+fmtCHF(tot),pw/2,y,{align:'center'});y+=10;doc.setTextColor(0);
     doc.autoTable({theme:'grid',startY:y,margin:{left:16,right:16},head:[['Data','Beneficiario','Tipo','Luogo','Descrizione','CHF']],
-      body:data.map(r=>[new Date(r.data_spesa+'T12:00:00').toLocaleDateString('it-IT'),r.beneficiario,SE_TIPI_LABEL[r.tipo]||r.tipo,r.luogo||'',r.descrizione||'',parseFloat(r.importo).toFixed(2)]),
-      foot:[['','','','','TOTALE',tot.toFixed(2)]],headStyles:{fillColor:[26,18,8]},footStyles:{fillColor:[245,243,238],textColor:[0,0,0],fontStyle:'bold'},
+      body:data.map(r=>[new Date(r.data_spesa+'T12:00:00').toLocaleDateString('it-IT'),r.beneficiario,SE_TIPI_LABEL[r.tipo]||r.tipo,r.luogo||'',r.descrizione||'',fmtCHF(r.importo)]),
+      foot:[['','','','','TOTALE','CHF '+fmtCHF(tot)]],headStyles:{fillColor:[26,18,8]},footStyles:{fillColor:[245,243,238],textColor:[0,0,0],fontStyle:'bold'},
       styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:8,cellPadding:3},columnStyles:{5:{halign:'right'}},alternateRowStyles:{fillColor:[250,247,242]}});
     const tp=doc.internal.getNumberOfPages();for(let i=1;i<=tp;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(150);doc.text('Casino Lugano SA — Spese Extra — Pag. '+i+'/'+tp,16,doc.internal.pageSize.getHeight()-8)}
     mostraPdfPreview(doc,'spese_extra.pdf','Spese Extra')}catch(e){toast('Errore PDF')}}
