@@ -5816,7 +5816,12 @@ async function importaCompleanniMaison(input){const file=input.files[0];if(!file
 function _soloCorrezioneCognome(nomeVecchio,matchBudget){
   const tokensVecchio=nomeVecchio.trim().split(/\s+/);
   const tokensBudget=matchBudget.trim().split(/\s+/);
-  if(tokensVecchio.length===1)return capitalizzaNome(tokensBudget[0]);
+  // Se il vecchio è solo cognome e il budget ha cognome+nome, usa il cognome corretto (non aggiungere nome)
+  // MA se il cognome è identico, ritorna il cognome (nessuna correzione ortografica necessaria)
+  if(tokensVecchio.length===1){
+    const cogCorretto=capitalizzaNome(tokensBudget[0]);
+    if(cogCorretto.toLowerCase()===nomeVecchio.toLowerCase())return nomeVecchio;// stesso cognome, nessun fix ortografico
+    return cogCorretto}
   return tokensVecchio.map(tv=>{
     const best=tokensBudget.find(tb=>tb.toLowerCase()===tv.toLowerCase())||
       tokensBudget.find(tb=>_levenshtein(tv.toLowerCase(),tb.toLowerCase())<=1)||
@@ -5834,11 +5839,12 @@ async function riallineaNomiMaison(){
   // Controlla costi maison
   costiNomi.forEach(nome=>{
     if(budgetNomi.find(b=>b.toLowerCase()===nome.toLowerCase()))return;// match esatto, ok
-    // Match anche solo cognome (il costo ha solo cognome, budget ha cognome+nome)
-    if(budgetNomi.find(b=>b.toLowerCase().split(/\s+/)[0]===nome.toLowerCase().split(/\s+/)[0]&&nome.split(/\s+/).length<=1))return;// cognome uguale, non serve correggere
     // Cerca match fuzzy
     const nl=nome.toLowerCase();const nlNoSp=nl.replace(/\s/g,'');
     let matchBudget=null;
+    // Cognome singolo → trova nome completo nel budget (Frigerio → Frigerio Luciano)
+    if(nome.split(/\s+/).length<=1){const cogMatch=budgetNomi.filter(b=>b.toLowerCase().split(/\s+/)[0]===nl);
+      if(cogMatch.length===1)matchBudget=cogMatch[0]}
     // Senza spazi (Dalozzo → Da Lozzo)
     matchBudget=budgetNomi.find(b=>b.toLowerCase().replace(/\s/g,'')===nlNoSp);
     // Levenshtein (Armelin → Armellin)
@@ -5859,10 +5865,11 @@ async function riallineaNomiMaison(){
   extraNomi.forEach(nome=>{
     if(budgetNomi.find(b=>b.toLowerCase()===nome.toLowerCase()))return;
     if(correzioni.find(c=>c.vecchio===nome))return;// già trovato sopra
-    // Cognome uguale → ok, non serve correggere
-    if(budgetNomi.find(b=>b.toLowerCase().split(/\s+/)[0]===nome.toLowerCase().split(/\s+/)[0]&&nome.split(/\s+/).length<=1))return;
     const nl=nome.toLowerCase();const nlNoSp=nl.replace(/\s/g,'');
     let matchBudget=null;
+    // Cognome singolo → trova nome completo nel budget
+    if(nome.split(/\s+/).length<=1){const cogMatch=budgetNomi.filter(b=>b.toLowerCase().split(/\s+/)[0]===nl);
+      if(cogMatch.length===1)matchBudget=cogMatch[0]}
     matchBudget=budgetNomi.find(b=>b.toLowerCase().replace(/\s/g,'')===nlNoSp);
     if(!matchBudget&&nl.length>3)matchBudget=budgetNomi.find(b=>_levenshtein(nl,b.toLowerCase().split(/\s+/)[0])<=2&&nl.length<=b.split(/\s+/)[0].length+2);
     if(!matchBudget&&nl.length>3)matchBudget=budgetNomi.find(b=>_levenshtein(nl,b.toLowerCase())<=2);
