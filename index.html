@@ -4755,19 +4755,40 @@ function renderMaisonDashboard(){const data=getMaisonFiltrati();
   thtml+='</tbody></table></div></div>';tb.innerHTML=thtml;
   // Grafici
   renderMaisonCharts(data,sorted);renderMaisonGdOggi()}
+let _gdSelezionata=null;
+function cambiaGdMaison(dir){
+  const tutteDate=[...new Set(getMaisonRepartoExpanded().map(r=>r.data_giornata))].sort();
+  if(!tutteDate.length)return;
+  const attuale=_gdSelezionata||getGiornataCasino();
+  const idx=tutteDate.indexOf(attuale);
+  if(dir===0){_gdSelezionata=null}// torna a oggi
+  else if(dir===-1){_gdSelezionata=idx>0?tutteDate[idx-1]:tutteDate[tutteDate.length-1]}
+  else{_gdSelezionata=idx<tutteDate.length-1?tutteDate[idx+1]:tutteDate[0]}
+  renderMaisonGdOggi()}
 function renderMaisonGdOggi(){
   const container=document.getElementById('maison-gd-oggi');if(!container)return;
-  const oggi=getGiornataCasino();
-  const righe=getMaisonRepartoExpanded().filter(r=>r.data_giornata===oggi);
-  if(!righe.length){container.innerHTML='<div style="padding:16px;text-align:center;color:var(--muted);font-size:.88rem">Nessun costo Maison per la GD di oggi</div>';container.style.display='';return}
+  const gdData=_gdSelezionata||getGiornataCasino();
+  const righe=getMaisonRepartoExpanded().filter(r=>r.data_giornata===gdData);
+  const isOggi=gdData===getGiornataCasino();
+  if(!righe.length&&isOggi){container.innerHTML='<div style="padding:16px;text-align:center;color:var(--muted);font-size:.88rem">Nessun costo Maison per la GD di oggi</div>';container.style.display='';return}
+  if(!righe.length){container.innerHTML='<div style="padding:16px;text-align:center;color:var(--muted);font-size:.88rem">Nessun dato per questa data</div>';container.style.display='';return}
   righe.sort((a,b)=>a.nome.localeCompare(b.nome,'it'));
   const totCHF=righe.reduce((s,r)=>s+parseFloat(r.costo||0),0);
   const totPX=righe.reduce((s,r)=>s+(r.px||0),0);
-  const dt=new Date(oggi+'T12:00:00');
+  const dt=new Date(gdData+'T12:00:00');
   const GIORNI=['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
   const dataFmt=dt.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'});
   const _brGd=getBudgetReparto();
-  let h='<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap">GD '+dataFmt+' &mdash; '+GIORNI[dt.getDay()]+' <span style="font-weight:400;font-size:.88rem;color:var(--muted);margin-left:12px">'+totCHF.toFixed(2)+' CHF &middot; '+totPX+' PX</span><div style="display:flex;gap:6px"><button class="btn-export" onclick="esportaGdOggiCSV()" style="font-size:.72rem;padding:4px 10px">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaGdOggiPDF()" style="font-size:.72rem;padding:4px 10px">PDF</button></div></div>';
+  let h='<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
+  h+='<div style="display:flex;align-items:center;gap:8px">';
+  h+='<button onclick="cambiaGdMaison(-1)" style="background:none;border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:4px 8px;color:var(--ink);font-size:.9rem" title="Giorno precedente">&#9664;</button>';
+  h+='<span>GD '+dataFmt+' &mdash; '+GIORNI[dt.getDay()]+'</span>';
+  h+='<button onclick="cambiaGdMaison(1)" style="background:none;border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:4px 8px;color:var(--ink);font-size:.9rem" title="Giorno successivo">&#9654;</button>';
+  if(!isOggi)h+='<button onclick="cambiaGdMaison(0)" style="background:none;border:1px solid var(--accent2);border-radius:2px;cursor:pointer;padding:4px 8px;color:var(--accent2);font-size:.78rem;font-weight:600">Oggi</button>';
+  h+='</div>';
+  h+='<div style="display:flex;align-items:center;gap:8px"><span style="font-weight:400;font-size:.88rem;color:var(--muted)">'+totCHF.toFixed(2)+' CHF &middot; '+totPX+' PX</span>';
+  h+='<button class="btn-export" onclick="esportaGdOggiCSV()" style="font-size:.72rem;padding:4px 10px">CSV</button>';
+  h+='<button class="btn-export btn-export-pdf" onclick="esportaGdOggiPDF()" style="font-size:.72rem;padding:4px 10px">PDF</button></div></div>';
   h+='<div style="padding:0 16px 16px;overflow-x:auto"><table class="collab-table"><thead><tr><th style="background:var(--paper)">Cliente</th><th style="background:var(--paper)">Tipo</th><th class="num" style="background:var(--paper)">PX</th><th class="num" style="background:var(--paper)">Costo CHF</th><th style="background:var(--paper)"></th></tr></thead><tbody>';
   // Raggruppa righe con stesso gruppo (es. Bonomelli/Grignani)
   const _gdVisti=new Set();
@@ -4820,7 +4841,7 @@ function _raggruppaGdRighe(righe){const result=[];const visti=new Set();
       result.push({nome:gr[0].nome,altriNomi:gr.slice(1).map(x=>x.nome),tipo_buono:r.tipo_buono,px:gr.reduce((s,x)=>s+(x.px||0),0),costo:gr.reduce((s,x)=>s+parseFloat(x.costo||0),0),ids:gr.map(x=>x.id)});
     }else{visti.add(r.id);result.push({nome:r.nome,altriNomi:[],tipo_buono:r.tipo_buono,px:r.px,costo:parseFloat(r.costo||0),ids:[r.id]})}});
   return result}
-function esportaGdOggiCSV(){const oggi=getGiornataCasino();const righe=getMaisonRepartoExpanded().filter(r=>r.data_giornata===oggi).sort((a,b)=>a.nome.localeCompare(b.nome));
+function esportaGdOggiCSV(){const oggi=_gdSelezionata||getGiornataCasino();const righe=getMaisonRepartoExpanded().filter(r=>r.data_giornata===oggi).sort((a,b)=>a.nome.localeCompare(b.nome));
   if(!righe.length){toast('Nessun dato');return}
   const grouped=_raggruppaGdRighe(righe);
   const dt=new Date(oggi+'T12:00:00');const _catL={full_maison:'Full Maison',maison:'Maison',direzione:'Direzione',bu:'Buono Unico',bl:'Buono Lounge'};
@@ -4833,7 +4854,7 @@ function esportaGdOggiCSV(){const oggi=getGiornataCasino();const righe=getMaison
   rows.push(['TOTALE','','',grouped.reduce((s,g)=>s+g.px,0),tot.toFixed(2)]);
   const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\n')],{type:'text/csv;charset=utf-8'});
   Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'maison_gd_'+oggi+'.csv'}).click();toast('CSV GD esportato!')}
-async function esportaGdOggiPDF(){const oggi=getGiornataCasino();const righe=getMaisonRepartoExpanded().filter(r=>r.data_giornata===oggi).sort((a,b)=>a.nome.localeCompare(b.nome));
+async function esportaGdOggiPDF(){const oggi=_gdSelezionata||getGiornataCasino();const righe=getMaisonRepartoExpanded().filter(r=>r.data_giornata===oggi).sort((a,b)=>a.nome.localeCompare(b.nome));
   if(!righe.length){toast('Nessun dato');return}
   if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore');return}}
   const dt=new Date(oggi+'T12:00:00');const tot=righe.reduce((s,r)=>s+parseFloat(r.costo||0),0);const totPx=righe.reduce((s,r)=>s+(r.px||0),0);
