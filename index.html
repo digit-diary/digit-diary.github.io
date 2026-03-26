@@ -4828,8 +4828,8 @@ function renderMaisonGdOggi(){
   if(!isOggi)h+='<button onclick="cambiaGdMaison(0)" style="background:none;border:1px solid var(--accent2);border-radius:2px;cursor:pointer;padding:4px 10px;color:var(--accent2);font-size:.78rem;font-weight:600">Oggi</button>';
   h+='</div>';
   h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-weight:400;font-size:.85rem;color:var(--muted)">'+totCHF.toFixed(2)+' CHF &middot; '+totPX+' PX'+(_gdBU?' &middot; '+_gdBU+'BU':'')+(_gdBL?' &middot; '+_gdBL+'BL':'')+(_gdCG?' &middot; '+_gdCG+'CG':'')+(_gdWL?' &middot; '+_gdWL+'WL':'')+'</span>';
-  h+='<button class="btn-export" onclick="esportaGdOggiCSV()" style="font-size:.72rem;padding:4px 10px">CSV</button>';
-  h+='<button class="btn-export btn-export-pdf" onclick="esportaGdOggiPDF()" style="font-size:.72rem;padding:4px 10px">PDF</button></div></div>';
+  h+='<button onclick="esportaGdOggiCSV()" style="font-size:.72rem;padding:4px 10px;background:none;border:1px solid white;color:white;border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif;font-weight:600">CSV</button>';
+  h+='<button onclick="esportaGdOggiPDF()" style="font-size:.72rem;padding:4px 10px;background:none;border:1px solid #c0392b;color:#c0392b;border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif;font-weight:600">PDF</button></div></div>';
   h+='<div style="padding:0 16px 16px;overflow-x:auto"><table class="collab-table"><thead><tr><th style="background:var(--paper)">Cliente</th><th style="background:var(--paper)">Tipo</th><th class="num" style="background:var(--paper)">PX</th><th class="num" style="background:var(--paper)">Costo CHF</th><th style="background:var(--paper)"></th></tr></thead><tbody>';
   // Raggruppa righe con stesso gruppo (es. Bonomelli/Grignani)
   const _gdVisti=new Set();
