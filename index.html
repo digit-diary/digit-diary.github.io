@@ -4797,9 +4797,9 @@ function renderMaisonGdOggi(){
   const _gdCG=righe.filter(r=>r.tipo_buono==='CG').length,_gdWL=righe.filter(r=>r.tipo_buono==='WL').length;
   let h='<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
   h+='<div style="display:flex;align-items:center;gap:6px">';
-  h+='<button onclick="cambiaGdMaison(-1)" style="background:none;border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:5px 10px;color:var(--ink);font-size:.85rem;font-weight:700" title="Giorno precedente">&lt;</button>';
+  h+='<button onclick="cambiaGdMaison(-1)" style="background:var(--paper2);border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:5px 12px;color:var(--ink);font-size:1rem;font-weight:700;line-height:1" title="Giorno precedente">&#8249;</button>';
   h+='<input type="text" id="gd-date-picker" value="'+dataFmt+'" readonly style="cursor:pointer;padding:5px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink);width:130px;text-align:center;font-weight:600">';
-  h+='<button onclick="cambiaGdMaison(1)" style="background:none;border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:5px 10px;color:var(--ink);font-size:.85rem;font-weight:700" title="Giorno successivo">&gt;</button>';
+  h+='<button onclick="cambiaGdMaison(1)" style="background:var(--paper2);border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:5px 12px;color:var(--ink);font-size:1rem;font-weight:700;line-height:1" title="Giorno successivo">&#8250;</button>';
   h+='<span style="font-weight:400;font-size:.85rem;color:var(--muted)">'+GIORNI[dt.getDay()]+'</span>';
   if(!isOggi)h+='<button onclick="cambiaGdMaison(0)" style="background:none;border:1px solid var(--accent2);border-radius:2px;cursor:pointer;padding:4px 10px;color:var(--accent2);font-size:.78rem;font-weight:600">Oggi</button>';
   h+='</div>';
@@ -4827,8 +4827,8 @@ function renderMaisonGdOggi(){
         if(!bAltro){const c=x.nome.toLowerCase().split(/\s+/)[0];if(c.length>=3)bAltro=_brGd.find(b=>b.nome.toLowerCase().split(/\s+/)[0]===c)}
         const cBadge=bAltro&&bAltro.categoria?' <span class="mini-badge" style="background:'+({full_maison:'#b8860b',maison:'#2980b9',direzione:'#8e44ad',bu:'#e67e22',bl:'#2c6e49'}[bAltro.categoria]||'var(--muted)')+';font-size:.65rem">'+({full_maison:'FM',maison:'M',direzione:'D',bu:'BU',bl:'BL'}[bAltro.categoria]||'')+'</span>':'';
         return escP(x.nome)+cBadge}).join(' / ');
-      var _qtyM=(r.note||'').match(/(\d+)\s*(BU|BL|CG|WL)/i);var _qtyN=_qtyM?parseInt(_qtyM[1]):0;
-      var tipoBadge=r.tipo_buono?'<span class="mini-badge" style="background:'+({BU:'#e67e22',BL:'#2c6e49',CG:'#8e44ad',WL:'#2980b9'}[r.tipo_buono]||'var(--muted)')+'">'+(_qtyN>1?_qtyN:'')+r.tipo_buono+'</span>':'<span style="color:var(--muted)">&mdash;</span>';
+      var _qtyM=(r.note||'').match(/(\d+)\s*(BU|BL|CG|WL)/i);var _qtyN=_qtyM?parseInt(_qtyM[1]):1;
+      var tipoBadge=r.tipo_buono?'<span class="mini-badge" style="background:'+({BU:'#e67e22',BL:'#2c6e49',CG:'#8e44ad',WL:'#2980b9'}[r.tipo_buono]||'var(--muted)')+'">'+_qtyN+' '+r.tipo_buono+'</span>':'<span style="color:var(--muted)">&mdash;</span>';
       const idsGruppo=gruppoRighe.map(x=>x.id).join(',');
       h+='<tr><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+neP+'\')">'+escP(primoNome)+'</span></strong>'+catBadge+(altriNomi?' <span style="color:var(--muted);font-size:.82rem"> /'+altriNomi+'</span>':'')+'</td><td>'+tipoBadge+'</td><td class="num">'+totPxGruppo+'</td><td class="num">'+totGruppo.toFixed(2)+'</td><td style="white-space:nowrap"><button class="btn-act del" onclick="eliminaMaisonGruppoGd(\''+idsGruppo+'\')" title="Elimina gruppo">Elimina</button></td></tr>';
     }else{
@@ -4836,8 +4836,8 @@ function renderMaisonGdOggi(){
       var budget=_brGd.find(function(b){return b.nome.toLowerCase()===r.nome.toLowerCase()});
       if(!budget){var _cog=r.nome.toLowerCase().split(/\s+/)[0];if(_cog.length>=3)budget=_brGd.find(function(b){return b.nome.toLowerCase().split(/\s+/)[0]===_cog})}
       var catBadge=budget&&budget.categoria?'<span class="mini-badge" style="background:'+({full_maison:'#b8860b',maison:'#2980b9',direzione:'#8e44ad',bu:'#e67e22',bl:'#2c6e49'}[budget.categoria]||'var(--muted)')+';margin-left:6px">'+({full_maison:'Full Maison',maison:'Maison',direzione:'Direzione',bu:'Buono Unico',bl:'Buono Lounge'}[budget.categoria]||'')+'</span>':'';
-      var _qtyM=(r.note||'').match(/(\d+)\s*(BU|BL|CG|WL)/i);var _qtyN=_qtyM?parseInt(_qtyM[1]):0;
-      var tipoBadge=r.tipo_buono?'<span class="mini-badge" style="background:'+({BU:'#e67e22',BL:'#2c6e49',CG:'#8e44ad',WL:'#2980b9'}[r.tipo_buono]||'var(--muted)')+'">'+(_qtyN>1?_qtyN:'')+r.tipo_buono+'</span>':'<span style="color:var(--muted)">&mdash;</span>';
+      var _qtyM=(r.note||'').match(/(\d+)\s*(BU|BL|CG|WL)/i);var _qtyN=_qtyM?parseInt(_qtyM[1]):1;
+      var tipoBadge=r.tipo_buono?'<span class="mini-badge" style="background:'+({BU:'#e67e22',BL:'#2c6e49',CG:'#8e44ad',WL:'#2980b9'}[r.tipo_buono]||'var(--muted)')+'">'+_qtyN+' '+r.tipo_buono+'</span>':'<span style="color:var(--muted)">&mdash;</span>';
       h+='<tr><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(r.nome)+'</span></strong>'+catBadge+'</td><td>'+tipoBadge+'</td><td class="num">'+r.px+'</td><td class="num">'+parseFloat(r.costo||0).toFixed(2)+'</td><td style="white-space:nowrap"><button class="btn-act del" onclick="eliminaMaisonRigaGd('+r.id+')" title="Elimina">Elimina</button></td></tr>'}}
   );
   const _totBuoni=[_gdBU?_gdBU+'BU':'',_gdBL?_gdBL+'BL':'',_gdCG?_gdCG+'CG':'',_gdWL?_gdWL+'WL':''].filter(Boolean).join(' · ');
@@ -4872,8 +4872,8 @@ function esportaGdOggiCSV(){const oggi=_gdSelezionata||getGiornataCasino();const
   const _br=getBudgetReparto();
   grouped.forEach(g=>{let b=_br.find(x=>x.nome.toLowerCase()===g.nome.toLowerCase());if(!b){const c=g.nome.toLowerCase().split(/\s+/)[0];if(c.length>=3)b=_br.find(x=>x.nome.toLowerCase().split(/\s+/)[0]===c)}
     const label=g.nome+(g.altriNomi.length?'/'+g.altriNomi.join('/'):'');
-    const _qm=(g.note||'').match(/(\d+)\s*(BU|BL|CG|WL)/i);const _qn=_qm?parseInt(_qm[1]):0;
-    rows.push([label,b&&b.categoria?_catL[b.categoria]||'':'',g.tipo_buono?(_qn>1?_qn:'')+g.tipo_buono:'—',g.px,g.costo.toFixed(2)])});
+    const _qm=(g.note||'').match(/(\d+)\s*(BU|BL|CG|WL)/i);const _qn=_qm?parseInt(_qm[1]):1;
+    rows.push([label,b&&b.categoria?_catL[b.categoria]||'':'',g.tipo_buono?_qn+' '+g.tipo_buono:'—',g.px,g.costo.toFixed(2)])});
   const tot=grouped.reduce((s,g)=>s+g.costo,0);
   rows.push(['TOTALE','','',grouped.reduce((s,g)=>s+g.px,0),tot.toFixed(2)]);
   const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\n')],{type:'text/csv;charset=utf-8'});
@@ -4895,8 +4895,9 @@ async function esportaGdOggiPDF(){const oggi=_gdSelezionata||getGiornataCasino()
     doc.autoTable({startY:y,margin:{left:16,right:16},head:[['Cliente','Categoria','Tipo','PX','Costo CHF']],
       body:grouped.map(g=>{let b=_br.find(x=>x.nome.toLowerCase()===g.nome.toLowerCase());if(!b){const c=g.nome.toLowerCase().split(/\s+/)[0];if(c.length>=3)b=_br.find(x=>x.nome.toLowerCase().split(/\s+/)[0]===c)}
         const label=g.nome+(g.altriNomi.length?'/'+g.altriNomi.join('/'):'');
-        return[label,b&&b.categoria?_catL[b.categoria]||'':'',g.tipo_buono||'—',g.px,g.costo.toFixed(2)]}),
-      foot:[['TOTALE','','',totPx,tot.toFixed(2)]],
+        const _qm=(g.note||'').match(/(\d+)\s*(BU|BL|CG|WL)/i);const _qn=_qm?parseInt(_qm[1]):1;
+        return[label,b&&b.categoria?_catL[b.categoria]||'':'',g.tipo_buono?_qn+' '+g.tipo_buono:'—',g.px,g.costo.toFixed(2)]}),
+      foot:[['TOTALE','',righe.filter(r=>r.tipo_buono).length?[righe.filter(r=>r.tipo_buono==='BU').length?righe.filter(r=>r.tipo_buono==='BU').length+'BU':'',righe.filter(r=>r.tipo_buono==='BL').length?righe.filter(r=>r.tipo_buono==='BL').length+'BL':'',righe.filter(r=>r.tipo_buono==='CG').length?righe.filter(r=>r.tipo_buono==='CG').length+'CG':'',righe.filter(r=>r.tipo_buono==='WL').length?righe.filter(r=>r.tipo_buono==='WL').length+'WL':''].filter(Boolean).join(' '):'',totPx,tot.toFixed(2)]],
       headStyles:{fillColor:[184,134,11]},footStyles:{fillColor:[245,243,238],textColor:[0,0,0],fontStyle:'bold'},
       styles:{fontSize:9,cellPadding:3},columnStyles:{3:{halign:'center'},4:{halign:'right'}},
       didParseCell:function(d){if(d.section==='body'&&d.column.index===1){const c=Object.entries(_catL).find(([k,v])=>v===d.cell.raw);if(c&&_catC[c[0]]){d.cell.styles.textColor=_catC[c[0]];d.cell.styles.fontStyle='bold'}}},
