@@ -6186,8 +6186,8 @@ async function esportaMaisonPDF(){const data=getMaisonFiltrati();if(!data.length
         const cat=budget&&budget.categoria?_catLabels[budget.categoria]||'':'';
         return[n,cat,d.visite,d.px,d.bu||'',d.bl||'',d.cg||'',d.wl||'',d.tot.toFixed(2),(d.tot/d.visite).toFixed(2)]}),
       foot:[['TOTALE','',sorted.reduce((s,c)=>s+c[1].visite,0),sorted.reduce((s,c)=>s+c[1].px,0),sorted.reduce((s,c)=>s+c[1].bu,0)||'',sorted.reduce((s,c)=>s+c[1].bl,0)||'',sorted.reduce((s,c)=>s+c[1].cg,0)||'',sorted.reduce((s,c)=>s+c[1].wl,0)||'',totale.toFixed(2),'']],
-      headStyles:{fillColor:[26,18,8]},footStyles:{fillColor:[245,243,238],textColor:[0,0,0],fontStyle:'bold'},
-      styles:{fontSize:7.5,cellPadding:2.5},columnStyles:{0:{cellWidth:38},1:{cellWidth:28},2:{halign:'center',cellWidth:14},3:{halign:'center',cellWidth:12},4:{halign:'center',cellWidth:10},5:{halign:'center',cellWidth:10},6:{halign:'center',cellWidth:10},7:{halign:'center',cellWidth:10},8:{halign:'right',cellWidth:22},9:{halign:'right',cellWidth:18}},
+      headStyles:{fillColor:[26,18,8],halign:'center'},footStyles:{fillColor:[245,243,238],textColor:[0,0,0],fontStyle:'bold'},
+      styles:{fontSize:7.5,cellPadding:2.5,lineColor:[220,215,205],lineWidth:0.15},columnStyles:{0:{cellWidth:38,halign:'left'},1:{cellWidth:28,halign:'left'},2:{halign:'center',cellWidth:14},3:{halign:'center',cellWidth:12},4:{halign:'center',cellWidth:10},5:{halign:'center',cellWidth:10},6:{halign:'center',cellWidth:10},7:{halign:'center',cellWidth:10},8:{halign:'right',cellWidth:22},9:{halign:'right',cellWidth:18}},
       didParseCell:function(d){if(d.section==='body'&&d.column.index===1){const c=Object.entries(_catLabels).find(([k,v])=>v===d.cell.raw);if(c&&_catColors[c[0]]){d.cell.styles.textColor=_catColors[c[0]];d.cell.styles.fontStyle='bold'}}},
       alternateRowStyles:{fillColor:[250,247,242]}});
     y=doc.lastAutoTable.finalY+6;
