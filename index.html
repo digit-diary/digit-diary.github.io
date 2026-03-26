@@ -4455,6 +4455,8 @@ function _trovaNomeSimileMaison(nome){const nomi=[...new Set(getMaisonReparto().
   // Match cognome (primo token): "Leccese" → "Leccese Pietro"
   const _cognome=nl.split(/\s+/)[0];
   if(_cognome.length>=3){for(const n of nomi){if(n.toLowerCase().split(/\s+/)[0]===_cognome)return{nome:n,tipo:'simile'}}}
+  // Match su qualsiasi token: "Baroni" → "Micheli Baroni Cristina"
+  if(_cognome.length>=3){for(const n of nomi){const tokens=n.toLowerCase().split(/\s+/);if(tokens.some(t=>t===_cognome))return{nome:n,tipo:'simile'}}}
   return null}
 const BUONO_VALORI={BU:15,BL:40,CG:40,WL:40};
 function _contaBuoni(righe,tipo){
