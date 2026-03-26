@@ -5607,7 +5607,7 @@ async function importaCompleanniMaison(input){const file=input.files[0];if(!file
     if(!found){
       // Fuzzy match con Levenshtein
       const sim=_trovaNomeSimileMaison(c.nome);
-      if(sim)found=maisonBudgetCache.find(b=>b.nome.toLowerCase()===sim.toLowerCase()&&(b.reparto_dip||'slots')===currentReparto);
+      if(sim)found=maisonBudgetCache.find(b=>b.nome.toLowerCase()===(sim.nome||sim).toLowerCase()&&(b.reparto_dip||'slots')===currentReparto);
     }
     if(found)matched.push({...c,budgetId:found.id,nomeDB:found.nome,isNew:false});
     else matched.push({...c,budgetId:null,nomeDB:null,isNew:true});
