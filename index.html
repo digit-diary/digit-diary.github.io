@@ -171,7 +171,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 /* CARD */
 .main-card{width:100%;background:var(--paper);border-radius:3px;box-shadow:4px 4px 0 #b8aa95,0 8px 32px var(--shadow);overflow:hidden;margin-bottom:24px}
 .card-header{background:var(--ink);color:var(--paper);padding:16px 24px;font-size:.85rem;letter-spacing:.18em;text-transform:uppercase;font-weight:600}
-.form-area{padding:24px;border-bottom:1px solid var(--line)}
+.form-area{padding:24px;border-bottom:1px solid var(--line);overflow:visible}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
 .field{display:flex;flex-direction:column;gap:6px}
 .field label{font-size:.8rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
@@ -224,7 +224,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 .modulo-field textarea{min-height:80px;resize:vertical}
 .btn-ai{background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:3px;padding:4px 12px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:'Source Sans 3',sans-serif;letter-spacing:.02em;transition:opacity .2s;margin-top:4px}
 .btn-ai:hover{opacity:.85}.btn-ai:disabled{opacity:.5;cursor:wait}.btn-ai-wrap{display:flex;justify-content:flex-end}
-.ac-wrap{position:relative}.ac-drop{position:absolute;top:100%;left:0;width:260px;max-height:200px;overflow-y:auto;background:var(--paper);border:1.5px solid var(--accent2);border-top:none;border-radius:0 0 3px 3px;z-index:900;display:none;box-shadow:0 4px 12px rgba(0,0,0,.15)}
+.ac-wrap{position:relative}.ac-drop{position:absolute;top:100%;left:0;width:320px;max-height:280px;overflow-y:auto;background:var(--paper);border:1.5px solid var(--accent2);border-top:none;border-radius:0 0 3px 3px;z-index:900;display:none;box-shadow:0 4px 12px rgba(0,0,0,.15)}
 .ac-drop.show{display:block}.ac-drop div{padding:8px 12px;cursor:pointer;font-size:1rem;color:var(--ink)}.ac-drop div:hover,.ac-drop div.ac-active{background:var(--accent2);color:white}
 .entry-actions{display:flex;flex-direction:row;align-items:center;justify-content:flex-end;gap:6px;padding:8px 18px 12px;grid-column:1/-1;opacity:0;transition:opacity .15s}
 .entry:hover .entry-actions{opacity:1}
@@ -4518,6 +4518,60 @@ async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0
   try{
     const XLSX=window.XLSX;if(!XLSX){toast('Libreria XLSX non caricata');status.textContent='';return}
     const buf=await f.arrayBuffer();const wb=XLSX.read(buf);
+    // --- Pre-scan: disambiguazione nomi con cognome multiplo ---
+    if(!window._maisonDisambigua)window._maisonDisambigua={};
+    if(!forzaSostituisci||!window._maisonDisambiguaDone){
+      const _budgetList=getBudgetReparto();
+      const _cognomeBudgetMap={};
+      _budgetList.forEach(b=>{const cog=b.nome.toLowerCase().split(/\s+/)[0];if(!_cognomeBudgetMap[cog])_cognomeBudgetMap[cog]=[];_cognomeBudgetMap[cog].push(b)});
+      // Raccogli tutti i nomi dal file
+      const _allFileNames=new Set();
+      for(const sheetName of wb.SheetNames){
+        const dm=sheetName.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);if(!dm)continue;
+        const sdata=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:''});
+        let sRow=-1;for(let i=0;i<Math.min(sdata.length,5);i++){const row=sdata[i];if(row.some(c=>String(c).toLowerCase().includes('cognome')||String(c).toLowerCase().includes('costo'))){sRow=i+1;break}}
+        if(sRow===-1)sRow=3;
+        for(let i=sRow;i<sdata.length;i++){const rn=String(sdata[i][0]||'').trim();if(!rn)continue;
+          rn.split(/\s*\/\s*/).forEach(nr=>{const p=_parseMaisonNome(nr);if(p.nome&&!p.isSeven)_allFileNames.add(p.nome)})}}
+      // Controlla ambiguità
+      const _ambigui={};
+      _allFileNames.forEach(nome=>{
+        const nl=nome.toLowerCase();const cog=nl.split(/\s+/)[0];
+        if(cog.length<3)return;
+        // Già nome completo che matcha esattamente? No disambigua
+        if(_budgetList.find(b=>b.nome.toLowerCase()===nl))return;
+        // Già disambiguato in precedenza? Skip
+        if(window._maisonDisambigua[cog])return;
+        const matches=_cognomeBudgetMap[cog];
+        if(matches&&matches.length>1){_ambigui[cog]={fileName:nome,matches:matches}}});
+      if(Object.keys(_ambigui).length>0){
+        // Mostra modal disambiguazione
+        const _catLabelsD={full_maison:'Full Maison',maison:'Maison',direzione:'Direzione',bu:'Buono Unico',bl:'Buono Lounge'};
+        const _catColorsD={full_maison:'#b8860b',maison:'#2980b9',direzione:'#8e44ad',bu:'#e67e22',bl:'#2c6e49'};
+        let mHtml='<h3>Nomi ambigui trovati</h3><div style="max-height:60vh;overflow-y:auto;text-align:left">';
+        Object.entries(_ambigui).forEach(([cog,info])=>{
+          mHtml+='<div style="margin-bottom:16px;padding:10px;background:var(--paper2);border-radius:4px">';
+          mHtml+='<div style="font-weight:600;margin-bottom:8px">&laquo;'+escP(info.fileName)+'&raquo; &rarr; '+info.matches.length+' clienti:</div>';
+          info.matches.forEach((b,idx)=>{
+            const catLabel=b.categoria?_catLabelsD[b.categoria]||'':'—';
+            const catColor=b.categoria?_catColorsD[b.categoria]||'var(--muted)':'var(--muted)';
+            const badge='<span class="mini-badge" style="background:'+catColor+';margin-left:6px;font-size:.7rem">'+escP(catLabel)+'</span>';
+            mHtml+='<label style="display:block;padding:4px 0 4px 8px;cursor:pointer"><input type="radio" name="disamb_'+escP(cog)+'" value="'+escP(b.nome)+'" '+(idx===0?'checked':'')+' style="margin-right:8px">'+escP(b.nome)+badge+'</label>'});
+          mHtml+='</div>'});
+        mHtml+='</div><div class="pwd-modal-btns" style="margin-top:12px"><button class="btn-modal-ok" id="disamb-continua-btn">Continua importazione</button></div>';
+        const modalBox=document.getElementById('pwd-modal-content');
+        modalBox.innerHTML=mHtml;
+        document.getElementById('pwd-modal').classList.remove('hidden');
+        // Aspetta click su "Continua importazione"
+        await new Promise(resolve=>{document.getElementById('disamb-continua-btn').onclick=function(){
+          // Salva selezioni
+          Object.keys(_ambigui).forEach(cog=>{
+            const sel=document.querySelector('input[name="disamb_'+cog+'"]:checked');
+            if(sel)window._maisonDisambigua[cog]=sel.value});
+          document.getElementById('pwd-modal').classList.add('hidden');
+          resolve()}});
+        window._maisonDisambiguaDone=true}}
+    // --- Fine pre-scan disambiguazione ---
     let totalRows=0,warnings=[],giorniNuovi=0,giorniSaltati=[],giorniSostituiti=0,sevenCount=0,dupCount=0;
     // Rileva giorni già presenti nel DB
     const giorniEsistenti=new Set(getMaisonReparto().map(r=>r.data_giornata));
@@ -4583,6 +4637,12 @@ async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0
               operatore:getOperatore(),reparto_dip:currentReparto};
             try{await secPost('spese_extra',seRec);totalRows++;sevenCount++}catch(e){}
             continue}
+          // Disambiguazione: se il cognome è stato scelto dall'utente, usa quello
+          if(window._maisonDisambigua){const _dCog=parsed.nome.toLowerCase().split(/\s+/)[0];
+            if(_dCog.length>=3&&window._maisonDisambigua[_dCog]){
+              const _chosenName=window._maisonDisambigua[_dCog];
+              if(parsed.nome.toLowerCase()!==_chosenName.toLowerCase()){
+                warnings.push(parsed.nome+' → disambiguato in "'+_chosenName+'"');parsed.nome=_chosenName}}}
           const simile=_trovaNomeSimileMaison(parsed.nome);
           if(simile&&simile.tipo==='simile'){
             // Correggi solo il cognome, non aggiungere il nome di battesimo
@@ -4629,7 +4689,7 @@ async function caricaMaisonFile(input,forzaSostituisci){const file=input.files[0
     else if(giorniSaltati.length)toast(giorniSaltati.length+' giorni già presenti (saltati)');
     renderMaisonDashboard();renderMaisonBudgetUI();renderMaisonBudgetAlerts();renderSpeseExtra();
     if(totalRows)getBudgetReparto().forEach(function(b){checkBudgetPushAfterInsert(b.nome)});
-    if(forzaSostituisci||!giorniSaltati.length)window._maisonPendingFile=null;
+    if(forzaSostituisci||!giorniSaltati.length){window._maisonPendingFile=null;window._maisonDisambigua={};window._maisonDisambiguaDone=false}
   }catch(e){console.error(e);status.textContent='Errore: '+e.message;toast('Errore importazione')}
   input.value=''}
 // TOGGLE SEZIONI
@@ -5910,10 +5970,24 @@ function renderMaisonBudgetAlerts(){const container=document.getElementById('mai
   if(nearAlerts.length){html+='<div class="cassa-alert-banner allin" style="margin-bottom:8px;cursor:default">&#9888; Quasi al budget (80%+): '+nearAlerts.map(a=>escP(a.nome)+' ('+a.spent.toFixed(0)+'/'+a.budget.toFixed(0)+' CHF)').join(' — ')+'</div>'}
   container.innerHTML=html}
 function acFiltraMaison(inputId,dropId){const inp=document.getElementById(inputId),drop=document.getElementById(dropId);if(!inp||!drop)return;
-  const v=inp.value.toLowerCase(),nomi=[...new Set(getMaisonRepartoExpanded().map(r=>r.nome))].sort();
-  const filtrati=v?nomi.filter(n=>n.toLowerCase().includes(v)):nomi;
+  const v=inp.value.toLowerCase();
+  const _catLabelsAc={full_maison:'Full Maison',maison:'Maison',direzione:'Direzione',bu:'Buono Unico',bl:'Buono Lounge'};
+  const _catColorsAc={full_maison:'#b8860b',maison:'#2980b9',direzione:'#8e44ad',bu:'#e67e22',bl:'#2c6e49'};
+  // Budget names con categoria (prioritari)
+  const budgetNomi=getBudgetReparto().map(b=>({nome:b.nome,cat:b.categoria||null}));
+  const budgetSet=new Set(budgetNomi.map(b=>b.nome.toLowerCase()));
+  // Nomi da costi esistenti non in budget
+  const costiNomi=[...new Set(getMaisonRepartoExpanded().map(r=>r.nome))].filter(n=>!budgetSet.has(n.toLowerCase())).map(n=>({nome:n,cat:null}));
+  // Unisci: budget prima, poi extra
+  const tutti=budgetNomi.concat(costiNomi);
+  // Filtra: match su qualsiasi parte del nome (cognome, nome)
+  const filtrati=v?tutti.filter(item=>item.nome.toLowerCase().includes(v)):tutti;
+  // Ordina: budget first, poi alfa
+  filtrati.sort((a,b)=>{if(a.cat&&!b.cat)return -1;if(!a.cat&&b.cat)return 1;return a.nome.localeCompare(b.nome)});
   if(!filtrati.length){drop.classList.remove('show');return}
-  drop.innerHTML=filtrati.slice(0,15).map(n=>'<div onmousedown="document.getElementById(\''+inputId+'\').value=\''+n.replace(/'/g,"\\'")+'\';document.getElementById(\''+dropId+'\').classList.remove(\'show\')">'+escP(n)+'</div>').join('');
+  drop.innerHTML=filtrati.slice(0,15).map(item=>{
+    const badge=item.cat?'<span class="mini-badge" style="background:'+(_catColorsAc[item.cat]||'var(--muted)')+';margin-left:6px;font-size:.6rem;vertical-align:middle">'+escP(_catLabelsAc[item.cat]||'')+'</span>':'';
+    return'<div onmousedown="document.getElementById(\''+inputId+'\').value=\''+item.nome.replace(/'/g,"\\'")+'\';document.getElementById(\''+dropId+'\').classList.remove(\'show\')" style="display:flex;align-items:center;justify-content:space-between">'+escP(item.nome)+badge+'</div>'}).join('');
   drop.classList.add('show')}
 // Export
 function esportaMaisonCSV(){const data=getMaisonFiltrati();if(!data.length){toast('Nessun dato');return}
