@@ -4840,7 +4840,8 @@ function renderMaisonGdOggi(){
       var tipoBadge=r.tipo_buono?'<span class="mini-badge" style="background:'+({BU:'#e67e22',BL:'#2c6e49',CG:'#8e44ad',WL:'#2980b9'}[r.tipo_buono]||'var(--muted)')+'">'+(_qtyN>1?_qtyN:'')+r.tipo_buono+'</span>':'<span style="color:var(--muted)">&mdash;</span>';
       h+='<tr><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(r.nome)+'</span></strong>'+catBadge+'</td><td>'+tipoBadge+'</td><td class="num">'+r.px+'</td><td class="num">'+parseFloat(r.costo||0).toFixed(2)+'</td><td style="white-space:nowrap"><button class="btn-act del" onclick="eliminaMaisonRigaGd('+r.id+')" title="Elimina">Elimina</button></td></tr>'}}
   );
-  h+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td></td><td class="num"><strong>'+totPX+'</strong></td><td class="num"><strong>'+totCHF.toFixed(2)+'</strong></td><td></td></tr>';
+  const _totBuoni=[_gdBU?_gdBU+'BU':'',_gdBL?_gdBL+'BL':'',_gdCG?_gdCG+'CG':'',_gdWL?_gdWL+'WL':''].filter(Boolean).join(' · ');
+  h+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td style="font-size:.78rem;color:var(--muted)">'+(_totBuoni||'')+'</td><td class="num"><strong>'+totPX+'</strong></td><td class="num"><strong>'+totCHF.toFixed(2)+'</strong></td><td></td></tr>';
   h+='</tbody></table></div>';
   container.innerHTML=h;container.style.display='';
   // Init flatpickr sul date picker
