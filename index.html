@@ -5576,10 +5576,10 @@ async function importaCompleanniMaison(input){const file=input.files[0];if(!file
         if(cellVal===undefined||cellVal===null||cellVal==='')continue;
         // Parsa la data in vari formati
         let isoDate=null;
-        // Se è un oggetto Date (cellDates:true)
-        if(cellVal instanceof Date&&!isNaN(cellVal)){isoDate=cellVal.toISOString().split('T')[0]}
+        // Se è un oggetto Date (cellDates:true) — usa getFullYear/Month/Date locali per evitare shift UTC
+        if(cellVal instanceof Date&&!isNaN(cellVal)){isoDate=cellVal.getFullYear()+'-'+String(cellVal.getMonth()+1).padStart(2,'0')+'-'+String(cellVal.getDate()).padStart(2,'0')}
         // Se è un numero seriale Excel
-        if(!isoDate&&typeof cellVal==='number'&&cellVal>1000&&cellVal<100000){const d=new Date((cellVal-25569)*86400000);if(!isNaN(d))isoDate=d.toISOString().split('T')[0]}
+        if(!isoDate&&typeof cellVal==='number'&&cellVal>1000&&cellVal<100000){const d=new Date((cellVal-25569)*86400000+43200000);if(!isNaN(d))isoDate=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
         // Se è stringa
         if(!isoDate&&typeof cellVal==='string'){
           const dataRaw=cellVal.trim();
