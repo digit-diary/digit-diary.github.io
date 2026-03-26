@@ -5562,8 +5562,7 @@ async function importaCompleanniMaison(input){const file=input.files[0];if(!file
   const compleanni=[];// [{nome, data}]
   const mesiIt=['GENNAIO','FEBBRAIO','MARZO','APRILE','MAGGIO','GIUGNO','LUGLIO','AGOSTO','SETTEMBRE','OTTOBRE','NOVEMBRE','DICEMBRE'];
   for(const sn of wb.SheetNames){
-    // Leggi sia raw (per numeri seriali) che con cellDates
-    const data=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:'',raw:true});
+    const data=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:'',raw:false});
     if(!data.length)continue;
     // Formato: coppie colonne (nome, data) per ogni mese
     for(let i=0;i<data.length;i++){
