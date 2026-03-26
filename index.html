@@ -4775,13 +4775,16 @@ function renderMaisonGdOggi(){
   if(!righe.length){
     const dt=new Date(gdData+'T12:00:00');const GIORNI=['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
     const dataFmt=dt.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'});
-    let emptyH='<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div style="display:flex;align-items:center;gap:8px">';
-    if(haAltriDati)emptyH+='<button onclick="cambiaGdMaison(-1)" style="background:none;border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:4px 8px;color:var(--ink);font-size:.9rem">&#9664;</button>';
-    emptyH+='<span>GD '+dataFmt+' &mdash; '+GIORNI[dt.getDay()]+'</span>';
-    if(haAltriDati)emptyH+='<button onclick="cambiaGdMaison(1)" style="background:none;border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:4px 8px;color:var(--ink);font-size:.9rem">&#9654;</button>';
-    if(!isOggi)emptyH+='<button onclick="cambiaGdMaison(0)" style="background:none;border:1px solid var(--accent2);border-radius:2px;cursor:pointer;padding:4px 8px;color:var(--accent2);font-size:.78rem;font-weight:600">Oggi</button>';
+    let emptyH='<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div style="display:flex;align-items:center;gap:6px">';
+    if(haAltriDati)emptyH+='<button onclick="cambiaGdMaison(-1)" style="background:none;border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:5px 10px;color:var(--ink);font-size:.85rem;font-weight:700">&lt;</button>';
+    emptyH+='<input type="text" id="gd-date-picker" value="'+dataFmt+'" readonly style="cursor:pointer;padding:5px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink);width:130px;text-align:center;font-weight:600">';
+    if(haAltriDati)emptyH+='<button onclick="cambiaGdMaison(1)" style="background:none;border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:5px 10px;color:var(--ink);font-size:.85rem;font-weight:700">&gt;</button>';
+    emptyH+='<span style="font-weight:400;font-size:.85rem;color:var(--muted)">'+GIORNI[dt.getDay()]+'</span>';
+    if(!isOggi)emptyH+='<button onclick="cambiaGdMaison(0)" style="background:none;border:1px solid var(--accent2);border-radius:2px;cursor:pointer;padding:4px 10px;color:var(--accent2);font-size:.78rem;font-weight:600">Oggi</button>';
     emptyH+='</div></div><div style="padding:16px;text-align:center;color:var(--muted);font-size:.88rem">Nessun costo Maison per questa GD</div>';
-    container.innerHTML=emptyH;container.style.display='';return}
+    container.innerHTML=emptyH;container.style.display='';
+    const _ep=document.getElementById('gd-date-picker');if(_ep&&window.flatpickr){flatpickr(_ep,{locale:'it',dateFormat:'d/m/Y',defaultDate:dt,onChange:function(sel){if(sel[0]){_gdSelezionata=sel[0].getFullYear()+'-'+String(sel[0].getMonth()+1).padStart(2,'0')+'-'+String(sel[0].getDate()).padStart(2,'0');renderMaisonGdOggi()}}})}
+    return}
   righe.sort((a,b)=>a.nome.localeCompare(b.nome,'it'));
   const totCHF=righe.reduce((s,r)=>s+parseFloat(r.costo||0),0);
   const totPX=righe.reduce((s,r)=>s+(r.px||0),0);
@@ -4789,14 +4792,18 @@ function renderMaisonGdOggi(){
   const GIORNI=['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
   const dataFmt=dt.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'});
   const _brGd=getBudgetReparto();
+  // Conteggio buoni per l'header
+  const _gdBU=righe.filter(r=>r.tipo_buono==='BU').length,_gdBL=righe.filter(r=>r.tipo_buono==='BL').length;
+  const _gdCG=righe.filter(r=>r.tipo_buono==='CG').length,_gdWL=righe.filter(r=>r.tipo_buono==='WL').length;
   let h='<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
-  h+='<div style="display:flex;align-items:center;gap:8px">';
-  h+='<button onclick="cambiaGdMaison(-1)" style="background:none;border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:4px 8px;color:var(--ink);font-size:.9rem" title="Giorno precedente">&#9664;</button>';
-  h+='<span>GD '+dataFmt+' &mdash; '+GIORNI[dt.getDay()]+'</span>';
-  h+='<button onclick="cambiaGdMaison(1)" style="background:none;border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:4px 8px;color:var(--ink);font-size:.9rem" title="Giorno successivo">&#9654;</button>';
-  if(!isOggi)h+='<button onclick="cambiaGdMaison(0)" style="background:none;border:1px solid var(--accent2);border-radius:2px;cursor:pointer;padding:4px 8px;color:var(--accent2);font-size:.78rem;font-weight:600">Oggi</button>';
+  h+='<div style="display:flex;align-items:center;gap:6px">';
+  h+='<button onclick="cambiaGdMaison(-1)" style="background:none;border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:5px 10px;color:var(--ink);font-size:.85rem;font-weight:700" title="Giorno precedente">&lt;</button>';
+  h+='<input type="text" id="gd-date-picker" value="'+dataFmt+'" readonly style="cursor:pointer;padding:5px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink);width:130px;text-align:center;font-weight:600">';
+  h+='<button onclick="cambiaGdMaison(1)" style="background:none;border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:5px 10px;color:var(--ink);font-size:.85rem;font-weight:700" title="Giorno successivo">&gt;</button>';
+  h+='<span style="font-weight:400;font-size:.85rem;color:var(--muted)">'+GIORNI[dt.getDay()]+'</span>';
+  if(!isOggi)h+='<button onclick="cambiaGdMaison(0)" style="background:none;border:1px solid var(--accent2);border-radius:2px;cursor:pointer;padding:4px 10px;color:var(--accent2);font-size:.78rem;font-weight:600">Oggi</button>';
   h+='</div>';
-  h+='<div style="display:flex;align-items:center;gap:8px"><span style="font-weight:400;font-size:.88rem;color:var(--muted)">'+totCHF.toFixed(2)+' CHF &middot; '+totPX+' PX</span>';
+  h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-weight:400;font-size:.85rem;color:var(--muted)">'+totCHF.toFixed(2)+' CHF &middot; '+totPX+' PX'+(_gdBU?' &middot; '+_gdBU+'BU':'')+(_gdBL?' &middot; '+_gdBL+'BL':'')+(_gdCG?' &middot; '+_gdCG+'CG':'')+(_gdWL?' &middot; '+_gdWL+'WL':'')+'</span>';
   h+='<button class="btn-export" onclick="esportaGdOggiCSV()" style="font-size:.72rem;padding:4px 10px">CSV</button>';
   h+='<button class="btn-export btn-export-pdf" onclick="esportaGdOggiPDF()" style="font-size:.72rem;padding:4px 10px">PDF</button></div></div>';
   h+='<div style="padding:0 16px 16px;overflow-x:auto"><table class="collab-table"><thead><tr><th style="background:var(--paper)">Cliente</th><th style="background:var(--paper)">Tipo</th><th class="num" style="background:var(--paper)">PX</th><th class="num" style="background:var(--paper)">Costo CHF</th><th style="background:var(--paper)"></th></tr></thead><tbody>';
@@ -4820,7 +4827,8 @@ function renderMaisonGdOggi(){
         if(!bAltro){const c=x.nome.toLowerCase().split(/\s+/)[0];if(c.length>=3)bAltro=_brGd.find(b=>b.nome.toLowerCase().split(/\s+/)[0]===c)}
         const cBadge=bAltro&&bAltro.categoria?' <span class="mini-badge" style="background:'+({full_maison:'#b8860b',maison:'#2980b9',direzione:'#8e44ad',bu:'#e67e22',bl:'#2c6e49'}[bAltro.categoria]||'var(--muted)')+';font-size:.65rem">'+({full_maison:'FM',maison:'M',direzione:'D',bu:'BU',bl:'BL'}[bAltro.categoria]||'')+'</span>':'';
         return escP(x.nome)+cBadge}).join(' / ');
-      var tipoBadge=r.tipo_buono?'<span class="mini-badge" style="background:'+({BU:'#e67e22',BL:'#2c6e49',CG:'#8e44ad',WL:'#2980b9'}[r.tipo_buono]||'var(--muted)')+'">'+r.tipo_buono+'</span>':'<span style="color:var(--muted)">&mdash;</span>';
+      var _qtyM=(r.note||'').match(/(\d+)\s*(BU|BL|CG|WL)/i);var _qtyN=_qtyM?parseInt(_qtyM[1]):0;
+      var tipoBadge=r.tipo_buono?'<span class="mini-badge" style="background:'+({BU:'#e67e22',BL:'#2c6e49',CG:'#8e44ad',WL:'#2980b9'}[r.tipo_buono]||'var(--muted)')+'">'+(_qtyN>1?_qtyN:'')+r.tipo_buono+'</span>':'<span style="color:var(--muted)">&mdash;</span>';
       const idsGruppo=gruppoRighe.map(x=>x.id).join(',');
       h+='<tr><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+neP+'\')">'+escP(primoNome)+'</span></strong>'+catBadge+(altriNomi?' <span style="color:var(--muted);font-size:.82rem"> /'+altriNomi+'</span>':'')+'</td><td>'+tipoBadge+'</td><td class="num">'+totPxGruppo+'</td><td class="num">'+totGruppo.toFixed(2)+'</td><td style="white-space:nowrap"><button class="btn-act del" onclick="eliminaMaisonGruppoGd(\''+idsGruppo+'\')" title="Elimina gruppo">Elimina</button></td></tr>';
     }else{
@@ -4828,12 +4836,16 @@ function renderMaisonGdOggi(){
       var budget=_brGd.find(function(b){return b.nome.toLowerCase()===r.nome.toLowerCase()});
       if(!budget){var _cog=r.nome.toLowerCase().split(/\s+/)[0];if(_cog.length>=3)budget=_brGd.find(function(b){return b.nome.toLowerCase().split(/\s+/)[0]===_cog})}
       var catBadge=budget&&budget.categoria?'<span class="mini-badge" style="background:'+({full_maison:'#b8860b',maison:'#2980b9',direzione:'#8e44ad',bu:'#e67e22',bl:'#2c6e49'}[budget.categoria]||'var(--muted)')+';margin-left:6px">'+({full_maison:'Full Maison',maison:'Maison',direzione:'Direzione',bu:'Buono Unico',bl:'Buono Lounge'}[budget.categoria]||'')+'</span>':'';
-      var tipoBadge=r.tipo_buono?'<span class="mini-badge" style="background:'+({BU:'#e67e22',BL:'#2c6e49',CG:'#8e44ad',WL:'#2980b9'}[r.tipo_buono]||'var(--muted)')+'">'+r.tipo_buono+'</span>':'<span style="color:var(--muted)">&mdash;</span>';
+      var _qtyM=(r.note||'').match(/(\d+)\s*(BU|BL|CG|WL)/i);var _qtyN=_qtyM?parseInt(_qtyM[1]):0;
+      var tipoBadge=r.tipo_buono?'<span class="mini-badge" style="background:'+({BU:'#e67e22',BL:'#2c6e49',CG:'#8e44ad',WL:'#2980b9'}[r.tipo_buono]||'var(--muted)')+'">'+(_qtyN>1?_qtyN:'')+r.tipo_buono+'</span>':'<span style="color:var(--muted)">&mdash;</span>';
       h+='<tr><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\''+ne+'\')">'+escP(r.nome)+'</span></strong>'+catBadge+'</td><td>'+tipoBadge+'</td><td class="num">'+r.px+'</td><td class="num">'+parseFloat(r.costo||0).toFixed(2)+'</td><td style="white-space:nowrap"><button class="btn-act del" onclick="eliminaMaisonRigaGd('+r.id+')" title="Elimina">Elimina</button></td></tr>'}}
   );
   h+='<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td></td><td class="num"><strong>'+totPX+'</strong></td><td class="num"><strong>'+totCHF.toFixed(2)+'</strong></td><td></td></tr>';
   h+='</tbody></table></div>';
-  container.innerHTML=h;container.style.display=''}
+  container.innerHTML=h;container.style.display='';
+  // Init flatpickr sul date picker
+  const _gdPicker=document.getElementById('gd-date-picker');
+  if(_gdPicker&&window.flatpickr){flatpickr(_gdPicker,{locale:'it',dateFormat:'d/m/Y',defaultDate:dt,onChange:function(sel){if(sel[0]){_gdSelezionata=sel[0].getFullYear()+'-'+String(sel[0].getMonth()+1).padStart(2,'0')+'-'+String(sel[0].getDate()).padStart(2,'0');renderMaisonGdOggi()}}})}}
 async function eliminaMaisonRigaGd(id){
   if(!confirm('Eliminare questa riga?'))return;
   try{await secDel('costi_maison','id=eq.'+id);
@@ -4848,8 +4860,8 @@ async function eliminaMaisonGruppoGd(idsStr){const ids=idsStr.split(',').map(Num
 function _raggruppaGdRighe(righe){const result=[];const visti=new Set();
   righe.forEach(r=>{if(visti.has(r.id))return;
     if(r.gruppo&&r.gruppo.length>1){const gr=righe.filter(x=>x.gruppo===r.gruppo);gr.forEach(x=>visti.add(x.id));
-      result.push({nome:gr[0].nome,altriNomi:gr.slice(1).map(x=>x.nome),tipo_buono:r.tipo_buono,px:gr.reduce((s,x)=>s+(x.px||0),0),costo:gr.reduce((s,x)=>s+parseFloat(x.costo||0),0),ids:gr.map(x=>x.id)});
-    }else{visti.add(r.id);result.push({nome:r.nome,altriNomi:[],tipo_buono:r.tipo_buono,px:r.px,costo:parseFloat(r.costo||0),ids:[r.id]})}});
+      result.push({nome:gr[0].nome,altriNomi:gr.slice(1).map(x=>x.nome),tipo_buono:r.tipo_buono,note:r.note||'',px:gr.reduce((s,x)=>s+(x.px||0),0),costo:gr.reduce((s,x)=>s+parseFloat(x.costo||0),0),ids:gr.map(x=>x.id)});
+    }else{visti.add(r.id);result.push({nome:r.nome,altriNomi:[],tipo_buono:r.tipo_buono,note:r.note||'',px:r.px,costo:parseFloat(r.costo||0),ids:[r.id]})}});
   return result}
 function esportaGdOggiCSV(){const oggi=_gdSelezionata||getGiornataCasino();const righe=getMaisonRepartoExpanded().filter(r=>r.data_giornata===oggi).sort((a,b)=>a.nome.localeCompare(b.nome));
   if(!righe.length){toast('Nessun dato');return}
@@ -4859,7 +4871,8 @@ function esportaGdOggiCSV(){const oggi=_gdSelezionata||getGiornataCasino();const
   const _br=getBudgetReparto();
   grouped.forEach(g=>{let b=_br.find(x=>x.nome.toLowerCase()===g.nome.toLowerCase());if(!b){const c=g.nome.toLowerCase().split(/\s+/)[0];if(c.length>=3)b=_br.find(x=>x.nome.toLowerCase().split(/\s+/)[0]===c)}
     const label=g.nome+(g.altriNomi.length?'/'+g.altriNomi.join('/'):'');
-    rows.push([label,b&&b.categoria?_catL[b.categoria]||'':'',g.tipo_buono||'—',g.px,g.costo.toFixed(2)])});
+    const _qm=(g.note||'').match(/(\d+)\s*(BU|BL|CG|WL)/i);const _qn=_qm?parseInt(_qm[1]):0;
+    rows.push([label,b&&b.categoria?_catL[b.categoria]||'':'',g.tipo_buono?(_qn>1?_qn:'')+g.tipo_buono:'—',g.px,g.costo.toFixed(2)])});
   const tot=grouped.reduce((s,g)=>s+g.costo,0);
   rows.push(['TOTALE','','',grouped.reduce((s,g)=>s+g.px,0),tot.toFixed(2)]);
   const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\n')],{type:'text/csv;charset=utf-8'});
