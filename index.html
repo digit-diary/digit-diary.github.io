@@ -5453,7 +5453,8 @@ function renderMaisonBudgetUI(){const el=document.getElementById('maison-budget-
   const nD=clientiCat.filter(b=>b.categoria==='direzione').length;
   const nBU=clientiCat.filter(b=>b.categoria==='bu').length;
   const nBL=clientiCat.filter(b=>b.categoria==='bl').length;
-  let html='<div style="display:flex;gap:10px;margin-bottom:12px;align-items:center;flex-wrap:wrap"><select id="maison-filt-cat-lista" onchange="renderMaisonBudgetUI()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.85rem;background:var(--paper);color:var(--ink)"><option value="">Tutti categorizzati ('+tuttiNomi.length+')</option><option value="full_maison"'+(filtCat==='full_maison'?' selected':'')+'>Full Maison ('+nFM+')</option><option value="maison"'+(filtCat==='maison'?' selected':'')+'>Maison ('+nM+')</option><option value="direzione"'+(filtCat==='direzione'?' selected':'')+'>Direzione ('+nD+')</option><option value="bu"'+(filtCat==='bu'?' selected':'')+'>Buono Unico ('+nBU+')</option><option value="bl"'+(filtCat==='bl'?' selected':'')+'>Buono Lounge ('+nBL+')</option></select></div>';
+  const _filtNomeBudget=(document.getElementById('maison-filt-nome-budget')||{}).value||'';
+  let html='<div style="display:flex;gap:10px;margin-bottom:12px;align-items:center;flex-wrap:wrap"><select id="maison-filt-cat-lista" onchange="renderMaisonBudgetUI()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.85rem;background:var(--paper);color:var(--ink)"><option value="">Tutti categorizzati ('+tuttiNomi.length+')</option><option value="full_maison"'+(filtCat==='full_maison'?' selected':'')+'>Full Maison ('+nFM+')</option><option value="maison"'+(filtCat==='maison'?' selected':'')+'>Maison ('+nM+')</option><option value="direzione"'+(filtCat==='direzione'?' selected':'')+'>Direzione ('+nD+')</option><option value="bu"'+(filtCat==='bu'?' selected':'')+'>Buono Unico ('+nBU+')</option><option value="bl"'+(filtCat==='bl'?' selected':'')+'>Buono Lounge ('+nBL+')</option></select><input type="text" id="maison-filt-nome-budget" placeholder="Cerca cliente..." value="'+escP(_filtNomeBudget)+'" oninput="renderMaisonBudgetUI()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.85rem;background:var(--paper);color:var(--ink);width:180px"></div>';
   // Build client data
   const clients=tuttiNomi.map(nome=>{
     const b=_br.find(x=>x.nome.toLowerCase()===nome.toLowerCase());
@@ -5463,6 +5464,7 @@ function renderMaisonBudgetUI(){const el=document.getElementById('maison-budget-
   // Filter
   let filtered=clients;
   if(filtCat){filtered=clients.filter(c=>c.cat===filtCat)}
+  if(_filtNomeBudget){const _fnl=_filtNomeBudget.toLowerCase();filtered=filtered.filter(c=>c.nome.toLowerCase().includes(_fnl))}
   // Group by category
   const catDefs=[{key:'full_maison',label:'Full Maison',color:'#b8860b'},{key:'maison',label:'Maison',color:'#2980b9'},{key:'direzione',label:'Direzione',color:'#8e44ad'},{key:'bu',label:'Buono Unico',color:'#e67e22'},{key:'bl',label:'Buono Lounge',color:'#2c6e49'}];
   function renderClientRow(c,idx){
