@@ -4994,7 +4994,7 @@ async function esportaGdOggiPDF(){const oggi=_gdSelezionata||getGiornataCasino()
         return[label,b&&b.categoria?_catL[b.categoria]||'':'',g.tipo_buono?_qn+' '+g.tipo_buono:'—',g.px,g.costo.toFixed(2)]}),
       foot:[['TOTALE','',righe.filter(r=>r.tipo_buono).length?[_contaBuoni(righe,'BU')?_contaBuoni(righe,'BU')+'BU':'',_contaBuoni(righe,'BL')?_contaBuoni(righe,'BL')+'BL':'',_contaBuoni(righe,'CG')?_contaBuoni(righe,'CG')+'CG':'',_contaBuoni(righe,'WL')?_contaBuoni(righe,'WL')+'WL':''].filter(Boolean).join(' '):'',totPx,tot.toFixed(2)]],
       headStyles:{fillColor:[184,134,11]},footStyles:{fillColor:[245,243,238],textColor:[0,0,0],fontStyle:'bold'},
-      styles:{fontSize:9,cellPadding:3},columnStyles:{3:{halign:'center'},4:{halign:'right'}},
+      styles:{fontSize:9,cellPadding:3},columnStyles:{2:{halign:'center'},3:{halign:'center'},4:{halign:'right'}},
       didParseCell:function(d){if(d.section==='body'&&d.column.index===1){const c=Object.entries(_catL).find(([k,v])=>v===d.cell.raw);if(c&&_catC[c[0]]){d.cell.styles.textColor=_catC[c[0]];d.cell.styles.fontStyle='bold'}}},
       alternateRowStyles:{fillColor:[250,247,242]}});
     doc.setFontSize(7);doc.setTextColor(150);doc.text('Casino Lugano SA — Formulario Ristorante GD '+dt.toLocaleDateString('it-IT'),16,doc.internal.pageSize.getHeight()-8);
@@ -6185,7 +6185,7 @@ async function esportaMaisonPDF(){const data=getMaisonFiltrati();if(!data.length
         if(!budget){const _cog=n.toLowerCase().split(/\s+/)[0];if(_cog.length>=3)budget=getBudgetReparto().find(b=>b.nome.toLowerCase().split(/\s+/)[0]===_cog)}
         const cat=budget&&budget.categoria?_catLabels[budget.categoria]||'':'';
         return[n,cat,d.visite,d.px,d.bu||'',d.bl||'',d.cg||'',d.wl||'',d.tot.toFixed(2),(d.tot/d.visite).toFixed(2)]}),
-      foot:[['TOTALE','',sorted.reduce((s,c)=>s+c[1].visite,0),'',sorted.reduce((s,c)=>s+c[1].bu,0),sorted.reduce((s,c)=>s+c[1].bl,0),sorted.reduce((s,c)=>s+c[1].cg,0),sorted.reduce((s,c)=>s+c[1].wl,0),totale.toFixed(2),'']],
+      foot:[['TOTALE','',sorted.reduce((s,c)=>s+c[1].visite,0),sorted.reduce((s,c)=>s+c[1].px,0),sorted.reduce((s,c)=>s+c[1].bu,0)||'',sorted.reduce((s,c)=>s+c[1].bl,0)||'',sorted.reduce((s,c)=>s+c[1].cg,0)||'',sorted.reduce((s,c)=>s+c[1].wl,0)||'',totale.toFixed(2),'']],
       headStyles:{fillColor:[26,18,8]},footStyles:{fillColor:[245,243,238],textColor:[0,0,0],fontStyle:'bold'},
       styles:{fontSize:7.5,cellPadding:2.5},columnStyles:{0:{cellWidth:38},1:{cellWidth:28},2:{halign:'center',cellWidth:14},3:{halign:'center',cellWidth:12},4:{halign:'center',cellWidth:10},5:{halign:'center',cellWidth:10},6:{halign:'center',cellWidth:10},7:{halign:'center',cellWidth:10},8:{halign:'right',cellWidth:22},9:{halign:'right',cellWidth:18}},
       didParseCell:function(d){if(d.section==='body'&&d.column.index===1){const c=Object.entries(_catLabels).find(([k,v])=>v===d.cell.raw);if(c&&_catColors[c[0]]){d.cell.styles.textColor=_catColors[c[0]];d.cell.styles.fontStyle='bold'}}},
