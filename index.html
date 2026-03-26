@@ -4800,9 +4800,9 @@ function renderMaisonGdOggi(){
     const dt=new Date(gdData+'T12:00:00');const GIORNI=['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
     const dataFmt=dt.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'});
     let emptyH='<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div style="display:flex;align-items:center;gap:6px">';
-    if(haAltriDati)emptyH+='<button onclick="cambiaGdMaison(-1)" style="background:none;border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:5px 10px;color:var(--ink);font-size:.85rem;font-weight:700">&lt;</button>';
+    if(haAltriDati)emptyH+='<button onclick="cambiaGdMaison(-1)" style="background:var(--accent2);color:white;border:none;border-radius:2px;cursor:pointer;padding:6px 14px;font-size:.9rem;font-weight:700">&#9664;</button>';
     emptyH+='<input type="text" id="gd-date-picker" value="'+dataFmt+'" readonly style="cursor:pointer;padding:5px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink);width:130px;text-align:center;font-weight:600">';
-    if(haAltriDati)emptyH+='<button onclick="cambiaGdMaison(1)" style="background:none;border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:5px 10px;color:var(--ink);font-size:.85rem;font-weight:700">&gt;</button>';
+    if(haAltriDati)emptyH+='<button onclick="cambiaGdMaison(1)" style="background:var(--accent2);color:white;border:none;border-radius:2px;cursor:pointer;padding:6px 14px;font-size:.9rem;font-weight:700">&#9654;</button>';
     emptyH+='<span style="font-weight:400;font-size:.85rem;color:var(--muted)">'+GIORNI[dt.getDay()]+'</span>';
     if(!isOggi)emptyH+='<button onclick="cambiaGdMaison(0)" style="background:none;border:1px solid var(--accent2);border-radius:2px;cursor:pointer;padding:4px 10px;color:var(--accent2);font-size:.78rem;font-weight:600">Oggi</button>';
     emptyH+='</div></div><div style="padding:16px;text-align:center;color:var(--muted);font-size:.88rem">Nessun costo Maison per questa GD</div>';
