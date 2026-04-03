@@ -2007,36 +2007,46 @@ function _motivoSimile(t1,t2,nomeCollab){let k1=_estraiKeywords(t1),k2=_estraiKe
   k1=_normalizzaKeywords(k1);k2=_normalizzaKeywords(k2);
   if(!k1.length||!k2.length)return false;const set2=new Set(k2);let comuni=0;k1.forEach(w=>{if(set2.has(w))comuni++});return comuni>=2||(comuni>=1&&Math.min(k1.length,k2.length)<=3)}
 
-// ALERT COLLABORATORE A RISCHIO (3+ allineamenti stesso motivo → RDI)
+// ALERT COLLABORATORE A RISCHIO (allineamenti → RDI)
 function checkRischioAlerts(){
   const alerts=[];
   const nomiSet=new Set(getModuliReparto().filter(m=>m.tipo==='allineamento').map(m=>m.collaboratore.toLowerCase()));
   nomiSet.forEach(nomeLc=>{
     const allins=getModuliReparto().filter(m=>m.tipo==='allineamento'&&m.collaboratore.toLowerCase()===nomeLc).sort((a,b)=>(a.created_at||a.data_modulo||'').localeCompare(b.created_at||b.data_modulo||''));
-    if(allins.length<3)return;
+    if(allins.length<2)return;
     const nome=allins[0].collaboratore;
-    // Raggruppa per motivo simile (non_conformita)
+    const lastAllin=allins[allins.length-1];
+    const lastDate=lastAllin.created_at||lastAllin.data_modulo||'';
+    const hasRdi=getModuliReparto().some(m=>m.tipo==='rdi'&&m.collaboratore.toLowerCase()===nomeLc&&(m.created_at||m.data_modulo||'')>lastDate);
+    if(hasRdi)return;
+    // 1) Recidiva: 3+ allineamenti stesso motivo → RDI obbligatorio
     const gruppi=[];
     allins.forEach(a=>{const nc=a.non_conformita||'';let trovato=false;
       for(const g of gruppi){if(_motivoSimile(nc,g.motivo,nome)){g.items.push(a);trovato=true;break}}
       if(!trovato)gruppi.push({motivo:nc,items:[a]})});
-    // Alert solo se 3+ allineamenti per lo stesso motivo
-    gruppi.filter(g=>g.items.length>=3).forEach(g=>{
-      const last=g.items[g.items.length-1];
-      const lastDate=last.created_at||last.data_modulo||'';
-      const hasRdi=getModuliReparto().some(m=>m.tipo==='rdi'&&m.collaboratore.toLowerCase()===nomeLc&&(m.created_at||m.data_modulo||'')>lastDate);
-      if(!hasRdi){const motBrv=_estraiKeywords(g.motivo).slice(0,4).join(', ');
-        alerts.push({nome,count:g.items.length,lastDate:last.data_modulo||lastDate,motivo:motBrv||'stesso motivo'})}})});
+    const recidiva=gruppi.find(g=>g.items.length>=3);
+    if(recidiva){const motBrv=_estraiKeywords(recidiva.motivo).slice(0,4).join(', ');
+      alerts.push({nome,count:recidiva.items.length,lastDate:lastAllin.data_modulo||lastDate,motivo:motBrv||'stesso motivo',tipo:'recidiva'});return}
+    // 2) Accumulo: 3+ allineamenti totali (motivi diversi) → segnalazione rischio
+    if(allins.length>=3){alerts.push({nome,count:allins.length,lastDate:lastAllin.data_modulo||lastDate,motivo:'',tipo:'accumulo'})}});
   return alerts}
 function renderRischioAlerts(){const container=document.getElementById('rischio-alerts-container');if(!container)return;
-  // Rimuovi solo la parte rischio, non tutto il container
   var oldRischio=document.getElementById('rischio-alerts-block');if(oldRischio)oldRischio.remove();
   const alerts=checkRischioAlerts();if(!alerts.length)return;
-  let html='<div id="rischio-alerts-block"><div class="rischio-alert-banner" onclick="toggleRischioDD()">&#9888;&#65039; '+alerts.length+' collaboratore/i a rischio disciplinare (3+ allineamenti stesso motivo) — Preparare RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
-  html+='<div class="rischio-alerts-dropdown hidden" id="rischio-dd">';
-  alerts.forEach(a=>{const dt=a.lastDate?new Date(a.lastDate+'T12:00:00').toLocaleDateString('it-IT'):'';
-    html+='<div class="cassa-alert-item"><span class="alert-name">'+escP(a.nome)+'</span><span class="alert-detail">'+a.count+' allineamenti per: '+escP(a.motivo)+' (ultimo: '+dt+'). Preparare RDI.</span><button class="alert-action" style="background:#8e44ad" onclick="apriModuloVeloce(\'rdi\',\''+a.nome.replace(/'/g,"\\'")+'\')">Crea RDI</button></div>'});
-  html+='</div></div>';container.insertAdjacentHTML('beforeend',html)}
+  const recidive=alerts.filter(a=>a.tipo==='recidiva'),accumuli=alerts.filter(a=>a.tipo==='accumulo');
+  let html='<div id="rischio-alerts-block">';
+  if(recidive.length){html+='<div class="rischio-alert-banner" style="background:#8e44ad" onclick="toggleRischioDD()">&#9888;&#65039; '+recidive.length+' collaboratore/i con 3+ allineamenti stesso motivo — Preparare RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
+    html+='<div class="rischio-alerts-dropdown hidden" id="rischio-dd">';
+    recidive.forEach(a=>{const dt=a.lastDate?new Date(a.lastDate+'T12:00:00').toLocaleDateString('it-IT'):'';
+      html+='<div class="cassa-alert-item"><span class="alert-name">'+escP(a.nome)+'</span><span class="alert-detail">'+a.count+' allineamenti per: '+escP(a.motivo)+' (ultimo: '+dt+'). Recidiva — preparare RDI.</span><button class="alert-action" style="background:#8e44ad" onclick="apriModuloVeloce(\'rdi\',\''+a.nome.replace(/'/g,"\\'")+'\')">Crea RDI</button></div>'});
+    html+='</div>'}
+  if(accumuli.length){html+='<div class="rischio-alert-banner" style="background:#e67e22;margin-top:6px" onclick="toggleAccDD()">&#9888;&#65039; '+accumuli.length+' collaboratore/i con 3+ allineamenti totali — Valutare RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
+    html+='<div class="rischio-alerts-dropdown hidden" id="acc-dd">';
+    accumuli.forEach(a=>{const dt=a.lastDate?new Date(a.lastDate+'T12:00:00').toLocaleDateString('it-IT'):'';
+      html+='<div class="cassa-alert-item"><span class="alert-name">'+escP(a.nome)+'</span><span class="alert-detail">'+a.count+' allineamenti totali (ultimo: '+dt+'). Valutare provvedimento.</span><button class="alert-action" style="background:#e67e22" onclick="apriModuloVeloce(\'rdi\',\''+a.nome.replace(/'/g,"\\'")+'\')">Crea RDI</button></div>'});
+    html+='</div>'}
+  html+='</div>';container.insertAdjacentHTML('beforeend',html)}
+function toggleAccDD(){const dd=document.getElementById('acc-dd');if(dd)dd.classList.toggle('hidden')}
 function toggleRischioDD(){const dd=document.getElementById('rischio-dd');if(dd)dd.classList.toggle('hidden')}
 
 // ALERT AMMONIMENTI VERBALI RECIDIVI (2+ stesso motivo → preparare allineamento)
@@ -2717,12 +2727,14 @@ function apriSchedaCollaboratore(nome){
   if(_ammMaxSame>=2&&allineamenti===0){
     html+='<div class="scheda-suggestion" style="background:rgba(230,126,34,0.12);color:#e67e22">&#9888; '+_ammMaxSame+' ammonimenti stesso motivo senza allineamento &#8594; Preparare allineamento</div>';
   }
-  // Allineamenti stesso motivo → RDI
+  // Allineamenti → RDI
   const _allinMods=moduli.filter(m=>m.tipo==='allineamento');
   const _allinGruppi=[];_allinMods.forEach(m=>{let trovato=false;for(const g of _allinGruppi){if(_motivoSimile(m.non_conformita||'',g.motivo,nome)){g.count++;trovato=true;break}}if(!trovato)_allinGruppi.push({motivo:m.non_conformita||'',count:1})});
   const _allinMaxSame=_allinGruppi.reduce((mx,g)=>Math.max(mx,g.count),0);
   if(_allinMaxSame>=3&&rdiCount===0){
-    html+='<div class="scheda-suggestion" style="background:rgba(192,57,43,0.12);color:var(--accent)">&#9888; '+_allinMaxSame+' allineamenti stesso motivo senza RDI &#8594; Preparare RDI</div>';
+    html+='<div class="scheda-suggestion" style="background:rgba(192,57,43,0.12);color:var(--accent)">&#9888; '+_allinMaxSame+' allineamenti stesso motivo senza RDI &#8594; Recidiva, preparare RDI</div>';
+  }else if(_allinMods.length>=3&&rdiCount===0){
+    html+='<div class="scheda-suggestion" style="background:rgba(230,126,34,0.12);color:#e67e22">&#9888; '+_allinMods.length+' allineamenti totali senza RDI &#8594; Valutare RDI</div>';
   }
   // Check last 3 months for 0 errors + appreciations
   const threeMonthsAgo=new Date(now.getFullYear(),now.getMonth()-3,1);
