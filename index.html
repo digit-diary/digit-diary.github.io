@@ -1968,9 +1968,10 @@ function checkCassaAlerts(){
     const lastAllinDate=lastAllin?(lastAllin.created_at||lastAllin.data_modulo||''):'';
     const lastRdi=getModuliReparto().filter(m=>m.tipo==='rdi'&&m.collaboratore.toLowerCase()===nome.toLowerCase()).sort((a,b)=>(b.created_at||b.data_modulo||'').localeCompare(a.created_at||a.data_modulo||''))[0];
     const lastRdiDate=lastRdi?(lastRdi.created_at||lastRdi.data_modulo||''):'';
-    const errsSinceAllin=lastAllinDate?errs.filter(e=>(e.data||'')>lastAllinDate):errs;
-    const errsSinceRdi=lastRdiDate?errs.filter(e=>(e.data||'')>lastRdiDate):errs;
-    const maxSingle=Math.max(...errsSinceAllin.map(e=>parseFloat(e.importo)||0),0);
+    // Solo errori ≥90 contano per il percorso disciplinare
+    const errsSinceAllin=(lastAllinDate?errs.filter(e=>(e.data||'')>lastAllinDate):errs).filter(e=>(parseFloat(e.importo)||0)>=90);
+    const errsSinceRdi=(lastRdiDate?errs.filter(e=>(e.data||'')>lastRdiDate):errs).filter(e=>(parseFloat(e.importo)||0)>=90);
+    const maxSingle=errsSinceAllin.length?Math.max(...errsSinceAllin.map(e=>parseFloat(e.importo)||0)):0;
     const cumTotal=errsSinceRdi.reduce((s,e)=>s+(parseFloat(e.importo)||0),0);
     // Se cumulativo ≥500 → solo RDI (non anche allineamento)
     if(cumTotal>=500)alerts.push({type:'rdi',nome,importo:cumTotal,count:errsSinceRdi.length});
