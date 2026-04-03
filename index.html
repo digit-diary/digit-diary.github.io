@@ -1346,7 +1346,7 @@ async function checkPwd(){const nome=document.getElementById('login-nome').value
       if(!datiCache.length&&nome){console.warn('Login: dati vuoti, rinnovo token...');if(await _renewToken())await loadAll()}
       _initNoteRealtime();
       applicaVisibilita();
-      switchPage('diario');renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();aggiornaNoteBadge();aggiornaPromemoriaBadge();aggiornaConsegnaBadge();renderDashboard();checkCompleanniBanner();
+      switchPage('diario');_renderPostLogin();
       if(res.deve_cambiare_pwd)setTimeout(()=>forzaCambioPwdOperatore(nome),300);
       else{setTimeout(()=>mostraNoteNonLette(),500);setTimeout(()=>mostraPromemoriaLogin(),1200);setTimeout(()=>mostraConsegnaLogin(),1800);setTimeout(checkQrHash,800);setTimeout(()=>offriBiometrico(),600)}return}
     if(res&&res.found){_loginFailCount++;if(_loginFailCount>=5){_loginLockUntil=Date.now()+30000;_loginFailCount=0}err.textContent='Password errata per '+nome;document.getElementById('pwd-input').value='';document.getElementById('pwd-input').focus();setTimeout(()=>err.textContent='',2500);return}}
@@ -1362,8 +1362,8 @@ async function checkPwd(){const nome=document.getElementById('login-nome').value
     await loadAll();
     if(!datiCache.length&&getOperatore()){console.warn('Admin login: dati vuoti, rinnovo token...');if(await _renewToken())await loadAll()}
     _initNoteRealtime();
-    applicaTemaOperatore();renderTipiUI();renderOperatoriUI();renderCampiRapportoUI();document.getElementById('tab-registro').style.display='';applicaVisibilita();registraPushSubscription();
-    switchPage('diario');aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();aggiornaNoteBadge();aggiornaPromemoriaBadge();aggiornaConsegnaBadge();renderDashboard();checkCompleanniBanner();
+    applicaTemaOperatore();renderOperatoriUI();renderCampiRapportoUI();document.getElementById('tab-registro').style.display='';applicaVisibilita();registraPushSubscription();
+    switchPage('diario');_renderPostLogin();
     setTimeout(()=>mostraNoteNonLette(),500);setTimeout(()=>mostraPromemoriaLogin(),1200);setTimeout(()=>mostraConsegnaLogin(),1800);setTimeout(checkQrHash,800);
   }else{_loginFailCount++;if(_loginFailCount>=5){_loginLockUntil=Date.now()+30000;_loginFailCount=0}err.textContent=nome?'Operatore non trovato o password errata':'Password errata';document.getElementById('pwd-input').value='';document.getElementById('pwd-input').focus();setTimeout(()=>err.textContent='',2500)}}
 function mostraForzaCambio(){const b=document.getElementById('pwd-modal-content');b.innerHTML='<h3>Cambia la password</h3><p>Password predefinita. Impostane una nuova.</p><div class="pwd-field"><label>Nuova password (min 4 car.)</label><input type="password" id="new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="eseguiPrimoCambio()">Imposta</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';document.getElementById('pwd-modal').classList.remove('hidden');setTimeout(()=>document.getElementById('new-pwd-1').focus(),100)}
@@ -1462,7 +1462,7 @@ async function tentaBiometrico(){var ok=await loginBiometrico();if(ok){
   if(!datiCache.length&&stored.op){console.warn('Bio login: dati vuoti, rinnovo token...');if(await _renewToken())await loadAll()}
   _initNoteRealtime();
   applicaVisibilita();
-  switchPage('diario');renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();aggiornaNoteBadge();aggiornaPromemoriaBadge();aggiornaConsegnaBadge();renderDashboard();checkCompleanniBanner();
+  switchPage('diario');_renderPostLogin();
   // Controlla se admin ha resettato la password → forza cambio
   var _dcCheck=await sbRpc('check_deve_cambiare',{p_nome:stored.op});
   if(_dcCheck&&_dcCheck.deve_cambiare_pwd){setTimeout(()=>forzaCambioPwdOperatore(stored.op),300)}
@@ -1655,6 +1655,9 @@ async function aggiungiTipoPersonalizzato(){const n=document.getElementById('new
 async function rimuoviTipo(n){if(!confirm('Rimuovere "'+n+'"?'))return;tipiPersonalizzati=tipiPersonalizzati.filter(t=>t.nome!==n);delete coloriOverride[n];await saveTipiP();await saveColoriOverride();renderTipiUI();toast('Rimosso')}
 async function nascondiTipoDefault(n){if(!confirm('Nascondere il tipo "'+n+'"? Le registrazioni esistenti non verranno eliminate.'))return;tipiNascosti.push(n);await setImp('tipi_nascosti',JSON.stringify(tipiNascosti));renderTipiUI();toast('Tipo "'+n+'" nascosto')}
 async function ripristinaTipoDefault(n){tipiNascosti=tipiNascosti.filter(t=>t!==n);await setImp('tipi_nascosti',JSON.stringify(tipiNascosti));renderTipiUI();toast('Tipo "'+n+'" ripristinato')}
+function _renderPostLogin(){try{renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();aggiornaNoteBadge();aggiornaPromemoriaBadge();aggiornaConsegnaBadge();renderDashboard();checkCompleanniBanner()}catch(e){console.error('Render error:',e)}
+  // Fallback: se dopo 600ms i tipi non ci sono, ri-renderizza
+  setTimeout(()=>{const ft=document.getElementById('form-tipo-tags');if(ft&&!ft.children.length){console.warn('Fallback render tipi+alerts');try{renderTipiUI();render();updateStats();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts()}catch(e2){console.error('Fallback error:',e2)}}},600)}
 function renderTipiUI(){const tutti=getTuttiTipi();
   document.getElementById('form-tipo-tags').innerHTML=tutti.map(t=>'<button class="tipo-tag'+(tipoSelezionato===t.nome?' active':'')+'" data-tipo="'+esc(t.nome)+'" style="'+(tipoSelezionato===t.nome?'background:'+t.colore+';border-color:'+t.colore:'')+'">'+esc(t.nome)+'</button>').join('');
   document.getElementById('form-tipo-tags').querySelectorAll('.tipo-tag').forEach(b=>{b.onclick=()=>{tipoSelezionato=b.dataset.tipo;renderTipiUI()}});
@@ -6478,7 +6481,7 @@ window.addEventListener('load',async()=>{
     if(!datiCache.length&&getOperatore()){console.warn('Init: dati vuoti, rinnovo token...');if(await _renewToken())await loadAll()}
     _initNoteRealtime();applicaVisibilita();
     var _sp=localStorage.getItem('pagina_corrente');switchPage(_sp||'dashboard');
-    renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();aggiornaNoteBadge();aggiornaPromemoriaBadge();aggiornaConsegnaBadge();renderDashboard();checkCompleanniBanner();
+    _renderPostLogin();
     if(getOperatore()){document.getElementById('operatore-display').textContent='Operatore: '+getOperatore();
       const authCheck=await sbRpc('check_deve_cambiare',{p_nome:getOperatore()});
       if(authCheck&&authCheck.deve_cambiare_pwd)setTimeout(()=>forzaCambioPwdOperatore(getOperatore()),300);
