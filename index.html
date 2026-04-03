@@ -1971,9 +1971,10 @@ function checkCassaAlerts(){
     const errsSinceAllin=lastAllinDate?errs.filter(e=>(e.data||'')>lastAllinDate):errs;
     const errsSinceRdi=lastRdiDate?errs.filter(e=>(e.data||'')>lastRdiDate):errs;
     const maxSingle=Math.max(...errsSinceAllin.map(e=>parseFloat(e.importo)||0),0);
-    if(maxSingle>=90)alerts.push({type:'allineamento',nome,importo:maxSingle,count:errsSinceAllin.length});
     const cumTotal=errsSinceRdi.reduce((s,e)=>s+(parseFloat(e.importo)||0),0);
-    if(cumTotal>=500)alerts.push({type:'rdi',nome,importo:cumTotal,count:errsSinceRdi.length})});
+    // Se cumulativo ≥500 → solo RDI (non anche allineamento)
+    if(cumTotal>=500)alerts.push({type:'rdi',nome,importo:cumTotal,count:errsSinceRdi.length});
+    else if(maxSingle>=90)alerts.push({type:'allineamento',nome,importo:maxSingle,count:errsSinceAllin.length})});
   return alerts}
 function renderCassaAlerts(){const container=document.getElementById('cassa-alerts-container');if(!container)return;
   const alerts=checkCassaAlerts();if(!alerts.length){container.innerHTML='';return}
