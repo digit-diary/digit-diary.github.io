@@ -1813,7 +1813,7 @@ async function salva(){let nome=capitalizzaNome(document.getElementById('inp-nom
   if(dupSimile.length){
     const tipoAmm=nomeCorrente('Ammonimento Verbale');
     let msg=nome+' ha già '+dupSimile.length+' registrazione/i "'+tipoSelezionato+'" oggi.';
-    if(tipoSelezionato===tipoAmm&&dupSimile.length>=1)msg+='\n\nCon 2+ ammonimenti verbali, valuta di preparare un modulo di Allineamento.';
+    if(tipoSelezionato===tipoAmm&&dupSimile.length>=1){const _ammSimili=dupSimile.filter(d=>_motivoSimile(d.testo,testo));if(_ammSimili.length>=1)msg+='\n\nCon 2+ ammonimenti verbali per lo stesso motivo, valuta di preparare un modulo di Allineamento.'}
     msg+='\n\nVuoi aggiungere comunque?';
     if(!confirm(msg))return}
   const rec={id:Date.now(),nome,tipo:tipoSelezionato,testo,data:new Date().toISOString(),operatore:getOperatore(),importo,valuta,reparto,reparto_dip:currentReparto};
@@ -1994,46 +1994,70 @@ function toggleCassaDD(type){const dd=document.getElementById('cassa-'+type+'-dd
 function apriModuloVeloce(tipo,nome){switchPage('moduli');
   setTimeout(()=>{apriModulo(tipo);setTimeout(()=>{const ci=document.getElementById('mod-collaboratore');if(ci)ci.value=nome},100)},200)}
 
-// ALERT COLLABORATORE A RISCHIO (2+ allineamenti stessa ragione)
+// KEYWORDS MOTIVO: estrae parole significative per confronto motivi
+const _STOP_WORDS=new Set(['il','lo','la','le','li','gli','i','un','uno','una','di','da','del','della','dello','dei','degli','delle','dal','dalla','con','e','in','per','a','al','alla','allo','che','non','si','ha','è','sono','stato','stata','stati','nel','nella','sul','sulla','come','questo','questa','durante','dopo','prima','tra','fra','essere','avere','suo','sua','suoi','sue','ogni','anche','più','già','senza','presso','fatto','data','turno','servizio','collaboratore','collaboratrice']);
+function _estraiKeywords(testo){if(!testo)return[];return testo.toLowerCase().replace(/[^a-zàèéìòù\s]/g,' ').split(/\s+/).filter(w=>w.length>3&&!_STOP_WORDS.has(w))}
+function _motivoSimile(t1,t2){const k1=_estraiKeywords(t1),k2=_estraiKeywords(t2);if(!k1.length||!k2.length)return false;const set2=new Set(k2);let comuni=0;k1.forEach(w=>{if(set2.has(w))comuni++});return comuni>=2||(comuni>=1&&Math.min(k1.length,k2.length)<=3)}
+
+// ALERT COLLABORATORE A RISCHIO (3+ allineamenti stesso motivo → RDI)
 function checkRischioAlerts(){
   const alerts=[];
   const nomiSet=new Set(getModuliReparto().filter(m=>m.tipo==='allineamento').map(m=>m.collaboratore.toLowerCase()));
   nomiSet.forEach(nomeLc=>{
     const allins=getModuliReparto().filter(m=>m.tipo==='allineamento'&&m.collaboratore.toLowerCase()===nomeLc).sort((a,b)=>(a.created_at||a.data_modulo||'').localeCompare(b.created_at||b.data_modulo||''));
-    if(allins.length<2)return;
+    if(allins.length<3)return;
     const nome=allins[0].collaboratore;
-    const hasRdi=getModuliReparto().some(m=>m.tipo==='rdi'&&m.collaboratore.toLowerCase()===nomeLc&&(m.created_at||m.data_modulo||'')>(allins[allins.length-1].created_at||allins[allins.length-1].data_modulo||''));
-    if(hasRdi)return;
-    alerts.push({nome,count:allins.length,lastDate:allins[allins.length-1].data_modulo||allins[allins.length-1].created_at||''})});
+    // Raggruppa per motivo simile (non_conformita)
+    const gruppi=[];
+    allins.forEach(a=>{const nc=a.non_conformita||'';let trovato=false;
+      for(const g of gruppi){if(_motivoSimile(nc,g.motivo)){g.items.push(a);trovato=true;break}}
+      if(!trovato)gruppi.push({motivo:nc,items:[a]})});
+    // Alert solo se 3+ allineamenti per lo stesso motivo
+    gruppi.filter(g=>g.items.length>=3).forEach(g=>{
+      const last=g.items[g.items.length-1];
+      const lastDate=last.created_at||last.data_modulo||'';
+      const hasRdi=getModuliReparto().some(m=>m.tipo==='rdi'&&m.collaboratore.toLowerCase()===nomeLc&&(m.created_at||m.data_modulo||'')>lastDate);
+      if(!hasRdi){const motBrv=_estraiKeywords(g.motivo).slice(0,4).join(', ');
+        alerts.push({nome,count:g.items.length,lastDate:last.data_modulo||lastDate,motivo:motBrv||'stesso motivo'})}})});
   return alerts}
 function renderRischioAlerts(){const container=document.getElementById('rischio-alerts-container');if(!container)return;
   // Rimuovi solo la parte rischio, non tutto il container
   var oldRischio=document.getElementById('rischio-alerts-block');if(oldRischio)oldRischio.remove();
   const alerts=checkRischioAlerts();if(!alerts.length)return;
-  let html='<div id="rischio-alerts-block"><div class="rischio-alert-banner" onclick="toggleRischioDD()">&#9888;&#65039; '+alerts.length+' collaboratore/i a rischio disciplinare (2+ allineamenti) — Prossimo allineamento scatta RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
+  let html='<div id="rischio-alerts-block"><div class="rischio-alert-banner" onclick="toggleRischioDD()">&#9888;&#65039; '+alerts.length+' collaboratore/i a rischio disciplinare (3+ allineamenti stesso motivo) — Preparare RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
   html+='<div class="rischio-alerts-dropdown hidden" id="rischio-dd">';
   alerts.forEach(a=>{const dt=a.lastDate?new Date(a.lastDate+'T12:00:00').toLocaleDateString('it-IT'):'';
-    html+='<div class="cassa-alert-item"><span class="alert-name">'+escP(a.nome)+'</span><span class="alert-detail">'+a.count+' allineamenti'+' (ultimo: '+dt+'). Il prossimo provvedimento sarà un RDI.</span><button class="alert-action" style="background:#8e44ad" onclick="apriModuloVeloce(\'rdi\',\''+a.nome.replace(/'/g,"\\'")+'\')">Crea RDI</button></div>'});
+    html+='<div class="cassa-alert-item"><span class="alert-name">'+escP(a.nome)+'</span><span class="alert-detail">'+a.count+' allineamenti per: '+escP(a.motivo)+' (ultimo: '+dt+'). Preparare RDI.</span><button class="alert-action" style="background:#8e44ad" onclick="apriModuloVeloce(\'rdi\',\''+a.nome.replace(/'/g,"\\'")+'\')">Crea RDI</button></div>'});
   html+='</div></div>';container.insertAdjacentHTML('beforeend',html)}
 function toggleRischioDD(){const dd=document.getElementById('rischio-dd');if(dd)dd.classList.toggle('hidden')}
 
-// ALERT AMMONIMENTI VERBALI RECIDIVI (2+ → preparare allineamento)
+// ALERT AMMONIMENTI VERBALI RECIDIVI (2+ stesso motivo → preparare allineamento)
 function checkAmmonimentiAlerts(){
   const tipoAmm=nomeCorrente('Ammonimento Verbale');const alerts=[];
-  const byNome={};getDatiReparto().filter(e=>e.tipo===tipoAmm).forEach(e=>{if(!byNome[e.nome.toLowerCase()])byNome[e.nome.toLowerCase()]={nome:e.nome,count:0,last:''};byNome[e.nome.toLowerCase()].count++;if(e.data>byNome[e.nome.toLowerCase()].last)byNome[e.nome.toLowerCase()].last=e.data});
-  Object.values(byNome).forEach(a=>{if(a.count<2)return;
-    // Controlla se c'e gia un allineamento dopo l'ultimo ammonimento
-    const hasAllin=getModuliReparto().some(m=>m.tipo==='allineamento'&&m.collaboratore.toLowerCase()===a.nome.toLowerCase()&&(m.created_at||m.data_modulo||'')>a.last);
-    if(!hasAllin)alerts.push(a)});
+  // Raggruppa ammonimenti per collaboratore
+  const byNome={};getDatiReparto().filter(e=>e.tipo===tipoAmm).forEach(e=>{const k=e.nome.toLowerCase();if(!byNome[k])byNome[k]={nome:e.nome,entries:[]};byNome[k].entries.push(e)});
+  Object.values(byNome).forEach(a=>{if(a.entries.length<2)return;
+    // Raggruppa per motivo simile
+    const gruppi=[];
+    a.entries.forEach(e=>{let trovato=false;
+      for(const g of gruppi){if(_motivoSimile(e.testo,g.motivo)){g.items.push(e);trovato=true;break}}
+      if(!trovato)gruppi.push({motivo:e.testo,items:[e]})});
+    // Alert solo per gruppi con 2+ ammonimenti stesso motivo
+    gruppi.filter(g=>g.items.length>=2).forEach(g=>{
+      const last=g.items.sort((a,b)=>(b.data||'').localeCompare(a.data||''))[0];
+      // Controlla se c'è già un allineamento dopo l'ultimo ammonimento di questo gruppo
+      const hasAllin=getModuliReparto().some(m=>m.tipo==='allineamento'&&m.collaboratore.toLowerCase()===a.nome.toLowerCase()&&(m.created_at||m.data_modulo||'')>last.data);
+      if(!hasAllin){const motBrv=_estraiKeywords(g.motivo).slice(0,4).join(', ');
+        alerts.push({nome:a.nome,count:g.items.length,last:last.data,motivo:motBrv||'stesso motivo'})}})});
   return alerts}
 function renderAmmonimentiAlerts(){var old=document.getElementById('amm-alerts-block');if(old)old.remove();
   const container=document.getElementById('rischio-alerts-container');if(!container)return;
   const ammAlerts=checkAmmonimentiAlerts();if(!ammAlerts.length)return;
   let html='<div id="amm-alerts-block">';
-  html+='<div class="cassa-alert-banner" style="background:#e67e22;margin-bottom:8px;cursor:pointer" onclick="toggleAmmDD()">&#9888; '+ammAlerts.length+' collaboratore/i con 2+ ammonimenti verbali — Preparare allineamento <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
+  html+='<div class="cassa-alert-banner" style="background:#e67e22;margin-bottom:8px;cursor:pointer" onclick="toggleAmmDD()">&#9888; '+ammAlerts.length+' collaboratore/i con 2+ ammonimenti stesso motivo — Preparare allineamento <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
   html+='<div class="cassa-alerts-dropdown hidden" id="amm-dd">';
   ammAlerts.forEach(a=>{const dt=a.last?new Date(a.last).toLocaleDateString('it-IT'):'';
-    html+='<div class="cassa-alert-item"><span class="alert-name">'+escP(a.nome)+'</span><span class="alert-detail">'+a.count+' ammonimenti verbali (ultimo: '+dt+')</span><button class="alert-action" style="background:#e67e22" onclick="apriModuloVeloce(\'allineamento\',\''+a.nome.replace(/'/g,"\\'")+'\')">Crea Allineamento</button></div>'});
+    html+='<div class="cassa-alert-item"><span class="alert-name">'+escP(a.nome)+'</span><span class="alert-detail">'+a.count+' ammonimenti per: '+escP(a.motivo)+' (ultimo: '+dt+')</span><button class="alert-action" style="background:#e67e22" onclick="apriModuloVeloce(\'allineamento\',\''+a.nome.replace(/'/g,"\\'")+'\')">Crea Allineamento</button></div>'});
   html+='</div></div>';container.insertAdjacentHTML('beforeend',html)}
 function toggleAmmDD(){const dd=document.getElementById('amm-dd');if(dd)dd.classList.toggle('hidden')}
 
@@ -2678,11 +2702,19 @@ function apriSchedaCollaboratore(nome){
   html+='<span class="scheda-path-step" style="background:rgba(192,57,43,0.12);color:var(--accent)">'+rdiCount+' RDI</span>';
   html+='</div>';
 
-  // Auto-suggestions
-  if(totAmm>=2&&allineamenti===0){
-    html+='<div class="scheda-suggestion" style="background:rgba(230,126,34,0.12);color:#e67e22">&#9888; '+totAmm+' ammonimenti senza allineamento &#8594; Preparare allineamento</div>';
-  }else if(totAmm>=3&&allineamenti>0&&rdiCount===0){
-    html+='<div class="scheda-suggestion" style="background:rgba(192,57,43,0.12);color:var(--accent)">&#9888; '+totAmm+' ammonimenti + '+allineamenti+' allineamento/i senza RDI &#8594; Valutare RDI</div>';
+  // Auto-suggestions (basate su stesso motivo)
+  const _ammEntries=entries.filter(e=>e.tipo===tipoAmm);
+  const _ammGruppi=[];_ammEntries.forEach(e=>{let trovato=false;for(const g of _ammGruppi){if(_motivoSimile(e.testo,g.motivo)){g.count++;trovato=true;break}}if(!trovato)_ammGruppi.push({motivo:e.testo,count:1})});
+  const _ammMaxSame=_ammGruppi.reduce((mx,g)=>Math.max(mx,g.count),0);
+  if(_ammMaxSame>=2&&allineamenti===0){
+    html+='<div class="scheda-suggestion" style="background:rgba(230,126,34,0.12);color:#e67e22">&#9888; '+_ammMaxSame+' ammonimenti stesso motivo senza allineamento &#8594; Preparare allineamento</div>';
+  }
+  // Allineamenti stesso motivo → RDI
+  const _allinMods=moduli.filter(m=>m.tipo==='allineamento');
+  const _allinGruppi=[];_allinMods.forEach(m=>{let trovato=false;for(const g of _allinGruppi){if(_motivoSimile(m.non_conformita||'',g.motivo)){g.count++;trovato=true;break}}if(!trovato)_allinGruppi.push({motivo:m.non_conformita||'',count:1})});
+  const _allinMaxSame=_allinGruppi.reduce((mx,g)=>Math.max(mx,g.count),0);
+  if(_allinMaxSame>=3&&rdiCount===0){
+    html+='<div class="scheda-suggestion" style="background:rgba(192,57,43,0.12);color:var(--accent)">&#9888; '+_allinMaxSame+' allineamenti stesso motivo senza RDI &#8594; Preparare RDI</div>';
   }
   // Check last 3 months for 0 errors + appreciations
   const threeMonthsAgo=new Date(now.getFullYear(),now.getMonth()-3,1);
