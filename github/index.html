@@ -1813,7 +1813,7 @@ async function salva(){let nome=capitalizzaNome(document.getElementById('inp-nom
   if(dupSimile.length){
     const tipoAmm=nomeCorrente('Ammonimento Verbale');
     let msg=nome+' ha già '+dupSimile.length+' registrazione/i "'+tipoSelezionato+'" oggi.';
-    if(tipoSelezionato===tipoAmm&&dupSimile.length>=1){const _ammSimili=dupSimile.filter(d=>_motivoSimile(d.testo,testo));if(_ammSimili.length>=1)msg+='\n\nCon 2+ ammonimenti verbali per lo stesso motivo, valuta di preparare un modulo di Allineamento.'}
+    if(tipoSelezionato===tipoAmm&&dupSimile.length>=1){const _ammSimili=dupSimile.filter(d=>_motivoSimile(d.testo,testo,nome));if(_ammSimili.length>=1)msg+='\n\nCon 2+ ammonimenti verbali per lo stesso motivo, valuta di preparare un modulo di Allineamento.'}
     msg+='\n\nVuoi aggiungere comunque?';
     if(!confirm(msg))return}
   const rec={id:Date.now(),nome,tipo:tipoSelezionato,testo,data:new Date().toISOString(),operatore:getOperatore(),importo,valuta,reparto,reparto_dip:currentReparto};
@@ -1997,7 +1997,15 @@ function apriModuloVeloce(tipo,nome){switchPage('moduli');
 // KEYWORDS MOTIVO: estrae parole significative per confronto motivi
 const _STOP_WORDS=new Set(['il','lo','la','le','li','gli','i','un','uno','una','di','da','del','della','dello','dei','degli','delle','dal','dalla','con','e','in','per','a','al','alla','allo','che','non','si','ha','è','sono','stato','stata','stati','nel','nella','sul','sulla','come','questo','questa','durante','dopo','prima','tra','fra','essere','avere','suo','sua','suoi','sue','ogni','anche','più','già','senza','presso','fatto','data','turno','servizio','collaboratore','collaboratrice']);
 function _estraiKeywords(testo){if(!testo)return[];return testo.toLowerCase().replace(/[^a-zàèéìòù\s]/g,' ').split(/\s+/).filter(w=>w.length>3&&!_STOP_WORDS.has(w))}
-function _motivoSimile(t1,t2){const k1=_estraiKeywords(t1),k2=_estraiKeywords(t2);if(!k1.length||!k2.length)return false;const set2=new Set(k2);let comuni=0;k1.forEach(w=>{if(set2.has(w))comuni++});return comuni>=2||(comuni>=1&&Math.min(k1.length,k2.length)<=3)}
+// Categorie semantiche: parole diverse ma stesso ambito disciplinare
+const _SINONIMI_MOTIVO={ritardo:['ritardo','ritardi','tardi','puntualità','orario','orari','timbratura','timbrare'],uniforme:['uniforme','divisa','camicia','abbigliamento','vestito','scarpe','cravatta','badge','targhetta','decoro'],cassa:['cassa','conteggio','ammanco','eccedenza','differenza','discrepanza','mancante','mancanza'],assenza:['assenza','assente','malattia','certificato','giustificativo'],comportamento:['comportamento','condotta','atteggiamento','maleducazione','scortese','scortesia','litigio','insulto','aggressivo'],procedura:['procedura','protocollo','regolamento','normativa','istruzione'],pulizia:['pulizia','mani','igiene','sfregamento','palmi'],identificazione:['identificazione','documento','identità','lrd','verifica','kyc'],cellulare:['cellulare','telefono','smartphone','telefonate']};
+function _normalizzaKeywords(keywords){return keywords.map(w=>{for(const[cat,sinonimi]of Object.entries(_SINONIMI_MOTIVO)){if(sinonimi.some(s=>w.includes(s)||s.includes(w)))return'__'+cat}return w})}
+function _motivoSimile(t1,t2,nomeCollab){let k1=_estraiKeywords(t1),k2=_estraiKeywords(t2);
+  // Rimuovi parole del nome collaboratore dal confronto
+  if(nomeCollab){const nk=new Set(nomeCollab.toLowerCase().split(/\s+/).filter(w=>w.length>2));k1=k1.filter(w=>!nk.has(w));k2=k2.filter(w=>!nk.has(w))}
+  // Normalizza sinonimi (divisa→__uniforme, ritardo→__ritardo, ecc.)
+  k1=_normalizzaKeywords(k1);k2=_normalizzaKeywords(k2);
+  if(!k1.length||!k2.length)return false;const set2=new Set(k2);let comuni=0;k1.forEach(w=>{if(set2.has(w))comuni++});return comuni>=2||(comuni>=1&&Math.min(k1.length,k2.length)<=3)}
 
 // ALERT COLLABORATORE A RISCHIO (3+ allineamenti stesso motivo → RDI)
 function checkRischioAlerts(){
@@ -2010,7 +2018,7 @@ function checkRischioAlerts(){
     // Raggruppa per motivo simile (non_conformita)
     const gruppi=[];
     allins.forEach(a=>{const nc=a.non_conformita||'';let trovato=false;
-      for(const g of gruppi){if(_motivoSimile(nc,g.motivo)){g.items.push(a);trovato=true;break}}
+      for(const g of gruppi){if(_motivoSimile(nc,g.motivo,nome)){g.items.push(a);trovato=true;break}}
       if(!trovato)gruppi.push({motivo:nc,items:[a]})});
     // Alert solo se 3+ allineamenti per lo stesso motivo
     gruppi.filter(g=>g.items.length>=3).forEach(g=>{
@@ -2040,7 +2048,7 @@ function checkAmmonimentiAlerts(){
     // Raggruppa per motivo simile
     const gruppi=[];
     a.entries.forEach(e=>{let trovato=false;
-      for(const g of gruppi){if(_motivoSimile(e.testo,g.motivo)){g.items.push(e);trovato=true;break}}
+      for(const g of gruppi){if(_motivoSimile(e.testo,g.motivo,a.nome)){g.items.push(e);trovato=true;break}}
       if(!trovato)gruppi.push({motivo:e.testo,items:[e]})});
     // Alert solo per gruppi con 2+ ammonimenti stesso motivo
     gruppi.filter(g=>g.items.length>=2).forEach(g=>{
@@ -2704,14 +2712,14 @@ function apriSchedaCollaboratore(nome){
 
   // Auto-suggestions (basate su stesso motivo)
   const _ammEntries=entries.filter(e=>e.tipo===tipoAmm);
-  const _ammGruppi=[];_ammEntries.forEach(e=>{let trovato=false;for(const g of _ammGruppi){if(_motivoSimile(e.testo,g.motivo)){g.count++;trovato=true;break}}if(!trovato)_ammGruppi.push({motivo:e.testo,count:1})});
+  const _ammGruppi=[];_ammEntries.forEach(e=>{let trovato=false;for(const g of _ammGruppi){if(_motivoSimile(e.testo,g.motivo,nome)){g.count++;trovato=true;break}}if(!trovato)_ammGruppi.push({motivo:e.testo,count:1})});
   const _ammMaxSame=_ammGruppi.reduce((mx,g)=>Math.max(mx,g.count),0);
   if(_ammMaxSame>=2&&allineamenti===0){
     html+='<div class="scheda-suggestion" style="background:rgba(230,126,34,0.12);color:#e67e22">&#9888; '+_ammMaxSame+' ammonimenti stesso motivo senza allineamento &#8594; Preparare allineamento</div>';
   }
   // Allineamenti stesso motivo → RDI
   const _allinMods=moduli.filter(m=>m.tipo==='allineamento');
-  const _allinGruppi=[];_allinMods.forEach(m=>{let trovato=false;for(const g of _allinGruppi){if(_motivoSimile(m.non_conformita||'',g.motivo)){g.count++;trovato=true;break}}if(!trovato)_allinGruppi.push({motivo:m.non_conformita||'',count:1})});
+  const _allinGruppi=[];_allinMods.forEach(m=>{let trovato=false;for(const g of _allinGruppi){if(_motivoSimile(m.non_conformita||'',g.motivo,nome)){g.count++;trovato=true;break}}if(!trovato)_allinGruppi.push({motivo:m.non_conformita||'',count:1})});
   const _allinMaxSame=_allinGruppi.reduce((mx,g)=>Math.max(mx,g.count),0);
   if(_allinMaxSame>=3&&rdiCount===0){
     html+='<div class="scheda-suggestion" style="background:rgba(192,57,43,0.12);color:var(--accent)">&#9888; '+_allinMaxSame+' allineamenti stesso motivo senza RDI &#8594; Preparare RDI</div>';
