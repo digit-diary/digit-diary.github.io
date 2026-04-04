@@ -4794,7 +4794,9 @@ async function salvaMaisonManuale(){
     if(tipo&&nNomi>1&&BUONO_VALORI[tipo]){
       _costo=i===0?Math.round(_buonoCosto*100)/100:Math.round(_restoCosto/(nNomi-1)*100)/100;
     }else{_costo=Math.round(importo/nNomi*100)/100}
-    const rec={data_giornata:dataVal,nome:nome,px:Math.round(px/nNomi)||1,
+    // Distribuzione px: primo prende il resto (es. 5px / 2 nomi → 3+2, non 3+3)
+    const _pxBase=Math.floor(px/nNomi)||1;const _pxExtra=px-_pxBase*nNomi;
+    const rec={data_giornata:dataVal,nome:nome,px:_pxBase+(i<_pxExtra?1:0),
       costo:_costo,tipo_buono:i===0?tipo:null,
       note:(_noteMan||'')+(gruppoLabel?' '+gruppoLabel:''),
       gruppo:gruppoLabel,operatore:getOperatore(),reparto_dip:currentReparto};
