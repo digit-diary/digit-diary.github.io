@@ -278,7 +278,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 .scheda-suggestion{padding:10px 14px;border-radius:3px;font-size:.84rem;font-weight:600;margin-top:8px;display:flex;align-items:center;gap:8px}
 .scheda-mom{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:10px 0}
 .scheda-mom-card{padding:8px 14px;border-radius:3px;font-size:.88rem;font-weight:600}
-.scheda-chart-wrap{position:relative;max-height:220px;margin:10px 0}
+.scheda-chart-wrap{position:relative;height:220px;margin:10px 0;overflow:hidden}
 .scheda-sick-flag{padding:6px 12px;border-radius:3px;font-size:.82rem;font-weight:600;margin-top:6px}
 .scheda-compare-wrap{margin-top:20px;padding:20px;background:var(--paper2);border-radius:3px}
 .scheda-compare-wrap h4{margin-bottom:12px}
@@ -2876,7 +2876,7 @@ function _renderSchedaTrendChart(nome,entries){
       {label:'Allineamenti',data:allinData,borderColor:'#1a4a7a',backgroundColor:'rgba(26,74,122,0.1)',fill:false,tension:0.3,pointRadius:4,pointBackgroundColor:'#1a4a7a',borderDash:[5,3]},
       {label:'RDI',data:rdiData,borderColor:'#7b2d8b',backgroundColor:'rgba(123,45,139,0.1)',fill:false,tension:0.3,pointRadius:4,pointBackgroundColor:'#7b2d8b',borderDash:[2,2]},
       {label:'Apprezzamenti',data:apprData,borderColor:'#b8860b',backgroundColor:'rgba(184,134,11,0.1)',fill:true,tension:0.3,pointRadius:4,pointBackgroundColor:'#b8860b'}]},
-    options:{responsive:true,maintainAspectRatio:true,animation:{duration:400},plugins:{legend:{position:'top',labels:{font:{size:11}}}},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:400},plugins:{legend:{position:'top',labels:{font:{size:11}}}},
       scales:{y:{beginAtZero:true,ticks:{stepSize:1,font:{size:11}}},x:{ticks:{font:{size:10}}}}}});
 }
 
