@@ -977,7 +977,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
     <div class="card-header">Registro attività operatori</div>
     <div style="padding:14px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--paper2)">
       <div class="filter-group"><span class="filter-label">Operatore</span><select id="log-filt-op" onchange="renderRegistro()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"><option value="">Tutti</option></select></div>
-      <div class="filter-group"><span class="filter-label">Categoria</span><select id="log-filt-cat" onchange="renderRegistro()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"><option value="">Tutte</option><option value="registrazione">Registrazioni</option><option value="modulo">Moduli</option><option value="nota">Note</option><option value="collaboratore">Collaboratori</option><option value="operatore">Operatori</option><option value="scadenza">Scadenze</option><option value="tipo">Tipi evento</option></select></div>
+      <div class="filter-group"><span class="filter-label">Categoria</span><select id="log-filt-cat" onchange="renderRegistro()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"><option value="">Tutte</option><option value="registrazione">Registrazioni</option><option value="modulo">Moduli</option><option value="collaboratore">Collaboratori</option><option value="operatore">Operatori</option><option value="scadenza">Scadenze</option><option value="tipo">Tipi evento</option></select></div>
       <div class="filter-group"><span class="filter-label">Cerca</span><input type="text" id="log-filt-cerca" placeholder="Cerca..." oninput="renderRegistro()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink);width:160px"></div>
       <div class="filter-group"><span class="filter-label">Dal</span><input type="text" id="log-filt-dal" placeholder="Seleziona..." readonly style="cursor:pointer;min-width:150px"></div>
       <div class="filter-group"><span class="filter-label">Al</span><input type="text" id="log-filt-al" placeholder="Seleziona..." readonly style="cursor:pointer;min-width:150px"></div>
@@ -2250,7 +2250,7 @@ async function inviaNotaCollega(){const dests=getDestinatariSelezionati(),msg=do
   const gid=dests.length>1?crypto.randomUUID():null;
   const msgEnc=await encryptNota(msg);
   try{for(const dest of dests){const r=await secPost('note_colleghi',{da_operatore:da,a_operatore:dest,messaggio:msgEnc,gruppo_id:gid});r[0].messaggio=msg;r[0]._decrypted=true;noteColleghiCache.unshift(r[0])}
-  logAzione('Nota inviata','A: '+dests.join(', ')+' - '+msg.substring(0,50));document.getElementById('nota-msg').value='';document.querySelectorAll('#nota-dest-box input[type=checkbox]').forEach(cb=>cb.checked=false);renderNoteCollega();toast('Nota inviata a '+dests.join(', '));
+  document.getElementById('nota-msg').value='';document.querySelectorAll('#nota-dest-box input[type=checkbox]').forEach(cb=>cb.checked=false);renderNoteCollega();toast('Nota inviata a '+dests.join(', '));
   inviaPush(dests,'Nota da '+da,msg.substring(0,120),'nota',true)}catch(e){toast('Errore invio')}}
 async function segnaNotaLetta(id){try{const ora=new Date().toISOString();await secPatch('note_colleghi','id=eq.'+id,{letta:true,letta_at:ora});const n=noteColleghiCache.find(n=>n.id===id);if(n){n.letta=true;n.letta_at=ora}renderNoteCollega()}catch(e){toast('Errore aggiornamento nota')}}
 function rispondiNota(mittente,notaId){
@@ -2277,12 +2277,12 @@ async function salvaModificaNota(id){const msg=document.getElementById('edit-not
   const ids=gid?noteColleghiCache.filter(x=>x.gruppo_id===gid&&x.da_operatore===n.da_operatore).map(x=>x.id):[id];
   const msgEnc=await encryptNota(msg);
   try{for(const nid of ids){await secPatch('note_colleghi','id=eq.'+nid,{messaggio:msgEnc});const c=noteColleghiCache.find(x=>x.id===nid);if(c){c.messaggio=msg;c._decrypted=true}}
-  logAzione('Nota modificata',msg.substring(0,50));document.getElementById('pwd-modal').classList.add('hidden');renderNoteCollega();toast('Nota modificata')}catch(e){toast('Errore modifica nota')}}
+  document.getElementById('pwd-modal').classList.add('hidden');renderNoteCollega();toast('Nota modificata')}catch(e){toast('Errore modifica nota')}}
 async function annullaInvioNota(id){const n=noteColleghiCache.find(n=>n.id===id);const gid=n?n.gruppo_id:null;
   const ids=gid?noteColleghiCache.filter(x=>x.gruppo_id===gid&&x.da_operatore===n.da_operatore).map(x=>x.id):[id];
   const label=ids.length>1?'Annullare l\'invio di '+ids.length+' note? Verranno eliminate per tutti i destinatari.':'Annullare l\'invio? La nota verrà eliminata anche per il destinatario.';
   if(!confirm(label))return;
-  try{for(const nid of ids){await secDel('note_colleghi','id=eq.'+nid)}noteColleghiCache=noteColleghiCache.filter(x=>!ids.includes(x.id));logAzione('Annullamento nota','Nota annullata ('+ids.length+' destinatari)');renderNoteCollega();toast('Invio annullato')}catch(e){toast('Errore annullamento invio')}}
+  try{for(const nid of ids){await secDel('note_colleghi','id=eq.'+nid)}noteColleghiCache=noteColleghiCache.filter(x=>!ids.includes(x.id));renderNoteCollega();toast('Invio annullato')}catch(e){toast('Errore annullamento invio')}}
 function renderNoteCollega(){const op=getOperatore();if(!op)return;
   const listEl=document.getElementById('note-conv-list');if(!listEl)return;
   // Build conversations from noteColleghiCache
@@ -2558,7 +2558,6 @@ async function inviaNotaChat(){
   if(!dests.length){toast('Nessun destinatario');return}
   const gid=dests.length>1?crypto.randomUUID():null;
   try{for(const dest of dests){const r=await secPost('note_colleghi',{da_operatore:op,a_operatore:dest,messaggio:msgEnc,gruppo_id:gid});r[0].messaggio=msg;r[0]._decrypted=true;noteColleghiCache.unshift(r[0])}
-  logAzione('Nota inviata','A: '+dests.join(', ')+' - '+msg.substring(0,50));
   ta.value='';ta.style.height='auto';annullaRispondi();
   // If was a new group conversation, switch to actual partner or group
   if(isNewGruppo){
@@ -3410,7 +3409,7 @@ function renderRegistro(){const el=document.getElementById('registro-list');if(!
   const fc=(document.getElementById('log-filt-cerca')||{}).value||'';
   const fd=(document.getElementById('log-filt-dal')||{}).value||'';
   const fa=(document.getElementById('log-filt-al')||{}).value||'';
-  const catMap={registrazione:['Nuova registrazione','Modifica registrazione','Eliminata registrazione'],modulo:['Modulo allineamento','Modulo apprezzamento','Modulo rdi','Eliminato modulo'],nota:['Nota inviata','Nota modificata','Annullamento nota'],collaboratore:['Rinomina collaboratore','Importa collaboratori','Collaboratore aggiunto','Collaboratore disattivato'],rapporto:['Rapporto salvato'],scadenza:['Scadenza creata','Scadenza completata'],operatore:['Operatore creato','Operatore rimosso'],tipo:['Tipo aggiunto']};
+  const catMap={registrazione:['Nuova registrazione','Modifica registrazione','Eliminata registrazione'],modulo:['Modulo allineamento','Modulo apprezzamento','Modulo rdi','Eliminato modulo'],collaboratore:['Rinomina collaboratore','Importa collaboratori','Collaboratore aggiunto','Collaboratore disattivato'],rapporto:['Rapporto salvato'],scadenza:['Scadenza creata','Scadenza completata'],operatore:['Operatore creato','Operatore rimosso'],tipo:['Tipo aggiunto']};
   let filtered=logCache.filter(l=>{if(fo&&l.operatore!==fo)return false;
     if(fcat&&catMap[fcat]&&!catMap[fcat].some(a=>l.azione.startsWith(a)))return false;
     if(fc&&!l.azione.toLowerCase().includes(fc.toLowerCase())&&!(l.dettaglio||'').toLowerCase().includes(fc.toLowerCase()))return false;
@@ -3419,7 +3418,7 @@ function renderRegistro(){const el=document.getElementById('registro-list');if(!
   el.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:.88rem"><thead><tr style="border-bottom:2px solid var(--line);text-align:left"><th style="padding:8px">Data/Ora</th><th style="padding:8px">Operatore</th><th style="padding:8px">Azione</th><th style="padding:8px">Dettaglio</th></tr></thead><tbody>'+filtered.slice(0,200).map(l=>{
     const d=new Date(l.created_at);return'<tr style="border-bottom:1px solid var(--line)"><td style="padding:6px 8px;white-space:nowrap;color:var(--muted);font-size:.82rem">'+d.toLocaleDateString('it-IT')+' '+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})+'</td><td style="padding:6px 8px;font-weight:600">'+escP(l.operatore)+'</td><td style="padding:6px 8px">'+escP(l.azione)+'</td><td style="padding:6px 8px;color:var(--muted);font-size:.84rem">'+escP(l.dettaglio)+'</td></tr>'}).join('')+'</tbody></table>'}
 function esportaRegistroCSV(){const fo=(document.getElementById('log-filt-op')||{}).value||'';const fcat=(document.getElementById('log-filt-cat')||{}).value||'';const fc=(document.getElementById('log-filt-cerca')||{}).value||'';const fd=(document.getElementById('log-filt-dal')||{}).value||'';const fa=(document.getElementById('log-filt-al')||{}).value||'';
-  const catMap={registrazione:['Nuova registrazione','Modifica registrazione','Eliminata registrazione'],modulo:['Modulo allineamento','Modulo apprezzamento','Modulo rdi','Eliminato modulo'],nota:['Nota inviata','Nota modificata','Annullamento nota'],collaboratore:['Rinomina collaboratore','Importa collaboratori','Collaboratore aggiunto','Collaboratore disattivato'],rapporto:['Rapporto salvato'],scadenza:['Scadenza creata','Scadenza completata'],operatore:['Operatore creato','Operatore rimosso'],tipo:['Tipo aggiunto']};
+  const catMap={registrazione:['Nuova registrazione','Modifica registrazione','Eliminata registrazione'],modulo:['Modulo allineamento','Modulo apprezzamento','Modulo rdi','Eliminato modulo'],collaboratore:['Rinomina collaboratore','Importa collaboratori','Collaboratore aggiunto','Collaboratore disattivato'],rapporto:['Rapporto salvato'],scadenza:['Scadenza creata','Scadenza completata'],operatore:['Operatore creato','Operatore rimosso'],tipo:['Tipo aggiunto']};
   const filtered=logCache.filter(l=>{if(fo&&l.operatore!==fo)return false;if(fcat&&catMap[fcat]&&!catMap[fcat].some(a=>l.azione.startsWith(a)))return false;if(fc&&!l.azione.toLowerCase().includes(fc.toLowerCase())&&!(l.dettaglio||'').toLowerCase().includes(fc.toLowerCase()))return false;if(fd&&l.created_at<fd)return false;if(fa&&l.created_at>fa+'T23:59:59')return false;return true});
   if(!filtered.length){toast('Nessun dato da esportare');return}
   const rows=[['Data','Ora','Operatore','Azione','Dettaglio']];filtered.forEach(l=>{const d=new Date(l.created_at);rows.push([d.toLocaleDateString('it-IT'),d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}),l.operatore,l.azione,'"'+(l.dettaglio||'').replace(/"/g,'""').replace(/\n/g,' ')+'"'])});
@@ -3783,7 +3782,7 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
         const dopodomaniMatch=/\bdopodomani\b/i.test(riga);
         const oggiMatch=/\b(oggi|stasera|questa sera)\b/i.test(riga);
         const finoMatch=riga.match(/fino\s+(?:al?\s+)?(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?/i);
-        const dalAlMatch=riga.match(/dal\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?\s+al\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?/i);
+        const dalAlMatch=riga.match(/dal\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?\s+al\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?/i);
         // Giorni della settimana
         const _giorniSett={lunedi:1,lunedì:1,martedi:2,martedì:2,mercoledi:3,mercoledì:3,giovedi:4,giovedì:4,venerdi:5,venerdì:5,sabato:6,domenica:0};
         const _giorniTrovati=[];
@@ -3830,9 +3829,13 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
           dataInizio=new Date(dataRapp);dataInizio.setDate(dataInizio.getDate()+1);dataFine=new Date(dataInizio);
         }else if(dalAlMatch){
           const gInizio=parseInt(dalAlMatch[1]),mInizio=dalAlMatch[2]?parseInt(dalAlMatch[2])-1:dataRapp.getMonth();
-          const gFine=parseInt(dalAlMatch[3]),mFine=dalAlMatch[4]?parseInt(dalAlMatch[4])-1:dataRapp.getMonth();
-          dataInizio=new Date(dataRapp.getFullYear(),mInizio,gInizio,12);
-          dataFine=new Date(dataRapp.getFullYear(),mFine,gFine,12);
+          const _aInizio=dalAlMatch[3]?parseInt(dalAlMatch[3]):null;
+          const annoInizio=_aInizio?(_aInizio<100?2000+_aInizio:_aInizio):dataRapp.getFullYear();
+          const gFine=parseInt(dalAlMatch[4]),mFine=dalAlMatch[5]?parseInt(dalAlMatch[5])-1:mInizio;
+          const _aFine=dalAlMatch[6]?parseInt(dalAlMatch[6]):null;
+          const annoFine=_aFine?(_aFine<100?2000+_aFine:_aFine):annoInizio;
+          dataInizio=new Date(annoInizio,mInizio,gInizio,12);
+          dataFine=new Date(annoFine,mFine,gFine,12);
         }else if(finoMatch){
           const gFine=parseInt(finoMatch[1]),mFine=finoMatch[2]?parseInt(finoMatch[2])-1:dataRapp.getMonth();
           dataFine=new Date(dataRapp.getFullYear(),mFine,gFine,12);
