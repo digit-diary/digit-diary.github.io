@@ -2456,10 +2456,12 @@ function rispondiNota(mittente,notaId){
 async function eliminaNotaCollega(id,ruolo){if(!confirm('Eliminare questa nota?'))return;
   const campo=ruolo==='mitt'?'nascosta_mitt':'nascosta_dest';
   const n=noteColleghiCache.find(x=>x.id===id);
-  const ids=(ruolo==='mitt'&&n&&n.gruppo_id)?noteColleghiCache.filter(x=>x.gruppo_id===n.gruppo_id&&x.da_operatore===n.da_operatore).map(x=>x.id):[id];
+  const _nTime=new Date(n.created_at||0).getTime();
+  const ids=(ruolo==='mitt'&&n&&n.gruppo_id)?noteColleghiCache.filter(x=>x.gruppo_id===n.gruppo_id&&x.da_operatore===n.da_operatore&&(x.messaggio||'')===(n.messaggio||'')&&Math.abs(new Date(x.created_at||0).getTime()-_nTime)<10000).map(x=>x.id):[id];
   try{for(const nid of ids){await secPatch('note_colleghi','id=eq.'+nid,{[campo]:true});const c=noteColleghiCache.find(x=>x.id===nid);if(c)c[campo]=true}renderNoteCollega();toast('Nota rimossa')}catch(e){toast('Errore rimozione nota')}}
 function modificaNotaCollega(id){const n=noteColleghiCache.find(n=>n.id===id);if(!n)return;
-  const gid=n.gruppo_id;const gruppo=gid?noteColleghiCache.filter(x=>x.gruppo_id===gid&&x.da_operatore===n.da_operatore):null;
+  const gid=n.gruppo_id;const _nTime2=new Date(n.created_at||0).getTime();
+  const gruppo=gid?noteColleghiCache.filter(x=>x.gruppo_id===gid&&x.da_operatore===n.da_operatore&&(x.messaggio||'')===(n.messaggio||'')&&Math.abs(new Date(x.created_at||0).getTime()-_nTime2)<10000):null;
   const destLabel=gruppo&&gruppo.length>1?gruppo.map(x=>escP(x.a_operatore)).join(', '):escP(n.a_operatore);
   const b=document.getElementById('pwd-modal-content');
   b.innerHTML='<h3>Modifica nota</h3><p>Destinatari: <strong>'+destLabel+'</strong></p><div class="pwd-field"><label>Messaggio</label><textarea id="edit-nota-msg" style="width:100%;min-height:80px;padding:10px;font-family:\'Source Sans 3\',sans-serif;font-size:.95rem;border:1.5px solid var(--line);border-radius:2px;resize:vertical">'+n.messaggio.replace(/</g,'&lt;')+'</textarea></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaModificaNota('+id+')">Salva</button></div>';
