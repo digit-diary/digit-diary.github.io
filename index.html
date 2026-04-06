@@ -2662,6 +2662,50 @@ function _apriGruppoSelezionato(){
   _chatShowArea();
   renderNoteChat(window._noteConvAttiva);renderNoteCollega()}
 function _getGruppoNome(gid){return localStorage.getItem('_gruppo_nome_'+gid)||''}
+function _apriAggiungiMembri(gid,partner){
+  const op=getOperatore();
+  // Trova membri attuali dal DB
+  const allGruppo=noteColleghiCache.filter(x=>x.gruppo_id===gid);
+  const membriAttuali=new Set();membriAttuali.add(op);
+  allGruppo.forEach(n=>{membriAttuali.add(n.da_operatore);membriAttuali.add(n.a_operatore)});
+  // Tutti gli operatori disponibili
+  const tutti=operatoriAuthCache.map(o=>o.nome).sort().filter(n=>n&&!membriAttuali.has(n));
+  if(!tutti.length){toast('Tutti gli operatori sono già nel gruppo');return}
+  const mc=document.getElementById('pwd-modal-content');
+  let html='<h3>Aggiungi al gruppo</h3>';
+  html+='<p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Membri attuali: '+[...membriAttuali].map(n=>escP(_nomeBreve(n))).join(', ')+'</p>';
+  html+='<div style="max-height:250px;overflow-y:auto">';
+  tutti.forEach(n=>{
+    const rep=operatoriRepartoMap[n]||'entrambi';
+    const badge=rep==='slots'?' <span style="font-size:.65rem;color:#1a4a7a;font-weight:700">S</span>':rep==='tavoli'?' <span style="font-size:.65rem;color:#8e44ad;font-weight:700">T</span>':'';
+    html+='<div style="padding:6px 0;display:flex;align-items:center;gap:8px"><input type="checkbox" class="add-member-cb" value="'+escP(n).replace(/"/g,'&quot;')+'" style="width:16px;height:16px"><span>'+escP(n)+badge+'</span></div>'});
+  html+='</div>';
+  html+='<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="_confermaAggiungiMembri(\''+escP(gid).replace(/'/g,"\\'")+'\',\''+escP(partner).replace(/'/g,"\\'")+'\')">Aggiungi</button></div>';
+  mc.innerHTML=html;document.getElementById('pwd-modal').classList.remove('hidden')}
+async function _confermaAggiungiMembri(gid,partner){
+  const cbs=document.querySelectorAll('.add-member-cb:checked');
+  const nuovi=[...cbs].map(cb=>cb.value);
+  if(!nuovi.length){toast('Seleziona almeno una persona');return}
+  const op=getOperatore();
+  // Manda un messaggio di sistema ai nuovi membri per "aggiungerli" al gruppo
+  const msgEnc=await encryptNota(nuovi.map(n=>_nomeBreve(n)).join(', ')+' aggiunt'+(nuovi.length===1?'o/a':'i')+' al gruppo');
+  try{
+    // Invia a TUTTI i membri (vecchi + nuovi) con lo stesso gruppo_id
+    const allGruppo=noteColleghiCache.filter(x=>x.gruppo_id===gid);
+    const membriVecchi=new Set();allGruppo.forEach(n=>{if(n.a_operatore!==op)membriVecchi.add(n.a_operatore);if(n.da_operatore!==op)membriVecchi.add(n.da_operatore)});
+    const tuttiDest=[...membriVecchi,...nuovi];
+    for(const dest of tuttiDest){const r=await secPost('note_colleghi',{da_operatore:op,a_operatore:dest,messaggio:msgEnc,gruppo_id:gid});r[0].messaggio=nuovi.map(n=>_nomeBreve(n)).join(', ')+' aggiunt'+(nuovi.length===1?'o/a':'i')+' al gruppo';r[0]._decrypted=true;noteColleghiCache.unshift(r[0])}
+    document.getElementById('pwd-modal').classList.add('hidden');
+    // Aggiorna nome gruppo se salvato
+    const nomeGruppo=_getGruppoNome(gid);
+    if(!nomeGruppo){
+      const allMembri=new Set();noteColleghiCache.filter(x=>x.gruppo_id===gid).forEach(n=>{if(n.da_operatore!==op)allMembri.add(n.da_operatore);if(n.a_operatore!==op)allMembri.add(n.a_operatore)});
+      const arr=[...allMembri];
+      const newLabel=arr.length<=3?arr.map(n=>_nomeBreve(n)).join(', '):_nomeBreve(arr[0])+', '+_nomeBreve(arr[1])+' +'+(arr.length-2);
+      // Non salva in localStorage, si ricalcola automaticamente
+    }
+    renderNoteChat(partner);renderNoteCollega();
+    toast(nuovi.map(n=>_nomeBreve(n)).join(', ')+' aggiunt'+(nuovi.length===1?'o/a':'i')+' al gruppo')}catch(e){toast('Errore: '+e.message)}}
 function apriConversazioneGruppo(reparto){
   const op=getOperatore();
   const dests=operatoriAuthCache.map(o=>o.nome).filter(n=>{if(!n||n===op)return false;if(reparto==='tutti')return true;const r=operatoriRepartoMap[n]||'entrambi';return r===reparto||r==='entrambi'});
@@ -2773,7 +2817,8 @@ function renderNoteChat(partner){
       _lastSeenHtml='<div style="font-size:.75rem;color:'+_lsColor+';font-weight:400">'+_lsText+_lsDot+'</div>'}}
   const backBtn='<button class="chat-back-btn" onclick="_chatBackToList()" style="display:none;background:none;border:none;cursor:pointer;font-size:1.2rem;color:var(--ink);padding:4px 8px" title="Indietro">&#8592;</button>';
   const searchBtn='<button onclick="apriCercaChat()" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:1.1rem;color:var(--muted);padding:4px 8px" title="Cerca">&#128269;</button>';
-  header.innerHTML=backBtn+'<div style="flex:1;position:relative"><div style="cursor:'+(isPersistentGroup?'pointer':'default')+'" onclick="var t=this.parentElement.querySelector(\'.group-members-tooltip\');if(t)t.style.display=t.style.display===\'none\'?\'block\':\'none\'" onmouseenter="var t=this.parentElement.querySelector(\'.group-members-tooltip\');if(t)t.style.display=\'block\'" onmouseleave="var t=this.parentElement.querySelector(\'.group-members-tooltip\');if(t)t.style.display=\'none\'">'+headerLabel+(isPersistentGroup?' <span style="font-size:.7rem;color:var(--muted)">&#9660;</span>':'')+'</div>'+_groupMembersHtml+_lastSeenHtml+'</div>'+searchBtn;
+  const addMemberBtn=isCustomGroup?'<button onclick="_apriAggiungiMembri(\''+escP(_gidChat).replace(/'/g,"\\'")+'\',\''+escP(partner).replace(/'/g,"\\'")+'\')" style="background:none;border:none;cursor:pointer;font-size:1.1rem;color:var(--accent2);padding:4px 8px" title="Aggiungi membri">&#43;</button>':'';
+  header.innerHTML=backBtn+'<div style="flex:1;position:relative"><div style="cursor:'+(isPersistentGroup?'pointer':'default')+'" onclick="var t=this.parentElement.querySelector(\'.group-members-tooltip\');if(t)t.style.display=t.style.display===\'none\'?\'block\':\'none\'" onmouseenter="var t=this.parentElement.querySelector(\'.group-members-tooltip\');if(t)t.style.display=\'block\'" onmouseleave="var t=this.parentElement.querySelector(\'.group-members-tooltip\');if(t)t.style.display=\'none\'">'+headerLabel+(isPersistentGroup?' <span style="font-size:.7rem;color:var(--muted)">&#9660;</span>':'')+'</div>'+_groupMembersHtml+_lastSeenHtml+'</div>'+addMemberBtn+searchBtn;
   // Show input
   inp.style.display='flex';
   // Messages
