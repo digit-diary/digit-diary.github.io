@@ -2747,7 +2747,9 @@ function renderNoteChat(partner){
     if(isCustomGroup){
       // Custom group: derive members from notes or from _noteConvGruppo
       if(window._noteConvGruppo&&window._noteConvGruppo.gid===_gidChat){headerGruppo=window._noteConvGruppo.label||_getGruppoNome(_gidChat)||'Gruppo';membri=window._noteConvGruppo.dests||[]}
-      else{const conv=_getConvNotes(partner,op);const ps=new Set();conv.forEach(n=>{if(n.da_operatore!==op)ps.add(n.da_operatore);if(n.a_operatore!==op)ps.add(n.a_operatore)});membri=[...ps];headerGruppo=membri.length<=3?membri.map(n=>_nomeBreve(n)).join(', '):_nomeBreve(membri[0])+', '+_nomeBreve(membri[1])+' +'+(membri.length-2)}
+      else{// Cerca tutti i membri dal DB originale (non deduplicato)
+        const allGruppo=noteColleghiCache.filter(x=>x.gruppo_id===_gidChat);
+        const ps=new Set();allGruppo.forEach(n=>{if(n.da_operatore!==op)ps.add(n.da_operatore);if(n.a_operatore!==op)ps.add(n.a_operatore)});membri=[...ps];headerGruppo=_getGruppoNome(_gidChat)||(membri.length<=3?membri.map(n=>_nomeBreve(n)).join(', '):_nomeBreve(membri[0])+', '+_nomeBreve(membri[1])+' +'+(membri.length-2))}
       headerLabel=headerGruppo;
     }else{const rep=_gidChat.replace('__gruppo_','');headerLabel=rep==='tutti'?'Tutti':'Tutti '+(rep==='slots'?'Slots':'Tavoli');
       membri=operatoriAuthCache.map(o=>o.nome).filter(n=>{if(!n||n===op)return false;if(rep==='tutti')return true;const r=operatoriRepartoMap[n]||'entrambi';return r===rep||r==='entrambi'})}
@@ -2861,9 +2863,9 @@ async function inviaNotaChat(){
   const _gidSend=isGroup?partner.replace('gruppo:',''):'';
   const isPersGroup=_gidSend.startsWith('__gruppo_');
   if(isPersGroup&&_gidSend.startsWith('__gruppo_custom_')){
-    // Custom group: get members from existing notes
-    const gNotes=_getConvNotes(partner,op);
-    const ps=new Set();gNotes.forEach(n=>{if(n.a_operatore!==op)ps.add(n.a_operatore);if(n.da_operatore!==op)ps.add(n.da_operatore)});
+    // Custom group: get members from DB originale (non deduplicato)
+    const allGruppo=noteColleghiCache.filter(x=>x.gruppo_id===_gidSend);
+    const ps=new Set();allGruppo.forEach(n=>{if(n.a_operatore!==op)ps.add(n.a_operatore);if(n.da_operatore!==op)ps.add(n.da_operatore)});
     dests=[...ps];
     // If new group (no notes yet), use stored dests
     if(!dests.length&&window._noteConvGruppo)dests=window._noteConvGruppo.dests||[];
