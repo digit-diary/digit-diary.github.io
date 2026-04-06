@@ -2410,6 +2410,28 @@ async function annullaInvioNota(id){const n=noteColleghiCache.find(n=>n.id===id)
   const label=ids.length>1?'Annullare l\'invio di '+ids.length+' note? Verranno eliminate per tutti i destinatari.':'Annullare l\'invio? La nota verrà eliminata anche per il destinatario.';
   if(!confirm(label))return;
   try{for(const nid of ids){await secDel('note_colleghi','id=eq.'+nid)}noteColleghiCache=noteColleghiCache.filter(x=>!ids.includes(x.id));renderNoteCollega();toast('Invio annullato')}catch(e){toast('Errore annullamento invio')}}
+// Migra vecchi gruppi note al formato persistente __gruppo_slots/__gruppo_tavoli
+async function _migraNoteGruppi(){
+  if(localStorage.getItem('_note_gruppi_migrati'))return;
+  const op=getOperatore();if(!op)return;
+  // Trova tutti i gruppo_id unici che NON sono già persistenti
+  const gruppiVecchi=new Set();
+  noteColleghiCache.forEach(n=>{if(n.gruppo_id&&!n.gruppo_id.startsWith('__gruppo_'))gruppiVecchi.add(n.gruppo_id)});
+  if(!gruppiVecchi.size){localStorage.setItem('_note_gruppi_migrati','1');return}
+  let migrati=0;
+  for(const gid of gruppiVecchi){
+    const gNotes=noteColleghiCache.filter(n=>n.gruppo_id===gid);
+    if(gNotes.length<2)continue; // non è un gruppo broadcast
+    // Determina il reparto dal mittente
+    const mittente=gNotes[0].da_operatore;
+    const repMitt=operatoriRepartoMap[mittente]||'entrambi';
+    const newGid=repMitt==='tavoli'?'__gruppo_tavoli':'__gruppo_slots';
+    // Aggiorna tutti i record di questo gruppo
+    for(const n of gNotes){
+      try{await secPatch('note_colleghi','id=eq.'+n.id,{gruppo_id:newGid});n.gruppo_id=newGid;migrati++}catch(e){}}
+  }
+  localStorage.setItem('_note_gruppi_migrati','1');
+  if(migrati)console.log('Migrati '+migrati+' messaggi gruppo al nuovo formato')}
 function renderNoteCollega(){const op=getOperatore();if(!op)return;
   const listEl=document.getElementById('note-conv-list');if(!listEl)return;
   // Build conversations from noteColleghiCache
@@ -2436,14 +2458,22 @@ function renderNoteCollega(){const op=getOperatore();if(!op)return;
     if(!convMap[key].notes.find(x=>x.id===n.id))convMap[key].notes.push(n);
     if(n.a_operatore===op&&!n.letta)convMap[key].unread++;
     const t=n.created_at||'';if(t>convMap[key].lastTime)convMap[key].lastTime=t});
-  // Sort: solo per data ultimo messaggio (come WhatsApp)
-  const convs=Object.values(convMap).sort((a,b)=>b.lastTime.localeCompare(a.lastTime));
+  // Separa gruppi e singoli, ordina per data
+  const allConvs=Object.values(convMap).sort((a,b)=>b.lastTime.localeCompare(a.lastTime));
+  const gruppiConvs=allConvs.filter(c=>c.partner.startsWith('gruppo:'));
+  const singoliConvs=allConvs.filter(c=>!c.partner.startsWith('gruppo:'));
   // Render conversation list
   let html='<div class="conv-new-btn" style="position:relative" id="conv-new-wrap" onclick="toggleConvNewDropdown(event)">&#43; Nuova conversazione</div>';
   html+='<div id="conv-new-dropdown" class="conv-new-dropdown" style="display:none"></div>';
   html+='<div style="padding:8px 10px;border-bottom:1px solid var(--line)"><input type="text" id="conv-search-input" placeholder="&#128269; Cerca conversazione..." oninput="filtraConversazioni()" style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:18px;font-size:.84rem;background:var(--paper);color:var(--ink);font-family:Source Sans 3,sans-serif;box-sizing:border-box"></div>';
-  if(!convs.length){html+='<div style="padding:20px;text-align:center;color:var(--muted);font-size:.88rem">Nessuna conversazione</div>'}
-  convs.forEach(c=>{
+  if(!allConvs.length){html+='<div style="padding:20px;text-align:center;color:var(--muted);font-size:.88rem">Nessuna conversazione</div>'}
+  // Gruppi prima
+  if(gruppiConvs.length){html+='<div style="padding:6px 14px;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;background:var(--paper2);border-bottom:1px solid var(--line)">Gruppi</div>'}
+  gruppiConvs.forEach(c=>{_renderConvItem(c)});
+  // Poi singoli
+  if(singoliConvs.length&&gruppiConvs.length){html+='<div style="padding:6px 14px;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;background:var(--paper2);border-bottom:1px solid var(--line)">Conversazioni</div>'}
+  singoliConvs.forEach(c=>{_renderConvItem(c)});
+  function _renderConvItem(c){
     const isActive=window._noteConvAttiva===c.partner;
     const isGroup=c.partner.startsWith('gruppo:');
     const _gid=isGroup?c.partner.replace('gruppo:',''):'';
@@ -2464,7 +2494,7 @@ function renderNoteCollega(){const op=getOperatore();if(!op)return;
     html+='<span style="font-size:.7rem;color:var(--muted)">'+timeStr+'</span>';
     html+='</div></div>';
     html+='<div style="font-size:.8rem;color:var(--muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'+(c.unread>0?';font-weight:600;color:var(--ink)':'')+'">'+escP(preview)+'</div>';
-    html+='</div>'});
+    html+='</div>'}
   listEl.innerHTML=html;
   // Position the dropdown correctly
   const wrapEl=document.getElementById('conv-new-wrap');
@@ -6985,6 +7015,8 @@ window.addEventListener('load',async()=>{
   setTimeout(checkQrHash,1200);
   // Realtime note (con fallback a polling se Supabase JS non caricato)
   _initNoteRealtime();
+  // Migra vecchi gruppi note al nuovo formato (una tantum)
+  _migraNoteGruppi();
   // Menu mobile
   aggiornaMenuMobile();
   // Flatpickr date pickers
