@@ -2412,12 +2412,13 @@ async function annullaInvioNota(id){const n=noteColleghiCache.find(n=>n.id===id)
   try{for(const nid of ids){await secDel('note_colleghi','id=eq.'+nid)}noteColleghiCache=noteColleghiCache.filter(x=>!ids.includes(x.id));renderNoteCollega();toast('Invio annullato')}catch(e){toast('Errore annullamento invio')}}
 // Migra vecchi gruppi note al formato persistente __gruppo_slots/__gruppo_tavoli
 async function _migraNoteGruppi(){
-  if(localStorage.getItem('_note_gruppi_migrati'))return;
+  if(localStorage.getItem('_note_gruppi_migrati_v2'))return;
   const op=getOperatore();if(!op)return;
   // Trova tutti i gruppo_id unici che NON sono già persistenti
   const gruppiVecchi=new Set();
   noteColleghiCache.forEach(n=>{if(n.gruppo_id&&!n.gruppo_id.startsWith('__gruppo_'))gruppiVecchi.add(n.gruppo_id)});
-  if(!gruppiVecchi.size){localStorage.setItem('_note_gruppi_migrati','1');return}
+  console.log('Migrazione note: '+gruppiVecchi.size+' gruppi vecchi trovati, '+noteColleghiCache.length+' note totali');
+  if(!gruppiVecchi.size){localStorage.setItem('_note_gruppi_migrati_v2','1');return}
   let migrati=0;
   for(const gid of gruppiVecchi){
     const gNotes=noteColleghiCache.filter(n=>n.gruppo_id===gid);
@@ -2430,8 +2431,8 @@ async function _migraNoteGruppi(){
     for(const n of gNotes){
       try{await secPatch('note_colleghi','id=eq.'+n.id,{gruppo_id:newGid});n.gruppo_id=newGid;migrati++}catch(e){}}
   }
-  localStorage.setItem('_note_gruppi_migrati','1');
-  if(migrati)console.log('Migrati '+migrati+' messaggi gruppo al nuovo formato')}
+  localStorage.setItem('_note_gruppi_migrati_v2','1');
+  if(migrati){console.log('Migrati '+migrati+' messaggi gruppo al nuovo formato');renderNoteCollega()}}
 function renderNoteCollega(){const op=getOperatore();if(!op)return;
   const listEl=document.getElementById('note-conv-list');if(!listEl)return;
   // Build conversations from noteColleghiCache
