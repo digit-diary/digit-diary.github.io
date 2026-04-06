@@ -4920,7 +4920,7 @@ function initMaisonFlatpickr(){if(_maisonFpInit||!window.flatpickr)return;_maiso
   const o={locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,onChange:()=>renderMaisonDashboard()};
   flatpickr('#maison-filt-dal',o);flatpickr('#maison-filt-al',o);
   _initNascitaInput('maison-budget-nascita');
-  flatpickr('#maison-man-data',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,defaultDate:'today'});
+  flatpickr('#maison-man-data',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,defaultDate:getGiornataCasino()});
   flatpickr('#regalo-data',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false})}
 function _trovaNomeSimileMaison(nome){const nomi=[...new Set(getMaisonReparto().map(r=>r.nome).concat(getBudgetReparto().map(b=>b.nome)))];const nl=nome.toLowerCase();const nlNoSp=nl.replace(/\s/g,'');
   const exact=nomi.find(n=>n.toLowerCase()===nl);if(exact)return{nome:exact,tipo:'esatto'};
@@ -5185,7 +5185,7 @@ async function salvaMaisonManuale(){
   let qty=parseInt(document.getElementById('maison-man-qty').value)||1;
   // Auto-calcola qty se l'utente lascia 1 ma il costo suggerisce di più
   if(tipo&&qty===1&&BUONO_VALORI[tipo]){const calcQ=Math.ceil(importo/BUONO_VALORI[tipo]);if(calcQ>=1)qty=calcQ}
-  const dataVal=document.getElementById('maison-man-data').value||new Date().toISOString().split('T')[0];
+  const dataVal=document.getElementById('maison-man-data').value||getGiornataCasino();
   // Gestione nomi multipli con /
   const nomiRaw=rawNome.split(/\s*\/\s*/).map(n=>capitalizzaNome(n.trim())).filter(n=>n);
   const nNomi=nomiRaw.length;
