@@ -934,9 +934,10 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
         <div class="field"><label>Tipo</label><select id="se-tipo" style="padding:11px 14px"><option value="cena_esterna">Cena esterna</option><option value="pranzo_esterno">Pranzo esterno</option><option value="rimborso">Rimborso spese</option><option value="viaggio">Viaggio</option><option value="biglietti">Biglietti</option><option value="regalo">Regalo</option><option value="hotel">Hotel / Alloggio</option><option value="altro">Altro</option></select></div>
         <div class="field"><label>Data</label><input type="text" id="se-data" placeholder="Seleziona..." readonly style="cursor:pointer"></div>
       </div>
-      <div class="form-row">
+      <div class="form-row" style="grid-template-columns:1fr 1fr 80px">
         <div class="field"><label>Luogo / Ristorante</label><input type="text" id="se-luogo" placeholder="Es: Ristorante Da Mario, Zurigo..."></div>
         <div class="field"><label>Importo CHF</label><input type="number" id="se-importo" placeholder="0.00" min="0" step="0.01"></div>
+        <div class="field"><label>PX</label><input type="number" id="se-px" value="1" min="1" style="width:70px"></div>
       </div>
       <div class="field" style="margin-bottom:16px"><label>Descrizione (opzionale)</label><input type="text" id="se-descrizione" placeholder="Dettagli aggiuntivi..."></div>
       <button class="btn-salva" onclick="salvaSpeseExtra()">Aggiungi spesa</button>
@@ -1242,7 +1243,7 @@ const MESI_FULL=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio
 const GIORNI=['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
 const GIORNI_SHORT=['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
 const DEFAULT_PWD_HASH='7310db08dd56916e4ded25837db6cf4ff5005c958fb53e405a62fd10d2009cce';
-const TIPI_DEFAULT=[{nome:'Attività',colore:'#1a4a7a'},{nome:'Richiesta',colore:'#2c6e49'},{nome:'Errore',colore:'#c0392b'},{nome:'Ammonimento Verbale',colore:'#7b2d8b'},{nome:'Malattia',colore:'#1a7a6d'},{nome:'Nota',colore:'#8b6914'},{nome:'Altro',colore:'#8a7d6b'}];
+const TIPI_DEFAULT=[{nome:'Attività',colore:'#1a4a7a'},{nome:'Richiesta',colore:'#2c6e49'},{nome:'Errore',colore:'#c0392b'},{nome:'Ammonimento Verbale',colore:'#7b2d8b'},{nome:'Malattia',colore:'#1a7a6d'},{nome:'Non Disponibilità',colore:'#5d6d7e'},{nome:'Nota',colore:'#8b6914'},{nome:'Altro',colore:'#8a7d6b'}];
 let tipiPersonalizzati=[],coloriOverride={},tipoSelezionato='Attività',modalEntryId=null,modalTipoSel=null,datiCache=[],pinnedIds=new Set(),scadenzeCache=[],charts={},operatoriSalvati=[];
 let rapportoMese=new Date().getMonth(),rapportoAnno=new Date().getFullYear(),rapportoGiornoAperto=null,rapportiCache={},noteColleghiCache=[],operatoriAuthCache=[];
 // --- CRITTOGRAFIA NOTE AES-GCM ---
@@ -2772,6 +2773,8 @@ function apriSchedaCollaboratore(nome){
   const totErrCost=errori.reduce((s,e)=>s+(parseFloat(e.importo)||0),0);
   const totMal=_contaTotaleMalattie(entries,tipoMal);
   const totAmm=entries.filter(e=>e.tipo===tipoAmm).length;
+  const tipoND=nomeCorrente('Non Disponibilità');
+  const totND=entries.filter(e=>e.tipo===tipoND).length;
   const allineamenti=moduli.filter(m=>m.tipo==='allineamento').length;
   const apprezzamenti=moduli.filter(m=>m.tipo==='apprezzamento').length;
   const rdiCount=moduli.filter(m=>m.tipo==='rdi').length;
@@ -2814,6 +2817,7 @@ function apriSchedaCollaboratore(nome){
   if(totErrCost)html+='<div class="scheda-kpi"><div class="kpi-val" style="color:var(--accent)">'+fmtCHF(totErrCost)+' CHF</div><div class="kpi-lbl">Costo errori</div></div>';
   html+='<div class="scheda-kpi"><div class="kpi-val" style="color:'+_malColor+'">'+totMal+(_totGiorniMal>totMal?' <span style="font-size:.7rem;font-weight:400">('+_totGiorniMal+'gg)</span>':'')+'</div><div class="kpi-lbl">Malattie</div></div>';
   if(totAmm)html+='<div class="scheda-kpi"><div class="kpi-val" style="color:#7b2d8b">'+totAmm+'</div><div class="kpi-lbl">Amm. verbali</div></div>';
+  if(totND)html+='<div class="scheda-kpi"><div class="kpi-val" style="color:#5d6d7e">'+totND+'</div><div class="kpi-lbl">Non disponib.</div></div>';
   if(allineamenti)html+='<div class="scheda-kpi"><div class="kpi-val" style="color:#1a4a7a">'+allineamenti+'</div><div class="kpi-lbl">Allineamenti</div></div>';
   if(apprezzamenti)html+='<div class="scheda-kpi"><div class="kpi-val" style="color:#b8860b">'+apprezzamenti+'</div><div class="kpi-lbl">Apprezzamenti</div></div>';
   if(apprezzamenti&&totNeg){const ratioColor=ratio>=1?'#2c6e49':'var(--accent)';
@@ -6294,19 +6298,26 @@ async function rimuoviMaisonBudget(id){if(!confirm('Rimuovere questo budget?'))r
   try{await secDel('maison_budget','id=eq.'+id);maisonBudgetCache=maisonBudgetCache.filter(b=>b.id!==id);logAzione('Budget maison rimosso','ID '+id);renderMaisonBudgetUI();renderMaisonDashboard();renderMaisonBudgetAlerts();toast('Budget rimosso')}catch(e){toast('Errore rimozione budget')}}
 function renderMaisonBudgetAlerts(){const container=document.getElementById('maison-alerts-container');if(!container)return;
   const now=new Date(),mese=now.getMonth(),anno=now.getFullYear();
-  const meseStart=anno+'-'+String(mese+1).padStart(2,'0')+'-01';
+  const periodo=(document.getElementById('maison-budget-periodo')||{}).value||'mese';
+  let dataStart;
+  if(periodo==='anno')dataStart=anno+'-01-01';
+  else dataStart=anno+'-'+String(mese+1).padStart(2,'0')+'-01';
+  const periodoLabel=periodo==='anno'?'anno '+anno:['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'][mese]+' '+anno;
   const alerts=[];const _mrAlerts=getMaisonRepartoExpanded();
   getBudgetReparto().forEach(b=>{
-    const meseData=_mrAlerts.filter(r=>r.nome.toLowerCase()===b.nome.toLowerCase()&&r.data_giornata>=meseStart);
-    const spent=meseData.reduce((s,r)=>s+parseFloat(r.costo||0),0);
-    const nBU=_contaBuoni(meseData,'BU');
-    const nBL=_contaBuoni(meseData,'BL');
-    if(b.budget_chf&&spent>=b.budget_chf)alerts.push({nome:b.nome,tipo:'chf_over',spent,budget:b.budget_chf});
-    else if(b.budget_chf&&spent>=b.budget_chf*0.8)alerts.push({nome:b.nome,tipo:'chf_near',spent,budget:b.budget_chf});
-    if(b.budget_bu&&nBU>=b.budget_bu)alerts.push({nome:b.nome,tipo:'bu_over',count:nBU,max:b.budget_bu});
-    if(b.budget_bl&&nBL>=b.budget_bl)alerts.push({nome:b.nome,tipo:'bl_over',count:nBL,max:b.budget_bl})});
-  if(!alerts.length){container.innerHTML='';return}
-  let html='';
+    const periodoData=_mrAlerts.filter(r=>r.nome.toLowerCase()===b.nome.toLowerCase()&&r.data_giornata>=dataStart);
+    const spent=periodoData.reduce((s,r)=>s+parseFloat(r.costo||0),0);
+    const nBU=_contaBuoni(periodoData,'BU');
+    const nBL=_contaBuoni(periodoData,'BL');
+    const budgetChf=periodo==='anno'&&b.budget_chf?(b.budget_chf*12):b.budget_chf;
+    const budgetBu=periodo==='anno'&&b.budget_bu?(b.budget_bu*12):b.budget_bu;
+    const budgetBl=periodo==='anno'&&b.budget_bl?(b.budget_bl*12):b.budget_bl;
+    if(budgetChf&&spent>=budgetChf)alerts.push({nome:b.nome,tipo:'chf_over',spent,budget:budgetChf});
+    else if(budgetChf&&spent>=budgetChf*0.8)alerts.push({nome:b.nome,tipo:'chf_near',spent,budget:budgetChf});
+    if(budgetBu&&nBU>=budgetBu)alerts.push({nome:b.nome,tipo:'bu_over',count:nBU,max:budgetBu});
+    if(budgetBl&&nBL>=budgetBl)alerts.push({nome:b.nome,tipo:'bl_over',count:nBL,max:budgetBl})});
+  let html='<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="font-size:.82rem;color:var(--muted)">Periodo budget:</span><select id="maison-budget-periodo" onchange="renderMaisonBudgetAlerts()" style="padding:4px 8px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper);color:var(--ink)"><option value="mese"'+(periodo==='mese'?' selected':'')+'>Mese corrente</option><option value="anno"'+(periodo==='anno'?' selected':'')+'>Anno corrente</option></select><span style="font-size:.82rem;color:var(--muted)">('+periodoLabel+')</span></div>';
+  if(!alerts.length){container.innerHTML=html;return}
   const overAlerts=alerts.filter(a=>a.tipo.includes('over'));
   const nearAlerts=alerts.filter(a=>a.tipo.includes('near'));
   if(overAlerts.length){html+='<div class="cassa-alert-banner rdi" style="margin-bottom:8px;cursor:default">&#9888; Budget superato: '+overAlerts.map(a=>escP(a.nome)+(a.spent?' ('+fmtCHF(a.spent)+'/'+fmtCHF(a.budget)+' CHF)':a.count?(' ('+a.count+'/'+a.max+' buoni)'):'')).join(' — ')+'</div>'}
@@ -6420,10 +6431,11 @@ async function salvaSpeseExtra(){let benef=capitalizzaNome(document.getElementBy
   // Controllo duplicati: stesso beneficiario + stessa data + stesso importo
   const seDup=getSpeseReparto().find(r=>r.beneficiario.toLowerCase()===benef.toLowerCase()&&r.data_spesa===data&&parseFloat(r.importo)===importo);
   if(seDup){if(!confirm(benef+' ha già una spesa di '+importo.toFixed(2)+' CHF il '+new Date(data+'T12:00:00').toLocaleDateString('it-IT')+'.\n\nVuoi aggiungere comunque?'))return}
-  try{const rec={beneficiario:benef,tipo,descrizione:desc,importo,data_spesa:data,luogo,operatore:getOperatore(),reparto_dip:currentReparto};
+  const px=parseInt(document.getElementById('se-px').value)||1;
+  try{const rec={beneficiario:benef,tipo,descrizione:desc+(px>1?' ('+px+' px)':''),importo,data_spesa:data,luogo,px:px,operatore:getOperatore(),reparto_dip:currentReparto};
     const r=await secPost('spese_extra',rec);speseExtraCache.unshift(r[0]);
     document.getElementById('se-beneficiario').value='';document.getElementById('se-luogo').value='';
-    document.getElementById('se-importo').value='';document.getElementById('se-descrizione').value='';
+    document.getElementById('se-importo').value='';document.getElementById('se-descrizione').value='';document.getElementById('se-px').value='1';
     const fp=document.getElementById('se-data');if(fp&&fp._flatpickr)fp._flatpickr.clear();
     logAzione('Spesa extra',benef+' — '+SE_TIPI_LABEL[tipo]+' — '+importo.toFixed(2)+' CHF');
     renderSpeseExtra();renderMaisonDashboard();toast('Spesa aggiunta')}catch(e){toast('Errore aggiunta spesa')}}
@@ -6595,10 +6607,12 @@ function renderInventarioBuoni(){
   const kpiEl=document.getElementById('inv-buoni-kpi');
   if(kpiEl){
     const labels={BU:'Buono Unico',BL:'Buono Lounge',CG:'C. Gourmet',WL:'Welcome L.'};
+    const _scortaBassa=['BU','BL','CG','WL'].filter(t=>(giacenze[t]||0)>0&&(giacenze[t]||0)<=10);
+    const _scortaFinita=['BU','BL','CG','WL'].filter(t=>(giacenze[t]||0)<=0&&getInventarioReparto().some(r=>r.categoria==='buono'&&r.tipo===t));
     kpiEl.innerHTML=['BU','BL','CG','WL'].map(t=>{
-      const v=giacenze[t]||0;const col=v<=5?'var(--accent)':v<=20?'#e67e22':'#2c6e49';
+      const v=giacenze[t]||0;const col=v<=0?'var(--accent)':v<=10?'#e67e22':'#2c6e49';
       return '<div class="mini-stat"><div class="mini-stat-num" style="color:'+col+'">'+v+'</div><div class="mini-stat-label">'+labels[t]+'</div></div>';
-    }).join('')+(nonPareggiati?'<div style="width:100%;grid-column:1/-1;margin-top:8px;padding:8px;background:rgba(230,126,34,0.12);color:#e67e22;border-radius:3px;font-size:.85rem">&#9888; '+nonPareggiati+' buoni pre-assegnati non pareggiati</div>':'');
+    }).join('')+(_scortaFinita.length?'<div style="width:100%;grid-column:1/-1;margin-top:8px;padding:8px;background:rgba(192,57,43,0.15);color:var(--accent);border-radius:3px;font-size:.85rem;font-weight:600">&#9888; Scorta esaurita: '+_scortaFinita.join(', ')+'</div>':'')+(_scortaBassa.length?'<div style="width:100%;grid-column:1/-1;margin-top:8px;padding:8px;background:rgba(230,126,34,0.12);color:#e67e22;border-radius:3px;font-size:.85rem">&#9888; Scorta bassa (&le;10): '+_scortaBassa.map(t=>t+' ('+giacenze[t]+')').join(', ')+'</div>':'')+(nonPareggiati?'<div style="width:100%;grid-column:1/-1;margin-top:8px;padding:8px;background:rgba(230,126,34,0.12);color:#e67e22;border-radius:3px;font-size:.85rem">&#9888; '+nonPareggiati+' buoni pre-assegnati non pareggiati</div>':'');
   }
   renderInventarioBuoniTable();
 }
