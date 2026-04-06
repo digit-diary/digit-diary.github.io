@@ -2512,13 +2512,19 @@ function renderNoteCollega(){const op=getOperatore();if(!op)return;
       header.innerHTML='<span style="color:var(--muted);font-weight:400">Note Colleghi</span>';
       msgs.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:.95rem">Seleziona una conversazione</div>';
       inp.style.display='none'}}}
+function _nomeBreve(nome){
+  // "Pisano Pamela" → "Pamela P." / "Rondinella Alessio" → "Alessio R."
+  const parts=(nome||'').trim().split(/\s+/);
+  if(parts.length<2)return nome;
+  // Cognome = primo, Nome = secondo (convenzione casino)
+  return parts.slice(1).join(' ')+' '+parts[0].charAt(0)+'.'}
 function _chatGroupLabel(conv){
   const op=getOperatore();
   const partners=new Set();
   conv.notes.forEach(n=>{if(n.da_operatore!==op)partners.add(n.da_operatore);if(n.a_operatore!==op)partners.add(n.a_operatore)});
   const arr=[...partners];
-  if(arr.length<=3)return arr.map(p=>escP(p)).join(', ');
-  return escP(arr[0])+', '+escP(arr[1])+' +'+( arr.length-2)}
+  if(arr.length<=3)return arr.map(p=>escP(_nomeBreve(p))).join(', ');
+  return escP(_nomeBreve(arr[0]))+', '+escP(_nomeBreve(arr[1]))+' +'+(arr.length-2)}
 function _chatTimeShort(isoStr){if(!isoStr)return'';
   const d=new Date(isoStr);const now=new Date();const today=now.toISOString().substring(0,10);const dateStr=isoStr.substring(0,10);
   if(dateStr===today)return d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
@@ -2563,7 +2569,7 @@ function _apriGruppoSelezionato(){
   // Crea un gruppo personalizzato con ID basato sui membri
   const membri=[op,...dests].sort().join('|');
   const gid='__gruppo_custom_'+membri.replace(/[^a-zA-Z0-9]/g,'_').substring(0,60);
-  window._noteConvGruppo={reparto:'custom',dests:dests,gid:gid,label:dests.length<=3?dests.join(', '):dests[0]+', '+dests[1]+' +'+(dests.length-2)};
+  window._noteConvGruppo={reparto:'custom',dests:dests,gid:gid,label:dests.length<=3?dests.map(n=>_nomeBreve(n)).join(', '):_nomeBreve(dests[0])+', '+_nomeBreve(dests[1])+' +'+(dests.length-2)};
   window._noteConvAttiva='gruppo:'+gid;
   const dd=document.getElementById('conv-new-dropdown');if(dd)dd.style.display='none';
   _chatShowArea();
@@ -2653,7 +2659,7 @@ function renderNoteChat(partner){
     if(isCustomGroup){
       // Custom group: derive members from notes or from _noteConvGruppo
       if(window._noteConvGruppo&&window._noteConvGruppo.gid===_gidChat){headerGruppo=window._noteConvGruppo.label||'Gruppo';membri=window._noteConvGruppo.dests||[]}
-      else{const conv=_getConvNotes(partner,op);const ps=new Set();conv.forEach(n=>{if(n.da_operatore!==op)ps.add(n.da_operatore);if(n.a_operatore!==op)ps.add(n.a_operatore)});membri=[...ps];headerGruppo=membri.length<=3?membri.join(', '):membri[0]+', '+membri[1]+' +'+(membri.length-2)}
+      else{const conv=_getConvNotes(partner,op);const ps=new Set();conv.forEach(n=>{if(n.da_operatore!==op)ps.add(n.da_operatore);if(n.a_operatore!==op)ps.add(n.a_operatore)});membri=[...ps];headerGruppo=membri.length<=3?membri.map(n=>_nomeBreve(n)).join(', '):_nomeBreve(membri[0])+', '+_nomeBreve(membri[1])+' +'+(membri.length-2)}
       headerLabel=headerGruppo;
     }else{const rep=_gidChat.replace('__gruppo_','');headerLabel='Tutti '+(rep==='slots'?'Slots':'Tavoli');
       membri=operatoriAuthCache.map(o=>o.nome).filter(n=>{if(!n||n===op)return false;const r=operatoriRepartoMap[n]||'entrambi';return r===rep||r==='entrambi'})}
