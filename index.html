@@ -693,12 +693,9 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
         <p style="color:var(--muted);font-size:.78rem;margin-top:6px">Se specifichi un periodo, verrà creata una registrazione per ogni giorno</p>
       </div>
       <div id="nd-extra-row" style="margin-bottom:16px;display:none">
-        <div class="form-row" style="grid-template-columns:1fr 1fr auto;gap:10px;align-items:flex-end">
-          <div class="field"><label>Dal</label><input type="text" id="inp-nd-dal" placeholder="Seleziona..." readonly style="cursor:pointer"></div>
-          <div class="field"><label>Al</label><input type="text" id="inp-nd-al" placeholder="Seleziona..." readonly style="cursor:pointer"></div>
-          <div class="field"><label style="visibility:hidden">x</label><button class="btn-reset" onclick="resetNdFiltri()" style="padding:8px 14px">Reset</button></div>
-        </div>
-        <p style="color:var(--muted);font-size:.78rem;margin-top:6px">Per quali turni non era disponibile. Se un solo giorno, compila solo "Dal".</p>
+        <div id="nd-cal-container" style="max-width:320px"></div>
+        <div id="nd-cal-selected" style="margin-top:8px;font-size:.84rem;color:var(--ink)"></div>
+        <p style="color:var(--muted);font-size:.78rem;margin-top:4px">Clicca sui giorni in cui non era disponibile. Clicca di nuovo per deselezionare.</p>
       </div>
       <div id="errore-extra-row" style="margin-bottom:16px;display:none">
         <div class="form-row" style="grid-template-columns:auto auto auto auto;gap:10px;align-items:flex-end">
@@ -1794,7 +1791,7 @@ function renderTipiUI(){const tutti=getTuttiTipi();
   document.getElementById('form-tipo-tags').querySelectorAll('.tipo-tag').forEach(b=>{b.onclick=()=>{tipoSelezionato=b.dataset.tipo;renderTipiUI()}});
   const errRow=document.getElementById('errore-extra-row');if(errRow)errRow.style.display=tipoSelezionato===nomeCorrente('Errore')?'block':'none';
   const malRow=document.getElementById('malattia-extra-row');if(malRow){malRow.style.display=tipoSelezionato===nomeCorrente('Malattia')?'block':'none';_initMalFlatpickr()}
-  const ndRow=document.getElementById('nd-extra-row');if(ndRow){ndRow.style.display=tipoSelezionato===nomeCorrente('Non Disponibilità')?'block':'none';_initNdFlatpickr()}
+  const ndRow=document.getElementById('nd-extra-row');if(ndRow){const showNd=tipoSelezionato===nomeCorrente('Non Disponibilità');ndRow.style.display=showNd?'block':'none';if(showNd)_initNdCal()}
   const fs=document.getElementById('filt-tipo');if(fs){const cv=fs.value;fs.innerHTML='<option value="">Tutti</option>'+tutti.map(t=>'<option'+(t.nome===cv?' selected':'')+'>'+esc(t.nome)+'</option>').join('')}
   document.getElementById('modal-tipo-tags').innerHTML=tutti.map(t=>'<button class="modal-tipo-tag'+(modalTipoSel===t.nome?' selected':'')+'" data-tipo="'+esc(t.nome)+'" style="'+(modalTipoSel===t.nome?'background:'+t.colore+';border-color:'+t.colore:'')+'">'+esc(t.nome)+'</button>').join('');
   document.getElementById('modal-tipo-tags').querySelectorAll('.modal-tipo-tag').forEach(b=>{b.onclick=()=>{modalTipoSel=b.dataset.tipo;renderTipiUI()}});
@@ -1833,9 +1830,53 @@ function _initMalFlatpickr(){if(_malFpInit||!window.flatpickr)return;_malFpInit=
   const o={locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false};
   flatpickr('#inp-mal-dal',o);flatpickr('#inp-mal-al',o)}
 function resetMalFiltri(){['inp-mal-dal','inp-mal-al'].forEach(id=>{const el=document.getElementById(id);if(el){el.value='';if(el._flatpickr)el._flatpickr.clear()}})}
-function _initNdFlatpickr(){if(!window.flatpickr)return;const o={locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false};
-  ['inp-nd-dal','inp-nd-al'].forEach(id=>{const el=document.getElementById(id);if(el&&!el._flatpickr)flatpickr('#'+id,o)})}
-function resetNdFiltri(){['inp-nd-dal','inp-nd-al'].forEach(id=>{const el=document.getElementById(id);if(el){el.value='';if(el._flatpickr)el._flatpickr.clear()}})}
+// Mini-calendario Non Disponibilità — selezione giorni sparsi
+let _ndSelectedDates=[];
+let _ndCalMonth=new Date().getMonth();
+let _ndCalYear=new Date().getFullYear();
+function _initNdCal(){_ndSelectedDates=[];_ndCalMonth=new Date().getMonth();_ndCalYear=new Date().getFullYear();_renderNdCal()}
+function _renderNdCal(){
+  const container=document.getElementById('nd-cal-container');if(!container)return;
+  const mesi=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+  const giorni=['Lu','Ma','Me','Gi','Ve','Sa','Do'];
+  const primo=new Date(_ndCalYear,_ndCalMonth,1);
+  const ultimoGiorno=new Date(_ndCalYear,_ndCalMonth+1,0).getDate();
+  let startDay=primo.getDay()-1;if(startDay<0)startDay=6; // lunedì=0
+  const oggi=new Date().toISOString().substring(0,10);
+  let html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+  html+='<button onclick="_ndCalNav(-1)" style="background:none;border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:4px 10px;color:var(--ink);font-size:1rem">&#9664;</button>';
+  html+='<strong style="font-size:.92rem">'+mesi[_ndCalMonth]+' '+_ndCalYear+'</strong>';
+  html+='<button onclick="_ndCalNav(1)" style="background:none;border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:4px 10px;color:var(--ink);font-size:1rem">&#9654;</button>';
+  html+='</div>';
+  html+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center">';
+  giorni.forEach(g=>{html+='<div style="font-size:.72rem;font-weight:700;color:var(--muted);padding:4px 0">'+g+'</div>'});
+  for(let i=0;i<startDay;i++)html+='<div></div>';
+  for(let d=1;d<=ultimoGiorno;d++){
+    const ds=_ndCalYear+'-'+String(_ndCalMonth+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    const isSel=_ndSelectedDates.includes(ds);
+    const isToday=ds===oggi;
+    let style='padding:6px 0;border-radius:2px;cursor:pointer;font-size:.84rem;font-weight:600;';
+    if(isSel)style+='background:var(--accent2);color:white;';
+    else if(isToday)style+='background:var(--paper2);border:1px solid var(--accent2);';
+    else style+='background:var(--paper);';
+    html+='<div onclick="_ndToggleDate(\''+ds+'\')" style="'+style+'">'+d+'</div>'}
+  html+='</div>';
+  if(_ndSelectedDates.length){
+    html+='<div style="margin-top:6px"><button onclick="_ndSelectedDates=[];_renderNdCal()" style="font-size:.75rem;background:none;border:1px solid var(--line);border-radius:2px;padding:2px 8px;cursor:pointer;color:var(--muted)">Pulisci selezione</button></div>'}
+  container.innerHTML=html;
+  // Update selected display
+  const selEl=document.getElementById('nd-cal-selected');if(selEl){
+    if(_ndSelectedDates.length){
+      const sorted=[..._ndSelectedDates].sort();
+      selEl.innerHTML='<strong>Selezionati:</strong> '+sorted.map(ds=>new Date(ds+'T12:00:00').toLocaleDateString('it-IT')).join(', ')+' <span style="color:var(--accent2);font-weight:700">('+_ndSelectedDates.length+' giorn'+ (_ndSelectedDates.length===1?'o':'i')+')</span>';
+    }else selEl.innerHTML=''}
+}
+function _ndToggleDate(ds){
+  const idx=_ndSelectedDates.indexOf(ds);
+  if(idx>=0)_ndSelectedDates.splice(idx,1);else _ndSelectedDates.push(ds);
+  _renderNdCal()}
+function _ndCalNav(dir){_ndCalMonth+=dir;if(_ndCalMonth>11){_ndCalMonth=0;_ndCalYear++}if(_ndCalMonth<0){_ndCalMonth=11;_ndCalYear--}_renderNdCal()}
+function resetNdFiltri(){_ndSelectedDates=[];_renderNdCal()}
 // CORE CRUD
 // NOTIFICA BANNER + SUONO
 let _notifTimeout=null,_notifAction=null;
@@ -1943,23 +1984,18 @@ async function salva(){let nome=capitalizzaNome(document.getElementById('inp-nom
       if(!collaboratoriCache.find(c=>c.nome.toLowerCase()===nome.toLowerCase())){try{const cr=await secPost('collaboratori',{nome,attivo:true});collaboratoriCache.push(cr[0])}catch(e2){}}
       document.getElementById('inp-testo').value='';resetMalFiltri();
       logAzione('Malattia range',nome+' — '+creati+' giorni');toast(nome+': '+creati+' giorni malattia registrati');aggiornaNomi();render();updateStats();return}}
-  // Non Disponibilità con date turno
-  if(tipoSelezionato===nomeCorrente('Non Disponibilità')){
-    const ndDal=(document.getElementById('inp-nd-dal')||{}).value;
-    const ndAl=(document.getElementById('inp-nd-al')||{}).value;
-    if(ndDal){
-      const dInizio=new Date(ndDal+'T12:00:00');
-      const dFine=ndAl?new Date(ndAl+'T12:00:00'):new Date(ndDal+'T12:00:00');
-      const nGiorni=Math.round((dFine-dInizio)/86400000)+1;
-      const dalStr=dInizio.toLocaleDateString('it-IT');
-      const alStr=dFine.toLocaleDateString('it-IT');
-      const descDate=nGiorni>1?' (turni dal '+dalStr+' al '+alStr+', '+nGiorni+' giorni)':' (turno del '+dalStr+')';
-      const rec={id:Date.now(),nome,tipo:tipoSelezionato,testo:testo+descDate,data:new Date().toISOString(),operatore:getOperatore(),reparto_dip:currentReparto};
-      try{await secPost('registrazioni',rec);datiCache.unshift(rec);
-        if(!collaboratoriCache.find(c=>c.nome.toLowerCase()===nome.toLowerCase())){try{const cr=await secPost('collaboratori',{nome,attivo:true});collaboratoriCache.push(cr[0])}catch(e2){}}
-        document.getElementById('inp-testo').value='';resetNdFiltri();
-        logAzione('Non disponibilità',nome+descDate);toast(nome+': non disponibilità registrata');aggiornaNomi();render();updateStats()}catch(e){toast('Errore salvataggio')}
-      return}}
+  // Non Disponibilità con giorni selezionati dal calendario
+  if(tipoSelezionato===nomeCorrente('Non Disponibilità')&&_ndSelectedDates.length){
+    const sorted=[..._ndSelectedDates].sort();
+    const dateLabel=sorted.map(ds=>new Date(ds+'T12:00:00').toLocaleDateString('it-IT')).join(', ');
+    const nGiorni=sorted.length;
+    const descDate=' ('+nGiorni+' giorn'+(nGiorni===1?'o':'i')+': '+dateLabel+')';
+    const rec={id:Date.now(),nome,tipo:tipoSelezionato,testo:testo+descDate,data:new Date().toISOString(),operatore:getOperatore(),reparto_dip:currentReparto};
+    try{await secPost('registrazioni',rec);datiCache.unshift(rec);
+      if(!collaboratoriCache.find(c=>c.nome.toLowerCase()===nome.toLowerCase())){try{const cr=await secPost('collaboratori',{nome,attivo:true});collaboratoriCache.push(cr[0])}catch(e2){}}
+      document.getElementById('inp-testo').value='';resetNdFiltri();
+      logAzione('Non disponibilità',nome+descDate);toast(nome+': non disponibilità registrata ('+nGiorni+' giorni)');aggiornaNomi();render();updateStats()}catch(e){toast('Errore salvataggio')}
+    return}
   // Controllo duplicati: stesso nome + stesso tipo + oggi
   const oggi=new Date().toISOString().split('T')[0];
   const dupExact=getDatiReparto().find(e=>e.nome.toLowerCase()===nome.toLowerCase()&&e.tipo===tipoSelezionato&&e.testo===testo&&e.data.startsWith(oggi));
