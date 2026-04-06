@@ -7197,6 +7197,7 @@ window.addEventListener('load',async()=>{
     if(isAdmin()){const tk=getAdminToken();if(tk){const sv=await sbRpc('validate_admin_session',{p_token:tk});if(!sv||!sv.valid){sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token')}}else{sessionStorage.removeItem('is_admin')}}
     // Verifica/rinnova token sessione per caricare dati
     var _opTk=getOpToken();
+    if(_opTk){var _vld=await sbRpc('validate_op_session',{p_token:_opTk});if(!_vld||!_vld.valid){sessionStorage.removeItem('op_token');_opTk=''}}
     if(!_opTk){var _ropN=getOperatore();if(_ropN){var _bioS=await sbRpc('create_bio_session',{p_nome:_ropN});if(_bioS&&_bioS.session_token)setOpToken(_bioS.session_token);
       else{var _bioS2=await sbRpc('create_bio_session',{p_nome:_ropN});if(_bioS2&&_bioS2.session_token)setOpToken(_bioS2.session_token)}}}
     await loadAll();
