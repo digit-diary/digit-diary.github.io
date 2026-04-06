@@ -2883,7 +2883,8 @@ function renderNoteChat(partner){
         destLabel='<div class="chat-group-label" style="font-size:.7rem;color:var(--muted);cursor:pointer;position:relative" onmouseenter="document.getElementById(\''+tooltipId+'\').style.display=\'block\'" onmouseleave="document.getElementById(\''+tooltipId+'\').style.display=\'none\'" onclick="var t=document.getElementById(\''+tooltipId+'\');t.style.display=t.style.display===\'none\'?\'block\':\'none\'">'+letti+'/'+gNotes.length+' letti'+tooltipHtml+'</div>'}
     }
     // Action buttons
-    const canEdit=isSent&&!n.letta;
+    const _qualcunoLetto=isSent&&n.gruppo_id?noteColleghiCache.some(x=>x.gruppo_id===n.gruppo_id&&x.da_operatore===op&&(x.messaggio||'')===(n.messaggio||'')&&x.letta):n.letta;
+    const canEdit=isSent&&!_qualcunoLetto;
     let actions='<div class="chat-msg-actions">';
     if(canEdit)actions+='<button class="btn-act tipo" style="font-size:.65rem;padding:2px 6px" onclick="event.stopPropagation();modificaNotaCollega('+n.id+')" title="Modifica">&#9998;</button>';
     if(isSent)actions+='<button class="btn-act del" style="font-size:.65rem;padding:2px 6px" onclick="event.stopPropagation();eliminaNotaSmart('+n.id+')" title="Elimina">&#128465;</button>';
