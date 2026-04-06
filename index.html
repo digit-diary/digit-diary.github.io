@@ -692,6 +692,14 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
         </div>
         <p style="color:var(--muted);font-size:.78rem;margin-top:6px">Se specifichi un periodo, verrà creata una registrazione per ogni giorno</p>
       </div>
+      <div id="nd-extra-row" style="margin-bottom:16px;display:none">
+        <div class="form-row" style="grid-template-columns:1fr 1fr auto;gap:10px;align-items:flex-end">
+          <div class="field"><label>Dal</label><input type="text" id="inp-nd-dal" placeholder="Seleziona..." readonly style="cursor:pointer"></div>
+          <div class="field"><label>Al</label><input type="text" id="inp-nd-al" placeholder="Seleziona..." readonly style="cursor:pointer"></div>
+          <div class="field"><label style="visibility:hidden">x</label><button class="btn-reset" onclick="resetNdFiltri()" style="padding:8px 14px">Reset</button></div>
+        </div>
+        <p style="color:var(--muted);font-size:.78rem;margin-top:6px">Per quali turni non era disponibile. Se un solo giorno, compila solo "Dal".</p>
+      </div>
       <div id="errore-extra-row" style="margin-bottom:16px;display:none">
         <div class="form-row" style="grid-template-columns:auto auto auto auto;gap:10px;align-items:flex-end">
           <div class="field"><label>Reparto</label><select id="inp-reparto"><option value="">—</option><option>Cassa</option><option>Sala</option><option>Rec</option><option>Guardaroba</option><option>Clientela</option><option>Staff</option><option>Altro</option></select></div>
@@ -1786,6 +1794,7 @@ function renderTipiUI(){const tutti=getTuttiTipi();
   document.getElementById('form-tipo-tags').querySelectorAll('.tipo-tag').forEach(b=>{b.onclick=()=>{tipoSelezionato=b.dataset.tipo;renderTipiUI()}});
   const errRow=document.getElementById('errore-extra-row');if(errRow)errRow.style.display=tipoSelezionato===nomeCorrente('Errore')?'block':'none';
   const malRow=document.getElementById('malattia-extra-row');if(malRow){malRow.style.display=tipoSelezionato===nomeCorrente('Malattia')?'block':'none';_initMalFlatpickr()}
+  const ndRow=document.getElementById('nd-extra-row');if(ndRow){ndRow.style.display=tipoSelezionato===nomeCorrente('Non Disponibilità')?'block':'none';_initNdFlatpickr()}
   const fs=document.getElementById('filt-tipo');if(fs){const cv=fs.value;fs.innerHTML='<option value="">Tutti</option>'+tutti.map(t=>'<option'+(t.nome===cv?' selected':'')+'>'+esc(t.nome)+'</option>').join('')}
   document.getElementById('modal-tipo-tags').innerHTML=tutti.map(t=>'<button class="modal-tipo-tag'+(modalTipoSel===t.nome?' selected':'')+'" data-tipo="'+esc(t.nome)+'" style="'+(modalTipoSel===t.nome?'background:'+t.colore+';border-color:'+t.colore:'')+'">'+esc(t.nome)+'</button>').join('');
   document.getElementById('modal-tipo-tags').querySelectorAll('.modal-tipo-tag').forEach(b=>{b.onclick=()=>{modalTipoSel=b.dataset.tipo;renderTipiUI()}});
@@ -1824,6 +1833,9 @@ function _initMalFlatpickr(){if(_malFpInit||!window.flatpickr)return;_malFpInit=
   const o={locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false};
   flatpickr('#inp-mal-dal',o);flatpickr('#inp-mal-al',o)}
 function resetMalFiltri(){['inp-mal-dal','inp-mal-al'].forEach(id=>{const el=document.getElementById(id);if(el){el.value='';if(el._flatpickr)el._flatpickr.clear()}})}
+function _initNdFlatpickr(){if(!window.flatpickr)return;const o={locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false};
+  ['inp-nd-dal','inp-nd-al'].forEach(id=>{const el=document.getElementById(id);if(el&&!el._flatpickr)flatpickr('#'+id,o)})}
+function resetNdFiltri(){['inp-nd-dal','inp-nd-al'].forEach(id=>{const el=document.getElementById(id);if(el){el.value='';if(el._flatpickr)el._flatpickr.clear()}})}
 // CORE CRUD
 // NOTIFICA BANNER + SUONO
 let _notifTimeout=null,_notifAction=null;
@@ -1931,6 +1943,23 @@ async function salva(){let nome=capitalizzaNome(document.getElementById('inp-nom
       if(!collaboratoriCache.find(c=>c.nome.toLowerCase()===nome.toLowerCase())){try{const cr=await secPost('collaboratori',{nome,attivo:true});collaboratoriCache.push(cr[0])}catch(e2){}}
       document.getElementById('inp-testo').value='';resetMalFiltri();
       logAzione('Malattia range',nome+' — '+creati+' giorni');toast(nome+': '+creati+' giorni malattia registrati');aggiornaNomi();render();updateStats();return}}
+  // Non Disponibilità con date turno
+  if(tipoSelezionato===nomeCorrente('Non Disponibilità')){
+    const ndDal=(document.getElementById('inp-nd-dal')||{}).value;
+    const ndAl=(document.getElementById('inp-nd-al')||{}).value;
+    if(ndDal){
+      const dInizio=new Date(ndDal+'T12:00:00');
+      const dFine=ndAl?new Date(ndAl+'T12:00:00'):new Date(ndDal+'T12:00:00');
+      const nGiorni=Math.round((dFine-dInizio)/86400000)+1;
+      const dalStr=dInizio.toLocaleDateString('it-IT');
+      const alStr=dFine.toLocaleDateString('it-IT');
+      const descDate=nGiorni>1?' (turni dal '+dalStr+' al '+alStr+', '+nGiorni+' giorni)':' (turno del '+dalStr+')';
+      const rec={id:Date.now(),nome,tipo:tipoSelezionato,testo:testo+descDate,data:new Date().toISOString(),operatore:getOperatore(),reparto_dip:currentReparto};
+      try{await secPost('registrazioni',rec);datiCache.unshift(rec);
+        if(!collaboratoriCache.find(c=>c.nome.toLowerCase()===nome.toLowerCase())){try{const cr=await secPost('collaboratori',{nome,attivo:true});collaboratoriCache.push(cr[0])}catch(e2){}}
+        document.getElementById('inp-testo').value='';resetNdFiltri();
+        logAzione('Non disponibilità',nome+descDate);toast(nome+': non disponibilità registrata');aggiornaNomi();render();updateStats()}catch(e){toast('Errore salvataggio')}
+      return}}
   // Controllo duplicati: stesso nome + stesso tipo + oggi
   const oggi=new Date().toISOString().split('T')[0];
   const dupExact=getDatiReparto().find(e=>e.nome.toLowerCase()===nome.toLowerCase()&&e.tipo===tipoSelezionato&&e.testo===testo&&e.data.startsWith(oggi));
