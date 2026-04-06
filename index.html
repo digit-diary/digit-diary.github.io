@@ -463,6 +463,14 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
   .operatore-chip{padding:6px 10px;font-size:.8rem}
   .add-tipo-row{flex-direction:column}
   .add-tipo-row .field{min-width:100%}
+  /* Inventario mobile */
+  .inv-tab-btn{padding:8px 14px!important;font-size:.82rem!important;flex:1}
+  #inv-buoni-kpi,#inv-sig-kpi{grid-template-columns:repeat(2,1fr)!important;gap:8px!important;padding:12px!important}
+  #inv-section-buoni .form-row,#inv-section-sigarette .form-row{grid-template-columns:1fr!important}
+  #inv-section-sigarette .field input[style*="width:70px"],#inv-section-buoni .field input[style*="width:70px"]{width:100%!important}
+  #inv-buoni-table table,#inv-sig-table table{font-size:.78rem!important}
+  #inv-buoni-table th,#inv-buoni-table td,#inv-sig-table th,#inv-sig-table td{padding:5px 6px!important}
+  #inv-buoni-table .entry-action-btn,#inv-sig-table .entry-action-btn{padding:3px 5px!important;font-size:.7rem!important}
 }
 @media(max-width:400px){
   header h1{font-size:1.3rem}
@@ -1056,7 +1064,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
           <div class="field"><label>Marca</label><input type="text" id="inv-sig-marca" placeholder="Es: Marlboro Gold..."></div>
           <div class="field"><label>Collaboratore</label><input type="text" id="inv-sig-collab" placeholder="Chi ha sbagliato..." list="collab-list"></div>
           <div class="field"><label>Cliente</label><div class="ac-wrap"><input type="text" id="inv-sig-cliente" placeholder="Per chi era..." oninput="acFiltraMaison('inv-sig-cliente','ac-inv-sig-cl')" onfocus="acFiltraMaison('inv-sig-cliente','ac-inv-sig-cl')"><div class="ac-drop" id="ac-inv-sig-cl"></div></div></div>
-          <div class="field"><label>Qty</label><input type="number" id="inv-sig-qty" value="1" min="1" style="width:70px"></div>
+          <div class="field"><label>Qty</label><input type="number" id="inv-sig-qty" value="1" min="1" style="width:70px;max-width:100%"></div>
           <div class="field"><label>Data</label><input type="text" id="inv-sig-data" placeholder="Oggi" readonly style="cursor:pointer"></div>
         </div>
         <button class="btn-salva" onclick="salvaInventarioSigEntrata()" style="background:#2c6e49">&#9650; Aggiungi alla scorta</button>
@@ -1070,7 +1078,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
         <div class="form-row" style="grid-template-columns:repeat(auto-fit,minmax(100px,1fr))">
           <div class="field"><label>Marca</label><select id="inv-sig-usc-marca" style="padding:11px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"><option value="">Seleziona...</option></select></div>
           <div class="field"><label>Cliente</label><div class="ac-wrap"><input type="text" id="inv-sig-usc-cliente" placeholder="A chi..." oninput="acFiltraMaison('inv-sig-usc-cliente','ac-inv-sig-usc')" onfocus="acFiltraMaison('inv-sig-usc-cliente','ac-inv-sig-usc')"><div class="ac-drop" id="ac-inv-sig-usc"></div></div></div>
-          <div class="field"><label>Qty</label><input type="number" id="inv-sig-usc-qty" value="1" min="1" style="width:70px"></div>
+          <div class="field"><label>Qty</label><input type="number" id="inv-sig-usc-qty" value="1" min="1" style="width:70px;max-width:100%"></div>
           <div class="field"><label>Data</label><input type="text" id="inv-sig-usc-data" placeholder="Oggi" readonly style="cursor:pointer"></div>
         </div>
         <button class="btn-salva" onclick="salvaInventarioSigUscita()" style="background:#c0392b">&#9660; Dai a cliente</button>
