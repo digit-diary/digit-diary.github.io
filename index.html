@@ -2478,7 +2478,8 @@ function renderNoteCollega(){const op=getOperatore();if(!op)return;
     const isActive=window._noteConvAttiva===c.partner;
     const isGroup=c.partner.startsWith('gruppo:');
     const _gid=isGroup?c.partner.replace('gruppo:',''):'';
-    const partnerLabel=_gid==='__gruppo_slots'?'Tutti Slots':_gid==='__gruppo_tavoli'?'Tutti Tavoli':_gid.startsWith('__gruppo_custom_')?_chatGroupLabel(c):isGroup?_chatGroupLabel(c):escP(c.partner);
+    const _customNome=_gid.startsWith('__gruppo_custom_')?_getGruppoNome(_gid):'';
+    const partnerLabel=_gid==='__gruppo_slots'?'Tutti Slots':_gid==='__gruppo_tavoli'?'Tutti Tavoli':_gid==='__gruppo_tutti'?'Tutti':_customNome?escP(_customNome):isGroup?_chatGroupLabel(c):escP(c.partner);
     const lastNote=c.notes.sort((a,b)=>b.created_at.localeCompare(a.created_at))[0];
     const preview=lastNote?(lastNote.da_operatore===op?'Tu: ':'')+lastNote.messaggio.substring(0,40)+(lastNote.messaggio.length>40?'...':''):'';
     const timeStr=lastNote?_chatTimeShort(lastNote.created_at):'';
@@ -2545,9 +2546,10 @@ function toggleConvNewDropdown(ev){ev.stopPropagation();
   const myRep=operatoriRepartoMap[op]||'entrambi';
   let h='';
   // Group buttons
+  h+='<div onclick="event.stopPropagation();apriConversazioneGruppo(\'tutti\')" style="font-weight:700;color:var(--ink)">Tutti</div>';
   if(myRep==='slots'||myRep==='entrambi')h+='<div onclick="event.stopPropagation();apriConversazioneGruppo(\'slots\')" style="font-weight:700;color:#1a4a7a">Tutti Slots</div>';
   if(myRep==='tavoli'||myRep==='entrambi')h+='<div onclick="event.stopPropagation();apriConversazioneGruppo(\'tavoli\')" style="font-weight:700;color:#8e44ad">Tutti Tavoli</div>';
-  if(h)h+='<div style="height:1px;background:var(--line);padding:0;cursor:default"></div>';
+  h+='<div style="height:1px;background:var(--line);padding:0;cursor:default"></div>';
   tutti.forEach(n=>{const rep=operatoriRepartoMap[n]||'entrambi';
     const badge=rep==='slots'?' <span style="font-size:.65rem;color:#1a4a7a;font-weight:700">S</span>':rep==='tavoli'?' <span style="font-size:.65rem;color:#8e44ad;font-weight:700">T</span>':'';
     h+='<div style="display:flex;align-items:center;gap:8px" onclick="event.stopPropagation()"><input type="checkbox" class="conv-group-cb" value="'+escP(n).replace(/"/g,'&quot;')+'" onchange="_aggiornaGruppoBtn()" style="cursor:pointer;width:16px;height:16px;flex-shrink:0"><span onclick="apriConversazione(\''+escP(n).replace(/'/g,"\\'")+'\');document.getElementById(\'conv-new-dropdown\').style.display=\'none\'" style="flex:1;cursor:pointer">'+escP(n)+badge+'</span></div>'});
@@ -2565,20 +2567,26 @@ function _apriGruppoSelezionato(){
   const cbs=document.querySelectorAll('.conv-group-cb:checked');
   const dests=[...cbs].map(cb=>cb.value);
   if(dests.length<2){toast('Seleziona almeno 2 persone');return}
+  // Chiedi nome gruppo
+  const nomeDefault=dests.length<=3?dests.map(n=>_nomeBreve(n)).join(', '):_nomeBreve(dests[0])+', '+_nomeBreve(dests[1])+' +'+(dests.length-2);
+  const nomeGruppo=prompt('Nome del gruppo (oppure lascia vuoto):',nomeDefault);
+  if(nomeGruppo===null)return; // annullato
+  const label=nomeGruppo.trim()||nomeDefault;
   const op=getOperatore();
-  // Crea un gruppo personalizzato con ID basato sui membri
   const membri=[op,...dests].sort().join('|');
   const gid='__gruppo_custom_'+membri.replace(/[^a-zA-Z0-9]/g,'_').substring(0,60);
-  window._noteConvGruppo={reparto:'custom',dests:dests,gid:gid,label:dests.length<=3?dests.map(n=>_nomeBreve(n)).join(', '):_nomeBreve(dests[0])+', '+_nomeBreve(dests[1])+' +'+(dests.length-2)};
+  // Salva nome gruppo in localStorage
+  if(nomeGruppo.trim())localStorage.setItem('_gruppo_nome_'+gid,label);
+  window._noteConvGruppo={reparto:'custom',dests:dests,gid:gid,label:label};
   window._noteConvAttiva='gruppo:'+gid;
   const dd=document.getElementById('conv-new-dropdown');if(dd)dd.style.display='none';
   _chatShowArea();
   renderNoteChat(window._noteConvAttiva);renderNoteCollega()}
+function _getGruppoNome(gid){return localStorage.getItem('_gruppo_nome_'+gid)||''}
 function apriConversazioneGruppo(reparto){
   const op=getOperatore();
-  const dests=operatoriAuthCache.map(o=>o.nome).filter(n=>{if(!n||n===op)return false;const r=operatoriRepartoMap[n]||'entrambi';return r===reparto||r==='entrambi'});
-  if(!dests.length){toast('Nessun operatore nel reparto');return}
-  // Persistent group ID per reparto
+  const dests=operatoriAuthCache.map(o=>o.nome).filter(n=>{if(!n||n===op)return false;if(reparto==='tutti')return true;const r=operatoriRepartoMap[n]||'entrambi';return r===reparto||r==='entrambi'});
+  if(!dests.length){toast('Nessun operatore');return}
   const gid='__gruppo_'+reparto;
   window._noteConvGruppo={reparto:reparto,dests:dests,gid:gid};
   window._noteConvAttiva='gruppo:'+gid;
@@ -2658,11 +2666,11 @@ function renderNoteChat(partner){
     let headerGruppo='',membri=[];
     if(isCustomGroup){
       // Custom group: derive members from notes or from _noteConvGruppo
-      if(window._noteConvGruppo&&window._noteConvGruppo.gid===_gidChat){headerGruppo=window._noteConvGruppo.label||'Gruppo';membri=window._noteConvGruppo.dests||[]}
+      if(window._noteConvGruppo&&window._noteConvGruppo.gid===_gidChat){headerGruppo=window._noteConvGruppo.label||_getGruppoNome(_gidChat)||'Gruppo';membri=window._noteConvGruppo.dests||[]}
       else{const conv=_getConvNotes(partner,op);const ps=new Set();conv.forEach(n=>{if(n.da_operatore!==op)ps.add(n.da_operatore);if(n.a_operatore!==op)ps.add(n.a_operatore)});membri=[...ps];headerGruppo=membri.length<=3?membri.map(n=>_nomeBreve(n)).join(', '):_nomeBreve(membri[0])+', '+_nomeBreve(membri[1])+' +'+(membri.length-2)}
       headerLabel=headerGruppo;
-    }else{const rep=_gidChat.replace('__gruppo_','');headerLabel='Tutti '+(rep==='slots'?'Slots':'Tavoli');
-      membri=operatoriAuthCache.map(o=>o.nome).filter(n=>{if(!n||n===op)return false;const r=operatoriRepartoMap[n]||'entrambi';return r===rep||r==='entrambi'})}
+    }else{const rep=_gidChat.replace('__gruppo_','');headerLabel=rep==='tutti'?'Tutti':'Tutti '+(rep==='slots'?'Slots':'Tavoli');
+      membri=operatoriAuthCache.map(o=>o.nome).filter(n=>{if(!n||n===op)return false;if(rep==='tutti')return true;const r=operatoriRepartoMap[n]||'entrambi';return r===rep||r==='entrambi'})}
     _groupMembersHtml='<div class="group-members-tooltip" style="display:none;position:absolute;top:100%;left:0;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:8px 12px;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:100;font-size:.82rem;max-width:300px;line-height:1.6">'+['Tu'].concat(membri.sort()).map(n=>'<span style="display:inline-block;margin:2px 4px;padding:1px 8px;background:var(--paper2);border-radius:12px;font-size:.78rem">'+escP(n)+'</span>').join('')+'</div>'}
   else if(isGroup){const conv=_getConvNotes(partner,op);const partners=new Set();conv.forEach(n=>{if(n.da_operatore!==op)partners.add(n.da_operatore);if(n.a_operatore!==op)partners.add(n.a_operatore)});headerLabel=[...partners].join(', ')}
   else{headerLabel=escP(partner)}
@@ -2776,7 +2784,7 @@ async function inviaNotaChat(){
   }else if(isPersGroup){
     // Department group: send to all current members
     const rep=_gidSend.replace('__gruppo_','');
-    dests=operatoriAuthCache.map(o=>o.nome).filter(n=>{if(!n||n===op)return false;const r=operatoriRepartoMap[n]||'entrambi';return r===rep||r==='entrambi'});
+    dests=operatoriAuthCache.map(o=>o.nome).filter(n=>{if(!n||n===op)return false;if(rep==='tutti')return true;const r=operatoriRepartoMap[n]||'entrambi';return r===rep||r==='entrambi'});
     gid=_gidSend;
   }else if(isGroup){
     const gNotes=_getConvNotes(partner,op);
