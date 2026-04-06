@@ -6626,9 +6626,13 @@ function acFiltraMaison(inputId,dropId){const inp=document.getElementById(inputI
     return'<div onmousedown="document.getElementById(\''+inputId+'\').value=\''+item.nome.replace(/'/g,"\\'")+'\';document.getElementById(\''+dropId+'\').classList.remove(\'show\');_preimpostaTipoMaison(\''+escP(item.cat||'')+'\')" style="display:flex;align-items:center;justify-content:space-between">'+escP(item.nome)+badge+'</div>'}).join('');
   drop.classList.add('show')}
 function _preimpostaTipoMaison(cat){
-  const tipoSel=document.getElementById('maison-man-tipo');if(!tipoSel)return;
-  const catToTipo={bu:'BU',bl:'BL'};
-  if(catToTipo[cat]){tipoSel.value=catToTipo[cat];tipoSel.dispatchEvent(new Event('change'))}
+  const catToTipo={bu:'BU',bl:'BL',cg:'CG',wl:'WL'};
+  // Sezione Maison
+  const tipoSel=document.getElementById('maison-man-tipo');
+  if(tipoSel&&catToTipo[cat]){tipoSel.value=catToTipo[cat];tipoSel.dispatchEvent(new Event('change'))}
+  // Sezione Inventario - Buono a Cliente
+  const invTipoSel=document.getElementById('inv-usc-tipo');
+  if(invTipoSel&&catToTipo[cat]){invTipoSel.value=catToTipo[cat]}
   // Ricalcola qty se c'è già un importo
   _autoCalcolaBuoniManuale()}
 function _autoCalcolaBuoniManuale(){
