@@ -6717,7 +6717,7 @@ async function salvaSpeseExtra(){let benef=capitalizzaNome(document.getElementBy
   const seDup=getSpeseReparto().find(r=>r.beneficiario.toLowerCase()===benef.toLowerCase()&&r.data_spesa===data&&parseFloat(r.importo)===importo);
   if(seDup){if(!confirm(benef+' ha già una spesa di '+importo.toFixed(2)+' CHF il '+new Date(data+'T12:00:00').toLocaleDateString('it-IT')+'.\n\nVuoi aggiungere comunque?'))return}
   const px=parseInt(document.getElementById('se-px').value)||1;
-  try{const rec={beneficiario:benef,tipo,descrizione:desc+(px>1?' ('+px+' px)':''),importo,data_spesa:data,luogo,px:px,operatore:getOperatore(),reparto_dip:currentReparto};
+  try{const rec={beneficiario:benef,tipo,descrizione:desc+(px>1?' ('+px+' px)':''),importo,data_spesa:data,luogo,operatore:getOperatore(),reparto_dip:currentReparto};
     const r=await secPost('spese_extra',rec);speseExtraCache.unshift(r[0]);
     document.getElementById('se-beneficiario').value='';document.getElementById('se-luogo').value='';
     document.getElementById('se-importo').value='';document.getElementById('se-descrizione').value='';document.getElementById('se-px').value='1';
