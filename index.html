@@ -2472,6 +2472,26 @@ async function salvaModificaNota(id){const msg=document.getElementById('edit-not
   const msgEnc=await encryptNota(msg);
   try{for(const nid of ids){await secPatch('note_colleghi','id=eq.'+nid,{messaggio:msgEnc});const c=noteColleghiCache.find(x=>x.id===nid);if(c){c.messaggio=msg;c._decrypted=true}}
   document.getElementById('pwd-modal').classList.add('hidden');renderNoteCollega();toast('Nota modificata')}catch(e){toast('Errore modifica nota')}}
+async function eliminaNotaSmart(id){const n=noteColleghiCache.find(n=>n.id===id);if(!n)return;
+  const gid=n.gruppo_id;const op=n.da_operatore;
+  const _nTimeS=new Date(n.created_at||0).getTime();
+  const copie=gid?noteColleghiCache.filter(x=>x.gruppo_id===gid&&x.da_operatore===op&&(x.messaggio||'')===(n.messaggio||'')&&Math.abs(new Date(x.created_at||0).getTime()-_nTimeS)<10000):[];
+  const qualcunoHaLetto=copie.some(x=>x.letta);
+  if(!qualcunoHaLetto&&copie.length){
+    // Nessuno ha letto → annulla invio per tutti
+    if(!confirm('Nessuno ha ancora letto. Annullare l\'invio per tutti?'))return;
+    const ids=copie.map(x=>x.id);
+    try{for(const nid of ids){await secDel('note_colleghi','id=eq.'+nid)}
+      noteColleghiCache=noteColleghiCache.filter(x=>!ids.includes(x.id));
+      renderNoteCollega();toast('Invio annullato per tutti')}catch(e){toast('Errore')}
+  }else{
+    // Qualcuno ha letto o messaggio singolo → nascondi dalla mia vista
+    if(!confirm('Eliminare dalla tua vista?'))return;
+    const mieIds=copie.length?copie.map(x=>x.id):[id];
+    try{for(const nid of mieIds){await secPatch('note_colleghi','id=eq.'+nid,{nascosta_mitt:true})}
+      mieIds.forEach(nid=>{const c=noteColleghiCache.find(x=>x.id===nid);if(c)c.nascosta_mitt=true});
+      noteColleghiCache=noteColleghiCache.filter(x=>!mieIds.includes(x.id)||!x.nascosta_mitt);
+      renderNoteCollega();toast('Messaggio eliminato dalla tua vista')}catch(e){toast('Errore')}}}
 async function annullaInvioNota(id){const n=noteColleghiCache.find(n=>n.id===id);if(!n)return;
   const gid=n.gruppo_id;const op=n.da_operatore;
   const _nTime=new Date(n.created_at||0).getTime();
@@ -2865,9 +2885,9 @@ function renderNoteChat(partner){
     // Action buttons
     const canEdit=isSent&&!n.letta;
     let actions='<div class="chat-msg-actions">';
-    if(canEdit)actions+='<button class="btn-act tipo" style="font-size:.65rem;padding:2px 6px" onclick="event.stopPropagation();modificaNotaCollega('+n.id+')">&#9998;</button>';
-    if(canEdit)actions+='<button class="btn-act del" style="font-size:.65rem;padding:2px 6px" onclick="event.stopPropagation();annullaInvioNota('+n.id+')">&#10005;</button>';
-    actions+='<button class="btn-act" style="font-size:.65rem;padding:2px 6px;color:var(--muted);border-color:var(--muted)" onclick="event.stopPropagation();eliminaNotaCollega('+n.id+',\''+(isSent?'mitt':'dest')+'\')">&#128465;</button>';
+    if(canEdit)actions+='<button class="btn-act tipo" style="font-size:.65rem;padding:2px 6px" onclick="event.stopPropagation();modificaNotaCollega('+n.id+')" title="Modifica">&#9998;</button>';
+    if(isSent)actions+='<button class="btn-act del" style="font-size:.65rem;padding:2px 6px" onclick="event.stopPropagation();eliminaNotaSmart('+n.id+')" title="Elimina">&#128465;</button>';
+    else actions+='<button class="btn-act" style="font-size:.65rem;padding:2px 6px;color:var(--muted);border-color:var(--muted)" onclick="event.stopPropagation();eliminaNotaCollega('+n.id+',\'dest\')" title="Elimina per me">&#128465;</button>';
     actions+='<button class="btn-act" style="font-size:.65rem;padding:2px 6px;color:var(--accent2);border-color:var(--accent2)" onclick="event.stopPropagation();rispondiAMessaggio('+n.id+')" title="Rispondi">&#8617;</button>';
     actions+='</div>';
     // Parse reply quote
