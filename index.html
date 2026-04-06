@@ -637,6 +637,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
   <button class="nav-tab" data-page="consegna" onclick="switchPage('consegna')" title="Consegne turno tra operatori">&#128221; Consegna <span id="consegna-badge" style="display:none;background:var(--accent);color:white;border-radius:9px;font-size:.7rem;padding:1px 6px;margin-left:4px;font-weight:700" title="Consegne non lette"></span></button>
   <button class="nav-tab" data-page="promemoria" onclick="switchPage('promemoria')" title="Promemoria con scadenze">&#128203; Promemoria <span id="promemoria-badge" style="display:none;background:var(--accent);color:white;border-radius:9px;font-size:.7rem;padding:1px 6px;margin-left:4px;font-weight:700" title="Promemoria in scadenza"></span></button>
   <button class="nav-tab" data-page="maison" onclick="switchPage('maison')" title="Gestione costi e clienti Maison">&#127860; Maison</button>
+  <button class="nav-tab" data-page="inventario" onclick="switchPage('inventario')">&#128230; Inventario</button>
   <button class="nav-tab" data-page="registro" onclick="switchPage('registro')" id="tab-registro" style="display:none">&#128203; Registro</button>
   <button class="nav-tab" data-page="impostazioni" onclick="switchPage('impostazioni')">&#9881;&#65039; Impostazioni</button>
 </div>
@@ -970,6 +971,126 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
   </div>
 </div>
 
+<!-- INVENTARIO -->
+<div class="page" id="page-inventario">
+  <div style="display:flex;gap:8px;margin-bottom:16px">
+    <button class="inv-tab-btn active" data-tab="buoni" onclick="switchInvTab('buoni')" style="padding:8px 20px;border:2px solid var(--ink);background:var(--ink);color:var(--paper);border-radius:2px;font-size:.88rem;font-weight:600;cursor:pointer;transition:all .2s">Buoni</button>
+    <button class="inv-tab-btn" data-tab="sigarette" onclick="switchInvTab('sigarette')" style="padding:8px 20px;border:2px solid var(--line);background:var(--paper);color:var(--ink);border-radius:2px;font-size:.88rem;font-weight:600;cursor:pointer;transition:all .2s">Sigarette</button>
+  </div>
+
+  <!-- BUONI SECTION -->
+  <div id="inv-section-buoni">
+    <div class="main-card">
+      <div class="card-header">Giacenza Buoni</div>
+      <div id="inv-buoni-kpi" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;padding:16px"></div>
+    </div>
+
+    <div class="main-card" style="margin-top:16px">
+      <div class="card-header">Carico Buoni</div>
+      <div class="form-area">
+        <p style="color:var(--muted);font-size:.84rem;margin-bottom:14px">Registra l'arrivo di nuovi buoni in scorta.</p>
+        <div class="form-row" style="grid-template-columns:repeat(auto-fit,minmax(100px,1fr))">
+          <div class="field"><label>Tipo</label><select id="inv-carico-tipo" style="padding:11px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"><option value="">Seleziona...</option><option value="BU">BU - Buono Unico</option><option value="BL">BL - Buono Lounge</option><option value="CG">CG - Coupon Gourmet</option><option value="WL">WL - Welcome Lounge</option></select></div>
+          <div class="field"><label>Quantit&agrave;</label><input type="number" id="inv-carico-qty" placeholder="0" min="1" step="1"></div>
+          <div class="field"><label>Data</label><input type="text" id="inv-carico-data" placeholder="Oggi" readonly style="cursor:pointer"></div>
+          <div class="field"><label>Nota</label><input type="text" id="inv-carico-nota" placeholder="Opzionale..."></div>
+        </div>
+        <button class="btn-salva" onclick="salvaInventarioCarico()" style="background:#2c6e49">&#9650; Carica buoni</button>
+      </div>
+    </div>
+
+    <div class="main-card" style="margin-top:16px">
+      <div class="card-header">Buono a Cliente</div>
+      <div class="form-area">
+        <p style="color:var(--muted);font-size:.84rem;margin-bottom:14px">Pre-assegna buoni a un cliente. Verr&agrave; pareggiato automaticamente quando il cliente consuma in Maison.</p>
+        <div class="form-row" style="grid-template-columns:repeat(auto-fit,minmax(100px,1fr))">
+          <div class="field"><label>Cliente</label><div class="ac-wrap"><input type="text" id="inv-usc-cliente" placeholder="Nome cliente..." oninput="acFiltraMaison('inv-usc-cliente','ac-inv-usc')" onfocus="acFiltraMaison('inv-usc-cliente','ac-inv-usc')"><div class="ac-drop" id="ac-inv-usc"></div></div></div>
+          <div class="field"><label>Tipo</label><select id="inv-usc-tipo" style="padding:11px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"><option value="">Seleziona...</option><option value="BU">BU</option><option value="BL">BL</option><option value="CG">CG</option><option value="WL">WL</option></select></div>
+          <div class="field"><label>Quantit&agrave;</label><input type="number" id="inv-usc-qty" placeholder="1" min="1" step="1" value="1"></div>
+          <div class="field"><label>Data</label><input type="text" id="inv-usc-data" placeholder="Oggi" readonly style="cursor:pointer"></div>
+          <div class="field"><label>Nota</label><input type="text" id="inv-usc-nota" placeholder="Opzionale..."></div>
+        </div>
+        <button class="btn-salva" onclick="salvaInventarioUscita()" style="background:#e67e22">&#9660; Assegna buono</button>
+      </div>
+    </div>
+
+    <div class="main-card" style="margin-top:16px">
+      <div class="card-header">Movimenti Buoni</div>
+      <div class="filters" style="padding:14px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--paper2)">
+        <div class="filter-group"><span class="filter-label">Tipo</span><select id="inv-b-filt-tipo" onchange="renderInventarioBuoniTable()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"><option value="">Tutti</option><option value="BU">BU</option><option value="BL">BL</option><option value="CG">CG</option><option value="WL">WL</option></select></div>
+        <div class="filter-group"><span class="filter-label">Cliente</span><input type="text" id="inv-b-filt-cliente" placeholder="Cerca..." oninput="renderInventarioBuoniTable()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink);width:140px"></div>
+        <div class="filter-group"><span class="filter-label">Cerca</span><input type="text" id="inv-b-filt-cerca" placeholder="Parola chiave..." oninput="renderInventarioBuoniTable()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink);width:140px"></div>
+        <div class="filter-group"><span class="filter-label">Mese</span><select id="inv-b-filt-mese" onchange="renderInventarioBuoniTable()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"><option value="">Tutti</option><option value="01">Gennaio</option><option value="02">Febbraio</option><option value="03">Marzo</option><option value="04">Aprile</option><option value="05">Maggio</option><option value="06">Giugno</option><option value="07">Luglio</option><option value="08">Agosto</option><option value="09">Settembre</option><option value="10">Ottobre</option><option value="11">Novembre</option><option value="12">Dicembre</option></select></div>
+        <div class="filter-group"><span class="filter-label">Anno</span><select id="inv-b-filt-anno" onchange="renderInventarioBuoniTable()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"><option value="">Tutti</option></select></div>
+        <div class="filter-group"><span class="filter-label">Dal</span><input type="text" id="inv-b-filt-dal" placeholder="Seleziona..." readonly style="cursor:pointer;min-width:130px"></div>
+        <div class="filter-group"><span class="filter-label">Al</span><input type="text" id="inv-b-filt-al" placeholder="Seleziona..." readonly style="cursor:pointer;min-width:130px"></div>
+        <div class="filter-group"><span class="filter-label">Stato</span><select id="inv-b-filt-stato" onchange="renderInventarioBuoniTable()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"><option value="">Tutti</option><option value="pareggiato">Pareggiato</option><option value="non_pareggiato">Non pareggiato</option></select></div>
+        <button class="btn-reset" onclick="document.getElementById('inv-b-filt-tipo').value='';document.getElementById('inv-b-filt-cliente').value='';document.getElementById('inv-b-filt-cerca').value='';document.getElementById('inv-b-filt-mese').value='';document.getElementById('inv-b-filt-anno').value='';document.getElementById('inv-b-filt-stato').value='';['inv-b-filt-dal','inv-b-filt-al'].forEach(function(id){var e=document.getElementById(id);if(e&&e._flatpickr)e._flatpickr.clear()});renderInventarioBuoniTable()" style="padding:6px 14px;font-size:.82rem">Reset</button>
+      </div>
+      <div id="inv-buoni-table" style="padding:12px 18px;overflow-x:auto"></div>
+      <div style="padding:8px 18px 16px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-export" onclick="esportaInventarioCSV()" style="padding:6px 14px;font-size:.82rem">CSV</button>
+        <button class="btn-export btn-export-pdf" onclick="esportaInventarioPDF()" style="padding:6px 14px;font-size:.82rem">PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIGARETTE SECTION -->
+  <div id="inv-section-sigarette" style="display:none">
+    <div class="main-card">
+      <div class="card-header">Scorta Sigarette</div>
+      <div id="inv-sig-kpi" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;padding:16px"></div>
+    </div>
+
+    <div class="main-card" style="margin-top:16px">
+      <div class="card-header">Sigaretta Sbagliata (entrata)</div>
+      <div class="form-area">
+        <p style="color:var(--muted);font-size:.84rem;margin-bottom:14px">Registra una sigaretta sbagliata data al cliente (entra in scorta).</p>
+        <div class="form-row" style="grid-template-columns:repeat(auto-fit,minmax(100px,1fr))">
+          <div class="field"><label>Marca</label><input type="text" id="inv-sig-marca" placeholder="Es: Marlboro Gold..."></div>
+          <div class="field"><label>Collaboratore</label><input type="text" id="inv-sig-collab" placeholder="Chi ha sbagliato..." list="collab-list"></div>
+          <div class="field"><label>Cliente</label><div class="ac-wrap"><input type="text" id="inv-sig-cliente" placeholder="Per chi era..." oninput="acFiltraMaison('inv-sig-cliente','ac-inv-sig-cl')" onfocus="acFiltraMaison('inv-sig-cliente','ac-inv-sig-cl')"><div class="ac-drop" id="ac-inv-sig-cl"></div></div></div>
+          <div class="field"><label>Qty</label><input type="number" id="inv-sig-qty" value="1" min="1" style="width:70px"></div>
+          <div class="field"><label>Data</label><input type="text" id="inv-sig-data" placeholder="Oggi" readonly style="cursor:pointer"></div>
+        </div>
+        <button class="btn-salva" onclick="salvaInventarioSigEntrata()" style="background:#2c6e49">&#9650; Aggiungi alla scorta</button>
+      </div>
+    </div>
+
+    <div class="main-card" style="margin-top:16px">
+      <div class="card-header">Usa dalla Scorta (uscita)</div>
+      <div class="form-area">
+        <p style="color:var(--muted);font-size:.84rem;margin-bottom:14px">Dai una sigaretta dalla scorta a un cliente.</p>
+        <div class="form-row" style="grid-template-columns:repeat(auto-fit,minmax(100px,1fr))">
+          <div class="field"><label>Marca</label><select id="inv-sig-usc-marca" style="padding:11px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"><option value="">Seleziona...</option></select></div>
+          <div class="field"><label>Cliente</label><div class="ac-wrap"><input type="text" id="inv-sig-usc-cliente" placeholder="A chi..." oninput="acFiltraMaison('inv-sig-usc-cliente','ac-inv-sig-usc')" onfocus="acFiltraMaison('inv-sig-usc-cliente','ac-inv-sig-usc')"><div class="ac-drop" id="ac-inv-sig-usc"></div></div></div>
+          <div class="field"><label>Qty</label><input type="number" id="inv-sig-usc-qty" value="1" min="1" style="width:70px"></div>
+          <div class="field"><label>Data</label><input type="text" id="inv-sig-usc-data" placeholder="Oggi" readonly style="cursor:pointer"></div>
+        </div>
+        <button class="btn-salva" onclick="salvaInventarioSigUscita()" style="background:#c0392b">&#9660; Dai a cliente</button>
+      </div>
+    </div>
+
+    <div class="main-card" style="margin-top:16px">
+      <div class="card-header">Movimenti Sigarette</div>
+      <div class="filters" style="padding:14px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--paper2)">
+        <div class="filter-group"><span class="filter-label">Marca</span><input type="text" id="inv-s-filt-marca" placeholder="Cerca..." oninput="renderInventarioSigTable()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink);width:140px"></div>
+        <div class="filter-group"><span class="filter-label">Cerca</span><input type="text" id="inv-s-filt-cerca" placeholder="Parola chiave..." oninput="renderInventarioSigTable()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink);width:140px"></div>
+        <div class="filter-group"><span class="filter-label">Mese</span><select id="inv-s-filt-mese" onchange="renderInventarioSigTable()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"><option value="">Tutti</option><option value="01">Gennaio</option><option value="02">Febbraio</option><option value="03">Marzo</option><option value="04">Aprile</option><option value="05">Maggio</option><option value="06">Giugno</option><option value="07">Luglio</option><option value="08">Agosto</option><option value="09">Settembre</option><option value="10">Ottobre</option><option value="11">Novembre</option><option value="12">Dicembre</option></select></div>
+        <div class="filter-group"><span class="filter-label">Anno</span><select id="inv-s-filt-anno" onchange="renderInventarioSigTable()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink)"><option value="">Tutti</option></select></div>
+        <div class="filter-group"><span class="filter-label">Dal</span><input type="text" id="inv-s-filt-dal" placeholder="Seleziona..." readonly style="cursor:pointer;min-width:130px"></div>
+        <div class="filter-group"><span class="filter-label">Al</span><input type="text" id="inv-s-filt-al" placeholder="Seleziona..." readonly style="cursor:pointer;min-width:130px"></div>
+        <button class="btn-reset" onclick="document.getElementById('inv-s-filt-marca').value='';document.getElementById('inv-s-filt-cerca').value='';document.getElementById('inv-s-filt-mese').value='';document.getElementById('inv-s-filt-anno').value='';['inv-s-filt-dal','inv-s-filt-al'].forEach(function(id){var e=document.getElementById(id);if(e&&e._flatpickr)e._flatpickr.clear()});renderInventarioSigTable()" style="padding:6px 14px;font-size:.82rem">Reset</button>
+      </div>
+      <div id="inv-sig-table" style="padding:12px 18px;overflow-x:auto"></div>
+      <div style="padding:8px 18px 16px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-export" onclick="esportaInventarioCSV()" style="padding:6px 14px;font-size:.82rem">CSV</button>
+        <button class="btn-export btn-export-pdf" onclick="esportaInventarioPDF()" style="padding:6px 14px;font-size:.82rem">PDF</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- IMPOSTAZIONI -->
 <!-- REGISTRO ATTIVITA -->
 <div class="page" id="page-registro">
@@ -1152,7 +1273,7 @@ const CAMPI_RAPPORTO_DEFAULT=[{key:'sup_note',label:'Supervisore',type:'input'},
 const RAPPORTO_DB_COLS=['sup_note','cassa_note','sala_note','n_assegni','prelievi','assenze'];
 let campiRapportoExtra=[],tipiNascosti=[],campiNascosti=[],tipiOrdine=[],campiOrdine=[],campiLabelOverride={},tipiRinominati={};
 let visibilitaConfig={};
-let collaboratoriCache=[],moduliCache=[],logCache=[],maisonCache=[],maisonBudgetCache=[],promemoriaCache=[],consegneCache=[],speseExtraCache=[],regaliCache=[],noteClientiCache=[];
+let collaboratoriCache=[],moduliCache=[],logCache=[],maisonCache=[],maisonBudgetCache=[],promemoriaCache=[],consegneCache=[],speseExtraCache=[],regaliCache=[],noteClientiCache=[],inventarioCache=[];
 let currentReparto='slots',operatoriRepartoMap={};
 function nomeCorrente(orig){return tipiRinominati[orig]||orig}
 function getTuttiTipi(){let list=[...TIPI_DEFAULT.filter(t=>!tipiNascosti.includes(t.nome)).map(t=>{const c=coloriOverride[t.nome]||t.colore;const n=tipiRinominati[t.nome]||t.nome;return{nome:n,colore:c,_orig:t.nome}}),...tipiPersonalizzati];
@@ -1248,7 +1369,7 @@ async function loadAll(){
   if(vis)try{visibilitaConfig=JSON.parse(vis)}catch(e){}
   const opRep=await getImp('operatori_reparto');if(opRep){try{operatoriRepartoMap=JSON.parse(opRep);localStorage.setItem('_cache_operatori_reparto',opRep)}catch(e){}}
   else{try{const cached=localStorage.getItem('_cache_operatori_reparto');if(cached)operatoriRepartoMap=JSON.parse(cached)}catch(e){}}
-  const [dati,pins,scadenze,noteC,opAuth,collabs,moduli,logs,maisonD,maisonB,promemoriaD,consegneD,speseD,regaliD,noteClD]=await Promise.all([
+  const [dati,pins,scadenze,noteC,opAuth,collabs,moduli,logs,maisonD,maisonB,promemoriaD,consegneD,speseD,regaliD,noteClD,inventarioD]=await Promise.all([
     secGet('registrazioni?order=data.desc'),
     secGet('note_fissate?select=registrazione_id'),
     secGet('scadenze?order=data_scadenza.asc'),
@@ -1263,7 +1384,8 @@ async function loadAll(){
     secGet('consegne_turno?order=created_at.desc&limit=50'),
     secGet('spese_extra?order=data_spesa.desc'),
     secGet('regali_maison?order=created_at.desc'),
-    secGet('note_clienti?order=created_at.desc')]);
+    secGet('note_clienti?order=created_at.desc'),
+    secGet('inventario?order=data_movimento.desc')]);
   datiCache=dati;pinnedIds=new Set(pins.map(p=>p.registrazione_id));
   scadenzeCache=scadenze;noteColleghiCache=noteC||[];
   operatoriAuthCache=opAuth&&opAuth.length?opAuth:[];
@@ -1277,7 +1399,7 @@ async function loadAll(){
   collaboratoriCache=collabs;moduliCache=moduli;logCache=logs;
   maisonCache=maisonD||[];maisonBudgetCache=maisonB||[];
   promemoriaCache=promemoriaD||[];consegneCache=consegneD||[];speseExtraCache=speseD||[];
-  regaliCache=regaliD||[];noteClientiCache=noteClD||[];
+  regaliCache=regaliD||[];noteClientiCache=noteClD||[];inventarioCache=inventarioD||[];
   await decryptNoteCache();
   await loadGroqKey();
   _loadLogo();
@@ -1402,7 +1524,7 @@ function esci(){const tk=getOpToken()||getAdminToken();if(tk){sbRpc('invalidate_
   localStorage.removeItem('diario_auth_ts');localStorage.removeItem('pagina_corrente');localStorage.removeItem('operatore_corrente');
   sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token');sessionStorage.removeItem('op_token');sessionStorage.removeItem('diario_auth');sessionStorage.removeItem('session_active');sessionStorage.removeItem('bio_verified');sessionStorage.removeItem('note_popup_shown');
   // Svuota cache in memoria
-  noteColleghiCache=[];datiCache=[];moduliCache=[];logCache=[];maisonCache=[];promemoriaCache=[];consegneCache=[];speseExtraCache=[];regaliCache=[];noteClientiCache=[];scadenzeCache=[];
+  noteColleghiCache=[];datiCache=[];moduliCache=[];logCache=[];maisonCache=[];promemoriaCache=[];consegneCache=[];speseExtraCache=[];regaliCache=[];noteClientiCache=[];scadenzeCache=[];inventarioCache=[];
   location.reload()}
 // FACE ID / TOUCH ID (WebAuthn)
 async function biometricAvailable(){if(!window.PublicKeyCredential)return false;try{return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()}catch(e){return false}}
@@ -1644,7 +1766,7 @@ function switchPage(name){flushRapportoSave();
   if(!_pagesAlwaysVisible.includes(name)&&typeof isVis==='function'&&!isVis(_visKey)){name='dashboard'}
   var _epf=document.getElementById('early-page-fix');if(_epf)_epf.remove();document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));const pg=document.getElementById('page-'+name);if(pg)pg.classList.add('active');const tb=document.querySelector('.nav-tab[data-page="'+name+'"]');if(tb)tb.classList.add('active');localStorage.setItem('pagina_corrente',name);if(typeof aggiornaMenuMobile==='function')aggiornaMenuMobile();
   if(name==='diario'){aggiornaNomi();_restoreFiltri();render();updateStats()}if(name==='statistiche'){initStatsFlatpickr();renderStatistiche()}if(name==='rapporto'){if(!rapportoGiornoAperto){const gc=getGiornataCasino();const d=new Date(gc+'T12:00:00');rapportoMese=d.getMonth();rapportoAnno=d.getFullYear();rapportoGiornoAperto=gc}renderRapporto()}if(name==='note-collega'){initNoteFlatpickr();renderNoteCollega()}if(name==='impostazioni'){renderTipiUI();renderScadenzeSettings();renderOperatoriUI();renderCampiRapportoUI();
-    const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}renderCollaboratoriUI();renderBiometricSettings();const ai=document.getElementById('ai-section');if(ai)ai.style.display=isAdmin()?'':'none';const dbSec=document.getElementById('db-stats-section');if(dbSec)dbSec.style.display=isAdmin()?'':'none';const visSec=document.getElementById('visibilita-section');if(visSec){visSec.style.display=isAdmin()?'':'none';if(isAdmin())renderVisibilitaUI()}if(isAdmin()&&groqKey){const gs=document.getElementById('groq-status');if(gs)gs.innerHTML='<span style="color:#2c6e49">Chiave configurata</span>'}}if(name==='moduli'){if(!document.getElementById('mod-list-results'))_modFiltInit=false;renderModuliList()};if(name==='registro')renderRegistro();if(name==='maison'){renderMaisonDashboard();renderMaisonBudgetUI();initMaisonFlatpickr();renderSpeseExtra();initSpeseExtraFP();renderRegali()}if(name==='promemoria'){renderPromemoria();initPromemoriaUI()}if(name==='dashboard')renderDashboard();if(name==='consegna'){initConsFlatpickr();renderConsegne();initConsegnaUI()}}
+    const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}renderCollaboratoriUI();renderBiometricSettings();const ai=document.getElementById('ai-section');if(ai)ai.style.display=isAdmin()?'':'none';const dbSec=document.getElementById('db-stats-section');if(dbSec)dbSec.style.display=isAdmin()?'':'none';const visSec=document.getElementById('visibilita-section');if(visSec){visSec.style.display=isAdmin()?'':'none';if(isAdmin())renderVisibilitaUI()}if(isAdmin()&&groqKey){const gs=document.getElementById('groq-status');if(gs)gs.innerHTML='<span style="color:#2c6e49">Chiave configurata</span>'}}if(name==='moduli'){if(!document.getElementById('mod-list-results'))_modFiltInit=false;renderModuliList()};if(name==='registro')renderRegistro();if(name==='maison'){renderMaisonDashboard();renderMaisonBudgetUI();initMaisonFlatpickr();renderSpeseExtra();initSpeseExtraFP();renderRegali()}if(name==='promemoria'){renderPromemoria();initPromemoriaUI()}if(name==='dashboard')renderDashboard();if(name==='consegna'){initConsFlatpickr();renderConsegne();initConsegnaUI()}if(name==='inventario'){renderInventario();initInventarioFP()}}
 
 // TIPI
 async function saveTipiP(){await setImp('tipi_personalizzati',JSON.stringify(tipiPersonalizzati))}
@@ -4811,7 +4933,7 @@ async function salvaMaisonManuale(){
     document.getElementById('maison-man-nome').value='';document.getElementById('maison-man-importo').value='';
     document.getElementById('maison-man-px').value='1';document.getElementById('maison-man-tipo').value='';document.getElementById('maison-man-qty').value='1';
     const fp=document.getElementById('maison-man-data');if(fp&&fp._flatpickr)fp._flatpickr.clear();
-    renderMaisonDashboard();renderMaisonBudgetAlerts();logAzione('Maison manuale',nome+' '+importo+' CHF');toast('Spesa aggiunta per '+nome);checkBudgetPushAfterInsert(nome)}catch(e){toast('Errore: '+e.message)}}
+    renderMaisonDashboard();renderMaisonBudgetAlerts();sincronizzaPareggioBuoni();logAzione('Maison manuale',nome+' '+importo+' CHF');toast('Spesa aggiunta per '+nome);checkBudgetPushAfterInsert(nome)}catch(e){toast('Errore: '+e.message)}}
 // REGALI MAISON
 function getRegaliReparto(){return regaliCache.filter(function(r){return(r.reparto_dip||'slots')===currentReparto})}
 async function salvaRegalo(){
@@ -6206,7 +6328,7 @@ function acFiltraMaison(inputId,dropId){const inp=document.getElementById(inputI
   // Ordina: budget first, poi alfa
   filtrati.sort((a,b)=>{if(a.cat&&!b.cat)return -1;if(!a.cat&&b.cat)return 1;return a.nome.localeCompare(b.nome)});
   if(!filtrati.length){drop.classList.remove('show');return}
-  drop.innerHTML=filtrati.slice(0,15).map(item=>{
+  drop.innerHTML=filtrati.slice(0,50).map(item=>{
     const badge=item.cat?'<span class="mini-badge" style="background:'+(_catColorsAc[item.cat]||'var(--muted)')+';margin-left:6px;font-size:.6rem;vertical-align:middle">'+escP(_catLabelsAc[item.cat]||'')+'</span>':'';
     const catTipo=item.cat==='bu'?'BU':item.cat==='bl'?'BL':'';
     return'<div onmousedown="document.getElementById(\''+inputId+'\').value=\''+item.nome.replace(/'/g,"\\'")+'\';document.getElementById(\''+dropId+'\').classList.remove(\'show\');_preimpostaTipoMaison(\''+escP(item.cat||'')+'\')" style="display:flex;align-items:center;justify-content:space-between">'+escP(item.nome)+badge+'</div>'}).join('');
@@ -6425,6 +6547,310 @@ function getSpeseReparto(){return speseExtraCache.filter(function(r){return(r.re
 function getModuliReparto(){return moduliCache.filter(function(m){return(m.reparto_dip||'slots')===currentReparto})}
 function getConsegneReparto(){return consegneCache.filter(function(c){return(c.reparto_dip||'slots')===currentReparto})}
 
+// === INVENTARIO ===
+let _invTab='buoni';
+function getInventarioReparto(){return inventarioCache.filter(r=>(r.reparto_dip||'slots')===currentReparto)}
+function calcolaGiacenzaBuoni(){
+  const inv=getInventarioReparto().filter(r=>r.categoria==='buono');
+  const giacenze={BU:0,BL:0,CG:0,WL:0};
+  ['BU','BL','CG','WL'].forEach(t=>{
+    const recs=inv.filter(r=>r.tipo===t);
+    const entrate=recs.filter(r=>r.movimento==='entrata').reduce((s,r)=>s+r.quantita,0);
+    const uscite=recs.filter(r=>r.movimento==='uscita').reduce((s,r)=>s+r.quantita,0);
+    const preAss=recs.filter(r=>r.movimento==='preassegno'&&!r.pareggiato).reduce((s,r)=>s+r.quantita,0);
+    giacenze[t]=entrate-uscite-preAss;
+  });
+  const maisonBuoni=getMaisonReparto().filter(r=>r.tipo_buono);
+  const linkedIds=new Set(inv.filter(r=>r.maison_id).map(r=>r.maison_id));
+  maisonBuoni.forEach(r=>{
+    if(linkedIds.has(r.id))return;
+    const preMatch=inv.find(p=>p.movimento==='preassegno'&&!p.pareggiato&&p.tipo===r.tipo_buono&&p.cliente.toLowerCase()===r.nome.toLowerCase());
+    if(!preMatch){
+      const qty=_contaBuoniFromNote(r);
+      if(giacenze[r.tipo_buono]!==undefined)giacenze[r.tipo_buono]-=qty;
+    }
+  });
+  return giacenze;
+}
+function _contaBuoniFromNote(r){const m=(r.note||'').match(/(\d+)\s*(?:BU|BL|CG|WL)/i);return m?parseInt(m[1]):1}
+function calcolaGiacenzeSigarette(){
+  const inv=getInventarioReparto().filter(r=>r.categoria==='sigaretta');
+  const byMarca={};
+  inv.forEach(r=>{if(!byMarca[r.tipo])byMarca[r.tipo]=0;if(r.movimento==='entrata')byMarca[r.tipo]+=r.quantita;else byMarca[r.tipo]-=r.quantita});
+  return byMarca;
+}
+function renderInventario(){
+  if(_invTab==='buoni'){renderInventarioBuoni();document.getElementById('inv-section-buoni').style.display='';document.getElementById('inv-section-sigarette').style.display='none'}
+  else{renderInventarioSigarette();document.getElementById('inv-section-buoni').style.display='none';document.getElementById('inv-section-sigarette').style.display=''}
+  document.querySelectorAll('.inv-tab-btn').forEach(b=>{
+    const isActive=b.dataset.tab===_invTab;
+    b.classList.toggle('active',isActive);
+    b.style.background=isActive?'var(--ink)':'var(--paper)';b.style.color=isActive?'var(--paper)':'var(--ink)';b.style.borderColor=isActive?'var(--ink)':'var(--line)';
+  });
+}
+function switchInvTab(tab){_invTab=tab;renderInventario()}
+function renderInventarioBuoni(){
+  const giacenze=calcolaGiacenzaBuoni();
+  const nonPareggiati=getInventarioReparto().filter(r=>r.categoria==='buono'&&r.movimento==='preassegno'&&!r.pareggiato).length;
+  const kpiEl=document.getElementById('inv-buoni-kpi');
+  if(kpiEl){
+    const labels={BU:'Buono Unico',BL:'Buono Lounge',CG:'C. Gourmet',WL:'Welcome L.'};
+    kpiEl.innerHTML=['BU','BL','CG','WL'].map(t=>{
+      const v=giacenze[t]||0;const col=v<=5?'var(--accent)':v<=20?'#e67e22':'#2c6e49';
+      return '<div class="mini-stat"><div class="mini-stat-num" style="color:'+col+'">'+v+'</div><div class="mini-stat-label">'+labels[t]+'</div></div>';
+    }).join('')+(nonPareggiati?'<div style="width:100%;grid-column:1/-1;margin-top:8px;padding:8px;background:rgba(230,126,34,0.12);color:#e67e22;border-radius:3px;font-size:.85rem">&#9888; '+nonPareggiati+' buoni pre-assegnati non pareggiati</div>':'');
+  }
+  renderInventarioBuoniTable();
+}
+function _invPopulateAnni(){
+  const anni=new Set();getInventarioReparto().forEach(r=>{if(r.data_movimento)anni.add(r.data_movimento.substring(0,4))});
+  getMaisonReparto().filter(r=>r.tipo_buono).forEach(r=>{if(r.data_giornata)anni.add(r.data_giornata.substring(0,4))});
+  const sorted=[...anni].sort().reverse();
+  ['inv-b-filt-anno','inv-s-filt-anno'].forEach(id=>{
+    const sel=document.getElementById(id);if(!sel)return;const cv=sel.value;
+    sel.innerHTML='<option value="">Tutti</option>'+sorted.map(a=>'<option'+(a===cv?' selected':'')+'>'+a+'</option>').join('')});
+}
+function renderInventarioBuoniTable(){
+  const el=document.getElementById('inv-buoni-table');if(!el)return;
+  _invPopulateAnni();
+  const ft=(document.getElementById('inv-b-filt-tipo')||{}).value||'';
+  const fc=(document.getElementById('inv-b-filt-cliente')||{}).value||'';
+  const fq=(document.getElementById('inv-b-filt-cerca')||{}).value||'';
+  const fmese=(document.getElementById('inv-b-filt-mese')||{}).value||'';
+  const fanno=(document.getElementById('inv-b-filt-anno')||{}).value||'';
+  const fd=(document.getElementById('inv-b-filt-dal')||{}).value||'';
+  const fa=(document.getElementById('inv-b-filt-al')||{}).value||'';
+  const fs=(document.getElementById('inv-b-filt-stato')||{}).value||'';
+  function _filtDate(d){if(!d)return false;if(fd&&d<fd)return false;if(fa&&d>fa)return false;if(fmese&&d.substring(5,7)!==fmese)return false;if(fanno&&d.substring(0,4)!==fanno)return false;return true}
+  function _filtCerca(r){if(!fq)return true;const q=fq.toLowerCase();return(r.tipo||'').toLowerCase().includes(q)||(r.cliente||'').toLowerCase().includes(q)||(r.note||'').toLowerCase().includes(q)||(r.movimento||'').toLowerCase().includes(q)}
+  let rows=getInventarioReparto().filter(r=>r.categoria==='buono');
+  if(ft)rows=rows.filter(r=>r.tipo===ft);
+  if(fc)rows=rows.filter(r=>(r.cliente||'').toLowerCase().includes(fc.toLowerCase()));
+  rows=rows.filter(r=>_filtDate(r.data_movimento));
+  rows=rows.filter(_filtCerca);
+  if(fs==='pareggiato')rows=rows.filter(r=>r.pareggiato);
+  if(fs==='non_pareggiato')rows=rows.filter(r=>r.movimento==='preassegno'&&!r.pareggiato);
+  const linkedIds=new Set(getInventarioReparto().filter(r=>r.maison_id).map(r=>r.maison_id));
+  let autoRows=getMaisonReparto().filter(r=>r.tipo_buono&&!linkedIds.has(r.id)).map(r=>({
+    tipo:r.tipo_buono,movimento:'auto',quantita:_contaBuoniFromNote(r),
+    cliente:r.nome,data_movimento:r.data_giornata,note:'Da Maison',_auto:true
+  }));
+  const all=[...rows,...autoRows.filter(r=>{
+    if(ft&&r.tipo!==ft)return false;
+    if(fc&&!r.cliente.toLowerCase().includes(fc.toLowerCase()))return false;
+    if(!_filtDate(r.data_movimento))return false;
+    if(!_filtCerca(r))return false;
+    if(fs)return false;
+    return true;
+  })].sort((a,b)=>(b.data_movimento||'').localeCompare(a.data_movimento||''));
+  if(!all.length){el.innerHTML='<p style="color:var(--muted);padding:16px;text-align:center">Nessun movimento</p>';return}
+  const movLabels={entrata:'&#9650; Carico',uscita:'&#9660; Uscita man.',preassegno:'&#9660; Pre-assegnato',auto:'&#9660; Da Maison'};
+  const movColors={entrata:'#2c6e49',uscita:'#c0392b',preassegno:'#e67e22',auto:'#8a7d6b'};
+  const tipColors={BU:'#b8860b',BL:'#1a4a7a',CG:'#2c6e49',WL:'#7b2d8b'};
+  let html='<table style="width:100%;border-collapse:collapse;font-size:.88rem"><thead><tr style="border-bottom:2px solid var(--line);text-align:left"><th style="padding:8px">Data</th><th style="padding:8px">Tipo</th><th style="padding:8px">Qty</th><th style="padding:8px">Movimento</th><th style="padding:8px">Cliente</th><th style="padding:8px">Stato</th><th style="padding:8px"></th></tr></thead><tbody>';
+  all.forEach(r=>{
+    const d=r.data_movimento?new Date(r.data_movimento+'T12:00:00').toLocaleDateString('it-IT'):'';
+    const mov=movLabels[r.movimento]||r.movimento;const col=movColors[r.movimento]||'var(--ink)';
+    const qSign=r.movimento==='entrata'?'+':'-';
+    const stato=r.movimento==='preassegno'?(r.pareggiato?'<span style="color:#2c6e49">&#10003; Pareggiato</span>':'<span style="color:#e67e22">&#9203; In attesa</span>'):(r._auto?'<span style="color:var(--muted)">auto</span>':'');
+    const actions=r._auto?'':'<div style="display:flex;gap:4px"><button class="entry-action-btn" onclick="modificaInventario('+r.id+')" title="Modifica">&#9998;</button><button class="entry-action-btn" onclick="eliminaInventario('+r.id+')" title="Elimina">&#128465;</button></div>';
+    html+='<tr style="border-bottom:1px solid var(--line)"><td style="padding:6px 8px;white-space:nowrap;color:var(--muted);font-size:.82rem">'+d+'</td><td style="padding:6px 8px"><span style="background:'+(tipColors[r.tipo]||'var(--muted)')+';color:white;padding:2px 8px;border-radius:2px;font-size:.78rem;font-weight:600">'+escP(r.tipo)+'</span></td><td style="padding:6px 8px;font-weight:700;color:'+col+'">'+qSign+r.quantita+'</td><td style="padding:6px 8px;color:'+col+'">'+mov+'</td><td style="padding:6px 8px">'+escP(r.cliente||'')+'</td><td style="padding:6px 8px">'+stato+'</td><td style="padding:6px 8px">'+actions+'</td></tr>';
+  });
+  html+='</tbody></table>';el.innerHTML=html;
+}
+function renderInventarioSigarette(){
+  const giacenze=calcolaGiacenzeSigarette();
+  const kpiEl=document.getElementById('inv-sig-kpi');
+  if(kpiEl){
+    const brands=Object.entries(giacenze).filter(([k,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+    const totale=brands.reduce((s,[k,v])=>s+v,0);
+    kpiEl.innerHTML=brands.map(([marca,qty])=>'<div class="mini-stat"><div class="mini-stat-num">'+qty+'</div><div class="mini-stat-label">'+escP(marca)+'</div></div>').join('')+'<div class="mini-stat"><div class="mini-stat-num" style="color:var(--ink)">'+totale+'</div><div class="mini-stat-label">Totale pacchetti</div></div>';
+    if(!brands.length)kpiEl.innerHTML='<p style="color:var(--muted);text-align:center;padding:12px">Nessuna sigaretta in scorta</p>';
+  }
+  renderInventarioSigTable();_aggiornaMarche();
+}
+function renderInventarioSigTable(){
+  const el=document.getElementById('inv-sig-table');if(!el)return;
+  _invPopulateAnni();
+  const fm=(document.getElementById('inv-s-filt-marca')||{}).value||'';
+  const fq=(document.getElementById('inv-s-filt-cerca')||{}).value||'';
+  const fmese=(document.getElementById('inv-s-filt-mese')||{}).value||'';
+  const fanno=(document.getElementById('inv-s-filt-anno')||{}).value||'';
+  const fd=(document.getElementById('inv-s-filt-dal')||{}).value||'';
+  const fa=(document.getElementById('inv-s-filt-al')||{}).value||'';
+  let rows=getInventarioReparto().filter(r=>r.categoria==='sigaretta');
+  if(fm)rows=rows.filter(r=>r.tipo.toLowerCase().includes(fm.toLowerCase()));
+  if(fq){const q=fq.toLowerCase();rows=rows.filter(r=>(r.tipo||'').toLowerCase().includes(q)||(r.cliente||'').toLowerCase().includes(q)||(r.note||'').toLowerCase().includes(q))}
+  if(fmese)rows=rows.filter(r=>r.data_movimento&&r.data_movimento.substring(5,7)===fmese);
+  if(fanno)rows=rows.filter(r=>r.data_movimento&&r.data_movimento.substring(0,4)===fanno);
+  if(fd)rows=rows.filter(r=>r.data_movimento>=fd);
+  if(fa)rows=rows.filter(r=>r.data_movimento<=fa);
+  rows.sort((a,b)=>(b.data_movimento||'').localeCompare(a.data_movimento||''));
+  if(!rows.length){el.innerHTML='<p style="color:var(--muted);padding:16px;text-align:center">Nessun movimento</p>';return}
+  let html='<table style="width:100%;border-collapse:collapse;font-size:.88rem"><thead><tr style="border-bottom:2px solid var(--line);text-align:left"><th style="padding:8px">Data</th><th style="padding:8px">Marca</th><th style="padding:8px">Qty</th><th style="padding:8px">Movimento</th><th style="padding:8px">Cliente</th><th style="padding:8px">Collaboratore</th><th style="padding:8px"></th></tr></thead><tbody>';
+  rows.forEach(r=>{
+    const d=r.data_movimento?new Date(r.data_movimento+'T12:00:00').toLocaleDateString('it-IT'):'';
+    const isIn=r.movimento==='entrata';
+    html+='<tr style="border-bottom:1px solid var(--line)"><td style="padding:6px 8px;color:var(--muted);font-size:.82rem">'+d+'</td><td style="padding:6px 8px;font-weight:600">'+escP(r.tipo)+'</td><td style="padding:6px 8px;font-weight:700;color:'+(isIn?'#2c6e49':'#c0392b')+'">'+(isIn?'+':'-')+r.quantita+'</td><td style="padding:6px 8px;color:'+(isIn?'#2c6e49':'#c0392b')+'">'+(isIn?'&#9650; Sbagliata':'&#9660; Data a cliente')+'</td><td style="padding:6px 8px">'+escP(r.cliente||'')+'</td><td style="padding:6px 8px;color:var(--muted)">'+escP(r.note||'')+'</td><td style="padding:6px 8px"><div style="display:flex;gap:4px"><button class="entry-action-btn" onclick="modificaInventario('+r.id+')" title="Modifica">&#9998;</button><button class="entry-action-btn" onclick="eliminaInventario('+r.id+')" title="Elimina">&#128465;</button></div></td></tr>';
+  });
+  html+='</tbody></table>';el.innerHTML=html;
+}
+async function salvaInventarioCarico(){
+  const tipo=(document.getElementById('inv-carico-tipo')||{}).value;
+  const qty=parseInt((document.getElementById('inv-carico-qty')||{}).value)||0;
+  const data=(document.getElementById('inv-carico-data')||{}).value||new Date().toISOString().split('T')[0];
+  const nota=(document.getElementById('inv-carico-nota')||{}).value||'';
+  if(!tipo){toast('Seleziona il tipo');return}
+  if(!qty||qty<1){toast('Inserisci la quantit\u00e0');return}
+  const rec={categoria:'buono',tipo:tipo,movimento:'entrata',quantita:qty,data_movimento:data,note:nota,operatore:getOperatore(),reparto_dip:currentReparto};
+  try{const r=await secPost('inventario',rec);if(r&&r[0])inventarioCache.unshift(r[0]);
+    document.getElementById('inv-carico-qty').value='';document.getElementById('inv-carico-nota').value='';
+    const fp=document.getElementById('inv-carico-data');if(fp&&fp._flatpickr)fp._flatpickr.clear();
+    logAzione('Inventario carico',qty+' '+tipo);renderInventario();toast(qty+' '+tipo+' caricati')}catch(e){toast('Errore: '+e.message)}
+}
+async function salvaInventarioUscita(){
+  const cliente=capitalizzaNome((document.getElementById('inv-usc-cliente')||{}).value.trim());
+  const tipo=(document.getElementById('inv-usc-tipo')||{}).value;
+  const qty=parseInt((document.getElementById('inv-usc-qty')||{}).value)||0;
+  const data=(document.getElementById('inv-usc-data')||{}).value||new Date().toISOString().split('T')[0];
+  const nota=(document.getElementById('inv-usc-nota')||{}).value||'';
+  if(!cliente){toast('Inserisci il cliente');return}
+  if(!tipo){toast('Seleziona il tipo');return}
+  if(!qty||qty<1){toast('Inserisci la quantit\u00e0');return}
+  const rec={categoria:'buono',tipo:tipo,movimento:'preassegno',quantita:qty,cliente:cliente,data_movimento:data,note:nota,pareggiato:false,operatore:getOperatore(),reparto_dip:currentReparto};
+  try{const r=await secPost('inventario',rec);if(r&&r[0])inventarioCache.unshift(r[0]);
+    document.getElementById('inv-usc-cliente').value='';document.getElementById('inv-usc-qty').value='1';document.getElementById('inv-usc-nota').value='';
+    const fp=document.getElementById('inv-usc-data');if(fp&&fp._flatpickr)fp._flatpickr.clear();
+    logAzione('Inventario uscita',qty+' '+tipo+' a '+cliente);renderInventario();toast(qty+' '+tipo+' assegnati a '+cliente)}catch(e){toast('Errore: '+e.message)}
+}
+async function salvaInventarioSigEntrata(){
+  const marca=capitalizzaNome((document.getElementById('inv-sig-marca')||{}).value.trim());
+  const collab=(document.getElementById('inv-sig-collab')||{}).value.trim();
+  const cliente=(document.getElementById('inv-sig-cliente')||{}).value.trim();
+  const qty=parseInt((document.getElementById('inv-sig-qty')||{}).value)||1;
+  const data=(document.getElementById('inv-sig-data')||{}).value||new Date().toISOString().split('T')[0];
+  if(!marca){toast('Inserisci la marca');return}
+  const rec={categoria:'sigaretta',tipo:marca,movimento:'entrata',quantita:qty,cliente:cliente||'',note:collab||'',data_movimento:data,operatore:getOperatore(),reparto_dip:currentReparto};
+  try{const r=await secPost('inventario',rec);if(r&&r[0])inventarioCache.unshift(r[0]);
+    document.getElementById('inv-sig-marca').value='';document.getElementById('inv-sig-collab').value='';document.getElementById('inv-sig-cliente').value='';
+    logAzione('Inventario sigaretta',marca+' (sbagliata per '+cliente+')');renderInventario();toast(marca+' aggiunta alla scorta')}catch(e){toast('Errore: '+e.message)}
+}
+async function salvaInventarioSigUscita(){
+  const marca=(document.getElementById('inv-sig-usc-marca')||{}).value;
+  const cliente=(document.getElementById('inv-sig-usc-cliente')||{}).value.trim();
+  const qty=parseInt((document.getElementById('inv-sig-usc-qty')||{}).value)||1;
+  const data=(document.getElementById('inv-sig-usc-data')||{}).value||new Date().toISOString().split('T')[0];
+  if(!marca){toast('Seleziona la marca');return}
+  if(!cliente){toast('Inserisci il cliente');return}
+  const rec={categoria:'sigaretta',tipo:marca,movimento:'uscita',quantita:qty,cliente:cliente,data_movimento:data,operatore:getOperatore(),reparto_dip:currentReparto};
+  try{const r=await secPost('inventario',rec);if(r&&r[0])inventarioCache.unshift(r[0]);
+    document.getElementById('inv-sig-usc-cliente').value='';
+    logAzione('Inventario sigaretta',marca+' data a '+cliente);renderInventario();toast(marca+' data a '+cliente)}catch(e){toast('Errore: '+e.message)}
+}
+async function eliminaInventario(id){
+  if(!confirm('Eliminare questo movimento?'))return;
+  try{await secDel('inventario','id=eq.'+id);inventarioCache=inventarioCache.filter(r=>r.id!==id);
+    logAzione('Inventario eliminato','ID '+id);renderInventario();toast('Movimento eliminato')}catch(e){toast('Errore eliminazione')}
+}
+function modificaInventario(id){
+  const r=inventarioCache.find(x=>x.id===id);if(!r)return;
+  const b=document.getElementById('pwd-modal-content');
+  const isBuono=r.categoria==='buono';
+  let html='<h3>Modifica movimento</h3>';
+  if(isBuono){
+    html+='<div class="pwd-field"><label>Tipo</label><select id="inv-edit-tipo" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"><option value="BU"'+(r.tipo==='BU'?' selected':'')+'>BU</option><option value="BL"'+(r.tipo==='BL'?' selected':'')+'>BL</option><option value="CG"'+(r.tipo==='CG'?' selected':'')+'>CG</option><option value="WL"'+(r.tipo==='WL'?' selected':'')+'>WL</option></select></div>';
+  }else{
+    html+='<div class="pwd-field"><label>Marca</label><input type="text" id="inv-edit-tipo" value="'+escP(r.tipo)+'" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"></div>';
+  }
+  html+='<div class="pwd-field"><label>Quantit\u00e0</label><input type="number" id="inv-edit-qty" value="'+r.quantita+'" min="1" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"></div>';
+  html+='<div class="pwd-field"><label>Cliente</label><input type="text" id="inv-edit-cliente" value="'+escP(r.cliente||'')+'" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"></div>';
+  html+='<div class="pwd-field"><label>Data</label><input type="text" id="inv-edit-data" value="'+(r.data_movimento?new Date(r.data_movimento+'T12:00:00').toLocaleDateString('it-IT'):'')+'" placeholder="GG/MM/AAAA" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"></div>';
+  html+='<div class="pwd-field"><label>Nota</label><input type="text" id="inv-edit-nota" value="'+escP(r.note||'')+'" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"></div>';
+  html+='<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaModificaInventario('+id+')">Salva</button></div>';
+  b.innerHTML=html;document.getElementById('pwd-modal').classList.remove('hidden');
+  if(window.flatpickr)flatpickr('#inv-edit-data',{locale:'it',dateFormat:'d/m/Y',allowInput:true});
+}
+async function salvaModificaInventario(id){
+  const tipo=(document.getElementById('inv-edit-tipo')||{}).value.trim();
+  const qty=parseInt((document.getElementById('inv-edit-qty')||{}).value)||1;
+  const cliente=(document.getElementById('inv-edit-cliente')||{}).value.trim();
+  const dataRaw=(document.getElementById('inv-edit-data')||{}).value.trim();
+  const nota=(document.getElementById('inv-edit-nota')||{}).value.trim();
+  let dataISO='';
+  if(dataRaw){const dm=dataRaw.match(/(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{2,4})/);
+    if(dm){const a=parseInt(dm[3]);dataISO=(a<100?2000+a:a)+'-'+dm[2].padStart(2,'0')+'-'+dm[1].padStart(2,'0')}
+    else dataISO=dataRaw}
+  const updates={tipo:tipo,quantita:qty,cliente:cliente,note:nota};
+  if(dataISO)updates.data_movimento=dataISO;
+  try{await secPatch('inventario','id=eq.'+id,updates);
+    const c=inventarioCache.find(x=>x.id===id);if(c)Object.assign(c,updates);
+    document.getElementById('pwd-modal').classList.add('hidden');
+    logAzione('Inventario modificato',tipo+' qty='+qty);renderInventario();toast('Movimento modificato')}catch(e){toast('Errore modifica')}
+}
+function sincronizzaPareggioBuoni(){
+  const inv=getInventarioReparto().filter(r=>r.categoria==='buono'&&r.movimento==='preassegno'&&!r.pareggiato);
+  if(!inv.length)return;
+  const maison=getMaisonReparto().filter(r=>r.tipo_buono);
+  inv.forEach(async(pre)=>{
+    const match=maison.find(m=>m.tipo_buono===pre.tipo&&m.nome.toLowerCase()===pre.cliente.toLowerCase()&&m.data_giornata>=pre.data_movimento);
+    if(match){
+      try{await secPatch('inventario','id=eq.'+pre.id,{pareggiato:true,pareggio_maison_id:match.id});
+        pre.pareggiato=true;pre.pareggio_maison_id=match.id}catch(e){}
+    }
+  });
+}
+function _aggiornaMarche(){
+  const sel=document.getElementById('inv-sig-usc-marca');if(!sel)return;
+  const giacenze=calcolaGiacenzeSigarette();
+  const brands=Object.entries(giacenze).filter(([k,v])=>v>0).sort((a,b)=>a[0].localeCompare(b[0]));
+  sel.innerHTML='<option value="">Seleziona...</option>'+brands.map(([m,q])=>'<option value="'+escP(m)+'">'+escP(m)+' ('+q+')</option>').join('');
+}
+function initInventarioFP(){
+  if(!window.flatpickr)return;
+  const opts={locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false};
+  ['inv-carico-data','inv-usc-data','inv-sig-data','inv-sig-usc-data'].forEach(id=>{
+    const el=document.getElementById(id);if(el&&!el._flatpickr)flatpickr('#'+id,opts);
+  });
+  const fOpts=Object.assign({},opts,{onChange:function(){renderInventario()}});
+  ['inv-b-filt-dal','inv-b-filt-al','inv-s-filt-dal','inv-s-filt-al'].forEach(id=>{
+    const el=document.getElementById(id);if(el&&!el._flatpickr)flatpickr('#'+id,fOpts);
+  });
+}
+function esportaInventarioCSV(){
+  const isBuoni=_invTab==='buoni';
+  const data=getInventarioReparto().filter(r=>r.categoria===(isBuoni?'buono':'sigaretta'));
+  if(!data.length){toast('Nessun dato');return}
+  const headers=isBuoni?['Data','Tipo','Quantit\u00e0','Movimento','Cliente','Stato','Nota']:['Data','Marca','Quantit\u00e0','Movimento','Cliente','Collaboratore'];
+  const rows=data.map(r=>{
+    const d=r.data_movimento?new Date(r.data_movimento+'T12:00:00').toLocaleDateString('it-IT'):'';
+    if(isBuoni)return[d,r.tipo,(r.movimento==='entrata'?'+':'-')+r.quantita,r.movimento,r.cliente||'',r.pareggiato?'Pareggiato':(r.movimento==='preassegno'?'In attesa':''),r.note||''];
+    return[d,r.tipo,(r.movimento==='entrata'?'+':'-')+r.quantita,r.movimento==='entrata'?'Sbagliata':'Data a cliente',r.cliente||'',r.note||''];
+  });
+  const csv=[headers,...rows].map(r=>r.map(c=>'"'+(c+'').replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='inventario_'+(isBuoni?'buoni':'sigarette')+'_'+new Date().toISOString().split('T')[0]+'.csv';a.click();
+}
+function esportaInventarioPDF(){
+  if(!window.jspdf){toast('Libreria PDF non caricata');return}
+  const isBuoni=_invTab==='buoni';
+  const data=getInventarioReparto().filter(r=>r.categoria===(isBuoni?'buono':'sigaretta'));
+  if(!data.length){toast('Nessun dato');return}
+  const jsPDF=window.jspdf.jsPDF;const doc=new jsPDF('landscape','mm','a4');
+  doc.setFontSize(14);doc.setFont('helvetica','bold');
+  doc.text('Inventario '+(isBuoni?'Buoni':'Sigarette')+' \u2014 '+currentReparto.charAt(0).toUpperCase()+currentReparto.slice(1),14,16);
+  doc.setFontSize(9);doc.setFont('helvetica','normal');
+  doc.text('Generato il '+new Date().toLocaleDateString('it-IT')+' alle '+new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}),14,22);
+  if(isBuoni){const giacenze=calcolaGiacenzaBuoni();doc.text('Giacenze: BU='+giacenze.BU+' | BL='+giacenze.BL+' | CG='+giacenze.CG+' | WL='+giacenze.WL,14,28)}
+  const headers=isBuoni?[['Data','Tipo','Qty','Movimento','Cliente','Stato','Nota']]:[['Data','Marca','Qty','Movimento','Cliente','Collaboratore']];
+  const rows=data.map(r=>{
+    const d=r.data_movimento?new Date(r.data_movimento+'T12:00:00').toLocaleDateString('it-IT'):'';
+    if(isBuoni)return[d,r.tipo,(r.movimento==='entrata'?'+':'-')+r.quantita,r.movimento,r.cliente||'',r.pareggiato?'Pareggiato':(r.movimento==='preassegno'?'In attesa':''),r.note||''];
+    return[d,r.tipo,(r.movimento==='entrata'?'+':'-')+r.quantita,r.movimento==='entrata'?'Sbagliata':'Data a cliente',r.cliente||'',r.note||''];
+  });
+  doc.autoTable({head:headers,body:rows,startY:isBuoni?32:26,theme:'grid',styles:{fontSize:8,cellPadding:3,lineColor:[200,200,200]},headStyles:{fillColor:[44,62,80],textColor:255,fontStyle:'bold'},footStyles:{fillColor:[245,245,245],fontStyle:'bold'}});
+  doc.save('inventario_'+(isBuoni?'buoni':'sigarette')+'_'+new Date().toISOString().split('T')[0]+'.pdf');
+}
+
 // MENU MOBILE
 function toggleMobileNav(){document.getElementById('mobile-nav').classList.toggle('show')}
 function chiudiMobileNav(){document.getElementById('mobile-nav').classList.remove('show')}
@@ -6440,6 +6866,7 @@ function aggiornaMenuMobile(){try{
     {page:'consegna',icon:'&#128221;',label:'Consegna',vis:'consegna',badgeId:'consegna-badge'},
     {page:'promemoria',icon:'&#128203;',label:'Promemoria',vis:'promemoria',badgeId:'promemoria-badge'},
     {page:'maison',icon:'&#127860;',label:'Maison',vis:'maison'},
+    {page:'inventario',icon:'&#128230;',label:'Inventario',vis:'inventario'},
     {page:'registro',icon:'&#128203;',label:'Registro',adminOnly:true},
     {page:'impostazioni',icon:'&#9881;&#65039;',label:'Impostazioni'}];
   const cur=localStorage.getItem('pagina_corrente')||'dashboard';
