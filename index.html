@@ -2472,7 +2472,8 @@ async function salvaModificaNota(id){const msg=document.getElementById('edit-not
   document.getElementById('pwd-modal').classList.add('hidden');renderNoteCollega();toast('Nota modificata')}catch(e){toast('Errore modifica nota')}}
 async function annullaInvioNota(id){const n=noteColleghiCache.find(n=>n.id===id);if(!n)return;
   const gid=n.gruppo_id;const op=n.da_operatore;
-  const copie=gid?noteColleghiCache.filter(x=>x.gruppo_id===gid&&x.da_operatore===op&&(x.messaggio||'').substring(0,50)===(n.messaggio||'').substring(0,50)):[];
+  const _nTime=new Date(n.created_at||0).getTime();
+  const copie=gid?noteColleghiCache.filter(x=>x.gruppo_id===gid&&x.da_operatore===op&&(x.messaggio||'')===(n.messaggio||'')&&Math.abs(new Date(x.created_at||0).getTime()-_nTime)<10000):[];
   const qualcunoHaLetto=copie.some(x=>x.letta);
   if(qualcunoHaLetto||!copie.length){
     // Almeno uno ha letto (o messaggio singolo) → elimina solo per me
