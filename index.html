@@ -2784,13 +2784,20 @@ function renderNoteChat(partner){
     if(isGroup&&isSent)senderLabel='<div class="chat-sender-label" style="color:#b8860b">Tu</div>';
     // Group read status: aggregated (3/5 letti)
     let destLabel='';
-    if(isSent&&n.gruppo_id&&isPersistentGroup){
-      const gNotes=noteColleghiCache.filter(x=>x.gruppo_id===n.gruppo_id&&x.da_operatore===op&&x.created_at===n.created_at);
-      if(gNotes.length>1){const letti=gNotes.filter(x=>x.letta).length;
-        destLabel='<div class="chat-group-label" style="font-size:.7rem;color:var(--muted)">'+letti+'/'+gNotes.length+' letti</div>'}
-    }else if(isSent&&n.gruppo_id){
-      const gNotes=noteColleghiCache.filter(x=>x.gruppo_id===n.gruppo_id&&x.da_operatore===op);
-      if(gNotes.length>1)destLabel='<div class="chat-group-label">A: '+gNotes.map(x=>escP(x.a_operatore)).join(', ')+'</div>'}
+    if(isSent&&n.gruppo_id&&isGroup){
+      // Trova tutte le copie di questo messaggio (stesso gruppo_id, stesso mittente, stesso testo)
+      const gNotes=noteColleghiCache.filter(x=>x.gruppo_id===n.gruppo_id&&x.da_operatore===op&&(x.messaggio||'').substring(0,50)===(n.messaggio||'').substring(0,50));
+      if(gNotes.length>1){
+        const lettiList=gNotes.filter(x=>x.letta).map(x=>x.a_operatore);
+        const nonLettiList=gNotes.filter(x=>!x.letta).map(x=>x.a_operatore);
+        const letti=lettiList.length;
+        const tooltipId='read-tip-'+n.id;
+        let tooltipHtml='<div id="'+tooltipId+'" style="display:none;position:absolute;bottom:100%;left:0;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:8px 12px;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:100;font-size:.78rem;min-width:160px;max-width:280px">';
+        if(lettiList.length)tooltipHtml+='<div style="color:#2c6e49;margin-bottom:4px"><strong>&#10003;&#10003; Letto da:</strong></div>'+lettiList.map(n=>'<div style="padding:1px 0">'+escP(n)+'</div>').join('');
+        if(nonLettiList.length)tooltipHtml+='<div style="color:var(--muted);margin-top:6px"><strong>&#10003; Non letto:</strong></div>'+nonLettiList.map(n=>'<div style="padding:1px 0">'+escP(n)+'</div>').join('');
+        tooltipHtml+='</div>';
+        destLabel='<div class="chat-group-label" style="font-size:.7rem;color:var(--muted);cursor:pointer;position:relative" onmouseenter="document.getElementById(\''+tooltipId+'\').style.display=\'block\'" onmouseleave="document.getElementById(\''+tooltipId+'\').style.display=\'none\'" onclick="var t=document.getElementById(\''+tooltipId+'\');t.style.display=t.style.display===\'none\'?\'block\':\'none\'">'+letti+'/'+gNotes.length+' letti'+tooltipHtml+'</div>'}
+    }
     // Action buttons
     const canEdit=isSent&&!n.letta;
     let actions='<div class="chat-msg-actions">';
