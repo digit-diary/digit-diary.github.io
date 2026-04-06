@@ -2470,11 +2470,25 @@ async function salvaModificaNota(id){const msg=document.getElementById('edit-not
   const msgEnc=await encryptNota(msg);
   try{for(const nid of ids){await secPatch('note_colleghi','id=eq.'+nid,{messaggio:msgEnc});const c=noteColleghiCache.find(x=>x.id===nid);if(c){c.messaggio=msg;c._decrypted=true}}
   document.getElementById('pwd-modal').classList.add('hidden');renderNoteCollega();toast('Nota modificata')}catch(e){toast('Errore modifica nota')}}
-async function annullaInvioNota(id){const n=noteColleghiCache.find(n=>n.id===id);const gid=n?n.gruppo_id:null;
-  const ids=gid?noteColleghiCache.filter(x=>x.gruppo_id===gid&&x.da_operatore===n.da_operatore).map(x=>x.id):[id];
-  const label=ids.length>1?'Annullare l\'invio di '+ids.length+' note? Verranno eliminate per tutti i destinatari.':'Annullare l\'invio? La nota verrà eliminata anche per il destinatario.';
-  if(!confirm(label))return;
-  try{for(const nid of ids){await secDel('note_colleghi','id=eq.'+nid)}noteColleghiCache=noteColleghiCache.filter(x=>!ids.includes(x.id));renderNoteCollega();toast('Invio annullato')}catch(e){toast('Errore annullamento invio')}}
+async function annullaInvioNota(id){const n=noteColleghiCache.find(n=>n.id===id);if(!n)return;
+  const gid=n.gruppo_id;const op=n.da_operatore;
+  const copie=gid?noteColleghiCache.filter(x=>x.gruppo_id===gid&&x.da_operatore===op&&(x.messaggio||'').substring(0,50)===(n.messaggio||'').substring(0,50)):[];
+  const qualcunoHaLetto=copie.some(x=>x.letta);
+  if(qualcunoHaLetto||!copie.length){
+    // Almeno uno ha letto (o messaggio singolo) → elimina solo per me
+    if(!confirm('Qualcuno ha già letto questo messaggio. Eliminare solo dalla tua vista?'))return;
+    const mieIds=copie.length?copie.map(x=>x.id):[id];
+    try{for(const nid of mieIds){await secPatch('note_colleghi','id=eq.'+nid,{nascosta_mitt:true})}
+      mieIds.forEach(nid=>{const c=noteColleghiCache.find(x=>x.id===nid);if(c)c.nascosta_mitt=true});
+      noteColleghiCache=noteColleghiCache.filter(x=>!mieIds.includes(x.id)||!x.nascosta_mitt);
+      renderNoteCollega();toast('Messaggio nascosto per te')}catch(e){toast('Errore')}
+  }else{
+    // Nessuno ha letto → annulla invio per tutti
+    const ids=copie.map(x=>x.id);
+    if(!confirm('Nessuno ha ancora letto. Annullare l\'invio per tutti ('+ ids.length+' destinatari)?'))return;
+    try{for(const nid of ids){await secDel('note_colleghi','id=eq.'+nid)}
+      noteColleghiCache=noteColleghiCache.filter(x=>!ids.includes(x.id));
+      renderNoteCollega();toast('Invio annullato per tutti')}catch(e){toast('Errore annullamento invio')}}}
 // Migra vecchi gruppi note al formato persistente __gruppo_slots/__gruppo_tavoli
 async function _migraNoteGruppi(){
   if(localStorage.getItem('_note_gruppi_migrati_v2'))return;
