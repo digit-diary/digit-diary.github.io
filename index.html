@@ -2595,7 +2595,10 @@ function renderNoteChat(partner){
   const _gidChat=isGroup?partner.replace('gruppo:',''):'';
   const isPersistentGroup=_gidChat.startsWith('__gruppo_');
   let headerLabel='';
-  if(isPersistentGroup){const rep=_gidChat.replace('__gruppo_','');headerLabel='Tutti '+(rep==='slots'?'Slots':'Tavoli')}
+  let _groupMembersHtml='';
+  if(isPersistentGroup){const rep=_gidChat.replace('__gruppo_','');headerLabel='Tutti '+(rep==='slots'?'Slots':'Tavoli');
+    const membri=operatoriAuthCache.map(o=>o.nome).filter(n=>{if(!n||n===op)return false;const r=operatoriRepartoMap[n]||'entrambi';return r===rep||r==='entrambi'});
+    _groupMembersHtml='<div class="group-members-tooltip" style="display:none;position:absolute;top:100%;left:0;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:8px 12px;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:100;font-size:.82rem;max-width:300px;line-height:1.6">'+['Tu'].concat(membri.sort()).map(n=>'<span style="display:inline-block;margin:2px 4px;padding:1px 8px;background:var(--paper2);border-radius:12px;font-size:.78rem">'+escP(n)+'</span>').join('')+'</div>'}
   else if(isGroup){const conv=_getConvNotes(partner,op);const partners=new Set();conv.forEach(n=>{if(n.da_operatore!==op)partners.add(n.da_operatore);if(n.a_operatore!==op)partners.add(n.a_operatore)});headerLabel=[...partners].join(', ')}
   else{headerLabel=escP(partner)}
   // Ultimo visto da log_attivita
@@ -2615,7 +2618,7 @@ function renderNoteChat(partner){
       _lastSeenHtml='<div style="font-size:.75rem;color:'+_lsColor+';font-weight:400">'+_lsText+_lsDot+'</div>'}}
   const backBtn='<button class="chat-back-btn" onclick="_chatBackToList()" style="display:none;background:none;border:none;cursor:pointer;font-size:1.2rem;color:var(--ink);padding:4px 8px" title="Indietro">&#8592;</button>';
   const searchBtn='<button onclick="apriCercaChat()" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:1.1rem;color:var(--muted);padding:4px 8px" title="Cerca">&#128269;</button>';
-  header.innerHTML=backBtn+'<div style="flex:1"><div>'+headerLabel+'</div>'+_lastSeenHtml+'</div>'+searchBtn;
+  header.innerHTML=backBtn+'<div style="flex:1;position:relative"><div style="cursor:'+(isPersistentGroup?'pointer':'default')+'" onclick="var t=this.parentElement.querySelector(\'.group-members-tooltip\');if(t)t.style.display=t.style.display===\'none\'?\'block\':\'none\'" onmouseenter="var t=this.parentElement.querySelector(\'.group-members-tooltip\');if(t)t.style.display=\'block\'" onmouseleave="var t=this.parentElement.querySelector(\'.group-members-tooltip\');if(t)t.style.display=\'none\'">'+headerLabel+(isPersistentGroup?' <span style="font-size:.7rem;color:var(--muted)">&#9660;</span>':'')+'</div>'+_groupMembersHtml+_lastSeenHtml+'</div>'+searchBtn;
   // Show input
   inp.style.display='flex';
   // Messages
