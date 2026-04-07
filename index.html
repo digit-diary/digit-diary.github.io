@@ -5754,7 +5754,9 @@ function eseguiConfrontoMaison(){
     h+='</div>'}
   document.getElementById('conf-risultato').innerHTML=h}
 function esportaMaisonClienteCSV(nome){const righe=getMaisonFiltrati().filter(r=>r.nome===nome).sort((a,b)=>a.data_giornata.localeCompare(b.data_giornata));
-  if(!righe.length){toast('Nessun dato');return}
+  const seRighe=getSpeseReparto().filter(r=>r.beneficiario.toLowerCase()===nome.toLowerCase()).sort((a,b)=>(a.data_spesa||'').localeCompare(b.data_spesa||''));
+  const regRighe=getRegaliReparto().filter(r=>r.nome&&r.nome.toLowerCase()===nome.toLowerCase());
+  if(!righe.length&&!seRighe.length&&!regRighe.length){toast('Nessun dato');return}
   const _csvCatLabels={full_maison:'Full Maison',maison:'Maison',direzione:'Direzione',bu:'Buono Unico',bl:'Buono Lounge'};
   let _csvBudget=getBudgetReparto().find(b=>b.nome.toLowerCase()===nome.toLowerCase());
   if(!_csvBudget){const _cog=nome.toLowerCase().split(/\s+/)[0];if(_cog.length>=3)_csvBudget=getBudgetReparto().find(b=>b.nome.toLowerCase().split(/\s+/)[0]===_cog)}
@@ -5764,6 +5766,14 @@ function esportaMaisonClienteCSV(nome){const righe=getMaisonFiltrati().filter(r=
   const tot=righe.reduce((s,r)=>s+parseFloat(r.costo||0),0);
   const _nBU=_contaBuoni(righe,'BU'),_nBL=_contaBuoni(righe,'BL'),_nCG=_contaBuoni(righe,'CG'),_nWL=_contaBuoni(righe,'WL');
   rows.push(['TOTALE','',righe.reduce((s,r)=>s+(r.px||0),0),fmtCHF(tot),'BU:'+_nBU+' BL:'+_nBL+' CG:'+_nCG+' WL:'+_nWL,'','']);
+  // Spese Extra
+  if(seRighe.length){rows.push([]);rows.push(['SPESE EXTRA']);rows.push(['Data','Tipo','Luogo','Descrizione','Importo CHF']);
+    seRighe.forEach(r=>{rows.push([new Date(r.data_spesa+'T12:00:00').toLocaleDateString('it-IT'),SE_TIPI_LABEL[r.tipo]||r.tipo,r.luogo||'',r.descrizione||'',fmtCHF(r.importo)])});
+    rows.push(['TOTALE EXTRA','','','',fmtCHF(seRighe.reduce((s,r)=>s+parseFloat(r.importo||0),0))])}
+  // Regali
+  if(regRighe.length){rows.push([]);rows.push(['REGALI']);rows.push(['Data','Descrizione','Importo CHF']);
+    regRighe.forEach(r=>{rows.push([r.data_regalo?new Date(r.data_regalo+'T12:00:00').toLocaleDateString('it-IT'):'',r.descrizione||'',fmtCHF(r.importo||0)])});
+    rows.push(['TOTALE REGALI','',fmtCHF(regRighe.reduce((s,r)=>s+parseFloat(r.importo||0),0))])}
   const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\n')],{type:'text/csv;charset=utf-8'});
   Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'maison_'+nome.replace(/\s+/g,'_')+'_'+_maisonFilePeriodo(righe)+'.csv'}).click();toast('CSV esportato!')}
 function apriPdfSchedaMaison(nome){const mc=document.getElementById('pwd-modal-content');
