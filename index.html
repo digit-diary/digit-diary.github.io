@@ -2138,6 +2138,10 @@ async function parseDifferenzeCassa(text,ds,turno){if(!text||!text.trim())return
       let m=part.match(/^([A-Za-zÀ-ü\s.'-]+?)\s*([+-])?\s*(\d+(?:[.,]\d{1,2})?)\s*$/);
       // 2. Formato con CHF: "Cognome 50 CHF" o "Cognome 50 chf"
       if(!m)m=part.match(/^([A-Za-zÀ-ü\s.'-]+?)\s*([+-])?\s*(\d+(?:[.,]\d{1,2})?)\s*(?:chf|fr\.?|franchi)?\s*$/i);
+      // 2b. Formato invertito: "-170.44 Cognome" o "+50 Cognome"
+      if(!m){const _inv=part.match(/^\s*([+-])?\s*(\d+(?:[.,]\d{1,2})?)\s+([A-Za-zÀ-ü\s.'-]+?)\s*$/);if(_inv)m=[part,_inv[3],_inv[1],_inv[2]]}
+      // 2c. Pulisci nome da keyword non-nome se il match classico ha parole extra
+      if(m&&m[1]){const _cleaned=m[1].replace(/\b(chiude|chiuso|con|ha|aveva|fatto|differenza|cassa|ammanco|eccedenza)\b/gi,'').trim();if(_cleaned.length>=2)m[1]=_cleaned}
       // 3. Frase libera: cerca cognome collaboratore + importo nella stessa riga
       if(!m){
         // Cerca importo nella riga
@@ -2690,14 +2694,19 @@ function _apriGruppoSelezionato(){
   const op=getOperatore();
   const membri=[op,...dests].sort().join('|');
   const gid='__gruppo_custom_'+membri.replace(/[^a-zA-Z0-9]/g,'_').substring(0,60);
-  // Salva nome gruppo in localStorage
-  if(nomeGruppo.trim())localStorage.setItem('_gruppo_nome_'+gid,label);
+  // Salva nome gruppo in localStorage + nel gid per condividerlo
+  localStorage.setItem('_gruppo_nome_'+gid,label);
   window._noteConvGruppo={reparto:'custom',dests:dests,gid:gid,label:label};
   window._noteConvAttiva='gruppo:'+gid;
   const dd=document.getElementById('conv-new-dropdown');if(dd)dd.style.display='none';
   _chatShowArea();
   renderNoteChat(window._noteConvAttiva);renderNoteCollega()}
-function _getGruppoNome(gid){return localStorage.getItem('_gruppo_nome_'+gid)||''}
+function _getGruppoNome(gid){
+  const ls=localStorage.getItem('_gruppo_nome_'+gid);if(ls)return ls;
+  // Cerca il nome nei messaggi del gruppo (tag [GNAME:...])
+  const note=noteColleghiCache.find(n=>n.gruppo_id===gid&&(n.messaggio||'').includes('[GNAME:'));
+  if(note){const gm=(note.messaggio||'').match(/\[GNAME:([^\]]+)\]/);if(gm){localStorage.setItem('_gruppo_nome_'+gid,gm[1]);return gm[1]}}
+  return ''}
 function _apriAggiungiMembri(gid,partner){
   const op=getOperatore();
   // Trova membri attuali dal DB
@@ -2905,7 +2914,7 @@ function renderNoteChat(partner){
     actions+='<button class="btn-act" style="font-size:.65rem;padding:2px 6px;color:var(--accent2);border-color:var(--accent2)" onclick="event.stopPropagation();rispondiAMessaggio('+n.id+')" title="Rispondi">&#8617;</button>';
     actions+='</div>';
     // Parse reply quote
-    let msgText=n.messaggio||'';let quoteHtml='';
+    let msgText=(n.messaggio||'').replace(/\[GNAME:[^\]]*\]/g,'');let quoteHtml='';
     const replyMatch=msgText.match(/^\[REPLY:(\d+):([^:]*):([^\]]*)\]/);
     if(replyMatch){msgText=msgText.substring(replyMatch[0].length);quoteHtml='<div class="chat-quote" onclick="scrollToNote('+replyMatch[1]+')"><div class="quote-name">'+escP(replyMatch[2])+'</div><div>'+escP(replyMatch[3].substring(0,80))+'</div></div>'}
     html+='<div class="chat-bubble '+cls+'" id="note-bubble-'+n.id+'" style="position:relative">';
@@ -2939,6 +2948,10 @@ async function inviaNotaChat(){
   if(_replyToNote){let origMsg=_replyToNote.messaggio||'';const rm=origMsg.match(/^\[REPLY:\d+:[^:]*:[^\]]*\]/);if(rm)origMsg=origMsg.substring(rm[0].length);msg='[REPLY:'+_replyToNote.id+':'+_replyToNote.da_operatore+':'+origMsg.substring(0,60).replace(/[\[\]:]/g,'')+']'+msg}
   const op=getOperatore();if(!op){toast('Seleziona prima un operatore');return}
   const partner=window._noteConvAttiva;if(!partner){toast('Seleziona una conversazione');return}
+  // Per nuovi gruppi custom: includi tag nome nel primo messaggio
+  const _isNewCustom=partner.startsWith('gruppo:__gruppo_custom_')&&!noteColleghiCache.some(n=>n.gruppo_id===partner.replace('gruppo:',''));
+  const _gName=_isNewCustom?_getGruppoNome(partner.replace('gruppo:',''))||'':'';
+  if(_gName&&!msg.includes('[GNAME:'))msg='[GNAME:'+_gName+']'+msg;
   const msgEnc=await encryptNota(msg);
   let dests=[];let gid=null;
   const isGroup=partner.startsWith('gruppo:');
