@@ -5789,7 +5789,9 @@ async function esportaMaisonClientePDF(nome){
   const sez={kpi:document.getElementById('pdf-mc-kpi')?.checked!==false,visite:document.getElementById('pdf-mc-visite')?.checked!==false,trend:document.getElementById('pdf-mc-trend')?.checked,extra:document.getElementById('pdf-mc-extra')?.checked,regali:document.getElementById('pdf-mc-regali')?.checked};
   document.getElementById('pwd-modal').classList.add('hidden');
   const righe=getMaisonFiltrati().filter(r=>r.nome===nome).sort((a,b)=>a.data_giornata.localeCompare(b.data_giornata));
-  if(!righe.length){toast('Nessun dato');return}
+  const _seRighePdf=getSpeseReparto().filter(r=>r.beneficiario.toLowerCase()===nome.toLowerCase());
+  const _regRighePdf=getRegaliReparto().filter(r=>r.nome&&r.nome.toLowerCase()===nome.toLowerCase());
+  if(!righe.length&&!_seRighePdf.length&&!_regRighePdf.length){toast('Nessun dato');return}
   if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore caricamento libreria PDF');return}}
   const tot=righe.reduce((s,r)=>s+parseFloat(r.costo||0),0);const totPx=righe.reduce((s,r)=>s+(r.px||0),0);
   const nBU=_contaBuoni(righe,'BU'),nBL=_contaBuoni(righe,'BL');
