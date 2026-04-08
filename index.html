@@ -2260,9 +2260,17 @@ function renderRischioAlerts(){const container=document.getElementById('rischio-
   if(accumuli.length){html+='<div class="rischio-alert-banner" style="background:#e67e22;margin-top:6px" onclick="toggleAccDD()">&#9888;&#65039; '+accumuli.length+' collaboratore/i con 3+ allineamenti totali — Valutare RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
     html+='<div class="rischio-alerts-dropdown hidden" id="acc-dd">';
     accumuli.forEach(a=>{const dt=a.lastDate?new Date(a.lastDate+'T12:00:00').toLocaleDateString('it-IT'):'';
-      html+='<div class="cassa-alert-item"><span class="alert-name">'+escP(a.nome)+'</span><span class="alert-detail">'+a.count+' allineamenti totali (ultimo: '+dt+'). Valutare provvedimento.</span><button class="alert-action" style="background:#e67e22" onclick="apriModuloVeloce(\'rdi\',\''+a.nome.replace(/'/g,"\\'")+'\')">Crea RDI</button></div>'});
+      const _ignKey='_alert_ign_'+a.nome.toLowerCase().replace(/\s/g,'_')+'_acc';
+      if(localStorage.getItem(_ignKey))return;
+      html+='<div class="cassa-alert-item"><span class="alert-name">'+escP(a.nome)+'</span><span class="alert-detail">'+a.count+' allineamenti totali (ultimo: '+dt+'). Valutare provvedimento.</span><button class="alert-action" style="background:#e67e22" onclick="apriModuloVeloce(\'rdi\',\''+a.nome.replace(/'/g,"\\'")+'\')">Crea RDI</button><button class="alert-action" style="background:var(--muted);margin-left:4px" onclick="ignoraAlertSuggerimento(\''+escP(a.nome).replace(/'/g,"\\'")+'\',\'acc\')">Ignora</button></div>'});
     html+='</div>'}
   html+='</div>';container.insertAdjacentHTML('beforeend',html)}
+function ignoraAlertSuggerimento(nome,tipo){
+  if(!confirm('Ignorare questo suggerimento per '+nome+'?\nVerrà registrato nel log.'))return;
+  const _ignKey='_alert_ign_'+nome.toLowerCase().replace(/\s/g,'_')+'_'+tipo;
+  localStorage.setItem(_ignKey,'1');
+  logAzione('Alert ignorato',nome+' — suggerimento '+tipo+' ignorato da '+getOperatore());
+  renderRischioAlerts();renderAmmonimentiAlerts();toast('Suggerimento ignorato per '+nome)}
 function toggleAccDD(){const dd=document.getElementById('acc-dd');if(dd)dd.classList.toggle('hidden')}
 function toggleRischioDD(){const dd=document.getElementById('rischio-dd');if(dd)dd.classList.toggle('hidden')}
 
