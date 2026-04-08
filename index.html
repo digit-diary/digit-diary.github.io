@@ -2186,11 +2186,11 @@ function checkCassaAlerts(){
     // Solo errori ≥90 contano per il percorso disciplinare
     const errsSinceAllin=(lastAllinDate?errs.filter(e=>(e.data||'')>lastAllinDate):errs).filter(e=>(parseFloat(e.importo)||0)>=90);
     const errsSinceRdi=(lastRdiDate?errs.filter(e=>(e.data||'')>lastRdiDate):errs).filter(e=>(parseFloat(e.importo)||0)>=90);
-    const maxSingle=errsSinceAllin.length?Math.max(...errsSinceAllin.map(e=>parseFloat(e.importo)||0)):0;
     const cumTotal=errsSinceRdi.reduce((s,e)=>s+(parseFloat(e.importo)||0),0);
-    // Se cumulativo ≥500 → solo RDI (non anche allineamento)
+    // Se cumulativo ≥500 → solo RDI
     if(cumTotal>=500)alerts.push({type:'rdi',nome,importo:cumTotal,count:errsSinceRdi.length});
-    else if(maxSingle>=90)alerts.push({type:'allineamento',nome,importo:maxSingle,count:errsSinceAllin.length})});
+    // Altrimenti: un alert per ogni errore ≥90
+    else{errsSinceAllin.forEach(e=>{const imp=parseFloat(e.importo)||0;if(imp>=90){const dt=e.data?new Date(e.data).toLocaleDateString('it-IT'):'';alerts.push({type:'allineamento',nome,importo:imp,count:1,dataErr:dt})}})}});
   return alerts}
 function renderCassaAlerts(){const container=document.getElementById('cassa-alerts-container');if(!container)return;
   const alerts=checkCassaAlerts();if(!alerts.length){container.innerHTML='';return}
@@ -2199,7 +2199,7 @@ function renderCassaAlerts(){const container=document.getElementById('cassa-aler
   if(allinAlerts.length){
     html+='<div class="cassa-alert-banner allin" onclick="toggleCassaDD(\'allin\')">&#9888;&#65039; '+allinAlerts.length+' collaboratore/i con differenza cassa &#8805; CHF 90 &#8212; Preparare allineamento <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
     html+='<div class="cassa-alerts-dropdown hidden" id="cassa-allin-dd">';
-    allinAlerts.forEach(a=>{html+='<div class="cassa-alert-item"><span class="alert-name">'+escP(a.nome)+'</span><span class="alert-detail">Max singola differenza: '+fmtCHF(a.importo)+' CHF ('+a.count+' errori dal ultimo allineamento)</span><button class="alert-action" onclick="apriModuloVeloce(\'allineamento\',\''+a.nome.replace(/'/g,"\\'")+'\')">Crea Allineamento</button></div>'});
+    allinAlerts.forEach(a=>{html+='<div class="cassa-alert-item"><span class="alert-name">'+escP(a.nome)+'</span><span class="alert-detail">Differenza: '+fmtCHF(a.importo)+' CHF'+(a.dataErr?' del '+a.dataErr:'')+'</span><button class="alert-action" onclick="apriModuloVeloce(\'allineamento\',\''+a.nome.replace(/'/g,"\\'")+'\')">Crea Allineamento</button></div>'});
     html+='</div>'}
   if(rdiAlerts.length){
     html+='<div class="cassa-alert-banner rdi" onclick="toggleCassaDD(\'rdi\')">&#9888;&#65039; '+rdiAlerts.length+' collaboratore/i con differenze cumulative &#8805; CHF 500 &#8212; Fare RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
