@@ -1240,6 +1240,9 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
     <div class="add-tipo-row"><div class="field" style="flex:2"><label>Chiave API Groq</label><input type="password" id="groq-key-input" placeholder="gsk_..."></div><button class="btn-add-tipo" onclick="salvaGroqKey()">Salva</button></div><p id="groq-status" style="font-size:.82rem;margin-top:8px"></p></div>
   <div class="settings-section" id="db-stats-section" style="display:none"><h4>Stato Database</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Supabase piano gratuito: 500 MB database.</p>
     <div id="db-stats-content" style="padding:12px 0"><button class="btn-salva" onclick="caricaDbStats()" style="background:var(--ink);font-size:.82rem;padding:8px 20px">Verifica stato</button></div></div>
+  <div class="settings-section" id="cestino-section" style="display:none"><h4>&#128465; Cestino</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Elementi eliminati. Puoi ripristinarli o svuotare il cestino.</p>
+    <button class="btn-salva" onclick="caricaCestino()" style="background:var(--ink);font-size:.82rem;padding:8px 20px;margin-bottom:12px">Carica cestino</button>
+    <div id="cestino-content"></div></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -1400,7 +1403,7 @@ async function loadAll(){
     secGet('regali_maison?order=created_at.desc'),
     secGet('note_clienti?order=created_at.desc'),
     secGet('inventario?order=data_movimento.desc')]);
-  datiCache=dati;pinnedIds=new Set(pins.map(p=>p.registrazione_id));
+  datiCache=(dati||[]).filter(e=>!e.eliminato);pinnedIds=new Set(pins.map(p=>p.registrazione_id));
   scadenzeCache=scadenze;noteColleghiCache=noteC||[];
   operatoriAuthCache=opAuth&&opAuth.length?opAuth:[];
   // Cache operatori in localStorage per fallback login
@@ -1410,7 +1413,7 @@ async function loadAll(){
   let _mapChanged=false;
   operatoriAuthCache.forEach(o=>{if(!operatoriRepartoMap[o.nome]){operatoriRepartoMap[o.nome]='entrambi';_mapChanged=true}});
   if(_mapChanged){setImp('operatori_reparto',JSON.stringify(operatoriRepartoMap));localStorage.setItem('_cache_operatori_reparto',JSON.stringify(operatoriRepartoMap))}
-  collaboratoriCache=collabs;moduliCache=moduli;logCache=logs;
+  collaboratoriCache=collabs;moduliCache=(moduli||[]).filter(m=>!m.eliminato);logCache=logs;
   maisonCache=maisonD||[];maisonBudgetCache=maisonB||[];
   promemoriaCache=promemoriaD||[];consegneCache=consegneD||[];speseExtraCache=speseD||[];
   regaliCache=regaliD||[];noteClientiCache=noteClD||[];inventarioCache=inventarioD||[];
@@ -1422,6 +1425,59 @@ async function loadAll(){
   // Health check silenzioso (solo se loggato)
   if(getOpToken())_healthCheck();
 }
+// CESTINO
+let _cestinoModuli=[],_cestinoReg=[];
+async function caricaCestino(){
+  const el=document.getElementById('cestino-content');if(!el)return;
+  el.innerHTML='<p style="color:var(--muted)">Caricamento...</p>';
+  try{
+    const modDel=await secGet('moduli?eliminato=eq.true&order=eliminato_at.desc');
+    const regDel=await secGet('registrazioni?eliminato=eq.true&order=eliminato_at.desc');
+    _cestinoModuli=modDel||[];_cestinoReg=regDel||[];
+    renderCestino()}catch(e){el.innerHTML='<p style="color:var(--accent)">Errore caricamento cestino</p>'}}
+function renderCestino(){
+  const el=document.getElementById('cestino-content');if(!el)return;
+  if(!_cestinoModuli.length&&!_cestinoReg.length){el.innerHTML='<p style="color:#2c6e49;font-weight:600">Cestino vuoto</p>';return}
+  let html='';
+  if(_cestinoReg.length){
+    html+='<h5 style="margin:12px 0 8px;color:var(--ink)">Registrazioni ('+_cestinoReg.length+')</h5>';
+    html+='<div style="max-height:300px;overflow-y:auto">';
+    _cestinoReg.forEach(r=>{
+      const d=r.data?new Date(r.data).toLocaleDateString('it-IT'):'';
+      const delAt=r.eliminato_at?new Date(r.eliminato_at).toLocaleDateString('it-IT')+' '+new Date(r.eliminato_at).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}):'';
+      html+='<div style="padding:8px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:.85rem"><div style="flex:1"><strong>'+escP(r.nome||'')+'</strong> — <span style="color:var(--muted)">'+escP(r.tipo||'')+'</span> — '+d+'<div style="font-size:.75rem;color:var(--muted)">'+escP((r.testo||'').substring(0,60))+'</div><div style="font-size:.72rem;color:var(--accent)">Eliminato da '+escP(r.eliminato_da||'')+' il '+delAt+'</div></div><button class="btn-salva" style="font-size:.75rem;padding:4px 10px;background:#2c6e49" onclick="ripristinaCestino(\'registrazioni\','+r.id+')">Ripristina</button><button class="btn-salva" style="font-size:.75rem;padding:4px 10px;background:var(--accent)" onclick="eliminaDefinitivo(\'registrazioni\','+r.id+')">Elimina</button></div>'});
+    html+='</div>'}
+  if(_cestinoModuli.length){
+    html+='<h5 style="margin:12px 0 8px;color:var(--ink)">Moduli ('+_cestinoModuli.length+')</h5>';
+    html+='<div style="max-height:300px;overflow-y:auto">';
+    _cestinoModuli.forEach(m=>{
+      const delAt=m.eliminato_at?new Date(m.eliminato_at).toLocaleDateString('it-IT')+' '+new Date(m.eliminato_at).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}):'';
+      html+='<div style="padding:8px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:.85rem"><div style="flex:1"><strong>'+escP(m.collaboratore||'')+'</strong> — <span style="color:var(--muted)">'+escP(m.tipo||'')+'</span> — '+escP(m.data_modulo||'')+'<div style="font-size:.72rem;color:var(--accent)">Eliminato da '+escP(m.eliminato_da||'')+' il '+delAt+'</div></div><button class="btn-salva" style="font-size:.75rem;padding:4px 10px;background:#2c6e49" onclick="ripristinaCestino(\'moduli\','+m.id+')">Ripristina</button><button class="btn-salva" style="font-size:.75rem;padding:4px 10px;background:var(--accent)" onclick="eliminaDefinitivo(\'moduli\','+m.id+')">Elimina</button></div>'});
+    html+='</div>'}
+  html+='<div style="margin-top:16px;display:flex;gap:8px"><button class="btn-salva" style="background:var(--accent);font-size:.82rem;padding:8px 16px" onclick="svuotaCestino()">Svuota cestino</button></div>';
+  el.innerHTML=html}
+async function ripristinaCestino(tabella,id){
+  if(!confirm('Ripristinare questo elemento?'))return;
+  try{await secPatch(tabella,'id=eq.'+id,{eliminato:false,eliminato_da:null,eliminato_at:null});
+    if(tabella==='moduli'){const m=_cestinoModuli.find(x=>x.id===id);if(m){m.eliminato=false;moduliCache.push(m);_cestinoModuli=_cestinoModuli.filter(x=>x.id!==id)}}
+    else{const r=_cestinoReg.find(x=>x.id===id);if(r){r.eliminato=false;datiCache.unshift(r);_cestinoReg=_cestinoReg.filter(x=>x.id!==id)}}
+    logAzione('Ripristinato da cestino',tabella+' ID '+id);
+    renderCestino();aggiornaNomi();render();updateStats();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();aggiornaModuliLista();
+    toast('Ripristinato!')}catch(e){toast('Errore ripristino')}}
+async function eliminaDefinitivo(tabella,id){
+  if(!confirm('Eliminare DEFINITIVAMENTE? Non potrà essere recuperato.'))return;
+  try{await secDel(tabella,'id=eq.'+id);
+    if(tabella==='moduli')_cestinoModuli=_cestinoModuli.filter(x=>x.id!==id);
+    else _cestinoReg=_cestinoReg.filter(x=>x.id!==id);
+    logAzione('Eliminato definitivamente',tabella+' ID '+id);renderCestino();toast('Eliminato definitivamente')}catch(e){toast('Errore eliminazione')}}
+async function svuotaCestino(){
+  const tot=_cestinoModuli.length+_cestinoReg.length;
+  if(!tot){toast('Cestino già vuoto');return}
+  if(!confirm('Svuotare il cestino? '+tot+' elementi verranno eliminati DEFINITIVAMENTE.'))return;
+  try{for(const m of _cestinoModuli){await secDel('moduli','id=eq.'+m.id)}
+    for(const r of _cestinoReg){await secDel('registrazioni','id=eq.'+r.id)}
+    logAzione('Cestino svuotato',tot+' elementi eliminati definitivamente');
+    _cestinoModuli=[];_cestinoReg=[];renderCestino();toast('Cestino svuotato')}catch(e){toast('Errore svuotamento')}}
 async function caricaDbStats(){const el=document.getElementById('db-stats-content');if(!el)return;
   el.innerHTML='<p style="color:var(--muted)">Caricamento...</p>';
   const tk=getAdminToken();if(!tk){el.innerHTML='<p style="color:var(--accent)">Nessun token admin. Esci e rientra come admin.</p>';return}
@@ -1780,7 +1836,7 @@ function switchPage(name){flushRapportoSave();
   if(!_pagesAlwaysVisible.includes(name)&&typeof isVis==='function'&&!isVis(_visKey)){name='dashboard'}
   var _epf=document.getElementById('early-page-fix');if(_epf)_epf.remove();document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));const pg=document.getElementById('page-'+name);if(pg)pg.classList.add('active');const tb=document.querySelector('.nav-tab[data-page="'+name+'"]');if(tb)tb.classList.add('active');localStorage.setItem('pagina_corrente',name);if(typeof aggiornaMenuMobile==='function')aggiornaMenuMobile();
   if(name==='diario'){aggiornaNomi();_restoreFiltri();render();updateStats()}if(name==='statistiche'){initStatsFlatpickr();renderStatistiche()}if(name==='rapporto'){if(!rapportoGiornoAperto){const gc=getGiornataCasino();const d=new Date(gc+'T12:00:00');rapportoMese=d.getMonth();rapportoAnno=d.getFullYear();rapportoGiornoAperto=gc}renderRapporto()}if(name==='note-collega'){initNoteFlatpickr();renderNoteCollega()}if(name==='impostazioni'){renderTipiUI();renderScadenzeSettings();renderOperatoriUI();renderCampiRapportoUI();
-    const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}renderCollaboratoriUI();renderBiometricSettings();const ai=document.getElementById('ai-section');if(ai)ai.style.display=isAdmin()?'':'none';const dbSec=document.getElementById('db-stats-section');if(dbSec)dbSec.style.display=isAdmin()?'':'none';const visSec=document.getElementById('visibilita-section');if(visSec){visSec.style.display=isAdmin()?'':'none';if(isAdmin())renderVisibilitaUI()}if(isAdmin()&&groqKey){const gs=document.getElementById('groq-status');if(gs)gs.innerHTML='<span style="color:#2c6e49">Chiave configurata</span>'}}if(name==='moduli'){if(!document.getElementById('mod-list-results'))_modFiltInit=false;renderModuliList()};if(name==='registro')renderRegistro();if(name==='maison'){renderMaisonDashboard();renderMaisonBudgetUI();renderMaisonBudgetAlerts();initMaisonFlatpickr();renderSpeseExtra();initSpeseExtraFP();renderRegali()}if(name==='promemoria'){renderPromemoria();initPromemoriaUI()}if(name==='dashboard')renderDashboard();if(name==='consegna'){initConsFlatpickr();renderConsegne();initConsegnaUI()}if(name==='inventario'){renderInventario();initInventarioFP()}}
+    const sb=document.getElementById('sicurezza-btns');if(sb){sb.innerHTML=isAdmin()?'<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>':'<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>'}renderCollaboratoriUI();renderBiometricSettings();const ai=document.getElementById('ai-section');if(ai)ai.style.display=isAdmin()?'':'none';const dbSec=document.getElementById('db-stats-section');if(dbSec)dbSec.style.display=isAdmin()?'':'none';const cestSec=document.getElementById('cestino-section');if(cestSec)cestSec.style.display=isAdmin()?'':'none';const visSec=document.getElementById('visibilita-section');if(visSec){visSec.style.display=isAdmin()?'':'none';if(isAdmin())renderVisibilitaUI()}if(isAdmin()&&groqKey){const gs=document.getElementById('groq-status');if(gs)gs.innerHTML='<span style="color:#2c6e49">Chiave configurata</span>'}}if(name==='moduli'){if(!document.getElementById('mod-list-results'))_modFiltInit=false;renderModuliList()};if(name==='registro')renderRegistro();if(name==='maison'){renderMaisonDashboard();renderMaisonBudgetUI();renderMaisonBudgetAlerts();initMaisonFlatpickr();renderSpeseExtra();initSpeseExtraFP();renderRegali()}if(name==='promemoria'){renderPromemoria();initPromemoriaUI()}if(name==='dashboard')renderDashboard();if(name==='consegna'){initConsFlatpickr();renderConsegne();initConsegnaUI()}if(name==='inventario'){renderInventario();initInventarioFP()}}
 
 // TIPI
 async function saveTipiP(){await setImp('tipi_personalizzati',JSON.stringify(tipiPersonalizzati))}
@@ -2038,7 +2094,12 @@ async function _creaFollowUp(nome,testo,dataDirecta){
     const r=await secPost('promemoria',rec);promemoriaCache.push(r[0]);
     document.getElementById('pwd-modal').classList.add('hidden');
     aggiornaPromemoriaBadge();toast('Promemoria follow-up creato per '+nome)}catch(e){toast('Errore creazione promemoria')}}
-async function elimina(id){if(!confirm('Eliminare?'))return;const _e=datiCache.find(x=>x.id===id);try{await secDel('registrazioni','id=eq.'+id);datiCache=datiCache.filter(e=>e.id!==id);pinnedIds.delete(id);if(_e)logAzione('Eliminata registrazione',_e.nome+' - '+_e.tipo);aggiornaNomi();render();updateStats();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();toast('Eliminata')}catch(e){toast('Errore eliminazione')}}
+async function elimina(id){if(!confirm('Eliminare? Sarà spostata nel cestino.'))return;const _e=datiCache.find(x=>x.id===id);const op=getOperatore();const now=new Date().toISOString();
+  try{await secPatch('registrazioni','id=eq.'+id,{eliminato:true,eliminato_da:op,eliminato_at:now});
+    if(_e){_e.eliminato=true;_e.eliminato_da=op;_e.eliminato_at=now}
+    datiCache=datiCache.filter(e=>!e.eliminato);pinnedIds.delete(id);
+    if(_e)logAzione('Registrazione nel cestino',_e.nome+' - '+_e.tipo+' (da '+op+')');
+    aggiornaNomi();render();updateStats();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();toast('Spostata nel cestino')}catch(e){toast('Errore eliminazione')}}
 async function togglePin(id){try{if(pinnedIds.has(id)){await secDel('note_fissate','registrazione_id=eq.'+id);pinnedIds.delete(id)}else{await secPost('note_fissate',{registrazione_id:id});pinnedIds.add(id)}render()}catch(e){toast('Errore fissaggio nota')}}
 
 // MODIFICA REGISTRAZIONE
@@ -2887,6 +2948,7 @@ function renderNoteChat(partner){
   const isPersistentGroup=_gidChat.startsWith('__gruppo_');
   let headerLabel='';
   let _groupMembersHtml='';
+  let _grpAdmin='';
   const isCustomGroup=_gidChat.startsWith('__gruppo_custom_');
   if(isPersistentGroup){
     let headerGruppo='',membri=[];
@@ -2901,7 +2963,7 @@ function renderNoteChat(partner){
       membri=operatoriAuthCache.map(o=>o.nome).filter(n=>{if(!n||n===op)return false;if(rep==='tutti')return true;const r=operatoriRepartoMap[n]||'entrambi';return r===rep||r==='entrambi'})}
     // Trova admin del gruppo (creatore = primo messaggio)
     const _allGrpNotes=noteColleghiCache.filter(x=>x.gruppo_id===_gidChat).sort((a,b)=>(a.created_at||'').localeCompare(b.created_at||''));
-    const _grpAdmin=_allGrpNotes.length?_allGrpNotes[0].da_operatore:'';
+    _grpAdmin=_allGrpNotes.length?_allGrpNotes[0].da_operatore:'';
     const _isMyAdmin=_grpAdmin===op;
     const _adminBadge='<span style="background:var(--accent2);color:white;font-size:.6rem;padding:0 4px;border-radius:8px;margin-left:2px;font-weight:700;vertical-align:middle">A</span>';
     _groupMembersHtml='<div class="group-members-tooltip" style="display:none;position:absolute;top:100%;left:0;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:8px 12px;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:100;font-size:.82rem;max-width:300px;line-height:1.6">'+['Tu'+(_isMyAdmin?_adminBadge:'')].concat(membri.sort().map(n=>escP(n)+(n===_grpAdmin?_adminBadge:''))).map(n=>'<span style="display:inline-block;margin:2px 4px;padding:1px 8px;background:var(--paper2);border-radius:12px;font-size:.78rem">'+n+'</span>').join('')+'</div>'}
@@ -3859,8 +3921,15 @@ function checkQrHash(){const h=window.location.hash;if(!h.startsWith('#modulo/')
   if(mod){switchPage('moduli');setTimeout(()=>apriModuloSalvato(mod.id),300)}else{toast('Modulo non trovato')}
   history.replaceState(null,'',window.location.pathname)}
 function ristampaModuloPDF(id){window._isRistampa=true;apriModuloSalvato(id);setTimeout(()=>{const m=moduliCache.find(x=>x.id===id);if(m)generaModuloPDF(m.tipo);window._isRistampa=false},150)}
-async function eliminaModulo(id){if(!confirm('Eliminare questo modulo?'))return;
-  const _m=moduliCache.find(x=>x.id===id);try{await secDel('moduli','id=eq.'+id);moduliCache=moduliCache.filter(x=>x.id!==id);if(_m)logAzione('Eliminato modulo',_m.tipo+' - '+_m.collaboratore);aggiornaModuliLista();const cnt=document.getElementById('mod-list-count');if(cnt)cnt.textContent=getModuliReparto().length;toast('Modulo eliminato')}catch(e){toast('Errore eliminazione')}}
+async function eliminaModulo(id){if(!confirm('Eliminare questo modulo? Sarà spostato nel cestino.'))return;
+  const _m=moduliCache.find(x=>x.id===id);const op=getOperatore();const now=new Date().toISOString();
+  try{await secPatch('moduli','id=eq.'+id,{eliminato:true,eliminato_da:op,eliminato_at:now});
+    if(_m){_m.eliminato=true;_m.eliminato_da=op;_m.eliminato_at=now}
+    moduliCache=moduliCache.filter(x=>!x.eliminato);
+    if(_m)logAzione('Modulo nel cestino',_m.tipo+' - '+_m.collaboratore+' (da '+op+')');
+    aggiornaModuliLista();const cnt=document.getElementById('mod-list-count');if(cnt)cnt.textContent=getModuliReparto().length;
+    renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();
+    toast('Modulo spostato nel cestino')}catch(e){toast('Errore eliminazione')}}
 
 // GESTIONE COLLABORATORI
 async function renderCollaboratoriUI(){const section=document.getElementById('collab-section');if(!section)return;
@@ -4153,7 +4222,7 @@ function render(){const f=getFiltrati(),el=document.getElementById('entries-list
     if(e.modificato_da)metaLines.push('Modificata da '+escP(e.modificato_da));
     const gdDiff=d.getHours()<6;const gdDate=gdDiff?new Date(d.getTime()-86400000):d;const gdBadge=gdDiff?'<span style="font-size:.72rem;padding:2px 7px;border-radius:2px;background:var(--accent2);color:white;font-weight:700">GD '+gdDate.getDate()+'.'+String(gdDate.getMonth()+1).padStart(2,'0')+'</span>':'';
     return'<div class="entry'+(pin?' pinned':'')+'"><div class="entry-date"><div class="entry-day">'+d.getDate()+'</div><div class="entry-month">'+MESI[d.getMonth()]+' '+d.getFullYear()+'</div><div class="entry-time">'+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})+'</div></div><div class="entry-body"><div class="entry-top"><span class="entry-name" onclick="apriProfilo(\''+e.nome.replace(/'/g,"\\'")+'\')">'+esc(e.nome)+'</span><span class="badge '+bc+'">'+escP(e.tipo)+'</span>'+gdBadge+rep+imp+'</div><div class="entry-text">'+esc(e.testo)+'</div>'+(metaLines.length?'<div class="entry-meta">'+metaLines.join(' · ')+'</div>':'')+'</div><div class="entry-actions"><button class="btn-act pin" onclick="togglePin('+e.id+')">'+(pin?'Rimuovi pin':'Fissa')+'</button><button class="btn-act tipo" onclick="apriModal('+e.id+',\''+te+'\')">Tipo</button><button class="btn-act edit" onclick="modificaRegistrazione('+e.id+')">Modifica</button><button class="btn-act del" onclick="elimina('+e.id+')">Elimina</button></div></div>'}).join('');_saveFiltri()}
-function getNomiLista(){return[...new Set([...collaboratoriCache.map(c=>c.nome),...getDatiReparto().map(e=>e.nome)])].filter(Boolean).sort()}
+function getNomiLista(){return[...new Set([...collaboratoriCache.map(c=>c.nome.trim()),...getDatiReparto().map(e=>(e.nome||'').trim())].filter(Boolean).map(n=>n.replace(/\s+/g,' ')))].sort()}
 function aggiornaNomi(){const nomi=getNomiLista();
   const sel=document.getElementById('filt-persona'),cur=sel.value;sel.innerHTML='<option value="">Tutte</option>'+nomi.map(n=>'<option'+(n===cur?' selected':'')+'>'+escP(n)+'</option>').join('')}
 function acFiltra(inputId,dropId){const inp=document.getElementById(inputId),drop=document.getElementById(dropId);if(!inp||!drop)return;
