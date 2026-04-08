@@ -221,7 +221,7 @@ header h1 .casino{display:block;font-size:.82rem;font-family:'Source Sans 3',san
 .modulo-card:hover{border-color:var(--accent2)!important;background:var(--paper2)}
 .modulo-field{margin-bottom:14px}.modulo-field label{display:block;font-weight:700;font-size:.84rem;margin-bottom:4px;color:var(--ink)}
 .modulo-field input,.modulo-field textarea,.modulo-field select{width:100%;padding:10px;font-family:'Source Sans 3',sans-serif;font-size:.95rem;border:1.5px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)}
-.modulo-field textarea{min-height:80px;resize:vertical}
+.modulo-field textarea{min-height:80px;resize:vertical;overflow-y:hidden}
 .btn-ai{background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:3px;padding:4px 12px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:'Source Sans 3',sans-serif;letter-spacing:.02em;transition:opacity .2s;margin-top:4px}
 .btn-ai:hover{opacity:.85}.btn-ai:disabled{opacity:.5;cursor:wait}.btn-ai-wrap{display:flex;justify-content:flex-end}
 .ac-wrap{position:relative}.ac-drop{position:absolute;top:100%;left:0;width:320px;max-height:280px;overflow-y:auto;background:var(--paper);border:1.5px solid var(--accent2);border-top:none;border-radius:0 0 3px 3px;z-index:900;display:none;box-shadow:0 4px 12px rgba(0,0,0,.15)}
@@ -3605,7 +3605,12 @@ function apriModulo(tipo){
   html+='<div class="modulo-field" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)"><label>Modalit\u00E0 firma</label><div style="display:flex;gap:18px;margin-bottom:8px"><label style="display:flex;align-items:center;gap:5px;font-size:.88rem;cursor:pointer"><input type="radio" name="firma-tipo" value="cartacea" checked onchange="toggleFirmaDigitale()"> &#128221; Cartacea (stampa e firma a mano)</label><label style="display:flex;align-items:center;gap:5px;font-size:.88rem;cursor:pointer"><input type="radio" name="firma-tipo" value="digitale" onchange="toggleFirmaDigitale()"> &#9999;&#65039; Digitale (firma sullo schermo)</label></div><div id="firma-digitale-box" style="display:none"><div class="firma-canvas-wrap"><div class="firma-canvas-box"><small>Firma Resp. Settore</small><canvas id="firma-resp-canvas" class="firma-canvas" width="560" height="200"></canvas><button onclick="clearFirma(\'firma-resp-canvas\')">Cancella</button></div><div class="firma-canvas-box"><small>Firma Collaboratore</small><canvas id="firma-collab-canvas" class="firma-canvas" width="560" height="200"></canvas><button onclick="clearFirma(\'firma-collab-canvas\')">Cancella</button></div></div></div></div>';
   html+='<div style="display:flex;gap:12px;margin-top:18px"><button class="btn-salva" onclick="generaModuloPDF(\''+tipo+'\')">Genera PDF</button><button class="btn-modal-cancel" onclick="chiudiModulo()">Annulla</button></div>';
   html+='</div></div>';area.innerHTML=html;
-  area.scrollIntoView({behavior:'smooth'});applicaVisibilita()}
+  area.scrollIntoView({behavior:'smooth'});applicaVisibilita();
+  // Auto-resize textarea in base al contenuto
+  setTimeout(()=>{area.querySelectorAll('textarea').forEach(ta=>{
+    ta.addEventListener('input',function(){this.style.height='auto';this.style.height=Math.max(80,this.scrollHeight)+'px'});
+    // Resize iniziale se ha già contenuto
+    if(ta.value){ta.style.height='auto';ta.style.height=Math.max(80,ta.scrollHeight)+'px'}})},100)}
 function chiudiModulo(){document.getElementById('modulo-form-area').style.display='none';document.getElementById('modulo-form-area').innerHTML='';window._editModuloId=null}
 // FIRMA DIGITALE
 function toggleFirmaDigitale(){const d=document.querySelector('input[name="firma-tipo"][value="digitale"]');const box=document.getElementById('firma-digitale-box');
@@ -3846,7 +3851,9 @@ function apriModuloSalvato(id){const m=moduliCache.find(x=>x.id===id);if(!m)retu
     if(dt.firma_digitale){setTimeout(()=>{const radio=document.querySelector('input[name="firma-tipo"][value="digitale"]');
       if(radio){radio.checked=true;toggleFirmaDigitale();
         setTimeout(()=>{if(dt.firma_resp)loadFirmaToCanvas('firma-resp-canvas',dt.firma_resp);
-          if(dt.firma_collab)loadFirmaToCanvas('firma-collab-canvas',dt.firma_collab)},150)}},100)}},50)}
+          if(dt.firma_collab)loadFirmaToCanvas('firma-collab-canvas',dt.firma_collab)},150)}},100)}
+    // Auto-resize textarea dopo populate
+    setTimeout(()=>{document.querySelectorAll('#modulo-form-area textarea').forEach(ta=>{if(ta.value){ta.style.height='auto';ta.style.height=Math.max(80,ta.scrollHeight)+'px'}})},200)},50)}
 function checkQrHash(){const h=window.location.hash;if(!h.startsWith('#modulo/'))return;const code=h.split('/')[1];
   const mod=moduliCache.find(m=>m.dati&&m.dati.qr_code===code);
   if(mod){switchPage('moduli');setTimeout(()=>apriModuloSalvato(mod.id),300)}else{toast('Modulo non trovato')}
@@ -3945,7 +3952,7 @@ async function miglioraTesto(fieldId,contesto){const el=document.getElementById(
       body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[{role:'user',content:prompt}],temperature:0.3,max_tokens:1000})});
     if(!r.ok)throw new Error('API error '+r.status);
     const data=await r.json();const migliorato=data.choices?.[0]?.message?.content;
-    if(migliorato){el.value=migliorato.trim();toast('Testo migliorato!')}else throw new Error('Nessuna risposta')
+    if(migliorato){el.value=migliorato.trim();el.style.height='auto';el.style.height=Math.max(80,el.scrollHeight)+'px';toast('Testo migliorato!')}else throw new Error('Nessuna risposta')
   }catch(e){console.error(e);toast('Errore AI: verifica la chiave Groq')}
   if(btn){btn.disabled=false;btn.textContent='Migliora testo con AI'}}
 let _moduloFotoB64=null;
@@ -4004,6 +4011,8 @@ async function generaModuloAI(tipo){
       if(parsed.osservazioni){const el=document.getElementById('mod-osservazioni');if(el)el.value=parsed.osservazioni}
     }
     if(status)status.innerHTML='<span style="color:#2c6e49">Campi compilati! Verifica e modifica se necessario.</span>';
+    // Auto-resize textarea dopo AI
+    document.querySelectorAll('#modulo-form-area textarea').forEach(ta=>{if(ta.value){ta.style.height='auto';ta.style.height=Math.max(80,ta.scrollHeight)+'px'}});
     toast('Campi compilati dall\'AI!')
   }catch(e){console.error(e);const msg=e.message||'';if(status)status.innerHTML='<span style="color:#c0392b">'+(msg.includes('API error')?'Errore API: verifica la chiave Groq':msg.includes('non valida')?'Risposta AI non leggibile, riprova':'Errore: '+msg)+'</span>';toast('Errore AI: '+msg)}
   if(btn){btn.disabled=false;btn.textContent='Genera tutti i campi'}}
