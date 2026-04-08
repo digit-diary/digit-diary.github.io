@@ -2134,7 +2134,8 @@ function matchCollaboratore(cognome){cognome=cognome.trim().toLowerCase();if(!co
 async function parseDifferenzeCassa(text,ds,turno){if(!text||!text.trim())return;
   const entries=text.split(/[\n;]/).map(s=>s.trim()).filter(Boolean);
   for(const entry of entries){
-    const parts=entry.split(',').map(s=>s.trim()).filter(Boolean);
+    // Separa per virgola, "e" tra due differenze, o "/"
+    const parts=entry.split(/,|\be\b(?=\s+[A-Za-zÀ-ü])|\/(?=\s*[A-Za-zÀ-ü])/).map(s=>s.trim()).filter(Boolean);
     for(const part of parts){
       // 1. Formato classico: "Cognome +/-importo" o "Cognome importo"
       let m=part.match(/^([A-Za-zÀ-ü\s.'-]+?)\s*([+-])?\s*(\d+(?:[.,]\d{1,2})?)\s*$/);
