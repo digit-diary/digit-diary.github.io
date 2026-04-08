@@ -1344,7 +1344,7 @@ async function _renewToken(){const op=getOperatore();if(!op)return false;
 let _renewingToken=false;
 async function _ensureToken(){if(_renewingToken)return;const tk=getOpToken();if(tk){
   const v=await sbRpc('validate_op_session',{p_token:tk});if(v&&v.valid)return}
-  _renewingToken=true;await _renewToken();_renewingToken=false}
+  _renewingToken=true;try{await _renewToken()}finally{_renewingToken=false}}
 function genCode(){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let r='';for(let i=0;i<8;i++)r+=c[Math.floor(Math.random()*c.length)];return r}
 
 // SUPABASE
@@ -1462,8 +1462,8 @@ async function caricaCestino(){
   const el=document.getElementById('cestino-content');if(!el)return;
   el.innerHTML='<p style="color:var(--muted)">Caricamento...</p>';
   try{
-    const modDel=await secGet('moduli?eliminato=eq.true&order=eliminato_at.desc');
-    const regDel=await secGet('registrazioni?eliminato=eq.true&order=eliminato_at.desc');
+    const modDel=await secGet('moduli?eliminato=eq.true&reparto_dip=eq.'+currentReparto+'&order=eliminato_at.desc');
+    const regDel=await secGet('registrazioni?eliminato=eq.true&reparto_dip=eq.'+currentReparto+'&order=eliminato_at.desc');
     _cestinoModuli=modDel||[];_cestinoReg=regDel||[];
     renderCestino()}catch(e){el.innerHTML='<p style="color:var(--accent)">Errore caricamento cestino</p>'}}
 function renderCestino(){
@@ -2619,8 +2619,7 @@ async function eliminaNotaSmart(id){const n=noteColleghiCache.find(n=>n.id===id)
     if(!confirm('Eliminare dalla tua vista?'))return;
     const mieIds=copie.length?copie.map(x=>x.id):[id];
     try{for(const nid of mieIds){await secPatch('note_colleghi','id=eq.'+nid,{nascosta_mitt:true})}
-      mieIds.forEach(nid=>{const c=noteColleghiCache.find(x=>x.id===nid);if(c)c.nascosta_mitt=true});
-      noteColleghiCache=noteColleghiCache.filter(x=>!mieIds.includes(x.id)||!x.nascosta_mitt);
+      noteColleghiCache=noteColleghiCache.filter(x=>!mieIds.includes(x.id));
       renderNoteCollega();toast('Messaggio eliminato dalla tua vista')}catch(e){toast('Errore')}}}
 async function annullaInvioNota(id){const n=noteColleghiCache.find(n=>n.id===id);if(!n)return;
   const gid=n.gruppo_id;const op=n.da_operatore;
@@ -2632,8 +2631,7 @@ async function annullaInvioNota(id){const n=noteColleghiCache.find(n=>n.id===id)
     if(!confirm('Qualcuno ha già letto questo messaggio. Eliminare solo dalla tua vista?'))return;
     const mieIds=copie.length?copie.map(x=>x.id):[id];
     try{for(const nid of mieIds){await secPatch('note_colleghi','id=eq.'+nid,{nascosta_mitt:true})}
-      mieIds.forEach(nid=>{const c=noteColleghiCache.find(x=>x.id===nid);if(c)c.nascosta_mitt=true});
-      noteColleghiCache=noteColleghiCache.filter(x=>!mieIds.includes(x.id)||!x.nascosta_mitt);
+      noteColleghiCache=noteColleghiCache.filter(x=>!mieIds.includes(x.id));
       renderNoteCollega();toast('Messaggio nascosto per te')}catch(e){toast('Errore')}
   }else{
     // Nessuno ha letto → annulla invio per tutti
