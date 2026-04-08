@@ -542,6 +542,20 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
 .chat-msg-actions{display:none;position:absolute;top:-6px;right:8px;gap:2px}
 .chat-bubble:hover .chat-msg-actions{display:flex}
 .chat-bubble.received:hover .chat-msg-actions{right:auto;left:8px}
+/* REACTION PICKER */
+.reaction-picker{display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:var(--paper);border:1px solid var(--line);border-radius:20px;padding:4px 8px;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:120;white-space:nowrap;margin-bottom:6px}
+.reaction-picker.show{display:flex;gap:2px;align-items:center}
+.reaction-picker button{background:none;border:none;cursor:pointer;font-size:1.2rem;padding:4px 6px;border-radius:50%;transition:background .15s;line-height:1}
+.reaction-picker button:hover{background:rgba(0,0,0,.08)}
+/* REACTION BADGES */
+.chat-reactions{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.reaction-badge{display:inline-flex;align-items:center;gap:3px;background:var(--paper2);border:1px solid var(--line);border-radius:12px;padding:2px 8px;font-size:.75rem;cursor:pointer;transition:background .15s;position:relative}
+.reaction-badge:hover{background:rgba(184,134,11,.12)}
+.reaction-badge.mine{border-color:var(--accent2);background:rgba(184,134,11,.08)}
+.reaction-badge .r-emoji{font-size:.9rem}
+.reaction-badge .r-count{font-weight:600;color:var(--ink);font-size:.72rem}
+.reaction-tooltip{display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--paper);border-radius:4px;padding:4px 8px;font-size:.72rem;white-space:nowrap;margin-bottom:4px;z-index:130;pointer-events:none}
+.reaction-badge:hover .reaction-tooltip{display:block}
 .chat-reply-bar{padding:8px 12px;background:var(--paper2);border-top:1px solid var(--line);display:flex;align-items:center;gap:8px}
 .chat-reply-bar .reply-preview{flex:1;padding:6px 10px;border-left:3px solid var(--accent2);background:var(--paper);border-radius:0 4px 4px 0;font-size:.82rem;color:var(--muted);max-height:40px;overflow:hidden}
 .chat-reply-bar .reply-close{background:none;border:none;cursor:pointer;color:var(--muted);font-size:1.1rem;padding:4px}
@@ -553,13 +567,19 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
 .conv-new-dropdown div{padding:10px 14px;cursor:pointer;font-size:.88rem;border-bottom:1px solid var(--paper2);display:flex;align-items:center;gap:8px}
 .conv-new-dropdown div:hover{background:rgba(184,134,11,0.08)}
 @media(max-width:700px){
-.chat-container{flex-direction:column;height:calc(100dvh - 110px);height:calc(100vh - 160px)}
-.chat-conv-list{width:100%;min-width:100%;border-right:none;border-bottom:1px solid var(--line)}
+.chat-container{flex-direction:column;height:100dvh;height:calc(100vh - 60px);position:relative}
+.chat-conv-list{width:100%;min-width:100%;border-right:none;border-bottom:1px solid var(--line);height:100dvh;height:calc(100vh - 60px)}
 .chat-conv-list.chat-hidden{display:none}
 .chat-area.chat-hidden{display:none}
-.chat-area{height:calc(100dvh - 110px);height:calc(100vh - 160px)}
+.chat-area{height:100dvh;height:calc(100vh - 60px);display:flex;flex-direction:column}
 .chat-back-btn{display:flex!important}
-.chat-bubble{max-width:85%}
+.chat-bubble{max-width:85%;padding:6px 10px}
+.chat-msg-actions{display:flex;opacity:1;position:absolute;top:-6px;right:8px;gap:2px}
+.chat-bubble.received .chat-msg-actions{right:auto;left:8px}
+.reaction-picker{font-size:1rem}
+.reaction-picker button{font-size:1.1rem;padding:4px 5px}
+#note-chat-messages{padding:10px 8px}
+#note-chat-input{padding:8px 10px}
 }
 </style>
 </head>
@@ -3067,20 +3087,34 @@ function renderNoteChat(partner){
     if(isSent)actions+='<button class="btn-act del" style="font-size:.65rem;padding:2px 6px" onclick="event.stopPropagation();eliminaNotaSmart('+n.id+')" title="Elimina">&#128465;</button>';
     else actions+='<button class="btn-act" style="font-size:.65rem;padding:2px 6px;color:var(--muted);border-color:var(--muted)" onclick="event.stopPropagation();eliminaNotaCollega('+n.id+',\'dest\')" title="Elimina per me">&#128465;</button>';
     actions+='<button class="btn-act" style="font-size:.65rem;padding:2px 6px;color:var(--accent2);border-color:var(--accent2)" onclick="event.stopPropagation();rispondiAMessaggio('+n.id+')" title="Rispondi">&#8617;</button>';
+    actions+='<button class="btn-act" style="font-size:.65rem;padding:2px 6px;color:var(--muted);border-color:var(--muted)" onclick="event.stopPropagation();inoltraMessaggio('+n.id+')" title="Inoltra">&#10132;</button>';
     actions+='</div>';
     // Parse reply quote
     let msgText=(n.messaggio||'').replace(/\[GNAME:[^\]]*\]/g,'');let quoteHtml='';
     const replyMatch=msgText.match(/^\[REPLY:(\d+):([^:]*):([^\]]*)\]/);
     if(replyMatch){msgText=msgText.substring(replyMatch[0].length);quoteHtml='<div class="chat-quote" onclick="scrollToNote('+replyMatch[1]+')"><div class="quote-name">'+escP(replyMatch[2])+'</div><div>'+escP(replyMatch[3].substring(0,80))+'</div></div>'}
-    html+='<div class="chat-bubble '+cls+'" id="note-bubble-'+n.id+'" style="position:relative">';
+    // Render reactions
+    let reactionsHtml=renderReazioni(n);
+    html+='<div class="chat-bubble '+cls+'" id="note-bubble-'+n.id+'" style="position:relative" ontouchstart="_reactionTouchStart(event,'+n.id+')" ontouchend="_reactionTouchEnd('+n.id+')" ontouchmove="_reactionTouchCancel('+n.id+')">';
+    html+='<div class="reaction-picker" id="reaction-picker-'+n.id+'">'+_REACTION_EMOJIS.map(e=>'<button onclick="event.stopPropagation();toggleReazione('+n.id+',\''+e+'\')">'+e+'</button>').join('')+'</div>';
     html+=senderLabel+destLabel+quoteHtml;
     html+='<div>'+esc(msgText)+'</div>';
     html+='<div class="chat-time">'+time+' '+ticks+'</div>';
+    html+=reactionsHtml;
     html+=actions;
     html+='</div>'});
   msgsEl.innerHTML=html;
   // Auto-scroll to bottom (con delay per rendering DOM)
-  requestAnimationFrame(()=>{msgsEl.scrollTop=msgsEl.scrollHeight})}
+  requestAnimationFrame(()=>{msgsEl.scrollTop=msgsEl.scrollHeight});
+  // Desktop hover per reaction picker: doppio click
+  if(window.innerWidth>700){
+    msgsEl.querySelectorAll('.chat-bubble').forEach(bubble=>{
+      bubble.addEventListener('dblclick',function(e){
+        if(e.target.closest('.chat-msg-actions')||e.target.closest('.reaction-badge')||e.target.closest('.reaction-picker'))return;
+        _closeAllReactionPickers();
+        const picker=bubble.querySelector('.reaction-picker');
+        if(picker)picker.classList.add('show');
+        e.preventDefault()})})}}
 // Reply state
 let _replyToNote=null;
 function rispondiAMessaggio(noteId){
@@ -3097,6 +3131,103 @@ function rispondiAMessaggio(noteId){
   document.getElementById('nota-msg-chat').focus()}
 function annullaRispondi(){_replyToNote=null;const bar=document.getElementById('note-chat-reply-bar');if(bar)bar.style.display='none'}
 function scrollToNote(noteId){const el=document.getElementById('note-bubble-'+noteId);if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.style.background='rgba(184,134,11,0.15)';setTimeout(()=>el.style.background='',1500)}}
+// ===== EMOJI REACTIONS =====
+const _REACTION_EMOJIS=['👍','✅','❤️','😂','😮','🙏'];
+let _reactionTimers={};
+function _reactionTouchStart(e,noteId){
+  if(e.target.closest('.chat-msg-actions')||e.target.closest('.reaction-badge')||e.target.closest('.reaction-picker'))return;
+  _reactionTimers[noteId]=setTimeout(()=>{_closeAllReactionPickers();const picker=document.getElementById('reaction-picker-'+noteId);if(picker)picker.classList.add('show');_reactionTimers[noteId]=null},500)}
+function _reactionTouchEnd(noteId){if(_reactionTimers[noteId]){clearTimeout(_reactionTimers[noteId]);_reactionTimers[noteId]=null}}
+function _reactionTouchCancel(noteId){if(_reactionTimers[noteId]){clearTimeout(_reactionTimers[noteId]);_reactionTimers[noteId]=null}}
+function _closeAllReactionPickers(){document.querySelectorAll('.reaction-picker.show').forEach(p=>p.classList.remove('show'))}
+document.addEventListener('click',function(e){if(!e.target.closest('.reaction-picker')&&!e.target.closest('.reaction-badge'))_closeAllReactionPickers()});
+async function toggleReazione(noteId,emoji){
+  const op=getOperatore();if(!op)return;
+  const n=noteColleghiCache.find(x=>x.id===noteId);if(!n)return;
+  let reazioni=n.reazioni||{};
+  if(typeof reazioni==='string'){try{reazioni=JSON.parse(reazioni)}catch(e){reazioni={}}}
+  reazioni={...reazioni};
+  if(!reazioni[emoji])reazioni[emoji]=[];
+  else reazioni[emoji]=[...reazioni[emoji]];
+  const idx=reazioni[emoji].indexOf(op);
+  if(idx>=0)reazioni[emoji].splice(idx,1);
+  else reazioni[emoji].push(op);
+  if(reazioni[emoji].length===0)delete reazioni[emoji];
+  n.reazioni=reazioni;
+  _closeAllReactionPickers();
+  // Update UI immediately
+  const bubbleEl=document.getElementById('note-bubble-'+noteId);
+  if(bubbleEl){const oldR=bubbleEl.querySelector('.chat-reactions');const newR=document.createElement('div');newR.innerHTML=renderReazioni(n);const newEl=newR.firstChild;if(oldR&&newEl)oldR.replaceWith(newEl);else if(oldR&&!newEl)oldR.remove();else if(!oldR&&newEl){const timeEl=bubbleEl.querySelector('.chat-time');if(timeEl)timeEl.after(newEl)}}
+  // Save to DB
+  try{await secPatch('note_colleghi','id=eq.'+noteId,{reazioni:JSON.stringify(reazioni)})}catch(e){console.warn('Errore salvataggio reazione:',e)}}
+function renderReazioni(note){
+  let reazioni=note.reazioni||{};
+  if(typeof reazioni==='string'){try{reazioni=JSON.parse(reazioni)}catch(e){reazioni={}}}
+  const keys=Object.keys(reazioni).filter(k=>reazioni[k]&&reazioni[k].length>0);
+  if(!keys.length)return'';
+  const op=getOperatore();
+  let html='<div class="chat-reactions">';
+  keys.forEach(emoji=>{
+    const nomi=reazioni[emoji];
+    const isMine=nomi.includes(op);
+    const tooltipText=nomi.join(', ');
+    html+='<span class="reaction-badge'+(isMine?' mine':'')+'" onclick="event.stopPropagation();toggleReazione('+note.id+',\''+emoji+'\')">';
+    html+='<span class="reaction-tooltip">'+escP(tooltipText)+'</span>';
+    html+='<span class="r-emoji">'+emoji+'</span>';
+    if(nomi.length>1)html+='<span class="r-count">'+nomi.length+'</span>';
+    html+='</span>'});
+  html+='</div>';return html}
+// ===== MESSAGE FORWARDING =====
+function inoltraMessaggio(noteId){
+  const n=noteColleghiCache.find(x=>x.id===noteId);if(!n)return;
+  const op=getOperatore();
+  // Get clean message text
+  let msgText=(n.messaggio||'').replace(/\[GNAME:[^\]]*\]/g,'').replace(/\[REPLY:\d+:[^:]*:[^\]]*\]/g,'').trim();
+  // Build modal with conversation list
+  const mc=document.getElementById('pwd-modal-content');
+  let html='<h3>Inoltra messaggio</h3>';
+  html+='<p style="color:var(--muted);font-size:.84rem;margin-bottom:4px">Messaggio:</p>';
+  html+='<div style="background:var(--paper2);border-left:3px solid var(--accent2);padding:8px 12px;border-radius:0 4px 4px 0;font-size:.85rem;margin-bottom:14px;max-height:80px;overflow:hidden;color:var(--ink)">'+escP(msgText.substring(0,200))+(msgText.length>200?'...':'')+'</div>';
+  html+='<p style="color:var(--muted);font-size:.84rem;margin-bottom:8px">Inoltra a:</p>';
+  html+='<div style="max-height:280px;overflow-y:auto">';
+  // Groups
+  html+='<div onclick="_eseguiInoltro('+noteId+',\'gruppo:__gruppo_tutti\')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--line);font-weight:600" onmouseenter="this.style.background=\'rgba(184,134,11,.08)\'" onmouseleave="this.style.background=\'\'">Tutti</div>';
+  html+='<div onclick="_eseguiInoltro('+noteId+',\'gruppo:__gruppo_slots\')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--line);font-weight:600;color:#1a4a7a" onmouseenter="this.style.background=\'rgba(184,134,11,.08)\'" onmouseleave="this.style.background=\'\'">Tutti Slots</div>';
+  html+='<div onclick="_eseguiInoltro('+noteId+',\'gruppo:__gruppo_tavoli\')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--line);font-weight:600;color:#8e44ad" onmouseenter="this.style.background=\'rgba(184,134,11,.08)\'" onmouseleave="this.style.background=\'\'">Tutti Tavoli</div>';
+  html+='<div style="height:1px;background:var(--line)"></div>';
+  // Individual operators
+  const tutti=operatoriAuthCache.map(o=>o.nome).sort().filter(x=>x&&x!==op);
+  tutti.forEach(nome=>{
+    const rep=operatoriRepartoMap[nome]||'entrambi';
+    const badge=rep==='slots'?' <span style="font-size:.65rem;color:#1a4a7a;font-weight:700">S</span>':rep==='tavoli'?' <span style="font-size:.65rem;color:#8e44ad;font-weight:700">T</span>':'';
+    html+='<div onclick="_eseguiInoltro('+noteId+',\''+escP(nome).replace(/'/g,"\\'")+'\',true)" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--line);font-size:.88rem" onmouseenter="this.style.background=\'rgba(184,134,11,.08)\'" onmouseleave="this.style.background=\'\'">'+escP(nome)+badge+'</div>'});
+  html+='</div>';
+  html+='<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button></div>';
+  mc.innerHTML=html;document.getElementById('pwd-modal').classList.remove('hidden')}
+async function _eseguiInoltro(noteId,destKey,isSingle){
+  const n=noteColleghiCache.find(x=>x.id===noteId);if(!n)return;
+  const op=getOperatore();
+  let msgText=(n.messaggio||'').replace(/\[GNAME:[^\]]*\]/g,'').replace(/\[REPLY:\d+:[^:]*:[^\]]*\]/g,'').trim();
+  const fwdMsg='Inoltrato da '+_nomeBreve(n.da_operatore)+':\n'+msgText;
+  const msgEnc=await encryptNota(fwdMsg);
+  let dests=[];let gid=null;
+  if(isSingle){dests=[destKey]}
+  else{
+    const gidKey=destKey.replace('gruppo:','');
+    gid=gidKey;
+    if(gidKey==='__gruppo_tutti')dests=operatoriAuthCache.map(o=>o.nome).filter(x=>x&&x!==op);
+    else if(gidKey==='__gruppo_slots')dests=operatoriAuthCache.map(o=>o.nome).filter(x=>{if(!x||x===op)return false;const r=operatoriRepartoMap[x]||'entrambi';return r==='slots'||r==='entrambi'});
+    else if(gidKey==='__gruppo_tavoli')dests=operatoriAuthCache.map(o=>o.nome).filter(x=>{if(!x||x===op)return false;const r=operatoriRepartoMap[x]||'entrambi';return r==='tavoli'||r==='entrambi'});
+    else{// Custom group
+      const allGruppo=noteColleghiCache.filter(x=>x.gruppo_id===gidKey);
+      const ps=new Set();allGruppo.forEach(nn=>{if(nn.a_operatore!==op)ps.add(nn.a_operatore);if(nn.da_operatore!==op)ps.add(nn.da_operatore)});
+      dests=[...ps]}}
+  if(!dests.length){toast('Nessun destinatario');return}
+  if(!gid&&dests.length>1)gid=crypto.randomUUID();
+  try{for(const dest of dests){const r=await secPost('note_colleghi',{da_operatore:op,a_operatore:dest,messaggio:msgEnc,gruppo_id:gid});r[0].messaggio=fwdMsg;r[0]._decrypted=true;noteColleghiCache.unshift(r[0])}
+  document.getElementById('pwd-modal').classList.add('hidden');
+  renderNoteCollega();toast('Messaggio inoltrato');
+  inviaPush(dests,'Nota da '+op,'[Inoltrato] '+msgText.substring(0,100),'nota',true)}catch(e){toast('Errore inoltro: '+e.message)}}
 async function inviaNotaChat(){
   const ta=document.getElementById('nota-msg-chat');if(!ta)return;
   let msg=ta.value.trim();if(!msg){toast('Scrivi un messaggio');return}
