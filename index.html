@@ -2120,6 +2120,8 @@ function matchCollaboratore(cognome){cognome=cognome.trim().toLowerCase();if(!co
   const exact=collaboratoriCache.find(c=>c.nome.toLowerCase()===cognome);if(exact)return exact.nome;
   // 2. Match cognome o nome singolo esatto
   for(const c of collaboratoriCache){const words=c.nome.toLowerCase().split(/\s+/);if(words.some(w=>w===cognome))return c.nome}
+  // 2b. Match cognome multi-parola (es. "de lima" → "De Lima Marco")
+  if(cognome.includes(' ')){for(const c of collaboratoriCache){if(c.nome.toLowerCase().startsWith(cognome+' ')||c.nome.toLowerCase()===cognome)return c.nome}}
   // 3. Match prefisso (min 3 caratteri)
   for(const c of collaboratoriCache){const words=c.nome.toLowerCase().split(/\s+/);if(words.some(w=>w.startsWith(cognome)&&cognome.length>=3))return c.nome}
   // 4. Match fuzzy (Levenshtein ≤ 2) per errori di battitura
