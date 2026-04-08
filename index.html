@@ -1281,7 +1281,12 @@ function _getSbClient(){if(_sbClient)return _sbClient;if(typeof supabase!=='unde
 function _initNoteRealtime(){if(_noteChannel)return;const sb=_getSbClient();if(!sb){console.warn('Supabase client non disponibile, fallback a polling');setInterval(pollNuoveNote,15000);return}
   _noteChannel=sb.channel('note-colleghi-changes').on('postgres_changes',{event:'*',schema:'public',table:'note_colleghi'},async function(payload){
     const op=getOperatore();if(!op)return;
-    if(payload.eventType==='INSERT'){const n=payload.new;if(n.a_operatore===op||n.da_operatore===op){if(n.messaggio&&n.messaggio.startsWith('ENC:'))n.messaggio=await decryptNota(n.messaggio);n._decrypted=true;noteColleghiCache.unshift(n);aggiornaNoteBadge();const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();if(n.a_operatore===op&&!n.letta){mostraNotifBanner('nota','Nota da '+n.da_operatore,n.messaggio.substring(0,80),()=>switchPage('note-collega'));inviaNotifica('Nota da '+n.da_operatore,n.messaggio.substring(0,80))}}}
+    if(payload.eventType==='INSERT'){const n=payload.new;if(n.a_operatore===op||n.da_operatore===op){
+      // Evita duplicati nella cache
+      if(noteColleghiCache.find(x=>x.id===n.id))return;
+      if(n.messaggio&&n.messaggio.startsWith('ENC:'))n.messaggio=await decryptNota(n.messaggio);n._decrypted=true;noteColleghiCache.unshift(n);aggiornaNoteBadge();const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();
+      // Notifica solo per messaggi ricevuti (non per le copie dei propri messaggi inviati)
+      if(n.a_operatore===op&&n.da_operatore!==op&&!n.letta){mostraNotifBanner('nota','Nota da '+n.da_operatore,n.messaggio.substring(0,80).replace(/\[GNAME:[^\]]*\]/g,'').replace(/\[REPLY:[^\]]*\]/g,''),()=>switchPage('note-collega'));inviaNotifica('Nota da '+n.da_operatore,n.messaggio.substring(0,80).replace(/\[GNAME:[^\]]*\]/g,'').replace(/\[REPLY:[^\]]*\]/g,''))}}}
     else if(payload.eventType==='UPDATE'){const n=payload.new;const op=getOperatore();
       // Se la nota è stata nascosta per questo operatore, rimuovila dalla cache
       if((n.a_operatore===op&&n.nascosta_dest)||(n.da_operatore===op&&n.nascosta_mitt)){noteColleghiCache=noteColleghiCache.filter(x=>x.id!==n.id);aggiornaNoteBadge();const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();return}
