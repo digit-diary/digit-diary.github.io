@@ -2176,7 +2176,7 @@ async function parseDifferenzeCassa(text,ds,turno){if(!text||!text.trim())return
     }}render();updateStats()}
 function checkCassaAlerts(){
   const alerts=[];const tipoErr=nomeCorrente('Errore');
-  const errori=getDatiReparto().filter(e=>e.tipo===tipoErr&&e.reparto==='Cassa'&&(parseFloat(e.importo)||0)>0);
+  const errori=getDatiReparto().filter(e=>e.tipo===tipoErr&&(e.reparto==='Cassa'||(e.testo||'').toLowerCase().includes('differenza cassa'))&&(parseFloat(e.importo)||0)>0);
   const byNome={};errori.forEach(e=>{const k=e.nome.toLowerCase();if(!byNome[k])byNome[k]={nome:e.nome,errs:[]};byNome[k].errs.push(e)});
   Object.values(byNome).forEach(({nome,errs})=>{
     const lastAllin=getModuliReparto().filter(m=>m.tipo==='allineamento'&&m.collaboratore.toLowerCase()===nome.toLowerCase()).sort((a,b)=>(b.created_at||b.data_modulo||'').localeCompare(a.created_at||a.data_modulo||''))[0];
