@@ -1242,6 +1242,12 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
     <div id="db-stats-content" style="padding:12px 0"><button class="btn-salva" onclick="caricaDbStats()" style="background:var(--ink);font-size:.82rem;padding:8px 20px">Verifica stato</button></div></div>
   <div class="settings-section" id="cestino-section" style="display:none"><h4>&#128465; Cestino</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Elementi eliminati. Puoi ripristinarli o svuotare il cestino.</p>
     <button class="btn-salva" onclick="caricaCestino()" style="background:var(--ink);font-size:.82rem;padding:8px 20px;margin-bottom:12px">Carica cestino</button>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
+      <select id="cestino-filt-tipo" onchange="renderCestino()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.84rem;background:var(--paper);color:var(--ink)"><option value="">Tutti i tipi</option><option value="registrazioni">Registrazioni</option><option value="moduli">Moduli</option></select>
+      <input type="text" id="cestino-filt-nome" placeholder="Cerca nome..." oninput="renderCestino()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.84rem;background:var(--paper);color:var(--ink);width:160px">
+      <input type="text" id="cestino-filt-chi" placeholder="Eliminato da..." oninput="renderCestino()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.84rem;background:var(--paper);color:var(--ink);width:140px">
+      <button class="btn-reset" onclick="document.getElementById('cestino-filt-tipo').value='';document.getElementById('cestino-filt-nome').value='';document.getElementById('cestino-filt-chi').value='';renderCestino()" style="padding:6px 14px;font-size:.82rem">Reset</button>
+    </div>
     <div id="cestino-content"></div></div>
 </div>
 
@@ -1437,20 +1443,29 @@ async function caricaCestino(){
     renderCestino()}catch(e){el.innerHTML='<p style="color:var(--accent)">Errore caricamento cestino</p>'}}
 function renderCestino(){
   const el=document.getElementById('cestino-content');if(!el)return;
-  if(!_cestinoModuli.length&&!_cestinoReg.length){el.innerHTML='<p style="color:#2c6e49;font-weight:600">Cestino vuoto</p>';return}
+  const ft=(document.getElementById('cestino-filt-tipo')||{}).value||'';
+  const fn=(document.getElementById('cestino-filt-nome')||{}).value||'';
+  const fc=(document.getElementById('cestino-filt-chi')||{}).value||'';
+  const fnl=fn.toLowerCase(),fcl=fc.toLowerCase();
+  let filtReg=_cestinoReg;let filtMod=_cestinoModuli;
+  if(ft==='registrazioni')filtMod=[];
+  if(ft==='moduli')filtReg=[];
+  if(fn){filtReg=filtReg.filter(r=>(r.nome||'').toLowerCase().includes(fnl)||(r.testo||'').toLowerCase().includes(fnl));filtMod=filtMod.filter(m=>(m.collaboratore||'').toLowerCase().includes(fnl))}
+  if(fc){filtReg=filtReg.filter(r=>(r.eliminato_da||'').toLowerCase().includes(fcl));filtMod=filtMod.filter(m=>(m.eliminato_da||'').toLowerCase().includes(fcl))}
+  if(!filtMod.length&&!filtReg.length){el.innerHTML='<p style="color:#2c6e49;font-weight:600">'+((_cestinoModuli.length||_cestinoReg.length)?'Nessun risultato con i filtri applicati':'Cestino vuoto')+'</p>';return}
   let html='';
-  if(_cestinoReg.length){
-    html+='<h5 style="margin:12px 0 8px;color:var(--ink)">Registrazioni ('+_cestinoReg.length+')</h5>';
+  if(filtReg.length){
+    html+='<h5 style="margin:12px 0 8px;color:var(--ink)">Registrazioni ('+filtReg.length+')</h5>';
     html+='<div style="max-height:300px;overflow-y:auto">';
-    _cestinoReg.forEach(r=>{
+    filtReg.forEach(r=>{
       const d=r.data?new Date(r.data).toLocaleDateString('it-IT'):'';
       const delAt=r.eliminato_at?new Date(r.eliminato_at).toLocaleDateString('it-IT')+' '+new Date(r.eliminato_at).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}):'';
       html+='<div style="padding:8px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:.85rem"><div style="flex:1"><strong>'+escP(r.nome||'')+'</strong> — <span style="color:var(--muted)">'+escP(r.tipo||'')+'</span> — '+d+'<div style="font-size:.75rem;color:var(--muted)">'+escP((r.testo||'').substring(0,60))+'</div><div style="font-size:.72rem;color:var(--accent)">Eliminato da '+escP(r.eliminato_da||'')+' il '+delAt+'</div></div><button class="btn-salva" style="font-size:.75rem;padding:4px 10px;background:#2c6e49" onclick="ripristinaCestino(\'registrazioni\','+r.id+')">Ripristina</button><button class="btn-salva" style="font-size:.75rem;padding:4px 10px;background:var(--accent)" onclick="eliminaDefinitivo(\'registrazioni\','+r.id+')">Elimina</button></div>'});
     html+='</div>'}
-  if(_cestinoModuli.length){
-    html+='<h5 style="margin:12px 0 8px;color:var(--ink)">Moduli ('+_cestinoModuli.length+')</h5>';
+  if(filtMod.length){
+    html+='<h5 style="margin:12px 0 8px;color:var(--ink)">Moduli ('+filtMod.length+')</h5>';
     html+='<div style="max-height:300px;overflow-y:auto">';
-    _cestinoModuli.forEach(m=>{
+    filtMod.forEach(m=>{
       const delAt=m.eliminato_at?new Date(m.eliminato_at).toLocaleDateString('it-IT')+' '+new Date(m.eliminato_at).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}):'';
       html+='<div style="padding:8px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:.85rem"><div style="flex:1"><strong>'+escP(m.collaboratore||'')+'</strong> — <span style="color:var(--muted)">'+escP(m.tipo||'')+'</span> — '+escP(m.data_modulo||'')+'<div style="font-size:.72rem;color:var(--accent)">Eliminato da '+escP(m.eliminato_da||'')+' il '+delAt+'</div></div><button class="btn-salva" style="font-size:.75rem;padding:4px 10px;background:#2c6e49" onclick="ripristinaCestino(\'moduli\','+m.id+')">Ripristina</button><button class="btn-salva" style="font-size:.75rem;padding:4px 10px;background:var(--accent)" onclick="eliminaDefinitivo(\'moduli\','+m.id+')">Elimina</button></div>'});
     html+='</div>'}
