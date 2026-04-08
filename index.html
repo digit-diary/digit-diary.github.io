@@ -1459,8 +1459,8 @@ function renderCestino(){
 async function ripristinaCestino(tabella,id){
   if(!confirm('Ripristinare questo elemento?'))return;
   try{await secPatch(tabella,'id=eq.'+id,{eliminato:false,eliminato_da:null,eliminato_at:null});
-    if(tabella==='moduli'){const m=_cestinoModuli.find(x=>x.id===id);if(m){m.eliminato=false;moduliCache.push(m);_cestinoModuli=_cestinoModuli.filter(x=>x.id!==id)}}
-    else{const r=_cestinoReg.find(x=>x.id===id);if(r){r.eliminato=false;datiCache.unshift(r);_cestinoReg=_cestinoReg.filter(x=>x.id!==id)}}
+    if(tabella==='moduli'){const m=_cestinoModuli.find(x=>x.id===id);if(m){m.eliminato=false;m.eliminato_da=null;m.eliminato_at=null;moduliCache.push(m);_cestinoModuli=_cestinoModuli.filter(x=>x.id!==id)}}
+    else{const r=_cestinoReg.find(x=>x.id===id);if(r){r.eliminato=false;r.eliminato_da=null;r.eliminato_at=null;datiCache.unshift(r);_cestinoReg=_cestinoReg.filter(x=>x.id!==id)}}
     logAzione('Ripristinato da cestino',tabella+' ID '+id);
     renderCestino();aggiornaNomi();render();updateStats();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();aggiornaModuliLista();
     toast('Ripristinato!')}catch(e){toast('Errore ripristino')}}
@@ -2557,7 +2557,8 @@ function modificaNotaCollega(id){const n=noteColleghiCache.find(n=>n.id===id);if
   document.getElementById('pwd-modal').classList.remove('hidden')}
 async function salvaModificaNota(id){const msg=document.getElementById('edit-nota-msg').value.trim();if(!msg){toast('Scrivi un messaggio');return}
   const n=noteColleghiCache.find(n=>n.id===id);const gid=n?n.gruppo_id:null;
-  const ids=gid?noteColleghiCache.filter(x=>x.gruppo_id===gid&&x.da_operatore===n.da_operatore).map(x=>x.id):[id];
+  const _nTimeM=new Date(n.created_at||0).getTime();
+  const ids=gid?noteColleghiCache.filter(x=>x.gruppo_id===gid&&x.da_operatore===n.da_operatore&&(x.messaggio||'')===(n.messaggio||'')&&Math.abs(new Date(x.created_at||0).getTime()-_nTimeM)<10000).map(x=>x.id):[id];
   const msgEnc=await encryptNota(msg);
   try{for(const nid of ids){await secPatch('note_colleghi','id=eq.'+nid,{messaggio:msgEnc});const c=noteColleghiCache.find(x=>x.id===nid);if(c){c.messaggio=msg;c._decrypted=true}}
   document.getElementById('pwd-modal').classList.add('hidden');renderNoteCollega();toast('Nota modificata')}catch(e){toast('Errore modifica nota')}}
