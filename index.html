@@ -581,6 +581,19 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
 #note-chat-messages{padding:10px 8px}
 #note-chat-input{padding:8px 10px}
 }
+/* STAR & URGENT MESSAGES */
+.chat-bubble.importante{border-left:3px solid #d4a017}
+.chat-bubble.urgente{border-left:3px solid var(--accent);background:rgba(192,57,43,.06)}
+.chat-bubble.sent.urgente{background:rgba(192,57,43,.12)}
+.chat-bubble.importante.urgente{border-left:3px solid var(--accent)}
+.chat-star-icon{cursor:pointer;font-size:.85rem;margin-right:2px;vertical-align:middle;opacity:.8;transition:opacity .15s}
+.chat-star-icon:hover{opacity:1}
+.urgente-label{font-size:.7rem;font-weight:700;color:var(--accent);letter-spacing:.06em;margin-bottom:2px}
+.btn-urgent-toggle{background:none;border:1px solid var(--line);border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;color:var(--muted);transition:all .15s}
+.btn-urgent-toggle.active{background:var(--accent);color:white;border-color:var(--accent)}
+.notif-banner.urgente{background:#c0392b}
+.btn-star-filter{background:none;border:1px solid var(--line);border-radius:12px;padding:3px 10px;font-size:.78rem;cursor:pointer;color:var(--muted);transition:all .15s;white-space:nowrap}
+.btn-star-filter.active{background:rgba(212,160,23,.15);border-color:var(--accent2);color:var(--accent2);font-weight:600}
 </style>
 </head>
 <body>
@@ -771,6 +784,9 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
         <button onclick="cercaInChatNav(1)" style="background:none;border:1px solid var(--line);border-radius:50%;width:28px;height:28px;cursor:pointer;color:var(--ink);font-size:.85rem" title="Successivo">&#9660;</button>
         <button onclick="chiudiCercaChat()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:1.1rem" title="Chiudi">&#10005;</button>
       </div>
+      <div id="note-chat-star-filter" style="display:none;padding:4px 16px;border-bottom:1px solid var(--line);background:var(--paper2)">
+        <button class="btn-star-filter" onclick="toggleStarFilter()">&#9733; Solo importanti</button>
+      </div>
       <div id="note-chat-messages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px"></div>
       <div id="note-chat-reply-bar" class="chat-reply-bar" style="display:none">
         <div class="reply-preview"><span id="reply-preview-name" style="font-weight:600;color:var(--accent2)"></span><br><span id="reply-preview-text"></span></div>
@@ -778,6 +794,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
       </div>
       <div id="note-chat-input" style="padding:12px 16px;border-top:1px solid var(--line);display:none;gap:8px;align-items:flex-end">
         <textarea id="nota-msg-chat" placeholder="Scrivi un messaggio..." style="flex:1;padding:10px;border:1px solid var(--line);border-radius:18px;font-family:Source Sans 3,sans-serif;font-size:.9rem;resize:none;max-height:100px;min-height:40px;background:var(--paper2);color:var(--ink)" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();inviaNotaChat()}" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"></textarea>
+        <button id="btn-urgent-mode" class="btn-urgent-toggle" onclick="toggleUrgentMode()" title="Urgente">&#10071;</button>
         <button onclick="inviaNotaChat()" style="padding:10px 16px;background:var(--accent2);color:white;border:none;border-radius:50%;cursor:pointer;font-size:1.1rem;width:42px;height:42px;display:flex;align-items:center;justify-content:center" title="Invia">&#10148;</button>
       </div>
     </div>
@@ -1306,7 +1323,7 @@ function _initNoteRealtime(){if(_noteChannel)return;const sb=_getSbClient();if(!
       if(noteColleghiCache.find(x=>x.id===n.id))return;
       if(n.messaggio&&n.messaggio.startsWith('ENC:'))n.messaggio=await decryptNota(n.messaggio);n._decrypted=true;noteColleghiCache.unshift(n);aggiornaNoteBadge();const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();
       // Notifica solo per messaggi ricevuti (non per le copie dei propri messaggi inviati)
-      if(n.a_operatore===op&&n.da_operatore!==op&&!n.letta){mostraNotifBanner('nota','Nota da '+n.da_operatore,n.messaggio.substring(0,80).replace(/\[GNAME:[^\]]*\]/g,'').replace(/\[REPLY:[^\]]*\]/g,''),()=>switchPage('note-collega'));inviaNotifica('Nota da '+n.da_operatore,n.messaggio.substring(0,80).replace(/\[GNAME:[^\]]*\]/g,'').replace(/\[REPLY:[^\]]*\]/g,''))}}}
+      if(n.a_operatore===op&&n.da_operatore!==op&&!n.letta){const _cleanMsg=n.messaggio.substring(0,80).replace(/\[GNAME:[^\]]*\]/g,'').replace(/\[REPLY:[^\]]*\]/g,'');if(n.urgente){mostraNotifBanner('urgente','\u26A0\uFE0F URGENTE da '+n.da_operatore,_cleanMsg,()=>switchPage('note-collega'));inviaNotifica('\u26A0\uFE0F URGENTE da '+n.da_operatore,_cleanMsg)}else{mostraNotifBanner('nota','Nota da '+n.da_operatore,_cleanMsg,()=>switchPage('note-collega'));inviaNotifica('Nota da '+n.da_operatore,_cleanMsg)}}}}
     else if(payload.eventType==='UPDATE'){const n=payload.new;const op=getOperatore();
       // Se la nota è stata nascosta per questo operatore, rimuovila dalla cache
       if((n.a_operatore===op&&n.nascosta_dest)||(n.da_operatore===op&&n.nascosta_mitt)){noteColleghiCache=noteColleghiCache.filter(x=>x.id!==n.id);aggiornaNoteBadge();const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();return}
@@ -2474,15 +2491,47 @@ document.getElementById('ricerca-globale').addEventListener('keydown',function(e
 
 // RIEPILOGO MENSILE PDF
 async function generaRiepilogoMensile(){
+  // Show selection dialog before generating
+  const mc=document.getElementById('pwd-modal-content');
+  const now=new Date();
+  let _rmMese=now.getMonth(),_rmAnno=now.getFullYear();
+  // Build month selector options
+  let meseOpts='';MESI_FULL.forEach((m,i)=>{meseOpts+='<option value="'+i+'"'+(i===_rmMese?' selected':'')+'>'+m+'</option>'});
+  let annoOpts='';for(let a=_rmAnno;a>=_rmAnno-3;a--)annoOpts+='<option value="'+a+'"'+(a===_rmAnno?' selected':'')+'>'+a+'</option>';
+  let html='<h3>Riepilogo Mensile PDF</h3>';
+  html+='<p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Seleziona mese e sezioni da includere</p>';
+  html+='<div style="display:flex;gap:10px;margin-bottom:14px"><select id="rm-mese" style="flex:1;padding:8px;border:1px solid var(--line);border-radius:2px;font-family:Source Sans 3,sans-serif;font-size:.9rem">'+meseOpts+'</select>';
+  html+='<select id="rm-anno" style="flex:1;padding:8px;border:1px solid var(--line);border-radius:2px;font-family:Source Sans 3,sans-serif;font-size:.9rem">'+annoOpts+'</select></div>';
+  html+='<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">';
+  const _sez=[
+    ['registrazioni','Registrazioni (errori, malattie, ammonimenti, ecc.)'],
+    ['differenze','Differenze cassa'],
+    ['moduli','Moduli (allineamenti, RDI, apprezzamenti)'],
+    ['maison','Costi Maison'],
+    ['spese','Spese Extra'],
+    ['inventario','Inventario movimenti'],
+    ['statistiche','Statistiche riepilogative']
+  ];
+  _sez.forEach(([k,l])=>{html+='<label style="display:flex;align-items:center;gap:8px;font-size:.88rem;cursor:pointer"><input type="checkbox" id="rm-sez-'+k+'" checked style="width:16px;height:16px;accent-color:var(--accent2)"> '+l+'</label>'});
+  html+='</div>';
+  html+='<div style="display:flex;gap:8px;margin-bottom:8px"><button style="flex:1;padding:6px;font-size:.78rem;cursor:pointer;border:1px solid var(--line);border-radius:2px;background:var(--paper2);font-family:Source Sans 3,sans-serif" onclick="document.querySelectorAll(\'[id^=rm-sez-]\').forEach(c=>c.checked=true)">Seleziona tutti</button><button style="flex:1;padding:6px;font-size:.78rem;cursor:pointer;border:1px solid var(--line);border-radius:2px;background:var(--paper2);font-family:Source Sans 3,sans-serif" onclick="document.querySelectorAll(\'[id^=rm-sez-]\').forEach(c=>c.checked=false)">Deseleziona tutti</button></div>';
+  html+='<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="_eseguiRiepilogoMensile()">Genera PDF</button></div>';
+  mc.innerHTML=html;document.getElementById('pwd-modal').classList.remove('hidden')}
+async function _eseguiRiepilogoMensile(){
+  document.getElementById('pwd-modal').classList.add('hidden');
   if(!window.jspdf){toast('Caricamento PDF...');if(!await caricaJsPDF()){toast('Errore caricamento libreria PDF');return}}
-  const now=new Date();const mese=now.getMonth(),anno=now.getFullYear();
+  const mese=parseInt(document.getElementById('rm-mese').value);
+  const anno=parseInt(document.getElementById('rm-anno').value);
+  const sez={};document.querySelectorAll('[id^=rm-sez-]').forEach(c=>{sez[c.id.replace('rm-sez-','')]=c.checked});
   const meseName=MESI_FULL[mese]+' '+anno;
   const primoGiorno=anno+'-'+String(mese+1).padStart(2,'0')+'-01';
   const nextAnno=mese===11?anno+1:anno,nextMese=mese===11?1:mese+2;
-  const meseData=getDatiReparto().filter(e=>e.data>=primoGiorno&&e.data<nextAnno+'-'+String(nextMese).padStart(2,'0')+'-01');
-  const meseModuli=getModuliReparto().filter(m=>{const d=m.created_at||m.data_modulo||'';return d>=primoGiorno&&d<nextAnno+'-'+String(nextMese).padStart(2,'0')+'-01'});
+  const fineStr=nextAnno+'-'+String(nextMese).padStart(2,'0')+'-01';
+  const meseData=getDatiReparto().filter(e=>e.data>=primoGiorno&&e.data<fineStr);
+  const meseModuli=getModuliReparto().filter(m=>{const d=m.created_at||m.data_modulo||'';return d>=primoGiorno&&d<fineStr});
   try{
-    const{jsPDF}=window.jspdf;const doc=new jsPDF('portrait','mm','a4');const pw=doc.internal.pageSize.getWidth();const mx=16;let y=14;
+    const{jsPDF}=window.jspdf;const doc=new jsPDF('portrait','mm','a4');const pw=doc.internal.pageSize.getWidth();const ph=doc.internal.pageSize.getHeight();const mx=16;let y=14;
+    function _checkPage(needed){if(y+needed>ph-20){doc.addPage();y=16}}
     // Logo
     if(_logoB64)try{doc.addImage(_logoB64,'PNG',pw/2-20,y,40,22.5)}catch(e){}
     y+=28;
@@ -2491,7 +2540,7 @@ async function generaRiepilogoMensile(){
     doc.setFontSize(11);doc.setFont('helvetica','normal');doc.setTextColor(100);
     doc.text(meseName+' — Casino Lugano SA',pw/2,y,{align:'center'});y+=10;
     doc.setTextColor(0);
-    // Statistiche generali
+    // Panoramica (sempre visibile)
     const nCollab=new Set(meseData.map(e=>e.nome)).size;
     const nErr=meseData.filter(e=>e.tipo===nomeCorrente('Errore')).length;
     const nMal=_contaTotaleMalattie(meseData,nomeCorrente('Malattia'));
@@ -2509,54 +2558,170 @@ async function generaRiepilogoMensile(){
     ];
     doc.autoTable({theme:'grid',startY:y,margin:{left:mx,right:mx},
       body:stats.map(s=>[s[0],String(s[1])]),
-      theme:'grid',styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:3},
+      styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:3},
       columnStyles:{0:{fontStyle:'bold',cellWidth:90},1:{halign:'center'}},
       alternateRowStyles:{fillColor:[250,247,242]}});
     y=doc.lastAutoTable.finalY+10;
-    // Top collaboratori
-    if(meseData.length){
+    // SEZIONE: Registrazioni
+    if(sez.registrazioni&&meseData.length){
       const cc={};meseData.forEach(e=>{cc[e.nome]=(cc[e.nome]||0)+1});
       const top10=Object.entries(cc).sort((a,b)=>b[1]-a[1]).slice(0,10);
-      doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text('Top 10 collaboratori con più registrazioni',mx,y);y+=2;
+      _checkPage(30);
+      doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text('Top 10 collaboratori con piu registrazioni',mx,y);y+=2;
       doc.autoTable({theme:'grid',startY:y,margin:{left:mx,right:mx},
         head:[['Collaboratore','N. registrazioni']],
         body:top10.map(([n,c])=>[n,String(c)]),
         headStyles:{fillColor:[26,18,8],textColor:[250,247,242]},
         styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:3},columnStyles:{1:{halign:'center'}},
         alternateRowStyles:{fillColor:[250,247,242]}});
-      y=doc.lastAutoTable.finalY+10}
-    // Errori per collaboratore
-    const errori=meseData.filter(e=>e.tipo===nomeCorrente('Errore'));
-    if(errori.length){
-      const errMap={};errori.forEach(e=>{if(!errMap[e.nome])errMap[e.nome]={count:0,tot:0};errMap[e.nome].count++;errMap[e.nome].tot+=(parseFloat(e.importo)||0)});
-      const errSorted=Object.entries(errMap).sort((a,b)=>b[1].count-a[1].count);
-      if(y+30>doc.internal.pageSize.getHeight()-20){doc.addPage();y=16}
-      doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text('Dettaglio errori per collaboratore',mx,y);y+=2;
-      doc.autoTable({theme:'grid',startY:y,margin:{left:mx,right:mx},
-        head:[['Collaboratore','N. errori','Importo totale']],
-        body:errSorted.map(([n,d])=>[n,String(d.count),'CHF '+fmtCHF(d.tot)]),
-        headStyles:{fillColor:[192,57,43],textColor:[255,255,255]},
-        styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:3},columnStyles:{1:{halign:'center'},2:{halign:'right'}},
-        alternateRowStyles:{fillColor:[250,247,242]}});
-      y=doc.lastAutoTable.finalY+10}
-    // Maison summary
-    const _pdfMaison=getMaisonRepartoExpanded().filter(r=>r.data_giornata>=primoGiorno&&r.data_giornata<nextAnno+'-'+String(nextMese).padStart(2,'0')+'-01');
-    const _pdfSpese=getSpeseReparto().filter(r=>(r.data_spesa||r.created_at||'')>=primoGiorno&&(r.data_spesa||r.created_at||'')<nextAnno+'-'+String(nextMese).padStart(2,'0')+'-01');
-    if(_pdfMaison.length||_pdfSpese.length){
-      if(y+30>doc.internal.pageSize.getHeight()-20){doc.addPage();y=16}
-      doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0);doc.text('Riepilogo Maison e Spese Extra',mx,y);y+=2;
+      y=doc.lastAutoTable.finalY+10;
+      // Errori per collaboratore
+      const errori=meseData.filter(e=>e.tipo===nomeCorrente('Errore'));
+      if(errori.length){
+        const errMap={};errori.forEach(e=>{if(!errMap[e.nome])errMap[e.nome]={count:0,tot:0};errMap[e.nome].count++;errMap[e.nome].tot+=(parseFloat(e.importo)||0)});
+        const errSorted=Object.entries(errMap).sort((a,b)=>b[1].count-a[1].count);
+        _checkPage(30);
+        doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text('Dettaglio errori per collaboratore',mx,y);y+=2;
+        doc.autoTable({theme:'grid',startY:y,margin:{left:mx,right:mx},
+          head:[['Collaboratore','N. errori','Importo totale']],
+          body:errSorted.map(([n,d])=>[n,String(d.count),'CHF '+fmtCHF(d.tot)]),
+          headStyles:{fillColor:[192,57,43],textColor:[255,255,255]},
+          styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:3},columnStyles:{1:{halign:'center'},2:{halign:'right'}},
+          alternateRowStyles:{fillColor:[250,247,242]}});
+        y=doc.lastAutoTable.finalY+10}
+      // Malattie
+      const malattie=meseData.filter(e=>e.tipo===nomeCorrente('Malattia'));
+      if(malattie.length){
+        _checkPage(30);
+        doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text('Malattie',mx,y);y+=2;
+        const malMap={};malattie.forEach(e=>{if(!malMap[e.nome])malMap[e.nome]=0;const gg=_contaGiorniMalattia(e);malMap[e.nome]+=gg});
+        const malSorted=Object.entries(malMap).sort((a,b)=>b[1]-a[1]);
+        doc.autoTable({theme:'grid',startY:y,margin:{left:mx,right:mx},
+          head:[['Collaboratore','Giorni malattia']],
+          body:malSorted.map(([n,g])=>[n,String(g)]),
+          headStyles:{fillColor:[230,126,34],textColor:[255,255,255]},
+          styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:3},columnStyles:{1:{halign:'center'}},
+          alternateRowStyles:{fillColor:[250,247,242]}});
+        y=doc.lastAutoTable.finalY+10}}
+    // SEZIONE: Differenze cassa
+    if(sez.differenze){
+      const cassaEntries=meseData.filter(e=>e.tipo===nomeCorrente('Differenza Cassa')||e.tipo==='Differenza Cassa');
+      if(cassaEntries.length){
+        _checkPage(30);
+        doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text('Differenze Cassa',mx,y);y+=2;
+        const cassaBody=cassaEntries.map(e=>[e.nome,e.data?new Date(e.data+'T12:00:00').toLocaleDateString('it-IT'):'','CHF '+fmtCHF(parseFloat(e.importo)||0),(e.descrizione||'').substring(0,60)]);
+        doc.autoTable({theme:'grid',startY:y,margin:{left:mx,right:mx},
+          head:[['Collaboratore','Data','Importo','Descrizione']],
+          body:cassaBody,
+          headStyles:{fillColor:[52,73,94],textColor:[255,255,255]},
+          styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:8.5,cellPadding:3},
+          columnStyles:{2:{halign:'right'},3:{cellWidth:60}},
+          alternateRowStyles:{fillColor:[250,247,242]}});
+        y=doc.lastAutoTable.finalY+10}}
+    // SEZIONE: Moduli
+    if(sez.moduli&&meseModuli.length){
+      _checkPage(30);
+      doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text('Moduli generati',mx,y);y+=2;
+      const tipiModulo=['allineamento','rdi','apprezzamento'];
+      const modBody=[];
+      tipiModulo.forEach(tipo=>{
+        const mm=meseModuli.filter(m=>m.tipo===tipo);
+        if(mm.length){const collab={};mm.forEach(m=>{collab[m.nome]=(collab[m.nome]||0)+1});
+          Object.entries(collab).sort((a,b)=>b[1]-a[1]).forEach(([n,c])=>{modBody.push([tipo.charAt(0).toUpperCase()+tipo.slice(1),n,String(c)])})}});
+      if(modBody.length){
+        doc.autoTable({theme:'grid',startY:y,margin:{left:mx,right:mx},
+          head:[['Tipo','Collaboratore','Quantita']],
+          body:modBody,
+          headStyles:{fillColor:[142,68,173],textColor:[255,255,255]},
+          styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:3},columnStyles:{2:{halign:'center'}},
+          alternateRowStyles:{fillColor:[250,247,242]}});
+        y=doc.lastAutoTable.finalY+10}}
+    // SEZIONE: Costi Maison
+    const _pdfMaison=getMaisonRepartoExpanded().filter(r=>r.data_giornata>=primoGiorno&&r.data_giornata<fineStr);
+    if(sez.maison&&_pdfMaison.length){
+      _checkPage(30);
+      doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0);doc.text('Costi Maison',mx,y);y+=2;
       const maisonTot=_pdfMaison.reduce((s,r)=>s+parseFloat(r.costo||0),0);
-      const speseTot=_pdfSpese.reduce((s,r)=>s+parseFloat(r.importo||0),0);
       const maisonClienti=new Set(_pdfMaison.map(r=>r.nome)).size;
+      // Summary
       doc.autoTable({theme:'grid',startY:y,margin:{left:mx,right:mx},
-        body:[['Costo totale Maison','CHF '+fmtCHF(maisonTot)],['Spese Extra totali','CHF '+fmtCHF(speseTot)],['Clienti Maison',String(maisonClienti)]],
-        theme:'grid',styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:3},
+        body:[['Costo totale','CHF '+fmtCHF(maisonTot)],['Clienti',''+maisonClienti],['Visite totali',''+_pdfMaison.length]],
+        styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:3},
         columnStyles:{0:{fontStyle:'bold',cellWidth:90},1:{halign:'center'}},
+        alternateRowStyles:{fillColor:[250,247,242]}});
+      y=doc.lastAutoTable.finalY+6;
+      // Top clienti Maison
+      const cliMap={};_pdfMaison.forEach(r=>{if(!cliMap[r.nome])cliMap[r.nome]={costo:0,visite:0};cliMap[r.nome].costo+=parseFloat(r.costo||0);cliMap[r.nome].visite++});
+      const topCli=Object.entries(cliMap).sort((a,b)=>b[1].costo-a[1].costo).slice(0,15);
+      if(topCli.length){
+        _checkPage(30);
+        doc.setFont('helvetica','bold');doc.setFontSize(10);doc.text('Top clienti Maison per costo',mx,y);y+=2;
+        doc.autoTable({theme:'grid',startY:y,margin:{left:mx,right:mx},
+          head:[['Cliente','Visite','Costo totale']],
+          body:topCli.map(([n,d])=>[n,String(d.visite),'CHF '+fmtCHF(d.costo)]),
+          headStyles:{fillColor:[139,105,20],textColor:[255,255,255]},
+          styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:3},columnStyles:{1:{halign:'center'},2:{halign:'right'}},
+          alternateRowStyles:{fillColor:[250,247,242]}});
+        y=doc.lastAutoTable.finalY+10}}
+    // SEZIONE: Spese Extra
+    const _pdfSpese=getSpeseReparto().filter(r=>(r.data_spesa||r.created_at||'')>=primoGiorno&&(r.data_spesa||r.created_at||'')<fineStr);
+    if(sez.spese&&_pdfSpese.length){
+      _checkPage(30);
+      doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0);doc.text('Spese Extra',mx,y);y+=2;
+      const speseTot=_pdfSpese.reduce((s,r)=>s+parseFloat(r.importo||0),0);
+      const speseBody=_pdfSpese.sort((a,b)=>(b.data_spesa||'').localeCompare(a.data_spesa||'')).map(r=>[r.beneficiario||'',r.data_spesa?new Date(r.data_spesa+'T12:00:00').toLocaleDateString('it-IT'):'',(SE_TIPI_LABEL&&SE_TIPI_LABEL[r.tipo])||r.tipo||'','CHF '+fmtCHF(parseFloat(r.importo||0)),(r.luogo||'').substring(0,30)]);
+      doc.autoTable({theme:'grid',startY:y,margin:{left:mx,right:mx},
+        head:[['Beneficiario','Data','Tipo','Importo','Luogo']],
+        body:speseBody,
+        headStyles:{fillColor:[44,110,73],textColor:[255,255,255]},
+        styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:8.5,cellPadding:3},columnStyles:{3:{halign:'right'}},
+        alternateRowStyles:{fillColor:[250,247,242]}});
+      y=doc.lastAutoTable.finalY+4;
+      doc.setFont('helvetica','bold');doc.setFontSize(9);doc.text('Totale Spese Extra: CHF '+fmtCHF(speseTot),mx,y+4);
+      y+=10}
+    // SEZIONE: Inventario movimenti
+    if(sez.inventario){
+      const invData=getInventarioReparto().filter(r=>(r.data_movimento||r.created_at||'')>=primoGiorno&&(r.data_movimento||r.created_at||'')<fineStr);
+      if(invData.length){
+        _checkPage(30);
+        doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0);doc.text('Inventario Movimenti',mx,y);y+=2;
+        const invBody=invData.sort((a,b)=>(b.data_movimento||'').localeCompare(a.data_movimento||'')).map(r=>[r.articolo||'',(r.tipo_movimento||'').charAt(0).toUpperCase()+(r.tipo_movimento||'').slice(1),String(r.quantita||0),r.data_movimento?new Date(r.data_movimento+'T12:00:00').toLocaleDateString('it-IT'):'',(r.note||'').substring(0,40)]);
+        doc.autoTable({theme:'grid',startY:y,margin:{left:mx,right:mx},
+          head:[['Articolo','Tipo','Quantita','Data','Note']],
+          body:invBody,
+          headStyles:{fillColor:[52,73,94],textColor:[255,255,255]},
+          styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:8.5,cellPadding:3},columnStyles:{2:{halign:'center'}},
+          alternateRowStyles:{fillColor:[250,247,242]}});
+        y=doc.lastAutoTable.finalY+10}}
+    // SEZIONE: Statistiche riepilogative
+    if(sez.statistiche&&meseData.length){
+      _checkPage(30);
+      doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0);doc.text('Statistiche per tipo di evento',mx,y);y+=2;
+      const tipoCount={};meseData.forEach(e=>{tipoCount[e.tipo]=(tipoCount[e.tipo]||0)+1});
+      const tipoSorted=Object.entries(tipoCount).sort((a,b)=>b[1]-a[1]);
+      doc.autoTable({theme:'grid',startY:y,margin:{left:mx,right:mx},
+        head:[['Tipo evento','Conteggio','Percentuale']],
+        body:tipoSorted.map(([t,c])=>[t,String(c),(c/meseData.length*100).toFixed(1)+'%']),
+        headStyles:{fillColor:[26,18,8],textColor:[250,247,242]},
+        styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:3},columnStyles:{1:{halign:'center'},2:{halign:'center'}},
+        alternateRowStyles:{fillColor:[250,247,242]}});
+      y=doc.lastAutoTable.finalY+8;
+      // Distribuzione per giorno della settimana
+      const giorniNome=['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
+      const giorniCount=[0,0,0,0,0,0,0];
+      meseData.forEach(e=>{if(e.data){const d=new Date(e.data+'T12:00:00');giorniCount[d.getDay()]++}});
+      _checkPage(30);
+      doc.setFont('helvetica','bold');doc.setFontSize(10);doc.text('Distribuzione per giorno della settimana',mx,y);y+=2;
+      doc.autoTable({theme:'grid',startY:y,margin:{left:mx,right:mx},
+        head:[giorniNome],
+        body:[giorniCount.map(String)],
+        headStyles:{fillColor:[26,18,8],textColor:[250,247,242]},
+        styles:{lineColor:[220,215,205],lineWidth:0.15,fontSize:9,cellPadding:3,halign:'center'},
         alternateRowStyles:{fillColor:[250,247,242]}});
       y=doc.lastAutoTable.finalY+10}
     // Footer
     const tp=doc.internal.getNumberOfPages();for(let i=1;i<=tp;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(150);
-      doc.text('Casino Lugano SA — Riepilogo '+meseName+' — Pag. '+i+'/'+tp,mx,doc.internal.pageSize.getHeight()-8)}
+      doc.text('Casino Lugano SA — Riepilogo '+meseName+' — Pag. '+i+'/'+tp,mx,ph-8)}
     mostraPdfPreview(doc,'Riepilogo_'+meseName.replace(/\s/g,'_')+'.pdf','Riepilogo '+meseName)
   }catch(e){console.error(e);toast('Errore generazione PDF: '+e.message)}}
 
@@ -2991,6 +3156,8 @@ function renderNoteChat(partner){
   const msgsEl=document.getElementById('note-chat-messages');
   const inp=document.getElementById('note-chat-input');
   chatArea.classList.remove('chat-hidden');
+  // Show star filter bar
+  const _sfBar=document.getElementById('note-chat-star-filter');if(_sfBar)_sfBar.style.display='block';
   // Header
   const isGroup=partner.startsWith('gruppo:');
   const _gidChat=isGroup?partner.replace('gruppo:',''):'';
@@ -3038,15 +3205,17 @@ function renderNoteChat(partner){
   const _gpEsc=escP(_gidChat).replace(/'/g,"\\'");const _ptEsc=escP(partner).replace(/'/g,"\\'");
   const _amIAdmin=isCustomGroup&&_grpAdmin===op;
   const addMemberBtn=isCustomGroup&&_amIAdmin?'<button onclick="_apriAggiungiMembri(\''+_gpEsc+'\',\''+_ptEsc+'\')" style="background:none;border:none;cursor:pointer;font-size:1rem;color:var(--accent2);padding:4px 6px" title="Aggiungi membri">&#43;</button><button onclick="_rinominaGruppo(\''+_gpEsc+'\',\''+_ptEsc+'\')" style="background:none;border:none;cursor:pointer;font-size:.9rem;color:var(--muted);padding:4px 6px" title="Rinomina gruppo">&#9998;</button><button onclick="_apriRimuoviMembri(\''+_gpEsc+'\',\''+_ptEsc+'\')" style="background:none;border:none;cursor:pointer;font-size:.9rem;color:var(--muted);padding:4px 6px" title="Rimuovi membro">&#128101;</button>':'';
-  header.innerHTML=backBtn+'<div style="flex:1;position:relative"><div style="cursor:'+(isPersistentGroup?'pointer':'default')+'" onclick="var t=this.parentElement.querySelector(\'.group-members-tooltip\');if(t)t.style.display=t.style.display===\'none\'?\'block\':\'none\'" onmouseenter="var t=this.parentElement.querySelector(\'.group-members-tooltip\');if(t)t.style.display=\'block\'" onmouseleave="var t=this.parentElement.querySelector(\'.group-members-tooltip\');if(t)t.style.display=\'none\'">'+headerLabel+(isPersistentGroup?' <span style="font-size:.7rem;color:var(--muted)">&#9660;</span>':'')+'</div>'+_groupMembersHtml+_lastSeenHtml+'</div>'+addMemberBtn+searchBtn;
+  const starFilterBtn='<button class="btn-star-filter'+ (_starFilterActive?' active':'')+'" onclick="toggleStarFilter()" style="margin-left:4px" title="Filtra importanti">&#9733;</button>';
+  header.innerHTML=backBtn+'<div style="flex:1;position:relative"><div style="cursor:'+(isPersistentGroup?'pointer':'default')+'" onclick="var t=this.parentElement.querySelector(\'.group-members-tooltip\');if(t)t.style.display=t.style.display===\'none\'?\'block\':\'none\'" onmouseenter="var t=this.parentElement.querySelector(\'.group-members-tooltip\');if(t)t.style.display=\'block\'" onmouseleave="var t=this.parentElement.querySelector(\'.group-members-tooltip\');if(t)t.style.display=\'none\'">'+headerLabel+(isPersistentGroup?' <span style="font-size:.7rem;color:var(--muted)">&#9660;</span>':'')+'</div>'+_groupMembersHtml+_lastSeenHtml+'</div>'+addMemberBtn+starFilterBtn+searchBtn;
   // Show input
   inp.style.display='flex';
   // Messages
   if(isPersistentGroup&&!_getConvNotes(partner,op).length){
     msgsEl.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:.9rem">Scrivi un messaggio al gruppo</div>';
     return}
-  const notes=_getConvNotes(partner,op).sort((a,b)=>(a.created_at||'').localeCompare(b.created_at||''));
-  if(!notes.length){msgsEl.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:.9rem">Nessun messaggio. Inizia la conversazione!</div>';return}
+  let notes=_getConvNotes(partner,op).sort((a,b)=>(a.created_at||'').localeCompare(b.created_at||''));
+  if(_starFilterActive)notes=notes.filter(n=>n.importante);
+  if(!notes.length){msgsEl.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:.9rem">'+(_starFilterActive?'Nessun messaggio importante':'Nessun messaggio. Inizia la conversazione!')+'</div>';return}
   let html='';let lastDate='';
   notes.forEach(n=>{
     const dateStr=(n.created_at||'').substring(0,10);
@@ -3087,6 +3256,7 @@ function renderNoteChat(partner){
     const _qualcunoLetto=isSent&&n.gruppo_id?noteColleghiCache.some(x=>x.gruppo_id===n.gruppo_id&&x.da_operatore===op&&(x.messaggio||'')===(n.messaggio||'')&&x.letta):n.letta;
     const canEdit=isSent&&!_qualcunoLetto;
     let actions='<div class="chat-msg-actions">';
+    actions+='<button class="btn-act" style="font-size:.65rem;padding:2px 6px;color:#d4a017;border-color:#d4a017" onclick="event.stopPropagation();toggleImportante('+n.id+')" title="'+(n.importante?'Rimuovi importante':'Segna importante')+'">'+(n.importante?'&#9733;':'&#9734;')+'</button>';
     if(canEdit)actions+='<button class="btn-act tipo" style="font-size:.65rem;padding:2px 6px" onclick="event.stopPropagation();modificaNotaCollega('+n.id+')" title="Modifica">&#9998;</button>';
     if(isSent)actions+='<button class="btn-act del" style="font-size:.65rem;padding:2px 6px" onclick="event.stopPropagation();eliminaNotaSmart('+n.id+')" title="Elimina">&#128465;</button>';
     else actions+='<button class="btn-act" style="font-size:.65rem;padding:2px 6px;color:var(--muted);border-color:var(--muted)" onclick="event.stopPropagation();eliminaNotaCollega('+n.id+',\'dest\')" title="Elimina per me">&#128465;</button>';
@@ -3099,11 +3269,14 @@ function renderNoteChat(partner){
     if(replyMatch){msgText=msgText.substring(replyMatch[0].length);quoteHtml='<div class="chat-quote" onclick="scrollToNote('+replyMatch[1]+')"><div class="quote-name">'+escP(replyMatch[2])+'</div><div>'+escP(replyMatch[3].substring(0,80))+'</div></div>'}
     // Render reactions
     let reactionsHtml=renderReazioni(n);
-    html+='<div class="chat-bubble '+cls+'" id="note-bubble-'+n.id+'" style="position:relative" ontouchstart="_reactionTouchStart(event,'+n.id+')" ontouchend="_reactionTouchEnd('+n.id+')" ontouchmove="_reactionTouchCancel('+n.id+')">';
+    const _extraCls=(n.importante?' importante':'')+(n.urgente?' urgente':'');
+    html+='<div class="chat-bubble '+cls+_extraCls+'" id="note-bubble-'+n.id+'" style="position:relative" ontouchstart="_reactionTouchStart(event,'+n.id+')" ontouchend="_reactionTouchEnd('+n.id+')" ontouchmove="_reactionTouchCancel('+n.id+')">';
     html+='<div class="reaction-picker" id="reaction-picker-'+n.id+'">'+_REACTION_EMOJIS.map(e=>'<button onclick="event.stopPropagation();toggleReazione('+n.id+',\''+e+'\')">'+e+'</button>').join('')+'</div>';
+    if(n.urgente)html+='<div class="urgente-label">&#10071; URGENTE</div>';
     html+=senderLabel+destLabel+quoteHtml;
     html+='<div>'+esc(msgText)+'</div>';
-    html+='<div class="chat-time">'+time+' '+ticks+'</div>';
+    const _starIcon=n.importante?'<span class="chat-star-icon" onclick="event.stopPropagation();toggleImportante('+n.id+')" title="Importante">&#9733;</span>':'';
+    html+='<div class="chat-time">'+_starIcon+time+' '+ticks+'</div>';
     html+=reactionsHtml;
     html+=actions;
     html+='</div>'});
@@ -3269,14 +3442,17 @@ async function inviaNotaChat(){
   }else{dests=[partner]}
   if(!dests.length){toast('Nessun destinatario');return}
   if(!gid&&dests.length>1)gid=crypto.randomUUID();
-  try{for(const dest of dests){const r=await secPost('note_colleghi',{da_operatore:op,a_operatore:dest,messaggio:msgEnc,gruppo_id:gid});r[0].messaggio=msg;r[0]._decrypted=true;noteColleghiCache.unshift(r[0])}
+  const _sendUrgent=_isUrgentMode;
+  try{for(const dest of dests){const rec={da_operatore:op,a_operatore:dest,messaggio:msgEnc,gruppo_id:gid};if(_sendUrgent)rec.urgente=true;const r=await secPost('note_colleghi',rec);r[0].messaggio=msg;r[0]._decrypted=true;if(_sendUrgent)r[0].urgente=true;noteColleghiCache.unshift(r[0])}
   ta.value='';ta.style.height='auto';annullaRispondi();
+  // Reset urgent mode after sending
+  if(_isUrgentMode){_isUrgentMode=false;const ub=document.getElementById('btn-urgent-mode');if(ub)ub.classList.remove('active');ta.placeholder='Scrivi un messaggio...'}
   // Switch to persistent group conversation
   if(isPersGroup||(_gidSend&&!isPersGroup)){/* already on correct conv */}
   else if(window._noteConvGruppo&&window._noteConvGruppo.gid){window._noteConvAttiva='gruppo:'+window._noteConvGruppo.gid;window._noteConvGruppo=null}
   renderNoteCollega();
-  toast('Nota inviata');
-  inviaPush(dests,'Nota da '+op,msg.substring(0,120),'nota',true)}catch(e){toast('Errore invio')}}
+  toast(_sendUrgent?'Messaggio urgente inviato':'Nota inviata');
+  inviaPush(dests,(_sendUrgent?'\u26A0\uFE0F URGENTE da ':'Nota da ')+op,msg.substring(0,120),'nota',true)}catch(e){toast('Errore invio')}}
 // Filtra conversazioni nella lista (cerca in nome + tutti i messaggi)
 let _convSearchQuery='';
 function filtraConversazioni(){const q=(document.getElementById('conv-search-input')||{}).value||'';
@@ -3325,6 +3501,28 @@ function cercaInChatNav(dir){if(!_chatSearchResults.length)return;
   _chatSearchResults[_chatSearchIdx].style.background='#e67e22';
   _chatSearchResults[_chatSearchIdx].scrollIntoView({behavior:'smooth',block:'center'});
   document.getElementById('note-search-count').textContent=(_chatSearchIdx+1)+'/'+_chatSearchResults.length}
+// ===== STAR / IMPORTANT MESSAGES =====
+let _starFilterActive=false;
+function toggleStarFilter(){
+  _starFilterActive=!_starFilterActive;
+  const btn=document.querySelector('#note-chat-star-filter .btn-star-filter');
+  if(btn)btn.classList.toggle('active',_starFilterActive);
+  if(window._noteConvAttiva)renderNoteChat(window._noteConvAttiva)}
+async function toggleImportante(noteId){
+  const n=noteColleghiCache.find(x=>x.id===noteId);if(!n)return;
+  const nuovoVal=!n.importante;
+  n.importante=nuovoVal;
+  // Update UI immediately
+  if(window._noteConvAttiva)renderNoteChat(window._noteConvAttiva);
+  try{await secPatch('note_colleghi','id=eq.'+noteId,{importante:nuovoVal})}catch(e){n.importante=!nuovoVal;toast('Errore salvataggio');if(window._noteConvAttiva)renderNoteChat(window._noteConvAttiva)}}
+// ===== URGENT MODE =====
+let _isUrgentMode=false;
+function toggleUrgentMode(){
+  _isUrgentMode=!_isUrgentMode;
+  const btn=document.getElementById('btn-urgent-mode');
+  if(btn)btn.classList.toggle('active',_isUrgentMode);
+  const ta=document.getElementById('nota-msg-chat');
+  if(ta)ta.placeholder=_isUrgentMode?'Messaggio URGENTE...':'Scrivi un messaggio...'}
 let _noteFpInit=false;
 function initNoteFlatpickr(){_noteFpInit=true}
 function resetNoteFiltri(tipo){renderNoteCollega()}
