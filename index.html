@@ -4682,8 +4682,12 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
       for(const riga of righe){
         // Skip: non sono malattia
         if(/\b(lutto|ferie|vacanza|vacanze|infortunio|permesso|giorno libero|riposo|congedo|ritardo|in ritardo)\b/i.test(riga))continue;
+        // Pulisci nome da "dal/al" attaccato (es. "cacciapuotidal" → "cacciapuoti dal")
+        let _rigaPulita=riga.replace(/([a-zà-ü])(dal\s|fino\s)/gi,'$1 $2');
         // Match: nome + (assente|malattia|malato|malata|codice turno come x1,r2,c0,s1,s7...)
-        let m=riga.match(/^([A-ZÀ-Üa-zà-ü\s.'-]+?)\s*(assente|malattia|malato|malata|([a-zA-Z])\s*(\d{1,2}))\b/i);
+        let m=_rigaPulita.match(/^([A-ZÀ-Üa-zà-ü\s.'-]+?)\s*(assente|malattia|malato|malata|([a-zA-Z])\s*(\d{1,2}))\b/i);
+        // Se non matcha con keyword, prova a estrarre nome prima di "dal/fino"
+        if(!m){const _preDate=_rigaPulita.match(/^([A-ZÀ-Üa-zà-ü\s.'-]+?)\s+(?:dal|fino|domani|dopodomani|oggi)/i);if(_preDate&&_preDate[1].trim().length>=3)m=[_rigaPulita,_preDate[1],'assente',null,null]}
         // Scarta se il "nome" è troppo lungo (frase intera, non un nome)
         if(m&&m[1].trim().split(/\s+/).length>4)m=null;
         // Fallback: cerca cognome collaboratore nella frase + keyword assenza
@@ -4710,7 +4714,7 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
         const dopodomaniMatch=/\bdopodomani\b/i.test(riga);
         const oggiMatch=/\b(oggi|stasera|questa sera)\b/i.test(riga);
         const finoMatch=riga.match(/fino\s+(?:al?\s+)?(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?/i);
-        const dalAlMatch=riga.match(/dal\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?\s+al\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?/i);
+        const dalAlMatch=_rigaPulita.match(/dal\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?\s+al\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?/i);
         // Giorni della settimana
         const _giorniSett={lunedi:1,lunedì:1,martedi:2,martedì:2,mercoledi:3,mercoledì:3,giovedi:4,giovedì:4,venerdi:5,venerdì:5,sabato:6,domenica:0};
         const _giorniTrovati=[];
