@@ -2007,7 +2007,7 @@ document.addEventListener('keydown',()=>{_userHasInteracted=true},{once:true});
 document.addEventListener('touchstart',()=>{_userHasInteracted=true},{once:true});
 function _playNotifSound(){if(!_userHasInteracted)return;try{const ctx=new(window.AudioContext||window.webkitAudioContext)();const osc=ctx.createOscillator();const gain=ctx.createGain();osc.connect(gain);gain.connect(ctx.destination);osc.frequency.value=880;osc.type='sine';gain.gain.value=0.15;osc.start();gain.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.3);osc.stop(ctx.currentTime+0.3)}catch(e){}}
 function mostraNotifBanner(tipo,titolo,testo,azione){
-  const icons={nota:'&#9993;',consegna:'&#128221;',promemoria:'&#128203;'};
+  const icons={nota:'&#9993;',consegna:'&#128221;',promemoria:'&#128203;',urgente:'&#10071;'};
   const b=document.getElementById('notif-banner');
   b.className='notif-banner '+(tipo||'nota');
   document.getElementById('notif-icon').innerHTML=icons[tipo]||'&#128276;';
@@ -2525,7 +2525,7 @@ async function _eseguiRiepilogoMensile(){
   const sez={};document.querySelectorAll('[id^=rm-sez-]').forEach(c=>{sez[c.id.replace('rm-sez-','')]=c.checked});
   const meseName=MESI_FULL[mese]+' '+anno;
   const primoGiorno=anno+'-'+String(mese+1).padStart(2,'0')+'-01';
-  const nextAnno=mese===11?anno+1:anno,nextMese=mese===11?1:mese+2;
+  const nextAnno=mese===11?anno+1:anno,nextMese=mese===11?1:mese+1;
   const fineStr=nextAnno+'-'+String(nextMese).padStart(2,'0')+'-01';
   const meseData=getDatiReparto().filter(e=>e.data>=primoGiorno&&e.data<fineStr);
   const meseModuli=getModuliReparto().filter(m=>{const d=m.created_at||m.data_modulo||'';return d>=primoGiorno&&d<fineStr});
