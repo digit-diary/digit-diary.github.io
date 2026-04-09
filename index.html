@@ -2789,13 +2789,19 @@ function toggleConvNewDropdown(ev){ev.stopPropagation();
   dd.innerHTML=h;dd.style.display='block';
   // Close on outside click
   setTimeout(()=>{document.addEventListener('click',function _cl(){dd.style.display='none';document.removeEventListener('click',_cl)},{once:true})},0)}
-function _rinominaGruppo(gid,partner){
+async function _rinominaGruppo(gid,partner){
   const nomeAttuale=_getGruppoNome(gid)||'';
   const nuovo=prompt('Nuovo nome del gruppo:',nomeAttuale);
   if(nuovo===null)return;
   const label=nuovo.trim();
   if(label)localStorage.setItem('_gruppo_nome_'+gid,label);
   else localStorage.removeItem('_gruppo_nome_'+gid);
+  // Invia messaggio sistema con GNAME per sincronizzare il nome su tutti i dispositivi
+  const op=getOperatore();
+  const allGruppo=noteColleghiCache.filter(x=>x.gruppo_id===gid);
+  const membri=new Set();allGruppo.forEach(n=>{if(n.a_operatore!==op)membri.add(n.a_operatore);if(n.da_operatore!==op)membri.add(n.da_operatore)});
+  if(membri.size&&label){const msgTxt='[GNAME:'+label+']Gruppo rinominato in "'+label+'"';const msgEnc=await encryptNota(msgTxt);
+    for(const dest of membri){try{const r=await secPost('note_colleghi',{da_operatore:op,a_operatore:dest,messaggio:msgEnc,gruppo_id:gid});r[0].messaggio=msgTxt;r[0]._decrypted=true;noteColleghiCache.unshift(r[0])}catch(e){}}}
   logAzione('Gruppo rinominato',(nomeAttuale||'senza nome')+' → '+(label||'nomi automatici'));
   renderNoteChat(partner);renderNoteCollega();toast('Gruppo rinominato')}
 function _apriRimuoviMembri(gid,partner){
@@ -2862,9 +2868,9 @@ function _apriGruppoSelezionato(){
   renderNoteChat(window._noteConvAttiva);renderNoteCollega()}
 function _getGruppoNome(gid){
   const ls=localStorage.getItem('_gruppo_nome_'+gid);if(ls)return ls;
-  // Cerca il nome nei messaggi del gruppo (tag [GNAME:...])
-  const note=noteColleghiCache.find(n=>n.gruppo_id===gid&&(n.messaggio||'').includes('[GNAME:'));
-  if(note){const gm=(note.messaggio||'').match(/\[GNAME:([^\]]+)\]/);if(gm){localStorage.setItem('_gruppo_nome_'+gid,gm[1]);return gm[1]}}
+  // Cerca il nome più recente nei messaggi del gruppo (tag [GNAME:...])
+  const notes=noteColleghiCache.filter(n=>n.gruppo_id===gid&&(n.messaggio||'').includes('[GNAME:')).sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||''));
+  if(notes.length){const gm=(notes[0].messaggio||'').match(/\[GNAME:([^\]]+)\]/);if(gm){localStorage.setItem('_gruppo_nome_'+gid,gm[1]);return gm[1]}}
   return ''}
 function _apriAggiungiMembri(gid,partner){
   const op=getOperatore();
