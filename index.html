@@ -4659,6 +4659,10 @@ async function apriGiorno(ds){flushRapportoSave();rapportoGiornoAperto=ds;const 
   function autoSave(turno,cls){clearTimeout(window._rappTimers[cls]);window._rappPending[cls]=turno;const st=document.getElementById('status-'+cls);if(st)st.textContent='Salvando...';window._rappTimers[cls]=setTimeout(()=>{delete window._rappPending[cls];salvaRapportoTurno(ds,turno,cls).then(()=>{if(st){st.textContent='Salvato';setTimeout(()=>{if(st)st.textContent=''},2000)}})},1200)}
   document.querySelectorAll('#rapporto-view .turno-body textarea, #rapporto-view .turno-body input').forEach(el=>{const cls=el.id.startsWith('presto')?'presto':'notte';const turno=cls==='presto'?'PRESTO':'NOTTE';el.addEventListener('input',()=>autoSave(turno,cls));el.addEventListener('change',()=>autoSave(turno,cls))})}
 // === D-FULL PARSER ASSENZE: analyze + execute + audit + transactional ============
+// Schema flags per gestire deployment senza migration applicata (graceful degradation)
+let _origineSchemaSupported=true;// false se DB non ha ancora la colonna 'origine'
+let _transactionalRpcSupported=true;// false se la function parse_assenze_transactional non esiste
+function _stripOrigine(rec){const r=Object.assign({},rec);delete r.origine;return r}
 // Helper: estrae range date di una malattia (dal testo "dal DD/MM/YYYY al DD/MM/YYYY" o dal campo data per single-day)
 function _getRangeMalattiaRec(rec){
   const t=rec.testo||'';
@@ -4870,21 +4874,52 @@ async function _eseguiAssenzeOps(ops,ds,turno){
   for(const d of ops.deletes)rpcOps.push({action:'delete',id:d.id});
   let result={created_ids:[],created:0,updated:0,deleted:0};
   let usedFallback=false;
+  // Strip origine dalle ops se schema non supporta la colonna (graceful degradation pre-migration)
+  const _maybeStripOrigineFromOps=()=>{if(!_origineSchemaSupported){for(const op of rpcOps){if(op.action==='create'&&op.data)delete op.data.origine}}};
+  _maybeStripOrigineFromOps();
   if(rpcOps.length>0){
     const tk=getOpToken();
-    if(tk){
+    if(tk&&_transactionalRpcSupported){
       try{
         const _rpcResult=await sbRpc('parse_assenze_transactional',{p_token:tk,p_ops:rpcOps});
         if(_rpcResult)result=_rpcResult;
       }catch(e){
-        console.warn('parse_assenze_transactional non disponibile, fallback REST sequenziale:',e.message);
-        usedFallback=true;
+        const _msg=(e.message||'').toLowerCase();
+        // Detect schema mismatch sulla colonna origine
+        if(_msg.includes('origine')||_msg.includes('column')){
+          console.warn('Colonna origine non disponibile, switching schema legacy');
+          _origineSchemaSupported=false;
+          _maybeStripOrigineFromOps();
+          // Retry RPC senza origine
+          try{
+            const _rpcResult=await sbRpc('parse_assenze_transactional',{p_token:tk,p_ops:rpcOps});
+            if(_rpcResult)result=_rpcResult;
+          }catch(e2){
+            console.warn('parse_assenze_transactional non disponibile, fallback REST:',e2.message);
+            _transactionalRpcSupported=false;
+            usedFallback=true;
+          }
+        }else{
+          console.warn('parse_assenze_transactional non disponibile, fallback REST sequenziale:',e.message);
+          _transactionalRpcSupported=false;
+          usedFallback=true;
+        }
       }
     }else{usedFallback=true}
     if(usedFallback){
       // Fallback: chiamate REST sequenziali (no atomicità ma recupero degradato)
       for(const c of ops.creates){
-        try{const _saved=await secPost('registrazioni',c.record);
+        let _recToSend=_origineSchemaSupported?c.record:_stripOrigine(c.record);
+        try{
+          let _saved;
+          try{_saved=await secPost('registrazioni',_recToSend)}
+          catch(innerErr){
+            const _imsg=(innerErr.message||'').toLowerCase();
+            if(_origineSchemaSupported&&(_imsg.includes('origine')||_imsg.includes('column'))){
+              _origineSchemaSupported=false;
+              _saved=await secPost('registrazioni',_stripOrigine(c.record));
+            }else{throw innerErr}
+          }
           if(_saved&&_saved[0]&&_saved[0].id)result.created_ids.push(_saved[0].id);
           else result.created_ids.push(Date.now()+Math.floor(Math.random()*1000));
           result.created++;
