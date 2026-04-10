@@ -4679,19 +4679,30 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
     const _rapLabel='da rapporto '+turno+' del '+_rappDateStr;
     const _rapLabelOld='da rapporto '+turno;// formato legacy senza data
     const _malTipo=nomeCorrente('Malattia');
+    // Helper: estrae il range date di una malattia (dal testo o dal campo data per single-day)
+    const _getRangeMalattia=(rec)=>{
+      const t=rec.testo||'';
+      const m=t.match(/dal\s+(\d{1,2})\/(\d{1,2})\/(\d{4})\s+al\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if(m)return{i:m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'),f:m[6]+'-'+m[5].padStart(2,'0')+'-'+m[4].padStart(2,'0')};
+      if(rec.data){const d=(rec.data||'').substring(0,10);return{i:d,f:d}}
+      return null;
+    };
+    // Helper: true se il record appartiene al rapporto corrente (turno+data), inclusi vecchi
+    const _isCurrentRapporto=(rec)=>{
+      const t=rec.testo||'';
+      if(t.includes(_rapLabel))return true;
+      if(t.includes(_rapLabelOld+')')&&!t.includes(_rapLabelOld+' del ')&&(rec.data||'').startsWith(ds))return true;
+      return false;
+    };
     // Snapshot delle malattie già esistenti per QUESTO rapporto specifico (turno+data+reparto)
     // Backwards-compat: include anche record formato vecchio se creati nel giorno del rapporto
     const _esistenti=datiCache.filter(e=>{
       if(e.tipo!==_malTipo)return false;
       if((e.reparto_dip||currentReparto)!==currentReparto)return false;
-      const t=e.testo||'';
-      // Formato nuovo: scopato per data del rapporto
-      if(t.includes(_rapLabel))return true;
-      // Formato vecchio: "da rapporto TURNO)" senza " del " + creato nel giorno del rapporto
-      if(t.includes(_rapLabelOld+')')&&!t.includes(_rapLabelOld+' del ')&&(e.data||'').startsWith(ds))return true;
-      return false;
+      return _isCurrentRapporto(e);
     });
     const _nomiProcessati=new Set();
+    const _usedEsistentiIds=new Set();// per gestire piu righe stesso nome (no overwrite)
     const assenzeText=data.assenze||'';
     if(!assenzeText.trim()){
       // Campo assenze vuoto → rimuovi tutte le malattie create da questo rapporto specifico
@@ -4811,8 +4822,10 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
           :'Assente per malattia'+codeTxt+' ('+_rapLabel+')';
         // Check: esiste gia una malattia per questo nome da QUESTO rapporto specifico (snapshot)
         _nomiProcessati.add(nomeFinale.toLowerCase());
-        const esiste=_esistenti.find(e=>e.nome.toLowerCase()===nomeFinale.toLowerCase());
+        // Trova il PROSSIMO record non ancora usato per questo nome (gestisce piu righe stesso nome)
+        const esiste=_esistenti.find(e=>e.nome.toLowerCase()===nomeFinale.toLowerCase()&&!_usedEsistentiIds.has(e.id));
         if(esiste){
+          _usedEsistentiIds.add(esiste.id);
           // Aggiorna se il testo è cambiato
           if(esiste.testo!==testo){
             try{await secPatch('registrazioni','id=eq.'+esiste.id,{testo});esiste.testo=testo;
@@ -4820,6 +4833,27 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
             catch(e){console.error('Errore patch malattia '+nomeFinale+':',e);toast('Errore aggiornamento malattia '+nomeFinale)}
           }
         }else{
+          // CROSS-RAPPORTO DEDUP: stesso nome + stesse date in altro rapporto → non duplicare
+          const _newKeyI=dataInizio.toISOString().substring(0,10);
+          const _newKeyF=dataFine.toISOString().substring(0,10);
+          const _giaInAltro=datiCache.find(e=>{
+            if(e.tipo!==_malTipo)return false;
+            if(e.nome.toLowerCase()!==nomeFinale.toLowerCase())return false;
+            if((e.reparto_dip||currentReparto)!==currentReparto)return false;
+            // Escludi i record del rapporto corrente (gestiti dal blocco _esistenti sopra)
+            if(_isCurrentRapporto(e))return false;
+            // Confronta range date estratto dal record
+            const r=_getRangeMalattia(e);
+            if(!r)return false;
+            return r.i===_newKeyI&&r.f===_newKeyF;
+          });
+          if(_giaInAltro){
+            // Estrai il riferimento al rapporto sorgente dal testo (per il toast informativo)
+            const _refMatch=(_giaInAltro.testo||'').match(/da rapporto (PRESTO|NOTTE)(?:\s+del\s+(\d{2}\/\d{2}\/\d{4}))?/);
+            const _refTxt=_refMatch?(_refMatch[1]+(_refMatch[2]?' del '+_refMatch[2]:'')):'altro rapporto';
+            toast(nomeFinale+': stessa malattia già documentata nel rapporto '+_refTxt+', non duplicato');
+            continue;
+          }
           // Data del record = data del rapporto + orario reale di inserimento
           // (così l'evento appare sotto la data corretta del rapporto, non del giorno in cui hai compilato)
           const _now=new Date();
