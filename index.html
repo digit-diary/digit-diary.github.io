@@ -1306,6 +1306,32 @@ const TIPI_DEFAULT=[{nome:'Attività',colore:'#1a4a7a'},{nome:'Richiesta',colore
 let tipiPersonalizzati=[],coloriOverride={},tipoSelezionato='Attività',modalEntryId=null,modalTipoSel=null,datiCache=[],pinnedIds=new Set(),scadenzeCache=[],charts={},operatoriSalvati=[];
 let rapportoMese=new Date().getMonth(),rapportoAnno=new Date().getFullYear(),rapportoGiornoAperto=null,rapportiCache={},noteColleghiCache=[],operatoriAuthCache=[];
 // --- CRITTOGRAFIA NOTE AES-GCM ---
+// MODELLO DI SICUREZZA (importante - leggere prima di modificare):
+// Questa NON e' cifratura end-to-end. La chiave AES-GCM e' derivata da una costante
+// hardcoded (_k + _NOTE_ENC_SALT) ed e' identica per tutti gli operatori. Chiunque
+// scarichi il bundle JS pubblico puo' estrarre la chiave e decifrare i messaggi che
+// possiede.
+//
+// COSA PROTEGGE:
+//   - Backup file (es. dump JSON su USB): senza la chiave, i messaggi nei backup
+//     restano illeggibili a chi li ottiene senza accedere all'app.
+//   - Database leak isolato: se SOLO il DB venisse esfiltrato senza il codice JS,
+//     i messaggi restano cifrati.
+//
+// COSA NON PROTEGGE:
+//   - Attaccante che scarica il JS pubblico (puo' derivare la chiave)
+//   - Insider con accesso alla codebase
+//   - Intercettazione network (gia' protetto da HTTPS, non c'entra la cifratura app)
+//
+// La protezione reale dei dati passa per:
+//   - Row Level Security deny_all_anon su Supabase (autenticazione token)
+//   - HTTPS/TLS sul trasporto
+//   - Hashing password operatori
+//
+// PER MIGRARE A E2E REALE servirebbe: chiave per-utente derivata da segreto server-side
+// fetchato post-login + key exchange Signal-style per gruppi. Refactor significativo
+// con migrazione delicata dei messaggi storici (re-encrypt o keep dual-key fallback).
+// Vedere documentazione tecnica per il piano di migrazione completo.
 const _NOTE_ENC_SALT='DiarioCL26_NoteEnc_v1';
 let _noteEncKey=null;
 async function _getNoteKey(){if(_noteEncKey)return _noteEncKey;const enc=new TextEncoder();const km=await crypto.subtle.importKey('raw',enc.encode(_k+_NOTE_ENC_SALT),'PBKDF2',false,['deriveKey']);_noteEncKey=await crypto.subtle.deriveKey({name:'PBKDF2',salt:enc.encode(_NOTE_ENC_SALT),iterations:50000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);return _noteEncKey}
@@ -1315,20 +1341,35 @@ async function decryptNoteCache(){for(const n of noteColleghiCache){if(n.messagg
 // --- SUPABASE REALTIME ---
 let _sbClient=null,_noteChannel=null;
 function _getSbClient(){if(_sbClient)return _sbClient;if(typeof supabase!=='undefined'&&supabase.createClient){_sbClient=supabase.createClient(SB_URL,SB_KEY);return _sbClient}return null}
-function _initNoteRealtime(){if(_noteChannel)return;const sb=_getSbClient();if(!sb){console.warn('Supabase client non disponibile, fallback a polling');setInterval(pollNuoveNote,15000);return}
+function _initNoteRealtime(){if(_noteChannel||window._notePollingId)return;const sb=_getSbClient();if(!sb){console.warn('Supabase client non disponibile, fallback a polling');window._notePollingId=setInterval(pollNuoveNote,15000);return}
   _noteChannel=sb.channel('note-colleghi-changes').on('postgres_changes',{event:'*',schema:'public',table:'note_colleghi'},async function(payload){
-    const op=getOperatore();if(!op)return;
-    if(payload.eventType==='INSERT'){const n=payload.new;if(n.a_operatore===op||n.da_operatore===op){
-      // Evita duplicati nella cache
-      if(noteColleghiCache.find(x=>x.id===n.id))return;
-      if(n.messaggio&&n.messaggio.startsWith('ENC:'))n.messaggio=await decryptNota(n.messaggio);n._decrypted=true;noteColleghiCache.unshift(n);aggiornaNoteBadge();const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();
-      // Notifica solo per messaggi ricevuti (non per le copie dei propri messaggi inviati)
-      if(n.a_operatore===op&&n.da_operatore!==op&&!n.letta){const _cleanMsg=n.messaggio.substring(0,80).replace(/\[GNAME:[^\]]*\]/g,'').replace(/\[REPLY:[^\]]*\]/g,'');if(n.urgente){mostraNotifBanner('urgente','\u26A0\uFE0F URGENTE da '+n.da_operatore,_cleanMsg,()=>switchPage('note-collega'));inviaNotifica('\u26A0\uFE0F URGENTE da '+n.da_operatore,_cleanMsg)}else{mostraNotifBanner('nota','Nota da '+n.da_operatore,_cleanMsg,()=>switchPage('note-collega'));inviaNotifica('Nota da '+n.da_operatore,_cleanMsg)}}}}
-    else if(payload.eventType==='UPDATE'){const n=payload.new;const op=getOperatore();
-      // Se la nota è stata nascosta per questo operatore, rimuovila dalla cache
-      if((n.a_operatore===op&&n.nascosta_dest)||(n.da_operatore===op&&n.nascosta_mitt)){noteColleghiCache=noteColleghiCache.filter(x=>x.id!==n.id);aggiornaNoteBadge();const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();return}
-      const idx=noteColleghiCache.findIndex(x=>x.id===n.id);if(idx!==-1){if(n.messaggio&&n.messaggio.startsWith('ENC:'))n.messaggio=await decryptNota(n.messaggio);else if(noteColleghiCache[idx]._decrypted)n.messaggio=noteColleghiCache[idx].messaggio;n._decrypted=true;noteColleghiCache[idx]=n;aggiornaNoteBadge();const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega()}}
-    else if(payload.eventType==='DELETE'){const old=payload.old;noteColleghiCache=noteColleghiCache.filter(x=>x.id!==old.id);aggiornaNoteBadge();const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega()}
+    // FIX BUG #4: try/catch difensivo + null guard. Cosi' un INSERT con messaggio=null
+    // non rompe il canale realtime per gli eventi successivi.
+    try{
+      const op=getOperatore();if(!op)return;
+      if(payload.eventType==='INSERT'){const n=payload.new;if(n.a_operatore===op||n.da_operatore===op){
+        // Evita duplicati nella cache
+        if(noteColleghiCache.find(x=>x.id===n.id))return;
+        if(n.messaggio&&n.messaggio.startsWith('ENC:'))n.messaggio=await decryptNota(n.messaggio);n._decrypted=true;noteColleghiCache.unshift(n);aggiornaNoteBadge();const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();
+        // Notifica solo per messaggi ricevuti (non per le copie dei propri messaggi inviati)
+        // FIX EDGE CASE #1: niente banner duplicato se sei gia' nella chat aperta col mittente/gruppo
+        if(n.a_operatore===op&&n.da_operatore!==op&&!n.letta){
+          const _isCurrentConv=window._noteConvAttiva&&pg==='note-collega'&&((n.gruppo_id&&n.gruppo_id.startsWith('__gruppo_')&&window._noteConvAttiva==='gruppo:'+n.gruppo_id)||(!n.gruppo_id&&window._noteConvAttiva===n.da_operatore));
+          if(!_isCurrentConv){
+            const _cleanMsg=(n.messaggio||'').substring(0,80).replace(/\[GNAME:[^\]]*\]/g,'').replace(/\[REPLY:[^\]]*\]/g,'').trim();
+            if(n.urgente){mostraNotifBanner('urgente','\u26A0\uFE0F URGENTE da '+n.da_operatore,_cleanMsg,()=>switchPage('note-collega'));inviaNotifica('\u26A0\uFE0F URGENTE da '+n.da_operatore,_cleanMsg)}
+            else{mostraNotifBanner('nota','Nota da '+n.da_operatore,_cleanMsg,()=>switchPage('note-collega'));inviaNotifica('Nota da '+n.da_operatore,_cleanMsg)}
+          }else{
+            // Sei gia' nella chat: marca subito letta in DB (visto = letto)
+            secPatch('note_colleghi','id=eq.'+n.id,{letta:true,letta_at:new Date().toISOString()}).then(()=>{n.letta=true;aggiornaNoteBadge()}).catch(e=>console.warn('Auto-mark read failed:',e.message));
+          }
+        }}}
+      else if(payload.eventType==='UPDATE'){const n=payload.new;
+        // Se la nota è stata nascosta per questo operatore, rimuovila dalla cache
+        if((n.a_operatore===op&&n.nascosta_dest)||(n.da_operatore===op&&n.nascosta_mitt)){noteColleghiCache=noteColleghiCache.filter(x=>x.id!==n.id);aggiornaNoteBadge();const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();return}
+        const idx=noteColleghiCache.findIndex(x=>x.id===n.id);if(idx!==-1){if(n.messaggio&&n.messaggio.startsWith('ENC:'))n.messaggio=await decryptNota(n.messaggio);else if(noteColleghiCache[idx]._decrypted)n.messaggio=noteColleghiCache[idx].messaggio;n._decrypted=true;noteColleghiCache[idx]=n;aggiornaNoteBadge();const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega()}}
+      else if(payload.eventType==='DELETE'){const old=payload.old;noteColleghiCache=noteColleghiCache.filter(x=>x.id!==old.id);aggiornaNoteBadge();const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega()}
+    }catch(e){console.error('Realtime note callback error:',e,payload)}
   }).subscribe(function(status){if(status==='SUBSCRIBED')console.log('Realtime note: connesso');
     if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){console.warn('Realtime note: errore, risincronizzazione...');setTimeout(_resyncNote,3000)}});
   // Riconnessione: quando il tab torna attivo, rinnova token e risincronizza
@@ -1647,6 +1688,9 @@ async function eseguiForzaCambioPwdOp(nome){const p1=document.getElementById('op
   document.getElementById('pwd-modal-content').innerHTML='<h3>Password impostata!</h3><p style="text-align:center;color:var(--muted)">Da ora accedi con la tua nuova password.</p><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\');mostraNoteNonLette()">OK</button></div>';
   toast('Password personale impostata!')}catch(e){err.textContent='Errore salvataggio'}}
 function esci(){const tk=getOpToken()||getAdminToken();if(tk){sbRpc('invalidate_op_session',{p_token:tk}).catch(()=>{});sbRpc('invalidate_admin_session',{p_token:tk}).catch(()=>{})}
+  // FIX BUG #20: cleanup polling interval e canale realtime al logout
+  if(window._notePollingId){clearInterval(window._notePollingId);window._notePollingId=null}
+  if(_noteChannel){try{_noteChannel.unsubscribe()}catch(e){}_noteChannel=null}
   // Pulisci TUTTO: sessione, operatore, pagina, cache
   localStorage.removeItem('diario_auth_ts');localStorage.removeItem('pagina_corrente');localStorage.removeItem('operatore_corrente');
   sessionStorage.removeItem('is_admin');sessionStorage.removeItem('admin_token');sessionStorage.removeItem('op_token');sessionStorage.removeItem('diario_auth');sessionStorage.removeItem('session_active');sessionStorage.removeItem('bio_verified');sessionStorage.removeItem('note_popup_shown');
@@ -2761,16 +2805,29 @@ function modificaNotaCollega(id){const n=noteColleghiCache.find(n=>n.id===id);if
   const gid=n.gruppo_id;const _nTime2=new Date(n.created_at||0).getTime();
   const gruppo=gid?noteColleghiCache.filter(x=>x.gruppo_id===gid&&x.da_operatore===n.da_operatore&&(x.messaggio||'')===(n.messaggio||'')&&Math.abs(new Date(x.created_at||0).getTime()-_nTime2)<10000):null;
   const destLabel=gruppo&&gruppo.length>1?gruppo.map(x=>escP(x.a_operatore)).join(', '):escP(n.a_operatore);
+  // FIX EDGE CASE #2: salva snapshot del messaggio corrente per optimistic lock
+  // Se al momento del salvataggio il messaggio risulta cambiato (es. modificato altrove via realtime),
+  // abortiamo con warning invece di sovrascrivere ciecamente.
+  window._editNoteSnapshot={id:id,originalMsg:n.messaggio,originalCreatedAt:n.created_at};
   const b=document.getElementById('pwd-modal-content');
   b.innerHTML='<h3>Modifica nota</h3><p>Destinatari: <strong>'+destLabel+'</strong></p><div class="pwd-field"><label>Messaggio</label><textarea id="edit-nota-msg" style="width:100%;min-height:80px;padding:10px;font-family:\'Source Sans 3\',sans-serif;font-size:.95rem;border:1.5px solid var(--line);border-radius:2px;resize:vertical">'+n.messaggio.replace(/</g,'&lt;')+'</textarea></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaModificaNota('+id+')">Salva</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden')}
 async function salvaModificaNota(id){const msg=document.getElementById('edit-nota-msg').value.trim();if(!msg){toast('Scrivi un messaggio');return}
-  const n=noteColleghiCache.find(n=>n.id===id);const gid=n?n.gruppo_id:null;
+  const n=noteColleghiCache.find(n=>n.id===id);if(!n){toast('Nota non trovata');return}
+  // FIX EDGE CASE #2: optimistic lock - verifica che il messaggio non sia cambiato dall'apertura del dialog
+  const snap=window._editNoteSnapshot;
+  if(snap&&snap.id===id&&snap.originalMsg!==n.messaggio){
+    toast('La nota e\' stata modificata altrove. Riapri il messaggio per vedere la versione aggiornata.');
+    document.getElementById('pwd-modal').classList.add('hidden');
+    window._editNoteSnapshot=null;
+    return;
+  }
+  const gid=n?n.gruppo_id:null;
   const _nTimeM=new Date(n.created_at||0).getTime();
   const ids=gid?noteColleghiCache.filter(x=>x.gruppo_id===gid&&x.da_operatore===n.da_operatore&&(x.messaggio||'')===(n.messaggio||'')&&Math.abs(new Date(x.created_at||0).getTime()-_nTimeM)<10000).map(x=>x.id):[id];
   const msgEnc=await encryptNota(msg);
   try{for(const nid of ids){await secPatch('note_colleghi','id=eq.'+nid,{messaggio:msgEnc});const c=noteColleghiCache.find(x=>x.id===nid);if(c){c.messaggio=msg;c._decrypted=true}}
-  document.getElementById('pwd-modal').classList.add('hidden');renderNoteCollega();toast('Nota modificata')}catch(e){toast('Errore modifica nota')}}
+  document.getElementById('pwd-modal').classList.add('hidden');window._editNoteSnapshot=null;renderNoteCollega();toast('Nota modificata')}catch(e){toast('Errore modifica nota')}}
 async function eliminaNotaSmart(id){const n=noteColleghiCache.find(n=>n.id===id);if(!n)return;
   const gid=n.gruppo_id;const op=n.da_operatore;
   const _nTimeS=new Date(n.created_at||0).getTime();
@@ -3021,7 +3078,18 @@ function _apriGruppoSelezionato(){
   const label=nomeGruppo.trim()||nomeDefault;
   const op=getOperatore();
   const membri=[op,...dests].sort().join('|');
-  const gid='__gruppo_custom_'+membri.replace(/[^a-zA-Z0-9]/g,'_').substring(0,60);
+  // FIX EDGE CASE #3: per gruppi corti il gid e' come prima (backward compat),
+  // per gruppi lunghi (>60 char puliti) appende un hash deterministico per evitare collisioni di troncamento.
+  const _cleanMembri=membri.replace(/[^a-zA-Z0-9]/g,'_');
+  let gid;
+  if(_cleanMembri.length<=60){
+    gid='__gruppo_custom_'+_cleanMembri;
+  }else{
+    // Hash djb2 short, alphanumeric — guarantees uniqueness anche per truncation collisions
+    let _h=5381;for(let _i=0;_i<_cleanMembri.length;_i++)_h=((_h<<5)+_h+_cleanMembri.charCodeAt(_i))|0;
+    const _hash=Math.abs(_h).toString(36);
+    gid='__gruppo_custom_'+_cleanMembri.substring(0,50)+'_'+_hash;
+  }
   // Salva nome gruppo in localStorage + nel gid per condividerlo
   localStorage.setItem('_gruppo_nome_'+gid,label);
   window._noteConvGruppo={reparto:'custom',dests:dests,gid:gid,label:label};
@@ -3096,7 +3164,25 @@ function apriConversazione(partner){
   const op=getOperatore();const ora=new Date().toISOString();
   const conv=_getConvNotes(partner,op);
   const daLeggere=conv.filter(n=>n.a_operatore===op&&!n.letta);
-  if(daLeggere.length){daLeggere.forEach(n=>{n.letta=true;n.letta_at=ora;secPatch('note_colleghi','id=eq.'+n.id,{letta:true,letta_at:ora}).catch(()=>{})});aggiornaNoteBadge()}
+  if(daLeggere.length){
+    // FIX BUG #5: optimistic update + retry su fallimento + rollback se errore (no piu' fire-and-forget silenzioso)
+    daLeggere.forEach(n=>{n.letta=true;n.letta_at=ora});
+    aggiornaNoteBadge();
+    (async()=>{
+      const failed=[];
+      for(const n of daLeggere){
+        try{await secPatch('note_colleghi','id=eq.'+n.id,{letta:true,letta_at:ora})}
+        catch(e){console.error('Mark as read fallito per nota '+n.id+':',e.message);failed.push(n)}
+      }
+      if(failed.length){
+        // Rollback dei record falliti
+        failed.forEach(n=>{n.letta=false;n.letta_at=null});
+        aggiornaNoteBadge();
+        const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();
+        toast(failed.length+' messaggi non marcati letti (errore rete)');
+      }
+    })();
+  }
   // Show chat area on mobile
   _chatShowArea();
   renderNoteChat(partner);renderNoteCollega();
@@ -3132,12 +3218,15 @@ function _getConvNotes(partner,op){
     // Persistent group: get all messages, deduplicate by grupo_id+created_at (sender sees only their copy)
     if(gid.startsWith('__gruppo_')){
       const all=noteColleghiCache.filter(n=>n.gruppo_id===gid&&((n.da_operatore===op&&!n.nascosta_mitt)||(n.a_operatore===op&&!n.nascosta_dest)));
-      // Deduplicate: for sent messages show one copy, for received show the one addressed to me
+      // FIX BUG #1: dedup per inviati usa timestamp ESATTO (created_at completo), non minuto/contenuto.
+      // Per ricevuti ogni riga e' unica per id (no dedup needed).
+      // Cosi' due messaggi identici "ok" inviati nel gruppo non si annullano piu'.
       const seen=new Set();const result=[];
       all.forEach(n=>{
         const isSent=n.da_operatore===op;
-        // Dedup: per messaggi inviati raggruppa per gruppo_id+messaggio (evita N bolle per N destinatari)
-        const dedupKey=isSent?(n.da_operatore+'_'+(n.messaggio||'').substring(0,50)+'_'+n.gruppo_id):(n.da_operatore+'_'+(n.messaggio||'').substring(0,50)+'_'+(n.created_at||'').substring(0,16));
+        const dedupKey=isSent
+          ?('s:'+n.da_operatore+'|'+n.gruppo_id+'|'+(n.created_at||''))
+          :('r:'+n.id);
         if(!seen.has(dedupKey)){seen.add(dedupKey);result.push(n)}});
       return result}
     return noteColleghiCache.filter(n=>n.gruppo_id===gid&&((n.da_operatore===op&&!n.nascosta_mitt)||(n.a_operatore===op&&!n.nascosta_dest)))}
@@ -3319,6 +3408,8 @@ document.addEventListener('click',function(e){if(!e.target.closest('.reaction-pi
 async function toggleReazione(noteId,emoji){
   const op=getOperatore();if(!op)return;
   const n=noteColleghiCache.find(x=>x.id===noteId);if(!n)return;
+  // FIX BUG #16: salva lo stato precedente per rollback in caso di fallimento PATCH
+  const _reazioniPrecedenti=n.reazioni;
   let reazioni=n.reazioni||{};
   if(typeof reazioni==='string'){try{reazioni=JSON.parse(reazioni)}catch(e){reazioni={}}}
   reazioni={...reazioni};
@@ -3330,11 +3421,18 @@ async function toggleReazione(noteId,emoji){
   if(reazioni[emoji].length===0)delete reazioni[emoji];
   n.reazioni=reazioni;
   _closeAllReactionPickers();
-  // Update UI immediately
+  // Update UI immediately (optimistic)
   const bubbleEl=document.getElementById('note-bubble-'+noteId);
   if(bubbleEl){const oldR=bubbleEl.querySelector('.chat-reactions');const newR=document.createElement('div');newR.innerHTML=renderReazioni(n);const newEl=newR.firstChild;if(oldR&&newEl)oldR.replaceWith(newEl);else if(oldR&&!newEl)oldR.remove();else if(!oldR&&newEl){const timeEl=bubbleEl.querySelector('.chat-time');if(timeEl)timeEl.after(newEl)}}
-  // Save to DB
-  try{await secPatch('note_colleghi','id=eq.'+noteId,{reazioni:JSON.stringify(reazioni)})}catch(e){console.warn('Errore salvataggio reazione:',e)}}
+  // Save to DB - rollback se fallisce
+  try{await secPatch('note_colleghi','id=eq.'+noteId,{reazioni:JSON.stringify(reazioni)})}
+  catch(e){
+    console.error('Errore salvataggio reazione:',e);
+    // Rollback cache + UI
+    n.reazioni=_reazioniPrecedenti;
+    if(bubbleEl){const oldR=bubbleEl.querySelector('.chat-reactions');const newR=document.createElement('div');newR.innerHTML=renderReazioni(n);const newEl=newR.firstChild;if(oldR&&newEl)oldR.replaceWith(newEl);else if(oldR&&!newEl)oldR.remove();else if(!oldR&&newEl){const timeEl=bubbleEl.querySelector('.chat-time');if(timeEl)timeEl.after(newEl)}}
+    toast('Errore salvataggio reazione, riprova');
+  }}
 function renderReazioni(note){
   let reazioni=note.reazioni||{};
   if(typeof reazioni==='string'){try{reazioni=JSON.parse(reazioni)}catch(e){reazioni={}}}
@@ -3406,7 +3504,12 @@ async function _eseguiInoltro(noteId,destKey,isSingle){
 async function inviaNotaChat(){
   const ta=document.getElementById('nota-msg-chat');if(!ta)return;
   let msg=ta.value.trim();if(!msg){toast('Scrivi un messaggio');return}
-  if(_replyToNote){let origMsg=_replyToNote.messaggio||'';const rm=origMsg.match(/^\[REPLY:\d+:[^:]*:[^\]]*\]/);if(rm)origMsg=origMsg.substring(rm[0].length);msg='[REPLY:'+_replyToNote.id+':'+_replyToNote.da_operatore+':'+origMsg.substring(0,60).replace(/[\[\]:]/g,'')+']'+msg}
+  if(_replyToNote){let origMsg=_replyToNote.messaggio||'';const rm=origMsg.match(/^\[REPLY:\d+:[^:]*:[^\]]*\]/);if(rm)origMsg=origMsg.substring(rm[0].length);
+    // FIX EDGE CASE #4: sanitize anche il NOME del mittente nella citation REPLY
+    // (prima solo il testo veniva sanitizzato, il nome poteva contenere : o ] e rompere il regex)
+    const _replySafeName=(_replyToNote.da_operatore||'').replace(/[\[\]:]/g,'');
+    const _replySafeMsg=origMsg.substring(0,60).replace(/[\[\]:]/g,'');
+    msg='[REPLY:'+_replyToNote.id+':'+_replySafeName+':'+_replySafeMsg+']'+msg}
   const op=getOperatore();if(!op){toast('Seleziona prima un operatore');return}
   const partner=window._noteConvAttiva;if(!partner){toast('Seleziona una conversazione');return}
   // Per nuovi gruppi custom: includi tag nome nel primo messaggio
@@ -3467,7 +3570,11 @@ function filtraConversazioni(){const q=(document.getElementById('conv-search-inp
       if(n.gruppo_id)partnerConMatch.add('gruppo:'+n.gruppo_id)}});
   document.querySelectorAll('.conv-item').forEach(el=>{
     const name=el.getAttribute('data-conv-name')||'';
-    const show=name.includes(ql)||partnerConMatch.has(name.split(' ')[0]);
+    // FIX BUG #11: prima usava name.split(' ')[0] che prendeva solo il primo cognome,
+    // mancando match per nomi composti tipo "Pisano Pamela". Ora controlla se uno
+    // qualsiasi dei partner con match e' contenuto in name.
+    let show=name.includes(ql);
+    if(!show)for(const p of partnerConMatch){if(name.includes(p)){show=true;break}}
     el.style.display=show?'':'none'})}
 // Ricerca nella chat
 let _chatSearchResults=[],_chatSearchIdx=-1;
@@ -3985,10 +4092,33 @@ function mostraNoteNonLette(){const op=getOperatore();if(!op)return;
   const mc=document.getElementById('note-modal-content');
   // Segna tutte come lette automaticamente all'apertura del popup
   segnaNoteLette();
-  mc.innerHTML='<h3 style="margin-bottom:4px">Hai '+nonLette.length+' nota/e non letta/e</h3><p style="color:var(--muted);font-size:.82rem;margin-bottom:16px">Messaggi dai tuoi colleghi</p>'+nonLette.map(n=>'<div style="background:var(--paper2);border-radius:3px;padding:12px;margin-bottom:10px;border-left:3px solid var(--accent2)"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><strong style="color:var(--accent2)">Da: '+escP(n.da_operatore)+'</strong><span style="font-size:.75rem;color:var(--muted)">'+new Date(n.created_at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</span></div><div style="font-size:.95rem">'+esc(n.messaggio)+'</div><button style="margin-top:8px;color:var(--accent2);border:1px solid var(--accent2);background:none;padding:4px 14px;border-radius:2px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:Source Sans 3,sans-serif" onclick="document.getElementById(\'note-modal\').classList.add(\'hidden\');switchPage(\'note-collega\');setTimeout(function(){rispondiNota(\''+escP(n.da_operatore).replace(/'/g,"\\'")+'\','+n.id+')},300)">Rispondi</button></div>').join('')+'<div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'note-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
+  // FIX BUG #2: pulisci il testo da tag [REPLY:id:nome:testo] e [GNAME:nome] prima di mostrarlo
+  // FIX BUG #3: indica se il messaggio era in un gruppo (label gruppo accanto al mittente)
+  const _pulisciTesto=(t)=>(t||'').replace(/\[REPLY:\d+:[^:]*:[^\]]*\]/g,'').replace(/\[GNAME:[^\]]*\]/g,'').trim();
+  const _gruppoLabel=(n)=>{
+    if(!n.gruppo_id||!n.gruppo_id.startsWith('__gruppo_'))return'';
+    const gid=n.gruppo_id;
+    if(gid==='__gruppo_slots')return' (in Tutti Slots)';
+    if(gid==='__gruppo_tavoli')return' (in Tutti Tavoli)';
+    if(gid==='__gruppo_tutti')return' (in Tutti)';
+    if(gid.startsWith('__gruppo_custom_')){const nm=_getGruppoNome(gid);return nm?' (in '+escP(nm)+')':' (in gruppo)'}
+    return' (in gruppo)';
+  };
+  mc.innerHTML='<h3 style="margin-bottom:4px">Hai '+nonLette.length+' nota/e non letta/e</h3><p style="color:var(--muted);font-size:.82rem;margin-bottom:16px">Messaggi dai tuoi colleghi</p>'+nonLette.map(n=>{
+    const testoPulito=_pulisciTesto(n.messaggio);
+    const ctxGruppo=_gruppoLabel(n);
+    return'<div style="background:var(--paper2);border-radius:3px;padding:12px;margin-bottom:10px;border-left:3px solid var(--accent2)"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><strong style="color:var(--accent2)">Da: '+escP(n.da_operatore)+'<span style="font-weight:400;color:var(--muted);font-size:.82rem">'+ctxGruppo+'</span></strong><span style="font-size:.75rem;color:var(--muted)">'+new Date(n.created_at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</span></div><div style="font-size:.95rem">'+esc(testoPulito)+'</div><button style="margin-top:8px;color:var(--accent2);border:1px solid var(--accent2);background:none;padding:4px 14px;border-radius:2px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:Source Sans 3,sans-serif" onclick="document.getElementById(\'note-modal\').classList.add(\'hidden\');switchPage(\'note-collega\');setTimeout(function(){rispondiNota(\''+escP(n.da_operatore).replace(/'/g,"\\'")+'\','+n.id+')},300)">Rispondi</button></div>';
+  }).join('')+'<div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'note-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
   document.getElementById('note-modal').classList.remove('hidden')}
 async function segnaNoteLette(){const op=getOperatore();const nonLette=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.letta);const ora=new Date().toISOString();
-  for(const n of nonLette){try{await secPatch('note_colleghi','id=eq.'+n.id,{letta:true,letta_at:ora});n.letta=true;n.letta_at=ora}catch(e){}}renderNoteCollega()}
+  // FIX: stesso pattern del Bug #5 - error handling esplicito invece del catch silenzioso
+  const failed=[];
+  for(const n of nonLette){
+    try{await secPatch('note_colleghi','id=eq.'+n.id,{letta:true,letta_at:ora});n.letta=true;n.letta_at=ora}
+    catch(e){console.error('segnaNoteLette fallita per nota '+n.id+':',e.message);failed.push(n)}
+  }
+  if(failed.length)toast(failed.length+' note non marcate lette (errore rete)');
+  renderNoteCollega()}
 
 // MODULI DISCIPLINARI
 function apriModulo(tipo){
