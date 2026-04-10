@@ -4677,13 +4677,20 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
     // _rapLabel SCOPATO per data del rapporto: ogni rapporto (turno+data) ha firma univoca
     const _rappDateStr=new Date(ds+'T12:00:00').toLocaleDateString('it-IT');
     const _rapLabel='da rapporto '+turno+' del '+_rappDateStr;
+    const _rapLabelOld='da rapporto '+turno;// formato legacy senza data
     const _malTipo=nomeCorrente('Malattia');
     // Snapshot delle malattie già esistenti per QUESTO rapporto specifico (turno+data+reparto)
-    const _esistenti=datiCache.filter(e=>
-      e.tipo===_malTipo
-      && (e.testo||'').includes(_rapLabel)
-      && (e.reparto_dip||currentReparto)===currentReparto
-    );
+    // Backwards-compat: include anche record formato vecchio se creati nel giorno del rapporto
+    const _esistenti=datiCache.filter(e=>{
+      if(e.tipo!==_malTipo)return false;
+      if((e.reparto_dip||currentReparto)!==currentReparto)return false;
+      const t=e.testo||'';
+      // Formato nuovo: scopato per data del rapporto
+      if(t.includes(_rapLabel))return true;
+      // Formato vecchio: "da rapporto TURNO)" senza " del " + creato nel giorno del rapporto
+      if(t.includes(_rapLabelOld+')')&&!t.includes(_rapLabelOld+' del ')&&(e.data||'').startsWith(ds))return true;
+      return false;
+    });
     const _nomiProcessati=new Set();
     const assenzeText=data.assenze||'';
     if(!assenzeText.trim()){
@@ -4813,7 +4820,11 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
             catch(e){console.error('Errore patch malattia '+nomeFinale+':',e);toast('Errore aggiornamento malattia '+nomeFinale)}
           }
         }else{
-          const rec={id:Date.now()+Math.floor(Math.random()*1000),nome:nomeFinale,tipo:_malTipo,testo,data:new Date().toISOString(),operatore:getOperatore(),reparto_dip:currentReparto};
+          // Data del record = data del rapporto + orario reale di inserimento
+          // (così l'evento appare sotto la data corretta del rapporto, non del giorno in cui hai compilato)
+          const _now=new Date();
+          const _evtDate=new Date(ds+'T'+String(_now.getHours()).padStart(2,'0')+':'+String(_now.getMinutes()).padStart(2,'0')+':'+String(_now.getSeconds()).padStart(2,'0')).toISOString();
+          const rec={id:Date.now()+Math.floor(Math.random()*1000),nome:nomeFinale,tipo:_malTipo,testo,data:_evtDate,operatore:getOperatore(),reparto_dip:currentReparto};
           try{const _saved=await secPost('registrazioni',rec);
             // Usa l'id reale dal DB se disponibile (fallback su id locale)
             if(_saved&&_saved[0]&&_saved[0].id)rec.id=_saved[0].id;
