@@ -4658,6 +4658,292 @@ async function apriGiorno(ds){flushRapportoSave();rapportoGiornoAperto=ds;const 
   window._rappTimers={};window._rappPending={};window._rappDs=ds;
   function autoSave(turno,cls){clearTimeout(window._rappTimers[cls]);window._rappPending[cls]=turno;const st=document.getElementById('status-'+cls);if(st)st.textContent='Salvando...';window._rappTimers[cls]=setTimeout(()=>{delete window._rappPending[cls];salvaRapportoTurno(ds,turno,cls).then(()=>{if(st){st.textContent='Salvato';setTimeout(()=>{if(st)st.textContent=''},2000)}})},1200)}
   document.querySelectorAll('#rapporto-view .turno-body textarea, #rapporto-view .turno-body input').forEach(el=>{const cls=el.id.startsWith('presto')?'presto':'notte';const turno=cls==='presto'?'PRESTO':'NOTTE';el.addEventListener('input',()=>autoSave(turno,cls));el.addEventListener('change',()=>autoSave(turno,cls))})}
+// === D-FULL PARSER ASSENZE: analyze + execute + audit + transactional ============
+// Helper: estrae range date di una malattia (dal testo "dal DD/MM/YYYY al DD/MM/YYYY" o dal campo data per single-day)
+function _getRangeMalattiaRec(rec){
+  const t=rec.testo||'';
+  const m=t.match(/dal\s+(\d{1,2})\/(\d{1,2})\/(\d{4})\s+al\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if(m)return{i:m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'),f:m[6]+'-'+m[5].padStart(2,'0')+'-'+m[4].padStart(2,'0')};
+  if(rec.data){const d=(rec.data||'').substring(0,10);return{i:d,f:d}}
+  return null;
+}
+// Helper: true se il record appartiene al rapporto corrente (turno+ds), inclusi formati legacy
+function _recIsCurrentRapporto(rec,_rapLabel,_rapLabelOld,ds){
+  const t=rec.testo||'';
+  if(t.includes(_rapLabel))return true;
+  if(t.includes(_rapLabelOld+')')&&!t.includes(_rapLabelOld+' del ')&&(rec.data||'').startsWith(ds))return true;
+  return false;
+}
+// === ANALYZE: parsa il campo assenze e ritorna lista operazioni (NESSUN side effect) ===
+function _analizzaAssenzeRapporto(assenzeText,ds,turno){
+  const _rappDateStr=new Date(ds+'T12:00:00').toLocaleDateString('it-IT');
+  const _rapLabel='da rapporto '+turno+' del '+_rappDateStr;
+  const _rapLabelOld='da rapporto '+turno;
+  const _malTipo=nomeCorrente('Malattia');
+  // D1: snapshot esistenti per QUESTO rapporto, ESCLUSI i record con origine='manual'
+  const _esistenti=datiCache.filter(e=>{
+    if(e.tipo!==_malTipo)return false;
+    if((e.reparto_dip||currentReparto)!==currentReparto)return false;
+    if(e.origine==='manual')return false;
+    return _recIsCurrentRapporto(e,_rapLabel,_rapLabelOld,ds);
+  });
+  const ops={creates:[],updates:[],deletes:[],skipped:[],errors:[],meta:{rapLabel:_rapLabel,malTipo:_malTipo,turno,ds,rappDateStr:_rappDateStr}};
+  if(!assenzeText.trim()){
+    // Tutte le esistenti diventano deletes
+    for(const v of _esistenti){
+      ops.deletes.push({id:v.id,nome:v.nome,motivo:'campo assenze vuoto'});
+    }
+    return ops;
+  }
+  const _nomiProcessati=new Set();
+  const _usedEsistentiIds=new Set();
+  const righe=assenzeText.split('\n').filter(r=>r.trim());
+  for(const riga of righe){
+    if(/\b(lutto|ferie|vacanza|vacanze|infortunio|permesso|giorno libero|riposo|congedo|ritardo|in ritardo)\b/i.test(riga))continue;
+    let _rigaPulita=riga.replace(/([a-zà-ü])(dal\s|fino\s)/gi,'$1 $2');
+    let m=_rigaPulita.match(/^([A-ZÀ-Üa-zà-ü\s.'-]+?)\s*(assente|malattia|malato|malata|([A-Z])\s*(\d{1,2}))\b/);
+    if(m&&m[1])m[1]=m[1].replace(/\s+(da|dal|fino|al|a)$/i,'');
+    if(!m){const _preDate=_rigaPulita.match(/^(.+?)\s+(?:dal\s|fino\s|domani|dopodomani|oggi)/i);
+      if(_preDate){let _pn=_preDate[1].replace(/\s+(da|dal|fino|a)$/i,'').trim();
+        if(_pn.length>=3&&/^[A-ZÀ-Üa-zà-ü\s.'-]+$/.test(_pn))m=[_rigaPulita,_pn,'assente',null,null]}}
+    if(m&&m[1].trim().split(/\s+/).length>4)m=null;
+    if(!m&&/\b(assente|malattia|malato|malata|malessere|non.{0,10}present[ei]|non.{0,10}vien[ei]|chiamat[oa]|si è sentit[oa]|non.{0,10}sar[àa]|non sta bene|sta male|ricoverat[oa]|ospedale|pronto soccorso|visita medica|controllo medico|certificato medico)\b/i.test(riga)){
+      let _foundNome=null,_codice=null;
+      for(const c of collaboratoriCache){
+        const words=c.nome.toLowerCase().split(/\s+/);
+        for(const w of words){
+          if(w.length>=3&&new RegExp('\\b'+w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','i').test(riga)){
+            _foundNome=c.nome;break}}
+        if(_foundNome)break}
+      if(_foundNome){
+        const _cm=riga.match(/\b([A-Z])\s*(\d{1,2})\b/);
+        if(_cm)_codice=_cm;
+        m=[riga,_foundNome,_codice?_cm[0]:'assente',_codice?_cm[1]:null,_codice?_cm[2]:null]}}
+    if(!m)continue;
+    const nome=m[1]&&m[1]===m[1]?capitalizzaNome(m[1].trim()):capitalizzaNome(m[1]);
+    const isCodice=!!m[3]&&/^[a-zA-Z]$/.test(m[3]);
+    const codiceNum=m[4]?parseInt(m[4]):0;
+    const domaniMatch=/\bdomani\b/i.test(riga);
+    const dopodomaniMatch=/\bdopodomani\b/i.test(riga);
+    const oggiMatch=/\b(oggi|stasera|questa sera)\b/i.test(riga);
+    const finoMatch=riga.match(/fino\s+(?:al?\s+)?(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?/i);
+    const dalAlMatch=_rigaPulita.match(/dal\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?\s+al\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?/i);
+    const _giorniSett={lunedi:1,lunedì:1,martedi:2,martedì:2,mercoledi:3,mercoledì:3,giovedi:4,giovedì:4,venerdi:5,venerdì:5,sabato:6,domenica:0};
+    const _giorniTrovati=[];
+    const rigaLow=riga.toLowerCase();
+    for(const[g,idx]of Object.entries(_giorniSett)){if(rigaLow.includes(g))_giorniTrovati.push(idx)}
+    const finoGiornoMatch=riga.match(/fino\s+(?:a\s+)?(luned[iì]|marted[iì]|mercoled[iì]|gioved[iì]|venerd[iì]|sabato|domenica)/i);
+    const dataRapp=new Date(ds+'T12:00:00');
+    let dataInizio=new Date(ds+'T12:00:00'),dataFine=new Date(ds+'T12:00:00');
+    if(dopodomaniMatch&&domaniMatch){
+      dataInizio=new Date(dataRapp);dataInizio.setDate(dataInizio.getDate()+1);
+      dataFine=new Date(dataRapp);dataFine.setDate(dataFine.getDate()+2);
+    }else if(domaniMatch&&_giorniTrovati.length){
+      dataInizio=new Date(dataRapp);dataInizio.setDate(dataInizio.getDate()+1);
+      const targetDay=_giorniTrovati[0];
+      dataFine=new Date(dataRapp);
+      let diff=(targetDay-dataFine.getDay()+7)%7;if(diff===0)diff=7;
+      dataFine.setDate(dataFine.getDate()+diff);
+      if(dataFine<dataInizio)dataFine.setDate(dataFine.getDate()+7);
+    }else if(finoGiornoMatch){
+      const targetDay=_giorniSett[finoGiornoMatch[1].toLowerCase()];
+      dataFine=new Date(dataRapp);
+      let diff=(targetDay-dataFine.getDay()+7)%7;if(diff===0)diff=7;
+      dataFine.setDate(dataFine.getDate()+diff);
+    }else if(_giorniTrovati.length>=2){
+      const dates=_giorniTrovati.map(g=>{const d=new Date(dataRapp);let diff=(g-d.getDay()+7)%7;if(diff===0)diff=7;d.setDate(d.getDate()+diff);return d}).sort((a,b)=>a-b);
+      dataInizio=dates[0];dataFine=dates[dates.length-1];
+    }else if(_giorniTrovati.length===1){
+      const targetDay=_giorniTrovati[0];
+      dataInizio=new Date(dataRapp);
+      let diff=(targetDay-dataInizio.getDay()+7)%7;if(diff===0)diff=7;
+      dataInizio.setDate(dataInizio.getDate()+diff);
+      dataFine=new Date(dataInizio);
+    }else if(dopodomaniMatch){
+      dataInizio=new Date(dataRapp);dataInizio.setDate(dataInizio.getDate()+1);
+      dataFine=new Date(dataRapp);dataFine.setDate(dataFine.getDate()+2);
+    }else if(domaniMatch){
+      dataInizio=new Date(dataRapp);dataInizio.setDate(dataInizio.getDate()+1);dataFine=new Date(dataInizio);
+    }else if(dalAlMatch){
+      const gInizio=parseInt(dalAlMatch[1]),mInizio=dalAlMatch[2]?parseInt(dalAlMatch[2])-1:dataRapp.getMonth();
+      const _aInizio=dalAlMatch[3]?parseInt(dalAlMatch[3]):null;
+      const annoInizio=_aInizio?(_aInizio<100?2000+_aInizio:_aInizio):dataRapp.getFullYear();
+      const gFine=parseInt(dalAlMatch[4]),mFine=dalAlMatch[5]?parseInt(dalAlMatch[5])-1:mInizio;
+      const _aFine=dalAlMatch[6]?parseInt(dalAlMatch[6]):null;
+      const annoFine=_aFine?(_aFine<100?2000+_aFine:_aFine):annoInizio;
+      dataInizio=new Date(annoInizio,mInizio,gInizio,12);
+      dataFine=new Date(annoFine,mFine,gFine,12);
+    }else if(finoMatch){
+      const gFine=parseInt(finoMatch[1]),mFine=finoMatch[2]?parseInt(finoMatch[2])-1:dataRapp.getMonth();
+      dataFine=new Date(dataRapp.getFullYear(),mFine,gFine,12);
+      if(dataFine<dataInizio)dataFine.setFullYear(dataFine.getFullYear()+1);
+    }
+    const nomeFinale=matchCollaboratore(nome)||capitalizzaNome(nome);
+    // === D7: VALIDAZIONE DATE ===
+    if(dataFine<dataInizio){const _tmp=dataInizio;dataInizio=dataFine;dataFine=_tmp}// auto-swap
+    const _oggi=new Date();_oggi.setHours(12,0,0,0);
+    const _maxFuturo=new Date(_oggi);_maxFuturo.setDate(_maxFuturo.getDate()+365);
+    const _maxPassato=new Date(_oggi);_maxPassato.setDate(_maxPassato.getDate()-180);
+    if(dataInizio>_maxFuturo){
+      ops.errors.push({nome:nomeFinale,motivo:'data inizio oltre 12 mesi nel futuro ('+dataInizio.toLocaleDateString('it-IT')+')',riga});
+      continue;
+    }
+    if(dataFine<_maxPassato){
+      ops.errors.push({nome:nomeFinale,motivo:'data fine oltre 6 mesi nel passato ('+dataFine.toLocaleDateString('it-IT')+')',riga});
+      continue;
+    }
+    const nGiorni=Math.round((dataFine-dataInizio)/(86400000))+1;
+    if(nGiorni>180){
+      ops.errors.push({nome:nomeFinale,motivo:'range eccessivo ('+nGiorni+' giorni) - probabile errore di data',riga});
+      continue;
+    }
+    const dalStr=dataInizio.toLocaleDateString('it-IT'),alStr=dataFine.toLocaleDateString('it-IT');
+    const codeTxt=isCodice?' ('+m[2].toUpperCase()+')':'';
+    const testo=nGiorni>1
+      ?'Assente per malattia'+codeTxt+' dal '+dalStr+' al '+alStr+' ('+nGiorni+' giorni, '+_rapLabel+')'
+      :'Assente per malattia'+codeTxt+' ('+_rapLabel+')';
+    _nomiProcessati.add(nomeFinale.toLowerCase());
+    const esiste=_esistenti.find(e=>e.nome.toLowerCase()===nomeFinale.toLowerCase()&&!_usedEsistentiIds.has(e.id));
+    if(esiste){
+      _usedEsistentiIds.add(esiste.id);
+      if(esiste.testo!==testo){
+        ops.updates.push({id:esiste.id,nome:nomeFinale,vecchioTesto:esiste.testo,nuovoTesto:testo,nGiorni});
+      }
+      // else: no-op
+    }else{
+      // Cross-rapporto dedup: include ANCHE record manuali (per evitare duplicati visivi)
+      const _newKeyI=dataInizio.toISOString().substring(0,10);
+      const _newKeyF=dataFine.toISOString().substring(0,10);
+      const _giaInAltro=datiCache.find(e=>{
+        if(e.tipo!==_malTipo)return false;
+        if(e.nome.toLowerCase()!==nomeFinale.toLowerCase())return false;
+        if((e.reparto_dip||currentReparto)!==currentReparto)return false;
+        if(_recIsCurrentRapporto(e,_rapLabel,_rapLabelOld,ds))return false;
+        const r=_getRangeMalattiaRec(e);
+        if(!r)return false;
+        return r.i===_newKeyI&&r.f===_newKeyF;
+      });
+      if(_giaInAltro){
+        let _motivo;
+        if(_giaInAltro.origine==='manual'){
+          _motivo='già inserita manualmente';
+        }else{
+          const _refMatch=(_giaInAltro.testo||'').match(/da rapporto (PRESTO|NOTTE)(?:\s+del\s+(\d{2}\/\d{2}\/\d{4}))?/);
+          const _refTxt=_refMatch?(_refMatch[1]+(_refMatch[2]?' del '+_refMatch[2]:'')):'altro rapporto';
+          _motivo='già documentata nel rapporto '+_refTxt;
+        }
+        ops.skipped.push({nome:nomeFinale,motivo:_motivo,existingId:_giaInAltro.id});
+        continue;
+      }
+      // Nuovo record da creare
+      const _now=new Date();
+      const _evtDate=new Date(ds+'T'+String(_now.getHours()).padStart(2,'0')+':'+String(_now.getMinutes()).padStart(2,'0')+':'+String(_now.getSeconds()).padStart(2,'0')).toISOString();
+      ops.creates.push({
+        nome:nomeFinale,
+        nGiorni,
+        dataInizio,dataFine,
+        record:{nome:nomeFinale,tipo:_malTipo,testo,data:_evtDate,operatore:getOperatore(),reparto_dip:currentReparto,origine:'rapporto'}
+      });
+    }
+  }
+  // Cleanup orfani: nomi non più nel campo assenze diventano deletes
+  for(const v of _esistenti){
+    if(!_nomiProcessati.has((v.nome||'').toLowerCase())){
+      ops.deletes.push({id:v.id,nome:v.nome,motivo:'rimosso dal campo assenze'});
+    }
+  }
+  return ops;
+}
+// === EXECUTE: applica le operazioni (D6 transactional con fallback REST + D4 audit) ===
+async function _eseguiAssenzeOps(ops,ds,turno){
+  // D7: notifica errori validazione (non bloccanti, gli altri op vanno avanti)
+  for(const e of ops.errors){
+    toast('⚠ '+e.nome+': '+e.motivo);
+    try{logAzione('Validazione assenza fallita',e.nome+' - '+e.motivo+' (rapporto '+turno+' del '+ds+')')}catch(_){}
+  }
+  const totaleDb=ops.creates.length+ops.updates.length+ops.deletes.length;
+  if(totaleDb===0&&ops.skipped.length===0)return;
+  // D6: TRANSACTIONAL — costruisci batch operazioni per RPC
+  const rpcOps=[];
+  for(const c of ops.creates)rpcOps.push({action:'create',data:c.record});
+  for(const u of ops.updates)rpcOps.push({action:'update',id:u.id,data:{testo:u.nuovoTesto}});
+  for(const d of ops.deletes)rpcOps.push({action:'delete',id:d.id});
+  let result={created_ids:[],created:0,updated:0,deleted:0};
+  let usedFallback=false;
+  if(rpcOps.length>0){
+    const tk=getOpToken();
+    if(tk){
+      try{
+        const _rpcResult=await sbRpc('parse_assenze_transactional',{p_token:tk,p_ops:rpcOps});
+        if(_rpcResult)result=_rpcResult;
+      }catch(e){
+        console.warn('parse_assenze_transactional non disponibile, fallback REST sequenziale:',e.message);
+        usedFallback=true;
+      }
+    }else{usedFallback=true}
+    if(usedFallback){
+      // Fallback: chiamate REST sequenziali (no atomicità ma recupero degradato)
+      for(const c of ops.creates){
+        try{const _saved=await secPost('registrazioni',c.record);
+          if(_saved&&_saved[0]&&_saved[0].id)result.created_ids.push(_saved[0].id);
+          else result.created_ids.push(Date.now()+Math.floor(Math.random()*1000));
+          result.created++;
+        }catch(err){console.error('Fallback create '+c.nome+':',err);toast('Errore creazione '+c.nome)}
+      }
+      for(const u of ops.updates){
+        try{await secPatch('registrazioni','id=eq.'+u.id,{testo:u.nuovoTesto});result.updated++}
+        catch(err){console.error('Fallback update '+u.nome+':',err);toast('Errore aggiornamento '+u.nome)}
+      }
+      for(const d of ops.deletes){
+        try{await secDel('registrazioni','id=eq.'+d.id);result.deleted++}
+        catch(err){console.error('Fallback delete '+d.nome+':',err);toast('Errore rimozione '+d.nome)}
+      }
+    }
+  }
+  // Aggiorna cache locale + audit log
+  // CREATES: assegna ID dal DB e unshift in datiCache
+  for(let i=0;i<ops.creates.length;i++){
+    const c=ops.creates[i];
+    const newId=(result.created_ids&&result.created_ids[i])||(Date.now()+Math.floor(Math.random()*1000));
+    const fullRec=Object.assign({id:newId},c.record);
+    datiCache.unshift(fullRec);
+    try{logAzione('Malattia creata da rapporto',c.nome+' ('+c.nGiorni+' giorni, dal '+c.dataInizio.toLocaleDateString('it-IT')+' al '+c.dataFine.toLocaleDateString('it-IT')+', rapporto '+turno+' del '+ds+')')}catch(_){}
+  }
+  // UPDATES: patch testo in cache + audit con diff giorni
+  for(const u of ops.updates){
+    const cached=datiCache.find(x=>x.id===u.id);
+    if(cached)cached.testo=u.nuovoTesto;
+    const _vecchiGiorniMatch=(u.vecchioTesto||'').match(/\((\d+) giorni/);
+    const _vecchiGiorni=_vecchiGiorniMatch?parseInt(_vecchiGiorniMatch[1]):null;
+    const _diff=_vecchiGiorni&&_vecchiGiorni!==u.nGiorni
+      ? ' ('+(u.nGiorni>_vecchiGiorni?'esteso':'ridotto')+' da '+_vecchiGiorni+' a '+u.nGiorni+' giorni)'
+      : '';
+    try{logAzione('Malattia aggiornata da rapporto',u.nome+_diff+' (rapporto '+turno+' del '+ds+')')}catch(_){}
+  }
+  // DELETES: rimuovi da cache + audit
+  for(const d of ops.deletes){
+    datiCache=datiCache.filter(x=>x.id!==d.id);
+    try{logAzione('Malattia eliminata da rapporto',d.nome+' ('+d.motivo+', rapporto '+turno+' del '+ds+')')}catch(_){}
+  }
+  // SKIPPED: solo audit + toast
+  for(const s of ops.skipped){
+    toast(s.nome+': '+s.motivo+', non duplicato');
+    try{logAzione('Duplicato cross-rapporto saltato',s.nome+': '+s.motivo+' (rapporto '+turno+' del '+ds+')')}catch(_){}
+  }
+  // Toast riepilogo
+  const summary=[];
+  if(result.created)summary.push(result.created+' create');
+  if(result.updated)summary.push(result.updated+' aggiornate');
+  if(result.deleted)summary.push(result.deleted+' eliminate');
+  if(ops.skipped.length)summary.push(ops.skipped.length+' duplicati saltati');
+  if(summary.length)toast('Assenze: '+summary.join(', ')+(usedFallback?' (modalita compatibilita)':''));
+}
+// === ORCHESTRATOR ===
+async function _processaAssenzeRapporto(assenzeText,ds,turno){
+  const ops=_analizzaAssenzeRapporto(assenzeText,ds,turno);
+  await _eseguiAssenzeOps(ops,ds,turno);
+}
+// =================================================================================
 async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();const extra={};
   const data={data_rapporto:ds,turno,operatore:getOperatore(),updated_at:new Date().toISOString(),reparto_dip:currentReparto};
   campi.forEach(c=>{const el=document.getElementById(cls+'-'+c.key);if(!el)return;const val=c.type==='number'?parseInt(el.value)||0:el.value;
@@ -4669,210 +4955,9 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
     if(existing){await secPatch('rapporti_giornalieri',filtro,data)}
     else{try{await secPost('rapporti_giornalieri',data)}catch(e2){await secPatch('rapporti_giornalieri',filtro,data)}}
     if(!rapportiCache[ds])rapportiCache[ds]={};rapportiCache[ds][turno]=data;
-    // Auto-malattia: parse assenze field
-    // Supporta: "Tonati assente", "Tonati malattia", "Tonati x1",
-    // "Tonati assente domani", "Tonati assente dopodomani",
-    // "Tonati assente fino al 27", "Tonati dal 20 al 27"
-    // Se assenze cancellate → rimuovi malattie create da questo rapporto
-    // _rapLabel SCOPATO per data del rapporto: ogni rapporto (turno+data) ha firma univoca
-    const _rappDateStr=new Date(ds+'T12:00:00').toLocaleDateString('it-IT');
-    const _rapLabel='da rapporto '+turno+' del '+_rappDateStr;
-    const _rapLabelOld='da rapporto '+turno;// formato legacy senza data
-    const _malTipo=nomeCorrente('Malattia');
-    // Helper: estrae il range date di una malattia (dal testo o dal campo data per single-day)
-    const _getRangeMalattia=(rec)=>{
-      const t=rec.testo||'';
-      const m=t.match(/dal\s+(\d{1,2})\/(\d{1,2})\/(\d{4})\s+al\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-      if(m)return{i:m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'),f:m[6]+'-'+m[5].padStart(2,'0')+'-'+m[4].padStart(2,'0')};
-      if(rec.data){const d=(rec.data||'').substring(0,10);return{i:d,f:d}}
-      return null;
-    };
-    // Helper: true se il record appartiene al rapporto corrente (turno+data), inclusi vecchi
-    const _isCurrentRapporto=(rec)=>{
-      const t=rec.testo||'';
-      if(t.includes(_rapLabel))return true;
-      if(t.includes(_rapLabelOld+')')&&!t.includes(_rapLabelOld+' del ')&&(rec.data||'').startsWith(ds))return true;
-      return false;
-    };
-    // Snapshot delle malattie già esistenti per QUESTO rapporto specifico (turno+data+reparto)
-    // Backwards-compat: include anche record formato vecchio se creati nel giorno del rapporto
-    const _esistenti=datiCache.filter(e=>{
-      if(e.tipo!==_malTipo)return false;
-      if((e.reparto_dip||currentReparto)!==currentReparto)return false;
-      return _isCurrentRapporto(e);
-    });
-    const _nomiProcessati=new Set();
-    const _usedEsistentiIds=new Set();// per gestire piu righe stesso nome (no overwrite)
-    const assenzeText=data.assenze||'';
-    if(!assenzeText.trim()){
-      // Campo assenze vuoto → rimuovi tutte le malattie create da questo rapporto specifico
-      for(const v of _esistenti){
-        try{await secDel('registrazioni','id=eq.'+v.id);datiCache=datiCache.filter(x=>x.id!==v.id)}
-        catch(e){console.error('Errore delete malattia (assenze vuote):',e);toast('Errore rimozione malattia '+v.nome)}
-      }
-    }
-    if(assenzeText.trim()){const righe=assenzeText.split('\n').filter(r=>r.trim());
-      for(const riga of righe){
-        // Skip: non sono malattia
-        if(/\b(lutto|ferie|vacanza|vacanze|infortunio|permesso|giorno libero|riposo|congedo|ritardo|in ritardo)\b/i.test(riga))continue;
-        // Pulisci nome da "dal/al" attaccato (es. "cacciapuotidal" → "cacciapuoti dal")
-        let _rigaPulita=riga.replace(/([a-zà-ü])(dal\s|fino\s)/gi,'$1 $2');
-        // Match: nome + (assente|malattia|malato|malata|codice turno come x1,r2,c0,s1,s7...)
-        let m=_rigaPulita.match(/^([A-ZÀ-Üa-zà-ü\s.'-]+?)\s*(assente|malattia|malato|malata|([A-Z])\s*(\d{1,2}))\b/);
-        // Pulisci nome da parole residue (dal, fino, a, da)
-        if(m&&m[1])m[1]=m[1].replace(/\s+(da|dal|fino|al|a)$/i,'');
-        // Se non matcha con keyword, prova a estrarre nome prima di "dal/fino"
-        if(!m){const _preDate=_rigaPulita.match(/^(.+?)\s+(?:dal\s|fino\s|domani|dopodomani|oggi)/i);
-          if(_preDate){let _pn=_preDate[1].replace(/\s+(da|dal|fino|a)$/i,'').trim();
-            if(_pn.length>=3&&/^[A-ZÀ-Üa-zà-ü\s.'-]+$/.test(_pn))m=[_rigaPulita,_pn,'assente',null,null]}}
-        // Scarta se il "nome" è troppo lungo (frase intera, non un nome)
-        if(m&&m[1].trim().split(/\s+/).length>4)m=null;
-        // Fallback: cerca cognome collaboratore nella frase + keyword assenza
-        if(!m&&/\b(assente|malattia|malato|malata|malessere|non.{0,10}present[ei]|non.{0,10}vien[ei]|chiamat[oa]|si è sentit[oa]|non.{0,10}sar[àa]|non sta bene|sta male|ricoverat[oa]|ospedale|pronto soccorso|visita medica|controllo medico|certificato medico)\b/i.test(riga)){
-          let _foundNome=null,_codice=null;
-          // Cerca cognome di un collaboratore nella frase
-          for(const c of collaboratoriCache){
-            const words=c.nome.toLowerCase().split(/\s+/);
-            for(const w of words){
-              if(w.length>=3&&new RegExp('\\b'+w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','i').test(riga)){
-                _foundNome=c.nome;break}}
-            if(_foundNome)break}
-          if(_foundNome){
-            // Cerca codice turno nella frase (R23, X1, S7, C0, ecc.)
-            const _cm=riga.match(/\b([A-Z])\s*(\d{1,2})\b/);
-            if(_cm)_codice=_cm;
-            m=[riga,_foundNome,_codice?_cm[0]:'assente',_codice?_cm[1]:null,_codice?_cm[2]:null]}}
-        if(!m)continue;
-        const nome=m[1]&&m[1]===m[1]?capitalizzaNome(m[1].trim()):capitalizzaNome(m[1]);
-        const isCodice=!!m[3]&&/^[a-zA-Z]$/.test(m[3]);// è un codice turno
-        const codiceNum=m[4]?parseInt(m[4]):0;
-        // Cerca date: "domani", "dopodomani", "fino al DD", "dal DD al DD", giorni settimana, "domani e lunedì"
-        const domaniMatch=/\bdomani\b/i.test(riga);
-        const dopodomaniMatch=/\bdopodomani\b/i.test(riga);
-        const oggiMatch=/\b(oggi|stasera|questa sera)\b/i.test(riga);
-        const finoMatch=riga.match(/fino\s+(?:al?\s+)?(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?/i);
-        const dalAlMatch=_rigaPulita.match(/dal\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?\s+al\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?/i);
-        // Giorni della settimana
-        const _giorniSett={lunedi:1,lunedì:1,martedi:2,martedì:2,mercoledi:3,mercoledì:3,giovedi:4,giovedì:4,venerdi:5,venerdì:5,sabato:6,domenica:0};
-        const _giorniTrovati=[];
-        const rigaLow=riga.toLowerCase();
-        for(const[g,idx]of Object.entries(_giorniSett)){
-          if(rigaLow.includes(g))_giorniTrovati.push(idx)}
-        // Anche "fino a lunedì", "fino a mercoledì"
-        const finoGiornoMatch=riga.match(/fino\s+(?:a\s+)?(luned[iì]|marted[iì]|mercoled[iì]|gioved[iì]|venerd[iì]|sabato|domenica)/i);
-        const dataRapp=new Date(ds+'T12:00:00');
-        let dataInizio=new Date(ds+'T12:00:00'),dataFine=new Date(ds+'T12:00:00');
-        if(dopodomaniMatch&&domaniMatch){
-          // "domani e dopodomani" = 2 giorni
-          dataInizio=new Date(dataRapp);dataInizio.setDate(dataInizio.getDate()+1);
-          dataFine=new Date(dataRapp);dataFine.setDate(dataFine.getDate()+2);
-        }else if(domaniMatch&&_giorniTrovati.length){
-          // "domani e lunedì" = da domani fino al giorno della settimana
-          dataInizio=new Date(dataRapp);dataInizio.setDate(dataInizio.getDate()+1);
-          const targetDay=_giorniTrovati[0];
-          dataFine=new Date(dataRapp);
-          let diff=(targetDay-dataFine.getDay()+7)%7;if(diff===0)diff=7;
-          dataFine.setDate(dataFine.getDate()+diff);
-          if(dataFine<dataInizio)dataFine.setDate(dataFine.getDate()+7);
-        }else if(finoGiornoMatch){
-          // "fino a lunedì"
-          const targetDay=_giorniSett[finoGiornoMatch[1].toLowerCase()];
-          dataFine=new Date(dataRapp);
-          let diff=(targetDay-dataFine.getDay()+7)%7;if(diff===0)diff=7;
-          dataFine.setDate(dataFine.getDate()+diff);
-        }else if(_giorniTrovati.length>=2){
-          // "lunedì e martedì" = range tra i due giorni
-          const dates=_giorniTrovati.map(g=>{const d=new Date(dataRapp);let diff=(g-d.getDay()+7)%7;if(diff===0)diff=7;d.setDate(d.getDate()+diff);return d}).sort((a,b)=>a-b);
-          dataInizio=dates[0];dataFine=dates[dates.length-1];
-        }else if(_giorniTrovati.length===1){
-          // "lunedì assente" = quel giorno specifico
-          const targetDay=_giorniTrovati[0];
-          dataInizio=new Date(dataRapp);
-          let diff=(targetDay-dataInizio.getDay()+7)%7;if(diff===0)diff=7;
-          dataInizio.setDate(dataInizio.getDate()+diff);
-          dataFine=new Date(dataInizio);
-        }else if(dopodomaniMatch){
-          dataInizio=new Date(dataRapp);dataInizio.setDate(dataInizio.getDate()+1);
-          dataFine=new Date(dataRapp);dataFine.setDate(dataFine.getDate()+2);
-        }else if(domaniMatch){
-          dataInizio=new Date(dataRapp);dataInizio.setDate(dataInizio.getDate()+1);dataFine=new Date(dataInizio);
-        }else if(dalAlMatch){
-          const gInizio=parseInt(dalAlMatch[1]),mInizio=dalAlMatch[2]?parseInt(dalAlMatch[2])-1:dataRapp.getMonth();
-          const _aInizio=dalAlMatch[3]?parseInt(dalAlMatch[3]):null;
-          const annoInizio=_aInizio?(_aInizio<100?2000+_aInizio:_aInizio):dataRapp.getFullYear();
-          const gFine=parseInt(dalAlMatch[4]),mFine=dalAlMatch[5]?parseInt(dalAlMatch[5])-1:mInizio;
-          const _aFine=dalAlMatch[6]?parseInt(dalAlMatch[6]):null;
-          const annoFine=_aFine?(_aFine<100?2000+_aFine:_aFine):annoInizio;
-          dataInizio=new Date(annoInizio,mInizio,gInizio,12);
-          dataFine=new Date(annoFine,mFine,gFine,12);
-        }else if(finoMatch){
-          const gFine=parseInt(finoMatch[1]),mFine=finoMatch[2]?parseInt(finoMatch[2])-1:dataRapp.getMonth();
-          dataFine=new Date(dataRapp.getFullYear(),mFine,gFine,12);
-          if(dataFine<dataInizio)dataFine.setFullYear(dataFine.getFullYear()+1);
-        }
-        // Cerca nome completo tra collaboratori (usa matchCollaboratore con fuzzy)
-        const nomeFinale=matchCollaboratore(nome)||capitalizzaNome(nome);
-        // Crea UNA registrazione unica con range giorni
-        const nGiorni=Math.round((dataFine-dataInizio)/(86400000))+1;
-        const dalStr=dataInizio.toLocaleDateString('it-IT');const alStr=dataFine.toLocaleDateString('it-IT');
-        const codeTxt=isCodice?' ('+m[2].toUpperCase()+')':'';
-        // Testo uniforme con _rapLabel coerente in entrambi i casi (single day & range)
-        const testo=nGiorni>1
-          ?'Assente per malattia'+codeTxt+' dal '+dalStr+' al '+alStr+' ('+nGiorni+' giorni, '+_rapLabel+')'
-          :'Assente per malattia'+codeTxt+' ('+_rapLabel+')';
-        // Check: esiste gia una malattia per questo nome da QUESTO rapporto specifico (snapshot)
-        _nomiProcessati.add(nomeFinale.toLowerCase());
-        // Trova il PROSSIMO record non ancora usato per questo nome (gestisce piu righe stesso nome)
-        const esiste=_esistenti.find(e=>e.nome.toLowerCase()===nomeFinale.toLowerCase()&&!_usedEsistentiIds.has(e.id));
-        if(esiste){
-          _usedEsistentiIds.add(esiste.id);
-          // Aggiorna se il testo è cambiato
-          if(esiste.testo!==testo){
-            try{await secPatch('registrazioni','id=eq.'+esiste.id,{testo});esiste.testo=testo;
-              const _cached=datiCache.find(x=>x.id===esiste.id);if(_cached)_cached.testo=testo}
-            catch(e){console.error('Errore patch malattia '+nomeFinale+':',e);toast('Errore aggiornamento malattia '+nomeFinale)}
-          }
-        }else{
-          // CROSS-RAPPORTO DEDUP: stesso nome + stesse date in altro rapporto → non duplicare
-          const _newKeyI=dataInizio.toISOString().substring(0,10);
-          const _newKeyF=dataFine.toISOString().substring(0,10);
-          const _giaInAltro=datiCache.find(e=>{
-            if(e.tipo!==_malTipo)return false;
-            if(e.nome.toLowerCase()!==nomeFinale.toLowerCase())return false;
-            if((e.reparto_dip||currentReparto)!==currentReparto)return false;
-            // Escludi i record del rapporto corrente (gestiti dal blocco _esistenti sopra)
-            if(_isCurrentRapporto(e))return false;
-            // Confronta range date estratto dal record
-            const r=_getRangeMalattia(e);
-            if(!r)return false;
-            return r.i===_newKeyI&&r.f===_newKeyF;
-          });
-          if(_giaInAltro){
-            // Estrai il riferimento al rapporto sorgente dal testo (per il toast informativo)
-            const _refMatch=(_giaInAltro.testo||'').match(/da rapporto (PRESTO|NOTTE)(?:\s+del\s+(\d{2}\/\d{2}\/\d{4}))?/);
-            const _refTxt=_refMatch?(_refMatch[1]+(_refMatch[2]?' del '+_refMatch[2]:'')):'altro rapporto';
-            toast(nomeFinale+': stessa malattia già documentata nel rapporto '+_refTxt+', non duplicato');
-            continue;
-          }
-          // Data del record = data del rapporto + orario reale di inserimento
-          // (così l'evento appare sotto la data corretta del rapporto, non del giorno in cui hai compilato)
-          const _now=new Date();
-          const _evtDate=new Date(ds+'T'+String(_now.getHours()).padStart(2,'0')+':'+String(_now.getMinutes()).padStart(2,'0')+':'+String(_now.getSeconds()).padStart(2,'0')).toISOString();
-          const rec={id:Date.now()+Math.floor(Math.random()*1000),nome:nomeFinale,tipo:_malTipo,testo,data:_evtDate,operatore:getOperatore(),reparto_dip:currentReparto};
-          try{const _saved=await secPost('registrazioni',rec);
-            // Usa l'id reale dal DB se disponibile (fallback su id locale)
-            if(_saved&&_saved[0]&&_saved[0].id)rec.id=_saved[0].id;
-            datiCache.unshift(rec);
-            toast(nomeFinale+': '+(nGiorni>1?nGiorni+' giorni malattia registrati':'malattia registrata'))}
-          catch(e){console.error('Errore insert malattia '+nomeFinale+':',e);toast('Errore creazione malattia '+nomeFinale)}}}
-      // Cleanup orfani: elimina malattie esistenti per nomi NON più presenti nel campo assenze
-      for(const v of _esistenti){
-        if(!_nomiProcessati.has((v.nome||'').toLowerCase())){
-          try{await secDel('registrazioni','id=eq.'+v.id);datiCache=datiCache.filter(x=>x.id!==v.id)}
-          catch(e){console.error('Errore delete malattia orfana '+v.nome+':',e);toast('Errore rimozione malattia '+v.nome)}
-        }
-      }
-    }
+    // Auto-malattia: parse assenze field via _processaAssenzeRapporto (analyze + execute)
+    // D-Full: D1 origine, D4 audit log, D6 transactional RPC, D7 date validation
+    await _processaAssenzeRapporto(data.assenze||'',ds,turno);
     // Auto-differenze cassa: parse differenze_cassa field
     const diffExtra=data.note_extra?JSON.parse(data.note_extra):{};
     const diffText=diffExtra.differenze_cassa||'';
