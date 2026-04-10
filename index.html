@@ -5651,9 +5651,9 @@ function _trovaNomeSimileMaison(nome){const nomi=[...new Set(getMaisonReparto().
   const exact=nomi.find(n=>n.toLowerCase()===nl);if(exact)return{nome:exact,tipo:'esatto'};
   // Match senza spazi (Delledonne = Delle Donne)
   for(const n of nomi){if(n.toLowerCase().replace(/\s/g,'')===nlNoSp)return{nome:n,tipo:'simile'}}
-  // Levenshtein: ≤1 per nomi corti (≤8), ≤2 solo per nomi lunghi (>8) e prima lettera uguale
-  for(const n of nomi){const d=_levenshtein(nl,n.toLowerCase());const maxD=nl.length>8?2:1;
-    if(d<=maxD&&d>0&&nl.length>3&&nl[0]===n.toLowerCase()[0])return{nome:n,tipo:'simile'}}
+  // Levenshtein RIMOSSO su richiesta utente: causava falsi positivi tipo Sala→Sula, Erba→Urba.
+  // Cognomi corti non possono essere corretti via fuzzy senza errori.
+  // Restano: match esatto, senza spazi, contenuto parziale, cognome, any-token.
   // Contenuto parziale
   for(const n of nomi){if(nl.length>=4&&(n.toLowerCase().includes(nl)||nl.includes(n.toLowerCase()))&&Math.abs(n.length-nome.length)<=3)return{nome:n,tipo:'simile'}}
   // Match cognome (primo token): "Leccese" → "Leccese Pietro"
