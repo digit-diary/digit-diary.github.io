@@ -2743,8 +2743,12 @@ function rispondiNota(mittente,notaId){
   // Segna come letta se non lo è
   const nota=noteColleghiCache.find(n=>n.id===notaId);
   if(nota&&!nota.letta)segnaNotaLetta(notaId);
-  // Open conversation with the sender in chat UI
-  apriConversazione(mittente);
+  // FIX: se il messaggio era in un gruppo, apri la chat del gruppo (non la chat privata col mittente)
+  let convKey=mittente;
+  if(nota&&nota.gruppo_id&&nota.gruppo_id.startsWith('__gruppo_')){
+    convKey='gruppo:'+nota.gruppo_id;
+  }
+  apriConversazione(convKey);
   // Focus on chat input
   setTimeout(()=>{const ta=document.getElementById('nota-msg-chat');if(ta){ta.focus();ta.placeholder='Rispondi a '+mittente+'...'}},200)}
 async function eliminaNotaCollega(id,ruolo){if(!confirm('Eliminare questa nota?'))return;
@@ -2855,21 +2859,15 @@ function renderNoteCollega(){const op=getOperatore();if(!op)return;
     if(!convMap[key].notes.find(x=>x.id===n.id))convMap[key].notes.push(n);
     if(n.a_operatore===op&&!n.letta)convMap[key].unread++;
     const t=n.created_at||'';if(t>convMap[key].lastTime)convMap[key].lastTime=t});
-  // Separa gruppi e singoli, ordina per data
+  // Lista unica ordinata per data ultimo messaggio (stile WhatsApp): groups e singoli mescolati
   const allConvs=Object.values(convMap).sort((a,b)=>b.lastTime.localeCompare(a.lastTime));
-  const gruppiConvs=allConvs.filter(c=>c.partner.startsWith('gruppo:'));
-  const singoliConvs=allConvs.filter(c=>!c.partner.startsWith('gruppo:'));
   // Render conversation list
   let html='<div style="position:relative"><div class="conv-new-btn" id="conv-new-wrap" onclick="toggleConvNewDropdown(event)">&#43; Nuova conversazione</div>';
   html+='<div id="conv-new-dropdown" class="conv-new-dropdown" style="display:none;position:absolute;left:0;right:0;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,.15)"></div></div>';
   html+='<div style="padding:8px 10px;border-bottom:1px solid var(--line)"><input type="text" id="conv-search-input" placeholder="&#128269; Cerca conversazione..." oninput="filtraConversazioni()" style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:18px;font-size:.84rem;background:var(--paper);color:var(--ink);font-family:Source Sans 3,sans-serif;box-sizing:border-box"></div>';
   if(!allConvs.length){html+='<div style="padding:20px;text-align:center;color:var(--muted);font-size:.88rem">Nessuna conversazione</div>'}
-  // Gruppi prima
-  if(gruppiConvs.length){html+='<div style="padding:6px 14px;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;background:var(--paper2);border-bottom:1px solid var(--line)">Gruppi</div>'}
-  gruppiConvs.forEach(c=>{_renderConvItem(c)});
-  // Poi singoli
-  if(singoliConvs.length&&gruppiConvs.length){html+='<div style="padding:6px 14px;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;background:var(--paper2);border-bottom:1px solid var(--line)">Conversazioni</div>'}
-  singoliConvs.forEach(c=>{_renderConvItem(c)});
+  // Lista mescolata: l'ultimo che scrive (gruppo o persona) sale in cima
+  allConvs.forEach(c=>{_renderConvItem(c)});
   function _renderConvItem(c){
     const isActive=window._noteConvAttiva===c.partner;
     const isGroup=c.partner.startsWith('gruppo:');
