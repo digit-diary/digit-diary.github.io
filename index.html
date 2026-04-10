@@ -4060,6 +4060,9 @@ function loadFirmaToCanvas(canvasId,b64){const c=document.getElementById(canvasI
 let _logoB64=null;
 async function _loadLogo(){try{const r=await fetch('logo_casino.png');if(!r.ok)return;const b=await r.blob();_logoB64=await new Promise(res=>{const rd=new FileReader();rd.onloadend=()=>res(rd.result);rd.readAsDataURL(b)})}catch(e){}}
 async function generaModuloPDF(tipo){
+  // Cattura SUBITO i flag, prima di qualsiasi await (race condition con ristampaModuloPDF)
+  const _isRistampaSnap=!!window._isRistampa;
+  const _isEditSnap=!!window._editModuloId;
   let collab=capitalizzaNome((document.getElementById('mod-collaboratore')||{}).value||'');
   const resp=(document.getElementById('mod-resp')||{}).value||'';
   const data=(document.getElementById('mod-data')||{}).value||'';
@@ -4183,7 +4186,7 @@ async function generaModuloPDF(tipo){
   if(_fResp)dati.firma_resp=_fResp;if(_fCollab)dati.firma_collab=_fCollab;dati.firma_digitale=!!(isDigFirma&&isDigFirma.checked);
   if(tipo==='allineamento'||tipo==='rdi'){dati.non_conformita=(document.getElementById('mod-non-conf')||{}).value||'';dati.obiettivo=(document.getElementById('mod-obiettivo')||{}).value||'';dati.scadenza=(document.getElementById('mod-scadenza')||{}).value||'';if(tipo==='rdi')dati.livello=(document.getElementById('mod-livello')||{}).value||'I'}
   else if(tipo==='apprezzamento'){dati.descrizione=(document.getElementById('mod-descrizione')||{}).value||'';dati.osservazioni=(document.getElementById('mod-osservazioni')||{}).value||''}
-  const isEdit=!!window._editModuloId;const isRistampa=!!window._isRistampa;
+  const isEdit=_isEditSnap;const isRistampa=_isRistampaSnap;
   // Ristampa: solo PDF, non salva nel DB
   if(isRistampa){window._editModuloId=null;chiudiModulo();return}
   try{if(isEdit){const origMod=moduliCache.find(x=>x.id===window._editModuloId);const origOp=origMod?origMod.operatore:getOperatore();
@@ -4282,7 +4285,7 @@ function checkQrHash(){const h=window.location.hash;if(!h.startsWith('#modulo/')
   const mod=moduliCache.find(m=>m.dati&&m.dati.qr_code===code);
   if(mod){switchPage('moduli');setTimeout(()=>apriModuloSalvato(mod.id),300)}else{toast('Modulo non trovato')}
   history.replaceState(null,'',window.location.pathname)}
-function ristampaModuloPDF(id){window._isRistampa=true;apriModuloSalvato(id);setTimeout(()=>{const m=moduliCache.find(x=>x.id===id);if(m)generaModuloPDF(m.tipo);window._isRistampa=false},150)}
+async function ristampaModuloPDF(id){window._isRistampa=true;apriModuloSalvato(id);await new Promise(r=>setTimeout(r,150));const m=moduliCache.find(x=>x.id===id);try{if(m)await generaModuloPDF(m.tipo)}finally{window._isRistampa=false}}
 async function eliminaModulo(id){if(!confirm('Eliminare questo modulo? Sarà spostato nel cestino.'))return;
   const _m=moduliCache.find(x=>x.id===id);const op=getOperatore();const now=new Date().toISOString();
   try{await secPatch('moduli','id=eq.'+id,{eliminato:true,eliminato_da:op,eliminato_at:now});
@@ -4671,12 +4674,24 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
     // "Tonati assente domani", "Tonati assente dopodomani",
     // "Tonati assente fino al 27", "Tonati dal 20 al 27"
     // Se assenze cancellate → rimuovi malattie create da questo rapporto
-    const _rapLabel='da rapporto '+turno;
+    // _rapLabel SCOPATO per data del rapporto: ogni rapporto (turno+data) ha firma univoca
+    const _rappDateStr=new Date(ds+'T12:00:00').toLocaleDateString('it-IT');
+    const _rapLabel='da rapporto '+turno+' del '+_rappDateStr;
+    const _malTipo=nomeCorrente('Malattia');
+    // Snapshot delle malattie già esistenti per QUESTO rapporto specifico (turno+data+reparto)
+    const _esistenti=datiCache.filter(e=>
+      e.tipo===_malTipo
+      && (e.testo||'').includes(_rapLabel)
+      && (e.reparto_dip||currentReparto)===currentReparto
+    );
+    const _nomiProcessati=new Set();
     const assenzeText=data.assenze||'';
     if(!assenzeText.trim()){
-      // Campo assenze vuoto → rimuovi malattie create da questo rapporto per oggi
-      const vecchie=datiCache.filter(e=>e.tipo===nomeCorrente('Malattia')&&e.testo.includes(_rapLabel)&&e.data.startsWith(ds));
-      for(const v of vecchie){try{await secDel('registrazioni','id=eq.'+v.id);datiCache=datiCache.filter(x=>x.id!==v.id)}catch(e){}}
+      // Campo assenze vuoto → rimuovi tutte le malattie create da questo rapporto specifico
+      for(const v of _esistenti){
+        try{await secDel('registrazioni','id=eq.'+v.id);datiCache=datiCache.filter(x=>x.id!==v.id)}
+        catch(e){console.error('Errore delete malattia (assenze vuote):',e);toast('Errore rimozione malattia '+v.nome)}
+      }
     }
     if(assenzeText.trim()){const righe=assenzeText.split('\n').filter(r=>r.trim());
       for(const riga of righe){
@@ -4783,16 +4798,36 @@ async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();c
         const nGiorni=Math.round((dataFine-dataInizio)/(86400000))+1;
         const dalStr=dataInizio.toLocaleDateString('it-IT');const alStr=dataFine.toLocaleDateString('it-IT');
         const codeTxt=isCodice?' ('+m[2].toUpperCase()+')':'';
-        // Check: esiste gia una malattia per questo nome da questo rapporto?
-        const testo=nGiorni>1?'Assente per malattia'+codeTxt+' dal '+dalStr+' al '+alStr+' ('+nGiorni+' giorni, da rapporto '+turno+')':'Assente per malattia'+codeTxt+' (da rapporto '+turno+' del '+new Date(ds+'T12:00:00').toLocaleDateString('it-IT')+')';
-        const esiste=datiCache.find(e=>e.nome.toLowerCase()===nomeFinale.toLowerCase()&&e.tipo===nomeCorrente('Malattia')&&e.testo.includes(_rapLabel));
+        // Testo uniforme con _rapLabel coerente in entrambi i casi (single day & range)
+        const testo=nGiorni>1
+          ?'Assente per malattia'+codeTxt+' dal '+dalStr+' al '+alStr+' ('+nGiorni+' giorni, '+_rapLabel+')'
+          :'Assente per malattia'+codeTxt+' ('+_rapLabel+')';
+        // Check: esiste gia una malattia per questo nome da QUESTO rapporto specifico (snapshot)
+        _nomiProcessati.add(nomeFinale.toLowerCase());
+        const esiste=_esistenti.find(e=>e.nome.toLowerCase()===nomeFinale.toLowerCase());
         if(esiste){
           // Aggiorna se il testo è cambiato
-          if(esiste.testo!==testo){try{await secPatch('registrazioni','id=eq.'+esiste.id,{testo});esiste.testo=testo}catch(e){}}
+          if(esiste.testo!==testo){
+            try{await secPatch('registrazioni','id=eq.'+esiste.id,{testo});esiste.testo=testo;
+              const _cached=datiCache.find(x=>x.id===esiste.id);if(_cached)_cached.testo=testo}
+            catch(e){console.error('Errore patch malattia '+nomeFinale+':',e);toast('Errore aggiornamento malattia '+nomeFinale)}
+          }
         }else{
-          const rec={id:Date.now()+Math.floor(Math.random()*1000),nome:nomeFinale,tipo:nomeCorrente('Malattia'),testo,data:new Date().toISOString(),operatore:getOperatore(),reparto_dip:currentReparto};
-          try{await secPost('registrazioni',rec);datiCache.unshift(rec);
-            toast(nomeFinale+': '+(nGiorni>1?nGiorni+' giorni malattia registrati':'malattia registrata'))}catch(e){}}}}
+          const rec={id:Date.now()+Math.floor(Math.random()*1000),nome:nomeFinale,tipo:_malTipo,testo,data:new Date().toISOString(),operatore:getOperatore(),reparto_dip:currentReparto};
+          try{const _saved=await secPost('registrazioni',rec);
+            // Usa l'id reale dal DB se disponibile (fallback su id locale)
+            if(_saved&&_saved[0]&&_saved[0].id)rec.id=_saved[0].id;
+            datiCache.unshift(rec);
+            toast(nomeFinale+': '+(nGiorni>1?nGiorni+' giorni malattia registrati':'malattia registrata'))}
+          catch(e){console.error('Errore insert malattia '+nomeFinale+':',e);toast('Errore creazione malattia '+nomeFinale)}}}
+      // Cleanup orfani: elimina malattie esistenti per nomi NON più presenti nel campo assenze
+      for(const v of _esistenti){
+        if(!_nomiProcessati.has((v.nome||'').toLowerCase())){
+          try{await secDel('registrazioni','id=eq.'+v.id);datiCache=datiCache.filter(x=>x.id!==v.id)}
+          catch(e){console.error('Errore delete malattia orfana '+v.nome+':',e);toast('Errore rimozione malattia '+v.nome)}
+        }
+      }
+    }
     // Auto-differenze cassa: parse differenze_cassa field
     const diffExtra=data.note_extra?JSON.parse(data.note_extra):{};
     const diffText=diffExtra.differenze_cassa||'';
