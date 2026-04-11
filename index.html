@@ -1305,6 +1305,11 @@ const DEFAULT_PWD_HASH='7310db08dd56916e4ded25837db6cf4ff5005c958fb53e405a62fd10
 const TIPI_DEFAULT=[{nome:'Attività',colore:'#1a4a7a'},{nome:'Richiesta',colore:'#2c6e49'},{nome:'Errore',colore:'#c0392b'},{nome:'Ammonimento Verbale',colore:'#7b2d8b'},{nome:'Malattia',colore:'#1a7a6d'},{nome:'Non Disponibilità',colore:'#5d6d7e'},{nome:'Nota',colore:'#8b6914'},{nome:'Altro',colore:'#8a7d6b'}];
 let tipiPersonalizzati=[],coloriOverride={},tipoSelezionato='Attività',modalEntryId=null,modalTipoSel=null,datiCache=[],pinnedIds=new Set(),scadenzeCache=[],charts={},operatoriSalvati=[];
 let rapportoMese=new Date().getMonth(),rapportoAnno=new Date().getFullYear(),rapportoGiornoAperto=null,rapportiCache={},noteColleghiCache=[],operatoriAuthCache=[];
+// === ENTERPRISE CHAT SCHEMA CACHES ===
+// Le 5 nuove tabelle chat_* sono la fonte di verita' per la chat.
+// noteColleghiCache viene RIGENERATA da chatMessagesCache via _chatBuildNoteCache()
+// per mantenere backward compat col rendering esistente (sintetizza N righe per gruppo).
+let chatMessagesCache=[],chatGroupsCache=[],chatGroupMembersCache=[],chatLettiCache=[],chatHiddenCache=[];
 // --- CRITTOGRAFIA NOTE AES-GCM ---
 // MODELLO DI SICUREZZA (importante - leggere prima di modificare):
 // Questa NON e' cifratura end-to-end. La chiave AES-GCM e' derivata da una costante
@@ -1338,43 +1343,296 @@ async function _getNoteKey(){if(_noteEncKey)return _noteEncKey;const enc=new Tex
 async function encryptNota(testo){try{const key=await _getNoteKey();const iv=crypto.getRandomValues(new Uint8Array(12));const enc=new TextEncoder().encode(testo);const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc);const buf=new Uint8Array(iv.length+ct.byteLength);buf.set(iv);buf.set(new Uint8Array(ct),iv.length);return'ENC:'+btoa(String.fromCharCode(...buf))}catch(e){console.error('Encrypt error:',e);return testo}}
 async function decryptNota(data){if(!data||!data.startsWith('ENC:'))return data;try{const key=await _getNoteKey();const raw=atob(data.substring(4));const buf=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)buf[i]=raw.charCodeAt(i);const iv=buf.slice(0,12),ct=buf.slice(12);const dec=await crypto.subtle.decrypt({name:'AES-GCM',iv},key,ct);return new TextDecoder().decode(dec)}catch(e){console.error('Decrypt error:',e);return data.substring(4)}}
 async function decryptNoteCache(){for(const n of noteColleghiCache){if(n.messaggio&&n.messaggio.startsWith('ENC:')&&!n._decrypted){n.messaggio=await decryptNota(n.messaggio);n._decrypted=true}}}
+// === ENTERPRISE CHAT: helpers di sintesi ===
+// Decifra tutti i chat_messages cached
+async function decryptChatMessagesCache(){
+  for(const m of chatMessagesCache){
+    if(m.messaggio&&m.messaggio.startsWith('ENC:')&&!m._decrypted){
+      m.messaggio=await decryptNota(m.messaggio);
+      m._decrypted=true;
+    }
+  }
+}
+// Helper: trova un chat_groups dato il suo id
+function _chatGetGroupById(group_id){return chatGroupsCache.find(g=>g.id===group_id)}
+// Helper: trova i membri di un gruppo
+function _chatGetGroupMembers(group_id){return chatGroupMembersCache.filter(m=>m.group_id===group_id).map(m=>m.operatore)}
+// Helper: ritorna il legacy gruppo_id se disponibile, altrimenti sintetizzato
+function _chatGroupGid(group){if(!group)return null;return group.legacy_gid||('__chat_group_'+group.id)}
+// Helper: trova chat_message per id
+function _chatFindMsg(id){return chatMessagesCache.find(m=>m.id===id)}
+// Helper: chi ha letto un messaggio
+function _chatLetti(message_id){return chatLettiCache.filter(l=>l.message_id===message_id)}
+// Helper: ha letto un operatore?
+function _chatHasLetto(message_id,operatore){return chatLettiCache.some(l=>l.message_id===message_id&&l.operatore===operatore)}
+// Helper: e' nascosto per un operatore?
+function _chatIsHidden(message_id,operatore){return chatHiddenCache.some(h=>h.message_id===message_id&&h.operatore===operatore)}
+// Trasforma un chat_message in 1 o N synthetic note_colleghi rows (per backward compat rendering)
+function _chatToSyntheticNotes(m){
+  const result=[];
+  if(m.a_operatore){
+    // 1-to-1
+    const isHiddenMitt=_chatIsHidden(m.id,m.da_operatore);
+    const isHiddenDest=_chatIsHidden(m.id,m.a_operatore);
+    const lettoDest=_chatHasLetto(m.id,m.a_operatore);
+    result.push({
+      id:m.id,
+      da_operatore:m.da_operatore,
+      a_operatore:m.a_operatore,
+      gruppo_id:null,
+      messaggio:m.messaggio,
+      letta:lettoDest,
+      letta_at:lettoDest?(_chatLetti(m.id).find(l=>l.operatore===m.a_operatore)||{}).letta_at:null,
+      nascosta_mitt:isHiddenMitt,
+      nascosta_dest:isHiddenDest,
+      reazioni:m.reazioni,
+      importante:m.importante,
+      urgente:m.urgente,
+      created_at:m.created_at,
+      updated_at:m.edited_at,
+      _decrypted:!!m._decrypted,
+      _chat_id:m.id,// id del chat_messages canonico
+    });
+  }else if(m.group_id){
+    // Group: sintetizza N synthetic rows
+    const group=_chatGetGroupById(m.group_id);
+    if(!group)return result;
+    const gid=_chatGroupGid(group);
+    const members=_chatGetGroupMembers(m.group_id);
+    const isHiddenMitt=_chatIsHidden(m.id,m.da_operatore);
+    // Add 1 row per (member who is NOT the sender)
+    for(const member of members){
+      if(member===m.da_operatore)continue;// no self-row
+      const letto=_chatHasLetto(m.id,member);
+      const isHiddenForMember=_chatIsHidden(m.id,member);
+      result.push({
+        id:m.id,// stesso id canonico per tutte le sintesi
+        da_operatore:m.da_operatore,
+        a_operatore:member,
+        gruppo_id:gid,
+        messaggio:m.messaggio,
+        letta:letto,
+        letta_at:letto?(_chatLetti(m.id).find(l=>l.operatore===member)||{}).letta_at:null,
+        nascosta_mitt:isHiddenMitt,
+        nascosta_dest:isHiddenForMember,
+        reazioni:m.reazioni,
+        importante:m.importante,
+        urgente:m.urgente,
+        created_at:m.created_at,
+        updated_at:m.edited_at,
+        _decrypted:!!m._decrypted,
+        _chat_id:m.id,
+      });
+    }
+  }
+  return result;
+}
+// Rigenera noteColleghiCache da chatMessagesCache (chiamato dopo loadAll e dopo realtime events)
+function _chatBuildNoteCache(){
+  const result=[];
+  for(const m of chatMessagesCache){
+    const syn=_chatToSyntheticNotes(m);
+    result.push(...syn);
+  }
+  // Sort desc per created_at (come ordering REST originale)
+  result.sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||''));
+  noteColleghiCache=result;
+}
+// === ENTERPRISE CHAT: WRAPPER OPERAZIONI ===
+// Patch un chat_message - traduce campi legacy (letta, nascosta_*) in operazioni corrette
+async function _chatPatchMessage(chatMessageId,updates){
+  const tk=getOpToken();const op=getOperatore();
+  const directUpdates={};
+  for(const k in updates){
+    const v=updates[k];
+    if(k==='letta'&&v===true){
+      // Marca come letto per l'operatore corrente (idempotent)
+      try{await sbRpc('chat_mark_letta',{p_token:tk,p_message_id:chatMessageId})}catch(e){console.warn('chat_mark_letta:',e.message)}
+      if(!chatLettiCache.some(l=>l.message_id===chatMessageId&&l.operatore===op)){
+        chatLettiCache.push({message_id:chatMessageId,operatore:op,letta_at:new Date().toISOString()});
+      }
+    }else if((k==='nascosta_mitt'||k==='nascosta_dest')&&v===true){
+      // Nascondi per operatore corrente (per nascosta_mitt si nasconde solo a chi lo ha inviato)
+      try{await sbRpc('chat_hide_message',{p_token:tk,p_message_id:chatMessageId})}catch(e){console.warn('chat_hide_message:',e.message)}
+      if(!chatHiddenCache.some(h=>h.message_id===chatMessageId&&h.operatore===op)){
+        chatHiddenCache.push({message_id:chatMessageId,operatore:op,hidden_at:new Date().toISOString()});
+      }
+    }else if(k==='letta_at'||k==='updated_at'){
+      // Skip - gestiti automaticamente
+    }else{
+      // Colonna reale su chat_messages
+      directUpdates[k]=v;
+    }
+  }
+  if(Object.keys(directUpdates).length>0){
+    if('messaggio' in directUpdates){
+      directUpdates.edited_at=new Date().toISOString();
+    }
+    try{await secPatch('chat_messages','id=eq.'+chatMessageId,directUpdates)}
+    catch(e){console.error('chat_messages patch fallita:',e.message);throw e}
+    const m=chatMessagesCache.find(x=>x.id===chatMessageId);
+    if(m)Object.assign(m,directUpdates);
+  }
+  _chatBuildNoteCache();
+}
+// Elimina un chat_message dal DB e dalla cache (cascades a letti e hidden)
+async function _chatDeleteMessage(chatMessageId){
+  try{await secDel('chat_messages','id=eq.'+chatMessageId)}
+  catch(e){console.error('chat_messages delete fallita:',e.message);throw e}
+  chatMessagesCache=chatMessagesCache.filter(m=>m.id!==chatMessageId);
+  chatLettiCache=chatLettiCache.filter(l=>l.message_id!==chatMessageId);
+  chatHiddenCache=chatHiddenCache.filter(h=>h.message_id!==chatMessageId);
+  _chatBuildNoteCache();
+}
+// Inserisce un nuovo chat_message (1-to-1 o gruppo) e aggiorna la cache
+// Usa: opts = {da, partner: 'nome' | 'gruppo:gid', messaggioCifrato, urgente?, gruppoMembers?}
+async function _chatInsertMessage(opts){
+  const tk=getOpToken();
+  const da=opts.da;
+  const partner=opts.partner;
+  const isGroup=partner.startsWith('gruppo:');
+  const _batchTs=new Date().toISOString();
+  const rec={da_operatore:da,messaggio:opts.messaggioCifrato,created_at:_batchTs};
+  if(opts.urgente)rec.urgente=true;
+  if(opts.importante)rec.importante=true;
+  if(isGroup){
+    const legacyGid=partner.replace('gruppo:','');
+    let group=chatGroupsCache.find(g=>g.legacy_gid===legacyGid||String(g.id)===legacyGid);
+    if(!group){
+      let tipo='custom',nome=null;
+      if(legacyGid==='__gruppo_slots'){tipo='slots';nome='Tutti Slots'}
+      else if(legacyGid==='__gruppo_tavoli'){tipo='tavoli';nome='Tutti Tavoli'}
+      else if(legacyGid==='__gruppo_tutti'){tipo='tutti';nome='Tutti'}
+      else if(legacyGid.startsWith('__gruppo_custom_'))nome=_getGruppoNome(legacyGid)||'Gruppo personalizzato';
+      const newGroupId=await sbRpc('chat_get_or_create_group',{p_token:tk,p_tipo:tipo,p_legacy_gid:legacyGid,p_nome:nome,p_members:opts.gruppoMembers||[da]});
+      group={id:newGroupId,nome,tipo,legacy_gid:legacyGid,creato_da:da,created_at:_batchTs};
+      chatGroupsCache.push(group);
+      for(const m of (opts.gruppoMembers||[da])){
+        if(!chatGroupMembersCache.some(x=>x.group_id===newGroupId&&x.operatore===m)){
+          chatGroupMembersCache.push({group_id:newGroupId,operatore:m,joined_at:_batchTs});
+        }
+      }
+    }
+    rec.group_id=group.id;
+  }else{
+    rec.a_operatore=partner;
+  }
+  const r=await secPost('chat_messages',rec);
+  const newMsg=r[0];
+  newMsg.messaggio=opts.messaggioPlain||newMsg.messaggio;
+  newMsg._decrypted=!!opts.messaggioPlain;
+  chatMessagesCache.unshift(newMsg);
+  _chatBuildNoteCache();
+  return newMsg;
+}
 // --- SUPABASE REALTIME ---
 let _sbClient=null,_noteChannel=null;
 function _getSbClient(){if(_sbClient)return _sbClient;if(typeof supabase!=='undefined'&&supabase.createClient){_sbClient=supabase.createClient(SB_URL,SB_KEY);return _sbClient}return null}
 function _initNoteRealtime(){if(_noteChannel||window._notePollingId)return;const sb=_getSbClient();if(!sb){console.warn('Supabase client non disponibile, fallback a polling');window._notePollingId=setInterval(pollNuoveNote,15000);return}
-  _noteChannel=sb.channel('note-colleghi-changes').on('postgres_changes',{event:'*',schema:'public',table:'note_colleghi'},async function(payload){
-    // FIX BUG #4: try/catch difensivo + null guard. Cosi' un INSERT con messaggio=null
-    // non rompe il canale realtime per gli eventi successivi.
-    try{
-      const op=getOperatore();if(!op)return;
-      if(payload.eventType==='INSERT'){const n=payload.new;if(n.a_operatore===op||n.da_operatore===op){
-        // Evita duplicati nella cache
-        if(noteColleghiCache.find(x=>x.id===n.id))return;
-        if(n.messaggio&&n.messaggio.startsWith('ENC:'))n.messaggio=await decryptNota(n.messaggio);n._decrypted=true;noteColleghiCache.unshift(n);aggiornaNoteBadge();const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();
-        // Notifica solo per messaggi ricevuti (non per le copie dei propri messaggi inviati)
-        // FIX EDGE CASE #1: niente banner duplicato se sei gia' nella chat aperta col mittente/gruppo
-        if(n.a_operatore===op&&n.da_operatore!==op&&!n.letta){
-          const _isCurrentConv=window._noteConvAttiva&&pg==='note-collega'&&((n.gruppo_id&&n.gruppo_id.startsWith('__gruppo_')&&window._noteConvAttiva==='gruppo:'+n.gruppo_id)||(!n.gruppo_id&&window._noteConvAttiva===n.da_operatore));
-          if(!_isCurrentConv){
-            const _cleanMsg=(n.messaggio||'').substring(0,80).replace(/\[GNAME:[^\]]*\]/g,'').replace(/\[REPLY:[^\]]*\]/g,'').trim();
-            if(n.urgente){mostraNotifBanner('urgente','\u26A0\uFE0F URGENTE da '+n.da_operatore,_cleanMsg,()=>switchPage('note-collega'));inviaNotifica('\u26A0\uFE0F URGENTE da '+n.da_operatore,_cleanMsg)}
-            else{mostraNotifBanner('nota','Nota da '+n.da_operatore,_cleanMsg,()=>switchPage('note-collega'));inviaNotifica('Nota da '+n.da_operatore,_cleanMsg)}
-          }else{
-            // Sei gia' nella chat: marca subito letta in DB (visto = letto)
-            secPatch('note_colleghi','id=eq.'+n.id,{letta:true,letta_at:new Date().toISOString()}).then(()=>{n.letta=true;aggiornaNoteBadge()}).catch(e=>console.warn('Auto-mark read failed:',e.message));
+  // ENTERPRISE REALTIME: subscribe a chat_messages, chat_message_letti, chat_message_hidden
+  _noteChannel=sb.channel('chat-enterprise-changes')
+    .on('postgres_changes',{event:'*',schema:'public',table:'chat_messages'},async function(payload){
+      try{
+        const op=getOperatore();if(!op)return;
+        if(payload.eventType==='INSERT'){
+          const m=payload.new;
+          // Skip duplicati
+          if(chatMessagesCache.find(x=>x.id===m.id))return;
+          if(m.messaggio&&m.messaggio.startsWith('ENC:'))m.messaggio=await decryptNota(m.messaggio);
+          m._decrypted=true;
+          chatMessagesCache.unshift(m);
+          _chatBuildNoteCache();
+          aggiornaNoteBadge();
+          const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();
+          // Notifica solo per messaggi che riceviamo (1-to-1 a noi, o gruppo di cui siamo membri, NON nostri)
+          if(m.da_operatore!==op){
+            let isForMe=false;
+            if(m.a_operatore===op)isForMe=true;
+            else if(m.group_id&&chatGroupMembersCache.some(gm=>gm.group_id===m.group_id&&gm.operatore===op))isForMe=true;
+            if(isForMe){
+              // Skip banner se sei gia' nella chat aperta
+              let convKey=null;
+              if(m.a_operatore===op)convKey=m.da_operatore;// 1-to-1
+              else if(m.group_id){const g=_chatGetGroupById(m.group_id);if(g)convKey='gruppo:'+_chatGroupGid(g)}
+              const _isCurrentConv=window._noteConvAttiva&&pg==='note-collega'&&window._noteConvAttiva===convKey;
+              if(!_isCurrentConv){
+                const _cleanMsg=(m.messaggio||'').substring(0,80).replace(/\[GNAME:[^\]]*\]/g,'').replace(/\[REPLY:[^\]]*\]/g,'').trim();
+                if(m.urgente){mostraNotifBanner('urgente','\u26A0\uFE0F URGENTE da '+m.da_operatore,_cleanMsg,()=>switchPage('note-collega'));inviaNotifica('\u26A0\uFE0F URGENTE da '+m.da_operatore,_cleanMsg)}
+                else{mostraNotifBanner('nota','Nota da '+m.da_operatore,_cleanMsg,()=>switchPage('note-collega'));inviaNotifica('Nota da '+m.da_operatore,_cleanMsg)}
+              }else{
+                // Auto-mark letta se sei gia' nella chat
+                _chatPatchMessage(m.id,{letta:true}).then(()=>aggiornaNoteBadge()).catch(e=>console.warn('Auto-mark read failed:',e.message));
+              }
+            }
           }
-        }}}
-      else if(payload.eventType==='UPDATE'){const n=payload.new;
-        // Se la nota è stata nascosta per questo operatore, rimuovila dalla cache
-        if((n.a_operatore===op&&n.nascosta_dest)||(n.da_operatore===op&&n.nascosta_mitt)){noteColleghiCache=noteColleghiCache.filter(x=>x.id!==n.id);aggiornaNoteBadge();const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();return}
-        const idx=noteColleghiCache.findIndex(x=>x.id===n.id);if(idx!==-1){if(n.messaggio&&n.messaggio.startsWith('ENC:'))n.messaggio=await decryptNota(n.messaggio);else if(noteColleghiCache[idx]._decrypted)n.messaggio=noteColleghiCache[idx].messaggio;n._decrypted=true;noteColleghiCache[idx]=n;aggiornaNoteBadge();const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega()}}
-      else if(payload.eventType==='DELETE'){const old=payload.old;noteColleghiCache=noteColleghiCache.filter(x=>x.id!==old.id);aggiornaNoteBadge();const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega()}
-    }catch(e){console.error('Realtime note callback error:',e,payload)}
-  }).subscribe(function(status){if(status==='SUBSCRIBED')console.log('Realtime note: connesso');
-    if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){console.warn('Realtime note: errore, risincronizzazione...');setTimeout(_resyncNote,3000)}});
+        }
+        else if(payload.eventType==='UPDATE'){
+          const m=payload.new;
+          const idx=chatMessagesCache.findIndex(x=>x.id===m.id);
+          if(idx!==-1){
+            if(m.messaggio&&m.messaggio.startsWith('ENC:'))m.messaggio=await decryptNota(m.messaggio);
+            else if(chatMessagesCache[idx]._decrypted)m.messaggio=chatMessagesCache[idx].messaggio;
+            m._decrypted=true;
+            chatMessagesCache[idx]=m;
+            _chatBuildNoteCache();
+            aggiornaNoteBadge();
+            const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();
+          }
+        }
+        else if(payload.eventType==='DELETE'){
+          const old=payload.old;
+          chatMessagesCache=chatMessagesCache.filter(x=>x.id!==old.id);
+          chatLettiCache=chatLettiCache.filter(l=>l.message_id!==old.id);
+          chatHiddenCache=chatHiddenCache.filter(h=>h.message_id!==old.id);
+          _chatBuildNoteCache();
+          aggiornaNoteBadge();
+          const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();
+        }
+      }catch(e){console.error('Realtime chat_messages callback error:',e,payload)}
+    })
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'chat_message_letti'},function(payload){
+      try{
+        const l=payload.new;
+        if(!chatLettiCache.some(x=>x.message_id===l.message_id&&x.operatore===l.operatore)){
+          chatLettiCache.push(l);
+          _chatBuildNoteCache();
+          aggiornaNoteBadge();
+          const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();
+        }
+      }catch(e){console.error('Realtime letti callback error:',e)}
+    })
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'chat_message_hidden'},function(payload){
+      try{
+        const h=payload.new;
+        if(!chatHiddenCache.some(x=>x.message_id===h.message_id&&x.operatore===h.operatore)){
+          chatHiddenCache.push(h);
+          _chatBuildNoteCache();
+          aggiornaNoteBadge();
+          const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();
+        }
+      }catch(e){console.error('Realtime hidden callback error:',e)}
+    })
+    .subscribe(function(status){if(status==='SUBSCRIBED')console.log('Realtime chat enterprise: connesso');
+      if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){console.warn('Realtime chat: errore, risincronizzazione...');setTimeout(_resyncNote,3000)}});
   // Riconnessione: quando il tab torna attivo, rinnova token e risincronizza
   document.addEventListener('visibilitychange',async function(){if(!document.hidden){await _ensureToken();_resyncNote()}})}
-async function _resyncNote(){try{const nuove=await secGet('note_colleghi?order=created_at.desc');if(nuove&&nuove.length!==undefined){noteColleghiCache=nuove;await decryptNoteCache();aggiornaNoteBadge();const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega()}}catch(e){}}
+async function _resyncNote(){
+  // ENTERPRISE: rifetch chat_* tables
+  try{
+    const [msgs,letti,hidden,grps,members]=await Promise.all([
+      secGet('chat_messages?order=created_at.desc'),
+      secGet('chat_message_letti?order=letta_at.desc'),
+      secGet('chat_message_hidden?order=hidden_at.desc'),
+      secGet('chat_groups?order=id.asc'),
+      secGet('chat_group_members?order=group_id.asc'),
+    ]);
+    chatMessagesCache=msgs||[];chatLettiCache=letti||[];chatHiddenCache=hidden||[];chatGroupsCache=grps||[];chatGroupMembersCache=members||[];
+    await decryptChatMessagesCache();
+    _chatBuildNoteCache();
+    aggiornaNoteBadge();
+    const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();
+  }catch(e){console.warn('_resyncNote enterprise:',e.message)}
+}
 const CAMPI_RAPPORTO_DEFAULT=[{key:'sup_note',label:'Supervisore',type:'input'},{key:'cassa_note',label:'Cassa',type:'text'},{key:'differenze_cassa',label:'Differenze Cassa',type:'text'},{key:'sala_note',label:'Sala',type:'text'},{key:'n_assegni',label:'Incasso Assegni',type:'text'},{key:'prelievi',label:'Prelievi',type:'text'},{key:'assenze',label:'Assenze',type:'text'}];
 const RAPPORTO_DB_COLS=['sup_note','cassa_note','sala_note','n_assegni','prelievi','assenze'];
 let campiRapportoExtra=[],tipiNascosti=[],campiNascosti=[],tipiOrdine=[],campiOrdine=[],campiLabelOverride={},tipiRinominati={};
@@ -1475,11 +1733,16 @@ async function loadAll(){
   if(vis)try{visibilitaConfig=JSON.parse(vis)}catch(e){}
   const opRep=await getImp('operatori_reparto');if(opRep){try{operatoriRepartoMap=JSON.parse(opRep);localStorage.setItem('_cache_operatori_reparto',opRep)}catch(e){}}
   else{try{const cached=localStorage.getItem('_cache_operatori_reparto');if(cached)operatoriRepartoMap=JSON.parse(cached)}catch(e){}}
-  const [dati,pins,scadenze,noteC,opAuth,collabs,moduli,logs,maisonD,maisonB,promemoriaD,consegneD,speseD,regaliD,noteClD,inventarioD]=await Promise.all([
+  const [dati,pins,scadenze,chatMsgs,chatGrps,chatGrpMembers,chatLetti,chatHidden,opAuth,collabs,moduli,logs,maisonD,maisonB,promemoriaD,consegneD,speseD,regaliD,noteClD,inventarioD]=await Promise.all([
     secGet('registrazioni?order=data.desc'),
     secGet('note_fissate?select=registrazione_id'),
     secGet('scadenze?order=data_scadenza.asc'),
-    secGet('note_colleghi?order=created_at.desc'),
+    // ENTERPRISE CHAT: carica le 5 nuove tabelle invece di note_colleghi
+    secGet('chat_messages?order=created_at.desc'),
+    secGet('chat_groups?order=id.asc'),
+    secGet('chat_group_members?order=group_id.asc'),
+    secGet('chat_message_letti?order=letta_at.desc'),
+    secGet('chat_message_hidden?order=hidden_at.desc'),
     sbRpc('list_operators'),
     secGet('collaboratori?attivo=eq.true&order=nome.asc'),
     secGet('moduli?order=created_at.desc'),
@@ -1493,7 +1756,13 @@ async function loadAll(){
     secGet('note_clienti?order=created_at.desc'),
     secGet('inventario?order=data_movimento.desc')]);
   datiCache=(dati||[]).filter(e=>!e.eliminato);pinnedIds=new Set(pins.map(p=>p.registrazione_id));
-  scadenzeCache=scadenze;noteColleghiCache=noteC||[];
+  scadenzeCache=scadenze;
+  // ENTERPRISE CHAT: popola caches enterprise
+  chatMessagesCache=chatMsgs||[];
+  chatGroupsCache=chatGrps||[];
+  chatGroupMembersCache=chatGrpMembers||[];
+  chatLettiCache=chatLetti||[];
+  chatHiddenCache=chatHidden||[];
   operatoriAuthCache=opAuth&&opAuth.length?opAuth:[];
   // Cache operatori in localStorage per fallback login
   if(operatoriAuthCache.length)localStorage.setItem('_cache_operatori_auth',JSON.stringify(operatoriAuthCache));
@@ -1506,7 +1775,9 @@ async function loadAll(){
   maisonCache=maisonD||[];maisonBudgetCache=maisonB||[];
   promemoriaCache=promemoriaD||[];consegneCache=consegneD||[];speseExtraCache=speseD||[];
   regaliCache=regaliD||[];noteClientiCache=noteClD||[];inventarioCache=inventarioD||[];
-  await decryptNoteCache();
+  // ENTERPRISE CHAT: decifra chat_messages e sintetizza noteColleghiCache
+  await decryptChatMessagesCache();
+  _chatBuildNoteCache();
   await loadGroqKey();
   _loadLogo();
   // Pulizia automatica: sessioni scadute + log > 12 mesi
@@ -2777,12 +3048,20 @@ function toggleGruppoDest(reparto){const c=document.querySelector('#nota-dest-bo
 function getDestinatariSelezionati(){return[...document.querySelectorAll('#nota-dest-box input[type=checkbox]:not(#nota-tutti)')].filter(cb=>cb.checked).map(cb=>cb.value)}
 async function inviaNotaCollega(){const dests=getDestinatariSelezionati(),msg=document.getElementById('nota-msg').value.trim(),da=getOperatore();
   if(!da){toast('Seleziona prima un operatore (in alto)');return}if(!dests.length){toast('Seleziona almeno un destinatario');return}if(!msg){toast('Scrivi un messaggio');_highlightField('nota-msg');return}
-  const gid=dests.length>1?crypto.randomUUID():null;
   const msgEnc=await encryptNota(msg);
-  try{for(const dest of dests){const r=await secPost('note_colleghi',{da_operatore:da,a_operatore:dest,messaggio:msgEnc,gruppo_id:gid});r[0].messaggio=msg;r[0]._decrypted=true;noteColleghiCache.unshift(r[0])}
-  document.getElementById('nota-msg').value='';document.querySelectorAll('#nota-dest-box input[type=checkbox]').forEach(cb=>cb.checked=false);renderNoteCollega();toast('Nota inviata a '+dests.join(', '));
-  inviaPush(dests,'Nota da '+da,msg.substring(0,120),'nota',true)}catch(e){toast('Errore invio')}}
-async function segnaNotaLetta(id){try{const ora=new Date().toISOString();await secPatch('note_colleghi','id=eq.'+id,{letta:true,letta_at:ora});const n=noteColleghiCache.find(n=>n.id===id);if(n){n.letta=true;n.letta_at=ora}renderNoteCollega()}catch(e){toast('Errore aggiornamento nota')}}
+  try{
+    if(dests.length===1){
+      // 1-to-1
+      await _chatInsertMessage({da,partner:dests[0],messaggioCifrato:msgEnc,messaggioPlain:msg});
+    }else{
+      // Gruppo ad-hoc → crea custom group
+      const legacyGid='__gruppo_custom_'+[da,...dests].sort().join('|').replace(/[^a-zA-Z0-9]/g,'_').substring(0,60);
+      await _chatInsertMessage({da,partner:'gruppo:'+legacyGid,messaggioCifrato:msgEnc,messaggioPlain:msg,gruppoMembers:[da,...dests]});
+    }
+    document.getElementById('nota-msg').value='';document.querySelectorAll('#nota-dest-box input[type=checkbox]').forEach(cb=>cb.checked=false);renderNoteCollega();toast('Nota inviata a '+dests.join(', '));
+    inviaPush(dests,'Nota da '+da,msg.substring(0,120),'nota',true);
+  }catch(e){toast('Errore invio: '+e.message)}}
+async function segnaNotaLetta(id){try{await _chatPatchMessage(id,{letta:true});renderNoteCollega()}catch(e){toast('Errore aggiornamento nota')}}
 function rispondiNota(mittente,notaId){
   // Segna come letta se non lo è
   const nota=noteColleghiCache.find(n=>n.id===notaId);
@@ -2796,11 +3075,10 @@ function rispondiNota(mittente,notaId){
   // Focus on chat input
   setTimeout(()=>{const ta=document.getElementById('nota-msg-chat');if(ta){ta.focus();ta.placeholder='Rispondi a '+mittente+'...'}},200)}
 async function eliminaNotaCollega(id,ruolo){if(!confirm('Eliminare questa nota?'))return;
+  // ENTERPRISE: id e' chat_messages.id, basta UNA operazione (nascondi per me)
   const campo=ruolo==='mitt'?'nascosta_mitt':'nascosta_dest';
-  const n=noteColleghiCache.find(x=>x.id===id);
-  const _nTime=new Date(n.created_at||0).getTime();
-  const ids=(ruolo==='mitt'&&n&&n.gruppo_id)?noteColleghiCache.filter(x=>x.gruppo_id===n.gruppo_id&&x.da_operatore===n.da_operatore&&(x.messaggio||'')===(n.messaggio||'')&&Math.abs(new Date(x.created_at||0).getTime()-_nTime)<10000).map(x=>x.id):[id];
-  try{for(const nid of ids){await secPatch('note_colleghi','id=eq.'+nid,{[campo]:true});const c=noteColleghiCache.find(x=>x.id===nid);if(c)c[campo]=true}renderNoteCollega();toast('Nota rimossa')}catch(e){toast('Errore rimozione nota')}}
+  try{await _chatPatchMessage(id,{[campo]:true});renderNoteCollega();toast('Nota rimossa')}
+  catch(e){toast('Errore rimozione nota')}}
 function modificaNotaCollega(id){const n=noteColleghiCache.find(n=>n.id===id);if(!n)return;
   const gid=n.gruppo_id;const _nTime2=new Date(n.created_at||0).getTime();
   const gruppo=gid?noteColleghiCache.filter(x=>x.gruppo_id===gid&&x.da_operatore===n.da_operatore&&(x.messaggio||'')===(n.messaggio||'')&&Math.abs(new Date(x.created_at||0).getTime()-_nTime2)<10000):null;
@@ -2814,7 +3092,7 @@ function modificaNotaCollega(id){const n=noteColleghiCache.find(n=>n.id===id);if
   document.getElementById('pwd-modal').classList.remove('hidden')}
 async function salvaModificaNota(id){const msg=document.getElementById('edit-nota-msg').value.trim();if(!msg){toast('Scrivi un messaggio');return}
   const n=noteColleghiCache.find(n=>n.id===id);if(!n){toast('Nota non trovata');return}
-  // FIX EDGE CASE #2: optimistic lock - verifica che il messaggio non sia cambiato dall'apertura del dialog
+  // FIX EDGE CASE #2: optimistic lock
   const snap=window._editNoteSnapshot;
   if(snap&&snap.id===id&&snap.originalMsg!==n.messaggio){
     toast('La nota e\' stata modificata altrove. Riapri il messaggio per vedere la versione aggiornata.');
@@ -2822,73 +3100,43 @@ async function salvaModificaNota(id){const msg=document.getElementById('edit-not
     window._editNoteSnapshot=null;
     return;
   }
-  const gid=n?n.gruppo_id:null;
-  const _nTimeM=new Date(n.created_at||0).getTime();
-  const ids=gid?noteColleghiCache.filter(x=>x.gruppo_id===gid&&x.da_operatore===n.da_operatore&&(x.messaggio||'')===(n.messaggio||'')&&Math.abs(new Date(x.created_at||0).getTime()-_nTimeM)<10000).map(x=>x.id):[id];
+  // ENTERPRISE: 1 sola PATCH su chat_messages
   const msgEnc=await encryptNota(msg);
-  try{for(const nid of ids){await secPatch('note_colleghi','id=eq.'+nid,{messaggio:msgEnc});const c=noteColleghiCache.find(x=>x.id===nid);if(c){c.messaggio=msg;c._decrypted=true}}
-  document.getElementById('pwd-modal').classList.add('hidden');window._editNoteSnapshot=null;renderNoteCollega();toast('Nota modificata')}catch(e){toast('Errore modifica nota')}}
-async function eliminaNotaSmart(id){const n=noteColleghiCache.find(n=>n.id===id);if(!n)return;
-  const gid=n.gruppo_id;const op=n.da_operatore;
-  const _nTimeS=new Date(n.created_at||0).getTime();
-  const copie=gid?noteColleghiCache.filter(x=>x.gruppo_id===gid&&x.da_operatore===op&&(x.messaggio||'')===(n.messaggio||'')&&Math.abs(new Date(x.created_at||0).getTime()-_nTimeS)<10000):[];
-  const qualcunoHaLetto=copie.some(x=>x.letta);
-  if(!qualcunoHaLetto&&copie.length){
-    // Nessuno ha letto → annulla invio per tutti
+  try{
+    await _chatPatchMessage(id,{messaggio:msgEnc});
+    // Aggiorna anche la cache locale chat_messages con il testo decifrato per uso immediato
+    const cm=chatMessagesCache.find(x=>x.id===id);if(cm){cm.messaggio=msg;cm._decrypted=true}
+    _chatBuildNoteCache();
+    document.getElementById('pwd-modal').classList.add('hidden');window._editNoteSnapshot=null;
+    renderNoteCollega();toast('Nota modificata');
+  }catch(e){toast('Errore modifica nota')}}
+async function eliminaNotaSmart(id){
+  // ENTERPRISE: id e' chat_messages.id. Check letti via chat_message_letti.
+  const cm=_chatFindMsg(id);if(!cm)return;
+  const letti=_chatLetti(id).filter(l=>l.operatore!==cm.da_operatore);
+  const qualcunoHaLetto=letti.length>0;
+  if(!qualcunoHaLetto){
     if(!confirm('Nessuno ha ancora letto. Annullare l\'invio per tutti?'))return;
-    const ids=copie.map(x=>x.id);
-    try{for(const nid of ids){await secDel('note_colleghi','id=eq.'+nid)}
-      noteColleghiCache=noteColleghiCache.filter(x=>!ids.includes(x.id));
-      renderNoteCollega();toast('Invio annullato per tutti')}catch(e){toast('Errore')}
+    try{await _chatDeleteMessage(id);renderNoteCollega();toast('Invio annullato per tutti')}
+    catch(e){toast('Errore')}
   }else{
-    // Qualcuno ha letto o messaggio singolo → nascondi dalla mia vista
     if(!confirm('Eliminare dalla tua vista?'))return;
-    const mieIds=copie.length?copie.map(x=>x.id):[id];
-    try{for(const nid of mieIds){await secPatch('note_colleghi','id=eq.'+nid,{nascosta_mitt:true})}
-      noteColleghiCache=noteColleghiCache.filter(x=>!mieIds.includes(x.id));
-      renderNoteCollega();toast('Messaggio eliminato dalla tua vista')}catch(e){toast('Errore')}}}
-async function annullaInvioNota(id){const n=noteColleghiCache.find(n=>n.id===id);if(!n)return;
-  const gid=n.gruppo_id;const op=n.da_operatore;
-  const _nTime=new Date(n.created_at||0).getTime();
-  const copie=gid?noteColleghiCache.filter(x=>x.gruppo_id===gid&&x.da_operatore===op&&(x.messaggio||'')===(n.messaggio||'')&&Math.abs(new Date(x.created_at||0).getTime()-_nTime)<10000):[];
-  const qualcunoHaLetto=copie.some(x=>x.letta);
-  if(qualcunoHaLetto||!copie.length){
-    // Almeno uno ha letto (o messaggio singolo) → elimina solo per me
+    try{await _chatPatchMessage(id,{nascosta_mitt:true});renderNoteCollega();toast('Messaggio eliminato dalla tua vista')}
+    catch(e){toast('Errore')}}}
+async function annullaInvioNota(id){
+  const cm=_chatFindMsg(id);if(!cm)return;
+  const letti=_chatLetti(id).filter(l=>l.operatore!==cm.da_operatore);
+  const qualcunoHaLetto=letti.length>0;
+  if(qualcunoHaLetto){
     if(!confirm('Qualcuno ha già letto questo messaggio. Eliminare solo dalla tua vista?'))return;
-    const mieIds=copie.length?copie.map(x=>x.id):[id];
-    try{for(const nid of mieIds){await secPatch('note_colleghi','id=eq.'+nid,{nascosta_mitt:true})}
-      noteColleghiCache=noteColleghiCache.filter(x=>!mieIds.includes(x.id));
-      renderNoteCollega();toast('Messaggio nascosto per te')}catch(e){toast('Errore')}
+    try{await _chatPatchMessage(id,{nascosta_mitt:true});renderNoteCollega();toast('Messaggio nascosto per te')}
+    catch(e){toast('Errore')}
   }else{
-    // Nessuno ha letto → annulla invio per tutti
-    const ids=copie.map(x=>x.id);
-    if(!confirm('Nessuno ha ancora letto. Annullare l\'invio per tutti ('+ ids.length+' destinatari)?'))return;
-    try{for(const nid of ids){await secDel('note_colleghi','id=eq.'+nid)}
-      noteColleghiCache=noteColleghiCache.filter(x=>!ids.includes(x.id));
-      renderNoteCollega();toast('Invio annullato per tutti')}catch(e){toast('Errore annullamento invio')}}}
-// Migra vecchi gruppi note al formato persistente __gruppo_slots/__gruppo_tavoli
-async function _migraNoteGruppi(){
-  if(localStorage.getItem('_note_gruppi_migrati_v2'))return;
-  const op=getOperatore();if(!op)return;
-  // Trova tutti i gruppo_id unici che NON sono già persistenti
-  const gruppiVecchi=new Set();
-  noteColleghiCache.forEach(n=>{if(n.gruppo_id&&!n.gruppo_id.startsWith('__gruppo_'))gruppiVecchi.add(n.gruppo_id)});
-  console.log('Migrazione note: '+gruppiVecchi.size+' gruppi vecchi trovati, '+noteColleghiCache.length+' note totali');
-  if(!gruppiVecchi.size){localStorage.setItem('_note_gruppi_migrati_v2','1');return}
-  let migrati=0;
-  for(const gid of gruppiVecchi){
-    const gNotes=noteColleghiCache.filter(n=>n.gruppo_id===gid);
-    if(gNotes.length<2)continue; // non è un gruppo broadcast
-    // Determina il reparto dal mittente
-    const mittente=gNotes[0].da_operatore;
-    const repMitt=operatoriRepartoMap[mittente]||'entrambi';
-    const newGid=repMitt==='tavoli'?'__gruppo_tavoli':'__gruppo_slots';
-    // Aggiorna tutti i record di questo gruppo
-    for(const n of gNotes){
-      try{await secPatch('note_colleghi','id=eq.'+n.id,{gruppo_id:newGid});n.gruppo_id=newGid;migrati++}catch(e){}}
-  }
-  localStorage.setItem('_note_gruppi_migrati_v2','1');
-  if(migrati){console.log('Migrati '+migrati+' messaggi gruppo al nuovo formato');renderNoteCollega()}}
+    if(!confirm('Nessuno ha ancora letto. Annullare l\'invio per tutti?'))return;
+    try{await _chatDeleteMessage(id);renderNoteCollega();toast('Invio annullato per tutti')}
+    catch(e){toast('Errore annullamento invio')}}}
+// _migraNoteGruppi: OBSOLETA dopo refactor enterprise (la migrazione SQL ha gia' creato chat_groups)
+async function _migraNoteGruppi(){return}
 function renderNoteCollega(){const op=getOperatore();if(!op)return;
   const listEl=document.getElementById('note-conv-list');if(!listEl)return;
   // Build conversations from noteColleghiCache
@@ -3016,12 +3264,17 @@ async function _rinominaGruppo(gid,partner){
   const label=nuovo.trim();
   if(label)localStorage.setItem('_gruppo_nome_'+gid,label);
   else localStorage.removeItem('_gruppo_nome_'+gid);
-  // Invia messaggio sistema con GNAME per sincronizzare il nome su tutti i dispositivi
+  // ENTERPRISE: aggiorna nome direttamente su chat_groups + invia messaggio sistema GNAME
   const op=getOperatore();
-  const allGruppo=noteColleghiCache.filter(x=>x.gruppo_id===gid);
-  const membri=new Set();allGruppo.forEach(n=>{if(n.a_operatore!==op)membri.add(n.a_operatore);if(n.da_operatore!==op)membri.add(n.da_operatore)});
-  if(membri.size&&label){const msgTxt='[GNAME:'+label+']Gruppo rinominato in "'+label+'"';const msgEnc=await encryptNota(msgTxt);
-    for(const dest of membri){try{const r=await secPost('note_colleghi',{da_operatore:op,a_operatore:dest,messaggio:msgEnc,gruppo_id:gid});r[0].messaggio=msgTxt;r[0]._decrypted=true;noteColleghiCache.unshift(r[0])}catch(e){}}}
+  const group=chatGroupsCache.find(g=>g.legacy_gid===gid||String(g.id)===gid);
+  if(group&&label){
+    try{await secPatch('chat_groups','id=eq.'+group.id,{nome:label});group.nome=label}catch(e){console.warn('Update nome gruppo:',e.message)}
+  }
+  if(group&&label){
+    const msgTxt='[GNAME:'+label+']Gruppo rinominato in "'+label+'"';
+    const msgEnc=await encryptNota(msgTxt);
+    try{await _chatInsertMessage({da:op,partner:'gruppo:'+gid,messaggioCifrato:msgEnc,messaggioPlain:msgTxt})}catch(e){console.warn('Send GNAME message:',e.message)}
+  }
   logAzione('Gruppo rinominato',(nomeAttuale||'senza nome')+' → '+(label||'nomi automatici'));
   renderNoteChat(partner);renderNoteCollega();toast('Gruppo rinominato')}
 function _apriRimuoviMembri(gid,partner){
@@ -3044,19 +3297,18 @@ async function _confermaRimuoviMembri(gid,partner){
   const daRimuovere=[...cbs].map(cb=>cb.value);
   if(!daRimuovere.length){toast('Seleziona almeno una persona');return}
   const op=getOperatore();
-  // Nascondi i messaggi futuri per i membri rimossi marcando come nascosta_dest
-  const msgGruppo=noteColleghiCache.filter(n=>n.gruppo_id===gid&&daRimuovere.includes(n.a_operatore));
-  for(const n of msgGruppo){
-    try{await secPatch('note_colleghi','id=eq.'+n.id,{nascosta_dest:true});n.nascosta_dest=true}catch(e){}}
-  // Manda messaggio di sistema
-  const allGruppo=noteColleghiCache.filter(x=>x.gruppo_id===gid);
-  const membriRimasti=new Set();allGruppo.forEach(n=>{if(!n.nascosta_dest&&n.a_operatore!==op)membriRimasti.add(n.a_operatore);if(n.da_operatore!==op)membriRimasti.add(n.da_operatore)});
-  daRimuovere.forEach(n=>membriRimasti.delete(n));
-  const destsRimasti=[...membriRimasti];
-  if(destsRimasti.length){
-    const msgTxt=daRimuovere.map(n=>_nomeBreve(n)).join(', ')+' rimoss'+(daRimuovere.length===1?'o/a':'i')+' dal gruppo';
-    const msgEnc=await encryptNota(msgTxt);
-    for(const dest of destsRimasti){const r=await secPost('note_colleghi',{da_operatore:op,a_operatore:dest,messaggio:msgEnc,gruppo_id:gid});r[0].messaggio=msgTxt;r[0]._decrypted=true;noteColleghiCache.unshift(r[0])}}
+  // ENTERPRISE: rimuovi membri direttamente da chat_group_members
+  const group=chatGroupsCache.find(g=>g.legacy_gid===gid||String(g.id)===gid);
+  if(!group){toast('Gruppo non trovato');return}
+  for(const m of daRimuovere){
+    try{await secDel('chat_group_members','group_id=eq.'+group.id+'&operatore=eq.'+encodeURIComponent(m));
+      chatGroupMembersCache=chatGroupMembersCache.filter(x=>!(x.group_id===group.id&&x.operatore===m));
+    }catch(e){console.warn('Remove member fallita:',e.message)}
+  }
+  // Manda messaggio di sistema notificando la rimozione
+  const msgTxt=daRimuovere.map(n=>_nomeBreve(n)).join(', ')+' rimoss'+(daRimuovere.length===1?'o/a':'i')+' dal gruppo';
+  const msgEnc=await encryptNota(msgTxt);
+  try{await _chatInsertMessage({da:op,partner:'gruppo:'+gid,messaggioCifrato:msgEnc,messaggioPlain:msgTxt})}catch(e){}
   document.getElementById('pwd-modal').classList.add('hidden');
   logAzione('Membro rimosso dal gruppo',daRimuovere.join(', ')+' rimossi da '+(_getGruppoNome(gid)||'gruppo'));
   renderNoteChat(partner);renderNoteCollega();
@@ -3128,14 +3380,20 @@ async function _confermaAggiungiMembri(gid,partner){
   const nuovi=[...cbs].map(cb=>cb.value);
   if(!nuovi.length){toast('Seleziona almeno una persona');return}
   const op=getOperatore();
-  // Manda un messaggio di sistema ai nuovi membri per "aggiungerli" al gruppo
-  const msgEnc=await encryptNota(nuovi.map(n=>_nomeBreve(n)).join(', ')+' aggiunt'+(nuovi.length===1?'o/a':'i')+' al gruppo');
+  const msgTxt=nuovi.map(n=>_nomeBreve(n)).join(', ')+' aggiunt'+(nuovi.length===1?'o/a':'i')+' al gruppo';
+  const msgEnc=await encryptNota(msgTxt);
   try{
-    // Invia a TUTTI i membri (vecchi + nuovi) con lo stesso gruppo_id
-    const allGruppo=noteColleghiCache.filter(x=>x.gruppo_id===gid);
-    const membriVecchi=new Set();allGruppo.forEach(n=>{if(n.a_operatore!==op)membriVecchi.add(n.a_operatore);if(n.da_operatore!==op)membriVecchi.add(n.da_operatore)});
-    const tuttiDest=[...membriVecchi,...nuovi];
-    for(const dest of tuttiDest){const r=await secPost('note_colleghi',{da_operatore:op,a_operatore:dest,messaggio:msgEnc,gruppo_id:gid});r[0].messaggio=nuovi.map(n=>_nomeBreve(n)).join(', ')+' aggiunt'+(nuovi.length===1?'o/a':'i')+' al gruppo';r[0]._decrypted=true;noteColleghiCache.unshift(r[0])}
+    // ENTERPRISE: aggiungi membri direttamente in chat_group_members + invia messaggio sistema
+    const group=chatGroupsCache.find(g=>g.legacy_gid===gid||String(g.id)===gid);
+    if(group){
+      for(const m of nuovi){
+        if(!chatGroupMembersCache.some(x=>x.group_id===group.id&&x.operatore===m)){
+          try{await secPost('chat_group_members',{group_id:group.id,operatore:m});chatGroupMembersCache.push({group_id:group.id,operatore:m,joined_at:new Date().toISOString()})}catch(e){console.warn('Add member fallita:',e.message)}
+        }
+      }
+    }
+    // Messaggio di sistema notificando l'aggiunta
+    await _chatInsertMessage({da:op,partner:'gruppo:'+gid,messaggioCifrato:msgEnc,messaggioPlain:msgTxt});
     document.getElementById('pwd-modal').classList.add('hidden');
     // Aggiorna nome gruppo se salvato
     const nomeGruppo=_getGruppoNome(gid);
@@ -3160,23 +3418,32 @@ function apriConversazioneGruppo(reparto){
 function apriConversazione(partner){
   window._noteConvAttiva=partner;window._noteConvGruppo=null;
   const dd=document.getElementById('conv-new-dropdown');if(dd)dd.style.display='none';
-  // Mark unread messages from this partner as read
+  // ENTERPRISE: marca come letti i messaggi non ancora letti dall'operatore corrente
   const op=getOperatore();const ora=new Date().toISOString();
   const conv=_getConvNotes(partner,op);
-  const daLeggere=conv.filter(n=>n.a_operatore===op&&!n.letta);
+  // Filtra: messaggi diretti a me oppure messaggi gruppo non miei che non ho ancora letto
+  const daLeggere=conv.filter(n=>n.a_operatore===op&&!n.letta&&n.da_operatore!==op);
   if(daLeggere.length){
-    // FIX BUG #5: optimistic update + retry su fallimento + rollback se errore (no piu' fire-and-forget silenzioso)
-    daLeggere.forEach(n=>{n.letta=true;n.letta_at=ora});
+    // Optimistic: aggiungi entry in chatLettiCache
+    const tk=getOpToken();
+    const messageIds=[...new Set(daLeggere.map(n=>n._chat_id||n.id))];
+    for(const mid of messageIds){
+      if(!chatLettiCache.some(l=>l.message_id===mid&&l.operatore===op)){
+        chatLettiCache.push({message_id:mid,operatore:op,letta_at:ora});
+      }
+    }
+    _chatBuildNoteCache();
     aggiornaNoteBadge();
     (async()=>{
       const failed=[];
-      for(const n of daLeggere){
-        try{await secPatch('note_colleghi','id=eq.'+n.id,{letta:true,letta_at:ora})}
-        catch(e){console.error('Mark as read fallito per nota '+n.id+':',e.message);failed.push(n)}
+      for(const mid of messageIds){
+        try{await sbRpc('chat_mark_letta',{p_token:tk,p_message_id:mid})}
+        catch(e){console.error('chat_mark_letta fallito per id '+mid+':',e.message);failed.push(mid)}
       }
       if(failed.length){
-        // Rollback dei record falliti
-        failed.forEach(n=>{n.letta=false;n.letta_at=null});
+        // Rollback dei falliti
+        chatLettiCache=chatLettiCache.filter(l=>!(failed.includes(l.message_id)&&l.operatore===op));
+        _chatBuildNoteCache();
         aggiornaNoteBadge();
         const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();
         toast(failed.length+' messaggi non marcati letti (errore rete)');
@@ -3443,12 +3710,14 @@ async function toggleReazione(noteId,emoji){
   // Update UI immediately (optimistic)
   const bubbleEl=document.getElementById('note-bubble-'+noteId);
   if(bubbleEl){const oldR=bubbleEl.querySelector('.chat-reactions');const newR=document.createElement('div');newR.innerHTML=renderReazioni(n);const newEl=newR.firstChild;if(oldR&&newEl)oldR.replaceWith(newEl);else if(oldR&&!newEl)oldR.remove();else if(!oldR&&newEl){const timeEl=bubbleEl.querySelector('.chat-time');if(timeEl)timeEl.after(newEl)}}
-  // Save to DB - rollback se fallisce
-  try{await secPatch('note_colleghi','id=eq.'+noteId,{reazioni:JSON.stringify(reazioni)})}
+  // Save to DB - ENTERPRISE: aggiorna chat_messages.reazioni
+  try{await _chatPatchMessage(noteId,{reazioni:reazioni})}
   catch(e){
     console.error('Errore salvataggio reazione:',e);
     // Rollback cache + UI
     n.reazioni=_reazioniPrecedenti;
+    const cm=chatMessagesCache.find(x=>x.id===noteId);if(cm)cm.reazioni=_reazioniPrecedenti;
+    _chatBuildNoteCache();
     if(bubbleEl){const oldR=bubbleEl.querySelector('.chat-reactions');const newR=document.createElement('div');newR.innerHTML=renderReazioni(n);const newEl=newR.firstChild;if(oldR&&newEl)oldR.replaceWith(newEl);else if(oldR&&!newEl)oldR.remove();else if(!oldR&&newEl){const timeEl=bubbleEl.querySelector('.chat-time');if(timeEl)timeEl.after(newEl)}}
     toast('Errore salvataggio reazione, riprova');
   }}
@@ -3502,24 +3771,28 @@ async function _eseguiInoltro(noteId,destKey,isSingle){
   let msgText=(n.messaggio||'').replace(/\[GNAME:[^\]]*\]/g,'').replace(/\[REPLY:\d+:[^:]*:[^\]]*\]/g,'').trim();
   const fwdMsg='Inoltrato da '+_nomeBreve(n.da_operatore)+':\n'+msgText;
   const msgEnc=await encryptNota(fwdMsg);
-  let dests=[];let gid=null;
-  if(isSingle){dests=[destKey]}
-  else{
-    const gidKey=destKey.replace('gruppo:','');
-    gid=gidKey;
-    if(gidKey==='__gruppo_tutti')dests=operatoriAuthCache.map(o=>o.nome).filter(x=>x&&x!==op);
-    else if(gidKey==='__gruppo_slots')dests=operatoriAuthCache.map(o=>o.nome).filter(x=>{if(!x||x===op)return false;const r=operatoriRepartoMap[x]||'entrambi';return r==='slots'||r==='entrambi'});
-    else if(gidKey==='__gruppo_tavoli')dests=operatoriAuthCache.map(o=>o.nome).filter(x=>{if(!x||x===op)return false;const r=operatoriRepartoMap[x]||'entrambi';return r==='tavoli'||r==='entrambi'});
-    else{// Custom group
-      const allGruppo=noteColleghiCache.filter(x=>x.gruppo_id===gidKey);
-      const ps=new Set();allGruppo.forEach(nn=>{if(nn.a_operatore!==op)ps.add(nn.a_operatore);if(nn.da_operatore!==op)ps.add(nn.da_operatore)});
-      dests=[...ps]}}
-  if(!dests.length){toast('Nessun destinatario');return}
-  if(!gid&&dests.length>1)gid=crypto.randomUUID();
-  try{for(const dest of dests){const r=await secPost('note_colleghi',{da_operatore:op,a_operatore:dest,messaggio:msgEnc,gruppo_id:gid});r[0].messaggio=fwdMsg;r[0]._decrypted=true;noteColleghiCache.unshift(r[0])}
-  document.getElementById('pwd-modal').classList.add('hidden');
-  renderNoteCollega();toast('Messaggio inoltrato');
-  inviaPush(dests,'Nota da '+op,'[Inoltrato] '+msgText.substring(0,100),'nota',true)}catch(e){toast('Errore inoltro: '+e.message)}}
+  // ENTERPRISE: usa _chatInsertMessage per 1 sola INSERT (per gruppi) o N (per singoli)
+  try{
+    let dests=[];
+    if(isSingle){
+      // 1-to-1
+      await _chatInsertMessage({da:op,partner:destKey,messaggioCifrato:msgEnc,messaggioPlain:fwdMsg});
+      dests=[destKey];
+    }else{
+      // Gruppo persistente
+      const gidKey=destKey.replace('gruppo:','');
+      // Calcola membri per il chat_get_or_create_group
+      let members=[];
+      if(gidKey==='__gruppo_tutti')members=operatoriAuthCache.map(o=>o.nome).filter(x=>x);
+      else if(gidKey==='__gruppo_slots')members=operatoriAuthCache.map(o=>o.nome).filter(x=>{if(!x)return false;const r=operatoriRepartoMap[x]||'entrambi';return r==='slots'||r==='entrambi'});
+      else if(gidKey==='__gruppo_tavoli')members=operatoriAuthCache.map(o=>o.nome).filter(x=>{if(!x)return false;const r=operatoriRepartoMap[x]||'entrambi';return r==='tavoli'||r==='entrambi'});
+      await _chatInsertMessage({da:op,partner:destKey,messaggioCifrato:msgEnc,messaggioPlain:fwdMsg,gruppoMembers:members});
+      dests=members.filter(x=>x!==op);
+    }
+    document.getElementById('pwd-modal').classList.add('hidden');
+    renderNoteCollega();toast('Messaggio inoltrato');
+    inviaPush(dests,'Nota da '+op,'[Inoltrato] '+msgText.substring(0,100),'nota',true);
+  }catch(e){toast('Errore inoltro: '+e.message)}}
 async function inviaNotaChat(){
   const ta=document.getElementById('nota-msg-chat');if(!ta)return;
   let msg=ta.value.trim();if(!msg){toast('Scrivi un messaggio');return}
@@ -3563,10 +3836,60 @@ async function inviaNotaChat(){
   if(!dests.length){toast('Nessun destinatario');return}
   if(!gid&&dests.length>1)gid=crypto.randomUUID();
   const _sendUrgent=_isUrgentMode;
-  // FIX REGRESSIONE Bug #1: timestamp ESPLICITO uguale per tutte le righe del batch
-  // Cosi' la dedup per (da_op + gid + created_at esatto) collassa correttamente N righe in 1 bolla.
+  // ENTERPRISE CHAT: scrivi UNA SOLA riga in chat_messages (1-to-1 o gruppo)
+  // Per gruppi, prima trova/crea il chat_groups corrispondente con chat_get_or_create_group RPC
   const _batchCreatedAt=new Date().toISOString();
-  try{for(const dest of dests){const rec={da_operatore:op,a_operatore:dest,messaggio:msgEnc,gruppo_id:gid,created_at:_batchCreatedAt};if(_sendUrgent)rec.urgente=true;const r=await secPost('note_colleghi',rec);r[0].messaggio=msg;r[0]._decrypted=true;if(_sendUrgent)r[0].urgente=true;noteColleghiCache.unshift(r[0])}
+  try{
+    let chatGroupId=null;
+    if(isGroup){
+      // Cerca chat_groups esistente per legacy_gid
+      let existingGroup=chatGroupsCache.find(g=>g.legacy_gid===gid);
+      if(!existingGroup){
+        // Crea nuovo gruppo via RPC
+        let tipo='custom';
+        let nome=null;
+        if(gid==='__gruppo_slots'){tipo='slots';nome='Tutti Slots'}
+        else if(gid==='__gruppo_tavoli'){tipo='tavoli';nome='Tutti Tavoli'}
+        else if(gid==='__gruppo_tutti'){tipo='tutti';nome='Tutti'}
+        else if(gid.startsWith('__gruppo_custom_')){nome=_getGruppoNome(gid)||'Gruppo personalizzato'}
+        const tk=getOpToken();
+        const newGroupId=await sbRpc('chat_get_or_create_group',{p_token:tk,p_tipo:tipo,p_legacy_gid:gid,p_nome:nome,p_members:[op,...dests]});
+        chatGroupId=newGroupId;
+        // Aggiorna cache locale
+        existingGroup={id:newGroupId,nome,tipo,legacy_gid:gid,creato_da:op,created_at:_batchCreatedAt};
+        chatGroupsCache.push(existingGroup);
+        for(const m of [op,...dests]){
+          if(!chatGroupMembersCache.some(x=>x.group_id===newGroupId&&x.operatore===m)){
+            chatGroupMembersCache.push({group_id:newGroupId,operatore:m,joined_at:_batchCreatedAt});
+          }
+        }
+      }else{
+        chatGroupId=existingGroup.id;
+        // Assicura che dests siano membri (in caso il gruppo persistente abbia nuovi reparti)
+        for(const m of dests){
+          if(!chatGroupMembersCache.some(x=>x.group_id===chatGroupId&&x.operatore===m)){
+            // Aggiungi al DB e cache
+            try{await secPost('chat_group_members',{group_id:chatGroupId,operatore:m});chatGroupMembersCache.push({group_id:chatGroupId,operatore:m,joined_at:_batchCreatedAt})}catch(_){}
+          }
+        }
+      }
+    }
+    // Crea il record chat_messages
+    const rec={
+      da_operatore:op,
+      messaggio:msgEnc,
+      created_at:_batchCreatedAt,
+    };
+    if(_sendUrgent)rec.urgente=true;
+    if(isGroup){rec.group_id=chatGroupId}
+    else{rec.a_operatore=dests[0]}
+    const r=await secPost('chat_messages',rec);
+    const newMsg=r[0];
+    // Decifra localmente per uso immediato
+    newMsg.messaggio=msg;newMsg._decrypted=true;
+    chatMessagesCache.unshift(newMsg);
+    // Rigenera la cache sintetizzata per il rendering
+    _chatBuildNoteCache();
   ta.value='';ta.style.height='auto';annullaRispondi();
   // Reset urgent mode after sending
   if(_isUrgentMode){_isUrgentMode=false;const ub=document.getElementById('btn-urgent-mode');if(ub)ub.classList.remove('active');ta.placeholder='Scrivi un messaggio...'}
@@ -3638,10 +3961,18 @@ function toggleStarFilter(){
 async function toggleImportante(noteId){
   const n=noteColleghiCache.find(x=>x.id===noteId);if(!n)return;
   const nuovoVal=!n.importante;
-  n.importante=nuovoVal;
-  // Update UI immediately
+  // Optimistic update
+  const cm=chatMessagesCache.find(x=>x.id===noteId);if(cm)cm.importante=nuovoVal;
+  _chatBuildNoteCache();
   if(window._noteConvAttiva)renderNoteChat(window._noteConvAttiva);
-  try{await secPatch('note_colleghi','id=eq.'+noteId,{importante:nuovoVal})}catch(e){n.importante=!nuovoVal;toast('Errore salvataggio');if(window._noteConvAttiva)renderNoteChat(window._noteConvAttiva)}}
+  try{await _chatPatchMessage(noteId,{importante:nuovoVal})}
+  catch(e){
+    // Rollback
+    if(cm)cm.importante=!nuovoVal;
+    _chatBuildNoteCache();
+    toast('Errore salvataggio');
+    if(window._noteConvAttiva)renderNoteChat(window._noteConvAttiva);
+  }}
 // ===== URGENT MODE =====
 let _isUrgentMode=false;
 function toggleUrgentMode(){
@@ -4098,13 +4429,21 @@ function inviaNotifica(titolo,corpo,onClick){
     if(onClick)n.onclick=function(){window.focus();onClick();n.close()}}catch(e){}}
 async function pollNuoveNote(){if(sessionStorage.getItem('diario_auth')!=='1')return;
   try{const op=getOperatore();
-    const nuove=await secGet('note_colleghi?order=created_at.desc');
+    // ENTERPRISE: refetch da chat_messages + chat_message_letti + chat_message_hidden
+    const [msgs,letti,hidden]=await Promise.all([
+      secGet('chat_messages?order=created_at.desc'),
+      secGet('chat_message_letti?order=letta_at.desc'),
+      secGet('chat_message_hidden?order=hidden_at.desc'),
+    ]);
     const vecchieNonLette=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.letta&&!n.nascosta_dest).length;
-    noteColleghiCache=nuove||[];await decryptNoteCache();aggiornaNoteBadge();
+    chatMessagesCache=msgs||[];chatLettiCache=letti||[];chatHiddenCache=hidden||[];
+    await decryptChatMessagesCache();
+    _chatBuildNoteCache();
+    aggiornaNoteBadge();
     const nuoveNonLette=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.letta&&!n.nascosta_dest).length;
     if(nuoveNonLette>vecchieNonLette){toast('Hai '+nuoveNonLette+' nota/e non letta/e!');
       const nuoveArr=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.letta&&!n.nascosta_dest);
-      if(nuoveArr.length)inviaNotifica('Nuova nota da '+nuoveArr[0].da_operatore,nuoveArr[0].messaggio.substring(0,80))}
+      if(nuoveArr.length)inviaNotifica('Nuova nota da '+nuoveArr[0].da_operatore,(nuoveArr[0].messaggio||'').substring(0,80))}
     const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();
   }catch(e){}}
 function mostraNoteNonLette(){const op=getOperatore();if(!op)return;
@@ -4132,15 +4471,25 @@ function mostraNoteNonLette(){const op=getOperatore();if(!op)return;
     return'<div style="background:var(--paper2);border-radius:3px;padding:12px;margin-bottom:10px;border-left:3px solid var(--accent2)"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><strong style="color:var(--accent2)">Da: '+escP(n.da_operatore)+'<span style="font-weight:400;color:var(--muted);font-size:.82rem">'+ctxGruppo+'</span></strong><span style="font-size:.75rem;color:var(--muted)">'+new Date(n.created_at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</span></div><div style="font-size:.95rem">'+esc(testoPulito)+'</div><button style="margin-top:8px;color:var(--accent2);border:1px solid var(--accent2);background:none;padding:4px 14px;border-radius:2px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:Source Sans 3,sans-serif" onclick="document.getElementById(\'note-modal\').classList.add(\'hidden\');switchPage(\'note-collega\');setTimeout(function(){rispondiNota(\''+escP(n.da_operatore).replace(/'/g,"\\'")+'\','+n.id+')},300)">Rispondi</button></div>';
   }).join('')+'<div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'note-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
   document.getElementById('note-modal').classList.remove('hidden')}
-async function segnaNoteLette(){const op=getOperatore();const nonLette=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.letta);const ora=new Date().toISOString();
-  // FIX: stesso pattern del Bug #5 - error handling esplicito invece del catch silenzioso
+async function segnaNoteLette(){
+  // ENTERPRISE: marca tutti i messaggi non letti dell'operatore corrente via chat_mark_letta
+  const op=getOperatore();const tk=getOpToken();
+  const nonLette=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.letta&&n.da_operatore!==op);
+  const messageIds=[...new Set(nonLette.map(n=>n._chat_id||n.id))];
+  const ora=new Date().toISOString();
   const failed=[];
-  for(const n of nonLette){
-    try{await secPatch('note_colleghi','id=eq.'+n.id,{letta:true,letta_at:ora});n.letta=true;n.letta_at=ora}
-    catch(e){console.error('segnaNoteLette fallita per nota '+n.id+':',e.message);failed.push(n)}
+  for(const mid of messageIds){
+    try{await sbRpc('chat_mark_letta',{p_token:tk,p_message_id:mid});
+      if(!chatLettiCache.some(l=>l.message_id===mid&&l.operatore===op)){
+        chatLettiCache.push({message_id:mid,operatore:op,letta_at:ora});
+      }
+    }
+    catch(e){console.error('chat_mark_letta fallita per id '+mid+':',e.message);failed.push(mid)}
   }
   if(failed.length)toast(failed.length+' note non marcate lette (errore rete)');
-  renderNoteCollega()}
+  _chatBuildNoteCache();
+  renderNoteCollega();
+}
 
 // MODULI DISCIPLINARI
 function apriModulo(tipo){
@@ -4466,8 +4815,12 @@ async function salvaRinominaCollaboratore(vecchio){const nuovo=document.getEleme
   if(!nuovo){toast('Inserisci un nome');return}if(nuovo===vecchio){document.getElementById('pwd-modal').classList.add('hidden');return}
   try{await secPatch('collaboratori','nome=eq.'+encodeURIComponent(vecchio),{nome:nuovo});
     await secPatch('registrazioni','nome=eq.'+encodeURIComponent(vecchio),{nome:nuovo});
-    await secPatch('note_colleghi','da_operatore=eq.'+encodeURIComponent(vecchio),{da_operatore:nuovo});
-    await secPatch('note_colleghi','a_operatore=eq.'+encodeURIComponent(vecchio),{a_operatore:nuovo});
+    // ENTERPRISE: rinomina anche su chat_messages, chat_group_members, chat_message_letti, chat_message_hidden
+    try{await secPatch('chat_messages','da_operatore=eq.'+encodeURIComponent(vecchio),{da_operatore:nuovo})}catch(_){}
+    try{await secPatch('chat_messages','a_operatore=eq.'+encodeURIComponent(vecchio),{a_operatore:nuovo})}catch(_){}
+    try{await secPatch('chat_group_members','operatore=eq.'+encodeURIComponent(vecchio),{operatore:nuovo})}catch(_){}
+    try{await secPatch('chat_message_letti','operatore=eq.'+encodeURIComponent(vecchio),{operatore:nuovo})}catch(_){}
+    try{await secPatch('chat_message_hidden','operatore=eq.'+encodeURIComponent(vecchio),{operatore:nuovo})}catch(_){}
     await secPatch('moduli','collaboratore=eq.'+encodeURIComponent(vecchio),{collaboratore:nuovo});
     const ci=collaboratoriCache.findIndex(c=>c.nome===vecchio);if(ci!==-1)collaboratoriCache[ci].nome=nuovo;
     datiCache.forEach(e=>{if(e.nome===vecchio)e.nome=nuovo});
