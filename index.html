@@ -834,7 +834,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
       <p style="color:var(--muted);font-size:.84rem;margin-bottom:14px">Scrivi le informazioni importanti per il collega che prende il turno successivo.</p>
       <div class="form-row" style="grid-template-columns:1fr 1fr 1fr">
         <div class="field"><label>Turno uscente</label><select id="cons-turno" style="padding:11px 14px"><option value="PRESTO">PRESTO</option><option value="NOTTE">NOTTE</option></select></div>
-        <div class="field"><label>Destinatario</label><select id="cons-destinatario" style="padding:11px 14px"><option value="tutti">Tutti</option></select></div>
+        <div class="field"><label>Destinatari</label><button type="button" id="cons-destinatario-btn" onclick="apriMultiSelectOperatori('cons-destinatario','cons-destinatario-btn','Destinatari consegna')" style="padding:11px 14px;background:var(--paper2);color:var(--ink);border:1px solid var(--line);border-radius:2px;cursor:pointer;text-align:left;font-family:Source Sans 3,sans-serif;font-size:.9rem;width:100%">Tutti</button><input type="hidden" id="cons-destinatario" value="tutti"></div>
         <div class="field"><label>Priorita</label><select id="cons-priorita" style="padding:11px 14px"><option value="normale">Normale</option><option value="alta">Alta</option></select></div>
       </div>
       <div class="field" style="margin-bottom:16px"><label>Messaggio di consegna <small style="color:var(--muted);font-weight:300;text-transform:none;letter-spacing:0;font-size:.75rem">Ctrl+Invio per inviare</small></label><textarea id="cons-messaggio" placeholder="- Cliente X al tavolo 5, monitorare&#10;- Cassa 3 fuori servizio&#10;- Nuovo dipendente da affiancare&#10;..." style="min-height:120px"></textarea></div>
@@ -863,7 +863,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
       </div>
       <div class="form-row">
         <div class="field"><label>Descrizione (opzionale)</label><textarea id="pm-descrizione" placeholder="Dettagli aggiuntivi..." style="min-height:60px"></textarea></div>
-        <div class="field"><label>Assegnato a</label><select id="pm-assegnato" style="padding:11px 14px"><option value="tutti">Tutti gli operatori</option></select></div>
+        <div class="field"><label>Assegnato a</label><button type="button" id="pm-assegnato-btn" onclick="apriMultiSelectOperatori('pm-assegnato','pm-assegnato-btn','Assegnatari promemoria')" style="padding:11px 14px;background:var(--paper2);color:var(--ink);border:1px solid var(--line);border-radius:2px;cursor:pointer;text-align:left;font-family:Source Sans 3,sans-serif;font-size:.9rem;width:100%">Tutti gli operatori</button><input type="hidden" id="pm-assegnato" value="tutti"></div>
       </div>
       <div class="form-row">
         <div class="field"><label>Ricordami</label>
@@ -5630,30 +5630,35 @@ async function esportaPDF(){const f=getFiltrati();if(!f.length){toast('Nessun da
 // CONSEGNA TURNO
 // ========================
 async function initConsegnaUI(){const turno=_getTurnoCorrente();const sel=document.getElementById('cons-turno');if(sel)sel.value=turno;
-  const dSel=document.getElementById('cons-destinatario');if(dSel){const ops=operatoriAuthCache.map(o=>o.nome).filter(n=>{const rep=operatoriRepartoMap[n]||'entrambi';return rep===currentReparto||rep==='entrambi'}).sort();
-    // Carica rapporto di oggi se non in cache
-    const oggi=getGiornataCasino();
-    if(!rapportiCache[oggi]){try{const rData=await secGet('rapporti_giornalieri?data_rapporto=eq.'+oggi+'&reparto_dip=eq.'+currentReparto);
-      if(rData&&rData.length){if(!rapportiCache[oggi])rapportiCache[oggi]={};rData.forEach(r=>{rapportiCache[oggi][r.turno]=r})}}catch(e){}}
-    // Cerca supervisore dell'altro turno dal rapporto giornaliero
-    let suggerito='';const rapp=rapportiCache[oggi]||{};
-    const op=getOperatore();
-    // Se sono su PRESTO → cerco chi fa NOTTE (destinatario)
-    // Se sono su NOTTE → cerco chi fa PRESTO di domani (destinatario)
-    if(turno==='PRESTO'){
-      if(rapp.NOTTE&&rapp.NOTTE.sup_note)suggerito=rapp.NOTTE.sup_note.trim();
-    }else{
-      // Cerco PRESTO di domani
-      const domani=new Date(new Date(oggi+'T12:00:00').getTime()+86400000);const domaniStr=domani.getFullYear()+'-'+String(domani.getMonth()+1).padStart(2,'0')+'-'+String(domani.getDate()).padStart(2,'0');
-      const rappD=rapportiCache[domaniStr]||{};
-      if(rappD.PRESTO&&rappD.PRESTO.sup_note)suggerito=rappD.PRESTO.sup_note.trim();
-      // Fallback: cerco PRESTO di oggi
-      if(!suggerito&&rapp.PRESTO&&rapp.PRESTO.sup_note)suggerito=rapp.PRESTO.sup_note.trim();
-    }
-    // Match nome supervisore con operatori registrati
-    const sugMatch=suggerito?matchCollaboratoreOps(suggerito,ops):'';
-    dSel.innerHTML='<option value="tutti">Tutti</option>'+ops.filter(n=>n!==op).map(n=>'<option value="'+escP(n)+'"'+(sugMatch&&n===sugMatch?' selected':'')+'>'+escP(n)+'</option>').join('');
-    if(sugMatch)toast('Destinatario: '+sugMatch+' (dal rapporto)')}}
+  // Default destinatari "tutti" (il widget custom multi-select gestisce la selezione)
+  const hidden=document.getElementById('cons-destinatario');if(!hidden)return;
+  const ops=operatoriAuthCache.map(o=>o.nome).filter(n=>{const rep=operatoriRepartoMap[n]||'entrambi';return rep===currentReparto||rep==='entrambi'}).sort();
+  // Carica rapporto di oggi se non in cache
+  const oggi=getGiornataCasino();
+  if(!rapportiCache[oggi]){try{const rData=await secGet('rapporti_giornalieri?data_rapporto=eq.'+oggi+'&reparto_dip=eq.'+currentReparto);
+    if(rData&&rData.length){if(!rapportiCache[oggi])rapportiCache[oggi]={};rData.forEach(r=>{rapportiCache[oggi][r.turno]=r})}}catch(e){}}
+  // Cerca supervisore dell'altro turno dal rapporto giornaliero (suggerimento default)
+  let suggerito='';const rapp=rapportiCache[oggi]||{};
+  if(turno==='PRESTO'){
+    if(rapp.NOTTE&&rapp.NOTTE.sup_note)suggerito=rapp.NOTTE.sup_note.trim();
+  }else{
+    const domani=new Date(new Date(oggi+'T12:00:00').getTime()+86400000);const domaniStr=domani.getFullYear()+'-'+String(domani.getMonth()+1).padStart(2,'0')+'-'+String(domani.getDate()).padStart(2,'0');
+    const rappD=rapportiCache[domaniStr]||{};
+    if(rappD.PRESTO&&rappD.PRESTO.sup_note)suggerito=rappD.PRESTO.sup_note.trim();
+    if(!suggerito&&rapp.PRESTO&&rapp.PRESTO.sup_note)suggerito=rapp.PRESTO.sup_note.trim();
+  }
+  const sugMatch=suggerito?matchCollaboratoreOps(suggerito,ops):'';
+  const btn=document.getElementById('cons-destinatario-btn');
+  if(sugMatch){
+    // Pre-seleziona il supervisore suggerito come unico destinatario
+    hidden.value=sugMatch;
+    if(btn)btn.textContent=sugMatch+' (suggerito dal rapporto)';
+    toast('Destinatario suggerito: '+sugMatch);
+  }else{
+    hidden.value='tutti';
+    if(btn)btn.textContent='Tutti';
+  }
+}
 function matchCollaboratoreOps(nome,ops){nome=nome.toLowerCase();
   return ops.find(n=>n.toLowerCase()===nome)||ops.find(n=>{const w=n.toLowerCase().split(/\s+/);return w.some(p=>p===nome||nome===p)})||ops.find(n=>n.toLowerCase().includes(nome)||nome.includes(n.toLowerCase()))||''}
 async function inviaConsegnaTurno(){const turno=document.getElementById('cons-turno').value;
@@ -5667,7 +5672,9 @@ async function inviaConsegnaTurno(){const turno=document.getElementById('cons-tu
     document.getElementById('cons-messaggio').value='';
     logAzione('Consegna turno',turno+' — '+msg.substring(0,50));
     renderConsegne();aggiornaConsegnaBadge();toast('Consegna inviata!');
-    inviaPush(destinatario==='tutti'?['tutti']:[destinatario],'Consegna '+turno+' da '+getOperatore(),msg.substring(0,120),'consegna')}catch(e){toast('Errore invio consegna')}}
+    // Push: gestisci CSV multi-destinatario
+    const pushDests=destinatario==='tutti'?['tutti']:destinatario.split(',').map(s=>s.trim()).filter(s=>s);
+    inviaPush(pushDests,'Consegna '+turno+' da '+getOperatore(),msg.substring(0,120),'consegna')}catch(e){toast('Errore invio consegna')}}
 async function segnaConsegnaLetta(id){const op=getOperatore();
   try{await secPatch('consegne_turno','id=eq.'+id,{letto_da:op,letto_at:new Date().toISOString()});
     const c=consegneCache.find(x=>x.id===id);if(c){c.letto_da=op;c.letto_at=new Date().toISOString()}
@@ -5677,7 +5684,7 @@ function renderConsegne(){const el=document.getElementById('consegne-list');if(!
   const _consDal=(document.getElementById('cons-filt-dal')||{}).value||'';
   const _consAl=(document.getElementById('cons-filt-al')||{}).value||'';
   // Mostra solo: consegne che hai inviato tu, destinate a te, o destinate a tutti
-  var _cr=getConsegneReparto().filter(c=>{if(!(c.operatore===op||c.destinatario==='tutti'||c.destinatario===op||(isAdmin()&&!c.destinatario)))return false;const d=(c.data_giornata||c.created_at||'').substring(0,10);if(_consDal&&d<_consDal)return false;if(_consAl&&d>_consAl)return false;return true});
+  var _cr=getConsegneReparto().filter(c=>{if(!(c.operatore===op||_includeOpInCsv(c.destinatario,op)||(isAdmin()&&!c.destinatario)))return false;const d=(c.data_giornata||c.created_at||'').substring(0,10);if(_consDal&&d<_consDal)return false;if(_consAl&&d>_consAl)return false;return true});
   if(!_cr.length){el.innerHTML='<div class="empty-state"><p>Nessuna consegna</p><small>Le consegne appariranno qui dopo essere state inviate</small></div>';return}
   el.innerHTML=_cr.slice(0,20).map(c=>{const d=new Date(c.created_at);const isAlta=c.priorita==='alta';
     const letto=!!c.letto_da;const isMia=c.operatore===op;const canEdit=isMia&&!letto;
@@ -5702,10 +5709,10 @@ async function annullaConsegna(id){const c=consegneCache.find(x=>x.id===id);if(!
   try{await secDel('consegne_turno','id=eq.'+id);consegneCache=consegneCache.filter(x=>x.id!==id);
     logAzione('Consegna annullata',c.messaggio.substring(0,50));renderConsegne();aggiornaConsegnaBadge();toast('Consegna annullata')}catch(e){toast('Errore annullamento consegna')}}
 function aggiornaConsegnaBadge(){const op=getOperatore();const badge=document.getElementById('consegna-badge');if(!badge||!op)return;
-  const nonLette=getConsegneReparto().filter(c=>!c.letto_da&&c.operatore!==op&&(c.destinatario==='tutti'||c.destinatario===op)).length;
+  const nonLette=getConsegneReparto().filter(c=>!c.letto_da&&c.operatore!==op&&_includeOpInCsv(c.destinatario,op)).length;
   if(nonLette){badge.style.display='inline';badge.textContent=nonLette}else{badge.style.display='none'}}
 function mostraConsegnaLogin(){const op=getOperatore();if(!op)return;
-  const nonLette=getConsegneReparto().filter(c=>!c.letto_da&&c.operatore!==op&&(c.destinatario==='tutti'||c.destinatario===op));
+  const nonLette=getConsegneReparto().filter(c=>!c.letto_da&&c.operatore!==op&&_includeOpInCsv(c.destinatario,op));
   if(!nonLette.length)return;
   const ultima=nonLette[0];const isAlta=ultima.priorita==='alta';
   mostraNotifBanner('consegna','Consegna da '+ultima.operatore,ultima.messaggio.substring(0,80),()=>switchPage('consegna'));
@@ -5735,7 +5742,7 @@ function renderDashboard(){
   document.getElementById('dash-sottotitolo').textContent=GIORNI[gd.getDay()]+' — Turno '+turno+' — '+getOperatore();
   // Stats bar: 6 KPI
   const op=getOperatore();
-  const pmMiei=promemoriaCache.filter(p=>!p.completata&&(p.assegnato_a===op||p.assegnato_a==='tutti'));
+  const pmMiei=promemoriaCache.filter(p=>!p.completata&&(_includeOpInCsv(p.assegnato_a,op)));
   const pmScaduti=pmMiei.filter(p=>p.data_scadenza<oggi);
   const noteNL=noteColleghiCache.filter(n=>n.a_operatore===op&&!n.letta&&!n.nascosta_dest).length;
   const _rd=getDatiReparto(),_rm=getMaisonRepartoExpanded();
@@ -6045,11 +6052,11 @@ let _pmFpInit=false;
 function initPromemoriaUI(){
   // Flatpickr scadenza
   if(!_pmFpInit&&window.flatpickr){_pmFpInit=true;flatpickr('#pm-scadenza',{locale:'it',dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',allowInput:false,minDate:'today'})}
-  // Popola select operatori con il proprio nome pre-selezionato
-  const sel=document.getElementById('pm-assegnato');if(!sel)return;
-  const ops=operatoriAuthCache.map(o=>o.nome).filter(n=>{const rep=operatoriRepartoMap[n]||'entrambi';return rep===currentReparto||rep==='entrambi'}).sort();const me=getOperatore();
-  const cv=sel.value||me;sel.innerHTML='<option value="tutti">Tutti gli operatori</option>'+ops.map(n=>'<option value="'+escP(n)+'"'+(n===cv?' selected':'')+'>'+(n===me?'Per me':escP(n))+'</option>').join('');
-  // Filtro operatori
+  // Default assegnatario "tutti" (il widget custom multi-select gestisce il resto)
+  const hidden=document.getElementById('pm-assegnato');if(hidden&&!hidden.value)hidden.value='tutti';
+  const btn=document.getElementById('pm-assegnato-btn');if(btn&&hidden.value==='tutti')btn.textContent='Tutti gli operatori';
+  // Filtro operatori (questo resta un select normale)
+  const ops=operatoriAuthCache.map(o=>o.nome).filter(n=>{const rep=operatoriRepartoMap[n]||'entrambi';return rep===currentReparto||rep==='entrambi'}).sort();
   const fSel=document.getElementById('pm-filt-op');if(fSel){const fcv=fSel.value;fSel.innerHTML='<option value="">Tutti</option>'+ops.map(n=>'<option'+(n===fcv?' selected':'')+'>'+escP(n)+'</option>').join('')}}
 async function salvaPromemoria(){const titolo=document.getElementById('pm-titolo').value.trim();
   const scadenza=document.getElementById('pm-scadenza').value;
@@ -6071,7 +6078,9 @@ async function salvaPromemoria(){const titolo=document.getElementById('pm-titolo
     const fp=document.getElementById('pm-scadenza');if(fp&&fp._flatpickr)fp._flatpickr.clear();else fp.value='';
     logAzione('Promemoria creato',titolo+' → '+assegnato+' ('+scadenza+')');
     renderPromemoria();aggiornaPromemoriaBadge();toast('Promemoria creato');
-    inviaPush(assegnato==='tutti'?['tutti']:[assegnato],'Promemoria: '+titolo,(descrizione||titolo).substring(0,120),'promemoria',true)}catch(e){toast('Errore creazione promemoria')}}
+    // Push: gestisci CSV multi-destinatario
+    const pushDests=assegnato==='tutti'?['tutti']:assegnato.split(',').map(s=>s.trim()).filter(s=>s);
+    inviaPush(pushDests,'Promemoria: '+titolo,(descrizione||titolo).substring(0,120),'promemoria',true)}catch(e){toast('Errore creazione promemoria')}}
 async function completaPromemoria(id){const op=getOperatore();
   try{await secPatch('promemoria','id=eq.'+id,{completata:true,completata_da:op,completata_at:new Date().toISOString()});
     const p=promemoriaCache.find(x=>x.id===id);if(p){p.completata=true;p.completata_da=op;p.completata_at=new Date().toISOString();
@@ -6109,11 +6118,11 @@ function renderPromemoria(){const data=getPromemoriaFiltrati();const el=document
   el.innerHTML=data.map(p=>{
     const scaduto=!p.completata&&p.data_scadenza<oggi;
     const prossimo=!p.completata&&!scaduto&&p.data_scadenza<=new Date(Date.now()+3*86400000).toISOString().split('T')[0];
-    const mio=p.assegnato_a===op||p.assegnato_a==='tutti';
+    const mio=_includeOpInCsv(p.assegnato_a,op);
     const bgStyle=p.completata?'opacity:.6;border-left:3px solid #2c6e49':scaduto?'border-left:3px solid var(--accent);background:rgba(192,57,43,0.05)':prossimo?'border-left:3px solid #e67e22;background:rgba(230,126,34,0.05)':'border-left:3px solid var(--line)';
     return'<div class="scad-item" style="'+bgStyle+';padding:14px 0;flex-wrap:wrap"><div style="display:flex;align-items:center;gap:10px;width:100%;flex-wrap:wrap"><span class="scad-date'+(scaduto?' overdue':'')+'">'+new Date(p.data_scadenza+'T12:00:00').toLocaleDateString('it-IT')+'</span><strong style="flex:1;font-size:1rem;'+(p.completata?'text-decoration:line-through':'')+'">'+escP(p.titolo)+'</strong><span style="font-size:.78rem;padding:2px 8px;border-radius:2px;background:'+(p.assegnato_a==='tutti'?'var(--accent2)':'#2980b9')+';color:white;font-weight:600">'+escP(p.assegnato_a==='tutti'?'Tutti':p.assegnato_a)+'</span>'+(scaduto?'<span style="font-size:.75rem;color:var(--accent);font-weight:700">SCADUTO</span>':'')+(p.completata?'<span style="font-size:.78rem;color:#2c6e49;font-weight:600">Fatto da '+escP(p.completata_da||'?')+' il '+new Date(p.completata_at).toLocaleDateString('it-IT')+'</span>':'')+'<div style="display:flex;gap:6px">'+(!p.completata?'<button class="btn-act pin" onclick="completaPromemoria('+p.id+')" style="color:#2c6e49;border-color:#2c6e49">Fatto</button>':'<button class="btn-act tipo" onclick="riattivaPromemoria('+p.id+')">Riattiva</button>')+(admin?'<button class="btn-act del" onclick="eliminaPromemoria('+p.id+')">Elimina</button>':'')+'</div></div>'+(p.descrizione?'<div style="width:100%;padding:6px 0 0;color:var(--muted);font-size:.88rem">'+esc(p.descrizione)+'</div>':'')+'<div style="width:100%;font-size:.72rem;color:var(--muted);margin-top:4px">Creato da '+escP(p.creato_da||'Admin')+'</div></div>'}).join('')}
 function aggiornaPromemoriaBadge(){const op=getOperatore();const oggi=new Date().toISOString().split('T')[0];
-  const miei=promemoriaCache.filter(p=>!p.completata&&(p.assegnato_a===op||p.assegnato_a==='tutti'));
+  const miei=promemoriaCache.filter(p=>!p.completata&&(_includeOpInCsv(p.assegnato_a,op)));
   const scaduti=miei.filter(p=>p.data_scadenza<oggi);
   const badge=document.getElementById('promemoria-badge');if(!badge)return;
   if(miei.length){badge.style.display='inline';badge.textContent=miei.length;badge.style.background=scaduti.length?'var(--accent)':'var(--accent2)'}else{badge.style.display='none'}}
@@ -6123,7 +6132,7 @@ function _getDataRemindGlobal(p){const m=(p.descrizione||'').match(/Promemoria: 
   return p.data_scadenza}
 function mostraPromemoriaLogin(){const op=getOperatore();if(!op)return;
   const oggi=new Date().toISOString().split('T')[0];
-  const miei=promemoriaCache.filter(p=>!p.completata&&(p.assegnato_a===op||p.assegnato_a==='tutti'));
+  const miei=promemoriaCache.filter(p=>!p.completata&&(_includeOpInCsv(p.assegnato_a,op)));
   // Solo scaduti (data passata) + quelli il cui reminder è per oggi
   const scaduti=miei.filter(p=>p.data_scadenza<oggi);
   const reminderOggi=miei.filter(p=>{const dr=_getDataRemindGlobal(p);return dr<=oggi&&p.data_scadenza>=oggi});
@@ -6419,11 +6428,29 @@ async function salvaMaisonManuale(){
   const nomiRaw=rawNome.split(/\s*\/\s*/).map(n=>capitalizzaNome(n.trim())).filter(n=>n);
   const nNomi=nomiRaw.length;
   const gruppoLabel=nNomi>1?capitalizzaNome(rawNome):'';
-  // Correggi ogni nome
-  const nomiFinali=nomiRaw.map(n=>{
-    const simile=_trovaNomeSimileMaison(n);
-    if(simile&&simile.tipo==='simile'){const corretto=_soloCorrezioneCognome(n,simile.nome);return corretto}
-    return n});
+  // FIX: per nomi multipli (gruppo /), CERCA nomi completi nei budget Maison esistenti
+  // Es. "Bonomelli" → "Bonomelli Pierluigi". Disambiguazione modale se ci sono piu' match.
+  let nomiFinali;
+  if(nNomi>1){
+    nomiFinali=[];
+    for(const n of nomiRaw){
+      const result=_completaNomeDaBudget(n);
+      if(result.needDisambiguation){
+        // Apri modal di disambiguazione e aspetta scelta utente
+        const scelto=await _scegliCandidatoNome(n,result.candidates);
+        if(scelto===null){toast('Inserimento annullato');return}
+        nomiFinali.push(scelto);
+      }else{
+        nomiFinali.push(result.nome||n);
+      }
+    }
+  }else{
+    // Nome singolo: comportamento legacy (solo correzione cognome typo)
+    nomiFinali=nomiRaw.map(n=>{
+      const simile=_trovaNomeSimileMaison(n);
+      if(simile&&simile.tipo==='simile'){const corretto=_soloCorrezioneCognome(n,simile.nome);return corretto}
+      return n});
+  }
   const _noteMan=tipo&&qty>1?qty+tipo:'';
   // Calcola costo buono per splitting intelligente
   let _buonoCosto=0,_restoCosto=importo;
@@ -7560,6 +7587,124 @@ function _soloCorrezioneCognome(nomeVecchio,matchBudget){
       tokensBudget.find(tb=>tb.toLowerCase().replace(/\s/g,'')===tv.toLowerCase().replace(/\s/g,''));
     return best?capitalizzaNome(best):capitalizzaNome(tv);
   }).join(' ')}
+// === COMPLETA NOME DA BUDGET (per nomi multipli con /) ===
+// Usata quando l'utente scrive "Bonomelli/Grignani" → cerca i nomi completi "Bonomelli Pierluigi" e "Grignani [nome]"
+// Ritorna: { nome: 'Cognome Nome' (esatto match unico), candidates: [...], needDisambiguation: boolean }
+function _completaNomeDaBudget(input){
+  const inp=(input||'').trim();
+  if(!inp)return{nome:'',candidates:[],needDisambiguation:false};
+  // Se l'input ha gia' piu' parole (cognome + nome), non serve completarlo
+  if(inp.split(/\s+/).length>=2){
+    return{nome:capitalizzaNome(inp),candidates:[],needDisambiguation:false};
+  }
+  // Cerca tutti i clienti che iniziano col cognome scritto (sia in costi_maison sia in budget categorizzato)
+  const inpLower=inp.toLowerCase();
+  const tuttiNomi=[...new Set([
+    ...getMaisonReparto().map(r=>r.nome),
+    ...getBudgetReparto().map(b=>b.nome)
+  ])].filter(n=>n&&!n.includes('/'));// escludi gia' gruppi
+  // Match esatto cognome (primo token uguale)
+  const matches=tuttiNomi.filter(n=>{
+    const tokens=n.toLowerCase().split(/\s+/);
+    return tokens[0]===inpLower;
+  });
+  if(matches.length===1)return{nome:matches[0],candidates:[],needDisambiguation:false};
+  if(matches.length>1)return{nome:'',candidates:matches,needDisambiguation:true};
+  // Nessun match esatto: prova match senza spazi (es. "delledonne" → "Delle Donne Mario")
+  const matchesNoSpace=tuttiNomi.filter(n=>n.toLowerCase().replace(/\s/g,'').startsWith(inpLower));
+  if(matchesNoSpace.length===1)return{nome:matchesNoSpace[0],candidates:[],needDisambiguation:false};
+  if(matchesNoSpace.length>1)return{nome:'',candidates:matchesNoSpace,needDisambiguation:true};
+  // Nessun match: ritorna l'input cosi' com'e' (sara' creato come nuovo cliente)
+  return{nome:capitalizzaNome(inp),candidates:[],needDisambiguation:false};
+}
+// Helper: controlla se un operatore e' incluso in un campo destinatario CSV (es. "Mario,Anna,Luca" o "tutti")
+function _includeOpInCsv(field,op){
+  if(!field)return false;
+  if(field==='tutti')return true;
+  if(field===op)return true;
+  return field.split(',').map(s=>s.trim()).includes(op);
+}
+// === MULTI-SELECT OPERATORI (per consegne, promemoria, ecc.) ===
+// Apre un modal con checkbox per selezionare uno o piu' operatori del reparto corrente,
+// + opzioni "Tutti" / "Tutti Slots" / "Tutti Tavoli". Salva il risultato come CSV nel hidden input.
+// hiddenInputId = id del input nascosto che memorizza il valore (es. "cons-destinatario")
+// btnId = id del bottone che mostra la label (es. "cons-destinatario-btn")
+// title = titolo del modal
+function apriMultiSelectOperatori(hiddenInputId,btnId,title){
+  const op=getOperatore();
+  const ops=operatoriAuthCache.map(o=>o.nome).filter(n=>{const rep=operatoriRepartoMap[n]||'entrambi';return rep===currentReparto||rep==='entrambi'}).sort();
+  const cur=(document.getElementById(hiddenInputId)||{}).value||'tutti';
+  // Parse current selection (CSV o single value)
+  const selected=new Set();
+  if(cur==='tutti')selected.add('__tutti');
+  else cur.split(',').map(s=>s.trim()).filter(s=>s).forEach(s=>selected.add(s));
+  const mc=document.getElementById('pwd-modal-content');
+  let html='<h3>'+escP(title||'Seleziona operatori')+'</h3>';
+  html+='<p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Seleziona uno o piu\' destinatari, oppure "Tutti" per inviare a tutto il reparto.</p>';
+  // Opzione "Tutti"
+  html+='<div style="padding:10px 12px;background:var(--paper2);border-radius:3px;margin-bottom:10px"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:600"><input type="checkbox" id="msop-tutti"'+(selected.has('__tutti')?' checked':'')+' onclick="_msopToggleTutti()" style="width:18px;height:18px"><span>Tutti gli operatori del reparto ('+ops.length+')</span></label></div>';
+  // Lista operatori individuali
+  html+='<div style="max-height:280px;overflow-y:auto;border:1px solid var(--line);border-radius:3px;padding:8px">';
+  ops.forEach(n=>{
+    const rep=operatoriRepartoMap[n]||'entrambi';
+    const badge=rep==='slots'?' <span style="font-size:.65rem;color:#1a4a7a;font-weight:700">S</span>':rep==='tavoli'?' <span style="font-size:.65rem;color:#8e44ad;font-weight:700">T</span>':'';
+    const isMe=n===op?' (Tu)':'';
+    html+='<div style="padding:5px 0"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:.92rem"><input type="checkbox" class="msop-cb" value="'+escP(n).replace(/"/g,'&quot;')+'"'+(selected.has(n)?' checked':'')+' onclick="_msopToggleSingolo()" style="width:16px;height:16px"><span>'+escP(n)+badge+isMe+'</span></label></div>';
+  });
+  html+='</div>';
+  html+='<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="_msopConferma(\''+hiddenInputId+'\',\''+btnId+'\')">Conferma</button></div>';
+  mc.innerHTML=html;
+  document.getElementById('pwd-modal').classList.remove('hidden');
+}
+// Toggle "Tutti": deseleziona tutti gli individuali
+function _msopToggleTutti(){
+  const tutti=document.getElementById('msop-tutti');
+  if(tutti&&tutti.checked){
+    document.querySelectorAll('.msop-cb').forEach(cb=>cb.checked=false);
+  }
+}
+// Toggle individuale: deseleziona "Tutti"
+function _msopToggleSingolo(){
+  const tutti=document.getElementById('msop-tutti');
+  if(tutti)tutti.checked=false;
+}
+// Conferma selezione: salva nel hidden input + aggiorna label del bottone
+function _msopConferma(hiddenInputId,btnId){
+  const tutti=document.getElementById('msop-tutti');
+  const selected=[...document.querySelectorAll('.msop-cb:checked')].map(cb=>cb.value);
+  let valore,label;
+  if(tutti&&tutti.checked){valore='tutti';label='Tutti gli operatori'}
+  else if(selected.length===0){toast('Seleziona almeno un destinatario');return}
+  else if(selected.length===1){valore=selected[0];label=selected[0]}
+  else{valore=selected.join(',');label=selected.length+' operatori ('+selected.slice(0,2).join(', ')+(selected.length>2?'...':'')+')'}
+  document.getElementById(hiddenInputId).value=valore;
+  const btn=document.getElementById(btnId);if(btn)btn.textContent=label;
+  document.getElementById('pwd-modal').classList.add('hidden');
+}
+// Modal di disambiguazione: mostra una scelta tra piu' candidati e ritorna una Promise
+function _scegliCandidatoNome(input,candidates){
+  return new Promise(resolve=>{
+    const mc=document.getElementById('pwd-modal-content');
+    let html='<h3>Quale "'+escP(input)+'"?</h3>';
+    html+='<p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Esistono piu\' clienti con questo cognome. Seleziona quello giusto:</p>';
+    html+='<div style="max-height:280px;overflow-y:auto">';
+    candidates.forEach((c,i)=>{
+      html+='<div style="padding:8px 0;display:flex;align-items:center;gap:10px"><input type="radio" name="dis-nome-radio" value="'+i+'" id="dis-nome-'+i+'"'+(i===0?' checked':'')+' style="width:18px;height:18px"><label for="dis-nome-'+i+'" style="cursor:pointer;font-size:.95rem">'+escP(c)+'</label></div>';
+    });
+    html+='<div style="padding:8px 0;display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);margin-top:6px"><input type="radio" name="dis-nome-radio" value="-1" id="dis-nome-new" style="width:18px;height:18px"><label for="dis-nome-new" style="cursor:pointer;font-size:.92rem;color:var(--muted)">Crea come nuovo cliente "'+escP(input)+'"</label></div>';
+    html+='</div>';
+    html+='<div class="pwd-modal-btns"><button class="btn-modal-cancel" id="dis-cancel">Annulla</button><button class="btn-modal-ok" id="dis-ok">Conferma</button></div>';
+    mc.innerHTML=html;
+    document.getElementById('pwd-modal').classList.remove('hidden');
+    document.getElementById('dis-cancel').onclick=()=>{document.getElementById('pwd-modal').classList.add('hidden');resolve(null)};
+    document.getElementById('dis-ok').onclick=()=>{
+      const sel=document.querySelector('input[name="dis-nome-radio"]:checked');
+      const idx=sel?parseInt(sel.value):0;
+      document.getElementById('pwd-modal').classList.add('hidden');
+      resolve(idx===-1?capitalizzaNome(input):candidates[idx]);
+    };
+  });
+}
 async function riallineaNomiMaison(){
   const budget=getBudgetReparto();
   if(!budget.length){toast('Nessun cliente categorizzato. Importa prima le categorie.');return}
