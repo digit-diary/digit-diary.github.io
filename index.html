@@ -5349,7 +5349,7 @@ function _analizzaAssenzeRapporto(assenzeText,ds,turno){
         nome:nomeFinale,
         nGiorni,
         dataInizio,dataFine,
-        record:{nome:nomeFinale,tipo:_malTipo,testo,data:_evtDate,operatore:getOperatore(),reparto_dip:currentReparto,origine:'rapporto'}
+        record:{id:Date.now()+Math.floor(Math.random()*1000),nome:nomeFinale,tipo:_malTipo,testo,data:_evtDate,operatore:getOperatore(),reparto_dip:currentReparto,origine:'rapporto'}
       });
     }
   }
@@ -5478,14 +5478,8 @@ async function _eseguiAssenzeOps(ops,ds,turno){
 }
 // === ORCHESTRATOR ===
 async function _processaAssenzeRapporto(assenzeText,ds,turno){
-  console.log('[PARSER ASSENZE] Input:',JSON.stringify(assenzeText),'ds:',ds,'turno:',turno);
   const ops=_analizzaAssenzeRapporto(assenzeText,ds,turno);
-  console.log('[PARSER ASSENZE] Ops:',{creates:ops.creates.length,updates:ops.updates.length,deletes:ops.deletes.length,skipped:ops.skipped.length,errors:ops.errors.length});
-  if(ops.creates.length)console.log('[PARSER ASSENZE] Creates:',ops.creates.map(c=>c.nome+' ('+c.nGiorni+'gg)'));
-  if(ops.errors.length)console.log('[PARSER ASSENZE] Errors:',ops.errors);
-  if(ops.skipped.length)console.log('[PARSER ASSENZE] Skipped:',ops.skipped);
   await _eseguiAssenzeOps(ops,ds,turno);
-  console.log('[PARSER ASSENZE] Esecuzione completata');
 }
 // =================================================================================
 async function salvaRapportoTurno(ds,turno,cls){const campi=getCampiRapporto();const extra={};
