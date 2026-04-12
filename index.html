@@ -5164,7 +5164,7 @@ async function apriGiorno(ds){flushRapportoSave();rapportoGiornoAperto=ds;const 
 // === D-FULL PARSER ASSENZE: analyze + execute + audit + transactional ============
 // Schema flags per gestire deployment senza migration applicata (graceful degradation)
 let _origineSchemaSupported=true;// false se DB non ha ancora la colonna 'origine'
-let _transactionalRpcSupported=true;// false se la function parse_assenze_transactional non esiste
+let _transactionalRpcSupported=false;// DISABILITATO: la function ha bug INTEGER[] vs BIGINT[]. Usa REST diretto.
 function _stripOrigine(rec){const r=Object.assign({},rec);delete r.origine;return r}
 // Helper: estrae range date di una malattia (dal testo "dal DD/MM/YYYY al DD/MM/YYYY" o dal campo data per single-day)
 function _getRangeMalattiaRec(rec){
