@@ -1099,7 +1099,7 @@ button:focus-visible,.btn-act:focus-visible,.btn-header:focus-visible,.btn-salva
         <p style="color:var(--muted);font-size:.84rem;margin-bottom:14px">Registra una sigaretta sbagliata data al cliente (entra in scorta).</p>
         <div class="form-row" style="grid-template-columns:repeat(auto-fit,minmax(100px,1fr))">
           <div class="field"><label>Marca</label><input type="text" id="inv-sig-marca" placeholder="Es: Marlboro Gold..."></div>
-          <div class="field"><label>Collaboratore</label><input type="text" id="inv-sig-collab" placeholder="Chi ha sbagliato..." list="collab-list"></div>
+          <div class="field"><label>Collaboratore</label><div class="ac-wrap"><input type="text" id="inv-sig-collab" placeholder="Chi ha sbagliato..." oninput="acFiltra('inv-sig-collab','ac-inv-sig-collab')" onfocus="acFiltra('inv-sig-collab','ac-inv-sig-collab')"><div class="ac-drop" id="ac-inv-sig-collab"></div></div></div>
           <div class="field"><label>Cliente</label><div class="ac-wrap"><input type="text" id="inv-sig-cliente" placeholder="Per chi era..." oninput="acFiltraMaison('inv-sig-cliente','ac-inv-sig-cl')" onfocus="acFiltraMaison('inv-sig-cliente','ac-inv-sig-cl')"><div class="ac-drop" id="ac-inv-sig-cl"></div></div></div>
           <div class="field"><label>Qty</label><input type="number" id="inv-sig-qty" value="1" min="1" style="width:70px;max-width:100%"></div>
           <div class="field"><label>Data</label><input type="text" id="inv-sig-data" placeholder="Oggi" readonly style="cursor:pointer"></div>
