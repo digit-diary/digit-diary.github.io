@@ -2219,7 +2219,27 @@ async function aggiungiTipoPersonalizzato(){const n=document.getElementById('new
 async function rimuoviTipo(n){if(!confirm('Rimuovere "'+n+'"?'))return;tipiPersonalizzati=tipiPersonalizzati.filter(t=>t.nome!==n);delete coloriOverride[n];await saveTipiP();await saveColoriOverride();renderTipiUI();toast('Rimosso')}
 async function nascondiTipoDefault(n){if(!confirm('Nascondere il tipo "'+n+'"? Le registrazioni esistenti non verranno eliminate.'))return;tipiNascosti.push(n);await setImp('tipi_nascosti',JSON.stringify(tipiNascosti));renderTipiUI();toast('Tipo "'+n+'" nascosto')}
 async function ripristinaTipoDefault(n){tipiNascosti=tipiNascosti.filter(t=>t!==n);await setImp('tipi_nascosti',JSON.stringify(tipiNascosti));renderTipiUI();toast('Tipo "'+n+'" ripristinato')}
-function _renderPostLogin(){try{renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();aggiornaNoteBadge();aggiornaPromemoriaBadge();aggiornaConsegnaBadge();renderDashboard();checkCompleanniBanner()}catch(e){console.error('Render error:',e)}
+function _renderPostLogin(){try{renderTipiUI();aggiornaNomi();render();updateStats();renderScadenzeBanner();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts();aggiornaNoteBadge();aggiornaPromemoriaBadge();aggiornaConsegnaBadge();renderDashboard();checkCompleanniBanner();_avviaAutoDisconnessione()}catch(e){console.error('Render error:',e)}
+// Auto-disconnessione dopo 8 ore di sessione aperta (anche con app in primo piano)
+function _avviaAutoDisconnessione(){
+  if(window._autoDisconnTimer)clearInterval(window._autoDisconnTimer);
+  window._autoDisconnTimer=setInterval(function(){
+    var ts=parseInt(localStorage.getItem('diario_auth_ts')||'0');
+    if(!ts)return;
+    var ore=(Date.now()-ts)/3600000;
+    if(ore>=8){
+      clearInterval(window._autoDisconnTimer);
+      toast('Sessione scaduta dopo 8 ore. Disconnessione automatica.');
+      setTimeout(function(){esci()},2000);
+    }else if(ore>=7.5){
+      // Warning 30 minuti prima della scadenza (mostrato una sola volta)
+      if(!window._disconnWarningShown){
+        window._disconnWarningShown=true;
+        toast('La sessione scadra\' tra 30 minuti. Salva il tuo lavoro.');
+      }
+    }
+  },60000);// check ogni 60 secondi
+}
   // Fallback: se dopo 600ms i tipi non ci sono, ri-renderizza
   setTimeout(()=>{const ft=document.getElementById('form-tipo-tags');if(ft&&!ft.children.length){console.warn('Fallback render tipi+alerts');try{renderTipiUI();render();updateStats();renderCassaAlerts();renderRischioAlerts();renderAmmonimentiAlerts()}catch(e2){console.error('Fallback error:',e2)}}},600)}
 function renderTipiUI(){const tutti=getTuttiTipi();
