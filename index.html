@@ -1529,14 +1529,17 @@ async function _chatInsertMessage(opts){
 let _sbClient=null,_noteChannel=null;
 function _getSbClient(){if(_sbClient)return _sbClient;if(typeof supabase!=='undefined'&&supabase.createClient){_sbClient=supabase.createClient(SB_URL,SB_KEY);return _sbClient}return null}
 function _initNoteRealtime(){if(_noteChannel||window._notePollingId)return;const sb=_getSbClient();if(!sb){console.warn('Supabase client non disponibile, fallback a polling');window._notePollingId=setInterval(pollNuoveNote,15000);return}
-  // ENTERPRISE REALTIME: subscribe a chat_messages, chat_message_letti, chat_message_hidden
-  _noteChannel=sb.channel('chat-enterprise-changes')
+  // ENTERPRISE REALTIME: subscribe SOLO a chat_messages (tabella principale).
+  // Le altre tabelle (letti, hidden) vengono sincronizzate via _resyncNote al cambio tab.
+  // Sottoscrivere 3 tabelle in un canale causava loop errore/riconnessione su Supabase free.
+  let _rtRetryCount=0;const _RT_MAX_RETRIES=5;
+  _noteChannel=sb.channel('chat-msg-live')
     .on('postgres_changes',{event:'*',schema:'public',table:'chat_messages'},async function(payload){
       try{
+        _rtRetryCount=0;// reset retry su evento ricevuto con successo
         const op=getOperatore();if(!op)return;
         if(payload.eventType==='INSERT'){
           const m=payload.new;
-          // Skip duplicati
           if(chatMessagesCache.find(x=>x.id===m.id))return;
           if(m.messaggio&&m.messaggio.startsWith('ENC:'))m.messaggio=await decryptNota(m.messaggio);
           m._decrypted=true;
@@ -1544,15 +1547,13 @@ function _initNoteRealtime(){if(_noteChannel||window._notePollingId)return;const
           _chatBuildNoteCache();
           aggiornaNoteBadge();
           const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();
-          // Notifica solo per messaggi che riceviamo (1-to-1 a noi, o gruppo di cui siamo membri, NON nostri)
           if(m.da_operatore!==op){
             let isForMe=false;
             if(m.a_operatore===op)isForMe=true;
             else if(m.group_id&&chatGroupMembersCache.some(gm=>gm.group_id===m.group_id&&gm.operatore===op))isForMe=true;
             if(isForMe){
-              // Skip banner se sei gia' nella chat aperta
               let convKey=null;
-              if(m.a_operatore===op)convKey=m.da_operatore;// 1-to-1
+              if(m.a_operatore===op)convKey=m.da_operatore;
               else if(m.group_id){const g=_chatGetGroupById(m.group_id);if(g)convKey='gruppo:'+_chatGroupGid(g)}
               const _isCurrentConv=window._noteConvAttiva&&pg==='note-collega'&&window._noteConvAttiva===convKey;
               if(!_isCurrentConv){
@@ -1560,7 +1561,6 @@ function _initNoteRealtime(){if(_noteChannel||window._notePollingId)return;const
                 if(m.urgente){mostraNotifBanner('urgente','\u26A0\uFE0F URGENTE da '+m.da_operatore,_cleanMsg,()=>switchPage('note-collega'));inviaNotifica('\u26A0\uFE0F URGENTE da '+m.da_operatore,_cleanMsg)}
                 else{mostraNotifBanner('nota','Nota da '+m.da_operatore,_cleanMsg,()=>switchPage('note-collega'));inviaNotifica('Nota da '+m.da_operatore,_cleanMsg)}
               }else{
-                // Auto-mark letta se sei gia' nella chat
                 _chatPatchMessage(m.id,{letta:true}).then(()=>aggiornaNoteBadge()).catch(e=>console.warn('Auto-mark read failed:',e.message));
               }
             }
@@ -1572,10 +1572,8 @@ function _initNoteRealtime(){if(_noteChannel||window._notePollingId)return;const
           if(idx!==-1){
             if(m.messaggio&&m.messaggio.startsWith('ENC:'))m.messaggio=await decryptNota(m.messaggio);
             else if(chatMessagesCache[idx]._decrypted)m.messaggio=chatMessagesCache[idx].messaggio;
-            m._decrypted=true;
-            chatMessagesCache[idx]=m;
-            _chatBuildNoteCache();
-            aggiornaNoteBadge();
+            m._decrypted=true;chatMessagesCache[idx]=m;
+            _chatBuildNoteCache();aggiornaNoteBadge();
             const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();
           }
         }
@@ -1584,36 +1582,26 @@ function _initNoteRealtime(){if(_noteChannel||window._notePollingId)return;const
           chatMessagesCache=chatMessagesCache.filter(x=>x.id!==old.id);
           chatLettiCache=chatLettiCache.filter(l=>l.message_id!==old.id);
           chatHiddenCache=chatHiddenCache.filter(h=>h.message_id!==old.id);
-          _chatBuildNoteCache();
-          aggiornaNoteBadge();
+          _chatBuildNoteCache();aggiornaNoteBadge();
           const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();
         }
-      }catch(e){console.error('Realtime chat_messages callback error:',e,payload)}
+      }catch(e){console.error('Realtime chat callback error:',e)}
     })
-    .on('postgres_changes',{event:'INSERT',schema:'public',table:'chat_message_letti'},function(payload){
-      try{
-        const l=payload.new;
-        if(!chatLettiCache.some(x=>x.message_id===l.message_id&&x.operatore===l.operatore)){
-          chatLettiCache.push(l);
-          _chatBuildNoteCache();
-          aggiornaNoteBadge();
-          const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();
+    .subscribe(function(status){
+      if(status==='SUBSCRIBED'){console.log('Realtime chat: connesso');_rtRetryCount=0}
+      if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
+        _rtRetryCount++;
+        if(_rtRetryCount<=_RT_MAX_RETRIES){
+          console.warn('Realtime chat: errore ('+_rtRetryCount+'/'+_RT_MAX_RETRIES+'), risincronizzazione...');
+          setTimeout(_resyncNote,3000*_rtRetryCount);// backoff crescente
+        }else{
+          console.warn('Realtime chat: troppi errori, passaggio a polling ogni 30s');
+          try{_noteChannel.unsubscribe()}catch(e){}
+          _noteChannel=null;
+          window._notePollingId=setInterval(pollNuoveNote,30000);
         }
-      }catch(e){console.error('Realtime letti callback error:',e)}
-    })
-    .on('postgres_changes',{event:'INSERT',schema:'public',table:'chat_message_hidden'},function(payload){
-      try{
-        const h=payload.new;
-        if(!chatHiddenCache.some(x=>x.message_id===h.message_id&&x.operatore===h.operatore)){
-          chatHiddenCache.push(h);
-          _chatBuildNoteCache();
-          aggiornaNoteBadge();
-          const pg=localStorage.getItem('pagina_corrente');if(pg==='note-collega')renderNoteCollega();
-        }
-      }catch(e){console.error('Realtime hidden callback error:',e)}
-    })
-    .subscribe(function(status){if(status==='SUBSCRIBED')console.log('Realtime chat enterprise: connesso');
-      if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){console.warn('Realtime chat: errore, risincronizzazione...');setTimeout(_resyncNote,3000)}});
+      }
+    });
   // Riconnessione: quando il tab torna attivo, rinnova token e risincronizza
   document.addEventListener('visibilitychange',async function(){if(!document.hidden){await _ensureToken();_resyncNote()}})}
 async function _resyncNote(){
@@ -6494,7 +6482,7 @@ async function salvaMaisonManuale(){
     document.getElementById('maison-man-nome').value='';document.getElementById('maison-man-importo').value='';
     document.getElementById('maison-man-px').value='1';document.getElementById('maison-man-tipo').value='';document.getElementById('maison-man-qty').value='1';
     const fp=document.getElementById('maison-man-data');if(fp&&fp._flatpickr)fp._flatpickr.clear();
-    renderMaisonDashboard();renderMaisonBudgetAlerts();sincronizzaPareggioBuoni();logAzione('Maison manuale',nome+' '+importo+' CHF');toast('Spesa aggiunta per '+nome);checkBudgetPushAfterInsert(nome)}catch(e){toast('Errore: '+e.message)}}
+    renderMaisonDashboard();renderMaisonBudgetAlerts();sincronizzaPareggioBuoni();logAzione('Maison manuale',nomiFinali.join('/')+' '+importo+' CHF');toast('Spesa aggiunta per '+nomiFinali.join('/'));nomiFinali.forEach(n=>checkBudgetPushAfterInsert(n))}catch(e){toast('Errore: '+e.message)}}
 // REGALI MAISON
 function getRegaliReparto(){return regaliCache.filter(function(r){return(r.reparto_dip||'slots')===currentReparto})}
 async function salvaRegalo(){
