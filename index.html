@@ -6182,7 +6182,7 @@ function _trovaNomeSimileMaison(nome){const nomi=[...new Set(getMaisonReparto().
   // Match su qualsiasi token: "Baroni" → "Micheli Baroni Cristina"
   if(_cognome.length>=3){for(const n of nomi){const tokens=n.toLowerCase().split(/\s+/);if(tokens.some(t=>t===_cognome))return{nome:n,tipo:'simile'}}}
   return null}
-const BUONO_VALORI={BU:15,BL:40,CG:40,WL:40};
+const BUONO_VALORI={BU:15,BL:40,CG:80,WL:40};
 function _contaBuoni(righe,tipo){
   return righe.filter(r=>r.tipo_buono===tipo).reduce((s,r)=>{
     const m=(r.note||'').match(/(\d+)\s*(?:BU|BL|CG|WL)/i);
@@ -6459,24 +6459,74 @@ async function salvaMaisonManuale(){
       if(simile&&simile.tipo==='simile'){const corretto=_soloCorrezioneCognome(n,simile.nome);return corretto}
       return n});
   }
-  const _noteMan=tipo&&qty>1?qty+tipo:'';
-  // Calcola costo buono per splitting intelligente
-  let _buonoCosto=0,_restoCosto=importo;
-  if(tipo&&nNomi>1&&BUONO_VALORI[tipo]){
-    _buonoCosto=Math.min(qty*(BUONO_VALORI[tipo]),importo);
-    _restoCosto=importo-_buonoCosto}
-  try{for(let i=0;i<nomiFinali.length;i++){
-    const nome=nomiFinali[i];
-    // Se gruppo con buono: primo nome (quello che ha il buono) prende il costo buono, gli altri si dividono il resto
-    let _costo;
-    if(tipo&&nNomi>1&&BUONO_VALORI[tipo]){
-      _costo=i===0?Math.round(_buonoCosto*100)/100:Math.round(_restoCosto/(nNomi-1)*100)/100;
-    }else{_costo=Math.round(importo/nNomi*100)/100}
-    // Distribuzione px: primo prende il resto (es. 5px / 2 nomi → 3+2, non 3+3)
-    const _pxBase=Math.floor(px/nNomi)||1;const _pxExtra=px-_pxBase*nNomi;
-    const rec={data_giornata:dataVal,nome:nome,px:_pxBase+(i<_pxExtra?1:0),
-      costo:_costo,tipo_buono:i===0?tipo:null,
-      note:(_noteMan||'')+(gruppoLabel?' '+gruppoLabel:''),
+  // === SPLITTING INTELLIGENTE PER NOMI MULTIPLI (/) ===
+  // Auto-detect categoria buono dal budget se l'utente non seleziona tipo manualmente.
+  // Es: Aili(BL)/Bertaggia(full), px=2, 360 CHF → Aili 40 (1BL), Bertaggia 320 (resto)
+  const _pxBase=Math.floor(px/nNomi)||1;
+  const _pxExtra=px-_pxBase*nNomi;
+  // Per ogni nome: calcola costo, tipo_buono, px, note
+  const _nomiSplit=nomiFinali.map((n,i)=>{
+    const pxI=_pxBase+(i<_pxExtra?1:0);
+    return{nome:n,px:pxI,tipo_buono:null,costo:0,note:'',autoDetected:false};
+  });
+  if(tipo&&BUONO_VALORI[tipo]){
+    // Utente ha selezionato tipo manualmente
+    if(nNomi>1){
+      // Primo nome prende il buono, gli altri il resto
+      const buonoCosto=Math.min(qty*BUONO_VALORI[tipo],importo);
+      const restoCosto=importo-buonoCosto;
+      _nomiSplit[0].costo=Math.round(buonoCosto*100)/100;
+      _nomiSplit[0].tipo_buono=tipo;
+      _nomiSplit[0].note=qty>1?qty+tipo:'';
+      for(let i=1;i<nNomi;i++)_nomiSplit[i].costo=Math.round(restoCosto/(nNomi-1)*100)/100;
+    }else{
+      _nomiSplit[0].costo=importo;_nomiSplit[0].tipo_buono=tipo;
+      _nomiSplit[0].note=qty>1?qty+tipo:'';
+    }
+  }else if(nNomi>1){
+    // Nessun tipo selezionato + nomi multipli: AUTO-DETECT dal budget
+    const budgetCats=nomiFinali.map(n=>{
+      const b=getBudgetReparto().find(b=>b.nome.toLowerCase()===n.toLowerCase());
+      return b?b.categoria:null;
+    });
+    // Mappa categoria budget → tipo buono
+    const catToTipo={bu:'BU',bl:'BL'};
+    const buonoIdxs=[];const fullIdxs=[];
+    budgetCats.forEach((cat,i)=>{
+      if(cat&&catToTipo[cat])buonoIdxs.push(i);
+      else fullIdxs.push(i);
+    });
+    if(buonoIdxs.length>0&&fullIdxs.length>0){
+      // Mix: chi ha buoni prende quota buono, chi e' full prende il resto
+      let totalBuonoCosto=0;
+      buonoIdxs.forEach(i=>{
+        const tipoBuono=catToTipo[budgetCats[i]];
+        const pxI=_nomiSplit[i].px;
+        const buonoCosto=pxI*BUONO_VALORI[tipoBuono];
+        _nomiSplit[i].tipo_buono=tipoBuono;
+        _nomiSplit[i].costo=Math.round(Math.min(buonoCosto,importo)*100)/100;
+        _nomiSplit[i].note=pxI>1?pxI+tipoBuono:tipoBuono;
+        _nomiSplit[i].autoDetected=true;
+        totalBuonoCosto+=_nomiSplit[i].costo;
+      });
+      const restoCosto=Math.max(0,importo-totalBuonoCosto);
+      fullIdxs.forEach(i=>{
+        _nomiSplit[i].costo=Math.round(restoCosto/fullIdxs.length*100)/100;
+      });
+    }else{
+      // Tutti dello stesso tipo: dividi equamente
+      _nomiSplit.forEach(s=>{s.costo=Math.round(importo/nNomi*100)/100});
+    }
+  }else{
+    // Nome singolo
+    _nomiSplit[0].costo=importo;_nomiSplit[0].tipo_buono=tipo||null;
+    if(tipo&&qty>1)_nomiSplit[0].note=qty+tipo;
+  }
+  try{for(let i=0;i<_nomiSplit.length;i++){
+    const s=_nomiSplit[i];
+    const rec={data_giornata:dataVal,nome:s.nome,px:s.px,
+      costo:s.costo,tipo_buono:s.tipo_buono,
+      note:(s.note||'')+(gruppoLabel?' '+gruppoLabel:''),
       gruppo:gruppoLabel,operatore:getOperatore(),reparto_dip:currentReparto};
     const r=await secPost('costi_maison',rec);if(r&&r[0])maisonCache.unshift(r[0])}
     document.getElementById('maison-man-nome').value='';document.getElementById('maison-man-importo').value='';
