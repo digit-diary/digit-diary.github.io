@@ -1540,6 +1540,8 @@ function _initNoteRealtime(){if(_noteChannel||window._notePollingId)return;const
         const op=getOperatore();if(!op)return;
         if(payload.eventType==='INSERT'){
           const m=payload.new;
+          // Skip messaggi propri (evita auto-notifica) E duplicati gia' in cache
+          if(m.da_operatore===op)return;
           if(chatMessagesCache.find(x=>x.id===m.id))return;
           if(m.messaggio&&m.messaggio.startsWith('ENC:'))m.messaggio=await decryptNota(m.messaggio);
           m._decrypted=true;

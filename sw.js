@@ -1,4 +1,4 @@
-const CACHE_NAME = 'diario-cl-v27';
+const CACHE_NAME = 'diario-cl-v28';
 const SHELL_URLS = ['/', '/manifest.json', '/logo_casino.png', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', e => {
