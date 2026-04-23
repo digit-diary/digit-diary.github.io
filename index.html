@@ -2611,10 +2611,20 @@ async function parseDifferenzeCassa(text,ds,turno){if(!text||!text.trim())return
       if(!amount||amount<0.01)continue;
       const nomeCompleto=matchCollaboratore(cognome);
       if(!nomeCompleto){toast('Differenza: "'+cognome+'" non trovato tra i collaboratori');continue}
-      const esiste=datiCache.find(e=>e.nome.toLowerCase()===nomeCompleto.toLowerCase()&&e.tipo===nomeCorrente('Errore')&&e.reparto==='Cassa'&&e.data.startsWith(ds)&&Math.abs(parseFloat(e.importo)||0)===amount);
-      if(esiste)continue;
       const direction=sign==='+'?'eccedenza':'ammanco';
-      const rec={id:Date.now()+Math.floor(Math.random()*1000),nome:nomeCompleto,tipo:nomeCorrente('Errore'),testo:'Differenza cassa: '+direction+' di '+amount.toFixed(2)+' CHF (da rapporto '+turno+' del '+new Date(ds+'T12:00:00').toLocaleDateString('it-IT')+')',data:ds+'T'+new Date().toTimeString().slice(0,8)+'.000Z',operatore:getOperatore(),importo:amount,valuta:'CHF',reparto:'Cassa'};
+      const _rappRef='da rapporto '+turno+' del '+new Date(ds+'T12:00:00').toLocaleDateString('it-IT');
+      // FIX: check per nome + turno/data rapporto (non per importo esatto). Se cambi importo → aggiorna, non duplica.
+      const esiste=datiCache.find(e=>e.nome.toLowerCase()===nomeCompleto.toLowerCase()&&e.tipo===nomeCorrente('Errore')&&e.reparto==='Cassa'&&(e.testo||'').includes(_rappRef));
+      const newTesto='Differenza cassa: '+direction+' di '+amount.toFixed(2)+' CHF ('+_rappRef+')';
+      if(esiste){
+        // Aggiorna importo e testo se cambiati
+        if(Math.abs(parseFloat(esiste.importo)||0)!==amount||esiste.testo!==newTesto){
+          try{await secPatch('registrazioni','id=eq.'+esiste.id,{importo:amount,testo:newTesto});
+            esiste.importo=amount;esiste.testo=newTesto}catch(e){}
+        }
+        continue;
+      }
+      const rec={id:Date.now()+Math.floor(Math.random()*1000),nome:nomeCompleto,tipo:nomeCorrente('Errore'),testo:newTesto,data:ds+'T'+new Date().toTimeString().slice(0,8)+'.000Z',operatore:getOperatore(),importo:amount,valuta:'CHF',reparto:'Cassa'};
       try{await secPost('registrazioni',rec);datiCache.unshift(rec);logAzione('Auto-registrazione differenza cassa',nomeCompleto+' '+amount.toFixed(2)+' CHF')}catch(e){}
     }}render();updateStats()}
 function checkCassaAlerts(){
