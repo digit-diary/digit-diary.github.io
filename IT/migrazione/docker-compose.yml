@@ -1,0 +1,46 @@
+# Docker Compose per Supabase Self-Hosted
+# Copiare questo file sul server Windows e modificare .env
+# Poi eseguire: docker compose up -d
+#
+# Documentazione: https://supabase.com/docs/guides/self-hosting/docker
+
+version: "3.8"
+
+services:
+  db:
+    image: supabase/postgres:15.1.1.78
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+  rest:
+    image: postgrest/postgrest
+    ports:
+      - "3000:3000"
+    environment:
+      PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      - db
+
+  realtime:
+    image: supabase/realtime:v2.33.70
+    ports:
+      - "4000:4000"
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: postgres
+      JWT_SECRET: ${JWT_SECRET}
+      PORT: 4000
+    depends_on:
+      - db
+
+volumes:
+  db-data:

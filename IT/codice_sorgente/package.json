@@ -1,0 +1,12 @@
+{
+  "name": "diario-collaboratori",
+  "version": "2.0.0",
+  "description": "App gestione personale Casino Lugano SA — Diario, Chat, Rapporti, Maison, Moduli",
+  "author": "Casino Lugano SA",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "format": "npx prettier --write js/*.js css/*.css",
+    "validate": "node -e \"const fs=require('fs');let c='';['config','crypto','chat-core','realtime','api','utils','auth','cestino-core','settings','app','diario','alerts','search','chat-ui','moduli','rapporto','stats','consegna','promemoria','maison-core','maison-budget','maison-helpers'].forEach(f=>c+=fs.readFileSync('js/'+f+'.js','utf8'));try{new Function(c);console.log('OK')}catch(e){console.log('ERRORE:',e.message)}\""
+  }
+}
