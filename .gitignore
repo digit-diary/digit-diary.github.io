@@ -1,3 +1,7 @@
 IT/backup*
 backups/
 *.backup_pre_split
+.DS_Store
+.netlify/
+.vscode/
+*.xlsx

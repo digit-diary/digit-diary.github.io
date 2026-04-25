@@ -1,7 +1,6 @@
 Oggetto: Diario Collaboratori — Il nuovo strumento digitale per la gestione del personale
 
-
-Gentile Responsabile, cari colleghi,
+Buongiorno colleghi,
 
 sono lieto di presentarvi il Diario Collaboratori, un'applicazione web che ho
 sviluppato per semplificare e professionalizzare la gestione quotidiana del
@@ -12,8 +11,7 @@ PERCHE QUESTO STRUMENTO?
 
 Fino ad oggi abbiamo gestito le informazioni del personale con metodi che
 conosciamo bene: file sparsi sul desktop, fogli Excel condivisi che si
-sovrascrivono, bigliettini per il cambio turno, moduli cartacei da compilare
-a mano, e quella sensazione al rientro dalle ferie di non sapere cosa sia
+sovrascrivono, bigliettini per il cambio turno, moduli in cartelle diverse, e quella sensazione al rientro dalle ferie di non sapere cosa sia
 successo in nostra assenza.
 
 Il Diario Collaboratori risolve tutto questo in un unico punto di accesso,
@@ -24,7 +22,7 @@ COSA FA IN PRATICA
 
 1. DIARIO REGISTRAZIONI
    Ogni evento viene registrato con nome, tipo e descrizione. Niente piu
-   fogli volanti. Tutto e ricercabile, filtrabile per persona, tipo e periodo,
+   File excel sparsi. Tutto e ricercabile, filtrabile per persona, tipo e periodo,
    ed esportabile in PDF e CSV. I filtri si mantengono anche quando si cambia
    pagina.
 
@@ -50,7 +48,7 @@ COSA FA IN PRATICA
 5. MODULI DISCIPLINARI E APPREZZAMENTO
    Allineamento, RDI, Apprezzamento: compila i campi (o lascia che l'AI
    li generi automaticamente dalla tua descrizione) e genera un PDF
-   professionale con firma digitale e QR code di verifica. 8 template
+   professionale anche con firma digitale e QR code di verifica. 8 template
    rapidi per le situazioni piu comuni.
 
 6. PROMEMORIA INTELLIGENTI
@@ -88,10 +86,9 @@ L'applicazione e protetta su piu livelli:
 - Face ID / Touch ID per lo sblocco rapido
 - Tutti i dati sono protetti con Row Level Security
 - Le note tra colleghi sono crittografate
-- L'admin controlla cosa puo vedere ogni operatore
 
 I dati sono ospitati su server europei (Irlanda) e il sistema e
-autonomo per almeno 15-20 anni senza costi aggiuntivi.
+autonomo per almeno 10-15 anni senza costi.
 
 
 COME ACCEDERE
@@ -105,5 +102,5 @@ dettagliate per ogni funzione.
 
 Resto a disposizione per qualsiasi domanda o dimostrazione.
 
-Cordiali saluti,
-Musa Bushi
+Saluti.
+
