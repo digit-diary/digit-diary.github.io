@@ -1,9 +1,9 @@
 /**
  * Diario Collaboratori — Casino Lugano SA
  * File: stats.js
- * Righe originali: 82
- * Estratto automaticamente da index.html
  */
+
+// ================================================================
 // SEZIONE 10: STATISTICHE E GRAFICI
 // Chart.js, trend mensili, report PDF
 // ================================================================
@@ -72,11 +72,11 @@ function renderStatistiche() {
   const _errPrev = _dsAll.filter((e) => e.tipo === nomeCorrente('Errore') && (e.data || '').startsWith(_tPrevM)).length;
   const _malCurr = _contaTotaleMalattie(
     _dsAll.filter((e) => (e.data || '').startsWith(_tCurrM)),
-    nomeCorrente('Malattia')
+    nomeCorrente('Malattia'),
   );
   const _malPrev = _contaTotaleMalattie(
     _dsAll.filter((e) => (e.data || '').startsWith(_tPrevM)),
-    nomeCorrente('Malattia')
+    nomeCorrente('Malattia'),
   );
   function _trendBadge(curr, prev, label) {
     const d = curr - prev;
@@ -132,7 +132,7 @@ function renderStatistiche() {
       _ds.filter((e) => {
         const ed = new Date(e.data);
         return ed.getMonth() === d.getMonth() && ed.getFullYear() === d.getFullYear();
-      }).length
+      }).length,
     );
     me.push(
       _ds.filter((e) => {
@@ -140,7 +140,7 @@ function renderStatistiche() {
         return (
           e.tipo === nomeCorrente('Errore') && ed.getMonth() === d.getMonth() && ed.getFullYear() === d.getFullYear()
         );
-      }).length
+      }).length,
     );
   }
   renderChart(
@@ -159,7 +159,7 @@ function renderStatistiche() {
         y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 12 } } },
         x: { ticks: { font: { size: 11 } } },
       },
-    }
+    },
   );
   // Doughnut tipi
   renderChart(
@@ -176,7 +176,7 @@ function renderStatistiche() {
         },
       ],
     },
-    { plugins: { legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 12, usePointStyle: true } } } }
+    { plugins: { legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 12, usePointStyle: true } } } },
   );
   // Giorni settimana
   const gc = [0, 0, 0, 0, 0, 0, 0];
@@ -204,7 +204,7 @@ function renderStatistiche() {
         y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 12 } } },
         x: { ticks: { font: { size: 12 } } },
       },
-    }
+    },
   );
   // Top collaboratori
   const cc = {};
@@ -230,7 +230,7 @@ function renderStatistiche() {
         x: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 12 } } },
         y: { ticks: { font: { size: 13 } } },
       },
-    }
+    },
   );
   const _tipoMalStat = nomeCorrente('Malattia');
   const tutti = getTuttiTipi(),
@@ -488,7 +488,7 @@ async function esportaPDF() {
     mostraPdfPreview(
       doc,
       'diario_' + new Date().toLocaleDateString('it-IT').replace(/\//g, '-') + '.pdf',
-      'Diario Collaboratori'
+      'Diario Collaboratori',
     );
   } catch (e) {
     console.error('PDF error:', e);
@@ -497,4 +497,3 @@ async function esportaPDF() {
 }
 
 // ========================
-// ================================================================

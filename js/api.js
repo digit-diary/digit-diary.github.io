@@ -1,9 +1,9 @@
 /**
  * Diario Collaboratori — Casino Lugano SA
  * File: api.js
- * Righe originali: 77
- * Estratto automaticamente da index.html
  */
+
+// ================================================================
 // SEZIONE 5: API E CARICAMENTO DATI
 // secGet, secPost, secPatch, secDel, loadAll
 // ================================================================
@@ -174,4 +174,3 @@ async function loadAll() {
   // Health check silenzioso (solo se loggato)
   if (getOpToken()) _healthCheck();
 }
-// ================================================================

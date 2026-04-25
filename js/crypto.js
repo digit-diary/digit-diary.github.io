@@ -1,9 +1,9 @@
 /**
  * Diario Collaboratori — Casino Lugano SA
  * File: crypto.js
- * Righe originali: 37
- * Estratto automaticamente da index.html
  */
+
+// ================================================================
 // SEZIONE 2: CIFRATURA MESSAGGI (AES-GCM)
 // Cifratura e decifratura note colleghi
 // ================================================================
@@ -45,7 +45,7 @@ async function _getNoteKey() {
     km,
     { name: 'AES-GCM', length: 256 },
     false,
-    ['encrypt', 'decrypt']
+    ['encrypt', 'decrypt'],
   );
   return _noteEncKey;
 }
@@ -88,4 +88,3 @@ async function decryptNoteCache() {
     }
   }
 }
-// ================================================================

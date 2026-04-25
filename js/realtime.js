@@ -1,9 +1,9 @@
 /**
  * Diario Collaboratori — Casino Lugano SA
  * File: realtime.js
- * Righe originali: 181
- * Estratto automaticamente da index.html
  */
+
+// ================================================================
 // SEZIONE 4: REALTIME E POLLING
 // WebSocket per notifiche chat, polling fallback
 // ================================================================
@@ -75,7 +75,7 @@ function _initNoteRealtime() {
                   .trim();
                 if (m.urgente) {
                   mostraNotifBanner('urgente', '\u26A0\uFE0F URGENTE da ' + m.da_operatore, _cleanMsg, () =>
-                    switchPage('note-collega')
+                    switchPage('note-collega'),
                   );
                   inviaNotifica('\u26A0\uFE0F URGENTE da ' + m.da_operatore, _cleanMsg);
                 } else {
@@ -284,7 +284,7 @@ async function secureHash(password, salt) {
       hash: 'SHA-256',
     },
     km,
-    256
+    256,
   );
   return Array.from(new Uint8Array(bits))
     .map((b) => b.toString(16).padStart(2, '0'))
@@ -339,7 +339,7 @@ function genCode() {
 function sbH(x) {
   return Object.assign(
     { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
-    x || {}
+    x || {},
   );
 }
 async function sbGet(path) {
@@ -564,5 +564,3 @@ async function setImp(k, v) {
     } catch (e2) {}
   }
 }
-
-// ================================================================

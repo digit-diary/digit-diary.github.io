@@ -1,9 +1,9 @@
 /**
  * Diario Collaboratori — Casino Lugano SA
  * File: promemoria.js
- * Righe originali: 370
- * Estratto automaticamente da index.html
  */
+
+// ================================================================
 // SEZIONE 12: PROMEMORIA E SCADENZE
 // Promemoria, assegnazione operatori, notifiche push
 // ================================================================
@@ -329,7 +329,7 @@ function mostraPromemoriaLogin() {
           .map((p) => p.titolo)
           .join(', ')
           .substring(0, 60),
-      () => switchPage('promemoria')
+      () => switchPage('promemoria'),
     );
     inviaNotifica(
       'Promemoria scaduti',
@@ -340,7 +340,7 @@ function mostraPromemoriaLogin() {
         scaduti
           .map((p) => p.titolo)
           .join(', ')
-          .substring(0, 80)
+          .substring(0, 80),
     );
   } else if (reminderOggi.length) {
     mostraNotifBanner(
@@ -350,7 +350,7 @@ function mostraPromemoriaLogin() {
         .map((p) => p.titolo)
         .join(', ')
         .substring(0, 60),
-      () => switchPage('promemoria')
+      () => switchPage('promemoria'),
     );
   }
   const mc = document.getElementById('note-modal-content');
@@ -426,7 +426,7 @@ function _trovaNomeSimileMaison(nome) {
     ...new Set(
       getMaisonReparto()
         .map((r) => r.nome)
-        .concat(getBudgetReparto().map((b) => b.nome))
+        .concat(getBudgetReparto().map((b) => b.nome)),
     ),
   ];
   const nl = nome.toLowerCase();
@@ -508,7 +508,7 @@ function _parseMaisonNome(raw) {
   // 4. COUPON GOURMET — cerca in nome, note e raw
   const _checkCG = nome + ' ' + note;
   const _cgM = (nome + ' ' + note).match(
-    /(\d*)\s*(?:\b(?:coupon[ea]?|cpupon|cupon|coup|cena|buono|b\.?)\s*)*(?:gou?r?met|gouret|gourme\w?t?)\b/i
+    /(\d*)\s*(?:\b(?:coupon[ea]?|cpupon|cupon|coup|cena|buono|b\.?)\s*)*(?:gou?r?met|gouret|gourme\w?t?)\b/i,
   );
   if (_cgM || /gou?r?met|gouret|gourme\w?t?\b/i.test(_checkCG)) {
     const _cgQty = _cgM && _cgM[1] ? parseInt(_cgM[1]) : 1;
@@ -518,7 +518,7 @@ function _parseMaisonNome(raw) {
     nome = nome
       .replace(
         /\d*\s*(?:\b(?:coupon[ea]?|cpupon|cupon|coup|cena|buono|b\.?)\s*)*(?:gou?r?met|gouret|gourme\w?t?)\b/gi,
-        ''
+        '',
       )
       .trim();
   }
@@ -569,7 +569,7 @@ function _parseMaisonNome(raw) {
   nome = nome
     .replace(
       /\d*(coupon[ea]?|cpupon|cupon|coup|cena|gourmet|gouret|gourme\w*|welcome|lounge|buono|b\.?u\.?|b\.?l\.?)\b/gi,
-      ''
+      '',
     )
     .trim();
   nome = nome.replace(/^gruppo\s+/i, '').trim();
@@ -772,7 +772,7 @@ async function caricaMaisonFile(input, forzaSostituisci) {
       // Cancella anche spese_extra Seven di questa data (evita duplicati su reimport)
       await secDel(
         'spese_extra',
-        'data_spesa=eq.' + dataGiornata + '&reparto_dip=eq.' + currentReparto + '&luogo=eq.Ristorante%20Seven'
+        'data_spesa=eq.' + dataGiornata + '&reparto_dip=eq.' + currentReparto + '&luogo=eq.Ristorante%20Seven',
       );
       // Parsing righe
       const _giornoDuplicati = new Set();
@@ -871,7 +871,7 @@ async function caricaMaisonFile(input, forzaSostituisci) {
                 parsed.nome +
                 ' (' +
                 new Date(dataGiornata + 'T12:00:00').toLocaleDateString('it-IT') +
-                ')'
+                ')',
             );
           } else {
             _giornoDuplicati.add(_dupKey);
@@ -1004,4 +1004,3 @@ function toggleSezione(id, btn) {
   el.style.display = hidden ? '' : 'none';
   if (btn) btn.innerHTML = hidden ? '&#9650; Nascondi' : '&#9660; Mostra';
 }
-// ================================================================
