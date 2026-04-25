@@ -1,9 +1,9 @@
 /**
  * Diario Collaboratori — Casino Lugano SA
  * File: consegna.js
- * Righe originali: 423
- * Estratto automaticamente da index.html
  */
+
+// ================================================================
 // SEZIONE 11: CONSEGNA TURNO
 // Passaggio consegne tra turni con multi-destinatario
 // ================================================================
@@ -266,7 +266,7 @@ function aggiornaConsegnaBadge() {
   const badge = document.getElementById('consegna-badge');
   if (!badge || !op) return;
   const nonLette = getConsegneReparto().filter(
-    (c) => !c.letto_da && c.operatore !== op && _includeOpInCsv(c.destinatario, op)
+    (c) => !c.letto_da && c.operatore !== op && _includeOpInCsv(c.destinatario, op),
   ).length;
   if (nonLette) {
     badge.style.display = 'inline';
@@ -279,13 +279,13 @@ function mostraConsegnaLogin() {
   const op = getOperatore();
   if (!op) return;
   const nonLette = getConsegneReparto().filter(
-    (c) => !c.letto_da && c.operatore !== op && _includeOpInCsv(c.destinatario, op)
+    (c) => !c.letto_da && c.operatore !== op && _includeOpInCsv(c.destinatario, op),
   );
   if (!nonLette.length) return;
   const ultima = nonLette[0];
   const isAlta = ultima.priorita === 'alta';
   mostraNotifBanner('consegna', 'Consegna da ' + ultima.operatore, ultima.messaggio.substring(0, 80), () =>
-    switchPage('consegna')
+    switchPage('consegna'),
   );
   const mc = document.getElementById('note-modal-content');
   let html =
@@ -766,7 +766,7 @@ function _renderDashSettimana(_rd, _rm) {
     const d = new Date();
     d.setDate(d.getDate() - i + _dashSettOffset * 7);
     sett.push(
-      d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+      d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'),
     );
   }
   const titEl = document.getElementById('dash-sett-titolo');
@@ -789,7 +789,7 @@ function _renderDashSettimana(_rd, _rm) {
   }
   const regPerGiorno = sett.map((ds) => _rd.filter((e) => e.data && e.data.startsWith(ds)).length);
   const maisonPerGiorno = sett.map((ds) =>
-    _rm.filter((r) => r.data_giornata === ds).reduce((s, r) => s + parseFloat(r.costo || 0), 0)
+    _rm.filter((r) => r.data_giornata === ds).reduce((s, r) => s + parseFloat(r.costo || 0), 0),
   );
   renderChart(
     'chart-dash-settimana',
@@ -831,7 +831,7 @@ function _renderDashSettimana(_rd, _rm) {
           title: { display: true, text: 'Maison CHF' },
         },
       },
-    }
+    },
   );
 }
 
@@ -878,7 +878,7 @@ function _getReportSez() {
     function (k) {
       var cb = document.getElementById('rep-sez-' + k);
       sez[k] = cb ? cb.checked : true;
-    }
+    },
   );
   return sez;
 }
@@ -915,7 +915,7 @@ async function generaReportSettimanale(sez) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     sett.push(
-      d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+      d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'),
     );
   }
   const dalLabel = new Date(sett[0] + 'T12:00:00').toLocaleDateString('it-IT'),
@@ -980,7 +980,7 @@ async function generaReportSettimanale(sez) {
     // DIFFERENZE CASSA
     if (sez.cassa) {
       const errCassa = settData.filter(
-        (e) => e.tipo === nomeCorrente('Errore') && e.reparto === 'Cassa' && parseFloat(e.importo) > 0
+        (e) => e.tipo === nomeCorrente('Errore') && e.reparto === 'Cassa' && parseFloat(e.importo) > 0,
       );
       if (errCassa.length) {
         doc.setFont('helvetica', 'bold');
@@ -1132,7 +1132,7 @@ async function generaReportSettimanale(sez) {
     // Regali
     if (sez.regali) {
       const settReg = getRegaliReparto().filter(
-        (r) => (r.data_regalo || '') >= sett[0] && (r.data_regalo || '') <= sett[6]
+        (r) => (r.data_regalo || '') >= sett[0] && (r.data_regalo || '') <= sett[6],
       );
       if (settReg.length) {
         const totReg = settReg.reduce((s, r) => s + parseFloat(r.importo || 0), 0);
@@ -1171,13 +1171,13 @@ async function generaReportSettimanale(sez) {
       doc.text(
         'Casino Lugano SA — Report ' + dalLabel + ' / ' + alLabel + ' — Pag. ' + i + '/' + tp,
         mx,
-        doc.internal.pageSize.getHeight() - 8
+        doc.internal.pageSize.getHeight() - 8,
       );
     }
     mostraPdfPreview(
       doc,
       'report_settimanale_' + dalLabel.replace(/\//g, '-') + '_' + alLabel.replace(/\//g, '-') + '.pdf',
-      'Report Settimanale'
+      'Report Settimanale',
     );
   } catch (e) {
     console.error(e);
@@ -1192,7 +1192,7 @@ function generaReportSettimanaleCSV() {
     const d = new Date();
     d.setDate(d.getDate() - i);
     sett.push(
-      d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+      d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'),
     );
   }
   const dalL = new Date(sett[0] + 'T12:00:00').toLocaleDateString('it-IT'),
@@ -1240,7 +1240,7 @@ function generaReportSettimanaleCSV() {
   }
   const blob = new Blob(
     ['\uFEFF' + rows.map((r) => r.map((c) => '"' + String(c || '').replace(/"/g, '""') + '"').join(';')).join('\n')],
-    { type: 'text/csv;charset=utf-8' }
+    { type: 'text/csv;charset=utf-8' },
   );
   Object.assign(document.createElement('a'), {
     href: URL.createObjectURL(blob),
@@ -1262,7 +1262,7 @@ function _getDatiAnno(anno) {
     spese: getSpeseReparto().filter((r) => r.data_spesa >= start && r.data_spesa <= end),
     moduli: getModuliReparto().filter(
       (m) =>
-        (m.created_at || m.data_modulo || '') >= start && (m.created_at || m.data_modulo || '') <= end + 'T23:59:59'
+        (m.created_at || m.data_modulo || '') >= start && (m.created_at || m.data_modulo || '') <= end + 'T23:59:59',
     ),
   };
 }
@@ -1419,7 +1419,7 @@ async function generaReportAnnuale(sez) {
       doc.text(
         'Casino Lugano SA — Report Annuale ' + anno + ' — Pag. ' + i + '/' + tp,
         mx,
-        doc.internal.pageSize.getHeight() - 8
+        doc.internal.pageSize.getHeight() - 8,
       );
     }
     mostraPdfPreview(doc, 'report_annuale_' + anno + '.pdf', 'Report Annuale ' + anno);
@@ -1457,12 +1457,12 @@ function generaReportAnnualeCSV() {
       fmtCHF(
         mMaison.reduce(function (s, r) {
           return s + parseFloat(r.costo || 0);
-        }, 0)
+        }, 0),
       ),
       fmtCHF(
         mSE.reduce(function (s, r) {
           return s + parseFloat(r.importo || 0);
-        }, 0)
+        }, 0),
       ),
     ]);
   }
@@ -1509,7 +1509,7 @@ function generaReportAnnualeCSV() {
           })
           .join('\n'),
     ],
-    { type: 'text/csv;charset=utf-8' }
+    { type: 'text/csv;charset=utf-8' },
   );
   Object.assign(document.createElement('a'), {
     href: URL.createObjectURL(blob),
@@ -1519,4 +1519,3 @@ function generaReportAnnualeCSV() {
 }
 
 // ========================
-// ================================================================

@@ -1,9 +1,9 @@
 /**
  * Diario Collaboratori — Casino Lugano SA
  * File: chat-ui.js
- * Righe originali: 1455
- * Estratto automaticamente da index.html
  */
+
+// ================================================================
 // SEZIONE 7: NOTE COLLEGHI (interfaccia chat)
 // Lista conversazioni, renderNoteCollega, renderNoteChat
 // ================================================================
@@ -125,7 +125,7 @@ function modificaNotaCollega(id) {
           x.gruppo_id === gid &&
           x.da_operatore === n.da_operatore &&
           (x.messaggio || '') === (n.messaggio || '') &&
-          Math.abs(new Date(x.created_at || 0).getTime() - _nTime2) < 10000
+          Math.abs(new Date(x.created_at || 0).getTime() - _nTime2) < 10000,
       )
     : null;
   const destLabel =
@@ -485,7 +485,7 @@ function toggleConvNewDropdown(ev) {
         dd.style.display = 'none';
         document.removeEventListener('click', _cl);
       },
-      { once: true }
+      { once: true },
     );
   }, 0);
 }
@@ -885,7 +885,7 @@ function _getConvNotes(partner, op) {
       const all = noteColleghiCache.filter(
         (n) =>
           n.gruppo_id === gid &&
-          ((n.da_operatore === op && !n.nascosta_mitt) || (n.a_operatore === op && !n.nascosta_dest))
+          ((n.da_operatore === op && !n.nascosta_mitt) || (n.a_operatore === op && !n.nascosta_dest)),
       );
       // FIX BUG #1 + REGRESSIONE: dedup per inviati con doppio approccio:
       // 1. Nuovi messaggi (post-fix): hanno created_at IDENTICO su tutte le righe del batch (set esplicito in inviaNotaChat) → match esatto
@@ -925,7 +925,7 @@ function _getConvNotes(partner, op) {
     return noteColleghiCache.filter(
       (n) =>
         n.gruppo_id === gid &&
-        ((n.da_operatore === op && !n.nascosta_mitt) || (n.a_operatore === op && !n.nascosta_dest))
+        ((n.da_operatore === op && !n.nascosta_mitt) || (n.a_operatore === op && !n.nascosta_dest)),
     );
   }
   return noteColleghiCache.filter((n) => {
@@ -1006,7 +1006,7 @@ function renderNoteChat(partner) {
           (n) =>
             '<span style="display:inline-block;margin:2px 4px;padding:1px 8px;background:var(--paper2);border-radius:12px;font-size:.78rem">' +
             n +
-            '</span>'
+            '</span>',
         )
         .join('') +
       '</div>';
@@ -1140,7 +1140,7 @@ function renderNoteChat(partner) {
           x.gruppo_id === n.gruppo_id &&
           x.da_operatore === op &&
           (x.messaggio || '') === (n.messaggio || '') &&
-          Math.abs(new Date(x.created_at || 0).getTime() - _nTimeR) < 10000
+          Math.abs(new Date(x.created_at || 0).getTime() - _nTimeR) < 10000,
       );
       // Deduplicare per destinatario (evita nomi doppi)
       const _byDest = {};
@@ -1190,7 +1190,7 @@ function renderNoteChat(partner) {
               x.gruppo_id === n.gruppo_id &&
               x.da_operatore === op &&
               (x.messaggio || '') === (n.messaggio || '') &&
-              x.letta
+              x.letta,
           )
         : n.letta;
     const canEdit = isSent && !_qualcunoLetto;
@@ -1265,7 +1265,7 @@ function renderNoteChat(partner) {
       _REACTION_EMOJIS
         .map(
           (e) =>
-            '<button onclick="event.stopPropagation();toggleReazione(' + n.id + ",'" + e + '\')">' + e + '</button>'
+            '<button onclick="event.stopPropagation();toggleReazione(' + n.id + ",'" + e + '\')">' + e + '</button>',
         )
         .join('') +
       '</div>';
@@ -1991,7 +1991,7 @@ function apriSchedaCollaboratore(nome) {
   const allData = getDatiReparto();
   const entries = allData.filter((e) => e.nome === nome);
   const moduli = getModuliReparto().filter(
-    (m) => m.collaboratore && m.collaboratore.toLowerCase() === nome.toLowerCase()
+    (m) => m.collaboratore && m.collaboratore.toLowerCase() === nome.toLowerCase(),
   );
   const now = new Date();
   const tipoErr = nomeCorrente('Errore'),
@@ -2245,7 +2245,7 @@ function apriSchedaCollaboratore(nome) {
     const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
     const recentErr = entries.filter((e) => e.tipo === tipoErr && new Date(e.data) >= threeMonthsAgo).length;
     const recentApprMod = moduli.filter(
-      (m) => m.tipo === 'apprezzamento' && new Date(m.created_at) >= threeMonthsAgo
+      (m) => m.tipo === 'apprezzamento' && new Date(m.created_at) >= threeMonthsAgo,
     ).length;
     if (recentErr === 0 && recentApprMod > 0) {
       html +=
@@ -2738,7 +2738,7 @@ function stampaSchedaPDF(nome) {
   mostraPdfPreview(
     doc,
     'scheda_' + nome.replace(/\s+/g, '_') + '_' + new Date().toLocaleDateString('it-IT').replace(/\//g, '-') + '.pdf',
-    'Scheda ' + nome
+    'Scheda ' + nome,
   );
 }
 
@@ -2808,7 +2808,7 @@ function _mostraConfronto(nomi) {
         entries.filter(function (e) {
           var ed = new Date(e.data);
           return e.tipo === tipoErr && ed.getMonth() === d.getMonth() && ed.getFullYear() === d.getFullYear();
-        }).length
+        }).length,
       );
     }
     datasets.push({
@@ -3006,7 +3006,7 @@ function checkBudgetPushAfterInsert(nomeCliente) {
       ['tutti'],
       'Budget superato: ' + nomeCliente,
       nomeCliente + ' ' + spent.toFixed(0) + '/' + budget.budget_chf.toFixed(0) + ' CHF',
-      'budget'
+      'budget',
     );
 }
 function inviaNotifica(titolo, corpo, onClick) {
@@ -3032,7 +3032,7 @@ async function pollNuoveNote() {
       secGet('chat_message_hidden?order=hidden_at.desc'),
     ]);
     const vecchieNonLette = noteColleghiCache.filter(
-      (n) => n.a_operatore === op && !n.letta && !n.nascosta_dest
+      (n) => n.a_operatore === op && !n.letta && !n.nascosta_dest,
     ).length;
     chatMessagesCache = msgs || [];
     chatLettiCache = letti || [];
@@ -3136,5 +3136,3 @@ async function segnaNoteLette() {
   _chatBuildNoteCache();
   renderNoteCollega();
 }
-
-// ================================================================

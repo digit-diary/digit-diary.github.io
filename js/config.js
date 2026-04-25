@@ -1,8 +1,8 @@
 /**
  * Diario Collaboratori — Casino Lugano SA
  * File: config.js
- * Configurazione, costanti, variabili globali
  */
+
 // ================================================================
 // SEZIONE 1: CONFIGURAZIONE, COSTANTI, API KEYS
 // Chiavi Supabase (offuscate), costanti app, tipi default, caches
@@ -79,4 +79,3 @@ let chatMessagesCache = [],
   chatGroupMembersCache = [],
   chatLettiCache = [],
   chatHiddenCache = [];
-// ================================================================

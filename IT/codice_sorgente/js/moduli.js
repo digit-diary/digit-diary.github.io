@@ -1,9 +1,9 @@
 /**
  * Diario Collaboratori — Casino Lugano SA
  * File: moduli.js
- * Righe originali: 630
- * Estratto automaticamente da index.html
  */
+
+// ================================================================
 // SEZIONE 8: MODULI DISCIPLINARI
 // Allineamento, Apprezzamento, RDI — form e PDF
 // ================================================================
@@ -147,7 +147,7 @@ function initFirmaCanvas(canvasId) {
       drawing = true;
       [lx, ly] = gp(e);
     },
-    { passive: false }
+    { passive: false },
   );
   c.addEventListener(
     'touchmove',
@@ -161,7 +161,7 @@ function initFirmaCanvas(canvasId) {
       ctx.stroke();
       [lx, ly] = [x, y];
     },
-    { passive: false }
+    { passive: false },
   );
   c.addEventListener(
     'touchend',
@@ -169,7 +169,7 @@ function initFirmaCanvas(canvasId) {
       e.preventDefault();
       drawing = false;
     },
-    { passive: false }
+    { passive: false },
   );
 }
 function clearFirma(canvasId) {
@@ -327,7 +327,7 @@ async function generaModuloPDF(tipo) {
     const obiettivo = (document.getElementById('mod-obiettivo') || {}).value || '';
     drawSection(
       'Obiettivo concordato tra Collaboratore e Resp. Settore onde evitare il ripetersi della non conformit\u00E0',
-      obiettivo
+      obiettivo,
     );
     const scad = (document.getElementById('mod-scadenza') || {}).value || '';
     checkPage(16);
@@ -345,7 +345,7 @@ async function generaModuloPDF(tipo) {
     doc.text(
       " (termine di verifica entro il quale si \u00E8 concordato di raggiungere l'obiettivo di cui sopra)",
       mx + scW,
-      y
+      y,
     );
     y += 6;
     if (scad) {
@@ -399,7 +399,7 @@ async function generaModuloPDF(tipo) {
     const obiettivo = (document.getElementById('mod-obiettivo') || {}).value || '';
     drawSection(
       'Obiettivo concordato tra Collaboratore e Resp. Settore onde evitare il ripetersi della non conformit\u00E0',
-      obiettivo
+      obiettivo,
     );
     const scad = (document.getElementById('mod-scadenza') || {}).value || '';
     checkPage(16);
@@ -417,7 +417,7 @@ async function generaModuloPDF(tipo) {
     doc.text(
       " (termine di verifica entro il quale si \u00E8 concordato di raggiungere l'obiettivo di cui sopra)",
       mx + scW2,
-      y
+      y,
     );
     y += 6;
     if (scad) {
@@ -474,7 +474,7 @@ async function generaModuloPDF(tipo) {
     doc.setTextColor(80);
     const notaLines = doc.splitTextToSize(
       '* il collaboratore che non vuole sottoscrivere il rapporto disciplinare lo deve espressamente dichiarare, scrivendolo al posto della firma.',
-      pw - mid - 10 - mx
+      pw - mid - 10 - mx,
     );
     doc.text(notaLines, mid + 10, y);
     y += notaLines.length * 3 + 8;
@@ -509,7 +509,7 @@ async function generaModuloPDF(tipo) {
       '_' +
       data.replace(/\//g, '-') +
       '.pdf',
-    'Modulo ' + tipo.charAt(0).toUpperCase() + tipo.slice(1) + ' — ' + collab
+    'Modulo ' + tipo.charAt(0).toUpperCase() + tipo.slice(1) + ' — ' + collab,
   );
   // Salva/aggiorna nel database
   const dati = { qr_code: moduloQrId };
@@ -925,7 +925,7 @@ async function renderCollaboratoriUI() {
             c.nome.replace(/'/g, "\\'") +
             '\')">Rinomina</button><button class="btn-del-tipo" onclick="disattivaCollaboratore(\'' +
             c.nome.replace(/'/g, "\\'") +
-            '\')">Rimuovi</button></div>'
+            '\')">Rimuovi</button></div>',
         )
         .join('')
     : '<p style="color:var(--muted);font-size:.85rem">Nessun collaboratore.</p>';
@@ -939,7 +939,7 @@ async function renderCollaboratoriUI() {
             c.nome.replace(/'/g, "\\'") +
             '\')">+ ' +
             escP(c.nome) +
-            '</button>'
+            '</button>',
         )
         .join('') +
       '</div></div>';
@@ -1929,7 +1929,7 @@ function getNomiLista() {
     ...new Set(
       [...collaboratoriCache.map((c) => c.nome.trim()), ...getDatiReparto().map((e) => (e.nome || '').trim())]
         .filter(Boolean)
-        .map((n) => n.replace(/\s+/g, ' '))
+        .map((n) => n.replace(/\s+/g, ' ')),
     ),
   ].sort();
 }
@@ -1964,7 +1964,7 @@ function acFiltra(inputId, dropId) {
         n.replace(/'/g, "\\'") +
         '\')">' +
         escP(n) +
-        '</div>'
+        '</div>',
     )
     .join('');
   drop.classList.add('show');
@@ -2002,7 +2002,7 @@ function acFiltraModuli(inputId, dropId) {
         n.replace(/'/g, "\\'") +
         '\')">' +
         escP(n) +
-        '</div>'
+        '</div>',
     )
     .join('');
   drop.classList.add('show');
@@ -2029,7 +2029,7 @@ function _saveFiltri() {
         cerca: (document.getElementById('filt-cerca') || {}).value || '',
         dal: (document.getElementById('filt-dal') || {}).value || '',
         al: (document.getElementById('filt-al') || {}).value || '',
-      })
+      }),
     );
   } catch (e) {}
 }
@@ -2093,5 +2093,3 @@ function updateStats() {
     nomeCorrente('Malattia') +
     '</div></div>';
 }
-
-// ================================================================

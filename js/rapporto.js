@@ -1,9 +1,9 @@
 /**
  * Diario Collaboratori — Casino Lugano SA
  * File: rapporto.js
- * Righe originali: 436
- * Estratto automaticamente da index.html
  */
+
+// ================================================================
 // SEZIONE 9: RAPPORTO GIORNALIERO
 // Calendario, form turno, parser assenze e differenze cassa
 // ================================================================
@@ -21,7 +21,12 @@ async function fetchRapportiMese(a, m) {
   const end = nm.getFullYear() + '-' + String(nm.getMonth() + 1).padStart(2, '0') + '-01';
   rapportiCache = {};
   const data = await secGet(
-    'rapporti_giornalieri?data_rapporto=gte.' + start + '&data_rapporto=lt.' + end + '&reparto_dip=eq.' + currentReparto
+    'rapporti_giornalieri?data_rapporto=gte.' +
+      start +
+      '&data_rapporto=lt.' +
+      end +
+      '&reparto_dip=eq.' +
+      currentReparto,
   );
   data.forEach((r) => {
     const k = r.data_rapporto;
@@ -311,7 +316,7 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno) {
   for (const riga of righe) {
     if (
       /\b(lutto|ferie|vacanza|vacanze|infortunio|permesso|giorno libero|riposo|congedo|ritardo|in ritardo)\b/i.test(
-        riga
+        riga,
       )
     )
       continue;
@@ -329,7 +334,7 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno) {
     if (
       !m &&
       /\b(assente|malattia|malato|malata|malessere|non.{0,10}present[ei]|non.{0,10}vien[ei]|chiamat[oa]|si è sentit[oa]|non.{0,10}sar[àa]|non sta bene|sta male|ricoverat[oa]|ospedale|pronto soccorso|visita medica|controllo medico|certificato medico)\b/i.test(
-        riga
+        riga,
       )
     ) {
       let _foundNome = null,
@@ -359,7 +364,7 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno) {
     const oggiMatch = /\b(oggi|stasera|questa sera)\b/i.test(riga);
     const finoMatch = riga.match(/fino\s+(?:al?\s+)?(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?/i);
     const dalAlMatch = _rigaPulita.match(
-      /dal\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?\s+al\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?/i
+      /dal\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?\s+al\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?/i,
     );
     const _giorniSett = {
       lunedi: 1,
@@ -381,7 +386,7 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno) {
       if (rigaLow.includes(g)) _giorniTrovati.push(idx);
     }
     const finoGiornoMatch = riga.match(
-      /fino\s+(?:a\s+)?(luned[iì]|marted[iì]|mercoled[iì]|gioved[iì]|venerd[iì]|sabato|domenica)/i
+      /fino\s+(?:a\s+)?(luned[iì]|marted[iì]|mercoled[iì]|gioved[iì]|venerd[iì]|sabato|domenica)/i,
     );
     const dataRapp = new Date(ds + 'T12:00:00');
     let dataInizio = new Date(ds + 'T12:00:00'),
@@ -508,7 +513,7 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno) {
         : 'Assente per malattia' + codeTxt + ' (' + _rapLabel + ')';
     _nomiProcessati.add(nomeFinale.toLowerCase());
     const esiste = _esistenti.find(
-      (e) => e.nome.toLowerCase() === nomeFinale.toLowerCase() && !_usedEsistentiIds.has(e.id)
+      (e) => e.nome.toLowerCase() === nomeFinale.toLowerCase() && !_usedEsistentiIds.has(e.id),
     );
     if (esiste) {
       _usedEsistentiIds.add(esiste.id);
@@ -535,7 +540,7 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno) {
           _motivo = 'già inserita manualmente';
         } else {
           const _refMatch = (_giaInAltro.testo || '').match(
-            /da rapporto (PRESTO|NOTTE)(?:\s+del\s+(\d{2}\/\d{2}\/\d{4}))?/
+            /da rapporto (PRESTO|NOTTE)(?:\s+del\s+(\d{2}\/\d{2}\/\d{4}))?/,
           );
           const _refTxt = _refMatch ? _refMatch[1] + (_refMatch[2] ? ' del ' + _refMatch[2] : '') : 'altro rapporto';
           _motivo = 'già documentata nel rapporto ' + _refTxt;
@@ -552,7 +557,7 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno) {
           ':' +
           String(_now.getMinutes()).padStart(2, '0') +
           ':' +
-          String(_now.getSeconds()).padStart(2, '0')
+          String(_now.getSeconds()).padStart(2, '0'),
       ).toISOString();
       ops.creates.push({
         nome: nomeFinale,
@@ -704,7 +709,7 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
           turno +
           ' del ' +
           ds +
-          ')'
+          ')',
       );
     } catch (_) {}
   }
@@ -734,7 +739,7 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
     try {
       logAzione(
         'Malattia eliminata da rapporto',
-        d.nome + ' (' + d.motivo + ', rapporto ' + turno + ' del ' + ds + ')'
+        d.nome + ' (' + d.motivo + ', rapporto ' + turno + ' del ' + ds + ')',
       );
     } catch (_) {}
   }
@@ -744,7 +749,7 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
     try {
       logAzione(
         'Duplicato cross-rapporto saltato',
-        s.nome + ': ' + s.motivo + ' (rapporto ' + turno + ' del ' + ds + ')'
+        s.nome + ': ' + s.motivo + ' (rapporto ' + turno + ' del ' + ds + ')',
       );
     } catch (_) {}
   }
@@ -851,7 +856,7 @@ async function fetchRapportiRange(dal, al) {
       al +
       '&reparto_dip=eq.' +
       currentReparto +
-      '&order=data_rapporto.asc'
+      '&order=data_rapporto.asc',
   );
   const byDate = {};
   data.forEach((r) => {
@@ -991,5 +996,3 @@ async function esportaRapportoPDF() {
     toast('Errore generazione PDF: ' + e.message);
   }
 }
-
-// ================================================================

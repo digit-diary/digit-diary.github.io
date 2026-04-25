@@ -1,9 +1,9 @@
 /**
  * Diario Collaboratori — Casino Lugano SA
  * File: chat-core.js
- * Righe originali: 186
- * Estratto automaticamente da index.html
  */
+
+// ================================================================
 // SEZIONE 3: CHAT ENTERPRISE (schema normalizzato)
 // Cache synthesis, helpers, wrapper operazioni
 // ================================================================
@@ -234,4 +234,3 @@ async function _chatInsertMessage(opts) {
   _chatBuildNoteCache();
   return newMsg;
 }
-// ================================================================
