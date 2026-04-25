@@ -725,19 +725,29 @@
 <div class="toast" id="toast"></div>
 <div class="notif-banner" id="notif-banner" onclick="notifBannerClick()"><span class="notif-icon" id="notif-icon"></span><div class="notif-body"><div class="notif-title" id="notif-title"></div><div class="notif-text" id="notif-text"></div></div><button class="notif-close" onclick="event.stopPropagation();chiudiNotifBanner()">&#10005;</button></div>
 
-<!-- JavaScript: split in file separati per manutenibilita' -->
-<script src="js/config.js"></script>
-<script src="js/crypto.js"></script>
-<script src="js/chat-core.js"></script>
-<script src="js/realtime.js"></script>
-<script src="js/api.js"></script>
-<script src="js/cestino.js"></script>
-<script src="js/chat-ui.js"></script>
-<script src="js/moduli.js"></script>
-<script src="js/rapporto.js"></script>
-<script src="js/stats.js"></script>
-<script src="js/consegna.js"></script>
-<script src="js/promemoria.js"></script>
-<script src="js/maison.js"></script>
+<!-- JavaScript: split in 20 file separati per manutenibilita' -->
+<!-- L'ordine di caricamento e' IMPORTANTE (dipendenze) -->
+<script src="js/config.js"></script>       <!-- 1. Costanti, API keys, variabili globali -->
+<script src="js/crypto.js"></script>       <!-- 2. Cifratura AES-GCM messaggi -->
+<script src="js/chat-core.js"></script>    <!-- 3. Schema enterprise chat (logica) -->
+<script src="js/realtime.js"></script>     <!-- 4. WebSocket, polling -->
+<script src="js/api.js"></script>          <!-- 5. secGet/Post/Patch/Del, loadAll -->
+<script src="js/utils.js"></script>        <!-- 6. toast, escP, fmtCHF, capitalizzaNome -->
+<script src="js/auth.js"></script>         <!-- 7. Login, password, sessioni, biometrico -->
+<!-- cestino.js splittato in: auth, settings, app, utils, diario, alerts, search -->
+<script src="js/settings.js"></script>     <!-- 9. Visibilita, operatori, temi, campi -->
+<script src="js/app.js"></script>          <!-- 10. Routing pagine, init, renderPostLogin -->
+<script src="js/diario.js"></script>       <!-- 11. Registrazioni, salva, modifica -->
+<script src="js/alerts.js"></script>       <!-- 12. Alert cassa, rischio, ammonimenti -->
+<script src="js/search.js"></script>       <!-- 13. Ricerca globale, riepilogo mensile -->
+<script src="js/chat-ui.js"></script>      <!-- 14. Interfaccia chat WhatsApp -->
+<script src="js/moduli.js"></script>       <!-- 15. Moduli disciplinari, PDF -->
+<script src="js/rapporto.js"></script>     <!-- 16. Rapporto giornaliero, parser -->
+<script src="js/stats.js"></script>        <!-- 17. Statistiche, grafici -->
+<script src="js/consegna.js"></script>     <!-- 18. Consegne turno, dashboard -->
+<script src="js/promemoria.js"></script>   <!-- 19. Promemoria, scadenze -->
+<!-- maison.js splittato in: maison-budget, maison-helpers -->
+<script src="js/maison-budget.js"></script><!-- 20b. Maison: budget, profilo cliente -->
+<script src="js/maison-helpers.js"></script><!-- 20c. Maison: import, parser nomi, helpers -->
 </body>
 </html>
