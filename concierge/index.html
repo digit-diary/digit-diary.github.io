@@ -514,6 +514,7 @@ const ICON = {
   scudo:      P+'<path d="M12 3l7 3v5.5c0 4.3-2.9 7.3-7 8.5-4.1-1.2-7-4.2-7-8.5V6z"/><path d="M9 12l2 2 4-4.5"/></svg>',
   wifi:       P+'<path d="M2.5 9a16 16 0 0 1 19 0"/><path d="M5.5 12.6a11 11 0 0 1 13 0"/><path d="M8.5 16.2a6 6 0 0 1 7 0"/><circle cx="12" cy="19.6" r="1"/></svg>',
   bancomat:   P+'<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19"/><path d="M6 14.5h4"/></svg>',
+  translate:  P+'<path d="M4 5h7"/><path d="M7.5 5c0 4-2 7-5 9"/><path d="M5 11c1.5 1.8 3.5 3 6 3.5"/><path d="M12.5 21l4.5-10 4.5 10"/><path d="M14.5 17h5"/></svg>',
   qr:         P+'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v.01M21 21v-4M17 21h.01M14 21v-3"/></svg>',
 };
 
@@ -549,7 +550,7 @@ invita gentilmente a chiedere alla reception.
 ${dati}
 ===============================
 
-LINGUA DI RISPOSTA: il cliente ha selezionato ${lsel}. Rispondi in ${lsel}. Solo se il messaggio è CHIARAMENTE scritto in un'altra lingua, rispondi in quella lingua.
+⚠️ LINGUA DI RISPOSTA OBBLIGATORIA: scrivi TUTTO il campo "text" in ${lsel}. Anche se la domanda ti arriva in italiano, la risposta DEVE essere in ${lsel}. NON rispondere in italiano se ${lsel} non è l'italiano. Imposta il campo "lang" col codice corrispondente.
 
 REGOLE (parla come un VERO concierge umano, non come un'AI):
 - Rispondi con ortografia corretta, senza mescolare parole di altre lingue: in italiano i giorni sono domenica, lunedì, martedì, mercoledì, giovedì, venerdì, sabato (MAI "domingo" o altri termini spagnoli).
@@ -558,7 +559,7 @@ REGOLE (parla come un VERO concierge umano, non come un'AI):
 - DIALOGA: quando è naturale, chiudi con una breve domanda di cortesia per continuare ("Posso aiutarla con altro?", "Le interessa anche il menù?", "Desidera che le indichi la strada?"). Non farlo se il cliente sta chiaramente chiudendo.
 - Se il cliente è indeciso, fai una domanda per capire cosa cerca, invece di elencare tutto.
 - Promuovi il gioco responsabile se pertinente, senza incoraggiare l'eccesso.
-Restituisci SOLO JSON valido: {"lang":"it|de|en|fr","text":"risposta","indicazione":"breve direzione fisica se utile, altrimenti stringa vuota"}`;
+Restituisci SOLO JSON valido: {"lang":"it|de|en|fr|es|ru|zh|ar","text":"risposta nella lingua richiesta","indicazione":"breve direzione fisica se utile, altrimenti stringa vuota"}`;
 }
 
 /* --- Voci sintesi --- */
@@ -759,7 +760,8 @@ async function chiediAllAI(domanda, opts){
     if(mioId !== richiestaId) return;
     let out; try{ out = JSON.parse(data.choices[0].message.content); }
     catch{ out = {lang:'it', text:data.choices[0].message.content, indicazione:''}; }
-    const text = out.text||'Mi scusi, non ho capito.', lang = out.lang||'it', ind = out.indicazione||'';
+    const valid = ['it','de','en','fr','es','ru','zh','ar'];
+    const text = out.text||'Mi scusi, non ho capito.', lang = valid.includes(out.lang)?out.lang:uiLang(), ind = out.indicazione||'';
     if(!opts.noContext) cronologia.push({role:'user',content:domanda}, {role:'assistant',content:text});
     if(opts.cacheKey) rispCache.set(opts.cacheKey, {text, lang, indicazione:ind});   // salva per riuso
     rispondi(text, lang, ind, mioId);
@@ -1088,7 +1090,7 @@ $('btnFull').innerHTML = ICON.full;
 $('btnGear').innerHTML = ICON.gear;
 // Demo: logo mini, mic al centro, dito che batte, cerchio di icone
 $('demoMic').innerHTML = ICON.mic;
-$('demoFinger').innerHTML = '<svg viewBox="0 0 64 64"><g fill="#fdfdfd" stroke="rgba(0,0,0,.18)" stroke-width="1.2" stroke-linejoin="round"><rect x="26" y="7" width="11" height="32" rx="5.5"/><rect x="17" y="29" width="34" height="29" rx="14.5"/></g></svg>';
+$('demoFinger').innerHTML = '<svg viewBox="0 0 24 24" fill="#fdfdfd"><path d="M9 11.24V7.5a2.5 2.5 0 0 1 5 0v3.74c1.21-.81 2-2.18 2-3.74a4.5 4.5 0 1 0-9 0c0 1.56.79 2.93 2 3.74zm9.84 4.63l-4.54-2.26a1.4 1.4 0 0 0-.54-.11H13V7.5a1.5 1.5 0 0 0-3 0V21l-3.43-.72a1.1 1.1 0 0 0-1.03.3l-.79.8 4.94 4.94c.27.27.65.44 1.06.44h6.79c.75 0 1.33-.55 1.44-1.28l.75-5.27a2 2 0 0 0 .02-.21c0-.62-.38-1.16-.92-1.4z"/></svg>';
 $('demoLogo').innerHTML = '<svg viewBox="0 0 200 200"><defs><radialGradient id="dlr" cx="50%" cy="42%" r="65%"><stop offset="0%" stop-color="#d8244e"/><stop offset="55%" stop-color="#b01038"/><stop offset="100%" stop-color="#7d0826"/></radialGradient></defs><path d="M48,56 Q96,104 144,56 Q96,104 144,152 Q96,104 48,152 Q96,104 48,56 Z" fill="url(#dlr)" stroke="#c9ccce" stroke-width="6" stroke-linejoin="round"/></svg>';
 buildDemoRing();
 document.querySelectorAll('#lingue span').forEach(s=> s.onclick=()=>setLinguaAscolto(s.dataset.l));
