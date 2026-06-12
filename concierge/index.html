@@ -317,6 +317,10 @@
     <span data-l="de-DE" title="Deutsch">🇩🇪</span>
     <span data-l="en-GB" title="English">🇬🇧</span>
     <span data-l="fr-FR" title="Français">🇫🇷</span>
+    <span data-l="es-ES" title="Español">🇪🇸</span>
+    <span data-l="ru-RU" title="Русский">🇷🇺</span>
+    <span data-l="zh-CN" title="中文">🇨🇳</span>
+    <span data-l="ar-SA" title="العربية">🇸🇦</span>
   </div>
 
   <div class="rapide" id="rapide"></div>
@@ -482,8 +486,12 @@ const UI = {
   de:{idle:'Zum Sprechen tippen', greet:'Guten Tag! Wie kann ich Ihnen helfen?', attiva:'Zuhören aktivieren', ferma:'Zuhören stoppen', listen:'Ich höre zu… sprechen Sie', pausa:'Zuhören pausiert', think:'Einen Moment…', privacy:'Es wird kein Audio aufgezeichnet oder gespeichert — Echtzeitverarbeitung.'},
   en:{idle:'Tap to speak', greet:'Welcome! How may I help you?', attiva:'Start listening', ferma:'Stop listening', listen:'Listening… go ahead', pausa:'Listening paused', think:'One moment…', privacy:'No audio is recorded or stored — real-time processing.'},
   fr:{idle:'Touchez pour parler', greet:'Bonjour ! Comment puis-je vous aider ?', attiva:'Activer l\'écoute', ferma:'Arrêter l\'écoute', listen:'J\'écoute… allez-y', pausa:'Écoute en pause', think:'Un instant…', privacy:'Aucun son n\'est enregistré ni conservé — traitement en temps réel.'},
+  es:{idle:'Toque para hablar', greet:'¡Buenos días! ¿En qué puedo ayudarle?', attiva:'Activar escucha', ferma:'Detener escucha', listen:'Le escucho… hable', pausa:'Escucha en pausa', think:'Un momento…', privacy:'No se graba ni almacena ningún audio — procesamiento en tiempo real.'},
+  ru:{idle:'Нажмите, чтобы говорить', greet:'Здравствуйте! Чем могу помочь?', attiva:'Включить прослушивание', ferma:'Остановить', listen:'Слушаю… говорите', pausa:'Прослушивание на паузе', think:'Минуту…', privacy:'Аудио не записывается и не сохраняется — обработка в реальном времени.'},
+  zh:{idle:'轻触说话', greet:'您好！有什么可以帮您？', attiva:'开始聆听', ferma:'停止聆听', listen:'正在聆听…请讲', pausa:'聆听已暂停', think:'请稍候…', privacy:'不录制或保存任何音频 — 实时处理。'},
+  ar:{idle:'المس للتحدث', greet:'مرحباً! كيف يمكنني مساعدتك؟', attiva:'تفعيل الاستماع', ferma:'إيقاف الاستماع', listen:'أنا أستمع… تفضل', pausa:'الاستماع متوقف', think:'لحظة…', privacy:'لا يتم تسجيل أو حفظ أي صوت — معالجة فورية.'},
 };
-function uiLang(){ return ({ 'it-IT':'it','de-DE':'de','en-GB':'en','fr-FR':'fr' })[langAscolto] || 'it'; }
+function uiLang(){ return ({ 'it-IT':'it','de-DE':'de','en-GB':'en','fr-FR':'fr','es-ES':'es','ru-RU':'ru','zh-CN':'zh','ar-SA':'ar' })[langAscolto] || 'it'; }
 function T(k){ return UI[uiLang()][k]; }
 
 /* --- Icone SVG moderne (stile linea) --- */
@@ -531,7 +539,7 @@ let langAscolto = 'it-IT';
 
 function buildSystemPrompt(){
   const dati = localStorage.getItem('concierge_dati') || DATI_DEFAULT;
-  const LNAME = {it:'ITALIANO', de:'TEDESCO (Deutsch)', en:'INGLESE (English)', fr:'FRANCESE (Français)'};
+  const LNAME = {it:'ITALIANO', de:'TEDESCO (Deutsch)', en:'INGLESE (English)', fr:'FRANCESE (Français)', es:'SPAGNOLO (Español)', ru:'RUSSO (Русский)', zh:'CINESE (中文)', ar:'ARABO (العربية)'};
   const lsel = LNAME[uiLang()] || 'ITALIANO';
   return `Sei il concierge virtuale del Casinò di Lugano, cortese ed elegante.
 Rispondi SOLO usando le informazioni qui sotto. Se un dato non c'è, NON inventarlo:
@@ -790,7 +798,7 @@ function rispondi(testo, lang, indicazione, mioId){
 }
 
 function voceBrowser(testo, lang, fine){
-  const target = {it:'it-IT',de:'de-DE',en:'en-GB',fr:'fr-FR'}[lang]||'it-IT';
+  const target = {it:'it-IT',de:'de-DE',en:'en-GB',fr:'fr-FR',es:'es-ES',ru:'ru-RU',zh:'zh-CN',ar:'ar-SA'}[lang]||'it-IT';
   const u = new SpeechSynthesisUtterance(testo); u.lang=target;
   const v = voices.find(v=>v.lang===target)||voices.find(v=>v.lang.startsWith(lang));
   if(v) u.voice=v; u.onend=fine;
@@ -854,7 +862,9 @@ async function voceGoogle(testo, lang, fine, mioId){
   if(!key){ $('risposta').textContent='Manca la chiave Google TTS (⚙️).'; fine(); return; }
   const vmap = {
     it:{languageCode:'it-IT',name:'it-IT-Neural2-A'}, de:{languageCode:'de-DE',name:'de-DE-Neural2-F'},
-    en:{languageCode:'en-GB',name:'en-GB-Neural2-A'}, fr:{languageCode:'fr-FR',name:'fr-FR-Neural2-A'}
+    en:{languageCode:'en-GB',name:'en-GB-Neural2-A'}, fr:{languageCode:'fr-FR',name:'fr-FR-Neural2-A'},
+    es:{languageCode:'es-ES',name:'es-ES-Neural2-A'}, ru:{languageCode:'ru-RU',name:'ru-RU-Wavenet-A'},
+    zh:{languageCode:'cmn-CN',name:'cmn-CN-Wavenet-A'}, ar:{languageCode:'ar-XA',name:'ar-XA-Wavenet-A'}
   };
   const voce = vmap[lang]||vmap.it;
   try{
@@ -885,7 +895,7 @@ async function voceGoogle(testo, lang, fine, mioId){
 /* ============ 4. UI: bottoni rapidi, attesa, kiosk ============ */
 function costruisciRapide(){
   const lng = uiLang();
-  $('rapide').innerHTML = RAPIDE.map((r,i)=>`<button onclick="domandaRapida(${i})">${ICON[r.ic]}<span>${r.l[lng]}</span></button>`).join('');
+  $('rapide').innerHTML = RAPIDE.map((r,i)=>`<button onclick="domandaRapida(${i})">${ICON[r.ic]}<span>${r.l[lng]||r.l.en||r.l.it}</span></button>`).join('');
 }
 function domandaRapida(i){
   const r = RAPIDE[i];
@@ -893,7 +903,7 @@ function domandaRapida(i){
     mostraQR(r.url, true);
     return;
   }
-  const q = r.q[uiLang()];
+  const q = r.q[uiLang()] || r.q.it;    // lingue extra: domanda in italiano, l'AI risponde nella lingua scelta
   $('domanda').textContent = '“'+q+'”';
   if(r.url) mostraQR(r.url, false);     // es. Ristorante: risposta vocale + QR per il menù
   const ck = uiLang()+'|'+r.ic;         // chiave cache: bottone + lingua
@@ -949,14 +959,14 @@ function chiudiWeb(){ $('webModal').classList.remove('open'); $('webFrame').src=
 /* --- Demo animato dopo inattività (attract mode totem) --- */
 let inattivitaTimer = null, demoCtaTimer = null, demoCtaIdx = 0;
 const INATTIVITA_MS = 40000;          // 40s senza interazione → parte il demo
-const DEMO_CTA = {it:'Tocca lo schermo per iniziare', de:'Tippen, um zu starten', en:'Touch the screen to start', fr:'Touchez l\'écran pour commencer'};
-const DEMO_TITLE = {it:'Premi qui e chiedi', de:'Hier tippen und fragen', en:'Tap here and ask', fr:'Touchez ici et demandez'};
-const DEMO_EX = {it:'« Dov\'è il ristorante? »', de:'« Wo ist die Toilette? »', en:'« What time do you open? »', fr:'« Comment jouer à la roulette? »'};
-const FLAG_DEMO = {it:'🇮🇹', de:'🇩🇪', en:'🇬🇧', fr:'🇫🇷'};
-const DEMO_LANGS = ['it','de','en','fr'];
+const DEMO_CTA = {it:'Tocca lo schermo per iniziare', de:'Tippen, um zu starten', en:'Touch the screen to start', fr:'Touchez l\'écran pour commencer', es:'Toque la pantalla para empezar', ru:'Коснитесь экрана, чтобы начать', zh:'轻触屏幕开始', ar:'المس الشاشة للبدء'};
+const DEMO_TITLE = {it:'Premi qui e chiedi', de:'Hier tippen und fragen', en:'Tap here and ask', fr:'Touchez ici et demandez', es:'Toque aquí y pregunte', ru:'Нажмите и спросите', zh:'点这里提问', ar:'المس هنا واسأل'};
+const DEMO_EX = {it:'« Dov\'è il ristorante? »', de:'« Wo ist die Toilette? »', en:'« What time do you open? »', fr:'« Comment jouer à la roulette? »', es:'« ¿Dónde está el restaurante? »', ru:'« Где ресторан? »', zh:'« 餐厅在哪里？ »', ar:'« أين المطعم؟ »'};
+const FLAG_DEMO = {it:'🇮🇹', de:'🇩🇪', en:'🇬🇧', fr:'🇫🇷', es:'🇪🇸', ru:'🇷🇺', zh:'🇨🇳', ar:'🇸🇦'};
+const DEMO_LANGS = ['it','de','en','fr','es','ru','zh','ar'];
 
 function demoRotate(){
-  demoCtaIdx = (demoCtaIdx+1) % 4;
+  demoCtaIdx = (demoCtaIdx+1) % DEMO_LANGS.length;
   const l = DEMO_LANGS[demoCtaIdx];
   $('demoTitle').style.opacity = 0; $('demoExample').style.opacity = 0; $('demoCta').style.opacity = 0;
   setTimeout(()=>{
@@ -1078,7 +1088,7 @@ $('btnFull').innerHTML = ICON.full;
 $('btnGear').innerHTML = ICON.gear;
 // Demo: logo mini, mic al centro, dito che batte, cerchio di icone
 $('demoMic').innerHTML = ICON.mic;
-$('demoFinger').innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="rgba(0,0,0,.15)" stroke-width=".4"><path d="M10 9V4.4a1.7 1.7 0 0 1 3.4 0V11l1.2-2.7a1.5 1.5 0 0 1 2.8 1.1l-1 2.9 1-.6a1.5 1.5 0 0 1 1.7 2.4L17 18a6 6 0 0 1-5.1 3H10.5a6 6 0 0 1-5-2.7l-2.2-3.4a1.7 1.7 0 0 1 2.6-2.1L8 13V9a1.5 1.5 0 0 1 3 0z"/></svg>';
+$('demoFinger').innerHTML = '<svg viewBox="0 0 64 64"><g fill="#fdfdfd" stroke="rgba(0,0,0,.18)" stroke-width="1.2" stroke-linejoin="round"><rect x="26" y="7" width="11" height="32" rx="5.5"/><rect x="17" y="29" width="34" height="29" rx="14.5"/></g></svg>';
 $('demoLogo').innerHTML = '<svg viewBox="0 0 200 200"><defs><radialGradient id="dlr" cx="50%" cy="42%" r="65%"><stop offset="0%" stop-color="#d8244e"/><stop offset="55%" stop-color="#b01038"/><stop offset="100%" stop-color="#7d0826"/></radialGradient></defs><path d="M48,56 Q96,104 144,56 Q96,104 144,152 Q96,104 48,152 Q96,104 48,56 Z" fill="url(#dlr)" stroke="#c9ccce" stroke-width="6" stroke-linejoin="round"/></svg>';
 buildDemoRing();
 document.querySelectorAll('#lingue span').forEach(s=> s.onclick=()=>setLinguaAscolto(s.dataset.l));
