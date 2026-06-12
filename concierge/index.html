@@ -30,7 +30,8 @@
   body.listening{--acc:var(--verde)}
   body.thinking{--acc:var(--blu)}
   body.speaking{--acc:var(--oro)}
-  .emblema-wrap{position:relative;width:240px;height:240px;display:flex;align-items:center;justify-content:center;margin-bottom:22px}
+  .emblema-wrap{position:relative;width:240px;height:240px;display:flex;align-items:center;justify-content:center;margin-bottom:22px;cursor:pointer}
+  .parla{display:none!important}   /* si parla toccando il logo */
   .emblema{width:230px;height:230px;overflow:visible;transition:filter .5s;
     filter:drop-shadow(0 0 24px rgba(232,213,163,.45))}
   body.listening .emblema{filter:drop-shadow(0 0 32px rgba(58,208,122,.6))}
@@ -132,31 +133,29 @@
   .demo::after{width:360px;height:360px;background:#7d0826;bottom:-120px;right:-90px;animation:float2 17s ease-in-out infinite}
   @keyframes float1{0%,100%{transform:translate(0,0)}50%{transform:translate(60px,40px)}}
   @keyframes float2{0%,100%{transform:translate(0,0)}50%{transform:translate(-50px,-40px)}}
-  .demo-logo{width:64px;height:64px;margin-bottom:30px;opacity:.9;animation:demoLogoIn .8s ease, breathe 4s ease-in-out infinite 1s}
-  .demo-logo svg{width:64px;height:64px;filter:drop-shadow(0 0 16px rgba(232,213,163,.4))}
+  .demo-logo,.demo-logo svg{width:60px;height:60px}
+  .demo-logo{margin-bottom:16px;opacity:.9;animation:demoLogoIn .8s ease, breathe 4s ease-in-out infinite 1s}
+  .demo-logo svg{filter:drop-shadow(0 0 16px rgba(232,213,163,.4))}
   @keyframes demoLogoIn{from{opacity:0;transform:scale(.6)}to{opacity:.9;transform:scale(1)}}
-  .demo-inner{position:relative;width:90vw;max-width:660px;height:260px;display:flex;align-items:center;justify-content:center}
-  .demo-scene{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;opacity:0;animation:sceneCycle 16s infinite}
-  .demo-scene:nth-child(1){animation-delay:0s}
-  .demo-scene:nth-child(2){animation-delay:4s}
-  .demo-scene:nth-child(3){animation-delay:8s}
-  .demo-scene:nth-child(4){animation-delay:12s}
-  @keyframes sceneCycle{0%{opacity:0;transform:translateY(18px) scale(.97)}4%{opacity:1;transform:translateY(0) scale(1)}21%{opacity:1;transform:translateY(0) scale(1)}25%{opacity:0;transform:translateY(-18px) scale(.97)}100%{opacity:0}}
-  .demo-ic-big{width:92px;height:92px;color:var(--oro);animation:micPulse 1.8s ease-in-out infinite}
-  .demo-ic-big svg{width:92px;height:92px;filter:drop-shadow(0 0 18px rgba(232,213,163,.5))}
-  @keyframes micPulse{0%,100%{transform:scale(1);opacity:.92}50%{transform:scale(1.13);opacity:1}}
-  .demo-title{font-size:32px;color:#fff;font-weight:300;letter-spacing:.5px;text-align:center}
-  .demo-sub{font-size:18px;color:var(--oro);opacity:.85}
-  .demo-chat{flex-direction:column;align-items:stretch;width:78%;left:11%;gap:14px}
-  .demo-bubble{padding:15px 22px;border-radius:20px;font-size:21px;max-width:88%;line-height:1.3;
-    animation:bubbleIn .6s ease both}
-  .demo-bubble.user{align-self:flex-end;background:linear-gradient(135deg,#e8d5a3,#c9a84c);color:#1a1208;border-bottom-right-radius:5px;animation-delay:.3s}
-  .demo-bubble.bot{align-self:flex-start;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.12);color:#fff;border-bottom-left-radius:5px;animation-delay:1s}
-  @keyframes bubbleIn{from{opacity:0;transform:translateY(10px) scale(.9)}to{opacity:1;transform:translateY(0) scale(1)}}
-  .demo-icons{display:flex;gap:26px;color:var(--oro)}
-  .demo-icons svg{width:46px;height:46px;filter:drop-shadow(0 0 10px rgba(232,213,163,.35));animation:micPulse 2.4s ease-in-out infinite}
-  .demo-icons svg:nth-child(2){animation-delay:.3s}.demo-icons svg:nth-child(3){animation-delay:.6s}.demo-icons svg:nth-child(4){animation-delay:.9s}
-  .demo-flags{font-size:52px;letter-spacing:10px;animation:micPulse 3s ease-in-out infinite}
+
+  .demo-stage{position:relative;width:min(76vmin,440px);height:min(76vmin,440px);display:flex;align-items:center;justify-content:center}
+  .demo-ring{position:absolute;inset:0}
+  .demo-orb-ic{position:absolute;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;color:var(--oro);
+    background:rgba(232,213,163,.07);border:1px solid rgba(232,213,163,.28);animation:orbPulse 2.8s ease-in-out infinite}
+  .demo-orb-ic svg{width:32px;height:32px}
+  @keyframes orbPulse{0%,100%{box-shadow:0 0 0 0 rgba(232,213,163,0);opacity:.7;transform:translate(-50%,-50%) scale(1)}50%{box-shadow:0 0 22px 3px rgba(232,213,163,.45);opacity:1;transform:translate(-50%,-50%) scale(1.13)}}
+  .demo-center{position:relative;z-index:3;width:150px;height:150px;border-radius:50%;color:#3a2a08;
+    background:radial-gradient(circle at 40% 34%,#fff6e0,#e8d5a3 52%,#c9a84c 88%);
+    display:flex;align-items:center;justify-content:center;box-shadow:0 0 70px rgba(232,213,163,.55);animation:micPulse 2s ease-in-out infinite}
+  .demo-center svg{width:60px;height:60px}
+  @keyframes micPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+  .demo-tap{position:absolute;z-index:2;width:150px;height:150px;border-radius:50%;border:2px solid var(--oro);animation:tapRipple 2s ease-out infinite}
+  @keyframes tapRipple{0%{transform:scale(1);opacity:.7}100%{transform:scale(2);opacity:0}}
+  .demo-finger{position:absolute;z-index:4;width:58px;height:58px;color:#fff;filter:drop-shadow(0 5px 8px rgba(0,0,0,.55));animation:fingerTap 2s ease-in-out infinite}
+  .demo-finger svg{width:58px;height:58px}
+  @keyframes fingerTap{0%,100%{transform:translate(34px,52px)}45%{transform:translate(12px,16px)}58%{transform:translate(12px,18px)}}
+  .demo-title{font-size:32px;color:#fff;font-weight:300;letter-spacing:.5px;text-align:center;margin-top:24px}
   .demo-cta{position:absolute;bottom:9vh;font-size:20px;color:#fff;font-weight:500;padding:15px 38px;border-radius:44px;
     background:rgba(232,213,163,.08);border:1.5px solid var(--oro);animation:ctaPulse 2s ease-in-out infinite}
   @keyframes ctaPulse{0%,100%{box-shadow:0 0 0 0 rgba(232,213,163,.45);transform:scale(1)}50%{box-shadow:0 0 0 16px rgba(232,213,163,0);transform:scale(1.04)}}
@@ -189,16 +188,15 @@
     .qr-cap{font-size:14px}
     .web-back{padding:11px 18px;font-size:15px}
     /* demo su telefono */
-    .demo-logo,.demo-logo svg{width:48px;height:48px;margin-bottom:16px}
-    .demo-inner{height:200px}
-    .demo-ic-big,.demo-ic-big svg{width:66px;height:66px}
-    .demo-title{font-size:23px}
-    .demo-sub{font-size:15px}
-    .demo-bubble{font-size:16px;padding:11px 16px}
-    .demo-icons{gap:18px}
-    .demo-icons svg{width:36px;height:36px}
-    .demo-flags{font-size:38px;letter-spacing:6px}
-    .demo-cta{font-size:16px;padding:13px 26px;bottom:6vh}
+    .demo-logo,.demo-logo svg{width:46px;height:46px}
+    .demo-stage{width:min(84vmin,320px);height:min(84vmin,320px)}
+    .demo-center,.demo-tap{width:116px;height:116px}
+    .demo-center svg{width:46px;height:46px}
+    .demo-orb-ic{width:50px;height:50px}
+    .demo-orb-ic svg{width:25px;height:25px}
+    .demo-finger,.demo-finger svg{width:46px;height:46px}
+    .demo-title{font-size:22px;margin-top:16px}
+    .demo-cta{font-size:16px;padding:13px 26px;bottom:5vh}
   }
   /* Tablet (iPad): leggermente più contenuto del kiosk */
   @media (min-width:641px) and (max-width:1100px){
@@ -226,13 +224,13 @@
     .qr-card #qrBox img,.qr-card #qrBox canvas{width:300px!important;height:300px!important}
     .qr-cap{font-size:22px}
     .demo-logo,.demo-logo svg{width:96px;height:96px}
-    .demo-inner{height:380px;max-width:1000px}
-    .demo-ic-big,.demo-ic-big svg{width:140px;height:140px}
-    .demo-title{font-size:50px}
-    .demo-sub{font-size:28px}
-    .demo-bubble{font-size:32px;padding:20px 30px}
-    .demo-icons svg{width:64px;height:64px}
-    .demo-flags{font-size:78px}
+    .demo-stage{width:min(70vmin,640px);height:min(70vmin,640px)}
+    .demo-center,.demo-tap{width:220px;height:220px}
+    .demo-center svg{width:90px;height:90px}
+    .demo-orb-ic{width:96px;height:96px}
+    .demo-orb-ic svg{width:48px;height:48px}
+    .demo-finger,.demo-finger svg{width:86px;height:86px}
+    .demo-title{font-size:46px}
     .demo-cta{font-size:30px;padding:22px 54px}
   }
   /* TV 4K */
@@ -245,11 +243,13 @@
     .rapide{max-width:1600px;gap:20px}
     .rapide button{font-size:28px;padding:22px 40px}
     .rapide .ic{width:36px;height:36px}
+    .demo-stage{width:min(64vmin,920px);height:min(64vmin,920px)}
+    .demo-center,.demo-tap{width:320px;height:320px}
+    .demo-center svg{width:130px;height:130px}
+    .demo-orb-ic{width:140px;height:140px}
+    .demo-orb-ic svg{width:70px;height:70px}
+    .demo-finger,.demo-finger svg{width:120px;height:120px}
     .demo-title{font-size:70px}
-    .demo-sub{font-size:40px}
-    .demo-bubble{font-size:46px;padding:28px 44px}
-    .demo-ic-big,.demo-ic-big svg{width:200px;height:200px}
-    .demo-flags{font-size:110px}
     .demo-cta{font-size:42px;padding:30px 70px}
   }
 </style>
@@ -262,7 +262,7 @@
     <span class="gear" id="btnGear" onclick="apriSettings()" title="Impostazioni"></span>
   </div>
 
-  <div class="emblema-wrap">
+  <div class="emblema-wrap" onclick="toggleHandsFree()" title="Tocca per parlare">
     <svg class="emblema" viewBox="0 0 200 200">
       <defs>
         <radialGradient id="logoRed" cx="50%" cy="42%" r="65%">
@@ -323,25 +323,13 @@
   <!-- Demo animato (attract mode) -->
   <div class="demo" id="demo" onclick="chiudiDemo()">
     <div class="demo-logo" id="demoLogo"></div>
-    <div class="demo-inner">
-      <div class="demo-scene">
-        <div class="demo-ic-big" id="demoMic"></div>
-        <div class="demo-title">Tocca e parla</div>
-        <div class="demo-sub">Fai una domanda a voce</div>
-      </div>
-      <div class="demo-scene demo-chat">
-        <div class="demo-bubble user">Dov'è il ristorante?</div>
-        <div class="demo-bubble bot">Al primo piano, ristorante Elementi 🍽️</div>
-      </div>
-      <div class="demo-scene">
-        <div class="demo-icons" id="demoIcons"></div>
-        <div class="demo-title">Oppure tocca un argomento</div>
-      </div>
-      <div class="demo-scene">
-        <div class="demo-flags">🇮🇹 🇩🇪 🇬🇧 🇫🇷</div>
-        <div class="demo-title">Chiedi nella tua lingua</div>
-      </div>
+    <div class="demo-stage">
+      <div class="demo-ring" id="demoRing"></div>
+      <div class="demo-tap"></div>
+      <div class="demo-center"><span id="demoMic"></span></div>
+      <div class="demo-finger" id="demoFinger"></div>
     </div>
+    <div class="demo-title" id="demoTitle">Premi qui e chiedi</div>
     <div class="demo-cta" id="demoCta">Tocca lo schermo per iniziare</div>
   </div>
 
@@ -391,6 +379,10 @@
       <h3>Ascolto</h3>
       <label><input type="checkbox" id="wake" style="width:auto;margin-right:8px"> Richiedi parola di attivazione "Ciao"</label>
       <div class="hint">Utile in ambienti rumorosi: risponde solo se la frase inizia con "Ciao".</div>
+
+      <label>Demo animato dopo (secondi di inattività) <span style="opacity:.5">(0 = disattivato)</span></label>
+      <input id="demoDelay" type="number" min="0" placeholder="40">
+      <div class="hint">Il video-guida parte da solo dopo questo tempo senza interazioni. Tocca lo schermo per chiuderlo.</div>
 
       <h3>Cosa sa il concierge (dati del casinò)</h3>
       <label>Modifica liberamente — l'AI risponde SOLO con queste informazioni</label>
@@ -543,7 +535,10 @@ function setStato(classe, testo){ document.body.className = classe; if(testo!==u
 /* ============ 1. ASCOLTO continuo (hands-free) ============ */
 function creaRecognition(){
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SR){ alert("Il riconoscimento vocale funziona su Chrome o Edge."); return null; }
+  if(!SR){
+    const m = {it:'Microfono non disponibile su questo dispositivo. Tocca un argomento qui sotto.',de:'Mikrofon auf diesem Gerät nicht verfügbar. Bitte unten ein Thema antippen.',en:'Microphone not available on this device. Tap a topic below.',fr:'Micro indisponible sur cet appareil. Touchez un thème ci-dessous.'};
+    $('risposta').textContent = m[uiLang()]; return null;
+  }
   const r = new SR();
   r.lang = langAscolto;
   r.continuous = true; r.interimResults = false; r.maxAlternatives = 1;
@@ -927,11 +922,24 @@ function chiudiWeb(){ $('webModal').classList.remove('open'); $('webFrame').src=
 let inattivitaTimer = null, demoCtaTimer = null, demoCtaIdx = 0;
 const INATTIVITA_MS = 40000;          // 40s senza interazione → parte il demo
 const DEMO_CTA = {it:'Tocca lo schermo per iniziare', de:'Tippen, um zu starten', en:'Touch the screen to start', fr:'Touchez l\'écran pour commencer'};
+const DEMO_TITLE = {it:'Premi qui e chiedi', de:'Hier tippen und fragen', en:'Tap here and ask', fr:'Touchez ici et demandez'};
+
+// Dispone le icone-funzione in cerchio attorno al centro
+function buildDemoRing(){
+  const ics = ['ristorante','giocare','bancomat','wifi','orari','scudo','fedelta','bar'];
+  const n = ics.length, R = 44;
+  $('demoRing').innerHTML = ics.map((ic,i)=>{
+    const a = (2*Math.PI/n)*i - Math.PI/2;
+    const x = (50 + R*Math.cos(a)).toFixed(1), y = (50 + R*Math.sin(a)).toFixed(1);
+    return '<span class="demo-orb-ic" style="left:'+x+'%;top:'+y+'%;animation-delay:'+(i*0.22).toFixed(2)+'s">'+ICON[ic]+'</span>';
+  }).join('');
+}
 
 function resetInattivita(){
   chiudiDemo();
   clearTimeout(inattivitaTimer);
-  inattivitaTimer = setTimeout(mostraDemo, INATTIVITA_MS);
+  const sec = parseInt(localStorage.getItem('concierge_demo_delay')||'40', 10);
+  if(sec > 0) inattivitaTimer = setTimeout(mostraDemo, sec*1000);
 }
 function mostraDemo(){
   if(occupato){ resetInattivita(); return; }   // non interrompere una risposta in corso
@@ -945,9 +953,9 @@ function mostraDemo(){
   setStato(ascoltoAttivo?'listening':'idle');
   // CTA che ruota nelle 4 lingue
   const langs = ['it','de','en','fr']; demoCtaIdx = 0;
-  $('demoCta').textContent = DEMO_CTA.it;
+  $('demoCta').textContent = DEMO_CTA.it; $('demoTitle').textContent = DEMO_TITLE.it;
   clearInterval(demoCtaTimer);
-  demoCtaTimer = setInterval(()=>{ demoCtaIdx=(demoCtaIdx+1)%4; $('demoCta').textContent = DEMO_CTA[langs[demoCtaIdx]]; }, 3000);
+  demoCtaTimer = setInterval(()=>{ demoCtaIdx=(demoCtaIdx+1)%4; const l=langs[demoCtaIdx]; $('demoCta').textContent=DEMO_CTA[l]; $('demoTitle').textContent=DEMO_TITLE[l]; }, 3000);
   $('demo').classList.add('open');
 }
 function chiudiDemo(){
@@ -994,6 +1002,7 @@ function apriSettings(){
   $('limGoogle').value = localStorage.getItem('concierge_lim_google')||'1000000';
   $('limite').value    = localStorage.getItem('concierge_limite')||'0';
   $('wake').checked    = localStorage.getItem('concierge_wake')==='1';
+  $('demoDelay').value = localStorage.getItem('concierge_demo_delay')||'40';
   $('usoOggi').textContent = 'Consumo questo mese — ElevenLabs: '+usoMese('eleven').toLocaleString('de-CH')+' / Google: '+usoMese('google').toLocaleString('de-CH')+' caratteri.';
   $('dati').value      = localStorage.getItem('concierge_dati')||DATI_DEFAULT;
   $('modal').classList.add('open');
@@ -1011,6 +1020,7 @@ function salvaSettings(){
   localStorage.setItem('concierge_lim_google', String(parseInt($('limGoogle').value||'1000000',10)||0));
   localStorage.setItem('concierge_limite', String(parseInt($('limite').value||'0',10)||0));
   localStorage.setItem('concierge_wake', $('wake').checked?'1':'');
+  localStorage.setItem('concierge_demo_delay', String(parseInt($('demoDelay').value||'40',10)));
   localStorage.setItem('concierge_dati', $('dati').value.trim());
   rispCache.clear();                 // i dati possono essere cambiati → invalida le risposte salvate
   $('errModal').textContent='';
@@ -1023,10 +1033,11 @@ $('modal').addEventListener('click', e=>{ if(e.target.id==='modal') $('modal').c
 caricaTtsCache();
 $('btnFull').innerHTML = ICON.full;
 $('btnGear').innerHTML = ICON.gear;
-// Icone del demo
+// Demo: logo mini, mic al centro, dito che batte, cerchio di icone
 $('demoMic').innerHTML = ICON.mic;
-$('demoIcons').innerHTML = ICON.ristorante + ICON.giocare + ICON.bancomat + ICON.wifi;
+$('demoFinger').innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11.5V5.4a1.6 1.6 0 0 1 3.2 0v5.2m0-.4a1.6 1.6 0 0 1 3.2 0v1.1m0-.6a1.6 1.6 0 0 1 3.2 0V15a6 6 0 0 1-6 6h-1.1a6 6 0 0 1-4.7-2.3l-2.2-2.7a1.7 1.7 0 0 1 2.5-2.1L9 13.6z"/></svg>';
 $('demoLogo').innerHTML = '<svg viewBox="0 0 200 200"><defs><radialGradient id="dlr" cx="50%" cy="42%" r="65%"><stop offset="0%" stop-color="#d8244e"/><stop offset="55%" stop-color="#b01038"/><stop offset="100%" stop-color="#7d0826"/></radialGradient></defs><path d="M48,56 Q96,104 144,56 Q96,104 144,152 Q96,104 48,152 Q96,104 48,56 Z" fill="url(#dlr)" stroke="#c9ccce" stroke-width="6" stroke-linejoin="round"/></svg>';
+buildDemoRing();
 document.querySelectorAll('#lingue span').forEach(s=> s.onclick=()=>setLinguaAscolto(s.dataset.l));
 setLinguaAscolto('it-IT');
 costruisciRapide();
