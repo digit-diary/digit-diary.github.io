@@ -173,6 +173,24 @@
     background:rgba(232,213,163,.08);border:1.5px solid var(--oro);animation:ctaPulse 2s ease-in-out infinite;transition:opacity .4s}
   @keyframes ctaPulse{0%,100%{box-shadow:0 0 0 0 rgba(232,213,163,.45);transform:scale(1)}50%{box-shadow:0 0 0 16px rgba(232,213,163,0);transform:scale(1.04)}}
 
+  /* ===== Traduttore ===== */
+  .trad-modal{position:fixed;inset:0;background:radial-gradient(ellipse at 50% 38%,#241f33,#0a0a0f 74%);display:none;flex-direction:column;z-index:65;color:#fff}
+  .trad-modal.open{display:flex;animation:fadein .3s}
+  .trad-head{flex:none;padding:16px 22px;display:flex;align-items:center;justify-content:space-between;gap:14px;border-bottom:1px solid rgba(232,213,163,.15)}
+  .trad-langsel{display:flex;align-items:center;gap:8px;font-size:16px;color:var(--oro)}
+  .trad-langsel select{padding:9px 12px;border-radius:9px;background:#0d0d16;color:#fff;border:1px solid rgba(255,255,255,.18);font-size:16px}
+  .trad-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:26px;text-align:center}
+  .trad-orig{font-size:24px;opacity:.65;max-width:92%;min-height:30px;font-style:italic}
+  .trad-sep{color:var(--oro);opacity:.5;font-size:26px}
+  .trad-out{font-size:36px;font-weight:300;line-height:1.35;max-width:94%;min-height:46px}
+  .trad-ctrl{flex:none;padding:22px;display:flex;flex-direction:column;align-items:center;gap:16px}
+  .trad-mic{padding:18px 52px;border:none;border-radius:50px;cursor:pointer;font-size:19px;font-weight:600;
+    background:linear-gradient(135deg,var(--oro),var(--oro-scuro));color:#1a1208;box-shadow:0 8px 24px rgba(232,213,163,.3)}
+  .trad-mic.rec{background:linear-gradient(135deg,#ef5d5d,#bd2b2b);color:#fff;animation:ctaPulse 1.2s ease-in-out infinite}
+  .trad-typed{display:flex;gap:8px;width:min(92vw,480px)}
+  .trad-typed input{flex:1;padding:14px;border-radius:11px;border:1px solid rgba(255,255,255,.18);background:#0d0d16;color:#fff;font-size:16px}
+  .trad-typed button{padding:14px 24px;border:none;border-radius:11px;background:var(--oro);color:#1a1208;font-weight:600;font-size:15px;cursor:pointer}
+
   /* ===== MOBILE (telefoni) ===== */
   @media (max-width:640px){
     html,body{overflow-y:auto}
@@ -277,6 +295,7 @@
 
   <div class="logo">Casinò Lugano · Concierge</div>
   <div class="tools">
+    <span class="trad" id="btnTrad" onclick="apriTrad()" title="Traduttore"></span>
     <span class="full" id="btnFull" onclick="schermoIntero()" title="Schermo intero"></span>
     <span class="gear" id="btnGear" onclick="apriSettings()" title="Impostazioni"></span>
   </div>
@@ -359,6 +378,36 @@
     <div class="demo-title" id="demoTitle">Premi qui e chiedi</div>
     <div class="demo-example" id="demoExample"></div>
     <div class="demo-cta" id="demoCta">Tocca lo schermo per iniziare</div>
+  </div>
+
+  <!-- Traduttore -->
+  <div class="trad-modal" id="tradModal">
+    <div class="trad-head">
+      <button class="web-back" id="tradBack" onclick="chiudiTrad()">← Indietro</button>
+      <div class="trad-langsel">🇮🇹 Italiano ⇄
+        <select id="tradLang">
+          <option value="en">🇬🇧 English</option>
+          <option value="de">🇩🇪 Deutsch</option>
+          <option value="fr">🇫🇷 Français</option>
+          <option value="es">🇪🇸 Español</option>
+          <option value="ru">🇷🇺 Русский</option>
+          <option value="zh">🇨🇳 中文</option>
+          <option value="ar">🇸🇦 العربية</option>
+        </select>
+      </div>
+    </div>
+    <div class="trad-body">
+      <div class="trad-orig" id="tradOrig"></div>
+      <div class="trad-sep" id="tradSep"></div>
+      <div class="trad-out" id="tradOut">Parla o scrivi: traduco automaticamente.</div>
+    </div>
+    <div class="trad-ctrl">
+      <button class="trad-mic" id="tradMic" onclick="tradToggleRec()">🎤 Tocca e parla</button>
+      <div class="trad-typed">
+        <input id="tradInput" placeholder="…oppure scrivi qui">
+        <button id="tradGo" onclick="tradTesto()">Traduci</button>
+      </div>
+    </div>
   </div>
 
   <!-- Settings -->
@@ -959,6 +1008,92 @@ function apriWeb(){
 }
 function chiudiWeb(){ $('webModal').classList.remove('open'); $('webFrame').src='about:blank'; }
 
+/* ============ TRADUTTORE (auto-rileva la lingua parlata) ============ */
+let tradRec = null, tradChunks = [], tradRecording = false, tradStream = null;
+const STT_CODE = {en:'en-US',de:'de-DE',fr:'fr-FR',es:'es-ES',ru:'ru-RU',zh:'cmn-Hans-CN',ar:'ar-SA'};
+const LNAME_TRAD = {it:'italiano',en:'inglese',de:'tedesco',fr:'francese',es:'spagnolo',ru:'russo',zh:'cinese',ar:'arabo'};
+
+function apriTrad(){ fermaTutto(); fermaAscoltoTemp(); chiudiDemo(); $('tradOrig').textContent=''; $('tradSep').textContent=''; $('tradModal').classList.add('open'); }
+function chiudiTrad(){ if(tradRecording) tradStop(); $('tradModal').classList.remove('open'); }
+
+async function tradToggleRec(){
+  if(tradRecording){ tradStop(); return; }
+  try{ tradStream = await navigator.mediaDevices.getUserMedia({audio:true}); }
+  catch(e){ $('tradOut').textContent='Microfono non disponibile su questo dispositivo. Usa la scrittura.'; return; }
+  tradChunks = [];
+  tradRec = new MediaRecorder(tradStream);
+  tradRec.ondataavailable = e => { if(e.data.size>0) tradChunks.push(e.data); };
+  tradRec.onstop = tradProcess;
+  tradRec.start();
+  tradRecording = true;
+  $('tradMic').classList.add('rec'); $('tradMic').textContent='● Registrazione… tocca per fermare';
+}
+function tradStop(){
+  tradRecording = false;
+  $('tradMic').classList.remove('rec'); $('tradMic').textContent='🎤 Tocca e parla';
+  try{ tradRec.stop(); }catch(_){}
+  if(tradStream){ tradStream.getTracks().forEach(t=>t.stop()); tradStream=null; }
+}
+async function tradProcess(){
+  $('tradOut').textContent='…'; $('tradOrig').textContent=''; $('tradSep').textContent='';
+  try{
+    const blob = new Blob(tradChunks, {type: (tradChunks[0]&&tradChunks[0].type) || 'audio/webm'});
+    const b64 = await audioToLinear16(blob);
+    const cl = $('tradLang').value;
+    const det = await googleSTT(b64, 'it-IT', STT_CODE[cl]);
+    if(!det.text){ $('tradOut').textContent='Non ho capito, riprova.'; return; }
+    $('tradOrig').textContent = det.text; $('tradSep').textContent = '↓';
+    await tradTraduci(det.text, cl);
+  }catch(e){ console.error(e); $('tradOut').textContent='Errore: '+(e.message||e); }
+}
+async function tradTesto(){
+  const t = $('tradInput').value.trim(); if(!t) return;
+  $('tradOrig').textContent = t; $('tradSep').textContent='↓'; $('tradOut').textContent='…';
+  await tradTraduci(t, $('tradLang').value); $('tradInput').value='';
+}
+async function tradTraduci(testo, cl){
+  const key = localStorage.getItem(KEY_LS);
+  const sys = 'Sei un traduttore per il personale di un casinò. Se il testo è in italiano, traducilo in '+LNAME_TRAD[cl]+'. Se NON è in italiano, traducilo in italiano. Mantieni il tono cortese. Rispondi SOLO con JSON: {"to":"it|'+cl+'","translation":"la traduzione"}';
+  try{
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+      body:JSON.stringify({model:'llama-3.3-70b-versatile',temperature:0.2,response_format:{type:'json_object'},
+        messages:[{role:'system',content:sys},{role:'user',content:testo}]})});
+    const d = await r.json();
+    if(!r.ok) throw new Error('AI '+r.status);
+    let o; try{ o=JSON.parse(d.choices[0].message.content); }catch{ o={to:cl,translation:d.choices[0].message.content}; }
+    $('tradOut').textContent = o.translation || '—';
+    voceGoogle(o.translation||'', o.to||cl, ()=>{}, ++richiestaId);   // pronuncia la traduzione
+  }catch(e){ console.error(e); $('tradOut').textContent='Errore traduzione: '+(e.message||e); }
+}
+async function googleSTT(b64, primary, alt){
+  const key = localStorage.getItem('concierge_google');
+  if(!key) throw new Error('manca la chiave Google (⚙️)');
+  const r = await fetch('https://speech.googleapis.com/v1/speech:recognize?key='+key,{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({config:{encoding:'LINEAR16',sampleRateHertz:16000,languageCode:primary,alternativeLanguageCodes:[alt],enableAutomaticPunctuation:true},audio:{content:b64}})});
+  const d = await r.json();
+  if(!r.ok) throw new Error('STT '+r.status+' — abilita "Cloud Speech-to-Text API"');
+  const res = d.results && d.results[0];
+  return {text: res?res.alternatives[0].transcript:'', lang:(res&&res.languageCode)||primary};
+}
+// Converte l'audio registrato in PCM LINEAR16 16kHz mono (compatibile Chrome+Safari)
+async function audioToLinear16(blob){
+  const buf = await blob.arrayBuffer();
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const decoded = await new AC().decodeAudioData(buf);
+  const target = 16000;
+  const off = new OfflineAudioContext(1, Math.max(1, Math.ceil(decoded.duration*target)), target);
+  const src = off.createBufferSource(); src.buffer = decoded; src.connect(off.destination); src.start();
+  const data = (await off.startRendering()).getChannelData(0);
+  const int16 = new Int16Array(data.length);
+  for(let i=0;i<data.length;i++){ let s=Math.max(-1,Math.min(1,data[i])); int16[i]= s<0 ? s*0x8000 : s*0x7FFF; }
+  const bytes = new Uint8Array(int16.buffer);
+  let bin=''; const CH=0x8000;
+  for(let i=0;i<bytes.length;i+=CH) bin += String.fromCharCode.apply(null, bytes.subarray(i,i+CH));
+  return btoa(bin);
+}
+
 /* --- Demo animato dopo inattività (attract mode totem) --- */
 let inattivitaTimer = null, demoCtaTimer = null, demoCtaIdx = 0;
 const INATTIVITA_MS = 40000;          // 40s senza interazione → parte il demo
@@ -998,7 +1133,7 @@ function resetInattivita(){
   if(sec > 0) inattivitaTimer = setTimeout(mostraDemo, sec*1000);
 }
 function mostraDemo(){
-  if(occupato){ resetInattivita(); return; }   // non interrompere una risposta in corso
+  if(occupato || $('tradModal').classList.contains('open')){ resetInattivita(); return; }   // non coprire risposta/traduttore
   fermaTutto(); fermaAscoltoTemp();
   if(recognition && !ascoltoAttivo){ try{ recognition.stop(); }catch(_){} }
   chiudiQR(); chiudiWeb(); $('modal').classList.remove('open');
@@ -1089,6 +1224,7 @@ $('modal').addEventListener('click', e=>{ if(e.target.id==='modal') $('modal').c
 caricaTtsCache();
 $('btnFull').innerHTML = ICON.full;
 $('btnGear').innerHTML = ICON.gear;
+$('btnTrad').innerHTML = ICON.translate;
 // Demo: logo mini, mic al centro, dito che batte, cerchio di icone
 $('demoMic').innerHTML = ICON.mic;
 $('demoFinger').innerHTML = '<svg viewBox="0 0 24 24" fill="#fdfdfd"><path d="M9 11.24V7.5a2.5 2.5 0 0 1 5 0v3.74c1.21-.81 2-2.18 2-3.74a4.5 4.5 0 1 0-9 0c0 1.56.79 2.93 2 3.74zm9.84 4.63l-4.54-2.26a1.4 1.4 0 0 0-.54-.11H13V7.5a1.5 1.5 0 0 0-3 0V21l-3.43-.72a1.1 1.1 0 0 0-1.03.3l-.79.8 4.94 4.94c.27.27.65.44 1.06.44h6.79c.75 0 1.33-.55 1.44-1.28l.75-5.27a2 2 0 0 0 .02-.21c0-.62-.38-1.16-.92-1.4z"/></svg>';
