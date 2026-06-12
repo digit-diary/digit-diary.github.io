@@ -456,27 +456,27 @@ TOILETTE: presenti a ogni piano, in fondo a sinistra.
 
 /* --- Domande rapide (bottoni touch), etichetta + domanda nelle 4 lingue --- */
 const RAPIDE = [
-  {ic:'ristorante', url:'https://casinolugano.ch/ristorante/', l:{it:'Ristorante',de:'Restaurant',en:'Restaurant',fr:'Restaurant'},
+  {ic:'ristorante', url:'https://casinolugano.ch/ristorante/', l:{it:'Ristorante',de:'Restaurant',en:'Restaurant',fr:'Restaurant',es:'Restaurante',ru:'Ресторан',zh:'餐厅',ar:'مطعم'},
             q:{it:'Dov\'è il ristorante e a che ora apre?',de:'Wo ist das Restaurant und wann öffnet es?',en:'Where is the restaurant and when does it open?',fr:'Où est le restaurant et à quelle heure ouvre-t-il ?'}},
-  {ic:'bar', l:{it:'Bar',de:'Bar',en:'Bar',fr:'Bar'},
+  {ic:'bar', l:{it:'Bar',de:'Bar',en:'Bar',fr:'Bar',es:'Bar',ru:'Бар',zh:'酒吧',ar:'بار'},
             q:{it:'Dove sono i bar?',de:'Wo sind die Bars?',en:'Where are the bars?',fr:'Où sont les bars ?'}},
-  {ic:'toilette', l:{it:'Toilette',de:'Toiletten',en:'Restrooms',fr:'Toilettes'},
+  {ic:'toilette', l:{it:'Toilette',de:'Toiletten',en:'Restrooms',fr:'Toilettes',es:'Aseos',ru:'Туалет',zh:'洗手间',ar:'دورة المياه'},
             q:{it:'Dove sono le toilette?',de:'Wo sind die Toiletten?',en:'Where are the restrooms?',fr:'Où sont les toilettes ?'}},
-  {ic:'eventi', url:'https://casinolugano.ch/eventi/', soloLink:true, l:{it:'Eventi',de:'Events',en:'Events',fr:'Événements'},
+  {ic:'eventi', url:'https://casinolugano.ch/eventi/', soloLink:true, l:{it:'Eventi',de:'Events',en:'Events',fr:'Événements',es:'Eventos',ru:'События',zh:'活动',ar:'فعاليات'},
             q:{it:'Quali eventi ci sono stasera?',de:'Welche Veranstaltungen gibt es heute Abend?',en:'What events are on tonight?',fr:'Quels événements ce soir ?'}},
-  {ic:'giocare', l:{it:'Come giocare',de:'Spielen',en:'How to play',fr:'Comment jouer'},
+  {ic:'giocare', l:{it:'Come giocare',de:'Spielen',en:'How to play',fr:'Comment jouer',es:'Cómo jugar',ru:'Как играть',zh:'如何游戏',ar:'كيف ألعب'},
             q:{it:'Come si gioca alle slot machine? Spiegami la procedura della tessera.',de:'Wie spielt man an den Spielautomaten? Erklären Sie mir die Karten-Prozedur.',en:'How do I play the slot machines? Explain the card procedure.',fr:'Comment jouer aux machines à sous ? Expliquez-moi la procédure de la carte.'}},
-  {ic:'orari', l:{it:'Orari',de:'Öffnungszeiten',en:'Hours',fr:'Horaires'},
+  {ic:'orari', l:{it:'Orari',de:'Öffnungszeiten',en:'Hours',fr:'Horaires',es:'Horarios',ru:'Часы',zh:'营业时间',ar:'ساعات العمل'},
             q:{it:'Quali sono gli orari di apertura?',de:'Was sind die Öffnungszeiten?',en:'What are the opening hours?',fr:'Quels sont les horaires d\'ouverture ?'}},
-  {ic:'parcheggio', l:{it:'Parcheggio',de:'Parkplatz',en:'Parking',fr:'Parking'},
+  {ic:'parcheggio', l:{it:'Parcheggio',de:'Parkplatz',en:'Parking',fr:'Parking',es:'Aparcamiento',ru:'Парковка',zh:'停车',ar:'موقف سيارات'},
             q:{it:'Come ritiro l\'auto dal parcheggio?',de:'Wie hole ich mein Auto vom Parkplatz?',en:'How do I get my car from the parking?',fr:'Comment récupérer ma voiture au parking ?'}},
-  {ic:'fedelta', l:{it:'Fedeltà',de:'Treueclub',en:'Loyalty',fr:'Fidélité'},
+  {ic:'fedelta', l:{it:'Fedeltà',de:'Treueclub',en:'Loyalty',fr:'Fidélité',es:'Fidelidad',ru:'Лояльность',zh:'会员',ar:'الولاء'},
             q:{it:'Come mi iscrivo al programma fedeltà?',de:'Wie melde ich mich beim Treueprogramm an?',en:'How do I join the loyalty program?',fr:'Comment m\'inscrire au programme de fidélité ?'}},
-  {ic:'scudo', url:'https://casinolugano.ch/gioco-responsabile/', soloLink:true, l:{it:'Gioco responsabile',de:'Verantwortung',en:'Responsible gaming',fr:'Jeu responsable'},
+  {ic:'scudo', url:'https://casinolugano.ch/gioco-responsabile/', soloLink:true, l:{it:'Gioco responsabile',de:'Verantwortung',en:'Responsible gaming',fr:'Jeu responsable',es:'Juego responsable',ru:'Ответственная игра',zh:'负责任博彩',ar:'اللعب المسؤول'},
             q:{it:'Informazioni sul gioco responsabile',de:'Informationen zum verantwortungsvollen Spielen',en:'Responsible gaming information',fr:'Informations sur le jeu responsable'}},
-  {ic:'wifi', l:{it:'WiFi',de:'WLAN',en:'WiFi',fr:'WiFi'},
+  {ic:'wifi', l:{it:'WiFi',de:'WLAN',en:'WiFi',fr:'WiFi',es:'WiFi',ru:'Wi-Fi',zh:'无线网络',ar:'واي فاي'},
             q:{it:'Come mi collego al WiFi?',de:'Wie verbinde ich mich mit dem WLAN?',en:'How do I connect to the WiFi?',fr:'Comment me connecter au WiFi ?'}},
-  {ic:'bancomat', l:{it:'Bancomat',de:'Geldautomat',en:'ATM / Cash',fr:'Distributeur'},
+  {ic:'bancomat', l:{it:'Bancomat',de:'Geldautomat',en:'ATM / Cash',fr:'Distributeur',es:'Cajero',ru:'Банкомат',zh:'取款机',ar:'صراف آلي'},
             q:{it:'Dove posso prelevare contanti?',de:'Wo kann ich Bargeld abheben?',en:'Where can I withdraw cash?',fr:'Où puis-je retirer de l\'argent ?'}},
 ];
 
@@ -742,7 +742,8 @@ async function chiediAllAI(domanda, opts){
 
   // i bottoni (noContext) NON usano la memoria → risposta deterministica e cache-abile
   const ctx = opts.noContext ? [] : cronologia.slice(-6);
-  const messaggi = [{role:'system',content:buildSystemPrompt()}, ...ctx, {role:'user',content:domanda}];
+  const lreq = {it:'',de:'[Antworte auf Deutsch] ',en:'[Reply in English] ',fr:'[Réponds en français] ',es:'[Responde en español] ',ru:'[Ответь на русском] ',zh:'[用中文回答] ',ar:'[أجب بالعربية] '}[uiLang()] || '';
+  const messaggi = [{role:'system',content:buildSystemPrompt()}, ...ctx, {role:'user',content: lreq + domanda}];
   try{
     const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method:'POST', signal:abortCtrl.signal,
