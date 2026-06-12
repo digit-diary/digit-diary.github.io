@@ -591,7 +591,12 @@ async function chiediAllAI(domanda, opts){
       body: JSON.stringify({model:'llama-3.3-70b-versatile', temperature:0.5, response_format:{type:'json_object'}, messages:messaggi})
     });
     if(mioId !== richiestaId) return;             // è arrivata una richiesta più nuova
-    if(!r.ok) throw new Error('HTTP '+r.status);
+    if(!r.ok){
+      let det=''; try{ det = await r.text(); }catch(_){}
+      const extra = r.status===401 ? ' — chiave Groq non valida' : '';
+      $('risposta').textContent = 'AI errore '+r.status+extra+'. '+det.slice(0,140);
+      console.error('Groq', r.status, det); riprendiAscolto(); return;
+    }
     const data = await r.json();
     if(mioId !== richiestaId) return;
     let out; try{ out = JSON.parse(data.choices[0].message.content); }
