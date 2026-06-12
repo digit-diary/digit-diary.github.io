@@ -182,6 +182,9 @@
   .trad-head{position:relative;z-index:2;flex:none;padding:16px 22px;display:flex;align-items:center;justify-content:space-between;gap:14px;border-bottom:1px solid rgba(232,213,163,.15)}
   .trad-langsel{display:flex;align-items:center;gap:8px;font-size:16px;color:var(--oro)}
   .trad-langsel select{padding:9px 12px;border-radius:9px;background:#0d0d16;color:#fff;border:1px solid rgba(255,255,255,.18);font-size:16px}
+  #tradDirLabel{font-size:16px;color:#fff;white-space:nowrap}
+  .trad-swap{width:38px;height:38px;border-radius:50%;border:1.5px solid var(--oro);background:rgba(232,213,163,.1);color:var(--oro);font-size:18px;cursor:pointer;transition:transform .25s}
+  .trad-swap:active{transform:rotate(180deg) scale(.9)}
   .trad-body{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:26px;text-align:center}
   .trad-orig{font-size:22px;opacity:.6;max-width:92%;min-height:28px;font-style:italic;transition:opacity .3s}
   .trad-sep{color:var(--oro);font-size:28px;letter-spacing:2px;min-height:32px}
@@ -405,8 +408,10 @@
   <div class="trad-modal" id="tradModal">
     <div class="trad-head">
       <button class="web-back" id="tradBack" onclick="chiudiTrad()">← Indietro</button>
-      <div class="trad-langsel">🇮🇹 Italiano ⇄
-        <select id="tradLang">
+      <div class="trad-langsel">
+        <span id="tradDirLabel">🇮🇹 Italiano → 🇬🇧 English</span>
+        <button class="trad-swap" id="tradSwap" onclick="tradSwapDir()" title="Inverti direzione">⇄</button>
+        <select id="tradLang" onchange="updateTradDir()">
           <option value="en">🇬🇧 English</option>
           <option value="de">🇩🇪 Deutsch</option>
           <option value="fr">🇫🇷 Français</option>
@@ -1038,17 +1043,27 @@ const LNAME_TRAD = {it:'italiano',en:'inglese',de:'tedesco',fr:'francese',es:'sp
 
 const TRAD_SPEAK = {it:'Tocca e parla',en:'Touch and speak',de:'Tippen und sprechen',fr:'Touchez et parlez',es:'Toque y hable',ru:'Нажмите и говорите',zh:'轻触说话',ar:'المس وتحدث'};
 const TRAD_REC = {it:'Registrazione… tocca per fermare',en:'Recording… tap to stop',de:'Aufnahme… zum Stoppen tippen',fr:'Enregistrement… touchez pour arrêter',es:'Grabando… toque para parar',ru:'Запись… нажмите, чтобы остановить',zh:'录音中…轻触停止',ar:'جارٍ التسجيل… المس للإيقاف'};
-function updateTradInstr(){
+let tradDir = 'a';   // 'a' = italiano → altra lingua ; 'b' = altra lingua → italiano
+const LANGNAME = {it:'Italiano',en:'English',de:'Deutsch',fr:'Français',es:'Español',ru:'Русский',zh:'中文',ar:'العربية'};
+function updateTradDir(){
   const cl = $('tradLang').value;
+  const it = '🇮🇹 Italiano', other = FLAG_DEMO[cl]+' '+LANGNAME[cl];
+  $('tradDirLabel').textContent = (tradDir==='a') ? (it+' → '+other) : (other+' → '+it);
+  updateTradInstr();
+}
+function tradSwapDir(){ tradDir = (tradDir==='a') ? 'b' : 'a'; updateTradDir(); }
+function updateTradInstr(){
+  // la lingua di chi sta per parlare = lingua sorgente secondo la direzione
+  const cl = $('tradLang').value;
+  const src = (tradDir==='a') ? 'it' : cl;
   const m = tradRecording ? TRAD_REC : TRAD_SPEAK;
-  $('tradInstr').textContent = m.it; $('tradInstr2').textContent = m[cl] || '';
+  $('tradInstr').textContent = m[src] || m.it; $('tradInstr2').textContent = (src==='it' ? (m[cl]||'') : m.it);
 }
 function apriTrad(){
   fermaTutto(); fermaAscoltoTemp(); chiudiDemo();
   $('tradMicIco').innerHTML = ICON.mic;
-  $('tradLang').onchange = updateTradInstr;
   $('tradOrig').textContent=''; $('tradSep').textContent='';
-  updateTradInstr();
+  updateTradDir();
   $('tradModal').classList.add('open');
 }
 function chiudiTrad(){ if(tradRecording) tradStop(); $('tradModal').classList.remove('open'); }
@@ -1077,20 +1092,25 @@ async function tradProcess(){
     const blob = new Blob(tradChunks, {type: (tradChunks[0]&&tradChunks[0].type) || 'audio/webm'});
     const b64 = await audioToLinear16(blob);
     const cl = $('tradLang').value;
-    const det = await googleSTT(b64, 'it-IT', STT_CODE[cl]);
+    const src = (tradDir==='a') ? 'it-IT' : STT_CODE[cl];
+    const alt = (tradDir==='a') ? STT_CODE[cl] : 'it-IT';
+    const det = await googleSTT(b64, src, alt);
     if(!det.text){ $('tradOut').textContent='Non ho capito, riprova.'; return; }
     $('tradOrig').textContent = det.text; $('tradSep').textContent = '↓';
-    await tradTraduci(det.text, cl);
+    await tradTraduci(det.text);
   }catch(e){ console.error(e); $('tradOut').textContent='Errore: '+(e.message||e); }
 }
 async function tradTesto(){
   const t = $('tradInput').value.trim(); if(!t) return;
   $('tradOrig').textContent = t; $('tradSep').textContent='↓'; $('tradOut').textContent='…';
-  await tradTraduci(t, $('tradLang').value); $('tradInput').value='';
+  await tradTraduci(t); $('tradInput').value='';
 }
-async function tradTraduci(testo, cl){
+async function tradTraduci(testo){
+  const cl = $('tradLang').value;
+  const to = (tradDir==='a') ? cl : 'it';      // direzione scelta dall'utente
+  const from = (tradDir==='a') ? 'it' : cl;
   const key = localStorage.getItem(KEY_LS);
-  const sys = 'Sei un traduttore per il personale di un casinò. Se il testo è in italiano, traducilo in '+LNAME_TRAD[cl]+'. Se NON è in italiano, traducilo in italiano. Mantieni il tono cortese. Rispondi SOLO con JSON: {"to":"it|'+cl+'","translation":"la traduzione"}';
+  const sys = 'Sei un traduttore per il personale di un casinò. Traduci il testo dell\'utente in '+LNAME_TRAD[to]+'. Mantieni un tono cortese e naturale. Rispondi SOLO con JSON: {"translation":"la traduzione"}';
   try{
     const r = await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
@@ -1098,9 +1118,7 @@ async function tradTraduci(testo, cl){
         messages:[{role:'system',content:sys},{role:'user',content:testo}]})});
     const d = await r.json();
     if(!r.ok) throw new Error('AI '+r.status);
-    let o; try{ o=JSON.parse(d.choices[0].message.content); }catch{ o={to:cl,translation:d.choices[0].message.content}; }
-    const to = (o.to==='it'||o.to===cl) ? o.to : cl;
-    const from = (to==='it') ? cl : 'it';
+    let o; try{ o=JSON.parse(d.choices[0].message.content); }catch{ o={translation:d.choices[0].message.content}; }
     $('tradSep').innerHTML = FLAG_DEMO[from]+' &nbsp;→&nbsp; '+FLAG_DEMO[to];   // mostra la direzione
     $('tradOut').textContent = o.translation || '—';
     voceGoogle(o.translation||'', to, ()=>{}, ++richiestaId);   // pronuncia la traduzione
