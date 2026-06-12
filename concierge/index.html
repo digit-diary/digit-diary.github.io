@@ -1037,8 +1037,8 @@ function apriWeb(){
 function chiudiWeb(){ $('webModal').classList.remove('open'); $('webFrame').src='about:blank'; }
 
 /* ============ TRADUTTORE (auto-rileva la lingua parlata) ============ */
-let tradRec = null, tradChunks = [], tradRecording = false, tradStream = null;
-const STT_CODE = {en:'en-US',de:'de-DE',fr:'fr-FR',es:'es-ES',ru:'ru-RU',zh:'cmn-Hans-CN',ar:'ar-SA'};
+let tradSR = null, tradRecording = false;
+const REC_CODE = {it:'it-IT',en:'en-GB',de:'de-DE',fr:'fr-FR',es:'es-ES',ru:'ru-RU',zh:'zh-CN',ar:'ar-SA'};
 const LNAME_TRAD = {it:'italiano',en:'inglese',de:'tedesco',fr:'francese',es:'spagnolo',ru:'russo',zh:'cinese',ar:'arabo'};
 
 const TRAD_SPEAK = {it:'Tocca e parla',en:'Touch and speak',de:'Tippen und sprechen',fr:'Touchez et parlez',es:'Toque y hable',ru:'Нажмите и говорите',zh:'轻触说话',ar:'المس وتحدث'};
@@ -1068,38 +1068,26 @@ function apriTrad(){
 }
 function chiudiTrad(){ if(tradRecording) tradStop(); $('tradModal').classList.remove('open'); }
 
-async function tradToggleRec(){
+function tradToggleRec(){
   if(tradRecording){ tradStop(); return; }
-  try{ tradStream = await navigator.mediaDevices.getUserMedia({audio:true}); }
-  catch(e){ $('tradOut').textContent='Microfono non disponibile su questo dispositivo. Usa la scrittura.'; return; }
-  tradChunks = [];
-  tradRec = new MediaRecorder(tradStream);
-  tradRec.ondataavailable = e => { if(e.data.size>0) tradChunks.push(e.data); };
-  tradRec.onstop = tradProcess;
-  tradRec.start();
-  tradRecording = true;
-  $('tradMic').classList.add('rec'); updateTradInstr();
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){ $('tradOut').textContent='Il microfono vocale funziona su Chrome/Edge. Su iPhone usa la scrittura.'; return; }
+  const cl = $('tradLang').value;
+  const srcLang = (tradDir==='a') ? 'it' : cl;     // chi parla, secondo la direzione scelta
+  tradSR = new SR();
+  tradSR.lang = REC_CODE[srcLang];
+  tradSR.interimResults = false; tradSR.maxAlternatives = 1;
+  $('tradOrig').textContent=''; $('tradSep').textContent=''; $('tradOut').textContent='';
+  tradSR.onresult = e => {
+    const t = e.results[0][0].transcript.trim();
+    $('tradOrig').textContent = t; $('tradSep').textContent='↓'; $('tradOut').textContent='…';
+    tradTraduci(t);
+  };
+  tradSR.onerror = e => { $('tradOut').textContent = e.error==='no-speech' ? 'Non ho sentito, riprova.' : 'Errore microfono.'; };
+  tradSR.onend = () => { tradRecording=false; $('tradMic').classList.remove('rec'); updateTradInstr(); };
+  try{ tradSR.start(); tradRecording=true; $('tradMic').classList.add('rec'); updateTradInstr(); }catch(_){}
 }
-function tradStop(){
-  tradRecording = false;
-  $('tradMic').classList.remove('rec'); updateTradInstr();
-  try{ tradRec.stop(); }catch(_){}
-  if(tradStream){ tradStream.getTracks().forEach(t=>t.stop()); tradStream=null; }
-}
-async function tradProcess(){
-  $('tradOut').textContent='…'; $('tradOrig').textContent=''; $('tradSep').textContent='';
-  try{
-    const blob = new Blob(tradChunks, {type: (tradChunks[0]&&tradChunks[0].type) || 'audio/webm'});
-    const b64 = await audioToLinear16(blob);
-    const cl = $('tradLang').value;
-    const src = (tradDir==='a') ? 'it-IT' : STT_CODE[cl];
-    const alt = (tradDir==='a') ? STT_CODE[cl] : 'it-IT';
-    const det = await googleSTT(b64, src, alt);
-    if(!det.text){ $('tradOut').textContent='Non ho capito, riprova.'; return; }
-    $('tradOrig').textContent = det.text; $('tradSep').textContent = '↓';
-    await tradTraduci(det.text);
-  }catch(e){ console.error(e); $('tradOut').textContent='Errore: '+(e.message||e); }
-}
+function tradStop(){ if(tradSR){ try{ tradSR.stop(); }catch(_){} } tradRecording=false; $('tradMic').classList.remove('rec'); updateTradInstr(); }
 async function tradTesto(){
   const t = $('tradInput').value.trim(); if(!t) return;
   $('tradOrig').textContent = t; $('tradSep').textContent='↓'; $('tradOut').textContent='…';
@@ -1121,35 +1109,11 @@ async function tradTraduci(testo){
     let o; try{ o=JSON.parse(d.choices[0].message.content); }catch{ o={translation:d.choices[0].message.content}; }
     $('tradSep').innerHTML = FLAG_DEMO[from]+' &nbsp;→&nbsp; '+FLAG_DEMO[to];   // mostra la direzione
     $('tradOut').textContent = o.translation || '—';
-    voceGoogle(o.translation||'', to, ()=>{}, ++richiestaId);   // pronuncia la traduzione
+    // pronuncia rispettando il motore scelto (browser = gratis, niente Google)
+    const motore = localStorage.getItem('concierge_motore') || 'browser';
+    if(motore==='google' || motore==='eleven' || motore==='auto') voceGoogle(o.translation||'', to, ()=>{}, ++richiestaId);
+    else voceBrowser(o.translation||'', to, ()=>{});
   }catch(e){ console.error(e); $('tradOut').textContent='Errore traduzione: '+(e.message||e); }
-}
-async function googleSTT(b64, primary, alt){
-  const key = localStorage.getItem('concierge_google');
-  if(!key) throw new Error('manca la chiave Google (⚙️)');
-  const r = await fetch('https://speech.googleapis.com/v1/speech:recognize?key='+key,{method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({config:{encoding:'LINEAR16',sampleRateHertz:16000,languageCode:primary,alternativeLanguageCodes:[alt],enableAutomaticPunctuation:true},audio:{content:b64}})});
-  const d = await r.json();
-  if(!r.ok) throw new Error('STT '+r.status+' — abilita "Cloud Speech-to-Text API"');
-  const res = d.results && d.results[0];
-  return {text: res?res.alternatives[0].transcript:'', lang:(res&&res.languageCode)||primary};
-}
-// Converte l'audio registrato in PCM LINEAR16 16kHz mono (compatibile Chrome+Safari)
-async function audioToLinear16(blob){
-  const buf = await blob.arrayBuffer();
-  const AC = window.AudioContext || window.webkitAudioContext;
-  const decoded = await new AC().decodeAudioData(buf);
-  const target = 16000;
-  const off = new OfflineAudioContext(1, Math.max(1, Math.ceil(decoded.duration*target)), target);
-  const src = off.createBufferSource(); src.buffer = decoded; src.connect(off.destination); src.start();
-  const data = (await off.startRendering()).getChannelData(0);
-  const int16 = new Int16Array(data.length);
-  for(let i=0;i<data.length;i++){ let s=Math.max(-1,Math.min(1,data[i])); int16[i]= s<0 ? s*0x8000 : s*0x7FFF; }
-  const bytes = new Uint8Array(int16.buffer);
-  let bin=''; const CH=0x8000;
-  for(let i=0;i<bytes.length;i+=CH) bin += String.fromCharCode.apply(null, bytes.subarray(i,i+CH));
-  return btoa(bin);
 }
 
 /* --- Demo animato dopo inattività (attract mode totem) --- */
