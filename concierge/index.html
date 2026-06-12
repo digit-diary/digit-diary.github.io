@@ -706,14 +706,19 @@ async function voceGoogle(testo, lang, fine, mioId){
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({input:{text:testo}, voice:{languageCode:voce.languageCode,name:voce.name}, audioConfig:{audioEncoding:'MP3'}})
     });
-    if(!r.ok) throw new Error('HTTP '+r.status);
+    if(!r.ok){
+      let det=''; try{ det = await r.text(); }catch(_){}
+      const msg = r.status===400 ? 'richiesta non valida' : r.status===403 ? 'chiave non valida o con restrizioni (referrer/API)' : r.status===429 ? 'limite superato' : 'errore '+r.status;
+      $('risposta').textContent = 'Google: '+msg;
+      console.error('Google TTS', r.status, det.slice(0,300)); fine(); return;
+    }
     const data = await r.json();
     if(mioId!==richiestaId) return;            // interrotta da un nuovo comando
     const url = 'data:audio/mp3;base64,'+data.audioContent;
     contaCaratteri(testo.length); contaMese('google', testo.length);   // conta solo le chiamate REALI
     salvaCache(ck, url);
     suonaCache(url, fine);
-  }catch(e){ $('risposta').textContent='Errore voce Google (chiave o API non abilitata).'; console.error(e); fine(); }
+  }catch(e){ $('risposta').textContent='Google non raggiungibile: '+(e.message||e); console.error(e); fine(); }
 }
 
 /* ============ 4. UI: bottoni rapidi, attesa, kiosk ============ */
