@@ -174,21 +174,34 @@
   @keyframes ctaPulse{0%,100%{box-shadow:0 0 0 0 rgba(232,213,163,.45);transform:scale(1)}50%{box-shadow:0 0 0 16px rgba(232,213,163,0);transform:scale(1.04)}}
 
   /* ===== Traduttore ===== */
-  .trad-modal{position:fixed;inset:0;background:radial-gradient(ellipse at 50% 38%,#241f33,#0a0a0f 74%);display:none;flex-direction:column;z-index:65;color:#fff}
+  .trad-modal{position:fixed;inset:0;background:radial-gradient(ellipse at 50% 36%,#241f33,#0a0a0f 74%);display:none;flex-direction:column;z-index:65;color:#fff;overflow:hidden}
   .trad-modal.open{display:flex;animation:fadein .3s}
-  .trad-head{flex:none;padding:16px 22px;display:flex;align-items:center;justify-content:space-between;gap:14px;border-bottom:1px solid rgba(232,213,163,.15)}
+  .trad-modal::before,.trad-modal::after{content:'';position:absolute;border-radius:50%;filter:blur(70px);opacity:.16;pointer-events:none}
+  .trad-modal::before{width:400px;height:400px;background:#e8d5a3;top:-120px;left:-90px;animation:float1 15s ease-in-out infinite}
+  .trad-modal::after{width:340px;height:340px;background:#7d0826;bottom:-110px;right:-80px;animation:float2 18s ease-in-out infinite}
+  .trad-head{position:relative;z-index:2;flex:none;padding:16px 22px;display:flex;align-items:center;justify-content:space-between;gap:14px;border-bottom:1px solid rgba(232,213,163,.15)}
   .trad-langsel{display:flex;align-items:center;gap:8px;font-size:16px;color:var(--oro)}
   .trad-langsel select{padding:9px 12px;border-radius:9px;background:#0d0d16;color:#fff;border:1px solid rgba(255,255,255,.18);font-size:16px}
-  .trad-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:26px;text-align:center}
-  .trad-orig{font-size:24px;opacity:.65;max-width:92%;min-height:30px;font-style:italic}
-  .trad-sep{color:var(--oro);opacity:.5;font-size:26px}
-  .trad-out{font-size:36px;font-weight:300;line-height:1.35;max-width:94%;min-height:46px}
-  .trad-ctrl{flex:none;padding:22px;display:flex;flex-direction:column;align-items:center;gap:16px}
-  .trad-mic{padding:18px 52px;border:none;border-radius:50px;cursor:pointer;font-size:19px;font-weight:600;
-    background:linear-gradient(135deg,var(--oro),var(--oro-scuro));color:#1a1208;box-shadow:0 8px 24px rgba(232,213,163,.3)}
-  .trad-mic.rec{background:linear-gradient(135deg,#ef5d5d,#bd2b2b);color:#fff;animation:ctaPulse 1.2s ease-in-out infinite}
-  .trad-typed{display:flex;gap:8px;width:min(92vw,480px)}
-  .trad-typed input{flex:1;padding:14px;border-radius:11px;border:1px solid rgba(255,255,255,.18);background:#0d0d16;color:#fff;font-size:16px}
+  .trad-body{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:26px;text-align:center}
+  .trad-orig{font-size:22px;opacity:.6;max-width:92%;min-height:28px;font-style:italic;transition:opacity .3s}
+  .trad-sep{color:var(--oro);font-size:28px;letter-spacing:2px;min-height:32px}
+  .trad-out{font-size:38px;font-weight:300;line-height:1.35;max-width:94%;min-height:48px;
+    background:linear-gradient(90deg,#fff,#f3e6c4);-webkit-background-clip:text;background-clip:text;transition:opacity .3s}
+  .trad-ctrl{position:relative;z-index:2;flex:none;padding:18px 22px 30px;display:flex;flex-direction:column;align-items:center;gap:10px}
+  .trad-mic{position:relative;width:108px;height:108px;border-radius:50%;border:none;cursor:pointer;color:#1a1208;
+    background:radial-gradient(circle at 40% 34%,#fff6e0,#e8d5a3 55%,#c9a84c 90%);
+    box-shadow:0 10px 30px rgba(0,0,0,.4),0 0 50px rgba(232,213,163,.45);
+    display:flex;align-items:center;justify-content:center;animation:micBreath 2.4s ease-in-out infinite;transition:transform .15s}
+  .trad-mic:active{transform:scale(.94)}
+  .trad-mic::before{content:'';position:absolute;inset:-2px;border-radius:50%;border:2px solid var(--oro);animation:tapRing 2.4s ease-out infinite}
+  .trad-mic-ico svg{width:48px;height:48px}
+  .trad-mic.rec{background:radial-gradient(circle at 40% 34%,#ffd6d6,#ef5d5d 55%,#bd2b2b 90%);color:#fff;animation:micBreath .9s ease-in-out infinite}
+  .trad-mic.rec::before{border-color:#ef5d5d;animation:tapRing .9s ease-out infinite}
+  @keyframes micBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+  .trad-instr{font-size:20px;color:#fff;font-weight:500;margin-top:6px}
+  .trad-instr2{font-size:17px;color:var(--oro);opacity:.85;min-height:22px}
+  .trad-typed{display:flex;gap:8px;width:min(92vw,480px);margin-top:10px}
+  .trad-typed input{flex:1;padding:14px;border-radius:11px;border:1px solid rgba(255,255,255,.18);background:rgba(13,13,22,.8);color:#fff;font-size:16px}
   .trad-typed button{padding:14px 24px;border:none;border-radius:11px;background:var(--oro);color:#1a1208;font-weight:600;font-size:15px;cursor:pointer}
 
   /* ===== MOBILE (telefoni) ===== */
@@ -230,6 +243,14 @@
     .demo-title{font-size:22px;margin-top:16px}
     .demo-example{font-size:16px}
     .demo-cta{font-size:16px;padding:13px 26px;bottom:5vh}
+    /* traduttore su telefono */
+    .trad-langsel{font-size:13px}
+    .trad-orig{font-size:17px}
+    .trad-out{font-size:25px}
+    .trad-mic{width:92px;height:92px}
+    .trad-mic-ico svg{width:40px;height:40px}
+    .trad-instr{font-size:17px}
+    .trad-instr2{font-size:15px}
   }
   /* Tablet (iPad): leggermente più contenuto del kiosk */
   @media (min-width:641px) and (max-width:1100px){
@@ -402,7 +423,9 @@
       <div class="trad-out" id="tradOut">Parla o scrivi: traduco automaticamente.</div>
     </div>
     <div class="trad-ctrl">
-      <button class="trad-mic" id="tradMic" onclick="tradToggleRec()">🎤 Tocca e parla</button>
+      <button class="trad-mic" id="tradMic" onclick="tradToggleRec()"><span class="trad-mic-ico" id="tradMicIco"></span></button>
+      <div class="trad-instr" id="tradInstr">Tocca e parla</div>
+      <div class="trad-instr2" id="tradInstr2"></div>
       <div class="trad-typed">
         <input id="tradInput" placeholder="…oppure scrivi qui">
         <button id="tradGo" onclick="tradTesto()">Traduci</button>
@@ -1013,7 +1036,21 @@ let tradRec = null, tradChunks = [], tradRecording = false, tradStream = null;
 const STT_CODE = {en:'en-US',de:'de-DE',fr:'fr-FR',es:'es-ES',ru:'ru-RU',zh:'cmn-Hans-CN',ar:'ar-SA'};
 const LNAME_TRAD = {it:'italiano',en:'inglese',de:'tedesco',fr:'francese',es:'spagnolo',ru:'russo',zh:'cinese',ar:'arabo'};
 
-function apriTrad(){ fermaTutto(); fermaAscoltoTemp(); chiudiDemo(); $('tradOrig').textContent=''; $('tradSep').textContent=''; $('tradModal').classList.add('open'); }
+const TRAD_SPEAK = {it:'Tocca e parla',en:'Touch and speak',de:'Tippen und sprechen',fr:'Touchez et parlez',es:'Toque y hable',ru:'Нажмите и говорите',zh:'轻触说话',ar:'المس وتحدث'};
+const TRAD_REC = {it:'Registrazione… tocca per fermare',en:'Recording… tap to stop',de:'Aufnahme… zum Stoppen tippen',fr:'Enregistrement… touchez pour arrêter',es:'Grabando… toque para parar',ru:'Запись… нажмите, чтобы остановить',zh:'录音中…轻触停止',ar:'جارٍ التسجيل… المس للإيقاف'};
+function updateTradInstr(){
+  const cl = $('tradLang').value;
+  const m = tradRecording ? TRAD_REC : TRAD_SPEAK;
+  $('tradInstr').textContent = m.it; $('tradInstr2').textContent = m[cl] || '';
+}
+function apriTrad(){
+  fermaTutto(); fermaAscoltoTemp(); chiudiDemo();
+  $('tradMicIco').innerHTML = ICON.mic;
+  $('tradLang').onchange = updateTradInstr;
+  $('tradOrig').textContent=''; $('tradSep').textContent='';
+  updateTradInstr();
+  $('tradModal').classList.add('open');
+}
 function chiudiTrad(){ if(tradRecording) tradStop(); $('tradModal').classList.remove('open'); }
 
 async function tradToggleRec(){
@@ -1026,11 +1063,11 @@ async function tradToggleRec(){
   tradRec.onstop = tradProcess;
   tradRec.start();
   tradRecording = true;
-  $('tradMic').classList.add('rec'); $('tradMic').textContent='● Registrazione… tocca per fermare';
+  $('tradMic').classList.add('rec'); updateTradInstr();
 }
 function tradStop(){
   tradRecording = false;
-  $('tradMic').classList.remove('rec'); $('tradMic').textContent='🎤 Tocca e parla';
+  $('tradMic').classList.remove('rec'); updateTradInstr();
   try{ tradRec.stop(); }catch(_){}
   if(tradStream){ tradStream.getTracks().forEach(t=>t.stop()); tradStream=null; }
 }
@@ -1062,8 +1099,11 @@ async function tradTraduci(testo, cl){
     const d = await r.json();
     if(!r.ok) throw new Error('AI '+r.status);
     let o; try{ o=JSON.parse(d.choices[0].message.content); }catch{ o={to:cl,translation:d.choices[0].message.content}; }
+    const to = (o.to==='it'||o.to===cl) ? o.to : cl;
+    const from = (to==='it') ? cl : 'it';
+    $('tradSep').innerHTML = FLAG_DEMO[from]+' &nbsp;→&nbsp; '+FLAG_DEMO[to];   // mostra la direzione
     $('tradOut').textContent = o.translation || '—';
-    voceGoogle(o.translation||'', o.to||cl, ()=>{}, ++richiestaId);   // pronuncia la traduzione
+    voceGoogle(o.translation||'', to, ()=>{}, ++richiestaId);   // pronuncia la traduzione
   }catch(e){ console.error(e); $('tradOut').textContent='Errore traduzione: '+(e.message||e); }
 }
 async function googleSTT(b64, primary, alt){
