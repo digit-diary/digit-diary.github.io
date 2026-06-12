@@ -681,6 +681,7 @@ async function vocePremiumEleven(testo, lang, fine, mioId){
       // Free Tier disabilitato / chiave non valida → disattiva ElevenLabs per non riprovare inutilmente
       if(r.status===401 || r.status===403 || /unusual_activity|disabled/i.test(det)) localStorage.setItem('concierge_eleven_off','1');
       if(localStorage.getItem('concierge_google')){ voceGoogle(testo, lang, fine, mioId); return; }   // fallback automatico a Google
+      if((localStorage.getItem('concierge_motore')||'')==='auto'){ voceBrowser(testo, lang, fine); return; }   // ultimo fallback: browser
       const msg = (r.status===401||r.status===403) ? 'Free Tier disabilitato o chiave non valida' : r.status===429 ? 'credito esaurito' : 'errore '+r.status;
       $('risposta').textContent = 'ElevenLabs: '+msg+' (imposta Google in ⚙️).';
       console.error('ElevenLabs', r.status, det.slice(0,200)); fine(); return;
@@ -713,9 +714,10 @@ async function voceGoogle(testo, lang, fine, mioId){
     });
     if(!r.ok){
       let det=''; try{ det = await r.text(); }catch(_){}
+      console.error('Google TTS', r.status, det.slice(0,300));
+      if((localStorage.getItem('concierge_motore')||'')==='auto'){ voceBrowser(testo, lang, fine); return; }  // cascata: ripiega sul browser
       const msg = r.status===400 ? 'richiesta non valida' : r.status===403 ? 'chiave non valida o con restrizioni (referrer/API)' : r.status===429 ? 'limite superato' : 'errore '+r.status;
-      $('risposta').textContent = 'Google: '+msg;
-      console.error('Google TTS', r.status, det.slice(0,300)); fine(); return;
+      $('risposta').textContent = 'Google: '+msg; fine(); return;
     }
     const data = await r.json();
     if(mioId!==richiestaId) return;            // interrotta da un nuovo comando
@@ -723,7 +725,11 @@ async function voceGoogle(testo, lang, fine, mioId){
     contaCaratteri(testo.length); contaMese('google', testo.length);   // conta solo le chiamate REALI
     salvaCache(ck, url);
     suonaCache(url, fine);
-  }catch(e){ $('risposta').textContent='Google non raggiungibile: '+(e.message||e); console.error(e); fine(); }
+  }catch(e){
+    console.error(e);
+    if((localStorage.getItem('concierge_motore')||'')==='auto'){ voceBrowser(testo, lang, fine); return; }
+    $('risposta').textContent='Google non raggiungibile: '+(e.message||e); fine();
+  }
 }
 
 /* ============ 4. UI: bottoni rapidi, attesa, kiosk ============ */
