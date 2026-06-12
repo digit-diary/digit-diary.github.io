@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Concierge AI — Casinò Lugano</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{
+    --oro:#e8d5a3; --oro-scuro:#c9a84c; --bg:#0a0a0f; --bg2:#14141f;
+    --verde:#3ad07a; --blu:#4a9ce8;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
+  body{
+    background:radial-gradient(ellipse at center,#1a1a2e 0%,var(--bg) 70%);
+    color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    height:100dvh;text-align:center;padding:20px;user-select:none;
+  }
+
+  /* --- Header --- */
+  .logo{position:fixed;top:24px;font-size:13px;letter-spacing:4px;color:var(--oro);opacity:.75;text-transform:uppercase}
+  .tools{position:fixed;top:18px;right:20px;display:flex;gap:14px}
+  .tools span{font-size:21px;opacity:.35;cursor:pointer;transition:.2s}
+  .tools span:hover{opacity:.9}
+  .gear:hover{transform:rotate(45deg)}
+
+  /* --- Emblema casino animato --- */
+  body{--acc:var(--oro)}
+  body.listening{--acc:var(--verde)}
+  body.thinking{--acc:var(--blu)}
+  body.speaking{--acc:var(--oro)}
+  .emblema-wrap{position:relative;width:240px;height:240px;display:flex;align-items:center;justify-content:center;margin-bottom:22px}
+  .emblema{width:230px;height:230px;overflow:visible;transition:filter .5s;
+    filter:drop-shadow(0 0 24px rgba(232,213,163,.45))}
+  body.listening .emblema{filter:drop-shadow(0 0 32px rgba(58,208,122,.6))}
+  body.thinking  .emblema{filter:drop-shadow(0 0 32px rgba(74,156,232,.6))}
+  body.speaking  .emblema{filter:drop-shadow(0 0 40px rgba(232,213,163,.7))}
+  .emblema circle, .emblema text{transition:stroke .5s}
+  .ring-out{transform-origin:100px 100px;animation:rot 30s linear infinite}
+  .ring-in {transform-origin:100px 100px;animation:rot 20s linear infinite reverse}
+  .core    {transform-origin:100px 100px;animation:breathe 4s ease-in-out infinite}
+  @keyframes rot{to{transform:rotate(360deg)}}
+  @keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.045)}}
+  /* Stati: velocità diverse */
+  body.listening .ring-out{animation-duration:14s}
+  body.thinking  .ring-out{animation-duration:7s}
+  body.thinking  .ring-in {animation-duration:5s}
+  body.speaking  .ring-out{animation-duration:9s}
+  body.speaking  .core{animation-duration:1.1s}
+
+  /* --- Testi --- */
+  .stato{font-size:14px;letter-spacing:1px;color:var(--oro);opacity:.85;min-height:18px;text-transform:uppercase}
+  .domanda{font-size:16px;opacity:.55;margin-top:14px;min-height:22px;font-style:italic;max-width:680px}
+  .risposta{font-size:26px;line-height:1.4;margin-top:10px;max-width:780px;min-height:32px;font-weight:300;transition:opacity .4s}
+  .indicazione{font-size:20px;color:var(--oro);margin-top:14px;min-height:24px;font-weight:500;display:inline-flex;align-items:center;gap:8px;justify-content:center}
+  .parla{display:inline-flex;align-items:center;gap:9px}
+  .privacy{display:inline-flex;align-items:center;gap:6px}
+  .privacy .ic{width:14px;height:14px}
+  .attract{font-size:18px;opacity:.5;margin-top:8px;transition:opacity .5s}
+
+  /* --- Bottone parla --- */
+  .parla{
+    margin-top:30px;padding:16px 42px;border:none;border-radius:50px;cursor:pointer;
+    background:linear-gradient(135deg,var(--oro),var(--oro-scuro));color:#1a1208;
+    font-size:17px;font-weight:600;letter-spacing:.5px;box-shadow:0 8px 24px rgba(232,213,163,.3);transition:transform .15s;
+  }
+  .parla:active{transform:scale(.95)}
+
+  /* --- Bandiere lingua --- */
+  .lingue{margin-top:18px;display:flex;gap:8px}
+  .lingue span{font-size:24px;opacity:.35;cursor:pointer;transition:.2s;padding:4px;border-radius:8px}
+  .lingue span:hover{opacity:.8}
+  .lingue span.attiva{opacity:1;background:rgba(232,213,163,.18)}
+
+  /* --- Bottoni domande rapide --- */
+  .rapide{margin-top:26px;display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:720px}
+  .rapide button{
+    display:inline-flex;align-items:center;gap:8px;
+    background:rgba(255,255,255,.06);border:1px solid rgba(232,213,163,.25);color:#fff;
+    padding:10px 18px;border-radius:30px;font-size:14px;cursor:pointer;transition:.2s;
+  }
+  .rapide button:hover{background:rgba(232,213,163,.16);border-color:var(--oro)}
+  .rapide button:active{transform:scale(.94)}
+  .ic{width:19px;height:19px;flex:none}
+  .rapide .ic{color:var(--oro)}
+  .tools .ic{width:22px;height:22px}
+
+  /* --- Privacy --- */
+  .privacy{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);font-size:11px;opacity:.3;letter-spacing:.3px;white-space:nowrap}
+
+  /* --- Pannello QR --- */
+  .qr-modal{position:fixed;inset:0;background:transparent;display:none;align-items:center;justify-content:flex-end;padding:0 48px;z-index:45;cursor:pointer}
+  .qr-modal.open{display:flex}
+  .qr-card{background:#fff;border-radius:22px;padding:22px 22px 16px;text-align:center;box-shadow:0 24px 70px rgba(0,0,0,.55);cursor:default;animation:slidein .3s ease}
+  @keyframes slidein{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}
+  .qr-card #qrBox{display:flex;justify-content:center}
+  .qr-card #qrBox img,.qr-card #qrBox canvas{border-radius:10px;display:block}
+  .qr-cap{margin-top:14px;color:#1a1208;font-size:15px;font-weight:600;max-width:210px;line-height:1.4}
+  .qr-open{margin-top:16px;width:100%;padding:13px;border:none;border-radius:12px;background:#7d0826;color:#fff;font-size:15px;font-weight:600;cursor:pointer}
+  .qr-open:active{transform:scale(.96)}
+  .qr-close{margin-top:12px;color:#9a8f7a;font-size:13px;cursor:pointer}
+
+  /* --- Pagina web a schermo --- */
+  .web-modal{position:fixed;inset:0;background:#fff;display:none;flex-direction:column;z-index:60}
+  .web-modal.open{display:flex}
+  .web-bar{flex:none;background:var(--bg2);padding:10px 14px;display:flex;align-items:center}
+  .web-back{background:var(--oro);color:#1a1208;border:none;border-radius:30px;padding:10px 20px;font-size:15px;font-weight:600;cursor:pointer}
+  #webFrame{flex:1;width:100%;border:none}
+
+  /* --- Settings --- */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;z-index:50;padding:20px;overflow:auto}
+  .modal.open{display:flex}
+  .card{background:var(--bg2);border:1px solid rgba(232,213,163,.25);border-radius:18px;padding:28px;max-width:520px;width:100%;text-align:left;max-height:90vh;overflow:auto}
+  .card h2{color:var(--oro);font-size:19px;margin-bottom:8px}
+  .card h3{color:var(--oro);font-size:14px;margin:22px 0 4px;opacity:.85;text-transform:uppercase;letter-spacing:1px}
+  .card label{font-size:13px;opacity:.7;display:block;margin:12px 0 6px}
+  .card input,.card select,.card textarea{width:100%;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:#0d0d16;color:#fff;font-size:14px;font-family:inherit}
+  .card textarea{min-height:150px;resize:vertical;line-height:1.5}
+  .card .hint{font-size:12px;opacity:.5;margin-top:6px;line-height:1.5}
+  .card a{color:var(--oro)}
+  .card button.salva{margin-top:24px;width:100%;padding:14px;border:none;border-radius:10px;background:var(--oro);color:#1a1208;font-weight:600;font-size:15px;cursor:pointer}
+  .err{color:#ff8080;font-size:14px;margin-top:12px;min-height:18px}
+</style>
+</head>
+<body class="idle">
+
+  <div class="logo">Casinò Lugano · Concierge</div>
+  <div class="tools">
+    <span class="full" id="btnFull" onclick="schermoIntero()" title="Schermo intero"></span>
+    <span class="gear" id="btnGear" onclick="apriSettings()" title="Impostazioni"></span>
+  </div>
+
+  <div class="emblema-wrap">
+    <svg class="emblema" viewBox="0 0 200 200">
+      <defs>
+        <radialGradient id="logoRed" cx="50%" cy="42%" r="65%">
+          <stop offset="0%" stop-color="#d8244e"/><stop offset="55%" stop-color="#b01038"/><stop offset="100%" stop-color="#7d0826"/>
+        </radialGradient>
+        <radialGradient id="sfera" cx="38%" cy="32%" r="70%">
+          <stop offset="0%" stop-color="#ffffff"/><stop offset="60%" stop-color="#d9dbdc"/><stop offset="100%" stop-color="#9a9ea1"/>
+        </radialGradient>
+      </defs>
+      <!-- anello di stato che ruota attorno al logo -->
+      <g class="ring-out">
+        <circle cx="100" cy="100" r="92" fill="none" stroke="var(--acc)" stroke-width="2" stroke-dasharray="1.6 6.4" opacity=".85"/>
+      </g>
+      <!-- logo Casinò Lugano (stella concava + sferetta) -->
+      <g class="core">
+        <path d="M48,56 Q96,104 144,56 Q96,104 144,152 Q96,104 48,152 Q96,104 48,56 Z"
+              fill="url(#logoRed)" stroke="#c9ccce" stroke-width="5" stroke-linejoin="round"/>
+        <circle cx="150" cy="52" r="13" fill="url(#sfera)" stroke="#b6babd" stroke-width="1.5"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="stato" id="stato">Tocca per parlare</div>
+  <div class="domanda" id="domanda"></div>
+  <div class="risposta" id="risposta">Buongiorno! Come posso aiutarla?</div>
+  <div class="indicazione" id="indicazione"></div>
+  <div class="attract" id="attract"></div>
+
+  <button class="parla" id="btnParla" onclick="toggleHandsFree()">🎤 Attiva ascolto</button>
+
+  <div class="lingue" id="lingue">
+    <span data-l="it-IT" title="Italiano">🇮🇹</span>
+    <span data-l="de-DE" title="Deutsch">🇩🇪</span>
+    <span data-l="en-GB" title="English">🇬🇧</span>
+    <span data-l="fr-FR" title="Français">🇫🇷</span>
+  </div>
+
+  <div class="rapide" id="rapide"></div>
+
+  <div class="privacy">🔒 Nessun audio viene registrato o conservato — elaborazione in tempo reale.</div>
+
+  <!-- Pannello QR (link al sito ufficiale) -->
+  <div class="qr-modal" id="qrModal" onclick="chiudiQR()">
+    <div class="qr-card" onclick="event.stopPropagation()">
+      <div id="qrBox"></div>
+      <div class="qr-cap" id="qrCap"></div>
+      <button class="qr-open" id="qrOpen" onclick="apriWeb()"></button>
+      <div class="qr-close" id="qrClose" onclick="chiudiQR()"></div>
+    </div>
+  </div>
+
+  <!-- Pagina web a schermo (iframe) -->
+  <div class="web-modal" id="webModal">
+    <div class="web-bar"><button class="web-back" id="webBack" onclick="chiudiWeb()"></button></div>
+    <iframe id="webFrame" referrerpolicy="no-referrer"></iframe>
+  </div>
+
+  <!-- Settings -->
+  <div class="modal" id="modal">
+    <div class="card">
+      <h2>⚙️ Impostazioni</h2>
+
+      <h3>Chiavi</h3>
+      <label>Chiave API Groq (cervello AI)</label>
+      <input id="apiKey" type="password" placeholder="gsk_...">
+      <div class="hint">Gratis su <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a></div>
+
+      <label>🎙️ Motore voce</label>
+      <select id="motore">
+        <option value="auto">Automatico: ElevenLabs → Google → Browser (consigliato)</option>
+        <option value="eleven">Solo ElevenLabs (dolce e realistica)</option>
+        <option value="google">Solo Google TTS (naturale, gratis)</option>
+        <option value="browser">Solo Browser (gratis, robotica)</option>
+        <option value="testo">Solo testo (nessuna voce, costo zero)</option>
+      </select>
+
+      <div id="boxAuto">
+        <label>Quando ElevenLabs e Google sono esauriti, usa:</label>
+        <select id="fallback">
+          <option value="browser">Voce del browser (gratis)</option>
+          <option value="testo">Solo testo (nessuna voce)</option>
+        </select>
+        <label>Limite ElevenLabs / mese</label>
+        <input id="limEleven" type="number" min="0" placeholder="10000">
+        <label>Limite Google / mese</label>
+        <input id="limGoogle" type="number" min="0" placeholder="1000000">
+        <div class="hint" id="usoOggi"></div>
+      </div>
+
+      <label>Limite caratteri al giorno (modalità manuali) <span style="opacity:.5">(0 = nessuno)</span></label>
+      <input id="limite" type="number" min="0" placeholder="0">
+      <div class="hint">La cache non conta verso i limiti: le domande dei bottoni si generano una volta e poi sono gratis.</div>
+
+      <label>Chiave ElevenLabs</label>
+      <input id="elevenKey" type="password" placeholder="sk_...">
+      <label>Chiave Google TTS</label>
+      <input id="googleKey" type="password" placeholder="AIza...">
+
+      <h3>Ascolto</h3>
+      <label><input type="checkbox" id="wake" style="width:auto;margin-right:8px"> Richiedi parola di attivazione "Ciao"</label>
+      <div class="hint">Utile in ambienti rumorosi: risponde solo se la frase inizia con "Ciao".</div>
+
+      <h3>Cosa sa il concierge (dati del casinò)</h3>
+      <label>Modifica liberamente — l'AI risponde SOLO con queste informazioni</label>
+      <textarea id="dati"></textarea>
+      <div class="hint">Orari, ristorante, eventi, parcheggio… Aggiorna gli eventi quando cambiano.</div>
+
+      <div class="err" id="errModal"></div>
+      <button class="salva" onclick="salvaSettings()">Salva</button>
+    </div>
+  </div>
+
+<script>
+/* ============================================================
+   CONCIERGE AI v2 — Casinò Lugano
+   Voce + AI + contenuti veri + touch + multilingua. Tutto locale.
+   ============================================================ */
+
+const $ = id => document.getElementById(id);
+const KEY_LS = 'concierge_groq_key';
+
+/* --- DATI DEL CASINO (modificabili da ⚙️, salvati in locale) ---
+   Sono FITTIZI: sostituiscili con quelli reali nel pannello impostazioni. */
+const DATI_DEFAULT =
+`ORARI: apertura tutti i giorni alle 12:00. Chiusura: da domenica a giovedì alle 04:00; venerdì, sabato e nelle vigilie dei giorni festivi italiani alle 05:00.
+TAVOLI DA GIOCO: al secondo piano.
+SLOT MACHINE: per giocare serve una tessera (in CHF o in EUR), ritirabile alla reception o alla cassa. Prima si inserisce la tessera in una qualsiasi slot, poi si inseriscono le banconote.
+SALA FUMATORI: al primo piano; inoltre una piccola sala fumatori al piano 0 (piano terra).
+COME SALIRE AI PIANI: per il primo piano (sala fumatori) o il secondo piano (tavoli) si può prendere l'ascensore (lift) oppure la scala mobile.
+INGRESSO: documento d'identità obbligatorio, maggiorenni (18+).
+WIFI: rete gratuita "Wifi free casino lugano". Collegarsi alla rete, poi attendere che compaia la pagina di accesso, spuntare la casella di accettazione dei termini e premere per connettersi.
+BANCOMAT: due distributori, al piano 0 (sotto la scala mobile) e al primo piano. Permettono di prelevare SOLO franchi svizzeri (CHF).
+CASSE: si trovano a metà sala. Alle casse si può prelevare sia in euro (EUR) sia in franchi (CHF).
+GIOCO RESPONSABILE: informazioni e autoesclusione disponibili alla reception, in modo riservato.
+
+FEDELTÀ: programma "Lugano Class". Ci si iscrive informandosi all'Info Point.
+PARCHEGGIO (ritiro chiavi): scansionare il ticket ricevuto alla reception e ritirare un secondo ticket; poi presentarsi al guardaroba con entrambi i ticket per ricevere le chiavi.
+
+RISTORANTE: "Elementi", al primo piano. Orari: domenica-giovedì 19:00-22:30; venerdì e sabato 19:00-23:30.
+BAR: presenti a ogni piano.
+TOILETTE: presenti a ogni piano, in fondo a sinistra.
+
+(DA COMPLETARE: EVENTI — chiedere all'Info Point.)`;
+
+/* --- Domande rapide (bottoni touch), etichetta + domanda nelle 4 lingue --- */
+const RAPIDE = [
+  {ic:'ristorante', url:'https://casinolugano.ch/ristorante/', l:{it:'Ristorante',de:'Restaurant',en:'Restaurant',fr:'Restaurant'},
+            q:{it:'Dov\'è il ristorante e a che ora apre?',de:'Wo ist das Restaurant und wann öffnet es?',en:'Where is the restaurant and when does it open?',fr:'Où est le restaurant et à quelle heure ouvre-t-il ?'}},
+  {ic:'bar', l:{it:'Bar',de:'Bar',en:'Bar',fr:'Bar'},
+            q:{it:'Dove sono i bar?',de:'Wo sind die Bars?',en:'Where are the bars?',fr:'Où sont les bars ?'}},
+  {ic:'toilette', l:{it:'Toilette',de:'Toiletten',en:'Restrooms',fr:'Toilettes'},
+            q:{it:'Dove sono le toilette?',de:'Wo sind die Toiletten?',en:'Where are the restrooms?',fr:'Où sont les toilettes ?'}},
+  {ic:'eventi', url:'https://casinolugano.ch/eventi/', soloLink:true, l:{it:'Eventi',de:'Events',en:'Events',fr:'Événements'},
+            q:{it:'Quali eventi ci sono stasera?',de:'Welche Veranstaltungen gibt es heute Abend?',en:'What events are on tonight?',fr:'Quels événements ce soir ?'}},
+  {ic:'giocare', l:{it:'Come giocare',de:'Spielen',en:'How to play',fr:'Comment jouer'},
+            q:{it:'Come si gioca alle slot machine? Spiegami la procedura della tessera.',de:'Wie spielt man an den Spielautomaten? Erklären Sie mir die Karten-Prozedur.',en:'How do I play the slot machines? Explain the card procedure.',fr:'Comment jouer aux machines à sous ? Expliquez-moi la procédure de la carte.'}},
+  {ic:'orari', l:{it:'Orari',de:'Öffnungszeiten',en:'Hours',fr:'Horaires'},
+            q:{it:'Quali sono gli orari di apertura?',de:'Was sind die Öffnungszeiten?',en:'What are the opening hours?',fr:'Quels sont les horaires d\'ouverture ?'}},
+  {ic:'parcheggio', l:{it:'Parcheggio',de:'Parkplatz',en:'Parking',fr:'Parking'},
+            q:{it:'Come ritiro l\'auto dal parcheggio?',de:'Wie hole ich mein Auto vom Parkplatz?',en:'How do I get my car from the parking?',fr:'Comment récupérer ma voiture au parking ?'}},
+  {ic:'fedelta', l:{it:'Fedeltà',de:'Treueclub',en:'Loyalty',fr:'Fidélité'},
+            q:{it:'Come mi iscrivo al programma fedeltà?',de:'Wie melde ich mich beim Treueprogramm an?',en:'How do I join the loyalty program?',fr:'Comment m\'inscrire au programme de fidélité ?'}},
+  {ic:'scudo', url:'https://casinolugano.ch/gioco-responsabile/', soloLink:true, l:{it:'Gioco responsabile',de:'Verantwortung',en:'Responsible gaming',fr:'Jeu responsable'},
+            q:{it:'Informazioni sul gioco responsabile',de:'Informationen zum verantwortungsvollen Spielen',en:'Responsible gaming information',fr:'Informations sur le jeu responsable'}},
+  {ic:'wifi', l:{it:'WiFi',de:'WLAN',en:'WiFi',fr:'WiFi'},
+            q:{it:'Come mi collego al WiFi?',de:'Wie verbinde ich mich mit dem WLAN?',en:'How do I connect to the WiFi?',fr:'Comment me connecter au WiFi ?'}},
+  {ic:'bancomat', l:{it:'Bancomat',de:'Geldautomat',en:'ATM / Cash',fr:'Distributeur'},
+            q:{it:'Dove posso prelevare contanti?',de:'Wo kann ich Bargeld abheben?',en:'Where can I withdraw cash?',fr:'Où puis-je retirer de l\'argent ?'}},
+];
+
+/* --- Testi dell'interfaccia nelle 4 lingue --- */
+const UI = {
+  it:{idle:'Tocca per parlare', greet:'Buongiorno! Come posso aiutarla?', attiva:'Attiva ascolto', ferma:'Ferma ascolto', listen:'Ascolto… parla pure', pausa:'Ascolto in pausa', think:'Un momento…', privacy:'Nessun audio viene registrato o conservato — elaborazione in tempo reale.'},
+  de:{idle:'Zum Sprechen tippen', greet:'Guten Tag! Wie kann ich Ihnen helfen?', attiva:'Zuhören aktivieren', ferma:'Zuhören stoppen', listen:'Ich höre zu… sprechen Sie', pausa:'Zuhören pausiert', think:'Einen Moment…', privacy:'Es wird kein Audio aufgezeichnet oder gespeichert — Echtzeitverarbeitung.'},
+  en:{idle:'Tap to speak', greet:'Welcome! How may I help you?', attiva:'Start listening', ferma:'Stop listening', listen:'Listening… go ahead', pausa:'Listening paused', think:'One moment…', privacy:'No audio is recorded or stored — real-time processing.'},
+  fr:{idle:'Touchez pour parler', greet:'Bonjour ! Comment puis-je vous aider ?', attiva:'Activer l\'écoute', ferma:'Arrêter l\'écoute', listen:'J\'écoute… allez-y', pausa:'Écoute en pause', think:'Un instant…', privacy:'Aucun son n\'est enregistré ni conservé — traitement en temps réel.'},
+};
+function uiLang(){ return ({ 'it-IT':'it','de-DE':'de','en-GB':'en','fr-FR':'fr' })[langAscolto] || 'it'; }
+function T(k){ return UI[uiLang()][k]; }
+
+/* --- Icone SVG moderne (stile linea) --- */
+const P = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="ic">';
+const ICON = {
+  ristorante: P+'<path d="M6 3v7a2 2 0 0 0 4 0V3M8 10v11"/><path d="M16 3c-1.4 0-2.5 1.9-2.5 4.5S14.6 12 16 12s2.5-1.9 2.5-4.5S17.4 3 16 3zM16 12v9"/></svg>',
+  bar:        P+'<path d="M5 4h14l-7 8z"/><path d="M12 12v7M8 21h8"/></svg>',
+  toilette:   P+'<path d="M6 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17"/><path d="M4 21h16"/><circle cx="14.5" cy="12" r="1"/></svg>',
+  eventi:     P+'<path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/><path d="M18.5 15l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg>',
+  giocare:    P+'<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.1"/><circle cx="15" cy="9" r="1.1"/><circle cx="9" cy="15" r="1.1"/><circle cx="15" cy="15" r="1.1"/></svg>',
+  orari:      P+'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>',
+  parcheggio: P+'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9.5 16V8H13a2.5 2.5 0 0 1 0 5H9.5"/></svg>',
+  fedelta:    P+'<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 17l-5.2 2.6 1-5.8L3.5 9.7l5.9-.9z"/></svg>',
+  full:       P+'<path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>',
+  gear:       P+'<circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v2.6M12 18.9v2.6M21.5 12h-2.6M5.1 12H2.5M18.7 5.3l-1.8 1.8M7.1 16.9l-1.8 1.8M18.7 18.7l-1.8-1.8M7.1 7.1L5.3 5.3"/></svg>',
+  mic:        P+'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
+  pausa:      P+'<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>',
+  lock:       P+'<rect x="4" y="10.5" width="16" height="10.5" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>',
+  nav:        P+'<path d="M3 11l18-8-8 18-2-8z"/></svg>',
+  scudo:      P+'<path d="M12 3l7 3v5.5c0 4.3-2.9 7.3-7 8.5-4.1-1.2-7-4.2-7-8.5V6z"/><path d="M9 12l2 2 4-4.5"/></svg>',
+  wifi:       P+'<path d="M2.5 9a16 16 0 0 1 19 0"/><path d="M5.5 12.6a11 11 0 0 1 13 0"/><path d="M8.5 16.2a6 6 0 0 1 7 0"/><circle cx="12" cy="19.6" r="1"/></svg>',
+  bancomat:   P+'<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19"/><path d="M6 14.5h4"/></svg>',
+  qr:         P+'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v.01M21 21v-4M17 21h.01M14 21v-3"/></svg>',
+};
+
+/* --- Inviti schermo d'attesa (4 lingue, a rotazione) --- */
+const INVITI = [
+  'Chiedimi pure: "Dov\'è il ristorante?"',
+  'Fragen Sie mich: "Wo ist die Toilette?"',
+  'Ask me: "What time do you open?"',
+  'Demandez-moi : "Comment jouer à la roulette ?"',
+];
+// Saluto di benvenuto a rotazione (stesso ordine: it, de, en, fr)
+const BENVENUTI = [
+  'Buongiorno! Come posso aiutarla?',
+  'Guten Tag! Wie kann ich Ihnen helfen?',
+  'Good day! How may I help you?',
+  'Bonjour ! Comment puis-je vous aider ?',
+];
+
+let recognition = null, voices = [];
+let ascoltoAttivo = false, occupato = false;
+let ascoltoTemp = false, ascoltoTempTimer = null;   // microfono auto dopo una risposta (conversazione)
+let langAscolto = 'it-IT';
+
+function buildSystemPrompt(){
+  const dati = localStorage.getItem('concierge_dati') || DATI_DEFAULT;
+  return `Sei il concierge virtuale del Casinò di Lugano, cortese ed elegante.
+Rispondi SOLO usando le informazioni qui sotto. Se un dato non c'è, NON inventarlo:
+invita gentilmente a chiedere alla reception.
+
+=== INFORMAZIONI DEL CASINO ===
+${dati}
+===============================
+
+REGOLE (parla come un VERO concierge umano, non come un'AI):
+- Rispondi SEMPRE nella STESSA lingua del cliente, con ortografia corretta. NON mescolare parole di altre lingue: in italiano i giorni sono domenica, lunedì, martedì, mercoledì, giovedì, venerdì, sabato (MAI "domingo" o altri termini spagnoli).
+- Tono caldo, cortese e naturale, come un receptionist d'albergo di classe. MAI robotico o burocratico.
+- Risposta breve e parlata (2-3 frasi). Usa il contesto delle frasi precedenti (ricordi la conversazione).
+- DIALOGA: quando è naturale, chiudi con una breve domanda di cortesia per continuare ("Posso aiutarla con altro?", "Le interessa anche il menù?", "Desidera che le indichi la strada?"). Non farlo se il cliente sta chiaramente chiudendo.
+- Se il cliente è indeciso, fai una domanda per capire cosa cerca, invece di elencare tutto.
+- Promuovi il gioco responsabile se pertinente, senza incoraggiare l'eccesso.
+Restituisci SOLO JSON valido: {"lang":"it|de|en|fr","text":"risposta","indicazione":"breve direzione fisica se utile, altrimenti stringa vuota"}`;
+}
+
+/* --- Voci sintesi --- */
+function caricaVoci(){ voices = speechSynthesis.getVoices(); }
+caricaVoci();
+if(speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschanged = caricaVoci;
+
+function setStato(classe, testo){ document.body.className = classe; if(testo!==undefined) $('stato').textContent = testo; }
+
+/* ============ 1. ASCOLTO continuo (hands-free) ============ */
+function creaRecognition(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){ alert("Il riconoscimento vocale funziona su Chrome o Edge."); return null; }
+  const r = new SR();
+  r.lang = langAscolto;
+  r.continuous = true; r.interimResults = false; r.maxAlternatives = 1;
+  r.onresult = e => {
+    const res = e.results[e.results.length-1];
+    if(!res.isFinal) return;
+    const alt = res[0];
+    let testo = alt.transcript.trim();
+    if(occupato) return;
+    // Filtro anti-rumore: scarta i risultati a bassa confidenza (probabile rumore di fondo)
+    if(typeof alt.confidence === 'number' && alt.confidence > 0 && alt.confidence < 0.55) return;
+    // Scarta frammenti troppo corti (rumori, singole sillabe)
+    if(testo.length < 3 || testo.split(/\s+/).length < 1) return;
+    // Parola di attivazione opzionale (consigliata in ambienti rumorosi)
+    if(localStorage.getItem('concierge_wake')==='1'){
+      const m = testo.match(/^\s*ciao[\s,]+(.+)/i);
+      if(!m) return;
+      testo = m[1].trim();
+    }
+    $('domanda').textContent = '“'+testo+'”';
+    chiediAllAI(testo);
+  };
+  r.onerror = e => {};
+  r.onend = () => { if((ascoltoAttivo || ascoltoTemp) && !occupato){ try{ r.start(); }catch(_){} } };
+  return r;
+}
+
+function toggleHandsFree(){
+  if(!localStorage.getItem(KEY_LS)){ apriSettings(); return; }
+  fermaAscoltoTemp();
+  ascoltoAttivo = !ascoltoAttivo;
+  if(ascoltoAttivo){
+    if(!recognition) recognition = creaRecognition();
+    if(!recognition){ ascoltoAttivo=false; return; }
+    try{ recognition.start(); }catch(_){}
+    setStato('listening', T('listen')); $('risposta').textContent='';
+  } else {
+    if(recognition) recognition.stop();
+    setStato('idle', T('pausa'));
+  }
+  aggiornaBottone();
+}
+function aggiornaBottone(){
+  $('btnParla').innerHTML = (ascoltoAttivo ? ICON.pausa : ICON.mic) + '<span>' + (ascoltoAttivo ? T('ferma') : T('attiva')) + '</span>';
+}
+
+function riprendiAscolto(){
+  occupato = false;
+  if(ascoltoAttivo){
+    setStato('listening', T('listen'));
+    if(recognition){ try{ recognition.start(); }catch(_){} }
+  } else {
+    // hands-free spento: apri comunque il microfono per qualche secondo per cogliere la replica
+    avviaAscoltoTemporaneo();
+  }
+}
+
+// Finestra di ascolto automatica dopo una risposta (così il cliente risponde al follow-up senza premere)
+function avviaAscoltoTemporaneo(){
+  if(!localStorage.getItem(KEY_LS)){ setStato('idle', T('idle')); return; }
+  if(!recognition) recognition = creaRecognition();
+  if(!recognition){ setStato('idle', T('idle')); return; }
+  ascoltoTemp = true;
+  try{ recognition.start(); }catch(_){}
+  setStato('listening', T('listen'));
+  clearTimeout(ascoltoTempTimer);
+  ascoltoTempTimer = setTimeout(()=>{
+    ascoltoTemp = false;
+    if(recognition && !ascoltoAttivo){ try{ recognition.stop(); }catch(_){} }
+    if(!occupato) setStato('idle', T('idle'));
+  }, 12000);    // 12 secondi per rispondere, poi si ferma
+}
+function fermaAscoltoTemp(){ ascoltoTemp = false; clearTimeout(ascoltoTempTimer); }
+
+/* Cambia lingua di ascolto dalle bandiere */
+function setLinguaAscolto(l){
+  langAscolto = l;
+  document.querySelectorAll('#lingue span').forEach(s=>s.classList.toggle('attiva', s.dataset.l===l));
+  if(recognition){ recognition.lang = l; if(ascoltoAttivo){ try{recognition.stop();}catch(_){} } }
+  applicaLinguaUI();
+}
+
+/* Aggiorna tutte le scritte fisse nella lingua scelta */
+function applicaLinguaUI(){
+  costruisciRapide();
+  $('privacy').innerHTML = ICON.lock + '<span>' + T('privacy') + '</span>';
+  aggiornaBottone();
+  // aggiorna i testi tranne mentre pensa/parla
+  if(!occupato){
+    $('stato').textContent = ascoltoAttivo ? T('listen') : T('idle');
+    if(!$('domanda').textContent) $('risposta').textContent = T('greet');
+  }
+}
+
+/* ============ 2. CERVELLO (Groq) ============ */
+let richiestaId = 0;          // token per invalidare risposte vecchie
+let audioCorrente = null;     // audio TTS in riproduzione (per interromperlo)
+let abortCtrl = null;         // per annullare la fetch in corso
+let cronologia = [];          // memoria conversazione
+let ultimaInterazione = 0;
+const ttsCache = new Map();   // audio già generato: motore|lang|testo → url (NIENTE nuove chiamate)
+const rispCache = new Map();  // risposte AI dei bottoni: domanda → {text,lang,indicazione}
+
+// Contatore caratteri TTS consumati oggi (per il limite giornaliero)
+function _oggi(){ return new Date().toISOString().slice(0,10); }
+function contaCaratteri(n){
+  let d; try{ d = JSON.parse(localStorage.getItem('concierge_uso')||'{}'); }catch(_){ d={}; }
+  if(d.giorno !== _oggi()) d = {giorno:_oggi(), chars:0};
+  d.chars = (d.chars||0) + n;
+  localStorage.setItem('concierge_uso', JSON.stringify(d));
+}
+function caratteriOggi(){
+  let d; try{ d = JSON.parse(localStorage.getItem('concierge_uso')||'{}'); }catch(_){ return 0; }
+  return d.giorno === _oggi() ? (d.chars||0) : 0;
+}
+
+// --- Consumo MENSILE per motore (per la cascata automatica) ---
+function _mese(){ return new Date().toISOString().slice(0,7); }   // YYYY-MM
+function usoMese(eng){
+  let d; try{ d = JSON.parse(localStorage.getItem('concierge_uso_'+eng)||'{}'); }catch(_){ return 0; }
+  return d.mese === _mese() ? (d.chars||0) : 0;
+}
+function contaMese(eng, n){
+  let d; try{ d = JSON.parse(localStorage.getItem('concierge_uso_'+eng)||'{}'); }catch(_){ d={}; }
+  if(d.mese !== _mese()) d = {mese:_mese(), chars:0};
+  d.chars = (d.chars||0) + n;
+  localStorage.setItem('concierge_uso_'+eng, JSON.stringify(d));
+}
+// Sceglie il motore in modalità automatica: ElevenLabs → Google → fallback
+function scegliMotore(){
+  const hasE = !!localStorage.getItem('concierge_eleven');
+  const hasG = !!localStorage.getItem('concierge_google');
+  const limE = parseInt(localStorage.getItem('concierge_lim_eleven')||'10000', 10);
+  const limG = parseInt(localStorage.getItem('concierge_lim_google')||'1000000', 10);
+  if(hasE && usoMese('eleven') < limE) return 'eleven';
+  if(hasG && usoMese('google') < limG) return 'google';
+  return localStorage.getItem('concierge_fallback') || 'browser';   // 'browser' o 'testo'
+}
+
+// Interrompe immediatamente voce + richiesta in corso
+function fermaTutto(){
+  try{ speechSynthesis.cancel(); }catch(_){}
+  if(audioCorrente){ try{ audioCorrente.onended=null; audioCorrente.pause(); }catch(_){} audioCorrente=null; }
+  if(abortCtrl){ try{ abortCtrl.abort(); }catch(_){} }
+}
+
+async function chiediAllAI(domanda, opts){
+  opts = opts || {};
+  resetInattivita();                              // ogni domanda riavvia il timer totem
+  fermaAscoltoTemp();                             // chiude la finestra di ascolto temporanea
+  const mioId = ++richiestaId;
+  fermaTutto();                                   // barge-in: stoppa risposta precedente
+  abortCtrl = new AbortController();
+  occupato = true;
+  if(recognition){ try{ recognition.stop(); }catch(_){} }
+  $('indicazione').innerHTML=''; $('attract').textContent='';
+  setStato('thinking', T('think'));
+
+  // memoria: nuovo cliente se è passato troppo tempo (kiosk)
+  const ora = Date.now();
+  if(ora - ultimaInterazione > 90000) cronologia = [];
+  ultimaInterazione = ora;
+
+  // i bottoni (noContext) NON usano la memoria → risposta deterministica e cache-abile
+  const ctx = opts.noContext ? [] : cronologia.slice(-6);
+  const messaggi = [{role:'system',content:buildSystemPrompt()}, ...ctx, {role:'user',content:domanda}];
+  try{
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method:'POST', signal:abortCtrl.signal,
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem(KEY_LS)},
+      body: JSON.stringify({model:'llama-3.3-70b-versatile', temperature:0.5, response_format:{type:'json_object'}, messages:messaggi})
+    });
+    if(mioId !== richiestaId) return;             // è arrivata una richiesta più nuova
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const data = await r.json();
+    if(mioId !== richiestaId) return;
+    let out; try{ out = JSON.parse(data.choices[0].message.content); }
+    catch{ out = {lang:'it', text:data.choices[0].message.content, indicazione:''}; }
+    const text = out.text||'Mi scusi, non ho capito.', lang = out.lang||'it', ind = out.indicazione||'';
+    if(!opts.noContext) cronologia.push({role:'user',content:domanda}, {role:'assistant',content:text});
+    if(opts.cacheKey) rispCache.set(opts.cacheKey, {text, lang, indicazione:ind});   // salva per riuso
+    rispondi(text, lang, ind, mioId);
+  }catch(err){
+    if(err.name==='AbortError') return;           // interrotta apposta da un nuovo comando
+    $('risposta').textContent='Errore di connessione all\'AI. Controlla la chiave in ⚙️.';
+    console.error(err); riprendiAscolto();
+  }
+}
+
+/* ============ 3. VOCE ============ */
+function rispondi(testo, lang, indicazione, mioId){
+  $('risposta').textContent = testo;
+  $('indicazione').innerHTML = indicazione ? ICON.nav + '<span>' + indicazione + '</span>' : '';
+  const fine = () => { if(mioId===richiestaId) riprendiAscolto(); };
+  const scelta = localStorage.getItem('concierge_motore')||'browser';
+  // Modalità automatica: cascata ElevenLabs → Google → Browser/testo secondo i limiti mensili
+  let motore = (scelta==='auto') ? scegliMotore() : scelta;
+  // Limite giornaliero opzionale (solo nelle modalità manuali a pagamento)
+  if(scelta!=='auto'){
+    const cloud = (motore==='google' || motore==='eleven');
+    const limite = parseInt(localStorage.getItem('concierge_limite')||'0', 10);
+    if(cloud && limite>0 && caratteriOggi() >= limite) motore = 'testo';
+  }
+  // Solo testo: nessuna voce
+  if(motore==='testo'){
+    setStato('idle'); $('stato').textContent = '';
+    setTimeout(fine, 2000);          // lascia leggere la risposta, poi torna ad ascoltare
+    return;
+  }
+  const etichetta = {it:'Parlo',de:'Spreche',en:'Speaking',fr:'Je parle'}[lang]||'Parlo';
+  setStato('speaking', etichetta);
+  if(motore==='eleven')      vocePremiumEleven(testo, lang, fine, mioId);
+  else if(motore==='google') voceGoogle(testo, lang, fine, mioId);
+  else                       voceBrowser(testo, lang, fine);
+}
+
+function voceBrowser(testo, lang, fine){
+  const target = {it:'it-IT',de:'de-DE',en:'en-GB',fr:'fr-FR'}[lang]||'it-IT';
+  const u = new SpeechSynthesisUtterance(testo); u.lang=target;
+  const v = voices.find(v=>v.lang===target)||voices.find(v=>v.lang.startsWith(lang));
+  if(v) u.voice=v; u.onend=fine;
+  speechSynthesis.cancel(); speechSynthesis.speak(u);
+}
+
+// --- Gestione cache audio (in memoria + su disco) ---
+function ttsKey(motore, lang, testo){ return motore+'|'+lang+'|'+testo; }
+function blobToDataURL(blob){ return new Promise(res=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.readAsDataURL(blob); }); }
+function suonaCache(url, fine){ const a=new Audio(url); audioCorrente=a; a.onended=fine; a.play(); }
+function salvaCache(key, url){
+  ttsCache.set(key, url);
+  try{
+    let o = JSON.parse(localStorage.getItem('concierge_tts')||'{}');
+    o[key] = url;
+    const ks = Object.keys(o);
+    if(ks.length > 120) delete o[ks[0]];       // limita la dimensione su disco
+    localStorage.setItem('concierge_tts', JSON.stringify(o));
+  }catch(_){ /* quota piena: resta solo in memoria, nessun problema */ }
+}
+function caricaTtsCache(){
+  try{ const o = JSON.parse(localStorage.getItem('concierge_tts')||'{}'); for(const k in o) ttsCache.set(k, o[k]); }catch(_){}
+}
+
+async function vocePremiumEleven(testo, lang, fine, mioId){
+  const ck = ttsKey('eleven', lang, testo);
+  if(ttsCache.has(ck)){ suonaCache(ttsCache.get(ck), fine); return; }   // riuso: nessuna chiamata
+  const key = localStorage.getItem('concierge_eleven');
+  if(!key){ $('risposta').textContent='Manca la chiave ElevenLabs (⚙️).'; fine(); return; }
+  const voiceId = 'EXAVITQu4vr4xnSDxMaL'; // "Sarah"
+  try{
+    const r = await fetch('https://api.elevenlabs.io/v1/text-to-speech/'+voiceId, {
+      method:'POST', headers:{'xi-api-key':key,'Content-Type':'application/json'},
+      body: JSON.stringify({text:testo, model_id:'eleven_multilingual_v2', voice_settings:{stability:0.5,similarity_boost:0.8,style:0.3}})
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const url = await blobToDataURL(await r.blob());
+    if(mioId!==richiestaId) return;            // interrotta da un nuovo comando
+    contaCaratteri(testo.length); contaMese('eleven', testo.length);   // conta solo le chiamate REALI
+    salvaCache(ck, url);
+    suonaCache(url, fine);
+  }catch(e){ $('risposta').textContent='Errore voce ElevenLabs (chiave o credito).'; console.error(e); fine(); }
+}
+
+async function voceGoogle(testo, lang, fine, mioId){
+  const ck = ttsKey('google', lang, testo);
+  if(ttsCache.has(ck)){ suonaCache(ttsCache.get(ck), fine); return; }   // riuso: nessuna chiamata
+  const key = localStorage.getItem('concierge_google');
+  if(!key){ $('risposta').textContent='Manca la chiave Google TTS (⚙️).'; fine(); return; }
+  const vmap = {
+    it:{languageCode:'it-IT',name:'it-IT-Neural2-A'}, de:{languageCode:'de-DE',name:'de-DE-Neural2-F'},
+    en:{languageCode:'en-GB',name:'en-GB-Neural2-A'}, fr:{languageCode:'fr-FR',name:'fr-FR-Neural2-A'}
+  };
+  const voce = vmap[lang]||vmap.it;
+  try{
+    const r = await fetch('https://texttospeech.googleapis.com/v1/text:synthesize?key='+key, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({input:{text:testo}, voice:{languageCode:voce.languageCode,name:voce.name}, audioConfig:{audioEncoding:'MP3'}})
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const data = await r.json();
+    if(mioId!==richiestaId) return;            // interrotta da un nuovo comando
+    const url = 'data:audio/mp3;base64,'+data.audioContent;
+    contaCaratteri(testo.length); contaMese('google', testo.length);   // conta solo le chiamate REALI
+    salvaCache(ck, url);
+    suonaCache(url, fine);
+  }catch(e){ $('risposta').textContent='Errore voce Google (chiave o API non abilitata).'; console.error(e); fine(); }
+}
+
+/* ============ 4. UI: bottoni rapidi, attesa, kiosk ============ */
+function costruisciRapide(){
+  const lng = uiLang();
+  $('rapide').innerHTML = RAPIDE.map((r,i)=>`<button onclick="domandaRapida(${i})">${ICON[r.ic]}<span>${r.l[lng]}</span></button>`).join('');
+}
+function domandaRapida(i){
+  const r = RAPIDE[i];
+  if(r.soloLink){                       // Eventi / Gioco responsabile: solo QR + invito vocale
+    mostraQR(r.url, true);
+    return;
+  }
+  const q = r.q[uiLang()];
+  $('domanda').textContent = '“'+q+'”';
+  if(r.url) mostraQR(r.url, false);     // es. Ristorante: risposta vocale + QR per il menù
+  const ck = uiLang()+'|'+r.ic;         // chiave cache: bottone + lingua
+  if(rispCache.has(ck)){                // già chiesto → riusa risposta+audio, NESSUNA chiamata AI
+    resetInattivita(); fermaTutto(); occupato = true;
+    const c = rispCache.get(ck);
+    rispondi(c.text, c.lang, c.indicazione, ++richiestaId);
+    return;
+  }
+  chiediAllAI(q, {cacheKey:ck, noContext:true});
+}
+
+/* --- QR verso il sito ufficiale --- */
+let qrTimer = null, qrUrlCorrente = '';
+const QR_CAP = {
+  it:'Inquadra il codice col telefono o visita il sito', de:'Scannen Sie den Code oder besuchen Sie die Webseite',
+  en:'Scan the code or visit the website',   fr:'Scannez le code ou visitez le site'
+};
+const QR_CLOSE = {it:'Tocca per chiudere',de:'Zum Schließen tippen',en:'Tap to close',fr:'Touchez pour fermer'};
+const QR_OPEN  = {it:'Apri la pagina sullo schermo',de:'Seite am Bildschirm öffnen',en:'Open the page on screen',fr:'Ouvrir la page à l\'écran'};
+const WEB_BACK = {it:'← Torna al concierge',de:'← Zurück zum Concierge',en:'← Back to concierge',fr:'← Retour au concierge'};
+
+function mostraQR(url, parla){
+  qrUrlCorrente = url;
+  const box = $('qrBox'); box.innerHTML='';
+  if(typeof QRCode!=='undefined'){
+    new QRCode(box, {text:url, width:240, height:240, colorDark:'#7d0826', colorLight:'#ffffff', correctLevel:QRCode.CorrectLevel.M});
+  } else { box.textContent = url; }
+  const lng = uiLang();
+  $('qrCap').textContent   = QR_CAP[lng];
+  $('qrOpen').textContent  = QR_OPEN[lng];
+  $('qrClose').textContent = QR_CLOSE[lng];
+  $('qrModal').classList.add('open');
+  clearTimeout(qrTimer); qrTimer = setTimeout(chiudiQR, 45000);   // auto-chiusura
+  if(parla){                          // invito vocale (Eventi / Gioco responsabile)
+    fermaTutto(); occupato = true;
+    rispondi(QR_CAP[lng], lng, '', ++richiestaId);
+  }
+}
+function chiudiQR(){ $('qrModal').classList.remove('open'); clearTimeout(qrTimer); }
+
+// Apre la pagina web dentro l'app (iframe), con tasto "torna indietro"
+function apriWeb(){
+  if(!qrUrlCorrente) return;
+  clearTimeout(qrTimer);
+  $('webBack').textContent = WEB_BACK[uiLang()];
+  $('webFrame').src = qrUrlCorrente;
+  $('qrModal').classList.remove('open');
+  $('webModal').classList.add('open');
+}
+function chiudiWeb(){ $('webModal').classList.remove('open'); $('webFrame').src='about:blank'; }
+
+/* --- Auto-reset a HOME dopo inattività (modalità totem) --- */
+let inattivitaTimer = null;
+const INATTIVITA_MS = 60000;          // 60s senza interazione → torna home
+function resetInattivita(){
+  clearTimeout(inattivitaTimer);
+  inattivitaTimer = setTimeout(tornaHome, INATTIVITA_MS);
+}
+function tornaHome(){
+  if(occupato){ resetInattivita(); return; }   // non interrompere una risposta in corso
+  fermaTutto(); fermaAscoltoTemp();
+  if(recognition && !ascoltoAttivo){ try{ recognition.stop(); }catch(_){} }
+  chiudiQR(); chiudiWeb();
+  $('modal').classList.remove('open');
+  cronologia = [];                              // nuovo cliente
+  $('domanda').textContent=''; $('indicazione').innerHTML='';
+  if(langAscolto!=='it-IT') setLinguaAscolto('it-IT');   // ripristina lingua di default
+  $('risposta').textContent = T('greet');
+  if(ascoltoAttivo){ setStato('listening', T('listen')); if(recognition){ try{ recognition.start(); }catch(_){} } }
+  else setStato('idle', T('idle'));
+}
+
+let invitoIdx = 0, invitoTimer = null;
+function avviaAttract(){
+  clearInterval(invitoTimer);
+  invitoTimer = setInterval(()=>{
+    // ruota solo nella schermata di benvenuto (non mentre pensa/parla o mostra una risposta)
+    if(occupato || $('domanda').textContent) return;
+    $('risposta').style.opacity = 0; $('attract').style.opacity = 0;
+    setTimeout(()=>{
+      const i = invitoIdx % INVITI.length;
+      $('risposta').textContent = BENVENUTI[i];
+      $('attract').textContent  = INVITI[i];
+      invitoIdx++;
+      $('risposta').style.opacity = 1; $('attract').style.opacity = .5;
+    }, 400);
+  }, 3800);
+}
+
+function schermoIntero(){
+  if(!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+  else document.exitFullscreen?.();
+}
+
+/* ============ Settings ============ */
+function apriSettings(){
+  $('apiKey').value    = localStorage.getItem(KEY_LS)||'';
+  $('elevenKey').value = localStorage.getItem('concierge_eleven')||'';
+  $('googleKey').value = localStorage.getItem('concierge_google')||'';
+  $('motore').value    = localStorage.getItem('concierge_motore')||'browser';
+  $('fallback').value  = localStorage.getItem('concierge_fallback')||'browser';
+  $('limEleven').value = localStorage.getItem('concierge_lim_eleven')||'10000';
+  $('limGoogle').value = localStorage.getItem('concierge_lim_google')||'1000000';
+  $('limite').value    = localStorage.getItem('concierge_limite')||'0';
+  $('wake').checked    = localStorage.getItem('concierge_wake')==='1';
+  $('usoOggi').textContent = 'Consumo questo mese — ElevenLabs: '+usoMese('eleven').toLocaleString('de-CH')+' / Google: '+usoMese('google').toLocaleString('de-CH')+' caratteri.';
+  $('dati').value      = localStorage.getItem('concierge_dati')||DATI_DEFAULT;
+  $('modal').classList.add('open');
+}
+function salvaSettings(){
+  const k = $('apiKey').value.trim();
+  if(!k.startsWith('gsk_')){ $('errModal').textContent='La chiave Groq inizia con "gsk_".'; return; }
+  localStorage.setItem(KEY_LS, k);
+  localStorage.setItem('concierge_eleven', $('elevenKey').value.trim());
+  localStorage.setItem('concierge_google', $('googleKey').value.trim());
+  localStorage.setItem('concierge_motore', $('motore').value);
+  localStorage.setItem('concierge_fallback', $('fallback').value);
+  localStorage.setItem('concierge_lim_eleven', String(parseInt($('limEleven').value||'10000',10)||0));
+  localStorage.setItem('concierge_lim_google', String(parseInt($('limGoogle').value||'1000000',10)||0));
+  localStorage.setItem('concierge_limite', String(parseInt($('limite').value||'0',10)||0));
+  localStorage.setItem('concierge_wake', $('wake').checked?'1':'');
+  localStorage.setItem('concierge_dati', $('dati').value.trim());
+  rispCache.clear();                 // i dati possono essere cambiati → invalida le risposte salvate
+  $('errModal').textContent='';
+  $('modal').classList.remove('open');
+  $('risposta').textContent='Pronto! Tocca un argomento o "Attiva ascolto".';
+}
+$('modal').addEventListener('click', e=>{ if(e.target.id==='modal') $('modal').classList.remove('open'); });
+
+/* ============ Avvio ============ */
+caricaTtsCache();
+$('btnFull').innerHTML = ICON.full;
+$('btnGear').innerHTML = ICON.gear;
+document.querySelectorAll('#lingue span').forEach(s=> s.onclick=()=>setLinguaAscolto(s.dataset.l));
+setLinguaAscolto('it-IT');
+costruisciRapide();
+avviaAttract();
+// Auto-reset totem: ogni interazione (tocco/click/tasto) riavvia il timer
+['click','touchstart','keydown'].forEach(ev => document.addEventListener(ev, resetInattivita, {passive:true}));
+resetInattivita();
+if(!localStorage.getItem(KEY_LS)) setTimeout(apriSettings, 600);
+</script>
+</body>
+</html>
