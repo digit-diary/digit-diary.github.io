@@ -551,7 +551,8 @@ function scegliMotore(){
   const hasG = !!localStorage.getItem('concierge_google');
   const limE = parseInt(localStorage.getItem('concierge_lim_eleven')||'10000', 10);
   const limG = parseInt(localStorage.getItem('concierge_lim_google')||'1000000', 10);
-  if(hasE && usoMese('eleven') < limE) return 'eleven';
+  const elevenOff = localStorage.getItem('concierge_eleven_off')==='1';
+  if(hasE && !elevenOff && usoMese('eleven') < limE) return 'eleven';
   if(hasG && usoMese('google') < limG) return 'google';
   return localStorage.getItem('concierge_fallback') || 'browser';   // 'browser' o 'testo'
 }
@@ -671,17 +672,23 @@ async function vocePremiumEleven(testo, lang, fine, mioId){
       body: JSON.stringify({text:testo, model_id:'eleven_multilingual_v2', voice_settings:{stability:0.5,similarity_boost:0.8,style:0.3}})
     });
     if(!r.ok){
-      let det=''; try{ det = JSON.stringify(await r.json()).slice(0,160); }catch(_){}
-      const msg = r.status===401 ? 'chiave non valida' : r.status===429 ? 'credito mensile esaurito' : r.status===400 ? 'richiesta non valida (voce/modello)' : 'errore '+r.status;
-      $('risposta').textContent = 'ElevenLabs: '+msg+'. '+det;
-      console.error('ElevenLabs', r.status, det); fine(); return;
+      let det=''; try{ det = await r.text(); }catch(_){}
+      // Free Tier disabilitato / chiave non valida → disattiva ElevenLabs per non riprovare inutilmente
+      if(r.status===401 || r.status===403 || /unusual_activity|disabled/i.test(det)) localStorage.setItem('concierge_eleven_off','1');
+      if(localStorage.getItem('concierge_google')){ voceGoogle(testo, lang, fine, mioId); return; }   // fallback automatico a Google
+      const msg = (r.status===401||r.status===403) ? 'Free Tier disabilitato o chiave non valida' : r.status===429 ? 'credito esaurito' : 'errore '+r.status;
+      $('risposta').textContent = 'ElevenLabs: '+msg+' (imposta Google in ⚙️).';
+      console.error('ElevenLabs', r.status, det.slice(0,200)); fine(); return;
     }
     const url = await blobToDataURL(await r.blob());
     if(mioId!==richiestaId) return;            // interrotta da un nuovo comando
     contaCaratteri(testo.length); contaMese('eleven', testo.length);   // conta solo le chiamate REALI
     salvaCache(ck, url);
     suonaCache(url, fine);
-  }catch(e){ $('risposta').textContent='ElevenLabs non raggiungibile: '+(e.message||e); console.error(e); fine(); }
+  }catch(e){
+    if(localStorage.getItem('concierge_google')){ voceGoogle(testo, lang, fine, mioId); return; }   // fallback a Google
+    $('risposta').textContent='ElevenLabs non raggiungibile.'; console.error(e); fine();
+  }
 }
 
 async function voceGoogle(testo, lang, fine, mioId){
@@ -840,6 +847,7 @@ function salvaSettings(){
   if(!k.startsWith('gsk_')){ $('errModal').textContent='La chiave Groq inizia con "gsk_".'; return; }
   localStorage.setItem(KEY_LS, k);
   localStorage.setItem('concierge_eleven', $('elevenKey').value.trim());
+  localStorage.removeItem('concierge_eleven_off');   // nuova chiave salvata → riprova ElevenLabs
   localStorage.setItem('concierge_google', $('googleKey').value.trim());
   localStorage.setItem('concierge_motore', $('motore').value);
   localStorage.setItem('concierge_fallback', $('fallback').value);
