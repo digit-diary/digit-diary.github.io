@@ -122,6 +122,45 @@
   .card button.salva{margin-top:24px;width:100%;padding:14px;border:none;border-radius:10px;background:var(--oro);color:#1a1208;font-weight:600;font-size:15px;cursor:pointer}
   .err{color:#ff8080;font-size:14px;margin-top:12px;min-height:18px}
 
+  /* ===== DEMO animato (attract mode) ===== */
+  .demo{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:70;cursor:pointer;overflow:hidden;
+    background:radial-gradient(ellipse at 50% 40%,#241f33 0%,#0a0a0f 72%)}
+  .demo.open{display:flex;animation:fadein .5s ease}
+  /* particelle dorate sullo sfondo */
+  .demo::before,.demo::after{content:'';position:absolute;border-radius:50%;filter:blur(60px);opacity:.18;pointer-events:none}
+  .demo::before{width:420px;height:420px;background:#e8d5a3;top:-120px;left:-100px;animation:float1 14s ease-in-out infinite}
+  .demo::after{width:360px;height:360px;background:#7d0826;bottom:-120px;right:-90px;animation:float2 17s ease-in-out infinite}
+  @keyframes float1{0%,100%{transform:translate(0,0)}50%{transform:translate(60px,40px)}}
+  @keyframes float2{0%,100%{transform:translate(0,0)}50%{transform:translate(-50px,-40px)}}
+  .demo-logo{width:64px;height:64px;margin-bottom:30px;opacity:.9;animation:demoLogoIn .8s ease, breathe 4s ease-in-out infinite 1s}
+  .demo-logo svg{width:64px;height:64px;filter:drop-shadow(0 0 16px rgba(232,213,163,.4))}
+  @keyframes demoLogoIn{from{opacity:0;transform:scale(.6)}to{opacity:.9;transform:scale(1)}}
+  .demo-inner{position:relative;width:90vw;max-width:660px;height:260px;display:flex;align-items:center;justify-content:center}
+  .demo-scene{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;opacity:0;animation:sceneCycle 16s infinite}
+  .demo-scene:nth-child(1){animation-delay:0s}
+  .demo-scene:nth-child(2){animation-delay:4s}
+  .demo-scene:nth-child(3){animation-delay:8s}
+  .demo-scene:nth-child(4){animation-delay:12s}
+  @keyframes sceneCycle{0%{opacity:0;transform:translateY(18px) scale(.97)}4%{opacity:1;transform:translateY(0) scale(1)}21%{opacity:1;transform:translateY(0) scale(1)}25%{opacity:0;transform:translateY(-18px) scale(.97)}100%{opacity:0}}
+  .demo-ic-big{width:92px;height:92px;color:var(--oro);animation:micPulse 1.8s ease-in-out infinite}
+  .demo-ic-big svg{width:92px;height:92px;filter:drop-shadow(0 0 18px rgba(232,213,163,.5))}
+  @keyframes micPulse{0%,100%{transform:scale(1);opacity:.92}50%{transform:scale(1.13);opacity:1}}
+  .demo-title{font-size:32px;color:#fff;font-weight:300;letter-spacing:.5px;text-align:center}
+  .demo-sub{font-size:18px;color:var(--oro);opacity:.85}
+  .demo-chat{flex-direction:column;align-items:stretch;width:78%;left:11%;gap:14px}
+  .demo-bubble{padding:15px 22px;border-radius:20px;font-size:21px;max-width:88%;line-height:1.3;
+    animation:bubbleIn .6s ease both}
+  .demo-bubble.user{align-self:flex-end;background:linear-gradient(135deg,#e8d5a3,#c9a84c);color:#1a1208;border-bottom-right-radius:5px;animation-delay:.3s}
+  .demo-bubble.bot{align-self:flex-start;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.12);color:#fff;border-bottom-left-radius:5px;animation-delay:1s}
+  @keyframes bubbleIn{from{opacity:0;transform:translateY(10px) scale(.9)}to{opacity:1;transform:translateY(0) scale(1)}}
+  .demo-icons{display:flex;gap:26px;color:var(--oro)}
+  .demo-icons svg{width:46px;height:46px;filter:drop-shadow(0 0 10px rgba(232,213,163,.35));animation:micPulse 2.4s ease-in-out infinite}
+  .demo-icons svg:nth-child(2){animation-delay:.3s}.demo-icons svg:nth-child(3){animation-delay:.6s}.demo-icons svg:nth-child(4){animation-delay:.9s}
+  .demo-flags{font-size:52px;letter-spacing:10px;animation:micPulse 3s ease-in-out infinite}
+  .demo-cta{position:absolute;bottom:9vh;font-size:20px;color:#fff;font-weight:500;padding:15px 38px;border-radius:44px;
+    background:rgba(232,213,163,.08);border:1.5px solid var(--oro);animation:ctaPulse 2s ease-in-out infinite}
+  @keyframes ctaPulse{0%,100%{box-shadow:0 0 0 0 rgba(232,213,163,.45);transform:scale(1)}50%{box-shadow:0 0 0 16px rgba(232,213,163,0);transform:scale(1.04)}}
+
   /* ===== MOBILE (telefoni) ===== */
   @media (max-width:640px){
     html,body{overflow-y:auto}
@@ -149,6 +188,23 @@
     .qr-card #qrBox img,.qr-card #qrBox canvas{width:198px!important;height:198px!important}
     .qr-cap{font-size:14px}
     .web-back{padding:11px 18px;font-size:15px}
+    /* demo su telefono */
+    .demo-logo,.demo-logo svg{width:48px;height:48px;margin-bottom:16px}
+    .demo-inner{height:200px}
+    .demo-ic-big,.demo-ic-big svg{width:66px;height:66px}
+    .demo-title{font-size:23px}
+    .demo-sub{font-size:15px}
+    .demo-bubble{font-size:16px;padding:11px 16px}
+    .demo-icons{gap:18px}
+    .demo-icons svg{width:36px;height:36px}
+    .demo-flags{font-size:38px;letter-spacing:6px}
+    .demo-cta{font-size:16px;padding:13px 26px;bottom:6vh}
+  }
+  /* Tablet (iPad): leggermente più contenuto del kiosk */
+  @media (min-width:641px) and (max-width:1100px){
+    .risposta{font-size:24px}
+    .rapide{max-width:88vw}
+    .demo-title{font-size:30px}
   }
 </style>
 </head>
@@ -216,6 +272,31 @@
   <div class="web-modal" id="webModal">
     <div class="web-bar"><button class="web-back" id="webBack" onclick="chiudiWeb()"></button></div>
     <iframe id="webFrame" referrerpolicy="no-referrer"></iframe>
+  </div>
+
+  <!-- Demo animato (attract mode) -->
+  <div class="demo" id="demo" onclick="chiudiDemo()">
+    <div class="demo-logo" id="demoLogo"></div>
+    <div class="demo-inner">
+      <div class="demo-scene">
+        <div class="demo-ic-big" id="demoMic"></div>
+        <div class="demo-title">Tocca e parla</div>
+        <div class="demo-sub">Fai una domanda a voce</div>
+      </div>
+      <div class="demo-scene demo-chat">
+        <div class="demo-bubble user">Dov'è il ristorante?</div>
+        <div class="demo-bubble bot">Al primo piano, ristorante Elementi 🍽️</div>
+      </div>
+      <div class="demo-scene">
+        <div class="demo-icons" id="demoIcons"></div>
+        <div class="demo-title">Oppure tocca un argomento</div>
+      </div>
+      <div class="demo-scene">
+        <div class="demo-flags">🇮🇹 🇩🇪 🇬🇧 🇫🇷</div>
+        <div class="demo-title">Chiedi nella tua lingua</div>
+      </div>
+    </div>
+    <div class="demo-cta" id="demoCta">Tocca lo schermo per iniziare</div>
   </div>
 
   <!-- Settings -->
@@ -796,25 +877,38 @@ function apriWeb(){
 }
 function chiudiWeb(){ $('webModal').classList.remove('open'); $('webFrame').src='about:blank'; }
 
-/* --- Auto-reset a HOME dopo inattività (modalità totem) --- */
-let inattivitaTimer = null;
-const INATTIVITA_MS = 60000;          // 60s senza interazione → torna home
+/* --- Demo animato dopo inattività (attract mode totem) --- */
+let inattivitaTimer = null, demoCtaTimer = null, demoCtaIdx = 0;
+const INATTIVITA_MS = 40000;          // 40s senza interazione → parte il demo
+const DEMO_CTA = {it:'Tocca lo schermo per iniziare', de:'Tippen, um zu starten', en:'Touch the screen to start', fr:'Touchez l\'écran pour commencer'};
+
 function resetInattivita(){
+  chiudiDemo();
   clearTimeout(inattivitaTimer);
-  inattivitaTimer = setTimeout(tornaHome, INATTIVITA_MS);
+  inattivitaTimer = setTimeout(mostraDemo, INATTIVITA_MS);
 }
-function tornaHome(){
+function mostraDemo(){
   if(occupato){ resetInattivita(); return; }   // non interrompere una risposta in corso
   fermaTutto(); fermaAscoltoTemp();
   if(recognition && !ascoltoAttivo){ try{ recognition.stop(); }catch(_){} }
-  chiudiQR(); chiudiWeb();
-  $('modal').classList.remove('open');
-  cronologia = [];                              // nuovo cliente
+  chiudiQR(); chiudiWeb(); $('modal').classList.remove('open');
+  cronologia = [];                             // nuovo cliente
   $('domanda').textContent=''; $('indicazione').innerHTML='';
-  if(langAscolto!=='it-IT') setLinguaAscolto('it-IT');   // ripristina lingua di default
+  if(langAscolto!=='it-IT') setLinguaAscolto('it-IT');
   $('risposta').textContent = T('greet');
-  if(ascoltoAttivo){ setStato('listening', T('listen')); if(recognition){ try{ recognition.start(); }catch(_){} } }
-  else setStato('idle', T('idle'));
+  setStato(ascoltoAttivo?'listening':'idle');
+  // CTA che ruota nelle 4 lingue
+  const langs = ['it','de','en','fr']; demoCtaIdx = 0;
+  $('demoCta').textContent = DEMO_CTA.it;
+  clearInterval(demoCtaTimer);
+  demoCtaTimer = setInterval(()=>{ demoCtaIdx=(demoCtaIdx+1)%4; $('demoCta').textContent = DEMO_CTA[langs[demoCtaIdx]]; }, 3000);
+  $('demo').classList.add('open');
+}
+function chiudiDemo(){
+  if(!$('demo').classList.contains('open')) return;
+  $('demo').classList.remove('open');
+  clearInterval(demoCtaTimer);
+  setStato(ascoltoAttivo?'listening':'idle', ascoltoAttivo?T('listen'):T('idle'));
 }
 
 let invitoIdx = 0, invitoTimer = null;
@@ -883,12 +977,28 @@ $('modal').addEventListener('click', e=>{ if(e.target.id==='modal') $('modal').c
 caricaTtsCache();
 $('btnFull').innerHTML = ICON.full;
 $('btnGear').innerHTML = ICON.gear;
+// Icone del demo
+$('demoMic').innerHTML = ICON.mic;
+$('demoIcons').innerHTML = ICON.ristorante + ICON.giocare + ICON.bancomat + ICON.wifi;
+$('demoLogo').innerHTML = '<svg viewBox="0 0 200 200"><defs><radialGradient id="dlr" cx="50%" cy="42%" r="65%"><stop offset="0%" stop-color="#d8244e"/><stop offset="55%" stop-color="#b01038"/><stop offset="100%" stop-color="#7d0826"/></radialGradient></defs><path d="M48,56 Q96,104 144,56 Q96,104 144,152 Q96,104 48,152 Q96,104 48,56 Z" fill="url(#dlr)" stroke="#c9ccce" stroke-width="6" stroke-linejoin="round"/></svg>';
 document.querySelectorAll('#lingue span').forEach(s=> s.onclick=()=>setLinguaAscolto(s.dataset.l));
 setLinguaAscolto('it-IT');
 costruisciRapide();
 avviaAttract();
-// Auto-reset totem: ogni interazione (tocco/click/tasto) riavvia il timer
-['click','touchstart','keydown'].forEach(ev => document.addEventListener(ev, resetInattivita, {passive:true}));
+
+// Sblocco audio per iOS (iPhone/iPad): al primo tocco abilita la riproduzione audio
+let audioSbloccato = false;
+function sbloccaAudio(){
+  if(audioSbloccato) return; audioSbloccato = true;
+  try{
+    const a = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=');
+    a.play().catch(()=>{});
+    if(window.speechSynthesis){ const u=new SpeechSynthesisUtterance(' '); u.volume=0; speechSynthesis.speak(u); }
+  }catch(_){}
+}
+
+// Auto-reset totem: ogni interazione (tocco/click/tasto) riavvia il timer + sblocca audio
+['click','touchstart','keydown'].forEach(ev => document.addEventListener(ev, ()=>{ sbloccaAudio(); resetInattivita(); }, {passive:true}));
 resetInattivita();
 if(!localStorage.getItem(KEY_LS)) setTimeout(apriSettings, 600);
 </script>
