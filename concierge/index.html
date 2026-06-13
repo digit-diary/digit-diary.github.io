@@ -861,9 +861,19 @@ function getBottoni(){
     q: {it:'Dammi informazioni su: '+b.label, de:'Informationen über: '+b.label, en:'Information about: '+b.label, fr:'Informations sur: '+b.label}
   }));
   const hid = getHiddenBtns();
-  return RAPIDE.filter(b=>!hid.includes(b.ic)).concat(cust);
+  const urlOv = getBtnUrl();
+  const rap = RAPIDE.filter(b=>!hid.includes(b.ic)).map(b=>{
+    if(Object.prototype.hasOwnProperty.call(urlOv, b.ic)){      // QR/link modificato dall'admin
+      const u = (urlOv[b.ic]||'').trim();
+      return Object.assign({}, b, { url:u, soloLink: b.soloLink && !!u });   // url vuoto = nessun QR
+    }
+    return b;
+  });
+  return rap.concat(cust);
 }
 function getHiddenBtns(){ try{ return JSON.parse(localStorage.getItem('concierge_btn_hidden')||'[]'); }catch(_){ return []; } }
+function getBtnUrl(){ try{ return JSON.parse(localStorage.getItem('concierge_btn_url')||'{}'); }catch(_){ return {}; } }
+function setBtnUrl(ic, u){ const m=getBtnUrl(); m[ic]=u; localStorage.setItem('concierge_btn_url', JSON.stringify(m)); costruisciRapide(); }
 function toggleHideBtn(ic){
   const h = getHiddenBtns(); const i = h.indexOf(ic);
   if(i>=0) h.splice(i,1); else h.push(ic);
@@ -897,13 +907,15 @@ function renderCustomBtnList(){
   RAPIDE.forEach(b=>{
     const key = BTN_DATI[b.ic];
     const nascosto = hid.includes(b.ic);
+    const urlOv = getBtnUrl();
+    const effUrl = Object.prototype.hasOwnProperty.call(urlOv,b.ic) ? (urlOv[b.ic]||'') : (b.url||'');
     const row = document.createElement('div'); row.className='cbtn-row';
     row.style.cssText='flex-wrap:wrap;align-items:center'+(nascosto?';opacity:.45':'');
     const ci = document.createElement('div'); ci.className='ci'; ci.innerHTML = ICON[b.ic]||ICON.info;
     const nm = document.createElement('div'); nm.className='nm'; nm.textContent = (b.l&&b.l.it)||b.ic;
     const badge = document.createElement('span');
     badge.style.cssText='font-size:11px;padding:2px 9px;border-radius:20px;background:rgba(232,213,163,.12);color:var(--oro);margin-left:8px;white-space:nowrap';
-    badge.textContent = nascosto ? 'Nascosto' : (b.soloLink ? 'Apre QR / sito' : (b.url ? 'Risposta + QR' : 'Risposta vocale'));
+    badge.textContent = nascosto ? 'Nascosto' : ((b.soloLink && effUrl) ? 'Apre QR / sito' : (effUrl ? 'Risposta + QR' : 'Risposta vocale'));
     nm.appendChild(badge);
     row.appendChild(ci); row.appendChild(nm);
     if(key && !nascosto){
@@ -922,6 +934,14 @@ function renderCustomBtnList(){
       const v = (_datiVal(key)||'').trim();
       prev.textContent = v || '(vuoto — aggiungi il testo nei Contenuti)';
       row.appendChild(prev);
+    }
+    if(!nascosto){    // QR / link del bottone: vuoto = nessun QR
+      const qr = document.createElement('div'); qr.style.cssText='flex:1 1 100%;margin-top:6px;display:flex;gap:8px;align-items:center';
+      const lab = document.createElement('span'); lab.textContent='QR / link:'; lab.style.cssText='font-size:12px;opacity:.7;white-space:nowrap';
+      const inp = document.createElement('input'); inp.type='url'; inp.placeholder='https://… (vuoto = nessun QR)'; inp.value=effUrl;
+      inp.style.cssText='flex:1;font-size:13px;padding:6px 8px';
+      inp.onchange=()=>{ setBtnUrl(b.ic, inp.value.trim()); renderCustomBtnList(); };
+      qr.appendChild(lab); qr.appendChild(inp); row.appendChild(qr);
     }
     box.appendChild(row);
   });
@@ -2269,7 +2289,7 @@ function resetVergine(){
   if(!confirm('Azzerare TUTTA la configurazione (logo, nome, contenuti, bottoni personalizzati)? L\'app tornerà vuota, pronta per una nuova azienda.')) return;
   const empty = {}; DATI_FIELDS.forEach(f=>empty[f.k]='');
   localStorage.setItem('concierge_dati_struct', JSON.stringify(empty));
-  ['concierge_brand','concierge_logo','concierge_btn_custom','concierge_dati_extra','concierge_btn_hidden','concierge_pin','concierge_kiosk','concierge_demo_frasi'].forEach(k=>localStorage.removeItem(k));
+  ['concierge_brand','concierge_logo','concierge_btn_custom','concierge_dati_extra','concierge_btn_hidden','concierge_btn_url','concierge_pin','concierge_kiosk','concierge_demo_frasi'].forEach(k=>localStorage.removeItem(k));
   localStorage.setItem('concierge_vergine','1');   // niente stella casinò: emblema neutro finché non si carica un logo
   mapClear(); aggiornaBtnMappa();
   applyKiosk();
