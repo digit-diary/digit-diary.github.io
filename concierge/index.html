@@ -641,6 +641,35 @@
         <label>Demo animato dopo (secondi di inattività) <span style="opacity:.5">(0 = disattivato)</span></label>
         <input id="demoDelay" type="number" min="0" placeholder="40">
         <div class="hint">Il video-guida parte da solo dopo questo tempo senza interazioni.</div>
+
+        <label>Lingua predefinita all'avvio</label>
+        <select id="langDef">
+          <option value="it-IT">Italiano</option>
+          <option value="de-DE">Deutsch</option>
+          <option value="en-GB">English</option>
+          <option value="fr-FR">Français</option>
+          <option value="es-ES">Español</option>
+          <option value="ru-RU">Русский</option>
+          <option value="zh-CN">中文</option>
+          <option value="ar-SA">العربية</option>
+        </select>
+
+        <label>Sensibilità microfono (filtro rumore)</label>
+        <select id="micSens">
+          <option value="0.35">Alta — sente di più (ambiente silenzioso)</option>
+          <option value="0.55">Media — consigliata</option>
+          <option value="0.7">Bassa — solo voce chiara (ambiente rumoroso)</option>
+        </select>
+
+        <label>Velocità della voce</label>
+        <select id="voiceRate">
+          <option value="0.9">Lenta</option>
+          <option value="1">Normale</option>
+          <option value="1.1">Veloce</option>
+        </select>
+
+        <label>Effetto transizione foto demo (Ken Burns) <span style="opacity:.5">si imposta in Media</span></label>
+        <div class="hint">La velocità del demo e gli effetti foto si regolano nella sezione Media. La modalità chiosco con PIN è in arrivo.</div>
       </div>
 
       <div class="err" id="errModal"></div>
@@ -973,7 +1002,7 @@ function creaRecognition(){
     let testo = alt.transcript.trim();
     if(occupato) return;
     // Filtro anti-rumore: scarta i risultati a bassa confidenza (probabile rumore di fondo)
-    if(typeof alt.confidence === 'number' && alt.confidence > 0 && alt.confidence < 0.55) return;
+    if(typeof alt.confidence === 'number' && alt.confidence > 0 && alt.confidence < parseFloat(localStorage.getItem('concierge_mic_sens')||'0.55')) return;
     // Scarta frammenti troppo corti (rumori, singole sillabe)
     if(testo.length < 3 || testo.split(/\s+/).length < 1) return;
     // Parola di attivazione opzionale (consigliata in ambienti rumorosi)
@@ -1213,7 +1242,7 @@ function voceBrowser(testo, lang, fine){
   const target = {it:'it-IT',de:'de-DE',en:'en-GB',fr:'fr-FR',es:'es-ES',ru:'ru-RU',zh:'zh-CN',ar:'ar-SA'}[lang]||'it-IT';
   const u = new SpeechSynthesisUtterance(testo); u.lang=target;
   const v = voices.find(v=>v.lang===target)||voices.find(v=>v.lang.startsWith(lang));
-  if(v) u.voice=v; u.onend=fine;
+  if(v) u.voice=v; u.onend=fine; u.rate = parseFloat(localStorage.getItem('concierge_voice_rate')||'1');
   speechSynthesis.cancel(); speechSynthesis.speak(u);
 }
 
@@ -1282,7 +1311,7 @@ async function voceGoogle(testo, lang, fine, mioId){
   try{
     const r = await fetch('https://texttospeech.googleapis.com/v1/text:synthesize?key='+key, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({input:{text:testo}, voice:{languageCode:voce.languageCode,name:voce.name}, audioConfig:{audioEncoding:'MP3'}})
+      body: JSON.stringify({input:{text:testo}, voice:{languageCode:voce.languageCode,name:voce.name}, audioConfig:{audioEncoding:'MP3', speakingRate: parseFloat(localStorage.getItem('concierge_voice_rate')||'1')}})
     });
     if(!r.ok){
       let det=''; try{ det = await r.text(); }catch(_){}
@@ -1555,6 +1584,9 @@ function apriSettings(){
   $('limite').value    = localStorage.getItem('concierge_limite')||'0';
   $('wake').checked    = localStorage.getItem('concierge_wake')==='1';
   $('demoDelay').value = localStorage.getItem('concierge_demo_delay')||'40';
+  $('langDef').value   = localStorage.getItem('concierge_lang_def')||'it-IT';
+  $('micSens').value   = localStorage.getItem('concierge_mic_sens')||'0.55';
+  $('voiceRate').value = localStorage.getItem('concierge_voice_rate')||'1';
   $('bgInterval').value = localStorage.getItem('concierge_bg_int')||'8';
   $('bgFx').value = localStorage.getItem('concierge_bg_fx')||'fade';
   renderMediaGrid();
@@ -1580,6 +1612,9 @@ function salvaSettings(){
   localStorage.setItem('concierge_limite', String(parseInt($('limite').value||'0',10)||0));
   localStorage.setItem('concierge_wake', $('wake').checked?'1':'');
   localStorage.setItem('concierge_demo_delay', String(parseInt($('demoDelay').value||'40',10)));
+  localStorage.setItem('concierge_lang_def', $('langDef').value);
+  localStorage.setItem('concierge_mic_sens', $('micSens').value);
+  localStorage.setItem('concierge_voice_rate', $('voiceRate').value);
   localStorage.setItem('concierge_bg_int', String(parseInt($('bgInterval').value||'8',10)||8));
   localStorage.setItem('concierge_bg_fx', $('bgFx').value);
   avviaSfondo();
@@ -1772,7 +1807,7 @@ applyBranding();
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>switchTab(b.dataset.t));
 buildDemoRing();
 document.querySelectorAll('#lingue span').forEach(s=> s.onclick=()=>setLinguaAscolto(s.dataset.l));
-setLinguaAscolto('it-IT');
+setLinguaAscolto(localStorage.getItem('concierge_lang_def')||'it-IT');
 costruisciRapide();
 avviaAttract();
 
