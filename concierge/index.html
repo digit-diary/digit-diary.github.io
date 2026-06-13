@@ -668,7 +668,7 @@
         <input type="file" id="fileImport" accept="image/*,video/*,application/pdf" multiple style="display:none" onchange="importaMedia(event)">
         <label class="btn-import" id="btnImport" for="fileImport"></label>
         <span class="btn-clear" id="btnClear" onclick="svuotaMedia()"></span>
-        <div class="hint">Immagini e video → sfondo a rotazione (foto e video insieme, in coda). PDF (menù, mappa) → apribili. Usa ↑↓ per l'ordine. Memoria del dispositivo (offline).</div>
+        <div class="hint">Immagini e video → sfondo a rotazione (foto e video insieme, in coda). PDF (menù, mappa) → apribili. Usa ↑↓ per l'ordine. Memoria del dispositivo (offline).<br><b>I media si salvano subito appena caricati</b> (non serve "Salva"). Per togliere un file usa il cestino 🗑.</div>
         <label>Durata di ogni foto in sfondo (secondi)</label>
         <input id="bgInterval" type="number" min="2" placeholder="8">
         <label>Effetto transizione (come girano le foto)</label>
@@ -1921,6 +1921,7 @@ function verificaPin(){
 function applyKiosk(){
   const on = localStorage.getItem('concierge_kiosk')==='1';
   if($('btnGear')) $('btnGear').style.display = on ? 'none' : '';
+  if($('btnFull')) $('btnFull').style.display = on ? 'none' : '';   // chiosco: schermo intero è automatico → via il pulsante per gli ospiti
   if(on && !document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(()=>{});
 }
 // Schermo intero automatico per il CLIENTE: in modalità chiosco, al primo tocco (e ai successivi
