@@ -149,6 +149,15 @@
   .lingue span{font-size:36px;opacity:.4;cursor:pointer;transition:.2s;padding:5px;border-radius:8px}
   .lingue span:hover{opacity:.8}
   .lingue span.attiva{opacity:1;background:rgba(232,213,163,.18)}
+  /* Testi personalizzati attorno al logo / bordi schermo */
+  .emblema-row{display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap}
+  .logo-extra{text-align:center;line-height:1.25;max-width:90vw;word-break:break-word}
+  .logo-extra.logo-side{max-width:32vw}
+  #logoTop{margin-bottom:6px}
+  #logoBot{margin-top:10px}
+  .screen-edge{position:fixed;left:50%;transform:translateX(-50%);z-index:30;width:auto;max-width:94vw;pointer-events:none}
+  .screen-top{top:14px}
+  .screen-bottom{bottom:70px}
 
   /* --- Bottoni domande rapide --- */
   .rapide{margin-top:26px;display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:760px;max-height:34vh;overflow-y:auto;padding:2px 4px}
@@ -434,6 +443,10 @@
     <span class="gear" id="btnGear" onclick="tentaSettings()" title="Impostazioni"></span>
   </div>
 
+  <!-- Testi personalizzati ai bordi schermo -->
+  <div class="logo-extra screen-edge screen-top" id="screenTop" style="display:none"></div>
+  <div class="logo-extra screen-edge screen-bottom" id="screenBottom" style="display:none"></div>
+
   <!-- Angolo segreto: tieni premuto 1,5s per l'accesso admin in modalità chiosco -->
   <div id="adminCorner" style="position:fixed;top:0;left:0;width:72px;height:72px;z-index:9998"></div>
 
@@ -508,6 +521,10 @@
     </div>
   </div>
 
+  <div class="logo-extra" id="logoTop" style="display:none"></div>
+
+  <div class="emblema-row">
+  <div class="logo-extra logo-side" id="logoLeft" style="display:none"></div>
   <div class="emblema-wrap" onclick="toggleHandsFree()" title="Tocca per parlare">
     <svg class="emblema" viewBox="0 0 200 200">
       <defs>
@@ -531,6 +548,10 @@
     </svg>
     <div class="emblema-custom" id="emblemaCustom"></div>
   </div>
+  <div class="logo-extra logo-side" id="logoRight" style="display:none"></div>
+  </div>
+
+  <div class="logo-extra" id="logoBot" style="display:none"></div>
 
   <div class="stato" id="stato">Tocca per parlare</div>
   <div class="domanda" id="domanda"></div>
@@ -673,6 +694,14 @@
         <label class="btn-import" id="btnLogo" for="logoFile"></label>
         <span class="btn-clear" id="btnLogoDel" onclick="rimuoviLogo()"></span>
         <div id="logoPreview" style="margin-top:10px"></div>
+
+        <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.1);padding-top:12px">
+          <h3 style="margin:0 0 6px">Testi personalizzati</h3>
+          <div class="hint">Aggiungi scritte attorno al logo (sopra, sotto, a fianco) o ai bordi dello schermo, con colore, dimensione e stile. Puoi metterne quante vuoi, in qualsiasi combinazione.</div>
+          <div id="textList"></div>
+          <span class="btn-import" style="margin-top:8px;display:inline-block" onclick="aggiungiTesto()">Aggiungi testo</span>
+        </div>
+
         <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.1);padding-top:12px">
           <h3 style="margin:0 0 6px">Esporta / Importa configurazione</h3>
           <div class="hint">Salva tutta la configurazione (nome, contenuti, bottoni, frasi, comportamento, chiavi) in un file, e importala su un altro schermo → cloni un totem in un secondo. <b>Nota:</b> i media (foto/video/piantine) non sono inclusi, vanno importati su ogni dispositivo.</div>
@@ -2187,7 +2216,7 @@ function apriSettings(){
   renderDatiFields();
   renderCustomBtnList(); chiudiFormBtn();
   $('brandName').value = localStorage.getItem('concierge_brand')||'';
-  renderLogoPreview();
+  renderLogoPreview(); renderTestiAdmin();
   $('modal').classList.add('open');
   const card = document.querySelector('#modal .card'); if(card) card.scrollTop = 0;   // apre sempre in cima
   $('modal').scrollTop = 0;
@@ -2518,14 +2547,50 @@ function importaLogo(e){
   r.readAsDataURL(f); e.target.value='';
 }
 function rimuoviLogo(){ localStorage.removeItem('concierge_logo'); applyBranding(); renderLogoPreview(); }
+
+/* --- Testi personalizzati attorno al logo / bordi schermo (colore, dimensione, stile) --- */
+const TXT_POS = {top:'logoTop', bottom:'logoBot', left:'logoLeft', right:'logoRight', 'screen-top':'screenTop', 'screen-bottom':'screenBottom'};
+const TXT_SIZE = {sm:'16px', md:'24px', lg:'36px', xl:'54px'};
+function getTesti(){ try{ return JSON.parse(localStorage.getItem('concierge_texts')||'[]'); }catch(_){ return []; } }
+function saveTesti(a){ localStorage.setItem('concierge_texts', JSON.stringify(a)); }
+function renderTesti(){
+  Object.values(TXT_POS).forEach(id=>{ const el=$(id); if(el){ el.innerHTML=''; el.style.display='none'; } });
+  getTesti().forEach(t=>{
+    const el=$(TXT_POS[t.pos||'top']); if(!el || !(t.text||'').trim()) return;
+    const d=document.createElement('div');
+    d.textContent = t.upper ? (t.text||'').toUpperCase() : (t.text||'');
+    d.style.cssText='color:'+(t.color||'#ffffff')+';font-size:'+(TXT_SIZE[t.size]||TXT_SIZE.md)+';font-weight:'+(t.bold?'700':'400')+';'+(t.italic?'font-style:italic;':'')+'margin:2px 0;text-shadow:0 1px 6px rgba(0,0,0,.5)';
+    el.appendChild(d); el.style.display='block';
+  });
+}
+function _updTesto(i,k,v){ const a=getTesti(); if(!a[i]) return; a[i][k]=v; saveTesti(a); renderTesti(); }
+function aggiungiTesto(){ const a=getTesti(); a.push({text:'',pos:'top',color:'#ffffff',size:'md',bold:false,italic:false,upper:false}); saveTesti(a); renderTestiAdmin(); }
+function rimuoviTesto(i){ const a=getTesti(); a.splice(i,1); saveTesti(a); renderTestiAdmin(); renderTesti(); }
+function _opts(list, val){ return list.map(o=>'<option value="'+o[0]+'"'+(val===o[0]?' selected':'')+'>'+o[1]+'</option>').join(''); }
+function renderTestiAdmin(){
+  const box=$('textList'); if(!box) return; const arr=getTesti(); box.innerHTML='';
+  arr.forEach((t,i)=>{
+    const row=document.createElement('div'); row.style.cssText='border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:10px;margin-top:8px';
+    const ti=document.createElement('input'); ti.type='text'; ti.value=t.text||''; ti.placeholder='Testo da mostrare'; ti.style.marginBottom='6px'; ti.oninput=()=>_updTesto(i,'text',ti.value);
+    const r2=document.createElement('div'); r2.style.cssText='display:flex;gap:8px;flex-wrap:wrap;align-items:center';
+    const ps=document.createElement('select'); ps.style.cssText='width:auto;flex:1;min-width:150px'; ps.innerHTML=_opts([['top','Sopra il logo'],['bottom','Sotto il logo'],['left','A sinistra del logo'],['right','A destra del logo'],['screen-top','Cima schermo'],['screen-bottom','Fondo schermo']], t.pos); ps.onchange=()=>_updTesto(i,'pos',ps.value);
+    const sz=document.createElement('select'); sz.style.cssText='width:auto'; sz.innerHTML=_opts([['sm','Piccolo'],['md','Medio'],['lg','Grande'],['xl','Molto grande']], t.size); sz.onchange=()=>_updTesto(i,'size',sz.value);
+    const co=document.createElement('input'); co.type='color'; co.value=t.color||'#ffffff'; co.style.cssText='width:42px;height:34px;padding:2px;flex:none'; co.oninput=()=>_updTesto(i,'color',co.value);
+    const mk=(lab,key)=>{ const l=document.createElement('label'); l.style.cssText='display:inline-flex;align-items:center;gap:4px;font-size:13px'; const c=document.createElement('input'); c.type='checkbox'; c.style.width='auto'; c.checked=!!t[key]; c.onchange=()=>_updTesto(i,key,c.checked); l.appendChild(c); l.appendChild(document.createTextNode(lab)); return l; };
+    const del=document.createElement('button'); del.type='button'; del.className='btn-clear'; del.textContent='Rimuovi'; del.style.color='#e88'; del.onclick=()=>rimuoviTesto(i);
+    r2.appendChild(ps); r2.appendChild(sz); r2.appendChild(co); r2.appendChild(mk('G','bold')); r2.appendChild(mk('C','italic')); r2.appendChild(mk('MAIUSC','upper')); r2.appendChild(del);
+    row.appendChild(ti); row.appendChild(r2); box.appendChild(row);
+  });
+}
 function resetVergine(){
   if(!confirm('Azzerare TUTTA la configurazione (logo, nome, contenuti, bottoni personalizzati)? L\'app tornerà vuota, pronta per una nuova azienda.')) return;
   const empty = {}; DATI_FIELDS.forEach(f=>empty[f.k]='');
   localStorage.setItem('concierge_dati_struct', JSON.stringify(empty));
   ['concierge_brand','concierge_logo','concierge_btn_custom','concierge_dati_extra','concierge_btn_hidden','concierge_btn_url','concierge_pin','concierge_kiosk','concierge_demo_frasi','concierge_feedback','concierge_feedback_on','concierge_feedback_comment','concierge_stats','concierge_standby_da','concierge_standby_a','concierge_langs','concierge_langs_off'].forEach(k=>localStorage.removeItem(k));
   for(let i=localStorage.length-1;i>=0;i--){ const k=localStorage.key(i); if(k&&k.indexOf('concierge_lang_')===0) localStorage.removeItem(k); }   // bundle traduzioni
+  localStorage.removeItem('concierge_texts');
   localStorage.setItem('concierge_vergine','1');   // niente stella casinò: emblema neutro finché non si carica un logo
-  mapClear(); aggiornaBtnMappa(); renderLingue();
+  mapClear(); aggiornaBtnMappa(); renderLingue(); renderTesti();
   applyKiosk();
   svuotaRisp();
   applyBranding(); renderDatiFields(); renderCustomBtnList(); costruisciRapide();
@@ -2702,6 +2767,7 @@ applyBranding();
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>switchTab(b.dataset.t));
 buildDemoRing();
 renderLingue();   // genera le bandiere (8 base + extra) e collega i click
+renderTesti();    // testi personalizzati attorno al logo / bordi schermo
 setLinguaAscolto(localStorage.getItem('concierge_lang_def')||'it-IT');
 costruisciRapide();
 avviaAttract();
