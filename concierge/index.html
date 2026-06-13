@@ -2828,7 +2828,9 @@ function attivaLicenza(){
 
 /* --- SINCRONIZZAZIONE config tra totem (Master invia / Ricevente riceve, automatico + bottone) --- */
 // Chiavi che NON si sincronizzano (restano locali al dispositivo per sicurezza)
-const SYNC_SKIP = ['concierge_groq_key','concierge_eleven','concierge_google','concierge_eleven_off','concierge_pin','concierge_kiosk','concierge_sync_group','concierge_sync_mode','concierge_sync_ver','concierge_license','concierge_license_ok','concierge_uso','concierge_uso_google','concierge_uso_eleven','concierge_resp','concierge_tts','concierge_stats','concierge_feedback'];
+// Restano LOCALI (non sincronizzati): chiavi API, PIN, licenza, contatori/cache, statistiche/feedback raccolti.
+// concierge_kiosk SI sincronizza (così la protezione chiosco arriva anche ai riceventi).
+const SYNC_SKIP = ['concierge_groq_key','concierge_eleven','concierge_google','concierge_eleven_off','concierge_pin','concierge_sync_group','concierge_sync_mode','concierge_sync_ver','concierge_license','concierge_license_ok','concierge_uso','concierge_uso_google','concierge_uso_eleven','concierge_resp','concierge_tts','concierge_stats','concierge_feedback'];
 function syncGruppo(){ return (localStorage.getItem('concierge_sync_group')||'').trim(); }
 function syncMode(){ return localStorage.getItem('concierge_sync_mode')||'off'; }
 function gatherSyncConfig(){ const o={}; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.indexOf('concierge_')===0 && SYNC_SKIP.indexOf(k)<0) o[k]=localStorage.getItem(k); } return o; }
@@ -2845,18 +2847,21 @@ function applyRemoteConfig(dati, ver){
   localStorage.setItem('concierge_sync_ver', String(ver));
   location.reload();
 }
-async function syncPull(force){
+async function syncPull(force, withFeedback){
   const g=syncGruppo(); if(!g) return;
   try{ const r=await fetch(SBC_URL+'/rest/v1/rpc/concierge_config_get',{method:'POST',headers:_sbcH(),body:JSON.stringify({p_gruppo:g})});
-    if(!r.ok) return; const d=await r.json();
+    if(!r.ok){ if(withFeedback) alert('Errore di rete durante la sincronizzazione.'); return; }
+    const d=await r.json();
     const remoteVer=(d&&d.ver)||0; const localVer=parseInt(localStorage.getItem('concierge_sync_ver')||'0',10);
-    if(remoteVer>0 && (force || remoteVer!==localVer) && d.dati) applyRemoteConfig(d.dati, remoteVer);
-  }catch(_){}
+    if(remoteVer===0){ if(withFeedback) alert('Nessuna configurazione pubblicata per il gruppo "'+g+'".\n\nVai sul totem MASTER (stesso nome gruppo), scegli "Master", Salva, e premi "Sincronizza ora" per pubblicare. Poi torna qui.'); return; }
+    if(remoteVer>0 && (force || remoteVer!==localVer) && d.dati){ applyRemoteConfig(d.dati, remoteVer); return; }   // applica + ricarica
+    if(withFeedback) alert('Già allineato all\'ultima versione pubblicata.');
+  }catch(_){ if(withFeedback) alert('Sincronizzazione non riuscita (rete).'); }
 }
 function sincronizzaOra(){
-  const m=syncMode(); if(m==='off' || !syncGruppo()){ alert('Imposta un nome gruppo e scegli Master o Ricevente, poi Salva.'); return; }
-  if(m==='master'){ syncPush().then(ok=>alert(ok?'Configurazione PUBBLICATA. Ora premi "Sincronizza ora" sui totem Riceventi che vuoi aggiornare.':'Invio non riuscito.')); }
-  else { if(confirm('Scaricare e applicare la configurazione del Master su QUESTO totem? La pagina si ricaricherà.')) syncPull(true); }
+  const m=syncMode(); if(m==='off' || !syncGruppo()){ alert('Imposta un nome gruppo e scegli Master o Ricevente, poi premi Salva. Poi riprova.'); return; }
+  if(m==='master'){ syncPush().then(ok=>alert(ok?'Configurazione PUBBLICATA sul gruppo "'+syncGruppo()+'".\n\nOra su ogni totem RICEVENTE (stesso gruppo) premi "Sincronizza ora" per scaricarla.':'Invio non riuscito (rete).')); }
+  else { if(confirm('Scaricare e applicare la configurazione del Master su QUESTO totem? La pagina si ricaricherà.')) syncPull(true, true); }
 }
 
 function renderLogoPreview(){
