@@ -868,22 +868,31 @@
    Nessun audio registrato. Nessun dato personale memorizzato. Il cloud
    contiene solo un numero (caratteri consumati/mese). Media in locale.
 
-   INDICE DEL CODICE
-   -----------------
-   [HTML]  struttura pagina + pannello impostazioni (sopra questo <script>)
+   INDICE DEL CODICE (sezioni marcate con  /* ===== SEZIONE N ... ===== */ )
+   ----------------------------------------------------------------------------
+   [HTML]  struttura pagina + pannello impostazioni a TAB (sopra questo <script>)
    [CSS]   stili + responsive mobile/tablet/PC/TV/4K (nell'<head>)
-   [JS] 1.  CONFIGURAZIONE      → dati casinò, bottoni, testi, icone
-        2.  ASCOLTO             → microfono (riconoscimento vocale)
-        3.  CERVELLO (AI)       → chiamata a Groq, lingua, memoria
-        4.  CONTATORE CONDIVISO → Supabase (consumo voce tra schermi)
-        5.  VOCE (TTS)          → cascata ElevenLabs→Google→Browser + cache
-        6.  UI                  → bottoni rapidi, schermo d'attesa, kiosk
+   [JS] 1.  CONFIGURAZIONE      → DATI_FIELDS, RAPIDE, BTN_DATI, UI, ICON, bottoni custom
+        2.  ASCOLTO             → microfono (riconoscimento vocale, parola attivazione)
+        3.  CERVELLO (AI)       → chiamata a Groq, lingua, memoria, cache risposte
+        4.  CONTATORE+CACHE     → Supabase: contatore voce + CACHE CONDIVISA testo/audio
+                                  (la 1ª domanda paga, gli altri schermi riusano)
+        5.  VOCE (TTS)          → cascata ElevenLabs→Google→Browser, cache IndexedDB+cloud
+        6.  UI                  → bottoni rapidi, costruisciRapide
         7.  QR                  → codici verso il sito ufficiale
         8.  TRADUTTORE          → riconosci + traduci + pronuncia
-        9.  DEMO                → attract-mode animato dopo inattività
-       10.  IMPOSTAZIONI        → lettura/scrittura configurazione (⚙️)
-       11.  MOTORE MEDIA        → import foto/video/PDF, sfondo a rotazione
-       12.  AVVIO               → inizializzazione all'apertura
+        9.  DEMO                → attract-mode animato (icone reali, frasi, anteprima)
+       10.  IMPOSTAZIONI        → apriSettings/salvaSettings, tab, PIN+CHIOSCO, branding,
+                                  cache stats, e — marcate con /* --- ... --- */ —
+                                  ESPORTA/IMPORTA config, STATISTICHE, STANDBY orari,
+                                  VALUTAZIONE (faccine+commento), LICENZA
+       11.  MOTORE MEDIA        → import foto/video/PDF, sfondo a rotazione (effetti)
+       11b. MAPPA DEI PIANI     → import piantine (img/PDF) + viewer zoomabile
+       12.  AVVIO               → inizializzazione, gateLicenza, sblocco audio iOS
+
+   CHIAVI localStorage principali: concierge_* (config per-dispositivo) ·
+   IndexedDB: concierge_media, concierge_tts, concierge_mappe ·
+   Supabase: SBC_URL/SBC_KEY (anon) → RPC concierge_get_uso/add_uso/cache_get/cache_set/check_license
    ============================================================================== */
 
 const $ = id => document.getElementById(id);
