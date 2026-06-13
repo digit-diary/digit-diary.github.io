@@ -2320,7 +2320,6 @@ function chiudiMappa(){ $('mapOverlay').style.display='none'; try{ $('mapFrame')
 caricaTtsCache(); caricaRisp();                                  // riusa risposte/audio già salvati (zero chiamate)
 applyKiosk();                                                    // se chiosco attivo: nasconde ⚙️ + schermo intero
 applyStandby(); setInterval(applyStandby, 30000);               // standby fuori orario
-renderFeedback();                                               // faccine soddisfazione
 caricaUsoCondiviso(); setInterval(caricaUsoCondiviso, 120000);   // contatore condiviso tra schermi
 avviaSfondo();                                                    // sfondo media (se presente)
 $('btnFull').innerHTML = ICON.full;
