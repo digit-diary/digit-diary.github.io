@@ -865,7 +865,7 @@ function renderCustomBtnList(){
     const nm = document.createElement('div'); nm.className='nm'; nm.textContent = b.label||'(senza nome)';
     const ctrl = document.createElement('div'); ctrl.className='ctrl';
     ctrl.appendChild(_mkBtn(ICON.edit, ()=>apriFormBtn(b.id)));
-    ctrl.appendChild(_mkBtn(ICON.trash, ()=>{ saveCustomBtns(getCustomBtns().filter(x=>x.id!==b.id)); rispCache.clear(); renderCustomBtnList(); costruisciRapide(); }, 'x'));
+    ctrl.appendChild(_mkBtn(ICON.trash, ()=>{ saveCustomBtns(getCustomBtns().filter(x=>x.id!==b.id)); svuotaRisp(); renderCustomBtnList(); costruisciRapide(); }, 'x'));
     row.appendChild(ci); row.appendChild(nm); row.appendChild(ctrl); box.appendChild(row);
   });
 }
@@ -896,7 +896,7 @@ function salvaBtn(){
   const data = { id: btnEditId || ('c'+Date.now()), ic: btnPickIc, label, descrizione: $('btnDesc').value.trim(), url: $('btnUrl').value.trim(), soloLink: $('btnSoloLink').checked };
   const i = arr.findIndex(x=>x.id===data.id);
   if(i>=0) arr[i]=data; else arr.push(data);
-  saveCustomBtns(arr); rispCache.clear();
+  saveCustomBtns(arr); svuotaRisp();
   chiudiFormBtn(); renderCustomBtnList(); costruisciRapide();
 }
 // Genera i campi (un argomento per riga) nel pannello impostazioni
@@ -1254,6 +1254,63 @@ function aggiungiUsoCondiviso(motore, chars){
 function usoGoogleTot(){ return Math.max(usoCondiviso.mese===_mese()?usoCondiviso.google:0, usoMese('google')); }
 function usoElevenTot(){ return Math.max(usoCondiviso.mese===_mese()?usoCondiviso.eleven:0, usoMese('eleven')); }
 
+/* ===== CACHE CONDIVISA (la PRIMA chiamata paga, poi tutti gli schermi riusano da Supabase) =====
+   PRIVACY: si salvano SOLO le risposte dei BOTTONI (testo della macchina + audio TTS della macchina).
+   La voce dell'ospite e le conversazioni libere NON vengono MAI salvate, né in locale né in cloud. */
+function _hash(s){ let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))>>>0; return h.toString(36); }
+function dataURLtoBlob(d){ return fetch(d).then(r=>r.blob()); }
+
+// --- Testo risposte bottoni (tabella concierge_cache) ---
+async function cacheGetRemote(ck){
+  try{ const r = await fetch(SBC_URL+'/rest/v1/rpc/concierge_cache_get', {method:'POST', headers:_sbcH(), body:JSON.stringify({p_ck:ck})});
+    if(r.ok){ const d = await r.json(); if(d && d.text) return {text:d.text, lang:d.lang||'it', indicazione:d.indicazione||''}; } }catch(_){}
+  return null;
+}
+function cacheSetRemote(ck, text, lang, ind){
+  try{ fetch(SBC_URL+'/rest/v1/rpc/concierge_cache_set', {method:'POST', headers:_sbcH(), body:JSON.stringify({p_ck:ck, p_text:text, p_lang:lang, p_ind:ind||''})}); }catch(_){}
+}
+
+// --- Audio TTS condiviso (bucket 'tts') ---
+function ttsRemoteUrl(name){ return SBC_URL+'/storage/v1/object/public/tts/'+name; }
+function ttsRemoteUpload(name, blob){
+  try{ fetch(SBC_URL+'/storage/v1/object/tts/'+name, {method:'POST', headers:{apikey:SBC_KEY, Authorization:'Bearer '+SBC_KEY, 'Content-Type':'audio/mpeg', 'x-upsert':'true'}, body:blob}); }catch(_){}
+}
+
+// --- Audio durevole sul dispositivo (IndexedDB: grande e permanente) ---
+let _ttsDB = null;
+function ttsDB(){ return new Promise((res,rej)=>{ if(_ttsDB) return res(_ttsDB);
+  const rq = indexedDB.open('concierge_tts', 1);
+  rq.onupgradeneeded = e => { const db=e.target.result; if(!db.objectStoreNames.contains('aud')) db.createObjectStore('aud',{keyPath:'k'}); };
+  rq.onsuccess = e => { _ttsDB=e.target.result; res(_ttsDB); };
+  rq.onerror = e => rej(e); }); }
+function ttsDbGet(k){ return ttsDB().then(db=>new Promise(res=>{ const tx=db.transaction('aud','readonly'); const r=tx.objectStore('aud').get(k); r.onsuccess=()=>res(r.result?r.result.url:null); r.onerror=()=>res(null); })).catch(()=>null); }
+function ttsDbPut(k,url){ return ttsDB().then(db=>new Promise(res=>{ const tx=db.transaction('aud','readwrite'); tx.objectStore('aud').put({k,url}); tx.oncomplete=res; tx.onerror=res; })).catch(()=>{}); }
+
+// Cerca un audio già pronto: memoria → dispositivo → (se condivisibile) cloud condiviso
+async function ttsLookup(motore, lang, testo, share){
+  const ck = ttsKey(motore, lang, testo);
+  if(ttsCache.has(ck)) return ttsCache.get(ck);
+  if(!share) return null;                                   // conversazioni libere: solo memoria, niente disco/cloud
+  const dev = await ttsDbGet(ck);
+  if(dev){ ttsCache.set(ck, dev); return dev; }
+  const name = motore+'_'+lang+'_'+_hash(testo)+'.mp3';
+  try{ const r = await fetch(ttsRemoteUrl(name)); if(r.ok){ const url = await blobToDataURL(await r.blob()); ttsCache.set(ck,url); ttsDbPut(ck,url); return url; } }catch(_){}
+  return null;
+}
+// Salva un audio appena sintetizzato: memoria sempre; disco+cloud SOLO se condivisibile (bottoni)
+function ttsStore(motore, lang, testo, url, share){
+  ttsCache.set(ttsKey(motore,lang,testo), url);
+  if(!share) return;
+  ttsDbPut(ttsKey(motore,lang,testo), url);
+  const name = motore+'_'+lang+'_'+_hash(testo)+'.mp3';
+  dataURLtoBlob(url).then(b=>ttsRemoteUpload(name, b)).catch(()=>{});
+}
+
+// Persistenza locale delle risposte testuali dei bottoni (così non si richiama l'AI a ogni riavvio)
+function salvaRisp(){ try{ const o={}; let n=0; rispCache.forEach((v,k)=>{ if(n++<300) o[k]=v; }); localStorage.setItem('concierge_resp', JSON.stringify(o)); }catch(_){} }
+function caricaRisp(){ try{ const o=JSON.parse(localStorage.getItem('concierge_resp')||'{}'); for(const k in o) rispCache.set(k,o[k]); }catch(_){} }
+function svuotaRisp(){ rispCache.clear(); try{ localStorage.removeItem('concierge_resp'); }catch(_){} }
+
 // Sceglie il motore in modalità automatica: ElevenLabs → Google → fallback
 function scegliMotore(){
   const hasE = !!localStorage.getItem('concierge_eleven');
@@ -1261,8 +1318,9 @@ function scegliMotore(){
   const limE = parseInt(localStorage.getItem('concierge_lim_eleven')||'10000', 10);
   const limG = parseInt(localStorage.getItem('concierge_lim_google')||'1000000', 10);
   const elevenOff = localStorage.getItem('concierge_eleven_off')==='1';
-  if(hasE && !elevenOff && usoElevenTot() < limE) return 'eleven';
-  if(hasG && usoGoogleTot() < limG) return 'google';
+  const SAFE = 0.95;   // margine di sicurezza: ripiega sul gratis al 95% del limite, MAI a ridosso della soglia a pagamento
+  if(hasE && !elevenOff && usoElevenTot() < Math.floor(limE*SAFE)) return 'eleven';
+  if(hasG && usoGoogleTot() < Math.floor(limG*SAFE)) return 'google';
   return localStorage.getItem('concierge_fallback') || 'browser';   // 'browser' o 'testo'
 }
 
@@ -1292,6 +1350,13 @@ async function chiediAllAI(domanda, opts){
 
   // i bottoni (noContext) NON usano la memoria → risposta deterministica e cache-abile
   const ctx = opts.noContext ? [] : cronologia.slice(-6);
+  // CACHE CONDIVISA: per i bottoni, prima di chiamare l'AI controlla se un altro schermo
+  // ha già la risposta su Supabase → nessuna chiamata Groq (risparmio su tutti gli schermi).
+  if(opts.cacheKey){
+    const rem = await cacheGetRemote(opts.cacheKey);
+    if(mioId !== richiestaId) return;
+    if(rem){ rispCache.set(opts.cacheKey, rem); salvaRisp(); rispondi(rem.text, rem.lang, rem.indicazione, mioId, true); return; }
+  }
   const lreq = {it:'',de:'[Antworte auf Deutsch] ',en:'[Reply in English] ',fr:'[Réponds en français] ',es:'[Responde en español] ',ru:'[Ответь на русском] ',zh:'[用中文回答] ',ar:'[أجب بالعربية] '}[uiLang()] || '';
   const messaggi = [{role:'system',content:buildSystemPrompt()}, ...ctx, {role:'user',content: lreq + domanda}];
   try{
@@ -1314,8 +1379,11 @@ async function chiediAllAI(domanda, opts){
     const valid = ['it','de','en','fr','es','ru','zh','ar'];
     const text = out.text||'Mi scusi, non ho capito.', lang = valid.includes(out.lang)?out.lang:uiLang(), ind = out.indicazione||'';
     if(!opts.noContext) cronologia.push({role:'user',content:domanda}, {role:'assistant',content:text});
-    if(opts.cacheKey) rispCache.set(opts.cacheKey, {text, lang, indicazione:ind});   // salva per riuso
-    rispondi(text, lang, ind, mioId);
+    if(opts.cacheKey){                                  // bottone → salva locale + condiviso (tutte le lingue)
+      rispCache.set(opts.cacheKey, {text, lang, indicazione:ind}); salvaRisp();
+      cacheSetRemote(opts.cacheKey, text, lang, ind);
+    }
+    rispondi(text, lang, ind, mioId, !!opts.cacheKey);   // share=true SOLO per i bottoni (mai conversazioni libere)
   }catch(err){
     if(err.name==='AbortError') return;           // interrotta apposta da un nuovo comando
     $('risposta').textContent='Errore di connessione all\'AI. Controlla la chiave in ⚙️.';
@@ -1324,7 +1392,7 @@ async function chiediAllAI(domanda, opts){
 }
 
 /* ===== SEZIONE 5 · VOCE (TTS a cascata ElevenLabs->Google->Browser + cache) ===== */
-function rispondi(testo, lang, indicazione, mioId){
+function rispondi(testo, lang, indicazione, mioId, share){
   $('risposta').textContent = testo;
   $('indicazione').innerHTML = indicazione ? ICON.nav + '<span>' + indicazione + '</span>' : '';
   const fine = () => { if(mioId===richiestaId) riprendiAscolto(); };
@@ -1345,8 +1413,8 @@ function rispondi(testo, lang, indicazione, mioId){
   }
   const etichetta = {it:'Parlo',de:'Spreche',en:'Speaking',fr:'Je parle'}[lang]||'Parlo';
   setStato('speaking', etichetta);
-  if(motore==='eleven')      vocePremiumEleven(testo, lang, fine, mioId);
-  else if(motore==='google') voceGoogle(testo, lang, fine, mioId);
+  if(motore==='eleven')      vocePremiumEleven(testo, lang, fine, mioId, share);
+  else if(motore==='google') voceGoogle(testo, lang, fine, mioId, share);
   else                       voceBrowser(testo, lang, fine);
 }
 
@@ -1376,9 +1444,10 @@ function caricaTtsCache(){
   try{ const o = JSON.parse(localStorage.getItem('concierge_tts')||'{}'); for(const k in o) ttsCache.set(k, o[k]); }catch(_){}
 }
 
-async function vocePremiumEleven(testo, lang, fine, mioId){
-  const ck = ttsKey('eleven', lang, testo);
-  if(ttsCache.has(ck)){ suonaCache(ttsCache.get(ck), fine); return; }   // riuso: nessuna chiamata
+async function vocePremiumEleven(testo, lang, fine, mioId, share){
+  const cached = await ttsLookup('eleven', lang, testo, share);   // memoria → dispositivo → cloud condiviso
+  if(mioId!==richiestaId) return;
+  if(cached){ suonaCache(cached, fine); return; }                 // riuso: nessuna chiamata, nessun carattere speso
   const key = localStorage.getItem('concierge_eleven');
   if(!key){ $('risposta').textContent='Manca la chiave ElevenLabs (⚙️).'; fine(); return; }
   const voiceId = 'EXAVITQu4vr4xnSDxMaL'; // "Sarah"
@@ -1391,7 +1460,7 @@ async function vocePremiumEleven(testo, lang, fine, mioId){
       let det=''; try{ det = await r.text(); }catch(_){}
       // Free Tier disabilitato / chiave non valida → disattiva ElevenLabs per non riprovare inutilmente
       if(r.status===401 || r.status===403 || /unusual_activity|disabled/i.test(det)) localStorage.setItem('concierge_eleven_off','1');
-      if(localStorage.getItem('concierge_google')){ voceGoogle(testo, lang, fine, mioId); return; }   // fallback automatico a Google
+      if(localStorage.getItem('concierge_google')){ voceGoogle(testo, lang, fine, mioId, share); return; }   // fallback automatico a Google
       if((localStorage.getItem('concierge_motore')||'')==='auto'){ voceBrowser(testo, lang, fine); return; }   // ultimo fallback: browser
       const msg = (r.status===401||r.status===403) ? 'Free Tier disabilitato o chiave non valida' : r.status===429 ? 'credito esaurito' : 'errore '+r.status;
       $('risposta').textContent = 'ElevenLabs: '+msg+' (imposta Google in ⚙️).';
@@ -1400,17 +1469,18 @@ async function vocePremiumEleven(testo, lang, fine, mioId){
     const url = await blobToDataURL(await r.blob());
     if(mioId!==richiestaId) return;            // interrotta da un nuovo comando
     contaCaratteri(testo.length); contaMese('eleven', testo.length); aggiungiUsoCondiviso('eleven', testo.length);   // conta solo le chiamate REALI
-    salvaCache(ck, url);
+    ttsStore('eleven', lang, testo, url, share);   // bottoni → disco+cloud condiviso; conversazioni → solo memoria
     suonaCache(url, fine);
   }catch(e){
-    if(localStorage.getItem('concierge_google')){ voceGoogle(testo, lang, fine, mioId); return; }   // fallback a Google
+    if(localStorage.getItem('concierge_google')){ voceGoogle(testo, lang, fine, mioId, share); return; }   // fallback a Google
     $('risposta').textContent='ElevenLabs non raggiungibile.'; console.error(e); fine();
   }
 }
 
-async function voceGoogle(testo, lang, fine, mioId){
-  const ck = ttsKey('google', lang, testo);
-  if(ttsCache.has(ck)){ suonaCache(ttsCache.get(ck), fine); return; }   // riuso: nessuna chiamata
+async function voceGoogle(testo, lang, fine, mioId, share){
+  const cached = await ttsLookup('google', lang, testo, share);   // memoria → dispositivo → cloud condiviso
+  if(mioId!==richiestaId) return;
+  if(cached){ suonaCache(cached, fine); return; }                 // riuso: nessuna chiamata, nessun carattere speso
   const key = localStorage.getItem('concierge_google');
   if(!key){ $('risposta').textContent='Manca la chiave Google TTS (⚙️).'; fine(); return; }
   const vmap = {
@@ -1436,7 +1506,7 @@ async function voceGoogle(testo, lang, fine, mioId){
     if(mioId!==richiestaId) return;            // interrotta da un nuovo comando
     const url = 'data:audio/mp3;base64,'+data.audioContent;
     contaCaratteri(testo.length); contaMese('google', testo.length); aggiungiUsoCondiviso('google', testo.length);   // conta solo le chiamate REALI
-    salvaCache(ck, url);
+    ttsStore('google', lang, testo, url, share);   // bottoni → disco+cloud condiviso; conversazioni → solo memoria
     suonaCache(url, fine);
   }catch(e){
     console.error(e);
@@ -1460,11 +1530,13 @@ function domandaRapida(i){
   const q = r.q[uiLang()] || r.q.it;    // lingue extra: domanda in italiano, l'AI risponde nella lingua scelta
   $('domanda').textContent = '“'+q+'”';
   if(r.url) mostraQR(r.url, false);     // es. Ristorante: risposta vocale + QR per il menù
-  const ck = uiLang()+'|'+r.ic+'|'+(r.l.it||'');   // chiave cache: bottone + lingua (unica anche per i personalizzati)
+  // chiave cache: bottone + lingua + impronta dei contenuti (se cambi i dati la risposta si rigenera;
+  // schermi con configurazione identica condividono, con config diversa NON si mischiano)
+  const ck = uiLang()+'|'+r.ic+'|'+(r.l.it||'')+'|'+_hash(datiCasino());
   if(rispCache.has(ck)){                // già chiesto → riusa risposta+audio, NESSUNA chiamata AI
     resetInattivita(); fermaTutto(); occupato = true;
     const c = rispCache.get(ck);
-    rispondi(c.text, c.lang, c.indicazione, ++richiestaId);
+    rispondi(c.text, c.lang, c.indicazione, ++richiestaId, true);
     return;
   }
   chiediAllAI(q, {cacheKey:ck, noContext:true});
@@ -1742,7 +1814,7 @@ function salvaSettings(){
   localStorage.setItem('concierge_dati_extra', JSON.stringify(extra));
   localStorage.setItem('concierge_brand', $('brandName').value.trim());
   applyBranding();
-  rispCache.clear();                 // i dati possono essere cambiati → invalida le risposte salvate
+  svuotaRisp();                 // i dati possono essere cambiati → invalida le risposte salvate
   $('errModal').textContent='';
   $('modal').classList.remove('open');
   $('risposta').textContent='Pronto! Tocca un argomento o "Attiva ascolto".';
@@ -1875,7 +1947,7 @@ function mostraSfondo(items, gen){
 }
 
 /* ===== SEZIONE 12 · AVVIO (inizializzazione all'apertura) ===== */
-caricaTtsCache();
+caricaTtsCache(); caricaRisp();                                  // riusa risposte/audio già salvati (zero chiamate)
 caricaUsoCondiviso(); setInterval(caricaUsoCondiviso, 120000);   // contatore condiviso tra schermi
 avviaSfondo();                                                    // sfondo media (se presente)
 $('btnFull').innerHTML = ICON.full;
@@ -1920,7 +1992,7 @@ function resetVergine(){
   const empty = {}; DATI_FIELDS.forEach(f=>empty[f.k]='');
   localStorage.setItem('concierge_dati_struct', JSON.stringify(empty));
   ['concierge_brand','concierge_logo','concierge_btn_custom','concierge_dati_extra','concierge_btn_hidden'].forEach(k=>localStorage.removeItem(k));
-  rispCache.clear();
+  svuotaRisp();
   applyBranding(); renderDatiFields(); renderCustomBtnList(); costruisciRapide();
   $('errModal').textContent='Configurazione azzerata. Inserisci i dati della nuova azienda.';
 }
