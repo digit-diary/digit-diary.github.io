@@ -84,6 +84,15 @@
   .tools{position:fixed;top:18px;right:20px;display:flex;gap:14px}
   .tools span{font-size:21px;opacity:.35;cursor:pointer;transition:.2s}
   .tools span:hover{opacity:.9}
+  /* Valutazione soddisfazione */
+  .fbk{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:14px;background:rgba(20,18,28,.55);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(6px);padding:8px 18px;border-radius:40px}
+  .fbk-q{font-size:14px;color:#cfcfd6;opacity:.85}
+  .fbk-face{background:none;border:none;cursor:pointer;padding:2px;color:#cdb98a;opacity:.7;transition:.18s;display:flex}
+  .fbk-face svg{width:30px;height:30px}
+  .fbk-face:hover{opacity:1;transform:scale(1.18)}
+  .fbk-face[data-r="sad"]:hover{color:#e08a8a}
+  .fbk-face[data-r="ok"]:hover{color:#e8d5a3}
+  .fbk-face[data-r="hap"]:hover{color:#7ddca0}
   .tools span.trad{transform:scale(1.22);opacity:.5}            /* traduttore leggermente più grande e visibile */
   .tools span.trad:hover{transform:scale(1.22);opacity:.95}
   .gear:hover{transform:rotate(45deg)}
@@ -428,6 +437,28 @@
   <!-- Angolo segreto: tieni premuto 1,5s per l'accesso admin in modalità chiosco -->
   <div id="adminCorner" style="position:fixed;top:0;left:0;width:72px;height:72px;z-index:9998"></div>
 
+  <!-- Valutazione soddisfazione (faccine) -->
+  <div id="feedbackBar" class="fbk"></div>
+
+  <!-- Commento opzionale (visibile solo all'admin) -->
+  <div id="fbkModal" style="position:fixed;inset:0;background:rgba(8,5,12,.8);display:none;z-index:95;align-items:center;justify-content:center">
+    <div style="background:#1a1320;border:1px solid var(--oro);border-radius:16px;padding:24px;width:340px;max-width:90vw;text-align:center">
+      <div id="fbkThx" style="font-size:17px;color:var(--oro);margin-bottom:6px">Grazie!</div>
+      <div style="font-size:13px;opacity:.7;margin-bottom:12px" id="fbkSub">Vuoi lasciare un commento? (facoltativo)</div>
+      <textarea id="fbkComment" rows="3" placeholder="Scrivi qui…" style="width:100%;min-height:60px"></textarea>
+      <div style="display:flex;gap:10px;margin-top:12px">
+        <button onclick="inviaCommento(true)" style="flex:1;padding:11px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:transparent;color:#fff;cursor:pointer">Salta</button>
+        <button onclick="inviaCommento(false)" style="flex:1;padding:11px;border-radius:10px;border:none;background:var(--oro);color:#1a1320;font-weight:600;cursor:pointer">Invia</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Standby fuori orario (schermo scuro) -->
+  <div id="standby" onclick="wakeStandby()" style="position:fixed;inset:0;background:#04040a;display:none;z-index:90;align-items:center;justify-content:center;flex-direction:column;cursor:pointer">
+    <div style="width:14px;height:14px;border-radius:50%;background:#e8d5a3;opacity:.25;animation:breathe 4s ease-in-out infinite"></div>
+    <div style="margin-top:18px;font-size:13px;color:#555">Tocca per attivare</div>
+  </div>
+
   <!-- Visore Mappa dei piani -->
   <div id="mapOverlay" style="position:fixed;inset:0;background:rgba(8,5,12,.97);display:none;z-index:80;flex-direction:column">
     <div style="display:flex;align-items:center;gap:10px;padding:14px 18px">
@@ -629,6 +660,15 @@
         <span class="btn-clear" id="btnLogoDel" onclick="rimuoviLogo()"></span>
         <div id="logoPreview" style="margin-top:10px"></div>
         <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.1);padding-top:12px">
+          <h3 style="margin:0 0 6px">Esporta / Importa configurazione</h3>
+          <div class="hint">Salva tutta la configurazione (nome, contenuti, bottoni, frasi, comportamento, chiavi) in un file, e importala su un altro schermo → cloni un totem in un secondo. <b>Nota:</b> i media (foto/video/piantine) non sono inclusi, vanno importati su ogni dispositivo.</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+            <span class="btn-import" onclick="esportaConfig()">Esporta configurazione</span>
+            <input type="file" id="fileConfig" accept="application/json,.json" style="display:none" onchange="importaConfig(event)">
+            <label class="btn-import" for="fileConfig" style="background:rgba(232,213,163,.14)">Importa configurazione</label>
+          </div>
+        </div>
+        <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.1);padding-top:12px">
           <div class="hint">Per presentare il sistema a un'altra azienda: azzera TUTTA la configurazione (logo, nome, contenuti, bottoni) e riparti da vuoto.</div>
           <span class="btn-clear" onclick="resetVergine()">Azzera tutto — modalità vergine</span>
         </div>
@@ -710,6 +750,7 @@
         <label>Frasi d'esempio della demo <span style="opacity:.5">(una per riga)</span></label>
         <textarea id="demoFrasi" rows="3" placeholder="Es.&#10;Dov'è il ristorante?&#10;A che ora aprite?&#10;Come si gioca alle slot?"></textarea>
         <div class="hint">Le frasi che ruotano sotto il cerchio. <b>Vuoto</b> = quelle multilingue di default (consigliato per il casinò). Per altre aziende, scrivi le tue.</div>
+        <span class="btn-clear" style="margin-top:8px;display:inline-block" onclick="anteprimaDemo()">▶ Anteprima schermata d'attesa</span>
 
         <label>Lingua predefinita all'avvio</label>
         <select id="langDef">
@@ -746,6 +787,25 @@
         <label>PIN amministratore (4–8 cifre)</label>
         <input id="pinSet" type="text" inputmode="numeric" maxlength="8" placeholder="Vuoto = non cambiare · scrivi OFF per rimuovere" autocomplete="off">
         <div class="hint">Protegge le impostazioni. Senza PIN l'accesso è libero. Imposta un PIN <b>prima</b> di attivare il chiosco.</div>
+
+        <h3 style="margin-top:22px">Standby fuori orario</h3>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end">
+          <div><label>Dalle</label><input id="standbyDa" type="time" style="width:auto"></div>
+          <div><label>Alle</label><input id="standbyA" type="time" style="width:auto"></div>
+        </div>
+        <div class="hint">Lo schermo va in <b>standby scuro</b> in questo intervallo (orario di chiusura, es. 05:00 → 11:00). Vuoto = sempre acceso. Un tocco lo riattiva per un minuto.</div>
+
+        <h3 style="margin-top:22px">Statistiche d'uso</h3>
+        <div class="hint" id="statsBox" style="line-height:1.6">—</div>
+        <span class="btn-clear" style="margin-top:8px;display:inline-block" onclick="resetStats()">Azzera statistiche</span>
+        <div class="hint">Solo numeri (interazioni e bottoni più usati). Nessun dato personale.</div>
+
+        <h3 style="margin-top:22px">Valutazione soddisfazione</h3>
+        <label><input type="checkbox" id="feedbackOn" style="width:auto;margin-right:8px"> Mostra le faccine di valutazione agli ospiti</label>
+        <label><input type="checkbox" id="feedbackComment" style="width:auto;margin-right:8px"> Permetti il commento facoltativo (altrimenti solo faccine)</label>
+        <div class="hint">Tre faccine (felicissimo / felice / non felice) in basso. Se il commento è attivo, l'ospite può lasciarne uno <b>facoltativo</b> che <b>solo tu (admin) vedi qui sotto</b>.</div>
+        <div class="hint" id="fbkAdmin" style="line-height:1.7;margin-top:8px">—</div>
+        <span class="btn-clear" style="margin-top:8px;display:inline-block" onclick="resetFeedback()">Azzera valutazioni e commenti</span>
 
         <h3 style="margin-top:22px">Manutenzione</h3>
         <div class="hint" id="cacheStats" style="line-height:1.6">Calcolo spazio…</div>
@@ -1431,6 +1491,7 @@ function fermaTutto(){
 
 async function chiediAllAI(domanda, opts){
   opts = opts || {};
+  if(!opts.cacheKey) statAdd(null);               // conversazione libera (i bottoni sono già contati)
   resetInattivita();                              // ogni domanda riavvia il timer totem
   fermaAscoltoTemp();                             // chiude la finestra di ascolto temporanea
   const mioId = ++richiestaId;
@@ -1657,10 +1718,12 @@ async function voceGoogle(testo, lang, fine, mioId, share){
 function costruisciRapide(){
   const lng = uiLang();
   $('rapide').innerHTML = getBottoni().map((r,i)=>`<button onclick="domandaRapida(${i})">${ICON[r.ic]||ICON.info}<span>${r.l[lng]||r.l.en||r.l.it}</span></button>`).join('');
+  renderFeedback();   // aggiorna anche le faccine nella lingua corrente
 }
 function domandaRapida(i){
   const r = getBottoni()[i];
   if(!r) return;
+  statAdd(r.ic);                        // statistica d'uso
   if(r.soloLink){                       // Eventi / Gioco responsabile: solo QR + invito vocale
     mostraQR(r.url, true);
     return;
@@ -1868,12 +1931,14 @@ function mostraDemo(){
   demoRotate();                                  // imposta subito la prima lingua
   demoCtaTimer = setInterval(demoRotate, 3400);  // ruota ogni 3.4s
   avviaDemoBg();                                  // sfondo demo (media marcati "Demo")
+  if($('feedbackBar')) $('feedbackBar').style.display='none';   // nascondi le faccine durante l'attesa
   $('demo').classList.add('open');
 }
 function chiudiDemo(){
   if(!$('demo').classList.contains('open')) return;
   $('demo').classList.remove('open');
   clearInterval(demoCtaTimer);
+  renderFeedback();                               // ripristina le faccine
   setStato(ascoltoAttivo?'listening':'idle', ascoltoAttivo?T('listen'):T('idle'));
 }
 
@@ -1964,6 +2029,11 @@ function apriSettings(){
   $('bgFx').value = localStorage.getItem('concierge_bg_fx')||'fade';
   $('kiosk').checked = localStorage.getItem('concierge_kiosk')==='1';
   $('pinSet').value = '';
+  $('standbyDa').value = localStorage.getItem('concierge_standby_da')||'';
+  $('standbyA').value  = localStorage.getItem('concierge_standby_a')||'';
+  $('feedbackOn').checked = localStorage.getItem('concierge_feedback_on')!=='0';
+  $('feedbackComment').checked = localStorage.getItem('concierge_feedback_comment')!=='0';
+  renderStats(); renderFeedbackAdmin();
   cacheStats();
   renderMediaGrid(); renderMappaGrid();
   caricaUsoCondiviso().then(()=>{ $('usoOggi').textContent = 'Consumo CONDIVISO questo mese (tutti gli schermi) — Google: '+usoGoogleTot().toLocaleString('de-CH')+' / ElevenLabs: '+usoElevenTot().toLocaleString('de-CH')+' caratteri (gratis fino a 1.000.000).'; });
@@ -1992,6 +2062,12 @@ function salvaSettings(){
   lsSet('concierge_wake_word', ($('wakeWord').value||'').trim());
   lsSet('concierge_demo_delay', String(parseInt($('demoDelay').value||'40',10)));
   lsSet('concierge_demo_frasi', ($('demoFrasi').value||'').trim());
+  lsSet('concierge_standby_da', $('standbyDa').value||'');
+  lsSet('concierge_standby_a', $('standbyA').value||'');
+  applyStandby();
+  lsSet('concierge_feedback_on', $('feedbackOn').checked ? '1' : '0');
+  lsSet('concierge_feedback_comment', $('feedbackComment').checked ? '1' : '0');
+  renderFeedback();
   lsSet('concierge_lang_def', $('langDef').value);
   lsSet('concierge_mic_sens', $('micSens').value);
   lsSet('concierge_voice_rate', $('voiceRate').value);
@@ -2243,6 +2319,8 @@ function chiudiMappa(){ $('mapOverlay').style.display='none'; try{ $('mapFrame')
 /* ===== SEZIONE 12 · AVVIO (inizializzazione all'apertura) ===== */
 caricaTtsCache(); caricaRisp();                                  // riusa risposte/audio già salvati (zero chiamate)
 applyKiosk();                                                    // se chiosco attivo: nasconde ⚙️ + schermo intero
+applyStandby(); setInterval(applyStandby, 30000);               // standby fuori orario
+renderFeedback();                                               // faccine soddisfazione
 caricaUsoCondiviso(); setInterval(caricaUsoCondiviso, 120000);   // contatore condiviso tra schermi
 avviaSfondo();                                                    // sfondo media (se presente)
 $('btnFull').innerHTML = ICON.full;
@@ -2299,7 +2377,7 @@ function resetVergine(){
   if(!confirm('Azzerare TUTTA la configurazione (logo, nome, contenuti, bottoni personalizzati)? L\'app tornerà vuota, pronta per una nuova azienda.')) return;
   const empty = {}; DATI_FIELDS.forEach(f=>empty[f.k]='');
   localStorage.setItem('concierge_dati_struct', JSON.stringify(empty));
-  ['concierge_brand','concierge_logo','concierge_btn_custom','concierge_dati_extra','concierge_btn_hidden','concierge_btn_url','concierge_pin','concierge_kiosk','concierge_demo_frasi'].forEach(k=>localStorage.removeItem(k));
+  ['concierge_brand','concierge_logo','concierge_btn_custom','concierge_dati_extra','concierge_btn_hidden','concierge_btn_url','concierge_pin','concierge_kiosk','concierge_demo_frasi','concierge_feedback','concierge_feedback_on','concierge_feedback_comment','concierge_stats','concierge_standby_da','concierge_standby_a'].forEach(k=>localStorage.removeItem(k));
   localStorage.setItem('concierge_vergine','1');   // niente stella casinò: emblema neutro finché non si carica un logo
   mapClear(); aggiornaBtnMappa();
   applyKiosk();
@@ -2307,6 +2385,117 @@ function resetVergine(){
   applyBranding(); renderDatiFields(); renderCustomBtnList(); costruisciRapide();
   $('errModal').textContent='Configurazione azzerata. Inserisci i dati della nuova azienda.';
 }
+/* --- Esporta / Importa configurazione (clona un totem) --- */
+function esportaConfig(){
+  const skip = ['concierge_uso','concierge_uso_google','concierge_uso_eleven','concierge_resp','concierge_tts','concierge_eleven_off'];
+  const data = {};
+  for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k && k.indexOf('concierge_')===0 && !skip.includes(k)) data[k]=localStorage.getItem(k); }
+  const blob = new Blob([JSON.stringify({_app:'concierge', _v:1, data}, null, 2)], {type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'concierge-config.json'; a.click();
+  setTimeout(()=>{ try{ URL.revokeObjectURL(a.href); }catch(_){} }, 1000);
+  $('errModal').textContent = 'Configurazione esportata (file concierge-config.json).';
+}
+function importaConfig(e){
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ()=>{
+    let j; try{ j = JSON.parse(r.result); }catch(_){ alert('File non valido.'); return; }
+    const data = (j && j.data) ? j.data : j;
+    if(!data || typeof data!=='object'){ alert('File non valido.'); return; }
+    if(!confirm('Importare questa configurazione? Sostituirà quella attuale (i media restano).')) return;
+    Object.keys(data).forEach(k=>{ if(k.indexOf('concierge_')===0) lsSet(k, data[k]); });
+    alert('Configurazione importata. La pagina si ricarica.');
+    location.reload();
+  };
+  r.readAsText(f); e.target.value='';
+}
+
+/* --- Anteprima della schermata d'attesa (demo) --- */
+function anteprimaDemo(){ $('modal').classList.remove('open'); setTimeout(mostraDemo, 250); }
+
+/* --- Statistiche d'uso (solo numeri, in locale, privacy ok) --- */
+function getStats(){ try{ return JSON.parse(localStorage.getItem('concierge_stats')||'{}'); }catch(_){ return {}; } }
+function statAdd(ic){
+  const s = getStats(); s.tot = (s.tot||0)+1; s.btn = s.btn||{};
+  if(ic){ s.btn[ic] = (s.btn[ic]||0)+1; }
+  try{ localStorage.setItem('concierge_stats', JSON.stringify(s)); }catch(_){}
+}
+function renderStats(){
+  const el = $('statsBox'); if(!el) return;
+  const s = getStats(); const tot = s.tot||0; const btn = s.btn||{};
+  const top = Object.keys(btn).sort((a,b)=>btn[b]-btn[a]).slice(0,5);
+  let html = 'Interazioni totali: <b>'+tot+'</b>';
+  if(top.length){ html += '<br>Più usati: ' + top.map(ic=>{ const b=getBottoni().find(x=>x.ic===ic); const nm=(b&&b.l&&b.l.it)||ic; return nm+' ('+btn[ic]+')'; }).join(' · '); }
+  el.innerHTML = html;
+}
+function resetStats(){ if(!confirm('Azzerare le statistiche d\'uso?')) return; try{ localStorage.removeItem('concierge_stats'); }catch(_){} renderStats(); }
+
+/* --- Standby fuori orario (schermo scuro) --- */
+let _wakeUntil = 0;
+function inStandbyWindow(){
+  const da = localStorage.getItem('concierge_standby_da')||''; const a = localStorage.getItem('concierge_standby_a')||'';
+  if(!da || !a) return false;
+  const now = new Date(); const cur = now.getHours()*60 + now.getMinutes();
+  const [dh,dm] = da.split(':').map(Number); const [ah,am] = a.split(':').map(Number);
+  const s = dh*60+dm, e = ah*60+am; if(s===e) return false;
+  return s < e ? (cur>=s && cur<e) : (cur>=s || cur<e);
+}
+function applyStandby(){
+  const should = inStandbyWindow() && Date.now() > _wakeUntil;
+  if($('standby')) $('standby').style.display = should ? 'flex' : 'none';
+}
+function wakeStandby(){ _wakeUntil = Date.now() + 60000; applyStandby(); }
+
+/* --- Valutazione soddisfazione (faccine SVG, no emoji) --- */
+const FBK_Q = {it:"Com'è andata?",de:'Wie war es?',en:'How was it?',fr:"Comment c'était ?",es:'¿Qué tal?',ru:'Как всё прошло?',zh:'体验如何？',ar:'كيف كانت تجربتك؟'};
+const FBK_THX = {it:'Grazie!',de:'Danke!',en:'Thank you!',fr:'Merci !',es:'¡Gracias!',ru:'Спасибо!',zh:'谢谢！',ar:'شكراً!'};
+const _FBASE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9.5"/><circle cx="8.6" cy="10" r=".95" fill="currentColor" stroke="none"/><circle cx="15.4" cy="10" r=".95" fill="currentColor" stroke="none"/>';
+const FACE_SAD = _FBASE + '<path d="M8.4 16.2 Q12 12.9 15.6 16.2"/></svg>';   // non felice (bocca all'ingiù)
+const FACE_OK  = _FBASE + '<path d="M8.4 14 Q12 17.2 15.6 14"/></svg>';       // felice (sorriso)
+const FACE_HAP = _FBASE + '<path d="M7.8 13.4 Q12 19 16.2 13.4 Z" fill="currentColor" stroke="none"/></svg>'; // felicissimo (sorriso pieno)
+function escHtml(s){ return (s||'').replace(/[&<>]/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
+function getFeedback(){ try{ return JSON.parse(localStorage.getItem('concierge_feedback')||'{}'); }catch(_){ return {}; } }
+let _fbkRating = null;
+function renderFeedback(){
+  const bar = $('feedbackBar'); if(!bar) return;
+  if(localStorage.getItem('concierge_feedback_on')==='0'){ bar.style.display='none'; bar.innerHTML=''; return; }
+  bar.style.display='flex';
+  const l = uiLang();
+  bar.innerHTML = '<span class="fbk-q">'+(FBK_Q[l]||FBK_Q.it)+'</span>'+
+    '<button class="fbk-face" data-r="sad">'+FACE_SAD+'</button>'+
+    '<button class="fbk-face" data-r="ok">'+FACE_OK+'</button>'+
+    '<button class="fbk-face" data-r="hap">'+FACE_HAP+'</button>';
+  bar.querySelectorAll('.fbk-face').forEach(b=>b.onclick=()=>votaFeedback(b.dataset.r));
+}
+function votaFeedback(r){
+  const f = getFeedback(); f.faces = f.faces||{}; f.faces[r] = (f.faces[r]||0)+1;
+  try{ localStorage.setItem('concierge_feedback', JSON.stringify(f)); }catch(_){}
+  resetInattivita();
+  if(localStorage.getItem('concierge_feedback_comment')!=='0'){          // commento attivo → chiedi (facoltativo)
+    _fbkRating = r; $('fbkComment').value=''; $('fbkThx').textContent = FBK_THX[uiLang()]||'Grazie!';
+    $('fbkModal').style.display='flex';
+  } else {                                                                // solo faccine → ringraziamento veloce
+    const bar=$('feedbackBar'); if(bar){ bar.innerHTML = '<span class="fbk-q">'+(FBK_THX[uiLang()]||'Grazie!')+'</span>'; setTimeout(renderFeedback, 2200); }
+  }
+}
+function inviaCommento(skip){
+  if(!skip){
+    const t = ($('fbkComment').value||'').trim();
+    if(t){ const f=getFeedback(); f.comments=f.comments||[]; f.comments.push({r:_fbkRating, t:t.slice(0,300)}); while(f.comments.length>200) f.comments.shift(); try{ localStorage.setItem('concierge_feedback', JSON.stringify(f)); }catch(_){} }
+  }
+  $('fbkModal').style.display='none';
+}
+function renderFeedbackAdmin(){
+  const el = $('fbkAdmin'); if(!el) return;
+  const f = getFeedback(); const fa = f.faces||{}; const c = f.comments||[];
+  let h = 'Felicissimo: <b>'+(fa.hap||0)+'</b> · Felice: <b>'+(fa.ok||0)+'</b> · Non felice: <b>'+(fa.sad||0)+'</b>';
+  const lab = {sad:'non felice', ok:'felice', hap:'felicissimo'};
+  if(c.length){ h += '<br><br>Commenti ('+c.length+'):<br>' + c.slice(-20).reverse().map(x=>'• ['+(lab[x.r]||x.r)+'] '+escHtml(x.t)).join('<br>'); }
+  else h += '<br>Nessun commento.';
+  el.innerHTML = h;
+}
+function resetFeedback(){ if(!confirm('Azzerare valutazioni e commenti?')) return; try{ localStorage.removeItem('concierge_feedback'); }catch(_){} renderFeedbackAdmin(); }
+
 function renderLogoPreview(){
   const logo = localStorage.getItem('concierge_logo');
   $('logoPreview').innerHTML = logo ? '<img src="'+logo+'" style="max-width:130px;max-height:70px;background:rgba(255,255,255,.1);padding:6px;border-radius:8px">' : '<span style="opacity:.5;font-size:13px">Nessun logo: uso quello predefinito.</span>';
