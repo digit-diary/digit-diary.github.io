@@ -1462,18 +1462,28 @@ function voceBrowser(testo, lang, fine){
 function ttsKey(motore, lang, testo){ return motore+'|'+lang+'|'+testo; }
 function blobToDataURL(blob){ return new Promise(res=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.readAsDataURL(blob); }); }
 function suonaCache(url, fine){ const a=new Audio(url); audioCorrente=a; a.onended=fine; a.play(); }
-function salvaCache(key, url){
-  ttsCache.set(key, url);
-  try{
-    let o = JSON.parse(localStorage.getItem('concierge_tts')||'{}');
-    o[key] = url;
-    const ks = Object.keys(o);
-    if(ks.length > 120) delete o[ks[0]];       // limita la dimensione su disco
-    localStorage.setItem('concierge_tts', JSON.stringify(o));
-  }catch(_){ /* quota piena: resta solo in memoria, nessun problema */ }
+// Migra la VECCHIA cache audio da localStorage (che riempiva i ~5MB) a IndexedDB (grande),
+// poi LIBERA localStorage. Risolve il QuotaExceededError sui salvataggi.
+// Libera spazio in localStorage (le cache audio pesanti vivono su IndexedDB)
+function freeSpace(){
+  try{ localStorage.removeItem('concierge_tts'); }catch(_){}
+  try{ localStorage.removeItem('concierge_resp'); }catch(_){}
+}
+// Scrittura SICURA: se localStorage è pieno, libera spazio e riprova; non lancia MAI errori
+function lsSet(k, v){
+  try{ localStorage.setItem(k, v); return true; }
+  catch(e){ freeSpace(); try{ localStorage.setItem(k, v); return true; }
+    catch(e2){ console.warn('localStorage pieno per', k); return false; } }
 }
 function caricaTtsCache(){
-  try{ const o = JSON.parse(localStorage.getItem('concierge_tts')||'{}'); for(const k in o) ttsCache.set(k, o[k]); }catch(_){}
+  try{
+    const o = JSON.parse(localStorage.getItem('concierge_tts')||'{}');
+    const ks = Object.keys(o);
+    if(ks.length){
+      for(const k of ks){ ttsCache.set(k, o[k]); ttsDbPut(k, o[k]); }   // sposta su IndexedDB (durevole)
+      localStorage.removeItem('concierge_tts');                        // libera lo spazio occupato
+    }
+  }catch(_){ try{ localStorage.removeItem('concierge_tts'); }catch(_){} }
 }
 
 async function vocePremiumEleven(testo, lang, fine, mioId, share){
@@ -1775,8 +1785,10 @@ function avviaAttract(){
 }
 
 function schermoIntero(){
-  if(!document.fullscreenElement) document.documentElement.requestFullscreen?.();
-  else document.exitFullscreen?.();
+  try{
+    if(!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(()=>{});
+    else document.exitFullscreen?.().catch(()=>{});
+  }catch(_){}
 }
 
 /* ===== SEZIONE 10 · IMPOSTAZIONI (lettura/scrittura configurazione) ===== */
@@ -1787,6 +1799,7 @@ function toggleVediChiavi(){
 function switchTab(t){
   document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.t===t));
   document.querySelectorAll('.tab-pane').forEach(p=>p.classList.toggle('on', p.dataset.p===t));
+  const card = document.querySelector('#modal .card'); if(card) card.scrollTop = 0;   // ogni tab parte dall'alto
 }
 /* --- Sicurezza: PIN admin + modalità chiosco --- */
 function getPin(){ return localStorage.getItem('concierge_pin')||''; }
@@ -1839,52 +1852,58 @@ function apriSettings(){
   $('brandName').value = localStorage.getItem('concierge_brand')||'';
   renderLogoPreview();
   $('modal').classList.add('open');
+  const card = document.querySelector('#modal .card'); if(card) card.scrollTop = 0;   // apre sempre in cima
+  $('modal').scrollTop = 0;
 }
 function salvaSettings(){
   const k = $('apiKey').value.trim();
   if(k && !k.startsWith('gsk_')){ switchTab('api'); $('errModal').textContent='La chiave Groq inizia con "gsk_" (oppure lascia vuoto).'; return; }
-  localStorage.setItem(KEY_LS, k);
-  localStorage.setItem('concierge_eleven', $('elevenKey').value.trim());
+  lsSet(KEY_LS, k);
+  lsSet('concierge_eleven', $('elevenKey').value.trim());
   localStorage.removeItem('concierge_eleven_off');   // nuova chiave salvata → riprova ElevenLabs
-  localStorage.setItem('concierge_google', $('googleKey').value.trim());
-  localStorage.setItem('concierge_motore', $('motore').value);
-  localStorage.setItem('concierge_fallback', $('fallback').value);
-  localStorage.setItem('concierge_lim_eleven', String(parseInt($('limEleven').value||'10000',10)||0));
-  localStorage.setItem('concierge_lim_google', String(parseInt($('limGoogle').value||'1000000',10)||0));
-  localStorage.setItem('concierge_limite', String(parseInt($('limite').value||'0',10)||0));
-  localStorage.setItem('concierge_wake', $('wake').checked?'1':'');
-  localStorage.setItem('concierge_demo_delay', String(parseInt($('demoDelay').value||'40',10)));
-  localStorage.setItem('concierge_lang_def', $('langDef').value);
-  localStorage.setItem('concierge_mic_sens', $('micSens').value);
-  localStorage.setItem('concierge_voice_rate', $('voiceRate').value);
-  localStorage.setItem('concierge_bg_int', String(parseInt($('bgInterval').value||'8',10)||8));
-  localStorage.setItem('concierge_bg_fx', $('bgFx').value);
+  lsSet('concierge_google', $('googleKey').value.trim());
+  lsSet('concierge_motore', $('motore').value);
+  lsSet('concierge_fallback', $('fallback').value);
+  lsSet('concierge_lim_eleven', String(parseInt($('limEleven').value||'10000',10)||0));
+  lsSet('concierge_lim_google', String(parseInt($('limGoogle').value||'1000000',10)||0));
+  lsSet('concierge_limite', String(parseInt($('limite').value||'0',10)||0));
+  lsSet('concierge_wake', $('wake').checked?'1':'');
+  lsSet('concierge_demo_delay', String(parseInt($('demoDelay').value||'40',10)));
+  lsSet('concierge_lang_def', $('langDef').value);
+  lsSet('concierge_mic_sens', $('micSens').value);
+  lsSet('concierge_voice_rate', $('voiceRate').value);
+  lsSet('concierge_bg_int', String(parseInt($('bgInterval').value||'8',10)||8));
+  lsSet('concierge_bg_fx', $('bgFx').value);
   avviaSfondo();
   const struct = {};
   $('datiFields').querySelectorAll('textarea[data-k]').forEach(ta => { struct[ta.dataset.k] = ta.value.trim(); });
-  localStorage.setItem('concierge_dati_struct', JSON.stringify(struct));
+  lsSet('concierge_dati_struct', JSON.stringify(struct));
   const extra = [];
   $('datiFields').querySelectorAll('.extra-entry').forEach(r => {
     const l = (r.querySelector('.extra-label').value||'').trim();
     const v = (r.querySelector('.extra-value').value||'').trim();
     if(l || v) extra.push({l, v});
   });
-  localStorage.setItem('concierge_dati_extra', JSON.stringify(extra));
-  localStorage.setItem('concierge_brand', $('brandName').value.trim());
+  lsSet('concierge_dati_extra', JSON.stringify(extra));
+  lsSet('concierge_brand', $('brandName').value.trim());
   applyBranding();
   // PIN amministratore: vuoto = non cambiare; "off" = rimuovi; altrimenti 4–8 cifre
   const pv = ($('pinSet').value||'').trim();
   if(pv.toLowerCase()==='off'){ localStorage.removeItem('concierge_pin'); }
   else if(pv){
-    if(!/^\d{4,8}$/.test(pv)){ switchTab('comp'); $('errModal').textContent='Il PIN deve avere da 4 a 8 cifre (oppure "off" per rimuoverlo).'; return; }
-    localStorage.setItem('concierge_pin', pv);
+    if(!/^\d{4,8}$/.test(pv)){ switchTab('comp'); $('errModal').textContent='Il PIN deve avere da 4 a 8 cifre.'; alert('PIN non valido: usa da 4 a 8 cifre (solo numeri), oppure scrivi OFF per rimuoverlo.'); return; }
+    lsSet('concierge_pin', pv);
   }
   // Modalità chiosco: richiede un PIN (altrimenti chiunque accede dall'angolo segreto)
   if($('kiosk').checked && !getPin()){
-    switchTab('comp'); $('errModal').textContent='Imposta prima un PIN, poi attiva il chiosco (altrimenti chiunque vi accede).'; return;
+    switchTab('comp'); $('errModal').textContent='Imposta prima un PIN, poi attiva il chiosco.'; alert('Per attivare la Modalità chiosco devi prima scrivere un PIN nel campo qui sotto, poi premere Salva.'); return;
   }
-  localStorage.setItem('concierge_kiosk', $('kiosk').checked ? '1' : '0');
+  const kioskPrima = localStorage.getItem('concierge_kiosk')==='1';
+  lsSet('concierge_kiosk', $('kiosk').checked ? '1' : '0');
   applyKiosk();
+  // conferma visibile quando si cambia lo stato sicurezza
+  if($('kiosk').checked && !kioskPrima) alert('Modalità chiosco ATTIVA. L\'icona impostazioni ora è nascosta. Per rientrare: tieni premuto 1,5s l\'angolo in alto a sinistra e inserisci il PIN.');
+  else if(pv && pv.toLowerCase()!=='off') alert('PIN impostato. Le impostazioni ora chiedono il PIN.');
   svuotaRisp();                 // i dati possono essere cambiati → invalida le risposte salvate
   $('errModal').textContent='';
   $('modal').classList.remove('open');
