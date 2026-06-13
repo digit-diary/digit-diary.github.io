@@ -152,7 +152,12 @@
   /* Testi personalizzati attorno al logo / bordi schermo */
   .emblema-row{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap}
   .logo-extra{text-align:center;line-height:1.25;max-width:90vw;word-break:break-word}
-  .logo-extra.logo-side{max-width:32vw}
+  .logo-extra.logo-side{max-width:34vw}
+  /* dimensioni testi logo: scalano da mobile a 4K (clamp) */
+  .lx-sm{font-size:clamp(13px,2.2vw,22px)} .lx-md{font-size:clamp(18px,3.4vw,32px)}
+  .lx-lg{font-size:clamp(26px,5.4vw,48px)} .lx-xl{font-size:clamp(34px,8vw,68px)}
+  .lx-demo.lx-sm{font-size:clamp(8px,1.3vw,13px)} .lx-demo.lx-md{font-size:clamp(11px,1.9vw,18px)}
+  .lx-demo.lx-lg{font-size:clamp(15px,3vw,27px)} .lx-demo.lx-xl{font-size:clamp(19px,4.5vw,38px)}
   #logoTop{margin-bottom:6px}
   #logoBot{margin-top:10px}
   .screen-edge{position:fixed;left:50%;transform:translateX(-50%);z-index:30;width:auto;max-width:94vw;pointer-events:none}
@@ -365,6 +370,12 @@
     .trad-mic-ico svg{width:40px;height:40px}
     .trad-instr{font-size:17px}
     .trad-instr2{font-size:15px}
+    /* faccine valutazione + demo */
+    .fbk{bottom:38px;gap:14px;padding:7px 15px}
+    .fbk-q{font-size:12px;margin-right:2px}
+    .fbk-face{padding:4px 7px} .fbk-face svg{width:26px;height:26px}
+    .demo-faces{gap:12px;margin-top:14px} .demo-face svg{width:34px;height:34px} .demo-fbk-q{font-size:14px}
+    .logo-extra.logo-side{max-width:42vw}
   }
   /* Schermi BASSI / orizzontali (telefoni in landscape) — niente sovrapposizioni */
   @media (max-height:560px){
@@ -383,6 +394,8 @@
     .demo-example{font-size:13px;margin-top:6px;min-height:18px}
     .demo-cta{font-size:14px;padding:9px 22px;margin-top:8px}
     .trad-out{font-size:22px}
+    .fbk{bottom:8px;gap:12px;padding:6px 13px} .fbk-face svg{width:23px;height:23px} .fbk-q{font-size:11px}
+    .demo-faces{margin-top:8px;gap:10px} .demo-face svg{width:26px;height:26px} .demo-fbk-q{font-size:13px}
   }
   /* Tablet (iPad): leggermente più contenuto del kiosk */
   @media (min-width:641px) and (max-width:1100px){
@@ -420,6 +433,8 @@
     .demo-title{font-size:46px}
     .demo-example{font-size:30px}
     .demo-cta{font-size:30px;padding:22px 54px}
+    .fbk{bottom:58px;gap:30px;padding:12px 32px} .fbk-q{font-size:22px} .fbk-face svg{width:48px;height:48px}
+    .demo-faces{gap:26px} .demo-face svg{width:62px;height:62px} .demo-fbk-q{font-size:28px}
   }
   /* TV 4K */
   @media (min-width:2560px){
@@ -441,6 +456,8 @@
     .demo-title{font-size:70px}
     .demo-example{font-size:42px}
     .demo-cta{font-size:42px;padding:30px 70px}
+    .fbk{gap:38px;padding:16px 44px} .fbk-q{font-size:30px} .fbk-face svg{width:62px;height:62px}
+    .demo-faces{gap:34px} .demo-face svg{width:82px;height:82px} .demo-fbk-q{font-size:36px}
   }
 </style>
 </head>
@@ -2616,11 +2633,11 @@ const TXT_POS = {top:'logoTop', bottom:'logoBot', left:'logoLeft', right:'logoRi
 const TXT_SIZE = {sm:'16px', md:'24px', lg:'36px', xl:'54px'};
 function getTesti(){ try{ return JSON.parse(localStorage.getItem('concierge_texts')||'[]'); }catch(_){ return []; } }
 function saveTesti(a){ localStorage.setItem('concierge_texts', JSON.stringify(a)); }
-function _testoEl(t, scale){
+function _testoEl(t, demo){
   const d=document.createElement('div');
   d.textContent = t.upper ? (t.text||'').toUpperCase() : (t.text||'');
-  const px = Math.round((parseInt(TXT_SIZE[t.size]||TXT_SIZE.md,10)) * (scale||1));
-  d.style.cssText='color:'+(t.color||'#ffffff')+';font-size:'+px+'px;font-weight:'+(t.bold?'700':'400')+';'+(t.italic?'font-style:italic;':'')+'margin:2px 0;text-shadow:0 1px 6px rgba(0,0,0,.5)';
+  d.className = 'lx-'+(t.size||'md') + (demo?' lx-demo':'');     // dimensione responsive via CSS
+  d.style.cssText='color:'+(t.color||'#ffffff')+';font-weight:'+(t.bold?'700':'400')+';'+(t.italic?'font-style:italic;':'')+'margin:2px 0;text-shadow:0 1px 6px rgba(0,0,0,.5)';
   return d;
 }
 const DEMO_POS = {top:'demoLogoTop', bottom:'demoLogoBot', left:'demoLogoLeft', right:'demoLogoRight', 'screen-top':'demoLogoTop', 'screen-bottom':'demoLogoBot'};
@@ -2629,8 +2646,8 @@ function renderTesti(){
   getTesti().forEach(t=>{
     if(!(t.text||'').trim()) return;
     const pos = t.pos||'top';
-    const el=$(TXT_POS[pos]); if(el){ el.appendChild(_testoEl(t,1)); el.style.display='block'; }            // home (dimensione piena)
-    const de=$(DEMO_POS[pos]); if(de){ de.appendChild(_testoEl(t,0.55)); de.style.display='block'; }        // demo (stessa posizione, più piccolo)
+    const el=$(TXT_POS[pos]); if(el){ el.appendChild(_testoEl(t,false)); el.style.display='block'; }         // home (dimensione piena)
+    const de=$(DEMO_POS[pos]); if(de){ de.appendChild(_testoEl(t,true)); de.style.display='block'; }         // demo (stessa posizione, più piccolo)
   });
 }
 function _updTesto(i,k,v){ const a=getTesti(); if(!a[i]) return; a[i][k]=v; saveTesti(a); renderTesti(); }
