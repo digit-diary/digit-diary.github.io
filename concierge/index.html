@@ -1923,6 +1923,13 @@ function applyKiosk(){
   if($('btnGear')) $('btnGear').style.display = on ? 'none' : '';
   if(on && !document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(()=>{});
 }
+// Schermo intero automatico per il CLIENTE: in modalità chiosco, al primo tocco (e ai successivi
+// se è uscito con Esc) va a tutto schermo. I browser permettono il fullscreen solo dopo un gesto.
+document.addEventListener('pointerdown', ()=>{
+  if(localStorage.getItem('concierge_kiosk')==='1' && !document.fullscreenElement){
+    document.documentElement.requestFullscreen?.().catch(()=>{});
+  }
+}, true);
 // Accesso admin in chiosco: tieni premuto 1,5s l'angolo in alto a sinistra
 (function(){
   const c = $('adminCorner'); if(!c) return;
