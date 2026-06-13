@@ -107,7 +107,8 @@
   /* Avatar: palco centrale (stessa area dell'emblema, già responsive) */
   .viz-canvas{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:185%;height:185%;pointer-events:none;display:none}
   .avatar-layer{position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:none;overflow:visible}
-  body.avatar-cover .emblema{opacity:0}                     /* volto/concierge coprono il logo */
+  body.avatar-cover .emblema,
+  body.avatar-cover .emblema-custom{opacity:0 !important}   /* volto/concierge: nascondi del tutto logo + logo aziendale */
   body.speaking .avatar-layer{filter:drop-shadow(0 0 30px rgba(232,213,163,.55))}
   body.listening .avatar-layer{filter:drop-shadow(0 0 26px rgba(58,208,122,.5))}
   body.thinking .avatar-layer{filter:drop-shadow(0 0 26px rgba(74,156,232,.5))}
