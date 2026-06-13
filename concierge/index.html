@@ -2073,8 +2073,12 @@ function applyBranding(){
 }
 function importaLogo(e){
   const f = e.target.files[0]; if(!f) return;
+  if(f.size > 1500000){ alert('Logo troppo pesante ('+Math.round(f.size/1024)+' KB). Usa un file sotto 1,5 MB (SVG o PNG/JPEG ottimizzato).'); e.target.value=''; return; }
   const r = new FileReader();
-  r.onload = ()=>{ localStorage.setItem('concierge_logo', r.result); applyBranding(); renderLogoPreview(); };
+  r.onload = ()=>{
+    if(!lsSet('concierge_logo', r.result)){ alert('Spazio insufficiente per salvare il logo. Prova un file più piccolo.'); return; }
+    applyBranding(); renderLogoPreview();
+  };
   r.readAsDataURL(f); e.target.value='';
 }
 function rimuoviLogo(){ localStorage.removeItem('concierge_logo'); applyBranding(); renderLogoPreview(); }
