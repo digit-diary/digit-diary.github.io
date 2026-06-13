@@ -104,6 +104,16 @@
   body.speaking{--acc:var(--oro)}
   .emblema-wrap{position:relative;width:240px;height:240px;display:flex;align-items:center;justify-content:center;margin-bottom:22px;cursor:pointer}
   .emblema-custom{position:absolute;inset:0;display:none;align-items:center;justify-content:center;pointer-events:none}
+  /* Avatar: palco centrale (stessa area dell'emblema, già responsive) */
+  .viz-canvas{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:185%;height:185%;pointer-events:none;display:none}
+  .avatar-layer{position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:none;overflow:visible}
+  body.avatar-cover .emblema{opacity:0}                     /* volto/concierge coprono il logo */
+  body.speaking .avatar-layer{filter:drop-shadow(0 0 30px rgba(232,213,163,.55))}
+  body.listening .avatar-layer{filter:drop-shadow(0 0 26px rgba(58,208,122,.5))}
+  body.thinking .avatar-layer{filter:drop-shadow(0 0 26px rgba(74,156,232,.5))}
+  .av-eyes{transform-origin:center 86px;animation:avBlink 5.5s ease-in-out infinite}
+  @keyframes avBlink{0%,92%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+  #avatarMouth,#avatarConciergeMouth{transition:ry .06s linear}
   .emblema-custom.on{display:flex;animation:breathe 4s ease-in-out infinite}
   .emblema-custom img{width:62%;height:62%;object-fit:contain;filter:drop-shadow(0 0 18px rgba(232,213,163,.4))}
   body.has-logo .emblema .core{display:none}
@@ -557,6 +567,7 @@
   <div class="emblema-row">
   <div class="logo-extra logo-side" id="logoLeft" style="display:none"></div>
   <div class="emblema-wrap" onclick="toggleHandsFree()" title="Tocca per parlare">
+    <canvas class="viz-canvas" id="vizCanvas"></canvas>
     <svg class="emblema" viewBox="0 0 200 200">
       <defs>
         <radialGradient id="logoRed" cx="50%" cy="42%" r="65%">
@@ -578,6 +589,24 @@
       </g>
     </svg>
     <div class="emblema-custom" id="emblemaCustom"></div>
+    <!-- AVATAR: Volto stilizzato -->
+    <svg class="avatar-layer" id="avatarFace" viewBox="0 0 200 200" style="display:none">
+      <defs><radialGradient id="afg" cx="50%" cy="38%" r="68%"><stop offset="0%" stop-color="#2c2438"/><stop offset="100%" stop-color="#14101c"/></radialGradient></defs>
+      <circle cx="100" cy="100" r="90" fill="url(#afg)" stroke="#e8d5a3" stroke-width="2.5"/>
+      <g class="av-eyes" fill="#e8d5a3"><ellipse cx="73" cy="86" rx="8" ry="11"/><ellipse cx="127" cy="86" rx="8" ry="11"/></g>
+      <ellipse id="avatarMouth" cx="100" cy="135" rx="22" ry="3.5" fill="#7d0826" stroke="#e8d5a3" stroke-width="2"/>
+    </svg>
+    <!-- AVATAR: Concierge elegante -->
+    <svg class="avatar-layer" id="avatarConcierge" viewBox="0 0 200 200" style="display:none">
+      <defs><radialGradient id="acg" cx="50%" cy="36%" r="70%"><stop offset="0%" stop-color="#2c2438"/><stop offset="100%" stop-color="#14101c"/></radialGradient></defs>
+      <path d="M34 204 Q34 150 100 150 Q166 150 166 204 Z" fill="#1a1320" stroke="#e8d5a3" stroke-width="2.5"/>
+      <path d="M86 151 L100 178 L114 151 Z" fill="#f3eede"/>
+      <path d="M90 159 L77 151 L77 167 Z" fill="#7d0826"/><path d="M110 159 L123 151 L123 167 Z" fill="#7d0826"/><circle cx="100" cy="159" r="3.4" fill="#7d0826"/>
+      <circle cx="100" cy="90" r="48" fill="url(#acg)" stroke="#e8d5a3" stroke-width="2.5"/>
+      <path d="M58 74 Q100 40 142 74" fill="none" stroke="#0c0913" stroke-width="14" stroke-linecap="round"/>
+      <g class="av-eyes" fill="#e8d5a3"><circle cx="84" cy="86" r="5"/><circle cx="116" cy="86" r="5"/></g>
+      <ellipse id="avatarConciergeMouth" cx="100" cy="110" rx="13" ry="2.6" fill="#7d0826" stroke="#e8d5a3" stroke-width="1.5"/>
+    </svg>
   </div>
   <div class="logo-extra logo-side" id="logoRight" style="display:none"></div>
   </div>
@@ -732,6 +761,17 @@
         <label class="btn-import" id="btnLogo" for="logoFile"></label>
         <span class="btn-clear" id="btnLogoDel" onclick="rimuoviLogo()"></span>
         <div id="logoPreview" style="margin-top:10px"></div>
+
+        <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.1);padding-top:12px">
+          <h3 style="margin:0 0 6px">Avatar animato</h3>
+          <div class="hint">Un avatar che prende vita con la voce, al centro dello schermo. <b>Aura</b> mantiene il logo; <b>Volto</b> e <b>Concierge</b> lo coprono.</div>
+          <select id="avatarSel">
+            <option value="off">Off — solo il logo (predefinito)</option>
+            <option value="aura">Aura dorata — onda audio-reattiva attorno al logo ⭐</option>
+            <option value="volto">Volto stilizzato — la bocca si muove con la voce</option>
+            <option value="concierge">Concierge elegante — figura con papillon</option>
+          </select>
+        </div>
 
         <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.1);padding-top:12px">
           <h3 style="margin:0 0 6px">Testi personalizzati</h3>
@@ -1706,6 +1746,7 @@ function fermaTutto(){
   try{ speechSynthesis.cancel(); }catch(_){}
   if(audioCorrente){ try{ audioCorrente.onended=null; audioCorrente.pause(); }catch(_){} audioCorrente=null; }
   if(abortCtrl){ try{ abortCtrl.abort(); }catch(_){} }
+  if(typeof avStop==='function') avStop();   // ferma l'animazione avatar
 }
 
 async function chiediAllAI(domanda, opts){
@@ -1806,19 +1847,70 @@ function rispondi(testo, lang, indicazione, mioId, share){
   else                       voceBrowser(testo, lang, fine);
 }
 
+/* ===== AVATAR animato (Off / Aura audio-reattiva / Volto / Concierge) ===== */
+function avatarMode(){ return localStorage.getItem('concierge_avatar')||'off'; }
+function applyAvatar(){
+  const m=avatarMode();
+  if($('vizCanvas'))       $('vizCanvas').style.display       = (m==='aura')?'block':'none';
+  if($('avatarFace'))      $('avatarFace').style.display      = (m==='volto')?'block':'none';
+  if($('avatarConcierge')) $('avatarConcierge').style.display = (m==='concierge')?'block':'none';
+  document.body.classList.toggle('avatar-cover', m==='volto'||m==='concierge');   // i volti coprono il logo
+}
+let _ac=null,_an=null,_fd=null,_avRAF=null,_avSim=0; const _avSrc=new WeakMap();
+function _avInit(){ if(_ac) return !!_an; try{ _ac=new (window.AudioContext||window.webkitAudioContext)(); _an=_ac.createAnalyser(); _an.fftSize=128; _an.smoothingTimeConstant=.78; _an.connect(_ac.destination); _fd=new Uint8Array(_an.frequencyBinCount); return true; }catch(_){ return false; } }
+function avAttach(audioEl){
+  if(!_avInit()) return false;
+  try{ if(_ac.state==='suspended') _ac.resume(); }catch(_){}
+  if(!_ac || _ac.state!=='running') return false;   // contesto non attivo → NON collegare (così la voce non resta muta)
+  try{ let s=_avSrc.get(audioEl); if(!s){ s=_ac.createMediaElementSource(audioEl); _avSrc.set(audioEl,s); s.connect(_an); } return true; }catch(_){ return false; }
+}
+function avStart(simulate){ if(avatarMode()==='off') return; if(_avRAF) return; const loop=()=>{ _avRAF=requestAnimationFrame(loop); _avFrame(simulate); }; loop(); }
+function avStop(){ if(_avRAF){ cancelAnimationFrame(_avRAF); _avRAF=null; } const c=$('vizCanvas'); if(c){ const x=c.getContext('2d'); x&&x.clearRect(0,0,c.width,c.height); } const mo=$('avatarMouth'); if(mo) mo.setAttribute('ry','3.5'); const mc=$('avatarConciergeMouth'); if(mc) mc.setAttribute('ry','2.6'); }
+function _avFrame(simulate){
+  let amp=0;
+  if(simulate){ _avSim+=0.16; amp=(Math.sin(_avSim)*0.5+0.5)*0.45+0.12; }
+  else if(_an){ _an.getByteFrequencyData(_fd); let s=0; for(let i=0;i<_fd.length;i++) s+=_fd[i]; amp=Math.min(1,(s/_fd.length)/95); }
+  const m=avatarMode();
+  if(m==='aura') _avAura(simulate, amp);
+  else if(m==='volto'){ const mo=$('avatarMouth'); if(mo) mo.setAttribute('ry',(3.5+amp*15).toFixed(1)); }
+  else if(m==='concierge'){ const mc=$('avatarConciergeMouth'); if(mc) mc.setAttribute('ry',(2.6+amp*9).toFixed(1)); }
+}
+function _avAura(simulate, amp){
+  const c=$('vizCanvas'); if(!c) return; const r=c.getBoundingClientRect(); const dpr=Math.min(window.devicePixelRatio||1,2);
+  if(c.width!==Math.round(r.width*dpr)){ c.width=Math.round(r.width*dpr); c.height=Math.round(r.height*dpr); }
+  const x=c.getContext('2d'), W=c.width, H=c.height; x.clearRect(0,0,W,H);
+  const cx=W/2, cy=H/2, baseR=Math.min(W,H)*0.30, N=56;
+  for(let i=0;i<N;i++){ const a=(Math.PI*2/N)*i - Math.PI/2;
+    const v = simulate ? (Math.sin(_avSim+i*0.45)*0.5+0.5)*(0.3+amp) : (_fd[(i*2)%_fd.length]/255);
+    const len=baseR*0.12 + v*baseR*0.55;
+    x.strokeStyle='rgba(232,213,163,'+(0.30+v*0.6).toFixed(2)+')'; x.lineWidth=Math.max(2,W*0.0055); x.lineCap='round';
+    x.beginPath(); x.moveTo(cx+Math.cos(a)*baseR, cy+Math.sin(a)*baseR); x.lineTo(cx+Math.cos(a)*(baseR+len), cy+Math.sin(a)*(baseR+len)); x.stroke();
+  }
+  const glow=baseR*(1.0+amp*0.55), gr=x.createRadialGradient(cx,cy,baseR*0.4,cx,cy,glow);
+  gr.addColorStop(0,'rgba(232,213,163,'+(0.08+amp*0.2).toFixed(2)+')'); gr.addColorStop(1,'rgba(232,213,163,0)');
+  x.fillStyle=gr; x.beginPath(); x.arc(cx,cy,glow,0,Math.PI*2); x.fill();
+}
+
 function voceBrowser(testo, lang, fine){
   const _ex = getLingueExtra().find(x=>x.code===lang);
   const target = {it:'it-IT',de:'de-DE',en:'en-GB',fr:'fr-FR',es:'es-ES',ru:'ru-RU',zh:'zh-CN',ar:'ar-SA'}[lang] || (_ex&&_ex.bcp) || 'it-IT';
   const u = new SpeechSynthesisUtterance(testo); u.lang=target;
   const v = voices.find(v=>v.lang===target)||voices.find(v=>v.lang.startsWith(lang));
-  if(v) u.voice=v; u.onend=fine; u.rate = parseFloat(localStorage.getItem('concierge_voice_rate')||'1');
+  if(v) u.voice=v; u.rate = parseFloat(localStorage.getItem('concierge_voice_rate')||'1');
+  u.onstart=()=>{ if(avatarMode()!=='off') avStart(true); };          // voce browser → animazione simulata
+  u.onend=()=>{ avStop(); if(fine) fine(); };
   speechSynthesis.cancel(); speechSynthesis.speak(u);
 }
 
 // --- Gestione cache audio (in memoria + su disco) ---
 function ttsKey(motore, lang, testo){ return motore+'|'+lang+'|'+testo; }
 function blobToDataURL(blob){ return new Promise(res=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.readAsDataURL(blob); }); }
-function suonaCache(url, fine){ const a=new Audio(url); audioCorrente=a; a.onended=fine; a.play(); }
+function suonaCache(url, fine){
+  const a=new Audio(url); audioCorrente=a;
+  a.onended=()=>{ avStop(); if(fine) fine(); };
+  const real = (avatarMode()!=='off') ? avAttach(a) : false;   // collega l'audio all'analizzatore
+  a.play().then(()=>{ if(avatarMode()!=='off') avStart(!real); }).catch(()=>{ try{ a.play(); }catch(_){} });
+}
 // Migra la VECCHIA cache audio da localStorage (che riempiva i ~5MB) a IndexedDB (grande),
 // poi LIBERA localStorage. Risolve il QuotaExceededError sui salvataggi.
 // Libera spazio in localStorage (le cache audio pesanti vivono su IndexedDB)
@@ -2279,6 +2371,7 @@ function apriSettings(){
   renderDatiFields();
   renderCustomBtnList(); chiudiFormBtn();
   $('brandName').value = localStorage.getItem('concierge_brand')||'';
+  $('avatarSel').value = avatarMode();
   renderLogoPreview(); renderTestiAdmin();
   $('modal').classList.add('open');
   const card = document.querySelector('#modal .card'); if(card) card.scrollTop = 0;   // apre sempre in cima
@@ -2326,7 +2419,8 @@ function salvaSettings(){
   });
   lsSet('concierge_dati_extra', JSON.stringify(extra));
   lsSet('concierge_brand', $('brandName').value.trim());
-  applyBranding();
+  lsSet('concierge_avatar', $('avatarSel').value);
+  applyBranding(); applyAvatar();
   // PIN amministratore: vuoto = non cambiare; "off" = rimuovi; altrimenti 4–8 cifre
   const pv = ($('pinSet').value||'').trim();
   if(pv.toLowerCase()==='off'){ localStorage.removeItem('concierge_pin'); }
@@ -2675,9 +2769,9 @@ function resetVergine(){
   localStorage.setItem('concierge_dati_struct', JSON.stringify(empty));
   ['concierge_brand','concierge_logo','concierge_btn_custom','concierge_dati_extra','concierge_btn_hidden','concierge_btn_url','concierge_pin','concierge_kiosk','concierge_demo_frasi','concierge_feedback','concierge_feedback_on','concierge_feedback_comment','concierge_stats','concierge_standby_da','concierge_standby_a','concierge_langs','concierge_langs_off'].forEach(k=>localStorage.removeItem(k));
   for(let i=localStorage.length-1;i>=0;i--){ const k=localStorage.key(i); if(k&&k.indexOf('concierge_lang_')===0) localStorage.removeItem(k); }   // bundle traduzioni
-  localStorage.removeItem('concierge_texts');
+  localStorage.removeItem('concierge_texts'); localStorage.removeItem('concierge_avatar');
   localStorage.setItem('concierge_vergine','1');   // niente stella casinò: emblema neutro finché non si carica un logo
-  mapClear(); aggiornaBtnMappa(); renderLingue(); renderTesti();
+  mapClear(); aggiornaBtnMappa(); renderLingue(); renderTesti(); applyAvatar();
   applyKiosk();
   svuotaRisp();
   applyBranding(); renderDatiFields(); renderCustomBtnList(); costruisciRapide();
@@ -2892,6 +2986,7 @@ $('btnLogo').innerHTML = ICON.upload + '<span>Carica logo</span>';
 $('btnLogoDel').innerHTML = ICON.trash + '<span>Rimuovi</span>';
 $('hBrand').innerHTML = ICON.image + '<span>Personalizzazione — logo e nome</span>';
 applyBranding();
+applyAvatar();
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>switchTab(b.dataset.t));
 buildDemoRing();
 renderLingue();   // genera le bandiere (8 base + extra) e collega i click
@@ -2908,6 +3003,7 @@ function sbloccaAudio(){
     const a = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=');
     a.play().catch(()=>{});
     if(window.speechSynthesis){ const u=new SpeechSynthesisUtterance(' '); u.volume=0; speechSynthesis.speak(u); }
+    if(avatarMode()!=='off' && _avInit() && _ac.state==='suspended') _ac.resume();   // prepara il contesto audio per l'avatar
   }catch(_){}
 }
 
