@@ -453,6 +453,18 @@
     </div>
   </div>
 
+  <!-- Risultati valutazioni + commenti (solo admin, in dialog separato) -->
+  <div id="fbkResultsModal" style="position:fixed;inset:0;background:rgba(8,5,12,.82);display:none;z-index:96;align-items:center;justify-content:center;padding:20px">
+    <div style="background:#1a1320;border:1px solid var(--oro);border-radius:16px;padding:22px;width:540px;max-width:92vw;max-height:82vh;overflow:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-size:18px;font-weight:600;color:var(--oro)">Valutazioni e commenti</div>
+        <button onclick="$('fbkResultsModal').style.display='none'" style="width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:transparent;color:#fff;font-size:16px;cursor:pointer">✕</button>
+      </div>
+      <div id="fbkAdmin" style="line-height:1.8;font-size:14px">—</div>
+      <span class="btn-clear" style="margin-top:16px;display:inline-block;color:#e88" onclick="resetFeedback()">Azzera valutazioni e commenti</span>
+    </div>
+  </div>
+
   <!-- Standby fuori orario (schermo scuro) -->
   <div id="standby" onclick="wakeStandby()" style="position:fixed;inset:0;background:#04040a;display:none;z-index:90;align-items:center;justify-content:center;flex-direction:column;cursor:pointer">
     <div style="width:14px;height:14px;border-radius:50%;background:#e8d5a3;opacity:.25;animation:breathe 4s ease-in-out infinite"></div>
@@ -813,9 +825,8 @@
         <h3 style="margin-top:22px">Valutazione soddisfazione</h3>
         <label><input type="checkbox" id="feedbackOn" style="width:auto;margin-right:8px" onchange="syncFeedbackUI()"> Mostra le faccine di valutazione agli ospiti</label>
         <label id="lblFbkComment"><input type="checkbox" id="feedbackComment" style="width:auto;margin-right:8px"> Permetti il commento facoltativo (altrimenti solo faccine)</label>
-        <div class="hint">Tre faccine (felicissimo / felice / non felice) in basso. Se il commento è attivo, l'ospite può lasciarne uno <b>facoltativo</b> che <b>solo tu (admin) vedi qui sotto</b>.</div>
-        <div class="hint" id="fbkAdmin" style="line-height:1.7;margin-top:8px">—</div>
-        <span class="btn-clear" style="margin-top:8px;display:inline-block" onclick="resetFeedback()">Azzera valutazioni e commenti</span>
+        <div class="hint">Tre faccine (felicissimo / felice / non felice) in basso. Se il commento è attivo, l'ospite può lasciarne uno <b>facoltativo</b> che <b>solo tu (admin)</b> puoi vedere.</div>
+        <span class="btn-clear" style="margin-top:8px;display:inline-block;background:rgba(232,213,163,.15);color:var(--oro)" onclick="apriRisultatiFeedback()">Vedi valutazioni e commenti</span>
 
         <h3 style="margin-top:22px">Manutenzione</h3>
         <div class="hint" id="cacheStats" style="line-height:1.6">Calcolo spazio…</div>
@@ -2168,7 +2179,7 @@ function apriSettings(){
   $('feedbackOn').checked = localStorage.getItem('concierge_feedback_on')!=='0';
   $('feedbackComment').checked = localStorage.getItem('concierge_feedback_comment')!=='0';
   syncFeedbackUI();
-  renderStats(); renderFeedbackAdmin(); renderLingueAdmin();
+  renderStats(); renderLingueAdmin();
   cacheStats();
   renderMediaGrid(); renderMappaGrid();
   caricaUsoCondiviso().then(()=>{ $('usoOggi').textContent = 'Consumo CONDIVISO questo mese (tutti gli schermi) — Google: '+usoGoogleTot().toLocaleString('de-CH')+' / ElevenLabs: '+usoElevenTot().toLocaleString('de-CH')+' caratteri (gratis fino a 1.000.000).'; });
@@ -2648,6 +2659,7 @@ function renderFeedbackAdmin(){
   else h += '<br>Nessun commento.';
   el.innerHTML = h;
 }
+function apriRisultatiFeedback(){ renderFeedbackAdmin(); $('fbkResultsModal').style.display='flex'; }
 function resetFeedback(){ if(!confirm('Azzerare valutazioni e commenti?')) return; try{ localStorage.removeItem('concierge_feedback'); }catch(_){} renderFeedbackAdmin(); }
 function syncFeedbackUI(){
   const on = $('feedbackOn') && $('feedbackOn').checked;
