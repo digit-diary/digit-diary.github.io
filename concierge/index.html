@@ -586,6 +586,7 @@
   <!-- Demo animato (attract mode) -->
   <div class="demo" id="demo" onclick="chiudiDemo()">
     <div class="demo-bg" id="demoBg"></div>
+    <div class="logo-extra" id="demoLogoTop" style="display:none"></div>
     <div class="demo-logo" id="demoLogo"></div>
     <div class="demo-stage">
       <div class="demo-ring" id="demoRing"></div>
@@ -597,6 +598,7 @@
         <div class="demo-finger" id="demoFinger"></div>
       </div>
     </div>
+    <div class="logo-extra" id="demoLogoBot" style="display:none"></div>
     <div class="demo-title" id="demoTitle">Premi qui e chiedi</div>
     <div class="demo-example" id="demoExample"></div>
     <div class="demo-cta" id="demoCta">Tocca lo schermo per iniziare</div>
@@ -2553,14 +2555,20 @@ const TXT_POS = {top:'logoTop', bottom:'logoBot', left:'logoLeft', right:'logoRi
 const TXT_SIZE = {sm:'16px', md:'24px', lg:'36px', xl:'54px'};
 function getTesti(){ try{ return JSON.parse(localStorage.getItem('concierge_texts')||'[]'); }catch(_){ return []; } }
 function saveTesti(a){ localStorage.setItem('concierge_texts', JSON.stringify(a)); }
+function _testoEl(t, scale){
+  const d=document.createElement('div');
+  d.textContent = t.upper ? (t.text||'').toUpperCase() : (t.text||'');
+  const px = Math.round((parseInt(TXT_SIZE[t.size]||TXT_SIZE.md,10)) * (scale||1));
+  d.style.cssText='color:'+(t.color||'#ffffff')+';font-size:'+px+'px;font-weight:'+(t.bold?'700':'400')+';'+(t.italic?'font-style:italic;':'')+'margin:2px 0;text-shadow:0 1px 6px rgba(0,0,0,.5)';
+  return d;
+}
 function renderTesti(){
-  Object.values(TXT_POS).forEach(id=>{ const el=$(id); if(el){ el.innerHTML=''; el.style.display='none'; } });
+  Object.values(TXT_POS).concat(['demoLogoTop','demoLogoBot']).forEach(id=>{ const el=$(id); if(el){ el.innerHTML=''; el.style.display='none'; } });
   getTesti().forEach(t=>{
-    const el=$(TXT_POS[t.pos||'top']); if(!el || !(t.text||'').trim()) return;
-    const d=document.createElement('div');
-    d.textContent = t.upper ? (t.text||'').toUpperCase() : (t.text||'');
-    d.style.cssText='color:'+(t.color||'#ffffff')+';font-size:'+(TXT_SIZE[t.size]||TXT_SIZE.md)+';font-weight:'+(t.bold?'700':'400')+';'+(t.italic?'font-style:italic;':'')+'margin:2px 0;text-shadow:0 1px 6px rgba(0,0,0,.5)';
-    el.appendChild(d); el.style.display='block';
+    if(!(t.text||'').trim()) return;
+    const el=$(TXT_POS[t.pos||'top']); if(el){ el.appendChild(_testoEl(t,1)); el.style.display='block'; }      // home (dimensione piena)
+    const demoId=(t.pos==='bottom'||t.pos==='right'||t.pos==='screen-bottom')?'demoLogoBot':'demoLogoTop';   // demo (attorno al logo, più piccolo)
+    const de=$(demoId); if(de){ de.appendChild(_testoEl(t,0.55)); de.style.display='block'; }
   });
 }
 function _updTesto(i,k,v){ const a=getTesti(); if(!a[i]) return; a[i][k]=v; saveTesti(a); renderTesti(); }
