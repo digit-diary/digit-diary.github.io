@@ -702,6 +702,14 @@
         <label>PIN amministratore (4–8 cifre)</label>
         <input id="pinSet" type="text" inputmode="numeric" maxlength="8" placeholder="Vuoto = non cambiare · scrivi OFF per rimuovere" autocomplete="off">
         <div class="hint">Protegge le impostazioni. Senza PIN l'accesso è libero. Imposta un PIN <b>prima</b> di attivare il chiosco.</div>
+
+        <h3 style="margin-top:22px">Manutenzione</h3>
+        <div class="hint" id="cacheStats" style="line-height:1.6">Calcolo spazio…</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+          <button type="button" class="btn-clear" onclick="svuotaCacheAudio()">Svuota cache voce</button>
+          <button type="button" class="btn-clear" onclick="svuotaCacheRisposte()">Svuota risposte salvate</button>
+        </div>
+        <div class="hint" style="margin-top:6px">Svuotare le cache <b>non cancella</b> la configurazione: le risposte e le voci si rigenerano da sole alla prima richiesta (riprese da Supabase, gratis).</div>
       </div>
 
       <div class="err" id="errModal"></div>
@@ -1475,6 +1483,28 @@ function lsSet(k, v){
   catch(e){ freeSpace(); try{ localStorage.setItem(k, v); return true; }
     catch(e2){ console.warn('localStorage pieno per', k); return false; } }
 }
+// Svuota lo store audio di IndexedDB
+function ttsDbClear(){ return ttsDB().then(db=>new Promise(res=>{ const tx=db.transaction('aud','readwrite'); tx.objectStore('aud').clear(); tx.oncomplete=res; tx.onerror=res; })).catch(()=>{}); }
+function ttsDbCount(){ return ttsDB().then(db=>new Promise(res=>{ const tx=db.transaction('aud','readonly'); const r=tx.objectStore('aud').count(); r.onsuccess=()=>res(r.result||0); r.onerror=()=>res(0); })).catch(()=>0); }
+// Mostra spazio usato + numero elementi in cache
+async function cacheStats(){
+  const el = $('cacheStats'); if(!el) return;
+  let ls=0; try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); ls += k.length + (localStorage.getItem(k)||'').length; } }catch(_){}
+  const risposte = rispCache.size;
+  let aud=0; try{ aud = await ttsDbCount(); }catch(_){}
+  let idb=''; try{ if(navigator.storage&&navigator.storage.estimate){ const e=await navigator.storage.estimate(); if(e&&e.usage) idb=' · dispositivo: '+(e.usage/1048576).toFixed(1)+' MB'; } }catch(_){}
+  el.innerHTML = 'Configurazione (testo): <b>'+(ls/1024).toFixed(0)+' KB</b> / ~5000 KB'+
+    '<br>Risposte in cache: <b>'+risposte+'</b> · Clip voce salvati: <b>'+aud+'</b>'+idb;
+}
+function svuotaCacheAudio(){
+  if(!confirm('Svuotare la cache della voce? Le frasi verranno ri-pronunciate (e ri-salvate) alla prossima richiesta. La configurazione resta intatta.')) return;
+  ttsCache.clear(); ttsDbClear(); try{ localStorage.removeItem('concierge_tts'); }catch(_){}
+  cacheStats(); alert('Cache voce svuotata.');
+}
+function svuotaCacheRisposte(){
+  if(!confirm('Svuotare le risposte salvate? Verranno rigenerate alla prossima richiesta. La configurazione resta intatta.')) return;
+  svuotaRisp(); cacheStats(); alert('Risposte svuotate.');
+}
 function caricaTtsCache(){
   try{
     const o = JSON.parse(localStorage.getItem('concierge_tts')||'{}');
@@ -1844,6 +1874,7 @@ function apriSettings(){
   $('bgFx').value = localStorage.getItem('concierge_bg_fx')||'fade';
   $('kiosk').checked = localStorage.getItem('concierge_kiosk')==='1';
   $('pinSet').value = '';
+  cacheStats();
   renderMediaGrid();
   caricaUsoCondiviso().then(()=>{ $('usoOggi').textContent = 'Consumo CONDIVISO questo mese (tutti gli schermi) — Google: '+usoGoogleTot().toLocaleString('de-CH')+' / ElevenLabs: '+usoElevenTot().toLocaleString('de-CH')+' caratteri (gratis fino a 1.000.000).'; });
   $('usoOggi').textContent = 'Consumo questo mese — Google: '+usoGoogleTot().toLocaleString('de-CH')+' / ElevenLabs: '+usoElevenTot().toLocaleString('de-CH')+' caratteri.';
