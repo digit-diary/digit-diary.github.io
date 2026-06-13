@@ -275,6 +275,14 @@
   .demo-cta{margin-top:18px;font-size:19px;color:#fff;font-weight:500;padding:13px 34px;border-radius:44px;
     background:rgba(232,213,163,.08);border:1.5px solid var(--oro);animation:ctaPulse 2s ease-in-out infinite;transition:opacity .4s}
   @keyframes ctaPulse{0%,100%{box-shadow:0 0 0 0 rgba(232,213,163,.45);transform:scale(1)}50%{box-shadow:0 0 0 16px rgba(232,213,163,0);transform:scale(1.04)}}
+  /* Faccine a comparsa animata nella demo (solo se attive) */
+  .demo-faces{margin-top:20px;display:flex;align-items:center;justify-content:center;gap:18px;opacity:0;animation:facesWrapIn .6s ease .4s forwards}
+  .demo-fbk-q{font-size:18px;color:#cfcfd6;opacity:.85}
+  .demo-face{display:inline-flex;color:#cdb98a;opacity:0;transform:scale(.3);animation:facePop .55s cubic-bezier(.18,1.5,.5,1) forwards}
+  .demo-face svg{width:42px;height:42px;filter:drop-shadow(0 0 9px rgba(232,213,163,.35))}
+  .demo-face:nth-child(2){animation-delay:.6s} .demo-face:nth-child(3){animation-delay:.82s} .demo-face:nth-child(4){animation-delay:1.04s}
+  @keyframes facesWrapIn{to{opacity:1}}
+  @keyframes facePop{0%{opacity:0;transform:scale(.3) translateY(10px)}55%{opacity:1;transform:scale(1.22) translateY(0)}80%{transform:scale(.95)}100%{opacity:.92;transform:scale(1)}}
 
   /* ===== Traduttore ===== */
   .trad-modal{position:fixed;inset:0;background:radial-gradient(ellipse at 50% 36%,#241f33,#0a0a0f 74%);display:none;flex-direction:column;z-index:65;color:#fff;overflow:hidden}
@@ -612,6 +620,7 @@
     <div class="demo-title" id="demoTitle">Premi qui e chiedi</div>
     <div class="demo-example" id="demoExample"></div>
     <div class="demo-cta" id="demoCta">Tocca lo schermo per iniziare</div>
+    <div class="demo-faces" id="demoFaces" style="display:none"></div>
   </div>
 
   <!-- Traduttore -->
@@ -2082,6 +2091,7 @@ function demoRotate(){
   setTimeout(()=>{
     $('demoTitle').textContent = demoTxt('title', l);
     $('demoCta').textContent   = demoTxt('cta', l);
+    const _fl=$('demoFbkLabel'); if(_fl) _fl.textContent = fbkTxt('q', l);   // etichetta faccine demo, stessa lingua
     if(frasi.length){                                   // frasi personalizzate (testo dell'admin)
       const ph = frasi[demoFraseIdx % frasi.length]; demoFraseIdx++;
       $('demoExample').innerHTML = '<i></i>'; $('demoExample').querySelector('i').textContent = ph;
@@ -2130,7 +2140,15 @@ function mostraDemo(){
   demoRotate();                                  // imposta subito la prima lingua
   demoCtaTimer = setInterval(demoRotate, 3400);  // ruota ogni 3.4s
   avviaDemoBg();                                  // sfondo demo (media marcati "Demo")
-  if($('feedbackBar')) $('feedbackBar').style.display='none';   // nascondi le faccine durante l'attesa
+  if($('feedbackBar')) $('feedbackBar').style.display='none';   // nascondi le faccine reali durante l'attesa
+  // Faccine a comparsa nella demo (illustrative) — solo se la valutazione è attiva
+  if($('demoFaces')){
+    if(localStorage.getItem('concierge_feedback_on')!=='0'){
+      $('demoFaces').innerHTML = '<span class="demo-fbk-q" id="demoFbkLabel"></span>'+
+        '<span class="demo-face">'+FACE_SAD+'</span><span class="demo-face">'+FACE_OK+'</span><span class="demo-face">'+FACE_HAP+'</span>';
+      $('demoFaces').style.display='flex';
+    } else { $('demoFaces').style.display='none'; $('demoFaces').innerHTML=''; }
+  }
   $('demo').classList.add('open');
 }
 function chiudiDemo(){
