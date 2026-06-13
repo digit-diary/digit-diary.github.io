@@ -528,16 +528,7 @@
 
   <button class="parla" id="btnParla" onclick="toggleHandsFree()">🎤 Attiva ascolto</button>
 
-  <div class="lingue" id="lingue">
-    <span data-l="it-IT" title="Italiano">🇮🇹</span>
-    <span data-l="de-DE" title="Deutsch">🇩🇪</span>
-    <span data-l="en-GB" title="English">🇬🇧</span>
-    <span data-l="fr-FR" title="Français">🇫🇷</span>
-    <span data-l="es-ES" title="Español">🇪🇸</span>
-    <span data-l="ru-RU" title="Русский">🇷🇺</span>
-    <span data-l="zh-CN" title="中文">🇨🇳</span>
-    <span data-l="ar-SA" title="العربية">🇸🇦</span>
-  </div>
+  <div class="lingue" id="lingue"></div><!-- bandiere generate da renderLingue() (8 base + extra) -->
 
   <div class="rapide" id="rapide"></div>
 
@@ -805,6 +796,14 @@
           <div><label>Alle</label><input id="standbyA" type="time" style="width:auto"></div>
         </div>
         <div class="hint">Lo schermo va in <b>standby scuro</b> in questo intervallo (orario di chiusura, es. 05:00 → 11:00). Vuoto = sempre acceso. Un tocco lo riattiva per un minuto.</div>
+
+        <h3 style="margin-top:22px">Lingue</h3>
+        <div class="hint">Le 8 lingue di base sono sempre attive. Puoi <b>aggiungere altre lingue</b>: l'AI traduce da sola tutta l'interfaccia (serve la chiave Groq). Voce e risposte funzionano subito.</div>
+        <div id="langList" style="margin-top:6px"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
+          <select id="langSel" style="width:auto;flex:1;min-width:160px"></select>
+          <button type="button" id="btnAddLang" class="btn-clear" style="background:rgba(232,213,163,.15);color:var(--oro)" onclick="aggiungiLingua($('langSel').value)">Aggiungi e traduci</button>
+        </div>
 
         <h3 style="margin-top:22px">Statistiche d'uso</h3>
         <div class="hint" id="statsBox" style="line-height:1.6">—</div>
@@ -1158,8 +1157,117 @@ const UI = {
   zh:{idle:'轻触说话', greet:'您好！有什么可以帮您？', attiva:'开始聆听', ferma:'停止聆听', listen:'正在聆听…请讲', pausa:'聆听已暂停', think:'请稍候…', privacy:'不录制或保存任何音频 — 实时处理。'},
   ar:{idle:'المس للتحدث', greet:'مرحباً! كيف يمكنني مساعدتك؟', attiva:'تفعيل الاستماع', ferma:'إيقاف الاستماع', listen:'أنا أستمع… تفضل', pausa:'الاستماع متوقف', think:'لحظة…', privacy:'لا يتم تسجيل أو حفظ أي صوت — معالجة فورية.'},
 };
-function uiLang(){ return ({ 'it-IT':'it','de-DE':'de','en-GB':'en','fr-FR':'fr','es-ES':'es','ru-RU':'ru','zh-CN':'zh','ar-SA':'ar' })[langAscolto] || 'it'; }
-function T(k){ return UI[uiLang()][k]; }
+/* ===== SEZIONE 1b · LINGUE DINAMICHE (aggiungi/togli lingue, traduzione automatica via AI) ===== */
+// 8 lingue integrate (sempre presenti). Le extra si aggiungono da ⚙️ e si traducono da sole.
+const LINGUE_BASE = [
+  {l:'it-IT',f:'🇮🇹',t:'Italiano'},{l:'de-DE',f:'🇩🇪',t:'Deutsch'},{l:'en-GB',f:'🇬🇧',t:'English'},{l:'fr-FR',f:'🇫🇷',t:'Français'},
+  {l:'es-ES',f:'🇪🇸',t:'Español'},{l:'ru-RU',f:'🇷🇺',t:'Русский'},{l:'zh-CN',f:'🇨🇳',t:'中文'},{l:'ar-SA',f:'🇸🇦',t:'العربية'}
+];
+// Lingue extra pronte (preset): l'admin sceglie, l'AI traduce. gvoice = voce Google TTS.
+const LINGUE_DISPONIBILI = [
+  {code:'nl',en:'Dutch',name:'Nederlands',flag:'🇳🇱',bcp:'nl-NL',gvoice:'nl-NL-Standard-A'},
+  {code:'tr',en:'Turkish',name:'Türkçe',flag:'🇹🇷',bcp:'tr-TR',gvoice:'tr-TR-Standard-A'},
+  {code:'pt',en:'Portuguese',name:'Português',flag:'🇵🇹',bcp:'pt-PT',gvoice:'pt-PT-Standard-A'},
+  {code:'pl',en:'Polish',name:'Polski',flag:'🇵🇱',bcp:'pl-PL',gvoice:'pl-PL-Standard-A'},
+  {code:'ja',en:'Japanese',name:'日本語',flag:'🇯🇵',bcp:'ja-JP',gvoice:'ja-JP-Standard-A'},
+  {code:'ko',en:'Korean',name:'한국어',flag:'🇰🇷',bcp:'ko-KR',gvoice:'ko-KR-Standard-A'},
+  {code:'el',en:'Greek',name:'Ελληνικά',flag:'🇬🇷',bcp:'el-GR',gvoice:'el-GR-Standard-A'},
+  {code:'sv',en:'Swedish',name:'Svenska',flag:'🇸🇪',bcp:'sv-SE',gvoice:'sv-SE-Standard-A'},
+  {code:'cs',en:'Czech',name:'Čeština',flag:'🇨🇿',bcp:'cs-CZ',gvoice:'cs-CZ-Standard-A'},
+  {code:'uk',en:'Ukrainian',name:'Українська',flag:'🇺🇦',bcp:'uk-UA',gvoice:'uk-UA-Standard-A'},
+  {code:'hi',en:'Hindi',name:'हिन्दी',flag:'🇮🇳',bcp:'hi-IN',gvoice:'hi-IN-Standard-A'},
+  {code:'th',en:'Thai',name:'ไทย',flag:'🇹🇭',bcp:'th-TH',gvoice:'th-TH-Standard-A'}
+];
+function getLingueExtra(){ try{ return JSON.parse(localStorage.getItem('concierge_langs')||'[]'); }catch(_){ return []; } }
+function saveLingueExtra(a){ localStorage.setItem('concierge_langs', JSON.stringify(a)); }
+function getLangBundle(code){ try{ return JSON.parse(localStorage.getItem('concierge_lang_'+code)||'null'); }catch(_){ return null; } }
+function linguaCodes(){ return ['it','de','en','fr','es','ru','zh','ar'].concat(getLingueExtra().map(x=>x.code)); }
+
+function uiLang(){
+  const m = { 'it-IT':'it','de-DE':'de','en-GB':'en','fr-FR':'fr','es-ES':'es','ru-RU':'ru','zh-CN':'zh','ar-SA':'ar' };
+  if(m[langAscolto]) return m[langAscolto];
+  const ex = getLingueExtra().find(x=>x.bcp===langAscolto); return ex ? ex.code : 'it';
+}
+// Testo interfaccia: lingua integrata → hardcoded; lingua extra → bundle tradotto; fallback IT
+function T(k){ const c=uiLang(); if(UI[c]) return UI[c][k]; const b=getLangBundle(c); return (b&&b.ui&&b.ui[k]) || UI.it[k]; }
+// Etichetta bottone nella lingua corrente (con fallback sicuri)
+function btnLabel(r, lng){ if(r.l&&r.l[lng]) return r.l[lng]; const b=getLangBundle(lng); if(b&&b.btn&&b.btn[r.ic]) return b.btn[r.ic]; return (r.l&&(r.l.en||r.l.it))||r.ic; }
+// Testi demo / faccine nella lingua corrente
+function demoTxt(kind, l){ const map={title:DEMO_TITLE, ex:DEMO_EX, cta:DEMO_CTA}; if(map[kind][l]) return map[kind][l]; const b=getLangBundle(l); return (b&&b.demo&&b.demo[kind]) || map[kind].it; }
+function fbkTxt(kind, l){ const map={q:FBK_Q, thx:FBK_THX}; if(map[kind][l]) return map[kind][l]; const b=getLangBundle(l); return (b&&b.fbk&&b.fbk[kind]) || map[kind].it; }
+
+// Lingue base disattivate (per azienda). Default vuoto = tutte le 8 attive (es. il casinò).
+function getLangOff(){ try{ return JSON.parse(localStorage.getItem('concierge_langs_off')||'[]'); }catch(_){ return []; } }
+function toggleLangBase(bcp, on){
+  let off=getLangOff(); if(on) off=off.filter(x=>x!==bcp); else if(!off.includes(bcp)) off.push(bcp);
+  localStorage.setItem('concierge_langs_off', JSON.stringify(off));
+  renderLingue();
+}
+// Costruisce la barra delle bandiere: base attive + extra
+function renderLingue(){
+  const box=$('lingue'); if(!box) return;
+  const off=getLangOff();
+  const base=LINGUE_BASE.filter(x=>!off.includes(x.l));
+  const extra=getLingueExtra().map(x=>({l:x.bcp,f:x.flag,t:x.name}));
+  box.innerHTML=[...base,...extra].map(x=>'<span data-l="'+x.l+'" title="'+x.t+'">'+x.f+'</span>').join('');
+  box.querySelectorAll('span').forEach(s=>{ s.onclick=()=>setLinguaAscolto(s.dataset.l); s.classList.toggle('attiva', s.dataset.l===langAscolto); });
+}
+
+// Pacchetto di stringhe da tradurre (sorgente: italiano)
+function bundleSorgente(){
+  const btn={}; RAPIDE.forEach(b=>btn[b.ic]=(b.l&&b.l.it)||b.ic);
+  return { ui:Object.assign({}, UI.it), btn, demo:{title:DEMO_TITLE.it, ex:DEMO_EX.it, cta:DEMO_CTA.it}, fbk:{q:FBK_Q.it, thx:FBK_THX.it} };
+}
+// Traduce tutte le stringhe in una lingua via Groq e salva il bundle
+async function traduciLingua(code, enName){
+  const key=localStorage.getItem(KEY_LS); if(!key) throw new Error('Manca la chiave Groq (⚙️ → API)');
+  const src=bundleSorgente();
+  const messaggi=[
+    {role:'system',content:'You are a professional translator. Translate ALL string VALUES of the given JSON into '+enName+'. Keep keys and structure identical. Keep it natural and concise for a kiosk. Reply with ONLY one valid JSON object.'},
+    {role:'user',content:JSON.stringify(src)}
+  ];
+  const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:'llama-3.3-70b-versatile',temperature:0.2,response_format:{type:'json_object'},messages:messaggi})});
+  if(!r.ok) throw new Error('Errore AI '+r.status);
+  const d=await r.json(); const out=JSON.parse(d.choices[0].message.content);
+  localStorage.setItem('concierge_lang_'+code, JSON.stringify(out));
+  return out;
+}
+async function aggiungiLingua(code){
+  const def=LINGUE_DISPONIBILI.find(x=>x.code===code); if(!def) return;
+  const extra=getLingueExtra(); if(extra.find(x=>x.code===code)){ alert('Lingua già presente.'); return; }
+  const btn=$('btnAddLang'); if(btn){ btn.disabled=true; btn.textContent='Traduco…'; }
+  try{
+    await traduciLingua(def.code, def.en);
+    extra.push({code:def.code, en:def.en, name:def.name, flag:def.flag, bcp:def.bcp, gvoice:def.gvoice});
+    saveLingueExtra(extra);
+    renderLingue(); renderLingueAdmin();
+    alert(def.name+' aggiunta e tradotta.');
+  }catch(e){ alert('Traduzione non riuscita: '+(e.message||e)); }
+  if(btn){ btn.disabled=false; btn.textContent='Aggiungi e traduci'; }
+}
+function rimuoviLingua(code){
+  if(!confirm('Rimuovere questa lingua?')) return;
+  saveLingueExtra(getLingueExtra().filter(x=>x.code!==code));
+  try{ localStorage.removeItem('concierge_lang_'+code); }catch(_){}
+  if(uiLang()===code) setLinguaAscolto('it-IT');
+  renderLingue(); renderLingueAdmin();
+}
+function renderLingueAdmin(){
+  const box=$('langList'); if(!box) return;
+  const off=getLangOff(); const extra=getLingueExtra();
+  // 8 di base con spunta (mostra/nascondi) — per il casinò restano tutte spuntate
+  let h = '<div class="hint" style="margin:2px 0 4px">Lingue di base (spunta = visibile):</div>';
+  h += '<div style="display:flex;flex-wrap:wrap;gap:6px 16px">' + LINGUE_BASE.map(x=>
+    '<label style="display:inline-flex;align-items:center;gap:6px;font-size:14px"><input type="checkbox" style="width:auto" '+(off.includes(x.l)?'':'checked')+' onchange="toggleLangBase(\''+x.l+'\', this.checked)"> '+x.f+' '+x.t+'</label>'
+  ).join('') + '</div>';
+  // lingue extra (aggiunte/tradotte)
+  if(extra.length){
+    h += '<div class="hint" style="margin:10px 0 4px">Lingue extra (tradotte):</div>';
+    h += extra.map(x=>'<div class="cbtn-row"><div class="nm">'+x.flag+' '+x.name+'</div><button type="button" class="btn-clear" style="color:#e88" onclick="rimuoviLingua(\''+x.code+'\')">Rimuovi</button></div>').join('');
+  }
+  box.innerHTML = h;
+  const sel=$('langSel'); if(sel){ sel.innerHTML=LINGUE_DISPONIBILI.filter(d=>!extra.find(x=>x.code===d.code)).map(d=>'<option value="'+d.code+'">'+d.flag+' '+d.name+' ('+d.en+')</option>').join(''); }
+}
 
 /* --- Icone SVG moderne (stile linea) --- */
 const P = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="ic">';
@@ -1536,7 +1644,9 @@ async function chiediAllAI(domanda, opts){
     if(mioId !== richiestaId) return;
     if(rem){ rispCache.set(opts.cacheKey, rem); salvaRisp(); rispondi(rem.text, rem.lang, rem.indicazione, mioId, true); return; }
   }
-  const lreq = {it:'',de:'[Antworte auf Deutsch] ',en:'[Reply in English] ',fr:'[Réponds en français] ',es:'[Responde en español] ',ru:'[Ответь на русском] ',zh:'[用中文回答] ',ar:'[أجب بالعربية] '}[uiLang()] || '';
+  const _dir = {it:'',de:'[Antworte auf Deutsch] ',en:'[Reply in English] ',fr:'[Réponds en français] ',es:'[Responde en español] ',ru:'[Ответь на русском] ',zh:'[用中文回答] ',ar:'[أجب بالعربية] '}[uiLang()];
+  let lreq = _dir;
+  if(lreq===undefined){ const ex=getLingueExtra().find(x=>x.code===uiLang()); lreq = ex ? '[Reply in '+ex.en+'] ' : ''; }   // lingue extra
   const messaggi = [{role:'system',content:buildSystemPrompt()}, ...ctx, {role:'user',content: lreq + domanda}];
   try{
     const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -1606,7 +1716,8 @@ function rispondi(testo, lang, indicazione, mioId, share){
 }
 
 function voceBrowser(testo, lang, fine){
-  const target = {it:'it-IT',de:'de-DE',en:'en-GB',fr:'fr-FR',es:'es-ES',ru:'ru-RU',zh:'zh-CN',ar:'ar-SA'}[lang]||'it-IT';
+  const _ex = getLingueExtra().find(x=>x.code===lang);
+  const target = {it:'it-IT',de:'de-DE',en:'en-GB',fr:'fr-FR',es:'es-ES',ru:'ru-RU',zh:'zh-CN',ar:'ar-SA'}[lang] || (_ex&&_ex.bcp) || 'it-IT';
   const u = new SpeechSynthesisUtterance(testo); u.lang=target;
   const v = voices.find(v=>v.lang===target)||voices.find(v=>v.lang.startsWith(lang));
   if(v) u.voice=v; u.onend=fine; u.rate = parseFloat(localStorage.getItem('concierge_voice_rate')||'1');
@@ -1708,7 +1819,8 @@ async function voceGoogle(testo, lang, fine, mioId, share){
     es:{languageCode:'es-ES',name:'es-ES-Neural2-A'}, ru:{languageCode:'ru-RU',name:'ru-RU-Wavenet-A'},
     zh:{languageCode:'cmn-CN',name:'cmn-CN-Wavenet-A'}, ar:{languageCode:'ar-XA',name:'ar-XA-Wavenet-A'}
   };
-  const voce = vmap[lang]||vmap.it;
+  const _exv = getLingueExtra().find(x=>x.code===lang);
+  const voce = vmap[lang] || (_exv ? {languageCode:_exv.bcp, name:_exv.gvoice} : vmap.it);   // lingue extra → voce Google del preset
   try{
     const r = await fetch('https://texttospeech.googleapis.com/v1/text:synthesize?key='+key, {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -1737,7 +1849,7 @@ async function voceGoogle(testo, lang, fine, mioId, share){
 /* ===== SEZIONE 6 · UI (bottoni rapidi, schermo d.attesa, kiosk) ===== */
 function costruisciRapide(){
   const lng = uiLang();
-  $('rapide').innerHTML = getBottoni().map((r,i)=>`<button onclick="domandaRapida(${i})">${ICON[r.ic]||ICON.info}<span>${r.l[lng]||r.l.en||r.l.it}</span></button>`).join('');
+  $('rapide').innerHTML = getBottoni().map((r,i)=>`<button onclick="domandaRapida(${i})">${ICON[r.ic]||ICON.info}<span>${btnLabel(r,lng)}</span></button>`).join('');
   renderFeedback();   // aggiorna anche le faccine nella lingua corrente
 }
 function domandaRapida(i){
@@ -1895,20 +2007,22 @@ let demoFraseIdx = 0;
 // Frasi d'esempio personalizzate dall'admin (una per riga). Vuoto = quelle multilingue di default.
 function getDemoFrasi(){ return (localStorage.getItem('concierge_demo_frasi')||'').split('\n').map(s=>s.trim()).filter(Boolean); }
 
+function flagOf(code){ return FLAG_DEMO[code] || ((getLingueExtra().find(x=>x.code===code)||{}).flag) || ''; }
 function demoRotate(){
-  demoCtaIdx = (demoCtaIdx+1) % DEMO_LANGS.length;
-  const l = DEMO_LANGS[demoCtaIdx];
+  const codes = linguaCodes();
+  demoCtaIdx = (demoCtaIdx+1) % codes.length;
+  const l = codes[demoCtaIdx];
   const frasi = getDemoFrasi();
   $('demoTitle').style.opacity = 0; $('demoExample').style.opacity = 0; $('demoCta').style.opacity = 0;
   setTimeout(()=>{
-    $('demoTitle').textContent = DEMO_TITLE[l];
-    $('demoCta').textContent   = DEMO_CTA[l];
+    $('demoTitle').textContent = demoTxt('title', l);
+    $('demoCta').textContent   = demoTxt('cta', l);
     if(frasi.length){                                   // frasi personalizzate (testo dell'admin)
       const ph = frasi[demoFraseIdx % frasi.length]; demoFraseIdx++;
       $('demoExample').innerHTML = '<i></i>'; $('demoExample').querySelector('i').textContent = ph;
     } else {                                            // default: esempio nella lingua corrente + bandiera
-      $('demoExample').innerHTML = '<span class="fl">'+FLAG_DEMO[l]+'</span> <i></i>';
-      $('demoExample').querySelector('i').textContent = DEMO_EX[l];
+      $('demoExample').innerHTML = '<span class="fl">'+flagOf(l)+'</span> <i></i>';
+      $('demoExample').querySelector('i').textContent = demoTxt('ex', l);
     }
     $('demoTitle').style.opacity = 1; $('demoExample').style.opacity = .95; $('demoCta').style.opacity = 1;
   }, 380);
@@ -2054,7 +2168,7 @@ function apriSettings(){
   $('feedbackOn').checked = localStorage.getItem('concierge_feedback_on')!=='0';
   $('feedbackComment').checked = localStorage.getItem('concierge_feedback_comment')!=='0';
   syncFeedbackUI();
-  renderStats(); renderFeedbackAdmin();
+  renderStats(); renderFeedbackAdmin(); renderLingueAdmin();
   cacheStats();
   renderMediaGrid(); renderMappaGrid();
   caricaUsoCondiviso().then(()=>{ $('usoOggi').textContent = 'Consumo CONDIVISO questo mese (tutti gli schermi) — Google: '+usoGoogleTot().toLocaleString('de-CH')+' / ElevenLabs: '+usoElevenTot().toLocaleString('de-CH')+' caratteri (gratis fino a 1.000.000).'; });
@@ -2397,9 +2511,10 @@ function resetVergine(){
   if(!confirm('Azzerare TUTTA la configurazione (logo, nome, contenuti, bottoni personalizzati)? L\'app tornerà vuota, pronta per una nuova azienda.')) return;
   const empty = {}; DATI_FIELDS.forEach(f=>empty[f.k]='');
   localStorage.setItem('concierge_dati_struct', JSON.stringify(empty));
-  ['concierge_brand','concierge_logo','concierge_btn_custom','concierge_dati_extra','concierge_btn_hidden','concierge_btn_url','concierge_pin','concierge_kiosk','concierge_demo_frasi','concierge_feedback','concierge_feedback_on','concierge_feedback_comment','concierge_stats','concierge_standby_da','concierge_standby_a'].forEach(k=>localStorage.removeItem(k));
+  ['concierge_brand','concierge_logo','concierge_btn_custom','concierge_dati_extra','concierge_btn_hidden','concierge_btn_url','concierge_pin','concierge_kiosk','concierge_demo_frasi','concierge_feedback','concierge_feedback_on','concierge_feedback_comment','concierge_stats','concierge_standby_da','concierge_standby_a','concierge_langs','concierge_langs_off'].forEach(k=>localStorage.removeItem(k));
+  for(let i=localStorage.length-1;i>=0;i--){ const k=localStorage.key(i); if(k&&k.indexOf('concierge_lang_')===0) localStorage.removeItem(k); }   // bundle traduzioni
   localStorage.setItem('concierge_vergine','1');   // niente stella casinò: emblema neutro finché non si carica un logo
-  mapClear(); aggiornaBtnMappa();
+  mapClear(); aggiornaBtnMappa(); renderLingue();
   applyKiosk();
   svuotaRisp();
   applyBranding(); renderDatiFields(); renderCustomBtnList(); costruisciRapide();
@@ -2482,7 +2597,7 @@ function renderFeedback(){
   clearInterval(_fbkQTimer);
   if(localStorage.getItem('concierge_feedback_on')==='0'){ bar.style.display='none'; bar.innerHTML=''; return; }
   bar.style.display='flex';
-  bar.innerHTML = '<span class="fbk-q" style="transition:opacity .4s">'+(FBK_Q[uiLang()]||FBK_Q.it)+'</span>'+
+  bar.innerHTML = '<span class="fbk-q" style="transition:opacity .4s">'+fbkTxt('q',uiLang())+'</span>'+
     '<button class="fbk-face" data-r="sad">'+FACE_SAD+'</button>'+
     '<button class="fbk-face" data-r="ok">'+FACE_OK+'</button>'+
     '<button class="fbk-face" data-r="hap">'+FACE_HAP+'</button>';
@@ -2493,20 +2608,21 @@ function renderFeedback(){
 function ruotaFbkQ(){
   const bar = $('feedbackBar'); if(!bar || bar.style.display==='none') return;
   const q = bar.querySelector('.fbk-q'); if(!q) return;
-  _fbkQIdx = (_fbkQIdx+1) % DEMO_LANGS.length;
-  const l = DEMO_LANGS[_fbkQIdx];
+  const codes = linguaCodes();
+  _fbkQIdx = (_fbkQIdx+1) % codes.length;
+  const l = codes[_fbkQIdx];
   q.style.opacity = '0';
-  setTimeout(()=>{ q.textContent = FBK_Q[l]||FBK_Q.it; q.style.opacity = '0.85'; }, 400);
+  setTimeout(()=>{ q.textContent = fbkTxt('q',l); q.style.opacity = '0.85'; }, 400);
 }
 function votaFeedback(r){
   const f = getFeedback(); f.faces = f.faces||{}; f.faces[r] = (f.faces[r]||0)+1;
   try{ localStorage.setItem('concierge_feedback', JSON.stringify(f)); }catch(_){}
   resetInattivita();
   if(localStorage.getItem('concierge_feedback_comment')!=='0'){          // commento attivo → chiedi (facoltativo)
-    _fbkRating = r; $('fbkComment').value=''; $('fbkThx').textContent = FBK_THX[uiLang()]||'Grazie!';
+    _fbkRating = r; $('fbkComment').value=''; $('fbkThx').textContent = fbkTxt('thx',uiLang());
     $('fbkModal').style.display='flex';
   } else {                                                                // solo faccine → ringraziamento veloce
-    const bar=$('feedbackBar'); if(bar){ bar.innerHTML = '<span class="fbk-q">'+(FBK_THX[uiLang()]||'Grazie!')+'</span>'; setTimeout(renderFeedback, 2200); }
+    const bar=$('feedbackBar'); if(bar){ bar.innerHTML = '<span class="fbk-q">'+fbkTxt('thx',uiLang())+'</span>'; setTimeout(renderFeedback, 2200); }
   }
 }
 function inviaCommento(skip){
@@ -2566,7 +2682,7 @@ $('hBrand').innerHTML = ICON.image + '<span>Personalizzazione — logo e nome</s
 applyBranding();
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>switchTab(b.dataset.t));
 buildDemoRing();
-document.querySelectorAll('#lingue span').forEach(s=> s.onclick=()=>setLinguaAscolto(s.dataset.l));
+renderLingue();   // genera le bandiere (8 base + extra) e collega i click
 setLinguaAscolto(localStorage.getItem('concierge_lang_def')||'it-IT');
 costruisciRapide();
 avviaAttract();
