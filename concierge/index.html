@@ -85,7 +85,7 @@
   .tools span{font-size:21px;opacity:.35;cursor:pointer;transition:.2s}
   .tools span:hover{opacity:.9}
   /* Valutazione soddisfazione */
-  .fbk{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:14px;background:rgba(20,18,28,.55);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(6px);padding:8px 18px;border-radius:40px}
+  .fbk{position:fixed;bottom:44px;left:50%;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:14px;background:rgba(20,18,28,.55);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(6px);padding:8px 18px;border-radius:40px}
   .fbk-q{font-size:14px;color:#cfcfd6;opacity:.85}
   .fbk-face{background:none;border:none;cursor:pointer;padding:2px;color:#cdb98a;opacity:.7;transition:.18s;display:flex}
   .fbk-face svg{width:30px;height:30px}
@@ -468,6 +468,17 @@
     <div id="mapBody" style="flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;padding:0 14px 18px">
       <img id="mapImg" alt="Mappa" style="max-width:100%;max-height:100%;object-fit:contain;cursor:zoom-in;transition:transform .2s;transform-origin:center">
       <iframe id="mapFrame" title="Piantina PDF" style="display:none;width:100%;height:100%;border:0;border-radius:8px;background:#fff"></iframe>
+    </div>
+  </div>
+
+  <!-- Blocco licenza (solo su domini non autorizzati: copie non licenziate) -->
+  <div id="licOverlay" style="position:fixed;inset:0;background:#0a0810;display:none;z-index:10000;align-items:center;justify-content:center;flex-direction:column;color:#fff;padding:24px">
+    <div style="max-width:380px;width:100%;text-align:center">
+      <div style="font-size:20px;color:var(--oro);font-weight:600;margin-bottom:10px">Licenza richiesta</div>
+      <div style="font-size:14px;opacity:.75;margin-bottom:16px">Questo sistema richiede una licenza valida. Inserisci la chiave fornita o contatta il fornitore.</div>
+      <input id="licInput" type="text" placeholder="Chiave di licenza" autocomplete="off" style="width:100%;text-align:center;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.05);color:#fff">
+      <div id="licErr" style="color:#e88;font-size:13px;min-height:18px;margin:8px 0"></div>
+      <button onclick="attivaLicenza()" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--oro);color:#1a1320;font-weight:600;cursor:pointer">Attiva</button>
     </div>
   </div>
 
@@ -2455,16 +2466,27 @@ const FACE_HAP = _FBASE + '<path d="M7.8 13.4 Q12 19 16.2 13.4 Z" fill="currentC
 function escHtml(s){ return (s||'').replace(/[&<>]/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
 function getFeedback(){ try{ return JSON.parse(localStorage.getItem('concierge_feedback')||'{}'); }catch(_){ return {}; } }
 let _fbkRating = null;
+let _fbkQIdx = 0, _fbkQTimer = null;
 function renderFeedback(){
   const bar = $('feedbackBar'); if(!bar) return;
+  clearInterval(_fbkQTimer);
   if(localStorage.getItem('concierge_feedback_on')==='0'){ bar.style.display='none'; bar.innerHTML=''; return; }
   bar.style.display='flex';
-  const l = uiLang();
-  bar.innerHTML = '<span class="fbk-q">'+(FBK_Q[l]||FBK_Q.it)+'</span>'+
+  bar.innerHTML = '<span class="fbk-q" style="transition:opacity .4s">'+(FBK_Q[uiLang()]||FBK_Q.it)+'</span>'+
     '<button class="fbk-face" data-r="sad">'+FACE_SAD+'</button>'+
     '<button class="fbk-face" data-r="ok">'+FACE_OK+'</button>'+
     '<button class="fbk-face" data-r="hap">'+FACE_HAP+'</button>';
   bar.querySelectorAll('.fbk-face').forEach(b=>b.onclick=()=>votaFeedback(b.dataset.r));
+  _fbkQIdx = 0;
+  _fbkQTimer = setInterval(ruotaFbkQ, 3000);    // "Com'è andata?" ruota in tutte le lingue
+}
+function ruotaFbkQ(){
+  const bar = $('feedbackBar'); if(!bar || bar.style.display==='none') return;
+  const q = bar.querySelector('.fbk-q'); if(!q) return;
+  _fbkQIdx = (_fbkQIdx+1) % DEMO_LANGS.length;
+  const l = DEMO_LANGS[_fbkQIdx];
+  q.style.opacity = '0';
+  setTimeout(()=>{ q.textContent = FBK_Q[l]||FBK_Q.it; q.style.opacity = '0.85'; }, 400);
 }
 function votaFeedback(r){
   const f = getFeedback(); f.faces = f.faces||{}; f.faces[r] = (f.faces[r]||0)+1;
