@@ -408,7 +408,24 @@
   <div class="tools">
     <span class="trad" id="btnTrad" onclick="apriTrad()" title="Traduttore"></span>
     <span class="full" id="btnFull" onclick="schermoIntero()" title="Schermo intero"></span>
-    <span class="gear" id="btnGear" onclick="apriSettings()" title="Impostazioni"></span>
+    <span class="gear" id="btnGear" onclick="tentaSettings()" title="Impostazioni"></span>
+  </div>
+
+  <!-- Angolo segreto: tieni premuto 1,5s per l'accesso admin in modalità chiosco -->
+  <div id="adminCorner" style="position:fixed;top:0;left:0;width:72px;height:72px;z-index:9998"></div>
+
+  <!-- Sblocco con PIN -->
+  <div id="pinOverlay" style="position:fixed;inset:0;background:rgba(8,5,12,.82);display:none;z-index:9999;align-items:center;justify-content:center">
+    <div style="background:#1a1320;border:1px solid var(--oro);border-radius:16px;padding:26px 24px;width:300px;max-width:90vw;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.6)">
+      <div style="font-size:18px;font-weight:600;color:var(--oro);margin-bottom:14px">Accesso amministratore</div>
+      <input id="pinInput" type="password" inputmode="numeric" maxlength="8" placeholder="PIN" autocomplete="off"
+             style="width:100%;text-align:center;letter-spacing:6px;font-size:22px;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.05);color:#fff">
+      <div id="pinErr" style="color:#e88;font-size:13px;min-height:18px;margin:8px 0"></div>
+      <div style="display:flex;gap:10px">
+        <button onclick="chiudiPin()" style="flex:1;padding:11px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:transparent;color:#fff;cursor:pointer">Annulla</button>
+        <button onclick="verificaPin()" style="flex:1;padding:11px;border-radius:10px;border:none;background:var(--oro);color:#1a1320;font-weight:600;cursor:pointer">Apri</button>
+      </div>
+    </div>
   </div>
 
   <div class="emblema-wrap" onclick="toggleHandsFree()" title="Tocca per parlare">
@@ -677,7 +694,14 @@
         </select>
 
         <label>Effetto transizione foto demo (Ken Burns) <span style="opacity:.5">si imposta in Media</span></label>
-        <div class="hint">La velocità del demo e gli effetti foto si regolano nella sezione Media. La modalità chiosco con PIN è in arrivo.</div>
+        <div class="hint">La velocità del demo e gli effetti foto si regolano nella sezione Media.</div>
+
+        <h3 style="margin-top:22px">Sicurezza (modalità totem)</h3>
+        <label><input type="checkbox" id="kiosk" style="width:auto;margin-right:8px"> Modalità chiosco — nasconde le impostazioni agli ospiti</label>
+        <div class="hint">A schermo intero. L'icona ⚙️ sparisce. Per rientrare: <b>tieni premuto 1,5&nbsp;secondi l'angolo in alto a sinistra</b> e inserisci il PIN.</div>
+        <label>PIN amministratore (4–8 cifre)</label>
+        <input id="pinSet" type="text" inputmode="numeric" maxlength="8" placeholder="Vuoto = non cambiare · scrivi OFF per rimuovere" autocomplete="off">
+        <div class="hint">Protegge le impostazioni. Senza PIN l'accesso è libero. Imposta un PIN <b>prima</b> di attivare il chiosco.</div>
       </div>
 
       <div class="err" id="errModal"></div>
@@ -1764,6 +1788,30 @@ function switchTab(t){
   document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.t===t));
   document.querySelectorAll('.tab-pane').forEach(p=>p.classList.toggle('on', p.dataset.p===t));
 }
+/* --- Sicurezza: PIN admin + modalità chiosco --- */
+function getPin(){ return localStorage.getItem('concierge_pin')||''; }
+function tentaSettings(){ if(getPin()) apriPin(); else apriSettings(); }
+function apriPin(){ $('pinInput').value=''; $('pinErr').textContent=''; $('pinOverlay').style.display='flex'; setTimeout(()=>$('pinInput').focus(), 60); }
+function chiudiPin(){ $('pinOverlay').style.display='none'; }
+function verificaPin(){
+  if($('pinInput').value === getPin()){ chiudiPin(); apriSettings(); }
+  else { $('pinErr').textContent='PIN errato'; $('pinInput').value=''; $('pinInput').focus(); }
+}
+function applyKiosk(){
+  const on = localStorage.getItem('concierge_kiosk')==='1';
+  if($('btnGear')) $('btnGear').style.display = on ? 'none' : '';
+  if(on && !document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(()=>{});
+}
+// Accesso admin in chiosco: tieni premuto 1,5s l'angolo in alto a sinistra
+(function(){
+  const c = $('adminCorner'); if(!c) return;
+  let t=null; const start=()=>{ t=setTimeout(()=>{ t=null; tentaSettings(); }, 1500); };
+  const stop=()=>{ if(t){ clearTimeout(t); t=null; } };
+  c.addEventListener('pointerdown', start);
+  ['pointerup','pointerleave','pointercancel'].forEach(ev=>c.addEventListener(ev, stop));
+})();
+document.addEventListener('keydown', e=>{ if(e.key==='Enter' && $('pinOverlay').style.display==='flex') verificaPin(); });
+
 function apriSettings(){
   switchTab('api');
   $('apiKey').value    = localStorage.getItem(KEY_LS)||'';
@@ -1781,6 +1829,8 @@ function apriSettings(){
   $('voiceRate').value = localStorage.getItem('concierge_voice_rate')||'1';
   $('bgInterval').value = localStorage.getItem('concierge_bg_int')||'8';
   $('bgFx').value = localStorage.getItem('concierge_bg_fx')||'fade';
+  $('kiosk').checked = localStorage.getItem('concierge_kiosk')==='1';
+  $('pinSet').value = '';
   renderMediaGrid();
   caricaUsoCondiviso().then(()=>{ $('usoOggi').textContent = 'Consumo CONDIVISO questo mese (tutti gli schermi) — Google: '+usoGoogleTot().toLocaleString('de-CH')+' / ElevenLabs: '+usoElevenTot().toLocaleString('de-CH')+' caratteri (gratis fino a 1.000.000).'; });
   $('usoOggi').textContent = 'Consumo questo mese — Google: '+usoGoogleTot().toLocaleString('de-CH')+' / ElevenLabs: '+usoElevenTot().toLocaleString('de-CH')+' caratteri.';
@@ -1822,6 +1872,19 @@ function salvaSettings(){
   localStorage.setItem('concierge_dati_extra', JSON.stringify(extra));
   localStorage.setItem('concierge_brand', $('brandName').value.trim());
   applyBranding();
+  // PIN amministratore: vuoto = non cambiare; "off" = rimuovi; altrimenti 4–8 cifre
+  const pv = ($('pinSet').value||'').trim();
+  if(pv.toLowerCase()==='off'){ localStorage.removeItem('concierge_pin'); }
+  else if(pv){
+    if(!/^\d{4,8}$/.test(pv)){ switchTab('comp'); $('errModal').textContent='Il PIN deve avere da 4 a 8 cifre (oppure "off" per rimuoverlo).'; return; }
+    localStorage.setItem('concierge_pin', pv);
+  }
+  // Modalità chiosco: richiede un PIN (altrimenti chiunque accede dall'angolo segreto)
+  if($('kiosk').checked && !getPin()){
+    switchTab('comp'); $('errModal').textContent='Imposta prima un PIN, poi attiva il chiosco (altrimenti chiunque vi accede).'; return;
+  }
+  localStorage.setItem('concierge_kiosk', $('kiosk').checked ? '1' : '0');
+  applyKiosk();
   svuotaRisp();                 // i dati possono essere cambiati → invalida le risposte salvate
   $('errModal').textContent='';
   $('modal').classList.remove('open');
@@ -1956,6 +2019,7 @@ function mostraSfondo(items, gen){
 
 /* ===== SEZIONE 12 · AVVIO (inizializzazione all'apertura) ===== */
 caricaTtsCache(); caricaRisp();                                  // riusa risposte/audio già salvati (zero chiamate)
+applyKiosk();                                                    // se chiosco attivo: nasconde ⚙️ + schermo intero
 caricaUsoCondiviso(); setInterval(caricaUsoCondiviso, 120000);   // contatore condiviso tra schermi
 avviaSfondo();                                                    // sfondo media (se presente)
 $('btnFull').innerHTML = ICON.full;
@@ -1999,7 +2063,8 @@ function resetVergine(){
   if(!confirm('Azzerare TUTTA la configurazione (logo, nome, contenuti, bottoni personalizzati)? L\'app tornerà vuota, pronta per una nuova azienda.')) return;
   const empty = {}; DATI_FIELDS.forEach(f=>empty[f.k]='');
   localStorage.setItem('concierge_dati_struct', JSON.stringify(empty));
-  ['concierge_brand','concierge_logo','concierge_btn_custom','concierge_dati_extra','concierge_btn_hidden'].forEach(k=>localStorage.removeItem(k));
+  ['concierge_brand','concierge_logo','concierge_btn_custom','concierge_dati_extra','concierge_btn_hidden','concierge_pin','concierge_kiosk'].forEach(k=>localStorage.removeItem(k));
+  applyKiosk();
   svuotaRisp();
   applyBranding(); renderDatiFields(); renderCustomBtnList(); costruisciRapide();
   $('errModal').textContent='Configurazione azzerata. Inserisci i dati della nuova azienda.';
