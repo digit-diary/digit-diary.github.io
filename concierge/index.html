@@ -786,7 +786,15 @@ function getBottoni(){
     l: {it:b.label,de:b.label,en:b.label,fr:b.label,es:b.label,ru:b.label,zh:b.label,ar:b.label},
     q: {it:'Dammi informazioni su: '+b.label, de:'Informationen über: '+b.label, en:'Information about: '+b.label, fr:'Informations sur: '+b.label}
   }));
-  return RAPIDE.concat(cust);
+  const hid = getHiddenBtns();
+  return RAPIDE.filter(b=>!hid.includes(b.ic)).concat(cust);
+}
+function getHiddenBtns(){ try{ return JSON.parse(localStorage.getItem('concierge_btn_hidden')||'[]'); }catch(_){ return []; } }
+function toggleHideBtn(ic){
+  const h = getHiddenBtns(); const i = h.indexOf(ic);
+  if(i>=0) h.splice(i,1); else h.push(ic);
+  localStorage.setItem('concierge_btn_hidden', JSON.stringify(h));
+  renderCustomBtnList(); costruisciRapide();
 }
 // --- Gestione bottoni personalizzati nel pannello admin ---
 let btnEditId = null, btnPickIc = 'info';
@@ -811,21 +819,30 @@ function renderCustomBtnList(){
   const s1 = document.createElement('div'); s1.className='hint'; s1.style.cssText='margin-bottom:8px;opacity:.75';
   s1.textContent='Sono le scorciatoie sullo schermo. Il testo della risposta è quello dei Contenuti: tocca "Modifica" per cambiarlo.';
   box.appendChild(h1); box.appendChild(s1);
+  const hid = getHiddenBtns();
   RAPIDE.forEach(b=>{
     const key = BTN_DATI[b.ic];
-    const row = document.createElement('div'); row.className='cbtn-row'; row.style.cssText='flex-wrap:wrap;align-items:center';
+    const nascosto = hid.includes(b.ic);
+    const row = document.createElement('div'); row.className='cbtn-row';
+    row.style.cssText='flex-wrap:wrap;align-items:center'+(nascosto?';opacity:.45':'');
     const ci = document.createElement('div'); ci.className='ci'; ci.innerHTML = ICON[b.ic]||ICON.info;
     const nm = document.createElement('div'); nm.className='nm'; nm.textContent = (b.l&&b.l.it)||b.ic;
     const badge = document.createElement('span');
     badge.style.cssText='font-size:11px;padding:2px 9px;border-radius:20px;background:rgba(232,213,163,.12);color:var(--oro);margin-left:8px;white-space:nowrap';
-    badge.textContent = b.soloLink ? 'Apre QR / sito' : (b.url ? 'Risposta + QR' : 'Risposta vocale');
+    badge.textContent = nascosto ? 'Nascosto' : (b.soloLink ? 'Apre QR / sito' : (b.url ? 'Risposta + QR' : 'Risposta vocale'));
     nm.appendChild(badge);
     row.appendChild(ci); row.appendChild(nm);
-    if(key){
+    if(key && !nascosto){
       const mod = document.createElement('button'); mod.type='button'; mod.className='btn-clear';
       mod.style.cssText='font-size:13px;color:var(--oro);white-space:nowrap';
       mod.textContent='Modifica'; mod.onclick=()=>jumpContenuti(key);
       row.appendChild(mod);
+    }
+    const hide = document.createElement('button'); hide.type='button'; hide.className='btn-clear';
+    hide.style.cssText='font-size:13px;white-space:nowrap;color:'+(nascosto?'var(--oro)':'#e88');
+    hide.textContent = nascosto ? 'Mostra' : 'Nascondi'; hide.onclick=()=>toggleHideBtn(b.ic);
+    row.appendChild(hide);
+    if(key && !nascosto){
       const prev = document.createElement('div');
       prev.style.cssText='flex:1 1 100%;margin-top:6px;font-size:13px;opacity:.7;line-height:1.4;border-left:2px solid rgba(232,213,163,.3);padding-left:10px';
       const v = (_datiVal(key)||'').trim();
@@ -1902,7 +1919,7 @@ function resetVergine(){
   if(!confirm('Azzerare TUTTA la configurazione (logo, nome, contenuti, bottoni personalizzati)? L\'app tornerà vuota, pronta per una nuova azienda.')) return;
   const empty = {}; DATI_FIELDS.forEach(f=>empty[f.k]='');
   localStorage.setItem('concierge_dati_struct', JSON.stringify(empty));
-  ['concierge_brand','concierge_logo','concierge_btn_custom','concierge_dati_extra','concierge_btn_desc'].forEach(k=>localStorage.removeItem(k));
+  ['concierge_brand','concierge_logo','concierge_btn_custom','concierge_dati_extra','concierge_btn_hidden'].forEach(k=>localStorage.removeItem(k));
   rispCache.clear();
   applyBranding(); renderDatiFields(); renderCustomBtnList(); costruisciRapide();
   $('errModal').textContent='Configurazione azzerata. Inserisci i dati della nuova azienda.';
