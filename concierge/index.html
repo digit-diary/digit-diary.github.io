@@ -1775,9 +1775,12 @@ function demoRotate(){
   }, 380);
 }
 
-// Dispone le icone-funzione in cerchio attorno al centro
+// Dispone le icone-funzione in cerchio attorno al centro.
+// Usa i BOTTONI REALI attivi (rispetta quelli aggiunti e quelli nascosti); fallback alla lista classica.
 function buildDemoRing(){
-  const ics = ['ristorante','giocare','bancomat','wifi','orari','scudo','fedelta','bar'];
+  let ics = getBottoni().map(b=>b.ic).filter(ic=>ICON[ic]);
+  if(ics.length > 8) ics = ics.slice(0, 8);
+  if(ics.length < 3) ics = ['ristorante','giocare','bancomat','wifi','orari','scudo','fedelta','bar'];
   const n = ics.length, R = 44;
   $('demoRing').innerHTML = ics.map((ic,i)=>{
     const a = (2*Math.PI/n)*i - Math.PI/2;
@@ -1797,6 +1800,7 @@ function mostraDemo(){
   fermaTutto(); fermaAscoltoTemp();
   if(recognition && !ascoltoAttivo){ try{ recognition.stop(); }catch(_){} }
   chiudiQR(); chiudiWeb(); $('modal').classList.remove('open');
+  buildDemoRing();                             // icone = bottoni reali attuali (aggiunti/nascosti)
   cronologia = [];                             // nuovo cliente
   $('domanda').textContent=''; $('indicazione').innerHTML='';
   if(langAscolto!=='it-IT') setLinguaAscolto('it-IT');
