@@ -447,8 +447,8 @@
       <div style="font-size:13px;opacity:.7;margin-bottom:12px" id="fbkSub">Vuoi lasciare un commento? (facoltativo)</div>
       <textarea id="fbkComment" rows="3" placeholder="Scrivi qui…" style="width:100%;min-height:60px"></textarea>
       <div style="display:flex;gap:10px;margin-top:12px">
-        <button onclick="inviaCommento(true)" style="flex:1;padding:11px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:transparent;color:#fff;cursor:pointer">Salta</button>
-        <button onclick="inviaCommento(false)" style="flex:1;padding:11px;border-radius:10px;border:none;background:var(--oro);color:#1a1320;font-weight:600;cursor:pointer">Invia</button>
+        <button id="fbkSkip" onclick="inviaCommento(true)" style="flex:1;padding:11px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:transparent;color:#fff;cursor:pointer">Salta</button>
+        <button id="fbkSend" onclick="inviaCommento(false)" style="flex:1;padding:11px;border-radius:10px;border:none;background:var(--oro);color:#1a1320;font-weight:600;cursor:pointer">Invia</button>
       </div>
     </div>
   </div>
@@ -1194,7 +1194,7 @@ function T(k){ const c=uiLang(); if(UI[c]) return UI[c][k]; const b=getLangBundl
 function btnLabel(r, lng){ if(r.l&&r.l[lng]) return r.l[lng]; const b=getLangBundle(lng); if(b&&b.btn&&b.btn[r.ic]) return b.btn[r.ic]; return (r.l&&(r.l.en||r.l.it))||r.ic; }
 // Testi demo / faccine nella lingua corrente
 function demoTxt(kind, l){ const map={title:DEMO_TITLE, ex:DEMO_EX, cta:DEMO_CTA}; if(map[kind][l]) return map[kind][l]; const b=getLangBundle(l); return (b&&b.demo&&b.demo[kind]) || map[kind].it; }
-function fbkTxt(kind, l){ const map={q:FBK_Q, thx:FBK_THX}; if(map[kind][l]) return map[kind][l]; const b=getLangBundle(l); return (b&&b.fbk&&b.fbk[kind]) || map[kind].it; }
+function fbkTxt(kind, l){ const map={q:FBK_Q, thx:FBK_THX, sub:FBK_SUB, ph:FBK_PH, skip:FBK_SKIP, send:FBK_SEND}; if(map[kind][l]) return map[kind][l]; const b=getLangBundle(l); return (b&&b.fbk&&b.fbk[kind]) || map[kind].it; }
 
 // Lingue base disattivate (per azienda). Default vuoto = tutte le 8 attive (es. il casinò).
 function getLangOff(){ try{ return JSON.parse(localStorage.getItem('concierge_langs_off')||'[]'); }catch(_){ return []; } }
@@ -1216,7 +1216,7 @@ function renderLingue(){
 // Pacchetto di stringhe da tradurre (sorgente: italiano)
 function bundleSorgente(){
   const btn={}; RAPIDE.forEach(b=>btn[b.ic]=(b.l&&b.l.it)||b.ic);
-  return { ui:Object.assign({}, UI.it), btn, demo:{title:DEMO_TITLE.it, ex:DEMO_EX.it, cta:DEMO_CTA.it}, fbk:{q:FBK_Q.it, thx:FBK_THX.it} };
+  return { ui:Object.assign({}, UI.it), btn, demo:{title:DEMO_TITLE.it, ex:DEMO_EX.it, cta:DEMO_CTA.it}, fbk:{q:FBK_Q.it, thx:FBK_THX.it, sub:FBK_SUB.it, ph:FBK_PH.it, skip:FBK_SKIP.it, send:FBK_SEND.it} };
 }
 // Traduce tutte le stringhe in una lingua via Groq e salva il bundle
 async function traduciLingua(code, enName){
@@ -2584,6 +2584,10 @@ function wakeStandby(){ _wakeUntil = Date.now() + 60000; applyStandby(); }
 /* --- Valutazione soddisfazione (faccine SVG, no emoji) --- */
 const FBK_Q = {it:"Com'è andata?",de:'Wie war es?',en:'How was it?',fr:"Comment c'était ?",es:'¿Qué tal?',ru:'Как всё прошло?',zh:'体验如何？',ar:'كيف كانت تجربتك؟'};
 const FBK_THX = {it:'Grazie!',de:'Danke!',en:'Thank you!',fr:'Merci !',es:'¡Gracias!',ru:'Спасибо!',zh:'谢谢！',ar:'شكراً!'};
+const FBK_SUB = {it:'Vuoi lasciare un commento? (facoltativo)',de:'Möchten Sie einen Kommentar hinterlassen? (optional)',en:'Leave a comment? (optional)',fr:'Laisser un commentaire ? (facultatif)',es:'¿Desea dejar un comentario? (opcional)',ru:'Оставить комментарий? (необязательно)',zh:'留下评论吗？（可选）',ar:'هل تريد ترك تعليق؟ (اختياري)'};
+const FBK_PH  = {it:'Scrivi qui…',de:'Hier schreiben…',en:'Write here…',fr:'Écrivez ici…',es:'Escriba aquí…',ru:'Напишите здесь…',zh:'在此输入…',ar:'اكتب هنا…'};
+const FBK_SKIP= {it:'Salta',de:'Überspringen',en:'Skip',fr:'Passer',es:'Omitir',ru:'Пропустить',zh:'跳过',ar:'تخطّي'};
+const FBK_SEND= {it:'Invia',de:'Senden',en:'Send',fr:'Envoyer',es:'Enviar',ru:'Отправить',zh:'发送',ar:'إرسال'};
 const _FBASE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9.5"/><circle cx="8.6" cy="10" r=".95" fill="currentColor" stroke="none"/><circle cx="15.4" cy="10" r=".95" fill="currentColor" stroke="none"/>';
 const FACE_SAD = _FBASE + '<path d="M8.4 16.2 Q12 12.9 15.6 16.2"/></svg>';   // non felice (bocca all'ingiù)
 const FACE_OK  = _FBASE + '<path d="M8.4 14 Q12 17.2 15.6 14"/></svg>';       // felice (sorriso)
@@ -2619,7 +2623,10 @@ function votaFeedback(r){
   try{ localStorage.setItem('concierge_feedback', JSON.stringify(f)); }catch(_){}
   resetInattivita();
   if(localStorage.getItem('concierge_feedback_comment')!=='0'){          // commento attivo → chiedi (facoltativo)
-    _fbkRating = r; $('fbkComment').value=''; $('fbkThx').textContent = fbkTxt('thx',uiLang());
+    const c = uiLang();
+    _fbkRating = r; $('fbkComment').value=''; $('fbkComment').placeholder = fbkTxt('ph',c);
+    $('fbkThx').textContent = fbkTxt('thx',c); $('fbkSub').textContent = fbkTxt('sub',c);
+    $('fbkSkip').textContent = fbkTxt('skip',c); $('fbkSend').textContent = fbkTxt('send',c);
     $('fbkModal').style.display='flex';
   } else {                                                                // solo faccine → ringraziamento veloce
     const bar=$('feedbackBar'); if(bar){ bar.innerHTML = '<span class="fbk-q">'+fbkTxt('thx',uiLang())+'</span>'; setTimeout(renderFeedback, 2200); }
