@@ -769,8 +769,14 @@ function datiCasino(){
   if(!d){ d={}; DATI_FIELDS.forEach(f=>d[f.k]=f.v); }
   const base = DATI_FIELDS.filter(f=>(d[f.k]||'').trim()).map(f => f.l.toUpperCase()+': '+d[f.k].trim()).join('\n');
   const cust = getCustomBtns().filter(b=>(b.descrizione||'').trim()).map(b => (b.label||'').toUpperCase()+': '+b.descrizione.trim()).join('\n');
-  return base + (cust ? '\n'+cust : '');
+  const fixDesc = getBtnDesc();
+  const fdesc = RAPIDE.filter(b=>(fixDesc[b.ic]||'').trim()).map(b => ((b.l&&b.l.it)||b.ic).toUpperCase()+': '+fixDesc[b.ic].trim()).join('\n');
+  const extra = getDatiExtra().filter(e=>(e.v||'').trim()).map(e => (e.l||'INFO').toUpperCase()+': '+e.v.trim()).join('\n');
+  return [base, fdesc, cust, extra].filter(Boolean).join('\n');
 }
+function getDatiExtra(){ try{ return JSON.parse(localStorage.getItem('concierge_dati_extra')||'[]'); }catch(_){ return []; } }
+function getBtnDesc(){ try{ return JSON.parse(localStorage.getItem('concierge_btn_desc')||'{}'); }catch(_){ return {}; } }
+function setBtnDesc(ic,v){ const m=getBtnDesc(); if(v) m[ic]=v; else delete m[ic]; localStorage.setItem('concierge_btn_desc',JSON.stringify(m)); rispCache.clear(); }
 /* --- Bottoni personalizzati (aggiunti dall'admin, salvati in locale) --- */
 const ICONE_CASINO = ['info','star','gift','trophy','music','cocktail','chip','cards','ticket','spa','phone','key','pin','calendar','mail','map','shop','heart','user','home','building','camera','document','globe','bell','tag','coffee','ristorante','bar','toilette','eventi','giocare','orari','parcheggio','fedelta','scudo','wifi','bancomat','nav'];
 function getCustomBtns(){ try{ return JSON.parse(localStorage.getItem('concierge_btn_custom')||'[]'); }catch(_){ return []; } }
@@ -787,7 +793,32 @@ function getBottoni(){
 // --- Gestione bottoni personalizzati nel pannello admin ---
 let btnEditId = null, btnPickIc = 'info';
 function renderCustomBtnList(){
-  const arr = getCustomBtns(); const box = $('customBtnList'); if(!box) return; box.innerHTML='';
+  const box = $('customBtnList'); if(!box) return; box.innerHTML='';
+  // --- Bottoni già esistenti: descrizione modificabile ---
+  const fixDesc = getBtnDesc();
+  const h1 = document.createElement('div'); h1.style.cssText='font-weight:600;color:var(--oro);margin:0 0 4px';
+  h1.textContent='Bottoni esistenti';
+  const s1 = document.createElement('div'); s1.className='hint'; s1.style.cssText='margin-bottom:8px;opacity:.75';
+  s1.textContent='Modifica la descrizione: è ciò che il concierge sa e dice quando l\'ospite tocca quel bottone.';
+  box.appendChild(h1); box.appendChild(s1);
+  RAPIDE.forEach(b=>{
+    const row = document.createElement('div'); row.className='cbtn-row'; row.style.cssText='flex-wrap:wrap;align-items:flex-start';
+    const ci = document.createElement('div'); ci.className='ci'; ci.innerHTML = ICON[b.ic]||ICON.info;
+    const nm = document.createElement('div'); nm.className='nm'; nm.textContent = (b.l&&b.l.it)||b.ic;
+    const ta = document.createElement('textarea'); ta.rows=2;
+    ta.placeholder='Descrizione / cosa deve sapere il concierge…';
+    ta.value = fixDesc[b.ic]||''; ta.style.cssText='flex:1 1 100%;margin-top:6px;min-height:42px';
+    ta.onchange = ()=>setBtnDesc(b.ic, ta.value.trim());
+    row.appendChild(ci); row.appendChild(nm); row.appendChild(ta); box.appendChild(row);
+  });
+  // --- Bottoni personalizzati ---
+  const arr = getCustomBtns();
+  const h2 = document.createElement('div'); h2.style.cssText='font-weight:600;color:var(--oro);margin:18px 0 6px';
+  h2.textContent='Bottoni personalizzati'; box.appendChild(h2);
+  if(!arr.length){
+    const e = document.createElement('div'); e.className='hint'; e.style.opacity='.7';
+    e.textContent='Nessuno ancora. Usa "Aggiungi bottone" qui sotto.'; box.appendChild(e);
+  }
   arr.forEach(b=>{
     const row = document.createElement('div'); row.className='cbtn-row';
     const ci = document.createElement('div'); ci.className='ci'; ci.innerHTML = ICON[b.ic]||ICON.info;
@@ -839,6 +870,36 @@ function renderDatiFields(){
     ta.style.minHeight = '50px';
     box.appendChild(lab); box.appendChild(ta);
   });
+  // --- Voci aggiuntive personalizzate (argomenti tuoi, senza per forza un bottone) ---
+  const sep = document.createElement('div'); sep.className='hint';
+  sep.style.cssText='margin:18px 0 4px;font-weight:600;color:var(--oro)';
+  sep.textContent='Voci aggiuntive (argomenti tuoi)';
+  box.appendChild(sep);
+  const sub = document.createElement('div'); sub.className='hint';
+  sub.style.cssText='margin-bottom:8px;opacity:.75';
+  sub.textContent='Aggiungi qualsiasi informazione che il concierge deve sapere (es. Spa, Guardaroba, Navetta). Verrà usata nelle risposte anche senza creare un bottone.';
+  box.appendChild(sub);
+  const wrap = document.createElement('div'); wrap.id='extraEntries'; box.appendChild(wrap);
+  getDatiExtra().forEach(e=>wrap.appendChild(makeExtraRow(e.l,e.v)));
+  const add = document.createElement('button'); add.type='button'; add.className='btn-clear';
+  add.style.cssText='margin-top:10px;display:inline-flex;align-items:center;gap:7px;background:rgba(232,213,163,.14);color:var(--oro);border:1px solid rgba(232,213,163,.35)';
+  add.innerHTML = ICON.plus + '<span>Aggiungi voce</span>';
+  add.onclick = ()=>{ wrap.appendChild(makeExtraRow('','')); wrap.lastChild.querySelector('.extra-label').focus(); };
+  box.appendChild(add);
+}
+function makeExtraRow(l,v){
+  const row = document.createElement('div'); row.className='extra-entry';
+  row.style.cssText='border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px;margin-top:10px;position:relative';
+  const li = document.createElement('input'); li.className='extra-label';
+  li.placeholder='Nome argomento (es. Spa)'; li.value=l||'';
+  li.style.cssText='font-weight:600;margin-bottom:6px';
+  const ta = document.createElement('textarea'); ta.className='extra-value'; ta.rows=2;
+  ta.placeholder='Descrizione / informazione…'; ta.value=v||''; ta.style.minHeight='46px';
+  const del = document.createElement('button'); del.type='button'; del.className='btn-clear';
+  del.textContent='Rimuovi'; del.style.cssText='margin-top:6px;font-size:13px;color:#e88';
+  del.onclick=()=>row.remove();
+  row.appendChild(li); row.appendChild(ta); row.appendChild(del);
+  return row;
 }
 
 /* --- Domande rapide (bottoni touch), etichetta + domanda nelle 4 lingue --- */
@@ -1627,8 +1688,15 @@ function salvaSettings(){
   localStorage.setItem('concierge_bg_fx', $('bgFx').value);
   avviaSfondo();
   const struct = {};
-  $('datiFields').querySelectorAll('textarea').forEach(ta => { struct[ta.dataset.k] = ta.value.trim(); });
+  $('datiFields').querySelectorAll('textarea[data-k]').forEach(ta => { struct[ta.dataset.k] = ta.value.trim(); });
   localStorage.setItem('concierge_dati_struct', JSON.stringify(struct));
+  const extra = [];
+  $('datiFields').querySelectorAll('.extra-entry').forEach(r => {
+    const l = (r.querySelector('.extra-label').value||'').trim();
+    const v = (r.querySelector('.extra-value').value||'').trim();
+    if(l || v) extra.push({l, v});
+  });
+  localStorage.setItem('concierge_dati_extra', JSON.stringify(extra));
   localStorage.setItem('concierge_brand', $('brandName').value.trim());
   applyBranding();
   rispCache.clear();                 // i dati possono essere cambiati → invalida le risposte salvate
@@ -1808,7 +1876,7 @@ function resetVergine(){
   if(!confirm('Azzerare TUTTA la configurazione (logo, nome, contenuti, bottoni personalizzati)? L\'app tornerà vuota, pronta per una nuova azienda.')) return;
   const empty = {}; DATI_FIELDS.forEach(f=>empty[f.k]='');
   localStorage.setItem('concierge_dati_struct', JSON.stringify(empty));
-  ['concierge_brand','concierge_logo','concierge_btn_custom'].forEach(k=>localStorage.removeItem(k));
+  ['concierge_brand','concierge_logo','concierge_btn_custom','concierge_dati_extra','concierge_btn_desc'].forEach(k=>localStorage.removeItem(k));
   rispCache.clear();
   applyBranding(); renderDatiFields(); renderCustomBtnList(); costruisciRapide();
   $('errModal').textContent='Configurazione azzerata. Inserisci i dati della nuova azienda.';
