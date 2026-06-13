@@ -18,6 +18,21 @@
     height:100dvh;text-align:center;padding:20px;user-select:none;
   }
 
+  /* --- Sfondo media (foto/video a rotazione) --- */
+  .bg-slide{position:fixed;inset:0;z-index:-2;overflow:hidden;background:radial-gradient(ellipse at center,#1a1a2e 0%,var(--bg) 70%)}
+  .bg-slide .media{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1.4s ease}
+  .bg-slide .media.on{opacity:1}
+  .bg-overlay{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(ellipse at center,rgba(20,20,35,.45),rgba(10,10,15,.78) 72%)}
+
+  /* --- Gestione media nel pannello Admin --- */
+  .media-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .media-item{position:relative;width:74px;height:54px;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,.15);background:#0d0d16;display:flex;align-items:center;justify-content:center}
+  .media-item img,.media-item video{width:100%;height:100%;object-fit:cover}
+  .media-item .pdf{color:var(--oro);font-size:11px;font-weight:600;text-align:center;padding:4px}
+  .media-item .del{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(200,40,40,.9);color:#fff;font-size:12px;line-height:18px;text-align:center;cursor:pointer}
+  .media-empty{font-size:13px;opacity:.5;margin-top:8px}
+  .btn-import{display:inline-block;margin-top:10px;padding:12px 20px;border-radius:10px;background:var(--oro);color:#1a1208;font-weight:600;font-size:14px;cursor:pointer}
+
   /* --- Header --- */
   .logo{position:fixed;top:24px;font-size:13px;letter-spacing:4px;color:var(--oro);opacity:.75;text-transform:uppercase}
   .tools{position:fixed;top:18px;right:20px;display:flex;gap:14px}
@@ -317,6 +332,9 @@
 </head>
 <body class="idle">
 
+  <div class="bg-slide" id="bgSlide"></div>
+  <div class="bg-overlay" id="bgOverlay"></div>
+
   <div class="logo">Casinò Lugano · Concierge</div>
   <div class="tools">
     <span class="trad" id="btnTrad" onclick="apriTrad()" title="Traduttore"></span>
@@ -488,6 +506,15 @@
       <label>Demo animato dopo (secondi di inattività) <span style="opacity:.5">(0 = disattivato)</span></label>
       <input id="demoDelay" type="number" min="0" placeholder="40">
       <div class="hint">Il video-guida parte da solo dopo questo tempo senza interazioni. Tocca lo schermo per chiuderlo.</div>
+
+      <h3>🖼️ Sfondo e media (foto / video / PDF)</h3>
+      <input type="file" id="fileImport" accept="image/*,video/*,application/pdf" multiple style="display:none" onchange="importaMedia(event)">
+      <label class="btn-import" for="fileImport">📁 Importa dal dispositivo</label>
+      <div class="hint">Immagini e video → sfondo a rotazione. PDF (menù, locandine) → apribili. Tutto salvato nella memoria di QUESTO dispositivo (offline, niente cloud).</div>
+      <label>Intervallo rotazione foto (secondi)</label>
+      <input id="bgInterval" type="number" min="3" placeholder="8">
+      <div class="media-grid" id="mediaGrid"></div>
+      <div class="media-empty" id="mediaEmpty">Nessun media caricato.</div>
 
       <h3>Cosa sa il concierge (dati del casinò)</h3>
       <label>Modifica liberamente — l'AI risponde SOLO con queste informazioni</label>
@@ -1238,6 +1265,8 @@ function apriSettings(){
   $('limite').value    = localStorage.getItem('concierge_limite')||'0';
   $('wake').checked    = localStorage.getItem('concierge_wake')==='1';
   $('demoDelay').value = localStorage.getItem('concierge_demo_delay')||'40';
+  $('bgInterval').value = localStorage.getItem('concierge_bg_int')||'8';
+  renderMediaGrid();
   caricaUsoCondiviso().then(()=>{ $('usoOggi').textContent = 'Consumo CONDIVISO questo mese (tutti gli schermi) — Google: '+usoGoogleTot().toLocaleString('de-CH')+' / ElevenLabs: '+usoElevenTot().toLocaleString('de-CH')+' caratteri (gratis fino a 1.000.000).'; });
   $('usoOggi').textContent = 'Consumo questo mese — Google: '+usoGoogleTot().toLocaleString('de-CH')+' / ElevenLabs: '+usoElevenTot().toLocaleString('de-CH')+' caratteri.';
   $('dati').value      = localStorage.getItem('concierge_dati')||DATI_DEFAULT;
@@ -1257,6 +1286,8 @@ function salvaSettings(){
   localStorage.setItem('concierge_limite', String(parseInt($('limite').value||'0',10)||0));
   localStorage.setItem('concierge_wake', $('wake').checked?'1':'');
   localStorage.setItem('concierge_demo_delay', String(parseInt($('demoDelay').value||'40',10)));
+  localStorage.setItem('concierge_bg_int', String(parseInt($('bgInterval').value||'8',10)||8));
+  avviaSfondo();
   localStorage.setItem('concierge_dati', $('dati').value.trim());
   rispCache.clear();                 // i dati possono essere cambiati → invalida le risposte salvate
   $('errModal').textContent='';
@@ -1266,8 +1297,80 @@ function salvaSettings(){
 $('modal').addEventListener('click', e=>{ if(e.target.id==='modal') $('modal').classList.remove('open'); });
 
 /* ============ Avvio ============ */
+/* ============ MOTORE MEDIA — foto/video/PDF nella memoria del dispositivo ============ */
+let _mediaDB = null, bgIdx = 0, bgTimer = null, bgGen = 0;
+function mediaDB(){
+  return new Promise((res,rej)=>{
+    if(_mediaDB) return res(_mediaDB);
+    const rq = indexedDB.open('concierge_media', 1);
+    rq.onupgradeneeded = e => { const db=e.target.result; if(!db.objectStoreNames.contains('media')) db.createObjectStore('media',{keyPath:'id',autoIncrement:true}); };
+    rq.onsuccess = e => { _mediaDB=e.target.result; res(_mediaDB); };
+    rq.onerror = e => rej(e);
+  });
+}
+function mediaAdd(blob,tipo,nome){ return mediaDB().then(db=>new Promise((res,rej)=>{ const tx=db.transaction('media','readwrite'); tx.objectStore('media').add({blob,tipo,nome,t:Date.now()}); tx.oncomplete=res; tx.onerror=rej; })); }
+function mediaGetAll(){ return mediaDB().then(db=>new Promise(res=>{ const tx=db.transaction('media','readonly'); const r=tx.objectStore('media').getAll(); r.onsuccess=()=>res(r.result||[]); r.onerror=()=>res([]); })); }
+function mediaDel(id){ return mediaDB().then(db=>new Promise(res=>{ const tx=db.transaction('media','readwrite'); tx.objectStore('media').delete(id); tx.oncomplete=res; tx.onerror=res; })); }
+
+async function importaMedia(e){
+  const files = [...e.target.files];
+  for(const f of files){
+    const tipo = f.type.startsWith('image') ? 'image' : f.type.startsWith('video') ? 'video' : f.type==='application/pdf' ? 'pdf' : '';
+    if(!tipo) continue;
+    try{ await mediaAdd(f, tipo, f.name); }catch(_){}
+  }
+  e.target.value='';
+  await renderMediaGrid();
+  avviaSfondo();
+}
+async function renderMediaGrid(){
+  const items = await mediaGetAll();
+  const grid = $('mediaGrid'); if(!grid) return; grid.innerHTML='';
+  $('mediaEmpty').style.display = items.length ? 'none' : 'block';
+  for(const m of items){
+    const url = URL.createObjectURL(m.blob);
+    const div = document.createElement('div'); div.className='media-item';
+    if(m.tipo==='image') div.innerHTML = '<img src="'+url+'">';
+    else if(m.tipo==='video') div.innerHTML = '<video src="'+url+'" muted></video>';
+    else div.innerHTML = '<div class="pdf">PDF<br>'+((m.nome||'').slice(0,9))+'</div>';
+    const del = document.createElement('div'); del.className='del'; del.textContent='×';
+    del.onclick = async ev => { ev.stopPropagation(); await mediaDel(m.id); await renderMediaGrid(); avviaSfondo(); };
+    div.appendChild(del);
+    if(m.tipo==='pdf'){ div.style.cursor='pointer'; div.onclick = ()=>{ $('webFrame').src=url; $('webBack').textContent=WEB_BACK[uiLang()]; $('modal').classList.remove('open'); $('webModal').classList.add('open'); }; }
+    grid.appendChild(div);
+  }
+}
+async function avviaSfondo(){
+  clearTimeout(bgTimer);
+  const gen = ++bgGen;
+  const items = (await mediaGetAll()).filter(m => m.tipo==='image' || m.tipo==='video');
+  $('bgSlide').innerHTML = '';
+  if(!items.length) return;            // niente media → sfondo gradiente di default
+  bgIdx = 0; mostraSfondo(items, gen);
+}
+function mostraSfondo(items, gen){
+  if(gen !== bgGen) return;
+  const m = items[bgIdx % items.length];
+  const url = URL.createObjectURL(m.blob);
+  let el;
+  if(m.tipo==='video'){ el=document.createElement('video'); el.src=url; el.muted=true; el.autoplay=true; el.setAttribute('playsinline',''); }
+  else { el=document.createElement('img'); el.src=url; }
+  el.className = 'media';
+  $('bgSlide').appendChild(el);
+  requestAnimationFrame(()=>{ el.classList.add('on'); });
+  const next = ()=>{
+    if(gen !== bgGen) return;
+    el.classList.remove('on');
+    setTimeout(()=>{ try{ URL.revokeObjectURL(url); el.remove(); }catch(_){} }, 1500);
+    bgIdx++; mostraSfondo(items, gen);
+  };
+  if(m.tipo==='video'){ el.onended = next; el.play().catch(()=>{ bgTimer=setTimeout(next, 10000); }); }
+  else { const sec = parseInt(localStorage.getItem('concierge_bg_int')||'8', 10); bgTimer = setTimeout(next, Math.max(3,sec)*1000); }
+}
+
 caricaTtsCache();
 caricaUsoCondiviso(); setInterval(caricaUsoCondiviso, 120000);   // contatore condiviso tra schermi
+avviaSfondo();                                                    // sfondo media (se presente)
 $('btnFull').innerHTML = ICON.full;
 $('btnGear').innerHTML = ICON.gear;
 $('btnTrad').innerHTML = ICON.translate;
