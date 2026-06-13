@@ -21,7 +21,7 @@
   /* --- Sfondo media (foto/video a rotazione) --- */
   .bg-slide{position:fixed;inset:0;z-index:-2;overflow:hidden;background:radial-gradient(ellipse at center,#1a1a2e 0%,var(--bg) 70%)}
   .bg-slide{perspective:1300px}
-  .bg-slide .media{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1.4s ease, transform 1.4s ease}
+  .bg-slide .media{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1.4s ease, transform 1.4s ease, filter 1.4s ease}
   .bg-slide .media.on{opacity:1}
   /* Effetti di transizione (scelti dall'admin) */
   .bg-slide .media.fx-slide{transform:translateX(9%)}
@@ -30,6 +30,17 @@
   @keyframes kenburns{from{transform:scale(1.14)}to{transform:scale(1)}}
   .bg-slide .media.fx-flip{transform:rotateY(28deg);transform-origin:left center}
   .bg-slide .media.fx-flip.on{transform:rotateY(0)}
+  /* Effetti premium aggiuntivi */
+  .bg-slide .media.fx-kbpan.on{animation:kbpan 11s ease forwards}
+  @keyframes kbpan{from{transform:scale(1.18) translate(-3%,-2%)}to{transform:scale(1.04) translate(2%,2%)}}
+  .bg-slide .media.fx-zoomout.on{animation:zoomout 9s ease forwards}
+  @keyframes zoomout{from{transform:scale(1)}to{transform:scale(1.16)}}
+  .bg-slide .media.fx-blur{filter:blur(18px) saturate(1.2);transform:scale(1.06)}
+  .bg-slide .media.fx-blur.on{filter:blur(0) saturate(1);transform:scale(1)}
+  .bg-slide .media.fx-glow{filter:brightness(1.5) saturate(1.3)}
+  .bg-slide .media.fx-glow.on{filter:brightness(1) saturate(1)}
+  .bg-slide .media.fx-cube{transform:perspective(1200px) rotateY(45deg) scale(.92);transform-origin:right center}
+  .bg-slide .media.fx-cube.on{transform:perspective(1200px) rotateY(0) scale(1)}
   .bg-overlay{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(ellipse at center,rgba(20,20,35,.45),rgba(10,10,15,.78) 72%)}
 
   /* --- Gestore media nel pannello Admin (lista ordinabile) --- */
@@ -665,7 +676,13 @@
           <option value="fade">Dissolvenza (classico)</option>
           <option value="slide">Scorrimento laterale</option>
           <option value="zoom">Zoom lento (Ken Burns)</option>
+          <option value="kbpan">Ken Burns panoramico (zoom + movimento) ⭐</option>
+          <option value="zoomout">Zoom indietro (rivelazione)</option>
+          <option value="blur">Dissolvenza cinema (sfocato → nitido) ⭐</option>
+          <option value="glow">Bagliore (luce → naturale)</option>
           <option value="flip">3D — rotazione</option>
+          <option value="cube">3D cubo (prospettiva)</option>
+          <option value="random">Misto — effetto casuale a ogni foto 🎲</option>
         </select>
         <div class="media-list" id="mediaGrid"></div>
         <div class="media-empty" id="mediaEmpty">Nessun media caricato.</div>
@@ -2099,7 +2116,9 @@ function mostraSfondo(items, gen){
   let el;
   if(m.tipo==='video'){ el=document.createElement('video'); el.src=url; el.muted=true; el.autoplay=true; el.setAttribute('playsinline',''); }
   else { el=document.createElement('img'); el.src=url; }
-  el.className = 'media fx-' + (localStorage.getItem('concierge_bg_fx')||'fade');
+  let fx = localStorage.getItem('concierge_bg_fx')||'fade';
+  if(fx==='random'){ const opts=['fade','slide','zoom','kbpan','zoomout','blur','glow','flip','cube']; fx = opts[Math.floor(Math.random()*opts.length)]; }
+  el.className = 'media fx-' + fx;
   $('bgSlide').appendChild(el);
   requestAnimationFrame(()=>{ el.classList.add('on'); });
   const next = ()=>{
