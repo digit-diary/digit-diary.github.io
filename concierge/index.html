@@ -406,6 +406,7 @@
 
   <div class="logo" id="brandTitle">Casinò Lugano · Concierge</div>
   <div class="tools">
+    <span class="mapbtn" id="btnMap" onclick="apriMappa()" title="Mappa" style="display:none"></span>
     <span class="trad" id="btnTrad" onclick="apriTrad()" title="Traduttore"></span>
     <span class="full" id="btnFull" onclick="schermoIntero()" title="Schermo intero"></span>
     <span class="gear" id="btnGear" onclick="tentaSettings()" title="Impostazioni"></span>
@@ -413,6 +414,17 @@
 
   <!-- Angolo segreto: tieni premuto 1,5s per l'accesso admin in modalità chiosco -->
   <div id="adminCorner" style="position:fixed;top:0;left:0;width:72px;height:72px;z-index:9998"></div>
+
+  <!-- Visore Mappa dei piani -->
+  <div id="mapOverlay" style="position:fixed;inset:0;background:rgba(8,5,12,.97);display:none;z-index:80;flex-direction:column">
+    <div style="display:flex;align-items:center;gap:10px;padding:14px 18px">
+      <div id="mapFloors" style="display:flex;gap:8px;flex-wrap:wrap;flex:1"></div>
+      <button onclick="chiudiMappa()" title="Chiudi" style="width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:transparent;color:#fff;font-size:18px;cursor:pointer;flex:none">✕</button>
+    </div>
+    <div id="mapBody" style="flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;padding:0 14px 18px">
+      <img id="mapImg" alt="Mappa" style="max-width:100%;max-height:100%;object-fit:contain;cursor:zoom-in;transition:transform .2s;transform-origin:center">
+    </div>
+  </div>
 
   <!-- Sblocco con PIN -->
   <div id="pinOverlay" style="position:fixed;inset:0;background:rgba(8,5,12,.82);display:none;z-index:9999;align-items:center;justify-content:center">
@@ -656,6 +668,13 @@
         </select>
         <div class="media-list" id="mediaGrid"></div>
         <div class="media-empty" id="mediaEmpty">Nessun media caricato.</div>
+
+        <h3 style="margin-top:22px">Mappa dei piani (piantine)</h3>
+        <input type="file" id="fileMappa" accept="image/*" multiple style="display:none" onchange="importaMappa(event)">
+        <label class="btn-import" for="fileMappa">Importa piantina</label>
+        <div class="hint">Carica un'immagine per ogni piano (es. Piano 0, 1, 2). Comparirà il bottone <b>Mappa</b> per gli ospiti, con selettore dei piani e zoom. Memoria del dispositivo.</div>
+        <div class="media-list" id="mappaGrid"></div>
+        <div class="media-empty" id="mappaEmpty">Nessuna piantina caricata.</div>
       </div>
 
       <!-- SEZIONE COMPORTAMENTO -->
@@ -1875,7 +1894,7 @@ function apriSettings(){
   $('kiosk').checked = localStorage.getItem('concierge_kiosk')==='1';
   $('pinSet').value = '';
   cacheStats();
-  renderMediaGrid();
+  renderMediaGrid(); renderMappaGrid();
   caricaUsoCondiviso().then(()=>{ $('usoOggi').textContent = 'Consumo CONDIVISO questo mese (tutti gli schermi) — Google: '+usoGoogleTot().toLocaleString('de-CH')+' / ElevenLabs: '+usoElevenTot().toLocaleString('de-CH')+' caratteri (gratis fino a 1.000.000).'; });
   $('usoOggi').textContent = 'Consumo questo mese — Google: '+usoGoogleTot().toLocaleString('de-CH')+' / ElevenLabs: '+usoElevenTot().toLocaleString('de-CH')+' caratteri.';
   renderDatiFields();
@@ -2067,6 +2086,79 @@ function mostraSfondo(items, gen){
   else { const sec = parseInt(localStorage.getItem('concierge_bg_int')||'8', 10); bgTimer = setTimeout(next, Math.max(3,sec)*1000); }
 }
 
+/* ===== SEZIONE 11b · MAPPA DEI PIANI (piantine importate, viewer zoomabile) ===== */
+let _mapDB = null;
+function mapDB(){ return new Promise((res,rej)=>{ if(_mapDB) return res(_mapDB);
+  const rq = indexedDB.open('concierge_mappe', 1);
+  rq.onupgradeneeded = e => { const db=e.target.result; if(!db.objectStoreNames.contains('mappe')) db.createObjectStore('mappe',{keyPath:'id',autoIncrement:true}); };
+  rq.onsuccess = e => { _mapDB=e.target.result; res(_mapDB); };
+  rq.onerror = e => rej(e); }); }
+function mapAdd(blob,nome,ord){ return mapDB().then(db=>new Promise((res,rej)=>{ const tx=db.transaction('mappe','readwrite'); tx.objectStore('mappe').add({blob,nome,ord,t:Date.now()}); tx.oncomplete=res; tx.onerror=rej; })); }
+function mapPut(it){ return mapDB().then(db=>new Promise((res,rej)=>{ const tx=db.transaction('mappe','readwrite'); tx.objectStore('mappe').put(it); tx.oncomplete=res; tx.onerror=rej; })); }
+function mapGetAll(){ return mapDB().then(db=>new Promise(res=>{ const tx=db.transaction('mappe','readonly'); const r=tx.objectStore('mappe').getAll(); r.onsuccess=()=>res((r.result||[]).sort((a,b)=>(a.ord||a.t||0)-(b.ord||b.t||0))); r.onerror=()=>res([]); })); }
+function mapDel(id){ return mapDB().then(db=>new Promise(res=>{ const tx=db.transaction('mappe','readwrite'); tx.objectStore('mappe').delete(id); tx.oncomplete=res; tx.onerror=res; })); }
+function mapClear(){ return mapDB().then(db=>new Promise(res=>{ const tx=db.transaction('mappe','readwrite'); tx.objectStore('mappe').clear(); tx.oncomplete=res; tx.onerror=res; })).catch(()=>{}); }
+
+async function importaMappa(e){
+  const files = [...e.target.files];
+  let maxOrd = (await mapGetAll()).reduce((m,x)=>Math.max(m, x.ord||0), 0);
+  for(const f of files){
+    if(!f.type.startsWith('image')) continue;
+    if(f.size > 8000000){ alert('Piantina troppo pesante ('+Math.round(f.size/1024)+' KB): usa un\'immagine sotto 8 MB.'); continue; }
+    const nome = (prompt('Nome del piano per "'+f.name+'":', 'Piano '+(maxOrd+1)) || ('Piano '+(maxOrd+1))).trim();
+    try{ await mapAdd(f, nome, ++maxOrd); }catch(_){}
+  }
+  e.target.value=''; renderMappaGrid(); aggiornaBtnMappa();
+}
+async function renderMappaGrid(){
+  const box = $('mappaGrid'); if(!box) return; const arr = await mapGetAll(); box.innerHTML='';
+  if($('mappaEmpty')) $('mappaEmpty').style.display = arr.length ? 'none' : 'block';
+  arr.forEach((m, idx)=>{
+    const url = URL.createObjectURL(m.blob);
+    const row = document.createElement('div'); row.className='media-row';
+    const thumb = document.createElement('div'); thumb.className='thumb'; thumb.innerHTML='<img src="'+url+'">';
+    const info = document.createElement('div'); info.className='info';
+    info.innerHTML = '<div class="nm"></div><div class="tp">piantina</div>';
+    info.querySelector('.nm').textContent = m.nome || ('Piano '+(idx+1));
+    const ctrl = document.createElement('div'); ctrl.className='ctrl';
+    ctrl.appendChild(_mkBtn(ICON.edit, async ()=>{ const n=prompt('Nome del piano:', m.nome||''); if(n!==null){ m.nome=n.trim(); await mapPut(m); renderMappaGrid(); } }));
+    ctrl.appendChild(_mkBtn(ICON.up,   async ()=>{ await mapSwap(idx,-1); }));
+    ctrl.appendChild(_mkBtn(ICON.down, async ()=>{ await mapSwap(idx, 1); }));
+    ctrl.appendChild(_mkBtn(ICON.trash, async ()=>{ await mapDel(m.id); renderMappaGrid(); aggiornaBtnMappa(); }, 'x'));
+    row.appendChild(thumb); row.appendChild(info); row.appendChild(ctrl);
+    box.appendChild(row);
+  });
+}
+async function mapSwap(idx, dir){
+  const arr = await mapGetAll(); const j = idx+dir; if(j<0||j>=arr.length) return;
+  const a=arr[idx], b=arr[j]; const t=a.ord; a.ord=b.ord; b.ord=t;
+  await mapPut(a); await mapPut(b); renderMappaGrid();
+}
+function aggiornaBtnMappa(){ mapGetAll().then(a=>{ if($('btnMap')) $('btnMap').style.display = a.length ? '' : 'none'; }); }
+
+let _mapUrls = [], _mapZoom = false;
+async function apriMappa(){
+  const arr = await mapGetAll(); if(!arr.length) return;
+  _mapUrls.forEach(u=>{ try{ URL.revokeObjectURL(u); }catch(_){} }); _mapUrls=[];
+  const fl = $('mapFloors'); fl.innerHTML='';
+  arr.forEach((m,i)=>{
+    const u = URL.createObjectURL(m.blob); _mapUrls.push(u);
+    const b = document.createElement('button');
+    b.textContent = m.nome || ('Piano '+(i+1));
+    b.style.cssText = 'padding:9px 16px;border-radius:22px;border:1px solid var(--oro);background:transparent;color:#fff;cursor:pointer;font-size:15px;opacity:.6';
+    b.onclick = ()=>mostraPiano(u, b);
+    fl.appendChild(b);
+    if(i===0) mostraPiano(u, b);
+  });
+  $('mapOverlay').style.display='flex'; resetInattivita();
+}
+function mostraPiano(url, btn){
+  $('mapImg').src = url; _mapZoom=false; $('mapImg').style.transform=''; $('mapImg').style.cursor='zoom-in';
+  [...$('mapFloors').children].forEach(c=>{ c.style.opacity='.6'; c.style.background='transparent'; });
+  if(btn){ btn.style.opacity='1'; btn.style.background='rgba(232,213,163,.18)'; }
+}
+function chiudiMappa(){ $('mapOverlay').style.display='none'; resetInattivita(); }
+
 /* ===== SEZIONE 12 · AVVIO (inizializzazione all'apertura) ===== */
 caricaTtsCache(); caricaRisp();                                  // riusa risposte/audio già salvati (zero chiamate)
 applyKiosk();                                                    // se chiosco attivo: nasconde ⚙️ + schermo intero
@@ -2075,6 +2167,8 @@ avviaSfondo();                                                    // sfondo medi
 $('btnFull').innerHTML = ICON.full;
 $('btnGear').innerHTML = ICON.gear;
 $('btnTrad').innerHTML = ICON.translate;
+$('btnMap').innerHTML = ICON.map; aggiornaBtnMappa();
+$('mapImg').addEventListener('click', function(){ _mapZoom=!_mapZoom; this.style.transform=_mapZoom?'scale(2)':''; this.style.cursor=_mapZoom?'zoom-out':'zoom-in'; });
 // Icone professionali nel pannello impostazioni (niente emoji)
 $('hImpost').innerHTML   = ICON.gear   + '<span>Impostazioni</span>';
 $('lblMotore').innerHTML = ICON.voce   + '<span>Motore voce</span>';
@@ -2118,6 +2212,7 @@ function resetVergine(){
   const empty = {}; DATI_FIELDS.forEach(f=>empty[f.k]='');
   localStorage.setItem('concierge_dati_struct', JSON.stringify(empty));
   ['concierge_brand','concierge_logo','concierge_btn_custom','concierge_dati_extra','concierge_btn_hidden','concierge_pin','concierge_kiosk'].forEach(k=>localStorage.removeItem(k));
+  mapClear(); aggiornaBtnMappa();
   applyKiosk();
   svuotaRisp();
   applyBranding(); renderDatiFields(); renderCustomBtnList(); costruisciRapide();
