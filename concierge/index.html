@@ -686,6 +686,9 @@
         <label>Demo animato dopo (secondi di inattività) <span style="opacity:.5">(0 = disattivato)</span></label>
         <input id="demoDelay" type="number" min="0" placeholder="40">
         <div class="hint">Il video-guida parte da solo dopo questo tempo senza interazioni.</div>
+        <label>Frasi d'esempio della demo <span style="opacity:.5">(una per riga)</span></label>
+        <textarea id="demoFrasi" rows="3" placeholder="Es.&#10;Dov'è il ristorante?&#10;A che ora aprite?&#10;Come si gioca alle slot?"></textarea>
+        <div class="hint">Le frasi che ruotano sotto il cerchio. <b>Vuoto</b> = quelle multilingue di default (consigliato per il casinò). Per altre aziende, scrivi le tue.</div>
 
         <label>Lingua predefinita all'avvio</label>
         <select id="langDef">
@@ -1762,15 +1765,25 @@ const DEMO_TITLE = {it:'Premi qui e chiedi', de:'Hier tippen und fragen', en:'Ta
 const DEMO_EX = {it:'« Dov\'è il ristorante? »', de:'« Wo ist die Toilette? »', en:'« What time do you open? »', fr:'« Comment jouer à la roulette? »', es:'« ¿Dónde está el restaurante? »', ru:'« Где ресторан? »', zh:'« 餐厅在哪里？ »', ar:'« أين المطعم؟ »'};
 const FLAG_DEMO = {it:'🇮🇹', de:'🇩🇪', en:'🇬🇧', fr:'🇫🇷', es:'🇪🇸', ru:'🇷🇺', zh:'🇨🇳', ar:'🇸🇦'};
 const DEMO_LANGS = ['it','de','en','fr','es','ru','zh','ar'];
+let demoFraseIdx = 0;
+// Frasi d'esempio personalizzate dall'admin (una per riga). Vuoto = quelle multilingue di default.
+function getDemoFrasi(){ return (localStorage.getItem('concierge_demo_frasi')||'').split('\n').map(s=>s.trim()).filter(Boolean); }
 
 function demoRotate(){
   demoCtaIdx = (demoCtaIdx+1) % DEMO_LANGS.length;
   const l = DEMO_LANGS[demoCtaIdx];
+  const frasi = getDemoFrasi();
   $('demoTitle').style.opacity = 0; $('demoExample').style.opacity = 0; $('demoCta').style.opacity = 0;
   setTimeout(()=>{
     $('demoTitle').textContent = DEMO_TITLE[l];
     $('demoCta').textContent   = DEMO_CTA[l];
-    $('demoExample').innerHTML = '<span class="fl">'+FLAG_DEMO[l]+'</span> <i>'+DEMO_EX[l]+'</i>';
+    if(frasi.length){                                   // frasi personalizzate (testo dell'admin)
+      const ph = frasi[demoFraseIdx % frasi.length]; demoFraseIdx++;
+      $('demoExample').innerHTML = '<i></i>'; $('demoExample').querySelector('i').textContent = ph;
+    } else {                                            // default: esempio nella lingua corrente + bandiera
+      $('demoExample').innerHTML = '<span class="fl">'+FLAG_DEMO[l]+'</span> <i></i>';
+      $('demoExample').querySelector('i').textContent = DEMO_EX[l];
+    }
     $('demoTitle').style.opacity = 1; $('demoExample').style.opacity = .95; $('demoCta').style.opacity = 1;
   }, 380);
 }
@@ -1891,6 +1904,7 @@ function apriSettings(){
   $('limite').value    = localStorage.getItem('concierge_limite')||'0';
   $('wake').checked    = localStorage.getItem('concierge_wake')==='1';
   $('demoDelay').value = localStorage.getItem('concierge_demo_delay')||'40';
+  $('demoFrasi').value = localStorage.getItem('concierge_demo_frasi')||'';
   $('langDef').value   = localStorage.getItem('concierge_lang_def')||'it-IT';
   $('micSens').value   = localStorage.getItem('concierge_mic_sens')||'0.55';
   $('voiceRate').value = localStorage.getItem('concierge_voice_rate')||'1';
@@ -1924,6 +1938,7 @@ function salvaSettings(){
   lsSet('concierge_limite', String(parseInt($('limite').value||'0',10)||0));
   lsSet('concierge_wake', $('wake').checked?'1':'');
   lsSet('concierge_demo_delay', String(parseInt($('demoDelay').value||'40',10)));
+  lsSet('concierge_demo_frasi', ($('demoFrasi').value||'').trim());
   lsSet('concierge_lang_def', $('langDef').value);
   lsSet('concierge_mic_sens', $('micSens').value);
   lsSet('concierge_voice_rate', $('voiceRate').value);
@@ -2192,16 +2207,23 @@ $('btnAddCustom').innerHTML = ICON.plus + '<span>Aggiungi bottone</span>';
 $('demoMic').innerHTML = ICON.mic;
 $('demoFinger').innerHTML = '<svg viewBox="0 0 24 24" fill="#fdfdfd"><path d="M9 11.24V7.5a2.5 2.5 0 0 1 5 0v3.74c1.21-.81 2-2.18 2-3.74a4.5 4.5 0 1 0-9 0c0 1.56.79 2.93 2 3.74zm9.84 4.63l-4.54-2.26a1.4 1.4 0 0 0-.54-.11H13V7.5a1.5 1.5 0 0 0-3 0V21l-3.43-.72a1.1 1.1 0 0 0-1.03.3l-.79.8 4.94 4.94c.27.27.65.44 1.06.44h6.79c.75 0 1.33-.55 1.44-1.28l.75-5.27a2 2 0 0 0 .02-.21c0-.62-.38-1.16-.92-1.4z"/></svg>';
 const DEMO_LOGO_DEFAULT = '<svg viewBox="0 0 200 200"><defs><radialGradient id="dlr" cx="50%" cy="42%" r="65%"><stop offset="0%" stop-color="#d8244e"/><stop offset="55%" stop-color="#b01038"/><stop offset="100%" stop-color="#7d0826"/></radialGradient><radialGradient id="dls" cx="38%" cy="32%" r="70%"><stop offset="0%" stop-color="#ffffff"/><stop offset="60%" stop-color="#d9dbdc"/><stop offset="100%" stop-color="#9a9ea1"/></radialGradient></defs><path d="M48,56 Q96,104 144,56 Q96,104 144,152 Q96,104 48,152 Q96,104 48,56 Z" fill="url(#dlr)" stroke="#c9ccce" stroke-width="6" stroke-linejoin="round"/><circle cx="150" cy="52" r="13" fill="url(#dls)" stroke="#b6babd" stroke-width="1.5"/></svg>';
+// Emblema NEUTRO per lo stato vergine/white-label (NON la stella del casinò)
+const NEUTRAL_LOGO = '<svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="62" fill="none" stroke="#e8d5a3" stroke-width="6" opacity=".75"/><circle cx="100" cy="100" r="19" fill="#e8d5a3" opacity=".85"/></svg>';
 $('demoLogo').innerHTML = DEMO_LOGO_DEFAULT;
 // Branding (logo + nome azienda) — white-label
 function applyBranding(){
   const logo = localStorage.getItem('concierge_logo');
+  const vergine = localStorage.getItem('concierge_vergine')==='1';
   const brand = (localStorage.getItem('concierge_brand')||'').trim();
-  $('brandTitle').textContent = brand || 'Casinò Lugano · Concierge';
+  $('brandTitle').textContent = brand || (vergine ? 'Concierge' : 'Casinò Lugano · Concierge');
   const ec = $('emblemaCustom');
   if(logo){
     ec.innerHTML = '<img src="'+logo+'" alt="logo">'; ec.classList.add('on'); document.body.classList.add('has-logo');
     $('demoLogo').innerHTML = '<img src="'+logo+'" style="width:100%;height:100%;object-fit:contain">';
+  } else if(vergine){
+    // Vergine: niente stella casinò → emblema neutro (copre quello di default sulla home)
+    ec.innerHTML = NEUTRAL_LOGO; ec.classList.add('on'); document.body.classList.add('has-logo');
+    $('demoLogo').innerHTML = NEUTRAL_LOGO;
   } else {
     ec.innerHTML=''; ec.classList.remove('on'); document.body.classList.remove('has-logo');
     $('demoLogo').innerHTML = DEMO_LOGO_DEFAULT;
@@ -2222,7 +2244,8 @@ function resetVergine(){
   if(!confirm('Azzerare TUTTA la configurazione (logo, nome, contenuti, bottoni personalizzati)? L\'app tornerà vuota, pronta per una nuova azienda.')) return;
   const empty = {}; DATI_FIELDS.forEach(f=>empty[f.k]='');
   localStorage.setItem('concierge_dati_struct', JSON.stringify(empty));
-  ['concierge_brand','concierge_logo','concierge_btn_custom','concierge_dati_extra','concierge_btn_hidden','concierge_pin','concierge_kiosk'].forEach(k=>localStorage.removeItem(k));
+  ['concierge_brand','concierge_logo','concierge_btn_custom','concierge_dati_extra','concierge_btn_hidden','concierge_pin','concierge_kiosk','concierge_demo_frasi'].forEach(k=>localStorage.removeItem(k));
+  localStorage.setItem('concierge_vergine','1');   // niente stella casinò: emblema neutro finché non si carica un logo
   mapClear(); aggiornaBtnMappa();
   applyKiosk();
   svuotaRisp();
