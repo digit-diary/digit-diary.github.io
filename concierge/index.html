@@ -20,8 +20,16 @@
 
   /* --- Sfondo media (foto/video a rotazione) --- */
   .bg-slide{position:fixed;inset:0;z-index:-2;overflow:hidden;background:radial-gradient(ellipse at center,#1a1a2e 0%,var(--bg) 70%)}
-  .bg-slide .media{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1.4s ease}
+  .bg-slide{perspective:1300px}
+  .bg-slide .media{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1.4s ease, transform 1.4s ease}
   .bg-slide .media.on{opacity:1}
+  /* Effetti di transizione (scelti dall'admin) */
+  .bg-slide .media.fx-slide{transform:translateX(9%)}
+  .bg-slide .media.fx-slide.on{transform:translateX(0)}
+  .bg-slide .media.fx-zoom.on{animation:kenburns 9s ease forwards}
+  @keyframes kenburns{from{transform:scale(1.14)}to{transform:scale(1)}}
+  .bg-slide .media.fx-flip{transform:rotateY(28deg);transform-origin:left center}
+  .bg-slide .media.fx-flip.on{transform:rotateY(0)}
   .bg-overlay{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(ellipse at center,rgba(20,20,35,.45),rgba(10,10,15,.78) 72%)}
 
   /* --- Gestore media nel pannello Admin (lista ordinabile) --- */
@@ -187,6 +195,10 @@
   .demo::after{width:360px;height:360px;background:#7d0826;bottom:-120px;right:-90px;animation:float2 17s ease-in-out infinite}
   @keyframes float1{0%,100%{transform:translate(0,0)}50%{transform:translate(60px,40px)}}
   @keyframes float2{0%,100%{transform:translate(0,0)}50%{transform:translate(-50px,-40px)}}
+  .demo-bg{position:absolute;inset:0;z-index:0;overflow:hidden}
+  .demo-bg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1.4s ease}
+  .demo-bg img.on{opacity:.32}
+  .demo > *:not(.demo-bg){position:relative;z-index:1}
   .demo-logo,.demo-logo svg{width:60px;height:60px}
   .demo-logo{margin-bottom:16px;opacity:.9;animation:demoLogoIn .8s ease, breathe 4s ease-in-out infinite 1s}
   .demo-logo svg{filter:drop-shadow(0 0 16px rgba(232,213,163,.4))}
@@ -308,6 +320,20 @@
     .trad-mic-ico svg{width:40px;height:40px}
     .trad-instr{font-size:17px}
     .trad-instr2{font-size:15px}
+  }
+  /* Schermi BASSI / orizzontali (telefoni in landscape) — niente sovrapposizioni */
+  @media (max-height:560px){
+    html,body{overflow-y:auto}
+    body{justify-content:flex-start;height:auto;min-height:100dvh;padding:46px 14px 60px}
+    .emblema-wrap{width:118px;height:118px;margin-bottom:8px}
+    .stato{font-size:12px}
+    .risposta{font-size:18px}
+    .domanda{font-size:13px}
+    .lingue{margin-top:10px}
+    .rapide{margin-top:12px;max-height:none;overflow:visible}
+    .rapide button{padding:7px 12px;font-size:12px}
+    .demo-stage{width:min(58vmin,230px);height:min(58vmin,230px)}
+    .trad-out{font-size:22px}
   }
   /* Tablet (iPad): leggermente più contenuto del kiosk */
   @media (min-width:641px) and (max-width:1100px){
@@ -446,6 +472,7 @@
 
   <!-- Demo animato (attract mode) -->
   <div class="demo" id="demo" onclick="chiudiDemo()">
+    <div class="demo-bg" id="demoBg"></div>
     <div class="demo-logo" id="demoLogo"></div>
     <div class="demo-stage">
       <div class="demo-ring" id="demoRing"></div>
@@ -595,6 +622,13 @@
         <div class="hint">Immagini e video → sfondo a rotazione (foto e video insieme, in coda). PDF (menù, mappa) → apribili. Usa ↑↓ per l'ordine. Memoria del dispositivo (offline).</div>
         <label>Durata di ogni foto in sfondo (secondi)</label>
         <input id="bgInterval" type="number" min="2" placeholder="8">
+        <label>Effetto transizione (come girano le foto)</label>
+        <select id="bgFx">
+          <option value="fade">Dissolvenza (classico)</option>
+          <option value="slide">Scorrimento laterale</option>
+          <option value="zoom">Zoom lento (Ken Burns)</option>
+          <option value="flip">3D — rotazione</option>
+        </select>
         <div class="media-list" id="mediaGrid"></div>
         <div class="media-empty" id="mediaEmpty">Nessun media caricato.</div>
       </div>
@@ -1468,6 +1502,7 @@ function mostraDemo(){
   clearInterval(demoCtaTimer);
   demoRotate();                                  // imposta subito la prima lingua
   demoCtaTimer = setInterval(demoRotate, 3400);  // ruota ogni 3.4s
+  avviaDemoBg();                                  // sfondo demo (media marcati "Demo")
   $('demo').classList.add('open');
 }
 function chiudiDemo(){
@@ -1521,6 +1556,7 @@ function apriSettings(){
   $('wake').checked    = localStorage.getItem('concierge_wake')==='1';
   $('demoDelay').value = localStorage.getItem('concierge_demo_delay')||'40';
   $('bgInterval').value = localStorage.getItem('concierge_bg_int')||'8';
+  $('bgFx').value = localStorage.getItem('concierge_bg_fx')||'fade';
   renderMediaGrid();
   caricaUsoCondiviso().then(()=>{ $('usoOggi').textContent = 'Consumo CONDIVISO questo mese (tutti gli schermi) — Google: '+usoGoogleTot().toLocaleString('de-CH')+' / ElevenLabs: '+usoElevenTot().toLocaleString('de-CH')+' caratteri (gratis fino a 1.000.000).'; });
   $('usoOggi').textContent = 'Consumo questo mese — Google: '+usoGoogleTot().toLocaleString('de-CH')+' / ElevenLabs: '+usoElevenTot().toLocaleString('de-CH')+' caratteri.';
@@ -1545,6 +1581,7 @@ function salvaSettings(){
   localStorage.setItem('concierge_wake', $('wake').checked?'1':'');
   localStorage.setItem('concierge_demo_delay', String(parseInt($('demoDelay').value||'40',10)));
   localStorage.setItem('concierge_bg_int', String(parseInt($('bgInterval').value||'8',10)||8));
+  localStorage.setItem('concierge_bg_fx', $('bgFx').value);
   avviaSfondo();
   const struct = {};
   $('datiFields').querySelectorAll('textarea').forEach(ta => { struct[ta.dataset.k] = ta.value.trim(); });
@@ -1621,18 +1658,47 @@ async function renderMediaGrid(){
     ctrl.appendChild(_mkBtn(ICON.up,   ()=>spostaMedia(m.id,-1)));
     ctrl.appendChild(_mkBtn(ICON.down, ()=>spostaMedia(m.id, 1)));
     if(m.tipo==='pdf') ctrl.appendChild(_mkBtn(ICON.eye, ()=>apriPdf(url)));
-    ctrl.appendChild(_mkBtn(ICON.trash, async ()=>{ await mediaDel(m.id); await renderMediaGrid(); avviaSfondo(); }, 'x'));
-    row.appendChild(thumb); row.appendChild(info); row.appendChild(ctrl);
+    ctrl.appendChild(_mkBtn(ICON.trash, async ()=>{ await mediaDel(m.id); await renderMediaGrid(); avviaSfondo(); avviaDemoBg(); }, 'x'));
+    row.appendChild(thumb); row.appendChild(info);
+    if(m.tipo!=='pdf'){
+      const sel = document.createElement('select');
+      sel.style.cssText = 'width:auto;padding:6px 8px;font-size:12px;flex:none';
+      sel.innerHTML = '<option value="sfondo">Sfondo</option><option value="demo">Demo</option>';
+      sel.value = m.uso || 'sfondo';
+      sel.onchange = async ()=>{ m.uso = sel.value; await mediaPut(m); avviaSfondo(); avviaDemoBg(); };
+      row.appendChild(sel);
+    }
+    row.appendChild(ctrl);
     grid.appendChild(row);
   });
 }
 async function avviaSfondo(){
   clearTimeout(bgTimer);
   const gen = ++bgGen;
-  const items = (await mediaGetAll()).filter(m => m.tipo==='image' || m.tipo==='video');
+  const items = (await mediaGetAll()).filter(m => (m.tipo==='image'||m.tipo==='video') && (m.uso||'sfondo')!=='demo');
   $('bgSlide').innerHTML = '';
   if(!items.length) return;            // niente media → sfondo gradiente di default
   bgIdx = 0; mostraSfondo(items, gen);
+}
+// Slideshow sfondo del DEMO (media marcati "Demo")
+let demoBgGen = 0, demoBgTimer = null, demoBgIdx = 0;
+async function avviaDemoBg(){
+  clearTimeout(demoBgTimer);
+  const gen = ++demoBgGen;
+  const items = (await mediaGetAll()).filter(m => m.tipo==='image' && m.uso==='demo');
+  if($('demoBg')) $('demoBg').innerHTML = '';
+  if(!items.length) return;
+  demoBgIdx = 0; demoBgShow(items, gen);
+}
+function demoBgShow(items, gen){
+  if(gen !== demoBgGen || !$('demoBg')) return;
+  const m = items[demoBgIdx % items.length];
+  const url = URL.createObjectURL(m.blob);
+  const el = document.createElement('img'); el.src = url;
+  $('demoBg').appendChild(el);
+  requestAnimationFrame(()=>el.classList.add('on'));
+  const next = ()=>{ if(gen!==demoBgGen) return; el.classList.remove('on'); setTimeout(()=>{ try{ URL.revokeObjectURL(url); el.remove(); }catch(_){} }, 1400); demoBgIdx++; demoBgShow(items, gen); };
+  demoBgTimer = setTimeout(next, 6000);
 }
 function mostraSfondo(items, gen){
   if(gen !== bgGen) return;
@@ -1641,7 +1707,7 @@ function mostraSfondo(items, gen){
   let el;
   if(m.tipo==='video'){ el=document.createElement('video'); el.src=url; el.muted=true; el.autoplay=true; el.setAttribute('playsinline',''); }
   else { el=document.createElement('img'); el.src=url; }
-  el.className = 'media';
+  el.className = 'media fx-' + (localStorage.getItem('concierge_bg_fx')||'fade');
   $('bgSlide').appendChild(el);
   requestAnimationFrame(()=>{ el.classList.add('on'); });
   const next = ()=>{
