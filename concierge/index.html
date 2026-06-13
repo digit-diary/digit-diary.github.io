@@ -812,8 +812,8 @@
         <div class="hint">Solo numeri (interazioni e bottoni più usati). Nessun dato personale.</div>
 
         <h3 style="margin-top:22px">Valutazione soddisfazione</h3>
-        <label><input type="checkbox" id="feedbackOn" style="width:auto;margin-right:8px"> Mostra le faccine di valutazione agli ospiti</label>
-        <label><input type="checkbox" id="feedbackComment" style="width:auto;margin-right:8px"> Permetti il commento facoltativo (altrimenti solo faccine)</label>
+        <label><input type="checkbox" id="feedbackOn" style="width:auto;margin-right:8px" onchange="syncFeedbackUI()"> Mostra le faccine di valutazione agli ospiti</label>
+        <label id="lblFbkComment"><input type="checkbox" id="feedbackComment" style="width:auto;margin-right:8px"> Permetti il commento facoltativo (altrimenti solo faccine)</label>
         <div class="hint">Tre faccine (felicissimo / felice / non felice) in basso. Se il commento è attivo, l'ospite può lasciarne uno <b>facoltativo</b> che <b>solo tu (admin) vedi qui sotto</b>.</div>
         <div class="hint" id="fbkAdmin" style="line-height:1.7;margin-top:8px">—</div>
         <span class="btn-clear" style="margin-top:8px;display:inline-block" onclick="resetFeedback()">Azzera valutazioni e commenti</span>
@@ -2044,6 +2044,7 @@ function apriSettings(){
   $('standbyA').value  = localStorage.getItem('concierge_standby_a')||'';
   $('feedbackOn').checked = localStorage.getItem('concierge_feedback_on')!=='0';
   $('feedbackComment').checked = localStorage.getItem('concierge_feedback_comment')!=='0';
+  syncFeedbackUI();
   renderStats(); renderFeedbackAdmin();
   cacheStats();
   renderMediaGrid(); renderMappaGrid();
@@ -2516,6 +2517,11 @@ function renderFeedbackAdmin(){
   el.innerHTML = h;
 }
 function resetFeedback(){ if(!confirm('Azzerare valutazioni e commenti?')) return; try{ localStorage.removeItem('concierge_feedback'); }catch(_){} renderFeedbackAdmin(); }
+function syncFeedbackUI(){
+  const on = $('feedbackOn') && $('feedbackOn').checked;
+  if($('feedbackComment')) $('feedbackComment').disabled = !on;
+  if($('lblFbkComment')) $('lblFbkComment').style.opacity = on ? '1' : '.45';
+}
 
 /* --- LICENZA: l'app funziona libera sulla TUA deployment; su altri domini serve una chiave valida --- */
 function verificaLicenza(){
