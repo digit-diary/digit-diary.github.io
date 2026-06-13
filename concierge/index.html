@@ -769,14 +769,12 @@ function datiCasino(){
   if(!d){ d={}; DATI_FIELDS.forEach(f=>d[f.k]=f.v); }
   const base = DATI_FIELDS.filter(f=>(d[f.k]||'').trim()).map(f => f.l.toUpperCase()+': '+d[f.k].trim()).join('\n');
   const cust = getCustomBtns().filter(b=>(b.descrizione||'').trim()).map(b => (b.label||'').toUpperCase()+': '+b.descrizione.trim()).join('\n');
-  const fixDesc = getBtnDesc();
-  const fdesc = RAPIDE.filter(b=>(fixDesc[b.ic]||'').trim()).map(b => ((b.l&&b.l.it)||b.ic).toUpperCase()+': '+fixDesc[b.ic].trim()).join('\n');
   const extra = getDatiExtra().filter(e=>(e.v||'').trim()).map(e => (e.l||'INFO').toUpperCase()+': '+e.v.trim()).join('\n');
-  return [base, fdesc, cust, extra].filter(Boolean).join('\n');
+  return [base, cust, extra].filter(Boolean).join('\n');
 }
 function getDatiExtra(){ try{ return JSON.parse(localStorage.getItem('concierge_dati_extra')||'[]'); }catch(_){ return []; } }
-function getBtnDesc(){ try{ return JSON.parse(localStorage.getItem('concierge_btn_desc')||'{}'); }catch(_){ return {}; } }
-function setBtnDesc(ic,v){ const m=getBtnDesc(); if(v) m[ic]=v; else delete m[ic]; localStorage.setItem('concierge_btn_desc',JSON.stringify(m)); rispCache.clear(); }
+// Ogni bottone fisso è collegato a un argomento dei Contenuti (unica fonte di verità del testo)
+const BTN_DATI = {ristorante:'ristorante', bar:'bar', toilette:'toilette', eventi:'eventi', giocare:'slot', orari:'orari', parcheggio:'parcheggio', fedelta:'fedelta', scudo:'gioco_resp', wifi:'wifi', bancomat:'bancomat'};
 /* --- Bottoni personalizzati (aggiunti dall'admin, salvati in locale) --- */
 const ICONE_CASINO = ['info','star','gift','trophy','music','cocktail','chip','cards','ticket','spa','phone','key','pin','calendar','mail','map','shop','heart','user','home','building','camera','document','globe','bell','tag','coffee','ristorante','bar','toilette','eventi','giocare','orari','parcheggio','fedelta','scudo','wifi','bancomat','nav'];
 function getCustomBtns(){ try{ return JSON.parse(localStorage.getItem('concierge_btn_custom')||'[]'); }catch(_){ return []; } }
@@ -792,24 +790,49 @@ function getBottoni(){
 }
 // --- Gestione bottoni personalizzati nel pannello admin ---
 let btnEditId = null, btnPickIc = 'info';
+function _datiVal(k){
+  let d; try{ d=JSON.parse(localStorage.getItem('concierge_dati_struct')||'null'); }catch(_){ d=null; }
+  if(d && d[k]!=null) return d[k];
+  const f = DATI_FIELDS.find(x=>x.k===k); return f ? f.v : '';
+}
+function jumpContenuti(k){
+  switchTab('dati');
+  const ta = document.querySelector('#datiFields textarea[data-k="'+k+'"]');
+  if(ta){ ta.scrollIntoView({block:'center'}); ta.focus();
+    ta.style.transition='box-shadow .3s'; ta.style.boxShadow='0 0 0 2px var(--oro)';
+    setTimeout(()=>{ ta.style.boxShadow=''; }, 1400);
+  }
+}
 function renderCustomBtnList(){
   const box = $('customBtnList'); if(!box) return; box.innerHTML='';
-  // --- Bottoni già esistenti: descrizione modificabile ---
-  const fixDesc = getBtnDesc();
+  // --- Bottoni già esistenti (scorciatoie). Il testo della risposta vive nei Contenuti. ---
   const h1 = document.createElement('div'); h1.style.cssText='font-weight:600;color:var(--oro);margin:0 0 4px';
   h1.textContent='Bottoni esistenti';
   const s1 = document.createElement('div'); s1.className='hint'; s1.style.cssText='margin-bottom:8px;opacity:.75';
-  s1.textContent='Modifica la descrizione: è ciò che il concierge sa e dice quando l\'ospite tocca quel bottone.';
+  s1.textContent='Sono le scorciatoie sullo schermo. Il testo della risposta è quello dei Contenuti: tocca "Modifica" per cambiarlo.';
   box.appendChild(h1); box.appendChild(s1);
   RAPIDE.forEach(b=>{
-    const row = document.createElement('div'); row.className='cbtn-row'; row.style.cssText='flex-wrap:wrap;align-items:flex-start';
+    const key = BTN_DATI[b.ic];
+    const row = document.createElement('div'); row.className='cbtn-row'; row.style.cssText='flex-wrap:wrap;align-items:center';
     const ci = document.createElement('div'); ci.className='ci'; ci.innerHTML = ICON[b.ic]||ICON.info;
     const nm = document.createElement('div'); nm.className='nm'; nm.textContent = (b.l&&b.l.it)||b.ic;
-    const ta = document.createElement('textarea'); ta.rows=2;
-    ta.placeholder='Descrizione / cosa deve sapere il concierge…';
-    ta.value = fixDesc[b.ic]||''; ta.style.cssText='flex:1 1 100%;margin-top:6px;min-height:42px';
-    ta.onchange = ()=>setBtnDesc(b.ic, ta.value.trim());
-    row.appendChild(ci); row.appendChild(nm); row.appendChild(ta); box.appendChild(row);
+    const badge = document.createElement('span');
+    badge.style.cssText='font-size:11px;padding:2px 9px;border-radius:20px;background:rgba(232,213,163,.12);color:var(--oro);margin-left:8px;white-space:nowrap';
+    badge.textContent = b.soloLink ? 'Apre QR / sito' : (b.url ? 'Risposta + QR' : 'Risposta vocale');
+    nm.appendChild(badge);
+    row.appendChild(ci); row.appendChild(nm);
+    if(key){
+      const mod = document.createElement('button'); mod.type='button'; mod.className='btn-clear';
+      mod.style.cssText='font-size:13px;color:var(--oro);white-space:nowrap';
+      mod.textContent='Modifica'; mod.onclick=()=>jumpContenuti(key);
+      row.appendChild(mod);
+      const prev = document.createElement('div');
+      prev.style.cssText='flex:1 1 100%;margin-top:6px;font-size:13px;opacity:.7;line-height:1.4;border-left:2px solid rgba(232,213,163,.3);padding-left:10px';
+      const v = (_datiVal(key)||'').trim();
+      prev.textContent = v || '(vuoto — aggiungi il testo nei Contenuti)';
+      row.appendChild(prev);
+    }
+    box.appendChild(row);
   });
   // --- Bottoni personalizzati ---
   const arr = getCustomBtns();
@@ -863,6 +886,9 @@ function salvaBtn(){
 function renderDatiFields(){
   let d; try{ d = JSON.parse(localStorage.getItem('concierge_dati_struct')||'null'); }catch(_){ d=null; }
   const box = $('datiFields'); if(!box) return; box.innerHTML='';
+  const intro = document.createElement('div'); intro.className='hint'; intro.style.cssText='margin-bottom:12px;opacity:.8';
+  intro.textContent='Qui c\'è tutto ciò che il concierge sa e risponde. È l\'unica fonte di verità: i bottoni usano questi testi.';
+  box.appendChild(intro);
   DATI_FIELDS.forEach(f=>{
     const lab = document.createElement('label'); lab.textContent = f.l;
     const ta = document.createElement('textarea'); ta.rows = 2; ta.dataset.k = f.k;
