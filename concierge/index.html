@@ -681,7 +681,9 @@
       <!-- SEZIONE COMPORTAMENTO -->
       <div class="tab-pane" data-p="comp">
         <h3>Ascolto e demo</h3>
-        <label><input type="checkbox" id="wake" style="width:auto;margin-right:8px"> Richiedi parola di attivazione "Ciao"</label>
+        <label><input type="checkbox" id="wake" style="width:auto;margin-right:8px"> Richiedi parola di attivazione</label>
+        <input id="wakeWord" type="text" maxlength="20" placeholder="ciao" style="margin-top:6px">
+        <div class="hint">Risponde solo se la frase inizia con questa parola (es. <i>ciao</i>, <i>ehi</i>, il nome del totem…). Vuoto = "ciao".</div>
         <div class="hint">Utile in ambienti rumorosi: risponde solo se la frase inizia con "Ciao".</div>
         <label>Demo animato dopo (secondi di inattività) <span style="opacity:.5">(0 = disattivato)</span></label>
         <input id="demoDelay" type="number" min="0" placeholder="40">
@@ -1172,9 +1174,11 @@ function creaRecognition(){
     if(typeof alt.confidence === 'number' && alt.confidence > 0 && alt.confidence < parseFloat(localStorage.getItem('concierge_mic_sens')||'0.55')) return;
     // Scarta frammenti troppo corti (rumori, singole sillabe)
     if(testo.length < 3 || testo.split(/\s+/).length < 1) return;
-    // Parola di attivazione opzionale (consigliata in ambienti rumorosi)
+    // Parola di attivazione opzionale (personalizzabile; consigliata in ambienti rumorosi)
     if(localStorage.getItem('concierge_wake')==='1'){
-      const m = testo.match(/^\s*ciao[\s,]+(.+)/i);
+      const w = (localStorage.getItem('concierge_wake_word')||'ciao').trim() || 'ciao';
+      const we = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');           // escape per la regex
+      const m = testo.match(new RegExp('^\\s*'+we+'[\\s,]+(.+)', 'i'));
       if(!m) return;
       testo = m[1].trim();
     }
@@ -1903,6 +1907,7 @@ function apriSettings(){
   $('limGoogle').value = localStorage.getItem('concierge_lim_google')||'1000000';
   $('limite').value    = localStorage.getItem('concierge_limite')||'0';
   $('wake').checked    = localStorage.getItem('concierge_wake')==='1';
+  $('wakeWord').value  = localStorage.getItem('concierge_wake_word')||'';
   $('demoDelay').value = localStorage.getItem('concierge_demo_delay')||'40';
   $('demoFrasi').value = localStorage.getItem('concierge_demo_frasi')||'';
   $('langDef').value   = localStorage.getItem('concierge_lang_def')||'it-IT';
@@ -1937,6 +1942,7 @@ function salvaSettings(){
   lsSet('concierge_lim_google', String(parseInt($('limGoogle').value||'1000000',10)||0));
   lsSet('concierge_limite', String(parseInt($('limite').value||'0',10)||0));
   lsSet('concierge_wake', $('wake').checked?'1':'');
+  lsSet('concierge_wake_word', ($('wakeWord').value||'').trim());
   lsSet('concierge_demo_delay', String(parseInt($('demoDelay').value||'40',10)));
   lsSet('concierge_demo_frasi', ($('demoFrasi').value||'').trim());
   lsSet('concierge_lang_def', $('langDef').value);
