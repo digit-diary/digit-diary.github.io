@@ -848,6 +848,19 @@
           <button type="button" id="btnAddLang" class="btn-clear" style="background:rgba(232,213,163,.15);color:var(--oro)" onclick="aggiungiLingua($('langSel').value)">Aggiungi e traduci</button>
         </div>
 
+        <h3 style="margin-top:22px">Sincronizzazione tra totem</h3>
+        <div class="hint"><b>Come funziona:</b> sul totem <b>Master</b> premi "Sincronizza ora" per <b>pubblicare</b> la configurazione. Poi su ogni totem <b>Ricevente</b> che vuoi aggiornare premi "Sincronizza ora" per <b>scaricarla</b>. Così scegli tu <b>se aggiornarne solo alcuni o tutti</b>. Si sincronizza solo la configurazione (contenuti, bottoni, testi, lingue, logo, comportamento) — <b>non</b> chiavi, PIN o licenza. Media/piantine vanno importati su ogni dispositivo.</div>
+        <label>Nome gruppo <span style="opacity:.5">(lo stesso su tutti i totem che devono allinearsi)</span></label>
+        <input id="syncGroup" type="text" placeholder="es. casino-lugano" autocomplete="off">
+        <label>Ruolo di questo totem</label>
+        <select id="syncMode">
+          <option value="off">Disattivato (nessuna sincronizzazione)</option>
+          <option value="master">Master — invia agli altri</option>
+          <option value="receiver">Ricevente — riceve dal Master</option>
+        </select>
+        <div class="hint" id="syncStatus" style="margin-top:6px"></div>
+        <span class="btn-clear" style="margin-top:8px;display:inline-block;background:rgba(232,213,163,.15);color:var(--oro)" onclick="sincronizzaOra()">Sincronizza ora</span>
+
         <h3 style="margin-top:22px">Statistiche d'uso</h3>
         <div class="hint" id="statsBox" style="line-height:1.6">—</div>
         <span class="btn-clear" style="margin-top:8px;display:inline-block" onclick="resetStats()">Azzera statistiche</span>
@@ -2209,6 +2222,9 @@ function apriSettings(){
   $('standbyA').value  = localStorage.getItem('concierge_standby_a')||'';
   $('feedbackOn').checked = localStorage.getItem('concierge_feedback_on')!=='0';
   $('feedbackComment').checked = localStorage.getItem('concierge_feedback_comment')!=='0';
+  $('syncGroup').value = localStorage.getItem('concierge_sync_group')||'';
+  $('syncMode').value = localStorage.getItem('concierge_sync_mode')||'off';
+  $('syncStatus').textContent = (syncMode()!=='off'&&syncGruppo()) ? ('Attiva ('+syncMode()+') · gruppo "'+syncGruppo()+'" · versione locale '+(localStorage.getItem('concierge_sync_ver')||'0')) : 'Non attiva.';
   syncFeedbackUI();
   renderStats(); renderLingueAdmin();
   cacheStats();
@@ -2245,6 +2261,9 @@ function salvaSettings(){
   lsSet('concierge_feedback_on', $('feedbackOn').checked ? '1' : '0');
   lsSet('concierge_feedback_comment', $('feedbackComment').checked ? '1' : '0');
   renderFeedback();
+  lsSet('concierge_sync_group', ($('syncGroup').value||'').trim());
+  lsSet('concierge_sync_mode', $('syncMode').value);
+  // Sincronizzazione MANUALE: si applica solo col bottone "Sincronizza ora" (decidi tu su quali totem)
   lsSet('concierge_lang_def', $('langDef').value);
   lsSet('concierge_mic_sens', $('micSens').value);
   lsSet('concierge_voice_rate', $('voiceRate').value);
@@ -2762,6 +2781,39 @@ function attivaLicenza(){
   localStorage.setItem('concierge_license', k); localStorage.removeItem('concierge_license_ok');
   $('licErr').textContent='Verifica…';
   verificaLicenza().then(ok=>{ if(ok) location.reload(); else $('licErr').textContent='Chiave non valida o non attiva.'; });
+}
+
+/* --- SINCRONIZZAZIONE config tra totem (Master invia / Ricevente riceve, automatico + bottone) --- */
+// Chiavi che NON si sincronizzano (restano locali al dispositivo per sicurezza)
+const SYNC_SKIP = ['concierge_groq_key','concierge_eleven','concierge_google','concierge_eleven_off','concierge_pin','concierge_kiosk','concierge_sync_group','concierge_sync_mode','concierge_sync_ver','concierge_license','concierge_license_ok','concierge_uso','concierge_uso_google','concierge_uso_eleven','concierge_resp','concierge_tts','concierge_stats','concierge_feedback'];
+function syncGruppo(){ return (localStorage.getItem('concierge_sync_group')||'').trim(); }
+function syncMode(){ return localStorage.getItem('concierge_sync_mode')||'off'; }
+function gatherSyncConfig(){ const o={}; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.indexOf('concierge_')===0 && SYNC_SKIP.indexOf(k)<0) o[k]=localStorage.getItem(k); } return o; }
+async function syncPush(){
+  const g=syncGruppo(); if(!g) return false;
+  try{ const r=await fetch(SBC_URL+'/rest/v1/rpc/concierge_config_set',{method:'POST',headers:_sbcH(),body:JSON.stringify({p_gruppo:g,p_dati:gatherSyncConfig()})});
+    if(r.ok){ const ver=await r.json(); localStorage.setItem('concierge_sync_ver', String(ver)); return true; } }catch(_){}
+  return false;
+}
+function applyRemoteConfig(dati, ver){
+  const toDel=[]; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.indexOf('concierge_')===0 && SYNC_SKIP.indexOf(k)<0) toDel.push(k); }
+  toDel.forEach(k=>localStorage.removeItem(k));
+  Object.keys(dati||{}).forEach(k=>{ if(k.indexOf('concierge_')===0 && SYNC_SKIP.indexOf(k)<0) localStorage.setItem(k, dati[k]); });
+  localStorage.setItem('concierge_sync_ver', String(ver));
+  location.reload();
+}
+async function syncPull(force){
+  const g=syncGruppo(); if(!g) return;
+  try{ const r=await fetch(SBC_URL+'/rest/v1/rpc/concierge_config_get',{method:'POST',headers:_sbcH(),body:JSON.stringify({p_gruppo:g})});
+    if(!r.ok) return; const d=await r.json();
+    const remoteVer=(d&&d.ver)||0; const localVer=parseInt(localStorage.getItem('concierge_sync_ver')||'0',10);
+    if(remoteVer>0 && (force || remoteVer!==localVer) && d.dati) applyRemoteConfig(d.dati, remoteVer);
+  }catch(_){}
+}
+function sincronizzaOra(){
+  const m=syncMode(); if(m==='off' || !syncGruppo()){ alert('Imposta un nome gruppo e scegli Master o Ricevente, poi Salva.'); return; }
+  if(m==='master'){ syncPush().then(ok=>alert(ok?'Configurazione PUBBLICATA. Ora premi "Sincronizza ora" sui totem Riceventi che vuoi aggiornare.':'Invio non riuscito.')); }
+  else { if(confirm('Scaricare e applicare la configurazione del Master su QUESTO totem? La pagina si ricaricherà.')) syncPull(true); }
 }
 
 function renderLogoPreview(){
