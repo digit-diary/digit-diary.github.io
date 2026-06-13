@@ -781,6 +781,28 @@ function contaMese(eng, n){
   d.chars = (d.chars||0) + n;
   localStorage.setItem('concierge_uso_'+eng, JSON.stringify(d));
 }
+/* --- Contatore condiviso tra TUTTI gli schermi (Supabase: solo un numero, NESSUN dato personale) --- */
+const SBC_URL = 'https://hzkzhjubeexctltfgsml.supabase.co';
+const SBC_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6a3poanViZWV4Y3RsdGZnc21sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMTM5OTQsImV4cCI6MjA5Njg4OTk5NH0._GJMMAAdNG2UTtn0nvsWzxy6vPfR72HoV-1rZTizZy8';
+let usoCondiviso = {mese:'', google:0, eleven:0};
+function _sbcH(){ return {apikey:SBC_KEY, Authorization:'Bearer '+SBC_KEY, 'Content-Type':'application/json'}; }
+async function caricaUsoCondiviso(){
+  try{
+    const mese = _mese();
+    const r = await fetch(SBC_URL+'/rest/v1/rpc/concierge_get_uso', {method:'POST', headers:_sbcH(), body:JSON.stringify({p_mese:mese})});
+    if(r.ok){ const d = await r.json(); usoCondiviso = {mese, google:(d&&d.google_chars)||0, eleven:(d&&d.eleven_chars)||0}; }
+  }catch(_){}
+}
+function aggiungiUsoCondiviso(motore, chars){
+  const mese = _mese();
+  if(usoCondiviso.mese !== mese) usoCondiviso = {mese, google:0, eleven:0};
+  if(motore==='google') usoCondiviso.google += chars; else if(motore==='eleven') usoCondiviso.eleven += chars;
+  try{ fetch(SBC_URL+'/rest/v1/rpc/concierge_add_uso', {method:'POST', headers:_sbcH(), body:JSON.stringify({p_mese:mese, p_motore:motore, p_chars:chars})}); }catch(_){}
+}
+// totale = max(condiviso, locale) → cap rispettato su qualsiasi schermo
+function usoGoogleTot(){ return Math.max(usoCondiviso.mese===_mese()?usoCondiviso.google:0, usoMese('google')); }
+function usoElevenTot(){ return Math.max(usoCondiviso.mese===_mese()?usoCondiviso.eleven:0, usoMese('eleven')); }
+
 // Sceglie il motore in modalità automatica: ElevenLabs → Google → fallback
 function scegliMotore(){
   const hasE = !!localStorage.getItem('concierge_eleven');
@@ -788,8 +810,8 @@ function scegliMotore(){
   const limE = parseInt(localStorage.getItem('concierge_lim_eleven')||'10000', 10);
   const limG = parseInt(localStorage.getItem('concierge_lim_google')||'1000000', 10);
   const elevenOff = localStorage.getItem('concierge_eleven_off')==='1';
-  if(hasE && !elevenOff && usoMese('eleven') < limE) return 'eleven';
-  if(hasG && usoMese('google') < limG) return 'google';
+  if(hasE && !elevenOff && usoElevenTot() < limE) return 'eleven';
+  if(hasG && usoGoogleTot() < limG) return 'google';
   return localStorage.getItem('concierge_fallback') || 'browser';   // 'browser' o 'testo'
 }
 
@@ -926,7 +948,7 @@ async function vocePremiumEleven(testo, lang, fine, mioId){
     }
     const url = await blobToDataURL(await r.blob());
     if(mioId!==richiestaId) return;            // interrotta da un nuovo comando
-    contaCaratteri(testo.length); contaMese('eleven', testo.length);   // conta solo le chiamate REALI
+    contaCaratteri(testo.length); contaMese('eleven', testo.length); aggiungiUsoCondiviso('eleven', testo.length);   // conta solo le chiamate REALI
     salvaCache(ck, url);
     suonaCache(url, fine);
   }catch(e){
@@ -962,7 +984,7 @@ async function voceGoogle(testo, lang, fine, mioId){
     const data = await r.json();
     if(mioId!==richiestaId) return;            // interrotta da un nuovo comando
     const url = 'data:audio/mp3;base64,'+data.audioContent;
-    contaCaratteri(testo.length); contaMese('google', testo.length);   // conta solo le chiamate REALI
+    contaCaratteri(testo.length); contaMese('google', testo.length); aggiungiUsoCondiviso('google', testo.length);   // conta solo le chiamate REALI
     salvaCache(ck, url);
     suonaCache(url, fine);
   }catch(e){
@@ -1216,7 +1238,8 @@ function apriSettings(){
   $('limite').value    = localStorage.getItem('concierge_limite')||'0';
   $('wake').checked    = localStorage.getItem('concierge_wake')==='1';
   $('demoDelay').value = localStorage.getItem('concierge_demo_delay')||'40';
-  $('usoOggi').textContent = 'Consumo questo mese — ElevenLabs: '+usoMese('eleven').toLocaleString('de-CH')+' / Google: '+usoMese('google').toLocaleString('de-CH')+' caratteri.';
+  caricaUsoCondiviso().then(()=>{ $('usoOggi').textContent = 'Consumo CONDIVISO questo mese (tutti gli schermi) — Google: '+usoGoogleTot().toLocaleString('de-CH')+' / ElevenLabs: '+usoElevenTot().toLocaleString('de-CH')+' caratteri (gratis fino a 1.000.000).'; });
+  $('usoOggi').textContent = 'Consumo questo mese — Google: '+usoGoogleTot().toLocaleString('de-CH')+' / ElevenLabs: '+usoElevenTot().toLocaleString('de-CH')+' caratteri.';
   $('dati').value      = localStorage.getItem('concierge_dati')||DATI_DEFAULT;
   $('modal').classList.add('open');
 }
@@ -1244,6 +1267,7 @@ $('modal').addEventListener('click', e=>{ if(e.target.id==='modal') $('modal').c
 
 /* ============ Avvio ============ */
 caricaTtsCache();
+caricaUsoCondiviso(); setInterval(caricaUsoCondiviso, 120000);   // contatore condiviso tra schermi
 $('btnFull').innerHTML = ICON.full;
 $('btnGear').innerHTML = ICON.gear;
 $('btnTrad').innerHTML = ICON.translate;
