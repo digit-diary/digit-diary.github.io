@@ -587,7 +587,11 @@
   <div class="demo" id="demo" onclick="chiudiDemo()">
     <div class="demo-bg" id="demoBg"></div>
     <div class="logo-extra" id="demoLogoTop" style="display:none"></div>
-    <div class="demo-logo" id="demoLogo"></div>
+    <div class="emblema-row">
+      <div class="logo-extra logo-side" id="demoLogoLeft" style="display:none"></div>
+      <div class="demo-logo" id="demoLogo"></div>
+      <div class="logo-extra logo-side" id="demoLogoRight" style="display:none"></div>
+    </div>
     <div class="demo-stage">
       <div class="demo-ring" id="demoRing"></div>
       <div class="demo-tap"></div>
@@ -2581,13 +2585,14 @@ function _testoEl(t, scale){
   d.style.cssText='color:'+(t.color||'#ffffff')+';font-size:'+px+'px;font-weight:'+(t.bold?'700':'400')+';'+(t.italic?'font-style:italic;':'')+'margin:2px 0;text-shadow:0 1px 6px rgba(0,0,0,.5)';
   return d;
 }
+const DEMO_POS = {top:'demoLogoTop', bottom:'demoLogoBot', left:'demoLogoLeft', right:'demoLogoRight', 'screen-top':'demoLogoTop', 'screen-bottom':'demoLogoBot'};
 function renderTesti(){
-  Object.values(TXT_POS).concat(['demoLogoTop','demoLogoBot']).forEach(id=>{ const el=$(id); if(el){ el.innerHTML=''; el.style.display='none'; } });
+  Object.values(TXT_POS).concat(['demoLogoTop','demoLogoBot','demoLogoLeft','demoLogoRight']).forEach(id=>{ const el=$(id); if(el){ el.innerHTML=''; el.style.display='none'; } });
   getTesti().forEach(t=>{
     if(!(t.text||'').trim()) return;
-    const el=$(TXT_POS[t.pos||'top']); if(el){ el.appendChild(_testoEl(t,1)); el.style.display='block'; }      // home (dimensione piena)
-    const demoId=(t.pos==='bottom'||t.pos==='right'||t.pos==='screen-bottom')?'demoLogoBot':'demoLogoTop';   // demo (attorno al logo, più piccolo)
-    const de=$(demoId); if(de){ de.appendChild(_testoEl(t,0.55)); de.style.display='block'; }
+    const pos = t.pos||'top';
+    const el=$(TXT_POS[pos]); if(el){ el.appendChild(_testoEl(t,1)); el.style.display='block'; }            // home (dimensione piena)
+    const de=$(DEMO_POS[pos]); if(de){ de.appendChild(_testoEl(t,0.55)); de.style.display='block'; }        // demo (stessa posizione, più piccolo)
   });
 }
 function _updTesto(i,k,v){ const a=getTesti(); if(!a[i]) return; a[i][k]=v; saveTesti(a); renderTesti(); }
