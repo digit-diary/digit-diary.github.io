@@ -981,12 +981,12 @@
           <option value="1.1">Veloce</option>
         </select>
         <label>Voce (genere)</label>
-        <select id="voiceGender">
+        <select id="voiceGender" onchange="lsSet('concierge_voice_gender', this.value)">
           <option value="auto">Automatica (segue l'avatar)</option>
           <option value="f">Femminile</option>
           <option value="m">Maschile</option>
         </select>
-        <div class="hint">"Automatica": donna → voce femminile, uomo/concierge → voce maschile. Vale per la voce Google.</div>
+        <div class="hint">"Automatica": donna → femminile, uomo/concierge → maschile. <b>Funziona al meglio con voce Google</b> (⚙️ → API e Voce → Motore = Google o Automatico). Sulla voce Browser dipende dalle voci del dispositivo.</div>
 
         <label>Effetto transizione foto demo (Ken Burns) <span style="opacity:.5">si imposta in Media</span></label>
         <div class="hint">La velocità del demo e gli effetti foto si regolano nella sezione Media.</div>
@@ -2023,7 +2023,13 @@ function voceBrowser(testo, lang, fine){
   const _ex = getLingueExtra().find(x=>x.code===lang);
   const target = {it:'it-IT',de:'de-DE',en:'en-GB',fr:'fr-FR',es:'es-ES',ru:'ru-RU',zh:'zh-CN',ar:'ar-SA'}[lang] || (_ex&&_ex.bcp) || 'it-IT';
   const u = new SpeechSynthesisUtterance(testo); u.lang=target;
-  const v = voices.find(v=>v.lang===target)||voices.find(v=>v.lang.startsWith(lang));
+  const cand = voices.filter(x=>x.lang===target || x.lang.startsWith(lang));
+  let v = cand[0] || voices.find(x=>x.lang.startsWith(lang));
+  // tentativo SICURO di scegliere una voce del genere richiesto (se disponibile, altrimenti resta com'era)
+  const g = voceGenere();
+  const RX_M=/\b(male|maschi|uomo|david|diego|jorge|juan|paul|thomas|daniel|fred|luca|marco|matteo|man)\b/i;
+  const RX_F=/\b(female|femmin|donna|zira|elsa|anna|laura|alice|monica|samantha|paola|giulia|woman)\b/i;
+  if(cand.length>1){ const want = g==='m' ? cand.find(x=>RX_M.test(x.name)) : cand.find(x=>RX_F.test(x.name)); if(want) v=want; }
   if(v) u.voice=v; u.rate = parseFloat(localStorage.getItem('concierge_voice_rate')||'1');
   u.onstart=()=>{ if(avatarMode()!=='off') avStart(true); };          // voce browser → animazione simulata
   u.onend=()=>{ avStop(); if(fine) fine(); };
