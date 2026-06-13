@@ -531,10 +531,9 @@
       <div class="media-list" id="mediaGrid"></div>
       <div class="media-empty" id="mediaEmpty">Nessun media caricato.</div>
 
-      <h3>Cosa sa il concierge (dati del casinò)</h3>
-      <label>Modifica liberamente — l'AI risponde SOLO con queste informazioni</label>
-      <textarea id="dati"></textarea>
-      <div class="hint">Orari, ristorante, eventi, parcheggio… Aggiorna gli eventi quando cambiano.</div>
+      <h3 id="hDati">Cosa sa il concierge — informazioni del casinò</h3>
+      <div class="hint">Un campo per argomento. L'AI risponde SOLO con queste informazioni. Lascia vuoto un campo per ometterlo.</div>
+      <div id="datiFields"></div>
 
       <div class="err" id="errModal"></div>
       <button class="salva" onclick="salvaSettings()">Salva</button>
@@ -600,26 +599,43 @@ const KEY_LS = 'concierge_groq_key';
 
 /* ===== SEZIONE 1 · CONFIGURAZIONE — dati del casino (modificabili da ⚙️, salvati in locale) ---
    Sono FITTIZI: sostituiscili con quelli reali nel pannello impostazioni. */
-const DATI_DEFAULT =
-`ORARI: apertura tutti i giorni alle 12:00. Chiusura: da domenica a giovedì alle 04:00; venerdì, sabato e nelle vigilie dei giorni festivi italiani alle 05:00.
-TAVOLI DA GIOCO: al secondo piano.
-SLOT MACHINE: per giocare serve una tessera (in CHF o in EUR), ritirabile alla reception o alla cassa. Prima si inserisce la tessera in una qualsiasi slot, poi si inseriscono le banconote.
-SALA FUMATORI: al primo piano; inoltre una piccola sala fumatori al piano 0 (piano terra).
-COME SALIRE AI PIANI: per il primo piano (sala fumatori) o il secondo piano (tavoli) si può prendere l'ascensore (lift) oppure la scala mobile.
-INGRESSO: documento d'identità obbligatorio, maggiorenni (18+).
-WIFI: rete gratuita "Wifi free casino lugano". Collegarsi alla rete, poi attendere che compaia la pagina di accesso, spuntare la casella di accettazione dei termini e premere per connettersi.
-BANCOMAT: due distributori, al piano 0 (sotto la scala mobile) e al primo piano. Permettono di prelevare SOLO franchi svizzeri (CHF).
-CASSE: si trovano a metà sala. Alle casse si può prelevare sia in euro (EUR) sia in franchi (CHF).
-GIOCO RESPONSABILE: informazioni e autoesclusione disponibili alla reception, in modo riservato.
-
-FEDELTÀ: programma "Lugano Class". Ci si iscrive informandosi all'Info Point.
-PARCHEGGIO (ritiro chiavi): scansionare il ticket ricevuto alla reception e ritirare un secondo ticket; poi presentarsi al guardaroba con entrambi i ticket per ricevere le chiavi.
-
-RISTORANTE: "Elementi", al primo piano. Orari: domenica-giovedì 19:00-22:30; venerdì e sabato 19:00-23:30.
-BAR: presenti a ogni piano.
-TOILETTE: presenti a ogni piano, in fondo a sinistra.
-
-(DA COMPLETARE: EVENTI — chiedere all'Info Point.)`;
+/* Campi strutturati: un argomento per riga (label + valore). Modificabili da ⚙️. */
+const DATI_FIELDS = [
+  {k:'orari',      l:'Orari di apertura',        v:'Apertura tutti i giorni alle 12:00. Chiusura: domenica-giovedì 04:00; venerdì, sabato e vigilie dei festivi italiani 05:00.'},
+  {k:'ristorante', l:'Ristorante',               v:'"Elementi", al primo piano. Orari: domenica-giovedì 19:00-22:30; venerdì e sabato 19:00-23:30.'},
+  {k:'bar',        l:'Bar',                       v:'Presenti a ogni piano.'},
+  {k:'toilette',   l:'Toilette',                  v:'A ogni piano, in fondo a sinistra.'},
+  {k:'tavoli',     l:'Tavoli da gioco',           v:'Al secondo piano.'},
+  {k:'slot',       l:'Slot machine',              v:'Serve una tessera (CHF o EUR) ritirabile a reception o cassa. Inserire la tessera in una slot, poi le banconote.'},
+  {k:'fumatori',   l:'Sala fumatori',             v:'Al primo piano; piccola sala fumatori anche al piano 0.'},
+  {k:'piani',      l:'Come salire ai piani',      v:'Per il 1° piano (fumatori) o 2° piano (tavoli): ascensore o scala mobile.'},
+  {k:'parcheggio', l:'Parcheggio (ritiro auto)',  v:'Scansionare il ticket della reception, ritirare un secondo ticket, presentarsi al guardaroba con entrambi per le chiavi.'},
+  {k:'bancomat',   l:'Bancomat e casse',          v:'Bancomat al piano 0 (sotto la scala mobile) e 1° piano: solo CHF. Casse a metà sala: EUR e CHF.'},
+  {k:'wifi',       l:'WiFi',                      v:'Rete gratuita "Wifi free casino lugano". Collegarsi, attendere la pagina, accettare i termini, connettersi.'},
+  {k:'ingresso',   l:'Ingresso e documenti',      v:'Documento d\'identità obbligatorio, maggiorenni (18+).'},
+  {k:'fedelta',    l:'Programma fedeltà',         v:'"Lugano Class", iscrizione all\'Info Point.'},
+  {k:'gioco_resp', l:'Gioco responsabile',        v:'Informazioni e autoesclusione alla reception, in modo riservato.'},
+  {k:'eventi',     l:'Eventi',                    v:'Invitare a inquadrare il QR a schermo per il calendario eventi aggiornato sul sito.'},
+  {k:'extra',      l:'Altre informazioni',        v:''},
+];
+// Costruisce il testo dei dati per l'AI a partire dai campi (struttura salvata o default)
+function datiCasino(){
+  let d; try{ d = JSON.parse(localStorage.getItem('concierge_dati_struct')||'null'); }catch(_){ d=null; }
+  if(!d){ d={}; DATI_FIELDS.forEach(f=>d[f.k]=f.v); }
+  return DATI_FIELDS.filter(f=>(d[f.k]||'').trim()).map(f => f.l.toUpperCase()+': '+d[f.k].trim()).join('\n');
+}
+// Genera i campi (un argomento per riga) nel pannello impostazioni
+function renderDatiFields(){
+  let d; try{ d = JSON.parse(localStorage.getItem('concierge_dati_struct')||'null'); }catch(_){ d=null; }
+  const box = $('datiFields'); if(!box) return; box.innerHTML='';
+  DATI_FIELDS.forEach(f=>{
+    const lab = document.createElement('label'); lab.textContent = f.l;
+    const ta = document.createElement('textarea'); ta.rows = 2; ta.dataset.k = f.k;
+    ta.value = (d && d[f.k]!=null) ? d[f.k] : f.v;
+    ta.style.minHeight = '50px';
+    box.appendChild(lab); box.appendChild(ta);
+  });
+}
 
 /* --- Domande rapide (bottoni touch), etichetta + domanda nelle 4 lingue --- */
 const RAPIDE = [
@@ -713,7 +729,7 @@ let ascoltoTemp = false, ascoltoTempTimer = null;   // microfono auto dopo una r
 let langAscolto = 'it-IT';
 
 function buildSystemPrompt(){
-  const dati = localStorage.getItem('concierge_dati') || DATI_DEFAULT;
+  const dati = datiCasino();
   const LNAME = {it:'ITALIANO', de:'TEDESCO (Deutsch)', en:'INGLESE (English)', fr:'FRANCESE (Français)', es:'SPAGNOLO (Español)', ru:'RUSSO (Русский)', zh:'CINESE (中文)', ar:'ARABO (العربية)'};
   const lsel = LNAME[uiLang()] || 'ITALIANO';
   return `Sei il concierge virtuale del Casinò di Lugano, cortese ed elegante.
@@ -1339,7 +1355,7 @@ function apriSettings(){
   renderMediaGrid();
   caricaUsoCondiviso().then(()=>{ $('usoOggi').textContent = 'Consumo CONDIVISO questo mese (tutti gli schermi) — Google: '+usoGoogleTot().toLocaleString('de-CH')+' / ElevenLabs: '+usoElevenTot().toLocaleString('de-CH')+' caratteri (gratis fino a 1.000.000).'; });
   $('usoOggi').textContent = 'Consumo questo mese — Google: '+usoGoogleTot().toLocaleString('de-CH')+' / ElevenLabs: '+usoElevenTot().toLocaleString('de-CH')+' caratteri.';
-  $('dati').value      = localStorage.getItem('concierge_dati')||DATI_DEFAULT;
+  renderDatiFields();
   $('modal').classList.add('open');
 }
 function salvaSettings(){
@@ -1358,7 +1374,9 @@ function salvaSettings(){
   localStorage.setItem('concierge_demo_delay', String(parseInt($('demoDelay').value||'40',10)));
   localStorage.setItem('concierge_bg_int', String(parseInt($('bgInterval').value||'8',10)||8));
   avviaSfondo();
-  localStorage.setItem('concierge_dati', $('dati').value.trim());
+  const struct = {};
+  $('datiFields').querySelectorAll('textarea').forEach(ta => { struct[ta.dataset.k] = ta.value.trim(); });
+  localStorage.setItem('concierge_dati_struct', JSON.stringify(struct));
   rispCache.clear();                 // i dati possono essere cambiati → invalida le risposte salvate
   $('errModal').textContent='';
   $('modal').classList.remove('open');
