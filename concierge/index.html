@@ -557,7 +557,7 @@
       <g class="core">
         <path d="M48,56 Q96,104 144,56 Q96,104 144,152 Q96,104 48,152 Q96,104 48,56 Z"
               fill="url(#logoRed)" stroke="#c9ccce" stroke-width="5" stroke-linejoin="round"/>
-        <circle cx="150" cy="52" r="13" fill="url(#sfera)" stroke="#b6babd" stroke-width="1.5"/>
+        <circle cx="160" cy="40" r="13" fill="url(#sfera)" stroke="#b6babd" stroke-width="1.5"/>
       </g>
     </svg>
     <div class="emblema-custom" id="emblemaCustom"></div>
@@ -2562,7 +2562,21 @@ $('btnAddCustom').innerHTML = ICON.plus + '<span>Aggiungi bottone</span>';
 // Demo: logo mini, mic al centro, dito che batte, cerchio di icone
 $('demoMic').innerHTML = ICON.mic;
 $('demoFinger').innerHTML = '<svg viewBox="0 0 24 24" fill="#fdfdfd"><path d="M9 11.24V7.5a2.5 2.5 0 0 1 5 0v3.74c1.21-.81 2-2.18 2-3.74a4.5 4.5 0 1 0-9 0c0 1.56.79 2.93 2 3.74zm9.84 4.63l-4.54-2.26a1.4 1.4 0 0 0-.54-.11H13V7.5a1.5 1.5 0 0 0-3 0V21l-3.43-.72a1.1 1.1 0 0 0-1.03.3l-.79.8 4.94 4.94c.27.27.65.44 1.06.44h6.79c.75 0 1.33-.55 1.44-1.28l.75-5.27a2 2 0 0 0 .02-.21c0-.62-.38-1.16-.92-1.4z"/></svg>';
-const DEMO_LOGO_DEFAULT = '<svg viewBox="-4 4 200 200"><defs><radialGradient id="dlr" cx="50%" cy="42%" r="65%"><stop offset="0%" stop-color="#d8244e"/><stop offset="55%" stop-color="#b01038"/><stop offset="100%" stop-color="#7d0826"/></radialGradient><radialGradient id="dls" cx="38%" cy="32%" r="70%"><stop offset="0%" stop-color="#ffffff"/><stop offset="60%" stop-color="#d9dbdc"/><stop offset="100%" stop-color="#9a9ea1"/></radialGradient></defs><path d="M48,56 Q96,104 144,56 Q96,104 144,152 Q96,104 48,152 Q96,104 48,56 Z" fill="url(#dlr)" stroke="#c9ccce" stroke-width="6" stroke-linejoin="round"/><circle cx="150" cy="52" r="13" fill="url(#dls)" stroke="#b6babd" stroke-width="1.5"/></svg>';
+// Logo demo del casinò: GENERATO automaticamente dal logo della home (stella+sferetta).
+// Così basta modificare l'emblema nella home e la demo si aggiorna da sola. (In vergine/logo
+// aziendale è applyBranding a decidere: emblema neutro o logo importato.)
+const DEMO_LOGO_DEFAULT = (function(){
+  try{
+    const em = document.querySelector('.emblema');
+    const defs = em && em.querySelector('defs');
+    const core = em && em.querySelector('.core');
+    if(defs && core){
+      const inner = (defs.outerHTML + core.outerHTML).replace(/logoRed/g,'dlR').replace(/sfera/g,'dlS');  // rinomina id per non duplicarli
+      return '<svg viewBox="-4 4 200 200">'+inner+'</svg>';
+    }
+  }catch(_){}
+  return '<svg viewBox="-4 4 200 200"><defs><radialGradient id="dlr" cx="50%" cy="42%" r="65%"><stop offset="0%" stop-color="#d8244e"/><stop offset="55%" stop-color="#b01038"/><stop offset="100%" stop-color="#7d0826"/></radialGradient><radialGradient id="dls" cx="38%" cy="32%" r="70%"><stop offset="0%" stop-color="#ffffff"/><stop offset="60%" stop-color="#d9dbdc"/><stop offset="100%" stop-color="#9a9ea1"/></radialGradient></defs><path d="M48,56 Q96,104 144,56 Q96,104 144,152 Q96,104 48,152 Q96,104 48,56 Z" fill="url(#dlr)" stroke="#c9ccce" stroke-width="6" stroke-linejoin="round"/><circle cx="160" cy="40" r="13" fill="url(#dls)" stroke="#b6babd" stroke-width="1.5"/></svg>';
+})();
 // Emblema NEUTRO per lo stato vergine/white-label (NON la stella del casinò)
 const NEUTRAL_LOGO = '<svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="62" fill="none" stroke="#e8d5a3" stroke-width="6" opacity=".75"/><circle cx="100" cy="100" r="19" fill="#e8d5a3" opacity=".85"/></svg>';
 $('demoLogo').innerHTML = DEMO_LOGO_DEFAULT;
