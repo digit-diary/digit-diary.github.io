@@ -233,6 +233,10 @@
   .demo-logo,.demo-logo svg{width:60px;height:60px}
   .demo-logo{margin-bottom:16px;opacity:.9;animation:demoLogoIn .8s ease, breathe 4s ease-in-out infinite 1s}
   .demo-logo svg{filter:drop-shadow(0 0 16px rgba(232,213,163,.4))}
+  /* Demo: scritte laterali centrate e vicine al logo (niente cerchio come nella home) */
+  .demo .emblema-row{gap:10px;margin-bottom:16px;align-items:center}
+  .demo .demo-logo{margin-bottom:0}
+  .demo .logo-side{max-width:34vw}
   @keyframes demoLogoIn{from{opacity:0;transform:scale(.6)}to{opacity:.9;transform:scale(1)}}
 
   .demo-stage{position:relative;width:min(72vmin,52vh,420px);height:min(72vmin,52vh,420px);display:flex;align-items:center;justify-content:center;perspective:1000px}
