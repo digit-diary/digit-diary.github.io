@@ -204,7 +204,7 @@
   .demo-logo svg{filter:drop-shadow(0 0 16px rgba(232,213,163,.4))}
   @keyframes demoLogoIn{from{opacity:0;transform:scale(.6)}to{opacity:.9;transform:scale(1)}}
 
-  .demo-stage{position:relative;width:min(76vmin,440px);height:min(76vmin,440px);display:flex;align-items:center;justify-content:center;perspective:1000px}
+  .demo-stage{position:relative;width:min(72vmin,52vh,420px);height:min(72vmin,52vh,420px);display:flex;align-items:center;justify-content:center;perspective:1000px}
   .demo-ring{position:absolute;inset:0;transform:rotateX(9deg)}
   .demo-orb-ic{position:absolute;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;
     display:flex;align-items:center;justify-content:center;color:var(--oro);
@@ -421,7 +421,7 @@
       <g class="ring-out">
         <circle cx="100" cy="100" r="92" fill="none" stroke="var(--acc)" stroke-width="2" stroke-dasharray="1.6 6.4" opacity=".85"/>
       </g>
-      <!-- logo Casinò Lugano (stella concava + sferetta) -->
+      <!-- logo Casinò Lugano (stella concava + sferetta) — sostituibile col logo aziendale -->
       <g class="core">
         <path d="M48,56 Q96,104 144,56 Q96,104 144,152 Q96,104 48,152 Q96,104 48,56 Z"
               fill="url(#logoRed)" stroke="#c9ccce" stroke-width="5" stroke-linejoin="round"/>
@@ -581,6 +581,10 @@
         <label class="btn-import" id="btnLogo" for="logoFile"></label>
         <span class="btn-clear" id="btnLogoDel" onclick="rimuoviLogo()"></span>
         <div id="logoPreview" style="margin-top:10px"></div>
+        <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.1);padding-top:12px">
+          <div class="hint">Per presentare il sistema a un'altra azienda: azzera TUTTA la configurazione (logo, nome, contenuti, bottoni) e riparti da vuoto.</div>
+          <span class="btn-clear" onclick="resetVergine()">Azzera tutto — modalità vergine</span>
+        </div>
       </div>
 
       <!-- SEZIONE BOTTONI -->
@@ -958,12 +962,13 @@ function buildSystemPrompt(){
   const dati = datiCasino();
   const LNAME = {it:'ITALIANO', de:'TEDESCO (Deutsch)', en:'INGLESE (English)', fr:'FRANCESE (Français)', es:'SPAGNOLO (Español)', ru:'RUSSO (Русский)', zh:'CINESE (中文)', ar:'ARABO (العربية)'};
   const lsel = LNAME[uiLang()] || 'ITALIANO';
-  return `Sei il concierge virtuale del Casinò di Lugano, cortese ed elegante.
+  const brand = (localStorage.getItem('concierge_brand')||'').trim() || 'Casinò di Lugano';
+  return `Sei l'assistente virtuale di ${brand}, cortese ed elegante.
 Rispondi SOLO usando le informazioni qui sotto. Se un dato non c'è, NON inventarlo:
-invita gentilmente a chiedere alla reception.
+invita gentilmente a chiedere alla reception/info point.
 
-=== INFORMAZIONI DEL CASINO ===
-${dati}
+=== INFORMAZIONI DELLA STRUTTURA ===
+${dati || '(nessuna informazione ancora configurata)'}
 ===============================
 
 ⚠️ LINGUA DI RISPOSTA OBBLIGATORIA: scrivi TUTTO il campo "text" in ${lsel}. Anche se la domanda ti arriva in italiano, la risposta DEVE essere in ${lsel}. NON rispondere in italiano se ${lsel} non è l'italiano. Imposta il campo "lang" col codice corrispondente.
@@ -974,7 +979,6 @@ REGOLE (parla come un VERO concierge umano, non come un'AI):
 - Risposta breve e parlata (2-3 frasi). Usa il contesto delle frasi precedenti (ricordi la conversazione).
 - DIALOGA: quando è naturale, chiudi con una breve domanda di cortesia per continuare ("Posso aiutarla con altro?", "Le interessa anche il menù?", "Desidera che le indichi la strada?"). Non farlo se il cliente sta chiaramente chiudendo.
 - Se il cliente è indeciso, fai una domanda per capire cosa cerca, invece di elencare tutto.
-- Promuovi il gioco responsabile se pertinente, senza incoraggiare l'eccesso.
 Restituisci SOLO JSON valido: {"lang":"it|de|en|fr|es|ru|zh|ar","text":"risposta nella lingua richiesta","indicazione":"breve direzione fisica se utile, altrimenti stringa vuota"}`;
 }
 
@@ -1600,7 +1604,7 @@ function apriSettings(){
 }
 function salvaSettings(){
   const k = $('apiKey').value.trim();
-  if(!k.startsWith('gsk_')){ $('errModal').textContent='La chiave Groq inizia con "gsk_".'; return; }
+  if(k && !k.startsWith('gsk_')){ switchTab('api'); $('errModal').textContent='La chiave Groq inizia con "gsk_" (oppure lascia vuoto).'; return; }
   localStorage.setItem(KEY_LS, k);
   localStorage.setItem('concierge_eleven', $('elevenKey').value.trim());
   localStorage.removeItem('concierge_eleven_off');   // nuova chiave salvata → riprova ElevenLabs
@@ -1773,7 +1777,7 @@ $('btnAddCustom').innerHTML = ICON.plus + '<span>Aggiungi bottone</span>';
 // Demo: logo mini, mic al centro, dito che batte, cerchio di icone
 $('demoMic').innerHTML = ICON.mic;
 $('demoFinger').innerHTML = '<svg viewBox="0 0 24 24" fill="#fdfdfd"><path d="M9 11.24V7.5a2.5 2.5 0 0 1 5 0v3.74c1.21-.81 2-2.18 2-3.74a4.5 4.5 0 1 0-9 0c0 1.56.79 2.93 2 3.74zm9.84 4.63l-4.54-2.26a1.4 1.4 0 0 0-.54-.11H13V7.5a1.5 1.5 0 0 0-3 0V21l-3.43-.72a1.1 1.1 0 0 0-1.03.3l-.79.8 4.94 4.94c.27.27.65.44 1.06.44h6.79c.75 0 1.33-.55 1.44-1.28l.75-5.27a2 2 0 0 0 .02-.21c0-.62-.38-1.16-.92-1.4z"/></svg>';
-const DEMO_LOGO_DEFAULT = '<svg viewBox="0 0 200 200"><defs><radialGradient id="dlr" cx="50%" cy="42%" r="65%"><stop offset="0%" stop-color="#d8244e"/><stop offset="55%" stop-color="#b01038"/><stop offset="100%" stop-color="#7d0826"/></radialGradient></defs><path d="M48,56 Q96,104 144,56 Q96,104 144,152 Q96,104 48,152 Q96,104 48,56 Z" fill="url(#dlr)" stroke="#c9ccce" stroke-width="6" stroke-linejoin="round"/></svg>';
+const DEMO_LOGO_DEFAULT = '<svg viewBox="0 0 200 200"><defs><radialGradient id="dlr" cx="50%" cy="42%" r="65%"><stop offset="0%" stop-color="#d8244e"/><stop offset="55%" stop-color="#b01038"/><stop offset="100%" stop-color="#7d0826"/></radialGradient><radialGradient id="dls" cx="38%" cy="32%" r="70%"><stop offset="0%" stop-color="#ffffff"/><stop offset="60%" stop-color="#d9dbdc"/><stop offset="100%" stop-color="#9a9ea1"/></radialGradient></defs><path d="M48,56 Q96,104 144,56 Q96,104 144,152 Q96,104 48,152 Q96,104 48,56 Z" fill="url(#dlr)" stroke="#c9ccce" stroke-width="6" stroke-linejoin="round"/><circle cx="150" cy="52" r="13" fill="url(#dls)" stroke="#b6babd" stroke-width="1.5"/></svg>';
 $('demoLogo').innerHTML = DEMO_LOGO_DEFAULT;
 // Branding (logo + nome azienda) — white-label
 function applyBranding(){
@@ -1796,6 +1800,15 @@ function importaLogo(e){
   r.readAsDataURL(f); e.target.value='';
 }
 function rimuoviLogo(){ localStorage.removeItem('concierge_logo'); applyBranding(); renderLogoPreview(); }
+function resetVergine(){
+  if(!confirm('Azzerare TUTTA la configurazione (logo, nome, contenuti, bottoni personalizzati)? L\'app tornerà vuota, pronta per una nuova azienda.')) return;
+  const empty = {}; DATI_FIELDS.forEach(f=>empty[f.k]='');
+  localStorage.setItem('concierge_dati_struct', JSON.stringify(empty));
+  ['concierge_brand','concierge_logo','concierge_btn_custom'].forEach(k=>localStorage.removeItem(k));
+  rispCache.clear();
+  applyBranding(); renderDatiFields(); renderCustomBtnList(); costruisciRapide();
+  $('errModal').textContent='Configurazione azzerata. Inserisci i dati della nuova azienda.';
+}
 function renderLogoPreview(){
   const logo = localStorage.getItem('concierge_logo');
   $('logoPreview').innerHTML = logo ? '<img src="'+logo+'" style="max-width:130px;max-height:70px;background:rgba(255,255,255,.1);padding:6px;border-radius:8px">' : '<span style="opacity:.5;font-size:13px">Nessun logo: uso quello predefinito.</span>';
