@@ -423,6 +423,7 @@
     </div>
     <div id="mapBody" style="flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;padding:0 14px 18px">
       <img id="mapImg" alt="Mappa" style="max-width:100%;max-height:100%;object-fit:contain;cursor:zoom-in;transition:transform .2s;transform-origin:center">
+      <iframe id="mapFrame" title="Piantina PDF" style="display:none;width:100%;height:100%;border:0;border-radius:8px;background:#fff"></iframe>
     </div>
   </div>
 
@@ -670,9 +671,9 @@
         <div class="media-empty" id="mediaEmpty">Nessun media caricato.</div>
 
         <h3 style="margin-top:22px">Mappa dei piani (piantine)</h3>
-        <input type="file" id="fileMappa" accept="image/*" multiple style="display:none" onchange="importaMappa(event)">
+        <input type="file" id="fileMappa" accept="image/*,application/pdf" multiple style="display:none" onchange="importaMappa(event)">
         <label class="btn-import" for="fileMappa">Importa piantina</label>
-        <div class="hint">Carica un'immagine per ogni piano (es. Piano 0, 1, 2). Comparirà il bottone <b>Mappa</b> per gli ospiti, con selettore dei piani e zoom. Memoria del dispositivo.</div>
+        <div class="hint">Carica <b>immagine (JPG/PNG/SVG) o PDF</b> per ogni piano (es. Piano 0, 1, 2). Comparirà il bottone <b>Mappa</b> per gli ospiti, con selettore dei piani e zoom. Memoria del dispositivo.</div>
         <div class="media-list" id="mappaGrid"></div>
         <div class="media-empty" id="mappaEmpty">Nessuna piantina caricata.</div>
       </div>
@@ -2093,7 +2094,7 @@ function mapDB(){ return new Promise((res,rej)=>{ if(_mapDB) return res(_mapDB);
   rq.onupgradeneeded = e => { const db=e.target.result; if(!db.objectStoreNames.contains('mappe')) db.createObjectStore('mappe',{keyPath:'id',autoIncrement:true}); };
   rq.onsuccess = e => { _mapDB=e.target.result; res(_mapDB); };
   rq.onerror = e => rej(e); }); }
-function mapAdd(blob,nome,ord){ return mapDB().then(db=>new Promise((res,rej)=>{ const tx=db.transaction('mappe','readwrite'); tx.objectStore('mappe').add({blob,nome,ord,t:Date.now()}); tx.oncomplete=res; tx.onerror=rej; })); }
+function mapAdd(blob,nome,ord,tipo){ return mapDB().then(db=>new Promise((res,rej)=>{ const tx=db.transaction('mappe','readwrite'); tx.objectStore('mappe').add({blob,nome,ord,tipo:tipo||'image',t:Date.now()}); tx.oncomplete=res; tx.onerror=rej; })); }
 function mapPut(it){ return mapDB().then(db=>new Promise((res,rej)=>{ const tx=db.transaction('mappe','readwrite'); tx.objectStore('mappe').put(it); tx.oncomplete=res; tx.onerror=rej; })); }
 function mapGetAll(){ return mapDB().then(db=>new Promise(res=>{ const tx=db.transaction('mappe','readonly'); const r=tx.objectStore('mappe').getAll(); r.onsuccess=()=>res((r.result||[]).sort((a,b)=>(a.ord||a.t||0)-(b.ord||b.t||0))); r.onerror=()=>res([]); })); }
 function mapDel(id){ return mapDB().then(db=>new Promise(res=>{ const tx=db.transaction('mappe','readwrite'); tx.objectStore('mappe').delete(id); tx.oncomplete=res; tx.onerror=res; })); }
@@ -2103,10 +2104,11 @@ async function importaMappa(e){
   const files = [...e.target.files];
   let maxOrd = (await mapGetAll()).reduce((m,x)=>Math.max(m, x.ord||0), 0);
   for(const f of files){
-    if(!f.type.startsWith('image')) continue;
-    if(f.size > 8000000){ alert('Piantina troppo pesante ('+Math.round(f.size/1024)+' KB): usa un\'immagine sotto 8 MB.'); continue; }
+    const isImg = f.type.startsWith('image'); const isPdf = f.type==='application/pdf';
+    if(!isImg && !isPdf) continue;
+    if(f.size > 12000000){ alert('Piantina troppo pesante ('+Math.round(f.size/1024)+' KB): usa un file sotto 12 MB.'); continue; }
     const nome = (prompt('Nome del piano per "'+f.name+'":', 'Piano '+(maxOrd+1)) || ('Piano '+(maxOrd+1))).trim();
-    try{ await mapAdd(f, nome, ++maxOrd); }catch(_){}
+    try{ await mapAdd(f, nome, ++maxOrd, isPdf?'pdf':'image'); }catch(_){}
   }
   e.target.value=''; renderMappaGrid(); aggiornaBtnMappa();
 }
@@ -2116,9 +2118,10 @@ async function renderMappaGrid(){
   arr.forEach((m, idx)=>{
     const url = URL.createObjectURL(m.blob);
     const row = document.createElement('div'); row.className='media-row';
-    const thumb = document.createElement('div'); thumb.className='thumb'; thumb.innerHTML='<img src="'+url+'">';
+    const thumb = document.createElement('div'); thumb.className='thumb';
+    thumb.innerHTML = m.tipo==='pdf' ? '<div class="pdf">PDF</div>' : '<img src="'+url+'">';
     const info = document.createElement('div'); info.className='info';
-    info.innerHTML = '<div class="nm"></div><div class="tp">piantina</div>';
+    info.innerHTML = '<div class="nm"></div><div class="tp">'+(m.tipo==='pdf'?'piantina PDF':'piantina')+'</div>';
     info.querySelector('.nm').textContent = m.nome || ('Piano '+(idx+1));
     const ctrl = document.createElement('div'); ctrl.className='ctrl';
     ctrl.appendChild(_mkBtn(ICON.edit, async ()=>{ const n=prompt('Nome del piano:', m.nome||''); if(n!==null){ m.nome=n.trim(); await mapPut(m); renderMappaGrid(); } }));
@@ -2146,18 +2149,22 @@ async function apriMappa(){
     const b = document.createElement('button');
     b.textContent = m.nome || ('Piano '+(i+1));
     b.style.cssText = 'padding:9px 16px;border-radius:22px;border:1px solid var(--oro);background:transparent;color:#fff;cursor:pointer;font-size:15px;opacity:.6';
-    b.onclick = ()=>mostraPiano(u, b);
+    b.onclick = ()=>mostraPiano(u, b, m.tipo);
     fl.appendChild(b);
-    if(i===0) mostraPiano(u, b);
+    if(i===0) mostraPiano(u, b, m.tipo);
   });
   $('mapOverlay').style.display='flex'; resetInattivita();
 }
-function mostraPiano(url, btn){
-  $('mapImg').src = url; _mapZoom=false; $('mapImg').style.transform=''; $('mapImg').style.cursor='zoom-in';
+function mostraPiano(url, btn, tipo){
+  const isPdf = tipo==='pdf';
+  $('mapImg').style.display = isPdf ? 'none' : '';
+  $('mapFrame').style.display = isPdf ? '' : 'none';
+  if(isPdf){ $('mapFrame').src = url; }
+  else { $('mapImg').src = url; _mapZoom=false; $('mapImg').style.transform=''; $('mapImg').style.cursor='zoom-in'; }
   [...$('mapFloors').children].forEach(c=>{ c.style.opacity='.6'; c.style.background='transparent'; });
   if(btn){ btn.style.opacity='1'; btn.style.background='rgba(232,213,163,.18)'; }
 }
-function chiudiMappa(){ $('mapOverlay').style.display='none'; resetInattivita(); }
+function chiudiMappa(){ $('mapOverlay').style.display='none'; try{ $('mapFrame').src='about:blank'; }catch(_){} resetInattivita(); }
 
 /* ===== SEZIONE 12 · AVVIO (inizializzazione all'apertura) ===== */
 caricaTtsCache(); caricaRisp();                                  // riusa risposte/audio già salvati (zero chiamate)
