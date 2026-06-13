@@ -2859,7 +2859,10 @@ async function syncPull(force, withFeedback){
   }catch(_){ if(withFeedback) alert('Sincronizzazione non riuscita (rete).'); }
 }
 function sincronizzaOra(){
-  const m=syncMode(); if(m==='off' || !syncGruppo()){ alert('Imposta un nome gruppo e scegli Master o Ricevente, poi premi Salva. Poi riprova.'); return; }
+  // legge gruppo+ruolo direttamente dai campi (non serve premere Salva prima)
+  if($('syncGroup')) localStorage.setItem('concierge_sync_group', ($('syncGroup').value||'').trim());
+  if($('syncMode'))  localStorage.setItem('concierge_sync_mode', $('syncMode').value||'off');
+  const m=syncMode(); if(m==='off' || !syncGruppo()){ alert('Scrivi un NOME GRUPPO e scegli Master o Ricevente, poi premi "Sincronizza ora".'); return; }
   if(m==='master'){ syncPush().then(ok=>alert(ok?'Configurazione PUBBLICATA sul gruppo "'+syncGruppo()+'".\n\nOra su ogni totem RICEVENTE (stesso gruppo) premi "Sincronizza ora" per scaricarla.':'Invio non riuscito (rete).')); }
   else { if(confirm('Scaricare e applicare la configurazione del Master su QUESTO totem? La pagina si ricaricherà.')) syncPull(true, true); }
 }
