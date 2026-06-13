@@ -527,15 +527,63 @@
   </div>
 
 <script>
-/* ============================================================
-   CONCIERGE AI v2 — Casinò Lugano
-   Voce + AI + contenuti veri + touch + multilingua. Tutto locale.
-   ============================================================ */
+/* ##############################################################################
+   #  CONCIERGE AI — CASINÒ LUGANO                                              #
+   #  Totem di accoglienza vocale multilingue (single-file, web app)           #
+   #  Versione 3.0 · 2026                                                       #
+   ##############################################################################
+
+   COS'È
+   -----
+   App web in un solo file (index.html). Si apre in un browser su qualsiasi
+   dispositivo (PC Windows, tablet, TV). Accoglie gli ospiti a voce e con il
+   tocco in 8 lingue, traduce per il personale, mostra media e QR ufficiali.
+
+   ARCHITETTURA (dipendenze esterne)
+   ---------------------------------
+   • Groq          → cervello AI (risposte/traduzione).        Chiave: ⚙️
+   • Google TTS    → voce naturale (gratis 1M caratteri/mese). Chiave: ⚙️
+   • ElevenLabs    → voce premium opzionale.                   Chiave: ⚙️
+   • Browser STT   → microfono (gratuito, nessuna chiave).
+   • Supabase      → SOLO contatore consumo voce condiviso (un numero,
+                     nessun dato personale). URL+chiave: costanti SBC_URL/SBC_KEY.
+   • IndexedDB     → media (foto/video/PDF) nella memoria del dispositivo.
+
+   COME AGGIUNGERE UN NUOVO SCHERMO (scala a 10+ schermi)
+   -----------------------------------------------------
+   1. Apri l'URL del concierge sul nuovo dispositivo (browser).
+   2. ⚙️ → inserisci le chiavi (Groq, Google) → Salva.
+   3. Fatto. Tutti gli schermi CONDIVIDONO lo stesso contatore consumo
+      (Supabase), quindi il limite gratuito vale sul TOTALE, non per schermo.
+      Nessun limite al numero di schermi.
+
+   PRIVACY (nLPD / Svizzera)
+   -------------------------
+   Nessun audio registrato. Nessun dato personale memorizzato. Il cloud
+   contiene solo un numero (caratteri consumati/mese). Media in locale.
+
+   INDICE DEL CODICE
+   -----------------
+   [HTML]  struttura pagina + pannello impostazioni (sopra questo <script>)
+   [CSS]   stili + responsive mobile/tablet/PC/TV/4K (nell'<head>)
+   [JS] 1.  CONFIGURAZIONE      → dati casinò, bottoni, testi, icone
+        2.  ASCOLTO             → microfono (riconoscimento vocale)
+        3.  CERVELLO (AI)       → chiamata a Groq, lingua, memoria
+        4.  CONTATORE CONDIVISO → Supabase (consumo voce tra schermi)
+        5.  VOCE (TTS)          → cascata ElevenLabs→Google→Browser + cache
+        6.  UI                  → bottoni rapidi, schermo d'attesa, kiosk
+        7.  QR                  → codici verso il sito ufficiale
+        8.  TRADUTTORE          → riconosci + traduci + pronuncia
+        9.  DEMO                → attract-mode animato dopo inattività
+       10.  IMPOSTAZIONI        → lettura/scrittura configurazione (⚙️)
+       11.  MOTORE MEDIA        → import foto/video/PDF, sfondo a rotazione
+       12.  AVVIO               → inizializzazione all'apertura
+   ============================================================================== */
 
 const $ = id => document.getElementById(id);
 const KEY_LS = 'concierge_groq_key';
 
-/* --- DATI DEL CASINO (modificabili da ⚙️, salvati in locale) ---
+/* ===== SEZIONE 1 · CONFIGURAZIONE — dati del casino (modificabili da ⚙️, salvati in locale) ---
    Sono FITTIZI: sostituiscili con quelli reali nel pannello impostazioni. */
 const DATI_DEFAULT =
 `ORARI: apertura tutti i giorni alle 12:00. Chiusura: da domenica a giovedì alle 04:00; venerdì, sabato e nelle vigilie dei giorni festivi italiani alle 05:00.
@@ -673,7 +721,7 @@ if(speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschange
 
 function setStato(classe, testo){ document.body.className = classe; if(testo!==undefined) $('stato').textContent = testo; }
 
-/* ============ 1. ASCOLTO continuo (hands-free) ============ */
+/* ===== SEZIONE 2 · ASCOLTO (microfono / riconoscimento vocale) ===== */
 function creaRecognition(){
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if(!SR){
@@ -774,7 +822,7 @@ function applicaLinguaUI(){
   }
 }
 
-/* ============ 2. CERVELLO (Groq) ============ */
+/* ===== SEZIONE 3 · CERVELLO (AI — Groq) ===== */
 let richiestaId = 0;          // token per invalidare risposte vecchie
 let audioCorrente = null;     // audio TTS in riproduzione (per interromperlo)
 let abortCtrl = null;         // per annullare la fetch in corso
@@ -808,7 +856,7 @@ function contaMese(eng, n){
   d.chars = (d.chars||0) + n;
   localStorage.setItem('concierge_uso_'+eng, JSON.stringify(d));
 }
-/* --- Contatore condiviso tra TUTTI gli schermi (Supabase: solo un numero, NESSUN dato personale) --- */
+/* ===== SEZIONE 4 · CONTATORE CONDIVISO consumo voce (Supabase — solo un numero, nessun dato personale) ===== */
 const SBC_URL = 'https://hzkzhjubeexctltfgsml.supabase.co';
 const SBC_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6a3poanViZWV4Y3RsdGZnc21sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMTM5OTQsImV4cCI6MjA5Njg4OTk5NH0._GJMMAAdNG2UTtn0nvsWzxy6vPfR72HoV-1rZTizZy8';
 let usoCondiviso = {mese:'', google:0, eleven:0};
@@ -899,7 +947,7 @@ async function chiediAllAI(domanda, opts){
   }
 }
 
-/* ============ 3. VOCE ============ */
+/* ===== SEZIONE 5 · VOCE (TTS a cascata ElevenLabs->Google->Browser + cache) ===== */
 function rispondi(testo, lang, indicazione, mioId){
   $('risposta').textContent = testo;
   $('indicazione').innerHTML = indicazione ? ICON.nav + '<span>' + indicazione + '</span>' : '';
@@ -1021,7 +1069,7 @@ async function voceGoogle(testo, lang, fine, mioId){
   }
 }
 
-/* ============ 4. UI: bottoni rapidi, attesa, kiosk ============ */
+/* ===== SEZIONE 6 · UI (bottoni rapidi, schermo d.attesa, kiosk) ===== */
 function costruisciRapide(){
   const lng = uiLang();
   $('rapide').innerHTML = RAPIDE.map((r,i)=>`<button onclick="domandaRapida(${i})">${ICON[r.ic]}<span>${r.l[lng]||r.l.en||r.l.it}</span></button>`).join('');
@@ -1045,7 +1093,7 @@ function domandaRapida(i){
   chiediAllAI(q, {cacheKey:ck, noContext:true});
 }
 
-/* --- QR verso il sito ufficiale --- */
+/* ===== SEZIONE 7 · QR (verso il sito ufficiale) ===== */
 let qrTimer = null, qrUrlCorrente = '';
 const QR_CAP = {
   it:'Inquadra il codice col telefono o visita il sito', de:'Scannen Sie den Code oder besuchen Sie die Webseite',
@@ -1085,7 +1133,7 @@ function apriWeb(){
 }
 function chiudiWeb(){ $('webModal').classList.remove('open'); $('webFrame').src='about:blank'; }
 
-/* ============ TRADUTTORE (auto-rileva la lingua parlata) ============ */
+/* ===== SEZIONE 8 · TRADUTTORE (riconosci + traduci + pronuncia) ===== */
 let tradSR = null, tradRecording = false;
 const REC_CODE = {it:'it-IT',en:'en-GB',de:'de-DE',fr:'fr-FR',es:'es-ES',ru:'ru-RU',zh:'zh-CN',ar:'ar-SA'};
 const LNAME_TRAD = {it:'italiano',en:'inglese',de:'tedesco',fr:'francese',es:'spagnolo',ru:'russo',zh:'cinese',ar:'arabo'};
@@ -1165,7 +1213,7 @@ async function tradTraduci(testo){
   }catch(e){ console.error(e); $('tradOut').textContent='Errore traduzione: '+(e.message||e); }
 }
 
-/* --- Demo animato dopo inattività (attract mode totem) --- */
+/* ===== SEZIONE 9 · DEMO (attract-mode animato dopo inattivita) ===== */
 let inattivitaTimer = null, demoCtaTimer = null, demoCtaIdx = 0;
 const INATTIVITA_MS = 40000;          // 40s senza interazione → parte il demo
 const DEMO_CTA = {it:'Tocca lo schermo per iniziare', de:'Tippen, um zu starten', en:'Touch the screen to start', fr:'Touchez l\'écran pour commencer', es:'Toque la pantalla para empezar', ru:'Коснитесь экрана, чтобы начать', zh:'轻触屏幕开始', ar:'المس الشاشة للبدء'};
@@ -1249,7 +1297,7 @@ function schermoIntero(){
   else document.exitFullscreen?.();
 }
 
-/* ============ Settings ============ */
+/* ===== SEZIONE 10 · IMPOSTAZIONI (lettura/scrittura configurazione) ===== */
 function toggleVediChiavi(){
   const t = $('vediChiavi').checked ? 'text' : 'password';
   ['apiKey','elevenKey','googleKey'].forEach(id => { $(id).type = t; });
@@ -1296,8 +1344,7 @@ function salvaSettings(){
 }
 $('modal').addEventListener('click', e=>{ if(e.target.id==='modal') $('modal').classList.remove('open'); });
 
-/* ============ Avvio ============ */
-/* ============ MOTORE MEDIA — foto/video/PDF nella memoria del dispositivo ============ */
+/* ===== SEZIONE 11 · MOTORE MEDIA (import foto/video/PDF, sfondo a rotazione) ===== */
 let _mediaDB = null, bgIdx = 0, bgTimer = null, bgGen = 0;
 function mediaDB(){
   return new Promise((res,rej)=>{
@@ -1368,6 +1415,7 @@ function mostraSfondo(items, gen){
   else { const sec = parseInt(localStorage.getItem('concierge_bg_int')||'8', 10); bgTimer = setTimeout(next, Math.max(3,sec)*1000); }
 }
 
+/* ===== SEZIONE 12 · AVVIO (inizializzazione all'apertura) ===== */
 caricaTtsCache();
 caricaUsoCondiviso(); setInterval(caricaUsoCondiviso, 120000);   // contatore condiviso tra schermi
 avviaSfondo();                                                    // sfondo media (se presente)
