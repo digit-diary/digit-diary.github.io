@@ -595,7 +595,7 @@
       </g>
     </svg>
     <div class="emblema-custom" id="emblemaCustom"></div>
-    <!-- AVATAR: Immagine realistica (caricata, es. generata con ChatGPT) -->
+    <!-- AVATAR: Immagine realistica (caricata) -->
     <div class="avatar-layer avatar-img" id="avatarImg" style="display:none"></div>
     <!-- AVATAR: Volto stilizzato (illustrazione curata) -->
     <svg class="avatar-layer" id="avatarFace" viewBox="0 0 200 200" style="display:none">
@@ -844,7 +844,7 @@
           <select id="avatarSel">
             <option value="off">Off — solo il logo (predefinito)</option>
             <option value="aura">Aura dorata — onda audio-reattiva attorno al logo ⭐</option>
-            <option value="immagine">Immagine realistica — la carichi tu (es. da ChatGPT) + aura ⭐</option>
+            <option value="immagine">Immagine realistica — la carichi tu (foto) + aura ⭐</option>
             <option value="volto">Volto stilizzato (uomo) — la bocca si muove con la voce</option>
             <option value="donna">Hostess (donna) — elegante, bocca animata</option>
             <option value="concierge">Concierge elegante — figura con papillon + spilla logo</option>
@@ -980,6 +980,13 @@
           <option value="1">Normale</option>
           <option value="1.1">Veloce</option>
         </select>
+        <label>Voce (genere)</label>
+        <select id="voiceGender">
+          <option value="auto">Automatica (segue l'avatar)</option>
+          <option value="f">Femminile</option>
+          <option value="m">Maschile</option>
+        </select>
+        <div class="hint">"Automatica": donna → voce femminile, uomo/concierge → voce maschile. Vale per la voce Google.</div>
 
         <label>Effetto transizione foto demo (Ken Burns) <span style="opacity:.5">si imposta in Media</span></label>
         <div class="hint">La velocità del demo e gli effetti foto si regolano nella sezione Media.</div>
@@ -1792,7 +1799,7 @@ async function ttsLookup(motore, lang, testo, share){
   if(!share) return null;                                   // conversazioni libere: solo memoria, niente disco/cloud
   const dev = await ttsDbGet(ck);
   if(dev){ ttsCache.set(ck, dev); return dev; }
-  const name = motore+'_'+lang+'_'+_hash(testo)+'.mp3';
+  const name = motore+'_'+lang+(voceGenere()==='m'?'_M':'')+'_'+_hash(testo)+'.mp3';
   try{ const r = await fetch(ttsRemoteUrl(name)); if(r.ok){ const url = await blobToDataURL(await r.blob()); ttsCache.set(ck,url); ttsDbPut(ck,url); return url; } }catch(_){}
   return null;
 }
@@ -1801,7 +1808,7 @@ function ttsStore(motore, lang, testo, url, share){
   ttsCache.set(ttsKey(motore,lang,testo), url);
   if(!share) return;
   ttsDbPut(ttsKey(motore,lang,testo), url);
-  const name = motore+'_'+lang+'_'+_hash(testo)+'.mp3';
+  const name = motore+'_'+lang+(voceGenere()==='m'?'_M':'')+'_'+_hash(testo)+'.mp3';
   dataURLtoBlob(url).then(b=>ttsRemoteUpload(name, b)).catch(()=>{});
 }
 
@@ -1931,6 +1938,15 @@ function rispondi(testo, lang, indicazione, mioId, share){
 
 /* ===== AVATAR animato (Off / Aura audio-reattiva / Volto / Concierge) ===== */
 function avatarMode(){ return localStorage.getItem('concierge_avatar')||'off'; }
+// Genere voce: m / f / auto (segue l'avatar: donna→f, uomo/concierge→m)
+function voceGenere(){
+  const g=localStorage.getItem('concierge_voice_gender')||'auto';
+  if(g==='m'||g==='f') return g;
+  const a=avatarMode();
+  if(a==='donna') return 'f';
+  if(a==='volto'||a==='concierge') return 'm';
+  return 'f';
+}
 function getAvatarImg(){ return localStorage.getItem('concierge_avatar_img')||''; }
 function renderAvatarImg(){ const el=$('avatarImg'); if(!el) return; const im=getAvatarImg(); el.innerHTML = im ? '<img src="'+im+'" alt="avatar">' : ''; }
 function importaAvatarImg(e){
@@ -2015,7 +2031,9 @@ function voceBrowser(testo, lang, fine){
 }
 
 // --- Gestione cache audio (in memoria + su disco) ---
-function ttsKey(motore, lang, testo){ return motore+'|'+lang+'|'+testo; }
+// Chiave cache: identica a prima per la voce femminile (default) → cache esistente intatta;
+// aggiunge "M" SOLO per la voce maschile (così non rigenera nulla per il setup attuale).
+function ttsKey(motore, lang, testo){ return motore+'|'+lang+(voceGenere()==='m'?'|M':'')+'|'+testo; }
 function blobToDataURL(blob){ return new Promise(res=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.readAsDataURL(blob); }); }
 function suonaCache(url, fine){
   const a=new Audio(url); audioCorrente=a;
@@ -2108,14 +2126,15 @@ async function voceGoogle(testo, lang, fine, mioId, share){
   if(cached){ suonaCache(cached, fine); return; }                 // riuso: nessuna chiamata, nessun carattere speso
   const key = localStorage.getItem('concierge_google');
   if(!key){ $('risposta').textContent='Manca la chiave Google TTS (⚙️).'; fine(); return; }
-  const vmap = {
-    it:{languageCode:'it-IT',name:'it-IT-Neural2-A'}, de:{languageCode:'de-DE',name:'de-DE-Neural2-F'},
-    en:{languageCode:'en-GB',name:'en-GB-Neural2-A'}, fr:{languageCode:'fr-FR',name:'fr-FR-Neural2-A'},
-    es:{languageCode:'es-ES',name:'es-ES-Neural2-A'}, ru:{languageCode:'ru-RU',name:'ru-RU-Wavenet-A'},
-    zh:{languageCode:'cmn-CN',name:'cmn-CN-Wavenet-A'}, ar:{languageCode:'ar-XA',name:'ar-XA-Wavenet-A'}
-  };
+  const LANGCODE = {it:'it-IT',de:'de-DE',en:'en-GB',fr:'fr-FR',es:'es-ES',ru:'ru-RU',zh:'cmn-CN',ar:'ar-XA'};
+  const VOCI_F = {it:'it-IT-Neural2-A',de:'de-DE-Neural2-F',en:'en-GB-Neural2-A',fr:'fr-FR-Neural2-A',es:'es-ES-Neural2-A',ru:'ru-RU-Wavenet-A',zh:'cmn-CN-Wavenet-A',ar:'ar-XA-Wavenet-A'};
+  const VOCI_M = {it:'it-IT-Neural2-C',de:'de-DE-Neural2-B',en:'en-GB-Neural2-B',fr:'fr-FR-Neural2-B',es:'es-ES-Neural2-B',ru:'ru-RU-Wavenet-D',zh:'cmn-CN-Wavenet-B',ar:'ar-XA-Wavenet-B'};
+  const g = voceGenere();
   const _exv = getLingueExtra().find(x=>x.code===lang);
-  const voce = vmap[lang] || (_exv ? {languageCode:_exv.bcp, name:_exv.gvoice} : vmap.it);   // lingue extra → voce Google del preset
+  let voce;
+  if(LANGCODE[lang]) voce = {languageCode:LANGCODE[lang], name:(g==='m'?VOCI_M:VOCI_F)[lang]};
+  else if(_exv) voce = {languageCode:_exv.bcp, name:_exv.gvoice};   // lingue extra → voce del preset
+  else voce = {languageCode:'it-IT', name:(g==='m'?VOCI_M:VOCI_F).it};
   try{
     const r = await fetch('https://texttospeech.googleapis.com/v1/text:synthesize?key='+key, {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -2463,6 +2482,7 @@ function apriSettings(){
   $('langDef').value   = localStorage.getItem('concierge_lang_def')||'it-IT';
   $('micSens').value   = localStorage.getItem('concierge_mic_sens')||'0.55';
   $('voiceRate').value = localStorage.getItem('concierge_voice_rate')||'1';
+  $('voiceGender').value = localStorage.getItem('concierge_voice_gender')||'auto';
   $('bgInterval').value = localStorage.getItem('concierge_bg_int')||'8';
   $('bgFx').value = localStorage.getItem('concierge_bg_fx')||'fade';
   $('kiosk').checked = localStorage.getItem('concierge_kiosk')==='1';
@@ -2518,6 +2538,7 @@ function salvaSettings(){
   lsSet('concierge_lang_def', $('langDef').value);
   lsSet('concierge_mic_sens', $('micSens').value);
   lsSet('concierge_voice_rate', $('voiceRate').value);
+  lsSet('concierge_voice_gender', $('voiceGender').value);
   lsSet('concierge_bg_int', String(parseInt($('bgInterval').value||'8',10)||8));
   lsSet('concierge_bg_fx', $('bgFx').value);
   avviaSfondo();
