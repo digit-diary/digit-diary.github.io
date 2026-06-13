@@ -115,6 +115,11 @@
   .av-eyes{transform-origin:center 86px;animation:avBlink 5.5s ease-in-out infinite}
   @keyframes avBlink{0%,92%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
   #avatarMouth,#avatarConciergeMouth{transition:ry .06s linear}
+  /* Avatar immagine realistica (caricata) */
+  .avatar-img{align-items:center;justify-content:center;animation:avBreath 5s ease-in-out infinite}
+  .avatar-img img{width:96%;height:96%;object-fit:cover;border-radius:50%;box-shadow:0 0 0 2px rgba(232,213,163,.4)}
+  body.speaking #avatarImg img{box-shadow:0 0 34px rgba(232,213,163,.55),0 0 0 2px rgba(232,213,163,.7)}
+  @keyframes avBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.015)}}
   .emblema-custom.on{display:flex;animation:breathe 4s ease-in-out infinite}
   .emblema-custom img{width:62%;height:62%;object-fit:contain;filter:drop-shadow(0 0 18px rgba(232,213,163,.4))}
   body.has-logo .emblema .core{display:none}
@@ -590,6 +595,8 @@
       </g>
     </svg>
     <div class="emblema-custom" id="emblemaCustom"></div>
+    <!-- AVATAR: Immagine realistica (caricata, es. generata con ChatGPT) -->
+    <div class="avatar-layer avatar-img" id="avatarImg" style="display:none"></div>
     <!-- AVATAR: Volto stilizzato -->
     <svg class="avatar-layer" id="avatarFace" viewBox="0 0 200 200" style="display:none">
       <defs><radialGradient id="afg" cx="50%" cy="38%" r="68%"><stop offset="0%" stop-color="#2c2438"/><stop offset="100%" stop-color="#14101c"/></radialGradient></defs>
@@ -769,9 +776,14 @@
           <select id="avatarSel">
             <option value="off">Off — solo il logo (predefinito)</option>
             <option value="aura">Aura dorata — onda audio-reattiva attorno al logo ⭐</option>
+            <option value="immagine">Immagine realistica — la carichi tu (es. da ChatGPT) + aura ⭐</option>
             <option value="volto">Volto stilizzato — la bocca si muove con la voce</option>
             <option value="concierge">Concierge elegante — figura con papillon</option>
           </select>
+          <input type="file" id="avatarImgFile" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="importaAvatarImg(event)">
+          <label class="btn-import" for="avatarImgFile" style="margin-top:8px;display:inline-block">Carica immagine avatar</label>
+          <span class="btn-clear" style="margin-top:8px;display:inline-block" onclick="rimuoviAvatarImg()">Rimuovi</span>
+          <div id="avatarImgPrev" style="margin-top:8px"></div>
         </div>
 
         <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.1);padding-top:12px">
@@ -1850,12 +1862,25 @@ function rispondi(testo, lang, indicazione, mioId, share){
 
 /* ===== AVATAR animato (Off / Aura audio-reattiva / Volto / Concierge) ===== */
 function avatarMode(){ return localStorage.getItem('concierge_avatar')||'off'; }
+function getAvatarImg(){ return localStorage.getItem('concierge_avatar_img')||''; }
+function renderAvatarImg(){ const el=$('avatarImg'); if(!el) return; const im=getAvatarImg(); el.innerHTML = im ? '<img src="'+im+'" alt="avatar">' : ''; }
+function importaAvatarImg(e){
+  const f=e.target.files[0]; if(!f) return;
+  if(f.size>2500000){ alert('Immagine troppo pesante ('+Math.round(f.size/1024)+' KB). Usa un file sotto 2,5 MB.'); e.target.value=''; return; }
+  const r=new FileReader();
+  r.onload=()=>{ if(!lsSet('concierge_avatar_img', r.result)){ alert('Spazio insufficiente.'); return; } localStorage.setItem('concierge_avatar','immagine'); if($('avatarSel')) $('avatarSel').value='immagine'; renderAvatarImg(); renderAvatarImgPrev(); applyAvatar(); };
+  r.readAsDataURL(f); e.target.value='';
+}
+function rimuoviAvatarImg(){ localStorage.removeItem('concierge_avatar_img'); renderAvatarImg(); renderAvatarImgPrev(); applyAvatar(); }
+function renderAvatarImgPrev(){ const el=$('avatarImgPrev'); if(!el) return; const im=getAvatarImg(); el.innerHTML = im ? '<img src="'+im+'" style="width:84px;height:84px;border-radius:50%;object-fit:cover;border:2px solid var(--oro)">' : '<span style="opacity:.5;font-size:13px">Nessuna immagine. Caricane una (volto realistico) per usarla come avatar.</span>'; }
 function applyAvatar(){
   const m=avatarMode();
-  if($('vizCanvas'))       $('vizCanvas').style.display       = (m==='aura')?'block':'none';
+  if($('vizCanvas'))       $('vizCanvas').style.display       = (m==='aura'||m==='immagine')?'block':'none';
+  if($('avatarImg'))       $('avatarImg').style.display       = (m==='immagine')?'flex':'none';
   if($('avatarFace'))      $('avatarFace').style.display      = (m==='volto')?'block':'none';
   if($('avatarConcierge')) $('avatarConcierge').style.display = (m==='concierge')?'block':'none';
-  document.body.classList.toggle('avatar-cover', m==='volto'||m==='concierge');   // i volti coprono il logo
+  document.body.classList.toggle('avatar-cover', m==='volto'||m==='concierge'||m==='immagine');   // volti/immagine coprono il logo
+  if(m==='immagine') renderAvatarImg();
 }
 let _ac=null,_an=null,_fd=null,_avRAF=null,_avSim=0; const _avSrc=new WeakMap();
 function _avInit(){ if(_ac) return !!_an; try{ _ac=new (window.AudioContext||window.webkitAudioContext)(); _an=_ac.createAnalyser(); _an.fftSize=128; _an.smoothingTimeConstant=.78; _an.connect(_ac.destination); _fd=new Uint8Array(_an.frequencyBinCount); return true; }catch(_){ return false; } }
@@ -1872,7 +1897,7 @@ function _avFrame(simulate){
   if(simulate){ _avSim+=0.16; amp=(Math.sin(_avSim)*0.5+0.5)*0.45+0.12; }
   else if(_an){ _an.getByteFrequencyData(_fd); let s=0; for(let i=0;i<_fd.length;i++) s+=_fd[i]; amp=Math.min(1,(s/_fd.length)/95); }
   const m=avatarMode();
-  if(m==='aura') _avAura(simulate, amp);
+  if(m==='aura'||m==='immagine') _avAura(simulate, amp);
   else if(m==='volto'){ const mo=$('avatarMouth'); if(mo) mo.setAttribute('ry',(3.5+amp*15).toFixed(1)); }
   else if(m==='concierge'){ const mc=$('avatarConciergeMouth'); if(mc) mc.setAttribute('ry',(2.6+amp*9).toFixed(1)); }
 }
@@ -2373,6 +2398,7 @@ function apriSettings(){
   renderCustomBtnList(); chiudiFormBtn();
   $('brandName').value = localStorage.getItem('concierge_brand')||'';
   $('avatarSel').value = avatarMode();
+  renderAvatarImgPrev();
   renderLogoPreview(); renderTestiAdmin();
   $('modal').classList.add('open');
   const card = document.querySelector('#modal .card'); if(card) card.scrollTop = 0;   // apre sempre in cima
@@ -2770,7 +2796,7 @@ function resetVergine(){
   localStorage.setItem('concierge_dati_struct', JSON.stringify(empty));
   ['concierge_brand','concierge_logo','concierge_btn_custom','concierge_dati_extra','concierge_btn_hidden','concierge_btn_url','concierge_pin','concierge_kiosk','concierge_demo_frasi','concierge_feedback','concierge_feedback_on','concierge_feedback_comment','concierge_stats','concierge_standby_da','concierge_standby_a','concierge_langs','concierge_langs_off'].forEach(k=>localStorage.removeItem(k));
   for(let i=localStorage.length-1;i>=0;i--){ const k=localStorage.key(i); if(k&&k.indexOf('concierge_lang_')===0) localStorage.removeItem(k); }   // bundle traduzioni
-  localStorage.removeItem('concierge_texts'); localStorage.removeItem('concierge_avatar');
+  localStorage.removeItem('concierge_texts'); localStorage.removeItem('concierge_avatar'); localStorage.removeItem('concierge_avatar_img');
   localStorage.setItem('concierge_vergine','1');   // niente stella casinò: emblema neutro finché non si carica un logo
   mapClear(); aggiornaBtnMappa(); renderLingue(); renderTesti(); applyAvatar();
   applyKiosk();
@@ -2987,7 +3013,7 @@ $('btnLogo').innerHTML = ICON.upload + '<span>Carica logo</span>';
 $('btnLogoDel').innerHTML = ICON.trash + '<span>Rimuovi</span>';
 $('hBrand').innerHTML = ICON.image + '<span>Personalizzazione — logo e nome</span>';
 applyBranding();
-applyAvatar();
+renderAvatarImg(); applyAvatar();
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>switchTab(b.dataset.t));
 buildDemoRing();
 renderLingue();   // genera le bandiere (8 base + extra) e collega i click
