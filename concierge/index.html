@@ -73,6 +73,10 @@
   body.thinking{--acc:var(--blu)}
   body.speaking{--acc:var(--oro)}
   .emblema-wrap{position:relative;width:240px;height:240px;display:flex;align-items:center;justify-content:center;margin-bottom:22px;cursor:pointer}
+  .emblema-custom{position:absolute;inset:0;display:none;align-items:center;justify-content:center;pointer-events:none}
+  .emblema-custom.on{display:flex;animation:breathe 4s ease-in-out infinite}
+  .emblema-custom img{width:62%;height:62%;object-fit:contain;filter:drop-shadow(0 0 18px rgba(232,213,163,.4))}
+  body.has-logo .emblema .core{display:none}
   .parla{display:none!important}   /* si parla toccando il logo */
   .emblema{width:230px;height:230px;overflow:visible;transition:filter .5s;
     filter:drop-shadow(0 0 24px rgba(232,213,163,.45))}
@@ -166,6 +170,12 @@
   .card a{color:var(--oro)}
   .card button.salva{margin-top:24px;width:100%;padding:14px;border:none;border-radius:10px;background:var(--oro);color:#1a1208;font-weight:600;font-size:15px;cursor:pointer}
   .err{color:#ff8080;font-size:14px;margin-top:12px;min-height:18px}
+  /* --- Tab del pannello impostazioni --- */
+  .tabs{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 16px;border-bottom:1px solid rgba(255,255,255,.1);padding-bottom:12px}
+  .tabs button{background:rgba(255,255,255,.05);border:1px solid rgba(232,213,163,.22);color:#fff;padding:9px 13px;border-radius:8px;font-size:13px;cursor:pointer;transition:.15s}
+  .tabs button.on{background:var(--oro);color:#1a1208;border-color:var(--oro);font-weight:600}
+  .tab-pane{display:none}
+  .tab-pane.on{display:block;animation:fadein .25s}
 
   /* ===== DEMO animato (attract mode) ===== */
   .demo{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:70;cursor:pointer;overflow:hidden;
@@ -364,7 +374,7 @@
   <div class="bg-slide" id="bgSlide"></div>
   <div class="bg-overlay" id="bgOverlay"></div>
 
-  <div class="logo">Casinò Lugano · Concierge</div>
+  <div class="logo" id="brandTitle">Casinò Lugano · Concierge</div>
   <div class="tools">
     <span class="trad" id="btnTrad" onclick="apriTrad()" title="Traduttore"></span>
     <span class="full" id="btnFull" onclick="schermoIntero()" title="Schermo intero"></span>
@@ -392,6 +402,7 @@
         <circle cx="150" cy="52" r="13" fill="url(#sfera)" stroke="#b6babd" stroke-width="1.5"/>
       </g>
     </svg>
+    <div class="emblema-custom" id="emblemaCustom"></div>
   </div>
 
   <div class="stato" id="stato">Tocca per parlare</div>
@@ -489,86 +500,114 @@
   <div class="modal" id="modal">
     <div class="card">
       <h2 id="hImpost">Impostazioni</h2>
-
-      <h3>Chiavi</h3>
-      <label>Chiave API Groq (cervello AI)</label>
-      <input id="apiKey" type="password" placeholder="gsk_...">
-      <div class="hint">Gratis su <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a></div>
-
-      <label id="lblMotore">Motore voce</label>
-      <select id="motore">
-        <option value="auto">Automatico: ElevenLabs → Google → Browser (consigliato)</option>
-        <option value="eleven">Solo ElevenLabs (dolce e realistica)</option>
-        <option value="google">Solo Google TTS (naturale, gratis)</option>
-        <option value="browser">Solo Browser (gratis, robotica)</option>
-        <option value="testo">Solo testo (nessuna voce, costo zero)</option>
-      </select>
-
-      <div id="boxAuto">
-        <label>Quando ElevenLabs e Google sono esauriti, usa:</label>
-        <select id="fallback">
-          <option value="browser">Voce del browser (gratis)</option>
-          <option value="testo">Solo testo (nessuna voce)</option>
-        </select>
-        <label>Limite ElevenLabs / mese</label>
-        <input id="limEleven" type="number" min="0" placeholder="10000">
-        <label>Limite Google / mese</label>
-        <input id="limGoogle" type="number" min="0" placeholder="1000000">
-        <div class="hint" id="usoOggi"></div>
+      <div class="tabs" id="tabs">
+        <button data-t="api" class="on">API e Voce</button>
+        <button data-t="brand">Logo e Nome</button>
+        <button data-t="btn">Bottoni</button>
+        <button data-t="dati">Contenuti</button>
+        <button data-t="media">Media</button>
+        <button data-t="comp">Comportamento</button>
       </div>
 
-      <label>Limite caratteri al giorno (modalità manuali) <span style="opacity:.5">(0 = nessuno)</span></label>
-      <input id="limite" type="number" min="0" placeholder="0">
-      <div class="hint">La cache non conta verso i limiti: le domande dei bottoni si generano una volta e poi sono gratis.</div>
+      <!-- SEZIONE API E VOCE -->
+      <div class="tab-pane on" data-p="api">
+        <label>Chiave API Groq (cervello AI)</label>
+        <input id="apiKey" type="password" placeholder="gsk_...">
+        <div class="hint">Gratis su <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a></div>
+        <label id="lblMotore">Motore voce</label>
+        <select id="motore">
+          <option value="auto">Automatico: ElevenLabs → Google → Browser (consigliato)</option>
+          <option value="eleven">Solo ElevenLabs (dolce e realistica)</option>
+          <option value="google">Solo Google TTS (naturale, gratis)</option>
+          <option value="browser">Solo Browser (gratis, robotica)</option>
+          <option value="testo">Solo testo (nessuna voce, costo zero)</option>
+        </select>
+        <div id="boxAuto">
+          <label>Quando ElevenLabs e Google sono esauriti, usa:</label>
+          <select id="fallback">
+            <option value="browser">Voce del browser (gratis)</option>
+            <option value="testo">Solo testo (nessuna voce)</option>
+          </select>
+          <label>Limite ElevenLabs / mese</label>
+          <input id="limEleven" type="number" min="0" placeholder="10000">
+          <label>Limite Google / mese</label>
+          <input id="limGoogle" type="number" min="0" placeholder="1000000">
+          <div class="hint" id="usoOggi"></div>
+        </div>
+        <label>Limite caratteri al giorno (modalità manuali) <span style="opacity:.5">(0 = nessuno)</span></label>
+        <input id="limite" type="number" min="0" placeholder="0">
+        <div class="hint">La cache non conta verso i limiti.</div>
+        <label>Chiave ElevenLabs</label>
+        <input id="elevenKey" type="password" placeholder="sk_...">
+        <label>Chiave Google TTS</label>
+        <input id="googleKey" type="password" placeholder="AIza...">
+        <label><input type="checkbox" id="vediChiavi" style="width:auto;margin-right:8px" onchange="toggleVediChiavi()"> Mostra le chiavi (per leggerle/copiarle)</label>
+      </div>
 
-      <label>Chiave ElevenLabs</label>
-      <input id="elevenKey" type="password" placeholder="sk_...">
-      <label>Chiave Google TTS</label>
-      <input id="googleKey" type="password" placeholder="AIza...">
+      <!-- SEZIONE LOGO E NOME -->
+      <div class="tab-pane" data-p="brand">
+        <h3 id="hBrand">Personalizzazione — logo e nome</h3>
+        <div class="hint">Sostituisci logo e nome per qualsiasi azienda. Il logo appare nella home (animato) e nel demo. Formati: SVG (vettoriale), PNG, JPEG, WEBP.</div>
+        <label>Nome / titolo in alto</label>
+        <input id="brandName" type="text" placeholder="es. Casinò Lugano · Concierge">
+        <input type="file" id="logoFile" accept="image/svg+xml,image/png,image/jpeg,image/webp,.svg" style="display:none" onchange="importaLogo(event)">
+        <label class="btn-import" id="btnLogo" for="logoFile"></label>
+        <span class="btn-clear" id="btnLogoDel" onclick="rimuoviLogo()"></span>
+        <div id="logoPreview" style="margin-top:10px"></div>
+      </div>
 
-      <label><input type="checkbox" id="vediChiavi" style="width:auto;margin-right:8px" onchange="toggleVediChiavi()"> Mostra le chiavi (per leggerle/copiarle)</label>
-
-      <h3>Ascolto</h3>
-      <label><input type="checkbox" id="wake" style="width:auto;margin-right:8px"> Richiedi parola di attivazione "Ciao"</label>
-      <div class="hint">Utile in ambienti rumorosi: risponde solo se la frase inizia con "Ciao".</div>
-
-      <label>Demo animato dopo (secondi di inattività) <span style="opacity:.5">(0 = disattivato)</span></label>
-      <input id="demoDelay" type="number" min="0" placeholder="40">
-      <div class="hint">Il video-guida parte da solo dopo questo tempo senza interazioni. Tocca lo schermo per chiuderlo.</div>
-
-      <h3 id="hMedia">Sfondo e media (foto / video / PDF)</h3>
-      <input type="file" id="fileImport" accept="image/*,video/*,application/pdf" multiple style="display:none" onchange="importaMedia(event)">
-      <label class="btn-import" id="btnImport" for="fileImport"></label>
-      <span class="btn-clear" id="btnClear" onclick="svuotaMedia()"></span>
-      <div class="hint">Immagini e video → sfondo a rotazione (foto e video insieme, in coda). PDF (menù, mappa, locandine) → apribili. Usa ↑↓ per l'ordine. Tutto nella memoria di QUESTO dispositivo (offline).</div>
-      <label>Durata di ogni foto in sfondo (secondi)</label>
-      <input id="bgInterval" type="number" min="2" placeholder="8">
-      <div class="media-list" id="mediaGrid"></div>
-      <div class="media-empty" id="mediaEmpty">Nessun media caricato.</div>
-
-      <h3 id="hBtn">Bottoni personalizzati</h3>
-      <div class="hint">Aggiungi i tuoi bottoni (es. Spa, Tornei, VIP) con icona e descrizione. Appaiono nella home accanto agli altri. Nessun codice.</div>
-      <div id="customBtnList"></div>
-      <span class="btn-import" id="btnAddCustom" onclick="apriFormBtn()"></span>
-      <div id="formBtn" style="display:none;margin-top:12px;padding:14px;border:1px solid rgba(232,213,163,.25);border-radius:12px">
-        <label>Icona del bottone</label>
-        <div class="icon-picker" id="iconPicker"></div>
-        <label>Nome del bottone</label>
-        <input id="btnLabel" type="text" placeholder="es. Spa & Benessere">
-        <label>Descrizione (cosa risponde il concierge)</label>
-        <textarea id="btnDesc" rows="2" style="min-height:50px" placeholder="es. La Spa è al terzo piano, aperta 10:00-22:00..."></textarea>
-        <label>Link/QR opzionale (sito o pagina)</label>
-        <input id="btnUrl" type="text" placeholder="https://...">
-        <label><input type="checkbox" id="btnSoloLink" style="width:auto;margin-right:8px"> Mostra solo il QR (niente risposta vocale)</label>
-        <div style="display:flex;gap:8px;margin-top:12px">
-          <button class="salva" style="margin-top:0" onclick="salvaBtn()">Salva bottone</button>
-          <span class="btn-clear" style="margin-top:0" onclick="chiudiFormBtn()">Annulla</span>
+      <!-- SEZIONE BOTTONI -->
+      <div class="tab-pane" data-p="btn">
+        <h3 id="hBtn">Bottoni personalizzati</h3>
+        <div class="hint">Aggiungi i tuoi bottoni (es. Spa, Tornei, VIP) con icona e descrizione. Appaiono nella home accanto agli altri. Nessun codice.</div>
+        <div id="customBtnList"></div>
+        <span class="btn-import" id="btnAddCustom" onclick="apriFormBtn()"></span>
+        <div id="formBtn" style="display:none;margin-top:12px;padding:14px;border:1px solid rgba(232,213,163,.25);border-radius:12px">
+          <label>Icona del bottone</label>
+          <div class="icon-picker" id="iconPicker"></div>
+          <label>Nome del bottone</label>
+          <input id="btnLabel" type="text" placeholder="es. Spa & Benessere">
+          <label>Descrizione (cosa risponde il concierge)</label>
+          <textarea id="btnDesc" rows="2" style="min-height:50px" placeholder="es. La Spa è al terzo piano, aperta 10:00-22:00..."></textarea>
+          <label>Link/QR opzionale (sito o pagina)</label>
+          <input id="btnUrl" type="text" placeholder="https://...">
+          <label><input type="checkbox" id="btnSoloLink" style="width:auto;margin-right:8px"> Mostra solo il QR (niente risposta vocale)</label>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="salva" style="margin-top:0" onclick="salvaBtn()">Salva bottone</button>
+            <span class="btn-clear" style="margin-top:0" onclick="chiudiFormBtn()">Annulla</span>
+          </div>
         </div>
       </div>
 
-      <h3 id="hDati">Cosa sa il concierge — informazioni del casinò</h3>
-      <div class="hint">Un campo per argomento. L'AI risponde SOLO con queste informazioni. Lascia vuoto un campo per ometterlo.</div>
-      <div id="datiFields"></div>
+      <!-- SEZIONE CONTENUTI -->
+      <div class="tab-pane" data-p="dati">
+        <h3 id="hDati">Cosa sa il concierge — informazioni</h3>
+        <div class="hint">Un campo per argomento. L'AI risponde SOLO con queste informazioni. Lascia vuoto un campo per ometterlo.</div>
+        <div id="datiFields"></div>
+      </div>
+
+      <!-- SEZIONE MEDIA -->
+      <div class="tab-pane" data-p="media">
+        <h3 id="hMedia">Sfondo e media (foto / video / PDF)</h3>
+        <input type="file" id="fileImport" accept="image/*,video/*,application/pdf" multiple style="display:none" onchange="importaMedia(event)">
+        <label class="btn-import" id="btnImport" for="fileImport"></label>
+        <span class="btn-clear" id="btnClear" onclick="svuotaMedia()"></span>
+        <div class="hint">Immagini e video → sfondo a rotazione (foto e video insieme, in coda). PDF (menù, mappa) → apribili. Usa ↑↓ per l'ordine. Memoria del dispositivo (offline).</div>
+        <label>Durata di ogni foto in sfondo (secondi)</label>
+        <input id="bgInterval" type="number" min="2" placeholder="8">
+        <div class="media-list" id="mediaGrid"></div>
+        <div class="media-empty" id="mediaEmpty">Nessun media caricato.</div>
+      </div>
+
+      <!-- SEZIONE COMPORTAMENTO -->
+      <div class="tab-pane" data-p="comp">
+        <h3>Ascolto e demo</h3>
+        <label><input type="checkbox" id="wake" style="width:auto;margin-right:8px"> Richiedi parola di attivazione "Ciao"</label>
+        <div class="hint">Utile in ambienti rumorosi: risponde solo se la frase inizia con "Ciao".</div>
+        <label>Demo animato dopo (secondi di inattività) <span style="opacity:.5">(0 = disattivato)</span></label>
+        <input id="demoDelay" type="number" min="0" placeholder="40">
+        <div class="hint">Il video-guida parte da solo dopo questo tempo senza interazioni.</div>
+      </div>
 
       <div class="err" id="errModal"></div>
       <button class="salva" onclick="salvaSettings()">Salva</button>
@@ -1465,7 +1504,12 @@ function toggleVediChiavi(){
   const t = $('vediChiavi').checked ? 'text' : 'password';
   ['apiKey','elevenKey','googleKey'].forEach(id => { $(id).type = t; });
 }
+function switchTab(t){
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.t===t));
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.toggle('on', p.dataset.p===t));
+}
 function apriSettings(){
+  switchTab('api');
   $('apiKey').value    = localStorage.getItem(KEY_LS)||'';
   $('elevenKey').value = localStorage.getItem('concierge_eleven')||'';
   $('googleKey').value = localStorage.getItem('concierge_google')||'';
@@ -1482,6 +1526,8 @@ function apriSettings(){
   $('usoOggi').textContent = 'Consumo questo mese — Google: '+usoGoogleTot().toLocaleString('de-CH')+' / ElevenLabs: '+usoElevenTot().toLocaleString('de-CH')+' caratteri.';
   renderDatiFields();
   renderCustomBtnList(); chiudiFormBtn();
+  $('brandName').value = localStorage.getItem('concierge_brand')||'';
+  renderLogoPreview();
   $('modal').classList.add('open');
 }
 function salvaSettings(){
@@ -1503,6 +1549,8 @@ function salvaSettings(){
   const struct = {};
   $('datiFields').querySelectorAll('textarea').forEach(ta => { struct[ta.dataset.k] = ta.value.trim(); });
   localStorage.setItem('concierge_dati_struct', JSON.stringify(struct));
+  localStorage.setItem('concierge_brand', $('brandName').value.trim());
+  applyBranding();
   rispCache.clear();                 // i dati possono essere cambiati → invalida le risposte salvate
   $('errModal').textContent='';
   $('modal').classList.remove('open');
@@ -1624,7 +1672,38 @@ $('btnAddCustom').innerHTML = ICON.plus + '<span>Aggiungi bottone</span>';
 // Demo: logo mini, mic al centro, dito che batte, cerchio di icone
 $('demoMic').innerHTML = ICON.mic;
 $('demoFinger').innerHTML = '<svg viewBox="0 0 24 24" fill="#fdfdfd"><path d="M9 11.24V7.5a2.5 2.5 0 0 1 5 0v3.74c1.21-.81 2-2.18 2-3.74a4.5 4.5 0 1 0-9 0c0 1.56.79 2.93 2 3.74zm9.84 4.63l-4.54-2.26a1.4 1.4 0 0 0-.54-.11H13V7.5a1.5 1.5 0 0 0-3 0V21l-3.43-.72a1.1 1.1 0 0 0-1.03.3l-.79.8 4.94 4.94c.27.27.65.44 1.06.44h6.79c.75 0 1.33-.55 1.44-1.28l.75-5.27a2 2 0 0 0 .02-.21c0-.62-.38-1.16-.92-1.4z"/></svg>';
-$('demoLogo').innerHTML = '<svg viewBox="0 0 200 200"><defs><radialGradient id="dlr" cx="50%" cy="42%" r="65%"><stop offset="0%" stop-color="#d8244e"/><stop offset="55%" stop-color="#b01038"/><stop offset="100%" stop-color="#7d0826"/></radialGradient></defs><path d="M48,56 Q96,104 144,56 Q96,104 144,152 Q96,104 48,152 Q96,104 48,56 Z" fill="url(#dlr)" stroke="#c9ccce" stroke-width="6" stroke-linejoin="round"/></svg>';
+const DEMO_LOGO_DEFAULT = '<svg viewBox="0 0 200 200"><defs><radialGradient id="dlr" cx="50%" cy="42%" r="65%"><stop offset="0%" stop-color="#d8244e"/><stop offset="55%" stop-color="#b01038"/><stop offset="100%" stop-color="#7d0826"/></radialGradient></defs><path d="M48,56 Q96,104 144,56 Q96,104 144,152 Q96,104 48,152 Q96,104 48,56 Z" fill="url(#dlr)" stroke="#c9ccce" stroke-width="6" stroke-linejoin="round"/></svg>';
+$('demoLogo').innerHTML = DEMO_LOGO_DEFAULT;
+// Branding (logo + nome azienda) — white-label
+function applyBranding(){
+  const logo = localStorage.getItem('concierge_logo');
+  const brand = (localStorage.getItem('concierge_brand')||'').trim();
+  $('brandTitle').textContent = brand || 'Casinò Lugano · Concierge';
+  const ec = $('emblemaCustom');
+  if(logo){
+    ec.innerHTML = '<img src="'+logo+'" alt="logo">'; ec.classList.add('on'); document.body.classList.add('has-logo');
+    $('demoLogo').innerHTML = '<img src="'+logo+'" style="width:100%;height:100%;object-fit:contain">';
+  } else {
+    ec.innerHTML=''; ec.classList.remove('on'); document.body.classList.remove('has-logo');
+    $('demoLogo').innerHTML = DEMO_LOGO_DEFAULT;
+  }
+}
+function importaLogo(e){
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ()=>{ localStorage.setItem('concierge_logo', r.result); applyBranding(); renderLogoPreview(); };
+  r.readAsDataURL(f); e.target.value='';
+}
+function rimuoviLogo(){ localStorage.removeItem('concierge_logo'); applyBranding(); renderLogoPreview(); }
+function renderLogoPreview(){
+  const logo = localStorage.getItem('concierge_logo');
+  $('logoPreview').innerHTML = logo ? '<img src="'+logo+'" style="max-width:130px;max-height:70px;background:rgba(255,255,255,.1);padding:6px;border-radius:8px">' : '<span style="opacity:.5;font-size:13px">Nessun logo: uso quello predefinito.</span>';
+}
+$('btnLogo').innerHTML = ICON.upload + '<span>Carica logo</span>';
+$('btnLogoDel').innerHTML = ICON.trash + '<span>Rimuovi</span>';
+$('hBrand').innerHTML = ICON.image + '<span>Personalizzazione — logo e nome</span>';
+applyBranding();
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>switchTab(b.dataset.t));
 buildDemoRing();
 document.querySelectorAll('#lingue span').forEach(s=> s.onclick=()=>setLinguaAscolto(s.dataset.l));
 setLinguaAscolto('it-IT');
