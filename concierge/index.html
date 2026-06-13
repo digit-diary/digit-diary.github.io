@@ -2099,7 +2099,7 @@ async function vocePremiumEleven(testo, lang, fine, mioId, share){
   if(cached){ suonaCache(cached, fine); return; }                 // riuso: nessuna chiamata, nessun carattere speso
   const key = localStorage.getItem('concierge_eleven');
   if(!key){ $('risposta').textContent='Manca la chiave ElevenLabs (⚙️).'; fine(); return; }
-  const voiceId = 'EXAVITQu4vr4xnSDxMaL'; // "Sarah"
+  const voiceId = voceGenere()==='m' ? 'pNInz6obpgDQGcFmaJgB' : 'EXAVITQu4vr4xnSDxMaL'; // Adam (m) / Sarah (f)
   try{
     const r = await fetch('https://api.elevenlabs.io/v1/text-to-speech/'+voiceId, {
       method:'POST', headers:{'xi-api-key':key,'Content-Type':'application/json'},
