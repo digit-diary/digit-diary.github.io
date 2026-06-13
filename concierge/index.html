@@ -1941,9 +1941,15 @@ function renderAvatarImgPrev(){ const el=$('avatarImgPrev'); if(!el) return; con
 function aggiornaSpilla(){
   const slot=$('pinSlot'); if(!slot) return;
   const logo=localStorage.getItem('concierge_logo');
+  const vergine=localStorage.getItem('concierge_vergine')==='1';
   let inner='<circle cx="0" cy="0" r="11.5" fill="#0c0913" stroke="#e8d5a3" stroke-width="1.6"/>';
-  if(logo){ inner+='<clipPath id="pinClip"><circle cx="0" cy="0" r="9.5"/></clipPath><image href="'+logo+'" x="-9.5" y="-9.5" width="19" height="19" clip-path="url(#pinClip)" preserveAspectRatio="xMidYMid slice"/>'; }
-  else { inner+='<g transform="scale(0.082) translate(-103,-100)"><path d="M48,56 Q96,104 144,56 Q96,104 144,152 Q96,104 48,152 Q96,104 48,56 Z" fill="#b01038" stroke="#cfd2d4" stroke-width="7"/><circle cx="160" cy="40" r="13" fill="#dcdcdc"/></g>'; }
+  if(logo){                       // azienda con logo → mostra il loro logo
+    inner+='<clipPath id="pinClip"><circle cx="0" cy="0" r="9.5"/></clipPath><image href="'+logo+'" x="-9.5" y="-9.5" width="19" height="19" clip-path="url(#pinClip)" preserveAspectRatio="xMidYMid slice"/>';
+  } else if(!vergine){            // casinò (default) → stella del casinò
+    inner+='<g transform="scale(0.082) translate(-103,-100)"><path d="M48,56 Q96,104 144,56 Q96,104 144,152 Q96,104 48,152 Q96,104 48,56 Z" fill="#b01038" stroke="#cfd2d4" stroke-width="7"/><circle cx="160" cy="40" r="13" fill="#dcdcdc"/></g>';
+  } else {                        // vergine/white-label → pallino neutro (niente stella casinò)
+    inner+='<circle cx="0" cy="0" r="5" fill="#e8d5a3" opacity=".85"/>';
+  }
   slot.innerHTML=inner;
 }
 function applyAvatar(){
