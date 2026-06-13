@@ -46,6 +46,19 @@
   #lblMotore{display:flex;align-items:center;gap:7px}
   #lblMotore .ic{width:17px;height:17px;color:var(--oro)}
   .media-row .ctrl button .ic{width:16px;height:16px}
+  /* --- Bottoni personalizzati (admin) --- */
+  .icon-picker{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+  .icon-picker .pick{width:40px;height:40px;border-radius:9px;border:1px solid rgba(255,255,255,.15);background:#0d0d16;color:var(--oro);display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .icon-picker .pick.sel{border-color:var(--oro);background:rgba(232,213,163,.2)}
+  .icon-picker .pick .ic{width:20px;height:20px}
+  .cbtn-row{display:flex;align-items:center;gap:10px;background:#0d0d16;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:8px;margin-top:7px}
+  .cbtn-row .ci{width:34px;height:34px;color:var(--oro);display:flex;align-items:center;justify-content:center;flex:none}
+  .cbtn-row .ci .ic{width:22px;height:22px}
+  .cbtn-row .nm{flex:1;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cbtn-row .ctrl{display:flex;gap:5px;flex:none}
+  .cbtn-row .ctrl button{width:30px;height:30px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:#1a1a26;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .cbtn-row .ctrl button.x{background:rgba(160,30,30,.85);border-color:transparent}
+  .cbtn-row .ctrl button .ic{width:15px;height:15px}
 
   /* --- Header --- */
   .logo{position:fixed;top:24px;font-size:13px;letter-spacing:4px;color:var(--oro);opacity:.75;text-transform:uppercase}
@@ -104,7 +117,9 @@
   .lingue span.attiva{opacity:1;background:rgba(232,213,163,.18)}
 
   /* --- Bottoni domande rapide --- */
-  .rapide{margin-top:26px;display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:720px}
+  .rapide{margin-top:26px;display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:760px;max-height:34vh;overflow-y:auto;padding:2px 4px}
+  .rapide::-webkit-scrollbar{width:6px}
+  .rapide::-webkit-scrollbar-thumb{background:rgba(232,213,163,.3);border-radius:3px}
   .rapide button{
     display:inline-flex;align-items:center;gap:8px;
     background:rgba(255,255,255,.06);border:1px solid rgba(232,213,163,.25);color:#fff;
@@ -253,7 +268,7 @@
     .parla{margin-top:20px;padding:14px 32px;font-size:16px}
     .lingue{margin-top:16px}
     .lingue span{font-size:23px}
-    .rapide{margin-top:18px;gap:8px}
+    .rapide{margin-top:18px;gap:8px;max-height:none;overflow:visible}
     .rapide button{padding:9px 14px;font-size:13px}
     .rapide .ic{width:16px;height:16px}
     .privacy{font-size:9px;white-space:normal;text-align:center;width:92vw}
@@ -531,6 +546,26 @@
       <div class="media-list" id="mediaGrid"></div>
       <div class="media-empty" id="mediaEmpty">Nessun media caricato.</div>
 
+      <h3 id="hBtn">Bottoni personalizzati</h3>
+      <div class="hint">Aggiungi i tuoi bottoni (es. Spa, Tornei, VIP) con icona e descrizione. Appaiono nella home accanto agli altri. Nessun codice.</div>
+      <div id="customBtnList"></div>
+      <span class="btn-import" id="btnAddCustom" onclick="apriFormBtn()"></span>
+      <div id="formBtn" style="display:none;margin-top:12px;padding:14px;border:1px solid rgba(232,213,163,.25);border-radius:12px">
+        <label>Icona del bottone</label>
+        <div class="icon-picker" id="iconPicker"></div>
+        <label>Nome del bottone</label>
+        <input id="btnLabel" type="text" placeholder="es. Spa & Benessere">
+        <label>Descrizione (cosa risponde il concierge)</label>
+        <textarea id="btnDesc" rows="2" style="min-height:50px" placeholder="es. La Spa è al terzo piano, aperta 10:00-22:00..."></textarea>
+        <label>Link/QR opzionale (sito o pagina)</label>
+        <input id="btnUrl" type="text" placeholder="https://...">
+        <label><input type="checkbox" id="btnSoloLink" style="width:auto;margin-right:8px"> Mostra solo il QR (niente risposta vocale)</label>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="salva" style="margin-top:0" onclick="salvaBtn()">Salva bottone</button>
+          <span class="btn-clear" style="margin-top:0" onclick="chiudiFormBtn()">Annulla</span>
+        </div>
+      </div>
+
       <h3 id="hDati">Cosa sa il concierge — informazioni del casinò</h3>
       <div class="hint">Un campo per argomento. L'AI risponde SOLO con queste informazioni. Lascia vuoto un campo per ometterlo.</div>
       <div id="datiFields"></div>
@@ -622,7 +657,66 @@ const DATI_FIELDS = [
 function datiCasino(){
   let d; try{ d = JSON.parse(localStorage.getItem('concierge_dati_struct')||'null'); }catch(_){ d=null; }
   if(!d){ d={}; DATI_FIELDS.forEach(f=>d[f.k]=f.v); }
-  return DATI_FIELDS.filter(f=>(d[f.k]||'').trim()).map(f => f.l.toUpperCase()+': '+d[f.k].trim()).join('\n');
+  const base = DATI_FIELDS.filter(f=>(d[f.k]||'').trim()).map(f => f.l.toUpperCase()+': '+d[f.k].trim()).join('\n');
+  const cust = getCustomBtns().filter(b=>(b.descrizione||'').trim()).map(b => (b.label||'').toUpperCase()+': '+b.descrizione.trim()).join('\n');
+  return base + (cust ? '\n'+cust : '');
+}
+/* --- Bottoni personalizzati (aggiunti dall'admin, salvati in locale) --- */
+const ICONE_CASINO = ['info','star','gift','trophy','music','cocktail','chip','cards','ticket','spa','phone','key','pin','calendar','mail','map','shop','heart','user','home','building','camera','document','globe','bell','tag','coffee','ristorante','bar','toilette','eventi','giocare','orari','parcheggio','fedelta','scudo','wifi','bancomat','nav'];
+function getCustomBtns(){ try{ return JSON.parse(localStorage.getItem('concierge_btn_custom')||'[]'); }catch(_){ return []; } }
+function saveCustomBtns(a){ localStorage.setItem('concierge_btn_custom', JSON.stringify(a)); }
+// Lista completa = bottoni fissi + personalizzati (stessa forma)
+function getBottoni(){
+  const cust = getCustomBtns().map(b => ({
+    ic: b.ic || 'info', custom:true, url: b.url||'', soloLink: !!(b.url && b.soloLink), descrizione: b.descrizione||'',
+    l: {it:b.label,de:b.label,en:b.label,fr:b.label,es:b.label,ru:b.label,zh:b.label,ar:b.label},
+    q: {it:'Dammi informazioni su: '+b.label, de:'Informationen über: '+b.label, en:'Information about: '+b.label, fr:'Informations sur: '+b.label}
+  }));
+  return RAPIDE.concat(cust);
+}
+// --- Gestione bottoni personalizzati nel pannello admin ---
+let btnEditId = null, btnPickIc = 'info';
+function renderCustomBtnList(){
+  const arr = getCustomBtns(); const box = $('customBtnList'); if(!box) return; box.innerHTML='';
+  arr.forEach(b=>{
+    const row = document.createElement('div'); row.className='cbtn-row';
+    const ci = document.createElement('div'); ci.className='ci'; ci.innerHTML = ICON[b.ic]||ICON.info;
+    const nm = document.createElement('div'); nm.className='nm'; nm.textContent = b.label||'(senza nome)';
+    const ctrl = document.createElement('div'); ctrl.className='ctrl';
+    ctrl.appendChild(_mkBtn(ICON.edit, ()=>apriFormBtn(b.id)));
+    ctrl.appendChild(_mkBtn(ICON.trash, ()=>{ saveCustomBtns(getCustomBtns().filter(x=>x.id!==b.id)); rispCache.clear(); renderCustomBtnList(); costruisciRapide(); }, 'x'));
+    row.appendChild(ci); row.appendChild(nm); row.appendChild(ctrl); box.appendChild(row);
+  });
+}
+function renderIconPicker(){
+  const box = $('iconPicker'); box.innerHTML='';
+  ICONE_CASINO.forEach(k=>{
+    const d = document.createElement('div'); d.className = 'pick'+(k===btnPickIc?' sel':''); d.innerHTML = ICON[k]||'';
+    d.onclick = ()=>{ btnPickIc = k; renderIconPicker(); };
+    box.appendChild(d);
+  });
+}
+function apriFormBtn(id){
+  btnEditId = id || null;
+  const b = id ? getCustomBtns().find(x=>x.id===id) : null;
+  btnPickIc = b ? b.ic : 'info';
+  $('btnLabel').value = b ? (b.label||'') : '';
+  $('btnDesc').value  = b ? (b.descrizione||'') : '';
+  $('btnUrl').value   = b ? (b.url||'') : '';
+  $('btnSoloLink').checked = b ? !!b.soloLink : false;
+  renderIconPicker();
+  $('formBtn').style.display = 'block';
+}
+function chiudiFormBtn(){ $('formBtn').style.display='none'; btnEditId=null; }
+function salvaBtn(){
+  const label = $('btnLabel').value.trim();
+  if(!label){ alert('Dai un nome al bottone.'); return; }
+  const arr = getCustomBtns();
+  const data = { id: btnEditId || ('c'+Date.now()), ic: btnPickIc, label, descrizione: $('btnDesc').value.trim(), url: $('btnUrl').value.trim(), soloLink: $('btnSoloLink').checked };
+  const i = arr.findIndex(x=>x.id===data.id);
+  if(i>=0) arr[i]=data; else arr.push(data);
+  saveCustomBtns(arr); rispCache.clear();
+  chiudiFormBtn(); renderCustomBtnList(); costruisciRapide();
 }
 // Genera i campi (un argomento per riga) nel pannello impostazioni
 function renderDatiFields(){
@@ -705,6 +799,36 @@ const ICON = {
   eye:        P+'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>',
   image:      P+'<rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="8.5" cy="9.5" r="1.8"/><path d="M21 16l-5-5L5 20"/></svg>',
   voce:       P+'<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M16 9a3.5 3.5 0 0 1 0 6"/><path d="M19 6a7 7 0 0 1 0 12"/></svg>',
+  info:       P+'<circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 7.6v.01"/></svg>',
+  star:       P+'<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 17l-5.2 2.6 1-5.8L3.5 9.7l5.9-.9z"/></svg>',
+  gift:       P+'<rect x="3" y="8" width="18" height="12" rx="1.5"/><path d="M3 12h18M12 8v12"/><path d="M12 8S10.5 3.5 8 4.5 9.5 8 12 8zM12 8s1.5-4.5 4-3.5S14.5 8 12 8z"/></svg>',
+  trophy:     P+'<path d="M8 4h8v4a4 4 0 0 1-8 0z"/><path d="M8 5.5H5.5a1.8 1.8 0 0 0 0 3.6H7M16 5.5h2.5a1.8 1.8 0 0 1 0 3.6H17"/><path d="M10 12.5 9 19h6l-1-6.5M9 19h6"/></svg>',
+  music:      P+'<path d="M9 17V5l11-2v12"/><circle cx="6" cy="17" r="3"/><circle cx="17" cy="15" r="3"/></svg>',
+  cocktail:   P+'<path d="M5 5h14l-7 7.5z"/><path d="M12 12.5V19M8.5 19h7"/><circle cx="16.5" cy="6.5" r="1.1"/></svg>',
+  chip:       P+'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>',
+  cards:      P+'<rect x="3.5" y="5" width="11" height="15" rx="2"/><path d="M14.5 8H18a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-6"/><path d="M8.5 9l1.6 3-1.6 1.6L7 12z"/></svg>',
+  ticket:     P+'<path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2 2 2 0 0 0 0 4 2 2 0 0 1-2 2H5a2 2 0 0 1-2-2 2 2 0 0 0 0-4z"/><path d="M12 7v10"/></svg>',
+  spa:        P+'<path d="M12 21c-4-3-7-6.2-7-10a7 7 0 0 1 14 0c0 3.8-3 7-7 10z"/><path d="M9 12s1.5 1 3 1 3-1 3-1"/></svg>',
+  phone:      P+'<path d="M5 4h4l2 5-2.5 1.8a12 12 0 0 0 4.7 4.7L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg>',
+  key:        P+'<circle cx="8" cy="8" r="4"/><path d="M11 11l9 9M16.5 16.5l2-2M13.5 13.5l2-2"/></svg>',
+  plus:       P+'<path d="M12 5v14M5 12h14"/></svg>',
+  edit:       P+'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+  /* --- Icone generiche universali (per qualsiasi azienda) --- */
+  pin:        P+'<path d="M12 21s7-6.3 7-11a7 7 0 0 0-14 0c0 4.7 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>',
+  calendar:   P+'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg>',
+  mail:       P+'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7.5l9 6 9-6"/></svg>',
+  map:        P+'<path d="M9 4 3 6.2v14L9 18l6 2 6-2V4l-6 2.2L9 4z"/><path d="M9 4v14M15 6.2v14"/></svg>',
+  shop:       P+'<circle cx="9" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/><path d="M3 4h2l2.4 12.4a1 1 0 0 0 1 .8h8.2a1 1 0 0 0 1-.8L21 8H6.2"/></svg>',
+  heart:      P+'<path d="M12 21s-7-4.5-9.2-9C1.4 8.6 3.2 5 6.6 5 9 5 12 8 12 8s3-3 5.4-3c3.4 0 5.2 3.6 3.8 7C19 16.5 12 21 12 21z"/></svg>',
+  user:       P+'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
+  home:       P+'<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>',
+  building:   P+'<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2"/></svg>',
+  camera:     P+'<rect x="3" y="7" width="18" height="13" rx="2"/><circle cx="12" cy="13.5" r="3.5"/><path d="M8 7l1.5-2h5L16 7"/></svg>',
+  document:   P+'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/></svg>',
+  globe:      P+'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg>',
+  bell:       P+'<path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>',
+  tag:        P+'<path d="M3 11V4h7l11 11-7 7L3 11z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg>',
+  coffee:     P+'<path d="M4 8h13v5a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 9h2a2 2 0 0 1 0 4h-2"/><path d="M7 3.5v2M11 3.5v2"/></svg>',
   qr:         P+'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v.01M21 21v-4M17 21h.01M14 21v-3"/></svg>',
 };
 
@@ -1110,10 +1234,11 @@ async function voceGoogle(testo, lang, fine, mioId){
 /* ===== SEZIONE 6 · UI (bottoni rapidi, schermo d.attesa, kiosk) ===== */
 function costruisciRapide(){
   const lng = uiLang();
-  $('rapide').innerHTML = RAPIDE.map((r,i)=>`<button onclick="domandaRapida(${i})">${ICON[r.ic]}<span>${r.l[lng]||r.l.en||r.l.it}</span></button>`).join('');
+  $('rapide').innerHTML = getBottoni().map((r,i)=>`<button onclick="domandaRapida(${i})">${ICON[r.ic]||ICON.info}<span>${r.l[lng]||r.l.en||r.l.it}</span></button>`).join('');
 }
 function domandaRapida(i){
-  const r = RAPIDE[i];
+  const r = getBottoni()[i];
+  if(!r) return;
   if(r.soloLink){                       // Eventi / Gioco responsabile: solo QR + invito vocale
     mostraQR(r.url, true);
     return;
@@ -1121,7 +1246,7 @@ function domandaRapida(i){
   const q = r.q[uiLang()] || r.q.it;    // lingue extra: domanda in italiano, l'AI risponde nella lingua scelta
   $('domanda').textContent = '“'+q+'”';
   if(r.url) mostraQR(r.url, false);     // es. Ristorante: risposta vocale + QR per il menù
-  const ck = uiLang()+'|'+r.ic;         // chiave cache: bottone + lingua
+  const ck = uiLang()+'|'+r.ic+'|'+(r.l.it||'');   // chiave cache: bottone + lingua (unica anche per i personalizzati)
   if(rispCache.has(ck)){                // già chiesto → riusa risposta+audio, NESSUNA chiamata AI
     resetInattivita(); fermaTutto(); occupato = true;
     const c = rispCache.get(ck);
@@ -1356,6 +1481,7 @@ function apriSettings(){
   caricaUsoCondiviso().then(()=>{ $('usoOggi').textContent = 'Consumo CONDIVISO questo mese (tutti gli schermi) — Google: '+usoGoogleTot().toLocaleString('de-CH')+' / ElevenLabs: '+usoElevenTot().toLocaleString('de-CH')+' caratteri (gratis fino a 1.000.000).'; });
   $('usoOggi').textContent = 'Consumo questo mese — Google: '+usoGoogleTot().toLocaleString('de-CH')+' / ElevenLabs: '+usoElevenTot().toLocaleString('de-CH')+' caratteri.';
   renderDatiFields();
+  renderCustomBtnList(); chiudiFormBtn();
   $('modal').classList.add('open');
 }
 function salvaSettings(){
@@ -1493,6 +1619,8 @@ $('lblMotore').innerHTML = ICON.voce   + '<span>Motore voce</span>';
 $('hMedia').innerHTML    = ICON.image  + '<span>Sfondo e media (foto / video / PDF)</span>';
 $('btnImport').innerHTML = ICON.upload + '<span>Importa dal dispositivo</span>';
 $('btnClear').innerHTML  = ICON.trash  + '<span>Svuota tutto</span>';
+$('hBtn').innerHTML      = ICON.plus   + '<span>Bottoni personalizzati</span>';
+$('btnAddCustom').innerHTML = ICON.plus + '<span>Aggiungi bottone</span>';
 // Demo: logo mini, mic al centro, dito che batte, cerchio di icone
 $('demoMic').innerHTML = ICON.mic;
 $('demoFinger').innerHTML = '<svg viewBox="0 0 24 24" fill="#fdfdfd"><path d="M9 11.24V7.5a2.5 2.5 0 0 1 5 0v3.74c1.21-.81 2-2.18 2-3.74a4.5 4.5 0 1 0-9 0c0 1.56.79 2.93 2 3.74zm9.84 4.63l-4.54-2.26a1.4 1.4 0 0 0-.54-.11H13V7.5a1.5 1.5 0 0 0-3 0V21l-3.43-.72a1.1 1.1 0 0 0-1.03.3l-.79.8 4.94 4.94c.27.27.65.44 1.06.44h6.79c.75 0 1.33-.55 1.44-1.28l.75-5.27a2 2 0 0 0 .02-.21c0-.62-.38-1.16-.92-1.4z"/></svg>';
