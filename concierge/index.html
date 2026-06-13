@@ -2517,6 +2517,30 @@ function renderFeedbackAdmin(){
 }
 function resetFeedback(){ if(!confirm('Azzerare valutazioni e commenti?')) return; try{ localStorage.removeItem('concierge_feedback'); }catch(_){} renderFeedbackAdmin(); }
 
+/* --- LICENZA: l'app funziona libera sulla TUA deployment; su altri domini serve una chiave valida --- */
+function verificaLicenza(){
+  return new Promise(resolve=>{
+    const LIC_ALLOWED = ['', 'localhost', '127.0.0.1', 'digit-diary.github.io'];   // tua installazione + sviluppo
+    if(LIC_ALLOWED.includes(location.hostname)) return resolve(true);
+    const key = (localStorage.getItem('concierge_license')||'').trim();
+    let cache=null; try{ cache=JSON.parse(localStorage.getItem('concierge_license_ok')||'null'); }catch(_){}
+    if(cache && cache.k===key && cache.valid && (Date.now()-cache.ts) < 30*864e5) return resolve(true);  // grazia offline 30gg
+    if(!key) return resolve(false);
+    fetch(SBC_URL+'/rest/v1/rpc/concierge_check_license', {method:'POST', headers:_sbcH(), body:JSON.stringify({p_key:key})})
+      .then(r=>r.ok?r.json():null)
+      .then(d=>{ const valid=!!(d&&d.valid); try{ localStorage.setItem('concierge_license_ok', JSON.stringify({k:key, valid, ts:Date.now()})); }catch(_){} resolve(valid); })
+      .catch(()=>resolve(!!(cache && cache.k===key && cache.valid)));   // offline: concedi se era già valida
+  });
+}
+function gateLicenza(){ verificaLicenza().then(ok=>{ if($('licOverlay')) $('licOverlay').style.display = ok ? 'none' : 'flex'; }); }
+function attivaLicenza(){
+  const k = ($('licInput').value||'').trim();
+  if(!k){ $('licErr').textContent='Inserisci la chiave.'; return; }
+  localStorage.setItem('concierge_license', k); localStorage.removeItem('concierge_license_ok');
+  $('licErr').textContent='Verifica…';
+  verificaLicenza().then(ok=>{ if(ok) location.reload(); else $('licErr').textContent='Chiave non valida o non attiva.'; });
+}
+
 function renderLogoPreview(){
   const logo = localStorage.getItem('concierge_logo');
   $('logoPreview').innerHTML = logo ? '<img src="'+logo+'" style="max-width:130px;max-height:70px;background:rgba(255,255,255,.1);padding:6px;border-radius:8px">' : '<span style="opacity:.5;font-size:13px">Nessun logo: uso quello predefinito.</span>';
@@ -2546,6 +2570,7 @@ function sbloccaAudio(){
 // Auto-reset totem: ogni interazione (tocco/click/tasto) riavvia il timer + sblocca audio
 ['click','touchstart','keydown'].forEach(ev => document.addEventListener(ev, ()=>{ sbloccaAudio(); resetInattivita(); }, {passive:true}));
 resetInattivita();
+gateLicenza();                                                   // blocco licenza (solo su domini non autorizzati)
 if(!localStorage.getItem(KEY_LS)) setTimeout(apriSettings, 600);
 </script>
 </body>
