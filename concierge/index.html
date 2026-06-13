@@ -1399,8 +1399,16 @@ function rispondi(testo, lang, indicazione, mioId, share){
   const scelta = localStorage.getItem('concierge_motore')||'browser';
   // Modalità automatica: cascata ElevenLabs → Google → Browser/testo secondo i limiti mensili
   let motore = (scelta==='auto') ? scegliMotore() : scelta;
-  // Limite giornaliero opzionale (solo nelle modalità manuali a pagamento)
+  // SICUREZZA: anche in modalità MANUALE (Google/ElevenLabs fisso) rispetta SEMPRE il tetto
+  // mensile gratuito al 95% → non si supera MAI il free tier, in nessuna configurazione.
   if(scelta!=='auto'){
+    const SAFE = 0.95;
+    const limG = parseInt(localStorage.getItem('concierge_lim_google')||'1000000', 10);
+    const limE = parseInt(localStorage.getItem('concierge_lim_eleven')||'10000', 10);
+    if(motore==='google' && usoGoogleTot() >= Math.floor(limG*SAFE)) motore = 'browser';            // oltre il cap → voce gratuita
+    if(motore==='eleven' && usoElevenTot() >= Math.floor(limE*SAFE))
+      motore = (localStorage.getItem('concierge_google') && usoGoogleTot() < Math.floor(limG*SAFE)) ? 'google' : 'browser';
+    // Limite giornaliero opzionale aggiuntivo
     const cloud = (motore==='google' || motore==='eleven');
     const limite = parseInt(localStorage.getItem('concierge_limite')||'0', 10);
     if(cloud && limite>0 && caratteriOggi() >= limite) motore = 'testo';
