@@ -1024,6 +1024,11 @@
         <input id="pinSet" type="text" inputmode="numeric" maxlength="8" placeholder="Vuoto = non cambiare · scrivi OFF per rimuovere" autocomplete="off">
         <div class="hint">Protegge le impostazioni. Senza PIN l'accesso è libero. Imposta un PIN <b>prima</b> di attivare il chiosco.</div>
 
+        <h3 style="margin-top:22px">QR per ospiti</h3>
+        <div class="hint">Genera un QR che apre il concierge sul telefono del cliente in <b>modalità ospite</b>: bottoni e contenuti, ma <b>nessun accesso alle impostazioni</b> (icona ⚙️ e angolo segreto disattivati). Perfetto per gli schermi "solo immagini", i tavoli o l'ingresso. Le risposte arrivano dalla <b>cache condivisa</b>, quindi non servono chiavi sul telefono del cliente.</div>
+        <span class="btn-clear" style="margin-top:8px;display:inline-block;background:rgba(232,213,163,.15);color:var(--oro)" onclick="generaQrOspiti()">Genera QR per ospiti</span>
+        <div id="qrOspitiBox" style="margin-top:12px;display:flex;flex-direction:column;align-items:center;gap:8px"></div>
+
         <h3 style="margin-top:22px">Standby fuori orario</h3>
         <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end">
           <div><label>Dalle</label><input id="standbyDa" type="time" style="width:auto"></div>
@@ -1631,6 +1636,27 @@ let ascoltoTemp = false, ascoltoTempTimer = null;   // microfono auto dopo una r
 let langAscolto = 'it-IT';
 // Versione del prompt: cambiala per RIGENERARE le risposte in cache dopo aver migliorato il prompt
 const PROMPT_VER = 'v2';
+// MODALITÀ OSPITE: il QR per gli ospiti apre l'app con ?guest → niente accesso alle impostazioni (telefono del cliente)
+const GUEST = (function(){ try{ return new URLSearchParams(location.search).has('guest'); }catch(_){ return /[?&]guest(\b|=)/.test(location.search); } })();
+function applyGuestLock(){
+  if(!GUEST) return;
+  const g=$('btnGear'); if(g) g.style.display='none';        // niente icona impostazioni
+  const c=$('adminCorner'); if(c) c.remove();                // niente angolo segreto admin
+  document.body.classList.add('guest');
+}
+// Genera il QR che apre l'app in modalità ospite (per gli schermi passivi / tavoli)
+function generaQrOspiti(){
+  const url = location.origin + location.pathname + '?guest=1';
+  const box = $('qrOspitiBox'); if(!box) return;
+  box.innerHTML='';
+  if(typeof QRCode!=='undefined'){
+    new QRCode(box, {text:url, width:200, height:200, colorDark:'#1a1320', colorLight:'#ffffff', correctLevel:QRCode.CorrectLevel.M});
+  } else { box.textContent = url; }
+  const cap=document.createElement('div');
+  cap.style.cssText='font-size:11px;opacity:.65;word-break:break-all;text-align:center;max-width:220px';
+  cap.textContent=url;
+  box.appendChild(cap);
+}
 // iOS (iPhone/iPad): Safari avvia il microfono SOLO dentro un tocco e non regge l'ascolto continuo.
 // Su iOS quindi: una domanda per tocco (niente riavvii automatici a vuoto che direbbero "in ascolto" senza sentire).
 const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.maxTouchPoints>1 && /Macintosh|Mac OS/.test(navigator.userAgent));
@@ -1741,6 +1767,10 @@ function creaRecognition(){
 }
 
 function toggleHandsFree(){
+  if(GUEST && !localStorage.getItem(KEY_LS)){          // ospite senza chiavi: usa i bottoni (risposte dalla cache condivisa)
+    const m={it:'Tocca un argomento qui sotto 👇',de:'Tippen Sie unten auf ein Thema 👇',en:'Tap a topic below 👇',fr:'Touchez un thème ci-dessous 👇',es:'Toca un tema abajo 👇',ru:'Выберите тему ниже 👇',zh:'请点击下方主题 👇',ar:'اختر موضوعًا أدناه 👇'};
+    $('risposta').textContent = m[uiLang()]||m.it; return;
+  }
   if(!localStorage.getItem(KEY_LS)){ apriSettings(); return; }
   fermaAscoltoTemp();
   ascoltoAttivo = !ascoltoAttivo;
@@ -2587,7 +2617,7 @@ function switchTab(t){
 }
 /* --- Sicurezza: PIN admin + modalità chiosco --- */
 function getPin(){ return localStorage.getItem('concierge_pin')||''; }
-function tentaSettings(){ if(getPin()) apriPin(); else apriSettings(); }
+function tentaSettings(){ if(GUEST) return; if(getPin()) apriPin(); else apriSettings(); }
 function apriPin(){ $('pinInput').value=''; $('pinErr').textContent=''; $('pinOverlay').style.display='flex'; setTimeout(()=>$('pinInput').focus(), 60); }
 function chiudiPin(){ $('pinOverlay').style.display='none'; }
 function verificaPin(){
@@ -2618,6 +2648,7 @@ document.addEventListener('pointerdown', ()=>{
 document.addEventListener('keydown', e=>{ if(e.key==='Enter' && $('pinOverlay').style.display==='flex') verificaPin(); });
 
 function apriSettings(){
+  if(GUEST) return;                 // modalità ospite: nessun accesso alle impostazioni
   switchTab('api');
   $('apiKey').value    = localStorage.getItem(KEY_LS)||'';
   $('elevenKey').value = localStorage.getItem('concierge_eleven')||'';
@@ -3325,6 +3356,7 @@ costruisciRapide();
 avviaAttract();
 applyConversaMode();   // se "conversazione continua" è configurata, prova ad ascoltare già all'avvio (totem con mic autorizzato)
 applySyncAuto();       // se "sincronizzazione automatica" è attiva (Ricevente), avvia il controllo periodico
+applyGuestLock();      // se aperto via QR ospiti (?guest), blocca l'accesso alle impostazioni
 
 // Sblocco audio per iOS (iPhone/iPad): al primo tocco abilita la riproduzione audio
 let audioSbloccato = false;
