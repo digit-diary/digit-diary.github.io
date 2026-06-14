@@ -11,11 +11,14 @@
     --verde:#3ad07a; --blu:#4a9ce8;
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{height:100%;overflow:hidden;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
+  html,body{min-height:100%;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
+  /* Layout universale: si centra se il contenuto ci sta, scorre dall'alto se è troppo.
+     "safe center" evita che il contenuto venga tagliato in alto sui totem verticali lunghi. */
   body{
     background:radial-gradient(ellipse at center,#1a1a2e 0%,var(--bg) 70%);
-    color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    height:100dvh;text-align:center;padding:20px;user-select:none;
+    color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:safe center;
+    min-height:100dvh;overflow-y:auto;overflow-x:hidden;text-align:center;
+    padding:clamp(46px,6vh,76px) clamp(14px,3vw,40px) clamp(22px,3vh,46px);user-select:none;
   }
 
   /* --- Sfondo media (foto/video a rotazione) --- */
@@ -85,7 +88,7 @@
   .tools span{font-size:21px;opacity:.35;cursor:pointer;transition:.2s}
   .tools span:hover{opacity:.9}
   /* Valutazione soddisfazione */
-  .fbk{position:fixed;bottom:44px;left:50%;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:22px;background:rgba(20,18,28,.55);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(6px);padding:8px 22px;border-radius:40px}
+  .fbk{margin:22px auto 0;display:flex;align-items:center;gap:22px;flex-wrap:wrap;justify-content:center;max-width:94vw;background:rgba(20,18,28,.55);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(6px);padding:8px 22px;border-radius:40px}
   .fbk-q{font-size:14px;color:#cfcfd6;opacity:.85;margin-right:4px}
   .fbk-face{background:none;border:none;cursor:pointer;padding:4px 10px;color:#cdb98a;opacity:.7;transition:.18s;display:flex}
   .fbk-face svg{width:30px;height:30px}
@@ -162,12 +165,18 @@
 
   /* --- Bandiere lingua --- */
   .lingue{margin-top:18px;display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
-  .lingue span{font-size:36px;opacity:.4;cursor:pointer;transition:.2s;padding:5px;border-radius:8px}
-  .lingue span:hover{opacity:.8}
+  .lingue span{font-size:36px;opacity:.45;cursor:pointer;transition:.2s;padding:5px;border-radius:8px;line-height:0}
+  /* Bandiere disegnate in SVG (si vedono su Windows, Linux e ovunque — niente emoji) */
+  .lingue span svg{width:1.66em;height:1.1em;display:block;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.45)}
+  .lingue span .fl-emo{font-size:1em;line-height:1}
+  .fl-adm{display:inline-flex;vertical-align:middle}
+  .fl-adm svg{width:22px;height:15px;border-radius:2px;display:block;box-shadow:0 1px 2px rgba(0,0,0,.4)}
+  .lingue span:hover{opacity:.85}
   .lingue span.attiva{opacity:1;background:rgba(232,213,163,.18)}
+  .lingue span.attiva svg{box-shadow:0 0 0 2px var(--oro),0 1px 4px rgba(0,0,0,.5)}
   /* Testi personalizzati attorno al logo / bordi schermo */
   .emblema-row{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap}
-  .logo-extra{text-align:center;line-height:1.25;max-width:90vw;word-break:break-word}
+  .logo-extra{text-align:center;line-height:1.25;max-width:90vw;overflow-wrap:break-word}
   .logo-extra.logo-side{max-width:34vw}
   /* dimensioni testi logo: scalano da mobile a 4K (clamp) */
   .lx-sm{font-size:clamp(13px,2.2vw,22px)} .lx-md{font-size:clamp(18px,3.4vw,32px)}
@@ -196,7 +205,7 @@
   .tools .ic{width:22px;height:22px}
 
   /* --- Privacy --- */
-  .privacy{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);font-size:11px;opacity:.3;letter-spacing:.3px;white-space:nowrap}
+  .privacy{margin:16px auto 0;font-size:11px;opacity:.3;letter-spacing:.3px;max-width:94vw;text-align:center}
 
   /* --- Pannello QR --- */
   .qr-modal{position:fixed;inset:0;background:transparent;display:none;align-items:center;justify-content:flex-end;padding:0 48px;z-index:45;cursor:pointer}
@@ -391,7 +400,15 @@
     .fbk-q{font-size:12px;margin-right:2px}
     .fbk-face{padding:4px 7px} .fbk-face svg{width:26px;height:26px}
     .demo-faces{gap:12px;margin-top:14px} .demo-face svg{width:34px;height:34px} .demo-fbk-q{font-size:14px}
-    .logo-extra.logo-side{max-width:42vw}
+    /* Scritte attorno al logo: su telefono si impilano sopra/sotto (non a fianco) e non diventano enormi */
+    .emblema-row{flex-direction:column;gap:4px}
+    .logo-extra.logo-side{max-width:92vw}
+    .lx-xl{font-size:clamp(22px,7.5vw,40px)} .lx-lg{font-size:clamp(19px,6vw,34px)} .lx-md{font-size:clamp(15px,4.4vw,26px)}
+  }
+  /* Totem VERTICALI / schermi molto più alti che larghi: impila il brand attorno al logo */
+  @media (max-aspect-ratio:5/7) and (min-width:641px){
+    .emblema-row{flex-direction:column;gap:6px}
+    .logo-extra.logo-side{max-width:84vw}
   }
   /* Schermi BASSI / orizzontali (telefoni in landscape) — niente sovrapposizioni */
   @media (max-height:560px){
@@ -496,9 +513,6 @@
 
   <!-- Angolo segreto: tieni premuto 1,5s per l'accesso admin in modalità chiosco -->
   <div id="adminCorner" style="position:fixed;top:0;left:0;width:72px;height:72px;z-index:9998"></div>
-
-  <!-- Valutazione soddisfazione (faccine) -->
-  <div id="feedbackBar" class="fbk"></div>
 
   <!-- Commento opzionale (visibile solo all'admin) -->
   <div id="fbkModal" style="position:fixed;inset:0;background:rgba(8,5,12,.8);display:none;z-index:95;align-items:center;justify-content:center">
@@ -700,6 +714,9 @@
   <div class="lingue" id="lingue"></div><!-- bandiere generate da renderLingue() (8 base + extra) -->
 
   <div class="rapide" id="rapide"></div>
+
+  <!-- Valutazione soddisfazione (faccine) — nel flusso, sotto i bottoni -->
+  <div id="feedbackBar" class="fbk"></div>
 
   <div class="privacy" id="privacy">🔒 Nessun audio viene registrato o conservato — elaborazione in tempo reale.</div>
 
@@ -1378,6 +1395,37 @@ const UI = {
   ar:{idle:'المس للتحدث', greet:'مرحباً! كيف يمكنني مساعدتك؟', attiva:'تفعيل الاستماع', ferma:'إيقاف الاستماع', listen:'أنا أستمع… تفضل', pausa:'الاستماع متوقف', think:'لحظة…', privacy:'لا يتم تسجيل أو حفظ أي صوت — معالجة فورية.'},
 };
 /* ===== SEZIONE 1b · LINGUE DINAMICHE (aggiungi/togli lingue, traduzione automatica via AI) ===== */
+// ---- Bandiere disegnate in SVG (le emoji bandiera NON si vedono su Windows) ----
+const _ST='M0,-1 .225,-.309 .951,-.309 .363,.118 .588,.809 0,.382 -.588,.809 -.363,.118 -.951,-.309 -.225,-.309Z';
+function _star(x,y,s,r){ return '<g transform="translate('+x+','+y+') scale('+s+')'+(r?' rotate('+r+')':'')+'"><path d="'+_ST+'"/></g>'; }
+const FLAG_SVG = {
+  it:'<svg viewBox="0 0 30 20"><rect width="10" height="20" fill="#009246"/><rect x="10" width="10" height="20" fill="#fff"/><rect x="20" width="10" height="20" fill="#ce2b37"/></svg>',
+  de:'<svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#000"/><rect y="6.67" width="30" height="6.66" fill="#dd0000"/><rect y="13.33" width="30" height="6.67" fill="#ffce00"/></svg>',
+  gb:'<svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#012169"/><path d="M0,0 30,20 M30,0 0,20" stroke="#fff" stroke-width="4"/><path d="M0,0 30,20 M30,0 0,20" stroke="#c8102e" stroke-width="1.6"/><rect x="12" width="6" height="20" fill="#fff"/><rect y="7" width="30" height="6" fill="#fff"/><rect x="13" width="4" height="20" fill="#c8102e"/><rect y="8" width="30" height="4" fill="#c8102e"/></svg>',
+  fr:'<svg viewBox="0 0 30 20"><rect width="10" height="20" fill="#002395"/><rect x="10" width="10" height="20" fill="#fff"/><rect x="20" width="10" height="20" fill="#ed2939"/></svg>',
+  es:'<svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#aa151b"/><rect y="5" width="30" height="10" fill="#f1bf00"/></svg>',
+  ru:'<svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#fff"/><rect y="6.67" width="30" height="6.66" fill="#0039a6"/><rect y="13.33" width="30" height="6.67" fill="#d52b1e"/></svg>',
+  cn:'<svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#de2910"/><g fill="#ffde00">'+_star(6,6,3.4)+_star(11.5,2.6,1.1,20)+_star(13.8,5,1.1,40)+_star(13.8,8.4,1.1,-10)+_star(11.5,10.8,1.1,20)+'</g></svg>',
+  sa:'<svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#006c35"/><rect x="5" y="7.4" width="20" height="1.5" fill="#fff"/><rect x="5" y="12" width="17" height="1.4" fill="#fff"/><rect x="22" y="11" width="3" height="3.4" rx=".6" fill="#fff"/></svg>',
+  nl:'<svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#ae1c28"/><rect y="6.67" width="30" height="6.66" fill="#fff"/><rect y="13.33" width="30" height="6.67" fill="#21468b"/></svg>',
+  tr:'<svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#e30a17"/><circle cx="12" cy="10" r="5" fill="#fff"/><circle cx="13.7" cy="10" r="4" fill="#e30a17"/><g fill="#fff">'+_star(18,10,1.7)+'</g></svg>',
+  pt:'<svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#ff0000"/><rect width="12" height="20" fill="#006600"/><circle cx="12" cy="10" r="2.7" fill="#ffcb00" stroke="#fff" stroke-width=".7"/></svg>',
+  pl:'<svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#fff"/><rect y="10" width="30" height="10" fill="#dc143c"/></svg>',
+  jp:'<svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#fff"/><circle cx="15" cy="10" r="6" fill="#bc002d"/></svg>',
+  kr:'<svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#fff"/><path d="M15,5a5,5 0 0,1 0,10a2.5,2.5 0 0,0 0,-5a2.5,2.5 0 0,1 0,-5z" fill="#cd2e3a"/><path d="M15,5a5,5 0 0,0 0,10a2.5,2.5 0 0,1 0,-5a2.5,2.5 0 0,0 0,-5z" fill="#0047a0"/></svg>',
+  gr:'<svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#0d5eaf"/><g fill="#fff"><rect y="2.22" width="30" height="2.22"/><rect y="6.67" width="30" height="2.22"/><rect y="11.1" width="30" height="2.22"/><rect y="15.56" width="30" height="2.22"/></g><rect width="11.1" height="11.1" fill="#0d5eaf"/><path d="M5.55,0 V11.1 M0,5.55 H11.1" stroke="#fff" stroke-width="2.2"/></svg>',
+  se:'<svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#006aa7"/><rect x="9" width="3" height="20" fill="#fecc00"/><rect y="8.5" width="30" height="3" fill="#fecc00"/></svg>',
+  cz:'<svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#fff"/><rect y="10" width="30" height="10" fill="#d7141a"/><path d="M0,0 15,10 0,20Z" fill="#11457e"/></svg>',
+  ua:'<svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#0057b7"/><rect y="10" width="30" height="10" fill="#ffd700"/></svg>',
+  in:'<svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#ff9933"/><rect y="6.67" width="30" height="6.66" fill="#fff"/><rect y="13.33" width="30" height="6.67" fill="#138808"/><circle cx="15" cy="10" r="2.4" fill="none" stroke="#000080" stroke-width=".7"/><circle cx="15" cy="10" r=".5" fill="#000080"/></svg>',
+  th:'<svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#a51931"/><rect y="3.33" width="30" height="13.34" fill="#f4f5f8"/><rect y="6.67" width="30" height="6.66" fill="#2d2a4a"/></svg>'
+};
+// Restituisce la bandiera SVG dato un BCP ('it-IT') o codice ('it'); se sconosciuta usa l'emoji come fallback
+function flagSVG(bcp, emoji){
+  const p=String(bcp||'').toLowerCase().split('-');
+  const iso=(p[1]||p[0]||'');
+  return FLAG_SVG[iso] || FLAG_SVG[p[0]] || '<span class="fl-emo">'+(emoji||'')+'</span>';
+}
 // 8 lingue integrate (sempre presenti). Le extra si aggiungono da ⚙️ e si traducono da sole.
 const LINGUE_BASE = [
   {l:'it-IT',f:'🇮🇹',t:'Italiano'},{l:'de-DE',f:'🇩🇪',t:'Deutsch'},{l:'en-GB',f:'🇬🇧',t:'English'},{l:'fr-FR',f:'🇫🇷',t:'Français'},
@@ -1429,7 +1477,7 @@ function renderLingue(){
   const off=getLangOff();
   const base=LINGUE_BASE.filter(x=>!off.includes(x.l));
   const extra=getLingueExtra().map(x=>({l:x.bcp,f:x.flag,t:x.name}));
-  box.innerHTML=[...base,...extra].map(x=>'<span data-l="'+x.l+'" title="'+x.t+'">'+x.f+'</span>').join('');
+  box.innerHTML=[...base,...extra].map(x=>'<span data-l="'+x.l+'" title="'+x.t+'">'+flagSVG(x.l,x.f)+'</span>').join('');
   box.querySelectorAll('span').forEach(s=>{ s.onclick=()=>setLinguaAscolto(s.dataset.l); s.classList.toggle('attiva', s.dataset.l===langAscolto); });
 }
 
@@ -1478,12 +1526,12 @@ function renderLingueAdmin(){
   // 8 di base con spunta (mostra/nascondi) — per il casinò restano tutte spuntate
   let h = '<div class="hint" style="margin:2px 0 4px">Lingue di base (spunta = visibile):</div>';
   h += '<div style="display:flex;flex-wrap:wrap;gap:6px 16px">' + LINGUE_BASE.map(x=>
-    '<label style="display:inline-flex;align-items:center;gap:6px;font-size:14px"><input type="checkbox" style="width:auto" '+(off.includes(x.l)?'':'checked')+' onchange="toggleLangBase(\''+x.l+'\', this.checked)"> '+x.f+' '+x.t+'</label>'
+    '<label style="display:inline-flex;align-items:center;gap:6px;font-size:14px"><input type="checkbox" style="width:auto" '+(off.includes(x.l)?'':'checked')+' onchange="toggleLangBase(\''+x.l+'\', this.checked)"> <span class="fl-adm">'+flagSVG(x.l,x.f)+'</span> '+x.t+'</label>'
   ).join('') + '</div>';
   // lingue extra (aggiunte/tradotte)
   if(extra.length){
     h += '<div class="hint" style="margin:10px 0 4px">Lingue extra (tradotte):</div>';
-    h += extra.map(x=>'<div class="cbtn-row"><div class="nm">'+x.flag+' '+x.name+'</div><button type="button" class="btn-clear" style="color:#e88" onclick="rimuoviLingua(\''+x.code+'\')">Rimuovi</button></div>').join('');
+    h += extra.map(x=>'<div class="cbtn-row"><div class="nm"><span class="fl-adm">'+flagSVG(x.bcp||x.code,x.flag)+'</span> '+x.name+'</div><button type="button" class="btn-clear" style="color:#e88" onclick="rimuoviLingua(\''+x.code+'\')">Rimuovi</button></div>').join('');
   }
   box.innerHTML = h;
   const sel=$('langSel'); if(sel){ sel.innerHTML=LINGUE_DISPONIBILI.filter(d=>!extra.find(x=>x.code===d.code)).map(d=>'<option value="'+d.code+'">'+d.flag+' '+d.name+' ('+d.en+')</option>').join(''); }
