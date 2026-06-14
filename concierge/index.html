@@ -1646,7 +1646,10 @@ function applyGuestLock(){
 }
 // Genera il QR che apre l'app in modalità ospite (per gli schermi passivi / tavoli)
 function generaQrOspiti(){
-  const url = location.origin + location.pathname + '?guest=1';
+  // Usa SEMPRE un indirizzo web pubblico: se la pagina è aperta in locale (file://) ripiega sull'URL pubblico.
+  let base = (location.protocol==='http:'||location.protocol==='https:') ? (location.origin + location.pathname) : '';
+  if(!base){ base = (localStorage.getItem('concierge_public_url')||'https://digit-diary.github.io/concierge/').trim(); }
+  const url = base + (base.indexOf('?')>=0 ? '&' : '?') + 'guest=1';
   const box = $('qrOspitiBox'); if(!box) return;
   box.innerHTML='';
   if(typeof QRCode!=='undefined'){
