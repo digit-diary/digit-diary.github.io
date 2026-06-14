@@ -1665,10 +1665,16 @@ function creaRecognition(){
     const alt = res[0];
     let testo = alt.transcript.trim();
     if(occupato) return;
-    // Filtro anti-rumore: scarta i risultati a bassa confidenza (probabile rumore di fondo)
-    if(typeof alt.confidence === 'number' && alt.confidence > 0 && alt.confidence < parseFloat(localStorage.getItem('concierge_mic_sens')||'0.55')) return;
+    // ANTI-RUMORE (casinò): durante l'ascolto AUTOMATICO (mic riaperto da solo) sii più severo,
+    // così chiacchiere/musica di sottofondo non fanno partire risposte a caso.
+    const autoMic = ascoltoTemp || ascoltoAttivo;                 // mic aperto senza un tocco diretto
+    const soglia = parseFloat(localStorage.getItem('concierge_mic_sens')||'0.55');
+    const sogliaEff = autoMic ? Math.min(0.9, soglia + 0.15) : soglia;
+    if(typeof alt.confidence === 'number' && alt.confidence > 0 && alt.confidence < sogliaEff) return;
     // Scarta frammenti troppo corti (rumori, singole sillabe)
-    if(testo.length < 3 || testo.split(/\s+/).length < 1) return;
+    const nParole = testo.split(/\s+/).filter(Boolean).length;
+    if(testo.length < 3) return;
+    if(autoMic && nParole < 2 && testo.length < 5) return;        // rumore: micro-frammento col mic aperto da solo
     // Parola di attivazione opzionale (personalizzabile; consigliata in ambienti rumorosi)
     if(localStorage.getItem('concierge_wake')==='1'){
       const w = (localStorage.getItem('concierge_wake_word')||'ciao').trim() || 'ciao';
@@ -1690,6 +1696,8 @@ function creaRecognition(){
     }
     // 'no-speech' / 'aborted' / 'audio-capture': lascia gestire a onend (niente loop a vuoto)
   };
+  // Mentre la persona parla, rimanda la chiusura per silenzio (conversazione che non si interrompe)
+  r.onspeechstart = () => { if(ascoltoTemp){ armaSilenzioTemp(); setStato('listening', T('listen')); } };
   r.onend = () => {
     if(occupato) return;                       // sta rispondendo/parlando: non riaprire ora
     if(isIOS){
@@ -1742,12 +1750,17 @@ function avviaAscoltoTemporaneo(){
   ascoltoTemp = true;
   try{ recognition.start(); }catch(_){}
   setStato('listening', T('listen'));
+  armaSilenzioTemp();
+}
+// Timer di "silenzio": chiude il riascolto dopo 18s SENZA voce. Si riarma quando la persona parla → non taglia conversazioni lunghe.
+const SILENZIO_MS = 18000;
+function armaSilenzioTemp(){
   clearTimeout(ascoltoTempTimer);
   ascoltoTempTimer = setTimeout(()=>{
     ascoltoTemp = false;
     if(recognition && !ascoltoAttivo){ try{ recognition.stop(); }catch(_){} }
     if(!occupato) setStato('idle', T('idle'));
-  }, 12000);    // 12 secondi per rispondere, poi si ferma
+  }, SILENZIO_MS);
 }
 function fermaAscoltoTemp(){ ascoltoTemp = false; clearTimeout(ascoltoTempTimer); }
 
