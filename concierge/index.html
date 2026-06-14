@@ -1077,11 +1077,6 @@
         <input id="pinSet" type="text" inputmode="numeric" maxlength="8" placeholder="Vuoto = non cambiare · scrivi OFF per rimuovere" autocomplete="off">
         <div class="hint">Protegge le impostazioni. Senza PIN l'accesso è libero. Imposta un PIN <b>prima</b> di attivare il chiosco.</div>
 
-        <h3 style="margin-top:22px">QR per ospiti</h3>
-        <div class="hint">Genera un QR che apre il concierge sul telefono del cliente in <b>modalità ospite</b>: bottoni e contenuti, ma <b>nessun accesso alle impostazioni</b> (icona ⚙️ e angolo segreto disattivati). Perfetto per gli schermi "solo immagini", i tavoli o l'ingresso. Le risposte arrivano dalla <b>cache condivisa</b>, quindi non servono chiavi sul telefono del cliente.</div>
-        <span class="btn-clear" style="margin-top:8px;display:inline-block;background:rgba(232,213,163,.15);color:var(--oro)" onclick="generaQrOspiti()">Genera QR per ospiti</span>
-        <div id="qrOspitiBox" style="margin-top:12px;display:flex;flex-direction:column;align-items:center;gap:8px"></div>
-
         <h3 style="margin-top:22px">Privacy e dati</h3>
         <div class="hint">🔒 Nessun audio viene registrato o conservato — l'elaborazione è in tempo reale. Le chiavi API, il PIN e la licenza restano <b>solo su questo dispositivo</b> e <b>non</b> vengono mai sincronizzati. Le risposte in cache (su Supabase) non contengono dati personali.</div>
       </div>
