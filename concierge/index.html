@@ -225,7 +225,7 @@
   .web-modal{position:fixed;inset:0;background:#fff;display:none;flex-direction:column;z-index:60}
   .web-modal.open{display:flex}
   .web-bar{flex:none;background:var(--bg2);padding:10px 14px;display:flex;align-items:center}
-  .web-back{background:var(--oro);color:#1a1208;border:none;border-radius:30px;padding:10px 20px;font-size:15px;font-weight:600;cursor:pointer}
+  .web-back{background:var(--oro);color:#1a1208;border:none;border-radius:30px;padding:10px 20px;font-size:15px;font-weight:600;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
   #webFrame{flex:1;width:100%;border:none}
 
   /* --- Settings --- */
@@ -377,6 +377,8 @@
     .qr-card #qrBox img,.qr-card #qrBox canvas{width:198px!important;height:198px!important}
     .qr-cap{font-size:14px}
     .web-back{padding:11px 18px;font-size:15px}
+    /* Telefono: le "macchie" sfocate (blur 70px) animate sono pesanti per la GPU → via, così il traduttore è fluido e il tasto Indietro risponde subito */
+    .trad-modal::before,.trad-modal::after{display:none!important}
     /* demo su telefono */
     .demo-logo,.demo-logo svg{width:46px;height:46px}
     .demo-stage{width:min(84vmin,320px);height:min(84vmin,320px)}
