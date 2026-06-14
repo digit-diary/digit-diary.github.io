@@ -3238,13 +3238,26 @@ function attivaLicenza(){
 // Chiavi che NON si sincronizzano (restano locali al dispositivo per sicurezza)
 // Restano LOCALI (non sincronizzati): chiavi API, PIN, licenza, contatori/cache, statistiche/feedback raccolti.
 // concierge_kiosk SI sincronizza (così la protezione chiosco arriva anche ai riceventi).
-const SYNC_SKIP = ['concierge_groq_key','concierge_eleven','concierge_google','concierge_eleven_off','concierge_pin','concierge_sync_group','concierge_sync_mode','concierge_sync_ver','concierge_sync_auto','concierge_sync_auto_min','concierge_license','concierge_license_ok','concierge_uso','concierge_uso_google','concierge_uso_eleven','concierge_resp','concierge_tts','concierge_stats','concierge_feedback'];
+const SYNC_SKIP = ['concierge_groq_key','concierge_eleven','concierge_google','concierge_eleven_off','concierge_pin','concierge_sync_group','concierge_sync_mode','concierge_sync_ver','concierge_sync_auto','concierge_sync_auto_min','concierge_device_id','concierge_license','concierge_license_ok','concierge_uso','concierge_uso_google','concierge_uso_eleven','concierge_resp','concierge_tts','concierge_stats','concierge_feedback'];
 function syncGruppo(){ return (localStorage.getItem('concierge_sync_group')||'').trim(); }
 function syncMode(){ return localStorage.getItem('concierge_sync_mode')||'off'; }
+// ID stabile e LOCALE del dispositivo (per riconoscere quale Master ha pubblicato)
+function deviceId(){ let id=localStorage.getItem('concierge_device_id'); if(!id){ id='d'+Math.random().toString(36).slice(2,10)+Date.now().toString(36); localStorage.setItem('concierge_device_id', id); } return id; }
+// Controlla se un ALTRO dispositivo risulta Master del gruppo (ha pubblicato per ultimo)
+async function altroMaster(){
+  const g=syncGruppo(); if(!g) return null;
+  try{ const r=await fetch(SBC_URL+'/rest/v1/rpc/concierge_config_get',{method:'POST',headers:_sbcH(),body:JSON.stringify({p_gruppo:g})});
+    if(!r.ok) return null; const d=await r.json();
+    const mid = d&&d.dati&&d.dati.__master_id;
+    return (mid && mid!==deviceId()) ? (d.dati.__master_time||'1') : null;
+  }catch(_){ return null; }
+}
 function gatherSyncConfig(){ const o={}; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.indexOf('concierge_')===0 && SYNC_SKIP.indexOf(k)<0) o[k]=localStorage.getItem(k); } return o; }
 async function syncPush(){
   const g=syncGruppo(); if(!g) return false;
-  try{ const r=await fetch(SBC_URL+'/rest/v1/rpc/concierge_config_set',{method:'POST',headers:_sbcH(),body:JSON.stringify({p_gruppo:g,p_dati:gatherSyncConfig()})});
+  const dati = gatherSyncConfig();
+  dati.__master_id = deviceId(); dati.__master_time = String(Date.now());   // chi pubblica (per rilevare Master doppi)
+  try{ const r=await fetch(SBC_URL+'/rest/v1/rpc/concierge_config_set',{method:'POST',headers:_sbcH(),body:JSON.stringify({p_gruppo:g,p_dati:dati})});
     if(r.ok){ const ver=await r.json(); localStorage.setItem('concierge_sync_ver', String(ver)); return true; } }catch(_){}
   return false;
 }
@@ -3284,7 +3297,13 @@ function sincronizzaOra(){
   if($('syncGroup')) localStorage.setItem('concierge_sync_group', ($('syncGroup').value||'').trim());
   if($('syncMode'))  localStorage.setItem('concierge_sync_mode', $('syncMode').value||'off');
   const m=syncMode(); if(m==='off' || !syncGruppo()){ alert('Scrivi un NOME GRUPPO e scegli Master o Ricevente, poi premi "Sincronizza ora".'); return; }
-  if(m==='master'){ syncPush().then(ok=>alert(ok?'Configurazione PUBBLICATA sul gruppo "'+syncGruppo()+'".\n\nOra su ogni totem RICEVENTE (stesso gruppo) premi "Sincronizza ora" per scaricarla.':'Invio non riuscito (rete).')); }
+  if(m==='master'){
+    const g=syncGruppo();
+    altroMaster().then(altro=>{
+      if(altro && !confirm('⚠️ Un ALTRO dispositivo risulta Master del gruppo "'+g+'".\n\nSe pubblichi ORA, la TUA configurazione SOVRASCRIVE la sua su tutti i Riceventi.\nConsiglio: tieni un solo Master per evitare conflitti.\n\nPubblicare comunque?')) return;
+      syncPush().then(ok=>alert(ok?'Configurazione PUBBLICATA sul gruppo "'+g+'".\n\nQuesto dispositivo è ora il Master attivo. Sui Riceventi premi "Sincronizza ora" (o attendi la sincronizzazione automatica).':'Invio non riuscito (rete).'));
+    });
+  }
   else { if(confirm('Scaricare e applicare la configurazione del Master su QUESTO totem? La pagina si ricaricherà.')) syncPull(true, true); }
 }
 
