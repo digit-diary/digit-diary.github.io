@@ -1051,6 +1051,9 @@
         </select>
         <div class="hint" id="syncStatus" style="margin-top:6px"></div>
         <span class="btn-clear" style="margin-top:8px;display:inline-block;background:rgba(232,213,163,.15);color:var(--oro)" onclick="sincronizzaOra()">Sincronizza ora</span>
+        <label style="margin-top:12px"><input type="checkbox" id="syncAuto" style="width:auto;margin-right:8px"> Sincronizzazione automatica (i Riceventi scaricano da soli)</label>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:2px"><span class="hint" style="margin:0">Controlla ogni</span><input id="syncAutoMin" type="number" min="2" max="240" placeholder="10" style="width:84px"><span class="hint" style="margin:0">minuti</span></div>
+        <div class="hint">Solo sui totem <b>Ricevente</b>: scaricano e applicano da soli le novità pubblicate dal Master. Si ricaricano <b>solo</b> quando c'è davvero una nuova versione, e <b>mai durante una conversazione</b>. Lascialo spento per restare manuale.</div>
 
         <h3 style="margin-top:22px">Statistiche d'uso</h3>
         <div class="hint" id="statsBox" style="line-height:1.6">—</div>
@@ -2644,6 +2647,8 @@ function apriSettings(){
   $('feedbackComment').checked = localStorage.getItem('concierge_feedback_comment')!=='0';
   $('syncGroup').value = localStorage.getItem('concierge_sync_group')||'';
   $('syncMode').value = localStorage.getItem('concierge_sync_mode')||'off';
+  if($('syncAuto'))    $('syncAuto').checked = localStorage.getItem('concierge_sync_auto')==='1';
+  if($('syncAutoMin')) $('syncAutoMin').value = localStorage.getItem('concierge_sync_auto_min')||'10';
   $('syncStatus').textContent = (syncMode()!=='off'&&syncGruppo()) ? ('Attiva ('+syncMode()+') · gruppo "'+syncGruppo()+'" · versione locale '+(localStorage.getItem('concierge_sync_ver')||'0')) : 'Non attiva.';
   syncFeedbackUI();
   renderStats(); renderLingueAdmin();
@@ -2688,6 +2693,9 @@ function salvaSettings(){
   renderFeedback();
   lsSet('concierge_sync_group', ($('syncGroup').value||'').trim());
   lsSet('concierge_sync_mode', $('syncMode').value);
+  if($('syncAuto'))    lsSet('concierge_sync_auto', $('syncAuto').checked?'1':'');
+  if($('syncAutoMin')) lsSet('concierge_sync_auto_min', String(Math.min(240,Math.max(2,parseInt($('syncAutoMin').value||'10',10)||10))));
+  applySyncAuto();
   // Sincronizzazione MANUALE: si applica solo col bottone "Sincronizza ora" (decidi tu su quali totem)
   lsSet('concierge_lang_def', $('langDef').value);
   lsSet('concierge_mic_sens', $('micSens').value);
@@ -3230,7 +3238,7 @@ function attivaLicenza(){
 // Chiavi che NON si sincronizzano (restano locali al dispositivo per sicurezza)
 // Restano LOCALI (non sincronizzati): chiavi API, PIN, licenza, contatori/cache, statistiche/feedback raccolti.
 // concierge_kiosk SI sincronizza (così la protezione chiosco arriva anche ai riceventi).
-const SYNC_SKIP = ['concierge_groq_key','concierge_eleven','concierge_google','concierge_eleven_off','concierge_pin','concierge_sync_group','concierge_sync_mode','concierge_sync_ver','concierge_license','concierge_license_ok','concierge_uso','concierge_uso_google','concierge_uso_eleven','concierge_resp','concierge_tts','concierge_stats','concierge_feedback'];
+const SYNC_SKIP = ['concierge_groq_key','concierge_eleven','concierge_google','concierge_eleven_off','concierge_pin','concierge_sync_group','concierge_sync_mode','concierge_sync_ver','concierge_sync_auto','concierge_sync_auto_min','concierge_license','concierge_license_ok','concierge_uso','concierge_uso_google','concierge_uso_eleven','concierge_resp','concierge_tts','concierge_stats','concierge_feedback'];
 function syncGruppo(){ return (localStorage.getItem('concierge_sync_group')||'').trim(); }
 function syncMode(){ return localStorage.getItem('concierge_sync_mode')||'off'; }
 function gatherSyncConfig(){ const o={}; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.indexOf('concierge_')===0 && SYNC_SKIP.indexOf(k)<0) o[k]=localStorage.getItem(k); } return o; }
@@ -3258,6 +3266,19 @@ async function syncPull(force, withFeedback){
     if(withFeedback) alert('Già allineato all\'ultima versione pubblicata.');
   }catch(_){ if(withFeedback) alert('Sincronizzazione non riuscita (rete).'); }
 }
+// Sincronizzazione AUTOMATICA (opzionale, solo Riceventi): scarica da solo le novità del Master.
+let _syncAutoTimer = null;
+function applySyncAuto(){
+  clearInterval(_syncAutoTimer); _syncAutoTimer = null;
+  if(localStorage.getItem('concierge_sync_auto')==='1' && syncMode()==='receiver' && syncGruppo()){
+    const min = Math.min(240, Math.max(2, parseInt(localStorage.getItem('concierge_sync_auto_min')||'10',10)||10));
+    _syncAutoTimer = setInterval(()=>{
+      if(occupato || ascoltoAttivo || ascoltoTemp) return;                 // mai durante una conversazione/ascolto
+      if($('modal') && $('modal').classList.contains('open')) return;      // non mentre l'admin sta configurando
+      syncPull(false, false);                                              // applica SOLO se c'è una versione nuova (altrimenti non fa nulla)
+    }, min*60000);
+  }
+}
 function sincronizzaOra(){
   // legge gruppo+ruolo direttamente dai campi (non serve premere Salva prima)
   if($('syncGroup')) localStorage.setItem('concierge_sync_group', ($('syncGroup').value||'').trim());
@@ -3284,6 +3305,7 @@ setLinguaAscolto(localStorage.getItem('concierge_lang_def')||'it-IT');
 costruisciRapide();
 avviaAttract();
 applyConversaMode();   // se "conversazione continua" è configurata, prova ad ascoltare già all'avvio (totem con mic autorizzato)
+applySyncAuto();       // se "sincronizzazione automatica" è attiva (Ricevente), avvia il controllo periodico
 
 // Sblocco audio per iOS (iPhone/iPad): al primo tocco abilita la riproduzione audio
 let audioSbloccato = false;
