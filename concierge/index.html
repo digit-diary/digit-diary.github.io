@@ -1614,6 +1614,9 @@ let recognition = null, voices = [];
 let ascoltoAttivo = false, occupato = false;
 let ascoltoTemp = false, ascoltoTempTimer = null;   // microfono auto dopo una risposta (conversazione)
 let langAscolto = 'it-IT';
+// iOS (iPhone/iPad): Safari avvia il microfono SOLO dentro un tocco e non regge l'ascolto continuo.
+// Su iOS quindi: una domanda per tocco (niente riavvii automatici a vuoto che direbbero "in ascolto" senza sentire).
+const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.maxTouchPoints>1 && /Macintosh|Mac OS/.test(navigator.userAgent));
 
 function buildSystemPrompt(){
   const dati = datiCasino();
@@ -1655,7 +1658,7 @@ function creaRecognition(){
   }
   const r = new SR();
   r.lang = langAscolto;
-  r.continuous = true; r.interimResults = false; r.maxAlternatives = 1;
+  r.continuous = !isIOS; r.interimResults = false; r.maxAlternatives = 1;   // iOS: ascolto singolo (continuo non affidabile)
   r.onresult = e => {
     const res = e.results[e.results.length-1];
     if(!res.isFinal) return;
@@ -1677,8 +1680,24 @@ function creaRecognition(){
     $('domanda').textContent = '“'+testo+'”';
     chiediAllAI(testo);
   };
-  r.onerror = e => {};
-  r.onend = () => { if((ascoltoAttivo || ascoltoTemp) && !occupato){ try{ r.start(); }catch(_){} } };
+  r.onerror = e => {
+    const err = e && e.error;
+    if(err==='not-allowed' || err==='service-not-allowed'){
+      // Permesso microfono negato: spegni l'ascolto e spiega
+      ascoltoAttivo=false; ascoltoTemp=false;
+      const m={it:'Permetti l’accesso al microfono nelle impostazioni del browser, oppure tocca un argomento qui sotto.',de:'Bitte Mikrofonzugriff in den Browser-Einstellungen erlauben oder unten ein Thema antippen.',en:'Allow microphone access in your browser settings, or tap a topic below.',fr:'Autorisez le micro dans les réglages du navigateur, ou touchez un thème ci-dessous.'};
+      $('risposta').textContent = m[uiLang()]||m.it; setStato('idle', T('idle')); aggiornaBottone&&aggiornaBottone();
+    }
+    // 'no-speech' / 'aborted' / 'audio-capture': lascia gestire a onend (niente loop a vuoto)
+  };
+  r.onend = () => {
+    if(occupato) return;                       // sta rispondendo/parlando: non riaprire ora
+    if(isIOS){
+      // iOS non riapre il microfono senza un nuovo tocco: torna a "Tocca per parlare" invece di restare "in ascolto" a vuoto
+      ascoltoAttivo=false; ascoltoTemp=false; setStato('idle', T('idle')); aggiornaBottone&&aggiornaBottone(); return;
+    }
+    if(ascoltoAttivo || ascoltoTemp){ try{ r.start(); }catch(_){} }
+  };
   return r;
 }
 
@@ -1703,6 +1722,7 @@ function aggiornaBottone(){
 
 function riprendiAscolto(){
   occupato = false;
+  if(isIOS){ ascoltoAttivo=false; setStato('idle', T('idle')); aggiornaBottone(); return; }   // iOS: serve un nuovo tocco per riascoltare
   if(ascoltoAttivo){
     setStato('listening', T('listen'));
     if(recognition){ try{ recognition.start(); }catch(_){} }
@@ -1714,6 +1734,7 @@ function riprendiAscolto(){
 
 // Finestra di ascolto automatica dopo una risposta (così il cliente risponde al follow-up senza premere)
 function avviaAscoltoTemporaneo(){
+  if(isIOS){ setStato('idle', T('idle')); return; }   // iOS: niente apertura microfono senza un tocco
   if(!localStorage.getItem(KEY_LS)){ setStato('idle', T('idle')); return; }
   if(!recognition) recognition = creaRecognition();
   if(!recognition){ setStato('idle', T('idle')); return; }
