@@ -804,6 +804,7 @@
         <button data-t="dati">Contenuti</button>
         <button data-t="media">Media</button>
         <button data-t="comp">Comportamento</button>
+        <button data-t="sec">Sicurezza</button>
       </div>
 
       <!-- SEZIONE API E VOCE -->
@@ -1017,18 +1018,6 @@
         <label>Effetto transizione foto demo (Ken Burns) <span style="opacity:.5">si imposta in Media</span></label>
         <div class="hint">La velocità del demo e gli effetti foto si regolano nella sezione Media.</div>
 
-        <h3 style="margin-top:22px">Sicurezza (modalità totem)</h3>
-        <label><input type="checkbox" id="kiosk" style="width:auto;margin-right:8px"> Modalità chiosco — nasconde le impostazioni agli ospiti</label>
-        <div class="hint">A schermo intero. L'icona ⚙️ sparisce. Per rientrare: <b>tieni premuto 1,5&nbsp;secondi l'angolo in alto a sinistra</b> e inserisci il PIN.</div>
-        <label>PIN amministratore (4–8 cifre)</label>
-        <input id="pinSet" type="text" inputmode="numeric" maxlength="8" placeholder="Vuoto = non cambiare · scrivi OFF per rimuovere" autocomplete="off">
-        <div class="hint">Protegge le impostazioni. Senza PIN l'accesso è libero. Imposta un PIN <b>prima</b> di attivare il chiosco.</div>
-
-        <h3 style="margin-top:22px">QR per ospiti</h3>
-        <div class="hint">Genera un QR che apre il concierge sul telefono del cliente in <b>modalità ospite</b>: bottoni e contenuti, ma <b>nessun accesso alle impostazioni</b> (icona ⚙️ e angolo segreto disattivati). Perfetto per gli schermi "solo immagini", i tavoli o l'ingresso. Le risposte arrivano dalla <b>cache condivisa</b>, quindi non servono chiavi sul telefono del cliente.</div>
-        <span class="btn-clear" style="margin-top:8px;display:inline-block;background:rgba(232,213,163,.15);color:var(--oro)" onclick="generaQrOspiti()">Genera QR per ospiti</span>
-        <div id="qrOspitiBox" style="margin-top:12px;display:flex;flex-direction:column;align-items:center;gap:8px"></div>
-
         <h3 style="margin-top:22px">Standby fuori orario</h3>
         <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end">
           <div><label>Dalle</label><input id="standbyDa" type="time" style="width:auto"></div>
@@ -1078,6 +1067,23 @@
           <button type="button" class="btn-clear" onclick="svuotaCacheRisposte()">Svuota risposte salvate</button>
         </div>
         <div class="hint" style="margin-top:6px">Svuotare le cache <b>non cancella</b> la configurazione: le risposte e le voci si rigenerano da sole alla prima richiesta (riprese da Supabase, gratis).</div>
+      </div>
+
+      <div class="tab-pane" data-p="sec">
+        <h3>Modalità chiosco (totem)</h3>
+        <label><input type="checkbox" id="kiosk" style="width:auto;margin-right:8px"> Modalità chiosco — nasconde le impostazioni agli ospiti</label>
+        <div class="hint">A schermo intero. L'icona ⚙️ sparisce. Per rientrare: <b>tieni premuto 1,5&nbsp;secondi l'angolo in alto a sinistra</b> e inserisci il PIN.</div>
+        <label>PIN amministratore (4–8 cifre)</label>
+        <input id="pinSet" type="text" inputmode="numeric" maxlength="8" placeholder="Vuoto = non cambiare · scrivi OFF per rimuovere" autocomplete="off">
+        <div class="hint">Protegge le impostazioni. Senza PIN l'accesso è libero. Imposta un PIN <b>prima</b> di attivare il chiosco.</div>
+
+        <h3 style="margin-top:22px">QR per ospiti</h3>
+        <div class="hint">Genera un QR che apre il concierge sul telefono del cliente in <b>modalità ospite</b>: bottoni e contenuti, ma <b>nessun accesso alle impostazioni</b> (icona ⚙️ e angolo segreto disattivati). Perfetto per gli schermi "solo immagini", i tavoli o l'ingresso. Le risposte arrivano dalla <b>cache condivisa</b>, quindi non servono chiavi sul telefono del cliente.</div>
+        <span class="btn-clear" style="margin-top:8px;display:inline-block;background:rgba(232,213,163,.15);color:var(--oro)" onclick="generaQrOspiti()">Genera QR per ospiti</span>
+        <div id="qrOspitiBox" style="margin-top:12px;display:flex;flex-direction:column;align-items:center;gap:8px"></div>
+
+        <h3 style="margin-top:22px">Privacy e dati</h3>
+        <div class="hint">🔒 Nessun audio viene registrato o conservato — l'elaborazione è in tempo reale. Le chiavi API, il PIN e la licenza restano <b>solo su questo dispositivo</b> e <b>non</b> vengono mai sincronizzati. Le risposte in cache (su Supabase) non contengono dati personali.</div>
       </div>
 
       <div class="err" id="errModal"></div>
