@@ -1626,6 +1626,8 @@ let recognition = null, voices = [];
 let ascoltoAttivo = false, occupato = false;
 let ascoltoTemp = false, ascoltoTempTimer = null;   // microfono auto dopo una risposta (conversazione)
 let langAscolto = 'it-IT';
+// Versione del prompt: cambiala per RIGENERARE le risposte in cache dopo aver migliorato il prompt
+const PROMPT_VER = 'v2';
 // iOS (iPhone/iPad): Safari avvia il microfono SOLO dentro un tocco e non regge l'ascolto continuo.
 // Su iOS quindi: una domanda per tocco (niente riavvii automatici a vuoto che direbbero "in ascolto" senza sentire).
 const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.maxTouchPoints>1 && /Macintosh|Mac OS/.test(navigator.userAgent));
@@ -1651,6 +1653,7 @@ ${dati || '(nessuna informazione ancora configurata)'}
 
 PRINCIPI — valgono per QUALSIASI domanda o situazione:
 - Usa SOLO le informazioni ufficiali qui sopra. Se un dato non c'è, NON inventarlo: dillo con garbo e indirizza alla reception/info point del posto.
+- FEDELTÀ AI DETTAGLI: includi SEMPRE i dettagli concreti dell'informazione ufficiale — valute (es. franchi svizzeri o euro), prezzi, importi, nomi, orari, condizioni, passaggi. Puoi riformulare il tono, ma NON omettere né semplificare questi dettagli: per il cliente sono essenziali.
 - Parla come un VERO concierge umano: tono caldo, naturale, cortese. Mai robotico, mai burocratico.
 - Risposta breve e parlata (2-3 frasi), adatta ad essere ascoltata ad alta voce. Niente elenchi lunghi: se servono dettagli, chiedi prima cosa interessa.
 - Ricorda la conversazione in corso e usa il contesto.
@@ -2325,7 +2328,7 @@ function domandaRapida(i){
   if(r.url) mostraQR(r.url, false);     // es. Ristorante: risposta vocale + QR per il menù
   // chiave cache: bottone + lingua + impronta dei contenuti (se cambi i dati la risposta si rigenera;
   // schermi con configurazione identica condividono, con config diversa NON si mischiano)
-  const ck = uiLang()+'|'+r.ic+'|'+(r.l.it||'')+'|'+_hash(datiCasino());
+  const ck = PROMPT_VER+'|'+uiLang()+'|'+r.ic+'|'+(r.l.it||'')+'|'+_hash(datiCasino());
   if(rispCache.has(ck)){                // già chiesto → riusa risposta+audio, NESSUNA chiamata AI
     resetInattivita(); fermaTutto(); occupato = true;
     const c = rispCache.get(ck);
