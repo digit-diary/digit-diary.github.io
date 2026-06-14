@@ -1034,7 +1034,7 @@
         </div>
 
         <h3 style="margin-top:22px">Sincronizzazione tra totem</h3>
-        <div class="hint"><b>Come funziona:</b> sul totem <b>Master</b> premi "Sincronizza ora" per <b>pubblicare</b> la configurazione. Poi su ogni totem <b>Ricevente</b> che vuoi aggiornare premi "Sincronizza ora" per <b>scaricarla</b>. Così scegli tu <b>se aggiornarne solo alcuni o tutti</b>. Si sincronizza solo la configurazione (contenuti, bottoni, testi, lingue, logo, comportamento) — <b>non</b> chiavi, PIN o licenza. Media/piantine vanno importati su ogni dispositivo.</div>
+        <div class="hint"><b>Come funziona:</b> sul totem <b>Master</b> premi "Sincronizza ora" per <b>pubblicare</b> la configurazione. Poi su ogni totem <b>Ricevente</b> che vuoi aggiornare premi "Sincronizza ora" per <b>scaricarla</b>. Così scegli tu <b>se aggiornarne solo alcuni o tutti</b>. Si sincronizza la configurazione (contenuti, bottoni, testi, lingue, logo, comportamento, <b>PIN e modalità chiosco</b>) — <b>non</b> le chiavi API né la licenza (restano locali a ogni dispositivo). Così imposti <b>un unico PIN</b> sul Master e vale per tutti. Media/piantine vanno importati su ogni dispositivo.</div>
         <label>Nome gruppo <span style="opacity:.5">(lo stesso su tutti i totem che devono allinearsi)</span></label>
         <input id="syncGroup" type="text" placeholder="es. casino-lugano" autocomplete="off">
         <label>Ruolo di questo totem</label>
@@ -3284,9 +3284,11 @@ function attivaLicenza(){
 
 /* --- SINCRONIZZAZIONE config tra totem (Master invia / Ricevente riceve, automatico + bottone) --- */
 // Chiavi che NON si sincronizzano (restano locali al dispositivo per sicurezza)
-// Restano LOCALI (non sincronizzati): chiavi API, PIN, licenza, contatori/cache, statistiche/feedback raccolti.
+// Restano LOCALI (non sincronizzati): chiavi API, licenza, ID dispositivo, contatori/cache, statistiche/feedback. Il PIN invece si sincronizza (uno unico per tutti).
 // concierge_kiosk SI sincronizza (così la protezione chiosco arriva anche ai riceventi).
-const SYNC_SKIP = ['concierge_groq_key','concierge_eleven','concierge_google','concierge_eleven_off','concierge_pin','concierge_sync_group','concierge_sync_mode','concierge_sync_ver','concierge_sync_auto','concierge_sync_auto_min','concierge_device_id','concierge_guest','concierge_license','concierge_license_ok','concierge_uso','concierge_uso_google','concierge_uso_eleven','concierge_resp','concierge_tts','concierge_stats','concierge_feedback'];
+// NOTA: concierge_pin NON è più qui → il PIN si sincronizza (uno unico per tutti i totem del gruppo).
+// Restano locali (mai sincronizzati) le chiavi API, la licenza e gli identificativi del dispositivo.
+const SYNC_SKIP = ['concierge_groq_key','concierge_eleven','concierge_google','concierge_eleven_off','concierge_sync_group','concierge_sync_mode','concierge_sync_ver','concierge_sync_auto','concierge_sync_auto_min','concierge_device_id','concierge_guest','concierge_license','concierge_license_ok','concierge_uso','concierge_uso_google','concierge_uso_eleven','concierge_resp','concierge_tts','concierge_stats','concierge_feedback'];
 function syncGruppo(){ return (localStorage.getItem('concierge_sync_group')||'').trim(); }
 function syncMode(){ return localStorage.getItem('concierge_sync_mode')||'off'; }
 // ID stabile e LOCALE del dispositivo (per riconoscere quale Master ha pubblicato)
