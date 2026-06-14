@@ -2049,8 +2049,7 @@ function applyAvatar(){
   document.body.classList.toggle('avatar-cover', m==='volto'||m==='donna'||m==='concierge'||m==='immagine');   // volti/immagine coprono il logo
   if(m==='immagine') renderAvatarImg();
   if(m==='concierge') aggiornaSpilla();
-  if(m==='aura'||m==='immagine') avEnsureLoop();        // aura viva subito (respiro idle)
-  else if(!_avSpeaking) avStopLoop();                    // volti/off: nessun loop se non parla
+  if(!_avSpeaking){ avStopLoop(); const c=$('vizCanvas'); if(c){ const x=c.getContext('2d'); x&&x.clearRect(0,0,c.width,c.height); } }   // da fermo nessuna animazione
 }
 let _ac=null,_an=null,_fd=null,_avRAF=null,_avSim=0; const _avSrc=new WeakMap();
 function _avInit(){ if(_ac) return !!_an; try{ _ac=new (window.AudioContext||window.webkitAudioContext)(); _an=_ac.createAnalyser(); _an.fftSize=128; _an.smoothingTimeConstant=.78; _an.connect(_ac.destination); _fd=new Uint8Array(_an.frequencyBinCount); return true; }catch(_){ return false; } }
@@ -2068,9 +2067,8 @@ function avStart(simulate){ if(avatarMode()==='off') return; _avSpeaking=true; _
 function avStop(){
   _avSpeaking=false;
   const mo=$('avatarMouth'); if(mo) mo.setAttribute('ry','3.5'); const md=$('avatarDonnaMouth'); if(md) md.setAttribute('ry','3'); const mc=$('avatarConciergeMouth'); if(mc) mc.setAttribute('ry','2.6');
-  const m=avatarMode();
-  if(m==='aura'||m==='immagine'){ avEnsureLoop(); }   // l'aura resta VIVA con un respiro gentile anche da ferma
-  else { avStopLoop(); const c=$('vizCanvas'); if(c){ const x=c.getContext('2d'); x&&x.clearRect(0,0,c.width,c.height); } }
+  avStopLoop();   // niente animazione da fermo: l'aura/bocca si ferma quando non parla
+  const c=$('vizCanvas'); if(c){ const x=c.getContext('2d'); x&&x.clearRect(0,0,c.width,c.height); }
 }
 function _avFrame(){
   const m=avatarMode(); if(m==='off'){ avStopLoop(); return; }
@@ -2080,8 +2078,8 @@ function _avFrame(){
       if(amp<0.02){ _avSim+=0.16; amp=(Math.sin(_avSim)*0.5+0.5)*0.4+0.12; useSine=true; }   // analisi muta (es. AudioContext sospeso) → simulata
     } else { _avSim+=0.16; amp=(Math.sin(_avSim)*0.5+0.5)*0.45+0.12; useSine=true; }          // voce browser o niente analizzatore → simulata
   } else {
-    if(m==='aura'||m==='immagine'){ _avSim+=0.05; amp=(Math.sin(_avSim)*0.5+0.5)*0.12+0.05; useSine=true; }   // respiro gentile da fermo
-    else { avStopLoop(); return; }   // volti: bocca ferma da fermo
+    // da fermo: nessuna animazione (aura solo mentre parla). Pulisci e ferma il loop.
+    avStopLoop(); const c=$('vizCanvas'); if(c){ const x=c.getContext('2d'); x&&x.clearRect(0,0,c.width,c.height); } return;
   }
   if(m==='aura'||m==='immagine') _avAura(useSine, amp);
   else if(m==='volto'){ const mo=$('avatarMouth'); if(mo) mo.setAttribute('ry',(3.5+amp*15).toFixed(1)); }
