@@ -1706,9 +1706,10 @@ function toggleHandsFree(){
   fermaAscoltoTemp();
   ascoltoAttivo = !ascoltoAttivo;
   if(ascoltoAttivo){
+    if(isIOS && recognition){ try{ recognition.onend=null; recognition.abort(); }catch(_){} recognition=null; }   // iOS: riparti sempre da un oggetto pulito
     if(!recognition) recognition = creaRecognition();
     if(!recognition){ ascoltoAttivo=false; return; }
-    try{ recognition.start(); }catch(_){}
+    try{ recognition.start(); }catch(_){ try{ recognition.abort(); recognition.start(); }catch(__){} }
     setStato('listening', T('listen')); $('risposta').textContent='';
   } else {
     if(recognition) recognition.stop();
@@ -2125,10 +2126,17 @@ function voceBrowser(testo, lang, fine){
 // aggiunge "M" SOLO per la voce maschile (così non rigenera nulla per il setup attuale).
 function ttsKey(motore, lang, testo){ return motore+'|'+lang+(voceGenere()==='m'?'|M':'')+'|'+testo; }
 function blobToDataURL(blob){ return new Promise(res=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.readAsDataURL(blob); }); }
+// iOS: un SOLO elemento audio, sbloccato col primo tocco, riusato per ogni risposta (altrimenti Safari non lo suona)
+let _ttsEl = null;
+function getTtsEl(){ if(!_ttsEl){ _ttsEl = new Audio(); _ttsEl.preload='auto'; } return _ttsEl; }
 function suonaCache(url, fine){
-  const a=new Audio(url); audioCorrente=a;
+  let a;
+  if(isIOS){ a = getTtsEl(); a.src = url; }   // riusa l'elemento già sbloccato dal tocco
+  else { a = new Audio(url); }                 // totem (non iOS): comportamento invariato
+  audioCorrente=a;
   a.onended=()=>{ avStop(); if(fine) fine(); };
-  const real = (avatarMode()!=='off') ? avAttach(a) : false;   // collega l'audio all'analizzatore
+  // iOS: NON passare dal Web Audio dell'avatar (col contesto sospeso l'audio resterebbe muto) → animazione simulata
+  const real = (!isIOS && avatarMode()!=='off') ? avAttach(a) : false;
   a.play().then(()=>{ if(avatarMode()!=='off') avStart(!real); }).catch(()=>{ try{ a.play(); }catch(_){} });
 }
 // Migra la VECCHIA cache audio da localStorage (che riempiva i ~5MB) a IndexedDB (grande),
@@ -3225,10 +3233,12 @@ let audioSbloccato = false;
 function sbloccaAudio(){
   if(audioSbloccato) return; audioSbloccato = true;
   try{
-    const a = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=');
-    a.play().catch(()=>{});
+    // Sblocca PROPRIO l'elemento che riprodurrà la voce (iOS: così i play successivi fuori dal tocco funzionano)
+    const el = getTtsEl();
+    el.src='data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+    el.play().then(()=>{ try{ el.pause(); el.currentTime=0; }catch(_){} }).catch(()=>{});
     if(window.speechSynthesis){ const u=new SpeechSynthesisUtterance(' '); u.volume=0; speechSynthesis.speak(u); }
-    if(avatarMode()!=='off' && _avInit() && _ac.state==='suspended') _ac.resume();   // prepara il contesto audio per l'avatar
+    if(!isIOS && avatarMode()!=='off' && _avInit() && _ac.state==='suspended') _ac.resume();   // totem: prepara il Web Audio per l'avatar
   }catch(_){}
 }
 
