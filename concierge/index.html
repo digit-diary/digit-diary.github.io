@@ -1642,8 +1642,21 @@ let ascoltoTemp = false, ascoltoTempTimer = null;   // microfono auto dopo una r
 let langAscolto = 'it-IT';
 // Versione del prompt: cambiala per RIGENERARE le risposte in cache dopo aver migliorato il prompt
 const PROMPT_VER = 'v2';
-// MODALITÀ OSPITE: il QR per gli ospiti apre l'app con ?guest → niente accesso alle impostazioni (telefono del cliente)
-const GUEST = (function(){ try{ return new URLSearchParams(location.search).has('guest'); }catch(_){ return /[?&]guest(\b|=)/.test(location.search); } })();
+// MODALITÀ OSPITE: il QR apre l'app con ?guest → niente accesso impostazioni.
+// PERSISTENTE: una volta ospite il dispositivo RESTA ospite anche se toglie il ?guest dall'URL.
+// Per USCIRE da ospite su un dispositivo (es. il tuo telefono di test): apri ...?guest=0
+const GUEST = (function(){
+  try{
+    const p = new URLSearchParams(location.search);
+    if(p.has('guest')){
+      const v = (p.get('guest')||'1').toLowerCase();
+      if(v==='0'||v==='off'||v==='false'||v==='no'){ try{localStorage.removeItem('concierge_guest');}catch(_){ } return false; }
+      try{ localStorage.setItem('concierge_guest','1'); }catch(_){}
+      return true;
+    }
+  }catch(_){}
+  try{ return localStorage.getItem('concierge_guest')==='1'; }catch(_){ return false; }
+})();
 function applyGuestLock(){
   if(!GUEST) return;
   const g=$('btnGear'); if(g) g.style.display='none';        // niente icona impostazioni
@@ -3278,7 +3291,7 @@ function attivaLicenza(){
 // Chiavi che NON si sincronizzano (restano locali al dispositivo per sicurezza)
 // Restano LOCALI (non sincronizzati): chiavi API, PIN, licenza, contatori/cache, statistiche/feedback raccolti.
 // concierge_kiosk SI sincronizza (così la protezione chiosco arriva anche ai riceventi).
-const SYNC_SKIP = ['concierge_groq_key','concierge_eleven','concierge_google','concierge_eleven_off','concierge_pin','concierge_sync_group','concierge_sync_mode','concierge_sync_ver','concierge_sync_auto','concierge_sync_auto_min','concierge_device_id','concierge_license','concierge_license_ok','concierge_uso','concierge_uso_google','concierge_uso_eleven','concierge_resp','concierge_tts','concierge_stats','concierge_feedback'];
+const SYNC_SKIP = ['concierge_groq_key','concierge_eleven','concierge_google','concierge_eleven_off','concierge_pin','concierge_sync_group','concierge_sync_mode','concierge_sync_ver','concierge_sync_auto','concierge_sync_auto_min','concierge_device_id','concierge_guest','concierge_license','concierge_license_ok','concierge_uso','concierge_uso_google','concierge_uso_eleven','concierge_resp','concierge_tts','concierge_stats','concierge_feedback'];
 function syncGruppo(){ return (localStorage.getItem('concierge_sync_group')||'').trim(); }
 function syncMode(){ return localStorage.getItem('concierge_sync_mode')||'off'; }
 // ID stabile e LOCALE del dispositivo (per riconoscere quale Master ha pubblicato)
