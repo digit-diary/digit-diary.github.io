@@ -961,6 +961,18 @@
         <input id="wakeWord" type="text" maxlength="20" placeholder="ciao" style="margin-top:6px">
         <div class="hint">Risponde solo se la frase inizia con questa parola (es. <i>ciao</i>, <i>ehi</i>, il nome del totem…). Vuoto = "ciao".</div>
         <div class="hint">Utile in ambienti rumorosi: risponde solo se la frase inizia con "Ciao".</div>
+
+        <h3 style="margin-top:20px">Conversazione</h3>
+        <label>Modalità</label>
+        <select id="conversaMode">
+          <option value="tap">Tocca per parlare, poi dialogo automatico (consigliata)</option>
+          <option value="continua">Continua a mani libere — ascolta sempre (ambienti silenziosi)</option>
+        </select>
+        <div class="hint"><b>Tocca per parlare:</b> il cliente tocca una volta per iniziare, poi il microfono si riapre da solo dopo ogni risposta per continuare il dialogo. Ideale in ambienti rumorosi (es. casinò). <b>Continua:</b> il totem ascolta sempre, senza tocchi — meglio in hall/reception silenziose.</div>
+        <label>Secondi per rispondere (dopo una risposta)</label>
+        <input id="listenSec" type="number" min="5" max="60" placeholder="18">
+        <div class="hint">Quanto resta aperto il microfono in attesa della replica del cliente (si estende mentre parla). Più alto = più tempo, ma più esposto al rumore.</div>
+
         <label>Demo animato dopo (secondi di inattività) <span style="opacity:.5">(0 = disattivato)</span></label>
         <input id="demoDelay" type="number" min="0" placeholder="40">
         <div class="hint">Il video-guida parte da solo dopo questo tempo senza interazioni.</div>
@@ -1620,26 +1632,39 @@ const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.maxTouchP
 
 function buildSystemPrompt(){
   const dati = datiCasino();
-  const LNAME = {it:'ITALIANO', de:'TEDESCO (Deutsch)', en:'INGLESE (English)', fr:'FRANCESE (Français)', es:'SPAGNOLO (Español)', ru:'RUSSO (Русский)', zh:'CINESE (中文)', ar:'ARABO (العربية)'};
-  const lsel = LNAME[uiLang()] || 'ITALIANO';
   const brand = (localStorage.getItem('concierge_brand')||'').trim() || 'Casinò di Lugano';
-  return `Sei l'assistente virtuale di ${brand}, cortese ed elegante.
-Rispondi SOLO usando le informazioni qui sotto. Se un dato non c'è, NON inventarlo:
-invita gentilmente a chiedere alla reception/info point.
+  const LNAME = {it:'ITALIANO', de:'TEDESCO (Deutsch)', en:'INGLESE (English)', fr:'FRANCESE (Français)', es:'SPAGNOLO (Español)', ru:'RUSSO (Русский)', zh:'CINESE (中文)', ar:'ARABO (العربية)'};
+  const cur = uiLang();
+  let lsel = LNAME[cur];
+  if(!lsel){ const ex=getLingueExtra().find(x=>x.code===cur); lsel = ex ? (ex.name+' ('+ex.en+')').toUpperCase() : 'ITALIANO'; }   // lingue extra
+  // Lingue realmente ATTIVE su questo totem (per rispondere con precisione su "parli X?")
+  const off = getLangOff();
+  const attive = LINGUE_BASE.filter(x=>!off.includes(x.l)).map(x=>x.t).concat(getLingueExtra().map(x=>x.name));
+  const lingueAttive = attive.join(', ');
+  return `Sei il concierge virtuale di ${brand}: una persona reale dell'accoglienza — calorosa, elegante, competente e discreta. NON sei un'AI generica e non lo dichiari mai.
 
-=== INFORMAZIONI DELLA STRUTTURA ===
+=== INFORMAZIONI UFFICIALI DI ${brand} ===
 ${dati || '(nessuna informazione ancora configurata)'}
-===============================
+========================================
 
-⚠️ LINGUA DI RISPOSTA OBBLIGATORIA: scrivi TUTTO il campo "text" in ${lsel}. Anche se la domanda ti arriva in italiano, la risposta DEVE essere in ${lsel}. NON rispondere in italiano se ${lsel} non è l'italiano. Imposta il campo "lang" col codice corrispondente.
+⚠️ LINGUA DI RISPOSTA OBBLIGATORIA: scrivi TUTTO il campo "text" in ${lsel}. Anche se la domanda arriva in un'altra lingua, rispondi in ${lsel}. Imposta "lang" col codice corretto. Ortografia perfetta, senza mescolare parole di altre lingue.
 
-REGOLE (parla come un VERO concierge umano, non come un'AI):
-- Rispondi con ortografia corretta, senza mescolare parole di altre lingue: in italiano i giorni sono domenica, lunedì, martedì, mercoledì, giovedì, venerdì, sabato (MAI "domingo" o altri termini spagnoli).
-- Tono caldo, cortese e naturale, come un receptionist d'albergo di classe. MAI robotico o burocratico.
-- Risposta breve e parlata (2-3 frasi). Usa il contesto delle frasi precedenti (ricordi la conversazione).
-- DIALOGA: quando è naturale, chiudi con una breve domanda di cortesia per continuare ("Posso aiutarla con altro?", "Le interessa anche il menù?", "Desidera che le indichi la strada?"). Non farlo se il cliente sta chiaramente chiudendo.
-- Se il cliente è indeciso, fai una domanda per capire cosa cerca, invece di elencare tutto.
-Restituisci SOLO JSON valido: {"lang":"it|de|en|fr|es|ru|zh|ar","text":"risposta nella lingua richiesta","indicazione":"breve direzione fisica se utile, altrimenti stringa vuota"}`;
+PRINCIPI — valgono per QUALSIASI domanda o situazione:
+- Usa SOLO le informazioni ufficiali qui sopra. Se un dato non c'è, NON inventarlo: dillo con garbo e indirizza alla reception/info point del posto.
+- Parla come un VERO concierge umano: tono caldo, naturale, cortese. Mai robotico, mai burocratico.
+- Risposta breve e parlata (2-3 frasi), adatta ad essere ascoltata ad alta voce. Niente elenchi lunghi: se servono dettagli, chiedi prima cosa interessa.
+- Ricorda la conversazione in corso e usa il contesto.
+- Professionale in OGNI situazione:
+  • Domanda fuori tema o troppo personale → riporta con eleganza al tuo ruolo ("Sono qui per assisterla con ${brand}…").
+  • Reclamo o cliente insoddisfatto → ascolta, scusati con tatto e indirizza al personale competente.
+  • Oggetto smarrito, emergenza, problema di salute o sicurezza → invita SUBITO a rivolgersi al personale o alla sicurezza, con calma e premura.
+  • Richiesta che non puoi soddisfare → proponi un'alternativa utile o indica chi può aiutare. Mai un "no" secco.
+  • Cliente indeciso → una breve domanda per capire cosa cerca.
+- DIALOGA: quando è naturale, chiudi con una breve domanda di cortesia ("Posso aiutarla con altro?", "Desidera che le indichi la strada?"). Non farlo se il cliente sta chiudendo.
+
+LINGUE: su questo totem puoi assistere in: ${lingueAttive}. Se chiedono se parli una di queste, confermalo con piacere e ricorda che possono toccare la bandiera in basso per cambiare lingua. Se chiedono una lingua NON in elenco, scusati con garbo e proponi una di quelle disponibili.
+
+Restituisci SOLO JSON valido: {"lang":"codice lingua (es. it, de, en, fr, es, ru, zh, ar o la lingua extra attiva)","text":"risposta in ${lsel}","indicazione":"breve direzione fisica se utile, altrimenti stringa vuota"}`;
 }
 
 /* --- Voci sintesi --- */
@@ -1752,17 +1777,29 @@ function avviaAscoltoTemporaneo(){
   setStato('listening', T('listen'));
   armaSilenzioTemp();
 }
-// Timer di "silenzio": chiude il riascolto dopo 18s SENZA voce. Si riarma quando la persona parla → non taglia conversazioni lunghe.
-const SILENZIO_MS = 18000;
+// Timer di "silenzio": chiude il riascolto dopo N secondi SENZA voce (configurabile). Si riarma quando la persona parla → non taglia conversazioni lunghe.
+function silenzioMs(){ const s = parseInt(localStorage.getItem('concierge_listen_sec')||'18',10); return (isNaN(s)?18:Math.min(60,Math.max(5,s)))*1000; }
 function armaSilenzioTemp(){
   clearTimeout(ascoltoTempTimer);
   ascoltoTempTimer = setTimeout(()=>{
     ascoltoTemp = false;
     if(recognition && !ascoltoAttivo){ try{ recognition.stop(); }catch(_){} }
     if(!occupato) setStato('idle', T('idle'));
-  }, SILENZIO_MS);
+  }, silenzioMs());
 }
 function fermaAscoltoTemp(){ ascoltoTemp = false; clearTimeout(ascoltoTempTimer); }
+// Modalità "conversazione continua": il totem ascolta sempre (no tocco). Solo su totem (non iOS).
+function applyConversaMode(){
+  const mode = localStorage.getItem('concierge_conversa')||'tap';
+  if(mode==='continua' && !isIOS){
+    if(!ascoltoAttivo && localStorage.getItem(KEY_LS)){
+      ascoltoAttivo = true;
+      if(!recognition) recognition = creaRecognition();
+      if(recognition){ try{ recognition.start(); }catch(_){} setStato('listening', T('listen')); }
+      aggiornaBottone();
+    }
+  }
+}
 
 /* Cambia lingua di ascolto dalle bandiere */
 function setLinguaAscolto(l){
@@ -2586,6 +2623,8 @@ function apriSettings(){
   $('limite').value    = localStorage.getItem('concierge_limite')||'0';
   $('wake').checked    = localStorage.getItem('concierge_wake')==='1';
   $('wakeWord').value  = localStorage.getItem('concierge_wake_word')||'';
+  if($('conversaMode')) $('conversaMode').value = localStorage.getItem('concierge_conversa')||'tap';
+  if($('listenSec'))    $('listenSec').value    = localStorage.getItem('concierge_listen_sec')||'18';
   $('demoDelay').value = localStorage.getItem('concierge_demo_delay')||'40';
   $('demoFrasi').value = localStorage.getItem('concierge_demo_frasi')||'';
   $('langDef').value   = localStorage.getItem('concierge_lang_def')||'it-IT';
@@ -2633,6 +2672,9 @@ function salvaSettings(){
   lsSet('concierge_limite', String(parseInt($('limite').value||'0',10)||0));
   lsSet('concierge_wake', $('wake').checked?'1':'');
   lsSet('concierge_wake_word', ($('wakeWord').value||'').trim());
+  if($('conversaMode')) lsSet('concierge_conversa', $('conversaMode').value);
+  if($('listenSec'))    lsSet('concierge_listen_sec', String(Math.min(60,Math.max(5,parseInt($('listenSec').value||'18',10)||18))));
+  applyConversaMode();
   lsSet('concierge_demo_delay', String(parseInt($('demoDelay').value||'40',10)));
   lsSet('concierge_demo_frasi', ($('demoFrasi').value||'').trim());
   lsSet('concierge_standby_da', $('standbyDa').value||'');
@@ -3238,6 +3280,7 @@ renderTesti();    // testi personalizzati attorno al logo / bordi schermo
 setLinguaAscolto(localStorage.getItem('concierge_lang_def')||'it-IT');
 costruisciRapide();
 avviaAttract();
+applyConversaMode();   // se "conversazione continua" è configurata, prova ad ascoltare già all'avvio (totem con mic autorizzato)
 
 // Sblocco audio per iOS (iPhone/iPad): al primo tocco abilita la riproduzione audio
 let audioSbloccato = false;
@@ -3250,6 +3293,7 @@ function sbloccaAudio(){
     el.play().then(()=>{ try{ el.pause(); el.currentTime=0; }catch(_){} }).catch(()=>{});
     if(window.speechSynthesis){ const u=new SpeechSynthesisUtterance(' '); u.volume=0; speechSynthesis.speak(u); }
     if(!isIOS && avatarMode()!=='off' && _avInit() && _ac.state==='suspended') _ac.resume();   // totem: prepara il Web Audio per l'avatar
+    applyConversaMode();   // se "conversazione continua", avvia l'ascolto a mani libere al primo tocco
   }catch(_){}
 }
 
