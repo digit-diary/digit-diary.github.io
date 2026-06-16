@@ -511,7 +511,7 @@
   <div class="logo-extra screen-edge screen-bottom" id="screenBottom" style="display:none"></div>
 
   <!-- Angolo segreto: tieni premuto 1,5s per l'accesso admin in modalità chiosco -->
-  <div id="adminCorner" style="position:fixed;top:0;left:0;width:72px;height:72px;z-index:9998"></div>
+  <div id="adminCorner" style="position:fixed;top:0;left:0;width:84px;height:84px;z-index:9998;touch-action:none;-webkit-tap-highlight-color:transparent"></div>
 
   <!-- Commento opzionale (visibile solo all'admin) -->
   <div id="fbkModal" style="position:fixed;inset:0;background:rgba(8,5,12,.8);display:none;z-index:95;align-items:center;justify-content:center">
@@ -2662,7 +2662,7 @@ document.addEventListener('pointerdown', ()=>{
   let t=null; const start=()=>{ t=setTimeout(()=>{ t=null; tentaSettings(); }, 1500); };
   const stop=()=>{ if(t){ clearTimeout(t); t=null; } };
   c.addEventListener('pointerdown', start);
-  ['pointerup','pointerleave','pointercancel'].forEach(ev=>c.addEventListener(ev, stop));
+  ['pointerup','pointercancel'].forEach(ev=>c.addEventListener(ev, stop));   // niente 'pointerleave': un micro-movimento del dito non annulla la pressione
 })();
 document.addEventListener('keydown', e=>{ if(e.key==='Enter' && $('pinOverlay').style.display==='flex') verificaPin(); });
 
