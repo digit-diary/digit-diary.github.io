@@ -1642,20 +1642,18 @@ let ascoltoTemp = false, ascoltoTempTimer = null;   // microfono auto dopo una r
 let langAscolto = 'it-IT';
 // Versione del prompt: cambiala per RIGENERARE le risposte in cache dopo aver migliorato il prompt
 const PROMPT_VER = 'v2';
-// MODALITÀ OSPITE: il QR apre l'app con ?guest → niente accesso impostazioni.
-// PERSISTENTE: una volta ospite il dispositivo RESTA ospite anche se toglie il ?guest dall'URL.
-// Per USCIRE da ospite su un dispositivo (es. il tuo telefono di test): apri ...?guest=0
+// MODALITÀ OSPITE: attiva SOLO se l'URL contiene ?guest (NON persistente).
+// Così nessun dispositivo resta "bloccato" ospite: basta ricaricare la pagina normale.
+try{ localStorage.removeItem('concierge_guest'); }catch(_){}   // pulizia di eventuali blocchi vecchi
 const GUEST = (function(){
   try{
     const p = new URLSearchParams(location.search);
     if(p.has('guest')){
       const v = (p.get('guest')||'1').toLowerCase();
-      if(v==='0'||v==='off'||v==='false'||v==='no'){ try{localStorage.removeItem('concierge_guest');}catch(_){ } return false; }
-      try{ localStorage.setItem('concierge_guest','1'); }catch(_){}
-      return true;
+      return !(v==='0'||v==='off'||v==='false'||v==='no');
     }
   }catch(_){}
-  try{ return localStorage.getItem('concierge_guest')==='1'; }catch(_){ return false; }
+  return false;
 })();
 function applyGuestLock(){
   if(!GUEST) return;
@@ -2662,10 +2660,12 @@ document.addEventListener('pointerdown', ()=>{
 // Accesso admin in chiosco: tieni premuto 1,5s l'angolo in alto a sinistra
 (function(){
   const c = $('adminCorner'); if(!c) return;
-  let t=null; const start=()=>{ t=setTimeout(()=>{ t=null; tentaSettings(); }, 1500); };
+  let t=null;
+  const start=()=>{ if(t) return; t=setTimeout(()=>{ t=null; tentaSettings(); }, 1500); };   // guard: niente doppio avvio (pointer+touch)
   const stop=()=>{ if(t){ clearTimeout(t); t=null; } };
   c.addEventListener('pointerdown', start);
-  ['pointerup','pointercancel'].forEach(ev=>c.addEventListener(ev, stop));   // niente 'pointerleave': un micro-movimento del dito non annulla la pressione
+  c.addEventListener('touchstart', start, {passive:true});   // fallback iOS (pointer a volte non scatta)
+  ['pointerup','pointercancel','touchend','touchcancel'].forEach(ev=>c.addEventListener(ev, stop));   // niente 'pointerleave': un micro-movimento del dito non annulla la pressione
 })();
 document.addEventListener('keydown', e=>{ if(e.key==='Enter' && $('pinOverlay').style.display==='flex') verificaPin(); });
 
