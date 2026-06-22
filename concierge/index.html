@@ -2038,7 +2038,7 @@ async function chiediAllAI(domanda, opts){
   if(opts.cacheKey){
     const rem = await cacheGetRemote(opts.cacheKey);
     if(mioId !== richiestaId) return;
-    if(rem){ rispCache.set(opts.cacheKey, rem); salvaRisp(); rispondi(rem.text, rem.lang, rem.indicazione, mioId, true); return; }
+    if(rem){ rispCache.set(opts.cacheKey, rem); salvaRisp(); rispondi(rem.text, rem.lang, rem.indicazione, mioId, true); wfTryShowOnMap(domanda); return; }
   }
   const _dir = {it:'',de:'[Antworte auf Deutsch] ',en:'[Reply in English] ',fr:'[Réponds en français] ',es:'[Responde en español] ',ru:'[Ответь на русском] ',zh:'[用中文回答] ',ar:'[أجب بالعربية] '}[uiLang()];
   let lreq = _dir;
@@ -2069,6 +2069,7 @@ async function chiediAllAI(domanda, opts){
       cacheSetRemote(opts.cacheKey, text, lang, ind);
     }
     rispondi(text, lang, ind, mioId, !!opts.cacheKey);   // share=true SOLO per i bottoni (mai conversazioni libere)
+    wfTryShowOnMap(domanda);                              // se chiede "dove si trova X" → apre la mappa sul punto (locale, niente API)
   }catch(err){
     if(err.name==='AbortError') return;           // interrotta apposta da un nuovo comando
     $('risposta').textContent='Errore di connessione all\'AI. Controlla la chiave in ⚙️.';
@@ -3410,14 +3411,27 @@ if(!localStorage.getItem(KEY_LS)) setTimeout(apriSettings, 600);
 /* ===== WAYFINDING: il bottone "Mappa" apre la pagina interattiva (wayfinding.html, stesso dominio → lingua e dati condivisi). Override additivo. ===== */
 function wfHasData(){ try{ const s=JSON.parse(localStorage.getItem('wayfind_proto_v5')||'null'); return !!(s&&s._floors&&s._floors.some(f=>f&&f.dests&&f.dests.length)); }catch(_){ return false; } }
 function aggiornaBtnMappa(){ if($('btnMap')) $('btnMap').style.display = wfHasData() ? '' : 'none'; }   // mostra Mappa quando il wayfinding ha destinazioni
-async function apriMappa(admin){
+async function apriMappa(admin, goto){
   let ov=document.getElementById('wfPageOverlay');
   if(!ov){ ov=document.createElement('div'); ov.id='wfPageOverlay';
     ov.style.cssText='position:fixed;inset:0;z-index:90;background:#0a0a0f;display:none';
     ov.innerHTML='<button id="wfClose" title="Chiudi" style="position:fixed;top:12px;right:14px;z-index:91;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.3);background:rgba(20,16,30,.85);color:#fff;font-size:18px;cursor:pointer">&#10005;</button><iframe id="wfFrame" title="Mappa" style="width:100%;height:100%;border:0"></iframe>';
     document.body.appendChild(ov); document.getElementById('wfClose').onclick=chiudiMappa; }
-  document.getElementById('wfFrame').src='wayfinding.html?lang='+encodeURIComponent(uiLang())+(admin===true?'&admin=1':'');   // da Impostazioni = Configura (già protetto dal PIN del Concierge)
+  document.getElementById('wfFrame').src='wayfinding.html?lang='+encodeURIComponent(uiLang())+(admin===true?'&admin=1':'')+(goto?'&goto='+encodeURIComponent(goto):'');   // da Impostazioni = Configura; goto = mostra subito quel punto
   ov.style.display=''; resetInattivita();
+}
+/* L'AI ha risposto: se la domanda è "dove si trova X" e X è una destinazione della mappa, apre la mappa sul punto. TUTTO LOCALE: nessuna chiamata API extra. */
+function wfTryShowOnMap(domanda){
+  try{ const s=JSON.parse(localStorage.getItem('wayfind_proto_v5')||'null'); if(!s||!s._floors) return;
+    const q=(domanda||'').toLowerCase(); if(q.length<3) return;
+    if(!/dove|dov'|where|wo\b|wo ist|où|donde|dónde|где|哪|أين/i.test(q)) return;   // solo domande "dove…"
+    let best=null;
+    s._floors.forEach(fl=>(fl.dests||[]).forEach(d=>{
+      const forms=[d.name].concat(d.t?Object.keys(d.t).map(k=>d.t[k]):[]);
+      forms.forEach(f=>{ f=(''+(f||'')).toLowerCase(); if(f.length>=3 && q.indexOf(f)>=0 && (!best||f.length>best.L)) best={name:d.name,L:f.length}; });
+    }));
+    if(best) setTimeout(()=>{ try{ apriMappa(false, best.name); }catch(_){} }, 1800);   // dopo la risposta vocale, mostra la strada
+  }catch(_){}
 }
 function chiudiMappa(){ const ov=document.getElementById('wfPageOverlay'); if(ov)ov.style.display='none'; const f=document.getElementById('wfFrame'); if(f)f.src='about:blank'; aggiornaBtnMappa(); resetInattivita(); }   // dopo la config, mostra/aggiorna subito il bottone Mappa
 
