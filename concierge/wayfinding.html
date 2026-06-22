@@ -382,8 +382,13 @@ function renderFloors(){ const box=document.getElementById('floors'); if(!box)re
   if(S._floors.length<=1 && mode!=='admin'){ box.classList.add('hidden'); box.innerHTML=''; return; }
   box.classList.remove('hidden');
   let html=S._floors.map((f,i)=>'<button class="'+(i===S._fi?'on':'')+'" onclick="switchFloor('+i+')" ondblclick="renameFloor('+i+')">'+esc(f.name||('Piano '+(i+1)))+'</button>').join('');
-  if(mode==='admin') html+='<button class="addf" onclick="addFloor()">＋ Piano</button>';
+  if(mode==='admin'){ html+='<button class="addf" onclick="addFloor()">＋ Piano</button>';
+    if(S._floors.length>1) html+='<button class="addf" onclick="deleteFloor()" style="color:#e08a8a">'+svgIco('trash',14)+' Elimina piano</button>'; }
   box.innerHTML=html; }
+function deleteFloor(){ if(S._floors.length<=1){ alert('Deve restare almeno un piano.'); return; }
+  const nm=S._floors[S._fi].name||('Piano '+(S._fi+1));
+  if(!confirm('Eliminare il piano "'+nm+'"? I suoi punti, percorsi e piantina verranno persi.')) return;
+  S._floors.splice(S._fi,1); applyFloor(Math.max(0,S._fi-1)); clearRoute(); zoomReset(); save(); render(); }
 function floorAppear(){ const mw=document.getElementById('mapwrap'); if(!mw)return; mw.style.animation='none'; void mw.offsetWidth; mw.style.animation='floorIn .55s ease'; }
 function switchFloor(i){ if(i===S._fi)return; S._floors[S._fi]=snap(); applyFloor(i); clearRoute(); zoomReset(); render(); floorAppear(); }
 function addFloor(){ S._floors[S._fi]=snap(); S._floors.push({name:'Piano '+(S._floors.length+1), img:null,imgW:null,imgH:null,showBg:false, nodes:[],edges:[],dests:[],here:null}); applyFloor(S._floors.length-1); clearRoute(); zoomReset(); save(); render(); alert('Nuovo piano vuoto creato. Premi "Importa piantina" per caricare la mappa di QUESTO piano.'); }
