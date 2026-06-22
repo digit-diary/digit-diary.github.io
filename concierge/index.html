@@ -958,6 +958,7 @@
         <label class="btn-import" for="fileMappa" style="display:none">Importa piantina</label>
         <button type="button" class="btn-import" onclick="apriMappa(true)">Apri mappa interattiva (percorsi) &#10142;</button>
         <div class="hint"><b>Tutto si configura QUI DENTRO:</b> premi il bottone qui sopra → si apre già in <b>Configura</b> → premi <b>Importa piantina</b> (per ogni piano), poi metti <b>"Tu sei qui"</b> e le <b>destinazioni</b>. ⚠️ <b>Non importare la piantina altrove:</b> la mappa interattiva usa il suo import interno. La lingua segue la home; il bottone <b>Mappa</b> appare agli ospiti quando ci sono destinazioni.</div>
+        <label style="display:block;margin-top:10px"><input type="checkbox" id="mapOn" checked style="width:auto;margin-right:8px" onchange="setMapOn(this.checked)"> Mostra il bottone <b>Mappa</b> agli ospiti</label>
         <div class="media-list" id="mappaGrid" style="display:none"></div>
         <div class="media-empty" id="mappaEmpty" style="display:none"></div>
       </div>
@@ -3014,7 +3015,7 @@ avviaSfondo();                                                    // sfondo medi
 $('btnFull').innerHTML = ICON.full;
 $('btnGear').innerHTML = ICON.gear;
 $('btnTrad').innerHTML = ICON.translate;
-$('btnMap').innerHTML = ICON.map; aggiornaBtnMappa();
+$('btnMap').innerHTML = ICON.map; if($('mapOn')) $('mapOn').checked = localStorage.getItem('concierge_map_on')!=='0'; aggiornaBtnMappa();
 $('mapImg').addEventListener('click', function(){ _mapZoom=!_mapZoom; this.style.transform=_mapZoom?'scale(2)':''; this.style.cursor=_mapZoom?'zoom-out':'zoom-in'; });
 // Icone professionali nel pannello impostazioni (niente emoji)
 $('hImpost').innerHTML   = ICON.gear   + '<span>Impostazioni</span>';
@@ -3410,7 +3411,8 @@ if(!localStorage.getItem(KEY_LS)) setTimeout(apriSettings, 600);
 
 /* ===== WAYFINDING: il bottone "Mappa" apre la pagina interattiva (wayfinding.html, stesso dominio → lingua e dati condivisi). Override additivo. ===== */
 function wfHasData(){ try{ const s=JSON.parse(localStorage.getItem('wayfind_proto_v5')||'null'); return !!(s&&s._floors&&s._floors.some(f=>f&&f.dests&&f.dests.length)); }catch(_){ return false; } }
-function aggiornaBtnMappa(){ if($('btnMap')) $('btnMap').style.display = wfHasData() ? '' : 'none'; }   // mostra Mappa quando il wayfinding ha destinazioni
+function aggiornaBtnMappa(){ const on=localStorage.getItem('concierge_map_on')!=='0'; if($('btnMap')) $('btnMap').style.display = (wfHasData()&&on) ? '' : 'none'; }   // mostra Mappa se ci sono destinazioni E l'opzione è attiva
+function setMapOn(v){ localStorage.setItem('concierge_map_on', v?'1':'0'); aggiornaBtnMappa(); }
 async function apriMappa(admin, goto){
   let ov=document.getElementById('wfPageOverlay');
   if(!ov){ ov=document.createElement('div'); ov.id='wfPageOverlay';

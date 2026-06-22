@@ -101,6 +101,9 @@
   .icoGrid button.on{border-color:var(--oro);background:rgba(232,213,163,.16);color:var(--oro)}
   .icoGrid svg{width:20px;height:20px}
   .cardRow{display:flex;gap:8px;justify-content:space-between}
+  /* adattamento a qualsiasi schermo */
+  @media (min-width:1500px){ h1{font-size:26px} .dest button{font-size:19px;padding:12px 20px} .dest button svg{width:22px;height:22px} button.b{font-size:15px} .askbar input{font-size:19px;padding:14px 20px} .chips button{font-size:15px} .card .cn{font-size:19px} }
+  @media (max-width:560px){ h1{font-size:17px} .sub{font-size:11px} .dest button{font-size:13px;padding:8px 12px} .askbar input{font-size:14px} .card{max-width:78vw} .bar{gap:5px} }
 </style></head>
 <body>
   <h1 id="ttl">Wayfinding</h1>
@@ -393,7 +396,11 @@ function toggleAcc(){ accessible=!accessible; const b=document.getElementById('a
   if(activeDest){ const d=S.dests.find(x=>x.id===activeDest); if(d)showRoute(d); } }
 function applyViewBox(){ const W=(S.img&&S.imgW)?S.imgW:1000, H=(S.img&&S.imgH)?S.imgH:700;
   svg.setAttribute('viewBox','0 0 '+W+' '+H);
-  const mw=document.getElementById('mapwrap'); if(mw) mw.style.aspectRatio=W+'/'+H;
+  const mw=document.getElementById('mapwrap');
+  if(mw){ mw.style.aspectRatio=W+'/'+H;
+    const availW=window.innerWidth*0.96, availH=window.innerHeight*(window.innerHeight>window.innerWidth?0.66:0.74);
+    let w=Math.min(availW, 1600); let h=w*H/W; if(h>availH){ h=availH; w=h*W/H; }   // adatta a QUALSIASI schermo mantenendo le proporzioni
+    mw.style.width=Math.round(w)+'px'; mw.style.maxWidth='none'; }
   ['bgImg','bgTint'].forEach(id=>{const e=document.getElementById(id); if(e){e.setAttribute('width',W);e.setAttribute('height',H);}});
   svg.querySelectorAll(':scope > rect[fill^="url"]').forEach(r=>{r.setAttribute('width',W);r.setAttribute('height',H);}); }
 function applyView(){ document.getElementById('viewport').setAttribute('transform','translate('+view.tx+' '+view.ty+') scale('+view.s+')'); }
@@ -634,6 +641,7 @@ function importConfig(e){ const f=e.target.files[0]; if(!f)return; const r=new F
 
 /* ===== AVVIO ===== */
 render();
+window.addEventListener('resize', applyViewBox);   // adatta la mappa a qualsiasi schermo, anche su rotazione/ridimensionamento
 if(new URLSearchParams(location.search).get('admin')==='1') setMode('admin');   // aperto da Impostazioni del Concierge → Configura diretta
 const _goto=new URLSearchParams(location.search).get('goto');                   // l'AI chiede di mostrare un punto
 setTimeout(()=>{ if(mode==='guest'){ if(_goto) gotoDest(_goto); else resetIdle(); } },700);
