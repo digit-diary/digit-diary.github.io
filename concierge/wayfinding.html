@@ -546,29 +546,40 @@ function lung(p){let l=0;for(let i=1;i<p.length;i++)l+=Math.hypot(p[i].x-p[i-1].
 function puntoA(p,t){const tot=lung(p);let tg=t*tot,acc=0;for(let i=1;i<p.length;i++){const s=Math.hypot(p[i].x-p[i-1].x,p[i].y-p[i-1].y);if(acc+s>=tg){const k=s?(tg-acc)/s:0;return{x:p[i-1].x+(p[i].x-p[i-1].x)*k,y:p[i-1].y+(p[i].y-p[i-1].y)*k};}acc+=s;}return p[p.length-1];}
 function angleA(p,t){const a=puntoA(p,Math.max(0,t-0.01)),b=puntoA(p,Math.min(1,t+0.01));return Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI;}
 function clearRoute(){routeEl.setAttribute('d','');flowEl.setAttribute('d','');hintG.innerHTML='';arrowG.innerHTML='';dot.classList.add('hidden');if(anim)cancelAnimationFrame(anim);
-  document.getElementById('card').classList.remove('on');hideBanner();activeDest=null; }
+  document.getElementById('card').classList.remove('on');hideBanner();stopCross();activeDest=null; }
 /* ===== Percorso tra piani diversi (via ascensore/scala) ===== */
 function floorElevator(fi, pt){ const fl=S._floors[fi]; if(!fl||!fl.dests)return null;
   const ev=fl.dests.filter(d=>d.ic==='elevator'||d.ic==='stairs'); if(!ev.length)return null;
   if(!pt)return ev[0]; let b=ev[0],bd=1e9; ev.forEach(e=>{const dd=Math.hypot(e.x-pt.x,e.y-pt.y);if(dd<bd){bd=dd;b=e;}}); return b; }
 function otherFloorMatches(){ if(!S._floors||S._floors.length<2)return []; const q=query.toLowerCase(); const res=[];
   S._floors.forEach((fl,fi)=>{ if(fi===S._fi)return; (fl.dests||[]).forEach(d=>{ if((!filterCat||catOf(d.ic)===filterCat)&&(!q||d.name.toLowerCase().includes(q)||displayName(d).toLowerCase().includes(q))) res.push({d,fi,fname:fl.name||('Piano '+(fi+1))}); }); }); return res; }
+let _crossTimer=null;
+function stopCross(){ if(_crossTimer){ clearTimeout(_crossTimer); _crossTimer=null; } }
 function goCross(targetFi, destId){
   if(targetFi===S._fi){ const d=S.dests.find(x=>x.id===destId); if(d)showRoute(d); return; }
-  const evHere=floorElevator(S._fi, S.here); const targetName=(S._floors[targetFi].name)||('Piano '+(targetFi+1));
-  if(evHere) showRoute(evHere);
-  showBanner(svgIco('elevator',18)+'<span>'+cf('up')+' '+esc(targetName)+'</span>', cf('cont')+' →', ()=>{
+  const originFi=S._fi;
+  const tName=(S._floors[targetFi].name)||('Piano '+(targetFi+1));
+  const oName=(S._floors[originFi].name)||('Piano '+(originFi+1));
+  function phaseUp(){    // piano di partenza → ascensore/scala
+    if(S._fi!==originFi){ S._floors[S._fi]=snap(); applyFloor(originFi); render(); floorAppear(); }
+    const ev=floorElevator(originFi, S.here); if(ev) showRoute(ev); else clearRoute();
+    showBanner(svgIco('elevator',18)+'<span>'+cf('up')+' '+esc(tName)+' — '+esc(oName)+'</span>','',null);
+    _crossTimer=setTimeout(phaseTo, 4500);
+  }
+  function phaseTo(){    // piano destinazione: ascensore → meta
     S._floors[S._fi]=snap(); applyFloor(targetFi); render(); floorAppear();
     const evT=floorElevator(targetFi,null), d=S.dests.find(x=>x.id===destId);
     if(d) showRoute(d, evT?{x:evT.x,y:evT.y}:null);
-    showBanner(svgIco('elevator',18)+'<span>'+esc(targetName)+'</span>','',null);   // conferma: sei al piano X
-  });
+    showBanner(svgIco('elevator',18)+'<span>'+esc(tName)+'</span>','',null);
+    _crossTimer=setTimeout(phaseUp, 4500);
+  }
+  stopCross(); phaseUp();   // ciclo automatico Piano partenza ↔ Piano destinazione (animato)
 }
 function showBanner(html, btnText, fn){ const b=document.getElementById('banner'); if(!b)return;
   b.innerHTML=html+(btnText?' <button id="bannerBtn">'+btnText+'</button>':''); b.classList.add('on');
   const bb=document.getElementById('bannerBtn'); if(bb&&fn) bb.onclick=fn; }
 function hideBanner(){ const b=document.getElementById('banner'); if(b){b.classList.remove('on'); b.innerHTML='';} }
-function showRoute(d, fromPt){ hideBanner(); const from=fromPt||S.here; if(!from){alert('Imposta prima "Tu sei qui".');return;}
+function showRoute(d, fromPt){ hideBanner(); if(!fromPt)stopCross(); const from=fromPt||S.here; if(!from){alert('Imposta prima "Tu sei qui".');return;}
   activeDest=d.id; renderDests(); renderDestBtns();
   const pts=buildRoute(from,{x:d.x,y:d.y});
   hintG.innerHTML='<path class="corrHint" d="'+dPath(pts)+'"/>';
