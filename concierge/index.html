@@ -729,6 +729,7 @@
       <div id="qrBox"></div>
       <div class="qr-cap" id="qrCap"></div>
       <button class="qr-open" id="qrOpen" onclick="apriWeb()"></button>
+      <button class="qr-open" id="qrMap" style="display:none" onclick="apriMappaDaQR()"></button>
       <div class="qr-close" id="qrClose" onclick="chiudiQR()"></div>
     </div>
   </div>
@@ -2396,17 +2397,19 @@ function domandaRapida(i){
 }
 
 /* ===== SEZIONE 7 · QR (verso il sito ufficiale) ===== */
-let qrTimer = null, qrUrlCorrente = '';
+let qrTimer = null, qrUrlCorrente = '', qrMapTarget = '';
 const QR_CAP = {
   it:'Inquadra il codice col telefono o visita il sito', de:'Scannen Sie den Code oder besuchen Sie die Webseite',
   en:'Scan the code or visit the website',   fr:'Scannez le code ou visitez le site'
 };
 const QR_CLOSE = {it:'Tocca per chiudere',de:'Zum Schließen tippen',en:'Tap to close',fr:'Touchez pour fermer'};
 const QR_OPEN  = {it:'Apri la pagina sullo schermo',de:'Seite am Bildschirm öffnen',en:'Open the page on screen',fr:'Ouvrir la page à l\'écran'};
+const QR_MAP   = {it:'Apri la mappa',de:'Karte öffnen',en:'Open the map',fr:'Ouvrir le plan',es:'Abrir el mapa',ru:'Открыть карту',zh:'打开地图',ar:'افتح الخريطة'};
 const WEB_BACK = {it:'← Torna al concierge',de:'← Zurück zum Concierge',en:'← Back to concierge',fr:'← Retour au concierge'};
 
 function mostraQR(url, parla){
-  qrUrlCorrente = url;
+  qrUrlCorrente = url; qrMapTarget='';
+  if($('qrMap')) $('qrMap').style.display='none';
   const box = $('qrBox'); box.innerHTML='';
   if(typeof QRCode!=='undefined'){
     new QRCode(box, {text:url, width:240, height:240, colorDark:'#7d0826', colorLight:'#ffffff', correctLevel:QRCode.CorrectLevel.M});
@@ -2422,7 +2425,8 @@ function mostraQR(url, parla){
     rispondi(QR_CAP[lng], lng, '', ++richiestaId);
   }
 }
-function chiudiQR(){ $('qrModal').classList.remove('open'); clearTimeout(qrTimer); }
+function chiudiQR(){ $('qrModal').classList.remove('open'); clearTimeout(qrTimer); if($('qrMap')) $('qrMap').style.display='none'; }
+function apriMappaDaQR(){ const t=qrMapTarget; chiudiQR(); if(t){ try{ apriMappa(false, t); }catch(_){} } }
 
 // Apre la pagina web dentro l'app (iframe), con tasto "torna indietro"
 function apriWeb(){
@@ -3450,7 +3454,15 @@ function wfTryShowOnMap(domanda, isButton){
       forms.forEach(f=>{ f=(''+(f||'')).toLowerCase(); if(f.length>=3 && q.indexOf(f)>=0 && (!best||f.length>best.L)) best={name:d.name,L:f.length}; }); });
     if(!best){ const c=WF_CONCEPTS.find(c=>c.w.some(w=>q.indexOf(w)>=0));                       // 2) match intelligente per concetto (sinonimo o ICONA)
       if(c){ const d=allD.find(d=>{ const nm=(d.name||'').toLowerCase(); return c.ic.indexOf(d.ic)>=0 || c.w.some(w=>nm.indexOf(w)>=0); }); if(d) best={name:d.name}; } }
-    if(best) setTimeout(()=>{ try{ apriMappa(false, best.name); }catch(_){} }, 1800);            // dopo la risposta, apre la mappa sul punto
+    if(best){
+      const qrAperto = $('qrModal') && $('qrModal').classList.contains('open');
+      if(qrAperto){                                  // c'è un QR (es. Ristorante col sito): NON coprirlo → offri la scelta
+        qrMapTarget=best.name; const lng=uiLang(); const b=$('qrMap');
+        if(b){ b.textContent=(QR_MAP[lng]||QR_MAP.en); b.style.display=''; }
+      } else {
+        setTimeout(()=>{ try{ apriMappa(false, best.name); }catch(_){} }, 1800);                 // niente QR → apre la mappa sul punto
+      }
+    }
   }catch(_){}
 }
 function chiudiMappa(){ const ov=document.getElementById('wfPageOverlay'); if(ov)ov.style.display='none'; const f=document.getElementById('wfFrame'); if(f)f.src='about:blank'; aggiornaBtnMappa(); resetInattivita(); }   // dopo la config, mostra/aggiorna subito il bottone Mappa
