@@ -955,7 +955,8 @@
         <h3 style="margin-top:22px">Mappa dei piani (piantine)</h3>
         <input type="file" id="fileMappa" accept="image/*,application/pdf" multiple style="display:none" onchange="importaMappa(event)">
         <label class="btn-import" for="fileMappa">Importa piantina</label>
-        <div class="hint">Carica <b>immagine (JPG/PNG/SVG) o PDF</b> per ogni piano (es. Piano 0, 1, 2). Comparirà il bottone <b>Mappa</b> per gli ospiti, con selettore dei piani e zoom. Memoria del dispositivo.</div>
+        <button type="button" class="btn-import" style="margin-top:8px" onclick="apriMappa(true)">Apri mappa interattiva (percorsi) &#10142;</button>
+        <div class="hint"><b>Mappa interattiva (percorsi):</b> premi il bottone qui sopra. Dentro la mappa, per configurarla tieni premuto <b>l'angolo in alto a sinistra</b> e inserisci il PIN → <b>Configura</b> (importi piantina per piano, pin "tu sei qui", destinazioni, corridoi). La lingua segue la home. Il bottone <b>Mappa</b> appare agli ospiti quando ci sono destinazioni.</div>
         <div class="media-list" id="mappaGrid"></div>
         <div class="media-empty" id="mappaEmpty">Nessuna piantina caricata.</div>
       </div>
@@ -1039,7 +1040,7 @@
         </div>
 
         <h3 style="margin-top:22px">Sincronizzazione tra totem</h3>
-        <div class="hint"><b>Come funziona:</b> sul totem <b>Master</b> premi "Sincronizza ora" per <b>pubblicare</b> la configurazione. Poi su ogni totem <b>Ricevente</b> che vuoi aggiornare premi "Sincronizza ora" per <b>scaricarla</b>. Così scegli tu <b>se aggiornarne solo alcuni o tutti</b>. Si sincronizza la configurazione (contenuti, bottoni, testi, lingue, logo, comportamento, <b>PIN e modalità chiosco</b>) — <b>non</b> le chiavi API né la licenza (restano locali a ogni dispositivo). Così imposti <b>un unico PIN</b> sul Master e vale per tutti. Media/piantine vanno importati su ogni dispositivo.</div>
+        <div class="hint"><b>Come funziona:</b> sul totem <b>Master</b> premi "Sincronizza ora" per <b>pubblicare</b> la configurazione. Poi su ogni totem <b>Ricevente</b> che vuoi aggiornare premi "Sincronizza ora" per <b>scaricarla</b>. Così scegli tu <b>se aggiornarne solo alcuni o tutti</b>. Si sincronizza la configurazione (contenuti, bottoni, testi, lingue, logo, comportamento, <b>PIN e modalità chiosco</b>) — <b>non</b> le chiavi API né la licenza (restano locali a ogni dispositivo). Così imposti <b>un unico PIN</b> sul Master e vale per tutti. Media/piantine vanno importati su ogni dispositivo. <b>La mappa interattiva (percorsi) ora si sincronizza col gruppo</b> — solo il <b>"Tu sei qui"</b> resta locale a ogni totem.</div>
         <label>Nome gruppo <span style="opacity:.5">(lo stesso su tutti i totem che devono allinearsi)</span></label>
         <input id="syncGroup" type="text" placeholder="es. casino-lugano" autocomplete="off">
         <label>Ruolo di questo totem</label>
@@ -3402,6 +3403,43 @@ function sbloccaAudio(){
 resetInattivita();
 gateLicenza();                                                   // blocco licenza (solo su domini non autorizzati)
 if(!localStorage.getItem(KEY_LS)) setTimeout(apriSettings, 600);
+
+/* ===== WAYFINDING: il bottone "Mappa" apre la pagina interattiva (wayfinding.html, stesso dominio → lingua e dati condivisi). Override additivo. ===== */
+function wfHasData(){ try{ const s=JSON.parse(localStorage.getItem('wayfind_proto_v5')||'null'); return !!(s&&s._floors&&s._floors.some(f=>f&&f.dests&&f.dests.length)); }catch(_){ return false; } }
+function aggiornaBtnMappa(){ if($('btnMap')) $('btnMap').style.display = wfHasData() ? '' : 'none'; }   // mostra Mappa quando il wayfinding ha destinazioni
+async function apriMappa(admin){
+  let ov=document.getElementById('wfPageOverlay');
+  if(!ov){ ov=document.createElement('div'); ov.id='wfPageOverlay';
+    ov.style.cssText='position:fixed;inset:0;z-index:90;background:#0a0a0f;display:none';
+    ov.innerHTML='<button id="wfClose" title="Chiudi" style="position:fixed;top:12px;right:14px;z-index:91;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.3);background:rgba(20,16,30,.85);color:#fff;font-size:18px;cursor:pointer">&#10005;</button><iframe id="wfFrame" title="Mappa" style="width:100%;height:100%;border:0"></iframe>';
+    document.body.appendChild(ov); document.getElementById('wfClose').onclick=chiudiMappa; }
+  document.getElementById('wfFrame').src='wayfinding.html?lang='+encodeURIComponent(uiLang())+(admin===true?'&admin=1':'');   // da Impostazioni = Configura (già protetto dal PIN del Concierge)
+  ov.style.display=''; resetInattivita();
+}
+function chiudiMappa(){ const ov=document.getElementById('wfPageOverlay'); if(ov)ov.style.display='none'; const f=document.getElementById('wfFrame'); if(f)f.src='about:blank'; resetInattivita(); }
+
+/* ===== Sync della mappa interattiva: la config viaggia col gruppo (mirror 'concierge_wf'), il "TU SEI QUI" resta LOCALE a ogni totem. Override additivo. ===== */
+function gatherSyncConfig(){
+  try{ const w=JSON.parse(localStorage.getItem('wayfind_proto_v5')||'null');
+    if(w&&w._floors){ const m={company:w.company,_floors:w._floors.map(f=>Object.assign({},f,{here:null})),_fi:0}; localStorage.setItem('concierge_wf', JSON.stringify(m)); }   // mirror senza il verde
+  }catch(_){}
+  const o={}; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.indexOf('concierge_')===0 && SYNC_SKIP.indexOf(k)<0) o[k]=localStorage.getItem(k); } return o;
+}
+function applyRemoteConfig(dati, ver){
+  const toDel=[]; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.indexOf('concierge_')===0 && SYNC_SKIP.indexOf(k)<0) toDel.push(k); }
+  toDel.forEach(k=>localStorage.removeItem(k));
+  Object.keys(dati||{}).forEach(k=>{ if(k.indexOf('concierge_')===0 && SYNC_SKIP.indexOf(k)<0) localStorage.setItem(k, dati[k]); });
+  try{ const remote=JSON.parse(localStorage.getItem('concierge_wf')||'null');                 // ricostruisci il wayfinding dal mirror...
+    if(remote&&remote._floors){ let local=null; try{ local=JSON.parse(localStorage.getItem('wayfind_proto_v5')||'null'); }catch(_){}
+      const lh=(local&&local._floors)?local._floors.map(f=>f&&f.here):[];                      // ...mantenendo il "TU SEI QUI" di QUESTO totem
+      const merged={company:remote.company,_floors:remote._floors.map((f,i)=>Object.assign({},f,{here:(lh[i]||null)})),_fi:0};
+      if(local&&local.pin) merged.pin=local.pin;
+      localStorage.setItem('wayfind_proto_v5', JSON.stringify(merged));
+    }
+  }catch(_){}
+  localStorage.setItem('concierge_sync_ver', String(ver));
+  location.reload();
+}
 </script>
 </body>
 </html>

@@ -1,0 +1,580 @@
+<!doctype html><html lang="it"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wayfinding Pro · Concierge (white-label)</title>
+<style>
+  :root{--oro:#e8d5a3;--bg1:#241f33;--bg2:#0a0a0f}
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(ellipse at 50% 25%,var(--bg1),var(--bg2) 75%);color:#fff;
+       font-family:-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:14px 12px 36px}
+  h1{font-weight:300;letter-spacing:1px;font-size:19px;margin:2px 0;color:var(--oro)}
+  .sub{opacity:.5;font-size:12px;margin-bottom:10px;text-align:center;max-width:780px}
+  .bar{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;align-items:center;margin-bottom:8px;max-width:920px}
+  .bar input[type=text]{background:rgba(255,255,255,.06);border:1px solid rgba(232,213,163,.4);color:#fff;padding:8px 12px;border-radius:20px;font-size:14px;min-width:150px;text-align:center}
+  select.lang{background:rgba(255,255,255,.06);border:1px solid rgba(232,213,163,.4);color:#fff;padding:8px 10px;border-radius:20px;font-size:14px}
+  button.b{display:inline-flex;align-items:center;gap:6px;background:rgba(232,213,163,.08);border:1.3px solid rgba(232,213,163,.5);color:#fff;padding:8px 13px;border-radius:22px;font-size:13px;cursor:pointer;transition:.18s}
+  button.b:hover{background:rgba(232,213,163,.2);border-color:var(--oro)}
+  button.b.on{background:var(--oro);color:#1a1622;border-color:var(--oro);font-weight:600}
+  button.b svg{width:16px;height:16px}
+  .seg{display:inline-flex;gap:4px;background:rgba(0,0,0,.25);padding:4px;border-radius:24px;border:1px solid rgba(255,255,255,.08)}
+  .seg button{display:inline-flex;align-items:center;gap:6px;border:none;background:transparent;color:#fff;padding:7px 14px;border-radius:20px;cursor:pointer;font-size:13px}
+  .seg button.on{background:var(--oro);color:#1a1622;font-weight:600}
+  .seg button svg{width:16px;height:16px}
+  .tools{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;align-items:center;margin-bottom:8px;max-width:920px}
+  .tools button{font-size:12.5px;padding:7px 11px}
+  .badge{font-size:11px;opacity:.5;align-self:center}
+  /* ricerca + chip (ospite) */
+  .askwrap{display:flex;flex-direction:column;align-items:center;gap:7px;margin-bottom:9px;width:min(94vw,760px)}
+  .askbar{display:flex;gap:8px;width:100%;align-items:center}
+  .askbar input{flex:1;background:rgba(255,255,255,.07);border:1px solid rgba(232,213,163,.4);color:#fff;padding:11px 16px;border-radius:26px;font-size:15px}
+  .mic{flex:none;width:44px;height:44px;border-radius:50%;border:1.3px solid rgba(232,213,163,.5);background:rgba(232,213,163,.08);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .mic.rec{background:#c0392b;border-color:#c0392b;animation:micp 1s infinite}
+  .mic.acton{background:var(--oro);color:#1a1622;border-color:var(--oro)}
+  .floors{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:9px}
+  .floors button{font-size:13px;padding:7px 14px;border-radius:18px;border:1px solid rgba(232,213,163,.35);background:rgba(255,255,255,.05);color:#cdbf9e;cursor:pointer}
+  .floors button.on{background:var(--oro);color:#1a1622;border-color:var(--oro);font-weight:600}
+  .floors button.addf{color:var(--oro)}
+  @keyframes micp{50%{box-shadow:0 0 0 6px rgba(192,57,43,.3)}}
+  .mic svg{width:20px;height:20px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+  .chips button{font-size:12.5px;padding:6px 12px;border-radius:16px;border:1px solid rgba(232,213,163,.3);background:transparent;color:#cdbf9e;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+  .chips button.on{background:var(--oro);color:#1a1622;border-color:var(--oro);font-weight:600}
+  .chips svg{width:14px;height:14px}
+  .dest{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:840px;margin-bottom:10px}
+  .dest button{display:inline-flex;align-items:center;gap:8px;background:rgba(232,213,163,.08);border:1.3px solid rgba(232,213,163,.5);color:#fff;padding:9px 15px;border-radius:26px;font-size:14.5px;cursor:pointer;transition:.2s}
+  .dest button svg{width:18px;height:18px}
+  .dest button:hover,.dest button.on{background:rgba(232,213,163,.22);border-color:var(--oro)}
+  .mapwrap{position:relative;width:min(94vw,860px);aspect-ratio:10/7;background:#15131d;border:1px solid rgba(232,213,163,.25);border-radius:16px;overflow:hidden;box-shadow:0 18px 50px rgba(0,0,0,.5)}
+  svg.map{width:100%;height:100%;display:block;touch-action:none}
+  .zone{fill:url(#zoneGrad);stroke:rgba(232,213,163,.22);stroke-width:1.5;filter:drop-shadow(0 6px 16px rgba(0,0,0,.45))}
+  .zoneLbl{fill:#9a8fb5;font-size:14px;text-anchor:middle;font-weight:500;letter-spacing:2px}
+  #bgImg{filter:saturate(.55) brightness(.5) contrast(1.05)}
+  .edge{stroke:#3d6fa5;stroke-width:3;stroke-linecap:round;opacity:.7}
+  .node{fill:#4aa3ff;stroke:#fff;stroke-width:1.5;cursor:pointer}
+  .node.sel{fill:#fff;stroke:#4aa3ff;stroke-width:3}
+  .corrHint{stroke:#2c2638;stroke-width:14;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .route{stroke:var(--oro);stroke-width:6;fill:none;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 7px rgba(232,213,163,.9))}
+  .route-flow{stroke:#fff7e0;stroke-width:2.6;fill:none;stroke-linecap:round;stroke-dasharray:2 17;animation:flow 1s linear infinite}
+  @keyframes flow{to{stroke-dashoffset:-19}}
+  .chev{stroke:#fff;stroke-width:2.4;fill:none;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
+  .dot{fill:#fff;filter:drop-shadow(0 0 9px var(--oro))}
+  .pin{cursor:pointer}
+  .pin .pinBody{fill:var(--oro);stroke:#1a1622;stroke-width:1;filter:drop-shadow(0 3px 7px rgba(0,0,0,.55))}
+  .pinIcon{stroke:#1a1622;stroke-width:2.3;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .pin.active .pinBody{fill:#fff;animation:pinPulse 1.2s ease-in-out infinite}
+  @keyframes pinPulse{0%,100%{filter:drop-shadow(0 0 0 rgba(232,213,163,.7))}50%{filter:drop-shadow(0 0 14px rgba(232,213,163,1))}}
+  .pin.dim{opacity:.28}
+  .pinTxt{fill:#fff;font-size:12.5px;text-anchor:middle;font-weight:600;paint-order:stroke;stroke:#1a1622;stroke-width:3px}
+  .here{fill:#3ad07a;stroke:#fff;stroke-width:2}
+  .here-ring{fill:none;stroke:#3ad07a;stroke-width:2;opacity:.7;animation:hereP 1.7s ease-out infinite}
+  @keyframes hereP{0%{r:11;opacity:.7}100%{r:30;opacity:0}}
+  .here-tag{fill:#fff;font-size:11.5px;text-anchor:middle;font-weight:700;paint-order:stroke;stroke:#1a1622;stroke-width:3px}
+  /* logo + zoom + card sopra la mappa */
+  .logo{position:absolute;top:12px;left:14px;color:var(--oro);font-size:15px;font-weight:500;letter-spacing:.5px;text-shadow:0 2px 8px rgba(0,0,0,.7);pointer-events:none}
+  .wfbanner{position:absolute;top:12px;left:50%;transform:translateX(-50%);max-width:84%;background:rgba(20,16,30,.93);border:1px solid var(--oro);color:#fff;padding:9px 14px;border-radius:22px;display:none;align-items:center;gap:10px;font-size:14px;z-index:6;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+  .wfbanner.on{display:flex}
+  .wfbanner svg{width:18px;height:18px;stroke:var(--oro);flex:none}
+  .wfbanner button{background:var(--oro);color:#1a1622;border:none;border-radius:16px;padding:6px 12px;font-weight:600;cursor:pointer;flex:none}
+  @keyframes floorIn{from{opacity:0;filter:blur(7px)}to{opacity:1;filter:none}}
+  .zoomctl{position:absolute;right:12px;bottom:12px;display:flex;flex-direction:column;gap:6px}
+  .zoomctl button{width:38px;height:38px;border-radius:10px;border:1px solid rgba(232,213,163,.4);background:rgba(20,16,30,.8);color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .card{position:absolute;left:12px;bottom:12px;max-width:300px;background:rgba(20,16,30,.92);border:1px solid rgba(232,213,163,.4);border-radius:14px;padding:12px 14px;display:none;align-items:center;gap:12px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+  .card.on{display:flex}
+  .card .ci{width:46px;height:46px;border-radius:50%;background:var(--oro);color:#1a1622;display:flex;align-items:center;justify-content:center;flex:none}
+  .card .ci svg{width:24px;height:24px;stroke:#1a1622;stroke-width:2.2;fill:none}
+  .card .cn{font-size:16px;font-weight:600}
+  .card .cs{font-size:12.5px;opacity:.65}
+  .card .cd{font-size:13px;color:var(--oro);margin-top:3px;display:flex;align-items:center;gap:5px}
+  .card .cd svg{width:14px;height:14px}
+  .note{opacity:.5;font-size:11.5px;margin-top:11px;text-align:center;max-width:780px;line-height:1.5}
+  .hidden{display:none!important}
+  #pinCorner{position:fixed;top:0;left:0;width:64px;height:64px;z-index:40}
+  .ov{position:fixed;inset:0;background:rgba(8,6,14,.7);display:none;align-items:center;justify-content:center;z-index:20}
+  .ov.on{display:flex}
+  .cardE{background:#1b1726;border:1px solid rgba(232,213,163,.35);border-radius:16px;padding:18px;width:min(92vw,380px)}
+  .cardE h3{margin:0 0 12px;color:var(--oro);font-weight:500;font-size:16px}
+  .cardE input{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(232,213,163,.4);color:#fff;padding:10px 12px;border-radius:10px;font-size:15px;margin-bottom:12px}
+  .catTabs{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+  .catTabs button{font-size:11.5px;padding:5px 9px;border-radius:14px;border:1px solid rgba(232,213,163,.3);background:transparent;color:#cdbf9e;cursor:pointer}
+  .catTabs button.on{background:var(--oro);color:#1a1622;border-color:var(--oro);font-weight:600}
+  .icoGrid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:14px}
+  .icoGrid button{background:rgba(255,255,255,.05);border:1.4px solid transparent;border-radius:10px;padding:8px 0;cursor:pointer;color:#cdbf9e;display:flex;justify-content:center}
+  .icoGrid button.on{border-color:var(--oro);background:rgba(232,213,163,.16);color:var(--oro)}
+  .icoGrid svg{width:20px;height:20px}
+  .cardRow{display:flex;gap:8px;justify-content:space-between}
+</style></head>
+<body>
+  <h1 id="ttl">Wayfinding</h1>
+  <div class="sub" id="sub">Prototipo white-label · personalizzabile per ogni azienda</div>
+
+  <div id="pinCorner" title="Admin"></div>
+  <div class="bar">
+    <span class="seg adminOnly">
+      <button id="mGuest" class="on" data-ic="eye" onclick="setMode('guest')"></button>
+      <button id="mAdmin" data-ic="gear" onclick="setMode('admin')"></button>
+    </span>
+    <select class="lang adminOnly" id="lang" onchange="setLang(this.value)" title="Nel Concierge la lingua arriva dalla home">
+      <option value="it">IT</option><option value="en">EN</option><option value="de">DE</option><option value="fr">FR</option><option value="es">ES</option><option value="ru">RU</option><option value="zh">ZH</option><option value="ar">AR</option>
+    </select>
+    <input type="text" id="company" class="adminOnly" oninput="onCompany()">
+    <label class="b adminOnly" id="lblImport" for="fileMap" data-ic="image"></label>
+    <input type="file" id="fileMap" accept="image/*" class="hidden" onchange="importMap(event)">
+    <button class="b adminOnly" id="btnBg" onclick="toggleBg()"></button>
+    <button class="b adminOnly" id="btnDemo" data-ic="sparkle" onclick="loadCasino()"></button>
+    <button class="b adminOnly" id="btnPin" data-ic="key" data-lbl="PIN" onclick="changePin()"></button>
+    <button class="b adminOnly" id="btnExport" data-ic="download" data-lbl="Esporta (master)" onclick="exportConfig()"></button>
+    <label class="b adminOnly" id="lblImpCfg" for="fileCfg" data-ic="kiosk" data-lbl="Scarica su kiosk"></label>
+    <input type="file" id="fileCfg" accept="application/json" class="hidden" onchange="importConfig(event)">
+    <button class="b adminOnly" id="btnReset" data-ic="reset" onclick="resetAll()"></button>
+  </div>
+
+  <!-- Strumenti admin -->
+  <div class="tools hidden" id="adminTools">
+    <span class="badge">SEMPLICE:</span>
+    <button class="b on" data-tool="dest" data-ic="pin"  onclick="setTool('dest')"></button>
+    <button class="b"    data-tool="here" data-ic="here" onclick="setTool('here')"></button>
+    <span class="badge">CORRIDOI (opz.):</span>
+    <button class="b"    data-tool="node" data-ic="dot"  onclick="setTool('node')"></button>
+    <button class="b"    data-tool="link" data-ic="link" onclick="setTool('link')"></button>
+    <button class="b"    data-ic="sparkle" onclick="autoLink()" id="btnAuto"></button>
+    <button class="b"    data-tool="del"  data-ic="trash" onclick="setTool('del')"></button>
+  </div>
+  <div class="tools hidden" id="adminHint"><span class="badge" id="hintTxt" style="opacity:.8;color:var(--oro)"></span></div>
+
+  <!-- Ricerca + voce + filtri (ospite) -->
+  <div class="askwrap" id="askwrap">
+    <div class="askbar">
+      <input type="text" id="ask" oninput="onSearch()" onkeydown="if(event.key==='Enter')askGo()">
+      <button class="mic" id="mic" onclick="micToggle()" title="Voce"></button>
+      <button class="mic" id="acc" onclick="toggleAcc()" title="Percorso accessibile"></button>
+    </div>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <div class="floors hidden" id="floors"></div>
+  <div class="dest" id="destBtns"></div>
+
+  <div class="mapwrap" id="mapwrap">
+    <div class="logo" id="logo"></div>
+    <div class="wfbanner" id="banner"></div>
+    <svg id="svg" class="map" viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <radialGradient id="zoneGrad" cx="50%" cy="32%" r="80%"><stop offset="0%" stop-color="#2c2543"/><stop offset="100%" stop-color="#191525"/></radialGradient>
+        <radialGradient id="vign" cx="50%" cy="28%" r="85%"><stop offset="0%" stop-color="#241f33"/><stop offset="100%" stop-color="#0b0910"/></radialGradient>
+        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#fff" stroke-opacity=".03" stroke-width="1"/></pattern>
+      </defs>
+      <rect x="0" y="0" width="1000" height="700" fill="url(#vign)"/>
+      <rect x="0" y="0" width="1000" height="700" fill="url(#grid)"/>
+      <g id="viewport">
+        <image id="bgImg" class="hidden" x="0" y="0" width="1000" height="700" preserveAspectRatio="xMidYMid slice"/>
+        <rect id="bgTint" class="hidden" x="0" y="0" width="1000" height="700" fill="#15102a" opacity=".45"/>
+        <g id="gDemo"></g>
+        <g id="gEdges"></g>
+        <g id="gRouteHint"></g>
+        <path class="route" id="route" d=""/>
+        <path class="route-flow" id="routeFlow" d=""/>
+        <g id="gArrows"></g>
+        <circle class="dot hidden" id="dot" r="7"/>
+        <g id="gNodes"></g>
+        <g id="gDests"></g>
+        <g id="gHere"></g>
+      </g>
+    </svg>
+    <div class="card" id="card">
+      <div class="ci" id="cardIc"></div>
+      <div><div class="cn" id="cardName"></div><div class="cs" id="cardSub"></div><div class="cd" id="cardDist"></div></div>
+    </div>
+  </div>
+
+  <div class="note" id="footNote"></div>
+
+  <!-- Editor destinazione -->
+  <div class="ov" id="ov"><div class="cardE">
+    <h3 id="ovTitle">Destinazione</h3>
+    <input type="text" id="ovName" placeholder="Nome">
+    <div class="catTabs" id="ovCats"></div>
+    <div class="icoGrid" id="ovIcons"></div>
+    <div class="cardRow">
+      <button class="b" data-ic="trash" data-lbl="Elimina" onclick="ovDelete()"></button>
+      <span style="flex:1"></span>
+      <button class="b" data-lbl="Annulla" onclick="ovClose()"></button>
+      <button class="b on" data-lbl="Salva" onclick="ovSave()"></button>
+    </div>
+  </div></div>
+
+<script>
+/* ===== ICONE SVG (currentColor) ===== */
+const ICON={
+  pin:'<path d="M12 22c4-5 7-8.4 7-12A7 7 0 1 0 5 10c0 3.6 3 7 7 12z"/><circle cx="12" cy="10" r="2.6"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="7.7" r="1.1"/>',
+  star:'<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 17l-5.2 2.6 1-5.8L3.5 9.7l5.9-.9z"/>',
+  gift:'<rect x="4" y="10" width="16" height="10" rx="1.5"/><path d="M3 10h18M12 10v10"/><path d="M12 10c-1-3.6-5-3.6-5-1S9.5 10 12 10zm0 0c1-3.6 5-3.6 5-1S14.5 10 12 10z"/>',
+  cup:'<path d="M6 8h11v4.5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z"/><path d="M17 9h1.8a2.2 2.2 0 0 1 0 4.4H17"/><path d="M7 21h9"/>',
+  bag:'<path d="M6.5 8h11l-1 12h-9z"/><path d="M9 8a3 3 0 0 1 6 0"/>',
+  cash:'<rect x="3" y="6" width="18" height="12" rx="1.5"/><circle cx="12" cy="12" r="3"/><path d="M6.5 9v6M17.5 9v6"/>',
+  ticket:'<rect x="3" y="7" width="18" height="10" rx="2"/><path d="M9 7v10"/>',
+  door:'<rect x="6" y="3" width="12" height="18" rx="1"/><circle cx="14.5" cy="12" r="1"/>',
+  elevator:'<rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 10l1.5-2 1.5 2M13 14l1.5 2 1.5-2"/>',
+  calendar:'<rect x="4" y="5" width="16" height="15" rx="1.5"/><path d="M4 9.5h16M8 3v4M16 3v4"/>',
+  game:'<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.1"/><circle cx="15" cy="9" r="1.1"/><circle cx="9" cy="15" r="1.1"/><circle cx="15" cy="15" r="1.1"/><circle cx="12" cy="12" r="1.1"/>',
+  food:'<path d="M6 3v6a2 2 0 0 0 4 0V3M8 3v18"/><path d="M16 3c-1.6.7-2.2 3-2.2 5.2 0 1.8.7 2.8 2.2 3.2V21"/>',
+  wc:'<circle cx="8" cy="4.5" r="1.7"/><path d="M6 21l1.2-7H6l1-4.2A1.4 1.4 0 0 1 9.4 9.8L10.4 14H9l1 7"/><circle cx="16" cy="4.5" r="1.7"/><path d="M14 21l1.4-6h1.2L18 21M16 8.8l-2 5h4z"/>',
+  exit:'<path d="M13 4H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h7"/><path d="M10 12h10M16 8l4 4-4 4"/>',
+  stairs:'<path d="M4 20h4v-4h4v-4h4v-4h4"/>',
+  parking:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 17V8h3.6a2.6 2.6 0 0 1 0 5.2H9"/>',
+  wifi:'<path d="M4.5 11a11 11 0 0 1 15 0"/><path d="M7.5 14a7 7 0 0 1 9 0"/><circle cx="12" cy="17.5" r="1.2"/>',
+  phone:'<path d="M5 4h3.5l1.8 4.5-2.3 1.4a11 11 0 0 0 4.6 4.6l1.4-2.3L18 16v3.4A1.6 1.6 0 0 1 16.4 21 14 14 0 0 1 3 7.6 1.6 1.6 0 0 1 4.6 6z"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5.2l3.2 2"/>',
+  slot:'<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9v6M12 9v6M16 9v6"/>',
+  chips:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.2"/><path d="M12 4v3M12 17v3M4 12h3M17 12h3"/>',
+  cards:'<rect x="4" y="6" width="9" height="12" rx="1.5" transform="rotate(-9 8.5 12)"/><rect x="11" y="6" width="9" height="12" rx="1.5" transform="rotate(9 15.5 12)"/>',
+  trophy:'<path d="M8 4h8v4a4 4 0 0 1-8 0z"/><path d="M8 6H5.5a2 2 0 0 0 0 4H7M16 6h2.5a2 2 0 0 1 0 4H17M10 20h4M11.5 13h1v4h-1zM9.5 20h5v1h-5z"/>',
+  building:'<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2"/>',
+  meeting:'<circle cx="8" cy="9" r="2.2"/><circle cx="16" cy="9" r="2.2"/><path d="M3.5 18a4.5 4.5 0 0 1 9 0M11.5 18a4.5 4.5 0 0 1 9 0"/>',
+  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5l8.5 6.5 8.5-6.5"/>',
+  printer:'<path d="M7 8V4h10v4"/><rect x="4" y="8" width="16" height="8" rx="1.5"/><rect x="7" y="14" width="10" height="6"/><circle cx="17" cy="11" r="1"/>',
+  badge:'<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9.5 4V2h5v2"/><circle cx="12" cy="11" r="2.2"/><path d="M8.5 17.5a3.5 3.5 0 0 1 7 0"/>',
+  mask:'<path d="M5 4h14v6a7 7 0 0 1-14 0z"/><circle cx="9.5" cy="8" r="1"/><circle cx="14.5" cy="8" r="1"/><path d="M9 12.5c1.6 1.4 4.4 1.4 6 0"/>',
+  music:'<path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.2"/><circle cx="16.5" cy="16" r="2.2"/>',
+  mic:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6"/>',
+  seat:'<path d="M6 10V6.5A2.5 2.5 0 0 1 8.5 4h7A2.5 2.5 0 0 1 18 6.5V10"/><path d="M5 10h14v5H5zM7 15v4M17 15v4"/>',
+  firstaid:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M12 9.5v6M9 12.5h6"/>',
+  pill:'<rect x="2" y="9" width="20" height="6" rx="3" transform="rotate(-45 12 12)"/><path d="M8.5 8.5l7 7"/>',
+  stethoscope:'<path d="M6 4v5a4 4 0 0 0 8 0V4"/><path d="M10 13.5a5 5 0 0 0 8 3.5"/><circle cx="19" cy="14" r="2"/><circle cx="6" cy="3.5" r="1"/><circle cx="14" cy="3.5" r="1"/>',
+  wheelchair:'<circle cx="13" cy="16" r="5"/><circle cx="8.5" cy="5" r="1.6"/><path d="M8.5 7v5h5l3 5M8.5 12h2"/>',
+  bed:'<path d="M3 8v11M3 14h18v5M21 19v-5a3 3 0 0 0-3-3h-7v4"/><circle cx="7" cy="10.5" r="2"/>',
+  bar:'<path d="M5 4h14l-7 8z"/><path d="M12 12v6M9 21h6"/>',
+  key:'<circle cx="8" cy="8" r="4"/><path d="M11 11l8 8M16 16l2-2M18 18l2-2"/>',
+  spa:'<path d="M12 3c3 4 3 7.5 0 10.5C9 10.5 9 7 12 3z"/><path d="M4 13.5c4 0 7 2 8 6-4 0-7-2-8-6zM20 13.5c-4 0-7 2-8 6 4 0 7-2 8-6z"/>',
+  cart:'<path d="M3.5 5H6l2 11h9l2-7.5H7"/><circle cx="9" cy="20" r="1.4"/><circle cx="16" cy="20" r="1.4"/>',
+  tag:'<path d="M4 4h7l9 9-7 7-9-9z"/><circle cx="8.5" cy="8.5" r="1.5"/>',
+  eye:'<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>',
+  gear:'<circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>',
+  image:'<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8" cy="10" r="1.6"/><path d="M5 17l5-4 3 2 3-3 3 3"/>',
+  reset:'<path d="M5.5 12a6.5 6.5 0 1 1 1.9 4.6"/><path d="M5 17.5V13h4.5"/>',
+  dot:'<circle cx="12" cy="12" r="5.5"/>',
+  link:'<path d="M10 14a4 4 0 0 0 5.7 0l2-2a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-2 2a4 4 0 0 0 5.7 5.7l1-1"/>',
+  sparkle:'<path d="M12 3.5l1.6 5.4 5.4 1.6-5.4 1.6L12 17.5l-1.6-5.4L5 10.5l5.4-1.6z"/>',
+  trash:'<path d="M5 7h14M10 7V5h4v2M6.5 7l1 13h9l1-13"/>',
+  search:'<circle cx="11" cy="11" r="7"/><path d="M16 16l5 5"/>',
+  walk:'<circle cx="13" cy="4" r="1.8"/><path d="M13 6v6l3 4M13 12l-3 1-2 5M13 9l4 1"/>',
+  slotmachine:'<rect x="5" y="3" width="14" height="18" rx="2"/><rect x="7.5" y="6" width="8.5" height="5" rx="1"/><path d="M10.3 6v5M13.3 6v5"/><circle cx="17.5" cy="8.5" r="1.2"/><path d="M8 14.5h4M8 17.5h6"/>',
+  register:'<rect x="3" y="10" width="18" height="9" rx="1.2"/><path d="M6 10V6h8v4"/><rect x="15" y="5.5" width="4" height="4.5" rx="1"/><path d="M7 14h4"/>',
+  atm:'<rect x="4" y="3" width="16" height="18" rx="2"/><rect x="7" y="6" width="10" height="5" rx="1"/><path d="M8 15h3M8 18h6"/>',
+  kiosk:'<rect x="6.5" y="3" width="11" height="13" rx="1.5"/><rect x="9" y="6" width="6" height="5" rx="1"/><path d="M12 16v5M9 21h6"/>',
+  download:'<path d="M12 3v11M7.5 10.5L12 15l4.5-4.5"/><path d="M5 20h14"/>',
+  lockers:'<rect x="6" y="3" width="12" height="18" rx="1.5"/><path d="M12 3v18"/><circle cx="9.3" cy="8" r=".8"/><circle cx="14.7" cy="8" r=".8"/>',
+  taxi:'<path d="M4 11l1.6-4h12.8L20 11"/><rect x="3" y="11" width="18" height="6" rx="1.5"/><circle cx="7" cy="17.5" r="1.4"/><circle cx="17" cy="17.5" r="1.4"/><path d="M9.5 7V5h5v2"/>',
+  smoke:'<rect x="3" y="13.5" width="13" height="3" rx="1"/><path d="M19 13.5V16M18 13.5c0-2 .5-2 .5-3.5M20.5 13.5c0-1.5-.5-2-.5-3.5"/>'
+};
+const CATS=[
+  {id:'gen', t:{it:'Generale',en:'General',de:'Allgemein',fr:'Général',es:'General',ru:'Общее',zh:'通用',ar:'عام'}, k:['pin','info','door','exit','elevator','stairs','wc','parking','wifi','phone','clock','calendar','kiosk','download','lockers','taxi','smoke']},
+  {id:'gioco', t:{it:'Gioco',en:'Gaming',de:'Spiel',fr:'Jeux',es:'Juego',ru:'Игры',zh:'游戏',ar:'الألعاب'}, k:['game','slot','slotmachine','chips','cards','trophy','cash','register','atm']},
+  {id:'uffici', t:{it:'Uffici',en:'Offices',de:'Büros',fr:'Bureaux',es:'Oficinas',ru:'Офисы',zh:'办公室',ar:'مكاتب'}, k:['building','meeting','mail','printer','badge','info']},
+  {id:'teatro', t:{it:'Teatro',en:'Theatre',de:'Theater',fr:'Théâtre',es:'Teatro',ru:'Театр',zh:'剧院',ar:'مسرح'}, k:['mask','music','mic','seat','ticket','star']},
+  {id:'salute', t:{it:'Salute',en:'Health',de:'Gesundheit',fr:'Santé',es:'Salud',ru:'Здоровье',zh:'健康',ar:'صحة'}, k:['firstaid','pill','stethoscope','wheelchair','bed','spa']},
+  {id:'hotel', t:{it:'Hotel/Bar',en:'Hotel/Bar',de:'Hotel/Bar',fr:'Hôtel/Bar',es:'Hotel/Bar',ru:'Отель/Бар',zh:'酒店/酒吧',ar:'فندق/بار'}, k:['cup','bar','food','bed','key','spa']},
+  {id:'negozi', t:{it:'Negozi',en:'Shops',de:'Geschäfte',fr:'Boutiques',es:'Tiendas',ru:'Магазины',zh:'商店',ar:'متاجر'}, k:['bag','gift','cart','tag','register']}
+];
+function catOf(ic){ const c=CATS.find(c=>c.k.includes(ic)); return c?c.id:'gen'; }
+function catName(id){ const c=CATS.find(c=>c.id===id); return c?(c.t[uiLang]||c.t.it):id; }
+/* ===== Multilingua (interfaccia) ===== */
+const T={
+  it:{here:'TU SEI QUI',search:'Cerca o chiedi: dove si trova…',all:'Tutti',import:'Importa piantina',demo:'Esempio (demo)',reset:'Reset',company:'Nome azienda',min:'min',clean:'Pulita',plan:'Piantina',tap:'Tocca una destinazione per vedere il percorso',sub:{gen:'Punto utile',gioco:'Area gioco',uffici:'Ufficio',teatro:'Eventi',salute:'Servizio sanitario',hotel:'Ristorazione / Hotel',negozi:'Negozio'}},
+  en:{here:'YOU ARE HERE',search:'Search or ask: where is…',all:'All',import:'Import map',demo:'Demo example',reset:'Reset',company:'Company name',min:'min',clean:'Clean',plan:'Floor plan',tap:'Tap a destination to see the route',sub:{gen:'Useful point',gioco:'Gaming area',uffici:'Office',teatro:'Events',salute:'Health service',hotel:'Dining / Hotel',negozi:'Shop'}},
+  de:{here:'SIE SIND HIER',search:'Suchen oder fragen: wo ist…',all:'Alle',import:'Plan importieren',demo:'Demo-Beispiel',reset:'Reset',company:'Firmenname',min:'Min',clean:'Sauber',plan:'Grundriss',tap:'Tippen Sie ein Ziel an',sub:{gen:'Nützlicher Punkt',gioco:'Spielbereich',uffici:'Büro',teatro:'Events',salute:'Gesundheit',hotel:'Gastronomie / Hotel',negozi:'Geschäft'}},
+  fr:{here:'VOUS ÊTES ICI',search:'Cherchez ou demandez : où est…',all:'Tous',import:'Importer le plan',demo:'Exemple démo',reset:'Reset',company:'Nom entreprise',min:'min',clean:'Épuré',plan:'Plan',tap:'Touchez une destination',sub:{gen:'Point utile',gioco:'Espace jeux',uffici:'Bureau',teatro:'Événements',salute:'Santé',hotel:'Restauration / Hôtel',negozi:'Boutique'}},
+  es:{here:'ESTÁS AQUÍ',search:'Busca o pregunta: dónde está…',all:'Todos',import:'Importar plano',demo:'Ejemplo (demo)',reset:'Reiniciar',company:'Nombre empresa',min:'min',clean:'Limpio',plan:'Plano',tap:'Toca un destino para ver la ruta',sub:{gen:'Punto útil',gioco:'Zona de juego',uffici:'Oficina',teatro:'Eventos',salute:'Servicio sanitario',hotel:'Restauración / Hotel',negozi:'Tienda'}},
+  ru:{here:'ВЫ ЗДЕСЬ',search:'Поиск или вопрос: где находится…',all:'Все',import:'Импорт плана',demo:'Пример (демо)',reset:'Сброс',company:'Название компании',min:'мин',clean:'Чисто',plan:'План',tap:'Коснитесь пункта назначения',sub:{gen:'Полезное место',gioco:'Игровая зона',uffici:'Офис',teatro:'События',salute:'Медпункт',hotel:'Питание / Отель',negozi:'Магазин'}},
+  zh:{here:'您在这里',search:'搜索或询问：在哪里…',all:'全部',import:'导入平面图',demo:'示例（演示）',reset:'重置',company:'公司名称',min:'分钟',clean:'简洁',plan:'平面图',tap:'点击目的地查看路线',sub:{gen:'实用点',gioco:'游戏区',uffici:'办公室',teatro:'活动',salute:'医疗服务',hotel:'餐饮 / 酒店',negozi:'商店'}},
+  ar:{here:'أنت هنا',search:'ابحث أو اسأل: أين…',all:'الكل',import:'استيراد المخطط',demo:'مثال (تجريبي)',reset:'إعادة ضبط',company:'اسم الشركة',min:'دقيقة',clean:'نظيف',plan:'المخطط',tap:'انقر على وجهة لرؤية المسار',sub:{gen:'نقطة مفيدة',gioco:'منطقة الألعاب',uffici:'مكتب',teatro:'فعاليات',salute:'خدمة صحية',hotel:'مطاعم / فندق',negozi:'متجر'}}
+};
+function initLang(){ try{ const u=new URLSearchParams(location.search).get('lang'); if(u&&T[u])return u; }catch(_){}
+  try{ const st=localStorage.getItem('concierge_uilang'); if(st&&T[st])return st; }catch(_){}
+  const b=(navigator.language||'it').slice(0,2).toLowerCase(); return T[b]?b:'it'; }   // eredita: ?lang dalla home → localStorage → dispositivo
+let uiLang=initLang();
+function tr(){ return T[uiLang]||T.it; }
+const CF={it:{up:'Salga al',cont:'Continua'},en:{up:'Go to',cont:'Continue'},de:{up:'Zur',cont:'Weiter'},fr:{up:'Allez au',cont:'Continuer'},es:{up:'Suba a',cont:'Continuar'},ru:{up:'Перейдите на',cont:'Далее'},zh:{up:'前往',cont:'继续'},ar:{up:'اذهب إلى',cont:'متابعة'}};
+function cf(k){ return (CF[uiLang]||CF.it)[k]; }
+
+const LS='wayfind_proto_v5', NS='http://www.w3.org/2000/svg';
+const M_PER_UNIT=0.11, SPEED=1.25; // scala demo: metri per unità · m/s a piedi
+let S=load()||demoState(), mode='guest', tool='dest', linkFrom=null, activeDest=null, ovEditId=null, ovIcon='pin', ovPos=null, ovCat=0;
+let query='', filterCat='', idleTimer=null, view={s:1,tx:0,ty:0}, rec=null;
+let accessible=false, _dragPin=null, _pinMoved=false, _dragNode=null, _nodeMoved=false;
+if(S&&S._floors)applyFloor(S._fi);                       // sincronizza i campi live col piano corrente
+function demoFloor(){ return { name:'Piano terra', img:null, imgW:null, imgH:null, showBg:false,
+  nodes:[{id:1,x:500,y:620},{id:2,x:500,y:430},{id:3,x:230,y:430},{id:4,x:770,y:430},{id:5,x:500,y:230},{id:6,x:230,y:230},{id:7,x:770,y:230}],
+  edges:[[1,2],[2,3],[2,4],[2,5],[3,6],[4,7],[5,6],[5,7]],
+  dests:[{id:11,name:'Reception',ic:'info',x:500,y:150},{id:12,name:'Sala A',ic:'star',x:150,y:150},{id:13,name:'Sala B',ic:'star',x:850,y:150},{id:14,name:'Bar',ic:'cup',x:150,y:480},{id:15,name:'Servizi',ic:'wc',x:850,y:480}],
+  here:{x:500,y:660} }; }
+function wrap(company,floors){ const S0={company,_floors:floors,_fi:0}; Object.assign(S0,floors[0]); return S0; }
+function demoState(){ return wrap('La tua azienda',[demoFloor()]); }
+function snap(){ return {name:S._floors[S._fi].name, img:S.img,imgW:S.imgW,imgH:S.imgH,showBg:S.showBg,nodes:S.nodes,edges:S.edges,dests:S.dests,here:S.here}; }
+function applyFloor(i){ const f=S._floors[i]; S._fi=i; S.img=f.img;S.imgW=f.imgW;S.imgH=f.imgH;S.showBg=f.showBg;S.nodes=f.nodes;S.edges=f.edges;S.dests=f.dests;S.here=f.here; }
+function save(){ try{ S._floors[S._fi]=snap(); localStorage.setItem(LS,JSON.stringify(S)); }catch(_){ } }
+function load(){ try{ const o=JSON.parse(localStorage.getItem(LS)||'null'); return (o&&o._floors)?o:null; }catch(_){ return null; } }
+
+/* ===== SVG utils (coordinate nel sistema del viewport, così zoom/pan sono trasparenti) ===== */
+const svg=document.getElementById('svg');
+function svgXY(evt){ const vp=document.getElementById('viewport'); const pt=svg.createSVGPoint(); const t=(evt.touches&&evt.touches[0])||evt;
+  pt.x=t.clientX; pt.y=t.clientY; const p=pt.matrixTransform(vp.getScreenCTM().inverse()); return {x:Math.round(p.x),y:Math.round(p.y)}; }
+function nid(){ return Math.floor(performance.now())%1e7 + Math.floor((performance.now()*1000)%1000); }
+function esc(s){ return (s||'').replace(/[<&>]/g,c=>({'<':'&lt;','&':'&amp;','>':'&gt;'}[c])); }
+function svgIco(k,sz){ sz=sz||18; return '<svg viewBox="0 0 24 24" width="'+sz+'" height="'+sz+'" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+(ICON[k]||ICON.pin)+'</svg>'; }
+
+/* ===== ROUTING (Dijkstra) ===== */
+function nearestNode(p){ let b=null,bd=1e9; S.nodes.forEach(n=>{const d=Math.hypot(n.x-p.x,n.y-p.y); if(d<bd){bd=d;b=n;}}); return b; }
+function adj(){ const a={}; S.nodes.forEach(n=>a[n.id]=[]); S.edges.forEach(e=>{const x=e[0],y=e[1],st=e[2]==='s'; const A=S.nodes.find(n=>n.id===x),B=S.nodes.find(n=>n.id===y);
+  if(A&&B){let w=Math.hypot(A.x-B.x,A.y-B.y); if(accessible&&st)w*=60; a[x].push([y,w]); a[y].push([x,w]);}}); return a; }
+function dijkstra(from,to){ const a=adj(),dist={},prev={},Q=new Set(S.nodes.map(n=>n.id));
+  S.nodes.forEach(n=>dist[n.id]=1e9); if(dist[from]==null)return null; dist[from]=0;
+  while(Q.size){ let u=null,ud=1e9; Q.forEach(id=>{if(dist[id]<ud){ud=dist[id];u=id;}}); if(u==null)break; Q.delete(u); if(u===to)break;
+    (a[u]||[]).forEach(([v,w])=>{if(dist[u]+w<dist[v]){dist[v]=dist[u]+w;prev[v]=u;}}); }
+  if(dist[to]>=1e9)return null; const path=[]; let c=to; while(c!=null){path.unshift(c); if(c===from)break; c=prev[c];}
+  return path[0]===from?path:null; }
+function buildRoute(from,to){ if(S.nodes.length>=2&&S.edges.length){ const n1=nearestNode(from),n2=nearestNode(to);
+  if(n1&&n2){ const ids=dijkstra(n1.id,n2.id); if(ids) return [from,...ids.map(id=>{const n=S.nodes.find(x=>x.id===id);return{x:n.x,y:n.y};}),to]; } }
+  return [from,to]; }
+
+/* ===== RENDER ===== */
+function render(){
+  document.getElementById('company').value=S.company||'';
+  document.getElementById('ttl').textContent=(S.company?S.company+' · ':'')+'Wayfinding';
+  document.getElementById('logo').textContent=S.company||'';
+  document.documentElement.dir=(uiLang==='ar')?'rtl':'ltr';   // arabo da destra a sinistra
+  applyViewBox(); applyView();
+  renderBg(); renderEdges(); renderNodes(); renderDests(); renderHere();
+  renderFloors(); renderChips(); renderDestBtns(); decorateUIstrings(); updateBgBtn(); updateFoot(); applyLock();
+}
+function applyLock(){ const adm=mode==='admin';
+  document.querySelectorAll('.adminOnly').forEach(e=>{ e.style.display = adm ? '' : 'none'; });
+  const pc=document.getElementById('pinCorner'); if(pc) pc.style.display = adm ? 'none' : 'block'; }
+/* ===== Multi-piano ===== */
+function renderFloors(){ const box=document.getElementById('floors'); if(!box)return;
+  if(S._floors.length<=1 && mode!=='admin'){ box.classList.add('hidden'); box.innerHTML=''; return; }
+  box.classList.remove('hidden');
+  let html=S._floors.map((f,i)=>'<button class="'+(i===S._fi?'on':'')+'" onclick="switchFloor('+i+')" ondblclick="renameFloor('+i+')">'+esc(f.name||('Piano '+(i+1)))+'</button>').join('');
+  if(mode==='admin') html+='<button class="addf" onclick="addFloor()">＋ Piano</button>';
+  box.innerHTML=html; }
+function floorAppear(){ const mw=document.getElementById('mapwrap'); if(!mw)return; mw.style.animation='none'; void mw.offsetWidth; mw.style.animation='floorIn .55s ease'; }
+function switchFloor(i){ if(i===S._fi)return; S._floors[S._fi]=snap(); applyFloor(i); clearRoute(); zoomReset(); render(); floorAppear(); }
+function addFloor(){ S._floors[S._fi]=snap(); S._floors.push({name:'Piano '+(S._floors.length+1), img:null,imgW:null,imgH:null,showBg:false, nodes:[],edges:[],dests:[],here:null}); applyFloor(S._floors.length-1); clearRoute(); zoomReset(); save(); render(); alert('Nuovo piano vuoto creato. Premi "Importa piantina" per caricare la mappa di QUESTO piano.'); }
+function renameFloor(i){ const n=prompt('Nome piano:',S._floors[i].name); if(n!=null){ S._floors[i].name=n.trim()||S._floors[i].name; save(); render(); } }
+/* ===== Accessibile ♿ ===== */
+function toggleAcc(){ accessible=!accessible; const b=document.getElementById('acc'); if(b)b.classList.toggle('acton',accessible);
+  if(activeDest){ const d=S.dests.find(x=>x.id===activeDest); if(d)showRoute(d); } }
+function applyViewBox(){ const W=(S.img&&S.imgW)?S.imgW:1000, H=(S.img&&S.imgH)?S.imgH:700;
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  const mw=document.getElementById('mapwrap'); if(mw) mw.style.aspectRatio=W+'/'+H;
+  ['bgImg','bgTint'].forEach(id=>{const e=document.getElementById(id); if(e){e.setAttribute('width',W);e.setAttribute('height',H);}});
+  svg.querySelectorAll(':scope > rect[fill^="url"]').forEach(r=>{r.setAttribute('width',W);r.setAttribute('height',H);}); }
+function applyView(){ document.getElementById('viewport').setAttribute('transform','translate('+view.tx+' '+view.ty+') scale('+view.s+')'); }
+function renderBg(){ const demo=document.getElementById('gDemo'),img=document.getElementById('bgImg'),tint=document.getElementById('bgTint');
+  const usaP=!!(S.img&&S.showBg);
+  if(S.img){ img.setAttributeNS('http://www.w3.org/1999/xlink','href',S.img); img.setAttribute('href',S.img); }
+  img.classList.toggle('hidden', !usaP); tint.classList.toggle('hidden', !usaP); demo.classList.toggle('hidden', !!S.img);
+  if(!demo.childNodes.length){ const rooms=[[60,60,300,180,'SALA A'],[640,60,300,180,'SALA B'],[60,470,300,170,'BAR'],[640,470,300,170,'SERVIZI'],[380,40,240,150,'RECEPTION']];
+    demo.innerHTML=rooms.map(([x,y,w,h,l])=>'<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="16" class="zone"/><text x="'+(x+w/2)+'" y="'+(y+h/2+5)+'" class="zoneLbl">'+l+'</text>').join(''); } }
+function renderEdges(){ const g=document.getElementById('gEdges'); if(mode!=='admin'){g.innerHTML='';return;}
+  g.innerHTML=S.edges.map(([x,y])=>{const A=S.nodes.find(n=>n.id===x),B=S.nodes.find(n=>n.id===y); return A&&B?'<line x1="'+A.x+'" y1="'+A.y+'" x2="'+B.x+'" y2="'+B.y+'" class="edge"/>':'';}).join(''); }
+function renderNodes(){ const g=document.getElementById('gNodes'); if(mode!=='admin'){g.innerHTML='';return;}
+  g.innerHTML=S.nodes.map(n=>'<circle cx="'+n.x+'" cy="'+n.y+'" r="9" class="node'+(linkFrom===n.id?' sel':'')+'" data-node="'+n.id+'"/>').join('');
+  g.querySelectorAll('[data-node]').forEach(c=>{ const id=+c.getAttribute('data-node');
+    c.addEventListener('pointerdown',e=>{ if(tool!=='del'&&tool!=='link'){ e.stopPropagation(); _nodeMoved=false; _dragNode={id,sx:e.clientX,sy:e.clientY,moved:false}; } });
+    c.addEventListener('click',e=>{ e.stopPropagation(); if(_nodeMoved){_nodeMoved=false;return;} onNode(id); }); }); }
+function visibleDests(){ return S.dests.filter(d=>(!filterCat||catOf(d.ic)===filterCat) && (!query||d.name.toLowerCase().includes(query.toLowerCase()))); }
+function pinMarkup(d,dim){ return '<g class="pin'+(activeDest===d.id?' active':'')+(dim?' dim':'')+'" data-id="'+d.id+'">'+
+  '<circle cx="'+d.x+'" cy="'+d.y+'" r="16" class="pinBody"/>'+
+  '<g class="pinIcon" transform="translate('+d.x+','+d.y+') scale(.6) translate(-12,-12)">'+(ICON[d.ic]||ICON.pin)+'</g>'+
+  '<text x="'+d.x+'" y="'+(d.y-24)+'" class="pinTxt">'+esc(d.name)+'</text></g>'; }
+function renderDests(){ const g=document.getElementById('gDests'); const vis=new Set(visibleDests().map(d=>d.id));
+  g.innerHTML=S.dests.map(d=>pinMarkup(d, mode==='guest'&&!vis.has(d.id))).join('');
+  g.querySelectorAll('[data-id]').forEach(el=>{ const d=S.dests.find(x=>x.id===+el.getAttribute('data-id'));
+    el.addEventListener('pointerdown',e=>{ if(mode==='admin'&&tool!=='del'){ e.stopPropagation(); _pinMoved=false; _dragPin={d,sx:e.clientX,sy:e.clientY,moved:false}; } });
+    el.addEventListener('click',e=>{ e.stopPropagation(); if(_pinMoved){_pinMoved=false;return;} onPin(d); }); }); }
+function renderHere(){ const g=document.getElementById('gHere'); if(!S.here){g.innerHTML='';return;}
+  g.innerHTML='<circle cx="'+S.here.x+'" cy="'+S.here.y+'" r="11" class="here-ring"/><circle cx="'+S.here.x+'" cy="'+S.here.y+'" r="9" class="here"/><text x="'+S.here.x+'" y="'+(S.here.y+26)+'" class="here-tag">'+tr().here+'</text>'; }
+function renderChips(){ const box=document.getElementById('chips'); if(mode!=='guest'){box.innerHTML='';return;}
+  const present=[...new Set(S.dests.map(d=>catOf(d.ic)))];
+  let html='<button class="'+(filterCat===''?'on':'')+'" onclick="setFilter(\'\')">'+tr().all+'</button>';
+  present.forEach(id=>{ html+='<button class="'+(filterCat===id?'on':'')+'" onclick="setFilter(\''+id+'\')">'+catName(id)+'</button>'; });
+  box.innerHTML=html; }
+function renderDestBtns(){ const box=document.getElementById('destBtns'); if(mode!=='guest'){box.classList.add('hidden');box.innerHTML='';return;}
+  box.classList.remove('hidden'); box.innerHTML=visibleDests().map(d=>'<button data-id="'+d.id+'" class="'+(activeDest===d.id?'on':'')+'">'+svgIco(d.ic,18)+'<span>'+esc(d.name)+'</span></button>').join('');
+  box.querySelectorAll('button[data-id]').forEach(b=>b.onclick=()=>onPin(S.dests.find(x=>x.id===+b.getAttribute('data-id'))));
+  otherFloorMatches().forEach(m=>{ const b=document.createElement('button'); b.style.opacity='.8'; b.innerHTML=svgIco(m.d.ic,18)+'<span>'+esc(m.d.name)+' · '+esc(m.fname)+'</span>'; b.onclick=()=>goCross(m.fi,m.d.id); box.appendChild(b); }); }
+
+/* ===== PERCORSO + frecce + distanza/tempo + scheda ===== */
+const routeEl=document.getElementById('route'),flowEl=document.getElementById('routeFlow'),hintG=document.getElementById('gRouteHint'),arrowG=document.getElementById('gArrows'),dot=document.getElementById('dot');
+let anim=null; const dPath=p=>'M'+p.map(q=>q.x+' '+q.y).join(' L');
+function lung(p){let l=0;for(let i=1;i<p.length;i++)l+=Math.hypot(p[i].x-p[i-1].x,p[i].y-p[i-1].y);return l;}
+function puntoA(p,t){const tot=lung(p);let tg=t*tot,acc=0;for(let i=1;i<p.length;i++){const s=Math.hypot(p[i].x-p[i-1].x,p[i].y-p[i-1].y);if(acc+s>=tg){const k=s?(tg-acc)/s:0;return{x:p[i-1].x+(p[i].x-p[i-1].x)*k,y:p[i-1].y+(p[i].y-p[i-1].y)*k};}acc+=s;}return p[p.length-1];}
+function angleA(p,t){const a=puntoA(p,Math.max(0,t-0.01)),b=puntoA(p,Math.min(1,t+0.01));return Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI;}
+function clearRoute(){routeEl.setAttribute('d','');flowEl.setAttribute('d','');hintG.innerHTML='';arrowG.innerHTML='';dot.classList.add('hidden');if(anim)cancelAnimationFrame(anim);
+  document.getElementById('card').classList.remove('on');hideBanner();activeDest=null; }
+/* ===== Percorso tra piani diversi (via ascensore/scala) ===== */
+function floorElevator(fi, pt){ const fl=S._floors[fi]; if(!fl||!fl.dests)return null;
+  const ev=fl.dests.filter(d=>d.ic==='elevator'||d.ic==='stairs'); if(!ev.length)return null;
+  if(!pt)return ev[0]; let b=ev[0],bd=1e9; ev.forEach(e=>{const dd=Math.hypot(e.x-pt.x,e.y-pt.y);if(dd<bd){bd=dd;b=e;}}); return b; }
+function otherFloorMatches(){ if(!S._floors||S._floors.length<2)return []; const q=query.toLowerCase(); const res=[];
+  S._floors.forEach((fl,fi)=>{ if(fi===S._fi)return; (fl.dests||[]).forEach(d=>{ if((!filterCat||catOf(d.ic)===filterCat)&&(!q||d.name.toLowerCase().includes(q))) res.push({d,fi,fname:fl.name||('Piano '+(fi+1))}); }); }); return res; }
+function goCross(targetFi, destId){
+  if(targetFi===S._fi){ const d=S.dests.find(x=>x.id===destId); if(d)showRoute(d); return; }
+  const evHere=floorElevator(S._fi, S.here); const targetName=(S._floors[targetFi].name)||('Piano '+(targetFi+1));
+  if(evHere) showRoute(evHere);
+  showBanner(svgIco('elevator',18)+'<span>'+cf('up')+' '+esc(targetName)+'</span>', cf('cont')+' →', ()=>{
+    S._floors[S._fi]=snap(); applyFloor(targetFi); render(); floorAppear();
+    const evT=floorElevator(targetFi,null), d=S.dests.find(x=>x.id===destId);
+    if(d) showRoute(d, evT?{x:evT.x,y:evT.y}:null);
+    showBanner(svgIco('elevator',18)+'<span>'+esc(targetName)+'</span>','',null);   // conferma: sei al piano X
+  });
+}
+function showBanner(html, btnText, fn){ const b=document.getElementById('banner'); if(!b)return;
+  b.innerHTML=html+(btnText?' <button id="bannerBtn">'+btnText+'</button>':''); b.classList.add('on');
+  const bb=document.getElementById('bannerBtn'); if(bb&&fn) bb.onclick=fn; }
+function hideBanner(){ const b=document.getElementById('banner'); if(b){b.classList.remove('on'); b.innerHTML='';} }
+function showRoute(d, fromPt){ hideBanner(); const from=fromPt||S.here; if(!from){alert('Imposta prima "Tu sei qui".');return;}
+  activeDest=d.id; renderDests(); renderDestBtns();
+  const pts=buildRoute(from,{x:d.x,y:d.y});
+  hintG.innerHTML='<path class="corrHint" d="'+dPath(pts)+'"/>';
+  const dd=dPath(pts); routeEl.setAttribute('d',dd); flowEl.setAttribute('d',dd);
+  const len=routeEl.getTotalLength(); routeEl.style.transition='none'; routeEl.style.strokeDasharray=len; routeEl.style.strokeDashoffset=len;
+  routeEl.getBoundingClientRect(); routeEl.style.transition='stroke-dashoffset 1.1s ease'; routeEl.style.strokeDashoffset=0;
+  // frecce direzionali (chevron) lungo il percorso
+  const L=lung(pts), step=Math.max(70, L/9); let ar='';
+  for(let dlen=step*0.6; dlen<L-20; dlen+=step){ const t=dlen/L; const q=puntoA(pts,t); const ang=angleA(pts,t);
+    ar+='<g transform="translate('+q.x+','+q.y+') rotate('+ang.toFixed(0)+')"><path class="chev" d="M-6 -5 L1 0 L-6 5"/></g>'; }
+  arrowG.innerHTML=ar;
+  dot.classList.remove('hidden'); if(anim)cancelAnimationFrame(anim); let start=null; const dur=Math.max(1400, L*1.1);   // velocità naturale
+  (function step2(ts){ if(!start)start=ts; const tt=((ts-start)%dur)/dur; const q=puntoA(pts,tt); dot.setAttribute('cx',q.x); dot.setAttribute('cy',q.y); anim=requestAnimationFrame(step2); })(performance.now());   // LOOP: ripete il percorso all'infinito
+  // distanza/tempo + scheda
+  const meters=Math.round(L*M_PER_UNIT), mins=Math.max(1,Math.ceil(meters/SPEED/60));
+  showCard(d, meters, mins);
+  resetIdle();
+}
+function showCard(d,meters,mins){ const c=document.getElementById('card');
+  document.getElementById('cardIc').innerHTML='<svg viewBox="0 0 24 24">'+(ICON[d.ic]||ICON.pin)+'</svg>';
+  document.getElementById('cardName').textContent=d.name;
+  document.getElementById('cardSub').textContent=(tr().sub[catOf(d.ic)]||'');
+  document.getElementById('cardDist').innerHTML=svgIco('walk',14)+'<span>~'+meters+' m · ~'+mins+' '+tr().min+'</span>';
+  c.classList.add('on'); }
+
+/* ===== INTERAZIONI ===== */
+function onPin(d){ if(!d)return; resetIdle(); if(mode==='guest'){ showRoute(d); }
+  else if(tool==='del'){ S.dests=S.dests.filter(x=>x.id!==d.id); save(); render(); } else { openDest(d); } }
+function onNode(id){ const n=S.nodes.find(x=>x.id===id); if(!n)return;
+  if(tool==='del'){ S.nodes=S.nodes.filter(x=>x.id!==id); S.edges=S.edges.filter(([a,b])=>a!==id&&b!==id); linkFrom=null; save(); render(); return; }
+  if(tool==='link'){ if(linkFrom==null){linkFrom=id;renderNodes();}
+    else if(linkFrom===id){linkFrom=null;renderNodes();}
+    else{ const ex=S.edges.findIndex(([a,b])=>(a===linkFrom&&b===id)||(a===id&&b===linkFrom)); if(ex>=0)S.edges.splice(ex,1); else S.edges.push([linkFrom,id]); linkFrom=null; save(); render(); } } }
+svg.addEventListener('click',ev=>{ if(mode!=='admin')return; if(_panned)return; const p=svgXY(ev);
+  if(tool==='node'){ S.nodes.push({id:nid(),x:p.x,y:p.y}); save(); render(); }
+  else if(tool==='dest'){ openDest(null,p); }
+  else if(tool==='here'){ S.here={x:p.x,y:p.y}; save(); render(); } });
+function autoLink(){ const R=320; S.edges=[]; S.nodes.forEach(a=>{ const near=S.nodes.filter(b=>b.id!==a.id).map(b=>({b,d:Math.hypot(a.x-b.x,a.y-b.y)})).filter(o=>o.d<=R).sort((x,y)=>x.d-y.d).slice(0,2);
+  near.forEach(({b})=>{ if(!S.edges.some(([x,y])=>(x===a.id&&y===b.id)||(x===b.id&&y===a.id))) S.edges.push([a.id,b.id]); }); }); save(); render(); }
+
+/* ===== Ricerca / voce ===== */
+function onSearch(){ query=document.getElementById('ask').value; renderDests(); renderDestBtns(); resetIdle(); }
+function askGo(){ const vis=visibleDests(); if(vis.length){ onPin(vis[0]); } }
+function micToggle(){ const SR=window.SpeechRecognition||window.webkitSpeechRecognition; const b=document.getElementById('mic');
+  if(!SR){ alert('Voce non disponibile su questo browser. Usa la ricerca scritta.'); return; }
+  if(rec){ rec.stop(); rec=null; b.classList.remove('rec'); return; }
+  rec=new SR(); rec.lang={it:'it-IT',en:'en-US',de:'de-DE',fr:'fr-FR'}[uiLang]; rec.interimResults=false; rec.maxAlternatives=1;
+  rec.onresult=e=>{ const txt=e.results[0][0].transcript; document.getElementById('ask').value=txt; query=txt; renderDests(); renderDestBtns(); askGo(); };
+  rec.onend=()=>{ b.classList.remove('rec'); rec=null; }; b.classList.add('rec'); rec.start(); }
+
+/* ===== Editor destinazione ===== */
+function openDest(d,pos){ ovEditId=d?d.id:null; ovPos=pos||null; ovIcon=d?d.ic:'pin'; ovCat=Math.max(0,CATS.findIndex(c=>c.k.includes(ovIcon)));
+  document.getElementById('ovTitle').textContent=d?'Modifica destinazione':'Nuova destinazione';
+  document.getElementById('ovName').value=d?d.name:'';
+  document.getElementById('ovCats').innerHTML=CATS.map((c,i)=>'<button data-c="'+i+'" class="'+(i===ovCat?'on':'')+'">'+(c.t[uiLang]||c.t.it)+'</button>').join('');
+  document.querySelectorAll('#ovCats button').forEach(b=>b.onclick=()=>{ ovCat=+b.getAttribute('data-c'); document.querySelectorAll('#ovCats button').forEach(x=>x.classList.toggle('on',x===b)); renderIcoGrid(); });
+  renderIcoGrid(); document.getElementById('ov').classList.add('on'); setTimeout(()=>document.getElementById('ovName').focus(),50); }
+function renderIcoGrid(){ document.getElementById('ovIcons').innerHTML=CATS[ovCat].k.map(k=>'<button data-k="'+k+'" class="'+(k===ovIcon?'on':'')+'">'+svgIco(k,20)+'</button>').join('');
+  document.querySelectorAll('#ovIcons button').forEach(b=>b.onclick=()=>{ ovIcon=b.getAttribute('data-k'); document.querySelectorAll('#ovIcons button').forEach(x=>x.classList.toggle('on',x===b)); }); }
+function ovClose(){ document.getElementById('ov').classList.remove('on'); }
+function ovSave(){ const name=document.getElementById('ovName').value.trim()||'Punto';
+  if(ovEditId){ const d=S.dests.find(x=>x.id===ovEditId); if(d){d.name=name;d.ic=ovIcon;} }
+  else { const p=ovPos||{x:500,y:350}; S.dests.push({id:nid(),name,ic:ovIcon,x:p.x,y:p.y}); }
+  save(); render(); ovClose(); }
+function ovDelete(){ if(ovEditId){ S.dests=S.dests.filter(x=>x.id!==ovEditId); save(); render(); } ovClose(); }
+
+/* ===== Zoom rimosso: la mappa si vede sempre intera (niente confusione sul totem) ===== */
+let _panned=false;
+function zoomReset(){ view={s:1,tx:0,ty:0}; applyView(); }
+/* trascina i pin (admin) */
+window.addEventListener('pointermove',e=>{ if(!_dragPin)return; if(Math.abs(e.clientX-_dragPin.sx)+Math.abs(e.clientY-_dragPin.sy)>4){ _dragPin.moved=true; _pinMoved=true; const p=svgXY(e); _dragPin.d.x=p.x; _dragPin.d.y=p.y; renderDests(); } });
+window.addEventListener('pointerup',()=>{ if(_dragPin){ if(_dragPin.moved){ save(); render(); } _dragPin=null; } });
+/* trascina i nodi blu (admin) */
+window.addEventListener('pointermove',e=>{ if(!_dragNode)return; if(Math.abs(e.clientX-_dragNode.sx)+Math.abs(e.clientY-_dragNode.sy)>4){ _dragNode.moved=true; _nodeMoved=true; const p=svgXY(e); const n=S.nodes.find(x=>x.id===_dragNode.id); if(n){n.x=p.x;n.y=p.y;} renderNodes(); renderEdges(); } });
+window.addEventListener('pointerup',()=>{ if(_dragNode){ if(_dragNode.moved){ save(); render(); } _dragNode=null; } });
+
+/* ===== Idle reset ===== */
+function resetIdle(){ if(idleTimer)clearTimeout(idleTimer); if(mode!=='guest')return; idleTimer=setTimeout(()=>{ clearRoute(); zoomReset(); query=''; document.getElementById('ask').value=''; filterCat=''; render(); },25000); }
+document.addEventListener('pointerdown',resetIdle);
+
+/* ===== Modalità / lingua / UI strings ===== */
+function setMode(m){ mode=m; linkFrom=null; clearRoute();
+  document.getElementById('mGuest').classList.toggle('on',m==='guest'); document.getElementById('mAdmin').classList.toggle('on',m==='admin');
+  document.getElementById('adminTools').classList.toggle('hidden',m!=='admin'); document.getElementById('adminHint').classList.toggle('hidden',m!=='admin');
+  document.getElementById('askwrap').classList.toggle('hidden',m!=='guest'); render(); }
+function setTool(t){ tool=t; linkFrom=null; document.querySelectorAll('#adminTools button[data-tool]').forEach(b=>b.classList.toggle('on',b.getAttribute('data-tool')===t));
+  const H={node:'Tocca la piantina per aggiungere un nodo.',link:'Tocca due nodi per collegarli/scollegarli.',dest:'Tocca dove si trova una destinazione.',here:'Tocca dove si trova questo totem.',del:'Tocca un nodo o destinazione per eliminarlo.'};
+  document.getElementById('hintTxt').textContent=H[t]; renderNodes(); }
+function setFilter(id){ filterCat=id; renderChips(); renderDests(); renderDestBtns(); resetIdle(); }
+function setLang(l){ uiLang=l; try{ localStorage.setItem('concierge_uilang',l); }catch(_){} render(); }   // persiste come la home
+function onCompany(){ S.company=document.getElementById('company').value; save(); document.getElementById('ttl').textContent=(S.company?S.company+' · ':'')+'Wayfinding'; document.getElementById('logo').textContent=S.company; }
+function decorateUIstrings(){ const t=tr();
+  document.getElementById('mGuest').innerHTML=svgIco('eye',16)+'<span>'+({it:'Ospite',en:'Guest',de:'Gast',fr:'Visiteur',es:'Visitante',ru:'Гость',zh:'访客',ar:'زائر'}[uiLang]||'Ospite')+'</span>';
+  document.getElementById('mAdmin').innerHTML=svgIco('gear',16)+'<span>'+({it:'Configura',en:'Setup',de:'Einrichten',fr:'Config',es:'Configurar',ru:'Настройка',zh:'设置',ar:'إعداد'}[uiLang]||'Configura')+'</span>';
+  document.getElementById('lblImport').innerHTML=svgIco('image',16)+'<span>'+t.import+'</span>';
+  document.getElementById('btnDemo').innerHTML=svgIco('sparkle',16)+'<span>'+t.demo+'</span>';
+  document.getElementById('btnReset').innerHTML=svgIco('reset',16)+'<span>'+t.reset+'</span>';
+  document.getElementById('btnAuto').innerHTML=svgIco('sparkle',16)+'<span>'+({it:'Auto-collega',en:'Auto-link',de:'Auto-verbinden',fr:'Auto-relier'}[uiLang]||'Auto-collega')+'</span>';
+  const TL={dest:{it:'Destinazione',en:'Destination',de:'Ziel',fr:'Destination'},here:{it:'Tu sei qui',en:'You are here',de:'Sie sind hier',fr:'Vous êtes ici'},node:{it:'Nodo',en:'Node',de:'Knoten',fr:'Nœud'},link:{it:'Collega',en:'Link',de:'Verbinden',fr:'Relier'},del:{it:'Elimina',en:'Delete',de:'Löschen',fr:'Supprimer'}};
+  document.querySelectorAll('#adminTools button[data-tool]').forEach(b=>{ const tl=b.getAttribute('data-tool'),ic=b.getAttribute('data-ic'); b.innerHTML=svgIco(ic,16)+'<span>'+(TL[tl][uiLang]||TL[tl].it)+'</span>'; });
+  document.getElementById('company').placeholder=t.company; document.getElementById('ask').placeholder=t.search;
+  document.getElementById('mic').innerHTML=svgIco('mic',20); document.getElementById('lang').value=uiLang;
+  const ab=document.getElementById('acc'); if(ab){ ab.innerHTML=svgIco('wheelchair',20); ab.classList.toggle('acton',accessible); }
+  // bottoni editor
+  document.querySelectorAll('[data-lbl]').forEach(b=>{ const ic=b.getAttribute('data-ic'),l=b.getAttribute('data-lbl'); b.innerHTML=(ic?svgIco(ic,16):'')+'<span>'+l+'</span>'; }); }
+function updateBgBtn(){ const b=document.getElementById('btnBg'); if(!b)return; b.innerHTML=svgIco('image',16)+'<span>'+(S.showBg?tr().plan:tr().clean)+'</span>'; b.classList.toggle('on',!!S.showBg); b.style.opacity=S.img?'1':'.5'; }
+function toggleBg(){ if(!S.img){ alert('Importa prima una piantina.'); return; } S.showBg=!S.showBg; save(); render(); }
+function updateFoot(){ document.getElementById('footNote').innerHTML='Destinazioni: <b>'+S.dests.length+'</b> · Nodi: <b>'+S.nodes.length+'</b> · '+(S.here?'<span style="color:#3ad07a">Totem ✓</span>':'<span style="color:#ffd479">Totem da impostare</span>')+' · '+tr().tap; }
+function importMap(e){ const f=e.target.files[0]; if(!f)return; const r=new FileReader();
+  r.onload=()=>{ const im=new Image(); im.onload=()=>{ S.img=r.result; S.imgW=im.naturalWidth; S.imgH=im.naturalHeight; S.showBg=true; zoomReset(); save(); render(); }; im.src=r.result; }; r.readAsDataURL(f); e.target.value=''; }
+function resetAll(){ if(!confirm('Azzerare tutto e tornare alla demo?'))return; S=demoState(); zoomReset(); save(); setMode('guest'); render(); }
+function loadCasino(){ const f={ name:'Piano terra', img:'demo_venue.svg', imgW:1000, imgH:720, showBg:true,
+  nodes:[{id:101,x:130,y:235},{id:102,x:360,y:235},{id:103,x:660,y:235},{id:104,x:910,y:235},{id:105,x:130,y:460},{id:106,x:360,y:460},{id:107,x:660,y:460},{id:108,x:910,y:460},{id:109,x:360,y:350},{id:110,x:660,y:350}],
+  edges:[[101,102],[102,103],[103,104],[105,106],[106,107],[107,108],[101,105],[102,109,'s'],[109,106],[103,110],[110,107],[104,108]],
+  dests:[{id:11,name:'Sala A',ic:'slot',x:190,y:130},{id:12,name:'Sala Eventi',ic:'mask',x:510,y:120},{id:13,name:'Ristorante',ic:'food',x:820,y:130},{id:14,name:'Bar',ic:'bar',x:170,y:350},{id:15,name:'Sala B',ic:'slotmachine',x:510,y:340},{id:16,name:'Negozio',ic:'bag',x:830,y:340},{id:17,name:'Caffè',ic:'cup',x:170,y:570},{id:18,name:'Sala C',ic:'slot',x:510,y:570},{id:19,name:'Cassa',ic:'register',x:755,y:560},{id:20,name:'Ascensori',ic:'elevator',x:905,y:560}],
+  here:{x:60,y:460} }; S=wrap('Esempio Azienda',[f]); applyFloor(0);
+  accessible=false; save(); setMode('guest'); render(); setTimeout(()=>{ if(visibleDests()[0]) onPin(visibleDests()[0]); },500); }
+
+/* ===== PIN / blocco ospite ===== */
+let _pinT=null;
+const EMBEDDED=(function(){ try{ return window.self!==window.top; }catch(_){ return true; } })();   // dentro il Concierge (iframe)?
+(function(){ const pc=document.getElementById('pinCorner'); if(!pc||EMBEDDED)return;   // dentro il Concierge: admin SOLO da Impostazioni (?admin=1), niente PIN interno → l'ospite non sblocca
+  pc.addEventListener('pointerdown',()=>{ _pinT=setTimeout(askPin,1500); });
+  ['pointerup','pointerleave','pointercancel'].forEach(ev=>pc.addEventListener(ev,()=>{ if(_pinT){clearTimeout(_pinT);_pinT=null;} })); })();
+function askPin(){ const p=prompt('PIN amministratore (default 1234):'); if(p==null)return; if(p===String(S.pin||'1234')) setMode('admin'); else alert('PIN errato.'); }
+function changePin(){ const n=prompt('Nuovo PIN (4-8 cifre):',S.pin||'1234'); if(n==null)return; if(/^\d{4,8}$/.test(n)){ S.pin=n; save(); alert('PIN aggiornato.'); } else alert('Il PIN deve essere 4-8 cifre.'); }
+/* ===== Esporta / Importa config (master → kiosk) — il punto verde resta locale ===== */
+function exportConfig(){ S._floors[S._fi]=snap();
+  const out={company:S.company, _floors:S._floors.map(f=>Object.assign({},f,{here:null}))};
+  const blob=new Blob([JSON.stringify(out)],{type:'application/json'}); const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download='wayfinding_config.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
+function importConfig(e){ const f=e.target.files[0]; if(!f)return; const r=new FileReader();
+  r.onload=()=>{ try{ const o=JSON.parse(r.result); if(!o._floors)throw 0;
+    const localHere=S._floors.map(fl=>fl.here);                       // conserva il "tu sei qui" di questo totem
+    S.company=o.company||S.company; S._floors=o._floors.map((fl,i)=>Object.assign({},fl,{here:localHere[i]||null})); S._fi=0; applyFloor(0); save(); render();
+    alert('Configurazione scaricata su questo kiosk. Ora imposta il "Tu sei qui" di QUESTO totem (è l\'unica cosa locale).');
+  }catch(_){ alert('File non valido.'); } }; r.readAsText(f); e.target.value=''; }
+
+/* ===== AVVIO ===== */
+render();
+if(new URLSearchParams(location.search).get('admin')==='1') setMode('admin');   // aperto da Impostazioni del Concierge → Configura diretta
+setTimeout(()=>{ if(mode==='guest'&&visibleDests()[0]) onPin(visibleDests()[0]); },700);
+</script>
+</body></html>
