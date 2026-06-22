@@ -3416,7 +3416,7 @@ async function apriMappa(admin){
   document.getElementById('wfFrame').src='wayfinding.html?lang='+encodeURIComponent(uiLang())+(admin===true?'&admin=1':'');   // da Impostazioni = Configura (già protetto dal PIN del Concierge)
   ov.style.display=''; resetInattivita();
 }
-function chiudiMappa(){ const ov=document.getElementById('wfPageOverlay'); if(ov)ov.style.display='none'; const f=document.getElementById('wfFrame'); if(f)f.src='about:blank'; resetInattivita(); }
+function chiudiMappa(){ const ov=document.getElementById('wfPageOverlay'); if(ov)ov.style.display='none'; const f=document.getElementById('wfFrame'); if(f)f.src='about:blank'; aggiornaBtnMappa(); resetInattivita(); }   // dopo la config, mostra/aggiorna subito il bottone Mappa
 
 /* ===== Sync della mappa interattiva: la config viaggia col gruppo (mirror 'concierge_wf'), il "TU SEI QUI" resta LOCALE a ogni totem. Override additivo. ===== */
 function gatherSyncConfig(){
