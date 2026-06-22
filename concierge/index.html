@@ -3421,7 +3421,7 @@ function chiudiMappa(){ const ov=document.getElementById('wfPageOverlay'); if(ov
 /* ===== Sync della mappa interattiva: la config viaggia col gruppo (mirror 'concierge_wf'), il "TU SEI QUI" resta LOCALE a ogni totem. Override additivo. ===== */
 function gatherSyncConfig(){
   try{ const w=JSON.parse(localStorage.getItem('wayfind_proto_v5')||'null');
-    if(w&&w._floors){ const m={company:w.company,_floors:w._floors.map(f=>Object.assign({},f,{here:null})),_fi:0}; localStorage.setItem('concierge_wf', JSON.stringify(m)); }   // mirror senza il verde
+    if(w&&w._floors){ const m={company:w.company,_floors:w._floors.map(f=>Object.assign({},f,{here:null,img:null})),_fi:0}; localStorage.setItem('concierge_wf', JSON.stringify(m)); }   // mirror senza il verde e senza immagini (per-dispositivo)
   }catch(_){}
   const o={}; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.indexOf('concierge_')===0 && SYNC_SKIP.indexOf(k)<0) o[k]=localStorage.getItem(k); } return o;
 }
@@ -3431,8 +3431,9 @@ function applyRemoteConfig(dati, ver){
   Object.keys(dati||{}).forEach(k=>{ if(k.indexOf('concierge_')===0 && SYNC_SKIP.indexOf(k)<0) localStorage.setItem(k, dati[k]); });
   try{ const remote=JSON.parse(localStorage.getItem('concierge_wf')||'null');                 // ricostruisci il wayfinding dal mirror...
     if(remote&&remote._floors){ let local=null; try{ local=JSON.parse(localStorage.getItem('wayfind_proto_v5')||'null'); }catch(_){}
-      const lh=(local&&local._floors)?local._floors.map(f=>f&&f.here):[];                      // ...mantenendo il "TU SEI QUI" di QUESTO totem
-      const merged={company:remote.company,_floors:remote._floors.map((f,i)=>Object.assign({},f,{here:(lh[i]||null)})),_fi:0};
+      const lh=(local&&local._floors)?local._floors.map(f=>f&&f.here):[];                      // ...mantenendo "TU SEI QUI" e l'immagine LOCALE di QUESTO totem
+      const li=(local&&local._floors)?local._floors.map(f=>f&&f.img):[];
+      const merged={company:remote.company,_floors:remote._floors.map((f,i)=>Object.assign({},f,{here:(lh[i]||null),img:(li[i]||null)})),_fi:0};
       if(local&&local.pin) merged.pin=local.pin;
       localStorage.setItem('wayfind_proto_v5', JSON.stringify(merged));
     }

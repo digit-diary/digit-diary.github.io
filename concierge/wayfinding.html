@@ -117,7 +117,7 @@
     </select>
     <input type="text" id="company" class="adminOnly" oninput="onCompany()">
     <label class="b adminOnly" id="lblImport" for="fileMap" data-ic="image"></label>
-    <input type="file" id="fileMap" accept="image/*" class="hidden" onchange="importMap(event)">
+    <input type="file" id="fileMap" accept="image/*,application/pdf" class="hidden" onchange="importMap(event)">
     <button class="b adminOnly" id="btnBg" onclick="toggleBg()"></button>
     <button class="b adminOnly" id="btnDemo" data-ic="sparkle" onclick="loadCasino()"></button>
     <button class="b adminOnly" id="btnPin" data-ic="key" data-lbl="PIN" onclick="changePin()"></button>
@@ -137,6 +137,9 @@
     <button class="b"    data-tool="link" data-ic="link" onclick="setTool('link')"></button>
     <button class="b"    data-ic="sparkle" onclick="autoLink()" id="btnAuto"></button>
     <button class="b"    data-tool="del"  data-ic="trash" onclick="setTool('del')"></button>
+    <span class="badge">AI:</span>
+    <button class="b" id="btnOcr" data-ic="sparkle" data-lbl="Leggi piantina" onclick="ocrRead()"></button>
+    <button class="b" id="btnTr" data-ic="sparkle" data-lbl="Traduci nomi" onclick="translateAll()"></button>
   </div>
   <div class="tools hidden" id="adminHint"><span class="badge" id="hintTxt" style="opacity:.8;color:var(--oro)"></span></div>
 
@@ -313,6 +316,15 @@ function snap(){ return {name:S._floors[S._fi].name, img:S.img,imgW:S.imgW,imgH:
 function applyFloor(i){ const f=S._floors[i]; S._fi=i; S.img=f.img;S.imgW=f.imgW;S.imgH=f.imgH;S.showBg=f.showBg;S.nodes=f.nodes;S.edges=f.edges;S.dests=f.dests;S.here=f.here; }
 function save(){ try{ S._floors[S._fi]=snap(); localStorage.setItem(LS,JSON.stringify(S)); }catch(_){ } }
 function load(){ try{ const o=JSON.parse(localStorage.getItem(LS)||'null'); return (o&&o._floors)?o:null; }catch(_){ return null; } }
+/* ===== Immagini in IndexedDB (per-dispositivo). In config si salva solo un riferimento 'idb:token', non il dataURL ===== */
+let _wfdb=null, _imgCache={};
+function wfDB(){ return new Promise((res,rej)=>{ if(_wfdb)return res(_wfdb); const rq=indexedDB.open('wf_images',1);
+  rq.onupgradeneeded=e=>{ const db=e.target.result; if(!db.objectStoreNames.contains('img')) db.createObjectStore('img'); };
+  rq.onsuccess=e=>{ _wfdb=e.target.result; res(_wfdb); }; rq.onerror=()=>rej(); }); }
+function wfImgPut(key,v){ return wfDB().then(db=>new Promise((res,rej)=>{ const tx=db.transaction('img','readwrite'); tx.objectStore('img').put(v,key); tx.oncomplete=res; tx.onerror=rej; })).catch(()=>{}); }
+function wfImgGet(key){ return wfDB().then(db=>new Promise(res=>{ const tx=db.transaction('img','readonly'); const r=tx.objectStore('img').get(key); r.onsuccess=()=>res(r.result||null); r.onerror=()=>res(null); })).catch(()=>null); }
+function imgSrc(){ const v=S.img; if(!v)return ''; if(v.indexOf('idb:')===0) return _imgCache[v]||''; return v; }   // dataURL/URL pronto da mostrare
+function ensureImg(cb){ const v=S.img; if(v&&v.indexOf('idb:')===0&&!_imgCache[v]){ wfImgGet(v).then(d=>{ if(d)_imgCache[v]=d; if(cb)cb(); }); } }
 
 /* ===== SVG utils (coordinate nel sistema del viewport, così zoom/pan sono trasparenti) ===== */
 const svg=document.getElementById('svg');
@@ -320,6 +332,22 @@ function svgXY(evt){ const vp=document.getElementById('viewport'); const pt=svg.
   pt.x=t.clientX; pt.y=t.clientY; const p=pt.matrixTransform(vp.getScreenCTM().inverse()); return {x:Math.round(p.x),y:Math.round(p.y)}; }
 function nid(){ return Math.floor(performance.now())%1e7 + Math.floor((performance.now()*1000)%1000); }
 function esc(s){ return (s||'').replace(/[<&>]/g,c=>({'<':'&lt;','&':'&amp;','>':'&gt;'}[c])); }
+function displayName(d){ return (d&&d.t&&d.t[uiLang])||(d&&d.name)||''; }   // nome tradotto se disponibile, altrimenti l'originale
+function loadScript(src){ return new Promise((res,rej)=>{ if([].slice.call(document.scripts).some(s=>s.src===src))return res(); const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('rete')); document.head.appendChild(s); }); }
+/* Traduzione nomi via Groq (usa la chiave del Concierge se presente). Solo in setup. */
+async function translateName(name){
+  const key=(localStorage.getItem('concierge_groq_key')||'').trim(); if(!key||!name) return null;
+  const p='Traduci questo nome di luogo/insegna nelle lingue indicate. Se è un NOME PROPRIO o un marchio, lascialo INVARIATO. Rispondi SOLO con JSON con queste chiavi esatte: it,en,de,fr,es,ru,zh,ar. Nome: "'+name+'"';
+  try{ const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:'llama-3.3-70b-versatile',temperature:0,response_format:{type:'json_object'},messages:[{role:'user',content:p}]})});
+    if(!r.ok) return null; const d=await r.json(); const o=JSON.parse(d.choices[0].message.content); return (o&&o.it)?o:null;
+  }catch(_){ return null; } }
+async function translateAll(){
+  const key=(localStorage.getItem('concierge_groq_key')||'').trim();
+  if(!key){ alert('Manca la chiave Groq: impostala nel Concierge (⚙️ → API e Voce). Poi riprova.'); return; }
+  showBanner(svgIco('sparkle',18)+'<span>Traduzione nomi…</span>','',null);
+  for(const fl of S._floors){ for(const d of (fl.dests||[])){ const t=await translateName(d.name); if(t) d.t=t; } }
+  save(); render(); hideBanner(); alert('Nomi tradotti nelle 8 lingue. Cambia lingua per verificare.');
+}
 function svgIco(k,sz){ sz=sz||18; return '<svg viewBox="0 0 24 24" width="'+sz+'" height="'+sz+'" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+(ICON[k]||ICON.pin)+'</svg>'; }
 
 /* ===== ROUTING (Dijkstra) ===== */
@@ -370,8 +398,9 @@ function applyViewBox(){ const W=(S.img&&S.imgW)?S.imgW:1000, H=(S.img&&S.imgH)?
   svg.querySelectorAll(':scope > rect[fill^="url"]').forEach(r=>{r.setAttribute('width',W);r.setAttribute('height',H);}); }
 function applyView(){ document.getElementById('viewport').setAttribute('transform','translate('+view.tx+' '+view.ty+') scale('+view.s+')'); }
 function renderBg(){ const demo=document.getElementById('gDemo'),img=document.getElementById('bgImg'),tint=document.getElementById('bgTint');
-  const usaP=!!(S.img&&S.showBg);
-  if(S.img){ img.setAttributeNS('http://www.w3.org/1999/xlink','href',S.img); img.setAttribute('href',S.img); }
+  const src=imgSrc(); const usaP=!!(S.img&&S.showBg&&src);
+  if(S.img&&!src) ensureImg(()=>renderBg());                 // immagine in IndexedDB: caricala e ridisegna
+  if(src){ img.setAttributeNS('http://www.w3.org/1999/xlink','href',src); img.setAttribute('href',src); }
   img.classList.toggle('hidden', !usaP); tint.classList.toggle('hidden', !usaP); demo.classList.toggle('hidden', !!S.img);
   if(!demo.childNodes.length){ const rooms=[[60,60,300,180,'SALA A'],[640,60,300,180,'SALA B'],[60,470,300,170,'BAR'],[640,470,300,170,'SERVIZI'],[380,40,240,150,'RECEPTION']];
     demo.innerHTML=rooms.map(([x,y,w,h,l])=>'<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="16" class="zone"/><text x="'+(x+w/2)+'" y="'+(y+h/2+5)+'" class="zoneLbl">'+l+'</text>').join(''); } }
@@ -382,11 +411,11 @@ function renderNodes(){ const g=document.getElementById('gNodes'); if(mode!=='ad
   g.querySelectorAll('[data-node]').forEach(c=>{ const id=+c.getAttribute('data-node');
     c.addEventListener('pointerdown',e=>{ if(tool!=='del'&&tool!=='link'){ e.stopPropagation(); _nodeMoved=false; _dragNode={id,sx:e.clientX,sy:e.clientY,moved:false}; } });
     c.addEventListener('click',e=>{ e.stopPropagation(); if(_nodeMoved){_nodeMoved=false;return;} onNode(id); }); }); }
-function visibleDests(){ return S.dests.filter(d=>(!filterCat||catOf(d.ic)===filterCat) && (!query||d.name.toLowerCase().includes(query.toLowerCase()))); }
+function visibleDests(){ const q=query.toLowerCase(); return S.dests.filter(d=>(!filterCat||catOf(d.ic)===filterCat) && (!q||d.name.toLowerCase().includes(q)||displayName(d).toLowerCase().includes(q))); }
 function pinMarkup(d,dim){ return '<g class="pin'+(activeDest===d.id?' active':'')+(dim?' dim':'')+'" data-id="'+d.id+'">'+
   '<circle cx="'+d.x+'" cy="'+d.y+'" r="16" class="pinBody"/>'+
   '<g class="pinIcon" transform="translate('+d.x+','+d.y+') scale(.6) translate(-12,-12)">'+(ICON[d.ic]||ICON.pin)+'</g>'+
-  '<text x="'+d.x+'" y="'+(d.y-24)+'" class="pinTxt">'+esc(d.name)+'</text></g>'; }
+  '<text x="'+d.x+'" y="'+(d.y-24)+'" class="pinTxt">'+esc(displayName(d))+'</text></g>'; }
 function renderDests(){ const g=document.getElementById('gDests'); const vis=new Set(visibleDests().map(d=>d.id));
   g.innerHTML=S.dests.map(d=>pinMarkup(d, mode==='guest'&&!vis.has(d.id))).join('');
   g.querySelectorAll('[data-id]').forEach(el=>{ const d=S.dests.find(x=>x.id===+el.getAttribute('data-id'));
@@ -400,9 +429,9 @@ function renderChips(){ const box=document.getElementById('chips'); if(mode!=='g
   present.forEach(id=>{ html+='<button class="'+(filterCat===id?'on':'')+'" onclick="setFilter(\''+id+'\')">'+catName(id)+'</button>'; });
   box.innerHTML=html; }
 function renderDestBtns(){ const box=document.getElementById('destBtns'); if(mode!=='guest'){box.classList.add('hidden');box.innerHTML='';return;}
-  box.classList.remove('hidden'); box.innerHTML=visibleDests().map(d=>'<button data-id="'+d.id+'" class="'+(activeDest===d.id?'on':'')+'">'+svgIco(d.ic,18)+'<span>'+esc(d.name)+'</span></button>').join('');
+  box.classList.remove('hidden'); box.innerHTML=visibleDests().map(d=>'<button data-id="'+d.id+'" class="'+(activeDest===d.id?'on':'')+'">'+svgIco(d.ic,18)+'<span>'+esc(displayName(d))+'</span></button>').join('');
   box.querySelectorAll('button[data-id]').forEach(b=>b.onclick=()=>onPin(S.dests.find(x=>x.id===+b.getAttribute('data-id'))));
-  otherFloorMatches().forEach(m=>{ const b=document.createElement('button'); b.style.opacity='.8'; b.innerHTML=svgIco(m.d.ic,18)+'<span>'+esc(m.d.name)+' · '+esc(m.fname)+'</span>'; b.onclick=()=>goCross(m.fi,m.d.id); box.appendChild(b); }); }
+  otherFloorMatches().forEach(m=>{ const b=document.createElement('button'); b.style.opacity='.8'; b.innerHTML=svgIco(m.d.ic,18)+'<span>'+esc(displayName(m.d))+' · '+esc(m.fname)+'</span>'; b.onclick=()=>goCross(m.fi,m.d.id); box.appendChild(b); }); }
 
 /* ===== PERCORSO + frecce + distanza/tempo + scheda ===== */
 const routeEl=document.getElementById('route'),flowEl=document.getElementById('routeFlow'),hintG=document.getElementById('gRouteHint'),arrowG=document.getElementById('gArrows'),dot=document.getElementById('dot');
@@ -417,7 +446,7 @@ function floorElevator(fi, pt){ const fl=S._floors[fi]; if(!fl||!fl.dests)return
   const ev=fl.dests.filter(d=>d.ic==='elevator'||d.ic==='stairs'); if(!ev.length)return null;
   if(!pt)return ev[0]; let b=ev[0],bd=1e9; ev.forEach(e=>{const dd=Math.hypot(e.x-pt.x,e.y-pt.y);if(dd<bd){bd=dd;b=e;}}); return b; }
 function otherFloorMatches(){ if(!S._floors||S._floors.length<2)return []; const q=query.toLowerCase(); const res=[];
-  S._floors.forEach((fl,fi)=>{ if(fi===S._fi)return; (fl.dests||[]).forEach(d=>{ if((!filterCat||catOf(d.ic)===filterCat)&&(!q||d.name.toLowerCase().includes(q))) res.push({d,fi,fname:fl.name||('Piano '+(fi+1))}); }); }); return res; }
+  S._floors.forEach((fl,fi)=>{ if(fi===S._fi)return; (fl.dests||[]).forEach(d=>{ if((!filterCat||catOf(d.ic)===filterCat)&&(!q||d.name.toLowerCase().includes(q)||displayName(d).toLowerCase().includes(q))) res.push({d,fi,fname:fl.name||('Piano '+(fi+1))}); }); }); return res; }
 function goCross(targetFi, destId){
   if(targetFi===S._fi){ const d=S.dests.find(x=>x.id===destId); if(d)showRoute(d); return; }
   const evHere=floorElevator(S._fi, S.here); const targetName=(S._floors[targetFi].name)||('Piano '+(targetFi+1));
@@ -454,7 +483,7 @@ function showRoute(d, fromPt){ hideBanner(); const from=fromPt||S.here; if(!from
 }
 function showCard(d,meters,mins){ const c=document.getElementById('card');
   document.getElementById('cardIc').innerHTML='<svg viewBox="0 0 24 24">'+(ICON[d.ic]||ICON.pin)+'</svg>';
-  document.getElementById('cardName').textContent=d.name;
+  document.getElementById('cardName').textContent=displayName(d);
   document.getElementById('cardSub').textContent=(tr().sub[catOf(d.ic)]||'');
   document.getElementById('cardDist').innerHTML=svgIco('walk',14)+'<span>~'+meters+' m · ~'+mins+' '+tr().min+'</span>';
   c.classList.add('on'); }
@@ -494,10 +523,12 @@ function openDest(d,pos){ ovEditId=d?d.id:null; ovPos=pos||null; ovIcon=d?d.ic:'
 function renderIcoGrid(){ document.getElementById('ovIcons').innerHTML=CATS[ovCat].k.map(k=>'<button data-k="'+k+'" class="'+(k===ovIcon?'on':'')+'">'+svgIco(k,20)+'</button>').join('');
   document.querySelectorAll('#ovIcons button').forEach(b=>b.onclick=()=>{ ovIcon=b.getAttribute('data-k'); document.querySelectorAll('#ovIcons button').forEach(x=>x.classList.toggle('on',x===b)); }); }
 function ovClose(){ document.getElementById('ov').classList.remove('on'); }
-function ovSave(){ const name=document.getElementById('ovName').value.trim()||'Punto';
-  if(ovEditId){ const d=S.dests.find(x=>x.id===ovEditId); if(d){d.name=name;d.ic=ovIcon;} }
-  else { const p=ovPos||{x:500,y:350}; S.dests.push({id:nid(),name,ic:ovIcon,x:p.x,y:p.y}); }
-  save(); render(); ovClose(); }
+function ovSave(){ const name=document.getElementById('ovName').value.trim()||'Punto'; let dest;
+  if(ovEditId){ dest=S.dests.find(x=>x.id===ovEditId); if(dest){ dest.name=name; dest.ic=ovIcon; dest.t=null; } }
+  else { const p=ovPos||{x:500,y:350}; dest={id:nid(),name,ic:ovIcon,x:p.x,y:p.y}; S.dests.push(dest); }
+  save(); render(); ovClose();
+  if(dest) translateName(name).then(t=>{ if(t&&S.dests.indexOf(dest)>=0){ dest.t=t; save(); render(); } });   // traduce in background e salva
+}
 function ovDelete(){ if(ovEditId){ S.dests=S.dests.filter(x=>x.id!==ovEditId); save(); render(); } ovClose(); }
 
 /* ===== Zoom rimosso: la mappa si vede sempre intera (niente confusione sul totem) ===== */
@@ -542,8 +573,33 @@ function decorateUIstrings(){ const t=tr();
 function updateBgBtn(){ const b=document.getElementById('btnBg'); if(!b)return; b.innerHTML=svgIco('image',16)+'<span>'+(S.showBg?tr().plan:tr().clean)+'</span>'; b.classList.toggle('on',!!S.showBg); b.style.opacity=S.img?'1':'.5'; }
 function toggleBg(){ if(!S.img){ alert('Importa prima una piantina.'); return; } S.showBg=!S.showBg; save(); render(); }
 function updateFoot(){ document.getElementById('footNote').innerHTML='Destinazioni: <b>'+S.dests.length+'</b> · Nodi: <b>'+S.nodes.length+'</b> · '+(S.here?'<span style="color:#3ad07a">Totem ✓</span>':'<span style="color:#ffd479">Totem da impostare</span>')+' · '+tr().tap; }
-function importMap(e){ const f=e.target.files[0]; if(!f)return; const r=new FileReader();
-  r.onload=()=>{ const im=new Image(); im.onload=()=>{ S.img=r.result; S.imgW=im.naturalWidth; S.imgH=im.naturalHeight; S.showBg=true; zoomReset(); save(); render(); }; im.src=r.result; }; r.readAsDataURL(f); e.target.value=''; }
+function importMap(e){ const f=e.target.files[0]; if(!f)return;
+  if(f.type==='application/pdf'){ importPdf(f); e.target.value=''; return; }
+  const r=new FileReader();
+  r.onload=()=>{ const im=new Image(); im.onload=()=>{ const tok='idb:'+nid(); _imgCache[tok]=r.result; wfImgPut(tok,r.result); S.img=tok; S.imgW=im.naturalWidth; S.imgH=im.naturalHeight; S.showBg=true; zoomReset(); save(); render(); }; im.src=r.result; }; r.readAsDataURL(f); e.target.value=''; }
+async function importPdf(f){
+  showBanner(svgIco('image',18)+'<span>Conversione PDF…</span>','',null);
+  try{ await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const buf=await f.arrayBuffer(); const pdf=await pdfjsLib.getDocument({data:buf}).promise; const page=await pdf.getPage(1);
+    const vp=page.getViewport({scale:2}); const c=document.createElement('canvas'); c.width=vp.width; c.height=vp.height;
+    await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+    const url=c.toDataURL('image/jpeg',0.85); const tok='idb:'+nid(); _imgCache[tok]=url; wfImgPut(tok,url); S.img=tok; S.imgW=Math.round(vp.width); S.imgH=Math.round(vp.height); S.showBg=true; zoomReset(); save(); render(); hideBanner();
+  }catch(err){ hideBanner(); alert('PDF non convertito (serve connessione a internet): '+(err.message||err)); }
+}
+async function ocrRead(){
+  const src=imgSrc(); if(!src){ alert('Importa prima una piantina.'); return; }
+  showBanner(svgIco('sparkle',18)+'<span>Lettura piantina (AI)…</span>','',null);
+  try{ await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
+    const lang=(uiLang==='it')?'ita':(uiLang==='de'?'deu':(uiLang==='fr'?'fra':(uiLang==='es'?'spa':'eng')));
+    const res=await Tesseract.recognize(src, lang+'+eng');
+    const words=((res.data&&res.data.words)||[]).filter(w=>w.confidence>55 && /[A-Za-zÀ-ÿ]{3,}/.test(w.text));
+    let n=0; words.forEach(w=>{ const b=w.bbox; const cx=Math.round((b.x0+b.x1)/2), cy=Math.round((b.y0+b.y1)/2);
+      S.dests.push({id:nid(),name:(w.text.replace(/[^A-Za-zÀ-ÿ0-9' ]/g,'').trim()||'Punto'),ic:'pin',x:cx,y:cy}); n++; });
+    save(); render(); hideBanner();
+    alert('Proposti '+n+' punti dalla piantina. Ora: rinomina/sposta quelli giusti ed ELIMINA i superflui. Poi "Traduci nomi" per le 8 lingue.');
+  }catch(err){ hideBanner(); alert('Lettura non riuscita (serve connessione): '+(err.message||err)); }
+}
 function resetAll(){ if(!confirm('Azzerare tutto e tornare alla demo?'))return; S=demoState(); zoomReset(); save(); setMode('guest'); render(); }
 function loadCasino(){ const f={ name:'Piano terra', img:'demo_venue.svg', imgW:1000, imgH:720, showBg:true,
   nodes:[{id:101,x:130,y:235},{id:102,x:360,y:235},{id:103,x:660,y:235},{id:104,x:910,y:235},{id:105,x:130,y:460},{id:106,x:360,y:460},{id:107,x:660,y:460},{id:108,x:910,y:460},{id:109,x:360,y:350},{id:110,x:660,y:350}],
