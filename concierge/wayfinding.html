@@ -140,6 +140,7 @@
     <button class="b on" data-tool="dest" data-ic="pin"  onclick="setTool('dest')"></button>
     <button class="b"    data-tool="here" data-ic="here" onclick="setTool('here')"></button>
     <span class="badge">DISEGNA MAPPA:</span>
+    <button class="b" id="btnNew" data-ic="room" data-lbl="Crea mappa (foglio bianco)" onclick="newBlankMap()"></button>
     <button class="b"    data-tool="zone" data-ic="room" onclick="setTool('zone')"></button>
     <button class="b"    data-tool="wall" data-ic="wall" onclick="setTool('wall')"></button>
     <button class="b"    data-tool="door" data-ic="door" onclick="setTool('door')"></button>
@@ -456,9 +457,11 @@ function renderBg(){ const demo=document.getElementById('gDemo'),img=document.ge
   if(S.zones && S.zones.length){                                   // mappa DISEGNATA: quadranti/stanze
     demo.innerHTML=S.zones.map(z=>'<rect x="'+z.x+'" y="'+z.y+'" width="'+z.w+'" height="'+z.h+'" rx="10" class="zone" data-zone="'+z.id+'"/><text x="'+(z.x+z.w/2)+'" y="'+(z.y+z.h/2+5)+'" class="zoneLbl">'+esc(z.name||'')+'</text>').join('');
     if(mode==='admin') demo.querySelectorAll('[data-zone]').forEach(r=>r.addEventListener('click',e=>{ if(tool==='del'){ e.stopPropagation(); const id=+r.getAttribute('data-zone'); S.zones=(S.zones||[]).filter(z=>z.id!==id); save(); render(); } }));
-  } else {                                                          // segnaposto demo (finché non disegni/importi)
+  } else if(mode!=='admin'){                                        // segnaposto demo SOLO per l'ospite (anteprima)
     const rooms=[[60,60,300,180,'SALA A'],[640,60,300,180,'SALA B'],[60,470,300,170,'BAR'],[640,470,300,170,'SERVIZI'],[380,40,240,150,'RECEPTION']];
     demo.innerHTML=rooms.map(r=>'<rect x="'+r[0]+'" y="'+r[1]+'" width="'+r[2]+'" height="'+r[3]+'" rx="16" class="zone"/><text x="'+(r[0]+r[2]/2)+'" y="'+(r[1]+r[3]/2+5)+'" class="zoneLbl">'+r[4]+'</text>').join('');
+  } else {                                                          // ADMIN su foglio vuoto → pronto a disegnare
+    demo.innerHTML='<text x="500" y="350" text-anchor="middle" fill="#4a4458" font-size="22" letter-spacing="1">Disegna la tua mappa: Stanza · Muro · Porta · Corridoio</text>';
   } }
 function renderEdges(){ const g=document.getElementById('gEdges'); if(mode!=='admin'){g.innerHTML='';return;}
   g.innerHTML=S.edges.map(([x,y])=>{const A=S.nodes.find(n=>n.id===x),B=S.nodes.find(n=>n.id===y); return A&&B?'<line x1="'+A.x+'" y1="'+A.y+'" x2="'+B.x+'" y2="'+B.y+'" class="edge"/>':'';}).join(''); }
@@ -708,6 +711,18 @@ window.addEventListener('pointerup', ()=>{ if(!_draw)return; const d=_draw; _dra
   if(d.t==='zone'){ const x=Math.min(d.sx,d.ex),y=Math.min(d.sy,d.ey),w=Math.abs(d.ex-d.sx),h=Math.abs(d.ey-d.sy); if(w>25&&h>25){ const name=prompt('Nome stanza (es. Sala B):',''); S.zones=S.zones||[]; S.zones.push({id:nid(),x,y,w,h,name:(name||'').trim()}); save(); render(); } }
   else if(d.t==='wall'){ if(Math.hypot(d.ex-d.sx,d.ey-d.sy)>15){ S.walls=S.walls||[]; S.walls.push({id:nid(),x1:d.sx,y1:d.sy,x2:d.ex,y2:d.ey}); save(); render(); } }
   else if(d.t==='corr'){ if(Math.hypot(d.ex-d.sx,d.ey-d.sy)>15){ const a=nodeAt(d.sx,d.sy),b=nodeAt(d.ex,d.ey); if(a.id!==b.id && !S.edges.some(([x,y])=>(x===a.id&&y===b.id)||(x===b.id&&y===a.id))) S.edges.push([a.id,b.id]); save(); render(); } } });
+/* ===== Crea mappa: chiede il nome, poi foglio bianco pronto a disegnare ===== */
+function newBlankMap(){
+  if((S.zones&&S.zones.length)||(S.walls&&S.walls.length)||S.img||(S.dests&&S.dests.length)){
+    if(!confirm('Creare una NUOVA mappa da disegnare su questo piano? Cancella ciò che c’è ora su questo piano.')) return;
+  }
+  const nm=prompt('Nome della mappa (es. Piano Terra, Centro, Casinò):', S._floors[S._fi].name||'');
+  if(nm===null) return;
+  S.img=null; S.imgW=null; S.imgH=null; S.showBg=false; S.zones=[]; S.walls=[]; S.doors=[]; S.nodes=[]; S.edges=[]; S.dests=[]; S.here=null;
+  S._floors[S._fi].name = nm.trim() || S._floors[S._fi].name || 'Mappa';
+  if(!S.company || S.company==='La tua azienda') S.company = S._floors[S._fi].name;
+  save(); setMode('admin'); setTool('wall'); render();
+}
 /* ===== Esporta mappa (PDF, fallback PNG) ===== */
 const EXPORT_CSS='.zone{fill:#221d2e;stroke:#5a5470;stroke-width:1.5}.zoneLbl{fill:#9a8fb5;font:600 14px sans-serif;text-anchor:middle}.wall{stroke:#6b6480;stroke-width:9;stroke-linecap:round}.doorGap{stroke:#0e0b16;stroke-width:12}.door{stroke:#e8d5a3;stroke-width:2.5;fill:none}.route{stroke:#e8d5a3;stroke-width:6;fill:none}.route-flow{display:none}.pinBody{fill:#e8d5a3;stroke:#1a1622}.pinIcon{stroke:#1a1622;stroke-width:2.3;fill:none}.pinTxt{fill:#fff;font:600 12.5px sans-serif;text-anchor:middle}.here{fill:#3ad07a;stroke:#fff}.here-ring{display:none}.here-tag{fill:#fff;font:700 11.5px sans-serif;text-anchor:middle}.chev{stroke:#fff;stroke-width:2.4;fill:none}.dot{display:none}';
 async function exportMap(){
