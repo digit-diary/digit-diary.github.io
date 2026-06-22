@@ -635,6 +635,12 @@ function importConfig(e){ const f=e.target.files[0]; if(!f)return; const r=new F
 /* ===== AVVIO ===== */
 render();
 if(new URLSearchParams(location.search).get('admin')==='1') setMode('admin');   // aperto da Impostazioni del Concierge → Configura diretta
-setTimeout(()=>{ if(mode==='guest') resetIdle(); },700);   // apre PULITA (niente percorso automatico), avvia il timer di rientro
+const _goto=new URLSearchParams(location.search).get('goto');                   // l'AI chiede di mostrare un punto
+setTimeout(()=>{ if(mode==='guest'){ if(_goto) gotoDest(_goto); else resetIdle(); } },700);
+function gotoDest(name){ const q=(name||'').toLowerCase(); if(!q) return;
+  for(let fi=0; fi<S._floors.length; fi++){ const fl=S._floors[fi];
+    const d=(fl.dests||[]).find(x=>{ const forms=[x.name].concat(x.t?Object.keys(x.t).map(k=>x.t[k]):[]); return forms.some(f=>{ f=(''+(f||'')).toLowerCase(); return f && (f.indexOf(q)>=0 || q.indexOf(f)>=0); }); });
+    if(d){ if(fi===S._fi) onPin(d); else goCross(fi, d.id); return; }
+  } }
 </script>
 </body></html>
