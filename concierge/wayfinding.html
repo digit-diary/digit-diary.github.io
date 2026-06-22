@@ -22,6 +22,13 @@
   .tools{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;align-items:center;margin-bottom:8px;max-width:920px}
   .tools button{font-size:12.5px;padding:7px 11px}
   .badge{font-size:11px;opacity:.5;align-self:center}
+  .tgrp{display:inline-flex;align-items:center;gap:6px;padding:5px 14px;border-right:1px solid rgba(232,213,163,.18)}
+  .tgrp:last-child{border-right:none}
+  .tgrp .badge{margin-right:3px;text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+  .editctl{position:absolute;top:12px;right:14px;display:flex;gap:6px;z-index:6}
+  .editctl button{width:40px;height:40px;border-radius:11px;border:1px solid rgba(232,213,163,.4);background:rgba(20,16,30,.88);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .editctl button:hover{background:rgba(232,213,163,.22)}
+  .editctl button svg{width:19px;height:19px}
   /* ricerca + chip (ospite) */
   .askwrap{display:flex;flex-direction:column;align-items:center;gap:7px;margin-bottom:9px;width:min(94vw,760px)}
   .askbar{display:flex;gap:8px;width:100%;align-items:center}
@@ -136,26 +143,31 @@
 
   <!-- Strumenti admin -->
   <div class="tools hidden" id="adminTools">
-    <span class="badge">SEMPLICE:</span>
-    <button class="b on" data-tool="dest" data-ic="pin"  onclick="setTool('dest')"></button>
-    <button class="b"    data-tool="here" data-ic="here" onclick="setTool('here')"></button>
-    <span class="badge">DISEGNA MAPPA:</span>
-    <button class="b" id="btnNew" data-ic="room" data-lbl="Crea mappa (foglio bianco)" onclick="newBlankMap()"></button>
-    <button class="b"    data-tool="zone" data-ic="room" onclick="setTool('zone')"></button>
-    <button class="b"    data-tool="wall" data-ic="wall" onclick="setTool('wall')"></button>
-    <button class="b"    data-tool="door" data-ic="door" onclick="setTool('door')"></button>
-    <button class="b"    data-tool="corr" data-ic="corr" onclick="setTool('corr')"></button>
-    <span class="badge">CORRIDOI (avanz.):</span>
-    <button class="b"    data-tool="node" data-ic="dot"  onclick="setTool('node')"></button>
-    <button class="b"    data-tool="link" data-ic="link" onclick="setTool('link')"></button>
-    <button class="b"    data-ic="sparkle" onclick="autoLink()" id="btnAuto"></button>
-    <button class="b"    data-tool="del"  data-ic="trash" onclick="setTool('del')"></button>
-    <button class="b" id="btnUndo" data-ic="undo" data-lbl="Annulla" onclick="undo()"></button>
-    <button class="b" id="btnRedo" data-ic="redo" data-lbl="Ripeti" onclick="redo()"></button>
-    <button class="b" id="btnExport" data-ic="download" data-lbl="Esporta PDF" onclick="exportMap()"></button>
-    <span class="badge">AI:</span>
-    <button class="b" id="btnOcr" data-ic="sparkle" data-lbl="Leggi piantina" onclick="ocrRead()"></button>
-    <button class="b" id="btnTr" data-ic="sparkle" data-lbl="Traduci nomi" onclick="translateAll()"></button>
+    <span class="tgrp">
+      <span class="badge">Punti</span>
+      <button class="b on" data-tool="dest" data-ic="pin"  onclick="setTool('dest')"></button>
+      <button class="b"    data-tool="here" data-ic="here" onclick="setTool('here')"></button>
+    </span>
+    <span class="tgrp">
+      <span class="badge">Disegna</span>
+      <button class="b" id="btnNew" data-ic="room" data-lbl="Crea mappa" onclick="newBlankMap()"></button>
+      <button class="b" data-tool="zone" data-ic="room" onclick="setTool('zone')"></button>
+      <button class="b" data-tool="wall" data-ic="wall" onclick="setTool('wall')"></button>
+      <button class="b" data-tool="door" data-ic="door" onclick="setTool('door')"></button>
+      <button class="b" data-tool="corr" data-ic="corr" onclick="setTool('corr')"></button>
+    </span>
+    <span class="tgrp">
+      <button class="b" data-tool="del" data-ic="trash" onclick="setTool('del')"></button>
+      <button class="b" id="btnAdv" data-lbl="Avanzate" onclick="toggleAdv()"></button>
+    </span>
+    <span class="tgrp hidden" id="advTools">
+      <span class="badge">Avanzate</span>
+      <button class="b" data-tool="node" data-ic="dot"  onclick="setTool('node')"></button>
+      <button class="b" data-tool="link" data-ic="link" onclick="setTool('link')"></button>
+      <button class="b" id="btnAuto" data-ic="sparkle" onclick="autoLink()"></button>
+      <button class="b" id="btnOcr" data-ic="sparkle" data-lbl="Leggi piantina" onclick="ocrRead()"></button>
+      <button class="b" id="btnTr" data-ic="sparkle" data-lbl="Traduci nomi" onclick="translateAll()"></button>
+    </span>
   </div>
   <div class="tools hidden" id="adminHint"><span class="badge" id="hintTxt" style="opacity:.8;color:var(--oro)"></span></div>
 
@@ -175,6 +187,11 @@
   <div class="mapwrap" id="mapwrap">
     <div class="logo" id="logo"></div>
     <div class="wfbanner" id="banner"></div>
+    <div class="editctl adminOnly" id="editctl">
+      <button id="btnUndo" title="Annulla" onclick="undo()"></button>
+      <button id="btnRedo" title="Ripeti" onclick="redo()"></button>
+      <button id="btnExport" title="Esporta PDF" onclick="exportMap()"></button>
+    </div>
     <svg id="svg" class="map" viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid slice">
       <defs>
         <radialGradient id="zoneGrad" cx="50%" cy="32%" r="80%"><stop offset="0%" stop-color="#2c2543"/><stop offset="100%" stop-color="#191525"/></radialGradient>
@@ -411,9 +428,12 @@ function renderWalls(){ const g=document.getElementById('gWalls'); if(!g)return;
   if(mode==='admin') g.querySelectorAll('[data-wall]').forEach(l=>l.addEventListener('click',e=>{ if(tool==='del'){ e.stopPropagation(); const id=+l.getAttribute('data-wall'); S.walls=(S.walls||[]).filter(x=>x.id!==id); save(); render(); } }));
 }
 function renderDoors(){ const g=document.getElementById('gDoors'); if(!g)return;
-  g.innerHTML=(S.doors||[]).map(d=>{ const L=22, r=(d.a||0)*Math.PI/180, ux=Math.cos(r), uy=Math.sin(r);
-    const x1=d.x-ux*L/2, y1=d.y-uy*L/2, x2=d.x+ux*L/2, y2=d.y+uy*L/2, ax=x1-uy*L, ay=y1+ux*L;
-    return '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" class="doorGap"/><path d="M'+x1.toFixed(1)+' '+y1.toFixed(1)+' A'+L+' '+L+' 0 0 1 '+ax.toFixed(1)+' '+ay.toFixed(1)+'" class="door" data-door="'+d.id+'"/>'; }).join('');
+  g.innerHTML=(S.doors||[]).map(d=>{ const L=24, r=(d.a||0)*Math.PI/180, ux=Math.cos(r), uy=Math.sin(r);
+    const hx=d.x-ux*L/2, hy=d.y-uy*L/2, jx=d.x+ux*L/2, jy=d.y+uy*L/2;   // cardine + stipite (apertura)
+    const tx=hx-uy*L, ty=hy+ux*L;                                        // punta dell'anta (aperta 90°)
+    return '<line x1="'+hx.toFixed(1)+'" y1="'+hy.toFixed(1)+'" x2="'+jx.toFixed(1)+'" y2="'+jy.toFixed(1)+'" class="doorGap"/>'
+      +'<line x1="'+hx.toFixed(1)+'" y1="'+hy.toFixed(1)+'" x2="'+tx.toFixed(1)+'" y2="'+ty.toFixed(1)+'" class="door" data-door="'+d.id+'"/>'
+      +'<path d="M'+tx.toFixed(1)+' '+ty.toFixed(1)+' A'+L+' '+L+' 0 0 1 '+jx.toFixed(1)+' '+jy.toFixed(1)+'" class="door"/>'; }).join('');
   if(mode==='admin') g.querySelectorAll('[data-door]').forEach(p=>p.addEventListener('click',e=>{ if(tool==='del'){ e.stopPropagation(); const id=+p.getAttribute('data-door'); S.doors=(S.doors||[]).filter(x=>x.id!==id); save(); render(); } }));
 }
 function applyLock(){ const adm=mode==='admin';
@@ -632,7 +652,10 @@ function decorateUIstrings(){ const t=tr();
   document.getElementById('mic').innerHTML=svgIco('mic',20); document.getElementById('lang').value=uiLang;
   const ab=document.getElementById('acc'); if(ab){ ab.innerHTML=svgIco('wheelchair',20); ab.classList.toggle('acton',accessible); }
   // bottoni editor
-  document.querySelectorAll('[data-lbl]').forEach(b=>{ const ic=b.getAttribute('data-ic'),l=b.getAttribute('data-lbl'); b.innerHTML=(ic?svgIco(ic,16):'')+'<span>'+l+'</span>'; }); }
+  document.querySelectorAll('[data-lbl]').forEach(b=>{ const ic=b.getAttribute('data-ic'),l=b.getAttribute('data-lbl'); b.innerHTML=(ic?svgIco(ic,16):'')+'<span>'+l+'</span>'; });
+  [['btnUndo','undo'],['btnRedo','redo'],['btnExport','download']].forEach(([id,ic])=>{ const b=document.getElementById(id); if(b) b.innerHTML=svgIco(ic,19); });   // controlli flottanti mappa (solo icona)
+}
+function toggleAdv(){ const a=document.getElementById('advTools'); if(a) a.classList.toggle('hidden'); }
 function updateBgBtn(){ const b=document.getElementById('btnBg'); if(!b)return; b.innerHTML=svgIco('image',16)+'<span>'+(S.showBg?tr().plan:tr().clean)+'</span>'; b.classList.toggle('on',!!S.showBg); b.style.opacity=S.img?'1':'.5'; }
 function toggleBg(){ if(!S.img){ alert('Importa prima una piantina.'); return; } S.showBg=!S.showBg; save(); render(); }
 function updateFoot(){ document.getElementById('footNote').innerHTML='Destinazioni: <b>'+S.dests.length+'</b> · Nodi: <b>'+S.nodes.length+'</b> · '+(S.here?'<span style="color:#3ad07a">Totem ✓</span>':'<span style="color:#ffd479">Totem da impostare</span>')+' · '+tr().tap; }
