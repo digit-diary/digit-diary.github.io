@@ -14,6 +14,8 @@
   button.b{display:inline-flex;align-items:center;gap:6px;background:rgba(232,213,163,.08);border:1.3px solid rgba(232,213,163,.5);color:#fff;padding:8px 13px;border-radius:22px;font-size:13px;cursor:pointer;transition:.18s}
   button.b:hover{background:rgba(232,213,163,.2);border-color:var(--oro)}
   button.b.on{background:var(--oro);color:#1a1622;border-color:var(--oro);font-weight:600}
+  .b.bprimary{background:rgba(232,213,163,.18);border-color:var(--oro);color:#fff;font-weight:600}
+  .b.bprimary:hover{background:rgba(232,213,163,.3)}
   button.b svg{width:16px;height:16px}
   .seg{display:inline-flex;gap:4px;background:rgba(0,0,0,.25);padding:4px;border-radius:24px;border:1px solid rgba(255,255,255,.08)}
   .seg button{display:inline-flex;align-items:center;gap:6px;border:none;background:transparent;color:#fff;padding:7px 14px;border-radius:20px;cursor:pointer;font-size:13px}
@@ -29,6 +31,13 @@
   .editctl button{width:40px;height:40px;border-radius:11px;border:1px solid rgba(232,213,163,.4);background:rgba(20,16,30,.88);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}
   .editctl button:hover{background:rgba(232,213,163,.22)}
   .editctl button svg{width:19px;height:19px}
+  .maptools{position:absolute;top:48px;left:14px;display:flex;flex-direction:column;gap:5px;background:rgba(18,15,28,.9);border:1px solid rgba(232,213,163,.25);border-radius:14px;padding:7px;z-index:6;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+  .maptools .mt{width:42px;height:42px;border-radius:10px;border:1px solid transparent;background:transparent;color:#cdbf9e;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .maptools .mt:hover{background:rgba(232,213,163,.14);color:#fff}
+  .maptools .mt.on{background:var(--oro);color:#1a1622}
+  .maptools .mt svg{width:20px;height:20px}
+  .mtsep{height:1px;background:rgba(232,213,163,.18);margin:3px 5px}
+  .mtadv{display:flex;flex-direction:column;gap:5px}
   /* ricerca + chip (ospite) */
   .askwrap{display:flex;flex-direction:column;align-items:center;gap:7px;margin-bottom:9px;width:min(94vw,760px)}
   .askbar{display:flex;gap:8px;width:100%;align-items:center}
@@ -133,42 +142,16 @@
       <option value="it">IT</option><option value="en">EN</option><option value="de">DE</option><option value="fr">FR</option><option value="es">ES</option><option value="ru">RU</option><option value="zh">ZH</option><option value="ar">AR</option>
     </select>
     <input type="text" id="company" class="adminOnly" oninput="onCompany()">
-    <label class="b adminOnly" id="lblImport" for="fileMap" data-ic="image"></label>
+    <label class="b adminOnly bprimary" id="lblImport" for="fileMap" data-ic="image"></label>
     <input type="file" id="fileMap" accept="image/*,application/pdf" class="hidden" onchange="importMap(event)">
+    <button class="b adminOnly bprimary" id="btnNew" data-ic="plus" data-lbl="Crea mappa" onclick="newBlankMap()"></button>
     <button class="b adminOnly" id="btnBg" onclick="toggleBg()"></button>
     <button class="b adminOnly" id="btnDemo" data-ic="sparkle" onclick="loadCasino()"></button>
     <button class="b adminOnly" id="btnPin" data-ic="key" data-lbl="PIN" onclick="changePin()"></button>
     <button class="b adminOnly" id="btnReset" data-ic="reset" onclick="resetAll()"></button>
   </div>
 
-  <!-- Strumenti admin -->
-  <div class="tools hidden" id="adminTools">
-    <span class="tgrp">
-      <span class="badge">Punti</span>
-      <button class="b on" data-tool="dest" data-ic="pin"  onclick="setTool('dest')"></button>
-      <button class="b"    data-tool="here" data-ic="here" onclick="setTool('here')"></button>
-    </span>
-    <span class="tgrp">
-      <span class="badge">Disegna</span>
-      <button class="b" id="btnNew" data-ic="room" data-lbl="Crea mappa" onclick="newBlankMap()"></button>
-      <button class="b" data-tool="zone" data-ic="room" onclick="setTool('zone')"></button>
-      <button class="b" data-tool="wall" data-ic="wall" onclick="setTool('wall')"></button>
-      <button class="b" data-tool="door" data-ic="door" onclick="setTool('door')"></button>
-      <button class="b" data-tool="corr" data-ic="corr" onclick="setTool('corr')"></button>
-    </span>
-    <span class="tgrp">
-      <button class="b" data-tool="del" data-ic="trash" onclick="setTool('del')"></button>
-      <button class="b" id="btnAdv" data-lbl="Avanzate" onclick="toggleAdv()"></button>
-    </span>
-    <span class="tgrp hidden" id="advTools">
-      <span class="badge">Avanzate</span>
-      <button class="b" data-tool="node" data-ic="dot"  onclick="setTool('node')"></button>
-      <button class="b" data-tool="link" data-ic="link" onclick="setTool('link')"></button>
-      <button class="b" id="btnAuto" data-ic="sparkle" onclick="autoLink()"></button>
-      <button class="b" id="btnOcr" data-ic="sparkle" data-lbl="Leggi piantina" onclick="ocrRead()"></button>
-      <button class="b" id="btnTr" data-ic="sparkle" data-lbl="Traduci nomi" onclick="translateAll()"></button>
-    </span>
-  </div>
+  <div class="tools hidden" id="adminTools"></div>
   <div class="tools hidden" id="adminHint"><span class="badge" id="hintTxt" style="opacity:.8;color:var(--oro)"></span></div>
 
   <!-- Ricerca + voce + filtri (ospite) -->
@@ -191,6 +174,25 @@
       <button id="btnUndo" title="Annulla" onclick="undo()"></button>
       <button id="btnRedo" title="Ripeti" onclick="redo()"></button>
       <button id="btnExport" title="Esporta PDF" onclick="exportMap()"></button>
+    </div>
+    <div class="maptools adminOnly" id="mapTools">
+      <button class="mt on" data-tool="dest" data-ic="pin"  onclick="setTool('dest')"></button>
+      <button class="mt"    data-tool="here" data-ic="here" onclick="setTool('here')"></button>
+      <div class="mtsep"></div>
+      <button class="mt"    data-tool="zone" data-ic="room" onclick="setTool('zone')"></button>
+      <button class="mt"    data-tool="wall" data-ic="wall" onclick="setTool('wall')"></button>
+      <button class="mt"    data-tool="door" data-ic="door" onclick="setTool('door')"></button>
+      <button class="mt"    data-tool="corr" data-ic="corr" onclick="setTool('corr')"></button>
+      <div class="mtsep"></div>
+      <button class="mt"    data-tool="del"  data-ic="trash" onclick="setTool('del')"></button>
+      <button class="mt"    id="btnAdv" data-ic="dots" onclick="toggleAdv()" title="Avanzate"></button>
+      <div id="advTools" class="mtadv hidden">
+        <button class="mt" data-tool="node" data-ic="dot"  onclick="setTool('node')"></button>
+        <button class="mt" data-tool="link" data-ic="link" onclick="setTool('link')"></button>
+        <button class="mt" id="btnAuto" data-ic="sparkle" onclick="autoLink()" title="Auto-collega corridoi"></button>
+        <button class="mt" id="btnOcr" data-ic="search" onclick="ocrRead()" title="Leggi piantina (AI)"></button>
+        <button class="mt" id="btnTr" data-ic="sparkle" onclick="translateAll()" title="Traduci nomi"></button>
+      </div>
     </div>
     <svg id="svg" class="map" viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid slice">
       <defs>
@@ -298,6 +300,8 @@ const ICON={
   corr:'<path d="M7 4v16M17 4v16"/>',
   undo:'<path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
   redo:'<path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  dots:'<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
   link:'<path d="M10 14a4 4 0 0 0 5.7 0l2-2a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-2 2a4 4 0 0 0 5.7 5.7l1-1"/>',
   sparkle:'<path d="M12 3.5l1.6 5.4 5.4 1.6-5.4 1.6L12 17.5l-1.6-5.4L5 10.5l5.4-1.6z"/>',
   trash:'<path d="M5 7h14M10 7V5h4v2M6.5 7l1 13h9l1-13"/>',
@@ -633,7 +637,7 @@ function setMode(m){ mode=m; linkFrom=null; clearRoute();
   document.getElementById('mGuest').classList.toggle('on',m==='guest'); document.getElementById('mAdmin').classList.toggle('on',m==='admin');
   document.getElementById('adminTools').classList.toggle('hidden',m!=='admin'); document.getElementById('adminHint').classList.toggle('hidden',m!=='admin');
   document.getElementById('askwrap').classList.toggle('hidden',m!=='guest'); render(); }
-function setTool(t){ tool=t; linkFrom=null; document.querySelectorAll('#adminTools button[data-tool]').forEach(b=>b.classList.toggle('on',b.getAttribute('data-tool')===t));
+function setTool(t){ tool=t; linkFrom=null; document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('on',b.getAttribute('data-tool')===t));
   const H={node:'Tocca la piantina per aggiungere un nodo.',link:'Tocca due nodi per collegarli/scollegarli.',dest:'Tocca dove si trova una destinazione.',here:'Tocca dove si trova questo totem.',del:'Tocca un elemento (stanza, muro, porta, nodo, pin) per eliminarlo.',zone:'Trascina per disegnare una stanza, poi dalle un nome (mappa senza immagine).',wall:'Trascina per tracciare un muro. Gli estremi si agganciano ai muri vicini. Shift = dritto.',door:'Tocca su un muro per inserire una porta.',corr:'Trascina per creare un corridoio percorribile (il percorso ci passa sopra).'};
   document.getElementById('hintTxt').textContent=H[t]; renderNodes(); }
 function setFilter(id){ filterCat=id; renderChips(); renderDests(); renderDestBtns(); resetIdle(); }
@@ -645,9 +649,9 @@ function decorateUIstrings(){ const t=tr();
   document.getElementById('lblImport').innerHTML=svgIco('image',16)+'<span>'+t.import+'</span>';
   document.getElementById('btnDemo').innerHTML=svgIco('sparkle',16)+'<span>'+t.demo+'</span>';
   document.getElementById('btnReset').innerHTML=svgIco('reset',16)+'<span>'+t.reset+'</span>';
-  document.getElementById('btnAuto').innerHTML=svgIco('sparkle',16)+'<span>'+({it:'Auto-collega',en:'Auto-link',de:'Auto-verbinden',fr:'Auto-relier'}[uiLang]||'Auto-collega')+'</span>';
   const TL={dest:{it:'Destinazione',en:'Destination',de:'Ziel',fr:'Destination'},here:{it:'Tu sei qui',en:'You are here',de:'Sie sind hier',fr:'Vous êtes ici'},node:{it:'Nodo',en:'Node',de:'Knoten',fr:'Nœud'},link:{it:'Collega',en:'Link',de:'Verbinden',fr:'Relier'},del:{it:'Elimina',en:'Delete',de:'Löschen',fr:'Supprimer'},zone:{it:'Stanza',en:'Room',de:'Raum',fr:'Salle'},wall:{it:'Muro',en:'Wall',de:'Wand',fr:'Mur'},door:{it:'Porta',en:'Door',de:'Tür',fr:'Porte'},corr:{it:'Corridoio',en:'Corridor',de:'Korridor',fr:'Couloir'}};
-  document.querySelectorAll('#adminTools button[data-tool]').forEach(b=>{ const tl=b.getAttribute('data-tool'),ic=b.getAttribute('data-ic'); b.innerHTML=svgIco(ic,16)+'<span>'+(TL[tl][uiLang]||TL[tl].it)+'</span>'; });
+  document.querySelectorAll('.mt[data-ic]').forEach(b=>{ b.innerHTML=svgIco(b.getAttribute('data-ic'),20); });   // palette mappa: solo icone
+  document.querySelectorAll('[data-tool]').forEach(b=>{ const tl=b.getAttribute('data-tool'),lab=(TL[tl]&&(TL[tl][uiLang]||TL[tl].it))||tl; if(b.classList.contains('mt')) b.title=lab; else b.innerHTML=svgIco(b.getAttribute('data-ic'),16)+'<span>'+lab+'</span>'; });
   document.getElementById('company').placeholder=t.company; document.getElementById('ask').placeholder=t.search;
   document.getElementById('mic').innerHTML=svgIco('mic',20); document.getElementById('lang').value=uiLang;
   const ab=document.getElementById('acc'); if(ab){ ab.innerHTML=svgIco('wheelchair',20); ab.classList.toggle('acton',accessible); }
