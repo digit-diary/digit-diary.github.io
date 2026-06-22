@@ -2039,7 +2039,7 @@ async function chiediAllAI(domanda, opts){
   if(opts.cacheKey){
     const rem = await cacheGetRemote(opts.cacheKey);
     if(mioId !== richiestaId) return;
-    if(rem){ rispCache.set(opts.cacheKey, rem); salvaRisp(); rispondi(rem.text, rem.lang, rem.indicazione, mioId, true); wfTryShowOnMap(domanda); return; }
+    if(rem){ rispCache.set(opts.cacheKey, rem); salvaRisp(); rispondi(rem.text, rem.lang, rem.indicazione, mioId, true); wfTryShowOnMap(domanda, true); return; }
   }
   const _dir = {it:'',de:'[Antworte auf Deutsch] ',en:'[Reply in English] ',fr:'[Réponds en français] ',es:'[Responde en español] ',ru:'[Ответь на русском] ',zh:'[用中文回答] ',ar:'[أجب بالعربية] '}[uiLang()];
   let lreq = _dir;
@@ -2070,7 +2070,7 @@ async function chiediAllAI(domanda, opts){
       cacheSetRemote(opts.cacheKey, text, lang, ind);
     }
     rispondi(text, lang, ind, mioId, !!opts.cacheKey);   // share=true SOLO per i bottoni (mai conversazioni libere)
-    wfTryShowOnMap(domanda);                              // se chiede "dove si trova X" → apre la mappa sul punto (locale, niente API)
+    wfTryShowOnMap(domanda, !!opts.cacheKey);             // domanda "dove…" o BOTTONE → apre la mappa sul punto (locale, niente API)
   }catch(err){
     if(err.name==='AbortError') return;           // interrotta apposta da un nuovo comando
     $('risposta').textContent='Errore di connessione all\'AI. Controlla la chiave in ⚙️.';
@@ -3423,16 +3423,34 @@ async function apriMappa(admin, goto){
   ov.style.display=''; resetInattivita();
 }
 /* L'AI ha risposto: se la domanda è "dove si trova X" e X è una destinazione della mappa, apre la mappa sul punto. TUTTO LOCALE: nessuna chiamata API extra. */
-function wfTryShowOnMap(domanda){
+// Concetti: sinonimi + icone, per collegare in modo INTELLIGENTE un bottone/domanda alla destinazione giusta (es. "Toilette" → destinazione con icona wc, comunque si chiami)
+const WF_CONCEPTS=[
+  {w:['toilette','servizi','bagno','bagni','wc','restroom','toilet','toiletten','baño','туалет','洗手间','حمام'], ic:['wc']},
+  {w:['ristorante','restaurant','steakhouse','tacos','noodle','dining','mangiare','essen','restaurante'], ic:['food']},
+  {w:['bar','cocktail','lounge'], ic:['bar','cup']},
+  {w:['caffè','caffe','coffee','café','kaffee'], ic:['cup']},
+  {w:['bancomat','atm','cassa','cash','cage','cambio','geldautomat'], ic:['atm','cash','register']},
+  {w:['slot','sala','gaming','giochi','jackpot','spielautomat'], ic:['slot','slotmachine','game','chips']},
+  {w:['ascensore','elevator','lift','aufzug','ascenseur'], ic:['elevator']},
+  {w:['scala','scale','stairs','treppe'], ic:['stairs']},
+  {w:['negozio','shop','gift','store','boutique','geschäft','tienda'], ic:['bag','gift','cart']},
+  {w:['hotel','reception','registrazione','desk','empfang'], ic:['info','bed','key']},
+  {w:['uscita','exit','ausgang','sortie','salida'], ic:['exit']},
+  {w:['parcheggio','parking','garage'], ic:['parking']},
+  {w:['fumatori','smoking','fumo'], ic:['smoke']}
+];
+function wfTryShowOnMap(domanda, isButton){
   try{ const s=JSON.parse(localStorage.getItem('wayfind_proto_v5')||'null'); if(!s||!s._floors) return;
     const q=(domanda||'').toLowerCase(); if(q.length<3) return;
-    if(!/dove|dov'|where|wo\b|wo ist|où|donde|dónde|где|哪|أين/i.test(q)) return;   // solo domande "dove…"
+    const hasWhere=/dove|dov'|where|wo\b|wo ist|où|donde|dónde|где|哪|أين/i.test(q);
+    if(!hasWhere && !isButton) return;   // voce libera → solo se chiede "dove…"; un BOTTONE → sempre
+    const allD=[]; s._floors.forEach(fl=>(fl.dests||[]).forEach(d=>allD.push(d)));
     let best=null;
-    s._floors.forEach(fl=>(fl.dests||[]).forEach(d=>{
-      const forms=[d.name].concat(d.t?Object.keys(d.t).map(k=>d.t[k]):[]);
-      forms.forEach(f=>{ f=(''+(f||'')).toLowerCase(); if(f.length>=3 && q.indexOf(f)>=0 && (!best||f.length>best.L)) best={name:d.name,L:f.length}; });
-    }));
-    if(best) setTimeout(()=>{ try{ apriMappa(false, best.name); }catch(_){} }, 1800);   // dopo la risposta vocale, mostra la strada
+    allD.forEach(d=>{ const forms=[d.name].concat(d.t?Object.keys(d.t).map(k=>d.t[k]):[]);    // 1) match diretto per nome/traduzione
+      forms.forEach(f=>{ f=(''+(f||'')).toLowerCase(); if(f.length>=3 && q.indexOf(f)>=0 && (!best||f.length>best.L)) best={name:d.name,L:f.length}; }); });
+    if(!best){ const c=WF_CONCEPTS.find(c=>c.w.some(w=>q.indexOf(w)>=0));                       // 2) match intelligente per concetto (sinonimo o ICONA)
+      if(c){ const d=allD.find(d=>{ const nm=(d.name||'').toLowerCase(); return c.ic.indexOf(d.ic)>=0 || c.w.some(w=>nm.indexOf(w)>=0); }); if(d) best={name:d.name}; } }
+    if(best) setTimeout(()=>{ try{ apriMappa(false, best.name); }catch(_){} }, 1800);            // dopo la risposta, apre la mappa sul punto
   }catch(_){}
 }
 function chiudiMappa(){ const ov=document.getElementById('wfPageOverlay'); if(ov)ov.style.display='none'; const f=document.getElementById('wfFrame'); if(f)f.src='about:blank'; aggiornaBtnMappa(); resetInattivita(); }   // dopo la config, mostra/aggiorna subito il bottone Mappa
