@@ -99,8 +99,9 @@
   .fbk-face[data-r="sad"]:hover{color:#e08a8a}
   .fbk-face[data-r="ok"]:hover{color:#e8d5a3}
   .fbk-face[data-r="hap"]:hover{color:#7ddca0}
-  .tools span.trad{transform:scale(1.22);opacity:.5}            /* traduttore leggermente più grande e visibile */
-  .tools span.trad:hover{transform:scale(1.22);opacity:.95}
+  .tools span.mapbtn, .tools span.trad{opacity:.6}              /* Mappa e Traduttore: più grandi e visibili */
+  .tools span.mapbtn:hover, .tools span.trad:hover{opacity:.95}
+  .tools span.mapbtn .ic, .tools span.trad .ic{width:31px;height:31px}
   .gear:hover{transform:rotate(45deg)}
 
   /* --- Emblema casino animato --- */
@@ -2567,10 +2568,12 @@ function resetInattivita(){
   if(sec > 0) inattivitaTimer = setTimeout(mostraDemo, sec*1000);
 }
 function mostraDemo(){
-  if(occupato || $('tradModal').classList.contains('open')){ resetInattivita(); return; }   // non coprire risposta/traduttore
+  const _mapOv=document.getElementById('wfPageOverlay');
+  if(occupato || (_mapOv && _mapOv.style.display!=='none')){ resetInattivita(); return; }   // non interrompere una risposta o la mappa aperta (la mappa si chiude da sé dopo inattività)
   fermaTutto(); fermaAscoltoTemp();
   if(recognition && !ascoltoAttivo){ try{ recognition.stop(); }catch(_){} }
   chiudiQR(); chiudiWeb(); $('modal').classList.remove('open');
+  try{ chiudiTrad(); }catch(_){}                                                            // dopo inattività: chiudi il Traduttore → torna alla home
   buildDemoRing();                             // icone = bottoni reali attuali (aggiunti/nascosti)
   cronologia = [];                             // nuovo cliente
   $('domanda').textContent=''; $('indicazione').innerHTML='';

@@ -542,7 +542,11 @@ window.addEventListener('pointermove',e=>{ if(!_dragNode)return; if(Math.abs(e.c
 window.addEventListener('pointerup',()=>{ if(_dragNode){ if(_dragNode.moved){ save(); render(); } _dragNode=null; } });
 
 /* ===== Idle reset ===== */
-function resetIdle(){ if(idleTimer)clearTimeout(idleTimer); if(mode!=='guest')return; idleTimer=setTimeout(()=>{ clearRoute(); zoomReset(); query=''; document.getElementById('ask').value=''; filterCat=''; render(); },25000); }
+function resetIdle(){ if(idleTimer)clearTimeout(idleTimer); if(mode!=='guest')return;
+  idleTimer=setTimeout(()=>{
+    if(EMBEDDED && window.parent && window.parent!==window){ try{ window.parent.chiudiMappa(); return; }catch(_){} }   // dentro il Concierge: torna alla home
+    clearRoute(); zoomReset(); query=''; document.getElementById('ask').value=''; filterCat=''; render();
+  }, EMBEDDED?40000:25000); }
 document.addEventListener('pointerdown',resetIdle);
 
 /* ===== Modalità / lingua / UI strings ===== */
@@ -606,7 +610,7 @@ function loadCasino(){ const f={ name:'Piano terra', img:'demo_venue.svg', imgW:
   edges:[[101,102],[102,103],[103,104],[105,106],[106,107],[107,108],[101,105],[102,109,'s'],[109,106],[103,110],[110,107],[104,108]],
   dests:[{id:11,name:'Sala A',ic:'slot',x:190,y:130},{id:12,name:'Sala Eventi',ic:'mask',x:510,y:120},{id:13,name:'Ristorante',ic:'food',x:820,y:130},{id:14,name:'Bar',ic:'bar',x:170,y:350},{id:15,name:'Sala B',ic:'slotmachine',x:510,y:340},{id:16,name:'Negozio',ic:'bag',x:830,y:340},{id:17,name:'Caffè',ic:'cup',x:170,y:570},{id:18,name:'Sala C',ic:'slot',x:510,y:570},{id:19,name:'Cassa',ic:'register',x:755,y:560},{id:20,name:'Ascensori',ic:'elevator',x:905,y:560}],
   here:{x:60,y:460} }; S=wrap('Esempio Azienda',[f]); applyFloor(0);
-  accessible=false; save(); setMode('guest'); render(); setTimeout(()=>{ if(visibleDests()[0]) onPin(visibleDests()[0]); },500); }
+  accessible=false; save(); setMode('guest'); render(); }
 
 /* ===== PIN / blocco ospite ===== */
 let _pinT=null;
@@ -631,6 +635,6 @@ function importConfig(e){ const f=e.target.files[0]; if(!f)return; const r=new F
 /* ===== AVVIO ===== */
 render();
 if(new URLSearchParams(location.search).get('admin')==='1') setMode('admin');   // aperto da Impostazioni del Concierge → Configura diretta
-setTimeout(()=>{ if(mode==='guest'&&visibleDests()[0]) onPin(visibleDests()[0]); },700);
+setTimeout(()=>{ if(mode==='guest') resetIdle(); },700);   // apre PULITA (niente percorso automatico), avvia il timer di rientro
 </script>
 </body></html>
