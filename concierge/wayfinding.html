@@ -47,8 +47,15 @@
   svg.map{width:100%;height:100%;display:block;touch-action:none}
   .zone{fill:url(#zoneGrad);stroke:rgba(232,213,163,.22);stroke-width:1.5;filter:drop-shadow(0 6px 16px rgba(0,0,0,.45))}
   .zoneLbl{fill:#9a8fb5;font-size:14px;text-anchor:middle;font-weight:500;letter-spacing:2px}
+  .dimPrev{fill:#fff;font-size:13px;font-weight:700;paint-order:stroke;stroke:#1a1622;stroke-width:3px}
   #bgImg{filter:saturate(.55) brightness(.5) contrast(1.05)}
   .edge{stroke:#3d6fa5;stroke-width:3;stroke-linecap:round;opacity:.7}
+  .wall{stroke:#6b6480;stroke-width:9;stroke-linecap:round;stroke-linejoin:round;cursor:pointer}
+  .doorGap{stroke:#15131d;stroke-width:12;stroke-linecap:butt}
+  .door{stroke:#e8d5a3;stroke-width:2.5;fill:none;cursor:pointer}
+  #linePrev.wall{stroke:#8a83a0}
+  #linePrev.edge{stroke:#4aa3ff;stroke-width:5}
+  #zonePrev{stroke-dasharray:6 5}
   .node{fill:#4aa3ff;stroke:#fff;stroke-width:1.5;cursor:pointer}
   .node.sel{fill:#fff;stroke:#4aa3ff;stroke-width:3}
   .corrHint{stroke:#2c2638;stroke-width:14;fill:none;stroke-linecap:round;stroke-linejoin:round}
@@ -132,11 +139,19 @@
     <span class="badge">SEMPLICE:</span>
     <button class="b on" data-tool="dest" data-ic="pin"  onclick="setTool('dest')"></button>
     <button class="b"    data-tool="here" data-ic="here" onclick="setTool('here')"></button>
-    <span class="badge">CORRIDOI (opz.):</span>
+    <span class="badge">DISEGNA MAPPA:</span>
+    <button class="b"    data-tool="zone" data-ic="room" onclick="setTool('zone')"></button>
+    <button class="b"    data-tool="wall" data-ic="wall" onclick="setTool('wall')"></button>
+    <button class="b"    data-tool="door" data-ic="door" onclick="setTool('door')"></button>
+    <button class="b"    data-tool="corr" data-ic="corr" onclick="setTool('corr')"></button>
+    <span class="badge">CORRIDOI (avanz.):</span>
     <button class="b"    data-tool="node" data-ic="dot"  onclick="setTool('node')"></button>
     <button class="b"    data-tool="link" data-ic="link" onclick="setTool('link')"></button>
     <button class="b"    data-ic="sparkle" onclick="autoLink()" id="btnAuto"></button>
     <button class="b"    data-tool="del"  data-ic="trash" onclick="setTool('del')"></button>
+    <button class="b" id="btnUndo" data-ic="undo" data-lbl="Annulla" onclick="undo()"></button>
+    <button class="b" id="btnRedo" data-ic="redo" data-lbl="Ripeti" onclick="redo()"></button>
+    <button class="b" id="btnExport" data-ic="download" data-lbl="Esporta PDF" onclick="exportMap()"></button>
     <span class="badge">AI:</span>
     <button class="b" id="btnOcr" data-ic="sparkle" data-lbl="Leggi piantina" onclick="ocrRead()"></button>
     <button class="b" id="btnTr" data-ic="sparkle" data-lbl="Traduci nomi" onclick="translateAll()"></button>
@@ -171,6 +186,11 @@
         <image id="bgImg" class="hidden" x="0" y="0" width="1000" height="700" preserveAspectRatio="xMidYMid slice"/>
         <rect id="bgTint" class="hidden" x="0" y="0" width="1000" height="700" fill="#15102a" opacity=".45"/>
         <g id="gDemo"></g>
+        <g id="gWalls"></g>
+        <g id="gDoors"></g>
+        <rect id="zonePrev" class="zone" opacity=".45" style="display:none"/>
+        <line id="linePrev" opacity=".7" style="display:none"/>
+        <text id="dimPrev" class="dimPrev" style="display:none"></text>
         <g id="gEdges"></g>
         <g id="gRouteHint"></g>
         <path class="route" id="route" d=""/>
@@ -255,6 +275,11 @@ const ICON={
   image:'<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8" cy="10" r="1.6"/><path d="M5 17l5-4 3 2 3-3 3 3"/>',
   reset:'<path d="M5.5 12a6.5 6.5 0 1 1 1.9 4.6"/><path d="M5 17.5V13h4.5"/>',
   dot:'<circle cx="12" cy="12" r="5.5"/>',
+  room:'<rect x="3.5" y="3.5" width="17" height="17" rx="2"/>',
+  wall:'<path d="M4 6h16M4 12h16M4 18h16M10 6v6M16 12v6M10 0"/>',
+  corr:'<path d="M7 4v16M17 4v16"/>',
+  undo:'<path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
+  redo:'<path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/>',
   link:'<path d="M10 14a4 4 0 0 0 5.7 0l2-2a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-2 2a4 4 0 0 0 5.7 5.7l1-1"/>',
   sparkle:'<path d="M12 3.5l1.6 5.4 5.4 1.6-5.4 1.6L12 17.5l-1.6-5.4L5 10.5l5.4-1.6z"/>',
   trash:'<path d="M5 7h14M10 7V5h4v2M6.5 7l1 13h9l1-13"/>',
@@ -312,9 +337,15 @@ function demoFloor(){ return { name:'Piano terra', img:null, imgW:null, imgH:nul
   here:{x:500,y:660} }; }
 function wrap(company,floors){ const S0={company,_floors:floors,_fi:0}; Object.assign(S0,floors[0]); return S0; }
 function demoState(){ return wrap('La tua azienda',[demoFloor()]); }
-function snap(){ return {name:S._floors[S._fi].name, img:S.img,imgW:S.imgW,imgH:S.imgH,showBg:S.showBg,nodes:S.nodes,edges:S.edges,dests:S.dests,here:S.here}; }
-function applyFloor(i){ const f=S._floors[i]; S._fi=i; S.img=f.img;S.imgW=f.imgW;S.imgH=f.imgH;S.showBg=f.showBg;S.nodes=f.nodes;S.edges=f.edges;S.dests=f.dests;S.here=f.here; }
-function save(){ try{ S._floors[S._fi]=snap(); localStorage.setItem(LS,JSON.stringify(S)); }catch(_){ } }
+function snap(){ return {name:S._floors[S._fi].name, img:S.img,imgW:S.imgW,imgH:S.imgH,showBg:S.showBg,nodes:S.nodes,edges:S.edges,dests:S.dests,here:S.here,zones:S.zones,walls:S.walls,doors:S.doors}; }
+function applyFloor(i){ const f=S._floors[i]; S._fi=i; S.img=f.img;S.imgW=f.imgW;S.imgH=f.imgH;S.showBg=f.showBg;S.nodes=f.nodes;S.edges=f.edges;S.dests=f.dests;S.here=f.here;S.zones=f.zones||[];S.walls=f.walls||[];S.doors=f.doors||[]; }
+let _undo=[], _redo=[], _baseline=null;
+function save(){ try{ S._floors[S._fi]=snap(); localStorage.setItem(LS,JSON.stringify(S)); }catch(_){ }
+  if(_baseline!==null){ _undo.push(_baseline); if(_undo.length>80)_undo.shift(); _redo=[]; }   // registra lo stato precedente per Annulla
+  _baseline=JSON.stringify({floors:S._floors, fi:S._fi}); }
+function _restore(str){ const o=JSON.parse(str); S._floors=o.floors; S._fi=Math.min(o.fi||0,S._floors.length-1); applyFloor(S._fi); _baseline=JSON.stringify({floors:S._floors,fi:S._fi}); try{localStorage.setItem(LS,JSON.stringify(S));}catch(_){ } clearRoute(); render(); }
+function undo(){ if(!_undo.length)return; _redo.push(JSON.stringify({floors:S._floors,fi:S._fi})); _restore(_undo.pop()); }
+function redo(){ if(!_redo.length)return; _undo.push(JSON.stringify({floors:S._floors,fi:S._fi})); _restore(_redo.pop()); }
 function load(){ try{ const o=JSON.parse(localStorage.getItem(LS)||'null'); return (o&&o._floors)?o:null; }catch(_){ return null; } }
 /* ===== Immagini in IndexedDB (per-dispositivo). In config si salva solo un riferimento 'idb:token', non il dataURL ===== */
 let _wfdb=null, _imgCache={};
@@ -371,8 +402,18 @@ function render(){
   document.getElementById('logo').textContent=S.company||'';
   document.documentElement.dir=(uiLang==='ar')?'rtl':'ltr';   // arabo da destra a sinistra
   applyViewBox(); applyView();
-  renderBg(); renderEdges(); renderNodes(); renderDests(); renderHere();
+  renderBg(); renderWalls(); renderDoors(); renderEdges(); renderNodes(); renderDests(); renderHere();
   renderFloors(); renderChips(); renderDestBtns(); decorateUIstrings(); updateBgBtn(); updateFoot(); applyLock();
+}
+function renderWalls(){ const g=document.getElementById('gWalls'); if(!g)return;
+  g.innerHTML=(S.walls||[]).map(w=>'<line x1="'+w.x1+'" y1="'+w.y1+'" x2="'+w.x2+'" y2="'+w.y2+'" class="wall" data-wall="'+w.id+'"/>').join('');
+  if(mode==='admin') g.querySelectorAll('[data-wall]').forEach(l=>l.addEventListener('click',e=>{ if(tool==='del'){ e.stopPropagation(); const id=+l.getAttribute('data-wall'); S.walls=(S.walls||[]).filter(x=>x.id!==id); save(); render(); } }));
+}
+function renderDoors(){ const g=document.getElementById('gDoors'); if(!g)return;
+  g.innerHTML=(S.doors||[]).map(d=>{ const L=22, r=(d.a||0)*Math.PI/180, ux=Math.cos(r), uy=Math.sin(r);
+    const x1=d.x-ux*L/2, y1=d.y-uy*L/2, x2=d.x+ux*L/2, y2=d.y+uy*L/2, ax=x1-uy*L, ay=y1+ux*L;
+    return '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" class="doorGap"/><path d="M'+x1.toFixed(1)+' '+y1.toFixed(1)+' A'+L+' '+L+' 0 0 1 '+ax.toFixed(1)+' '+ay.toFixed(1)+'" class="door" data-door="'+d.id+'"/>'; }).join('');
+  if(mode==='admin') g.querySelectorAll('[data-door]').forEach(p=>p.addEventListener('click',e=>{ if(tool==='del'){ e.stopPropagation(); const id=+p.getAttribute('data-door'); S.doors=(S.doors||[]).filter(x=>x.id!==id); save(); render(); } }));
 }
 function applyLock(){ const adm=mode==='admin';
   document.querySelectorAll('.adminOnly').forEach(e=>{ e.style.display = adm ? '' : 'none'; });
@@ -411,8 +452,14 @@ function renderBg(){ const demo=document.getElementById('gDemo'),img=document.ge
   if(S.img&&!src) ensureImg(()=>renderBg());                 // immagine in IndexedDB: caricala e ridisegna
   if(src){ img.setAttributeNS('http://www.w3.org/1999/xlink','href',src); img.setAttribute('href',src); }
   img.classList.toggle('hidden', !usaP); tint.classList.toggle('hidden', !usaP); demo.classList.toggle('hidden', !!S.img);
-  if(!demo.childNodes.length){ const rooms=[[60,60,300,180,'SALA A'],[640,60,300,180,'SALA B'],[60,470,300,170,'BAR'],[640,470,300,170,'SERVIZI'],[380,40,240,150,'RECEPTION']];
-    demo.innerHTML=rooms.map(([x,y,w,h,l])=>'<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="16" class="zone"/><text x="'+(x+w/2)+'" y="'+(y+h/2+5)+'" class="zoneLbl">'+l+'</text>').join(''); } }
+  if(S.img){ return; }
+  if(S.zones && S.zones.length){                                   // mappa DISEGNATA: quadranti/stanze
+    demo.innerHTML=S.zones.map(z=>'<rect x="'+z.x+'" y="'+z.y+'" width="'+z.w+'" height="'+z.h+'" rx="10" class="zone" data-zone="'+z.id+'"/><text x="'+(z.x+z.w/2)+'" y="'+(z.y+z.h/2+5)+'" class="zoneLbl">'+esc(z.name||'')+'</text>').join('');
+    if(mode==='admin') demo.querySelectorAll('[data-zone]').forEach(r=>r.addEventListener('click',e=>{ if(tool==='del'){ e.stopPropagation(); const id=+r.getAttribute('data-zone'); S.zones=(S.zones||[]).filter(z=>z.id!==id); save(); render(); } }));
+  } else {                                                          // segnaposto demo (finché non disegni/importi)
+    const rooms=[[60,60,300,180,'SALA A'],[640,60,300,180,'SALA B'],[60,470,300,170,'BAR'],[640,470,300,170,'SERVIZI'],[380,40,240,150,'RECEPTION']];
+    demo.innerHTML=rooms.map(r=>'<rect x="'+r[0]+'" y="'+r[1]+'" width="'+r[2]+'" height="'+r[3]+'" rx="16" class="zone"/><text x="'+(r[0]+r[2]/2)+'" y="'+(r[1]+r[3]/2+5)+'" class="zoneLbl">'+r[4]+'</text>').join('');
+  } }
 function renderEdges(){ const g=document.getElementById('gEdges'); if(mode!=='admin'){g.innerHTML='';return;}
   g.innerHTML=S.edges.map(([x,y])=>{const A=S.nodes.find(n=>n.id===x),B=S.nodes.find(n=>n.id===y); return A&&B?'<line x1="'+A.x+'" y1="'+A.y+'" x2="'+B.x+'" y2="'+B.y+'" class="edge"/>':'';}).join(''); }
 function renderNodes(){ const g=document.getElementById('gNodes'); if(mode!=='admin'){g.innerHTML='';return;}
@@ -564,7 +611,7 @@ function setMode(m){ mode=m; linkFrom=null; clearRoute();
   document.getElementById('adminTools').classList.toggle('hidden',m!=='admin'); document.getElementById('adminHint').classList.toggle('hidden',m!=='admin');
   document.getElementById('askwrap').classList.toggle('hidden',m!=='guest'); render(); }
 function setTool(t){ tool=t; linkFrom=null; document.querySelectorAll('#adminTools button[data-tool]').forEach(b=>b.classList.toggle('on',b.getAttribute('data-tool')===t));
-  const H={node:'Tocca la piantina per aggiungere un nodo.',link:'Tocca due nodi per collegarli/scollegarli.',dest:'Tocca dove si trova una destinazione.',here:'Tocca dove si trova questo totem.',del:'Tocca un nodo o destinazione per eliminarlo.'};
+  const H={node:'Tocca la piantina per aggiungere un nodo.',link:'Tocca due nodi per collegarli/scollegarli.',dest:'Tocca dove si trova una destinazione.',here:'Tocca dove si trova questo totem.',del:'Tocca un elemento (stanza, muro, porta, nodo, pin) per eliminarlo.',zone:'Trascina per disegnare una stanza, poi dalle un nome (mappa senza immagine).',wall:'Trascina per tracciare un muro. Gli estremi si agganciano ai muri vicini. Shift = dritto.',door:'Tocca su un muro per inserire una porta.',corr:'Trascina per creare un corridoio percorribile (il percorso ci passa sopra).'};
   document.getElementById('hintTxt').textContent=H[t]; renderNodes(); }
 function setFilter(id){ filterCat=id; renderChips(); renderDests(); renderDestBtns(); resetIdle(); }
 function setLang(l){ uiLang=l; try{ localStorage.setItem('concierge_uilang',l); }catch(_){} render(); }   // persiste come la home
@@ -576,7 +623,7 @@ function decorateUIstrings(){ const t=tr();
   document.getElementById('btnDemo').innerHTML=svgIco('sparkle',16)+'<span>'+t.demo+'</span>';
   document.getElementById('btnReset').innerHTML=svgIco('reset',16)+'<span>'+t.reset+'</span>';
   document.getElementById('btnAuto').innerHTML=svgIco('sparkle',16)+'<span>'+({it:'Auto-collega',en:'Auto-link',de:'Auto-verbinden',fr:'Auto-relier'}[uiLang]||'Auto-collega')+'</span>';
-  const TL={dest:{it:'Destinazione',en:'Destination',de:'Ziel',fr:'Destination'},here:{it:'Tu sei qui',en:'You are here',de:'Sie sind hier',fr:'Vous êtes ici'},node:{it:'Nodo',en:'Node',de:'Knoten',fr:'Nœud'},link:{it:'Collega',en:'Link',de:'Verbinden',fr:'Relier'},del:{it:'Elimina',en:'Delete',de:'Löschen',fr:'Supprimer'}};
+  const TL={dest:{it:'Destinazione',en:'Destination',de:'Ziel',fr:'Destination'},here:{it:'Tu sei qui',en:'You are here',de:'Sie sind hier',fr:'Vous êtes ici'},node:{it:'Nodo',en:'Node',de:'Knoten',fr:'Nœud'},link:{it:'Collega',en:'Link',de:'Verbinden',fr:'Relier'},del:{it:'Elimina',en:'Delete',de:'Löschen',fr:'Supprimer'},zone:{it:'Stanza',en:'Room',de:'Raum',fr:'Salle'},wall:{it:'Muro',en:'Wall',de:'Wand',fr:'Mur'},door:{it:'Porta',en:'Door',de:'Tür',fr:'Porte'},corr:{it:'Corridoio',en:'Corridor',de:'Korridor',fr:'Couloir'}};
   document.querySelectorAll('#adminTools button[data-tool]').forEach(b=>{ const tl=b.getAttribute('data-tool'),ic=b.getAttribute('data-ic'); b.innerHTML=svgIco(ic,16)+'<span>'+(TL[tl][uiLang]||TL[tl].it)+'</span>'; });
   document.getElementById('company').placeholder=t.company; document.getElementById('ask').placeholder=t.search;
   document.getElementById('mic').innerHTML=svgIco('mic',20); document.getElementById('lang').value=uiLang;
@@ -641,8 +688,46 @@ function importConfig(e){ const f=e.target.files[0]; if(!f)return; const r=new F
     alert('Configurazione scaricata su questo kiosk. Ora imposta il "Tu sei qui" di QUESTO totem (è l\'unica cosa locale).');
   }catch(_){ alert('File non valido.'); } }; r.readAsText(f); e.target.value=''; }
 
+/* ===== EDITOR PLANIMETRIE (muri/stanze/porte/corridoi) ===== */
+function $id(i){ return document.getElementById(i); }
+function snapG(v){ return Math.round(v/10)*10; }
+function constrain(sx,sy,ex,ey){ const dx=ex-sx,dy=ey-sy,adx=Math.abs(dx),ady=Math.abs(dy); if(adx>ady*2.5)return{x:ex,y:sy}; if(ady>adx*2.5)return{x:sx,y:ey}; const m=(adx+ady)/2; return {x:sx+Math.sign(dx)*m,y:sy+Math.sign(dy)*m}; }
+function nodeAt(x,y){ let n=S.nodes.find(nd=>Math.hypot(nd.x-x,nd.y-y)<=35); if(!n){ n={id:nid(),x,y}; S.nodes.push(n);} return n; }
+function nearWallEnd(x,y){ let best=null,bd=18; (S.walls||[]).forEach(w=>{[[w.x1,w.y1],[w.x2,w.y2]].forEach(p=>{const dd=Math.hypot(p[0]-x,p[1]-y); if(dd<bd){bd=dd;best={x:p[0],y:p[1]};}});}); return best; }
+function projectOnWall(p){ let best=null,bd=28; (S.walls||[]).forEach(w=>{ const dx=w.x2-w.x1,dy=w.y2-w.y1,l2=dx*dx+dy*dy; if(!l2)return; let t=((p.x-w.x1)*dx+(p.y-w.y1)*dy)/l2; t=Math.max(0,Math.min(1,t)); const px=w.x1+t*dx,py=w.y1+t*dy,dd=Math.hypot(px-p.x,py-p.y); if(dd<bd){bd=dd;best={x:Math.round(px),y:Math.round(py),a:Math.atan2(dy,dx)*180/Math.PI};} }); return best; }
+function showDim(x,y,txt){ const t=$id('dimPrev'); if(!t)return; t.setAttribute('x',x);t.setAttribute('y',y);t.setAttribute('text-anchor','middle');t.textContent=txt;t.style.display=''; }
+function hideDim(){ const t=$id('dimPrev'); if(t)t.style.display='none'; }
+let _draw=null;
+svg.addEventListener('pointerdown', e=>{ if(mode!=='admin')return; const t=tool, p=svgXY(e);
+  if(t==='door'){ const d=projectOnWall(p); if(d){ S.doors=S.doors||[]; S.doors.push({id:nid(),x:d.x,y:d.y,a:d.a}); save(); render(); } else alert('Avvicina la porta a un muro.'); return; }
+  if(t==='zone'||t==='wall'||t==='corr'){ if((t==='zone'||t==='wall')&&S.img){ alert('Stanze e muri si disegnano sulla mappa SENZA immagine importata.'); return; } _draw={t,sx:snapG(p.x),sy:snapG(p.y),ex:snapG(p.x),ey:snapG(p.y)}; e.preventDefault(); } });
+window.addEventListener('pointermove', e=>{ if(!_draw)return; const p=svgXY(e); let ex=snapG(p.x),ey=snapG(p.y);
+  if(_draw.t==='zone'){ const x=Math.min(_draw.sx,ex),y=Math.min(_draw.sy,ey),w=Math.abs(ex-_draw.sx),h=Math.abs(ey-_draw.sy); const pv=$id('zonePrev'); pv.setAttribute('x',x);pv.setAttribute('y',y);pv.setAttribute('width',w);pv.setAttribute('height',h);pv.style.display=''; _draw.ex=ex;_draw.ey=ey; showDim(x+w/2,y-6,(Math.round(w*M_PER_UNIT*10)/10)+'×'+(Math.round(h*M_PER_UNIT*10)/10)+' m'); }
+  else { let c={x:ex,y:ey}; if(_draw.t==='wall'){ const sn=nearWallEnd(ex,ey); if(sn&&!(sn.x===_draw.sx&&sn.y===_draw.sy)) c=sn; } if(e.shiftKey) c=constrain(_draw.sx,_draw.sy,c.x,c.y); const pv=$id('linePrev'); pv.setAttribute('x1',_draw.sx);pv.setAttribute('y1',_draw.sy);pv.setAttribute('x2',c.x);pv.setAttribute('y2',c.y); pv.setAttribute('class',_draw.t==='wall'?'wall':'edge'); pv.style.display=''; _draw.ex=c.x;_draw.ey=c.y; showDim((_draw.sx+c.x)/2,(_draw.sy+c.y)/2-6,(Math.round(Math.hypot(c.x-_draw.sx,c.y-_draw.sy)*M_PER_UNIT*10)/10)+' m'); } });
+window.addEventListener('pointerup', ()=>{ if(!_draw)return; const d=_draw; _draw=null; $id('zonePrev').style.display='none'; $id('linePrev').style.display='none'; hideDim();
+  if(d.t==='zone'){ const x=Math.min(d.sx,d.ex),y=Math.min(d.sy,d.ey),w=Math.abs(d.ex-d.sx),h=Math.abs(d.ey-d.sy); if(w>25&&h>25){ const name=prompt('Nome stanza (es. Sala B):',''); S.zones=S.zones||[]; S.zones.push({id:nid(),x,y,w,h,name:(name||'').trim()}); save(); render(); } }
+  else if(d.t==='wall'){ if(Math.hypot(d.ex-d.sx,d.ey-d.sy)>15){ S.walls=S.walls||[]; S.walls.push({id:nid(),x1:d.sx,y1:d.sy,x2:d.ex,y2:d.ey}); save(); render(); } }
+  else if(d.t==='corr'){ if(Math.hypot(d.ex-d.sx,d.ey-d.sy)>15){ const a=nodeAt(d.sx,d.sy),b=nodeAt(d.ex,d.ey); if(a.id!==b.id && !S.edges.some(([x,y])=>(x===a.id&&y===b.id)||(x===b.id&&y===a.id))) S.edges.push([a.id,b.id]); save(); render(); } } });
+/* ===== Esporta mappa (PDF, fallback PNG) ===== */
+const EXPORT_CSS='.zone{fill:#221d2e;stroke:#5a5470;stroke-width:1.5}.zoneLbl{fill:#9a8fb5;font:600 14px sans-serif;text-anchor:middle}.wall{stroke:#6b6480;stroke-width:9;stroke-linecap:round}.doorGap{stroke:#0e0b16;stroke-width:12}.door{stroke:#e8d5a3;stroke-width:2.5;fill:none}.route{stroke:#e8d5a3;stroke-width:6;fill:none}.route-flow{display:none}.pinBody{fill:#e8d5a3;stroke:#1a1622}.pinIcon{stroke:#1a1622;stroke-width:2.3;fill:none}.pinTxt{fill:#fff;font:600 12.5px sans-serif;text-anchor:middle}.here{fill:#3ad07a;stroke:#fff}.here-ring{display:none}.here-tag{fill:#fff;font:700 11.5px sans-serif;text-anchor:middle}.chev{stroke:#fff;stroke-width:2.4;fill:none}.dot{display:none}';
+async function exportMap(){
+  const W=(S.img&&S.imgW)?S.imgW:1000, H=(S.img&&S.imgH)?S.imgH:700;
+  const clone=svg.cloneNode(true); clone.setAttribute('width',W); clone.setAttribute('height',H); clone.setAttribute('viewBox','0 0 '+W+' '+H);
+  ['zonePrev','linePrev','dimPrev','gNodes','gEdges'].forEach(id=>{ const e=clone.querySelector('#'+id); if(e) e.remove(); });
+  const vp=clone.querySelector('#viewport'); if(vp) vp.removeAttribute('transform');
+  const st=document.createElementNS(NS,'style'); st.textContent=EXPORT_CSS; clone.insertBefore(st, clone.firstChild);
+  const xml=new XMLSerializer().serializeToString(clone);
+  const im=new Image();
+  im.onload=async()=>{ const c=document.createElement('canvas'); c.width=W; c.height=H; const ctx=c.getContext('2d'); ctx.fillStyle='#0e0b16'; ctx.fillRect(0,0,W,H); ctx.drawImage(im,0,0,W,H); const png=c.toDataURL('image/png');
+    try{ await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'); const J=(window.jspdf&&window.jspdf.jsPDF); if(!J)throw 0; const pdf=new J({orientation:W>=H?'l':'p',unit:'px',format:[W,H]}); pdf.addImage(png,'PNG',0,0,W,H); pdf.save((S.company||'mappa')+'.pdf'); }
+    catch(_){ const a=document.createElement('a'); a.href=png; a.download=(S.company||'mappa')+'.png'; a.click(); } };
+  im.onerror=()=>alert('Esportazione non riuscita (riprova).');
+  im.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(xml);
+}
+
 /* ===== AVVIO ===== */
 render();
+_baseline=JSON.stringify({floors:S._floors, fi:S._fi});   // base per Annulla/Ripeti
 window.addEventListener('resize', applyViewBox);   // adatta la mappa a qualsiasi schermo, anche su rotazione/ridimensionamento
 if(new URLSearchParams(location.search).get('admin')==='1') setMode('admin');   // aperto da Impostazioni del Concierge → Configura diretta
 const _goto=new URLSearchParams(location.search).get('goto');                   // l'AI chiede di mostrare un punto
