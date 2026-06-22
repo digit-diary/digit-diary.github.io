@@ -2391,6 +2391,7 @@ function domandaRapida(i){
     resetInattivita(); fermaTutto(); occupato = true;
     const c = rispCache.get(ck);
     rispondi(c.text, c.lang, c.indicazione, ++richiestaId, true);
+    wfTryShowOnMap(q, true);             // anche con risposta in cache: apri la mappa sul punto (bottone)
     return;
   }
   chiediAllAI(q, {cacheKey:ck, noContext:true});
