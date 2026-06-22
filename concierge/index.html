@@ -952,13 +952,13 @@
         <div class="media-list" id="mediaGrid"></div>
         <div class="media-empty" id="mediaEmpty">Nessun media caricato.</div>
 
-        <h3 style="margin-top:22px">Mappa dei piani (piantine)</h3>
+        <h3 style="margin-top:22px">Mappa interattiva (percorsi)</h3>
         <input type="file" id="fileMappa" accept="image/*,application/pdf" multiple style="display:none" onchange="importaMappa(event)">
-        <label class="btn-import" for="fileMappa">Importa piantina</label>
-        <button type="button" class="btn-import" style="margin-top:8px" onclick="apriMappa(true)">Apri mappa interattiva (percorsi) &#10142;</button>
-        <div class="hint"><b>Mappa interattiva (percorsi):</b> premi il bottone qui sopra. Dentro la mappa, per configurarla tieni premuto <b>l'angolo in alto a sinistra</b> e inserisci il PIN → <b>Configura</b> (importi piantina per piano, pin "tu sei qui", destinazioni, corridoi). La lingua segue la home. Il bottone <b>Mappa</b> appare agli ospiti quando ci sono destinazioni.</div>
-        <div class="media-list" id="mappaGrid"></div>
-        <div class="media-empty" id="mappaEmpty">Nessuna piantina caricata.</div>
+        <label class="btn-import" for="fileMappa" style="display:none">Importa piantina</label>
+        <button type="button" class="btn-import" onclick="apriMappa(true)">Apri mappa interattiva (percorsi) &#10142;</button>
+        <div class="hint"><b>Tutto si configura QUI DENTRO:</b> premi il bottone qui sopra → si apre già in <b>Configura</b> → premi <b>Importa piantina</b> (per ogni piano), poi metti <b>"Tu sei qui"</b> e le <b>destinazioni</b>. ⚠️ <b>Non importare la piantina altrove:</b> la mappa interattiva usa il suo import interno. La lingua segue la home; il bottone <b>Mappa</b> appare agli ospiti quando ci sono destinazioni.</div>
+        <div class="media-list" id="mappaGrid" style="display:none"></div>
+        <div class="media-empty" id="mappaEmpty" style="display:none"></div>
       </div>
 
       <!-- SEZIONE COMPORTAMENTO -->
