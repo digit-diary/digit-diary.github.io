@@ -411,7 +411,13 @@ function modificaRegistrazione(id) {
         (e.valuta === 'EUR' ? ' selected' : '') +
         '>EUR</option></select></div></div>'
       : '') +
-    '<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaModificaRegistrazione(' +
+    '<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button>' +
+    (_isMalattia
+      ? '<button class="btn-modal-ok" style="background:#1a7a6d" onclick="salvaModificaRegistrazione(' +
+        id +
+        ',true)">Salva + Copertura</button>'
+      : '') +
+    '<button class="btn-modal-ok" onclick="salvaModificaRegistrazione(' +
     id +
     ')">Salva</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
@@ -439,10 +445,11 @@ function modificaRegistrazione(id) {
     };
   });
 }
-async function salvaModificaRegistrazione(id) {
+async function salvaModificaRegistrazione(id, conCopertura) {
   const nome = document.getElementById('edit-nome').value.trim();
   let testo = document.getElementById('edit-testo').value.trim();
   const tipo = window._editTipoCorrente;
+  let _copDataRef = null;
   if (!nome) {
     toast('Inserisci il nome');
     return;
@@ -483,6 +490,12 @@ async function salvaModificaRegistrazione(id) {
         testo = testo.replace(/\s*\(\d+ giorni[^)]*\)/gi, '').trim();
         if (nGiorni > 1) testo += ' dal ' + dalFmt + ' al ' + alFmt + ' (' + nGiorni + ' giorni)';
         else if (nGiorni === 1) testo += ' il ' + dalFmt + ' (1 giorno)';
+        _copDataRef =
+          d1.getFullYear() +
+          '-' +
+          String(d1.getMonth() + 1).padStart(2, '0') +
+          '-' +
+          String(d1.getDate()).padStart(2, '0');
       } else {
         toast('Formato data non valido (usa GG/MM/AA o GG.MM.AA)');
         return;
@@ -516,6 +529,11 @@ async function salvaModificaRegistrazione(id) {
     renderRischioAlerts();
     renderAmmonimentiAlerts();
     toast('Registrazione modificata');
+    // "Salva + Copertura": apre il popup chi copre / chi ha rifiutato
+    if (conCopertura && tipo === nomeCorrente('Malattia') && typeof apriPopupCopertura === 'function') {
+      const dataRef = _copDataRef || (e && e.data ? e.data.substring(0, 10) : new Date().toISOString().split('T')[0]);
+      setTimeout(() => apriPopupCopertura(nome, dataRef), 150);
+    }
   } catch (e) {
     toast('Errore salvataggio');
   }
