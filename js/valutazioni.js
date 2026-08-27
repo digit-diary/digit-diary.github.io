@@ -295,12 +295,20 @@ function _mediaValutazione(aree) {
   if (!vals.length) return 0;
   return Math.round(vals.reduce((s, v) => s + Number(v), 0) / vals.length);
 }
+// Fasce colore ufficiali della scheda HR: 90-100 verde, 70-89 azzurro, 50-69 giallo, 0-49 rosso
 function _coloreValore(v) {
   if (v == null) return 'var(--muted)';
   if (v >= 90) return '#2c6e49';
-  if (v >= 70) return '#8b6914';
-  if (v >= 50) return '#e67e22';
+  if (v >= 70) return '#1a7aa8';
+  if (v >= 50) return '#b39b00';
   return '#c0392b';
+}
+// Riempimento celle PDF (stessi colori del foglio Excel)
+function _fasciaFillPdf(n) {
+  if (n >= 90) return [183, 225, 166];
+  if (n >= 70) return [189, 224, 238];
+  if (n >= 50) return [255, 255, 130];
+  return [234, 107, 99];
 }
 function _initSchedaValutazione(nome) {
   const el = document.getElementById('scheda-radar-valutazione');
@@ -918,10 +926,18 @@ async function esportaValutazionePDF(id) {
     margin: { left: mx, right: mx },
     styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 8.5, cellPadding: 1.8, valign: 'middle' },
     columnStyles: {
-      0: { cellWidth: 38, fontStyle: 'bold' },
-      1: { cellWidth: 53 },
-      2: { cellWidth: 38, fontStyle: 'bold' },
+      0: { cellWidth: 38 },
+      1: { cellWidth: 53, fontStyle: 'bold' },
+      2: { cellWidth: 38 },
       3: { cellWidth: 'auto' },
+    },
+    // come nel foglio: etichette con i due punti in grassetto, valori del valutato in grassetto,
+    // "Periodo di valutazione" centrato e "Data" a destra
+    didParseCell: function (d) {
+      const raw = String(d.cell.raw || '');
+      if (raw.endsWith(':')) d.cell.styles.fontStyle = 'bold';
+      if (d.row.index === 4 && d.column.index === 1) d.cell.styles.halign = 'center';
+      if (d.row.index === 4 && d.column.index === 3) d.cell.styles.halign = 'right';
     },
   };
   doc.autoTable(
@@ -951,16 +967,23 @@ async function esportaValutazionePDF(id) {
   const stileTab = {
     theme: 'grid',
     margin: { left: mx, right: mx },
-    headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 7.5 },
+    headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 7.5 },
     styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 7.2, cellPadding: 1.8, valign: 'top' },
   };
+  // come nel foglio: numeri allineati a destra in basso, intestazioni centrate
   const colStili = {
     0: { cellWidth: 30, fontStyle: 'bold' },
-    1: { cellWidth: 11, halign: 'center' },
-    2: { cellWidth: 17, halign: 'center', fontStyle: 'bold' },
-    3: { cellWidth: 12, halign: 'center' },
-    4: { cellWidth: 12, halign: 'center' },
+    1: { cellWidth: 13, halign: 'right', valign: 'bottom' },
+    2: { cellWidth: 17, halign: 'right', valign: 'bottom' },
+    3: { cellWidth: 13, halign: 'center', valign: 'middle' },
+    4: { cellWidth: 13, halign: 'right', valign: 'bottom' },
     5: { cellWidth: 'auto' },
+  };
+  const _testateCentrate = function (d) {
+    if (d.section === 'head') {
+      d.cell.styles.halign = 'center';
+      d.cell.styles.valign = 'middle';
+    }
   };
   if (conNote) colStili[6] = { cellWidth: 40, fontStyle: 'italic' };
   const testataAree = ['Area di valutazione', 'Grado', 'Punteggio', 'Valore', 'Totale', 'Descrizione area'];
@@ -987,6 +1010,7 @@ async function esportaValutazionePDF(id) {
         ],
       ],
       columnStyles: colStili,
+      didParseCell: _testateCentrate,
     }),
   );
   y = doc.lastAutoTable.finalY + 4;
@@ -1032,6 +1056,13 @@ async function esportaValutazionePDF(id) {
         head: [testataAree],
         body,
         columnStyles: colStili,
+        // intestazioni centrate + colonna "Valore" colorata per fascia come nel foglio ufficiale
+        didParseCell: function (d) {
+          _testateCentrate(d);
+          if (d.section !== 'body' || d.column.index !== 3) return;
+          const n = parseFloat(d.cell.raw);
+          if (!isNaN(n)) d.cell.styles.fillColor = _fasciaFillPdf(n);
+        },
       }),
     );
     y = doc.lastAutoTable.finalY + 4;
