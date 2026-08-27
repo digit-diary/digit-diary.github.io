@@ -1967,7 +1967,12 @@ async function aggiungiCategoriaInventario() {
   if (nome === null) return;
   const label = nome.trim();
   if (!label) return;
-  const key = 'cat_' + label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  const key =
+    'cat_' +
+    label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
   if (['buoni', 'sigarette'].includes(key) || getInvCategorieExtra().find((c) => c.key === key)) {
     toast('Categoria già esistente');
     return;
@@ -2031,7 +2036,8 @@ function renderInventarioCustom(cat) {
     .filter(([, v]) => v > 0)
     .sort((a, b) => a[0].localeCompare(b[0]));
   const totale = articoli.reduce((s, [, v]) => s + v, 0);
-  let html = '<div class="main-card"><div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span>Scorta ' +
+  let html =
+    '<div class="main-card"><div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span>Scorta ' +
     escP(cat.label) +
     '</span>' +
     (adm
@@ -2044,7 +2050,8 @@ function renderInventarioCustom(cat) {
     '</div>';
   html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;padding:16px">';
   if (!articoli.length)
-    html += '<p style="color:var(--muted);text-align:center;padding:12px;grid-column:1/-1">Nessun articolo in scorta</p>';
+    html +=
+      '<p style="color:var(--muted);text-align:center;padding:12px;grid-column:1/-1">Nessun articolo in scorta</p>';
   else {
     articoli.forEach(([art, qty]) => {
       html +=
@@ -2078,7 +2085,9 @@ function renderInventarioCustom(cat) {
     escP(cat.label) +
     '</div><div class="form-area"><div class="form-row" style="grid-template-columns:repeat(auto-fit,minmax(100px,1fr))">' +
     '<div class="field"><label>Articolo</label><select id="inv-cust-usc-marca" style="padding:11px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"><option value="">Seleziona...</option>' +
-    articoli.map(([art, qty]) => '<option value="' + escP(art) + '">' + escP(art) + ' (' + qty + ')</option>').join('') +
+    articoli
+      .map(([art, qty]) => '<option value="' + escP(art) + '">' + escP(art) + ' (' + qty + ')</option>')
+      .join('') +
     '</select></div>' +
     '<div class="field"><label>A chi / destinazione</label><div class="ac-wrap"><input type="text" id="inv-cust-usc-cliente" placeholder="Cliente o destinazione..." oninput="acFiltraMaison(\'inv-cust-usc-cliente\',\'ac-inv-cust-usc\')" onfocus="acFiltraMaison(\'inv-cust-usc-cliente\',\'ac-inv-cust-usc\')"><div class="ac-drop" id="ac-inv-cust-usc"></div></div></div>' +
     '<div class="field"><label>Quantità</label><input type="number" id="inv-cust-usc-qty" value="1" min="1"></div>' +
@@ -2090,7 +2099,8 @@ function renderInventarioCustom(cat) {
   const rows = getInventarioReparto()
     .filter((r) => r.categoria === cat.key)
     .sort((a, b) => (b.data_movimento || '').localeCompare(a.data_movimento || ''));
-  html += '<div class="main-card" style="margin-top:16px"><div class="card-header">Movimenti ' + escP(cat.label) + '</div>';
+  html +=
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Movimenti ' + escP(cat.label) + '</div>';
   if (!rows.length) html += '<p style="color:var(--muted);padding:16px;text-align:center">Nessun movimento</p>';
   else {
     html +=
@@ -2169,7 +2179,10 @@ async function salvaInvCustomMovimento(catKey, movimento) {
       reparto_dip: currentReparto,
     });
     if (r && r[0]) inventarioCache.unshift(r[0]);
-    logAzione('Inventario ' + (cat ? cat.label : catKey), (isIn ? '+' : '-') + qty + ' ' + art + (cliente ? ' → ' + cliente : ''));
+    logAzione(
+      'Inventario ' + (cat ? cat.label : catKey),
+      (isIn ? '+' : '-') + qty + ' ' + art + (cliente ? ' → ' + cliente : ''),
+    );
     renderInventario();
     toast((isIn ? 'Caricati ' : 'Usciti ') + qty + ' × ' + art);
   } catch (e) {
@@ -2776,7 +2789,11 @@ function initInventarioFP() {
 function esportaInventarioCSV() {
   const isBuoni = _invTab === 'buoni';
   const _catCsv = _invTab === 'buoni' ? 'buono' : _invTab === 'sigarette' ? 'sigaretta' : _invTab;
-  const _catLbl = isBuoni ? 'buoni' : _invTab === 'sigarette' ? 'sigarette' : ((getInvCategorieExtra().find((c) => c.key === _invTab) || {}).label || _invTab);
+  const _catLbl = isBuoni
+    ? 'buoni'
+    : _invTab === 'sigarette'
+      ? 'sigarette'
+      : (getInvCategorieExtra().find((c) => c.key === _invTab) || {}).label || _invTab;
   const data = getInventarioReparto().filter((r) => r.categoria === _catCsv);
   if (!data.length) {
     toast('Nessun dato');
@@ -2823,7 +2840,11 @@ function esportaInventarioPDF() {
   }
   const isBuoni = _invTab === 'buoni';
   const _catPdf = _invTab === 'buoni' ? 'buono' : _invTab === 'sigarette' ? 'sigaretta' : _invTab;
-  const _catLbl = isBuoni ? 'Buoni' : _invTab === 'sigarette' ? 'Sigarette' : ((getInvCategorieExtra().find((c) => c.key === _invTab) || {}).label || _invTab);
+  const _catLbl = isBuoni
+    ? 'Buoni'
+    : _invTab === 'sigarette'
+      ? 'Sigarette'
+      : (getInvCategorieExtra().find((c) => c.key === _invTab) || {}).label || _invTab;
   const data = getInventarioReparto().filter((r) => r.categoria === _catPdf);
   if (!data.length) {
     toast('Nessun dato');
@@ -2834,11 +2855,7 @@ function esportaInventarioPDF() {
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
   doc.text(
-    'Inventario ' +
-      _catLbl +
-      ' \u2014 ' +
-      currentReparto.charAt(0).toUpperCase() +
-      currentReparto.slice(1),
+    'Inventario ' + _catLbl + ' \u2014 ' + currentReparto.charAt(0).toUpperCase() + currentReparto.slice(1),
     14,
     16,
   );
@@ -2896,7 +2913,9 @@ function esportaInventarioPDF() {
     headStyles: { fillColor: [44, 62, 80], textColor: 255, fontStyle: 'bold' },
     footStyles: { fillColor: [245, 245, 245], fontStyle: 'bold' },
   });
-  doc.save('inventario_' + _catLbl.toLowerCase().replace(/\s+/g, '_') + '_' + new Date().toISOString().split('T')[0] + '.pdf');
+  doc.save(
+    'inventario_' + _catLbl.toLowerCase().replace(/\s+/g, '_') + '_' + new Date().toISOString().split('T')[0] + '.pdf',
+  );
 }
 
 // MENU MOBILE
