@@ -5,3 +5,5 @@ backups/
 .netlify/
 .vscode/
 *.xlsx
+.supabase_db_password.txt
+CREDENZIALI_LOCALI.md
