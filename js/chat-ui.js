@@ -2538,6 +2538,7 @@ function _renderSchedaTimeline(nome, entries, moduli, dal, al) {
   var items = [];
   entries.forEach(function (e) {
     items.push({
+      id: e.id,
       date: e.data,
       tipo: e.tipo,
       text: e.testo,
@@ -2556,6 +2557,7 @@ function _renderSchedaTimeline(nome, entries, moduli, dal, al) {
         rdi: 'RDI',
       }[m.tipo] || m.tipo;
     items.push({
+      id: m.id,
       date: m.created_at || m.data_modulo,
       tipo: label,
       text: 'Modulo ' + label + (m.resp_settore ? ' — Resp: ' + m.resp_settore : ''),
@@ -2613,7 +2615,11 @@ function _renderSchedaTimeline(nome, entries, moduli, dal, al) {
           ? '<span style="margin-left:4px;padding:1px 5px;border:1px solid var(--line);border-radius:2px;font-size:.65rem;color:var(--muted)">MODULO</span>'
           : '';
       return (
-        '<div class="scheda-timeline-item"><span style="font-size:.78rem;color:var(--muted);min-width:100px">' +
+        '<div class="scheda-timeline-item" style="cursor:pointer" title="Clicca per l\'anteprima completa" onclick="apriVoceTimeline(\'' +
+        i.source +
+        "'," +
+        i.id +
+        ')"><span style="font-size:.78rem;color:var(--muted);min-width:100px">' +
         dateStr +
         '</span><span class="mini-badge" style="background:' +
         bgCol +
@@ -2651,6 +2657,77 @@ function schedaKpiFiltra(nome, source, tipo) {
     try {
       tl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } catch (e) {}
+}
+
+// Anteprima completa di una voce della cronologia (registrazione o modulo)
+function apriVoceTimeline(source, id) {
+  var b = document.getElementById('pwd-modal-content');
+  if (!b) return;
+  var html = '';
+  var riga = function (label, val) {
+    if (!val) return '';
+    return (
+      '<div style="margin-bottom:8px"><div style="font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700">' +
+      label +
+      '</div><div style="font-size:.88rem;line-height:1.45">' +
+      esc(String(val)) +
+      '</div></div>'
+    );
+  };
+  if (source === 'reg') {
+    var e = datiCache.find(function (x) {
+      return x.id === id;
+    });
+    if (!e) return;
+    var d = new Date(e.data);
+    html =
+      '<h3 style="margin-bottom:4px">' +
+      escP(e.tipo) +
+      ' — ' +
+      escP(e.nome) +
+      '</h3><p style="color:var(--muted);font-size:.8rem;margin-bottom:12px">' +
+      d.toLocaleDateString('it-IT') +
+      ' ' +
+      d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) +
+      (e.reparto ? ' — ' + escP(e.reparto) : '') +
+      (e.operatore ? ' — inserito da ' + escP(e.operatore) : '') +
+      '</p>';
+    if (e.importo && parseFloat(e.importo))
+      html +=
+        '<p style="margin-bottom:10px"><span class="mini-badge" style="background:var(--accent);font-size:.8rem">' +
+        fmtCHF(e.importo) +
+        ' ' +
+        (e.valuta || 'CHF') +
+        '</span></p>';
+    html += riga('Testo completo', e.testo);
+  } else {
+    var m = moduliCache.find(function (x) {
+      return x.id === id;
+    });
+    if (!m) return;
+    var label = { allineamento: 'Allineamento', apprezzamento: 'Apprezzamento', rdi: 'RDI' }[m.tipo] || m.tipo;
+    var dm = m.data_modulo ? new Date(m.data_modulo + 'T12:00:00').toLocaleDateString('it-IT') : '';
+    html =
+      '<h3 style="margin-bottom:4px">Modulo ' +
+      escP(label) +
+      ' — ' +
+      escP(m.collaboratore) +
+      '</h3><p style="color:var(--muted);font-size:.8rem;margin-bottom:12px">' +
+      dm +
+      (m.resp_settore ? ' — Resp. settore: ' + escP(m.resp_settore) : '') +
+      (m.operatore ? ' — inserito da ' + escP(m.operatore) : '') +
+      (m.livello ? ' — Livello ' + escP(m.livello) : '') +
+      '</p>';
+    html += riga('Non conformità', m.non_conformita);
+    html += riga('Descrizione', m.descrizione);
+    html += riga('Obiettivo', m.obiettivo);
+    html += riga('Scadenza', m.scadenza);
+    html += riga('Osservazioni', m.osservazioni);
+  }
+  html +=
+    '<div class="pwd-modal-btns" style="margin-top:14px"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
+  b.innerHTML = html;
+  document.getElementById('pwd-modal').classList.remove('hidden');
 }
 
 function _schedaFilterTimeline(nome) {
@@ -2869,36 +2946,133 @@ function stampaSchedaPDF(nome) {
 
   var jsPDF = window.jspdf.jsPDF;
   var doc = new jsPDF('portrait', 'mm', 'a4');
-  doc.setFontSize(16);
+  var pw = doc.internal.pageSize.getWidth();
+  var y = 14;
+  if (typeof _logoB64 !== 'undefined' && _logoB64)
+    try {
+      doc.addImage(_logoB64, 'PNG', pw / 2 - 20, y, 40, 22.5);
+      y += 27;
+    } catch (e) {}
+  doc.setFontSize(15);
   doc.setFont('helvetica', 'bold');
-  doc.text('Scheda Collaboratore', 14, 18);
-  doc.setFontSize(11);
+  doc.text('Scheda Collaboratore — ' + nome, pw / 2, y + 4, { align: 'center' });
+  y += 10;
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.text('Casino Lugano SA — ' + new Date().toLocaleDateString('it-IT'), 14, 25);
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text(nome, 14, 35);
-  if (dal || al) {
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Periodo: ' + (dal || 'inizio') + ' — ' + (al || 'oggi'), 14, 41);
-  }
+  doc.setTextColor(100);
+  // riga anagrafica: impiego, categoria, data di nascita, reparto
+  var cRec = collaboratoriCache.find(function (c) {
+    return c.nome === nome;
+  });
+  var anag = [];
+  if (cRec && cRec.impiego) anag.push(cRec.impiego === 'fisso' ? 'Fisso 100%' : 'Jolly');
+  if (cRec && cRec.categoria) anag.push('Categoria ' + cRec.categoria + 'ª');
+  if (cRec && cRec.data_nascita)
+    anag.push('Nato/a il ' + new Date(cRec.data_nascita + 'T12:00:00').toLocaleDateString('it-IT'));
+  anag.push('Reparto ' + currentReparto.charAt(0).toUpperCase() + currentReparto.slice(1));
+  anag.push('Generata il ' + new Date().toLocaleDateString('it-IT'));
+  if (dal || al) anag.push('Periodo: ' + (dal || 'inizio') + ' — ' + (al || 'oggi'));
+  doc.text(anag.join('  ·  '), pw / 2, y, { align: 'center' });
+  doc.setTextColor(0);
+  y += 6;
 
   // KPI table
   doc.autoTable({
     theme: 'grid',
-    startY: dal || al ? 45 : 40,
+    startY: y,
     head: [
       ['Registrazioni', 'Errori', 'Costo Errori', 'Malattie', 'Amm. Verbali', 'Allineamenti', 'Apprezzamenti', 'RDI'],
     ],
     body: [
       [entries.length, totErr, totErrCost ? 'CHF ' + fmtCHF(totErrCost) : '0', totMal, totAmm, allin, apprMod, rdi],
     ],
-    theme: 'grid',
     headStyles: { fillColor: [26, 74, 122], fontSize: 7 },
-    bodyStyles: { fontSize: 8 },
+    bodyStyles: { fontSize: 8, halign: 'center' },
     margin: { left: 14, right: 14 },
   });
+
+  // Multidisciplinarità: livello, punti, coperture/rifiuti, competenze certificate
+  if (typeof livelloDiCollaboratore === 'function' && cRec) {
+    var lvPdf = livelloDiCollaboratore(cRec);
+    var ptsPdf = puntiTotali(nome);
+    var copPdf = conteggioAzione(nome, 'copertura');
+    var rifPdf = conteggioAzione(nome, 'disponibilita_negata');
+    var compsPdf = getCompetenzeReparto()
+      .filter(function (k) {
+        return (cRec.competenze || {})[k.key] === true;
+      })
+      .map(function (k) {
+        return k.label;
+      });
+    doc.autoTable({
+      theme: 'grid',
+      startY: doc.lastAutoTable.finalY + 4,
+      head: [
+        [
+          'Livello multidisciplinare',
+          'Punti ' + new Date().getFullYear(),
+          'Coperture',
+          'Rifiuti disp.',
+          'Competenze certificate',
+        ],
+      ],
+      body: [[lvPdf ? 'Livello ' + lvPdf : '—', ptsPdf, copPdf, rifPdf, compsPdf.length ? compsPdf.join(', ') : '—']],
+      headStyles: { fillColor: [139, 105, 20], fontSize: 7 },
+      bodyStyles: { fontSize: 8, halign: 'center' },
+      margin: { left: 14, right: 14 },
+    });
+  }
+
+  // Valutazione più recente: media + aree
+  if (typeof getValutazioniCollab === 'function') {
+    var valsPdf = getValutazioniCollab(nome);
+    if (valsPdf.length) {
+      var vP = valsPdf[0];
+      var areeP = typeof _areeNormalizza === 'function' ? _areeNormalizza(vP.aree) : vP.aree || {};
+      var mediaP = _mediaValutazione(areeP);
+      doc.autoTable({
+        theme: 'grid',
+        startY: doc.lastAutoTable.finalY + 4,
+        head: [
+          [
+            {
+              content:
+                'Valutazione ' +
+                vP.anno +
+                ' — media ' +
+                mediaP +
+                '% (' +
+                _giudizioScala(mediaP) +
+                ')' +
+                (vP.valutatore ? ' — valutatore: ' + vP.valutatore : ''),
+              colSpan: 4,
+            },
+          ],
+        ],
+        body: (function () {
+          var righe = [];
+          for (var i = 0; i < AREE_VALUTAZIONE.length; i += 2) {
+            var a1 = AREE_VALUTAZIONE[i],
+              a2 = AREE_VALUTAZIONE[i + 1];
+            righe.push([
+              a1.label,
+              areeP[a1.key] != null ? areeP[a1.key] + '%' : '—',
+              a2 ? a2.label : '',
+              a2 && areeP[a2.key] != null ? areeP[a2.key] + '%' : a2 ? '—' : '',
+            ]);
+          }
+          return righe;
+        })(),
+        headStyles: { fillColor: [44, 110, 73], fontSize: 8 },
+        bodyStyles: { fontSize: 7.5 },
+        columnStyles: {
+          1: { halign: 'center', fontStyle: 'bold', cellWidth: 16 },
+          3: { halign: 'center', fontStyle: 'bold', cellWidth: 16 },
+        },
+        margin: { left: 14, right: 14 },
+      });
+    }
+  }
 
   // Timeline table
   var items = [];
@@ -2921,7 +3095,9 @@ function stampaSchedaPDF(nome) {
     });
   }
   filteredEntries.forEach(function (e) {
-    items.push([new Date(e.data).toLocaleDateString('it-IT'), e.tipo, e.testo.substring(0, 80), e.operatore || '']);
+    var txt = e.testo || '';
+    if (e.importo && parseFloat(e.importo)) txt += ' (' + fmtCHF(e.importo) + ' ' + (e.valuta || 'CHF') + ')';
+    items.push([new Date(e.data).toLocaleDateString('it-IT'), e.tipo, txt.substring(0, 110), e.operatore || '']);
   });
   filteredModuli.forEach(function (m) {
     var label =
@@ -2954,6 +3130,9 @@ function stampaSchedaPDF(nome) {
       margin: { left: 14, right: 14 },
     });
   }
+  doc.setFontSize(6.5);
+  doc.setTextColor(150);
+  doc.text('Casino Lugano SA — Scheda collaboratore — Riservato', 14, doc.internal.pageSize.getHeight() - 8);
 
   mostraPdfPreview(
     doc,

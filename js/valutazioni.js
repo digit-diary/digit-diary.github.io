@@ -1,12 +1,12 @@
 /**
  * Diario Collaboratori — Casino Lugano SA
  * File: valutazioni.js
- * Valutazione annuale integrata: 9 aree scheda HR + Versatilità, Affidabilità,
- * Disponibilità. Editor, storico, radar nella scheda collaboratore,
- * import Excel della scheda compilata, export PDF in formato HR.
+ * Valutazione annuale integrata: 9 aree scheda HR + Versatilità e
+ * "Affidabilità e disponibilità" (voce unica). Editor multi-scheda (anno/tipo),
+ * note per area (colonna I), radar, import Excel, export PDF formato HR.
  */
 
-// Aree della scheda ufficiale HR (versione 02/25) + le 3 nuove concordate con HR
+// Aree della scheda ufficiale HR (versione 02/25) + le 2 nuove concordate con HR
 const AREE_VALUTAZIONE = [
   {
     key: 'gestione_risorse',
@@ -69,20 +69,38 @@ const AREE_VALUTAZIONE = [
     desc: 'Sa operare su più settori del reparto secondo il percorso multidisciplinare (es. Sala, Reception, Cassa). Si adatta rapidamente a ruoli e postazioni diverse in base alle necessità operative.',
   },
   {
-    key: 'affidabilita',
-    label: 'Affidabilità',
+    key: 'affidabilita_disponibilita',
+    label: 'Affidabilità e disponibilità',
     gruppo: 'COMPETENZE MULTIDISCIPLINARI',
-    desc: 'Svolge il proprio lavoro con costanza e precisione, con un basso tasso di errori. Rispetta le procedure e le consegne; si può contare sul suo operato senza necessità di controlli continui.',
-  },
-  {
-    key: 'disponibilita',
-    label: 'Disponibilità',
-    gruppo: 'COMPETENZE MULTIDISCIPLINARI',
-    desc: 'È disponibile a coprire turni scoperti, ad accettare cambi di turno e a supportare i colleghi nei momenti di necessità, contribuendo concretamente alla continuità del servizio.',
+    desc: 'Svolge il proprio lavoro con costanza e precisione, con un basso tasso di errori; si può contare sul suo operato senza necessità di controlli continui. È disponibile a coprire turni scoperti, ad accettare cambi di turno e a supportare i colleghi nei momenti di necessità, contribuendo concretamente alla continuità del servizio.',
   },
 ];
+// Compatibilità: le valutazioni salvate prima della fusione avevano 'affidabilita' e
+// 'disponibilita' separate → confluiscono nella voce unica (media delle due)
+function _areeNormalizza(aree) {
+  const a = Object.assign({}, aree || {});
+  if (a.affidabilita_disponibilita == null && (a.affidabilita != null || a.disponibilita != null)) {
+    const vv = [a.affidabilita, a.disponibilita].filter((x) => x != null && !isNaN(x)).map(Number);
+    if (vv.length) a.affidabilita_disponibilita = Math.round(vv.reduce((s, x) => s + x, 0) / vv.length);
+  }
+  delete a.affidabilita;
+  delete a.disponibilita;
+  return a;
+}
 const SCALA_VALUTAZIONE =
   '100%-90% Raggiunto/Ottimo · 80%-70% Buono/Abb. Bene · 60%-50% Sufficiente/Appena sufficiente · 40%-0% Insufficiente/Non raggiunto';
+// Foglio "Scala valutazione" della scheda HR: fasce di giudizio + Grado 1-5 (punteggio = grado x 20)
+function _giudizioScala(v) {
+  if (v == null || isNaN(v)) return '';
+  if (v >= 90) return 'Ottimo/Raggiunto';
+  if (v >= 70) return 'Abbastanza bene/Buono';
+  if (v >= 50) return 'Appena sufficiente/Sufficiente';
+  return 'Insufficiente/Non raggiunto';
+}
+function _gradoScala(v) {
+  if (v == null || isNaN(v)) return '';
+  return Math.max(1, Math.min(5, Math.round(v / 20)));
+}
 
 function getValutazioniCollab(nome) {
   return getValutazioniReparto()
@@ -99,45 +117,59 @@ function _suggerisciAree(nome) {
     const lv = livelloDiCollaboratore(c);
     sug.versatilita = lv >= 3 ? 100 : lv === 2 ? 80 : lv === 1 ? 60 : 40;
   }
-  // Affidabilità da errori/ammonimenti ultimi 12 mesi
+  // Affidabilità e disponibilità (voce unica): metà dal tasso di errori/ammonimenti
+  // degli ultimi 12 mesi, metà da coperture/rifiuti registrati nei punti
   const unAnnoFa = new Date(Date.now() - 365 * 86400000).toISOString();
   const entries = getDatiReparto().filter((e) => e.nome.toLowerCase() === nome.toLowerCase() && e.data >= unAnnoFa);
   const errori = entries.filter((e) => e.tipo === nomeCorrente('Errore')).length;
   const amm = entries.filter((e) => e.tipo === nomeCorrente('Ammonimento Verbale')).length;
-  sug.affidabilita = Math.max(30, 100 - errori * 8 - amm * 12);
-  // Disponibilità da coperture/rifiuti registrati nei punti
+  const affid = Math.max(30, 100 - errori * 8 - amm * 12);
+  let disp = null;
   if (typeof conteggioAzione === 'function') {
     const coperture = conteggioAzione(nome, 'copertura') + conteggioAzione(nome, 'cambio_turno');
     const rifiuti = conteggioAzione(nome, 'disponibilita_negata');
-    sug.disponibilita = Math.max(30, Math.min(100, 60 + coperture * 8 - rifiuti * 10));
+    disp = Math.max(30, Math.min(100, 60 + coperture * 8 - rifiuti * 10));
   }
+  sug.affidabilita_disponibilita = disp != null ? Math.round((affid + disp) / 2) : affid;
   return sug;
 }
 
 // ================================================================
 // SEZIONE NELLA SCHEDA COLLABORATORE
 // ================================================================
+// Restituisce la valutazione selezionata nel selettore schede (default: la più recente)
+function _valSchedaCorrente(vals) {
+  return vals.find((x) => x.id === window._valSchedaSel) || vals[0];
+}
+// Cambio scheda dal selettore (più valutazioni per collaboratore: anni e tipi diversi)
+function selezionaValutazione(nome, id) {
+  window._valSchedaSel = id;
+  apriSchedaCollaboratore(nome);
+}
 function _renderValutazioneSezione(nome) {
   const vals = getValutazioniCollab(nome);
   const ne = nome.replace(/'/g, "\\'");
   const puoVal = typeof puoModificare === 'function' ? puoModificare('gestione_valutazioni') : isAdmin();
+  const v = vals.length ? _valSchedaCorrente(vals) : null;
   let html =
     '<div class="scheda-section"><h4 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Valutazione annuale';
   if (puoVal) {
     html +=
       '<button class="btn-export" onclick="apriValutazioneEditor(\'' +
       ne +
-      '\')" style="font-size:.72rem;padding:4px 12px">+ Nuova / Modifica</button>';
+      "'" +
+      (v ? ',' + v.anno + ",'" + escP(v.tipo) + "'" : '') +
+      ')" style="font-size:.72rem;padding:4px 12px">+ Nuova / Modifica</button>';
     html +=
       '<button class="btn-export" onclick="document.getElementById(\'val-import-file\').click()" style="font-size:.72rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49">Importa Excel</button>' +
       '<input type="file" id="val-import-file" accept=".xlsx,.xls" style="display:none" onchange="importaValutazioneExcel(this,\'' +
       ne +
       '\')">';
   }
-  if (vals.length) {
+  if (v) {
     html +=
       '<button class="btn-export btn-export-pdf" onclick="esportaValutazionePDF(' +
-      vals[0].id +
+      v.id +
       ')" style="font-size:.72rem;padding:4px 12px">PDF scheda HR</button>';
   }
   html += '</h4>';
@@ -146,8 +178,31 @@ function _renderValutazioneSezione(nome) {
       '<p style="color:var(--muted);font-size:.86rem">Nessuna valutazione registrata. Creane una nuova o importa la scheda Excel compilata.</p></div>';
     return html;
   }
-  const v = vals[0];
-  const aree = v.aree || {};
+  // Selettore schede (più valutazioni: anni/tipi diversi)
+  if (vals.length > 1) {
+    html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">';
+    vals.forEach((x) => {
+      const att = x.id === v.id;
+      html +=
+        '<span class="mini-badge" style="cursor:pointer;font-size:.74rem;' +
+        (att
+          ? 'background:var(--accent2);color:white'
+          : 'background:var(--paper2);color:var(--ink);border:1px solid var(--line)') +
+        '" onclick="selezionaValutazione(\'' +
+        ne +
+        "'," +
+        x.id +
+        ')">' +
+        x.anno +
+        (x.tipo !== 'valutazione' ? ' · ' + escP(x.tipo) : '') +
+        ' — ' +
+        _mediaValutazione(_areeNormalizza(x.aree)) +
+        '%</span>';
+    });
+    html += '</div>';
+  }
+  const aree = _areeNormalizza(v.aree);
+  const note = v.aree_note || {};
   const media = _mediaValutazione(aree);
   html +=
     '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start"><div style="flex:1;min-width:260px">';
@@ -162,7 +217,9 @@ function _renderValutazioneSezione(nome) {
     _coloreValore(media) +
     '">' +
     media +
-    '%</strong></p>';
+    '%</strong> <span style="font-size:.78rem">(' +
+    _giudizioScala(media) +
+    ')</span></p>';
   let gruppoCorr = '';
   AREE_VALUTAZIONE.forEach((a) => {
     if (a.gruppo !== gruppoCorr) {
@@ -182,36 +239,24 @@ function _renderValutazioneSezione(nome) {
       _coloreValore(val) +
       '"></div></div><strong style="min-width:38px;text-align:right;color:' +
       _coloreValore(val) +
-      '">' +
+      '"' +
+      (val != null ? ' title="Grado ' + _gradoScala(val) + ' — ' + _giudizioScala(val) + '"' : '') +
+      '>' +
       (val != null ? val + '%' : '—') +
       '</strong></div>';
+    if (note[a.key])
+      html +=
+        '<div style="font-size:.76rem;color:var(--muted);font-style:italic;padding:0 0 3px 12px;line-height:1.3">&#8618; ' +
+        escP(note[a.key]) +
+        '</div>';
   });
   html +=
     '</div><div style="width:320px;max-width:100%"><div class="scheda-chart-wrap" style="height:280px"><canvas id="scheda-radar-valutazione"></canvas></div></div></div>';
-  // storico anni
-  if (vals.length > 1) {
-    html +=
-      '<p style="font-size:.8rem;color:var(--muted);margin-top:8px">Storico: ' +
-      vals
-        .map(
-          (x) =>
-            '<span class="mini-badge" style="background:var(--paper2);color:var(--ink);border:1px solid var(--line);cursor:pointer" onclick="apriValutazioneEditor(\'' +
-            ne +
-            "'," +
-            x.anno +
-            ')">' +
-            x.anno +
-            ': ' +
-            _mediaValutazione(x.aree || {}) +
-            '%</span>',
-        )
-        .join(' ') +
-      '</p>';
-  }
   html += '</div>';
   return html;
 }
 function _mediaValutazione(aree) {
+  aree = _areeNormalizza(aree);
   const vals = AREE_VALUTAZIONE.map((a) => aree[a.key]).filter((v) => v != null && !isNaN(v));
   if (!vals.length) return 0;
   return Math.round(vals.reduce((s, v) => s + Number(v), 0) / vals.length);
@@ -228,9 +273,12 @@ function _initSchedaValutazione(nome) {
   if (!el || !window.Chart) return;
   const vals = getValutazioniCollab(nome);
   if (!vals.length) return;
-  const datasets = vals.slice(0, 2).map((v, i) => ({
-    label: v.anno + (v.tipo === 'autovalutazione' ? ' (auto)' : ''),
-    data: AREE_VALUTAZIONE.map((a) => (v.aree || {})[a.key] || 0),
+  // radar: scheda selezionata in oro + la successiva (per confronto) in blu
+  const sel = _valSchedaCorrente(vals);
+  const daMostrare = [sel].concat(vals.filter((x) => x.id !== sel.id).slice(0, 1));
+  const datasets = daMostrare.map((v, i) => ({
+    label: v.anno + (v.tipo !== 'valutazione' ? ' (' + v.tipo + ')' : ''),
+    data: AREE_VALUTAZIONE.map((a) => _areeNormalizza(v.aree)[a.key] || 0),
     borderColor: i === 0 ? '#8b6914' : '#1a4a7a',
     backgroundColor: i === 0 ? 'rgba(139,105,20,0.15)' : 'rgba(26,74,122,0.10)',
     pointRadius: 3,
@@ -264,10 +312,12 @@ function _initSchedaValutazione(nome) {
 // ================================================================
 // EDITOR VALUTAZIONE
 // ================================================================
-function apriValutazioneEditor(nome, anno) {
+function apriValutazioneEditor(nome, anno, tipo) {
   const a = anno || new Date().getFullYear();
-  const esistente = getValutazioniCollab(nome).find((v) => v.anno === a && v.tipo === 'valutazione');
-  const aree = (esistente && esistente.aree) || {};
+  const tp = tipo || 'valutazione';
+  const esistente = getValutazioniCollab(nome).find((v) => v.anno === a && v.tipo === tp);
+  const aree = _areeNormalizza((esistente && esistente.aree) || {});
+  const note = (esistente && esistente.aree_note) || {};
   const sug = _suggerisciAree(nome);
   const ne = nome.replace(/'/g, "\\'");
   let html =
@@ -282,6 +332,11 @@ function apriValutazioneEditor(nome, anno) {
     '<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap"><span class="filter-label">Anno</span><input type="number" id="val-anno" value="' +
     a +
     '" min="2020" max="2040" style="width:100px;padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)">' +
+    '<span class="filter-label">Tipo</span><select id="val-tipo" style="padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)">' +
+    ['valutazione', 'autovalutazione', 'intermedia']
+      .map((t) => '<option value="' + t + '"' + (tp === t ? ' selected' : '') + '>' + t + '</option>')
+      .join('') +
+    '</select>' +
     '<span class="filter-label">Valutatore</span><input type="text" id="val-valutatore" value="' +
     escP((esistente && esistente.valutatore) || getOperatore() || '') +
     '" style="width:200px;padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"></div>';
@@ -316,6 +371,12 @@ function apriValutazioneEditor(nome, anno) {
           '</button>'
         : '') +
       '</div>';
+    html +=
+      '<input type="text" id="val-nota-' +
+      ar.key +
+      '" value="' +
+      escP(note[ar.key] || '') +
+      '" placeholder="Nota del valutatore (opzionale)..." style="width:100%;margin:0 0 4px;padding:6px 10px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--muted);font-size:.8rem;font-style:italic">';
   });
   const pf = (esistente && esistente.punti_forza) || '';
   const ob = (esistente && esistente.obiettivi) || [];
@@ -372,10 +433,14 @@ async function salvaValutazione(nome) {
     return;
   }
   const anno = parseInt((document.getElementById('val-anno') || {}).value) || new Date().getFullYear();
+  const tipo = (document.getElementById('val-tipo') || {}).value || 'valutazione';
   const aree = {};
+  const areeNote = {};
   AREE_VALUTAZIONE.forEach((a) => {
     const v = (document.getElementById('val-area-' + a.key) || {}).value;
     if (v !== '' && v != null) aree[a.key] = Math.max(0, Math.min(100, parseInt(v)));
+    const n = ((document.getElementById('val-nota-' + a.key) || {}).value || '').trim();
+    if (n) areeNote[a.key] = n;
   });
   const obiettivi = [];
   for (let i = 0; i < 3; i++) {
@@ -385,8 +450,9 @@ async function salvaValutazione(nome) {
   const rec = {
     collaboratore: nome,
     anno,
-    tipo: 'valutazione',
+    tipo,
     aree,
+    aree_note: areeNote,
     punti_forza: ((document.getElementById('val-punti-forza') || {}).value || '').trim(),
     obiettivi,
     esigenze_formative: ((document.getElementById('val-esigenze') || {}).value || '').trim(),
@@ -396,16 +462,20 @@ async function salvaValutazione(nome) {
     reparto_dip: currentReparto,
   };
   try {
-    const esistente = getValutazioniCollab(nome).find((v) => v.anno === anno && v.tipo === 'valutazione');
+    const esistente = getValutazioniCollab(nome).find((v) => v.anno === anno && v.tipo === tipo);
     if (esistente) {
       rec.updated_at = new Date().toISOString();
       await secPatch('valutazioni', 'id=eq.' + esistente.id, rec);
       Object.assign(esistente, rec);
+      window._valSchedaSel = esistente.id;
     } else {
       const r = await secPost('valutazioni', rec);
-      if (r && r[0]) valutazioniCache.unshift(r[0]);
+      if (r && r[0]) {
+        valutazioniCache.unshift(r[0]);
+        window._valSchedaSel = r[0].id;
+      }
     }
-    logAzione('Valutazione salvata', nome + ' — anno ' + anno + ' (media ' + _mediaValutazione(aree) + '%)');
+    logAzione('Valutazione salvata', nome + ' — ' + tipo + ' ' + anno + ' (media ' + _mediaValutazione(aree) + '%)');
     toast('Valutazione ' + anno + ' salvata');
     apriSchedaCollaboratore(nome);
   } catch (e) {
@@ -449,8 +519,9 @@ const _AREE_MATCH = [
   { key: 'impegno', match: 'impegno' },
   { key: 'servizio_cliente', match: 'servizio al cliente' },
   { key: 'versatilita', match: 'versatilita' },
-  { key: 'affidabilita', match: 'affidabilita' },
-  { key: 'disponibilita', match: 'disponibilita' },
+  // voce unica: nel file può comparire come "Affidabilità e disponibilità" o come righe separate
+  { key: 'affidabilita_disponibilita', match: 'affidabilita' },
+  { key: 'affidabilita_disponibilita', match: 'disponibilita' },
 ];
 // Parser scheda HR: la scheda ufficiale del valutatore ha colonne B=Grado (1-5),
 // C=Punteggio (0-100), D=Valore, E=Totale — il punteggio da importare è la colonna C,
@@ -458,6 +529,7 @@ const _AREE_MATCH = [
 // Mai prendere il primo numero della riga: sarebbe il Grado 1-5.
 function _parseValutazioneWorkbook(wb) {
   const aree = {};
+  const areeNote = {};
   const extra = {};
   let annoTrovato = null;
   const leggiNum = (v) => {
@@ -481,13 +553,16 @@ function _parseValutazioneWorkbook(wb) {
     const isScheda = data.some((row) => row.some((c) => _normTesto(c).includes('area di valutazione')));
     if (!isScheda) continue;
     let colPunteggio = -1;
+    let colDescr = -1;
     data.forEach((row) => {
       const rowNorm = row.map(_normTesto);
-      // riga di intestazione tabella: memorizza dove sta la colonna del punteggio
+      // riga di intestazione tabella: memorizza dove stanno punteggio e descrizione
       if (rowNorm.some((c) => c.includes('area di valutazione'))) {
         let ip = rowNorm.findIndex((c) => c.includes('punteggio'));
         if (ip === -1) ip = rowNorm.findIndex((c) => c === 'valore');
         if (ip !== -1) colPunteggio = ip;
+        const idd = rowNorm.findIndex((c) => c.includes('descrizione area') || c.includes('param'));
+        if (idd !== -1) colDescr = idd;
         return;
       }
       // anno: un anno isolato 20xx (riga "Periodo di valutazione")
@@ -502,18 +577,27 @@ function _parseValutazioneWorkbook(wb) {
         // 1) colonna Punteggio individuata dall'intestazione
         if (colPunteggio !== -1 && colPunteggio !== idx) {
           const n = leggiNum(row[colPunteggio]);
-          if (n != null) {
-            aree[am.key] = n;
-            return;
-          }
+          if (n != null) aree[am.key] = n;
         }
         // 2) fallback: primo valore numerico 0-100 nella riga
-        for (let j = 0; j < row.length; j++) {
-          if (j === idx) continue;
-          const n = leggiNum(row[j]);
-          if (n != null) {
-            aree[am.key] = n;
-            break;
+        if (aree[am.key] == null) {
+          for (let j = 0; j < row.length; j++) {
+            if (j === idx) continue;
+            const n = leggiNum(row[j]);
+            if (n != null) {
+              aree[am.key] = n;
+              break;
+            }
+          }
+        }
+        // nota del valutatore (es. colonna I): primo testo dopo la colonna Descrizione
+        if (areeNote[am.key] == null && colDescr !== -1) {
+          for (let j = colDescr + 1; j < row.length; j++) {
+            const t = String(row[j] || '').trim();
+            if (t.length > 2 && isNaN(parseFloat(t))) {
+              areeNote[am.key] = t;
+              break;
+            }
           }
         }
       });
@@ -542,6 +626,7 @@ function _parseValutazioneWorkbook(wb) {
       }
     });
   }
+  if (Object.keys(areeNote).length) extra.aree_note = areeNote;
   return { aree, annoTrovato, extra };
 }
 async function importaValutazioneExcel(input, nome) {
@@ -578,7 +663,9 @@ async function importaValutazioneExcel(input, nome) {
       anno +
       '</strong> — ' +
       trovate +
-      '/12 aree riconosciute:</p><div style="max-height:280px;overflow-y:auto;text-align:left;margin-bottom:14px">' +
+      '/' +
+      AREE_VALUTAZIONE.length +
+      ' aree riconosciute:</p><div style="max-height:280px;overflow-y:auto;text-align:left;margin-bottom:14px">' +
       AREE_VALUTAZIONE.map(
         (a) =>
           '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:.85rem;border-bottom:1px solid var(--line)"><span>' +
@@ -589,12 +676,13 @@ async function importaValutazioneExcel(input, nome) {
           (aree[a.key] != null ? aree[a.key] + '%' : 'non trovata') +
           '</strong></div>',
       ).join('') +
-      (extra && (extra.punti_forza || extra.esigenze_formative || (extra.obiettivi || []).length)
+      (extra && (extra.punti_forza || extra.esigenze_formative || (extra.obiettivi || []).length || extra.aree_note)
         ? '<p style="font-size:.78rem;color:var(--muted);margin:0 0 10px">Testi trovati: ' +
           [
             extra.punti_forza ? 'punti di forza' : '',
             (extra.obiettivi || []).length ? (extra.obiettivi || []).length + ' obiettivi' : '',
             extra.esigenze_formative ? 'esigenze formative' : '',
+            extra.aree_note ? Object.keys(extra.aree_note).length + ' note area' : '',
           ]
             .filter(Boolean)
             .join(' · ') +
@@ -617,9 +705,11 @@ async function _confermaImportValutazione() {
     if (ex.punti_forza) testi.punti_forza = ex.punti_forza;
     if (ex.esigenze_formative) testi.esigenze_formative = ex.esigenze_formative;
     if (Array.isArray(ex.obiettivi) && ex.obiettivi.length) testi.obiettivi = ex.obiettivi;
+    if (ex.aree_note && Object.keys(ex.aree_note).length) testi.aree_note = ex.aree_note;
     const esistente = getValutazioniCollab(p.nome).find((v) => v.anno === p.anno && v.tipo === 'valutazione');
     if (esistente) {
       const areeMerged = Object.assign({}, esistente.aree || {}, p.aree);
+      if (testi.aree_note) testi.aree_note = Object.assign({}, esistente.aree_note || {}, testi.aree_note);
       const patch = Object.assign({ aree: areeMerged, updated_at: new Date().toISOString() }, testi);
       await secPatch('valutazioni', 'id=eq.' + esistente.id, patch);
       Object.assign(esistente, patch);
@@ -712,7 +802,9 @@ async function esportaValutazionePDF(id) {
   doc.text('Scala di valore: ' + SCALA_VALUTAZIONE, mx, y);
   doc.setTextColor(0);
   y += 5;
-  const aree = v.aree || {};
+  const aree = _areeNormalizza(v.aree);
+  const note = v.aree_note || {};
+  const conNote = Object.keys(note).some((k) => note[k]);
   const gruppi = ['COMPETENZE PERSONALI', 'PRESTAZIONI LAVORATIVE', 'COMPETENZE MULTIDISCIPLINARI'];
   gruppi.forEach((g) => {
     const righe = AREE_VALUTAZIONE.filter((a) => a.gruppo === g);
@@ -730,8 +822,16 @@ async function esportaValutazionePDF(id) {
       theme: 'grid',
       startY: y,
       margin: { left: mx, right: mx },
-      head: [['Area di valutazione', 'Valore', 'Descrizione area']],
-      body: righe.map((a) => [a.label, aree[a.key] != null ? aree[a.key] + '%' : '', a.desc]),
+      head: [
+        conNote
+          ? ['Area di valutazione', 'Valore', 'Descrizione area', 'Osservazioni']
+          : ['Area di valutazione', 'Valore', 'Descrizione area'],
+      ],
+      body: righe.map((a) => {
+        const base = [a.label, aree[a.key] != null ? aree[a.key] + '%' : '', a.desc];
+        if (conNote) base.push(note[a.key] || '');
+        return base;
+      }),
       headStyles: {
         fillColor: [240, 240, 240],
         textColor: [0, 0, 0],
@@ -745,11 +845,18 @@ async function esportaValutazionePDF(id) {
         cellPadding: 2,
         valign: 'top',
       },
-      columnStyles: {
-        0: { cellWidth: 45, fontStyle: 'bold' },
-        1: { cellWidth: 16, halign: 'center', fontStyle: 'bold' },
-        2: { cellWidth: 'auto' },
-      },
+      columnStyles: conNote
+        ? {
+            0: { cellWidth: 40, fontStyle: 'bold' },
+            1: { cellWidth: 14, halign: 'center', fontStyle: 'bold' },
+            2: { cellWidth: 'auto' },
+            3: { cellWidth: 48, fontStyle: 'italic' },
+          }
+        : {
+            0: { cellWidth: 45, fontStyle: 'bold' },
+            1: { cellWidth: 16, halign: 'center', fontStyle: 'bold' },
+            2: { cellWidth: 'auto' },
+          },
     });
     y = doc.lastAutoTable.finalY + 4;
   });
