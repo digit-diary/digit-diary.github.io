@@ -204,6 +204,23 @@ function _renderValutazioneSezione(nome) {
   const aree = _areeNormalizza(v.aree);
   const note = v.aree_note || {};
   const media = _mediaValutazione(aree);
+  // Confronto con la scheda precedente (anno più recente prima di quella selezionata)
+  const prec = vals.find((x) => x.anno < v.anno) || null;
+  const areePrec = prec ? _areeNormalizza(prec.aree) : {};
+  const mediaPrec = prec ? _mediaValutazione(areePrec) : null;
+  const deltaBadge = function (cur, old) {
+    if (cur == null || old == null) return '';
+    const d = cur - old;
+    if (d === 0) return '<span style="font-size:.7rem;color:var(--muted);min-width:34px;text-align:right">=</span>';
+    return (
+      '<span style="font-size:.7rem;font-weight:700;min-width:34px;text-align:right;color:' +
+      (d > 0 ? '#2c6e49' : 'var(--accent)') +
+      '">' +
+      (d > 0 ? '&#9650; +' : '&#9660; ') +
+      d +
+      '</span>'
+    );
+  };
   html +=
     '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start"><div style="flex:1;min-width:260px">';
   html +=
@@ -219,7 +236,18 @@ function _renderValutazioneSezione(nome) {
     media +
     '%</strong> <span style="font-size:.78rem">(' +
     _giudizioScala(media) +
-    ')</span></p>';
+    ')</span>' +
+    (mediaPrec != null
+      ? ' <span style="font-size:.78rem;font-weight:700;color:' +
+        (media - mediaPrec > 0 ? '#2c6e49' : media - mediaPrec < 0 ? 'var(--accent)' : 'var(--muted)') +
+        '">' +
+        (media - mediaPrec > 0 ? '▲ +' : media - mediaPrec < 0 ? '▼ ' : '= ') +
+        (media - mediaPrec !== 0 ? media - mediaPrec + '%' : '') +
+        ' vs ' +
+        prec.anno +
+        '</span>'
+      : '') +
+    '</p>';
   let gruppoCorr = '';
   AREE_VALUTAZIONE.forEach((a) => {
     if (a.gruppo !== gruppoCorr) {
@@ -243,7 +271,9 @@ function _renderValutazioneSezione(nome) {
       (val != null ? ' title="Grado ' + _gradoScala(val) + ' — ' + _giudizioScala(val) + '"' : '') +
       '>' +
       (val != null ? val + '%' : '—') +
-      '</strong></div>';
+      '</strong>' +
+      (prec ? deltaBadge(val, areePrec[a.key]) : '') +
+      '</div>';
     if (note[a.key])
       html +=
         '<div style="font-size:.76rem;color:var(--muted);font-style:italic;padding:0 0 3px 12px;line-height:1.3">&#8618; ' +

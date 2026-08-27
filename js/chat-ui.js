@@ -2724,10 +2724,24 @@ function apriVoceTimeline(source, id) {
     html += riga('Scadenza', m.scadenza);
     html += riga('Osservazioni', m.osservazioni);
   }
+  html += '<div class="pwd-modal-btns" style="margin-top:14px">';
+  if (source === 'mod')
+    html +=
+      '<button class="btn-modal-ok" style="background:var(--accent2)" onclick="apriPdfModuloDaScheda(' +
+      id +
+      ')">Apri PDF modulo</button>';
   html +=
-    '<div class="pwd-modal-btns" style="margin-top:14px"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
+    '<button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
   b.innerHTML = html;
   document.getElementById('pwd-modal').classList.remove('hidden');
+}
+
+// Dall'anteprima di un modulo nella scheda: genera e mostra il PDF ufficiale del modulo
+function apriPdfModuloDaScheda(id) {
+  document.getElementById('pwd-modal').classList.add('hidden');
+  document.getElementById('profilo-modal').classList.add('hidden');
+  _destroySchedaCharts();
+  if (typeof ristampaModuloPDF === 'function') ristampaModuloPDF(id);
 }
 
 function _schedaFilterTimeline(nome) {
