@@ -69,6 +69,17 @@ function switchPage(name) {
       const sel = document.getElementById('maison-autodelete-sel');
       if (sel) sel.value = String(maisonAutoDeleteGiorni || 0);
     }
+    const saSec = document.getElementById('soglie-alert-section');
+    if (saSec) {
+      saSec.style.display = isAdmin() ? '' : 'none';
+      if (isAdmin() && typeof getSoglieAlert === 'function') {
+        const sa = getSoglieAlert();
+        const iA = document.getElementById('soglia-allin-input');
+        const iR = document.getElementById('soglia-rdi-input');
+        if (iA) iA.value = sa.allineamento;
+        if (iR) iR.value = sa.rdi;
+      }
+    }
     const cestSec = document.getElementById('cestino-section');
     if (cestSec) cestSec.style.display = isAdmin() ? '' : 'none';
     const visSec = document.getElementById('visibilita-section');

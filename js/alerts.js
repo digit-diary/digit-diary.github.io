@@ -4,8 +4,33 @@
  * Alert: cassa, rischio, ammonimenti
  */
 
+// Soglie CHF personalizzabili da admin (Impostazioni): default 90 (allineamento) / 500 (RDI)
+function getSoglieAlert() {
+  const s =
+    typeof soglieAlertCfg !== 'undefined' && soglieAlertCfg && typeof soglieAlertCfg === 'object' ? soglieAlertCfg : {};
+  return {
+    allineamento: parseFloat(s.allineamento) > 0 ? parseFloat(s.allineamento) : 90,
+    rdi: parseFloat(s.rdi) > 0 ? parseFloat(s.rdi) : 500,
+  };
+}
+async function salvaSoglieAlert() {
+  const a = parseFloat((document.getElementById('soglia-allin-input') || {}).value);
+  const r = parseFloat((document.getElementById('soglia-rdi-input') || {}).value);
+  if (!(a > 0) || !(r > 0)) {
+    toast('Inserisci importi validi (maggiori di 0)');
+    return;
+  }
+  soglieAlertCfg = { allineamento: a, rdi: r };
+  await setImp('soglie_alert', JSON.stringify(soglieAlertCfg));
+  logAzione('Soglie alert modificate', 'Allineamento >= ' + a + ' CHF, RDI cumulativo >= ' + r + ' CHF');
+  const st = document.getElementById('soglie-alert-status');
+  if (st) st.textContent = 'Salvato: allineamento da CHF ' + a + ', RDI cumulativo da CHF ' + r + '.';
+  renderCassaAlerts();
+  toast('Soglie alert salvate');
+}
 function checkCassaAlerts() {
   const alerts = [];
+  const SA = getSoglieAlert();
   const tipoErr = nomeCorrente('Errore');
   const errori = getDatiReparto().filter(
     (e) =>
@@ -28,21 +53,21 @@ function checkCassaAlerts() {
       .filter((m) => m.tipo === 'rdi' && m.collaboratore.toLowerCase() === nome.toLowerCase())
       .sort((a, b) => (b.created_at || b.data_modulo || '').localeCompare(a.created_at || a.data_modulo || ''))[0];
     const lastRdiDate = lastRdi ? lastRdi.created_at || lastRdi.data_modulo || '' : '';
-    // Solo errori ≥90 contano per il percorso disciplinare
+    // Solo errori >= soglia allineamento contano per il percorso disciplinare
     const errsSinceAllin = (lastAllinDate ? errs.filter((e) => (e.data || '') > lastAllinDate) : errs).filter(
-      (e) => (parseFloat(e.importo) || 0) >= 90,
+      (e) => (parseFloat(e.importo) || 0) >= SA.allineamento,
     );
     const errsSinceRdi = (lastRdiDate ? errs.filter((e) => (e.data || '') > lastRdiDate) : errs).filter(
-      (e) => (parseFloat(e.importo) || 0) >= 90,
+      (e) => (parseFloat(e.importo) || 0) >= SA.allineamento,
     );
     const cumTotal = errsSinceRdi.reduce((s, e) => s + (parseFloat(e.importo) || 0), 0);
-    // Se cumulativo ≥500 → solo RDI
-    if (cumTotal >= 500) alerts.push({ type: 'rdi', nome, importo: cumTotal, count: errsSinceRdi.length });
-    // Altrimenti: un alert per ogni errore ≥90
+    // Se cumulativo >= soglia RDI → solo RDI
+    if (cumTotal >= SA.rdi) alerts.push({ type: 'rdi', nome, importo: cumTotal, count: errsSinceRdi.length });
+    // Altrimenti: un alert per ogni errore >= soglia allineamento
     else {
       errsSinceAllin.forEach((e) => {
         const imp = parseFloat(e.importo) || 0;
-        if (imp >= 90) {
+        if (imp >= SA.allineamento) {
           const dt = e.data ? new Date(e.data).toLocaleDateString('it-IT') : '';
           alerts.push({ type: 'allineamento', nome, importo: imp, count: 1, dataErr: dt });
         }
@@ -59,6 +84,7 @@ function renderCassaAlerts() {
     container.innerHTML = '';
     return;
   }
+  const SA = getSoglieAlert();
   const allinAlerts = alerts.filter((a) => a.type === 'allineamento');
   const rdiAlerts = alerts.filter((a) => a.type === 'rdi');
   let html = '';
@@ -66,7 +92,9 @@ function renderCassaAlerts() {
     html +=
       '<div class="cassa-alert-banner allin" onclick="toggleCassaDD(\'allin\')">&#9888;&#65039; ' +
       allinAlerts.length +
-      ' collaboratore/i con differenza cassa &#8805; CHF 90 &#8212; Preparare allineamento <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
+      ' collaboratore/i con differenza cassa &#8805; CHF ' +
+      SA.allineamento +
+      ' &#8212; Preparare allineamento <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
     html += '<div class="cassa-alerts-dropdown hidden" id="cassa-allin-dd">';
     allinAlerts.forEach((a) => {
       html +=
@@ -86,7 +114,9 @@ function renderCassaAlerts() {
     html +=
       '<div class="cassa-alert-banner rdi" onclick="toggleCassaDD(\'rdi\')">&#9888;&#65039; ' +
       rdiAlerts.length +
-      ' collaboratore/i con differenze cumulative &#8805; CHF 500 &#8212; Fare RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
+      ' collaboratore/i con differenze cumulative &#8805; CHF ' +
+      SA.rdi +
+      ' &#8212; Fare RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
     html += '<div class="cassa-alerts-dropdown hidden" id="cassa-rdi-dd">';
     rdiAlerts.forEach((a) => {
       html +=

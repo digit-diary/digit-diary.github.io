@@ -10,22 +10,25 @@
 // DATA LOADING
 async function loadAll() {
   // Caricamento parallelo: impostazioni + dati + tabelle
-  const [tp, co, ops, cr, tn, cn, to, cmo, clo, tr, vis, compCfg, pntCfg, maisonAd] = await Promise.all([
-    getImp('tipi_personalizzati'),
-    getImp('colori_override'),
-    getImp('operatori_lista'),
-    getImp('campi_rapporto_extra'),
-    getImp('tipi_nascosti'),
-    getImp('campi_nascosti'),
-    getImp('tipi_ordine'),
-    getImp('campi_ordine'),
-    getImp('campi_label_override'),
-    getImp('tipi_rinominati'),
-    getImp('visibilita'),
-    getImp('competenze_config'),
-    getImp('punti_config'),
-    getImp('maison_auto_delete_giorni'),
-  ]);
+  const [tp, co, ops, cr, tn, cn, to, cmo, clo, tr, vis, compCfg, pntCfg, maisonAd, invCatExtra, soglieAl] =
+    await Promise.all([
+      getImp('tipi_personalizzati'),
+      getImp('colori_override'),
+      getImp('operatori_lista'),
+      getImp('campi_rapporto_extra'),
+      getImp('tipi_nascosti'),
+      getImp('campi_nascosti'),
+      getImp('tipi_ordine'),
+      getImp('campi_ordine'),
+      getImp('campi_label_override'),
+      getImp('tipi_rinominati'),
+      getImp('visibilita'),
+      getImp('competenze_config'),
+      getImp('punti_config'),
+      getImp('maison_auto_delete_giorni'),
+      getImp('inventario_categorie_extra'),
+      getImp('soglie_alert'),
+    ]);
   if (tp)
     try {
       tipiPersonalizzati = JSON.parse(tp);
@@ -79,6 +82,14 @@ async function loadAll() {
       puntiConfig = JSON.parse(pntCfg);
     } catch (e) {}
   maisonAutoDeleteGiorni = parseInt(maisonAd) || 0;
+  if (invCatExtra)
+    try {
+      inventarioCategorieExtra = JSON.parse(invCatExtra) || [];
+    } catch (e) {}
+  if (soglieAl)
+    try {
+      soglieAlertCfg = JSON.parse(soglieAl);
+    } catch (e) {}
   const opRep = await getImp('operatori_reparto');
   if (opRep) {
     try {
