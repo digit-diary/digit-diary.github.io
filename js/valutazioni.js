@@ -952,12 +952,7 @@ async function esportaValutazionePDF(id) {
       ],
     }),
   );
-  y = doc.lastAutoTable.finalY + 3;
-  doc.setFontSize(7.5);
-  doc.setTextColor(90);
-  doc.text('Scala di valore: ' + SCALA_VALUTAZIONE, mx, y + 1);
-  doc.setTextColor(0);
-  y += 5;
+  y = doc.lastAutoTable.finalY + 4;
   // === Tabelle aree nel formato ufficiale: Grado / Punteggio / Valore / Totale ===
   const aree = _areeNormalizza(v.aree);
   const note = v.aree_note || {};
