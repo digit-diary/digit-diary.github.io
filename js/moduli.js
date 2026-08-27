@@ -2017,7 +2017,15 @@ function render() {
         te +
         '\')">Tipo</button><button class="btn-act edit" onclick="modificaRegistrazione(' +
         e.id +
-        ')">Modifica</button><button class="btn-act del" onclick="elimina(' +
+        ')">Modifica</button>' +
+        (e.tipo === nomeCorrente('Malattia') && typeof apriPopupCopertura === 'function'
+          ? '<button class="btn-act" style="color:#1a7a6d;border-color:#1a7a6d" onclick="apriPopupCopertura(\'' +
+            e.nome.replace(/'/g, "\\'") +
+            "','" +
+            (e.data || '').substring(0, 10) +
+            '\')" title="Chi copre / chi ha rifiutato">Copertura</button>'
+          : '') +
+        '<button class="btn-act del" onclick="elimina(' +
         e.id +
         ')">Elimina</button></div></div>'
       );
