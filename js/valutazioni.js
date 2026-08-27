@@ -230,6 +230,10 @@ function _renderValutazioneSezione(nome) {
     escP(v.tipo) +
     ')' +
     (v.valutatore ? ' — valutatore: ' + escP(v.valutatore) : '') +
+    ((v.dati_personali || {}).settore || (v.dati_personali || {}).funzione
+      ? ' — ' +
+        [(v.dati_personali || {}).settore, (v.dati_personali || {}).funzione].filter(Boolean).map(escP).join(' · ')
+      : '') +
     ' — media: <strong style="color:' +
     _coloreValore(media) +
     '">' +
@@ -369,7 +373,13 @@ function apriValutazioneEditor(nome, anno, tipo) {
     '</select>' +
     '<span class="filter-label">Valutatore</span><input type="text" id="val-valutatore" value="' +
     escP((esistente && esistente.valutatore) || getOperatore() || '') +
-    '" style="width:200px;padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"></div>';
+    '" style="width:200px;padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)">' +
+    '<span class="filter-label">Settore</span><input type="text" id="val-settore" value="' +
+    escP(((esistente && esistente.dati_personali) || {}).settore || '') +
+    '" placeholder="Es: Foboslot" style="width:130px;padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)">' +
+    '<span class="filter-label">Funzione</span><input type="text" id="val-funzione" value="' +
+    escP(((esistente && esistente.dati_personali) || {}).funzione || '') +
+    '" placeholder="Es: Casinò Host" style="width:150px;padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"></div>';
   let gruppoCorr = '';
   AREE_VALUTAZIONE.forEach((ar) => {
     if (ar.gruppo !== gruppoCorr) {
@@ -477,12 +487,22 @@ async function salvaValutazione(nome) {
     const v = ((document.getElementById('val-obiettivo-' + i) || {}).value || '').trim();
     if (v) obiettivi.push(v);
   }
+  // dati ufficiali: settore/funzione modificabili, ID e dati valutatore conservati dall'import
+  const esistPre = getValutazioniCollab(nome).find((v) => v.anno === anno && v.tipo === tipo);
+  const datiPers = Object.assign({}, (esistPre && esistPre.dati_personali) || {});
+  const setV = ((document.getElementById('val-settore') || {}).value || '').trim();
+  const funV = ((document.getElementById('val-funzione') || {}).value || '').trim();
+  if (setV) datiPers.settore = setV;
+  else delete datiPers.settore;
+  if (funV) datiPers.funzione = funV;
+  else delete datiPers.funzione;
   const rec = {
     collaboratore: nome,
     anno,
     tipo,
     aree,
     aree_note: areeNote,
+    dati_personali: datiPers,
     punti_forza: ((document.getElementById('val-punti-forza') || {}).value || '').trim(),
     obiettivi,
     esigenze_formative: ((document.getElementById('val-esigenze') || {}).value || '').trim(),
@@ -584,8 +604,56 @@ function _parseValutazioneWorkbook(wb) {
     if (!isScheda) continue;
     let colPunteggio = -1;
     let colDescr = -1;
+    const dp = extra.dati_personali || {};
+    // DATI PERSONALI ufficiali: nella scheda le etichette compaiono due volte per riga
+    // (colonna sinistra = valutato, colonna destra = valutatore)
+    const leggiCoppia = (row, rowNorm, etichetta, esatta) => {
+      const trovati = [];
+      rowNorm.forEach((c, j) => {
+        if (esatta ? c !== etichetta : c !== etichetta && !c.startsWith(etichetta)) return;
+        for (let k = j + 1; k < row.length; k++) {
+          const t = String(row[k] == null ? '' : row[k]).trim();
+          if (t !== '') {
+            trovati.push(t);
+            break;
+          }
+        }
+      });
+      return trovati;
+    };
     data.forEach((row) => {
       const rowNorm = row.map(_normTesto);
+      // blocco DATI PERSONALI: la prima scheda (valutatore) imposta, le altre non sovrascrivono
+      const settori = leggiCoppia(row, rowNorm, 'settore');
+      if (settori.length && dp.settore == null) {
+        dp.settore = settori[0];
+        if (settori[1] != null) dp.valutatore_settore = settori[1];
+      }
+      const funzioni = leggiCoppia(row, rowNorm, 'funzione');
+      if (funzioni.length && dp.funzione == null) {
+        dp.funzione = funzioni[0];
+        if (funzioni[1] != null) dp.valutatore_funzione = funzioni[1];
+      }
+      const ids = leggiCoppia(row, rowNorm, 'valutato id');
+      if (ids.length && dp.valutato_id == null) dp.valutato_id = ids[0];
+      const idsV = leggiCoppia(row, rowNorm, 'valutatore id');
+      if (idsV.length && dp.valutatore_id == null) dp.valutatore_id = idsV[0];
+      const nomi = leggiCoppia(row, rowNorm, 'cognome');
+      if (nomi.length >= 2 && !extra.valutatore) extra.valutatore = nomi[1];
+      // data ufficiale della scheda (cella "Data:") — numero seriale Excel o testo gg.mm.aaaa
+      const dataC = leggiCoppia(row, rowNorm, 'data', true);
+      if (dataC.length && dp.data_scheda == null) {
+        const nSer = parseFloat(dataC[0]);
+        if (!isNaN(nSer) && nSer > 40000 && nSer < 60000) {
+          dp.data_scheda = new Date(Math.round((nSer - 25569) * 86400000)).toISOString().split('T')[0];
+        } else {
+          const md = String(dataC[0]).match(/(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/);
+          if (md)
+            dp.data_scheda =
+              (md[3].length === 2 ? '20' + md[3] : md[3]) + '-' + md[2].padStart(2, '0') + '-' + md[1].padStart(2, '0');
+        }
+      }
+      if (Object.keys(dp).length) extra.dati_personali = dp;
       // riga di intestazione tabella: memorizza dove stanno punteggio e descrizione
       if (rowNorm.some((c) => c.includes('area di valutazione'))) {
         let ip = rowNorm.findIndex((c) => c.includes('punteggio'));
@@ -706,9 +774,19 @@ async function importaValutazioneExcel(input, nome) {
           (aree[a.key] != null ? aree[a.key] + '%' : 'non trovata') +
           '</strong></div>',
       ).join('') +
-      (extra && (extra.punti_forza || extra.esigenze_formative || (extra.obiettivi || []).length || extra.aree_note)
+      (extra &&
+      (extra.punti_forza ||
+        extra.esigenze_formative ||
+        (extra.obiettivi || []).length ||
+        extra.aree_note ||
+        extra.dati_personali)
         ? '<p style="font-size:.78rem;color:var(--muted);margin:0 0 10px">Testi trovati: ' +
           [
+            extra.dati_personali
+              ? 'dati ufficiali (' +
+                [extra.dati_personali.settore, extra.dati_personali.funzione].filter(Boolean).join(', ') +
+                ')'
+              : '',
             extra.punti_forza ? 'punti di forza' : '',
             (extra.obiettivi || []).length ? (extra.obiettivi || []).length + ' obiettivi' : '',
             extra.esigenze_formative ? 'esigenze formative' : '',
@@ -736,10 +814,16 @@ async function _confermaImportValutazione() {
     if (ex.esigenze_formative) testi.esigenze_formative = ex.esigenze_formative;
     if (Array.isArray(ex.obiettivi) && ex.obiettivi.length) testi.obiettivi = ex.obiettivi;
     if (ex.aree_note && Object.keys(ex.aree_note).length) testi.aree_note = ex.aree_note;
+    // dati ufficiali della scheda: settore, funzione, ID, valutatore, data
+    if (ex.dati_personali && Object.keys(ex.dati_personali).length) testi.dati_personali = ex.dati_personali;
+    if (ex.valutatore) testi.valutatore = ex.valutatore;
+    if (ex.dati_personali && ex.dati_personali.data_scheda) testi.data_valutazione = ex.dati_personali.data_scheda;
     const esistente = getValutazioniCollab(p.nome).find((v) => v.anno === p.anno && v.tipo === 'valutazione');
     if (esistente) {
       const areeMerged = Object.assign({}, esistente.aree || {}, p.aree);
       if (testi.aree_note) testi.aree_note = Object.assign({}, esistente.aree_note || {}, testi.aree_note);
+      if (testi.dati_personali)
+        testi.dati_personali = Object.assign({}, esistente.dati_personali || {}, testi.dati_personali);
       const patch = Object.assign({ aree: areeMerged, updated_at: new Date().toISOString() }, testi);
       await secPatch('valutazioni', 'id=eq.' + esistente.id, patch);
       Object.assign(esistente, patch);
@@ -812,9 +896,15 @@ async function esportaValutazionePDF(id) {
   sezione('DATI PERSONALI');
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9.5);
-  doc.text('Valutato: ' + v.collaboratore, mx, y + 1);
-  doc.text('Settore: Reparto ' + (v.reparto_dip === 'tavoli' ? 'Tavoli' : 'Slot'), mx + 90, y + 1);
+  const dpP = v.dati_personali || {};
+  const settoreLbl = dpP.settore || 'Reparto ' + (v.reparto_dip === 'tavoli' ? 'Tavoli' : 'Slot');
+  doc.text('Valutato: ' + v.collaboratore + (dpP.valutato_id ? ' (ID ' + dpP.valutato_id + ')' : ''), mx, y + 1);
+  doc.text('Settore: ' + settoreLbl, mx + 90, y + 1);
   y += 6;
+  if (dpP.funzione) {
+    doc.text('Funzione: ' + dpP.funzione, mx, y + 1);
+    y += 5;
+  }
   doc.text('Periodo di valutazione: ' + v.anno, mx, y + 1);
   doc.text(
     'Data: ' + (v.data_valutazione ? new Date(v.data_valutazione + 'T12:00:00').toLocaleDateString('it-IT') : ''),
@@ -823,7 +913,15 @@ async function esportaValutazionePDF(id) {
   );
   y += 5;
   if (v.valutatore) {
-    doc.text('Valutatore: ' + v.valutatore, mx, y + 1);
+    doc.text(
+      'Valutatore: ' +
+        v.valutatore +
+        (dpP.valutatore_id ? ' (ID ' + dpP.valutatore_id + ')' : '') +
+        (dpP.valutatore_funzione ? ' — ' + dpP.valutatore_funzione : '') +
+        (dpP.valutatore_settore ? ' — Settore ' + dpP.valutatore_settore : ''),
+      mx,
+      y + 1,
+    );
     y += 5;
   }
   y += 2;
