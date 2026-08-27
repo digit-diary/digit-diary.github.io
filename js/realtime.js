@@ -488,6 +488,8 @@ async function secPatch(table, filter, data) {
   if (tk) {
     try {
       // Converte filtro REST (id=eq.123&nome=eq.X) in SQL (id = 123 AND nome = 'X')
+      // I valori possono arrivare URL-encoded (encodeURIComponent nei chiamanti):
+      // vanno decodificati, altrimenti 'Rossi%20Mario' non matcha 'Rossi Mario'.
       const parts = filter
         .split('&')
         .map((p) => {
@@ -496,7 +498,11 @@ async function secPatch(table, filter, data) {
           const m = rest.match(/^(eq|neq)\.(.*)/);
           if (m) {
             const op = m[1] === 'eq' ? '=' : '!=';
-            const val = isNaN(m[2]) ? "'" + m[2].replace(/'/g, "''") + "'" : m[2];
+            let raw = m[2];
+            try {
+              raw = decodeURIComponent(raw);
+            } catch (e) {}
+            const val = isNaN(raw) ? "'" + raw.replace(/'/g, "''") + "'" : raw;
             return k + ' ' + op + ' ' + val;
           }
           return null;
@@ -524,7 +530,11 @@ async function secDel(table, filter) {
           const m = rest.match(/^(eq|neq|like)\.(.*)/);
           if (m) {
             const op = { eq: '=', neq: '!=', like: 'LIKE' }[m[1]];
-            const val = isNaN(m[2]) ? "'" + m[2].replace(/'/g, "''") + "'" : m[2];
+            let raw = m[2];
+            try {
+              raw = decodeURIComponent(raw);
+            } catch (e) {}
+            const val = isNaN(raw) ? "'" + raw.replace(/'/g, "''") + "'" : raw;
             return k + ' ' + op + ' ' + val;
           }
           return null;
