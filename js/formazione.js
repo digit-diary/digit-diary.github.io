@@ -642,7 +642,11 @@ function _renderFormazioneConfig() {
         escP(k.label) +
         ' <span class="tipo-item-default">(L' +
         k.livello +
-        ')</span></div><button class="btn-del-tipo" onclick="rimuoviCompetenzaCfg(\'' +
+        ')</span></div><button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2)" onclick="rinominaCompetenzaCfg(\'' +
+        rep +
+        "'," +
+        i +
+        ')">Rinomina</button><button class="btn-del-tipo" style="margin-left:4px" onclick="rimuoviCompetenzaCfg(\'' +
         rep +
         "'," +
         i +
@@ -670,7 +674,9 @@ function _renderFormazioneConfig() {
       a.punti +
       '" onchange="modificaPuntiAzione(' +
       i +
-      ',this.value)" style="width:70px;padding:5px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);text-align:center"><button class="btn-del-tipo" style="margin-left:6px" onclick="rimuoviAzioneCfg(' +
+      ',this.value)" style="width:70px;padding:5px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);text-align:center"><button class="btn-del-tipo" style="margin-left:6px;color:var(--accent2);border-color:var(--accent2)" onclick="rinominaAzioneCfg(' +
+      i +
+      ')">Rinomina</button><button class="btn-del-tipo" style="margin-left:4px" onclick="rimuoviAzioneCfg(' +
       i +
       ')">Rimuovi</button></div>';
   });
@@ -733,6 +739,26 @@ async function aggiungiCompetenzaCfg(rep) {
   renderFormazione();
   toast('Competenza aggiunta');
 }
+// Rinomina: cambia solo l'etichetta visualizzata; la chiave interna resta invariata,
+// quindi le spunte già assegnate ai collaboratori vengono conservate.
+async function rinominaCompetenzaCfg(rep, idx) {
+  const cfg = getCompetenzeConfigAll();
+  const k = cfg[rep][idx];
+  if (!k) return;
+  const nuovo = prompt('Nuovo nome per "' + k.label + '":', k.label);
+  if (nuovo === null) return;
+  const label = nuovo.trim();
+  if (!label) {
+    toast('Inserisci un nome');
+    return;
+  }
+  const vecchio = k.label;
+  cfg[rep][idx] = Object.assign({}, k, { label });
+  await saveCompetenzeConfig(cfg);
+  logAzione('Competenza rinominata', rep + ': ' + vecchio + ' → ' + label);
+  renderFormazione();
+  toast(vecchio + ' → ' + label);
+}
 async function rimuoviCompetenzaCfg(rep, idx) {
   const cfg = getCompetenzeConfigAll();
   const k = cfg[rep][idx];
@@ -767,6 +793,26 @@ async function modificaPuntiAzione(idx, val) {
   cfg.azioni[idx].punti = parseInt(val) || 0;
   await savePuntiConfig(cfg);
   toast('Punti aggiornati');
+}
+// Rinomina azione punti: cambia solo l'etichetta; il registro storico resta coerente
+// perché i movimenti referenziano la chiave interna, non il nome.
+async function rinominaAzioneCfg(idx) {
+  const cfg = getPuntiConfig();
+  const a = cfg.azioni[idx];
+  if (!a) return;
+  const nuovo = prompt('Nuovo nome per "' + a.label + '":', a.label);
+  if (nuovo === null) return;
+  const label = nuovo.trim();
+  if (!label) {
+    toast('Inserisci un nome');
+    return;
+  }
+  const vecchio = a.label;
+  cfg.azioni[idx] = Object.assign({}, a, { label });
+  await savePuntiConfig(cfg);
+  logAzione('Azione punti rinominata', vecchio + ' → ' + label);
+  renderFormazione();
+  toast(vecchio + ' → ' + label);
 }
 async function rimuoviAzioneCfg(idx) {
   const cfg = getPuntiConfig();
