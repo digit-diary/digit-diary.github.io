@@ -809,3 +809,110 @@ async function modificaPremioLivello(lv, val) {
   await savePuntiConfig(cfg);
   toast('Premio livello aggiornato');
 }
+
+// ================================================================
+// POPUP COPERTURA MALATTIA
+// Appare quando si registra una malattia (Diario o rapporto giornaliero):
+// chiede chi copre il turno (+punti) e chi NON ha dato disponibilità (-punti).
+// Ritorna una Promise risolta alla chiusura (per accodare più assenze).
+// ================================================================
+function apriPopupCopertura(assente, dataRif) {
+  return new Promise((resolve) => {
+    const collabs = getCollaboratoriReparto()
+      .filter((c) => c.attivo !== false && c.nome.toLowerCase() !== (assente || '').toLowerCase())
+      .sort((a, b) => a.nome.localeCompare(b.nome));
+    if (!collabs.length) {
+      resolve(false);
+      return;
+    }
+    const cfg = getPuntiConfig();
+    const azCop = cfg.azioni.find((a) => a.key === 'copertura');
+    const azNeg = cfg.azioni.find((a) => a.key === 'disponibilita_negata');
+    const dataLabel = dataRif ? new Date(dataRif + 'T12:00:00').toLocaleDateString('it-IT') : 'oggi';
+    window._copResolve = resolve;
+    window._copCtx = { assente, dataRif: dataRif || new Date().toISOString().split('T')[0] };
+    let html =
+      '<h3>Copertura turno — ' +
+      escP(assente) +
+      '</h3><p style="color:var(--muted);font-size:.84rem;margin-bottom:14px">Assenza del ' +
+      dataLabel +
+      '. Se il turno non viene sostituito, chiudi con "Nessuna copertura".</p>';
+    html +=
+      '<div class="pwd-field"><label>Chi copre il turno' +
+      (azCop ? ' (+' + azCop.punti + ' punti)' : '') +
+      '</label><select id="cop-chi" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"><option value="">— Nessuno / da decidere —</option>' +
+      collabs.map((c) => '<option>' + escP(c.nome) + '</option>').join('') +
+      '</select></div>';
+    if (azNeg) {
+      html +=
+        '<div class="pwd-field"><label>Chi NON ha dato disponibilità (' +
+        azNeg.punti +
+        ' punti ciascuno)</label><div style="max-height:170px;overflow-y:auto;border:1px solid var(--line);border-radius:2px;padding:6px 10px;background:var(--paper2)">' +
+        collabs
+          .map(
+            (c) =>
+              '<label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:.9rem"><input type="checkbox" class="cop-negato-cb" value="' +
+              escP(c.nome).replace(/"/g, '&quot;') +
+              '" style="width:16px;height:16px"> ' +
+              escP(c.nome) +
+              '</label>',
+          )
+          .join('') +
+        '</div></div>';
+    }
+    html +=
+      '<div class="pwd-field"><label>Nota (opzionale)</label><input type="text" id="cop-nota" placeholder="Es: doppio turno, chiamati in 3..."></div>';
+    html +=
+      '<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="_chiudiPopupCopertura(false)">Nessuna copertura</button><button class="btn-modal-ok" onclick="_chiudiPopupCopertura(true)">Conferma</button></div>';
+    html +=
+      '<p style="font-size:.72rem;color:var(--muted);text-align:center;margin-top:8px">Puoi sempre assegnare o correggere i punti dopo, dalla pagina Formazione.</p>';
+    document.getElementById('pwd-modal-content').innerHTML = html;
+    document.getElementById('pwd-modal').classList.remove('hidden');
+  });
+}
+async function _chiudiPopupCopertura(conferma) {
+  const ctx = window._copCtx || {};
+  const resolve = window._copResolve;
+  const dataLabel = ctx.dataRif ? new Date(ctx.dataRif + 'T12:00:00').toLocaleDateString('it-IT') : '';
+  if (conferma) {
+    const chi = (document.getElementById('cop-chi') || {}).value || '';
+    const nota = ((document.getElementById('cop-nota') || {}).value || '').trim();
+    const negati = [...document.querySelectorAll('.cop-negato-cb:checked')].map((cb) => cb.value);
+    const cfg = getPuntiConfig();
+    const azCop = cfg.azioni.find((a) => a.key === 'copertura');
+    const azNeg = cfg.azioni.find((a) => a.key === 'disponibilita_negata');
+    // Chi copre non può essere anche tra i rifiuti
+    const negatiValidi = negati.filter((n) => n !== chi);
+    try {
+      if (chi && azCop) {
+        await _insertPuntiEvento(
+          chi,
+          azCop.punti,
+          'copertura',
+          'Copertura per ' + ctx.assente + ' del ' + dataLabel + (nota ? ' — ' + nota : ''),
+        );
+      }
+      if (azNeg) {
+        for (const n of negatiValidi) {
+          await _insertPuntiEvento(
+            n,
+            azNeg.punti,
+            'disponibilita_negata',
+            'Disponibilità negata per assenza di ' + ctx.assente + ' del ' + dataLabel + (nota ? ' — ' + nota : ''),
+          );
+        }
+      }
+      const parti = [];
+      if (chi && azCop) parti.push(chi + ' +' + azCop.punti);
+      if (negatiValidi.length && azNeg)
+        parti.push(negatiValidi.length + ' rifiut' + (negatiValidi.length === 1 ? 'o' : 'i') + ' ' + azNeg.punti);
+      if (parti.length) toast('Punti registrati: ' + parti.join(' · '));
+    } catch (e) {
+      toast('Errore registrazione punti');
+    }
+  }
+  document.getElementById('pwd-modal').classList.add('hidden');
+  window._copCtx = null;
+  window._copResolve = null;
+  if (resolve) resolve(!!conferma);
+}

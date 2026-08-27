@@ -760,6 +760,20 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
   if (result.deleted) summary.push(result.deleted + ' eliminate');
   if (ops.skipped.length) summary.push(ops.skipped.length + ' duplicati saltati');
   if (summary.length) toast('Assenze: ' + summary.join(', ') + (usedFallback ? ' (modalita compatibilita)' : ''));
+  // Popup copertura per ogni NUOVA assenza creata dal rapporto (in sequenza)
+  if (ops.creates.length && typeof apriPopupCopertura === 'function') {
+    for (const c of ops.creates) {
+      const dIso =
+        c.dataInizio instanceof Date
+          ? c.dataInizio.getFullYear() +
+            '-' +
+            String(c.dataInizio.getMonth() + 1).padStart(2, '0') +
+            '-' +
+            String(c.dataInizio.getDate()).padStart(2, '0')
+          : ds;
+      await apriPopupCopertura(c.nome, dIso);
+    }
+  }
 }
 // === ORCHESTRATOR ===
 async function _processaAssenzeRapporto(assenzeText, ds, turno) {
