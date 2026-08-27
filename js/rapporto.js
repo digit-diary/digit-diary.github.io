@@ -589,7 +589,7 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno) {
 async function _eseguiAssenzeOps(ops, ds, turno) {
   // D7: notifica errori validazione (non bloccanti, gli altri op vanno avanti)
   for (const e of ops.errors) {
-    toast('⚠ ' + e.nome + ': ' + e.motivo);
+    toast('Attenzione — ' + e.nome + ': ' + e.motivo);
     try {
       logAzione('Validazione assenza fallita', e.nome + ' - ' + e.motivo + ' (rapporto ' + turno + ' del ' + ds + ')');
     } catch (_) {}

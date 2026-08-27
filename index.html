@@ -190,7 +190,7 @@
               letter-spacing: 0.02em;
             "
           >
-            &#128274;
+            <i class="icx icx-lucchetto"></i>
           </button>
         </div>
         <div class="login-error" id="login-error"></div>
@@ -285,9 +285,13 @@
         <div class="date-badge" id="today-date"></div>
         <div class="operatore-badge" id="operatore-display"></div>
         <div class="header-btns">
-          <button class="btn-header" id="btn-tema" onclick="toggleTema()">&#127761; Tema scuro</button>
-          <button class="btn-header" onclick="window.print()">&#128424; Stampa</button>
-          <button class="btn-header" onclick="esci()" style="color: var(--accent)">&#128682; Esci</button>
+          <button class="btn-header" id="btn-tema" onclick="toggleTema()">
+            <i class="icx icx-luna"></i> Tema scuro
+          </button>
+          <button class="btn-header" onclick="window.print()"><i class="icx icx-stampa"></i> Stampa</button>
+          <button class="btn-header" onclick="esci()" style="color: var(--accent)">
+            <i class="icx icx-esci"></i> Esci
+          </button>
         </div>
       </div>
     </header>
@@ -304,7 +308,7 @@
     <div id="rischio-alerts-container"></div>
 
     <div class="ricerca-globale-wrap">
-      <span class="ricerca-globale-icon">&#128269;</span>
+      <span class="ricerca-globale-icon"><i class="icx icx-cerca"></i></span>
       <input
         type="text"
         class="ricerca-globale-input"
@@ -320,7 +324,9 @@
       <button class="reparto-btn active-slots" id="btn-rep-slots" onclick="setReparto('slots')">Slots</button>
       <button class="reparto-btn" id="btn-rep-tavoli" onclick="setReparto('tavoli')">Tavoli</button>
     </div>
-    <button class="hamburger-btn" onclick="toggleMobileNav()" id="hamburger-btn">&#9776; Menu</button>
+    <button class="hamburger-btn" onclick="toggleMobileNav()" id="hamburger-btn">
+      <i class="icx icx-menu"></i> Menu
+    </button>
     <div class="mobile-nav" id="mobile-nav" onclick="if (event.target === this) chiudiMobileNav();">
       <div class="mobile-nav-panel">
         <button class="mobile-nav-close" onclick="chiudiMobileNav()">&#10005; Chiudi</button>
@@ -328,15 +334,19 @@
       </div>
     </div>
     <div class="nav-tabs">
-      <button class="nav-tab active" data-page="dashboard" onclick="switchPage('dashboard')">&#127968; Home</button>
-      <button class="nav-tab" data-page="diario" onclick="switchPage('diario')">&#128214; Diario</button>
+      <button class="nav-tab active" data-page="dashboard" onclick="switchPage('dashboard')">
+        <i class="icx icx-home"></i> Home
+      </button>
+      <button class="nav-tab" data-page="diario" onclick="switchPage('diario')">
+        <i class="icx icx-diario"></i> Diario
+      </button>
       <button
         class="nav-tab"
         data-page="rapporto"
         onclick="switchPage('rapporto')"
         title="Rapporto giornaliero di turno"
       >
-        &#128197; Rapporto
+        <i class="icx icx-calendario"></i> Rapporto
       </button>
       <button
         class="nav-tab"
@@ -344,7 +354,7 @@
         onclick="switchPage('note-collega')"
         title="Messaggi tra colleghi"
       >
-        &#9993;&#65039; Note Colleghi
+        <i class="icx icx-mail"></i>&#65039; Note Colleghi
         <span
           id="note-badge"
           style="
@@ -360,14 +370,16 @@
           title="Note non lette"
         ></span>
       </button>
-      <button class="nav-tab" data-page="statistiche" onclick="switchPage('statistiche')">&#128202; Statistiche</button>
+      <button class="nav-tab" data-page="statistiche" onclick="switchPage('statistiche')">
+        <i class="icx icx-stats"></i> Statistiche
+      </button>
       <button
         class="nav-tab"
         data-page="moduli"
         onclick="switchPage('moduli')"
         title="Moduli disciplinari e apprezzamento"
       >
-        &#128196; Moduli
+        <i class="icx icx-file"></i> Moduli
       </button>
       <button
         class="nav-tab"
@@ -375,7 +387,7 @@
         onclick="switchPage('formazione')"
         title="Multidisciplinarità: competenze, livelli e punti"
       >
-        &#127891; Formazione
+        <i class="icx icx-formazione"></i> Formazione
       </button>
       <button
         class="nav-tab"
@@ -383,7 +395,7 @@
         onclick="switchPage('assistente')"
         title="Assistente AI per scrittura professionale"
       >
-        &#128113;&#8205;&#9792;&#65039; Assistente
+        <i class="icx icx-assistente"></i> Assistente
       </button>
       <button
         class="nav-tab"
@@ -391,7 +403,7 @@
         onclick="switchPage('consegna')"
         title="Consegne turno tra operatori"
       >
-        &#128221; Consegna
+        <i class="icx icx-penna"></i> Consegna
         <span
           id="consegna-badge"
           style="
@@ -408,7 +420,7 @@
         ></span>
       </button>
       <button class="nav-tab" data-page="promemoria" onclick="switchPage('promemoria')" title="Promemoria con scadenze">
-        &#128203; Promemoria
+        <i class="icx icx-clipboard"></i> Promemoria
         <span
           id="promemoria-badge"
           style="
@@ -425,9 +437,11 @@
         ></span>
       </button>
       <button class="nav-tab" data-page="maison" onclick="switchPage('maison')" title="Gestione costi e clienti Maison">
-        &#127860; Maison
+        <i class="icx icx-maison"></i> Maison
       </button>
-      <button class="nav-tab" data-page="inventario" onclick="switchPage('inventario')">&#128230; Inventario</button>
+      <button class="nav-tab" data-page="inventario" onclick="switchPage('inventario')">
+        <i class="icx icx-inventario"></i> Inventario
+      </button>
       <button
         class="nav-tab"
         data-page="registro"
@@ -435,10 +449,10 @@
         id="tab-registro"
         style="display: none"
       >
-        &#128203; Registro
+        <i class="icx icx-clipboard"></i> Registro
       </button>
       <button class="nav-tab" data-page="impostazioni" onclick="switchPage('impostazioni')">
-        &#9881;&#65039; Impostazioni
+        <i class="icx icx-settings"></i> Impostazioni
       </button>
     </div>
 
@@ -465,14 +479,14 @@
           onclick="switchPage('consegna')"
           style="padding: 10px 20px; font-size: 0.82rem; width: auto; background: #2c3e50"
         >
-          &#9998; Scrivi consegna
+          <i class="icx icx-modifica"></i> Scrivi consegna
         </button>
         <button
           class="btn-salva"
           onclick="switchPage('promemoria')"
           style="padding: 10px 20px; font-size: 0.82rem; width: auto; background: #8e44ad"
         >
-          &#128203; Nuovo promemoria
+          <i class="icx icx-clipboard"></i> Nuovo promemoria
         </button>
       </div>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px" id="dash-grid">
@@ -489,7 +503,7 @@
           <div id="dash-alert-list" style="padding: 14px; max-height: 300px; overflow-y: auto"></div>
         </div>
         <div class="main-card" id="dash-compleanni">
-          <div class="card-header">&#127874; Compleanni</div>
+          <div class="card-header"><i class="icx icx-torta"></i> Compleanni</div>
           <div id="dash-compleanni-list" style="padding: 14px; max-height: 300px; overflow-y: auto"></div>
         </div>
         <div class="main-card" id="dash-recenti">
@@ -790,7 +804,9 @@
             id="note-chat-star-filter"
             style="display: none; padding: 4px 16px; border-bottom: 1px solid var(--line); background: var(--paper2)"
           >
-            <button class="btn-star-filter" onclick="toggleStarFilter()">&#9733; Solo importanti</button>
+            <button class="btn-star-filter" onclick="toggleStarFilter()">
+              <i class="icx icx-stella-piena"></i> Solo importanti
+            </button>
           </div>
           <div
             id="note-chat-messages"
@@ -916,7 +932,7 @@
           onclick="generaRiepilogoMensile()"
           style="padding: 10px 24px; font-size: 0.88rem"
         >
-          &#128203; Riepilogo mensile PDF
+          <i class="icx icx-clipboard"></i> Riepilogo mensile PDF
         </button>
       </div>
       <div id="stats-summary" style="margin-bottom: 20px"></div>
@@ -1408,7 +1424,7 @@
             onclick="document.getElementById('import-cat-file').click()"
             style="font-size: 0.78rem; padding: 5px 14px; border-color: #b8860b; color: #b8860b"
           >
-            &#128229; Importa Categorie</button
+            <i class="icx icx-download"></i> Importa Categorie</button
           ><input
             type="file"
             id="import-cat-file"
@@ -1420,7 +1436,7 @@
             onclick="document.getElementById('import-compl-file').click()"
             style="font-size: 0.78rem; padding: 5px 14px; border-color: #8e44ad; color: #8e44ad"
           >
-            &#127874; Importa Compleanni</button
+            <i class="icx icx-torta"></i> Importa Compleanni</button
           ><input
             type="file"
             id="import-compl-file"
@@ -1432,13 +1448,13 @@
             onclick="riallineaNomiMaison()"
             style="font-size: 0.78rem; padding: 5px 14px; border-color: #c0392b; color: #c0392b"
           >
-            &#128260; Riallinea Nomi</button
+            <i class="icx icx-refresh"></i> Riallinea Nomi</button
           ><button
             class="btn-export"
             onclick="unisciDuplicatiMaison()"
             style="font-size: 0.78rem; padding: 5px 14px; border-color: #1a4a7a; color: #1a4a7a"
           >
-            &#128279; Unisci Duplicati
+            <i class="icx icx-link"></i> Unisci Duplicati
           </button>
         </div>
         <div id="maison-budget-list" style="margin-bottom: 14px"></div>
@@ -2838,7 +2854,7 @@
         </div>
       </div>
       <div class="settings-section" id="cestino-section" style="display: none">
-        <h4>&#128465; Cestino</h4>
+        <h4><i class="icx icx-cestino"></i> Cestino</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
           Elementi eliminati. Puoi ripristinarli o svuotare il cestino.
         </p>

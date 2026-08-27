@@ -90,7 +90,7 @@ function renderCassaAlerts() {
   let html = '';
   if (allinAlerts.length) {
     html +=
-      '<div class="cassa-alert-banner allin" onclick="toggleCassaDD(\'allin\')">&#9888;&#65039; ' +
+      '<div class="cassa-alert-banner allin" onclick="toggleCassaDD(\'allin\')"><i class="icx icx-avviso"></i> ' +
       allinAlerts.length +
       ' collaboratore/i con differenza cassa &#8805; CHF ' +
       SA.allineamento +
@@ -112,7 +112,7 @@ function renderCassaAlerts() {
   }
   if (rdiAlerts.length) {
     html +=
-      '<div class="cassa-alert-banner rdi" onclick="toggleCassaDD(\'rdi\')">&#9888;&#65039; ' +
+      '<div class="cassa-alert-banner rdi" onclick="toggleCassaDD(\'rdi\')"><i class="icx icx-avviso"></i> ' +
       rdiAlerts.length +
       ' collaboratore/i con differenze cumulative &#8805; CHF ' +
       SA.rdi +
@@ -368,7 +368,7 @@ function renderRischioAlerts() {
   let html = '<div id="rischio-alerts-block">';
   if (recidive.length) {
     html +=
-      '<div class="rischio-alert-banner" style="background:#8e44ad" onclick="toggleRischioDD()">&#9888;&#65039; ' +
+      '<div class="rischio-alert-banner" style="background:#8e44ad" onclick="toggleRischioDD()"><i class="icx icx-avviso"></i> ' +
       recidive.length +
       ' collaboratore/i con 3+ allineamenti stesso motivo — Preparare RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
     html += '<div class="rischio-alerts-dropdown hidden" id="rischio-dd">';
@@ -391,7 +391,7 @@ function renderRischioAlerts() {
   }
   if (accumuli.length) {
     html +=
-      '<div class="rischio-alert-banner" style="background:#e67e22;margin-top:6px" onclick="toggleAccDD()">&#9888;&#65039; ' +
+      '<div class="rischio-alert-banner" style="background:#e67e22;margin-top:6px" onclick="toggleAccDD()"><i class="icx icx-avviso"></i> ' +
       accumuli.length +
       ' collaboratore/i con 3+ allineamenti totali — Valutare RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
     html += '<div class="rischio-alerts-dropdown hidden" id="acc-dd">';
@@ -492,7 +492,7 @@ function renderAmmonimentiAlerts() {
   if (!ammAlerts.length) return;
   let html = '<div id="amm-alerts-block">';
   html +=
-    '<div class="cassa-alert-banner" style="background:#e67e22;margin-bottom:8px;cursor:pointer" onclick="toggleAmmDD()">&#9888; ' +
+    '<div class="cassa-alert-banner" style="background:#e67e22;margin-bottom:8px;cursor:pointer" onclick="toggleAmmDD()"><i class="icx icx-avviso"></i> ' +
     ammAlerts.length +
     ' collaboratore/i con 2+ ammonimenti stesso motivo — Preparare allineamento <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
   html += '<div class="cassa-alerts-dropdown hidden" id="amm-dd">';

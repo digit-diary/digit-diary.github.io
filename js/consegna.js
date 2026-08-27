@@ -290,7 +290,7 @@ function mostraConsegnaLogin() {
   const mc = document.getElementById('note-modal-content');
   let html =
     '<h3 style="margin-bottom:4px">' +
-    (isAlta ? '<span style="color:var(--accent)">&#9888;</span> ' : '') +
+    (isAlta ? '<span style="color:var(--accent)"><i class="icx icx-avviso"></i></span> ' : '') +
     'Consegna dal turno ' +
     ultima.turno_uscente +
     '</h3><p style="color:var(--accent2);font-size:.85rem;margin-bottom:12px">da ' +
@@ -436,13 +436,13 @@ function renderDashboard() {
   });
   if (noteNL)
     todoH +=
-      '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="switchPage(\'note-collega\')"><span style="color:#2980b9;font-size:1.1rem">&#9993;</span><span>' +
+      '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="switchPage(\'note-collega\')"><span style="color:#2980b9;font-size:1.1rem"><i class="icx icx-mail"></i></span><span>' +
       noteNL +
       ' nota/e non letta/e</span></div>';
   const bdays = isVis('alert_compleanni') ? _getCompleanniProssimi(0) : [];
   bdays.forEach((bd) => {
     todoH +=
-      '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="font-size:1.1rem">&#127874;</span><span style="flex:1"><strong>' +
+      '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="font-size:1.1rem"><i class="icx icx-torta"></i></span><span style="flex:1"><strong>' +
       escP(bd.nome) +
       '</strong> — <span style="color:var(--accent2);font-weight:700">Compleanno OGGI!</span></span></div>';
   });
@@ -478,7 +478,7 @@ function renderDashboard() {
   const bdaysDomani = isVis('alert_compleanni') ? _getCompleanniProssimi(1).filter((b) => b.giorni === 1) : [];
   bdaysDomani.forEach((bd) => {
     domH +=
-      '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="font-size:1.1rem">&#127874;</span><span style="flex:1"><strong>' +
+      '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="font-size:1.1rem"><i class="icx icx-torta"></i></span><span style="flex:1"><strong>' +
       escP(bd.nome) +
       '</strong> — compleanno domani</span></div>';
   });
@@ -526,7 +526,7 @@ function renderDashboard() {
             (isOggi
               ? 'background:rgba(184,134,11,0.12);border-left:3px solid var(--accent2)'
               : 'border-bottom:1px solid var(--line)') +
-            '"><span style="font-size:1.4rem">&#127874;</span><div style="flex:1"><strong>' +
+            '"><span style="font-size:1.4rem"><i class="icx icx-torta"></i></span><div style="flex:1"><strong>' +
             escP(bd.nome) +
             '</strong> <span style="font-size:.82rem;font-weight:700;color:' +
             (isOggi ? 'var(--accent2)' : 'var(--muted)') +
@@ -550,7 +550,7 @@ function renderDashboard() {
             (isOggi
               ? 'background:rgba(184,134,11,0.12);border-left:3px solid var(--accent2)'
               : 'border-bottom:1px solid var(--line)') +
-            '"><span style="font-size:1.4rem">&#127874;</span><div style="flex:1"><strong class="entry-name" onclick="apriDettaglioMaison(\'' +
+            '"><span style="font-size:1.4rem"><i class="icx icx-torta"></i></span><div style="flex:1"><strong class="entry-name" onclick="apriDettaglioMaison(\'' +
             ne +
             '\')">' +
             escP(bd.nome) +

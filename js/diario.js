@@ -693,7 +693,7 @@ function renderScadenzeBanner() {
   }
   banner.classList.remove('hidden');
   banner.innerHTML =
-    (scadute.length ? '&#9888;&#65039; ' + scadute.length + ' scadenza/e scaduta/e! ' : '') +
+    (scadute.length ? '<i class="icx icx-avviso"></i> ' + scadute.length + ' scadenza/e scaduta/e! ' : '') +
     (prossime.length ? prossime.length + ' in arrivo' : '');
   banner.style.background = scadute.length ? 'var(--accent)' : 'var(--accent2)';
 }

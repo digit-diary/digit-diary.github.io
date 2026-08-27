@@ -297,7 +297,7 @@ function renderNoteCollega() {
   html +=
     '<div id="conv-new-dropdown" class="conv-new-dropdown" style="display:none;position:absolute;left:0;right:0;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,.15)"></div></div>';
   html +=
-    '<div style="padding:8px 10px;border-bottom:1px solid var(--line)"><input type="text" id="conv-search-input" placeholder="&#128269; Cerca conversazione..." oninput="filtraConversazioni()" style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:18px;font-size:.84rem;background:var(--paper);color:var(--ink);font-family:Source Sans 3,sans-serif;box-sizing:border-box"></div>';
+    '<div style="padding:8px 10px;border-bottom:1px solid var(--line)"><input type="text" id="conv-search-input" placeholder="Cerca conversazione..." oninput="filtraConversazioni()" style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:18px;font-size:.84rem;background:var(--paper);color:var(--ink);font-family:Source Sans 3,sans-serif;box-sizing:border-box"></div>';
   if (!allConvs.length) {
     html +=
       '<div style="padding:20px;text-align:center;color:var(--muted);font-size:.88rem">Nessuna conversazione</div>';
@@ -1105,7 +1105,7 @@ function renderNoteChat(partner) {
   const backBtn =
     '<button class="chat-back-btn" onclick="_chatBackToList()" style="display:none;background:none;border:none;cursor:pointer;font-size:1.2rem;color:var(--ink);padding:4px 8px" title="Indietro">&#8592;</button>';
   const searchBtn =
-    '<button onclick="apriCercaChat()" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:1.1rem;color:var(--muted);padding:4px 8px" title="Cerca">&#128269;</button>';
+    '<button onclick="apriCercaChat()" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:1.1rem;color:var(--muted);padding:4px 8px" title="Cerca"><i class="icx icx-cerca"></i></button>';
   const _gpEsc = escP(_gidChat).replace(/'/g, "\\'");
   const _ptEsc = escP(partner).replace(/'/g, "\\'");
   const _amIAdmin = isCustomGroup && _grpAdmin === op;
@@ -1119,16 +1119,16 @@ function renderNoteChat(partner) {
         _gpEsc +
         "','" +
         _ptEsc +
-        '\')" style="background:none;border:none;cursor:pointer;font-size:.9rem;color:var(--muted);padding:4px 6px" title="Rinomina gruppo">&#9998;</button><button onclick="_apriRimuoviMembri(\'' +
+        '\')" style="background:none;border:none;cursor:pointer;font-size:.9rem;color:var(--muted);padding:4px 6px" title="Rinomina gruppo"><i class="icx icx-modifica"></i></button><button onclick="_apriRimuoviMembri(\'' +
         _gpEsc +
         "','" +
         _ptEsc +
-        '\')" style="background:none;border:none;cursor:pointer;font-size:.9rem;color:var(--muted);padding:4px 6px" title="Rimuovi membro">&#128101;</button>'
+        '\')" style="background:none;border:none;cursor:pointer;font-size:.9rem;color:var(--muted);padding:4px 6px" title="Rimuovi membro"><i class="icx icx-utenti"></i></button>'
       : '';
   const starFilterBtn =
     '<button class="btn-star-filter' +
     (_starFilterActive ? ' active' : '') +
-    '" onclick="toggleStarFilter()" style="margin-left:4px" title="Filtra importanti">&#9733;</button>';
+    '" onclick="toggleStarFilter()" style="margin-left:4px" title="Filtra importanti"><i class="icx icx-stella-piena"></i></button>';
   header.innerHTML =
     backBtn +
     '<div style="flex:1;position:relative"><div style="cursor:' +
@@ -1255,23 +1255,23 @@ function renderNoteChat(partner) {
       ')" title="' +
       (n.importante ? 'Rimuovi importante' : 'Segna importante') +
       '">' +
-      (n.importante ? '&#9733;' : '&#9734;') +
+      (n.importante ? '<i class="icx icx-stella-piena"></i>' : '<i class="icx icx-stella"></i>') +
       '</button>';
     if (canEdit)
       actions +=
         '<button class="btn-act tipo" style="font-size:.65rem;padding:2px 6px" onclick="event.stopPropagation();modificaNotaCollega(' +
         n.id +
-        ')" title="Modifica">&#9998;</button>';
+        ')" title="Modifica"><i class="icx icx-modifica"></i></button>';
     if (isSent)
       actions +=
         '<button class="btn-act del" style="font-size:.65rem;padding:2px 6px" onclick="event.stopPropagation();eliminaNotaSmart(' +
         n.id +
-        ')" title="Elimina">&#128465;</button>';
+        ')" title="Elimina"><i class="icx icx-cestino"></i></button>';
     else
       actions +=
         '<button class="btn-act" style="font-size:.65rem;padding:2px 6px;color:var(--muted);border-color:var(--muted)" onclick="event.stopPropagation();eliminaNotaCollega(' +
         n.id +
-        ',\'dest\')" title="Elimina per me">&#128465;</button>';
+        ',\'dest\')" title="Elimina per me"><i class="icx icx-cestino"></i></button>';
     actions +=
       '<button class="btn-act" style="font-size:.65rem;padding:2px 6px;color:var(--accent2);border-color:var(--accent2)" onclick="event.stopPropagation();rispondiAMessaggio(' +
       n.id +
@@ -1329,7 +1329,7 @@ function renderNoteChat(partner) {
     const _starIcon = n.importante
       ? '<span class="chat-star-icon" onclick="event.stopPropagation();toggleImportante(' +
         n.id +
-        ')" title="Importante">&#9733;</span>'
+        ')" title="Importante"><i class="icx icx-stella-piena"></i></span>'
       : '';
     html += '<div class="chat-time">' + _starIcon + time + ' ' + ticks + '</div>';
     html += reactionsHtml;
@@ -2109,7 +2109,9 @@ function apriSchedaCollaboratore(nome) {
   html +=
     '<div><h3 style="font-size:1.6rem">' +
     escP(nome) +
-    (isBirthday ? ' <span style="font-size:1.2rem" title="Compleanno oggi!">&#127874;</span>' : '') +
+    (isBirthday
+      ? ' <span style="font-size:1.2rem" title="Compleanno oggi!"><i class="icx icx-torta"></i></span>'
+      : '') +
     (collabRec && collabRec.impiego
       ? ' <span class="mini-badge" style="background:' +
         (collabRec.impiego === 'fisso' ? '#1a7a6d' : '#e67e22') +
@@ -2379,7 +2381,7 @@ function apriSchedaCollaboratore(nome) {
     const _ammMaxSame = _ammGruppi.reduce((mx, g) => Math.max(mx, g.count), 0);
     if (_ammMaxSame >= 2 && allineamenti === 0) {
       html +=
-        '<div class="scheda-suggestion" style="background:rgba(230,126,34,0.12);color:#e67e22">&#9888; ' +
+        '<div class="scheda-suggestion" style="background:rgba(230,126,34,0.12);color:#e67e22"><i class="icx icx-avviso"></i> ' +
         _ammMaxSame +
         ' ammonimenti stesso motivo senza allineamento &#8594; Preparare allineamento</div>';
     }
@@ -2400,12 +2402,12 @@ function apriSchedaCollaboratore(nome) {
     const _allinMaxSame = _allinGruppi.reduce((mx, g) => Math.max(mx, g.count), 0);
     if (_allinMaxSame >= 3 && rdiCount === 0) {
       html +=
-        '<div class="scheda-suggestion" style="background:rgba(192,57,43,0.12);color:var(--accent)">&#9888; ' +
+        '<div class="scheda-suggestion" style="background:rgba(192,57,43,0.12);color:var(--accent)"><i class="icx icx-avviso"></i> ' +
         _allinMaxSame +
         ' allineamenti stesso motivo senza RDI &#8594; Recidiva, preparare RDI</div>';
     } else if (_allinMods.length >= 3 && rdiCount === 0) {
       html +=
-        '<div class="scheda-suggestion" style="background:rgba(230,126,34,0.12);color:#e67e22">&#9888; ' +
+        '<div class="scheda-suggestion" style="background:rgba(230,126,34,0.12);color:#e67e22"><i class="icx icx-avviso"></i> ' +
         _allinMods.length +
         ' allineamenti totali senza RDI &#8594; Valutare RDI</div>';
     }
@@ -2422,7 +2424,7 @@ function apriSchedaCollaboratore(nome) {
         ' apprezzamenti &#8594; Candidato per premio</div>';
     } else if (recentErr === 0 && totReg > 5) {
       html +=
-        '<div class="scheda-suggestion" style="background:rgba(44,110,73,0.12);color:#2c6e49">&#9989; 0 errori negli ultimi 3 mesi</div>';
+        '<div class="scheda-suggestion" style="background:rgba(44,110,73,0.12);color:#2c6e49"><i class="icx icx-check"></i> 0 errori negli ultimi 3 mesi</div>';
     }
     html += '</div>';
   } // fine percorso disciplinare
@@ -2461,7 +2463,7 @@ function apriSchedaCollaboratore(nome) {
     html += '</div>';
     if (lunVenPct > 50) {
       html +=
-        '<div class="scheda-sick-flag" style="background:rgba(192,57,43,0.1);color:var(--accent)">&#9888; ' +
+        '<div class="scheda-sick-flag" style="background:rgba(192,57,43,0.1);color:var(--accent)"><i class="icx icx-avviso"></i> ' +
         lunVenPct +
         '% delle malattie cade di Lunedi o Venerdi (' +
         lunVen +
@@ -3457,9 +3459,9 @@ function checkCompleanniBanner() {
     if (_isCompleannoOggi(c.data_nascita)) compleanni.push(c.nome);
   });
   if (compleanni.length) {
-    banner.textContent = '&#127874; Buon compleanno a: ' + compleanni.join(', ') + '!';
+    banner.textContent = '<i class="icx icx-torta"></i> Buon compleanno a: ' + compleanni.join(', ') + '!';
     banner.innerHTML =
-      '&#127874; Buon compleanno a: <strong>' +
+      '<i class="icx icx-torta"></i> Buon compleanno a: <strong>' +
       compleanni
         .map(function (n) {
           return escP(n);

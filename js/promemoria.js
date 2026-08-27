@@ -954,7 +954,7 @@ async function caricaMaisonFile(input, forzaSostituisci) {
     if (!totalRows && !giorniSaltati.length) msg = '<span style="color:var(--muted)">Nessun dato nuovo trovato</span>';
     if (dupCount) {
       msg +=
-        '<br><span style="color:#c0392b;font-size:.82rem;font-weight:600">⚠ ' +
+        '<br><span style="color:#c0392b;font-size:.82rem;font-weight:600"><i class="icx icx-avviso"></i> ' +
         dupCount +
         ' duplicati trovati nello stesso giorno (inseriti comunque)</span>';
     }

@@ -137,13 +137,15 @@ function renderMaisonBudgetUI() {
       '\')">' +
       escP(c.nome) +
       _catBadgeRow +
-      (isBday ? ' <span style="font-size:1.1rem">&#127874;</span>' : '') +
+      (isBday ? ' <span style="font-size:1.1rem"><i class="icx icx-torta"></i></span>' : '') +
       '</span>' +
       (c.spent ? '<span style="font-size:.82rem;color:var(--muted)">' + fmtCHF(c.spent) + ' CHF</span>' : '') +
       (c.b && c.b.budget_chf
         ? '<span style="font-size:.82rem;color:' + pctColor + ';font-weight:600">' + pct + '%</span>' + budgetBar
         : '') +
-      (nascitaLabel ? '<span style="font-size:.82rem;color:var(--muted)">&#127874; ' + nascitaLabel + '</span>' : '') +
+      (nascitaLabel
+        ? '<span style="font-size:.82rem;color:var(--muted)"><i class="icx icx-torta"></i> ' + nascitaLabel + '</span>'
+        : '') +
       (c.b
         ? '<button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2);font-size:.72rem" onclick="modificaMaisonInfo(' +
           c.b.id +
@@ -397,7 +399,7 @@ function apriListaClientiMaison() {
       ')</div>';
     items.forEach(function (b) {
       var nascita = b.data_nascita
-        ? '  —  &#127874; ' +
+        ? '  —  <i class="icx icx-torta"></i> ' +
           new Date(b.data_nascita + 'T12:00:00').toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })
         : '';
       h +=
@@ -808,7 +810,7 @@ async function importaCategorieMaison(input) {
       // Riepilogo finale
       mc.innerHTML =
         '<div style="text-align:center;padding:20px"><div style="font-size:2.5rem;margin-bottom:8px">' +
-        (errori ? '&#9888;' : '&#9989;') +
+        (errori ? '<i class="icx icx-avviso"></i>' : '<i class="icx icx-check"></i>') +
         '</div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Importazione completata</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:#2c6e49">' +
         nuovi +
         '</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Nuovi</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--accent2)">' +
@@ -1103,7 +1105,7 @@ async function importaCompleanniMaison(input) {
       // Riepilogo finale
       mc.innerHTML =
         '<div style="text-align:center;padding:20px"><div style="font-size:2.5rem;margin-bottom:8px">' +
-        (nErrori ? '&#9888;' : '&#127874;') +
+        (nErrori ? '<i class="icx icx-avviso"></i>' : '<i class="icx icx-torta"></i>') +
         '</div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Compleanni importati</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:#2c6e49">' +
         nAggiornati +
         '</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Aggiornati</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:#2980b9">' +
