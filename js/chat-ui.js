@@ -2487,6 +2487,9 @@ function apriSchedaCollaboratore(nome) {
   // VALUTAZIONE ANNUALE (9 aree HR + Versatilità/Affidabilità/Disponibilità)
   if (typeof _renderValutazioneSezione === 'function') html += _renderValutazioneSezione(nome);
 
+  // STORICO HR (riservato: admin + operatori con permesso storico_hr)
+  if (typeof _renderStoricoHrSezione === 'function') html += _renderStoricoHrSezione(nome);
+
   // TIMELINE with date filter
   html += '<div class="scheda-section"><h4>Cronologia completa</h4>';
   html += '<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">';
@@ -2657,6 +2660,131 @@ function schedaKpiFiltra(nome, source, tipo) {
     try {
       tl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } catch (e) {}
+}
+
+// ========================
+// STORICO HR (riservato: admin + permesso storico_hr)
+// ========================
+var _HR_TIPO_STILE = {
+  assunzione: { label: 'Inizio contratto', col: '#1a7a6d' },
+  categoria: { label: 'Categoria', col: 'var(--accent2)' },
+  impiego: { label: 'Impiego', col: '#5d6d7e' },
+  premio: { label: 'Premio', col: '#b8860b' },
+  livello: { label: 'Livello', col: '#2c6e49' },
+  formazione: { label: 'Formazione', col: '#1a4a7a' },
+  nota: { label: 'Nota', col: 'var(--muted)' },
+};
+function _renderStoricoHrSezione(nome) {
+  if (typeof puoVedereStoricoHr !== 'function' || !puoVedereStoricoHr()) return '';
+  var c = collaboratoriCache.find(function (x) {
+    return x.nome === nome;
+  });
+  var eventi = getHrEventiReparto()
+    .filter(function (e) {
+      return e.collaboratore.toLowerCase() === nome.toLowerCase();
+    })
+    .sort(function (a, b) {
+      return (b.data_evento || '').localeCompare(a.data_evento || '') || (b.id || 0) - (a.id || 0);
+    });
+  var neS = nome.replace(/'/g, "\\'");
+  var html =
+    '<div class="scheda-section"><h4 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Storico HR <span class="mini-badge" style="background:var(--accent);font-size:.65rem">RISERVATO</span></h4>';
+  // Inizio contratto + anzianità
+  var dataAss = (c && c.data_assunzione) || '';
+  html += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">';
+  html += '<span style="font-size:.84rem;color:var(--muted)">Inizio contratto:</span>';
+  html +=
+    '<input type="date" id="hr-assunzione" value="' +
+    escP(dataAss) +
+    '" style="padding:5px 10px;border:1px solid var(--line);border-radius:2px;font-size:.84rem;background:var(--paper2);color:var(--ink)">';
+  html +=
+    '<button class="btn-salva" onclick="salvaDataAssunzione(\'' +
+    neS +
+    '\')" style="font-size:.75rem;padding:5px 14px;background:var(--accent2)">Salva</button>';
+  if (dataAss)
+    html +=
+      '<span class="mini-badge" style="background:#1a7a6d;font-size:.72rem">Anzianità: ' +
+      anzianitaLabel(dataAss) +
+      '</span>';
+  html += '</div>';
+  // Timeline eventi
+  if (!eventi.length) {
+    html +=
+      '<p style="color:var(--muted);font-size:.84rem">Nessun evento registrato. Categoria, impiego, premi, livelli e formazioni verranno tracciati qui automaticamente con la data.</p>';
+  } else {
+    html += '<div class="profilo-entries" style="max-height:240px">';
+    eventi.forEach(function (e) {
+      var st = _HR_TIPO_STILE[e.tipo] || _HR_TIPO_STILE.nota;
+      html +=
+        '<div class="scheda-timeline-item"><span style="font-size:.78rem;color:var(--muted);min-width:78px">' +
+        (e.data_evento ? new Date(e.data_evento + 'T12:00:00').toLocaleDateString('it-IT') : '') +
+        '</span><span class="mini-badge" style="background:' +
+        st.col +
+        ';font-size:.68rem">' +
+        st.label +
+        '</span><span style="flex:1">' +
+        escP(e.descrizione || '') +
+        '</span>' +
+        (e.operatore ? '<span style="font-size:.72rem;color:var(--accent2)">' + escP(e.operatore) + '</span>' : '') +
+        (isAdmin()
+          ? '<button class="btn-act del" onclick="eliminaHrEvento(' +
+            e.id +
+            ",'" +
+            neS +
+            '\')" style="font-size:.68rem">X</button>'
+          : '') +
+        '</div>';
+    });
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+async function salvaDataAssunzione(nome) {
+  if (typeof puoVedereStoricoHr !== 'function' || !puoVedereStoricoHr()) {
+    toast('Non hai il permesso');
+    return;
+  }
+  var val = (document.getElementById('hr-assunzione') || {}).value || '';
+  if (!val) {
+    toast('Seleziona una data');
+    return;
+  }
+  var c = collaboratoriCache.find(function (x) {
+    return x.nome === nome;
+  });
+  if (!c) return;
+  var prima = c.data_assunzione;
+  try {
+    await secPatch('collaboratori', 'id=eq.' + c.id, { data_assunzione: val });
+    c.data_assunzione = val;
+    if (val !== prima)
+      await _insertHrEvento(
+        nome,
+        'assunzione',
+        'Inizio contratto: ' + new Date(val + 'T12:00:00').toLocaleDateString('it-IT'),
+        val,
+      );
+    logAzione('Inizio contratto', nome + ' — ' + val);
+    toast('Inizio contratto salvato');
+    apriSchedaCollaboratore(nome);
+  } catch (e) {
+    toast('Errore salvataggio');
+  }
+}
+async function eliminaHrEvento(id, nome) {
+  if (!isAdmin()) return;
+  if (!confirm('Eliminare questo evento dallo storico HR?')) return;
+  try {
+    await secDel('hr_eventi', 'id=eq.' + id);
+    hrEventiCache = hrEventiCache.filter(function (e) {
+      return e.id !== id;
+    });
+    logAzione('Evento HR eliminato', nome + ' ID ' + id);
+    apriSchedaCollaboratore(nome);
+  } catch (e) {
+    toast('Errore eliminazione');
+  }
 }
 
 // Anteprima completa di una voce della cronologia (registrazione o modulo)

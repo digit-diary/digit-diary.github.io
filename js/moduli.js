@@ -1157,13 +1157,14 @@ async function cambiaImpiegoCollaboratore(id, imp) {
     return;
   }
   try {
-    await secPatch('collaboratori', 'id=eq.' + id, { impiego: imp || null });
     const c = collaboratoriCache.find((x) => x.id === id);
+    const prima = c ? c.impiego : null;
+    await secPatch('collaboratori', 'id=eq.' + id, { impiego: imp || null });
     if (c) c.impiego = imp || null;
-    logAzione(
-      'Impiego collaboratore',
-      (c ? c.nome : 'ID ' + id) + ' → ' + (imp === 'fisso' ? 'Fisso 100%' : imp || 'nessuno'),
-    );
+    const lbl = (v) => (v === 'fisso' ? 'Fisso 100%' : v === 'jolly' ? 'Jolly' : 'nessuno');
+    logAzione('Impiego collaboratore', (c ? c.nome : 'ID ' + id) + ' → ' + lbl(imp));
+    if (c && imp && imp !== prima && typeof _insertHrEvento === 'function')
+      _insertHrEvento(c.nome, 'impiego', 'Impiego: ' + lbl(imp) + (prima ? ' (era ' + lbl(prima) + ')' : ''));
     renderCollaboratoriUI();
     toast('Impiego aggiornato');
   } catch (e) {
@@ -1178,10 +1179,17 @@ async function cambiaCategoriaCollaboratore(id, cat) {
   }
   try {
     const n = parseInt(cat) || null;
-    await secPatch('collaboratori', 'id=eq.' + id, { categoria: n });
     const c = collaboratoriCache.find((x) => x.id === id);
+    const prima = c ? c.categoria : null;
+    await secPatch('collaboratori', 'id=eq.' + id, { categoria: n });
     if (c) c.categoria = n;
     logAzione('Categoria collaboratore', (c ? c.nome : 'ID ' + id) + ' → ' + (n ? n + 'ª' : 'nessuna'));
+    if (c && n && n !== prima && typeof _insertHrEvento === 'function')
+      _insertHrEvento(
+        c.nome,
+        'categoria',
+        'Categoria assegnata: ' + n + 'ª' + (prima ? ' (era ' + prima + 'ª)' : ' (prima assegnazione)'),
+      );
     renderCollaboratoriUI();
     toast('Categoria aggiornata');
   } catch (e) {

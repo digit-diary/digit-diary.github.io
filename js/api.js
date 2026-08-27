@@ -125,6 +125,7 @@ async function loadAll() {
     inventarioD,
     valutazioniD,
     puntiD,
+    hrEv,
   ] = await Promise.all([
     secGet('registrazioni?order=data.desc'),
     secGet('note_fissate?select=registrazione_id'),
@@ -149,6 +150,7 @@ async function loadAll() {
     secGet('inventario?order=data_movimento.desc'),
     secGet('valutazioni?order=anno.desc'),
     secGet('punti_eventi?order=data_evento.desc'),
+    secGet('hr_eventi?order=data_evento.desc'),
   ]);
   datiCache = (dati || []).filter((e) => !e.eliminato);
   pinnedIds = new Set(pins.map((p) => p.registrazione_id));
@@ -193,6 +195,7 @@ async function loadAll() {
   inventarioCache = inventarioD || [];
   valutazioniCache = valutazioniD || [];
   puntiEventiCache = puntiD || [];
+  hrEventiCache = hrEv || [];
   // ENTERPRISE CHAT: decifra chat_messages e sintetizza noteColleghiCache
   await decryptChatMessagesCache();
   _chatBuildNoteCache();

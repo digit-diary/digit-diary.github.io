@@ -37,6 +37,8 @@ const VIS_ITEMS = {
     gestione_categorie: 'Collaboratori — assegnare impiego (Jolly/Fisso) e categoria',
     gestione_competenze: 'Competenze — certificare le spunte in matrice',
     gestione_valutazioni: 'Valutazioni — inserire e importare schede',
+    gestione_formazioni: 'Formazioni — registrare sessioni formative svolte (es. supervisor)',
+    storico_hr: 'Storico HR — inizio contratto, tracciato categorie/premi/formazioni, equità (sezione riservata)',
   },
 };
 // Permesso di modifica: default solo admin (a differenza delle pagine, default 'tutti')

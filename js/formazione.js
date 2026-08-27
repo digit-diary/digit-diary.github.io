@@ -387,11 +387,167 @@ function renderFormazione() {
   }
   html += '</div></div>';
 
+  // REGISTRA FORMAZIONE SVOLTA (admin o permesso gestione_formazioni: es. supervisor)
+  const puoForm = adm || (typeof puoModificare === 'function' && puoModificare('gestione_formazioni'));
+  if (puoForm) {
+    html += '<div class="main-card"><div class="card-header">Registra formazione svolta</div><div class="form-area">';
+    html +=
+      '<div class="form-row" style="grid-template-columns:1fr 1.4fr 1fr auto auto;gap:10px;align-items:flex-end">';
+    html +=
+      '<div class="field"><label>Collaboratore</label><select id="frm-collab" style="padding:10px">' +
+      collabs.map((c) => '<option>' + escP(c.nome) + '</option>').join('') +
+      '</select></div>';
+    html +=
+      '<div class="field"><label>Formazione svolta</label><input type="text" id="frm-desc" placeholder="Es: formazione Reception, procedura LRD..."></div>';
+    html +=
+      '<div class="field"><label>Formatore</label><input type="text" id="frm-formatore" value="' +
+      escP(getOperatore() || '') +
+      '"></div>';
+    html +=
+      '<div class="field"><label>Data</label><input type="date" id="frm-data" value="' +
+      new Date().toISOString().split('T')[0] +
+      '" style="padding:9px"></div>';
+    html += '<button class="btn-add-tipo" onclick="registraFormazioneSvolta()">+ Registra</button></div>';
+    if (puoPunti) {
+      const azF = getPuntiConfig().azioni.find((a) => a.key === 'sessione_formativa');
+      html +=
+        '<label style="display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--muted);margin-top:8px;cursor:pointer"><input type="checkbox" id="frm-punti" checked> Assegna anche i punti "Sessione formativa completata"' +
+        (azF ? ' (+' + azF.punti + ')' : '') +
+        '</label>';
+    }
+    html +=
+      '<p style="color:var(--muted);font-size:.75rem;margin-top:6px">La formazione viene tracciata con data e formatore nello Storico HR del collaboratore (visibile solo a admin e operatori autorizzati).</p>';
+    html += '</div></div>';
+  }
+
+  // EQUITÀ CATEGORIE (riservato: admin + permesso storico_hr) — sistema meritocratico
+  if (typeof puoVedereStoricoHr === 'function' && puoVedereStoricoHr()) {
+    html += _renderEquitaCard(collabs);
+  }
+
   // CONFIG ADMIN
   if (adm) {
     html += _renderFormazioneConfig();
   }
   el.innerHTML = html;
+}
+
+// Registra una sessione formativa nello storico HR (+ punti opzionali)
+async function registraFormazioneSvolta() {
+  const adm = isAdmin();
+  if (!adm && !(typeof puoModificare === 'function' && puoModificare('gestione_formazioni'))) {
+    toast('Non hai il permesso di registrare formazioni');
+    return;
+  }
+  const nome = (document.getElementById('frm-collab') || {}).value;
+  const desc = ((document.getElementById('frm-desc') || {}).value || '').trim();
+  const formatore = ((document.getElementById('frm-formatore') || {}).value || '').trim();
+  const data = (document.getElementById('frm-data') || {}).value || new Date().toISOString().split('T')[0];
+  if (!nome || !desc) {
+    toast('Indica collaboratore e formazione svolta');
+    return;
+  }
+  try {
+    await _insertHrEvento(nome, 'formazione', desc + (formatore ? ' — formatore: ' + formatore : ''), data);
+    logAzione('Formazione registrata', nome + ' — ' + desc + (formatore ? ' (formatore ' + formatore + ')' : ''));
+    const conPunti = (document.getElementById('frm-punti') || {}).checked;
+    if (conPunti && (adm || (typeof puoModificare === 'function' && puoModificare('gestione_punti')))) {
+      const az = getPuntiConfig().azioni.find((a) => a.key === 'sessione_formativa');
+      if (az && az.punti) await _insertPuntiEvento(nome, az.punti, 'sessione_formativa', desc);
+    }
+    document.getElementById('frm-desc').value = '';
+    renderFormazione();
+    toast('Formazione registrata per ' + nome);
+  } catch (e) {
+    toast('Errore registrazione formazione');
+  }
+}
+
+// Confronto meritocratico: segnala chi ha più anzianità e pari livello ma categoria inferiore
+function _renderEquitaCard(collabs) {
+  const oggi = Date.now();
+  const righe = collabs.map((c) => {
+    const anzGiorni = c.data_assunzione
+      ? Math.floor((oggi - new Date(c.data_assunzione + 'T12:00:00').getTime()) / 86400000)
+      : null;
+    let media = null;
+    if (typeof getValutazioniReparto === 'function' && typeof _mediaValutazione === 'function') {
+      const v = getValutazioniReparto()
+        .filter((x) => x.collaboratore.toLowerCase() === c.nome.toLowerCase())
+        .sort((a, b) => b.anno - a.anno)[0];
+      if (v) media = _mediaValutazione(v.aree);
+    }
+    return {
+      nome: c.nome,
+      impiego: c.impiego || '',
+      categoria: c.categoria || null,
+      dataAss: c.data_assunzione || '',
+      anzGiorni,
+      lv: livelloDiCollaboratore(c),
+      punti: puntiTotali(c.nome),
+      media,
+    };
+  });
+  // segnalazioni: X penalizzato se esiste Y con categoria migliore, almeno 6 mesi di anzianità in meno e livello pari o inferiore
+  righe.forEach((x) => {
+    if (!x.categoria || x.anzGiorni == null) return;
+    const y = righe
+      .filter(
+        (o) =>
+          o.categoria &&
+          o.anzGiorni != null &&
+          o.categoria < x.categoria &&
+          x.anzGiorni > o.anzGiorni + 180 &&
+          (o.lv || 0) <= (x.lv || 0),
+      )
+      .sort((a, b) => a.anzGiorni - b.anzGiorni)[0];
+    if (y)
+      x.flag =
+        'In ' +
+        x.categoria +
+        'ª con più anzianità di ' +
+        y.nome +
+        ' (' +
+        y.categoria +
+        'ª, livello pari o inferiore) — valutare revisione';
+  });
+  const conDati = righe.filter((r) => r.categoria || r.dataAss);
+  let html =
+    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:8px">Equità categorie — analisi meritocratica <span class="mini-badge" style="background:var(--accent);font-size:.65rem">RISERVATO</span></div>';
+  if (!conDati.length) {
+    html +=
+      '<p style="color:var(--muted);padding:16px;font-size:.86rem">Assegna categorie e date di inizio contratto (scheda collaboratore → Storico HR) per attivare il confronto.</p></div>';
+    return html;
+  }
+  conDati.sort((a, b) => (a.categoria || 9) - (b.categoria || 9) || (b.anzGiorni || 0) - (a.anzGiorni || 0));
+  html +=
+    '<div style="padding:0 16px 8px;overflow-x:auto"><table class="collab-table"><thead><tr><th>Collaboratore</th><th>Impiego</th><th class="num">Cat.</th><th>Anzianità</th><th class="num">Livello</th><th class="num">Punti</th><th class="num">Valutazione</th><th>Segnalazione</th></tr></thead><tbody>';
+  conDati.forEach((r) => {
+    html +=
+      '<tr' +
+      (r.flag ? ' style="background:rgba(192,57,43,0.06)"' : '') +
+      '><td><strong>' +
+      escP(r.nome) +
+      '</strong></td><td>' +
+      (r.impiego === 'fisso' ? 'Fisso 100%' : r.impiego === 'jolly' ? 'Jolly' : '—') +
+      '</td><td class="num"><strong>' +
+      (r.categoria ? r.categoria + 'ª' : '—') +
+      '</strong></td><td>' +
+      (r.dataAss ? anzianitaLabel(r.dataAss) : '—') +
+      '</td><td class="num">' +
+      (r.lv ? 'L' + r.lv : '—') +
+      '</td><td class="num">' +
+      r.punti +
+      '</td><td class="num">' +
+      (r.media != null ? r.media + '%' : '—') +
+      '</td><td style="font-size:.78rem;color:var(--accent)">' +
+      (r.flag ? '⚠ ' + escP(r.flag) : '') +
+      '</td></tr>';
+  });
+  html += '</tbody></table></div>';
+  html +=
+    '<p style="color:var(--muted);font-size:.75rem;padding:0 16px 14px">Analisi indicativa basata su anzianità (inizio contratto), categoria e livello multidisciplinare: la decisione sulle categorie resta al responsabile e a HR.</p></div>';
+  return html;
 }
 function _filtraMatrice() {
   const q = ((document.getElementById('form-matr-cerca') || {}).value || '').toLowerCase();
@@ -418,6 +574,15 @@ async function toggleCompetenza(collabId, key, cb) {
     c.competenze = nuove;
     const compDef = getCompetenzeReparto().find((k) => k.key === key);
     logAzione('Competenza ' + (attiva ? 'certificata' : 'rimossa'), c.nome + ' — ' + (compDef ? compDef.label : key));
+    // Traccia nello storico HR: cosa è stato formato, quando e da chi
+    if (attiva && typeof _insertHrEvento === 'function') {
+      const fmt = (prompt('Formatore che ha svolto la formazione (opzionale):', '') || '').trim();
+      _insertHrEvento(
+        c.nome,
+        'formazione',
+        'Competenza certificata: ' + (compDef ? compDef.label : key) + (fmt ? ' — formatore: ' + fmt : ''),
+      );
+    }
     // Punti automatici per competenza certificata
     if (attiva) {
       const az = getPuntiConfig().azioni.find((a) => a.key === 'competenza');
@@ -447,6 +612,8 @@ async function toggleCompetenza(collabId, key, cb) {
     if (dopo > prima && dopo >= 2) {
       const premio = getPuntiConfig().premi_livello[String(dopo)];
       logAzione('Passaggio livello', c.nome + ' → Livello ' + dopo);
+      if (typeof _insertHrEvento === 'function')
+        _insertHrEvento(c.nome, 'livello', 'Raggiunto Livello ' + dopo + ' multidisciplinare');
       _notificaIncentivo(
         c.nome,
         '🎉 ' + c.nome + ' → Livello ' + dopo,
@@ -564,6 +731,7 @@ async function registraPremioConsegnato(nome, premio) {
   }
   try {
     await _insertPuntiEvento(nome, 0, 'premio', 'Premio consegnato: ' + premio);
+    if (typeof _insertHrEvento === 'function') _insertHrEvento(nome, 'premio', 'Premio consegnato: ' + premio);
     _notificaIncentivo(nome, '🎁 Premio consegnato', nome + ': ' + premio);
     renderFormazione();
     toast('Premio registrato per ' + nome);
