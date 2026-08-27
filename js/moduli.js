@@ -2003,6 +2003,7 @@ function render() {
         gdBadge +
         rep +
         imp +
+        (e.tipo === nomeCorrente('Malattia') && typeof badgeCoperturaHtml === 'function' ? badgeCoperturaHtml(e) : '') +
         '</div><div class="entry-text">' +
         esc(e.testo) +
         '</div>' +
@@ -2022,7 +2023,7 @@ function render() {
           ? '<button class="btn-act" style="color:#1a7a6d;border-color:#1a7a6d" onclick="apriPopupCopertura(\'' +
             e.nome.replace(/'/g, "\\'") +
             "','" +
-            (e.data || '').substring(0, 10) +
+            _dataRifCopertura(e) +
             '\')" title="Chi copre / chi ha rifiutato">Copertura</button>'
           : '') +
         '<button class="btn-act del" onclick="elimina(' +

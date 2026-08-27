@@ -862,59 +862,158 @@ async function modificaPremioLivello(lv, val) {
 // chiede chi copre il turno (+punti) e chi NON ha dato disponibilità (-punti).
 // Ritorna una Promise risolta alla chiusura (per accodare più assenze).
 // ================================================================
+// Data di riferimento della copertura per una registrazione malattia:
+// primo giorno del range se indicato nel testo, altrimenti la data della registrazione.
+function _dataRifCopertura(entry) {
+  const m = (entry.testo || '').match(/dal (\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  return (entry.data || '').substring(0, 10);
+}
+// Eventi copertura/rifiuto già registrati per una specifica assenza
+function eventiCopertura(assente, dataRif) {
+  if (!assente) return [];
+  const dataLabel = dataRif ? new Date(dataRif + 'T12:00:00').toLocaleDateString('it-IT') : '';
+  const nomeL = assente.toLowerCase();
+  return getPuntiReparto().filter(
+    (p) =>
+      (p.azione === 'copertura' || p.azione === 'disponibilita_negata') &&
+      (p.descrizione || '').toLowerCase().includes(nomeL) &&
+      (p.descrizione || '').includes('del ' + dataLabel),
+  );
+}
+// Badge riassuntivo per la riga del diario ("Coperto: X" / "Senza copertura" / rifiuti)
+function badgeCoperturaHtml(entry) {
+  const ev = eventiCopertura(entry.nome, _dataRifCopertura(entry));
+  const cop = ev.find((p) => p.azione === 'copertura');
+  const rifiuti = ev.filter((p) => p.azione === 'disponibilita_negata').length;
+  let h = '';
+  if (cop)
+    h +=
+      '<span style="display:inline-block;margin-left:6px;padding:2px 8px;background:#1a7a6d;color:white;border-radius:2px;font-size:.74rem;font-weight:700">Coperto: ' +
+      escP(cop.collaboratore) +
+      '</span>';
+  else
+    h +=
+      '<span style="display:inline-block;margin-left:6px;padding:2px 8px;background:var(--muted);color:white;border-radius:2px;font-size:.74rem;font-weight:600">Senza copertura</span>';
+  if (rifiuti)
+    h +=
+      '<span style="display:inline-block;margin-left:4px;padding:2px 8px;background:var(--accent);color:white;border-radius:2px;font-size:.74rem;font-weight:700">' +
+      rifiuti +
+      ' rifiut' +
+      (rifiuti === 1 ? 'o' : 'i') +
+      '</span>';
+  return h;
+}
 function apriPopupCopertura(assente, dataRif) {
   return new Promise((resolve) => {
-    const collabs = getCollaboratoriReparto()
-      .filter((c) => c.attivo !== false && c.nome.toLowerCase() !== (assente || '').toLowerCase())
-      .sort((a, b) => a.nome.localeCompare(b.nome));
-    if (!collabs.length) {
-      resolve(false);
-      return;
-    }
-    const cfg = getPuntiConfig();
-    const azCop = cfg.azioni.find((a) => a.key === 'copertura');
-    const azNeg = cfg.azioni.find((a) => a.key === 'disponibilita_negata');
-    const dataLabel = dataRif ? new Date(dataRif + 'T12:00:00').toLocaleDateString('it-IT') : 'oggi';
     window._copResolve = resolve;
     window._copCtx = { assente, dataRif: dataRif || new Date().toISOString().split('T')[0] };
-    let html =
-      '<h3>Copertura turno — ' +
-      escP(assente) +
-      '</h3><p style="color:var(--muted);font-size:.84rem;margin-bottom:14px">Assenza del ' +
-      dataLabel +
-      '. Se il turno non viene sostituito, chiudi con "Nessuna copertura".</p>';
-    html +=
-      '<div class="pwd-field"><label>Chi copre il turno' +
-      (azCop ? ' (+' + azCop.punti + ' punti)' : '') +
-      '</label><select id="cop-chi" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"><option value="">— Nessuno / da decidere —</option>' +
-      collabs.map((c) => '<option>' + escP(c.nome) + '</option>').join('') +
-      '</select></div>';
-    if (azNeg) {
-      html +=
-        '<div class="pwd-field"><label>Chi NON ha dato disponibilità (' +
-        azNeg.punti +
-        ' punti ciascuno)</label><div style="max-height:170px;overflow-y:auto;border:1px solid var(--line);border-radius:2px;padding:6px 10px;background:var(--paper2)">' +
-        collabs
-          .map(
-            (c) =>
-              '<label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:.9rem"><input type="checkbox" class="cop-negato-cb" value="' +
-              escP(c.nome).replace(/"/g, '&quot;') +
-              '" style="width:16px;height:16px"> ' +
-              escP(c.nome) +
-              '</label>',
-          )
-          .join('') +
-        '</div></div>';
-    }
-    html +=
-      '<div class="pwd-field"><label>Nota (opzionale)</label><input type="text" id="cop-nota" placeholder="Es: doppio turno, chiamati in 3..."></div>';
-    html +=
-      '<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="_chiudiPopupCopertura(false)">Nessuna copertura</button><button class="btn-modal-ok" onclick="_chiudiPopupCopertura(true)">Conferma</button></div>';
-    html +=
-      '<p style="font-size:.72rem;color:var(--muted);text-align:center;margin-top:8px">Puoi sempre assegnare o correggere i punti dopo, dalla pagina Formazione.</p>';
-    document.getElementById('pwd-modal-content').innerHTML = html;
-    document.getElementById('pwd-modal').classList.remove('hidden');
+    _renderPopupCopertura();
   });
+}
+function _renderPopupCopertura() {
+  const ctx = window._copCtx;
+  if (!ctx) return;
+  const assente = ctx.assente;
+  const collabs = getCollaboratoriReparto()
+    .filter((c) => c.attivo !== false && c.nome.toLowerCase() !== (assente || '').toLowerCase())
+    .sort((a, b) => a.nome.localeCompare(b.nome));
+  if (!collabs.length) {
+    _chiudiPopupCopertura(false);
+    return;
+  }
+  const cfg = getPuntiConfig();
+  const azCop = cfg.azioni.find((a) => a.key === 'copertura');
+  const azNeg = cfg.azioni.find((a) => a.key === 'disponibilita_negata');
+  const dataLabel = ctx.dataRif ? new Date(ctx.dataRif + 'T12:00:00').toLocaleDateString('it-IT') : 'oggi';
+  let html =
+    '<h3>Copertura turno — ' +
+    escP(assente) +
+    '</h3><p style="color:var(--muted);font-size:.84rem;margin-bottom:14px">Assenza del ' +
+    dataLabel +
+    '. Se il turno non viene sostituito, chiudi con "Nessuna copertura".</p>';
+  // Già registrato per questa assenza (con possibilità di rimuovere/correggere)
+  const esistenti = eventiCopertura(assente, ctx.dataRif);
+  if (esistenti.length) {
+    html +=
+      '<div style="margin-bottom:14px;padding:10px 12px;background:var(--paper2);border-radius:3px;border-left:3px solid var(--accent2)"><div style="font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:6px">Già registrato</div>' +
+      esistenti
+        .map(
+          (p) =>
+            '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:.86rem"><strong>' +
+            escP(p.collaboratore) +
+            '</strong><span style="color:' +
+            (p.punti < 0 ? 'var(--accent)' : '#1a7a6d') +
+            ';font-weight:700">' +
+            (p.punti > 0 ? '+' : '') +
+            p.punti +
+            '</span><span style="color:var(--muted);font-size:.78rem;flex:1">' +
+            (p.azione === 'copertura' ? 'copertura' : 'rifiuto disponibilità') +
+            '</span><button class="btn-act del" style="font-size:.68rem" onclick="_rimuoviEventoCopertura(' +
+            p.id +
+            ')">Rimuovi</button></div>',
+        )
+        .join('') +
+      '</div>';
+  }
+  html +=
+    '<div class="pwd-field"><label>Chi copre il turno' +
+    (azCop ? ' (+' + azCop.punti + ' punti)' : '') +
+    '</label><select id="cop-chi" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"><option value="">— Nessuno / da decidere —</option>' +
+    collabs.map((c) => '<option>' + escP(c.nome) + '</option>').join('') +
+    '</select></div>';
+  if (azNeg) {
+    html +=
+      '<div class="pwd-field"><label>Chi NON ha dato disponibilità (' +
+      azNeg.punti +
+      ' punti ciascuno)</label><div style="max-height:170px;overflow-y:auto;border:1px solid var(--line);border-radius:2px;padding:6px 10px;background:var(--paper2)">' +
+      collabs
+        .map(
+          (c) =>
+            '<label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:.9rem"><input type="checkbox" class="cop-negato-cb" value="' +
+            escP(c.nome).replace(/"/g, '&quot;') +
+            '" style="width:16px;height:16px"> ' +
+            escP(c.nome) +
+            '</label>',
+        )
+        .join('') +
+      '</div></div>';
+  }
+  html +=
+    '<div class="pwd-field"><label>Nota (opzionale)</label><input type="text" id="cop-nota" placeholder="Es: doppio turno, chiamati in 3..."></div>';
+  html +=
+    '<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="_chiudiPopupCopertura(false)">Nessuna copertura</button><button class="btn-modal-ok" onclick="_chiudiPopupCopertura(true)">Conferma</button></div>';
+  html +=
+    '<p style="font-size:.72rem;color:var(--muted);text-align:center;margin-top:8px">Puoi sempre assegnare o correggere i punti dopo, dalla pagina Formazione.</p>';
+  document.getElementById('pwd-modal-content').innerHTML = html;
+  document.getElementById('pwd-modal').classList.remove('hidden');
+}
+async function _rimuoviEventoCopertura(id) {
+  const p = puntiEventiCache.find((x) => x.id === id);
+  if (!p) return;
+  if (
+    !confirm(
+      'Rimuovere "' +
+        (p.azione === 'copertura' ? 'copertura' : 'rifiuto') +
+        '" di ' +
+        p.collaboratore +
+        ' (' +
+        (p.punti > 0 ? '+' : '') +
+        p.punti +
+        ' punti)?',
+    )
+  )
+    return;
+  try {
+    await secDel('punti_eventi', 'id=eq.' + id);
+    puntiEventiCache = puntiEventiCache.filter((x) => x.id !== id);
+    logAzione('Copertura rimossa', p.collaboratore + ' (' + p.punti + ' pt) — ' + (p.descrizione || ''));
+    toast('Rimosso');
+    _renderPopupCopertura();
+    if (typeof render === 'function' && localStorage.getItem('pagina_corrente') === 'diario') render();
+  } catch (e) {
+    toast('Errore rimozione');
+  }
 }
 async function _chiudiPopupCopertura(conferma) {
   const ctx = window._copCtx || {};
@@ -960,5 +1059,7 @@ async function _chiudiPopupCopertura(conferma) {
   document.getElementById('pwd-modal').classList.add('hidden');
   window._copCtx = null;
   window._copResolve = null;
+  // Aggiorna i badge copertura nelle righe del diario
+  if (typeof render === 'function' && localStorage.getItem('pagina_corrente') === 'diario') render();
   if (resolve) resolve(!!conferma);
 }
