@@ -933,8 +933,14 @@ async function eliminaModulo(id) {
 async function renderCollaboratoriUI() {
   const section = document.getElementById('collab-section');
   if (!section) return;
-  section.style.display = isAdmin() ? '' : 'none';
-  if (!isAdmin()) return;
+  // Admin: gestione completa. Operatore con permesso 'gestione_categorie' (es. HR):
+  // vede la lista e può assegnare solo impiego e categoria.
+  const adminFull = isAdmin();
+  const puoCat = adminFull || (typeof puoModificare === 'function' && puoModificare('gestione_categorie'));
+  section.style.display = puoCat ? '' : 'none';
+  const addRow = section.querySelector('.add-tipo-row');
+  if (addRow) addRow.style.display = adminFull ? '' : 'none';
+  if (!puoCat) return;
   const tutti = await secGet('collaboratori?order=nome.asc');
   // Mostra solo i collaboratori del reparto corrente (o 'entrambi')
   const delReparto = tutti.filter((c) => {
@@ -944,31 +950,80 @@ async function renderCollaboratoriUI() {
   const attivi = delReparto.filter((c) => c.attivo !== false);
   const inattivi = delReparto.filter((c) => c.attivo === false);
   const el = document.getElementById('collaboratori-list');
-  let html = attivi.length
-    ? attivi
-        .map((c) => {
-          const rep = c.reparto_dip || 'slots';
-          return (
-            '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border:1px solid var(--line)"><span style="flex:1;font-weight:400">' +
-            escP(c.nome) +
-            '</span><select onchange="cambiaRepartoCollaboratore(' +
-            c.id +
-            ',this.value)" style="font-size:.75rem;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><option value="slots"' +
-            (rep === 'slots' ? ' selected' : '') +
-            '>Slots</option><option value="tavoli"' +
-            (rep === 'tavoli' ? ' selected' : '') +
-            '>Tavoli</option><option value="entrambi"' +
-            (rep === 'entrambi' ? ' selected' : '') +
-            '>Entrambi</option></select><button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2)" onclick="rinominaCollaboratore(\'' +
-            c.nome.replace(/'/g, "\\'") +
-            '\')">Rinomina</button><button class="btn-del-tipo" onclick="disattivaCollaboratore(\'' +
-            c.nome.replace(/'/g, "\\'") +
-            '\')">Rimuovi</button></div>'
-          );
-        })
-        .join('')
-    : '<p style="color:var(--muted);font-size:.85rem">Nessun collaboratore.</p>';
-  if (inattivi.length) {
+  const selStyle =
+    'font-size:.75rem;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)';
+  const rigaCollab = (c) => {
+    const rep = c.reparto_dip || 'slots';
+    const imp = c.impiego || '';
+    const cat = c.categoria || '';
+    return (
+      '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border:1px solid var(--line);flex-wrap:wrap"><span style="flex:1;font-weight:400;min-width:140px">' +
+      escP(c.nome) +
+      (cat
+        ? ' <span class="mini-badge" style="background:var(--accent2);font-size:.68rem">' + cat + '&ordf;</span>'
+        : '') +
+      '</span><select onchange="cambiaImpiegoCollaboratore(' +
+      c.id +
+      ',this.value)" title="Tipo di impiego" style="' +
+      selStyle +
+      '"><option value=""' +
+      (imp === '' ? ' selected' : '') +
+      '>Impiego...</option><option value="fisso"' +
+      (imp === 'fisso' ? ' selected' : '') +
+      '>Fisso 100%</option><option value="jolly"' +
+      (imp === 'jolly' ? ' selected' : '') +
+      '>Jolly</option></select><select onchange="cambiaCategoriaCollaboratore(' +
+      c.id +
+      ',this.value)" title="Categoria (5&ordf; = ingresso, 1&ordf; = massima)" style="' +
+      selStyle +
+      '"><option value=""' +
+      (cat === '' ? ' selected' : '') +
+      '>Cat...</option>' +
+      [5, 4, 3, 2, 1]
+        .map((n) => '<option value="' + n + '"' + (cat === n ? ' selected' : '') + '>' + n + '&ordf;</option>')
+        .join('') +
+      '</select>' +
+      (adminFull
+        ? '<select onchange="cambiaRepartoCollaboratore(' +
+          c.id +
+          ',this.value)" style="' +
+          selStyle +
+          '"><option value="slots"' +
+          (rep === 'slots' ? ' selected' : '') +
+          '>Slots</option><option value="tavoli"' +
+          (rep === 'tavoli' ? ' selected' : '') +
+          '>Tavoli</option><option value="entrambi"' +
+          (rep === 'entrambi' ? ' selected' : '') +
+          '>Entrambi</option></select><button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2)" onclick="rinominaCollaboratore(\'' +
+          c.nome.replace(/'/g, "\\'") +
+          '\')">Rinomina</button><button class="btn-del-tipo" onclick="disattivaCollaboratore(\'' +
+          c.nome.replace(/'/g, "\\'") +
+          '\')">Rimuovi</button>'
+        : '') +
+      '</div>'
+    );
+  };
+  // Sezioni: Fissi 100% / Jolly / senza inquadramento (dentro ogni gruppo: categoria 1ª → 5ª, poi nome)
+  const ordina = (arr) =>
+    arr.slice().sort((a, b) => (a.categoria || 9) - (b.categoria || 9) || a.nome.localeCompare(b.nome));
+  const fissi = ordina(attivi.filter((c) => c.impiego === 'fisso'));
+  const jolly = ordina(attivi.filter((c) => c.impiego === 'jolly'));
+  const senza = ordina(attivi.filter((c) => !c.impiego));
+  const titoloSez = (t, n) =>
+    '<p style="font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:12px 0 6px">' +
+    t +
+    ' (' +
+    n +
+    ')</p>';
+  let html = '';
+  if (fissi.length) html += titoloSez('Fissi 100%', fissi.length) + fissi.map(rigaCollab).join('');
+  if (jolly.length) html += titoloSez('Jolly', jolly.length) + jolly.map(rigaCollab).join('');
+  if (senza.length)
+    html +=
+      (fissi.length || jolly.length ? titoloSez('Senza inquadramento', senza.length) : '') +
+      senza.map(rigaCollab).join('');
+  if (!attivi.length) html = '<p style="color:var(--muted);font-size:.85rem">Nessun collaboratore.</p>';
+  if (inattivi.length && adminFull) {
     html +=
       '<div style="margin-top:12px;padding:10px;background:var(--paper2);border-radius:3px"><small style="color:var(--muted);display:block;margin-bottom:6px">Collaboratori disattivati (clicca per riattivare):</small><div style="display:flex;flex-wrap:wrap;gap:6px">' +
       inattivi
@@ -1093,6 +1148,44 @@ async function cambiaRepartoCollaboratore(id, rep) {
     toast('Reparto aggiornato: ' + rep);
   } catch (e) {
     toast('Errore cambio reparto');
+  }
+}
+async function cambiaImpiegoCollaboratore(id, imp) {
+  if (typeof puoModificare === 'function' && !puoModificare('gestione_categorie')) {
+    toast("Non hai il permesso di modificare l'impiego");
+    renderCollaboratoriUI();
+    return;
+  }
+  try {
+    await secPatch('collaboratori', 'id=eq.' + id, { impiego: imp || null });
+    const c = collaboratoriCache.find((x) => x.id === id);
+    if (c) c.impiego = imp || null;
+    logAzione(
+      'Impiego collaboratore',
+      (c ? c.nome : 'ID ' + id) + ' → ' + (imp === 'fisso' ? 'Fisso 100%' : imp || 'nessuno'),
+    );
+    renderCollaboratoriUI();
+    toast('Impiego aggiornato');
+  } catch (e) {
+    toast('Errore cambio impiego');
+  }
+}
+async function cambiaCategoriaCollaboratore(id, cat) {
+  if (typeof puoModificare === 'function' && !puoModificare('gestione_categorie')) {
+    toast('Non hai il permesso di modificare la categoria');
+    renderCollaboratoriUI();
+    return;
+  }
+  try {
+    const n = parseInt(cat) || null;
+    await secPatch('collaboratori', 'id=eq.' + id, { categoria: n });
+    const c = collaboratoriCache.find((x) => x.id === id);
+    if (c) c.categoria = n;
+    logAzione('Categoria collaboratore', (c ? c.nome : 'ID ' + id) + ' → ' + (n ? n + 'ª' : 'nessuna'));
+    renderCollaboratoriUI();
+    toast('Categoria aggiornata');
+  } catch (e) {
+    toast('Errore cambio categoria');
   }
 }
 async function disattivaCollaboratore(nome) {
