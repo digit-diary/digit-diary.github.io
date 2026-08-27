@@ -204,7 +204,8 @@ let valutazioniCache = [],
   puntiConfig = null, // {azioni:[{key,label,punti}], soglie:[{punti,premio}], premi_livello:{}}
   maisonAutoDeleteGiorni = 0, // 0 = disattivato; 1 = conserva solo GD corrente; N = conserva N giorni
   inventarioCategorieExtra = [], // categorie inventario personalizzate [{key,label}] oltre a buoni/sigarette
-  soglieAlertCfg = null; // {allineamento, rdi} soglie CHF alert differenze — null = default 90/500
+  soglieAlertCfg = null, // {allineamento, rdi} soglie CHF alert differenze — null = default 90/500
+  hrEventiCache = []; // storico HR riservato: assunzione, categoria, impiego, premi, livelli
 let currentReparto = 'slots',
   operatoriRepartoMap = {};
 function nomeCorrente(orig) {

@@ -1856,6 +1856,41 @@ function getConsegneReparto() {
     return (c.reparto_dip || 'slots') === currentReparto;
   });
 }
+// === STORICO HR (riservato: admin + permesso storico_hr) ===
+function getHrEventiReparto() {
+  return hrEventiCache.filter(function (e) {
+    return (e.reparto_dip || 'slots') === currentReparto;
+  });
+}
+// Traccia in automatico gli eventi HR (categoria, impiego, premio, livello, assunzione)
+async function _insertHrEvento(nome, tipo, descrizione, dataEvento) {
+  try {
+    const r = await secPost('hr_eventi', {
+      collaboratore: nome,
+      tipo: tipo,
+      descrizione: descrizione || '',
+      data_evento: dataEvento || new Date().toISOString().split('T')[0],
+      operatore: getOperatore(),
+      reparto_dip: currentReparto,
+    });
+    if (r && r[0]) hrEventiCache.unshift(r[0]);
+  } catch (e) {}
+}
+function puoVedereStoricoHr() {
+  return isAdmin() || (typeof puoModificare === 'function' && puoModificare('storico_hr'));
+}
+// Anzianità leggibile da data_assunzione
+function anzianitaLabel(dataAss) {
+  if (!dataAss) return '';
+  const giorni = Math.floor((Date.now() - new Date(dataAss + 'T12:00:00').getTime()) / 86400000);
+  if (giorni < 0) return '';
+  const anni = Math.floor(giorni / 365);
+  const mesi = Math.floor((giorni % 365) / 30);
+  if (anni > 0)
+    return anni + (anni === 1 ? ' anno' : ' anni') + (mesi ? ' e ' + mesi + (mesi === 1 ? ' mese' : ' mesi') : '');
+  if (mesi > 0) return mesi + (mesi === 1 ? ' mese' : ' mesi');
+  return giorni + ' giorni';
+}
 
 // === INVENTARIO ===
 let _invTab = 'buoni';
