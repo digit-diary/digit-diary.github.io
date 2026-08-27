@@ -197,6 +197,12 @@ let collaboratoriCache = [],
   regaliCache = [],
   noteClientiCache = [],
   inventarioCache = [];
+// === MULTIDISCIPLINARITA: valutazioni, punti, competenze ===
+let valutazioniCache = [],
+  puntiEventiCache = [],
+  competenzeConfig = null, // {slots:[{key,label,livello}], tavoli:[...]} — null = default
+  puntiConfig = null, // {azioni:[{key,label,punti}], soglie:[{punti,premio}], premi_livello:{}}
+  maisonAutoDeleteGiorni = 0; // 0 = disattivato; 1 = conserva solo GD corrente; N = conserva N giorni
 let currentReparto = 'slots',
   operatoriRepartoMap = {};
 function nomeCorrente(orig) {
@@ -338,7 +344,11 @@ function genCode() {
 // SUPABASE
 function sbH(x) {
   return Object.assign(
-    { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
+    {
+      apikey: SB_KEY,
+      Authorization: 'Bearer ' + SB_KEY,
+      'Content-Type': 'application/json',
+    },
     x || {},
   );
 }
@@ -364,7 +374,10 @@ async function sbPatch(table, filter, data) {
   if (!r.ok) throw new Error(await r.text());
 }
 async function sbDel(table, filter) {
-  await fetch(SB_URL + '/rest/v1/' + table + '?' + filter, { method: 'DELETE', headers: sbH() });
+  await fetch(SB_URL + '/rest/v1/' + table + '?' + filter, {
+    method: 'DELETE',
+    headers: sbH(),
+  });
 }
 async function sbRpc(fn, params) {
   const r = await fetch(SB_URL + '/rest/v1/rpc/' + fn, {
@@ -472,7 +485,11 @@ async function secPost(table, data) {
   const tk = getOpToken();
   if (tk) {
     try {
-      const r = await sbRpc('secure_insert', { p_token: tk, p_table: table, p_data: data });
+      const r = await sbRpc('secure_insert', {
+        p_token: tk,
+        p_table: table,
+        p_data: data,
+      });
       if (r) return [r];
       console.warn('secPost: secure_insert null, fallback');
       return sbPost(table, data);
@@ -495,9 +512,16 @@ async function secPatch(table, filter, data) {
         .map((p) => {
           const [k, v] = p.split('=');
           const rest = p.substring(k.length + 1);
-          const m = rest.match(/^(eq|neq)\.(.*)/);
+          const m = rest.match(/^(eq|neq|lt|lte|gt|gte)\.(.*)/);
           if (m) {
-            const op = m[1] === 'eq' ? '=' : '!=';
+            const op = {
+              eq: '=',
+              neq: '!=',
+              lt: '<',
+              lte: '<=',
+              gt: '>',
+              gte: '>=',
+            }[m[1]];
             let raw = m[2];
             try {
               raw = decodeURIComponent(raw);
@@ -509,7 +533,12 @@ async function secPatch(table, filter, data) {
         })
         .filter(Boolean)
         .join(' AND ');
-      await sbRpc('secure_update', { p_token: tk, p_table: table, p_filter: parts, p_data: data });
+      await sbRpc('secure_update', {
+        p_token: tk,
+        p_table: table,
+        p_filter: parts,
+        p_data: data,
+      });
     } catch (e) {
       console.warn('secPatch fallback:', e.message);
       await sbPatch(table, filter, data);
@@ -527,9 +556,17 @@ async function secDel(table, filter) {
         .map((p) => {
           const [k] = p.split('=');
           const rest = p.substring(k.length + 1);
-          const m = rest.match(/^(eq|neq|like)\.(.*)/);
+          const m = rest.match(/^(eq|neq|like|lt|lte|gt|gte)\.(.*)/);
           if (m) {
-            const op = { eq: '=', neq: '!=', like: 'LIKE' }[m[1]];
+            const op = {
+              eq: '=',
+              neq: '!=',
+              like: 'LIKE',
+              lt: '<',
+              lte: '<=',
+              gt: '>',
+              gte: '>=',
+            }[m[1]];
             let raw = m[2];
             try {
               raw = decodeURIComponent(raw);
@@ -541,7 +578,11 @@ async function secDel(table, filter) {
         })
         .filter(Boolean)
         .join(' AND ');
-      await sbRpc('secure_delete', { p_token: tk, p_table: table, p_filter: parts });
+      await sbRpc('secure_delete', {
+        p_token: tk,
+        p_table: table,
+        p_filter: parts,
+      });
     } catch (e) {
       console.warn('secDel fallback:', e.message);
       await sbDel(table, filter);
@@ -558,7 +599,11 @@ async function setImp(k, v) {
   const tk = getOpToken();
   if (tk) {
     try {
-      await sbRpc('upsert_impostazione', { p_token: tk, p_chiave: k, p_valore: v });
+      await sbRpc('upsert_impostazione', {
+        p_token: tk,
+        p_chiave: k,
+        p_valore: v,
+      });
       return;
     } catch (e) {
       console.warn('setImp upsert error:', e.message);

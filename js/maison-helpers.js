@@ -9,7 +9,11 @@ function _completaNomeDaBudget(input) {
   if (!inp) return { nome: '', candidates: [], needDisambiguation: false };
   // Se l'input ha gia' piu' parole (cognome + nome), non serve completarlo
   if (inp.split(/\s+/).length >= 2) {
-    return { nome: capitalizzaNome(inp), candidates: [], needDisambiguation: false };
+    return {
+      nome: capitalizzaNome(inp),
+      candidates: [],
+      needDisambiguation: false,
+    };
   }
   // Cerca tutti i clienti che iniziano col cognome scritto (sia in costi_maison sia in budget categorizzato)
   const inpLower = inp.toLowerCase();
@@ -25,10 +29,19 @@ function _completaNomeDaBudget(input) {
   if (matches.length > 1) return { nome: '', candidates: matches, needDisambiguation: true };
   // Nessun match esatto: prova match senza spazi (es. "delledonne" → "Delle Donne Mario")
   const matchesNoSpace = tuttiNomi.filter((n) => n.toLowerCase().replace(/\s/g, '').startsWith(inpLower));
-  if (matchesNoSpace.length === 1) return { nome: matchesNoSpace[0], candidates: [], needDisambiguation: false };
+  if (matchesNoSpace.length === 1)
+    return {
+      nome: matchesNoSpace[0],
+      candidates: [],
+      needDisambiguation: false,
+    };
   if (matchesNoSpace.length > 1) return { nome: '', candidates: matchesNoSpace, needDisambiguation: true };
   // Nessun match: ritorna l'input cosi' com'e' (sara' creato come nuovo cliente)
-  return { nome: capitalizzaNome(inp), candidates: [], needDisambiguation: false };
+  return {
+    nome: capitalizzaNome(inp),
+    candidates: [],
+    needDisambiguation: false,
+  };
 }
 // Helper: controlla se un operatore e' incluso in un campo destinatario CSV (es. "Mario,Anna,Luca" o "tutti")
 function _includeOpInCsv(field, op) {
@@ -225,7 +238,12 @@ async function riallineaNomiMaison() {
       if (!existing) {
         const cc = getMaisonReparto().filter((r) => r.nome === nome).length;
         const ec = getSpeseReparto().filter((r) => r.beneficiario === nome).length;
-        correzioni.push({ vecchio: nome, nuovo: nuovoNome, costiCount: cc, extraCount: ec });
+        correzioni.push({
+          vecchio: nome,
+          nuovo: nuovoNome,
+          costiCount: cc,
+          extraCount: ec,
+        });
       }
     }
   });
@@ -251,7 +269,12 @@ async function riallineaNomiMaison() {
       const nuovoNome = _soloCorrezioneCognome(nome, matchBudget);
       if (nuovoNome.toLowerCase() === nome.toLowerCase()) return;
       const ec = getSpeseReparto().filter((r) => r.beneficiario === nome).length;
-      correzioni.push({ vecchio: nome, nuovo: nuovoNome, costiCount: 0, extraCount: ec });
+      correzioni.push({
+        vecchio: nome,
+        nuovo: nuovoNome,
+        costiCount: 0,
+        extraCount: ec,
+      });
     }
   });
   if (!correzioni.length) {
@@ -260,7 +283,13 @@ async function riallineaNomiMaison() {
   }
   correzioni.sort((a, b) => b.costiCount + b.extraCount - (a.costiCount + a.extraCount));
   // Stato globale per il riallineamento interattivo
-  window._riallineaState = { correzioni, confermati: 0, saltati: 0, errori: 0, vociCorr: 0 };
+  window._riallineaState = {
+    correzioni,
+    confermati: 0,
+    saltati: 0,
+    errori: 0,
+    vociCorr: 0,
+  };
   _renderRiallineaUI();
 }
 function _renderRiallineaUI() {
@@ -463,7 +492,13 @@ async function unisciDuplicatiMaison() {
     toast('Nessun duplicato trovato!');
     return;
   }
-  window._unisciState = { coppie, confermati: 0, saltati: 0, errori: 0, vociCorr: 0 };
+  window._unisciState = {
+    coppie,
+    confermati: 0,
+    saltati: 0,
+    errori: 0,
+    vociCorr: 0,
+  };
   _renderUnisciUI();
 }
 function _renderUnisciUI() {
@@ -592,7 +627,9 @@ async function confermaUnisci(idx) {
     );
     for (const r of costiShort) {
       try {
-        await secPatch('costi_maison', 'id=eq.' + r.id, { nome: c.merged.nome });
+        await secPatch('costi_maison', 'id=eq.' + r.id, {
+          nome: c.merged.nome,
+        });
         r.nome = c.merged.nome;
         st.vociCorr++;
       } catch (e) {
@@ -605,7 +642,9 @@ async function confermaUnisci(idx) {
     );
     for (const r of extraShort) {
       try {
-        await secPatch('spese_extra', 'id=eq.' + r.id, { beneficiario: c.merged.nome });
+        await secPatch('spese_extra', 'id=eq.' + r.id, {
+          beneficiario: c.merged.nome,
+        });
         r.beneficiario = c.merged.nome;
         st.vociCorr++;
       } catch (e) {
@@ -797,7 +836,10 @@ function acFiltraMaison(inputId, dropId) {
     bl: '#2c6e49',
   };
   // Budget names con categoria (prioritari)
-  const budgetNomi = getBudgetReparto().map((b) => ({ nome: b.nome, cat: b.categoria || null }));
+  const budgetNomi = getBudgetReparto().map((b) => ({
+    nome: b.nome,
+    cat: b.categoria || null,
+  }));
   const budgetSet = new Set(budgetNomi.map((b) => b.nome.toLowerCase()));
   // Nomi da costi esistenti non in budget
   const costiNomi = [...new Set(getMaisonRepartoExpanded().map((r) => r.nome))]
@@ -1033,7 +1075,9 @@ async function esportaMaisonPDF() {
     } else {
       _periodoLabel = 'Tutti i dati';
     }
-    doc.text(_periodoLabel + ' — Casino Lugano SA', pw / 2, y, { align: 'center' });
+    doc.text(_periodoLabel + ' — Casino Lugano SA', pw / 2, y, {
+      align: 'center',
+    });
     y += 10;
     doc.setTextColor(0);
     doc.autoTable({
@@ -1076,7 +1120,11 @@ async function esportaMaisonPDF() {
         ],
       ],
       headStyles: { fillColor: [26, 18, 8], halign: 'center' },
-      footStyles: { fillColor: [245, 243, 238], textColor: [0, 0, 0], fontStyle: 'bold' },
+      footStyles: {
+        fillColor: [245, 243, 238],
+        textColor: [0, 0, 0],
+        fontStyle: 'bold',
+      },
       styles: {
         lineColor: [220, 215, 205],
         lineWidth: 0.15,
@@ -1150,7 +1198,13 @@ let _seFpInit = false;
 function initSpeseExtraFP() {
   if (_seFpInit || !window.flatpickr) return;
   _seFpInit = true;
-  flatpickr('#se-data', { locale: 'it', dateFormat: 'Y-m-d', altInput: true, altFormat: 'd/m/Y', allowInput: false });
+  flatpickr('#se-data', {
+    locale: 'it',
+    dateFormat: 'Y-m-d',
+    altInput: true,
+    altFormat: 'd/m/Y',
+    allowInput: false,
+  });
   const o = {
     locale: 'it',
     dateFormat: 'Y-m-d',
@@ -1325,7 +1379,13 @@ async function salvaModificaSE(id) {
     return;
   }
   try {
-    await secPatch('spese_extra', 'id=eq.' + id, { beneficiario: benef, tipo, luogo, importo, descrizione: desc });
+    await secPatch('spese_extra', 'id=eq.' + id, {
+      beneficiario: benef,
+      tipo,
+      luogo,
+      importo,
+      descrizione: desc,
+    });
     const s = speseExtraCache.find((x) => x.id === id);
     if (s) {
       s.beneficiario = benef;
@@ -1628,8 +1688,17 @@ async function esportaSpeseExtraPDF() {
       ]),
       foot: [['', '', '', '', 'TOTALE', 'CHF ' + fmtCHF(tot)]],
       headStyles: { fillColor: [26, 18, 8] },
-      footStyles: { fillColor: [245, 243, 238], textColor: [0, 0, 0], fontStyle: 'bold' },
-      styles: { lineColor: [220, 215, 205], lineWidth: 0.15, fontSize: 8, cellPadding: 3 },
+      footStyles: {
+        fillColor: [245, 243, 238],
+        textColor: [0, 0, 0],
+        fontStyle: 'bold',
+      },
+      styles: {
+        lineColor: [220, 215, 205],
+        lineWidth: 0.15,
+        fontSize: 8,
+        cellPadding: 3,
+      },
       columnStyles: { 5: { halign: 'right' } },
       alternateRowStyles: { fillColor: [250, 247, 242] },
     });
@@ -1765,6 +1834,23 @@ function getModuliReparto() {
     return (m.reparto_dip || 'slots') === currentReparto;
   });
 }
+// Collaboratori del reparto corrente ('entrambi' visibile in tutti i reparti)
+function getCollaboratoriReparto() {
+  return collaboratoriCache.filter(function (c) {
+    var rep = c.reparto_dip || 'slots';
+    return rep === currentReparto || rep === 'entrambi';
+  });
+}
+function getValutazioniReparto() {
+  return valutazioniCache.filter(function (v) {
+    return (v.reparto_dip || 'slots') === currentReparto;
+  });
+}
+function getPuntiReparto() {
+  return puntiEventiCache.filter(function (p) {
+    return (p.reparto_dip || 'slots') === currentReparto;
+  });
+}
 function getConsegneReparto() {
   return consegneCache.filter(function (c) {
     return (c.reparto_dip || 'slots') === currentReparto;
@@ -1849,7 +1935,12 @@ function renderInventarioBuoni() {
   ).length;
   const kpiEl = document.getElementById('inv-buoni-kpi');
   if (kpiEl) {
-    const labels = { BU: 'Buono Unico', BL: 'Buono Lounge', CG: 'C. Gourmet', WL: 'Welcome L.' };
+    const labels = {
+      BU: 'Buono Unico',
+      BL: 'Buono Lounge',
+      CG: 'C. Gourmet',
+      WL: 'Welcome L.',
+    };
     const _scortaBassa = ['BU', 'BL', 'CG', 'WL'].filter((t) => (giacenze[t] || 0) > 0 && (giacenze[t] || 0) <= 10);
     const _scortaFinita = ['BU', 'BL', 'CG', 'WL'].filter(
       (t) => (giacenze[t] || 0) <= 0 && getInventarioReparto().some((r) => r.categoria === 'buono' && r.tipo === t),
@@ -1982,8 +2073,18 @@ function renderInventarioBuoniTable() {
     preassegno: '&#9660; Pre-assegnato',
     auto: '&#9660; Da Maison',
   };
-  const movColors = { entrata: '#2c6e49', uscita: '#c0392b', preassegno: '#e67e22', auto: '#8a7d6b' };
-  const tipColors = { BU: '#b8860b', BL: '#1a4a7a', CG: '#2c6e49', WL: '#7b2d8b' };
+  const movColors = {
+    entrata: '#2c6e49',
+    uscita: '#c0392b',
+    preassegno: '#e67e22',
+    auto: '#8a7d6b',
+  };
+  const tipColors = {
+    BU: '#b8860b',
+    BL: '#1a4a7a',
+    CG: '#2c6e49',
+    WL: '#7b2d8b',
+  };
   let html =
     '<table style="width:100%;border-collapse:collapse;font-size:.88rem"><thead><tr style="border-bottom:2px solid var(--line);text-align:left"><th style="padding:8px">Data</th><th style="padding:8px">Tipo</th><th style="padding:8px">Qty</th><th style="padding:8px">Movimento</th><th style="padding:8px">Cliente</th><th style="padding:8px">Stato</th><th style="padding:8px"></th></tr></thead><tbody>';
   all.forEach((r) => {
@@ -2330,7 +2431,12 @@ function modificaInventario(id) {
     ')">Salva</button></div>';
   b.innerHTML = html;
   document.getElementById('pwd-modal').classList.remove('hidden');
-  if (window.flatpickr) flatpickr('#inv-edit-data', { locale: 'it', dateFormat: 'd/m/Y', allowInput: true });
+  if (window.flatpickr)
+    flatpickr('#inv-edit-data', {
+      locale: 'it',
+      dateFormat: 'd/m/Y',
+      allowInput: true,
+    });
 }
 async function salvaModificaInventario(id) {
   const tipo = (document.getElementById('inv-edit-tipo') || {}).value.trim();
@@ -2375,7 +2481,10 @@ function sincronizzaPareggioBuoni() {
     );
     if (match) {
       try {
-        await secPatch('inventario', 'id=eq.' + pre.id, { pareggiato: true, pareggio_maison_id: match.id });
+        await secPatch('inventario', 'id=eq.' + pre.id, {
+          pareggiato: true,
+          pareggio_maison_id: match.id,
+        });
         pre.pareggiato = true;
         pre.pareggio_maison_id = match.id;
       } catch (e) {}
@@ -2395,7 +2504,13 @@ function _aggiornaMarche() {
 }
 function initInventarioFP() {
   if (!window.flatpickr) return;
-  const opts = { locale: 'it', dateFormat: 'Y-m-d', altInput: true, altFormat: 'd/m/Y', allowInput: false };
+  const opts = {
+    locale: 'it',
+    dateFormat: 'Y-m-d',
+    altInput: true,
+    altFormat: 'd/m/Y',
+    allowInput: false,
+  };
   ['inv-carico-data', 'inv-usc-data', 'inv-sig-data', 'inv-sig-usc-data'].forEach((id) => {
     const el = document.getElementById(id);
     if (el && !el._flatpickr) flatpickr('#' + id, opts);
@@ -2481,7 +2596,10 @@ function esportaInventarioPDF() {
     'Generato il ' +
       new Date().toLocaleDateString('it-IT') +
       ' alle ' +
-      new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
+      new Date().toLocaleTimeString('it-IT', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
     14,
     22,
   );
@@ -2543,7 +2661,12 @@ function aggiornaMenuMobile() {
     const tabs = [
       { page: 'dashboard', icon: '&#127968;', label: 'Home' },
       { page: 'diario', icon: '&#128214;', label: 'Diario' },
-      { page: 'rapporto', icon: '&#128197;', label: 'Rapporto', vis: 'rapporto' },
+      {
+        page: 'rapporto',
+        icon: '&#128197;',
+        label: 'Rapporto',
+        vis: 'rapporto',
+      },
       {
         page: 'note-collega',
         icon: '&#9993;&#65039;',
@@ -2551,14 +2674,52 @@ function aggiornaMenuMobile() {
         vis: 'note_collega',
         badgeId: 'note-badge',
       },
-      { page: 'statistiche', icon: '&#128202;', label: 'Statistiche', vis: 'statistiche' },
+      {
+        page: 'statistiche',
+        icon: '&#128202;',
+        label: 'Statistiche',
+        vis: 'statistiche',
+      },
       { page: 'moduli', icon: '&#128196;', label: 'Moduli', vis: 'moduli' },
-      { page: 'assistente', icon: '&#128113;&#8205;&#9792;&#65039;', label: 'Assistente', vis: 'assistente' },
-      { page: 'consegna', icon: '&#128221;', label: 'Consegna', vis: 'consegna', badgeId: 'consegna-badge' },
-      { page: 'promemoria', icon: '&#128203;', label: 'Promemoria', vis: 'promemoria', badgeId: 'promemoria-badge' },
+      {
+        page: 'formazione',
+        icon: '&#127891;',
+        label: 'Formazione',
+        vis: 'formazione',
+      },
+      {
+        page: 'assistente',
+        icon: '&#128113;&#8205;&#9792;&#65039;',
+        label: 'Assistente',
+        vis: 'assistente',
+      },
+      {
+        page: 'consegna',
+        icon: '&#128221;',
+        label: 'Consegna',
+        vis: 'consegna',
+        badgeId: 'consegna-badge',
+      },
+      {
+        page: 'promemoria',
+        icon: '&#128203;',
+        label: 'Promemoria',
+        vis: 'promemoria',
+        badgeId: 'promemoria-badge',
+      },
       { page: 'maison', icon: '&#127860;', label: 'Maison', vis: 'maison' },
-      { page: 'inventario', icon: '&#128230;', label: 'Inventario', vis: 'inventario' },
-      { page: 'registro', icon: '&#128203;', label: 'Registro', adminOnly: true },
+      {
+        page: 'inventario',
+        icon: '&#128230;',
+        label: 'Inventario',
+        vis: 'inventario',
+      },
+      {
+        page: 'registro',
+        icon: '&#128203;',
+        label: 'Registro',
+        adminOnly: true,
+      },
       { page: 'impostazioni', icon: '&#9881;&#65039;', label: 'Impostazioni' },
     ];
     const cur = localStorage.getItem('pagina_corrente') || 'dashboard';
@@ -2600,7 +2761,9 @@ window.addEventListener('load', async () => {
   } // tema provvisorio, poi si applica quello dell'operatore
   document.getElementById('entries-list').innerHTML = '<div class="loading">Caricamento...</div>';
   const h = document.getElementById('login-hint');
-  const defCheck = await sbRpc('is_default_master_pwd', { p_default_hash: DEFAULT_PWD_HASH });
+  const defCheck = await sbRpc('is_default_master_pwd', {
+    p_default_hash: DEFAULT_PWD_HASH,
+  });
   if ((defCheck && defCheck.is_default) || operatoriAuthCache.length)
     h.innerHTML = 'Accedi come Admin oppure seleziona il tuo nome';
   // Carica mappa reparti e operatori da cache per il login
@@ -2702,7 +2865,9 @@ window.addEventListener('load', async () => {
     _renderPostLogin();
     if (getOperatore()) {
       document.getElementById('operatore-display').textContent = 'Operatore: ' + getOperatore();
-      const authCheck = await sbRpc('check_deve_cambiare', { p_nome: getOperatore() });
+      const authCheck = await sbRpc('check_deve_cambiare', {
+        p_nome: getOperatore(),
+      });
       if (authCheck && authCheck.deve_cambiare_pwd) setTimeout(() => forzaCambioPwdOperatore(getOperatore()), 300);
       else {
         setTimeout(() => mostraNoteNonLette(), 800);

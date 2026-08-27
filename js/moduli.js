@@ -12,7 +12,11 @@ function apriModulo(tipo) {
   const area = document.getElementById('modulo-form-area');
   area.style.display = 'block';
   const op = getOperatore() || '';
-  const oggi = new Date().toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const oggi = new Date().toLocaleDateString('it-IT', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
   let html = '<div class="main-card" style="margin-top:18px"><div class="card-header">';
   const aiBox =
     '<div class="ai-gen-box" style="margin-bottom:16px;padding:14px;background:linear-gradient(135deg,rgba(102,126,234,.08),rgba(118,75,162,.08));border:1.5px solid rgba(102,126,234,.25);border-radius:6px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:1.1rem">&#9733;</span><strong style="font-size:.92rem">Genera con AI</strong><span style="font-size:.78rem;color:var(--muted)">Descrivi la situazione e l\'AI compila tutti i campi</span></div><textarea id="ai-gen-prompt" placeholder="Es: Cognome Nome – cassa – acquisto crediti senza documento – cliente non identificato – 22:45 – 08.03.2026 – 2000 CHF – LOG 7834&#10;&#10;Oppure: Cognome Nome – valet – alle 23:10 ha consegnato il veicolo sbagliato al cliente – 05.03.2026 – IR 4521" style="width:100%;min-height:70px;padding:10px;border:1px solid var(--line);border-radius:4px;font-size:.88rem;background:var(--paper);color:var(--ink);resize:vertical"></textarea><div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn-ai" id="btn-ai-gen" onclick="generaModuloAI(\'' +
@@ -278,7 +282,10 @@ async function generaModuloPDF(tipo) {
         lineColor: [0, 0, 0],
         lineWidth: 0.3,
       },
-      columnStyles: { 0: { fontStyle: 'bold', cellWidth: col1 }, 1: { fontStyle: 'normal' } },
+      columnStyles: {
+        0: { fontStyle: 'bold', cellWidth: col1 },
+        1: { fontStyle: 'normal' },
+      },
       didDrawPage: function () {},
     });
     y = doc.lastAutoTable.finalY + 6;
@@ -539,7 +546,12 @@ async function generaModuloPDF(tipo) {
       const origOp = origMod ? origMod.operatore : getOperatore();
       // Confronta con originale per capire se c'è stata una modifica reale
       const orig = window._editModuloOrig || {};
-      const curSnap = { collaboratore: collab, resp_settore: resp, data_modulo: data, dati: JSON.stringify(dati) };
+      const curSnap = {
+        collaboratore: collab,
+        resp_settore: resp,
+        data_modulo: data,
+        dati: JSON.stringify(dati),
+      };
       const hasChanged =
         curSnap.collaboratore !== orig.collaboratore ||
         curSnap.resp_settore !== orig.resp_settore ||
@@ -754,8 +766,16 @@ function aggiornaModuliLista() {
     if (fa && m.created_at > fa + 'T23:59:59') return false;
     return true;
   });
-  const tl = { allineamento: 'Allineamento', apprezzamento: 'Apprezzamento', rdi: 'RDI' };
-  const tc = { allineamento: '#1a4a7a', apprezzamento: '#b8860b', rdi: '#c0392b' };
+  const tl = {
+    allineamento: 'Allineamento',
+    apprezzamento: 'Apprezzamento',
+    rdi: 'RDI',
+  };
+  const tc = {
+    allineamento: '#1a4a7a',
+    apprezzamento: '#b8860b',
+    rdi: '#c0392b',
+  };
   const box = document.getElementById('mod-list-results');
   if (!box) return;
   if (!filtered.length) {
@@ -885,7 +905,11 @@ async function eliminaModulo(id) {
   const op = getOperatore();
   const now = new Date().toISOString();
   try {
-    await secPatch('moduli', 'id=eq.' + id, { eliminato: true, eliminato_da: op, eliminato_at: now });
+    await secPatch('moduli', 'id=eq.' + id, {
+      eliminato: true,
+      eliminato_da: op,
+      eliminato_at: now,
+    });
     if (_m) {
       _m.eliminato = true;
       _m.eliminato_da = op;
@@ -912,21 +936,36 @@ async function renderCollaboratoriUI() {
   section.style.display = isAdmin() ? '' : 'none';
   if (!isAdmin()) return;
   const tutti = await secGet('collaboratori?order=nome.asc');
-  const attivi = tutti.filter((c) => c.attivo !== false);
-  const inattivi = tutti.filter((c) => c.attivo === false);
+  // Mostra solo i collaboratori del reparto corrente (o 'entrambi')
+  const delReparto = tutti.filter((c) => {
+    const rep = c.reparto_dip || 'slots';
+    return rep === currentReparto || rep === 'entrambi';
+  });
+  const attivi = delReparto.filter((c) => c.attivo !== false);
+  const inattivi = delReparto.filter((c) => c.attivo === false);
   const el = document.getElementById('collaboratori-list');
   let html = attivi.length
     ? attivi
-        .map(
-          (c) =>
+        .map((c) => {
+          const rep = c.reparto_dip || 'slots';
+          return (
             '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border:1px solid var(--line)"><span style="flex:1;font-weight:400">' +
             escP(c.nome) +
-            '</span><button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2)" onclick="rinominaCollaboratore(\'' +
+            '</span><select onchange="cambiaRepartoCollaboratore(' +
+            c.id +
+            ',this.value)" style="font-size:.75rem;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><option value="slots"' +
+            (rep === 'slots' ? ' selected' : '') +
+            '>Slots</option><option value="tavoli"' +
+            (rep === 'tavoli' ? ' selected' : '') +
+            '>Tavoli</option><option value="entrambi"' +
+            (rep === 'entrambi' ? ' selected' : '') +
+            '>Entrambi</option></select><button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2)" onclick="rinominaCollaboratore(\'' +
             c.nome.replace(/'/g, "\\'") +
             '\')">Rinomina</button><button class="btn-del-tipo" onclick="disattivaCollaboratore(\'' +
             c.nome.replace(/'/g, "\\'") +
-            '\')">Rimuovi</button></div>',
-        )
+            '\')">Rimuovi</button></div>'
+          );
+        })
         .join('')
     : '<p style="color:var(--muted);font-size:.85rem">Nessun collaboratore.</p>';
   if (inattivi.length) {
@@ -957,7 +996,11 @@ async function aggiungiCollaboratore() {
     return;
   }
   try {
-    const r = await secPost('collaboratori', { nome, attivo: true });
+    const r = await secPost('collaboratori', {
+      nome,
+      attivo: true,
+      reparto_dip: currentReparto,
+    });
     collaboratoriCache.push(r[0]);
     collaboratoriCache.sort((a, b) => a.nome.localeCompare(b.nome));
     logAzione('Collaboratore aggiunto', nome);
@@ -1000,8 +1043,12 @@ async function salvaRinominaCollaboratore(vecchio) {
     return;
   }
   try {
-    await secPatch('collaboratori', 'nome=eq.' + encodeURIComponent(vecchio), { nome: nuovo });
-    await secPatch('registrazioni', 'nome=eq.' + encodeURIComponent(vecchio), { nome: nuovo });
+    await secPatch('collaboratori', 'nome=eq.' + encodeURIComponent(vecchio), {
+      nome: nuovo,
+    });
+    await secPatch('registrazioni', 'nome=eq.' + encodeURIComponent(vecchio), {
+      nome: nuovo,
+    });
     // ENTERPRISE: rinomina anche su chat_messages, chat_group_members, chat_message_letti, chat_message_hidden
     try {
       await secPatch('chat_messages', 'da_operatore=eq.' + encodeURIComponent(vecchio), { da_operatore: nuovo });
@@ -1035,10 +1082,25 @@ async function salvaRinominaCollaboratore(vecchio) {
     toast('Errore: nome già esistente?');
   }
 }
+async function cambiaRepartoCollaboratore(id, rep) {
+  try {
+    await secPatch('collaboratori', 'id=eq.' + id, { reparto_dip: rep });
+    const c = collaboratoriCache.find((x) => x.id === id);
+    if (c) c.reparto_dip = rep;
+    logAzione('Reparto collaboratore', (c ? c.nome : 'ID ' + id) + ' → ' + rep);
+    renderCollaboratoriUI();
+    aggiornaNomi();
+    toast('Reparto aggiornato: ' + rep);
+  } catch (e) {
+    toast('Errore cambio reparto');
+  }
+}
 async function disattivaCollaboratore(nome) {
   if (!confirm('Disattivare "' + nome + '"? Non apparirà più nell\'autocomplete.')) return;
   try {
-    await secPatch('collaboratori', 'nome=eq.' + encodeURIComponent(nome), { attivo: false });
+    await secPatch('collaboratori', 'nome=eq.' + encodeURIComponent(nome), {
+      attivo: false,
+    });
     collaboratoriCache = collaboratoriCache.filter((c) => c.nome !== nome);
     logAzione('Collaboratore disattivato', nome);
     renderCollaboratoriUI();
@@ -1050,7 +1112,9 @@ async function disattivaCollaboratore(nome) {
 }
 async function riattivaCollaboratore(nome) {
   try {
-    await secPatch('collaboratori', 'nome=eq.' + encodeURIComponent(nome), { attivo: true });
+    await secPatch('collaboratori', 'nome=eq.' + encodeURIComponent(nome), {
+      attivo: true,
+    });
     collaboratoriCache.push({ nome, attivo: true });
     collaboratoriCache.sort((a, b) => a.nome.localeCompare(b.nome));
     renderCollaboratoriUI();
@@ -1064,7 +1128,11 @@ async function riattivaCollaboratore(nome) {
 // LOG ATTIVITA
 async function logAzione(azione, dettaglio) {
   try {
-    const rec = { operatore: getOperatore() || 'Admin', azione, dettaglio: dettaglio || '' };
+    const rec = {
+      operatore: getOperatore() || 'Admin',
+      azione,
+      dettaglio: dettaglio || '',
+    };
     await secPost('log_attivita', rec);
     logCache.unshift(Object.assign(rec, { created_at: new Date().toISOString() }));
   } catch (e) {}
@@ -1126,7 +1194,10 @@ function renderRegistro() {
           '<tr style="border-bottom:1px solid var(--line)"><td style="padding:6px 8px;white-space:nowrap;color:var(--muted);font-size:.82rem">' +
           d.toLocaleDateString('it-IT') +
           ' ' +
-          d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) +
+          d.toLocaleTimeString('it-IT', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }) +
           '</td><td style="padding:6px 8px;font-weight:600">' +
           escP(l.operatore) +
           '</td><td style="padding:6px 8px">' +
@@ -1187,7 +1258,9 @@ function esportaRegistroCSV() {
       '"' + (l.dettaglio || '').replace(/"/g, '""').replace(/\n/g, ' ') + '"',
     ]);
   });
-  const blob = new Blob(['\uFEFF' + rows.map((r) => r.join(';')).join('\n')], { type: 'text/csv;charset=utf-8' });
+  const blob = new Blob(['\uFEFF' + rows.map((r) => r.join(';')).join('\n')], {
+    type: 'text/csv;charset=utf-8',
+  });
   Object.assign(document.createElement('a'), {
     href: URL.createObjectURL(blob),
     download: 'registro_' + new Date().toLocaleDateString('it-IT').replace(/\//g, '-') + '.csv',
@@ -1237,7 +1310,11 @@ async function importaCollaboratori(input) {
       continue;
     }
     try {
-      const r = await secPost('collaboratori', { nome, attivo: true });
+      const r = await secPost('collaboratori', {
+        nome,
+        attivo: true,
+        reparto_dip: currentReparto,
+      });
       collaboratoriCache.push(r[0]);
       aggiunti++;
     } catch (e) {
@@ -1263,7 +1340,10 @@ async function loadGroqKey() {
         groqKey = _d(k.substring(4));
       } else {
         groqKey = k;
-        await sbRpc('set_groq_key', { p_key: 'enc:' + _e(k), p_token: getAdminToken() }).catch(() => {});
+        await sbRpc('set_groq_key', {
+          p_key: 'enc:' + _e(k),
+          p_token: getAdminToken(),
+        }).catch(() => {});
       }
     }
   } catch (e) {
@@ -1285,7 +1365,10 @@ async function salvaGroqKey() {
     return;
   }
   try {
-    await sbRpc('set_groq_key', { p_key: 'enc:' + _e(k), p_token: getAdminToken() });
+    await sbRpc('set_groq_key', {
+      p_key: 'enc:' + _e(k),
+      p_token: getAdminToken(),
+    });
   } catch (e) {
     await setImp('groq_api_key', 'enc:' + _e(k));
   }
@@ -1320,7 +1403,10 @@ async function miglioraTesto(fieldId, contesto) {
       testo;
     const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + groqKey },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + groqKey,
+      },
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
         messages: [{ role: 'user', content: prompt }],
@@ -1424,7 +1510,10 @@ async function generaModuloAI(tipo) {
     }
     const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + groqKey },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + groqKey,
+      },
       body: JSON.stringify(Object.assign({ model: model, messages: messages }, bodyOpts)),
     });
     if (!r.ok) {
@@ -1602,8 +1691,16 @@ async function assistenteGenera() {
   try {
     const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + groqKey },
-      body: JSON.stringify({ model: model, messages: messages, temperature: 0.3, max_tokens: 1500 }),
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + groqKey,
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: messages,
+        temperature: 0.3,
+        max_tokens: 1500,
+      }),
     });
     if (!r.ok) {
       const errTxt = await r.text();
@@ -1736,7 +1833,11 @@ async function importaModuloFile(input) {
     // Salva file originale come base64 per scaricarlo dopo
     const reader = new FileReader();
     reader.onload = () => {
-      window._importedFileData = { name: file.name, type: file.type, data: reader.result };
+      window._importedFileData = {
+        name: file.name,
+        type: file.type,
+        data: reader.result,
+      };
     };
     reader.readAsDataURL(file);
     toast('Modulo importato - controlla i campi e genera il PDF');
@@ -1925,9 +2026,10 @@ function render() {
   _saveFiltri();
 }
 function getNomiLista() {
+  // Solo collaboratori del reparto corrente (Tavoli non vede i nomi Slots e viceversa)
   return [
     ...new Set(
-      [...collaboratoriCache.map((c) => c.nome.trim()), ...getDatiReparto().map((e) => (e.nome || '').trim())]
+      [...getCollaboratoriReparto().map((c) => c.nome.trim()), ...getDatiReparto().map((e) => (e.nome || '').trim())]
         .filter(Boolean)
         .map((n) => n.replace(/\s+/g, ' ')),
     ),

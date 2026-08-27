@@ -90,7 +90,13 @@ let _malFpInit = false;
 function _initMalFlatpickr() {
   if (_malFpInit || !window.flatpickr) return;
   _malFpInit = true;
-  const o = { locale: 'it', dateFormat: 'Y-m-d', altInput: true, altFormat: 'd/m/Y', allowInput: false };
+  const o = {
+    locale: 'it',
+    dateFormat: 'Y-m-d',
+    altInput: true,
+    altFormat: 'd/m/Y',
+    allowInput: false,
+  };
   flatpickr('#inp-mal-dal', o);
   flatpickr('#inp-mal-al', o);
 }
@@ -245,7 +251,12 @@ function _playNotifSound() {
   } catch (e) {}
 }
 function mostraNotifBanner(tipo, titolo, testo, azione) {
-  const icons = { nota: '&#9993;', consegna: '&#128221;', promemoria: '&#128203;', urgente: '&#10071;' };
+  const icons = {
+    nota: '&#9993;',
+    consegna: '&#128221;',
+    promemoria: '&#128203;',
+    urgente: '&#10071;',
+  };
   const b = document.getElementById('notif-banner');
   b.className = 'notif-banner ' + (tipo || 'nota');
   document.getElementById('notif-icon').innerHTML = icons[tipo] || '&#128276;';
@@ -271,11 +282,11 @@ async function _verificaNome(nome) {
   if (!nome) return nome;
   const nl = nome.toLowerCase();
   // Esiste esattamente?
-  if (collaboratoriCache.find((c) => c.nome.toLowerCase() === nl)) return nome;
-  // Cerca simile (Levenshtein ≤ 2)
+  if (getCollaboratoriReparto().find((c) => c.nome.toLowerCase() === nl)) return nome;
+  // Cerca simile (Levenshtein ≤ 2) — solo tra i collaboratori del reparto corrente
   let best = null,
     bestDist = 3;
-  for (const c of collaboratoriCache) {
+  for (const c of getCollaboratoriReparto()) {
     const dist = _levenshtein(nl, c.nome.toLowerCase());
     if (dist < bestDist) {
       bestDist = dist;
@@ -335,8 +346,12 @@ async function _verificaNome(nome) {
     resolver.onclick = async function () {
       if (this.dataset.result === 'add') {
         try {
-          await secPost('collaboratori', { nome, attivo: true });
-          collaboratoriCache.push({ nome, attivo: true });
+          const _cr = await secPost('collaboratori', {
+            nome,
+            attivo: true,
+            reparto_dip: currentReparto,
+          });
+          collaboratoriCache.push(_cr && _cr[0] ? _cr[0] : { nome, attivo: true, reparto_dip: currentReparto });
           collaboratoriCache.sort((a, b) => a.nome.localeCompare(b.nome));
           aggiornaNomi();
           toast(nome + ' aggiunto alla lista');

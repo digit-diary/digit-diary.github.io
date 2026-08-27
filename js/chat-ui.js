@@ -48,7 +48,12 @@ async function inviaNotaCollega() {
   try {
     if (dests.length === 1) {
       // 1-to-1
-      await _chatInsertMessage({ da, partner: dests[0], messaggioCifrato: msgEnc, messaggioPlain: msg });
+      await _chatInsertMessage({
+        da,
+        partner: dests[0],
+        messaggioCifrato: msgEnc,
+        messaggioPlain: msg,
+      });
     } else {
       // Gruppo ad-hoc → crea custom group
       const legacyGid =
@@ -133,7 +138,11 @@ function modificaNotaCollega(id) {
   // FIX EDGE CASE #2: salva snapshot del messaggio corrente per optimistic lock
   // Se al momento del salvataggio il messaggio risulta cambiato (es. modificato altrove via realtime),
   // abortiamo con warning invece di sovrascrivere ciecamente.
-  window._editNoteSnapshot = { id: id, originalMsg: n.messaggio, originalCreatedAt: n.created_at };
+  window._editNoteSnapshot = {
+    id: id,
+    originalMsg: n.messaggio,
+    originalCreatedAt: n.created_at,
+  };
   const b = document.getElementById('pwd-modal-content');
   b.innerHTML =
     '<h3>Modifica nota</h3><p>Destinatari: <strong>' +
@@ -412,7 +421,11 @@ function _chatTimeShort(isoStr) {
   const now = new Date();
   const today = now.toISOString().substring(0, 10);
   const dateStr = isoStr.substring(0, 10);
-  if (dateStr === today) return d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+  if (dateStr === today)
+    return d.toLocaleTimeString('it-IT', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   const ieri = new Date(now);
   ieri.setDate(ieri.getDate() - 1);
   if (dateStr === ieri.toISOString().substring(0, 10)) return 'Ieri';
@@ -428,7 +441,12 @@ function _chatDateLabel(isoStr) {
   const ieri = new Date(now);
   ieri.setDate(ieri.getDate() - 1);
   if (dateStr === ieri.toISOString().substring(0, 10)) return 'Ieri';
-  return d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  return d.toLocaleDateString('it-IT', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
 }
 function toggleConvNewDropdown(ev) {
   ev.stopPropagation();
@@ -511,7 +529,12 @@ async function _rinominaGruppo(gid, partner) {
     const msgTxt = '[GNAME:' + label + ']Gruppo rinominato in "' + label + '"';
     const msgEnc = await encryptNota(msgTxt);
     try {
-      await _chatInsertMessage({ da: op, partner: 'gruppo:' + gid, messaggioCifrato: msgEnc, messaggioPlain: msgTxt });
+      await _chatInsertMessage({
+        da: op,
+        partner: 'gruppo:' + gid,
+        messaggioCifrato: msgEnc,
+        messaggioPlain: msgTxt,
+      });
     } catch (e) {
       console.warn('Send GNAME message:', e.message);
     }
@@ -587,7 +610,12 @@ async function _confermaRimuoviMembri(gid, partner) {
     ' dal gruppo';
   const msgEnc = await encryptNota(msgTxt);
   try {
-    await _chatInsertMessage({ da: op, partner: 'gruppo:' + gid, messaggioCifrato: msgEnc, messaggioPlain: msgTxt });
+    await _chatInsertMessage({
+      da: op,
+      partner: 'gruppo:' + gid,
+      messaggioCifrato: msgEnc,
+      messaggioPlain: msgTxt,
+    });
   } catch (e) {}
   document.getElementById('pwd-modal').classList.add('hidden');
   logAzione('Membro rimosso dal gruppo', daRimuovere.join(', ') + ' rimossi da ' + (_getGruppoNome(gid) || 'gruppo'));
@@ -636,7 +664,12 @@ function _apriGruppoSelezionato() {
   }
   // Salva nome gruppo in localStorage + nel gid per condividerlo
   localStorage.setItem('_gruppo_nome_' + gid, label);
-  window._noteConvGruppo = { reparto: 'custom', dests: dests, gid: gid, label: label };
+  window._noteConvGruppo = {
+    reparto: 'custom',
+    dests: dests,
+    gid: gid,
+    label: label,
+  };
   window._noteConvAttiva = 'gruppo:' + gid;
   const dd = document.getElementById('conv-new-dropdown');
   if (dd) dd.style.display = 'none';
@@ -730,8 +763,15 @@ async function _confermaAggiungiMembri(gid, partner) {
       for (const m of nuovi) {
         if (!chatGroupMembersCache.some((x) => x.group_id === group.id && x.operatore === m)) {
           try {
-            await secPost('chat_group_members', { group_id: group.id, operatore: m });
-            chatGroupMembersCache.push({ group_id: group.id, operatore: m, joined_at: new Date().toISOString() });
+            await secPost('chat_group_members', {
+              group_id: group.id,
+              operatore: m,
+            });
+            chatGroupMembersCache.push({
+              group_id: group.id,
+              operatore: m,
+              joined_at: new Date().toISOString(),
+            });
           } catch (e) {
             console.warn('Add member fallita:', e.message);
           }
@@ -739,7 +779,12 @@ async function _confermaAggiungiMembri(gid, partner) {
       }
     }
     // Messaggio di sistema notificando l'aggiunta
-    await _chatInsertMessage({ da: op, partner: 'gruppo:' + gid, messaggioCifrato: msgEnc, messaggioPlain: msgTxt });
+    await _chatInsertMessage({
+      da: op,
+      partner: 'gruppo:' + gid,
+      messaggioCifrato: msgEnc,
+      messaggioPlain: msgTxt,
+    });
     document.getElementById('pwd-modal').classList.add('hidden');
     // Aggiorna nome gruppo se salvato
     const nomeGruppo = _getGruppoNome(gid);
@@ -1038,9 +1083,15 @@ function renderNoteChat(partner) {
       } else {
         _lsText =
           'visto il ' +
-          _lsDate.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }) +
+          _lsDate.toLocaleDateString('it-IT', {
+            day: '2-digit',
+            month: '2-digit',
+          }) +
           ' alle ' +
-          _lsDate.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+          _lsDate.toLocaleTimeString('it-IT', {
+            hour: '2-digit',
+            minute: '2-digit',
+          });
       }
       const _lsColor = _diffMin < 5 ? '#2c6e49' : _diffMin < 60 ? '#e67e22' : 'var(--muted)';
       const _lsDot =
@@ -1119,7 +1170,10 @@ function renderNoteChat(partner) {
     }
     const isSent = n.da_operatore === op;
     const cls = isSent ? 'sent' : 'received';
-    const time = new Date(n.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+    const time = new Date(n.created_at).toLocaleTimeString('it-IT', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
     // Ticks for sent messages
     let ticks = '';
     if (isSent) {
@@ -1547,7 +1601,12 @@ async function _eseguiInoltro(noteId, destKey, isSingle) {
     let dests = [];
     if (isSingle) {
       // 1-to-1
-      await _chatInsertMessage({ da: op, partner: destKey, messaggioCifrato: msgEnc, messaggioPlain: fwdMsg });
+      await _chatInsertMessage({
+        da: op,
+        partner: destKey,
+        messaggioCifrato: msgEnc,
+        messaggioPlain: fwdMsg,
+      });
       dests = [destKey];
     } else {
       // Gruppo persistente
@@ -1707,11 +1766,22 @@ async function inviaNotaChat() {
         });
         chatGroupId = newGroupId;
         // Aggiorna cache locale
-        existingGroup = { id: newGroupId, nome, tipo, legacy_gid: gid, creato_da: op, created_at: _batchCreatedAt };
+        existingGroup = {
+          id: newGroupId,
+          nome,
+          tipo,
+          legacy_gid: gid,
+          creato_da: op,
+          created_at: _batchCreatedAt,
+        };
         chatGroupsCache.push(existingGroup);
         for (const m of [op, ...dests]) {
           if (!chatGroupMembersCache.some((x) => x.group_id === newGroupId && x.operatore === m)) {
-            chatGroupMembersCache.push({ group_id: newGroupId, operatore: m, joined_at: _batchCreatedAt });
+            chatGroupMembersCache.push({
+              group_id: newGroupId,
+              operatore: m,
+              joined_at: _batchCreatedAt,
+            });
           }
         }
       } else {
@@ -1721,8 +1791,15 @@ async function inviaNotaChat() {
           if (!chatGroupMembersCache.some((x) => x.group_id === chatGroupId && x.operatore === m)) {
             // Aggiungi al DB e cache
             try {
-              await secPost('chat_group_members', { group_id: chatGroupId, operatore: m });
-              chatGroupMembersCache.push({ group_id: chatGroupId, operatore: m, joined_at: _batchCreatedAt });
+              await secPost('chat_group_members', {
+                group_id: chatGroupId,
+                operatore: m,
+              });
+              chatGroupMembersCache.push({
+                group_id: chatGroupId,
+                operatore: m,
+                joined_at: _batchCreatedAt,
+              });
             } catch (_) {}
           }
         }
@@ -1882,7 +1959,10 @@ function cercaInChat() {
     : '0 risultati';
   if (_chatSearchResults.length) {
     _chatSearchIdx = 0;
-    _chatSearchResults[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    _chatSearchResults[0].scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    });
   }
 }
 function cercaInChatNav(dir) {
@@ -1890,7 +1970,10 @@ function cercaInChatNav(dir) {
   if (_chatSearchResults[_chatSearchIdx]) _chatSearchResults[_chatSearchIdx].style.background = '#f1c40f';
   _chatSearchIdx = (_chatSearchIdx + dir + _chatSearchResults.length) % _chatSearchResults.length;
   _chatSearchResults[_chatSearchIdx].style.background = '#e67e22';
-  _chatSearchResults[_chatSearchIdx].scrollIntoView({ behavior: 'smooth', block: 'center' });
+  _chatSearchResults[_chatSearchIdx].scrollIntoView({
+    behavior: 'smooth',
+    block: 'center',
+  });
   document.getElementById('note-search-count').textContent = _chatSearchIdx + 1 + '/' + _chatSearchResults.length;
 }
 // ===== STAR / IMPORTANT MESSAGES =====
@@ -2131,6 +2214,50 @@ function apriSchedaCollaboratore(nome) {
       ')</div></div>';
   html += '</div>';
 
+  // MULTIDISCIPLINARITA: livello, punti, coperture/rifiuti
+  if (typeof livelloDiCollaboratore === 'function') {
+    const _mdCollab = getCollaboratoriReparto().find((c) => c.nome.toLowerCase() === nome.toLowerCase());
+    if (_mdCollab) {
+      const _mdLv = livelloDiCollaboratore(_mdCollab);
+      const _mdPts = puntiTotali(nome);
+      const _mdCop = conteggioAzione(nome, 'copertura');
+      const _mdRif = conteggioAzione(nome, 'disponibilita_negata');
+      const _mdNext = prossimaSoglia(_mdPts);
+      html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:-6px 0 14px">';
+      html += livelloBadgeHtml(_mdLv);
+      const _mdComps = getCompetenzeReparto().filter((k) => (_mdCollab.competenze || {})[k.key] === true);
+      if (_mdComps.length)
+        html +=
+          '<span style="font-size:.78rem;color:var(--muted)">' +
+          _mdComps.map((k) => escP(k.label)).join(' · ') +
+          '</span>';
+      html +=
+        '<span class="mini-badge" style="background:var(--accent2);font-size:.72rem" title="Punti ' +
+        new Date().getFullYear() +
+        '">' +
+        _mdPts +
+        ' punti</span>';
+      if (_mdNext)
+        html +=
+          '<span style="font-size:.75rem;color:var(--muted)">-' +
+          (_mdNext.punti - _mdPts) +
+          ' pt al premio: ' +
+          escP(_mdNext.premio) +
+          '</span>';
+      if (_mdCop)
+        html +=
+          '<span class="mini-badge" style="background:#2c6e49;font-size:.7rem" title="Coperture turno">' +
+          _mdCop +
+          ' coperture</span>';
+      if (_mdRif)
+        html +=
+          '<span class="mini-badge" style="background:var(--accent);font-size:.7rem" title="Disponibilità negate">' +
+          _mdRif +
+          ' rifiuti</span>';
+      html += '</div>';
+    }
+  }
+
   // MONTHLY TREND CHART (last 6 months) — solo se ci sono dati significativi
   const _hasChartData = totErr > 0 || allineamenti > 0 || rdiCount > 0 || apprezzamenti > 0 || totReg >= 3;
   if (_hasChartData) {
@@ -2316,6 +2443,9 @@ function apriSchedaCollaboratore(nome) {
     html += '</div>';
   }
 
+  // VALUTAZIONE ANNUALE (9 aree HR + Versatilità/Affidabilità/Disponibilità)
+  if (typeof _renderValutazioneSezione === 'function') html += _renderValutazioneSezione(nome);
+
   // TIMELINE with date filter
   html += '<div class="scheda-section"><h4>Cronologia completa</h4>';
   html += '<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">';
@@ -2356,6 +2486,8 @@ function apriSchedaCollaboratore(nome) {
     }
     // Render trend chart (solo se canvas esiste)
     if (document.getElementById('scheda-chart-trend')) _renderSchedaTrendChart(nome, entries);
+    // Radar valutazione
+    if (typeof _initSchedaValutazione === 'function') _initSchedaValutazione(nome);
   }, 120);
 }
 
@@ -2375,7 +2507,12 @@ function _renderSchedaTimeline(nome, entries, moduli, dal, al) {
     });
   });
   moduli.forEach(function (m) {
-    var label = { allineamento: 'Allineamento', apprezzamento: 'Apprezzamento', rdi: 'RDI' }[m.tipo] || m.tipo;
+    var label =
+      {
+        allineamento: 'Allineamento',
+        apprezzamento: 'Apprezzamento',
+        rdi: 'RDI',
+      }[m.tipo] || m.tipo;
     items.push({
       date: m.created_at || m.data_modulo,
       tipo: label,
@@ -2591,7 +2728,9 @@ async function salvaSchedaNascita(nome) {
   });
   if (coll) {
     try {
-      await secPatch('collaboratori', 'id=eq.' + coll.id, { data_nascita: val || null });
+      await secPatch('collaboratori', 'id=eq.' + coll.id, {
+        data_nascita: val || null,
+      });
       coll.data_nascita = val || null;
       logAzione('Data nascita collaboratore', nome + ' → ' + (val || 'rimossa'));
       toast('Data nascita salvata');
@@ -2600,7 +2739,12 @@ async function salvaSchedaNascita(nome) {
     }
   } else {
     try {
-      var r = await secPost('collaboratori', { nome: nome, attivo: true, data_nascita: val || null });
+      var r = await secPost('collaboratori', {
+        nome: nome,
+        attivo: true,
+        data_nascita: val || null,
+        reparto_dip: currentReparto,
+      });
       if (r && r[0]) collaboratoriCache.push(r[0]);
       toast('Data nascita salvata');
     } catch (e) {
@@ -2709,7 +2853,12 @@ function stampaSchedaPDF(nome) {
     items.push([new Date(e.data).toLocaleDateString('it-IT'), e.tipo, e.testo.substring(0, 80), e.operatore || '']);
   });
   filteredModuli.forEach(function (m) {
-    var label = { allineamento: 'Allineamento', apprezzamento: 'Apprezzamento', rdi: 'RDI' }[m.tipo] || m.tipo;
+    var label =
+      {
+        allineamento: 'Allineamento',
+        apprezzamento: 'Apprezzamento',
+        rdi: 'RDI',
+      }[m.tipo] || m.tipo;
     items.push([
       new Date(m.created_at || m.data_modulo).toLocaleDateString('it-IT'),
       '[Modulo] ' + label,
@@ -2892,8 +3041,13 @@ function _mostraConfronto(nomi) {
         responsive: true,
         maintainAspectRatio: true,
         animation: { duration: 400 },
-        plugins: { legend: { position: 'top', labels: { font: { size: 11 } } } },
-        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } }, x: { ticks: { font: { size: 10 } } } },
+        plugins: {
+          legend: { position: 'top', labels: { font: { size: 11 } } },
+        },
+        scales: {
+          y: { beginAtZero: true, ticks: { stepSize: 1 } },
+          x: { ticks: { font: { size: 10 } } },
+        },
       },
     });
   }, 100);
@@ -2956,7 +3110,11 @@ async function registraPushSubscription() {
     if (!op || !j.endpoint || !j.keys) return;
     await fetch(SB_URL + '/functions/v1/send-push', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + SB_KEY, 'x-push-secret': PUSH_SECRET },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + SB_KEY,
+        'x-push-secret': PUSH_SECRET,
+      },
       body: JSON.stringify({
         action: 'register',
         operatore: op,
@@ -2983,7 +3141,11 @@ function inviaPush(destinatari, titolo, corpo, tipo, crossReparto) {
   if (!crossReparto) body.reparto_dip = currentReparto;
   fetch(SB_URL + '/functions/v1/send-push', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + SB_KEY, 'x-push-secret': PUSH_SECRET },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + SB_KEY,
+      'x-push-secret': PUSH_SECRET,
+    },
     body: JSON.stringify(body),
   }).catch(function () {});
 }
@@ -3012,7 +3174,11 @@ function checkBudgetPushAfterInsert(nomeCliente) {
 function inviaNotifica(titolo, corpo, onClick) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   try {
-    const n = new Notification(titolo, { body: corpo, icon: 'icon-192.png', badge: 'icon-192.png' });
+    const n = new Notification(titolo, {
+      body: corpo,
+      icon: 'icon-192.png',
+      badge: 'icon-192.png',
+    });
     if (onClick)
       n.onclick = function () {
         window.focus();
