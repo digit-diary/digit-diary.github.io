@@ -1906,17 +1906,50 @@ function calcolaGiacenzeSigarette() {
   });
   return byMarca;
 }
-function renderInventario() {
-  if (_invTab === 'buoni') {
-    renderInventarioBuoni();
-    document.getElementById('inv-section-buoni').style.display = '';
-    document.getElementById('inv-section-sigarette').style.display = 'none';
-  } else {
-    renderInventarioSigarette();
-    document.getElementById('inv-section-buoni').style.display = 'none';
-    document.getElementById('inv-section-sigarette').style.display = '';
+// Categorie inventario personalizzate (oltre a Buoni e Sigarette), gestite da admin
+function getInvCategorieExtra() {
+  return Array.isArray(inventarioCategorieExtra) ? inventarioCategorieExtra : [];
+}
+async function _saveInvCategorieExtra() {
+  await setImp('inventario_categorie_extra', JSON.stringify(inventarioCategorieExtra));
+}
+function _renderInvTabs() {
+  const wrap = document.getElementById('inv-tabs');
+  if (!wrap) return;
+  // Rimuovi tab custom esistenti (rigenerate ogni volta), tieni Buoni/Sigarette
+  wrap.querySelectorAll('.inv-tab-custom, .inv-tab-admin').forEach((b) => b.remove());
+  const stile =
+    'padding:8px 20px;border:2px solid var(--line);background:var(--paper);color:var(--ink);border-radius:2px;font-size:.88rem;font-weight:600;cursor:pointer;transition:all .2s';
+  getInvCategorieExtra().forEach((cat) => {
+    const b = document.createElement('button');
+    b.className = 'inv-tab-btn inv-tab-custom';
+    b.dataset.tab = cat.key;
+    b.style.cssText = stile;
+    b.textContent = cat.label;
+    b.onclick = () => switchInvTab(cat.key);
+    wrap.appendChild(b);
+  });
+  if (isAdmin()) {
+    const add = document.createElement('button');
+    add.className = 'inv-tab-admin';
+    add.style.cssText = stile + ';border-style:dashed;color:var(--accent2);border-color:var(--accent2)';
+    add.textContent = '+ Categoria';
+    add.title = 'Aggiungi una categoria inventario personalizzata';
+    add.onclick = aggiungiCategoriaInventario;
+    wrap.appendChild(add);
   }
-  document.querySelectorAll('.inv-tab-btn').forEach((b) => {
+}
+function renderInventario() {
+  _renderInvTabs();
+  const custom = getInvCategorieExtra().find((c) => c.key === _invTab);
+  document.getElementById('inv-section-buoni').style.display = _invTab === 'buoni' ? '' : 'none';
+  document.getElementById('inv-section-sigarette').style.display = _invTab === 'sigarette' ? '' : 'none';
+  const customEl = document.getElementById('inv-section-custom');
+  if (customEl) customEl.style.display = custom ? '' : 'none';
+  if (_invTab === 'buoni') renderInventarioBuoni();
+  else if (_invTab === 'sigarette') renderInventarioSigarette();
+  else if (custom) renderInventarioCustom(custom);
+  document.querySelectorAll('#inv-tabs .inv-tab-btn').forEach((b) => {
     const isActive = b.dataset.tab === _invTab;
     b.classList.toggle('active', isActive);
     b.style.background = isActive ? 'var(--ink)' : 'var(--paper)';
@@ -1927,6 +1960,221 @@ function renderInventario() {
 function switchInvTab(tab) {
   _invTab = tab;
   renderInventario();
+}
+// --- Gestione categorie custom (admin) ---
+async function aggiungiCategoriaInventario() {
+  const nome = prompt('Nome della nuova categoria inventario (es: Accendini, Gadget, Ombrelli...):');
+  if (nome === null) return;
+  const label = nome.trim();
+  if (!label) return;
+  const key = 'cat_' + label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  if (['buoni', 'sigarette'].includes(key) || getInvCategorieExtra().find((c) => c.key === key)) {
+    toast('Categoria già esistente');
+    return;
+  }
+  inventarioCategorieExtra = [...getInvCategorieExtra(), { key, label }];
+  await _saveInvCategorieExtra();
+  logAzione('Inventario: categoria aggiunta', label);
+  _invTab = key;
+  renderInventario();
+  toast('Categoria "' + label + '" aggiunta');
+}
+async function rinominaCategoriaInventario(key) {
+  const cat = getInvCategorieExtra().find((c) => c.key === key);
+  if (!cat) return;
+  const nuovo = prompt('Nuovo nome per "' + cat.label + '":', cat.label);
+  if (nuovo === null) return;
+  const label = nuovo.trim();
+  if (!label) return;
+  const vecchio = cat.label;
+  cat.label = label;
+  await _saveInvCategorieExtra();
+  logAzione('Inventario: categoria rinominata', vecchio + ' → ' + label);
+  renderInventario();
+}
+async function rimuoviCategoriaInventario(key) {
+  const cat = getInvCategorieExtra().find((c) => c.key === key);
+  if (!cat) return;
+  const nMov = getInventarioReparto().filter((r) => r.categoria === key).length;
+  if (
+    !confirm(
+      'Rimuovere la categoria "' +
+        cat.label +
+        '"?' +
+        (nMov ? '\n\nI ' + nMov + ' movimenti registrati restano nel database ma non saranno più visibili.' : ''),
+    )
+  )
+    return;
+  inventarioCategorieExtra = getInvCategorieExtra().filter((c) => c.key !== key);
+  await _saveInvCategorieExtra();
+  logAzione('Inventario: categoria rimossa', cat.label);
+  _invTab = 'buoni';
+  renderInventario();
+}
+// --- Sezione generica per categoria custom: giacenze, carico, uscita, movimenti ---
+function _giacenzeCustom(catKey) {
+  const inv = getInventarioReparto().filter((r) => r.categoria === catKey);
+  const byArt = {};
+  inv.forEach((r) => {
+    if (!byArt[r.tipo]) byArt[r.tipo] = 0;
+    if (r.movimento === 'entrata') byArt[r.tipo] += r.quantita;
+    else byArt[r.tipo] -= r.quantita;
+  });
+  return byArt;
+}
+function renderInventarioCustom(cat) {
+  const el = document.getElementById('inv-section-custom');
+  if (!el) return;
+  const adm = isAdmin();
+  const giacenze = _giacenzeCustom(cat.key);
+  const articoli = Object.entries(giacenze)
+    .filter(([, v]) => v > 0)
+    .sort((a, b) => a[0].localeCompare(b[0]));
+  const totale = articoli.reduce((s, [, v]) => s + v, 0);
+  let html = '<div class="main-card"><div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span>Scorta ' +
+    escP(cat.label) +
+    '</span>' +
+    (adm
+      ? '<span><button onclick="rinominaCategoriaInventario(\'' +
+        cat.key +
+        '\')" style="font-size:.7rem;padding:3px 10px;background:none;border:1px solid var(--paper);color:var(--paper);border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif">Rinomina</button> <button onclick="rimuoviCategoriaInventario(\'' +
+        cat.key +
+        '\')" style="font-size:.7rem;padding:3px 10px;background:none;border:1px solid #e74c3c;color:#e74c3c;border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif">Rimuovi categoria</button></span>'
+      : '') +
+    '</div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;padding:16px">';
+  if (!articoli.length)
+    html += '<p style="color:var(--muted);text-align:center;padding:12px;grid-column:1/-1">Nessun articolo in scorta</p>';
+  else {
+    articoli.forEach(([art, qty]) => {
+      html +=
+        '<div class="mini-stat"><div class="mini-stat-num">' +
+        qty +
+        '</div><div class="mini-stat-label">' +
+        escP(art) +
+        '</div></div>';
+    });
+    html +=
+      '<div class="mini-stat"><div class="mini-stat-num" style="color:var(--ink)">' +
+      totale +
+      '</div><div class="mini-stat-label">Totale pezzi</div></div>';
+  }
+  html += '</div></div>';
+  // Carico
+  html +=
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Carico ' +
+    escP(cat.label) +
+    '</div><div class="form-area"><div class="form-row" style="grid-template-columns:repeat(auto-fit,minmax(100px,1fr))">' +
+    '<div class="field"><label>Articolo</label><input type="text" id="inv-cust-marca" placeholder="Es: modello, marca..."></div>' +
+    '<div class="field"><label>Quantità</label><input type="number" id="inv-cust-qty" value="1" min="1"></div>' +
+    '<div class="field"><label>Data</label><input type="text" id="inv-cust-data" placeholder="Oggi" readonly style="cursor:pointer"></div>' +
+    '<div class="field"><label>Nota</label><input type="text" id="inv-cust-nota" placeholder="Opzionale..."></div>' +
+    '</div><button class="btn-salva" onclick="salvaInvCustomMovimento(\'' +
+    cat.key +
+    '\',\'entrata\')" style="background:#2c6e49">&#9650; Carica</button></div></div>';
+  // Uscita
+  html +=
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Uscita ' +
+    escP(cat.label) +
+    '</div><div class="form-area"><div class="form-row" style="grid-template-columns:repeat(auto-fit,minmax(100px,1fr))">' +
+    '<div class="field"><label>Articolo</label><select id="inv-cust-usc-marca" style="padding:11px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"><option value="">Seleziona...</option>' +
+    articoli.map(([art, qty]) => '<option value="' + escP(art) + '">' + escP(art) + ' (' + qty + ')</option>').join('') +
+    '</select></div>' +
+    '<div class="field"><label>A chi / destinazione</label><div class="ac-wrap"><input type="text" id="inv-cust-usc-cliente" placeholder="Cliente o destinazione..." oninput="acFiltraMaison(\'inv-cust-usc-cliente\',\'ac-inv-cust-usc\')" onfocus="acFiltraMaison(\'inv-cust-usc-cliente\',\'ac-inv-cust-usc\')"><div class="ac-drop" id="ac-inv-cust-usc"></div></div></div>' +
+    '<div class="field"><label>Quantità</label><input type="number" id="inv-cust-usc-qty" value="1" min="1"></div>' +
+    '<div class="field"><label>Data</label><input type="text" id="inv-cust-usc-data" placeholder="Oggi" readonly style="cursor:pointer"></div>' +
+    '</div><button class="btn-salva" onclick="salvaInvCustomMovimento(\'' +
+    cat.key +
+    '\',\'uscita\')" style="background:#c0392b">&#9660; Uscita</button></div></div>';
+  // Movimenti
+  const rows = getInventarioReparto()
+    .filter((r) => r.categoria === cat.key)
+    .sort((a, b) => (b.data_movimento || '').localeCompare(a.data_movimento || ''));
+  html += '<div class="main-card" style="margin-top:16px"><div class="card-header">Movimenti ' + escP(cat.label) + '</div>';
+  if (!rows.length) html += '<p style="color:var(--muted);padding:16px;text-align:center">Nessun movimento</p>';
+  else {
+    html +=
+      '<div style="padding:12px 18px;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.88rem"><thead><tr style="border-bottom:2px solid var(--line);text-align:left"><th style="padding:8px">Data</th><th style="padding:8px">Articolo</th><th style="padding:8px">Qty</th><th style="padding:8px">Movimento</th><th style="padding:8px">Destinazione</th><th style="padding:8px">Nota</th><th style="padding:8px"></th></tr></thead><tbody>';
+    rows.forEach((r) => {
+      const d = r.data_movimento ? new Date(r.data_movimento + 'T12:00:00').toLocaleDateString('it-IT') : '';
+      const isIn = r.movimento === 'entrata';
+      html +=
+        '<tr style="border-bottom:1px solid var(--line)"><td style="padding:6px 8px;color:var(--muted);font-size:.82rem">' +
+        d +
+        '</td><td style="padding:6px 8px;font-weight:600">' +
+        escP(r.tipo) +
+        '</td><td style="padding:6px 8px;font-weight:700;color:' +
+        (isIn ? '#2c6e49' : '#c0392b') +
+        '">' +
+        (isIn ? '+' : '-') +
+        r.quantita +
+        '</td><td style="padding:6px 8px;color:' +
+        (isIn ? '#2c6e49' : '#c0392b') +
+        '">' +
+        (isIn ? '&#9650; Carico' : '&#9660; Uscita') +
+        '</td><td style="padding:6px 8px">' +
+        escP(r.cliente || '') +
+        '</td><td style="padding:6px 8px;color:var(--muted)">' +
+        escP(r.note || '') +
+        '</td><td style="padding:6px 8px"><div style="display:flex;gap:4px"><button class="entry-action-btn" onclick="modificaInventario(' +
+        r.id +
+        ')" title="Modifica">&#9998;</button><button class="entry-action-btn" onclick="eliminaInventario(' +
+        r.id +
+        ')" title="Elimina">&#128465;</button></div></td></tr>';
+    });
+    html += '</tbody></table></div>';
+    html +=
+      '<div style="padding:8px 18px 16px;display:flex;gap:8px"><button class="btn-export" onclick="esportaInventarioCSV()" style="padding:6px 14px;font-size:.82rem">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaInventarioPDF()" style="padding:6px 14px;font-size:.82rem">PDF</button></div>';
+  }
+  html += '</div>';
+  el.innerHTML = html;
+  if (window.flatpickr) {
+    const opts = { locale: 'it', dateFormat: 'Y-m-d', altInput: true, altFormat: 'd/m/Y', allowInput: false };
+    ['inv-cust-data', 'inv-cust-usc-data'].forEach((id) => {
+      const f = document.getElementById(id);
+      if (f && !f._flatpickr) flatpickr('#' + id, opts);
+    });
+  }
+}
+async function salvaInvCustomMovimento(catKey, movimento) {
+  const isIn = movimento === 'entrata';
+  const art = isIn
+    ? capitalizzaNome(((document.getElementById('inv-cust-marca') || {}).value || '').trim())
+    : (document.getElementById('inv-cust-usc-marca') || {}).value;
+  const qty = parseInt((document.getElementById(isIn ? 'inv-cust-qty' : 'inv-cust-usc-qty') || {}).value) || 0;
+  const data =
+    (document.getElementById(isIn ? 'inv-cust-data' : 'inv-cust-usc-data') || {}).value ||
+    new Date().toISOString().split('T')[0];
+  const nota = isIn ? ((document.getElementById('inv-cust-nota') || {}).value || '').trim() : '';
+  const cliente = isIn ? '' : ((document.getElementById('inv-cust-usc-cliente') || {}).value || '').trim();
+  if (!art) {
+    toast(isIn ? "Inserisci l'articolo" : "Seleziona l'articolo");
+    return;
+  }
+  if (!qty || qty < 1) {
+    toast('Inserisci la quantità');
+    return;
+  }
+  const cat = getInvCategorieExtra().find((c) => c.key === catKey);
+  try {
+    const r = await secPost('inventario', {
+      categoria: catKey,
+      tipo: art,
+      movimento: movimento,
+      quantita: qty,
+      cliente: cliente,
+      note: nota,
+      data_movimento: data,
+      operatore: getOperatore(),
+      reparto_dip: currentReparto,
+    });
+    if (r && r[0]) inventarioCache.unshift(r[0]);
+    logAzione('Inventario ' + (cat ? cat.label : catKey), (isIn ? '+' : '-') + qty + ' ' + art + (cliente ? ' → ' + cliente : ''));
+    renderInventario();
+    toast((isIn ? 'Caricati ' : 'Usciti ') + qty + ' × ' + art);
+  } catch (e) {
+    toast('Errore: ' + e.message);
+  }
 }
 function renderInventarioBuoni() {
   const giacenze = calcolaGiacenzaBuoni();
@@ -2527,7 +2775,9 @@ function initInventarioFP() {
 }
 function esportaInventarioCSV() {
   const isBuoni = _invTab === 'buoni';
-  const data = getInventarioReparto().filter((r) => r.categoria === (isBuoni ? 'buono' : 'sigaretta'));
+  const _catCsv = _invTab === 'buoni' ? 'buono' : _invTab === 'sigarette' ? 'sigaretta' : _invTab;
+  const _catLbl = isBuoni ? 'buoni' : _invTab === 'sigarette' ? 'sigarette' : ((getInvCategorieExtra().find((c) => c.key === _invTab) || {}).label || _invTab);
+  const data = getInventarioReparto().filter((r) => r.categoria === _catCsv);
   if (!data.length) {
     toast('Nessun dato');
     return;
@@ -2563,7 +2813,7 @@ function esportaInventarioCSV() {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download =
-    'inventario_' + (isBuoni ? 'buoni' : 'sigarette') + '_' + new Date().toISOString().split('T')[0] + '.csv';
+    'inventario_' + _catLbl.toLowerCase().replace(/\s+/g, '_') + '_' + new Date().toISOString().split('T')[0] + '.csv';
   a.click();
 }
 function esportaInventarioPDF() {
@@ -2572,7 +2822,9 @@ function esportaInventarioPDF() {
     return;
   }
   const isBuoni = _invTab === 'buoni';
-  const data = getInventarioReparto().filter((r) => r.categoria === (isBuoni ? 'buono' : 'sigaretta'));
+  const _catPdf = _invTab === 'buoni' ? 'buono' : _invTab === 'sigarette' ? 'sigaretta' : _invTab;
+  const _catLbl = isBuoni ? 'Buoni' : _invTab === 'sigarette' ? 'Sigarette' : ((getInvCategorieExtra().find((c) => c.key === _invTab) || {}).label || _invTab);
+  const data = getInventarioReparto().filter((r) => r.categoria === _catPdf);
   if (!data.length) {
     toast('Nessun dato');
     return;
@@ -2583,7 +2835,7 @@ function esportaInventarioPDF() {
   doc.setFont('helvetica', 'bold');
   doc.text(
     'Inventario ' +
-      (isBuoni ? 'Buoni' : 'Sigarette') +
+      _catLbl +
       ' \u2014 ' +
       currentReparto.charAt(0).toUpperCase() +
       currentReparto.slice(1),
@@ -2644,7 +2896,7 @@ function esportaInventarioPDF() {
     headStyles: { fillColor: [44, 62, 80], textColor: 255, fontStyle: 'bold' },
     footStyles: { fillColor: [245, 245, 245], fontStyle: 'bold' },
   });
-  doc.save('inventario_' + (isBuoni ? 'buoni' : 'sigarette') + '_' + new Date().toISOString().split('T')[0] + '.pdf');
+  doc.save('inventario_' + _catLbl.toLowerCase().replace(/\s+/g, '_') + '_' + new Date().toISOString().split('T')[0] + '.pdf');
 }
 
 // MENU MOBILE

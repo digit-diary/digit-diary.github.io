@@ -2071,6 +2071,7 @@ function _destroySchedaCharts() {
 
 function apriSchedaCollaboratore(nome) {
   _destroySchedaCharts();
+  window._schedaTlTipo = null;
   const allData = getDatiReparto();
   const entries = allData.filter((e) => e.nome === nome);
   const moduli = getModuliReparto().filter(
@@ -2154,23 +2155,37 @@ function apriSchedaCollaboratore(nome) {
   const _lastEntry = entries.length ? entries.sort((a, b) => (b.data || '').localeCompare(a.data || ''))[0] : null;
   const _lastDateStr = _lastEntry ? new Date(_lastEntry.data).toLocaleDateString('it-IT') : '—';
   const _lastTipo = _lastEntry ? _lastEntry.tipo : '';
-  // KPI CARDS
+  // KPI CARDS — cliccabili: aprono l'anteprima delle voci nella cronologia
+  const _kpiClick = function (source, tipo) {
+    return ' onclick="schedaKpiFiltra(\'' + neS + "','" + source + "','" + String(tipo).replace(/'/g, "\\'") + '\')"';
+  };
+  const _kpiAttr = function (source, tipo) {
+    return ' style="cursor:pointer" title="Clicca per vedere le voci"' + _kpiClick(source, tipo);
+  };
   html += '<div class="scheda-kpi-grid">';
   html +=
-    '<div class="scheda-kpi"><div class="kpi-val" style="color:var(--ink)">' +
+    '<div class="scheda-kpi"' +
+    _kpiAttr('', '') +
+    '><div class="kpi-val" style="color:var(--ink)">' +
     totReg +
     '</div><div class="kpi-lbl">Registrazioni</div></div>';
   html +=
-    '<div class="scheda-kpi"><div class="kpi-val" style="color:var(--accent)">' +
+    '<div class="scheda-kpi"' +
+    _kpiAttr('reg', tipoErr) +
+    '><div class="kpi-val" style="color:var(--accent)">' +
     totErr +
     '</div><div class="kpi-lbl">Errori</div></div>';
   if (totErrCost)
     html +=
-      '<div class="scheda-kpi"><div class="kpi-val" style="color:var(--accent)">' +
+      '<div class="scheda-kpi"' +
+      _kpiAttr('reg', tipoErr) +
+      '><div class="kpi-val" style="color:var(--accent)">' +
       fmtCHF(totErrCost) +
       ' CHF</div><div class="kpi-lbl">Costo errori</div></div>';
   html +=
-    '<div class="scheda-kpi"><div class="kpi-val" style="color:' +
+    '<div class="scheda-kpi"' +
+    _kpiAttr('reg', tipoMal) +
+    '><div class="kpi-val" style="color:' +
     _malColor +
     '">' +
     totMal +
@@ -2178,22 +2193,30 @@ function apriSchedaCollaboratore(nome) {
     '</div><div class="kpi-lbl">Malattie</div></div>';
   if (totAmm)
     html +=
-      '<div class="scheda-kpi"><div class="kpi-val" style="color:#7b2d8b">' +
+      '<div class="scheda-kpi"' +
+      _kpiAttr('reg', tipoAmm) +
+      '><div class="kpi-val" style="color:#7b2d8b">' +
       totAmm +
       '</div><div class="kpi-lbl">Amm. verbali</div></div>';
   if (totND)
     html +=
-      '<div class="scheda-kpi"><div class="kpi-val" style="color:#5d6d7e">' +
+      '<div class="scheda-kpi"' +
+      _kpiAttr('reg', tipoND) +
+      '><div class="kpi-val" style="color:#5d6d7e">' +
       totND +
       '</div><div class="kpi-lbl">Non disponib.</div></div>';
   if (allineamenti)
     html +=
-      '<div class="scheda-kpi"><div class="kpi-val" style="color:#1a4a7a">' +
+      '<div class="scheda-kpi"' +
+      _kpiAttr('mod', 'Allineamento') +
+      '><div class="kpi-val" style="color:#1a4a7a">' +
       allineamenti +
       '</div><div class="kpi-lbl">Allineamenti</div></div>';
   if (apprezzamenti)
     html +=
-      '<div class="scheda-kpi"><div class="kpi-val" style="color:#b8860b">' +
+      '<div class="scheda-kpi"' +
+      _kpiAttr('mod', 'Apprezzamento') +
+      '><div class="kpi-val" style="color:#b8860b">' +
       apprezzamenti +
       '</div><div class="kpi-lbl">Apprezzamenti</div></div>';
   if (apprezzamenti && totNeg) {
@@ -2306,17 +2329,23 @@ function apriSchedaCollaboratore(nome) {
     html += '<div class="scheda-section"><h4>Percorso disciplinare</h4>';
     html += '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">';
     html +=
-      '<span class="scheda-path-step" style="background:rgba(123,45,139,0.12);color:#7b2d8b">' +
+      '<span class="scheda-path-step" style="background:rgba(123,45,139,0.12);color:#7b2d8b;cursor:pointer" title="Clicca per vedere le voci"' +
+      _kpiClick('reg', tipoAmm) +
+      '>' +
       totAmm +
       ' Amm. verbali</span>';
     html += '<span class="scheda-path-arrow">&#10132;</span>';
     html +=
-      '<span class="scheda-path-step" style="background:rgba(26,74,122,0.12);color:#1a4a7a">' +
+      '<span class="scheda-path-step" style="background:rgba(26,74,122,0.12);color:#1a4a7a;cursor:pointer" title="Clicca per vedere le voci"' +
+      _kpiClick('mod', 'Allineamento') +
+      '>' +
       allineamenti +
       ' Allineamenti</span>';
     html += '<span class="scheda-path-arrow">&#10132;</span>';
     html +=
-      '<span class="scheda-path-step" style="background:rgba(192,57,43,0.12);color:var(--accent)">' +
+      '<span class="scheda-path-step" style="background:rgba(192,57,43,0.12);color:var(--accent);cursor:pointer" title="Clicca per vedere le voci"' +
+      _kpiClick('mod', 'RDI') +
+      '>' +
       rdiCount +
       ' RDI</span>';
     html += '</div>';
@@ -2455,6 +2484,7 @@ function apriSchedaCollaboratore(nome) {
   html +=
     '<input type="text" id="scheda-tl-al" placeholder="Al..." readonly style="cursor:pointer;padding:4px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper2);color:var(--ink);width:120px">';
   html += '<button class="btn-reset" onclick="schedaResetTlFilter(\'' + neS + '\')">Reset</button>';
+  html += '<span id="scheda-tl-tipo-chip"></span>';
   html += '</div>';
   html +=
     '<div id="scheda-timeline" class="profilo-entries" style="max-height:350px">' +
@@ -2532,6 +2562,12 @@ function _renderSchedaTimeline(nome, entries, moduli, dal, al) {
     items = items.filter(function (i) {
       return i.date <= al + 'T23:59:59';
     });
+  // Filtro per tipo (click sulle card KPI della scheda)
+  var tf = window._schedaTlTipo;
+  if (tf && tf.tipo)
+    items = items.filter(function (i) {
+      return (!tf.source || i.source === tf.source) && i.tipo === tf.tipo;
+    });
   if (!items.length)
     return '<div style="padding:14px;text-align:center;color:var(--muted)">Nessun evento nel periodo selezionato</div>';
   return items
@@ -2585,6 +2621,26 @@ function _renderSchedaTimeline(nome, entries, moduli, dal, al) {
     .join('');
 }
 
+// Click su una card KPI della scheda: mostra in anteprima solo quelle voci nella cronologia
+function schedaKpiFiltra(nome, source, tipo) {
+  window._schedaTlTipo = tipo ? { source: source, tipo: tipo } : null;
+  _schedaFilterTimeline(nome);
+  var chip = document.getElementById('scheda-tl-tipo-chip');
+  if (chip)
+    chip.innerHTML = tipo
+      ? '<span class="mini-badge" style="background:var(--accent2);cursor:pointer;font-size:.72rem" title="Rimuovi filtro" onclick="schedaKpiFiltra(\'' +
+        nome.replace(/'/g, "\\'") +
+        "','','')\">" +
+        escP(tipo) +
+        ' &#10005;</span>'
+      : '';
+  var tl = document.getElementById('scheda-timeline');
+  if (tl && tipo)
+    try {
+      tl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } catch (e) {}
+}
+
 function _schedaFilterTimeline(nome) {
   var dalEl = document.getElementById('scheda-tl-dal'),
     alEl = document.getElementById('scheda-tl-al');
@@ -2601,6 +2657,9 @@ function _schedaFilterTimeline(nome) {
 }
 
 function schedaResetTlFilter(nome) {
+  window._schedaTlTipo = null;
+  var chip = document.getElementById('scheda-tl-tipo-chip');
+  if (chip) chip.innerHTML = '';
   ['scheda-tl-dal', 'scheda-tl-al'].forEach(function (id) {
     var el = document.getElementById(id);
     if (el) {

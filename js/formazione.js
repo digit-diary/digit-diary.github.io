@@ -50,6 +50,8 @@ const PUNTI_DEFAULT = {
     2: 'Aperitivo di team',
     3: 'Cena + proposta riconoscimento HR',
   },
+  // 'privato' = premi/livelli notificati solo all'interessato; 'tutti' = annuncio a tutta la squadra; 'off' = nessuna push
+  notifiche: 'privato',
 };
 
 function getCompetenzeConfigAll() {
@@ -72,7 +74,21 @@ function getPuntiConfig() {
     azioni: Array.isArray(cfg.azioni) && cfg.azioni.length ? cfg.azioni : PUNTI_DEFAULT.azioni,
     soglie: Array.isArray(cfg.soglie) ? cfg.soglie : PUNTI_DEFAULT.soglie,
     premi_livello: cfg.premi_livello || PUNTI_DEFAULT.premi_livello,
+    notifiche: cfg.notifiche === 'tutti' || cfg.notifiche === 'off' ? cfg.notifiche : 'privato',
   };
+}
+// Push incentivi: i punti personali arrivano sempre e solo all'interessato (se è anche operatore);
+// premi e passaggi di livello seguono la scelta admin (privato / annuncio a tutti / off)
+function _notificaIncentivo(nome, titolo, corpo, soloPrivato) {
+  if (typeof inviaPush !== 'function') return;
+  const mode = getPuntiConfig().notifiche;
+  if (mode === 'off') return;
+  if (mode === 'tutti' && !soloPrivato) {
+    inviaPush(['tutti'], titolo, corpo, 'general');
+    return;
+  }
+  const isOp = (operatoriAuthCache || []).some((o) => (o.nome || '').toLowerCase() === nome.toLowerCase());
+  if (isOp) inviaPush([nome], titolo, corpo, 'general');
 }
 async function savePuntiConfig(cfg) {
   puntiConfig = cfg;
@@ -302,7 +318,12 @@ function renderFormazione() {
 
   // TRAGUARDI PREMI
   const cfgP = getPuntiConfig();
-  html += '<div class="main-card"><div class="card-header">Traguardi e premi</div><div style="padding:16px">';
+  html +=
+    '<div class="main-card"><div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">Traguardi e premi' +
+    (adm
+      ? '<button class="btn-export btn-export-pdf" onclick="esportaReportIncentiviPDF()" style="font-size:.75rem;padding:4px 12px">Report Incentivi PDF</button>'
+      : '') +
+    '</div><div style="padding:16px">';
   html +=
     '<p style="color:var(--muted);font-size:.84rem;margin-bottom:10px">Soglie punti: ' +
     cfgP.soglie.map((s) => '<strong>' + s.punti + '</strong> = ' + escP(s.premio)).join(' · ') +
@@ -406,6 +427,11 @@ async function toggleCompetenza(collabId, key, cb) {
     if (dopo > prima && dopo >= 2) {
       const premio = getPuntiConfig().premi_livello[String(dopo)];
       logAzione('Passaggio livello', c.nome + ' → Livello ' + dopo);
+      _notificaIncentivo(
+        c.nome,
+        '🎉 ' + c.nome + ' → Livello ' + dopo,
+        'Tutte le competenze fino al livello ' + dopo + ' completate' + (premio ? ' — premio: ' + premio : ''),
+      );
       const b = document.getElementById('pwd-modal-content');
       b.innerHTML =
         '<h3>🎉 ' +
@@ -446,6 +472,13 @@ async function _insertPuntiEvento(nome, punti, azione, descrizione) {
   });
   if (r && r[0]) puntiEventiCache.unshift(r[0]);
   logAzione('Punti assegnati', nome + ' ' + (punti > 0 ? '+' : '') + punti + ' (' + azione + ')');
+  if (punti > 0)
+    _notificaIncentivo(
+      nome,
+      '⭐ +' + punti + ' punti',
+      (descrizione || azione) + ' — totale ' + puntiTotali(nome) + ' punti',
+      true,
+    );
 }
 async function assegnaPuntiRapido() {
   const nome = (document.getElementById('pt-collab') || {}).value;
@@ -471,6 +504,12 @@ async function assegnaPuntiRapido() {
     const raggiunta = getPuntiConfig().soglie.find((s) => tot >= s.punti && tot - punti < s.punti);
     renderFormazione();
     toast(nome + ': ' + (punti > 0 ? '+' : '') + punti + ' punti (totale ' + tot + ')');
+    if (raggiunta)
+      _notificaIncentivo(
+        nome,
+        '🏆 Traguardo raggiunto: ' + raggiunta.premio,
+        nome + ' ha raggiunto ' + raggiunta.punti + ' punti — premio: ' + raggiunta.premio,
+      );
     if (raggiunta) {
       setTimeout(() => {
         const b = document.getElementById('pwd-modal-content');
@@ -497,6 +536,7 @@ async function registraPremioConsegnato(nome, premio) {
   document.getElementById('pwd-modal').classList.add('hidden');
   try {
     await _insertPuntiEvento(nome, 0, 'premio', 'Premio consegnato: ' + premio);
+    _notificaIncentivo(nome, '🎁 Premio consegnato', nome + ': ' + premio);
     renderFormazione();
     toast('Premio registrato per ' + nome);
   } catch (e) {
@@ -623,6 +663,140 @@ async function esportaMatricePDF() {
   mostraPdfPreview(doc, 'matrice_competenze_' + currentReparto + '.pdf', 'Matrice Competenze');
 }
 
+// Report annuale incentivi per HR: riepilogo per collaboratore + registro premi + movimenti punti
+async function esportaReportIncentiviPDF() {
+  if (!window.jspdf) {
+    toast('Caricamento PDF...');
+    if (!(await caricaJsPDF())) {
+      toast('Errore caricamento libreria PDF');
+      return;
+    }
+  }
+  const anno = new Date().getFullYear();
+  const azLabels = {};
+  getPuntiConfig().azioni.forEach((a) => (azLabels[a.key] = a.label));
+  azLabels.premio = 'Premio consegnato';
+  azLabels.manuale = 'Assegnazione manuale';
+  const eventi = getPuntiReparto().filter((p) => (p.data_evento || '').startsWith(String(anno)));
+  const collabs = getCollaboratoriReparto();
+  const righe = collabs
+    .map((c) => {
+      const premiCons = eventi.filter(
+        (p) => p.azione === 'premio' && p.collaboratore.toLowerCase() === c.nome.toLowerCase(),
+      );
+      return {
+        nome: c.nome,
+        lv: livelloDiCollaboratore(c),
+        punti: puntiTotali(c.nome, anno),
+        cop: conteggioAzione(c.nome, 'copertura', anno),
+        rif: conteggioAzione(c.nome, 'disponibilita_negata', anno),
+        raggiunti: sogliePremiRaggiunti(c.nome, anno).join(', '),
+        consegnati: premiCons.length,
+      };
+    })
+    .filter((r) => r.punti !== 0 || r.lv > 0 || r.cop || r.rif || r.consegnati)
+    .sort((a, b) => b.punti - a.punti);
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('portrait', 'mm', 'a4');
+  const pw = doc.internal.pageSize.getWidth();
+  let y = 14;
+  if (_logoB64)
+    try {
+      doc.addImage(_logoB64, 'PNG', pw / 2 - 20, y, 40, 22.5);
+    } catch (e) {}
+  y += 28;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(15);
+  doc.text('Report Incentivi ' + anno + ' — Progetto Multidisciplinarità', pw / 2, y, { align: 'center' });
+  y += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(100);
+  doc.text(
+    'Reparto ' +
+      currentReparto.charAt(0).toUpperCase() +
+      currentReparto.slice(1) +
+      ' — generato il ' +
+      new Date().toLocaleDateString('it-IT') +
+      ' — Casino Lugano SA — Documento riservato HR',
+    pw / 2,
+    y,
+    { align: 'center' },
+  );
+  y += 8;
+  doc.setTextColor(0);
+  const stiliTab = {
+    theme: 'grid',
+    margin: { left: 14, right: 14 },
+    headStyles: { fillColor: [26, 18, 8], textColor: [250, 247, 242], fontSize: 8 },
+    styles: { lineColor: [220, 215, 205], lineWidth: 0.15, fontSize: 8.5, cellPadding: 2 },
+    alternateRowStyles: { fillColor: [250, 247, 242] },
+  };
+  doc.autoTable(
+    Object.assign({}, stiliTab, {
+      startY: y,
+      head: [['Collaboratore', 'Livello', 'Punti ' + anno, 'Coperture', 'Rifiuti', 'Premi raggiunti', 'Consegnati']],
+      body: righe.length
+        ? righe.map((r) => [r.nome, r.lv ? 'L' + r.lv : '—', r.punti, r.cop, r.rif, r.raggiunti || '—', r.consegnati])
+        : [['Nessun dato per il ' + anno, '', '', '', '', '', '']],
+      columnStyles: { 0: { halign: 'left', fontStyle: 'bold' } },
+    }),
+  );
+  y = doc.lastAutoTable.finalY + 10;
+  const premi = eventi
+    .filter((p) => p.azione === 'premio')
+    .sort((a, b) => (b.data_evento || '').localeCompare(a.data_evento || ''));
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('Registro premi consegnati', 14, y);
+  y += 4;
+  doc.autoTable(
+    Object.assign({}, stiliTab, {
+      startY: y,
+      head: [['Data', 'Collaboratore', 'Premio', 'Registrato da']],
+      body: premi.length
+        ? premi.map((p) => [
+            p.data_evento ? new Date(p.data_evento + 'T12:00:00').toLocaleDateString('it-IT') : '',
+            p.collaboratore,
+            (p.descrizione || '').replace(/^Premio consegnato:\s*/, ''),
+            p.operatore || '',
+          ])
+        : [['Nessun premio consegnato nel ' + anno, '', '', '']],
+      columnStyles: { 1: { fontStyle: 'bold' } },
+    }),
+  );
+  y = doc.lastAutoTable.finalY + 10;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('Movimenti punti ' + anno, 14, y);
+  y += 4;
+  doc.autoTable(
+    Object.assign({}, stiliTab, {
+      startY: y,
+      head: [['Data', 'Collaboratore', 'Punti', 'Azione', 'Nota', 'Operatore']],
+      body: eventi.length
+        ? eventi
+            .slice()
+            .sort((a, b) => (b.data_evento || '').localeCompare(a.data_evento || ''))
+            .map((p) => [
+              p.data_evento ? new Date(p.data_evento + 'T12:00:00').toLocaleDateString('it-IT') : '',
+              p.collaboratore,
+              (p.punti > 0 ? '+' : '') + p.punti,
+              azLabels[p.azione] || p.azione,
+              p.descrizione || '',
+              p.operatore || '',
+            ])
+        : [['Nessun movimento nel ' + anno, '', '', '', '', '']],
+      columnStyles: { 2: { halign: 'center', fontStyle: 'bold' } },
+    }),
+  );
+  doc.setFontSize(7);
+  doc.setTextColor(150);
+  doc.text('Casino Lugano SA — Report incentivi — Riservato HR', 14, doc.internal.pageSize.getHeight() - 8);
+  logAzione('Report incentivi', 'PDF esportato — reparto ' + currentReparto + ', anno ' + anno);
+  mostraPdfPreview(doc, 'report_incentivi_' + currentReparto + '_' + anno + '.pdf', 'Report Incentivi');
+}
+
 // ================================================================
 // CONFIG ADMIN (competenze per reparto + punti + soglie)
 // ================================================================
@@ -714,8 +888,32 @@ function _renderFormazioneConfig() {
       l +
       ',this.value)" style="flex:1;padding:5px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></div>';
   });
+  // notifiche incentivi
+  html +=
+    '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Notifiche incentivi</p>';
+  html +=
+    '<div class="tipo-item"><div class="tipo-item-name">Premi e passaggi di livello</div><select onchange="modificaNotificheCfg(this.value)" style="padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)">' +
+    '<option value="privato"' +
+    (cfgP.notifiche === 'privato' ? ' selected' : '') +
+    '>Privato (solo interessato)</option><option value="tutti"' +
+    (cfgP.notifiche === 'tutti' ? ' selected' : '') +
+    '>Annuncio a tutti</option><option value="off"' +
+    (cfgP.notifiche === 'off' ? ' selected' : '') +
+    '>Disattivate</option></select></div>';
+  html +=
+    '<p style="font-size:.75rem;color:var(--muted);margin:4px 0 0">I punti personali arrivano sempre e solo all\'interessato (se ha un account operatore con notifiche attive). La scelta qui sopra riguarda premi raggiunti, premi consegnati e passaggi di livello. Per HR usa il pulsante "Report Incentivi PDF" nella sezione Traguardi.</p>';
   html += '</div>';
   return html;
+}
+async function modificaNotificheCfg(val) {
+  const cfg = getPuntiConfig();
+  cfg.notifiche = val === 'tutti' || val === 'off' ? val : 'privato';
+  await savePuntiConfig(cfg);
+  logAzione('Notifiche incentivi', 'Modalità: ' + cfg.notifiche);
+  toast(
+    'Notifiche incentivi: ' +
+      (cfg.notifiche === 'tutti' ? 'annuncio a tutti' : cfg.notifiche === 'off' ? 'disattivate' : 'privato'),
+  );
 }
 async function aggiungiCompetenzaCfg(rep) {
   const nome = (document.getElementById('cfg-comp-nome-' + rep) || {}).value.trim();
