@@ -63,6 +63,12 @@ function switchPage(name) {
     if (ai) ai.style.display = isAdmin() ? '' : 'none';
     const dbSec = document.getElementById('db-stats-section');
     if (dbSec) dbSec.style.display = isAdmin() ? '' : 'none';
+    const mpSec = document.getElementById('maison-privacy-section');
+    if (mpSec) {
+      mpSec.style.display = isAdmin() ? '' : 'none';
+      const sel = document.getElementById('maison-autodelete-sel');
+      if (sel) sel.value = String(maisonAutoDeleteGiorni || 0);
+    }
     const cestSec = document.getElementById('cestino-section');
     if (cestSec) cestSec.style.display = isAdmin() ? '' : 'none';
     const visSec = document.getElementById('visibilita-section');
@@ -79,8 +85,10 @@ function switchPage(name) {
     if (!document.getElementById('mod-list-results')) _modFiltInit = false;
     renderModuliList();
   }
+  if (name === 'formazione') renderFormazione();
   if (name === 'registro') renderRegistro();
   if (name === 'maison') {
+    if (typeof _maisonAutoCleanup === 'function') _maisonAutoCleanup().catch(() => {});
     renderMaisonDashboard();
     renderMaisonBudgetUI();
     renderMaisonBudgetAlerts();

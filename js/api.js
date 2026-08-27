@@ -10,7 +10,7 @@
 // DATA LOADING
 async function loadAll() {
   // Caricamento parallelo: impostazioni + dati + tabelle
-  const [tp, co, ops, cr, tn, cn, to, cmo, clo, tr, vis] = await Promise.all([
+  const [tp, co, ops, cr, tn, cn, to, cmo, clo, tr, vis, compCfg, pntCfg, maisonAd] = await Promise.all([
     getImp('tipi_personalizzati'),
     getImp('colori_override'),
     getImp('operatori_lista'),
@@ -22,6 +22,9 @@ async function loadAll() {
     getImp('campi_label_override'),
     getImp('tipi_rinominati'),
     getImp('visibilita'),
+    getImp('competenze_config'),
+    getImp('punti_config'),
+    getImp('maison_auto_delete_giorni'),
   ]);
   if (tp)
     try {
@@ -67,6 +70,15 @@ async function loadAll() {
     try {
       visibilitaConfig = JSON.parse(vis);
     } catch (e) {}
+  if (compCfg)
+    try {
+      competenzeConfig = JSON.parse(compCfg);
+    } catch (e) {}
+  if (pntCfg)
+    try {
+      puntiConfig = JSON.parse(pntCfg);
+    } catch (e) {}
+  maisonAutoDeleteGiorni = parseInt(maisonAd) || 0;
   const opRep = await getImp('operatori_reparto');
   if (opRep) {
     try {
@@ -100,6 +112,8 @@ async function loadAll() {
     regaliD,
     noteClD,
     inventarioD,
+    valutazioniD,
+    puntiD,
   ] = await Promise.all([
     secGet('registrazioni?order=data.desc'),
     secGet('note_fissate?select=registrazione_id'),
@@ -122,6 +136,8 @@ async function loadAll() {
     secGet('regali_maison?order=created_at.desc'),
     secGet('note_clienti?order=created_at.desc'),
     secGet('inventario?order=data_movimento.desc'),
+    secGet('valutazioni?order=anno.desc'),
+    secGet('punti_eventi?order=data_evento.desc'),
   ]);
   datiCache = (dati || []).filter((e) => !e.eliminato);
   pinnedIds = new Set(pins.map((p) => p.registrazione_id));
@@ -164,6 +180,8 @@ async function loadAll() {
   regaliCache = regaliD || [];
   noteClientiCache = noteClD || [];
   inventarioCache = inventarioD || [];
+  valutazioniCache = valutazioniD || [];
+  puntiEventiCache = puntiD || [];
   // ENTERPRISE CHAT: decifra chat_messages e sintetizza noteColleghiCache
   await decryptChatMessagesCache();
   _chatBuildNoteCache();
@@ -171,6 +189,8 @@ async function loadAll() {
   _loadLogo();
   // Pulizia automatica: sessioni scadute + log > 12 mesi
   sbRpc('cleanup_old_data').catch(() => {});
+  // Maison: auto-cancellazione GD precedenti se configurata (privacy)
+  if (typeof _maisonAutoCleanup === 'function') _maisonAutoCleanup().catch(() => {});
   // Health check silenzioso (solo se loggato)
   if (getOpToken()) _healthCheck();
 }

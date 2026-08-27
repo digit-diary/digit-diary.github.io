@@ -14,6 +14,7 @@ const VIS_ITEMS = {
     note_collega: 'Note Colleghi',
     statistiche: 'Statistiche',
     moduli: 'Moduli',
+    formazione: 'Formazione',
     assistente: 'Assistente',
     consegna: 'Consegna Turno',
     promemoria: 'Promemoria',
@@ -198,7 +199,11 @@ async function aggiungiOperatoreConPwd() {
   }
   const h = await secureHash(p, n);
   try {
-    await sbRpc('add_operator', { p_nome: n, p_hash: h, p_token: getAdminToken() });
+    await sbRpc('add_operator', {
+      p_nome: n,
+      p_hash: h,
+      p_token: getAdminToken(),
+    });
     operatoriAuthCache.push({ nome: n, ruolo: 'operatore' });
     if (!operatoriSalvati.includes(n)) {
       operatoriSalvati.push(n);
@@ -268,7 +273,12 @@ async function eseguiCambioPwdOp() {
     return;
   }
   const nh = await secureHash(p1, op);
-  const res = await sbRpc('change_op_pwd', { p_nome: op, p_old_hash: oh, p_new_hash: nh, p_old_legacy_hash: ohL });
+  const res = await sbRpc('change_op_pwd', {
+    p_nome: op,
+    p_old_hash: oh,
+    p_new_hash: nh,
+    p_old_legacy_hash: ohL,
+  });
   if (!res || !res.success) {
     err.textContent = 'Password attuale errata';
     return;

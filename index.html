@@ -108,6 +108,7 @@
   <button class="nav-tab" data-page="note-collega" onclick="switchPage('note-collega')" title="Messaggi tra colleghi">&#9993;&#65039; Note Colleghi <span id="note-badge" style="display:none;background:var(--accent);color:white;border-radius:9px;font-size:.7rem;padding:1px 6px;margin-left:4px;font-weight:700" title="Note non lette"></span></button>
   <button class="nav-tab" data-page="statistiche" onclick="switchPage('statistiche')">&#128202; Statistiche</button>
   <button class="nav-tab" data-page="moduli" onclick="switchPage('moduli')" title="Moduli disciplinari e apprezzamento">&#128196; Moduli</button>
+  <button class="nav-tab" data-page="formazione" onclick="switchPage('formazione')" title="Multidisciplinarità: competenze, livelli e punti">&#127891; Formazione</button>
   <button class="nav-tab" data-page="assistente" onclick="switchPage('assistente')" title="Assistente AI per scrittura professionale">&#128113;&#8205;&#9792;&#65039; Assistente</button>
   <button class="nav-tab" data-page="consegna" onclick="switchPage('consegna')" title="Consegne turno tra operatori">&#128221; Consegna <span id="consegna-badge" style="display:none;background:var(--accent);color:white;border-radius:9px;font-size:.7rem;padding:1px 6px;margin-left:4px;font-weight:700" title="Consegne non lette"></span></button>
   <button class="nav-tab" data-page="promemoria" onclick="switchPage('promemoria')" title="Promemoria con scadenze">&#128203; Promemoria <span id="promemoria-badge" style="display:none;background:var(--accent);color:white;border-radius:9px;font-size:.7rem;padding:1px 6px;margin-left:4px;font-weight:700" title="Promemoria in scadenza"></span></button>
@@ -629,6 +630,15 @@
   <div id="modulo-form-area" style="display:none"></div>
 </div>
 
+<!-- FORMAZIONE / MULTIDISCIPLINARITA -->
+<div class="page" id="page-formazione">
+  <div style="text-align:center;margin-bottom:16px">
+    <h2 style="font-family:'Playfair Display',serif;font-size:1.5rem;color:var(--ink);margin-bottom:4px">Progetto Multidisciplinarità</h2>
+    <p style="color:var(--muted);font-size:.88rem">Mappatura competenze, livelli di formazione e sistema punti</p>
+  </div>
+  <div id="formazione-content"></div>
+</div>
+
 <!-- ASSISTENTE -->
 <div class="page" id="page-assistente">
   <div class="main-card">
@@ -709,6 +719,22 @@
     <div id="biometric-settings" style="margin-top:14px;padding:12px 16px;background:var(--paper2);border-radius:3px"></div></div>
   <div class="settings-section" id="ai-section" style="display:none"><h4>Assistente AI (Groq)</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Migliora automaticamente i testi nei moduli disciplinari. Ottieni una chiave gratuita su <a href="https://console.groq.com/keys" target="_blank" style="color:var(--accent2)">console.groq.com</a>.</p>
     <div class="add-tipo-row"><div class="field" style="flex:2"><label>Chiave API Groq</label><input type="password" id="groq-key-input" placeholder="gsk_..."></div><button class="btn-add-tipo" onclick="salvaGroqKey()">Salva</button></div><p id="groq-status" style="font-size:.82rem;margin-top:8px"></p></div>
+  <div class="settings-section" id="maison-privacy-section" style="display:none"><h4>Maison — Conservazione dati</h4>
+    <p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Per privacy puoi far cancellare automaticamente le registrazioni dei Costi Maison più vecchie: all'apertura dell'app i dati oltre il periodo scelto vengono eliminati definitivamente (le funzioni manuali Elimina giorno/mese restano disponibili).</p>
+    <div class="add-tipo-row" style="align-items:center">
+      <div class="field" style="max-width:340px"><label>Cancellazione automatica</label>
+        <select id="maison-autodelete-sel" onchange="salvaMaisonAutoDelete(this.value)" style="padding:10px">
+          <option value="0">Disattivata (conserva tutto)</option>
+          <option value="1">Conserva solo il GD corrente (cancella dal GD successivo)</option>
+          <option value="2">Conserva 2 giorni</option>
+          <option value="3">Conserva 3 giorni</option>
+          <option value="7">Conserva 7 giorni</option>
+          <option value="31">Conserva 31 giorni</option>
+        </select>
+      </div>
+    </div>
+    <p id="maison-autodelete-status" style="font-size:.8rem;color:var(--muted);margin-top:8px"></p>
+  </div>
   <div class="settings-section" id="db-stats-section" style="display:none"><h4>Stato Database</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Supabase piano gratuito: 500 MB database.</p>
     <div id="db-stats-content" style="padding:12px 0"><button class="btn-salva" onclick="caricaDbStats()" style="background:var(--ink);font-size:.82rem;padding:8px 20px">Verifica stato</button></div></div>
   <div class="settings-section" id="cestino-section" style="display:none"><h4>&#128465; Cestino</h4><p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Elementi eliminati. Puoi ripristinarli o svuotare il cestino.</p>
@@ -741,6 +767,8 @@
 <script src="js/search.js"></script>
 <script src="js/chat-ui.js"></script>
 <script src="js/moduli.js"></script>
+<script src="js/formazione.js"></script>
+<script src="js/valutazioni.js"></script>
 <script src="js/rapporto.js"></script>
 <script src="js/stats.js"></script>
 <script src="js/consegna.js"></script>

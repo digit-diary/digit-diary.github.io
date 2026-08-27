@@ -13,6 +13,102 @@
 // SEZIONE 13: MAISON (clienti VIP)
 // Costi, budget, import Excel, parser nomi, regali, spese extra
 // ================================================================
+// === AUTO-CANCELLAZIONE COSTI MAISON (privacy, configurabile da admin) ===
+// maisonAutoDeleteGiorni: 0 = off; 1 = conserva solo il GD corrente; N = conserva N giorni.
+// Eseguita al login (loadAll) e all'apertura della pagina Maison. Vale per tutti i reparti.
+let _maisonCleanupInCorso = false;
+async function _maisonAutoCleanup() {
+  if (!maisonAutoDeleteGiorni || _maisonCleanupInCorso) return;
+  const gd = getGiornataCasino();
+  const cutoff = new Date(gd + 'T12:00:00');
+  cutoff.setDate(cutoff.getDate() - (maisonAutoDeleteGiorni - 1));
+  const cutoffStr =
+    cutoff.getFullYear() +
+    '-' +
+    String(cutoff.getMonth() + 1).padStart(2, '0') +
+    '-' +
+    String(cutoff.getDate()).padStart(2, '0');
+  const daEliminare = maisonCache.filter((r) => r.data_giornata < cutoffStr);
+  if (!daEliminare.length) return;
+  _maisonCleanupInCorso = true;
+  try {
+    await secDel('costi_maison', 'data_giornata=lt.' + cutoffStr);
+    maisonCache = maisonCache.filter((r) => r.data_giornata >= cutoffStr);
+    logAzione(
+      'Maison auto-pulizia',
+      daEliminare.length +
+        ' righe eliminate (GD precedenti al ' +
+        cutoffStr +
+        ', conservazione ' +
+        maisonAutoDeleteGiorni +
+        'g)',
+    );
+    const pg = localStorage.getItem('pagina_corrente');
+    if (pg === 'maison') {
+      renderMaisonDashboard();
+      renderMaisonBudgetAlerts();
+    }
+    console.log('Maison auto-pulizia:', daEliminare.length, 'righe eliminate');
+  } catch (e) {
+    console.error('Maison auto-pulizia fallita:', e);
+  } finally {
+    _maisonCleanupInCorso = false;
+  }
+}
+async function salvaMaisonAutoDelete(val) {
+  const nuovo = parseInt(val) || 0;
+  // Conferma esplicita: mostra quante registrazioni esistenti verrebbero eliminate
+  if (nuovo) {
+    const gd = getGiornataCasino();
+    const cutoff = new Date(gd + 'T12:00:00');
+    cutoff.setDate(cutoff.getDate() - (nuovo - 1));
+    const cutoffStr = cutoff.toISOString().split('T')[0];
+    const daEliminare = maisonCache.filter((r) => r.data_giornata < cutoffStr).length;
+    if (daEliminare > 0) {
+      if (
+        !confirm(
+          'ATTENZIONE: con questa impostazione ' +
+            daEliminare +
+            ' registrazioni Maison esistenti (precedenti al ' +
+            new Date(cutoffStr + 'T12:00:00').toLocaleDateString('it-IT') +
+            ') verranno ELIMINATE DEFINITIVAMENTE alla prossima apertura.\n\nConfermi?',
+        )
+      ) {
+        const sel = document.getElementById('maison-autodelete-sel');
+        if (sel) sel.value = String(maisonAutoDeleteGiorni || 0);
+        return;
+      }
+    }
+  }
+  maisonAutoDeleteGiorni = nuovo;
+  await setImp('maison_auto_delete_giorni', String(maisonAutoDeleteGiorni));
+  logAzione(
+    'Maison conservazione dati',
+    maisonAutoDeleteGiorni
+      ? 'auto-cancellazione: conserva ' + maisonAutoDeleteGiorni + ' giorni'
+      : 'auto-cancellazione disattivata',
+  );
+  const st = document.getElementById('maison-autodelete-status');
+  if (maisonAutoDeleteGiorni) {
+    const vecchie = maisonCache.filter((r) => {
+      const gd = getGiornataCasino();
+      const cutoff = new Date(gd + 'T12:00:00');
+      cutoff.setDate(cutoff.getDate() - (maisonAutoDeleteGiorni - 1));
+      return r.data_giornata < cutoff.toISOString().split('T')[0];
+    }).length;
+    if (st)
+      st.innerHTML = vecchie
+        ? '<span style="color:var(--accent);font-weight:600">Attenzione: ' +
+          vecchie +
+          ' registrazioni esistenti verranno eliminate alla prossima apertura.</span>'
+        : '<span style="color:#2c6e49">Impostazione salvata.</span>';
+    toast('Auto-cancellazione attiva: conserva ' + maisonAutoDeleteGiorni + ' giorni');
+  } else {
+    if (st) st.innerHTML = '<span style="color:#2c6e49">Auto-cancellazione disattivata.</span>';
+    toast('Auto-cancellazione disattivata');
+  }
+}
+
 // MAISON MANUALE
 async function salvaMaisonManuale() {
   const rawNome = document.getElementById('maison-man-nome').value.trim();
@@ -80,7 +176,14 @@ async function salvaMaisonManuale() {
   // Per ogni nome: calcola costo, tipo_buono, px, note
   const _nomiSplit = nomiFinali.map((n, i) => {
     const pxI = _pxBase + (i < _pxExtra ? 1 : 0);
-    return { nome: n, px: pxI, tipo_buono: null, costo: 0, note: '', autoDetected: false };
+    return {
+      nome: n,
+      px: pxI,
+      tipo_buono: null,
+      costo: 0,
+      note: '',
+      autoDetected: false,
+    };
   });
   if (tipo && BUONO_VALORI[tipo]) {
     // Utente ha selezionato tipo manualmente
@@ -230,7 +333,9 @@ async function rinominaRegalo(id) {
   const nuovo = prompt('Rinomina cliente regalo:', r.nome);
   if (!nuovo || !nuovo.trim()) return;
   try {
-    await secPatch('regali_maison', 'id=eq.' + id, { nome: capitalizzaNome(nuovo.trim()) });
+    await secPatch('regali_maison', 'id=eq.' + id, {
+      nome: capitalizzaNome(nuovo.trim()),
+    });
     r.nome = capitalizzaNome(nuovo.trim());
     renderRegali();
     toast('Rinominato');
@@ -471,7 +576,17 @@ function renderMaisonDashboard() {
   const byNome = {};
   data.forEach((r) => {
     if (!byNome[r.nome])
-      byNome[r.nome] = { tot: 0, px: 0, visite: 0, bu: 0, bl: 0, cg: 0, wl: 0, condivise: 0, condivisiGruppi: [] };
+      byNome[r.nome] = {
+        tot: 0,
+        px: 0,
+        visite: 0,
+        bu: 0,
+        bl: 0,
+        cg: 0,
+        wl: 0,
+        condivise: 0,
+        condivisiGruppi: [],
+      };
     const _bn = byNome[r.nome];
     _bn.tot += parseFloat(r.costo || 0);
     _bn.px += r.px || 0;
@@ -665,7 +780,11 @@ function renderMaisonGdOggi() {
   if (!righe.length) {
     const dt = new Date(gdData + 'T12:00:00');
     const GIORNI = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'];
-    const dataFmt = dt.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const dataFmt = dt.toLocaleDateString('it-IT', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
     let emptyH =
       '<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div style="display:flex;align-items:center;gap:6px">';
     if (haAltriDati)
@@ -712,7 +831,11 @@ function renderMaisonGdOggi() {
   const totPX = righe.reduce((s, r) => s + (r.px || 0), 0);
   const dt = new Date(gdData + 'T12:00:00');
   const GIORNI = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'];
-  const dataFmt = dt.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const dataFmt = dt.toLocaleDateString('it-IT', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
   const _brGd = getBudgetReparto();
   // Conteggio buoni per l'header
   const _gdBU = _contaBuoni(righe, 'BU'),
@@ -778,9 +901,13 @@ function renderMaisonGdOggi() {
       var catBadge =
         budget && budget.categoria
           ? '<span class="mini-badge" style="background:' +
-            ({ full_maison: '#b8860b', maison: '#2980b9', direzione: '#8e44ad', bu: '#e67e22', bl: '#2c6e49' }[
-              budget.categoria
-            ] || 'var(--muted)') +
+            ({
+              full_maison: '#b8860b',
+              maison: '#2980b9',
+              direzione: '#8e44ad',
+              bu: '#e67e22',
+              bl: '#2c6e49',
+            }[budget.categoria] || 'var(--muted)') +
             ';margin-left:6px">' +
             ({
               full_maison: 'Full Maison',
@@ -802,11 +929,21 @@ function renderMaisonGdOggi() {
           const cBadge =
             bAltro && bAltro.categoria
               ? ' <span class="mini-badge" style="background:' +
-                ({ full_maison: '#b8860b', maison: '#2980b9', direzione: '#8e44ad', bu: '#e67e22', bl: '#2c6e49' }[
-                  bAltro.categoria
-                ] || 'var(--muted)') +
+                ({
+                  full_maison: '#b8860b',
+                  maison: '#2980b9',
+                  direzione: '#8e44ad',
+                  bu: '#e67e22',
+                  bl: '#2c6e49',
+                }[bAltro.categoria] || 'var(--muted)') +
                 ';font-size:.65rem">' +
-                ({ full_maison: 'FM', maison: 'M', direzione: 'D', bu: 'BU', bl: 'BL' }[bAltro.categoria] || '') +
+                ({
+                  full_maison: 'FM',
+                  maison: 'M',
+                  direzione: 'D',
+                  bu: 'BU',
+                  bl: 'BL',
+                }[bAltro.categoria] || '') +
                 '</span>'
               : '';
           return escP(x.nome) + cBadge;
@@ -856,9 +993,13 @@ function renderMaisonGdOggi() {
       var catBadge =
         budget && budget.categoria
           ? '<span class="mini-badge" style="background:' +
-            ({ full_maison: '#b8860b', maison: '#2980b9', direzione: '#8e44ad', bu: '#e67e22', bl: '#2c6e49' }[
-              budget.categoria
-            ] || 'var(--muted)') +
+            ({
+              full_maison: '#b8860b',
+              maison: '#2980b9',
+              direzione: '#8e44ad',
+              bu: '#e67e22',
+              bl: '#2c6e49',
+            }[budget.categoria] || 'var(--muted)') +
             ';margin-left:6px">' +
             ({
               full_maison: 'Full Maison',
@@ -1153,8 +1294,17 @@ async function esportaGdOggiPDF() {
         ],
       ],
       headStyles: { fillColor: [184, 134, 11], halign: 'center' },
-      footStyles: { fillColor: [245, 243, 238], textColor: [0, 0, 0], fontStyle: 'bold' },
-      styles: { lineColor: [220, 215, 205], lineWidth: 0.15, fontSize: 9, cellPadding: 3 },
+      footStyles: {
+        fillColor: [245, 243, 238],
+        textColor: [0, 0, 0],
+        fontStyle: 'bold',
+      },
+      styles: {
+        lineColor: [220, 215, 205],
+        lineWidth: 0.15,
+        fontSize: 9,
+        cellPadding: 3,
+      },
       columnStyles: {
         0: { halign: 'left', cellWidth: 50 },
         1: { halign: 'left', cellWidth: 30 },
@@ -1244,7 +1394,12 @@ function renderMaisonCharts(data, sorted) {
     {
       labels: top15.map((c) => c[0]),
       datasets: [
-        { label: 'CHF', data: top15.map((c) => c[1].tot), backgroundColor: 'rgba(184,134,11,0.7)', borderRadius: 4 },
+        {
+          label: 'CHF',
+          data: top15.map((c) => c[1].tot),
+          backgroundColor: 'rgba(184,134,11,0.7)',
+          borderRadius: 4,
+        },
       ],
     },
     {
@@ -1298,7 +1453,11 @@ function renderMaisonCharts(data, sorted) {
         },
       ],
     },
-    { plugins: { legend: { position: 'bottom', labels: { font: { size: 12 } } } } },
+    {
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 12 } } },
+      },
+    },
   );
 }
 function resetMaisonFiltri() {
@@ -1454,7 +1613,10 @@ function apriDettaglioMaison(nome) {
           ? ' — ' +
             new Date(budget.aggiornato_at).toLocaleDateString('it-IT') +
             ' ' +
-            new Date(budget.aggiornato_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+            new Date(budget.aggiornato_at).toLocaleTimeString('it-IT', {
+              hour: '2-digit',
+              minute: '2-digit',
+            })
           : '') +
         '</p>'
       : '') +
@@ -1947,7 +2109,10 @@ function stampaSchedaCliente() {
     '<div style="text-align:center;margin-top:20px;font-size:.75rem;color:#8a7d6b">Stampato il ' +
       new Date().toLocaleDateString('it-IT') +
       ' alle ' +
-      new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) +
+      new Date().toLocaleTimeString('it-IT', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }) +
       ' — Riservato</div>',
   );
   win.document.write('</body></html>');
@@ -2443,7 +2608,13 @@ async function esportaMaisonClientePDF(nome) {
         head: [['Visite', 'Persone', 'BU', 'BL', 'CG', 'WL', 'Totale CHF', 'Media/visita']],
         body: [[righe.length, totPx, nBU || '-', nBL || '-', nCG || '-', nWL || '-', 'CHF ' + fmtCHF(tot), media]],
         headStyles: { fillColor: [184, 134, 11] },
-        styles: { lineColor: [220, 215, 205], lineWidth: 0.15, fontSize: 9, cellPadding: 4, halign: 'center' },
+        styles: {
+          lineColor: [220, 215, 205],
+          lineWidth: 0.15,
+          fontSize: 9,
+          cellPadding: 4,
+          halign: 'center',
+        },
         columnStyles: { 6: { fontStyle: 'bold' } },
       });
       y = doc.lastAutoTable.finalY + 8;
@@ -2468,7 +2639,12 @@ async function esportaMaisonClientePDF(nome) {
             return [m, fmtCHF(v), delta];
           }),
           headStyles: { fillColor: [26, 74, 122] },
-          styles: { lineColor: [220, 215, 205], lineWidth: 0.15, fontSize: 9, cellPadding: 3 },
+          styles: {
+            lineColor: [220, 215, 205],
+            lineWidth: 0.15,
+            fontSize: 9,
+            cellPadding: 3,
+          },
           alternateRowStyles: { fillColor: [250, 247, 242] },
         });
         y = doc.lastAutoTable.finalY + 8;
@@ -2495,8 +2671,17 @@ async function esportaMaisonClientePDF(nome) {
         }),
         foot: [['TOTALE', '', totPx, 'CHF ' + fmtCHF(tot), '', '', '']],
         headStyles: { fillColor: [26, 18, 8] },
-        footStyles: { fillColor: [245, 243, 238], textColor: [0, 0, 0], fontStyle: 'bold' },
-        styles: { lineColor: [220, 215, 205], lineWidth: 0.15, fontSize: 8, cellPadding: 3 },
+        footStyles: {
+          fillColor: [245, 243, 238],
+          textColor: [0, 0, 0],
+          fontStyle: 'bold',
+        },
+        styles: {
+          lineColor: [220, 215, 205],
+          lineWidth: 0.15,
+          fontSize: 8,
+          cellPadding: 3,
+        },
         columnStyles: { 2: { halign: 'center' }, 3: { halign: 'right' } },
         alternateRowStyles: { fillColor: [250, 247, 242] },
       });
@@ -2524,8 +2709,17 @@ async function esportaMaisonClientePDF(nome) {
           }),
           foot: [['TOTALE EXTRA', '', '', '', 'CHF ' + fmtCHF(totSE)]],
           headStyles: { fillColor: [142, 68, 173] },
-          footStyles: { fillColor: [245, 243, 238], textColor: [0, 0, 0], fontStyle: 'bold' },
-          styles: { lineColor: [220, 215, 205], lineWidth: 0.15, fontSize: 8, cellPadding: 3 },
+          footStyles: {
+            fillColor: [245, 243, 238],
+            textColor: [0, 0, 0],
+            fontStyle: 'bold',
+          },
+          styles: {
+            lineColor: [220, 215, 205],
+            lineWidth: 0.15,
+            fontSize: 8,
+            cellPadding: 3,
+          },
           alternateRowStyles: { fillColor: [250, 247, 242] },
         });
         y = doc.lastAutoTable.finalY + 8;
@@ -2547,7 +2741,12 @@ async function esportaMaisonClientePDF(nome) {
             r.operatore || '',
           ]),
           headStyles: { fillColor: [184, 134, 11] },
-          styles: { lineColor: [220, 215, 205], lineWidth: 0.15, fontSize: 8, cellPadding: 3 },
+          styles: {
+            lineColor: [220, 215, 205],
+            lineWidth: 0.15,
+            fontSize: 8,
+            cellPadding: 3,
+          },
           alternateRowStyles: { fillColor: [250, 247, 242] },
         });
         y = doc.lastAutoTable.finalY + 8;
@@ -2751,7 +2950,9 @@ async function eseguiRinominaMaison(vecchio) {
       (b) => b.nome.toLowerCase() === vecchio.toLowerCase() && (b.reparto_dip || 'slots') === currentReparto,
     );
     if (bIdx !== -1) {
-      await secPatch('maison_budget', 'id=eq.' + maisonBudgetCache[bIdx].id, { nome: nuovo });
+      await secPatch('maison_budget', 'id=eq.' + maisonBudgetCache[bIdx].id, {
+        nome: nuovo,
+      });
       maisonBudgetCache[bIdx].nome = nuovo;
     }
     logAzione('Maison: rinominato', vecchio + ' → ' + nuovo);
@@ -2839,7 +3040,12 @@ async function salvaModificaMaisonRiga(id, nome) {
   const tipo = document.getElementById('edit-mr-tipo').value || null;
   const note = document.getElementById('edit-mr-note').value.trim();
   try {
-    await secPatch('costi_maison', 'id=eq.' + id, { px, costo, tipo_buono: tipo, note });
+    await secPatch('costi_maison', 'id=eq.' + id, {
+      px,
+      costo,
+      tipo_buono: tipo,
+      note,
+    });
     const r = maisonCache.find((x) => x.id === id);
     if (r) {
       r.px = px;

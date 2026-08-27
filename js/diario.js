@@ -75,9 +75,13 @@ async function salva() {
           } catch (e) {}
         }
       }
-      if (!collaboratoriCache.find((c) => c.nome.toLowerCase() === nome.toLowerCase())) {
+      if (!getCollaboratoriReparto().find((c) => c.nome.toLowerCase() === nome.toLowerCase())) {
         try {
-          const cr = await secPost('collaboratori', { nome, attivo: true });
+          const cr = await secPost('collaboratori', {
+            nome,
+            attivo: true,
+            reparto_dip: currentReparto,
+          });
           collaboratoriCache.push(cr[0]);
         } catch (e2) {}
       }
@@ -109,9 +113,13 @@ async function salva() {
     try {
       await secPost('registrazioni', rec);
       datiCache.unshift(rec);
-      if (!collaboratoriCache.find((c) => c.nome.toLowerCase() === nome.toLowerCase())) {
+      if (!getCollaboratoriReparto().find((c) => c.nome.toLowerCase() === nome.toLowerCase())) {
         try {
-          const cr = await secPost('collaboratori', { nome, attivo: true });
+          const cr = await secPost('collaboratori', {
+            nome,
+            attivo: true,
+            reparto_dip: currentReparto,
+          });
           collaboratoriCache.push(cr[0]);
         } catch (e2) {}
       }
@@ -174,7 +182,11 @@ async function salva() {
     document.getElementById('inp-reparto').value = '';
     if (!collaboratoriCache.find((c) => c.nome.toLowerCase() === nome.toLowerCase())) {
       try {
-        const cr = await secPost('collaboratori', { nome, attivo: true });
+        const cr = await secPost('collaboratori', {
+          nome,
+          attivo: true,
+          reparto_dip: currentReparto,
+        });
         collaboratoriCache.push(cr[0]);
         collaboratoriCache.sort((a, b) => a.nome.localeCompare(b.nome));
       } catch (e2) {}
@@ -204,7 +216,10 @@ function _suggerisciFollowUp(nome, testo) {
   const fra14 = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
   const fra30 = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
   function _fmtD(iso) {
-    return new Date(iso + 'T12:00:00').toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' });
+    return new Date(iso + 'T12:00:00').toLocaleDateString('it-IT', {
+      day: '2-digit',
+      month: '2-digit',
+    });
   }
   b.innerHTML =
     '<h3>Scadenza follow-up</h3><p style="margin-bottom:14px">Richiesta registrata per <strong>' +
@@ -285,7 +300,11 @@ async function elimina(id) {
   const op = getOperatore();
   const now = new Date().toISOString();
   try {
-    await secPatch('registrazioni', 'id=eq.' + id, { eliminato: true, eliminato_da: op, eliminato_at: now });
+    await secPatch('registrazioni', 'id=eq.' + id, {
+      eliminato: true,
+      eliminato_da: op,
+      eliminato_at: now,
+    });
     if (_e) {
       _e.eliminato = true;
       _e.eliminato_da = op;
@@ -519,7 +538,10 @@ async function confermaCambioTipo() {
     ' alle ' +
     now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
   try {
-    await secPatch('registrazioni', 'id=eq.' + modalEntryId, { tipo: modalTipoSel, modificato_da: mod });
+    await secPatch('registrazioni', 'id=eq.' + modalEntryId, {
+      tipo: modalTipoSel,
+      modificato_da: mod,
+    });
     const e = datiCache.find((e) => e.id === modalEntryId);
     if (e) {
       e.tipo = modalTipoSel;
@@ -561,7 +583,12 @@ async function salvaScadenza(regId) {
     return;
   }
   try {
-    const r = await secPost('scadenze', { registrazione_id: regId, titolo: t, data_scadenza: d, descrizione: desc });
+    const r = await secPost('scadenze', {
+      registrazione_id: regId,
+      titolo: t,
+      data_scadenza: d,
+      descrizione: desc,
+    });
     scadenzeCache.push(r[0]);
     logAzione('Scadenza creata', t + ' - ' + d);
     renderScadenzeBanner();
@@ -573,7 +600,10 @@ async function salvaScadenza(regId) {
 }
 async function completaScadenza(id) {
   try {
-    await secPatch('scadenze', 'id=eq.' + id, { completata: true, completata_da: getOperatore() || '?' });
+    await secPatch('scadenze', 'id=eq.' + id, {
+      completata: true,
+      completata_da: getOperatore() || '?',
+    });
     const s = scadenzeCache.find((s) => s.id === id);
     if (s) {
       s.completata = true;
@@ -831,7 +861,10 @@ async function parseDifferenzeCassa(text, ds, turno) {
         // Aggiorna importo e testo se cambiati
         if (Math.abs(parseFloat(esiste.importo) || 0) !== amount || esiste.testo !== newTesto) {
           try {
-            await secPatch('registrazioni', 'id=eq.' + esiste.id, { importo: amount, testo: newTesto });
+            await secPatch('registrazioni', 'id=eq.' + esiste.id, {
+              importo: amount,
+              testo: newTesto,
+            });
             esiste.importo = amount;
             esiste.testo = newTesto;
           } catch (e) {}
