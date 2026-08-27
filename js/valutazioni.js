@@ -580,6 +580,7 @@ const _AREE_MATCH = [
 function _parseValutazioneWorkbook(wb) {
   const aree = {};
   const areeNote = {};
+  const areeValori = {};
   const extra = {};
   let annoTrovato = null;
   const leggiNum = (v) => {
@@ -604,6 +605,7 @@ function _parseValutazioneWorkbook(wb) {
     if (!isScheda) continue;
     let colPunteggio = -1;
     let colDescr = -1;
+    let colValore = -1;
     const dp = extra.dati_personali || {};
     // DATI PERSONALI ufficiali: nella scheda le etichette compaiono due volte per riga
     // (colonna sinistra = valutato, colonna destra = valutatore)
@@ -659,6 +661,9 @@ function _parseValutazioneWorkbook(wb) {
         let ip = rowNorm.findIndex((c) => c.includes('punteggio'));
         if (ip === -1) ip = rowNorm.findIndex((c) => c === 'valore');
         if (ip !== -1) colPunteggio = ip;
+        // colonna D "Valore" (ponderazione ufficiale) — solo se distinta dal punteggio
+        const iv = rowNorm.findIndex((c, j) => c === 'valore' && j !== ip);
+        colValore = iv !== -1 && rowNorm[ip] !== 'valore' ? iv : -1;
         const idd = rowNorm.findIndex((c) => c.includes('descrizione area') || c.includes('param'));
         if (idd !== -1) colDescr = idd;
         return;
@@ -688,6 +693,11 @@ function _parseValutazioneWorkbook(wb) {
             }
           }
         }
+        // colonna D "Valore" (ponderazione ufficiale) per il calcolo di Totale/Conseguito
+        if (areeValori[am.key] == null && colValore !== -1) {
+          const nv = leggiNum(row[colValore]);
+          if (nv != null) areeValori[am.key] = nv;
+        }
         // nota del valutatore (es. colonna I): primo testo dopo la colonna Descrizione
         if (areeNote[am.key] == null && colDescr !== -1) {
           for (let j = colDescr + 1; j < row.length; j++) {
@@ -708,6 +718,7 @@ function _parseValutazioneWorkbook(wb) {
           .map((v) => String(v || '').trim())
           .find((v) => v.length > 2);
         if (label.startsWith('punti di forza') && testoDopo && !extra.punti_forza) extra.punti_forza = testoDopo;
+        if (label === 'sintesi' && testoDopo && !extra.sintesi) extra.sintesi = testoDopo;
         if (label.startsWith('esigenze formative') && testoDopo && !extra.esigenze_formative)
           extra.esigenze_formative = testoDopo;
       }
@@ -725,6 +736,7 @@ function _parseValutazioneWorkbook(wb) {
     });
   }
   if (Object.keys(areeNote).length) extra.aree_note = areeNote;
+  if (Object.keys(areeValori).length) extra.aree_valori = areeValori;
   return { aree, annoTrovato, extra };
 }
 async function importaValutazioneExcel(input, nome) {
@@ -814,6 +826,8 @@ async function _confermaImportValutazione() {
     if (ex.esigenze_formative) testi.esigenze_formative = ex.esigenze_formative;
     if (Array.isArray(ex.obiettivi) && ex.obiettivi.length) testi.obiettivi = ex.obiettivi;
     if (ex.aree_note && Object.keys(ex.aree_note).length) testi.aree_note = ex.aree_note;
+    if (ex.aree_valori && Object.keys(ex.aree_valori).length) testi.aree_valori = ex.aree_valori;
+    if (ex.sintesi) testi.sintesi = ex.sintesi;
     // dati ufficiali della scheda: settore, funzione, ID, valutatore, data
     if (ex.dati_personali && Object.keys(ex.dati_personali).length) testi.dati_personali = ex.dati_personali;
     if (ex.valutatore) testi.valutatore = ex.valutatore;
@@ -822,6 +836,7 @@ async function _confermaImportValutazione() {
     if (esistente) {
       const areeMerged = Object.assign({}, esistente.aree || {}, p.aree);
       if (testi.aree_note) testi.aree_note = Object.assign({}, esistente.aree_note || {}, testi.aree_note);
+      if (testi.aree_valori) testi.aree_valori = Object.assign({}, esistente.aree_valori || {}, testi.aree_valori);
       if (testi.dati_personali)
         testi.dati_personali = Object.assign({}, esistente.dati_personali || {}, testi.dati_personali);
       const patch = Object.assign({ aree: areeMerged, updated_at: new Date().toISOString() }, testi);
@@ -893,46 +908,88 @@ async function esportaValutazionePDF(id) {
     doc.setTextColor(0);
     y += 9;
   }
+  // === DATI PERSONALI: blocco a due colonne come il foglio ufficiale ===
   sezione('DATI PERSONALI');
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9.5);
   const dpP = v.dati_personali || {};
   const settoreLbl = dpP.settore || 'Reparto ' + (v.reparto_dip === 'tavoli' ? 'Tavoli' : 'Slot');
-  doc.text('Valutato: ' + v.collaboratore + (dpP.valutato_id ? ' (ID ' + dpP.valutato_id + ')' : ''), mx, y + 1);
-  doc.text('Settore: ' + settoreLbl, mx + 90, y + 1);
-  y += 6;
-  if (dpP.funzione) {
-    doc.text('Funzione: ' + dpP.funzione, mx, y + 1);
-    y += 5;
-  }
-  doc.text('Periodo di valutazione: ' + v.anno, mx, y + 1);
-  doc.text(
-    'Data: ' + (v.data_valutazione ? new Date(v.data_valutazione + 'T12:00:00').toLocaleDateString('it-IT') : ''),
-    mx + 90,
-    y + 1,
+  const dataLbl = v.data_valutazione ? new Date(v.data_valutazione + 'T12:00:00').toLocaleDateString('it-IT') : '';
+  const stileDP = {
+    theme: 'grid',
+    margin: { left: mx, right: mx },
+    styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 8.5, cellPadding: 1.8, valign: 'middle' },
+    columnStyles: {
+      0: { cellWidth: 38, fontStyle: 'bold' },
+      1: { cellWidth: 53 },
+      2: { cellWidth: 38, fontStyle: 'bold' },
+      3: { cellWidth: 'auto' },
+    },
+  };
+  doc.autoTable(
+    Object.assign({}, stileDP, {
+      startY: y,
+      body: [
+        ['Valutato ID:', dpP.valutato_id || '', 'Valutatore ID:', dpP.valutatore_id || ''],
+        ['Cognome, Nome', v.collaboratore, 'Cognome, Nome', v.valutatore || ''],
+        ['Settore', settoreLbl, 'Settore', dpP.valutatore_settore || ''],
+        ['Funzione', dpP.funzione || '', 'Funzione', dpP.valutatore_funzione || ''],
+        ['Periodo di valutazione:', String(v.anno), 'Data:', dataLbl],
+      ],
+    }),
   );
-  y += 5;
-  if (v.valutatore) {
-    doc.text(
-      'Valutatore: ' +
-        v.valutatore +
-        (dpP.valutatore_id ? ' (ID ' + dpP.valutatore_id + ')' : '') +
-        (dpP.valutatore_funzione ? ' — ' + dpP.valutatore_funzione : '') +
-        (dpP.valutatore_settore ? ' — Settore ' + dpP.valutatore_settore : ''),
-      mx,
-      y + 1,
-    );
-    y += 5;
-  }
-  y += 2;
+  y = doc.lastAutoTable.finalY + 3;
   doc.setFontSize(7.5);
   doc.setTextColor(90);
-  doc.text('Scala di valore: ' + SCALA_VALUTAZIONE, mx, y);
+  doc.text('Scala di valore: ' + SCALA_VALUTAZIONE, mx, y + 1);
   doc.setTextColor(0);
   y += 5;
+  // === Tabelle aree nel formato ufficiale: Grado / Punteggio / Valore / Totale ===
   const aree = _areeNormalizza(v.aree);
   const note = v.aree_note || {};
+  const valori = v.aree_valori || {};
   const conNote = Object.keys(note).some((k) => note[k]);
+  const conValori = Object.keys(valori).some((k) => valori[k] != null);
+  const stileTab = {
+    theme: 'grid',
+    margin: { left: mx, right: mx },
+    headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 7.5 },
+    styles: { lineColor: [0, 0, 0], lineWidth: 0.2, fontSize: 7.2, cellPadding: 1.8, valign: 'top' },
+  };
+  const colStili = {
+    0: { cellWidth: 30, fontStyle: 'bold' },
+    1: { cellWidth: 11, halign: 'center' },
+    2: { cellWidth: 17, halign: 'center', fontStyle: 'bold' },
+    3: { cellWidth: 12, halign: 'center' },
+    4: { cellWidth: 12, halign: 'center' },
+    5: { cellWidth: 'auto' },
+  };
+  if (conNote) colStili[6] = { cellWidth: 40, fontStyle: 'italic' };
+  const testataAree = ['Area di valutazione', 'Grado', 'Punteggio', 'Valore', 'Totale', 'Descrizione area'];
+  if (conNote) testataAree.push('Osservazioni');
+  // sezione "Verifica obiettivi precedenti" del formulario ufficiale (compilazione manuale)
+  if (y + 30 > ph - 20) {
+    doc.addPage();
+    y = 14;
+  }
+  sezione('VERIFICA OBIETTIVI PRECEDENTI E FORMAZIONI CONSEGUITE');
+  doc.autoTable(
+    Object.assign({}, stileTab, {
+      startY: y,
+      head: [
+        ['Area di valutazione', 'Grado', 'Punteggio', 'Valore', 'Totale', 'Paramentro di valutazione e/o osservazioni'],
+      ],
+      body: [
+        ['', '', '', '', '', ''],
+        ['', '', '', '', '', ''],
+        ['', '', '', '', '', ''],
+        [
+          { content: '', colSpan: 5 },
+          { content: 'Conseguito:', styles: { fontStyle: 'bold', halign: 'right' } },
+        ],
+      ],
+      columnStyles: colStili,
+    }),
+  );
+  y = doc.lastAutoTable.finalY + 4;
   const gruppi = ['COMPETENZE PERSONALI', 'PRESTAZIONI LAVORATIVE', 'COMPETENZE MULTIDISCIPLINARI'];
   gruppi.forEach((g) => {
     const righe = AREE_VALUTAZIONE.filter((a) => a.gruppo === g);
@@ -946,46 +1003,37 @@ async function esportaValutazionePDF(id) {
           ? ' (progetto multidisciplinarità)'
           : ' (in riferimento alla posizione ricoperta)'),
     );
-    doc.autoTable({
-      theme: 'grid',
-      startY: y,
-      margin: { left: mx, right: mx },
-      head: [
-        conNote
-          ? ['Area di valutazione', 'Valore', 'Descrizione area', 'Osservazioni']
-          : ['Area di valutazione', 'Valore', 'Descrizione area'],
-      ],
-      body: righe.map((a) => {
-        const base = [a.label, aree[a.key] != null ? aree[a.key] + '%' : '', a.desc];
-        if (conNote) base.push(note[a.key] || '');
-        return base;
-      }),
-      headStyles: {
-        fillColor: [240, 240, 240],
-        textColor: [0, 0, 0],
-        fontStyle: 'bold',
-        fontSize: 8,
-      },
-      styles: {
-        lineColor: [0, 0, 0],
-        lineWidth: 0.2,
-        fontSize: 7.5,
-        cellPadding: 2,
-        valign: 'top',
-      },
-      columnStyles: conNote
-        ? {
-            0: { cellWidth: 40, fontStyle: 'bold' },
-            1: { cellWidth: 14, halign: 'center', fontStyle: 'bold' },
-            2: { cellWidth: 'auto' },
-            3: { cellWidth: 48, fontStyle: 'italic' },
-          }
-        : {
-            0: { cellWidth: 45, fontStyle: 'bold' },
-            1: { cellWidth: 16, halign: 'center', fontStyle: 'bold' },
-            2: { cellWidth: 'auto' },
-          },
+    // Conseguito = somma Totale / somma Punteggio (come nel foglio ufficiale)
+    let sommaTot = 0;
+    let sommaPunt = 0;
+    const body = righe.map((a) => {
+      const p = aree[a.key];
+      const val = valori[a.key];
+      const grado = p != null ? _gradoScala(p) : '';
+      const totale = p != null && val != null ? Math.round((p * val) / 100) : '';
+      if (p != null && val != null) {
+        sommaTot += (p * val) / 100;
+        sommaPunt += p;
+      }
+      const riga = [a.label, grado, p != null ? p : '', val != null ? val : '', totale, a.desc];
+      if (conNote) riga.push(note[a.key] || '');
+      return riga;
     });
+    if (conValori && sommaPunt > 0) {
+      const conseguito = Math.round((sommaTot / sommaPunt) * 100) + '%';
+      body.push([
+        { content: '', colSpan: conNote ? 6 : 5 },
+        { content: 'Conseguito: ' + conseguito, styles: { fontStyle: 'bold', halign: 'right' } },
+      ]);
+    }
+    doc.autoTable(
+      Object.assign({}, stileTab, {
+        startY: y,
+        head: [testataAree],
+        body,
+        columnStyles: colStili,
+      }),
+    );
     y = doc.lastAutoTable.finalY + 4;
   });
   if (y + 45 > ph - 20) {
@@ -997,15 +1045,20 @@ async function esportaValutazionePDF(id) {
   doc.setFontSize(8.5);
   function blocco(label, testo) {
     doc.setFont('helvetica', 'bold');
-    doc.text(label, mx, y + 1);
+    const labLines = doc.splitTextToSize(label, 42);
+    doc.text(labLines, mx, y + 1);
     doc.setFont('helvetica', 'normal');
     const lines = doc.splitTextToSize(testo || '—', pw - mx * 2 - 45);
     doc.text(lines, mx + 45, y + 1);
-    y += Math.max(6, lines.length * 3.8 + 2);
+    y += Math.max(6, Math.max(lines.length, labLines.length) * 3.8 + 2);
   }
+  if (v.sintesi) blocco('Sintesi', v.sintesi);
   blocco('Punti di forza', v.punti_forza);
   const ob = v.obiettivi || [];
-  blocco('Obiettivi entro 31/12', ob.length ? ob.map((o, i) => i + 1 + '. ' + o).join('\n') : '—');
+  blocco(
+    'Punti da migliorare/sviluppare e/o obiettivi da raggiungere entro il 31 dicembre:',
+    ob.length ? ob.map((o, i) => i + 1 + '. ' + o).join('\n') : '—',
+  );
   blocco('Esigenze formative', v.esigenze_formative);
   if (v.osservazioni) {
     if (y + 25 > ph - 30) {
@@ -1026,8 +1079,19 @@ async function esportaValutazionePDF(id) {
   doc.setFontSize(8.5);
   doc.text('Valutato, data e firma', mx, y + 4);
   doc.line(mx, y + 14, mx + 70, y + 14);
-  doc.text('Responsabile, data e firma', mx + 95, y + 4);
+  doc.text('Valutatore, firma', mx + 95, y + 4);
   doc.line(mx + 95, y + 14, mx + 165, y + 14);
+  y += 22;
+  if (y + 22 > ph - 15) {
+    doc.addPage();
+    y = 14;
+  }
+  doc.text('Per visione resp. Settore', mx, y + 4);
+  doc.text('Data, visto:', mx, y + 9);
+  doc.line(mx + 18, y + 14, mx + 70, y + 14);
+  doc.text('Per visione HR', mx + 95, y + 4);
+  doc.text('Data, visto:', mx + 95, y + 9);
+  doc.line(mx + 113, y + 14, mx + 165, y + 14);
   doc.setFontSize(6.5);
   doc.setTextColor(150);
   doc.text('Casino Lugano SA — Scheda di valutazione ' + v.anno + ' — Riservato', mx, ph - 8);
