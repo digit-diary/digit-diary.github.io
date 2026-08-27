@@ -252,14 +252,14 @@ function _playNotifSound() {
 }
 function mostraNotifBanner(tipo, titolo, testo, azione) {
   const icons = {
-    nota: '&#9993;',
-    consegna: '&#128221;',
-    promemoria: '&#128203;',
+    nota: '<i class="icx icx-mail"></i>',
+    consegna: '<i class="icx icx-penna"></i>',
+    promemoria: '<i class="icx icx-clipboard"></i>',
     urgente: '&#10071;',
   };
   const b = document.getElementById('notif-banner');
   b.className = 'notif-banner ' + (tipo || 'nota');
-  document.getElementById('notif-icon').innerHTML = icons[tipo] || '&#128276;';
+  document.getElementById('notif-icon').innerHTML = icons[tipo] || '<i class="icx icx-campana"></i>';
   document.getElementById('notif-title').textContent = titolo;
   document.getElementById('notif-text').textContent = testo;
   _notifAction = azione || null;

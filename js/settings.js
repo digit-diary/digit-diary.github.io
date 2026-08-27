@@ -658,7 +658,9 @@ function toggleTema() {
   document.body.classList.toggle('dark-theme');
   const isDark = document.body.classList.contains('dark-theme');
   localStorage.setItem(getTemaKey(), isDark ? 'dark' : 'light');
-  document.getElementById('btn-tema').innerHTML = isDark ? '&#9728;&#65039; Tema chiaro' : '&#127761; Tema scuro';
+  document.getElementById('btn-tema').innerHTML = isDark
+    ? '<i class="icx icx-sole"></i> Tema chiaro'
+    : '<i class="icx icx-luna"></i> Tema scuro';
 }
 function applicaTemaOperatore() {
   const t = localStorage.getItem(getTemaKey()) || localStorage.getItem('tema') || 'light';

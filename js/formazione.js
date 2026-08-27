@@ -380,7 +380,9 @@ function renderFormazione() {
             '</span>'
           : '<span style="font-size:.78rem;color:#2c6e49;font-weight:700">Tutte le soglie raggiunte!</span>') +
         (raggiunti.length
-          ? '<span style="font-size:.78rem;color:#2c6e49">🏆 ' + raggiunti.map(escP).join(', ') + '</span>'
+          ? '<span style="font-size:.78rem;color:#2c6e49"><i class="icx icx-trofeo"></i> ' +
+            raggiunti.map(escP).join(', ') +
+            '</span>'
           : '') +
         '</div></div>';
     });
@@ -541,7 +543,7 @@ function _renderEquitaCard(collabs) {
       '</td><td class="num">' +
       (r.media != null ? r.media + '%' : '—') +
       '</td><td style="font-size:.78rem;color:var(--accent)">' +
-      (r.flag ? '⚠ ' + escP(r.flag) : '') +
+      (r.flag ? '<i class="icx icx-avviso"></i> ' + escP(r.flag) : '') +
       '</td></tr>';
   });
   html += '</tbody></table></div>';
@@ -621,7 +623,7 @@ async function toggleCompetenza(collabId, key, cb) {
       );
       const b = document.getElementById('pwd-modal-content');
       b.innerHTML =
-        '<h3>🎉 ' +
+        '<h3><i class="icx icx-premio"></i> ' +
         escP(c.nome) +
         ' → Livello ' +
         dopo +
@@ -705,7 +707,7 @@ async function assegnaPuntiRapido() {
       setTimeout(() => {
         const b = document.getElementById('pwd-modal-content');
         b.innerHTML =
-          '<h3>🏆 Traguardo raggiunto!</h3><p style="margin-bottom:14px"><strong>' +
+          '<h3><i class="icx icx-trofeo"></i> Traguardo raggiunto!</h3><p style="margin-bottom:14px"><strong>' +
           escP(nome) +
           '</strong> ha raggiunto <strong>' +
           raggiunta.punti +

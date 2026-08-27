@@ -299,7 +299,7 @@ function _renderRiallineaUI() {
   if (!rimaste.length) {
     // Riepilogo finale
     mc.innerHTML =
-      '<div style="text-align:center;padding:20px"><div style="font-size:2.5rem;margin-bottom:8px">&#9989;</div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Riallineamento completato</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:#2c6e49">' +
+      '<div style="text-align:center;padding:20px"><div style="font-size:2.5rem;margin-bottom:8px"><i class="icx icx-check"></i></div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Riallineamento completato</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:#2c6e49">' +
       st.confermati +
       '</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Confermati</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--muted)">' +
       st.saltati +
@@ -391,7 +391,7 @@ async function confermaRiallinea(idx) {
   if (row) {
     row.style.background = 'rgba(44,110,73,0.1)';
     row.innerHTML =
-      '<span style="color:#2c6e49;font-size:.85rem">&#9989; ' +
+      '<span style="color:#2c6e49;font-size:.85rem"><i class="icx icx-check"></i> ' +
       escP(c.vecchio) +
       ' → <strong>' +
       escP(c.nuovo) +
@@ -507,7 +507,7 @@ function _renderUnisciUI() {
   const rimaste = st.coppie.filter((c) => !c._done);
   if (!rimaste.length) {
     mc.innerHTML =
-      '<div style="text-align:center;padding:20px"><div style="font-size:2.5rem;margin-bottom:8px">&#9989;</div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Unione duplicati completata</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:#2c6e49">' +
+      '<div style="text-align:center;padding:20px"><div style="font-size:2.5rem;margin-bottom:8px"><i class="icx icx-check"></i></div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Unione duplicati completata</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:#2c6e49">' +
       st.confermati +
       '</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Uniti</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--muted)">' +
       st.saltati +
@@ -559,14 +559,14 @@ function _renderUnisciUI() {
     const rInfo = [];
     if (c.keep.budget_chf) kInfo.push(fmtCHF(parseFloat(c.keep.budget_chf)) + ' CHF');
     if (c.keep.categoria) kInfo.push(_catLabel(c.keep.categoria));
-    if (c.keep.data_nascita) kInfo.push('&#127874; ' + _fmtDn(c.keep.data_nascita));
+    if (c.keep.data_nascita) kInfo.push('<i class="icx icx-torta"></i> ' + _fmtDn(c.keep.data_nascita));
     if (c.remove.budget_chf) rInfo.push(fmtCHF(parseFloat(c.remove.budget_chf)) + ' CHF');
     if (c.remove.categoria) rInfo.push(_catLabel(c.remove.categoria));
-    if (c.remove.data_nascita) rInfo.push('&#127874; ' + _fmtDn(c.remove.data_nascita));
+    if (c.remove.data_nascita) rInfo.push('<i class="icx icx-torta"></i> ' + _fmtDn(c.remove.data_nascita));
     const mInfo = [];
     if (c.merged.categoria) mInfo.push(_catLabel(c.merged.categoria));
     if (c.merged.budget_chf) mInfo.push(fmtCHF(parseFloat(c.merged.budget_chf)) + ' CHF');
-    if (c.merged.data_nascita) mInfo.push('&#127874; ' + _fmtDn(c.merged.data_nascita));
+    if (c.merged.data_nascita) mInfo.push('<i class="icx icx-torta"></i> ' + _fmtDn(c.merged.data_nascita));
     html +=
       '<div id="unisci-row-' +
       idx +
@@ -659,7 +659,7 @@ async function confermaUnisci(idx) {
     if (row) {
       row.style.background = 'rgba(44,110,73,0.1)';
       row.innerHTML =
-        '<span style="color:#2c6e49;font-size:.85rem">&#9989; ' +
+        '<span style="color:#2c6e49;font-size:.85rem"><i class="icx icx-check"></i> ' +
         escP(c.remove.nome) +
         ' unito in <strong>' +
         escP(c.merged.nome) +
@@ -794,7 +794,7 @@ function renderMaisonBudgetAlerts() {
   const nearAlerts = alerts.filter((a) => a.tipo.includes('near'));
   if (overAlerts.length) {
     html +=
-      '<div class="cassa-alert-banner rdi" style="margin-bottom:8px;cursor:default">&#9888; Budget superato: ' +
+      '<div class="cassa-alert-banner rdi" style="margin-bottom:8px;cursor:default"><i class="icx icx-avviso"></i> Budget superato: ' +
       overAlerts
         .map(
           (a) =>
@@ -810,7 +810,7 @@ function renderMaisonBudgetAlerts() {
   }
   if (nearAlerts.length) {
     html +=
-      '<div class="cassa-alert-banner allin" style="margin-bottom:8px;cursor:default">&#9888; Quasi al budget (80%+): ' +
+      '<div class="cassa-alert-banner allin" style="margin-bottom:8px;cursor:default"><i class="icx icx-avviso"></i> Quasi al budget (80%+): ' +
       nearAlerts.map((a) => escP(a.nome) + ' (' + fmtCHF(a.spent) + '/' + fmtCHF(a.budget) + ' CHF)').join(' — ') +
       '</div>';
   }
@@ -2163,9 +2163,9 @@ function renderInventarioCustom(cat) {
         escP(r.note || '') +
         '</td><td style="padding:6px 8px"><div style="display:flex;gap:4px"><button class="entry-action-btn" onclick="modificaInventario(' +
         r.id +
-        ')" title="Modifica">&#9998;</button><button class="entry-action-btn" onclick="eliminaInventario(' +
+        ')" title="Modifica"><i class="icx icx-modifica"></i></button><button class="entry-action-btn" onclick="eliminaInventario(' +
         r.id +
-        ')" title="Elimina">&#128465;</button></div></td></tr>';
+        ')" title="Elimina"><i class="icx icx-cestino"></i></button></div></td></tr>';
     });
     html += '</tbody></table></div>';
     html +=
@@ -2258,17 +2258,17 @@ function renderInventarioBuoni() {
         })
         .join('') +
       (_scortaFinita.length
-        ? '<div style="width:100%;grid-column:1/-1;margin-top:8px;padding:8px;background:rgba(192,57,43,0.15);color:var(--accent);border-radius:3px;font-size:.85rem;font-weight:600">&#9888; Scorta esaurita: ' +
+        ? '<div style="width:100%;grid-column:1/-1;margin-top:8px;padding:8px;background:rgba(192,57,43,0.15);color:var(--accent);border-radius:3px;font-size:.85rem;font-weight:600"><i class="icx icx-avviso"></i> Scorta esaurita: ' +
           _scortaFinita.join(', ') +
           '</div>'
         : '') +
       (_scortaBassa.length
-        ? '<div style="width:100%;grid-column:1/-1;margin-top:8px;padding:8px;background:rgba(230,126,34,0.12);color:#e67e22;border-radius:3px;font-size:.85rem">&#9888; Scorta bassa (&le;10): ' +
+        ? '<div style="width:100%;grid-column:1/-1;margin-top:8px;padding:8px;background:rgba(230,126,34,0.12);color:#e67e22;border-radius:3px;font-size:.85rem"><i class="icx icx-avviso"></i> Scorta bassa (&le;10): ' +
           _scortaBassa.map((t) => t + ' (' + giacenze[t] + ')').join(', ') +
           '</div>'
         : '') +
       (nonPareggiati
-        ? '<div style="width:100%;grid-column:1/-1;margin-top:8px;padding:8px;background:rgba(230,126,34,0.12);color:#e67e22;border-radius:3px;font-size:.85rem">&#9888; ' +
+        ? '<div style="width:100%;grid-column:1/-1;margin-top:8px;padding:8px;background:rgba(230,126,34,0.12);color:#e67e22;border-radius:3px;font-size:.85rem"><i class="icx icx-avviso"></i> ' +
           nonPareggiati +
           ' buoni pre-assegnati non pareggiati</div>'
         : '');
@@ -2400,9 +2400,9 @@ function renderInventarioBuoniTable() {
       ? ''
       : '<div style="display:flex;gap:4px"><button class="entry-action-btn" onclick="modificaInventario(' +
         r.id +
-        ')" title="Modifica">&#9998;</button><button class="entry-action-btn" onclick="eliminaInventario(' +
+        ')" title="Modifica"><i class="icx icx-modifica"></i></button><button class="entry-action-btn" onclick="eliminaInventario(' +
         r.id +
-        ')" title="Elimina">&#128465;</button></div>';
+        ')" title="Elimina"><i class="icx icx-cestino"></i></button></div>';
     html +=
       '<tr style="border-bottom:1px solid var(--line)"><td style="padding:6px 8px;white-space:nowrap;color:var(--muted);font-size:.82rem">' +
       d +
@@ -2513,9 +2513,9 @@ function renderInventarioSigTable() {
       escP(r.note || '') +
       '</td><td style="padding:6px 8px"><div style="display:flex;gap:4px"><button class="entry-action-btn" onclick="modificaInventario(' +
       r.id +
-      ')" title="Modifica">&#9998;</button><button class="entry-action-btn" onclick="eliminaInventario(' +
+      ')" title="Modifica"><i class="icx icx-modifica"></i></button><button class="entry-action-btn" onclick="eliminaInventario(' +
       r.id +
-      ')" title="Elimina">&#128465;</button></div></td></tr>';
+      ')" title="Elimina"><i class="icx icx-cestino"></i></button></div></td></tr>';
   });
   html += '</tbody></table>';
   el.innerHTML = html;
@@ -2965,68 +2965,68 @@ function aggiornaMenuMobile() {
     const items = document.getElementById('mobile-nav-items');
     if (!items) return;
     const tabs = [
-      { page: 'dashboard', icon: '&#127968;', label: 'Home' },
-      { page: 'diario', icon: '&#128214;', label: 'Diario' },
+      { page: 'dashboard', icon: '<i class="icx icx-home"></i>', label: 'Home' },
+      { page: 'diario', icon: '<i class="icx icx-diario"></i>', label: 'Diario' },
       {
         page: 'rapporto',
-        icon: '&#128197;',
+        icon: '<i class="icx icx-calendario"></i>',
         label: 'Rapporto',
         vis: 'rapporto',
       },
       {
         page: 'note-collega',
-        icon: '&#9993;&#65039;',
+        icon: '<i class="icx icx-mail"></i>&#65039;',
         label: 'Note Colleghi',
         vis: 'note_collega',
         badgeId: 'note-badge',
       },
       {
         page: 'statistiche',
-        icon: '&#128202;',
+        icon: '<i class="icx icx-stats"></i>',
         label: 'Statistiche',
         vis: 'statistiche',
       },
-      { page: 'moduli', icon: '&#128196;', label: 'Moduli', vis: 'moduli' },
+      { page: 'moduli', icon: '<i class="icx icx-file"></i>', label: 'Moduli', vis: 'moduli' },
       {
         page: 'formazione',
-        icon: '&#127891;',
+        icon: '<i class="icx icx-formazione"></i>',
         label: 'Formazione',
         vis: 'formazione',
       },
       {
         page: 'assistente',
-        icon: '&#128113;&#8205;&#9792;&#65039;',
+        icon: '<i class="icx icx-assistente"></i>',
         label: 'Assistente',
         vis: 'assistente',
       },
       {
         page: 'consegna',
-        icon: '&#128221;',
+        icon: '<i class="icx icx-penna"></i>',
         label: 'Consegna',
         vis: 'consegna',
         badgeId: 'consegna-badge',
       },
       {
         page: 'promemoria',
-        icon: '&#128203;',
+        icon: '<i class="icx icx-clipboard"></i>',
         label: 'Promemoria',
         vis: 'promemoria',
         badgeId: 'promemoria-badge',
       },
-      { page: 'maison', icon: '&#127860;', label: 'Maison', vis: 'maison' },
+      { page: 'maison', icon: '<i class="icx icx-maison"></i>', label: 'Maison', vis: 'maison' },
       {
         page: 'inventario',
-        icon: '&#128230;',
+        icon: '<i class="icx icx-inventario"></i>',
         label: 'Inventario',
         vis: 'inventario',
       },
       {
         page: 'registro',
-        icon: '&#128203;',
+        icon: '<i class="icx icx-clipboard"></i>',
         label: 'Registro',
         adminOnly: true,
       },
-      { page: 'impostazioni', icon: '&#9881;&#65039;', label: 'Impostazioni' },
+      { page: 'impostazioni', icon: '<i class="icx icx-settings"></i>', label: 'Impostazioni' },
     ];
     const cur = localStorage.getItem('pagina_corrente') || 'dashboard';
     let html = '';
@@ -3053,7 +3053,7 @@ function aggiornaMenuMobile() {
       return t.page === cur;
     });
     var hBtn = document.getElementById('hamburger-btn');
-    if (hBtn && curTab) hBtn.innerHTML = '&#9776; ' + curTab.icon + ' ' + curTab.label;
+    if (hBtn && curTab) hBtn.innerHTML = '<i class="icx icx-menu"></i> ' + curTab.icon + ' ' + curTab.label;
   } catch (e) {
     console.error('Menu mobile error:', e);
   }
