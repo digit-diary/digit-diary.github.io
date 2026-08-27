@@ -152,6 +152,8 @@ function renderFormazione() {
   const el = document.getElementById('formazione-content');
   if (!el) return;
   const adm = isAdmin();
+  const puoPunti = typeof puoModificare === 'function' ? puoModificare('gestione_punti') : adm;
+  const puoComp = typeof puoModificare === 'function' ? puoModificare('gestione_competenze') : adm;
   const comps = getCompetenzeReparto();
   const collabs = getCollaboratoriReparto()
     .filter((c) => c.attivo !== false)
@@ -216,19 +218,32 @@ function renderFormazione() {
       ne +
       '\')"><strong>' +
       escP(c.nome) +
-      '</strong></span></td>';
+      '</strong></span>' +
+      (c.impiego
+        ? ' <span class="mini-badge" style="background:' +
+          (c.impiego === 'fisso' ? '#1a7a6d' : '#e67e22') +
+          ';font-size:.62rem">' +
+          (c.impiego === 'fisso' ? 'Fisso' : 'Jolly') +
+          '</span>'
+        : '') +
+      (c.categoria
+        ? ' <span class="mini-badge" style="background:var(--accent2);font-size:.62rem">' +
+          c.categoria +
+          '&ordf;</span>'
+        : '') +
+      '</td>';
     comps.forEach((k) => {
       const on = (c.competenze || {})[k.key] === true;
       html +=
         '<td class="num"><input type="checkbox" ' +
         (on ? 'checked ' : '') +
-        (adm ? '' : 'disabled ') +
+        (puoComp ? '' : 'disabled ') +
         'onchange="toggleCompetenza(' +
         c.id +
         ",'" +
         k.key +
         '\',this)" style="width:18px;height:18px;accent-color:#2c6e49;cursor:' +
-        (adm ? 'pointer' : 'default') +
+        (puoComp ? 'pointer' : 'default') +
         '"></td>';
     });
     html +=
@@ -244,7 +259,7 @@ function renderFormazione() {
 
   // PUNTI — assegnazione rapida + registro
   html += '<div class="main-card"><div class="card-header">Punti — assegnazione</div><div class="form-area">';
-  if (adm) {
+  if (puoPunti) {
     const cfg = getPuntiConfig();
     html += '<div class="form-row" style="grid-template-columns:1fr 1fr 1fr auto;gap:10px;align-items:flex-end">';
     html +=
@@ -320,7 +335,7 @@ function renderFormazione() {
   const cfgP = getPuntiConfig();
   html +=
     '<div class="main-card"><div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">Traguardi e premi' +
-    (adm
+    (adm || puoPunti
       ? '<button class="btn-export btn-export-pdf" onclick="esportaReportIncentiviPDF()" style="font-size:.75rem;padding:4px 12px">Report Incentivi PDF</button>'
       : '') +
     '</div><div style="padding:16px">';
@@ -387,6 +402,11 @@ function _filtraMatrice() {
 
 // Toggle spunta competenza (admin) + punti automatici + rilevamento passaggio livello
 async function toggleCompetenza(collabId, key, cb) {
+  if (typeof puoModificare === 'function' && !puoModificare('gestione_competenze')) {
+    cb.checked = !cb.checked;
+    toast('Non hai il permesso di certificare competenze');
+    return;
+  }
   const c = collaboratoriCache.find((x) => x.id === collabId);
   if (!c) return;
   const prima = livelloDiCollaboratore(c);
@@ -481,6 +501,10 @@ async function _insertPuntiEvento(nome, punti, azione, descrizione) {
     );
 }
 async function assegnaPuntiRapido() {
+  if (typeof puoModificare === 'function' && !puoModificare('gestione_punti')) {
+    toast('Non hai il permesso di assegnare punti');
+    return;
+  }
   const nome = (document.getElementById('pt-collab') || {}).value;
   const azKey = (document.getElementById('pt-azione') || {}).value;
   const nota = ((document.getElementById('pt-nota') || {}).value || '').trim();
@@ -534,6 +558,10 @@ async function assegnaPuntiRapido() {
 }
 async function registraPremioConsegnato(nome, premio) {
   document.getElementById('pwd-modal').classList.add('hidden');
+  if (typeof puoModificare === 'function' && !puoModificare('gestione_punti')) {
+    toast('Non hai il permesso di registrare premi');
+    return;
+  }
   try {
     await _insertPuntiEvento(nome, 0, 'premio', 'Premio consegnato: ' + premio);
     _notificaIncentivo(nome, '🎁 Premio consegnato', nome + ': ' + premio);

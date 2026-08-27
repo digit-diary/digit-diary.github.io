@@ -30,7 +30,26 @@ const VIS_ITEMS = {
     qr_code: 'QR Code su PDF',
     ai_moduli: 'AI (Genera + Migliora testo)',
   },
+  // Permessi di MODIFICA: chi non è abilitato vede comunque i dati in sola lettura.
+  // Default: solo admin. "Operatori selezionati" = es. l'operatore HR.
+  permessi: {
+    gestione_punti: 'Punti e premi — assegnare/registrare incentivi',
+    gestione_categorie: 'Collaboratori — assegnare impiego (Jolly/Fisso) e categoria',
+    gestione_competenze: 'Competenze — certificare le spunte in matrice',
+    gestione_valutazioni: 'Valutazioni — inserire e importare schede',
+  },
 };
+// Permesso di modifica: default solo admin (a differenza delle pagine, default 'tutti')
+function puoModificare(key) {
+  if (isAdmin()) return true;
+  const v = visibilitaConfig[key] || 'admin';
+  if (v === 'admin' || v === 'nascosto') return false;
+  if (typeof v === 'object' && v.tipo === 'selezionati') {
+    const op = getOperatore();
+    return !!(v.operatori && v.operatori.includes(op));
+  }
+  return true;
+}
 function visGet(key) {
   return visibilitaConfig[key] || 'tutti';
 }
@@ -152,6 +171,18 @@ function renderVisibilitaUI() {
     html += _visRadioHtml(k, visGet(k), opList);
     html += '</div>';
   });
+  html +=
+    '<div style="margin:18px 0 4px"><strong style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Permessi di modifica</strong></div>';
+  html +=
+    '<p style="color:var(--muted);font-size:.8rem;margin-bottom:10px">Chi non è abilitato vede comunque punti, premi, categorie, competenze e valutazioni in sola lettura. Usa "Operatori selezionati" per delegare, ad esempio, all\'operatore HR.</p>';
+  Object.entries(VIS_ITEMS.permessi).forEach(([k, label]) => {
+    html +=
+      '<div style="padding:10px 0;border-bottom:1px solid var(--line)"><div style="font-weight:600;margin-bottom:6px">' +
+      label +
+      '</div>';
+    html += _visRadioHtml(k, visibilitaConfig[k] || 'admin', opList);
+    html += '</div>';
+  });
   el.innerHTML = html;
 }
 async function cambiaVisibilita(key, val) {
@@ -160,7 +191,8 @@ async function cambiaVisibilita(key, val) {
     const box = document.getElementById('vis-ops-' + key);
     if (box) box.style.display = 'flex';
   } else {
-    if (val === 'tutti') delete visibilitaConfig[key];
+    // per i permessi di modifica il default (chiave assente) è 'admin', quindi 'tutti' va salvato esplicitamente
+    if (val === 'tutti' && !(VIS_ITEMS.permessi && VIS_ITEMS.permessi[key])) delete visibilitaConfig[key];
     else visibilitaConfig[key] = val;
     const box = document.getElementById('vis-ops-' + key);
     if (box) box.style.display = 'none';

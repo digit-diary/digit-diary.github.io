@@ -2110,6 +2110,18 @@ function apriSchedaCollaboratore(nome) {
     '<div><h3 style="font-size:1.6rem">' +
     escP(nome) +
     (isBirthday ? ' <span style="font-size:1.2rem" title="Compleanno oggi!">&#127874;</span>' : '') +
+    (collabRec && collabRec.impiego
+      ? ' <span class="mini-badge" style="background:' +
+        (collabRec.impiego === 'fisso' ? '#1a7a6d' : '#e67e22') +
+        ';font-size:.68rem;vertical-align:middle">' +
+        (collabRec.impiego === 'fisso' ? 'Fisso 100%' : 'Jolly') +
+        '</span>'
+      : '') +
+    (collabRec && collabRec.categoria
+      ? ' <span class="mini-badge" style="background:var(--accent2);font-size:.68rem;vertical-align:middle" title="Categoria professionale (5&ordf; = ingresso, 1&ordf; = massima)">Cat. ' +
+        collabRec.categoria +
+        '&ordf;</span>'
+      : '') +
     '</h3>';
   html += '<div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap">';
   html += '<span style="font-size:.82rem;color:var(--muted)">Data di nascita:</span>';

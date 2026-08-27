@@ -120,17 +120,20 @@ function _suggerisciAree(nome) {
 function _renderValutazioneSezione(nome) {
   const vals = getValutazioniCollab(nome);
   const ne = nome.replace(/'/g, "\\'");
+  const puoVal = typeof puoModificare === 'function' ? puoModificare('gestione_valutazioni') : isAdmin();
   let html =
     '<div class="scheda-section"><h4 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Valutazione annuale';
-  html +=
-    '<button class="btn-export" onclick="apriValutazioneEditor(\'' +
-    ne +
-    '\')" style="font-size:.72rem;padding:4px 12px">+ Nuova / Modifica</button>';
-  html +=
-    '<button class="btn-export" onclick="document.getElementById(\'val-import-file\').click()" style="font-size:.72rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49">Importa Excel</button>' +
-    '<input type="file" id="val-import-file" accept=".xlsx,.xls" style="display:none" onchange="importaValutazioneExcel(this,\'' +
-    ne +
-    '\')">';
+  if (puoVal) {
+    html +=
+      '<button class="btn-export" onclick="apriValutazioneEditor(\'' +
+      ne +
+      '\')" style="font-size:.72rem;padding:4px 12px">+ Nuova / Modifica</button>';
+    html +=
+      '<button class="btn-export" onclick="document.getElementById(\'val-import-file\').click()" style="font-size:.72rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49">Importa Excel</button>' +
+      '<input type="file" id="val-import-file" accept=".xlsx,.xls" style="display:none" onchange="importaValutazioneExcel(this,\'' +
+      ne +
+      '\')">';
+  }
   if (vals.length) {
     html +=
       '<button class="btn-export btn-export-pdf" onclick="esportaValutazionePDF(' +
@@ -364,6 +367,10 @@ function apriValutazioneEditor(nome, anno) {
   document.getElementById('profilo-modal').classList.remove('hidden');
 }
 async function salvaValutazione(nome) {
+  if (typeof puoModificare === 'function' && !puoModificare('gestione_valutazioni')) {
+    toast('Non hai il permesso di salvare valutazioni');
+    return;
+  }
   const anno = parseInt((document.getElementById('val-anno') || {}).value) || new Date().getFullYear();
   const aree = {};
   AREE_VALUTAZIONE.forEach((a) => {
@@ -445,7 +452,104 @@ const _AREE_MATCH = [
   { key: 'affidabilita', match: 'affidabilita' },
   { key: 'disponibilita', match: 'disponibilita' },
 ];
+// Parser scheda HR: la scheda ufficiale del valutatore ha colonne B=Grado (1-5),
+// C=Punteggio (0-100), D=Valore, E=Totale — il punteggio da importare è la colonna C,
+// individuata dall'intestazione "Punteggio" (nell'autovalutazione la colonna si chiama "Valore").
+// Mai prendere il primo numero della riga: sarebbe il Grado 1-5.
+function _parseValutazioneWorkbook(wb) {
+  const aree = {};
+  const extra = {};
+  let annoTrovato = null;
+  const leggiNum = (v) => {
+    if (typeof v === 'string') v = v.replace('%', '').replace(',', '.').trim();
+    const n = parseFloat(v);
+    if (isNaN(n) || n < 0 || n > 100 || String(v) === '') return null;
+    // Excel a volte usa 0-1 per le percentuali
+    return n <= 1 && n > 0 ? Math.round(n * 100) : Math.round(n);
+  };
+  // La scheda del valutatore ha priorità sull'autovalutazione
+  const ordinati = wb.SheetNames.slice().sort((a, b) => {
+    const peso = (n) => (_normTesto(n).includes('autovalutazione') ? 1 : 0);
+    return peso(a) - peso(b);
+  });
+  for (const sn of ordinati) {
+    const data = XLSX.utils.sheet_to_json(wb.Sheets[sn], {
+      header: 1,
+      defval: '',
+    });
+    // Considera solo i fogli che sono schede (esclude "Elenco persone" ecc.)
+    const isScheda = data.some((row) => row.some((c) => _normTesto(c).includes('area di valutazione')));
+    if (!isScheda) continue;
+    let colPunteggio = -1;
+    data.forEach((row) => {
+      const rowNorm = row.map(_normTesto);
+      // riga di intestazione tabella: memorizza dove sta la colonna del punteggio
+      if (rowNorm.some((c) => c.includes('area di valutazione'))) {
+        let ip = rowNorm.findIndex((c) => c.includes('punteggio'));
+        if (ip === -1) ip = rowNorm.findIndex((c) => c === 'valore');
+        if (ip !== -1) colPunteggio = ip;
+        return;
+      }
+      // anno: un anno isolato 20xx (riga "Periodo di valutazione")
+      row.forEach((cell) => {
+        const m = String(cell).match(/^(20[2-4]\d)$/);
+        if (m && !annoTrovato) annoTrovato = parseInt(m[1]);
+      });
+      _AREE_MATCH.forEach((am) => {
+        if (aree[am.key] != null) return;
+        const idx = rowNorm.findIndex((c) => c && c.includes(am.match));
+        if (idx === -1) return;
+        // 1) colonna Punteggio individuata dall'intestazione
+        if (colPunteggio !== -1 && colPunteggio !== idx) {
+          const n = leggiNum(row[colPunteggio]);
+          if (n != null) {
+            aree[am.key] = n;
+            return;
+          }
+        }
+        // 2) fallback: primo valore numerico 0-100 nella riga
+        for (let j = 0; j < row.length; j++) {
+          if (j === idx) continue;
+          const n = leggiNum(row[j]);
+          if (n != null) {
+            aree[am.key] = n;
+            break;
+          }
+        }
+      });
+      // testi: punti di forza / esigenze formative / obiettivi numerati 1-3
+      const primo = rowNorm.findIndex((c) => c);
+      if (primo !== -1) {
+        const label = rowNorm[primo];
+        const testoDopo = row
+          .slice(primo + 1)
+          .map((v) => String(v || '').trim())
+          .find((v) => v.length > 2);
+        if (label.startsWith('punti di forza') && testoDopo && !extra.punti_forza) extra.punti_forza = testoDopo;
+        if (label.startsWith('esigenze formative') && testoDopo && !extra.esigenze_formative)
+          extra.esigenze_formative = testoDopo;
+      }
+      const n0 = parseInt(row[0]);
+      if (!isNaN(n0) && n0 >= 1 && n0 <= 3 && String(row[0]).trim().length <= 2) {
+        const t = row
+          .slice(1)
+          .map((v) => String(v || '').trim())
+          .find((v) => v.length > 2);
+        if (t) {
+          extra.obiettivi = extra.obiettivi || [];
+          if (extra.obiettivi.length < 3 && !extra.obiettivi.includes(t)) extra.obiettivi.push(t);
+        }
+      }
+    });
+  }
+  return { aree, annoTrovato, extra };
+}
 async function importaValutazioneExcel(input, nome) {
+  if (typeof puoModificare === 'function' && !puoModificare('gestione_valutazioni')) {
+    input.value = '';
+    toast('Non hai il permesso di importare valutazioni');
+    return;
+  }
   const file = input.files[0];
   if (!file) return;
   input.value = '';
@@ -456,39 +560,7 @@ async function importaValutazioneExcel(input, nome) {
   try {
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf);
-    const aree = {};
-    let annoTrovato = null;
-    for (const sn of wb.SheetNames) {
-      const data = XLSX.utils.sheet_to_json(wb.Sheets[sn], {
-        header: 1,
-        defval: '',
-      });
-      data.forEach((row) => {
-        const rowNorm = row.map(_normTesto);
-        // anno: cella "periodo di valutazione" o un anno isolato 20xx
-        row.forEach((cell) => {
-          const m = String(cell).match(/^(20[2-4]\d)$/);
-          if (m && !annoTrovato) annoTrovato = parseInt(m[1]);
-        });
-        _AREE_MATCH.forEach((am) => {
-          if (aree[am.key] != null) return;
-          const idx = rowNorm.findIndex((c) => c && c.includes(am.match));
-          if (idx === -1) return;
-          // primo valore numerico 0-100 nella stessa riga (dopo la label)
-          for (let j = 0; j < row.length; j++) {
-            if (j === idx) continue;
-            let v = row[j];
-            if (typeof v === 'string') v = v.replace('%', '').replace(',', '.').trim();
-            const n = parseFloat(v);
-            if (!isNaN(n) && n >= 0 && n <= 100 && String(v) !== '') {
-              // Excel a volte usa 0-1 per le percentuali
-              aree[am.key] = n <= 1 && n > 0 ? Math.round(n * 100) : Math.round(n);
-              break;
-            }
-          }
-        });
-      });
-    }
+    const { aree, annoTrovato, extra } = _parseValutazioneWorkbook(wb);
     const trovate = Object.keys(aree).length;
     if (!trovate) {
       toast('Nessuna area di valutazione riconosciuta nel file');
@@ -498,7 +570,7 @@ async function importaValutazioneExcel(input, nome) {
     // anteprima conferma
     const b = document.getElementById('pwd-modal-content');
     const ne = nome.replace(/'/g, "\\'");
-    window._valImportPending = { nome, anno, aree };
+    window._valImportPending = { nome, anno, aree, extra };
     b.innerHTML =
       '<h3>Importa valutazione</h3><p style="margin-bottom:10px"><strong>' +
       escP(nome) +
@@ -517,6 +589,17 @@ async function importaValutazioneExcel(input, nome) {
           (aree[a.key] != null ? aree[a.key] + '%' : 'non trovata') +
           '</strong></div>',
       ).join('') +
+      (extra && (extra.punti_forza || extra.esigenze_formative || (extra.obiettivi || []).length)
+        ? '<p style="font-size:.78rem;color:var(--muted);margin:0 0 10px">Testi trovati: ' +
+          [
+            extra.punti_forza ? 'punti di forza' : '',
+            (extra.obiettivi || []).length ? (extra.obiettivi || []).length + ' obiettivi' : '',
+            extra.esigenze_formative ? 'esigenze formative' : '',
+          ]
+            .filter(Boolean)
+            .join(' · ') +
+          '</p>'
+        : '') +
       '</div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="_confermaImportValutazione()">Importa</button></div>';
     document.getElementById('pwd-modal').classList.remove('hidden');
   } catch (e) {
@@ -529,19 +612,23 @@ async function _confermaImportValutazione() {
   if (!p) return;
   document.getElementById('pwd-modal').classList.add('hidden');
   try {
+    const ex = p.extra || {};
+    const testi = {};
+    if (ex.punti_forza) testi.punti_forza = ex.punti_forza;
+    if (ex.esigenze_formative) testi.esigenze_formative = ex.esigenze_formative;
+    if (Array.isArray(ex.obiettivi) && ex.obiettivi.length) testi.obiettivi = ex.obiettivi;
     const esistente = getValutazioniCollab(p.nome).find((v) => v.anno === p.anno && v.tipo === 'valutazione');
     if (esistente) {
       const areeMerged = Object.assign({}, esistente.aree || {}, p.aree);
-      await secPatch('valutazioni', 'id=eq.' + esistente.id, {
-        aree: areeMerged,
-        updated_at: new Date().toISOString(),
-      });
-      esistente.aree = areeMerged;
+      const patch = Object.assign({ aree: areeMerged, updated_at: new Date().toISOString() }, testi);
+      await secPatch('valutazioni', 'id=eq.' + esistente.id, patch);
+      Object.assign(esistente, patch);
     } else {
       const r = await secPost('valutazioni', {
         collaboratore: p.nome,
         anno: p.anno,
         tipo: 'valutazione',
+        ...testi,
         aree: p.aree,
         valutatore: getOperatore(),
         data_valutazione: new Date().toISOString().split('T')[0],
