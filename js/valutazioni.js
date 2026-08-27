@@ -954,10 +954,9 @@ async function esportaValutazionePDF(id) {
   );
   y = doc.lastAutoTable.finalY + 4;
   // === Tabelle aree nel formato ufficiale: Grado / Punteggio / Valore / Totale ===
+  // Le note del valutatore (colonna I) restano SOLO nella scheda in-app: nel PDF non si stampano
   const aree = _areeNormalizza(v.aree);
-  const note = v.aree_note || {};
   const valori = v.aree_valori || {};
-  const conNote = Object.keys(note).some((k) => note[k]);
   const conValori = Object.keys(valori).some((k) => valori[k] != null);
   const stileTab = {
     theme: 'grid',
@@ -980,9 +979,7 @@ async function esportaValutazionePDF(id) {
       d.cell.styles.valign = 'middle';
     }
   };
-  if (conNote) colStili[6] = { cellWidth: 40, fontStyle: 'italic' };
   const testataAree = ['Area di valutazione', 'Grado', 'Punteggio', 'Valore', 'Totale', 'Descrizione area'];
-  if (conNote) testataAree.push('Osservazioni');
   // sezione "Verifica obiettivi precedenti" del formulario ufficiale (compilazione manuale)
   if (y + 30 > ph - 20) {
     doc.addPage();
@@ -1034,14 +1031,12 @@ async function esportaValutazionePDF(id) {
         sommaTot += (p * val) / 100;
         sommaPunt += p;
       }
-      const riga = [a.label, grado, p != null ? p : '', val != null ? val : '', totale, a.desc];
-      if (conNote) riga.push(note[a.key] || '');
-      return riga;
+      return [a.label, grado, p != null ? p : '', val != null ? val : '', totale, a.desc];
     });
     if (conValori && sommaPunt > 0) {
       const conseguito = Math.round((sommaTot / sommaPunt) * 100) + '%';
       body.push([
-        { content: '', colSpan: conNote ? 6 : 5 },
+        { content: '', colSpan: 5 },
         { content: 'Conseguito: ' + conseguito, styles: { fontStyle: 'bold', halign: 'right' } },
       ]);
     }
