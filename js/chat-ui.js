@@ -2706,7 +2706,9 @@ function apriVoceTimeline(source, id) {
     });
     if (!m) return;
     var label = { allineamento: 'Allineamento', apprezzamento: 'Apprezzamento', rdi: 'RDI' }[m.tipo] || m.tipo;
-    var dm = m.data_modulo ? new Date(m.data_modulo + 'T12:00:00').toLocaleDateString('it-IT') : '';
+    var rawD = m.data_modulo || m.created_at || '';
+    var dObj = rawD ? new Date(String(rawD).length <= 10 ? rawD + 'T12:00:00' : rawD) : null;
+    var dm = dObj && !isNaN(dObj) ? dObj.toLocaleDateString('it-IT') : '';
     html =
       '<h3 style="margin-bottom:4px">Modulo ' +
       escP(label) +
