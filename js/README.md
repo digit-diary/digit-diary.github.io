@@ -1,33 +1,50 @@
-# Diario Collaboratori — Struttura JavaScript (22 file)
+# Diario Collaboratori — Struttura JavaScript (24 file)
 
 ## Ordine di caricamento (IMPORTANTE)
 I file devono essere caricati nell'ordine elencato in index.html.
+Dipendenze chiave: `realtime.js` dichiara i globals/cache; `api.js` li popola (loadAll);
+`settings.js` definisce `isAdmin`/`isVis`/`puoModificare` usati da tutti i moduli successivi;
+`maison-helpers.js` (ultimo) contiene i filtri per reparto `getXxxReparto()` usati anche
+da formazione/valutazioni (chiamati solo a runtime, dopo il caricamento completo).
 
 ## File per area funzionale
 
-| # | File | Righe | Funzioni | Descrizione |
-|---|---|---|---|---|
-| 1 | config.js | 81 | 2 | Costanti, API keys, variabili globali |
-| 2 | crypto.js | 90 | 4 | Cifratura AES-GCM messaggi chat |
-| 3 | chat-core.js | 236 | 13 | Schema enterprise: cache, helpers, wrapper |
-| 4 | realtime.js | 566 | 32 | WebSocket Supabase, polling fallback |
-| 5 | api.js | 176 | 1 | secGet/Post/Patch/Del, loadAll, healthCheck |
-| 6 | utils.js | 431 | 25 | toast, escP, fmtCHF, capitalizzaNome, helpers |
-| 7 | auth.js | 597 | 24 | Login, password, sessioni, biometrico |
-| 8 | cestino-core.js | 335 | 7 | Soft delete, ripristino, DB stats |
-| 9 | settings.js | 630 | 31 | Visibilità, operatori, temi, campi rapporto |
-| 10 | app.js | 361 | 11 | Routing pagine, init, renderPostLogin |
-| 11 | diario.js | 861 | 20 | Registrazioni: salva, modifica, elimina |
-| 12 | alerts.js | 589 | 16 | Alert cassa, rischio, ammonimenti |
-| 13 | search.js | 733 | 5 | Ricerca globale, riepilogo mensile PDF |
-| 14 | chat-ui.js | 3138 | 77 | Interfaccia chat stile WhatsApp |
-| 15 | moduli.js | 2095 | 56 | Moduli disciplinari, generazione PDF, AI |
-| 16 | rapporto.js | 998 | 19 | Rapporto giornaliero, parser assenze/cassa |
-| 17 | stats.js | 499 | 7 | Statistiche, grafici Chart.js |
-| 18 | consegna.js | 1521 | 24 | Consegne turno, dashboard |
-| 19 | promemoria.js | 1006 | 16 | Promemoria, scadenze, push |
-| 20 | maison-core.js | 3014 | 47 | Maison: dashboard, costi, form manuale |
-| 21 | maison-budget.js | 1150 | 12 | Maison: budget, categorie, profilo |
-| 22 | maison-helpers.js | 2862 | 74 | Maison: import Excel, parser nomi |
+| # | File | Righe | Descrizione |
+|---|---|---|---|
+| 1 | config.js | 81 | Costanti, chiavi offuscate (XOR), variabili base |
+| 2 | crypto.js | 90 | Cifratura AES-GCM messaggi chat |
+| 3 | chat-core.js | 236 | Schema chat enterprise: cache, helpers, wrapper |
+| 4 | realtime.js | 623 | WebSocket Supabase, polling fallback, GLOBALS/cache (incl. valutazioni, punti, soglie alert, categorie inventario) |
+| 5 | api.js | 207 | secGet/Post/Patch/Del, loadAll, healthCheck |
+| 6 | utils.js | 446 | toast, escP, fmtCHF, capitalizzaNome, helpers |
+| 7 | auth.js | 597 | Login, password, sessioni, biometrico |
+| 8 | cestino-core.js | 335 | Soft delete, ripristino, DB stats |
+| 9 | settings.js | 672 | Visibilità pagine/funzioni, PERMESSI DI MODIFICA (puoModificare: punti, categorie, competenze, valutazioni), operatori, temi |
+| 10 | app.js | 380 | Routing pagine, init, renderPostLogin |
+| 11 | diario.js | 942 | Registrazioni: salva, modifica, elimina; hook popup copertura malattie |
+| 12 | alerts.js | 619 | Alert cassa/rischio/ammonimenti, soglie personalizzabili (getSoglieAlert) |
+| 13 | search.js | 733 | Ricerca globale, riepilogo mensile PDF |
+| 14 | chat-ui.js | 3570 | Chat WhatsApp + SCHEDA COLLABORATORE (KPI cliccabili, cronologia con anteprima voci/PDF modulo, PDF scheda, push) |
+| 15 | moduli.js | 2299 | Moduli disciplinari, PDF, AI, gestione collaboratori (reparto, impiego Jolly/Fisso, categoria 5ª-1ª) |
+| 16 | formazione.js | 1291 | MULTIDISCIPLINARITÀ: matrice competenze, livelli L1-L3, punti/premi, popup copertura, notifiche incentivi, Report Incentivi PDF |
+| 17 | valutazioni.js | 1124 | VALUTAZIONE ANNUALE: 11 aree (9 HR + Versatilità + Affidabilità e disponibilità), editor multi-scheda, import Excel scheda ufficiale, PDF formato HR |
+| 18 | rapporto.js | 1012 | Rapporto giornaliero, parser assenze/cassa |
+| 19 | stats.js | 499 | Statistiche, grafici Chart.js |
+| 20 | consegna.js | 1521 | Consegne turno, dashboard |
+| 21 | promemoria.js | 1006 | Promemoria, scadenze, push |
+| 22 | maison-core.js | 3220 | Maison: dashboard, costi, form manuale, auto-pulizia GD |
+| 23 | maison-budget.js | 1150 | Maison: budget, categorie, profilo |
+| 24 | maison-helpers.js | 3279 | Maison import Excel/parser nomi + FILTRI REPARTO (getCollaboratoriReparto, getValutazioniReparto, getPuntiReparto, getInventarioReparto) + inventario con categorie personalizzabili |
 
-**Totale: 22 file, ~21.000 righe formattate, 523 funzioni**
+**Totale: 24 file, ~26.000 righe formattate**
+
+## Separazione reparti (Slots / Tavoli)
+Tutti i dati passano dai filtri `getXxxReparto()` (registrazioni, moduli, collaboratori,
+valutazioni, punti, inventario, maison, consegne, promemoria). I record nuovi salvano
+sempre `reparto_dip: currentReparto`. Config per reparto: competenze (slots/tavoli
+separate). Config condivise tra reparti: punti/premi, soglie alert, categorie inventario.
+
+## Permessi di modifica (settings.js)
+Default solo admin, delegabili a operatori selezionati (es. HR) da Visibilità:
+`gestione_punti`, `gestione_categorie`, `gestione_competenze`, `gestione_valutazioni`.
+Chi non è abilitato vede tutto in sola lettura.
