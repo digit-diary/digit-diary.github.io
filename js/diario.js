@@ -92,6 +92,8 @@ async function salva() {
       aggiornaNomi();
       render();
       updateStats();
+      // Popup copertura turno: chi copre / chi ha rifiutato
+      if (creati && typeof apriPopupCopertura === 'function') apriPopupCopertura(nome, malDal);
       return;
     }
   }
@@ -202,6 +204,10 @@ async function salva() {
     // Richiesta → suggerisci promemoria di follow-up
     if (tipoSelezionato === nomeCorrente('Richiesta')) {
       _suggerisciFollowUp(nome, testo);
+    }
+    // Malattia (giorno singolo) → popup copertura turno
+    if (tipoSelezionato === nomeCorrente('Malattia') && typeof apriPopupCopertura === 'function') {
+      apriPopupCopertura(nome, new Date().toISOString().split('T')[0]);
     }
   } catch (e) {
     toast('Errore salvataggio');
