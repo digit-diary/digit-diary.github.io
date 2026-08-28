@@ -438,6 +438,10 @@ function renderFormazione() {
     html += '</div></div>';
   }
 
+  // PANORAMICA HR (riservato: admin + permesso storico_hr)
+  if (typeof puoVedereStoricoHr === 'function' && puoVedereStoricoHr()) {
+    html += _renderPanoramicaHrCard(collabs);
+  }
   // PREMI GIUBILEO (riservato: admin + permesso storico_hr)
   if (typeof puoVedereStoricoHr === 'function' && puoVedereStoricoHr()) {
     html += _renderGiubileiCard(collabs);
@@ -1565,5 +1569,71 @@ function _renderGiubileiCard(collabs) {
   }
   html +=
     '<p style="color:var(--muted);font-size:.75rem;margin-top:10px">La consegna si registra dalla scheda del collaboratore (Storico HR). Importi configurabili in Impostazioni → Premio giubileo.</p></div></div>';
+  return html;
+}
+
+// Card riservata HR: numeri chiave del settore corrente — organico (fissi/jolly),
+// distribuzione categorie e livelli, spese giubilei e premi incentivi consegnati
+function _estraiChf(testo) {
+  const m = String(testo || '').match(/([\d']+(?:\.\d+)?) CHF/);
+  return m ? parseFloat(m[1].replace(/'/g, '')) : 0;
+}
+function _renderPanoramicaHrCard(collabs) {
+  const anno = new Date().getFullYear();
+  const fissi = collabs.filter((c) => c.impiego === 'fisso').length;
+  const jolly = collabs.filter((c) => c.impiego === 'jolly').length;
+  const senza = collabs.length - fissi - jolly;
+  const perCat = {};
+  collabs.forEach((c) => {
+    if (c.categoria) perCat[c.categoria] = (perCat[c.categoria] || 0) + 1;
+  });
+  const perLiv = {};
+  collabs.forEach((c) => {
+    const lv = livelloDiCollaboratore(c);
+    if (lv) perLiv[lv] = (perLiv[lv] || 0) + 1;
+  });
+  const giubilei = getHrEventiReparto().filter((e) => e.tipo === 'giubileo');
+  const giubAnno = giubilei.filter((e) => (e.data_evento || '').startsWith(String(anno)));
+  const spesaGiubAnno = giubAnno.reduce((s2, e) => s2 + _estraiChf(e.descrizione), 0);
+  const spesaGiubTot = giubilei.reduce((s2, e) => s2 + _estraiChf(e.descrizione), 0);
+  const premiAnno = getPuntiReparto().filter(
+    (p) => p.azione === 'premio' && (p.data_evento || '').startsWith(String(anno)),
+  ).length;
+  let html =
+    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:8px">Panoramica HR — ' +
+    escP(repartoLabel(currentReparto)) +
+    ' <span class="mini-badge" style="background:var(--accent);font-size:.65rem">RISERVATO</span></div><div style="padding:14px 16px">';
+  html +=
+    '<div class="stats-bar" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr));margin-bottom:12px">';
+  const kpi = (n, lbl, col) =>
+    '<div class="stat"><div class="stat-num"' +
+    (col ? ' style="color:' + col + '"' : '') +
+    '>' +
+    n +
+    '</div><div class="stat-label">' +
+    lbl +
+    '</div></div>';
+  html += kpi(collabs.length, 'Collaboratori');
+  html += kpi(fissi, 'Fissi 100%', '#1a7a6d');
+  html += kpi(jolly, 'Jolly', '#e67e22');
+  if (senza) html += kpi(senza, 'Senza inquadramento', 'var(--muted)');
+  html += kpi(premiAnno, 'Premi consegnati ' + anno, '#b8860b');
+  html += kpi(fmtCHF(spesaGiubAnno) + ' CHF', 'Giubilei erogati ' + anno, '#8b6914');
+  html += kpi(fmtCHF(spesaGiubTot) + ' CHF', 'Giubilei totali storici', '#8b6914');
+  html += '</div>';
+  const righe = [];
+  const catStr = [5, 4, 3, 2, 1]
+    .filter((n) => perCat[n])
+    .map((n) => n + 'ª: <strong>' + perCat[n] + '</strong>')
+    .join(' · ');
+  if (catStr) righe.push('<span style="color:var(--muted)">Categorie —</span> ' + catStr);
+  const livStr = [1, 2, 3]
+    .filter((n) => perLiv[n])
+    .map((n) => 'L' + n + ': <strong>' + perLiv[n] + '</strong>')
+    .join(' · ');
+  if (livStr) righe.push('<span style="color:var(--muted)">Livelli multidisciplinari —</span> ' + livStr);
+  if (righe.length) html += '<p style="font-size:.86rem;line-height:1.8">' + righe.join('<br>') + '</p>';
+  html +=
+    '<p style="color:var(--muted);font-size:.75rem;margin-top:8px">Dati del settore corrente: usa lo switch settori in alto per vedere gli altri. Dettaglio per persona nella card Equità categorie.</p></div></div>';
   return html;
 }
