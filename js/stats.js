@@ -497,3 +497,236 @@ async function esportaPDF() {
 }
 
 // ========================
+
+// ================================================================
+// REPORT DIREZIONE (admin): sintesi mensile di TUTTI i settori,
+// pensata per il Direttore/CEO — organico, andamento operativo,
+// disciplinare, sviluppo multidisciplinare, incentivi e spese HR
+// ================================================================
+function _rdMese(campo, ym) {
+  return (campo || '').startsWith(ym);
+}
+function _rdGiorniMalattia(entries) {
+  let g = 0;
+  entries.forEach((e) => {
+    const m = (e.testo || '').match(/(\d+)\s*giorni/);
+    g += m ? parseInt(m[1]) : 1;
+  });
+  return g;
+}
+async function esportaReportDirezionePDF() {
+  if (!isAdmin()) {
+    toast('Solo admin');
+    return;
+  }
+  if (!window.jspdf) {
+    toast('Caricamento PDF...');
+    if (!(await caricaJsPDF())) {
+      toast('Errore caricamento libreria PDF');
+      return;
+    }
+  }
+  const ym = (document.getElementById('rd-mese') || {}).value || new Date().toISOString().substring(0, 7);
+  const dRef = new Date(ym + '-15T12:00:00');
+  const MESI_FULL = [
+    'Gennaio',
+    'Febbraio',
+    'Marzo',
+    'Aprile',
+    'Maggio',
+    'Giugno',
+    'Luglio',
+    'Agosto',
+    'Settembre',
+    'Ottobre',
+    'Novembre',
+    'Dicembre',
+  ];
+  const meseLabel = MESI_FULL[dRef.getMonth()] + ' ' + dRef.getFullYear();
+  const dPrec = new Date(dRef);
+  dPrec.setMonth(dPrec.getMonth() - 1);
+  const ymPrec = dPrec.getFullYear() + '-' + String(dPrec.getMonth() + 1).padStart(2, '0');
+  const anno = String(dRef.getFullYear());
+  const tipoErr = nomeCorrente('Errore');
+  const tipoMal = nomeCorrente('Malattia');
+  const tipoAmm = nomeCorrente('Ammonimento Verbale');
+
+  const reparti = getReparti();
+  const curSave = currentReparto;
+  const righeOrganico = [];
+  const righeMese = [];
+  const righeSviluppo = [];
+  const tot = {
+    collab: 0,
+    mal: 0,
+    malG: 0,
+    err: 0,
+    errChf: 0,
+    amm: 0,
+    allin: 0,
+    rdi: 0,
+    appr: 0,
+    form: 0,
+    punti: 0,
+    premi: 0,
+    giub: 0,
+  };
+  let malPrecTot = 0;
+  let errPrecTot = 0;
+  reparti.forEach((r) => {
+    currentReparto = r.key;
+    const collabs = getCollaboratoriReparto().filter((c) => c.attivo !== false);
+    const fissi = collabs.filter((c) => c.impiego === 'fisso').length;
+    const jolly = collabs.filter((c) => c.impiego === 'jolly').length;
+    const liv = { 1: 0, 2: 0, 3: 0 };
+    collabs.forEach((c) => {
+      const l = livelloDiCollaboratore(c);
+      if (l) liv[l]++;
+    });
+    righeOrganico.push([r.label, collabs.length, fissi, jolly, liv[1], liv[2], liv[3]]);
+    tot.collab += collabs.length;
+
+    const dati = getDatiReparto();
+    const mal = dati.filter((e) => e.tipo === tipoMal && _rdMese(e.data, ym));
+    const malG = _rdGiorniMalattia(mal);
+    const err = dati.filter((e) => e.tipo === tipoErr && _rdMese(e.data, ym));
+    const errChf = err.reduce((s2, e) => s2 + (parseFloat(e.importo) || 0), 0);
+    const amm = dati.filter((e) => e.tipo === tipoAmm && _rdMese(e.data, ym)).length;
+    malPrecTot += dati.filter((e) => e.tipo === tipoMal && _rdMese(e.data, ymPrec)).length;
+    errPrecTot += dati.filter((e) => e.tipo === tipoErr && _rdMese(e.data, ymPrec)).length;
+    const mods = getModuliReparto().filter((m) => _rdMese(m.created_at || m.data_modulo, ym));
+    const allin = mods.filter((m) => m.tipo === 'allineamento').length;
+    const rdi = mods.filter((m) => m.tipo === 'rdi').length;
+    const appr = mods.filter((m) => m.tipo === 'apprezzamento').length;
+    righeMese.push([
+      r.label,
+      mal.length + (malG > mal.length ? ' (' + malG + ' gg)' : ''),
+      err.length,
+      fmtCHF(errChf),
+      amm,
+      allin,
+      rdi,
+      appr,
+    ]);
+    tot.mal += mal.length;
+    tot.malG += malG;
+    tot.err += err.length;
+    tot.errChf += errChf;
+    tot.amm += amm;
+    tot.allin += allin;
+    tot.rdi += rdi;
+    tot.appr += appr;
+
+    const hrEv = getHrEventiReparto().filter((e) => _rdMese(e.data_evento, ym));
+    const form = hrEv.filter((e) => e.tipo === 'formazione').length;
+    const giubChf = hrEv.filter((e) => e.tipo === 'giubileo').reduce((s2, e) => s2 + _estraiChf(e.descrizione), 0);
+    const puntiM = getPuntiReparto().filter((p) => _rdMese(p.data_evento, ym));
+    const puntiTot = puntiM.filter((p) => p.punti > 0).reduce((s2, p) => s2 + p.punti, 0);
+    const premi = puntiM.filter((p) => p.azione === 'premio').length;
+    const valAnno = getValutazioniReparto().filter((v) => String(v.anno) === anno).length;
+    righeSviluppo.push([r.label, form, puntiTot, premi, giubChf ? fmtCHF(giubChf) : '—', valAnno]);
+    tot.form += form;
+    tot.punti += puntiTot;
+    tot.premi += premi;
+    tot.giub += giubChf;
+  });
+  currentReparto = curSave;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('portrait', 'mm', 'a4');
+  const pw = doc.internal.pageSize.getWidth();
+  const ph = doc.internal.pageSize.getHeight();
+  let y = 14;
+  if (_logoB64)
+    try {
+      doc.addImage(_logoB64, 'PNG', pw / 2 - 20, y, 40, 22.5);
+    } catch (e) {}
+  y += 28;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.text('Report Direzione — ' + meseLabel, pw / 2, y, { align: 'center' });
+  y += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(100);
+  doc.text(
+    'Diario Collaboratori — generato il ' + new Date().toLocaleDateString('it-IT') + ' — Riservato alla Direzione',
+    pw / 2,
+    y,
+    { align: 'center' },
+  );
+  doc.setTextColor(0);
+  y += 8;
+  const stile = {
+    theme: 'grid',
+    margin: { left: 14, right: 14 },
+    headStyles: { fillColor: [26, 18, 8], textColor: [250, 247, 242], fontSize: 8 },
+    styles: { lineColor: [220, 215, 205], lineWidth: 0.15, fontSize: 8.5, cellPadding: 2, halign: 'center' },
+    columnStyles: { 0: { halign: 'left', fontStyle: 'bold' } },
+    alternateRowStyles: { fillColor: [250, 247, 242] },
+  };
+  const sezioneRd = (titolo) => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text(titolo, 14, y);
+    y += 4;
+  };
+  sezioneRd('Organico e progetto multidisciplinarità');
+  doc.autoTable(
+    Object.assign({}, stile, {
+      startY: y,
+      head: [['Settore', 'Collaboratori', 'Fissi 100%', 'Jolly', 'Livello 1', 'Livello 2', 'Livello 3']],
+      body: righeOrganico,
+      foot: [['Totale', tot.collab, '', '', '', '', '']],
+      footStyles: { fillColor: [240, 236, 228], textColor: [26, 18, 8], fontStyle: 'bold', fontSize: 8.5 },
+    }),
+  );
+  y = doc.lastAutoTable.finalY + 8;
+  sezioneRd('Andamento operativo del mese');
+  doc.autoTable(
+    Object.assign({}, stile, {
+      startY: y,
+      head: [['Settore', 'Malattie', 'Errori', 'Errori CHF', 'Amm. verbali', 'Allineamenti', 'RDI', 'Apprezzamenti']],
+      body: righeMese,
+      foot: [
+        [
+          'Totale',
+          tot.mal + (tot.malG > tot.mal ? ' (' + tot.malG + ' gg)' : ''),
+          tot.err,
+          fmtCHF(tot.errChf),
+          tot.amm,
+          tot.allin,
+          tot.rdi,
+          tot.appr,
+        ],
+      ],
+      footStyles: { fillColor: [240, 236, 228], textColor: [26, 18, 8], fontStyle: 'bold', fontSize: 8.5 },
+    }),
+  );
+  y = doc.lastAutoTable.finalY + 4;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(100);
+  const trend = (cur, prec, label) =>
+    label + ': ' + cur + (prec ? ' (mese precedente: ' + prec + ')' : ' (mese precedente: 0)');
+  doc.text(trend(tot.mal, malPrecTot, 'Malattie') + '   ·   ' + trend(tot.err, errPrecTot, 'Errori cassa'), 14, y + 2);
+  doc.setTextColor(0);
+  y += 10;
+  sezioneRd('Sviluppo del personale e incentivi');
+  doc.autoTable(
+    Object.assign({}, stile, {
+      startY: y,
+      head: [
+        ['Settore', 'Formazioni svolte', 'Punti assegnati', 'Premi consegnati', 'Giubilei CHF', 'Valutazioni ' + anno],
+      ],
+      body: righeSviluppo,
+      foot: [['Totale', tot.form, tot.punti, tot.premi, tot.giub ? fmtCHF(tot.giub) : '—', '']],
+      footStyles: { fillColor: [240, 236, 228], textColor: [26, 18, 8], fontStyle: 'bold', fontSize: 8.5 },
+    }),
+  );
+  doc.setFontSize(6.5);
+  doc.setTextColor(150);
+  doc.text('Casino Lugano SA — Report Direzione — Documento riservato', 14, ph - 8);
+  logAzione('Report Direzione', 'PDF esportato — ' + meseLabel);
+  mostraPdfPreview(doc, 'report_direzione_' + ym + '.pdf', 'Report Direzione ' + meseLabel);
+}

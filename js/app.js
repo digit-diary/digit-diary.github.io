@@ -31,6 +31,24 @@ function switchPage(name) {
   if (name === 'statistiche') {
     initStatsFlatpickr();
     renderStatistiche();
+    const rdWrap = document.getElementById('report-direzione-wrap');
+    if (rdWrap) {
+      rdWrap.style.display = isAdmin() ? 'flex' : 'none';
+      const sel = document.getElementById('rd-mese');
+      if (sel && !sel.options.length) {
+        const MESI_L = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
+        let h = '';
+        for (let i = 0; i < 12; i++) {
+          const d = new Date();
+          d.setDate(1);
+          d.setMonth(d.getMonth() - i);
+          const val = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+          h += '<option value="' + val + '">' + MESI_L[d.getMonth()] + ' ' + d.getFullYear() + '</option>';
+        }
+        sel.innerHTML = h;
+        if (sel.options.length > 1) sel.selectedIndex = 1; // default: mese scorso
+      }
+    }
   }
   if (name === 'rapporto') {
     if (!rapportoGiornoAperto) {
