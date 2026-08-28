@@ -465,7 +465,8 @@ function _trovaNomeSimileMaison(nome) {
   }
   return null;
 }
-const BUONO_VALORI = { BU: 15, BL: 40, CG: 80, WL: 40 };
+// Valori CHF dei buoni Maison — personalizzabili da admin in Impostazioni (chiave 'buono_valori')
+let BUONO_VALORI = { BU: 15, BL: 40, CG: 80, WL: 40 };
 function _contaBuoni(righe, tipo) {
   return righe
     .filter((r) => r.tipo_buono === tipo)

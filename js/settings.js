@@ -350,7 +350,11 @@ function renderOperatoriUI() {
               ? '<span class="mini-badge" style="background:#1a4a7a">Slots</span>'
               : rep === 'tavoli'
                 ? '<span class="mini-badge" style="background:#8e44ad">Tavoli</span>'
-                : '<span class="mini-badge" style="background:var(--accent2)">Entrambi</span>';
+                : rep === 'valet'
+                  ? '<span class="mini-badge" style="background:#1a7a6d">Valet</span>'
+                  : rep === 'cleaning'
+                    ? '<span class="mini-badge" style="background:#5d6d7e">Cleaning</span>'
+                    : '<span class="mini-badge" style="background:var(--accent2)">Tutti</span>';
           const ne = n.replace(/'/g, "\\'");
           return (
             '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border:1px solid ' +
@@ -367,11 +371,15 @@ function renderOperatoriUI() {
                 ne +
                 '\',this.value)" style="font-size:.75rem;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><option value="entrambi"' +
                 (rep === 'entrambi' ? ' selected' : '') +
-                '>Entrambi</option><option value="slots"' +
+                '>Tutti i reparti</option><option value="slots"' +
                 (rep === 'slots' ? ' selected' : '') +
                 '>Slots</option><option value="tavoli"' +
                 (rep === 'tavoli' ? ' selected' : '') +
-                '>Tavoli</option></select>'
+                '>Tavoli</option><option value="valet"' +
+                (rep === 'valet' ? ' selected' : '') +
+                '>Valet</option><option value="cleaning"' +
+                (rep === 'cleaning' ? ' selected' : '') +
+                '>Cleaning</option></select>'
               : '') +
             (admin && hasAuth
               ? '<button style="font-size:.75rem;padding:3px 8px;cursor:pointer;border:1px solid var(--accent2);color:var(--accent2);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif;font-weight:600" onclick="resetPasswordOperatore(\'' +
@@ -666,11 +674,93 @@ function applicaTemaOperatore() {
   const t = localStorage.getItem(getTemaKey()) || localStorage.getItem('tema') || 'light';
   if (t === 'dark') {
     document.body.classList.add('dark-theme');
-    document.getElementById('btn-tema').innerHTML = '\u2600\uFE0F Tema chiaro';
+    document.getElementById('btn-tema').innerHTML = '<i class="icx icx-sole"></i> Tema chiaro';
   } else {
     document.body.classList.remove('dark-theme');
-    document.getElementById('btn-tema').innerHTML = '\uD83C\uDF11 Tema scuro';
+    document.getElementById('btn-tema').innerHTML = '<i class="icx icx-luna"></i> Tema scuro';
   }
 }
 
 // NAVIGATION
+
+// ================================================================
+// PERSONALIZZAZIONI ADMIN: valori buoni Maison + backup completo
+// ================================================================
+async function salvaBuonoValori() {
+  const nuovi = {};
+  for (const k of ['BU', 'BL', 'CG', 'WL']) {
+    const v = parseFloat((document.getElementById('buono-' + k.toLowerCase() + '-input') || {}).value);
+    if (!(v > 0)) {
+      toast('Inserisci un valore valido per ' + k);
+      return;
+    }
+    nuovi[k] = v;
+  }
+  Object.assign(BUONO_VALORI, nuovi);
+  await setImp('buono_valori', JSON.stringify(nuovi));
+  logAzione(
+    'Valori buoni Maison',
+    'BU ' + nuovi.BU + ' / BL ' + nuovi.BL + ' / CG ' + nuovi.CG + ' / WL ' + nuovi.WL + ' CHF',
+  );
+  toast('Valori buoni salvati');
+}
+
+// Backup completo di tutti i dati in un file JSON scaricabile (solo admin)
+const _TABELLE_BACKUP = [
+  'registrazioni',
+  'note_fissate',
+  'scadenze',
+  'collaboratori',
+  'moduli',
+  'log_attivita',
+  'costi_maison',
+  'maison_budget',
+  'promemoria',
+  'consegne_turno',
+  'spese_extra',
+  'regali_maison',
+  'note_clienti',
+  'rapporti_giornalieri',
+  'impostazioni',
+  'inventario',
+  'valutazioni',
+  'punti_eventi',
+  'hr_eventi',
+  'chat_groups',
+  'chat_group_members',
+  'chat_messages',
+];
+async function esportaBackupCompleto() {
+  if (!isAdmin()) {
+    toast('Solo admin');
+    return;
+  }
+  const st = document.getElementById('backup-status');
+  if (st) st.textContent = 'Esportazione in corso...';
+  try {
+    const dati = {};
+    let totale = 0;
+    for (const t of _TABELLE_BACKUP) {
+      dati[t] = await secGet(t + '?limit=100000');
+      totale += (dati[t] || []).length;
+    }
+    const backup = {
+      app: 'Diario Collaboratori — Casino Lugano SA',
+      esportato_il: new Date().toISOString(),
+      esportato_da: getOperatore(),
+      tabelle: dati,
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 1)], { type: 'application/json' });
+    Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(blob),
+      download: 'diario_backup_' + new Date().toISOString().split('T')[0] + '.json',
+    }).click();
+    logAzione('Backup completo esportato', totale + ' record, ' + _TABELLE_BACKUP.length + ' tabelle');
+    if (st) st.textContent = 'Backup scaricato: ' + totale + ' record da ' + _TABELLE_BACKUP.length + ' tabelle.';
+    toast('Backup completo scaricato');
+  } catch (e) {
+    console.error(e);
+    if (st) st.textContent = "Errore durante l'esportazione.";
+    toast('Errore esportazione backup');
+  }
+}

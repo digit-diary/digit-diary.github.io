@@ -919,7 +919,8 @@ async function esportaValutazionePDF(id) {
   // === DATI PERSONALI: blocco a due colonne come il foglio ufficiale ===
   sezione('DATI PERSONALI');
   const dpP = v.dati_personali || {};
-  const settoreLbl = dpP.settore || 'Reparto ' + (v.reparto_dip === 'tavoli' ? 'Tavoli' : 'Slot');
+  const settoreLbl =
+    dpP.settore || 'Reparto ' + ({ tavoli: 'Tavoli', valet: 'Valet', cleaning: 'Cleaning' }[v.reparto_dip] || 'Slot');
   const dataLbl = v.data_valutazione ? new Date(v.data_valutazione + 'T12:00:00').toLocaleDateString('it-IT') : '';
   const stileDP = {
     theme: 'grid',

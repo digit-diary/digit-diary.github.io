@@ -205,6 +205,8 @@ let valutazioniCache = [],
   maisonAutoDeleteGiorni = 0, // 0 = disattivato; 1 = conserva solo GD corrente; N = conserva N giorni
   inventarioCategorieExtra = [], // categorie inventario personalizzate [{key,label}] oltre a buoni/sigarette
   soglieAlertCfg = null, // {allineamento, rdi} soglie CHF alert differenze — null = default 90/500
+  soglieDisciplinariCfg = null, // {amm, recidiva, accumulo} soglie percorso disciplinare — null = default 2/3/3
+  equitaMesi = 6, // mesi di anzianità in più per far scattare la segnalazione equità categorie
   hrEventiCache = []; // storico HR riservato: assunzione, categoria, impiego, premi, livelli
 let currentReparto = 'slots',
   operatoriRepartoMap = {};

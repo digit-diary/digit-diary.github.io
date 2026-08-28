@@ -10,25 +10,47 @@
 // DATA LOADING
 async function loadAll() {
   // Caricamento parallelo: impostazioni + dati + tabelle
-  const [tp, co, ops, cr, tn, cn, to, cmo, clo, tr, vis, compCfg, pntCfg, maisonAd, invCatExtra, soglieAl] =
-    await Promise.all([
-      getImp('tipi_personalizzati'),
-      getImp('colori_override'),
-      getImp('operatori_lista'),
-      getImp('campi_rapporto_extra'),
-      getImp('tipi_nascosti'),
-      getImp('campi_nascosti'),
-      getImp('tipi_ordine'),
-      getImp('campi_ordine'),
-      getImp('campi_label_override'),
-      getImp('tipi_rinominati'),
-      getImp('visibilita'),
-      getImp('competenze_config'),
-      getImp('punti_config'),
-      getImp('maison_auto_delete_giorni'),
-      getImp('inventario_categorie_extra'),
-      getImp('soglie_alert'),
-    ]);
+  const [
+    tp,
+    co,
+    ops,
+    cr,
+    tn,
+    cn,
+    to,
+    cmo,
+    clo,
+    tr,
+    vis,
+    compCfg,
+    pntCfg,
+    maisonAd,
+    invCatExtra,
+    soglieAl,
+    soglieDis,
+    buonoVal,
+    eqMesi,
+  ] = await Promise.all([
+    getImp('tipi_personalizzati'),
+    getImp('colori_override'),
+    getImp('operatori_lista'),
+    getImp('campi_rapporto_extra'),
+    getImp('tipi_nascosti'),
+    getImp('campi_nascosti'),
+    getImp('tipi_ordine'),
+    getImp('campi_ordine'),
+    getImp('campi_label_override'),
+    getImp('tipi_rinominati'),
+    getImp('visibilita'),
+    getImp('competenze_config'),
+    getImp('punti_config'),
+    getImp('maison_auto_delete_giorni'),
+    getImp('inventario_categorie_extra'),
+    getImp('soglie_alert'),
+    getImp('soglie_disciplinari'),
+    getImp('buono_valori'),
+    getImp('equita_mesi'),
+  ]);
   if (tp)
     try {
       tipiPersonalizzati = JSON.parse(tp);
@@ -90,6 +112,16 @@ async function loadAll() {
     try {
       soglieAlertCfg = JSON.parse(soglieAl);
     } catch (e) {}
+  if (soglieDis)
+    try {
+      soglieDisciplinariCfg = JSON.parse(soglieDis);
+    } catch (e) {}
+  if (buonoVal)
+    try {
+      const bv = JSON.parse(buonoVal);
+      if (bv && typeof BUONO_VALORI !== 'undefined') Object.assign(BUONO_VALORI, bv);
+    } catch (e) {}
+  if (eqMesi && parseInt(eqMesi) > 0) equitaMesi = parseInt(eqMesi);
   const opRep = await getImp('operatori_reparto');
   if (opRep) {
     try {
