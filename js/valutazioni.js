@@ -103,7 +103,8 @@ function _gradoScala(v) {
 }
 
 function getValutazioniCollab(nome) {
-  return getValutazioniReparto()
+  const fonte = window._schedaVistaCompleta ? valutazioniCache : getValutazioniReparto();
+  return fonte
     .filter((v) => v.collaboratore.toLowerCase() === nome.toLowerCase())
     .sort((a, b) => b.anno - a.anno || (a.tipo === 'valutazione' ? -1 : 1));
 }
