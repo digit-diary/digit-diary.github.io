@@ -453,6 +453,8 @@ function renderFormazione() {
   }
   el.innerHTML = html;
   if (typeof initSezioniRichiudibili === 'function') initSezioniRichiudibili('formazione-content');
+  if (typeof initCardRichiudibili === 'function')
+    initCardRichiudibili('formazione-content', ['Matrice competenze', 'Punti']);
 }
 
 // Registra una sessione formativa nello storico HR (+ punti opzionali)

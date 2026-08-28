@@ -3482,3 +3482,43 @@ button:focus-visible,
 .settings-section.sec-collapsed > h4 .sec-chev {
   transform: rotate(-90deg);
 }
+
+/* === CARD RICHIUDIBILI (Formazione) === */
+.main-card > .card-header {
+  cursor: pointer;
+  user-select: none;
+}
+.main-card > .card-header .sec-chev {
+  margin-left: auto;
+  font-size: 0.65rem;
+  opacity: 0.7;
+  transition: transform 0.2s;
+}
+.main-card.card-collapsed > *:not(.card-header) {
+  display: none !important;
+}
+.main-card.card-collapsed > .card-header .sec-chev {
+  transform: rotate(-90deg);
+}
+/* === STRISCIA ALERT COMPATTA === */
+.alert-compatto {
+  background: linear-gradient(90deg, #c0392b, #e67e22);
+  color: white;
+  padding: 10px 16px;
+  border-radius: 3px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.alert-compatto .sec-chev {
+  margin-left: auto;
+  font-size: 0.65rem;
+  transition: transform 0.2s;
+}
+.alert-compatto.aperto .sec-chev {
+  transform: rotate(180deg);
+}

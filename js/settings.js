@@ -1044,3 +1044,34 @@ function initSezioniRichiudibili(rootId) {
     });
   });
 }
+
+// Card richiudibili (es. pagina Formazione): titolo cliccabile, stato ricordato.
+// aperteDefault = elenco di prefissi dei titoli aperti al primo utilizzo.
+function initCardRichiudibili(rootId, aperteDefault) {
+  const root = document.getElementById(rootId);
+  if (!root) return;
+  let stato = {};
+  try {
+    stato = JSON.parse(localStorage.getItem('_sezioni_aperte') || '{}');
+  } catch (e) {}
+  root.querySelectorAll('.main-card').forEach((card) => {
+    const h = card.querySelector(':scope > .card-header');
+    if (!h) return;
+    const titolo = (h.textContent || '').trim();
+    const key = rootId + ':card:' + titolo.substring(0, 30);
+    if (!h.querySelector('.sec-chev')) h.insertAdjacentHTML('beforeend', '<span class="sec-chev">&#9660;</span>');
+    const aperta =
+      key in stato ? stato[key] : (aperteDefault || []).some((p) => titolo.toLowerCase().startsWith(p.toLowerCase()));
+    card.classList.toggle('card-collapsed', !aperta);
+    if (h.dataset.accInit) return;
+    h.dataset.accInit = '1';
+    h.addEventListener('click', (e) => {
+      if (e.target.closest('button, input, select, a, label')) return;
+      card.classList.toggle('card-collapsed');
+      stato[key] = !card.classList.contains('card-collapsed');
+      try {
+        localStorage.setItem('_sezioni_aperte', JSON.stringify(stato));
+      } catch (err) {}
+    });
+  });
+}

@@ -2146,6 +2146,16 @@ function apriSchedaCollaboratore(nome) {
   const _lastEntry = entries.length ? entries.sort((a, b) => (b.data || '').localeCompare(a.data || ''))[0] : null;
   const _lastDateStr = _lastEntry ? new Date(_lastEntry.data).toLocaleDateString('it-IT') : '—';
   const _lastTipo = _lastEntry ? _lastEntry.tipo : '';
+  // MINI-INDICE: salta alle sezioni della scheda
+  const _chipStile =
+    'padding:4px 12px;border:1px solid var(--line);border-radius:14px;font-size:.75rem;cursor:pointer;background:var(--paper2);color:var(--muted);font-weight:600';
+  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">';
+  ['Valutazione', 'Storico HR', 'Cronologia'].forEach(function (sez) {
+    if (sez === 'Storico HR' && !(typeof puoVedereStoricoHr === 'function' && puoVedereStoricoHr())) return;
+    html += '<span style="' + _chipStile + '" onclick="schedaVaiA(\'' + sez + '\')">' + sez + '</span>';
+  });
+  html += '</div>';
+
   // KPI CARDS — cliccabili: aprono l'anteprima delle voci nella cronologia
   const _kpiClick = function (source, tipo) {
     return ' onclick="schedaKpiFiltra(\'' + neS + "','" + source + "','" + String(tipo).replace(/'/g, "\\'") + '\')"';
@@ -2891,6 +2901,19 @@ function apriPdfModuloDaScheda(id) {
   document.getElementById('profilo-modal').classList.add('hidden');
   _destroySchedaCharts();
   if (typeof ristampaModuloPDF === 'function') ristampaModuloPDF(id);
+}
+
+// Mini-indice della scheda: scrolla alla sezione con quel titolo
+function schedaVaiA(sezione) {
+  var h = [...document.querySelectorAll('#profilo-content .scheda-section h4')].find(function (x) {
+    return x.textContent.indexOf(sezione) !== -1;
+  });
+  if (h)
+    try {
+      h.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (e) {
+      h.scrollIntoView();
+    }
 }
 
 function _schedaFilterTimeline(nome) {
