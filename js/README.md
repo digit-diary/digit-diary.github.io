@@ -38,11 +38,15 @@ da formazione/valutazioni (chiamati solo a runtime, dopo il caricamento completo
 
 **Totale: 24 file, ~26.000 righe formattate**
 
-## Separazione reparti (Slots / Tavoli)
-Tutti i dati passano dai filtri `getXxxReparto()` (registrazioni, moduli, collaboratori,
-valutazioni, punti, inventario, maison, consegne, promemoria). I record nuovi salvano
-sempre `reparto_dip: currentReparto`. Config per reparto: competenze (slots/tavoli
-separate). Config condivise tra reparti: punti/premi, soglie alert, categorie inventario.
+## Settori (dinamici, personalizzabili da admin)
+Slots e Tavoli sono fissi (REPARTI_BASE in utils.js); gli altri (default Valet, Cleaning)
+vivono in impostazioni `reparti_config` e si gestiscono da Impostazioni → Settori
+(aggiungi/rinomina/colore/disattiva). Tutti i dati passano dai filtri `getXxxReparto()`
+e salvano `reparto_dip: currentReparto`. Config per settore: competenze
+(competenze_config[key]), categorie inventario (inventario_categorie_extra per settore,
+Buoni/Sigarette solo Slots/Tavoli), pagine visibili (`reparti_pagine`, es. niente Maison
+nel Valet — applicata da isVis). Config condivise: punti/premi, soglie alert/disciplinari,
+valori buoni. Il select del login usa la cache localStorage `_cache_reparti`.
 
 ## Permessi di modifica (settings.js)
 Default solo admin, delegabili a operatori selezionati (es. HR) da Visibilità:

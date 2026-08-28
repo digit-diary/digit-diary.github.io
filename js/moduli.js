@@ -988,17 +988,9 @@ async function renderCollaboratoriUI() {
           c.id +
           ',this.value)" style="' +
           selStyle +
-          '"><option value="slots"' +
-          (rep === 'slots' ? ' selected' : '') +
-          '>Slots</option><option value="tavoli"' +
-          (rep === 'tavoli' ? ' selected' : '') +
-          '>Tavoli</option><option value="valet"' +
-          (rep === 'valet' ? ' selected' : '') +
-          '>Valet</option><option value="cleaning"' +
-          (rep === 'cleaning' ? ' selected' : '') +
-          '>Cleaning</option><option value="entrambi"' +
-          (rep === 'entrambi' ? ' selected' : '') +
-          '>Tutti</option></select><button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2)" onclick="rinominaCollaboratore(\'' +
+          '">' +
+          opzioniRepartoHtml(rep === 'entrambi' ? 'entrambi' : rep, true) +
+          '</select><button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2)" onclick="rinominaCollaboratore(\'' +
           c.nome.replace(/'/g, "\\'") +
           '\')">Rinomina</button><button class="btn-del-tipo" onclick="disattivaCollaboratore(\'' +
           c.nome.replace(/'/g, "\\'") +

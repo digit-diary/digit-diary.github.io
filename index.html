@@ -322,12 +322,7 @@
       <div class="ricerca-globale-results" id="ricerca-globale-results"></div>
     </div>
 
-    <div class="reparto-switch" id="reparto-switch" style="display: none">
-      <button class="reparto-btn active-slots" id="btn-rep-slots" onclick="setReparto('slots')">Slots</button>
-      <button class="reparto-btn" id="btn-rep-tavoli" onclick="setReparto('tavoli')">Tavoli</button>
-      <button class="reparto-btn" id="btn-rep-valet" onclick="setReparto('valet')">Valet</button>
-      <button class="reparto-btn" id="btn-rep-cleaning" onclick="setReparto('cleaning')">Cleaning</button>
-    </div>
+    <div class="reparto-switch" id="reparto-switch" style="display: none"></div>
     <button class="hamburger-btn" onclick="toggleMobileNav()" id="hamburger-btn">
       <i class="icx icx-menu"></i> Menu
     </button>
@@ -2772,6 +2767,15 @@
           </div>
           <button class="btn-add-tipo" onclick="aggiungiOperatoreConPwd()">+ Crea operatore</button>
         </div>
+      </div>
+      <div class="settings-section" id="settori-section" style="display: none">
+        <h4>Settori</h4>
+        <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
+          Gestisci i settori del casinò: aggiungi nuovi settori (es. Bar, Sicurezza), rinominali, scegli il colore e
+          quali pagine sono visibili in ognuno (es. niente Maison nel Valet). Slots e Tavoli sono fissi. Disattivare un
+          settore lo nasconde senza toccare i dati.
+        </p>
+        <div id="settori-list"></div>
       </div>
       <div class="settings-section" id="visibilita-section" style="display: none">
         <h4>Visibilità pagine e funzioni</h4>

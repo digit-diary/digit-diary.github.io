@@ -30,6 +30,8 @@ async function loadAll() {
     soglieDis,
     buonoVal,
     eqMesi,
+    repCfg,
+    repPag,
   ] = await Promise.all([
     getImp('tipi_personalizzati'),
     getImp('colori_override'),
@@ -50,6 +52,8 @@ async function loadAll() {
     getImp('soglie_disciplinari'),
     getImp('buono_valori'),
     getImp('equita_mesi'),
+    getImp('reparti_config'),
+    getImp('reparti_pagine'),
   ]);
   if (tp)
     try {
@@ -122,6 +126,17 @@ async function loadAll() {
       if (bv && typeof BUONO_VALORI !== 'undefined') Object.assign(BUONO_VALORI, bv);
     } catch (e) {}
   if (eqMesi && parseInt(eqMesi) > 0) equitaMesi = parseInt(eqMesi);
+  if (repCfg)
+    try {
+      const rc = JSON.parse(repCfg);
+      if (Array.isArray(rc)) repartiConfig = rc;
+    } catch (e) {}
+  if (repPag)
+    try {
+      repartiPagineCfg = JSON.parse(repPag);
+    } catch (e) {}
+  if (typeof _salvaCacheReparti === 'function') _salvaCacheReparti();
+  if (typeof popolaLoginSettore === 'function') popolaLoginSettore();
   const opRep = await getImp('operatori_reparto');
   if (opRep) {
     try {

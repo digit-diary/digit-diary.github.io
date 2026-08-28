@@ -55,7 +55,29 @@ function puoModificare(key) {
 function visGet(key) {
   return visibilitaConfig[key] || 'tutti';
 }
+// Pagine che possono essere abilitate/disabilitate per singolo settore (Impostazioni → Settori)
+const PAGINE_REPARTO = {
+  rapporto: 'Rapporto',
+  note_collega: 'Note Colleghi',
+  statistiche: 'Statistiche',
+  moduli: 'Moduli',
+  formazione: 'Formazione',
+  assistente: 'Assistente',
+  consegna: 'Consegna',
+  promemoria: 'Promemoria',
+  maison: 'Maison',
+  inventario: 'Inventario',
+  registro: 'Registro',
+};
+function paginaAbilitataReparto(key, repKey) {
+  if (!(key in PAGINE_REPARTO)) return true;
+  const cfg = (typeof repartiPagineCfg !== 'undefined' && repartiPagineCfg) || {};
+  const rc = cfg[repKey || currentReparto];
+  if (!rc) return true;
+  return rc[key] !== false;
+}
 function isVis(key) {
+  if (!paginaAbilitataReparto(key)) return false;
   const v = visGet(key);
   if (v === 'nascosto') return false;
   if (v === 'admin') return isAdmin();
@@ -67,12 +89,15 @@ function isVis(key) {
   return true;
 }
 function applicaVisibilita() {
-  // Pagine
-  Object.keys(VIS_ITEMS.pagine).forEach((k) => {
-    const pageName = k.replace('_', '-');
-    const tab = document.querySelector('.nav-tab[data-page="' + pageName + '"]');
-    if (tab) tab.style.display = isVis(k) ? '' : 'none';
-  });
+  // Pagine (incluse inventario e registro, che non hanno visibilità classica ma possono
+  // essere disattivate per settore)
+  Object.keys(VIS_ITEMS.pagine)
+    .concat(['inventario', 'registro'])
+    .forEach((k) => {
+      const pageName = k.replace('_', '-');
+      const tab = document.querySelector('.nav-tab[data-page="' + pageName + '"]');
+      if (tab) tab.style.display = isVis(k) ? '' : 'none';
+    });
   // Ricerca globale
   const rg = document.querySelector('.ricerca-globale-wrap');
   if (rg) rg.style.display = isVis('ricerca_globale') ? '' : 'none';
@@ -346,15 +371,13 @@ function renderOperatoriUI() {
           const hasAuth = operatoriAuthCache.find((o) => o.nome === n);
           const rep = operatoriRepartoMap[n] || 'entrambi';
           const repBadge =
-            rep === 'slots'
-              ? '<span class="mini-badge" style="background:#1a4a7a">Slots</span>'
-              : rep === 'tavoli'
-                ? '<span class="mini-badge" style="background:#8e44ad">Tavoli</span>'
-                : rep === 'valet'
-                  ? '<span class="mini-badge" style="background:#1a7a6d">Valet</span>'
-                  : rep === 'cleaning'
-                    ? '<span class="mini-badge" style="background:#5d6d7e">Cleaning</span>'
-                    : '<span class="mini-badge" style="background:var(--accent2)">Tutti</span>';
+            rep === 'entrambi' || !getRepartoInfo(rep)
+              ? '<span class="mini-badge" style="background:var(--accent2)">Tutti</span>'
+              : '<span class="mini-badge" style="background:' +
+                repartoColore(rep) +
+                '">' +
+                escP(repartoLabel(rep)) +
+                '</span>';
           const ne = n.replace(/'/g, "\\'");
           return (
             '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border:1px solid ' +
@@ -369,17 +392,9 @@ function renderOperatoriUI() {
             (admin
               ? '<select onchange="cambiaRepartoOperatore(\'' +
                 ne +
-                '\',this.value)" style="font-size:.75rem;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><option value="entrambi"' +
-                (rep === 'entrambi' ? ' selected' : '') +
-                '>Tutti i reparti</option><option value="slots"' +
-                (rep === 'slots' ? ' selected' : '') +
-                '>Slots</option><option value="tavoli"' +
-                (rep === 'tavoli' ? ' selected' : '') +
-                '>Tavoli</option><option value="valet"' +
-                (rep === 'valet' ? ' selected' : '') +
-                '>Valet</option><option value="cleaning"' +
-                (rep === 'cleaning' ? ' selected' : '') +
-                '>Cleaning</option></select>'
+                '\',this.value)" style="font-size:.75rem;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)">' +
+                opzioniRepartoHtml(rep, true) +
+                '</select>'
               : '') +
             (admin && hasAuth
               ? '<button style="font-size:.75rem;padding:3px 8px;cursor:pointer;border:1px solid var(--accent2);color:var(--accent2);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif;font-weight:600" onclick="resetPasswordOperatore(\'' +
@@ -763,4 +778,166 @@ async function esportaBackupCompleto() {
     if (st) st.textContent = "Errore durante l'esportazione.";
     toast('Errore esportazione backup');
   }
+}
+
+// ================================================================
+// SETTORI (admin): aggiungi/rinomina/colore/disattiva + pagine per settore
+// ================================================================
+function renderSettoriUI() {
+  const el = document.getElementById('settori-list');
+  if (!el || !isAdmin()) return;
+  let html = '';
+  getRepartiTutti().forEach((r) => {
+    const custom = !r.fisso;
+    const disattivo = custom && r.attivo === false;
+    const nDati =
+      collaboratoriCache.filter((c) => c.reparto_dip === r.key).length +
+      datiCache.filter((d) => d.reparto_dip === r.key).length;
+    html +=
+      '<div style="padding:12px 0;border-bottom:1px solid var(--line)' +
+      (disattivo ? ';opacity:.55' : '') +
+      '"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">';
+    html +=
+      '<span class="mini-badge" style="background:' + r.colore + ';font-size:.78rem">' + escP(r.label) + '</span>';
+    if (custom) {
+      html +=
+        '<input type="text" id="settore-label-' +
+        r.key +
+        '" value="' +
+        escP(r.label) +
+        '" style="width:150px;padding:5px 10px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink);font-size:.84rem">';
+    } else {
+      html += '<span style="font-size:.78rem;color:var(--muted)">settore di base (fisso)</span>';
+    }
+    html +=
+      '<input type="color" id="settore-colore-' +
+      r.key +
+      '" value="' +
+      (r.colore || '#8a7d6b') +
+      '" style="width:40px;height:30px;border:1px solid var(--line);border-radius:2px;cursor:pointer;background:var(--paper2)">';
+    html +=
+      '<button class="btn-add-tipo" onclick="salvaSettore(\'' + r.key + '\')" style="padding:6px 14px">Salva</button>';
+    if (custom) {
+      html +=
+        '<button class="btn-del-tipo" onclick="toggleAttivoSettore(\'' +
+        r.key +
+        '\')" style="margin-left:4px">' +
+        (disattivo ? 'Riattiva' : 'Disattiva') +
+        '</button>';
+      if (nDati) html += '<span style="font-size:.72rem;color:var(--muted)">' + nDati + ' record collegati</span>';
+    }
+    html += '</div>';
+    // pagine abilitate per questo settore
+    html += '<div style="display:flex;flex-wrap:wrap;gap:4px 14px;padding-left:4px">';
+    Object.entries(PAGINE_REPARTO).forEach(([pk, plabel]) => {
+      html +=
+        '<label style="display:flex;align-items:center;gap:4px;font-size:.78rem;color:var(--muted);cursor:pointer"><input type="checkbox"' +
+        (paginaAbilitataReparto(pk, r.key) ? ' checked' : '') +
+        ' onchange="salvaPaginaSettore(\'' +
+        r.key +
+        "','" +
+        pk +
+        '\',this.checked)"> ' +
+        plabel +
+        '</label>';
+    });
+    html += '</div></div>';
+  });
+  html +=
+    '<div class="add-tipo-row" style="margin-top:12px;align-items:flex-end"><div class="field"><label>Nuovo settore</label><input type="text" id="nuovo-settore-nome" placeholder="Es: Bar, Sicurezza, Reception..."></div><div class="field"><label>Colore</label><input type="color" id="nuovo-settore-colore" value="#b8860b" style="width:50px;height:38px;border:1px solid var(--line);border-radius:2px;cursor:pointer;background:var(--paper2)"></div><button class="btn-add-tipo" onclick="aggiungiSettore()">+ Aggiungi settore</button></div>';
+  el.innerHTML = html;
+}
+async function _salvaRepartiConfig() {
+  await setImp('reparti_config', JSON.stringify(getRepartiCustom()));
+  _salvaCacheReparti();
+  if (typeof renderRepartoSwitch === 'function') renderRepartoSwitch();
+  if (typeof applicaVisibilita === 'function') applicaVisibilita();
+  if (typeof aggiornaMenuMobile === 'function') aggiornaMenuMobile();
+  popolaLoginSettore();
+}
+async function aggiungiSettore() {
+  const nome = ((document.getElementById('nuovo-settore-nome') || {}).value || '').trim();
+  const colore = (document.getElementById('nuovo-settore-colore') || {}).value || '#b8860b';
+  if (!nome) {
+    toast('Inserisci il nome del settore');
+    return;
+  }
+  const key = nome
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  if (!key || key === 'entrambi' || getRepartiTutti().some((r) => r.key === key)) {
+    toast('Settore già esistente o nome non valido');
+    return;
+  }
+  repartiConfig = [...getRepartiCustom(), { key, label: nome, colore, attivo: true }];
+  await _salvaRepartiConfig();
+  logAzione('Settore aggiunto', nome);
+  renderSettoriUI();
+  toast('Settore "' + nome + '" creato');
+}
+async function salvaSettore(key) {
+  const lista = getRepartiCustom();
+  const r = lista.find((x) => x.key === key);
+  const colore = (document.getElementById('settore-colore-' + key) || {}).value;
+  if (r) {
+    const label = ((document.getElementById('settore-label-' + key) || {}).value || '').trim();
+    if (label) r.label = label;
+    if (colore) r.colore = colore;
+    repartiConfig = lista;
+  } else {
+    // settore base: solo colore
+    const base = REPARTI_BASE.find((x) => x.key === key);
+    if (base && colore) base.colore = colore;
+  }
+  await _salvaRepartiConfig();
+  logAzione('Settore modificato', key);
+  renderSettoriUI();
+  toast('Settore salvato');
+}
+async function toggleAttivoSettore(key) {
+  const lista = getRepartiCustom();
+  const r = lista.find((x) => x.key === key);
+  if (!r) return;
+  const disattiva = r.attivo !== false;
+  if (disattiva) {
+    const nDati =
+      collaboratoriCache.filter((c) => c.reparto_dip === key).length +
+      datiCache.filter((d) => d.reparto_dip === key).length;
+    if (
+      !confirm(
+        'Disattivare il settore "' +
+          r.label +
+          '"?\n\nSparisce dallo switch e dai menu ma NESSUN dato viene toccato' +
+          (nDati ? ' (' + nDati + ' record restano al sicuro)' : '') +
+          '. Puoi riattivarlo quando vuoi.',
+      )
+    )
+      return;
+  }
+  r.attivo = !disattiva ? true : false;
+  repartiConfig = lista;
+  if (currentReparto === key && disattiva) currentReparto = 'slots';
+  await _salvaRepartiConfig();
+  logAzione('Settore ' + (disattiva ? 'disattivato' : 'riattivato'), r.label);
+  renderSettoriUI();
+  toast('Settore ' + (disattiva ? 'disattivato' : 'riattivato'));
+}
+async function salvaPaginaSettore(repKey, pageKey, abilitata) {
+  if (!repartiPagineCfg || typeof repartiPagineCfg !== 'object') repartiPagineCfg = {};
+  if (!repartiPagineCfg[repKey]) repartiPagineCfg[repKey] = {};
+  if (abilitata) delete repartiPagineCfg[repKey][pageKey];
+  else repartiPagineCfg[repKey][pageKey] = false;
+  if (!Object.keys(repartiPagineCfg[repKey]).length) delete repartiPagineCfg[repKey];
+  await setImp('reparti_pagine', JSON.stringify(repartiPagineCfg));
+  logAzione('Pagine settore', repartoLabel(repKey) + ' — ' + pageKey + ': ' + (abilitata ? 'attiva' : 'disattivata'));
+  if (typeof applicaVisibilita === 'function') applicaVisibilita();
+  if (typeof aggiornaMenuMobile === 'function') aggiornaMenuMobile();
+  toast(
+    (abilitata ? 'Attivata' : 'Disattivata') +
+      ' "' +
+      (PAGINE_REPARTO[pageKey] || pageKey) +
+      '" per ' +
+      repartoLabel(repKey),
+  );
 }
