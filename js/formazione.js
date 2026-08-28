@@ -452,6 +452,7 @@ function renderFormazione() {
     html += _renderFormazioneConfig();
   }
   el.innerHTML = html;
+  if (typeof initSezioniRichiudibili === 'function') initSezioniRichiudibili('formazione-content');
 }
 
 // Registra una sessione formativa nello storico HR (+ punti opzionali)

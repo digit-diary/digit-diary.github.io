@@ -1013,3 +1013,34 @@ async function salvaGiubileoPreavviso(val) {
   logAzione('Giubileo: preavviso notifica', g ? g + ' giorni' : 'disattivato');
   toast(g ? 'Notifica giubileo: ' + g + ' giorni prima' : 'Notifica giubileo disattivata');
 }
+
+// ================================================================
+// SEZIONI RICHIUDIBILI: le sezioni di Impostazioni (e la config admin
+// di Formazione) si aprono/chiudono cliccando sul titolo; lo stato
+// viene ricordato per dispositivo. Default: tutte chiuse (pagina pulita).
+// ================================================================
+function initSezioniRichiudibili(rootId) {
+  const root = document.getElementById(rootId);
+  if (!root) return;
+  let aperte = {};
+  try {
+    aperte = JSON.parse(localStorage.getItem('_sezioni_aperte') || '{}');
+  } catch (e) {}
+  root.querySelectorAll('.settings-section').forEach((sec, i) => {
+    const h = sec.querySelector(':scope > h4');
+    if (!h) return;
+    const key = rootId + ':' + (sec.id || 'sec_' + i);
+    if (!h.querySelector('.sec-chev')) h.insertAdjacentHTML('beforeend', '<span class="sec-chev">&#9660;</span>');
+    sec.classList.toggle('sec-collapsed', !aperte[key]);
+    if (h.dataset.accInit) return;
+    h.dataset.accInit = '1';
+    h.addEventListener('click', (e) => {
+      if (e.target.closest('button, input, select, a, label')) return;
+      sec.classList.toggle('sec-collapsed');
+      aperte[key] = !sec.classList.contains('sec-collapsed');
+      try {
+        localStorage.setItem('_sezioni_aperte', JSON.stringify(aperte));
+      } catch (err) {}
+    });
+  });
+}

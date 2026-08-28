@@ -127,6 +127,7 @@ function switchPage(name) {
       const gs = document.getElementById('groq-status');
       if (gs) gs.innerHTML = '<span style="color:#2c6e49">Chiave configurata</span>';
     }
+    if (typeof initSezioniRichiudibili === 'function') initSezioniRichiudibili('page-impostazioni');
   }
   if (name === 'moduli') {
     if (!document.getElementById('mod-list-results')) _modFiltInit = false;
