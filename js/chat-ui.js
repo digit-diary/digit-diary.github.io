@@ -2049,9 +2049,14 @@ function _destroySchedaCharts() {
 function apriSchedaCollaboratore(nome) {
   _destroySchedaCharts();
   window._schedaTlTipo = null;
+  // Vista completa (admin + permesso Storico HR): la storia del collaboratore attraverso
+  // TUTTI i settori — i record restano archiviati nel settore dove sono avvenuti,
+  // ma il fascicolo della persona si vede intero. Gli altri vedono solo il settore corrente.
+  const vistaCompleta = typeof puoVedereStoricoHr === 'function' && puoVedereStoricoHr();
+  window._schedaVistaCompleta = vistaCompleta;
   const allData = getDatiReparto();
-  const entries = allData.filter((e) => e.nome === nome);
-  const moduli = getModuliReparto().filter(
+  const entries = (vistaCompleta ? datiCache : allData).filter((e) => e.nome === nome);
+  const moduli = (vistaCompleta ? moduliCache : getModuliReparto()).filter(
     (m) => m.collaboratore && m.collaboratore.toLowerCase() === nome.toLowerCase(),
   );
   const now = new Date();
@@ -2480,7 +2485,12 @@ function apriSchedaCollaboratore(nome) {
   if (typeof _renderStoricoHrSezione === 'function') html += _renderStoricoHrSezione(nome);
 
   // TIMELINE with date filter
-  html += '<div class="scheda-section"><h4>Cronologia completa</h4>';
+  html +=
+    '<div class="scheda-section"><h4>Cronologia completa' +
+    (vistaCompleta
+      ? ' <span class="mini-badge" style="background:var(--accent2);font-size:.62rem" title="Stai vedendo gli eventi di tutti i settori (vista admin/HR)">TUTTI I SETTORI</span>'
+      : '') +
+    '</h4>';
   html += '<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">';
   html += '<span style="font-size:.78rem;color:var(--muted);font-weight:600">FILTRO:</span>';
   html +=
@@ -2539,6 +2549,7 @@ function _renderSchedaTimeline(nome, entries, moduli, dal, al) {
       importo: e.importo,
       valuta: e.valuta,
       reparto: e.reparto,
+      repDip: e.reparto_dip || 'slots',
     });
   });
   moduli.forEach(function (m) {
@@ -2555,6 +2566,7 @@ function _renderSchedaTimeline(nome, entries, moduli, dal, al) {
       text: 'Modulo ' + label + (m.resp_settore ? ' — Resp: ' + m.resp_settore : ''),
       source: 'mod',
       operatore: m.operatore || '',
+      repDip: m.reparto_dip || 'slots',
     });
   });
   items.sort(function (a, b) {
@@ -2606,6 +2618,14 @@ function _renderSchedaTimeline(nome, entries, moduli, dal, al) {
         i.source === 'mod'
           ? '<span style="margin-left:4px;padding:1px 5px;border:1px solid var(--line);border-radius:2px;font-size:.65rem;color:var(--muted)">MODULO</span>'
           : '';
+      var setBadge =
+        window._schedaVistaCompleta && i.repDip && typeof repartoLabel === 'function'
+          ? '<span class="mini-badge" style="margin-left:4px;background:' +
+            repartoColore(i.repDip) +
+            ';font-size:.62rem">' +
+            escP(repartoLabel(i.repDip)) +
+            '</span>'
+          : '';
       return (
         '<div class="scheda-timeline-item" style="cursor:pointer" title="Clicca per l\'anteprima completa" onclick="apriVoceTimeline(\'' +
         i.source +
@@ -2619,6 +2639,7 @@ function _renderSchedaTimeline(nome, entries, moduli, dal, al) {
         escP(i.tipo) +
         '</span>' +
         srcBadge +
+        setBadge +
         repBadge +
         impBadge +
         '<span style="flex:1;overflow:hidden;text-overflow:ellipsis">' +
@@ -2669,7 +2690,7 @@ function _renderStoricoHrSezione(nome) {
   var c = collaboratoriCache.find(function (x) {
     return x.nome === nome;
   });
-  var eventi = getHrEventiReparto()
+  var eventi = (window._schedaVistaCompleta ? hrEventiCache : getHrEventiReparto())
     .filter(function (e) {
       return e.collaboratore.toLowerCase() === nome.toLowerCase();
     })
@@ -2921,10 +2942,10 @@ function _schedaFilterTimeline(nome) {
     alEl = document.getElementById('scheda-tl-al');
   var dal = dalEl ? dalEl.value : '',
     al = alEl ? alEl.value : '';
-  var entries = getDatiReparto().filter(function (e) {
+  var entries = (window._schedaVistaCompleta ? datiCache : getDatiReparto()).filter(function (e) {
     return e.nome === nome;
   });
-  var moduli = getModuliReparto().filter(function (m) {
+  var moduli = (window._schedaVistaCompleta ? moduliCache : getModuliReparto()).filter(function (m) {
     return m.collaboratore && m.collaboratore.toLowerCase() === nome.toLowerCase();
   });
   var tl = document.getElementById('scheda-timeline');
