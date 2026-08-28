@@ -1933,6 +1933,145 @@ async function _insertHrEvento(nome, tipo, descrizione, dataEvento) {
     if (r && r[0]) hrEventiCache.unshift(r[0]);
   } catch (e) {}
 }
+
+// === ALLEGATI STORICO HR: schede originali (PDF/Excel/immagine, max 2 MB) ===
+// La tabella hr_allegati NON è in loadAll: si legge on-demand dalla scheda collaboratore.
+const HR_ALLEGATO_MAX = 2 * 1024 * 1024;
+const HR_ALLEGATO_MIME = {
+  pdf: 'application/pdf',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  xls: 'application/vnd.ms-excel',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+};
+function puoVedereAllegatiHr() {
+  if (typeof puoVedereStoricoHr === 'function' && puoVedereStoricoHr()) return true;
+  return typeof puoModificare === 'function' && puoModificare('gestione_formazioni');
+}
+async function _uploadHrAllegato(file, collaboratore, titolo) {
+  const est = (file.name.split('.').pop() || '').toLowerCase();
+  const mime = HR_ALLEGATO_MIME[est];
+  if (!mime) {
+    toast('Formato non supportato: usa PDF, Excel o immagine (jpg/png)');
+    return null;
+  }
+  if (file.size > HR_ALLEGATO_MAX) {
+    toast('File troppo grande: massimo 2 MB');
+    return null;
+  }
+  const b64 = await new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => res(String(fr.result).split(',')[1]);
+    fr.onerror = rej;
+    fr.readAsDataURL(file);
+  });
+  const r = await secPost('hr_allegati', {
+    collaboratore: collaboratore,
+    titolo: titolo || file.name,
+    filename: file.name,
+    mime: mime,
+    dati: b64,
+    data_evento: new Date().toISOString().split('T')[0],
+    operatore: getOperatore(),
+    reparto_dip: currentReparto,
+  });
+  logAzione('Allegato HR caricato', collaboratore + ' — ' + (titolo || file.name));
+  return r && r[0] ? r[0] : null;
+}
+window._hrAllegatiScheda = []; // ultimo elenco caricato (per apri/elimina)
+async function caricaAllegatiCollab(nome) {
+  const el = document.getElementById('hr-allegati-list');
+  if (!el) return;
+  el.innerHTML = '<p style="color:var(--muted);font-size:.82rem">Caricamento allegati...</p>';
+  try {
+    const rows = await secGet(
+      'hr_allegati?collaboratore=eq.' + encodeURIComponent(nome) + '&order=created_at.desc&limit=50',
+    );
+    window._hrAllegatiScheda = rows || [];
+    if (!rows || !rows.length) {
+      el.innerHTML = '<p style="color:var(--muted);font-size:.82rem">Nessun allegato caricato.</p>';
+      return;
+    }
+    el.innerHTML = rows
+      .map((a) => {
+        const d = new Date(a.created_at || a.data_evento);
+        return (
+          '<div class="tipo-item" style="gap:8px"><div class="tipo-item-name" style="min-width:0"><i class="icx icx-modulo"></i> ' +
+          escP(a.titolo) +
+          ' <span class="tipo-item-default">(' +
+          escP(a.filename) +
+          ' — ' +
+          d.toLocaleDateString('it-IT') +
+          (a.operatore ? ' — ' + escP(a.operatore) : '') +
+          ')</span></div><button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2)" onclick="apriHrAllegato(' +
+          a.id +
+          ')">Apri</button>' +
+          (isAdmin()
+            ? '<button class="btn-del-tipo" style="margin-left:4px" onclick="eliminaHrAllegato(' +
+              a.id +
+              ",'" +
+              nome.replace(/'/g, "\\'") +
+              '\')">Elimina</button>'
+            : '') +
+          '</div>'
+        );
+      })
+      .join('');
+  } catch (e) {
+    el.innerHTML = '<p style="color:var(--accent);font-size:.82rem">Errore caricamento allegati.</p>';
+  }
+}
+function apriHrAllegato(id) {
+  const a = (window._hrAllegatiScheda || []).find((x) => x.id === id);
+  if (!a) return;
+  const bin = atob(a.dati);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  const url = URL.createObjectURL(new Blob([arr], { type: a.mime }));
+  const w = window.open(url, '_blank');
+  if (!w) {
+    // popup bloccato: scarica direttamente
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = a.filename;
+    link.click();
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+async function eliminaHrAllegato(id, nome) {
+  if (!isAdmin()) return;
+  if (!confirm('Eliminare questo allegato? Operazione definitiva.')) return;
+  try {
+    await secDel('hr_allegati', 'id=eq.' + id);
+    logAzione('Allegato HR eliminato', 'id ' + id + ' (' + nome + ')');
+    toast('Allegato eliminato');
+    caricaAllegatiCollab(nome);
+  } catch (e) {
+    toast('Errore eliminazione allegato');
+  }
+}
+async function caricaNuovoAllegatoScheda(input, nome) {
+  const file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  if (!puoVedereAllegatiHr()) {
+    toast('Non hai il permesso di caricare allegati');
+    return;
+  }
+  const titolo = (prompt('Titolo allegato (es. "Scheda valutazione 2026 — valutatore"):', file.name) || '').trim();
+  if (!titolo) return;
+  try {
+    const r = await _uploadHrAllegato(file, nome, titolo);
+    if (r) {
+      toast('Allegato caricato');
+      caricaAllegatiCollab(nome);
+    }
+  } catch (e) {
+    toast('Errore caricamento allegato');
+  }
+}
+
 // === PREMIO GIUBILEO (riservato HR/admin): somma in denaro ogni N anni di servizio ===
 const GIUBILEO_DEFAULT = [
   { anni: 5, importo: 500 },

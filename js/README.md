@@ -49,6 +49,14 @@ nel Valet — applicata da isVis). Config condivise: punti/premi, soglie alert/d
 valori buoni. Il select del login usa la cache localStorage `_cache_reparti`.
 
 ## Permessi di modifica (settings.js)
-Default solo admin, delegabili a operatori selezionati (es. HR) da Visibilità:
-`gestione_punti`, `gestione_categorie`, `gestione_competenze`, `gestione_valutazioni`.
+Default solo admin, delegabili a operatori selezionati (es. HR, supervisor) da Visibilità:
+`gestione_punti`, `gestione_impiego`, `gestione_categorie`, `vista_categorie`,
+`gestione_competenze`, `gestione_valutazioni`, `gestione_formazioni`, `storico_hr`.
 Chi non è abilitato vede tutto in sola lettura.
+
+## Allegati Storico HR (hr_allegati)
+Schede originali (PDF/Excel/immagine, max 2 MB, base64 nel DB) caricate dalla scheda
+collaboratore o da Registra formazione; l'import Excel valutazione salva anche il file
+originale. La tabella NON è in loadAll: lettura on-demand (caricaAllegatiCollab).
+Visibili a admin + `storico_hr` + `gestione_formazioni`. L'import legge anche il foglio
+"Autovalutazione" del workbook ufficiale (colonna auto_aree, mostrata accanto ai valori).

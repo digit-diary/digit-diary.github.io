@@ -176,7 +176,9 @@ function _renderValutazioneSezione(nome) {
   html += '</h4>';
   if (!vals.length) {
     html +=
-      '<p style="color:var(--muted);font-size:.86rem">Nessuna valutazione registrata. Creane una nuova o importa la scheda Excel compilata.</p></div>';
+      '<p style="font-size:.86rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="mini-badge" style="background:#8a1c1c;color:#fff;font-size:.72rem;letter-spacing:.05em">VALUTAZIONE ASSENTE</span><span style="color:var(--muted)">Nessuna scheda di valutazione registrata' +
+      (puoVal ? ': creane una nuova o importa la scheda Excel compilata.' : '.') +
+      '</span></p></div>';
     return html;
   }
   // Selettore schede (più valutazioni: anni/tipi diversi)
@@ -278,6 +280,11 @@ function _renderValutazioneSezione(nome) {
       (val != null ? val + '%' : '—') +
       '</strong>' +
       (prec ? deltaBadge(val, areePrec[a.key]) : '') +
+      ((v.auto_aree || {})[a.key] != null
+        ? '<span style="font-size:.7rem;color:#1a4a7a;min-width:58px;text-align:right" title="Autovalutazione del collaboratore">auto: ' +
+          v.auto_aree[a.key] +
+          '%</span>'
+        : '') +
       '</div>';
     if (note[a.key])
       html +=
@@ -588,6 +595,7 @@ const _AREE_MATCH = [
 // Mai prendere il primo numero della riga: sarebbe il Grado 1-5.
 function _parseValutazioneWorkbook(wb) {
   const aree = {};
+  const autoAree = {}; // foglio "Autovalutazione" (autovalutazione del collaboratore)
   const areeNote = {};
   const areeValori = {};
   const extra = {};
@@ -605,6 +613,7 @@ function _parseValutazioneWorkbook(wb) {
     return peso(a) - peso(b);
   });
   for (const sn of ordinati) {
+    const isAuto = _normTesto(sn).includes('autovalutazione');
     const data = XLSX.utils.sheet_to_json(wb.Sheets[sn], {
       header: 1,
       defval: '',
@@ -683,25 +692,28 @@ function _parseValutazioneWorkbook(wb) {
         if (m && !annoTrovato) annoTrovato = parseInt(m[1]);
       });
       _AREE_MATCH.forEach((am) => {
-        if (aree[am.key] != null) return;
+        // il foglio Autovalutazione riempie autoAree, la scheda del valutatore riempie aree
+        const target = isAuto ? autoAree : aree;
+        if (target[am.key] != null) return;
         const idx = rowNorm.findIndex((c) => c && c.includes(am.match));
         if (idx === -1) return;
         // 1) colonna Punteggio individuata dall'intestazione
         if (colPunteggio !== -1 && colPunteggio !== idx) {
           const n = leggiNum(row[colPunteggio]);
-          if (n != null) aree[am.key] = n;
+          if (n != null) target[am.key] = n;
         }
         // 2) fallback: primo valore numerico 0-100 nella riga
-        if (aree[am.key] == null) {
+        if (target[am.key] == null) {
           for (let j = 0; j < row.length; j++) {
             if (j === idx) continue;
             const n = leggiNum(row[j]);
             if (n != null) {
-              aree[am.key] = n;
+              target[am.key] = n;
               break;
             }
           }
         }
+        if (isAuto) return; // valori D, note e testi solo dalla scheda del valutatore
         // colonna D "Valore" (ponderazione ufficiale) per il calcolo di Totale/Conseguito
         if (areeValori[am.key] == null && colValore !== -1) {
           const nv = leggiNum(row[colValore]);
@@ -746,7 +758,7 @@ function _parseValutazioneWorkbook(wb) {
   }
   if (Object.keys(areeNote).length) extra.aree_note = areeNote;
   if (Object.keys(areeValori).length) extra.aree_valori = areeValori;
-  return { aree, annoTrovato, extra };
+  return { aree, annoTrovato, extra, autoAree };
 }
 async function importaValutazioneExcel(input, nome) {
   if (typeof puoModificare === 'function' && !puoModificare('gestione_valutazioni')) {
@@ -764,7 +776,7 @@ async function importaValutazioneExcel(input, nome) {
   try {
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf);
-    const { aree, annoTrovato, extra } = _parseValutazioneWorkbook(wb);
+    const { aree, annoTrovato, extra, autoAree } = _parseValutazioneWorkbook(wb);
     const trovate = Object.keys(aree).length;
     if (!trovate) {
       toast('Nessuna area di valutazione riconosciuta nel file');
@@ -774,7 +786,7 @@ async function importaValutazioneExcel(input, nome) {
     // anteprima conferma
     const b = document.getElementById('pwd-modal-content');
     const ne = nome.replace(/'/g, "\\'");
-    window._valImportPending = { nome, anno, aree, extra };
+    window._valImportPending = { nome, anno, aree, extra, autoAree, file };
     b.innerHTML =
       '<h3>Importa valutazione</h3><p style="margin-bottom:10px"><strong>' +
       escP(nome) +
@@ -817,6 +829,12 @@ async function importaValutazioneExcel(input, nome) {
             .join(' · ') +
           '</p>'
         : '') +
+      (autoAree && Object.keys(autoAree).length
+        ? '<p style="font-size:.78rem;color:#1a4a7a;margin:0 0 10px">Autovalutazione trovata: ' +
+          Object.keys(autoAree).length +
+          ' aree (verrà salvata accanto alla valutazione)</p>'
+        : '') +
+      '<p style="font-size:.75rem;color:var(--muted);margin:0 0 10px">Il file Excel originale verrà salvato come allegato nello Storico HR.</p>' +
       '</div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="_confermaImportValutazione()">Importa</button></div>';
     document.getElementById('pwd-modal').classList.remove('hidden');
   } catch (e) {
@@ -841,10 +859,12 @@ async function _confermaImportValutazione() {
     if (ex.dati_personali && Object.keys(ex.dati_personali).length) testi.dati_personali = ex.dati_personali;
     if (ex.valutatore) testi.valutatore = ex.valutatore;
     if (ex.dati_personali && ex.dati_personali.data_scheda) testi.data_valutazione = ex.dati_personali.data_scheda;
+    if (p.autoAree && Object.keys(p.autoAree).length) testi.auto_aree = p.autoAree;
     const esistente = getValutazioniCollab(p.nome).find((v) => v.anno === p.anno && v.tipo === 'valutazione');
     if (esistente) {
       const areeMerged = Object.assign({}, esistente.aree || {}, p.aree);
       if (testi.aree_note) testi.aree_note = Object.assign({}, esistente.aree_note || {}, testi.aree_note);
+      if (testi.auto_aree) testi.auto_aree = Object.assign({}, esistente.auto_aree || {}, testi.auto_aree);
       if (testi.aree_valori) testi.aree_valori = Object.assign({}, esistente.aree_valori || {}, testi.aree_valori);
       if (testi.dati_personali)
         testi.dati_personali = Object.assign({}, esistente.dati_personali || {}, testi.dati_personali);
@@ -865,6 +885,12 @@ async function _confermaImportValutazione() {
       if (r && r[0]) valutazioniCache.unshift(r[0]);
     }
     logAzione('Valutazione importata da Excel', p.nome + ' — anno ' + p.anno);
+    // File Excel originale → allegato nello Storico HR (max 2 MB, gestito dall'helper)
+    if (p.file && typeof _uploadHrAllegato === 'function') {
+      try {
+        await _uploadHrAllegato(p.file, p.nome, 'Scheda valutazione ' + p.anno + ' (Excel originale)');
+      } catch (e2) {}
+    }
     toast('Valutazione importata');
     window._valImportPending = null;
     apriSchedaCollaboratore(p.nome);
