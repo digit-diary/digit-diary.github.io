@@ -1756,6 +1756,16 @@ function setReparto(rep) {
       renderInventario();
   }
   registraPushSubscription();
+  // Pagine dipendenti dal settore che prima restavano "congelate" al cambio:
+  var _pgAttiva = function (id) {
+    var p = document.getElementById(id);
+    return p && p.classList.contains('active');
+  };
+  if (_pgAttiva('page-formazione') && typeof renderFormazione === 'function') renderFormazione();
+  if (_pgAttiva('page-impostazioni') && typeof renderCollaboratoriUI === 'function') renderCollaboratoriUI();
+  if (typeof renderPromemoria === 'function') renderPromemoria();
+  if (typeof aggiornaPromemoriaBadge === 'function') aggiornaPromemoriaBadge();
+  if (_pgAttiva('page-promemoria') && typeof initPromemoriaUI === 'function') initPromemoriaUI();
   // Re-render TUTTE le pagine (dati devono essere sempre freschi per il reparto)
   aggiornaNomi();
   render();
