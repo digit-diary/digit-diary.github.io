@@ -103,6 +103,8 @@ function switchPage(name) {
     if (gbSec) {
       gbSec.style.display = isAdmin() ? '' : 'none';
       if (isAdmin() && typeof renderGiubileoUI === 'function') renderGiubileoUI();
+      const gbPre = document.getElementById('giubileo-preavviso-sel');
+      if (gbPre) gbPre.value = String(typeof giubileoPreavviso !== 'undefined' ? giubileoPreavviso : 60);
     }
     const bkSec = document.getElementById('backup-section');
     if (bkSec) bkSec.style.display = isAdmin() ? '' : 'none';

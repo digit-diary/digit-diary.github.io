@@ -2903,6 +2903,19 @@
           contratto). Gli importi sono personalizzabili; i giubilei maturati appaiono nello Storico HR della scheda
           collaboratore e sono visibili solo ad admin e operatori con permesso "Storico HR" (es. HR).
         </p>
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px">
+          <span style="font-size: 0.84rem; color: var(--muted)">Notifica anticipata agli operatori HR:</span>
+          <select id="giubileo-preavviso-sel" onchange="salvaGiubileoPreavviso(this.value)" style="padding: 8px">
+            <option value="0">Disattivata</option>
+            <option value="30">30 giorni prima</option>
+            <option value="60">60 giorni prima</option>
+            <option value="90">90 giorni prima</option>
+            <option value="120">120 giorni prima</option>
+          </select>
+          <span style="font-size: 0.75rem; color: var(--muted)"
+            >(push agli operatori selezionati nel permesso "Storico HR")</span
+          >
+        </div>
         <div id="giubileo-list"></div>
         <div class="add-tipo-row" style="align-items: flex-end; margin-top: 8px">
           <div class="field">

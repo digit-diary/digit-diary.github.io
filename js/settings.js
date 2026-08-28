@@ -1005,3 +1005,11 @@ async function rimuoviGiubileo(idx) {
   await _salvaGiubileoConfig(cfg);
   logAzione('Giubileo: scaglione rimosso', rimosso.anni + ' anni');
 }
+
+async function salvaGiubileoPreavviso(val) {
+  const g = parseInt(val) || 0;
+  giubileoPreavviso = g;
+  await setImp('giubileo_preavviso', String(g));
+  logAzione('Giubileo: preavviso notifica', g ? g + ' giorni' : 'disattivato');
+  toast(g ? 'Notifica giubileo: ' + g + ' giorni prima' : 'Notifica giubileo disattivata');
+}
