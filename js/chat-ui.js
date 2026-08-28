@@ -2155,8 +2155,11 @@ function apriSchedaCollaboratore(nome) {
   const _chipStile =
     'padding:4px 12px;border:1px solid var(--line);border-radius:14px;font-size:.75rem;cursor:pointer;background:var(--paper2);color:var(--muted);font-weight:600';
   html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">';
-  ['Valutazione', 'Storico HR', 'Cronologia'].forEach(function (sez) {
-    if (sez === 'Storico HR' && !(typeof puoVedereStoricoHr === 'function' && puoVedereStoricoHr())) return;
+  const _hrChipFull = typeof puoVedereStoricoHr === 'function' && puoVedereStoricoHr();
+  const _chipForm = !_hrChipFull && typeof puoModificare === 'function' && puoModificare('gestione_formazioni');
+  ['Valutazione', 'Storico HR', 'Formazioni svolte', 'Cronologia'].forEach(function (sez) {
+    if (sez === 'Storico HR' && !_hrChipFull) return;
+    if (sez === 'Formazioni svolte' && !_chipForm) return;
     html += '<span style="' + _chipStile + '" onclick="schedaVaiA(\'' + sez + '\')">' + sez + '</span>';
   });
   html += '</div>';
@@ -2686,81 +2689,91 @@ var _HR_TIPO_STILE = {
   nota: { label: 'Nota', col: 'var(--muted)' },
 };
 function _renderStoricoHrSezione(nome) {
-  if (typeof puoVedereStoricoHr !== 'function' || !puoVedereStoricoHr()) return '';
+  const _hrFull = typeof puoVedereStoricoHr === 'function' && puoVedereStoricoHr();
+  // chi ha il permesso "Formazioni" (es. supervisor) vede SOLO le righe formazione,
+  // senza contratti, categorie, premi e giubilei
+  const _soloFormazioni = !_hrFull && typeof puoModificare === 'function' && puoModificare('gestione_formazioni');
+  if (!_hrFull && !_soloFormazioni) return '';
   var c = collaboratoriCache.find(function (x) {
     return x.nome === nome;
   });
   var eventi = (window._schedaVistaCompleta ? hrEventiCache : getHrEventiReparto())
     .filter(function (e) {
+      if (_soloFormazioni && e.tipo !== 'formazione') return false;
       return e.collaboratore.toLowerCase() === nome.toLowerCase();
     })
     .sort(function (a, b) {
       return (b.data_evento || '').localeCompare(a.data_evento || '') || (b.id || 0) - (a.id || 0);
     });
   var neS = nome.replace(/'/g, "\\'");
-  var html =
-    '<div class="scheda-section"><h4 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Storico HR <span class="mini-badge" style="background:var(--accent);font-size:.65rem">RISERVATO</span></h4>';
-  // Inizio contratto + anzianità
+  var html = _soloFormazioni
+    ? '<div class="scheda-section"><h4 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Formazioni svolte <span class="mini-badge" style="background:#1a4a7a;font-size:.65rem">SUPERVISOR</span></h4>'
+    : '<div class="scheda-section"><h4 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Storico HR <span class="mini-badge" style="background:var(--accent);font-size:.65rem">RISERVATO</span></h4>';
+  // Inizio contratto + anzianità (solo vista HR completa)
   var dataAss = (c && c.data_assunzione) || '';
-  html += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">';
-  html += '<span style="font-size:.84rem;color:var(--muted)">Inizio contratto:</span>';
-  html +=
-    '<input type="date" id="hr-assunzione" value="' +
-    escP(dataAss) +
-    '" style="padding:5px 10px;border:1px solid var(--line);border-radius:2px;font-size:.84rem;background:var(--paper2);color:var(--ink)">';
-  html +=
-    '<button class="btn-salva" onclick="salvaDataAssunzione(\'' +
-    neS +
-    '\')" style="font-size:.75rem;padding:5px 14px;background:var(--accent2)">Salva</button>';
-  if (dataAss)
+  if (_soloFormazioni) dataAss = '';
+  if (!_soloFormazioni) {
+    html += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">';
+    html += '<span style="font-size:.84rem;color:var(--muted)">Inizio contratto:</span>';
     html +=
-      '<span class="mini-badge" style="background:#1a7a6d;font-size:.72rem">Anzianità: ' +
-      anzianitaLabel(dataAss) +
-      '</span>';
-  html += '</div>';
-  // Premio giubileo (ogni N anni di servizio, importi configurabili da admin)
-  if (dataAss && typeof giubileiCollaboratore === 'function') {
-    var gb = giubileiCollaboratore(c);
-    var daConsegnare = gb.maturati.filter(function (g) {
-      return !g.registrato;
-    });
-    if (daConsegnare.length || gb.prossimo) {
-      html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">';
-      html += '<span style="font-size:.84rem;color:var(--muted)">Premio giubileo:</span>';
-      daConsegnare.forEach(function (g) {
-        html +=
-          '<span class="mini-badge" style="background:#8b6914;font-size:.72rem">' +
-          g.anni +
-          ' anni maturato il ' +
-          g.dataLabel +
-          ' — ' +
-          fmtCHF(g.importo) +
-          ' CHF</span><button class="btn-salva" style="font-size:.72rem;padding:4px 12px;background:#8b6914" onclick="registraGiubileo(\'' +
-          nome.replace(/'/g, "\\'") +
-          "'," +
-          g.anni +
-          ',' +
-          g.importo +
-          ",'" +
-          g.data +
-          '\')">Registra consegna</button>';
+      '<input type="date" id="hr-assunzione" value="' +
+      escP(dataAss) +
+      '" style="padding:5px 10px;border:1px solid var(--line);border-radius:2px;font-size:.84rem;background:var(--paper2);color:var(--ink)">';
+    html +=
+      '<button class="btn-salva" onclick="salvaDataAssunzione(\'' +
+      neS +
+      '\')" style="font-size:.75rem;padding:5px 14px;background:var(--accent2)">Salva</button>';
+    if (dataAss)
+      html +=
+        '<span class="mini-badge" style="background:#1a7a6d;font-size:.72rem">Anzianità: ' +
+        anzianitaLabel(dataAss) +
+        '</span>';
+    html += '</div>';
+    // Premio giubileo (ogni N anni di servizio, importi configurabili da admin)
+    if (dataAss && typeof giubileiCollaboratore === 'function') {
+      var gb = giubileiCollaboratore(c);
+      var daConsegnare = gb.maturati.filter(function (g) {
+        return !g.registrato;
       });
-      if (!daConsegnare.length && gb.prossimo)
-        html +=
-          '<span style="font-size:.8rem;color:var(--muted)">prossimo: ' +
-          gb.prossimo.anni +
-          ' anni il ' +
-          gb.prossimo.dataLabel +
-          ' (' +
-          fmtCHF(gb.prossimo.importo) +
-          ' CHF)</span>';
-      html += '</div>';
+      if (daConsegnare.length || gb.prossimo) {
+        html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">';
+        html += '<span style="font-size:.84rem;color:var(--muted)">Premio giubileo:</span>';
+        daConsegnare.forEach(function (g) {
+          html +=
+            '<span class="mini-badge" style="background:#8b6914;font-size:.72rem">' +
+            g.anni +
+            ' anni maturato il ' +
+            g.dataLabel +
+            ' — ' +
+            fmtCHF(g.importo) +
+            ' CHF</span><button class="btn-salva" style="font-size:.72rem;padding:4px 12px;background:#8b6914" onclick="registraGiubileo(\'' +
+            nome.replace(/'/g, "\\'") +
+            "'," +
+            g.anni +
+            ',' +
+            g.importo +
+            ",'" +
+            g.data +
+            '\')">Registra consegna</button>';
+        });
+        if (!daConsegnare.length && gb.prossimo)
+          html +=
+            '<span style="font-size:.8rem;color:var(--muted)">prossimo: ' +
+            gb.prossimo.anni +
+            ' anni il ' +
+            gb.prossimo.dataLabel +
+            ' (' +
+            fmtCHF(gb.prossimo.importo) +
+            ' CHF)</span>';
+        html += '</div>';
+      }
     }
   }
   // Timeline eventi
   if (!eventi.length) {
-    html +=
-      '<p style="color:var(--muted);font-size:.84rem">Nessun evento registrato. Categoria, impiego, premi, livelli e formazioni verranno tracciati qui automaticamente con la data.</p>';
+    html += _soloFormazioni
+      ? '<p style="color:var(--muted);font-size:.84rem">Nessuna formazione registrata per questo collaboratore.</p>'
+      : '<p style="color:var(--muted);font-size:.84rem">Nessun evento registrato. Categoria, impiego, premi, livelli e formazioni verranno tracciati qui automaticamente con la data.</p>';
   } else {
     html += '<div class="profilo-entries" style="max-height:240px">';
     eventi.forEach(function (e) {
