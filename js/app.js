@@ -47,6 +47,14 @@ function switchPage(name) {
         }
         sel.innerHTML = h;
         if (sel.options.length > 1) sel.selectedIndex = 1; // default: mese scorso
+        const selA = document.getElementById('rd-mese-a');
+        if (selA) selA.innerHTML = h; // default: mese corrente (indice 0)
+        const selAnno = document.getElementById('rd-anno');
+        if (selAnno) {
+          let ha = '';
+          for (let a = new Date().getFullYear(); a >= 2026; a--) ha += '<option value="' + a + '">' + a + '</option>';
+          selAnno.innerHTML = ha;
+        }
       }
     }
   }

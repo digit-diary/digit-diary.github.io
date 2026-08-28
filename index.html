@@ -927,8 +927,29 @@
           <button class="btn-act pin" onclick="resetStatsFiltri()" style="font-size: 0.82rem">Reset</button>
         </div>
         <span style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
-          <span id="report-direzione-wrap" style="display: none; gap: 8px; align-items: center">
+          <span id="report-direzione-wrap" style="display: none; gap: 8px; align-items: center; flex-wrap: wrap">
+            <select id="rd-tipo" style="padding: 9px" onchange="aggiornaRdPeriodo()">
+              <option value="mese">Mese</option>
+              <option value="anno">Anno</option>
+              <option value="periodo">Periodo</option>
+            </select>
             <select id="rd-mese" style="padding: 9px"></select>
+            <span id="rd-mese-a-wrap" style="display: none; gap: 6px; align-items: center">
+              <span style="font-size: 0.85rem">→</span>
+              <select id="rd-mese-a" style="padding: 9px"></select>
+            </span>
+            <select id="rd-anno" style="padding: 9px; display: none"></select>
+            <span style="display: inline-flex; gap: 10px; align-items: center; font-size: 0.8rem">
+              <label style="display: inline-flex; gap: 4px; align-items: center; cursor: pointer"
+                ><input type="checkbox" id="rd-cb-org" checked /> Organico</label
+              >
+              <label style="display: inline-flex; gap: 4px; align-items: center; cursor: pointer"
+                ><input type="checkbox" id="rd-cb-ope" checked /> Operativo</label
+              >
+              <label style="display: inline-flex; gap: 4px; align-items: center; cursor: pointer"
+                ><input type="checkbox" id="rd-cb-svi" checked /> Sviluppo</label
+              >
+            </span>
             <button
               class="btn-export btn-export-pdf"
               onclick="esportaReportDirezionePDF()"
