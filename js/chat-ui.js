@@ -2101,7 +2101,7 @@ function apriSchedaCollaboratore(nome) {
         (collabRec.impiego === 'fisso' ? 'Fisso 100%' : 'Jolly') +
         '</span>'
       : '') +
-    (collabRec && collabRec.categoria
+    (collabRec && collabRec.categoria && typeof puoVedereCategorie === 'function' && puoVedereCategorie()
       ? ' <span class="mini-badge" style="background:var(--accent2);font-size:.68rem;vertical-align:middle" title="Categoria professionale (5&ordf; = ingresso, 1&ordf; = massima)">Cat. ' +
         collabRec.categoria +
         '&ordf;</span>'
@@ -3186,7 +3186,8 @@ function stampaSchedaPDF(nome) {
   });
   var anag = [];
   if (cRec && cRec.impiego) anag.push(cRec.impiego === 'fisso' ? 'Fisso 100%' : 'Jolly');
-  if (cRec && cRec.categoria) anag.push('Categoria ' + cRec.categoria + 'ª');
+  if (cRec && cRec.categoria && typeof puoVedereCategorie === 'function' && puoVedereCategorie())
+    anag.push('Categoria ' + cRec.categoria + 'ª');
   if (cRec && cRec.data_nascita)
     anag.push('Nato/a il ' + new Date(cRec.data_nascita + 'T12:00:00').toLocaleDateString('it-IT'));
   anag.push('Reparto ' + currentReparto.charAt(0).toUpperCase() + currentReparto.slice(1));

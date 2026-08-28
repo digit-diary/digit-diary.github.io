@@ -235,7 +235,7 @@ function renderFormazione() {
           (c.impiego === 'fisso' ? 'Fisso' : 'Jolly') +
           '</span>'
         : '') +
-      (c.categoria
+      (c.categoria && typeof puoVedereCategorie === 'function' && puoVedereCategorie()
         ? ' <span class="mini-badge" style="background:var(--accent2);font-size:.62rem">' +
           c.categoria +
           '&ordf;</span>'

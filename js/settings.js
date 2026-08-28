@@ -36,12 +36,19 @@ const VIS_ITEMS = {
     gestione_punti: 'Punti e premi — assegnare/registrare incentivi',
     gestione_impiego: 'Impiego — assegnare Jolly / Fisso 100% ai collaboratori (es. supervisor)',
     gestione_categorie: 'Categorie — assegnare la categoria professionale 5ª–1ª (es. HR)',
+    vista_categorie: 'Categorie — vedere la categoria dei collaboratori (badge in scheda, matrice e PDF)',
     gestione_competenze: 'Competenze — certificare le spunte in matrice',
     gestione_valutazioni: 'Valutazioni — inserire e importare schede',
     gestione_formazioni: 'Formazioni — registrare sessioni formative svolte (es. supervisor)',
     storico_hr: 'Storico HR — inizio contratto, tracciato categorie/premi/formazioni, equità (sezione riservata)',
   },
 };
+// Visione categorie: admin, chi le gestisce, chi ha lo Storico HR, o chi è abilitato apposta
+function puoVedereCategorie() {
+  return (
+    isAdmin() || puoModificare('vista_categorie') || puoModificare('gestione_categorie') || puoModificare('storico_hr')
+  );
+}
 // Permesso di modifica: default solo admin (a differenza delle pagine, default 'tutti')
 function puoModificare(key) {
   if (isAdmin()) return true;
