@@ -509,6 +509,26 @@ async function secPost(table, data) {
   }
   return sbPost(table, data);
 }
+// Converte un filtro REST (id=eq.123&nome=eq.X) nel filtro SQL per le RPC secure_*
+function _filtroSqlDaRest(filter) {
+  return filter
+    .split('&')
+    .map((p) => {
+      const [k] = p.split('=');
+      const rest = p.substring(k.length + 1);
+      const m = rest.match(/^(eq|neq|like|lt|lte|gt|gte)\.(.*)/);
+      if (!m) return null;
+      const op = { eq: '=', neq: '!=', like: 'LIKE', lt: '<', lte: '<=', gt: '>', gte: '>=' }[m[1]];
+      let raw = m[2];
+      try {
+        raw = decodeURIComponent(raw);
+      } catch (e) {}
+      const val = isNaN(raw) ? "'" + raw.replace(/'/g, "''") + "'" : raw;
+      return k + ' ' + op + ' ' + val;
+    })
+    .filter(Boolean)
+    .join(' AND ');
+}
 async function secPatch(table, filter, data) {
   const tk = getOpToken();
   if (tk) {
@@ -549,8 +569,20 @@ async function secPatch(table, filter, data) {
         p_data: data,
       });
     } catch (e) {
-      console.warn('secPatch fallback:', e.message);
-      await sbPatch(table, filter, data);
+      // Token scaduto? Rinnova e riprova UNA volta. Se fallisce ancora, ERRORE VISIBILE:
+      // il vecchio fallback anonimo veniva bloccato in silenzio dalla RLS (0 righe toccate
+      // ma nessun errore) e l'app credeva di aver salvato/cancellato — dati "fantasma".
+      if (await _renewToken()) {
+        const tk2 = getOpToken();
+        await sbRpc('secure_update', {
+          p_token: tk2,
+          p_table: table,
+          p_filter: _filtroSqlDaRest(filter),
+          p_data: data,
+        });
+      } else {
+        throw e;
+      }
     }
   } else {
     await sbPatch(table, filter, data);
@@ -593,8 +625,14 @@ async function secDel(table, filter) {
         p_filter: parts,
       });
     } catch (e) {
-      console.warn('secDel fallback:', e.message);
-      await sbDel(table, filter);
+      // Come secPatch: rinnova il token e riprova; mai fallback anonimo silenzioso
+      // (la RLS rispondeva OK senza cancellare nulla → le righe "riapparivano")
+      if (await _renewToken()) {
+        const tk2 = getOpToken();
+        await sbRpc('secure_delete', { p_token: tk2, p_table: table, p_filter: _filtroSqlDaRest(filter) });
+      } else {
+        throw e;
+      }
     }
   } else {
     await sbDel(table, filter);
