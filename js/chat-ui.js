@@ -2649,6 +2649,7 @@ var _HR_TIPO_STILE = {
   categoria: { label: 'Categoria', col: 'var(--accent2)' },
   impiego: { label: 'Impiego', col: '#5d6d7e' },
   premio: { label: 'Premio', col: '#b8860b' },
+  giubileo: { label: 'Giubileo', col: '#8b6914' },
   livello: { label: 'Livello', col: '#2c6e49' },
   formazione: { label: 'Formazione', col: '#1a4a7a' },
   nota: { label: 'Nota', col: 'var(--muted)' },
@@ -2686,6 +2687,45 @@ function _renderStoricoHrSezione(nome) {
       anzianitaLabel(dataAss) +
       '</span>';
   html += '</div>';
+  // Premio giubileo (ogni N anni di servizio, importi configurabili da admin)
+  if (dataAss && typeof giubileiCollaboratore === 'function') {
+    var gb = giubileiCollaboratore(c);
+    var daConsegnare = gb.maturati.filter(function (g) {
+      return !g.registrato;
+    });
+    if (daConsegnare.length || gb.prossimo) {
+      html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">';
+      html += '<span style="font-size:.84rem;color:var(--muted)">Premio giubileo:</span>';
+      daConsegnare.forEach(function (g) {
+        html +=
+          '<span class="mini-badge" style="background:#8b6914;font-size:.72rem">' +
+          g.anni +
+          ' anni maturato il ' +
+          g.dataLabel +
+          ' — ' +
+          fmtCHF(g.importo) +
+          ' CHF</span><button class="btn-salva" style="font-size:.72rem;padding:4px 12px;background:#8b6914" onclick="registraGiubileo(\'' +
+          nome.replace(/'/g, "\\'") +
+          "'," +
+          g.anni +
+          ',' +
+          g.importo +
+          ",'" +
+          g.data +
+          '\')">Registra consegna</button>';
+      });
+      if (!daConsegnare.length && gb.prossimo)
+        html +=
+          '<span style="font-size:.8rem;color:var(--muted)">prossimo: ' +
+          gb.prossimo.anni +
+          ' anni il ' +
+          gb.prossimo.dataLabel +
+          ' (' +
+          fmtCHF(gb.prossimo.importo) +
+          ' CHF)</span>';
+      html += '</div>';
+    }
+  }
   // Timeline eventi
   if (!eventi.length) {
     html +=

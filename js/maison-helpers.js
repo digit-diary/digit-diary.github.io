@@ -1923,6 +1923,85 @@ async function _insertHrEvento(nome, tipo, descrizione, dataEvento) {
     if (r && r[0]) hrEventiCache.unshift(r[0]);
   } catch (e) {}
 }
+// === PREMIO GIUBILEO (riservato HR/admin): somma in denaro ogni N anni di servizio ===
+const GIUBILEO_DEFAULT = [
+  { anni: 5, importo: 500 },
+  { anni: 10, importo: 1000 },
+  { anni: 15, importo: 1500 },
+  { anni: 20, importo: 2000 },
+  { anni: 25, importo: 2500 },
+  { anni: 30, importo: 3000 },
+];
+function getGiubileoConfig() {
+  const cfg =
+    typeof giubileoConfig !== 'undefined' && Array.isArray(giubileoConfig) ? giubileoConfig : GIUBILEO_DEFAULT;
+  return cfg
+    .filter(function (g) {
+      return parseInt(g.anni) > 0 && parseFloat(g.importo) >= 0;
+    })
+    .slice()
+    .sort(function (a, b) {
+      return a.anni - b.anni;
+    });
+}
+// Stato giubilei di un collaboratore: maturati (con o senza consegna registrata) e prossimo
+function giubileiCollaboratore(c) {
+  if (!c || !c.data_assunzione) return { maturati: [], prossimo: null };
+  const base = new Date(c.data_assunzione + 'T12:00:00');
+  if (isNaN(base)) return { maturati: [], prossimo: null };
+  const oggi = new Date();
+  const maturati = [];
+  let prossimo = null;
+  getGiubileoConfig().forEach(function (g) {
+    const dataMat = new Date(base);
+    dataMat.setFullYear(base.getFullYear() + parseInt(g.anni));
+    const voce = {
+      anni: parseInt(g.anni),
+      importo: parseFloat(g.importo),
+      data: dataMat.toISOString().split('T')[0],
+      dataLabel: dataMat.toLocaleDateString('it-IT'),
+    };
+    if (dataMat <= oggi) {
+      voce.registrato = hrEventiCache.some(function (e) {
+        return (
+          e.tipo === 'giubileo' &&
+          e.collaboratore.toLowerCase() === c.nome.toLowerCase() &&
+          (e.descrizione || '').indexOf('giubileo ' + voce.anni + ' anni') !== -1
+        );
+      });
+      maturati.push(voce);
+    } else if (!prossimo) {
+      prossimo = voce;
+    }
+  });
+  return { maturati: maturati, prossimo: prossimo };
+}
+async function registraGiubileo(nome, anni, importo, dataMat) {
+  if (!puoVedereStoricoHr()) {
+    toast('Non hai il permesso');
+    return;
+  }
+  if (
+    !confirm(
+      'Registrare la consegna del premio giubileo ' + anni + ' anni (' + fmtCHF(importo) + ' CHF) a ' + nome + '?',
+    )
+  )
+    return;
+  await _insertHrEvento(
+    nome,
+    'giubileo',
+    'Premio giubileo ' +
+      anni +
+      ' anni — ' +
+      fmtCHF(importo) +
+      ' CHF (maturato il ' +
+      new Date(dataMat + 'T12:00:00').toLocaleDateString('it-IT') +
+      ')',
+  );
+  logAzione('Premio giubileo consegnato', nome + ' — ' + anni + ' anni, ' + fmtCHF(importo) + ' CHF');
+  toast('Giubileo registrato per ' + nome);
+  apriSchedaCollaboratore(nome);
+}
 function puoVedereStoricoHr() {
   return isAdmin() || (typeof puoModificare === 'function' && puoModificare('storico_hr'));
 }

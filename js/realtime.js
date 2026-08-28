@@ -209,7 +209,8 @@ let valutazioniCache = [],
   equitaMesi = 6, // mesi di anzianità in più per far scattare la segnalazione equità categorie
   hrEventiCache = [], // storico HR riservato: assunzione, categoria, impiego, premi, livelli
   repartiConfig = null, // settori personalizzati [{key,label,colore,attivo}] — null = default valet+cleaning
-  repartiPagineCfg = null; // pagine visibili per settore {repKey:{maison:false,...}} — assente = tutte
+  repartiPagineCfg = null, // pagine visibili per settore {repKey:{maison:false,...}} — assente = tutte
+  giubileoConfig = null; // premio giubileo [{anni,importo}] — null = default 5/10/15/20/25/30 anni
 let currentReparto = 'slots',
   operatoriRepartoMap = {};
 function nomeCorrente(orig) {

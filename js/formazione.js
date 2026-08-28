@@ -438,6 +438,10 @@ function renderFormazione() {
     html += '</div></div>';
   }
 
+  // PREMI GIUBILEO (riservato: admin + permesso storico_hr)
+  if (typeof puoVedereStoricoHr === 'function' && puoVedereStoricoHr()) {
+    html += _renderGiubileiCard(collabs);
+  }
   // EQUITÀ CATEGORIE (riservato: admin + permesso storico_hr) — sistema meritocratico
   if (typeof puoVedereStoricoHr === 'function' && puoVedereStoricoHr()) {
     html += _renderEquitaCard(collabs);
@@ -1505,4 +1509,58 @@ async function salvaEquitaMesi(val) {
   logAzione('Soglia equità categorie', m + ' mesi');
   renderFormazione();
   toast('Soglia equità: ' + m + ' mesi di anzianità');
+}
+
+// Card riservata HR: giubilei maturati da consegnare + in arrivo nei prossimi 12 mesi
+function _renderGiubileiCard(collabs) {
+  const daConsegnare = [];
+  const inArrivo = [];
+  const tra12mesi = new Date();
+  tra12mesi.setFullYear(tra12mesi.getFullYear() + 1);
+  collabs.forEach((c) => {
+    const gb = giubileiCollaboratore(c);
+    gb.maturati.filter((g) => !g.registrato).forEach((g) => daConsegnare.push({ nome: c.nome, g }));
+    if (gb.prossimo && new Date(gb.prossimo.data + 'T12:00:00') <= tra12mesi)
+      inArrivo.push({ nome: c.nome, g: gb.prossimo });
+  });
+  if (!daConsegnare.length && !inArrivo.length) return '';
+  let html =
+    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:8px">Premi giubileo <span class="mini-badge" style="background:var(--accent);font-size:.65rem">RISERVATO</span></div><div style="padding:14px 16px">';
+  if (daConsegnare.length) {
+    html +=
+      '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:6px">Da consegnare</p>';
+    daConsegnare.forEach((x) => {
+      html +=
+        '<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--line);flex-wrap:wrap"><strong style="min-width:170px;cursor:pointer" onclick="apriSchedaCollaboratore(\'' +
+        x.nome.replace(/'/g, "\\'") +
+        '\')">' +
+        escP(x.nome) +
+        '</strong><span class="mini-badge" style="background:#8b6914;font-size:.72rem">' +
+        x.g.anni +
+        ' anni</span><span style="font-size:.84rem">maturato il ' +
+        x.g.dataLabel +
+        '</span><strong style="color:#8b6914">' +
+        fmtCHF(x.g.importo) +
+        ' CHF</strong></div>';
+    });
+  }
+  if (inArrivo.length) {
+    html +=
+      '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:12px 0 6px">In arrivo (12 mesi)</p>';
+    inArrivo.forEach((x) => {
+      html +=
+        '<div style="display:flex;align-items:center;gap:10px;padding:4px 0;font-size:.84rem;color:var(--muted);flex-wrap:wrap"><span style="min-width:170px;color:var(--ink)">' +
+        escP(x.nome) +
+        '</span>' +
+        x.g.anni +
+        ' anni il ' +
+        x.g.dataLabel +
+        ' — ' +
+        fmtCHF(x.g.importo) +
+        ' CHF</div>';
+    });
+  }
+  html +=
+    '<p style="color:var(--muted);font-size:.75rem;margin-top:10px">La consegna si registra dalla scheda del collaboratore (Storico HR). Importi configurabili in Impostazioni → Premio giubileo.</p></div></div>';
+  return html;
 }
