@@ -3191,7 +3191,11 @@ async function eliminaMaisonMese() {
   }
   const mese = sel.value;
   const meseStart = mese + '-01';
-  const meseEnd = mese + '-31';
+  // Ultimo giorno REALE del mese: con '-31' fisso, Febbraio e Aprile generavano una data
+  // inesistente e la cancellazione falliva sul server (le righe "riapparivano")
+  const _parti = mese.split('-');
+  const _ultimoGiorno = new Date(parseInt(_parti[0]), parseInt(_parti[1]), 0).getDate();
+  const meseEnd = mese + '-' + String(_ultimoGiorno).padStart(2, '0');
   const label = MESI_FULL[parseInt(mese.split('-')[1]) - 1] + ' ' + mese.split('-')[0];
   const count = getMaisonReparto().filter((r) => r.data_giornata >= meseStart && r.data_giornata <= meseEnd).length;
   if (!count) {
