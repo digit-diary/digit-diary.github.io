@@ -346,7 +346,9 @@ function renderDashboard() {
     GIORNI[gd.getDay()] + ' — Turno ' + turno + ' — ' + getOperatore();
   // Stats bar: 6 KPI
   const op = getOperatore();
-  const pmMiei = promemoriaCache.filter((p) => !p.completata && _includeOpInCsv(p.assegnato_a, op));
+  const pmMiei = promemoriaCache.filter(
+    (p) => !p.completata && (!p.reparto_dip || p.reparto_dip === currentReparto) && _includeOpInCsv(p.assegnato_a, op),
+  );
   const pmScaduti = pmMiei.filter((p) => p.data_scadenza < oggi);
   const noteNL = noteColleghiCache.filter((n) => n.a_operatore === op && !n.letta && !n.nascosta_dest).length;
   const _rd = getDatiReparto(),
@@ -923,7 +925,10 @@ async function generaReportSettimanale(sez) {
   const settData = getDatiReparto().filter((e) => e.data >= sett[0] && e.data <= sett[6] + 'T23:59:59');
   const settMaison = getMaisonRepartoExpanded().filter((r) => r.data_giornata >= sett[0] && r.data_giornata <= sett[6]);
   const settModuli = getModuliReparto().filter((m) => (m.created_at || m.data_modulo || '') >= sett[0]);
-  const settPM = promemoriaCache.filter((p) => p.data_scadenza >= sett[0] && p.data_scadenza <= sett[6]);
+  const settPM = promemoriaCache.filter(
+    (p) =>
+      (!p.reparto_dip || p.reparto_dip === currentReparto) && p.data_scadenza >= sett[0] && p.data_scadenza <= sett[6],
+  );
   try {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('portrait', 'mm', 'a4');

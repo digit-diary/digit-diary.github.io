@@ -33,6 +33,7 @@ async function loadAll() {
     repCfg,
     repPag,
     giubCfg,
+    giubPre,
   ] = await Promise.all([
     getImp('tipi_personalizzati'),
     getImp('colori_override'),
@@ -56,6 +57,7 @@ async function loadAll() {
     getImp('reparti_config'),
     getImp('reparti_pagine'),
     getImp('giubileo_config'),
+    getImp('giubileo_preavviso'),
   ]);
   if (tp)
     try {
@@ -142,6 +144,7 @@ async function loadAll() {
       const gc = JSON.parse(giubCfg);
       if (Array.isArray(gc)) giubileoConfig = gc;
     } catch (e) {}
+  if (giubPre != null && giubPre !== '' && !isNaN(parseInt(giubPre))) giubileoPreavviso = parseInt(giubPre);
   if (typeof _salvaCacheReparti === 'function') _salvaCacheReparti();
   if (typeof popolaLoginSettore === 'function') popolaLoginSettore();
   const opRep = await getImp('operatori_reparto');
@@ -259,6 +262,8 @@ async function loadAll() {
   sbRpc('cleanup_old_data').catch(() => {});
   // Maison: auto-cancellazione GD precedenti se configurata (privacy)
   if (typeof _maisonAutoCleanup === 'function') _maisonAutoCleanup().catch(() => {});
+  // Giubilei in arrivo: notifica una tantum agli operatori HR (se configurato il preavviso)
+  if (typeof _checkGiubileiNotifiche === 'function') _checkGiubileiNotifiche().catch(() => {});
   // Health check silenzioso (solo se loggato)
   if (getOpToken()) _healthCheck();
 }

@@ -92,6 +92,7 @@ async function salvaPromemoria() {
       assegnato_a: assegnato,
       creato_da: getOperatore(),
       ripetizione,
+      reparto_dip: currentReparto,
     };
     const r = await secPost('promemoria', rec);
     promemoriaCache.push(r[0]);
@@ -153,6 +154,7 @@ async function completaPromemoria(id) {
             assegnato_a: p.assegnato_a,
             creato_da: p.creato_da,
             ripetizione: p.ripetizione,
+            reparto_dip: p.reparto_dip || currentReparto,
           });
           promemoriaCache.push(nr[0]);
           toast('Prossimo: ' + nuovaData);
@@ -195,6 +197,16 @@ async function eliminaPromemoria(id) {
     toast('Errore eliminazione promemoria');
   }
 }
+// Visibilità promemoria: settore corrente (i vecchi senza settore restano visibili ovunque)
+// + assegnazione ('tutti' del settore, o gli operatori indicati; admin vede tutto il settore)
+function _promemoriaNelReparto(p) {
+  return !p.reparto_dip || p.reparto_dip === currentReparto;
+}
+function _promemoriaVisibile(p) {
+  if (!_promemoriaNelReparto(p)) return false;
+  if (isAdmin()) return true;
+  return _includeOpInCsv(p.assegnato_a, getOperatore());
+}
 function getPromemoriaFiltrati() {
   const op = getOperatore();
   const admin = isAdmin();
@@ -203,10 +215,8 @@ function getPromemoriaFiltrati() {
   return promemoriaCache.filter((p) => {
     if (stato === 'attivi' && p.completata) return false;
     if (stato === 'completati' && !p.completata) return false;
-    if (filtOp && p.assegnato_a !== filtOp && p.assegnato_a !== 'tutti') return false;
-    // Operatore: vede solo i suoi (assegnati a lui o a "tutti")
-    // Admin: vede tutto
-    if (!admin && p.assegnato_a !== op && p.assegnato_a !== 'tutti') return false;
+    if (filtOp && !_includeOpInCsv(p.assegnato_a, filtOp)) return false;
+    if (!_promemoriaVisibile(p)) return false;
     return true;
   });
 }
@@ -282,7 +292,9 @@ function renderPromemoria() {
 function aggiornaPromemoriaBadge() {
   const op = getOperatore();
   const oggi = new Date().toISOString().split('T')[0];
-  const miei = promemoriaCache.filter((p) => !p.completata && _includeOpInCsv(p.assegnato_a, op));
+  const miei = promemoriaCache.filter(
+    (p) => !p.completata && _promemoriaNelReparto(p) && _includeOpInCsv(p.assegnato_a, op),
+  );
   const scaduti = miei.filter((p) => p.data_scadenza < oggi);
   const badge = document.getElementById('promemoria-badge');
   if (!badge) return;
@@ -308,7 +320,9 @@ function mostraPromemoriaLogin() {
   const op = getOperatore();
   if (!op) return;
   const oggi = new Date().toISOString().split('T')[0];
-  const miei = promemoriaCache.filter((p) => !p.completata && _includeOpInCsv(p.assegnato_a, op));
+  const miei = promemoriaCache.filter(
+    (p) => !p.completata && _promemoriaNelReparto(p) && _includeOpInCsv(p.assegnato_a, op),
+  );
   // Solo scaduti (data passata) + quelli il cui reminder è per oggi
   const scaduti = miei.filter((p) => p.data_scadenza < oggi);
   const reminderOggi = miei.filter((p) => {

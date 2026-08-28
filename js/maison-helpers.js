@@ -2002,6 +2002,52 @@ async function registraGiubileo(nome, anni, importo, dataMat) {
   toast('Giubileo registrato per ' + nome);
   apriSchedaCollaboratore(nome);
 }
+// Notifica anticipata giubilei agli operatori con permesso Storico HR (una sola volta per giubileo).
+// Il preavviso (giorni) è configurabile da admin in Impostazioni → Premio giubileo.
+async function _checkGiubileiNotifiche() {
+  const giorni = typeof giubileoPreavviso !== 'undefined' ? giubileoPreavviso : 60;
+  if (!giorni || giorni <= 0) return;
+  const cfgHr = visibilitaConfig && visibilitaConfig.storico_hr;
+  const destinatari = cfgHr && cfgHr.tipo === 'selezionati' && Array.isArray(cfgHr.operatori) ? cfgHr.operatori : [];
+  if (!destinatari.length) return; // nessun operatore HR configurato: resta la card in Formazione
+  const limite = new Date();
+  limite.setDate(limite.getDate() + giorni);
+  const daNotificare = [];
+  collaboratoriCache.forEach(function (c) {
+    if (c.attivo === false || !c.data_assunzione) return;
+    const gb = giubileiCollaboratore(c);
+    gb.maturati
+      .filter(function (g) {
+        return !g.registrato;
+      })
+      .forEach(function (g) {
+        daNotificare.push({ nome: c.nome, g: g, maturato: true });
+      });
+    if (gb.prossimo && new Date(gb.prossimo.data + 'T12:00:00') <= limite)
+      daNotificare.push({ nome: c.nome, g: gb.prossimo, maturato: false });
+  });
+  if (!daNotificare.length) return;
+  let notificati = [];
+  try {
+    notificati = JSON.parse((await getImp('giubileo_notificati')) || '[]');
+  } catch (e) {}
+  const nuovi = daNotificare.filter(function (x) {
+    return !notificati.includes(x.nome + '|' + x.g.anni);
+  });
+  if (!nuovi.length) return;
+  nuovi.forEach(function (x) {
+    inviaPush(
+      destinatari,
+      'Giubileo ' + (x.maturato ? 'maturato' : 'in arrivo') + ': ' + x.nome,
+      x.g.anni + ' anni il ' + x.g.dataLabel + ' — ' + fmtCHF(x.g.importo) + ' CHF',
+      'general',
+      true,
+    );
+    notificati.push(x.nome + '|' + x.g.anni);
+  });
+  await setImp('giubileo_notificati', JSON.stringify(notificati.slice(-500)));
+  logAzione('Notifiche giubileo', nuovi.length + ' avvisi inviati a HR');
+}
 function puoVedereStoricoHr() {
   return isAdmin() || (typeof puoModificare === 'function' && puoModificare('storico_hr'));
 }
