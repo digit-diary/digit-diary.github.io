@@ -3458,3 +3458,27 @@ button:focus-visible,
   -webkit-mask-image: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22black%22 stroke=%22black%22 stroke-width=%221%22%3E%3Cpolygon points=%2212 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2%22/%3E%3C/svg%3E');
   mask-image: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22black%22 stroke=%22black%22 stroke-width=%221%22%3E%3Cpolygon points=%2212 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2%22/%3E%3C/svg%3E');
 }
+
+/* === SEZIONI RICHIUDIBILI (Impostazioni + config admin) === */
+.settings-section > h4 {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.settings-section > h4 .sec-chev {
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: var(--muted);
+  transition: transform 0.2s;
+}
+.settings-section.sec-collapsed > h4 {
+  margin-bottom: 0;
+}
+.settings-section.sec-collapsed > *:not(h4) {
+  display: none !important;
+}
+.settings-section.sec-collapsed > h4 .sec-chev {
+  transform: rotate(-90deg);
+}
