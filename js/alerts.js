@@ -111,6 +111,7 @@ function renderCassaAlerts() {
   const alerts = checkCassaAlerts();
   if (!alerts.length) {
     container.innerHTML = '';
+    renderAlertCompatti();
     return;
   }
   const SA = getSoglieAlert();
@@ -162,6 +163,44 @@ function renderCassaAlerts() {
     html += '</div>';
   }
   container.innerHTML = html;
+  renderAlertCompatti();
+}
+// Se ci sono 2+ banner di alert, li compatta in un'unica striscia espandibile
+function renderAlertCompatti() {
+  const cassa = document.getElementById('cassa-alerts-container');
+  const rischio = document.getElementById('rischio-alerts-container');
+  if (!cassa) return;
+  let strip = document.getElementById('alert-compatto');
+  const banners = [
+    ...(cassa ? cassa.querySelectorAll('.cassa-alert-banner') : []),
+    ...(rischio ? rischio.querySelectorAll('.rischio-alert-banner, .cassa-alert-banner') : []),
+  ];
+  if (banners.length < 2) {
+    if (strip) strip.remove();
+    if (cassa) cassa.style.display = '';
+    if (rischio) rischio.style.display = '';
+    return;
+  }
+  if (!strip) {
+    strip = document.createElement('div');
+    strip.id = 'alert-compatto';
+    strip.className = 'alert-compatto';
+    strip.onclick = function () {
+      window._alertEspansi = !window._alertEspansi;
+      renderAlertCompatti();
+    };
+    cassa.parentNode.insertBefore(strip, cassa);
+  }
+  strip.innerHTML =
+    '<i class="icx icx-avviso"></i> ' +
+    banners.length +
+    ' segnalazioni operative — ' +
+    (window._alertEspansi ? 'nascondi' : 'mostra dettagli') +
+    '<span class="sec-chev">&#9660;</span>';
+  strip.classList.toggle('aperto', !!window._alertEspansi);
+  const vis = window._alertEspansi ? '' : 'none';
+  if (cassa) cassa.style.display = vis;
+  if (rischio) rischio.style.display = vis;
 }
 function toggleCassaDD(type) {
   const dd = document.getElementById('cassa-' + type + '-dd');
@@ -391,7 +430,10 @@ function renderRischioAlerts() {
   var oldRischio = document.getElementById('rischio-alerts-block');
   if (oldRischio) oldRischio.remove();
   const alerts = checkRischioAlerts();
-  if (!alerts.length) return;
+  if (!alerts.length) {
+    renderAlertCompatti();
+    return;
+  }
   const recidive = alerts.filter((a) => a.tipo === 'recidiva'),
     accumuli = alerts.filter((a) => a.tipo === 'accumulo');
   let html = '<div id="rischio-alerts-block">';
@@ -449,6 +491,7 @@ function renderRischioAlerts() {
   }
   html += '</div>';
   container.insertAdjacentHTML('beforeend', html);
+  renderAlertCompatti();
 }
 function ignoraAlertSuggerimento(nome, tipo) {
   if (!confirm('Ignorare questo suggerimento per ' + nome + '?\nVerrà registrato nel log.')) return;
@@ -522,7 +565,10 @@ function renderAmmonimentiAlerts() {
   const container = document.getElementById('rischio-alerts-container');
   if (!container) return;
   const ammAlerts = checkAmmonimentiAlerts();
-  if (!ammAlerts.length) return;
+  if (!ammAlerts.length) {
+    renderAlertCompatti();
+    return;
+  }
   let html = '<div id="amm-alerts-block">';
   html +=
     '<div class="cassa-alert-banner" style="background:#e67e22;margin-bottom:8px;cursor:pointer" onclick="toggleAmmDD()"><i class="icx icx-avviso"></i> ' +
@@ -548,6 +594,7 @@ function renderAmmonimentiAlerts() {
   });
   html += '</div></div>';
   container.insertAdjacentHTML('beforeend', html);
+  renderAlertCompatti();
 }
 function toggleAmmDD() {
   const dd = document.getElementById('amm-dd');
