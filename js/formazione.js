@@ -58,6 +58,8 @@ const PUNTI_DEFAULT = {
     2: 'Aperitivo di team',
     3: 'Cena + proposta riconoscimento HR',
   },
+  // Punti assegnati automaticamente al raggiungimento di ogni livello (0 = disattivato)
+  punti_livello: { 1: 0, 2: 0, 3: 0 },
   // 'privato' = premi/livelli notificati solo all'interessato; 'tutti' = annuncio a tutta la squadra; 'off' = nessuna push
   notifiche: 'privato',
 };
@@ -83,6 +85,7 @@ function getPuntiConfig() {
     azioni: Array.isArray(cfg.azioni) && cfg.azioni.length ? cfg.azioni : PUNTI_DEFAULT.azioni,
     soglie: Array.isArray(cfg.soglie) ? cfg.soglie : PUNTI_DEFAULT.soglie,
     premi_livello: cfg.premi_livello || PUNTI_DEFAULT.premi_livello,
+    punti_livello: cfg.punti_livello || PUNTI_DEFAULT.punti_livello,
     notifiche: cfg.notifiche === 'tutti' || cfg.notifiche === 'off' ? cfg.notifiche : 'privato',
   };
 }
@@ -432,7 +435,17 @@ function renderFormazione() {
         '<label style="display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--muted);margin-top:8px;cursor:pointer"><input type="checkbox" id="frm-punti" checked> Assegna anche i punti "Sessione formativa completata"' +
         (azF ? ' (+' + azF.punti + ')' : '') +
         '</label>';
+      const azFmt = getPuntiConfig().azioni.find((a) => a.key === 'formatore');
+      html +=
+        '<label style="display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--muted);margin-top:4px;cursor:pointer"><input type="checkbox" id="frm-punti-fmt"> Assegna i punti "Formatore in sessione" al formatore' +
+        (azFmt ? ' (+' + azFmt.punti + ')' : '') +
+        ' — facoltativo, solo se il formatore è un collaboratore</label>';
     }
+    html +=
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">' +
+      '<span style="font-size:.8rem;color:var(--muted)">Allega scheda (facoltativo):</span>' +
+      '<input type="file" id="frm-allegato" accept=".pdf,.xlsx,.xls,.jpg,.jpeg,.png" style="font-size:.78rem;max-width:260px">' +
+      '<span style="font-size:.72rem;color:var(--muted)">PDF, Excel o immagine — max 2 MB, visibile nello Storico HR</span></div>';
     html +=
       '<p style="color:var(--muted);font-size:.75rem;margin-top:6px">La formazione viene tracciata con data e formatore nello Storico HR del collaboratore (visibile solo a admin e operatori autorizzati).</p>';
     html += '</div></div>';
@@ -479,10 +492,30 @@ async function registraFormazioneSvolta() {
   try {
     await _insertHrEvento(nome, 'formazione', desc + (formatore ? ' — formatore: ' + formatore : ''), data);
     logAzione('Formazione registrata', nome + ' — ' + desc + (formatore ? ' (formatore ' + formatore + ')' : ''));
+    // Allegato facoltativo (scheda originale) → Storico HR
+    const fEl = document.getElementById('frm-allegato');
+    const fAll = fEl && fEl.files && fEl.files[0];
+    if (fAll && typeof _uploadHrAllegato === 'function') {
+      const rAll = await _uploadHrAllegato(fAll, nome, 'Scheda formazione: ' + desc);
+      if (rAll) toast('Scheda allegata allo Storico HR');
+      fEl.value = '';
+    }
+    const puoP = adm || (typeof puoModificare === 'function' && puoModificare('gestione_punti'));
     const conPunti = (document.getElementById('frm-punti') || {}).checked;
-    if (conPunti && (adm || (typeof puoModificare === 'function' && puoModificare('gestione_punti')))) {
+    if (conPunti && puoP) {
       const az = getPuntiConfig().azioni.find((a) => a.key === 'sessione_formativa');
       if (az && az.punti) await _insertPuntiEvento(nome, az.punti, 'sessione_formativa', desc);
+    }
+    // Punti al formatore: facoltativi, solo se il nome corrisponde a un collaboratore
+    const conPuntiFmt = (document.getElementById('frm-punti-fmt') || {}).checked;
+    if (conPuntiFmt && puoP && formatore) {
+      const collFmt = (collaboratoriCache || []).find((x) => (x.nome || '').toLowerCase() === formatore.toLowerCase());
+      const azF = getPuntiConfig().azioni.find((a) => a.key === 'formatore');
+      if (!collFmt) {
+        toast('Formatore "' + formatore + '" non trovato tra i collaboratori: punti formatore non assegnati');
+      } else if (azF && azF.punti) {
+        await _insertPuntiEvento(collFmt.nome, azF.punti, 'formatore', 'Formatore in sessione: ' + desc);
+      }
     }
     document.getElementById('frm-desc').value = '';
     renderFormazione();
@@ -657,6 +690,13 @@ async function toggleCompetenza(collabId, key, cb) {
     }
     // Passaggio livello?
     const dopo = livelloDiCollaboratore(c);
+    if (dopo > prima) {
+      // Punti configurabili per ogni livello raggiunto (anche più livelli in un colpo)
+      for (let lv = prima + 1; lv <= dopo; lv++) {
+        const pl = parseInt(getPuntiConfig().punti_livello[String(lv)]) || 0;
+        if (pl) await _insertPuntiEvento(c.nome, pl, 'livello_' + lv, 'Raggiunto Livello ' + lv + ' multidisciplinare');
+      }
+    }
     if (dopo > prima && dopo >= 2) {
       const premio = getPuntiConfig().premi_livello[String(dopo)];
       logAzione('Passaggio livello', c.nome + ' → Livello ' + dopo);
@@ -1121,6 +1161,20 @@ function _renderFormazioneConfig() {
   });
   html +=
     '<div class="add-tipo-row" style="margin:6px 0 4px"><div class="field"><label>Punti</label><input type="number" id="cfg-soglia-punti" value="100" style="width:90px"></div><div class="field"><label>Premio</label><input type="text" id="cfg-soglia-premio" placeholder="Es: Buono ristorante..."></div><button class="btn-add-tipo" onclick="aggiungiSoglia()">+ Aggiungi</button></div>';
+  // punti passaggio livello
+  html +=
+    '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Punti al raggiungimento del livello (0 = disattivato)</p>';
+  [1, 2, 3].forEach((l) => {
+    html +=
+      '<div class="tipo-item"><div class="tipo-item-name">Livello ' +
+      l +
+      (l === 3 ? ' <span class="tipo-item-default">(completamento di tutti i livelli)</span>' : '') +
+      '</div><input type="number" value="' +
+      (parseInt(cfgP.punti_livello[String(l)]) || 0) +
+      '" onchange="modificaPuntiLivello(' +
+      l +
+      ',this.value)" style="width:70px;padding:5px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);text-align:center"></div>';
+  });
   // premi livello
   html +=
     '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Premi passaggio livello</p>';
@@ -1128,6 +1182,7 @@ function _renderFormazioneConfig() {
     html +=
       '<div class="tipo-item"><div class="tipo-item-name">Livello ' +
       l +
+      (l === 3 ? ' <span class="tipo-item-default">(completamento di tutti i livelli)</span>' : '') +
       '</div><input type="text" value="' +
       escP(cfgP.premi_livello[String(l)] || '') +
       '" onchange="modificaPremioLivello(' +
@@ -1298,6 +1353,13 @@ async function modificaPremioLivello(lv, val) {
   cfg.premi_livello[String(lv)] = val.trim();
   await savePuntiConfig(cfg);
   toast('Premio livello aggiornato');
+}
+async function modificaPuntiLivello(lv, val) {
+  const cfg = getPuntiConfig();
+  cfg.punti_livello[String(lv)] = parseInt(val) || 0;
+  await savePuntiConfig(cfg);
+  logAzione('Punti livello', 'Livello ' + lv + ' → ' + (parseInt(val) || 0) + ' punti');
+  toast('Punti livello ' + lv + ' aggiornati');
 }
 
 // ================================================================
@@ -1599,6 +1661,13 @@ function _renderPanoramicaHrCard(collabs) {
   const premiAnno = getPuntiReparto().filter(
     (p) => p.azione === 'premio' && (p.data_evento || '').startsWith(String(anno)),
   ).length;
+  // Collaboratori attivi ancora senza scheda di valutazione (nessuna, di nessun anno)
+  const conValutazione = new Set(
+    (typeof getValutazioniReparto === 'function' ? getValutazioniReparto() : []).map((v) =>
+      (v.collaboratore || '').toLowerCase(),
+    ),
+  );
+  const senzaVal = collabs.filter((c) => !conValutazione.has((c.nome || '').toLowerCase())).length;
   let html =
     '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:8px">Panoramica HR — ' +
     escP(repartoLabel(currentReparto)) +
@@ -1618,6 +1687,7 @@ function _renderPanoramicaHrCard(collabs) {
   html += kpi(jolly, 'Jolly', '#e67e22');
   if (senza) html += kpi(senza, 'Senza inquadramento', 'var(--muted)');
   html += kpi(premiAnno, 'Premi consegnati ' + anno, '#b8860b');
+  if (senzaVal) html += kpi(senzaVal, 'Senza valutazione', '#8a1c1c');
   html += kpi(fmtCHF(spesaGiubAnno) + ' CHF', 'Giubilei erogati ' + anno, '#8b6914');
   html += kpi(fmtCHF(spesaGiubTot) + ' CHF', 'Giubilei totali storici', '#8b6914');
   html += '</div>';

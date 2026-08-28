@@ -2800,6 +2800,21 @@ function _renderStoricoHrSezione(nome) {
     });
     html += '</div>';
   }
+  // Allegati (schede valutazione/formazione originali) — caricati on-demand, non pesano sull'apertura
+  if (typeof puoVedereAllegatiHr === 'function' && puoVedereAllegatiHr()) {
+    html +=
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px">' +
+      '<span style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700">Allegati (schede originali)</span>' +
+      '<button class="btn-export" style="font-size:.72rem;padding:3px 10px" onclick="caricaAllegatiCollab(\'' +
+      neS +
+      '\')">Mostra</button>' +
+      '<button class="btn-export" style="font-size:.72rem;padding:3px 10px;border-color:#2c6e49;color:#2c6e49" onclick="document.getElementById(\'hr-allegato-file\').click()">+ Carica file</button>' +
+      '<input type="file" id="hr-allegato-file" accept=".pdf,.xlsx,.xls,.jpg,.jpeg,.png" style="display:none" onchange="caricaNuovoAllegatoScheda(this,\'' +
+      neS +
+      '\')">' +
+      '<span style="font-size:.72rem;color:var(--muted)">PDF, Excel o immagine — max 2 MB</span>' +
+      '</div><div id="hr-allegati-list" style="margin-top:6px"></div>';
+  }
   html += '</div>';
   return html;
 }
