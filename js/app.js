@@ -103,6 +103,14 @@ function switchPage(name) {
     if (bkSec) bkSec.style.display = isAdmin() ? '' : 'none';
     const cestSec = document.getElementById('cestino-section');
     if (cestSec) cestSec.style.display = isAdmin() ? '' : 'none';
+    const setSec = document.getElementById('settori-section');
+    if (setSec) {
+      setSec.style.display = isAdmin() ? '' : 'none';
+      if (isAdmin() && typeof renderSettoriUI === 'function') renderSettoriUI();
+    }
+    const nuovoOpRep = document.getElementById('new-operatore-rep');
+    if (nuovoOpRep && typeof opzioniRepartoHtml === 'function')
+      nuovoOpRep.innerHTML = opzioniRepartoHtml(nuovoOpRep.value || 'entrambi', true);
     const visSec = document.getElementById('visibilita-section');
     if (visSec) {
       visSec.style.display = isAdmin() ? '' : 'none';

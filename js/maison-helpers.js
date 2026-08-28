@@ -93,16 +93,7 @@ function apriMultiSelectOperatori(hiddenInputId, btnId, title) {
   html += '<div style="max-height:280px;overflow-y:auto;border:1px solid var(--line);border-radius:3px;padding:8px">';
   ops.forEach((n) => {
     const rep = operatoriRepartoMap[n] || 'entrambi';
-    const badge =
-      rep === 'slots'
-        ? ' <span style="font-size:.65rem;color:#1a4a7a;font-weight:700">S</span>'
-        : rep === 'tavoli'
-          ? ' <span style="font-size:.65rem;color:#8e44ad;font-weight:700">T</span>'
-          : rep === 'valet'
-            ? ' <span style="font-size:.65rem;color:#1a7a6d;font-weight:700">V</span>'
-            : rep === 'cleaning'
-              ? ' <span style="font-size:.65rem;color:#5d6d7e;font-weight:700">C</span>'
-              : '';
+    const badge = _repBadge(rep);
     const isMe = n === op ? ' (Tu)' : '';
     html +=
       '<div style="padding:5px 0"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:.92rem"><input type="checkbox" class="msop-cb" value="' +
@@ -1747,6 +1738,23 @@ function aggiornaLoginOperatori() {
 function setReparto(rep) {
   currentReparto = rep;
   _aggiornaBottoniReparto();
+  // pagine abilitate per settore: nascondi tab e, se la pagina corrente non è disponibile, torna alla Home
+  if (typeof applicaVisibilita === 'function') applicaVisibilita();
+  var _pgCur = localStorage.getItem('pagina_corrente') || 'dashboard';
+  if (
+    !['dashboard', 'diario', 'impostazioni'].includes(_pgCur) &&
+    typeof isVis === 'function' &&
+    !isVis(_pgCur.replace(/-/g, '_'))
+  )
+    switchPage('dashboard');
+  if (typeof _invTabDefault === 'function') {
+    _invTab = _invTabDefault();
+    if (
+      document.getElementById('page-inventario') &&
+      document.getElementById('page-inventario').classList.contains('active')
+    )
+      renderInventario();
+  }
   registraPushSubscription();
   // Re-render TUTTE le pagine (dati devono essere sempre freschi per il reparto)
   aggiornaNomi();
@@ -1767,27 +1775,62 @@ function setReparto(rep) {
   renderAmmonimentiAlerts();
   renderScadenzeBanner();
 }
-var REPARTI = ['slots', 'tavoli', 'valet', 'cleaning'];
+// Switch reparti dinamico: i bottoni vengono generati da getReparti() (configurabile da admin)
+function renderRepartoSwitch() {
+  var sw = document.getElementById('reparto-switch');
+  if (!sw) return;
+  sw.innerHTML = getReparti()
+    .map(function (r) {
+      return (
+        '<button class="reparto-btn" id="btn-rep-' +
+        r.key +
+        '" onclick="setReparto(\'' +
+        r.key +
+        '\')">' +
+        escP(r.label) +
+        '</button>'
+      );
+    })
+    .join('');
+  _aggiornaBottoniReparto();
+}
 function _aggiornaBottoniReparto() {
-  REPARTI.forEach(function (r) {
-    var btn = document.getElementById('btn-rep-' + r);
-    if (btn) btn.className = 'reparto-btn' + (currentReparto === r ? ' active-' + r : '');
+  getReparti().forEach(function (r) {
+    var btn = document.getElementById('btn-rep-' + r.key);
+    if (!btn) return;
+    var attivo = currentReparto === r.key;
+    btn.style.background = attivo ? r.colore : '';
+    btn.style.borderColor = attivo ? r.colore : '';
+    btn.style.color = attivo ? 'white' : '';
   });
 }
 function applicaRepartoVisibilita() {
   var sw = document.getElementById('reparto-switch');
   if (!sw) return;
+  renderRepartoSwitch();
   var op = getOperatore();
   var opRep = operatoriRepartoMap[op] || 'entrambi';
   if (isAdmin()) opRep = 'entrambi';
+  // se il reparto corrente non esiste più (disattivato), torna a slots
+  if (
+    !getReparti().some(function (r) {
+      return r.key === currentReparto;
+    })
+  )
+    currentReparto = 'slots';
   // 'entrambi' = tutti i reparti; altrimenti l'operatore vede solo il proprio
-  if (opRep === 'entrambi') {
+  if (opRep === 'entrambi' && getReparti().length > 1) {
     sw.style.display = 'flex';
     sw.classList.remove('hidden');
   } else {
     sw.style.display = 'none';
     sw.classList.add('hidden');
-    currentReparto = REPARTI.includes(opRep) ? opRep : 'slots';
+    if (opRep !== 'entrambi')
+      currentReparto = getReparti().some(function (r) {
+        return r.key === opRep;
+      })
+        ? opRep
+        : 'slots';
   }
   _aggiornaBottoniReparto();
 }
@@ -1947,7 +1990,27 @@ function calcolaGiacenzeSigarette() {
 }
 // Categorie inventario personalizzate (oltre a Buoni e Sigarette), gestite da admin
 function getInvCategorieExtra() {
-  return Array.isArray(inventarioCategorieExtra) ? inventarioCategorieExtra : [];
+  const raw = inventarioCategorieExtra;
+  // legacy (array semplice): erano le categorie condivise di Slots/Tavoli
+  if (Array.isArray(raw)) return ['slots', 'tavoli'].includes(currentReparto) ? raw : [];
+  if (raw && typeof raw === 'object') return Array.isArray(raw[currentReparto]) ? raw[currentReparto] : [];
+  return [];
+}
+// Le categorie base Buoni/Sigarette sono legate alla Maison: esistono solo in Slots/Tavoli
+function _invConBase() {
+  return ['slots', 'tavoli'].includes(currentReparto);
+}
+function _invTabDefault() {
+  if (_invConBase()) return 'buoni';
+  const c = getInvCategorieExtra();
+  return c.length ? c[0].key : '';
+}
+function _setInvCategorieReparto(lista) {
+  let obj = inventarioCategorieExtra;
+  if (Array.isArray(obj)) obj = { slots: obj, tavoli: obj.slice() }; // migra il formato legacy
+  if (!obj || typeof obj !== 'object') obj = {};
+  obj[currentReparto] = lista;
+  inventarioCategorieExtra = obj;
 }
 async function _saveInvCategorieExtra() {
   await setImp('inventario_categorie_extra', JSON.stringify(inventarioCategorieExtra));
@@ -1957,6 +2020,10 @@ function _renderInvTabs() {
   if (!wrap) return;
   // Rimuovi tab custom esistenti (rigenerate ogni volta), tieni Buoni/Sigarette
   wrap.querySelectorAll('.inv-tab-custom, .inv-tab-admin').forEach((b) => b.remove());
+  // Buoni/Sigarette solo nei settori Maison (Slots/Tavoli)
+  wrap
+    .querySelectorAll('.inv-tab-btn:not(.inv-tab-custom)')
+    .forEach((b) => (b.style.display = _invConBase() ? '' : 'none'));
   const stile =
     'padding:8px 20px;border:2px solid var(--line);background:var(--paper);color:var(--ink);border-radius:2px;font-size:.88rem;font-weight:600;cursor:pointer;transition:all .2s';
   getInvCategorieExtra().forEach((cat) => {
@@ -1979,12 +2046,26 @@ function _renderInvTabs() {
   }
 }
 function renderInventario() {
+  // tab corrente valida per questo settore? (es. 'buoni' non esiste in Valet/Cleaning)
+  const _valida =
+    (_invConBase() && ['buoni', 'sigarette'].includes(_invTab)) ||
+    getInvCategorieExtra().some((c) => c.key === _invTab);
+  if (!_valida) _invTab = _invTabDefault();
   _renderInvTabs();
   const custom = getInvCategorieExtra().find((c) => c.key === _invTab);
   document.getElementById('inv-section-buoni').style.display = _invTab === 'buoni' ? '' : 'none';
   document.getElementById('inv-section-sigarette').style.display = _invTab === 'sigarette' ? '' : 'none';
   const customEl = document.getElementById('inv-section-custom');
-  if (customEl) customEl.style.display = custom ? '' : 'none';
+  if (customEl) customEl.style.display = custom || !_invTab ? '' : 'none';
+  if (!_invTab && customEl) {
+    customEl.innerHTML =
+      '<p style="color:var(--muted);padding:20px;text-align:center">Nessuna categoria inventario per il settore ' +
+      escP(repartoLabel(currentReparto)) +
+      '.' +
+      (isAdmin() ? ' Usa "+ Categoria" per crearne una (es. Prodotti pulizia, Pettorine, Chiavi...).' : '') +
+      '</p>';
+    return;
+  }
   if (_invTab === 'buoni') renderInventarioBuoni();
   else if (_invTab === 'sigarette') renderInventarioSigarette();
   else if (custom) renderInventarioCustom(custom);
@@ -2016,7 +2097,7 @@ async function aggiungiCategoriaInventario() {
     toast('Categoria già esistente');
     return;
   }
-  inventarioCategorieExtra = [...getInvCategorieExtra(), { key, label }];
+  _setInvCategorieReparto([...getInvCategorieExtra(), { key, label }]);
   await _saveInvCategorieExtra();
   logAzione('Inventario: categoria aggiunta', label);
   _invTab = key;
@@ -2049,10 +2130,10 @@ async function rimuoviCategoriaInventario(key) {
     )
   )
     return;
-  inventarioCategorieExtra = getInvCategorieExtra().filter((c) => c.key !== key);
+  _setInvCategorieReparto(getInvCategorieExtra().filter((c) => c.key !== key));
   await _saveInvCategorieExtra();
   logAzione('Inventario: categoria rimossa', cat.label);
-  _invTab = 'buoni';
+  _invTab = _invTabDefault();
   renderInventario();
 }
 // --- Sezione generica per categoria custom: giacenze, carico, uscita, movimenti ---

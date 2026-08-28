@@ -207,7 +207,9 @@ let valutazioniCache = [],
   soglieAlertCfg = null, // {allineamento, rdi} soglie CHF alert differenze — null = default 90/500
   soglieDisciplinariCfg = null, // {amm, recidiva, accumulo} soglie percorso disciplinare — null = default 2/3/3
   equitaMesi = 6, // mesi di anzianità in più per far scattare la segnalazione equità categorie
-  hrEventiCache = []; // storico HR riservato: assunzione, categoria, impiego, premi, livelli
+  hrEventiCache = [], // storico HR riservato: assunzione, categoria, impiego, premi, livelli
+  repartiConfig = null, // settori personalizzati [{key,label,colore,attivo}] — null = default valet+cleaning
+  repartiPagineCfg = null; // pagine visibili per settore {repKey:{maison:false,...}} — assente = tutte
 let currentReparto = 'slots',
   operatoriRepartoMap = {};
 function nomeCorrente(orig) {

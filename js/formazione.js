@@ -63,20 +63,15 @@ const PUNTI_DEFAULT = {
 };
 
 function getCompetenzeConfigAll() {
-  const cfg = competenzeConfig && typeof competenzeConfig === 'object' ? competenzeConfig : COMPETENZE_DEFAULT;
-  return {
-    slots: Array.isArray(cfg.slots) ? cfg.slots : COMPETENZE_DEFAULT.slots,
-    tavoli: Array.isArray(cfg.tavoli) ? cfg.tavoli : COMPETENZE_DEFAULT.tavoli,
-    valet: Array.isArray(cfg.valet) ? cfg.valet : COMPETENZE_DEFAULT.valet,
-    cleaning: Array.isArray(cfg.cleaning) ? cfg.cleaning : COMPETENZE_DEFAULT.cleaning,
-  };
+  const cfg = competenzeConfig && typeof competenzeConfig === 'object' ? competenzeConfig : {};
+  const out = {};
+  getRepartiTutti().forEach((r) => {
+    out[r.key] = Array.isArray(cfg[r.key]) ? cfg[r.key] : COMPETENZE_DEFAULT[r.key] || [];
+  });
+  return out;
 }
 function getCompetenzeReparto() {
-  return (
-    getCompetenzeConfigAll()[
-      ['slots', 'tavoli', 'valet', 'cleaning'].includes(currentReparto) ? currentReparto : 'slots'
-    ] || []
-  );
+  return getCompetenzeConfigAll()[currentReparto] || [];
 }
 async function saveCompetenzeConfig(cfg) {
   competenzeConfig = cfg;
@@ -1043,44 +1038,40 @@ function _renderFormazioneConfig() {
   const cfgP = getPuntiConfig();
   let html = '<div class="settings-section"><h4>Configurazione (admin)</h4>';
   // competenze per reparto
-  ['slots', 'tavoli', 'valet', 'cleaning'].forEach((rep) => {
-    html +=
-      '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:12px 0 6px">Competenze ' +
-      rep +
-      '</p>';
-    (cfgC[rep] || []).forEach((k, i) => {
+  getReparti()
+    .map((r) => r.key)
+    .forEach((rep) => {
       html +=
-        '<div class="tipo-item"><div class="tipo-item-name">' +
-        escP(k.label) +
-        ' <span class="tipo-item-default">(L' +
-        k.livello +
-        ')</span></div><button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2)" onclick="rinominaCompetenzaCfg(\'' +
+        '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:12px 0 6px">Competenze ' +
+        escP(repartoLabel(rep)) +
+        '</p>';
+      (cfgC[rep] || []).forEach((k, i) => {
+        html +=
+          '<div class="tipo-item"><div class="tipo-item-name">' +
+          escP(k.label) +
+          ' <span class="tipo-item-default">(L' +
+          k.livello +
+          ')</span></div><button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2)" onclick="rinominaCompetenzaCfg(\'' +
+          rep +
+          "'," +
+          i +
+          ')">Rinomina</button><button class="btn-del-tipo" style="margin-left:4px" onclick="rimuoviCompetenzaCfg(\'' +
+          rep +
+          "'," +
+          i +
+          ')">Rimuovi</button></div>';
+      });
+      html +=
+        '<div class="add-tipo-row" style="margin:6px 0 4px"><div class="field"><label>Nuova competenza</label><input type="text" id="cfg-comp-nome-' +
         rep +
-        "'," +
-        i +
-        ')">Rinomina</button><button class="btn-del-tipo" style="margin-left:4px" onclick="rimuoviCompetenzaCfg(\'' +
+        '" placeholder="Es: ' +
+        (rep === 'tavoli' ? 'Chef de table' : 'Nuova competenza') +
+        '..."></div><div class="field"><label>Livello</label><select id="cfg-comp-lv-' +
         rep +
-        "'," +
-        i +
-        ')">Rimuovi</button></div>';
+        '" style="padding:10px;width:90px"><option value="1">L1</option><option value="2">L2</option><option value="3">L3</option><option value="0">Extra</option></select></div><button class="btn-add-tipo" onclick="aggiungiCompetenzaCfg(\'' +
+        rep +
+        '\')">+ Aggiungi</button></div>';
     });
-    html +=
-      '<div class="add-tipo-row" style="margin:6px 0 4px"><div class="field"><label>Nuova competenza</label><input type="text" id="cfg-comp-nome-' +
-      rep +
-      '" placeholder="Es: ' +
-      (rep === 'tavoli'
-        ? 'Chef de table'
-        : rep === 'valet'
-          ? 'Navetta clienti'
-          : rep === 'cleaning'
-            ? 'Sanificazione'
-            : 'Tecnica slot') +
-      '..."></div><div class="field"><label>Livello</label><select id="cfg-comp-lv-' +
-      rep +
-      '" style="padding:10px;width:90px"><option value="1">L1</option><option value="2">L2</option><option value="3">L3</option><option value="0">Extra</option></select></div><button class="btn-add-tipo" onclick="aggiungiCompetenzaCfg(\'' +
-      rep +
-      '\')">+ Aggiungi</button></div>';
-  });
   // punti azioni
   html +=
     '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Azioni e punti</p>';

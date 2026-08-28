@@ -312,21 +312,15 @@ function renderNoteCollega() {
     const _gid = isGroup ? c.partner.replace('gruppo:', '') : '';
     const _customNome = _gid.startsWith('__gruppo_custom_') ? _getGruppoNome(_gid) : '';
     const partnerLabel =
-      _gid === '__gruppo_slots'
-        ? 'Tutti Slots'
-        : _gid === '__gruppo_tavoli'
-          ? 'Tutti Tavoli'
-          : _gid === '__gruppo_valet'
-            ? 'Tutti Valet'
-            : _gid === '__gruppo_cleaning'
-              ? 'Tutti Cleaning'
-              : _gid === '__gruppo_tutti'
-                ? 'Tutti'
-                : _customNome
-                  ? escP(_customNome)
-                  : isGroup
-                    ? _chatGroupLabel(c)
-                    : escP(c.partner);
+      _gid.startsWith('__gruppo_') && getRepartoInfo(_gid.replace('__gruppo_', ''))
+        ? 'Tutti ' + repartoLabel(_gid.replace('__gruppo_', ''))
+        : _gid === '__gruppo_tutti'
+          ? 'Tutti'
+          : _customNome
+            ? escP(_customNome)
+            : isGroup
+              ? _chatGroupLabel(c)
+              : escP(c.partner);
     const lastNote = c.notes.sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
     const _prevMsg = lastNote
       ? (lastNote.messaggio || '')
@@ -339,16 +333,7 @@ function renderNoteCollega() {
       : '';
     const timeStr = lastNote ? _chatTimeShort(lastNote.created_at) : '';
     const rep = !isGroup ? operatoriRepartoMap[c.partner] || '' : '';
-    const repBadge =
-      rep === 'slots'
-        ? '<span style="font-size:.6rem;color:#1a4a7a;font-weight:700;margin-left:4px">S</span>'
-        : rep === 'tavoli'
-          ? '<span style="font-size:.6rem;color:#8e44ad;font-weight:700;margin-left:4px">T</span>'
-          : rep === 'valet'
-            ? '<span style="font-size:.6rem;color:#1a7a6d;font-weight:700;margin-left:4px">V</span>'
-            : rep === 'cleaning'
-              ? '<span style="font-size:.6rem;color:#5d6d7e;font-weight:700;margin-left:4px">C</span>'
-              : '';
+    const repBadge = _repBadge(rep, true);
     html +=
       '<div class="conv-item' +
       (isActive ? ' active' : '') +
@@ -474,31 +459,21 @@ function toggleConvNewDropdown(ev) {
   // Group buttons
   h +=
     '<div onclick="event.stopPropagation();apriConversazioneGruppo(\'tutti\')" style="font-weight:700;color:var(--ink)">Tutti</div>';
-  if (myRep === 'slots' || myRep === 'entrambi')
+  getReparti().forEach(function (r) {
+    if (myRep !== r.key && myRep !== 'entrambi') return;
     h +=
-      '<div onclick="event.stopPropagation();apriConversazioneGruppo(\'slots\')" style="font-weight:700;color:#1a4a7a">Tutti Slots</div>';
-  if (myRep === 'tavoli' || myRep === 'entrambi')
-    h +=
-      '<div onclick="event.stopPropagation();apriConversazioneGruppo(\'tavoli\')" style="font-weight:700;color:#8e44ad">Tutti Tavoli</div>';
-  if (myRep === 'valet' || myRep === 'entrambi')
-    h +=
-      '<div onclick="event.stopPropagation();apriConversazioneGruppo(\'valet\')" style="font-weight:700;color:#1a7a6d">Tutti Valet</div>';
-  if (myRep === 'cleaning' || myRep === 'entrambi')
-    h +=
-      '<div onclick="event.stopPropagation();apriConversazioneGruppo(\'cleaning\')" style="font-weight:700;color:#5d6d7e">Tutti Cleaning</div>';
+      '<div onclick="event.stopPropagation();apriConversazioneGruppo(\'' +
+      r.key +
+      '\')" style="font-weight:700;color:' +
+      r.colore +
+      '">Tutti ' +
+      escP(r.label) +
+      '</div>';
+  });
   h += '<div style="height:1px;background:var(--line);padding:0;cursor:default"></div>';
   tutti.forEach((n) => {
     const rep = operatoriRepartoMap[n] || 'entrambi';
-    const badge =
-      rep === 'slots'
-        ? ' <span style="font-size:.65rem;color:#1a4a7a;font-weight:700">S</span>'
-        : rep === 'tavoli'
-          ? ' <span style="font-size:.65rem;color:#8e44ad;font-weight:700">T</span>'
-          : rep === 'valet'
-            ? ' <span style="font-size:.65rem;color:#1a7a6d;font-weight:700">V</span>'
-            : rep === 'cleaning'
-              ? ' <span style="font-size:.65rem;color:#5d6d7e;font-weight:700">C</span>'
-              : '';
+    const badge = _repBadge(rep);
     h +=
       '<div style="display:flex;align-items:center;gap:8px" onclick="event.stopPropagation()"><input type="checkbox" class="conv-group-cb" value="' +
       escP(n).replace(/"/g, '&quot;') +
@@ -739,16 +714,7 @@ function _apriAggiungiMembri(gid, partner) {
   html += '<div style="max-height:250px;overflow-y:auto">';
   tutti.forEach((n) => {
     const rep = operatoriRepartoMap[n] || 'entrambi';
-    const badge =
-      rep === 'slots'
-        ? ' <span style="font-size:.65rem;color:#1a4a7a;font-weight:700">S</span>'
-        : rep === 'tavoli'
-          ? ' <span style="font-size:.65rem;color:#8e44ad;font-weight:700">T</span>'
-          : rep === 'valet'
-            ? ' <span style="font-size:.65rem;color:#1a7a6d;font-weight:700">V</span>'
-            : rep === 'cleaning'
-              ? ' <span style="font-size:.65rem;color:#5d6d7e;font-weight:700">C</span>'
-              : '';
+    const badge = _repBadge(rep);
     html +=
       '<div style="padding:6px 0;display:flex;align-items:center;gap:8px"><input type="checkbox" class="add-member-cb" value="' +
       escP(n).replace(/"/g, '&quot;') +
@@ -1586,16 +1552,7 @@ function inoltraMessaggio(noteId) {
     .filter((x) => x && x !== op);
   tutti.forEach((nome) => {
     const rep = operatoriRepartoMap[nome] || 'entrambi';
-    const badge =
-      rep === 'slots'
-        ? ' <span style="font-size:.65rem;color:#1a4a7a;font-weight:700">S</span>'
-        : rep === 'tavoli'
-          ? ' <span style="font-size:.65rem;color:#8e44ad;font-weight:700">T</span>'
-          : rep === 'valet'
-            ? ' <span style="font-size:.65rem;color:#1a7a6d;font-weight:700">V</span>'
-            : rep === 'cleaning'
-              ? ' <span style="font-size:.65rem;color:#5d6d7e;font-weight:700">C</span>'
-              : '';
+    const badge = _repBadge(rep);
     html +=
       '<div onclick="_eseguiInoltro(' +
       noteId +
@@ -1640,15 +1597,7 @@ async function _eseguiInoltro(noteId, destKey, isSingle) {
       // Calcola membri per il chat_get_or_create_group
       let members = [];
       if (gidKey === '__gruppo_tutti') members = operatoriAuthCache.map((o) => o.nome).filter((x) => x);
-      else if (gidKey === '__gruppo_slots')
-        members = operatoriAuthCache
-          .map((o) => o.nome)
-          .filter((x) => {
-            if (!x) return false;
-            const r = operatoriRepartoMap[x] || 'entrambi';
-            return r === 'slots' || r === 'entrambi';
-          });
-      else if (['__gruppo_tavoli', '__gruppo_valet', '__gruppo_cleaning'].includes(gidKey)) {
+      else if (gidKey.startsWith('__gruppo_') && getRepartoInfo(gidKey.replace('__gruppo_', ''))) {
         const repGrp = gidKey.replace('__gruppo_', '');
         members = operatoriAuthCache
           .map((o) => o.nome)

@@ -920,7 +920,7 @@ async function esportaValutazionePDF(id) {
   sezione('DATI PERSONALI');
   const dpP = v.dati_personali || {};
   const settoreLbl =
-    dpP.settore || 'Reparto ' + ({ tavoli: 'Tavoli', valet: 'Valet', cleaning: 'Cleaning' }[v.reparto_dip] || 'Slot');
+    dpP.settore || 'Reparto ' + repartoLabel(v.reparto_dip || 'slots');
   const dataLbl = v.data_valutazione ? new Date(v.data_valutazione + 'T12:00:00').toLocaleDateString('it-IT') : '';
   const stileDP = {
     theme: 'grid',

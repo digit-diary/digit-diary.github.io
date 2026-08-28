@@ -444,3 +444,91 @@ function _highlightField(id) {
   }, 2000);
   el.focus();
 }
+
+// ================================================================
+// REPARTI / SETTORI — personalizzabili da admin (Impostazioni → Settori)
+// Slots e Tavoli sono fissi (dati storici); gli altri sono configurabili
+// in impostazioni 'reparti_config'. La chiave (key) è immutabile perché
+// salvata in reparto_dip di ogni record; label e colore sono modificabili.
+// ================================================================
+const REPARTI_BASE = [
+  { key: 'slots', label: 'Slots', colore: '#1a4a7a', fisso: true },
+  { key: 'tavoli', label: 'Tavoli', colore: '#8e44ad', fisso: true },
+];
+const REPARTI_CUSTOM_DEFAULT = [
+  { key: 'valet', label: 'Valet', colore: '#1a7a6d', attivo: true },
+  { key: 'cleaning', label: 'Cleaning', colore: '#5d6d7e', attivo: true },
+];
+function getRepartiCustom() {
+  return typeof repartiConfig !== 'undefined' && Array.isArray(repartiConfig)
+    ? repartiConfig
+    : REPARTI_CUSTOM_DEFAULT.map((r) => Object.assign({}, r));
+}
+function getRepartiTutti() {
+  return REPARTI_BASE.concat(getRepartiCustom());
+}
+function getReparti() {
+  return REPARTI_BASE.concat(getRepartiCustom().filter((r) => r.attivo !== false));
+}
+function getRepartoInfo(key) {
+  return getRepartiTutti().find((r) => r.key === key) || null;
+}
+function repartoLabel(key) {
+  if (key === 'entrambi') return 'Tutti i reparti';
+  const r = getRepartoInfo(key);
+  return r ? r.label : key || '';
+}
+function repartoColore(key) {
+  const r = getRepartoInfo(key);
+  return r && r.colore ? r.colore : 'var(--muted)';
+}
+function repartoLettera(key) {
+  const r = getRepartoInfo(key);
+  return r && r.label ? r.label.charAt(0).toUpperCase() : '';
+}
+// Badge lettera reparto (es. S/T/V/C) col colore del settore
+function _repBadge(rep, piccolo) {
+  if (!rep || rep === 'entrambi' || !getRepartoInfo(rep)) return '';
+  return piccolo
+    ? '<span style="font-size:.6rem;color:' +
+        repartoColore(rep) +
+        ';font-weight:700;margin-left:4px">' +
+        repartoLettera(rep) +
+        '</span>'
+    : ' <span style="font-size:.65rem;color:' +
+        repartoColore(rep) +
+        ';font-weight:700">' +
+        repartoLettera(rep) +
+        '</span>';
+}
+// Opzioni <select> reparto (con eventuale voce 'Tutti i reparti')
+function opzioniRepartoHtml(selezionato, conEntrambi) {
+  let h = conEntrambi
+    ? '<option value="entrambi"' + (selezionato === 'entrambi' ? ' selected' : '') + '>Tutti i reparti</option>'
+    : '';
+  getReparti().forEach((r) => {
+    h +=
+      '<option value="' + r.key + '"' + (selezionato === r.key ? ' selected' : '') + '>' + escP(r.label) + '</option>';
+  });
+  return h;
+}
+// Select settore nella schermata di login: popolato dalla cache locale
+// (le impostazioni non sono leggibili prima del login)
+function popolaLoginSettore() {
+  const sel = document.getElementById('login-settore');
+  if (!sel) return;
+  let lista = null;
+  try {
+    lista = JSON.parse(localStorage.getItem('_cache_reparti') || 'null');
+  } catch (e) {}
+  if (!lista || !lista.length) lista = getReparti().map((r) => ({ key: r.key, label: r.label }));
+  const cur = sel.value;
+  sel.innerHTML = lista.map((r) => '<option value="' + r.key + '">' + escP(r.label) + '</option>').join('');
+  if (lista.some((r) => r.key === cur)) sel.value = cur;
+}
+document.addEventListener('DOMContentLoaded', popolaLoginSettore);
+function _salvaCacheReparti() {
+  try {
+    localStorage.setItem('_cache_reparti', JSON.stringify(getReparti().map((r) => ({ key: r.key, label: r.label }))));
+  } catch (e) {}
+}
