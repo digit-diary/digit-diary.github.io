@@ -1444,6 +1444,31 @@ async function importaCollaboratori(input) {
 
 // ASSISTENTE AI GROQ
 let groqKey = '';
+// Modelli correnti (ago 2026: Groq ha DISMESSO tutti i llama-3.x — un modello
+// hard-coded morto rompeva l'AI ovunque con l'errore fuorviante "verifica la chiave")
+const GROQ_MODEL_TESTO = 'openai/gpt-oss-120b'; // il migliore per testi formali (modello con reasoning: servono max_tokens abbondanti)
+const GROQ_MODEL_JSON = 'qwen/qwen3.8-27b'; // affidabile con response_format json_object
+const GROQ_MODEL_VISION = 'qwen/qwen3.8-27b'; // supporta le immagini
+async function _groqChat(body) {
+  const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + groqKey },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    const t = await r.text();
+    console.error('Groq error', r.status, t);
+    if (r.status === 401 || r.status === 403) throw new Error('Chiave Groq non valida: controllala nelle Impostazioni');
+    if (r.status === 404) throw new Error("Modello AI non più disponibile: serve un aggiornamento dell'app");
+    if (r.status === 429 || r.status === 503)
+      throw new Error('AI momentaneamente sovraccarica: riprova tra qualche secondo');
+    throw new Error('Errore AI (' + r.status + ')');
+  }
+  const data = await r.json();
+  const txt = data.choices?.[0]?.message?.content;
+  if (!txt) throw new Error("Nessuna risposta dall'AI");
+  return txt;
+}
 async function loadGroqKey() {
   try {
     const res = await sbRpc('get_groq_key');
@@ -1514,31 +1539,19 @@ async function miglioraTesto(fieldId, contesto) {
       contesto +
       '.\n\nSTILE RICHIESTO:\n- Italiano formale e professionale, tipico di documenti di un casinò svizzero\n- Terza persona: "il/la collaboratore/trice", "il Sig./la Sig.ra [Cognome Nome]"\n- MANTIENI tutti i dettagli specifici: date, orari, luoghi, importi, circostanze\n- Per fatti: "In data [data], durante il turno [turno], presso [luogo]..." → "si è verificato quanto segue:"\n- Per telecamere: "dalla revisione delle immagini del sistema CCTV risulta che..."\n- Per violazioni: "Tale comportamento costituisce una violazione della procedura QM [codice]" citando la procedura specifica\n- Per soglie: usa SEMPRE "pari o superiore a" (NON "superiore a")\n- Per obiettivi: "Si invita formalmente il/la collaboratore/trice a:" seguito da elenco puntato con -\n- Chiudi con: "consapevole che il ripetersi di tale comportamento potrà comportare l\'adozione di provvedimenti disciplinari più severi"\n- NON inventare fatti, migliora SOLO la forma professionale del testo esistente\n- Scrivi come un RESPONSABILE DI SETTORE esperto, NON come un\'intelligenza artificiale. Il testo deve sembrare scritto da una persona reale con esperienza nel settore. Evita frasi generiche, template o formule troppo perfette. Usa il linguaggio naturale di chi lavora in un casinò svizzero ogni giorno.\n- Rispondi SOLO con il testo migliorato, senza commenti o spiegazioni\n\nABBREVIAZIONI E TERMINOLOGIA CASINO:\nDIR=Direttore, CdA=Consiglio Amministrazione, CdD=Collegio Direzione, MgrTeam=Management Team, CO=Compliance, RLRD=Resp.LRD, RCS=Resp.Concezione Sociale, RSS=Resp.Sicurezza&Sorveglianza, R_FBS=Resp.FoBoSlot, SUP_FBS=Supervisor FoBoSlot, R_LG=Resp.Live Game, SUP_LG=Supervisor Live Game, CAS=Cassiere, REC=Receptionist, SA=Slot Attendant, GUARD=Guardaroba, BOK=Back Office, CT=Counting Team, CR=Croupier, ISP=Ispettore tavolo, SIC=Sicurezza, SURV=Sorveglianza, SECC=Sistema elettronico conteggio/controllo, AAGA=Apparecchi automatici da gioco, IR=Incident Report, SOL=Surveillance Operator Log, TRAKA=sistema gestione chiavi, GD=giornata di gioco, PLG=prodotto lordo giochi, RDI=Rapporto Disciplinare Interno, LRD=Legge riciclaggio denaro, CFCG=Commissione federale case da gioco, QM=Quality Management, VP=Valet Parking, MG=Manutenzione Giochi, FAC=Facility, PUL=Pulizie, F&C=Finanze&Controlling, F&B=Food&Beverage, MKTG=Marketing, VC=gettoni valore, NN=fiches non negoziabili, CLI/CLO=Cashless In/Out, NRT=Note Recycler Terminal, JP=Jackpot, CD=Cassa.\n\nPRINCIPI TRASVERSALI:\n- Pulizia delle mani: sfregamento palmi verso alto verso CCTV\n- Principio dei quattro occhi: un funzionario esegue, uno+ indipendenti attestano\n- Percorso più breve: rientro immediato alla postazione senza soste\n- Tutte le operazioni sotto copertura CCTV (art.33 OCG-DFGP)\n\nSOGLIE CHF:\n- CHF 3\'000: identificazione LRD obbligatoria (pari o superiore)\n- CHF 4\'000: registrazione Form III (pari o superiore)\n- CHF 10: discrepanza cassa → verifica con SUP_FBS\n- CHF 100: discrepanza cassa → indagine formale + IR\n- CHF 15\'000: pagamento → notifica preventiva SURV + verifica KYC/PEP immediata\n- CHF 30\'000: acquisto gettoni → chiarimento speciale con SUP_FBS\n- CHF 50\'000: riscossione/jackpot → chiarimento speciale + fax CFCG entro fine GD\n\nLIVELLI DISCIPLINARI: 1)Allineamento verbale 2)Allineamento scritto 3)RDI 1°grado 4)RDI 2°grado (può portare a disdetta). Dal 3° allineamento scritto stesso motivo → scatta RDI.\n\nTesto originale:\n' +
       testo;
-    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + groqKey,
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.3,
-        max_tokens: 1000,
-      }),
+    const migliorato = await _groqChat({
+      model: GROQ_MODEL_TESTO,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.3,
+      max_tokens: 2000,
     });
-    if (!r.ok) throw new Error('API error ' + r.status);
-    const data = await r.json();
-    const migliorato = data.choices?.[0]?.message?.content;
-    if (migliorato) {
-      el.value = migliorato.trim();
-      el.style.height = 'auto';
-      el.style.height = Math.max(80, el.scrollHeight) + 'px';
-      toast('Testo migliorato!');
-    } else throw new Error('Nessuna risposta');
+    el.value = migliorato.trim();
+    el.style.height = 'auto';
+    el.style.height = Math.max(80, el.scrollHeight) + 'px';
+    toast('Testo migliorato!');
   } catch (e) {
     console.error(e);
-    toast('Errore AI: verifica la chiave Groq');
+    toast(e && e.message ? e.message : 'Errore AI');
   }
   if (btn) {
     btn.disabled = false;
@@ -1603,11 +1616,11 @@ async function generaModuloAI(tipo) {
     sysPrompt +=
       '\n\nHo allegato una foto che mostra la situazione (screenshot, documento, log, schermata). Analizzala e usa le informazioni visibili per compilare i campi. Integra foto e testo.';
   try {
-    let model = 'llama-3.3-70b-versatile';
+    let model = GROQ_MODEL_JSON;
     let messages;
     let bodyOpts = { temperature: 0.2, top_p: 0.9, max_tokens: 1500 };
     if (_moduloFotoB64) {
-      model = 'llama-3.2-90b-vision-preview';
+      model = GROQ_MODEL_VISION;
       messages = [
         {
           role: 'user',
@@ -1621,22 +1634,7 @@ async function generaModuloAI(tipo) {
       messages = [{ role: 'user', content: sysPrompt }];
       bodyOpts.response_format = { type: 'json_object' };
     }
-    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + groqKey,
-      },
-      body: JSON.stringify(Object.assign({ model: model, messages: messages }, bodyOpts)),
-    });
-    if (!r.ok) {
-      const errTxt = await r.text();
-      console.error('Groq API error', r.status, errTxt);
-      throw new Error('API error ' + r.status);
-    }
-    const data = await r.json();
-    let txt = data.choices?.[0]?.message?.content;
-    if (!txt) throw new Error("Nessuna risposta dall'AI");
+    let txt = await _groqChat(Object.assign({ model: model, messages: messages }, bodyOpts));
     txt = txt
       .replace(/```json\s*/g, '')
       .replace(/```\s*/g, '')
@@ -1689,17 +1687,9 @@ async function generaModuloAI(tipo) {
     toast("Campi compilati dall'AI!");
   } catch (e) {
     console.error(e);
-    const msg = e.message || '';
-    if (status)
-      status.innerHTML =
-        '<span style="color:#c0392b">' +
-        (msg.includes('API error')
-          ? 'Errore API: verifica la chiave Groq'
-          : msg.includes('non valida')
-            ? 'Risposta AI non leggibile, riprova'
-            : 'Errore: ' + msg) +
-        '</span>';
-    toast('Errore AI: ' + msg);
+    const msg = e.message || 'Errore AI';
+    if (status) status.innerHTML = '<span style="color:#c0392b">' + escP(msg) + '</span>';
+    toast(msg);
   }
   if (btn) {
     btn.disabled = false;
@@ -1785,10 +1775,10 @@ async function assistenteGenera() {
       '\n\nHo allegato una foto. Analizzala e integra le informazioni visibili nella foto con il testo scritto. Se la foto mostra documenti, schermate, situazioni o dettagli rilevanti, includili nel testo riscritto.';
   promptText +=
     '\n\nTesto originale:\n' + (input || '[Vedi foto allegata - descrivi e riscrivi in base a ciò che vedi]');
-  let model = 'llama-3.3-70b-versatile';
+  let model = GROQ_MODEL_TESTO;
   let messages;
   if (_assistFotoB64) {
-    model = 'llama-3.2-90b-vision-preview';
+    model = GROQ_MODEL_VISION;
     messages = [
       {
         role: 'user',
@@ -1802,36 +1792,20 @@ async function assistenteGenera() {
     messages = [{ role: 'user', content: promptText }];
   }
   try {
-    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + groqKey,
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: messages,
-        temperature: 0.3,
-        max_tokens: 1500,
-      }),
+    const result = await _groqChat({
+      model: model,
+      messages: messages,
+      temperature: 0.3,
+      max_tokens: 2000,
     });
-    if (!r.ok) {
-      const errTxt = await r.text();
-      console.error('Groq error', r.status, errTxt);
-      throw new Error('API error ' + r.status);
-    }
-    const data = await r.json();
-    const result = data.choices?.[0]?.message?.content;
-    if (result) {
-      document.getElementById('assist-output').value = result.trim();
-      document.getElementById('assist-output-wrap').style.display = 'block';
-      if (status) status.innerHTML = '<span style="color:#2c6e49">Testo riscritto!</span>';
-      toast('Testo riscritto!');
-    } else throw new Error('Nessuna risposta');
+    document.getElementById('assist-output').value = result.trim();
+    document.getElementById('assist-output-wrap').style.display = 'block';
+    if (status) status.innerHTML = '<span style="color:#2c6e49">Testo riscritto!</span>';
+    toast('Testo riscritto!');
   } catch (e) {
     console.error(e);
-    if (status) status.innerHTML = '<span style="color:#c0392b">Errore: verifica la chiave Groq</span>';
-    toast('Errore AI: ' + e.message);
+    if (status) status.innerHTML = '<span style="color:#c0392b">' + escP(e.message || 'Errore AI') + '</span>';
+    toast(e.message || 'Errore AI');
   }
   btn.disabled = false;
   btn.textContent = 'Riscrivi con AI';
