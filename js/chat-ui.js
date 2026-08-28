@@ -316,13 +316,17 @@ function renderNoteCollega() {
         ? 'Tutti Slots'
         : _gid === '__gruppo_tavoli'
           ? 'Tutti Tavoli'
-          : _gid === '__gruppo_tutti'
-            ? 'Tutti'
-            : _customNome
-              ? escP(_customNome)
-              : isGroup
-                ? _chatGroupLabel(c)
-                : escP(c.partner);
+          : _gid === '__gruppo_valet'
+            ? 'Tutti Valet'
+            : _gid === '__gruppo_cleaning'
+              ? 'Tutti Cleaning'
+              : _gid === '__gruppo_tutti'
+                ? 'Tutti'
+                : _customNome
+                  ? escP(_customNome)
+                  : isGroup
+                    ? _chatGroupLabel(c)
+                    : escP(c.partner);
     const lastNote = c.notes.sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
     const _prevMsg = lastNote
       ? (lastNote.messaggio || '')
@@ -340,7 +344,11 @@ function renderNoteCollega() {
         ? '<span style="font-size:.6rem;color:#1a4a7a;font-weight:700;margin-left:4px">S</span>'
         : rep === 'tavoli'
           ? '<span style="font-size:.6rem;color:#8e44ad;font-weight:700;margin-left:4px">T</span>'
-          : '';
+          : rep === 'valet'
+            ? '<span style="font-size:.6rem;color:#1a7a6d;font-weight:700;margin-left:4px">V</span>'
+            : rep === 'cleaning'
+              ? '<span style="font-size:.6rem;color:#5d6d7e;font-weight:700;margin-left:4px">C</span>'
+              : '';
     html +=
       '<div class="conv-item' +
       (isActive ? ' active' : '') +
@@ -472,6 +480,12 @@ function toggleConvNewDropdown(ev) {
   if (myRep === 'tavoli' || myRep === 'entrambi')
     h +=
       '<div onclick="event.stopPropagation();apriConversazioneGruppo(\'tavoli\')" style="font-weight:700;color:#8e44ad">Tutti Tavoli</div>';
+  if (myRep === 'valet' || myRep === 'entrambi')
+    h +=
+      '<div onclick="event.stopPropagation();apriConversazioneGruppo(\'valet\')" style="font-weight:700;color:#1a7a6d">Tutti Valet</div>';
+  if (myRep === 'cleaning' || myRep === 'entrambi')
+    h +=
+      '<div onclick="event.stopPropagation();apriConversazioneGruppo(\'cleaning\')" style="font-weight:700;color:#5d6d7e">Tutti Cleaning</div>';
   h += '<div style="height:1px;background:var(--line);padding:0;cursor:default"></div>';
   tutti.forEach((n) => {
     const rep = operatoriRepartoMap[n] || 'entrambi';
@@ -480,7 +494,11 @@ function toggleConvNewDropdown(ev) {
         ? ' <span style="font-size:.65rem;color:#1a4a7a;font-weight:700">S</span>'
         : rep === 'tavoli'
           ? ' <span style="font-size:.65rem;color:#8e44ad;font-weight:700">T</span>'
-          : '';
+          : rep === 'valet'
+            ? ' <span style="font-size:.65rem;color:#1a7a6d;font-weight:700">V</span>'
+            : rep === 'cleaning'
+              ? ' <span style="font-size:.65rem;color:#5d6d7e;font-weight:700">C</span>'
+              : '';
     h +=
       '<div style="display:flex;align-items:center;gap:8px" onclick="event.stopPropagation()"><input type="checkbox" class="conv-group-cb" value="' +
       escP(n).replace(/"/g, '&quot;') +
@@ -726,7 +744,11 @@ function _apriAggiungiMembri(gid, partner) {
         ? ' <span style="font-size:.65rem;color:#1a4a7a;font-weight:700">S</span>'
         : rep === 'tavoli'
           ? ' <span style="font-size:.65rem;color:#8e44ad;font-weight:700">T</span>'
-          : '';
+          : rep === 'valet'
+            ? ' <span style="font-size:.65rem;color:#1a7a6d;font-weight:700">V</span>'
+            : rep === 'cleaning'
+              ? ' <span style="font-size:.65rem;color:#5d6d7e;font-weight:700">C</span>'
+              : '';
     html +=
       '<div style="padding:6px 0;display:flex;align-items:center;gap:8px"><input type="checkbox" class="add-member-cb" value="' +
       escP(n).replace(/"/g, '&quot;') +
@@ -1569,7 +1591,11 @@ function inoltraMessaggio(noteId) {
         ? ' <span style="font-size:.65rem;color:#1a4a7a;font-weight:700">S</span>'
         : rep === 'tavoli'
           ? ' <span style="font-size:.65rem;color:#8e44ad;font-weight:700">T</span>'
-          : '';
+          : rep === 'valet'
+            ? ' <span style="font-size:.65rem;color:#1a7a6d;font-weight:700">V</span>'
+            : rep === 'cleaning'
+              ? ' <span style="font-size:.65rem;color:#5d6d7e;font-weight:700">C</span>'
+              : '';
     html +=
       '<div onclick="_eseguiInoltro(' +
       noteId +
@@ -1622,14 +1648,16 @@ async function _eseguiInoltro(noteId, destKey, isSingle) {
             const r = operatoriRepartoMap[x] || 'entrambi';
             return r === 'slots' || r === 'entrambi';
           });
-      else if (gidKey === '__gruppo_tavoli')
+      else if (['__gruppo_tavoli', '__gruppo_valet', '__gruppo_cleaning'].includes(gidKey)) {
+        const repGrp = gidKey.replace('__gruppo_', '');
         members = operatoriAuthCache
           .map((o) => o.nome)
           .filter((x) => {
             if (!x) return false;
             const r = operatoriRepartoMap[x] || 'entrambi';
-            return r === 'tavoli' || r === 'entrambi';
+            return r === repGrp || r === 'entrambi';
           });
+      }
       await _chatInsertMessage({
         da: op,
         partner: destKey,
@@ -2379,7 +2407,7 @@ function apriSchedaCollaboratore(nome) {
       if (!trovato) _ammGruppi.push({ motivo: e.testo, count: 1 });
     });
     const _ammMaxSame = _ammGruppi.reduce((mx, g) => Math.max(mx, g.count), 0);
-    if (_ammMaxSame >= 2 && allineamenti === 0) {
+    if (_ammMaxSame >= getSoglieDisciplinari().amm && allineamenti === 0) {
       html +=
         '<div class="scheda-suggestion" style="background:rgba(230,126,34,0.12);color:#e67e22"><i class="icx icx-avviso"></i> ' +
         _ammMaxSame +
@@ -2400,12 +2428,12 @@ function apriSchedaCollaboratore(nome) {
       if (!trovato) _allinGruppi.push({ motivo: m.non_conformita || '', count: 1 });
     });
     const _allinMaxSame = _allinGruppi.reduce((mx, g) => Math.max(mx, g.count), 0);
-    if (_allinMaxSame >= 3 && rdiCount === 0) {
+    if (_allinMaxSame >= getSoglieDisciplinari().recidiva && rdiCount === 0) {
       html +=
         '<div class="scheda-suggestion" style="background:rgba(192,57,43,0.12);color:var(--accent)"><i class="icx icx-avviso"></i> ' +
         _allinMaxSame +
         ' allineamenti stesso motivo senza RDI &#8594; Recidiva, preparare RDI</div>';
-    } else if (_allinMods.length >= 3 && rdiCount === 0) {
+    } else if (_allinMods.length >= getSoglieDisciplinari().accumulo && rdiCount === 0) {
       html +=
         '<div class="scheda-suggestion" style="background:rgba(230,126,34,0.12);color:#e67e22"><i class="icx icx-avviso"></i> ' +
         _allinMods.length +

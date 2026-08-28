@@ -98,7 +98,11 @@ function apriMultiSelectOperatori(hiddenInputId, btnId, title) {
         ? ' <span style="font-size:.65rem;color:#1a4a7a;font-weight:700">S</span>'
         : rep === 'tavoli'
           ? ' <span style="font-size:.65rem;color:#8e44ad;font-weight:700">T</span>'
-          : '';
+          : rep === 'valet'
+            ? ' <span style="font-size:.65rem;color:#1a7a6d;font-weight:700">V</span>'
+            : rep === 'cleaning'
+              ? ' <span style="font-size:.65rem;color:#5d6d7e;font-weight:700">C</span>'
+              : '';
     const isMe = n === op ? ' (Tu)' : '';
     html +=
       '<div style="padding:5px 0"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:.92rem"><input type="checkbox" class="msop-cb" value="' +
@@ -1742,8 +1746,7 @@ function aggiornaLoginOperatori() {
 }
 function setReparto(rep) {
   currentReparto = rep;
-  document.getElementById('btn-rep-slots').className = 'reparto-btn' + (rep === 'slots' ? ' active-slots' : '');
-  document.getElementById('btn-rep-tavoli').className = 'reparto-btn' + (rep === 'tavoli' ? ' active-tavoli' : '');
+  _aggiornaBottoniReparto();
   registraPushSubscription();
   // Re-render TUTTE le pagine (dati devono essere sempre freschi per il reparto)
   aggiornaNomi();
@@ -1764,28 +1767,29 @@ function setReparto(rep) {
   renderAmmonimentiAlerts();
   renderScadenzeBanner();
 }
+var REPARTI = ['slots', 'tavoli', 'valet', 'cleaning'];
+function _aggiornaBottoniReparto() {
+  REPARTI.forEach(function (r) {
+    var btn = document.getElementById('btn-rep-' + r);
+    if (btn) btn.className = 'reparto-btn' + (currentReparto === r ? ' active-' + r : '');
+  });
+}
 function applicaRepartoVisibilita() {
   var sw = document.getElementById('reparto-switch');
   if (!sw) return;
   var op = getOperatore();
   var opRep = operatoriRepartoMap[op] || 'entrambi';
   if (isAdmin()) opRep = 'entrambi';
-  var vSlots = opRep === 'slots' || opRep === 'entrambi';
-  var vTavoli = opRep === 'tavoli' || opRep === 'entrambi';
-  if (vSlots && vTavoli) {
+  // 'entrambi' = tutti i reparti; altrimenti l'operatore vede solo il proprio
+  if (opRep === 'entrambi') {
     sw.style.display = 'flex';
     sw.classList.remove('hidden');
   } else {
     sw.style.display = 'none';
     sw.classList.add('hidden');
-    if (vSlots) currentReparto = 'slots';
-    else if (vTavoli) currentReparto = 'tavoli';
-    else currentReparto = 'slots';
+    currentReparto = REPARTI.includes(opRep) ? opRep : 'slots';
   }
-  document.getElementById('btn-rep-slots').className =
-    'reparto-btn' + (currentReparto === 'slots' ? ' active-slots' : '');
-  document.getElementById('btn-rep-tavoli').className =
-    'reparto-btn' + (currentReparto === 'tavoli' ? ' active-tavoli' : '');
+  _aggiornaBottoniReparto();
 }
 function getDatiReparto() {
   return datiCache.filter(function (e) {

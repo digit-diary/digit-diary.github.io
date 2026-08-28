@@ -19,6 +19,14 @@ const COMPETENZE_DEFAULT = {
     { key: 'ispettore', label: 'Ispettore tavolo', livello: 2 },
     { key: 'cassa_tavoli', label: 'Cassa Tavoli', livello: 3 },
   ],
+  valet: [
+    { key: 'valet_servizio', label: 'Servizio Valet', livello: 1 },
+    { key: 'valet_accoglienza', label: 'Accoglienza clienti', livello: 2 },
+  ],
+  cleaning: [
+    { key: 'cleaning_sale', label: 'Pulizia sale', livello: 1 },
+    { key: 'cleaning_speciali', label: 'Interventi speciali', livello: 2 },
+  ],
 };
 const PUNTI_DEFAULT = {
   azioni: [
@@ -59,10 +67,16 @@ function getCompetenzeConfigAll() {
   return {
     slots: Array.isArray(cfg.slots) ? cfg.slots : COMPETENZE_DEFAULT.slots,
     tavoli: Array.isArray(cfg.tavoli) ? cfg.tavoli : COMPETENZE_DEFAULT.tavoli,
+    valet: Array.isArray(cfg.valet) ? cfg.valet : COMPETENZE_DEFAULT.valet,
+    cleaning: Array.isArray(cfg.cleaning) ? cfg.cleaning : COMPETENZE_DEFAULT.cleaning,
   };
 }
 function getCompetenzeReparto() {
-  return getCompetenzeConfigAll()[currentReparto === 'tavoli' ? 'tavoli' : 'slots'] || [];
+  return (
+    getCompetenzeConfigAll()[
+      ['slots', 'tavoli', 'valet', 'cleaning'].includes(currentReparto) ? currentReparto : 'slots'
+    ] || []
+  );
 }
 async function saveCompetenzeConfig(cfg) {
   competenzeConfig = cfg;
@@ -336,7 +350,14 @@ function renderFormazione() {
   html +=
     '<div class="main-card"><div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">Traguardi e premi' +
     (adm || puoPunti
-      ? '<button class="btn-export btn-export-pdf" onclick="esportaReportIncentiviPDF()" style="font-size:.75rem;padding:4px 12px">Report Incentivi PDF</button>'
+      ? '<span style="display:flex;align-items:center;gap:6px"><select id="ri-anno" style="padding:4px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);font-size:.75rem">' +
+        [0, 1, 2, 3]
+          .map((d) => {
+            const a = new Date().getFullYear() - d;
+            return '<option value="' + a + '">' + a + '</option>';
+          })
+          .join('') +
+        '</select><button class="btn-export btn-export-pdf" onclick="esportaReportIncentiviPDF()" style="font-size:.75rem;padding:4px 12px">Report Incentivi PDF</button></span>'
       : '') +
     '</div><div style="padding:16px">';
   html +=
@@ -499,7 +520,7 @@ function _renderEquitaCard(collabs) {
           o.categoria &&
           o.anzGiorni != null &&
           o.categoria < x.categoria &&
-          x.anzGiorni > o.anzGiorni + 180 &&
+          x.anzGiorni > o.anzGiorni + (typeof equitaMesi !== 'undefined' ? equitaMesi : 6) * 30 &&
           (o.lv || 0) <= (x.lv || 0),
       )
       .sort((a, b) => a.anzGiorni - b.anzGiorni)[0];
@@ -515,7 +536,24 @@ function _renderEquitaCard(collabs) {
   });
   const conDati = righe.filter((r) => r.categoria || r.dataAss);
   let html =
-    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:8px">Equità categorie — analisi meritocratica <span class="mini-badge" style="background:var(--accent);font-size:.65rem">RISERVATO</span></div>';
+    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:8px">Equità categorie — analisi meritocratica <span class="mini-badge" style="background:var(--accent);font-size:.65rem">RISERVATO</span>' +
+    (isAdmin()
+      ? '<span style="margin-left:auto;font-size:.72rem;font-weight:400;display:flex;align-items:center;gap:6px">Segnala da <select onchange="salvaEquitaMesi(this.value)" style="padding:4px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);font-size:.75rem">' +
+        [3, 6, 9, 12]
+          .map(
+            (m) =>
+              '<option value="' +
+              m +
+              '"' +
+              ((typeof equitaMesi !== 'undefined' ? equitaMesi : 6) === m ? ' selected' : '') +
+              '>' +
+              m +
+              ' mesi</option>',
+          )
+          .join('') +
+        '</select> di anzianità in più</span>'
+      : '') +
+    '</div>';
   if (!conDati.length) {
     html +=
       '<p style="color:var(--muted);padding:16px;font-size:.86rem">Assegna categorie e date di inizio contratto (scheda collaboratore → Storico HR) per attivare il confronto.</p></div>';
@@ -548,7 +586,9 @@ function _renderEquitaCard(collabs) {
   });
   html += '</tbody></table></div>';
   html +=
-    '<p style="color:var(--muted);font-size:.75rem;padding:0 16px 14px">Analisi indicativa basata su anzianità (inizio contratto), categoria e livello multidisciplinare: la decisione sulle categorie resta al responsabile e a HR.</p></div>';
+    '<p style="color:var(--muted);font-size:.75rem;padding:0 16px 14px">Analisi indicativa basata su anzianità (inizio contratto), categoria e livello multidisciplinare — segnala con almeno ' +
+    (typeof equitaMesi !== 'undefined' ? equitaMesi : 6) +
+    ' mesi di anzianità in più a parità di livello: la decisione sulle categorie resta al responsabile e a HR.</p></div>';
   return html;
 }
 function _filtraMatrice() {
@@ -870,7 +910,7 @@ async function esportaReportIncentiviPDF() {
       return;
     }
   }
-  const anno = new Date().getFullYear();
+  const anno = parseInt((document.getElementById('ri-anno') || {}).value) || new Date().getFullYear();
   const azLabels = {};
   getPuntiConfig().azioni.forEach((a) => (azLabels[a.key] = a.label));
   azLabels.premio = 'Premio consegnato';
@@ -1003,7 +1043,7 @@ function _renderFormazioneConfig() {
   const cfgP = getPuntiConfig();
   let html = '<div class="settings-section"><h4>Configurazione (admin)</h4>';
   // competenze per reparto
-  ['slots', 'tavoli'].forEach((rep) => {
+  ['slots', 'tavoli', 'valet', 'cleaning'].forEach((rep) => {
     html +=
       '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:12px 0 6px">Competenze ' +
       rep +
@@ -1028,7 +1068,13 @@ function _renderFormazioneConfig() {
       '<div class="add-tipo-row" style="margin:6px 0 4px"><div class="field"><label>Nuova competenza</label><input type="text" id="cfg-comp-nome-' +
       rep +
       '" placeholder="Es: ' +
-      (rep === 'tavoli' ? 'Chef de table' : 'Tecnica slot') +
+      (rep === 'tavoli'
+        ? 'Chef de table'
+        : rep === 'valet'
+          ? 'Navetta clienti'
+          : rep === 'cleaning'
+            ? 'Sanificazione'
+            : 'Tecnica slot') +
       '..."></div><div class="field"><label>Livello</label><select id="cfg-comp-lv-' +
       rep +
       '" style="padding:10px;width:90px"><option value="1">L1</option><option value="2">L2</option><option value="3">L3</option><option value="0">Extra</option></select></div><button class="btn-add-tipo" onclick="aggiungiCompetenzaCfg(\'' +
@@ -1458,4 +1504,14 @@ async function _chiudiPopupCopertura(conferma) {
   // Aggiorna i badge copertura nelle righe del diario
   if (typeof render === 'function' && localStorage.getItem('pagina_corrente') === 'diario') render();
   if (resolve) resolve(!!conferma);
+}
+
+// Soglia (mesi di anzianità in più) per la segnalazione di equità categorie
+async function salvaEquitaMesi(val) {
+  const m = parseInt(val) || 6;
+  equitaMesi = m;
+  await setImp('equita_mesi', String(m));
+  logAzione('Soglia equità categorie', m + ' mesi');
+  renderFormazione();
+  toast('Soglia equità: ' + m + ' mesi di anzianità');
 }

@@ -79,7 +79,28 @@ function switchPage(name) {
         if (iA) iA.value = sa.allineamento;
         if (iR) iR.value = sa.rdi;
       }
+      if (isAdmin() && typeof getSoglieDisciplinari === 'function') {
+        const sd = getSoglieDisciplinari();
+        const iAm = document.getElementById('soglia-amm-input');
+        const iRe = document.getElementById('soglia-recidiva-input');
+        const iAc = document.getElementById('soglia-accumulo-input');
+        if (iAm) iAm.value = sd.amm;
+        if (iRe) iRe.value = sd.recidiva;
+        if (iAc) iAc.value = sd.accumulo;
+      }
     }
+    const bvSec = document.getElementById('buoni-valori-section');
+    if (bvSec) {
+      bvSec.style.display = isAdmin() ? '' : 'none';
+      if (isAdmin() && typeof BUONO_VALORI !== 'undefined') {
+        ['bu', 'bl', 'cg', 'wl'].forEach((k) => {
+          const el = document.getElementById('buono-' + k + '-input');
+          if (el) el.value = BUONO_VALORI[k.toUpperCase()];
+        });
+      }
+    }
+    const bkSec = document.getElementById('backup-section');
+    if (bkSec) bkSec.style.display = isAdmin() ? '' : 'none';
     const cestSec = document.getElementById('cestino-section');
     if (cestSec) cestSec.style.display = isAdmin() ? '' : 'none';
     const visSec = document.getElementById('visibilita-section');

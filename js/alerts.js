@@ -28,6 +28,35 @@ async function salvaSoglieAlert() {
   renderCassaAlerts();
   toast('Soglie alert salvate');
 }
+// Soglie del percorso disciplinare — personalizzabili da admin (default: 2 amm → allineamento,
+// 3 allineamenti stesso motivo → RDI, 3 allineamenti totali → valutare RDI)
+function getSoglieDisciplinari() {
+  const s =
+    typeof soglieDisciplinariCfg !== 'undefined' && soglieDisciplinariCfg && typeof soglieDisciplinariCfg === 'object'
+      ? soglieDisciplinariCfg
+      : {};
+  return {
+    amm: parseInt(s.amm) > 0 ? parseInt(s.amm) : 2,
+    recidiva: parseInt(s.recidiva) > 0 ? parseInt(s.recidiva) : 3,
+    accumulo: parseInt(s.accumulo) > 0 ? parseInt(s.accumulo) : 3,
+  };
+}
+async function salvaSoglieDisciplinari() {
+  const a = parseInt((document.getElementById('soglia-amm-input') || {}).value);
+  const r = parseInt((document.getElementById('soglia-recidiva-input') || {}).value);
+  const c = parseInt((document.getElementById('soglia-accumulo-input') || {}).value);
+  if (!(a > 0) || !(r > 0) || !(c > 0)) {
+    toast('Inserisci valori validi (maggiori di 0)');
+    return;
+  }
+  soglieDisciplinariCfg = { amm: a, recidiva: r, accumulo: c };
+  await setImp('soglie_disciplinari', JSON.stringify(soglieDisciplinariCfg));
+  logAzione('Soglie disciplinari modificate', a + '+ amm, ' + r + '+ allin. recidiva, ' + c + '+ allin. totali');
+  renderCassaAlerts();
+  renderRischioAlerts();
+  renderAmmonimentiAlerts();
+  toast('Soglie percorso disciplinare salvate');
+}
 function checkCassaAlerts() {
   const alerts = [];
   const SA = getSoglieAlert();
@@ -306,7 +335,7 @@ function checkRischioAlerts() {
     const allins = getModuliReparto()
       .filter((m) => m.tipo === 'allineamento' && m.collaboratore.toLowerCase() === nomeLc)
       .sort((a, b) => (a.created_at || a.data_modulo || '').localeCompare(b.created_at || b.data_modulo || ''));
-    if (allins.length < 2) return;
+    if (allins.length < Math.min(2, getSoglieDisciplinari().recidiva)) return;
     const nome = allins[0].collaboratore;
     const lastAllin = allins[allins.length - 1];
     const lastDate = lastAllin.created_at || lastAllin.data_modulo || '';
@@ -331,7 +360,7 @@ function checkRischioAlerts() {
       }
       if (!trovato) gruppi.push({ motivo: nc, items: [a] });
     });
-    const recidiva = gruppi.find((g) => g.items.length >= 3);
+    const recidiva = gruppi.find((g) => g.items.length >= getSoglieDisciplinari().recidiva);
     if (recidiva) {
       const motBrv = _estraiKeywords(recidiva.motivo).slice(0, 4).join(', ');
       alerts.push({
@@ -343,8 +372,8 @@ function checkRischioAlerts() {
       });
       return;
     }
-    // 2) Accumulo: 3+ allineamenti totali (motivi diversi) → segnalazione rischio
-    if (allins.length >= 3) {
+    // 2) Accumulo: N+ allineamenti totali (motivi diversi) → segnalazione rischio
+    if (allins.length >= getSoglieDisciplinari().accumulo) {
       alerts.push({
         nome,
         count: allins.length,
@@ -370,7 +399,9 @@ function renderRischioAlerts() {
     html +=
       '<div class="rischio-alert-banner" style="background:#8e44ad" onclick="toggleRischioDD()"><i class="icx icx-avviso"></i> ' +
       recidive.length +
-      ' collaboratore/i con 3+ allineamenti stesso motivo — Preparare RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
+      ' collaboratore/i con ' +
+      getSoglieDisciplinari().recidiva +
+      '+ allineamenti stesso motivo — Preparare RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
     html += '<div class="rischio-alerts-dropdown hidden" id="rischio-dd">';
     recidive.forEach((a) => {
       const dt = a.lastDate ? new Date(a.lastDate + 'T12:00:00').toLocaleDateString('it-IT') : '';
@@ -393,7 +424,9 @@ function renderRischioAlerts() {
     html +=
       '<div class="rischio-alert-banner" style="background:#e67e22;margin-top:6px" onclick="toggleAccDD()"><i class="icx icx-avviso"></i> ' +
       accumuli.length +
-      ' collaboratore/i con 3+ allineamenti totali — Valutare RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
+      ' collaboratore/i con ' +
+      getSoglieDisciplinari().accumulo +
+      '+ allineamenti totali — Valutare RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
     html += '<div class="rischio-alerts-dropdown hidden" id="acc-dd">';
     accumuli.forEach((a) => {
       const dt = a.lastDate ? new Date(a.lastDate + 'T12:00:00').toLocaleDateString('it-IT') : '';
@@ -449,7 +482,7 @@ function checkAmmonimentiAlerts() {
       byNome[k].entries.push(e);
     });
   Object.values(byNome).forEach((a) => {
-    if (a.entries.length < 2) return;
+    if (a.entries.length < getSoglieDisciplinari().amm) return;
     // Raggruppa per motivo simile
     const gruppi = [];
     a.entries.forEach((e) => {
@@ -465,7 +498,7 @@ function checkAmmonimentiAlerts() {
     });
     // Alert solo per gruppi con 2+ ammonimenti stesso motivo
     gruppi
-      .filter((g) => g.items.length >= 2)
+      .filter((g) => g.items.length >= getSoglieDisciplinari().amm)
       .forEach((g) => {
         const last = g.items.sort((a, b) => (b.data || '').localeCompare(a.data || ''))[0];
         // Controlla se c'è già un allineamento dopo l'ultimo ammonimento di questo gruppo
@@ -494,7 +527,9 @@ function renderAmmonimentiAlerts() {
   html +=
     '<div class="cassa-alert-banner" style="background:#e67e22;margin-bottom:8px;cursor:pointer" onclick="toggleAmmDD()"><i class="icx icx-avviso"></i> ' +
     ammAlerts.length +
-    ' collaboratore/i con 2+ ammonimenti stesso motivo — Preparare allineamento <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
+    ' collaboratore/i con ' +
+    getSoglieDisciplinari().amm +
+    '+ ammonimenti stesso motivo — Preparare allineamento <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
   html += '<div class="cassa-alerts-dropdown hidden" id="amm-dd">';
   ammAlerts.forEach((a) => {
     const dt = a.last ? new Date(a.last).toLocaleDateString('it-IT') : '';

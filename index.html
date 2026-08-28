@@ -144,6 +144,8 @@
           <option value="">-- Seleziona settore --</option>
           <option value="slots">Slots</option>
           <option value="tavoli">Tavoli</option>
+          <option value="valet">Valet</option>
+          <option value="cleaning">Cleaning</option>
         </select>
         <select
           id="login-nome"
@@ -323,6 +325,8 @@
     <div class="reparto-switch" id="reparto-switch" style="display: none">
       <button class="reparto-btn active-slots" id="btn-rep-slots" onclick="setReparto('slots')">Slots</button>
       <button class="reparto-btn" id="btn-rep-tavoli" onclick="setReparto('tavoli')">Tavoli</button>
+      <button class="reparto-btn" id="btn-rep-valet" onclick="setReparto('valet')">Valet</button>
+      <button class="reparto-btn" id="btn-rep-cleaning" onclick="setReparto('cleaning')">Cleaning</button>
     </div>
     <button class="hamburger-btn" onclick="toggleMobileNav()" id="hamburger-btn">
       <i class="icx icx-menu"></i> Menu
@@ -2759,9 +2763,11 @@
           <div class="field">
             <label>Reparto</label
             ><select id="new-operatore-rep" style="padding: 10px">
-              <option value="entrambi">Entrambi</option>
+              <option value="entrambi">Tutti i reparti</option>
               <option value="slots">Slots</option>
               <option value="tavoli">Tavoli</option>
+              <option value="valet">Valet</option>
+              <option value="cleaning">Cleaning</option>
             </select>
           </div>
           <button class="btn-add-tipo" onclick="aggiungiOperatoreConPwd()">+ Crea operatore</button>
@@ -2837,6 +2843,70 @@
           <button class="btn-add-tipo" onclick="salvaSoglieAlert()">Salva soglie</button>
         </div>
         <p id="soglie-alert-status" style="font-size: 0.8rem; color: var(--muted); margin-top: 8px"></p>
+        <p
+          style="
+            color: var(--muted);
+            font-size: 0.84rem;
+            margin: 16px 0 12px;
+            border-top: 1px solid var(--line);
+            padding-top: 14px;
+          "
+        >
+          <strong>Percorso disciplinare</strong> — quanti episodi fanno scattare i suggerimenti.
+        </p>
+        <div class="add-tipo-row" style="align-items: flex-end">
+          <div class="field">
+            <label>Ammonimenti stesso motivo → Allineamento</label
+            ><input type="number" id="soglia-amm-input" min="1" step="1" style="width: 120px" />
+          </div>
+          <div class="field">
+            <label>Allineamenti stesso motivo → RDI</label
+            ><input type="number" id="soglia-recidiva-input" min="1" step="1" style="width: 120px" />
+          </div>
+          <div class="field">
+            <label>Allineamenti totali → Valutare RDI</label
+            ><input type="number" id="soglia-accumulo-input" min="1" step="1" style="width: 120px" />
+          </div>
+          <button class="btn-add-tipo" onclick="salvaSoglieDisciplinari()">Salva</button>
+        </div>
+      </div>
+      <div class="settings-section" id="buoni-valori-section" style="display: none">
+        <h4>Maison — Valori buoni (CHF)</h4>
+        <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
+          Valore in CHF di ogni tipo di buono: usato per l'auto-calcolo del numero di buoni dal costo e per la divisione
+          dei costi nei gruppi.
+        </p>
+        <div class="add-tipo-row" style="align-items: flex-end">
+          <div class="field">
+            <label>BU</label><input type="number" id="buono-bu-input" min="1" step="1" style="width: 100px" />
+          </div>
+          <div class="field">
+            <label>BL</label><input type="number" id="buono-bl-input" min="1" step="1" style="width: 100px" />
+          </div>
+          <div class="field">
+            <label>CG</label><input type="number" id="buono-cg-input" min="1" step="1" style="width: 100px" />
+          </div>
+          <div class="field">
+            <label>WL</label><input type="number" id="buono-wl-input" min="1" step="1" style="width: 100px" />
+          </div>
+          <button class="btn-add-tipo" onclick="salvaBuonoValori()">Salva valori</button>
+        </div>
+      </div>
+      <div class="settings-section" id="backup-section" style="display: none">
+        <h4>Backup dati</h4>
+        <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
+          Scarica una copia completa di tutti i dati (registrazioni, moduli, collaboratori, maison, valutazioni, punti,
+          storico HR, impostazioni) in un file JSON. Conservala in un posto sicuro: serve per ripristini e per la
+          migrazione IT.
+        </p>
+        <button
+          class="btn-salva"
+          onclick="esportaBackupCompleto()"
+          style="background: var(--ink); font-size: 0.82rem; padding: 8px 20px"
+        >
+          Esporta backup completo
+        </button>
+        <p id="backup-status" style="font-size: 0.8rem; color: var(--muted); margin-top: 8px"></p>
       </div>
       <div class="settings-section" id="db-stats-section" style="display: none">
         <h4>Stato Database</h4>
