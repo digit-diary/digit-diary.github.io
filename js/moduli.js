@@ -961,7 +961,7 @@ async function renderCollaboratoriUI() {
     return (
       '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border:1px solid var(--line);flex-wrap:wrap"><span style="flex:1;font-weight:400;min-width:140px">' +
       escP(c.nome) +
-      (cat
+      (cat && (puoCat || (typeof puoVedereCategorie === 'function' && puoVedereCategorie()))
         ? ' <span class="mini-badge" style="background:var(--accent2);font-size:.68rem">' + cat + '&ordf;</span>'
         : '') +
       '</span><select ' +
@@ -976,19 +976,22 @@ async function renderCollaboratoriUI() {
       (imp === 'fisso' ? ' selected' : '') +
       '>Fisso 100%</option><option value="jolly"' +
       (imp === 'jolly' ? ' selected' : '') +
-      '>Jolly</option></select><select ' +
-      (puoCat ? '' : 'disabled ') +
-      'onchange="cambiaCategoriaCollaboratore(' +
-      c.id +
-      ',this.value)" title="Categoria (5&ordf; = ingresso, 1&ordf; = massima)" style="' +
-      selStyle +
-      '"><option value=""' +
-      (cat === '' ? ' selected' : '') +
-      '>Cat...</option>' +
-      [5, 4, 3, 2, 1]
-        .map((n) => '<option value="' + n + '"' + (cat === n ? ' selected' : '') + '>' + n + '&ordf;</option>')
-        .join('') +
-      '</select>' +
+      '>Jolly</option></select>' +
+      (puoCat || (typeof puoVedereCategorie === 'function' && puoVedereCategorie())
+        ? '<select ' +
+          (puoCat ? '' : 'disabled ') +
+          'onchange="cambiaCategoriaCollaboratore(' +
+          c.id +
+          ',this.value)" title="Categoria (5&ordf; = ingresso, 1&ordf; = massima)" style="' +
+          selStyle +
+          '"><option value=""' +
+          (cat === '' ? ' selected' : '') +
+          '>Cat...</option>' +
+          [5, 4, 3, 2, 1]
+            .map((n) => '<option value="' + n + '"' + (cat === n ? ' selected' : '') + '>' + n + '&ordf;</option>')
+            .join('') +
+          '</select>'
+        : '') +
       (adminFull
         ? '<select onchange="cambiaRepartoCollaboratore(' +
           c.id +
@@ -1006,8 +1009,15 @@ async function renderCollaboratoriUI() {
     );
   };
   // Sezioni: Fissi 100% / Jolly / senza inquadramento (dentro ogni gruppo: categoria 1ª → 5ª, poi nome)
+  const vedeCat = puoCat || (typeof puoVedereCategorie === 'function' && puoVedereCategorie());
   const ordina = (arr) =>
-    arr.slice().sort((a, b) => (a.categoria || 9) - (b.categoria || 9) || a.nome.localeCompare(b.nome));
+    arr
+      .slice()
+      .sort((a, b) =>
+        vedeCat
+          ? (a.categoria || 9) - (b.categoria || 9) || a.nome.localeCompare(b.nome)
+          : a.nome.localeCompare(b.nome),
+      );
   const fissi = ordina(attivi.filter((c) => c.impiego === 'fisso'));
   const jolly = ordina(attivi.filter((c) => c.impiego === 'jolly'));
   const senza = ordina(attivi.filter((c) => !c.impiego));
