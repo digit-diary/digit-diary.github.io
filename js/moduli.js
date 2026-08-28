@@ -936,11 +936,13 @@ async function renderCollaboratoriUI() {
   // Admin: gestione completa. Operatore con permesso 'gestione_categorie' (es. HR):
   // vede la lista e può assegnare solo impiego e categoria.
   const adminFull = isAdmin();
+  const puoImp = adminFull || (typeof puoModificare === 'function' && puoModificare('gestione_impiego'));
   const puoCat = adminFull || (typeof puoModificare === 'function' && puoModificare('gestione_categorie'));
-  section.style.display = puoCat ? '' : 'none';
+  const accesso = adminFull || puoImp || puoCat;
+  section.style.display = accesso ? '' : 'none';
   const addRow = section.querySelector('.add-tipo-row');
   if (addRow) addRow.style.display = adminFull ? '' : 'none';
-  if (!puoCat) return;
+  if (!accesso) return;
   const tutti = await secGet('collaboratori?order=nome.asc');
   // Mostra solo i collaboratori del reparto corrente (o 'entrambi')
   const delReparto = tutti.filter((c) => {
@@ -962,7 +964,9 @@ async function renderCollaboratoriUI() {
       (cat
         ? ' <span class="mini-badge" style="background:var(--accent2);font-size:.68rem">' + cat + '&ordf;</span>'
         : '') +
-      '</span><select onchange="cambiaImpiegoCollaboratore(' +
+      '</span><select ' +
+      (puoImp ? '' : 'disabled ') +
+      'onchange="cambiaImpiegoCollaboratore(' +
       c.id +
       ',this.value)" title="Tipo di impiego" style="' +
       selStyle +
@@ -972,7 +976,9 @@ async function renderCollaboratoriUI() {
       (imp === 'fisso' ? ' selected' : '') +
       '>Fisso 100%</option><option value="jolly"' +
       (imp === 'jolly' ? ' selected' : '') +
-      '>Jolly</option></select><select onchange="cambiaCategoriaCollaboratore(' +
+      '>Jolly</option></select><select ' +
+      (puoCat ? '' : 'disabled ') +
+      'onchange="cambiaCategoriaCollaboratore(' +
       c.id +
       ',this.value)" title="Categoria (5&ordf; = ingresso, 1&ordf; = massima)" style="' +
       selStyle +
@@ -1147,7 +1153,7 @@ async function cambiaRepartoCollaboratore(id, rep) {
   }
 }
 async function cambiaImpiegoCollaboratore(id, imp) {
-  if (typeof puoModificare === 'function' && !puoModificare('gestione_categorie')) {
+  if (typeof puoModificare === 'function' && !puoModificare('gestione_impiego')) {
     toast("Non hai il permesso di modificare l'impiego");
     renderCollaboratoriUI();
     return;
