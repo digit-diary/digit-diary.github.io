@@ -941,3 +941,67 @@ async function salvaPaginaSettore(repKey, pageKey, abilitata) {
       repartoLabel(repKey),
   );
 }
+
+// ================================================================
+// PREMIO GIUBILEO (admin): scaglioni anni di servizio → importo CHF
+// ================================================================
+function renderGiubileoUI() {
+  const el = document.getElementById('giubileo-list');
+  if (!el || !isAdmin()) return;
+  const cfg = getGiubileoConfig();
+  el.innerHTML = cfg.length
+    ? cfg
+        .map(
+          (g, i) =>
+            '<div class="tipo-item"><div class="tipo-item-name">' +
+            g.anni +
+            ' anni di servizio</div><input type="number" value="' +
+            g.importo +
+            '" min="0" step="50" onchange="modificaGiubileo(' +
+            i +
+            ',this.value)" style="width:110px;padding:5px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);text-align:center"> <span style="font-size:.8rem;color:var(--muted)">CHF</span><button class="btn-del-tipo" style="margin-left:6px" onclick="rimuoviGiubileo(' +
+            i +
+            ')">Rimuovi</button></div>',
+        )
+        .join('')
+    : '<p style="color:var(--muted);font-size:.84rem">Nessuno scaglione configurato.</p>';
+}
+async function _salvaGiubileoConfig(cfg) {
+  giubileoConfig = cfg;
+  await setImp('giubileo_config', JSON.stringify(cfg));
+  renderGiubileoUI();
+}
+async function aggiungiGiubileo() {
+  const anni = parseInt((document.getElementById('giubileo-anni-input') || {}).value);
+  const importo = parseFloat((document.getElementById('giubileo-importo-input') || {}).value);
+  if (!(anni > 0) || !(importo >= 0)) {
+    toast('Inserisci anni e importo validi');
+    return;
+  }
+  const cfg = getGiubileoConfig();
+  if (cfg.some((g) => g.anni === anni)) {
+    toast('Scaglione già esistente');
+    return;
+  }
+  cfg.push({ anni, importo });
+  await _salvaGiubileoConfig(cfg.sort((a, b) => a.anni - b.anni));
+  logAzione('Giubileo: scaglione aggiunto', anni + ' anni = ' + fmtCHF(importo) + ' CHF');
+  toast('Scaglione ' + anni + ' anni aggiunto');
+}
+async function modificaGiubileo(idx, val) {
+  const cfg = getGiubileoConfig();
+  const n = parseFloat(val);
+  if (!cfg[idx] || !(n >= 0)) return;
+  cfg[idx].importo = n;
+  await _salvaGiubileoConfig(cfg);
+  logAzione('Giubileo: importo modificato', cfg[idx].anni + ' anni = ' + fmtCHF(n) + ' CHF');
+  toast('Importo aggiornato');
+}
+async function rimuoviGiubileo(idx) {
+  const cfg = getGiubileoConfig();
+  if (!cfg[idx]) return;
+  if (!confirm('Rimuovere lo scaglione ' + cfg[idx].anni + ' anni?')) return;
+  const rimosso = cfg.splice(idx, 1)[0];
+  await _salvaGiubileoConfig(cfg);
+  logAzione('Giubileo: scaglione rimosso', rimosso.anni + ' anni');
+}

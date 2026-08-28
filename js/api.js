@@ -32,6 +32,7 @@ async function loadAll() {
     eqMesi,
     repCfg,
     repPag,
+    giubCfg,
   ] = await Promise.all([
     getImp('tipi_personalizzati'),
     getImp('colori_override'),
@@ -54,6 +55,7 @@ async function loadAll() {
     getImp('equita_mesi'),
     getImp('reparti_config'),
     getImp('reparti_pagine'),
+    getImp('giubileo_config'),
   ]);
   if (tp)
     try {
@@ -134,6 +136,11 @@ async function loadAll() {
   if (repPag)
     try {
       repartiPagineCfg = JSON.parse(repPag);
+    } catch (e) {}
+  if (giubCfg)
+    try {
+      const gc = JSON.parse(giubCfg);
+      if (Array.isArray(gc)) giubileoConfig = gc;
     } catch (e) {}
   if (typeof _salvaCacheReparti === 'function') _salvaCacheReparti();
   if (typeof popolaLoginSettore === 'function') popolaLoginSettore();

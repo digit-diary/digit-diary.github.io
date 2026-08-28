@@ -99,6 +99,11 @@ function switchPage(name) {
         });
       }
     }
+    const gbSec = document.getElementById('giubileo-section');
+    if (gbSec) {
+      gbSec.style.display = isAdmin() ? '' : 'none';
+      if (isAdmin() && typeof renderGiubileoUI === 'function') renderGiubileoUI();
+    }
     const bkSec = document.getElementById('backup-section');
     if (bkSec) bkSec.style.display = isAdmin() ? '' : 'none';
     const cestSec = document.getElementById('cestino-section');
