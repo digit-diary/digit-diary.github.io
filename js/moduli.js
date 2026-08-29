@@ -938,6 +938,7 @@ async function renderCollaboratoriUI() {
   const adminFull = isAdmin();
   const puoImp = adminFull || (typeof puoModificare === 'function' && puoModificare('gestione_impiego'));
   const puoCat = adminFull || (typeof puoModificare === 'function' && puoModificare('gestione_categorie'));
+  const puoHr = adminFull || (typeof puoModificare === 'function' && puoModificare('storico_hr'));
   const accesso = adminFull || puoImp || puoCat;
   section.style.display = accesso ? '' : 'none';
   const addRow = section.querySelector('.add-tipo-row');
@@ -989,6 +990,31 @@ async function renderCollaboratoriUI() {
           '>Cat...</option>' +
           [5, 4, 3, 2, 1]
             .map((n) => '<option value="' + n + '"' + (cat === n ? ' selected' : '') + '>' + n + '&ordf;</option>')
+            .join('') +
+          '</select>'
+        : '') +
+      (puoHr
+        ? '<select onchange="cambiaFunzioneCollaboratore(' +
+          c.id +
+          ',this.value)" title="Funzione (per il Piano di lavoro: regole SUP/BO)" style="' +
+          selStyle +
+          '"><option value=""' +
+          (!c.funzione ? ' selected' : '') +
+          '>Funzione...</option>' +
+          (window._pianoFunzioni || ['RESP', 'SUP', 'BO', 'HOST'])
+            .map((f) => '<option value="' + f + '"' + (c.funzione === f ? ' selected' : '') + '>' + f + '</option>')
+            .join('') +
+          '</select><select onchange="cambiaPercentualeCollaboratore(' +
+          c.id +
+          ',this.value)" title="Percentuale d\'impiego (per saldo ore e codici CCL)" style="' +
+          selStyle +
+          '">' +
+          [100, 90, 80, 70, 60, 50, 40, 30, 20]
+            .map((p) => {
+              const v = p / 100;
+              const cur = Math.round((parseFloat(c.percentuale) || 1) * 100);
+              return '<option value="' + v + '"' + (cur === p ? ' selected' : '') + '>' + p + '%</option>';
+            })
             .join('') +
           '</select>'
         : '') +
@@ -2371,4 +2397,39 @@ function updateStats() {
     '</div><div class="stat-label">' +
     nomeCorrente('Malattia') +
     '</div></div>';
+}
+
+// Funzione e percentuale d'impiego (per il Piano di lavoro e il saldo ore)
+async function cambiaFunzioneCollaboratore(id, funzione) {
+  if (!isAdmin() && !(typeof puoModificare === 'function' && puoModificare('storico_hr'))) {
+    toast('Non hai il permesso');
+    return;
+  }
+  try {
+    await secPatch('collaboratori', 'id=eq.' + id, { funzione: funzione || null });
+    const c = collaboratoriCache.find((x) => x.id === id);
+    if (c) c.funzione = funzione || null;
+    logAzione('Funzione collaboratore', (c ? c.nome : id) + ' -> ' + (funzione || 'nessuna'));
+    toast('Funzione aggiornata');
+  } catch (e) {
+    toast('Errore salvataggio funzione');
+  }
+}
+async function cambiaPercentualeCollaboratore(id, perc) {
+  if (!isAdmin() && !(typeof puoModificare === 'function' && puoModificare('storico_hr'))) {
+    toast('Non hai il permesso');
+    return;
+  }
+  try {
+    const p = parseFloat(perc) || 1;
+    await secPatch('collaboratori', 'id=eq.' + id, { percentuale: p });
+    const c = collaboratoriCache.find((x) => x.id === id);
+    if (c) c.percentuale = p;
+    if (typeof _insertHrEvento === 'function' && c)
+      _insertHrEvento(c.nome, 'nota', 'Percentuale impiego: ' + Math.round(p * 100) + '%');
+    logAzione('Percentuale collaboratore', (c ? c.nome : id) + ' -> ' + Math.round(p * 100) + '%');
+    toast('Percentuale aggiornata');
+  } catch (e) {
+    toast('Errore salvataggio percentuale');
+  }
 }
