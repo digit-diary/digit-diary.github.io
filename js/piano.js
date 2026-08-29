@@ -998,6 +998,24 @@ async function generaBozzaPiano() {
               return false;
             // mappature per funzione (SUP/BO limitati ai loro turni; regole settimana SUP)
             const fz = infoC && infoC.funzione;
+            // regola HARD l1_solo_bo_sup: L1 e 9 riservati a BO e SUP
+            if (
+              (f.turno_codice === 'L1' || f.turno_codice === '9') &&
+              String(_pianoRegolaVal('l1_solo_bo_sup')).toUpperCase() === 'TRUE' &&
+              fz !== 'SUP' &&
+              fz !== 'BO'
+            )
+              return false;
+            // regola HARD no_4w1c1w: niente rientro dopo UN solo giorno di riposo
+            // se prima c'erano 4+ giorni di lavoro consecutivi
+            if (String(_pianoRegolaVal('no_4w1c1w')).toUpperCase() === 'TRUE') {
+              const cp0 = consecPrima(n, g);
+              if (cp0 === 0 && !_pianoIsLavoro(cella[n + '|' + (g - 1)] || '')) {
+                let streakPrec = 0;
+                for (let k = g - 2; k >= 1 && _pianoIsLavoro(cella[n + '|' + k] || ''); k--) streakPrec++;
+                if (streakPrec >= 4) return false;
+              }
+            }
             const mapp = _pianoMappFunzione(fz);
             if (mapp) {
               const voci = mapp
