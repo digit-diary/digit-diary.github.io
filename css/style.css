@@ -3524,8 +3524,12 @@ button:focus-visible,
 }
 
 /* ===== PIANO DI LAVORO (griglia mensile turni) ===== */
+/* Come Turnivo: la griglia scorre DENTRO il contenitore (max 80vh), così la
+   barra delle date (thead sticky top) e la colonna nomi (sticky left) restano
+   ferme durante lo scorrimento verticale e orizzontale */
 .piano-wrap {
-  overflow-x: auto;
+  max-height: 80vh;
+  overflow: auto;
   padding: 0 6px 8px;
 }
 .piano-table {
@@ -3633,22 +3637,19 @@ button:focus-visible,
   outline: 2px solid #c0392b !important;
   outline-offset: -2px;
 }
+/* Selezione riga/colonna IDENTICA a Turnivo: velo azzurro semi-trasparente
+   in overlay (i colori dei turni restano visibili), header colonna blu piena */
+.piano-table .col-selected {
+  box-shadow: inset 0 0 0 100px rgba(13, 110, 253, 0.22) !important;
+}
 .piano-table tr.row-selected td {
-  box-shadow:
-    inset 0 2.5px 0 0 #1a4a7a,
-    inset 0 -2.5px 0 0 #1a4a7a;
+  box-shadow: inset 0 0 0 100px rgba(13, 110, 253, 0.22) !important;
 }
 .piano-table tr.row-selected .piano-nome {
-  background: #1a4a7a !important;
-  color: #fff !important;
+  box-shadow: inset 0 0 0 100px rgba(13, 110, 253, 0.35) !important;
 }
-.piano-table .col-selected {
-  box-shadow:
-    inset 2.5px 0 0 0 #1a4a7a,
-    inset -2.5px 0 0 0 #1a4a7a;
-}
-.piano-table thead th.col-selected {
-  background: #1a4a7a !important;
+.piano-table thead th.col-selected-header {
+  background-color: #2563eb !important;
   color: #fff !important;
 }
 /* Righe colorate per funzione (come Turnivo): SUP verdino, BO arancio chiaro */
