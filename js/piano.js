@@ -1793,9 +1793,41 @@ async function salvaPianoCodice(id, campo, valore) {
 // ---- Card FESTIVI (admin) ----
 function _renderPianoFestiviCard() {
   if (!isAdmin()) return '';
+  // selettore anno: si vedono (e generano) anche i festivi degli anni futuri
+  const anniPresenti = [...new Set(pianoFestiviCache.map((f) => parseInt(f.data.split('-')[0])))];
+  const annoCorrente = parseInt(_pianoMeseSel.split('-')[0]);
+  const anni = [...new Set(anniPresenti.concat([annoCorrente]))].sort();
+  const annoSel =
+    window._pianoFestiviAnnoSel && anni.concat([window._pianoFestiviAnnoSel])
+      ? window._pianoFestiviAnnoSel
+      : annoCorrente;
+  window._pianoFestiviAnnoSel = annoSel;
+  const visibili = pianoFestiviCache.filter((f) => parseInt(f.data.split('-')[0]) === annoSel);
   let h =
-    '<div class="main-card" style="margin-top:16px"><div class="card-header">Festivi (admin)</div><div style="padding:10px 14px">';
-  pianoFestiviCache
+    '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px">Festivi ' +
+    annoSel +
+    ' (' +
+    visibili.length +
+    ')';
+  h +=
+    '<select onchange="window._pianoFestiviAnnoSel=parseInt(this.value);renderPiano()" style="padding:4px 8px;font-size:.8rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a">';
+  for (let a = 2024; a <= 2032; a++)
+    h +=
+      '<option value="' +
+      a +
+      '"' +
+      (a === annoSel ? ' selected' : '') +
+      '>' +
+      a +
+      (anniPresenti.includes(a) ? '' : ' (vuoto)') +
+      '</option>';
+  h += '</select></div><div style="padding:10px 14px">';
+  if (!visibili.length)
+    h +=
+      '<p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Nessun festivo per il ' +
+      annoSel +
+      ': generali con il pulsante qui sotto.</p>';
+  visibili
     .slice()
     .sort((x, y) => x.data.localeCompare(y.data))
     .forEach((f) => {
@@ -1816,7 +1848,7 @@ function _renderPianoFestiviCard() {
     '<button class="btn-add-tipo" onclick="aggiungiPianoFestivo()">+ Aggiungi</button></div>';
   h +=
     '<div class="add-tipo-row" style="margin-top:6px;border-top:1px solid var(--line);padding-top:8px"><div class="field"><label>Genera automaticamente i festivi di un anno</label><input type="number" id="pf-genera-anno" value="' +
-    (new Date().getFullYear() + 1) +
+    annoSel +
     '" min="2024" max="2050" style="width:90px"></div>' +
     '<button class="btn-add-tipo" onclick="generaPianoFestivi()">Genera festivi anno</button>' +
     '<span style="font-size:.8rem;color:var(--muted)">11 festivi italiani (Lunedì dell&#39;Angelo calcolato dalla Pasqua)</span></div>';
