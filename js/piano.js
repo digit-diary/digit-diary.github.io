@@ -417,6 +417,7 @@ async function renderPiano() {
     el.innerHTML = h;
     if (typeof initCardRichiudibili === 'function') initCardRichiudibili('piano-config', []);
     _pianoInitSelezione();
+    _pianoInitSticky();
     _pianoRenderViolazioni();
   } catch (e) {
     console.error('Errore piano:', e);
@@ -1956,6 +1957,38 @@ async function confermaScambioTurno() {
 }
 
 // ---- Selezione riga/colonna stile Excel (come Turnivo) ----
+// Barra delle date sempre visibile durante lo scorrimento della PAGINA:
+// il piano scorre col resto della pagina (nessuno scrollbox interno) e le
+// intestazioni vengono traslate per restare in cima allo schermo. Vale per
+// tutte le tabelle piano-wrap (griglia collaboratori e fabbisogno).
+function _pianoInitSticky() {
+  const wraps = document.querySelectorAll('#piano-content .piano-wrap');
+  window._pianoStickyEls = [...wraps]
+    .map((w) => {
+      const tab = w.querySelector('table');
+      return tab ? { tab: tab, ths: tab.querySelectorAll('thead th') } : null;
+    })
+    .filter(Boolean);
+  if (window._pianoStickyBound) return;
+  window._pianoStickyBound = true;
+  const applica = () => {
+    (window._pianoStickyEls || []).forEach((o) => {
+      if (!o.tab || !o.tab.isConnected) return;
+      const r = o.tab.getBoundingClientRect();
+      const hHead = o.ths[0] ? o.ths[0].offsetHeight : 24;
+      let y = 0;
+      if (r.top < 0) y = Math.min(-r.top, r.height - hHead * 2);
+      if (y < 0) y = 0;
+      const t = y ? 'translateY(' + Math.round(y) + 'px)' : '';
+      o.ths.forEach((th) => {
+        if (th.style.transform !== t) th.style.transform = t;
+      });
+    });
+  };
+  window.addEventListener('scroll', applica, { passive: true, capture: true });
+  window.addEventListener('resize', applica, { passive: true });
+}
+
 function _pianoInitSelezione() {
   // IDENTICA a Turnivo (main.js data-selectable): click header giorno =
   // colonna con velo azzurro + header blu; click nome = riga; ri-click =
