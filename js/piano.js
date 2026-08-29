@@ -152,7 +152,7 @@ async function renderPiano() {
       '</span>';
     if (puoMod) {
       h +=
-        '<button class="btn-export" style="font-size:.72rem;padding:4px 12px" onclick="validaPiano()">Valida regole</button>';
+        '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:#d4b86a;color:#d4b86a" onclick="validaPiano()">Valida regole</button>';
       h +=
         '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49" onclick="generaBozzaPiano()">Genera bozza</button>';
       h +=
