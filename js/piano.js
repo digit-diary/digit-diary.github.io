@@ -45,7 +45,7 @@ let pianoMappatureCache = [];
 let _pianoOreSett = 41; // ore settimanali contratto (imp 'piano_ore_settimanali')
 async function _pianoCaricaCfg() {
   if (_pianoCfgCaricata) return;
-  const [turni, codici, festivi, regole, mappature, oreSett, funzioni] = await Promise.all([
+  const [turni, codici, festivi, regole, mappature, oreSett, funzioni, ordineCollab] = await Promise.all([
     secGet('piano_turni?order=ordine.asc&limit=500'),
     secGet('piano_codici?order=codice.asc&limit=200'),
     secGet('piano_festivi?order=data.asc&limit=200'),
@@ -53,7 +53,13 @@ async function _pianoCaricaCfg() {
     secGet('piano_mappature?order=funzione.asc&limit=500'),
     getImp('piano_ore_settimanali'),
     getImp('piano_funzioni'),
+    getImp('piano_ordine_collab'),
   ]);
+  try {
+    window._pianoOrdineCollab = ordineCollab ? JSON.parse(ordineCollab) : {};
+  } catch (e) {
+    window._pianoOrdineCollab = {};
+  }
   pianoTurniCache = turni || [];
   pianoCodiciCache = codici || [];
   pianoFestiviCache = festivi || [];
@@ -150,12 +156,29 @@ async function renderPiano() {
     pianoFestiviCache.forEach((f) => (festiviSet[f.data] = f.descrizione));
 
     // righe: collaboratori attivi del settore + eventuali nomi presenti solo nel piano
+    // ordine predefinito: prima i SUP, poi i BO, poi gli altri (alfabetico);
+    // se l'operatore ha riordinato a mano (drag della riga) vale quell'ordine
+    const rangoFn = (n) => {
+      const f = ((_pianoCollabInfo(n) || {}).funzione || '').toUpperCase();
+      return f === 'SUP' ? 0 : f === 'BO' ? 1 : 2;
+    };
+    const ordinePred = (x, y) => rangoFn(x) - rangoFn(y) || x.localeCompare(y);
     const collabs = collaboratoriCache
       .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
       .map((c) => c.nome)
-      .sort((x, y) => x.localeCompare(y));
-    const extra = [...new Set(_pianoRighe.map((r) => r.collaboratore))].filter((n) => !collabs.includes(n)).sort();
-    const nomi = collabs.concat(extra);
+      .sort(ordinePred);
+    const extra = [...new Set(_pianoRighe.map((r) => r.collaboratore))]
+      .filter((n) => !collabs.includes(n))
+      .sort(ordinePred);
+    let nomi = collabs.concat(extra);
+    const ordineSalvato = (window._pianoOrdineCollab || {})[_pianoReparto()];
+    if (Array.isArray(ordineSalvato) && ordineSalvato.length) {
+      const pos = {};
+      ordineSalvato.forEach((n, i) => (pos[n] = i));
+      nomi = nomi
+        .slice()
+        .sort((x, y) => (pos[x] != null ? pos[x] : 9999) - (pos[y] != null ? pos[y] : 9999) || ordinePred(x, y));
+    }
     const puoMod = puoGestirePiano();
     const GG = ['D', 'L', 'M', 'M', 'G', 'V', 'S'];
     const MESI_L = MESI_FULL || [];
@@ -186,7 +209,8 @@ async function renderPiano() {
       h +=
         '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49" onclick="generaBozzaPiano()">Genera bozza</button>';
       h +=
-        '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:var(--accent);color:var(--accent)" onclick="cancellaBozzaPiano()">Cancella piano</button>';
+        '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:var(--accent);color:var(--accent)" onclick="cancellaBozzaPiano()">Cancella piano</button>' +
+        '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:#d4b86a;color:#d4b86a" title="Trascina i nomi per riordinare; questo pulsante ripristina SUP, BO, poi gli altri" onclick="ripristinaOrdinePiano()">Ordine predefinito</button>';
     }
     h +=
       '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:#b8a98a;color:#b8a98a" onclick="copiaPianoExcel()">Copia per Excel</button>';
@@ -292,7 +316,9 @@ async function renderPiano() {
       h +=
         '<tr' +
         _clsRiga +
-        '><td class="piano-nome"' +
+        ' data-nome="' +
+        escP(nome) +
+        '"><td class="piano-nome"' +
         (infoC && infoC.funzione ? ' title="' + escP(infoC.funzione) + ' ' + Math.round(perc * 100) + '%"' : '') +
         '><i class="icx icx-stampa piano-pdf-ico" title="Stampa il piano di ' +
         escP(nome) +
@@ -399,6 +425,85 @@ async function renderPiano() {
       h += '</tbody></table></div>';
       h +=
         '<p style="font-size:.72rem;color:var(--muted);padding:8px 14px">assegnati/richiesti — <span style="color:#2c6e49;font-weight:700">verde</span> = coperto, <span style="color:#c0392b;font-weight:700">rosso</span> = carenza. Il fabbisogno guida "Genera bozza".</p></div>';
+
+      // DIFFERENZE + EFFETTIVI — schema IDENTICO a Turnivo (calendario.html):
+      // differenze = effettivi - pianificazione (verde >0, rosso <0, vuoto 0),
+      // effettivi = conteggio persone per turno/giorno con colonna Tot
+      const turniOrdinati = turniRep
+        .slice()
+        .sort((x, y) => (gruppoOrd[x.codice] || '').localeCompare(gruppoOrd[y.codice] || ''));
+      const testataGiorni = (conTot) => {
+        let t = '<thead><tr><th class="piano-nome">Turno</th>';
+        for (let g = 1; g <= nGiorni; g++) {
+          const dstr = ym + '-' + String(g).padStart(2, '0');
+          const dow = new Date(dstr + 'T12:00:00').getDay();
+          let cls = '';
+          if (festiviSet[dstr]) cls = 'piano-festivo';
+          else if (dow === 0) cls = 'piano-domenica';
+          else if (dow === 5 || dow === 6) cls = 'piano-weekend';
+          t += '<th class="' + cls + '">' + g + '</th>';
+        }
+        if (conTot) t += '<th>Tot</th>';
+        return t + '</tr></thead>';
+      };
+      const clsCella = (g) => {
+        const dstr = ym + '-' + String(g).padStart(2, '0');
+        const dow = new Date(dstr + 'T12:00:00').getDay();
+        if (dow === 0) return 'piano-cel-dom';
+        if (dow === 5 || dow === 6) return 'piano-cel-we';
+        return '';
+      };
+      const cellaTurno = (t) =>
+        '<td class="piano-nome" title="' +
+        escP((t.gruppo || '') + ' ' + (t.ora_inizio || '').substring(0, 5) + '-' + (t.ora_fine || '').substring(0, 5)) +
+        '">' +
+        escP(t.codice) +
+        '</td>';
+
+      h +=
+        '<div class="main-card" style="margin-top:16px"><div class="card-header">Differenze — ' +
+        escP(label) +
+        ' <span style="font-size:.68rem;color:#b8a98a;font-weight:400">(effettivi − pianificazione)</span></div>';
+      h += '<div class="piano-wrap"><table class="piano-table">' + testataGiorni(false) + '<tbody>';
+      turniOrdinati.forEach((t) => {
+        h += '<tr>' + cellaTurno(t);
+        for (let g = 1; g <= nGiorni; g++) {
+          const diff = ((assMap[t.codice] || {})[g] || 0) - ((fabbMap[t.codice] || {})[g] || 0);
+          const col = diff > 0 ? 'color:#006100' : diff < 0 ? 'color:#FF0000' : '';
+          h +=
+            '<td class="' +
+            clsCella(g) +
+            '" style="font-weight:bold;' +
+            col +
+            '">' +
+            (diff !== 0 ? diff : '') +
+            '</td>';
+        }
+        h += '</tr>';
+      });
+      h += '</tbody></table></div></div>';
+
+      h +=
+        '<div class="main-card" style="margin-top:16px"><div class="card-header">Effettivi — ' + escP(label) + '</div>';
+      h += '<div class="piano-wrap"><table class="piano-table">' + testataGiorni(true) + '<tbody>';
+      turniOrdinati.forEach((t) => {
+        h += '<tr>' + cellaTurno(t);
+        let tot = 0;
+        for (let g = 1; g <= nGiorni; g++) {
+          const q = (assMap[t.codice] || {})[g] || 0;
+          tot += q;
+          h +=
+            '<td class="' +
+            clsCella(g) +
+            '"' +
+            (q > 0 ? ' style="font-weight:bold"' : '') +
+            '>' +
+            (q > 0 ? q : '') +
+            '</td>';
+        }
+        h += '<td><strong>' + tot + '</strong></td></tr>';
+      });
+      h += '</tbody></table></div></div>';
     }
     // Configurazione (card richiudibili, solo admin)
     h +=
@@ -1957,6 +2062,24 @@ async function confermaScambioTurno() {
 }
 
 // ---- Selezione riga/colonna stile Excel (come Turnivo) ----
+async function salvaOrdinePiano(nomi) {
+  if (!puoGestirePiano()) return;
+  window._pianoOrdineCollab = window._pianoOrdineCollab || {};
+  window._pianoOrdineCollab[_pianoReparto()] = nomi;
+  await setImp('piano_ordine_collab', JSON.stringify(window._pianoOrdineCollab));
+  logAzione('Piano: ordine collaboratori', _pianoReparto());
+  toast('Ordine salvato');
+}
+async function ripristinaOrdinePiano() {
+  if (!puoGestirePiano()) return;
+  window._pianoOrdineCollab = window._pianoOrdineCollab || {};
+  delete window._pianoOrdineCollab[_pianoReparto()];
+  await setImp('piano_ordine_collab', JSON.stringify(window._pianoOrdineCollab));
+  logAzione('Piano: ordine predefinito', _pianoReparto());
+  toast('Ordine predefinito: SUP, BO, poi gli altri');
+  renderPiano();
+}
+
 // Barra delle date sempre visibile durante lo scorrimento della PAGINA:
 // il piano scorre col resto della pagina (nessuno scrollbox interno) e le
 // intestazioni vengono traslate per restare in cima allo schermo. Vale per
@@ -1995,37 +2118,57 @@ function _pianoInitSelezione() {
   // deseleziona; riga e colonna mutuamente esclusive; click fuori dalla
   // tabella = deseleziona. La stampa avviene SOLO dall'icona rossa.
   // Come Turnivo (table[data-selectable]): vale per TUTTE le tabelle in
-  // piano-wrap — griglia collaboratori E fabbisogno
-  const initTabella = (tab) => {
-    if (!tab || tab.dataset.selInit) return;
-    tab.dataset.selInit = '1';
+  // piano-wrap — griglia collaboratori E fabbisogno. Le COLONNE data sono
+  // COLLEGATE: selezionando un giorno nel piano l'evidenziazione arriva
+  // fino in fondo al fabbisogno (stessa colonna) e viceversa, così si
+  // capisce la corrispondenza giorno-fabbisogno.
+  const tabelle = [...document.querySelectorAll('#piano-content .piano-wrap > .piano-table')].filter(
+    (t) => !t.dataset.selInit,
+  );
+  if (!tabelle.length) return;
+  tabelle.forEach((t) => (t.dataset.selInit = '1'));
+  let selTipo = '';
+  let selIdx = -1;
+  let selTab = null;
+  const clearAll = () => {
+    tabelle.forEach((t) => {
+      t.querySelectorAll('.col-selected, .col-selected-header').forEach((el) =>
+        el.classList.remove('col-selected', 'col-selected-header'),
+      );
+      t.querySelectorAll('.row-selected').forEach((el) => el.classList.remove('row-selected'));
+    });
+    selTipo = '';
+    selIdx = -1;
+    selTab = null;
+  };
+  const selezionaColonna = (colIdx) => {
+    tabelle.forEach((t) => {
+      const th = t.querySelectorAll('thead tr th')[colIdx];
+      if (!th || th.classList.contains('piano-nome')) return;
+      th.classList.add('col-selected-header');
+      t.querySelector('tbody')
+        .querySelectorAll('tr')
+        .forEach((riga) => {
+          const celle = riga.querySelectorAll('td, th');
+          if (celle[colIdx]) celle[colIdx].classList.add('col-selected');
+        });
+    });
+  };
+  tabelle.forEach((tab) => {
     const thead = tab.querySelector('thead');
     const tbody = tab.querySelector('tbody');
     if (!thead || !tbody) return;
-    let selCol = -1;
-    let selRow = -1;
-    const clear = () => {
-      tab
-        .querySelectorAll('.col-selected, .col-selected-header')
-        .forEach((el) => el.classList.remove('col-selected', 'col-selected-header'));
-      tab.querySelectorAll('.row-selected').forEach((el) => el.classList.remove('row-selected'));
-      selCol = -1;
-      selRow = -1;
-    };
     thead.querySelectorAll('tr th').forEach((th, colIdx) => {
       if (th.classList.contains('piano-nome')) return;
       th.style.cursor = 'pointer';
       th.addEventListener('click', (e) => {
         e.stopPropagation();
-        const era = colIdx === selCol;
-        clear();
+        const era = selTipo === 'col' && colIdx === selIdx;
+        clearAll();
         if (era) return;
-        selCol = colIdx;
-        th.classList.add('col-selected-header');
-        tbody.querySelectorAll('tr').forEach((riga) => {
-          const celle = riga.querySelectorAll('td, th');
-          if (celle[colIdx]) celle[colIdx].classList.add('col-selected');
-        });
+        selTipo = 'col';
+        selIdx = colIdx;
+        selezionaColonna(colIdx);
       });
     });
     tbody.querySelectorAll('tr').forEach((riga, rowIdx) => {
@@ -2035,17 +2178,48 @@ function _pianoInitSelezione() {
       nomeCella.addEventListener('click', (e) => {
         if (e.target.closest('a, .piano-pdf-ico')) return;
         e.stopPropagation();
-        const era = rowIdx === selRow;
-        clear();
+        const era = selTipo === 'row' && rowIdx === selIdx && selTab === tab;
+        clearAll();
         if (era) return;
-        selRow = rowIdx;
+        selTipo = 'row';
+        selIdx = rowIdx;
+        selTab = tab;
         riga.classList.add('row-selected');
       });
     });
-  };
-  document.querySelectorAll('#piano-content .piano-wrap > .piano-table').forEach(initTabella);
+  });
   const tab = document.querySelector('#piano-content .piano-table');
   if (!tab) return;
+  // Riordino collaboratori: trascina la riga dal nome (solo chi gestisce il piano)
+  if (puoGestirePiano()) {
+    const tbodyG = tab.querySelector('tbody');
+    let trDrag = null;
+    tbodyG.querySelectorAll('tr[data-nome]').forEach((tr) => {
+      const cel = tr.querySelector('.piano-nome');
+      if (!cel) return;
+      cel.draggable = true;
+      cel.title = (cel.title ? cel.title + ' — ' : '') + 'trascina per riordinare';
+      cel.addEventListener('dragstart', (e) => {
+        trDrag = tr;
+        tr.style.opacity = '0.4';
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      cel.addEventListener('dragend', async () => {
+        tr.style.opacity = '';
+        if (!trDrag) return;
+        trDrag = null;
+        const nuovi = [...tbodyG.querySelectorAll('tr[data-nome]')].map((r) => r.dataset.nome);
+        await salvaOrdinePiano(nuovi);
+      });
+      tr.addEventListener('dragover', (e) => {
+        if (!trDrag || trDrag === tr) return;
+        e.preventDefault();
+        const r = tr.getBoundingClientRect();
+        if (e.clientY < r.top + r.height / 2) tbodyG.insertBefore(trDrag, tr);
+        else tbodyG.insertBefore(trDrag, tr.nextSibling);
+      });
+    });
+  }
   if (!window._pianoSelDocClick) {
     window._pianoSelDocClick = true;
     document.addEventListener('click', (e) => {
