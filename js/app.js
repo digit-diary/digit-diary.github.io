@@ -160,6 +160,7 @@ function switchPage(name) {
     renderModuliList();
   }
   if (name === 'formazione') renderFormazione();
+  if (name === 'piano' && typeof renderPiano === 'function') renderPiano();
   if (name === 'registro') renderRegistro();
   if (name === 'maison') {
     if (typeof _maisonAutoCleanup === 'function') _maisonAutoCleanup().catch(() => {});

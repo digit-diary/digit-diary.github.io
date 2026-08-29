@@ -3522,3 +3522,109 @@ button:focus-visible,
 .alert-compatto.aperto .sec-chev {
   transform: rotate(180deg);
 }
+
+/* ===== PIANO DI LAVORO (griglia mensile turni) ===== */
+.piano-wrap {
+  overflow-x: auto;
+  padding: 0 6px 8px;
+}
+.piano-table {
+  border-collapse: collapse;
+  font-size: 0.7rem;
+  min-width: 100%;
+}
+.piano-table th,
+.piano-table td {
+  border: 1px solid var(--line);
+  text-align: center;
+  padding: 2px 3px;
+  min-width: 26px;
+  white-space: nowrap;
+}
+.piano-table thead th {
+  background: var(--paper2);
+  font-size: 0.62rem;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.piano-table .piano-nome {
+  text-align: left;
+  font-weight: 600;
+  padding: 2px 8px;
+  position: sticky;
+  left: 0;
+  background: var(--paper);
+  z-index: 1;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.piano-table thead .piano-nome {
+  z-index: 3;
+  background: var(--paper2);
+}
+.piano-table th.piano-weekend {
+  background: #dff0db;
+}
+.piano-table th.piano-domenica {
+  background: #f7ddb8;
+}
+.piano-table th.piano-festivo {
+  background: #f5c6d4;
+}
+.piano-cella {
+  cursor: pointer;
+  font-weight: 600;
+  color: #222;
+}
+.piano-cella:hover {
+  outline: 2px solid var(--accent2);
+  outline-offset: -2px;
+}
+.piano-prot {
+  box-shadow: inset 0 -3px 0 0 #c0392b;
+}
+.piano-comm {
+  position: relative;
+}
+.piano-comm::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  border-style: solid;
+  border-width: 0 7px 7px 0;
+  border-color: transparent #c0392b transparent transparent;
+}
+.piano-malattia-auto {
+  color: #c0392b;
+  border: 1px dashed #c0392b !important;
+  font-weight: 700;
+}
+.piano-tot {
+  background: var(--paper2);
+  font-weight: 700;
+  min-width: 34px;
+}
+.piano-fabb-ok {
+  background: #dff0db;
+  color: #2c6e49;
+  font-weight: 600;
+}
+.piano-fabb-ko {
+  background: #f5c6c6;
+  color: #c0392b;
+  font-weight: 700;
+}
+.piano-leg {
+  display: inline-block;
+  width: 18px;
+  height: 14px;
+  border: 1px solid var(--line);
+  vertical-align: middle;
+  margin-right: 3px;
+  text-align: center;
+  font-size: 0.62rem;
+  line-height: 13px;
+}

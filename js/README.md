@@ -1,4 +1,4 @@
-# Diario Collaboratori — Struttura JavaScript (24 file)
+# Diario Collaboratori — Struttura JavaScript (25 file)
 
 ## Ordine di caricamento (IMPORTANTE)
 I file devono essere caricati nell'ordine elencato in index.html.
@@ -35,8 +35,9 @@ da formazione/valutazioni (chiamati solo a runtime, dopo il caricamento completo
 | 22 | maison-core.js | 3224 | Maison: dashboard, costi, form manuale, auto-pulizia GD |
 | 23 | maison-budget.js | 1152 | Maison: budget, categorie, profilo |
 | 24 | maison-helpers.js | 3810 | Maison import Excel/parser nomi + FILTRI REPARTO (getCollaboratoriReparto, getValutazioniReparto, getPuntiReparto, getInventarioReparto) + inventario con categorie personalizzabili |
+| 25 | piano.js | 456 | PIANO DI LAVORO (da Turnivo): griglia mensile turni, codici speciali, malattie auto dal Diario, fabbisogno vs assegnati; tabelle piano_* on-demand |
 
-**Totale: 24 file. ~28.292 righe formattate**
+**Totale: 25 file. ~28.762 righe formattate**
 
 ## Settori (dinamici, personalizzabili da admin)
 Slots e Tavoli sono fissi (REPARTI_BASE in utils.js); gli altri (default Valet, Cleaning)

@@ -1878,6 +1878,7 @@ function setReparto(rep) {
     return p && p.classList.contains('active');
   };
   if (_pgAttiva('page-formazione') && typeof renderFormazione === 'function') renderFormazione();
+  if (_pgAttiva('page-piano') && typeof renderPiano === 'function') renderPiano();
   if (_pgAttiva('page-impostazioni') && typeof renderCollaboratoriUI === 'function') renderCollaboratoriUI();
   if (typeof renderPromemoria === 'function') renderPromemoria();
   if (typeof aggiornaPromemoriaBadge === 'function') aggiornaPromemoriaBadge();
@@ -3469,6 +3470,12 @@ function aggiornaMenuMobile() {
         icon: '<i class="icx icx-formazione"></i>',
         label: 'Formazione',
         vis: 'formazione',
+      },
+      {
+        page: 'piano',
+        icon: '<i class="icx icx-calendario"></i>',
+        label: 'Piano di lavoro',
+        vis: 'piano',
       },
       {
         page: 'assistente',

@@ -390,6 +390,14 @@
       </button>
       <button
         class="nav-tab"
+        data-page="piano"
+        onclick="switchPage('piano')"
+        title="Piano di lavoro mensile: turni e assenze"
+      >
+        <i class="icx icx-calendario"></i> Piano
+      </button>
+      <button
+        class="nav-tab"
         data-page="assistente"
         onclick="switchPage('assistente')"
         title="Assistente AI per scrittura professionale"
@@ -2553,6 +2561,11 @@
     </div>
 
     <!-- ASSISTENTE -->
+    <!-- PIANO DI LAVORO -->
+    <div class="page" id="page-piano">
+      <div id="piano-content"></div>
+    </div>
+
     <div class="page" id="page-assistente">
       <div class="main-card">
         <div class="card-header">Assistente – Scrittura veloce</div>
@@ -3137,5 +3150,6 @@
     <script src="js/maison-core.js"></script>
     <script src="js/maison-budget.js"></script>
     <script src="js/maison-helpers.js"></script>
+    <script src="js/piano.js"></script>
   </body>
 </html>
