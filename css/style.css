@@ -3524,14 +3524,12 @@ button:focus-visible,
 }
 
 /* ===== PIANO DI LAVORO (griglia mensile turni) ===== */
-/* Come Turnivo: la griglia (e il fabbisogno) scorrono DENTRO il contenitore,
-   quasi a schermo intero — la barra delle date (thead sticky top) e la colonna
-   nomi (sticky left) restano ferme durante lo scorrimento. In Turnivo la
-   navbar è minima e la griglia occupa tutto lo schermo: qui equivale a
-   100vh meno la barra del mese */
+/* Il piano scorre CON la pagina (nessuno scrollbox verticale interno, quindi
+   niente barra laterale che copre i totali): la barra delle date viene tenuta
+   ferma in cima allo schermo via JS (_pianoInitSticky, translateY), la colonna
+   nomi resta ferma con sticky left dentro lo scroll orizzontale */
 .piano-wrap {
-  max-height: calc(100vh - 90px);
-  overflow: auto;
+  overflow-x: auto;
   padding: 0 6px 8px;
 }
 .piano-table {
