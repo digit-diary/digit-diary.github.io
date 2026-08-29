@@ -3628,3 +3628,7 @@ button:focus-visible,
   font-size: 0.62rem;
   line-height: 13px;
 }
+.piano-viol {
+  outline: 2px solid #c0392b !important;
+  outline-offset: -2px;
+}

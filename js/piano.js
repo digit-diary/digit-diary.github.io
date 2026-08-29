@@ -150,12 +150,21 @@ async function renderPiano() {
       '<span class="mini-badge" style="background:var(--accent2);font-size:.62rem">' +
       escP(repartoLabel(currentReparto)) +
       '</span>';
+    if (puoMod) {
+      h +=
+        '<button class="btn-export" style="font-size:.72rem;padding:4px 12px" onclick="validaPiano()">Valida regole</button>';
+      h +=
+        '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49" onclick="generaBozzaPiano()">Genera bozza</button>';
+      h +=
+        '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:var(--accent);color:var(--accent)" onclick="cancellaBozzaPiano()">Cancella bozza</button>';
+    }
     h +=
       '<span style="font-size:.72rem;color:var(--muted);margin-left:auto">' +
       _pianoRighe.length +
       ' assegnazioni' +
       (puoMod ? ' — clicca una cella per modificare' : ' — sola lettura') +
       '</span></div>';
+    h += '<div id="piano-violazioni"></div>';
 
     // GRIGLIA
     h += '<div class="piano-wrap"><table class="piano-table"><thead><tr><th class="piano-nome">Collaboratore</th>';
@@ -217,6 +226,11 @@ async function renderPiano() {
           cella = 'M';
           cls += ' piano-malattia-auto';
           titolo = 'Malattia registrata nel Diario (automatica, non salvata nel piano)';
+        }
+        const violMsg = _pianoViolCelle[nome + '|' + dstr];
+        if (violMsg) {
+          cls += ' piano-viol';
+          titolo += (titolo ? ' — ' : '') + '⚠ ' + violMsg.join(' | ');
         }
         riga +=
           '<td class="' +
@@ -297,6 +311,7 @@ async function renderPiano() {
         '<p style="font-size:.72rem;color:var(--muted);padding:8px 14px">assegnati/richiesti — <span style="color:#2c6e49;font-weight:700">verde</span> = coperto, <span style="color:#c0392b;font-weight:700">rosso</span> = carenza</p></div>';
     }
     el.innerHTML = h;
+    _pianoRenderViolazioni();
   } catch (e) {
     console.error('Errore piano:', e);
     el.innerHTML = '<p style="color:var(--accent);padding:20px">Errore caricamento piano</p>';
@@ -307,6 +322,8 @@ function pianoCambiaMese(delta) {
   const p = _pianoMeseSel.split('-');
   const d = new Date(parseInt(p[0]), parseInt(p[1]) - 1 + delta, 15);
   _pianoMeseSel = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  _pianoViolCelle = {};
+  _pianoViolLista = null;
   renderPiano();
 }
 
@@ -439,5 +456,312 @@ async function rimuoviPianoCella(giaChiuso) {
     renderPiano();
   } catch (e) {
     toast('Errore rimozione');
+  }
+}
+
+// ================================================================
+// FASE 2 — VALIDATORE REGOLE (dai manuali Turnivo/Casino Lugano)
+// ================================================================
+let _pianoViolCelle = {}; // 'nome|data' -> [messaggi]
+let _pianoViolLista = null; // ultima validazione (null = mai eseguita)
+
+function _pianoOra(hhmm) {
+  if (!hhmm) return null;
+  const p = String(hhmm).split(':');
+  return parseInt(p[0]) + (parseInt(p[1]) || 0) / 60;
+}
+function _pianoRegolaVal(nome) {
+  const r = pianoRegoleCache.find((x) => x.nome === nome);
+  if (!r || r.attivo === false) return null;
+  return r.valore;
+}
+function _pianoIsLavoro(codice) {
+  return !!_pianoTurnoInfo(codice);
+}
+
+// Calcola le violazioni del mese corrente. Ritorna la lista e riempie _pianoViolCelle.
+function _pianoCalcolaViolazioni() {
+  const ym = _pianoMeseSel;
+  const nGiorni = _pianoUltimoGiorno(ym);
+  const maxCons = parseInt(_pianoRegolaVal('max_consecutivi')) || 0;
+  const minRiposo = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 0;
+  const no4w1c1w = _pianoRegolaVal('no_4w1c1w') === 'TRUE';
+  const diurnoPreV = _pianoRegolaVal('diurno_prima_vacanza') === 'TRUE';
+  const celle = {};
+  const lista = [];
+  const aggiungi = (nome, giorno, msg) => {
+    const dstr = ym + '-' + String(giorno).padStart(2, '0');
+    (celle[nome + '|' + dstr] = celle[nome + '|' + dstr] || []).push(msg);
+    lista.push({ nome: nome, giorno: giorno, msg: msg });
+  };
+  const perNome = {};
+  _pianoRighe.forEach((r) => {
+    const g = parseInt(r.data.split('-')[2]);
+    (perNome[r.collaboratore] = perNome[r.collaboratore] || {})[g] = r.codice;
+  });
+  Object.keys(perNome).forEach((nome) => {
+    const giorni = perNome[nome];
+    let consec = 0;
+    for (let g = 1; g <= nGiorni; g++) {
+      const cod = giorni[g] || '';
+      const lavoro = _pianoIsLavoro(cod);
+      // 1) massimo giorni lavorativi consecutivi
+      if (lavoro) {
+        consec++;
+        if (maxCons && consec === maxCons + 1)
+          aggiungi(nome, g, consec - 1 + '+ giorni lavorativi consecutivi (max ' + maxCons + ')');
+      } else {
+        consec = 0;
+      }
+      // 2) riposo minimo tra due turni consecutivi
+      if (minRiposo && lavoro && giorni[g + 1] && _pianoIsLavoro(giorni[g + 1])) {
+        const t1 = _pianoTurnoInfo(cod);
+        const t2 = _pianoTurnoInfo(giorni[g + 1]);
+        const fine1 = _pianoOra(t1.ora_fine);
+        const inizio2 = _pianoOra(t2.ora_inizio);
+        if (fine1 != null && inizio2 != null) {
+          const fineAbs = t1.oltre23 || fine1 < _pianoOra(t1.ora_inizio) ? 24 + fine1 : fine1;
+          const riposo = 24 + inizio2 - fineAbs;
+          if (riposo < minRiposo)
+            aggiungi(
+              nome,
+              g + 1,
+              'solo ' + riposo.toFixed(1) + 'h di riposo dopo ' + cod + ' (min ' + minRiposo + 'h)',
+            );
+        }
+      }
+      // 3) vietato 4 lavoro + 1 riposo + 1 lavoro
+      if (no4w1c1w && !lavoro && cod && g >= 5) {
+        let prima = 0;
+        for (let k = g - 1; k >= 1 && _pianoIsLavoro(giorni[k]); k--) prima++;
+        if (prima >= 4 && _pianoIsLavoro(giorni[g + 1] || ''))
+          aggiungi(nome, g, 'riposo singolo dopo ' + prima + ' giorni di lavoro (vietato 4+1+1)');
+      }
+      // 4) turno diurno il giorno prima delle vacanze
+      if (diurnoPreV && (cod === 'V' || cod === 'V1') && (giorni[g - 1] || '') && _pianoIsLavoro(giorni[g - 1])) {
+        const tp = _pianoTurnoInfo(giorni[g - 1]);
+        if (tp && tp.tipo === 'NOTTURNO')
+          aggiungi(nome, g - 1, 'turno notturno il giorno prima delle vacanze (deve essere diurno)');
+      }
+    }
+  });
+  return { celle: celle, lista: lista };
+}
+
+function validaPiano() {
+  const r = _pianoCalcolaViolazioni();
+  _pianoViolCelle = r.celle;
+  _pianoViolLista = r.lista;
+  logAzione('Piano validato', _pianoMeseSel + ' — ' + r.lista.length + ' violazioni');
+  renderPiano();
+}
+
+function _pianoRenderViolazioni() {
+  const el = document.getElementById('piano-violazioni');
+  if (!el || _pianoViolLista === null) return;
+  if (!_pianoViolLista.length) {
+    el.innerHTML =
+      '<p style="padding:8px 14px;font-size:.82rem;color:#2c6e49;font-weight:600">✓ Nessuna violazione delle regole attive nel mese.</p>';
+    return;
+  }
+  let h =
+    '<div style="padding:8px 14px"><p style="font-size:.82rem;font-weight:700;color:var(--accent);margin-bottom:6px">' +
+    _pianoViolLista.length +
+    ' violazioni (celle evidenziate in rosso):</p><div style="max-height:180px;overflow-y:auto;font-size:.78rem;line-height:1.7">';
+  _pianoViolLista.forEach((v) => {
+    h += '<div>• <strong>' + escP(v.nome) + '</strong> — giorno ' + v.giorno + ': ' + escP(v.msg) + '</div>';
+  });
+  h += '</div></div>';
+  el.innerHTML = h;
+}
+
+// ================================================================
+// FASE 2 — GENERA BOZZA (euristica istantanea, non il solver)
+// Riempie i fabbisogni del mese rispettando: riposo 11h, max
+// consecutivi, idoneità storica (gruppi già fatti), equità ore.
+// Le celle esistenti (V, protette, malattie Diario) non si toccano.
+// ================================================================
+async function generaBozzaPiano() {
+  if (!puoGestirePiano()) return;
+  const ym = _pianoMeseSel;
+  const nGiorni = _pianoUltimoGiorno(ym);
+  const da = ym + '-01';
+  const a = ym + '-' + String(nGiorni).padStart(2, '0');
+  const fabb =
+    (await secGet(
+      'piano_fabbisogni?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + currentReparto + '&limit=3000',
+    )) || [];
+  if (!fabb.length) {
+    toast('Nessun fabbisogno configurato per questo mese: la bozza non sa cosa riempire');
+    return;
+  }
+  const maxCons = parseInt(_pianoRegolaVal('max_consecutivi')) || 5;
+  const minRiposo = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 11;
+  // storia per idoneità (chi ha già fatto quel gruppo) e familiarità:
+  // tutte le assegnazioni passate del settore (le più recenti prima)
+  const storia =
+    (await secGet('piano?data=lt.' + da + '&reparto_dip=eq.' + currentReparto + '&order=data.desc&limit=5000')) || [];
+  const idoneita = {}; // nome -> Set(gruppi)
+  const familiarita = {}; // nome|codice -> n
+  storia.concat(_pianoRighe).forEach((r) => {
+    const t = _pianoTurnoInfo(r.codice);
+    if (!t) return;
+    (idoneita[r.collaboratore] = idoneita[r.collaboratore] || new Set()).add(t.gruppo);
+    familiarita[r.collaboratore + '|' + r.codice] = (familiarita[r.collaboratore + '|' + r.codice] || 0) + 1;
+  });
+  const malattie = _pianoMalattieMese(ym);
+  // stato griglia: esistenti + assegnazioni della bozza
+  const cella = {}; // 'nome|g' -> codice
+  _pianoRighe.forEach((r) => (cella[r.collaboratore + '|' + parseInt(r.data.split('-')[2])] = r.codice));
+  const oreMese = {}; // equità
+  Object.keys(cella).forEach((k) => {
+    const t = _pianoTurnoInfo(cella[k]);
+    if (t) oreMese[k.split('|')[0]] = (oreMese[k.split('|')[0]] || 0) + (parseFloat(t.durata_ore) || 0);
+  });
+  const nomi = getCollaboratoriReparto()
+    .filter((c) => c.attivo !== false)
+    .map((c) => c.nome);
+  const consecPrima = (nome, g) => {
+    let n = 0;
+    for (let k = g - 1; k >= 1 && _pianoIsLavoro(cella[nome + '|' + k] || ''); k--) n++;
+    return n;
+  };
+  const riposoOk = (nome, g, t) => {
+    // verso il giorno prima
+    const prev = _pianoTurnoInfo(cella[nome + '|' + (g - 1)] || '');
+    if (prev) {
+      const finePrev = _pianoOra(prev.ora_fine);
+      const fineAbs = prev.oltre23 || finePrev < _pianoOra(prev.ora_inizio) ? 24 + finePrev : finePrev;
+      if (24 + _pianoOra(t.ora_inizio) - fineAbs < minRiposo) return false;
+    }
+    // verso il giorno dopo (se già assegnato, es. cella protetta)
+    const next = _pianoTurnoInfo(cella[nome + '|' + (g + 1)] || '');
+    if (next) {
+      const fine = _pianoOra(t.ora_fine);
+      const fineAbs = t.oltre23 || fine < _pianoOra(t.ora_inizio) ? 24 + fine : fine;
+      if (24 + _pianoOra(next.ora_inizio) - fineAbs < minRiposo) return false;
+    }
+    return true;
+  };
+  // fabbisogno per giorno
+  const fabbG = {}; // g -> [{codice, quantita}]
+  fabb.forEach((f) => {
+    const g = parseInt(f.data.split('-')[2]);
+    (fabbG[g] = fabbG[g] || []).push(f);
+  });
+  const nuove = [];
+  const scoperti = [];
+  for (let g = 1; g <= nGiorni; g++) {
+    (fabbG[g] || []).forEach((f) => {
+      const t = _pianoTurnoInfo(f.turno_codice);
+      if (!t) return;
+      const dstr = ym + '-' + String(g).padStart(2, '0');
+      let have = nomi.filter((n) => cella[n + '|' + g] === f.turno_codice).length;
+      while (have < f.quantita) {
+        const candidati = nomi
+          .filter(
+            (n) =>
+              !cella[n + '|' + g] &&
+              !malattie[n + '|' + dstr] &&
+              idoneita[n] &&
+              idoneita[n].has(t.gruppo) &&
+              consecPrima(n, g) < maxCons &&
+              riposoOk(n, g, t),
+          )
+          .sort(
+            (x, y) =>
+              (oreMese[x] || 0) - (oreMese[y] || 0) ||
+              (familiarita[y + '|' + f.turno_codice] || 0) - (familiarita[x + '|' + f.turno_codice] || 0),
+          );
+        if (!candidati.length) {
+          scoperti.push(f.turno_codice + ' giorno ' + g);
+          break;
+        }
+        const scelto = candidati[0];
+        cella[scelto + '|' + g] = f.turno_codice;
+        oreMese[scelto] = (oreMese[scelto] || 0) + (parseFloat(t.durata_ore) || 0);
+        nuove.push({
+          collaboratore: scelto,
+          data: dstr,
+          codice: f.turno_codice,
+          protetto: false,
+          generato: true,
+          reparto_dip: currentReparto,
+        });
+        have++;
+      }
+    });
+  }
+  if (!nuove.length) {
+    toast(
+      'Niente da generare: fabbisogni già coperti' +
+        (scoperti.length ? ' (' + scoperti.length + ' scoperti senza candidati)' : ''),
+    );
+    return;
+  }
+  if (
+    !confirm(
+      'Genera bozza per ' +
+        ym +
+        ' (' +
+        repartoLabel(currentReparto) +
+        '):\n\n• ' +
+        nuove.length +
+        ' turni da assegnare\n• ' +
+        scoperti.length +
+        ' posti senza candidato idoneo\n\nLe celle esistenti (vacanze, protette, malattie) NON vengono toccate.\nLa bozza si può eliminare con "Cancella bozza". Procedere?',
+    )
+  )
+    return;
+  try {
+    const r = await sbRpc('piano_bulk_upsert', { p_token: getOpToken(), p_rows: nuove });
+    logAzione('Piano: bozza generata', ym + ' — ' + nuove.length + ' turni, ' + scoperti.length + ' scoperti');
+    toast(
+      'Bozza generata: ' +
+        ((r && r.inserite) || nuove.length) +
+        ' turni' +
+        (scoperti.length ? ' — ' + scoperti.length + ' scoperti' : ''),
+    );
+    _pianoViolLista = null;
+    _pianoViolCelle = {};
+    renderPiano();
+  } catch (e) {
+    console.error(e);
+    toast('Errore generazione bozza');
+  }
+}
+
+async function cancellaBozzaPiano() {
+  if (!puoGestirePiano()) return;
+  const ym = _pianoMeseSel;
+  const da = ym + '-01';
+  const a = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
+  const generati = _pianoRighe.filter((r) => r.generato && !r.protetto);
+  if (!generati.length) {
+    toast('Nessuna cella generata da cancellare in questo mese');
+    return;
+  }
+  if (
+    !confirm(
+      'Cancellare le ' +
+        generati.length +
+        ' celle GENERATE di ' +
+        ym +
+        '?\nLe celle inserite a mano (protette) restano.',
+    )
+  )
+    return;
+  try {
+    await secDel(
+      'piano',
+      'data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + currentReparto + '&generato=eq.true&protetto=eq.false',
+    );
+    logAzione('Piano: bozza cancellata', ym + ' — ' + generati.length + ' celle');
+    toast('Bozza cancellata (' + generati.length + ' celle)');
+    _pianoViolLista = null;
+    _pianoViolCelle = {};
+    renderPiano();
+  } catch (e) {
+    toast('Errore cancellazione bozza');
   }
 }
