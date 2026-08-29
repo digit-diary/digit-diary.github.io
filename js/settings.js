@@ -15,6 +15,7 @@ const VIS_ITEMS = {
     statistiche: 'Statistiche',
     moduli: 'Moduli',
     formazione: 'Formazione',
+    piano: 'Piano di lavoro',
     assistente: 'Assistente',
     consegna: 'Consegna Turno',
     promemoria: 'Promemoria',
@@ -40,6 +41,7 @@ const VIS_ITEMS = {
     gestione_competenze: 'Competenze — certificare le spunte in matrice',
     gestione_valutazioni: 'Valutazioni — inserire e importare schede',
     gestione_formazioni: 'Formazioni — registrare sessioni formative svolte (es. supervisor)',
+    gestione_piano: 'Piano di lavoro — modificare la griglia turni del mese (es. supervisor)',
     storico_hr: 'Storico HR — inizio contratto, tracciato categorie/premi/formazioni, equità (sezione riservata)',
   },
 };
@@ -70,6 +72,7 @@ const PAGINE_REPARTO = {
   statistiche: 'Statistiche',
   moduli: 'Moduli',
   formazione: 'Formazione',
+  piano: 'Piano di lavoro',
   assistente: 'Assistente',
   consegna: 'Consegna',
   promemoria: 'Promemoria',
@@ -87,6 +90,9 @@ function paginaAbilitataReparto(key, repKey) {
 function isVis(key) {
   if (!paginaAbilitataReparto(key)) return false;
   const v = visGet(key);
+  // Piano di lavoro: sezione nuova, di default visibile solo ad admin
+  // finché non viene configurata esplicitamente in Visibilità
+  if (key === 'piano' && visibilitaConfig[key] == null) return isAdmin();
   if (v === 'nascosto') return false;
   if (v === 'admin') return isAdmin();
   if (typeof v === 'object' && v.tipo === 'selezionati') {
