@@ -7,3 +7,4 @@ backups/
 *.xlsx
 .supabase_db_password.txt
 CREDENZIALI_LOCALI.md
+IT/
