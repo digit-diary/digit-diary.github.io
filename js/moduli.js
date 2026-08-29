@@ -1445,11 +1445,20 @@ async function importaCollaboratori(input) {
 // ASSISTENTE AI GROQ
 let groqKey = '';
 // Modelli correnti (ago 2026: Groq ha DISMESSO tutti i llama-3.x — un modello
-// hard-coded morto rompeva l'AI ovunque con l'errore fuorviante "verifica la chiave")
-const GROQ_MODEL_TESTO = 'openai/gpt-oss-120b'; // il migliore per testi formali (modello con reasoning: servono max_tokens abbondanti)
-const GROQ_MODEL_JSON = 'qwen/qwen3.8-27b'; // affidabile con response_format json_object
-const GROQ_MODEL_VISION = 'qwen/qwen3.8-27b'; // supporta le immagini
-async function _groqChat(body) {
+// hard-coded morto rompeva l'AI ovunque con l'errore fuorviante "verifica la chiave").
+// I nomi sono personalizzabili da Impostazioni (imp 'groq_modelli'): una futura dismissione
+// si risolve senza toccare il codice; su 404/429/503 scatta il fallback automatico.
+const GROQ_MODELLI_DEFAULT = {
+  testo: 'openai/gpt-oss-120b', // il migliore per testi formali (modello con reasoning: servono max_tokens abbondanti)
+  json: 'qwen/qwen3.8-27b', // affidabile con response_format json_object
+  vision: 'qwen/qwen3.8-27b', // supporta le immagini
+};
+const GROQ_FALLBACK = 'qwen/qwen3.8-27b'; // riserva se il modello principale è morto o sovraccarico
+let _groqModelli = Object.assign({}, GROQ_MODELLI_DEFAULT);
+function groqModel(tipo) {
+  return _groqModelli[tipo] || GROQ_MODELLI_DEFAULT[tipo] || GROQ_FALLBACK;
+}
+async function _groqChat(body, _ritentato) {
   const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + groqKey },
@@ -1458,8 +1467,20 @@ async function _groqChat(body) {
   if (!r.ok) {
     const t = await r.text();
     console.error('Groq error', r.status, t);
+    // Fallback automatico: modello dismesso o sovraccarico → riprova col modello di riserva
+    if (!_ritentato && (r.status === 404 || r.status === 429 || r.status === 503)) {
+      if (body.model !== GROQ_FALLBACK) {
+        console.warn('Groq: riprovo con il modello di riserva', GROQ_FALLBACK);
+        return _groqChat(Object.assign({}, body, { model: GROQ_FALLBACK }), true);
+      }
+      if (r.status !== 404) {
+        await new Promise((res) => setTimeout(res, 2500));
+        return _groqChat(body, true);
+      }
+    }
     if (r.status === 401 || r.status === 403) throw new Error('Chiave Groq non valida: controllala nelle Impostazioni');
-    if (r.status === 404) throw new Error("Modello AI non più disponibile: serve un aggiornamento dell'app");
+    if (r.status === 404)
+      throw new Error('Modello AI non più disponibile: aggiorna i nomi dei modelli nelle Impostazioni');
     if (r.status === 429 || r.status === 503)
       throw new Error('AI momentaneamente sovraccarica: riprova tra qualche secondo');
     throw new Error('Errore AI (' + r.status + ')');
@@ -1468,6 +1489,34 @@ async function _groqChat(body) {
   const txt = data.choices?.[0]?.message?.content;
   if (!txt) throw new Error("Nessuna risposta dall'AI");
   return txt;
+}
+async function _loadGroqModelli() {
+  try {
+    const gm = await getImp('groq_modelli');
+    if (gm) _groqModelli = Object.assign({}, GROQ_MODELLI_DEFAULT, JSON.parse(gm));
+  } catch (e) {}
+  ['testo', 'json', 'vision'].forEach((t) => {
+    const el = document.getElementById('groq-mod-' + t);
+    if (el) el.value = _groqModelli[t];
+  });
+}
+async function salvaGroqModelli() {
+  const nuovo = {};
+  ['testo', 'json', 'vision'].forEach((t) => {
+    const v = ((document.getElementById('groq-mod-' + t) || {}).value || '').trim();
+    nuovo[t] = v || GROQ_MODELLI_DEFAULT[t];
+  });
+  _groqModelli = nuovo;
+  await setImp('groq_modelli', JSON.stringify(nuovo));
+  logAzione('Modelli AI aggiornati', nuovo.testo + ' / ' + nuovo.json + ' / ' + nuovo.vision);
+  toast('Modelli AI salvati');
+  _loadGroqModelli();
+}
+async function ripristinaGroqModelli() {
+  _groqModelli = Object.assign({}, GROQ_MODELLI_DEFAULT);
+  await setImp('groq_modelli', JSON.stringify(_groqModelli));
+  toast('Modelli AI ripristinati ai default');
+  _loadGroqModelli();
 }
 async function loadGroqKey() {
   try {
@@ -1495,6 +1544,7 @@ async function loadGroqKey() {
       }
     }
   }
+  _loadGroqModelli().catch(() => {});
 }
 async function salvaGroqKey() {
   const k = document.getElementById('groq-key-input').value.trim();
@@ -1540,7 +1590,7 @@ async function miglioraTesto(fieldId, contesto) {
       '.\n\nSTILE RICHIESTO:\n- Italiano formale e professionale, tipico di documenti di un casinò svizzero\n- Terza persona: "il/la collaboratore/trice", "il Sig./la Sig.ra [Cognome Nome]"\n- MANTIENI tutti i dettagli specifici: date, orari, luoghi, importi, circostanze\n- Per fatti: "In data [data], durante il turno [turno], presso [luogo]..." → "si è verificato quanto segue:"\n- Per telecamere: "dalla revisione delle immagini del sistema CCTV risulta che..."\n- Per violazioni: "Tale comportamento costituisce una violazione della procedura QM [codice]" citando la procedura specifica\n- Per soglie: usa SEMPRE "pari o superiore a" (NON "superiore a")\n- Per obiettivi: "Si invita formalmente il/la collaboratore/trice a:" seguito da elenco puntato con -\n- Chiudi con: "consapevole che il ripetersi di tale comportamento potrà comportare l\'adozione di provvedimenti disciplinari più severi"\n- NON inventare fatti, migliora SOLO la forma professionale del testo esistente\n- Scrivi come un RESPONSABILE DI SETTORE esperto, NON come un\'intelligenza artificiale. Il testo deve sembrare scritto da una persona reale con esperienza nel settore. Evita frasi generiche, template o formule troppo perfette. Usa il linguaggio naturale di chi lavora in un casinò svizzero ogni giorno.\n- Rispondi SOLO con il testo migliorato, senza commenti o spiegazioni\n\nABBREVIAZIONI E TERMINOLOGIA CASINO:\nDIR=Direttore, CdA=Consiglio Amministrazione, CdD=Collegio Direzione, MgrTeam=Management Team, CO=Compliance, RLRD=Resp.LRD, RCS=Resp.Concezione Sociale, RSS=Resp.Sicurezza&Sorveglianza, R_FBS=Resp.FoBoSlot, SUP_FBS=Supervisor FoBoSlot, R_LG=Resp.Live Game, SUP_LG=Supervisor Live Game, CAS=Cassiere, REC=Receptionist, SA=Slot Attendant, GUARD=Guardaroba, BOK=Back Office, CT=Counting Team, CR=Croupier, ISP=Ispettore tavolo, SIC=Sicurezza, SURV=Sorveglianza, SECC=Sistema elettronico conteggio/controllo, AAGA=Apparecchi automatici da gioco, IR=Incident Report, SOL=Surveillance Operator Log, TRAKA=sistema gestione chiavi, GD=giornata di gioco, PLG=prodotto lordo giochi, RDI=Rapporto Disciplinare Interno, LRD=Legge riciclaggio denaro, CFCG=Commissione federale case da gioco, QM=Quality Management, VP=Valet Parking, MG=Manutenzione Giochi, FAC=Facility, PUL=Pulizie, F&C=Finanze&Controlling, F&B=Food&Beverage, MKTG=Marketing, VC=gettoni valore, NN=fiches non negoziabili, CLI/CLO=Cashless In/Out, NRT=Note Recycler Terminal, JP=Jackpot, CD=Cassa.\n\nPRINCIPI TRASVERSALI:\n- Pulizia delle mani: sfregamento palmi verso alto verso CCTV\n- Principio dei quattro occhi: un funzionario esegue, uno+ indipendenti attestano\n- Percorso più breve: rientro immediato alla postazione senza soste\n- Tutte le operazioni sotto copertura CCTV (art.33 OCG-DFGP)\n\nSOGLIE CHF:\n- CHF 3\'000: identificazione LRD obbligatoria (pari o superiore)\n- CHF 4\'000: registrazione Form III (pari o superiore)\n- CHF 10: discrepanza cassa → verifica con SUP_FBS\n- CHF 100: discrepanza cassa → indagine formale + IR\n- CHF 15\'000: pagamento → notifica preventiva SURV + verifica KYC/PEP immediata\n- CHF 30\'000: acquisto gettoni → chiarimento speciale con SUP_FBS\n- CHF 50\'000: riscossione/jackpot → chiarimento speciale + fax CFCG entro fine GD\n\nLIVELLI DISCIPLINARI: 1)Allineamento verbale 2)Allineamento scritto 3)RDI 1°grado 4)RDI 2°grado (può portare a disdetta). Dal 3° allineamento scritto stesso motivo → scatta RDI.\n\nTesto originale:\n' +
       testo;
     const migliorato = await _groqChat({
-      model: GROQ_MODEL_TESTO,
+      model: groqModel('testo'),
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.3,
       max_tokens: 2000,
@@ -1616,11 +1666,11 @@ async function generaModuloAI(tipo) {
     sysPrompt +=
       '\n\nHo allegato una foto che mostra la situazione (screenshot, documento, log, schermata). Analizzala e usa le informazioni visibili per compilare i campi. Integra foto e testo.';
   try {
-    let model = GROQ_MODEL_JSON;
+    let model = groqModel('json');
     let messages;
     let bodyOpts = { temperature: 0.2, top_p: 0.9, max_tokens: 1500 };
     if (_moduloFotoB64) {
-      model = GROQ_MODEL_VISION;
+      model = groqModel('vision');
       messages = [
         {
           role: 'user',
@@ -1737,6 +1787,7 @@ async function assistenteGenera() {
   const tipo = document.getElementById('assist-tipo').value;
   const tono = document.getElementById('assist-tono').value;
   const lunghezza = (document.getElementById('assist-lunghezza') || {}).value || 'auto';
+  const lingua = (document.getElementById('assist-lingua') || {}).value || 'it';
   const btn = document.getElementById('btn-assist-gen');
   const status = document.getElementById('assist-status');
   btn.disabled = true;
@@ -1751,6 +1802,7 @@ async function assistenteGenera() {
     segnalazione: 'una segnalazione o un rapporto interno',
     risposta: 'una risposta formale a una richiesta o reclamo',
     libero: 'un testo professionale (migliora solo la forma)',
+    correzione: 'lo stesso identico testo, SOLO corretto',
   };
   const tonoLabels = {
     formale: 'Tono formale e istituzionale, tipico di documenti ufficiali.',
@@ -1763,22 +1815,34 @@ async function assistenteGenera() {
     media: '\n- Lunghezza MEDIA: copri tutti i punti ma senza dilungarti.',
     lunga: '\n- Testo DETTAGLIATO: sviluppa ogni punto in modo completo e articolato.',
   };
+  const linguaLabels = {
+    it: '',
+    de: "\n- IMPORTANTE: il testo finale deve essere in TEDESCO (Hochdeutsch formale, standard svizzero: usa 'ss' al posto di 'ß'). Mantieni nomi propri, sigle e importi CHF invariati.",
+    fr: '\n- IMPORTANTE: il testo finale deve essere in FRANCESE formale (standard svizzero). Mantieni nomi propri, sigle e importi CHF invariati.',
+    en: '\n- IMPORTANTE: il testo finale deve essere in INGLESE professionale. Mantieni nomi propri, sigle e importi CHF invariati.',
+  };
   let promptText =
     "Sei un responsabile di settore esperto del Casinò Lugano SA (CLSA), casa da gioco svizzera regolata dalla CFCG. Scrivi come una persona REALE che lavora nel casinò ogni giorno, NON come un'intelligenza artificiale.\n\nRiscrivi il seguente testo come " +
     tipoLabels[tipo] +
     '.\n\n' +
     tonoLabels[tono] +
     "\n\nREGOLE:\n- Italiano corretto e professionale, linguaggio naturale e diretto\n- Il testo deve sembrare scritto da un essere umano esperto del settore\n- Mantieni TUTTI i dettagli specifici (nomi, date, orari, importi, circostanze)\n- Usa le abbreviazioni ufficiali del casinò quando pertinente\n- Per le soglie usa SEMPRE \"pari o superiore a\" (MAI \"superiore a\")\n- NON inventare fatti non presenti nel testo originale\n- NON aggiungere saluti/chiusure se non richiesto\n- Rispondi SOLO con il testo riscritto, senza commenti o spiegazioni\n\nABBREVIAZIONI CASINO LUGANO:\nDIR=Direttore, CdA=Consiglio Amministrazione, CdD=Collegio Direzione, MgrTeam=Management Team, CO=Compliance, RLRD=Resp.LRD, RCS=Resp.Concezione Sociale, RSS=Resp.Sicurezza&Sorveglianza, R_FBS=Resp.FoBoSlot, SUP_FBS=Supervisor FoBoSlot, R_LG=Resp.Live Game, SUP_LG=Supervisor Live Game, CAS=Cassiere, REC=Receptionist, SA=Slot Attendant, GUARD=Guardaroba, BOK=Back Office, CT=Counting Team, CR=Croupier, ISP=Ispettore tavolo, SIC=Sicurezza, SURV=Sorveglianza, SECC=Sistema elettronico conteggio/controllo, AAGA=Apparecchi automatici da gioco, IR=Incident Report, SOL=Surveillance Operator Log, TRAKA=sistema gestione chiavi, GD=giornata di gioco, PLG=prodotto lordo giochi, RDI=Rapporto Disciplinare Interno, LRD=Legge riciclaggio denaro, CFCG=Commissione federale case da gioco, QM=Quality Management, VP=Valet Parking, MG=Manutenzione Giochi, FAC=Facility, PUL=Pulizie, F&C=Finanze&Controlling, F&B=Food&Beverage, MKTG=Marketing, VC=gettoni valore, NN=fiches non negoziabili, CLI/CLO=Cashless In/Out, NRT=Note Recycler Terminal, JP=Jackpot, CD=Cassa, CS=Concezione Sociale, RAP=Regolamento aziendale e del personale.\n\nPRINCIPI: Pulizia delle mani (palmi verso CCTV), Principio dei quattro occhi, Percorso più breve, Copertura CCTV (art.33 OCG-DFGP).\nSOGLIE: CHF 3'000 identificazione LRD, CHF 4'000 registrazione, CHF 15'000 notifica SURV, CHF 30'000 chiarimento speciale, CHF 50'000 fax CFCG.\nDISCIPLINARE: allineamento verbale → scritto → RDI 1° → RDI 2° (disdetta). 3° allineamento stesso motivo → RDI" +
-    (lunghLabels[lunghezza] || '');
+    (lunghLabels[lunghezza] || '') +
+    (linguaLabels[lingua] || '');
+  // Modalità "solo correzione": niente riscrittura, il testo resta com'è
+  if (tipo === 'correzione')
+    promptText =
+      'Sei un correttore di bozze professionale. Correggi SOLO grammatica, ortografia, punteggiatura e refusi del testo seguente. NON riformulare le frasi, NON cambiare stile o tono, NON aggiungere né togliere contenuti. Rispondi SOLO con il testo corretto, senza commenti.' +
+      (linguaLabels[lingua] || '');
   if (_assistFotoB64)
     promptText +=
       '\n\nHo allegato una foto. Analizzala e integra le informazioni visibili nella foto con il testo scritto. Se la foto mostra documenti, schermate, situazioni o dettagli rilevanti, includili nel testo riscritto.';
   promptText +=
     '\n\nTesto originale:\n' + (input || '[Vedi foto allegata - descrivi e riscrivi in base a ciò che vedi]');
-  let model = GROQ_MODEL_TESTO;
+  let model = groqModel('testo');
   let messages;
   if (_assistFotoB64) {
-    model = GROQ_MODEL_VISION;
+    model = groqModel('vision');
     messages = [
       {
         role: 'user',
