@@ -1417,7 +1417,123 @@ function getSpeseExtraFiltrate() {
     return true;
   });
 }
+// Eliminazione per giorno/mese SOLO delle spese extra del settore corrente (admin).
+// Regali e bottiglie Maison NON vengono mai toccati da queste funzioni.
+function _renderSpeseExtraDel() {
+  const wrap = document.getElementById('se-del-wrap');
+  if (!wrap) return;
+  const tutte = getSpeseReparto();
+  if (!isAdmin() || !tutte.length) {
+    wrap.style.display = 'none';
+    wrap.innerHTML = '';
+    return;
+  }
+  const stile =
+    'padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper);color:var(--ink)';
+  const giorni = [...new Set(tutte.map((r) => r.data_spesa))].filter(Boolean).sort().reverse();
+  const mesi = [...new Set(tutte.map((r) => (r.data_spesa || '').substring(0, 7)))].filter(Boolean).sort().reverse();
+  wrap.style.display = 'inline-flex';
+  wrap.innerHTML =
+    '<select id="se-del-giorno" style="' +
+    stile +
+    '"><option value="">Seleziona giorno...</option>' +
+    giorni
+      .map((g) => '<option value="' + g + '">' + new Date(g + 'T12:00:00').toLocaleDateString('it-IT') + '</option>')
+      .join('') +
+    '</select><button class="btn-act del" onclick="eliminaSpeseExtraGiorno()" style="padding:5px 12px">Elimina giorno</button>' +
+    '<select id="se-del-mese" style="' +
+    stile +
+    '"><option value="">Seleziona mese...</option>' +
+    mesi
+      .map(
+        (m) =>
+          '<option value="' + m + '">' + MESI_FULL[parseInt(m.split('-')[1]) - 1] + ' ' + m.split('-')[0] + '</option>',
+      )
+      .join('') +
+    '</select><button class="btn-act del" onclick="eliminaSpeseExtraMese()" style="padding:5px 12px">Elimina mese</button>';
+}
+async function eliminaSpeseExtraGiorno() {
+  if (!isAdmin()) return;
+  const sel = document.getElementById('se-del-giorno');
+  if (!sel || !sel.value) {
+    toast('Seleziona un giorno');
+    return;
+  }
+  const giorno = sel.value;
+  const label = new Date(giorno + 'T12:00:00').toLocaleDateString('it-IT');
+  const count = getSpeseReparto().filter((r) => r.data_spesa === giorno).length;
+  if (
+    !confirm(
+      'Eliminare le ' +
+        count +
+        ' spese extra del ' +
+        label +
+        ' (' +
+        currentReparto +
+        ')?\nRegali e bottiglie NON vengono toccati.',
+    )
+  )
+    return;
+  try {
+    await secDel('spese_extra', 'data_spesa=eq.' + giorno + '&reparto_dip=eq.' + currentReparto);
+    speseExtraCache = speseExtraCache.filter(
+      (r) => !(r.data_spesa === giorno && (r.reparto_dip || 'slots') === currentReparto),
+    );
+    logAzione('Spese extra: eliminato giorno', label + ' (' + count + ' righe, ' + currentReparto + ')');
+    renderSpeseExtra();
+    toast('Spese extra del ' + label + ' eliminate');
+  } catch (e) {
+    toast('Errore eliminazione spese extra');
+  }
+}
+async function eliminaSpeseExtraMese() {
+  if (!isAdmin()) return;
+  const sel = document.getElementById('se-del-mese');
+  if (!sel || !sel.value) {
+    toast('Seleziona un mese');
+    return;
+  }
+  const mese = sel.value;
+  const meseStart = mese + '-01';
+  // ultimo giorno REALE del mese (mai '-31' fisso: Febbraio/Aprile fallirebbero)
+  const _parti = mese.split('-');
+  const _ultimoGiorno = new Date(parseInt(_parti[0]), parseInt(_parti[1]), 0).getDate();
+  const meseEnd = mese + '-' + String(_ultimoGiorno).padStart(2, '0');
+  const label = MESI_FULL[parseInt(_parti[1]) - 1] + ' ' + _parti[0];
+  const count = getSpeseReparto().filter((r) => r.data_spesa >= meseStart && r.data_spesa <= meseEnd).length;
+  if (!count) {
+    toast('Nessuna spesa extra per ' + label);
+    return;
+  }
+  if (
+    !confirm(
+      'Eliminare le ' +
+        count +
+        ' spese extra di ' +
+        label +
+        ' (' +
+        currentReparto +
+        ')?\nRegali e bottiglie NON vengono toccati.',
+    )
+  )
+    return;
+  try {
+    await secDel(
+      'spese_extra',
+      'data_spesa=gte.' + meseStart + '&data_spesa=lte.' + meseEnd + '&reparto_dip=eq.' + currentReparto,
+    );
+    speseExtraCache = speseExtraCache.filter(
+      (r) => !(r.data_spesa >= meseStart && r.data_spesa <= meseEnd && (r.reparto_dip || 'slots') === currentReparto),
+    );
+    logAzione('Spese extra: eliminato mese', label + ' (' + count + ' righe, ' + currentReparto + ')');
+    renderSpeseExtra();
+    toast('Spese extra di ' + label + ' eliminate (' + count + ' righe)');
+  } catch (e) {
+    toast('Errore eliminazione spese extra');
+  }
+}
 function renderSpeseExtra() {
+  _renderSpeseExtraDel();
   const data = getSpeseExtraFiltrate();
   const el = document.getElementById('spese-extra-list');
   if (!el) return;
@@ -2350,6 +2466,8 @@ function renderInventario() {
     b.style.color = isActive ? 'var(--paper)' : 'var(--ink)';
     b.style.borderColor = isActive ? 'var(--ink)' : 'var(--line)';
   });
+  // Card richiudibili: la scorta/giacenza resta aperta, carico/uscita/movimenti si chiudono
+  if (typeof initCardRichiudibili === 'function') initCardRichiudibili('page-inventario', ['Scorta', 'Giacenza']);
 }
 function switchInvTab(tab) {
   _invTab = tab;

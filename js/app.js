@@ -170,6 +170,8 @@ function switchPage(name) {
     renderSpeseExtra();
     initSpeseExtraFP();
     renderRegali();
+    // blocco Budget richiudibile (si apre raramente)
+    if (typeof initSezioniRichiudibili === 'function') initSezioniRichiudibili('page-maison');
   }
   if (name === 'promemoria') {
     renderPromemoria();

@@ -1663,6 +1663,7 @@
             <button class="btn-export" onclick="esportaSpeseExtraCSV()">CSV</button>
             <button class="btn-export btn-export-pdf" onclick="esportaSpeseExtraPDF()">PDF</button>
           </div>
+          <span id="se-del-wrap" style="display: none; gap: 6px; align-items: center; flex-wrap: wrap"></span>
         </div>
         <div id="spese-extra-list" style="padding: 16px"></div>
       </div>
@@ -2571,6 +2572,7 @@
                 <option value="segnalazione">Segnalazione / rapporto</option>
                 <option value="risposta">Risposta a richiesta / reclamo</option>
                 <option value="libero">Testo libero (migliora solo la forma)</option>
+                <option value="correzione">Solo correzione (grammatica e refusi, testo intatto)</option>
               </select>
             </div>
             <div class="field">
@@ -2588,6 +2590,15 @@
                 <option value="breve">Breve (poche righe)</option>
                 <option value="media">Media</option>
                 <option value="lunga">Dettagliata</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Lingua</label>
+              <select id="assist-lingua">
+                <option value="it">Italiano</option>
+                <option value="de">Tedesco</option>
+                <option value="fr">Francese</option>
+                <option value="en">Inglese</option>
               </select>
             </div>
           </div>
@@ -2838,6 +2849,20 @@
           <button class="btn-add-tipo" onclick="salvaGroqKey()">Salva</button>
         </div>
         <p id="groq-status" style="font-size: 0.82rem; margin-top: 8px"></p>
+        <div style="margin-top: 14px">
+          <p style="color: var(--muted); font-size: 0.8rem; margin-bottom: 8px">
+            Modelli AI (se Groq ne dismette uno, basta aggiornare il nome qui — vale per tutte le copie dell'app):
+          </p>
+          <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; align-items: flex-end">
+            <div class="field"><label>Testi</label><input type="text" id="groq-mod-testo" /></div>
+            <div class="field"><label>Moduli (JSON)</label><input type="text" id="groq-mod-json" /></div>
+            <div class="field"><label>Foto</label><input type="text" id="groq-mod-vision" /></div>
+            <button class="btn-add-tipo" onclick="salvaGroqModelli()">Salva modelli</button>
+          </div>
+          <button class="btn-del-tipo" onclick="ripristinaGroqModelli()" style="margin-top: 6px; font-size: 0.72rem">
+            Ripristina default
+          </button>
+        </div>
       </div>
       <div class="settings-section" id="maison-privacy-section" style="display: none">
         <h4>Maison — Conservazione dati</h4>
