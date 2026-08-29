@@ -3536,9 +3536,9 @@ button:focus-visible,
 }
 .piano-tab {
   color: #adb5bd;
-  padding: 6px 14px;
+  padding: 7px 16px;
   cursor: pointer;
-  font-size: 0.82rem;
+  font-size: 0.9rem;
   font-weight: 600;
   border-radius: 3px;
   user-select: none;
@@ -3565,7 +3565,7 @@ button:focus-visible,
 }
 .piano-table {
   border-collapse: collapse;
-  font-size: 0.82rem;
+  font-size: 0.88rem;
   min-width: 100%;
 }
 .piano-table th,
@@ -3612,9 +3612,9 @@ button:focus-visible,
   left: 150px;
   z-index: 2;
   background: var(--paper);
-  min-width: 44px;
-  max-width: 44px;
-  font-size: 0.66rem;
+  min-width: 48px;
+  max-width: 48px;
+  font-size: 0.72rem;
   line-height: 1.1;
   overflow: hidden;
 }
