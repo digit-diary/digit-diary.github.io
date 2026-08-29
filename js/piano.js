@@ -20,35 +20,21 @@ let _pianoRighe = []; // righe del mese/settore correnti
 let _pianoMeseSel = new Date().toISOString().substring(0, 7);
 let _pianoCellaSel = null; // {nome, data} in modifica
 
-// Colori dei codici speciali (i turni hanno il colore del gruppo dal DB)
+// Colori dei codici speciali — PALETTE ORIGINALE TURNIVO (= formattazione
+// condizionale dell'Excel del casinò). I codici non elencati restano bianchi.
 const PIANO_COLORI_SPECIALI = {
-  V: '#F5E6A8',
-  V1: '#F5E6A8',
-  M: '#F2BDBD',
-  M1: '#F2BDBD',
-  I: '#F2BDBD',
-  I1: '#F2BDBD',
-  MA: '#F2BDBD',
-  C: '#E3E3E3',
-  RC: '#E3E3E3',
-  CO: '#E3E3E3',
-  P: '#E3E3E3',
-  ND: '#D6D6D6',
-  D: '#EFEFEF',
-  F: '#BFE0F2',
-  '1F': '#BFE0F2',
-  CS: '#BFE0F2',
-  LRD: '#BFE0F2',
-  CGF: '#F5D5A8',
-  JG: '#D9F2BF',
-  U: '#E8DFF5',
-  MI: '#E3E3E3',
-  PC: '#E3E3E3',
-  FU: '#E3E3E3',
-  TR: '#E3E3E3',
-  MT: '#E3E3E3',
-  NS: '#E3E3E3',
-  AF: '#E3E3E3',
+  V: '#00B0F0',
+  V1: '#00B0F0',
+  CGF: '#00B0F0',
+  M: '#FFFF00',
+  M1: '#FFFF00',
+  I: '#FFFF00',
+  I1: '#FFFF00',
+  LRD: '#FFFF00',
+  JG: '#FFFF00',
+  C: '#FBD4B4',
+  RC: '#FFC000',
+  ND: '#F2DBDB',
 };
 
 function puoGestirePiano() {
@@ -81,8 +67,8 @@ function _pianoCodiceInfo(codice) {
 }
 function _pianoColore(codice) {
   const t = _pianoTurnoInfo(codice);
-  if (t) return t.colore || '#EEEEEE';
-  return PIANO_COLORI_SPECIALI[codice] || '#EFEFEF';
+  if (t) return t.colore || '';
+  return PIANO_COLORI_SPECIALI[codice] || ''; // '' = cella bianca (come Turnivo/Excel)
 }
 function _pianoUltimoGiorno(ym) {
   const p = ym.split('-');
@@ -211,7 +197,8 @@ async function renderPiano() {
           const t = _pianoTurnoInfo(codice);
           const cs = _pianoCodiceInfo(codice);
           cella = escP(codice);
-          stile = 'background:' + _pianoColore(codice);
+          const _col = _pianoColore(codice);
+          if (_col) stile = 'background:' + _col;
           if (t) {
             ore += parseFloat(t.durata_ore) || 0;
             if (t.tipo === 'NOTTURNO') nN++;
