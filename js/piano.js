@@ -1219,7 +1219,7 @@ function _renderPianoFestiviCard() {
     (new Date().getFullYear() + 1) +
     '" min="2024" max="2050" style="width:90px"></div>' +
     '<button class="btn-add-tipo" onclick="generaPianoFestivi()">Genera festivi anno</button>' +
-    '<span style="font-size:.72rem;color:var(--muted)">7 fissi + Lunedì di Pasqua e Ascensione calcolati (lista del casinò)</span></div>';
+    '<span style="font-size:.72rem;color:var(--muted)">11 festivi italiani (Lunedì dell&#39;Angelo calcolato dalla Pasqua)</span></div>';
   h += '</div></div>';
   return h;
 }
@@ -1305,14 +1305,17 @@ function _pianoFestiviAnno(anno) {
       d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
     );
   };
+  // FESTIVI ITALIANI (scelta confermata dall'utente il 29/08/2026)
   return [
     { data: anno + '-01-01', descrizione: 'Capodanno' },
     { data: anno + '-01-06', descrizione: 'Epifania' },
-    { data: add(pasqua, 1), descrizione: 'Lunedi di Pasqua' },
-    { data: add(pasqua, 39), descrizione: 'Ascensione' },
-    { data: anno + '-08-01', descrizione: 'Festa Nazionale CH' },
-    { data: anno + '-08-15', descrizione: 'Assunzione' },
+    { data: add(pasqua, 1), descrizione: "Lunedì dell'Angelo" },
+    { data: anno + '-04-25', descrizione: 'Festa della Liberazione' },
+    { data: anno + '-05-01', descrizione: 'Festa del Lavoro' },
+    { data: anno + '-06-02', descrizione: 'Festa della Repubblica' },
+    { data: anno + '-08-15', descrizione: 'Ferragosto' },
     { data: anno + '-11-01', descrizione: 'Ognissanti' },
+    { data: anno + '-12-08', descrizione: 'Immacolata Concezione' },
     { data: anno + '-12-25', descrizione: 'Natale' },
     { data: anno + '-12-26', descrizione: 'Santo Stefano' },
   ];
