@@ -329,7 +329,7 @@ async function renderPiano() {
       '<span><span class="piano-leg piano-comm" style="background:var(--paper2)"></span> triangolo = commento (passa il mouse)</span>';
     h +=
       '<span><span class="piano-leg piano-malattia-auto" style="background:var(--paper2)">M</span> = malattia dal Diario (automatica)</span>';
-    h += '<span>doppio click sul nome = stampa scheda collaboratore — tasto destro su una cella = nota rapida</span>';
+    h += '<span>icona rossa = stampa piano del collaboratore — tasto destro su una cella = menu opzioni</span>';
     h += '</div></div>';
 
     // FABBISOGNO vs ASSEGNATI (editabile: click sulla cella per impostare le persone necessarie)
@@ -2707,7 +2707,7 @@ async function salvaPreferenzaCollab(id, campo, valore) {
 }
 
 // ================================================================
-// STAMPA PIANO DEL SINGOLO COLLABORATORE (doppio click sul nome)
+// STAMPA PIANO DEL SINGOLO COLLABORATORE (icona rossa prima del nome)
 // + NOTA RAPIDA con tasto destro sulla cella (come Turnivo)
 // ================================================================
 async function stampaPianoCollaboratore(nome) {
