@@ -3394,7 +3394,18 @@ async function confermaCambioEsigenze() {
 // Salvataggio cella (regole Turnivo: vuoto elimina senza conferma, nessuna
 // validazione del codice, commento conservato, cella protetta)
 async function pianoSalvaCella(nome, dstr, codice) {
-  if (!puoGestirePiano()) return;
+  if (!puoGestirePiano()) return false;
+  // sigla inesistente (né turno né codice speciale) = errore, niente salvataggio
+  // (solo a config caricata: con le cache vuote non si blocca nulla)
+  if (
+    codice &&
+    (pianoTurniCache.length || pianoCodiciCache.length) &&
+    !_pianoTurnoInfo(codice) &&
+    !_pianoCodiceInfo(codice)
+  ) {
+    toast('Errore: la sigla "' + codice + '" non esiste (né turno né codice speciale)');
+    return false;
+  }
   const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
   const attuale = r ? r.codice : '';
   _pianoCellaSel = { nome: nome, data: dstr };
@@ -3469,7 +3480,8 @@ function pianoCellaInline(nome, dstr, el) {
       el.innerHTML = vecchio;
       return;
     }
-    await pianoSalvaCella(nome, dstr, v);
+    const ok = await pianoSalvaCella(nome, dstr, v);
+    if (ok === false) el.innerHTML = vecchio;
   };
   inp.addEventListener('keydown', (e) => {
     e.stopPropagation();
