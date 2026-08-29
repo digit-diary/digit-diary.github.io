@@ -3524,6 +3524,11 @@ button:focus-visible,
 }
 
 /* ===== PIANO DI LAVORO (griglia mensile turni) ===== */
+/* La sezione Piano usa quasi tutta la larghezza dello schermo (le altre
+   pagine restano a 1280px) */
+#page-piano {
+  max-width: calc(100vw - 48px);
+}
 /* Il piano scorre CON la pagina (nessuno scrollbox verticale interno, quindi
    niente barra laterale che copre i totali): la barra delle date viene tenuta
    ferma in cima allo schermo via JS (_pianoInitSticky, translateY), la colonna
@@ -3547,7 +3552,7 @@ button:focus-visible,
 }
 .piano-table thead th {
   background: var(--paper2);
-  font-size: 0.62rem;
+  font-size: 0.8rem;
   position: sticky;
   top: 0;
   z-index: 2;
