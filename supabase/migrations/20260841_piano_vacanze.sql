@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS piano_vacanze (
 CREATE INDEX IF NOT EXISTS idx_piano_vacanze_anno ON piano_vacanze (anno);
 
 ALTER TABLE collaboratori ADD COLUMN IF NOT EXISTS is_jolly BOOLEAN DEFAULT FALSE;
+ALTER TABLE collaboratori ADD COLUMN IF NOT EXISTS lingue TEXT;
 
 INSERT INTO piano_codici (codice, descrizione, ore, is_riposo, attivo)
 VALUES ('WD', 'Diurno forzato (pre-vacanza)', 0, false, true)

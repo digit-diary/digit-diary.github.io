@@ -1016,7 +1016,13 @@ async function renderCollaboratoriUI() {
               return '<option value="' + v + '"' + (cur === p ? ' selected' : '') + '>' + p + '%</option>';
             })
             .join('') +
-          '</select>'
+          '</select><input type="text" value="' +
+          (c.lingue || '').replace(/"/g, '&quot;') +
+          '" placeholder="🇮🇹🇬🇧" maxlength="20" title="Lingue parlate (bandierine, mostrate nel Piano accanto al nome)" onchange="cambiaLingueCollaboratore(' +
+          c.id +
+          ',this.value)" style="' +
+          selStyle +
+          ';width:76px">'
         : '') +
       (adminFull
         ? '<select onchange="cambiaRepartoCollaboratore(' +
@@ -2413,6 +2419,22 @@ async function cambiaFunzioneCollaboratore(id, funzione) {
     toast('Funzione aggiornata');
   } catch (e) {
     toast('Errore salvataggio funzione');
+  }
+}
+async function cambiaLingueCollaboratore(id, lingue) {
+  if (!isAdmin() && !(typeof puoModificare === 'function' && puoModificare('storico_hr'))) {
+    toast('Non hai il permesso');
+    return;
+  }
+  try {
+    const v = String(lingue || '').trim();
+    await secPatch('collaboratori', 'id=eq.' + id, { lingue: v });
+    const c = collaboratoriCache.find((x) => x.id === id);
+    if (c) c.lingue = v;
+    logAzione('Lingue collaboratore', (c ? c.nome : id) + ' -> ' + v);
+    toast('Lingue aggiornate');
+  } catch (e) {
+    toast('Errore salvataggio lingue');
   }
 }
 async function cambiaPercentualeCollaboratore(id, perc) {
