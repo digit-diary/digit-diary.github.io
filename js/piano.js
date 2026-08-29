@@ -186,7 +186,7 @@ async function renderPiano() {
       h +=
         '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49" onclick="generaBozzaPiano()">Genera bozza</button>';
       h +=
-        '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:var(--accent);color:var(--accent)" onclick="cancellaBozzaPiano()">Cancella bozza</button>';
+        '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:var(--accent);color:var(--accent)" onclick="cancellaBozzaPiano()">Cancella piano</button>';
     }
     h +=
       '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:#b8a98a;color:#b8a98a" onclick="copiaPianoExcel()">Copia per Excel</button>';
@@ -875,7 +875,7 @@ async function generaBozzaPiano() {
         nuove.length +
         ' turni da assegnare\n• ' +
         scoperti.length +
-        ' posti senza candidato idoneo\n\nLe celle esistenti (vacanze, protette, malattie) NON vengono toccate.\nLa bozza si può eliminare con "Cancella bozza". Procedere?',
+        ' posti senza candidato idoneo\n\nLe celle esistenti (vacanze, protette, malattie) NON vengono toccate.\nLa bozza si può eliminare con "Cancella piano". Procedere?',
     )
   )
     return;
@@ -898,43 +898,59 @@ async function generaBozzaPiano() {
 }
 
 async function cancellaBozzaPiano() {
+  // IDENTICO a Turnivo (cancella_piano): elimina le celle NON protette del mese;
+  // opzione "cancella tutto" per includere anche le protette.
   if (!puoGestirePiano()) return;
   const ym = _pianoMeseSel;
   const da = ym + '-01';
   const a = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
-  const generati = _pianoRighe.filter((r) => r.generato && !r.protetto);
-  if (!generati.length) {
-    toast('Nessuna cella generata da cancellare in questo mese');
+  const nonProtette = _pianoRighe.filter((r) => !r.protetto).length;
+  const protette = _pianoRighe.length - nonProtette;
+  const b = document.getElementById('pwd-modal-content');
+  b.innerHTML =
+    '<h3>Cancella piano — ' +
+    ym +
+    '</h3><p style="margin-bottom:14px;font-size:.88rem">' +
+    nonProtette +
+    ' celle generate/non protette, ' +
+    protette +
+    ' protette (manuali/vacanze).</p>' +
+    '<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button>' +
+    '<button class="btn-modal-ok" onclick="eseguiCancellaPiano(false)">Solo non protette (' +
+    nonProtette +
+    ')</button>' +
+    '<button class="btn-modal-ok" style="background:var(--accent)" onclick="eseguiCancellaPiano(true)">TUTTE (' +
+    _pianoRighe.length +
+    ')</button></div>';
+  document.getElementById('pwd-modal').classList.remove('hidden');
+}
+async function eseguiCancellaPiano(tutto) {
+  document.getElementById('pwd-modal').classList.add('hidden');
+  const ym = _pianoMeseSel;
+  const da = ym + '-01';
+  const a = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
+  const n = tutto ? _pianoRighe.length : _pianoRighe.filter((r) => !r.protetto).length;
+  if (!n) {
+    toast('Niente da cancellare');
     return;
   }
   if (
-    !confirm(
-      'Cancellare le ' +
-        generati.length +
-        ' celle GENERATE di ' +
-        ym +
-        '?\nLe celle inserite a mano (protette) restano.',
-    )
+    tutto &&
+    !confirm('ATTENZIONE: verranno eliminate ANCHE le celle protette (vacanze, inserimenti manuali). Confermi?')
   )
     return;
   try {
     await secDel(
       'piano',
-      'data=gte.' +
-        da +
-        '&data=lte.' +
-        a +
-        '&reparto_dip=eq.' +
-        _pianoReparto() +
-        '&generato=eq.true&protetto=eq.false',
+      'data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + (tutto ? '' : '&protetto=eq.false'),
     );
-    logAzione('Piano: bozza cancellata', ym + ' — ' + generati.length + ' celle');
-    toast('Bozza cancellata (' + generati.length + ' celle)');
-    _pianoViolLista = null;
+    logAzione('Piano: cancellato', ym + ' — ' + n + ' celle (tutto=' + tutto + ')');
+    toast('Piano cancellato: ' + n + ' celle rimosse');
     _pianoViolCelle = {};
+    _pianoViolLista = null;
     renderPiano();
   } catch (e) {
-    toast('Errore cancellazione bozza');
+    toast('Errore cancellazione');
   }
 }
 
@@ -1693,6 +1709,18 @@ function _pdfCambioTurno(dati) {
       ],
     );
   }
+  if (dati.restituzione) {
+    // IDENTICA a Turnivo: barra viola #8e44ad, sfondo #f8f0ff
+    sezione(
+      'Restituzione',
+      [142, 68, 173],
+      [248, 240, 255],
+      [
+        ['Data restituzione:', dati.restituzione],
+        ['', 'In questa data i turni verranno scambiati nuovamente tra i due collaboratori.'],
+      ],
+    );
+  }
   sezione('Motivazione', [46, 204, 113], [240, 250, 240], [['', dati.motivo || 'Nessuna motivazione specificata']]);
   // Autorizzazione con checkbox
   const hAut = 30;
@@ -1810,6 +1838,8 @@ function apriScambioTurno() {
       )
       .join('') +
     '</select><div class="field" style="text-align:left;margin-top:10px"><label>Motivazione</label><input type="text" id="scambio-motivo" placeholder="Es: esigenze personali..."></div>' +
+    '<div style="text-align:left;margin-top:10px"><label style="font-weight:700;font-size:.86rem"><input type="checkbox" id="scambio-restituito" onchange="document.getElementById(\'scambio-rest-wrap\').style.display=this.checked?\'block\':\'none\'"> Con restituzione</label>' +
+    '<div id="scambio-rest-wrap" style="display:none;margin-top:6px"><label style="font-size:.8rem">Data restituzione:</label> <input type="date" id="scambio-data-rest" style="padding:6px;max-width:180px"></div></div>' +
     '<div class="pwd-modal-btns" style="margin-top:14px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="confermaScambioTurno()">Scambia</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
@@ -1817,6 +1847,12 @@ async function confermaScambioTurno() {
   const sel = _pianoCellaSel;
   const collega = (document.getElementById('scambio-collega') || {}).value;
   const motivo = ((document.getElementById('scambio-motivo') || {}).value || '').trim();
+  const conRest = (document.getElementById('scambio-restituito') || {}).checked;
+  let dataRest = conRest ? (document.getElementById('scambio-data-rest') || {}).value || '' : '';
+  if (conRest && dataRest && dataRest <= sel.data) {
+    toast('La data di restituzione deve essere successiva al giorno del cambio');
+    return;
+  }
   document.getElementById('pwd-modal').classList.add('hidden');
   if (!sel || !collega) return;
   const r1 = _pianoRighe.find((x) => x.collaboratore === sel.nome && x.data === sel.data);
@@ -1842,8 +1878,50 @@ async function confermaScambioTurno() {
     r1.codice = c2;
     r2.codice = c1;
     r1.protetto = r2.protetto = true;
+    // Restituzione: come Turnivo, scambio inverso applicato subito alla data indicata
+    if (dataRest) {
+      const op = getOperatore();
+      const ra = _pianoRighe.find((x) => x.collaboratore === sel.nome && x.data === dataRest);
+      const rb = _pianoRighe.find((x) => x.collaboratore === collega && x.data === dataRest);
+      const ca = ra ? ra.codice : '';
+      const cb = rb ? rb.codice : '';
+      const applica = async (riga, nomeC, nuovoCod, exCod, altroNome) => {
+        const commento = 'Ex ' + exCod + ' - restituzione cambio con ' + altroNome + ' - ' + op;
+        if (riga) {
+          await secPatch('piano', 'id=eq.' + riga.id, {
+            codice: nuovoCod,
+            protetto: true,
+            generato: false,
+            commento: commento,
+            operatore: op,
+            updated_at: new Date().toISOString(),
+          });
+          riga.codice = nuovoCod;
+          riga.protetto = true;
+          riga.commento = commento;
+        } else if (nuovoCod) {
+          const n = await secPost('piano', {
+            collaboratore: nomeC,
+            data: dataRest,
+            codice: nuovoCod,
+            protetto: true,
+            generato: false,
+            commento: commento,
+            reparto_dip: _pianoReparto(),
+            operatore: op,
+          });
+          if (n && n[0]) _pianoRighe.push(n[0]);
+        }
+      };
+      await applica(ra, sel.nome, cb, ca, collega);
+      await applica(rb, collega, ca, cb, sel.nome);
+      logAzione('Piano: restituzione programmata', sel.nome + ' <-> ' + collega + ' il ' + dataRest);
+    }
     logAzione('Piano: scambio turno', sel.nome + ' (' + c1 + ') <-> ' + collega + ' (' + c2 + ') il ' + sel.data);
-    toast('Turni scambiati');
+    toast(
+      'Turni scambiati' +
+        (dataRest ? ' — restituzione il ' + new Date(dataRest + 'T12:00:00').toLocaleDateString('it-IT') : ''),
+    );
     // Formulario IDENTICO a Turnivo
     if (!window.jspdf) await caricaJsPDF();
     if (window.jspdf) {
@@ -1866,6 +1944,7 @@ async function confermaScambioTurno() {
         b: { nome: collega, settore: repartoLabel(_pianoReparto()), turno: c2, orari: fmtOra(t2) },
         motivo: motivo,
         richiesto: getOperatore(),
+        restituzione: dataRest ? new Date(dataRest + 'T12:00:00').toLocaleDateString('it-IT') : null,
       });
       mostraPdfPreview(doc, 'cambio_turno_' + sel.data + '.pdf', 'Cambio turno ' + sel.data);
     }
@@ -1908,6 +1987,51 @@ function _pianoInitSelezione() {
       const nome = nomeCella.textContent.trim().replace(/\s+(RESP|SUP|BO|HOST)$/, '');
       mostraPianoCtx(e, nome, _pianoMeseSel + '-' + String(giorno).padStart(2, '0'));
     });
+    // Mobile: long-press (>500ms) = menu contestuale, come Turnivo
+    let lpTimer = null;
+    let lpFired = false;
+    cella.addEventListener(
+      'touchstart',
+      (e) => {
+        lpFired = false;
+        lpTimer = setTimeout(() => {
+          lpFired = true;
+          if (navigator.vibrate) navigator.vibrate(50);
+          const tocco = e.changedTouches[0] || e.touches[0];
+          const tr = cella.closest('tr');
+          const nomeCella = tr.querySelector('.piano-nome');
+          const idx = [...tr.children].indexOf(cella);
+          if (!nomeCella || idx < 1 || !tocco) return;
+          const nome = nomeCella.textContent.trim().replace(/\s+(RESP|SUP|BO|HOST)$/, '');
+          mostraPianoCtx(
+            { preventDefault: () => {}, clientX: tocco.clientX, clientY: tocco.clientY },
+            nome,
+            _pianoMeseSel + '-' + String(idx).padStart(2, '0'),
+          );
+        }, 500);
+      },
+      { passive: true },
+    );
+    cella.addEventListener('touchend', (e) => {
+      if (lpTimer) {
+        clearTimeout(lpTimer);
+        lpTimer = null;
+      }
+      if (lpFired) {
+        e.preventDefault();
+        lpFired = false;
+      }
+    });
+    cella.addEventListener(
+      'touchmove',
+      () => {
+        if (lpTimer) {
+          clearTimeout(lpTimer);
+          lpTimer = null;
+        }
+      },
+      { passive: true },
+    );
   });
   tab.querySelectorAll('thead th').forEach((th, idx) => {
     if (th.classList.contains('piano-nome') || th.classList.contains('piano-tot')) return;
@@ -2729,26 +2853,40 @@ async function stampaPianoCollaboratore(nome) {
 
 // Nota rapida col tasto destro (senza aprire il popup completo)
 async function _pianoNotaRapida(nome, dstr) {
+  // IDENTICO a Turnivo (commentCell/modifica_commento): "Commento per <codice>",
+  // firma automatica "- <operatore>", il commento su cella vuota crea la riga.
   if (!puoGestirePiano()) return;
+  const g = parseInt(dstr.split('-')[2]);
   const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
-  if (!r) {
-    toast('Assegna prima un codice alla cella (click sinistro)');
-    return;
-  }
-  const nota = prompt(
-    'Nota per ' + nome + ' — ' + r.codice + ' del ' + new Date(dstr + 'T12:00:00').toLocaleDateString('it-IT') + ':',
-    r.commento || '',
-  );
-  if (nota === null) return;
+  const attuale = (r && r.commento) || '';
+  const v = prompt('Commento per ' + (r && r.codice ? r.codice : 'giorno ' + g) + ':', attuale);
+  if (v === null) return;
+  let commento = v.trim();
+  const op = getOperatore();
+  if (commento && !commento.endsWith('- ' + op)) commento = commento + ' - ' + op;
   try {
-    await secPatch('piano', 'id=eq.' + r.id, {
-      commento: nota.trim() || null,
-      operatore: getOperatore(),
-      updated_at: new Date().toISOString(),
-    });
-    r.commento = nota.trim();
-    logAzione('Piano: nota cella', nome + ' ' + dstr);
-    toast(nota.trim() ? 'Nota salvata' : 'Nota rimossa');
+    if (!r) {
+      if (!commento) return;
+      const nuovo = await secPost('piano', {
+        collaboratore: nome,
+        data: dstr,
+        codice: '',
+        protetto: false,
+        generato: false,
+        commento: commento,
+        reparto_dip: _pianoReparto(),
+        operatore: op,
+      });
+      if (nuovo && nuovo[0]) _pianoRighe.push(nuovo[0]);
+    } else {
+      await secPatch('piano', 'id=eq.' + r.id, {
+        commento: commento || null,
+        operatore: op,
+        updated_at: new Date().toISOString(),
+      });
+      r.commento = commento;
+    }
+    if (commento) logAzione('Piano: commento', nome + ' ' + dstr + ': "' + commento + '"');
     renderPiano();
   } catch (e) {
     toast('Errore salvataggio nota');
@@ -2784,7 +2922,7 @@ function mostraPianoCtx(e, nome, dstr) {
     attiva
       ? '<div class="piano-ctx-item" onclick="' + azione + '"><i class="icx ' + icona + '"></i> ' + label + '</div>'
       : '';
-  h += voce('Modifica turno (finestra)', 'icx-modifica', "pianoCtxAzione('modifica')", puoMod);
+  h += voce('Modifica turno', 'icx-modifica', "pianoCtxAzione('modifica')", puoMod);
   h += voce('Commento / nota', 'icx-penna', "pianoCtxAzione('nota')", puoMod && !!r);
   h += voce('Cambia turno con...', 'icx-refresh', "pianoCtxAzione('scambio')", puoMod && !!haTurno);
   h += voce('Cambio per esigenze', 'icx-settings', "pianoCtxAzione('esigenze')", puoMod && !!haTurno);
@@ -2810,7 +2948,7 @@ function pianoCtxAzione(azione) {
   nascondiPianoCtx();
   const sel = _pianoCtxSel;
   if (!sel) return;
-  if (azione === 'modifica') apriPianoCella(sel.nome, sel.data);
+  if (azione === 'modifica') pianoCellaPrompt(sel.nome, sel.data);
   else if (azione === 'nota') _pianoNotaRapida(sel.nome, sel.data);
   else if (azione === 'stampa') stampaPianoCollaboratore(sel.nome);
   else if (azione === 'scambio') {
@@ -2933,36 +3071,28 @@ async function confermaCambioEsigenze() {
 // La finestra completa resta nel menu del tasto destro.
 // ================================================================
 async function pianoCellaPrompt(nome, dstr) {
-  if (!puoGestirePiano()) {
-    toast('Non hai il permesso di modificare il piano');
-    return;
-  }
+  // Comportamento IDENTICO a Turnivo (editCell): prompt "Turno per giorno N
+  // (vuoto per rimuovere)", vuoto elimina senza conferma, nessuna validazione
+  // del codice, il commento esistente viene conservato.
+  if (!puoGestirePiano()) return;
+  const g = parseInt(dstr.split('-')[2]);
   const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
   const attuale = r ? r.codice : '';
-  const v = prompt(
-    'Turno/codice per ' +
-      nome +
-      ' — ' +
-      new Date(dstr + 'T12:00:00').toLocaleDateString('it-IT') +
-      ' (vuoto = rimuovi):',
-    attuale,
-  );
+  const v = prompt('Turno per giorno ' + g + ' (vuoto per rimuovere):', attuale);
   if (v === null) return;
   const codice = v.trim().toUpperCase();
   _pianoCellaSel = { nome: nome, data: dstr };
-  if (!codice) {
-    if (r && confirm('Rimuovere ' + attuale + ' di ' + nome + '?')) await rimuoviPianoCella(true);
-    return;
-  }
-  if (codice === attuale) return;
-  const valido =
-    _pianoTurniReparto().some((t) => t.codice === codice) ||
-    pianoCodiciCache.some((c) => c.codice === codice && c.attivo !== false);
-  if (!valido) {
-    toast('Codice "' + codice + '" sconosciuto: usa un turno del settore (es. S22) o un codice speciale (V, M, C...)');
-    return;
-  }
   try {
+    if (!codice) {
+      if (r) {
+        await secDel('piano', 'id=eq.' + r.id);
+        _pianoRighe = _pianoRighe.filter((x) => x.id !== r.id);
+        logAzione('Piano: turno rimosso', nome + ' ' + dstr + ' (era ' + attuale + ')');
+        renderPiano();
+      }
+      return;
+    }
+    if (codice === attuale) return;
     if (r) {
       await secPatch('piano', 'id=eq.' + r.id, {
         codice: codice,
@@ -2986,7 +3116,6 @@ async function pianoCellaPrompt(nome, dstr) {
       if (nuovo && nuovo[0]) _pianoRighe.push(nuovo[0]);
     }
     logAzione('Piano modificato', nome + ' ' + dstr + ' → ' + codice);
-    toast('Piano aggiornato');
     renderPiano();
   } catch (e) {
     console.error(e);
