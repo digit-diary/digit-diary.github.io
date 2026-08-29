@@ -1556,6 +1556,224 @@ async function stampaPianoPDF() {
   mostraPdfPreview(doc, 'piano_' + ym + '_' + _pianoReparto() + '.pdf', 'Piano ' + label);
 }
 
+// Formulario cambio turno IDENTICO a Turnivo (template cambio_turno_pdf.html):
+// header centrato, sezioni con barra colorata (A blu, B arancio, motivazione
+// verde, autorizzazione viola con checkbox), chip turni, firme con data.
+function _pdfCambioTurno(dati) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('portrait', 'mm', 'a4');
+  const M = 15;
+  const W = 210 - 2 * M;
+  let y = 20;
+  // header centrato
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(14);
+  doc.setTextColor(51, 51, 51);
+  doc.text('Casino Lugano SA', 105, y, { align: 'center' });
+  y += 8;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(20);
+  doc.setTextColor(44, 62, 80);
+  doc.text(dati.tipo === 'ESIGENZE' ? 'CAMBIO TURNO PER ESIGENZE OPERATIVE' : 'RICHIESTA CAMBIO TURNO', 105, y, {
+    align: 'center',
+  });
+  y += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(51, 51, 51);
+  doc.text(
+    'Generato il ' +
+      new Date().toLocaleDateString('it-IT') +
+      ' ' +
+      new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
+    105,
+    y,
+    { align: 'center' },
+  );
+  y += 5;
+  doc.setDrawColor(44, 62, 80);
+  doc.setLineWidth(1);
+  doc.line(M, y, 210 - M, y);
+  y += 10;
+
+  const chip = (x, yy, testo, bg, fg) => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    const w = doc.getTextWidth(testo) + 5;
+    doc.setFillColor(bg[0], bg[1], bg[2]);
+    doc.roundedRect(x, yy - 4.2, w, 6, 1.2, 1.2, 'F');
+    doc.setTextColor(fg[0], fg[1], fg[2]);
+    doc.text(testo, x + 2.5, yy);
+    doc.setTextColor(34, 34, 34);
+    return w;
+  };
+  const sezione = (titolo, barra, sfondo, righe) => {
+    const altezza = 12 + righe.length * 6.5 + 3;
+    doc.setFillColor(sfondo[0], sfondo[1], sfondo[2]);
+    doc.setDrawColor(221, 221, 221);
+    doc.setLineWidth(0.25);
+    doc.roundedRect(M, y, W, altezza, 1.8, 1.8, 'FD');
+    doc.setFillColor(barra[0], barra[1], barra[2]);
+    doc.rect(M, y, 1.6, altezza, 'F');
+    let yy = y + 8;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(44, 62, 80);
+    doc.text(titolo, M + 6, yy);
+    doc.setDrawColor(221, 221, 221);
+    doc.line(M + 6, yy + 2, 210 - M - 6, yy + 2);
+    yy += 8;
+    doc.setFontSize(10);
+    righe.forEach((r) => {
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(51, 51, 51);
+      doc.text(r[0], M + 6, yy);
+      if (r[2] === 'chip') {
+        const w = chip(M + 6 + 42, yy, r[1], [232, 244, 253], [21, 101, 192]);
+        if (r[3]) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8.5);
+          doc.setTextColor(85, 85, 85);
+          doc.text(r[3], M + 6 + 42 + w + 2, yy);
+          doc.setFontSize(10);
+        }
+      } else if (r[2] === 'chiprosso') {
+        const w = chip(M + 6 + 42, yy, r[1], [253, 232, 232], [192, 57, 43]);
+        if (r[3]) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8.5);
+          doc.setTextColor(85, 85, 85);
+          doc.text(r[3], M + 6 + 42 + w + 2, yy);
+          doc.setFontSize(10);
+        }
+      } else {
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(34, 34, 34);
+        doc.text(String(r[1]), M + 6 + 42, yy);
+      }
+      yy += 6.5;
+    });
+    y += altezza + 6;
+  };
+
+  if (dati.tipo === 'ESIGENZE') {
+    sezione(
+      'Collaboratore',
+      [52, 152, 219],
+      [250, 250, 250],
+      [
+        ['Nome:', dati.a.nome],
+        ['Settore:', dati.a.settore],
+        ['Data turno:', dati.data],
+        ['Turno originale:', dati.a.turno, 'chip', dati.a.orari],
+        ['Nuovo turno:', dati.nuovoTurno, 'chiprosso', dati.nuovoOrari],
+      ],
+    );
+  } else {
+    sezione(
+      'Collaboratore A (richiedente)',
+      [52, 152, 219],
+      [250, 250, 250],
+      [
+        ['Nome:', dati.a.nome],
+        ['Settore:', dati.a.settore],
+        ['Data turno:', dati.data],
+        ['Turno originale:', dati.a.turno, 'chip', dati.a.orari],
+      ],
+    );
+    sezione(
+      'Collaboratore B (accetta lo scambio)',
+      [230, 126, 34],
+      [250, 250, 250],
+      [
+        ['Nome:', dati.b.nome],
+        ['Settore:', dati.b.settore],
+        ['Data turno:', dati.data],
+        ['Turno originale:', dati.b.turno, 'chip', dati.b.orari],
+      ],
+    );
+  }
+  sezione('Motivazione', [46, 204, 113], [240, 250, 240], [['', dati.motivo || 'Nessuna motivazione specificata']]);
+  // Autorizzazione con checkbox
+  const hAut = 30;
+  doc.setFillColor(250, 248, 252);
+  doc.setDrawColor(221, 221, 221);
+  doc.roundedRect(M, y, W, hAut, 1.8, 1.8, 'FD');
+  doc.setFillColor(142, 68, 173);
+  doc.rect(M, y, 1.6, hAut, 'F');
+  let yy = y + 8;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(44, 62, 80);
+  doc.text('Autorizzazione', M + 6, yy);
+  doc.setDrawColor(221, 221, 221);
+  doc.line(M + 6, yy + 2, 210 - M - 6, yy + 2);
+  yy += 9;
+  doc.setDrawColor(51, 51, 51);
+  doc.setLineWidth(0.5);
+  doc.rect(M + 6, yy - 4, 5, 5);
+  doc.setFontSize(11);
+  doc.setTextColor(34, 34, 34);
+  doc.text('X', M + 7.2, yy);
+  doc.text('Autorizzato', M + 14, yy);
+  doc.rect(M + 52, yy - 4, 5, 5);
+  doc.text('Non autorizzato', M + 60, yy);
+  yy += 8;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('Motivo:', M + 6, yy);
+  doc.setFont('helvetica', 'normal');
+  doc.text('_______________________________________________________________________', M + 22, yy);
+  y += hAut + 14;
+  // firme
+  const firme =
+    dati.tipo === 'ESIGENZE'
+      ? [
+          ['Firma Collaboratore', dati.a.nome],
+          ['Firma Responsabile', ''],
+        ]
+      : [
+          ['Firma Collaboratore A', dati.a.nome],
+          ['Firma Collaboratore B', dati.b.nome],
+          ['Firma Responsabile', ''],
+        ];
+  const wBox = firme.length === 2 ? W * 0.45 : W * 0.3;
+  const gap = (W - wBox * firme.length) / (firme.length - 1);
+  y += 18;
+  firme.forEach((f, i) => {
+    const x = M + i * (wBox + gap);
+    doc.setDrawColor(51, 51, 51);
+    doc.setLineWidth(0.35);
+    doc.line(x, y, x + wBox, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(51, 51, 51);
+    doc.text(f[0], x + wBox / 2, y + 4.5, { align: 'center' });
+    if (f[1]) {
+      doc.setFont('helvetica', 'bold');
+      doc.text(f[1], x + wBox / 2, y + 9, { align: 'center' });
+    }
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.text('Data: ____/____/________', x + wBox / 2, y + (f[1] ? 13.5 : 9), { align: 'center' });
+  });
+  // footer
+  const ph = doc.internal.pageSize.getHeight();
+  doc.setDrawColor(221, 221, 221);
+  doc.line(M, ph - 14, 210 - M, ph - 14);
+  doc.setFontSize(7.5);
+  doc.setTextColor(85, 85, 85);
+  doc.text(
+    'Generato da Turnivo — Casino Lugano SA — Richiesto da: ' + (dati.richiesto || getOperatore()),
+    105,
+    ph - 9,
+    {
+      align: 'center',
+    },
+  );
+  return doc;
+}
+
 // ---- Scambio turno tra colleghi (come Turnivo cap. 19) ----
 function apriScambioTurno() {
   const sel = _pianoCellaSel;
@@ -1626,38 +1844,29 @@ async function confermaScambioTurno() {
     r1.protetto = r2.protetto = true;
     logAzione('Piano: scambio turno', sel.nome + ' (' + c1 + ') <-> ' + collega + ' (' + c2 + ') il ' + sel.data);
     toast('Turni scambiati');
-    // PDF dello scambio (documentazione con firme, come Turnivo)
+    // Formulario IDENTICO a Turnivo
     if (!window.jspdf) await caricaJsPDF();
     if (window.jspdf) {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      let y = 20;
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(15);
-      doc.text('Modulo cambio turno', 105, y, { align: 'center' });
-      y += 12;
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(11);
-      doc.text('Data del turno: ' + new Date(sel.data + 'T12:00:00').toLocaleDateString('it-IT'), 20, y);
-      y += 8;
-      doc.text('Settore: ' + repartoLabel(_pianoReparto()), 20, y);
-      y += 12;
-      doc.text(sel.nome + ':  ' + c1 + '  ->  ' + c2, 20, y);
-      y += 8;
-      doc.text(collega + ':  ' + c2 + '  ->  ' + c1, 20, y);
-      y += 10;
-      if (motivo) {
-        doc.text('Motivazione: ' + motivo, 20, y);
-        y += 10;
-      }
-      doc.text('Registrato da: ' + getOperatore() + ' il ' + new Date().toLocaleDateString('it-IT'), 20, y);
-      y += 24;
-      doc.line(20, y, 85, y);
-      doc.line(115, y, 180, y);
-      y += 5;
-      doc.setFontSize(9);
-      doc.text('Firma ' + sel.nome, 20, y);
-      doc.text('Firma ' + collega, 115, y);
+      const t1 = _pianoTurnoInfo(c1);
+      const t2 = _pianoTurnoInfo(c2);
+      const fmtOra = (t) =>
+        t
+          ? '(' +
+            (t.ora_inizio || '').substring(0, 5) +
+            '-' +
+            (t.ora_fine || '').substring(0, 5) +
+            ', ' +
+            (t.gruppo || '') +
+            ')'
+          : '';
+      const doc = _pdfCambioTurno({
+        tipo: 'SCAMBIO',
+        data: new Date(sel.data + 'T12:00:00').toLocaleDateString('it-IT'),
+        a: { nome: sel.nome, settore: repartoLabel(_pianoReparto()), turno: c1, orari: fmtOra(t1) },
+        b: { nome: collega, settore: repartoLabel(_pianoReparto()), turno: c2, orari: fmtOra(t2) },
+        motivo: motivo,
+        richiesto: getOperatore(),
+      });
       mostraPdfPreview(doc, 'cambio_turno_' + sel.data + '.pdf', 'Cambio turno ' + sel.data);
     }
     renderPiano();
@@ -2349,130 +2558,171 @@ async function salvaPreferenzaCollab(id, campo, valore) {
 // + NOTA RAPIDA con tasto destro sulla cella (come Turnivo)
 // ================================================================
 async function stampaPianoCollaboratore(nome) {
+  // PDF IDENTICO a Turnivo (template pdf_turni.html): A4 verticale,
+  // intestazione con nome, tabella Data | Turno | Commenti, righe colorate
+  // (weekend verde, domenica arancio, festivo rosa, con commento azzurro)
   if (!window.jspdf) {
     toast('Caricamento PDF...');
     if (!(await caricaJsPDF())) return;
   }
   const ym = _pianoMeseSel;
   const nGiorni = _pianoUltimoGiorno(ym);
-  const label = (MESI_FULL[parseInt(ym.split('-')[1]) - 1] || ym) + ' ' + ym.split('-')[0];
-  const righe = _pianoRighe.filter((r) => r.collaboratore === nome).sort((a, b) => a.data.localeCompare(b.data));
-  if (!righe.length) {
-    toast('Nessuna assegnazione per ' + nome + ' in ' + label);
-    return;
-  }
-  const GGf = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'];
+  const anno = ym.split('-')[0];
+  const meseNome = MESI_FULL[parseInt(ym.split('-')[1]) - 1] || ym;
+  const meseNomeLower = meseNome.toLowerCase();
+  const mappa = {};
+  _pianoRighe.filter((r) => r.collaboratore === nome).forEach((r) => (mappa[parseInt(r.data.split('-')[2])] = r));
+  const festiviSet = {};
+  pianoFestiviCache.forEach((f) => {
+    if (f.data.startsWith(ym)) festiviSet[parseInt(f.data.split('-')[2])] = true;
+  });
+  const GG_FULL = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
   const info = _pianoCollabInfo(nome);
-  const perc = info ? parseFloat(info.percentuale) || 1 : 1;
-  let ore = 0;
-  let nD = 0;
-  let nN = 0;
-  let nV = 0;
-  let nM = 0;
-  const body = [];
+  const righePdf = [];
   for (let g = 1; g <= nGiorni; g++) {
     const dstr = ym + '-' + String(g).padStart(2, '0');
-    const r = righe.find((x) => x.data === dstr);
-    const d = new Date(dstr + 'T12:00:00');
-    let orario = '';
-    let oreG = '';
-    if (r) {
-      const t = _pianoTurnoInfo(r.codice);
-      const cs = _pianoCodiceInfo(r.codice);
-      if (t) {
-        orario = (t.ora_inizio || '').substring(0, 5) + ' - ' + (t.ora_fine || '').substring(0, 5);
-        oreG = (parseFloat(t.durata_ore) || 0).toFixed(2);
-        ore += parseFloat(t.durata_ore) || 0;
-        if (t.tipo === 'NOTTURNO') nN++;
-        else nD++;
-      } else if (cs) {
-        orario = cs.descrizione || '';
-        oreG = (parseFloat(cs.ore) || 0).toFixed(2);
-        ore += parseFloat(cs.ore) || 0;
-        if (r.codice === 'V' || r.codice === 'V1') nV++;
-        if (r.codice === 'M' || r.codice === 'M1') nM++;
-      }
-    }
-    body.push([g + ' ' + GGf[d.getDay()].substring(0, 3), r ? r.codice : '', orario, oreG, (r && r.commento) || '']);
+    const dow = new Date(dstr + 'T12:00:00').getDay();
+    const r = mappa[g];
+    const codice = r ? r.codice : '';
+    const t = codice ? _pianoTurnoInfo(codice) : null;
+    const cs = codice && !t ? _pianoCodiceInfo(codice) : null;
+    let desc = '';
+    if (t)
+      desc =
+        '(' +
+        (t.gruppo || '') +
+        ' ' +
+        (t.ora_inizio || '').substring(0, 5) +
+        '-' +
+        (t.ora_fine || '').substring(0, 5) +
+        ')';
+    else if (cs) desc = '(' + (cs.descrizione || '') + ')';
+    righePdf.push({
+      data: GG_FULL[dow] + ' ' + g + ' ' + meseNomeLower + ' ' + anno,
+      codice: codice || '-',
+      desc: desc,
+      commento: (r && r.commento) || '',
+      fill:
+        r && r.commento
+          ? [187, 222, 251] // azzurro: riga con commento
+          : festiviSet[g]
+            ? [252, 228, 236] // rosa: festivo
+            : dow === 0
+              ? [255, 243, 224] // arancio: domenica
+              : dow === 5 || dow === 6
+                ? [232, 245, 233] // verde: weekend
+                : g % 2 === 0
+                  ? [248, 249, 250]
+                  : [255, 255, 255],
+      vuoto: !codice,
+    });
   }
-  const dovute = Math.round(((_pianoOreSett * perc * nGiorni) / 7) * 10) / 10;
-  const saldo = Math.round((ore - dovute) * 10) / 10;
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
+  const doc = new jsPDF('portrait', 'mm', 'a4');
+  let y = 16;
+  // intestazione stile Turnivo
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(15);
-  doc.text('Piano di lavoro — ' + nome, 105, 14, { align: 'center' });
+  doc.setFontSize(22);
+  doc.setTextColor(26, 26, 26);
+  doc.text(nome, 12, y);
+  y += 3;
+  doc.setDrawColor(51, 51, 51);
+  doc.setLineWidth(0.6);
+  doc.line(12, y, 198, y);
+  y += 6;
+  doc.setFontSize(9);
+  doc.setTextColor(85, 85, 85);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Persona:', 12, y);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(90);
-  doc.text(
-    label +
-      ' — ' +
-      repartoLabel(_pianoReparto()) +
-      (info && info.funzione ? ' — ' + info.funzione : '') +
-      ' — impiego ' +
-      Math.round(perc * 100) +
-      '%',
-    105,
-    20,
-    { align: 'center' },
-  );
+  doc.text(nome, 45, y);
+  y += 4.5;
+  doc.setFont('helvetica', 'bold');
+  doc.text('Settore/Dipartimento:', 12, y);
+  doc.setFont('helvetica', 'normal');
+  doc.text(repartoLabel(_pianoReparto()) + (info && info.funzione ? ' — ' + info.funzione : ''), 45, y);
+  y += 4.5;
+  doc.setFont('helvetica', 'bold');
+  doc.text('Mese selezionato:', 12, y);
+  doc.setFont('helvetica', 'normal');
+  doc.text(meseNome, 45, y);
+  y += 6;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(0, 102, 204);
+  doc.text(anno, 12, y);
   doc.setTextColor(0);
+  y += 4;
   doc.autoTable({
-    startY: 25,
-    head: [['Giorno', 'Turno', 'Orario / descrizione', 'Ore', 'Note']],
-    body: body,
-    theme: 'grid',
-    styles: { fontSize: 7.5, cellPadding: 1.2 },
-    headStyles: { fillColor: [26, 18, 8], textColor: [255, 255, 255], fontSize: 8 },
-    columnStyles: {
-      0: { cellWidth: 24 },
-      1: { cellWidth: 18, halign: 'center', fontStyle: 'bold' },
-      3: { cellWidth: 15, halign: 'right' },
-    },
+    startY: y,
+    head: [['DATA', 'TURNO', 'COMMENTI']],
+    body: righePdf.map((r) => [r.data, ' ', r.commento]),
+    theme: 'plain',
+    margin: { left: 12, right: 12 },
+    styles: { fontSize: 9, cellPadding: { top: 1.8, bottom: 1.8, left: 2.5, right: 2.5 }, lineWidth: 0 },
+    headStyles: { fillColor: [44, 62, 80], textColor: [255, 255, 255], fontSize: 9, fontStyle: 'bold' },
+    columnStyles: { 0: { cellWidth: 65 }, 1: { cellWidth: 75 }, 2: { cellWidth: 46 } },
     didParseCell: (d) => {
-      if (d.section === 'body' && d.column.index === 1 && d.cell.raw) {
-        const col = _pianoColore(String(d.cell.raw));
-        if (col) {
-          const hex = col.replace('#', '');
-          d.cell.styles.fillColor = [
-            parseInt(hex.substring(0, 2), 16),
-            parseInt(hex.substring(2, 4), 16),
-            parseInt(hex.substring(4, 6), 16),
-          ];
+      if (d.section !== 'body') return;
+      const r = righePdf[d.row.index];
+      d.cell.styles.fillColor = r.fill;
+      if (d.column.index === 0) d.cell.styles.textColor = [80, 80, 80];
+      if (d.column.index === 2) {
+        d.cell.styles.textColor = [102, 102, 102];
+        d.cell.styles.fontStyle = 'italic';
+        d.cell.styles.fontSize = 8.5;
+      }
+    },
+    didDrawCell: (d) => {
+      // colonna Turno: codice blu grassetto + descrizione grigia (come Turnivo)
+      if (d.section !== 'body' || d.column.index !== 1) return;
+      const r = righePdf[d.row.index];
+      const x = d.cell.x + 2.5;
+      const yy = d.cell.y + d.cell.height / 2 + 1.2;
+      if (r.vuoto) {
+        d.doc.setTextColor(170, 170, 170);
+        d.doc.setFont('helvetica', 'normal');
+        d.doc.setFontSize(9);
+        d.doc.text('-', x, yy);
+      } else {
+        d.doc.setFont('helvetica', 'bold');
+        d.doc.setFontSize(9);
+        d.doc.setTextColor(21, 101, 192);
+        d.doc.text(r.codice, x, yy);
+        if (r.desc) {
+          const w = d.doc.getTextWidth(r.codice);
+          d.doc.setFont('helvetica', 'normal');
+          d.doc.setFontSize(8.5);
+          d.doc.setTextColor(85, 85, 85);
+          d.doc.text(' ' + r.desc, x + w + 1, yy);
         }
       }
+      d.doc.setTextColor(0);
+    },
+    didDrawPage: () => {
+      const ph = doc.internal.pageSize.getHeight();
+      doc.setDrawColor(221, 221, 221);
+      doc.setLineWidth(0.2);
+      doc.line(12, ph - 12, 198, ph - 12);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(153, 153, 153);
+      doc.text(
+        'Casino Lugano SA — Piano turni ' +
+          meseNome +
+          ' ' +
+          anno +
+          ' — Generato il ' +
+          new Date().toLocaleDateString('it-IT') +
+          ' ' +
+          new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
+        105,
+        ph - 8,
+        { align: 'center' },
+      );
+      doc.setTextColor(0);
     },
   });
-  let y = doc.lastAutoTable.finalY + 6;
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'bold');
-  doc.text(
-    'Ore: ' +
-      ore.toFixed(1) +
-      '   Dovute: ' +
-      dovute.toFixed(1) +
-      '   Saldo: ' +
-      (saldo > 0 ? '+' : '') +
-      saldo.toFixed(1) +
-      '   Diurni: ' +
-      nD +
-      '   Notturni: ' +
-      nN +
-      '   Vacanze: ' +
-      nV +
-      '   Malattie: ' +
-      nM,
-    14,
-    y,
-  );
-  y += 14;
-  doc.setFont('helvetica', 'normal');
-  doc.line(14, y, 80, y);
-  doc.line(120, y, 186, y);
-  doc.setFontSize(8);
-  doc.text('Firma collaboratore', 14, y + 4);
-  doc.text('Firma responsabile', 120, y + 4);
   logAzione('Piano collaboratore stampato', nome + ' ' + ym);
   mostraPdfPreview(doc, 'piano_' + nome.replace(/\s+/g, '_') + '_' + ym + '.pdf', 'Piano ' + nome);
 }
@@ -2647,33 +2897,27 @@ async function confermaCambioEsigenze() {
     toast('Turno cambiato: ' + vecchio + ' -> ' + nuovo);
     if (!window.jspdf) await caricaJsPDF();
     if (window.jspdf) {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      let y = 20;
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(15);
-      doc.text('Cambio turno per esigenze operative', 105, y, { align: 'center' });
-      y += 12;
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(11);
-      doc.text('Collaboratore: ' + sel.nome, 20, y);
-      y += 8;
-      doc.text('Data del turno: ' + new Date(sel.data + 'T12:00:00').toLocaleDateString('it-IT'), 20, y);
-      y += 8;
-      doc.text('Turno: ' + vecchio + '  ->  ' + nuovo, 20, y);
-      y += 8;
-      if (motivo) {
-        doc.text('Motivazione: ' + motivo, 20, y);
-        y += 8;
-      }
-      doc.text('Registrato da: ' + getOperatore() + ' il ' + new Date().toLocaleDateString('it-IT'), 20, y);
-      y += 24;
-      doc.line(20, y, 85, y);
-      doc.line(115, y, 180, y);
-      y += 5;
-      doc.setFontSize(9);
-      doc.text('Firma ' + sel.nome, 20, y);
-      doc.text('Firma responsabile', 115, y);
+      const tv = _pianoTurnoInfo(vecchio);
+      const tn = _pianoTurnoInfo(nuovo);
+      const fmtOra = (t) =>
+        t
+          ? '(' +
+            (t.ora_inizio || '').substring(0, 5) +
+            '-' +
+            (t.ora_fine || '').substring(0, 5) +
+            ', ' +
+            (t.gruppo || '') +
+            ')'
+          : '';
+      const doc = _pdfCambioTurno({
+        tipo: 'ESIGENZE',
+        data: new Date(sel.data + 'T12:00:00').toLocaleDateString('it-IT'),
+        a: { nome: sel.nome, settore: repartoLabel(_pianoReparto()), turno: vecchio, orari: fmtOra(tv) },
+        nuovoTurno: nuovo,
+        nuovoOrari: fmtOra(tn),
+        motivo: motivo,
+        richiesto: getOperatore(),
+      });
       mostraPdfPreview(doc, 'cambio_esigenze_' + sel.data + '.pdf', 'Cambio per esigenze ' + sel.data);
     }
     renderPiano();

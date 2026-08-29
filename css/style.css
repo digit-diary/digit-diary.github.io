@@ -3598,7 +3598,8 @@ button:focus-visible,
   border-color: transparent #c0392b transparent transparent;
 }
 .piano-malattia-auto {
-  color: #c0392b;
+  background: #ffff00 !important;
+  color: #222;
   border: 1px dashed #c0392b !important;
   font-weight: 700;
 }
