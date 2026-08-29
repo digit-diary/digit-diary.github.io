@@ -1133,10 +1133,27 @@ async function salvaRinominaCollaboratore(vecchio) {
       await secPatch('chat_message_hidden', 'operatore=eq.' + encodeURIComponent(vecchio), { operatore: nuovo });
     } catch (_) {}
     await secPatch('moduli', 'collaboratore=eq.' + encodeURIComponent(vecchio), { collaboratore: nuovo });
+    // Tabelle nome-collaboratore aggiunte dopo: valutazioni, punti, storico HR, allegati, piano
+    for (const tab of ['valutazioni', 'punti_eventi', 'hr_eventi', 'hr_allegati', 'piano']) {
+      try {
+        await secPatch(tab, 'collaboratore=eq.' + encodeURIComponent(vecchio), { collaboratore: nuovo });
+      } catch (_) {}
+    }
     const ci = collaboratoriCache.findIndex((c) => c.nome === vecchio);
     if (ci !== -1) collaboratoriCache[ci].nome = nuovo;
     datiCache.forEach((e) => {
       if (e.nome === vecchio) e.nome = nuovo;
+    });
+    // aggiorna anche le cache in memoria delle tabelle nome-collaboratore
+    [
+      typeof valutazioniCache !== 'undefined' ? valutazioniCache : [],
+      typeof puntiEventiCache !== 'undefined' ? puntiEventiCache : [],
+      typeof hrEventiCache !== 'undefined' ? hrEventiCache : [],
+      typeof _pianoRighe !== 'undefined' ? _pianoRighe : [],
+    ].forEach((cache) => {
+      cache.forEach((r) => {
+        if (r.collaboratore === vecchio) r.collaboratore = nuovo;
+      });
     });
     collaboratoriCache.sort((a, b) => a.nome.localeCompare(b.nome));
     logAzione('Rinomina collaboratore', vecchio + ' → ' + nuovo);
