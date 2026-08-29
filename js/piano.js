@@ -274,7 +274,7 @@ async function renderPiano() {
           stile +
           '"' +
           (titolo ? ' title="' + escP(titolo) + '"' : '') +
-          (puoMod ? ' onclick="apriPianoCella(\'' + ne + "','" + dstr + '\')"' : '') +
+          (puoMod ? ' onclick="pianoCellaPrompt(\'' + ne + "','" + dstr + '\')"' : '') +
           '>' +
           cella +
           '</td>';
@@ -294,7 +294,11 @@ async function renderPiano() {
         _clsRiga +
         '><td class="piano-nome"' +
         (infoC && infoC.funzione ? ' title="' + escP(infoC.funzione) + ' ' + Math.round(perc * 100) + '%"' : '') +
-        '>' +
+        '><i class="icx icx-stampa piano-pdf-ico" title="Stampa il piano di ' +
+        escP(nome) +
+        '" onclick="event.stopPropagation();stampaPianoCollaboratore(\'' +
+        ne +
+        '\')"></i>' +
         escP(nome) +
         (infoC && infoC.funzione && infoC.funzione !== 'HOST'
           ? ' <span style="font-size:.58rem;color:var(--muted)">' + escP(infoC.funzione) + '</span>'
@@ -1693,7 +1697,7 @@ function _pianoInitSelezione() {
       const giorno = idx; // colonna 0 = nome, 1..n = giorni
       if (!nomeCella || giorno < 1) return;
       const nome = nomeCella.textContent.trim().replace(/\s+(RESP|SUP|BO|HOST)$/, '');
-      _pianoNotaRapida(nome, _pianoMeseSel + '-' + String(giorno).padStart(2, '0'));
+      mostraPianoCtx(e, nome, _pianoMeseSel + '-' + String(giorno).padStart(2, '0'));
     });
   });
   tab.querySelectorAll('thead th').forEach((th, idx) => {
@@ -2498,5 +2502,250 @@ async function _pianoNotaRapida(nome, dstr) {
     renderPiano();
   } catch (e) {
     toast('Errore salvataggio nota');
+  }
+}
+
+// ================================================================
+// MENU CONTESTUALE (tasto destro) — come Turnivo cap. 17.4:
+// Modifica turno / Commento / Cambia turno con... / Cambio per
+// esigenze / Stampa piano collaboratore
+// ================================================================
+let _pianoCtxSel = null; // {nome, data}
+
+function mostraPianoCtx(e, nome, dstr) {
+  _pianoCtxSel = { nome: nome, data: dstr };
+  let menu = document.getElementById('piano-ctx');
+  if (!menu) {
+    menu = document.createElement('div');
+    menu.id = 'piano-ctx';
+    document.body.appendChild(menu);
+    document.addEventListener('click', (ev) => {
+      if (!ev.target.closest('#piano-ctx')) nascondiPianoCtx();
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') nascondiPianoCtx();
+    });
+  }
+  const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
+  const haTurno = r && _pianoTurnoInfo(r.codice);
+  const puoMod = puoGestirePiano();
+  let h = '';
+  const voce = (label, icona, azione, attiva) =>
+    attiva
+      ? '<div class="piano-ctx-item" onclick="' + azione + '"><i class="icx ' + icona + '"></i> ' + label + '</div>'
+      : '';
+  h += voce('Modifica turno (finestra)', 'icx-modifica', "pianoCtxAzione('modifica')", puoMod);
+  h += voce('Commento / nota', 'icx-penna', "pianoCtxAzione('nota')", puoMod && !!r);
+  h += voce('Cambia turno con...', 'icx-refresh', "pianoCtxAzione('scambio')", puoMod && !!haTurno);
+  h += voce('Cambio per esigenze', 'icx-settings', "pianoCtxAzione('esigenze')", puoMod && !!haTurno);
+  h += voce('Rimuovi cella', 'icx-cestino', "pianoCtxAzione('rimuovi')", puoMod && !!r);
+  h += voce('Stampa piano di ' + escP(nome.split(' ')[0]), 'icx-stampa', "pianoCtxAzione('stampa')", true);
+  menu.innerHTML =
+    '<div class="piano-ctx-head">' +
+    escP(nome) +
+    ' — ' +
+    new Date(dstr + 'T12:00:00').toLocaleDateString('it-IT') +
+    (r ? ' (' + escP(r.codice) + ')' : '') +
+    '</div>' +
+    h;
+  menu.style.display = 'block';
+  menu.style.left = Math.min(e.clientX, window.innerWidth - 230) + 'px';
+  menu.style.top = Math.min(e.clientY, window.innerHeight - menu.offsetHeight - 10) + 'px';
+}
+function nascondiPianoCtx() {
+  const menu = document.getElementById('piano-ctx');
+  if (menu) menu.style.display = 'none';
+}
+function pianoCtxAzione(azione) {
+  nascondiPianoCtx();
+  const sel = _pianoCtxSel;
+  if (!sel) return;
+  if (azione === 'modifica') apriPianoCella(sel.nome, sel.data);
+  else if (azione === 'nota') _pianoNotaRapida(sel.nome, sel.data);
+  else if (azione === 'stampa') stampaPianoCollaboratore(sel.nome);
+  else if (azione === 'scambio') {
+    _pianoCellaSel = { nome: sel.nome, data: sel.data };
+    apriScambioTurno();
+  } else if (azione === 'esigenze') apriCambioEsigenze(sel.nome, sel.data);
+  else if (azione === 'rimuovi') {
+    _pianoCellaSel = { nome: sel.nome, data: sel.data };
+    if (
+      confirm(
+        'Rimuovere la cella di ' +
+          sel.nome +
+          ' del ' +
+          new Date(sel.data + 'T12:00:00').toLocaleDateString('it-IT') +
+          '?',
+      )
+    )
+      rimuoviPianoCella(true);
+  }
+}
+
+// Cambio per esigenze operative (come Turnivo): il turno della cella viene
+// sostituito con un altro, con commento automatico "Ex <vecchio>" e PDF firma
+function apriCambioEsigenze(nome, dstr) {
+  const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
+  if (!r || !_pianoTurnoInfo(r.codice)) return;
+  _pianoCtxSel = { nome: nome, data: dstr };
+  const turni = _pianoTurniReparto().filter((t) => t.codice !== r.codice);
+  const b = document.getElementById('pwd-modal-content');
+  b.innerHTML =
+    '<h3>Cambio per esigenze operative</h3><p style="margin-bottom:10px;font-size:.86rem"><strong>' +
+    escP(nome) +
+    '</strong> — ' +
+    new Date(dstr + 'T12:00:00').toLocaleDateString('it-IT') +
+    ' — turno attuale: <strong>' +
+    escP(r.codice) +
+    '</strong></p>' +
+    '<div class="field" style="text-align:left"><label>Nuovo turno</label><select id="esig-turno" style="width:100%;padding:10px">' +
+    turni
+      .map(
+        (t) =>
+          '<option value="' +
+          escP(t.codice) +
+          '">' +
+          escP(t.codice) +
+          ' (' +
+          (t.ora_inizio || '').substring(0, 5) +
+          '-' +
+          (t.ora_fine || '').substring(0, 5) +
+          ')</option>',
+      )
+      .join('') +
+    '</select></div>' +
+    '<div class="field" style="text-align:left;margin-top:8px"><label>Motivazione</label><input type="text" id="esig-motivo" placeholder="Es: copertura cassa, evento speciale..."></div>' +
+    '<div class="pwd-modal-btns" style="margin-top:14px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="confermaCambioEsigenze()">Cambia turno</button></div>';
+  document.getElementById('pwd-modal').classList.remove('hidden');
+}
+async function confermaCambioEsigenze() {
+  const sel = _pianoCtxSel;
+  const nuovo = (document.getElementById('esig-turno') || {}).value;
+  const motivo = ((document.getElementById('esig-motivo') || {}).value || '').trim();
+  document.getElementById('pwd-modal').classList.add('hidden');
+  if (!sel || !nuovo) return;
+  const r = _pianoRighe.find((x) => x.collaboratore === sel.nome && x.data === sel.data);
+  if (!r) return;
+  const vecchio = r.codice;
+  try {
+    await secPatch('piano', 'id=eq.' + r.id, {
+      codice: nuovo,
+      protetto: true,
+      commento: (
+        'Ex ' +
+        vecchio +
+        ' — cambio per esigenze operative' +
+        (motivo ? ': ' + motivo : '') +
+        ' — firma'
+      ).substring(0, 400),
+      operatore: getOperatore(),
+      updated_at: new Date().toISOString(),
+    });
+    r.codice = nuovo;
+    r.protetto = true;
+    logAzione('Piano: cambio per esigenze', sel.nome + ' ' + sel.data + ': ' + vecchio + ' -> ' + nuovo);
+    toast('Turno cambiato: ' + vecchio + ' -> ' + nuovo);
+    if (!window.jspdf) await caricaJsPDF();
+    if (window.jspdf) {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      let y = 20;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(15);
+      doc.text('Cambio turno per esigenze operative', 105, y, { align: 'center' });
+      y += 12;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(11);
+      doc.text('Collaboratore: ' + sel.nome, 20, y);
+      y += 8;
+      doc.text('Data del turno: ' + new Date(sel.data + 'T12:00:00').toLocaleDateString('it-IT'), 20, y);
+      y += 8;
+      doc.text('Turno: ' + vecchio + '  ->  ' + nuovo, 20, y);
+      y += 8;
+      if (motivo) {
+        doc.text('Motivazione: ' + motivo, 20, y);
+        y += 8;
+      }
+      doc.text('Registrato da: ' + getOperatore() + ' il ' + new Date().toLocaleDateString('it-IT'), 20, y);
+      y += 24;
+      doc.line(20, y, 85, y);
+      doc.line(115, y, 180, y);
+      y += 5;
+      doc.setFontSize(9);
+      doc.text('Firma ' + sel.nome, 20, y);
+      doc.text('Firma responsabile', 115, y);
+      mostraPdfPreview(doc, 'cambio_esigenze_' + sel.data + '.pdf', 'Cambio per esigenze ' + sel.data);
+    }
+    renderPiano();
+  } catch (e) {
+    console.error(e);
+    toast('Errore cambio turno');
+  }
+}
+
+// ================================================================
+// MODIFICA RAPIDA STILE TURNIVO: click sulla cella = prompt in cui
+// si scrive direttamente il codice (S22, V, C...). Vuoto = rimuovi.
+// La finestra completa resta nel menu del tasto destro.
+// ================================================================
+async function pianoCellaPrompt(nome, dstr) {
+  if (!puoGestirePiano()) {
+    toast('Non hai il permesso di modificare il piano');
+    return;
+  }
+  const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
+  const attuale = r ? r.codice : '';
+  const v = prompt(
+    'Turno/codice per ' +
+      nome +
+      ' — ' +
+      new Date(dstr + 'T12:00:00').toLocaleDateString('it-IT') +
+      ' (vuoto = rimuovi):',
+    attuale,
+  );
+  if (v === null) return;
+  const codice = v.trim().toUpperCase();
+  _pianoCellaSel = { nome: nome, data: dstr };
+  if (!codice) {
+    if (r && confirm('Rimuovere ' + attuale + ' di ' + nome + '?')) await rimuoviPianoCella(true);
+    return;
+  }
+  if (codice === attuale) return;
+  const valido =
+    _pianoTurniReparto().some((t) => t.codice === codice) ||
+    pianoCodiciCache.some((c) => c.codice === codice && c.attivo !== false);
+  if (!valido) {
+    toast('Codice "' + codice + '" sconosciuto: usa un turno del settore (es. S22) o un codice speciale (V, M, C...)');
+    return;
+  }
+  try {
+    if (r) {
+      await secPatch('piano', 'id=eq.' + r.id, {
+        codice: codice,
+        protetto: true,
+        generato: false,
+        operatore: getOperatore(),
+        updated_at: new Date().toISOString(),
+      });
+      r.codice = codice;
+      r.protetto = true;
+    } else {
+      const nuovo = await secPost('piano', {
+        collaboratore: nome,
+        data: dstr,
+        codice: codice,
+        protetto: true,
+        generato: false,
+        reparto_dip: _pianoReparto(),
+        operatore: getOperatore(),
+      });
+      if (nuovo && nuovo[0]) _pianoRighe.push(nuovo[0]);
+    }
+    logAzione('Piano modificato', nome + ' ' + dstr + ' → ' + codice);
+    toast('Piano aggiornato');
+    renderPiano();
+  } catch (e) {
+    console.error(e);
+    toast('Errore salvataggio piano');
   }
 }

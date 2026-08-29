@@ -3665,3 +3665,49 @@ button:focus-visible,
   background: #fce4d6;
   font-weight: 700;
 }
+/* Menu contestuale del Piano (tasto destro, come Turnivo) */
+#piano-ctx {
+  display: none;
+  position: fixed;
+  z-index: 99999;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  min-width: 210px;
+  font-size: 0.84rem;
+  overflow: hidden;
+}
+.piano-ctx-head {
+  padding: 7px 12px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.piano-ctx-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+}
+.piano-ctx-item:last-child {
+  border-bottom: none;
+}
+.piano-ctx-item:hover {
+  background: var(--paper2);
+}
+.piano-pdf-ico {
+  cursor: pointer;
+  color: #c0392b;
+  margin-right: 4px;
+  width: 12px;
+  height: 12px;
+  vertical-align: -1px;
+}
+.piano-pdf-ico:hover {
+  transform: scale(1.25);
+}
