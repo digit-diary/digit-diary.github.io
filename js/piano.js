@@ -135,6 +135,42 @@ function _pianoMalattieMese(ym) {
   return out;
 }
 
+// Tab della sezione Piano (come la navbar di Turnivo: ogni voce una schermata)
+let _pianoTab = localStorage.getItem('piano_tab') || 'calendario';
+const _PIANO_TABS = [
+  ['calendario', 'Calendario'],
+  ['vacanze', 'Vacanze'],
+  ['turni', 'Turni'],
+  ['regole', 'Regole'],
+  ['festivi', 'Festivi'],
+  ['timbrature', 'Timbrate'],
+  ['statistiche', 'Statistiche'],
+  ['impostazioni', 'Impostazioni'],
+];
+function pianoCambiaTab(t) {
+  _pianoTab = t;
+  localStorage.setItem('piano_tab', t);
+  renderPiano();
+}
+function _pianoTabBar() {
+  return (
+    '<div class="piano-tabs">' +
+    _PIANO_TABS
+      .map(
+        ([k, lbl]) =>
+          '<span class="piano-tab' +
+          (k === _pianoTab ? ' attiva' : '') +
+          '" onclick="pianoCambiaTab(\'' +
+          k +
+          '\')">' +
+          lbl +
+          '</span>',
+      )
+      .join('') +
+    '</div>'
+  );
+}
+
 async function renderPiano() {
   const el = document.getElementById('piano-content');
   if (!el) return;
@@ -185,359 +221,378 @@ async function renderPiano() {
     const MESI_L = MESI_FULL || [];
     const label = (MESI_L[parseInt(ym.split('-')[1]) - 1] || ym) + ' ' + ym.split('-')[0];
 
-    let h =
-      '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
-    h +=
-      '<button class="btn-act pin" onclick="pianoCambiaMese(-1)">&larr;</button><span style="min-width:150px;text-align:center;font-weight:700">' +
-      escP(label) +
-      '</span><button class="btn-act pin" onclick="pianoCambiaMese(1)">&rarr;</button>';
-    h +=
-      '<select onchange="pianoCambiaReparto(this.value)" style="padding:4px 8px;font-size:.72rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a">';
-    getReparti().forEach((rp) => {
+    let h = _pianoTabBar();
+    if (_pianoTab === 'calendario') {
       h +=
-        '<option value="' +
-        rp.key +
-        '"' +
-        (rp.key === _pianoReparto() ? ' selected' : '') +
-        ' style="color:#000">' +
-        escP(rp.label) +
-        '</option>';
-    });
-    h += '</select>';
-    if (puoMod) {
+        '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
       h +=
-        '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:#d4b86a;color:#d4b86a" onclick="validaPiano()">Valida regole</button>';
+        '<button class="btn-act pin" onclick="pianoCambiaMese(-1)">&larr;</button><span style="min-width:150px;text-align:center;font-weight:700">' +
+        escP(label) +
+        '</span><button class="btn-act pin" onclick="pianoCambiaMese(1)">&rarr;</button>';
       h +=
-        '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49" onclick="generaBozzaPiano()">Genera bozza</button>';
+        '<select onchange="pianoCambiaReparto(this.value)" style="padding:4px 8px;font-size:.72rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a">';
+      getReparti().forEach((rp) => {
+        h +=
+          '<option value="' +
+          rp.key +
+          '"' +
+          (rp.key === _pianoReparto() ? ' selected' : '') +
+          ' style="color:#000">' +
+          escP(rp.label) +
+          '</option>';
+      });
+      h += '</select>';
+      if (puoMod) {
+        h +=
+          '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:#d4b86a;color:#d4b86a" onclick="validaPiano()">Valida regole</button>';
+        h +=
+          '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49" onclick="generaBozzaPiano()">Genera bozza</button>';
+        h +=
+          '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:var(--accent);color:var(--accent)" onclick="cancellaBozzaPiano()">Cancella piano</button>' +
+          '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:#d4b86a;color:#d4b86a" title="Trascina i nomi per riordinare; questo pulsante ripristina SUP, BO, poi gli altri" onclick="ripristinaOrdinePiano()">Ordine predefinito</button>';
+      }
       h +=
-        '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:var(--accent);color:var(--accent)" onclick="cancellaBozzaPiano()">Cancella piano</button>' +
-        '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:#d4b86a;color:#d4b86a" title="Trascina i nomi per riordinare; questo pulsante ripristina SUP, BO, poi gli altri" onclick="ripristinaOrdinePiano()">Ordine predefinito</button>';
-    }
-    h +=
-      '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:#b8a98a;color:#b8a98a" onclick="copiaPianoExcel()">Copia per Excel</button>';
-    h +=
-      '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:#b8a98a;color:#b8a98a" onclick="stampaPianoPDF()">Stampa PDF</button>';
-    h +=
-      '<span style="font-size:.72rem;color:var(--muted);margin-left:auto">' +
-      _pianoRighe.length +
-      ' assegnazioni' +
-      (puoMod ? ' — clicca una cella per modificare' : ' — sola lettura') +
-      '</span></div>';
-    h += '<div id="piano-violazioni"></div>';
+        '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:#b8a98a;color:#b8a98a" onclick="copiaPianoExcel()">Copia per Excel</button>';
+      h +=
+        '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:#b8a98a;color:#b8a98a" onclick="stampaPianoPDF()">Stampa PDF</button>';
+      h +=
+        '<span style="font-size:.72rem;color:var(--muted);margin-left:auto">' +
+        _pianoRighe.length +
+        ' assegnazioni' +
+        (puoMod ? ' — clicca una cella per modificare' : ' — sola lettura') +
+        '</span></div>';
+      h += '<div id="piano-violazioni"></div>';
 
-    // GRIGLIA
-    h += '<div class="piano-wrap"><table class="piano-table"><thead><tr><th class="piano-nome">Collaboratore</th>';
-    for (let g = 1; g <= nGiorni; g++) {
-      const dstr = ym + '-' + String(g).padStart(2, '0');
-      const dow = new Date(dstr + 'T12:00:00').getDay();
-      let cls = '';
-      if (festiviSet[dstr]) cls = 'piano-festivo';
-      else if (dow === 0) cls = 'piano-domenica';
-      else if (dow === 5 || dow === 6) cls = 'piano-weekend';
-      if (g === 1) cls += ' piano-sep-left';
-      h +=
-        '<th class="' +
-        cls +
-        '"' +
-        (festiviSet[dstr] ? ' title="' + escP(festiviSet[dstr]) + '"' : '') +
-        '><div>' +
-        GG3[dow] +
-        '</div><div>' +
-        g +
-        '</div></th>';
-    }
-    h +=
-      '<th class="piano-tot piano-sep-left">Ore</th><th class="piano-tot">D</th><th class="piano-tot">N</th><th class="piano-tot" title="Ore dovute (ore settimanali x percentuale x giorni/7)">Dov.</th><th class="piano-tot" title="Saldo: pianificate - dovute">Saldo</th></tr></thead><tbody>';
-
-    nomi.forEach((nome) => {
-      const ne = nome.replace(/'/g, "\\'");
-      let ore = 0;
-      let nD = 0;
-      let nN = 0;
-      let riga = '';
+      // GRIGLIA
+      h += '<div class="piano-wrap"><table class="piano-table"><thead><tr><th class="piano-nome">Collaboratore</th>';
       for (let g = 1; g <= nGiorni; g++) {
         const dstr = ym + '-' + String(g).padStart(2, '0');
-        const r = mappa[nome + '|' + dstr];
-        const codice = r ? r.codice : '';
-        let cella = '';
-        let stile = '';
-        let cls = 'piano-cella';
+        const dow = new Date(dstr + 'T12:00:00').getDay();
+        let cls = '';
+        if (festiviSet[dstr]) cls = 'piano-festivo';
+        else if (dow === 0) cls = 'piano-domenica';
+        else if (dow === 5 || dow === 6) cls = 'piano-weekend';
         if (g === 1) cls += ' piano-sep-left';
-        let titolo = '';
-        if (r) {
-          const t = _pianoTurnoInfo(codice);
-          const cs = _pianoCodiceInfo(codice);
-          cella = escP(codice);
-          const _col = _pianoColore(codice);
-          if (_col) stile = 'background:' + _col;
-          if (t) {
-            ore += parseFloat(t.durata_ore) || 0;
-            if (t.tipo === 'NOTTURNO') nN++;
-            else nD++;
-            titolo = codice + ' ' + (t.ora_inizio || '').substring(0, 5) + '-' + (t.ora_fine || '').substring(0, 5);
-          } else if (cs) {
-            ore += parseFloat(cs.ore) || 0;
-            titolo = cs.descrizione || codice;
-          }
-          if (r.protetto) cls += ' piano-prot';
-          if (r.commento) {
-            cls += ' piano-comm';
-            titolo += (titolo ? ' — ' : '') + r.commento;
-          }
-        } else if (malattie[nome + '|' + dstr]) {
-          cella = 'M';
-          cls += ' piano-malattia-auto';
-          titolo = 'Malattia registrata nel Diario (automatica, non salvata nel piano)';
-        }
-        const violMsg = _pianoViolCelle[nome + '|' + dstr];
-        if (violMsg) {
-          cls += ' piano-viol';
-          titolo += (titolo ? ' — ' : '') + '⚠ ' + violMsg.join(' | ');
-        }
-        riga +=
-          '<td class="' +
-          cls +
-          '" style="' +
-          stile +
-          '"' +
-          (titolo ? ' title="' + escP(titolo) + '"' : '') +
-          (puoMod ? ' onclick="pianoCellaInline(\'' + ne + "','" + dstr + '\',this)"' : '') +
-          '>' +
-          cella +
-          '</td>';
-      }
-      const infoC = _pianoCollabInfo(nome);
-      const perc = infoC ? parseFloat(infoC.percentuale) || 1 : 1;
-      const dovute = Math.round(((_pianoOreSett * perc * nGiorni) / 7) * 10) / 10;
-      const saldo = Math.round((ore - dovute) * 10) / 10;
-      const _clsRiga =
-        infoC && infoC.funzione === 'SUP'
-          ? ' class="piano-row-sup"'
-          : infoC && infoC.funzione === 'BO'
-            ? ' class="piano-row-bo"'
-            : '';
-      h +=
-        '<tr' +
-        _clsRiga +
-        ' data-nome="' +
-        escP(nome) +
-        '"><td class="piano-nome"' +
-        (infoC && infoC.funzione ? ' title="' + escP(infoC.funzione) + ' ' + Math.round(perc * 100) + '%"' : '') +
-        '><i class="icx icx-stampa piano-pdf-ico" title="Stampa il piano di ' +
-        escP(nome) +
-        '" onclick="event.stopPropagation();stampaPianoCollaboratore(\'' +
-        ne +
-        '\')"></i>' +
-        escP(nome) +
-        (infoC && infoC.funzione && infoC.funzione !== 'HOST'
-          ? ' <span style="font-size:.58rem;color:var(--muted)">' + escP(infoC.funzione) + '</span>'
-          : '') +
-        '</td>' +
-        riga +
-        '<td class="piano-tot piano-sep-left">' +
-        (ore ? ore.toFixed(1) : '') +
-        '</td><td class="piano-tot">' +
-        (nD || '') +
-        '</td><td class="piano-tot">' +
-        (nN || '') +
-        '</td><td class="piano-tot" style="color:var(--muted)">' +
-        (ore ? dovute.toFixed(1) : '') +
-        '</td><td class="piano-tot" style="color:' +
-        (saldo > 0 ? '#2c6e49' : saldo < 0 ? '#c0392b' : 'var(--muted)') +
-        '">' +
-        (ore ? (saldo > 0 ? '+' : '') + saldo.toFixed(1) : '') +
-        '</td></tr>';
-    });
-    h += '</tbody></table></div>';
-
-    // legenda
-    h += '<div style="display:flex;gap:14px;flex-wrap:wrap;padding:10px 14px;font-size:.72rem;color:var(--muted)">';
-    h +=
-      '<span><span class="piano-leg piano-prot" style="background:var(--paper2)"></span> bordo rosso = inserito a mano (protetto)</span>';
-    h +=
-      '<span><span class="piano-leg piano-comm" style="background:var(--paper2)"></span> triangolo = commento (passa il mouse)</span>';
-    h +=
-      '<span><span class="piano-leg piano-malattia-auto" style="background:var(--paper2)">M</span> = malattia dal Diario (automatica)</span>';
-    h += '<span>icona rossa = stampa piano del collaboratore — tasto destro su una cella = menu opzioni</span>';
-    h += '</div></div>';
-
-    // FABBISOGNO vs ASSEGNATI (editabile: click sulla cella per impostare le persone necessarie)
-    const fabb =
-      (await secGet(
-        'piano_fabbisogni?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=3000',
-      )) || [];
-    _pianoFabbCache = fabb;
-    const turniRep = _pianoTurniReparto();
-    if (turniRep.length) {
-      const fabbMap = {}; // codice -> {giorno: quantita}
-      fabb.forEach((f) => {
-        const g = parseInt(f.data.split('-')[2]);
-        (fabbMap[f.turno_codice] = fabbMap[f.turno_codice] || {})[g] = f.quantita;
-      });
-      const assMap = {}; // codice -> {giorno: n}
-      _pianoRighe.forEach((r) => {
-        const g = parseInt(r.data.split('-')[2]);
-        (assMap[r.codice] = assMap[r.codice] || {})[g] =
-          (assMap[r.codice] && assMap[r.codice][g] ? assMap[r.codice][g] : 0) + 1;
-      });
-      h +=
-        '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Fabbisogno vs assegnati — ' +
-        escP(label);
-      if (puoMod)
         h +=
-          '<button class="btn-export" style="font-size:.7rem;padding:3px 10px;border-color:#d4b86a;color:#d4b86a" onclick="copiaFabbisognoMese()">Copia dal mese precedente</button>' +
-          '<span style="font-size:.68rem;color:#b8a98a;font-weight:400">clicca una cella per impostare le persone necessarie</span>';
-      h += '</div>';
-      // testata giorni con sigla settimana (D/L/M...), festivi e weekend:
-      // usata da fabbisogno, differenze ed effettivi
-      const testataGiorni = (conTot) => {
-        let t = '<thead><tr><th class="piano-nome">Turno</th>';
+          '<th class="' +
+          cls +
+          '"' +
+          (festiviSet[dstr] ? ' title="' + escP(festiviSet[dstr]) + '"' : '') +
+          '><div>' +
+          GG3[dow] +
+          '</div><div>' +
+          g +
+          '</div></th>';
+      }
+      h +=
+        '<th class="piano-tot piano-sep-left">Ore</th><th class="piano-tot">D</th><th class="piano-tot">N</th><th class="piano-tot" title="Ore dovute (ore settimanali x percentuale x giorni/7)">Dov.</th><th class="piano-tot" title="Saldo: pianificate - dovute">Saldo</th></tr></thead><tbody>';
+
+      nomi.forEach((nome) => {
+        const ne = nome.replace(/'/g, "\\'");
+        let ore = 0;
+        let nD = 0;
+        let nN = 0;
+        let riga = '';
         for (let g = 1; g <= nGiorni; g++) {
           const dstr = ym + '-' + String(g).padStart(2, '0');
-          const dow = new Date(dstr + 'T12:00:00').getDay();
-          let cls = '';
-          if (festiviSet[dstr]) cls = 'piano-festivo';
-          else if (dow === 0) cls = 'piano-domenica';
-          else if (dow === 5 || dow === 6) cls = 'piano-weekend';
+          const r = mappa[nome + '|' + dstr];
+          const codice = r ? r.codice : '';
+          let cella = '';
+          let stile = '';
+          let cls = 'piano-cella';
           if (g === 1) cls += ' piano-sep-left';
-          t +=
-            '<th class="' +
+          let titolo = '';
+          if (r) {
+            const t = _pianoTurnoInfo(codice);
+            const cs = _pianoCodiceInfo(codice);
+            cella = escP(codice);
+            const _col = _pianoColore(codice);
+            if (_col) stile = 'background:' + _col;
+            if (t) {
+              ore += parseFloat(t.durata_ore) || 0;
+              if (t.tipo === 'NOTTURNO') nN++;
+              else nD++;
+              titolo = codice + ' ' + (t.ora_inizio || '').substring(0, 5) + '-' + (t.ora_fine || '').substring(0, 5);
+            } else if (cs) {
+              ore += parseFloat(cs.ore) || 0;
+              titolo = cs.descrizione || codice;
+            }
+            if (r.protetto) cls += ' piano-prot';
+            if (r.commento) {
+              cls += ' piano-comm';
+              titolo += (titolo ? ' — ' : '') + r.commento;
+            }
+          } else if (malattie[nome + '|' + dstr]) {
+            cella = 'M';
+            cls += ' piano-malattia-auto';
+            titolo = 'Malattia registrata nel Diario (automatica, non salvata nel piano)';
+          }
+          const violMsg = _pianoViolCelle[nome + '|' + dstr];
+          if (violMsg) {
+            cls += ' piano-viol';
+            titolo += (titolo ? ' — ' : '') + '⚠ ' + violMsg.join(' | ');
+          }
+          riga +=
+            '<td class="' +
             cls +
+            '" style="' +
+            stile +
             '"' +
-            (festiviSet[dstr] ? ' title="' + escP(festiviSet[dstr]) + '"' : '') +
-            '><div>' +
-            GG3[dow] +
-            '</div><div>' +
-            g +
-            '</div></th>';
-        }
-        if (conTot) t += '<th>Tot</th>';
-        return t + '</tr></thead>';
-      };
-      h += '<div class="piano-wrap"><table class="piano-table">' + testataGiorni(false) + '<tbody>';
-      const gruppoOrd = {};
-      turniRep.forEach((t, i) => (gruppoOrd[t.codice] = (t.gruppo || '') + '|' + String(i).padStart(3, '0')));
-      turniRep
-        .slice()
-        .sort((x, y) => (gruppoOrd[x.codice] || '').localeCompare(gruppoOrd[y.codice] || ''))
-        .forEach((t) => {
-          const cod = t.codice;
-          h +=
-            '<tr><td class="piano-nome" title="' +
-            escP(
-              (t.gruppo || '') + ' ' + (t.ora_inizio || '').substring(0, 5) + '-' + (t.ora_fine || '').substring(0, 5),
-            ) +
-            '">' +
-            escP(cod) +
+            (titolo ? ' title="' + escP(titolo) + '"' : '') +
+            (puoMod ? ' onclick="pianoCellaInline(\'' + ne + "','" + dstr + '\',this)"' : '') +
+            '>' +
+            cella +
             '</td>';
+        }
+        const infoC = _pianoCollabInfo(nome);
+        const perc = infoC ? parseFloat(infoC.percentuale) || 1 : 1;
+        const dovute = Math.round(((_pianoOreSett * perc * nGiorni) / 7) * 10) / 10;
+        const saldo = Math.round((ore - dovute) * 10) / 10;
+        const _clsRiga =
+          infoC && infoC.funzione === 'SUP'
+            ? ' class="piano-row-sup"'
+            : infoC && infoC.funzione === 'BO'
+              ? ' class="piano-row-bo"'
+              : '';
+        h +=
+          '<tr' +
+          _clsRiga +
+          ' data-nome="' +
+          escP(nome) +
+          '"><td class="piano-nome"' +
+          (infoC && infoC.funzione ? ' title="' + escP(infoC.funzione) + ' ' + Math.round(perc * 100) + '%"' : '') +
+          '><i class="icx icx-stampa piano-pdf-ico" title="Stampa il piano di ' +
+          escP(nome) +
+          '" onclick="event.stopPropagation();stampaPianoCollaboratore(\'' +
+          ne +
+          '\')"></i>' +
+          escP(nome) +
+          (infoC && infoC.funzione && infoC.funzione !== 'HOST'
+            ? ' <span style="font-size:.58rem;color:var(--muted)">' + escP(infoC.funzione) + '</span>'
+            : '') +
+          '</td>' +
+          riga +
+          '<td class="piano-tot piano-sep-left">' +
+          (ore ? ore.toFixed(1) : '') +
+          '</td><td class="piano-tot">' +
+          (nD || '') +
+          '</td><td class="piano-tot">' +
+          (nN || '') +
+          '</td><td class="piano-tot" style="color:var(--muted)">' +
+          (ore ? dovute.toFixed(1) : '') +
+          '</td><td class="piano-tot" style="color:' +
+          (saldo > 0 ? '#2c6e49' : saldo < 0 ? '#c0392b' : 'var(--muted)') +
+          '">' +
+          (ore ? (saldo > 0 ? '+' : '') + saldo.toFixed(1) : '') +
+          '</td></tr>';
+      });
+      h += '</tbody></table></div>';
+
+      // legenda
+      h += '<div style="display:flex;gap:14px;flex-wrap:wrap;padding:10px 14px;font-size:.72rem;color:var(--muted)">';
+      h +=
+        '<span><span class="piano-leg piano-prot" style="background:var(--paper2)"></span> bordo rosso = inserito a mano (protetto)</span>';
+      h +=
+        '<span><span class="piano-leg piano-comm" style="background:var(--paper2)"></span> triangolo = commento (passa il mouse)</span>';
+      h +=
+        '<span><span class="piano-leg piano-malattia-auto" style="background:var(--paper2)">M</span> = malattia dal Diario (automatica)</span>';
+      h += '<span>icona rossa = stampa piano del collaboratore — tasto destro su una cella = menu opzioni</span>';
+      h += '</div></div>';
+
+      // FABBISOGNO vs ASSEGNATI (editabile: click sulla cella per impostare le persone necessarie)
+      const fabb =
+        (await secGet(
+          'piano_fabbisogni?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=3000',
+        )) || [];
+      _pianoFabbCache = fabb;
+      const turniRep = _pianoTurniReparto();
+      if (turniRep.length) {
+        const fabbMap = {}; // codice -> {giorno: quantita}
+        fabb.forEach((f) => {
+          const g = parseInt(f.data.split('-')[2]);
+          (fabbMap[f.turno_codice] = fabbMap[f.turno_codice] || {})[g] = f.quantita;
+        });
+        const assMap = {}; // codice -> {giorno: n}
+        _pianoRighe.forEach((r) => {
+          const g = parseInt(r.data.split('-')[2]);
+          (assMap[r.codice] = assMap[r.codice] || {})[g] =
+            (assMap[r.codice] && assMap[r.codice][g] ? assMap[r.codice][g] : 0) + 1;
+        });
+        h +=
+          '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Fabbisogno vs assegnati — ' +
+          escP(label);
+        if (puoMod)
+          h +=
+            '<button class="btn-export" style="font-size:.7rem;padding:3px 10px;border-color:#d4b86a;color:#d4b86a" onclick="copiaFabbisognoMese()">Copia dal mese precedente</button>' +
+            '<span style="font-size:.68rem;color:#b8a98a;font-weight:400">clicca una cella per impostare le persone necessarie</span>';
+        h += '</div>';
+        // testata giorni con sigla settimana (D/L/M...), festivi e weekend:
+        // usata da fabbisogno, differenze ed effettivi
+        const testataGiorni = (conTot) => {
+          let t = '<thead><tr><th class="piano-nome">Turno</th>';
           for (let g = 1; g <= nGiorni; g++) {
-            const req = (fabbMap[cod] || {})[g] || 0;
-            const ass = (assMap[cod] || {})[g] || 0;
-            let cls = g === 1 ? 'piano-sep-left' : '';
-            if (req) cls += (cls ? ' ' : '') + (ass >= req ? 'piano-fabb-ok' : 'piano-fabb-ko');
             const dstr = ym + '-' + String(g).padStart(2, '0');
-            h +=
-              '<td class="' +
+            const dow = new Date(dstr + 'T12:00:00').getDay();
+            let cls = '';
+            if (festiviSet[dstr]) cls = 'piano-festivo';
+            else if (dow === 0) cls = 'piano-domenica';
+            else if (dow === 5 || dow === 6) cls = 'piano-weekend';
+            if (g === 1) cls += ' piano-sep-left';
+            t +=
+              '<th class="' +
               cls +
               '"' +
-              (puoMod
-                ? ' style="cursor:pointer" onclick="fabbisognoInline(\'' + escP(cod) + "','" + dstr + '\',this)"'
-                : '') +
-              '>' +
-              (req ? ass + '/' + req : '') +
+              (festiviSet[dstr] ? ' title="' + escP(festiviSet[dstr]) + '"' : '') +
+              '><div>' +
+              GG3[dow] +
+              '</div><div>' +
+              g +
+              '</div></th>';
+          }
+          if (conTot) t += '<th>Tot</th>';
+          return t + '</tr></thead>';
+        };
+        h += '<div class="piano-wrap"><table class="piano-table">' + testataGiorni(false) + '<tbody>';
+        const gruppoOrd = {};
+        turniRep.forEach((t, i) => (gruppoOrd[t.codice] = (t.gruppo || '') + '|' + String(i).padStart(3, '0')));
+        turniRep
+          .slice()
+          .sort((x, y) => (gruppoOrd[x.codice] || '').localeCompare(gruppoOrd[y.codice] || ''))
+          .forEach((t) => {
+            const cod = t.codice;
+            h +=
+              '<tr><td class="piano-nome" title="' +
+              escP(
+                (t.gruppo || '') +
+                  ' ' +
+                  (t.ora_inizio || '').substring(0, 5) +
+                  '-' +
+                  (t.ora_fine || '').substring(0, 5),
+              ) +
+              '">' +
+              escP(cod) +
+              '</td>';
+            for (let g = 1; g <= nGiorni; g++) {
+              const req = (fabbMap[cod] || {})[g] || 0;
+              const ass = (assMap[cod] || {})[g] || 0;
+              let cls = g === 1 ? 'piano-sep-left' : '';
+              if (req) cls += (cls ? ' ' : '') + (ass >= req ? 'piano-fabb-ok' : 'piano-fabb-ko');
+              const dstr = ym + '-' + String(g).padStart(2, '0');
+              h +=
+                '<td class="' +
+                cls +
+                '"' +
+                (puoMod
+                  ? ' style="cursor:pointer" onclick="fabbisognoInline(\'' + escP(cod) + "','" + dstr + '\',this)"'
+                  : '') +
+                '>' +
+                (req ? ass + '/' + req : '') +
+                '</td>';
+            }
+            h += '</tr>';
+          });
+        h += '</tbody></table></div>';
+        h +=
+          '<p style="font-size:.72rem;color:var(--muted);padding:8px 14px">assegnati/richiesti — <span style="color:#2c6e49;font-weight:700">verde</span> = coperto, <span style="color:#c0392b;font-weight:700">rosso</span> = carenza. Il fabbisogno guida "Genera bozza".</p></div>';
+
+        // DIFFERENZE + EFFETTIVI — schema IDENTICO a Turnivo (calendario.html):
+        // differenze = effettivi - pianificazione (verde >0, rosso <0, vuoto 0),
+        // effettivi = conteggio persone per turno/giorno con colonna Tot
+        const turniOrdinati = turniRep
+          .slice()
+          .sort((x, y) => (gruppoOrd[x.codice] || '').localeCompare(gruppoOrd[y.codice] || ''));
+        const clsCella = (g) => {
+          const dstr = ym + '-' + String(g).padStart(2, '0');
+          const dow = new Date(dstr + 'T12:00:00').getDay();
+          const sep = g === 1 ? ' piano-sep-left' : '';
+          if (dow === 0) return 'piano-cel-dom' + sep;
+          if (dow === 5 || dow === 6) return 'piano-cel-we' + sep;
+          return sep.trim();
+        };
+        const cellaTurno = (t) =>
+          '<td class="piano-nome" title="' +
+          escP(
+            (t.gruppo || '') + ' ' + (t.ora_inizio || '').substring(0, 5) + '-' + (t.ora_fine || '').substring(0, 5),
+          ) +
+          '">' +
+          escP(t.codice) +
+          '</td>';
+
+        h +=
+          '<div class="main-card" style="margin-top:16px"><div class="card-header">Differenze — ' +
+          escP(label) +
+          ' <span style="font-size:.68rem;color:#b8a98a;font-weight:400">(effettivi − pianificazione)</span></div>';
+        h += '<div class="piano-wrap"><table class="piano-table">' + testataGiorni(false) + '<tbody>';
+        turniOrdinati.forEach((t) => {
+          h += '<tr>' + cellaTurno(t);
+          for (let g = 1; g <= nGiorni; g++) {
+            const diff = ((assMap[t.codice] || {})[g] || 0) - ((fabbMap[t.codice] || {})[g] || 0);
+            const col = diff > 0 ? 'color:#006100' : diff < 0 ? 'color:#FF0000' : '';
+            h +=
+              '<td class="' +
+              clsCella(g) +
+              '" style="font-weight:bold;' +
+              col +
+              '">' +
+              (diff !== 0 ? diff : '') +
               '</td>';
           }
           h += '</tr>';
         });
-      h += '</tbody></table></div>';
-      h +=
-        '<p style="font-size:.72rem;color:var(--muted);padding:8px 14px">assegnati/richiesti — <span style="color:#2c6e49;font-weight:700">verde</span> = coperto, <span style="color:#c0392b;font-weight:700">rosso</span> = carenza. Il fabbisogno guida "Genera bozza".</p></div>';
+        h += '</tbody></table></div></div>';
 
-      // DIFFERENZE + EFFETTIVI — schema IDENTICO a Turnivo (calendario.html):
-      // differenze = effettivi - pianificazione (verde >0, rosso <0, vuoto 0),
-      // effettivi = conteggio persone per turno/giorno con colonna Tot
-      const turniOrdinati = turniRep
-        .slice()
-        .sort((x, y) => (gruppoOrd[x.codice] || '').localeCompare(gruppoOrd[y.codice] || ''));
-      const clsCella = (g) => {
-        const dstr = ym + '-' + String(g).padStart(2, '0');
-        const dow = new Date(dstr + 'T12:00:00').getDay();
-        const sep = g === 1 ? ' piano-sep-left' : '';
-        if (dow === 0) return 'piano-cel-dom' + sep;
-        if (dow === 5 || dow === 6) return 'piano-cel-we' + sep;
-        return sep.trim();
-      };
-      const cellaTurno = (t) =>
-        '<td class="piano-nome" title="' +
-        escP((t.gruppo || '') + ' ' + (t.ora_inizio || '').substring(0, 5) + '-' + (t.ora_fine || '').substring(0, 5)) +
-        '">' +
-        escP(t.codice) +
-        '</td>';
-
+        h +=
+          '<div class="main-card" style="margin-top:16px"><div class="card-header">Effettivi — ' +
+          escP(label) +
+          '</div>';
+        h += '<div class="piano-wrap"><table class="piano-table">' + testataGiorni(true) + '<tbody>';
+        turniOrdinati.forEach((t) => {
+          h += '<tr>' + cellaTurno(t);
+          let tot = 0;
+          for (let g = 1; g <= nGiorni; g++) {
+            const q = (assMap[t.codice] || {})[g] || 0;
+            tot += q;
+            h +=
+              '<td class="' +
+              clsCella(g) +
+              '"' +
+              (q > 0 ? ' style="font-weight:bold"' : '') +
+              '>' +
+              (q > 0 ? q : '') +
+              '</td>';
+          }
+          h += '<td><strong>' + tot + '</strong></td></tr>';
+        });
+        h += '</tbody></table></div></div>';
+      }
+    } else if (_pianoTab === 'vacanze') {
+      h += await _renderPianoVacanzeTab();
+    } else if (_pianoTab === 'turni') {
+      h += '<div id="piano-config">' + _renderPianoTurniCard() + _renderPianoCodiciCard() + '</div>';
+    } else if (_pianoTab === 'regole') {
+      h += '<div id="piano-config">' + _renderPianoRegoleCard() + '</div>';
+    } else if (_pianoTab === 'festivi') {
+      h += '<div id="piano-config">' + _renderPianoFestiviCard() + '</div>';
+    } else if (_pianoTab === 'timbrature') {
+      h += '<div id="piano-config">' + _renderPianoTimbratureCard() + '</div>';
+    } else if (_pianoTab === 'statistiche') {
+      h += '<div id="piano-config">' + _renderPianoStatCard() + '</div>';
+    } else if (_pianoTab === 'impostazioni') {
       h +=
-        '<div class="main-card" style="margin-top:16px"><div class="card-header">Differenze — ' +
-        escP(label) +
-        ' <span style="font-size:.68rem;color:#b8a98a;font-weight:400">(effettivi − pianificazione)</span></div>';
-      h += '<div class="piano-wrap"><table class="piano-table">' + testataGiorni(false) + '<tbody>';
-      turniOrdinati.forEach((t) => {
-        h += '<tr>' + cellaTurno(t);
-        for (let g = 1; g <= nGiorni; g++) {
-          const diff = ((assMap[t.codice] || {})[g] || 0) - ((fabbMap[t.codice] || {})[g] || 0);
-          const col = diff > 0 ? 'color:#006100' : diff < 0 ? 'color:#FF0000' : '';
-          h +=
-            '<td class="' +
-            clsCella(g) +
-            '" style="font-weight:bold;' +
-            col +
-            '">' +
-            (diff !== 0 ? diff : '') +
-            '</td>';
-        }
-        h += '</tr>';
-      });
-      h += '</tbody></table></div></div>';
-
-      h +=
-        '<div class="main-card" style="margin-top:16px"><div class="card-header">Effettivi — ' + escP(label) + '</div>';
-      h += '<div class="piano-wrap"><table class="piano-table">' + testataGiorni(true) + '<tbody>';
-      turniOrdinati.forEach((t) => {
-        h += '<tr>' + cellaTurno(t);
-        let tot = 0;
-        for (let g = 1; g <= nGiorni; g++) {
-          const q = (assMap[t.codice] || {})[g] || 0;
-          tot += q;
-          h +=
-            '<td class="' +
-            clsCella(g) +
-            '"' +
-            (q > 0 ? ' style="font-weight:bold"' : '') +
-            '>' +
-            (q > 0 ? q : '') +
-            '</td>';
-        }
-        h += '<td><strong>' + tot + '</strong></td></tr>';
-      });
-      h += '</tbody></table></div></div>';
+        '<div id="piano-config">' +
+        _renderPianoMappatureCard() +
+        _renderPianoPreferenzeCard() +
+        _renderPianoImpostazioniCard() +
+        '</div>';
     }
-    // Configurazione (card richiudibili, solo admin)
-    h +=
-      '<div id="piano-config">' +
-      _renderPianoRegoleCard() +
-      _renderPianoTurniCard() +
-      _renderPianoCodiciCard() +
-      _renderPianoFestiviCard() +
-      _renderPianoMappatureCard() +
-      _renderPianoPreferenzeCard() +
-      _renderPianoImpostazioniCard() +
-      _renderPianoTimbratureCard() +
-      _renderPianoVacanzeCard() +
-      _renderPianoStatCard() +
-      '</div>';
     el.innerHTML = h;
-    if (typeof initCardRichiudibili === 'function') initCardRichiudibili('piano-config', []);
-    _pianoInitSelezione();
-    _pianoInitSticky();
-    _pianoRenderViolazioni();
+    if (typeof initCardRichiudibili === 'function' && document.getElementById('piano-config'))
+      initCardRichiudibili('piano-config', []);
+    if (_pianoTab === 'calendario') {
+      _pianoInitSelezione();
+      _pianoInitSticky();
+      _pianoRenderViolazioni();
+    }
   } catch (e) {
     console.error('Errore piano:', e);
     el.innerHTML = '<p style="color:var(--accent);padding:20px">Errore caricamento piano</p>';
@@ -845,6 +900,14 @@ async function generaBozzaPiano() {
     toast('Nessun fabbisogno configurato per questo mese: la bozza non sa cosa riempire');
     return;
   }
+  // Step 0 come Turnivo: prima le vacanze (V protette + C + WD)
+  const esitoVac = await _applicaVacanzeMese(false);
+  if (esitoVac && (esitoVac.v || esitoVac.c || esitoVac.wd)) {
+    _pianoRighe =
+      (await secGet(
+        'piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=5000',
+      )) || [];
+  }
   const maxCons = parseInt(_pianoRegolaVal('max_consecutivi')) || 5;
   const minRiposo = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 11;
   // storia per idoneità (chi ha già fatto quel gruppo) e familiarità:
@@ -862,7 +925,12 @@ async function generaBozzaPiano() {
   const malattie = _pianoMalattieMese(ym);
   // stato griglia: esistenti + assegnazioni della bozza
   const cella = {}; // 'nome|g' -> codice
-  _pianoRighe.forEach((r) => (cella[r.collaboratore + '|' + parseInt(r.data.split('-')[2])] = r.codice));
+  const rigaDi = {}; // 'nome|g' -> riga (per sostituire i segnaposto WD)
+  _pianoRighe.forEach((r) => {
+    const k = r.collaboratore + '|' + parseInt(r.data.split('-')[2]);
+    cella[k] = r.codice;
+    rigaDi[k] = r;
+  });
   const oreMese = {}; // equità
   Object.keys(cella).forEach((k) => {
     const t = _pianoTurnoInfo(cella[k]);
@@ -900,6 +968,7 @@ async function generaBozzaPiano() {
     (fabbG[g] = fabbG[g] || []).push(f);
   });
   const nuove = [];
+  const sostituzioniWd = [];
   const scoperti = [];
   for (let g = 1; g <= nGiorni; g++) {
     (fabbG[g] || []).forEach((f) => {
@@ -911,7 +980,10 @@ async function generaBozzaPiano() {
         const dowG = new Date(dstr + 'T12:00:00').getDay();
         const candidati = nomi
           .filter((n) => {
-            if (cella[n + '|' + g] || malattie[n + '|' + dstr]) return false;
+            const esistente = cella[n + '|' + g];
+            if (malattie[n + '|' + dstr]) return false;
+            if (esistente && esistente !== 'WD') return false;
+            if (esistente === 'WD' && t.tipo === 'NOTTURNO') return false; // WD = diurno forzato
             const infoC = _pianoCollabInfo(n);
             // preferenze collaboratore
             if (infoC && infoC.solo_diurni && t.tipo === 'NOTTURNO') return false;
@@ -957,6 +1029,7 @@ async function generaBozzaPiano() {
             // il blocco (fino a max consecutivi); chi ha riposato UN solo giorno
             // non viene richiamato subito (i riposi vanno a coppie, stile 4L+2R)
             const pattern = (n) => {
+              if (cella[n + '|' + g] === 'WD') return -5; // WD = qui DEVE lavorare diurno: priorità massima
               const cp = consecPrima(n, g);
               if (cp > 0 && cp < maxCons) return -3;
               if (cp === 0 && _pianoIsLavoro(cella[n + '|' + (g - 2)] || '')) return 2;
@@ -974,25 +1047,31 @@ async function generaBozzaPiano() {
           break;
         }
         const scelto = candidati[0];
+        const eraWd = cella[scelto + '|' + g] === 'WD';
         cella[scelto + '|' + g] = f.turno_codice;
         oreMese[scelto] = (oreMese[scelto] || 0) + (parseFloat(t.durata_ore) || 0);
-        nuove.push({
-          collaboratore: scelto,
-          data: dstr,
-          codice: f.turno_codice,
-          protetto: false,
-          generato: true,
-          reparto_dip: _pianoReparto(),
-        });
+        if (eraWd && rigaDi[scelto + '|' + g]) {
+          sostituzioniWd.push({ id: rigaDi[scelto + '|' + g].id, codice: f.turno_codice });
+        } else {
+          nuove.push({
+            collaboratore: scelto,
+            data: dstr,
+            codice: f.turno_codice,
+            protetto: false,
+            generato: true,
+            reparto_dip: _pianoReparto(),
+          });
+        }
         have++;
       }
     });
   }
-  if (!nuove.length) {
+  if (!nuove.length && !sostituzioniWd.length) {
     toast(
       'Niente da generare: fabbisogni già coperti' +
         (scoperti.length ? ' (' + scoperti.length + ' scoperti senza candidati)' : ''),
     );
+    renderPiano();
     return;
   }
   if (
@@ -1002,7 +1081,7 @@ async function generaBozzaPiano() {
         ' (' +
         repartoLabel(_pianoReparto()) +
         '):\n\n• ' +
-        nuove.length +
+        (nuove.length + sostituzioniWd.length) +
         ' turni da assegnare\n• ' +
         scoperti.length +
         ' posti senza candidato idoneo\n\nLe celle esistenti (vacanze, protette, malattie) NON vengono toccate.\nLa bozza si può eliminare con "Cancella piano". Procedere?',
@@ -1010,7 +1089,18 @@ async function generaBozzaPiano() {
   )
     return;
   try {
-    const r = await sbRpc('piano_bulk_upsert', { p_token: getOpToken(), p_rows: nuove });
+    const r = nuove.length
+      ? await sbRpc('piano_bulk_upsert', { p_token: getOpToken(), p_rows: nuove })
+      : { inserite: 0 };
+    for (const sw of sostituzioniWd) {
+      await secPatch('piano', 'id=eq.' + sw.id, {
+        codice: sw.codice,
+        protetto: false,
+        generato: true,
+        operatore: getOperatore(),
+        updated_at: new Date().toISOString(),
+      });
+    }
     logAzione('Piano: bozza generata', ym + ' — ' + nuove.length + ' turni, ' + scoperti.length + ' scoperti');
     toast(
       'Bozza generata: ' +
@@ -2727,19 +2817,201 @@ async function caricaStatisticheAnnoPiano() {
 // ================================================================
 // IMPORT VACANZE DA EXCEL (col A cognome, col B nome, col F-BE = settimane 1-52 con X)
 // ================================================================
-function _renderPianoVacanzeCard() {
-  if (!puoGestirePiano()) return '';
-  return (
-    '<div class="main-card" style="margin-top:16px"><div class="card-header">Import vacanze da Excel</div><div style="padding:10px 14px">' +
-    '<p style="font-size:.76rem;color:var(--muted);margin-bottom:8px">Formato Turnivo: colonna A cognome, colonna B nome, colonne F–BE = settimane 1–52 con una X. Le settimane marcate diventano giorni V (protetti) nell\'anno scelto. Le celle già occupate non vengono toccate.</p>' +
-    '<div class="add-tipo-row"><div class="field"><label>Anno</label><input type="number" id="vac-anno" value="' +
-    _pianoMeseSel.split('-')[0] +
-    '" min="2024" max="2050" style="width:90px"></div>' +
-    '<button class="btn-add-tipo" onclick="document.getElementById(\'vac-file\').click()">Carica file vacanze</button>' +
-    '<input type="file" id="vac-file" accept=".xlsx,.xls" style="display:none" onchange="importaVacanzePiano(this)"></div>' +
-    '</div></div>'
-  );
+// ================================================================
+// TAB VACANZE — identica alla pagina Vacanze di Turnivo: settimane ISO
+// per collaboratore per anno, conferma, elimina, import Excel,
+// applicazione V+C+WD al piano (port di step_vacanze.py)
+// ================================================================
+let _pianoVacCache = [];
+function _vacDateSettimana(anno, settimana) {
+  const gg = _pianoGiorniSettimana(anno, settimana);
+  const f = (x) => x.split('-')[2] + '/' + x.split('-')[1];
+  return 'dal ' + f(gg[0]) + ' al ' + f(gg[6]);
 }
+async function _renderPianoVacanzeTab() {
+  const anno = window._pianoVacAnno || parseInt(_pianoMeseSel.split('-')[0]);
+  window._pianoVacAnno = anno;
+  _pianoVacCache =
+    (await secGet('piano_vacanze?anno=eq.' + anno + '&order=collaboratore.asc,settimana.asc&limit=2000')) || [];
+  const filtro = window._pianoVacFiltro || '';
+  const vac = filtro ? _pianoVacCache.filter((v) => v.collaboratore === filtro) : _pianoVacCache;
+  const puoMod = puoGestirePiano();
+  const nomiRep = collaboratoriCache
+    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
+    .map((c) => c.nome);
+  // ordine come nel piano (ordine salvato, poi SUP/BO/altri)
+  const ordSalv = (window._pianoOrdineCollab || {})[_pianoReparto()] || [];
+  const pos = {};
+  ordSalv.forEach((n, i) => (pos[n] = i));
+  const perCollab = {};
+  vac.forEach((v) => (perCollab[v.collaboratore] = (perCollab[v.collaboratore] || []).concat(v)));
+  const gruppi = Object.keys(perCollab).sort(
+    (x, y) => (pos[x] != null ? pos[x] : 9999) - (pos[y] != null ? pos[y] : 9999) || x.localeCompare(y),
+  );
+  const MESI_L = MESI_FULL || [];
+  const meseLbl = (MESI_L[parseInt(_pianoMeseSel.split('-')[1]) - 1] || '') + ' ' + _pianoMeseSel.split('-')[0];
+
+  let h =
+    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Vacanze ' +
+    anno +
+    ' (' +
+    vac.length +
+    ')';
+  h +=
+    '<select onchange="window._pianoVacAnno=parseInt(this.value);renderPiano()" style="padding:4px 8px;font-size:.72rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a">';
+  for (let a = 2025; a <= 2031; a++)
+    h += '<option value="' + a + '"' + (a === anno ? ' selected' : '') + '>' + a + '</option>';
+  h += '</select>';
+  h +=
+    '<select onchange="window._pianoVacFiltro=this.value;renderPiano()" style="padding:4px 8px;font-size:.72rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a;max-width:220px"><option value="">Tutti i collaboratori</option>' +
+    nomiRep
+      .map((n) => '<option value="' + escP(n) + '"' + (filtro === n ? ' selected' : '') + '>' + escP(n) + '</option>')
+      .join('') +
+    '</select>';
+  if (puoMod) {
+    h +=
+      '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49" onclick="apriNuovaVacanza()">Nuova vacanza</button>';
+    h +=
+      '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:#d4b86a;color:#d4b86a" onclick="document.getElementById(\'vac-file\').click()">Importa da Excel</button>' +
+      '<input type="file" id="vac-file" accept=".xlsx,.xls" style="display:none" onchange="importaVacanzePiano(this)">';
+    h +=
+      '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:#1a4a7a;color:#7ea8d8" onclick="applicaVacanzePiano()">Applica al piano — ' +
+      escP(meseLbl) +
+      '</button>';
+    h +=
+      '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:var(--accent);color:var(--accent)" onclick="eliminaTutteVacanze()">Elimina tutte</button>';
+  }
+  h += '</div>';
+  h +=
+    '<p style="font-size:.72rem;color:var(--muted);padding:8px 14px 0">Le vacanze sono settimane intere (lun-dom). "Applica al piano" scrive le V (protette) del mese scelto nel Calendario e i congedi C prima/dopo secondo le regole (1 C prima per i fissi, 2 per i jolly; C dopo scalati per percentuale). Import Excel formato Turnivo: colonna A cognome, B nome, colonne F-BE settimane 1-52 con X.</p>';
+  if (!gruppi.length) h += '<p style="padding:14px;color:var(--muted)">Nessuna vacanza per il ' + anno + '.</p>';
+  gruppi.forEach((nome) => {
+    const lista = perCollab[nome];
+    h +=
+      '<div style="margin:10px 14px;border:1px solid var(--line);border-radius:3px;overflow:hidden"><div style="background:#ffc107;color:#212529;padding:6px 10px;font-weight:700;font-size:.82rem">' +
+      escP(nome) +
+      ' (' +
+      lista.length +
+      ' settimane)</div>';
+    h +=
+      '<table class="piano-table" style="min-width:100%;font-size:.78rem"><thead><tr><th style="text-align:left">Settimana</th><th>Confermata</th>' +
+      (puoMod ? '<th>Azioni</th>' : '') +
+      '</tr></thead><tbody>';
+    lista.forEach((v) => {
+      h +=
+        '<tr><td style="text-align:left"><strong>Settimana ' +
+        v.settimana +
+        '</strong> <span style="color:var(--muted);font-size:.72rem">(' +
+        _vacDateSettimana(anno, v.settimana) +
+        ')</span></td>';
+      h +=
+        '<td>' +
+        (puoMod
+          ? '<span class="mini-badge" style="cursor:pointer;background:' +
+            (v.confermata ? '#2c6e49' : '#888') +
+            '" onclick="toggleVacanzaConfermata(' +
+            v.id +
+            ')">' +
+            (v.confermata ? 'Sì' : 'No') +
+            '</span>'
+          : v.confermata
+            ? 'Sì'
+            : 'No') +
+        '</td>';
+      if (puoMod)
+        h +=
+          '<td><button class="btn-export" style="font-size:.68rem;padding:2px 8px;border-color:var(--accent);color:var(--accent)" onclick="eliminaVacanza(' +
+          v.id +
+          ')">Elimina</button></td>';
+      h += '</tr>';
+    });
+    h += '</tbody></table></div>';
+  });
+  h += '</div>';
+  return h;
+}
+function apriNuovaVacanza() {
+  if (!puoGestirePiano()) return;
+  const nomiRep = collaboratoriCache
+    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
+    .map((c) => c.nome);
+  const b = document.getElementById('pwd-modal-content');
+  b.innerHTML =
+    '<h3>Nuova vacanza — ' +
+    window._pianoVacAnno +
+    '</h3><div class="field" style="text-align:left"><label>Collaboratore</label><select id="nv-collab" style="width:100%;padding:8px">' +
+    nomiRep.map((n) => '<option value="' + escP(n) + '">' + escP(n) + '</option>').join('') +
+    '</select></div><div class="field" style="text-align:left;margin-top:8px"><label>Settimana (1-53)</label><input type="number" id="nv-sett" min="1" max="53" style="width:110px;padding:8px"></div>' +
+    '<div style="text-align:left;margin-top:8px"><label style="font-size:.82rem"><input type="checkbox" id="nv-conf" checked> Confermata</label></div>' +
+    '<div class="pwd-modal-btns" style="margin-top:14px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaNuovaVacanza()">Aggiungi</button></div>';
+  document.getElementById('pwd-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('nv-sett').focus(), 100);
+}
+async function salvaNuovaVacanza() {
+  const nome = (document.getElementById('nv-collab') || {}).value;
+  const sett = parseInt((document.getElementById('nv-sett') || {}).value);
+  const conf = (document.getElementById('nv-conf') || {}).checked;
+  if (!nome || isNaN(sett) || sett < 1 || sett > 53) {
+    toast('Collaboratore e settimana (1-53) obbligatori');
+    return;
+  }
+  document.getElementById('pwd-modal').classList.add('hidden');
+  if (_pianoVacCache.find((v) => v.collaboratore === nome && v.settimana === sett)) {
+    toast('Vacanza già inserita per questa settimana');
+    return;
+  }
+  try {
+    await secPost('piano_vacanze', {
+      collaboratore: nome,
+      settimana: sett,
+      anno: window._pianoVacAnno,
+      confermata: conf,
+      operatore: getOperatore(),
+    });
+    logAzione('Vacanza aggiunta', nome + ' settimana ' + sett + '/' + window._pianoVacAnno);
+    toast('Vacanza settimana ' + sett + ' aggiunta per ' + nome);
+    renderPiano();
+  } catch (e) {
+    toast('Errore salvataggio vacanza');
+  }
+}
+async function toggleVacanzaConfermata(id) {
+  if (!puoGestirePiano()) return;
+  const v = _pianoVacCache.find((x) => x.id === id);
+  if (!v) return;
+  try {
+    await secPatch('piano_vacanze', 'id=eq.' + id, { confermata: !v.confermata });
+    renderPiano();
+  } catch (e) {
+    toast('Errore');
+  }
+}
+async function eliminaVacanza(id) {
+  if (!puoGestirePiano()) return;
+  const v = _pianoVacCache.find((x) => x.id === id);
+  if (!v || !confirm('Eliminare la vacanza di ' + v.collaboratore + ' settimana ' + v.settimana + '?')) return;
+  try {
+    await secDel('piano_vacanze', 'id=eq.' + id);
+    logAzione('Vacanza eliminata', v.collaboratore + ' settimana ' + v.settimana + '/' + v.anno);
+    renderPiano();
+  } catch (e) {
+    toast('Errore');
+  }
+}
+async function eliminaTutteVacanze() {
+  if (!puoGestirePiano()) return;
+  const anno = window._pianoVacAnno;
+  if (!confirm('Eliminare TUTTE le vacanze del ' + anno + '? (' + _pianoVacCache.length + ' settimane)')) return;
+  try {
+    await secDel('piano_vacanze', 'anno=eq.' + anno);
+    logAzione('Vacanze: eliminate tutte', String(anno));
+    toast('Vacanze ' + anno + ' eliminate');
+    renderPiano();
+  } catch (e) {
+    toast('Errore');
+  }
+}
+
 function _pianoGiorniSettimana(anno, settimana) {
   // ISO 8601: settimana 1 = quella che contiene il 4 gennaio; lunedì = primo giorno
   const d = new Date(anno, 0, 4, 12);
@@ -2754,12 +3026,212 @@ function _pianoGiorniSettimana(anno, settimana) {
   }
   return out;
 }
+// Port 1:1 di step_vacanze.py (Turnivo "Ferie e Riposi"): piazza V protette
+// dai blocchi settimana, C prima (1 fissi / 2 jolly, con riporto sul mese
+// precedente) e dopo (scala per percentuale 100->1, 80->2, 60->3, 40->4),
+// WD (diurno forzato, non protetto) nei giorni prima dei C pre-vacanza.
+async function _applicaVacanzeMese(interattivo) {
+  if (!puoGestirePiano()) return null;
+  const ym = _pianoMeseSel;
+  const anno = parseInt(ym.split('-')[0]);
+  const mese = parseInt(ym.split('-')[1]);
+  const nGiorni = _pianoUltimoGiorno(ym);
+  const cPrimaFissi = parseInt(_pianoRegolaVal('c_prima_fissi')) || 1;
+  const cPrimaJolly = parseInt(_pianoRegolaVal('c_prima_jolly')) || 2;
+  const cDopo = {
+    100: parseInt(_pianoRegolaVal('c_dopo_100')) || 1,
+    80: parseInt(_pianoRegolaVal('c_dopo_80')) || 2,
+    60: parseInt(_pianoRegolaVal('c_dopo_60')) || 3,
+    40: parseInt(_pianoRegolaVal('c_dopo_40')) || 4,
+  };
+  const wdPrima = parseInt(_pianoRegolaVal('wd_prima_vacanza'));
+  const nWd = isNaN(wdPrima) ? 4 : wdPrima;
+  const vacanze = (await secGet('piano_vacanze?anno=eq.' + anno + '&limit=2000')) || [];
+  const nomiRep = collaboratoriCache
+    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
+    .map((c) => c.nome);
+  // settimane -> giorni del mese corrente
+  const vacGiorni = {}; // nome -> Set(giorno)
+  vacanze.forEach((v) => {
+    if (!nomiRep.includes(v.collaboratore)) return;
+    _pianoGiorniSettimana(anno, v.settimana).forEach((dstr) => {
+      const p = dstr.split('-');
+      if (parseInt(p[0]) === anno && parseInt(p[1]) === mese)
+        (vacGiorni[v.collaboratore] = vacGiorni[v.collaboratore] || new Set()).add(parseInt(p[2]));
+    });
+  });
+  if (!Object.keys(vacGiorni).length) {
+    if (interattivo) toast('Nessuna vacanza cade in ' + ym + ' per questo settore');
+    return { v: 0, c: 0, wd: 0 };
+  }
+  const da = ym + '-01';
+  const a = ym + '-' + String(nGiorni).padStart(2, '0');
+  // come Turnivo: via le V/C/WD auto non protette rimaste da giri precedenti
+  await secDel(
+    'piano',
+    'data=gte.' +
+      da +
+      '&data=lte.' +
+      a +
+      '&reparto_dip=eq.' +
+      _pianoReparto() +
+      '&protetto=eq.false&generato=eq.true&codice=in.(V,C,WD)',
+  );
+  const righe =
+    (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=5000')) ||
+    [];
+  const perCella = {}; // nome|g -> riga
+  righe.forEach((r) => (perCella[r.collaboratore + '|' + parseInt(r.data.split('-')[2])] = r));
+  const dstrDi = (g) => ym + '-' + String(g).padStart(2, '0');
+  let nV = 0;
+  let nC = 0;
+  let nWdP = 0;
+  const op = getOperatore();
+  const scrivi = async (nome, g, codice, protetto, generato) => {
+    const r = perCella[nome + '|' + g];
+    if (r) {
+      if (r.protetto) return false; // mai toccare le protette
+      if (r.codice === codice) return false;
+      await secPatch('piano', 'id=eq.' + r.id, {
+        codice: codice,
+        protetto: protetto,
+        generato: generato,
+        operatore: op,
+        updated_at: new Date().toISOString(),
+      });
+      r.codice = codice;
+      r.protetto = protetto;
+    } else {
+      const n = await secPost('piano', {
+        collaboratore: nome,
+        data: dstrDi(g),
+        codice: codice,
+        protetto: protetto,
+        generato: generato,
+        reparto_dip: _pianoReparto(),
+        operatore: op,
+      });
+      if (n && n[0]) perCella[nome + '|' + g] = n[0];
+    }
+    return true;
+  };
+  for (const nome of Object.keys(vacGiorni)) {
+    const giorni = [...vacGiorni[nome]].sort((x, y) => x - y);
+    const info = _pianoCollabInfo(nome) || {};
+    // V protette su ogni giorno di vacanza (le protette esistenti restano)
+    for (const g of giorni) {
+      const r = perCella[nome + '|' + g];
+      if (r && r.protetto) continue;
+      if (await scrivi(nome, g, 'V', true, false)) nV++;
+    }
+    // blocchi contigui
+    const blocchi = [];
+    let bIni = giorni[0];
+    let bFine = giorni[0];
+    for (const g of giorni.slice(1)) {
+      if (g === bFine + 1) bFine = g;
+      else {
+        blocchi.push([bIni, bFine]);
+        bIni = g;
+        bFine = g;
+      }
+    }
+    blocchi.push([bIni, bFine]);
+    const pct = info.percentuale != null ? info.percentuale : 1.0;
+    const nCPrima = info.is_jolly ? cPrimaJolly : cPrimaFissi;
+    const nCDopo = pct >= 1.0 ? cDopo[100] : pct >= 0.8 ? cDopo[80] : pct >= 0.6 ? cDopo[60] : cDopo[40];
+    const setVac = vacGiorni[nome];
+    const cGiorni = new Set();
+    const cMesePrec = []; // giorni del mese precedente
+    const dPrec = new Date(anno, mese - 2, 15);
+    const nGiorniPrec = new Date(dPrec.getFullYear(), dPrec.getMonth() + 1, 0).getDate();
+    for (const [bstart, bend] of blocchi) {
+      for (let off = 1; off <= nCPrima; off++) {
+        const prima = bstart - off;
+        if (prima >= 1 && prima <= nGiorni && !setVac.has(prima)) cGiorni.add(prima);
+        else if (prima < 1) {
+          const gPrec = nGiorniPrec + prima;
+          if (gPrec >= 1 && gPrec <= nGiorniPrec) cMesePrec.push(gPrec);
+        }
+      }
+      for (let off = 1; off <= nCDopo; off++) {
+        const dopo = bend + off;
+        if (dopo >= 1 && dopo <= nGiorni && !setVac.has(dopo)) cGiorni.add(dopo);
+      }
+    }
+    for (const g of [...cGiorni].sort((x, y) => x - y)) {
+      if (await scrivi(nome, g, 'C', true, true)) nC++;
+    }
+    // WD: diurni forzati prima dei C pre-vacanza (non protetti)
+    if (nWd > 0) {
+      const wdSet = new Set();
+      for (const [bstart] of blocchi) {
+        const primoC = bstart - nCPrima;
+        for (let off = 1; off <= nWd; off++) {
+          const g = primoC - off;
+          if (g >= 1 && g <= nGiorni && !setVac.has(g) && !cGiorni.has(g)) wdSet.add(g);
+        }
+      }
+      for (const g of [...wdSet].sort((x, y) => x - y)) {
+        if (await scrivi(nome, g, 'WD', false, true)) nWdP++;
+      }
+    }
+    // C a cavallo del mese precedente
+    for (const gPrec of cMesePrec) {
+      const ymPrec = dPrec.getFullYear() + '-' + String(dPrec.getMonth() + 1).padStart(2, '0');
+      const dstrP = ymPrec + '-' + String(gPrec).padStart(2, '0');
+      const es = (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=eq.' + dstrP)) || [];
+      if (es.length) {
+        if (!es[0].protetto) {
+          await secPatch('piano', 'id=eq.' + es[0].id, { codice: 'C', generato: true, operatore: op });
+          nC++;
+        }
+      } else {
+        await secPost('piano', {
+          collaboratore: nome,
+          data: dstrP,
+          codice: 'C',
+          protetto: false,
+          generato: true,
+          reparto_dip: _pianoReparto(),
+          operatore: op,
+        });
+        nC++;
+      }
+    }
+  }
+  logAzione('Piano: vacanze applicate', ym + ' — ' + nV + ' V, ' + nC + ' C, ' + nWdP + ' WD');
+  return { v: nV, c: nC, wd: nWdP };
+}
+async function applicaVacanzePiano() {
+  const MESI_L = MESI_FULL || [];
+  const lbl = (MESI_L[parseInt(_pianoMeseSel.split('-')[1]) - 1] || '') + ' ' + _pianoMeseSel.split('-')[0];
+  if (
+    !confirm(
+      'Applicare le vacanze a ' +
+        lbl +
+        ' (' +
+        repartoLabel(_pianoReparto()) +
+        ')?\n\nScrive le V (protette) sui giorni di vacanza, i congedi C prima/dopo i blocchi e i WD (diurno forzato) secondo le regole. Le celle protette esistenti non vengono toccate.',
+    )
+  )
+    return;
+  const r = await _applicaVacanzeMese(true);
+  if (r) toast('Piazzate ' + r.v + ' V, ' + r.c + ' C, ' + r.wd + ' WD');
+  _pianoTab = 'calendario';
+  localStorage.setItem('piano_tab', 'calendario');
+  renderPiano();
+}
+
 async function importaVacanzePiano(input) {
+  // IDENTICO a Turnivo (vacanze.importa_excel): colonna A cognome, B nome,
+  // colonne F-BE = settimane 1-52 con X. Scrive settimane in piano_vacanze
+  // (confermata=true); le V arrivano nel piano con "Applica al piano".
   if (!puoGestirePiano()) return;
   const file = input.files[0];
   input.value = '';
   if (!file || !window.XLSX) return;
-  const anno = parseInt((document.getElementById('vac-anno') || {}).value) || new Date().getFullYear();
+  const anno = window._pianoVacAnno || parseInt(_pianoMeseSel.split('-')[0]);
   try {
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf);
@@ -2786,21 +3258,12 @@ async function importaVacanzePiano(input) {
           .trim()
           .toUpperCase(); // col F = indice 5 = settimana 1
         if (cella !== 'X') continue;
-        _pianoGiorniSettimana(anno, w).forEach((dstr) => {
-          if (dstr.startsWith(String(anno)))
-            nuove.push({
-              collaboratore: hit.nome,
-              data: dstr,
-              codice: 'V',
-              protetto: true,
-              generato: false,
-              reparto_dip: hit.reparto_dip || 'slots',
-            });
-        });
+        if (_pianoVacCache.find((v) => v.collaboratore === hit.nome && v.settimana === w)) continue;
+        nuove.push({ collaboratore: hit.nome, settimana: w, anno: anno, confermata: true, operatore: getOperatore() });
       }
     });
     if (!nuove.length) {
-      toast('Nessuna vacanza riconosciuta nel file (' + collabTrovati + ' collaboratori trovati)');
+      toast('Nessuna settimana nuova nel file (' + collabTrovati + ' collaboratori riconosciuti)');
       return;
     }
     if (
@@ -2811,13 +3274,13 @@ async function importaVacanzePiano(input) {
           collabTrovati +
           ' collaboratori riconosciuti\n• ' +
           nuove.length +
-          ' giorni V da inserire (protetti)\n\nLe celle già occupate non vengono toccate.',
+          ' settimane da inserire\n\nPoi usa "Applica al piano" per scrivere le V nel calendario.',
       )
     )
       return;
-    const r = await sbRpc('piano_bulk_upsert', { p_token: getOpToken(), p_rows: nuove });
-    logAzione('Piano: vacanze importate', anno + ' — ' + ((r && r.inserite) || 0) + '/' + nuove.length);
-    toast('Vacanze importate: ' + ((r && r.inserite) || 0) + ' giorni V');
+    for (const v of nuove) await secPost('piano_vacanze', v);
+    logAzione('Vacanze importate', anno + ' — ' + nuove.length + ' settimane');
+    toast('Vacanze importate: ' + nuove.length + ' settimane');
     renderPiano();
   } catch (e) {
     console.error(e);
