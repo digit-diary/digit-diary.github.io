@@ -758,6 +758,14 @@ const _TABELLE_BACKUP = [
   'chat_groups',
   'chat_group_members',
   'chat_messages',
+  'piano',
+  'piano_turni',
+  'piano_codici',
+  'piano_fabbisogni',
+  'piano_regole',
+  'piano_festivi',
+  'piano_timbrature',
+  'piano_mappature',
 ];
 async function esportaBackupCompleto() {
   if (!isAdmin()) {

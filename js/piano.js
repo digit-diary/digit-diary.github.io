@@ -41,19 +41,39 @@ function puoGestirePiano() {
   return typeof puoModificare === 'function' ? puoModificare('gestione_piano') : isAdmin();
 }
 
+let pianoMappatureCache = [];
+let _pianoOreSett = 41; // ore settimanali contratto (imp 'piano_ore_settimanali')
 async function _pianoCaricaCfg() {
   if (_pianoCfgCaricata) return;
-  const [turni, codici, festivi, regole] = await Promise.all([
+  const [turni, codici, festivi, regole, mappature, oreSett, funzioni] = await Promise.all([
     secGet('piano_turni?order=ordine.asc&limit=500'),
     secGet('piano_codici?order=codice.asc&limit=200'),
     secGet('piano_festivi?order=data.asc&limit=200'),
     secGet('piano_regole?order=id.asc&limit=200'),
+    secGet('piano_mappature?order=funzione.asc&limit=500'),
+    getImp('piano_ore_settimanali'),
+    getImp('piano_funzioni'),
   ]);
   pianoTurniCache = turni || [];
   pianoCodiciCache = codici || [];
   pianoFestiviCache = festivi || [];
   pianoRegoleCache = regole || [];
+  pianoMappatureCache = mappature || [];
+  _pianoOreSett = parseFloat(oreSett) || 41;
+  try {
+    window._pianoFunzioni = funzioni ? JSON.parse(funzioni) : null;
+  } catch (e) {}
+  if (!Array.isArray(window._pianoFunzioni) || !window._pianoFunzioni.length)
+    window._pianoFunzioni = ['RESP', 'SUP', 'BO', 'HOST'];
   _pianoCfgCaricata = true;
+}
+function _pianoMappFunzione(funzione) {
+  if (!funzione) return null;
+  const m = pianoMappatureCache.filter((x) => x.funzione === funzione);
+  return m.length ? m : null;
+}
+function _pianoCollabInfo(nome) {
+  return collaboratoriCache.find((c) => c.nome.toLowerCase() === nome.toLowerCase());
 }
 
 function _pianoTurniReparto() {
@@ -169,6 +189,10 @@ async function renderPiano() {
         '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:var(--accent);color:var(--accent)" onclick="cancellaBozzaPiano()">Cancella bozza</button>';
     }
     h +=
+      '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:#b8a98a;color:#b8a98a" onclick="copiaPianoExcel()">Copia per Excel</button>';
+    h +=
+      '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:#b8a98a;color:#b8a98a" onclick="stampaPianoPDF()">Stampa PDF</button>';
+    h +=
       '<span style="font-size:.72rem;color:var(--muted);margin-left:auto">' +
       _pianoRighe.length +
       ' assegnazioni' +
@@ -196,7 +220,8 @@ async function renderPiano() {
         GG[dow] +
         '</span></th>';
     }
-    h += '<th class="piano-tot">Ore</th><th class="piano-tot">D</th><th class="piano-tot">N</th></tr></thead><tbody>';
+    h +=
+      '<th class="piano-tot">Ore</th><th class="piano-tot">D</th><th class="piano-tot">N</th><th class="piano-tot" title="Ore dovute (ore settimanali x percentuale x giorni/7)">Dov.</th><th class="piano-tot" title="Saldo: pianificate - dovute">Saldo</th></tr></thead><tbody>';
 
     nomi.forEach((nome) => {
       const ne = nome.replace(/'/g, "\\'");
@@ -254,9 +279,18 @@ async function renderPiano() {
           cella +
           '</td>';
       }
+      const infoC = _pianoCollabInfo(nome);
+      const perc = infoC ? parseFloat(infoC.percentuale) || 1 : 1;
+      const dovute = Math.round(((_pianoOreSett * perc * nGiorni) / 7) * 10) / 10;
+      const saldo = Math.round((ore - dovute) * 10) / 10;
       h +=
-        '<tr><td class="piano-nome">' +
+        '<tr><td class="piano-nome"' +
+        (infoC && infoC.funzione ? ' title="' + escP(infoC.funzione) + ' ' + Math.round(perc * 100) + '%"' : '') +
+        '>' +
         escP(nome) +
+        (infoC && infoC.funzione && infoC.funzione !== 'HOST'
+          ? ' <span style="font-size:.58rem;color:var(--muted)">' + escP(infoC.funzione) + '</span>'
+          : '') +
         '</td>' +
         riga +
         '<td class="piano-tot">' +
@@ -265,6 +299,12 @@ async function renderPiano() {
         (nD || '') +
         '</td><td class="piano-tot">' +
         (nN || '') +
+        '</td><td class="piano-tot" style="color:var(--muted)">' +
+        (ore ? dovute.toFixed(1) : '') +
+        '</td><td class="piano-tot" style="color:' +
+        (saldo > 0 ? '#2c6e49' : saldo < 0 ? '#c0392b' : 'var(--muted)') +
+        '">' +
+        (ore ? (saldo > 0 ? '+' : '') + saldo.toFixed(1) : '') +
         '</td></tr>';
     });
     h += '</tbody></table></div>';
@@ -354,9 +394,16 @@ async function renderPiano() {
       _renderPianoTurniCard() +
       _renderPianoCodiciCard() +
       _renderPianoFestiviCard() +
+      _renderPianoMappatureCard() +
+      _renderPianoPreferenzeCard() +
+      _renderPianoImpostazioniCard() +
+      _renderPianoTimbratureCard() +
+      _renderPianoVacanzeCard() +
+      _renderPianoStatCard() +
       '</div>';
     el.innerHTML = h;
     if (typeof initCardRichiudibili === 'function') initCardRichiudibili('piano-config', []);
+    _pianoInitSelezione();
     _pianoRenderViolazioni();
   } catch (e) {
     console.error('Errore piano:', e);
@@ -437,6 +484,9 @@ function apriPianoCella(nome, data) {
     '<div class="pwd-modal-btns" style="margin-top:14px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button>' +
     (r
       ? '<button class="btn-modal-cancel" style="border-color:var(--accent);color:var(--accent)" onclick="rimuoviPianoCella()">Rimuovi</button>'
+      : '') +
+    (r && _pianoTurnoInfo(r.codice)
+      ? '<button class="btn-modal-cancel" style="border-color:#1a4a7a;color:#1a4a7a" onclick="apriScambioTurno()">Scambia con collega</button>'
       : '') +
     '<button class="btn-modal-ok" onclick="salvaPianoCella()">Salva</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
@@ -533,6 +583,9 @@ function _pianoCalcolaViolazioni() {
   const minRiposo = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 0;
   const no4w1c1w = _pianoRegolaVal('no_4w1c1w') === 'TRUE';
   const diurnoPreV = _pianoRegolaVal('diurno_prima_vacanza') === 'TRUE';
+  const supSoloZ = _pianoRegolaVal('sup_solo_z_settimana') === 'TRUE';
+  const supVenSab = _pianoRegolaVal('sup_ven_sab_z_e_s') === 'TRUE';
+  const l1SoloBoSup = _pianoRegolaVal('l1_solo_bo_sup') === 'TRUE';
   const celle = {};
   const lista = [];
   const aggiungi = (nome, giorno, msg) => {
@@ -588,6 +641,24 @@ function _pianoCalcolaViolazioni() {
         const tp = _pianoTurnoInfo(giorni[g - 1]);
         if (tp && tp.tipo === 'NOTTURNO')
           aggiungi(nome, g - 1, 'turno notturno il giorno prima delle vacanze (deve essere diurno)');
+      }
+      // 5) regole per funzione (SUP solo turni Z in settimana; L1/9 solo BO e SUP)
+      if (lavoro) {
+        const infoC = _pianoCollabInfo(nome);
+        const fz = infoC && infoC.funzione;
+        const t = _pianoTurnoInfo(cod);
+        const dow = new Date(ym + '-' + String(g).padStart(2, '0') + 'T12:00:00').getDay();
+        if (supSoloZ && fz === 'SUP' && t && dow >= 1 && dow <= 4) {
+          // lun-gio: SUP solo turni Z (o BO L1/9)
+          if (!(cod[0] === 'Z' || cod === 'L1' || cod === '9'))
+            aggiungi(nome, g, 'SUP con turno ' + cod + ' in settimana (lun-gio solo turni Z)');
+        }
+        if (supVenSab && fz === 'SUP' && t && (dow === 5 || dow === 6)) {
+          if (!(cod[0] === 'Z' || cod[0] === 'S' || cod === 'L1' || cod === '9'))
+            aggiungi(nome, g, 'SUP con turno ' + cod + ' nel weekend (ven/sab solo Z o S)');
+        }
+        if (l1SoloBoSup && (cod === 'L1' || cod === '9') && fz !== 'BO' && fz !== 'SUP' && fz !== 'RESP')
+          aggiungi(nome, g, 'turno ' + cod + ' riservato a BO e SUP (funzione: ' + (fz || 'nessuna') + ')');
       }
     }
   });
@@ -704,21 +775,57 @@ async function generaBozzaPiano() {
       const dstr = ym + '-' + String(g).padStart(2, '0');
       let have = nomi.filter((n) => cella[n + '|' + g] === f.turno_codice).length;
       while (have < f.quantita) {
+        const dowG = new Date(dstr + 'T12:00:00').getDay();
         const candidati = nomi
-          .filter(
-            (n) =>
-              !cella[n + '|' + g] &&
-              !malattie[n + '|' + dstr] &&
-              idoneita[n] &&
-              idoneita[n].has(t.gruppo) &&
-              consecPrima(n, g) < maxCons &&
-              riposoOk(n, g, t),
-          )
-          .sort(
-            (x, y) =>
+          .filter((n) => {
+            if (cella[n + '|' + g] || malattie[n + '|' + dstr]) return false;
+            const infoC = _pianoCollabInfo(n);
+            // preferenze collaboratore
+            if (infoC && infoC.solo_diurni && t.tipo === 'NOTTURNO') return false;
+            if (
+              infoC &&
+              infoC.turni_bloccati &&
+              infoC.turni_bloccati
+                .split(',')
+                .map((x) => x.trim())
+                .includes(f.turno_codice)
+            )
+              return false;
+            // mappature per funzione (SUP/BO limitati ai loro turni; regole settimana SUP)
+            const fz = infoC && infoC.funzione;
+            const mapp = _pianoMappFunzione(fz);
+            if (mapp) {
+              const voci = mapp
+                .filter((m) => m.tipo === 'PRINCIPALE' || m.tipo === 'AMMESSO')
+                .map((m) => m.turno_codice);
+              if (voci.length && !voci.includes(f.turno_codice)) return false;
+              if (
+                fz === 'SUP' &&
+                dowG >= 1 &&
+                dowG <= 4 &&
+                !(f.turno_codice[0] === 'Z' || f.turno_codice === 'L1' || f.turno_codice === '9')
+              )
+                return false;
+            } else if (!(idoneita[n] && idoneita[n].has(t.gruppo))) return false;
+            return consecPrima(n, g) < maxCons && riposoOk(n, g, t);
+          })
+          .sort((x, y) => {
+            const mx = _pianoMappFunzione((_pianoCollabInfo(x) || {}).funzione);
+            const my = _pianoMappFunzione((_pianoCollabInfo(y) || {}).funzione);
+            const bonus = (m) =>
+              m
+                ? m.some(
+                    (v) => v.turno_codice === f.turno_codice && (v.tipo === 'PRINCIPALE' || v.tipo === 'PREFERITO'),
+                  )
+                  ? -1
+                  : 0
+                : 0;
+            return (
+              bonus(mx) - bonus(my) ||
               (oreMese[x] || 0) - (oreMese[y] || 0) ||
-              (familiarita[y + '|' + f.turno_codice] || 0) - (familiarita[x + '|' + f.turno_codice] || 0),
-          );
+              (familiarita[y + '|' + f.turno_codice] || 0) - (familiarita[x + '|' + f.turno_codice] || 0)
+            );
+          });
         if (!candidati.length) {
           scoperti.push(f.turno_codice + ' giorno ' + g);
           break;
@@ -827,6 +934,9 @@ const PIANO_REGOLE_DOVE = {
   min_riposo_ore: 'Validatore + Bozza',
   no_4w1c1w: 'Validatore',
   diurno_prima_vacanza: 'Validatore',
+  sup_solo_z_settimana: 'Validatore + Bozza',
+  sup_ven_sab_z_e_s: 'Validatore + Bozza',
+  l1_solo_bo_sup: 'Validatore + Bozza',
 };
 function _pianoRegoleDove(nome) {
   return PIANO_REGOLE_DOVE[nome] || 'Solver (Fase 3)';
@@ -1357,5 +1467,850 @@ async function generaPianoFestivi() {
     renderPiano();
   } catch (e) {
     toast('Errore generazione festivi');
+  }
+}
+
+// ================================================================
+// COPIA PER EXCEL / STAMPA PDF / SCAMBIO TURNO / SELEZIONE RIGA
+// ================================================================
+function copiaPianoExcel() {
+  const tab = document.querySelector('#piano-content .piano-table');
+  if (!tab) return;
+  const righe = [];
+  tab.querySelectorAll('tr').forEach((tr) => {
+    const celle = [...tr.querySelectorAll('th,td')].map((c) => c.textContent.trim().replace(/\n/g, ' '));
+    righe.push(celle.join('\t'));
+  });
+  navigator.clipboard
+    .writeText(righe.join('\n'))
+    .then(() => toast('Piano copiato: incollalo in Excel'))
+    .catch(() => toast('Copia non riuscita'));
+}
+
+async function stampaPianoPDF() {
+  if (!window.jspdf) {
+    toast('Caricamento PDF...');
+    if (!(await caricaJsPDF())) {
+      toast('Errore libreria PDF');
+      return;
+    }
+  }
+  const ym = _pianoMeseSel;
+  const nGiorni = _pianoUltimoGiorno(ym);
+  const label = (MESI_FULL[parseInt(ym.split('-')[1]) - 1] || ym) + ' ' + ym.split('-')[0];
+  const mappa = {};
+  _pianoRighe.forEach((r) => (mappa[r.collaboratore + '|' + parseInt(r.data.split('-')[2])] = r.codice));
+  const nomi = [...new Set(_pianoRighe.map((r) => r.collaboratore))].sort();
+  const head = ['Collaboratore'];
+  for (let g = 1; g <= nGiorni; g++) head.push(String(g));
+  const body = nomi.map((n) => {
+    const riga = [n];
+    for (let g = 1; g <= nGiorni; g++) riga.push(mappa[n + '|' + g] || '');
+    return riga;
+  });
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('landscape', 'mm', 'a4');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text('Piano di lavoro — ' + label + ' — ' + repartoLabel(_pianoReparto()), 148, 10, { align: 'center' });
+  doc.autoTable({
+    startY: 14,
+    head: [head],
+    body: body,
+    theme: 'grid',
+    margin: { left: 4, right: 4 },
+    styles: { fontSize: 5.2, cellPadding: 0.6, halign: 'center', lineColor: [180, 180, 180], lineWidth: 0.1 },
+    headStyles: { fillColor: [26, 18, 8], textColor: [255, 255, 255], fontSize: 5 },
+    columnStyles: { 0: { halign: 'left', fontStyle: 'bold', cellWidth: 26, fontSize: 5 } },
+    didParseCell: (d) => {
+      if (d.section === 'body' && d.column.index > 0 && d.cell.raw) {
+        const col = _pianoColore(String(d.cell.raw));
+        if (col) {
+          const hex = col.replace('#', '');
+          d.cell.styles.fillColor = [
+            parseInt(hex.substring(0, 2), 16),
+            parseInt(hex.substring(2, 4), 16),
+            parseInt(hex.substring(4, 6), 16),
+          ];
+        }
+      }
+    },
+  });
+  doc.setFontSize(6);
+  doc.setTextColor(120);
+  doc.text('Casino Lugano SA — Piano di lavoro — generato il ' + new Date().toLocaleDateString('it-IT'), 4, 205);
+  logAzione('Piano stampato', label + ' (' + _pianoReparto() + ')');
+  mostraPdfPreview(doc, 'piano_' + ym + '_' + _pianoReparto() + '.pdf', 'Piano ' + label);
+}
+
+// ---- Scambio turno tra colleghi (come Turnivo cap. 19) ----
+function apriScambioTurno() {
+  const sel = _pianoCellaSel;
+  if (!sel) return;
+  const r = _pianoRighe.find((x) => x.collaboratore === sel.nome && x.data === sel.data);
+  if (!r || !_pianoTurnoInfo(r.codice)) return;
+  // colleghi con un TURNO quel giorno (scambio turno-turno)
+  const colleghi = _pianoRighe.filter(
+    (x) => x.data === sel.data && x.collaboratore !== sel.nome && _pianoTurnoInfo(x.codice),
+  );
+  if (!colleghi.length) {
+    toast('Nessun collega con un turno quel giorno');
+    return;
+  }
+  const b = document.getElementById('pwd-modal-content');
+  b.innerHTML =
+    '<h3>Scambio turno — ' +
+    new Date(sel.data + 'T12:00:00').toLocaleDateString('it-IT') +
+    '</h3><p style="margin-bottom:10px;font-size:.86rem"><strong>' +
+    escP(sel.nome) +
+    '</strong> (' +
+    escP(r.codice) +
+    ') scambia con:</p><select id="scambio-collega" style="width:100%;padding:10px">' +
+    colleghi
+      .map(
+        (c) =>
+          '<option value="' +
+          escP(c.collaboratore) +
+          '">' +
+          escP(c.collaboratore) +
+          ' — ' +
+          escP(c.codice) +
+          '</option>',
+      )
+      .join('') +
+    '</select><div class="field" style="text-align:left;margin-top:10px"><label>Motivazione</label><input type="text" id="scambio-motivo" placeholder="Es: esigenze personali..."></div>' +
+    '<div class="pwd-modal-btns" style="margin-top:14px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="confermaScambioTurno()">Scambia</button></div>';
+  document.getElementById('pwd-modal').classList.remove('hidden');
+}
+async function confermaScambioTurno() {
+  const sel = _pianoCellaSel;
+  const collega = (document.getElementById('scambio-collega') || {}).value;
+  const motivo = ((document.getElementById('scambio-motivo') || {}).value || '').trim();
+  document.getElementById('pwd-modal').classList.add('hidden');
+  if (!sel || !collega) return;
+  const r1 = _pianoRighe.find((x) => x.collaboratore === sel.nome && x.data === sel.data);
+  const r2 = _pianoRighe.find((x) => x.collaboratore === collega && x.data === sel.data);
+  if (!r1 || !r2) return;
+  const c1 = r1.codice;
+  const c2 = r2.codice;
+  try {
+    await secPatch('piano', 'id=eq.' + r1.id, {
+      codice: c2,
+      protetto: true,
+      commento: ('Scambio con ' + collega + ' (era ' + c1 + ')' + (motivo ? ' — ' + motivo : '')).substring(0, 400),
+      operatore: getOperatore(),
+      updated_at: new Date().toISOString(),
+    });
+    await secPatch('piano', 'id=eq.' + r2.id, {
+      codice: c1,
+      protetto: true,
+      commento: ('Scambio con ' + sel.nome + ' (era ' + c2 + ')' + (motivo ? ' — ' + motivo : '')).substring(0, 400),
+      operatore: getOperatore(),
+      updated_at: new Date().toISOString(),
+    });
+    r1.codice = c2;
+    r2.codice = c1;
+    r1.protetto = r2.protetto = true;
+    logAzione('Piano: scambio turno', sel.nome + ' (' + c1 + ') <-> ' + collega + ' (' + c2 + ') il ' + sel.data);
+    toast('Turni scambiati');
+    // PDF dello scambio (documentazione con firme, come Turnivo)
+    if (!window.jspdf) await caricaJsPDF();
+    if (window.jspdf) {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      let y = 20;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(15);
+      doc.text('Modulo cambio turno', 105, y, { align: 'center' });
+      y += 12;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(11);
+      doc.text('Data del turno: ' + new Date(sel.data + 'T12:00:00').toLocaleDateString('it-IT'), 20, y);
+      y += 8;
+      doc.text('Settore: ' + repartoLabel(_pianoReparto()), 20, y);
+      y += 12;
+      doc.text(sel.nome + ':  ' + c1 + '  ->  ' + c2, 20, y);
+      y += 8;
+      doc.text(collega + ':  ' + c2 + '  ->  ' + c1, 20, y);
+      y += 10;
+      if (motivo) {
+        doc.text('Motivazione: ' + motivo, 20, y);
+        y += 10;
+      }
+      doc.text('Registrato da: ' + getOperatore() + ' il ' + new Date().toLocaleDateString('it-IT'), 20, y);
+      y += 24;
+      doc.line(20, y, 85, y);
+      doc.line(115, y, 180, y);
+      y += 5;
+      doc.setFontSize(9);
+      doc.text('Firma ' + sel.nome, 20, y);
+      doc.text('Firma ' + collega, 115, y);
+      mostraPdfPreview(doc, 'cambio_turno_' + sel.data + '.pdf', 'Cambio turno ' + sel.data);
+    }
+    renderPiano();
+  } catch (e) {
+    console.error(e);
+    toast('Errore scambio turno');
+  }
+}
+
+// ---- Selezione riga/colonna stile Excel (come Turnivo) ----
+function _pianoInitSelezione() {
+  const tab = document.querySelector('#piano-content .piano-table');
+  if (!tab || tab.dataset.selInit) return;
+  tab.dataset.selInit = '1';
+  const clear = () => {
+    tab.querySelectorAll('.row-selected').forEach((el) => el.classList.remove('row-selected'));
+    tab.querySelectorAll('.col-selected').forEach((el) => el.classList.remove('col-selected'));
+  };
+  tab.querySelectorAll('tbody .piano-nome').forEach((cella) => {
+    cella.addEventListener('click', () => {
+      const tr = cella.closest('tr');
+      const era = tr.classList.contains('row-selected');
+      clear();
+      if (!era) tr.classList.add('row-selected');
+    });
+  });
+  tab.querySelectorAll('thead th').forEach((th, idx) => {
+    if (th.classList.contains('piano-nome') || th.classList.contains('piano-tot')) return;
+    th.addEventListener('click', () => {
+      const era = th.classList.contains('col-selected');
+      clear();
+      if (era) return;
+      th.classList.add('col-selected');
+      tab.querySelectorAll('tbody tr').forEach((tr) => {
+        const celle = tr.querySelectorAll('th,td');
+        if (celle[idx]) celle[idx].classList.add('col-selected');
+      });
+    });
+  });
+}
+
+// ================================================================
+// TIMBRATURE — inserimento manuale, upload da timbratrice, confronto
+// ore timbrate vs pianificate (come Turnivo cap. 22)
+// ================================================================
+let _pianoTimbrature = []; // mese corrente
+
+async function _pianoCaricaTimbrature() {
+  const ym = _pianoMeseSel;
+  const da = ym + '-01';
+  const a = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
+  _pianoTimbrature =
+    (await secGet(
+      'piano_timbrature?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=3000',
+    )) || [];
+}
+function _pianoOreTimbrata(entrata, uscita) {
+  const e = _pianoOra(entrata);
+  const u = _pianoOra(uscita);
+  if (e == null || u == null) return 0;
+  return Math.round((u >= e ? u - e : 24 + u - e) * 100) / 100;
+}
+function _renderPianoTimbratureCard() {
+  if (!puoGestirePiano() && !isAdmin()) return '';
+  let h =
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Timbrature — confronto con il piano</div><div style="padding:10px 14px" id="piano-timb-body">';
+  h +=
+    '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">' +
+    '<button class="btn-export" style="font-size:.74rem;padding:5px 12px" onclick="caricaConfrontoTimbrature()">Carica confronto del mese</button>' +
+    '<button class="btn-export" style="font-size:.74rem;padding:5px 12px;border-color:#2c6e49;color:#2c6e49" onclick="document.getElementById(\'timb-file\').click()">Importa file timbratrice</button>' +
+    '<input type="file" id="timb-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="importaTimbrature(this)">' +
+    '<span style="font-size:.72rem;color:var(--muted)">CSV o Excel con colonne nome / data / entrata / uscita (riconosciute in automatico)</span></div>';
+  // inserimento manuale
+  h +=
+    '<div class="add-tipo-row"><div class="field"><label>Collaboratore</label><select id="timb-collab" style="padding:8px">' +
+    collaboratoriCache
+      .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
+      .map((c) => '<option>' + escP(c.nome) + '</option>')
+      .join('') +
+    '</select></div>' +
+    '<div class="field"><label>Data</label><input type="date" id="timb-data"></div>' +
+    '<div class="field"><label>Entrata</label><input type="time" id="timb-entrata"></div>' +
+    '<div class="field"><label>Uscita</label><input type="time" id="timb-uscita"></div>' +
+    '<button class="btn-add-tipo" onclick="aggiungiTimbratura()">+ Registra</button></div>';
+  h += '<div id="timb-confronto"></div>';
+  h += '</div></div>';
+  return h;
+}
+async function aggiungiTimbratura() {
+  if (!puoGestirePiano()) return;
+  const nome = (document.getElementById('timb-collab') || {}).value;
+  const data = (document.getElementById('timb-data') || {}).value;
+  const entrata = (document.getElementById('timb-entrata') || {}).value;
+  const uscita = (document.getElementById('timb-uscita') || {}).value;
+  if (!nome || !data || !entrata || !uscita) {
+    toast('Compila tutti i campi');
+    return;
+  }
+  try {
+    await secPost('piano_timbrature', {
+      collaboratore: nome,
+      data: data,
+      ora_entrata: entrata,
+      ora_uscita: uscita,
+      ore: _pianoOreTimbrata(entrata, uscita),
+      fonte: 'manuale',
+      reparto_dip: _pianoReparto(),
+      operatore: getOperatore(),
+    });
+    logAzione('Timbratura registrata', nome + ' ' + data + ' ' + entrata + '-' + uscita);
+    toast('Timbratura registrata');
+    caricaConfrontoTimbrature();
+  } catch (e) {
+    toast('Errore (timbratura già presente per quel giorno?)');
+  }
+}
+async function importaTimbrature(input) {
+  if (!puoGestirePiano()) return;
+  const file = input.files[0];
+  input.value = '';
+  if (!file || !window.XLSX) return;
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf);
+    const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+    if (data.length < 2) {
+      toast('File vuoto');
+      return;
+    }
+    // riconoscimento colonne (fuzzy, come Turnivo)
+    const head = data[0].map((c) => String(c).toLowerCase());
+    const trova = (parole) => head.findIndex((c) => parole.some((p) => c.includes(p)));
+    const iNome = trova(['nome', 'collaboratore', 'dipendente']);
+    const iData = trova(['data', 'giorno', 'date']);
+    const iIn = trova(['entrata', 'ingresso', 'inizio', 'in']);
+    const iOut = trova(['uscita', 'fine', 'out']);
+    if (iNome === -1 || iData === -1 || iIn === -1 || iOut === -1) {
+      toast('Colonne non riconosciute: servono nome, data, entrata, uscita');
+      return;
+    }
+    const nomi = collaboratoriCache.filter((c) => c.attivo !== false);
+    const matchNome = (n) => {
+      const nn = String(n).toLowerCase().trim();
+      const parti = nn.split(/\s+/);
+      const hit = nomi.find(
+        (c) =>
+          c.nome.toLowerCase() === nn ||
+          c.nome.toLowerCase() === parti.slice().reverse().join(' ') ||
+          parti.every((p) => c.nome.toLowerCase().includes(p)),
+      );
+      return hit ? hit.nome : null;
+    };
+    const normOra = (v) => {
+      if (v instanceof Date)
+        return String(v.getHours()).padStart(2, '0') + ':' + String(v.getMinutes()).padStart(2, '0');
+      if (typeof v === 'number') {
+        const min = Math.round(v * 24 * 60);
+        return String(Math.floor(min / 60) % 24).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0');
+      }
+      const m = String(v).match(/(\d{1,2})[:.](\d{2})/);
+      return m ? m[1].padStart(2, '0') + ':' + m[2] : null;
+    };
+    const normData = (v) => {
+      if (v instanceof Date) return v.toISOString().substring(0, 10);
+      if (typeof v === 'number' && v > 40000)
+        return new Date(Math.round((v - 25569) * 86400000)).toISOString().substring(0, 10);
+      const m = String(v).match(/(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/);
+      if (m)
+        return (m[3].length === 2 ? '20' + m[3] : m[3]) + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+      const iso = String(v).match(/(\d{4})-(\d{2})-(\d{2})/);
+      return iso ? iso[0] : null;
+    };
+    const valide = [];
+    const scartate = [];
+    data.slice(1).forEach((row) => {
+      const nome = matchNome(row[iNome]);
+      const dt = normData(row[iData]);
+      const oin = normOra(row[iIn]);
+      const oout = normOra(row[iOut]);
+      if (nome && dt && oin && oout) valide.push({ nome, dt, oin, oout });
+      else if (String(row[iNome] || '').trim()) scartate.push(String(row[iNome]));
+    });
+    if (!valide.length) {
+      toast('Nessuna riga valida nel file');
+      return;
+    }
+    if (
+      !confirm(
+        'Importare ' +
+          valide.length +
+          ' timbrature?' +
+          (scartate.length ? '\n(' + scartate.length + ' righe scartate: nome/data non riconosciuti)' : '') +
+          '\nLe timbrature già presenti per lo stesso giorno non vengono toccate.',
+      )
+    )
+      return;
+    let ok = 0;
+    for (let i = 0; i < valide.length; i += 10) {
+      const blocco = valide.slice(i, i + 10);
+      const esiti = await Promise.all(
+        blocco.map((v) =>
+          secPost('piano_timbrature', {
+            collaboratore: v.nome,
+            data: v.dt,
+            ora_entrata: v.oin,
+            ora_uscita: v.oout,
+            ore: _pianoOreTimbrata(v.oin, v.oout),
+            fonte: 'import',
+            reparto_dip: _pianoReparto(),
+            operatore: getOperatore(),
+          }).then(
+            () => 1,
+            () => 0,
+          ),
+        ),
+      );
+      ok += esiti.reduce((s, x) => s + x, 0);
+    }
+    logAzione('Timbrature importate', ok + '/' + valide.length + ' da ' + file.name);
+    toast(
+      'Importate ' +
+        ok +
+        ' timbrature' +
+        (valide.length - ok ? ' (' + (valide.length - ok) + ' duplicate saltate)' : ''),
+    );
+    caricaConfrontoTimbrature();
+  } catch (e) {
+    console.error(e);
+    toast('Errore lettura file timbrature');
+  }
+}
+async function caricaConfrontoTimbrature() {
+  const el = document.getElementById('timb-confronto');
+  if (!el) return;
+  el.innerHTML = '<p style="color:var(--muted);font-size:.8rem;padding:6px 0">Caricamento...</p>';
+  await _pianoCaricaTimbrature();
+  if (!_pianoTimbrature.length) {
+    el.innerHTML =
+      '<p style="color:var(--muted);font-size:.8rem;padding:6px 0">Nessuna timbratura per ' + _pianoMeseSel + '.</p>';
+    return;
+  }
+  // ore pianificate per collaboratore (turni del mese)
+  const pianOre = {};
+  _pianoRighe.forEach((r) => {
+    const t = _pianoTurnoInfo(r.codice);
+    if (t) pianOre[r.collaboratore] = (pianOre[r.collaboratore] || 0) + (parseFloat(t.durata_ore) || 0);
+  });
+  const timbOre = {};
+  const timbGg = {};
+  _pianoTimbrature.forEach((t) => {
+    timbOre[t.collaboratore] = (timbOre[t.collaboratore] || 0) + (parseFloat(t.ore) || 0);
+    timbGg[t.collaboratore] = (timbGg[t.collaboratore] || 0) + 1;
+  });
+  let h =
+    '<div style="overflow-x:auto;margin-top:8px"><table class="piano-table" style="min-width:520px;font-size:.78rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Giorni timbrati</th><th>Ore timbrate</th><th>Ore pianificate</th><th>Differenza</th></tr></thead><tbody>';
+  Object.keys(timbOre)
+    .sort()
+    .forEach((n) => {
+      const diff = Math.round((timbOre[n] - (pianOre[n] || 0)) * 10) / 10;
+      h +=
+        '<tr><td style="text-align:left;font-weight:600">' +
+        escP(n) +
+        '</td><td>' +
+        timbGg[n] +
+        '</td><td>' +
+        timbOre[n].toFixed(1) +
+        '</td><td>' +
+        (pianOre[n] || 0).toFixed(1) +
+        '</td><td style="font-weight:700;color:' +
+        (diff > 0 ? '#2c6e49' : diff < 0 ? '#c0392b' : 'var(--muted)') +
+        '">' +
+        (diff > 0 ? '+' : '') +
+        diff.toFixed(1) +
+        '</td></tr>';
+    });
+  h += '</tbody></table></div>';
+  h +=
+    '<p style="font-size:.7rem;color:var(--muted);margin-top:6px">Differenza = timbrate − pianificate del mese (' +
+    _pianoMeseSel +
+    ', ' +
+    escP(repartoLabel(_pianoReparto())) +
+    ')</p>';
+  el.innerHTML = h;
+}
+
+// ================================================================
+// STATISTICHE ANNUALI + PANORAMICA MESI (come Turnivo cap. 7.4 e 20)
+// ================================================================
+function _renderPianoStatCard() {
+  return (
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Statistiche anno e panoramica mesi</div><div style="padding:10px 14px" id="piano-stat-body">' +
+    '<button class="btn-export" style="font-size:.74rem;padding:5px 12px" onclick="caricaStatisticheAnnoPiano()">Carica statistiche ' +
+    _pianoMeseSel.split('-')[0] +
+    '</button><div id="piano-stat-anno"></div></div></div>'
+  );
+}
+async function caricaStatisticheAnnoPiano() {
+  const el = document.getElementById('piano-stat-anno');
+  if (!el) return;
+  el.innerHTML = '<p style="color:var(--muted);font-size:.8rem;padding:6px 0">Caricamento anno...</p>';
+  const anno = _pianoMeseSel.split('-')[0];
+  const righe =
+    (await secGet(
+      'piano?data=gte.' +
+        anno +
+        '-01-01&data=lte.' +
+        anno +
+        '-12-31&reparto_dip=eq.' +
+        _pianoReparto() +
+        '&limit=20000',
+    )) || [];
+  const fabb =
+    (await secGet(
+      'piano_fabbisogni?data=gte.' +
+        anno +
+        '-01-01&data=lte.' +
+        anno +
+        '-12-31&reparto_dip=eq.' +
+        _pianoReparto() +
+        '&limit=5000',
+    )) || [];
+  // panoramica mesi
+  const mesiDati = {};
+  righe.forEach((r) => (mesiDati[r.data.substring(5, 7)] = (mesiDati[r.data.substring(5, 7)] || 0) + 1));
+  const mesiFabb = {};
+  fabb.forEach((f) => (mesiFabb[f.data.substring(5, 7)] = true));
+  let h = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0">';
+  for (let m = 1; m <= 12; m++) {
+    const mm = String(m).padStart(2, '0');
+    const ha = mesiDati[mm];
+    h +=
+      '<button class="btn-export" style="font-size:.7rem;padding:4px 10px;' +
+      (ha ? 'border-color:#2c6e49;color:#2c6e49;font-weight:700' : 'color:var(--muted)') +
+      '" onclick="_pianoMeseSel=\'' +
+      anno +
+      '-' +
+      mm +
+      '\';_pianoViolCelle={};_pianoViolLista=null;renderPiano()">' +
+      (MESI[m - 1] || mm) +
+      (ha ? ' (' + ha + ')' : '') +
+      (mesiFabb[mm] ? ' <span style="color:#d4b86a">F</span>' : '') +
+      '</button>';
+  }
+  h += '</div>';
+  // statistiche per collaboratore
+  const st = {};
+  righe.forEach((r) => {
+    const t = _pianoTurnoInfo(r.codice);
+    const cs = _pianoCodiceInfo(r.codice);
+    const o = (st[r.collaboratore] = st[r.collaboratore] || { ore: 0, d: 0, n: 0, we: 0, dom: 0, v: 0, m: 0 });
+    const dow = new Date(r.data + 'T12:00:00').getDay();
+    if (t) {
+      o.ore += parseFloat(t.durata_ore) || 0;
+      if (t.tipo === 'NOTTURNO') o.n++;
+      else o.d++;
+      if (dow === 5 || dow === 6) o.we++;
+      if (dow === 0) o.dom++;
+    } else if (cs) {
+      if (r.codice === 'V' || r.codice === 'V1') o.v++;
+      if (r.codice === 'M' || r.codice === 'M1') o.m++;
+      o.ore += parseFloat(cs.ore) || 0;
+    }
+  });
+  h +=
+    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:660px;font-size:.76rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Ore anno</th><th>Diurni</th><th>Notturni</th><th>Weekend</th><th>Domeniche</th><th>Vacanze</th><th>Malattie</th></tr></thead><tbody>';
+  Object.keys(st)
+    .sort()
+    .forEach((n) => {
+      const o = st[n];
+      h +=
+        '<tr><td style="text-align:left;font-weight:600">' +
+        escP(n) +
+        '</td><td>' +
+        o.ore.toFixed(1) +
+        '</td><td>' +
+        o.d +
+        '</td><td>' +
+        o.n +
+        '</td><td' +
+        (o.we > 20
+          ? ' style="color:#c0392b;font-weight:700"'
+          : o.we >= 12
+            ? ' style="color:#b39b00;font-weight:700"'
+            : '') +
+        '>' +
+        o.we +
+        '</td><td>' +
+        o.dom +
+        '</td><td>' +
+        o.v +
+        '</td><td>' +
+        o.m +
+        '</td></tr>';
+    });
+  h += '</tbody></table></div>';
+  h +=
+    '<p style="font-size:.7rem;color:var(--muted);margin-top:6px">Weekend: giallo da 12, rosso oltre 20 (equità). Click su un mese per aprirlo.</p>';
+  el.innerHTML = h;
+}
+
+// ================================================================
+// IMPORT VACANZE DA EXCEL (col A cognome, col B nome, col F-BE = settimane 1-52 con X)
+// ================================================================
+function _renderPianoVacanzeCard() {
+  if (!puoGestirePiano()) return '';
+  return (
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Import vacanze da Excel</div><div style="padding:10px 14px">' +
+    '<p style="font-size:.76rem;color:var(--muted);margin-bottom:8px">Formato Turnivo: colonna A cognome, colonna B nome, colonne F–BE = settimane 1–52 con una X. Le settimane marcate diventano giorni V (protetti) nell\'anno scelto. Le celle già occupate non vengono toccate.</p>' +
+    '<div class="add-tipo-row"><div class="field"><label>Anno</label><input type="number" id="vac-anno" value="' +
+    _pianoMeseSel.split('-')[0] +
+    '" min="2024" max="2050" style="width:90px"></div>' +
+    '<button class="btn-add-tipo" onclick="document.getElementById(\'vac-file\').click()">Carica file vacanze</button>' +
+    '<input type="file" id="vac-file" accept=".xlsx,.xls" style="display:none" onchange="importaVacanzePiano(this)"></div>' +
+    '</div></div>'
+  );
+}
+function _pianoGiorniSettimana(anno, settimana) {
+  // ISO 8601: settimana 1 = quella che contiene il 4 gennaio; lunedì = primo giorno
+  const d = new Date(anno, 0, 4, 12);
+  const dow = d.getDay() || 7;
+  d.setDate(d.getDate() - dow + 1 + (settimana - 1) * 7);
+  const out = [];
+  for (let i = 0; i < 7; i++) {
+    out.push(
+      d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'),
+    );
+    d.setDate(d.getDate() + 1);
+  }
+  return out;
+}
+async function importaVacanzePiano(input) {
+  if (!puoGestirePiano()) return;
+  const file = input.files[0];
+  input.value = '';
+  if (!file || !window.XLSX) return;
+  const anno = parseInt((document.getElementById('vac-anno') || {}).value) || new Date().getFullYear();
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf);
+    const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+    const nomi = collaboratoriCache.filter((c) => c.attivo !== false);
+    const nuove = [];
+    let collabTrovati = 0;
+    data.forEach((row) => {
+      const cognome = String(row[0] || '').trim();
+      const nome = String(row[1] || '').trim();
+      if (!cognome) return;
+      const completo = (cognome + ' ' + nome).toLowerCase().trim();
+      const hit = nomi.find(
+        (c) =>
+          c.nome.toLowerCase() === completo ||
+          c.nome.toLowerCase() === (nome + ' ' + cognome).toLowerCase().trim() ||
+          (new Set(c.nome.toLowerCase().split(/\s+/)).size === new Set(completo.split(/\s+/)).size &&
+            completo.split(/\s+/).every((p) => c.nome.toLowerCase().includes(p))),
+      );
+      if (!hit) return;
+      collabTrovati++;
+      for (let w = 1; w <= 52; w++) {
+        const cella = String(row[4 + w] || '')
+          .trim()
+          .toUpperCase(); // col F = indice 5 = settimana 1
+        if (cella !== 'X') continue;
+        _pianoGiorniSettimana(anno, w).forEach((dstr) => {
+          if (dstr.startsWith(String(anno)))
+            nuove.push({
+              collaboratore: hit.nome,
+              data: dstr,
+              codice: 'V',
+              protetto: true,
+              generato: false,
+              reparto_dip: hit.reparto_dip || 'slots',
+            });
+        });
+      }
+    });
+    if (!nuove.length) {
+      toast('Nessuna vacanza riconosciuta nel file (' + collabTrovati + ' collaboratori trovati)');
+      return;
+    }
+    if (
+      !confirm(
+        'Importare le vacanze ' +
+          anno +
+          '?\n\n• ' +
+          collabTrovati +
+          ' collaboratori riconosciuti\n• ' +
+          nuove.length +
+          ' giorni V da inserire (protetti)\n\nLe celle già occupate non vengono toccate.',
+      )
+    )
+      return;
+    const r = await sbRpc('piano_bulk_upsert', { p_token: getOpToken(), p_rows: nuove });
+    logAzione('Piano: vacanze importate', anno + ' — ' + ((r && r.inserite) || 0) + '/' + nuove.length);
+    toast('Vacanze importate: ' + ((r && r.inserite) || 0) + ' giorni V');
+    renderPiano();
+  } catch (e) {
+    console.error(e);
+    toast('Errore lettura file vacanze');
+  }
+}
+
+// ================================================================
+// MAPPATURE TURNO-FUNZIONE + IMPOSTAZIONI PIANO (personalizzabili)
+// ================================================================
+function _renderPianoMappatureCard() {
+  if (!isAdmin()) return '';
+  let h =
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Turni per funzione (admin)</div><div style="padding:10px 14px">';
+  h +=
+    '<p style="font-size:.74rem;color:var(--muted);margin-bottom:6px">PRINCIPALE = turni normali della funzione. AMMESSO = permessi quando serve. PREFERITO = la bozza li privilegia. Chi ha una funzione con mappature riceve SOLO i turni elencati; chi non ne ha segue la storia dei gruppi.</p>';
+  const ordine = { PRINCIPALE: 1, AMMESSO: 2, PREFERITO: 3 };
+  const perFz = {};
+  pianoMappatureCache.forEach((m) => (perFz[m.funzione] = (perFz[m.funzione] || []).concat(m)));
+  Object.keys(perFz)
+    .sort()
+    .forEach((fz) => {
+      h +=
+        '<p style="font-size:.76rem;font-weight:700;margin:8px 0 4px">' +
+        escP(fz) +
+        '</p><div style="display:flex;gap:6px;flex-wrap:wrap">';
+      perFz[fz]
+        .sort((a, b) => (ordine[a.tipo] || 9) - (ordine[b.tipo] || 9) || a.turno_codice.localeCompare(b.turno_codice))
+        .forEach((m) => {
+          const col = m.tipo === 'PRINCIPALE' ? '#2c6e49' : m.tipo === 'AMMESSO' ? '#b39b00' : '#1a4a7a';
+          h +=
+            '<span class="mini-badge" style="background:' +
+            col +
+            ';cursor:pointer" title="' +
+            m.tipo +
+            ' — clicca per rimuovere" onclick="rimuoviPianoMappatura(' +
+            m.id +
+            ')">' +
+            escP(m.turno_codice) +
+            '</span>';
+        });
+      h += '</div>';
+    });
+  h +=
+    '<div class="add-tipo-row" style="margin-top:10px"><div class="field"><label>Funzione</label><select id="mp-funzione" style="padding:8px">' +
+    (window._pianoFunzioni || ['RESP', 'SUP', 'BO', 'HOST']).map((f) => '<option>' + escP(f) + '</option>').join('') +
+    '</select></div><div class="field"><label>Turno</label><input type="text" id="mp-turno" placeholder="S22" style="width:80px"></div>' +
+    '<div class="field"><label>Tipo</label><select id="mp-tipo" style="padding:8px"><option>PRINCIPALE</option><option>AMMESSO</option><option>PREFERITO</option></select></div>' +
+    '<button class="btn-add-tipo" onclick="aggiungiPianoMappatura()">+ Aggiungi</button></div>';
+  h += '</div></div>';
+  return h;
+}
+async function aggiungiPianoMappatura() {
+  if (!isAdmin()) return;
+  const fz = (document.getElementById('mp-funzione') || {}).value;
+  const turno = ((document.getElementById('mp-turno') || {}).value || '').trim().toUpperCase();
+  const tipo = (document.getElementById('mp-tipo') || {}).value || 'PRINCIPALE';
+  if (!fz || !turno) {
+    toast('Compila funzione e turno');
+    return;
+  }
+  try {
+    const r = await secPost('piano_mappature', { funzione: fz, turno_codice: turno, tipo: tipo });
+    if (r && r[0]) pianoMappatureCache.push(r[0]);
+    logAzione('Piano: mappatura aggiunta', fz + ' ' + turno + ' ' + tipo);
+    toast('Mappatura aggiunta');
+    renderPiano();
+  } catch (e) {
+    toast('Errore (mappatura già presente?)');
+  }
+}
+async function rimuoviPianoMappatura(id) {
+  if (!isAdmin()) return;
+  const m = pianoMappatureCache.find((x) => x.id === id);
+  if (!m || !confirm('Rimuovere ' + m.funzione + ' → ' + m.turno_codice + ' (' + m.tipo + ')?')) return;
+  try {
+    await secDel('piano_mappature', 'id=eq.' + id);
+    pianoMappatureCache = pianoMappatureCache.filter((x) => x.id !== id);
+    logAzione('Piano: mappatura rimossa', m.funzione + ' ' + m.turno_codice);
+    toast('Mappatura rimossa');
+    renderPiano();
+  } catch (e) {
+    toast('Errore rimozione');
+  }
+}
+
+function _renderPianoImpostazioniCard() {
+  if (!isAdmin()) return '';
+  return (
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Impostazioni piano (admin)</div><div style="padding:10px 14px">' +
+    '<div class="add-tipo-row"><div class="field"><label>Ore settimanali contratto (per il saldo ore)</label><input type="number" step="0.5" id="pi-ore-sett" value="' +
+    _pianoOreSett +
+    '" style="width:90px" onchange="salvaOreSettimanali(this.value)"></div>' +
+    '<div class="field" style="flex:1;min-width:220px"><label>Funzioni disponibili (separate da virgola)</label><input type="text" id="pi-funzioni" value="' +
+    escP((window._pianoFunzioni || []).join(', ')) +
+    '" onchange="salvaPianoFunzioni(this.value)"></div></div>' +
+    '<p style="font-size:.72rem;color:var(--muted)">Le funzioni compaiono nei menu di Gestione collaboratori e nelle mappature. Preferenze per collaboratore (solo diurni, turni bloccati) nella card qui sotto.</p>' +
+    '</div></div>'
+  );
+}
+async function salvaOreSettimanali(v) {
+  if (!isAdmin()) return;
+  const n = parseFloat(v) || 41;
+  _pianoOreSett = n;
+  await setImp('piano_ore_settimanali', String(n));
+  logAzione('Piano: ore settimanali', String(n));
+  toast('Ore settimanali: ' + n);
+  renderPiano();
+}
+async function salvaPianoFunzioni(v) {
+  if (!isAdmin()) return;
+  const lista = String(v)
+    .split(',')
+    .map((x) => x.trim().toUpperCase())
+    .filter(Boolean);
+  if (!lista.length) {
+    toast('Inserisci almeno una funzione');
+    return;
+  }
+  window._pianoFunzioni = lista;
+  await setImp('piano_funzioni', JSON.stringify(lista));
+  logAzione('Piano: funzioni', lista.join(','));
+  toast('Funzioni aggiornate');
+}
+
+// Preferenze per collaboratore: solo diurni + turni bloccati
+function _renderPianoPreferenzeCard() {
+  if (!isAdmin() && !(typeof puoModificare === 'function' && puoModificare('storico_hr'))) return '';
+  const collabs = collaboratoriCache
+    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
+    .sort((a, b) => a.nome.localeCompare(b.nome));
+  let h =
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Preferenze collaboratori — ' +
+    escP(repartoLabel(_pianoReparto())) +
+    '</div><div style="padding:10px 14px">';
+  h +=
+    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:520px;font-size:.76rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th><th>Solo diurni</th><th style="text-align:left">Turni bloccati (CSV)</th></tr></thead><tbody>';
+  collabs.forEach((c) => {
+    h +=
+      '<tr><td style="text-align:left;font-weight:600">' +
+      escP(c.nome) +
+      '</td><td>' +
+      escP(c.funzione || '—') +
+      '</td><td>' +
+      Math.round((parseFloat(c.percentuale) || 1) * 100) +
+      '%</td><td><input type="checkbox"' +
+      (c.solo_diurni ? ' checked' : '') +
+      ' onchange="salvaPreferenzaCollab(' +
+      c.id +
+      ',\'solo_diurni\',this.checked)"></td><td style="text-align:left"><input type="text" value="' +
+      escP(c.turni_bloccati || '') +
+      '" placeholder="Es: S8,S7C" onchange="salvaPreferenzaCollab(' +
+      c.id +
+      ',\'turni_bloccati\',this.value)" style="width:140px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td></tr>';
+  });
+  h += '</tbody></table></div>';
+  h +=
+    '<p style="font-size:.7rem;color:var(--muted);margin-top:6px">"Solo diurni" e i turni bloccati vengono rispettati dalla bozza automatica. Funzione e percentuale si modificano in Impostazioni → Gestione collaboratori.</p>';
+  h += '</div></div>';
+  return h;
+}
+async function salvaPreferenzaCollab(id, campo, valore) {
+  if (!isAdmin() && !(typeof puoModificare === 'function' && puoModificare('storico_hr'))) return;
+  try {
+    const patch = {};
+    patch[campo] = campo === 'solo_diurni' ? !!valore : String(valore).trim().toUpperCase() || null;
+    await secPatch('collaboratori', 'id=eq.' + id, patch);
+    const c = collaboratoriCache.find((x) => x.id === id);
+    if (c) c[campo] = patch[campo];
+    logAzione('Piano: preferenza collaboratore', (c ? c.nome : id) + ' ' + campo);
+    toast('Preferenza salvata');
+  } catch (e) {
+    toast('Errore salvataggio preferenza');
   }
 }
