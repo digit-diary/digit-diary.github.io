@@ -317,6 +317,7 @@ async function renderPiano() {
       '<span><span class="piano-leg piano-comm" style="background:var(--paper2)"></span> triangolo = commento (passa il mouse)</span>';
     h +=
       '<span><span class="piano-leg piano-malattia-auto" style="background:var(--paper2)">M</span> = malattia dal Diario (automatica)</span>';
+    h += '<span>doppio click sul nome = stampa scheda collaboratore — tasto destro su una cella = nota rapida</span>';
     h += '</div></div>';
 
     // FABBISOGNO vs ASSEGNATI (editabile: click sulla cella per impostare le persone necessarie)
@@ -1670,6 +1671,22 @@ function _pianoInitSelezione() {
       clear();
       if (!era) tr.classList.add('row-selected');
     });
+    cella.addEventListener('dblclick', () => {
+      stampaPianoCollaboratore(cella.textContent.trim().replace(/\s+(RESP|SUP|BO|HOST)$/, ''));
+    });
+    cella.title = 'Click: evidenzia riga — Doppio click: stampa il piano del collaboratore';
+  });
+  tab.querySelectorAll('tbody .piano-cella').forEach((cella) => {
+    cella.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      const tr = cella.closest('tr');
+      const nomeCella = tr.querySelector('.piano-nome');
+      const idx = [...tr.children].indexOf(cella);
+      const giorno = idx; // colonna 0 = nome, 1..n = giorni
+      if (!nomeCella || giorno < 1) return;
+      const nome = nomeCella.textContent.trim().replace(/\s+(RESP|SUP|BO|HOST)$/, '');
+      _pianoNotaRapida(nome, _pianoMeseSel + '-' + String(giorno).padStart(2, '0'));
+    });
   });
   tab.querySelectorAll('thead th').forEach((th, idx) => {
     if (th.classList.contains('piano-nome') || th.classList.contains('piano-tot')) return;
@@ -2312,5 +2329,166 @@ async function salvaPreferenzaCollab(id, campo, valore) {
     toast('Preferenza salvata');
   } catch (e) {
     toast('Errore salvataggio preferenza');
+  }
+}
+
+// ================================================================
+// STAMPA PIANO DEL SINGOLO COLLABORATORE (doppio click sul nome)
+// + NOTA RAPIDA con tasto destro sulla cella (come Turnivo)
+// ================================================================
+async function stampaPianoCollaboratore(nome) {
+  if (!window.jspdf) {
+    toast('Caricamento PDF...');
+    if (!(await caricaJsPDF())) return;
+  }
+  const ym = _pianoMeseSel;
+  const nGiorni = _pianoUltimoGiorno(ym);
+  const label = (MESI_FULL[parseInt(ym.split('-')[1]) - 1] || ym) + ' ' + ym.split('-')[0];
+  const righe = _pianoRighe.filter((r) => r.collaboratore === nome).sort((a, b) => a.data.localeCompare(b.data));
+  if (!righe.length) {
+    toast('Nessuna assegnazione per ' + nome + ' in ' + label);
+    return;
+  }
+  const GGf = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'];
+  const info = _pianoCollabInfo(nome);
+  const perc = info ? parseFloat(info.percentuale) || 1 : 1;
+  let ore = 0;
+  let nD = 0;
+  let nN = 0;
+  let nV = 0;
+  let nM = 0;
+  const body = [];
+  for (let g = 1; g <= nGiorni; g++) {
+    const dstr = ym + '-' + String(g).padStart(2, '0');
+    const r = righe.find((x) => x.data === dstr);
+    const d = new Date(dstr + 'T12:00:00');
+    let orario = '';
+    let oreG = '';
+    if (r) {
+      const t = _pianoTurnoInfo(r.codice);
+      const cs = _pianoCodiceInfo(r.codice);
+      if (t) {
+        orario = (t.ora_inizio || '').substring(0, 5) + ' - ' + (t.ora_fine || '').substring(0, 5);
+        oreG = (parseFloat(t.durata_ore) || 0).toFixed(2);
+        ore += parseFloat(t.durata_ore) || 0;
+        if (t.tipo === 'NOTTURNO') nN++;
+        else nD++;
+      } else if (cs) {
+        orario = cs.descrizione || '';
+        oreG = (parseFloat(cs.ore) || 0).toFixed(2);
+        ore += parseFloat(cs.ore) || 0;
+        if (r.codice === 'V' || r.codice === 'V1') nV++;
+        if (r.codice === 'M' || r.codice === 'M1') nM++;
+      }
+    }
+    body.push([g + ' ' + GGf[d.getDay()].substring(0, 3), r ? r.codice : '', orario, oreG, (r && r.commento) || '']);
+  }
+  const dovute = Math.round(((_pianoOreSett * perc * nGiorni) / 7) * 10) / 10;
+  const saldo = Math.round((ore - dovute) * 10) / 10;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(15);
+  doc.text('Piano di lavoro — ' + nome, 105, 14, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(90);
+  doc.text(
+    label +
+      ' — ' +
+      repartoLabel(_pianoReparto()) +
+      (info && info.funzione ? ' — ' + info.funzione : '') +
+      ' — impiego ' +
+      Math.round(perc * 100) +
+      '%',
+    105,
+    20,
+    { align: 'center' },
+  );
+  doc.setTextColor(0);
+  doc.autoTable({
+    startY: 25,
+    head: [['Giorno', 'Turno', 'Orario / descrizione', 'Ore', 'Note']],
+    body: body,
+    theme: 'grid',
+    styles: { fontSize: 7.5, cellPadding: 1.2 },
+    headStyles: { fillColor: [26, 18, 8], textColor: [255, 255, 255], fontSize: 8 },
+    columnStyles: {
+      0: { cellWidth: 24 },
+      1: { cellWidth: 18, halign: 'center', fontStyle: 'bold' },
+      3: { cellWidth: 15, halign: 'right' },
+    },
+    didParseCell: (d) => {
+      if (d.section === 'body' && d.column.index === 1 && d.cell.raw) {
+        const col = _pianoColore(String(d.cell.raw));
+        if (col) {
+          const hex = col.replace('#', '');
+          d.cell.styles.fillColor = [
+            parseInt(hex.substring(0, 2), 16),
+            parseInt(hex.substring(2, 4), 16),
+            parseInt(hex.substring(4, 6), 16),
+          ];
+        }
+      }
+    },
+  });
+  let y = doc.lastAutoTable.finalY + 6;
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text(
+    'Ore: ' +
+      ore.toFixed(1) +
+      '   Dovute: ' +
+      dovute.toFixed(1) +
+      '   Saldo: ' +
+      (saldo > 0 ? '+' : '') +
+      saldo.toFixed(1) +
+      '   Diurni: ' +
+      nD +
+      '   Notturni: ' +
+      nN +
+      '   Vacanze: ' +
+      nV +
+      '   Malattie: ' +
+      nM,
+    14,
+    y,
+  );
+  y += 14;
+  doc.setFont('helvetica', 'normal');
+  doc.line(14, y, 80, y);
+  doc.line(120, y, 186, y);
+  doc.setFontSize(8);
+  doc.text('Firma collaboratore', 14, y + 4);
+  doc.text('Firma responsabile', 120, y + 4);
+  logAzione('Piano collaboratore stampato', nome + ' ' + ym);
+  mostraPdfPreview(doc, 'piano_' + nome.replace(/\s+/g, '_') + '_' + ym + '.pdf', 'Piano ' + nome);
+}
+
+// Nota rapida col tasto destro (senza aprire il popup completo)
+async function _pianoNotaRapida(nome, dstr) {
+  if (!puoGestirePiano()) return;
+  const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
+  if (!r) {
+    toast('Assegna prima un codice alla cella (click sinistro)');
+    return;
+  }
+  const nota = prompt(
+    'Nota per ' + nome + ' — ' + r.codice + ' del ' + new Date(dstr + 'T12:00:00').toLocaleDateString('it-IT') + ':',
+    r.commento || '',
+  );
+  if (nota === null) return;
+  try {
+    await secPatch('piano', 'id=eq.' + r.id, {
+      commento: nota.trim() || null,
+      operatore: getOperatore(),
+      updated_at: new Date().toISOString(),
+    });
+    r.commento = nota.trim();
+    logAzione('Piano: nota cella', nome + ' ' + dstr);
+    toast(nota.trim() ? 'Nota salvata' : 'Nota rimossa');
+    renderPiano();
+  } catch (e) {
+    toast('Errore salvataggio nota');
   }
 }
