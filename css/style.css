@@ -3534,15 +3534,15 @@ button:focus-visible,
 }
 .piano-table {
   border-collapse: collapse;
-  font-size: 0.7rem;
+  font-size: 0.82rem;
   min-width: 100%;
 }
 .piano-table th,
 .piano-table td {
   border: 1px solid var(--line);
   text-align: center;
-  padding: 2px 3px;
-  min-width: 26px;
+  padding: 3px 4px;
+  min-width: 32px;
   white-space: nowrap;
 }
 .piano-table thead th {
@@ -3651,6 +3651,13 @@ button:focus-visible,
 .piano-table thead th.col-selected-header {
   background-color: #2563eb !important;
   color: #fff !important;
+}
+/* Tinte weekend nelle tabelle differenze/effettivi (come Turnivo) */
+.piano-table td.piano-cel-we {
+  background: #f0faf0;
+}
+.piano-table td.piano-cel-dom {
+  background: #fdf0e6;
 }
 /* Righe colorate per funzione (come Turnivo): SUP verdino, BO arancio chiaro */
 .piano-table tr.piano-row-sup td {
