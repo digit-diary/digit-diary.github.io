@@ -283,8 +283,16 @@ async function renderPiano() {
       const perc = infoC ? parseFloat(infoC.percentuale) || 1 : 1;
       const dovute = Math.round(((_pianoOreSett * perc * nGiorni) / 7) * 10) / 10;
       const saldo = Math.round((ore - dovute) * 10) / 10;
+      const _clsRiga =
+        infoC && infoC.funzione === 'SUP'
+          ? ' class="piano-row-sup"'
+          : infoC && infoC.funzione === 'BO'
+            ? ' class="piano-row-bo"'
+            : '';
       h +=
-        '<tr><td class="piano-nome"' +
+        '<tr' +
+        _clsRiga +
+        '><td class="piano-nome"' +
         (infoC && infoC.funzione ? ' title="' + escP(infoC.funzione) + ' ' + Math.round(perc * 100) + '%"' : '') +
         '>' +
         escP(nome) +
