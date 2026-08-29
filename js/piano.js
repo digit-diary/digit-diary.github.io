@@ -144,7 +144,9 @@ const _PIANO_TABS = [
   ['regole', 'Regole'],
   ['festivi', 'Festivi'],
   ['timbrature', 'Timbrate'],
+  ['saldo', 'Saldo'],
   ['statistiche', 'Statistiche'],
+  ['storico', 'Storico'],
   ['impostazioni', 'Impostazioni'],
 ];
 function pianoCambiaTab(t) {
@@ -169,6 +171,63 @@ function _pianoTabBar() {
       .join('') +
     '</div>'
   );
+}
+
+// YTD saldo cumulato da gennaio al mese precedente (port di
+// compute_ytd_saldo_map di Turnivo): per ogni mese usa le ore timbrate se
+// presenti, altrimenti le ore piano (turni + codici speciali scalati);
+// saldo_mese = ore - dovute; jolly esclusi.
+let _pianoYtdMap = {};
+let _pianoYtdKey = '';
+async function _pianoAggiornaYtd(nomi) {
+  const ym = _pianoMeseSel;
+  const chiave = ym + '|' + _pianoReparto();
+  if (_pianoYtdKey === chiave) return;
+  const anno = parseInt(ym.split('-')[0]);
+  const mese = parseInt(ym.split('-')[1]);
+  _pianoYtdMap = {};
+  _pianoYtdKey = chiave;
+  if (mese <= 1) return;
+  const fine = ym + '-01';
+  const [righe, timbrate] = await Promise.all([
+    secGet('piano?data=gte.' + anno + '-01-01&data=lt.' + fine + '&reparto_dip=eq.' + _pianoReparto() + '&limit=20000'),
+    secGet('piano_timbrature?data=gte.' + anno + '-01-01&data=lt.' + fine + '&limit=20000'),
+  ]);
+  const perMese = {}; // nome|m -> ore piano
+  (righe || []).forEach((r) => {
+    const m = parseInt(r.data.split('-')[1]);
+    const info = _pianoCollabInfo(r.collaboratore) || {};
+    const pct = parseFloat(info.percentuale) || 1;
+    const t = _pianoTurnoInfo(r.codice);
+    let o = 0;
+    if (t) o = parseFloat(t.durata_ore) || 0;
+    else {
+      const cs = _pianoCodiceInfo(r.codice);
+      if (cs && parseFloat(cs.ore) > 0)
+        o = cs.scala_percentuale ? (parseFloat(cs.ore) || 0) * pct : parseFloat(cs.ore) || 0;
+    }
+    if (o) perMese[r.collaboratore + '|' + m] = (perMese[r.collaboratore + '|' + m] || 0) + o;
+  });
+  const timbMese = {}; // nome|m -> ore timbrate
+  (timbrate || []).forEach((t) => {
+    const m = parseInt(t.data.split('-')[1]);
+    timbMese[t.collaboratore + '|' + m] = (timbMese[t.collaboratore + '|' + m] || 0) + (parseFloat(t.ore) || 0);
+  });
+  nomi.forEach((n) => {
+    const info = _pianoCollabInfo(n) || {};
+    if (info.is_jolly) return;
+    const pct = parseFloat(info.percentuale) || 0;
+    if (!pct) return;
+    let cum = 0;
+    for (let m = 1; m < mese; m++) {
+      const dim = new Date(anno, m, 0).getDate();
+      const dovute = Math.round((dim / 7) * _pianoOreSett * pct * 100) / 100;
+      const k = n + '|' + m;
+      const effettive = timbMese[k] != null ? timbMese[k] : perMese[k] || 0;
+      cum += effettive - dovute;
+    }
+    _pianoYtdMap[n] = Math.round(cum * 100) / 100;
+  });
 }
 
 async function renderPiano() {
@@ -264,7 +323,8 @@ async function renderPiano() {
       h += '<div id="piano-violazioni"></div>';
 
       // GRIGLIA
-      h += '<div class="piano-wrap"><table class="piano-table"><thead><tr><th class="piano-nome">Collaboratore</th>';
+      h +=
+        '<div class="piano-wrap"><table class="piano-table"><thead><tr><th class="piano-nome">Collaboratore</th><th class="piano-fun">Fun</th>';
       for (let g = 1; g <= nGiorni; g++) {
         const dstr = ym + '-' + String(g).padStart(2, '0');
         const dow = new Date(dstr + 'T12:00:00').getDay();
@@ -276,6 +336,8 @@ async function renderPiano() {
         h +=
           '<th class="' +
           cls +
+          '" data-g="' +
+          g +
           '"' +
           (festiviSet[dstr] ? ' title="' + escP(festiviSet[dstr]) + '"' : '') +
           '><div>' +
@@ -285,11 +347,17 @@ async function renderPiano() {
           '</div></th>';
       }
       h +=
-        '<th class="piano-tot piano-sep-left">Ore</th><th class="piano-tot">D</th><th class="piano-tot">N</th><th class="piano-tot" title="Ore dovute (ore settimanali x percentuale x giorni/7)">Dov.</th><th class="piano-tot" title="Saldo: pianificate - dovute">Saldo</th></tr></thead><tbody>';
+        '<th class="piano-tot piano-sep-left">Ore</th><th class="piano-tot">D</th><th class="piano-tot">N</th>' +
+        '<th class="piano-tot" title="Ore Dovute">OD</th><th class="piano-tot" title="Ore Pianificate">OP</th>' +
+        '<th class="piano-tot" title="Saldo Mensile">SM</th><th class="piano-tot" title="Saldo Anno">YTD</th></tr></thead><tbody>';
 
+      await _pianoAggiornaYtd(nomi);
       nomi.forEach((nome) => {
         const ne = nome.replace(/'/g, "\\'");
-        let ore = 0;
+        const infoC0 = _pianoCollabInfo(nome);
+        const perc0 = infoC0 ? parseFloat(infoC0.percentuale) || 1 : 1;
+        let ore = 0; // solo turni (colonna Ore = ore_stimate Turnivo)
+        let oreSpec = 0; // codici speciali (scala_percentuale come Turnivo)
         let nD = 0;
         let nN = 0;
         let riga = '';
@@ -314,7 +382,8 @@ async function renderPiano() {
               else nD++;
               titolo = codice + ' ' + (t.ora_inizio || '').substring(0, 5) + '-' + (t.ora_fine || '').substring(0, 5);
             } else if (cs) {
-              ore += parseFloat(cs.ore) || 0;
+              const oreCs = parseFloat(cs.ore) || 0;
+              oreSpec += cs.scala_percentuale ? oreCs * perc0 : oreCs;
               titolo = cs.descrizione || codice;
             }
             if (r.protetto) cls += ' piano-prot';
@@ -335,6 +404,8 @@ async function renderPiano() {
           riga +=
             '<td class="' +
             cls +
+            '" data-g="' +
+            g +
             '" style="' +
             stile +
             '"' +
@@ -344,10 +415,13 @@ async function renderPiano() {
             cella +
             '</td>';
         }
-        const infoC = _pianoCollabInfo(nome);
-        const perc = infoC ? parseFloat(infoC.percentuale) || 1 : 1;
-        const dovute = Math.round(((_pianoOreSett * perc * nGiorni) / 7) * 10) / 10;
-        const saldo = Math.round((ore - dovute) * 10) / 10;
+        const infoC = infoC0;
+        const perc = perc0;
+        // come Turnivo: OD=(giorni/7)*ore_sett*pct (jolly=0), OP=turni+speciali, SM=OP-OD, YTD=cumulato da gennaio
+        const dovute = infoC && infoC.is_jolly ? 0 : Math.round(((_pianoOreSett * perc * nGiorni) / 7) * 10) / 10;
+        const orePiano = Math.round((ore + oreSpec) * 100) / 100;
+        const saldo = Math.round((orePiano - dovute) * 10) / 10;
+        const ytd = Math.round(((_pianoYtdMap[nome] || 0) + saldo) * 10) / 10;
         const _clsRiga =
           infoC && infoC.funzione === 'SUP'
             ? ' class="piano-row-sup"'
@@ -359,18 +433,19 @@ async function renderPiano() {
           _clsRiga +
           ' data-nome="' +
           escP(nome) +
-          '"><td class="piano-nome"' +
-          (infoC && infoC.funzione ? ' title="' + escP(infoC.funzione) + ' ' + Math.round(perc * 100) + '%"' : '') +
-          '><i class="icx icx-stampa piano-pdf-ico" title="Stampa il piano di ' +
+          '"><td class="piano-nome" title="' +
+          escP(nome) +
+          '"><i class="icx icx-stampa piano-pdf-ico" title="Stampa il piano di ' +
           escP(nome) +
           '" onclick="event.stopPropagation();stampaPianoCollaboratore(\'' +
           ne +
           '\')"></i>' +
-          escP(nome) +
-          (infoC && infoC.funzione && infoC.funzione !== 'HOST'
-            ? ' <span style="font-size:.58rem;color:var(--muted)">' + escP(infoC.funzione) + '</span>'
-            : '') +
-          '</td>' +
+          escP(nome.length > 20 ? nome.substring(0, 20) : nome) +
+          '</td><td class="piano-fun"><strong>' +
+          escP(infoC && infoC.is_jolly ? 'JOLLY' : (infoC && infoC.funzione) || '') +
+          '</strong> <span style="font-size:.6rem">' +
+          Math.round(perc * 100) +
+          '%</span></td>' +
           riga +
           '<td class="piano-tot piano-sep-left">' +
           (ore ? ore.toFixed(1) : '') +
@@ -379,11 +454,17 @@ async function renderPiano() {
           '</td><td class="piano-tot">' +
           (nN || '') +
           '</td><td class="piano-tot" style="color:var(--muted)">' +
-          (ore ? dovute.toFixed(1) : '') +
+          (dovute ? dovute.toFixed(1) : '') +
+          '</td><td class="piano-tot">' +
+          (orePiano ? orePiano.toFixed(1) : '') +
           '</td><td class="piano-tot" style="color:' +
           (saldo > 0 ? '#2c6e49' : saldo < 0 ? '#c0392b' : 'var(--muted)') +
           '">' +
-          (ore ? (saldo > 0 ? '+' : '') + saldo.toFixed(1) : '') +
+          (orePiano || dovute ? (saldo > 0 ? '+' : '') + saldo.toFixed(1) : '') +
+          '</td><td class="piano-tot" style="font-weight:700;color:' +
+          (ytd > 0 ? '#2c6e49' : ytd < 0 ? '#c0392b' : 'var(--muted)') +
+          '">' +
+          (orePiano || _pianoYtdMap[nome] ? (ytd > 0 ? '+' : '') + ytd.toFixed(1) : '') +
           '</td></tr>';
       });
       h += '</tbody></table></div>';
@@ -441,6 +522,8 @@ async function renderPiano() {
             t +=
               '<th class="' +
               cls +
+              '" data-g="' +
+              g +
               '"' +
               (festiviSet[dstr] ? ' title="' + escP(festiviSet[dstr]) + '"' : '') +
               '><div>' +
@@ -481,6 +564,8 @@ async function renderPiano() {
               h +=
                 '<td class="' +
                 cls +
+                '" data-g="' +
+                g +
                 '"' +
                 (puoMod
                   ? ' style="cursor:pointer" onclick="fabbisognoInline(\'' + escP(cod) + "','" + dstr + '\',this)"'
@@ -531,6 +616,8 @@ async function renderPiano() {
             h +=
               '<td class="' +
               clsCella(g) +
+              '" data-g="' +
+              g +
               '" style="font-weight:bold;' +
               col +
               '">' +
@@ -555,6 +642,8 @@ async function renderPiano() {
             h +=
               '<td class="' +
               clsCella(g) +
+              '" data-g="' +
+              g +
               '"' +
               (q > 0 ? ' style="font-weight:bold"' : '') +
               '>' +
@@ -577,6 +666,10 @@ async function renderPiano() {
       h += '<div id="piano-config">' + _renderPianoTimbratureCard() + '</div>';
     } else if (_pianoTab === 'statistiche') {
       h += '<div id="piano-config">' + _renderPianoStatCard() + '</div>';
+    } else if (_pianoTab === 'saldo') {
+      h += await _renderPianoSaldoTab();
+    } else if (_pianoTab === 'storico') {
+      h += await _renderPianoStoricoTab();
     } else if (_pianoTab === 'impostazioni') {
       h +=
         '<div id="piano-config">' +
@@ -2309,7 +2402,7 @@ function _pianoInitSelezione() {
     (t) => !t.dataset.selInit,
   );
   if (!tabelle.length) return;
-  tabelle.forEach((t) => (t.dataset.selInit = '1'));
+  tabelle.forEach((t, i) => (t.dataset.selInit = String(i + 1)));
   let selTipo = '';
   let selIdx = -1;
   let selTab = null;
@@ -2324,34 +2417,43 @@ function _pianoInitSelezione() {
     selIdx = -1;
     selTab = null;
   };
-  const selezionaColonna = (colIdx) => {
-    tabelle.forEach((t) => {
-      const th = t.querySelectorAll('thead tr th')[colIdx];
-      if (!th || th.classList.contains('piano-nome')) return;
-      th.classList.add('col-selected-header');
-      t.querySelector('tbody')
+  const selezionaColonna = (thCliccata, tabProprio, colIdx) => {
+    const g = thCliccata.dataset.g;
+    if (g) {
+      // colonna GIORNO: collegata su tutte le tabelle via data-g
+      tabelle.forEach((t) => {
+        const th = t.querySelector('thead th[data-g="' + g + '"]');
+        if (th) th.classList.add('col-selected-header');
+        t.querySelectorAll('tbody td[data-g="' + g + '"]').forEach((c) => c.classList.add('col-selected'));
+      });
+    } else {
+      // colonne totali (Ore/D/N/OD/OP/SM/YTD/Tot): solo nella propria tabella
+      thCliccata.classList.add('col-selected-header');
+      tabProprio
+        .querySelector('tbody')
         .querySelectorAll('tr')
         .forEach((riga) => {
           const celle = riga.querySelectorAll('td, th');
           if (celle[colIdx]) celle[colIdx].classList.add('col-selected');
         });
-    });
+    }
   };
   tabelle.forEach((tab) => {
     const thead = tab.querySelector('thead');
     const tbody = tab.querySelector('tbody');
     if (!thead || !tbody) return;
     thead.querySelectorAll('tr th').forEach((th, colIdx) => {
-      if (th.classList.contains('piano-nome')) return;
+      if (th.classList.contains('piano-nome') || th.classList.contains('piano-fun')) return;
       th.style.cursor = 'pointer';
       th.addEventListener('click', (e) => {
         e.stopPropagation();
-        const era = selTipo === 'col' && colIdx === selIdx;
+        const idSel = th.dataset.g ? 'g' + th.dataset.g : tab.dataset.selInit + ':' + colIdx;
+        const era = selTipo === 'col' && idSel === selIdx;
         clearAll();
         if (era) return;
         selTipo = 'col';
-        selIdx = colIdx;
-        selezionaColonna(colIdx);
+        selIdx = idSel;
+        selezionaColonna(th, tab, colIdx);
       });
     });
     tbody.querySelectorAll('tr').forEach((riga, rowIdx) => {
@@ -2418,12 +2520,9 @@ function _pianoInitSelezione() {
     cella.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       const tr = cella.closest('tr');
-      const nomeCella = tr.querySelector('.piano-nome');
-      const idx = [...tr.children].indexOf(cella);
-      const giorno = idx; // colonna 0 = nome, 1..n = giorni
-      if (!nomeCella || giorno < 1) return;
-      const nome = nomeCella.textContent.trim().replace(/\s+(RESP|SUP|BO|HOST)$/, '');
-      mostraPianoCtx(e, nome, _pianoMeseSel + '-' + String(giorno).padStart(2, '0'));
+      const giorno = parseInt(cella.dataset.g);
+      if (!tr.dataset.nome || !giorno) return;
+      mostraPianoCtx(e, tr.dataset.nome, _pianoMeseSel + '-' + String(giorno).padStart(2, '0'));
     });
     // Mobile: long-press (>500ms) = menu contestuale, come Turnivo
     let lpTimer = null;
@@ -2437,14 +2536,12 @@ function _pianoInitSelezione() {
           if (navigator.vibrate) navigator.vibrate(50);
           const tocco = e.changedTouches[0] || e.touches[0];
           const tr = cella.closest('tr');
-          const nomeCella = tr.querySelector('.piano-nome');
-          const idx = [...tr.children].indexOf(cella);
-          if (!nomeCella || idx < 1 || !tocco) return;
-          const nome = nomeCella.textContent.trim().replace(/\s+(RESP|SUP|BO|HOST)$/, '');
+          const giorno = parseInt(cella.dataset.g);
+          if (!tr.dataset.nome || !giorno || !tocco) return;
           mostraPianoCtx(
             { preventDefault: () => {}, clientX: tocco.clientX, clientY: tocco.clientY },
-            nome,
-            _pianoMeseSel + '-' + String(idx).padStart(2, '0'),
+            tr.dataset.nome,
+            _pianoMeseSel + '-' + String(giorno).padStart(2, '0'),
           );
         }, 500);
       },
@@ -2948,6 +3045,134 @@ async function _renderPianoVacanzeTab() {
   h += '</div>';
   return h;
 }
+// TAB SALDO — come la pagina Saldo Ore di Turnivo: dovute/pianificate/saldo
+// del mese per collaboratore + totali (YTD dalla stessa mappa della griglia)
+async function _renderPianoSaldoTab() {
+  const ym = _pianoMeseSel;
+  const nGiorni = _pianoUltimoGiorno(ym);
+  const MESI_L = MESI_FULL || [];
+  const label = (MESI_L[parseInt(ym.split('-')[1]) - 1] || ym) + ' ' + ym.split('-')[0];
+  const perNome = {};
+  _pianoRighe.forEach((r) => (perNome[r.collaboratore] = (perNome[r.collaboratore] || []).concat(r)));
+  const ordSalv = (window._pianoOrdineCollab || {})[_pianoReparto()] || [];
+  const pos = {};
+  ordSalv.forEach((n, i) => (pos[n] = i));
+  const nomi = collaboratoriCache
+    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
+    .map((c) => c.nome)
+    .sort((x, y) => (pos[x] != null ? pos[x] : 9999) - (pos[y] != null ? pos[y] : 9999) || x.localeCompare(y));
+  await _pianoAggiornaYtd(nomi);
+  let h =
+    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:10px">Saldo ore — ' +
+    escP(label) +
+    '<button class="btn-act pin" onclick="pianoCambiaMese(-1)">&larr;</button><button class="btn-act pin" onclick="pianoCambiaMese(1)">&rarr;</button></div>';
+  h +=
+    '<div style="overflow-x:auto;padding:0 6px 8px"><table class="piano-table" style="min-width:760px;font-size:.8rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Fun</th><th>%</th><th>Ore dovute</th><th>Ore pianificate</th><th>Saldo mese</th><th>Saldo anno (YTD)</th></tr></thead><tbody>';
+  let totD = 0;
+  let totP = 0;
+  let totS = 0;
+  nomi.forEach((nome) => {
+    const info = _pianoCollabInfo(nome) || {};
+    const pct = parseFloat(info.percentuale) || 1;
+    let op = 0;
+    (perNome[nome] || []).forEach((r) => {
+      const t = _pianoTurnoInfo(r.codice);
+      if (t) op += parseFloat(t.durata_ore) || 0;
+      else {
+        const cs = _pianoCodiceInfo(r.codice);
+        if (cs && parseFloat(cs.ore) > 0)
+          op += cs.scala_percentuale ? (parseFloat(cs.ore) || 0) * pct : parseFloat(cs.ore) || 0;
+      }
+    });
+    const od = info.is_jolly ? 0 : Math.round((nGiorni / 7) * _pianoOreSett * pct * 100) / 100;
+    const sm = Math.round((op - od) * 10) / 10;
+    const ytd = Math.round(((_pianoYtdMap[nome] || 0) + sm) * 10) / 10;
+    totD += od;
+    totP += op;
+    totS += sm;
+    const col = (v) => (v > 0 ? '#2c6e49' : v < 0 ? '#c0392b' : 'var(--muted)');
+    h +=
+      '<tr><td style="text-align:left;font-weight:600">' +
+      escP(nome) +
+      '</td><td>' +
+      escP(info.is_jolly ? 'JOLLY' : info.funzione || '') +
+      '</td><td>' +
+      Math.round(pct * 100) +
+      '%</td><td>' +
+      (od ? od.toFixed(1) : '—') +
+      '</td><td>' +
+      (op ? op.toFixed(1) : '') +
+      '</td><td style="font-weight:700;color:' +
+      col(sm) +
+      '">' +
+      (op || od ? (sm > 0 ? '+' : '') + sm.toFixed(1) : '') +
+      '</td><td style="font-weight:700;color:' +
+      col(ytd) +
+      '">' +
+      (op || _pianoYtdMap[nome] ? (ytd > 0 ? '+' : '') + ytd.toFixed(1) : '') +
+      '</td></tr>';
+  });
+  h +=
+    '<tr style="border-top:2px solid #000"><td style="text-align:left;font-weight:700">TOTALE</td><td></td><td></td><td style="font-weight:700">' +
+    totD.toFixed(1) +
+    '</td><td style="font-weight:700">' +
+    totP.toFixed(1) +
+    '</td><td style="font-weight:700;color:' +
+    (totS > 0 ? '#2c6e49' : totS < 0 ? '#c0392b' : 'inherit') +
+    '">' +
+    (totS > 0 ? '+' : '') +
+    totS.toFixed(1) +
+    '</td><td></td></tr>';
+  h +=
+    '</tbody></table></div><p style="font-size:.72rem;color:var(--muted);padding:8px 14px">Dovute = giorni/7 × ' +
+    _pianoOreSett +
+    'h × percentuale (jolly esclusi). Pianificate = ore turni + codici speciali (V, M... scalati per percentuale). YTD = cumulato da gennaio: nei mesi passati valgono le ore timbrate se presenti, altrimenti il piano.</p></div>';
+  return h;
+}
+
+// TAB STORICO — come la pagina Storico di Turnivo: log delle modifiche al
+// piano (dal Registro del Diario, filtrato sulle azioni del piano)
+async function _renderPianoStoricoTab() {
+  const filtro = window._pianoStoricoFiltro || '';
+  const logs =
+    (await secGet(
+      'log_attivita?or=(azione.ilike.Piano*,azione.ilike.Vacanz*,azione.ilike.*piano*)&order=created_at.desc&limit=300',
+    )) || [];
+  const visibili = filtro ? logs.filter((l) => l.azione === filtro) : logs;
+  const azioni = [...new Set(logs.map((l) => l.azione))].sort();
+  let h =
+    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Storico modifiche piano (' +
+    visibili.length +
+    ')';
+  h +=
+    '<select onchange="window._pianoStoricoFiltro=this.value;renderPiano()" style="padding:4px 8px;font-size:.72rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a"><option value="">Tutte le azioni</option>' +
+    azioni
+      .map((a) => '<option value="' + escP(a) + '"' + (filtro === a ? ' selected' : '') + '>' + escP(a) + '</option>')
+      .join('') +
+    '</select></div>';
+  h +=
+    '<div style="overflow-x:auto;padding:0 6px 8px"><table class="piano-table" style="min-width:700px;font-size:.78rem"><thead><tr><th>Data e ora</th><th>Operatore</th><th style="text-align:left">Azione</th><th style="text-align:left">Dettaglio</th></tr></thead><tbody>';
+  visibili.forEach((l) => {
+    const d = l.created_at ? new Date(l.created_at) : null;
+    h +=
+      '<tr><td>' +
+      (d
+        ? d.toLocaleDateString('it-IT') + ' ' + d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+        : '') +
+      '</td><td>' +
+      escP(l.operatore || '') +
+      '</td><td style="text-align:left;font-weight:600">' +
+      escP(l.azione || '') +
+      '</td><td style="text-align:left">' +
+      escP(l.dettaglio || '') +
+      '</td></tr>';
+  });
+  if (!visibili.length)
+    h += '<tr><td colspan="4" style="padding:14px;color:var(--muted)">Nessuna modifica registrata</td></tr>';
+  h += '</tbody></table></div></div>';
+  return h;
+}
+
 function apriNuovaVacanza() {
   if (!puoGestirePiano()) return;
   const nomiRep = collaboratoriCache
@@ -3748,7 +3973,7 @@ function pianoCtxAzione(azione) {
   if (!sel) return;
   if (azione === 'modifica') {
     const tr = document.querySelector('#piano-content .piano-table tbody tr[data-nome="' + CSS.escape(sel.nome) + '"]');
-    const cel = tr ? tr.children[parseInt(sel.data.split('-')[2])] : null;
+    const cel = tr ? tr.querySelector('td[data-g="' + parseInt(sel.data.split('-')[2]) + '"]') : null;
     if (cel) pianoCellaInline(sel.nome, sel.data, cel);
     else pianoCellaPrompt(sel.nome, sel.data);
   } else if (azione === 'nota') _pianoNotaRapida(sel.nome, sel.data);

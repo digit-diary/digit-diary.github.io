@@ -22,6 +22,11 @@ INSERT INTO piano_codici (codice, descrizione, ore, is_riposo, attivo)
 VALUES ('WD', 'Diurno forzato (pre-vacanza)', 0, false, true)
 ON CONFLICT (codice) DO NOTHING;
 
+
+-- Ore dei codici speciali scalate per percentuale d'impiego (come Turnivo)
+ALTER TABLE piano_codici ADD COLUMN IF NOT EXISTS scala_percentuale BOOLEAN DEFAULT FALSE;
+UPDATE piano_codici SET scala_percentuale = true WHERE codice IN ('V','V1','M','M1','I','I1','MA','MI','PC','FU','TR','MT','NS','AF');
+
 ALTER TABLE piano_vacanze ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS deny_all_anon ON piano_vacanze;
 CREATE POLICY deny_all_anon ON piano_vacanze FOR ALL TO anon USING (false) WITH CHECK (false);
