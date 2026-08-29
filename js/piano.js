@@ -57,7 +57,7 @@ async function _pianoCaricaCfg() {
 }
 
 function _pianoTurniReparto() {
-  return pianoTurniCache.filter((t) => t.attivo !== false && (t.reparto_dip || 'slots') === currentReparto);
+  return pianoTurniCache.filter((t) => t.attivo !== false && (t.reparto_dip || 'slots') === _pianoReparto());
 }
 function _pianoTurnoInfo(codice) {
   return _pianoTurniReparto().find((t) => t.codice === codice) || pianoTurniCache.find((t) => t.codice === codice);
@@ -120,8 +120,9 @@ async function renderPiano() {
     const da = ym + '-01';
     const a = ym + '-' + String(nGiorni).padStart(2, '0');
     _pianoRighe =
-      (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + currentReparto + '&limit=5000')) ||
-      [];
+      (await secGet(
+        'piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=5000',
+      )) || [];
     const mappa = {}; // 'nome|data' -> riga
     _pianoRighe.forEach((r) => (mappa[r.collaboratore + '|' + r.data] = r));
     const malattie = _pianoMalattieMese(ym);
@@ -129,8 +130,8 @@ async function renderPiano() {
     pianoFestiviCache.forEach((f) => (festiviSet[f.data] = f.descrizione));
 
     // righe: collaboratori attivi del settore + eventuali nomi presenti solo nel piano
-    const collabs = getCollaboratoriReparto()
-      .filter((c) => c.attivo !== false)
+    const collabs = collaboratoriCache
+      .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
       .map((c) => c.nome)
       .sort((x, y) => x.localeCompare(y));
     const extra = [...new Set(_pianoRighe.map((r) => r.collaboratore))].filter((n) => !collabs.includes(n)).sort();
@@ -147,9 +148,18 @@ async function renderPiano() {
       escP(label) +
       '</span><button class="btn-act pin" onclick="pianoCambiaMese(1)">&rarr;</button>';
     h +=
-      '<span class="mini-badge" style="background:var(--accent2);font-size:.62rem">' +
-      escP(repartoLabel(currentReparto)) +
-      '</span>';
+      '<select onchange="pianoCambiaReparto(this.value)" style="padding:4px 8px;font-size:.72rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a">';
+    getReparti().forEach((rp) => {
+      h +=
+        '<option value="' +
+        rp.key +
+        '"' +
+        (rp.key === _pianoReparto() ? ' selected' : '') +
+        ' style="color:#000">' +
+        escP(rp.label) +
+        '</option>';
+    });
+    h += '</select>';
     if (puoMod) {
       h +=
         '<button class="btn-export" style="font-size:.72rem;padding:4px 12px;border-color:#d4b86a;color:#d4b86a" onclick="validaPiano()">Valida regole</button>';
@@ -269,12 +279,14 @@ async function renderPiano() {
       '<span><span class="piano-leg piano-malattia-auto" style="background:var(--paper2)">M</span> = malattia dal Diario (automatica)</span>';
     h += '</div></div>';
 
-    // FABBISOGNO vs ASSEGNATI
+    // FABBISOGNO vs ASSEGNATI (editabile: click sulla cella per impostare le persone necessarie)
     const fabb =
       (await secGet(
-        'piano_fabbisogni?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + currentReparto + '&limit=3000',
+        'piano_fabbisogni?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=3000',
       )) || [];
-    if (fabb.length) {
+    _pianoFabbCache = fabb;
+    const turniRep = _pianoTurniReparto();
+    if (turniRep.length) {
       const fabbMap = {}; // codice -> {giorno: quantita}
       fabb.forEach((f) => {
         const g = parseInt(f.data.split('-')[2]);
@@ -287,30 +299,64 @@ async function renderPiano() {
           (assMap[r.codice] && assMap[r.codice][g] ? assMap[r.codice][g] : 0) + 1;
       });
       h +=
-        '<div class="main-card" style="margin-top:16px"><div class="card-header">Fabbisogno vs assegnati — ' +
-        escP(label) +
-        '</div>';
+        '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Fabbisogno vs assegnati — ' +
+        escP(label);
+      if (puoMod)
+        h +=
+          '<button class="btn-export" style="font-size:.7rem;padding:3px 10px;border-color:#d4b86a;color:#d4b86a" onclick="copiaFabbisognoMese()">Copia dal mese precedente</button>' +
+          '<span style="font-size:.68rem;color:#b8a98a;font-weight:400">clicca una cella per impostare le persone necessarie</span>';
+      h += '</div>';
       h += '<div class="piano-wrap"><table class="piano-table"><thead><tr><th class="piano-nome">Turno</th>';
       for (let g = 1; g <= nGiorni; g++) h += '<th>' + g + '</th>';
       h += '</tr></thead><tbody>';
-      Object.keys(fabbMap)
-        .sort()
-        .forEach((cod) => {
-          h += '<tr><td class="piano-nome">' + escP(cod) + '</td>';
+      const gruppoOrd = {};
+      turniRep.forEach((t, i) => (gruppoOrd[t.codice] = (t.gruppo || '') + '|' + String(i).padStart(3, '0')));
+      turniRep
+        .slice()
+        .sort((x, y) => (gruppoOrd[x.codice] || '').localeCompare(gruppoOrd[y.codice] || ''))
+        .forEach((t) => {
+          const cod = t.codice;
+          h +=
+            '<tr><td class="piano-nome" title="' +
+            escP(
+              (t.gruppo || '') + ' ' + (t.ora_inizio || '').substring(0, 5) + '-' + (t.ora_fine || '').substring(0, 5),
+            ) +
+            '">' +
+            escP(cod) +
+            '</td>';
           for (let g = 1; g <= nGiorni; g++) {
-            const req = fabbMap[cod][g] || 0;
+            const req = (fabbMap[cod] || {})[g] || 0;
             const ass = (assMap[cod] || {})[g] || 0;
             let cls = '';
             if (req) cls = ass >= req ? 'piano-fabb-ok' : 'piano-fabb-ko';
-            h += '<td class="' + cls + '">' + (req ? ass + '/' + req : '') + '</td>';
+            const dstr = ym + '-' + String(g).padStart(2, '0');
+            h +=
+              '<td class="' +
+              cls +
+              '"' +
+              (puoMod
+                ? ' style="cursor:pointer" onclick="setPianoFabbisogno(\'' + escP(cod) + "','" + dstr + '\')"'
+                : '') +
+              '>' +
+              (req ? ass + '/' + req : '') +
+              '</td>';
           }
           h += '</tr>';
         });
       h += '</tbody></table></div>';
       h +=
-        '<p style="font-size:.72rem;color:var(--muted);padding:8px 14px">assegnati/richiesti — <span style="color:#2c6e49;font-weight:700">verde</span> = coperto, <span style="color:#c0392b;font-weight:700">rosso</span> = carenza</p></div>';
+        '<p style="font-size:.72rem;color:var(--muted);padding:8px 14px">assegnati/richiesti — <span style="color:#2c6e49;font-weight:700">verde</span> = coperto, <span style="color:#c0392b;font-weight:700">rosso</span> = carenza. Il fabbisogno guida "Genera bozza".</p></div>';
     }
+    // Configurazione (card richiudibili, solo admin)
+    h +=
+      '<div id="piano-config">' +
+      _renderPianoRegoleCard() +
+      _renderPianoTurniCard() +
+      _renderPianoCodiciCard() +
+      _renderPianoFestiviCard() +
+      '</div>';
     el.innerHTML = h;
+    if (typeof initCardRichiudibili === 'function') initCardRichiudibili('piano-config', []);
     _pianoRenderViolazioni();
   } catch (e) {
     console.error('Errore piano:', e);
@@ -428,7 +474,7 @@ async function salvaPianoCella() {
         protetto: true,
         generato: false,
         commento: commento || null,
-        reparto_dip: currentReparto,
+        reparto_dip: _pianoReparto(),
         operatore: getOperatore(),
       });
       if (nuovo && nuovo[0]) _pianoRighe.push(nuovo[0]);
@@ -551,7 +597,7 @@ function _pianoCalcolaViolazioni() {
 function validaPiano() {
   const r = _pianoCalcolaViolazioni();
   _pianoViolCelle = r.celle;
-  _pianoViolLista = r.lista;
+  _pianoViolLista = r.lista.sort((a, b) => a.nome.localeCompare(b.nome) || a.giorno - b.giorno);
   logAzione('Piano validato', _pianoMeseSel + ' — ' + r.lista.length + ' violazioni');
   renderPiano();
 }
@@ -589,7 +635,7 @@ async function generaBozzaPiano() {
   const a = ym + '-' + String(nGiorni).padStart(2, '0');
   const fabb =
     (await secGet(
-      'piano_fabbisogni?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + currentReparto + '&limit=3000',
+      'piano_fabbisogni?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=3000',
     )) || [];
   if (!fabb.length) {
     toast('Nessun fabbisogno configurato per questo mese: la bozza non sa cosa riempire');
@@ -600,7 +646,7 @@ async function generaBozzaPiano() {
   // storia per idoneità (chi ha già fatto quel gruppo) e familiarità:
   // tutte le assegnazioni passate del settore (le più recenti prima)
   const storia =
-    (await secGet('piano?data=lt.' + da + '&reparto_dip=eq.' + currentReparto + '&order=data.desc&limit=5000')) || [];
+    (await secGet('piano?data=lt.' + da + '&reparto_dip=eq.' + _pianoReparto() + '&order=data.desc&limit=5000')) || [];
   const idoneita = {}; // nome -> Set(gruppi)
   const familiarita = {}; // nome|codice -> n
   storia.concat(_pianoRighe).forEach((r) => {
@@ -618,8 +664,8 @@ async function generaBozzaPiano() {
     const t = _pianoTurnoInfo(cella[k]);
     if (t) oreMese[k.split('|')[0]] = (oreMese[k.split('|')[0]] || 0) + (parseFloat(t.durata_ore) || 0);
   });
-  const nomi = getCollaboratoriReparto()
-    .filter((c) => c.attivo !== false)
+  const nomi = collaboratoriCache
+    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
     .map((c) => c.nome);
   const consecPrima = (nome, g) => {
     let n = 0;
@@ -686,7 +732,7 @@ async function generaBozzaPiano() {
           codice: f.turno_codice,
           protetto: false,
           generato: true,
-          reparto_dip: currentReparto,
+          reparto_dip: _pianoReparto(),
         });
         have++;
       }
@@ -704,7 +750,7 @@ async function generaBozzaPiano() {
       'Genera bozza per ' +
         ym +
         ' (' +
-        repartoLabel(currentReparto) +
+        repartoLabel(_pianoReparto()) +
         '):\n\n• ' +
         nuove.length +
         ' turni da assegnare\n• ' +
@@ -754,7 +800,13 @@ async function cancellaBozzaPiano() {
   try {
     await secDel(
       'piano',
-      'data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + currentReparto + '&generato=eq.true&protetto=eq.false',
+      'data=gte.' +
+        da +
+        '&data=lte.' +
+        a +
+        '&reparto_dip=eq.' +
+        _pianoReparto() +
+        '&generato=eq.true&protetto=eq.false',
     );
     logAzione('Piano: bozza cancellata', ym + ' — ' + generati.length + ' celle');
     toast('Bozza cancellata (' + generati.length + ' celle)');
@@ -764,4 +816,453 @@ async function cancellaBozzaPiano() {
   } catch (e) {
     toast('Errore cancellazione bozza');
   }
+}
+
+// ================================================================
+// REGOLE DEL PIANO — card admin: elenco ordinato, valori e stato
+// modificabili. Etichetta onesta su DOVE ogni regola è applicata.
+// ================================================================
+const PIANO_REGOLE_DOVE = {
+  max_consecutivi: 'Validatore + Bozza',
+  min_riposo_ore: 'Validatore + Bozza',
+  no_4w1c1w: 'Validatore',
+  diurno_prima_vacanza: 'Validatore',
+};
+function _pianoRegoleDove(nome) {
+  return PIANO_REGOLE_DOVE[nome] || 'Solver (Fase 3)';
+}
+function _renderPianoRegoleCard() {
+  if (!isAdmin()) return '';
+  const ordineTipo = { HARD: 1, SOFT: 2, PIPELINE: 3 };
+  const regole = pianoRegoleCache
+    .slice()
+    .sort((a, b) => (ordineTipo[a.tipo] || 9) - (ordineTipo[b.tipo] || 9) || (b.peso || 0) - (a.peso || 0));
+  let h =
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Regole del piano (admin)</div><div style="padding:10px 14px">';
+  h +=
+    '<p style="font-size:.76rem;color:var(--muted);margin-bottom:8px">HARD = mai violabili (il validatore le segnala). SOFT = preferenze con peso. PIPELINE = usate dal generatore. La colonna "Applicata da" dice onestamente dove ogni regola agisce oggi: quelle marcate "Solver (Fase 3)" sono conservate ma non ancora attive nel Diario.</p>';
+  let tipoCorr = '';
+  h += '<div style="overflow-x:auto"><table class="piano-table" style="min-width:720px;font-size:.76rem">';
+  h +=
+    '<thead><tr><th style="text-align:left">Regola</th><th style="text-align:left">Descrizione</th><th>Valore</th><th>Peso</th><th>Attiva</th><th>Applicata da</th></tr></thead><tbody>';
+  regole.forEach((r) => {
+    if (r.tipo !== tipoCorr) {
+      tipoCorr = r.tipo;
+      h +=
+        '<tr><td colspan="6" style="text-align:left;background:var(--paper2);font-weight:700;letter-spacing:.06em">' +
+        escP(tipoCorr) +
+        '</td></tr>';
+    }
+    h +=
+      '<tr><td style="text-align:left;font-weight:600">' +
+      escP(r.nome) +
+      '</td><td style="text-align:left;white-space:normal;min-width:220px">' +
+      escP(r.descrizione || '') +
+      '</td><td><input type="text" value="' +
+      escP(r.valore || '') +
+      '" onchange="salvaPianoRegola(' +
+      r.id +
+      ',\'valore\',this.value)" style="width:64px;padding:3px;text-align:center;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td>' +
+      (r.peso || 0) +
+      '</td><td><input type="checkbox"' +
+      (r.attivo !== false ? ' checked' : '') +
+      ' onchange="salvaPianoRegola(' +
+      r.id +
+      ',\'attivo\',this.checked)"></td><td style="font-size:.7rem;color:' +
+      (_pianoRegoleDove(r.nome).indexOf('Fase 3') === -1 ? '#2c6e49;font-weight:700' : 'var(--muted)') +
+      '">' +
+      _pianoRegoleDove(r.nome) +
+      '</td></tr>';
+  });
+  h += '</tbody></table></div></div></div>';
+  return h;
+}
+async function salvaPianoRegola(id, campo, valore) {
+  if (!isAdmin()) return;
+  try {
+    const patch = {};
+    patch[campo] = campo === 'attivo' ? !!valore : String(valore).trim();
+    await secPatch('piano_regole', 'id=eq.' + id, patch);
+    const r = pianoRegoleCache.find((x) => x.id === id);
+    if (r) r[campo] = patch[campo];
+    logAzione('Piano: regola modificata', (r ? r.nome : id) + ' ' + campo + ' → ' + patch[campo]);
+    toast('Regola aggiornata');
+    _pianoViolCelle = {};
+    _pianoViolLista = null;
+  } catch (e) {
+    toast('Errore salvataggio regola');
+  }
+}
+
+// ================================================================
+// PERSONALIZZAZIONE COMPLETA — fabbisogni, turni, codici, festivi
+// ================================================================
+let _pianoFabbCache = [];
+
+async function setPianoFabbisogno(codice, dstr) {
+  if (!puoGestirePiano()) return;
+  const esistente = _pianoFabbCache.find(
+    (f) => f.turno_codice === codice && f.data === dstr && (f.reparto_dip || 'slots') === _pianoReparto(),
+  );
+  const attuale = esistente ? esistente.quantita : 0;
+  const v = prompt(
+    'Persone necessarie per ' +
+      codice +
+      ' il ' +
+      new Date(dstr + 'T12:00:00').toLocaleDateString('it-IT') +
+      ' (0 = rimuovi):',
+    String(attuale),
+  );
+  if (v === null) return;
+  const q = parseInt(v);
+  if (isNaN(q) || q < 0 || q > 99) {
+    toast('Inserisci un numero tra 0 e 99');
+    return;
+  }
+  try {
+    if (esistente && q === 0) {
+      await secDel('piano_fabbisogni', 'id=eq.' + esistente.id);
+    } else if (esistente) {
+      await secPatch('piano_fabbisogni', 'id=eq.' + esistente.id, { quantita: q });
+    } else if (q > 0) {
+      await secPost('piano_fabbisogni', {
+        data: dstr,
+        turno_codice: codice,
+        quantita: q,
+        reparto_dip: _pianoReparto(),
+      });
+    } else return;
+    logAzione('Piano: fabbisogno', codice + ' ' + dstr + ' → ' + q);
+    renderPiano();
+  } catch (e) {
+    toast('Errore salvataggio fabbisogno');
+  }
+}
+
+async function copiaFabbisognoMese() {
+  if (!puoGestirePiano()) return;
+  const p = _pianoMeseSel.split('-');
+  const dPrec = new Date(parseInt(p[0]), parseInt(p[1]) - 2, 15);
+  const ymPrec = dPrec.getFullYear() + '-' + String(dPrec.getMonth() + 1).padStart(2, '0');
+  const daP = ymPrec + '-01';
+  const aP = ymPrec + '-' + String(_pianoUltimoGiorno(ymPrec)).padStart(2, '0');
+  const prec =
+    (await secGet(
+      'piano_fabbisogni?data=gte.' + daP + '&data=lte.' + aP + '&reparto_dip=eq.' + _pianoReparto() + '&limit=3000',
+    )) || [];
+  if (!prec.length) {
+    toast('Nessun fabbisogno nel mese precedente (' + ymPrec + ')');
+    return;
+  }
+  const nGiorni = _pianoUltimoGiorno(_pianoMeseSel);
+  const giaPresenti = new Set(_pianoFabbCache.map((f) => f.data + '|' + f.turno_codice));
+  const nuovi = prec
+    .map((f) => ({ giorno: parseInt(f.data.split('-')[2]), turno_codice: f.turno_codice, quantita: f.quantita }))
+    .filter((f) => f.giorno <= nGiorni)
+    .map((f) => ({
+      data: _pianoMeseSel + '-' + String(f.giorno).padStart(2, '0'),
+      turno_codice: f.turno_codice,
+      quantita: f.quantita,
+      reparto_dip: _pianoReparto(),
+    }))
+    .filter((f) => !giaPresenti.has(f.data + '|' + f.turno_codice));
+  if (!nuovi.length) {
+    toast('Fabbisogno già presente per tutte le celle del mese');
+    return;
+  }
+  if (
+    !confirm(
+      'Copiare ' +
+        nuovi.length +
+        ' fabbisogni da ' +
+        ymPrec +
+        ' a ' +
+        _pianoMeseSel +
+        '?\n(le celle già impostate non vengono toccate)',
+    )
+  )
+    return;
+  try {
+    for (let i = 0; i < nuovi.length; i += 10) {
+      await Promise.all(nuovi.slice(i, i + 10).map((f) => secPost('piano_fabbisogni', f)));
+    }
+    logAzione('Piano: fabbisogno copiato', ymPrec + ' → ' + _pianoMeseSel + ' (' + nuovi.length + ' celle)');
+    toast('Fabbisogno copiato (' + nuovi.length + ' celle)');
+    renderPiano();
+  } catch (e) {
+    toast('Errore copia fabbisogno');
+  }
+}
+
+// ---- Card TURNI (admin) ----
+function _renderPianoTurniCard() {
+  if (!isAdmin()) return '';
+  const turni = _pianoTurniReparto();
+  let h =
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Turni — ' +
+    escP(repartoLabel(_pianoReparto())) +
+    ' (admin)</div><div style="padding:10px 14px">';
+  h +=
+    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:640px;font-size:.76rem"><thead><tr><th>Codice</th><th>Gruppo</th><th>Inizio</th><th>Fine</th><th>Ore</th><th>Tipo</th><th>Oltre 23</th><th>Attivo</th><th></th></tr></thead><tbody>';
+  turni
+    .slice()
+    .sort((x, y) => (x.gruppo || '').localeCompare(y.gruppo || '') || x.codice.localeCompare(y.codice))
+    .forEach((t) => {
+      h +=
+        '<tr><td style="font-weight:700">' +
+        escP(t.codice) +
+        '</td><td>' +
+        escP(t.gruppo || '') +
+        '</td><td><input type="time" value="' +
+        escP((t.ora_inizio || '').substring(0, 5)) +
+        '" onchange="salvaPianoTurno(' +
+        t.id +
+        ',\'ora_inizio\',this.value)" style="padding:2px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td><input type="time" value="' +
+        escP((t.ora_fine || '').substring(0, 5)) +
+        '" onchange="salvaPianoTurno(' +
+        t.id +
+        ',\'ora_fine\',this.value)" style="padding:2px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td><input type="number" step="0.25" value="' +
+        (t.durata_ore || 0) +
+        '" onchange="salvaPianoTurno(' +
+        t.id +
+        ',\'durata_ore\',this.value)" style="width:58px;padding:2px;text-align:center;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td><select onchange="salvaPianoTurno(' +
+        t.id +
+        ',\'tipo\',this.value)" style="padding:2px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><option' +
+        (t.tipo === 'DIURNO' ? ' selected' : '') +
+        '>DIURNO</option><option' +
+        (t.tipo === 'NOTTURNO' ? ' selected' : '') +
+        '>NOTTURNO</option></select></td><td><input type="checkbox"' +
+        (t.oltre23 ? ' checked' : '') +
+        ' onchange="salvaPianoTurno(' +
+        t.id +
+        ',\'oltre23\',this.checked)"></td><td><input type="checkbox"' +
+        (t.attivo !== false ? ' checked' : '') +
+        ' onchange="salvaPianoTurno(' +
+        t.id +
+        ',\'attivo\',this.checked)"></td><td><button class="btn-del-tipo" onclick="eliminaPianoTurno(' +
+        t.id +
+        ')">Elimina</button></td></tr>';
+    });
+  h += '</tbody></table></div>';
+  h +=
+    '<div class="add-tipo-row" style="margin-top:8px"><div class="field"><label>Codice</label><input type="text" id="pt-nuovo-codice" placeholder="S9" style="width:80px"></div>' +
+    '<div class="field"><label>Gruppo</label><input type="text" id="pt-nuovo-gruppo" placeholder="SALA" style="width:110px"></div>' +
+    '<div class="field"><label>Inizio</label><input type="time" id="pt-nuovo-inizio"></div>' +
+    '<div class="field"><label>Fine</label><input type="time" id="pt-nuovo-fine"></div>' +
+    '<div class="field"><label>Ore</label><input type="number" step="0.25" id="pt-nuovo-ore" value="8.25" style="width:70px"></div>' +
+    '<button class="btn-add-tipo" onclick="aggiungiPianoTurno()">+ Aggiungi turno</button></div>';
+  h += '</div></div>';
+  return h;
+}
+async function salvaPianoTurno(id, campo, valore) {
+  if (!isAdmin()) return;
+  try {
+    const patch = {};
+    if (campo === 'attivo' || campo === 'oltre23') patch[campo] = !!valore;
+    else if (campo === 'durata_ore') patch[campo] = parseFloat(valore) || 0;
+    else patch[campo] = String(valore).trim();
+    await secPatch('piano_turni', 'id=eq.' + id, patch);
+    const t = pianoTurniCache.find((x) => x.id === id);
+    if (t) t[campo] = patch[campo];
+    logAzione('Piano: turno modificato', (t ? t.codice : id) + ' ' + campo + ' → ' + patch[campo]);
+    toast('Turno aggiornato');
+  } catch (e) {
+    toast('Errore salvataggio turno');
+  }
+}
+async function aggiungiPianoTurno() {
+  if (!isAdmin()) return;
+  const codice = ((document.getElementById('pt-nuovo-codice') || {}).value || '').trim().toUpperCase();
+  const gruppo = ((document.getElementById('pt-nuovo-gruppo') || {}).value || '').trim().toUpperCase();
+  const inizio = (document.getElementById('pt-nuovo-inizio') || {}).value || '';
+  const fine = (document.getElementById('pt-nuovo-fine') || {}).value || '';
+  const oreV = parseFloat((document.getElementById('pt-nuovo-ore') || {}).value) || 8.25;
+  if (!codice || !gruppo || !inizio || !fine) {
+    toast('Compila codice, gruppo e orari');
+    return;
+  }
+  if (pianoTurniCache.some((t) => t.codice === codice && (t.reparto_dip || 'slots') === _pianoReparto())) {
+    toast('Codice turno già esistente in questo settore');
+    return;
+  }
+  const oltre23 = _pianoOra(fine) < _pianoOra(inizio) || _pianoOra(fine) > 23;
+  try {
+    const r = await secPost('piano_turni', {
+      codice: codice,
+      gruppo: gruppo,
+      ora_inizio: inizio,
+      ora_fine: fine,
+      durata_ore: oreV,
+      tipo: _pianoOra(inizio) >= 15 || oltre23 ? 'NOTTURNO' : 'DIURNO',
+      oltre23: oltre23,
+      colore: PIANO_COLORI_GRUPPO[gruppo] || '#EEEEEE',
+      reparto_dip: _pianoReparto(),
+    });
+    if (r && r[0]) pianoTurniCache.push(r[0]);
+    logAzione('Piano: turno aggiunto', codice + ' (' + gruppo + ')');
+    toast('Turno ' + codice + ' aggiunto');
+    renderPiano();
+  } catch (e) {
+    toast('Errore aggiunta turno');
+  }
+}
+const PIANO_COLORI_GRUPPO = {
+  SALA: '#F2DBDB',
+  REC: '#FF99CC',
+  CASSA: '#FBD4B4',
+  SUP: '#B8CCE4',
+  ACCOGLIENZA: '#C6EFCE',
+  BO: '#CCC0D9',
+  VALET: '#343a40',
+};
+async function eliminaPianoTurno(id) {
+  if (!isAdmin()) return;
+  const t = pianoTurniCache.find((x) => x.id === id);
+  if (!t) return;
+  const usato = (await secGet('piano?codice=eq.' + encodeURIComponent(t.codice) + '&limit=1')) || [];
+  if (usato.length) {
+    toast('Il turno ' + t.codice + ' è usato nel piano: disattivalo invece di eliminarlo');
+    return;
+  }
+  if (!confirm('Eliminare il turno ' + t.codice + '? (mai usato nel piano)')) return;
+  try {
+    await secDel('piano_turni', 'id=eq.' + id);
+    pianoTurniCache = pianoTurniCache.filter((x) => x.id !== id);
+    logAzione('Piano: turno eliminato', t.codice);
+    toast('Turno eliminato');
+    renderPiano();
+  } catch (e) {
+    toast('Errore eliminazione turno');
+  }
+}
+
+// ---- Card CODICI SPECIALI (admin) ----
+function _renderPianoCodiciCard() {
+  if (!isAdmin()) return '';
+  let h =
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Codici speciali (admin)</div><div style="padding:10px 14px">';
+  h +=
+    '<p style="font-size:.74rem;color:var(--muted);margin-bottom:6px">Assenze e situazioni non lavorative. "Riposo" = il codice conta come giorno di riposo per le regole. Le ore seguono le formule CCL originali.</p>';
+  h +=
+    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:560px;font-size:.76rem"><thead><tr><th>Codice</th><th style="text-align:left">Descrizione</th><th>Ore</th><th>Riposo</th><th>Attivo</th></tr></thead><tbody>';
+  pianoCodiciCache
+    .slice()
+    .sort((x, y) => x.codice.localeCompare(y.codice))
+    .forEach((c) => {
+      h +=
+        '<tr><td style="font-weight:700">' +
+        escP(c.codice) +
+        '</td><td style="text-align:left"><input type="text" value="' +
+        escP(c.descrizione || '') +
+        '" onchange="salvaPianoCodice(' +
+        c.id +
+        ',\'descrizione\',this.value)" style="width:200px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td><input type="number" step="0.001" value="' +
+        (c.ore || 0) +
+        '" onchange="salvaPianoCodice(' +
+        c.id +
+        ',\'ore\',this.value)" style="width:70px;padding:2px;text-align:center;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td><input type="checkbox"' +
+        (c.is_riposo ? ' checked' : '') +
+        ' onchange="salvaPianoCodice(' +
+        c.id +
+        ',\'is_riposo\',this.checked)"></td><td><input type="checkbox"' +
+        (c.attivo !== false ? ' checked' : '') +
+        ' onchange="salvaPianoCodice(' +
+        c.id +
+        ",'attivo',this.checked)\"></td></tr>";
+    });
+  h += '</tbody></table></div></div></div>';
+  return h;
+}
+async function salvaPianoCodice(id, campo, valore) {
+  if (!isAdmin()) return;
+  try {
+    const patch = {};
+    if (campo === 'attivo' || campo === 'is_riposo') patch[campo] = !!valore;
+    else if (campo === 'ore') patch[campo] = parseFloat(valore) || 0;
+    else patch[campo] = String(valore).trim();
+    await secPatch('piano_codici', 'id=eq.' + id, patch);
+    const c = pianoCodiciCache.find((x) => x.id === id);
+    if (c) c[campo] = patch[campo];
+    logAzione('Piano: codice modificato', (c ? c.codice : id) + ' ' + campo);
+    toast('Codice aggiornato');
+  } catch (e) {
+    toast('Errore salvataggio codice');
+  }
+}
+
+// ---- Card FESTIVI (admin) ----
+function _renderPianoFestiviCard() {
+  if (!isAdmin()) return '';
+  let h =
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Festivi (admin)</div><div style="padding:10px 14px">';
+  pianoFestiviCache
+    .slice()
+    .sort((x, y) => x.data.localeCompare(y.data))
+    .forEach((f) => {
+      h +=
+        '<div class="tipo-item"><div class="tipo-item-name">' +
+        new Date(f.data + 'T12:00:00').toLocaleDateString('it-IT') +
+        ' — ' +
+        escP(f.descrizione || '') +
+        (f.cgf ? ' <span class="tipo-item-default">(CGF)</span>' : '') +
+        '</div><button class="btn-del-tipo" onclick="eliminaPianoFestivo(' +
+        f.id +
+        ')">Rimuovi</button></div>';
+    });
+  h +=
+    '<div class="add-tipo-row" style="margin-top:8px"><div class="field"><label>Data</label><input type="date" id="pf-nuova-data"></div>' +
+    '<div class="field"><label>Descrizione</label><input type="text" id="pf-nuova-desc" placeholder="Es: Natale"></div>' +
+    '<label style="display:flex;align-items:center;gap:4px;font-size:.78rem;cursor:pointer"><input type="checkbox" id="pf-nuovo-cgf" checked> CGF</label>' +
+    '<button class="btn-add-tipo" onclick="aggiungiPianoFestivo()">+ Aggiungi</button></div>';
+  h += '</div></div>';
+  return h;
+}
+async function aggiungiPianoFestivo() {
+  if (!isAdmin()) return;
+  const data = (document.getElementById('pf-nuova-data') || {}).value || '';
+  const desc = ((document.getElementById('pf-nuova-desc') || {}).value || '').trim();
+  const cgf = !!(document.getElementById('pf-nuovo-cgf') || {}).checked;
+  if (!data || !desc) {
+    toast('Compila data e descrizione');
+    return;
+  }
+  try {
+    const r = await secPost('piano_festivi', { data: data, descrizione: desc, cgf: cgf });
+    if (r && r[0]) pianoFestiviCache.push(r[0]);
+    logAzione('Piano: festivo aggiunto', data + ' ' + desc);
+    toast('Festivo aggiunto');
+    renderPiano();
+  } catch (e) {
+    toast('Errore (data già presente?)');
+  }
+}
+async function eliminaPianoFestivo(id) {
+  if (!isAdmin()) return;
+  const f = pianoFestiviCache.find((x) => x.id === id);
+  if (!f || !confirm('Rimuovere il festivo ' + f.data + ' (' + (f.descrizione || '') + ')?')) return;
+  try {
+    await secDel('piano_festivi', 'id=eq.' + id);
+    pianoFestiviCache = pianoFestiviCache.filter((x) => x.id !== id);
+    logAzione('Piano: festivo rimosso', f.data);
+    toast('Festivo rimosso');
+    renderPiano();
+  } catch (e) {
+    toast('Errore rimozione festivo');
+  }
+}
+
+// ================================================================
+// SETTORE DEL PIANO — un operatore autorizzato può vedere/gestire
+// il piano di un altro settore (es. supervisor Tavoli sul piano
+// Slots) senza cambiare login: il selettore vale solo per il Piano.
+// ================================================================
+let _pianoRepartoSel = null; // null = segue il settore corrente dell'app
+function _pianoReparto() {
+  return _pianoRepartoSel || currentReparto;
+}
+function pianoCambiaReparto(rep) {
+  _pianoRepartoSel = rep === currentReparto ? null : rep;
+  _pianoViolCelle = {};
+  _pianoViolLista = null;
+  renderPiano();
 }

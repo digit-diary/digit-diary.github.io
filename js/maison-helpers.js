@@ -1878,6 +1878,7 @@ function setReparto(rep) {
     return p && p.classList.contains('active');
   };
   if (_pgAttiva('page-formazione') && typeof renderFormazione === 'function') renderFormazione();
+  if (typeof _pianoRepartoSel !== 'undefined') _pianoRepartoSel = null; // il Piano torna a seguire il settore dell'app
   if (_pgAttiva('page-piano') && typeof renderPiano === 'function') renderPiano();
   if (_pgAttiva('page-impostazioni') && typeof renderCollaboratoriUI === 'function') renderCollaboratoriUI();
   if (typeof renderPromemoria === 'function') renderPromemoria();
