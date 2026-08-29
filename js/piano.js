@@ -298,7 +298,7 @@ async function renderPiano() {
           stile +
           '"' +
           (titolo ? ' title="' + escP(titolo) + '"' : '') +
-          (puoMod ? ' onclick="pianoCellaPrompt(\'' + ne + "','" + dstr + '\')"' : '') +
+          (puoMod ? ' onclick="pianoCellaInline(\'' + ne + "','" + dstr + '\',this)"' : '') +
           '>' +
           cella +
           '</td>';
@@ -385,9 +385,32 @@ async function renderPiano() {
           '<button class="btn-export" style="font-size:.7rem;padding:3px 10px;border-color:#d4b86a;color:#d4b86a" onclick="copiaFabbisognoMese()">Copia dal mese precedente</button>' +
           '<span style="font-size:.68rem;color:#b8a98a;font-weight:400">clicca una cella per impostare le persone necessarie</span>';
       h += '</div>';
-      h += '<div class="piano-wrap"><table class="piano-table"><thead><tr><th class="piano-nome">Turno</th>';
-      for (let g = 1; g <= nGiorni; g++) h += '<th>' + g + '</th>';
-      h += '</tr></thead><tbody>';
+      // testata giorni con sigla settimana (D/L/M...), festivi e weekend:
+      // usata da fabbisogno, differenze ed effettivi
+      const testataGiorni = (conTot) => {
+        let t = '<thead><tr><th class="piano-nome">Turno</th>';
+        for (let g = 1; g <= nGiorni; g++) {
+          const dstr = ym + '-' + String(g).padStart(2, '0');
+          const dow = new Date(dstr + 'T12:00:00').getDay();
+          let cls = '';
+          if (festiviSet[dstr]) cls = 'piano-festivo';
+          else if (dow === 0) cls = 'piano-domenica';
+          else if (dow === 5 || dow === 6) cls = 'piano-weekend';
+          t +=
+            '<th class="' +
+            cls +
+            '"' +
+            (festiviSet[dstr] ? ' title="' + escP(festiviSet[dstr]) + '"' : '') +
+            '>' +
+            g +
+            '<br><span style="font-weight:400">' +
+            GG[dow] +
+            '</span></th>';
+        }
+        if (conTot) t += '<th>Tot</th>';
+        return t + '</tr></thead>';
+      };
+      h += '<div class="piano-wrap"><table class="piano-table">' + testataGiorni(false) + '<tbody>';
       const gruppoOrd = {};
       turniRep.forEach((t, i) => (gruppoOrd[t.codice] = (t.gruppo || '') + '|' + String(i).padStart(3, '0')));
       turniRep
@@ -414,7 +437,7 @@ async function renderPiano() {
               cls +
               '"' +
               (puoMod
-                ? ' style="cursor:pointer" onclick="setPianoFabbisogno(\'' + escP(cod) + "','" + dstr + '\')"'
+                ? ' style="cursor:pointer" onclick="fabbisognoInline(\'' + escP(cod) + "','" + dstr + '\',this)"'
                 : '') +
               '>' +
               (req ? ass + '/' + req : '') +
@@ -432,20 +455,6 @@ async function renderPiano() {
       const turniOrdinati = turniRep
         .slice()
         .sort((x, y) => (gruppoOrd[x.codice] || '').localeCompare(gruppoOrd[y.codice] || ''));
-      const testataGiorni = (conTot) => {
-        let t = '<thead><tr><th class="piano-nome">Turno</th>';
-        for (let g = 1; g <= nGiorni; g++) {
-          const dstr = ym + '-' + String(g).padStart(2, '0');
-          const dow = new Date(dstr + 'T12:00:00').getDay();
-          let cls = '';
-          if (festiviSet[dstr]) cls = 'piano-festivo';
-          else if (dow === 0) cls = 'piano-domenica';
-          else if (dow === 5 || dow === 6) cls = 'piano-weekend';
-          t += '<th class="' + cls + '">' + g + '</th>';
-        }
-        if (conTot) t += '<th>Tot</th>';
-        return t + '</tr></thead>';
-      };
       const clsCella = (g) => {
         const dstr = ym + '-' + String(g).padStart(2, '0');
         const dow = new Date(dstr + 'T12:00:00').getDay();
@@ -1154,24 +1163,33 @@ async function salvaPianoRegola(id, campo, valore) {
 // ================================================================
 let _pianoFabbCache = [];
 
-async function setPianoFabbisogno(codice, dstr) {
+async function setPianoFabbisogno(codice, dstr, qDiretta) {
   if (!puoGestirePiano()) return;
   const esistente = _pianoFabbCache.find(
     (f) => f.turno_codice === codice && f.data === dstr && (f.reparto_dip || 'slots') === _pianoReparto(),
   );
   const attuale = esistente ? esistente.quantita : 0;
-  const v = prompt(
-    'Persone necessarie per ' +
-      codice +
-      ' il ' +
-      new Date(dstr + 'T12:00:00').toLocaleDateString('it-IT') +
-      ' (0 = rimuovi):',
-    String(attuale),
-  );
-  if (v === null) return;
-  const q = parseInt(v);
+  let q;
+  if (qDiretta != null) {
+    q = qDiretta;
+  } else {
+    const v = prompt(
+      'Persone necessarie per ' +
+        codice +
+        ' il ' +
+        new Date(dstr + 'T12:00:00').toLocaleDateString('it-IT') +
+        ' (0 = rimuovi):',
+      String(attuale),
+    );
+    if (v === null) return;
+    q = parseInt(v);
+  }
   if (isNaN(q) || q < 0 || q > 99) {
     toast('Inserisci un numero tra 0 e 99');
+    return;
+  }
+  if (q === attuale) {
+    renderPiano();
     return;
   }
   try {
@@ -1192,6 +1210,48 @@ async function setPianoFabbisogno(codice, dstr) {
   } catch (e) {
     toast('Errore salvataggio fabbisogno');
   }
+}
+
+// Modifica INLINE del fabbisogno: click sulla cella = scrivi il numero lì
+function fabbisognoInline(codice, dstr, el) {
+  if (!puoGestirePiano() || !el || el.querySelector('input')) return;
+  const esistente = _pianoFabbCache.find(
+    (f) => f.turno_codice === codice && f.data === dstr && (f.reparto_dip || 'slots') === _pianoReparto(),
+  );
+  const attuale = esistente ? esistente.quantita : 0;
+  const vecchio = el.innerHTML;
+  el.innerHTML =
+    '<input type="text" inputmode="numeric" value="' +
+    (attuale || '') +
+    '" maxlength="2" style="width:100%;min-width:26px;box-sizing:border-box;border:2px solid #1a4a7a;border-radius:2px;padding:1px 2px;font:inherit;font-weight:700;text-align:center;background:#fff;color:#000">';
+  const inp = el.querySelector('input');
+  inp.focus();
+  inp.select();
+  let chiuso = false;
+  const conferma = async () => {
+    if (chiuso) return;
+    chiuso = true;
+    const v = inp.value.trim();
+    const q = v === '' ? 0 : parseInt(v);
+    if (q === attuale || (v !== '' && isNaN(q))) {
+      el.innerHTML = vecchio;
+      if (v !== '' && isNaN(q)) toast('Inserisci un numero tra 0 e 99');
+      return;
+    }
+    await setPianoFabbisogno(codice, dstr, q);
+  };
+  inp.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      conferma();
+    } else if (e.key === 'Escape') {
+      chiuso = true;
+      el.innerHTML = vecchio;
+    }
+  });
+  inp.addEventListener('click', (e) => e.stopPropagation());
+  inp.addEventListener('blur', conferma);
 }
 
 async function copiaFabbisognoMese() {
@@ -3200,8 +3260,12 @@ function pianoCtxAzione(azione) {
   nascondiPianoCtx();
   const sel = _pianoCtxSel;
   if (!sel) return;
-  if (azione === 'modifica') pianoCellaPrompt(sel.nome, sel.data);
-  else if (azione === 'nota') _pianoNotaRapida(sel.nome, sel.data);
+  if (azione === 'modifica') {
+    const tr = document.querySelector('#piano-content .piano-table tbody tr[data-nome="' + CSS.escape(sel.nome) + '"]');
+    const cel = tr ? tr.children[parseInt(sel.data.split('-')[2])] : null;
+    if (cel) pianoCellaInline(sel.nome, sel.data, cel);
+    else pianoCellaPrompt(sel.nome, sel.data);
+  } else if (azione === 'nota') _pianoNotaRapida(sel.nome, sel.data);
   else if (azione === 'stampa') stampaPianoCollaboratore(sel.nome);
   else if (azione === 'scambio') {
     _pianoCellaSel = { nome: sel.nome, data: sel.data };
@@ -3322,17 +3386,12 @@ async function confermaCambioEsigenze() {
 // si scrive direttamente il codice (S22, V, C...). Vuoto = rimuovi.
 // La finestra completa resta nel menu del tasto destro.
 // ================================================================
-async function pianoCellaPrompt(nome, dstr) {
-  // Comportamento IDENTICO a Turnivo (editCell): prompt "Turno per giorno N
-  // (vuoto per rimuovere)", vuoto elimina senza conferma, nessuna validazione
-  // del codice, il commento esistente viene conservato.
+// Salvataggio cella (regole Turnivo: vuoto elimina senza conferma, nessuna
+// validazione del codice, commento conservato, cella protetta)
+async function pianoSalvaCella(nome, dstr, codice) {
   if (!puoGestirePiano()) return;
-  const g = parseInt(dstr.split('-')[2]);
   const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
   const attuale = r ? r.codice : '';
-  const v = prompt('Turno per giorno ' + g + ' (vuoto per rimuovere):', attuale);
-  if (v === null) return;
-  const codice = v.trim().toUpperCase();
   _pianoCellaSel = { nome: nome, data: dstr };
   try {
     if (!codice) {
@@ -3373,4 +3432,50 @@ async function pianoCellaPrompt(nome, dstr) {
     console.error(e);
     toast('Errore salvataggio piano');
   }
+}
+async function pianoCellaPrompt(nome, dstr) {
+  // usato dal menu contestuale quando la cella non è raggiungibile
+  if (!puoGestirePiano()) return;
+  const g = parseInt(dstr.split('-')[2]);
+  const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
+  const v = prompt('Turno per giorno ' + g + ' (vuoto per rimuovere):', r ? r.codice : '');
+  if (v === null) return;
+  await pianoSalvaCella(nome, dstr, v.trim().toUpperCase());
+}
+// Modifica INLINE: click sulla cella = si scrive direttamente lì (niente finestra)
+function pianoCellaInline(nome, dstr, el) {
+  if (!puoGestirePiano() || !el || el.querySelector('input')) return;
+  const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
+  const attuale = r ? r.codice : '';
+  const vecchio = el.innerHTML;
+  el.innerHTML =
+    '<input type="text" value="' +
+    escP(attuale) +
+    '" maxlength="6" style="width:100%;min-width:30px;box-sizing:border-box;border:2px solid #1a4a7a;border-radius:2px;padding:1px 2px;font:inherit;font-weight:700;text-transform:uppercase;text-align:center;background:#fff;color:#000">';
+  const inp = el.querySelector('input');
+  inp.focus();
+  inp.select();
+  let chiuso = false;
+  const conferma = async () => {
+    if (chiuso) return;
+    chiuso = true;
+    const v = inp.value.trim().toUpperCase();
+    if (v === attuale) {
+      el.innerHTML = vecchio;
+      return;
+    }
+    await pianoSalvaCella(nome, dstr, v);
+  };
+  inp.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      conferma();
+    } else if (e.key === 'Escape') {
+      chiuso = true;
+      el.innerHTML = vecchio;
+    }
+  });
+  inp.addEventListener('click', (e) => e.stopPropagation());
+  inp.addEventListener('blur', conferma);
 }
