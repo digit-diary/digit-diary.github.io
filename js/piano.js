@@ -1994,52 +1994,58 @@ function _pianoInitSelezione() {
   // colonna con velo azzurro + header blu; click nome = riga; ri-click =
   // deseleziona; riga e colonna mutuamente esclusive; click fuori dalla
   // tabella = deseleziona. La stampa avviene SOLO dall'icona rossa.
-  const tab = document.querySelector('#piano-content .piano-table');
-  if (!tab || tab.dataset.selInit) return;
-  tab.dataset.selInit = '1';
-  const thead = tab.querySelector('thead');
-  const tbody = tab.querySelector('tbody');
-  if (!thead || !tbody) return;
-  let selCol = -1;
-  let selRow = -1;
-  const clear = () => {
-    tab
-      .querySelectorAll('.col-selected, .col-selected-header')
-      .forEach((el) => el.classList.remove('col-selected', 'col-selected-header'));
-    tab.querySelectorAll('.row-selected').forEach((el) => el.classList.remove('row-selected'));
-    selCol = -1;
-    selRow = -1;
-  };
-  thead.querySelectorAll('tr th').forEach((th, colIdx) => {
-    if (th.classList.contains('piano-nome')) return;
-    th.style.cursor = 'pointer';
-    th.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const era = colIdx === selCol;
-      clear();
-      if (era) return;
-      selCol = colIdx;
-      th.classList.add('col-selected-header');
-      tbody.querySelectorAll('tr').forEach((riga) => {
-        const celle = riga.querySelectorAll('td, th');
-        if (celle[colIdx]) celle[colIdx].classList.add('col-selected');
+  // Come Turnivo (table[data-selectable]): vale per TUTTE le tabelle in
+  // piano-wrap — griglia collaboratori E fabbisogno
+  const initTabella = (tab) => {
+    if (!tab || tab.dataset.selInit) return;
+    tab.dataset.selInit = '1';
+    const thead = tab.querySelector('thead');
+    const tbody = tab.querySelector('tbody');
+    if (!thead || !tbody) return;
+    let selCol = -1;
+    let selRow = -1;
+    const clear = () => {
+      tab
+        .querySelectorAll('.col-selected, .col-selected-header')
+        .forEach((el) => el.classList.remove('col-selected', 'col-selected-header'));
+      tab.querySelectorAll('.row-selected').forEach((el) => el.classList.remove('row-selected'));
+      selCol = -1;
+      selRow = -1;
+    };
+    thead.querySelectorAll('tr th').forEach((th, colIdx) => {
+      if (th.classList.contains('piano-nome')) return;
+      th.style.cursor = 'pointer';
+      th.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const era = colIdx === selCol;
+        clear();
+        if (era) return;
+        selCol = colIdx;
+        th.classList.add('col-selected-header');
+        tbody.querySelectorAll('tr').forEach((riga) => {
+          const celle = riga.querySelectorAll('td, th');
+          if (celle[colIdx]) celle[colIdx].classList.add('col-selected');
+        });
       });
     });
-  });
-  tbody.querySelectorAll('tr').forEach((riga, rowIdx) => {
-    const nomeCella = riga.querySelector('.piano-nome');
-    if (!nomeCella) return;
-    nomeCella.style.cursor = 'pointer';
-    nomeCella.addEventListener('click', (e) => {
-      if (e.target.closest('a, .piano-pdf-ico')) return;
-      e.stopPropagation();
-      const era = rowIdx === selRow;
-      clear();
-      if (era) return;
-      selRow = rowIdx;
-      riga.classList.add('row-selected');
+    tbody.querySelectorAll('tr').forEach((riga, rowIdx) => {
+      const nomeCella = riga.querySelector('.piano-nome');
+      if (!nomeCella) return;
+      nomeCella.style.cursor = 'pointer';
+      nomeCella.addEventListener('click', (e) => {
+        if (e.target.closest('a, .piano-pdf-ico')) return;
+        e.stopPropagation();
+        const era = rowIdx === selRow;
+        clear();
+        if (era) return;
+        selRow = rowIdx;
+        riga.classList.add('row-selected');
+      });
     });
-  });
+  };
+  document.querySelectorAll('#piano-content .piano-wrap > .piano-table').forEach(initTabella);
+  const tab = document.querySelector('#piano-content .piano-table');
+  if (!tab) return;
   if (!window._pianoSelDocClick) {
     window._pianoSelDocClick = true;
     document.addEventListener('click', (e) => {
