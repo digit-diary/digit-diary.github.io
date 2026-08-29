@@ -3534,6 +3534,10 @@ button:focus-visible,
   border-radius: 3px;
   margin-bottom: 10px;
 }
+.piano-tab svg {
+  vertical-align: -2px;
+  margin-right: 2px;
+}
 .piano-tab {
   color: #adb5bd;
   padding: 7px 16px;
