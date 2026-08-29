@@ -3650,3 +3650,18 @@ button:focus-visible,
   background: #1a4a7a !important;
   color: #fff !important;
 }
+/* Righe colorate per funzione (come Turnivo): SUP verdino, BO arancio chiaro */
+.piano-table tr.piano-row-sup td {
+  background: #c6efce;
+}
+.piano-table tr.piano-row-sup .piano-nome {
+  background: #c6efce;
+  font-weight: 700;
+}
+.piano-table tr.piano-row-bo td {
+  background: #fce4d6;
+}
+.piano-table tr.piano-row-bo .piano-nome {
+  background: #fce4d6;
+  font-weight: 700;
+}
