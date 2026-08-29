@@ -1214,6 +1214,12 @@ function _renderPianoFestiviCard() {
     '<div class="field"><label>Descrizione</label><input type="text" id="pf-nuova-desc" placeholder="Es: Natale"></div>' +
     '<label style="display:flex;align-items:center;gap:4px;font-size:.78rem;cursor:pointer"><input type="checkbox" id="pf-nuovo-cgf" checked> CGF</label>' +
     '<button class="btn-add-tipo" onclick="aggiungiPianoFestivo()">+ Aggiungi</button></div>';
+  h +=
+    '<div class="add-tipo-row" style="margin-top:6px;border-top:1px solid var(--line);padding-top:8px"><div class="field"><label>Genera automaticamente i festivi di un anno</label><input type="number" id="pf-genera-anno" value="' +
+    (new Date().getFullYear() + 1) +
+    '" min="2024" max="2050" style="width:90px"></div>' +
+    '<button class="btn-add-tipo" onclick="generaPianoFestivi()">Genera festivi anno</button>' +
+    '<span style="font-size:.72rem;color:var(--muted)">7 fissi + Lunedì di Pasqua e Ascensione calcolati (lista del casinò)</span></div>';
   h += '</div></div>';
   return h;
 }
@@ -1265,4 +1271,88 @@ function pianoCambiaReparto(rep) {
   _pianoViolCelle = {};
   _pianoViolLista = null;
   renderPiano();
+}
+
+// ================================================================
+// FESTIVI AUTOMATICI — genera i festivi di un anno con un click.
+// Lista = quella osservata dal casinò (da Turnivo 2026): 7 fissi +
+// Lunedì di Pasqua e Ascensione calcolati dalla data di Pasqua.
+// ================================================================
+function _pianoPasqua(anno) {
+  // algoritmo di Meeus (calendario gregoriano)
+  const a = anno % 19;
+  const b = Math.floor(anno / 100);
+  const c = anno % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const hh = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - hh - k) % 7;
+  const m = Math.floor((a + 11 * hh + 22 * l) / 451);
+  const mese = Math.floor((hh + l - 7 * m + 114) / 31);
+  const giorno = ((hh + l - 7 * m + 114) % 31) + 1;
+  return new Date(anno, mese - 1, giorno, 12);
+}
+function _pianoFestiviAnno(anno) {
+  const pasqua = _pianoPasqua(anno);
+  const add = (base, giorni) => {
+    const d = new Date(base);
+    d.setDate(d.getDate() + giorni);
+    return (
+      d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+    );
+  };
+  return [
+    { data: anno + '-01-01', descrizione: 'Capodanno' },
+    { data: anno + '-01-06', descrizione: 'Epifania' },
+    { data: add(pasqua, 1), descrizione: 'Lunedi di Pasqua' },
+    { data: add(pasqua, 39), descrizione: 'Ascensione' },
+    { data: anno + '-08-01', descrizione: 'Festa Nazionale CH' },
+    { data: anno + '-08-15', descrizione: 'Assunzione' },
+    { data: anno + '-11-01', descrizione: 'Ognissanti' },
+    { data: anno + '-12-25', descrizione: 'Natale' },
+    { data: anno + '-12-26', descrizione: 'Santo Stefano' },
+  ];
+}
+async function generaPianoFestivi() {
+  if (!isAdmin()) return;
+  const anno = parseInt((document.getElementById('pf-genera-anno') || {}).value);
+  if (!anno || anno < 2024 || anno > 2050) {
+    toast('Inserisci un anno valido (2024-2050)');
+    return;
+  }
+  const esistenti = new Set(pianoFestiviCache.map((f) => f.data));
+  const nuovi = _pianoFestiviAnno(anno).filter((f) => !esistenti.has(f.data));
+  if (!nuovi.length) {
+    toast('Festivi ' + anno + ' già tutti presenti');
+    return;
+  }
+  if (
+    !confirm(
+      'Generare ' +
+        nuovi.length +
+        ' festivi per il ' +
+        anno +
+        '?\n\n' +
+        nuovi
+          .map((f) => new Date(f.data + 'T12:00:00').toLocaleDateString('it-IT') + ' — ' + f.descrizione)
+          .join('\n') +
+        '\n\n(tutti con CGF attivo; quelli già presenti non vengono toccati)',
+    )
+  )
+    return;
+  try {
+    for (const f of nuovi) {
+      const r = await secPost('piano_festivi', { data: f.data, descrizione: f.descrizione, cgf: true });
+      if (r && r[0]) pianoFestiviCache.push(r[0]);
+    }
+    logAzione('Piano: festivi generati', anno + ' (' + nuovi.length + ')');
+    toast('Generati ' + nuovi.length + ' festivi per il ' + anno);
+    renderPiano();
+  } catch (e) {
+    toast('Errore generazione festivi');
+  }
 }
