@@ -939,7 +939,17 @@ async function generaBozzaPiano() {
                   ? -1
                   : 0
                 : 0;
+            // Pattern a BLOCCHI (anti-scacchiera): chi ha lavorato ieri continua
+            // il blocco (fino a max consecutivi); chi ha riposato UN solo giorno
+            // non viene richiamato subito (i riposi vanno a coppie, stile 4L+2R)
+            const pattern = (n) => {
+              const cp = consecPrima(n, g);
+              if (cp > 0 && cp < maxCons) return -3;
+              if (cp === 0 && _pianoIsLavoro(cella[n + '|' + (g - 2)] || '')) return 2;
+              return 0;
+            };
             return (
+              pattern(x) - pattern(y) ||
               bonus(mx) - bonus(my) ||
               (oreMese[x] || 0) - (oreMese[y] || 0) ||
               (familiarita[y + '|' + f.turno_codice] || 0) - (familiarita[x + '|' + f.turno_codice] || 0)
