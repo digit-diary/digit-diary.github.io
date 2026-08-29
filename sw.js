@@ -1,4 +1,4 @@
-const CACHE_NAME = 'diario-cl-v72';
+const CACHE_NAME = 'diario-cl-v73';
 const SHELL_URLS = ['/', '/manifest.json', '/logo_casino.png', '/icon-192.png', '/icon-512.png',
   '/css/style.css',
   '/js/config.js', '/js/crypto.js', '/js/chat-core.js', '/js/realtime.js',
@@ -23,14 +23,19 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   // Always network for API calls
   if (e.request.url.includes('supabase.co')) return;
+  // Same-origin: bypassa la cache HTTP di GitHub Pages (max-age=600) rivalidando
+  // con l'ETag — gli aggiornamenti arrivano al primo reload invece che dopo 10 minuti.
+  // I CDN esterni restano con la cache normale (niente ri-download di librerie).
+  const sameOrigin = e.request.url.startsWith(self.location.origin);
+  const fetchOpts = sameOrigin ? { cache: 'no-cache' } : undefined;
   // HTML pages: always network-first, never serve stale HTML
   if (e.request.mode === 'navigate') {
-    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+    e.respondWith(fetch(e.request, fetchOpts).catch(() => caches.match(e.request)));
     return;
   }
   // Assets (icons, manifest): network-first with cache fallback
   e.respondWith(
-    fetch(e.request).then(r => {
+    fetch(e.request, fetchOpts).then(r => {
       if (r.ok) {
         const clone = r.clone();
         caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
