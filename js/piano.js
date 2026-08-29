@@ -181,6 +181,7 @@ async function renderPiano() {
     }
     const puoMod = puoGestirePiano();
     const GG = ['D', 'L', 'M', 'M', 'G', 'V', 'S'];
+    const GG3 = ['DOM', 'LUN', 'MAR', 'MER', 'GIO', 'VEN', 'SAB']; // come Turnivo (GIORNI_SETT)
     const MESI_L = MESI_FULL || [];
     const label = (MESI_L[parseInt(ym.split('-')[1]) - 1] || ym) + ' ' + ym.split('-')[0];
 
@@ -233,19 +234,20 @@ async function renderPiano() {
       if (festiviSet[dstr]) cls = 'piano-festivo';
       else if (dow === 0) cls = 'piano-domenica';
       else if (dow === 5 || dow === 6) cls = 'piano-weekend';
+      if (g === 1) cls += ' piano-sep-left';
       h +=
         '<th class="' +
         cls +
         '"' +
         (festiviSet[dstr] ? ' title="' + escP(festiviSet[dstr]) + '"' : '') +
-        '>' +
+        '><div>' +
+        GG3[dow] +
+        '</div><div>' +
         g +
-        '<br><span style="font-weight:400">' +
-        GG[dow] +
-        '</span></th>';
+        '</div></th>';
     }
     h +=
-      '<th class="piano-tot">Ore</th><th class="piano-tot">D</th><th class="piano-tot">N</th><th class="piano-tot" title="Ore dovute (ore settimanali x percentuale x giorni/7)">Dov.</th><th class="piano-tot" title="Saldo: pianificate - dovute">Saldo</th></tr></thead><tbody>';
+      '<th class="piano-tot piano-sep-left">Ore</th><th class="piano-tot">D</th><th class="piano-tot">N</th><th class="piano-tot" title="Ore dovute (ore settimanali x percentuale x giorni/7)">Dov.</th><th class="piano-tot" title="Saldo: pianificate - dovute">Saldo</th></tr></thead><tbody>';
 
     nomi.forEach((nome) => {
       const ne = nome.replace(/'/g, "\\'");
@@ -260,6 +262,7 @@ async function renderPiano() {
         let cella = '';
         let stile = '';
         let cls = 'piano-cella';
+        if (g === 1) cls += ' piano-sep-left';
         let titolo = '';
         if (r) {
           const t = _pianoTurnoInfo(codice);
@@ -331,7 +334,7 @@ async function renderPiano() {
           : '') +
         '</td>' +
         riga +
-        '<td class="piano-tot">' +
+        '<td class="piano-tot piano-sep-left">' +
         (ore ? ore.toFixed(1) : '') +
         '</td><td class="piano-tot">' +
         (nD || '') +
@@ -396,16 +399,17 @@ async function renderPiano() {
           if (festiviSet[dstr]) cls = 'piano-festivo';
           else if (dow === 0) cls = 'piano-domenica';
           else if (dow === 5 || dow === 6) cls = 'piano-weekend';
+          if (g === 1) cls += ' piano-sep-left';
           t +=
             '<th class="' +
             cls +
             '"' +
             (festiviSet[dstr] ? ' title="' + escP(festiviSet[dstr]) + '"' : '') +
-            '>' +
+            '><div>' +
+            GG3[dow] +
+            '</div><div>' +
             g +
-            '<br><span style="font-weight:400">' +
-            GG[dow] +
-            '</span></th>';
+            '</div></th>';
         }
         if (conTot) t += '<th>Tot</th>';
         return t + '</tr></thead>';
@@ -429,8 +433,8 @@ async function renderPiano() {
           for (let g = 1; g <= nGiorni; g++) {
             const req = (fabbMap[cod] || {})[g] || 0;
             const ass = (assMap[cod] || {})[g] || 0;
-            let cls = '';
-            if (req) cls = ass >= req ? 'piano-fabb-ok' : 'piano-fabb-ko';
+            let cls = g === 1 ? 'piano-sep-left' : '';
+            if (req) cls += (cls ? ' ' : '') + (ass >= req ? 'piano-fabb-ok' : 'piano-fabb-ko');
             const dstr = ym + '-' + String(g).padStart(2, '0');
             h +=
               '<td class="' +
@@ -458,9 +462,10 @@ async function renderPiano() {
       const clsCella = (g) => {
         const dstr = ym + '-' + String(g).padStart(2, '0');
         const dow = new Date(dstr + 'T12:00:00').getDay();
-        if (dow === 0) return 'piano-cel-dom';
-        if (dow === 5 || dow === 6) return 'piano-cel-we';
-        return '';
+        const sep = g === 1 ? ' piano-sep-left' : '';
+        if (dow === 0) return 'piano-cel-dom' + sep;
+        if (dow === 5 || dow === 6) return 'piano-cel-we' + sep;
+        return sep.trim();
       };
       const cellaTurno = (t) =>
         '<td class="piano-nome" title="' +
@@ -1223,7 +1228,7 @@ function fabbisognoInline(codice, dstr, el) {
   el.innerHTML =
     '<input type="text" inputmode="numeric" value="' +
     (attuale || '') +
-    '" maxlength="2" style="width:100%;min-width:26px;box-sizing:border-box;border:2px solid #1a4a7a;border-radius:2px;padding:1px 2px;font:inherit;font-weight:700;text-align:center;background:#fff;color:#000">';
+    '" size="1" maxlength="2" style="width:100%;min-width:0;box-sizing:border-box;border:1px solid #1a4a7a;border-radius:0;padding:0;margin:0;font:inherit;font-weight:700;text-align:center;background:#fff;color:#000">';
   const inp = el.querySelector('input');
   inp.focus();
   inp.select();
@@ -3451,7 +3456,7 @@ function pianoCellaInline(nome, dstr, el) {
   el.innerHTML =
     '<input type="text" value="' +
     escP(attuale) +
-    '" maxlength="6" style="width:100%;min-width:30px;box-sizing:border-box;border:2px solid #1a4a7a;border-radius:2px;padding:1px 2px;font:inherit;font-weight:700;text-transform:uppercase;text-align:center;background:#fff;color:#000">';
+    '" size="1" maxlength="6" style="width:100%;min-width:0;box-sizing:border-box;border:1px solid #1a4a7a;border-radius:0;padding:0;margin:0;font:inherit;font-weight:700;text-transform:uppercase;text-align:center;background:#fff;color:#000">';
   const inp = el.querySelector('input');
   inp.focus();
   inp.select();

@@ -3544,14 +3544,20 @@ button:focus-visible,
 }
 .piano-table th,
 .piano-table td {
-  border: 1px solid var(--line);
+  border: 1px solid #999; /* come Turnivo: linee sottili grigie */
   text-align: center;
-  padding: 3px 4px;
+  padding: 2px 3px;
   min-width: 32px;
   white-space: nowrap;
+  overflow: hidden;
+}
+/* linea di separazione GROSSA come Turnivo (nome|giorno1 e ultimoGiorno|totali) */
+.piano-table .piano-sep-left {
+  border-left: 3px solid #000 !important;
 }
 .piano-table thead th {
-  background: var(--paper2);
+  background: #212529; /* come Turnivo (thead table-dark) */
+  color: #fff;
   font-size: 0.8rem;
   position: sticky;
   top: 0;
@@ -3571,16 +3577,23 @@ button:focus-visible,
 }
 .piano-table thead .piano-nome {
   z-index: 3;
-  background: var(--paper2);
+  background: #212529;
+  color: #fff;
+}
+.piano-table thead th div {
+  line-height: 1.15;
 }
 .piano-table th.piano-weekend {
-  background: #dff0db;
+  background: #c6efce !important; /* hdr-vensab Turnivo */
+  color: #000;
 }
 .piano-table th.piano-domenica {
-  background: #f7ddb8;
+  background: #fbd4b4 !important; /* hdr-domenica Turnivo */
+  color: #000;
 }
 .piano-table th.piano-festivo {
-  background: #f5c6d4;
+  background: #fce4ec !important; /* hdr-festivo Turnivo */
+  color: #000;
 }
 .piano-cella {
   cursor: pointer;
