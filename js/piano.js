@@ -657,6 +657,7 @@ async function renderPiano() {
             '<button class="btn-export" style="font-size:.78rem;padding:3px 10px;border-color:#d4b86a;color:#d4b86a" onclick="copiaFabbisognoMese()">Copia dal mese precedente</button>' +
             '<button class="btn-export" style="font-size:.78rem;padding:3px 10px;border-color:#2c6e49;color:#2c6e49" onclick="document.getElementById(\'fabb-file\').click()">Importa da Excel</button>' +
             '<input type="file" id="fabb-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="importaFabbisognoExcel(this)">' +
+            '<button class="btn-export" style="font-size:.78rem;padding:3px 10px;border-color:var(--accent);color:var(--accent)" onclick="eliminaFabbisognoMese()">Svuota mese</button>' +
             '<span style="font-size:.76rem;color:#b8a98a;font-weight:400">clicca una cella per impostare le persone necessarie</span>';
         h += '</div>';
         // testata giorni con sigla settimana (D/L/M...), festivi e weekend:
@@ -1908,6 +1909,47 @@ async function importaFabbisognoExcel(input) {
   } catch (e) {
     console.error(e);
     toast('Errore lettura file fabbisogno');
+  }
+}
+// come fabbisogno.elimina di Turnivo: cancella tutto il fabbisogno del mese
+async function eliminaFabbisognoMese() {
+  if (!puoGestirePiano()) return;
+  const ym = _pianoMeseSel;
+  const n = _pianoFabbCache.length;
+  if (!n) {
+    toast('Nessun fabbisogno da eliminare per ' + ym);
+    return;
+  }
+  if (
+    !confirm(
+      'Eliminare TUTTO il fabbisogno di ' +
+        ym +
+        ' (' +
+        repartoLabel(_pianoReparto()) +
+        ')?\n\n' +
+        n +
+        ' celle verranno rimosse. Il piano già generato NON viene toccato.',
+    )
+  )
+    return;
+  try {
+    const nG = _pianoUltimoGiorno(ym);
+    await secDel(
+      'piano_fabbisogni',
+      'data=gte.' +
+        ym +
+        '-01&data=lte.' +
+        ym +
+        '-' +
+        String(nG).padStart(2, '0') +
+        '&reparto_dip=eq.' +
+        _pianoReparto(),
+    );
+    logAzione('Fabbisogno eliminato', ym + ' — ' + n + ' celle');
+    toast('Fabbisogno eliminato: ' + n + ' celle');
+    renderPiano();
+  } catch (e) {
+    toast('Errore eliminazione fabbisogno');
   }
 }
 async function copiaFabbisognoMese() {
