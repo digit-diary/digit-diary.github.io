@@ -191,6 +191,22 @@ function _pianoTurnoInfo(codice) {
 function _pianoCodiceInfo(codice) {
   return pianoCodiciCache.find((c) => c.codice === codice);
 }
+// Ore pianificate di una RIGA del piano: turno → durata del turno;
+// codice con orario personalizzato (es. JG con inizio/fine) → differenza;
+// altrimenti ore CCL del codice speciale (scalate per percentuale se previsto)
+function _pianoOreDiRiga(r, pct) {
+  const t = _pianoTurnoInfo(r.codice);
+  if (t) return parseFloat(t.durata_ore) || 0;
+  if (r.ora_inizio && r.ora_fine) {
+    const e = _pianoOra(r.ora_inizio);
+    const u = _pianoOra(r.ora_fine);
+    if (e != null && u != null) return Math.round((u >= e ? u - e : 24 + u - e) * 100) / 100;
+  }
+  const cs = _pianoCodiceInfo(r.codice);
+  if (cs && parseFloat(cs.ore) > 0)
+    return cs.scala_percentuale ? (parseFloat(cs.ore) || 0) * (pct || 1) : parseFloat(cs.ore) || 0;
+  return 0;
+}
 function _pianoColore(codice) {
   const t = _pianoTurnoInfo(codice);
   if (t) return t.colore || '';
@@ -351,14 +367,7 @@ async function _pianoAggiornaYtd(nomi) {
     const m = parseInt(r.data.split('-')[1]);
     const info = _pianoCollabInfo(r.collaboratore) || {};
     const pct = parseFloat(info.percentuale) || 1;
-    const t = _pianoTurnoInfo(r.codice);
-    let o = 0;
-    if (t) o = parseFloat(t.durata_ore) || 0;
-    else {
-      const cs = _pianoCodiceInfo(r.codice);
-      if (cs && parseFloat(cs.ore) > 0)
-        o = cs.scala_percentuale ? (parseFloat(cs.ore) || 0) * pct : parseFloat(cs.ore) || 0;
-    }
+    const o = _pianoOreDiRiga(r, pct);
     if (o) perMese[r.collaboratore + '|' + m] = (perMese[r.collaboratore + '|' + m] || 0) + o;
   });
   const timbMese = {}; // nome|m -> ore timbrate
@@ -543,9 +552,9 @@ async function renderPiano() {
               else nD++;
               titolo = codice + ' ' + (t.ora_inizio || '').substring(0, 5) + '-' + (t.ora_fine || '').substring(0, 5);
             } else if (cs) {
-              const oreCs = parseFloat(cs.ore) || 0;
-              oreSpec += cs.scala_percentuale ? oreCs * perc0 : oreCs;
-              titolo = cs.descrizione || codice;
+              oreSpec += _pianoOreDiRiga(r, perc0);
+              titolo =
+                (cs.descrizione || codice) + (r.ora_inizio && r.ora_fine ? ' ' + r.ora_inizio + '-' + r.ora_fine : '');
             }
             if (r.protetto) cls += ' piano-prot';
             if (r.commento) {
@@ -1010,16 +1019,9 @@ function _pianoCalcolaViolazioni() {
   if (!isNaN(tollOre)) {
     const orePerNome = {};
     _pianoRighe.forEach((r) => {
-      const t = _pianoTurnoInfo(r.codice);
       const info = _pianoCollabInfo(r.collaboratore) || {};
       const pct = parseFloat(info.percentuale) || 1;
-      let o = 0;
-      if (t) o = parseFloat(t.durata_ore) || 0;
-      else {
-        const csV = _pianoCodiceInfo(r.codice);
-        if (csV && parseFloat(csV.ore) > 0)
-          o = csV.scala_percentuale ? (parseFloat(csV.ore) || 0) * pct : parseFloat(csV.ore) || 0;
-      }
+      const o = _pianoOreDiRiga(r, pct);
       if (o) orePerNome[r.collaboratore] = (orePerNome[r.collaboratore] || 0) + o;
     });
     Object.keys(orePerNome).forEach((nome) => {
@@ -2229,7 +2231,7 @@ function _renderPianoCodiciCard() {
   h +=
     '<p style="font-size:.82rem;color:var(--muted);margin-bottom:6px">Assenze e situazioni non lavorative. "Riposo" = il codice conta come giorno di riposo per le regole. Le ore seguono le formule CCL originali.</p>';
   h +=
-    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:640px;font-size:.85rem"><thead><tr><th>Codice</th><th style="text-align:left">Descrizione</th><th>Ore</th><th title="Le ore vengono scalate per la percentuale d\'impiego">Scala %</th><th>Riposo</th><th>Attivo</th><th></th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:640px;font-size:.85rem"><thead><tr><th>Codice</th><th style="text-align:left">Descrizione</th><th>Ore</th><th title="Le ore vengono scalate per la percentuale d\'impiego">Scala %</th><th title="Inserendolo nel piano chiede orario di inizio e fine (es. JG)">Chiede orario</th><th>Riposo</th><th>Attivo</th><th></th></tr></thead><tbody>';
   pianoCodiciCache
     .slice()
     .sort((x, y) => x.codice.localeCompare(y.codice))
@@ -2250,6 +2252,10 @@ function _renderPianoCodiciCard() {
         ' onchange="salvaPianoCodice(' +
         c.id +
         ',\'scala_percentuale\',this.checked)"></td><td><input type="checkbox"' +
+        (c.richiede_orario ? ' checked' : '') +
+        ' onchange="salvaPianoCodice(' +
+        c.id +
+        ',\'richiede_orario\',this.checked)"></td><td><input type="checkbox"' +
         (c.is_riposo ? ' checked' : '') +
         ' onchange="salvaPianoCodice(' +
         c.id +
@@ -2328,7 +2334,8 @@ async function salvaPianoCodice(id, campo, valore) {
   if (!isAdmin()) return;
   try {
     const patch = {};
-    if (campo === 'attivo' || campo === 'is_riposo' || campo === 'scala_percentuale') patch[campo] = !!valore;
+    if (campo === 'attivo' || campo === 'is_riposo' || campo === 'scala_percentuale' || campo === 'richiede_orario')
+      patch[campo] = !!valore;
     else if (campo === 'ore') patch[campo] = parseFloat(valore) || 0;
     else patch[campo] = String(valore).trim();
     await secPatch('piano_codici', 'id=eq.' + id, patch);
@@ -3697,6 +3704,36 @@ function _pianoOreTimbrata(entrata, uscita) {
   if (e == null || u == null) return 0;
   return Math.round((u >= e ? u - e : 24 + u - e) * 100) / 100;
 }
+// Ore timbrate CON LA REGOLA DEL TURNO: chi timbra PRIMA dell'inizio del
+// proprio turno viene conteggiato dall'inizio turno (la timbratura resta
+// registrata com'è); l'uscita oltre il fine turno conta tutta (straordinario).
+// Con JG o altri codici senza orari (o senza turno) si conta dalla timbratura.
+function _pianoOreTimbrataPerGiorno(nome, dstr, entrata, uscita) {
+  const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
+  // orario personalizzato (es. JG con inizio dichiarato): stesso aggancio del turno
+  if (r && !_pianoTurnoInfo(r.codice) && r.ora_inizio) {
+    const e0 = _pianoOra(entrata);
+    const i0 = _pianoOra(r.ora_inizio);
+    if (e0 != null && i0 != null) {
+      const anticipo = i0 - e0;
+      if (anticipo > 0 && anticipo < 6) return _pianoOreTimbrata(r.ora_inizio, uscita);
+    }
+    return _pianoOreTimbrata(entrata, uscita);
+  }
+  const t = r ? _pianoTurnoInfo(r.codice) : null;
+  if (t && t.ora_inizio) {
+    const e = _pianoOra(entrata);
+    const inizio = _pianoOra(t.ora_inizio);
+    if (e != null && inizio != null) {
+      // "prima dell'inizio" tenendo conto della mezzanotte: se la differenza
+      // è piccola (< 6h) l'entrata anticipata si aggancia all'inizio turno
+      const anticipo = inizio - e;
+      const eEff = anticipo > 0 && anticipo < 6 ? t.ora_inizio.substring(0, 5) : entrata;
+      return _pianoOreTimbrata(eEff, uscita);
+    }
+  }
+  return _pianoOreTimbrata(entrata, uscita);
+}
 function _renderPianoTimbratureCard() {
   if (!puoGestirePiano() && !isAdmin()) return '';
   let h =
@@ -3741,7 +3778,7 @@ async function aggiungiTimbratura() {
       data: data,
       ora_entrata: entrata,
       ora_uscita: uscita,
-      ore: _pianoOreTimbrata(entrata, uscita),
+      ore: _pianoOreTimbrataPerGiorno(nome, data, entrata, uscita),
       fonte: 'manuale',
       reparto_dip: _pianoReparto(),
       operatore: getOperatore(),
@@ -3843,7 +3880,7 @@ async function importaTimbrature(input) {
             data: v.dt,
             ora_entrata: v.oin,
             ora_uscita: v.oout,
-            ore: _pianoOreTimbrata(v.oin, v.oout),
+            ore: _pianoOreTimbrataPerGiorno(v.nome, v.dt, v.oin, v.oout),
             fonte: 'import',
             reparto_dip: _pianoReparto(),
             operatore: getOperatore(),
@@ -4264,13 +4301,7 @@ async function _renderPianoSaldoTab() {
     const pct = parseFloat(info.percentuale) || 1;
     let op = 0;
     (perNome[nome] || []).forEach((r) => {
-      const t = _pianoTurnoInfo(r.codice);
-      if (t) op += parseFloat(t.durata_ore) || 0;
-      else {
-        const cs = _pianoCodiceInfo(r.codice);
-        if (cs && parseFloat(cs.ore) > 0)
-          op += cs.scala_percentuale ? (parseFloat(cs.ore) || 0) * pct : parseFloat(cs.ore) || 0;
-      }
+      op += _pianoOreDiRiga(r, pct);
     });
     if (timbNome[nome] != null) op = timbNome[nome]; // timbrate del mese: hanno la precedenza
     const od = info.is_jolly ? 0 : Math.round((nGiorni / 7) * _pianoOreSett * pct * 100) / 100;
@@ -6352,6 +6383,21 @@ async function pianoSalvaCella(nome, dstr, codice) {
   const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
   const attuale = r ? r.codice : '';
   _pianoCellaSel = { nome: nome, data: dstr };
+  // codici con orario personalizzato (es. JG): chiedi inizio e fine
+  let orarioJG = null;
+  const csOr = codice ? _pianoCodiceInfo(codice) : null;
+  if (csOr && csOr.richiede_orario) {
+    const ini = prompt('Orario di INIZIO per ' + codice + ' (es. 10:00):', (r && r.ora_inizio) || '10:00');
+    if (ini === null) return;
+    const fin = prompt('Orario di FINE per ' + codice + ' (es. 18:00):', (r && r.ora_fine) || '18:00');
+    if (fin === null) return;
+    const okOra = (v) => /^\d{1,2}[:.]\d{2}$/.test(String(v).trim());
+    if (!okOra(ini) || !okOra(fin)) {
+      toast('Orario non valido (usa hh:mm)');
+      return;
+    }
+    orarioJG = { ora_inizio: String(ini).trim().replace('.', ':'), ora_fine: String(fin).trim().replace('.', ':') };
+  }
   try {
     if (!codice) {
       if (r) {
@@ -6368,11 +6414,15 @@ async function pianoSalvaCella(nome, dstr, codice) {
         codice: codice,
         protetto: true,
         generato: false,
+        ora_inizio: orarioJG ? orarioJG.ora_inizio : null,
+        ora_fine: orarioJG ? orarioJG.ora_fine : null,
         operatore: getOperatore(),
         updated_at: new Date().toISOString(),
       });
       r.codice = codice;
       r.protetto = true;
+      r.ora_inizio = orarioJG ? orarioJG.ora_inizio : null;
+      r.ora_fine = orarioJG ? orarioJG.ora_fine : null;
     } else {
       const nuovo = await secPost('piano', {
         collaboratore: nome,
@@ -6380,6 +6430,8 @@ async function pianoSalvaCella(nome, dstr, codice) {
         codice: codice,
         protetto: true,
         generato: false,
+        ora_inizio: orarioJG ? orarioJG.ora_inizio : null,
+        ora_fine: orarioJG ? orarioJG.ora_fine : null,
         reparto_dip: _pianoReparto(),
         operatore: getOperatore(),
       });
