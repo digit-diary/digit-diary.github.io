@@ -66,6 +66,37 @@ const PUNTI_DEFAULT = {
   notifiche: 'privato',
 };
 
+// Nomi dei livelli personalizzabili (es. L1 = "Base Sala"): impostazione
+// 'formazione_livelli_nomi' = { reparto: { '1': 'nome', ... } }
+function livelloNome(lv) {
+  try {
+    const cfg = window._livelliNomiCfg || {};
+    const rep = cfg[currentReparto] || {};
+    if (rep[String(lv)]) return rep[String(lv)];
+  } catch (e) {}
+  return 'Livello ' + lv;
+}
+function livelloSigla(lv) {
+  try {
+    const cfg = window._livelliNomiCfg || {};
+    const rep = cfg[currentReparto] || {};
+    if (rep[String(lv)]) return rep[String(lv)];
+  } catch (e) {}
+  return 'L' + lv;
+}
+async function salvaNomeLivello(lv, nome) {
+  if (!isAdmin()) return;
+  const cfg = window._livelliNomiCfg || {};
+  cfg[currentReparto] = cfg[currentReparto] || {};
+  const v = String(nome || '').trim();
+  if (v) cfg[currentReparto][String(lv)] = v;
+  else delete cfg[currentReparto][String(lv)];
+  window._livelliNomiCfg = cfg;
+  await setImp('formazione_livelli_nomi', JSON.stringify(cfg));
+  logAzione('Nome livello', 'L' + lv + ' → ' + (v || 'default'));
+  toast('Nome livello salvato');
+  renderFormazione();
+}
 function getCompetenzeConfigAll() {
   const cfg = competenzeConfig && typeof competenzeConfig === 'object' ? competenzeConfig : {};
   const out = {};
@@ -129,7 +160,9 @@ function livelloDiCollaboratore(c) {
 function livelloBadgeHtml(lv) {
   if (!lv) return '<span class="mini-badge" style="background:var(--muted)">—</span>';
   const col = { 1: '#1a4a7a', 2: '#e67e22', 3: '#2c6e49' }[lv] || 'var(--muted)';
-  return '<span class="mini-badge" style="background:' + col + ';font-size:.72rem">Livello ' + lv + '</span>';
+  return (
+    '<span class="mini-badge" style="background:' + col + ';font-size:.72rem">' + escP(livelloNome(lv)) + '</span>'
+  );
 }
 function puntiTotali(nome, anno) {
   const a = anno || new Date().getFullYear();
@@ -1497,6 +1530,25 @@ function _renderFormazioneConfig() {
   const cfgC = getCompetenzeConfigAll();
   const cfgP = getPuntiConfig();
   let html = '<div class="settings-section"><h4>Configurazione (admin)</h4>';
+  // nomi dei livelli personalizzabili
+  html +=
+    '<p style="font-size:.85rem;font-weight:700;margin:8px 0 4px">Nomi dei livelli — ' +
+    escP(repartoLabel(currentReparto)) +
+    '</p><p style="font-size:.78rem;color:var(--muted);margin-bottom:6px">Personalizza come si chiamano i livelli (es. L1 = "Base Sala"). Vuoto = nome standard.</p><div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">';
+  for (let lv = 1; lv <= 5; lv++) {
+    const attuale = ((window._livelliNomiCfg || {})[currentReparto] || {})[String(lv)] || '';
+    html +=
+      '<label style="font-size:.8rem;display:flex;align-items:center;gap:4px">L' +
+      lv +
+      ' = <input type="text" value="' +
+      escP(attuale) +
+      '" placeholder="Livello ' +
+      lv +
+      '" maxlength="30" onchange="salvaNomeLivello(' +
+      lv +
+      ',this.value)" style="width:130px;padding:4px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></label>';
+  }
+  html += '</div>';
   // competenze per reparto
   getReparti()
     .map((r) => r.key)

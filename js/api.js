@@ -23,6 +23,7 @@ async function loadAll() {
     tr,
     vis,
     compCfg,
+    livNomi,
     pntCfg,
     maisonAd,
     invCatExtra,
@@ -47,6 +48,7 @@ async function loadAll() {
     getImp('tipi_rinominati'),
     getImp('visibilita'),
     getImp('competenze_config'),
+    getImp('formazione_livelli_nomi'),
     getImp('punti_config'),
     getImp('maison_auto_delete_giorni'),
     getImp('inventario_categorie_extra'),
@@ -102,6 +104,10 @@ async function loadAll() {
   if (vis)
     try {
       visibilitaConfig = JSON.parse(vis);
+    } catch (e) {}
+  if (livNomi)
+    try {
+      window._livelliNomiCfg = JSON.parse(livNomi);
     } catch (e) {}
   if (compCfg)
     try {

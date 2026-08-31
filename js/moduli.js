@@ -953,6 +953,11 @@ async function renderCollaboratoriUI() {
   const attivi = delReparto.filter((c) => c.attivo !== false);
   const inattivi = delReparto.filter((c) => c.attivo === false);
   const el = document.getElementById('collaboratori-list');
+  // link incrociati: da qui si raggiungono al volo le altre due "case" del collaboratore
+  const linkBar =
+    '<p style="font-size:.8rem;color:var(--muted);margin-bottom:8px">Qui: anagrafica (nome, funzione, %, impiego, categoria, lingue). ' +
+    '<a href="#" onclick="switchPage(\'formazione\');return false" style="color:#2c6e49;font-weight:700">Competenze e livelli → Formazione</a> · ' +
+    '<a href="#" onclick="switchPage(\'piano\');if(typeof pianoCambiaTab===\'function\')pianoCambiaTab(\'impostazioni\');return false" style="color:#1a4a7a;font-weight:700">Preferenze turni → Piano/Impostazioni</a></p>';
   const selStyle =
     'font-size:.75rem;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)';
   const rigaCollab = (c) => {
@@ -1082,7 +1087,7 @@ async function renderCollaboratoriUI() {
         .join('') +
       '</div></div>';
   }
-  el.innerHTML = html;
+  el.innerHTML = linkBar + html;
 }
 async function aggiungiCollaboratore() {
   const nome = capitalizzaNome(document.getElementById('new-collab-nome').value.trim());
