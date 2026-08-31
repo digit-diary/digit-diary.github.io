@@ -162,6 +162,381 @@ function sogliePremiRaggiunti(nome, anno) {
 // ================================================================
 // PAGINA FORMAZIONE
 // ================================================================
+// ================================================================
+// PROTOCOLLI DI FORMAZIONE (formulari ufficiali digitalizzati)
+// Template Excel scaricabile -> il formatore compila (X sui punti svolti,
+// voti 1-5 nella valutazione) -> import automatico: riconosce allievo,
+// punti e voti, registra nello storico HR e a protocollo completo propone
+// la certificazione della competenza (che abilita nel Piano di lavoro).
+// Personalizzabili con l'impostazione 'formazione_protocolli'.
+// ================================================================
+const FORMAZIONE_PROTOCOLLI_DEFAULT = {
+  slots: {
+    sala: {
+      titolo: 'FORMAZIONE TECNICA SLOT ATTENDANT (5 giorni)',
+      punti: [
+        [
+          'FASE 1 — Ambientazione',
+          'Visita Casinò',
+          'Giro guidato, punti significativi, registrazione entrata/uscita e accesso ai locali',
+        ],
+        [
+          'FASE 1 — Ambientazione',
+          'Teoria',
+          'Regolamento interno, meccanismi operativi, modelli comportamentali, Manuale Slot',
+        ],
+        [
+          'FASE 1 — Ambientazione',
+          'Turnazioni/Pause',
+          'Procedure amministrative: foglio disponibilità, turnazione Slot',
+        ],
+        ['FASE 2 — Tecnica', 'Materiale in dotazione', 'Tessera Slot Attendant, chiavi, telefonino (numeri utili)'],
+        ['FASE 2 — Tecnica', 'Nozioni tecniche', 'Struttura slot, menù interno, tipologia di macchine'],
+        [
+          'FASE 2 — Tecnica',
+          'Risoluzione problematiche',
+          'Messaggi di errore monitor, Ultrascreen (EGM locked, saldo tessera, controllo banconote)',
+        ],
+        [
+          'FASE 2 — Tecnica',
+          'Interventi per problemi',
+          'Banconote non accreditate, Bill Reader, Bill Box, crediti spariti, contestazioni pagamenti',
+        ],
+        [
+          'FASE 3 — Pratica',
+          'Teoria LRD / CS',
+          'Limiti LRD, ordinanza e responsabilità su RICICLAGGIO e CONCEZIONE SOCIALE',
+        ],
+        [
+          'FASE 3 — Pratica',
+          'Customer Care',
+          'Comportamento in sala, clienti Maison, linguaggio non verbale, clienti difficili, riservazioni, oggetti/denaro trovati',
+        ],
+        ['FASE 3 — Pratica', 'Pagamenti', 'Progressive Jackpot, Cancel Credit, Short Pay, giochi, conteggio crediti'],
+      ],
+      valutazione: [
+        'Conoscenza tipologie di macchine',
+        'Conoscenza giochi',
+        'Pagamenti Progressive',
+        'Gestione problematiche tecniche',
+        'Comportamento positivo e attivo con i clienti',
+        'Procedure / Regolamentazione',
+      ],
+    },
+    reception: {
+      titolo: 'FORMAZIONE TECNICA RECEPTION',
+      punti: [
+        ['Formazione', 'Visita Casinò', 'Postazioni di lavoro, registrazione entrata/uscita e accesso ai locali'],
+        [
+          'Formazione',
+          'Teoria',
+          'Regolamento interno, meccanismi operativi, modelli comportamentali, Manuale Ricezione',
+        ],
+        [
+          'Formazione',
+          'Turnazioni/Pause',
+          'Procedure amministrative: foglio ore, foglio disponibilità, turnazione Ricezione',
+        ],
+        ['Formazione', 'Programmi informatici', 'Programma REC, VETO, monitoraggi'],
+        [
+          'Guardaroba',
+          'Gestione Guardaroba',
+          'Chiavi Valet, biglietti Piazza Castello/Campo Marzio, dress code, accessori, oggetti smarriti, prenotazioni alberghi e ristorante',
+        ],
+        [
+          'Controllo',
+          'Controllo documenti',
+          'Visitors, procedure, documenti validi, autenticità, Remark, limitazioni e divieti, Concezione Sociale e Sicurezza',
+        ],
+        ['Controllo', 'Centralino', 'Come si risponde, deviazioni chiamate, informazioni da comunicare'],
+        [
+          'Formazione',
+          'Lugano Class',
+          'Emissione/ristampa carta, informazioni al cliente, problematiche, collaborazione Marketing',
+        ],
+        [
+          'Formazione',
+          'Servizio al cliente',
+          'Comunicazione verbale e non, problematiche, informazioni su giochi/carte/ristorante/eventi/orari',
+        ],
+        ['Formazione', 'Direttive aziendali', 'Direttive e procedure aziendali'],
+      ],
+      valutazione: [
+        'Gestione guardaroba',
+        'Controllo documenti',
+        'Centralino e comunicazione',
+        'Lugano Class',
+        'Servizio al cliente',
+        'Procedure / Regolamentazione',
+      ],
+    },
+    cassa: {
+      titolo: 'FORMAZIONE TECNICA CASSA',
+      punti: [
+        ['Formazione', 'Visita Casinò', 'Postazioni di lavoro, registrazione entrata/uscita e accesso ai locali'],
+        ['Formazione', 'Teoria', 'Regolamento interno, meccanismi operativi, Manuale Cassa'],
+        [
+          'Formazione',
+          'Turnazioni/Pause',
+          'Procedure amministrative: foglio ore, foglio disponibilità, turnazione Casse',
+        ],
+        ['Formazione', 'Programmi informatici', 'Programma CASSA, programma LRD'],
+        [
+          'Pratica',
+          'Apertura Cassa',
+          'Procedura apertura Casinò (Back Office), conteggio e stesura valori, trapassi da/per il Back Office',
+        ],
+        [
+          'Pratica',
+          'Operazioni di Cassa',
+          'Cambi valuta, denaro falso, cambi denominazione, cashless, handpay/progressive, short pay, assegni, carte di credito, bonifici, conti gettoni, fill e credit Live Game, Lugano Class',
+        ],
+        ['Pratica', 'Transazioni particolari', 'Tutte le transazioni del programma di cassa'],
+        ['Pratica', 'Transazioni RICICLAGGIO', 'Tutte le transazioni del programma LRD'],
+        ['Formazione', 'Ordinanza LRD / CS', 'Responsabilità del collaboratore su LRD e Concezione Sociale'],
+        [
+          'Pratica',
+          'Chiusura Cassa',
+          'Conteggio valori, passaggio intermedio col collega, procedura a chiusura Casinò',
+        ],
+      ],
+      valutazione: [
+        'Gestione apertura/chiusura cassa',
+        'Stesura banconote/chip',
+        'Conti gettoni',
+        'Procedure SIP/Pagamenti Slot',
+        'Assegni/Bonifici/Carte di Credito',
+        'Transazioni di cassa',
+        'Procedure / Regolamentazione',
+      ],
+    },
+  },
+};
+const VALUTAZIONE_PERSONALE_STD = [
+  'Comunicazione',
+  'Capacità di apprendimento',
+  'Resistenza allo stress',
+  'Organizzazione',
+  'Ruolo',
+  'Atteggiamento',
+  'Coinvolgimento',
+  'Presenza (aspetto al lavoro)',
+  'Puntualità',
+  'Comportamento verso colleghi e superiori',
+];
+function getProtocolli() {
+  let cfg = null;
+  try {
+    cfg = window._formazioneProtocolli || null;
+  } catch (e) {}
+  const base = FORMAZIONE_PROTOCOLLI_DEFAULT[currentReparto] || {};
+  return cfg && cfg[currentReparto] ? Object.assign({}, base, cfg[currentReparto]) : base;
+}
+function _renderProtocolliCard() {
+  const prot = getProtocolli();
+  const chiavi = Object.keys(prot);
+  if (!chiavi.length) return '';
+  const comps = getCompetenzeReparto();
+  let h =
+    '<div class="main-card"><div class="card-header">Protocolli di formazione (formulari ufficiali)</div><div style="padding:10px 16px">';
+  h +=
+    '<p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Scarica il protocollo in Excel, il formatore lo compila (X sui punti svolti, voti 1-5 nella valutazione) e lo reimporti qui: il sistema riconosce allievo, punti e voti, registra tutto nello storico HR e a protocollo completo propone la certificazione della competenza. Il foglio firmato si allega alla scheda del collaboratore (Allegati HR).</p>';
+  chiavi.forEach((k) => {
+    const c = comps.find((x) => x.key === k);
+    h +=
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0"><b style="min-width:180px">' +
+      escP(c ? c.label : k) +
+      '</b><button class="btn-export" style="font-size:.78rem;padding:3px 10px" onclick="scaricaProtocolloExcel(\'' +
+      k +
+      '\')">Scarica template</button>' +
+      '<button class="btn-export" style="font-size:.78rem;padding:3px 10px;border-color:#2c6e49;color:#2c6e49" onclick="document.getElementById(\'prot-file-' +
+      k +
+      '\').click()">Importa compilato</button><input type="file" id="prot-file-' +
+      k +
+      '" accept=".xlsx,.xls,.csv" style="display:none" onchange="importaProtocolloExcel(\'' +
+      k +
+      '\',this)"></div>';
+  });
+  h += '</div></div>';
+  return h;
+}
+function scaricaProtocolloExcel(compKey) {
+  if (!window.XLSX) {
+    toast('Libreria Excel non caricata');
+    return;
+  }
+  const p = getProtocolli()[compKey];
+  if (!p) return;
+  const righe = [
+    [p.titolo],
+    [],
+    ['ALLIEVO:', ''],
+    ['FORMATORE:', ''],
+    ['INIZIO FORMAZIONE:', ''],
+    ['FORMAZIONE TERMINATA IL:', ''],
+    [],
+    ['N', 'FASE', 'ARGOMENTO', 'SVOLGIMENTO', 'SVOLTO (X)'],
+  ];
+  p.punti.forEach((pt, i) => righe.push([i + 1, pt[0], pt[1], pt[2], '']));
+  const ws = XLSX.utils.aoa_to_sheet(righe);
+  ws['!cols'] = [{ wch: 4 }, { wch: 22 }, { wch: 28 }, { wch: 70 }, { wch: 10 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Protocollo');
+  const rigV = [
+    ['VALUTAZIONE FORMATORE — voti da 1 (insufficiente) a 5 (eccellente)'],
+    [],
+    ['COMPETENZE TECNICHE', 'VOTO (1-5)'],
+  ];
+  (p.valutazione || []).forEach((v) => rigV.push([v, '']));
+  rigV.push([]);
+  rigV.push(['COMPETENZE PERSONALI E ATTITUDINE', 'VOTO (1-5)']);
+  VALUTAZIONE_PERSONALE_STD.forEach((v) => rigV.push([v, '']));
+  rigV.push([]);
+  rigV.push(['GIUDIZIO COMPLESSIVO FORMATORE', '']);
+  rigV.push(["VALUTAZIONE DELL'ALLIEVO SUL FORMATORE", '']);
+  const wsV = XLSX.utils.aoa_to_sheet(rigV);
+  wsV['!cols'] = [{ wch: 60 }, { wch: 12 }];
+  XLSX.utils.book_append_sheet(wb, wsV, 'Valutazione');
+  const comps = getCompetenzeReparto();
+  const c = comps.find((x) => x.key === compKey);
+  XLSX.writeFile(wb, 'Protocollo_' + (c ? c.label.replace(/[^A-Za-z0-9]+/g, '_') : compKey) + '.xlsx');
+  logAzione('Protocollo scaricato', compKey);
+}
+async function importaProtocolloExcel(compKey, input) {
+  if (typeof puoModificare === 'function' && !puoModificare('gestione_competenze')) {
+    toast('Non hai il permesso');
+    input.value = '';
+    return;
+  }
+  const file = input.files[0];
+  input.value = '';
+  if (!file || !window.XLSX) return;
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf);
+    const dati = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+    // intestazione: ALLIEVO / FORMATORE / date
+    let allievo = '';
+    let formatore = '';
+    let fine = '';
+    dati.slice(0, 10).forEach((r) => {
+      const et = String(r[0] || '').toUpperCase();
+      if (et.startsWith('ALLIEVO')) allievo = String(r[1] || '').trim();
+      if (et.startsWith('FORMATORE')) formatore = String(r[1] || '').trim();
+      if (et.startsWith('FORMAZIONE TERMINATA')) fine = String(r[1] || '').trim();
+    });
+    const collab = collaboratoriCache.find(
+      (c) =>
+        c.attivo !== false &&
+        (c.nome.toLowerCase() === allievo.toLowerCase() ||
+          (allievo &&
+            allievo
+              .toLowerCase()
+              .split(/\s+/)
+              .every((p2) => c.nome.toLowerCase().includes(p2)))),
+    );
+    if (!allievo || !collab) {
+      toast('Allievo non riconosciuto: scrivi il nome nella cella accanto ad ALLIEVO');
+      return;
+    }
+    // punti svolti: righe dopo la testata N|FASE|...
+    const iTesta = dati.findIndex((r) => String(r[0]) === 'N' || String(r[0]).toUpperCase() === 'N');
+    let fatti = 0;
+    let totale = 0;
+    const mancanti = [];
+    if (iTesta >= 0)
+      dati.slice(iTesta + 1).forEach((r) => {
+        if (!r[2] && !r[3]) return;
+        totale++;
+        if (
+          String(r[4] || '')
+            .trim()
+            .toUpperCase() === 'X'
+        )
+          fatti++;
+        else mancanti.push(String(r[2] || '').trim());
+      });
+    // valutazioni (secondo foglio, se presente)
+    const voti = [];
+    if (wb.SheetNames[1]) {
+      const dv = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[1]], { header: 1, defval: '' });
+      dv.forEach((r) => {
+        const voto = parseInt(r[1]);
+        const criterio = String(r[0] || '').trim();
+        if (criterio && !isNaN(voto) && voto >= 1 && voto <= 5 && !criterio.toUpperCase().startsWith('COMPETENZE'))
+          voti.push(criterio + ': ' + voto + '/5');
+      });
+    }
+    const completo = totale > 0 && fatti === totale;
+    if (
+      !confirm(
+        'Protocollo ' +
+          compKey.toUpperCase() +
+          ' — ' +
+          collab.nome +
+          '\n\n• Punti svolti: ' +
+          fatti +
+          '/' +
+          totale +
+          (mancanti.length
+            ? '\n• Mancano: ' + mancanti.slice(0, 4).join(', ') + (mancanti.length > 4 ? '...' : '')
+            : '') +
+          (formatore ? '\n• Formatore: ' + formatore : '') +
+          (voti.length ? '\n• Valutazioni riconosciute: ' + voti.length : '') +
+          '\n\nRegistrare nello storico HR?',
+      )
+    )
+      return;
+    if (typeof _insertHrEvento === 'function') {
+      const comps = getCompetenzeReparto();
+      const cDef = comps.find((x) => x.key === compKey);
+      await _insertHrEvento(
+        collab.nome,
+        'formazione',
+        'Protocollo ' +
+          (cDef ? cDef.label : compKey) +
+          ': ' +
+          fatti +
+          '/' +
+          totale +
+          ' punti svolti' +
+          (formatore ? ' — formatore: ' + formatore : '') +
+          (fine ? ' — terminata il ' + fine : '') +
+          (voti.length ? '\n' + voti.join('; ') : ''),
+      );
+    }
+    logAzione('Protocollo importato', collab.nome + ' ' + compKey + ' ' + fatti + '/' + totale);
+    if (completo && !(collab.competenze || {})[compKey]) {
+      if (
+        confirm(
+          'Protocollo COMPLETO: certificare la competenza a ' +
+            collab.nome +
+            '? (lo abilita anche nel Piano di lavoro)',
+        )
+      ) {
+        const nuove = Object.assign({}, collab.competenze || {});
+        nuove[compKey] = true;
+        await secPatch('collaboratori', 'id=eq.' + collab.id, { competenze: nuove });
+        collab.competenze = nuove;
+        logAzione('Competenza certificata', collab.nome + ' — ' + compKey + ' (da protocollo)');
+        const az = getPuntiConfig().azioni.find((a) => a.key === 'competenza');
+        if (az && az.punti && confirm('Assegnare anche ' + az.punti + ' punti a ' + collab.nome + '?'))
+          await _insertPuntiEvento(
+            collab.nome,
+            az.punti,
+            'competenza',
+            'Competenza certificata: ' + compKey + ' (da protocollo)',
+          );
+      }
+    }
+    toast('Protocollo registrato: ' + fatti + '/' + totale + ' punti' + (completo ? ' — completo' : ''));
+    renderFormazione();
+  } catch (e) {
+    console.error(e);
+    toast('Errore lettura protocollo');
+  }
+}
+
 function renderFormazione() {
   const el = document.getElementById('formazione-content');
   if (!el) return;
@@ -207,6 +582,7 @@ function renderFormazione() {
   html += '</div>';
 
   // MATRICE COMPETENZE
+  html += _renderProtocolliCard();
   html += '<div class="main-card"><div class="card-header">Matrice competenze — chi sa fare cosa</div>';
   html +=
     '<div class="filters" style="padding:10px 16px"><div class="filter-group"><span class="filter-label">Cerca</span><input type="text" id="form-matr-cerca" placeholder="Nome..." oninput="_filtraMatrice()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink);width:180px"></div>' +
