@@ -666,6 +666,37 @@ async function toggleCompetenza(collabId, key, cb) {
         'Competenza certificata: ' + (compDef ? compDef.label : key) + (fmt ? ' — formatore: ' + fmt : ''),
       );
     }
+    // Rimozione spunta: se per questa competenza erano stati dati punti,
+    // proponi di toglierli (con conferma)
+    if (!attiva) {
+      const descrizioneAward = 'Competenza certificata: ' + (compDef ? compDef.label : key);
+      const eventi = (puntiEventiCache || []).filter(
+        (e) => e.collaboratore === c.nome && e.azione === 'competenza' && (e.descrizione || '') === descrizioneAward,
+      );
+      for (const ev of eventi) {
+        if (
+          confirm(
+            'A ' +
+              c.nome +
+              ' erano stati assegnati ' +
+              ev.punti +
+              ' punti per "' +
+              (compDef ? compDef.label : key) +
+              '" (' +
+              (ev.data_evento || '') +
+              ').\nTogliere anche i punti?',
+          )
+        ) {
+          await secDel('punti_eventi', 'id=eq.' + ev.id);
+          puntiEventiCache = puntiEventiCache.filter((x) => x.id !== ev.id);
+          logAzione(
+            'Punti rimossi',
+            c.nome + ' -' + ev.punti + ' (competenza rimossa: ' + (compDef ? compDef.label : key) + ')',
+          );
+          toast('Rimossi ' + ev.punti + ' punti a ' + c.nome);
+        }
+      }
+    }
     // Punti automatici per competenza certificata
     if (attiva) {
       const az = getPuntiConfig().azioni.find((a) => a.key === 'competenza');
