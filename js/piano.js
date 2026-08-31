@@ -50,6 +50,46 @@ function _pianoRegoleGruppoDi(gruppo) {
     (r) => r.attivo !== false && (r.gruppo || '').toUpperCase() === g && (r.reparto_dip || 'slots') === _pianoReparto(),
   );
 }
+// Competenze certificate in Formazione -> gruppi del piano.
+// Mappatura personalizzabile (imp 'piano_competenze_gruppi'); default per
+// le competenze standard dei reparti.
+const _COMPETENZE_GRUPPI_DEFAULT = {
+  sala: 'SALA',
+  reception: 'REC',
+  cassa: 'CASSA',
+  bo: 'BO',
+  sup: 'SUP',
+  croupier: 'SALA',
+  ispettore: 'SALA',
+  cassa_tavoli: 'CASSA',
+  valet_servizio: 'VALET',
+  valet_accoglienza: 'ACCOGLIENZA',
+};
+function _pianoCompetenzeGruppi() {
+  const cfg = window._pianoCompGruppiCfg;
+  return cfg && typeof cfg === 'object'
+    ? Object.assign({}, _COMPETENZE_GRUPPI_DEFAULT, cfg)
+    : _COMPETENZE_GRUPPI_DEFAULT;
+}
+// Settori EFFETTIVI: settori assegnati (fonte di verità, M2M Turnivo) +
+// gruppi sbloccati dalle competenze CERTIFICATE in Formazione.
+// null = nessuna configurazione (si usa la storia dei turni).
+function _pianoSettoriEffettivi(info) {
+  if (!info) return null;
+  const base = info.settori_piano
+    ? info.settori_piano
+        .toUpperCase()
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean)
+    : [];
+  const mappa = _pianoCompetenzeGruppi();
+  const comp = info.competenze || {};
+  Object.keys(comp).forEach((k) => {
+    if (comp[k] === true && mappa[k] && !base.includes(mappa[k].toUpperCase())) base.push(mappa[k].toUpperCase());
+  });
+  return base.length || info.settori_piano != null ? base : null;
+}
 function _pianoCampoOk(info, valore) {
   // 'campo>N' / 'campo>=N' -> true se il collaboratore PASSA il controllo
   for (const op of ['>=', '>']) {
@@ -67,7 +107,20 @@ function _pianoCampoOk(info, valore) {
 let _pianoOreSett = 41; // ore settimanali contratto (imp 'piano_ore_settimanali')
 async function _pianoCaricaCfg() {
   if (_pianoCfgCaricata) return;
-  const [turni, codici, festivi, regole, mappature, oreSett, funzioni, ordineCollab, regoleGruppo] = await Promise.all([
+  const [
+    turni,
+    codici,
+    festivi,
+    regole,
+    mappature,
+    oreSett,
+    funzioni,
+    ordineCollab,
+    regoleGruppo,
+    compGruppi,
+    maxCambi,
+    giorniWk,
+  ] = await Promise.all([
     secGet('piano_turni?order=ordine.asc&limit=500'),
     secGet('piano_codici?order=codice.asc&limit=200'),
     secGet('piano_festivi?order=data.asc&limit=200'),
@@ -77,8 +130,22 @@ async function _pianoCaricaCfg() {
     getImp('piano_funzioni'),
     getImp('piano_ordine_collab'),
     secGet('piano_regole_gruppo?order=gruppo.asc,id.asc&limit=200'),
+    getImp('piano_competenze_gruppi'),
+    getImp('piano_max_cambi_mese'),
+    getImp('piano_giorni_weekend'),
   ]);
   pianoRegoleGruppoCache = regoleGruppo || [];
+  try {
+    window._pianoCompGruppiCfg = compGruppi ? JSON.parse(compGruppi) : null;
+  } catch (e) {
+    window._pianoCompGruppiCfg = null;
+  }
+  window._pianoMaxCambiCfg = parseInt(maxCambi) || 0;
+  try {
+    window._pianoWeekendCfg = giorniWk ? JSON.parse(giorniWk) : null;
+  } catch (e) {
+    window._pianoWeekendCfg = null;
+  }
   try {
     window._pianoOrdineCollab = ordineCollab ? JSON.parse(ordineCollab) : {};
   } catch (e) {
@@ -404,7 +471,7 @@ async function renderPiano() {
         let cls = '';
         if (festiviSet[dstr]) cls = 'piano-festivo';
         else if (dow === 0) cls = 'piano-domenica';
-        else if (dow === 5 || dow === 6) cls = 'piano-weekend';
+        else if (_pianoGiorniWeekend().includes(dow)) cls = 'piano-weekend';
         if (g === 1) cls += ' piano-sep-left';
         h +=
           '<th class="' +
@@ -593,7 +660,7 @@ async function renderPiano() {
             let cls = '';
             if (festiviSet[dstr]) cls = 'piano-festivo';
             else if (dow === 0) cls = 'piano-domenica';
-            else if (dow === 5 || dow === 6) cls = 'piano-weekend';
+            else if (_pianoGiorniWeekend().includes(dow)) cls = 'piano-weekend';
             if (g === 1) cls += ' piano-sep-left';
             t +=
               '<th class="' +
@@ -667,7 +734,7 @@ async function renderPiano() {
           const dow = new Date(dstr + 'T12:00:00').getDay();
           const sep = g === 1 ? ' piano-sep-left' : '';
           if (dow === 0) return 'piano-cel-dom' + sep;
-          if (dow === 5 || dow === 6) return 'piano-cel-we' + sep;
+          if (_pianoGiorniWeekend().includes(dow)) return 'piano-cel-we' + sep;
           return sep.trim();
         };
         const cellaTurno = (t) =>
@@ -1018,7 +1085,7 @@ function _pianoCalcolaViolazioni() {
           if (!(cod[0] === 'Z' || cod === 'L1' || cod === '9'))
             aggiungi(nome, g, 'SUP con turno ' + cod + ' in settimana (lun-gio solo turni Z)');
         }
-        if (supVenSab && fz === 'SUP' && t && (dow === 5 || dow === 6)) {
+        if (supVenSab && fz === 'SUP' && t && _pianoGiorniWeekend().includes(dow)) {
           if (!(cod[0] === 'Z' || cod[0] === 'S' || cod === 'L1' || cod === '9'))
             aggiungi(nome, g, 'SUP con turno ' + cod + ' nel weekend (ven/sab solo Z o S)');
         }
@@ -1337,7 +1404,8 @@ async function generaBozzaPiano() {
               (f.turno_codice === 'L1' || f.turno_codice === '9') &&
               String(_pianoRegolaVal('l1_solo_bo_sup')).toUpperCase() === 'TRUE' &&
               fz !== 'SUP' &&
-              fz !== 'BO'
+              fz !== 'BO' &&
+              !(_pianoSettoriEffettivi(infoC) || []).some((x) => x === 'BO' || x === 'SUP')
             )
               return false;
             // regola HARD no_4w1c1w: niente rientro dopo UN solo giorno di riposo
@@ -1355,13 +1423,7 @@ async function generaBozzaPiano() {
             // fonte di verità; la storia vale solo se i settori non sono configurati
             const gruppoT = (t.gruppo || '').toUpperCase();
             const fzU = (fz || '').toUpperCase();
-            const settoriC =
-              infoC && infoC.settori_piano
-                ? infoC.settori_piano
-                    .toUpperCase()
-                    .split(',')
-                    .map((x) => x.trim())
-                : null;
+            const settoriC = _pianoSettoriEffettivi(infoC);
             const haStoria = settoriC ? settoriC.includes(gruppoT) : !!(idoneita[n] && idoneita[n].has(t.gruppo));
             let campoGrant = false;
             for (const rg of _pianoRegoleGruppoDi(gruppoT)) {
@@ -2723,7 +2785,16 @@ function apriScambioTurno() {
     return true;
   };
   const tMio = _pianoTurnoInfo(r.codice);
+  // limite cambi al mese (impostazione, 0 = illimitati)
+  const maxCambi = _pianoMaxCambi();
+  const cambiDi = (nomeX) =>
+    _pianoRighe.filter((x) => x.collaboratore === nomeX && / - cambio con /.test(x.commento || '')).length;
+  const mieiCambi = cambiDi(sel.nome);
   const problemaCon = (c) => {
+    if (maxCambi > 0) {
+      if (mieiCambi >= maxCambi) return 'hai già ' + mieiCambi + '/' + maxCambi + ' cambi questo mese';
+      if (cambiDi(c.collaboratore) >= maxCambi) return 'limite cambi raggiunto (' + maxCambi + '/mese)';
+    }
     const tSuo = _pianoTurnoInfo(c.codice);
     if (!_pianoIdoneoPerTurno(sel.nome, tSuo)) return 'tu non sei idoneo a ' + c.codice;
     if (!_pianoIdoneoPerTurno(c.collaboratore, tMio)) return 'non idoneo a ' + r.codice;
@@ -2774,6 +2845,15 @@ async function confermaScambioTurno() {
   }
   document.getElementById('pwd-modal').classList.add('hidden');
   if (!sel || !collega) return;
+  const maxC = _pianoMaxCambi();
+  if (maxC > 0) {
+    const conta = (nomeX) =>
+      _pianoRighe.filter((x) => x.collaboratore === nomeX && / - cambio con /.test(x.commento || '')).length;
+    if (conta(sel.nome) >= maxC || conta(collega) >= maxC) {
+      toast('Limite cambi mensili raggiunto (' + maxC + '): scambio non consentito');
+      return;
+    }
+  }
   const r1 = _pianoRighe.find((x) => x.collaboratore === sel.nome && x.data === sel.data);
   const r2 = _pianoRighe.find((x) => x.collaboratore === collega && x.data === sel.data);
   if (!r1 || !r2) return;
@@ -2914,12 +2994,7 @@ function _pianoIdoneoPerTurno(nome, turno) {
     return false;
   const gruppoT = (turno.gruppo || '').toUpperCase();
   const fzU = ((info.funzione || '') + '').toUpperCase();
-  const settoriC = info.settori_piano
-    ? info.settori_piano
-        .toUpperCase()
-        .split(',')
-        .map((x) => x.trim())
-    : null;
+  const settoriC = _pianoSettoriEffettivi(info);
   const haSettore = settoriC ? settoriC.includes(gruppoT) : true;
   let campoGrant = false;
   for (const rg of _pianoRegoleGruppoDi(gruppoT)) {
@@ -2950,7 +3025,8 @@ function _pianoIdoneoPerTurno(nome, turno) {
     (turno.codice === 'L1' || turno.codice === '9') &&
     String(_pianoRegolaVal('l1_solo_bo_sup')).toUpperCase() === 'TRUE' &&
     fzU !== 'SUP' &&
-    fzU !== 'BO'
+    fzU !== 'BO' &&
+    !(settoriC || []).some((x) => x === 'BO' || x === 'SUP')
   )
     return false;
   return true;
@@ -3829,7 +3905,7 @@ async function caricaStatisticheAnnoPiano() {
       o.gg++;
       if (t.tipo === 'NOTTURNO') o.n++;
       else o.d++;
-      if (dow === 5 || dow === 6) o.we++;
+      if (_pianoGiorniWeekend().includes(dow)) o.we++;
       if (dow === 0) o.dom++;
     } else if (cs) {
       if (r.codice === 'V' || r.codice === 'V1') o.v++;
@@ -4743,17 +4819,104 @@ async function rimuoviPianoMappatura(id) {
 
 function _renderPianoImpostazioniCard() {
   if (!isAdmin()) return '';
-  return (
-    '<div class="main-card" style="margin-top:16px"><div class="card-header">Impostazioni piano (admin)</div><div style="padding:10px 14px">' +
+  let h =
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Impostazioni piano (admin)</div><div style="padding:10px 14px">';
+  h +=
     '<div class="add-tipo-row"><div class="field"><label>Ore settimanali contratto (per il saldo ore)</label><input type="number" step="0.5" id="pi-ore-sett" value="' +
     _pianoOreSett +
     '" style="width:90px" onchange="salvaOreSettimanali(this.value)"></div>' +
     '<div class="field" style="flex:1;min-width:220px"><label>Funzioni disponibili (separate da virgola)</label><input type="text" id="pi-funzioni" value="' +
     escP((window._pianoFunzioni || []).join(', ')) +
-    '" onchange="salvaPianoFunzioni(this.value)"></div></div>' +
-    '<p style="font-size:.8rem;color:var(--muted)">Le funzioni compaiono nei menu di Gestione collaboratori e nelle mappature. Preferenze per collaboratore (solo diurni, turni bloccati) nella card qui sotto.</p>' +
-    '</div></div>'
-  );
+    '" onchange="salvaPianoFunzioni(this.value)"></div>' +
+    '<div class="field"><label title="0 = illimitati">Max cambi turno al mese</label><input type="number" min="0" max="99" value="' +
+    _pianoMaxCambi() +
+    '" style="width:80px" onchange="salvaMaxCambi(this.value)"></div></div>';
+  // giorni weekend configurabili (come get_giorni_weekend di Turnivo)
+  const GG_LBL = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+  const wk = _pianoGiorniWeekend();
+  h +=
+    '<p style="font-size:.85rem;font-weight:700;margin:12px 0 4px">Giorni weekend</p>' +
+    '<p style="font-size:.78rem;color:var(--muted);margin-bottom:6px">Colonne evidenziate in verde nel calendario e conteggio weekend nelle statistiche. La domenica ha sempre il suo colore.</p>' +
+    '<div style="display:flex;gap:12px;flex-wrap:wrap">' +
+    [1, 2, 3, 4, 5, 6, 0]
+      .map(
+        (d) =>
+          '<label style="font-size:.82rem"><input type="checkbox"' +
+          (wk.includes(d) ? ' checked' : '') +
+          ' onchange="salvaGiornoWeekend(' +
+          d +
+          ',this.checked)"> ' +
+          GG_LBL[d] +
+          '</label>',
+      )
+      .join('') +
+    '</div>';
+  // competenze Formazione -> gruppi del piano
+  h +=
+    '<p style="font-size:.85rem;font-weight:700;margin:12px 0 4px">Competenze Formazione → gruppi del piano</p>' +
+    '<p style="font-size:.78rem;color:var(--muted);margin-bottom:6px">Chi ha la competenza CERTIFICATA in Formazione diventa idoneo anche al gruppo indicato (in aggiunta ai suoi Settori). "—" = nessun collegamento.</p>';
+  const gruppiDisp = [...new Set(pianoTurniCache.map((t) => (t.gruppo || '').toUpperCase()).filter(Boolean))].sort();
+  const mappaCG = _pianoCompetenzeGruppi();
+  const compRep = typeof getCompetenzeConfigAll === 'function' ? getCompetenzeConfigAll()[_pianoReparto()] || [] : [];
+  if (compRep.length) {
+    h += '<div style="display:flex;gap:12px;flex-wrap:wrap">';
+    compRep.forEach((k) => {
+      h +=
+        '<label style="font-size:.8rem;display:flex;align-items:center;gap:4px">' +
+        escP(k.label) +
+        ' → <select onchange="salvaCompetenzaGruppo(\'' +
+        escP(k.key) +
+        '\',this.value)" style="padding:4px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><option value="">—</option>' +
+        gruppiDisp
+          .map(
+            (g) => '<option' + ((mappaCG[k.key] || '').toUpperCase() === g ? ' selected' : '') + '>' + g + '</option>',
+          )
+          .join('') +
+        '</select></label>';
+    });
+    h += '</div>';
+  }
+  h +=
+    '<p style="font-size:.8rem;color:var(--muted);margin-top:10px">Le funzioni compaiono nei menu di Gestione collaboratori e nelle mappature. Preferenze per collaboratore (solo diurni, turni bloccati, settori...) nella card qui sotto.</p>';
+  h += '</div></div>';
+  return h;
+}
+function _pianoMaxCambi() {
+  const v = parseInt(window._pianoMaxCambiCfg);
+  return isNaN(v) ? 0 : v;
+}
+async function salvaMaxCambi(v) {
+  if (!isAdmin()) return;
+  const n = Math.max(0, parseInt(v) || 0);
+  window._pianoMaxCambiCfg = n;
+  await setImp('piano_max_cambi_mese', String(n));
+  logAzione('Piano: max cambi mese', String(n));
+  toast(n ? 'Massimo ' + n + ' cambi al mese' : 'Cambi illimitati');
+}
+function _pianoGiorniWeekend() {
+  const v = window._pianoWeekendCfg;
+  if (Array.isArray(v) && v.length) return v;
+  return [5, 6]; // default: venerdì e sabato (la domenica ha il suo colore)
+}
+async function salvaGiornoWeekend(dow, attivo) {
+  if (!isAdmin()) return;
+  let wk = _pianoGiorniWeekend().slice();
+  if (attivo && !wk.includes(dow)) wk.push(dow);
+  if (!attivo) wk = wk.filter((x) => x !== dow);
+  window._pianoWeekendCfg = wk;
+  await setImp('piano_giorni_weekend', JSON.stringify(wk));
+  logAzione('Piano: giorni weekend', wk.join(','));
+  toast('Giorni weekend aggiornati');
+  renderPiano();
+}
+async function salvaCompetenzaGruppo(chiave, gruppo) {
+  if (!isAdmin()) return;
+  const cfg = Object.assign({}, window._pianoCompGruppiCfg || {});
+  cfg[chiave] = gruppo || '';
+  window._pianoCompGruppiCfg = cfg;
+  await setImp('piano_competenze_gruppi', JSON.stringify(cfg));
+  logAzione('Piano: competenza-gruppo', chiave + ' → ' + (gruppo || 'nessuno'));
+  toast('Collegamento salvato');
 }
 async function salvaOreSettimanali(v) {
   if (!isAdmin()) return;
@@ -5307,7 +5470,7 @@ async function stampaPianoCollaboratore(nome) {
             ? [252, 228, 236] // rosa: festivo
             : dow === 0
               ? [255, 243, 224] // arancio: domenica
-              : dow === 5 || dow === 6
+              : _pianoGiorniWeekend().includes(dow)
                 ? [232, 245, 233] // verde: weekend
                 : g % 2 === 0
                   ? [248, 249, 250]
