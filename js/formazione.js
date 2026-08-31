@@ -412,15 +412,25 @@ function scaricaProtocolloExcel(compKey) {
     ['INIZIO FORMAZIONE:', ''],
     ['FORMAZIONE TERMINATA IL:', ''],
     [],
-    ['N', 'FASE', 'ARGOMENTO', 'SVOLGIMENTO', 'SVOLTO (X)'],
+    ['N', 'ARGOMENTO', 'SVOLGIMENTO', 'FIRMA ALLIEVO per accettazione', 'SVOLTO (X)'],
   ];
-  p.punti.forEach((pt, i) => righe.push([i + 1, pt[0], pt[1], pt[2], '']));
+  let faseCorrente = null;
+  let numero = 0;
+  p.punti.forEach((pt) => {
+    if (pt[0] !== faseCorrente) {
+      faseCorrente = pt[0];
+      righe.push(['', faseCorrente.toUpperCase(), '', '', '']);
+    }
+    numero++;
+    righe.push([numero, pt[1], pt[2], '', '']);
+  });
   const ws = XLSX.utils.aoa_to_sheet(righe);
-  ws['!cols'] = [{ wch: 4 }, { wch: 22 }, { wch: 28 }, { wch: 70 }, { wch: 10 }];
+  ws['!cols'] = [{ wch: 4 }, { wch: 30 }, { wch: 75 }, { wch: 28 }, { wch: 10 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Protocollo');
   const rigV = [
-    ['VALUTAZIONE FORMATORE — voti da 1 (insufficiente) a 5 (eccellente)'],
+    ['VALUTAZIONE FORMATORE'],
+    ['insufficiente  1  2  3  4  5  eccellente — scrivere il voto nella colonna VOTO'],
     [],
     ['COMPETENZE TECNICHE', 'VOTO (1-5)'],
   ];
@@ -477,21 +487,23 @@ async function importaProtocolloExcel(compKey, input) {
       return;
     }
     // punti svolti: righe dopo la testata N|FASE|...
-    const iTesta = dati.findIndex((r) => String(r[0]) === 'N' || String(r[0]).toUpperCase() === 'N');
+    const iTesta = dati.findIndex((r) => String(r[0]).trim().toUpperCase() === 'N');
     let fatti = 0;
     let totale = 0;
     const mancanti = [];
     if (iTesta >= 0)
       dati.slice(iTesta + 1).forEach((r) => {
-        if (!r[2] && !r[3]) return;
+        if (isNaN(parseInt(r[0]))) return; // righe FASE o vuote
         totale++;
-        if (
+        const svoltoX =
           String(r[4] || '')
             .trim()
-            .toUpperCase() === 'X'
-        )
-          fatti++;
-        else mancanti.push(String(r[2] || '').trim());
+            .toUpperCase() === 'X' ||
+          String(r[3] || '')
+            .trim()
+            .toUpperCase() === 'X';
+        if (svoltoX) fatti++;
+        else mancanti.push(String(r[1] || '').trim());
       });
     // valutazioni (secondo foglio, se presente)
     const voti = [];
@@ -1111,7 +1123,10 @@ async function toggleCompetenza(collabId, key, cb) {
     c.competenze = nuove;
     if (implicate.length) {
       toast('Spuntati anche i livelli inferiori: ' + implicate.join(', '));
-      logAzione('Competenze implicite', c.nome + ' — ' + implicate.join(', ') + ' (da ' + (compAtt ? compAtt.label : key) + ')');
+      logAzione(
+        'Competenze implicite',
+        c.nome + ' — ' + implicate.join(', ') + ' (da ' + (compAtt ? compAtt.label : key) + ')',
+      );
     }
     const compDef = getCompetenzeReparto().find((k) => k.key === key);
     logAzione('Competenza ' + (attiva ? 'certificata' : 'rimossa'), c.nome + ' — ' + (compDef ? compDef.label : key));

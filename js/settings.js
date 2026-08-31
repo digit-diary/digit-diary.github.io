@@ -340,48 +340,75 @@ function apriAccessiExtra(nome) {
   }
   const cfg = (window._operatoriAccessiExtra || {})[nome] || {};
   const altri = getReparti().filter((r) => r.key !== proprio);
+  const pagineDisponibili = [['diario', 'Diario']].concat(
+    Object.keys(VIS_ITEMS.pagine).map((k) => [k, VIS_ITEMS.pagine[k]]),
+    [
+      ['inventario', 'Inventario'],
+      ['registro', 'Registro'],
+    ],
+  );
   const b = document.getElementById('pwd-modal-content');
   let h =
     '<h3>Accessi extra — ' +
     escP(nome) +
     '</h3><p style="font-size:.82rem;color:var(--muted);margin-bottom:10px">Reparto principale: <b>' +
     escP(repartoLabel(proprio)) +
-    '</b>. Qui puoi dargli accesso a sezioni di ALTRI reparti, in sola lettura o anche in modifica.</p>';
+    '</b>. Concedi l\'accesso a sezioni di altri reparti: tutte, oppure solo quelle che spunti. Senza "può modificare" l\'accesso è in sola lettura.</p>' +
+    '<div style="max-height:52vh;overflow:auto;text-align:left">';
   altri.forEach((r) => {
     const v = cfg[r.key];
-    const pagine =
-      v === 'tutte' || (v && v.pagine === 'tutte')
-        ? 'tutte'
-        : v && (Array.isArray(v) ? v : v.pagine || []).includes('piano')
-          ? 'piano'
-          : '';
+    const modalita = !v ? 'nessuno' : v === 'tutte' || (v && v.pagine === 'tutte') ? 'tutte' : 'scelte';
+    const pagineAttive = Array.isArray(v) ? v : (v && Array.isArray(v.pagine) && v.pagine) || [];
     const modifica = !!(v && v.modifica === true);
     h +=
-      '<div class="field" style="text-align:left;margin-top:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><label style="min-width:90px;font-weight:700;color:' +
+      '<div style="border:1px solid var(--line);border-left:4px solid ' +
+      repartoColore(r.key) +
+      ';border-radius:3px;padding:10px 12px;margin-bottom:10px">' +
+      '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><b style="min-width:80px;color:' +
       repartoColore(r.key) +
       '">' +
       escP(r.label) +
-      '</label><select id="ae-pag-' +
+      '</b>' +
+      '<select id="ae-mod-sel-' +
       r.key +
-      '" style="padding:6px">' +
-      '<option value=""' +
-      (pagine === '' ? ' selected' : '') +
-      '>Nessun accesso</option>' +
-      '<option value="piano"' +
-      (pagine === 'piano' ? ' selected' : '') +
-      '>Solo Piano di lavoro</option>' +
-      '<option value="tutte"' +
-      (pagine === 'tutte' ? ' selected' : '') +
-      '>Tutte le sezioni</option>' +
-      '</select><label style="font-size:.8rem"><input type="checkbox" id="ae-mod-' +
+      '" onchange="document.getElementById(\'ae-pagine-' +
+      r.key +
+      "').style.display=this.value==='scelte'?'flex':'none'\" style=\"padding:5px 8px\">" +
+      '<option value="nessuno"' +
+      (modalita === 'nessuno' ? ' selected' : '') +
+      '>Nessun accesso</option><option value="scelte"' +
+      (modalita === 'scelte' ? ' selected' : '') +
+      '>Solo sezioni scelte</option><option value="tutte"' +
+      (modalita === 'tutte' ? ' selected' : '') +
+      '>Tutte le sezioni</option></select>' +
+      '<label style="font-size:.8rem"><input type="checkbox" id="ae-scrivi-' +
       r.key +
       '"' +
       (modifica ? ' checked' : '') +
-      '> può anche modificare</label></div>';
+      '> può anche modificare</label></div>' +
+      '<div id="ae-pagine-' +
+      r.key +
+      '" style="display:' +
+      (modalita === 'scelte' ? 'flex' : 'none') +
+      ';gap:8px;flex-wrap:wrap;padding-top:4px;border-top:1px dashed var(--line)">' +
+      pagineDisponibili
+        .map(
+          ([k, lbl]) =>
+            '<label style="font-size:.78rem;background:var(--paper2);padding:3px 8px;border-radius:10px;border:1px solid var(--line)"><input type="checkbox" class="ae-pag-' +
+            r.key +
+            '" value="' +
+            k +
+            '"' +
+            (pagineAttive.includes(k) ? ' checked' : '') +
+            '> ' +
+            escP(lbl) +
+            '</label>',
+        )
+        .join('') +
+      '</div></div>';
   });
   h +=
-    '<p style="font-size:.76rem;color:var(--muted);margin-top:8px">Senza la spunta "può anche modificare" l\'accesso è in sola lettura: vede tutto ma i pulsanti di modifica sono disattivati.</p>' +
-    '<div class="pwd-modal-btns" style="margin-top:14px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaAccessiExtra(\'' +
+    '</div><div class="pwd-modal-btns" style="margin-top:12px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaAccessiExtra(\'' +
     nome.replace(/'/g, "\\'") +
     '\')">Salva</button></div>';
   b.innerHTML = h;
@@ -394,9 +421,13 @@ async function salvaAccessiExtra(nome) {
   getReparti()
     .filter((r) => r.key !== proprio)
     .forEach((r) => {
-      const pag = (document.getElementById('ae-pag-' + r.key) || {}).value;
-      const mod = (document.getElementById('ae-mod-' + r.key) || {}).checked;
-      if (pag) cfg[r.key] = { pagine: pag === 'tutte' ? 'tutte' : ['piano'], modifica: !!mod };
+      const modalita = (document.getElementById('ae-mod-sel-' + r.key) || {}).value;
+      const mod = (document.getElementById('ae-scrivi-' + r.key) || {}).checked;
+      if (modalita === 'tutte') cfg[r.key] = { pagine: 'tutte', modifica: !!mod };
+      else if (modalita === 'scelte') {
+        const scelte = [...document.querySelectorAll('.ae-pag-' + r.key + ':checked')].map((x) => x.value);
+        if (scelte.length) cfg[r.key] = { pagine: scelte, modifica: !!mod };
+      }
     });
   window._operatoriAccessiExtra = window._operatoriAccessiExtra || {};
   if (Object.keys(cfg).length) window._operatoriAccessiExtra[nome] = cfg;
@@ -408,7 +439,13 @@ async function salvaAccessiExtra(nome) {
     nome +
       ': ' +
       (Object.keys(cfg)
-        .map((k) => k + '=' + (cfg[k].pagine === 'tutte' ? 'tutte' : 'piano') + (cfg[k].modifica ? '+mod' : ''))
+        .map(
+          (k) =>
+            k +
+            '=' +
+            (cfg[k].pagine === 'tutte' ? 'tutte' : cfg[k].pagine.join('+')) +
+            (cfg[k].modifica ? ' (modifica)' : ' (lettura)'),
+        )
         .join(', ') || 'nessuno'),
   );
   document.getElementById('pwd-modal').classList.add('hidden');
