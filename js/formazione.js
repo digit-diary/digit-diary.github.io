@@ -13,6 +13,8 @@ const COMPETENZE_DEFAULT = {
     { key: 'sala', label: 'Sala Slot', livello: 1 },
     { key: 'reception', label: 'Reception', livello: 2 },
     { key: 'cassa', label: 'Cassa', livello: 3 },
+    { key: 'bo', label: 'Back Office (BO)', livello: 4 },
+    { key: 'sup', label: 'Supervisor (SUP)', livello: 5 },
   ],
   tavoli: [
     { key: 'croupier', label: 'Croupier', livello: 1 },
@@ -1119,7 +1121,7 @@ function _renderFormazioneConfig() {
         (rep === 'tavoli' ? 'Chef de table' : 'Nuova competenza') +
         '..."></div><div class="field"><label>Livello</label><select id="cfg-comp-lv-' +
         rep +
-        '" style="padding:10px;width:90px"><option value="1">L1</option><option value="2">L2</option><option value="3">L3</option><option value="0">Extra</option></select></div><button class="btn-add-tipo" onclick="aggiungiCompetenzaCfg(\'' +
+        '" style="padding:10px;width:90px"><option value="1">L1</option><option value="2">L2</option><option value="3">L3</option><option value="4">L4</option><option value="5">L5</option><option value="0">Extra</option></select></div><button class="btn-add-tipo" onclick="aggiungiCompetenzaCfg(\'' +
         rep +
         '\')">+ Aggiungi</button></div>';
     });

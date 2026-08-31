@@ -46,7 +46,9 @@ let pianoRegoleGruppoCache = [];
 // regole attive per un gruppo (maiuscolo), port di eligibility.py
 function _pianoRegoleGruppoDi(gruppo) {
   const g = (gruppo || '').toUpperCase();
-  return pianoRegoleGruppoCache.filter((r) => r.attivo !== false && (r.gruppo || '').toUpperCase() === g);
+  return pianoRegoleGruppoCache.filter(
+    (r) => r.attivo !== false && (r.gruppo || '').toUpperCase() === g && (r.reparto_dip || 'slots') === _pianoReparto(),
+  );
 }
 function _pianoCampoOk(info, valore) {
   // 'campo>N' / 'campo>=N' -> true se il collaboratore PASSA il controllo
@@ -373,7 +375,8 @@ async function renderPiano() {
       h += '</select>';
       if (puoMod) {
         h +=
-          '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#d4b86a;color:#d4b86a" onclick="validaPiano()">Valida regole</button>';
+          '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#d4b86a;color:#d4b86a" onclick="validaPiano()">Valida regole</button>' +
+          '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#c0392b;color:#e07b6d" onclick="apriCoperturaMalattia()">Copertura malattia</button>';
         h +=
           '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49" onclick="generaBozzaPiano()">Genera bozza</button>';
         h +=
@@ -2698,6 +2701,35 @@ function apriScambioTurno() {
     toast('Nessun collega con un turno quel giorno');
     return;
   }
+  // come "Cerca cambio turno" di Turnivo: verifica per ogni collega se lo
+  // scambio sarebbe valido (idoneità ai turni incrociati + riposo 11h)
+  const g = parseInt(sel.data.split('-')[2]);
+  const minRiposo = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 11;
+  const cellaMese = {};
+  _pianoRighe.forEach((x) => (cellaMese[x.collaboratore + '|' + parseInt(x.data.split('-')[2])] = x.codice));
+  const riposoOkCon = (nomeX, gX, t) => {
+    const prev = _pianoTurnoInfo(cellaMese[nomeX + '|' + (gX - 1)] || '');
+    if (prev) {
+      const finePrev = _pianoOra(prev.ora_fine);
+      const fineAbs = prev.oltre23 || finePrev < _pianoOra(prev.ora_inizio) ? 24 + finePrev : finePrev;
+      if (24 + _pianoOra(t.ora_inizio) - fineAbs < minRiposo) return false;
+    }
+    const next = _pianoTurnoInfo(cellaMese[nomeX + '|' + (gX + 1)] || '');
+    if (next) {
+      const fine = _pianoOra(t.ora_fine);
+      const fineAbs = t.oltre23 || fine < _pianoOra(t.ora_inizio) ? 24 + fine : fine;
+      if (24 + _pianoOra(next.ora_inizio) - fineAbs < minRiposo) return false;
+    }
+    return true;
+  };
+  const tMio = _pianoTurnoInfo(r.codice);
+  const problemaCon = (c) => {
+    const tSuo = _pianoTurnoInfo(c.codice);
+    if (!_pianoIdoneoPerTurno(sel.nome, tSuo)) return 'tu non sei idoneo a ' + c.codice;
+    if (!_pianoIdoneoPerTurno(c.collaboratore, tMio)) return 'non idoneo a ' + r.codice;
+    if (!riposoOkCon(sel.nome, g, tSuo) || !riposoOkCon(c.collaboratore, g, tMio)) return 'riposo 11h violato';
+    return null;
+  };
   const b = document.getElementById('pwd-modal-content');
   b.innerHTML =
     '<h3>Scambio turno — ' +
@@ -2708,16 +2740,21 @@ function apriScambioTurno() {
     escP(r.codice) +
     ') scambia con:</p><select id="scambio-collega" style="width:100%;padding:10px">' +
     colleghi
-      .map(
-        (c) =>
+      .map((c) => {
+        const prob = problemaCon(c);
+        return (
           '<option value="' +
           escP(c.collaboratore) +
-          '">' +
+          '"' +
+          (prob ? ' style="color:#c0392b"' : '') +
+          '>' +
           escP(c.collaboratore) +
           ' — ' +
           escP(c.codice) +
-          '</option>',
-      )
+          (prob ? ' ⚠ ' + prob : ' ✓') +
+          '</option>'
+        );
+      })
       .join('') +
     '</select><div class="field" style="text-align:left;margin-top:10px"><label>Motivazione</label><input type="text" id="scambio-motivo" placeholder="Es: esigenze personali..."></div>' +
     '<div style="text-align:left;margin-top:10px"><label style="font-weight:700;font-size:.86rem"><input type="checkbox" id="scambio-restituito" onchange="document.getElementById(\'scambio-rest-wrap\').style.display=this.checked?\'block\':\'none\'"> Con restituzione</label>' +
@@ -2746,14 +2783,14 @@ async function confermaScambioTurno() {
     await secPatch('piano', 'id=eq.' + r1.id, {
       codice: c2,
       protetto: true,
-      commento: ('Scambio con ' + collega + ' (era ' + c1 + ')' + (motivo ? ' — ' + motivo : '')).substring(0, 400),
+      commento: ((c1 ? 'Ex ' + c1 + ' - ' : '') + 'cambio con ' + collega + ' - ' + getOperatore()).substring(0, 400),
       operatore: getOperatore(),
       updated_at: new Date().toISOString(),
     });
     await secPatch('piano', 'id=eq.' + r2.id, {
       codice: c1,
       protetto: true,
-      commento: ('Scambio con ' + sel.nome + ' (era ' + c2 + ')' + (motivo ? ' — ' + motivo : '')).substring(0, 400),
+      commento: ((c2 ? 'Ex ' + c2 + ' - ' : '') + 'cambio con ' + sel.nome + ' - ' + getOperatore()).substring(0, 400),
       operatore: getOperatore(),
       updated_at: new Date().toISOString(),
     });
@@ -2854,6 +2891,345 @@ async function ripristinaOrdinePiano() {
   logAzione('Piano: ordine predefinito', _pianoReparto());
   toast('Ordine predefinito: SUP, BO, poi gli altri');
   renderPiano();
+}
+
+// ================================================================
+// COPERTURA MALATTIA — port di malattia_cerca/malattia_conferma di
+// Turnivo: per ogni giorno del periodo propone il miglior sostituto
+// libero e idoneo (greedy: meno ore mese + meno giorni consecutivi),
+// alla conferma mette M al malato e i turni (protetti) ai sostituti.
+// ================================================================
+function _pianoIdoneoPerTurno(nome, turno) {
+  // idoneità come il generatore: settori (fonte di verità), regole di
+  // gruppo, solo_diurni, turni bloccati
+  const info = _pianoCollabInfo(nome) || {};
+  if (info.solo_diurni && turno.tipo === 'NOTTURNO') return false;
+  if (
+    info.turni_bloccati &&
+    info.turni_bloccati
+      .split(',')
+      .map((x) => x.trim())
+      .includes(turno.codice)
+  )
+    return false;
+  const gruppoT = (turno.gruppo || '').toUpperCase();
+  const fzU = ((info.funzione || '') + '').toUpperCase();
+  const settoriC = info.settori_piano
+    ? info.settori_piano
+        .toUpperCase()
+        .split(',')
+        .map((x) => x.trim())
+    : null;
+  const haSettore = settoriC ? settoriC.includes(gruppoT) : true;
+  let campoGrant = false;
+  for (const rg of _pianoRegoleGruppoDi(gruppoT)) {
+    const tipoR = (rg.tipo_regola || '').toLowerCase();
+    if (tipoR === 'richiede_funzione') {
+      const ammesse = rg.valore.split(',').map((x) => x.trim().toUpperCase());
+      if (!haSettore && !ammesse.includes(fzU)) return false;
+    } else if (tipoR === 'blocca_tipo_turno') {
+      if (
+        rg.valore
+          .split(',')
+          .map((x) => x.trim().toUpperCase())
+          .includes((turno.tipo || '').toUpperCase())
+      )
+        return false;
+    } else if (tipoR === 'richiede_campo') {
+      if (!_pianoCampoOk(info, rg.valore)) return false;
+      campoGrant = true;
+    }
+  }
+  if (settoriC && !haSettore && !campoGrant) return false;
+  const mapp = _pianoMappFunzione(info.funzione);
+  if (mapp) {
+    const voci = mapp.filter((m) => m.tipo === 'PRINCIPALE' || m.tipo === 'AMMESSO').map((m) => m.turno_codice);
+    if (voci.length && !voci.includes(turno.codice)) return false;
+  }
+  if (
+    (turno.codice === 'L1' || turno.codice === '9') &&
+    String(_pianoRegolaVal('l1_solo_bo_sup')).toUpperCase() === 'TRUE' &&
+    fzU !== 'SUP' &&
+    fzU !== 'BO'
+  )
+    return false;
+  return true;
+}
+function apriCoperturaMalattia() {
+  if (!puoGestirePiano()) return;
+  const nomi = collaboratoriCache
+    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
+    .map((c) => c.nome);
+  const nGiorni = _pianoUltimoGiorno(_pianoMeseSel);
+  const b = document.getElementById('pwd-modal-content');
+  b.innerHTML =
+    '<h3>Copertura malattia — ' +
+    _pianoMeseSel +
+    '</h3><p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Cerca i migliori sostituti liberi per i turni del collaboratore malato (come in Turnivo).</p>' +
+    '<div class="field" style="text-align:left"><label>Collaboratore malato</label><select id="mal-collab" style="width:100%;padding:8px">' +
+    nomi.map((n) => '<option>' + escP(n) + '</option>').join('') +
+    '</select></div>' +
+    '<div style="display:flex;gap:10px;margin-top:8px"><div class="field" style="text-align:left"><label>Dal giorno</label><input type="number" id="mal-da" min="1" max="' +
+    nGiorni +
+    '" style="width:80px;padding:8px"></div>' +
+    '<div class="field" style="text-align:left"><label>Al giorno</label><input type="number" id="mal-al" min="1" max="' +
+    nGiorni +
+    '" style="width:80px;padding:8px"></div></div>' +
+    '<div id="mal-risultati" style="text-align:left;margin-top:10px;max-height:40vh;overflow:auto"></div>' +
+    '<div class="pwd-modal-btns" style="margin-top:14px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button>' +
+    '<button class="btn-modal-ok" id="mal-btn-cerca" onclick="cercaSostitutiMalattia()">Cerca sostituti</button>' +
+    '<button class="btn-modal-ok" id="mal-btn-conferma" style="display:none;background:#c0392b" onclick="confermaCoperturaMalattia()">Conferma copertura</button></div>';
+  document.getElementById('pwd-modal').classList.remove('hidden');
+}
+let _malattiaPiano = null;
+async function cercaSostitutiMalattia() {
+  const nome = (document.getElementById('mal-collab') || {}).value;
+  const da = parseInt((document.getElementById('mal-da') || {}).value);
+  const al = parseInt((document.getElementById('mal-al') || {}).value);
+  const out = document.getElementById('mal-risultati');
+  if (!nome || isNaN(da) || isNaN(al) || da > al) {
+    toast('Compila collaboratore e periodo (dal ≤ al)');
+    return;
+  }
+  out.innerHTML = '<p style="color:var(--muted)">Ricerca in corso...</p>';
+  const ym = _pianoMeseSel;
+  const nomi = collaboratoriCache
+    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
+    .map((c) => c.nome);
+  const cella = {}; // nome|g -> codice (con overrides progressivi)
+  const rigaDi = {};
+  _pianoRighe.forEach((r) => {
+    const k = r.collaboratore + '|' + parseInt(r.data.split('-')[2]);
+    cella[k] = r.codice;
+    rigaDi[k] = r;
+  });
+  const oreMese = {};
+  _pianoRighe.forEach((r) => {
+    const t = _pianoTurnoInfo(r.codice);
+    if (t) oreMese[r.collaboratore] = (oreMese[r.collaboratore] || 0) + (parseFloat(t.durata_ore) || 0);
+  });
+  const maxCons = parseInt(_pianoRegolaVal('max_consecutivi')) || 5;
+  const minRiposo = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 11;
+  const consecFinoA = (n, g) => {
+    let c = 0;
+    for (let k = g - 1; k >= 1 && _pianoIsLavoro(cella[n + '|' + k] || ''); k--) c++;
+    return c;
+  };
+  const riposoOkSost = (n, g, t) => {
+    const prev = _pianoTurnoInfo(cella[n + '|' + (g - 1)] || '');
+    if (prev) {
+      const finePrev = _pianoOra(prev.ora_fine);
+      const fineAbs = prev.oltre23 || finePrev < _pianoOra(prev.ora_inizio) ? 24 + finePrev : finePrev;
+      if (24 + _pianoOra(t.ora_inizio) - fineAbs < minRiposo) return false;
+    }
+    const next = _pianoTurnoInfo(cella[n + '|' + (g + 1)] || '');
+    if (next) {
+      const fine = _pianoOra(t.ora_fine);
+      const fineAbs = t.oltre23 || fine < _pianoOra(t.ora_inizio) ? 24 + fine : fine;
+      if (24 + _pianoOra(next.ora_inizio) - fineAbs < minRiposo) return false;
+    }
+    return true;
+  };
+  const giorni = [];
+  for (let g = da; g <= al; g++) {
+    const cod = cella[nome + '|' + g] || '';
+    const t = _pianoTurnoInfo(cod);
+    if (!cod) {
+      giorni.push({ g: g, salta: 'Nessun turno assegnato' });
+      continue;
+    }
+    if (cod === 'M' || cod === 'M1') {
+      giorni.push({ g: g, salta: 'Già in malattia' });
+      continue;
+    }
+    if (!t) {
+      const cs = _pianoCodiceInfo(cod);
+      giorni.push({
+        g: g,
+        salta: cs && cs.is_riposo ? 'Giorno di riposo (' + cod + ')' : 'Codice speciale (' + cod + ')',
+      });
+      continue;
+    }
+    // candidati: liberi quel giorno (nessuna cella o codice di riposo non protetto)
+    let migliore = null;
+    let migliorePunteggio = Infinity;
+    for (const n of nomi) {
+      if (n === nome) continue;
+      const codC = cella[n + '|' + g] || '';
+      if (codC) {
+        const csC = _pianoCodiceInfo(codC);
+        const rC = rigaDi[n + '|' + g];
+        if (!(csC && csC.is_riposo && !(rC && rC.protetto && codC === 'V'))) continue; // occupato o vacanza protetta
+      }
+      if (!_pianoIdoneoPerTurno(n, t)) continue;
+      if (consecFinoA(n, g) >= maxCons) continue;
+      if (!riposoOkSost(n, g, t)) continue;
+      const punteggio = (oreMese[n] || 0) + consecFinoA(n, g) * 10;
+      if (punteggio < migliorePunteggio) {
+        migliorePunteggio = punteggio;
+        migliore = n;
+      }
+    }
+    if (migliore) {
+      giorni.push({
+        g: g,
+        codice: cod,
+        orari: (t.ora_inizio || '').substring(0, 5) + '-' + (t.ora_fine || '').substring(0, 5),
+        sostituto: migliore,
+        era: cella[migliore + '|' + g] || '',
+      });
+      cella[migliore + '|' + g] = cod; // override progressivo, come il greedy Turnivo
+      oreMese[migliore] = (oreMese[migliore] || 0) + (parseFloat(t.durata_ore) || 0);
+    } else {
+      giorni.push({ g: g, codice: cod, scoperto: true });
+    }
+  }
+  _malattiaPiano = { nome: nome, da: da, al: al, giorni: giorni };
+  let h =
+    '<table class="piano-table" style="min-width:100%;font-size:.82rem"><thead><tr><th>Giorno</th><th>Turno</th><th style="text-align:left">Sostituto proposto</th></tr></thead><tbody>';
+  giorni.forEach((d) => {
+    if (d.salta)
+      h +=
+        '<tr><td>' + d.g + '</td><td colspan="2" style="color:var(--muted);text-align:left">' + d.salta + '</td></tr>';
+    else if (d.scoperto)
+      h +=
+        '<tr><td>' +
+        d.g +
+        '</td><td>' +
+        escP(d.codice) +
+        '</td><td style="color:#c0392b;font-weight:700;text-align:left">NESSUN SOSTITUTO DISPONIBILE</td></tr>';
+    else
+      h +=
+        '<tr><td>' +
+        d.g +
+        '</td><td><b>' +
+        escP(d.codice) +
+        '</b> ' +
+        d.orari +
+        '</td><td style="text-align:left;color:#2c6e49;font-weight:700">' +
+        escP(d.sostituto) +
+        (d.era ? ' <span style="color:var(--muted);font-weight:400">(era ' + escP(d.era) + ')</span>' : '') +
+        '</td></tr>';
+  });
+  h += '</tbody></table>';
+  const coperti = giorni.filter((d) => d.sostituto).length;
+  const scoperti = giorni.filter((d) => d.scoperto).length;
+  h +=
+    '<p style="font-size:.8rem;margin-top:6px">' +
+    coperti +
+    ' giorni coperti' +
+    (scoperti ? ', <b style="color:#c0392b">' + scoperti + ' scoperti</b>' : '') +
+    '. Alla conferma: M (protetta) al malato, turni protetti ai sostituti' +
+    (coperti ? ' e punti incentivo per la copertura' : '') +
+    '.</p>';
+  out.innerHTML = h;
+  document.getElementById('mal-btn-conferma').style.display = coperti || giorni.some((d) => d.codice) ? '' : 'none';
+}
+async function confermaCoperturaMalattia() {
+  const m = _malattiaPiano;
+  if (!m) return;
+  document.getElementById('pwd-modal').classList.add('hidden');
+  const ym = _pianoMeseSel;
+  const op = getOperatore();
+  const dstrDi = (g) => ym + '-' + String(g).padStart(2, '0');
+  const rigaDi = {};
+  _pianoRighe.forEach((r) => (rigaDi[r.collaboratore + '|' + parseInt(r.data.split('-')[2])] = r));
+  let nM = 0;
+  let nSost = 0;
+  const sostituti = new Set();
+  try {
+    for (const d of m.giorni) {
+      if (d.salta) continue;
+      // M al malato (protetta)
+      const rMal = rigaDi[m.nome + '|' + d.g];
+      if (rMal) {
+        await secPatch('piano', 'id=eq.' + rMal.id, {
+          codice: 'M',
+          protetto: true,
+          generato: false,
+          commento: ('Malattia — era ' + d.codice + ' - ' + op).substring(0, 400),
+          operatore: op,
+          updated_at: new Date().toISOString(),
+        });
+      } else {
+        await secPost('piano', {
+          collaboratore: m.nome,
+          data: dstrDi(d.g),
+          codice: 'M',
+          protetto: true,
+          generato: false,
+          reparto_dip: _pianoReparto(),
+          operatore: op,
+        });
+      }
+      nM++;
+      // turno al sostituto (protetto)
+      if (d.sostituto) {
+        const rS = rigaDi[d.sostituto + '|' + d.g];
+        const commento = (
+          'Copertura malattia di ' +
+          m.nome +
+          (d.era ? ' (era ' + d.era + ')' : '') +
+          ' - ' +
+          op
+        ).substring(0, 400);
+        if (rS) {
+          await secPatch('piano', 'id=eq.' + rS.id, {
+            codice: d.codice,
+            protetto: true,
+            generato: false,
+            commento: commento,
+            operatore: op,
+            updated_at: new Date().toISOString(),
+          });
+        } else {
+          await secPost('piano', {
+            collaboratore: d.sostituto,
+            data: dstrDi(d.g),
+            codice: d.codice,
+            protetto: true,
+            generato: false,
+            commento: commento,
+            reparto_dip: _pianoReparto(),
+            operatore: op,
+          });
+        }
+        sostituti.add(d.sostituto);
+        nSost++;
+      }
+    }
+    // punti incentivo (azione 'copertura' della sezione Formazione)
+    if (typeof _insertPuntiEvento === 'function' && typeof getPuntiConfig === 'function') {
+      const az = (getPuntiConfig().azioni || []).find((a) => a.key === 'copertura');
+      if (az)
+        for (const n of sostituti)
+          await _insertPuntiEvento(
+            n,
+            az.punti,
+            'copertura',
+            'Copertura malattia di ' + m.nome + ' (' + m.da + '-' + m.al + ' ' + ym + ')',
+          );
+    }
+    logAzione(
+      'Copertura malattia',
+      m.nome + ' ' + m.da + '-' + m.al + ' ' + ym + ': ' + nM + ' M, ' + nSost + ' sostituzioni',
+    );
+    toast(
+      'Copertura registrata: ' +
+        nM +
+        ' giorni M, ' +
+        nSost +
+        ' sostituzioni' +
+        (sostituti.size ? ', punti assegnati' : ''),
+    );
+    _malattiaPiano = null;
+    _pianoViolCelle = {};
+    _pianoViolLista = null;
+    renderPiano();
+  } catch (e) {
+    console.error(e);
+    toast('Errore registrazione copertura');
+  }
 }
 
 // Barra delle date sempre visibile durante lo scorrimento della PAGINA:
@@ -4715,7 +5091,7 @@ function _renderPianoRegoleGruppoCard() {
   h +=
     '<div style="overflow-x:auto"><table class="piano-table" style="min-width:680px;font-size:.85rem"><thead><tr><th>Gruppo</th><th style="text-align:left">Regola</th><th style="text-align:left">Valore</th><th>Attiva</th><th></th></tr></thead><tbody>';
   pianoRegoleGruppoCache
-    .slice()
+    .filter((r) => (r.reparto_dip || 'slots') === _pianoReparto())
     .sort((a, b) => (a.gruppo || '').localeCompare(b.gruppo || '') || a.id - b.id)
     .forEach((r) => {
       h +=
@@ -4777,7 +5153,13 @@ async function aggiungiRegolaGruppo() {
     return;
   }
   try {
-    const r = await secPost('piano_regole_gruppo', { gruppo: gruppo, tipo_regola: tipo, valore: valore, attivo: true });
+    const r = await secPost('piano_regole_gruppo', {
+      gruppo: gruppo,
+      tipo_regola: tipo,
+      valore: valore,
+      attivo: true,
+      reparto_dip: _pianoReparto(),
+    });
     if (r && r[0]) pianoRegoleGruppoCache.push(r[0]);
     logAzione('Regola gruppo aggiunta', gruppo + ' ' + tipo + ' ' + valore);
     toast('Regola aggiunta');
@@ -5216,11 +5598,9 @@ async function confermaCambioEsigenze() {
       codice: nuovo,
       protetto: true,
       commento: (
-        'Ex ' +
-        vecchio +
-        ' — cambio per esigenze operative' +
-        (motivo ? ': ' + motivo : '') +
-        ' — firma'
+        (vecchio ? 'Ex ' + vecchio + ' - ' : '') +
+        'cambio per esigenze operative - ' +
+        getOperatore()
       ).substring(0, 400),
       operatore: getOperatore(),
       updated_at: new Date().toISOString(),
