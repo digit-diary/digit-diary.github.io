@@ -599,7 +599,9 @@ async function renderPiano() {
           ne +
           '\')"></i>' +
           escP(nome.length > 20 ? nome.substring(0, 20) : nome) +
-          (infoC && infoC.lingue ? ' <span style="font-size:.7rem">' + escP(infoC.lingue) + '</span>' : '') +
+          (infoC && infoC.lingue
+            ? ' <span style="font-size:.62rem;color:var(--muted);font-weight:700">' + escP(infoC.lingue) + '</span>'
+            : '') +
           '</td><td class="piano-fun"><strong>' +
           escP(infoC && infoC.is_jolly ? 'JOLLY' : (infoC && infoC.funzione) || '') +
           '</strong> <span style="font-size:.7rem">' +
