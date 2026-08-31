@@ -1018,7 +1018,7 @@ async function renderCollaboratoriUI() {
             .join('') +
           '</select><input type="text" value="' +
           (c.lingue || '').replace(/"/g, '&quot;') +
-          '" placeholder="Lingue" maxlength="20" title="Lingue parlate: scrivi le bandierine emoji (es. 🇮🇹 🇬🇧 dalla tastiera emoji) o le sigle (IT, EN). Vengono mostrate nel Piano accanto al nome" onchange="cambiaLingueCollaboratore(' +
+          '" placeholder="IT, EN" maxlength="20" title="Lingue parlate (sigle separate da spazio o virgola, es. IT EN DE). Vengono mostrate nel Piano accanto al nome" onchange="cambiaLingueCollaboratore(' +
           c.id +
           ',this.value)" style="' +
           selStyle +
@@ -2427,8 +2427,13 @@ async function cambiaLingueCollaboratore(id, lingue) {
     return;
   }
   try {
-    const v = String(lingue || '').trim();
-    await secPatch('collaboratori', 'id=eq.' + id, { lingue: v });
+    // normalizza: bandierine emoji -> lettere, tutto in sigle maiuscole
+    let v = String(lingue || '')
+      .replace(/[\u{1F1E6}-\u{1F1FF}]/gu, (ch) => String.fromCharCode(ch.codePointAt(0) - 0x1f1e6 + 65))
+      .toUpperCase()
+      .replace(/[^A-Z]+/g, ' ')
+      .trim();
+    await secPatch('collaboratori', 'id=eq.' + id, { lingue: v || null });
     const c = collaboratoriCache.find((x) => x.id === id);
     if (c) c.lingue = v;
     logAzione('Lingue collaboratore', (c ? c.nome : id) + ' -> ' + v);
