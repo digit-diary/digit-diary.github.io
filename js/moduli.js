@@ -1018,7 +1018,7 @@ async function renderCollaboratoriUI() {
             .join('') +
           '</select><input type="text" value="' +
           (c.lingue || '').replace(/"/g, '&quot;') +
-          '" placeholder="🇮🇹🇬🇧" maxlength="20" title="Lingue parlate (bandierine, mostrate nel Piano accanto al nome)" onchange="cambiaLingueCollaboratore(' +
+          '" placeholder="Lingue" maxlength="20" title="Lingue parlate: scrivi le bandierine emoji (es. 🇮🇹 🇬🇧 dalla tastiera emoji) o le sigle (IT, EN). Vengono mostrate nel Piano accanto al nome" onchange="cambiaLingueCollaboratore(' +
           c.id +
           ',this.value)" style="' +
           selStyle +
