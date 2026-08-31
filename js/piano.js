@@ -407,7 +407,10 @@ async function renderPiano() {
     // ordine predefinito: prima i SUP, poi i BO, poi gli altri (alfabetico);
     // se l'operatore ha riordinato a mano (drag della riga) vale quell'ordine
     const rangoFn = (n) => {
-      const f = ((_pianoCollabInfo(n) || {}).funzione || '').toUpperCase();
+      const info = _pianoCollabInfo(n) || {};
+      if (info.is_jolly) return 3; // i jolly in fondo, come nel foglio Excel
+      const f = ((info.funzione || '') + '').toUpperCase();
+      if (f === 'RESP' || f === 'VICERESP') return 0;
       return f === 'SUP' ? 0 : f === 'BO' ? 1 : 2;
     };
     const ordinePred = (x, y) => rangoFn(x) - rangoFn(y) || x.localeCompare(y);
@@ -5817,7 +5820,7 @@ function _renderPianoPreferenzeCard() {
     escP(repartoLabel(_pianoReparto())) +
     '</div><div style="padding:10px 14px">';
   h +=
-    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th><th>Solo diurni</th><th style="text-align:left">Turni bloccati (CSV)</th><th title="La bozza le privilegia sui turni L1">Preferisce L1</th><th title="Livello accoglienza (0-2): serve per il gruppo ACCOGLIENZA">Accoglienza</th><th style="text-align:left" title="Gruppi dove NON può lavorare da solo (CSV, es: REC)">Accompagnamento</th><th style="text-align:left" title="Gruppi/settori dove può lavorare (CSV, es: SALA,REC,CASSA) — la fonte di verità per l\'idoneità, come in Turnivo">Settori</th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th><th>Solo diurni</th><th style="text-align:left">Turni bloccati (CSV)</th><th title="La bozza le privilegia sui turni L1">Preferisce L1</th><th title="Livello accoglienza (0-2): serve per il gruppo ACCOGLIENZA">Accoglienza</th><th style="text-align:left" title="Gruppi dove NON può lavorare da solo (CSV, es: REC)">Accompagnamento</th><th style="text-align:left" title="Derivati dalle competenze certificate in Formazione (sola lettura)">Settori</th></tr></thead><tbody>';
   collabs.forEach((c) => {
     h +=
       '<tr><td style="text-align:left;font-weight:600">' +
@@ -5846,15 +5849,13 @@ function _renderPianoPreferenzeCard() {
       escP(c.accompagnamento_settori || '') +
       '" placeholder="Es: REC" onchange="salvaPreferenzaCollab(' +
       c.id +
-      ',\'accompagnamento_settori\',this.value)" style="width:90px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td style="text-align:left"><input type="text" value="' +
-      escP(c.settori_piano || '') +
-      '" placeholder="Es: SALA,REC,CASSA" onchange="salvaPreferenzaCollab(' +
-      c.id +
-      ',\'settori_piano\',this.value)" style="width:150px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td></tr>';
+      ',\'accompagnamento_settori\',this.value)" style="width:90px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td style="text-align:left;font-size:.78rem;color:var(--muted)" title="Si gestiscono con le spunte in Formazione">' +
+      escP((_pianoSettoriEffettivi(c) || []).join(', ') || '—') +
+      '</td></tr>';
   });
   h += '</tbody></table></div>';
   h +=
-    '<p style="font-size:.78rem;color:var(--muted);margin-top:6px">"Solo diurni" e i turni bloccati vengono rispettati dalla bozza automatica. Funzione e percentuale si modificano in Impostazioni → Gestione collaboratori.</p>';
+    '<p style="font-size:.78rem;color:var(--muted);margin-top:6px">"Solo diurni" e i turni bloccati vengono rispettati dalla bozza automatica. Funzione e percentuale si modificano in Impostazioni del Diario → Gestione collaboratori; i <b>Settori</b> derivano dalle competenze certificate in <b>Formazione</b> (spunta = idoneo, sola lettura qui).</p>';
   h += '</div></div>';
   return h;
 }
