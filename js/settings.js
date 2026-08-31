@@ -52,8 +52,37 @@ function puoVedereCategorie() {
   );
 }
 // Permesso di modifica: default solo admin (a differenza delle pagine, default 'tutti')
+// ---- Accessi extra: un operatore può accedere a sezioni scelte di ALTRI
+// reparti (es. tavoli vede il Piano di slots), in sola lettura o anche in
+// modifica. imp 'operatori_accessi_extra' =
+//   { operatore: { reparto: { pagine: ['piano'] | 'tutte', modifica: false } } }
+function _accessiExtraDi(op) {
+  const cfg = window._operatoriAccessiExtra || {};
+  return cfg[op] || null;
+}
+function _inRepartoExtra() {
+  if (isAdmin()) return false;
+  const op = getOperatore();
+  const proprio = operatoriRepartoMap[op] || 'entrambi';
+  if (proprio === 'entrambi' || proprio === currentReparto) return false;
+  const extra = _accessiExtraDi(op);
+  return !!(extra && extra[currentReparto]);
+}
+function _pagineExtraCorrenti() {
+  // pagine visibili nel reparto extra corrente ('tutte' | lista), null se non in extra
+  if (!_inRepartoExtra()) return null;
+  const v = _accessiExtraDi(getOperatore())[currentReparto];
+  if (v === 'tutte' || (v && v.pagine === 'tutte')) return 'tutte';
+  if (Array.isArray(v)) return v; // retrocompatibilità col formato lista
+  return v && Array.isArray(v.pagine) ? v.pagine : [];
+}
+function _extraPuoModificare() {
+  const v = _accessiExtraDi(getOperatore())[currentReparto];
+  return !!(v && v.modifica === true);
+}
 function puoModificare(key) {
   if (isAdmin()) return true;
+  if (_inRepartoExtra() && !_extraPuoModificare()) return false; // extra in sola lettura
   const v = visibilitaConfig[key] || 'admin';
   if (v === 'admin' || v === 'nascosto') return false;
   if (typeof v === 'object' && v.tipo === 'selezionati') {
@@ -89,6 +118,11 @@ function paginaAbilitataReparto(key, repKey) {
 }
 function isVis(key) {
   if (!paginaAbilitataReparto(key)) return false;
+  const extraPagine = typeof _pagineExtraCorrenti === 'function' ? _pagineExtraCorrenti() : null;
+  if (extraPagine && extraPagine !== 'tutte' && !extraPagine.includes(key)) return false;
+  // pagina concessa esplicitamente come accesso extra: la concessione vince
+  // sulle regole di default (ma non su un "nascosto" esplicito)
+  if (extraPagine && extraPagine !== 'tutte' && extraPagine.includes(key)) return visGet(key) !== 'nascosto';
   const v = visGet(key);
   // Piano di lavoro: sezione nuova, di default visibile solo ad admin
   // finché non viene configurata esplicitamente in Visibilità
@@ -296,6 +330,91 @@ async function aggiungiOperatoreConPwd() {
     toast('Errore creazione');
   }
 }
+// ---- Accessi extra: modal di configurazione per operatore ----
+function apriAccessiExtra(nome) {
+  if (!isAdmin()) return;
+  const proprio = operatoriRepartoMap[nome] || 'entrambi';
+  if (proprio === 'entrambi') {
+    toast(nome + ' vede già tutti i reparti');
+    return;
+  }
+  const cfg = (window._operatoriAccessiExtra || {})[nome] || {};
+  const altri = getReparti().filter((r) => r.key !== proprio);
+  const b = document.getElementById('pwd-modal-content');
+  let h =
+    '<h3>Accessi extra — ' +
+    escP(nome) +
+    '</h3><p style="font-size:.82rem;color:var(--muted);margin-bottom:10px">Reparto principale: <b>' +
+    escP(repartoLabel(proprio)) +
+    '</b>. Qui puoi dargli accesso a sezioni di ALTRI reparti, in sola lettura o anche in modifica.</p>';
+  altri.forEach((r) => {
+    const v = cfg[r.key];
+    const pagine =
+      v === 'tutte' || (v && v.pagine === 'tutte')
+        ? 'tutte'
+        : v && (Array.isArray(v) ? v : v.pagine || []).includes('piano')
+          ? 'piano'
+          : '';
+    const modifica = !!(v && v.modifica === true);
+    h +=
+      '<div class="field" style="text-align:left;margin-top:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><label style="min-width:90px;font-weight:700;color:' +
+      repartoColore(r.key) +
+      '">' +
+      escP(r.label) +
+      '</label><select id="ae-pag-' +
+      r.key +
+      '" style="padding:6px">' +
+      '<option value=""' +
+      (pagine === '' ? ' selected' : '') +
+      '>Nessun accesso</option>' +
+      '<option value="piano"' +
+      (pagine === 'piano' ? ' selected' : '') +
+      '>Solo Piano di lavoro</option>' +
+      '<option value="tutte"' +
+      (pagine === 'tutte' ? ' selected' : '') +
+      '>Tutte le sezioni</option>' +
+      '</select><label style="font-size:.8rem"><input type="checkbox" id="ae-mod-' +
+      r.key +
+      '"' +
+      (modifica ? ' checked' : '') +
+      '> può anche modificare</label></div>';
+  });
+  h +=
+    '<p style="font-size:.76rem;color:var(--muted);margin-top:8px">Senza la spunta "può anche modificare" l\'accesso è in sola lettura: vede tutto ma i pulsanti di modifica sono disattivati.</p>' +
+    '<div class="pwd-modal-btns" style="margin-top:14px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaAccessiExtra(\'' +
+    nome.replace(/'/g, "\\'") +
+    '\')">Salva</button></div>';
+  b.innerHTML = h;
+  document.getElementById('pwd-modal').classList.remove('hidden');
+}
+async function salvaAccessiExtra(nome) {
+  if (!isAdmin()) return;
+  const proprio = operatoriRepartoMap[nome] || 'entrambi';
+  const cfg = {};
+  getReparti()
+    .filter((r) => r.key !== proprio)
+    .forEach((r) => {
+      const pag = (document.getElementById('ae-pag-' + r.key) || {}).value;
+      const mod = (document.getElementById('ae-mod-' + r.key) || {}).checked;
+      if (pag) cfg[r.key] = { pagine: pag === 'tutte' ? 'tutte' : ['piano'], modifica: !!mod };
+    });
+  window._operatoriAccessiExtra = window._operatoriAccessiExtra || {};
+  if (Object.keys(cfg).length) window._operatoriAccessiExtra[nome] = cfg;
+  else delete window._operatoriAccessiExtra[nome];
+  await setImp('operatori_accessi_extra', JSON.stringify(window._operatoriAccessiExtra));
+  localStorage.setItem('_cache_operatori_accessi_extra', JSON.stringify(window._operatoriAccessiExtra));
+  logAzione(
+    'Accessi extra operatore',
+    nome +
+      ': ' +
+      (Object.keys(cfg)
+        .map((k) => k + '=' + (cfg[k].pagine === 'tutte' ? 'tutte' : 'piano') + (cfg[k].modifica ? '+mod' : ''))
+        .join(', ') || 'nessuno'),
+  );
+  document.getElementById('pwd-modal').classList.add('hidden');
+  toast('Accessi extra salvati per ' + nome);
+  renderOperatoriUI();
+}
 async function cambiaRepartoOperatore(nome, rep) {
   operatoriRepartoMap[nome] = rep;
   await setImp('operatori_reparto', JSON.stringify(operatoriRepartoMap));
@@ -404,7 +523,13 @@ function renderOperatoriUI() {
             repBadge +
             (hasAuth ? '<span style="font-size:.82rem;color:#2c6e49;font-weight:600">Con password</span>' : '') +
             (admin
-              ? '<select onchange="cambiaRepartoOperatore(\'' +
+              ? '<button class="btn-del-tipo" style="color:#1a4a7a;border-color:#1a4a7a" onclick="apriAccessiExtra(\'' +
+                ne +
+                '\')">Accessi extra' +
+                (Object.keys((window._operatoriAccessiExtra || {})[n] || {}).length
+                  ? ' (' + Object.keys((window._operatoriAccessiExtra || {})[n] || {}).length + ')'
+                  : '') +
+                '</button><select onchange="cambiaRepartoOperatore(\'' +
                 ne +
                 '\',this.value)" style="font-size:.75rem;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)">' +
                 opzioniRepartoHtml(rep, true) +
