@@ -1233,6 +1233,18 @@ async function generaBozzaPiano() {
   const nomi = collaboratoriCache
     .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
     .map((c) => c.nome);
+  // OBIETTIVO ORE mensile (come la tolleranza ore del solver Turnivo):
+  // giorni/7 × ore settimanali × percentuale, corretto col saldo cumulato
+  // dei mesi precedenti. La bozza dà i turni a chi è più LONTANO dal
+  // proprio obiettivo: prima i fissi al 100%, i jolly coprono il resto.
+  await _pianoAggiornaYtd(nomi);
+  const obiettivo = {};
+  nomi.forEach((n) => {
+    const info = _pianoCollabInfo(n) || {};
+    const pct = parseFloat(info.percentuale) || 1;
+    obiettivo[n] = (nGiorni / 7) * _pianoOreSett * pct - (_pianoYtdMap[n] || 0);
+  });
+  const gapOre = (n) => (obiettivo[n] || 0) - (oreMese[n] || 0);
   const consecPrima = (nome, g) => {
     let n = 0;
     for (let k = g - 1; k >= 1 && _pianoIsLavoro(cella[nome + '|' + k] || ''); k--) n++;
@@ -1426,10 +1438,13 @@ async function generaBozzaPiano() {
               if (cp === 0 && _pianoIsLavoro(cella[n + '|' + (g - 2)] || '')) return p + 2;
               return p;
             };
+            const jx = (_pianoCollabInfo(x) || {}).is_jolly ? 1 : 0;
+            const jy = (_pianoCollabInfo(y) || {}).is_jolly ? 1 : 0;
             return (
               pattern(x) - pattern(y) ||
               bonus(mx) - bonus(my) ||
-              (oreMese[x] || 0) - (oreMese[y] || 0) ||
+              gapOre(y) - gapOre(x) || // chi è più lontano dal proprio obiettivo ore viene prima
+              jx - jy || // a parità di gap, i fissi prima dei jolly
               (familiarita[y + '|' + f.turno_codice] || 0) - (familiarita[x + '|' + f.turno_codice] || 0)
             );
           });
