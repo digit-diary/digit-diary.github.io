@@ -1523,6 +1523,59 @@ async function generaBozzaPiano() {
       }
     });
   }
+  // ===== CGF AUTOMATICI =====
+  // Chi ha lavorato un giorno festivo (flag CGF) matura una compensazione:
+  // la bozza gliela assegna da sola nei BUCHI del mese (giorni senza turno),
+  // nei giorni successivi al festivo. I CGF già goduti vengono scalati.
+  const festiviCgf = new Set(pianoFestiviCache.filter((f) => f.cgf !== false).map((f) => f.data));
+  const annoCorr = ym.split('-')[0];
+  const cgfDovuti = {}; // nome -> [{daGiorno}]
+  const contaturaCgf = {}; // nome -> saldo (maturati - goduti) dall'inizio anno
+  storia.forEach((r) => {
+    if (!r.data.startsWith(annoCorr)) return;
+    if (festiviCgf.has(r.data) && _pianoTurnoInfo(r.codice))
+      contaturaCgf[r.collaboratore] = (contaturaCgf[r.collaboratore] || 0) + 1;
+    if (r.codice === 'CGF') contaturaCgf[r.collaboratore] = (contaturaCgf[r.collaboratore] || 0) - 1;
+  });
+  nomi.forEach((n) => {
+    // mese corrente: festivi lavorati (celle esistenti + appena generate) e CGF già presenti
+    for (let g = 1; g <= nGiorni; g++) {
+      const cod = cella[n + '|' + g];
+      if (!cod) continue;
+      const dstrG = ym + '-' + String(g).padStart(2, '0');
+      if (festiviCgf.has(dstrG) && _pianoTurnoInfo(cod)) (cgfDovuti[n] = cgfDovuti[n] || []).push({ daGiorno: g + 1 });
+      if (cod === 'CGF') contaturaCgf[n] = (contaturaCgf[n] || 0) - 1;
+    }
+    // crediti residui dai mesi precedenti: assegnabili in qualsiasi buco
+    let residui = contaturaCgf[n] || 0;
+    while (residui > 0) {
+      (cgfDovuti[n] = cgfDovuti[n] || []).push({ daGiorno: 1 });
+      residui--;
+    }
+  });
+  let nCgfAuto = 0;
+  nomi.forEach((n) => {
+    (cgfDovuti[n] || []).forEach((dovuto) => {
+      for (let g = Math.max(1, dovuto.daGiorno); g <= nGiorni; g++) {
+        if (cella[n + '|' + g]) continue;
+        const dstrG = ym + '-' + String(g).padStart(2, '0');
+        if (malattie[n + '|' + dstrG]) continue;
+        cella[n + '|' + g] = 'CGF';
+        nuove.push({
+          collaboratore: n,
+          data: dstrG,
+          codice: 'CGF',
+          protetto: false,
+          generato: true,
+          commento: 'CGF automatico (compensazione festivo lavorato)',
+          reparto_dip: _pianoReparto(),
+        });
+        nCgfAuto++;
+        break;
+      }
+    });
+  });
+
   if (!nuove.length && !sostituzioniWd.length) {
     toast(
       'Niente da generare: fabbisogni già coperti' +
@@ -1538,8 +1591,10 @@ async function generaBozzaPiano() {
         ' (' +
         repartoLabel(_pianoReparto()) +
         '):\n\n• ' +
-        (nuove.length + sostituzioniWd.length) +
-        ' turni da assegnare\n• ' +
+        (nuove.length + sostituzioniWd.length - nCgfAuto) +
+        ' turni da assegnare' +
+        (nCgfAuto ? '\n• ' + nCgfAuto + ' CGF automatici (compensazione festivi lavorati)' : '') +
+        '\n• ' +
         scoperti.length +
         ' posti senza candidato idoneo\n\nLe celle esistenti (vacanze, protette, malattie) NON vengono toccate.\nLa bozza si può eliminare con "Cancella piano". Procedere?',
     )
