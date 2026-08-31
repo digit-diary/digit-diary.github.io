@@ -285,6 +285,11 @@ const _PIANO_TABS = [
     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M5 10.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5m0-2a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m0-2a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m0-2a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5"/><path d="M3 0h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2v-1h1v1a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v1H1V2a2 2 0 0 1 2-2"/><path d="M1 5v-.5a.5.5 0 0 1 1 0V5h.5a.5.5 0 0 1 0 1h-2a.5.5 0 0 1 0-1zm0 3v-.5a.5.5 0 0 1 1 0V8h.5a.5.5 0 0 1 0 1h-2a.5.5 0 0 1 0-1zm0 3v-.5a.5.5 0 0 1 1 0v.5h.5a.5.5 0 0 1 0 1h-2a.5.5 0 0 1 0-1z"/></svg>',
   ],
   [
+    'formulari',
+    'Formulari',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 7a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1zM5 9.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m0 2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5"/><path d="M9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.5zm0 1v2A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1z"/></svg>',
+  ],
+  [
     'guida',
     'Guida',
     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783"/></svg>',
@@ -463,6 +468,10 @@ async function renderPiano() {
         '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#b8a98a;color:#b8a98a" onclick="copiaPianoExcel()">Copia per Excel</button>';
       h +=
         '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#b8a98a;color:#b8a98a" onclick="stampaPianoPDF()">Stampa PDF</button>';
+      if (puoMod)
+        h +=
+          '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#b8a98a;color:#b8a98a" onclick="document.getElementById(\'piano-imp-file\').click()">Importa piano</button>' +
+          '<input type="file" id="piano-imp-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importaPianoExcel(this)">';
       h +=
         '<span style="font-size:.8rem;color:var(--muted);margin-left:auto">' +
         _pianoRighe.length +
@@ -824,6 +833,8 @@ async function renderPiano() {
       h += await _renderPianoSaldoTab();
     } else if (_pianoTab === 'storico') {
       h += await _renderPianoStoricoTab();
+    } else if (_pianoTab === 'formulari') {
+      h += await _renderPianoFormulariTab();
     } else if (_pianoTab === 'guida') {
       h += _renderPianoGuidaTab();
     } else if (_pianoTab === 'impostazioni') {
@@ -1795,6 +1806,107 @@ async function importaFabbisognoExcel(input) {
     toast('Errore lettura file fabbisogno');
   }
 }
+// IMPORT PIANO da Excel/CSV (come l'import del foglio PIANO SLOTS in
+// Turnivo): prima colonna = collaboratore, colonne successive = giorni
+// 1..N con le sigle. Le celle esistenti NON vengono toccate; sigle
+// sconosciute e nomi non riconosciuti vengono scartati e conteggiati.
+// L'ordine delle righe resta quello predefinito (SUP, BO, poi gli
+// altri) e si può sempre riordinare trascinando i nomi.
+async function importaPianoExcel(input) {
+  if (!puoGestirePiano()) return;
+  const file = input.files[0];
+  input.value = '';
+  if (!file || !window.XLSX) return;
+  const ym = _pianoMeseSel;
+  const nGiorni = _pianoUltimoGiorno(ym);
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf);
+    const dati = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+    const collabs = collaboratoriCache.filter((c) => c.attivo !== false);
+    const trova = (nome) => {
+      const n = String(nome || '')
+        .trim()
+        .toLowerCase();
+      if (!n) return null;
+      return (
+        collabs.find(
+          (c) =>
+            c.nome.toLowerCase() === n ||
+            (n.split(/\s+/).length > 1 && n.split(/\s+/).every((p) => c.nome.toLowerCase().includes(p))),
+        ) || null
+      );
+    };
+    let inizio = 0;
+    const prima = String((dati[0] || [])[0] || '').toLowerCase();
+    if (!prima || prima.includes('collaborator') || prima.includes('nome')) inizio = 1;
+    const nuove = [];
+    const nomiOk = new Set();
+    const nomiSconosciuti = new Set();
+    let sigleScartate = 0;
+    dati.slice(inizio).forEach((riga) => {
+      const hit = trova(riga[0]);
+      if (!hit) {
+        if (String(riga[0] || '').trim()) nomiSconosciuti.add(String(riga[0]).trim());
+        return;
+      }
+      nomiOk.add(hit.nome);
+      for (let g = 1; g <= nGiorni; g++) {
+        const cod = String(riga[g] || '')
+          .trim()
+          .toUpperCase();
+        if (!cod) continue;
+        if (!_pianoTurnoInfo(cod) && !_pianoCodiceInfo(cod)) {
+          sigleScartate++;
+          continue;
+        }
+        nuove.push({
+          collaboratore: hit.nome,
+          data: ym + '-' + String(g).padStart(2, '0'),
+          codice: cod,
+          protetto: true,
+          generato: false,
+          reparto_dip: _pianoReparto(),
+        });
+      }
+    });
+    if (!nuove.length) {
+      toast('Nessuna cella riconosciuta nel file');
+      return;
+    }
+    const MESI_L = MESI_FULL || [];
+    const lbl = (MESI_L[parseInt(ym.split('-')[1]) - 1] || ym) + ' ' + ym.split('-')[0];
+    if (
+      !confirm(
+        'Importare il piano di ' +
+          lbl +
+          '?\n\n• ' +
+          nomiOk.size +
+          ' collaboratori riconosciuti\n• ' +
+          nuove.length +
+          ' celle da importare (protette)' +
+          (sigleScartate ? '\n• ' + sigleScartate + ' sigle sconosciute scartate' : '') +
+          (nomiSconosciuti.size
+            ? '\n• Nomi NON riconosciuti: ' +
+              [...nomiSconosciuti].slice(0, 5).join(', ') +
+              (nomiSconosciuti.size > 5 ? '...' : '')
+            : '') +
+          '\n\nLe celle già presenti NON vengono toccate.',
+      )
+    )
+      return;
+    const r = await sbRpc('piano_bulk_upsert', { p_token: getOpToken(), p_rows: nuove });
+    logAzione('Piano importato da Excel', ym + ' — ' + ((r && r.inserite) || 0) + '/' + nuove.length + ' celle');
+    toast('Piano importato: ' + ((r && r.inserite) || 0) + ' celle nuove');
+    _pianoViolCelle = {};
+    _pianoViolLista = null;
+    renderPiano();
+  } catch (e) {
+    console.error(e);
+    toast('Errore lettura file piano');
+  }
+}
+
 // come fabbisogno.elimina di Turnivo: cancella tutto il fabbisogno del mese
 async function eliminaFabbisognoMese() {
   if (!puoGestirePiano()) return;
@@ -2624,7 +2736,6 @@ function _pdfCambioTurno(dati) {
   doc.rect(M + 6, yy - 4, 5, 5);
   doc.setFontSize(11);
   doc.setTextColor(34, 34, 34);
-  doc.text('X', M + 7.2, yy);
   doc.text('Autorizzato', M + 14, yy);
   doc.rect(M + 52, yy - 4, 5, 5);
   doc.text('Non autorizzato', M + 60, yy);
@@ -3989,6 +4100,8 @@ async function _renderPianoVacanzeTab() {
       escP(meseLbl) +
       '</button>';
     h +=
+      '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#8e44ad;color:#b07cc7" onclick="apriScambioSettimane()">Scambia settimane</button>';
+    h +=
       '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#8e44ad;color:#b07cc7" onclick="pdfCambioVacanza()">Formulario cambio vacanza</button>';
     h +=
       '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:var(--accent);color:var(--accent)" onclick="eliminaTutteVacanze()">Elimina tutte</button>';
@@ -4183,7 +4296,7 @@ async function _renderPianoStoricoTab() {
 
 // Formulario RICHIESTA CAMBIO VACANZA — replica di cambio_vacanza_pdf.html
 // di Turnivo (modulo vuoto da compilare a mano, stesse sezioni colorate)
-async function pdfCambioVacanza() {
+async function pdfCambioVacanza(dati) {
   if (!window.jspdf) await caricaJsPDF();
   if (!window.jspdf) return;
   const { jsPDF } = window.jspdf;
@@ -4248,14 +4361,22 @@ async function pdfCambioVacanza() {
     y += altezza + 6;
     return yy;
   };
-  const campiCollab = [
-    ['Nome:', linea],
-    ['Settore:', linea],
-    ['Numero settimana:', '__________________'],
-    ['Periodo vacanza:', '____/____/________  —  ____/____/________'],
-  ];
-  sezione('Collaboratore A (richiedente)', [52, 152, 219], campiCollab);
-  sezione('Collaboratore B (accetta lo scambio)', [230, 126, 34], campiCollab);
+  const campiDi = (c) =>
+    c
+      ? [
+          ['Nome:', c.nome],
+          ['Settore:', c.settore || repartoLabel(_pianoReparto())],
+          ['Numero settimana:', 'Settimana ' + c.settimana],
+          ['Periodo vacanza:', c.dal + '  —  ' + c.al],
+        ]
+      : [
+          ['Nome:', linea],
+          ['Settore:', linea],
+          ['Numero settimana:', '__________________'],
+          ['Periodo vacanza:', '____/____/________  —  ____/____/________'],
+        ];
+  sezione('Collaboratore A (richiedente)', [52, 152, 219], campiDi(dati && dati.a));
+  sezione('Collaboratore B (accetta lo scambio)', [230, 126, 34], campiDi(dati && dati.b));
   sezione(
     'Motivazione',
     [46, 204, 113],
@@ -4313,6 +4434,141 @@ async function pdfCambioVacanza() {
   doc.setTextColor(150, 150, 150);
   doc.text('Generato dal Diario Collaboratori — formulario cambio vacanza', 105, 287, { align: 'center' });
   mostraPdfPreview(doc, 'cambio_vacanza.pdf', 'Formulario cambio vacanza');
+}
+
+// SCAMBIO SETTIMANE tra due collaboratori (meglio del solo formulario di
+// Turnivo): scambia le righe vacanza, sistema le celle V/C/WD nei mesi già
+// pianificati e genera il modulo PDF PRECOMPILATO per le firme.
+function apriScambioSettimane() {
+  if (!puoGestirePiano()) return;
+  if (_pianoVacCache.length < 2) {
+    toast("Servono almeno due vacanze nell'anno selezionato");
+    return;
+  }
+  const opzioni = _pianoVacCache
+    .slice()
+    .sort((a, b) => a.collaboratore.localeCompare(b.collaboratore) || a.settimana - b.settimana)
+    .map(
+      (v) =>
+        '<option value="' +
+        v.id +
+        '">' +
+        escP(v.collaboratore) +
+        ' — settimana ' +
+        v.settimana +
+        ' (' +
+        _vacDateSettimana(v.anno, v.settimana) +
+        ')</option>',
+    )
+    .join('');
+  const b = document.getElementById('pwd-modal-content');
+  b.innerHTML =
+    '<h3>Scambia settimane di vacanza — ' +
+    window._pianoVacAnno +
+    '</h3><div class="field" style="text-align:left"><label>Collaboratore A (richiedente)</label><select id="ss-a" style="width:100%;padding:8px">' +
+    opzioni +
+    '</select></div><div class="field" style="text-align:left;margin-top:8px"><label>Collaboratore B (accetta lo scambio)</label><select id="ss-b" style="width:100%;padding:8px">' +
+    opzioni +
+    '</select></div>' +
+    '<p style="font-size:.78rem;color:var(--muted);margin-top:8px">Le due settimane vengono scambiate; nei mesi già pianificati le V e i congedi vengono sistemati di conseguenza. Alla fine si genera il modulo PDF precompilato per le firme.</p>' +
+    '<div class="pwd-modal-btns" style="margin-top:14px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="confermaScambioSettimane()">Scambia</button></div>';
+  document.getElementById('pwd-modal').classList.remove('hidden');
+}
+async function confermaScambioSettimane() {
+  const idA = parseInt((document.getElementById('ss-a') || {}).value);
+  const idB = parseInt((document.getElementById('ss-b') || {}).value);
+  document.getElementById('pwd-modal').classList.add('hidden');
+  const vA = _pianoVacCache.find((x) => x.id === idA);
+  const vB = _pianoVacCache.find((x) => x.id === idB);
+  if (!vA || !vB || vA.id === vB.id) {
+    toast('Scegli due vacanze diverse');
+    return;
+  }
+  if (vA.collaboratore === vB.collaboratore) {
+    toast('Le due vacanze appartengono alla stessa persona: usa Modifica');
+    return;
+  }
+  // duplicati: A non deve già avere la settimana di B e viceversa
+  if (
+    _pianoVacCache.some(
+      (x) => x.collaboratore === vA.collaboratore && x.settimana === vB.settimana && x.id !== vA.id,
+    ) ||
+    _pianoVacCache.some((x) => x.collaboratore === vB.collaboratore && x.settimana === vA.settimana && x.id !== vB.id)
+  ) {
+    toast("Uno dei due ha già la settimana dell'altro");
+    return;
+  }
+  const op = getOperatore();
+  try {
+    await secPatch('piano_vacanze', 'id=eq.' + vA.id, { settimana: vB.settimana });
+    await secPatch('piano_vacanze', 'id=eq.' + vB.id, { settimana: vA.settimana });
+    logAzione(
+      'Vacanze: scambio settimane',
+      vA.collaboratore + ' (sett. ' + vA.settimana + ') <-> ' + vB.collaboratore + ' (sett. ' + vB.settimana + ')',
+    );
+    // sistemare i mesi già pianificati: via le V della vecchia settimana e i
+    // C/WD generati dei due collaboratori, poi riapplico le vacanze
+    const anno = window._pianoVacAnno;
+    const mesi = new Set();
+    [vA.settimana, vB.settimana].forEach((sett) =>
+      _pianoGiorniSettimana(anno, sett).forEach((dstr) => {
+        if (dstr.startsWith(String(anno))) mesi.add(dstr.substring(0, 7));
+      }),
+    );
+    const meseCorrente = _pianoMeseSel;
+    for (const ym of mesi) {
+      const nG = _pianoUltimoGiorno(ym);
+      const righeMese =
+        (await secGet(
+          'piano?data=gte.' +
+            ym +
+            '-01&data=lte.' +
+            ym +
+            '-' +
+            String(nG).padStart(2, '0') +
+            '&reparto_dip=eq.' +
+            _pianoReparto() +
+            '&limit=5000',
+        )) || [];
+      if (!righeMese.length) continue; // mese non ancora pianificato: le V arriveranno con Applica/Genera
+      for (const nome of [vA.collaboratore, vB.collaboratore]) {
+        for (const r of righeMese.filter(
+          (x) =>
+            x.collaboratore === nome && (x.codice === 'V' || ((x.codice === 'C' || x.codice === 'WD') && x.generato)),
+        )) {
+          await secDel('piano', 'id=eq.' + r.id);
+        }
+      }
+      _pianoMeseSel = ym;
+      _pianoRighe =
+        (await secGet(
+          'piano?data=gte.' +
+            ym +
+            '-01&data=lte.' +
+            ym +
+            '-' +
+            String(nG).padStart(2, '0') +
+            '&reparto_dip=eq.' +
+            _pianoReparto() +
+            '&limit=5000',
+        )) || [];
+      await _applicaVacanzeMese(false);
+    }
+    _pianoMeseSel = meseCorrente;
+    // PDF precompilato identico al modulo
+    const ggA = _pianoGiorniSettimana(anno, vB.settimana); // nuova settimana di A
+    const ggB = _pianoGiorniSettimana(anno, vA.settimana);
+    const fmt = (d) => d.split('-').reverse().join('/');
+    await pdfCambioVacanza({
+      a: { nome: vA.collaboratore, settimana: vB.settimana, dal: fmt(ggA[0]), al: fmt(ggA[6]) },
+      b: { nome: vB.collaboratore, settimana: vA.settimana, dal: fmt(ggB[0]), al: fmt(ggB[6]) },
+    });
+    toast('Settimane scambiate' + (mesi.size ? ' e piano aggiornato' : ''));
+    renderPiano();
+  } catch (e) {
+    console.error(e);
+    toast('Errore scambio settimane');
+  }
 }
 
 function apriNuovaVacanza() {
@@ -5175,6 +5431,230 @@ const _REGOLE_GRUPPO_TIPI = {
   minimo_funzione_giorno: 'Almeno N al giorno, con filtri (es: SUP:1:NOTTURNO:4,5 — 4,5=ven,sab)',
 };
 // TAB GUIDA — manuale rapido della sezione Piano (come la Guida di Turnivo)
+// ================================================================
+// TAB FORMULARI — moduli stampabili standard (come i formulari vuoti di
+// Turnivo) + ARCHIVIO personalizzato: carichi i tuoi formulari (PDF,
+// Word, Excel ≤2MB), li organizzi in cartelle nominabili per settore,
+// li apri/stampi (PDF direttamente, Word/Excel in download) e li elimini.
+// ================================================================
+let _pianoFormulariCache = [];
+async function _renderPianoFormulariTab() {
+  _pianoFormulariCache =
+    (await secGet('piano_formulari?reparto_dip=eq.' + _pianoReparto() + '&order=cartella.asc,nome.asc&limit=500')) ||
+    [];
+  const puoMod = puoGestirePiano() || isAdmin();
+  const riga = (titolo, desc, onclick, etichetta) =>
+    '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:260px"><b>' +
+    titolo +
+    '</b><br><span style="font-size:.8rem;color:var(--muted)">' +
+    desc +
+    '</span></div><button class="btn-export" style="font-size:.82rem;padding:5px 14px" onclick="' +
+    onclick +
+    '">' +
+    (etichetta || 'Stampa PDF') +
+    '</button></div>';
+  let h = '<div class="main-card"><div class="card-header">Moduli standard</div><div style="padding:6px 16px 14px">';
+  h += riga(
+    'Richiesta cambio turno (modulo vuoto)',
+    'Da compilare a mano e far firmare: collaboratori A e B, motivazione, autorizzazione.',
+    'pdfCambioTurnoVuoto()',
+  );
+  h += riga(
+    'Richiesta cambio vacanza (modulo vuoto)',
+    'Scambio di settimana di vacanza tra due collaboratori, con firme e autorizzazione.',
+    'pdfCambioVacanza()',
+  );
+  h += riga(
+    'Protocollo formazione — Slot Attendant',
+    'Checklist ufficiale con valutazione del formatore (Excel compilabile, si reimporta in Formazione).',
+    "pianoScaricaProtocollo('sala')",
+    'Scarica Excel',
+  );
+  h += riga(
+    'Protocollo formazione — Reception',
+    'Checklist ufficiale Reception.',
+    "pianoScaricaProtocollo('reception')",
+    'Scarica Excel',
+  );
+  h += riga(
+    'Protocollo formazione — Cassa',
+    'Checklist ufficiale Cassa.',
+    "pianoScaricaProtocollo('cassa')",
+    'Scarica Excel',
+  );
+  h += '</div></div>';
+
+  // ARCHIVIO personalizzato
+  h +=
+    '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">I tuoi formulari — ' +
+    escP(repartoLabel(_pianoReparto())) +
+    ' (' +
+    _pianoFormulariCache.length +
+    ')';
+  if (puoMod)
+    h +=
+      '<button class="btn-export" style="font-size:.78rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49" onclick="document.getElementById(\'form-arch-file\').click()">Carica formulario</button>' +
+      '<input type="file" id="form-arch-file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv" style="display:none" onchange="caricaFormulario(this)">';
+  h += '</div><div style="padding:6px 16px 14px">';
+  h +=
+    '<p style="font-size:.8rem;color:var(--muted);margin-bottom:8px">PDF, Word ed Excel fino a 2 MB, organizzati in cartelle per settore. I PDF si aprono e stampano direttamente; Word ed Excel si scaricano e si stampano dal programma.</p>';
+  if (!_pianoFormulariCache.length) h += '<p style="color:var(--muted);padding:8px 0">Nessun formulario caricato.</p>';
+  const perCartella = {};
+  _pianoFormulariCache.forEach(
+    (f) => (perCartella[f.cartella || 'Generale'] = (perCartella[f.cartella || 'Generale'] || []).concat(f)),
+  );
+  Object.keys(perCartella)
+    .sort()
+    .forEach((cart) => {
+      h +=
+        '<div style="margin:10px 0 4px;font-weight:700;font-size:.9rem">📁 ' +
+        escP(cart) +
+        ' <span style="font-weight:400;color:var(--muted)">(' +
+        perCartella[cart].length +
+        ')</span></div>';
+      perCartella[cart].forEach((f) => {
+        const icona = f.mime === 'application/pdf' ? '📄' : f.mime && f.mime.includes('sheet') ? '📊' : '📝';
+        h +=
+          '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0 6px 14px;border-bottom:1px solid var(--line)"><span style="flex:1;min-width:220px">' +
+          icona +
+          ' ' +
+          escP(f.nome) +
+          ' <span style="font-size:.72rem;color:var(--muted)">(' +
+          Math.round((f.dimensione || 0) / 1024) +
+          ' KB)</span></span>' +
+          '<button class="btn-export" style="font-size:.76rem;padding:3px 10px" onclick="apriFormulario(' +
+          f.id +
+          ')">' +
+          (f.mime === 'application/pdf' ? 'Apri / Stampa' : 'Scarica') +
+          '</button>' +
+          (puoMod
+            ? '<button class="btn-export" style="font-size:.76rem;padding:3px 10px;border-color:#1a4a7a;color:#1a4a7a" onclick="rinominaFormulario(' +
+              f.id +
+              ')">Rinomina/Sposta</button><button class="btn-export" style="font-size:.76rem;padding:3px 10px;border-color:var(--accent);color:var(--accent)" onclick="eliminaFormulario(' +
+              f.id +
+              ')">Elimina</button>'
+            : '') +
+          '</div>';
+      });
+    });
+  h += '</div></div>';
+  return h;
+}
+function pianoScaricaProtocollo(k) {
+  if (typeof scaricaProtocolloExcel === 'function') scaricaProtocolloExcel(k);
+}
+async function caricaFormulario(input) {
+  if (!puoGestirePiano() && !isAdmin()) return;
+  const file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) {
+    toast('File troppo grande (max 2 MB)');
+    return;
+  }
+  const cartella = (prompt('Cartella (es. Cambi, Formazione, HR...):', 'Generale') || '').trim();
+  if (cartella === '') return;
+  const nome = (prompt('Nome del formulario:', file.name.replace(/\.[^.]+$/, '')) || '').trim();
+  if (!nome) return;
+  try {
+    const buf = await file.arrayBuffer();
+    let bin = '';
+    const bytes = new Uint8Array(buf);
+    for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+    const b64 = btoa(bin);
+    const r = await secPost('piano_formulari', {
+      nome: nome,
+      cartella: cartella,
+      mime: file.type || 'application/octet-stream',
+      estensione: (file.name.split('.').pop() || '').toLowerCase(),
+      dimensione: file.size,
+      contenuto: b64,
+      reparto_dip: _pianoReparto(),
+      operatore: getOperatore(),
+    });
+    if (r && r[0]) _pianoFormulariCache.push(r[0]);
+    logAzione('Formulario caricato', nome + ' (' + cartella + ')');
+    toast('Formulario "' + nome + '" caricato');
+    renderPiano();
+  } catch (e) {
+    console.error(e);
+    toast('Errore caricamento formulario');
+  }
+}
+async function apriFormulario(id) {
+  let f = _pianoFormulariCache.find((x) => x.id === id);
+  if (f && !f.contenuto) f = null;
+  if (!f) {
+    const r = await secGet('piano_formulari?id=eq.' + id);
+    f = r && r[0];
+  }
+  if (!f) return;
+  try {
+    const bin = atob(f.contenuto);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const blob = new Blob([bytes], { type: f.mime || 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    if (f.mime === 'application/pdf') {
+      window.open(url, '_blank');
+    } else {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = f.nome + (f.estensione ? '.' + f.estensione : '');
+      a.click();
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+    toast('Errore apertura formulario');
+  }
+}
+async function rinominaFormulario(id) {
+  if (!puoGestirePiano() && !isAdmin()) return;
+  const f = _pianoFormulariCache.find((x) => x.id === id);
+  if (!f) return;
+  const nome = (prompt('Nome:', f.nome) || '').trim();
+  if (!nome) return;
+  const cartella = (prompt('Cartella:', f.cartella || 'Generale') || '').trim() || 'Generale';
+  try {
+    await secPatch('piano_formulari', 'id=eq.' + id, { nome: nome, cartella: cartella });
+    f.nome = nome;
+    f.cartella = cartella;
+    logAzione('Formulario rinominato', nome + ' (' + cartella + ')');
+    renderPiano();
+  } catch (e) {
+    toast('Errore');
+  }
+}
+async function eliminaFormulario(id) {
+  if (!puoGestirePiano() && !isAdmin()) return;
+  const f = _pianoFormulariCache.find((x) => x.id === id);
+  if (!f || !confirm('Eliminare il formulario "' + f.nome + '"?')) return;
+  try {
+    await secDel('piano_formulari', 'id=eq.' + id);
+    _pianoFormulariCache = _pianoFormulariCache.filter((x) => x.id !== id);
+    logAzione('Formulario eliminato', f.nome);
+    toast('Formulario eliminato');
+    renderPiano();
+  } catch (e) {
+    toast('Errore eliminazione');
+  }
+}
+// Modulo VUOTO di richiesta cambio turno (come cambio_turno_pdf_vuoto di Turnivo)
+async function pdfCambioTurnoVuoto() {
+  if (!window.jspdf) await caricaJsPDF();
+  if (!window.jspdf) return;
+  const linea = '___________________________________________';
+  const doc = _pdfCambioTurno({
+    tipo: 'SCAMBIO',
+    data: '____/____/________',
+    a: { nome: linea, settore: '', turno: '_____', orari: '' },
+    b: { nome: linea, settore: '', turno: '_____', orari: '' },
+    motivo: linea + '___________________',
+    richiesto: '',
+  });
+  mostraPdfPreview(doc, 'cambio_turno_vuoto.pdf', 'Formulario cambio turno');
+}
+
 function _renderPianoGuidaTab() {
   const sez = (titolo, righe) =>
     '<div class="main-card" style="margin-top:12px"><div class="card-header">' +
