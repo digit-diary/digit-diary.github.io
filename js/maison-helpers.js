@@ -1852,6 +1852,17 @@ function aggiornaLoginOperatori() {
       .join('');
 }
 function setReparto(rep) {
+  // sicurezza: un operatore non-admin può andare solo nel proprio reparto
+  // o nei reparti concessi come accesso extra
+  if (typeof isAdmin === 'function' && !isAdmin()) {
+    var _op = getOperatore();
+    var _proprio = operatoriRepartoMap[_op] || 'entrambi';
+    if (_proprio !== 'entrambi') {
+      var _extra = typeof _accessiExtraDi === 'function' ? _accessiExtraDi(_op) : null;
+      var _ok = rep === _proprio || !!(_extra && _extra[rep]);
+      if (!_ok) return;
+    }
+  }
   currentReparto = rep;
   _aggiornaBottoniReparto();
   // pagine abilitate per settore: nascondi tab e, se la pagina corrente non è disponibile, torna alla Home
@@ -1946,6 +1957,26 @@ function applicaRepartoVisibilita() {
     })
   )
     currentReparto = 'slots';
+  // accessi extra: reparti aggiuntivi concessi all'operatore (solo alcune
+  // sezioni, in lettura o modifica) — il selettore mostra proprio + extra
+  var extraCfg = typeof _accessiExtraDi === 'function' && opRep !== 'entrambi' ? _accessiExtraDi(op) : null;
+  var repartiExtra = extraCfg
+    ? Object.keys(extraCfg).filter(function (k) {
+        return extraCfg[k];
+      })
+    : [];
+  if (opRep !== 'entrambi' && repartiExtra.length && getReparti().length > 1) {
+    sw.style.display = 'flex';
+    sw.classList.remove('hidden');
+    var ammessi = [opRep].concat(repartiExtra);
+    getReparti().forEach(function (r) {
+      var btn = document.getElementById('btn-rep-' + r.key);
+      if (btn) btn.style.display = ammessi.indexOf(r.key) !== -1 ? '' : 'none';
+    });
+    if (ammessi.indexOf(currentReparto) === -1) currentReparto = opRep;
+    _aggiornaBottoniReparto();
+    return;
+  }
   // 'entrambi' = tutti i reparti; altrimenti l'operatore vede solo il proprio
   if (opRep === 'entrambi' && getReparti().length > 1) {
     sw.style.display = 'flex';

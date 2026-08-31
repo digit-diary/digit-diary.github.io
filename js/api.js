@@ -148,6 +148,21 @@ async function loadAll() {
   if (typeof _salvaCacheReparti === 'function') _salvaCacheReparti();
   if (typeof popolaLoginSettore === 'function') popolaLoginSettore();
   const opRep = await getImp('operatori_reparto');
+  try {
+    const accExtra = await getImp('operatori_accessi_extra');
+    if (accExtra) {
+      window._operatoriAccessiExtra = JSON.parse(accExtra);
+      localStorage.setItem('_cache_operatori_accessi_extra', accExtra);
+    } else {
+      const cachedAE = localStorage.getItem('_cache_operatori_accessi_extra');
+      if (cachedAE) window._operatoriAccessiExtra = JSON.parse(cachedAE);
+    }
+  } catch (e) {
+    try {
+      const cachedAE = localStorage.getItem('_cache_operatori_accessi_extra');
+      if (cachedAE) window._operatoriAccessiExtra = JSON.parse(cachedAE);
+    } catch (e2) {}
+  }
   if (opRep) {
     try {
       operatoriRepartoMap = JSON.parse(opRep);
