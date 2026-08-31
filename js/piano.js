@@ -5568,24 +5568,27 @@ async function _renderPianoFormulariTab() {
     'Modulo ufficiale HR 1187: i jolly indicano i giorni del mese in cui non sono disponibili (da consegnare entro il 3° giorno del mese).',
     'pdfNonDisponibilitaJolly()',
   );
-  h += riga(
+  const rigaProtocollo = (titolo, nomeOriginale, chiave) =>
+    '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:260px"><b>' +
+    titolo +
+    '</b><br><span style="font-size:.8rem;color:var(--muted)">Modulo ufficiale Word da stampare/compilare. In alternativa, la versione Excel si compila al computer e si reimporta in Formazione per la certificazione automatica.</span></div>' +
+    '<button class="btn-export" style="font-size:.82rem;padding:5px 14px;border-color:#1a4a7a;color:#1a4a7a" onclick="apriFormularioPerNome(\'' +
+    nomeOriginale.replace(/'/g, "\\'") +
+    '\')">Scarica Word (originale)</button>' +
+    '<button class="btn-export" style="font-size:.78rem;padding:4px 10px" onclick="pianoScaricaProtocollo(\'' +
+    chiave +
+    '\')">Excel per import</button></div>';
+  h += rigaProtocollo(
     'Protocollo formazione — Slot Attendant',
-    'Checklist ufficiale con valutazione del formatore (Excel compilabile, si reimporta in Formazione).',
-    "pianoScaricaProtocollo('sala')",
-    'Scarica Excel',
+    'Formazione Slot Attendant nuovi impiegati (originale)',
+    'sala',
   );
-  h += riga(
+  h += rigaProtocollo(
     'Protocollo formazione — Reception',
-    'Checklist ufficiale Reception.',
-    "pianoScaricaProtocollo('reception')",
-    'Scarica Excel',
+    'Formazione Reception nuovi impiegati (originale)',
+    'reception',
   );
-  h += riga(
-    'Protocollo formazione — Cassa',
-    'Checklist ufficiale Cassa.',
-    "pianoScaricaProtocollo('cassa')",
-    'Scarica Excel',
-  );
+  h += rigaProtocollo('Protocollo formazione — Cassa', 'Protocollo Formazione Cassa (originale)', 'cassa');
   h += '</div></div>';
 
   // ARCHIVIO personalizzato
@@ -5646,6 +5649,19 @@ async function _renderPianoFormulariTab() {
 }
 function pianoScaricaProtocollo(k) {
   if (typeof scaricaProtocolloExcel === 'function') scaricaProtocolloExcel(k);
+}
+async function apriFormularioPerNome(nome) {
+  let f = _pianoFormulariCache.find((x) => x.nome === nome);
+  if (!f) {
+    const r = await secGet('piano_formulari?nome=eq.' + encodeURIComponent(nome));
+    f = r && r[0];
+    if (f) _pianoFormulariCache.push(f);
+  }
+  if (!f) {
+    toast('Originale non trovato nell\'archivio: caricalo con "Carica formulario"');
+    return;
+  }
+  apriFormulario(f.id);
 }
 async function caricaFormulario(input) {
   if (!puoGestirePiano() && !isAdmin()) return;
