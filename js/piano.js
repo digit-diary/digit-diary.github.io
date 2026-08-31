@@ -76,7 +76,7 @@ function _pianoCompetenzeGruppi() {
 // null = nessuna configurazione (si usa la storia dei turni).
 function _pianoSettoriEffettivi(info) {
   if (!info) return null;
-  const base = info.settori_piano
+  let base = info.settori_piano
     ? info.settori_piano
         .toUpperCase()
         .split(',')
@@ -85,9 +85,18 @@ function _pianoSettoriEffettivi(info) {
     : [];
   const mappa = _pianoCompetenzeGruppi();
   const comp = info.competenze || {};
-  Object.keys(comp).forEach((k) => {
-    if (comp[k] === true && mappa[k] && !base.includes(mappa[k].toUpperCase())) base.push(mappa[k].toUpperCase());
-  });
+  const chiaviMappate = Object.keys(mappa).filter((k) => mappa[k]);
+  const haFormazione = chiaviMappate.some((k) => comp[k] === true);
+  if (haFormazione) {
+    // La FORMAZIONE comanda sui gruppi collegati: spunta = idoneo, senza
+    // spunta = escluso (es. tolto dalla cassa). I settori importati restano
+    // validi solo per i gruppi NON collegati a una competenza.
+    const gruppiMappati = [...new Set(chiaviMappate.map((k) => mappa[k].toUpperCase()))];
+    base = base.filter((g) => !gruppiMappati.includes(g));
+    chiaviMappate.forEach((k) => {
+      if (comp[k] === true && !base.includes(mappa[k].toUpperCase())) base.push(mappa[k].toUpperCase());
+    });
+  }
   return base.length || info.settori_piano != null ? base : null;
 }
 function _pianoCampoOk(info, valore) {
@@ -2750,7 +2759,7 @@ function _pdfCambioTurno(dati) {
 }
 
 // ---- Scambio turno tra colleghi (come Turnivo cap. 19) ----
-function apriScambioTurno() {
+async function apriScambioTurno() {
   const sel = _pianoCellaSel;
   if (!sel) return;
   const r = _pianoRighe.find((x) => x.collaboratore === sel.nome && x.data === sel.data);
@@ -2785,16 +2794,15 @@ function apriScambioTurno() {
     return true;
   };
   const tMio = _pianoTurnoInfo(r.codice);
-  // limite cambi al mese (impostazione, 0 = illimitati)
+  // limite cambi al mese: conta solo i cambi RICHIESTI dal collaboratore
+  // (es. limite 3: Mario chiede 3 cambi e li esaurisce, Paolo che ha solo
+  // accettato può ancora chiederne 3 a sua volta)
   const maxCambi = _pianoMaxCambi();
-  const cambiDi = (nomeX) =>
-    _pianoRighe.filter((x) => x.collaboratore === nomeX && / - cambio con /.test(x.commento || '')).length;
-  const mieiCambi = cambiDi(sel.nome);
+  const cambiRichiesti = maxCambi > 0 ? await _pianoCambiRichiesti(_pianoMeseSel) : {};
+  const mieiCambi = cambiRichiesti[sel.nome] || 0;
   const problemaCon = (c) => {
-    if (maxCambi > 0) {
-      if (mieiCambi >= maxCambi) return 'hai già ' + mieiCambi + '/' + maxCambi + ' cambi questo mese';
-      if (cambiDi(c.collaboratore) >= maxCambi) return 'limite cambi raggiunto (' + maxCambi + '/mese)';
-    }
+    if (maxCambi > 0 && mieiCambi >= maxCambi)
+      return 'limite superato (' + mieiCambi + '/' + maxCambi + '): serve autorizzazione';
     const tSuo = _pianoTurnoInfo(c.codice);
     if (!_pianoIdoneoPerTurno(sel.nome, tSuo)) return 'tu non sei idoneo a ' + c.codice;
     if (!_pianoIdoneoPerTurno(c.collaboratore, tMio)) return 'non idoneo a ' + r.codice;
@@ -2809,7 +2817,19 @@ function apriScambioTurno() {
     escP(sel.nome) +
     '</strong> (' +
     escP(r.codice) +
-    ') scambia con:</p><select id="scambio-collega" style="width:100%;padding:10px">' +
+    ') scambia con:</p>' +
+    (maxCambi > 0
+      ? '<p style="font-size:.78rem;color:' +
+        (mieiCambi >= maxCambi ? '#c0392b' : 'var(--muted)') +
+        ';margin-bottom:6px">Cambi richiesti da ' +
+        escP(sel.nome.split(' ')[0]) +
+        ' questo mese: ' +
+        mieiCambi +
+        '/' +
+        maxCambi +
+        ' (chi accetta non consuma il suo limite)</p>'
+      : '') +
+    '<select id="scambio-collega" style="width:100%;padding:10px">' +
     colleghi
       .map((c) => {
         const prob = problemaCon(c);
@@ -2847,11 +2867,26 @@ async function confermaScambioTurno() {
   if (!sel || !collega) return;
   const maxC = _pianoMaxCambi();
   if (maxC > 0) {
-    const conta = (nomeX) =>
-      _pianoRighe.filter((x) => x.collaboratore === nomeX && / - cambio con /.test(x.commento || '')).length;
-    if (conta(sel.nome) >= maxC || conta(collega) >= maxC) {
-      toast('Limite cambi mensili raggiunto (' + maxC + '): scambio non consentito');
-      return;
+    const richiesti = await _pianoCambiRichiesti(_pianoMeseSel);
+    const n = richiesti[sel.nome] || 0;
+    if (n >= maxC) {
+      // niente blocco duro: il responsabile può autorizzare l'eccezione
+      if (
+        !confirm(
+          'ATTENZIONE: ' +
+            sel.nome +
+            ' ha già richiesto ' +
+            n +
+            '/' +
+            maxC +
+            ' cambi questo mese.\n\nAutorizzi comunque lo scambio come responsabile? (verrà registrato nello storico come autorizzazione in deroga)',
+        )
+      )
+        return;
+      logAzione(
+        'Piano: scambio autorizzato oltre limite',
+        sel.nome + ' (' + (n + 1) + '/' + maxC + ') da ' + getOperatore(),
+      );
     }
   }
   const r1 = _pianoRighe.find((x) => x.collaboratore === sel.nome && x.data === sel.data);
@@ -4880,6 +4915,24 @@ function _renderPianoImpostazioniCard() {
     '<p style="font-size:.8rem;color:var(--muted);margin-top:10px">Le funzioni compaiono nei menu di Gestione collaboratori e nelle mappature. Preferenze per collaboratore (solo diurni, turni bloccati, settori...) nella card qui sotto.</p>';
   h += '</div></div>';
   return h;
+}
+// Cambi RICHIESTI nel mese per collaboratore (dal Registro: nel log dello
+// scambio il richiedente è il primo nome). Chi ACCETTA non consuma il limite.
+async function _pianoCambiRichiesti(ym) {
+  const logs =
+    (await secGet(
+      'log_attivita?azione=eq.' +
+        encodeURIComponent('Piano: scambio turno') +
+        '&dettaglio=like.' +
+        encodeURIComponent('%il ' + ym + '-%') +
+        '&limit=1000',
+    )) || [];
+  const conta = {};
+  logs.forEach((l) => {
+    const nome = (l.dettaglio || '').split(' (')[0].trim();
+    if (nome) conta[nome] = (conta[nome] || 0) + 1;
+  });
+  return conta;
 }
 function _pianoMaxCambi() {
   const v = parseInt(window._pianoMaxCambiCfg);
