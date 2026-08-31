@@ -149,7 +149,11 @@ function livelloDiCollaboratore(c) {
   if (!comps.length) return 0;
   const spunte = (c && c.competenze) || {};
   let lv = 0;
-  for (let n = 1; n <= 3; n++) {
+  const maxLv = Math.max.apply(
+    null,
+    comps.map((k) => parseInt(k.livello) || 0),
+  );
+  for (let n = 1; n <= maxLv; n++) {
     const richieste = comps.filter((k) => k.livello <= n);
     if (!richieste.length) continue;
     if (richieste.every((k) => spunte[k.key] === true)) lv = n;
@@ -159,7 +163,7 @@ function livelloDiCollaboratore(c) {
 }
 function livelloBadgeHtml(lv) {
   if (!lv) return '<span class="mini-badge" style="background:var(--muted)">—</span>';
-  const col = { 1: '#1a4a7a', 2: '#e67e22', 3: '#2c6e49' }[lv] || 'var(--muted)';
+  const col = { 1: '#1a4a7a', 2: '#e67e22', 3: '#2c6e49', 4: '#8e44ad', 5: '#c0392b' }[lv] || 'var(--muted)';
   return (
     '<span class="mini-badge" style="background:' + col + ';font-size:.72rem">' + escP(livelloNome(lv)) + '</span>'
   );
@@ -549,6 +553,14 @@ async function importaProtocolloExcel(compKey, input) {
       ) {
         const nuove = Object.assign({}, collab.competenze || {});
         nuove[compKey] = true;
+        // scala dei livelli: il livello certificato implica quelli inferiori
+        const compsRep2 = getCompetenzeReparto();
+        const lvQ = parseInt((compsRep2.find((k) => k.key === compKey) || {}).livello) || 0;
+        if (lvQ > 1)
+          compsRep2.forEach((k) => {
+            const lvK = parseInt(k.livello) || 0;
+            if (lvK > 0 && lvK < lvQ) nuove[k.key] = true;
+          });
         await secPatch('collaboratori', 'id=eq.' + collab.id, { competenze: nuove });
         collab.competenze = nuove;
         logAzione('Competenza certificata', collab.nome + ' — ' + compKey + ' (da protocollo)');
@@ -1061,9 +1073,46 @@ async function toggleCompetenza(collabId, key, cb) {
   const nuove = Object.assign({}, c.competenze || {});
   const attiva = cb.checked;
   nuove[key] = attiva;
+  // SCALA DEI LIVELLI: certificare un livello implica quelli inferiori
+  // (chi fa Back Office ha passato anche Sala, Reception e Cassa)
+  const compsRep = getCompetenzeReparto();
+  const compAtt = compsRep.find((k) => k.key === key);
+  const lvAtt = compAtt ? parseInt(compAtt.livello) || 0 : 0;
+  const implicate = [];
+  if (attiva && lvAtt > 1) {
+    compsRep.forEach((k) => {
+      const lv = parseInt(k.livello) || 0;
+      if (lv > 0 && lv < lvAtt && nuove[k.key] !== true) {
+        nuove[k.key] = true;
+        implicate.push(k.label);
+      }
+    });
+  }
+  if (!attiva && lvAtt > 0) {
+    const superiori = compsRep.filter((k) => (parseInt(k.livello) || 0) > lvAtt && nuove[k.key] === true);
+    if (superiori.length) {
+      if (
+        !confirm(
+          c.nome +
+            ' ha anche ' +
+            superiori.map((k) => k.label).join(', ') +
+            ' (livelli superiori che implicano questo).\nTogliere comunque solo "' +
+            (compAtt ? compAtt.label : key) +
+            '"?',
+        )
+      ) {
+        cb.checked = true;
+        return;
+      }
+    }
+  }
   try {
     await secPatch('collaboratori', 'id=eq.' + collabId, { competenze: nuove });
     c.competenze = nuove;
+    if (implicate.length) {
+      toast('Spuntati anche i livelli inferiori: ' + implicate.join(', '));
+      logAzione('Competenze implicite', c.nome + ' — ' + implicate.join(', ') + ' (da ' + (compAtt ? compAtt.label : key) + ')');
+    }
     const compDef = getCompetenzeReparto().find((k) => k.key === key);
     logAzione('Competenza ' + (attiva ? 'certificata' : 'rimossa'), c.nome + ' — ' + (compDef ? compDef.label : key));
     // Traccia nello storico HR: cosa è stato formato, quando e da chi
