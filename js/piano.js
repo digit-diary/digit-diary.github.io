@@ -4074,7 +4074,18 @@ async function caricaStatisticheAnnoPiano() {
   righe.forEach((r) => {
     const t = _pianoTurnoInfo(r.codice);
     const cs = _pianoCodiceInfo(r.codice);
-    const o = (st[r.collaboratore] = st[r.collaboratore] || { ore: 0, gg: 0, d: 0, n: 0, we: 0, dom: 0, v: 0, m: 0 });
+    const o = (st[r.collaboratore] = st[r.collaboratore] || {
+      ore: 0,
+      gg: 0,
+      d: 0,
+      n: 0,
+      we: 0,
+      dom: 0,
+      v: 0,
+      m: 0,
+      cgfMat: 0,
+      cgfGod: 0,
+    });
     const dow = new Date(r.data + 'T12:00:00').getDay();
     const info = _pianoCollabInfo(r.collaboratore) || {};
     if (t) {
@@ -4084,9 +4095,13 @@ async function caricaStatisticheAnnoPiano() {
       else o.d++;
       if (_pianoGiorniWeekend().includes(dow)) o.we++;
       if (dow === 0) o.dom++;
+      // CGF MATURATO: ha lavorato in un festivo con flag CGF (automatico)
+      const fest = pianoFestiviCache.find((f) => f.data === r.data);
+      if (fest && fest.cgf !== false) o.cgfMat++;
     } else if (cs) {
       if (r.codice === 'V' || r.codice === 'V1') o.v++;
       if (r.codice === 'M' || r.codice === 'M1') o.m++;
+      if (r.codice === 'CGF') o.cgfGod++; // CGF goduto
       const oCs = parseFloat(cs.ore) || 0;
       o.ore += cs.scala_percentuale ? oCs * (parseFloat(info.percentuale) || 1) : oCs;
     }
@@ -4100,7 +4115,7 @@ async function caricaStatisticheAnnoPiano() {
     return Math.round((ggDovuti / 7) * _pianoOreSett * (parseFloat(info.percentuale) || 1) * 10) / 10;
   };
   h +=
-    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Ore anno</th><th title="Sui mesi con un piano">Ore dovute</th><th>Giorni lavorati</th><th>Diurni</th><th>Notturni</th><th>Weekend</th><th>Domeniche</th><th>Vacanze</th><th>Malattie</th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Ore anno</th><th title="Sui mesi con un piano">Ore dovute</th><th>Giorni lavorati</th><th>Diurni</th><th>Notturni</th><th>Weekend</th><th>Domeniche</th><th>Vacanze</th><th>Malattie</th><th title="Festivi con flag CGF lavorati (maturati automaticamente)">CGF maturati</th><th title="Giorni CGF presi nel piano">CGF goduti</th><th title="Maturati − goduti">Saldo CGF</th></tr></thead><tbody>';
   Object.keys(st)
     .sort()
     .forEach((n) => {
@@ -4132,6 +4147,14 @@ async function caricaStatisticheAnnoPiano() {
         o.v +
         '</td><td>' +
         o.m +
+        '</td><td>' +
+        (o.cgfMat || '') +
+        '</td><td>' +
+        (o.cgfGod || '') +
+        '</td><td style="font-weight:700;color:' +
+        (o.cgfMat - o.cgfGod > 0 ? '#2c6e49' : o.cgfMat - o.cgfGod < 0 ? '#c0392b' : 'var(--muted)') +
+        '">' +
+        (o.cgfMat || o.cgfGod ? o.cgfMat - o.cgfGod : '') +
         '</td></tr>';
     });
   h += '</tbody></table></div>';
@@ -4685,7 +4708,10 @@ function apriNuovaVacanza() {
     '<div style="text-align:left;margin-top:8px"><label style="font-size:.82rem"><input type="checkbox" id="nv-conf" checked> Confermata</label></div>' +
     '<div class="pwd-modal-btns" style="margin-top:14px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaNuovaVacanza()">Aggiungi</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
-  setTimeout(() => document.getElementById('nv-sett').focus(), 100);
+  setTimeout(() => {
+    const el = document.getElementById('nv-sett');
+    if (el) el.focus();
+  }, 100);
 }
 async function salvaNuovaVacanza() {
   const nome = (document.getElementById('nv-collab') || {}).value;
