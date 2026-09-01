@@ -130,6 +130,7 @@ async function _pianoCaricaCfg() {
     maxCambi,
     giorniWk,
     giornoMarker,
+    corsiOrari,
   ] = await Promise.all([
     secGet('piano_turni?order=ordine.asc&limit=500'),
     secGet('piano_codici?order=codice.asc&limit=200'),
@@ -144,6 +145,7 @@ async function _pianoCaricaCfg() {
     getImp('piano_max_cambi_mese'),
     getImp('piano_giorni_weekend'),
     getImp('piano_giorno_marker'),
+    getImp('piano_corsi_orari'),
   ]);
   pianoRegoleGruppoCache = regoleGruppo || [];
   try {
@@ -162,6 +164,13 @@ async function _pianoCaricaCfg() {
   } catch (e) {
     window._pianoGiornoMarker = {};
   }
+  try {
+    window._pianoCorsiOrari = corsiOrari ? JSON.parse(corsiOrari) : {};
+  } catch (e) {
+    window._pianoCorsiOrari = {};
+  }
+  if (!window._pianoCorsiOrari.CS) window._pianoCorsiOrari.CS = '14:30-17:30';
+  if (!window._pianoCorsiOrari.LRD) window._pianoCorsiOrari.LRD = '';
   try {
     window._pianoOrdineCollab = ordineCollab ? JSON.parse(ordineCollab) : {};
   } catch (e) {
@@ -831,6 +840,11 @@ async function renderPiano() {
                 (puoMod ? 'cursor:pointer' : '') +
                 '"' +
                 (puoMod ? ' onclick="fabbisognoInline(\'' + escP(cod) + "','" + dstr + '\',this)"' : '') +
+                ' oncontextmenu="fabbCtxMenu(event,\'' +
+                escP(cod) +
+                "','" +
+                dstr +
+                '\')"' +
                 '>' +
                 (req ? ass + '/' + req : '') +
                 '</td>';
@@ -892,7 +906,7 @@ async function renderPiano() {
               clsCella(g) +
               '" data-g="' +
               g +
-              '" style="font-weight:bold;' +
+              '" onclick="if(window.event&&window.event.shiftKey)pianoBloccoClick(\'diff\',this)" style="font-weight:bold;' +
               col +
               '">' +
               (diff !== 0 ? diff : '') +
@@ -925,7 +939,7 @@ async function renderPiano() {
               clsCella(g) +
               '" data-g="' +
               g +
-              '"' +
+              '" onclick="if(window.event&&window.event.shiftKey)pianoBloccoClick(\'eff\',this)"' +
               (q > 0 ? ' style="font-weight:bold;background:#335593 !important;color:#fff"' : '') +
               '>' +
               (q > 0 ? q : '') +
@@ -940,7 +954,12 @@ async function renderPiano() {
     } else if (_pianoTab === 'vacanze') {
       h += await _renderPianoVacanzeTab();
     } else if (_pianoTab === 'turni') {
-      h += '<div id="piano-config">' + _renderPianoTurniCard() + _renderPianoCodiciCard() + '</div>';
+      h +=
+        '<div id="piano-config">' +
+        _renderPianoTurniCard() +
+        _renderPianoCodiciCard() +
+        _renderPianoCorsiCard() +
+        '</div>';
     } else if (_pianoTab === 'regole') {
       h += '<div id="piano-config">' + _renderPianoRegoleCard() + _renderPianoRegoleGruppoCard() + '</div>';
     } else if (_pianoTab === 'festivi') {
@@ -1940,6 +1959,10 @@ async function setPianoFabbisogno(codice, dstr, qDiretta) {
 
 // Modifica INLINE del fabbisogno: click sulla cella = scrivi il numero lì
 function fabbisognoInline(codice, dstr, el) {
+  if (window.event && window.event.shiftKey) {
+    pianoBloccoClick('fabb', el);
+    return;
+  }
   if (!puoGestirePiano() || !el || el.querySelector('input')) return;
   const esistente = _pianoFabbCache.find(
     (f) => f.turno_codice === codice && f.data === dstr && (f.reparto_dip || 'slots') === _pianoReparto(),
@@ -6773,6 +6796,14 @@ function mostraPianoCtx(e, nome, dstr) {
   h += voce('Cambia turno con...', 'icx-refresh', "pianoCtxAzione('scambio')", puoMod && !!haTurno);
   h += voce('Cambio per esigenze', 'icx-settings', "pianoCtxAzione('esigenze')", puoMod && !!haTurno);
   h += voce('Rimuovi cella', 'icx-cestino', "pianoCtxAzione('rimuovi')", puoMod && !!r);
+  h += voce('Copia cella', 'icx-modifica', "pianoCtxAzione('copia')", !!r);
+  h += voce(
+    'Copia blocco selezionato',
+    'icx-modifica',
+    "pianoCtxAzione('copiaBlocco')",
+    !!(window._pianoBlocco && window._pianoBlocco.completo),
+  );
+  h += voce('Incolla qui (Excel/blocco)', 'icx-refresh', "pianoCtxAzione('incolla')", puoMod);
   h += voce('Stampa piano di ' + escP(nome.split(' ')[0]), 'icx-stampa', "pianoCtxAzione('stampa')", true);
   menu.innerHTML =
     '<div class="piano-ctx-head">' +
@@ -6805,6 +6836,11 @@ function pianoCtxAzione(azione) {
     _pianoCellaSel = { nome: sel.nome, data: sel.data };
     apriScambioTurno();
   } else if (azione === 'esigenze') apriCambioEsigenze(sel.nome, sel.data);
+  else if (azione === 'copia') {
+    const r2 = _pianoRighe.find((x) => x.collaboratore === sel.nome && x.data === sel.data);
+    if (r2) navigator.clipboard.writeText(r2.codice).then(() => toast('Copiato: ' + r2.codice));
+  } else if (azione === 'copiaBlocco') pianoCopiaBlocco();
+  else if (azione === 'incolla') pianoIncollaDaClipboard(sel);
   else if (azione === 'rimuovi') {
     _pianoCellaSel = { nome: sel.nome, data: sel.data };
     if (
@@ -7008,6 +7044,10 @@ async function pianoCellaPrompt(nome, dstr) {
 }
 // Modifica INLINE: click sulla cella = si scrive direttamente lì (niente finestra)
 function pianoCellaInline(nome, dstr, el) {
+  if (window.event && window.event.shiftKey) {
+    pianoBloccoClick('piano', el);
+    return;
+  }
   if (!puoGestirePiano() || !el || el.querySelector('input')) return;
   const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
   const attuale = r ? r.codice : '';
@@ -7465,4 +7505,448 @@ function _briefPauseBodyHtml() {
   }
   h += _briefRenderPauseCfg();
   return h;
+}
+
+// ============================================================
+// CORSI (CS, LRD, ANTINCENDIO...) — pianificatore: scegli codice,
+// data, orario e partecipanti; le sigle finiscono da sole nel piano
+// ============================================================
+function _renderPianoCorsiCard() {
+  if (!puoGestirePiano()) return '';
+  const codici = pianoCodiciCache.filter((c) => c.attivo !== false);
+  const collabs = collaboratoriCache
+    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
+    .sort((a, b) => a.nome.localeCompare(b.nome));
+  let h =
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Corsi — inserimento automatico nel piano</div><div style="padding:12px 14px">';
+  h +=
+    '<p style="font-size:.8rem;color:var(--muted);margin-bottom:10px">Scegli il corso (CS, LRD, ANTINCENDIO...), la data, l&#39;orario e i partecipanti: la sigla viene scritta da sola nelle loro celle del piano (protetta, con orario e ore contate).</p>';
+  h += '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">';
+  h +=
+    '<div class="field"><label>Corso</label><select id="corso-cod" style="padding:8px" onchange="corsoPrefillOrari()">' +
+    codici
+      .map((c) => '<option' + (c.codice === 'CS' ? ' selected' : '') + '>' + escP(c.codice) + '</option>')
+      .join('') +
+    '</select></div>';
+  h += '<div class="field"><label>Data</label><input type="date" id="corso-data"></div>';
+  const preCS = ((window._pianoCorsiOrari || {})['CS'] || '14:30-17:30').split('-');
+  h +=
+    '<div class="field"><label>Inizio</label><input type="time" id="corso-inizio" value="' +
+    (preCS[0] || '') +
+    '"></div>';
+  h +=
+    '<div class="field"><label>Fine</label><input type="time" id="corso-fine" value="' + (preCS[1] || '') + '"></div>';
+  h +=
+    '<button class="btn-export" style="font-size:.72rem;padding:4px 10px" title="La prossima volta questo corso partirà con questo orario" onclick="corsoSalvaOrarioDefault()">Salva orario predefinito</button>';
+  h += '</div>';
+  h +=
+    '<div style="margin-bottom:6px;font-size:.82rem"><b>Partecipanti</b> — <span style="cursor:pointer;color:#1a4a7a;text-decoration:underline" onclick="document.querySelectorAll(\'.corso-part\').forEach(c=>c.checked=true)">tutti</span> / <span style="cursor:pointer;color:#1a4a7a;text-decoration:underline" onclick="document.querySelectorAll(\'.corso-part\').forEach(c=>c.checked=false)">nessuno</span></div>';
+  h +=
+    '<div style="max-height:180px;overflow-y:auto;border:1px solid var(--border,#ccc);padding:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:2px 12px;font-size:.84rem">';
+  collabs.forEach((c) => {
+    h +=
+      '<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="corso-part" value="' +
+      escP(c.nome) +
+      '">' +
+      escP(c.nome) +
+      '</label>';
+  });
+  h += '</div>';
+  h +=
+    '<button class="btn-export" style="font-size:.85rem;padding:6px 16px;margin-top:10px;border-color:#2c6e49;color:#2c6e49" onclick="pianoInserisciCorso()">Inserisci nel piano</button>';
+  h += '</div></div>';
+  return h;
+}
+function corsoPrefillOrari() {
+  const cod = (document.getElementById('corso-cod') || {}).value;
+  const pre = (window._pianoCorsiOrari || {})[cod] || '';
+  const p = pre.split('-');
+  document.getElementById('corso-inizio').value = p[0] || '';
+  document.getElementById('corso-fine').value = p[1] || '';
+}
+// salva l'orario attuale come predefinito del corso selezionato
+async function corsoSalvaOrarioDefault() {
+  if (!puoGestirePiano()) return;
+  const cod = (document.getElementById('corso-cod') || {}).value;
+  const inizio = (document.getElementById('corso-inizio') || {}).value;
+  const fine = (document.getElementById('corso-fine') || {}).value;
+  if (!cod) return;
+  window._pianoCorsiOrari = window._pianoCorsiOrari || {};
+  if (inizio && fine) window._pianoCorsiOrari[cod] = inizio + '-' + fine;
+  else delete window._pianoCorsiOrari[cod];
+  await setImp('piano_corsi_orari', JSON.stringify(window._pianoCorsiOrari));
+  toast('Orario predefinito di ' + cod + (inizio && fine ? ': ' + inizio + '-' + fine : ' rimosso'));
+}
+async function pianoInserisciCorso() {
+  if (!puoGestirePiano()) return;
+  const cod = (document.getElementById('corso-cod') || {}).value;
+  const data = (document.getElementById('corso-data') || {}).value;
+  const inizio = (document.getElementById('corso-inizio') || {}).value;
+  const fine = (document.getElementById('corso-fine') || {}).value;
+  const nomi = [...document.querySelectorAll('.corso-part:checked')].map((c) => c.value);
+  if (!cod || !data || !nomi.length) {
+    toast('Scegli corso, data e almeno un partecipante');
+    return;
+  }
+  try {
+    const esistenti = (await secGet('piano?data=eq.' + data + '&reparto_dip=eq.' + _pianoReparto())) || [];
+    const occupate = esistenti.filter((r) => nomi.includes(r.collaboratore));
+    if (
+      !confirm(
+        'Corso ' +
+          cod +
+          ' del ' +
+          data.split('-').reverse().join('.') +
+          (inizio && fine ? ' (' + inizio + '-' + fine + ')' : '') +
+          '\n\n• ' +
+          nomi.length +
+          ' partecipanti' +
+          (occupate.length
+            ? '\n• ' +
+              occupate.length +
+              ' hanno già una cella quel giorno: ' +
+              occupate.map((x) => x.collaboratore + ' (' + x.codice + ')').join(', ')
+            : ''),
+      )
+    )
+      return;
+    let sovrascrivi = false;
+    if (occupate.length)
+      sovrascrivi = confirm(
+        'Sovrascrivo anche le celle già occupate?\n(Annulla = il corso va solo a chi ha il giorno libero)',
+      );
+    let inseriti = 0;
+    for (const nome of nomi) {
+      const ex = esistenti.find((r) => r.collaboratore === nome);
+      const dati = {
+        codice: cod,
+        ora_inizio: inizio || null,
+        ora_fine: fine || null,
+        protetto: true,
+        generato: false,
+        commento: 'Corso ' + cod + (inizio && fine ? ' ' + inizio + '-' + fine : '') + ' - ' + getOperatore(),
+      };
+      if (ex) {
+        if (!sovrascrivi) continue;
+        await secPatch('piano', 'id=eq.' + ex.id, dati);
+      } else {
+        await secPost('piano', Object.assign({ collaboratore: nome, data: data, reparto_dip: _pianoReparto() }, dati));
+      }
+      inseriti++;
+    }
+    logAzione('Corso inserito nel piano', cod + ' ' + data + ' — ' + inseriti + ' partecipanti');
+    toast('Corso ' + cod + ': ' + inseriti + ' celle scritte');
+    if (_pianoMeseSel === data.substring(0, 7)) renderPiano();
+  } catch (e) {
+    console.error(e);
+    toast('Errore inserimento corso');
+  }
+}
+
+// ============================================================
+// COPIA / INCOLLA a blocchi — Shift+click su due celle = blocco
+// (piano o fabbisogno), tasto destro = Copia / Incolla. L'incolla
+// accetta anche celle copiate da Excel (formato tab-separato).
+// ============================================================
+window._pianoBlocco = null; // {tab, t1, t2, completo}
+function pianoBloccoClick(tab, el) {
+  const b = window._pianoBlocco;
+  if (b && !b.completo && b.tab === tab && b.t1.closest('table') === el.closest('table')) {
+    b.t2 = el;
+    b.completo = true;
+    _pianoBloccoEvidenzia();
+    toast('Blocco selezionato: tasto destro → Copia blocco / Incolla');
+  } else {
+    _pianoBloccoPulisci();
+    window._pianoBlocco = { tab: tab, t1: el, t2: null, completo: false };
+    el.classList.add('blocco-sel');
+  }
+}
+function _pianoBloccoCelle() {
+  const b = window._pianoBlocco;
+  if (!b || !b.completo) return [];
+  const tbody = b.t1.closest('tbody');
+  const righe = [...tbody.rows];
+  let r1 = righe.indexOf(b.t1.closest('tr'));
+  let r2 = righe.indexOf(b.t2.closest('tr'));
+  if (r1 > r2) [r1, r2] = [r2, r1];
+  let g1 = parseInt(b.t1.dataset.g);
+  let g2 = parseInt(b.t2.dataset.g);
+  if (g1 > g2) [g1, g2] = [g2, g1];
+  const out = [];
+  for (let ri = r1; ri <= r2; ri++) {
+    const riga = [];
+    for (let g = g1; g <= g2; g++) {
+      const cel = righe[ri].querySelector('td[data-g="' + g + '"]');
+      if (cel) riga.push(cel);
+    }
+    if (riga.length) out.push(riga);
+  }
+  return out;
+}
+function _pianoBloccoEvidenzia() {
+  _pianoBloccoCelle().forEach((riga) => riga.forEach((c) => c.classList.add('blocco-sel')));
+}
+function _pianoBloccoPulisci() {
+  document.querySelectorAll('.blocco-sel').forEach((c) => c.classList.remove('blocco-sel'));
+  window._pianoBlocco = null;
+}
+function pianoCopiaBlocco() {
+  const celle = _pianoBloccoCelle();
+  if (!celle.length) {
+    toast('Nessun blocco: Shift+click su due celle per selezionarlo');
+    return;
+  }
+  const tab = window._pianoBlocco.tab;
+  const tsv = celle
+    .map((riga) =>
+      riga
+        .map((c) => {
+          let t = (c.textContent || '').trim();
+          if (tab === 'fabb' && t.includes('/')) t = t.split('/').pop();
+          return t;
+        })
+        .join('\t'),
+    )
+    .join('\n');
+  navigator.clipboard.writeText(tsv).then(
+    () => toast('Copiate ' + celle.length * celle[0].length + ' celle (incollabili anche in Excel)'),
+    () => toast('Clipboard non disponibile'),
+  );
+}
+// testo dagli appunti, con ripiego manuale se il browser nega la lettura
+async function _pianoTestoAppunti() {
+  try {
+    const t = await navigator.clipboard.readText();
+    if (t && t.trim()) return t;
+  } catch (e) {}
+  return new Promise((res) => {
+    const m = document.getElementById('pwd-modal');
+    const mc = document.getElementById('pwd-modal-content');
+    if (!m || !mc) {
+      res(prompt('Incolla qui il contenuto copiato (una riga per collaboratore, celle separate da TAB):') || '');
+      return;
+    }
+    mc.innerHTML =
+      '<h3 style="margin-bottom:8px">Incolla</h3><p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Premi Ctrl+V (Cmd+V su Mac) nel riquadro: puoi incollare celle copiate da Excel o dal Diario.</p>' +
+      '<textarea id="incolla-txt" style="width:100%;height:140px;font-family:monospace;font-size:.85rem;padding:8px"></textarea>' +
+      '<div style="margin-top:10px;display:flex;gap:10px"><button class="btn-export" onclick="window._incollaOk()">Incolla</button><button class="btn-export" style="border-color:#c0392b;color:#c0392b" onclick="window._incollaAnnulla()">Annulla</button></div>';
+    m.classList.remove('hidden');
+    setTimeout(() => document.getElementById('incolla-txt').focus(), 100);
+    window._incollaOk = () => {
+      const v = document.getElementById('incolla-txt').value;
+      m.classList.add('hidden');
+      res(v);
+    };
+    window._incollaAnnulla = () => {
+      m.classList.add('hidden');
+      res('');
+    };
+  });
+}
+function _pianoParseTsv(testo) {
+  return testo
+    .replace(/\r/g, '')
+    .split('\n')
+    .map((r) => r.split('\t').map((x) => x.trim()));
+}
+// incolla nel PIANO a partire dalla cella target (righe = collaboratori in
+// ordine visivo, colonne = giorni)
+async function pianoIncollaDaClipboard(target) {
+  if (!puoGestirePiano()) return;
+  const testo = await _pianoTestoAppunti();
+  if (!testo.trim()) return;
+  const grid = _pianoParseTsv(testo);
+  const nomiVis = [...document.querySelectorAll('#piano-content .piano-table tbody tr[data-nome]')].map(
+    (tr) => tr.dataset.nome,
+  );
+  const start = nomiVis.indexOf(target.nome);
+  if (start < 0) {
+    toast('Cella di partenza non trovata');
+    return;
+  }
+  const ym = _pianoMeseSel;
+  const nGiorni = _pianoUltimoGiorno(ym);
+  const g0 = parseInt(target.data.split('-')[2]);
+  const daPatch = [];
+  const daInserire = [];
+  let scartate = 0;
+  let fuori = 0;
+  grid.forEach((riga, i) => {
+    const nome = nomiVis[start + i];
+    if (!nome) {
+      fuori += riga.filter((x) => x).length;
+      return;
+    }
+    riga.forEach((val, j) => {
+      const g = g0 + j;
+      const cod = String(val || '')
+        .trim()
+        .toUpperCase();
+      if (!cod) return;
+      if (g > nGiorni) {
+        fuori++;
+        return;
+      }
+      if (!_pianoTurnoInfo(cod) && !_pianoCodiceInfo(cod)) {
+        scartate++;
+        return;
+      }
+      const dstr = ym + '-' + String(g).padStart(2, '0');
+      const ex = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
+      if (ex) {
+        if (ex.codice !== cod) daPatch.push({ id: ex.id, codice: cod });
+      } else {
+        daInserire.push({
+          collaboratore: nome,
+          data: dstr,
+          codice: cod,
+          protetto: true,
+          generato: false,
+          reparto_dip: _pianoReparto(),
+        });
+      }
+    });
+  });
+  if (!daPatch.length && !daInserire.length) {
+    toast('Niente da incollare' + (scartate ? ' (' + scartate + ' sigle sconosciute)' : ''));
+    return;
+  }
+  if (
+    !confirm(
+      'Incollo a partire da ' +
+        target.nome +
+        ' / giorno ' +
+        g0 +
+        '?\n\n• ' +
+        daInserire.length +
+        ' celle nuove\n• ' +
+        daPatch.length +
+        ' celle sovrascritte' +
+        (scartate ? '\n• ' + scartate + ' sigle sconosciute scartate' : '') +
+        (fuori ? '\n• ' + fuori + ' celle oltre i bordi del mese/lista (ignorate)' : ''),
+    )
+  )
+    return;
+  try {
+    for (let i = 0; i < daPatch.length; i += 10)
+      await Promise.all(
+        daPatch
+          .slice(i, i + 10)
+          .map((p) => secPatch('piano', 'id=eq.' + p.id, { codice: p.codice, protetto: true, generato: false })),
+      );
+    if (daInserire.length) await sbRpc('piano_bulk_upsert', { p_token: getOpToken(), p_rows: daInserire });
+    logAzione('Incolla nel piano', target.nome + ' g' + g0 + ' — ' + (daPatch.length + daInserire.length) + ' celle');
+    toast('Incollate ' + (daPatch.length + daInserire.length) + ' celle');
+    _pianoBloccoPulisci();
+    _pianoViolCelle = {};
+    _pianoViolLista = null;
+    renderPiano();
+  } catch (e) {
+    console.error(e);
+    toast('Errore incolla');
+  }
+}
+// menu contestuale sul FABBISOGNO: copia blocco / incolla numeri
+function fabbCtxMenu(e, codice, dstr) {
+  e.preventDefault();
+  let menu = document.getElementById('piano-ctx');
+  if (!menu) return;
+  window._fabbCtxSel = { codice: codice, dstr: dstr };
+  const puoMod = puoGestirePiano();
+  let h =
+    '<div class="piano-ctx-head">Fabbisogno ' +
+    escP(codice) +
+    ' — ' +
+    new Date(dstr + 'T12:00:00').toLocaleDateString('it-IT') +
+    '</div>';
+  if (window._pianoBlocco && window._pianoBlocco.completo)
+    h +=
+      '<div class="piano-ctx-item" onclick="nascondiPianoCtx();pianoCopiaBlocco()"><i class="icx icx-modifica"></i> Copia blocco selezionato</div>';
+  if (puoMod)
+    h +=
+      '<div class="piano-ctx-item" onclick="nascondiPianoCtx();fabbIncollaDaClipboard()"><i class="icx icx-refresh"></i> Incolla numeri qui (Excel/blocco)</div>';
+  menu.innerHTML = h;
+  menu.style.display = 'block';
+  menu.style.left = Math.min(e.clientX, window.innerWidth - 230) + 'px';
+  menu.style.top = Math.min(e.clientY, window.innerHeight - 120) + 'px';
+}
+async function fabbIncollaDaClipboard() {
+  if (!puoGestirePiano() || !window._fabbCtxSel) return;
+  const target = window._fabbCtxSel;
+  const testo = await _pianoTestoAppunti();
+  if (!testo.trim()) return;
+  const grid = _pianoParseTsv(testo);
+  // ordine dei turni come mostrati nella tabella fabbisogno
+  const tabelle = [...document.querySelectorAll('#piano-content .piano-table')];
+  const tavFabb = tabelle.find((t) => t.querySelector('td[onclick*="fabbisognoInline"]'));
+  if (!tavFabb) return;
+  const codiciVis = [...tavFabb.querySelectorAll('tbody tr')].map((tr) =>
+    (tr.querySelector('.piano-nome') || {}).textContent ? tr.querySelector('.piano-nome').textContent.trim() : '',
+  );
+  const start = codiciVis.indexOf(target.codice);
+  if (start < 0) return;
+  const ym = _pianoMeseSel;
+  const nGiorni = _pianoUltimoGiorno(ym);
+  const g0 = parseInt(target.dstr.split('-')[2]);
+  const ops = [];
+  let scartate = 0;
+  grid.forEach((riga, i) => {
+    const cod = codiciVis[start + i];
+    if (!cod) return;
+    riga.forEach((val, j) => {
+      const g = g0 + j;
+      if (g > nGiorni) return;
+      const v = String(val || '').trim();
+      if (v === '') return;
+      const q = parseInt(v);
+      if (isNaN(q) || q < 0) {
+        scartate++;
+        return;
+      }
+      ops.push({ codice: cod, data: ym + '-' + String(g).padStart(2, '0'), q: q });
+    });
+  });
+  if (!ops.length) {
+    toast('Nessun numero da incollare');
+    return;
+  }
+  if (
+    !confirm(
+      'Incollo il fabbisogno da ' +
+        target.codice +
+        ' / giorno ' +
+        g0 +
+        '?\n\n• ' +
+        ops.length +
+        ' celle (0 = rimuove)' +
+        (scartate ? '\n• ' + scartate + ' valori non numerici scartati' : ''),
+    )
+  )
+    return;
+  try {
+    for (let i = 0; i < ops.length; i += 10)
+      await Promise.all(
+        ops.slice(i, i + 10).map(async (op) => {
+          await secDel(
+            'piano_fabbisogni',
+            'data=eq.' + op.data + '&turno_codice=eq.' + op.codice + '&reparto_dip=eq.' + _pianoReparto(),
+          );
+          if (op.q > 0)
+            await secPost('piano_fabbisogni', {
+              data: op.data,
+              turno_codice: op.codice,
+              quantita: op.q,
+              reparto_dip: _pianoReparto(),
+            });
+        }),
+      );
+    logAzione('Incolla fabbisogno', target.codice + ' g' + g0 + ' — ' + ops.length + ' celle');
+    toast('Fabbisogno incollato: ' + ops.length + ' celle');
+    _pianoBloccoPulisci();
+    renderPiano();
+  } catch (e) {
+    console.error(e);
+    toast('Errore incolla fabbisogno');
+  }
 }

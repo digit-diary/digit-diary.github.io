@@ -3806,3 +3806,8 @@ button:focus-visible,
   table-layout: fixed;
   min-width: 0;
 }
+
+/* blocco selezionato con Shift+click (copia/incolla) */
+.piano-table td.blocco-sel {
+  box-shadow: inset 0 0 0 99px rgba(255, 152, 0, 0.35) !important;
+}
