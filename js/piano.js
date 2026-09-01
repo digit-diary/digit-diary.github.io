@@ -7490,8 +7490,11 @@ function _briefOrarioHM(s) {
 function _briefComponi(pianoRighe) {
   const righe = [];
   (pianoRighe || []).forEach((r) => {
-    const t = _pianoTurnoInfo(r.codice);
-    const custom = !t && r.ora_inizio && r.ora_fine;
+    // regola multi-reparto: si finisce nel briefing del REPARTO DEL TURNO,
+    // non del reparto d'origine (Balliu con X1 valet → solo briefing valet,
+    // mai in quello slots). Niente fallback sui turni degli altri reparti.
+    const t = _pianoTurniReparto().find((x) => x.codice === r.codice);
+    const custom = !t && r.ora_inizio && r.ora_fine && (r.reparto_dip || 'slots') === _pianoReparto();
     if (!t && !custom) return;
     const info = _pianoCollabInfo(r.collaboratore);
     if (info && info.attivo === false) return;
@@ -7688,7 +7691,9 @@ async function _renderPianoBriefingTab() {
   const rep = _pianoReparto();
   const [salvati, pianoRighe, pauseCfg] = await Promise.all([
     secGet('piano_briefing?data=eq.' + dstr + '&reparto_dip=eq.' + rep),
-    secGet('piano?data=eq.' + dstr + '&reparto_dip=eq.' + rep),
+    // senza filtro reparto: i multi-reparto (es. Balliu) entrano nel briefing
+    // del reparto del TURNO che fanno quel giorno; _briefComponi filtra per turno
+    secGet('piano?data=eq.' + dstr),
     getImp('piano_pause_cfg'),
   ]);
   try {
