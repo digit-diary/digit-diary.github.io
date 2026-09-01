@@ -2704,7 +2704,37 @@ async function copiaFabbisognoMese() {
 
 // ---- Card TURNI (admin) ----
 function _renderPianoTurniCard() {
-  if (!isAdmin()) return '';
+  if (!isAdmin() && !puoGestirePiano()) {
+    // operatori: vedono i turni del PROPRIO settore in sola lettura
+    const turniRO = _pianoTurniReparto()
+      .slice()
+      .sort((x, y) => (x.gruppo || '').localeCompare(y.gruppo || '') || x.codice.localeCompare(y.codice));
+    let hRO =
+      '<div class="main-card" style="margin-top:16px"><div class="card-header">Turni — ' +
+      escP(repartoLabel(_pianoReparto())) +
+      '</div><div style="padding:10px 14px"><div style="overflow-x:auto"><table class="piano-table" style="min-width:520px;font-size:.85rem"><thead><tr><th>Codice</th><th>Gruppo</th><th>Inizio</th><th>Fine</th><th>Ore</th><th>Tipo</th></tr></thead><tbody>';
+    turniRO.forEach((t) => {
+      hRO +=
+        '<tr><td style="font-weight:700;background:' +
+        (t.colore || 'transparent') +
+        ';color:#000">' +
+        escP(t.codice) +
+        '</td><td>' +
+        escP(t.gruppo || '') +
+        '</td><td>' +
+        (t.ora_inizio || '—').substring(0, 5) +
+        '</td><td>' +
+        (t.ora_fine || '—').substring(0, 5) +
+        '</td><td>' +
+        (t.durata_ore || 0) +
+        '</td><td>' +
+        escP(t.tipo || '') +
+        '</td></tr>';
+    });
+    hRO +=
+      '</tbody></table></div><p style="font-size:.78rem;color:var(--muted);margin-top:6px">Sola lettura: i turni si modificano solo da admin o da chi ha il permesso.</p></div></div>';
+    return hRO;
+  }
   const turni = _pianoTurniReparto();
   let h =
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Turni — ' +
@@ -4858,12 +4888,14 @@ async function _renderPianoVacanzeTab() {
   window._pianoVacAnno = anno;
   _pianoVacCache =
     (await secGet('piano_vacanze?anno=eq.' + anno + '&order=collaboratore.asc,settimana.asc&limit=2000')) || [];
-  const filtro = window._pianoVacFiltro || '';
-  const vac = filtro ? _pianoVacCache.filter((v) => v.collaboratore === filtro) : _pianoVacCache;
   const puoMod = puoGestirePiano();
   const nomiRep = collaboratoriCache
     .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
     .map((c) => c.nome);
+  // ogni settore vede SOLO le vacanze dei propri collaboratori
+  _pianoVacCache = _pianoVacCache.filter((v) => nomiRep.includes(v.collaboratore));
+  const filtro = window._pianoVacFiltro || '';
+  const vac = filtro ? _pianoVacCache.filter((v) => v.collaboratore === filtro) : _pianoVacCache;
   // ordine come nel piano (ordine salvato, poi SUP/BO/altri)
   const ordSalv = (window._pianoOrdineCollab || {})[_pianoReparto()] || [];
   const pos = {};
@@ -5061,10 +5093,13 @@ async function _renderPianoStoricoTab() {
   const filtro = window._pianoStoricoFiltro || '';
   const cerca = (window._pianoStoricoCerca || '').toLowerCase();
   const srt = window._pianoStoricoSort || { campo: 'created_at', dir: -1 };
-  const logs =
+  // ogni settore vede il SUO storico; i log vecchi (senza settore) restano visibili
+  const logsTutti =
     (await secGet(
-      'log_attivita?or=(azione.ilike.Piano*,azione.ilike.Vacanz*,azione.ilike.*piano*)&order=created_at.desc&limit=300',
+      'log_attivita?or=(azione.ilike.Piano*,azione.ilike.Vacanz*,azione.ilike.*piano*)&order=created_at.desc&limit=400',
     )) || [];
+  const repCorr = _pianoReparto();
+  const logs = logsTutti.filter((l) => !l.reparto_dip || l.reparto_dip === repCorr);
   let visibili = filtro ? logs.filter((l) => l.azione === filtro) : logs;
   if (cerca)
     visibili = visibili.filter((l) =>

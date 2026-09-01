@@ -1311,6 +1311,12 @@ async function logAzione(azione, dettaglio) {
       operatore: getOperatore() || 'Admin',
       azione,
       dettaglio: dettaglio || '',
+      // settore dell'azione: lo storico del piano mostra a ognuno il suo.
+      // Per le azioni del piano vale il reparto SELEZIONATO nel piano
+      reparto_dip:
+        (typeof _pianoReparto === 'function' && /piano|vacanz|pause|briefing|fabbisogno|turn/i.test(azione)
+          ? _pianoReparto()
+          : typeof currentReparto !== 'undefined' && currentReparto) || null,
     };
     await secPost('log_attivita', rec);
     logCache.unshift(Object.assign(rec, { created_at: new Date().toISOString() }));

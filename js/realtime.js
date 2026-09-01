@@ -184,6 +184,7 @@ let campiRapportoExtra = [],
   tipiOrdine = [],
   campiOrdine = [],
   campiLabelOverride = {},
+  campiReparti = {}, // campo -> [settori dove appare]; assente = tutti i settori
   tipiRinominati = {};
 let visibilitaConfig = {};
 let collaboratoriCache = [],

@@ -151,6 +151,10 @@ async function loadAll() {
       if (Array.isArray(gc)) giubileoConfig = gc;
     } catch (e) {}
   if (giubPre != null && giubPre !== '' && !isNaN(parseInt(giubPre))) giubileoPreavviso = parseInt(giubPre);
+  try {
+    const cmr = await getImp('campi_rapporto_reparti');
+    if (cmr) campiReparti = JSON.parse(cmr);
+  } catch (e) {}
   if (typeof _salvaCacheReparti === 'function') _salvaCacheReparti();
   if (typeof popolaLoginSettore === 'function') popolaLoginSettore();
   const opRep = await getImp('operatori_reparto');

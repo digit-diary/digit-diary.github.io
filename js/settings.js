@@ -593,7 +593,8 @@ function renderOperatoriUI() {
 }
 
 // CAMPI RAPPORTO
-function getCampiRapporto() {
+// Tutti i campi configurati (per il pannello Impostazioni)
+function getCampiRapportoTutti() {
   let list = [
     ...CAMPI_RAPPORTO_DEFAULT.filter((c) => !campiNascosti.includes(c.key)).map((c) =>
       campiLabelOverride[c.key] ? { ...c, label: campiLabelOverride[c.key] } : c,
@@ -608,6 +609,34 @@ function getCampiRapporto() {
     });
   return list;
 }
+// Campi del rapporto per il SETTORE corrente: ogni campo può essere limitato
+// ad alcuni settori (campiReparti); senza limite appare ovunque
+function getCampiRapporto() {
+  return getCampiRapportoTutti().filter((c) => {
+    const rr = campiReparti[c.key];
+    return !Array.isArray(rr) || !rr.length || rr.includes(currentReparto);
+  });
+}
+function campoInReparto(key, repKey) {
+  const rr = campiReparti[key];
+  return !Array.isArray(rr) || !rr.length || rr.includes(repKey);
+}
+async function toggleCampoReparto(key, repKey, attivo) {
+  const tuttiRep = getReparti().map((r) => r.key);
+  let rr = Array.isArray(campiReparti[key]) && campiReparti[key].length ? campiReparti[key].slice() : tuttiRep.slice();
+  rr = attivo ? [...new Set([...rr, repKey])] : rr.filter((k) => k !== repKey);
+  if (!rr.length) {
+    toast('Il campo deve restare visibile in almeno un settore');
+    renderCampiRapportoUI();
+    return;
+  }
+  // se copre tutti i settori torna al default "ovunque" (robusto ai settori futuri)
+  if (tuttiRep.every((k) => rr.includes(k))) delete campiReparti[key];
+  else campiReparti[key] = rr;
+  await setImp('campi_rapporto_reparti', JSON.stringify(campiReparti));
+  logAzione('Campi rapporto', key + ' → settori: ' + (campiReparti[key] ? campiReparti[key].join(',') : 'tutti'));
+  renderCampiRapportoUI();
+}
 async function saveCampiExtra() {
   await setImp('campi_rapporto_extra', JSON.stringify(campiRapportoExtra));
 }
@@ -618,7 +647,7 @@ async function aggiungiCampoRapporto() {
     return;
   }
   const key = 'extra_' + n.toLowerCase().replace(/[^a-z0-9]/g, '_');
-  if (getCampiRapporto().find((c) => c.label.toLowerCase() === n.toLowerCase())) {
+  if (getCampiRapportoTutti().find((c) => c.label.toLowerCase() === n.toLowerCase())) {
     toast('Campo già esistente');
     return;
   }
@@ -661,7 +690,7 @@ async function spostaTipo(nome, dir) {
   renderTipiUI();
 }
 async function spostaCampo(key, dir) {
-  const campi = getCampiRapporto().map((c) => c.key);
+  const campi = getCampiRapportoTutti().map((c) => c.key);
   const i = campi.indexOf(key);
   if (i === -1) return;
   const ni = i + dir;
@@ -672,7 +701,7 @@ async function spostaCampo(key, dir) {
   renderCampiRapportoUI();
 }
 function rinominaCampo(key) {
-  const campi = getCampiRapporto();
+  const campi = getCampiRapportoTutti();
   const c = campi.find((x) => x.key === key);
   if (!c) return;
   const b = document.getElementById('pwd-modal-content');
@@ -794,8 +823,28 @@ async function eseguiRinominaTipo(vecchioNome) {
 function renderCampiRapportoUI() {
   const el = document.getElementById('rapporto-campi-list');
   if (!el) return;
-  const campi = getCampiRapporto();
+  const campi = getCampiRapportoTutti();
   const adm = isAdmin();
+  const reps = getReparti();
+  const settoriHtml = (key) =>
+    adm
+      ? '<span style="display:inline-flex;gap:8px;margin-left:10px;flex-wrap:wrap">' +
+        reps
+          .map(
+            (r) =>
+              '<label style="display:inline-flex;align-items:center;gap:3px;font-size:.72rem;color:var(--muted);cursor:pointer" title="Il campo appare nel rapporto di questo settore"><input type="checkbox"' +
+              (campoInReparto(key, r.key) ? ' checked' : '') +
+              ' onchange="toggleCampoReparto(\'' +
+              key +
+              "','" +
+              r.key +
+              '\',this.checked)">' +
+              escP(r.label) +
+              '</label>',
+          )
+          .join('') +
+        '</span>'
+      : '';
   let cHtml = campi
     .map((c, idx) => {
       const isDefault = CAMPI_RAPPORTO_DEFAULT.find((d) => d.key === c.key);
@@ -805,6 +854,7 @@ function renderCampiRapportoUI() {
         '"></div><div class="tipo-item-name">' +
         escP(c.label) +
         (isDefault ? ' <span class="tipo-item-default">(predefinito)</span>' : '') +
+        settoriHtml(c.key) +
         '</div>' +
         (adm
           ? '<div style="display:flex;gap:3px;margin-left:auto"><button class="btn-ord" onclick="spostaCampo(\'' +
