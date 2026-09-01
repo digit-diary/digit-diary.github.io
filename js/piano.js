@@ -197,6 +197,32 @@ function _pianoMappFunzione(funzione) {
   const m = pianoMappatureCache.filter((x) => x.funzione === funzione);
   return m.length ? m : null;
 }
+// multi-reparto: appartiene al reparto corrente se è il suo principale
+// oppure se elencato nei suoi "reparti extra" (es. valet che fa anche slots)
+function _pianoAppartieneAlReparto(c, rep) {
+  const r = rep || _pianoReparto();
+  if ((c.reparto_dip || 'slots') === r) return true;
+  return String(c.reparti_extra || '')
+    .split(',')
+    .map((x) => x.trim().toLowerCase())
+    .includes(r);
+}
+// accompagnamento_settori: accetta CSV ("REC") e vecchio JSON (["REC"])
+function _pianoAccompagnamentoDi(info) {
+  const raw = info && info.accompagnamento_settori;
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.map((x) => String(x).trim().toUpperCase());
+  const str = String(raw).trim();
+  if (str.startsWith('[')) {
+    try {
+      return JSON.parse(str).map((x) => String(x).trim().toUpperCase());
+    } catch (e) {}
+  }
+  return str
+    .split(',')
+    .map((x) => x.trim().toUpperCase())
+    .filter(Boolean);
+}
 function _pianoCollabInfo(nome) {
   return collaboratoriCache.find((c) => c.nome.toLowerCase() === nome.toLowerCase());
 }
@@ -415,7 +441,7 @@ async function _pianoAggiornaYtd(nomi) {
   if (mese <= 1) return;
   const fine = ym + '-01';
   const [righe, timbrate] = await Promise.all([
-    secGet('piano?data=gte.' + anno + '-01-01&data=lt.' + fine + '&reparto_dip=eq.' + _pianoReparto() + '&limit=20000'),
+    secGet('piano?data=gte.' + anno + '-01-01&data=lt.' + fine + '&limit=40000'),
     secGet('piano_timbrature?data=gte.' + anno + '-01-01&data=lt.' + fine + '&limit=20000'),
   ]);
   const perMese = {}; // nome|m -> ore piano
@@ -463,10 +489,15 @@ async function renderPiano() {
     const nGiorni = _pianoUltimoGiorno(ym);
     const da = ym + '-01';
     const a = ym + '-' + String(nGiorni).padStart(2, '0');
-    _pianoRighe =
-      (await secGet(
-        'piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=5000',
-      )) || [];
+    {
+      const tutteRighe = (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&limit=8000')) || [];
+      const rep = _pianoReparto();
+      _pianoRighe = tutteRighe.filter((r) => {
+        if ((r.reparto_dip || 'slots') === rep) return true;
+        const info = _pianoCollabInfo(r.collaboratore);
+        return !!(info && String(info.reparti_extra || '').trim() && _pianoAppartieneAlReparto(info));
+      });
+    }
     const mappa = {}; // 'nome|data' -> riga
     _pianoRighe.forEach((r) => (mappa[r.collaboratore + '|' + r.data] = r));
     const malattie = _pianoMalattieMese(ym);
@@ -485,7 +516,7 @@ async function renderPiano() {
     };
     const ordinePred = (x, y) => rangoFn(x) - rangoFn(y) || x.localeCompare(y);
     const collabs = collaboratoriCache
-      .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
+      .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
       .map((c) => c.nome)
       .sort(ordinePred);
     const extra = [...new Set(_pianoRighe.map((r) => r.collaboratore))]
@@ -632,6 +663,11 @@ async function renderPiano() {
                 (cs.descrizione || codice) + (r.ora_inizio && r.ora_fine ? ' ' + r.ora_inizio + '-' + r.ora_fine : '');
             }
             if (r.protetto) cls += ' piano-prot';
+            if ((r.reparto_dip || 'slots') !== _pianoReparto()) {
+              // cella dell'ALTRO reparto di un collaboratore multi-reparto
+              stile += (stile ? ';' : '') + 'opacity:.65;font-style:italic';
+              titolo = '[' + repartoLabel(r.reparto_dip) + '] ' + titolo;
+            }
             if (r.commento) {
               cls += ' piano-comm';
               titolo += (titolo ? ' — ' : '') + r.commento;
@@ -1210,7 +1246,7 @@ function _pianoCalcolaViolazioni() {
       }
       const infoAcc = _pianoCollabInfo(r.collaboratore);
       if (infoAcc && infoAcc.accompagnamento_settori) {
-        const grAcc = infoAcc.accompagnamento_settori.split(',').map((x) => x.trim().toUpperCase());
+        const grAcc = _pianoAccompagnamentoDi(infoAcc);
         if (grAcc.includes(gr)) r._accGruppo = gr;
       }
     });
@@ -1383,10 +1419,17 @@ async function generaBozzaPiano() {
       '&codice=eq.C&generato=eq.true&protetto=eq.false',
   );
   // Step 0 come Turnivo: prima le vacanze (V protette + C + WD)
-  const esitoVac = await _applicaVacanzeMese(false);
-  _pianoRighe =
-    (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=5000')) ||
-    [];
+  await _applicaVacanzeMese(false);
+  // ricarico includendo le celle degli ALTRI reparti dei multi-reparto
+  {
+    const tutteRighe = (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&limit=8000')) || [];
+    const repG = _pianoReparto();
+    _pianoRighe = tutteRighe.filter((r) => {
+      if ((r.reparto_dip || 'slots') === repG) return true;
+      const infoG = _pianoCollabInfo(r.collaboratore);
+      return !!(infoG && String(infoG.reparti_extra || '').trim() && _pianoAppartieneAlReparto(infoG));
+    });
+  }
   const maxCons = parseInt(_pianoRegolaVal('max_consecutivi')) || 5;
   const minRiposo = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 11;
   // storia per idoneità (chi ha già fatto quel gruppo) e familiarità:
@@ -1415,9 +1458,7 @@ async function generaBozzaPiano() {
     const t = _pianoTurnoInfo(cella[k]);
     if (t) oreMese[k.split('|')[0]] = (oreMese[k.split('|')[0]] || 0) + (parseFloat(t.durata_ore) || 0);
   });
-  const nomi = collaboratoriCache
-    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
-    .map((c) => c.nome);
+  const nomi = collaboratoriCache.filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c)).map((c) => c.nome);
   // OBIETTIVO ORE mensile (come la tolleranza ore del solver Turnivo):
   // giorni/7 × ore settimanali × percentuale, corretto col saldo cumulato
   // dei mesi precedenti. La bozza dà i turni a chi è più LONTANO dal
@@ -1572,7 +1613,7 @@ async function generaBozzaPiano() {
               return false;
             // accompagnamento: nei gruppi indicati non puo essere il primo/solo
             if (infoC && infoC.accompagnamento_settori) {
-              const grAcc = infoC.accompagnamento_settori.split(',').map((x) => x.trim().toUpperCase());
+              const grAcc = _pianoAccompagnamentoDi(infoC);
               if (grAcc.includes(gruppoT) && !(contaGiornoTot[gruppoT + '|' + g] || 0)) return false;
             }
             const mapp = _pianoMappFunzione(fz);
@@ -1735,6 +1776,8 @@ async function generaBozzaPiano() {
   // ogni giorno senza turno/assenza riceve C (congedo, 0 ore, rigenerabile)
   let nCongedi = 0;
   nomi.forEach((n) => {
+    const infoN = _pianoCollabInfo(n) || {};
+    if (String(infoN.reparti_extra || '').trim()) return; // multi-reparto: niente C automatiche
     for (let g = 1; g <= nGiorni; g++) {
       if (cella[n + '|' + g]) continue;
       const dstrG = ym + '-' + String(g).padStart(2, '0');
@@ -2444,7 +2487,11 @@ async function importaPianoExcel(input) {
     // né malattia)
     const lavoranti = new Set(righeCollab.filter((x) => x.celle.some((c) => c.cod !== 'C')).map((x) => x.nome));
     const daDisattivare = collaboratoriCache.filter(
-      (c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto() && !lavoranti.has(c.nome),
+      (c) =>
+        c.attivo !== false &&
+        (c.reparto_dip || 'slots') === _pianoReparto() &&
+        !lavoranti.has(c.nome) &&
+        !String(c.reparti_extra || '').trim(), // i multi-reparto lavorano altrove
     );
     if (
       daDisattivare.length &&
@@ -3681,9 +3728,7 @@ function _pianoIdoneoPerTurno(nome, turno) {
 }
 function apriCoperturaMalattia() {
   if (!puoGestirePiano()) return;
-  const nomi = collaboratoriCache
-    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
-    .map((c) => c.nome);
+  const nomi = collaboratoriCache.filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c)).map((c) => c.nome);
   const nGiorni = _pianoUltimoGiorno(_pianoMeseSel);
   const b = document.getElementById('pwd-modal-content');
   b.innerHTML =
@@ -3717,9 +3762,7 @@ async function cercaSostitutiMalattia() {
   }
   out.innerHTML = '<p style="color:var(--muted)">Ricerca in corso...</p>';
   const ym = _pianoMeseSel;
-  const nomi = collaboratoriCache
-    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
-    .map((c) => c.nome);
+  const nomi = collaboratoriCache.filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c)).map((c) => c.nome);
   const cella = {}; // nome|g -> codice (con overrides progressivi)
   const rigaDi = {};
   _pianoRighe.forEach((r) => {
@@ -4251,7 +4294,7 @@ function _renderPianoTimbratureCard() {
   h +=
     '<div class="add-tipo-row"><div class="field"><label>Collaboratore</label><select id="timb-collab" style="padding:8px">' +
     collaboratoriCache
-      .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
+      .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
       .map((c) => '<option>' + escP(c.nome) + '</option>')
       .join('') +
     '</select></div>' +
@@ -4687,7 +4730,7 @@ async function _renderPianoVacanzeTab() {
   const vac = filtro ? _pianoVacCache.filter((v) => v.collaboratore === filtro) : _pianoVacCache;
   const puoMod = puoGestirePiano();
   const nomiRep = collaboratoriCache
-    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
+    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
     .map((c) => c.nome);
   // ordine come nel piano (ordine salvato, poi SUP/BO/altri)
   const ordSalv = (window._pianoOrdineCollab || {})[_pianoReparto()] || [];
@@ -4799,7 +4842,7 @@ async function _renderPianoSaldoTab() {
   const pos = {};
   ordSalv.forEach((n, i) => (pos[n] = i));
   const nomi = collaboratoriCache
-    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
+    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
     .map((c) => c.nome)
     .sort((x, y) => (pos[x] != null ? pos[x] : 9999) - (pos[y] != null ? pos[y] : 9999) || x.localeCompare(y));
   await _pianoAggiornaYtd(nomi);
@@ -5197,7 +5240,7 @@ async function confermaScambioSettimane() {
 function apriNuovaVacanza() {
   if (!puoGestirePiano()) return;
   const nomiRep = collaboratoriCache
-    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
+    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
     .map((c) => c.nome);
   const b = document.getElementById('pwd-modal-content');
   b.innerHTML =
@@ -5341,7 +5384,7 @@ async function _applicaVacanzeMese(interattivo) {
   const nWd = isNaN(wdPrima) ? 4 : wdPrima;
   const vacanze = (await secGet('piano_vacanze?anno=eq.' + anno + '&limit=2000')) || [];
   const nomiRep = collaboratoriCache
-    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
+    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
     .map((c) => c.nome);
   // settimane -> giorni del mese corrente
   const vacGiorni = {}; // nome -> Set(giorno)
@@ -5850,7 +5893,7 @@ async function esportaPianoDati(tipo) {
         ],
       ];
       collaboratoriCache
-        .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
+        .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
         .forEach((c) =>
           righe.push([
             c.nome,
@@ -5995,7 +6038,7 @@ function scaricaTemplatePiano(tipo) {
     for (let w = 1; w <= 52; w++) testata.push('Sett ' + w);
     const righe = [testata];
     collaboratoriCache
-      .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
+      .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
       .slice(0, 5)
       .forEach((c) => {
         const parti = c.nome.split(' ');
@@ -6549,14 +6592,14 @@ async function eliminaRegolaGruppo(id) {
 function _renderPianoPreferenzeCard() {
   if (!isAdmin() && !(typeof puoModificare === 'function' && puoModificare('storico_hr'))) return '';
   const collabs = collaboratoriCache
-    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
+    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
     .sort((a, b) => a.nome.localeCompare(b.nome));
   let h =
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Preferenze collaboratori — ' +
     escP(repartoLabel(_pianoReparto())) +
     '</div><div style="padding:10px 14px">';
   h +=
-    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th><th>Solo diurni</th><th style="text-align:left">Turni bloccati (CSV)</th><th title="La bozza le privilegia sui turni L1">Preferisce L1</th><th title="Livello accoglienza (0-2): serve per il gruppo ACCOGLIENZA">Accoglienza</th><th style="text-align:left" title="Gruppi dove NON può lavorare da solo (CSV, es: REC)">Accompagnamento</th><th style="text-align:left" title="Derivati dalle competenze certificate in Formazione (sola lettura)">Settori</th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th><th>Solo diurni</th><th style="text-align:left">Turni bloccati (CSV)</th><th title="La bozza le privilegia sui turni L1">Preferisce L1</th><th title="Livello accoglienza (0-2): serve per il gruppo ACCOGLIENZA">Accoglienza</th><th style="text-align:left" title="Gruppi dove NON può lavorare da solo (CSV, es: REC)">Accompagnamento</th><th style="text-align:left" title="Altri reparti in cui lavora (CSV, es: valet): appare anche nei loro piani e le ore si sommano">Reparti extra</th><th style="text-align:left" title="Derivati dalle competenze certificate in Formazione (sola lettura)">Settori</th></tr></thead><tbody>';
   collabs.forEach((c) => {
     h +=
       '<tr><td style="text-align:left;font-weight:600">' +
@@ -6585,7 +6628,11 @@ function _renderPianoPreferenzeCard() {
       escP(c.accompagnamento_settori || '') +
       '" placeholder="Es: REC" onchange="salvaPreferenzaCollab(' +
       c.id +
-      ',\'accompagnamento_settori\',this.value)" style="width:90px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td style="text-align:left;font-size:.78rem;color:var(--muted)" title="Si gestiscono con le spunte in Formazione">' +
+      ',\'accompagnamento_settori\',this.value)" style="width:90px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td style="text-align:left"><input type="text" value="' +
+      escP(c.reparti_extra || '') +
+      '" placeholder="Es: valet" onchange="salvaPreferenzaCollab(' +
+      c.id +
+      ',\'reparti_extra\',this.value)" style="width:90px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td style="text-align:left;font-size:.78rem;color:var(--muted)" title="Si gestiscono con le spunte in Formazione">' +
       escP((_pianoSettoriEffettivi(c) || []).join(', ') || '—') +
       '</td></tr>';
   });
@@ -7584,7 +7631,7 @@ function _renderPianoCorsiCard() {
   if (!puoGestirePiano()) return '';
   const codici = pianoCodiciCache.filter((c) => c.attivo !== false);
   const collabs = collaboratoriCache
-    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
+    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
     .sort((a, b) => a.nome.localeCompare(b.nome));
   let h =
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Corsi — inserimento automatico nel piano</div><div style="padding:12px 14px">';
@@ -8097,12 +8144,17 @@ async function miglioraOrePiano() {
   const nGiorni = _pianoUltimoGiorno(ym);
   const da = ym + '-01';
   const a = ym + '-' + String(nGiorni).padStart(2, '0');
-  const righe =
-    (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=5000')) ||
-    [];
-  const nomi = collaboratoriCache
-    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
-    .map((c) => c.nome);
+  let righe;
+  {
+    const tutteRighe = (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&limit=8000')) || [];
+    const repM = _pianoReparto();
+    righe = tutteRighe.filter((r) => {
+      if ((r.reparto_dip || 'slots') === repM) return true;
+      const infoM = _pianoCollabInfo(r.collaboratore);
+      return !!(infoM && String(infoM.reparti_extra || '').trim() && _pianoAppartieneAlReparto(infoM));
+    });
+  }
+  const nomi = collaboratoriCache.filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c)).map((c) => c.nome);
   const cella = {};
   const rigaDi = {};
   righe.forEach((r) => {
@@ -8292,13 +8344,7 @@ function _pianoGruppoNonFormato(nome, codTurno, commento) {
   if (['SUP', 'SOSTRESP', 'RESP'].includes(fz)) return null;
   // chi lavora quel settore IN ACCOMPAGNAMENTO (es. guardaroba con la rec)
   // è una situazione voluta: nessun avviso
-  let acc = [];
-  try {
-    acc = Array.isArray(info.accompagnamento_settori)
-      ? info.accompagnamento_settori
-      : JSON.parse(info.accompagnamento_settori || '[]');
-  } catch (e) {}
-  if (acc.includes(g)) return null;
+  if (_pianoAccompagnamentoDi(info).includes(g)) return null;
   const sett = _pianoSettoriEffettivi(info);
   if (!sett || sett.includes(g)) return null;
   return g;

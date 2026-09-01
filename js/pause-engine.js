@@ -93,12 +93,7 @@ function _peCompetenze(righe) {
     try {
       sett = typeof _pianoSettoriEffettivi === 'function' ? _pianoSettoriEffettivi(info) || [] : [];
     } catch (e) {}
-    let acc = [];
-    try {
-      acc = Array.isArray(info.accompagnamento_settori)
-        ? info.accompagnamento_settori
-        : JSON.parse(info.accompagnamento_settori || '[]');
-    } catch (e) {}
+    const acc = typeof _pianoAccompagnamentoDi === 'function' ? _pianoAccompagnamentoDi(info) : [];
     let comp = '';
     if (sett.includes('SALA') || sett.includes('BO') || sett.includes('SUP')) comp += 'S';
     if ((sett.includes('REC') || sett.includes('BO') || sett.includes('SUP')) && !acc.includes('REC')) comp += 'R';
