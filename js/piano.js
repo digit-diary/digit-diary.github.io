@@ -529,7 +529,8 @@ async function renderPiano() {
           '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#d4b86a;color:#d4b86a" onclick="validaPiano()">Valida regole</button>' +
           '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#c0392b;color:#e07b6d" onclick="apriCoperturaMalattia()">Copertura malattia</button>';
         h +=
-          '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49" onclick="generaBozzaPiano()">Genera bozza</button>';
+          '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49" onclick="generaBozzaPiano()">Genera bozza</button>' +
+          '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#8e44ad;color:#8e44ad" title="Dopo la bozza: scambia turni generati tra chi è sopra e chi è sotto le ore dovute (stesso giorno, regole rispettate)" onclick="miglioraOrePiano()">Migliora ore</button>';
         h +=
           '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:var(--accent);color:var(--accent)" onclick="cancellaBozzaPiano()">Cancella piano</button>' +
           '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#d4b86a;color:#d4b86a" title="Trascina i nomi per riordinare; questo pulsante ripristina SUP, BO, poi gli altri" onclick="ripristinaOrdinePiano()">Ordine predefinito</button>';
@@ -1362,14 +1363,23 @@ async function generaBozzaPiano() {
     toast('Nessun fabbisogno configurato per questo mese: la bozza non sa cosa riempire');
     return;
   }
+  // le C di RIEMPIMENTO generate da una bozza precedente si tolgono e si
+  // rimettono alla fine: così rigenerare non trova i giorni "occupati"
+  await secDel(
+    'piano',
+    'data=gte.' +
+      da +
+      '&data=lte.' +
+      a +
+      '&reparto_dip=eq.' +
+      _pianoReparto() +
+      '&codice=eq.C&generato=eq.true&protetto=eq.false',
+  );
   // Step 0 come Turnivo: prima le vacanze (V protette + C + WD)
   const esitoVac = await _applicaVacanzeMese(false);
-  if (esitoVac && (esitoVac.v || esitoVac.c || esitoVac.wd)) {
-    _pianoRighe =
-      (await secGet(
-        'piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=5000',
-      )) || [];
-  }
+  _pianoRighe =
+    (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=5000')) ||
+    [];
   const maxCons = parseInt(_pianoRegolaVal('max_consecutivi')) || 5;
   const minRiposo = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 11;
   // storia per idoneità (chi ha già fatto quel gruppo) e familiarità:
@@ -1714,6 +1724,26 @@ async function generaBozzaPiano() {
     });
   });
 
+  // RIEMPIMENTO C: come nei piani fatti a mano, nessuna cella resta vuota —
+  // ogni giorno senza turno/assenza riceve C (congedo, 0 ore, rigenerabile)
+  let nCongedi = 0;
+  nomi.forEach((n) => {
+    for (let g = 1; g <= nGiorni; g++) {
+      if (cella[n + '|' + g]) continue;
+      const dstrG = ym + '-' + String(g).padStart(2, '0');
+      if (malattie[n + '|' + dstrG]) continue;
+      cella[n + '|' + g] = 'C';
+      nuove.push({
+        collaboratore: n,
+        data: dstrG,
+        codice: 'C',
+        protetto: false,
+        generato: true,
+        reparto_dip: _pianoReparto(),
+      });
+      nCongedi++;
+    }
+  });
   if (!nuove.length && !sostituzioniWd.length) {
     toast(
       'Niente da generare: fabbisogni già coperti' +
@@ -1729,9 +1759,10 @@ async function generaBozzaPiano() {
         ' (' +
         repartoLabel(_pianoReparto()) +
         '):\n\n• ' +
-        (nuove.length + sostituzioniWd.length - nCgfAuto) +
+        (nuove.length + sostituzioniWd.length - nCgfAuto - nCongedi) +
         ' turni da assegnare' +
         (nCgfAuto ? '\n• ' + nCgfAuto + ' CGF automatici (compensazione festivi lavorati)' : '') +
+        (nCongedi ? '\n• ' + nCongedi + ' congedi C di riempimento (giorni senza turno)' : '') +
         '\n• ' +
         scoperti.length +
         ' posti senza candidato idoneo\n\nLe celle esistenti (vacanze, protette, malattie) NON vengono toccate.\nLa bozza si può eliminare con "Cancella piano". Procedere?',
@@ -1739,9 +1770,12 @@ async function generaBozzaPiano() {
   )
     return;
   try {
-    const r = nuove.length
-      ? await sbRpc('piano_bulk_upsert', { p_token: getOpToken(), p_rows: nuove })
-      : { inserite: 0 };
+    let inseriteTot = 0;
+    for (let i = 0; i < nuove.length; i += 2500) {
+      const r2 = await sbRpc('piano_bulk_upsert', { p_token: getOpToken(), p_rows: nuove.slice(i, i + 2500) });
+      inseriteTot += (r2 && r2.inserite) || 0;
+    }
+    const r = { inserite: inseriteTot };
     for (const sw of sostituzioniWd) {
       await secPatch('piano', 'id=eq.' + sw.id, {
         codice: sw.codice,
@@ -7590,52 +7624,110 @@ async function pianoInserisciCorso() {
   }
   try {
     const esistenti = (await secGet('piano?data=eq.' + data + '&reparto_dip=eq.' + _pianoReparto())) || [];
-    const occupate = esistenti.filter((r) => nomi.includes(r.collaboratore));
+    const etichettaCorso = 'Corso ' + cod + (inizio && fine ? ' ' + inizio + '-' + fine : '');
+    const ci = _pianoOra(inizio);
+    const cf = _pianoOra(fine);
+    // classifica: liberi / turno COMPATIBILE (corso nel commento, turno
+    // intatto) / turno SOVRAPPOSTO (avviso!) / altre celle (assenze...)
+    const liberi = [];
+    const compatibili = [];
+    const conflitti = [];
+    const occupateAltre = [];
+    for (const nome of nomi) {
+      const ex = esistenti.find((r) => r.collaboratore === nome);
+      if (!ex) {
+        liberi.push(nome);
+        continue;
+      }
+      const t = _pianoTurnoInfo(ex.codice);
+      if (t && t.ora_inizio && ci != null && cf != null) {
+        const ti = _pianoOra(t.ora_inizio);
+        let tf = _pianoOra(t.ora_fine);
+        if (tf <= ti) tf += 24;
+        if (ci < tf && ti < cf) conflitti.push({ nome: nome, ex: ex, t: t });
+        else compatibili.push({ nome: nome, ex: ex });
+      } else {
+        occupateAltre.push({ nome: nome, ex: ex });
+      }
+    }
     if (
       !confirm(
-        'Corso ' +
-          cod +
+        etichettaCorso +
           ' del ' +
           data.split('-').reverse().join('.') +
-          (inizio && fine ? ' (' + inizio + '-' + fine + ')' : '') +
           '\n\n• ' +
-          nomi.length +
-          ' partecipanti' +
-          (occupate.length
+          liberi.length +
+          ' con giorno libero: ricevono la cella ' +
+          cod +
+          (compatibili.length
             ? '\n• ' +
-              occupate.length +
-              ' hanno già una cella quel giorno: ' +
-              occupate.map((x) => x.collaboratore + ' (' + x.codice + ')').join(', ')
+              compatibili.length +
+              ' con turno COMPATIBILE (turno intatto, corso nel commento): ' +
+              compatibili.map((x) => x.nome + ' (' + x.ex.codice + ')').join(', ')
+            : '') +
+          (conflitti.length
+            ? '\n\nATTENZIONE - turno SOVRAPPOSTO al corso, NON lo ricevono: ' +
+              conflitti
+                .map(
+                  (x) =>
+                    x.nome +
+                    ' (' +
+                    x.ex.codice +
+                    ' ' +
+                    _briefOrarioHM(x.t.ora_inizio) +
+                    '-' +
+                    _briefOrarioHM(x.t.ora_fine) +
+                    ')',
+                )
+                .join(', ')
+            : '') +
+          (occupateAltre.length
+            ? '\n• Altre celle (assenze/congedi), esclusi: ' +
+              occupateAltre.map((x) => x.nome + ' (' + x.ex.codice + ')').join(', ')
             : ''),
       )
     )
       return;
     let sovrascrivi = false;
-    if (occupate.length)
+    if (conflitti.length || occupateAltre.length)
       sovrascrivi = confirm(
-        'Sovrascrivo anche le celle già occupate?\n(Annulla = il corso va solo a chi ha il giorno libero)',
+        'Sovrascrivo comunque le celle di chi ha turno sovrapposto o altra cella?\n(Annulla = restano come sono, consigliato)',
       );
     let inseriti = 0;
-    for (const nome of nomi) {
-      const ex = esistenti.find((r) => r.collaboratore === nome);
-      const dati = {
-        codice: cod,
-        ora_inizio: inizio || null,
-        ora_fine: fine || null,
-        protetto: true,
-        generato: false,
-        commento: 'Corso ' + cod + (inizio && fine ? ' ' + inizio + '-' + fine : '') + ' - ' + getOperatore(),
-      };
-      if (ex) {
-        if (!sovrascrivi) continue;
-        await secPatch('piano', 'id=eq.' + ex.id, dati);
-      } else {
-        await secPost('piano', Object.assign({ collaboratore: nome, data: data, reparto_dip: _pianoReparto() }, dati));
-      }
+    let annotati = 0;
+    const datiCorso = {
+      codice: cod,
+      ora_inizio: inizio || null,
+      ora_fine: fine || null,
+      protetto: true,
+      generato: false,
+      commento: etichettaCorso + ' - ' + getOperatore(),
+    };
+    for (const nome of liberi) {
+      await secPost(
+        'piano',
+        Object.assign({ collaboratore: nome, data: data, reparto_dip: _pianoReparto() }, datiCorso),
+      );
       inseriti++;
     }
-    logAzione('Corso inserito nel piano', cod + ' ' + data + ' — ' + inseriti + ' partecipanti');
-    toast('Corso ' + cod + ': ' + inseriti + ' celle scritte');
+    for (const cx of compatibili) {
+      await secPatch('piano', 'id=eq.' + cx.ex.id, {
+        commento: etichettaCorso + ' poi ' + cx.ex.codice + ' - ' + getOperatore(),
+        protetto: true,
+      });
+      annotati++;
+    }
+    if (sovrascrivi) {
+      for (const cx of conflitti.concat(occupateAltre)) {
+        await secPatch('piano', 'id=eq.' + cx.ex.id, datiCorso);
+        inseriti++;
+      }
+    }
+    logAzione(
+      'Corso inserito nel piano',
+      cod + ' ' + data + ' — ' + inseriti + ' celle, ' + annotati + ' annotati sul turno',
+    );
+    toast('Corso ' + cod + ': ' + inseriti + ' celle' + (annotati ? ' + ' + annotati + ' annotati sul turno' : ''));
     if (_pianoMeseSel === data.substring(0, 7)) renderPiano();
   } catch (e) {
     console.error(e);
@@ -7948,5 +8040,186 @@ async function fabbIncollaDaClipboard() {
   } catch (e) {
     console.error(e);
     toast('Errore incolla fabbisogno');
+  }
+}
+
+// ============================================================
+// MIGLIORA ORE — secondo passaggio dopo la bozza: sposta turni
+// GENERATI (non protetti) da chi è sopra le ore dovute a chi è
+// sotto, stesso giorno e stesse regole (idoneità, consecutivi,
+// riposo 11h, tolleranza). La copertura del fabbisogno non cambia.
+// ============================================================
+async function miglioraOrePiano() {
+  if (!puoGestirePiano()) return;
+  const ym = _pianoMeseSel;
+  const nGiorni = _pianoUltimoGiorno(ym);
+  const da = ym + '-01';
+  const a = ym + '-' + String(nGiorni).padStart(2, '0');
+  const righe =
+    (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=5000')) ||
+    [];
+  const nomi = collaboratoriCache
+    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
+    .map((c) => c.nome);
+  const cella = {};
+  const rigaDi = {};
+  righe.forEach((r) => {
+    const k = r.collaboratore + '|' + parseInt(r.data.split('-')[2]);
+    cella[k] = r.codice;
+    rigaDi[k] = r;
+  });
+  const infoDi = {};
+  nomi.forEach((n) => (infoDi[n] = _pianoCollabInfo(n) || {}));
+  const ore = {};
+  righe.forEach((r) => {
+    if (!nomi.includes(r.collaboratore)) return;
+    const pct = parseFloat((infoDi[r.collaboratore] || {}).percentuale) || 1;
+    ore[r.collaboratore] = (ore[r.collaboratore] || 0) + _pianoOreDiRiga(r, pct);
+  });
+  await _pianoAggiornaYtd(nomi);
+  const saldo = {};
+  const fissi = nomi.filter((n) => !infoDi[n].is_jolly);
+  fissi.forEach((n) => {
+    const pct = parseFloat(infoDi[n].percentuale) || 1;
+    const obiettivo = (nGiorni / 7) * _pianoOreSett * pct - (_pianoYtdMap[n] || 0);
+    saldo[n] = (ore[n] || 0) - obiettivo;
+  });
+  const maxCons = parseInt(_pianoRegolaVal('max_consecutivi')) || 5;
+  const minRiposo = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 11;
+  const toll = parseFloat(_pianoRegolaVal('tolleranza_ore'));
+  const lavora = (cod) => !!_pianoTurnoInfo(cod);
+  const consecOk = (nome, g) => {
+    // catena consecutiva risultante aggiungendo un turno il giorno g
+    let n = 1;
+    for (let k = g - 1; k >= 1 && lavora(cella[nome + '|' + k] || ''); k--) n++;
+    for (let k = g + 1; k <= nGiorni && lavora(cella[nome + '|' + k] || ''); k++) n++;
+    return n <= maxCons;
+  };
+  const riposoOk = (nome, g, t) => {
+    const prev = _pianoTurnoInfo(cella[nome + '|' + (g - 1)] || '');
+    if (prev && prev.ora_fine && t.ora_inizio) {
+      const finePrev = _pianoOra(prev.ora_fine);
+      const fineAbs = prev.oltre23 || finePrev < _pianoOra(prev.ora_inizio) ? 24 + finePrev : finePrev;
+      if (24 + _pianoOra(t.ora_inizio) - fineAbs < minRiposo) return false;
+    }
+    const next = _pianoTurnoInfo(cella[nome + '|' + (g + 1)] || '');
+    if (next && next.ora_fine && t.ora_fine) {
+      const fineT = _pianoOra(t.ora_fine);
+      const fineTAbs = t.oltre23 || fineT < _pianoOra(t.ora_inizio) ? 24 + fineT : fineT;
+      if (24 + _pianoOra(next.ora_inizio) - fineTAbs < minRiposo) return false;
+    }
+    return true;
+  };
+  const malattie = _pianoMalattieMese(ym);
+  // donatori: turni GENERATI non protetti di chi è sopra (fissi sopra o jolly)
+  const donatrici = righe
+    .filter(
+      (r) =>
+        r.generato &&
+        !r.protetto &&
+        _pianoTurnoInfo(r.codice) &&
+        nomi.includes(r.collaboratore) &&
+        (infoDi[r.collaboratore].is_jolly || (saldo[r.collaboratore] || 0) > 1),
+    )
+    .sort(
+      (x, y) =>
+        (saldo[y.collaboratore] === undefined ? 999 : saldo[y.collaboratore]) -
+        (saldo[x.collaboratore] === undefined ? 999 : saldo[x.collaboratore]),
+    );
+  const scambi = [];
+  const mediaPrima = fissi.reduce((acc, n) => acc + Math.abs(saldo[n] || 0), 0) / (fissi.length || 1);
+  for (const rT of donatrici) {
+    const t = _pianoTurnoInfo(rT.codice);
+    const g = parseInt(rT.data.split('-')[2]);
+    const oT = parseFloat(t.durata_ore) || 0;
+    const donatore = rT.collaboratore;
+    const sD = infoDi[donatore].is_jolly ? 999 : saldo[donatore] || 0;
+    if (sD !== 999 && sD - oT < -1) continue; // il donatore andrebbe troppo sotto
+    // riceventi: fissi sotto le ore, ordinati dal più sotto
+    const cand = fissi
+      .filter((n) => n !== donatore && (saldo[n] || 0) < -1)
+      .sort((x, y) => (saldo[x] || 0) - (saldo[y] || 0));
+    for (const ric of cand) {
+      const kR = ric + '|' + g;
+      const celR = cella[kR] || '';
+      const rigaR = rigaDi[kR];
+      const libera = !celR || (celR === 'C' && rigaR && rigaR.generato && !rigaR.protetto);
+      if (!libera) continue;
+      if (malattie[ric + '|' + rT.data]) continue;
+      if (!_pianoIdoneoPerTurno(ric, t)) continue;
+      if (!consecOk(ric, g)) continue;
+      if (!riposoOk(ric, g, t)) continue;
+      if (!isNaN(toll) && (saldo[ric] || 0) + oT > toll) continue; // non superare obiettivo+toll
+      const sR = saldo[ric] || 0;
+      const dopoD = sD === 999 ? 0 : Math.abs(sD - oT) - Math.abs(sD);
+      const dopoR = Math.abs(sR + oT) - Math.abs(sR);
+      if (dopoD + dopoR >= -0.25) continue; // deve migliorare davvero
+      scambi.push({ rT: rT, rigaR: rigaR, ric: ric, g: g, cod: rT.codice });
+      // aggiorna lo stato per i prossimi scambi
+      cella[donatore + '|' + g] = 'C';
+      cella[kR] = rT.codice;
+      if (sD !== 999) saldo[donatore] = sD - oT;
+      saldo[ric] = sR + oT;
+      const pctD = parseFloat(infoDi[donatore].percentuale) || 1;
+      ore[donatore] = (ore[donatore] || 0) - oT;
+      ore[ric] = (ore[ric] || 0) + oT;
+      break;
+    }
+  }
+  if (!scambi.length) {
+    toast('Nessuno scambio utile trovato: le ore sono già bilanciate al meglio');
+    return;
+  }
+  const mediaDopo = fissi.reduce((acc, n) => acc + Math.abs(saldo[n] || 0), 0) / (fissi.length || 1);
+  if (
+    !confirm(
+      'Migliora ore (' +
+        ym +
+        '):\n\n• ' +
+        scambi.length +
+        ' turni spostati da chi è sopra a chi è sotto le ore dovute (stesso giorno, regole rispettate)\n• Scarto medio dalle ore dovute: ' +
+        mediaPrima.toFixed(1) +
+        ' → ' +
+        mediaDopo.toFixed(1) +
+        ' ore\n\nSolo celle GENERATE, mai quelle protette. Procedere?',
+    )
+  )
+    return;
+  try {
+    for (let i = 0; i < scambi.length; i += 8)
+      await Promise.all(
+        scambi.slice(i, i + 8).map(async (sc) => {
+          await secPatch('piano', 'id=eq.' + sc.rT.id, { codice: 'C' });
+          if (sc.rigaR) await secPatch('piano', 'id=eq.' + sc.rigaR.id, { codice: sc.cod });
+          else
+            await secPost('piano', {
+              collaboratore: sc.ric,
+              data: ym + '-' + String(sc.g).padStart(2, '0'),
+              codice: sc.cod,
+              protetto: false,
+              generato: true,
+              reparto_dip: _pianoReparto(),
+            });
+        }),
+      );
+    logAzione(
+      'Piano: migliora ore',
+      ym + ' — ' + scambi.length + ' scambi, scarto ' + mediaPrima.toFixed(1) + '→' + mediaDopo.toFixed(1),
+    );
+    toast(
+      'Migliorato: ' +
+        scambi.length +
+        ' scambi (scarto medio ' +
+        mediaPrima.toFixed(1) +
+        '→' +
+        mediaDopo.toFixed(1) +
+        ' ore)',
+    );
+    _pianoViolCelle = {};
+    _pianoViolLista = null;
+    renderPiano();
+  } catch (e) {
+    console.error(e);
+    toast('Errore migliora ore');
   }
 }
