@@ -225,6 +225,25 @@ function _pianoMarkerGiorno(ym, g) {
   const m = (window._pianoGiornoMarker || {})[ym];
   return m ? m[g] || m[String(g)] || '' : '';
 }
+// modifica manuale del marcatore (doppio click sull'intestazione del giorno)
+async function pianoMarkerEdit(g) {
+  if (!puoGestirePiano()) return;
+  const ym = _pianoMeseSel;
+  const attuale = _pianoMarkerGiorno(ym, g);
+  const v = prompt('Marcatore per il giorno ' + g + ' (es. CS, MN, LRD — vuoto per togliere):', attuale);
+  if (v === null) return;
+  const tutti = window._pianoGiornoMarker || {};
+  tutti[ym] = tutti[ym] || {};
+  if (v.trim()) tutti[ym][g] = v.trim().toUpperCase();
+  else {
+    delete tutti[ym][g];
+    delete tutti[ym][String(g)];
+  }
+  window._pianoGiornoMarker = tutti;
+  await setImp('piano_giorno_marker', JSON.stringify(tutti));
+  logAzione('Marcatore giorno', ym + '-' + g + ': ' + (v.trim() || '(rimosso)'));
+  renderPiano();
+}
 function _pianoUltimoGiorno(ym) {
   const p = ym.split('-');
   return new Date(parseInt(p[0]), parseInt(p[1]), 0).getDate();
@@ -532,7 +551,10 @@ async function renderPiano() {
           '" data-g="' +
           g +
           '"' +
-          (festiviSet[dstr] ? ' title="' + escP(festiviSet[dstr]) + '"' : '') +
+          (festiviSet[dstr]
+            ? ' title="' + escP(festiviSet[dstr]) + '"'
+            : ' title="Doppio click: marcatore del giorno (CS, MN, LRD...)"') +
+          (puoMod ? ' ondblclick="pianoMarkerEdit(' + g + ')"' : '') +
           '>' +
           (_pianoMarkerGiorno(ym, g)
             ? '<div style="font-size:.58rem;background:#FFFF00;color:#000;font-weight:bold;line-height:1.1">' +
@@ -7079,7 +7101,12 @@ async function _renderPianoBriefingTab() {
   const rigaBrief = (salvati || []).find((x) => x.sezione === 'briefing');
   const rigaPause = (salvati || []).find((x) => x.sezione === 'pause');
   let righe, salvato;
-  if (rigaBrief && rigaBrief.contenuto && Array.isArray(rigaBrief.contenuto.righe) && rigaBrief.contenuto.righe.length) {
+  if (
+    rigaBrief &&
+    rigaBrief.contenuto &&
+    Array.isArray(rigaBrief.contenuto.righe) &&
+    rigaBrief.contenuto.righe.length
+  ) {
     righe = rigaBrief.contenuto.righe;
     salvato = true;
   } else {
