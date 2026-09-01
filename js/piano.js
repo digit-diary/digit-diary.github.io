@@ -129,6 +129,7 @@ async function _pianoCaricaCfg() {
     compGruppi,
     maxCambi,
     giorniWk,
+    giornoMarker,
   ] = await Promise.all([
     secGet('piano_turni?order=ordine.asc&limit=500'),
     secGet('piano_codici?order=codice.asc&limit=200'),
@@ -142,6 +143,7 @@ async function _pianoCaricaCfg() {
     getImp('piano_competenze_gruppi'),
     getImp('piano_max_cambi_mese'),
     getImp('piano_giorni_weekend'),
+    getImp('piano_giorno_marker'),
   ]);
   pianoRegoleGruppoCache = regoleGruppo || [];
   try {
@@ -154,6 +156,11 @@ async function _pianoCaricaCfg() {
     window._pianoWeekendCfg = giorniWk ? JSON.parse(giorniWk) : null;
   } catch (e) {
     window._pianoWeekendCfg = null;
+  }
+  try {
+    window._pianoGiornoMarker = giornoMarker ? JSON.parse(giornoMarker) : {};
+  } catch (e) {
+    window._pianoGiornoMarker = {};
   }
   try {
     window._pianoOrdineCollab = ordineCollab ? JSON.parse(ordineCollab) : {};
@@ -211,6 +218,12 @@ function _pianoColore(codice) {
   const t = _pianoTurnoInfo(codice);
   if (t) return t.colore || '';
   return PIANO_COLORI_SPECIALI[codice] || ''; // '' = cella bianca (come Turnivo/Excel)
+}
+// marcatore del giorno importato dall'Excel (riga 2 del foglio: CS = concessione
+// sociale, MN, LRD...) — mostrato nelle intestazioni dei giorni
+function _pianoMarkerGiorno(ym, g) {
+  const m = (window._pianoGiornoMarker || {})[ym];
+  return m ? m[g] || m[String(g)] || '' : '';
 }
 function _pianoUltimoGiorno(ym) {
   const p = ym.split('-');
@@ -520,7 +533,13 @@ async function renderPiano() {
           g +
           '"' +
           (festiviSet[dstr] ? ' title="' + escP(festiviSet[dstr]) + '"' : '') +
-          '><div>' +
+          '>' +
+          (_pianoMarkerGiorno(ym, g)
+            ? '<div style="font-size:.58rem;background:#FFFF00;color:#000;font-weight:bold;line-height:1.1">' +
+              escP(_pianoMarkerGiorno(ym, g)) +
+              '</div>'
+            : '') +
+          '<div>' +
           GG3[dow] +
           '</div><div>' +
           g +
@@ -712,7 +731,13 @@ async function renderPiano() {
               g +
               '"' +
               (festiviSet[dstr] ? ' title="' + escP(festiviSet[dstr]) + '"' : '') +
-              '><div>' +
+              '>' +
+              (_pianoMarkerGiorno(ym, g)
+                ? '<div style="font-size:.58rem;background:#FFFF00;color:#000;font-weight:bold;line-height:1.1">' +
+                  escP(_pianoMarkerGiorno(ym, g)) +
+                  '</div>'
+                : '') +
+              '<div>' +
               GG3[dow] +
               '</div><div>' +
               g +
@@ -744,18 +769,28 @@ async function renderPiano() {
             for (let g = 1; g <= nGiorni; g++) {
               const req = (fabbMap[cod] || {})[g] || 0;
               const ass = (assMap[cod] || {})[g] || 0;
-              let cls = g === 1 ? 'piano-sep-left' : '';
-              if (req) cls += (cls ? ' ' : '') + (ass >= req ? 'piano-fabb-ok' : 'piano-fabb-ko');
+              const cls = g === 1 ? 'piano-sep-left' : '';
               const dstr = ym + '-' + String(g).padStart(2, '0');
+              // colori della PIANIFICAZIONE Excel: celle gialle, weekend verdi;
+              // la carenza resta segnalata dal numero rosso
+              const dow = new Date(dstr + 'T12:00:00').getDay();
+              let stile = '';
+              if (req) {
+                const bg = dow === 0 || _pianoGiorniWeekend().includes(dow) ? '#92D050' : '#FFFF00';
+                stile =
+                  'background:' + bg + ' !important;font-weight:bold;color:' + (ass >= req ? '#000' : '#c0392b') + ';';
+              }
               h +=
                 '<td class="' +
                 cls +
                 '" data-g="' +
                 g +
                 '"' +
-                (puoMod
-                  ? ' style="cursor:pointer" onclick="fabbisognoInline(\'' + escP(cod) + "','" + dstr + '\',this)"'
-                  : '') +
+                ' style="' +
+                stile +
+                (puoMod ? 'cursor:pointer' : '') +
+                '"' +
+                (puoMod ? ' onclick="fabbisognoInline(\'' + escP(cod) + "','" + dstr + '\',this)"' : '') +
                 '>' +
                 (req ? ass + '/' + req : '') +
                 '</td>';
@@ -764,7 +799,7 @@ async function renderPiano() {
           });
         h += '</tbody></table></div>';
         h +=
-          '<p style="font-size:.8rem;color:var(--muted);padding:8px 14px">assegnati/richiesti — <span style="color:#2c6e49;font-weight:700">verde</span> = coperto, <span style="color:#c0392b;font-weight:700">rosso</span> = carenza. Il fabbisogno guida "Genera bozza".</p></div>';
+          '<p style="font-size:.8rem;color:var(--muted);padding:8px 14px">assegnati/richiesti — celle gialle (weekend verdi) come la PIANIFICAZIONE dell&#39;Excel; numero <span style="color:#c0392b;font-weight:700">rosso</span> = carenza. Il fabbisogno guida "Genera bozza".</p></div>';
 
         // DIFFERENZE + EFFETTIVI — schema IDENTICO a Turnivo (calendario.html):
         // differenze = effettivi - pianificazione (verde >0, rosso <0, vuoto 0),
@@ -798,7 +833,13 @@ async function renderPiano() {
           h += '<tr>' + cellaTurno(t);
           for (let g = 1; g <= nGiorni; g++) {
             const diff = ((assMap[t.codice] || {})[g] || 0) - ((fabbMap[t.codice] || {})[g] || 0);
-            const col = diff > 0 ? 'color:#006100' : diff < 0 ? 'color:#FF0000' : '';
+            // colori identici all'Excel: negativo bordeaux/bianco, positivo grigio/blu
+            const col =
+              diff < 0
+                ? 'background:#993366 !important;color:#fff'
+                : diff > 0
+                  ? 'background:#C0C0C0 !important;color:#333399'
+                  : '';
             h +=
               '<td class="' +
               clsCella(g) +
@@ -831,7 +872,7 @@ async function renderPiano() {
               '" data-g="' +
               g +
               '"' +
-              (q > 0 ? ' style="font-weight:bold"' : '') +
+              (q > 0 ? ' style="font-weight:bold;background:#335593 !important;color:#fff"' : '') +
               '>' +
               (q > 0 ? q : '') +
               '</td>';
@@ -2176,8 +2217,9 @@ async function importaPianoExcel(input) {
       } else if (hit) {
         if (!celle.length) return;
         righeCollab.push({ nome: hit.nome, celle: celle, stato: 'riattiva', ref: hit });
-      } else if (celle.length >= 3) {
-        // collaboratore NUOVO trovato nel file: funzione e % dalle colonne accanto
+      } else if (celle.length >= 3 && celle.some((c) => c.cod !== 'C')) {
+        // collaboratore NUOVO trovato nel file: funzione e % dalle colonne
+        // accanto (chi ha solo congedo C non viene creato)
         const fz = String(riga[colNome + 1] || '')
           .trim()
           .toUpperCase();
@@ -2263,16 +2305,17 @@ async function importaPianoExcel(input) {
         logAzione('Collaboratore riattivato da import piano', rc.nome);
       }
     }
-    // chi è attivo nel Diario ma NON compare nel file (nessun turno, congedo
-    // o malattia nel mese): proposta di disattivazione
-    const presenti = new Set(righeCollab.map((x) => x.nome));
+    // proposta di disattivazione: chi è attivo ma NON compare nel file,
+    // oppure compare ma ha SOLO congedo (tutto il mese a C, nessun turno
+    // né malattia)
+    const lavoranti = new Set(righeCollab.filter((x) => x.celle.some((c) => c.cod !== 'C')).map((x) => x.nome));
     const daDisattivare = collaboratoriCache.filter(
-      (c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto() && !presenti.has(c.nome),
+      (c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto() && !lavoranti.has(c.nome),
     );
     if (
       daDisattivare.length &&
       confirm(
-        'Questi collaboratori del reparto NON compaiono nel file (nessun turno, congedo o malattia): li disattivo?\n\n' +
+        'Questi collaboratori attivi NON hanno turni nel file (assenti o con solo congedo C): li disattivo?\n\n' +
           daDisattivare.map((x) => '• ' + x.nome).join('\n') +
           '\n\n(Se rispondi Annulla restano attivi)',
       )
@@ -7036,7 +7079,7 @@ async function _renderPianoBriefingTab() {
   const rigaBrief = (salvati || []).find((x) => x.sezione === 'briefing');
   const rigaPause = (salvati || []).find((x) => x.sezione === 'pause');
   let righe, salvato;
-  if (rigaBrief && rigaBrief.contenuto && Array.isArray(rigaBrief.contenuto.righe)) {
+  if (rigaBrief && rigaBrief.contenuto && Array.isArray(rigaBrief.contenuto.righe) && rigaBrief.contenuto.righe.length) {
     righe = rigaBrief.contenuto.righe;
     salvato = true;
   } else {
