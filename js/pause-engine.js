@@ -49,12 +49,32 @@ function _peDurataMin(orari, turno) {
   return orari[turno] ? orari[turno].dur : 0;
 }
 // regola pause slots (personalizzabile in futuro): <6h 0', 6-7h 30', 7-9h 45', 9h+ 60'
-function _peMinutiPausa(orari, turno) {
+function _briefPauseCfg() {
+  return window._briefPauseCfgObj || {};
+}
+// composizione pause di un turno: personalizzata per turno (es. "15+15")
+// oppure default dalla fascia di durata
+function _pePauseSplit(orari, turno) {
+  const cfg = _briefPauseCfg();
+  const pers = cfg.turni && cfg.turni[String(turno).toUpperCase()];
+  if (pers) {
+    const arr = String(pers)
+      .split(/[+,;\s]+/)
+      .map((x) => parseInt(x))
+      .filter((x) => x > 0);
+    if (arr.length) return arr;
+    return []; // "0" o "-" = nessuna pausa
+  }
   const dur = _peDurataMin(orari, turno);
-  if (dur < 360) return 0;
-  if (dur < 420) return 30;
-  if (dur < 540) return 45;
-  return 60;
+  if (dur < 360) return [];
+  const tot =
+    dur < 420 ? parseInt(cfg.slots_6h) || 30 : dur < 540 ? parseInt(cfg.slots_7h) || 45 : parseInt(cfg.slots_9h) || 60;
+  if (tot <= 30) return [15, 15];
+  if (tot <= 45) return [30, 15];
+  return [30, 15, 15];
+}
+function _peMinutiPausa(orari, turno) {
+  return _pePauseSplit(orari, turno).reduce((a, b) => a + b, 0);
 }
 function _peSettoreTurno(t) {
   const c = String(t || '').toUpperCase()[0];
@@ -192,9 +212,9 @@ function _peScrTitolo(sh, titolo, dataStr, sotto, clr) {
   _peSet(sh, 3, 1, sotto, { b: 1, bg: clr, sz: 10, span: 8, center: 1 });
 }
 function _peScrHeader(sh, r, c, turno, nome, orario, clr) {
-  _peSet(sh, r, c, turno, { b: 1, bg: clr, sz: 10 });
-  _peSet(sh, r, c + 1, nome, { b: 1, bg: clr, sz: 9 });
-  _peSet(sh, r + 1, c + 1, orario, { b: 1, sz: 9 });
+  _peSet(sh, r, c, turno, { b: 1, bg: clr, sz: 10, hdr: 1 });
+  _peSet(sh, r, c + 1, nome, { b: 1, bg: clr, sz: 9, hdr: 1 });
+  _peSet(sh, r + 1, c + 1, orario, { b: 1, sz: 9, ora: 1 });
 }
 function _peGPN(dT, turno) {
   const l = dT[turno];
@@ -1780,22 +1800,54 @@ function _pePiazzaPauseExtra(sh, ctx) {
     const minPausa = _peMinutiPausa(ctx.orari, posStr);
     if (!minPausa) return;
     const slotsNeeded = Math.floor(minPausa / 15);
-    let piazzati = 0;
-    for (let c = 1; c <= 7 && piazzati < slotsNeeded; c += 3)
-      for (let rr = 7; rr <= lastR && piazzati < slotsNeeded; rr++) {
+    // MIGLIORIA rispetto al VBA (che prendeva i primi slot SALA trovati,
+    // spesso ammucchiati): raccolgo TUTTI gli slot SALA nel turno e li
+    // scelgo distribuiti — ideali a frazioni del turno, minimo 45' tra loro
+    const candidati = [];
+    for (let c = 1; c <= 7; c += 3)
+      for (let rr = 7; rr <= lastR; rr++) {
         const cell = _peGet(sh, rr, c);
         if (cell && String(cell.v) === 'SALA') {
           const ora = _peGet(sh, rr, c + 1);
           if (ora && _peSlotInTurno(ctx, ora.v, posStr)) {
-            cell.v = posStr;
-            cell.bg = _PE_CLR.arancio;
-            cell.b = 1;
-            ora.bg = _PE_CLR.arancio;
-            ora.b = 1;
-            piazzati++;
+            let min = _peOraMin(String(ora.v).split('-')[0].trim());
+            if (min != null) {
+              const oo = ctx.orari[posStr];
+              if (oo && min < 720 && oo.ini >= 720) min += 1440;
+              candidati.push({ cell: cell, ora: ora, min: min });
+            }
           }
         }
       }
+    candidati.sort((a, b) => a.min - b.min);
+    let piazzati = 0;
+    const o = ctx.orari[posStr];
+    if (o && candidati.length) {
+      const usati = [];
+      for (let k = 1; k <= slotsNeeded; k++) {
+        const ideale = o.ini + ((o.fin - o.ini) * k) / (slotsNeeded + 1);
+        let best = null;
+        let bestScore = -Infinity;
+        candidati.forEach((cand) => {
+          if (usati.includes(cand)) return;
+          let score = -Math.abs(cand.min - ideale);
+          if (usati.some((u) => Math.abs(u.min - cand.min) < 45)) score -= 10000;
+          if (score > bestScore) {
+            bestScore = score;
+            best = cand;
+          }
+        });
+        if (best) usati.push(best);
+      }
+      usati.forEach((cand) => {
+        cand.cell.v = posStr;
+        cand.cell.bg = _PE_CLR.arancio;
+        cand.cell.b = 1;
+        cand.ora.bg = _PE_CLR.arancio;
+        cand.ora.b = 1;
+        piazzati++;
+      });
+    }
     if (piazzati < slotsNeeded) {
       const noteR = _peMaxR(sh) + 1;
       _peSet(sh, noteR, 1, '! ' + posStr + ': pausa non coperta (' + piazzati * 15 + '/' + minPausa + ' min)', {
@@ -1867,22 +1919,14 @@ function _peGeneraPauseAuto(sh, startR, col, turno, ctx, pauseMin) {
   const o = ctx.orari[turno];
   if (!o) return;
   const durTot = o.fin - o.ini;
-  let numPause, durPrima;
-  if (pauseMin <= 30) {
-    numPause = 2;
-    durPrima = 15;
-  } else if (pauseMin <= 45) {
-    numPause = 2;
-    durPrima = 30;
-  } else {
-    numPause = 3;
-    durPrima = 30;
-  }
+  const split = _pePauseSplit(ctx.orari, turno);
+  const numPause = split.length;
+  if (!numPause) return;
   const intervallo = durTot / (numPause + 1);
   let prevEnd = o.ini;
   for (let k = 1; k <= numPause; k++) {
     let curMin = Math.floor((o.ini + intervallo * k) / 15) * 15;
-    const curDur = k === 1 ? durPrima : 15;
+    const curDur = split[k - 1];
     if (curMin > prevEnd)
       r = _peSS(sh, r, col, _peNomeSettore(sett), _peMinToOra(prevEnd) + ' - ' + _peMinToOra(curMin));
     r = _peSS(sh, r, col, 'PAUSA', _peMinToOra(curMin) + ' - ' + _peMinToOra(curMin + curDur));
@@ -1970,10 +2014,13 @@ function _peGeneraSlots(righe, dstr) {
 function _peGeneraValet(righe, dstr) {
   const dow = new Date(dstr + 'T12:00:00').getDay();
   const isWknd = dow === 5 || dow === 6;
-  const GAP_MIN = 45;
+  const cfg = _briefPauseCfg();
+  const GAP_MIN = parseInt(cfg.valet_gap) || 45;
   const WIN_MIN = 90;
-  const PEAK_S = 1380;
-  const PEAK_E = 1500;
+  const PEAK_S =
+    _peOraMin(cfg.picco_da) != null ? _peOraMin(cfg.picco_da) + (_peOraMin(cfg.picco_da) < 660 ? 1440 : 0) : 1380;
+  const PEAK_E =
+    _peOraMin(cfg.picco_a) != null ? _peOraMin(cfg.picco_a) + (_peOraMin(cfg.picco_a) < 660 ? 1440 : 0) : 1500;
   const orari = _peOrariTurni();
   const valet = [];
   (righe || []).forEach((r) => {
@@ -2000,7 +2047,16 @@ function _peGeneraValet(righe, dstr) {
   valet.forEach((v, vi) => {
     const dur = v.fin - v.ini;
     let arr;
-    if (dur < 360) arr = [[15, 0.5]];
+    const pers = (cfg.turni || {})[v.sigla];
+    if (pers) {
+      const split = String(pers)
+        .split(/[+,;\s]+/)
+        .map((x) => parseInt(x))
+        .filter((x) => x > 0);
+      const fr = { 1: [0.5], 2: [0.34, 0.67], 3: [0.22, 0.5, 0.78] }[Math.min(split.length, 3)] || [];
+      arr = split.slice(0, 3).map((d, k) => [d, fr[k]]);
+      if (!arr.length) return;
+    } else if (dur < 360) arr = [[15, 0.5]];
     else if (dur < 420)
       arr = [
         [15, 0.34],
@@ -2087,7 +2143,9 @@ function _peGeneraValet(righe, dstr) {
     tipo: 'valet',
     tipoGiorno: isWknd ? 'VEN-SAB' : dow === 0 ? 'DOM' : 'LUN-GIO',
     righe: out,
-    nota: "NOTA: chi termina il turno prima del previsto (es. un X1 che esce alle 19.00) di norma NON fa l'ultima pausa da 15 min.",
+    nota:
+      _briefPauseCfg().valet_nota ||
+      "NOTA: chi termina il turno prima del previsto (es. un X1 che esce alle 19.00) di norma NON fa l'ultima pausa da 15 min.",
   };
 }
 
@@ -2104,7 +2162,9 @@ async function briefGeneraPause() {
   if (_briefState.pause && _briefState.pause.contenuto && _briefState.pause.contenuto.tipo) {
     if (!confirm('Sovrascrivo le pause già generate per questa data?')) return;
   }
-  const contenuto = _briefIsValet() ? _peGeneraValet(righe, _briefData) : _peGeneraSlots(righe, _briefData);
+  // slots = pattern manuali (dal tuo Excel); valet e ogni altro settore =
+  // motore algoritmico (durate per fascia, gap, una-alla-volta)
+  const contenuto = _pianoReparto() === 'slots' ? _peGeneraSlots(righe, _briefData) : _peGeneraValet(righe, _briefData);
   if (!contenuto) {
     toast('Nessun turno riconosciuto per generare le pause');
     return;
@@ -2147,6 +2207,38 @@ function _briefSalvaPauseDebounce() {
       });
     } catch (e) {}
   }, 900);
+}
+function _briefRefreshPause() {
+  const el = document.getElementById('brief-pause-body');
+  if (el && typeof _briefPauseBodyHtml === 'function') el.innerHTML = _briefPauseBodyHtml();
+}
+function briefPausaInsRiga(base, r) {
+  if (!puoGestirePiano() || !_briefState || !_briefState.pause) return;
+  const c = _briefState.pause.contenuto;
+  // sposta in giù di 1 le celle di QUESTA coppia di colonne sotto la riga r
+  for (let rr = c.nR + 1; rr > r + 1; rr--) {
+    [base, base + 1].forEach((col) => {
+      const k = rr - 1 + '|' + col;
+      if (c.celle[k]) {
+        c.celle[rr + '|' + col] = c.celle[k];
+        delete c.celle[k];
+      }
+    });
+  }
+  c.celle[r + 1 + '|' + base] = { v: '', ins: 1 };
+  c.celle[r + 1 + '|' + (base + 1)] = { v: '', ins: 1 };
+  if (r + 1 > c.nR) c.nR = r + 1;
+  else c.nR = c.nR + 1;
+  _briefSalvaPauseDebounce();
+  _briefRefreshPause();
+}
+function briefPausaDelRiga(base, r) {
+  if (!puoGestirePiano() || !_briefState || !_briefState.pause) return;
+  const c = _briefState.pause.contenuto;
+  delete c.celle[r + '|' + base];
+  delete c.celle[r + '|' + (base + 1)];
+  _briefSalvaPauseDebounce();
+  _briefRefreshPause();
 }
 // modifica cella pause slots (r|c del foglio virtuale)
 function briefPausaCellaSlots(r, c, val) {
@@ -2193,6 +2285,18 @@ function briefPausaCellaValet(i, campo, val) {
   const el = document.getElementById('brief-crono');
   if (el) el.innerHTML = _briefRenderCronoValet(c);
 }
+function briefValetAddRiga() {
+  if (!puoGestirePiano() || !_briefState || !_briefState.pause) return;
+  _briefState.pause.contenuto.righe.push({ turno: '', nome: '', orario: '', pause: [] });
+  _briefSalvaPauseDebounce();
+  _briefRefreshPause();
+}
+function briefValetDelRiga(i) {
+  if (!puoGestirePiano() || !_briefState || !_briefState.pause) return;
+  _briefState.pause.contenuto.righe.splice(i, 1);
+  _briefSalvaPauseDebounce();
+  _briefRefreshPause();
+}
 async function briefEliminaPause() {
   if (!puoGestirePiano() || !_briefState || !_briefState.pause || !_briefState.pause.id) return;
   if (!confirm('Elimino le pause di questa data?')) return;
@@ -2207,74 +2311,129 @@ function _briefRenderPause(c) {
 }
 function _briefRenderPauseSlots(c) {
   const puo = puoGestirePiano();
-  const colw = [56, 110, 14, 56, 110, 14, 56, 110];
-  let h = '<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:.8rem;table-layout:fixed">';
-  h += '<colgroup>' + colw.map((w) => '<col style="width:' + w + 'px">').join('') + '</colgroup>';
-  for (let r = 1; r <= c.nR; r++) {
-    let vuota = true;
-    for (let col = 1; col <= 8; col++) if (c.celle[r + '|' + col]) vuota = false;
-    if (vuota) {
-      h += '<tr><td colspan="8" style="border:none;height:8px"></td></tr>';
-      continue;
+  let h = '';
+  const tit = c.celle['1|1'];
+  const dataC = c.celle['2|1'];
+  const sotto = c.celle['3|1'];
+  h += '<div style="max-width:580px">';
+  if (tit)
+    h +=
+      '<div style="border:1px solid #999;background:' +
+      (tit.bg || '#FFFF00') +
+      ';font-weight:bold;text-align:center;padding:4px;font-size:.95rem">' +
+      escP(tit.v) +
+      '</div>';
+  if (dataC) h += '<div style="font-weight:bold;font-size:.8rem;padding:2px 0">' + escP(dataC.v) + '</div>';
+  if (sotto)
+    h +=
+      '<div style="border:1px solid #999;background:' +
+      (sotto.bg || '#FFFF00') +
+      ';font-weight:bold;text-align:center;padding:3px;font-size:.85rem">' +
+      escP(sotto.v) +
+      '</div>';
+  h += '</div>';
+  // 3 pile compatte affiancate: le righe vuote spariscono, resta solo un
+  // piccolo stacco prima di ogni nuovo blocco (header turno)
+  h += '<div style="display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;margin-top:10px">';
+  [1, 4, 7].forEach((base) => {
+    const righe = [];
+    for (let r = 4; r <= c.nR; r++) {
+      const a = c.celle[r + '|' + base];
+      const b = c.celle[r + '|' + (base + 1)];
+      if ((a && (String(a.v).trim() !== '' || a.ins)) || (b && (String(b.v).trim() !== '' || b.ins)))
+        righe.push({ r: r, a: a, b: b });
     }
-    h += '<tr>';
-    for (let col = 1; col <= 8; col++) {
-      const cell = c.celle[r + '|' + col];
-      if (!cell) {
-        h += '<td style="border:none"></td>';
-        continue;
+    if (!righe.length) return;
+    let t =
+      '<table style="border-collapse:collapse;font-size:.78rem;table-layout:fixed"><colgroup><col style="width:58px"><col style="width:112px"></colgroup>';
+    righe.forEach((riga, idx) => {
+      const isHdr = (riga.a && riga.a.hdr) || (riga.b && riga.b.hdr);
+      if (isHdr && idx > 0) t += '<tr><td colspan="2" style="border:none;height:12px"></td></tr>';
+      if (!riga.a && riga.b) {
+        // riga orario sotto l\'header: una cella unica, niente buco a sinistra
+        t +=
+          '<tr><td colspan="2" style="border:1px solid #999;font-weight:bold;padding:2px 6px;text-align:center">' +
+          escP(riga.b.v) +
+          '</td></tr>';
+        return;
       }
-      if (cell.span) {
-        h +=
-          '<td colspan="' +
-          cell.span +
-          '" style="border:1px solid #999;background:' +
-          (cell.bg || '#fff') +
+      if (riga.a && riga.a.span) {
+        t +=
+          '<tr><td colspan="2" style="border:1px solid #999;background:' +
+          (riga.a.bg || '#fff') +
           ';color:' +
-          (cell.fg || '#000') +
-          ';font-weight:bold;text-align:' +
-          (cell.center ? 'center' : 'left') +
-          ';padding:3px 6px;font-size:' +
-          (cell.sz === 12 ? '.92rem' : '.8rem') +
-          '">' +
-          escP(cell.v) +
-          '</td>';
-        col += cell.span - 1;
-        continue;
+          (riga.a.fg || '#000') +
+          ';font-weight:bold;padding:2px 6px">' +
+          escP(riga.a.v) +
+          '</td></tr>';
+        return;
       }
-      const stile =
-        'border:1px solid #999;background:' +
-        (cell.bg || 'transparent') +
-        ';color:' +
-        (cell.fg || 'inherit') +
-        ';padding:0';
-      if (puo) {
-        h +=
-          '<td style="' +
-          stile +
-          '"><input value="' +
-          escP(cell.v) +
-          '" onchange="briefPausaCellaSlots(' +
-          r +
+      t += '<tr>';
+      [
+        [riga.a, base],
+        [riga.b, base + 1],
+      ].forEach(([cell, col]) => {
+        if (!cell) {
+          t += '<td style="border:1px solid #999">&nbsp;</td>';
+          return;
+        }
+        const stile =
+          'border:1px solid #999;background:' +
+          (cell.bg || 'transparent') +
+          ';color:' +
+          (cell.fg || 'inherit') +
+          ';padding:0';
+        if (puo) {
+          t +=
+            '<td style="' +
+            stile +
+            '"><input value="' +
+            escP(cell.v) +
+            '" onchange="briefPausaCellaSlots(' +
+            riga.r +
+            ',' +
+            col +
+            ',this.value)" style="width:100%;border:none;background:transparent;color:inherit;font:inherit;' +
+            (cell.b ? 'font-weight:bold;' : '') +
+            'padding:2px 4px;font-size:.78rem"></td>';
+        } else {
+          t +=
+            '<td style="' +
+            stile +
+            ';padding:2px 4px;' +
+            (cell.b ? 'font-weight:bold' : '') +
+            '">' +
+            escP(cell.v) +
+            '</td>';
+        }
+      });
+      if (puo)
+        t +=
+          '<td style="border:none;padding:0 3px;white-space:nowrap">' +
+          '<span style="cursor:pointer;color:#2c6e49;font-weight:bold" title="Inserisci riga sotto" onclick="briefPausaInsRiga(' +
+          base +
           ',' +
-          col +
-          ',this.value)" style="width:100%;border:none;background:transparent;color:inherit;font:inherit;' +
-          (cell.b ? 'font-weight:bold;' : '') +
-          'padding:2px 4px;font-size:.78rem"></td>';
-      } else {
-        h +=
-          '<td style="' +
-          stile +
-          ';padding:2px 4px;' +
-          (cell.b ? 'font-weight:bold' : '') +
-          '">' +
-          escP(cell.v) +
-          '</td>';
-      }
-    }
-    h += '</tr>';
-  }
-  h += '</table></div>';
+          riga.r +
+          ')">+</span> ' +
+          '<span style="cursor:pointer;color:#c0392b;font-weight:bold" title="Elimina riga" onclick="briefPausaDelRiga(' +
+          base +
+          ',' +
+          riga.r +
+          ')">×</span></td>';
+      t += '</tr>';
+    });
+    t += '</table>';
+    h += '<div>' + t;
+    if (puo)
+      h +=
+        '<button class="btn-export" style="font-size:.72rem;padding:2px 8px;margin-top:4px" onclick="briefPausaInsRiga(' +
+        base +
+        ',' +
+        (righe.length ? righe[righe.length - 1].r : 6) +
+        ')">+ riga</button>';
+    h += '</div>';
+  });
+  h += '</div>';
   if (puo)
     h +=
       '<div style="margin-top:8px"><button class="btn-export" style="font-size:.78rem;padding:4px 10px;border-color:#c0392b;color:#c0392b" onclick="briefEliminaPause()">Elimina pause</button></div>';
@@ -2357,9 +2516,23 @@ function _briefRenderPauseValet(c) {
     '</tr>';
   (c.righe || []).forEach((r, i) => {
     h += '<tr>';
-    h += '<td style="border:1px solid #999;padding:2px 8px;font-weight:bold">' + escP(r.turno) + '</td>';
-    h += '<td style="border:1px solid #999;padding:2px 8px">' + escP(r.nome) + '</td>';
-    h += '<td style="border:1px solid #999;padding:2px 8px">' + escP(r.orario) + '</td>';
+    const cInp = (campo, val, larg, extra) =>
+      puo
+        ? '<td style="border:1px solid #999;padding:0"><input value="' +
+          escP(val || '') +
+          '" onchange="briefPausaCellaValet(' +
+          i +
+          ",'" +
+          campo +
+          '\',this.value)" style="width:' +
+          larg +
+          'px;border:none;background:transparent;font:inherit;' +
+          (extra || '') +
+          'padding:2px 6px;font-size:.78rem"></td>'
+        : '<td style="border:1px solid #999;padding:2px 8px;' + (extra || '') + '">' + escP(val || '') + '</td>';
+    h += cInp('turno', r.turno, 55, 'font-weight:bold;');
+    h += cInp('nome', r.nome, 150);
+    h += cInp('orario', r.orario, 100);
     for (let k = 0; k < 3; k++) {
       const val = (r.pause || [])[k] || '';
       if (puo) {
@@ -2382,9 +2555,17 @@ function _briefRenderPauseValet(c) {
           '</td>';
       }
     }
+    if (puo)
+      h +=
+        '<td style="border:none;padding:0 4px"><span style="cursor:pointer;color:#c0392b;font-weight:bold" title="Elimina riga" onclick="briefValetDelRiga(' +
+        i +
+        ')">×</span></td>';
     h += '</tr>';
   });
   h += '</table></div>';
+  if (puo)
+    h +=
+      '<button class="btn-export" style="font-size:.72rem;padding:2px 8px;margin-top:4px" onclick="briefValetAddRiga()">+ Aggiungi riga</button>';
   h += '<div id="brief-crono">' + _briefRenderCronoValet(c) + '</div>';
   if (c.nota)
     h +=
@@ -2395,4 +2576,491 @@ function _briefRenderPauseValet(c) {
     h +=
       '<div style="margin-top:8px"><button class="btn-export" style="font-size:.78rem;padding:4px 10px;border-color:#c0392b;color:#c0392b" onclick="briefEliminaPause()">Elimina pause</button></div>';
   return h;
+}
+
+// ============================================================
+// STAMPA PDF A4 (briefing da compilare a penna + pause) e
+// regole pause personalizzabili (imp piano_pause_cfg)
+// ============================================================
+function _peHexRgb(hex) {
+  const h = hex.replace('#', '');
+  return [parseInt(h.substring(0, 2), 16), parseInt(h.substring(2, 4), 16), parseInt(h.substring(4, 6), 16)];
+}
+function pdfBriefingGiorno() {
+  if (!_briefState) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('portrait', 'mm', 'a4');
+  const valet = _briefIsValet();
+  const dstr = _briefData;
+  const lbl = _briefGiornoLbl(dstr) + ' ' + dstr.split('-').reverse().join('.');
+  doc.setFillColor(255, 255, 0);
+  doc.rect(10, 10, 190, 9, 'F');
+  doc.setDrawColor(120);
+  doc.rect(10, 10, 190, 9);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(0);
+  doc.text('BRIEFING ' + _pianoReparto().toUpperCase() + ' — ' + lbl, 105, 16.2, { align: 'center' });
+  const cols = valet
+    ? ['E', 'U', 'COLLABORATORE', 'TURNO', 'USCITA', 'FIRMA', 'RADIO', 'BADGE']
+    : ['E', 'U', 'HOST', 'T', 'CD', 'USCITA', 'FIRMA'];
+  const body = [];
+  let gPrec = null;
+  (_briefState.righe || []).forEach((r) => {
+    if (!r.nome && !r.turno) return;
+    const g = _briefGruppo(r.turno);
+    if (gPrec !== null && g !== gPrec)
+      body.push([{ content: '', colSpan: cols.length, styles: { minCellHeight: 3.5 } }]);
+    gPrec = g;
+    body.push(
+      valet
+        ? ['', '', r.nome || '', r.turno || '', r.uscita || '', r.firma || '', r.radio || '', r.badge || '']
+        : ['', '', r.nome || '', r.turno || '', r.cd || '', r.uscita || '', r.firma || ''],
+    );
+  });
+  doc.autoTable({
+    startY: 24,
+    margin: { left: 10 },
+    tableWidth: valet ? 190 : 138,
+    head: [cols],
+    body: body,
+    theme: 'grid',
+    styles: {
+      fontSize: 8.5,
+      cellPadding: 1.8,
+      lineColor: [120, 120, 120],
+      lineWidth: 0.2,
+      textColor: [0, 0, 0],
+      minCellHeight: 7,
+    },
+    headStyles: { fontStyle: 'bold', halign: 'center', minCellHeight: 6 },
+    columnStyles: valet
+      ? {
+          0: { cellWidth: 10 },
+          1: { cellWidth: 10 },
+          2: { cellWidth: 56 },
+          3: { cellWidth: 16 },
+          4: { cellWidth: 24 },
+          5: { cellWidth: 34 },
+          6: { cellWidth: 20 },
+          7: { cellWidth: 20 },
+        }
+      : {
+          0: { cellWidth: 10 },
+          1: { cellWidth: 10 },
+          2: { cellWidth: 46 },
+          3: { cellWidth: 13 },
+          4: { cellWidth: 11 },
+          5: { cellWidth: 20 },
+          6: { cellWidth: 28 },
+        },
+    didParseCell: (d) => {
+      if (d.section === 'head') {
+        d.cell.styles.fillColor =
+          d.column.index === 0 ? [0, 176, 80] : d.column.index === 1 ? [255, 0, 0] : [255, 255, 0];
+        if (d.column.index <= 1) d.cell.styles.textColor = [255, 255, 255];
+      } else if (d.column.index === 3 && d.cell.raw) {
+        const hex = _pianoColore(String(d.cell.raw).trim());
+        if (hex && hex[0] === '#') d.cell.styles.fillColor = _peHexRgb(hex);
+        d.cell.styles.fontStyle = 'bold';
+      } else if (d.column.index === 4 && !valet && d.cell.raw) {
+        d.cell.styles.fillColor = [255, 255, 0];
+        d.cell.styles.fontStyle = 'bold';
+      }
+    },
+  });
+  if (!valet) {
+    const turni = _pianoTurniReparto()
+      .slice()
+      .sort((a, b) => {
+        const g = _briefGruppo(a.codice) - _briefGruppo(b.codice);
+        if (g) return g;
+        return a.codice < b.codice ? -1 : 1;
+      });
+    const bodyT = [];
+    let gT = null;
+    turni.forEach((t) => {
+      const g = _briefGruppo(t.codice);
+      if (gT !== null && g !== gT) bodyT.push([{ content: '', colSpan: 3, styles: { minCellHeight: 2.5 } }]);
+      gT = g;
+      bodyT.push([t.codice, _briefOrarioHM(t.ora_inizio), _briefOrarioHM(t.ora_fine)]);
+    });
+    doc.autoTable({
+      startY: 24,
+      margin: { left: 156 },
+      tableWidth: 44,
+      head: [[{ content: 'ORARI', colSpan: 3, styles: { halign: 'center' } }]],
+      body: bodyT,
+      theme: 'grid',
+      styles: { fontSize: 7.5, cellPadding: 1.1, lineColor: [120, 120, 120], lineWidth: 0.2, textColor: [0, 0, 0] },
+      headStyles: { fillColor: [255, 255, 0], textColor: [0, 0, 0], fontStyle: 'bold' },
+      columnStyles: { 0: { cellWidth: 13, fontStyle: 'bold' }, 1: { cellWidth: 15.5 }, 2: { cellWidth: 15.5 } },
+      didParseCell: (d) => {
+        if (d.section === 'body' && d.column.index === 0 && d.cell.raw) {
+          const hex = _pianoColore(String(d.cell.raw).trim());
+          if (hex && hex[0] === '#') d.cell.styles.fillColor = _peHexRgb(hex);
+        }
+      },
+    });
+  }
+  doc.setFontSize(6);
+  doc.setTextColor(120);
+  doc.text('Casino Lugano SA — Briefing — E/U da spuntare a penna', 10, 292);
+  logAzione('Briefing stampato', _pianoReparto() + ' ' + dstr);
+  mostraPdfPreview(doc, 'briefing_' + dstr + '_' + _pianoReparto() + '.pdf', 'Briefing ' + lbl);
+}
+function pdfPauseGiorno() {
+  if (!_briefState || !_briefState.pause || !_briefState.pause.contenuto) return;
+  const c = _briefState.pause.contenuto;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('portrait', 'mm', 'a4');
+  const dstr = _briefData;
+  const lbl = _briefGiornoLbl(dstr) + ' ' + dstr.split('-').reverse().join('.');
+  const stiliBase = {
+    fontSize: 7.5,
+    cellPadding: 1.2,
+    lineColor: [120, 120, 120],
+    lineWidth: 0.2,
+    textColor: [0, 0, 0],
+  };
+  if (c.tipo === 'valet') {
+    doc.setFillColor(255, 255, 0);
+    doc.rect(10, 10, 190, 9, 'F');
+    doc.setDrawColor(120);
+    doc.rect(10, 10, 190, 9);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(0);
+    doc.text('PAUSE VALET — ' + lbl, 105, 16, { align: 'center' });
+    doc.autoTable({
+      startY: 24,
+      margin: { left: 10 },
+      tableWidth: 190,
+      head: [['TURNO', 'NOME', 'ORARIO', 'PAUSA 1', 'PAUSA 2', 'PAUSA 3']],
+      body: (c.righe || []).map((r) => [
+        r.turno,
+        r.nome,
+        r.orario,
+        (r.pause || [])[0] || '',
+        (r.pause || [])[1] || '',
+        (r.pause || [])[2] || '',
+      ]),
+      theme: 'grid',
+      styles: Object.assign({}, stiliBase, { fontSize: 8.5, cellPadding: 1.8 }),
+      headStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold', halign: 'center' },
+      didParseCell: (d) => {
+        if (d.section === 'body' && d.column.index >= 3 && d.cell.raw) d.cell.styles.fillColor = [255, 224, 178];
+      },
+    });
+    const eventi = [];
+    (c.righe || []).forEach((r) => {
+      (r.pause || []).forEach((p) => {
+        const iv = _briefParseIntv(p);
+        if (iv) eventi.push({ s: iv[0], e: iv[1], nome: r.nome, turno: r.turno, txt: p });
+      });
+    });
+    eventi.sort((a, b) => a.s - b.s);
+    let prevEnd = -1;
+    const bodyC = eventi.map((ev) => {
+      const overlap = prevEnd >= 0 && ev.s < prevEnd;
+      if (ev.e > prevEnd) prevEnd = ev.e;
+      return [ev.txt, ev.nome, ev.turno, ev.e - ev.s + ' min'].map((x) => ({
+        content: x,
+        styles: overlap ? { fillColor: [255, 80, 80], textColor: [255, 255, 255] } : {},
+      }));
+    });
+    doc.autoTable({
+      startY: doc.lastAutoTable.finalY + 6,
+      margin: { left: 10 },
+      tableWidth: 130,
+      head: [
+        [
+          {
+            content: 'ORDINE PAUSE (una alla volta)',
+            colSpan: 4,
+            styles: { fillColor: [255, 255, 0], textColor: [0, 0, 0] },
+          },
+        ],
+        ['ORARIO', 'NOME', 'TURNO', 'DURATA'],
+      ],
+      body: bodyC,
+      theme: 'grid',
+      styles: stiliBase,
+      headStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold' },
+    });
+    if (c.nota) {
+      const y = doc.lastAutoTable.finalY + 5;
+      doc.setFillColor(255, 255, 204);
+      doc.rect(10, y, 130, 12, 'F');
+      doc.setDrawColor(120);
+      doc.rect(10, y, 130, 12);
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(7);
+      doc.setTextColor(0);
+      doc.text(doc.splitTextToSize(c.nota, 126), 12, y + 4);
+    }
+  } else {
+    const tit = c.celle['1|1'];
+    const sotto = c.celle['3|1'];
+    doc.setFillColor(255, 255, 0);
+    doc.rect(10, 10, 190, 8, 'F');
+    doc.setDrawColor(120);
+    doc.rect(10, 10, 190, 8);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(0);
+    doc.text((tit ? String(tit.v) : 'PAUSE') + ' — ' + lbl, 105, 15.4, { align: 'center' });
+    if (sotto) {
+      doc.setFillColor(255, 255, 0);
+      doc.rect(10, 19.5, 190, 6.5, 'F');
+      doc.rect(10, 19.5, 190, 6.5);
+      doc.setFontSize(9);
+      doc.text(String(sotto.v), 105, 24, { align: 'center' });
+    }
+    [1, 4, 7].forEach((base, bi) => {
+      const body = [];
+      for (let r = 4; r <= c.nR; r++) {
+        const a = c.celle[r + '|' + base];
+        const b = c.celle[r + '|' + (base + 1)];
+        const pieno = (x) => x && String(x.v).trim() !== '';
+        if (!pieno(a) && !pieno(b)) continue;
+        const isHdr = (a && a.hdr) || (b && b.hdr);
+        if (isHdr && body.length)
+          body.push([
+            { content: '', colSpan: 2, styles: { minCellHeight: 3.2, lineWidth: 0, fillColor: [255, 255, 255] } },
+          ]);
+        if (!pieno(a) && pieno(b)) {
+          body.push([{ content: String(b.v), colSpan: 2, styles: { fontStyle: 'bold', halign: 'center' } }]);
+          continue;
+        }
+        if (a && a.span) {
+          body.push([
+            {
+              content: String(a.v),
+              colSpan: 2,
+              styles: {
+                fillColor: a.bg ? _peHexRgb(a.bg) : [255, 255, 255],
+                textColor: a.fg ? _peHexRgb(a.fg) : [0, 0, 0],
+                fontStyle: 'bold',
+              },
+            },
+          ]);
+          continue;
+        }
+        const mk = (cell) => ({
+          content: cell ? String(cell.v) : '',
+          styles: {
+            fillColor: cell && cell.bg ? _peHexRgb(cell.bg) : [255, 255, 255],
+            textColor: cell && cell.fg ? _peHexRgb(cell.fg) : [0, 0, 0],
+            fontStyle: cell && cell.b ? 'bold' : 'normal',
+          },
+        });
+        body.push([mk(a), mk(b)]);
+      }
+      if (!body.length) return;
+      doc.autoTable({
+        startY: 30,
+        margin: { left: 10 + bi * 65 },
+        tableWidth: 60,
+        body: body,
+        theme: 'grid',
+        styles: Object.assign({}, stiliBase, { cellPadding: 1 }),
+        columnStyles: { 0: { cellWidth: 17 }, 1: { cellWidth: 43 } },
+      });
+    });
+  }
+  doc.setFontSize(6);
+  doc.setTextColor(120);
+  doc.text(
+    'Casino Lugano SA — Pause ' + _pianoReparto() + ' — generato il ' + new Date().toLocaleDateString('it-IT'),
+    10,
+    292,
+  );
+  logAzione('Pause stampate', _pianoReparto() + ' ' + dstr);
+  mostraPdfPreview(doc, 'pause_' + dstr + '_' + _pianoReparto() + '.pdf', 'Pause ' + lbl);
+}
+// ---------- regole pause personalizzabili ----------
+function _briefRenderPauseCfg() {
+  if (typeof isAdmin === 'function' && !isAdmin()) return '';
+  const c = _briefPauseCfg();
+  const orari = _peOrariTurni();
+  // tabella "turni, orari e pause spettanti" calcolata LIVE dalle regole:
+  // cambi un orario nella tab Turni o una fascia qui sotto e si aggiorna
+  let tab =
+    '<table style="border-collapse:collapse;font-size:.78rem;margin:8px 0"><tr>' +
+    ['TURNO', 'ORARIO', 'DURATA', 'PAUSA SPETTANTE']
+      .map((x) => '<th style="border:1px solid #999;background:#FFFF00;padding:3px 10px">' + x + '</th>')
+      .join('') +
+    '</tr>';
+  _pianoTurniReparto()
+    .slice()
+    .sort((a, b) => {
+      const g = _briefGruppo(a.codice) - _briefGruppo(b.codice);
+      if (g) return g;
+      return a.codice < b.codice ? -1 : 1;
+    })
+    .forEach((t) => {
+      const o = orari[t.codice];
+      if (!o) return;
+      const split = _pePauseSplit(orari, t.codice);
+      const pers = (c.turni || {})[t.codice] || '';
+      const ore = Math.floor(o.dur / 60) + 'h' + (o.dur % 60 ? String(o.dur % 60).padStart(2, '0') : '');
+      tab +=
+        '<tr><td style="border:1px solid #999;padding:2px 10px;font-weight:bold;background:' +
+        (_pianoColore(t.codice) || '') +
+        '">' +
+        escP(t.codice) +
+        '</td><td style="border:1px solid #999;padding:2px 10px">' +
+        o.iniStr +
+        ' - ' +
+        o.finStr +
+        '</td><td style="border:1px solid #999;padding:2px 10px">' +
+        ore +
+        '</td><td style="border:1px solid #999;padding:0;background:' +
+        (pers ? '#FFF3C4' : 'transparent') +
+        '"><input class="pcfg-turno" data-turno="' +
+        escP(t.codice) +
+        '" value="' +
+        escP(pers) +
+        '" placeholder="' +
+        (split.length ? split.join('+') : '—') +
+        '" style="width:80px;border:none;background:transparent;font:inherit;font-weight:bold;padding:2px 8px"></td></tr>';
+    });
+  tab +=
+    '</table><p style="font-size:.72rem;color:var(--muted)">Colonna PAUSA: scrivi la composizione che vuoi per quel turno (es. <b>15+15</b> per S3, <b>30+15+15</b>), oppure lasciala vuota per usare la regola per fascia di durata (il valore grigio è quello attuale). Gli orari dei turni si modificano nella tab <b>Turni</b>. Tutto si aggiorna da solo.</p>';
+  const num = (id, val, larg) =>
+    '<input id="' +
+    id +
+    '" type="number" value="' +
+    escP(String(val)) +
+    '" style="width:' +
+    (larg || 60) +
+    'px;padding:4px">';
+  let h =
+    '<details style="margin-top:14px;font-size:.82rem"><summary style="cursor:pointer;font-weight:bold">Regole — turni, orari e pause spettanti (personalizza)</summary><div style="padding:10px 4px;display:flex;flex-direction:column;gap:8px">';
+  h += tab;
+  h +=
+    '<div><b>Slots</b> — minuti di pausa per durata turno: 6–7 ore ' +
+    num('pcfg-6h', c.slots_6h || 30) +
+    ' &nbsp; 7–9 ore ' +
+    num('pcfg-7h', c.slots_7h || 45) +
+    ' &nbsp; 9 ore o più ' +
+    num('pcfg-9h', c.slots_9h || 60) +
+    ' &nbsp; <span style="color:var(--muted)">(sotto le 6 ore: nessuna pausa)</span></div>';
+  h +=
+    '<div><b>Valet</b> — distanza minima tra pause ' +
+    num('pcfg-gap', c.valet_gap || 45) +
+    ' min &nbsp; fascia di punta ven/sab: da <input id="pcfg-picco-da" value="' +
+    escP(c.picco_da || '23.00') +
+    '" style="width:64px;padding:4px"> a <input id="pcfg-picco-a" value="' +
+    escP(c.picco_a || '01.00') +
+    '" style="width:64px;padding:4px"></div>';
+  h +=
+    '<div>Nota in fondo alle pause valet:<br><input id="pcfg-nota" value="' +
+    escP(c.valet_nota || '') +
+    '" placeholder="(testo standard)" style="width:100%;max-width:560px;padding:5px"></div>';
+  h +=
+    '<div><button class="btn-export" style="font-size:.8rem;padding:4px 14px" onclick="salvaPauseCfg()">Salva regole</button></div>';
+  h += '</div></details>';
+  return h;
+}
+async function salvaPauseCfg() {
+  const v = (id) => (document.getElementById(id) || {}).value || '';
+  const turni = {};
+  document.querySelectorAll('.pcfg-turno').forEach((el) => {
+    const val = el.value.trim();
+    if (val) turni[el.dataset.turno.toUpperCase()] = val;
+  });
+  const obj = {
+    slots_6h: parseInt(v('pcfg-6h')) || 30,
+    slots_7h: parseInt(v('pcfg-7h')) || 45,
+    slots_9h: parseInt(v('pcfg-9h')) || 60,
+    valet_gap: parseInt(v('pcfg-gap')) || 45,
+    picco_da: v('pcfg-picco-da') || '23.00',
+    picco_a: v('pcfg-picco-a') || '01.00',
+    valet_nota: v('pcfg-nota').trim(),
+    turni: turni,
+  };
+  await setImp('piano_pause_cfg', JSON.stringify(obj));
+  window._briefPauseCfgObj = obj;
+  toast('Regole pause salvate');
+}
+
+// Importa il briefing da un foglio Excel: cerca in ogni riga una cella che
+// corrisponde a un TURNO del reparto e prende come nome la cella non vuota
+// più vicina a sinistra (funziona con i fogli briefing slots e valet)
+async function importaBriefingExcel(input) {
+  if (!puoGestirePiano() || !_briefState) return;
+  const file = input.files[0];
+  input.value = '';
+  if (!file || !window.XLSX) return;
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf);
+    const codici = {};
+    _pianoTurniReparto().forEach((t) => (codici[t.codice.toUpperCase()] = true));
+    const righe = [];
+    const visti = {};
+    wb.SheetNames.forEach((nomeFoglio) => {
+      if (righe.length) return; // primo foglio utile
+      const grid = XLSX.utils.sheet_to_json(wb.Sheets[nomeFoglio], { header: 1, raw: false });
+      const trovate = [];
+      grid.forEach((r) => {
+        if (!r) return;
+        for (let j = 1; j < r.length; j++) {
+          const val = String(r[j] == null ? '' : r[j])
+            .trim()
+            .toUpperCase();
+          if (!codici[val]) continue;
+          let nome = '';
+          for (let k = j - 1; k >= 0; k--) {
+            const cand = String(r[k] == null ? '' : r[k]).trim();
+            if (cand && !/^\d|[./]/.test(cand)) {
+              nome = cand.toUpperCase();
+              break;
+            }
+          }
+          if (nome && nome !== 'HOST' && nome !== 'COLLABORATORE' && !visti[nome]) {
+            visti[nome] = true;
+            trovate.push({
+              e: '',
+              u: '',
+              nome: nome,
+              nomeFull: null,
+              turno: val,
+              cd: '',
+              uscita: '',
+              firma: '',
+              radio: '',
+              badge: '',
+            });
+          }
+          break;
+        }
+      });
+      if (trovate.length) righe.push(...trovate);
+    });
+    if (!righe.length) {
+      toast('Nessuna coppia nome+turno riconosciuta nel file');
+      return;
+    }
+    if (
+      _briefState.righe.length &&
+      !confirm('Trovate ' + righe.length + ' righe nel file. Sostituisco il briefing attuale?')
+    )
+      return;
+    righe.sort((a, b) => {
+      const g = _briefGruppo(a.turno) - _briefGruppo(b.turno);
+      if (g) return g;
+      if (a.turno !== b.turno) return a.turno < b.turno ? -1 : 1;
+      return a.nome < b.nome ? -1 : 1;
+    });
+    _briefState.righe = righe;
+    clearTimeout(_briefSaveTimer);
+    await briefSalvaBriefing();
+    renderPiano();
+    toast('Briefing importato: ' + righe.length + ' righe');
+  } catch (e) {
+    toast('Errore lettura file Excel');
+  }
 }
