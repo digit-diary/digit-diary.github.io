@@ -3761,6 +3761,28 @@ button:focus-visible,
 .piano-table td.col-nascosta {
   display: none !important;
 }
+/* confine righe nascoste (come Excel): linea marcata + chip cliccabile */
+.piano-table tr.riga-dopo-nascoste td {
+  border-top: 3px solid #555 !important;
+}
+.piano-table tr.riga-prima-nascoste td {
+  border-bottom: 3px solid #555 !important;
+}
+.chip-nascoste {
+  display: inline-block;
+  background: #555;
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 0 4px;
+  border-radius: 2px;
+  margin-right: 4px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+.chip-nascoste:hover {
+  background: #e67e22;
+}
 /* anteprima immediata dei commenti del piano */
 #piano-tip {
   position: fixed;
