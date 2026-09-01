@@ -1,4 +1,4 @@
-const CACHE_NAME = 'diario-cl-v112';
+const CACHE_NAME = 'diario-cl-v113';
 const SHELL_URLS = ['/', '/manifest.json', '/logo_casino.png', '/icon-192.png', '/icon-512.png',
   '/css/style.css',
   '/js/config.js', '/js/crypto.js', '/js/chat-core.js', '/js/realtime.js',
@@ -7,7 +7,7 @@ const SHELL_URLS = ['/', '/manifest.json', '/logo_casino.png', '/icon-192.png', 
   '/js/chat-ui.js', '/js/moduli.js', '/js/formazione.js', '/js/valutazioni.js',
   '/js/rapporto.js', '/js/stats.js',
   '/js/consegna.js', '/js/promemoria.js',
-  '/js/maison-core.js', '/js/maison-budget.js', '/js/maison-helpers.js', '/js/piano.js'
+  '/js/maison-core.js', '/js/maison-budget.js', '/js/maison-helpers.js', '/js/piano.js', '/js/pause-engine.js'
 ];
 
 self.addEventListener('install', e => {
