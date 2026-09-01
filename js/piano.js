@@ -225,6 +225,13 @@ function _pianoMarkerGiorno(ym, g) {
   const m = (window._pianoGiornoMarker || {})[ym];
   return m ? m[g] || m[String(g)] || '' : '';
 }
+// colonne a larghezza FISSA condivise da griglia/fabbisogno/differenze/
+// effettivi: i giorni si incolonnano alla perfezione tra le tabelle
+function _pianoColgroupGiorni(nGiorni) {
+  let cg = '';
+  for (let g = 1; g <= nGiorni; g++) cg += '<col style="width:37px">';
+  return cg;
+}
 // modifica manuale del marcatore (doppio click sull'intestazione del giorno)
 async function pianoMarkerEdit(g) {
   if (!puoGestirePiano()) return;
@@ -536,7 +543,11 @@ async function renderPiano() {
 
       // GRIGLIA
       h +=
-        '<div class="piano-wrap"><table class="piano-table"><thead><tr><th class="piano-nome">Collaboratore</th><th class="piano-fun">Fun</th>';
+        '<div class="piano-wrap"><table class="piano-table piano-fixed" style="width:' +
+        (194 + 37 * nGiorni + 326) +
+        'px"><colgroup><col style="width:150px"><col style="width:44px">' +
+        _pianoColgroupGiorni(nGiorni) +
+        '<col style="width:54px"><col style="width:30px"><col style="width:30px"><col style="width:54px"><col style="width:54px"><col style="width:50px"><col style="width:54px"></colgroup><thead><tr><th class="piano-nome">Collaboratore</th><th class="piano-fun">Fun</th>';
       for (let g = 1; g <= nGiorni; g++) {
         const dstr = ym + '-' + String(g).padStart(2, '0');
         const dow = new Date(dstr + 'T12:00:00').getDay();
@@ -768,7 +779,14 @@ async function renderPiano() {
           if (conTot) t += '<th>Tot</th>';
           return t + '</tr></thead>';
         };
-        h += '<div class="piano-wrap"><table class="piano-table">' + testataGiorni(false) + '<tbody>';
+        h +=
+          '<div class="piano-wrap"><table class="piano-table piano-fixed" style="width:' +
+          (194 + 37 * nGiorni) +
+          'px"><colgroup><col style="width:194px">' +
+          _pianoColgroupGiorni(nGiorni) +
+          '</colgroup>' +
+          testataGiorni(false) +
+          '<tbody>';
         const gruppoOrd = {};
         turniRep.forEach((t, i) => (gruppoOrd[t.codice] = (t.gruppo || '') + '|' + String(i).padStart(3, '0')));
         turniRep
@@ -850,7 +868,14 @@ async function renderPiano() {
           '<div class="main-card" style="margin-top:16px"><div class="card-header">Differenze — ' +
           escP(label) +
           ' <span style="font-size:.76rem;color:#b8a98a;font-weight:400">(effettivi − pianificazione)</span></div>';
-        h += '<div class="piano-wrap"><table class="piano-table">' + testataGiorni(false) + '<tbody>';
+        h +=
+          '<div class="piano-wrap"><table class="piano-table piano-fixed" style="width:' +
+          (194 + 37 * nGiorni) +
+          'px"><colgroup><col style="width:194px">' +
+          _pianoColgroupGiorni(nGiorni) +
+          '</colgroup>' +
+          testataGiorni(false) +
+          '<tbody>';
         turniOrdinati.forEach((t) => {
           h += '<tr>' + cellaTurno(t);
           for (let g = 1; g <= nGiorni; g++) {
@@ -881,7 +906,14 @@ async function renderPiano() {
           '<div class="main-card" style="margin-top:16px"><div class="card-header">Effettivi — ' +
           escP(label) +
           '</div>';
-        h += '<div class="piano-wrap"><table class="piano-table">' + testataGiorni(true) + '<tbody>';
+        h +=
+          '<div class="piano-wrap"><table class="piano-table piano-fixed" style="width:' +
+          (194 + 37 * nGiorni + 44) +
+          'px"><colgroup><col style="width:194px">' +
+          _pianoColgroupGiorni(nGiorni) +
+          '<col style="width:44px"></colgroup>' +
+          testataGiorni(true) +
+          '<tbody>';
         turniOrdinati.forEach((t) => {
           h += '<tr>' + cellaTurno(t);
           let tot = 0;
