@@ -400,7 +400,12 @@ async function _pianoAggiornaYtd(nomi) {
 async function renderPiano() {
   const el = document.getElementById('piano-content');
   if (!el) return;
-  el.innerHTML = '<p style="color:var(--muted);padding:20px">Caricamento piano...</p>';
+  // niente "Caricamento" che accorcia la pagina (faceva saltare lo scroll
+  // in cima a ogni cambio giorno/mese): il contenuto vecchio resta visibile
+  // sbiadito finché il nuovo non è pronto, poi lo scroll viene ripristinato
+  const scrollPrec = window.scrollY;
+  if (!el.firstChild) el.innerHTML = '<p style="color:var(--muted);padding:20px">Caricamento piano...</p>';
+  else el.style.opacity = '0.55';
   try {
     await _pianoCaricaCfg();
     const ym = _pianoMeseSel;
@@ -868,6 +873,8 @@ async function renderPiano() {
         '</div>';
     }
     el.innerHTML = h;
+    el.style.opacity = '';
+    if (scrollPrec) requestAnimationFrame(() => window.scrollTo(0, scrollPrec));
     if (typeof initCardRichiudibili === 'function' && document.getElementById('piano-config'))
       initCardRichiudibili('piano-config', []);
     if (_pianoTab === 'calendario') {
@@ -881,6 +888,7 @@ async function renderPiano() {
       setTimeout(() => caricaConfrontoTimbrature(), 50);
   } catch (e) {
     console.error('Errore piano:', e);
+    el.style.opacity = '';
     el.innerHTML = '<p style="color:var(--accent);padding:20px">Errore caricamento piano</p>';
   }
 }
@@ -6822,11 +6830,13 @@ async function _renderPianoBriefingTab() {
   // tabella briefing + tabella orari affiancate (stessa vista dell'Excel)
   h += '<div style="display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap"><div style="overflow-x:auto">';
   h += '<table class="brief-table" style="border-collapse:collapse;font-size:.85rem"><thead><tr>';
+  // ogni reparto ha il SUO briefing: slots con CD (numeri cassa), valet con
+  // radio/badge, gli altri (es. tavoli, senza casse) tabella essenziale
   const cols = valet
     ? ['E', 'U', 'COLLABORATORE', 'TURNO', 'USCITA', 'FIRMA', 'RADIO', 'BADGE']
     : rep === 'slots'
       ? ['E', 'U', 'HOST', 'T', 'CD', 'USCITA', 'FIRMA']
-      : ['E', 'U', 'COLLABORATORE', 'T', 'CD', 'USCITA', 'FIRMA'];
+      : ['E', 'U', 'COLLABORATORE', 'T', 'USCITA', 'FIRMA'];
   cols.forEach((c) => {
     const bg = c === 'E' ? '#00B050' : c === 'U' ? '#FF0000' : '#FFFF00';
     const fg = c === 'E' || c === 'U' ? '#fff' : '#000';
@@ -6887,6 +6897,9 @@ async function _renderPianoBriefingTab() {
       h += inp('firma', r.firma, 90);
       h += inp('radio', r.radio, 60);
       h += inp('badge', r.badge, 60);
+    } else if (rep !== 'slots') {
+      h += inp('uscita', r.uscita, 70);
+      h += inp('firma', r.firma, 90);
     } else {
       h +=
         '<td style="border:1px solid #999;padding:0;background:' +
@@ -6904,7 +6917,17 @@ async function _renderPianoBriefingTab() {
     }
     if (puo)
       h +=
-        '<td style="border:none;padding:0 4px"><span style="cursor:pointer;color:#c0392b;font-weight:bold" title="Elimina riga" onclick="briefEliminaRiga(' +
+        '<td style="border:none;padding:0 5px;white-space:nowrap;font-size:.85rem">' +
+        '<span style="cursor:pointer;color:#2c6e49;font-weight:bold" title="Inserisci riga sotto" onclick="briefInserisciRiga(' +
+        i +
+        ')">+</span> ' +
+        '<span style="cursor:pointer;color:var(--muted)" title="Sposta su" onclick="briefMuoviRiga(' +
+        i +
+        ',-1)">▲</span> ' +
+        '<span style="cursor:pointer;color:var(--muted)" title="Sposta giù" onclick="briefMuoviRiga(' +
+        i +
+        ',1)">▼</span> ' +
+        '<span style="cursor:pointer;color:#c0392b;font-weight:bold" title="Elimina riga" onclick="briefEliminaRiga(' +
         i +
         ')">×</span></td>';
     h += '</tr>';
@@ -6914,9 +6937,14 @@ async function _renderPianoBriefingTab() {
     h +=
       '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;margin-top:8px" onclick="briefAggiungiRiga()">+ Aggiungi riga</button>';
   h += '</div>';
-  // tabella ORARI (da piano_turni, sola lettura)
+  // tabella ORARI (da piano_turni, sola lettura): SOLO i turni presenti
+  // nel briefing di oggi
+  const turniPresenti = {};
+  righe.forEach((r) => {
+    if (r.turno) turniPresenti[String(r.turno).trim().toUpperCase()] = true;
+  });
   const turni = _pianoTurniReparto()
-    .slice()
+    .filter((t) => turniPresenti[t.codice.toUpperCase()])
     .sort((a, b) => {
       const g = _briefGruppo(a.codice) - _briefGruppo(b.codice);
       if (g) return g;
@@ -7017,6 +7045,27 @@ async function briefAggiungiRiga() {
     radio: '',
     badge: '',
   });
+  clearTimeout(_briefSaveTimer);
+  await briefSalvaBriefing();
+  renderPiano();
+}
+function _briefRigaVuota() {
+  return { e: '', u: '', nome: '', nomeFull: null, turno: '', cd: '', uscita: '', firma: '', radio: '', badge: '' };
+}
+async function briefInserisciRiga(i) {
+  if (!_briefState || !puoGestirePiano()) return;
+  _briefState.righe.splice(i + 1, 0, _briefRigaVuota());
+  clearTimeout(_briefSaveTimer);
+  await briefSalvaBriefing();
+  renderPiano();
+}
+async function briefMuoviRiga(i, delta) {
+  if (!_briefState || !puoGestirePiano()) return;
+  const j = i + delta;
+  if (j < 0 || j >= _briefState.righe.length) return;
+  const tmp = _briefState.righe[i];
+  _briefState.righe[i] = _briefState.righe[j];
+  _briefState.righe[j] = tmp;
   clearTimeout(_briefSaveTimer);
   await briefSalvaBriefing();
   renderPiano();

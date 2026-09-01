@@ -2345,7 +2345,7 @@ function _briefRenderPauseSlots(c) {
     }
     if (!righe.length) return;
     let t =
-      '<table style="border-collapse:collapse;font-size:.78rem;table-layout:fixed"><colgroup><col style="width:58px"><col style="width:112px"></colgroup>';
+      '<table style="border-collapse:collapse;font-size:.78rem;table-layout:fixed"><colgroup><col style="width:46px"><col style="width:88px"></colgroup>';
     righe.forEach((riga, idx) => {
       const isHdr = (riga.a && riga.a.hdr) || (riga.b && riga.b.hdr);
       if (isHdr && idx > 0) t += '<tr><td colspan="2" style="border:none;height:12px"></td></tr>';
@@ -2545,7 +2545,7 @@ function _briefRenderPauseValet(c) {
           i +
           ",'p" +
           k +
-          '\',this.value)" style="width:105px;border:none;background:transparent;font:inherit;text-align:center;padding:2px 4px;font-size:.78rem"></td>';
+          '\',this.value)" style="width:86px;border:none;background:transparent;font:inherit;text-align:center;padding:2px 4px;font-size:.78rem"></td>';
       } else {
         h +=
           '<td style="border:1px solid #999;background:' +
@@ -2601,9 +2601,12 @@ function pdfBriefingGiorno() {
   doc.setFontSize(13);
   doc.setTextColor(0);
   doc.text('BRIEFING ' + _pianoReparto().toUpperCase() + ' — ' + lbl, 105, 16.2, { align: 'center' });
+  const generico = !valet && _pianoReparto() !== 'slots';
   const cols = valet
     ? ['E', 'U', 'COLLABORATORE', 'TURNO', 'USCITA', 'FIRMA', 'RADIO', 'BADGE']
-    : ['E', 'U', 'HOST', 'T', 'CD', 'USCITA', 'FIRMA'];
+    : generico
+      ? ['E', 'U', 'COLLABORATORE', 'T', 'USCITA', 'FIRMA']
+      : ['E', 'U', 'HOST', 'T', 'CD', 'USCITA', 'FIRMA'];
   const body = [];
   let gPrec = null;
   (_briefState.righe || []).forEach((r) => {
@@ -2615,7 +2618,9 @@ function pdfBriefingGiorno() {
     body.push(
       valet
         ? ['', '', r.nome || '', r.turno || '', r.uscita || '', r.firma || '', r.radio || '', r.badge || '']
-        : ['', '', r.nome || '', r.turno || '', r.cd || '', r.uscita || '', r.firma || ''],
+        : generico
+          ? ['', '', r.nome || '', r.turno || '', r.uscita || '', r.firma || '']
+          : ['', '', r.nome || '', r.turno || '', r.cd || '', r.uscita || '', r.firma || ''],
     );
   });
   doc.autoTable({
@@ -2645,15 +2650,24 @@ function pdfBriefingGiorno() {
           6: { cellWidth: 20 },
           7: { cellWidth: 20 },
         }
-      : {
-          0: { cellWidth: 10 },
-          1: { cellWidth: 10 },
-          2: { cellWidth: 46 },
-          3: { cellWidth: 13 },
-          4: { cellWidth: 11 },
-          5: { cellWidth: 20 },
-          6: { cellWidth: 28 },
-        },
+      : generico
+        ? {
+            0: { cellWidth: 10 },
+            1: { cellWidth: 10 },
+            2: { cellWidth: 50 },
+            3: { cellWidth: 14 },
+            4: { cellWidth: 24 },
+            5: { cellWidth: 30 },
+          }
+        : {
+            0: { cellWidth: 10 },
+            1: { cellWidth: 10 },
+            2: { cellWidth: 46 },
+            3: { cellWidth: 13 },
+            4: { cellWidth: 11 },
+            5: { cellWidth: 20 },
+            6: { cellWidth: 28 },
+          },
     didParseCell: (d) => {
       if (d.section === 'head') {
         d.cell.styles.fillColor =
@@ -2663,15 +2677,19 @@ function pdfBriefingGiorno() {
         const hex = _pianoColore(String(d.cell.raw).trim());
         if (hex && hex[0] === '#') d.cell.styles.fillColor = _peHexRgb(hex);
         d.cell.styles.fontStyle = 'bold';
-      } else if (d.column.index === 4 && !valet && d.cell.raw) {
+      } else if (d.column.index === 4 && !valet && !generico && d.cell.raw) {
         d.cell.styles.fillColor = [255, 255, 0];
         d.cell.styles.fontStyle = 'bold';
       }
     },
   });
   if (!valet) {
+    const turniPresenti = {};
+    (_briefState.righe || []).forEach((r) => {
+      if (r.turno) turniPresenti[String(r.turno).trim().toUpperCase()] = true;
+    });
     const turni = _pianoTurniReparto()
-      .slice()
+      .filter((t) => turniPresenti[t.codice.toUpperCase()])
       .sort((a, b) => {
         const g = _briefGruppo(a.codice) - _briefGruppo(b.codice);
         if (g) return g;
@@ -2735,7 +2753,7 @@ function pdfPauseGiorno() {
     doc.autoTable({
       startY: 24,
       margin: { left: 10 },
-      tableWidth: 190,
+      tableWidth: 152,
       head: [['TURNO', 'NOME', 'ORARIO', 'PAUSA 1', 'PAUSA 2', 'PAUSA 3']],
       body: (c.righe || []).map((r) => [
         r.turno,
@@ -2746,7 +2764,15 @@ function pdfPauseGiorno() {
         (r.pause || [])[2] || '',
       ]),
       theme: 'grid',
-      styles: Object.assign({}, stiliBase, { fontSize: 8.5, cellPadding: 1.8 }),
+      styles: Object.assign({}, stiliBase, { fontSize: 8, cellPadding: 1.4 }),
+      columnStyles: {
+        0: { cellWidth: 15 },
+        1: { cellWidth: 42 },
+        2: { cellWidth: 26 },
+        3: { cellWidth: 23 },
+        4: { cellWidth: 23 },
+        5: { cellWidth: 23 },
+      },
       headStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold', halign: 'center' },
       didParseCell: (d) => {
         if (d.section === 'body' && d.column.index >= 3 && d.cell.raw) d.cell.styles.fillColor = [255, 224, 178];
@@ -2860,12 +2886,12 @@ function pdfPauseGiorno() {
       if (!body.length) return;
       doc.autoTable({
         startY: 30,
-        margin: { left: 10 + bi * 65 },
-        tableWidth: 60,
+        margin: { left: 10 + bi * 50 },
+        tableWidth: 42,
         body: body,
         theme: 'grid',
-        styles: Object.assign({}, stiliBase, { cellPadding: 1 }),
-        columnStyles: { 0: { cellWidth: 17 }, 1: { cellWidth: 43 } },
+        styles: Object.assign({}, stiliBase, { cellPadding: 0.9, fontSize: 7 }),
+        columnStyles: { 0: { cellWidth: 13 }, 1: { cellWidth: 29 } },
       });
     });
   }
