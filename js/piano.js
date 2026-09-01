@@ -261,6 +261,11 @@ const _PIANO_TABS = [
     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M11 6.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm-3 0a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm-5 3a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3 0a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5z"/><path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/></svg>',
   ],
   [
+    'briefing',
+    'Briefing',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M13 2.5a1.5 1.5 0 0 1 3 0v11a1.5 1.5 0 0 1-3 0v-.214c-2.162-1.241-4.49-1.843-6.912-2.083l.405 2.712A1 1 0 0 1 5.51 15.1h-.548a1 1 0 0 1-.916-.599l-1.85-3.49-.202-.003A2.014 2.014 0 0 1 0 9V7a2.02 2.02 0 0 1 1.992-2.013 75 75 0 0 0 2.483-.075c3.043-.154 6.148-.849 8.525-2.199zm1 0v11a.5.5 0 0 0 1 0v-11a.5.5 0 0 0-1 0m-1 1.35c-2.344 1.205-5.209 1.842-8 2.033v4.233q.27.015.537.036c2.568.189 5.093.744 7.463 1.993zm-9 6.215v-4.13a95 95 0 0 1-1.992.052A1.02 1.02 0 0 0 1 7v2c0 .55.448 1.002 1.006 1.009A61 61 0 0 1 4 10.065m1.09 1.047 1.278.245.401 2.688-.548.002z"/></svg>',
+  ],
+  [
     'vacanze',
     'Vacanze',
     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M8 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6m0 1a4 4 0 1 0 0-8 4 4 0 0 0 0 8M8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0m0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13m8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5M3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8m10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0m-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0m9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707M4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708"/></svg>',
@@ -830,6 +835,8 @@ async function renderPiano() {
         });
         h += '</tbody></table></div></div>';
       }
+    } else if (_pianoTab === 'briefing') {
+      h += await _renderPianoBriefingTab();
     } else if (_pianoTab === 'vacanze') {
       h += await _renderPianoVacanzeTab();
     } else if (_pianoTab === 'turni') {
@@ -6676,4 +6683,424 @@ function pianoCellaInline(nome, dstr, el) {
   });
   inp.addEventListener('click', (e) => e.stopPropagation());
   inp.addEventListener('blur', conferma);
+}
+
+// ============================================================
+// TAB BRIEFING — briefing giornaliero + pause (da Excel Musa)
+// Una riga piano_briefing per (data, reparto, sezione): il
+// contenuto è tutto editabile e si salva da solo; le colonne
+// E/U scrivono anche le timbrature (regola entrata anticipata).
+// ============================================================
+let _briefData = null;
+let _briefState = null;
+let _briefSaveTimer = null;
+let _briefSaving = false;
+
+function _briefDomani() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function _briefGiornoLbl(dstr) {
+  const d = new Date(dstr + 'T12:00:00');
+  return ['DOM', 'LUN', 'MAR', 'MER', 'GIO', 'VEN', 'SAB'][d.getDay()];
+}
+function _briefIsValet() {
+  return _pianoReparto() === 'valet';
+}
+function _briefGruppo(cod) {
+  if (!cod) return 9;
+  const u = String(cod).toUpperCase();
+  if (u === '9' || u === 'L1') return 3;
+  if (u[0] === 'Z') return 4;
+  if (u[0] === 'C') return 0;
+  if (u[0] === 'S') return 1;
+  if (u[0] === 'R') return 2;
+  if (u[0] === 'X') return 1;
+  return 5;
+}
+function _briefOrarioHM(s) {
+  return s ? String(s).substring(0, 5) : '';
+}
+// ore timbrate con la regola dell'entrata anticipata, usando la riga
+// piano della DATA del briefing (non del mese a video)
+function _briefOreClamp(nomeFull, entrata, uscita) {
+  const r = (_briefState.pianoRighe || []).find((x) => x.collaboratore === nomeFull);
+  if (r && !_pianoTurnoInfo(r.codice) && r.ora_inizio) {
+    const e0 = _pianoOra(entrata);
+    const i0 = _pianoOra(r.ora_inizio);
+    if (e0 != null && i0 != null && i0 - e0 > 0 && i0 - e0 < 6) return _pianoOreTimbrata(r.ora_inizio, uscita);
+    return _pianoOreTimbrata(entrata, uscita);
+  }
+  const t = r ? _pianoTurnoInfo(r.codice) : null;
+  if (t && t.ora_inizio) {
+    const e = _pianoOra(entrata);
+    const inizio = _pianoOra(t.ora_inizio);
+    if (e != null && inizio != null) {
+      const anticipo = inizio - e;
+      const eEff = anticipo > 0 && anticipo < 6 ? t.ora_inizio.substring(0, 5) : entrata;
+      return _pianoOreTimbrata(eEff, uscita);
+    }
+  }
+  return _pianoOreTimbrata(entrata, uscita);
+}
+function _briefComponi(pianoRighe, timbMap) {
+  const righe = [];
+  (pianoRighe || []).forEach((r) => {
+    const t = _pianoTurnoInfo(r.codice);
+    const custom = !t && r.ora_inizio && r.ora_fine;
+    if (!t && !custom) return;
+    const info = _pianoCollabInfo(r.collaboratore);
+    if (info && info.attivo === false) return;
+    if (info && info.funzione === 'RESP') return;
+    const parole = r.collaboratore.trim().split(/\s+/);
+    const cognome = (parole.length > 1 ? parole.slice(0, -1).join(' ') : parole[0]).toUpperCase();
+    const tm = timbMap[r.collaboratore];
+    righe.push({
+      e: tm ? _briefOrarioHM(tm.ora_entrata) : '',
+      u: tm ? _briefOrarioHM(tm.ora_uscita) : '',
+      nome: cognome,
+      nomeFull: r.collaboratore,
+      turno: r.codice,
+      oi: r.ora_inizio ? _briefOrarioHM(r.ora_inizio) : '',
+      of: r.ora_fine ? _briefOrarioHM(r.ora_fine) : '',
+      cd: '',
+      uscita: '',
+      firma: '',
+      radio: '',
+      badge: '',
+    });
+  });
+  righe.sort((a, b) => {
+    const g = _briefGruppo(a.turno) - _briefGruppo(b.turno);
+    if (g) return g;
+    if (a.turno !== b.turno) return a.turno < b.turno ? -1 : 1;
+    return a.nome < b.nome ? -1 : 1;
+  });
+  return righe;
+}
+async function _renderPianoBriefingTab() {
+  if (!_briefData) _briefData = _briefDomani();
+  const dstr = _briefData;
+  const rep = _pianoReparto();
+  const [salvati, pianoRighe, timbrate] = await Promise.all([
+    secGet('piano_briefing?data=eq.' + dstr + '&reparto_dip=eq.' + rep),
+    secGet('piano?data=eq.' + dstr + '&reparto_dip=eq.' + rep),
+    secGet('piano_timbrature?data=eq.' + dstr + '&limit=500'),
+  ]);
+  const timbMap = {};
+  (timbrate || []).forEach((t) => (timbMap[t.collaboratore] = t));
+  const rigaBrief = (salvati || []).find((x) => x.sezione === 'briefing');
+  const rigaPause = (salvati || []).find((x) => x.sezione === 'pause');
+  let righe, salvato;
+  if (rigaBrief && rigaBrief.contenuto && Array.isArray(rigaBrief.contenuto.righe)) {
+    righe = rigaBrief.contenuto.righe;
+    salvato = true;
+    // E/U sempre aggiornate dalle timbrature più recenti se la cella è vuota
+    righe.forEach((r) => {
+      const tm = r.nomeFull && timbMap[r.nomeFull];
+      if (tm) {
+        if (!r.e) r.e = _briefOrarioHM(tm.ora_entrata);
+        if (!r.u) r.u = _briefOrarioHM(tm.ora_uscita);
+      }
+    });
+  } else {
+    righe = _briefComponi(pianoRighe, timbMap);
+    salvato = false;
+  }
+  _briefState = {
+    id: rigaBrief ? rigaBrief.id : null,
+    righe: righe,
+    pause: rigaPause || null,
+    pianoRighe: pianoRighe || [],
+    timbMap: timbMap,
+    chiave: dstr + '|' + rep,
+  };
+  const puo = puoGestirePiano();
+  const valet = _briefIsValet();
+  let h =
+    '<div class="main-card" style="margin-top:14px"><div class="card-header">Briefing — ' +
+    escP(rep.toUpperCase()) +
+    '</div><div style="padding:12px 14px">';
+  h +=
+    '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">' +
+    '<button class="btn-export" style="padding:4px 10px" onclick="briefCambiaData(-1)">◀</button>' +
+    '<input type="date" id="brief-data" value="' +
+    dstr +
+    '" onchange="briefSetData(this.value)" style="padding:6px">' +
+    '<button class="btn-export" style="padding:4px 10px" onclick="briefCambiaData(1)">▶</button>' +
+    '<strong style="font-size:1rem">' +
+    _briefGiornoLbl(dstr) +
+    '</strong>' +
+    (puo
+      ? '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="briefCompila()">Compila dal piano</button>' +
+        '<button class="btn-export" style="font-size:.82rem;padding:5px 12px;border-color:#2c6e49;color:#2c6e49" onclick="briefGeneraPause()">Genera pause</button>'
+      : '') +
+    '<span id="brief-stato" style="font-size:.78rem;color:var(--muted)">' +
+    (salvato
+      ? 'Salvato'
+      : righe.length
+        ? 'Compilato dal piano — modifica una cella per salvare'
+        : 'Nessun turno nel piano per questa data') +
+    '</span></div>';
+  // tabella briefing + tabella orari affiancate (stessa vista dell'Excel)
+  h += '<div style="display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap"><div style="overflow-x:auto">';
+  h += '<table class="brief-table" style="border-collapse:collapse;font-size:.85rem"><thead><tr>';
+  const cols = valet
+    ? ['E', 'U', 'COLLABORATORE', 'TURNO', 'USCITA', 'FIRMA', 'RADIO', 'BADGE']
+    : ['E', 'U', 'HOST', 'T', 'CD', 'USCITA', 'FIRMA'];
+  cols.forEach((c) => {
+    h +=
+      '<th style="border:1px solid #999;background:#212529;color:#fff;padding:4px 8px;font-size:.78rem">' + c + '</th>';
+  });
+  h += (puo ? '<th style="border:none"></th>' : '') + '</tr></thead><tbody>';
+  let gPrec = null;
+  righe.forEach((r, i) => {
+    const g = _briefGruppo(r.turno);
+    if (gPrec !== null && g !== gPrec)
+      h += '<tr class="brief-sep"><td colspan="' + (cols.length + 1) + '" style="border:none;height:9px"></td></tr>';
+    gPrec = g;
+    const inp = (campo, val, larghezza, extra) =>
+      '<td style="border:1px solid #999;padding:0"><input ' +
+      (puo ? '' : 'disabled ') +
+      (extra || '') +
+      ' value="' +
+      escP(val || '') +
+      '" oninput="briefCella(' +
+      i +
+      ",'" +
+      campo +
+      '\',this.value)" ' +
+      'style="width:' +
+      larghezza +
+      'px;border:none;background:transparent;padding:4px 6px;font:inherit;color:inherit"></td>';
+    h += '<tr>';
+    h +=
+      '<td style="border:1px solid #999;padding:0"><input type="time" ' +
+      (puo ? '' : 'disabled ') +
+      'value="' +
+      escP(r.e || '') +
+      '" onchange="briefCella(' +
+      i +
+      ",'e',this.value);briefTimbra(" +
+      i +
+      ')" ' +
+      'style="width:80px;border:none;background:transparent;padding:3px 4px;font:inherit;color:inherit"></td>';
+    h +=
+      '<td style="border:1px solid #999;padding:0"><input type="time" ' +
+      (puo ? '' : 'disabled ') +
+      'value="' +
+      escP(r.u || '') +
+      '" onchange="briefCella(' +
+      i +
+      ",'u',this.value);briefTimbra(" +
+      i +
+      ')" ' +
+      'style="width:80px;border:none;background:transparent;padding:3px 4px;font:inherit;color:inherit"></td>';
+    h += inp('nome', r.nome, 150);
+    h += inp('turno', r.turno + (r.oi && !_pianoTurnoInfo(r.turno) ? '' : ''), 52);
+    if (valet) {
+      h += inp('uscita', r.uscita, 70);
+      h += inp('firma', r.firma, 90);
+      h += inp('radio', r.radio, 60);
+      h += inp('badge', r.badge, 60);
+    } else {
+      h += inp('cd', r.cd, 40);
+      h += inp('uscita', r.uscita, 70);
+      h += inp('firma', r.firma, 90);
+    }
+    if (puo)
+      h +=
+        '<td style="border:none;padding:0 4px"><span style="cursor:pointer;color:#c0392b;font-weight:bold" title="Elimina riga" onclick="briefEliminaRiga(' +
+        i +
+        ')">×</span></td>';
+    h += '</tr>';
+  });
+  h += '</tbody></table>';
+  if (puo)
+    h +=
+      '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;margin-top:8px" onclick="briefAggiungiRiga()">+ Aggiungi riga</button>';
+  h += '</div>';
+  // tabella ORARI (da piano_turni, sola lettura)
+  const turni = _pianoTurniReparto()
+    .slice()
+    .sort((a, b) => {
+      const g = _briefGruppo(a.codice) - _briefGruppo(b.codice);
+      if (g) return g;
+      return a.codice < b.codice ? -1 : 1;
+    });
+  h +=
+    '<div><table style="border-collapse:collapse;font-size:.8rem"><thead><tr><th colspan="3" style="border:1px solid #999;background:#212529;color:#fff;padding:4px 10px;font-size:.78rem">ORARI</th></tr></thead><tbody>';
+  let gT = null;
+  turni.forEach((t) => {
+    const g = _briefGruppo(t.codice);
+    if (gT !== null && g !== gT) h += '<tr><td colspan="3" style="border:none;height:7px"></td></tr>';
+    gT = g;
+    h +=
+      '<tr><td style="border:1px solid #999;padding:2px 10px;font-weight:bold">' +
+      escP(t.codice) +
+      '</td><td style="border:1px solid #999;padding:2px 10px">' +
+      _briefOrarioHM(t.ora_inizio) +
+      '</td><td style="border:1px solid #999;padding:2px 10px">' +
+      _briefOrarioHM(t.ora_fine) +
+      '</td></tr>';
+  });
+  h += '</tbody></table></div></div>';
+  h += '</div></div>';
+  h += _briefRenderPauseCard();
+  return h;
+}
+function briefCambiaData(delta) {
+  const d = new Date(_briefData + 'T12:00:00');
+  d.setDate(d.getDate() + delta);
+  _briefData =
+    d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  renderPiano();
+}
+function briefSetData(v) {
+  if (!v) return;
+  _briefData = v;
+  renderPiano();
+}
+function briefCella(i, campo, val) {
+  if (!puoGestirePiano() || !_briefState) return;
+  _briefState.righe[i][campo] = val;
+  if (campo === 'nome') _briefState.righe[i].nomeFull = null; // ri-matcha al salvataggio timbratura
+  _briefDirtySalva();
+}
+function _briefDirtySalva() {
+  clearTimeout(_briefSaveTimer);
+  const el = document.getElementById('brief-stato');
+  if (el) el.textContent = 'salvataggio…';
+  _briefSaveTimer = setTimeout(briefSalvaBriefing, 900);
+}
+async function briefSalvaBriefing() {
+  if (!_briefState || _briefSaving) {
+    if (_briefSaving) _briefSaveTimer = setTimeout(briefSalvaBriefing, 500);
+    return;
+  }
+  _briefSaving = true;
+  try {
+    const contenuto = { righe: _briefState.righe };
+    if (_briefState.id) {
+      await secPatch('piano_briefing', 'id=eq.' + _briefState.id, {
+        contenuto: contenuto,
+        operatore: getOperatore(),
+        updated_at: new Date().toISOString(),
+      });
+    } else {
+      const nuovo = await secPost('piano_briefing', {
+        data: _briefData,
+        reparto_dip: _pianoReparto(),
+        sezione: 'briefing',
+        contenuto: contenuto,
+        operatore: getOperatore(),
+      });
+      _briefState.id = nuovo && nuovo[0] ? nuovo[0].id : null;
+    }
+    const el = document.getElementById('brief-stato');
+    if (el) el.textContent = 'Salvato ✓';
+  } catch (e) {
+    const el = document.getElementById('brief-stato');
+    if (el) el.textContent = 'ERRORE salvataggio';
+  }
+  _briefSaving = false;
+}
+function _briefMatchNome(cognome) {
+  if (!cognome) return null;
+  const cg = cognome.trim().toLowerCase();
+  const cand = collaboratoriCache.filter(
+    (c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto() && c.nome.toLowerCase().startsWith(cg),
+  );
+  if (cand.length === 1) return cand[0].nome;
+  const tutti = collaboratoriCache.filter((c) => c.attivo !== false && c.nome.toLowerCase().startsWith(cg));
+  return tutti.length === 1 ? tutti[0].nome : null;
+}
+async function briefTimbra(i) {
+  if (!puoGestirePiano() || !_briefState) return;
+  const r = _briefState.righe[i];
+  if (!r.e || !r.u) return;
+  const nomeFull = r.nomeFull || _briefMatchNome(r.nome);
+  if (!nomeFull) {
+    toast('Collaboratore non riconosciuto: E/U salvate solo nel briefing');
+    return;
+  }
+  r.nomeFull = nomeFull;
+  try {
+    const ore = _briefOreClamp(nomeFull, r.e, r.u);
+    const ex = _briefState.timbMap[nomeFull];
+    if (ex && ex.id) {
+      await secPatch('piano_timbrature', 'id=eq.' + ex.id, {
+        ora_entrata: r.e,
+        ora_uscita: r.u,
+        ore: ore,
+        fonte: 'briefing',
+        operatore: getOperatore(),
+      });
+      ex.ora_entrata = r.e;
+      ex.ora_uscita = r.u;
+    } else {
+      const nuovo = await secPost('piano_timbrature', {
+        collaboratore: nomeFull,
+        data: _briefData,
+        ora_entrata: r.e,
+        ora_uscita: r.u,
+        ore: ore,
+        fonte: 'briefing',
+        reparto_dip: _pianoReparto(),
+        operatore: getOperatore(),
+      });
+      _briefState.timbMap[nomeFull] = nuovo && nuovo[0] ? nuovo[0] : { id: null };
+    }
+    logAzione('Timbratura da briefing', nomeFull + ' ' + _briefData + ' ' + r.e + '-' + r.u);
+    toast('Timbratura salvata: ' + nomeFull);
+  } catch (e) {
+    toast('Errore salvataggio timbratura');
+  }
+}
+function briefAggiungiRiga() {
+  if (!_briefState) return;
+  _briefState.righe.push({
+    e: '',
+    u: '',
+    nome: '',
+    nomeFull: null,
+    turno: '',
+    cd: '',
+    uscita: '',
+    firma: '',
+    radio: '',
+    badge: '',
+  });
+  _briefDirtySalva();
+  renderPiano();
+}
+function briefEliminaRiga(i) {
+  if (!_briefState) return;
+  _briefState.righe.splice(i, 1);
+  _briefDirtySalva();
+  renderPiano();
+}
+async function briefCompila() {
+  if (!_briefState) return;
+  if (_briefState.righe.length && !confirm('Sostituisco le righe attuali con i turni del piano di ' + _briefData + '?'))
+    return;
+  _briefState.righe = _briefComponi(_briefState.pianoRighe, _briefState.timbMap);
+  _briefDirtySalva();
+  renderPiano();
+}
+function _briefRenderPauseCard() {
+  let h =
+    '<div class="main-card" style="margin-top:14px"><div class="card-header">Pause — ' +
+    escP(_pianoReparto().toUpperCase()) +
+    '</div><div style="padding:12px 14px" id="brief-pause-body">';
+  const p = _briefState && _briefState.pause;
+  if (p && p.contenuto && p.contenuto.tipo) {
+    h += _briefRenderPause(p.contenuto);
+  } else {
+    h +=
+      '<p style="font-size:.85rem;color:var(--muted)">Nessuna pausa generata per questa data. Compila il briefing e premi <b>Genera pause</b>.</p>';
+  }
+  h += '</div></div>';
+  return h;
 }
