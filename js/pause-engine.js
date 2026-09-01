@@ -2280,23 +2280,36 @@ function briefPausaSposta(base, r, dir) {
   }
   const prima = dir < 0 ? d2 : d1;
   const seconda = dir < 0 ? d1 : d2;
-  // le POSTAZIONI si scambiano, gli orari si ricalcolano in sequenza
+  // le POSTAZIONI si scambiano (e l'eventuale avviso rosso [!] le segue),
+  // gli orari si ricalcolano in sequenza dall'inizio della prima riga
   const inizio = prima.ini;
-  const posPrima = seconda.a.v;
-  const posSeconda = prima.a.v;
+  const warnPrima = prima.a.bg === _PE_CLR.rosso;
+  const warnSeconda = seconda.a.bg === _PE_CLR.rosso;
+  const oraStile = (min) => {
+    // stile Excel: la fascia 24:00-24:59 si scrive 24.xx
+    let m = min;
+    while (m >= 1500) m -= 1440;
+    if (m >= 1440) return '24.' + String(m - 1440).padStart(2, '0');
+    return _peMinToOra(m);
+  };
   const durPrima = seconda.dur;
   const nuovi = [
-    { d: prima, pos: posPrima, ini: inizio, fin: inizio + durPrima },
-    { d: seconda, pos: posSeconda, ini: inizio + durPrima, fin: inizio + durPrima + prima.dur },
+    { d: prima, pos: seconda.a.v, warn: warnSeconda, ini: inizio, fin: inizio + durPrima },
+    { d: seconda, pos: prima.a.v, warn: warnPrima, ini: inizio + durPrima, fin: inizio + durPrima + prima.dur },
   ];
   nuovi.forEach((x) => {
     x.d.a.v = x.pos;
-    const clr = _peColoreSettore(x.pos);
+    const clr = x.warn ? _PE_CLR.rosso : _peColoreSettore(x.pos);
     x.d.a.bg = clr;
-    delete x.d.a.fg;
-    x.d.b.v = _peMinToOra(x.ini) + ' - ' + _peMinToOra(x.fin);
+    x.d.b.v = oraStile(x.ini) + ' - ' + oraStile(x.fin) + (x.warn ? '  [!]' : '');
     x.d.b.bg = clr;
-    delete x.d.b.fg;
+    if (x.warn) {
+      x.d.a.fg = '#fff';
+      x.d.b.fg = '#fff';
+    } else {
+      delete x.d.a.fg;
+      delete x.d.b.fg;
+    }
   });
   _briefSalvaPauseDebounce();
   _briefRefreshPause();
