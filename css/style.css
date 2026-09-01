@@ -3799,3 +3799,10 @@ button:focus-visible,
 .piano-pdf-ico:hover {
   transform: scale(1.25);
 }
+
+/* colonne a larghezza fissa: giorni allineati tra piano, fabbisogno,
+   differenze ed effettivi */
+.piano-table.piano-fixed {
+  table-layout: fixed;
+  min-width: 0;
+}
