@@ -131,6 +131,7 @@ async function _pianoCaricaCfg() {
     giorniWk,
     giornoMarker,
     corsiOrari,
+    ggFormazione,
   ] = await Promise.all([
     secGet('piano_turni?order=ordine.asc&limit=500'),
     secGet('piano_codici?order=codice.asc&limit=200'),
@@ -146,6 +147,7 @@ async function _pianoCaricaCfg() {
     getImp('piano_giorni_weekend'),
     getImp('piano_giorno_marker'),
     getImp('piano_corsi_orari'),
+    getImp('piano_giorni_formazione'),
   ]);
   pianoRegoleGruppoCache = regoleGruppo || [];
   try {
@@ -170,6 +172,7 @@ async function _pianoCaricaCfg() {
     window._pianoCorsiOrari = {};
   }
   if (!window._pianoCorsiOrari.CS) window._pianoCorsiOrari.CS = '14:30-17:30';
+  window._pianoGgFormazione = parseInt(ggFormazione) || 5;
   if (!window._pianoCorsiOrari.LRD) window._pianoCorsiOrari.LRD = '';
   try {
     window._pianoOrdineCollab = ordineCollab ? JSON.parse(ordineCollab) : {};
@@ -744,17 +747,18 @@ async function renderPiano() {
           (assMap[r.codice] = assMap[r.codice] || {})[g] =
             (assMap[r.codice] && assMap[r.codice][g] ? assMap[r.codice][g] : 0) + 1;
         });
-        h +=
-          '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Fabbisogno vs assegnati — ' +
+        let hFabb = '';
+        hFabb +=
+          '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Pianificazione (fabbisogno) vs assegnati — ' +
           escP(label);
         if (puoMod)
-          h +=
+          hFabb +=
             '<button class="btn-export" style="font-size:.78rem;padding:3px 10px;border-color:#d4b86a;color:#d4b86a" onclick="copiaFabbisognoMese()">Copia dal mese precedente</button>' +
             '<button class="btn-export" style="font-size:.78rem;padding:3px 10px;border-color:#2c6e49;color:#2c6e49" onclick="document.getElementById(\'fabb-file\').click()">Importa da Excel</button>' +
             '<input type="file" id="fabb-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="importaFabbisognoExcel(this)">' +
             '<button class="btn-export" style="font-size:.78rem;padding:3px 10px;border-color:var(--accent);color:var(--accent)" onclick="eliminaFabbisognoMese()">Svuota mese</button>' +
             '<span style="font-size:.76rem;color:#b8a98a;font-weight:400">clicca una cella per impostare le persone necessarie</span>';
-        h += '</div>';
+        hFabb += '</div>';
         // testata giorni con sigla settimana (D/L/M...), festivi e weekend:
         // usata da fabbisogno, differenze ed effettivi
         const testataGiorni = (conTot) => {
@@ -789,7 +793,7 @@ async function renderPiano() {
           if (conTot) t += '<th>Tot</th>';
           return t + '</tr></thead>';
         };
-        h +=
+        hFabb +=
           '<div class="piano-wrap"><table class="piano-table piano-fixed" style="width:' +
           (194 + 37 * nGiorni) +
           'px"><colgroup><col style="width:194px">' +
@@ -804,7 +808,7 @@ async function renderPiano() {
           .sort((x, y) => (gruppoOrd[x.codice] || '').localeCompare(gruppoOrd[y.codice] || ''))
           .forEach((t) => {
             const cod = t.codice;
-            h +=
+            hFabb +=
               '<tr><td class="piano-nome" title="' +
               escP(
                 (t.gruppo || '') +
@@ -830,7 +834,7 @@ async function renderPiano() {
                 stile =
                   'background:' + bg + ' !important;font-weight:bold;color:' + (ass >= req ? '#000' : '#c0392b') + ';';
               }
-              h +=
+              hFabb +=
                 '<td class="' +
                 cls +
                 '" data-g="' +
@@ -850,10 +854,10 @@ async function renderPiano() {
                 (req ? ass + '/' + req : '') +
                 '</td>';
             }
-            h += '</tr>';
+            hFabb += '</tr>';
           });
-        h += '</tbody></table></div>';
-        h +=
+        hFabb += '</tbody></table></div>';
+        hFabb +=
           '<p style="font-size:.8rem;color:var(--muted);padding:8px 14px">assegnati/richiesti — celle gialle (weekend verdi) come la PIANIFICAZIONE dell&#39;Excel; numero <span style="color:#c0392b;font-weight:700">rosso</span> = carenza. Il fabbisogno guida "Genera bozza".</p></div>';
 
         // DIFFERENZE + EFFETTIVI — schema IDENTICO a Turnivo (calendario.html):
@@ -949,6 +953,8 @@ async function renderPiano() {
           h += '<td><strong>' + tot + '</strong></td></tr>';
         });
         h += '</tbody></table></div></div>';
+        // ordine come nell'Excel: DIFFERENZE, EFFETTIVI, poi PIANIFICAZIONE
+        h += hFabb;
       }
     } else if (_pianoTab === 'briefing') {
       h += await _renderPianoBriefingTab();
@@ -1317,6 +1323,7 @@ function _pianoCalcolaViolazioni() {
 }
 
 function validaPiano() {
+  setTimeout(() => controllaFormazioniCompletate(true), 800);
   const r = _pianoCalcolaViolazioni();
   _pianoViolCelle = r.celle;
   _pianoViolLista = r.lista.sort((a, b) => a.nome.localeCompare(b.nome) || a.giorno - b.giorno);
@@ -2260,6 +2267,21 @@ async function importaPianoExcel(input) {
       dati = XLSX.utils.sheet_to_json(wb.Sheets[foglioMese], { header: 1, defval: '', raw: true });
       mappa = _xlsCercaMappaGiorni(dati, nGiorni, 0, 8);
     }
+    const wsCommenti = foglioMese ? wb.Sheets[foglioMese] : null;
+    const commentoCella = (rIdx, cIdx) => {
+      if (!wsCommenti) return '';
+      try {
+        const cel = wsCommenti[XLSX.utils.encode_cell({ r: rIdx, c: cIdx })];
+        if (!cel || !cel.c || !cel.c.length) return '';
+        return String(cel.c.map((x) => x.t || '').join(' '))
+          .replace(/^[^:\n]{0,20}:\s*/, '')
+          .replace(/\r/g, '')
+          .replace(/\n+/g, ' ')
+          .trim();
+      } catch (e) {
+        return '';
+      }
+    };
     if (foglioMese && mappa) {
       const primoGiornoCol = mappa[1];
       let rIntest = 0;
@@ -2305,7 +2327,7 @@ async function importaPianoExcel(input) {
     const righeCollab = []; // {nome, celle:[{g,cod}], stato:'ok'|'riattiva'|'nuovo', funzione, percentuale, ref}
     const nomiOk = new Set();
     let sigleScartate = 0;
-    dati.slice(inizio).forEach((riga) => {
+    dati.slice(inizio).forEach((riga, idxRiga) => {
       const raw = String(riga[colNome] || '').trim();
       if (!raw || raw.length < 4 || /^\d/.test(raw)) return;
       const celle = [];
@@ -2318,7 +2340,7 @@ async function importaPianoExcel(input) {
           sigleScartate++;
           continue;
         }
-        celle.push({ g: g, cod: cod });
+        celle.push({ g: g, cod: cod, commento: mappa ? commentoCella(inizio + idxRiga, mappa[g]) : '' });
       }
       const hit = trovaTutti(raw);
       if (hit && hit.attivo !== false) {
@@ -2357,6 +2379,7 @@ async function importaPianoExcel(input) {
           codice: c.cod,
           protetto: true,
           generato: false,
+          commento: c.commento || null,
           reparto_dip: _pianoReparto(),
         }),
       ),
@@ -2440,6 +2463,12 @@ async function importaPianoExcel(input) {
     const r = await sbRpc('piano_bulk_upsert', { p_token: getOpToken(), p_rows: nuove });
     logAzione('Piano importato da Excel', ym + ' — ' + ((r && r.inserite) || 0) + '/' + nuove.length + ' celle');
     toast('Piano importato: ' + ((r && r.inserite) || 0) + ' celle nuove');
+    setTimeout(async () => {
+      await _pianoProponiCertificazioniBulk(
+        nuove.map((x) => ({ nome: x.collaboratore, codice: x.codice, commento: x.commento || '' })),
+      );
+      await controllaFormazioniCompletate(true);
+    }, 400);
     _pianoViolCelle = {};
     _pianoViolLista = null;
     renderPiano();
@@ -5644,7 +5673,10 @@ function _renderPianoImpostazioniCard() {
     '" onchange="salvaPianoFunzioni(this.value)"></div>' +
     '<div class="field"><label title="0 = illimitati">Max cambi turno al mese</label><input type="number" min="0" max="99" value="' +
     _pianoMaxCambi() +
-    '" style="width:80px" onchange="salvaMaxCambi(this.value)"></div></div>';
+    '" style="width:80px" onchange="salvaMaxCambi(this.value)"></div>' +
+    '<div class="field"><label title="Giorni di affiancamento (dai commenti con formazione) prima della proposta di certificazione">Giorni formazione per certificare</label><input type="number" min="1" max="30" id="imp-gg-formazione" value="' +
+    (window._pianoGgFormazione || 5) +
+    '" style="width:80px" onchange="salvaGiorniFormazione()"></div></div>';
   // giorni weekend configurabili (come get_giorni_weekend di Turnivo)
   const GG_LBL = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
   const wk = _pianoGiorniWeekend();
@@ -7062,6 +7094,9 @@ async function pianoSalvaCella(nome, dstr, codice) {
     }
     logAzione('Piano modificato', nome + ' ' + dstr + ' → ' + codice);
     renderPiano();
+    // formazione: avvisa se il collaboratore non risulta formato per il settore
+    const gNF = _pianoGruppoNonFormato(nome, codice, '');
+    if (gNF) setTimeout(() => _pianoProponiCertificazione(nome, gNF), 300);
   } catch (e) {
     console.error(e);
     toast('Errore salvataggio piano');
@@ -7887,7 +7922,7 @@ async function pianoIncollaDaClipboard(target) {
       const dstr = ym + '-' + String(g).padStart(2, '0');
       const ex = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
       if (ex) {
-        if (ex.codice !== cod) daPatch.push({ id: ex.id, codice: cod });
+        if (ex.codice !== cod) daPatch.push({ id: ex.id, codice: cod, nomeRef: nome });
       } else {
         daInserire.push({
           collaboratore: nome,
@@ -7934,6 +7969,13 @@ async function pianoIncollaDaClipboard(target) {
     _pianoViolCelle = {};
     _pianoViolLista = null;
     renderPiano();
+    const coppieNF = daInserire
+      .map((x) => ({ nome: x.collaboratore, codice: x.codice, commento: '' }))
+      .concat(daPatch.map((p) => ({ nome: p.nomeRef || '', codice: p.codice, commento: '' })));
+    setTimeout(async () => {
+      await _pianoProponiCertificazioniBulk(coppieNF);
+      await controllaFormazioniCompletate(true);
+    }, 400);
   } catch (e) {
     console.error(e);
     toast('Errore incolla');
@@ -8222,4 +8264,164 @@ async function miglioraOrePiano() {
     console.error(e);
     toast('Errore migliora ore');
   }
+}
+
+// ============================================================
+// FORMAZIONE ↔ PIANO: avviso "non formato per il settore" e
+// contatore dei giorni di formazione dai commenti
+// ============================================================
+function _pianoGruppoCompInv() {
+  const m = _pianoCompetenzeGruppi();
+  const inv = {};
+  Object.entries(m).forEach(([k, g]) => {
+    if (!inv[g]) inv[g] = k;
+  });
+  return inv;
+}
+// ritorna il gruppo (SALA/REC/CASSA) per cui il collaboratore NON risulta
+// formato, oppure null. I commenti di formazione/affiancamento non contano.
+function _pianoGruppoNonFormato(nome, codTurno, commento) {
+  const t = _pianoTurnoInfo(codTurno);
+  if (!t) return null;
+  const g = (t.gruppo || '').toUpperCase();
+  if (!['SALA', 'REC', 'CASSA'].includes(g)) return null;
+  if (/formazion|affianc/i.test(commento || '')) return null;
+  const info = _pianoCollabInfo(nome);
+  if (!info) return null;
+  const fz = ((info.funzione || '') + '').toUpperCase();
+  if (['SUP', 'SOSTRESP', 'RESP'].includes(fz)) return null;
+  // chi lavora quel settore IN ACCOMPAGNAMENTO (es. guardaroba con la rec)
+  // è una situazione voluta: nessun avviso
+  let acc = [];
+  try {
+    acc = Array.isArray(info.accompagnamento_settori)
+      ? info.accompagnamento_settori
+      : JSON.parse(info.accompagnamento_settori || '[]');
+  } catch (e) {}
+  if (acc.includes(g)) return null;
+  const sett = _pianoSettoriEffettivi(info);
+  if (!sett || sett.includes(g)) return null;
+  return g;
+}
+async function _pianoProponiCertificazione(nome, gruppo) {
+  if (
+    !confirm(
+      nome +
+        ' non risulta formato per ' +
+        gruppo +
+        '.\nVuoi aggiungerlo in Formazione?\n\nOK = certifica (ti chiederà formatore e punti, come dalla Formazione)\nAnnulla = il turno resta ma la Formazione non cambia',
+    )
+  )
+    return;
+  const key = _pianoGruppoCompInv()[gruppo];
+  if (key && typeof certificaCompetenzaDaPiano === 'function') await certificaCompetenzaDaPiano(nome, key, true);
+}
+// riepilogo bulk (import/incolla): certificazione SENZA punti
+async function _pianoProponiCertificazioniBulk(coppie) {
+  const mancanti = [];
+  const visti = new Set();
+  coppie.forEach((c) => {
+    const g = _pianoGruppoNonFormato(c.nome, c.codice, c.commento);
+    if (g && !visti.has(c.nome + '|' + g)) {
+      visti.add(c.nome + '|' + g);
+      mancanti.push({ nome: c.nome, gruppo: g });
+    }
+  });
+  if (!mancanti.length) return;
+  if (
+    !confirm(
+      'Alcuni collaboratori hanno ricevuto turni di settori per cui NON risultano formati:\n\n' +
+        mancanti.map((x) => '• ' + x.nome + ' → ' + x.gruppo).join('\n') +
+        '\n\nVuoi certificarli in Formazione? (senza punti: i punti si assegnano poi dalla pagina Formazione)',
+    )
+  )
+    return;
+  const inv = _pianoGruppoCompInv();
+  for (const m of mancanti) {
+    const key = inv[m.gruppo];
+    if (key && typeof certificaCompetenzaDaPiano === 'function') await certificaCompetenzaDaPiano(m.nome, key, false);
+  }
+}
+// FORMAZIONI COMPLETATE dai commenti: cella con turno + commento
+// "formazione/affianc..." = giorno di affiancamento; al raggiungimento
+// della soglia (personalizzabile, default 5) propone la certificazione
+function _pianoSettoreDaCommento(commento, gruppoTurno) {
+  const c = (commento || '').toLowerCase();
+  if (/cass/.test(c)) return 'CASSA';
+  if (/rec/.test(c)) return 'REC';
+  if (/sala/.test(c)) return 'SALA';
+  if (/acc/.test(c)) return 'ACCOGLIENZA';
+  return gruppoTurno;
+}
+async function controllaFormazioniCompletate(silenzioso) {
+  const soglia = window._pianoGgFormazione || parseInt(await getImp('piano_giorni_formazione')) || 5;
+  const rep = _pianoReparto();
+  const pattern = ['%ormazion%', '%ORMAZION%', '%ffianc%', '%FFIANC%'];
+  const tutte = [];
+  for (const p of pattern) {
+    const r = (await secGet('piano?commento=like.' + p + '&reparto_dip=eq.' + rep + '&limit=5000')) || [];
+    r.forEach((x) => tutte.push(x));
+  }
+  const perId = {};
+  tutte.forEach((r) => (perId[r.id] = r));
+  const gruppi = {}; // nome|settore -> {giorni:Set, ultimo}
+  Object.values(perId).forEach((r) => {
+    const t = _pianoTurnoInfo(r.codice);
+    if (!t) return;
+    const sett = _pianoSettoreDaCommento(r.commento, (t.gruppo || '').toUpperCase());
+    if (!['SALA', 'REC', 'CASSA'].includes(sett)) return;
+    const k = r.collaboratore + '|' + sett;
+    gruppi[k] = gruppi[k] || { giorni: new Set(), ultimo: '' };
+    gruppi[k].giorni.add(r.data);
+    if (r.data > gruppi[k].ultimo) gruppi[k].ultimo = r.data;
+  });
+  const oggi = new Date();
+  const oggiStr =
+    oggi.getFullYear() +
+    '-' +
+    String(oggi.getMonth() + 1).padStart(2, '0') +
+    '-' +
+    String(oggi.getDate()).padStart(2, '0');
+  const complete = [];
+  Object.entries(gruppi).forEach(([k, v]) => {
+    const [nome, sett] = k.split('|');
+    if (v.giorni.size < soglia) return;
+    if (v.ultimo > oggiStr) return; // la formazione deve essere FINITA
+    const info = _pianoCollabInfo(nome);
+    if (!info || info.attivo === false) return;
+    const eff = _pianoSettoriEffettivi(info);
+    if (eff && eff.includes(sett)) return; // già formato/certificato
+    complete.push({ nome: nome, sett: sett, giorni: v.giorni.size, ultimo: v.ultimo });
+  });
+  if (!complete.length) {
+    if (!silenzioso) toast('Nessuna formazione completata da certificare (soglia ' + soglia + ' giorni)');
+    return;
+  }
+  for (const f of complete) {
+    if (
+      confirm(
+        f.nome +
+          ' ha COMPLETATO la formazione in ' +
+          f.sett +
+          ': ' +
+          f.giorni +
+          ' giorni di affiancamento (ultimo il ' +
+          f.ultimo.split('-').reverse().join('.') +
+          ', dai commenti del piano).\n\nVuoi certificarlo in Formazione?\n(OK = certifica — ti chiederà formatore e punti)',
+      )
+    ) {
+      const key = _pianoGruppoCompInv()[f.sett];
+      if (key && typeof certificaCompetenzaDaPiano === 'function') await certificaCompetenzaDaPiano(f.nome, key, true);
+    }
+  }
+}
+async function salvaGiorniFormazione() {
+  const v = parseInt((document.getElementById('imp-gg-formazione') || {}).value);
+  if (!v || v < 1) {
+    toast('Inserisci un numero di giorni valido');
+    return;
+  }
+  await setImp('piano_giorni_formazione', String(v));
+  window._pianoGgFormazione = v;
+  toast('Soglia giorni di formazione: ' + v);
 }
