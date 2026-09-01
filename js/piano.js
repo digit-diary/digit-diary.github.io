@@ -1126,6 +1126,36 @@ function _pianoRegolaVal(nome) {
   if (!r || r.attivo === false) return null;
   return r.valore;
 }
+// Limiti ORE MENSILI personalizzabili (pannello Regole):
+// - fissi e jolly CON percentuale: obiettivo = giorni/7 × ore sett × %;
+//   max = obiettivo + tolleranza_ore_sopra, min = obiettivo − tolleranza_ore_sotto
+//   (se sopra/sotto sono spente vale la tolleranza_ore simmetrica ±);
+// - jolly SENZA percentuale: range assoluto jolly_ore_min / jolly_ore_max.
+// min/max null = nessun limite su quel lato (regole spente).
+function _pianoLimitiOre(nome, nGiorni) {
+  const info = _pianoCollabInfo(nome) || {};
+  // jolly con percentuale PIENA (o vuota) = jolly puro → range assoluto;
+  // jolly con percentuale ridotta (es. 80%) = obiettivo % come i fissi
+  const pctJ = parseFloat(info.percentuale);
+  const jollySenzaPct = info.is_jolly && !(pctJ > 0 && pctJ < 1);
+  if (jollySenzaPct) {
+    const jMin = parseFloat(_pianoRegolaVal('jolly_ore_min'));
+    const jMax = parseFloat(_pianoRegolaVal('jolly_ore_max'));
+    return { obiettivo: null, min: isNaN(jMin) ? null : jMin, max: isNaN(jMax) ? null : jMax };
+  }
+  const pct = parseFloat(info.percentuale) || 1;
+  const obiettivo = (nGiorni / 7) * _pianoOreSett * pct;
+  const sim = parseFloat(_pianoRegolaVal('tolleranza_ore'));
+  const sopra = parseFloat(_pianoRegolaVal('tolleranza_ore_sopra'));
+  const sotto = parseFloat(_pianoRegolaVal('tolleranza_ore_sotto'));
+  const su = !isNaN(sopra) ? sopra : !isNaN(sim) ? sim : NaN;
+  const giu = !isNaN(sotto) ? sotto : !isNaN(sim) ? sim : NaN;
+  return {
+    obiettivo: obiettivo,
+    min: isNaN(giu) ? null : obiettivo - giu,
+    max: isNaN(su) ? null : obiettivo + su,
+  };
+}
 function _pianoIsLavoro(codice) {
   return !!_pianoTurnoInfo(codice);
 }
@@ -1218,9 +1248,9 @@ function _pianoCalcolaViolazioni() {
     }
   });
 
-  // ===== TOLLERANZA ORE (regola 'tolleranza_ore', modificabile) =====
-  const tollOre = parseFloat(_pianoRegolaVal('tolleranza_ore'));
-  if (!isNaN(tollOre)) {
+  // ===== TOLLERANZA ORE (regole personalizzabili: tolleranza_ore ±,
+  // tolleranza_ore_sopra/sotto per fissi e jolly con %, jolly_ore_min/max) =====
+  {
     const orePerNome = {};
     _pianoRighe.forEach((r) => {
       const info = _pianoCollabInfo(r.collaboratore) || {};
@@ -1229,22 +1259,35 @@ function _pianoCalcolaViolazioni() {
       if (o) orePerNome[r.collaboratore] = (orePerNome[r.collaboratore] || 0) + o;
     });
     Object.keys(orePerNome).forEach((nome) => {
-      const info = _pianoCollabInfo(nome) || {};
-      if (info.is_jolly) return; // i jolly non hanno obiettivo fisso
-      const pct = parseFloat(info.percentuale) || 1;
-      const target = (nGiorni / 7) * _pianoOreSett * pct;
-      const saldoM = Math.round((orePerNome[nome] - target) * 10) / 10;
-      if (Math.abs(saldoM) > tollOre)
+      const lim = _pianoLimitiOre(nome, nGiorni);
+      if (lim.min == null && lim.max == null) return; // regole spente per questo profilo
+      const oreT = Math.round(orePerNome[nome] * 10) / 10;
+      const arr = (x) => Math.round(x * 10) / 10;
+      if (lim.max != null && oreT > lim.max)
         lista.push({
           nome: nome,
           giorno: 0,
           msg:
-            'saldo mese ' +
-            (saldoM > 0 ? '+' : '') +
-            saldoM +
-            'h fuori tolleranza (±' +
-            tollOre +
-            'h, regola tolleranza_ore)',
+            'ore mese ' +
+            oreT +
+            'h SOPRA il massimo ' +
+            arr(lim.max) +
+            'h (regole tolleranza' +
+            (lim.obiettivo == null ? ' jolly' : '') +
+            ')',
+        });
+      else if (lim.min != null && oreT < lim.min)
+        lista.push({
+          nome: nome,
+          giorno: 0,
+          msg:
+            'ore mese ' +
+            oreT +
+            'h SOTTO il minimo ' +
+            arr(lim.min) +
+            'h (regole tolleranza' +
+            (lim.obiettivo == null ? ' jolly' : '') +
+            ')',
         });
     });
   }
@@ -1503,7 +1546,6 @@ async function generaBozzaPiano() {
     obiettivo[n] = (nGiorni / 7) * _pianoOreSett * pct - (_pianoYtdMap[n] || 0);
   });
   const gapOre = (n) => (obiettivo[n] || 0) - (oreMese[n] || 0);
-  const tolleranzaOre = parseFloat(_pianoRegolaVal('tolleranza_ore')); // regola modificabile (SOFT), NaN se spenta
   const consecPrima = (nome, g) => {
     let n = 0;
     for (let k = g - 1; k >= 1 && _pianoIsLavoro(cella[nome + '|' + k] || ''); k--) n++;
@@ -1633,16 +1675,17 @@ async function generaBozzaPiano() {
                 }
               }
             }
-            // tolleranza ore (regola 'tolleranza_ore'): un fisso non supera il
-            // proprio obiettivo mensile + tolleranza; i jolly possono sforare
-            // per coprire il fabbisogno (come il solver Turnivo)
-            if (
-              !isNaN(tolleranzaOre) &&
-              infoC &&
-              !infoC.is_jolly &&
-              (oreMese[n] || 0) + (parseFloat(t.durata_ore) || 0) > (obiettivo[n] || 0) + tolleranzaOre
-            )
-              return false;
+            // limiti ore (regole tolleranza_ore/_sopra, jolly_ore_max):
+            // nessuno supera il PROPRIO massimo mensile; i jolly senza
+            // regola restano liberi di coprire il fabbisogno (come Turnivo)
+            {
+              const limN = _pianoLimitiOre(n, nGiorni);
+              if (limN.max != null) {
+                // per chi ha obiettivo il max segue anche il saldo cumulato (YTD)
+                const maxEff = limN.obiettivo != null ? limN.max - (_pianoYtdMap[n] || 0) : limN.max;
+                if ((oreMese[n] || 0) + (parseFloat(t.durata_ore) || 0) > maxEff) return false;
+              }
+            }
             // accompagnamento: nei gruppi indicati non puo essere il primo/solo
             if (infoC && infoC.accompagnamento_settori) {
               const grAcc = _pianoAccompagnamentoDi(infoC);
@@ -1945,6 +1988,11 @@ async function eseguiCancellaPiano(tutto) {
 // modificabili. Etichetta onesta su DOVE ogni regola è applicata.
 // ================================================================
 const PIANO_REGOLE_DOVE = {
+  tolleranza_ore: 'Validatore + Bozza + Migliora ore',
+  tolleranza_ore_sopra: 'Validatore + Bozza + Migliora ore',
+  tolleranza_ore_sotto: 'Validatore',
+  jolly_ore_min: 'Validatore',
+  jolly_ore_max: 'Validatore + Bozza',
   max_consecutivi: 'Validatore + Bozza',
   min_riposo_ore: 'Validatore + Bozza',
   no_4w1c1w: 'Validatore',
@@ -9056,7 +9104,6 @@ async function miglioraOrePiano() {
   });
   const maxCons = parseInt(_pianoRegolaVal('max_consecutivi')) || 5;
   const minRiposo = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 11;
-  const toll = parseFloat(_pianoRegolaVal('tolleranza_ore'));
   const lavora = (cod) => !!_pianoTurnoInfo(cod);
   const consecOk = (nome, g) => {
     // catena consecutiva risultante aggiungendo un turno il giorno g
@@ -9119,7 +9166,9 @@ async function miglioraOrePiano() {
       if (!_pianoIdoneoPerTurno(ric, t)) continue;
       if (!consecOk(ric, g)) continue;
       if (!riposoOk(ric, g, t)) continue;
-      if (!isNaN(toll) && (saldo[ric] || 0) + oT > toll) continue; // non superare obiettivo+toll
+      // il ricevente non supera il proprio massimo (tolleranza_ore_sopra o simmetrica)
+      const limR = _pianoLimitiOre(ric, nGiorni);
+      if (limR.obiettivo != null && limR.max != null && (saldo[ric] || 0) + oT > limR.max - limR.obiettivo) continue;
       const sR = saldo[ric] || 0;
       const dopoD = sD === 999 ? 0 : Math.abs(sD - oT) - Math.abs(sD);
       const dopoR = Math.abs(sR + oT) - Math.abs(sR);
