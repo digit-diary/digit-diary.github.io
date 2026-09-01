@@ -132,6 +132,7 @@ async function _pianoCaricaCfg() {
     giornoMarker,
     corsiOrari,
     ggFormazione,
+    cdConfig,
   ] = await Promise.all([
     secGet('piano_turni?order=ordine.asc&limit=500'),
     secGet('piano_codici?order=codice.asc&limit=200'),
@@ -148,6 +149,7 @@ async function _pianoCaricaCfg() {
     getImp('piano_giorno_marker'),
     getImp('piano_corsi_orari'),
     getImp('piano_giorni_formazione'),
+    getImp('piano_cd_config'),
   ]);
   pianoRegoleGruppoCache = regoleGruppo || [];
   try {
@@ -173,6 +175,19 @@ async function _pianoCaricaCfg() {
   }
   if (!window._pianoCorsiOrari.CS) window._pianoCorsiOrari.CS = '14:30-17:30';
   window._pianoGgFormazione = parseInt(ggFormazione) || 5;
+  try {
+    window._pianoCdCfg = cdConfig ? JSON.parse(cdConfig) : null;
+  } catch (e) {
+    window._pianoCdCfg = null;
+  }
+  if (!window._pianoCdCfg || !Array.isArray(window._pianoCdCfg.coppie))
+    window._pianoCdCfg = {
+      coppie: [
+        { cd: ['2', '7'], apre: 'C0', chiude: 'C5' },
+        { cd: ['3', '4'], apre: 'C23', chiude: 'C20' },
+        { cd: ['8', '9'], apre: 'C4', chiude: 'C15' },
+      ],
+    };
   if (!window._pianoCorsiOrari.LRD) window._pianoCorsiOrari.LRD = '';
   try {
     window._pianoOrdineCollab = ordineCollab ? JSON.parse(ordineCollab) : {};
@@ -7264,13 +7279,71 @@ function _briefComponi(pianoRighe) {
       badge: '',
     });
   });
+  const inizioDi = (r) => {
+    const t = _pianoTurnoInfo(r.turno);
+    const o = t ? t.ora_inizio : r.oi;
+    const m = _pianoOra(o ? String(o).substring(0, 5) : '');
+    return m == null ? 99 : m;
+  };
+  // dentro ogni gruppo: prima i turni del presto, poi le notti (come l'Excel)
   righe.sort((a, b) => {
     const g = _briefGruppo(a.turno) - _briefGruppo(b.turno);
     if (g) return g;
+    const o = inizioDi(a) - inizioDi(b);
+    if (o) return o;
     if (a.turno !== b.turno) return a.turno < b.turno ? -1 : 1;
     return a.nome < b.nome ? -1 : 1;
   });
   return righe;
+}
+// NUMERI CASSA (CD) automatici: chi ha CHIUSO ieri RIAPRE oggi.
+// Coppie configurabili (default 2/7 su C0-C5, 3/4 su C23-C20, 8/9 su C4-C15);
+// i C8 di ven/sab prendono in ordine l'altra cassa di ogni coppia.
+// Tutto resta editabile: domani si riparte dai valori salvati oggi.
+async function _briefAssegnaCd(righe, dstr) {
+  const cfg = window._pianoCdCfg;
+  if (!cfg || !cfg.coppie || !cfg.coppie.length) return;
+  const ieriD = new Date(dstr + 'T12:00:00');
+  ieriD.setDate(ieriD.getDate() - 1);
+  const ieriStr =
+    ieriD.getFullYear() +
+    '-' +
+    String(ieriD.getMonth() + 1).padStart(2, '0') +
+    '-' +
+    String(ieriD.getDate()).padStart(2, '0');
+  let ieriRighe = [];
+  try {
+    const sv = await secGet(
+      'piano_briefing?data=eq.' + ieriStr + '&sezione=eq.briefing&reparto_dip=eq.' + _pianoReparto(),
+    );
+    if (sv && sv[0] && sv[0].contenuto && Array.isArray(sv[0].contenuto.righe)) ieriRighe = sv[0].contenuto.righe;
+  } catch (e) {}
+  const cdIeriDi = (turno) => {
+    const r = ieriRighe.find((x) => String(x.turno).toUpperCase() === turno && String(x.cd || '').trim());
+    return r ? String(r.cd).trim() : '';
+  };
+  const trovaOggi = (turno) => righe.find((x) => String(x.turno).toUpperCase() === turno);
+  const apreCds = [];
+  cfg.coppie.forEach((cp) => {
+    const [a, b] = cp.cd.map(String);
+    // chi ha chiuso ieri riapre oggi (fallback: primo numero della coppia)
+    const chiusoIeri = cdIeriDi(cp.chiude.toUpperCase()) || cdIeriDi(cp.apre.toUpperCase());
+    const apreCd = chiusoIeri === a || chiusoIeri === b ? chiusoIeri : a;
+    const chiudeCd = apreCd === a ? b : a;
+    apreCds.push(apreCd);
+    const rA = trovaOggi(cp.apre.toUpperCase());
+    const rC = trovaOggi(cp.chiude.toUpperCase());
+    if (rA && !String(rA.cd || '').trim()) rA.cd = apreCd;
+    if (rC && !String(rC.cd || '').trim()) rC.cd = chiudeCd;
+  });
+  // C8 in ordine: riapre la cassa del presto di ogni coppia
+  let k = 0;
+  righe.forEach((r) => {
+    if (String(r.turno).toUpperCase() === 'C8' && !String(r.cd || '').trim() && k < apreCds.length) {
+      r.cd = apreCds[k];
+      k++;
+    }
+  });
 }
 async function _renderPianoBriefingTab() {
   if (!_briefData) _briefData = _briefDomani();
@@ -7286,6 +7359,7 @@ async function _renderPianoBriefingTab() {
   } catch (e) {
     window._briefPauseCfgObj = {};
   }
+  const valetR = _briefIsValet();
   const rigaBrief = (salvati || []).find((x) => x.sezione === 'briefing');
   const rigaPause = (salvati || []).find((x) => x.sezione === 'pause');
   let righe, salvato;
@@ -7299,6 +7373,7 @@ async function _renderPianoBriefingTab() {
     salvato = true;
   } else {
     righe = _briefComponi(pianoRighe);
+    if (!valetR) await _briefAssegnaCd(righe, dstr);
     salvato = false;
   }
   _briefState = {
@@ -7461,6 +7536,10 @@ async function _renderPianoBriefingTab() {
     .sort((a, b) => {
       const g = _briefGruppo(a.codice) - _briefGruppo(b.codice);
       if (g) return g;
+      const oa = _pianoOra((a.ora_inizio || '').substring(0, 5));
+      const ob = _pianoOra((b.ora_inizio || '').substring(0, 5));
+      const o = (oa == null ? 99 : oa) - (ob == null ? 99 : ob);
+      if (o) return o;
       return a.codice < b.codice ? -1 : 1;
     });
   h +=
@@ -7595,6 +7674,7 @@ async function briefCompila() {
   if (_briefState.righe.length && !confirm('Sostituisco le righe attuali con i turni del piano di ' + _briefData + '?'))
     return;
   _briefState.righe = _briefComponi(_briefState.pianoRighe);
+  if (!_briefIsValet()) await _briefAssegnaCd(_briefState.righe, _briefData);
   clearTimeout(_briefSaveTimer);
   await briefSalvaBriefing();
   renderPiano();
