@@ -6722,29 +6722,7 @@ function _briefGruppo(cod) {
 function _briefOrarioHM(s) {
   return s ? String(s).substring(0, 5) : '';
 }
-// ore timbrate con la regola dell'entrata anticipata, usando la riga
-// piano della DATA del briefing (non del mese a video)
-function _briefOreClamp(nomeFull, entrata, uscita) {
-  const r = (_briefState.pianoRighe || []).find((x) => x.collaboratore === nomeFull);
-  if (r && !_pianoTurnoInfo(r.codice) && r.ora_inizio) {
-    const e0 = _pianoOra(entrata);
-    const i0 = _pianoOra(r.ora_inizio);
-    if (e0 != null && i0 != null && i0 - e0 > 0 && i0 - e0 < 6) return _pianoOreTimbrata(r.ora_inizio, uscita);
-    return _pianoOreTimbrata(entrata, uscita);
-  }
-  const t = r ? _pianoTurnoInfo(r.codice) : null;
-  if (t && t.ora_inizio) {
-    const e = _pianoOra(entrata);
-    const inizio = _pianoOra(t.ora_inizio);
-    if (e != null && inizio != null) {
-      const anticipo = inizio - e;
-      const eEff = anticipo > 0 && anticipo < 6 ? t.ora_inizio.substring(0, 5) : entrata;
-      return _pianoOreTimbrata(eEff, uscita);
-    }
-  }
-  return _pianoOreTimbrata(entrata, uscita);
-}
-function _briefComponi(pianoRighe, timbMap) {
+function _briefComponi(pianoRighe) {
   const righe = [];
   (pianoRighe || []).forEach((r) => {
     const t = _pianoTurnoInfo(r.codice);
@@ -6755,10 +6733,9 @@ function _briefComponi(pianoRighe, timbMap) {
     if (info && info.funzione === 'RESP') return;
     const parole = r.collaboratore.trim().split(/\s+/);
     const cognome = (parole.length > 1 ? parole.slice(0, -1).join(' ') : parole[0]).toUpperCase();
-    const tm = timbMap[r.collaboratore];
     righe.push({
-      e: tm ? _briefOrarioHM(tm.ora_entrata) : '',
-      u: tm ? _briefOrarioHM(tm.ora_uscita) : '',
+      e: '',
+      u: '',
       nome: cognome,
       nomeFull: r.collaboratore,
       turno: r.codice,
@@ -6783,29 +6760,24 @@ async function _renderPianoBriefingTab() {
   if (!_briefData) _briefData = _briefDomani();
   const dstr = _briefData;
   const rep = _pianoReparto();
-  const [salvati, pianoRighe, timbrate] = await Promise.all([
+  const [salvati, pianoRighe, pauseCfg] = await Promise.all([
     secGet('piano_briefing?data=eq.' + dstr + '&reparto_dip=eq.' + rep),
     secGet('piano?data=eq.' + dstr + '&reparto_dip=eq.' + rep),
-    secGet('piano_timbrature?data=eq.' + dstr + '&limit=500'),
+    getImp('piano_pause_cfg'),
   ]);
-  const timbMap = {};
-  (timbrate || []).forEach((t) => (timbMap[t.collaboratore] = t));
+  try {
+    window._briefPauseCfgObj = pauseCfg ? JSON.parse(pauseCfg) : {};
+  } catch (e) {
+    window._briefPauseCfgObj = {};
+  }
   const rigaBrief = (salvati || []).find((x) => x.sezione === 'briefing');
   const rigaPause = (salvati || []).find((x) => x.sezione === 'pause');
   let righe, salvato;
   if (rigaBrief && rigaBrief.contenuto && Array.isArray(rigaBrief.contenuto.righe)) {
     righe = rigaBrief.contenuto.righe;
     salvato = true;
-    // E/U sempre aggiornate dalle timbrature più recenti se la cella è vuota
-    righe.forEach((r) => {
-      const tm = r.nomeFull && timbMap[r.nomeFull];
-      if (tm) {
-        if (!r.e) r.e = _briefOrarioHM(tm.ora_entrata);
-        if (!r.u) r.u = _briefOrarioHM(tm.ora_uscita);
-      }
-    });
   } else {
-    righe = _briefComponi(pianoRighe, timbMap);
+    righe = _briefComponi(pianoRighe);
     salvato = false;
   }
   _briefState = {
@@ -6813,7 +6785,6 @@ async function _renderPianoBriefingTab() {
     righe: righe,
     pause: rigaPause || null,
     pianoRighe: pianoRighe || [],
-    timbMap: timbMap,
     chiave: dstr + '|' + rep,
   };
   const puo = puoGestirePiano();
@@ -6829,12 +6800,17 @@ async function _renderPianoBriefingTab() {
     dstr +
     '" onchange="briefSetData(this.value)" style="padding:6px">' +
     '<button class="btn-export" style="padding:4px 10px" onclick="briefCambiaData(1)">▶</button>' +
-    '<strong style="font-size:1rem">' +
+    '<strong style="font-size:1.1rem;background:#FFFF00;color:#000;padding:3px 12px;border:1px solid #999">' +
     _briefGiornoLbl(dstr) +
+    ' ' +
+    dstr.split('-').reverse().join('.') +
     '</strong>' +
     (puo
       ? '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="briefCompila()">Compila dal piano</button>' +
-        '<button class="btn-export" style="font-size:.82rem;padding:5px 12px;border-color:#2c6e49;color:#2c6e49" onclick="briefGeneraPause()">Genera pause</button>'
+        '<button class="btn-export" style="font-size:.82rem;padding:5px 12px;border-color:#2c6e49;color:#2c6e49" onclick="briefGeneraPause()">Genera pause</button>' +
+        '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="pdfBriefingGiorno()">Stampa briefing</button>' +
+        '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="document.getElementById(\'brief-xlsx\').click()">Importa da Excel</button>' +
+        '<input type="file" id="brief-xlsx" accept=".xlsx,.xls,.xlsm" style="display:none" onchange="importaBriefingExcel(this)">'
       : '') +
     '<span id="brief-stato" style="font-size:.78rem;color:var(--muted)">' +
     (salvato
@@ -6848,17 +6824,31 @@ async function _renderPianoBriefingTab() {
   h += '<table class="brief-table" style="border-collapse:collapse;font-size:.85rem"><thead><tr>';
   const cols = valet
     ? ['E', 'U', 'COLLABORATORE', 'TURNO', 'USCITA', 'FIRMA', 'RADIO', 'BADGE']
-    : ['E', 'U', 'HOST', 'T', 'CD', 'USCITA', 'FIRMA'];
+    : rep === 'slots'
+      ? ['E', 'U', 'HOST', 'T', 'CD', 'USCITA', 'FIRMA']
+      : ['E', 'U', 'COLLABORATORE', 'T', 'CD', 'USCITA', 'FIRMA'];
   cols.forEach((c) => {
+    const bg = c === 'E' ? '#00B050' : c === 'U' ? '#FF0000' : '#FFFF00';
+    const fg = c === 'E' || c === 'U' ? '#fff' : '#000';
     h +=
-      '<th style="border:1px solid #999;background:#212529;color:#fff;padding:4px 8px;font-size:.78rem">' + c + '</th>';
+      '<th style="border:1px solid #999;background:' +
+      bg +
+      ';color:' +
+      fg +
+      ';padding:4px 8px;font-size:.78rem">' +
+      c +
+      '</th>';
   });
   h += (puo ? '<th style="border:none"></th>' : '') + '</tr></thead><tbody>';
   let gPrec = null;
   righe.forEach((r, i) => {
     const g = _briefGruppo(r.turno);
     if (gPrec !== null && g !== gPrec)
-      h += '<tr class="brief-sep"><td colspan="' + (cols.length + 1) + '" style="border:none;height:9px"></td></tr>';
+      h +=
+        '<tr>' +
+        cols.map(() => '<td style="border:1px solid #999;padding:0;height:11px"></td>').join('') +
+        (puo ? '<td style="border:none"></td>' : '') +
+        '</tr>';
     gPrec = g;
     const inp = (campo, val, larghezza, extra) =>
       '<td style="border:1px solid #999;padding:0"><input ' +
@@ -6875,37 +6865,40 @@ async function _renderPianoBriefingTab() {
       larghezza +
       'px;border:none;background:transparent;padding:4px 6px;font:inherit;color:inherit"></td>';
     h += '<tr>';
-    h +=
-      '<td style="border:1px solid #999;padding:0"><input type="time" ' +
-      (puo ? '' : 'disabled ') +
-      'value="' +
-      escP(r.e || '') +
-      '" onchange="briefCella(' +
-      i +
-      ",'e',this.value);briefTimbra(" +
-      i +
-      ')" ' +
-      'style="width:80px;border:none;background:transparent;padding:3px 4px;font:inherit;color:inherit"></td>';
-    h +=
-      '<td style="border:1px solid #999;padding:0"><input type="time" ' +
-      (puo ? '' : 'disabled ') +
-      'value="' +
-      escP(r.u || '') +
-      '" onchange="briefCella(' +
-      i +
-      ",'u',this.value);briefTimbra(" +
-      i +
-      ')" ' +
-      'style="width:80px;border:none;background:transparent;padding:3px 4px;font:inherit;color:inherit"></td>';
+    // E e U si spuntano A PENNA sul foglio stampato: celle vuote
+    h += '<td style="border:1px solid #999;width:34px;padding:3px 4px">&nbsp;</td>';
+    h += '<td style="border:1px solid #999;width:34px;padding:3px 4px">&nbsp;</td>';
     h += inp('nome', r.nome, 150);
-    h += inp('turno', r.turno + (r.oi && !_pianoTurnoInfo(r.turno) ? '' : ''), 52);
+    const colTurno = _pianoColore(r.turno) || '';
+    h =
+      h.substring(0) +
+      '<td style="border:1px solid #999;padding:0;background:' +
+      colTurno +
+      '"><input ' +
+      (puo ? '' : 'disabled ') +
+      'value="' +
+      escP(r.turno || '') +
+      '" oninput="briefCella(' +
+      i +
+      ",'turno',this.value)\" " +
+      'style="width:52px;border:none;background:transparent;padding:4px 6px;font:inherit;font-weight:bold;color:inherit"></td>';
     if (valet) {
       h += inp('uscita', r.uscita, 70);
       h += inp('firma', r.firma, 90);
       h += inp('radio', r.radio, 60);
       h += inp('badge', r.badge, 60);
     } else {
-      h += inp('cd', r.cd, 40);
+      h +=
+        '<td style="border:1px solid #999;padding:0;background:' +
+        (r.cd ? '#FFFF00' : 'transparent') +
+        '"><input ' +
+        (puo ? '' : 'disabled ') +
+        'value="' +
+        escP(r.cd || '') +
+        '" oninput="briefCella(' +
+        i +
+        ",'cd',this.value)\" " +
+        'style="width:40px;border:none;background:transparent;padding:4px 6px;font:inherit;font-weight:bold;color:inherit"></td>';
       h += inp('uscita', r.uscita, 70);
       h += inp('firma', r.firma, 90);
     }
@@ -6930,14 +6923,18 @@ async function _renderPianoBriefingTab() {
       return a.codice < b.codice ? -1 : 1;
     });
   h +=
-    '<div><table style="border-collapse:collapse;font-size:.8rem"><thead><tr><th colspan="3" style="border:1px solid #999;background:#212529;color:#fff;padding:4px 10px;font-size:.78rem">ORARI</th></tr></thead><tbody>';
+    '<div><table style="border-collapse:collapse;font-size:.8rem"><thead><tr><th colspan="3" style="border:1px solid #999;background:#FFFF00;color:#000;padding:4px 10px;font-size:.78rem">ORARI</th></tr></thead><tbody>';
   let gT = null;
   turni.forEach((t) => {
     const g = _briefGruppo(t.codice);
-    if (gT !== null && g !== gT) h += '<tr><td colspan="3" style="border:none;height:7px"></td></tr>';
+    if (gT !== null && g !== gT)
+      h +=
+        '<tr><td style="border:1px solid #999;height:9px"></td><td style="border:1px solid #999"></td><td style="border:1px solid #999"></td></tr>';
     gT = g;
     h +=
-      '<tr><td style="border:1px solid #999;padding:2px 10px;font-weight:bold">' +
+      '<tr><td style="border:1px solid #999;padding:2px 10px;font-weight:bold;background:' +
+      (_pianoColore(t.codice) || '') +
+      '">' +
       escP(t.codice) +
       '</td><td style="border:1px solid #999;padding:2px 10px">' +
       _briefOrarioHM(t.ora_inizio) +
@@ -7006,59 +7003,7 @@ async function briefSalvaBriefing() {
   }
   _briefSaving = false;
 }
-function _briefMatchNome(cognome) {
-  if (!cognome) return null;
-  const cg = cognome.trim().toLowerCase();
-  const cand = collaboratoriCache.filter(
-    (c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto() && c.nome.toLowerCase().startsWith(cg),
-  );
-  if (cand.length === 1) return cand[0].nome;
-  const tutti = collaboratoriCache.filter((c) => c.attivo !== false && c.nome.toLowerCase().startsWith(cg));
-  return tutti.length === 1 ? tutti[0].nome : null;
-}
-async function briefTimbra(i) {
-  if (!puoGestirePiano() || !_briefState) return;
-  const r = _briefState.righe[i];
-  if (!r.e || !r.u) return;
-  const nomeFull = r.nomeFull || _briefMatchNome(r.nome);
-  if (!nomeFull) {
-    toast('Collaboratore non riconosciuto: E/U salvate solo nel briefing');
-    return;
-  }
-  r.nomeFull = nomeFull;
-  try {
-    const ore = _briefOreClamp(nomeFull, r.e, r.u);
-    const ex = _briefState.timbMap[nomeFull];
-    if (ex && ex.id) {
-      await secPatch('piano_timbrature', 'id=eq.' + ex.id, {
-        ora_entrata: r.e,
-        ora_uscita: r.u,
-        ore: ore,
-        fonte: 'briefing',
-        operatore: getOperatore(),
-      });
-      ex.ora_entrata = r.e;
-      ex.ora_uscita = r.u;
-    } else {
-      const nuovo = await secPost('piano_timbrature', {
-        collaboratore: nomeFull,
-        data: _briefData,
-        ora_entrata: r.e,
-        ora_uscita: r.u,
-        ore: ore,
-        fonte: 'briefing',
-        reparto_dip: _pianoReparto(),
-        operatore: getOperatore(),
-      });
-      _briefState.timbMap[nomeFull] = nuovo && nuovo[0] ? nuovo[0] : { id: null };
-    }
-    logAzione('Timbratura da briefing', nomeFull + ' ' + _briefData + ' ' + r.e + '-' + r.u);
-    toast('Timbratura salvata: ' + nomeFull);
-  } catch (e) {
-    toast('Errore salvataggio timbratura');
-  }
-}
-function briefAggiungiRiga() {
+async function briefAggiungiRiga() {
   if (!_briefState) return;
   _briefState.righe.push({
     e: '',
@@ -7072,21 +7017,24 @@ function briefAggiungiRiga() {
     radio: '',
     badge: '',
   });
-  _briefDirtySalva();
+  clearTimeout(_briefSaveTimer);
+  await briefSalvaBriefing();
   renderPiano();
 }
-function briefEliminaRiga(i) {
+async function briefEliminaRiga(i) {
   if (!_briefState) return;
   _briefState.righe.splice(i, 1);
-  _briefDirtySalva();
+  clearTimeout(_briefSaveTimer);
+  await briefSalvaBriefing();
   renderPiano();
 }
 async function briefCompila() {
   if (!_briefState) return;
   if (_briefState.righe.length && !confirm('Sostituisco le righe attuali con i turni del piano di ' + _briefData + '?'))
     return;
-  _briefState.righe = _briefComponi(_briefState.pianoRighe, _briefState.timbMap);
-  _briefDirtySalva();
+  _briefState.righe = _briefComponi(_briefState.pianoRighe);
+  clearTimeout(_briefSaveTimer);
+  await briefSalvaBriefing();
   renderPiano();
 }
 function _briefRenderPauseCard() {
@@ -7094,13 +7042,21 @@ function _briefRenderPauseCard() {
     '<div class="main-card" style="margin-top:14px"><div class="card-header">Pause — ' +
     escP(_pianoReparto().toUpperCase()) +
     '</div><div style="padding:12px 14px" id="brief-pause-body">';
+  h += _briefPauseBodyHtml();
+  h += '</div></div>';
+  return h;
+}
+function _briefPauseBodyHtml() {
+  let h = '';
   const p = _briefState && _briefState.pause;
   if (p && p.contenuto && p.contenuto.tipo) {
+    h +=
+      '<div style="margin-bottom:8px"><button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="pdfPauseGiorno()">Stampa pause</button></div>';
     h += _briefRenderPause(p.contenuto);
   } else {
     h +=
       '<p style="font-size:.85rem;color:var(--muted)">Nessuna pausa generata per questa data. Compila il briefing e premi <b>Genera pause</b>.</p>';
   }
-  h += '</div></div>';
+  h += _briefRenderPauseCfg();
   return h;
 }
