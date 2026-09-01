@@ -3745,13 +3745,24 @@ button:focus-visible,
 .piano-table td.bs-r {
   border-right: 2px solid #e67e22 !important;
 }
-/* intestazioni (giorni e nomi) della selezione in grassetto */
+/* intestazioni (giorni e nomi) della selezione: SOLO grassetto, senza sfondo —
+   la selezione vera (arancione) resta solo sulle celle scelte col mouse */
 .piano-table th.blocco-sel-head,
 .piano-table td.blocco-sel-head {
   font-weight: 900 !important;
-  box-shadow: inset 0 0 0 100px rgba(230, 126, 34, 0.25) !important;
 }
-/* selezione col trascinamento: niente selezione del testo mentre si trascina */
+/* niente selezione del TESTO del browser sulle tabelle del piano: partirebbe
+   dai nomi e confonderebbe; si copia col blocco arancione (o Copia per Excel).
+   Gli input (editor inline, briefing) restano selezionabili normalmente */
+table[data-seltab] {
+  user-select: none;
+  -webkit-user-select: none;
+}
+table[data-seltab] input,
+table[data-seltab] textarea {
+  user-select: text;
+  -webkit-user-select: text;
+}
 .piano-table.sel-noselect {
   user-select: none;
   -webkit-user-select: none;
