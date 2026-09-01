@@ -7881,11 +7881,15 @@ async function _renderPianoBriefingTab() {
         '<span style="cursor:pointer;color:#c0392b;font-weight:bold" title="Elimina riga" onclick="briefEliminaRiga(' +
         i +
         ')">×</span> ' +
-        '<span style="cursor:pointer;display:inline-block;width:12px;height:12px;border:1px solid #999;border-radius:2px;vertical-align:middle;background:' +
+        '<span style="cursor:pointer;display:inline-block;width:15px;height:15px;border:1.5px solid #777;border-radius:3px;vertical-align:middle;background:' +
         (r.col || 'transparent') +
-        '" title="Colore riga (clic per cambiare, dopo l\'ultimo torna senza colore)" onclick="briefColoreRiga(' +
+        '" title="Colore riga: apri la palette" onclick="briefColoreRiga(' +
         i +
-        ')"></span></td>';
+        ',event)">' +
+        (r.col
+          ? ''
+          : '<span style="font-size:.6rem;color:#999;line-height:15px;display:block;text-align:center">🎨</span>') +
+        '</span></td>';
     h += '</tr>';
   });
   h += '</tbody></table>';
@@ -8019,15 +8023,51 @@ async function briefInserisciRiga(i) {
   await briefSalvaBriefing();
   renderPiano();
 }
-// Colore della riga del briefing: ogni clic passa al colore successivo
-// della palette, dopo l'ultimo torna "senza colore" (vista + PDF)
-async function briefColoreRiga(i) {
+// Colore della riga del briefing: il quadratino apre la STESSA palette
+// del piano, con scelta diretta del colore (vista + PDF)
+function briefColoreRiga(i, ev) {
   if (!_briefState || !puoGestirePiano()) return;
-  const r = _briefState.righe[i];
-  if (!r) return;
-  const pal = PIANO_COLORI_CELLA;
-  const idx = pal.indexOf(r.col || '');
-  r.col = idx === -1 ? pal[0] : idx === pal.length - 1 ? null : pal[idx + 1];
+  if (ev) ev.stopPropagation();
+  let pop = document.getElementById('brief-colori-pop');
+  if (pop) pop.remove();
+  pop = document.createElement('div');
+  pop.id = 'brief-colori-pop';
+  pop.style.cssText =
+    'position:fixed;z-index:10001;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:8px;box-shadow:0 4px 14px rgba(0,0,0,.25);white-space:nowrap';
+  pop.innerHTML =
+    PIANO_COLORI_CELLA.map(
+      (c) =>
+        '<span onclick="briefColoreRigaSet(' +
+        i +
+        ",'" +
+        c +
+        '\')" style="display:inline-block;width:22px;height:22px;background:' +
+        c +
+        ';border:1px solid #999;border-radius:3px;margin:2px;cursor:pointer;vertical-align:middle"></span>',
+    ).join('') +
+    '<button class="btn-export" style="font-size:.7rem;padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="briefColoreRigaSet(' +
+    i +
+    ',null)">Nessuno</button>';
+  document.body.appendChild(pop);
+  const x = ev ? ev.clientX : 200;
+  const y = ev ? ev.clientY : 200;
+  pop.style.left = Math.min(x, window.innerWidth - 300) + 'px';
+  pop.style.top = Math.min(y + 8, window.innerHeight - 60) + 'px';
+  setTimeout(() => {
+    const chiudi = (e2) => {
+      if (!e2.target.closest('#brief-colori-pop')) {
+        pop.remove();
+        document.removeEventListener('click', chiudi);
+      }
+    };
+    document.addEventListener('click', chiudi);
+  }, 50);
+}
+async function briefColoreRigaSet(i, col) {
+  const pop = document.getElementById('brief-colori-pop');
+  if (pop) pop.remove();
+  if (!_briefState || !_briefState.righe[i]) return;
+  _briefState.righe[i].col = col || null;
   clearTimeout(_briefSaveTimer);
   await briefSalvaBriefing();
   renderPiano();
