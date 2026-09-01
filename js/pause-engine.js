@@ -2710,7 +2710,7 @@ function pdfBriefingGiorno() {
       body.push([{ content: '', colSpan: cols.length, styles: { minCellHeight: 3.5 } }]);
     gPrec = g;
     const nomePdf = (r.nome || '') + (r.fm ? ' (formazione)' : '');
-    if (r.fm) righeFm[body.length] = true;
+    if (r.col || r.fm) righeFm[body.length] = r.col || '#FFFF00';
     body.push(
       valet
         ? ['', '', nomePdf, r.turno || '', r.uscita || '', r.firma || '', r.radio || '', r.badge || '']
@@ -2775,7 +2775,7 @@ function pdfBriefingGiorno() {
           d.column.index === 0 ? [0, 176, 80] : d.column.index === 1 ? [255, 0, 0] : [255, 255, 0];
         if (d.column.index <= 1) d.cell.styles.textColor = [255, 255, 255];
       } else if (d.section === 'body' && d.column.index === 2 && righeFm[d.row.index]) {
-        d.cell.styles.fillColor = [255, 255, 0];
+        d.cell.styles.fillColor = _peHexRgb(righeFm[d.row.index]);
         d.cell.styles.fontStyle = 'bold';
       } else if (d.column.index === 3 && d.cell.raw) {
         const hex = _pianoColore(String(d.cell.raw).trim());

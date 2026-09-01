@@ -584,6 +584,7 @@ async function renderPiano() {
           '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:var(--accent);color:var(--accent)" onclick="cancellaBozzaPiano()">Cancella piano</button>' +
           '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#d4b86a;color:#d4b86a" title="Trascina i nomi per riordinare; questo pulsante ripristina SUP, BO, poi gli altri" onclick="ripristinaOrdinePiano()">Ordine predefinito</button>';
       }
+      if (puoMod) h += _pianoColoriBarHtml();
       h +=
         '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#b8a98a;color:#b8a98a" onclick="copiaPianoExcel()">Copia per Excel</button>';
       h +=
@@ -596,7 +597,7 @@ async function renderPiano() {
         '<span style="font-size:.8rem;color:var(--muted);margin-left:auto">' +
         _pianoRighe.length +
         ' assegnazioni' +
-        (puoMod ? ' — clicca una cella per modificare' : ' — sola lettura') +
+        (puoMod ? ' — click seleziona, doppio click modifica' : ' — sola lettura') +
         '</span></div>';
       h += '<div id="piano-violazioni"></div>';
 
@@ -697,6 +698,8 @@ async function renderPiano() {
             cls += ' piano-viol';
             titolo += (titolo ? ' — ' : '') + '⚠ ' + violMsg.join(' | ');
           }
+          // colore personalizzato della cella: vince sul colore del turno (solo qui nel piano)
+          if (r && r.colore) stile += (stile ? ';' : '') + 'background:' + r.colore;
           riga +=
             '<td class="' +
             cls +
@@ -707,7 +710,12 @@ async function renderPiano() {
             '"' +
             (titolo ? ' title="' + escP(titolo) + '"' : '') +
             (r && r.commento ? ' data-commento="' + escP(r.commento) + '"' : '') +
-            (puoMod ? ' onclick="pianoCellaInline(\'' + ne + "','" + dstr + '\',this)"' : '') +
+            ' onclick="pianoCellaClick(\'' +
+            ne +
+            "','" +
+            dstr +
+            '\',this)"' +
+            (puoMod ? ' ondblclick="pianoCellaInline(\'' + ne + "','" + dstr + '\',this)"' : '') +
             '>' +
             cella +
             '</td>';
@@ -896,7 +904,12 @@ async function renderPiano() {
                 stile +
                 (puoMod ? 'cursor:pointer' : '') +
                 '"' +
-                (puoMod ? ' onclick="fabbisognoInline(\'' + escP(cod) + "','" + dstr + '\',this)"' : '') +
+                ' onclick="fabbCellaClick(\'' +
+                escP(cod) +
+                "','" +
+                dstr +
+                '\',this)"' +
+                (puoMod ? ' ondblclick="fabbisognoInline(\'' + escP(cod) + "','" + dstr + '\',this)"' : '') +
                 ' oncontextmenu="fabbCtxMenu(event,\'' +
                 escP(cod) +
                 "','" +
@@ -2067,6 +2080,7 @@ function fabbisognoInline(codice, dstr, el) {
     return;
   }
   if (!puoGestirePiano() || !el || el.querySelector('input')) return;
+  _pianoBloccoPulisci();
   const esistente = _pianoFabbCache.find(
     (f) => f.turno_codice === codice && f.data === dstr && (f.reparto_dip || 'slots') === _pianoReparto(),
   );
@@ -2075,7 +2089,7 @@ function fabbisognoInline(codice, dstr, el) {
   el.innerHTML =
     '<input type="text" inputmode="numeric" value="' +
     (attuale || '') +
-    '" size="1" maxlength="2" style="width:100%;min-width:0;box-sizing:border-box;border:1px solid #1a4a7a;border-radius:0;padding:0;margin:0;font:inherit;font-weight:700;text-align:center;background:#fff;color:#000">';
+    '" size="1" maxlength="2" style="width:100%;min-width:0;box-sizing:border-box;border:1px solid #1a4a7a;border-radius:0;padding:0;margin:0;font:inherit;font-weight:700;text-align:center;background:transparent;color:inherit">';
   const inp = el.querySelector('input');
   inp.focus();
   inp.select();
@@ -3164,7 +3178,11 @@ async function stampaPianoPDF() {
   const nGiorni = _pianoUltimoGiorno(ym);
   const label = (MESI_FULL[parseInt(ym.split('-')[1]) - 1] || ym) + ' ' + ym.split('-')[0];
   const mappa = {};
-  _pianoRighe.forEach((r) => (mappa[r.collaboratore + '|' + parseInt(r.data.split('-')[2])] = r.codice));
+  const mappaCol = {};
+  _pianoRighe.forEach((r) => {
+    mappa[r.collaboratore + '|' + parseInt(r.data.split('-')[2])] = r.codice;
+    if (r.colore) mappaCol[r.collaboratore + '|' + parseInt(r.data.split('-')[2])] = r.colore;
+  });
   // righe/giorni NASCOSTI nella griglia restano fuori anche dalla stampa
   // (serve p.es. per stampare il piano senza i SUP)
   const nasc = _pianoNascosti();
@@ -3194,7 +3212,9 @@ async function stampaPianoPDF() {
     columnStyles: { 0: { halign: 'left', fontStyle: 'bold', cellWidth: 26, fontSize: 5 } },
     didParseCell: (d) => {
       if (d.section === 'body' && d.column.index > 0 && d.cell.raw) {
-        const col = _pianoColore(String(d.cell.raw));
+        // colore personalizzato della cella: vince sul colore del turno anche in stampa
+        const ovr = mappaCol[nomi[d.row.index] + '|' + giorniVis[d.column.index - 1]];
+        const col = ovr || _pianoColore(String(d.cell.raw));
         if (col) {
           const hex = col.replace('#', '');
           d.cell.styles.fillColor = [
@@ -4149,6 +4169,7 @@ function _pianoInitSelezione() {
       const nomeCella = riga.querySelector('.piano-nome');
       if (!nomeCella) return;
       nomeCella.style.cursor = 'pointer';
+      if (riga.dataset.nome) nomeCella.addEventListener('contextmenu', (e) => mostraPianoCtxNome(e, riga.dataset.nome));
       nomeCella.addEventListener('click', (e) => {
         if (e.target.closest('a, .piano-pdf-ico')) return;
         e.stopPropagation();
@@ -4982,10 +5003,16 @@ async function _renderPianoSaldoTab() {
 
 // TAB STORICO — come la pagina Storico di Turnivo: log delle modifiche al
 // piano (dal Registro del Diario, filtrato sulle azioni del piano)
+// ordinamento per colonna dello storico: 1° clic decrescente, 2° crescente
+function pianoStoricoSort(campo) {
+  const s0 = window._pianoStoricoSort || { campo: 'created_at', dir: -1 };
+  window._pianoStoricoSort = { campo: campo, dir: s0.campo === campo ? -s0.dir : campo === 'created_at' ? -1 : 1 };
+  renderPiano();
+}
 async function _renderPianoStoricoTab() {
   const filtro = window._pianoStoricoFiltro || '';
   const cerca = (window._pianoStoricoCerca || '').toLowerCase();
-  const ordina = window._pianoStoricoOrdina || 'data';
+  const srt = window._pianoStoricoSort || { campo: 'created_at', dir: -1 };
   const logs =
     (await secGet(
       'log_attivita?or=(azione.ilike.Piano*,azione.ilike.Vacanz*,azione.ilike.*piano*)&order=created_at.desc&limit=300',
@@ -4995,21 +5022,13 @@ async function _renderPianoStoricoTab() {
     visibili = visibili.filter((l) =>
       ((l.operatore || '') + ' ' + (l.azione || '') + ' ' + (l.dettaglio || '')).toLowerCase().includes(cerca),
     );
-  if (ordina === 'azione')
-    visibili = visibili
-      .slice()
-      .sort(
-        (a, b) =>
-          (a.azione || '').localeCompare(b.azione || '') || (b.created_at || '').localeCompare(a.created_at || ''),
-      );
-  else if (ordina === 'operatore')
-    visibili = visibili
-      .slice()
-      .sort(
-        (a, b) =>
-          (a.operatore || '').localeCompare(b.operatore || '') ||
-          (b.created_at || '').localeCompare(a.created_at || ''),
-      );
+  visibili = visibili
+    .slice()
+    .sort(
+      (a, b) =>
+        srt.dir * String(a[srt.campo] || '').localeCompare(String(b[srt.campo] || '')) ||
+        (b.created_at || '').localeCompare(a.created_at || ''),
+    );
   const azioni = [...new Set(logs.map((l) => l.azione))].sort();
   let h =
     '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Storico modifiche piano (' +
@@ -5025,18 +5044,32 @@ async function _renderPianoStoricoTab() {
     '<input type="text" value="' +
     escP(window._pianoStoricoCerca || '') +
     '" placeholder="Cerca nome o voce..." onchange="window._pianoStoricoCerca=this.value;renderPiano()" style="padding:4px 8px;font-size:.8rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a;width:170px">';
+  h += '</div>';
   h +=
-    '<select onchange="window._pianoStoricoOrdina=this.value;renderPiano()" style="padding:4px 8px;font-size:.8rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a">' +
+    '<div style="overflow-x:auto;padding:0 6px 8px"><table class="piano-table" style="min-width:700px;font-size:.85rem"><thead><tr>' +
     [
-      ['data', 'Più recenti'],
-      ['azione', 'Per azione'],
-      ['operatore', 'Per operatore'],
+      ['created_at', 'Data e ora', ''],
+      ['operatore', 'Operatore', ''],
+      ['azione', 'Azione', 'text-align:left'],
+      ['dettaglio', 'Dettaglio', 'text-align:left'],
     ]
-      .map(([v, l]) => '<option value="' + v + '"' + (ordina === v ? ' selected' : '') + '>' + l + '</option>')
+      .map(
+        ([campo, label, st]) =>
+          '<th style="cursor:pointer;' +
+          st +
+          '" title="Clicca per ordinare" onclick="pianoStoricoSort(\'' +
+          campo +
+          '\')">' +
+          label +
+          (srt.campo === campo
+            ? srt.dir === 1
+              ? ' &#9650;'
+              : ' &#9660;'
+            : ' <span style="opacity:.35">&#8597;</span>') +
+          '</th>',
+      )
       .join('') +
-    '</select></div>';
-  h +=
-    '<div style="overflow-x:auto;padding:0 6px 8px"><table class="piano-table" style="min-width:700px;font-size:.85rem"><thead><tr><th>Data e ora</th><th>Operatore</th><th style="text-align:left">Azione</th><th style="text-align:left">Dettaglio</th></tr></thead><tbody>';
+    '</tr></thead><tbody>';
   visibili.forEach((l) => {
     const d = l.created_at ? new Date(l.created_at) : null;
     h +=
@@ -7014,7 +7047,18 @@ function mostraPianoCtx(e, nome, dstr) {
       ? '<div class="piano-ctx-item" onclick="' + azione + '"><i class="icx ' + icona + '"></i> ' + label + '</div>'
       : '';
   h += voce('Modifica turno', 'icx-modifica', "pianoCtxAzione('modifica')", puoMod);
-  h += voce('Commento / nota', 'icx-penna', "pianoCtxAzione('nota')", puoMod && !!r);
+  if (r && (r.commento || '').trim()) {
+    h += voce('Modifica commento', 'icx-penna', "pianoCtxAzione('nota')", puoMod);
+    h += voce('Elimina commento', 'icx-cestino', "pianoCtxAzione('commentoElimina')", puoMod);
+  } else {
+    h += voce('Aggiungi commento', 'icx-penna', "pianoCtxAzione('nota')", puoMod && !!r);
+  }
+  h += voce(
+    'Colore cella' + (r && r.colore ? ' (attivo)' : ''),
+    'icx-penna',
+    "pianoCtxAzione('colore')",
+    puoMod && !!r,
+  );
   h += voce('Cambia turno con...', 'icx-refresh', "pianoCtxAzione('scambio')", puoMod && !!haTurno);
   h += voce('Cambio per esigenze', 'icx-settings', "pianoCtxAzione('esigenze')", puoMod && !!haTurno);
   h += voce('Rimuovi cella', 'icx-cestino', "pianoCtxAzione('rimuovi')", puoMod && !!r);
@@ -7060,6 +7104,37 @@ function nascondiPianoCtx() {
   const menu = document.getElementById('piano-ctx');
   if (menu) menu.style.display = 'none';
 }
+// Tasto destro sul NOME del collaboratore: menu della riga (nascondi, stampa...)
+function mostraPianoCtxNome(e, nome) {
+  e.preventDefault();
+  _pianoCtxSel = { nome: nome, data: _pianoMeseSel + '-01' };
+  let menu = document.getElementById('piano-ctx');
+  if (!menu) {
+    mostraPianoCtx(e, nome, _pianoMeseSel + '-01');
+    _pianoCtxSel = { nome: nome, data: _pianoMeseSel + '-01' };
+  }
+  menu = document.getElementById('piano-ctx');
+  const voce = (label, icona, azione, attiva) =>
+    attiva
+      ? '<div class="piano-ctx-item" onclick="' + azione + '"><i class="icx ' + icona + '"></i> ' + label + '</div>'
+      : '';
+  const nasc = _pianoNascosti();
+  const conBlocco = !!(window._pianoBlocco && window._pianoBlocco.completo);
+  let h = '';
+  h += voce('Nascondi riga (' + escP(nome.split(' ')[0]) + ')', 'icx-settings', "pianoCtxAzione('nascondiRiga')", true);
+  h += voce('Nascondi righe selezionate', 'icx-settings', "pianoCtxAzione('nascondiRigheSel')", conBlocco);
+  h += voce(
+    'Mostra nascosti (' + (nasc.nomi.length + nasc.giorni.length) + ')',
+    'icx-refresh',
+    'pianoMostraNascosti()',
+    nasc.nomi.length + nasc.giorni.length > 0,
+  );
+  h += voce('Stampa piano di ' + escP(nome.split(' ')[0]), 'icx-stampa', "pianoCtxAzione('stampa')", true);
+  menu.innerHTML = '<div class="piano-ctx-head">' + escP(nome) + '</div>' + h;
+  menu.style.display = 'block';
+  menu.style.left = Math.min(e.clientX, window.innerWidth - 230) + 'px';
+  menu.style.top = Math.min(e.clientY, window.innerHeight - menu.offsetHeight - 10) + 'px';
+}
 function pianoCtxAzione(azione) {
   nascondiPianoCtx();
   const sel = _pianoCtxSel;
@@ -7070,7 +7145,31 @@ function pianoCtxAzione(azione) {
     if (cel) pianoCellaInline(sel.nome, sel.data, cel);
     else pianoCellaPrompt(sel.nome, sel.data);
   } else if (azione === 'nota') _pianoNotaRapida(sel.nome, sel.data);
-  else if (azione === 'nascondiRiga') pianoNascondiRighe([sel.nome]);
+  else if (azione === 'commentoElimina') {
+    (async () => {
+      const r = _pianoRighe.find((x) => x.collaboratore === sel.nome && x.data === sel.data);
+      if (!r || !confirm('Eliminare il commento di ' + sel.nome + ' del ' + sel.data + '?')) return;
+      try {
+        await secPatch('piano', 'id=eq.' + r.id, { commento: null });
+        r.commento = null;
+        logAzione('Piano: commento eliminato', sel.nome + ' ' + sel.data);
+        toast('Commento eliminato');
+        renderPiano();
+      } catch (e) {
+        toast('Errore eliminazione commento');
+      }
+    })();
+  } else if (azione === 'colore') {
+    // seleziona la cella e apre la palette in alto (stessa di Excel)
+    const tr = document.querySelector('#piano-content .piano-table tbody tr[data-nome="' + CSS.escape(sel.nome) + '"]');
+    const cel = tr ? tr.querySelector('td[data-g="' + parseInt(sel.data.split('-')[2]) + '"]') : null;
+    if (cel) {
+      _pianoBloccoPulisci();
+      window._pianoBlocco = { tab: 'piano', t1: cel, t2: cel, completo: true };
+      _pianoBloccoEvidenzia();
+    }
+    pianoColoriToggle();
+  } else if (azione === 'nascondiRiga') pianoNascondiRighe([sel.nome]);
   else if (azione === 'nascondiGiorno') pianoNascondiGiorni([parseInt(sel.data.split('-')[2])]);
   else if (azione === 'nascondiRigheSel' || azione === 'nascondiGiorniSel') {
     const b = window._pianoBlocco;
@@ -7314,13 +7413,14 @@ function pianoCellaInline(nome, dstr, el) {
     return;
   }
   if (!puoGestirePiano() || !el || el.querySelector('input')) return;
+  _pianoBloccoPulisci();
   const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
   const attuale = r ? r.codice : '';
   const vecchio = el.innerHTML;
   el.innerHTML =
     '<input type="text" value="' +
     escP(attuale) +
-    '" size="1" maxlength="6" style="width:100%;min-width:0;box-sizing:border-box;border:1px solid #1a4a7a;border-radius:0;padding:0;margin:0;font:inherit;font-weight:700;text-transform:uppercase;text-align:center;background:#fff;color:#000">';
+    '" size="1" maxlength="6" style="width:100%;min-width:0;box-sizing:border-box;border:1px solid #1a4a7a;border-radius:0;padding:0;margin:0;font:inherit;font-weight:700;text-transform:uppercase;text-align:center;background:transparent;color:inherit">';
   const inp = el.querySelector('input');
   inp.focus();
   inp.select();
@@ -7413,6 +7513,24 @@ function _briefComponi(pianoRighe) {
       badge: '',
       fm: /formazion|affianc/i.test(r.commento || '') || undefined,
     });
+  });
+  // cognomi uguali di persone diverse (es. BIANCHI Milena e BIANCHI Chiara):
+  // aggiungi l'iniziale del nome; se coincide anche quella, il nome intero
+  const perCognome = {};
+  righe.forEach((r) => {
+    (perCognome[r.nome] = perCognome[r.nome] || new Set()).add(r.nomeFull || r.nome);
+  });
+  righe.forEach((r) => {
+    if (perCognome[r.nome] && perCognome[r.nome].size > 1 && r.nomeFull) {
+      const parole = r.nomeFull.trim().split(/\s+/);
+      const proprio = parole[parole.length - 1];
+      const iniziali = [...perCognome[r.nome]].map((n) => {
+        const p = n.trim().split(/\s+/);
+        return p[p.length - 1].charAt(0).toUpperCase();
+      });
+      const doppiaIni = iniziali.filter((x) => x === proprio.charAt(0).toUpperCase()).length > 1;
+      r.nome = r.nome + ' ' + (doppiaIni ? proprio.toUpperCase() : proprio.charAt(0).toUpperCase() + '.');
+    }
   });
   _briefOrdina(righe);
   return righe;
@@ -7682,17 +7800,26 @@ async function _renderPianoBriefingTab() {
     // E e U si spuntano A PENNA sul foglio stampato: celle vuote
     h += '<td style="border:1px solid #999;width:34px;padding:3px 4px">&nbsp;</td>';
     h += '<td style="border:1px solid #999;width:34px;padding:3px 4px">&nbsp;</td>';
-    if (r.fm) {
-      // in formazione: sfondo giallo + etichetta accanto al cognome
+    const bgNome = r.col || (r.fm ? '#FFFF00' : '');
+    if (r.fm || bgNome) {
+      // in formazione (giallo) o colorata a mano: sfondo sulla cella del nome
       h +=
-        '<td style="border:1px solid #999;padding:0;background:#FFFF00;white-space:nowrap"><input ' +
+        '<td style="border:1px solid #999;padding:0;white-space:nowrap;background:' +
+        (bgNome || 'transparent') +
+        '"><input ' +
         (puo ? '' : 'disabled ') +
         'value="' +
         escP(r.nome || '') +
         '" oninput="briefCella(' +
         i +
         ",'nome',this.value)\" " +
-        'style="width:86px;border:none;background:transparent;padding:4px 2px 4px 6px;font:inherit;color:#000"><span style="font-size:.66rem;font-weight:700;color:#000;padding-right:3px">(formazione)</span></td>';
+        'style="width:' +
+        (r.fm ? 86 : 138) +
+        'px;border:none;background:transparent;padding:4px 2px 4px 6px;font:inherit;color:#000">' +
+        (r.fm
+          ? '<span style="font-size:.66rem;font-weight:700;color:#000;padding-right:3px">(formazione)</span>'
+          : '') +
+        '</td>';
     } else h += inp('nome', r.nome, 150);
     const colTurno = _pianoColore(r.turno) || '';
     h =
@@ -7744,7 +7871,12 @@ async function _renderPianoBriefingTab() {
         ',1)">▼</span> ' +
         '<span style="cursor:pointer;color:#c0392b;font-weight:bold" title="Elimina riga" onclick="briefEliminaRiga(' +
         i +
-        ')">×</span></td>';
+        ')">×</span> ' +
+        '<span style="cursor:pointer;display:inline-block;width:12px;height:12px;border:1px solid #999;border-radius:2px;vertical-align:middle;background:' +
+        (r.col || 'transparent') +
+        '" title="Colore riga (clic per cambiare, dopo l\'ultimo torna senza colore)" onclick="briefColoreRiga(' +
+        i +
+        ')"></span></td>';
     h += '</tr>';
   });
   h += '</tbody></table>';
@@ -7874,6 +8006,19 @@ function _briefRigaVuota() {
 async function briefInserisciRiga(i) {
   if (!_briefState || !puoGestirePiano()) return;
   _briefState.righe.splice(i + 1, 0, _briefRigaVuota());
+  clearTimeout(_briefSaveTimer);
+  await briefSalvaBriefing();
+  renderPiano();
+}
+// Colore della riga del briefing: ogni clic passa al colore successivo
+// della palette, dopo l'ultimo torna "senza colore" (vista + PDF)
+async function briefColoreRiga(i) {
+  if (!_briefState || !puoGestirePiano()) return;
+  const r = _briefState.righe[i];
+  if (!r) return;
+  const pal = PIANO_COLORI_CELLA;
+  const idx = pal.indexOf(r.col || '');
+  r.col = idx === -1 ? pal[0] : idx === pal.length - 1 ? null : pal[idx + 1];
   clearTimeout(_briefSaveTimer);
   await briefSalvaBriefing();
   renderPiano();
@@ -8133,16 +8278,103 @@ async function pianoInserisciCorso() {
 window._pianoBlocco = null; // {tab, t1, t2, completo}
 function pianoBloccoClick(tab, el) {
   const b = window._pianoBlocco;
-  if (b && !b.completo && b.tab === tab && b.t1.closest('table') === el.closest('table')) {
-    b.t2 = el;
-    b.completo = true;
+  if (b && b.tab === tab && b.t1.closest('table') === el.closest('table')) {
+    // Shift+click: estende dalla cella àncora (come Excel)
+    const t1 = b.t1;
+    _pianoBloccoPulisci();
+    window._pianoBlocco = { tab: tab, t1: t1, t2: el, completo: true };
     _pianoBloccoEvidenzia();
-    toast('Blocco selezionato: tasto destro → Copia blocco / Incolla');
   } else {
     _pianoBloccoPulisci();
-    window._pianoBlocco = { tab: tab, t1: el, t2: null, completo: false };
-    el.classList.add('blocco-sel');
+    window._pianoBlocco = { tab: tab, t1: el, t2: el, completo: true };
+    _pianoBloccoEvidenzia();
   }
+}
+// === COLORI CELLE (come il secchiello di Excel): palette in alto, si
+// applica alle celle SELEZIONATE; solo visivo per quella cella del piano,
+// il colore predefinito del turno non cambia mai ===
+const PIANO_COLORI_CELLA = ['#FF6B6B', '#FFB86B', '#FFF06B', '#95E06C', '#6BCBFF', '#B39DDB', '#F48FB1', '#D7CCC8'];
+function _pianoColoriBarHtml() {
+  return (
+    '<span style="position:relative;display:inline-flex;align-items:center"><button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#e67e22;color:#e67e22" title="Colora le celle selezionate (solo qui nel piano, il turno non cambia)" onclick="event.stopPropagation();pianoColoriToggle()">Colori</button>' +
+    '<div id="piano-colori-pop" style="display:none;position:absolute;top:110%;left:0;z-index:1000;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:8px;box-shadow:0 4px 14px rgba(0,0,0,.25);white-space:nowrap">' +
+    PIANO_COLORI_CELLA.map(
+      (c) =>
+        '<span onclick="pianoApplicaColore(\'' +
+        c +
+        '\')" style="display:inline-block;width:22px;height:22px;background:' +
+        c +
+        ';border:1px solid #999;border-radius:3px;margin:2px;cursor:pointer;vertical-align:middle"></span>',
+    ).join('') +
+    '<button class="btn-export" style="font-size:.7rem;padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="pianoApplicaColore(null)">Colore del turno</button>' +
+    '</div></span>'
+  );
+}
+function pianoColoriToggle() {
+  const p = document.getElementById('piano-colori-pop');
+  if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+async function pianoApplicaColore(colore) {
+  const p = document.getElementById('piano-colori-pop');
+  if (p) p.style.display = 'none';
+  if (!puoGestirePiano()) return;
+  const b = window._pianoBlocco;
+  if (!b || !b.completo || b.tab !== 'piano') {
+    toast('Seleziona prima le celle nella griglia (click o trascinamento)');
+    return;
+  }
+  const celle = _pianoBloccoCelle();
+  let fatte = 0;
+  let senza = 0;
+  try {
+    for (const rigaC of celle) {
+      for (const td of rigaC) {
+        const tr = td.closest('tr');
+        const nome = tr ? tr.dataset.nome : null;
+        const g = parseInt(td.dataset.g);
+        if (!nome || !g) continue;
+        const dstr = _pianoMeseSel + '-' + String(g).padStart(2, '0');
+        const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
+        if (!r) {
+          senza++;
+          continue;
+        }
+        if ((r.colore || null) === colore) continue;
+        await secPatch('piano', 'id=eq.' + r.id, { colore: colore });
+        r.colore = colore;
+        fatte++;
+      }
+    }
+    logAzione('Piano: colore celle', (colore || 'rimosso') + ' su ' + fatte + ' celle');
+    toast(
+      colore
+        ? 'Colorate ' + fatte + ' celle' + (senza ? ' (' + senza + ' vuote saltate)' : '')
+        : 'Colore rimosso da ' + fatte + ' celle',
+    );
+    renderPiano();
+  } catch (e) {
+    toast('Errore salvataggio colore');
+  }
+}
+// Click SINGOLO sulla cella della griglia: la MARCA soltanto (come Excel);
+// la modifica manuale parte col DOPPIO click
+function pianoCellaClick(nome, dstr, el) {
+  if (window.event && window.event.shiftKey) {
+    pianoBloccoClick('piano', el);
+    return;
+  }
+  _pianoBloccoPulisci();
+  window._pianoBlocco = { tab: 'piano', t1: el, t2: el, completo: true };
+  _pianoBloccoEvidenzia();
+}
+function fabbCellaClick(codice, dstr, el) {
+  if (window.event && window.event.shiftKey) {
+    pianoBloccoClick('fabb', el);
+    return;
+  }
+  _pianoBloccoPulisci();
+  window._pianoBlocco = { tab: 'fabb', t1: el, t2: el, completo: true };
+  _pianoBloccoEvidenzia();
 }
 function _pianoBloccoCelle() {
   const b = window._pianoBlocco;
@@ -8217,7 +8449,32 @@ function _pianoDragBind() {
     const td = e.target.closest('td[data-g]');
     const tabEl = e.target.closest('table[data-seltab]');
     if (!td || !tabEl) return;
+    // niente selezione del TESTO del browser (prenderebbe anche i nomi):
+    // si copia solo il blocco marcato. Se c'è un editor aperto, lasciamo
+    // partire il blur (il preventDefault bloccherebbe il cambio di focus)
+    const att = document.activeElement;
+    if (!att || att.tagName !== 'INPUT' || !att.closest('td')) e.preventDefault();
     drag = { tab: tabEl.dataset.seltab, table: tabEl, start: td, moved: false };
+  });
+  // click fuori dalle tabelle = deseleziona (come Excel); Esc idem
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('table[data-seltab], #piano-ctx, #piano-colori-pop')) return;
+    if (window._pianoBlocco) _pianoBloccoPulisci();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && window._pianoBlocco) _pianoBloccoPulisci();
+    // Ctrl/Cmd+C copia il blocco marcato (solo le celle, mai i nomi)
+    if (
+      (e.ctrlKey || e.metaKey) &&
+      (e.key === 'c' || e.key === 'C') &&
+      window._pianoBlocco &&
+      window._pianoBlocco.completo &&
+      !e.target.closest('input,textarea,select') &&
+      String(window.getSelection ? window.getSelection() : '') === ''
+    ) {
+      e.preventDefault();
+      pianoCopiaBlocco();
+    }
   });
   document.addEventListener('mouseover', (e) => {
     if (!drag) return;
@@ -8332,6 +8589,14 @@ function pianoNascondiGiorni(gg) {
   _pianoApplicaNascosti();
   toast(gg.length + (gg.length === 1 ? ' giorno nascosto' : ' giorni nascosti'));
 }
+// rimostra SOLO alcune righe (dal chip sul confine, come Excel)
+function pianoMostraRighe(nomi) {
+  const o = _pianoNascosti();
+  o.nomi = o.nomi.filter((n) => !nomi.includes(n));
+  _pianoSalvaNascosti(o);
+  _pianoApplicaNascosti();
+  toast('Mostrate: ' + nomi.join(', '));
+}
 function pianoMostraNascosti() {
   _pianoSalvaNascosti({ nomi: [], giorni: [] });
   _pianoApplicaNascosti();
@@ -8367,6 +8632,44 @@ function _pianoApplicaNascosti() {
   document.querySelectorAll('#piano-content table[data-seltab="piano"] tbody tr[data-nome]').forEach((tr) => {
     tr.style.display = o.nomi.includes(tr.dataset.nome) ? 'none' : '';
   });
+  // confine visibile come Excel: linea marcata + chip a sinistra del nome
+  // che al passaggio dice chi c'è sotto ("Mostra: Andrade...") e al click li rimostra
+  document.querySelectorAll('.chip-nascoste').forEach((c) => c.remove());
+  document.querySelectorAll('.riga-dopo-nascoste').forEach((r) => r.classList.remove('riga-dopo-nascoste'));
+  document.querySelectorAll('.riga-prima-nascoste').forEach((r) => r.classList.remove('riga-prima-nascoste'));
+  const tbodyG = document.querySelector('#piano-content table[data-seltab="piano"] tbody');
+  if (tbodyG && o.nomi.length) {
+    const mettiChip = (tr, gruppo, inCoda) => {
+      tr.classList.add(inCoda ? 'riga-prima-nascoste' : 'riga-dopo-nascoste');
+      const cel = tr.querySelector('.piano-nome');
+      if (!cel) return;
+      const chip = document.createElement('span');
+      chip.className = 'chip-nascoste';
+      chip.textContent = (inCoda ? '▾' : '▸') + gruppo.length;
+      chip.title = 'Mostra: ' + gruppo.join(', ');
+      const g2 = gruppo.slice();
+      chip.onclick = (e) => {
+        e.stopPropagation();
+        pianoMostraRighe(g2);
+      };
+      cel.prepend(chip);
+    };
+    const rows = [...tbodyG.querySelectorAll('tr[data-nome]')];
+    let gruppo = [];
+    let ultimaVisibile = null;
+    rows.forEach((tr) => {
+      if (o.nomi.includes(tr.dataset.nome)) {
+        gruppo.push(tr.dataset.nome);
+        return;
+      }
+      if (gruppo.length) {
+        mettiChip(tr, gruppo, false);
+        gruppo = [];
+      }
+      ultimaVisibile = tr;
+    });
+    if (gruppo.length && ultimaVisibile) mettiChip(ultimaVisibile, gruppo, true);
+  }
   // barra "mostra tutto"
   const n = o.nomi.length + o.giorni.length;
   let bar = document.getElementById('piano-nascosti-bar');

@@ -720,6 +720,12 @@ async function _formCaricaOrdinePiano() {
     if (Object.keys(window._pianoOrdineCollab).length) renderFormazione();
   } catch (e) {}
 }
+// ordinamento per colonna dello storico punti: 1° clic decrescente, poi si inverte
+function formStoricoSort(campo) {
+  const s0 = window._formStoricoSort || { campo: 'data_evento', dir: -1 };
+  window._formStoricoSort = { campo: campo, dir: s0.campo === campo ? -s0.dir : -1 };
+  renderFormazione();
+}
 function renderFormazione() {
   const el = document.getElementById('formazione-content');
   if (!el) return;
@@ -880,49 +886,49 @@ function renderFormazione() {
   html += '</div>';
   // registro eventi punti: cerca per nome/voce + ordinamento
   const cercaSt = ((window._formStoricoCerca || '') + '').toLowerCase();
-  const ordinaSt = window._formStoricoOrdina || 'data';
+  const srtF = window._formStoricoSort || { campo: 'data_evento', dir: -1 };
   let eventi = getPuntiReparto();
   if (cercaSt)
     eventi = eventi.filter((p) =>
       ((p.collaboratore || '') + ' ' + (p.azione || '') + ' ' + (p.descrizione || '')).toLowerCase().includes(cercaSt),
     );
-  if (ordinaSt === 'nome')
-    eventi = eventi
-      .slice()
-      .sort(
-        (a, b) =>
-          (a.collaboratore || '').localeCompare(b.collaboratore || '') ||
-          (b.data_evento || '').localeCompare(a.data_evento || ''),
-      );
-  else if (ordinaSt === 'punti') eventi = eventi.slice().sort((a, b) => (b.punti || 0) - (a.punti || 0));
-  else if (ordinaSt === 'azione')
-    eventi = eventi
-      .slice()
-      .sort(
-        (a, b) =>
-          (a.azione || '').localeCompare(b.azione || '') || (b.data_evento || '').localeCompare(a.data_evento || ''),
-      );
+  eventi = eventi.slice().sort((a, b) => {
+    const d =
+      srtF.campo === 'punti'
+        ? srtF.dir * ((a.punti || 0) - (b.punti || 0))
+        : srtF.dir * String(a[srtF.campo] || '').localeCompare(String(b[srtF.campo] || ''));
+    return d || (b.data_evento || '').localeCompare(a.data_evento || '');
+  });
   eventi = eventi.slice(0, cercaSt ? 200 : 60);
   html += '<div style="padding:0 16px 16px">';
   html +=
     '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">' +
     '<input type="text" value="' +
     escP(window._formStoricoCerca || '') +
-    '" placeholder="Cerca nome o voce nello storico..." onchange="window._formStoricoCerca=this.value;renderFormazione()" style="padding:6px 10px;font-size:.82rem;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);width:220px">' +
-    '<select onchange="window._formStoricoOrdina=this.value;renderFormazione()" style="padding:6px 8px;font-size:.82rem;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)">' +
-    [
-      ['data', 'Più recenti'],
-      ['nome', 'Per collaboratore'],
-      ['azione', 'Per azione'],
-      ['punti', 'Per punti'],
-    ]
-      .map(([v, l]) => '<option value="' + v + '"' + (ordinaSt === v ? ' selected' : '') + '>' + l + '</option>')
-      .join('') +
-    '</select></div>';
+    '" placeholder="Cerca nome o voce nello storico..." onchange="window._formStoricoCerca=this.value;renderFormazione()" style="padding:6px 10px;font-size:.82rem;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);width:220px"></div>';
   if (!eventi.length) html += '<p style="color:var(--muted);padding:10px">Nessun punto assegnato finora.</p>';
   else {
+    const thSort = (campo, label, cls) =>
+      '<th' +
+      (cls ? ' class="' + cls + '"' : '') +
+      ' style="cursor:pointer" title="Clicca per ordinare" onclick="formStoricoSort(\'' +
+      campo +
+      '\')">' +
+      label +
+      (srtF.campo === campo
+        ? srtF.dir === 1
+          ? ' &#9650;'
+          : ' &#9660;'
+        : ' <span style="opacity:.35">&#8597;</span>') +
+      '</th>';
     html +=
-      '<table class="collab-table"><thead><tr><th>Data</th><th>Collaboratore</th><th class="num">Punti</th><th>Azione</th><th>Nota</th><th>Da</th>' +
+      '<table class="collab-table"><thead><tr>' +
+      thSort('data_evento', 'Data') +
+      thSort('collaboratore', 'Collaboratore') +
+      thSort('punti', 'Punti', 'num') +
+      thSort('azione', 'Azione') +
+      thSort('descrizione', 'Nota') +
+      thSort('operatore', 'Da') +
       (adm ? '<th></th>' : '') +
       '</tr></thead><tbody>';
     const azLabels = { premio: 'Premio consegnato', premio_attesa: 'In attesa premio' };
