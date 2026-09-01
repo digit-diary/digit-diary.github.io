@@ -532,3 +532,114 @@ function _salvaCacheReparti() {
     localStorage.setItem('_cache_reparti', JSON.stringify(getReparti().map((r) => ({ key: r.key, label: r.label }))));
   } catch (e) {}
 }
+
+// ---- Ripristino scroll dopo il refresh ----
+// L'app ridisegna tutto da zero al refresh, quindi il browser non può
+// ripristinare da solo la posizione (la pagina è ancora vuota quando ci
+// prova). Salviamo posizione+pagina e torniamo lì appena il contenuto
+// è pronto; qualsiasi interazione dell'utente annulla il ripristino.
+(function () {
+  try {
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  } catch (e) {}
+  let salvaT = null;
+  window.addEventListener(
+    'scroll',
+    () => {
+      if (window._scrollRipristino) return;
+      clearTimeout(salvaT);
+      salvaT = setTimeout(() => {
+        try {
+          sessionStorage.setItem('scroll_y', String(Math.round(window.scrollY)));
+          sessionStorage.setItem('scroll_pg', localStorage.getItem('pagina_corrente') || '');
+        } catch (e) {}
+      }, 150);
+    },
+    { passive: true },
+  );
+  let y = 0;
+  let pg = '';
+  try {
+    y = parseInt(sessionStorage.getItem('scroll_y') || '0');
+    pg = sessionStorage.getItem('scroll_pg') || '';
+  } catch (e) {}
+  if (!y) return;
+  window._scrollRipristino = true;
+  let tentativi = 0;
+  let timer = null;
+  const annulla = () => {
+    window._scrollRipristino = false;
+    if (timer) clearInterval(timer);
+    try {
+      sessionStorage.removeItem('scroll_y');
+      sessionStorage.removeItem('scroll_pg');
+    } catch (e) {}
+  };
+  ['wheel', 'touchstart', 'keydown'].forEach((ev) =>
+    window.addEventListener(ev, annulla, { once: true, passive: true }),
+  );
+  timer = setInterval(() => {
+    tentativi++;
+    if (!window._scrollRipristino) {
+      clearInterval(timer);
+      return;
+    }
+    const overlay = document.getElementById('login-overlay');
+    const app = overlay && overlay.classList.contains('hidden');
+    const pgAttuale = localStorage.getItem('pagina_corrente') || '';
+    if (app && pgAttuale && pgAttuale !== pg) {
+      annulla(); // pagina diversa: niente ripristino, si torna a salvare subito
+      return;
+    }
+    const pronta = app && pgAttuale === pg && document.body.scrollHeight >= y + window.innerHeight / 2;
+    if (pronta) {
+      window.scrollTo(0, y);
+      setTimeout(annulla, 300);
+    } else if (tentativi > 60) {
+      annulla();
+    }
+  }, 250);
+})();
+
+// ---- Anti-salto in cima sui ridisegni ----
+// Molte sezioni ridisegnano il contenuto (innerHTML) e per un attimo la
+// pagina si accorcia: il browser forza lo scroll a 0 e ti ritrovi in cima.
+// Riconosciamo QUEL caso (l'altezza non basta più per la posizione in cui
+// eri) e torniamo lì appena il contenuto riprende altezza. Se invece sei tu
+// a scrollare in cima, l'altezza è invariata e non tocchiamo nulla.
+(function () {
+  let lastY = 0;
+  let ripristinoT = null;
+  const annullaRipristino = () => {
+    if (ripristinoT) {
+      clearInterval(ripristinoT);
+      ripristinoT = null;
+    }
+  };
+  ['wheel', 'touchmove'].forEach((ev) => window.addEventListener(ev, annullaRipristino, { passive: true }));
+  window.addEventListener(
+    'scroll',
+    () => {
+      const y = window.scrollY;
+      if (y < 5 && lastY > 150 && !window._scrollRipristino) {
+        const collassata = document.documentElement.scrollHeight < lastY + window.innerHeight;
+        if (collassata) {
+          const target = lastY;
+          annullaRipristino();
+          let tent = 0;
+          ripristinoT = setInterval(() => {
+            tent++;
+            if (document.documentElement.scrollHeight >= target + window.innerHeight / 2) {
+              window.scrollTo(0, target);
+              annullaRipristino();
+            } else if (tent > 25) {
+              annullaRipristino();
+            }
+          }, 100);
+        }
+      }
+      lastY = y;
+    },
+    { passive: true },
+  );
+})();
