@@ -2232,3 +2232,57 @@ function _renderPanoramicaHrCard(collabs) {
     '<p style="color:var(--muted);font-size:.75rem;margin-top:8px">Dati del settore corrente: usa lo switch settori in alto per vedere gli altri. Dettaglio per persona nella card Equità categorie.</p></div></div>';
   return html;
 }
+
+// Certificazione HEADLESS richiamata dal Piano (avviso "non formato" e
+// formazioni completate dai commenti): stesso flusso della spunta in
+// Formazione — scala dei livelli, storico HR, punti su conferma.
+async function certificaCompetenzaDaPiano(nome, key, chiediPunti) {
+  const c = collaboratoriCache.find((x) => x.nome === nome);
+  if (!c) return false;
+  const prima = livelloDiCollaboratore(c);
+  const nuove = Object.assign({}, c.competenze || {});
+  if (nuove[key] === true) return true;
+  nuove[key] = true;
+  const compsRep = getCompetenzeReparto();
+  const compAtt = compsRep.find((k) => k.key === key);
+  const lvAtt = compAtt ? parseInt(compAtt.livello) || 0 : 0;
+  const implicate = [];
+  if (lvAtt > 1)
+    compsRep.forEach((k) => {
+      const lv = parseInt(k.livello) || 0;
+      if (lv > 0 && lv < lvAtt && nuove[k.key] !== true) {
+        nuove[k.key] = true;
+        implicate.push(k.label);
+      }
+    });
+  await secPatch('collaboratori', 'id=eq.' + c.id, { competenze: nuove });
+  c.competenze = nuove;
+  logAzione(
+    'Competenza certificata (dal Piano)',
+    nome + ' — ' + (compAtt ? compAtt.label : key) + (implicate.length ? ' + ' + implicate.join(', ') : ''),
+  );
+  if (typeof _insertHrEvento === 'function') {
+    const fmt = chiediPunti ? (prompt('Formatore che ha svolto la formazione (opzionale):', '') || '').trim() : '';
+    _insertHrEvento(
+      nome,
+      'formazione',
+      'Competenza certificata: ' + (compAtt ? compAtt.label : key) + (fmt ? ' — formatore: ' + fmt : ''),
+    );
+  }
+  if (chiediPunti) {
+    const az = getPuntiConfig().azioni.find((a) => a.key === 'competenza');
+    if (
+      az &&
+      az.punti &&
+      confirm('Assegnare ' + az.punti + ' punti a ' + nome + ' per "' + (compAtt ? compAtt.label : key) + '"?')
+    )
+      await _insertPuntiEvento(nome, az.punti, 'competenza', 'Competenza certificata: ' + (compAtt ? compAtt.label : key));
+    const dopo = livelloDiCollaboratore(c);
+    for (let lv = prima + 1; lv <= dopo; lv++) {
+      const pl = parseInt(getPuntiConfig().punti_livello[String(lv)]) || 0;
+      if (pl) await _insertPuntiEvento(nome, pl, 'livello_' + lv, 'Raggiunto Livello ' + lv + ' multidisciplinare');
+    }
+  }
+  toast(nome + ' certificato: ' + (compAtt ? compAtt.label : key));
+  return true;
+}
