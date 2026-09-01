@@ -2098,7 +2098,7 @@ function apriSchedaCollaboratore(nome) {
       ? ' <span class="mini-badge" style="background:' +
         (collabRec.impiego === 'fisso' ? '#1a7a6d' : '#e67e22') +
         ';font-size:.68rem;vertical-align:middle">' +
-        (collabRec.impiego === 'fisso' ? 'Fisso 100%' : 'Jolly') +
+        (collabRec.impiego === 'fisso' ? 'Fisso' : 'Jolly') +
         '</span>'
       : '') +
     (collabRec && collabRec.categoria && typeof puoVedereCategorie === 'function' && puoVedereCategorie()
@@ -3200,7 +3200,7 @@ function stampaSchedaPDF(nome) {
     return c.nome === nome;
   });
   var anag = [];
-  if (cRec && cRec.impiego) anag.push(cRec.impiego === 'fisso' ? 'Fisso 100%' : 'Jolly');
+  if (cRec && cRec.impiego) anag.push(cRec.impiego === 'fisso' ? 'Fisso' : 'Jolly');
   if (cRec && cRec.categoria && typeof puoVedereCategorie === 'function' && puoVedereCategorie())
     anag.push('Categoria ' + cRec.categoria + 'ª');
   if (cRec && cRec.data_nascita)

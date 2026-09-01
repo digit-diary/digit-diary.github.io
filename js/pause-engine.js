@@ -2164,7 +2164,10 @@ function _peGeneraValet(righe, dstr) {
 // ============================================================
 async function briefGeneraPause() {
   if (!puoGestirePiano() || !_briefState) return;
-  const righe = (_briefState.righe || []).filter((r) => r.nome && r.turno);
+  // XXX = posizione scoperta del fabbisogno: si vede sul foglio ma NON è un collaboratore
+  const righe = (_briefState.righe || []).filter(
+    (r) => r.nome && r.turno && String(r.nome).trim().toUpperCase() !== 'XXX',
+  );
   if (!righe.length) {
     toast('Compila prima il briefing (nomi e turni)');
     return;
@@ -2698,6 +2701,7 @@ function pdfBriefingGiorno() {
       ? ['E', 'U', 'COLLABORATORE', 'T', 'USCITA', 'FIRMA']
       : ['E', 'U', 'HOST', 'T', 'CD', 'USCITA', 'FIRMA'];
   const body = [];
+  const righeFm = {}; // indice riga body -> in formazione (nome giallo sul PDF)
   let gPrec = null;
   (_briefState.righe || []).forEach((r) => {
     if (!r.nome && !r.turno) return;
@@ -2705,14 +2709,21 @@ function pdfBriefingGiorno() {
     if (gPrec !== null && g !== gPrec)
       body.push([{ content: '', colSpan: cols.length, styles: { minCellHeight: 3.5 } }]);
     gPrec = g;
+    const nomePdf = (r.nome || '') + (r.fm ? ' (formazione)' : '');
+    if (r.fm) righeFm[body.length] = true;
     body.push(
       valet
-        ? ['', '', r.nome || '', r.turno || '', r.uscita || '', r.firma || '', r.radio || '', r.badge || '']
+        ? ['', '', nomePdf, r.turno || '', r.uscita || '', r.firma || '', r.radio || '', r.badge || '']
         : generico
-          ? ['', '', r.nome || '', r.turno || '', r.uscita || '', r.firma || '']
-          : ['', '', r.nome || '', r.turno || '', r.cd || '', r.uscita || '', r.firma || ''],
+          ? ['', '', nomePdf, r.turno || '', r.uscita || '', r.firma || '']
+          : ['', '', nomePdf, r.turno || '', r.cd || '', r.uscita || '', r.firma || ''],
     );
   });
+  // sempre in UN SOLO foglio: con tante righe compatta altezza e carattere
+  const nRighe = body.length || 1;
+  const rowH = nRighe > 32 ? Math.max(4.4, Math.floor((248 / nRighe) * 10) / 10) : 7;
+  const fontR = nRighe > 32 ? 7.4 : 8.5;
+  const padR = nRighe > 32 ? 1.1 : 1.8;
   doc.autoTable({
     startY: 24,
     margin: { left: 10 },
@@ -2721,12 +2732,12 @@ function pdfBriefingGiorno() {
     body: body,
     theme: 'grid',
     styles: {
-      fontSize: 8.5,
-      cellPadding: 1.8,
+      fontSize: fontR,
+      cellPadding: padR,
       lineColor: [120, 120, 120],
       lineWidth: 0.2,
       textColor: [0, 0, 0],
-      minCellHeight: 7,
+      minCellHeight: rowH,
     },
     headStyles: { fontStyle: 'bold', halign: 'center', minCellHeight: 6 },
     columnStyles: valet
@@ -2763,6 +2774,9 @@ function pdfBriefingGiorno() {
         d.cell.styles.fillColor =
           d.column.index === 0 ? [0, 176, 80] : d.column.index === 1 ? [255, 0, 0] : [255, 255, 0];
         if (d.column.index <= 1) d.cell.styles.textColor = [255, 255, 255];
+      } else if (d.section === 'body' && d.column.index === 2 && righeFm[d.row.index]) {
+        d.cell.styles.fillColor = [255, 255, 0];
+        d.cell.styles.fontStyle = 'bold';
       } else if (d.column.index === 3 && d.cell.raw) {
         const hex = _pianoColore(String(d.cell.raw).trim());
         if (hex && hex[0] === '#') d.cell.styles.fillColor = _peHexRgb(hex);

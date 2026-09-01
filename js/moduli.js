@@ -965,7 +965,9 @@ async function renderCollaboratoriUI() {
     const imp = c.impiego || '';
     const cat = c.categoria || '';
     return (
-      '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border:1px solid var(--line);flex-wrap:wrap"><span style="flex:1;font-weight:400;min-width:140px">' +
+      '<div class="collab-riga" data-nome="' +
+      escP(c.nome.toLowerCase()) +
+      '" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border:1px solid var(--line);flex-wrap:wrap"><span style="flex:1;font-weight:400;min-width:140px">' +
       escP(c.nome) +
       (cat && (puoCat || (typeof puoVedereCategorie === 'function' && puoVedereCategorie()))
         ? ' <span class="mini-badge" style="background:var(--accent2);font-size:.68rem">' + cat + '&ordf;</span>'
@@ -980,7 +982,7 @@ async function renderCollaboratoriUI() {
       (imp === '' ? ' selected' : '') +
       '>Impiego...</option><option value="fisso"' +
       (imp === 'fisso' ? ' selected' : '') +
-      '>Fisso 100%</option><option value="jolly"' +
+      '>Fisso</option><option value="jolly"' +
       (imp === 'jolly' ? ' selected' : '') +
       '>Jolly</option></select>' +
       (puoCat || (typeof puoVedereCategorie === 'function' && puoVedereCategorie())
@@ -1045,7 +1047,7 @@ async function renderCollaboratoriUI() {
       '</div>'
     );
   };
-  // Sezioni: Fissi 100% / Jolly / senza inquadramento (dentro ogni gruppo: categoria 1ª → 5ª, poi nome)
+  // Sezioni: Fissi / Jolly / senza inquadramento (dentro ogni gruppo: categoria 1ª → 5ª, poi nome)
   const vedeCat = puoCat || (typeof puoVedereCategorie === 'function' && puoVedereCategorie());
   const ordina = (arr) =>
     arr
@@ -1065,7 +1067,10 @@ async function renderCollaboratoriUI() {
     n +
     ')</p>';
   let html = '';
-  if (fissi.length) html += titoloSez('Fissi 100%', fissi.length) + fissi.map(rigaCollab).join('');
+  if (attivi.length > 8)
+    html +=
+      '<input type="text" id="collab-cerca" placeholder="Cerca collaboratore..." oninput="filtraCollaboratoriUI(this.value)" style="width:100%;max-width:280px;padding:7px 10px;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--ink);font-size:.85rem;margin-bottom:4px">';
+  if (fissi.length) html += titoloSez('Fissi', fissi.length) + fissi.map(rigaCollab).join('');
   if (jolly.length) html += titoloSez('Jolly', jolly.length) + jolly.map(rigaCollab).join('');
   if (senza.length)
     html +=
@@ -1088,6 +1093,13 @@ async function renderCollaboratoriUI() {
       '</div></div>';
   }
   el.innerHTML = linkBar + html;
+}
+// filtro live della lista collaboratori (solo visivo, non tocca i dati)
+function filtraCollaboratoriUI(testo) {
+  const q = (testo || '').trim().toLowerCase();
+  document.querySelectorAll('#collaboratori-list .collab-riga').forEach((r) => {
+    r.style.display = !q || (r.dataset.nome || '').includes(q) ? '' : 'none';
+  });
 }
 async function aggiungiCollaboratore() {
   const nome = capitalizzaNome(document.getElementById('new-collab-nome').value.trim());
@@ -1227,7 +1239,7 @@ async function cambiaImpiegoCollaboratore(id, imp) {
     const prima = c ? c.impiego : null;
     await secPatch('collaboratori', 'id=eq.' + id, { impiego: imp || null });
     if (c) c.impiego = imp || null;
-    const lbl = (v) => (v === 'fisso' ? 'Fisso 100%' : v === 'jolly' ? 'Jolly' : 'nessuno');
+    const lbl = (v) => (v === 'fisso' ? 'Fisso' : v === 'jolly' ? 'Jolly' : 'nessuno');
     logAzione('Impiego collaboratore', (c ? c.nome : 'ID ' + id) + ' → ' + lbl(imp));
     if (c && imp && imp !== prima && typeof _insertHrEvento === 'function')
       _insertHrEvento(c.nome, 'impiego', 'Impiego: ' + lbl(imp) + (prima ? ' (era ' + lbl(prima) + ')' : ''));

@@ -120,7 +120,44 @@ function getPuntiConfig() {
     premi_livello: cfg.premi_livello || PUNTI_DEFAULT.premi_livello,
     punti_livello: cfg.punti_livello || PUNTI_DEFAULT.punti_livello,
     notifiche: cfg.notifiche === 'tutti' || cfg.notifiche === 'off' ? cfg.notifiche : 'privato',
+    inventario: Array.isArray(cfg.inventario) ? cfg.inventario : [],
   };
+}
+
+// === LIMITI MENSILI, INVENTARIO E ATTESE PREMI ===
+// La soglia si ritrova dal testo del premio (la consegna può arrivare anche come 'Livello 3: X')
+function _premioSogliaDi(premio) {
+  const p = String(premio || '').toLowerCase();
+  return getPuntiConfig().soglie.find((s) => s.premio && p.includes(String(s.premio).toLowerCase())) || null;
+}
+function _consegnatiMesePremio(premio, ym) {
+  const p = String(premio || '').toLowerCase();
+  return getPuntiReparto().filter(
+    (e) =>
+      e.azione === 'premio' && (e.data_evento || '').startsWith(ym) && (e.descrizione || '').toLowerCase().includes(p),
+  ).length;
+}
+// Attese non ancora evase: 'premio_attesa' senza una consegna successiva dello stesso premio alla stessa persona.
+// Ordinate per data (chi aspetta da più tempo ha priorità), a parità di data per punti.
+function _attesePremi() {
+  const eventi = getPuntiReparto();
+  return eventi
+    .filter((a) => a.azione === 'premio_attesa')
+    .filter((a) => {
+      const prem = (a.descrizione || '').replace(/^In attesa premio:\s*/i, '').toLowerCase();
+      return !eventi.some(
+        (e) =>
+          e.azione === 'premio' &&
+          e.collaboratore === a.collaboratore &&
+          (e.descrizione || '').toLowerCase().includes(prem) &&
+          (e.data_evento || '') >= (a.data_evento || ''),
+      );
+    })
+    .sort(
+      (a, b) =>
+        (a.data_evento || '').localeCompare(b.data_evento || '') ||
+        puntiTotali(b.collaboratore) - puntiTotali(a.collaboratore),
+    );
 }
 // Push incentivi: i punti personali arrivano sempre e solo all'interessato (se è anche operatore);
 // premi e passaggi di livello seguono la scelta admin (privato / annuncio a tutti / off)
@@ -138,6 +175,43 @@ function _notificaIncentivo(nome, titolo, corpo, soloPrivato) {
 async function savePuntiConfig(cfg) {
   puntiConfig = cfg;
   await setImp('punti_config', JSON.stringify(cfg));
+}
+
+// Un JOLLY che completa TUTTI i livelli: promemoria + evento HR per valutare il contratto fisso
+async function _proponiContrattoFisso(c, dopo) {
+  try {
+    const comps = getCompetenzeReparto().filter((k) => k.livello >= 1);
+    if (!comps.length) return;
+    const maxLv = Math.max.apply(
+      null,
+      comps.map((k) => parseInt(k.livello) || 0),
+    );
+    if (!maxLv || dopo < maxLv || c.impiego !== 'jolly') return;
+    if (typeof _insertHrEvento === 'function')
+      _insertHrEvento(c.nome, 'impiego', 'Tutti i livelli completati da jolly: valutare proposta di contratto fisso');
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    const scad =
+      d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const r = await secPost('promemoria', {
+      titolo: 'Valutare contratto fisso: ' + c.nome,
+      descrizione:
+        'Jolly con tutti i livelli di formazione completati (Livello ' +
+        dopo +
+        ' multidisciplinare). Da discutere con HR.',
+      data_scadenza: scad,
+      assegnato_a: '',
+      creato_da: getOperatore(),
+      ripetizione: null,
+      reparto_dip: currentReparto,
+    });
+    if (r && r[0] && typeof promemoriaCache !== 'undefined') {
+      promemoriaCache.push(r[0]);
+      promemoriaCache.sort((a, b) => a.data_scadenza.localeCompare(b.data_scadenza));
+      if (typeof aggiornaPromemoriaBadge === 'function') aggiornaPromemoriaBadge();
+    }
+    toast('Promemoria creato: valutare contratto fisso per ' + c.nome);
+  } catch (e) {}
 }
 
 // ================================================================
@@ -804,16 +878,54 @@ function renderFormazione() {
     html += '<p style="color:var(--muted);font-size:.88rem">I punti vengono assegnati dal responsabile.</p>';
   }
   html += '</div>';
-  // registro eventi punti
-  const eventi = getPuntiReparto().slice(0, 60);
+  // registro eventi punti: cerca per nome/voce + ordinamento
+  const cercaSt = ((window._formStoricoCerca || '') + '').toLowerCase();
+  const ordinaSt = window._formStoricoOrdina || 'data';
+  let eventi = getPuntiReparto();
+  if (cercaSt)
+    eventi = eventi.filter((p) =>
+      ((p.collaboratore || '') + ' ' + (p.azione || '') + ' ' + (p.descrizione || '')).toLowerCase().includes(cercaSt),
+    );
+  if (ordinaSt === 'nome')
+    eventi = eventi
+      .slice()
+      .sort(
+        (a, b) =>
+          (a.collaboratore || '').localeCompare(b.collaboratore || '') ||
+          (b.data_evento || '').localeCompare(a.data_evento || ''),
+      );
+  else if (ordinaSt === 'punti') eventi = eventi.slice().sort((a, b) => (b.punti || 0) - (a.punti || 0));
+  else if (ordinaSt === 'azione')
+    eventi = eventi
+      .slice()
+      .sort(
+        (a, b) =>
+          (a.azione || '').localeCompare(b.azione || '') || (b.data_evento || '').localeCompare(a.data_evento || ''),
+      );
+  eventi = eventi.slice(0, cercaSt ? 200 : 60);
   html += '<div style="padding:0 16px 16px">';
+  html +=
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">' +
+    '<input type="text" value="' +
+    escP(window._formStoricoCerca || '') +
+    '" placeholder="Cerca nome o voce nello storico..." onchange="window._formStoricoCerca=this.value;renderFormazione()" style="padding:6px 10px;font-size:.82rem;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);width:220px">' +
+    '<select onchange="window._formStoricoOrdina=this.value;renderFormazione()" style="padding:6px 8px;font-size:.82rem;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)">' +
+    [
+      ['data', 'Più recenti'],
+      ['nome', 'Per collaboratore'],
+      ['azione', 'Per azione'],
+      ['punti', 'Per punti'],
+    ]
+      .map(([v, l]) => '<option value="' + v + '"' + (ordinaSt === v ? ' selected' : '') + '>' + l + '</option>')
+      .join('') +
+    '</select></div>';
   if (!eventi.length) html += '<p style="color:var(--muted);padding:10px">Nessun punto assegnato finora.</p>';
   else {
     html +=
       '<table class="collab-table"><thead><tr><th>Data</th><th>Collaboratore</th><th class="num">Punti</th><th>Azione</th><th>Nota</th><th>Da</th>' +
       (adm ? '<th></th>' : '') +
       '</tr></thead><tbody>';
-    const azLabels = {};
+    const azLabels = { premio: 'Premio consegnato', premio_attesa: 'In attesa premio' };
     getPuntiConfig().azioni.forEach((a) => (azLabels[a.key] = a.label));
     eventi.forEach((p) => {
       html +=
@@ -867,6 +979,67 @@ function renderFormazione() {
       .map(([l, p]) => 'L' + l + ' = ' + escP(p))
       .join(' · ') +
     '</p>';
+  // limiti mensili: consegnati/limite del mese corrente + attese con priorità
+  const soglieConLimite = cfgP.soglie.filter((s) => parseInt(s.limite_mese) > 0);
+  const attese = _attesePremi();
+  if (soglieConLimite.length || attese.length) {
+    const ymCorr = new Date().toISOString().substring(0, 7);
+    html +=
+      '<div style="padding:8px 12px;background:var(--paper2);border:1px solid var(--line);border-radius:3px;margin-bottom:12px">';
+    if (soglieConLimite.length) {
+      html +=
+        '<p style="font-size:.8rem;margin:0 0 4px"><strong>Premi del mese:</strong> ' +
+        soglieConLimite
+          .map((s) => {
+            const usati = _consegnatiMesePremio(s.premio, ymCorr);
+            const lim = parseInt(s.limite_mese);
+            const pieno = usati >= lim;
+            const inv = s.inventario ? (cfgP.inventario.find((i) => i.nome === s.inventario) || {}).qta : null;
+            return (
+              escP(s.premio) +
+              ' <strong style="color:' +
+              (pieno ? 'var(--accent)' : '#2c6e49') +
+              '">' +
+              usati +
+              '/' +
+              lim +
+              '</strong>' +
+              (pieno ? ' (esaurito)' : '') +
+              (inv != null ? ' · magazzino: ' + inv : '')
+            );
+          })
+          .join(' &nbsp;·&nbsp; ') +
+        '</p>';
+    }
+    if (attese.length) {
+      html +=
+        '<p style="font-size:.8rem;margin:0"><strong>In attesa (priorità dal mese dopo):</strong></p>' +
+        attese
+          .map((a) => {
+            const prem = (a.descrizione || '').replace(/^In attesa premio:\s*/i, '');
+            return (
+              '<div style="font-size:.8rem;display:flex;align-items:center;gap:8px;padding:2px 0">' +
+              '<span>&#9203; <strong>' +
+              escP(a.collaboratore) +
+              '</strong> — ' +
+              escP(prem) +
+              ' <span style="color:var(--muted)">(dal ' +
+              new Date((a.data_evento || '') + 'T12:00:00').toLocaleDateString('it-IT') +
+              ')</span></span>' +
+              (adm || puoPunti
+                ? '<button class="btn-export" style="font-size:.7rem;padding:2px 10px" onclick="registraPremioConsegnato(\'' +
+                  a.collaboratore.replace(/'/g, "\\'") +
+                  "','" +
+                  prem.replace(/'/g, "\\'") +
+                  '\')">Consegna ora</button>'
+                : '') +
+              '</div>'
+            );
+          })
+          .join('');
+    }
+    html += '</div>';
+  }
   const conPunti = collabs
     .map((c) => ({
       nome: c.nome,
@@ -1109,7 +1282,7 @@ function _renderEquitaCard(collabs) {
       '><td><strong>' +
       escP(r.nome) +
       '</strong></td><td>' +
-      (r.impiego === 'fisso' ? 'Fisso 100%' : r.impiego === 'jolly' ? 'Jolly' : '—') +
+      (r.impiego === 'fisso' ? 'Fisso' : r.impiego === 'jolly' ? 'Jolly' : '—') +
       '</td><td class="num"><strong>' +
       (r.categoria ? r.categoria + 'ª' : '—') +
       '</strong></td><td>' +
@@ -1274,6 +1447,7 @@ async function toggleCompetenza(collabId, key, cb) {
       logAzione('Passaggio livello', c.nome + ' → Livello ' + dopo);
       if (typeof _insertHrEvento === 'function')
         _insertHrEvento(c.nome, 'livello', 'Raggiunto Livello ' + dopo + ' multidisciplinare');
+      await _proponiContrattoFisso(c, dopo);
       _notificaIncentivo(
         c.nome,
         '🎉 ' + c.nome + ' → Livello ' + dopo,
@@ -1390,6 +1564,58 @@ async function registraPremioConsegnato(nome, premio) {
     return;
   }
   try {
+    const soglia = _premioSogliaDi(premio);
+    const ym = new Date().toISOString().substring(0, 7);
+    const lim = soglia && parseInt(soglia.limite_mese) > 0 ? parseInt(soglia.limite_mese) : 0;
+    if (lim) {
+      const usati = _consegnatiMesePremio(soglia.premio, ym);
+      if (usati >= lim) {
+        if (
+          confirm(
+            'Limite mensile raggiunto per "' +
+              soglia.premio +
+              '" (' +
+              usati +
+              ' su ' +
+              lim +
+              ').\n\nMettere ' +
+              nome +
+              ' IN ATTESA con priorità dal mese prossimo?\n\nOK = in attesa · Annulla = consegna comunque (fuori limite)',
+          )
+        ) {
+          await _insertPuntiEvento(nome, 0, 'premio_attesa', 'In attesa premio: ' + soglia.premio);
+          logAzione('Premio in attesa', nome + ' — ' + soglia.premio + ' (limite mensile ' + lim + ' raggiunto)');
+          _notificaIncentivo(
+            nome,
+            '⏳ Premio in attesa',
+            nome +
+              ': "' +
+              soglia.premio +
+              '" ha raggiunto il limite di questo mese — priorità dal 1° del mese prossimo',
+            true,
+          );
+          renderFormazione();
+          toast(nome + ' in attesa con priorità per: ' + soglia.premio);
+          return;
+        }
+      }
+    }
+    // premio legato a un oggetto dell'inventario: scarico di 1 pezzo alla consegna
+    if (soglia && soglia.inventario) {
+      const cfg = getPuntiConfig();
+      const item = (cfg.inventario || []).find((i) => i.nome === soglia.inventario);
+      if (item) {
+        const q = parseInt(item.qta) || 0;
+        if (q <= 0) {
+          if (!confirm('Inventario esaurito per "' + item.nome + '" (0 pezzi). Registrare comunque la consegna?'))
+            return;
+        } else {
+          item.qta = q - 1;
+          await savePuntiConfig(cfg);
+          logAzione('Inventario premi', item.nome + ' −1 (consegna a ' + nome + '), restano ' + item.qta);
+        }
+      }
+    }
     await _insertPuntiEvento(nome, 0, 'premio', 'Premio consegnato: ' + premio);
     if (typeof _insertHrEvento === 'function') _insertHrEvento(nome, 'premio', 'Premio consegnato: ' + premio);
     _notificaIncentivo(nome, '🎁 Premio consegnato', nome + ': ' + premio);
@@ -1736,6 +1962,9 @@ function _renderFormazioneConfig() {
   // soglie premi
   html +=
     '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Soglie premi (punti annuali)</p>';
+  html +=
+    '<p style="font-size:.75rem;color:var(--muted);margin:0 0 6px">Max/mese: quanti se ne possono consegnare al mese (vuoto = senza limite, dipende dal budget). Chi resta fuori va in attesa con priorità dal mese dopo. Inventario: se il premio è un oggetto aziendale, alla consegna viene scalato di 1.</p>';
+  const invNomi = (cfgP.inventario || []).map((x) => x.nome).filter(Boolean);
   cfgP.soglie.forEach((s, i) => {
     html +=
       '<div class="tipo-item"><input type="number" value="' +
@@ -1746,12 +1975,52 @@ function _renderFormazioneConfig() {
       escP(s.premio) +
       '" onchange="modificaSoglia(' +
       i +
-      ',\'premio\',this.value)" style="flex:1;padding:5px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><button class="btn-del-tipo" onclick="rimuoviSoglia(' +
+      ',\'premio\',this.value)" style="flex:1;padding:5px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><input type="number" min="0" value="' +
+      (parseInt(s.limite_mese) > 0 ? parseInt(s.limite_mese) : '') +
+      '" placeholder="max/mese" title="Massimo consegnabili al mese (vuoto = illimitato)" onchange="modificaSoglia(' +
+      i +
+      ',\'limite_mese\',this.value)" style="width:78px;padding:5px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);text-align:center"><select title="Oggetto dell\'inventario collegato (scalato alla consegna)" onchange="modificaSoglia(' +
+      i +
+      ",'inventario',this.value)\" style=\"width:120px;padding:5px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)\"><option value=''" +
+      (!s.inventario ? ' selected' : '') +
+      '>— inventario</option>' +
+      invNomi
+        .map(
+          (n) =>
+            '<option value="' + escP(n) + '"' + (s.inventario === n ? ' selected' : '') + '>' + escP(n) + '</option>',
+        )
+        .join('') +
+      '</select><button class="btn-del-tipo" onclick="rimuoviSoglia(' +
       i +
       ')">Rimuovi</button></div>';
   });
   html +=
     '<div class="add-tipo-row" style="margin:6px 0 4px"><div class="field"><label>Punti</label><input type="number" id="cfg-soglia-punti" value="100" style="width:90px"></div><div class="field"><label>Premio</label><input type="text" id="cfg-soglia-premio" placeholder="Es: Buono ristorante..."></div><button class="btn-add-tipo" onclick="aggiungiSoglia()">+ Aggiungi</button></div>';
+  // inventario premi (oggetti aziendali: watch, cuffie...)
+  html +=
+    '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Inventario premi (oggetti aziendali)</p>';
+  (cfgP.inventario || []).forEach((it, i) => {
+    html +=
+      '<div class="tipo-item"><input type="text" value="' +
+      escP(it.nome || '') +
+      '" onchange="modificaInvIncentivo(' +
+      i +
+      ',\'nome\',this.value)" style="flex:1;padding:5px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><input type="number" min="0" value="' +
+      (parseInt(it.qta) || 0) +
+      '" title="Pezzi disponibili" onchange="modificaInvIncentivo(' +
+      i +
+      ',\'qta\',this.value)" style="width:70px;padding:5px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);text-align:center"><input type="text" value="' +
+      escP(it.note || '') +
+      '" placeholder="note" onchange="modificaInvIncentivo(' +
+      i +
+      ',\'note\',this.value)" style="width:160px;padding:5px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><button class="btn-del-tipo" onclick="rimuoviInvIncentivo(' +
+      i +
+      ')">Rimuovi</button></div>';
+  });
+  html +=
+    '<div class="add-tipo-row" style="margin:6px 0 4px"><div class="field"><label>Oggetto</label><input type="text" id="cfg-inv-nome" placeholder="Es: Smartwatch, Cuffie..."></div><div class="field"><label>Pezzi</label><input type="number" id="cfg-inv-qta" value="1" min="0" style="width:80px"></div><button class="btn-add-tipo" onclick="aggiungiInvIncentivo()">+ Aggiungi</button></div>';
+  html +=
+    '<p style="font-size:.75rem;color:var(--muted);margin:2px 0 0">Ogni scarico alla consegna resta tracciato nel Registro attività.</p>';
   // punti passaggio livello
   html +=
     '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Punti al raggiungimento del livello (0 = disattivato)</p>';
@@ -1929,9 +2198,47 @@ async function aggiungiSoglia() {
 async function modificaSoglia(idx, campo, val) {
   const cfg = getPuntiConfig();
   if (!cfg.soglie[idx]) return;
-  cfg.soglie[idx][campo] = campo === 'punti' ? parseInt(val) || 0 : val;
+  if (campo === 'punti') cfg.soglie[idx][campo] = parseInt(val) || 0;
+  else if (campo === 'limite_mese') cfg.soglie[idx][campo] = parseInt(val) > 0 ? parseInt(val) : null;
+  else cfg.soglie[idx][campo] = val;
   await savePuntiConfig(cfg);
   toast('Soglia aggiornata');
+}
+async function aggiungiInvIncentivo() {
+  const nome = ((document.getElementById('cfg-inv-nome') || {}).value || '').trim();
+  const qta = parseInt((document.getElementById('cfg-inv-qta') || {}).value) || 0;
+  if (!nome) {
+    toast("Inserisci il nome dell'oggetto");
+    return;
+  }
+  const cfg = getPuntiConfig();
+  if (cfg.inventario.some((i) => i.nome.toLowerCase() === nome.toLowerCase())) {
+    toast('Oggetto già in inventario');
+    return;
+  }
+  cfg.inventario = [...cfg.inventario, { nome, qta, note: '' }];
+  await savePuntiConfig(cfg);
+  logAzione('Inventario premi', 'Aggiunto: ' + nome + ' (' + qta + ' pezzi)');
+  renderFormazione();
+}
+async function modificaInvIncentivo(idx, campo, val) {
+  const cfg = getPuntiConfig();
+  if (!cfg.inventario[idx]) return;
+  const prima = cfg.inventario[idx][campo];
+  cfg.inventario[idx][campo] = campo === 'qta' ? Math.max(0, parseInt(val) || 0) : val;
+  await savePuntiConfig(cfg);
+  if (campo === 'qta')
+    logAzione('Inventario premi', cfg.inventario[idx].nome + ': ' + prima + ' → ' + cfg.inventario[idx].qta);
+  toast('Inventario aggiornato');
+}
+async function rimuoviInvIncentivo(idx) {
+  const cfg = getPuntiConfig();
+  if (!cfg.inventario[idx]) return;
+  if (!confirm('Rimuovere "' + cfg.inventario[idx].nome + '" dall\'inventario premi?')) return;
+  logAzione('Inventario premi', 'Rimosso: ' + cfg.inventario[idx].nome);
+  cfg.inventario = cfg.inventario.filter((_, i) => i !== idx);
+  await savePuntiConfig(cfg);
+  renderFormazione();
 }
 async function rimuoviSoglia(idx) {
   const cfg = getPuntiConfig();
@@ -2274,7 +2581,7 @@ function _renderPanoramicaHrCard(collabs) {
     lbl +
     '</div></div>';
   html += kpi(collabs.length, 'Collaboratori');
-  html += kpi(fissi, 'Fissi 100%', '#1a7a6d');
+  html += kpi(fissi, 'Fissi', '#1a7a6d');
   html += kpi(jolly, 'Jolly', '#e67e22');
   if (senza) html += kpi(senza, 'Senza inquadramento', 'var(--muted)');
   html += kpi(premiAnno, 'Premi consegnati ' + anno, '#b8860b');
@@ -2353,6 +2660,7 @@ async function certificaCompetenzaDaPiano(nome, key, chiediPunti) {
       const pl = parseInt(getPuntiConfig().punti_livello[String(lv)]) || 0;
       if (pl) await _insertPuntiEvento(nome, pl, 'livello_' + lv, 'Raggiunto Livello ' + lv + ' multidisciplinare');
     }
+    if (dopo > prima) await _proponiContrattoFisso(c, dopo);
   }
   toast(nome + ' certificato: ' + (compAtt ? compAtt.label : key));
   return true;

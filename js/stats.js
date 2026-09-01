@@ -642,12 +642,13 @@ async function esportaReportDirezionePDF() {
     const collabs = getCollaboratoriReparto().filter((c) => c.attivo !== false);
     const fissi = collabs.filter((c) => c.impiego === 'fisso').length;
     const jolly = collabs.filter((c) => c.impiego === 'jolly').length;
+    const partTime = collabs.filter((c) => c.percentuale != null && parseFloat(c.percentuale) < 1).length;
     const liv = { 1: 0, 2: 0, 3: 0 };
     collabs.forEach((c) => {
       const l = livelloDiCollaboratore(c);
       if (l) liv[l]++;
     });
-    righeOrganico.push([r.label, collabs.length, fissi, jolly, liv[1], liv[2], liv[3]]);
+    righeOrganico.push([r.label, collabs.length, fissi, jolly, partTime, liv[1], liv[2], liv[3]]);
     tot.collab += collabs.length;
 
     const dati = getDatiReparto();
@@ -742,9 +743,9 @@ async function esportaReportDirezionePDF() {
     doc.autoTable(
       Object.assign({}, stile, {
         startY: y,
-        head: [['Settore', 'Collaboratori', 'Fissi 100%', 'Jolly', 'Livello 1', 'Livello 2', 'Livello 3']],
+        head: [['Settore', 'Collaboratori', 'Fissi', 'Jolly', 'Part-time', 'Livello 1', 'Livello 2', 'Livello 3']],
         body: righeOrganico,
-        foot: [['Totale', tot.collab, '', '', '', '', '']],
+        foot: [['Totale', tot.collab, '', '', '', '', '', '']],
         footStyles: { fillColor: [240, 236, 228], textColor: [26, 18, 8], fontStyle: 'bold', fontSize: 8.5 },
       }),
     );
