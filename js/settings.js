@@ -35,7 +35,7 @@ const VIS_ITEMS = {
   // Default: solo admin. "Operatori selezionati" = es. l'operatore HR.
   permessi: {
     gestione_punti: 'Punti e premi — assegnare/registrare incentivi',
-    gestione_impiego: 'Impiego — assegnare Jolly / Fisso 100% ai collaboratori (es. supervisor)',
+    gestione_impiego: 'Impiego — assegnare Jolly / Fisso ai collaboratori (es. supervisor)',
     gestione_categorie: 'Categorie — assegnare la categoria professionale 5ª–1ª (es. HR)',
     vista_categorie: 'Categorie — vedere la categoria dei collaboratori (badge in scheda, matrice e PDF)',
     gestione_competenze: 'Competenze — certificare le spunte in matrice',

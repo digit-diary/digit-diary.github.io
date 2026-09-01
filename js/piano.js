@@ -602,7 +602,7 @@ async function renderPiano() {
 
       // GRIGLIA
       h +=
-        '<div class="piano-wrap"><table class="piano-table piano-fixed" style="width:' +
+        '<div class="piano-wrap"><table data-seltab="piano" class="piano-table piano-fixed" style="width:' +
         (194 + 37 * nGiorni + 326) +
         'px"><colgroup><col style="width:150px"><col style="width:44px">' +
         _pianoColgroupGiorni(nGiorni) +
@@ -706,6 +706,7 @@ async function renderPiano() {
             stile +
             '"' +
             (titolo ? ' title="' + escP(titolo) + '"' : '') +
+            (r && r.commento ? ' data-commento="' + escP(r.commento) + '"' : '') +
             (puoMod ? ' onclick="pianoCellaInline(\'' + ne + "','" + dstr + '\',this)"' : '') +
             '>' +
             cella +
@@ -845,7 +846,7 @@ async function renderPiano() {
           return t + '</tr></thead>';
         };
         hFabb +=
-          '<div class="piano-wrap"><table class="piano-table piano-fixed" style="width:' +
+          '<div class="piano-wrap"><table data-seltab="fabb" class="piano-table piano-fixed" style="width:' +
           (194 + 37 * nGiorni) +
           'px"><colgroup><col style="width:194px">' +
           _pianoColgroupGiorni(nGiorni) +
@@ -939,7 +940,7 @@ async function renderPiano() {
           escP(label) +
           ' <span style="font-size:.76rem;color:#b8a98a;font-weight:400">(effettivi − pianificazione)</span></div>';
         h +=
-          '<div class="piano-wrap"><table class="piano-table piano-fixed" style="width:' +
+          '<div class="piano-wrap"><table data-seltab="diff" class="piano-table piano-fixed" style="width:' +
           (194 + 37 * nGiorni) +
           'px"><colgroup><col style="width:194px">' +
           _pianoColgroupGiorni(nGiorni) +
@@ -977,7 +978,7 @@ async function renderPiano() {
           escP(label) +
           '</div>';
         h +=
-          '<div class="piano-wrap"><table class="piano-table piano-fixed" style="width:' +
+          '<div class="piano-wrap"><table data-seltab="eff" class="piano-table piano-fixed" style="width:' +
           (194 + 37 * nGiorni + 44) +
           'px"><colgroup><col style="width:194px">' +
           _pianoColgroupGiorni(nGiorni) +
@@ -1053,6 +1054,9 @@ async function renderPiano() {
       _pianoInitSelezione();
       _pianoInitSticky();
       _pianoRenderViolazioni();
+      _pianoDragBind();
+      _pianoTipBind();
+      _pianoApplicaNascosti();
     }
     if (_pianoTab === 'statistiche' && typeof caricaStatisticheAnnoPiano === 'function')
       setTimeout(() => caricaStatisticheAnnoPiano(), 50);
@@ -3161,12 +3165,17 @@ async function stampaPianoPDF() {
   const label = (MESI_FULL[parseInt(ym.split('-')[1]) - 1] || ym) + ' ' + ym.split('-')[0];
   const mappa = {};
   _pianoRighe.forEach((r) => (mappa[r.collaboratore + '|' + parseInt(r.data.split('-')[2])] = r.codice));
-  const nomi = [...new Set(_pianoRighe.map((r) => r.collaboratore))].sort();
+  // righe/giorni NASCOSTI nella griglia restano fuori anche dalla stampa
+  // (serve p.es. per stampare il piano senza i SUP)
+  const nasc = _pianoNascosti();
+  const nomi = [...new Set(_pianoRighe.map((r) => r.collaboratore))].filter((n) => !nasc.nomi.includes(n)).sort();
+  const giorniVis = [];
+  for (let g = 1; g <= nGiorni; g++) if (!nasc.giorni.includes(g)) giorniVis.push(g);
   const head = ['Collaboratore'];
-  for (let g = 1; g <= nGiorni; g++) head.push(String(g));
+  giorniVis.forEach((g) => head.push(String(g)));
   const body = nomi.map((n) => {
     const riga = [n];
-    for (let g = 1; g <= nGiorni; g++) riga.push(mappa[n + '|' + g] || '');
+    giorniVis.forEach((g) => riga.push(mappa[n + '|' + g] || ''));
     return riga;
   });
   const { jsPDF } = window.jspdf;
@@ -4105,13 +4114,35 @@ function _pianoInitSelezione() {
       th.style.cursor = 'pointer';
       th.addEventListener('click', (e) => {
         e.stopPropagation();
-        const idSel = th.dataset.g ? 'g' + th.dataset.g : tab.dataset.selInit + ':' + colIdx;
+        const g = parseInt(th.dataset.g) || 0;
+        // Shift+click su un altro giorno = intervallo di colonne (come Excel), pronto da copiare
+        if (e.shiftKey && g && selTipo === 'col' && String(selIdx).charAt(0) === 'g') {
+          const g0 = parseInt(String(selIdx).substring(1)) || g;
+          const ga = Math.min(g0, g);
+          const gb = Math.max(g0, g);
+          clearAll();
+          _pianoBloccoPulisci();
+          selTipo = 'col';
+          selIdx = 'g' + g0;
+          for (let gi = ga; gi <= gb; gi++) {
+            tabelle.forEach((t) => {
+              const thx = t.querySelector('thead th[data-g="' + gi + '"]');
+              if (thx) thx.classList.add('col-selected-header');
+              t.querySelectorAll('tbody td[data-g="' + gi + '"]').forEach((c) => c.classList.add('col-selected'));
+            });
+          }
+          _pianoBloccoDaColonne(tab, ga, gb);
+          return;
+        }
+        const idSel = g ? 'g' + g : tab.dataset.selInit + ':' + colIdx;
         const era = selTipo === 'col' && idSel === selIdx;
         clearAll();
+        _pianoBloccoPulisci();
         if (era) return;
         selTipo = 'col';
         selIdx = idSel;
         selezionaColonna(th, tab, colIdx);
+        if (g) _pianoBloccoDaColonne(tab, g, g);
       });
     });
     tbody.querySelectorAll('tr').forEach((riga, rowIdx) => {
@@ -4121,13 +4152,30 @@ function _pianoInitSelezione() {
       nomeCella.addEventListener('click', (e) => {
         if (e.target.closest('a, .piano-pdf-ico')) return;
         e.stopPropagation();
+        const righeT = [...tbody.querySelectorAll('tr')];
+        // Shift+click su un altro nome = intervallo di righe (come Excel), pronto da copiare
+        if (e.shiftKey && selTipo === 'row' && selTab === tab && selIdx >= 0 && selIdx !== rowIdx) {
+          const a = Math.min(selIdx, rowIdx);
+          const b2 = Math.max(selIdx, rowIdx);
+          const ancora = selIdx;
+          clearAll();
+          _pianoBloccoPulisci();
+          selTipo = 'row';
+          selIdx = ancora;
+          selTab = tab;
+          for (let ri = a; ri <= b2; ri++) righeT[ri].classList.add('row-selected');
+          _pianoBloccoDaRighe(tab, righeT[a], righeT[b2]);
+          return;
+        }
         const era = selTipo === 'row' && rowIdx === selIdx && selTab === tab;
         clearAll();
+        _pianoBloccoPulisci();
         if (era) return;
         selTipo = 'row';
         selIdx = rowIdx;
         selTab = tab;
         riga.classList.add('row-selected');
+        _pianoBloccoDaRighe(tab, riga, riga);
       });
     });
   });
@@ -4936,11 +4984,32 @@ async function _renderPianoSaldoTab() {
 // piano (dal Registro del Diario, filtrato sulle azioni del piano)
 async function _renderPianoStoricoTab() {
   const filtro = window._pianoStoricoFiltro || '';
+  const cerca = (window._pianoStoricoCerca || '').toLowerCase();
+  const ordina = window._pianoStoricoOrdina || 'data';
   const logs =
     (await secGet(
       'log_attivita?or=(azione.ilike.Piano*,azione.ilike.Vacanz*,azione.ilike.*piano*)&order=created_at.desc&limit=300',
     )) || [];
-  const visibili = filtro ? logs.filter((l) => l.azione === filtro) : logs;
+  let visibili = filtro ? logs.filter((l) => l.azione === filtro) : logs;
+  if (cerca)
+    visibili = visibili.filter((l) =>
+      ((l.operatore || '') + ' ' + (l.azione || '') + ' ' + (l.dettaglio || '')).toLowerCase().includes(cerca),
+    );
+  if (ordina === 'azione')
+    visibili = visibili
+      .slice()
+      .sort(
+        (a, b) =>
+          (a.azione || '').localeCompare(b.azione || '') || (b.created_at || '').localeCompare(a.created_at || ''),
+      );
+  else if (ordina === 'operatore')
+    visibili = visibili
+      .slice()
+      .sort(
+        (a, b) =>
+          (a.operatore || '').localeCompare(b.operatore || '') ||
+          (b.created_at || '').localeCompare(a.created_at || ''),
+      );
   const azioni = [...new Set(logs.map((l) => l.azione))].sort();
   let h =
     '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Storico modifiche piano (' +
@@ -4950,6 +5019,20 @@ async function _renderPianoStoricoTab() {
     '<select onchange="window._pianoStoricoFiltro=this.value;renderPiano()" style="padding:4px 8px;font-size:.8rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a"><option value="">Tutte le azioni</option>' +
     azioni
       .map((a) => '<option value="' + escP(a) + '"' + (filtro === a ? ' selected' : '') + '>' + escP(a) + '</option>')
+      .join('') +
+    '</select>';
+  h +=
+    '<input type="text" value="' +
+    escP(window._pianoStoricoCerca || '') +
+    '" placeholder="Cerca nome o voce..." onchange="window._pianoStoricoCerca=this.value;renderPiano()" style="padding:4px 8px;font-size:.8rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a;width:170px">';
+  h +=
+    '<select onchange="window._pianoStoricoOrdina=this.value;renderPiano()" style="padding:4px 8px;font-size:.8rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a">' +
+    [
+      ['data', 'Più recenti'],
+      ['azione', 'Per azione'],
+      ['operatore', 'Per operatore'],
+    ]
+      .map(([v, l]) => '<option value="' + v + '"' + (ordina === v ? ' selected' : '') + '>' + l + '</option>')
       .join('') +
     '</select></div>';
   h +=
@@ -6614,10 +6697,14 @@ function _renderPianoPreferenzeCard() {
     escP(repartoLabel(_pianoReparto())) +
     '</div><div style="padding:10px 14px">';
   h +=
-    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th><th>Solo diurni</th><th style="text-align:left">Turni bloccati (CSV)</th><th title="La bozza le privilegia sui turni L1">Preferisce L1</th><th title="Livello accoglienza (0-2): serve per il gruppo ACCOGLIENZA">Accoglienza</th><th style="text-align:left" title="Gruppi dove NON può lavorare da solo (CSV, es: REC)">Accompagnamento</th><th style="text-align:left" title="Altri reparti in cui lavora (CSV, es: valet): appare anche nei loro piani e le ore si sommano">Reparti extra</th><th style="text-align:left" title="Derivati dalle competenze certificate in Formazione (sola lettura)">Settori</th></tr></thead><tbody>';
+    '<input type="text" id="pref-collab-cerca" placeholder="Cerca collaboratore..." oninput="_filtraPrefCollab(this.value)" style="width:100%;max-width:260px;padding:6px 10px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);font-size:.85rem;margin-bottom:8px">';
+  h +=
+    '<div style="overflow-x:auto"><table class="piano-table" id="pref-collab-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th><th>Solo diurni</th><th style="text-align:left">Turni bloccati (CSV)</th><th title="La bozza le privilegia sui turni L1">Preferisce L1</th><th title="Livello accoglienza (0-2): serve per il gruppo ACCOGLIENZA">Accoglienza</th><th style="text-align:left" title="Gruppi dove NON può lavorare da solo (CSV, es: REC)">Accompagnamento</th><th style="text-align:left" title="Altri reparti in cui lavora (CSV, es: valet): appare anche nei loro piani e le ore si sommano">Reparti extra</th><th style="text-align:left" title="Derivati dalle competenze certificate in Formazione (sola lettura)">Settori</th></tr></thead><tbody>';
   collabs.forEach((c) => {
     h +=
-      '<tr><td style="text-align:left;font-weight:600">' +
+      '<tr data-pref-nome="' +
+      escP(c.nome.toLowerCase()) +
+      '"><td style="text-align:left;font-weight:600">' +
       escP(c.nome) +
       '</td><td>' +
       escP(c.funzione || '—') +
@@ -6656,6 +6743,13 @@ function _renderPianoPreferenzeCard() {
     '<p style="font-size:.78rem;color:var(--muted);margin-top:6px">"Solo diurni" e i turni bloccati vengono rispettati dalla bozza automatica. Funzione e percentuale si modificano in Impostazioni del Diario → Gestione collaboratori; i <b>Settori</b> derivano dalle competenze certificate in <b>Formazione</b> (spunta = idoneo, sola lettura qui).</p>';
   h += '</div></div>';
   return h;
+}
+// filtro live della tabella preferenze (solo visivo)
+function _filtraPrefCollab(testo) {
+  const q = (testo || '').trim().toLowerCase();
+  document.querySelectorAll('#pref-collab-table tbody tr').forEach((tr) => {
+    tr.style.display = !q || (tr.dataset.prefNome || '').includes(q) ? '' : 'none';
+  });
 }
 async function salvaPreferenzaCollab(id, campo, valore) {
   if (!isAdmin() && !(typeof puoModificare === 'function' && puoModificare('storico_hr'))) return;
@@ -6932,6 +7026,23 @@ function mostraPianoCtx(e, nome, dstr) {
     !!(window._pianoBlocco && window._pianoBlocco.completo),
   );
   h += voce('Incolla qui (Excel/blocco)', 'icx-refresh', "pianoCtxAzione('incolla')", puoMod);
+  const nascN = _pianoNascosti();
+  const conBlocco = !!(window._pianoBlocco && window._pianoBlocco.completo);
+  h += voce('Nascondi riga (' + escP(nome.split(' ')[0]) + ')', 'icx-settings', "pianoCtxAzione('nascondiRiga')", true);
+  h += voce(
+    'Nascondi giorno ' + parseInt(dstr.split('-')[2]),
+    'icx-settings',
+    "pianoCtxAzione('nascondiGiorno')",
+    true,
+  );
+  h += voce('Nascondi righe selezionate', 'icx-settings', "pianoCtxAzione('nascondiRigheSel')", conBlocco);
+  h += voce('Nascondi giorni selezionati', 'icx-settings', "pianoCtxAzione('nascondiGiorniSel')", conBlocco);
+  h += voce(
+    'Mostra nascosti (' + (nascN.nomi.length + nascN.giorni.length) + ')',
+    'icx-refresh',
+    'pianoMostraNascosti()',
+    nascN.nomi.length + nascN.giorni.length > 0,
+  );
   h += voce('Stampa piano di ' + escP(nome.split(' ')[0]), 'icx-stampa', "pianoCtxAzione('stampa')", true);
   menu.innerHTML =
     '<div class="piano-ctx-head">' +
@@ -6959,7 +7070,30 @@ function pianoCtxAzione(azione) {
     if (cel) pianoCellaInline(sel.nome, sel.data, cel);
     else pianoCellaPrompt(sel.nome, sel.data);
   } else if (azione === 'nota') _pianoNotaRapida(sel.nome, sel.data);
-  else if (azione === 'stampa') stampaPianoCollaboratore(sel.nome);
+  else if (azione === 'nascondiRiga') pianoNascondiRighe([sel.nome]);
+  else if (azione === 'nascondiGiorno') pianoNascondiGiorni([parseInt(sel.data.split('-')[2])]);
+  else if (azione === 'nascondiRigheSel' || azione === 'nascondiGiorniSel') {
+    const b = window._pianoBlocco;
+    if (!b || !b.completo) return;
+    if (azione === 'nascondiRigheSel') {
+      const nomi = [
+        ...new Set(
+          _pianoBloccoCelle()
+            .map((r) => (r[0] && r[0].closest('tr') ? r[0].closest('tr').dataset.nome : null))
+            .filter(Boolean),
+        ),
+      ];
+      if (nomi.length) pianoNascondiRighe(nomi);
+      else toast('La selezione non è sulla griglia dei collaboratori');
+    } else {
+      let g1 = parseInt(b.t1.dataset.g);
+      let g2 = parseInt(b.t2.dataset.g);
+      if (g1 > g2) [g1, g2] = [g2, g1];
+      const gg = [];
+      for (let g = g1; g <= g2; g++) gg.push(g);
+      pianoNascondiGiorni(gg);
+    }
+  } else if (azione === 'stampa') stampaPianoCollaboratore(sel.nome);
   else if (azione === 'scambio') {
     _pianoCellaSel = { nome: sel.nome, data: sel.data };
     apriScambioTurno();
@@ -7277,24 +7411,75 @@ function _briefComponi(pianoRighe) {
       firma: '',
       radio: '',
       badge: '',
+      fm: /formazion|affianc/i.test(r.commento || '') || undefined,
     });
   });
+  _briefOrdina(righe);
+  return righe;
+}
+// Ordine del foglio: gruppi, dentro il gruppo prima i presti poi le notti;
+// aperture e chiusure seguono l'ordine delle coppie CD (C0,C23,C4 poi C5,C20,C15)
+function _briefOrdina(righe) {
   const inizioDi = (r) => {
     const t = _pianoTurnoInfo(r.turno);
     const o = t ? t.ora_inizio : r.oi;
     const m = _pianoOra(o ? String(o).substring(0, 5) : '');
     return m == null ? 99 : m;
   };
-  // dentro ogni gruppo: prima i turni del presto, poi le notti (come l'Excel)
+  const cfgCd = window._pianoCdCfg && Array.isArray(window._pianoCdCfg.coppie) ? window._pianoCdCfg.coppie : [];
+  const ordineCd = cfgCd
+    .map((cp) => String(cp.apre || '').toUpperCase())
+    .concat(cfgCd.map((cp) => String(cp.chiude || '').toUpperCase()))
+    .filter(Boolean);
+  const rangoCd = (t) => ordineCd.indexOf(String(t).toUpperCase());
   righe.sort((a, b) => {
     const g = _briefGruppo(a.turno) - _briefGruppo(b.turno);
     if (g) return g;
+    const ra = rangoCd(a.turno);
+    const rb = rangoCd(b.turno);
+    if (ra >= 0 || rb >= 0) {
+      if (ra >= 0 && rb >= 0 && ra !== rb) return ra - rb;
+      if (ra >= 0 !== rb >= 0) return ra >= 0 ? -1 : 1;
+    }
     const o = inizioDi(a) - inizioDi(b);
     if (o) return o;
     if (a.turno !== b.turno) return a.turno < b.turno ? -1 : 1;
+    // chi è in formazione sta VICINO al collega dello stesso turno (in fondo al gruppo turno)
+    if (!!a.fm !== !!b.fm) return a.fm ? 1 : -1;
     return a.nome < b.nome ? -1 : 1;
   });
   return righe;
+}
+// Posizioni del fabbisogno SCOPERTE (es. manca il C0 quel giorno): riga
+// segnaposto 'XXX' così sul foglio il buco si vede. Le pause NON la considerano.
+async function _briefAggiungiScoperti(righe, dstr) {
+  try {
+    const fabb = (await secGet('piano_fabbisogni?data=eq.' + dstr + '&reparto_dip=eq.' + _pianoReparto())) || [];
+    let aggiunte = false;
+    fabb.forEach((f) => {
+      const cod = String(f.turno_codice || '').toUpperCase();
+      if (!_pianoTurnoInfo(cod)) return;
+      const have = righe.filter((r) => String(r.turno || '').toUpperCase() === cod).length;
+      for (let k = have; k < (parseInt(f.quantita) || 0); k++) {
+        righe.push({
+          e: '',
+          u: '',
+          nome: 'XXX',
+          nomeFull: null,
+          turno: f.turno_codice,
+          oi: '',
+          of: '',
+          cd: '',
+          uscita: '',
+          firma: '',
+          radio: '',
+          badge: '',
+        });
+        aggiunte = true;
+      }
+    });
+    if (aggiunte) _briefOrdina(righe);
+  } catch (e) {}
 }
 // NUMERI CASSA (CD) automatici: chi ha CHIUSO ieri RIAPRE oggi.
 // Coppie configurabili (default 2/7 su C0-C5, 3/4 su C23-C20, 8/9 su C4-C15);
@@ -7324,6 +7509,7 @@ async function _briefAssegnaCd(righe, dstr) {
   };
   const trovaOggi = (turno) => righe.find((x) => String(x.turno).toUpperCase() === turno);
   const apreCds = [];
+  const coppieCalc = [];
   cfg.coppie.forEach((cp) => {
     const [a, b] = cp.cd.map(String);
     // chi ha chiuso ieri riapre oggi (fallback: primo numero della coppia)
@@ -7331,6 +7517,7 @@ async function _briefAssegnaCd(righe, dstr) {
     const apreCd = chiusoIeri === a || chiusoIeri === b ? chiusoIeri : a;
     const chiudeCd = apreCd === a ? b : a;
     apreCds.push(apreCd);
+    coppieCalc.push({ apreCd, chiudeCd });
     const rA = trovaOggi(cp.apre.toUpperCase());
     const rC = trovaOggi(cp.chiude.toUpperCase());
     if (rA && !String(rA.cd || '').trim()) rA.cd = apreCd;
@@ -7343,6 +7530,34 @@ async function _briefAssegnaCd(righe, dstr) {
       r.cd = apreCds[k];
       k++;
     }
+  });
+  // coppie in FORMAZIONE sullo stesso turno: lavorano sulla STESSA cassa
+  righe.forEach((r) => {
+    if (!r.fm || String(r.cd || '').trim()) return;
+    const collega = righe.find(
+      (x) => x !== r && String(x.turno).toUpperCase() === String(r.turno).toUpperCase() && String(x.cd || '').trim(),
+    );
+    if (collega) r.cd = String(collega.cd).trim();
+  });
+  // turni di chiusura doppi (es. due C5): il secondo prende una cassa LIBERA
+  // delle altre coppie (prima quella che chiuderebbe oggi, es. la 3 o la 4)
+  const usati = new Set(righe.map((r) => String(r.cd || '').trim()).filter(Boolean));
+  cfg.coppie.forEach((cp, i) => {
+    const doppi = righe.filter(
+      (x) => String(x.turno).toUpperCase() === cp.chiude.toUpperCase() && !String(x.cd || '').trim(),
+    );
+    doppi.forEach((rx) => {
+      for (let j = 1; j < cfg.coppie.length && !String(rx.cd || '').trim(); j++) {
+        const cc = coppieCalc[(i + j) % cfg.coppie.length];
+        for (const n of [cc.chiudeCd, cc.apreCd]) {
+          if (n && !usati.has(n)) {
+            rx.cd = n;
+            usati.add(n);
+            break;
+          }
+        }
+      }
+    });
   });
 }
 async function _renderPianoBriefingTab() {
@@ -7373,6 +7588,7 @@ async function _renderPianoBriefingTab() {
     salvato = true;
   } else {
     righe = _briefComponi(pianoRighe);
+    await _briefAggiungiScoperti(righe, dstr);
     if (!valetR) await _briefAssegnaCd(righe, dstr);
     salvato = false;
   }
@@ -7466,7 +7682,18 @@ async function _renderPianoBriefingTab() {
     // E e U si spuntano A PENNA sul foglio stampato: celle vuote
     h += '<td style="border:1px solid #999;width:34px;padding:3px 4px">&nbsp;</td>';
     h += '<td style="border:1px solid #999;width:34px;padding:3px 4px">&nbsp;</td>';
-    h += inp('nome', r.nome, 150);
+    if (r.fm) {
+      // in formazione: sfondo giallo + etichetta accanto al cognome
+      h +=
+        '<td style="border:1px solid #999;padding:0;background:#FFFF00;white-space:nowrap"><input ' +
+        (puo ? '' : 'disabled ') +
+        'value="' +
+        escP(r.nome || '') +
+        '" oninput="briefCella(' +
+        i +
+        ",'nome',this.value)\" " +
+        'style="width:86px;border:none;background:transparent;padding:4px 2px 4px 6px;font:inherit;color:#000"><span style="font-size:.66rem;font-weight:700;color:#000;padding-right:3px">(formazione)</span></td>';
+    } else h += inp('nome', r.nome, 150);
     const colTurno = _pianoColore(r.turno) || '';
     h =
       h.substring(0) +
@@ -7674,6 +7901,7 @@ async function briefCompila() {
   if (_briefState.righe.length && !confirm('Sostituisco le righe attuali con i turni del piano di ' + _briefData + '?'))
     return;
   _briefState.righe = _briefComponi(_briefState.pianoRighe);
+  await _briefAggiungiScoperti(_briefState.righe, _briefData);
   if (!_briefIsValet()) await _briefAssegnaCd(_briefState.righe, _briefData);
   clearTimeout(_briefSaveTimer);
   await briefSalvaBriefing();
@@ -7939,11 +8167,227 @@ function _pianoBloccoCelle() {
   return out;
 }
 function _pianoBloccoEvidenzia() {
-  _pianoBloccoCelle().forEach((riga) => riga.forEach((c) => c.classList.add('blocco-sel')));
+  const celle = _pianoBloccoCelle();
+  celle.forEach((riga, ri) =>
+    riga.forEach((c, ci) => {
+      c.classList.add('blocco-sel');
+      // quadrante in grassetto: bordi marcati sul perimetro della selezione
+      if (ri === 0) c.classList.add('bs-t');
+      if (ri === celle.length - 1) c.classList.add('bs-b');
+      if (ci === 0) c.classList.add('bs-l');
+      if (ci === riga.length - 1) c.classList.add('bs-r');
+    }),
+  );
+  // intestazioni della selezione in evidenza (giorni sopra, nome a sinistra)
+  const b = window._pianoBlocco;
+  if (!b || !celle.length) return;
+  const table = b.t1.closest('table');
+  let g1 = parseInt(b.t1.dataset.g);
+  let g2 = parseInt(b.t2.dataset.g);
+  if (g1 > g2) [g1, g2] = [g2, g1];
+  for (let g = g1; g <= g2; g++) {
+    const th = table.querySelector('thead th[data-g="' + g + '"]');
+    if (th) th.classList.add('blocco-sel-head');
+  }
+  celle.forEach((riga) => {
+    const primo = riga[0] && riga[0].closest('tr') && riga[0].closest('tr').firstElementChild;
+    if (primo && !primo.dataset.g) primo.classList.add('blocco-sel-head');
+  });
 }
 function _pianoBloccoPulisci() {
-  document.querySelectorAll('.blocco-sel').forEach((c) => c.classList.remove('blocco-sel'));
+  document
+    .querySelectorAll('.blocco-sel, .bs-t, .bs-b, .bs-l, .bs-r, .blocco-sel-head')
+    .forEach((c) => c.classList.remove('blocco-sel', 'bs-t', 'bs-b', 'bs-l', 'bs-r', 'blocco-sel-head'));
   window._pianoBlocco = null;
+}
+// === SELEZIONE COL TRASCINAMENTO (come Excel): mousedown su una cella e
+// trascina; il click semplice continua ad aprire l'editor della cella ===
+function _pianoDragBind() {
+  if (window._pianoDragBound) return;
+  window._pianoDragBound = true;
+  let drag = null; // {tab, table, start, moved}
+  const swallow = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    document.removeEventListener('click', swallow, true);
+  };
+  document.addEventListener('mousedown', (e) => {
+    if (e.button !== 0 || e.shiftKey) return;
+    if (e.target.closest('input,select,textarea,button,a')) return;
+    const td = e.target.closest('td[data-g]');
+    const tabEl = e.target.closest('table[data-seltab]');
+    if (!td || !tabEl) return;
+    drag = { tab: tabEl.dataset.seltab, table: tabEl, start: td, moved: false };
+  });
+  document.addEventListener('mouseover', (e) => {
+    if (!drag) return;
+    const td = e.target.closest('td[data-g]');
+    if (!td || td.closest('table') !== drag.table) return;
+    if (td === drag.start && !drag.moved) return;
+    drag.moved = true;
+    drag.table.classList.add('sel-noselect');
+    _pianoBloccoPulisci();
+    window._pianoBlocco = { tab: drag.tab, t1: drag.start, t2: td, completo: true };
+    _pianoBloccoEvidenzia();
+  });
+  document.addEventListener('mouseup', () => {
+    if (!drag) return;
+    if (drag.moved) {
+      drag.table.classList.remove('sel-noselect');
+      // il click che segue il rilascio NON deve aprire l'editor della cella
+      document.addEventListener('click', swallow, true);
+      setTimeout(() => document.removeEventListener('click', swallow, true), 300);
+    }
+    drag = null;
+  });
+}
+// Selezione "riga intera" / "colonne intere" impostata come blocco: così
+// il tasto destro → Copia blocco funziona anche da qui (come Excel)
+function _pianoBloccoDaColonne(tabEl, g1, g2) {
+  if (!tabEl || !tabEl.dataset.seltab) return;
+  const rows = [...tabEl.querySelectorAll('tbody tr')].filter((r) => r.querySelector('td[data-g]'));
+  if (!rows.length) return;
+  const t1 = rows[0].querySelector('td[data-g="' + g1 + '"]');
+  const t2 = rows[rows.length - 1].querySelector('td[data-g="' + g2 + '"]');
+  if (t1 && t2) window._pianoBlocco = { tab: tabEl.dataset.seltab, t1: t1, t2: t2, completo: true };
+}
+function _pianoBloccoDaRighe(tabEl, tr1, tr2) {
+  if (!tabEl || !tabEl.dataset.seltab) return;
+  const c1 = tr1.querySelectorAll('td[data-g]');
+  const c2 = tr2.querySelectorAll('td[data-g]');
+  if (!c1.length || !c2.length) return;
+  window._pianoBlocco = { tab: tabEl.dataset.seltab, t1: c1[0], t2: c2[c2.length - 1], completo: true };
+}
+// === ANTEPRIMA IMMEDIATA DEI COMMENTI: al passaggio del mouse su una cella
+// con commento la nota appare SUBITO (il tooltip del browser tarda secondi) ===
+function _pianoTipBind() {
+  if (window._pianoTipBound) return;
+  window._pianoTipBound = true;
+  let tip = null;
+  const nascondi = () => {
+    if (tip) tip.style.display = 'none';
+  };
+  document.addEventListener('mouseover', (e) => {
+    const td = e.target.closest('td[data-commento]');
+    if (!td) {
+      nascondi();
+      return;
+    }
+    if (!tip) {
+      tip = document.createElement('div');
+      tip.id = 'piano-tip';
+      document.body.appendChild(tip);
+    }
+    tip.textContent = td.dataset.commento;
+    tip.style.display = 'block';
+    const rc = td.getBoundingClientRect();
+    tip.style.left = Math.max(4, Math.min(rc.left, window.innerWidth - 264)) + 'px';
+    tip.style.top = rc.bottom + 4 + 'px';
+    // sospende il tooltip nativo (doppione): torna al mouseout
+    if (td.title) {
+      td.dataset.titSalvo = td.title;
+      td.removeAttribute('title');
+    }
+  });
+  document.addEventListener('mouseout', (e) => {
+    const td = e.target.closest('td[data-commento]');
+    if (td && td.dataset.titSalvo) {
+      td.title = td.dataset.titSalvo;
+      delete td.dataset.titSalvo;
+    }
+  });
+  document.addEventListener('scroll', nascondi, true);
+}
+// === RIGHE E GIORNI NASCOSTI (come nascondere righe/colonne in Excel):
+// solo visivo e per questo browser, i dati non si toccano mai ===
+function _pianoNascostiKey() {
+  return 'piano_nascosti_' + _pianoReparto();
+}
+function _pianoNascosti() {
+  try {
+    const o = JSON.parse(localStorage.getItem(_pianoNascostiKey()) || '{}');
+    return { nomi: Array.isArray(o.nomi) ? o.nomi : [], giorni: Array.isArray(o.giorni) ? o.giorni : [] };
+  } catch (e) {
+    return { nomi: [], giorni: [] };
+  }
+}
+function _pianoSalvaNascosti(o) {
+  localStorage.setItem(_pianoNascostiKey(), JSON.stringify(o));
+}
+function pianoNascondiRighe(nomi) {
+  const o = _pianoNascosti();
+  nomi.forEach((n) => {
+    if (!o.nomi.includes(n)) o.nomi.push(n);
+  });
+  _pianoSalvaNascosti(o);
+  _pianoApplicaNascosti();
+  toast(nomi.length + (nomi.length === 1 ? ' riga nascosta' : ' righe nascoste'));
+}
+function pianoNascondiGiorni(gg) {
+  const o = _pianoNascosti();
+  gg.forEach((g) => {
+    if (!o.giorni.includes(g)) o.giorni.push(g);
+  });
+  _pianoSalvaNascosti(o);
+  _pianoApplicaNascosti();
+  toast(gg.length + (gg.length === 1 ? ' giorno nascosto' : ' giorni nascosti'));
+}
+function pianoMostraNascosti() {
+  _pianoSalvaNascosti({ nomi: [], giorni: [] });
+  _pianoApplicaNascosti();
+  toast('Righe e giorni di nuovo tutti visibili');
+}
+function _pianoApplicaNascosti() {
+  const o = _pianoNascosti();
+  _pianoBloccoPulisci();
+  // giorni: colonne collegate su TUTTE le tabelle (griglia, differenze, effettivi, pianificazione);
+  // con table-layout:fixed va azzerata anche la <col> e ridotta la larghezza tabella
+  document.querySelectorAll('#piano-content table[data-seltab]').forEach((t) => {
+    t.querySelectorAll('th[data-g], td[data-g]').forEach((c) => {
+      c.classList.toggle('col-nascosta', o.giorni.includes(parseInt(c.dataset.g)));
+    });
+    const offset = t.dataset.seltab === 'piano' ? 2 : 1;
+    const cols = t.querySelectorAll('colgroup col');
+    if (!t.dataset.wOrig) t.dataset.wOrig = parseInt(t.style.width) || t.offsetWidth;
+    let tolti = 0;
+    cols.forEach((col, i) => {
+      const g = i - offset + 1;
+      if (g < 1) return;
+      if (!col.dataset.wOrig) col.dataset.wOrig = col.style.width || '37px';
+      if (o.giorni.includes(g) && parseInt(col.dataset.wOrig)) {
+        col.style.width = '0px';
+        tolti += parseInt(col.dataset.wOrig) || 37;
+      } else if (col.style.width === '0px') {
+        col.style.width = col.dataset.wOrig;
+      }
+    });
+    t.style.width = parseInt(t.dataset.wOrig) - tolti + 'px';
+  });
+  // righe: solo la griglia collaboratori
+  document.querySelectorAll('#piano-content table[data-seltab="piano"] tbody tr[data-nome]').forEach((tr) => {
+    tr.style.display = o.nomi.includes(tr.dataset.nome) ? 'none' : '';
+  });
+  // barra "mostra tutto"
+  const n = o.nomi.length + o.giorni.length;
+  let bar = document.getElementById('piano-nascosti-bar');
+  if (!n) {
+    if (bar) bar.remove();
+    return;
+  }
+  if (!bar) {
+    const wrap = document.querySelector('#piano-content table[data-seltab="piano"]');
+    if (!wrap) return;
+    bar = document.createElement('div');
+    bar.id = 'piano-nascosti-bar';
+    wrap.closest('.piano-wrap').parentNode.insertBefore(bar, wrap.closest('.piano-wrap'));
+  }
+  bar.innerHTML =
+    '<span style="font-size:.78rem;color:var(--muted)">Nascosti: ' +
+    (o.nomi.length ? o.nomi.length + ' righe' : '') +
+    (o.nomi.length && o.giorni.length ? ' + ' : '') +
+    (o.giorni.length ? o.giorni.length + ' giorni (' + o.giorni.sort((a, b) => a - b).join(', ') + ')' : '') +
+    '</span> <button class="btn-export" style="font-size:.72rem;padding:2px 10px;margin-left:8px" onclick="pianoMostraNascosti()">Mostra tutto</button>';
+  bar.style.cssText = 'padding:4px 2px 6px';
 }
 function pianoCopiaBlocco() {
   const celle = _pianoBloccoCelle();
