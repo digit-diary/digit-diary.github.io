@@ -161,7 +161,29 @@ function livelloDiCollaboratore(c) {
   }
   return lv;
 }
-function livelloBadgeHtml(lv) {
+function livelloBadgeHtml(lv, c) {
+  // livello PARZIALE: ha certificazioni di livello alto ma manca qualcosa
+  // sotto (es. Reception L2 senza Sala L1) — badge giallo con il dettaglio
+  if (c) {
+    const comps = getCompetenzeReparto().filter((k) => k.livello >= 1);
+    const spunte = (c && c.competenze) || {};
+    const certificati = comps.filter((k) => spunte[k.key] === true).map((k) => parseInt(k.livello) || 0);
+    const maxCert = certificati.length ? Math.max.apply(null, certificati) : 0;
+    if (maxCert > lv) {
+      const mancanti = comps
+        .filter((k) => (parseInt(k.livello) || 0) < maxCert && spunte[k.key] !== true)
+        .map((k) => k.label);
+      return (
+        '<span class="mini-badge" style="background:#d4a017;color:#000;font-size:.72rem" title="Certificato fino a ' +
+        escP(livelloNome(maxCert)) +
+        ' ma manca: ' +
+        escP(mancanti.join(', ')) +
+        '">' +
+        escP(livelloSigla(maxCert)) +
+        ' parziale</span>'
+      );
+    }
+  }
   if (!lv) return '<span class="mini-badge" style="background:var(--muted)">—</span>';
   const col = { 1: '#1a4a7a', 2: '#e67e22', 3: '#2c6e49', 4: '#8e44ad', 5: '#c0392b' }[lv] || 'var(--muted)';
   return (
@@ -644,13 +666,25 @@ function renderFormazione() {
   html +=
     '<div class="filters" style="padding:10px 16px"><div class="filter-group"><span class="filter-label">Cerca</span><input type="text" id="form-matr-cerca" placeholder="Nome..." oninput="_filtraMatrice()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink);width:180px"></div>' +
     '<div class="export-btns"><button class="btn-export" onclick="esportaMatriceCSV()">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaMatricePDF()">PDF</button></div></div>';
+  // colonna colorata come i turni di quel gruppo nel piano (Sala, Rec, ...)
+  const coloreComp = (key) => {
+    try {
+      const g = (typeof _pianoCompetenzeGruppi === 'function' ? _pianoCompetenzeGruppi() : {})[key];
+      return (typeof PIANO_COLORI_GRUPPO !== 'undefined' ? PIANO_COLORI_GRUPPO : {})[g] || '';
+    } catch (e) {
+      return '';
+    }
+  };
   html +=
     '<div style="padding:0 16px 16px;overflow-x:auto"><table class="collab-table" id="matrice-competenze"><thead><tr><th>Collaboratore</th>';
   comps.forEach((k) => {
+    const cc = coloreComp(k.key);
     html +=
-      '<th class="num">' +
+      '<th class="num"' +
+      (cc ? ' style="background:' + cc + ' !important;color:#000"' : '') +
+      '>' +
       escP(k.label) +
-      (k.livello ? ' <span style="font-size:.6rem;color:var(--muted)">L' + k.livello + '</span>' : '') +
+      (k.livello ? ' <span style="font-size:.6rem;color:#00000099">L' + k.livello + '</span>' : '') +
       '</th>';
   });
   html += '<th class="num">Livello</th><th class="num">Punti ' + new Date().getFullYear() + '</th></tr></thead><tbody>';
@@ -681,8 +715,11 @@ function renderFormazione() {
       '</td>';
     comps.forEach((k) => {
       const on = (c.competenze || {})[k.key] === true;
+      const cc2 = coloreComp(k.key);
       html +=
-        '<td class="num"><input type="checkbox" ' +
+        '<td class="num"' +
+        (cc2 ? ' style="background:' + cc2 + '40"' : '') +
+        '><input type="checkbox" ' +
         (on ? 'checked ' : '') +
         (puoComp ? '' : 'disabled ') +
         'onchange="toggleCompetenza(' +
@@ -695,7 +732,7 @@ function renderFormazione() {
     });
     html +=
       '<td class="num">' +
-      livelloBadgeHtml(lv) +
+      livelloBadgeHtml(lv, c) +
       '</td><td class="num"><strong style="color:' +
       (pts < 0 ? 'var(--accent)' : 'var(--accent2)') +
       '">' +
@@ -2276,7 +2313,12 @@ async function certificaCompetenzaDaPiano(nome, key, chiediPunti) {
       az.punti &&
       confirm('Assegnare ' + az.punti + ' punti a ' + nome + ' per "' + (compAtt ? compAtt.label : key) + '"?')
     )
-      await _insertPuntiEvento(nome, az.punti, 'competenza', 'Competenza certificata: ' + (compAtt ? compAtt.label : key));
+      await _insertPuntiEvento(
+        nome,
+        az.punti,
+        'competenza',
+        'Competenza certificata: ' + (compAtt ? compAtt.label : key),
+      );
     const dopo = livelloDiCollaboratore(c);
     for (let lv = prima + 1; lv <= dopo; lv++) {
       const pl = parseInt(getPuntiConfig().punti_livello[String(lv)]) || 0;
