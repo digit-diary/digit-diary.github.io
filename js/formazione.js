@@ -616,6 +616,36 @@ async function importaProtocolloExcel(compKey, input) {
   }
 }
 
+// Stesso ordine del piano: prima SUP/RESP, poi BO, poi gli altri, jolly in fondo;
+// se nel piano le righe sono state riordinate a mano (drag) vale quell'ordine anche qui
+function _formOrdineComePiano(lista) {
+  const rango = (c) => {
+    if (c.is_jolly) return 3;
+    const f = ((c.funzione || '') + '').toUpperCase();
+    if (f === 'RESP' || f === 'VICERESP' || f === 'SUP') return 0;
+    return f === 'BO' ? 1 : 2;
+  };
+  const pos = {};
+  try {
+    ((window._pianoOrdineCollab || {})[currentReparto] || []).forEach((n, i) => (pos[n] = i));
+  } catch (e) {}
+  return lista.slice().sort((a, b) => {
+    const pa = pos[a.nome] != null ? pos[a.nome] : 9999;
+    const pb = pos[b.nome] != null ? pos[b.nome] : 9999;
+    return pa - pb || rango(a) - rango(b) || a.nome.localeCompare(b.nome);
+  });
+}
+async function _formCaricaOrdinePiano() {
+  // l'ordine manuale del piano vive nell'imp 'piano_ordine_collab': se la pagina
+  // Formazione viene aperta prima del Piano lo carico qui, poi ridisegno
+  if (window._pianoOrdineCollab !== undefined || typeof getImp !== 'function') return;
+  window._pianoOrdineCollab = {};
+  try {
+    const v = await getImp('piano_ordine_collab');
+    if (v) window._pianoOrdineCollab = JSON.parse(v);
+    if (Object.keys(window._pianoOrdineCollab).length) renderFormazione();
+  } catch (e) {}
+}
 function renderFormazione() {
   const el = document.getElementById('formazione-content');
   if (!el) return;
@@ -623,9 +653,8 @@ function renderFormazione() {
   const puoPunti = typeof puoModificare === 'function' ? puoModificare('gestione_punti') : adm;
   const puoComp = typeof puoModificare === 'function' ? puoModificare('gestione_competenze') : adm;
   const comps = getCompetenzeReparto();
-  const collabs = getCollaboratoriReparto()
-    .filter((c) => c.attivo !== false)
-    .sort((a, b) => a.nome.localeCompare(b.nome));
+  _formCaricaOrdinePiano();
+  const collabs = _formOrdineComePiano(getCollaboratoriReparto().filter((c) => c.attivo !== false));
   // KPI livelli
   const perLivello = [0, 0, 0, 0];
   collabs.forEach((c) => {

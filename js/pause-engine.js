@@ -1414,8 +1414,9 @@ function _peGeneraVenSab(sh, ctx, dataStr) {
       cdPrinc = ctx.c8Cd[0];
     }
   }
-  const lblPrinc = cdPrinc > 0 ? 'CD ' + String(cdPrinc).padStart(2, '0') : 'CD 01';
-  const lblSec = cdSec > 0 ? 'CD ' + String(cdSec).padStart(2, '0') : 'CD 02';
+  // se il numero CD non è stato scritto nel briefing, l'etichetta resta C8
+  const lblPrinc = cdPrinc > 0 ? 'CD ' + String(cdPrinc).padStart(2, '0') : 'C8';
+  const lblSec = cdSec > 0 ? 'CD ' + String(cdSec).padStart(2, '0') : 'C8 (2)';
 
   let lblR8 = 'PAUSE ' + bg1.lblBG1;
   if (nS7) lblR8 += ' - S7';
@@ -1437,7 +1438,7 @@ function _peGeneraVenSab(sh, ctx, dataStr) {
     if (bgRecPrima) _peScrHeader(sh, 5, 4, lblRecBG, bgRecPrima, '20.00 - 02.00', _PE_CLR.verdeScuro);
     else _peScrHeader(sh, 5, 4, 'REC', '(nessun BG)', 'REC copertura', _PE_CLR.verdeScuro);
   }
-  _peScrHeader(sh, 5, 7, lblPrinc, nCassaPrinc, '20.50 - 05.00', _PE_CLR.azzurro);
+  if (nCassaPrinc) _peScrHeader(sh, 5, 7, lblPrinc, nCassaPrinc, '20.50 - 05.00', _PE_CLR.azzurro);
 
   // Q1
   if (bg1.bg1IsC23) {
@@ -1564,9 +1565,11 @@ function _peGeneraVenSab(sh, ctx, dataStr) {
     r = _peSS(sh, r, 4, 'REC', '01.00 - 02.00');
   }
 
-  // Q3 CASSA
+  // Q3 CASSA — solo se quel giorno c'è almeno un C8
   r = 7;
-  if (numC8Eff <= 2) {
+  if (!nCassaPrinc) {
+    // nessun C8: la terza colonna resta per gli extra
+  } else if (numC8Eff <= 2) {
     if (dT['C20']) {
       r = _peSPPC(sh, ctx, r, 7, 'C5', '21.00 - 21.30', nCassaPrinc);
       r = _peSPPC(sh, ctx, r, 7, 'C15', '21.30 - 22.00', nCassaPrinc);
@@ -3080,6 +3083,27 @@ function _briefRenderPauseCfg() {
     '<div>Nota in fondo alle pause valet:<br><input id="pcfg-nota" value="' +
     escP(c.valet_nota || '') +
     '" placeholder="(testo standard)" style="width:100%;max-width:560px;padding:5px"></div>';
+  // numeri cassa (CD): coppie e rotazione giornaliera
+  const cdCfg = (window._pianoCdCfg && window._pianoCdCfg.coppie) || [];
+  h +=
+    '<div style="margin-top:6px"><b>Numeri cassa (CD)</b> — chi ha chiuso ieri riapre oggi; i C8 di ven/sab riprendono in ordine la cassa del presto di ogni coppia. Tutto resta modificabile nel briefing.<br>';
+  cdCfg.forEach((cp, i) => {
+    h +=
+      '<div style="margin:4px 0">Coppia CD <input class="cdcfg" data-i="' +
+      i +
+      '" data-f="cd" value="' +
+      escP((cp.cd || []).join(',')) +
+      '" style="width:52px;padding:3px;text-align:center"> — apre: <input class="cdcfg" data-i="' +
+      i +
+      '" data-f="apre" value="' +
+      escP(cp.apre || '') +
+      '" style="width:52px;padding:3px;text-align:center"> chiude: <input class="cdcfg" data-i="' +
+      i +
+      '" data-f="chiude" value="' +
+      escP(cp.chiude || '') +
+      '" style="width:52px;padding:3px;text-align:center"></div>';
+  });
+  h += '</div>';
   h +=
     '<div><button class="btn-export" style="font-size:.8rem;padding:4px 14px" onclick="salvaPauseCfg()">Salva regole</button></div>';
   h += '</div></details>';
@@ -3104,7 +3128,24 @@ async function salvaPauseCfg() {
   };
   await setImp('piano_pause_cfg', JSON.stringify(obj));
   window._briefPauseCfgObj = obj;
-  toast('Regole pause salvate');
+  // coppie CD
+  const coppie = ((window._pianoCdCfg && window._pianoCdCfg.coppie) || []).map((cp) => Object.assign({}, cp));
+  document.querySelectorAll('.cdcfg').forEach((el) => {
+    const i = parseInt(el.dataset.i);
+    if (!coppie[i]) return;
+    if (el.dataset.f === 'cd')
+      coppie[i].cd = el.value
+        .split(/[,/\s]+/)
+        .map((x) => x.trim())
+        .filter(Boolean)
+        .slice(0, 2);
+    else coppie[i][el.dataset.f] = el.value.trim().toUpperCase();
+  });
+  if (coppie.length) {
+    window._pianoCdCfg = { coppie: coppie };
+    await setImp('piano_cd_config', JSON.stringify(window._pianoCdCfg));
+  }
+  toast('Regole pause e numeri cassa salvati');
 }
 
 // Importa il briefing da un foglio Excel: cerca in ogni riga una cella che
