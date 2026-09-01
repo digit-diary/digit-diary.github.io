@@ -1246,7 +1246,7 @@ async function generaBozzaPiano() {
   // storia per idoneità (chi ha già fatto quel gruppo) e familiarità:
   // tutte le assegnazioni passate del settore (le più recenti prima)
   const storia =
-    (await secGet('piano?data=lt.' + da + '&reparto_dip=eq.' + _pianoReparto() + '&order=data.desc&limit=5000')) || [];
+    (await secGet('piano?data=lt.' + da + '&reparto_dip=eq.' + _pianoReparto() + '&order=data.desc&limit=20000')) || [];
   const idoneita = {}; // nome -> Set(gruppi)
   const familiarita = {}; // nome|codice -> n
   storia.concat(_pianoRighe).forEach((r) => {
@@ -1529,29 +1529,38 @@ async function generaBozzaPiano() {
   // nei giorni successivi al festivo. I CGF già goduti vengono scalati.
   const festiviCgf = new Set(pianoFestiviCache.filter((f) => f.cgf !== false).map((f) => f.data));
   const annoCorr = ym.split('-')[0];
+  const annoPrec = String(Number(annoCorr) - 1);
   const cgfDovuti = {}; // nome -> [{daGiorno}]
-  const contaturaCgf = {}; // nome -> saldo (maturati - goduti) dall'inizio anno
+  // saldo (maturati - goduti) su anno precedente + corrente: così un festivo
+  // lavorato a fine dicembre viene compensato anche generando gennaio
+  const contaturaCgf = {};
   storia.forEach((r) => {
-    if (!r.data.startsWith(annoCorr)) return;
+    if (!r.data.startsWith(annoCorr) && !r.data.startsWith(annoPrec)) return;
     if (festiviCgf.has(r.data) && _pianoTurnoInfo(r.codice))
       contaturaCgf[r.collaboratore] = (contaturaCgf[r.collaboratore] || 0) + 1;
     if (r.codice === 'CGF') contaturaCgf[r.collaboratore] = (contaturaCgf[r.collaboratore] || 0) - 1;
   });
   nomi.forEach((n) => {
     // mese corrente: festivi lavorati (celle esistenti + appena generate) e CGF già presenti
+    const eventiMese = [];
+    let cgfPresentiMese = 0;
     for (let g = 1; g <= nGiorni; g++) {
       const cod = cella[n + '|' + g];
       if (!cod) continue;
       const dstrG = ym + '-' + String(g).padStart(2, '0');
-      if (festiviCgf.has(dstrG) && _pianoTurnoInfo(cod)) (cgfDovuti[n] = cgfDovuti[n] || []).push({ daGiorno: g + 1 });
-      if (cod === 'CGF') contaturaCgf[n] = (contaturaCgf[n] || 0) - 1;
+      if (festiviCgf.has(dstrG) && _pianoTurnoInfo(cod)) eventiMese.push(g + 1);
+      if (cod === 'CGF') cgfPresentiMese++;
     }
-    // crediti residui dai mesi precedenti: assegnabili in qualsiasi buco
-    let residui = contaturaCgf[n] || 0;
-    while (residui > 0) {
-      (cgfDovuti[n] = cgfDovuti[n] || []).push({ daGiorno: 1 });
-      residui--;
-    }
+    // bilancio TOTALE anno: crediti dei mesi passati + festivi del mese −
+    // CGF già goduti (passati e del mese): mai doppi se uno è già a mano
+    const totale = (contaturaCgf[n] || 0) + eventiMese.length - cgfPresentiMese;
+    if (totale <= 0) return;
+    // prima gli eventi del mese (nei giorni successivi al festivo),
+    // poi i crediti residui dei mesi precedenti in qualsiasi buco
+    const lista = [];
+    eventiMese.slice(-Math.min(totale, eventiMese.length)).forEach((daG) => lista.push({ daGiorno: daG }));
+    for (let k = lista.length; k < totale; k++) lista.push({ daGiorno: 1 });
+    cgfDovuti[n] = lista;
   });
   let nCgfAuto = 0;
   nomi.forEach((n) => {
