@@ -7512,6 +7512,9 @@ function _briefComponi(pianoRighe) {
       radio: '',
       badge: '',
       fm: /formazion|affianc/i.test(r.commento || '') || undefined,
+      // il colore dato alla cella del PIANO (es. X1 rosso = coordinatore valet)
+      // arriva anche sul briefing; resta modificabile col quadratino della riga
+      col: r.colore || undefined,
     });
   });
   // cognomi uguali di persone diverse (es. BIANCHI Milena e BIANCHI Chiara):
