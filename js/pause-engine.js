@@ -1898,8 +1898,20 @@ function _peGeneraExtra(sh, ctx, tipoGiorno) {
       if (ctx.orari[turno] && _peMinutiPausa(ctx.orari, turno) > 0) extraNomi[nome] = turno;
     }
   });
+  // se un turno ha già ricevuto i suoi slot pausa nella griglia (piazzati
+  // da PiazzaPauseExtra), niente blocco personale doppio
+  const lastRE = _peMaxR(sh);
+  const haSlot = (turno) => {
+    for (let c = 1; c <= 7; c += 3)
+      for (let rr = 7; rr <= lastRE; rr++) {
+        const cell = _peGet(sh, rr, c);
+        if (cell && String(cell.v) === turno) return true;
+      }
+    return false;
+  };
   Object.keys(extraNomi).forEach((nome) => {
     const turno = extraNomi[nome];
+    if (haSlot(turno)) return;
     const sett = _peSettoreTurno(turno);
     const pauseMin = _peMinutiPausa(ctx.orari, turno);
     const clrH =
@@ -2927,7 +2939,15 @@ function _briefRenderPauseCfg() {
     })
     .forEach((t) => {
       const o = orari[t.codice];
-      if (!o) return;
+      if (!o) {
+        tab +=
+          '<tr><td style="border:1px solid #999;padding:2px 10px;font-weight:bold;background:' +
+          (_pianoColore(t.codice) || '') +
+          '">' +
+          escP(t.codice) +
+          '</td><td colspan="3" style="border:1px solid #999;padding:2px 10px;color:#c0392b">orari mancanti — impostali nella tab Turni per far funzionare le pause</td></tr>';
+        return;
+      }
       const split = _pePauseSplit(orari, t.codice);
       const pers = (c.turni || {})[t.codice] || '';
       const ore = Math.floor(o.dur / 60) + 'h' + (o.dur % 60 ? String(o.dur % 60).padStart(2, '0') : '');

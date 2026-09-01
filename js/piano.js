@@ -5963,6 +5963,13 @@ function _renderPianoGuidaTab() {
     righe.map((r) => '<p style="margin:4px 0">• ' + r + '</p>').join('') +
     '</div></div>';
   let h = '';
+  h += sez('Briefing', [
+    'La data parte da <b>domani</b> (frecce o calendario per cambiarla). <b>Compila dal piano</b> riempie nomi e turni del giorno; ogni cella è modificabile e ogni riga ha + (inserisci sotto), le frecce per riordinare e × per eliminare. Tutto si salva da solo: una versione per data, rigenerare sovrascrive.',
+    'Le colonne <b>E</b> e <b>U</b> restano vuote: si spuntano <b>a penna</b> sul foglio stampato il giorno dopo, per confermare le timbrature di entrata e uscita.',
+    '<b>Genera pause</b> crea la distribuzione: per Slots usa i tuoi schemi (distributori S1/S22, S3, S7C…), per Valet e gli altri reparti il motore automatico (durata pause per fascia, minimo 45 minuti fra le pause, mai due in pausa insieme, ven/sab evita la fascia 23–01). Anche le pause sono modificabili cella per cella, con inserimento/eliminazione righe.',
+    'In fondo alla card Pause trovi <b>Regole — turni, orari e pause spettanti</b>: la tabella mostra la pausa di ogni turno e puoi personalizzarla per singolo turno (es. S3 = 15+15) o per fascia di durata. Gli orari dei turni si cambiano nella tab Turni e tutto si aggiorna da solo.',
+    '<b>Stampa briefing</b> e <b>Stampa pause</b> generano i PDF A4 da appendere/firmare; <b>Importa da Excel</b> legge nomi e turni da un foglio esistente.',
+  ]);
   h += sez('Calendario', [
     '<b>Clicca una cella</b> e scrivi direttamente la sigla del turno (Invio salva, Esc annulla, vuoto elimina). Le sigle inesistenti vengono rifiutate.',
     '<b>Tasto destro</b> (o pressione lunga sul tablet) su una cella: modifica, commento, cambio turno con collega (con eventuale restituzione), cambio per esigenze operative, rimozione, stampa.',
