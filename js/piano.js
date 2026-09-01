@@ -1888,45 +1888,159 @@ function fabbisognoInline(codice, dstr, el) {
 // Import fabbisogno da CSV/Excel — formato Turnivo (upload_fabbisogno):
 // prima colonna = codice turno, colonne successive = quantità per i giorni
 // 1..N del mese. SOSTITUISCE il fabbisogno del mese per questo settore.
+
+// ---- lettura dei file Excel REALI (PIANO SLOTS/VALET 2026) ----
+// I fogli sono per mese ("SETTEMBRE 2026"), l'intestazione giorni è una riga
+// di date seriali (1..31) e le sigle sono spesso minuscole.
+function _xlsFoglioMese(wb, ym) {
+  const MESI_L = (typeof MESI_FULL !== 'undefined' ? MESI_FULL : []).map((m) => String(m).toUpperCase());
+  const mese = MESI_L[parseInt(ym.split('-')[1]) - 1] || '';
+  const anno = ym.split('-')[0];
+  const hit = wb.SheetNames.find((n) => {
+    const u = n.toUpperCase().trim();
+    return mese && u.startsWith(mese) && u.includes(anno);
+  });
+  return hit || null;
+}
+// trova in una riga la mappa giorno -> indice colonna (valori 1..31 crescenti)
+function _xlsMappaGiorni(riga, nGiorni) {
+  const mappa = {};
+  let trovati = 0;
+  let atteso = 1;
+  for (let c = 0; c < (riga || []).length && atteso <= nGiorni; c++) {
+    let v = riga[c];
+    if (v instanceof Date) v = Math.round((v - new Date(Date.UTC(1899, 11, 31))) / 86400000);
+    const n = typeof v === 'number' ? Math.round(v) : parseInt(v);
+    if (n === atteso) {
+      mappa[atteso] = c;
+      trovati++;
+      atteso++;
+    }
+  }
+  return trovati >= Math.min(10, nGiorni) ? mappa : null;
+}
+function _xlsCercaMappaGiorni(dati, nGiorni, daRiga, aRiga) {
+  for (let r = daRiga; r <= Math.min(aRiga, dati.length - 1); r++) {
+    const m = _xlsMappaGiorni(dati[r], nGiorni);
+    if (m) return m;
+  }
+  return null;
+}
+function _xlsNormaNome(s) {
+  return String(s || '')
+    .toUpperCase()
+    .replace(/0/g, 'O')
+    .replace(/1/g, 'I')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 async function importaFabbisognoExcel(input) {
   if (!puoGestirePiano()) return;
   const file = input.files[0];
   input.value = '';
-  if (!file || !window.XLSX) return;
+  if (!file) return;
+  if (!window.XLSX) {
+    toast('Libreria Excel non caricata: controlla la connessione e ricarica');
+    return;
+  }
   const ym = _pianoMeseSel;
   const nGiorni = _pianoUltimoGiorno(ym);
   try {
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf);
-    const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
     const codiciValidi = new Set(pianoTurniCache.map((t) => t.codice.toUpperCase()));
-    let inizio = 0;
-    const prima = String((data[0] || [])[0] || '').toUpperCase();
-    if (prima === 'TURNO' || prima === 'CODICE' || prima === 'SHIFT' || prima === '') inizio = 1;
     const nuovi = [];
     let errori = 0;
-    for (const riga of data.slice(inizio)) {
-      const cod = String(riga[0] || '')
-        .trim()
-        .toUpperCase();
-      if (!cod) continue;
-      if (!codiciValidi.has(cod)) {
-        errori++;
-        continue;
+    let fonte = '';
+    // 1) file REALE (PIANO SLOTS/VALET): foglio del mese + sezione PIANIFICAZIONE
+    const foglioMese = _xlsFoglioMese(wb, ym);
+    let smartOk = false;
+    if (foglioMese) {
+      const dati = XLSX.utils.sheet_to_json(wb.Sheets[foglioMese], { header: 1, defval: '', raw: true });
+      let rPian = -1;
+      for (let r = 0; r < dati.length; r++) {
+        if ((dati[r] || []).some((v) => String(v).toUpperCase().includes('PIANIFICAZIONE'))) {
+          rPian = r;
+          break;
+        }
       }
-      for (let g = 1; g <= nGiorni; g++) {
-        const q = parseInt(riga[g]);
-        if (!isNaN(q) && q > 0)
-          nuovi.push({
-            data: ym + '-' + String(g).padStart(2, '0'),
-            turno_codice: cod,
-            quantita: q,
-            reparto_dip: _pianoReparto(),
-          });
+      if (rPian >= 0) {
+        const mappa = _xlsMappaGiorni(dati[rPian], nGiorni) || _xlsCercaMappaGiorni(dati, nGiorni, 0, 8);
+        if (mappa) {
+          let vuoteConsecutive = 0;
+          for (let r = rPian + 1; r < dati.length && vuoteConsecutive < 10; r++) {
+            const riga = dati[r] || [];
+            let cod = '';
+            for (let c = 0; c < 6; c++) {
+              const cand = String(riga[c] || '')
+                .trim()
+                .toUpperCase();
+              if (cand === 'TOT') {
+                cod = 'TOT';
+                break;
+              }
+              if (codiciValidi.has(cand)) {
+                cod = cand;
+                break;
+              }
+            }
+            if (cod === 'TOT') break;
+            if (!cod) {
+              vuoteConsecutive++;
+              continue;
+            }
+            vuoteConsecutive = 0;
+            for (let g = 1; g <= nGiorni; g++) {
+              const q = parseInt(riga[mappa[g]]);
+              if (!isNaN(q) && q > 0)
+                nuovi.push({
+                  data: ym + '-' + String(g).padStart(2, '0'),
+                  turno_codice: cod,
+                  quantita: q,
+                  reparto_dip: _pianoReparto(),
+                });
+            }
+          }
+          smartOk = true;
+          fonte = 'foglio "' + foglioMese + '" (sezione PIANIFICAZIONE)';
+        }
       }
     }
+    // 2) ripiego: formato semplice (prima colonna = turno, colonne = giorni 1..N)
+    if (!smartOk) {
+      const dati = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+      let inizio = 0;
+      const prima = String((dati[0] || [])[0] || '').toUpperCase();
+      if (prima === 'TURNO' || prima === 'CODICE' || prima === 'SHIFT' || prima === '') inizio = 1;
+      for (const riga of dati.slice(inizio)) {
+        const cod = String(riga[0] || '')
+          .trim()
+          .toUpperCase();
+        if (!cod) continue;
+        if (!codiciValidi.has(cod)) {
+          errori++;
+          continue;
+        }
+        for (let g = 1; g <= nGiorni; g++) {
+          const q = parseInt(riga[g]);
+          if (!isNaN(q) && q > 0)
+            nuovi.push({
+              data: ym + '-' + String(g).padStart(2, '0'),
+              turno_codice: cod,
+              quantita: q,
+              reparto_dip: _pianoReparto(),
+            });
+        }
+      }
+      fonte = 'formato semplice (turno + giorni)';
+    }
     if (!nuovi.length) {
-      toast('Nessuna quantità riconosciuta nel file' + (errori ? ' (' + errori + ' codici turno sconosciuti)' : ''));
+      toast(
+        'Nessuna quantità riconosciuta nel file' +
+          (foglioMese ? '' : ' — manca il foglio del mese selezionato') +
+          (errori ? ' (' + errori + ' codici turno sconosciuti)' : ''),
+      );
       return;
     }
     const MESI_L = MESI_FULL || [];
@@ -1935,7 +2049,9 @@ async function importaFabbisognoExcel(input) {
       !confirm(
         'Importare il fabbisogno di ' +
           lbl +
-          '?\n\n• ' +
+          '?\n\n• Letto da: ' +
+          fonte +
+          '\n• ' +
           nuovi.length +
           ' celle da caricare' +
           (errori ? '\n• ' + errori + ' righe con codice turno sconosciuto (saltate)' : '') +
@@ -1946,7 +2062,8 @@ async function importaFabbisognoExcel(input) {
     const da = ym + '-01';
     const a = ym + '-' + String(nGiorni).padStart(2, '0');
     await secDel('piano_fabbisogni', 'data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto());
-    for (const f of nuovi) await secPost('piano_fabbisogni', f);
+    for (let i = 0; i < nuovi.length; i += 10)
+      await Promise.all(nuovi.slice(i, i + 10).map((f) => secPost('piano_fabbisogni', f)));
     logAzione('Fabbisogno importato', ym + ' — ' + nuovi.length + ' celle');
     toast('Fabbisogno importato: ' + nuovi.length + ' celle');
     renderPiano();
@@ -1971,37 +2088,77 @@ async function importaPianoExcel(input) {
   try {
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf);
-    const dati = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
     const collabs = collaboratoriCache.filter((c) => c.attivo !== false);
+    // match nomi robusto: maiuscole/minuscole, ordine parole, refusi tipo 0/O e 1/I
     const trova = (nome) => {
-      const n = String(nome || '')
-        .trim()
-        .toLowerCase();
+      const n = _xlsNormaNome(nome).toLowerCase();
       if (!n) return null;
       return (
-        collabs.find(
-          (c) =>
-            c.nome.toLowerCase() === n ||
-            (n.split(/\s+/).length > 1 && n.split(/\s+/).every((p) => c.nome.toLowerCase().includes(p))),
-        ) || null
+        collabs.find((c) => {
+          const cn = _xlsNormaNome(c.nome).toLowerCase();
+          return cn === n || (n.split(' ').length > 1 && n.split(' ').every((p) => cn.includes(p)));
+        }) || null
       );
     };
-    let inizio = 0;
-    const prima = String((dati[0] || [])[0] || '').toLowerCase();
-    if (!prima || prima.includes('collaborator') || prima.includes('nome')) inizio = 1;
-    const nuove = [];
+    // layout: file REALE (foglio del mese, giorni da riga seriale, nomi nella
+    // colonna con più riscontri) oppure formato semplice (nome + giorni 1..N)
+    const foglioMese = _xlsFoglioMese(wb, ym);
+    let dati, mappa, colNome, inizio, fonte;
+    if (foglioMese) {
+      dati = XLSX.utils.sheet_to_json(wb.Sheets[foglioMese], { header: 1, defval: '', raw: true });
+      mappa = _xlsCercaMappaGiorni(dati, nGiorni, 0, 8);
+    }
+    if (foglioMese && mappa) {
+      const primoGiornoCol = mappa[1];
+      let rIntest = 0;
+      for (let r = 0; r <= 8; r++) if (_xlsMappaGiorni(dati[r], nGiorni)) rIntest = r;
+      // colonna nomi = quella a sinistra dei giorni con più collaboratori riconosciuti
+      colNome = 1;
+      let bestHit = -1;
+      for (let c = 0; c < primoGiornoCol; c++) {
+        let hit = 0;
+        for (let r = rIntest + 1; r < Math.min(dati.length, rIntest + 80); r++) if (trova((dati[r] || [])[c])) hit++;
+        if (hit > bestHit) {
+          bestHit = hit;
+          colNome = c;
+        }
+      }
+      inizio = rIntest + 1;
+      fonte = 'foglio "' + foglioMese + '"';
+    } else {
+      dati = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+      mappa = null;
+      colNome = 0;
+      inizio = 0;
+      const prima = String((dati[0] || [])[0] || '').toLowerCase();
+      if (!prima || prima.includes('collaborator') || prima.includes('nome')) inizio = 1;
+      fonte = 'formato semplice';
+    }
+    // match anche sui DISATTIVATI (da riattivare) e raccolta dei NUOVI
+    const tuttiCollabs = collaboratoriCache;
+    const trovaTutti = (nome) => {
+      const nrm = _xlsNormaNome(nome).toLowerCase();
+      if (!nrm) return null;
+      return (
+        tuttiCollabs.find((c) => {
+          const cn = _xlsNormaNome(c.nome).toLowerCase();
+          return cn === nrm || (nrm.split(' ').length > 1 && nrm.split(' ').every((p) => cn.includes(p)));
+        }) || null
+      );
+    };
+    const titolo = (str) =>
+      _xlsNormaNome(str)
+        .toLowerCase()
+        .replace(/(^|[\s.'-])(\w)/g, (m, a, b) => a + b.toUpperCase());
+    const righeCollab = []; // {nome, celle:[{g,cod}], stato:'ok'|'riattiva'|'nuovo', funzione, percentuale, ref}
     const nomiOk = new Set();
-    const nomiSconosciuti = new Set();
     let sigleScartate = 0;
     dati.slice(inizio).forEach((riga) => {
-      const hit = trova(riga[0]);
-      if (!hit) {
-        if (String(riga[0] || '').trim()) nomiSconosciuti.add(String(riga[0]).trim());
-        return;
-      }
-      nomiOk.add(hit.nome);
+      const raw = String(riga[colNome] || '').trim();
+      if (!raw || raw.length < 4 || /^\d/.test(raw)) return;
+      const celle = [];
       for (let g = 1; g <= nGiorni; g++) {
-        const cod = String(riga[g] || '')
+        const cod = String(riga[mappa ? mappa[g] : g] || '')
           .trim()
           .toUpperCase();
         if (!cod) continue;
@@ -2009,16 +2166,48 @@ async function importaPianoExcel(input) {
           sigleScartate++;
           continue;
         }
-        nuove.push({
-          collaboratore: hit.nome,
-          data: ym + '-' + String(g).padStart(2, '0'),
-          codice: cod,
-          protetto: true,
-          generato: false,
-          reparto_dip: _pianoReparto(),
+        celle.push({ g: g, cod: cod });
+      }
+      const hit = trovaTutti(raw);
+      if (hit && hit.attivo !== false) {
+        if (!celle.length) return;
+        righeCollab.push({ nome: hit.nome, celle: celle, stato: 'ok' });
+        nomiOk.add(hit.nome);
+      } else if (hit) {
+        if (!celle.length) return;
+        righeCollab.push({ nome: hit.nome, celle: celle, stato: 'riattiva', ref: hit });
+      } else if (celle.length >= 3) {
+        // collaboratore NUOVO trovato nel file: funzione e % dalle colonne accanto
+        const fz = String(riga[colNome + 1] || '')
+          .trim()
+          .toUpperCase();
+        const funzioni = window._pianoFunzioni || ['RESP', 'SOSTRESP', 'SUP', 'BO', 'HOST'];
+        const pct = parseFloat(riga[colNome + 2]);
+        righeCollab.push({
+          nome: titolo(raw),
+          celle: celle,
+          stato: 'nuovo',
+          funzione: funzioni.includes(fz) ? fz : 'HOST',
+          percentuale: !isNaN(pct) && pct > 0 && pct <= 1 ? pct : 1,
+          isJolly: isNaN(pct) || !pct,
         });
       }
     });
+    const nuoviCollab = righeCollab.filter((r) => r.stato === 'nuovo');
+    const daRiattivare = righeCollab.filter((r) => r.stato === 'riattiva');
+    const nuove = [];
+    righeCollab.forEach((rc) =>
+      rc.celle.forEach((c) =>
+        nuove.push({
+          collaboratore: rc.nome,
+          data: ym + '-' + String(c.g).padStart(2, '0'),
+          codice: c.cod,
+          protetto: true,
+          generato: false,
+          reparto_dip: _pianoReparto(),
+        }),
+      ),
+    );
     if (!nuove.length) {
       toast('Nessuna cella riconosciuta nel file');
       return;
@@ -2029,21 +2218,71 @@ async function importaPianoExcel(input) {
       !confirm(
         'Importare il piano di ' +
           lbl +
-          '?\n\n• ' +
+          '?\n\n• Letto da: ' +
+          fonte +
+          '\n• ' +
           nomiOk.size +
           ' collaboratori riconosciuti\n• ' +
           nuove.length +
           ' celle da importare (protette)' +
           (sigleScartate ? '\n• ' + sigleScartate + ' sigle sconosciute scartate' : '') +
-          (nomiSconosciuti.size
-            ? '\n• Nomi NON riconosciuti: ' +
-              [...nomiSconosciuti].slice(0, 5).join(', ') +
-              (nomiSconosciuti.size > 5 ? '...' : '')
+          (nuoviCollab.length
+            ? '\n• NUOVI collaboratori da creare: ' +
+              nuoviCollab.map((x) => x.nome + ' (' + x.funzione + ')').join(', ')
+            : '') +
+          (daRiattivare.length
+            ? '\n• Da RIATTIVARE (disattivati ma presenti nel file): ' + daRiattivare.map((x) => x.nome).join(', ')
             : '') +
           '\n\nLe celle già presenti NON vengono toccate.',
       )
     )
       return;
+    for (const nc of nuoviCollab) {
+      const creato = await secPost('collaboratori', {
+        nome: nc.nome,
+        attivo: true,
+        reparto_dip: _pianoReparto(),
+        funzione: nc.funzione,
+        percentuale: nc.percentuale,
+        is_jolly: !!nc.isJolly,
+      });
+      if (creato && creato[0]) collaboratoriCache.push(creato[0]);
+      logAzione('Collaboratore creato da import piano', nc.nome + ' (' + nc.funzione + ')');
+    }
+    if (
+      daRiattivare.length &&
+      confirm(
+        'Riattivo anche i collaboratori disattivati presenti nel file?\n\n' +
+          daRiattivare.map((x) => '• ' + x.nome).join('\n') +
+          '\n\n(Se rispondi Annulla, le loro celle vengono importate comunque ma restano disattivati)',
+      )
+    ) {
+      for (const rc of daRiattivare) {
+        await secPatch('collaboratori', 'id=eq.' + rc.ref.id, { attivo: true });
+        rc.ref.attivo = true;
+        logAzione('Collaboratore riattivato da import piano', rc.nome);
+      }
+    }
+    // chi è attivo nel Diario ma NON compare nel file (nessun turno, congedo
+    // o malattia nel mese): proposta di disattivazione
+    const presenti = new Set(righeCollab.map((x) => x.nome));
+    const daDisattivare = collaboratoriCache.filter(
+      (c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto() && !presenti.has(c.nome),
+    );
+    if (
+      daDisattivare.length &&
+      confirm(
+        'Questi collaboratori del reparto NON compaiono nel file (nessun turno, congedo o malattia): li disattivo?\n\n' +
+          daDisattivare.map((x) => '• ' + x.nome).join('\n') +
+          '\n\n(Se rispondi Annulla restano attivi)',
+      )
+    ) {
+      for (const c of daDisattivare) {
+        await secPatch('collaboratori', 'id=eq.' + c.id, { attivo: false });
+        c.attivo = false;
+        logAzione('Collaboratore disattivato da import piano', c.nome + ' (assente dal file ' + ym + ')');
+      }
+    }
     const r = await sbRpc('piano_bulk_upsert', { p_token: getOpToken(), p_rows: nuove });
     logAzione('Piano importato da Excel', ym + ' — ' + ((r && r.inserite) || 0) + '/' + nuove.length + ' celle');
     toast('Piano importato: ' + ((r && r.inserite) || 0) + ' celle nuove');
@@ -6002,6 +6241,15 @@ function _renderPianoGuidaTab() {
     "<b>Statistiche</b>: totali per collaboratore sull'anno e panoramica dei 12 mesi.",
     '<b>Storico</b>: chi ha modificato cosa e quando, filtrabile per azione.',
     '<b>Impostazioni</b>: export/import dati e template, turni per funzione (mappature), preferenze collaboratori (solo diurni, turni bloccati, preferisce L1, accoglienza, accompagnamento), ore settimanali del contratto.',
+  ]);
+  h += sez('Import dai file Excel reali', [
+    'Nella tab Calendario, <b>Importa piano</b> legge direttamente il file <b>PIANO SLOTS/VALET 2026.xlsx</b>: riconosce da solo il foglio del mese selezionato, le colonne dei giorni e i nomi (anche con maiuscole o piccoli refusi). Le celle esistenti non vengono toccate.',
+    'Se nel file ci sono <b>collaboratori nuovi</b> li crea (funzione e percentuale lette dal file); quelli <b>disattivati ma presenti</b> te li propone da riattivare; quelli <b>attivi ma assenti dal file</b> te li propone da disattivare. Ogni passo ha la sua conferma.',
+    'Nella tab Calendario (fabbisogno), <b>Importa fabbisogno</b> legge la sezione <b>PIANIFICAZIONE</b> del foglio del mese dello stesso file e SOSTITUISCE il fabbisogno del mese. Funziona anche col formato semplice (turno + giorni).',
+  ]);
+  h += sez('Formulari e CGF', [
+    'La tab <b>Formulari</b> raccoglie i moduli standard (cambio turno, cambio vacanza, non-disponibilità jolly 1187, protocolli formazione) e un archivio per cartelle dove caricare Word/PDF/Excel, rinominarli e stamparli.',
+    'I <b>CGF</b> sono automatici: chi lavora un festivo (con flag CGF) matura il compenso e la bozza glielo piazza nel primo buco dopo il festivo; i crediti passano ai mesi successivi, anche a cavallo d&#39;anno. Il conteggio maturati/goduti/saldo è nelle Statistiche.',
   ]);
   h += sez('Permessi e sicurezza', [
     'La sezione Piano si può nascondere o limitare da Impostazioni del Diario → Visibilità.',
