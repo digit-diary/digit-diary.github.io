@@ -928,6 +928,10 @@ const _TABELLE_BACKUP = [
   'piano_festivi',
   'piano_timbrature',
   'piano_mappature',
+  'piano_vacanze',
+  'piano_regole_gruppo',
+  'piano_formulari',
+  'piano_briefing',
 ];
 async function esportaBackupCompleto() {
   if (!isAdmin()) {
