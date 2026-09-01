@@ -2244,6 +2244,63 @@ function briefPausaInsRiga(base, r) {
   _briefSalvaPauseDebounce();
   _briefRefreshPause();
 }
+// scambia una riga di copertura con quella adiacente RICALCOLANDO gli
+// orari: l'inizio resta quello della prima, le durate seguono le postazioni
+// (es. R24 22.15-22.45 + S3 22.45-23.00 → S3 22.15-22.30 + R24 22.30-23.00)
+function briefPausaSposta(base, r, dir) {
+  if (!puoGestirePiano() || !_briefState || !_briefState.pause) return;
+  const c = _briefState.pause.contenuto;
+  const dati = (rr) => {
+    const a = c.celle[rr + '|' + base];
+    const b = c.celle[rr + '|' + (base + 1)];
+    if (!a || !b || a.hdr || a.span || b.hdr) return null;
+    const orario = String(b.v || '');
+    if (!orario.includes(' - ')) return null;
+    const p = orario.split(' - ');
+    const ini = _peOraMin(p[0].trim());
+    let fin = _peOraMin(p[1].trim());
+    if (ini == null || fin == null) return null;
+    let iniA = ini < 660 ? ini + 1440 : ini;
+    let finA = fin < 660 ? fin + 1440 : fin;
+    if (finA <= iniA) finA += 1440;
+    return { a: a, b: b, ini: iniA, fin: finA, dur: finA - iniA };
+  };
+  // trova la riga adiacente (salta le righe vuote della stessa coppia)
+  let r2 = r + dir;
+  let d2 = null;
+  while (r2 >= 4 && r2 <= c.nR + 1) {
+    d2 = dati(r2);
+    if (d2 || c.celle[r2 + '|' + base] || c.celle[r2 + '|' + (base + 1)]) break;
+    r2 += dir;
+  }
+  const d1 = dati(r);
+  if (!d1 || !d2) {
+    toast('Questa riga non si può scambiare (serve una riga di copertura adiacente)');
+    return;
+  }
+  const prima = dir < 0 ? d2 : d1;
+  const seconda = dir < 0 ? d1 : d2;
+  // le POSTAZIONI si scambiano, gli orari si ricalcolano in sequenza
+  const inizio = prima.ini;
+  const posPrima = seconda.a.v;
+  const posSeconda = prima.a.v;
+  const durPrima = seconda.dur;
+  const nuovi = [
+    { d: prima, pos: posPrima, ini: inizio, fin: inizio + durPrima },
+    { d: seconda, pos: posSeconda, ini: inizio + durPrima, fin: inizio + durPrima + prima.dur },
+  ];
+  nuovi.forEach((x) => {
+    x.d.a.v = x.pos;
+    const clr = _peColoreSettore(x.pos);
+    x.d.a.bg = clr;
+    delete x.d.a.fg;
+    x.d.b.v = _peMinToOra(x.ini) + ' - ' + _peMinToOra(x.fin);
+    x.d.b.bg = clr;
+    delete x.d.b.fg;
+  });
+  _briefSalvaPauseDebounce();
+  _briefRefreshPause();
+}
 function briefPausaDelRiga(base, r) {
   if (!puoGestirePiano() || !_briefState || !_briefState.pause) return;
   const c = _briefState.pause.contenuto;
@@ -2427,6 +2484,16 @@ function _briefRenderPauseSlots(c) {
           ',' +
           riga.r +
           ')">+</span> ' +
+          '<span style="cursor:pointer;color:var(--muted)" title="Scambia con la riga sopra (orari ricalcolati)" onclick="briefPausaSposta(' +
+          base +
+          ',' +
+          riga.r +
+          ',-1)">▲</span> ' +
+          '<span style="cursor:pointer;color:var(--muted)" title="Scambia con la riga sotto (orari ricalcolati)" onclick="briefPausaSposta(' +
+          base +
+          ',' +
+          riga.r +
+          ',1)">▼</span> ' +
           '<span style="cursor:pointer;color:#c0392b;font-weight:bold" title="Elimina riga" onclick="briefPausaDelRiga(' +
           base +
           ',' +
