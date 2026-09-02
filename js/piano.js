@@ -2020,12 +2020,17 @@ async function cancellaBozzaPiano() {
     '<button class="btn-modal-ok" onclick="eseguiCancellaPiano(false)">Solo non protette (' +
     nonProtette +
     ')</button>' +
-    '<button class="btn-modal-ok" style="background:var(--accent)" onclick="eseguiCancellaPiano(true)">TUTTE (' +
-    _pianoRighe.length +
-    ')</button></div>';
+    (isAdmin()
+      ? '<button class="btn-modal-ok" style="background:var(--accent)" onclick="eseguiCancellaPiano(true)">TUTTE (' +
+        _pianoRighe.length +
+        ')</button>'
+      : '') +
+    '</div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
 async function eseguiCancellaPiano(tutto) {
+  // cancellare ANCHE le celle protette (piano reale) e' riservato all'admin
+  if (tutto && !isAdmin()) return;
   document.getElementById('pwd-modal').classList.add('hidden');
   const ym = _pianoMeseSel;
   const da = ym + '-01';
@@ -2776,7 +2781,7 @@ async function copiaFabbisognoMese() {
 
 // ---- Card TURNI (admin) ----
 function _renderPianoTurniCard() {
-  if (!isAdmin() && !puoGestirePiano()) {
+  if (!isAdmin()) {
     // operatori: vedono i turni del PROPRIO settore in sola lettura
     const turniRO = _pianoTurniReparto()
       .slice()
