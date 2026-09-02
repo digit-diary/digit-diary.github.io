@@ -3530,9 +3530,36 @@ button:focus-visible,
   gap: 2px;
   flex-wrap: wrap;
   background: #212529;
-  padding: 6px 8px;
+  padding: 6px 10px 7px;
   border-radius: 3px;
   margin-bottom: 10px;
+  align-items: stretch;
+}
+/* tab raggruppate in famiglie: etichetta piccola sopra ogni gruppo */
+.piano-tabgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.piano-tabgroup-label {
+  font-size: 0.56rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #6c757d;
+  font-weight: 700;
+  padding: 1px 6px 0;
+  user-select: none;
+}
+.piano-tabgroup-tabs {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+.piano-tabsep {
+  width: 1px;
+  background: #3a4046;
+  margin: 4px 8px;
+  align-self: stretch;
 }
 .piano-tab svg {
   vertical-align: -2px;
@@ -3888,4 +3915,178 @@ table[data-seltab] textarea {
 /* blocco selezionato con Shift+click (copia/incolla) */
 .piano-table td.blocco-sel {
   box-shadow: inset 0 0 0 99px rgba(255, 152, 0, 0.35) !important;
+}
+
+/* ================================================================
+   RIFINITURA PROFESSIONALE (solo presentazione, nessuna logica):
+   coerenza di bottoni, campi, card, tabelle e stati di focus/hover
+   in chiaro e scuro. Regole volutamente leggere: armonizzano senza
+   stravolgere gli stili puntuali già scelti nelle singole card.
+   ================================================================ */
+/* Bottoni: transizioni e feedback uniformi */
+.btn-export,
+.btn-act,
+.btn-add-tipo,
+.btn-del-tipo,
+.btn-ord,
+.reparto-btn,
+.btn-modal-ok,
+.btn-modal-cancel {
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.05s ease;
+}
+.btn-export:active,
+.btn-act:active,
+.btn-add-tipo:active,
+.btn-del-tipo:active {
+  transform: translateY(1px);
+}
+.btn-export:hover,
+.btn-add-tipo:hover {
+  box-shadow: 0 2px 6px var(--shadow);
+}
+/* Campi: focus visibile e coerente ovunque */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent2);
+  outline-offset: 0;
+  border-color: var(--accent2);
+}
+/* Card: profondità e stacco coerenti */
+.main-card,
+.chart-card {
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px var(--shadow);
+}
+/* Tabelle: intestazioni leggibili e righe con hover discreto */
+.piano-table thead th,
+.collab-table thead th {
+  letter-spacing: 0.04em;
+}
+.collab-table tbody tr:hover td,
+#piano-content .piano-table:not(.piano-fixed) tbody tr:hover td {
+  background: color-mix(in srgb, var(--paper2) 55%, transparent);
+}
+/* Liste di configurazione: righe uniformi */
+.tipo-item {
+  border-radius: 3px;
+}
+/* Scrollbar sottili e coerenti (aree con scorrimento interno) */
+.piano-wrap::-webkit-scrollbar,
+div[style*='overflow-x: auto']::-webkit-scrollbar,
+div[style*='overflow-x:auto']::-webkit-scrollbar,
+div[style*='overflow-y:auto']::-webkit-scrollbar {
+  height: 9px;
+  width: 9px;
+}
+.piano-wrap::-webkit-scrollbar-thumb,
+div[style*='overflow-x: auto']::-webkit-scrollbar-thumb,
+div[style*='overflow-x:auto']::-webkit-scrollbar-thumb,
+div[style*='overflow-y:auto']::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border-radius: 5px;
+  border: 2px solid var(--paper);
+}
+/* Selettori nel Piano (reparto, storico): stessa altezza e stile dei bottoni */
+#piano-content select {
+  border-radius: 3px;
+}
+/* Toast e menu contestuale: ombra coerente */
+#piano-ctx {
+  box-shadow: 0 6px 20px var(--shadow);
+  border-radius: 4px;
+}
+/* Indice rapido della pagina Impostazioni */
+.settings-indice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  background: var(--paper2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.settings-indice-chip {
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+  user-select: none;
+}
+.settings-indice-chip:hover {
+  border-color: var(--accent2);
+  color: var(--accent2);
+}
+/* Barra comandi del calendario: gruppi ordinati e stile uniforme */
+.pbar-btn {
+  font-size: 0.78rem;
+  padding: 5px 13px;
+  border-radius: 3px;
+  border-color: #b8a98a;
+  color: #cfc3ad;
+  letter-spacing: 0.05em;
+}
+.pbar-btn:hover {
+  color: #fff;
+  border-color: #fff;
+}
+.pbar-btn.pbar-ok {
+  border-color: #4caf7d;
+  color: #6fd39e;
+  font-weight: 700;
+}
+.pbar-btn.pbar-ok:hover {
+  background: #2c6e49;
+  color: #fff;
+  border-color: #2c6e49;
+}
+.pbar-btn.pbar-warn {
+  border-color: #c0392b;
+  color: #e07b6d;
+}
+.pbar-btn.pbar-warn:hover {
+  background: #c0392b;
+  color: #fff;
+}
+.pbar-btn.pbar-soft {
+  border-color: #8a7d6b;
+  color: #b8a98a;
+}
+.pbar-btn.pbar-color {
+  border-color: #e67e22;
+  color: #f0a35c;
+}
+.pbar-sep {
+  width: 1px;
+  align-self: stretch;
+  background: rgba(255, 255, 255, 0.18);
+  margin: 2px 4px;
+}
+/* transizione morbida al cambio pagina */
+.page {
+  animation: paginaIn 0.16s ease;
+}
+@keyframes paginaIn {
+  from {
+    opacity: 0.55;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
