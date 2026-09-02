@@ -7929,7 +7929,19 @@ async function _renderPianoBriefingTab() {
         '<button class="btn-export" style="font-size:.82rem;padding:5px 12px;border-color:#2c6e49;color:#2c6e49" onclick="briefGeneraPause()">Genera pause</button>' +
         '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="pdfBriefingGiorno()">Stampa briefing</button>' +
         '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="document.getElementById(\'brief-xlsx\').click()">Importa da Excel</button>' +
-        '<input type="file" id="brief-xlsx" accept=".xlsx,.xls,.xlsm" style="display:none" onchange="importaBriefingExcel(this)">'
+        '<input type="file" id="brief-xlsx" accept=".xlsx,.xls,.xlsm" style="display:none" onchange="importaBriefingExcel(this)">' +
+        '<span style="position:relative;display:inline-flex;align-items:center"><button class="btn-export" style="font-size:.82rem;padding:5px 12px;border-color:#e67e22;color:#e67e22" title="Scegli un colore e poi clicca sulle righe da colorare" onclick="event.stopPropagation();briefColoriToggle()">Colori</button>' +
+        '<div id="brief-colori-bar" style="display:none;position:absolute;top:110%;left:0;z-index:1000;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:8px;box-shadow:0 4px 14px rgba(0,0,0,.25);white-space:nowrap">' +
+        PIANO_COLORI_CELLA.map(
+          (c) =>
+            '<span onclick="briefPennello(\'' +
+            c +
+            '\')" style="display:inline-block;width:22px;height:22px;background:' +
+            c +
+            ';border:1px solid #999;border-radius:3px;margin:2px;cursor:pointer;vertical-align:middle"></span>',
+        ).join('') +
+        '<button class="btn-export" style="font-size:.7rem;padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="briefPennello(null)">Nessuno</button>' +
+        '</div></span>'
       : '') +
     '<span id="brief-stato" style="font-size:.78rem;color:var(--muted)">' +
     (salvato
@@ -7985,7 +7997,7 @@ async function _renderPianoBriefingTab() {
       'style="width:' +
       larghezza +
       'px;border:none;background:transparent;padding:4px 6px;font:inherit;color:inherit"></td>';
-    h += '<tr>';
+    h += '<tr data-bidx="' + i + '">';
     // E e U si spuntano A PENNA sul foglio stampato: celle vuote
     h += '<td style="border:1px solid #999;width:34px;padding:3px 4px">&nbsp;</td>';
     h += '<td style="border:1px solid #999;width:34px;padding:3px 4px">&nbsp;</td>';
@@ -8242,6 +8254,45 @@ function briefColoreRiga(i, ev) {
     };
     document.addEventListener('click', chiudi);
   }, 50);
+}
+function briefColoriToggle() {
+  const b = document.getElementById('brief-colori-bar');
+  if (b) b.style.display = b.style.display === 'none' ? 'block' : 'none';
+}
+// MODALITA' PENNELLO: scegli il colore in alto, poi clicca le righe da
+// colorare; Esc (o di nuovo Colori) per uscire
+function briefPennello(col) {
+  const b = document.getElementById('brief-colori-bar');
+  if (b) b.style.display = 'none';
+  if (!puoGestireBriefing()) return;
+  window._briefPennello = { attivo: true, col: col };
+  toast(
+    (col ? 'Pennello attivo: clicca sulle righe da colorare' : 'Gomma attiva: clicca sulle righe da pulire') +
+      ' · Esc per finire',
+  );
+  if (!window._briefPennelloBound) {
+    window._briefPennelloBound = true;
+    document.addEventListener(
+      'click',
+      (e) => {
+        const pn = window._briefPennello;
+        if (!pn || !pn.attivo) return;
+        if (e.target.closest('#brief-colori-bar')) return;
+        const tr = e.target.closest('tr[data-bidx]');
+        if (!tr) return;
+        e.stopPropagation();
+        e.preventDefault();
+        briefColoreRigaSet(parseInt(tr.dataset.bidx), pn.col);
+      },
+      true,
+    );
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && window._briefPennello && window._briefPennello.attivo) {
+        window._briefPennello.attivo = false;
+        toast('Pennello disattivato');
+      }
+    });
+  }
 }
 async function briefColoreRigaSet(i, col) {
   const pop = document.getElementById('brief-colori-pop');
