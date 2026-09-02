@@ -7012,18 +7012,9 @@ async function stampaPianoCollaboratore(nome) {
       codice: codice || '-',
       desc: desc,
       commento: (r && r.commento) || '',
-      fill:
-        r && r.commento
-          ? [187, 222, 251] // azzurro: riga con commento
-          : festiviSet[g]
-            ? [252, 228, 236] // rosa: festivo
-            : dow === 0
-              ? [255, 243, 224] // arancio: domenica
-              : _pianoGiorniWeekend().includes(dow)
-                ? [232, 245, 233] // verde: weekend
-                : g % 2 === 0
-                  ? [248, 249, 250]
-                  : [255, 255, 255],
+      // stampa PULITA: righe bianche per tutti i settori (niente verdi/arancio
+      // weekend-festivi — richiesta utente); resta solo la zebra leggerissima
+      fill: g % 2 === 0 ? [248, 249, 250] : [255, 255, 255],
       vuoto: !codice,
     });
   }
@@ -8395,8 +8386,9 @@ async function corsoRimuovi(cod) {
 }
 function _renderPianoCorsiCard() {
   const corsi = _corsiLista();
-  // operatori: vedono l'elenco dei corsi in sola lettura
-  if (!puoGestirePiano()) {
+  const puoCorsi = puoGestirePiano() || (typeof puoModificare === 'function' && puoModificare('gestione_corsi'));
+  // operatori senza permesso corsi: elenco in sola lettura (orario aggiornabile)
+  if (!puoCorsi) {
     let hRO =
       '<div class="main-card" style="margin-top:16px"><div class="card-header">Corsi</div><div style="padding:12px 14px"><table class="piano-table" style="min-width:420px;font-size:.85rem"><thead><tr><th>Sigla</th><th style="text-align:left">Descrizione</th><th>Ore</th><th>Orario</th></tr></thead><tbody>';
     corsi.forEach((c) => {
@@ -8509,7 +8501,7 @@ async function corsoSalvaOrarioDefault() {
   toast('Orario predefinito di ' + cod + (inizio && fine ? ': ' + inizio + '-' + fine : ' rimosso'));
 }
 async function pianoInserisciCorso() {
-  if (!puoGestirePiano()) return;
+  if (!puoGestirePiano() && !(typeof puoModificare === 'function' && puoModificare('gestione_corsi'))) return;
   const cod = (document.getElementById('corso-cod') || {}).value;
   const data = (document.getElementById('corso-data') || {}).value;
   const inizio = (document.getElementById('corso-inizio') || {}).value;
