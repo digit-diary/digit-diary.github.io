@@ -42,6 +42,7 @@ const VIS_ITEMS = {
     gestione_valutazioni: 'Valutazioni — inserire e importare schede',
     gestione_formazioni: 'Formazioni — registrare sessioni formative svolte (es. supervisor)',
     gestione_piano: 'Piano di lavoro — modificare la griglia turni del mese (es. supervisor)',
+    gestione_corsi: 'Corsi — pianificare corsi nel piano: data, orario e partecipanti (es. supervisor)',
     storico_hr: 'Storico HR — inizio contratto, tracciato categorie/premi/formazioni, equità (sezione riservata)',
   },
 };
@@ -1264,14 +1265,30 @@ function initSezioniRichiudibili(rootId) {
   try {
     aperte = JSON.parse(localStorage.getItem('_sezioni_aperte') || '{}');
   } catch (e) {}
-  // indice rapido in cima: un chip per sezione, clic = apre e scorre lì
-  if (!document.getElementById(rootId + '-indice')) {
-    const sezioni = [...root.querySelectorAll('.settings-section')].filter((s) => s.querySelector(':scope > h4'));
+  // da OPERATORE le sezioni solo-admin non compaiono (sono inutilizzabili);
+  // restano Gestione Collaboratori (si regola coi suoi permessi) e Sicurezza
+  // (impronta del dispositivo, personale)
+  if (rootId === 'page-impostazioni' && !isAdmin()) {
+    const perOperatori = ['Gestione Collaboratori', 'Sicurezza'];
+    root.querySelectorAll('.settings-section').forEach((sec) => {
+      const h = sec.querySelector(':scope > h4');
+      if (!h) return;
+      const titolo = (h.childNodes[0].textContent || '').trim();
+      if (!perOperatori.includes(titolo)) sec.style.display = 'none';
+    });
+  }
+  // indice rapido in cima: un chip per ogni sezione VISIBILE, clic = apre e scorre lì
+  {
+    const vecchio = document.getElementById(rootId + '-indice');
+    if (vecchio) vecchio.remove();
+    const sezioni = [...root.querySelectorAll('.settings-section')].filter(
+      (s) => s.querySelector(':scope > h4') && s.style.display !== 'none',
+    );
     if (sezioni.length > 5) {
       const nav = document.createElement('div');
       nav.id = rootId + '-indice';
       nav.className = 'settings-indice';
-      sezioni.forEach((sec, i) => {
+      sezioni.forEach((sec) => {
         const titolo = (sec.querySelector(':scope > h4').childNodes[0].textContent || '').trim();
         if (!titolo) return;
         const chip = document.createElement('span');
