@@ -2084,13 +2084,27 @@ function _pianoRegoleDove(nome) {
 function _renderPianoRegoleCard() {
   if (!isAdmin()) return '';
   const ordineTipo = { HARD: 1, SOFT: 2, PIPELINE: 3 };
-  const regole = pianoRegoleCache
+  const tutteRegole = pianoRegoleCache
     .slice()
     .sort((a, b) => (ordineTipo[a.tipo] || 9) - (ordineTipo[b.tipo] || 9) || (b.peso || 0) - (a.peso || 0));
+  // le regole non ancora attive nel Diario ("Solver Fase 3") sono rumore per
+  // chi consulta: nascoste dietro un interruttore
+  const nonAttive = tutteRegole.filter((r) => _pianoRegoleDove(r.nome).indexOf('Fase 3') !== -1);
+  const regole = window._pianoRegoleMostraTutte
+    ? tutteRegole
+    : tutteRegole.filter((r) => _pianoRegoleDove(r.nome).indexOf('Fase 3') === -1);
   let h =
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Regole del piano (admin)</div><div style="padding:10px 14px">';
   h +=
-    '<p style="font-size:.85rem;color:var(--muted);margin-bottom:8px">HARD = mai violabili (il validatore le segnala). SOFT = preferenze con peso. PIPELINE = usate dal generatore. La colonna "Applicata da" dice onestamente dove ogni regola agisce oggi: quelle marcate "Solver (Fase 3)" sono conservate ma non ancora attive nel Diario.</p>';
+    '<p style="font-size:.85rem;color:var(--muted);margin-bottom:8px">HARD = mai violabili (il validatore le segnala). SOFT = preferenze con peso. PIPELINE = usate dal generatore.' +
+    (nonAttive.length
+      ? ' <a href="#" style="color:#8b6914;font-weight:700" onclick="window._pianoRegoleMostraTutte=!window._pianoRegoleMostraTutte;renderPiano();return false">' +
+        (window._pianoRegoleMostraTutte
+          ? 'Nascondi le regole non attive'
+          : 'Mostra anche ' + nonAttive.length + ' regole conservate ma non ancora attive (Solver Fase 3)') +
+        '</a>'
+      : '') +
+    '</p>';
   let tipoCorr = '';
   h += '<div style="overflow-x:auto"><table class="piano-table" style="min-width:720px;font-size:.85rem">';
   h +=

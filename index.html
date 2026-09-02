@@ -2837,7 +2837,8 @@
       <div class="settings-section" id="visibilita-section" style="display: none">
         <h4>Visibilità pagine e funzioni</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Controlla quali pagine e funzioni sono visibili agli operatori.
+          Controlla <b>chi</b> vede o modifica pagine e funzioni (tutti, solo admin, operatori scelti). Per decidere
+          invece <b>quali pagine esistono in ogni settore</b> usa la sezione «Settori» qui sopra.
         </p>
         <div id="visibilita-list"></div>
       </div>
@@ -3014,6 +3015,21 @@
         >
           Esporta backup completo
         </button>
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px">
+          <label style="font-size: 0.84rem"
+            >Backup automatico: scarica da solo ogni
+            <input
+              type="number"
+              id="backup-auto-giorni"
+              min="0"
+              max="90"
+              style="width: 60px; padding: 4px; text-align: center"
+              onchange="salvaBackupAutoGiorni(this.value)"
+            />
+            giorni all'accesso admin (0 = disattivato)</label
+          >
+          <span id="backup-ultimo-info" style="font-size: 0.78rem; color: var(--muted)"></span>
+        </div>
         <p id="backup-status" style="font-size: 0.8rem; color: var(--muted); margin-top: 8px"></p>
       </div>
       <div class="settings-section" id="db-stats-section" style="display: none">

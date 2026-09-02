@@ -4090,3 +4090,81 @@ div[style*='overflow-y:auto']::-webkit-scrollbar-thumb {
     transform: none;
   }
 }
+/* ================================================================
+   BELLA E MODERNA — Home e componenti (solo presentazione)
+   ================================================================ */
+/* Card statistiche: accento colorato in alto, numeri in evidenza,
+   micro-sollevamento al passaggio */
+.stat {
+  border-radius: 5px;
+  border-top: 3px solid var(--line);
+  box-shadow: 0 1px 4px var(--shadow);
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
+}
+.stat:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--shadow);
+}
+.stat:has(.stat-num.red) {
+  border-top-color: #c0392b;
+}
+.stat:has(.stat-num.blue) {
+  border-top-color: #1a4a7a;
+}
+.stat:has(.stat-num.teal) {
+  border-top-color: #1a7a6d;
+}
+.stat:has(.stat-num.gold) {
+  border-top-color: #b8860b;
+}
+.stat-num {
+  font-size: 2rem;
+  line-height: 1.15;
+}
+/* Bottoni azione rapida della Home: stessa altezza, sollevamento al passaggio */
+.quick-actions button,
+.btn-salva {
+  border-radius: 5px;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease,
+    background 0.15s ease;
+}
+.quick-actions button:hover,
+.btn-salva:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px var(--shadow);
+}
+/* Card principali: raggio morbido e ombra diffusa, titoli con più respiro */
+.main-card,
+.chart-card {
+  border-radius: 6px;
+}
+/* Navigazione principale: hover morbido, tab attiva marcata */
+.nav-tab {
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+  border-radius: 4px 4px 0 0;
+}
+.nav-tab:hover {
+  background: var(--paper2);
+}
+/* TEMA SCURO — contrasti garantiti: le celle del piano con colore
+   pastello chiaro mantengono SEMPRE il testo scuro leggibile */
+body.dark-theme .piano-cella[style*='background:#'],
+body.dark-theme .piano-cella[style*='background: #'] {
+  color: #14100a;
+}
+body.dark-theme .stat {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+/* liste di configurazione: riga evidenziata al passaggio (tutte le pagine) */
+.tipo-item {
+  transition: background 0.12s ease;
+}
+.tipo-item:hover {
+  background: var(--paper2);
+}

@@ -294,6 +294,8 @@ async function loadAll() {
   // dati pronti: se l'utente ha già aperto il Piano (era vuoto in attesa
   // dei dati), lo ridisegniamo ora che collaboratori e cache ci sono
   window._loadAllDone = true;
+  // backup automatico: parte da solo (solo admin) senza intralciare il login
+  if (typeof _backupAutoCheck === 'function') setTimeout(() => _backupAutoCheck(), 6000);
   try {
     if ((localStorage.getItem('pagina_corrente') || '') === 'piano' && typeof renderPiano === 'function') renderPiano();
   } catch (e) {}

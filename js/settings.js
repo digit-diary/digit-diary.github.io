@@ -1012,6 +1012,8 @@ async function esportaBackupCompleto() {
       download: 'diario_backup_' + new Date().toISOString().split('T')[0] + '.json',
     }).click();
     logAzione('Backup completo esportato', totale + ' record, ' + _TABELLE_BACKUP.length + ' tabelle');
+    await setImp('backup_ultimo', new Date().toISOString());
+    _aggiornaBackupInfo();
     if (st) st.textContent = 'Backup scaricato: ' + totale + ' record da ' + _TABELLE_BACKUP.length + ' tabelle.';
     toast('Backup completo scaricato');
   } catch (e) {
@@ -1021,13 +1023,58 @@ async function esportaBackupCompleto() {
   }
 }
 
+// ---- BACKUP AUTOMATICO: all'accesso admin, se l'ultimo backup e' piu'
+// vecchio di N giorni (configurabile, 0 = off) il file si scarica da solo ----
+async function _backupAutoCheck() {
+  if (!isAdmin()) return;
+  try {
+    const giorni = parseInt(await getImp('backup_auto_giorni'));
+    const nGiorni = isNaN(giorni) ? 7 : giorni; // default: settimanale
+    _aggiornaBackupInfo();
+    if (!nGiorni) return;
+    const ultimo = await getImp('backup_ultimo');
+    const etaMs = ultimo ? Date.now() - new Date(ultimo).getTime() : Infinity;
+    if (etaMs < nGiorni * 24 * 3600 * 1000) return;
+    toast(
+      'Backup automatico in corso (ultimo: ' + (ultimo ? new Date(ultimo).toLocaleDateString('it-IT') : 'mai') + ')',
+    );
+    await esportaBackupCompleto();
+  } catch (e) {}
+}
+async function _aggiornaBackupInfo() {
+  try {
+    const el = document.getElementById('backup-ultimo-info');
+    const inp = document.getElementById('backup-auto-giorni');
+    const ultimo = await getImp('backup_ultimo');
+    const giorni = parseInt(await getImp('backup_auto_giorni'));
+    if (inp && !inp.dataset.init) {
+      inp.value = isNaN(giorni) ? 7 : giorni;
+      inp.dataset.init = '1';
+    }
+    if (el)
+      el.textContent = ultimo
+        ? 'Ultimo backup: ' +
+          new Date(ultimo).toLocaleDateString('it-IT') +
+          ' ' +
+          new Date(ultimo).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+        : 'Nessun backup registrato finora.';
+  } catch (e) {}
+}
+async function salvaBackupAutoGiorni(v) {
+  if (!isAdmin()) return;
+  const n = Math.max(0, Math.min(90, parseInt(v) || 0));
+  await setImp('backup_auto_giorni', String(n));
+  logAzione('Backup automatico', n ? 'ogni ' + n + ' giorni' : 'disattivato');
+  toast(n ? 'Backup automatico: ogni ' + n + ' giorni' : 'Backup automatico disattivato');
+}
 // ================================================================
 // SETTORI (admin): aggiungi/rinomina/colore/disattiva + pagine per settore
 // ================================================================
 function renderSettoriUI() {
   const el = document.getElementById('settori-list');
   if (!el || !isAdmin()) return;
-  let html = '';
+  let html =
+    '<p style="color:var(--muted);font-size:.84rem;margin-bottom:10px">Qui decidi <b>quali pagine esistono</b> in ogni settore (spunte sotto a ogni settore). <b>Chi</b> le vede o le modifica si regola invece in «Visibilità pagine e funzioni».</p>';
   getRepartiTutti().forEach((r) => {
     const custom = !r.fisso;
     const disattivo = custom && r.attivo === false;
