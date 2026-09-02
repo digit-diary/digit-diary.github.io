@@ -1906,7 +1906,6 @@ async function generaBozzaPiano() {
           codice: 'CGF',
           protetto: false,
           generato: true,
-          commento: 'CGF automatico (compensazione festivo lavorato)',
           reparto_dip: _pianoReparto(),
         });
         nCgfAuto++;
