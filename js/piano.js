@@ -40,6 +40,11 @@ const PIANO_COLORI_SPECIALI = {
 function puoGestirePiano() {
   return typeof puoModificare === 'function' ? puoModificare('gestione_piano') : isAdmin();
 }
+// BRIEFING: permesso separato dal piano — gli operatori possono compilare e
+// modificare il foglio del giorno senza toccare la griglia dei turni
+function puoGestireBriefing() {
+  return puoGestirePiano() || (typeof puoModificare === 'function' && puoModificare('gestione_briefing'));
+}
 
 let pianoMappatureCache = [];
 let pianoRegoleGruppoCache = [];
@@ -7879,7 +7884,7 @@ async function _renderPianoBriefingTab() {
     pianoRighe: pianoRighe || [],
     chiave: dstr + '|' + rep,
   };
-  const puo = puoGestirePiano();
+  const puo = puoGestireBriefing();
   const valet = _briefIsValet();
   let h =
     '<div class="main-card" style="margin-top:14px"><div class="card-header">Briefing — ' +
@@ -8105,7 +8110,7 @@ function briefSetData(v) {
   renderPiano();
 }
 function briefCella(i, campo, val) {
-  if (!puoGestirePiano() || !_briefState) return;
+  if (!puoGestireBriefing() || !_briefState) return;
   _briefState.righe[i][campo] = val;
   if (campo === 'nome') _briefState.righe[i].nomeFull = null; // ri-matcha al salvataggio timbratura
   _briefDirtySalva();
@@ -8170,7 +8175,7 @@ function _briefRigaVuota() {
   return { e: '', u: '', nome: '', nomeFull: null, turno: '', cd: '', uscita: '', firma: '', radio: '', badge: '' };
 }
 async function briefInserisciRiga(i) {
-  if (!_briefState || !puoGestirePiano()) return;
+  if (!_briefState || !puoGestireBriefing()) return;
   _briefState.righe.splice(i + 1, 0, _briefRigaVuota());
   clearTimeout(_briefSaveTimer);
   await briefSalvaBriefing();
@@ -8179,7 +8184,7 @@ async function briefInserisciRiga(i) {
 // Colore della riga del briefing: il quadratino apre la STESSA palette
 // del piano, con scelta diretta del colore (vista + PDF)
 function briefColoreRiga(i, ev) {
-  if (!_briefState || !puoGestirePiano()) return;
+  if (!_briefState || !puoGestireBriefing()) return;
   if (ev) ev.stopPropagation();
   let pop = document.getElementById('brief-colori-pop');
   if (pop) pop.remove();
@@ -8226,7 +8231,7 @@ async function briefColoreRigaSet(i, col) {
   renderPiano();
 }
 async function briefMuoviRiga(i, delta) {
-  if (!_briefState || !puoGestirePiano()) return;
+  if (!_briefState || !puoGestireBriefing()) return;
   const j = i + delta;
   if (j < 0 || j >= _briefState.righe.length) return;
   const tmp = _briefState.righe[i];
@@ -8237,14 +8242,14 @@ async function briefMuoviRiga(i, delta) {
   renderPiano();
 }
 async function briefEliminaRiga(i) {
-  if (!_briefState) return;
+  if (!_briefState || !puoGestireBriefing()) return;
   _briefState.righe.splice(i, 1);
   clearTimeout(_briefSaveTimer);
   await briefSalvaBriefing();
   renderPiano();
 }
 async function briefCompila() {
-  if (!_briefState) return;
+  if (!_briefState || !puoGestireBriefing()) return;
   if (_briefState.righe.length && !confirm('Sostituisco le righe attuali con i turni del piano di ' + _briefData + '?'))
     return;
   _briefState.righe = _briefComponi(_briefState.pianoRighe);
