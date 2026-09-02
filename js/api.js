@@ -291,4 +291,10 @@ async function loadAll() {
   if (typeof _checkGiubileiNotifiche === 'function') _checkGiubileiNotifiche().catch(() => {});
   // Health check silenzioso (solo se loggato)
   if (getOpToken()) _healthCheck();
+  // dati pronti: se l'utente ha già aperto il Piano (era vuoto in attesa
+  // dei dati), lo ridisegniamo ora che collaboratori e cache ci sono
+  window._loadAllDone = true;
+  try {
+    if ((localStorage.getItem('pagina_corrente') || '') === 'piano' && typeof renderPiano === 'function') renderPiano();
+  } catch (e) {}
 }

@@ -527,6 +527,14 @@ async function _pianoAggiornaYtd(nomi) {
 async function renderPiano() {
   const el = document.getElementById('piano-content');
   if (!el) return;
+  // dati non ancora arrivati (login appena fatto): mostra l'attesa e riprova
+  // da solo — a caricamento finito loadAll richiama comunque renderPiano
+  if (!window._loadAllDone && (!collaboratoriCache || !collaboratoriCache.length)) {
+    el.innerHTML = '<p style="color:var(--muted);padding:20px">Caricamento dati&hellip;</p>';
+    clearTimeout(window._pianoAttesaTimer);
+    window._pianoAttesaTimer = setTimeout(() => renderPiano(), 800);
+    return;
+  }
   // niente "Caricamento" che accorcia la pagina (faceva saltare lo scroll
   // in cima a ogni cambio giorno/mese): il contenuto vecchio resta visibile
   // sbiadito finché il nuovo non è pronto, poi lo scroll viene ripristinato
