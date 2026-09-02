@@ -562,16 +562,19 @@ async function renderPiano() {
         '</span><button class="btn-act pin" onclick="pianoCambiaMese(1)">&rarr;</button>';
       h +=
         '<select onchange="pianoCambiaReparto(this.value)" style="padding:4px 8px;font-size:.8rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a">';
-      getReparti().forEach((rp) => {
-        h +=
-          '<option value="' +
-          rp.key +
-          '"' +
-          (rp.key === _pianoReparto() ? ' selected' : '') +
-          ' style="color:#000">' +
-          escP(rp.label) +
-          '</option>';
-      });
+      const ammessiRep = _pianoRepartiAmmessi();
+      getReparti()
+        .filter((rp) => ammessiRep.includes(rp.key))
+        .forEach((rp) => {
+          h +=
+            '<option value="' +
+            rp.key +
+            '"' +
+            (rp.key === _pianoReparto() ? ' selected' : '') +
+            ' style="color:#000">' +
+            escP(rp.label) +
+            '</option>';
+        });
       h += '</select>';
       if (puoMod) {
         h +=
@@ -3115,7 +3118,19 @@ let _pianoRepartoSel = null; // null = segue il settore corrente dell'app
 function _pianoReparto() {
   return _pianoRepartoSel || currentReparto;
 }
+// reparti che l'operatore può guardare nel piano: il suo + gli accessi extra
+// (admin e operatori senza reparto assegnato: tutti)
+function _pianoRepartiAmmessi() {
+  const tutti = getReparti().map((r) => r.key);
+  if (isAdmin()) return tutti;
+  const op = getOperatore();
+  const proprio = (typeof operatoriRepartoMap !== 'undefined' && operatoriRepartoMap[op]) || 'entrambi';
+  if (proprio === 'entrambi') return tutti;
+  const extra = typeof _accessiExtraDi === 'function' ? _accessiExtraDi(op) : null;
+  return tutti.filter((k) => k === proprio || !!(extra && extra[k]));
+}
 function pianoCambiaReparto(rep) {
+  if (!_pianoRepartiAmmessi().includes(rep)) return;
   _pianoRepartoSel = rep === currentReparto ? null : rep;
   _pianoViolCelle = {};
   _pianoViolLista = null;
