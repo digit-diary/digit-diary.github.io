@@ -1264,6 +1264,28 @@ function initSezioniRichiudibili(rootId) {
   try {
     aperte = JSON.parse(localStorage.getItem('_sezioni_aperte') || '{}');
   } catch (e) {}
+  // indice rapido in cima: un chip per sezione, clic = apre e scorre lì
+  if (!document.getElementById(rootId + '-indice')) {
+    const sezioni = [...root.querySelectorAll('.settings-section')].filter((s) => s.querySelector(':scope > h4'));
+    if (sezioni.length > 5) {
+      const nav = document.createElement('div');
+      nav.id = rootId + '-indice';
+      nav.className = 'settings-indice';
+      sezioni.forEach((sec, i) => {
+        const titolo = (sec.querySelector(':scope > h4').childNodes[0].textContent || '').trim();
+        if (!titolo) return;
+        const chip = document.createElement('span');
+        chip.className = 'settings-indice-chip';
+        chip.textContent = titolo;
+        chip.onclick = () => {
+          sec.classList.remove('sec-collapsed');
+          sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+        nav.appendChild(chip);
+      });
+      root.insertBefore(nav, root.firstElementChild);
+    }
+  }
   root.querySelectorAll('.settings-section').forEach((sec, i) => {
     const h = sec.querySelector(':scope > h4');
     if (!h) return;

@@ -431,23 +431,45 @@ function pianoCambiaTab(t) {
   localStorage.setItem('piano_tab', t);
   renderPiano();
 }
+// Le 13 tab raggruppate in 3 famiglie: si trova tutto a colpo d'occhio
+const PIANO_TAB_GRUPPI = [
+  ['Giornata', ['calendario', 'briefing']],
+  ['Gestione', ['vacanze', 'saldo', 'timbrature', 'statistiche', 'storico', 'formulari']],
+  ['Configurazione', ['turni', 'regole', 'festivi', 'impostazioni', 'guida']],
+];
 function _pianoTabBar() {
+  const tabHtml = (k) => {
+    const t = _PIANO_TABS.find((x) => x[0] === k);
+    if (!t) return '';
+    return (
+      '<span class="piano-tab' +
+      (k === _pianoTab ? ' attiva' : '') +
+      '" onclick="pianoCambiaTab(\'' +
+      k +
+      '\')">' +
+      (t[2] || '') +
+      ' ' +
+      t[1] +
+      '</span>'
+    );
+  };
+  const inGruppi = PIANO_TAB_GRUPPI.flatMap(([, keys]) => keys);
+  const fuori = _PIANO_TABS.map(([k]) => k).filter((k) => !inGruppi.includes(k));
   return (
     '<div class="piano-tabs">' +
-    _PIANO_TABS
-      .map(
-        ([k, lbl, ico]) =>
-          '<span class="piano-tab' +
-          (k === _pianoTab ? ' attiva' : '') +
-          '" onclick="pianoCambiaTab(\'' +
-          k +
-          '\')">' +
-          (ico || '') +
-          ' ' +
-          lbl +
-          '</span>',
-      )
-      .join('') +
+    PIANO_TAB_GRUPPI.map(
+      ([lbl, keys]) =>
+        '<div class="piano-tabgroup"><span class="piano-tabgroup-label">' +
+        lbl +
+        '</span><div class="piano-tabgroup-tabs">' +
+        keys.map(tabHtml).join('') +
+        '</div></div>',
+    ).join('<div class="piano-tabsep"></div>') +
+    (fuori.length
+      ? '<div class="piano-tabsep"></div><div class="piano-tabgroup"><span class="piano-tabgroup-label">&nbsp;</span><div class="piano-tabgroup-tabs">' +
+        fuori.map(tabHtml).join('') +
+        '</div></div>'
+      : '') +
     '</div>'
   );
 }
@@ -589,26 +611,48 @@ async function renderPiano() {
             '</option>';
         });
       h += '</select>';
+      // barra comandi ORDINATA in gruppi: Pianifica · Controlla · Strumenti · Esporta
+      const pbtn = (label, onclick, tipo, title) =>
+        '<button class="btn-export pbar-btn' +
+        (tipo ? ' ' + tipo : '') +
+        '"' +
+        (title ? ' title="' + title + '"' : '') +
+        ' onclick="' +
+        onclick +
+        '">' +
+        label +
+        '</button>';
+      const psep = '<span class="pbar-sep"></span>';
       if (puoMod) {
-        h +=
-          '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#d4b86a;color:#d4b86a" onclick="validaPiano()">Valida regole</button>' +
-          '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#c0392b;color:#e07b6d" onclick="apriCoperturaMalattia()">Copertura malattia</button>';
-        h +=
-          '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49" onclick="generaBozzaPiano()">Genera bozza</button>' +
-          '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#8e44ad;color:#8e44ad" title="Dopo la bozza: scambia turni generati tra chi è sopra e chi è sotto le ore dovute (stesso giorno, regole rispettate)" onclick="miglioraOrePiano()">Migliora ore</button>';
-        h +=
-          '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:var(--accent);color:var(--accent)" onclick="cancellaBozzaPiano()">Cancella piano</button>' +
-          '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#d4b86a;color:#d4b86a" title="Trascina i nomi per riordinare; questo pulsante ripristina SUP, BO, poi gli altri" onclick="ripristinaOrdinePiano()">Ordine predefinito</button>';
+        h += psep;
+        h += pbtn('Genera bozza', 'generaBozzaPiano()', 'pbar-ok');
+        h += pbtn(
+          'Migliora ore',
+          'miglioraOrePiano()',
+          '',
+          'Dopo la bozza: scambia turni generati tra chi è sopra e chi è sotto le ore dovute (stesso giorno, regole rispettate)',
+        );
+        h += pbtn('Valida regole', 'validaPiano()', '');
+        h += psep;
+        h += pbtn('Copertura malattia', 'apriCoperturaMalattia()', '');
+        h += pbtn('Cancella piano', 'cancellaBozzaPiano()', 'pbar-warn');
+        h += psep;
+        h += pbtn(
+          'Ordine predefinito',
+          'ripristinaOrdinePiano()',
+          '',
+          'Trascina i nomi per riordinare; questo pulsante ripristina SUP, BO, poi gli altri',
+        );
+        h += _pianoColoriBarHtml();
       }
-      if (puoMod) h += _pianoColoriBarHtml();
-      h +=
-        '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#b8a98a;color:#b8a98a" onclick="copiaPianoExcel()">Copia per Excel</button>';
-      h +=
-        '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#b8a98a;color:#b8a98a" onclick="stampaPianoPDF()">Stampa PDF</button>';
-      if (puoMod)
+      h += psep;
+      h += pbtn('Copia per Excel', 'copiaPianoExcel()', 'pbar-soft');
+      h += pbtn('Stampa PDF', 'stampaPianoPDF()', 'pbar-soft');
+      if (puoMod) {
+        h += pbtn('Importa piano', "document.getElementById('piano-imp-file').click()", 'pbar-soft');
         h +=
-          '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#b8a98a;color:#b8a98a" onclick="document.getElementById(\'piano-imp-file\').click()">Importa piano</button>' +
           '<input type="file" id="piano-imp-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importaPianoExcel(this)">';
+      }
       h +=
         '<span style="font-size:.8rem;color:var(--muted);margin-left:auto">' +
         _pianoRighe.length +
@@ -8249,6 +8293,22 @@ function _corsiLista() {
     })
     .filter(Boolean);
 }
+// orario del corso aggiornabile anche dagli operatori (è solo il riferimento
+// proposto alla prossima pianificazione, non tocca il piano)
+async function corsoOrarioRapido(cod, inizio, fine) {
+  const cur = ((window._pianoCorsiOrari || {})[cod] || '').split('-');
+  const oi = inizio != null ? inizio : cur[0] || '';
+  const of2 = fine != null ? fine : cur[1] || '';
+  window._pianoCorsiOrari = window._pianoCorsiOrari || {};
+  window._pianoCorsiOrari[cod] = oi && of2 ? oi + '-' + of2 : oi || of2 || '';
+  try {
+    await setImp('piano_corsi_orari', JSON.stringify(window._pianoCorsiOrari));
+    logAzione('Corsi', cod + ' orario aggiornato: ' + window._pianoCorsiOrari[cod]);
+    toast('Orario corso ' + cod + ' salvato');
+  } catch (e) {
+    toast('Errore salvataggio orario');
+  }
+}
 async function _corsiSalvaLista() {
   await setImp('piano_corsi_lista', window._pianoCorsiLista.join(','));
 }
@@ -8331,8 +8391,9 @@ function _renderPianoCorsiCard() {
   // operatori: vedono l'elenco dei corsi in sola lettura
   if (!puoGestirePiano()) {
     let hRO =
-      '<div class="main-card" style="margin-top:16px"><div class="card-header">Corsi</div><div style="padding:12px 14px"><table class="piano-table" style="min-width:380px;font-size:.85rem"><thead><tr><th>Sigla</th><th style="text-align:left">Descrizione</th><th>Ore</th><th>Orario predefinito</th></tr></thead><tbody>';
+      '<div class="main-card" style="margin-top:16px"><div class="card-header">Corsi</div><div style="padding:12px 14px"><table class="piano-table" style="min-width:420px;font-size:.85rem"><thead><tr><th>Sigla</th><th style="text-align:left">Descrizione</th><th>Ore</th><th>Orario</th></tr></thead><tbody>';
     corsi.forEach((c) => {
+      const orario = ((window._pianoCorsiOrari || {})[c.codice] || '').split('-');
       hRO +=
         '<tr><td style="font-weight:700">' +
         escP(c.codice) +
@@ -8340,11 +8401,18 @@ function _renderPianoCorsiCard() {
         escP(c.descrizione) +
         '</td><td>' +
         (c.ore || 0) +
-        '</td><td>' +
-        escP((window._pianoCorsiOrari || {})[c.codice] || '—') +
-        '</td></tr>';
+        '</td><td style="white-space:nowrap"><input type="time" value="' +
+        (orario[0] || '') +
+        '" onchange="corsoOrarioRapido(\'' +
+        c.codice +
+        '\',this.value,null)" style="padding:2px 4px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"> - <input type="time" value="' +
+        (orario[1] || '') +
+        '" onchange="corsoOrarioRapido(\'' +
+        c.codice +
+        '\',null,this.value)" style="padding:2px 4px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td></tr>';
     });
-    hRO += '</tbody></table></div></div>';
+    hRO +=
+      '</tbody></table><p style="font-size:.75rem;color:var(--muted);margin-top:6px">L&#39;orario del corso cambia di volta in volta: qui puoi aggiornarlo, viene proposto alla prossima pianificazione.</p></div></div>';
     return hRO;
   }
   const collabs = collaboratoriCache
@@ -8583,7 +8651,7 @@ function pianoBloccoClick(tab, el) {
 const PIANO_COLORI_CELLA = ['#FF6B6B', '#FFB86B', '#FFF06B', '#95E06C', '#6BCBFF', '#B39DDB', '#F48FB1', '#D7CCC8'];
 function _pianoColoriBarHtml() {
   return (
-    '<span style="position:relative;display:inline-flex;align-items:center"><button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#e67e22;color:#e67e22" title="Colora le celle selezionate (solo qui nel piano, il turno non cambia)" onclick="event.stopPropagation();pianoColoriToggle()">Colori</button>' +
+    '<span style="position:relative;display:inline-flex;align-items:center"><button class="btn-export pbar-btn pbar-color" title="Colora le celle selezionate (solo qui nel piano, il turno non cambia)" onclick="event.stopPropagation();pianoColoriToggle()">Colori</button>' +
     '<div id="piano-colori-pop" style="display:none;position:absolute;top:110%;left:0;z-index:1000;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:8px;box-shadow:0 4px 14px rgba(0,0,0,.25);white-space:nowrap">' +
     PIANO_COLORI_CELLA.map(
       (c) =>
