@@ -43,6 +43,8 @@ const VIS_ITEMS = {
     gestione_formazioni: 'Formazioni — registrare sessioni formative svolte (es. supervisor)',
     gestione_piano: 'Piano di lavoro — modificare la griglia turni del mese (es. supervisor)',
     gestione_corsi: 'Corsi — pianificare corsi nel piano: data, orario e partecipanti (es. supervisor)',
+    gestione_briefing:
+      'Briefing — compilare e modificare il foglio del giorno e le pause (senza toccare la griglia turni)',
     storico_hr: 'Storico HR — inizio contratto, tracciato categorie/premi/formazioni, equità (sezione riservata)',
   },
 };

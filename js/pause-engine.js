@@ -2163,7 +2163,7 @@ function _peGeneraValet(righe, dstr) {
 // GENERAZIONE + RENDERING + EDITING (chiamati da piano.js)
 // ============================================================
 async function briefGeneraPause() {
-  if (!puoGestirePiano() || !_briefState) return;
+  if (!puoGestireBriefing() || !_briefState) return;
   // XXX = posizione scoperta del fabbisogno: si vede sul foglio ma NON è un collaboratore
   const righe = (_briefState.righe || []).filter(
     (r) => r.nome && r.turno && String(r.nome).trim().toUpperCase() !== 'XXX',
@@ -2226,7 +2226,7 @@ function _briefRefreshPause() {
   if (el && typeof _briefPauseBodyHtml === 'function') el.innerHTML = _briefPauseBodyHtml();
 }
 function briefPausaInsRiga(base, r) {
-  if (!puoGestirePiano() || !_briefState || !_briefState.pause) return;
+  if (!puoGestireBriefing() || !_briefState || !_briefState.pause) return;
   const c = _briefState.pause.contenuto;
   // sposta in giù di 1 le celle di QUESTA coppia di colonne sotto la riga r
   for (let rr = c.nR + 1; rr > r + 1; rr--) {
@@ -2249,7 +2249,7 @@ function briefPausaInsRiga(base, r) {
 // orari: l'inizio resta quello della prima, le durate seguono le postazioni
 // (es. R24 22.15-22.45 + S3 22.45-23.00 → S3 22.15-22.30 + R24 22.30-23.00)
 function briefPausaSposta(base, r, dir) {
-  if (!puoGestirePiano() || !_briefState || !_briefState.pause) return;
+  if (!puoGestireBriefing() || !_briefState || !_briefState.pause) return;
   const c = _briefState.pause.contenuto;
   const dati = (rr) => {
     const a = c.celle[rr + '|' + base];
@@ -2316,7 +2316,7 @@ function briefPausaSposta(base, r, dir) {
   _briefRefreshPause();
 }
 function briefPausaDelRiga(base, r) {
-  if (!puoGestirePiano() || !_briefState || !_briefState.pause) return;
+  if (!puoGestireBriefing() || !_briefState || !_briefState.pause) return;
   const c = _briefState.pause.contenuto;
   delete c.celle[r + '|' + base];
   delete c.celle[r + '|' + (base + 1)];
@@ -2325,7 +2325,7 @@ function briefPausaDelRiga(base, r) {
 }
 // modifica cella pause slots (r|c del foglio virtuale)
 function briefPausaCellaSlots(r, c, val) {
-  if (!puoGestirePiano() || !_briefState || !_briefState.pause) return;
+  if (!puoGestireBriefing() || !_briefState || !_briefState.pause) return;
   const g = _briefState.pause.contenuto.celle;
   const k = r + '|' + c;
   if (!val.trim()) {
@@ -2354,7 +2354,7 @@ function briefPausaCellaSlots(r, c, val) {
 }
 // modifica pause valet (riga i, pausa k o campo)
 function briefPausaCellaValet(i, campo, val) {
-  if (!puoGestirePiano() || !_briefState || !_briefState.pause) return;
+  if (!puoGestireBriefing() || !_briefState || !_briefState.pause) return;
   const c = _briefState.pause.contenuto;
   if (campo === 'p0' || campo === 'p1' || campo === 'p2') {
     const k = parseInt(campo[1]);
@@ -2369,19 +2369,19 @@ function briefPausaCellaValet(i, campo, val) {
   if (el) el.innerHTML = _briefRenderCronoValet(c);
 }
 function briefValetAddRiga() {
-  if (!puoGestirePiano() || !_briefState || !_briefState.pause) return;
+  if (!puoGestireBriefing() || !_briefState || !_briefState.pause) return;
   _briefState.pause.contenuto.righe.push({ turno: '', nome: '', orario: '', pause: [] });
   _briefSalvaPauseDebounce();
   _briefRefreshPause();
 }
 function briefValetDelRiga(i) {
-  if (!puoGestirePiano() || !_briefState || !_briefState.pause) return;
+  if (!puoGestireBriefing() || !_briefState || !_briefState.pause) return;
   _briefState.pause.contenuto.righe.splice(i, 1);
   _briefSalvaPauseDebounce();
   _briefRefreshPause();
 }
 async function briefEliminaPause() {
-  if (!puoGestirePiano() || !_briefState || !_briefState.pause || !_briefState.pause.id) return;
+  if (!puoGestireBriefing() || !_briefState || !_briefState.pause || !_briefState.pause.id) return;
   if (!confirm('Elimino le pause di questa data?')) return;
   await secDel('piano_briefing', 'id=eq.' + _briefState.pause.id);
   _briefState.pause = null;
@@ -2393,7 +2393,7 @@ function _briefRenderPause(c) {
   return _briefRenderPauseSlots(c);
 }
 function _briefRenderPauseSlots(c) {
-  const puo = puoGestirePiano();
+  const puo = puoGestireBriefing();
   let h = '';
   const tit = c.celle['1|1'];
   const dataC = c.celle['2|1'];
@@ -2596,7 +2596,7 @@ function _briefRenderCronoValet(c) {
   return h;
 }
 function _briefRenderPauseValet(c) {
-  const puo = puoGestirePiano();
+  const puo = puoGestireBriefing();
   let h =
     '<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:.82rem"><tr><td colspan="6" style="border:1px solid #999;background:#FFFF00;font-weight:bold;text-align:center;padding:4px">PAUSE VALET — ' +
     escP(c.tipoGiorno || '') +
@@ -3166,7 +3166,7 @@ async function salvaPauseCfg() {
 // corrisponde a un TURNO del reparto e prende come nome la cella non vuota
 // più vicina a sinistra (funziona con i fogli briefing slots e valet)
 async function importaBriefingExcel(input) {
-  if (!puoGestirePiano() || !_briefState) return;
+  if (!puoGestireBriefing() || !_briefState) return;
   const file = input.files[0];
   input.value = '';
   if (!file || !window.XLSX) return;
