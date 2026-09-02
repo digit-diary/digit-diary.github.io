@@ -174,6 +174,19 @@ async function _pianoCaricaCfg() {
     window._pianoCorsiOrari = {};
   }
   if (!window._pianoCorsiOrari.CS) window._pianoCorsiOrari.CS = '14:30-17:30';
+  // lista CORSI personalizzabile (admin): solo queste sigle appaiono nel
+  // pianificatore corsi; gli altri codici restano codici normali
+  try {
+    const cl = await getImp('piano_corsi_lista');
+    window._pianoCorsiLista = cl
+      ? cl
+          .split(',')
+          .map((x) => x.trim().toUpperCase())
+          .filter(Boolean)
+      : ['CS', 'LRD', 'ANTINCENDIO'];
+  } catch (e) {
+    window._pianoCorsiLista = ['CS', 'LRD', 'ANTINCENDIO'];
+  }
   window._pianoGgFormazione = parseInt(ggFormazione) || 5;
   try {
     window._pianoCdCfg = cdConfig ? JSON.parse(cdConfig) : null;
@@ -8227,22 +8240,124 @@ function _briefPauseBodyHtml() {
 // CORSI (CS, LRD, ANTINCENDIO...) — pianificatore: scegli codice,
 // data, orario e partecipanti; le sigle finiscono da sole nel piano
 // ============================================================
+function _corsiLista() {
+  const lista = Array.isArray(window._pianoCorsiLista) ? window._pianoCorsiLista : ['CS', 'LRD', 'ANTINCENDIO'];
+  return lista
+    .map((cod) => {
+      const info = pianoCodiciCache.find((x) => x.codice.toUpperCase() === cod && x.attivo !== false);
+      return info ? { codice: info.codice, descrizione: info.descrizione || '', ore: info.ore } : null;
+    })
+    .filter(Boolean);
+}
+async function _corsiSalvaLista() {
+  await setImp('piano_corsi_lista', window._pianoCorsiLista.join(','));
+}
+async function corsoAggiungi() {
+  if (!isAdmin()) return;
+  const cod = ((document.getElementById('corso-nuovo-cod') || {}).value || '').trim().toUpperCase();
+  const desc = ((document.getElementById('corso-nuovo-desc') || {}).value || '').trim();
+  const ore = parseFloat((document.getElementById('corso-nuovo-ore') || {}).value) || 0;
+  if (!cod) {
+    toast('Inserisci la sigla del corso');
+    return;
+  }
+  if ((window._pianoCorsiLista || []).includes(cod)) {
+    toast('Corso già in lista');
+    return;
+  }
+  try {
+    const esiste = pianoCodiciCache.find((x) => x.codice.toUpperCase() === cod);
+    if (!esiste) {
+      const nuovo = await secPost('piano_codici', {
+        codice: cod,
+        descrizione: desc || 'Corso ' + cod,
+        ore: ore,
+        scala_percentuale: false,
+        protetto: false,
+        is_riposo: false,
+        attivo: true,
+        richiede_orario: false,
+      });
+      if (nuovo && nuovo[0]) pianoCodiciCache.push(nuovo[0]);
+    } else if (desc) {
+      await secPatch('piano_codici', 'id=eq.' + esiste.id, { descrizione: desc });
+      esiste.descrizione = desc;
+    }
+    window._pianoCorsiLista = [...(window._pianoCorsiLista || []), cod];
+    await _corsiSalvaLista();
+    logAzione('Corsi', 'Aggiunto corso ' + cod + ' (' + ore + 'h)');
+    toast('Corso ' + cod + ' aggiunto');
+    renderPiano();
+  } catch (e) {
+    toast('Errore aggiunta corso');
+  }
+}
+async function corsoRinomina(cod, desc) {
+  if (!isAdmin()) return;
+  const c = pianoCodiciCache.find((x) => x.codice.toUpperCase() === cod.toUpperCase());
+  if (!c) return;
+  try {
+    await secPatch('piano_codici', 'id=eq.' + c.id, { descrizione: (desc || '').trim() });
+    c.descrizione = (desc || '').trim();
+    logAzione('Corsi', cod + ' rinominato: ' + desc);
+    toast('Descrizione salvata');
+  } catch (e) {
+    toast('Errore salvataggio');
+  }
+}
+async function corsoOre(cod, ore) {
+  if (!isAdmin()) return;
+  const c = pianoCodiciCache.find((x) => x.codice.toUpperCase() === cod.toUpperCase());
+  if (!c) return;
+  try {
+    await secPatch('piano_codici', 'id=eq.' + c.id, { ore: parseFloat(ore) || 0 });
+    c.ore = parseFloat(ore) || 0;
+    logAzione('Corsi', cod + ' ore → ' + ore);
+    toast('Ore corso salvate');
+  } catch (e) {
+    toast('Errore salvataggio');
+  }
+}
+async function corsoRimuovi(cod) {
+  if (!isAdmin()) return;
+  if (!confirm('Togliere ' + cod + ' dalla lista corsi? (il codice resta tra i codici del piano)')) return;
+  window._pianoCorsiLista = (window._pianoCorsiLista || []).filter((x) => x !== cod);
+  await _corsiSalvaLista();
+  logAzione('Corsi', 'Rimosso dalla lista: ' + cod);
+  renderPiano();
+}
 function _renderPianoCorsiCard() {
-  if (!puoGestirePiano()) return '';
-  const codici = pianoCodiciCache.filter((c) => c.attivo !== false);
+  const corsi = _corsiLista();
+  // operatori: vedono l'elenco dei corsi in sola lettura
+  if (!puoGestirePiano()) {
+    let hRO =
+      '<div class="main-card" style="margin-top:16px"><div class="card-header">Corsi</div><div style="padding:12px 14px"><table class="piano-table" style="min-width:380px;font-size:.85rem"><thead><tr><th>Sigla</th><th style="text-align:left">Descrizione</th><th>Ore</th><th>Orario predefinito</th></tr></thead><tbody>';
+    corsi.forEach((c) => {
+      hRO +=
+        '<tr><td style="font-weight:700">' +
+        escP(c.codice) +
+        '</td><td style="text-align:left">' +
+        escP(c.descrizione) +
+        '</td><td>' +
+        (c.ore || 0) +
+        '</td><td>' +
+        escP((window._pianoCorsiOrari || {})[c.codice] || '—') +
+        '</td></tr>';
+    });
+    hRO += '</tbody></table></div></div>';
+    return hRO;
+  }
   const collabs = collaboratoriCache
     .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
     .sort((a, b) => a.nome.localeCompare(b.nome));
   let h =
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Corsi — inserimento automatico nel piano</div><div style="padding:12px 14px">';
   h +=
-    '<p style="font-size:.8rem;color:var(--muted);margin-bottom:10px">Scegli il corso (CS, LRD, ANTINCENDIO...), la data, l&#39;orario e i partecipanti: la sigla viene scritta da sola nelle loro celle del piano (protetta, con orario e ore contate).</p>';
+    '<p style="font-size:.8rem;color:var(--muted);margin-bottom:10px">Scegli il corso, la data, l&#39;orario e i partecipanti: la sigla viene scritta da sola nelle loro celle del piano (protetta, con orario e ore contate).</p>';
   h += '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">';
   h +=
     '<div class="field"><label>Corso</label><select id="corso-cod" style="padding:8px" onchange="corsoPrefillOrari()">' +
-    codici
-      .map((c) => '<option' + (c.codice === 'CS' ? ' selected' : '') + '>' + escP(c.codice) + '</option>')
-      .join('') +
+    corsi.map((c) => '<option' + (c.codice === 'CS' ? ' selected' : '') + '>' + escP(c.codice) + '</option>').join('') +
     '</select></div>';
   h += '<div class="field"><label>Data</label><input type="date" id="corso-data"></div>';
   const preCS = ((window._pianoCorsiOrari || {})['CS'] || '14:30-17:30').split('-');
@@ -8270,6 +8385,31 @@ function _renderPianoCorsiCard() {
   h += '</div>';
   h +=
     '<button class="btn-export" style="font-size:.85rem;padding:6px 16px;margin-top:10px;border-color:#2c6e49;color:#2c6e49" onclick="pianoInserisciCorso()">Inserisci nel piano</button>';
+  // gestione della LISTA corsi (admin): aggiungi sigla, rinomina, rimuovi
+  if (isAdmin()) {
+    h +=
+      '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Gestisci corsi (admin)</p>';
+    corsi.forEach((c) => {
+      h +=
+        '<div class="tipo-item"><div class="tipo-item-name" style="min-width:90px;font-weight:700">' +
+        escP(c.codice) +
+        '</div><input type="text" value="' +
+        escP(c.descrizione) +
+        '" placeholder="descrizione" onchange="corsoRinomina(\'' +
+        c.codice +
+        '\',this.value)" style="flex:1;padding:5px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><input type="number" step="0.5" min="0" value="' +
+        (c.ore || 0) +
+        '" title="Ore conteggiate per il corso" onchange="corsoOre(\'' +
+        c.codice +
+        '\',this.value)" style="width:70px;padding:5px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);text-align:center"><button class="btn-del-tipo" onclick="corsoRimuovi(\'' +
+        c.codice +
+        '\')">Rimuovi</button></div>';
+    });
+    h +=
+      '<div class="add-tipo-row" style="margin:6px 0 0"><div class="field"><label>Nuova sigla corso</label><input type="text" id="corso-nuovo-cod" placeholder="Es: PRIMO SOCCORSO" maxlength="14" style="width:150px"></div><div class="field"><label>Descrizione</label><input type="text" id="corso-nuovo-desc" placeholder="descrizione"></div><div class="field"><label>Ore</label><input type="number" id="corso-nuovo-ore" value="2" step="0.5" min="0" style="width:70px"></div><button class="btn-add-tipo" onclick="corsoAggiungi()">+ Aggiungi</button></div>';
+    h +=
+      '<p style="font-size:.75rem;color:var(--muted);margin:4px 0 0">Rimuovere un corso lo toglie solo da questa lista: il codice resta tra i codici del piano e le celle gi&agrave; inserite non cambiano.</p>';
+  }
   h += '</div></div>';
   return h;
 }
