@@ -1,5 +1,5 @@
 /**
- * Diario Collaboratori — Casino Lugano SA
+ * Diario Collaboratori · Casino Lugano SA
  * File: valutazioni.js
  * Valutazione annuale integrata: 9 aree scheda HR + Versatilità e
  * "Affidabilità e disponibilità" (voce unica). Editor multi-scheda (anno/tipo),
@@ -198,7 +198,7 @@ function _renderValutazioneSezione(nome) {
         ')">' +
         x.anno +
         (x.tipo !== 'valutazione' ? ' · ' + escP(x.tipo) : '') +
-        ' — ' +
+        ' · ' +
         _mediaValutazione(_areeNormalizza(x.aree)) +
         '%</span>';
     });
@@ -232,12 +232,12 @@ function _renderValutazioneSezione(nome) {
     '</strong> (' +
     escP(v.tipo) +
     ')' +
-    (v.valutatore ? ' — valutatore: ' + escP(v.valutatore) : '') +
+    (v.valutatore ? ' · valutatore: ' + escP(v.valutatore) : '') +
     ((v.dati_personali || {}).settore || (v.dati_personali || {}).funzione
-      ? ' — ' +
+      ? ' · ' +
         [(v.dati_personali || {}).settore, (v.dati_personali || {}).funzione].filter(Boolean).map(escP).join(' · ')
       : '') +
-    ' — media: <strong style="color:' +
+    ' · media: <strong style="color:' +
     _coloreValore(media) +
     '">' +
     media +
@@ -275,9 +275,9 @@ function _renderValutazioneSezione(nome) {
       '"></div></div><strong style="min-width:38px;text-align:right;color:' +
       _coloreValore(val) +
       '"' +
-      (val != null ? ' title="Grado ' + _gradoScala(val) + ' — ' + _giudizioScala(val) + '"' : '') +
+      (val != null ? ' title="Grado ' + _gradoScala(val) + ' · ' + _giudizioScala(val) + '"' : '') +
       '>' +
-      (val != null ? val + '%' : '—') +
+      (val != null ? val + '%' : '-') +
       '</strong>' +
       (prec ? deltaBadge(val, areePrec[a.key]) : '') +
       ((v.auto_aree || {})[a.key] != null
@@ -371,7 +371,7 @@ function apriValutazioneEditor(nome, anno, tipo) {
   const sug = _suggerisciAree(nome);
   const ne = nome.replace(/'/g, "\\'");
   let html =
-    '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px"><div><h3 style="font-family:Playfair Display,serif;color:var(--ink)">Valutazione — ' +
+    '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px"><div><h3 style="font-family:Playfair Display,serif;color:var(--ink)">Valutazione · ' +
     escP(nome) +
     '</h3><p style="color:var(--muted);font-size:.8rem">' +
     SCALA_VALUTAZIONE +
@@ -416,7 +416,7 @@ function apriValutazioneEditor(nome, anno, tipo) {
       ar.key +
       '" value="' +
       val +
-      '" min="0" max="100" step="5" placeholder="—" style="width:80px;padding:8px;border:1.5px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink);text-align:center;font-weight:700">' +
+      '" min="0" max="100" step="5" placeholder="-" style="width:80px;padding:8px;border:1.5px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink);text-align:center;font-weight:700">' +
       (s != null
         ? '<button class="btn-act pin" onclick="document.getElementById(\'val-area-' +
           ar.key +
@@ -541,7 +541,7 @@ async function salvaValutazione(nome) {
         window._valSchedaSel = r[0].id;
       }
     }
-    logAzione('Valutazione salvata', nome + ' — ' + tipo + ' ' + anno + ' (media ' + _mediaValutazione(aree) + '%)');
+    logAzione('Valutazione salvata', nome + ' · ' + tipo + ' ' + anno + ' (media ' + _mediaValutazione(aree) + '%)');
     toast('Valutazione ' + anno + ' salvata');
     apriSchedaCollaboratore(nome);
   } catch (e) {
@@ -563,7 +563,7 @@ async function eliminaValutazione(id, nome) {
 }
 
 // ================================================================
-// IMPORT EXCEL (scheda compilata da HR — parser tollerante)
+// IMPORT EXCEL (scheda compilata da HR · parser tollerante)
 // ================================================================
 function _normTesto(s) {
   return String(s || '')
@@ -590,7 +590,7 @@ const _AREE_MATCH = [
   { key: 'affidabilita_disponibilita', match: 'disponibilita' },
 ];
 // Parser scheda HR: la scheda ufficiale del valutatore ha colonne B=Grado (1-5),
-// C=Punteggio (0-100), D=Valore, E=Totale — il punteggio da importare è la colonna C,
+// C=Punteggio (0-100), D=Valore, E=Totale · il punteggio da importare è la colonna C,
 // individuata dall'intestazione "Punteggio" (nell'autovalutazione la colonna si chiama "Valore").
 // Mai prendere il primo numero della riga: sarebbe il Grado 1-5.
 function _parseValutazioneWorkbook(wb) {
@@ -660,7 +660,7 @@ function _parseValutazioneWorkbook(wb) {
       if (idsV.length && dp.valutatore_id == null) dp.valutatore_id = idsV[0];
       const nomi = leggiCoppia(row, rowNorm, 'cognome');
       if (nomi.length >= 2 && !extra.valutatore) extra.valutatore = nomi[1];
-      // data ufficiale della scheda (cella "Data:") — numero seriale Excel o testo gg.mm.aaaa
+      // data ufficiale della scheda (cella "Data:") · numero seriale Excel o testo gg.mm.aaaa
       const dataC = leggiCoppia(row, rowNorm, 'data', true);
       if (dataC.length && dp.data_scheda == null) {
         const nSer = parseFloat(dataC[0]);
@@ -679,7 +679,7 @@ function _parseValutazioneWorkbook(wb) {
         let ip = rowNorm.findIndex((c) => c.includes('punteggio'));
         if (ip === -1) ip = rowNorm.findIndex((c) => c === 'valore');
         if (ip !== -1) colPunteggio = ip;
-        // colonna D "Valore" (ponderazione ufficiale) — solo se distinta dal punteggio
+        // colonna D "Valore" (ponderazione ufficiale) · solo se distinta dal punteggio
         const iv = rowNorm.findIndex((c, j) => c === 'valore' && j !== ip);
         colValore = iv !== -1 && rowNorm[ip] !== 'valore' ? iv : -1;
         const idd = rowNorm.findIndex((c) => c.includes('descrizione area') || c.includes('param'));
@@ -790,9 +790,9 @@ async function importaValutazioneExcel(input, nome) {
     b.innerHTML =
       '<h3>Importa valutazione</h3><p style="margin-bottom:10px"><strong>' +
       escP(nome) +
-      '</strong> — anno <strong>' +
+      '</strong> · anno <strong>' +
       anno +
-      '</strong> — ' +
+      '</strong> · ' +
       trovate +
       '/' +
       AREE_VALUTAZIONE.length +
@@ -884,7 +884,7 @@ async function _confermaImportValutazione() {
       });
       if (r && r[0]) valutazioniCache.unshift(r[0]);
     }
-    logAzione('Valutazione importata da Excel', p.nome + ' — anno ' + p.anno);
+    logAzione('Valutazione importata da Excel', p.nome + ' · anno ' + p.anno);
     // File Excel originale → allegato nello Storico HR (max 2 MB, gestito dall'helper)
     if (p.file && typeof _uploadHrAllegato === 'function') {
       try {
@@ -900,7 +900,7 @@ async function _confermaImportValutazione() {
 }
 
 // ================================================================
-// EXPORT PDF — formato scheda ufficiale HR
+// EXPORT PDF · formato scheda ufficiale HR
 // ================================================================
 async function esportaValutazionePDF(id) {
   const v = valutazioniCache.find((x) => x.id === id);
@@ -926,7 +926,7 @@ async function esportaValutazionePDF(id) {
   doc.setFontSize(8);
   doc.setTextColor(100);
   doc.text(
-    'Scheda di valutazione\nRed: HR — Diario Collaboratori\nVersione: ' + new Date().getFullYear(),
+    'Scheda di valutazione\nRed: HR · Diario Collaboratori\nVersione: ' + new Date().getFullYear(),
     pw - mx,
     y + 4,
     { align: 'right' },
@@ -1096,7 +1096,7 @@ async function esportaValutazionePDF(id) {
     const labLines = doc.splitTextToSize(label, 42);
     doc.text(labLines, mx, y + 1);
     doc.setFont('helvetica', 'normal');
-    const lines = doc.splitTextToSize(testo || '—', pw - mx * 2 - 45);
+    const lines = doc.splitTextToSize(testo || '-', pw - mx * 2 - 45);
     doc.text(lines, mx + 45, y + 1);
     y += Math.max(6, Math.max(lines.length, labLines.length) * 3.8 + 2);
   }
@@ -1105,7 +1105,7 @@ async function esportaValutazionePDF(id) {
   const ob = v.obiettivi || [];
   blocco(
     'Punti da migliorare/sviluppare e/o obiettivi da raggiungere entro il 31 dicembre:',
-    ob.length ? ob.map((o, i) => i + 1 + '. ' + o).join('\n') : '—',
+    ob.length ? ob.map((o, i) => i + 1 + '. ' + o).join('\n') : '-',
   );
   blocco('Esigenze formative', v.esigenze_formative);
   if (v.osservazioni) {
@@ -1142,10 +1142,10 @@ async function esportaValutazionePDF(id) {
   doc.line(mx + 113, y + 14, mx + 165, y + 14);
   doc.setFontSize(6.5);
   doc.setTextColor(150);
-  doc.text('Casino Lugano SA — Scheda di valutazione ' + v.anno + ' — Riservato', mx, ph - 8);
+  doc.text('Casino Lugano SA · Scheda di valutazione ' + v.anno + ' · Riservato', mx, ph - 8);
   mostraPdfPreview(
     doc,
     'valutazione_' + v.collaboratore.replace(/\s+/g, '_') + '_' + v.anno + '.pdf',
-    'Valutazione ' + v.anno + ' — ' + v.collaboratore,
+    'Valutazione ' + v.anno + ' · ' + v.collaboratore,
   );
 }

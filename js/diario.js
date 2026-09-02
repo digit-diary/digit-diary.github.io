@@ -1,5 +1,5 @@
 /**
- * Diario Collaboratori — Casino Lugano SA
+ * Diario Collaboratori · Casino Lugano SA
  * File: diario.js
  * Diario: salva, modifica, elimina registrazioni
  */
@@ -87,7 +87,7 @@ async function salva() {
       }
       document.getElementById('inp-testo').value = '';
       resetMalFiltri();
-      logAzione('Malattia range', nome + ' — ' + creati + ' giorni');
+      logAzione('Malattia range', nome + ' · ' + creati + ' giorni');
       toast(nome + ': ' + creati + ' giorni malattia registrati');
       aggiornaNomi();
       render();

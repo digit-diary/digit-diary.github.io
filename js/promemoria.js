@@ -1,5 +1,5 @@
 /**
- * Diario Collaboratori — Casino Lugano SA
+ * Diario Collaboratori · Casino Lugano SA
  * File: promemoria.js
  */
 
@@ -479,7 +479,7 @@ function _trovaNomeSimileMaison(nome) {
   }
   return null;
 }
-// Valori CHF dei buoni Maison — personalizzabili da admin in Impostazioni (chiave 'buono_valori')
+// Valori CHF dei buoni Maison · personalizzabili da admin in Impostazioni (chiave 'buono_valori')
 let BUONO_VALORI = { BU: 15, BL: 40, CG: 80, WL: 40 };
 function _contaBuoni(righe, tipo) {
   return righe
@@ -505,12 +505,12 @@ function _parseMaisonNome(raw) {
     note = pMatch[1].trim();
     nome = nome.replace(pMatch[0], '').trim();
   }
-  // 2. SEVEN — qualsiasi variante (seven, Seven, SEVEN, attaccato, separato) — cerca anche in note
+  // 2. SEVEN · qualsiasi variante (seven, Seven, SEVEN, attaccato, separato) · cerca anche in note
   if (/seven/i.test(nome) || /seven/i.test(note) || /\(se\b/i.test(raw)) {
     isSeven = true;
     nome = nome.replace(/seven/gi, '').trim();
   }
-  // 3. WELCOME LOUNGE — cerca in nome, note e raw
+  // 3. WELCOME LOUNGE · cerca in nome, note e raw
   const _checkWL = nome + ' ' + note + ' ' + raw;
   const _wlM = (nome + ' ' + note).match(/(\d*)\s*(?:welcome\s*lounge|w\.?\s*lounge|\bw\.?\s*l\.?\b)/i);
   if (_wlM || /welcome\s*lounge|w\.?\s*lounge|\bw\.?\s*l\.?\b/i.test(_checkWL)) {
@@ -520,7 +520,7 @@ function _parseMaisonNome(raw) {
     note = (note ? note + ', ' : '') + 'Welcome Lounge';
     nome = nome.replace(/\d*\s*(?:welcome\s*lounge|w\.?\s*lounge|\bw\.?\s*l\.?\b)/gi, '').trim();
   }
-  // 4. COUPON GOURMET — cerca in nome, note e raw
+  // 4. COUPON GOURMET · cerca in nome, note e raw
   const _checkCG = nome + ' ' + note;
   const _cgM = (nome + ' ' + note).match(
     /(\d*)\s*(?:\b(?:coupon[ea]?|cpupon|cupon|coup|cena|buono|b\.?)\s*)*(?:gou?r?met|gouret|gourme\w?t?)\b/i,
@@ -537,7 +537,7 @@ function _parseMaisonNome(raw) {
       )
       .trim();
   }
-  // 5. COUPON (senza gourmet) — coupon omaggio, coup, ecc.
+  // 5. COUPON (senza gourmet) · coupon omaggio, coup, ecc.
   if (!tipoBuono) {
     const coupM = nome.match(/\b(coupon\s*\S*|coup)\b/gi);
     if (coupM) {
@@ -545,7 +545,7 @@ function _parseMaisonNome(raw) {
       nome = nome.replace(coupM[0], '').trim();
     }
   }
-  // 6. BU — qualsiasi variante
+  // 6. BU · qualsiasi variante
   const buM = nome.match(/\s*\+?\s*(\d*)\s*b\.?\s*u(?:nico)?\b/i);
   if (buM) {
     const _buQty = buM[1] ? parseInt(buM[1]) : 1;
@@ -554,7 +554,7 @@ function _parseMaisonNome(raw) {
     note = (note ? note + ', ' : '') + (_buQty || 1) + 'BU';
     nome = nome.replace(buM[0], '').trim();
   }
-  // 7. BL — qualsiasi variante
+  // 7. BL · qualsiasi variante
   const blM = nome.match(/\s*\+?\s*(\d*)\s*b\.?\s*l+(?:ounge)?\b/i);
   if (blM) {
     const _blQty = blM[1] ? parseInt(blM[1]) : 1;
@@ -694,7 +694,7 @@ async function caricaMaisonFile(input, forzaSostituisci) {
             info.matches.length +
             ' clienti:</div>';
           info.matches.forEach((b, idx) => {
-            const catLabel = b.categoria ? _catLabelsD[b.categoria] || '' : '—';
+            const catLabel = b.categoria ? _catLabelsD[b.categoria] || '' : '-';
             const catColor = b.categoria ? _catColorsD[b.categoria] || 'var(--muted)' : 'var(--muted)';
             const badge =
               '<span class="mini-badge" style="background:' +

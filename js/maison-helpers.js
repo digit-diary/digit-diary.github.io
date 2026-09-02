@@ -1,5 +1,5 @@
 /**
- * Diario Collaboratori — Casino Lugano SA
+ * Diario Collaboratori · Casino Lugano SA
  * File: maison-helpers.js
  * Maison: import, parser nomi, helpers
  */
@@ -409,7 +409,7 @@ function saltaRiallinea(idx) {
   if (row) {
     row.style.opacity = '0.3';
     row.innerHTML =
-      '<span style="color:var(--muted);font-size:.85rem">&#10060; ' + escP(c.vecchio) + ' — saltato</span>';
+      '<span style="color:var(--muted);font-size:.85rem">&#10060; ' + escP(c.vecchio) + ' · saltato</span>';
     setTimeout(() => {
       row.style.maxHeight = '0';
       row.style.padding = '0';
@@ -690,7 +690,7 @@ function saltaUnisci(idx) {
       escP(c.remove.nome) +
       ' / ' +
       escP(c.keep.nome) +
-      ' — saltato</span>';
+      ' · saltato</span>';
     setTimeout(function () {
       row.style.maxHeight = '0';
       row.style.padding = '0';
@@ -800,13 +800,13 @@ function renderMaisonBudgetAlerts() {
                 ? ' (' + a.count + '/' + a.max + ' buoni)'
                 : ''),
         )
-        .join(' — ') +
+        .join(' · ') +
       '</div>';
   }
   if (nearAlerts.length) {
     html +=
       '<div class="cassa-alert-banner allin" style="margin-bottom:8px;cursor:default"><i class="icx icx-avviso"></i> Quasi al budget (80%+): ' +
-      nearAlerts.map((a) => escP(a.nome) + ' (' + fmtCHF(a.spent) + '/' + fmtCHF(a.budget) + ' CHF)').join(' — ') +
+      nearAlerts.map((a) => escP(a.nome) + ' (' + fmtCHF(a.spent) + '/' + fmtCHF(a.budget) + ' CHF)').join(' · ') +
       '</div>';
   }
   container.innerHTML = html;
@@ -1050,7 +1050,7 @@ async function esportaMaisonPDF() {
     if (fd && fa) {
       _periodoLabel =
         new Date(fd + 'T12:00:00').toLocaleDateString('it-IT') +
-        ' — ' +
+        ' · ' +
         new Date(fa + 'T12:00:00').toLocaleDateString('it-IT');
     } else if (data.length) {
       const _dates = data.map((r) => r.data_giornata).sort();
@@ -1063,14 +1063,14 @@ async function esportaMaisonPDF() {
           MESI_FULL[_d1.getMonth()] +
           ' ' +
           _d1.getFullYear() +
-          ' — ' +
+          ' · ' +
           MESI_FULL[_d2.getMonth()] +
           ' ' +
           _d2.getFullYear();
     } else {
       _periodoLabel = 'Tutti i dati';
     }
-    doc.text(_periodoLabel + ' — Casino Lugano SA', pw / 2, y, {
+    doc.text(_periodoLabel + ' · Casino Lugano SA', pw / 2, y, {
       align: 'center',
     });
     y += 10;
@@ -1157,7 +1157,7 @@ async function esportaMaisonPDF() {
       doc.setPage(i);
       doc.setFontSize(7);
       doc.setTextColor(150);
-      doc.text('Casino Lugano SA — Costi Maison — Pag. ' + i + '/' + tp, 16, doc.internal.pageSize.getHeight() - 8);
+      doc.text('Casino Lugano SA · Costi Maison · Pag. ' + i + '/' + tp, 16, doc.internal.pageSize.getHeight() - 8);
     }
     mostraPdfPreview(doc, 'costi_maison_' + _maisonFilePeriodo(data) + '.pdf', 'Costi Maison');
   } catch (e) {
@@ -1308,7 +1308,7 @@ async function salvaSpeseExtra() {
     document.getElementById('se-px').value = '1';
     const fp = document.getElementById('se-data');
     if (fp && fp._flatpickr) fp._flatpickr.clear();
-    logAzione('Spesa extra', benef + ' — ' + SE_TIPI_LABEL[tipo] + ' — ' + importo.toFixed(2) + ' CHF');
+    logAzione('Spesa extra', benef + ' · ' + SE_TIPI_LABEL[tipo] + ' · ' + importo.toFixed(2) + ' CHF');
     renderSpeseExtra();
     renderMaisonDashboard();
     toast('Spesa aggiunta');
@@ -1781,7 +1781,7 @@ async function esportaSpeseExtraPDF() {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100);
-    doc.text('Casino Lugano SA — ' + data.length + ' spese — CHF ' + fmtCHF(tot), pw / 2, y, { align: 'center' });
+    doc.text('Casino Lugano SA · ' + data.length + ' spese · CHF ' + fmtCHF(tot), pw / 2, y, { align: 'center' });
     y += 10;
     doc.setTextColor(0);
     doc.autoTable({
@@ -1818,7 +1818,7 @@ async function esportaSpeseExtraPDF() {
       doc.setPage(i);
       doc.setFontSize(7);
       doc.setTextColor(150);
-      doc.text('Casino Lugano SA — Spese Extra — Pag. ' + i + '/' + tp, 16, doc.internal.pageSize.getHeight() - 8);
+      doc.text('Casino Lugano SA · Spese Extra · Pag. ' + i + '/' + tp, 16, doc.internal.pageSize.getHeight() - 8);
     }
     mostraPdfPreview(doc, 'spese_extra.pdf', 'Spese Extra');
   } catch (e) {
@@ -1958,7 +1958,7 @@ function applicaRepartoVisibilita() {
   )
     currentReparto = 'slots';
   // accessi extra: reparti aggiuntivi concessi all'operatore (solo alcune
-  // sezioni, in lettura o modifica) — il selettore mostra proprio + extra
+  // sezioni, in lettura o modifica) · il selettore mostra proprio + extra
   var extraCfg = typeof _accessiExtraDi === 'function' && opRep !== 'entrambi' ? _accessiExtraDi(op) : null;
   var repartiExtra = extraCfg
     ? Object.keys(extraCfg).filter(function (k) {
@@ -2125,7 +2125,7 @@ async function _uploadHrAllegato(file, collaboratore, titolo) {
     operatore: getOperatore(),
     reparto_dip: currentReparto,
   });
-  logAzione('Allegato HR caricato', collaboratore + ' — ' + (titolo || file.name));
+  logAzione('Allegato HR caricato', collaboratore + ' · ' + (titolo || file.name));
   return r && r[0] ? r[0] : null;
 }
 window._hrAllegatiScheda = []; // ultimo elenco caricato (per apri/elimina)
@@ -2150,9 +2150,9 @@ async function caricaAllegatiCollab(nome) {
           escP(a.titolo) +
           ' <span class="tipo-item-default">(' +
           escP(a.filename) +
-          ' — ' +
+          ' · ' +
           d.toLocaleDateString('it-IT') +
-          (a.operatore ? ' — ' + escP(a.operatore) : '') +
+          (a.operatore ? ' · ' + escP(a.operatore) : '') +
           ')</span></div><button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2)" onclick="apriHrAllegato(' +
           a.id +
           ')">Apri</button>' +
@@ -2208,7 +2208,7 @@ async function caricaNuovoAllegatoScheda(input, nome) {
     toast('Non hai il permesso di caricare allegati');
     return;
   }
-  const titolo = (prompt('Titolo allegato (es. "Scheda valutazione 2026 — valutatore"):', file.name) || '').trim();
+  const titolo = (prompt('Titolo allegato (es. "Scheda valutazione 2026 · valutatore"):', file.name) || '').trim();
   if (!titolo) return;
   try {
     const r = await _uploadHrAllegato(file, nome, titolo);
@@ -2290,13 +2290,13 @@ async function registraGiubileo(nome, anni, importo, dataMat) {
     'giubileo',
     'Premio giubileo ' +
       anni +
-      ' anni — ' +
+      ' anni · ' +
       fmtCHF(importo) +
       ' CHF (maturato il ' +
       new Date(dataMat + 'T12:00:00').toLocaleDateString('it-IT') +
       ')',
   );
-  logAzione('Premio giubileo consegnato', nome + ' — ' + anni + ' anni, ' + fmtCHF(importo) + ' CHF');
+  logAzione('Premio giubileo consegnato', nome + ' · ' + anni + ' anni, ' + fmtCHF(importo) + ' CHF');
   toast('Giubileo registrato per ' + nome);
   apriSchedaCollaboratore(nome);
 }
@@ -2337,7 +2337,7 @@ async function _checkGiubileiNotifiche() {
     inviaPush(
       destinatari,
       'Giubileo ' + (x.maturato ? 'maturato' : 'in arrivo') + ': ' + x.nome,
-      x.g.anni + ' anni il ' + x.g.dataLabel + ' — ' + fmtCHF(x.g.importo) + ' CHF',
+      x.g.anni + ' anni il ' + x.g.dataLabel + ' · ' + fmtCHF(x.g.importo) + ' CHF',
       'general',
       true,
     );
@@ -3843,7 +3843,7 @@ if ('serviceWorker' in navigator) {
     if (e.data && e.data.action === 'navigate' && e.data.page) switchPage(e.data.page);
     if (e.data && e.data.action === 'push' && e.data.data) {
       var d = e.data.data;
-      toast(d.titolo + (d.corpo ? ' — ' + d.corpo : ''));
+      toast(d.titolo + (d.corpo ? ' · ' + d.corpo : ''));
     }
   });
 }

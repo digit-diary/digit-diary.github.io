@@ -1,5 +1,5 @@
 /**
- * Diario Collaboratori — Casino Lugano SA
+ * Diario Collaboratori · Casino Lugano SA
  * File: utils.js
  * Utility: capitalizzaNome, toast, escP, fmtCHF
  */
@@ -109,7 +109,7 @@ function resetMalFiltri() {
     }
   });
 }
-// Mini-calendario Non Disponibilità — selezione giorni sparsi
+// Mini-calendario Non Disponibilità · selezione giorni sparsi
 let _ndSelectedDates = [];
 let _ndCalMonth = new Date().getMonth();
 let _ndCalYear = new Date().getFullYear();
@@ -283,7 +283,7 @@ async function _verificaNome(nome) {
   const nl = nome.toLowerCase();
   // Esiste esattamente?
   if (getCollaboratoriReparto().find((c) => c.nome.toLowerCase() === nl)) return nome;
-  // Cerca simile (Levenshtein ≤ 2) — solo tra i collaboratori del reparto corrente
+  // Cerca simile (Levenshtein ≤ 2) · solo tra i collaboratori del reparto corrente
   let best = null,
     bestDist = 3;
   for (const c of getCollaboratoriReparto()) {
@@ -446,7 +446,7 @@ function _highlightField(id) {
 }
 
 // ================================================================
-// REPARTI / SETTORI — personalizzabili da admin (Impostazioni → Settori)
+// REPARTI / SETTORI · personalizzabili da admin (Impostazioni → Settori)
 // Slots e Tavoli sono fissi (dati storici); gli altri sono configurabili
 // in impostazioni 'reparti_config'. La chiave (key) è immutabile perché
 // salvata in reparto_dip di ogni record; label e colore sono modificabili.

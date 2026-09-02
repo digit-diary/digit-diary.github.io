@@ -1,5 +1,5 @@
 /**
- * Diario Collaboratori — Casino Lugano SA
+ * Diario Collaboratori · Casino Lugano SA
  * File: alerts.js
  * Alert: cassa, rischio, ammonimenti
  */
@@ -28,7 +28,7 @@ async function salvaSoglieAlert() {
   renderCassaAlerts();
   toast('Soglie alert salvate');
 }
-// Soglie del percorso disciplinare — personalizzabili da admin (default: 2 amm → allineamento,
+// Soglie del percorso disciplinare · personalizzabili da admin (default: 2 amm → allineamento,
 // 3 allineamenti stesso motivo → RDI, 3 allineamenti totali → valutare RDI)
 function getSoglieDisciplinari() {
   const s =
@@ -124,7 +124,7 @@ function renderCassaAlerts() {
       allinAlerts.length +
       ' collaboratore/i con differenza cassa &#8805; CHF ' +
       SA.allineamento +
-      ' &#8212; Preparare allineamento <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
+      ' &middot; Preparare allineamento <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
     html += '<div class="cassa-alerts-dropdown hidden" id="cassa-allin-dd">';
     allinAlerts.forEach((a) => {
       html +=
@@ -146,7 +146,7 @@ function renderCassaAlerts() {
       rdiAlerts.length +
       ' collaboratore/i con differenze cumulative &#8805; CHF ' +
       SA.rdi +
-      ' &#8212; Fare RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
+      ' &middot; Fare RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
     html += '<div class="cassa-alerts-dropdown hidden" id="cassa-rdi-dd">';
     rdiAlerts.forEach((a) => {
       html +=
@@ -194,7 +194,7 @@ function renderAlertCompatti() {
   strip.innerHTML =
     '<i class="icx icx-avviso"></i> ' +
     banners.length +
-    ' segnalazioni operative — ' +
+    ' segnalazioni operative · ' +
     (window._alertEspansi ? 'nascondi' : 'mostra dettagli') +
     '<span class="sec-chev">&#9660;</span>';
   strip.classList.toggle('aperto', !!window._alertEspansi);
@@ -443,7 +443,7 @@ function renderRischioAlerts() {
       recidive.length +
       ' collaboratore/i con ' +
       getSoglieDisciplinari().recidiva +
-      '+ allineamenti stesso motivo — Preparare RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
+      '+ allineamenti stesso motivo · Preparare RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
     html += '<div class="rischio-alerts-dropdown hidden" id="rischio-dd">';
     recidive.forEach((a) => {
       const dt = a.lastDate ? new Date(a.lastDate + 'T12:00:00').toLocaleDateString('it-IT') : '';
@@ -456,7 +456,7 @@ function renderRischioAlerts() {
         escP(a.motivo) +
         ' (ultimo: ' +
         dt +
-        '). Recidiva — preparare RDI.</span><button class="alert-action" style="background:#8e44ad" onclick="apriModuloVeloce(\'rdi\',\'' +
+        '). Recidiva · preparare RDI.</span><button class="alert-action" style="background:#8e44ad" onclick="apriModuloVeloce(\'rdi\',\'' +
         a.nome.replace(/'/g, "\\'") +
         '\')">Crea RDI</button></div>';
     });
@@ -468,7 +468,7 @@ function renderRischioAlerts() {
       accumuli.length +
       ' collaboratore/i con ' +
       getSoglieDisciplinari().accumulo +
-      '+ allineamenti totali — Valutare RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
+      '+ allineamenti totali · Valutare RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
     html += '<div class="rischio-alerts-dropdown hidden" id="acc-dd">';
     accumuli.forEach((a) => {
       const dt = a.lastDate ? new Date(a.lastDate + 'T12:00:00').toLocaleDateString('it-IT') : '';
@@ -497,7 +497,7 @@ function ignoraAlertSuggerimento(nome, tipo) {
   if (!confirm('Ignorare questo suggerimento per ' + nome + '?\nVerrà registrato nel log.')) return;
   const _ignKey = '_alert_ign_' + nome.toLowerCase().replace(/\s/g, '_') + '_' + tipo;
   localStorage.setItem(_ignKey, '1');
-  logAzione('Alert ignorato', nome + ' — suggerimento ' + tipo + ' ignorato da ' + getOperatore());
+  logAzione('Alert ignorato', nome + ' · suggerimento ' + tipo + ' ignorato da ' + getOperatore());
   renderRischioAlerts();
   renderAmmonimentiAlerts();
   toast('Suggerimento ignorato per ' + nome);
@@ -575,7 +575,7 @@ function renderAmmonimentiAlerts() {
     ammAlerts.length +
     ' collaboratore/i con ' +
     getSoglieDisciplinari().amm +
-    '+ ammonimenti stesso motivo — Preparare allineamento <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
+    '+ ammonimenti stesso motivo · Preparare allineamento <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
   html += '<div class="cassa-alerts-dropdown hidden" id="amm-dd">';
   ammAlerts.forEach((a) => {
     const dt = a.last ? new Date(a.last).toLocaleDateString('it-IT') : '';

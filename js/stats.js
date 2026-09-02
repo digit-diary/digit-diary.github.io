@@ -1,5 +1,5 @@
 /**
- * Diario Collaboratori — Casino Lugano SA
+ * Diario Collaboratori · Casino Lugano SA
  * File: stats.js
  */
 
@@ -500,7 +500,7 @@ async function esportaPDF() {
 
 // ================================================================
 // REPORT DIREZIONE (admin): sintesi mensile di TUTTI i settori,
-// pensata per il Direttore/CEO — organico, andamento operativo,
+// pensata per il Direttore/CEO · organico, andamento operativo,
 // disciplinare, sviluppo multidisciplinare, incentivi e spese HR
 // ================================================================
 const _RD_MESI_FULL = [
@@ -691,7 +691,7 @@ async function esportaReportDirezionePDF() {
     const valAnno = getValutazioniReparto().filter(
       (v) => parseInt(v.anno) >= annoDa && parseInt(v.anno) <= annoA,
     ).length;
-    righeSviluppo.push([r.label, form, puntiTot, premi, giubChf ? fmtCHF(giubChf) : '—', valAnno]);
+    righeSviluppo.push([r.label, form, puntiTot, premi, giubChf ? fmtCHF(giubChf) : '-', valAnno]);
     tot.form += form;
     tot.punti += puntiTot;
     tot.premi += premi;
@@ -711,13 +711,13 @@ async function esportaReportDirezionePDF() {
   y += 28;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
-  doc.text('Report Direzione — ' + per.label, pw / 2, y, { align: 'center' });
+  doc.text('Report Direzione · ' + per.label, pw / 2, y, { align: 'center' });
   y += 6;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(100);
   doc.text(
-    'Diario Collaboratori — generato il ' + new Date().toLocaleDateString('it-IT') + ' — Riservato alla Direzione',
+    'Diario Collaboratori · generato il ' + new Date().toLocaleDateString('it-IT') + ' · Riservato alla Direzione',
     pw / 2,
     y,
     { align: 'center' },
@@ -808,15 +808,15 @@ async function esportaReportDirezionePDF() {
           ],
         ],
         body: righeSviluppo,
-        foot: [['Totale', tot.form, tot.punti, tot.premi, tot.giub ? fmtCHF(tot.giub) : '—', '']],
+        foot: [['Totale', tot.form, tot.punti, tot.premi, tot.giub ? fmtCHF(tot.giub) : '-', '']],
         footStyles: { fillColor: [240, 236, 228], textColor: [26, 18, 8], fontStyle: 'bold', fontSize: 8.5 },
       }),
     );
   }
   doc.setFontSize(6.5);
   doc.setTextColor(150);
-  doc.text('Casino Lugano SA — Report Direzione — Documento riservato', 14, ph - 8);
-  logAzione('Report Direzione', 'PDF esportato — ' + per.label);
+  doc.text('Casino Lugano SA · Report Direzione · Documento riservato', 14, ph - 8);
+  logAzione('Report Direzione', 'PDF esportato · ' + per.label);
   mostraPdfPreview(
     doc,
     'report_direzione_' + per.da + (per.a !== per.da ? '_' + per.a : '') + '.pdf',

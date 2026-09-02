@@ -1,5 +1,5 @@
 /**
- * Diario Collaboratori — Casino Lugano SA
+ * Diario Collaboratori · Casino Lugano SA
  * File: realtime.js
  */
 
@@ -201,17 +201,17 @@ let collaboratoriCache = [],
 // === MULTIDISCIPLINARITA: valutazioni, punti, competenze ===
 let valutazioniCache = [],
   puntiEventiCache = [],
-  competenzeConfig = null, // {slots:[{key,label,livello}], tavoli:[...]} — null = default
+  competenzeConfig = null, // {slots:[{key,label,livello}], tavoli:[...]} · null = default
   puntiConfig = null, // {azioni:[{key,label,punti}], soglie:[{punti,premio}], premi_livello:{}}
   maisonAutoDeleteGiorni = 0, // 0 = disattivato; 1 = conserva solo GD corrente; N = conserva N giorni
   inventarioCategorieExtra = [], // categorie inventario personalizzate [{key,label}] oltre a buoni/sigarette
-  soglieAlertCfg = null, // {allineamento, rdi} soglie CHF alert differenze — null = default 90/500
-  soglieDisciplinariCfg = null, // {amm, recidiva, accumulo} soglie percorso disciplinare — null = default 2/3/3
+  soglieAlertCfg = null, // {allineamento, rdi} soglie CHF alert differenze · null = default 90/500
+  soglieDisciplinariCfg = null, // {amm, recidiva, accumulo} soglie percorso disciplinare · null = default 2/3/3
   equitaMesi = 6, // mesi di anzianità in più per far scattare la segnalazione equità categorie
   hrEventiCache = [], // storico HR riservato: assunzione, categoria, impiego, premi, livelli
-  repartiConfig = null, // settori personalizzati [{key,label,colore,attivo}] — null = default valet+cleaning
-  repartiPagineCfg = null, // pagine visibili per settore {repKey:{maison:false,...}} — assente = tutte
-  giubileoConfig = null, // premio giubileo [{anni,importo}] — null = default 5/10/15/20/25/30 anni
+  repartiConfig = null, // settori personalizzati [{key,label,colore,attivo}] · null = default valet+cleaning
+  repartiPagineCfg = null, // pagine visibili per settore {repKey:{maison:false,...}} · assente = tutte
+  giubileoConfig = null, // premio giubileo [{anni,importo}] · null = default 5/10/15/20/25/30 anni
   giubileoPreavviso = 60; // giorni di preavviso notifica giubileo a HR (0 = disattivata)
 let currentReparto = 'slots',
   operatoriRepartoMap = {};
@@ -572,7 +572,7 @@ async function secPatch(table, filter, data) {
     } catch (e) {
       // Token scaduto? Rinnova e riprova UNA volta. Se fallisce ancora, ERRORE VISIBILE:
       // il vecchio fallback anonimo veniva bloccato in silenzio dalla RLS (0 righe toccate
-      // ma nessun errore) e l'app credeva di aver salvato/cancellato — dati "fantasma".
+      // ma nessun errore) e l'app credeva di aver salvato/cancellato · dati "fantasma".
       if (await _renewToken()) {
         const tk2 = getOpToken();
         await sbRpc('secure_update', {

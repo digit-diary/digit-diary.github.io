@@ -1,5 +1,5 @@
 /**
- * Diario Collaboratori — Casino Lugano SA
+ * Diario Collaboratori · Casino Lugano SA
  * File: formazione.js
  * Progetto Multidisciplinarità: mappatura competenze (spunte per reparto),
  * livelli L1/L2/L3, sistema punti personalizzabile e premi.
@@ -215,7 +215,7 @@ async function _proponiContrattoFisso(c, dopo) {
 }
 
 // ================================================================
-// LIVELLI E PUNTI — helpers
+// LIVELLI E PUNTI · helpers
 // ================================================================
 // Livello multidisciplinare: L(n) = tutte le competenze di livello <= n spuntate
 function livelloDiCollaboratore(c) {
@@ -237,7 +237,7 @@ function livelloDiCollaboratore(c) {
 }
 function livelloBadgeHtml(lv, c) {
   // livello PARZIALE: ha certificazioni di livello alto ma manca qualcosa
-  // sotto (es. Reception L2 senza Sala L1) — badge giallo con il dettaglio
+  // sotto (es. Reception L2 senza Sala L1) · badge giallo con il dettaglio
   if (c) {
     const comps = getCompetenzeReparto().filter((k) => k.livello >= 1);
     const spunte = (c && c.competenze) || {};
@@ -258,7 +258,7 @@ function livelloBadgeHtml(lv, c) {
       );
     }
   }
-  if (!lv) return '<span class="mini-badge" style="background:var(--muted)">—</span>';
+  if (!lv) return '<span class="mini-badge" style="background:var(--muted)">-</span>';
   const col = { 1: '#1a4a7a', 2: '#e67e22', 3: '#2c6e49', 4: '#8e44ad', 5: '#c0392b' }[lv] || 'var(--muted)';
   return (
     '<span class="mini-badge" style="background:' + col + ';font-size:.72rem">' + escP(livelloNome(lv)) + '</span>'
@@ -309,43 +309,43 @@ const FORMAZIONE_PROTOCOLLI_DEFAULT = {
       titolo: 'FORMAZIONE TECNICA SLOT ATTENDANT (5 giorni)',
       punti: [
         [
-          'FASE 1 — Ambientazione',
+          'FASE 1 · Ambientazione',
           'Visita Casinò',
           'Giro guidato, punti significativi, registrazione entrata/uscita e accesso ai locali',
         ],
         [
-          'FASE 1 — Ambientazione',
+          'FASE 1 · Ambientazione',
           'Teoria',
           'Regolamento interno, meccanismi operativi, modelli comportamentali, Manuale Slot',
         ],
         [
-          'FASE 1 — Ambientazione',
+          'FASE 1 · Ambientazione',
           'Turnazioni/Pause',
           'Procedure amministrative: foglio disponibilità, turnazione Slot',
         ],
-        ['FASE 2 — Tecnica', 'Materiale in dotazione', 'Tessera Slot Attendant, chiavi, telefonino (numeri utili)'],
-        ['FASE 2 — Tecnica', 'Nozioni tecniche', 'Struttura slot, menù interno, tipologia di macchine'],
+        ['FASE 2 · Tecnica', 'Materiale in dotazione', 'Tessera Slot Attendant, chiavi, telefonino (numeri utili)'],
+        ['FASE 2 · Tecnica', 'Nozioni tecniche', 'Struttura slot, menù interno, tipologia di macchine'],
         [
-          'FASE 2 — Tecnica',
+          'FASE 2 · Tecnica',
           'Risoluzione problematiche',
           'Messaggi di errore monitor, Ultrascreen (EGM locked, saldo tessera, controllo banconote)',
         ],
         [
-          'FASE 2 — Tecnica',
+          'FASE 2 · Tecnica',
           'Interventi per problemi',
           'Banconote non accreditate, Bill Reader, Bill Box, crediti spariti, contestazioni pagamenti',
         ],
         [
-          'FASE 3 — Pratica',
+          'FASE 3 · Pratica',
           'Teoria LRD / CS',
           'Limiti LRD, ordinanza e responsabilità su RICICLAGGIO e CONCEZIONE SOCIALE',
         ],
         [
-          'FASE 3 — Pratica',
+          'FASE 3 · Pratica',
           'Customer Care',
           'Comportamento in sala, clienti Maison, linguaggio non verbale, clienti difficili, riservazioni, oggetti/denaro trovati',
         ],
-        ['FASE 3 — Pratica', 'Pagamenti', 'Progressive Jackpot, Cancel Credit, Short Pay, giochi, conteggio crediti'],
+        ['FASE 3 · Pratica', 'Pagamenti', 'Progressive Jackpot, Cancel Credit, Short Pay, giochi, conteggio crediti'],
       ],
       valutazione: [
         'Conoscenza tipologie di macchine',
@@ -526,7 +526,7 @@ function scaricaProtocolloExcel(compKey) {
   XLSX.utils.book_append_sheet(wb, ws, 'Protocollo');
   const rigV = [
     ['VALUTAZIONE FORMATORE'],
-    ['insufficiente  1  2  3  4  5  eccellente — scrivere il voto nella colonna VOTO'],
+    ['insufficiente  1  2  3  4  5  eccellente · scrivere il voto nella colonna VOTO'],
     [],
     ['COMPETENZE TECNICHE', 'VOTO (1-5)'],
   ];
@@ -617,7 +617,7 @@ async function importaProtocolloExcel(compKey, input) {
       !confirm(
         'Protocollo ' +
           compKey.toUpperCase() +
-          ' — ' +
+          ' · ' +
           collab.nome +
           '\n\n• Punti svolti: ' +
           fatti +
@@ -645,8 +645,8 @@ async function importaProtocolloExcel(compKey, input) {
           '/' +
           totale +
           ' punti svolti' +
-          (formatore ? ' — formatore: ' + formatore : '') +
-          (fine ? ' — terminata il ' + fine : '') +
+          (formatore ? ' · formatore: ' + formatore : '') +
+          (fine ? ' · terminata il ' + fine : '') +
           (voti.length ? '\n' + voti.join('; ') : ''),
       );
     }
@@ -671,7 +671,7 @@ async function importaProtocolloExcel(compKey, input) {
           });
         await secPatch('collaboratori', 'id=eq.' + collab.id, { competenze: nuove });
         collab.competenze = nuove;
-        logAzione('Competenza certificata', collab.nome + ' — ' + compKey + ' (da protocollo)');
+        logAzione('Competenza certificata', collab.nome + ' · ' + compKey + ' (da protocollo)');
         const az = getPuntiConfig().azioni.find((a) => a.key === 'competenza');
         if (az && az.punti && confirm('Assegnare anche ' + az.punti + ' punti a ' + collab.nome + '?'))
           await _insertPuntiEvento(
@@ -682,7 +682,7 @@ async function importaProtocolloExcel(compKey, input) {
           );
       }
     }
-    toast('Protocollo registrato: ' + fatti + '/' + totale + ' punti' + (completo ? ' — completo' : ''));
+    toast('Protocollo registrato: ' + fatti + '/' + totale + ' punti' + (completo ? ' · completo' : ''));
     renderFormazione();
   } catch (e) {
     console.error(e);
@@ -771,7 +771,7 @@ function renderFormazione() {
 
   // MATRICE COMPETENZE
   html += _renderProtocolliCard();
-  html += '<div class="main-card"><div class="card-header">Matrice competenze — chi sa fare cosa</div>';
+  html += '<div class="main-card"><div class="card-header">Matrice competenze · chi sa fare cosa</div>';
   html +=
     '<div class="filters" style="padding:10px 16px"><div class="filter-group"><span class="filter-label">Cerca</span><input type="text" id="form-matr-cerca" placeholder="Nome..." oninput="_filtraMatrice()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink);width:180px"></div>' +
     '<div class="export-btns"><button class="btn-export" onclick="esportaMatriceCSV()">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaMatricePDF()">PDF</button></div></div>';
@@ -850,8 +850,8 @@ function renderFormazione() {
   });
   html += '</tbody></table></div></div>';
 
-  // PUNTI — assegnazione rapida + registro
-  html += '<div class="main-card"><div class="card-header">Punti — assegnazione</div><div class="form-area">';
+  // PUNTI · assegnazione rapida + registro
+  html += '<div class="main-card"><div class="card-header">Punti · assegnazione</div><div class="form-area">';
   if (puoPunti) {
     const cfg = getPuntiConfig();
     html += '<div class="form-row" style="grid-template-columns:1fr 1fr 1fr auto;gap:10px;align-items:flex-end">';
@@ -980,7 +980,7 @@ function renderFormazione() {
   html +=
     '<p style="color:var(--muted);font-size:.84rem;margin-bottom:10px">Soglie punti: ' +
     cfgP.soglie.map((s) => '<strong>' + s.punti + '</strong> = ' + escP(s.premio)).join(' · ') +
-    ' — Passaggio livello: ' +
+    ' · Passaggio livello: ' +
     Object.entries(cfgP.premi_livello)
       .map(([l, p]) => 'L' + l + ' = ' + escP(p))
       .join(' · ') +
@@ -1027,7 +1027,7 @@ function renderFormazione() {
               '<div style="font-size:.8rem;display:flex;align-items:center;gap:8px;padding:2px 0">' +
               '<span>&#9203; <strong>' +
               escP(a.collaboratore) +
-              '</strong> — ' +
+              '</strong> · ' +
               escP(prem) +
               ' <span style="color:var(--muted)">(dal ' +
               new Date((a.data_evento || '') + 'T12:00:00').toLocaleDateString('it-IT') +
@@ -1119,13 +1119,13 @@ function renderFormazione() {
       html +=
         '<label style="display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--muted);margin-top:4px;cursor:pointer"><input type="checkbox" id="frm-punti-fmt"> Assegna i punti "Formatore in sessione" al formatore' +
         (azFmt ? ' (+' + azFmt.punti + ')' : '') +
-        ' — facoltativo, solo se il formatore è un collaboratore</label>';
+        ' · facoltativo, solo se il formatore è un collaboratore</label>';
     }
     html +=
       '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">' +
       '<span style="font-size:.8rem;color:var(--muted)">Allega scheda (facoltativo):</span>' +
       '<input type="file" id="frm-allegato" accept=".pdf,.xlsx,.xls,.jpg,.jpeg,.png" style="font-size:.78rem;max-width:260px">' +
-      '<span style="font-size:.72rem;color:var(--muted)">PDF, Excel o immagine — max 2 MB, visibile nello Storico HR</span></div>';
+      '<span style="font-size:.72rem;color:var(--muted)">PDF, Excel o immagine · max 2 MB, visibile nello Storico HR</span></div>';
     html +=
       '<p style="color:var(--muted);font-size:.75rem;margin-top:6px">La formazione viene tracciata con data e formatore nello Storico HR del collaboratore (visibile solo a admin e operatori autorizzati).</p>';
     html += '</div></div>';
@@ -1139,7 +1139,7 @@ function renderFormazione() {
   if (typeof puoVedereStoricoHr === 'function' && puoVedereStoricoHr()) {
     html += _renderGiubileiCard(collabs);
   }
-  // EQUITÀ CATEGORIE (riservato: admin + permesso storico_hr) — sistema meritocratico
+  // EQUITÀ CATEGORIE (riservato: admin + permesso storico_hr) · sistema meritocratico
   if (typeof puoVedereStoricoHr === 'function' && puoVedereStoricoHr()) {
     html += _renderEquitaCard(collabs);
   }
@@ -1170,8 +1170,8 @@ async function registraFormazioneSvolta() {
     return;
   }
   try {
-    await _insertHrEvento(nome, 'formazione', desc + (formatore ? ' — formatore: ' + formatore : ''), data);
-    logAzione('Formazione registrata', nome + ' — ' + desc + (formatore ? ' (formatore ' + formatore + ')' : ''));
+    await _insertHrEvento(nome, 'formazione', desc + (formatore ? ' · formatore: ' + formatore : ''), data);
+    logAzione('Formazione registrata', nome + ' · ' + desc + (formatore ? ' (formatore ' + formatore + ')' : ''));
     // Allegato facoltativo (scheda originale) → Storico HR
     const fEl = document.getElementById('frm-allegato');
     const fAll = fEl && fEl.files && fEl.files[0];
@@ -1251,11 +1251,11 @@ function _renderEquitaCard(collabs) {
         y.nome +
         ' (' +
         y.categoria +
-        'ª, livello pari o inferiore) — valutare revisione';
+        'ª, livello pari o inferiore) · valutare revisione';
   });
   const conDati = righe.filter((r) => r.categoria || r.dataAss);
   let html =
-    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:8px">Equità categorie — analisi meritocratica <span class="mini-badge" style="background:var(--accent);font-size:.65rem">RISERVATO</span>' +
+    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:8px">Equità categorie · analisi meritocratica <span class="mini-badge" style="background:var(--accent);font-size:.65rem">RISERVATO</span>' +
     (isAdmin()
       ? '<span style="margin-left:auto;font-size:.72rem;font-weight:400;display:flex;align-items:center;gap:6px">Segnala da <select onchange="salvaEquitaMesi(this.value)" style="padding:4px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);font-size:.75rem">' +
         [3, 6, 9, 12]
@@ -1288,24 +1288,24 @@ function _renderEquitaCard(collabs) {
       '><td><strong>' +
       escP(r.nome) +
       '</strong></td><td>' +
-      (r.impiego === 'fisso' ? 'Fisso' : r.impiego === 'jolly' ? 'Jolly' : '—') +
+      (r.impiego === 'fisso' ? 'Fisso' : r.impiego === 'jolly' ? 'Jolly' : '-') +
       '</td><td class="num"><strong>' +
-      (r.categoria ? r.categoria + 'ª' : '—') +
+      (r.categoria ? r.categoria + 'ª' : '-') +
       '</strong></td><td>' +
-      (r.dataAss ? anzianitaLabel(r.dataAss) : '—') +
+      (r.dataAss ? anzianitaLabel(r.dataAss) : '-') +
       '</td><td class="num">' +
-      (r.lv ? 'L' + r.lv : '—') +
+      (r.lv ? 'L' + r.lv : '-') +
       '</td><td class="num">' +
       r.punti +
       '</td><td class="num">' +
-      (r.media != null ? r.media + '%' : '—') +
+      (r.media != null ? r.media + '%' : '-') +
       '</td><td style="font-size:.78rem;color:var(--accent)">' +
       (r.flag ? '<i class="icx icx-avviso"></i> ' + escP(r.flag) : '') +
       '</td></tr>';
   });
   html += '</tbody></table></div>';
   html +=
-    '<p style="color:var(--muted);font-size:.75rem;padding:0 16px 14px">Analisi indicativa basata su anzianità (inizio contratto), categoria e livello multidisciplinare — segnala con almeno ' +
+    '<p style="color:var(--muted);font-size:.75rem;padding:0 16px 14px">Analisi indicativa basata su anzianità (inizio contratto), categoria e livello multidisciplinare · segnala con almeno ' +
     (typeof equitaMesi !== 'undefined' ? equitaMesi : 6) +
     ' mesi di anzianità in più a parità di livello: la decisione sulle categorie resta al responsabile e a HR.</p></div>';
   return html;
@@ -1370,18 +1370,18 @@ async function toggleCompetenza(collabId, key, cb) {
       toast('Spuntati anche i livelli inferiori: ' + implicate.join(', '));
       logAzione(
         'Competenze implicite',
-        c.nome + ' — ' + implicate.join(', ') + ' (da ' + (compAtt ? compAtt.label : key) + ')',
+        c.nome + ' · ' + implicate.join(', ') + ' (da ' + (compAtt ? compAtt.label : key) + ')',
       );
     }
     const compDef = getCompetenzeReparto().find((k) => k.key === key);
-    logAzione('Competenza ' + (attiva ? 'certificata' : 'rimossa'), c.nome + ' — ' + (compDef ? compDef.label : key));
+    logAzione('Competenza ' + (attiva ? 'certificata' : 'rimossa'), c.nome + ' · ' + (compDef ? compDef.label : key));
     // Traccia nello storico HR: cosa è stato formato, quando e da chi
     if (attiva && typeof _insertHrEvento === 'function') {
       const fmt = (prompt('Formatore che ha svolto la formazione (opzionale):', '') || '').trim();
       _insertHrEvento(
         c.nome,
         'formazione',
-        'Competenza certificata: ' + (compDef ? compDef.label : key) + (fmt ? ' — formatore: ' + fmt : ''),
+        'Competenza certificata: ' + (compDef ? compDef.label : key) + (fmt ? ' · formatore: ' + fmt : ''),
       );
     }
     // Rimozione spunta: se per questa competenza erano stati dati punti,
@@ -1457,7 +1457,7 @@ async function toggleCompetenza(collabId, key, cb) {
       _notificaIncentivo(
         c.nome,
         '🎉 ' + c.nome + ' → Livello ' + dopo,
-        'Tutte le competenze fino al livello ' + dopo + ' completate' + (premio ? ' — premio: ' + premio : ''),
+        'Tutte le competenze fino al livello ' + dopo + ' completate' + (premio ? ' · premio: ' + premio : ''),
       );
       const b = document.getElementById('pwd-modal-content');
       b.innerHTML =
@@ -1503,7 +1503,7 @@ async function _insertPuntiEvento(nome, punti, azione, descrizione) {
     _notificaIncentivo(
       nome,
       '⭐ +' + punti + ' punti',
-      (descrizione || azione) + ' — totale ' + puntiTotali(nome) + ' punti',
+      (descrizione || azione) + ' · totale ' + puntiTotali(nome) + ' punti',
       true,
     );
 }
@@ -1539,7 +1539,7 @@ async function assegnaPuntiRapido() {
       _notificaIncentivo(
         nome,
         '🏆 Traguardo raggiunto: ' + raggiunta.premio,
-        nome + ' ha raggiunto ' + raggiunta.punti + ' punti — premio: ' + raggiunta.premio,
+        nome + ' ha raggiunto ' + raggiunta.punti + ' punti · premio: ' + raggiunta.premio,
       );
     if (raggiunta) {
       setTimeout(() => {
@@ -1590,14 +1590,14 @@ async function registraPremioConsegnato(nome, premio) {
           )
         ) {
           await _insertPuntiEvento(nome, 0, 'premio_attesa', 'In attesa premio: ' + soglia.premio);
-          logAzione('Premio in attesa', nome + ' — ' + soglia.premio + ' (limite mensile ' + lim + ' raggiunto)');
+          logAzione('Premio in attesa', nome + ' · ' + soglia.premio + ' (limite mensile ' + lim + ' raggiunto)');
           _notificaIncentivo(
             nome,
             '⏳ Premio in attesa',
             nome +
               ': "' +
               soglia.premio +
-              '" ha raggiunto il limite di questo mese — priorità dal 1° del mese prossimo',
+              '" ha raggiunto il limite di questo mese · priorità dal 1° del mese prossimo',
             true,
           );
           renderFormazione();
@@ -1660,8 +1660,8 @@ function _matriceRows() {
   ];
   const rows = collabs.map((c) => [
     c.nome,
-    ...comps.map((k) => ((c.competenze || {})[k.key] === true ? 'SI' : '—')),
-    livelloDiCollaboratore(c) || '—',
+    ...comps.map((k) => ((c.competenze || {})[k.key] === true ? 'SI' : '-')),
+    livelloDiCollaboratore(c) || '-',
     puntiTotali(c.nome),
   ]);
   return { head, rows };
@@ -1698,7 +1698,7 @@ async function esportaMatricePDF() {
   y += 28;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(15);
-  doc.text('Matrice Competenze — Progetto Multidisciplinarità', pw / 2, y, {
+  doc.text('Matrice Competenze · Progetto Multidisciplinarità', pw / 2, y, {
     align: 'center',
   });
   y += 6;
@@ -1709,9 +1709,9 @@ async function esportaMatricePDF() {
     'Reparto ' +
       currentReparto.charAt(0).toUpperCase() +
       currentReparto.slice(1) +
-      ' — ' +
+      ' · ' +
       new Date().toLocaleDateString('it-IT') +
-      ' — Casino Lugano SA',
+      ' · Casino Lugano SA',
     pw / 2,
     y,
     { align: 'center' },
@@ -1747,7 +1747,7 @@ async function esportaMatricePDF() {
   });
   doc.setFontSize(7);
   doc.setTextColor(150);
-  doc.text('Casino Lugano SA — Matrice competenze — Riservato', 14, doc.internal.pageSize.getHeight() - 8);
+  doc.text('Casino Lugano SA · Matrice competenze · Riservato', 14, doc.internal.pageSize.getHeight() - 8);
   mostraPdfPreview(doc, 'matrice_competenze_' + currentReparto + '.pdf', 'Matrice Competenze');
 }
 
@@ -1795,7 +1795,7 @@ async function esportaReportIncentiviPDF() {
   y += 28;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(15);
-  doc.text('Report Incentivi ' + anno + ' — Progetto Multidisciplinarità', pw / 2, y, { align: 'center' });
+  doc.text('Report Incentivi ' + anno + ' · Progetto Multidisciplinarità', pw / 2, y, { align: 'center' });
   y += 6;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
@@ -1804,9 +1804,9 @@ async function esportaReportIncentiviPDF() {
     'Reparto ' +
       currentReparto.charAt(0).toUpperCase() +
       currentReparto.slice(1) +
-      ' — generato il ' +
+      ' · generato il ' +
       new Date().toLocaleDateString('it-IT') +
-      ' — Casino Lugano SA — Documento riservato HR',
+      ' · Casino Lugano SA · Documento riservato HR',
     pw / 2,
     y,
     { align: 'center' },
@@ -1825,7 +1825,7 @@ async function esportaReportIncentiviPDF() {
       startY: y,
       head: [['Collaboratore', 'Livello', 'Punti ' + anno, 'Coperture', 'Rifiuti', 'Premi raggiunti', 'Consegnati']],
       body: righe.length
-        ? righe.map((r) => [r.nome, r.lv ? 'L' + r.lv : '—', r.punti, r.cop, r.rif, r.raggiunti || '—', r.consegnati])
+        ? righe.map((r) => [r.nome, r.lv ? 'L' + r.lv : '-', r.punti, r.cop, r.rif, r.raggiunti || '-', r.consegnati])
         : [['Nessun dato per il ' + anno, '', '', '', '', '', '']],
       columnStyles: { 0: { halign: 'left', fontStyle: 'bold' } },
     }),
@@ -1880,8 +1880,8 @@ async function esportaReportIncentiviPDF() {
   );
   doc.setFontSize(7);
   doc.setTextColor(150);
-  doc.text('Casino Lugano SA — Report incentivi — Riservato HR', 14, doc.internal.pageSize.getHeight() - 8);
-  logAzione('Report incentivi', 'PDF esportato — reparto ' + currentReparto + ', anno ' + anno);
+  doc.text('Casino Lugano SA · Report incentivi · Riservato HR', 14, doc.internal.pageSize.getHeight() - 8);
+  logAzione('Report incentivi', 'PDF esportato · reparto ' + currentReparto + ', anno ' + anno);
   mostraPdfPreview(doc, 'report_incentivi_' + currentReparto + '_' + anno + '.pdf', 'Report Incentivi');
 }
 
@@ -1894,7 +1894,7 @@ function _renderFormazioneConfig() {
   let html = '<div class="settings-section"><h4>Configurazione (admin)</h4>';
   // nomi dei livelli personalizzabili
   html +=
-    '<p style="font-size:.85rem;font-weight:700;margin:8px 0 4px">Nomi dei livelli — ' +
+    '<p style="font-size:.85rem;font-weight:700;margin:8px 0 4px">Nomi dei livelli · ' +
     escP(repartoLabel(currentReparto)) +
     '</p><p style="font-size:.78rem;color:var(--muted);margin-bottom:6px">Personalizza come si chiamano i livelli (es. L1 = "Base Sala"). Vuoto = nome standard.</p><div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">';
   for (let lv = 1; lv <= 5; lv++) {
@@ -1989,7 +1989,7 @@ function _renderFormazioneConfig() {
       i +
       ",'inventario',this.value)\" style=\"width:120px;padding:5px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)\"><option value=''" +
       (!s.inventario ? ' selected' : '') +
-      '>— inventario</option>' +
+      '>· inventario</option>' +
       invNomi
         .map(
           (n) =>
@@ -2337,7 +2337,7 @@ function _renderPopupCopertura() {
   const azNeg = cfg.azioni.find((a) => a.key === 'disponibilita_negata');
   const dataLabel = ctx.dataRif ? new Date(ctx.dataRif + 'T12:00:00').toLocaleDateString('it-IT') : 'oggi';
   let html =
-    '<h3>Copertura turno — ' +
+    '<h3>Copertura turno · ' +
     escP(assente) +
     '</h3><p style="color:var(--muted);font-size:.84rem;margin-bottom:14px">Assenza del ' +
     dataLabel +
@@ -2369,7 +2369,7 @@ function _renderPopupCopertura() {
   html +=
     '<div class="pwd-field"><label>Chi copre il turno' +
     (azCop ? ' (+' + azCop.punti + ' punti)' : '') +
-    '</label><select id="cop-chi" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"><option value="">— Nessuno / da decidere —</option>' +
+    '</label><select id="cop-chi" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"><option value="">· Nessuno / da decidere ·</option>' +
     collabs.map((c) => '<option>' + escP(c.nome) + '</option>').join('') +
     '</select></div>';
   if (azNeg) {
@@ -2417,7 +2417,7 @@ async function _rimuoviEventoCopertura(id) {
   try {
     await secDel('punti_eventi', 'id=eq.' + id);
     puntiEventiCache = puntiEventiCache.filter((x) => x.id !== id);
-    logAzione('Copertura rimossa', p.collaboratore + ' (' + p.punti + ' pt) — ' + (p.descrizione || ''));
+    logAzione('Copertura rimossa', p.collaboratore + ' (' + p.punti + ' pt) · ' + (p.descrizione || ''));
     toast('Rimosso');
     _renderPopupCopertura();
     if (typeof render === 'function' && localStorage.getItem('pagina_corrente') === 'diario') render();
@@ -2444,7 +2444,7 @@ async function _chiudiPopupCopertura(conferma) {
           chi,
           azCop.punti,
           'copertura',
-          'Copertura per ' + ctx.assente + ' del ' + dataLabel + (nota ? ' — ' + nota : ''),
+          'Copertura per ' + ctx.assente + ' del ' + dataLabel + (nota ? ' · ' + nota : ''),
         );
       }
       if (azNeg) {
@@ -2453,7 +2453,7 @@ async function _chiudiPopupCopertura(conferma) {
             n,
             azNeg.punti,
             'disponibilita_negata',
-            'Disponibilità negata per assenza di ' + ctx.assente + ' del ' + dataLabel + (nota ? ' — ' + nota : ''),
+            'Disponibilità negata per assenza di ' + ctx.assente + ' del ' + dataLabel + (nota ? ' · ' + nota : ''),
           );
         }
       }
@@ -2528,7 +2528,7 @@ function _renderGiubileiCard(collabs) {
         x.g.anni +
         ' anni il ' +
         x.g.dataLabel +
-        ' — ' +
+        ' · ' +
         fmtCHF(x.g.importo) +
         ' CHF</div>';
     });
@@ -2538,7 +2538,7 @@ function _renderGiubileiCard(collabs) {
   return html;
 }
 
-// Card riservata HR: numeri chiave del settore corrente — organico (fissi/jolly),
+// Card riservata HR: numeri chiave del settore corrente · organico (fissi/jolly),
 // distribuzione categorie e livelli, spese giubilei e premi incentivi consegnati
 function _estraiChf(testo) {
   const m = String(testo || '').match(/([\d']+(?:\.\d+)?) CHF/);
@@ -2573,7 +2573,7 @@ function _renderPanoramicaHrCard(collabs) {
   );
   const senzaVal = collabs.filter((c) => !conValutazione.has((c.nome || '').toLowerCase())).length;
   let html =
-    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:8px">Panoramica HR — ' +
+    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:8px">Panoramica HR · ' +
     escP(repartoLabel(currentReparto)) +
     ' <span class="mini-badge" style="background:var(--accent);font-size:.65rem">RISERVATO</span></div><div style="padding:14px 16px">';
   html +=
@@ -2600,12 +2600,12 @@ function _renderPanoramicaHrCard(collabs) {
     .filter((n) => perCat[n])
     .map((n) => n + 'ª: <strong>' + perCat[n] + '</strong>')
     .join(' · ');
-  if (catStr) righe.push('<span style="color:var(--muted)">Categorie —</span> ' + catStr);
+  if (catStr) righe.push('<span style="color:var(--muted)">Categorie ·</span> ' + catStr);
   const livStr = [1, 2, 3]
     .filter((n) => perLiv[n])
     .map((n) => 'L' + n + ': <strong>' + perLiv[n] + '</strong>')
     .join(' · ');
-  if (livStr) righe.push('<span style="color:var(--muted)">Livelli multidisciplinari —</span> ' + livStr);
+  if (livStr) righe.push('<span style="color:var(--muted)">Livelli multidisciplinari ·</span> ' + livStr);
   if (righe.length) html += '<p style="font-size:.86rem;line-height:1.8">' + righe.join('<br>') + '</p>';
   html +=
     '<p style="color:var(--muted);font-size:.75rem;margin-top:8px">Dati del settore corrente: usa lo switch settori in alto per vedere gli altri. Dettaglio per persona nella card Equità categorie.</p></div></div>';
@@ -2614,7 +2614,7 @@ function _renderPanoramicaHrCard(collabs) {
 
 // Certificazione HEADLESS richiamata dal Piano (avviso "non formato" e
 // formazioni completate dai commenti): stesso flusso della spunta in
-// Formazione — scala dei livelli, storico HR, punti su conferma.
+// Formazione · scala dei livelli, storico HR, punti su conferma.
 async function certificaCompetenzaDaPiano(nome, key, chiediPunti) {
   const c = collaboratoriCache.find((x) => x.nome === nome);
   if (!c) return false;
@@ -2638,14 +2638,14 @@ async function certificaCompetenzaDaPiano(nome, key, chiediPunti) {
   c.competenze = nuove;
   logAzione(
     'Competenza certificata (dal Piano)',
-    nome + ' — ' + (compAtt ? compAtt.label : key) + (implicate.length ? ' + ' + implicate.join(', ') : ''),
+    nome + ' · ' + (compAtt ? compAtt.label : key) + (implicate.length ? ' + ' + implicate.join(', ') : ''),
   );
   if (typeof _insertHrEvento === 'function') {
     const fmt = chiediPunti ? (prompt('Formatore che ha svolto la formazione (opzionale):', '') || '').trim() : '';
     _insertHrEvento(
       nome,
       'formazione',
-      'Competenza certificata: ' + (compAtt ? compAtt.label : key) + (fmt ? ' — formatore: ' + fmt : ''),
+      'Competenza certificata: ' + (compAtt ? compAtt.label : key) + (fmt ? ' · formatore: ' + fmt : ''),
     );
   }
   if (chiediPunti) {

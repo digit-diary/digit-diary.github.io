@@ -1,5 +1,5 @@
 /**
- * Diario Collaboratori — Casino Lugano SA
+ * Diario Collaboratori · Casino Lugano SA
  * File: consegna.js
  */
 
@@ -100,7 +100,7 @@ async function inviaConsegnaTurno() {
     const r = await secPost('consegne_turno', rec);
     consegneCache.unshift(r[0]);
     document.getElementById('cons-messaggio').value = '';
-    logAzione('Consegna turno', turno + ' — ' + msg.substring(0, 50));
+    logAzione('Consegna turno', turno + ' · ' + msg.substring(0, 50));
     renderConsegne();
     aggiornaConsegnaBadge();
     toast('Consegna inviata!');
@@ -295,7 +295,7 @@ function mostraConsegnaLogin() {
     ultima.turno_uscente +
     '</h3><p style="color:var(--accent2);font-size:.85rem;margin-bottom:12px">da ' +
     escP(ultima.operatore) +
-    ' — ' +
+    ' · ' +
     new Date(ultima.created_at).toLocaleDateString('it-IT') +
     ' ' +
     new Date(ultima.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) +
@@ -341,9 +341,9 @@ function renderDashboard() {
   const gd = new Date(oggi + 'T12:00:00');
   // Titolo: usa la giornata di gioco, non la data di sistema
   document.getElementById('dash-titolo').textContent =
-    'Dashboard — GD ' + gd.getDate() + ' ' + MESI_FULL[gd.getMonth()] + ' ' + gd.getFullYear();
+    'Dashboard · GD ' + gd.getDate() + ' ' + MESI_FULL[gd.getMonth()] + ' ' + gd.getFullYear();
   document.getElementById('dash-sottotitolo').textContent =
-    GIORNI[gd.getDay()] + ' — Turno ' + turno + ' — ' + getOperatore();
+    GIORNI[gd.getDay()] + ' · Turno ' + turno + ' · ' + getOperatore();
   // Stats bar: 6 KPI
   const op = getOperatore();
   const pmMiei = promemoriaCache.filter(
@@ -446,7 +446,7 @@ function renderDashboard() {
     todoH +=
       '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="font-size:1.1rem"><i class="icx icx-torta"></i></span><span style="flex:1"><strong>' +
       escP(bd.nome) +
-      '</strong> — <span style="color:var(--accent2);font-weight:700">Compleanno OGGI!</span></span></div>';
+      '</strong> · <span style="color:var(--accent2);font-weight:700">Compleanno OGGI!</span></span></div>';
   });
   const ammA = checkAmmonimentiAlerts();
   ammA.forEach((a) => {
@@ -456,7 +456,7 @@ function renderDashboard() {
       ne +
       '\')"><strong>' +
       escP(a.nome) +
-      '</strong> — ' +
+      '</strong> · ' +
       a.count +
       ' ammonimenti verbali</span></div>';
   });
@@ -482,7 +482,7 @@ function renderDashboard() {
     domH +=
       '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="font-size:1.1rem"><i class="icx icx-torta"></i></span><span style="flex:1"><strong>' +
       escP(bd.nome) +
-      '</strong> — compleanno domani</span></div>';
+      '</strong> · compleanno domani</span></div>';
   });
   if (!domH) domH = '<p style="color:var(--muted);text-align:center;padding:20px">Niente in programma</p>';
   domaniEl.innerHTML = domH;
@@ -598,7 +598,7 @@ function renderDashboard() {
       escP(a.nome) +
       '</strong></span>: ' +
       a.count +
-      ' allineamenti — rischio RDI</div>';
+      ' allineamenti · rischio RDI</div>';
   });
   getBudgetReparto().forEach((b) => {
     const spent = _rm
@@ -622,7 +622,7 @@ function renderDashboard() {
         '%)</div>';
     }
   });
-  // Stato rapporto giornaliero — carica da DB se non in cache, mostra solo se NON compilato
+  // Stato rapporto giornaliero · carica da DB se non in cache, mostra solo se NON compilato
   if (isVis('rapporto')) {
     if (!rapportiCache[oggi]) {
       secGet('rapporti_giornalieri?data_rapporto=eq.' + oggi + '&reparto_dip=eq.' + currentReparto)
@@ -781,7 +781,7 @@ function _renderDashSettimana(_rd, _rm) {
         d0.getDate() +
         ' ' +
         MESI[d0.getMonth()] +
-        ' — ' +
+        ' · ' +
         d6.getDate() +
         ' ' +
         MESI[d6.getMonth()] +
@@ -947,7 +947,7 @@ async function generaReportSettimanale(sez) {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100);
-    doc.text(dalLabel + ' — ' + alLabel + ' — Casino Lugano SA', pw / 2, y, { align: 'center' });
+    doc.text(dalLabel + ' · ' + alLabel + ' · Casino Lugano SA', pw / 2, y, { align: 'center' });
     y += 10;
     doc.setTextColor(0);
     // PANORAMICA
@@ -1158,7 +1158,7 @@ async function generaReportSettimanale(sez) {
             new Date((r.data_regalo || r.created_at) + 'T12:00:00').toLocaleDateString('it-IT'),
             r.nome,
             r.descrizione || '',
-            r.importo ? fmtCHF(r.importo) : '—',
+            r.importo ? fmtCHF(r.importo) : '-',
           ]),
           headStyles: { fillColor: [139, 105, 20] },
           styles: { lineColor: [220, 215, 205], lineWidth: 0.15, fontSize: 9, cellPadding: 3 },
@@ -1174,7 +1174,7 @@ async function generaReportSettimanale(sez) {
       doc.setFontSize(7);
       doc.setTextColor(150);
       doc.text(
-        'Casino Lugano SA — Report ' + dalLabel + ' / ' + alLabel + ' — Pag. ' + i + '/' + tp,
+        'Casino Lugano SA · Report ' + dalLabel + ' / ' + alLabel + ' · Pag. ' + i + '/' + tp,
         mx,
         doc.internal.pageSize.getHeight() - 8,
       );
@@ -1422,7 +1422,7 @@ async function generaReportAnnuale(sez) {
       doc.setFontSize(7);
       doc.setTextColor(150);
       doc.text(
-        'Casino Lugano SA — Report Annuale ' + anno + ' — Pag. ' + i + '/' + tp,
+        'Casino Lugano SA · Report Annuale ' + anno + ' · Pag. ' + i + '/' + tp,
         mx,
         doc.internal.pageSize.getHeight() - 8,
       );
@@ -1436,7 +1436,7 @@ async function generaReportAnnuale(sez) {
 function generaReportAnnualeCSV() {
   const anno = _getAnnoCorrente();
   const d = _getDatiAnno(anno);
-  const rows = [['REPORT ANNUALE ' + anno + ' — Casino Lugano SA'], ['']];
+  const rows = [['REPORT ANNUALE ' + anno + ' · Casino Lugano SA'], ['']];
   // Riepilogo mensile
   rows.push(['RIEPILOGO MENSILE'], ['Mese', 'Registrazioni', 'Errori', 'Malattie', 'Maison CHF', 'Spese Extra CHF']);
   for (var m = 0; m < 12; m++) {

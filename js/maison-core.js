@@ -1,11 +1,11 @@
 /**
- * Diario Collaboratori — Casino Lugano SA
+ * Diario Collaboratori · Casino Lugano SA
  * File: maison.js
  */
 
 // ================================================================
 /**
- * Diario Collaboratori — Casino Lugano SA
+ * Diario Collaboratori · Casino Lugano SA
  * File: maison-core.js
  * Maison: dashboard, costi, form manuale
  */
@@ -375,7 +375,7 @@ function renderRegali() {
   ).size;
   var html =
     '<div class="mini-stats-bar"><div class="mini-stat"><div class="mini-stat-num gold">' +
-    (totale ? fmtCHF(totale) : '—') +
+    (totale ? fmtCHF(totale) : '-') +
     '</div><div class="mini-stat-label">Totale CHF</div></div><div class="mini-stat"><div class="mini-stat-num blue">' +
     data.length +
     '</div><div class="mini-stat-label">Regali</div></div><div class="mini-stat"><div class="mini-stat-num">' +
@@ -420,7 +420,7 @@ function renderRegali() {
       '</td><td>' +
       escP(r.descrizione || '') +
       '</td><td class="num">' +
-      (r.importo ? fmtCHF(r.importo) : '—') +
+      (r.importo ? fmtCHF(r.importo) : '-') +
       '</td><td style="color:var(--muted);font-size:.82rem">' +
       escP(r.operatore || '') +
       '</td><td style="white-space:nowrap"><button class="btn-act edit" onclick="rinominaRegalo(' +
@@ -506,7 +506,7 @@ function renderMaisonDashboard() {
   if (fd && fa) {
     periodoLabel =
       new Date(fd + 'T12:00:00').toLocaleDateString('it-IT') +
-      ' — ' +
+      ' · ' +
       new Date(fa + 'T12:00:00').toLocaleDateString('it-IT');
   } else if (data.length) {
     const _mesiMap = {};
@@ -959,7 +959,7 @@ function renderMaisonGdOggi() {
           ' ' +
           r.tipo_buono +
           '</span>'
-        : '<span style="color:var(--muted)">&mdash;</span>';
+        : '<span style="color:var(--muted)">&middot;</span>';
       const idsGruppo = gruppoRighe.map((x) => x.id).join(',');
       h +=
         '<tr><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\'' +
@@ -1020,7 +1020,7 @@ function renderMaisonGdOggi() {
           ' ' +
           r.tipo_buono +
           '</span>'
-        : '<span style="color:var(--muted)">&mdash;</span>';
+        : '<span style="color:var(--muted)">&middot;</span>';
       h +=
         '<tr><td><strong><span class="entry-name" onclick="apriDettaglioMaison(\'' +
         ne +
@@ -1161,7 +1161,7 @@ function esportaGdOggiCSV() {
     bl: 'Buono Lounge',
   };
   const rows = [
-    ['GD ' + dt.toLocaleDateString('it-IT') + ' — ' + GIORNI[dt.getDay()]],
+    ['GD ' + dt.toLocaleDateString('it-IT') + ' · ' + GIORNI[dt.getDay()]],
     ['Cliente', 'Categoria', 'Tipo', 'PX', 'Costo CHF'],
   ];
   const _br = getBudgetReparto();
@@ -1177,7 +1177,7 @@ function esportaGdOggiCSV() {
     rows.push([
       label,
       b && b.categoria ? _catL[b.categoria] || '' : '',
-      g.tipo_buono ? _qn + ' ' + g.tipo_buono : '—',
+      g.tipo_buono ? _qn + ' ' + g.tipo_buono : '-',
       g.px,
       fmtCHF(g.costo),
     ]);
@@ -1245,11 +1245,11 @@ async function esportaGdOggiPDF() {
     doc.setFontSize(11);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100);
-    doc.text('GD ' + dt.toLocaleDateString('it-IT') + ' — ' + GIORNI[dt.getDay()] + ' — Casino Lugano SA', pw / 2, y, {
+    doc.text('GD ' + dt.toLocaleDateString('it-IT') + ' · ' + GIORNI[dt.getDay()] + ' · Casino Lugano SA', pw / 2, y, {
       align: 'center',
     });
     y += 5;
-    doc.text(righe.length + ' clienti — ' + totPx + ' persone — CHF ' + fmtCHF(tot), pw / 2, y, { align: 'center' });
+    doc.text(righe.length + ' clienti · ' + totPx + ' persone · CHF ' + fmtCHF(tot), pw / 2, y, { align: 'center' });
     y += 10;
     doc.setTextColor(0);
     const grouped = _raggruppaGdRighe(righe);
@@ -1270,7 +1270,7 @@ async function esportaGdOggiPDF() {
         return [
           label,
           b && b.categoria ? _catL[b.categoria] || '' : '',
-          g.tipo_buono ? _qn + ' ' + g.tipo_buono : '—',
+          g.tipo_buono ? _qn + ' ' + g.tipo_buono : '-',
           g.px,
           fmtCHF(g.costo),
         ];
@@ -1326,7 +1326,7 @@ async function esportaGdOggiPDF() {
     doc.setFontSize(7);
     doc.setTextColor(150);
     doc.text(
-      'Casino Lugano SA — Formulario Ristorante GD ' + dt.toLocaleDateString('it-IT'),
+      'Casino Lugano SA · Formulario Ristorante GD ' + dt.toLocaleDateString('it-IT'),
       16,
       doc.internal.pageSize.getHeight() - 8,
     );
@@ -1560,7 +1560,7 @@ function apriDettaglioMaison(nome) {
     ne +
     '\')" style="font-size:.78rem;padding:3px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink);vertical-align:middle;cursor:pointer"><option value=""' +
     (!_curCat ? ' selected' : '') +
-    '>— Categoria —</option><option value="full_maison"' +
+    '>· Categoria ·</option><option value="full_maison"' +
     (_curCat === 'full_maison' ? ' selected' : '') +
     '>Full Maison</option><option value="maison"' +
     (_curCat === 'maison' ? ' selected' : '') +
@@ -1580,13 +1580,13 @@ function apriDettaglioMaison(nome) {
     mesiCliente +
     '</p><p style="color:var(--muted);font-size:.82rem">' +
     righe.length +
-    ' visite — ' +
+    ' visite · ' +
     totPx +
-    ' persone — ' +
+    ' persone · ' +
     fmtCHF(tot) +
     ' CHF' +
-    (nBU ? ' — ' + nBU + ' BU' : '') +
-    (nBL ? ' — ' + nBL + ' BL' : '') +
+    (nBU ? ' · ' + nBU + ' BU' : '') +
+    (nBL ? ' · ' + nBL + ' BL' : '') +
     '</p>' +
     (budget && budget.budget_chf
       ? '<p style="font-size:.82rem;color:' +
@@ -1610,7 +1610,7 @@ function apriDettaglioMaison(nome) {
       ? '<p style="font-size:.78rem;color:var(--muted);margin-top:4px">Ultimo aggiornamento: ' +
         escP(budget.aggiornato_da) +
         (budget.aggiornato_at
-          ? ' — ' +
+          ? ' · ' +
             new Date(budget.aggiornato_at).toLocaleDateString('it-IT') +
             ' ' +
             new Date(budget.aggiornato_at).toLocaleTimeString('it-IT', {
@@ -1638,7 +1638,7 @@ function apriDettaglioMaison(nome) {
   const _ultimoPass = _dateSort.length ? new Date(_dateSort[_dateSort.length - 1] + 'T12:00:00') : null;
   const _ultimoStr = _ultimoPass
     ? _ultimoPass.getDate() + ' ' + MESI[_ultimoPass.getMonth()] + ' ' + _ultimoPass.getFullYear()
-    : '—';
+    : '-';
   html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">';
   html +=
     '<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.2rem;font-weight:700;color:#b8860b">CHF ' +
@@ -1674,7 +1674,7 @@ function apriDettaglioMaison(nome) {
     });
     const _giornoMaxIdx = _giorniCount.indexOf(Math.max(..._giorniCount));
     const _giornoPreferito = GIORNI[_giornoMaxIdx];
-    let _freqStr = '—';
+    let _freqStr = '-';
     if (_dateSort.length >= 2) {
       const _d0 = new Date(_dateSort[0] + 'T12:00:00');
       const _d1 = new Date(_dateSort[_dateSort.length - 1] + 'T12:00:00');
@@ -1801,7 +1801,7 @@ function apriDettaglioMaison(nome) {
             '">' +
             r.tipo_buono +
             '</span>'
-          : '—') +
+          : '-') +
         '</td><td style="color:var(--muted);font-size:.85rem">' +
         escP(r._gruppoOriginale || r.gruppo || '') +
         '</td><td style="color:var(--muted);font-size:.85rem">' +
@@ -1900,7 +1900,7 @@ function apriDettaglioMaison(nome) {
         '</td><td>' +
         escP(r.descrizione || '') +
         '</td><td class="num">' +
-        (r.importo ? fmtCHF(r.importo) : '—') +
+        (r.importo ? fmtCHF(r.importo) : '-') +
         '</td><td style="color:var(--muted);font-size:.82rem">' +
         escP(r.operatore || '') +
         '</td></tr>';
@@ -1920,7 +1920,7 @@ function apriDettaglioMaison(nome) {
         esc(r.nota) +
         '</p><small style="color:var(--muted)">' +
         escP(r.operatore || '') +
-        ' — ' +
+        ' · ' +
         new Date(r.created_at).toLocaleDateString('it-IT') +
         '</small></div><button class="btn-act del" onclick="eliminaNotaCliente(' +
         r.id +
@@ -2102,7 +2102,7 @@ function stampaSchedaCliente() {
   win.document.write('textarea,input[type=text]{display:none!important}');
   win.document.write('@media print{body{padding:10px}}</style></head><body>');
   win.document.write(
-    '<div style="text-align:center;margin-bottom:20px;font-size:.8rem;color:#8a7d6b">Casino Lugano SA — Scheda Cliente</div>',
+    '<div style="text-align:center;margin-bottom:20px;font-size:.8rem;color:#8a7d6b">Casino Lugano SA · Scheda Cliente</div>',
   );
   win.document.write(content);
   win.document.write(
@@ -2113,7 +2113,7 @@ function stampaSchedaCliente() {
         hour: '2-digit',
         minute: '2-digit',
       }) +
-      ' — Riservato</div>',
+      ' · Riservato</div>',
   );
   win.document.write('</body></html>');
   win.document.close();
@@ -2269,7 +2269,7 @@ function eseguiConfrontoMaison() {
                 ? 'Buono Unico'
                 : c === 'bl'
                   ? 'Buono Lounge'
-                  : '—';
+                  : '-';
       },
     },
     {
@@ -2318,13 +2318,13 @@ function eseguiConfrontoMaison() {
     {
       label: 'Buoni BU',
       fn: function (d) {
-        return d.nBU || '—';
+        return d.nBU || '-';
       },
     },
     {
       label: 'Buoni BL',
       fn: function (d) {
-        return d.nBL || '—';
+        return d.nBL || '-';
       },
     },
   ];
@@ -2420,7 +2420,7 @@ function esportaMaisonClienteCSV(nome) {
   }
   const _csvCat = _csvBudget && _csvBudget.categoria ? _csvCatLabels[_csvBudget.categoria] : '';
   const rows = [
-    [nome + (_csvCat ? ' — ' + _csvCat : '')],
+    [nome + (_csvCat ? ' · ' + _csvCat : '')],
     ['Data', 'Giorno', 'PX', 'Costo CHF', 'Tipo', 'Gruppo', 'Note'],
   ];
   righe.forEach((r) => {
@@ -2580,7 +2580,7 @@ async function esportaMaisonClientePDF(nome) {
       if (_cog.length >= 3) _clBudget = getBudgetReparto().find((b) => b.nome.toLowerCase().split(/\s+/)[0] === _cog);
     }
     const _clCat = _clBudget && _clBudget.categoria ? _clCatLabels[_clBudget.categoria] : '';
-    doc.text('Scheda Cliente — ' + nome, pw / 2, y, { align: 'center' });
+    doc.text('Scheda Cliente · ' + nome, pw / 2, y, { align: 'center' });
     y += 7;
     if (_clCat) {
       doc.setFontSize(11);
@@ -2593,7 +2593,7 @@ async function esportaMaisonClientePDF(nome) {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100);
-    doc.text(mesi + ' — Casino Lugano SA', pw / 2, y, { align: 'center' });
+    doc.text(mesi + ' · Casino Lugano SA', pw / 2, y, { align: 'center' });
     y += 8;
     doc.setTextColor(0);
     // KPI
@@ -2635,7 +2635,7 @@ async function esportaMaisonClientePDF(nome) {
           margin: { left: 16, right: 16 },
           head: [['Mese', 'Totale CHF', 'Variazione']],
           body: mesiArr.map(([m, v], i) => {
-            const delta = i > 0 ? (((v - mesiArr[i - 1][1]) / mesiArr[i - 1][1]) * 100).toFixed(1) + '%' : '—';
+            const delta = i > 0 ? (((v - mesiArr[i - 1][1]) / mesiArr[i - 1][1]) * 100).toFixed(1) + '%' : '-';
             return [m, fmtCHF(v), delta];
           }),
           headStyles: { fillColor: [26, 74, 122] },
@@ -2737,7 +2737,7 @@ async function esportaMaisonClientePDF(nome) {
           body: regR.map((r) => [
             new Date((r.data_regalo || r.created_at) + 'T12:00:00').toLocaleDateString('it-IT'),
             r.descrizione || '',
-            r.importo ? fmtCHF(r.importo) : '—',
+            r.importo ? fmtCHF(r.importo) : '-',
             r.operatore || '',
           ]),
           headStyles: { fillColor: [184, 134, 11] },
@@ -2757,12 +2757,12 @@ async function esportaMaisonClientePDF(nome) {
       doc.setPage(i);
       doc.setFontSize(7);
       doc.setTextColor(150);
-      doc.text('Casino Lugano SA — ' + nome + ' — Pag. ' + i + '/' + tp, 16, doc.internal.pageSize.getHeight() - 8);
+      doc.text('Casino Lugano SA · ' + nome + ' · Pag. ' + i + '/' + tp, 16, doc.internal.pageSize.getHeight() - 8);
     }
     mostraPdfPreview(
       doc,
       'scheda_' + nome.replace(/\s+/g, '_') + '_' + _maisonFilePeriodo(righe) + '.pdf',
-      'Scheda — ' + nome,
+      'Scheda · ' + nome,
     );
   } catch (e) {
     console.error(e);
@@ -3009,7 +3009,7 @@ function modificaMaisonRiga(id, nome) {
   mc.innerHTML =
     '<h3>Modifica riga</h3><p style="color:var(--muted);font-size:.85rem;margin-bottom:12px">' +
     escP(r.nome) +
-    ' — ' +
+    ' · ' +
     new Date(r.data_giornata + 'T12:00:00').toLocaleDateString('it-IT') +
     '</p><div style="display:flex;gap:10px;flex-wrap:wrap"><div class="pwd-field" style="flex:1;min-width:80px"><label>PX</label><input type="number" id="edit-mr-px" value="' +
     (r.px || 1) +

@@ -1,5 +1,5 @@
 /**
- * Diario Collaboratori — Casino Lugano SA
+ * Diario Collaboratori · Casino Lugano SA
  * File: cestino.js
  */
 
@@ -9,7 +9,7 @@
 // ================================================================
 // CESTINO
 /**
- * Diario Collaboratori — Casino Lugano SA
+ * Diario Collaboratori · Casino Lugano SA
  * File: cestino-core.js
  * Cestino: soft delete, ripristino, DB stats
  */
@@ -77,9 +77,9 @@ function renderCestino() {
       html +=
         '<div style="padding:8px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:.85rem"><div style="flex:1"><strong>' +
         escP(r.nome || '') +
-        '</strong> — <span style="color:var(--muted)">' +
+        '</strong> · <span style="color:var(--muted)">' +
         escP(r.tipo || '') +
-        '</span> — ' +
+        '</span> · ' +
         d +
         '<div style="font-size:.75rem;color:var(--muted)">' +
         escP((r.testo || '').substring(0, 60)) +
@@ -107,9 +107,9 @@ function renderCestino() {
       html +=
         '<div style="padding:8px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:.85rem"><div style="flex:1"><strong>' +
         escP(m.collaboratore || '') +
-        '</strong> — <span style="color:var(--muted)">' +
+        '</strong> · <span style="color:var(--muted)">' +
         escP(m.tipo || '') +
-        '</span> — ' +
+        '</span> · ' +
         escP(m.data_modulo || '') +
         '<div style="font-size:.72rem;color:var(--accent)">Eliminato da ' +
         escP(m.eliminato_da || '') +
@@ -281,7 +281,7 @@ async function caricaDbStats() {
   h +=
     '<p style="color:var(--muted);font-size:.85rem;margin-bottom:14px">Di cui dati reali: <strong style="color:var(--ink)">' +
     totalDataMB +
-    ' MB</strong> — il resto e overhead PostgreSQL (fisso, non cresce)</p>';
+    ' MB</strong> · il resto e overhead PostgreSQL (fisso, non cresce)</p>';
   // Card grid con conteggio + dimensione
   h +=
     '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px">';

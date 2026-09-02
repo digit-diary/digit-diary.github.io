@@ -1,5 +1,5 @@
 /**
- * Diario Collaboratori — Casino Lugano SA
+ * Diario Collaboratori · Casino Lugano SA
  * File: piano.js
  */
 
@@ -20,7 +20,7 @@ let _pianoRighe = []; // righe del mese/settore correnti
 let _pianoMeseSel = new Date().toISOString().substring(0, 7);
 let _pianoCellaSel = null; // {nome, data} in modifica
 
-// Colori dei codici speciali — PALETTE ORIGINALE TURNIVO (= formattazione
+// Colori dei codici speciali · PALETTE ORIGINALE TURNIVO (= formattazione
 // condizionale dell'Excel del casinò). I codici non elencati restano bianchi.
 const PIANO_COLORI_SPECIALI = {
   V: '#00B0F0',
@@ -40,7 +40,7 @@ const PIANO_COLORI_SPECIALI = {
 function puoGestirePiano() {
   return typeof puoModificare === 'function' ? puoModificare('gestione_piano') : isAdmin();
 }
-// BRIEFING: permesso separato dal piano — gli operatori possono compilare e
+// BRIEFING: permesso separato dal piano · gli operatori possono compilare e
 // modificare il foglio del giorno senza toccare la griglia dei turni
 function puoGestireBriefing() {
   return puoGestirePiano() || (typeof puoModificare === 'function' && puoModificare('gestione_briefing'));
@@ -291,7 +291,7 @@ function _pianoColore(codice) {
   return PIANO_COLORI_SPECIALI[codice] || ''; // '' = cella bianca (come Turnivo/Excel)
 }
 // marcatore del giorno importato dall'Excel (riga 2 del foglio: CS = concessione
-// sociale, MN, LRD...) — mostrato nelle intestazioni dei giorni
+// sociale, MN, LRD...) · mostrato nelle intestazioni dei giorni
 function _pianoMarkerGiorno(ym, g) {
   const m = (window._pianoGiornoMarker || {})[ym];
   return m ? m[g] || m[String(g)] || '' : '';
@@ -308,7 +308,7 @@ async function pianoMarkerEdit(g) {
   if (!puoGestirePiano()) return;
   const ym = _pianoMeseSel;
   const attuale = _pianoMarkerGiorno(ym, g);
-  const v = prompt('Marcatore per il giorno ' + g + ' (es. CS, MN, LRD — vuoto per togliere):', attuale);
+  const v = prompt('Marcatore per il giorno ' + g + ' (es. CS, MN, LRD · vuoto per togliere):', attuale);
   if (v === null) return;
   const tutti = window._pianoGiornoMarker || {};
   tutti[ym] = tutti[ym] || {};
@@ -533,7 +533,7 @@ async function renderPiano() {
   const el = document.getElementById('piano-content');
   if (!el) return;
   // dati non ancora arrivati (login appena fatto): mostra l'attesa e riprova
-  // da solo — a caricamento finito loadAll richiama comunque renderPiano
+  // da solo · a caricamento finito loadAll richiama comunque renderPiano
   if (!window._loadAllDone && (!collaboratoriCache || !collaboratoriCache.length)) {
     el.innerHTML = '<p style="color:var(--muted);padding:20px">Caricamento dati&hellip;</p>';
     clearTimeout(window._pianoAttesaTimer);
@@ -670,7 +670,7 @@ async function renderPiano() {
         '<span style="font-size:.8rem;color:var(--muted);margin-left:auto">' +
         _pianoRighe.length +
         ' assegnazioni' +
-        (puoMod ? ' — click seleziona, doppio click modifica' : ' — sola lettura') +
+        (puoMod ? ' · click seleziona, doppio click modifica' : ' · sola lettura') +
         '</span></div>';
       h += '<div id="piano-violazioni"></div>';
 
@@ -759,7 +759,7 @@ async function renderPiano() {
             }
             if (r.commento) {
               cls += ' piano-comm';
-              titolo += (titolo ? ' — ' : '') + r.commento;
+              titolo += (titolo ? ' · ' : '') + r.commento;
             }
           } else if (malattie[nome + '|' + dstr]) {
             cella = 'M';
@@ -769,7 +769,7 @@ async function renderPiano() {
           const violMsg = _pianoViolCelle[nome + '|' + dstr];
           if (violMsg) {
             cls += ' piano-viol';
-            titolo += (titolo ? ' — ' : '') + '⚠ ' + violMsg.join(' | ');
+            titolo += (titolo ? ' · ' : '') + '⚠ ' + violMsg.join(' | ');
           }
           // colore personalizzato della cella: vince sul colore del turno (solo qui nel piano)
           if (r && r.colore) stile += (stile ? ';' : '') + 'background:' + r.colore;
@@ -858,7 +858,7 @@ async function renderPiano() {
         '<span><span class="piano-leg piano-comm" style="background:var(--paper2)"></span> triangolo = commento (passa il mouse)</span>';
       h +=
         '<span><span class="piano-leg piano-malattia-auto" style="background:var(--paper2)">M</span> = malattia dal Diario (automatica)</span>';
-      h += '<span>icona rossa = stampa piano del collaboratore — tasto destro su una cella = menu opzioni</span>';
+      h += '<span>icona rossa = stampa piano del collaboratore · tasto destro su una cella = menu opzioni</span>';
       h += '</div></div>';
 
       // FABBISOGNO vs ASSEGNATI (editabile: click sulla cella per impostare le persone necessarie)
@@ -882,7 +882,7 @@ async function renderPiano() {
         });
         let hFabb = '';
         hFabb +=
-          '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Pianificazione (fabbisogno) vs assegnati — ' +
+          '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Pianificazione (fabbisogno) vs assegnati · ' +
           escP(label);
         if (puoMod)
           hFabb +=
@@ -996,9 +996,9 @@ async function renderPiano() {
           });
         hFabb += '</tbody></table></div>';
         hFabb +=
-          '<p style="font-size:.8rem;color:var(--muted);padding:8px 14px">assegnati/richiesti — celle gialle (weekend verdi) come la PIANIFICAZIONE dell&#39;Excel; numero <span style="color:#c0392b;font-weight:700">rosso</span> = carenza. Il fabbisogno guida "Genera bozza".</p></div>';
+          '<p style="font-size:.8rem;color:var(--muted);padding:8px 14px">assegnati/richiesti · celle gialle (weekend verdi) come la PIANIFICAZIONE dell&#39;Excel; numero <span style="color:#c0392b;font-weight:700">rosso</span> = carenza. Il fabbisogno guida "Genera bozza".</p></div>';
 
-        // DIFFERENZE + EFFETTIVI — schema IDENTICO a Turnivo (calendario.html):
+        // DIFFERENZE + EFFETTIVI · schema IDENTICO a Turnivo (calendario.html):
         // differenze = effettivi - pianificazione (verde >0, rosso <0, vuoto 0),
         // effettivi = conteggio persone per turno/giorno con colonna Tot
         const turniOrdinati = turniRep
@@ -1022,7 +1022,7 @@ async function renderPiano() {
           '</td>';
 
         h +=
-          '<div class="main-card" style="margin-top:16px"><div class="card-header">Differenze — ' +
+          '<div class="main-card" style="margin-top:16px"><div class="card-header">Differenze · ' +
           escP(label) +
           ' <span style="font-size:.76rem;color:#b8a98a;font-weight:400">(effettivi − pianificazione)</span></div>';
         h +=
@@ -1060,7 +1060,7 @@ async function renderPiano() {
         h += '</tbody></table></div></div>';
 
         h +=
-          '<div class="main-card" style="margin-top:16px"><div class="card-header">Effettivi — ' +
+          '<div class="main-card" style="margin-top:16px"><div class="card-header">Effettivi · ' +
           escP(label) +
           '</div>';
         h +=
@@ -1165,7 +1165,7 @@ function pianoCambiaMese(delta) {
 }
 
 // (la vecchia finestra di modifica cella è stata sostituita dalla
-// scrittura diretta nella cella — pianoCellaInline / pianoSalvaCella)
+// scrittura diretta nella cella · pianoCellaInline / pianoSalvaCella)
 async function rimuoviPianoCella(giaChiuso) {
   const sel = _pianoCellaSel;
   if (!sel) return;
@@ -1184,7 +1184,7 @@ async function rimuoviPianoCella(giaChiuso) {
 }
 
 // ================================================================
-// FASE 2 — VALIDATORE REGOLE (dai manuali Turnivo/Casino Lugano)
+// FASE 2 · VALIDATORE REGOLE (dai manuali Turnivo/Casino Lugano)
 // ================================================================
 let _pianoViolCelle = {}; // 'nome|data' -> [messaggi]
 let _pianoViolLista = null; // ultima validazione (null = mai eseguita)
@@ -1511,7 +1511,7 @@ function validaPiano() {
   const r = _pianoCalcolaViolazioni();
   _pianoViolCelle = r.celle;
   _pianoViolLista = r.lista.sort((a, b) => a.nome.localeCompare(b.nome) || a.giorno - b.giorno);
-  logAzione('Piano validato', _pianoMeseSel + ' — ' + r.lista.length + ' violazioni');
+  logAzione('Piano validato', _pianoMeseSel + ' · ' + r.lista.length + ' violazioni');
   renderPiano();
 }
 
@@ -1528,14 +1528,14 @@ function _pianoRenderViolazioni() {
     _pianoViolLista.length +
     ' violazioni (celle evidenziate in rosso):</p><div style="max-height:180px;overflow-y:auto;font-size:.85rem;line-height:1.7">';
   _pianoViolLista.forEach((v) => {
-    h += '<div>• <strong>' + escP(v.nome) + '</strong> — giorno ' + v.giorno + ': ' + escP(v.msg) + '</div>';
+    h += '<div>• <strong>' + escP(v.nome) + '</strong> · giorno ' + v.giorno + ': ' + escP(v.msg) + '</div>';
   });
   h += '</div></div>';
   el.innerHTML = h;
 }
 
 // ================================================================
-// FASE 2 — GENERA BOZZA (euristica istantanea, non il solver)
+// FASE 2 · GENERA BOZZA (euristica istantanea, non il solver)
 // Riempie i fabbisogni del mese rispettando: riposo 11h, max
 // consecutivi, idoneità storica (gruppi già fatti), equità ore.
 // Le celle esistenti (V, protette, malattie Diario) non si toccano.
@@ -1919,7 +1919,7 @@ async function generaBozzaPiano() {
     });
   });
 
-  // RIEMPIMENTO C: come nei piani fatti a mano, nessuna cella resta vuota —
+  // RIEMPIMENTO C: come nei piani fatti a mano, nessuna cella resta vuota ·
   // ogni giorno senza turno/assenza riceve C (congedo, 0 ore, rigenerabile)
   let nCongedi = 0;
   nomi.forEach((n) => {
@@ -1982,12 +1982,12 @@ async function generaBozzaPiano() {
         updated_at: new Date().toISOString(),
       });
     }
-    logAzione('Piano: bozza generata', ym + ' — ' + nuove.length + ' turni, ' + scoperti.length + ' scoperti');
+    logAzione('Piano: bozza generata', ym + ' · ' + nuove.length + ' turni, ' + scoperti.length + ' scoperti');
     toast(
       'Bozza generata: ' +
         ((r && r.inserite) || nuove.length) +
         ' turni' +
-        (scoperti.length ? ' — ' + scoperti.length + ' scoperti' : ''),
+        (scoperti.length ? ' · ' + scoperti.length + ' scoperti' : ''),
     );
     _pianoViolLista = null;
     _pianoViolCelle = {};
@@ -2009,7 +2009,7 @@ async function cancellaBozzaPiano() {
   const protette = _pianoRighe.length - nonProtette;
   const b = document.getElementById('pwd-modal-content');
   b.innerHTML =
-    '<h3>Cancella piano — ' +
+    '<h3>Cancella piano · ' +
     ym +
     '</h3><p style="margin-bottom:14px;font-size:.88rem">' +
     nonProtette +
@@ -2050,7 +2050,7 @@ async function eseguiCancellaPiano(tutto) {
       'piano',
       'data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + (tutto ? '' : '&protetto=eq.false'),
     );
-    logAzione('Piano: cancellato', ym + ' — ' + n + ' celle (tutto=' + tutto + ')');
+    logAzione('Piano: cancellato', ym + ' · ' + n + ' celle (tutto=' + tutto + ')');
     toast('Piano cancellato: ' + n + ' celle rimosse');
     _pianoViolCelle = {};
     _pianoViolLista = null;
@@ -2061,7 +2061,7 @@ async function eseguiCancellaPiano(tutto) {
 }
 
 // ================================================================
-// REGOLE DEL PIANO — card admin: elenco ordinato, valori e stato
+// REGOLE DEL PIANO · card admin: elenco ordinato, valori e stato
 // modificabili. Etichetta onesta su DOVE ogni regola è applicata.
 // ================================================================
 const PIANO_REGOLE_DOVE = {
@@ -2159,7 +2159,7 @@ async function salvaPianoRegola(id, campo, valore) {
 }
 
 // ================================================================
-// PERSONALIZZAZIONE COMPLETA — fabbisogni, turni, codici, festivi
+// PERSONALIZZAZIONE COMPLETA · fabbisogni, turni, codici, festivi
 // ================================================================
 let _pianoFabbCache = [];
 
@@ -2259,7 +2259,7 @@ function fabbisognoInline(codice, dstr, el) {
   inp.addEventListener('blur', conferma);
 }
 
-// Import fabbisogno da CSV/Excel — formato Turnivo (upload_fabbisogno):
+// Import fabbisogno da CSV/Excel · formato Turnivo (upload_fabbisogno):
 // prima colonna = codice turno, colonne successive = quantità per i giorni
 // 1..N del mese. SOSTITUISCE il fabbisogno del mese per questo settore.
 
@@ -2412,7 +2412,7 @@ async function importaFabbisognoExcel(input) {
     if (!nuovi.length) {
       toast(
         'Nessuna quantità riconosciuta nel file' +
-          (foglioMese ? '' : ' — manca il foglio del mese selezionato') +
+          (foglioMese ? '' : ' · manca il foglio del mese selezionato') +
           (errori ? ' (' + errori + ' codici turno sconosciuti)' : ''),
       );
       return;
@@ -2438,7 +2438,7 @@ async function importaFabbisognoExcel(input) {
     await secDel('piano_fabbisogni', 'data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto());
     for (let i = 0; i < nuovi.length; i += 10)
       await Promise.all(nuovi.slice(i, i + 10).map((f) => secPost('piano_fabbisogni', f)));
-    logAzione('Fabbisogno importato', ym + ' — ' + nuovi.length + ' celle');
+    logAzione('Fabbisogno importato', ym + ' · ' + nuovi.length + ' celle');
     toast('Fabbisogno importato: ' + nuovi.length + ' celle');
     renderPiano();
   } catch (e) {
@@ -2680,7 +2680,7 @@ async function importaPianoExcel(input) {
       }
     }
     const r = await sbRpc('piano_bulk_upsert', { p_token: getOpToken(), p_rows: nuove });
-    logAzione('Piano importato da Excel', ym + ' — ' + ((r && r.inserite) || 0) + '/' + nuove.length + ' celle');
+    logAzione('Piano importato da Excel', ym + ' · ' + ((r && r.inserite) || 0) + '/' + nuove.length + ' celle');
     toast('Piano importato: ' + ((r && r.inserite) || 0) + ' celle nuove');
     setTimeout(async () => {
       await _pianoProponiCertificazioniBulk(
@@ -2731,7 +2731,7 @@ async function eliminaFabbisognoMese() {
         '&reparto_dip=eq.' +
         _pianoReparto(),
     );
-    logAzione('Fabbisogno eliminato', ym + ' — ' + n + ' celle');
+    logAzione('Fabbisogno eliminato', ym + ' · ' + n + ' celle');
     toast('Fabbisogno eliminato: ' + n + ' celle');
     renderPiano();
   } catch (e) {
@@ -2801,7 +2801,7 @@ function _renderPianoTurniCard() {
       .slice()
       .sort((x, y) => (x.gruppo || '').localeCompare(y.gruppo || '') || x.codice.localeCompare(y.codice));
     let hRO =
-      '<div class="main-card" style="margin-top:16px"><div class="card-header">Turni — ' +
+      '<div class="main-card" style="margin-top:16px"><div class="card-header">Turni · ' +
       escP(repartoLabel(_pianoReparto())) +
       '</div><div style="padding:10px 14px"><div style="overflow-x:auto"><table class="piano-table" style="min-width:520px;font-size:.85rem"><thead><tr><th>Codice</th><th>Gruppo</th><th>Inizio</th><th>Fine</th><th>Ore</th><th>Tipo</th></tr></thead><tbody>';
     turniRO.forEach((t) => {
@@ -2813,9 +2813,9 @@ function _renderPianoTurniCard() {
         '</td><td>' +
         escP(t.gruppo || '') +
         '</td><td>' +
-        (t.ora_inizio || '—').substring(0, 5) +
+        (t.ora_inizio || '-').substring(0, 5) +
         '</td><td>' +
-        (t.ora_fine || '—').substring(0, 5) +
+        (t.ora_fine || '-').substring(0, 5) +
         '</td><td>' +
         (t.durata_ore || 0) +
         '</td><td>' +
@@ -2828,7 +2828,7 @@ function _renderPianoTurniCard() {
   }
   const turni = _pianoTurniReparto();
   let h =
-    '<div class="main-card" style="margin-top:16px"><div class="card-header">Turni — ' +
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Turni · ' +
     escP(repartoLabel(_pianoReparto())) +
     ' (admin)</div><div style="padding:10px 14px">';
   h +=
@@ -3142,7 +3142,7 @@ function _renderPianoFestiviCard() {
       h +=
         '<div class="tipo-item"><div class="tipo-item-name">' +
         new Date(f.data + 'T12:00:00').toLocaleDateString('it-IT') +
-        ' — ' +
+        ' · ' +
         escP(f.descrizione || '') +
         (f.cgf ? ' <span class="tipo-item-default">(CGF)</span>' : '') +
         '</div><button class="btn-del-tipo" onclick="eliminaPianoFestivo(' +
@@ -3198,7 +3198,7 @@ async function eliminaPianoFestivo(id) {
 }
 
 // ================================================================
-// SETTORE DEL PIANO — un operatore autorizzato può vedere/gestire
+// SETTORE DEL PIANO · un operatore autorizzato può vedere/gestire
 // il piano di un altro settore (es. supervisor Tavoli sul piano
 // Slots) senza cambiare login: il selettore vale solo per il Piano.
 // ================================================================
@@ -3226,7 +3226,7 @@ function pianoCambiaReparto(rep) {
 }
 
 // ================================================================
-// FESTIVI AUTOMATICI — genera i festivi di un anno con un click.
+// FESTIVI AUTOMATICI · genera i festivi di un anno con un click.
 // Lista = quella osservata dal casinò (da Turnivo 2026): 7 fissi +
 // Lunedì di Pasqua e Ascensione calcolati dalla data di Pasqua.
 // ================================================================
@@ -3285,7 +3285,7 @@ async function _generaFestiviSeMancanti() {
       if (r && r[0]) pianoFestiviCache.push(r[0]);
     }
     if (nuovi.length) {
-      logAzione('Piano: festivi generati automaticamente', anno + ' — ' + nuovi.length);
+      logAzione('Piano: festivi generati automaticamente', anno + ' · ' + nuovi.length);
       toast('Festivi ' + anno + ' generati automaticamente (' + nuovi.length + ')');
     }
   } catch (e) {}
@@ -3311,7 +3311,7 @@ async function generaPianoFestivi() {
         anno +
         '?\n\n' +
         nuovi
-          .map((f) => new Date(f.data + 'T12:00:00').toLocaleDateString('it-IT') + ' — ' + f.descrizione)
+          .map((f) => new Date(f.data + 'T12:00:00').toLocaleDateString('it-IT') + ' · ' + f.descrizione)
           .join('\n') +
         '\n\n(tutti con CGF attivo; quelli già presenti non vengono toccati)',
     )
@@ -3381,7 +3381,7 @@ async function stampaPianoPDF() {
   const doc = new jsPDF('landscape', 'mm', 'a4');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(13);
-  doc.text('Piano di lavoro — ' + label + ' — ' + repartoLabel(_pianoReparto()), 148, 10, { align: 'center' });
+  doc.text('Piano di lavoro · ' + label + ' · ' + repartoLabel(_pianoReparto()), 148, 10, { align: 'center' });
   doc.autoTable({
     startY: 14,
     head: [head],
@@ -3409,7 +3409,7 @@ async function stampaPianoPDF() {
   });
   doc.setFontSize(6);
   doc.setTextColor(120);
-  doc.text('Casino Lugano SA — Piano di lavoro — generato il ' + new Date().toLocaleDateString('it-IT'), 4, 205);
+  doc.text('Casino Lugano SA · Piano di lavoro · generato il ' + new Date().toLocaleDateString('it-IT'), 4, 205);
   logAzione('Piano stampato', label + ' (' + _pianoReparto() + ')');
   mostraPdfPreview(doc, 'piano_' + ym + '_' + _pianoReparto() + '.pdf', 'Piano ' + label);
 }
@@ -3633,7 +3633,7 @@ function _pdfCambioTurno(dati) {
   doc.setFontSize(7.5);
   doc.setTextColor(85, 85, 85);
   doc.text(
-    'Generato da Turnivo — Casino Lugano SA — Richiesto da: ' + (dati.richiesto || getOperatore()),
+    'Generato da Turnivo · Casino Lugano SA · Richiesto da: ' + (dati.richiesto || getOperatore()),
     105,
     ph - 9,
     {
@@ -3696,7 +3696,7 @@ async function apriScambioTurno() {
   };
   const b = document.getElementById('pwd-modal-content');
   b.innerHTML =
-    '<h3>Scambio turno — ' +
+    '<h3>Scambio turno · ' +
     new Date(sel.data + 'T12:00:00').toLocaleDateString('it-IT') +
     '</h3><p style="margin-bottom:10px;font-size:.86rem"><strong>' +
     escP(sel.nome) +
@@ -3725,7 +3725,7 @@ async function apriScambioTurno() {
           (prob ? ' style="color:#c0392b"' : '') +
           '>' +
           escP(c.collaboratore) +
-          ' — ' +
+          ' · ' +
           escP(c.codice) +
           (prob ? ' ⚠ ' + prob : ' ✓') +
           '</option>'
@@ -3839,7 +3839,7 @@ async function confermaScambioTurno() {
     logAzione('Piano: scambio turno', sel.nome + ' (' + c1 + ') <-> ' + collega + ' (' + c2 + ') il ' + sel.data);
     toast(
       'Turni scambiati' +
-        (dataRest ? ' — restituzione il ' + new Date(dataRest + 'T12:00:00').toLocaleDateString('it-IT') : ''),
+        (dataRest ? ' · restituzione il ' + new Date(dataRest + 'T12:00:00').toLocaleDateString('it-IT') : ''),
     );
     // Formulario IDENTICO a Turnivo
     if (!window.jspdf) await caricaJsPDF();
@@ -3894,7 +3894,7 @@ async function ripristinaOrdinePiano() {
 }
 
 // ================================================================
-// COPERTURA MALATTIA — port di malattia_cerca/malattia_conferma di
+// COPERTURA MALATTIA · port di malattia_cerca/malattia_conferma di
 // Turnivo: per ogni giorno del periodo propone il miglior sostituto
 // libero e idoneo (greedy: meno ore mese + meno giorni consecutivi),
 // alla conferma mette M al malato e i turni (protetti) ai sostituti.
@@ -3957,7 +3957,7 @@ function apriCoperturaMalattia() {
   const nGiorni = _pianoUltimoGiorno(_pianoMeseSel);
   const b = document.getElementById('pwd-modal-content');
   b.innerHTML =
-    '<h3>Copertura malattia — ' +
+    '<h3>Copertura malattia · ' +
     _pianoMeseSel +
     '</h3><p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Cerca i migliori sostituti liberi per i turni del collaboratore malato (come in Turnivo).</p>' +
     '<div class="field" style="text-align:left"><label>Collaboratore malato</label><select id="mal-collab" style="width:100%;padding:8px">' +
@@ -4139,7 +4139,7 @@ async function confermaCoperturaMalattia() {
           codice: 'M',
           protetto: true,
           generato: false,
-          commento: ('Malattia — era ' + d.codice + ' - ' + op).substring(0, 400),
+          commento: ('Malattia · era ' + d.codice + ' - ' + op).substring(0, 400),
           operatore: op,
           updated_at: new Date().toISOString(),
         });
@@ -4262,7 +4262,7 @@ function _pianoInitSelezione() {
   // deseleziona; riga e colonna mutuamente esclusive; click fuori dalla
   // tabella = deseleziona. La stampa avviene SOLO dall'icona rossa.
   // Come Turnivo (table[data-selectable]): vale per TUTTE le tabelle in
-  // piano-wrap — griglia collaboratori E fabbisogno. Le COLONNE data sono
+  // piano-wrap · griglia collaboratori E fabbisogno. Le COLONNE data sono
   // COLLEGATE: selezionando un giorno nel piano l'evidenziazione arriva
   // fino in fondo al fabbisogno (stessa colonna) e viceversa, così si
   // capisce la corrispondenza giorno-fabbisogno.
@@ -4391,7 +4391,7 @@ function _pianoInitSelezione() {
       const cel = tr.querySelector('.piano-nome');
       if (!cel) return;
       cel.draggable = true;
-      cel.title = (cel.title ? cel.title + ' — ' : '') + 'trascina per riordinare';
+      cel.title = (cel.title ? cel.title + ' · ' : '') + 'trascina per riordinare';
       cel.addEventListener('dragstart', (e) => {
         trDrag = tr;
         tr.style.opacity = '0.4';
@@ -4479,7 +4479,7 @@ function _pianoInitSelezione() {
 }
 
 // ================================================================
-// TIMBRATURE — inserimento manuale, upload da timbratrice, confronto
+// TIMBRATURE · inserimento manuale, upload da timbratrice, confronto
 // ore timbrate vs pianificate (come Turnivo cap. 22)
 // ================================================================
 let _pianoTimbrature = []; // mese corrente
@@ -4546,7 +4546,7 @@ function _pianoOreTimbrataPerGiorno(nome, dstr, entrata, uscita) {
 function _renderPianoTimbratureCard() {
   if (!puoGestirePiano() && !isAdmin()) return '';
   let h =
-    '<div class="main-card" style="margin-top:16px"><div class="card-header">Timbrature — confronto con il piano</div><div style="padding:10px 14px" id="piano-timb-body">';
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Timbrature · confronto con il piano</div><div style="padding:10px 14px" id="piano-timb-body">';
   h +=
     '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">' +
     '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="caricaConfrontoTimbrature()">Carica confronto del mese</button>' +
@@ -4782,7 +4782,7 @@ async function caricaConfrontoTimbrature() {
             '<tr><td>' +
             t.data.split('-')[2] +
             '</td><td>' +
-            escP(p ? p.codice : '—') +
+            escP(p ? p.codice : '-') +
             '</td><td>' +
             escP((t.ora_entrata || '').substring(0, 5)) +
             '</td><td>' +
@@ -4935,7 +4935,7 @@ async function caricaStatisticheAnnoPiano() {
         '</td><td>' +
         o.ore.toFixed(1) +
         '</td><td style="color:var(--muted)">' +
-        (dovuteDi(n) ? dovuteDi(n).toFixed(1) : '—') +
+        (dovuteDi(n) ? dovuteDi(n).toFixed(1) : '-') +
         '</td><td>' +
         o.gg +
         '</td><td>' +
@@ -4976,7 +4976,7 @@ async function caricaStatisticheAnnoPiano() {
 // IMPORT VACANZE DA EXCEL (col A cognome, col B nome, col F-BE = settimane 1-52 con X)
 // ================================================================
 // ================================================================
-// TAB VACANZE — identica alla pagina Vacanze di Turnivo: settimane ISO
+// TAB VACANZE · identica alla pagina Vacanze di Turnivo: settimane ISO
 // per collaboratore per anno, conferma, elimina, import Excel,
 // applicazione V+C+WD al piano (port di step_vacanze.py)
 // ================================================================
@@ -5035,7 +5035,7 @@ async function _renderPianoVacanzeTab() {
       '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#d4b86a;color:#d4b86a" onclick="document.getElementById(\'vac-file\').click()">Importa da Excel</button>' +
       '<input type="file" id="vac-file" accept=".xlsx,.xls" style="display:none" onchange="importaVacanzePiano(this)">';
     h +=
-      '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#1a4a7a;color:#7ea8d8" onclick="applicaVacanzePiano()">Applica al piano — ' +
+      '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#1a4a7a;color:#7ea8d8" onclick="applicaVacanzePiano()">Applica al piano · ' +
       escP(meseLbl) +
       '</button>';
     h +=
@@ -5096,7 +5096,7 @@ async function _renderPianoVacanzeTab() {
   h += '</div>';
   return h;
 }
-// TAB SALDO — come la pagina Saldo Ore di Turnivo: dovute/pianificate/saldo
+// TAB SALDO · come la pagina Saldo Ore di Turnivo: dovute/pianificate/saldo
 // del mese per collaboratore + totali (YTD dalla stessa mappa della griglia)
 async function _renderPianoSaldoTab() {
   const ym = _pianoMeseSel;
@@ -5122,7 +5122,7 @@ async function _renderPianoSaldoTab() {
     (t) => (timbNome[t.collaboratore] = (timbNome[t.collaboratore] || 0) + (parseFloat(t.ore) || 0)),
   );
   let h =
-    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:10px">Saldo ore — ' +
+    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:10px">Saldo ore · ' +
     escP(label) +
     '<button class="btn-act pin" onclick="pianoCambiaMese(-1)">&larr;</button><button class="btn-act pin" onclick="pianoCambiaMese(1)">&rarr;</button></div>';
   h +=
@@ -5153,7 +5153,7 @@ async function _renderPianoSaldoTab() {
       '</td><td>' +
       Math.round(pct * 100) +
       '%</td><td>' +
-      (od ? od.toFixed(1) : '—') +
+      (od ? od.toFixed(1) : '-') +
       '</td><td>' +
       (op ? op.toFixed(1) : '') +
       '</td><td style="font-weight:700;color:' +
@@ -5184,7 +5184,7 @@ async function _renderPianoSaldoTab() {
   return h;
 }
 
-// TAB STORICO — come la pagina Storico di Turnivo: log delle modifiche al
+// TAB STORICO · come la pagina Storico di Turnivo: log delle modifiche al
 // piano (dal Registro del Diario, filtrato sulle azioni del piano)
 // ordinamento per colonna dello storico: 1° clic decrescente, 2° crescente
 function pianoStoricoSort(campo) {
@@ -5277,7 +5277,7 @@ async function _renderPianoStoricoTab() {
   return h;
 }
 
-// Formulario RICHIESTA CAMBIO VACANZA — replica di cambio_vacanza_pdf.html
+// Formulario RICHIESTA CAMBIO VACANZA · replica di cambio_vacanza_pdf.html
 // di Turnivo (modulo vuoto da compilare a mano, stesse sezioni colorate)
 async function pdfCambioVacanza(dati) {
   if (!window.jspdf) await caricaJsPDF();
@@ -5350,13 +5350,13 @@ async function pdfCambioVacanza(dati) {
           ['Nome:', c.nome],
           ['Settore:', c.settore || repartoLabel(_pianoReparto())],
           ['Numero settimana:', 'Settimana ' + c.settimana],
-          ['Periodo vacanza:', c.dal + '  —  ' + c.al],
+          ['Periodo vacanza:', c.dal + '  ·  ' + c.al],
         ]
       : [
           ['Nome:', linea],
           ['Settore:', linea],
           ['Numero settimana:', '__________________'],
-          ['Periodo vacanza:', '____/____/________  —  ____/____/________'],
+          ['Periodo vacanza:', '____/____/________  ·  ____/____/________'],
         ];
   sezione('Collaboratore A (richiedente)', [52, 152, 219], campiDi(dati && dati.a));
   sezione('Collaboratore B (accetta lo scambio)', [230, 126, 34], campiDi(dati && dati.b));
@@ -5415,7 +5415,7 @@ async function pdfCambioVacanza(dati) {
   });
   doc.setFontSize(8);
   doc.setTextColor(150, 150, 150);
-  doc.text('Generato dal Diario Collaboratori — formulario cambio vacanza', 105, 287, { align: 'center' });
+  doc.text('Generato dal Diario Collaboratori · formulario cambio vacanza', 105, 287, { align: 'center' });
   mostraPdfPreview(doc, 'cambio_vacanza.pdf', 'Formulario cambio vacanza');
 }
 
@@ -5437,7 +5437,7 @@ function apriScambioSettimane() {
         v.id +
         '">' +
         escP(v.collaboratore) +
-        ' — settimana ' +
+        ' · settimana ' +
         v.settimana +
         ' (' +
         _vacDateSettimana(v.anno, v.settimana) +
@@ -5446,7 +5446,7 @@ function apriScambioSettimane() {
     .join('');
   const b = document.getElementById('pwd-modal-content');
   b.innerHTML =
-    '<h3>Scambia settimane di vacanza — ' +
+    '<h3>Scambia settimane di vacanza · ' +
     window._pianoVacAnno +
     '</h3><div class="field" style="text-align:left"><label>Collaboratore A (richiedente)</label><select id="ss-a" style="width:100%;padding:8px">' +
     opzioni +
@@ -5561,7 +5561,7 @@ function apriNuovaVacanza() {
     .map((c) => c.nome);
   const b = document.getElementById('pwd-modal-content');
   b.innerHTML =
-    '<h3>Nuova vacanza — ' +
+    '<h3>Nuova vacanza · ' +
     window._pianoVacAnno +
     '</h3><div class="field" style="text-align:left"><label>Collaboratore</label><select id="nv-collab" style="width:100%;padding:8px">' +
     nomiRep.map((n) => '<option value="' + escP(n) + '">' + escP(n) + '</option>').join('') +
@@ -5853,7 +5853,7 @@ async function _applicaVacanzeMese(interattivo) {
       }
     }
   }
-  logAzione('Piano: vacanze applicate', ym + ' — ' + nV + ' V, ' + nC + ' C, ' + nWdP + ' WD');
+  logAzione('Piano: vacanze applicate', ym + ' · ' + nV + ' V, ' + nC + ' C, ' + nWdP + ' WD');
   return { v: nV, c: nC, wd: nWdP };
 }
 async function applicaVacanzePiano() {
@@ -5932,7 +5932,7 @@ async function importaVacanzePiano(input) {
     )
       return;
     for (const v of nuove) await secPost('piano_vacanze', v);
-    logAzione('Vacanze importate', anno + ' — ' + nuove.length + ' settimane');
+    logAzione('Vacanze importate', anno + ' · ' + nuove.length + ' settimane');
     toast('Vacanze importate: ' + nuove.length + ' settimane');
     renderPiano();
   } catch (e) {
@@ -5969,7 +5969,7 @@ function _renderPianoMappatureCard() {
             col +
             ';cursor:pointer" title="' +
             m.tipo +
-            ' — clicca per rimuovere" onclick="rimuoviPianoMappatura(' +
+            ' · clicca per rimuovere" onclick="rimuoviPianoMappatura(' +
             m.id +
             ')">' +
             escP(m.turno_codice) +
@@ -6060,7 +6060,7 @@ function _renderPianoImpostazioniCard() {
   // competenze Formazione -> gruppi del piano
   h +=
     '<p style="font-size:.85rem;font-weight:700;margin:12px 0 4px">Competenze Formazione → gruppi del piano</p>' +
-    '<p style="font-size:.78rem;color:var(--muted);margin-bottom:6px">Chi ha la competenza CERTIFICATA in Formazione diventa idoneo anche al gruppo indicato (in aggiunta ai suoi Settori). "—" = nessun collegamento.</p>';
+    '<p style="font-size:.78rem;color:var(--muted);margin-bottom:6px">Chi ha la competenza CERTIFICATA in Formazione diventa idoneo anche al gruppo indicato (in aggiunta ai suoi Settori). "-" = nessun collegamento.</p>';
   const gruppiDisp = [...new Set(pianoTurniCache.map((t) => (t.gruppo || '').toUpperCase()).filter(Boolean))].sort();
   const mappaCG = _pianoCompetenzeGruppi();
   const compRep = typeof getCompetenzeConfigAll === 'function' ? getCompetenzeConfigAll()[_pianoReparto()] || [] : [];
@@ -6072,7 +6072,7 @@ function _renderPianoImpostazioniCard() {
         escP(k.label) +
         ' → <select onchange="salvaCompetenzaGruppo(\'' +
         escP(k.key) +
-        '\',this.value)" style="padding:4px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><option value="">—</option>' +
+        '\',this.value)" style="padding:4px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><option value="">-</option>' +
         gruppiDisp
           .map(
             (g) => '<option' + ((mappaCG[k.key] || '').toUpperCase() === g ? ' selected' : '') + '>' + g + '</option>',
@@ -6411,17 +6411,17 @@ function _renderPianoImportExportCard() {
 }
 
 const _REGOLE_GRUPPO_TIPI = {
-  richiede_funzione: 'Solo queste funzioni (es: SUP oppure BO,SUP) — la storia nel gruppo vale come consenso',
+  richiede_funzione: 'Solo queste funzioni (es: SUP oppure BO,SUP) · la storia nel gruppo vale come consenso',
   blocca_tipo_turno: 'Vieta un tipo di turno nel gruppo (es: NOTTURNO)',
   richiede_campo: 'Richiede un campo del collaboratore (es: accoglienza>0)',
   limite_funzione_giorno: 'Max N di una funzione al giorno (es: SUP:1)',
   limite_funzione_mese: 'Max N persone di una funzione al mese (es: SUP:1)',
   minimo_funzione_mese: 'Almeno N di una funzione al mese (es: SUP:1)',
-  minimo_funzione_giorno: 'Almeno N al giorno, con filtri (es: SUP:1:NOTTURNO:4,5 — 4,5=ven,sab)',
+  minimo_funzione_giorno: 'Almeno N al giorno, con filtri (es: SUP:1:NOTTURNO:4,5 · 4,5=ven,sab)',
 };
-// TAB GUIDA — manuale rapido della sezione Piano (come la Guida di Turnivo)
+// TAB GUIDA · manuale rapido della sezione Piano (come la Guida di Turnivo)
 // ================================================================
-// TAB FORMULARI — moduli stampabili standard (come i formulari vuoti di
+// TAB FORMULARI · moduli stampabili standard (come i formulari vuoti di
 // Turnivo) + ARCHIVIO personalizzato: carichi i tuoi formulari (PDF,
 // Word, Excel ≤2MB), li organizzi in cartelle nominabili per settore,
 // li apri/stampi (PDF direttamente, Word/Excel in download) e li elimini.
@@ -6469,21 +6469,21 @@ async function _renderPianoFormulariTab() {
     chiave +
     '\')">Excel per import</button></div>';
   h += rigaProtocollo(
-    'Protocollo formazione — Slot Attendant',
+    'Protocollo formazione · Slot Attendant',
     'Formazione Slot Attendant nuovi impiegati (originale)',
     'sala',
   );
   h += rigaProtocollo(
-    'Protocollo formazione — Reception',
+    'Protocollo formazione · Reception',
     'Formazione Reception nuovi impiegati (originale)',
     'reception',
   );
-  h += rigaProtocollo('Protocollo formazione — Cassa', 'Protocollo Formazione Cassa (originale)', 'cassa');
+  h += rigaProtocollo('Protocollo formazione · Cassa', 'Protocollo Formazione Cassa (originale)', 'cassa');
   h += '</div></div>';
 
   // ARCHIVIO personalizzato
   h +=
-    '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">I tuoi formulari — ' +
+    '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">I tuoi formulari · ' +
     escP(repartoLabel(_pianoReparto())) +
     ' (' +
     _pianoFormulariCache.length +
@@ -6649,7 +6649,7 @@ async function eliminaFormulario(id) {
     toast('Errore eliminazione');
   }
 }
-// LISTA DI NON DISPONIBILITÀ (JOLLY) — replica del modulo ufficiale
+// LISTA DI NON DISPONIBILITÀ (JOLLY) · replica del modulo ufficiale
 // HR 1187 del Casinò (giorni 1-31 con casella e osservazioni, firme)
 async function pdfNonDisponibilitaJolly() {
   if (!window.jspdf) await caricaJsPDF();
@@ -6752,7 +6752,7 @@ function _renderPianoGuidaTab() {
     'La data parte da <b>domani</b> (frecce o calendario per cambiarla). <b>Compila dal piano</b> riempie nomi e turni del giorno; ogni cella è modificabile e ogni riga ha + (inserisci sotto), le frecce per riordinare e × per eliminare. Tutto si salva da solo: una versione per data, rigenerare sovrascrive.',
     'Le colonne <b>E</b> e <b>U</b> restano vuote: si spuntano <b>a penna</b> sul foglio stampato il giorno dopo, per confermare le timbrature di entrata e uscita.',
     '<b>Genera pause</b> crea la distribuzione: per Slots usa i tuoi schemi (distributori S1/S22, S3, S7C…), per Valet e gli altri reparti il motore automatico (durata pause per fascia, minimo 45 minuti fra le pause, mai due in pausa insieme, ven/sab evita la fascia 23–01). Anche le pause sono modificabili cella per cella, con inserimento/eliminazione righe.',
-    'In fondo alla card Pause trovi <b>Regole — turni, orari e pause spettanti</b>: la tabella mostra la pausa di ogni turno e puoi personalizzarla per singolo turno (es. S3 = 15+15) o per fascia di durata. Gli orari dei turni si cambiano nella tab Turni e tutto si aggiorna da solo.',
+    'In fondo alla card Pause trovi <b>Regole · turni, orari e pause spettanti</b>: la tabella mostra la pausa di ogni turno e puoi personalizzarla per singolo turno (es. S3 = 15+15) o per fascia di durata. Gli orari dei turni si cambiano nella tab Turni e tutto si aggiorna da solo.',
     '<b>Stampa briefing</b> e <b>Stampa pause</b> generano i PDF A4 da appendere/firmare; <b>Importa da Excel</b> legge nomi e turni da un foglio esistente.',
   ]);
   h += sez('Calendario', [
@@ -6772,7 +6772,7 @@ function _renderPianoGuidaTab() {
     '<b>Formulario cambio vacanza</b> stampa il modulo vuoto da far firmare.',
   ]);
   h += sez('Turni, Codici e Regole', [
-    '<b>Turni</b>: orari, ore, tipo (diurno/notturno), colore della sigla nel piano — tutto modificabile; nuovi turni con + Aggiungi.',
+    '<b>Turni</b>: orari, ore, tipo (diurno/notturno), colore della sigla nel piano · tutto modificabile; nuovi turni con + Aggiungi.',
     "<b>Codici speciali</b> (V, M, C, ...): ore CCL, Scala % = le ore seguono la percentuale d'impiego, Riposo = conta come giorno di riposo.",
     '<b>Regole del piano</b>: le regole HARD/SOFT con i pesi (max consecutivi, riposo 11h, 4+1+1, L1 solo BO/SUP, congedi C, ...).',
     '<b>Regole di gruppo</b>: chi può lavorare in ogni settore (es. SUP richiesto nel gruppo SUP, niente notturni in BO, massimo 1 SUP al giorno in BO, almeno 1 SUP nei notturni di venerdì e sabato in SALA).',
@@ -6912,7 +6912,7 @@ function _renderPianoPreferenzeCard() {
     .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
     .sort((a, b) => a.nome.localeCompare(b.nome));
   let h =
-    '<div class="main-card" style="margin-top:16px"><div class="card-header">Preferenze collaboratori — ' +
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Preferenze collaboratori · ' +
     escP(repartoLabel(_pianoReparto())) +
     '</div><div style="padding:10px 14px">';
   h +=
@@ -6926,7 +6926,7 @@ function _renderPianoPreferenzeCard() {
       '"><td style="text-align:left;font-weight:600">' +
       escP(c.nome) +
       '</td><td>' +
-      escP(c.funzione || '—') +
+      escP(c.funzione || '-') +
       '</td><td>' +
       Math.round((parseFloat(c.percentuale) || 1) * 100) +
       '%</td><td><input type="checkbox"' +
@@ -6954,7 +6954,7 @@ function _renderPianoPreferenzeCard() {
       '" placeholder="Es: valet" onchange="salvaPreferenzaCollab(' +
       c.id +
       ',\'reparti_extra\',this.value)" style="width:90px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td style="text-align:left;font-size:.78rem;color:var(--muted)" title="Si gestiscono con le spunte in Formazione">' +
-      escP((_pianoSettoriEffettivi(c) || []).join(', ') || '—') +
+      escP((_pianoSettoriEffettivi(c) || []).join(', ') || '-') +
       '</td></tr>';
   });
   h += '</tbody></table></div>';
@@ -7037,7 +7037,7 @@ async function stampaPianoCollaboratore(nome) {
       desc: desc,
       commento: (r && r.commento) || '',
       // stampa PULITA: righe bianche per tutti i settori (niente verdi/arancio
-      // weekend-festivi — richiesta utente); resta solo la zebra leggerissima
+      // weekend-festivi · richiesta utente); resta solo la zebra leggerissima
       fill: g % 2 === 0 ? [248, 249, 250] : [255, 255, 255],
       vuoto: !codice,
     });
@@ -7065,7 +7065,7 @@ async function stampaPianoCollaboratore(nome) {
   doc.setFont('helvetica', 'bold');
   doc.text('Settore/Dipartimento:', 12, y);
   doc.setFont('helvetica', 'normal');
-  doc.text(repartoLabel(_pianoReparto()) + (info && info.funzione ? ' — ' + info.funzione : ''), 45, y);
+  doc.text(repartoLabel(_pianoReparto()) + (info && info.funzione ? ' · ' + info.funzione : ''), 45, y);
   y += 4.5;
   doc.setFont('helvetica', 'bold');
   doc.text('Mese selezionato:', 12, y);
@@ -7133,11 +7133,11 @@ async function stampaPianoCollaboratore(nome) {
       doc.setFontSize(7.5);
       doc.setTextColor(153, 153, 153);
       doc.text(
-        'Casino Lugano SA — Piano turni ' +
+        'Casino Lugano SA · Piano turni ' +
           meseNome +
           ' ' +
           anno +
-          ' — Generato il ' +
+          ' · Generato il ' +
           new Date().toLocaleDateString('it-IT') +
           ' ' +
           new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
@@ -7195,7 +7195,7 @@ async function _pianoNotaRapida(nome, dstr) {
 }
 
 // ================================================================
-// MENU CONTESTUALE (tasto destro) — come Turnivo cap. 17.4:
+// MENU CONTESTUALE (tasto destro) · come Turnivo cap. 17.4:
 // Modifica turno / Commento / Cambia turno con... / Cambio per
 // esigenze / Stampa piano collaboratore
 // ================================================================
@@ -7268,7 +7268,7 @@ function mostraPianoCtx(e, nome, dstr) {
   menu.innerHTML =
     '<div class="piano-ctx-head">' +
     escP(nome) +
-    ' — ' +
+    ' · ' +
     new Date(dstr + 'T12:00:00').toLocaleDateString('it-IT') +
     (r ? ' (' + escP(r.codice) + ')' : '') +
     '</div>' +
@@ -7405,9 +7405,9 @@ function apriCambioEsigenze(nome, dstr) {
   b.innerHTML =
     '<h3>Cambio per esigenze operative</h3><p style="margin-bottom:10px;font-size:.86rem"><strong>' +
     escP(nome) +
-    '</strong> — ' +
+    '</strong> · ' +
     new Date(dstr + 'T12:00:00').toLocaleDateString('it-IT') +
-    ' — turno attuale: <strong>' +
+    ' · turno attuale: <strong>' +
     escP(r.codice) +
     '</strong></p>' +
     '<div class="field" style="text-align:left"><label>Nuovo turno</label><select id="esig-turno" style="width:100%;padding:10px">' +
@@ -7628,7 +7628,7 @@ function pianoCellaInline(nome, dstr, el) {
 }
 
 // ============================================================
-// TAB BRIEFING — briefing giornaliero + pause (da Excel Musa)
+// TAB BRIEFING · briefing giornaliero + pause (da Excel Musa)
 // Una riga piano_briefing per (data, reparto, sezione): il
 // contenuto è tutto editabile e si salva da solo; le colonne
 // E/U scrivono anche le timbrature (regola entrata anticipata).
@@ -7906,7 +7906,7 @@ async function _renderPianoBriefingTab() {
   const puo = puoGestireBriefing();
   const valet = _briefIsValet();
   let h =
-    '<div class="main-card" style="margin-top:14px"><div class="card-header">Briefing — ' +
+    '<div class="main-card" style="margin-top:14px"><div class="card-header">Briefing · ' +
     escP(rep.toUpperCase()) +
     '</div><div style="padding:12px 14px">';
   h +=
@@ -7932,7 +7932,7 @@ async function _renderPianoBriefingTab() {
     (salvato
       ? 'Salvato'
       : righe.length
-        ? 'Compilato dal piano — modifica una cella per salvare'
+        ? 'Compilato dal piano · modifica una cella per salvare'
         : 'Nessun turno nel piano per questa data') +
     '</span></div>';
   // tabella briefing + tabella orari affiancate (stessa vista dell'Excel)
@@ -8280,7 +8280,7 @@ async function briefCompila() {
 }
 function _briefRenderPauseCard() {
   let h =
-    '<div class="main-card" style="margin-top:14px"><div class="card-header">Pause — ' +
+    '<div class="main-card" style="margin-top:14px"><div class="card-header">Pause · ' +
     escP(_pianoReparto().toUpperCase()) +
     '</div><div style="padding:12px 14px" id="brief-pause-body">';
   h += _briefPauseBodyHtml();
@@ -8303,7 +8303,7 @@ function _briefPauseBodyHtml() {
 }
 
 // ============================================================
-// CORSI (CS, LRD, ANTINCENDIO...) — pianificatore: scegli codice,
+// CORSI (CS, LRD, ANTINCENDIO...) · pianificatore: scegli codice,
 // data, orario e partecipanti; le sigle finiscono da sole nel piano
 // ============================================================
 function _corsiLista() {
@@ -8442,7 +8442,7 @@ function _renderPianoCorsiCard() {
     .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
     .sort((a, b) => a.nome.localeCompare(b.nome));
   let h =
-    '<div class="main-card" style="margin-top:16px"><div class="card-header">Corsi — inserimento automatico nel piano</div><div style="padding:12px 14px">';
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Corsi · inserimento automatico nel piano</div><div style="padding:12px 14px">';
   h +=
     '<p style="font-size:.8rem;color:var(--muted);margin-bottom:10px">Scegli il corso, la data, l&#39;orario e i partecipanti: la sigla viene scritta da sola nelle loro celle del piano (protetta, con orario e ore contate).</p>';
   h += '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">';
@@ -8462,7 +8462,7 @@ function _renderPianoCorsiCard() {
     '<button class="btn-export" style="font-size:.72rem;padding:4px 10px" title="La prossima volta questo corso partirà con questo orario" onclick="corsoSalvaOrarioDefault()">Salva orario predefinito</button>';
   h += '</div>';
   h +=
-    '<div style="margin-bottom:6px;font-size:.82rem"><b>Partecipanti</b> — <span style="cursor:pointer;color:#1a4a7a;text-decoration:underline" onclick="document.querySelectorAll(\'.corso-part\').forEach(c=>c.checked=true)">tutti</span> / <span style="cursor:pointer;color:#1a4a7a;text-decoration:underline" onclick="document.querySelectorAll(\'.corso-part\').forEach(c=>c.checked=false)">nessuno</span></div>';
+    '<div style="margin-bottom:6px;font-size:.82rem"><b>Partecipanti</b> · <span style="cursor:pointer;color:#1a4a7a;text-decoration:underline" onclick="document.querySelectorAll(\'.corso-part\').forEach(c=>c.checked=true)">tutti</span> / <span style="cursor:pointer;color:#1a4a7a;text-decoration:underline" onclick="document.querySelectorAll(\'.corso-part\').forEach(c=>c.checked=false)">nessuno</span></div>';
   h +=
     '<div style="max-height:180px;overflow-y:auto;border:1px solid var(--border,#ccc);padding:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:2px 12px;font-size:.84rem">';
   collabs.forEach((c) => {
@@ -8638,7 +8638,7 @@ async function pianoInserisciCorso() {
     }
     logAzione(
       'Corso inserito nel piano',
-      cod + ' ' + data + ' — ' + inseriti + ' celle, ' + annotati + ' annotati sul turno',
+      cod + ' ' + data + ' · ' + inseriti + ' celle, ' + annotati + ' annotati sul turno',
     );
     toast('Corso ' + cod + ': ' + inseriti + ' celle' + (annotati ? ' + ' + annotati + ' annotati sul turno' : ''));
     if (_pianoMeseSel === data.substring(0, 7)) renderPiano();
@@ -8649,7 +8649,7 @@ async function pianoInserisciCorso() {
 }
 
 // ============================================================
-// COPIA / INCOLLA a blocchi — Shift+click su due celle = blocco
+// COPIA / INCOLLA a blocchi · Shift+click su due celle = blocco
 // (piano o fabbisogno), tasto destro = Copia / Incolla. L'incolla
 // accetta anche celle copiate da Excel (formato tab-separato).
 // ============================================================
@@ -9215,7 +9215,7 @@ async function pianoIncollaDaClipboard(target) {
           .map((p) => secPatch('piano', 'id=eq.' + p.id, { codice: p.codice, protetto: true, generato: false })),
       );
     if (daInserire.length) await sbRpc('piano_bulk_upsert', { p_token: getOpToken(), p_rows: daInserire });
-    logAzione('Incolla nel piano', target.nome + ' g' + g0 + ' — ' + (daPatch.length + daInserire.length) + ' celle');
+    logAzione('Incolla nel piano', target.nome + ' g' + g0 + ' · ' + (daPatch.length + daInserire.length) + ' celle');
     toast('Incollate ' + (daPatch.length + daInserire.length) + ' celle');
     _pianoBloccoPulisci();
     _pianoViolCelle = {};
@@ -9243,7 +9243,7 @@ function fabbCtxMenu(e, codice, dstr) {
   let h =
     '<div class="piano-ctx-head">Fabbisogno ' +
     escP(codice) +
-    ' — ' +
+    ' · ' +
     new Date(dstr + 'T12:00:00').toLocaleDateString('it-IT') +
     '</div>';
   if (window._pianoBlocco && window._pianoBlocco.completo)
@@ -9327,7 +9327,7 @@ async function fabbIncollaDaClipboard() {
             });
         }),
       );
-    logAzione('Incolla fabbisogno', target.codice + ' g' + g0 + ' — ' + ops.length + ' celle');
+    logAzione('Incolla fabbisogno', target.codice + ' g' + g0 + ' · ' + ops.length + ' celle');
     toast('Fabbisogno incollato: ' + ops.length + ' celle');
     _pianoBloccoPulisci();
     renderPiano();
@@ -9338,7 +9338,7 @@ async function fabbIncollaDaClipboard() {
 }
 
 // ============================================================
-// MIGLIORA ORE — secondo passaggio dopo la bozza: sposta turni
+// MIGLIORA ORE · secondo passaggio dopo la bozza: sposta turni
 // GENERATI (non protetti) da chi è sopra le ore dovute a chi è
 // sotto, stesso giorno e stesse regole (idoneità, consecutivi,
 // riposo 11h, tolleranza). La copertura del fabbisogno non cambia.
@@ -9504,7 +9504,7 @@ async function miglioraOrePiano() {
       );
     logAzione(
       'Piano: migliora ore',
-      ym + ' — ' + scambi.length + ' scambi, scarto ' + mediaPrima.toFixed(1) + '→' + mediaDopo.toFixed(1),
+      ym + ' · ' + scambi.length + ' scambi, scarto ' + mediaPrima.toFixed(1) + '→' + mediaDopo.toFixed(1),
     );
     toast(
       'Migliorato: ' +
@@ -9659,7 +9659,7 @@ async function controllaFormazioniCompletate(silenzioso) {
           f.giorni +
           ' giorni di affiancamento (ultimo il ' +
           f.ultimo.split('-').reverse().join('.') +
-          ', dai commenti del piano).\n\nVuoi certificarlo in Formazione?\n(OK = certifica — ti chiederà formatore e punti)',
+          ', dai commenti del piano).\n\nVuoi certificarlo in Formazione?\n(OK = certifica · ti chiederà formatore e punti)',
       )
     ) {
       const key = _pianoGruppoCompInv()[f.sett];

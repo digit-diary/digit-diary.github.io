@@ -1,5 +1,5 @@
 /**
- * Diario Collaboratori — Casino Lugano SA
+ * Diario Collaboratori · Casino Lugano SA
  * File: auth.js
  * Autenticazione: login, password, sessioni, biometrico
  */
