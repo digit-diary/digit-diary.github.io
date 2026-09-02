@@ -1,5 +1,5 @@
 /**
- * Diario Collaboratori — Casino Lugano SA
+ * Diario Collaboratori · Casino Lugano SA
  * File: config.js
  */
 
@@ -23,7 +23,7 @@ const VAPID_PUBLIC_KEY = 'BOO-SFCx13LhF6iroGL5UkF2vEXDs1zMKISbDi_wKmcCsM6dri43vQ
 const _ps = 'cVEDSllXIXQGAHZZAEULW3MuAQUgCFRDXgkmLQEBcVxTFFhbey4AAnYIUhZcCSF/A1NxDwNAUV4iLgoCdAsERw==';
 const PUSH_SECRET = _d(_ps);
 function fmtCHF(n) {
-  if (!n && n !== 0) return '—';
+  if (!n && n !== 0) return '-';
   return parseFloat(n).toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 const MESI = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];

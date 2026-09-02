@@ -1,5 +1,5 @@
 /**
- * Diario Collaboratori — Casino Lugano SA
+ * Diario Collaboratori · Casino Lugano SA
  * File: settings.js
  * Impostazioni: visibilità, operatori, temi, campi
  */
@@ -34,18 +34,18 @@ const VIS_ITEMS = {
   // Permessi di MODIFICA: chi non è abilitato vede comunque i dati in sola lettura.
   // Default: solo admin. "Operatori selezionati" = es. l'operatore HR.
   permessi: {
-    gestione_punti: 'Punti e premi — assegnare/registrare incentivi',
-    gestione_impiego: 'Impiego — assegnare Jolly / Fisso ai collaboratori (es. supervisor)',
-    gestione_categorie: 'Categorie — assegnare la categoria professionale 5ª–1ª (es. HR)',
-    vista_categorie: 'Categorie — vedere la categoria dei collaboratori (badge in scheda, matrice e PDF)',
-    gestione_competenze: 'Competenze — certificare le spunte in matrice',
-    gestione_valutazioni: 'Valutazioni — inserire e importare schede',
-    gestione_formazioni: 'Formazioni — registrare sessioni formative svolte (es. supervisor)',
-    gestione_piano: 'Piano di lavoro — modificare la griglia turni del mese (es. supervisor)',
-    gestione_corsi: 'Corsi — pianificare corsi nel piano: data, orario e partecipanti (es. supervisor)',
+    gestione_punti: 'Punti e premi · assegnare/registrare incentivi',
+    gestione_impiego: 'Impiego · assegnare Jolly / Fisso ai collaboratori (es. supervisor)',
+    gestione_categorie: 'Categorie · assegnare la categoria professionale 5ª–1ª (es. HR)',
+    vista_categorie: 'Categorie · vedere la categoria dei collaboratori (badge in scheda, matrice e PDF)',
+    gestione_competenze: 'Competenze · certificare le spunte in matrice',
+    gestione_valutazioni: 'Valutazioni · inserire e importare schede',
+    gestione_formazioni: 'Formazioni · registrare sessioni formative svolte (es. supervisor)',
+    gestione_piano: 'Piano di lavoro · modificare la griglia turni del mese (es. supervisor)',
+    gestione_corsi: 'Corsi · pianificare corsi nel piano: data, orario e partecipanti (es. supervisor)',
     gestione_briefing:
-      'Briefing — compilare e modificare il foglio del giorno e le pause (senza toccare la griglia turni)',
-    storico_hr: 'Storico HR — inizio contratto, tracciato categorie/premi/formazioni, equità (sezione riservata)',
+      'Briefing · compilare e modificare il foglio del giorno e le pause (senza toccare la griglia turni)',
+    storico_hr: 'Storico HR · inizio contratto, tracciato categorie/premi/formazioni, equità (sezione riservata)',
   },
 };
 // Visione categorie: admin, chi le gestisce, chi ha lo Storico HR, o chi è abilitato apposta
@@ -352,7 +352,7 @@ function apriAccessiExtra(nome) {
   );
   const b = document.getElementById('pwd-modal-content');
   let h =
-    '<h3>Accessi extra — ' +
+    '<h3>Accessi extra · ' +
     escP(nome) +
     '</h3><p style="font-size:.82rem;color:var(--muted);margin-bottom:10px">Reparto principale: <b>' +
     escP(repartoLabel(proprio)) +
@@ -1001,7 +1001,7 @@ async function esportaBackupCompleto() {
       totale += (dati[t] || []).length;
     }
     const backup = {
-      app: 'Diario Collaboratori — Casino Lugano SA',
+      app: 'Diario Collaboratori · Casino Lugano SA',
       esportato_il: new Date().toISOString(),
       esportato_da: getOperatore(),
       tabelle: dati,
@@ -1218,7 +1218,7 @@ async function salvaPaginaSettore(repKey, pageKey, abilitata) {
   else repartiPagineCfg[repKey][pageKey] = false;
   if (!Object.keys(repartiPagineCfg[repKey]).length) delete repartiPagineCfg[repKey];
   await setImp('reparti_pagine', JSON.stringify(repartiPagineCfg));
-  logAzione('Pagine settore', repartoLabel(repKey) + ' — ' + pageKey + ': ' + (abilitata ? 'attiva' : 'disattivata'));
+  logAzione('Pagine settore', repartoLabel(repKey) + ' · ' + pageKey + ': ' + (abilitata ? 'attiva' : 'disattivata'));
   if (typeof applicaVisibilita === 'function') applicaVisibilita();
   if (typeof aggiornaMenuMobile === 'function') aggiornaMenuMobile();
   toast(

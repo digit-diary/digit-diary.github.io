@@ -1,5 +1,5 @@
 /**
- * Diario Collaboratori — Casino Lugano SA
+ * Diario Collaboratori · Casino Lugano SA
  * File: maison-budget.js
  * Maison: budget, categorie, profilo
  */
@@ -300,7 +300,7 @@ function modificaMaisonInfo(id) {
     escP(b.nome) +
     '" readonly style="background:var(--paper2);color:var(--muted)"></div><div class="pwd-field"><label>Categoria</label><select id="edit-mb-cat" style="width:100%;padding:8px"><option value=""' +
     (b.categoria === '' || !b.categoria ? ' selected' : '') +
-    '>—</option><option value="maison"' +
+    '>-</option><option value="maison"' +
     (b.categoria === 'maison' ? ' selected' : '') +
     '>Maison</option><option value="full_maison"' +
     (b.categoria === 'full_maison' ? ' selected' : '') +
@@ -372,15 +372,15 @@ function apriListaClientiMaison() {
   let html =
     '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px"><div><h3 style="font-family:Playfair Display,serif;color:var(--ink);margin-bottom:4px">Clienti Categorizzati</h3><p style="color:var(--muted);font-size:.82rem">' +
     tot +
-    ' clienti — ' +
+    ' clienti · ' +
     fullM.length +
-    ' Full Maison — ' +
+    ' Full Maison · ' +
     maison.length +
-    ' Maison — ' +
+    ' Maison · ' +
     direz.length +
-    ' Direzione — ' +
+    ' Direzione · ' +
     buCat.length +
-    ' BU — ' +
+    ' BU · ' +
     blCat.length +
     ' BL</p></div><button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\')" style="padding:6px 12px;font-size:.75rem">Chiudi</button></div>';
   html +=
@@ -399,7 +399,7 @@ function apriListaClientiMaison() {
       ')</div>';
     items.forEach(function (b) {
       var nascita = b.data_nascita
-        ? '  —  <i class="icx icx-torta"></i> ' +
+        ? '  ·  <i class="icx icx-torta"></i> ' +
           new Date(b.data_nascita + 'T12:00:00').toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })
         : '';
       h +=
@@ -483,7 +483,7 @@ async function esportaListaMaisonPDF() {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100);
-    doc.text('Casino Lugano SA — ' + _br.length + ' clienti', pw / 2, y, { align: 'center' });
+    doc.text('Casino Lugano SA · ' + _br.length + ' clienti', pw / 2, y, { align: 'center' });
     y += 10;
     doc.setTextColor(0);
     const catOrder = ['full_maison', 'maison', 'direzione', 'bu', 'bl'];
@@ -502,8 +502,8 @@ async function esportaListaMaisonPDF() {
               ? 'Buono Unico'
               : b.categoria === 'bl'
                 ? 'Buono Lounge'
-                : '—',
-      b.budget_chf ? parseFloat(b.budget_chf).toFixed(0) : '—',
+                : '-',
+      b.budget_chf ? parseFloat(b.budget_chf).toFixed(0) : '-',
       b.data_nascita ? new Date(b.data_nascita + 'T12:00:00').toLocaleDateString('it-IT') : '',
     ]);
     doc.autoTable({
@@ -541,7 +541,7 @@ async function esportaListaMaisonPDF() {
       doc.setPage(i);
       doc.setFontSize(7);
       doc.setTextColor(150);
-      doc.text('Casino Lugano SA — Clienti Maison — Pag. ' + i + '/' + tp, 16, doc.internal.pageSize.getHeight() - 8);
+      doc.text('Casino Lugano SA · Clienti Maison · Pag. ' + i + '/' + tp, 16, doc.internal.pageSize.getHeight() - 8);
     }
     mostraPdfPreview(doc, 'clienti_maison.pdf', 'Lista Clienti Maison');
   } catch (e) {
@@ -804,7 +804,7 @@ async function importaCategorieMaison(input) {
         }
         done++;
         bar.style.width = Math.round((done / nomi.length) * 100) + '%';
-        status.textContent = done + '/' + nomi.length + ' — ' + escP(nome);
+        status.textContent = done + '/' + nomi.length + ' · ' + escP(nome);
         if (done % 5 === 0) await new Promise((r) => setTimeout(r, 50));
       }
       // Riepilogo finale
@@ -872,7 +872,7 @@ async function importaCompleanniMaison(input) {
           if (cellVal === undefined || cellVal === null || cellVal === '') continue;
           // Parsa la data in vari formati
           let isoDate = null;
-          // Se è un oggetto Date (cellDates:true) — usa getFullYear/Month/Date locali per evitare shift UTC
+          // Se è un oggetto Date (cellDates:true) · usa getFullYear/Month/Date locali per evitare shift UTC
           if (cellVal instanceof Date && !isNaN(cellVal)) {
             isoDate =
               cellVal.getFullYear() +
@@ -1099,7 +1099,7 @@ async function importaCompleanniMaison(input) {
         }
         done++;
         bar.style.width = Math.round((done / matched.length) * 100) + '%';
-        status.textContent = done + '/' + matched.length + ' — ' + escP(m.nome);
+        status.textContent = done + '/' + matched.length + ' · ' + escP(m.nome);
         if (done % 5 === 0) await new Promise((r) => setTimeout(r, 50));
       }
       // Riepilogo finale

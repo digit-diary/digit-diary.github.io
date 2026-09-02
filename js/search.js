@@ -1,5 +1,5 @@
 /**
- * Diario Collaboratori — Casino Lugano SA
+ * Diario Collaboratori · Casino Lugano SA
  * File: search.js
  * Ricerca globale, riepilogo mensile PDF
  */
@@ -38,7 +38,7 @@ function _eseguiRicercaGlobale(q) {
         escP(e.tipo) +
         '</span><span class="rg-text"><strong>' +
         escP(e.nome) +
-        '</strong> — ' +
+        '</strong> · ' +
         escP(e.testo.substring(0, 80)) +
         '</span><span class="rg-date">' +
         d.toLocaleDateString('it-IT') +
@@ -70,7 +70,7 @@ function _eseguiRicercaGlobale(q) {
         escP(m.tipo) +
         '</span><span class="rg-text"><strong>' +
         escP(m.collaboratore) +
-        '</strong> — ' +
+        '</strong> · ' +
         escP(m.data_modulo || '') +
         '</span><span class="rg-date">' +
         (m.created_at ? new Date(m.created_at).toLocaleDateString('it-IT') : '') +
@@ -100,7 +100,7 @@ function _eseguiRicercaGlobale(q) {
         escP(n.da_operatore) +
         '</strong> → ' +
         escP(n.a_operatore) +
-        ' — ' +
+        ' · ' +
         escP(n.messaggio.substring(0, 60)) +
         '</span><span class="rg-date">' +
         new Date(n.created_at).toLocaleDateString('it-IT') +
@@ -126,7 +126,7 @@ function _eseguiRicercaGlobale(q) {
         escP(r.nome) +
         '\';renderMaisonDashboard()"><span class="rg-badge" style="background:#b8860b">Maison</span><span class="rg-text"><strong>' +
         escP(r.nome) +
-        '</strong> — ' +
+        '</strong> · ' +
         fmtCHF(r.costo) +
         ' CHF' +
         (r.tipo_buono ? ' (' + r.tipo_buono + ')' : '') +
@@ -157,7 +157,7 @@ function _eseguiRicercaGlobale(q) {
         '</span><span class="rg-text"><strong>' +
         escP(p.titolo) +
         '</strong>' +
-        (p.descrizione ? ' — ' + escP(p.descrizione.substring(0, 50)) : '') +
+        (p.descrizione ? ' · ' + escP(p.descrizione.substring(0, 50)) : '') +
         '</span><span class="rg-date">' +
         new Date(p.data_scadenza + 'T12:00:00').toLocaleDateString('it-IT') +
         '</span></div>';
@@ -186,8 +186,8 @@ function _eseguiRicercaGlobale(q) {
         '</span><span class="rg-text"><strong>' +
         escP(r.beneficiario) +
         '</strong>' +
-        (r.luogo ? ' — ' + escP(r.luogo) : '') +
-        ' — ' +
+        (r.luogo ? ' · ' + escP(r.luogo) : '') +
+        ' · ' +
         fmtCHF(r.importo) +
         ' CHF</span><span class="rg-date">' +
         new Date(r.data_spesa + 'T12:00:00').toLocaleDateString('it-IT') +
@@ -212,7 +212,7 @@ function _eseguiRicercaGlobale(q) {
         escP(q) +
         '\';renderRegistro()"><span class="rg-badge" style="background:var(--muted)">Log</span><span class="rg-text"><strong>' +
         escP(l.operatore || '') +
-        '</strong> — ' +
+        '</strong> · ' +
         escP(l.azione) +
         ' ' +
         escP((l.dettaglio || '').substring(0, 50)) +
@@ -345,7 +345,7 @@ async function _eseguiRiepilogoMensile() {
     doc.setFontSize(11);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100);
-    doc.text(meseName + ' — Casino Lugano SA', pw / 2, y, { align: 'center' });
+    doc.text(meseName + ' · Casino Lugano SA', pw / 2, y, { align: 'center' });
     y += 10;
     doc.setTextColor(0);
     // Panoramica (sempre visibile)
@@ -723,7 +723,7 @@ async function _eseguiRiepilogoMensile() {
       doc.setPage(i);
       doc.setFontSize(7);
       doc.setTextColor(150);
-      doc.text('Casino Lugano SA — Riepilogo ' + meseName + ' — Pag. ' + i + '/' + tp, mx, ph - 8);
+      doc.text('Casino Lugano SA · Riepilogo ' + meseName + ' · Pag. ' + i + '/' + tp, mx, ph - 8);
     }
     mostraPdfPreview(doc, 'Riepilogo_' + meseName.replace(/\s/g, '_') + '.pdf', 'Riepilogo ' + meseName);
   } catch (e) {

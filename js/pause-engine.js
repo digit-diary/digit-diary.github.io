@@ -1,5 +1,5 @@
 // ============================================================
-// MOTORE PAUSE — port 1:1 dai file Excel di Musa:
+// MOTORE PAUSE · port 1:1 dai file Excel di Musa:
 //  - Slots: ModuloPause_v8c (BG1/Q2/BG3, pattern LUN-GIO / VEN-SAB /
 //    DOM, C8 con CD, R30, pause extra) su "foglio virtuale" a 8
 //    colonne identico all'output Excel.
@@ -1565,7 +1565,7 @@ function _peGeneraVenSab(sh, ctx, dataStr) {
     r = _peSS(sh, r, 4, 'REC', '01.00 - 02.00');
   }
 
-  // Q3 CASSA — solo se quel giorno c'è almeno un C8
+  // Q3 CASSA · solo se quel giorno c'è almeno un C8
   r = 7;
   if (!nCassaPrinc) {
     // nessun C8: la terza colonna resta per gli extra
@@ -1800,7 +1800,7 @@ function _pePiazzaPauseExtra(sh, ctx) {
     const slotsNeeded = Math.floor(minPausa / 15);
     // MIGLIORIA rispetto al VBA (che prendeva i primi slot SALA trovati,
     // spesso ammucchiati): raccolgo TUTTI gli slot SALA nel turno e li
-    // scelgo distribuiti — ideali a frazioni del turno, minimo 45' tra loro
+    // scelgo distribuiti · ideali a frazioni del turno, minimo 45' tra loro
     const candidati = [];
     for (let c = 1; c <= 7; c += 3)
       for (let rr = 7; rr <= lastR; rr++) {
@@ -2598,7 +2598,7 @@ function _briefRenderCronoValet(c) {
 function _briefRenderPauseValet(c) {
   const puo = puoGestireBriefing();
   let h =
-    '<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:.82rem"><tr><td colspan="6" style="border:1px solid #999;background:#FFFF00;font-weight:bold;text-align:center;padding:4px">PAUSE VALET — ' +
+    '<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:.82rem"><tr><td colspan="6" style="border:1px solid #999;background:#FFFF00;font-weight:bold;text-align:center;padding:4px">PAUSE VALET · ' +
     escP(c.tipoGiorno || '') +
     '</td></tr><tr>' +
     ['TURNO', 'NOME', 'ORARIO', 'PAUSA 1', 'PAUSA 2', 'PAUSA 3']
@@ -2693,7 +2693,7 @@ function pdfBriefingGiorno() {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(13);
   doc.setTextColor(0);
-  doc.text('BRIEFING ' + _pianoReparto().toUpperCase() + ' — ' + lbl, 105, 16.2, { align: 'center' });
+  doc.text('BRIEFING ' + _pianoReparto().toUpperCase() + ' · ' + lbl, 105, 16.2, { align: 'center' });
   const generico = !valet && _pianoReparto() !== 'slots';
   const cols = valet
     ? ['E', 'U', 'COLLABORATORE', 'TURNO', 'USCITA', 'FIRMA', 'RADIO', 'BADGE']
@@ -2827,7 +2827,7 @@ function pdfBriefingGiorno() {
   }
   doc.setFontSize(6);
   doc.setTextColor(120);
-  doc.text('Casino Lugano SA — Briefing — E/U da spuntare a penna', 10, 292);
+  doc.text('Casino Lugano SA · Briefing · E/U da spuntare a penna', 10, 292);
   logAzione('Briefing stampato', _pianoReparto() + ' ' + dstr);
   mostraPdfPreview(doc, 'briefing_' + dstr + '_' + _pianoReparto() + '.pdf', 'Briefing ' + lbl);
 }
@@ -2853,7 +2853,7 @@ function pdfPauseGiorno() {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
     doc.setTextColor(0);
-    doc.text('PAUSE VALET — ' + lbl, 105, 16, { align: 'center' });
+    doc.text('PAUSE VALET · ' + lbl, 105, 16, { align: 'center' });
     doc.autoTable({
       startY: 24,
       margin: { left: 10 },
@@ -2939,7 +2939,7 @@ function pdfPauseGiorno() {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
     doc.setTextColor(0);
-    doc.text((tit ? String(tit.v) : 'PAUSE') + ' — ' + lbl, 105, 15.4, { align: 'center' });
+    doc.text((tit ? String(tit.v) : 'PAUSE') + ' · ' + lbl, 105, 15.4, { align: 'center' });
     if (sotto) {
       doc.setFillColor(255, 255, 0);
       doc.rect(10, 19.5, 190, 6.5, 'F');
@@ -3002,7 +3002,7 @@ function pdfPauseGiorno() {
   doc.setFontSize(6);
   doc.setTextColor(120);
   doc.text(
-    'Casino Lugano SA — Pause ' + _pianoReparto() + ' — generato il ' + new Date().toLocaleDateString('it-IT'),
+    'Casino Lugano SA · Pause ' + _pianoReparto() + ' · generato il ' + new Date().toLocaleDateString('it-IT'),
     10,
     292,
   );
@@ -3037,7 +3037,7 @@ function _briefRenderPauseCfg() {
           (_pianoColore(t.codice) || '') +
           '">' +
           escP(t.codice) +
-          '</td><td colspan="3" style="border:1px solid #999;padding:2px 10px;color:#c0392b">orari mancanti — impostali nella tab Turni per far funzionare le pause</td></tr>';
+          '</td><td colspan="3" style="border:1px solid #999;padding:2px 10px;color:#c0392b">orari mancanti · impostali nella tab Turni per far funzionare le pause</td></tr>';
         return;
       }
       const split = _pePauseSplit(orari, t.codice);
@@ -3061,7 +3061,7 @@ function _briefRenderPauseCfg() {
         '" value="' +
         escP(pers) +
         '" placeholder="' +
-        (split.length ? split.join('+') : '—') +
+        (split.length ? split.join('+') : '-') +
         '" style="width:80px;border:none;background:transparent;font:inherit;font-weight:bold;padding:2px 8px"></td></tr>';
     });
   tab +=
@@ -3075,10 +3075,10 @@ function _briefRenderPauseCfg() {
     (larg || 60) +
     'px;padding:4px">';
   let h =
-    '<details style="margin-top:14px;font-size:.82rem"><summary style="cursor:pointer;font-weight:bold">Regole — turni, orari e pause spettanti (personalizza)</summary><div style="padding:10px 4px;display:flex;flex-direction:column;gap:8px">';
+    '<details style="margin-top:14px;font-size:.82rem"><summary style="cursor:pointer;font-weight:bold">Regole · turni, orari e pause spettanti (personalizza)</summary><div style="padding:10px 4px;display:flex;flex-direction:column;gap:8px">';
   h += tab;
   h +=
-    '<div><b>Slots</b> — minuti di pausa per durata turno: 6–7 ore ' +
+    '<div><b>Slots</b> · minuti di pausa per durata turno: 6–7 ore ' +
     num('pcfg-6h', c.slots_6h || 30) +
     ' &nbsp; 7–9 ore ' +
     num('pcfg-7h', c.slots_7h || 45) +
@@ -3086,7 +3086,7 @@ function _briefRenderPauseCfg() {
     num('pcfg-9h', c.slots_9h || 60) +
     ' &nbsp; <span style="color:var(--muted)">(sotto le 6 ore: nessuna pausa)</span></div>';
   h +=
-    '<div><b>Valet</b> — distanza minima tra pause ' +
+    '<div><b>Valet</b> · distanza minima tra pause ' +
     num('pcfg-gap', c.valet_gap || 45) +
     ' min &nbsp; fascia di punta ven/sab: da <input id="pcfg-picco-da" value="' +
     escP(c.picco_da || '23.00') +
@@ -3100,14 +3100,14 @@ function _briefRenderPauseCfg() {
   // numeri cassa (CD): coppie e rotazione giornaliera
   const cdCfg = (window._pianoCdCfg && window._pianoCdCfg.coppie) || [];
   h +=
-    '<div style="margin-top:6px"><b>Numeri cassa (CD)</b> — chi ha chiuso ieri riapre oggi; i C8 di ven/sab riprendono in ordine la cassa del presto di ogni coppia. Tutto resta modificabile nel briefing.<br>';
+    '<div style="margin-top:6px"><b>Numeri cassa (CD)</b> · chi ha chiuso ieri riapre oggi; i C8 di ven/sab riprendono in ordine la cassa del presto di ogni coppia. Tutto resta modificabile nel briefing.<br>';
   cdCfg.forEach((cp, i) => {
     h +=
       '<div style="margin:4px 0">Coppia CD <input class="cdcfg" data-i="' +
       i +
       '" data-f="cd" value="' +
       escP((cp.cd || []).join(',')) +
-      '" style="width:52px;padding:3px;text-align:center"> — apre: <input class="cdcfg" data-i="' +
+      '" style="width:52px;padding:3px;text-align:center"> · apre: <input class="cdcfg" data-i="' +
       i +
       '" data-f="apre" value="' +
       escP(cp.apre || '') +

@@ -1,5 +1,5 @@
 /**
- * Diario Collaboratori — Casino Lugano SA
+ * Diario Collaboratori · Casino Lugano SA
  * File: chat-ui.js
  */
 
@@ -649,7 +649,7 @@ function _apriGruppoSelezionato() {
   if (_cleanMembri.length <= 60) {
     gid = '__gruppo_custom_' + _cleanMembri;
   } else {
-    // Hash djb2 short, alphanumeric — guarantees uniqueness anche per truncation collisions
+    // Hash djb2 short, alphanumeric · guarantees uniqueness anche per truncation collisions
     let _h = 5381;
     for (let _i = 0; _i < _cleanMembri.length; _i++) _h = ((_h << 5) + _h + _cleanMembri.charCodeAt(_i)) | 0;
     const _hash = Math.abs(_h).toString(36);
@@ -2050,7 +2050,7 @@ function apriSchedaCollaboratore(nome) {
   _destroySchedaCharts();
   window._schedaTlTipo = null;
   // Vista completa (admin + permesso Storico HR): la storia del collaboratore attraverso
-  // TUTTI i settori — i record restano archiviati nel settore dove sono avvenuti,
+  // TUTTI i settori · i record restano archiviati nel settore dove sono avvenuti,
   // ma il fascicolo della persona si vede intero. Gli altri vedono solo il settore corrente.
   const vistaCompleta = typeof puoVedereStoricoHr === 'function' && puoVedereStoricoHr();
   window._schedaVistaCompleta = vistaCompleta;
@@ -2149,7 +2149,7 @@ function apriSchedaCollaboratore(nome) {
   const _malColor = totMal >= 5 ? 'var(--accent)' : totMal >= 3 ? '#e67e22' : '#1a7a6d';
   // Ultima registrazione
   const _lastEntry = entries.length ? entries.sort((a, b) => (b.data || '').localeCompare(a.data || ''))[0] : null;
-  const _lastDateStr = _lastEntry ? new Date(_lastEntry.data).toLocaleDateString('it-IT') : '—';
+  const _lastDateStr = _lastEntry ? new Date(_lastEntry.data).toLocaleDateString('it-IT') : '-';
   const _lastTipo = _lastEntry ? _lastEntry.tipo : '';
   // MINI-INDICE: salta alle sezioni della scheda
   const _chipStile =
@@ -2164,7 +2164,7 @@ function apriSchedaCollaboratore(nome) {
   });
   html += '</div>';
 
-  // KPI CARDS — cliccabili: aprono l'anteprima delle voci nella cronologia
+  // KPI CARDS · cliccabili: aprono l'anteprima delle voci nella cronologia
   const _kpiClick = function (source, tipo) {
     return ' onclick="schedaKpiFiltra(\'' + neS + "','" + source + "','" + String(tipo).replace(/'/g, "\\'") + '\')"';
   };
@@ -2290,7 +2290,7 @@ function apriSchedaCollaboratore(nome) {
     }
   }
 
-  // MONTHLY TREND CHART (last 6 months) — solo se ci sono dati significativi
+  // MONTHLY TREND CHART (last 6 months) · solo se ci sono dati significativi
   const _hasChartData = totErr > 0 || allineamenti > 0 || rdiCount > 0 || apprezzamenti > 0 || totReg >= 3;
   if (_hasChartData) {
     html += '<div class="scheda-section"><h4>Andamento mensile (ultimi 6 mesi)</h4>';
@@ -2333,7 +2333,7 @@ function apriSchedaCollaboratore(nome) {
     html += '</div></div>';
   } // fine _hasChartData
 
-  // DISCIPLINARY PATH — solo se c'è almeno 1 evento
+  // DISCIPLINARY PATH · solo se c'è almeno 1 evento
   if (totAmm || allineamenti || rdiCount) {
     html += '<div class="scheda-section"><h4>Percorso disciplinare</h4>';
     html += '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">';
@@ -2473,7 +2473,7 @@ function apriSchedaCollaboratore(nome) {
     html +=
       '<div style="font-size:.82rem;color:var(--muted);margin-top:6px">Media team: ' +
       avgMal.toFixed(1) +
-      ' malattie/collaboratore — ' +
+      ' malattie/collaboratore · ' +
       (totMal > avgMal
         ? '<span style="color:var(--accent);font-weight:600">Sopra media</span>'
         : '<span style="color:#2c6e49;font-weight:600">Nella norma</span>') +
@@ -2566,7 +2566,7 @@ function _renderSchedaTimeline(nome, entries, moduli, dal, al) {
       id: m.id,
       date: m.created_at || m.data_modulo,
       tipo: label,
-      text: 'Modulo ' + label + (m.resp_settore ? ' — Resp: ' + m.resp_settore : ''),
+      text: 'Modulo ' + label + (m.resp_settore ? ' · Resp: ' + m.resp_settore : ''),
       source: 'mod',
       operatore: m.operatore || '',
       repDip: m.reparto_dip || 'slots',
@@ -2744,7 +2744,7 @@ function _renderStoricoHrSezione(nome) {
             g.anni +
             ' anni maturato il ' +
             g.dataLabel +
-            ' — ' +
+            ' · ' +
             fmtCHF(g.importo) +
             ' CHF</span><button class="btn-salva" style="font-size:.72rem;padding:4px 12px;background:#8b6914" onclick="registraGiubileo(\'' +
             nome.replace(/'/g, "\\'") +
@@ -2800,7 +2800,7 @@ function _renderStoricoHrSezione(nome) {
     });
     html += '</div>';
   }
-  // Allegati (schede valutazione/formazione originali) — caricati on-demand, non pesano sull'apertura
+  // Allegati (schede valutazione/formazione originali) · caricati on-demand, non pesano sull'apertura
   if (typeof puoVedereAllegatiHr === 'function' && puoVedereAllegatiHr()) {
     html +=
       '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px">' +
@@ -2812,7 +2812,7 @@ function _renderStoricoHrSezione(nome) {
       '<input type="file" id="hr-allegato-file" accept=".pdf,.xlsx,.xls,.jpg,.jpeg,.png" style="display:none" onchange="caricaNuovoAllegatoScheda(this,\'' +
       neS +
       '\')">' +
-      '<span style="font-size:.72rem;color:var(--muted)">PDF, Excel o immagine — max 2 MB</span>' +
+      '<span style="font-size:.72rem;color:var(--muted)">PDF, Excel o immagine · max 2 MB</span>' +
       '</div><div id="hr-allegati-list" style="margin-top:6px"></div>';
   }
   html += '</div>';
@@ -2843,7 +2843,7 @@ async function salvaDataAssunzione(nome) {
         'Inizio contratto: ' + new Date(val + 'T12:00:00').toLocaleDateString('it-IT'),
         val,
       );
-    logAzione('Inizio contratto', nome + ' — ' + val);
+    logAzione('Inizio contratto', nome + ' · ' + val);
     toast('Inizio contratto salvato');
     apriSchedaCollaboratore(nome);
   } catch (e) {
@@ -2889,14 +2889,14 @@ function apriVoceTimeline(source, id) {
     html =
       '<h3 style="margin-bottom:4px">' +
       escP(e.tipo) +
-      ' — ' +
+      ' · ' +
       escP(e.nome) +
       '</h3><p style="color:var(--muted);font-size:.8rem;margin-bottom:12px">' +
       d.toLocaleDateString('it-IT') +
       ' ' +
       d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) +
-      (e.reparto ? ' — ' + escP(e.reparto) : '') +
-      (e.operatore ? ' — inserito da ' + escP(e.operatore) : '') +
+      (e.reparto ? ' · ' + escP(e.reparto) : '') +
+      (e.operatore ? ' · inserito da ' + escP(e.operatore) : '') +
       '</p>';
     if (e.importo && parseFloat(e.importo))
       html +=
@@ -2918,13 +2918,13 @@ function apriVoceTimeline(source, id) {
     html =
       '<h3 style="margin-bottom:4px">Modulo ' +
       escP(label) +
-      ' — ' +
+      ' · ' +
       escP(m.collaboratore) +
       '</h3><p style="color:var(--muted);font-size:.8rem;margin-bottom:12px">' +
       dm +
-      (m.resp_settore ? ' — Resp. settore: ' + escP(m.resp_settore) : '') +
-      (m.operatore ? ' — inserito da ' + escP(m.operatore) : '') +
-      (m.livello ? ' — Livello ' + escP(m.livello) : '') +
+      (m.resp_settore ? ' · Resp. settore: ' + escP(m.resp_settore) : '') +
+      (m.operatore ? ' · inserito da ' + escP(m.operatore) : '') +
+      (m.livello ? ' · Livello ' + escP(m.livello) : '') +
       '</p>';
     html += riga('Non conformità', m.non_conformita);
     html += riga('Descrizione', m.descrizione);
@@ -3190,7 +3190,7 @@ function stampaSchedaPDF(nome) {
     } catch (e) {}
   doc.setFontSize(15);
   doc.setFont('helvetica', 'bold');
-  doc.text('Scheda Collaboratore — ' + nome, pw / 2, y + 4, { align: 'center' });
+  doc.text('Scheda Collaboratore · ' + nome, pw / 2, y + 4, { align: 'center' });
   y += 10;
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
@@ -3207,7 +3207,7 @@ function stampaSchedaPDF(nome) {
     anag.push('Nato/a il ' + new Date(cRec.data_nascita + 'T12:00:00').toLocaleDateString('it-IT'));
   anag.push('Reparto ' + currentReparto.charAt(0).toUpperCase() + currentReparto.slice(1));
   anag.push('Generata il ' + new Date().toLocaleDateString('it-IT'));
-  if (dal || al) anag.push('Periodo: ' + (dal || 'inizio') + ' — ' + (al || 'oggi'));
+  if (dal || al) anag.push('Periodo: ' + (dal || 'inizio') + ' · ' + (al || 'oggi'));
   doc.text(anag.join('  ·  '), pw / 2, y, { align: 'center' });
   doc.setTextColor(0);
   y += 6;
@@ -3252,7 +3252,7 @@ function stampaSchedaPDF(nome) {
           'Competenze certificate',
         ],
       ],
-      body: [[lvPdf ? 'Livello ' + lvPdf : '—', ptsPdf, copPdf, rifPdf, compsPdf.length ? compsPdf.join(', ') : '—']],
+      body: [[lvPdf ? 'Livello ' + lvPdf : '-', ptsPdf, copPdf, rifPdf, compsPdf.length ? compsPdf.join(', ') : '-']],
       headStyles: { fillColor: [139, 105, 20], fontSize: 7 },
       bodyStyles: { fontSize: 8, halign: 'center' },
       margin: { left: 14, right: 14 },
@@ -3275,12 +3275,12 @@ function stampaSchedaPDF(nome) {
               content:
                 'Valutazione ' +
                 vP.anno +
-                ' — media ' +
+                ' · media ' +
                 mediaP +
                 '% (' +
                 _giudizioScala(mediaP) +
                 ')' +
-                (vP.valutatore ? ' — valutatore: ' + vP.valutatore : ''),
+                (vP.valutatore ? ' · valutatore: ' + vP.valutatore : ''),
               colSpan: 4,
             },
           ],
@@ -3292,9 +3292,9 @@ function stampaSchedaPDF(nome) {
               a2 = AREE_VALUTAZIONE[i + 1];
             righe.push([
               a1.label,
-              areeP[a1.key] != null ? areeP[a1.key] + '%' : '—',
+              areeP[a1.key] != null ? areeP[a1.key] + '%' : '-',
               a2 ? a2.label : '',
-              a2 && areeP[a2.key] != null ? areeP[a2.key] + '%' : a2 ? '—' : '',
+              a2 && areeP[a2.key] != null ? areeP[a2.key] + '%' : a2 ? '-' : '',
             ]);
           }
           return righe;
@@ -3368,7 +3368,7 @@ function stampaSchedaPDF(nome) {
   }
   doc.setFontSize(6.5);
   doc.setTextColor(150);
-  doc.text('Casino Lugano SA — Scheda collaboratore — Riservato', 14, doc.internal.pageSize.getHeight() - 8);
+  doc.text('Casino Lugano SA · Scheda collaboratore · Riservato', 14, doc.internal.pageSize.getHeight() - 8);
 
   mostraPdfPreview(
     doc,
@@ -3393,11 +3393,11 @@ function apriConfrontoScheda(nomeIniziale) {
     optHtml +
     '</select></div>';
   h +=
-    '<div class="modulo-field"><label>Collaboratore 2</label><select id="conf-c2" style="padding:10px"><option value="">&#8212; Seleziona &#8212;</option>' +
+    '<div class="modulo-field"><label>Collaboratore 2</label><select id="conf-c2" style="padding:10px"><option value="">&middot; Seleziona &middot;</option>' +
     optHtml +
     '</select></div>';
   h +=
-    '<div class="modulo-field"><label>Collaboratore 3 (opzionale)</label><select id="conf-c3" style="padding:10px"><option value="">&#8212; Nessuno &#8212;</option>' +
+    '<div class="modulo-field"><label>Collaboratore 3 (opzionale)</label><select id="conf-c3" style="padding:10px"><option value="">&middot; Nessuno &middot;</option>' +
     optHtml +
     '</select></div>';
   h +=

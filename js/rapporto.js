@@ -1,5 +1,5 @@
 /**
- * Diario Collaboratori — Casino Lugano SA
+ * Diario Collaboratori · Casino Lugano SA
  * File: rapporto.js
  */
 
@@ -216,7 +216,7 @@ async function apriGiorno(ds) {
     MESI_FULL[d.getMonth()] +
     ' ' +
     d.getFullYear() +
-    ' — ' +
+    ' · ' +
     GIORNI[d.getDay()] +
     '</h3><div class="turno-columns">' +
     turnoCol('PRESTO', 'presto', p) +
@@ -589,14 +589,14 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno) {
 async function _eseguiAssenzeOps(ops, ds, turno) {
   // D7: notifica errori validazione (non bloccanti, gli altri op vanno avanti)
   for (const e of ops.errors) {
-    toast('Attenzione — ' + e.nome + ': ' + e.motivo);
+    toast('Attenzione · ' + e.nome + ': ' + e.motivo);
     try {
       logAzione('Validazione assenza fallita', e.nome + ' - ' + e.motivo + ' (rapporto ' + turno + ' del ' + ds + ')');
     } catch (_) {}
   }
   const totaleDb = ops.creates.length + ops.updates.length + ops.deletes.length;
   if (totaleDb === 0 && ops.skipped.length === 0) return;
-  // D6: TRANSACTIONAL — costruisci batch operazioni per RPC
+  // D6: TRANSACTIONAL · costruisci batch operazioni per RPC
   const rpcOps = [];
   for (const c of ops.creates) rpcOps.push({ action: 'create', data: c.record });
   for (const u of ops.updates) rpcOps.push({ action: 'update', id: u.id, data: { testo: u.nuovoTesto } });
@@ -943,12 +943,12 @@ async function esportaRapportoPDF() {
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(120);
-    doc.text('Casinò Lugano SA — dal ' + dalF + ' al ' + alF, 14, 21);
+    doc.text('Casinò Lugano SA · dal ' + dalF + ' al ' + alF, 14, 21);
     doc.setTextColor(0);
     let y = 28;
     dates.forEach((ds) => {
       const d = new Date(ds + 'T12:00:00');
-      const dayLabel = d.getDate() + ' ' + MESI_FULL[d.getMonth()] + ' ' + d.getFullYear() + ' — ' + GIORNI[d.getDay()];
+      const dayLabel = d.getDate() + ' ' + MESI_FULL[d.getMonth()] + ' ' + d.getFullYear() + ' · ' + GIORNI[d.getDay()];
       const p = byDate[ds].PRESTO || {},
         n = byDate[ds].NOTTE || {};
       const extraP = p.note_extra ? JSON.parse(p.note_extra) : {};
@@ -1002,9 +1002,9 @@ async function esportaRapportoPDF() {
       doc.setPage(i);
       doc.setFontSize(7);
       doc.setTextColor(150);
-      doc.text('Casinò Lugano SA — Pag. ' + i + '/' + tp, 14, doc.internal.pageSize.height - 8);
+      doc.text('Casinò Lugano SA · Pag. ' + i + '/' + tp, 14, doc.internal.pageSize.height - 8);
     }
-    mostraPdfPreview(doc, 'rapporto_' + dal + '_' + al + '.pdf', 'Rapporto ' + dal + ' — ' + al);
+    mostraPdfPreview(doc, 'rapporto_' + dal + '_' + al + '.pdf', 'Rapporto ' + dal + ' · ' + al);
   } catch (e) {
     console.error('PDF error:', e);
     toast('Errore generazione PDF: ' + e.message);

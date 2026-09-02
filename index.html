@@ -72,7 +72,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <link rel="stylesheet" href="css/style.css" />
     <style>
-      /* CSS estratto in css/style.css — qui restano solo override temporanei se necessari */
+      /* CSS estratto in css/style.css · qui restano solo override temporanei se necessari */
     </style>
   </head>
   <body>
@@ -639,7 +639,7 @@
               <div class="field">
                 <label>Reparto</label
                 ><select id="inp-reparto">
-                  <option value="">—</option>
+                  <option value="">-</option>
                   <option>Cassa</option>
                   <option>Sala</option>
                   <option>Rec</option>
@@ -1525,16 +1525,16 @@
           </div>
           <div class="field">
             <label>Max BU</label
-            ><input type="number" id="maison-budget-bu" placeholder="—" min="0" style="width: 80px" />
+            ><input type="number" id="maison-budget-bu" placeholder="-" min="0" style="width: 80px" />
           </div>
           <div class="field">
             <label>Max BL</label
-            ><input type="number" id="maison-budget-bl" placeholder="—" min="0" style="width: 80px" />
+            ><input type="number" id="maison-budget-bl" placeholder="-" min="0" style="width: 80px" />
           </div>
           <div class="field">
             <label>Categoria</label
             ><select id="maison-budget-cat" style="padding: 10px; width: 130px">
-              <option value="">—</option>
+              <option value="">-</option>
               <option value="maison">Maison</option>
               <option value="full_maison">Full Maison</option>
               <option value="direzione">Direzione</option>
@@ -1698,7 +1698,7 @@
             </div>
             <div class="field">
               <label>Importo CHF (opzionale)</label
-              ><input type="number" id="regalo-importo" placeholder="—" min="0" step="0.01" />
+              ><input type="number" id="regalo-importo" placeholder="-" min="0" step="0.01" />
             </div>
           </div>
           <div class="form-row">
@@ -2799,7 +2799,7 @@
       <div class="settings-section">
         <h4>Operatori</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Operatore attuale: <strong id="op-attuale">—</strong>. Ogni operatore accede con il proprio nome e password.
+          Operatore attuale: <strong id="op-attuale">-</strong>. Ogni operatore accede con il proprio nome e password.
         </p>
         <div id="operatori-list" style="margin-bottom: 14px"></div>
         <div class="add-tipo-row" style="align-items: flex-end">
@@ -2865,7 +2865,7 @@
         <p id="groq-status" style="font-size: 0.82rem; margin-top: 8px"></p>
         <div style="margin-top: 14px">
           <p style="color: var(--muted); font-size: 0.8rem; margin-bottom: 8px">
-            Modelli AI (se Groq ne dismette uno, basta aggiornare il nome qui — vale per tutte le copie dell'app):
+            Modelli AI (se Groq ne dismette uno, basta aggiornare il nome qui · vale per tutte le copie dell'app):
           </p>
           <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; align-items: flex-end">
             <div class="field"><label>Testi</label><input type="text" id="groq-mod-testo" /></div>
@@ -2879,7 +2879,7 @@
         </div>
       </div>
       <div class="settings-section" id="maison-privacy-section" style="display: none">
-        <h4>Maison — Conservazione dati</h4>
+        <h4>Maison · Conservazione dati</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
           Per privacy puoi far cancellare automaticamente le registrazioni dei Costi Maison più vecchie: all'apertura
           dell'app i dati oltre il periodo scelto vengono eliminati definitivamente (le funzioni manuali Elimina
@@ -2901,7 +2901,7 @@
         <p id="maison-autodelete-status" style="font-size: 0.8rem; color: var(--muted); margin-top: 8px"></p>
       </div>
       <div class="settings-section" id="soglie-alert-section" style="display: none">
-        <h4>Alert differenze cassa — Soglie</h4>
+        <h4>Alert differenze cassa · Soglie</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
           Personalizza gli importi che fanno scattare gli alert in Panoramica: una differenza singola pari o superiore
           alla prima soglia suggerisce l'<strong>Allineamento</strong>; le differenze cumulative dall'ultimo RDI pari o
@@ -2928,7 +2928,7 @@
             padding-top: 14px;
           "
         >
-          <strong>Percorso disciplinare</strong> — quanti episodi fanno scattare i suggerimenti.
+          <strong>Percorso disciplinare</strong> · quanti episodi fanno scattare i suggerimenti.
         </p>
         <div class="add-tipo-row" style="align-items: flex-end">
           <div class="field">
@@ -2947,7 +2947,7 @@
         </div>
       </div>
       <div class="settings-section" id="buoni-valori-section" style="display: none">
-        <h4>Maison — Valori buoni (CHF)</h4>
+        <h4>Maison · Valori buoni (CHF)</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
           Valore in CHF di ogni tipo di buono: usato per l'auto-calcolo del numero di buoni dal costo e per la divisione
           dei costi nei gruppi.
