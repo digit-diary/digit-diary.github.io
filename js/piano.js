@@ -7671,7 +7671,10 @@ function _briefComponi(pianoRighe) {
     // non del reparto d'origine (Balliu con X1 valet → solo briefing valet,
     // mai in quello slots). Niente fallback sui turni degli altri reparti.
     const t = _pianoTurniReparto().find((x) => x.codice === r.codice);
-    const custom = !t && r.ora_inizio && r.ora_fine && (r.reparto_dip || 'slots') === _pianoReparto();
+    // JG: sempre nel briefing quando è nel piano del reparto (con l'orario
+    // della cella se c'è, altrimenti da scrivere a mano sul foglio)
+    const isJg = String(r.codice).toUpperCase() === 'JG' && (r.reparto_dip || 'slots') === _pianoReparto();
+    const custom = (!t && r.ora_inizio && r.ora_fine && (r.reparto_dip || 'slots') === _pianoReparto()) || (!t && isJg);
     if (!t && !custom) return;
     const info = _pianoCollabInfo(r.collaboratore);
     if (info && info.attivo === false) return;
