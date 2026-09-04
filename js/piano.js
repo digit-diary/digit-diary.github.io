@@ -643,6 +643,14 @@ async function renderPiano() {
           (nR ? '' : ' disabled') +
           ' onclick="pianoRipristina()">&#8631;</button>' +
           '<span id="piano-autosave" title="Ogni modifica al piano si salva da sola nel database, subito. Le frecce servono per tornare indietro o avanti se sbagli.">Salvataggio automatico</span>';
+        const ssnap = (window._pianoSessSnap || {})[_pianoMeseSel + '|' + _pianoReparto()];
+        if (ssnap)
+          h +=
+            '<button class="btn-export" style="font-size:.72rem;padding:3px 9px;border-color:#c0392b;color:#c0392b" title="Riporta questo mese a com\'era quando hai iniziato a modificarlo in questa sessione (' +
+            ssnap.n +
+            ' operazioni tue)" onclick="pianoAnnullaTutto()">Annulla tutto (' +
+            ssnap.n +
+            ')</button>';
       }
       // barra comandi ORDINATA in gruppi: Pianifica · Controlla · Strumenti · Esporta
       const pbtn = (label, onclick, tipo, title) =>
@@ -4472,11 +4480,28 @@ function _pianoInitSelezione() {
   if (!window._pianoSelDocClick) {
     window._pianoSelDocClick = true;
     document.addEventListener('click', (e) => {
+      // celle dei TOTALI (Ore, D, N, OD, OP, SM, YTD): selezione sparsa come
+      // Excel (click = solo quella, Ctrl/Cmd+click = aggiungi o togli); la
+      // barra di calcolo mostra somma e media anche di queste
+      const tdTot = e.target.closest('#piano-content tbody td.piano-tot');
+      if (tdTot) {
+        if (e.ctrlKey || e.metaKey) tdTot.classList.toggle('tot-sel');
+        else {
+          document.querySelectorAll('#piano-content .tot-sel').forEach((x) => x.classList.remove('tot-sel'));
+          tdTot.classList.add('tot-sel');
+        }
+        setTimeout(_pianoStatSelezione, 30);
+        return;
+      }
       if (!e.target.closest('#piano-content .piano-table')) {
         document
           .querySelectorAll('#piano-content .col-selected, #piano-content .col-selected-header')
           .forEach((el) => el.classList.remove('col-selected', 'col-selected-header'));
         document.querySelectorAll('#piano-content .row-selected').forEach((el) => el.classList.remove('row-selected'));
+        if (document.querySelector('#piano-content .tot-sel')) {
+          document.querySelectorAll('#piano-content .tot-sel').forEach((el) => el.classList.remove('tot-sel'));
+          setTimeout(_pianoStatSelezione, 30);
+        }
       }
     });
   }
@@ -8036,9 +8061,9 @@ async function _renderPianoBriefingTab() {
         '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="pdfBriefingGiorno()">Stampa briefing</button>' +
         '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="document.getElementById(\'brief-xlsx\').click()">Importa da Excel</button>' +
         '<input type="file" id="brief-xlsx" accept=".xlsx,.xls,.xlsm" style="display:none" onchange="importaBriefingExcel(this)">' +
-        '<span style="position:relative;display:inline-flex;align-items:center"><button class="btn-export" style="font-size:.82rem;padding:5px 10px;border-color:#e67e22;color:#e67e22;display:inline-flex;align-items:center;gap:6px" title="Applica l\'ultimo colore alle celle o righe marcate" onclick="event.stopPropagation();briefColoreApplica(_colUltimo())">Colori <span class="col-ultimo-chip" style="display:inline-block;width:13px;height:13px;border:1px solid #999;border-radius:3px;background:' +
-        _colUltimo() +
-        '"></span></button>' +
+        '<span style="position:relative;display:inline-flex;align-items:center"><button class="btn-export" style="font-size:.82rem;padding:4px 10px;border-color:#e67e22;color:#e67e22" title="Applica alle celle o righe marcate il colore mostrato nella barretta (per cambiarlo usa la freccia accanto)" onclick="event.stopPropagation();briefColoreApplica(_colUltimo() || null)"><span style="display:flex;flex-direction:column;gap:3px;min-width:44px">Colora' +
+        _colChipHtml() +
+        '</span></button>' +
         '<button class="btn-export" style="font-size:.82rem;padding:5px 7px;border-color:#e67e22;color:#e67e22" title="Scegli colore o formato" onclick="event.stopPropagation();briefColoriToggle()">&#9662;</button>' +
         '<div id="brief-colori-bar" style="display:none;position:absolute;top:110%;left:0;z-index:1000;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:8px;box-shadow:0 4px 14px rgba(0,0,0,.25);white-space:nowrap">' +
         PIANO_COLORI_CELLA.map(
@@ -8373,31 +8398,34 @@ function _briefSelezioneBind() {
       return;
     }
     if (!puoGestireBriefing()) return;
+    // come Excel: il click semplice seleziona SOLO quella cella o riga,
+    // con Ctrl (o Cmd) si aggiunge o toglie dalla selezione
+    const multi = e.ctrlKey || e.metaKey;
     const td = e.target.closest('td[data-campo]');
     if (td && e.target.closest('input')) {
-      // click su una cella: la marca (come Excel, la cella attiva e'
-      // selezionata); ci si puo' scrivere normalmente
       const selC = _briefCelleSel();
       const k = tr.dataset.bidx + '|' + td.dataset.campo;
-      if (selC.has(k)) {
+      if (multi && selC.has(k)) {
         selC.delete(k);
         td.classList.remove('brief-cella-sel');
-      } else {
-        selC.add(k);
-        td.classList.add('brief-cella-sel');
+        return;
       }
+      if (!multi) _briefSelPulisci();
+      selC.add(k);
+      td.classList.add('brief-cella-sel');
       return;
     }
     if (e.target.closest('input')) return;
     const sel = _briefRigheSel();
     const i = tr.dataset.bidx;
-    if (sel.has(i)) {
+    if (multi && sel.has(i)) {
       sel.delete(i);
       tr.classList.remove('brief-riga-sel');
-    } else {
-      sel.add(i);
-      tr.classList.add('brief-riga-sel');
+      return;
     }
+    if (!multi) _briefSelPulisci();
+    sel.add(i);
+    tr.classList.add('brief-riga-sel');
   });
 }
 async function briefColoreApplica(col) {
@@ -8431,7 +8459,7 @@ async function briefColoreApplica(col) {
     }
   });
   _briefSelPulisci();
-  if (col) _colUltimoSet(col);
+  _colUltimoSet(col || '');
   clearTimeout(_briefSaveTimer);
   await briefSalvaBriefing();
   toast(col ? 'Colore applicato (' + n + ')' : 'Colore tolto (' + n + ')');
@@ -8896,7 +8924,9 @@ window._pianoBlocco = null; // {tab, t1, t2, completo}
 // per le celle coi turni la somma usa le ORE del turno
 function _pianoStatSelezione() {
   let box = document.getElementById('piano-statbar');
-  const sel = [...document.querySelectorAll('#piano-content .blocco-sel, #piano-content .col-selected')];
+  const sel = [
+    ...document.querySelectorAll('#piano-content .blocco-sel, #piano-content .col-selected, #piano-content .tot-sel'),
+  ];
   const valori = [];
   let piene = 0;
   sel.forEach((td) => {
@@ -8973,6 +9003,13 @@ function _pianoUndoSnap(label) {
     window._pianoUndo.push(st);
     if (window._pianoUndo.length > 15) window._pianoUndo.shift();
     window._pianoRedo = [];
+    // prima modifica di questo mese+settore nella sessione: si conserva lo
+    // stato di partenza per "Annulla tutto" (non limitato ai 15 passi)
+    window._pianoSessSnap = window._pianoSessSnap || {};
+    const k = st.ym + '|' + st.rep;
+    if (!window._pianoSessSnap[k])
+      window._pianoSessSnap[k] = { ym: st.ym, rep: st.rep, righe: st.righe, label: 'inizio sessione', n: 0 };
+    window._pianoSessSnap[k].n++;
     _pianoSalvatoFlash();
   } catch (e) {}
 }
@@ -9000,6 +9037,20 @@ async function _pianoRipristinaStato(st) {
     await sbRpc('piano_bulk_upsert', { p_token: getOpToken(), p_rows: st.righe.slice(i, i + 2000) });
   }
 }
+function _pianoMappaRighe(rows, rep) {
+  return rows.map((r) => ({
+    collaboratore: r.collaboratore,
+    data: r.data,
+    codice: r.codice,
+    protetto: r.protetto,
+    generato: r.generato,
+    ora_inizio: r.ora_inizio,
+    ora_fine: r.ora_fine,
+    commento: r.commento,
+    colore: r.colore,
+    reparto_dip: rep,
+  }));
+}
 async function pianoAnnulla() {
   const u = window._pianoUndo || [];
   if (!u.length) {
@@ -9020,27 +9071,53 @@ async function pianoAnnulla() {
         'piano?data=gte.' + st.ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + st.rep + '&limit=8000',
       )) || [];
     window._pianoRedo = window._pianoRedo || [];
-    window._pianoRedo.push({
-      ym: st.ym,
-      rep: st.rep,
-      label: st.label,
-      righe: cur.map((r) => ({
-        collaboratore: r.collaboratore,
-        data: r.data,
-        codice: r.codice,
-        protetto: r.protetto,
-        generato: r.generato,
-        ora_inizio: r.ora_inizio,
-        ora_fine: r.ora_fine,
-        commento: r.commento,
-        colore: r.colore,
-        reparto_dip: st.rep,
-      })),
-    });
+    window._pianoRedo.push({ ym: st.ym, rep: st.rep, label: st.label, righe: _pianoMappaRighe(cur, st.rep) });
   } catch (e) {}
   await _pianoRipristinaStato(st);
   logAzione('Piano: annullato', st.label + ' (' + st.ym + ')');
   toast('Annullato: ' + st.label);
+  renderPiano();
+}
+// ANNULLA TUTTO: riporta il mese visualizzato a com'era all'inizio della
+// sessione. Il bottone appare SOLO a chi ha fatto modifiche qui (lo stato
+// vive nel browser di chi le ha fatte) e sparisce dopo l'uso o al rientro
+async function pianoAnnullaTutto() {
+  if (!puoGestirePiano()) return;
+  const k = _pianoMeseSel + '|' + _pianoReparto();
+  const snap = (window._pianoSessSnap || {})[k];
+  if (!snap) return;
+  if (
+    !confirm(
+      'Riporto il piano di ' +
+        snap.ym +
+        ' (' +
+        repartoLabel(snap.rep) +
+        ") a com'era all'inizio di questa sessione, annullando le tue " +
+        snap.n +
+        ' operazioni.\n\nATTENZIONE: se un altro operatore ha modificato questo stesso mese nel frattempo, anche le sue modifiche verranno sovrascritte.\n\nConfermare?',
+    )
+  )
+    return;
+  // lo stato attuale (dal DB) finisce sulla freccia Ripristina: si puo' tornare avanti
+  try {
+    const fine = snap.ym + '-' + String(_pianoUltimoGiorno(snap.ym)).padStart(2, '0');
+    const cur =
+      (await secGet(
+        'piano?data=gte.' + snap.ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + snap.rep + '&limit=8000',
+      )) || [];
+    window._pianoRedo = window._pianoRedo || [];
+    window._pianoRedo.push({
+      ym: snap.ym,
+      rep: snap.rep,
+      label: 'annulla tutte le modifiche',
+      righe: _pianoMappaRighe(cur, snap.rep),
+    });
+  } catch (e) {}
+  await _pianoRipristinaStato(snap);
+  window._pianoUndo = (window._pianoUndo || []).filter((s) => !(s.ym === snap.ym && s.rep === snap.rep));
+  delete window._pianoSessSnap[k];
+  logAzione('Piano: annullate tutte le modifiche della sessione', snap.ym + ' · ' + snap.n + ' operazioni');
+  toast('Piano riportato a inizio sessione (' + snap.n + ' operazioni annullate)');
   renderPiano();
 }
 async function pianoRipristina() {
@@ -9141,13 +9218,28 @@ function _stileStr(st) {
   if (!st.c && !f) return null;
   return (st.c || '') + (f ? '|' + f : '');
 }
-// Ultimo colore usato (secchiello stile Excel, condiviso piano+briefing)
+// Ultimo colore usato (secchiello stile Excel, condiviso piano+briefing).
+// Ricorda anche "nessuno" ('' = barretta bianca barrata, il bottone toglie il colore)
 function _colUltimo() {
-  return localStorage.getItem('piano_col_ult') || PIANO_COLORI_CELLA[0];
+  const v = localStorage.getItem('piano_col_ult');
+  return v === null ? PIANO_COLORI_CELLA[0] : v;
+}
+function _colChipPaint(el, c) {
+  el.style.background = c || '#fff';
+  el.style.backgroundImage = c ? 'none' : 'linear-gradient(to top right, #fff 44%, #c0392b 47%, #c0392b 53%, #fff 56%)';
 }
 function _colUltimoSet(c) {
-  localStorage.setItem('piano_col_ult', c);
-  document.querySelectorAll('.col-ultimo-chip').forEach((el) => (el.style.background = c));
+  localStorage.setItem('piano_col_ult', c || '');
+  document.querySelectorAll('.col-ultimo-chip').forEach((el) => _colChipPaint(el, c));
+}
+function _colChipHtml() {
+  const c = _colUltimo();
+  return (
+    '<span class="col-ultimo-chip" style="display:block;width:100%;height:4px;border:1px solid #999;border-radius:2px;background:' +
+    (c || '#fff') +
+    (c ? '' : ';background-image:linear-gradient(to top right, #fff 44%, #c0392b 47%, #c0392b 53%, #fff 56%)') +
+    '"></span>'
+  );
 }
 const PIANO_COLORI_CELLA = ['#FF6B6B', '#FFB86B', '#FFF06B', '#95E06C', '#6BCBFF', '#B39DDB', '#F48FB1', '#D7CCC8'];
 function _pianoColoriBarHtml() {
@@ -9155,10 +9247,10 @@ function _pianoColoriBarHtml() {
   // (chip colorata), la freccia apre la palette con formato G/C
   return (
     '<span style="position:relative;display:inline-flex;align-items:center">' +
-    '<button class="btn-export pbar-btn pbar-color" style="display:inline-flex;align-items:center;gap:6px" title="Applica l\'ultimo colore alle celle selezionate (solo qui nel piano, il turno non cambia)" onclick="event.stopPropagation();pianoApplicaColore(_colUltimo())">Colori <span class="col-ultimo-chip" style="display:inline-block;width:13px;height:13px;border:1px solid #999;border-radius:3px;background:' +
-    _colUltimo() +
-    '"></span></button>' +
-    '<button class="btn-export pbar-btn pbar-color" style="padding-left:6px;padding-right:6px" title="Scegli colore o formato" onclick="event.stopPropagation();pianoColoriToggle()">&#9662;</button>' +
+    '<button class="btn-export pbar-btn pbar-color" title="Applica alle celle selezionate il colore mostrato nella barretta (per cambiarlo usa la freccia accanto)" onclick="event.stopPropagation();pianoApplicaColore(_colUltimo() || null)"><span style="display:flex;flex-direction:column;gap:3px;min-width:44px">Colora' +
+    _colChipHtml() +
+    '</span></button>' +
+    '<button class="btn-export pbar-btn pbar-color" style="padding-left:6px;padding-right:6px" title="Scegli un altro colore o il formato (grassetto, corsivo)" onclick="event.stopPropagation();pianoColoriToggle()">&#9662;</button>' +
     '<div id="piano-colori-pop" style="display:none;position:absolute;top:110%;left:0;z-index:1000;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:8px;box-shadow:0 4px 14px rgba(0,0,0,.25);white-space:nowrap">' +
     PIANO_COLORI_CELLA.map(
       (c) =>
@@ -9242,7 +9334,7 @@ async function pianoApplicaColore(colore) {
         fatte++;
       }
     }
-    if (colore) _colUltimoSet(colore);
+    _colUltimoSet(colore || '');
     logAzione('Piano: colore celle', (colore || 'rimosso') + ' su ' + fatte + ' celle');
     toast(
       colore
@@ -9373,6 +9465,7 @@ function _pianoBloccoEvidenzia() {
   setTimeout(_pianoStatSelezione, 30);
 }
 function _pianoBloccoPulisci() {
+  document.querySelectorAll('#piano-content .tot-sel').forEach((el) => el.classList.remove('tot-sel'));
   document
     .querySelectorAll('.blocco-sel, .bs-t, .bs-b, .bs-l, .bs-r, .blocco-sel-head')
     .forEach((c) => c.classList.remove('blocco-sel', 'bs-t', 'bs-b', 'bs-l', 'bs-r', 'blocco-sel-head'));
