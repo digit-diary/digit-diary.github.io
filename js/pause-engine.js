@@ -2702,7 +2702,14 @@ function pdfBriefingGiorno() {
       : ['E', 'U', 'HOST', 'T', 'CD', 'USCITA', 'FIRMA'];
   const body = [];
   const righeFm = {}; // indice riga body -> in formazione (nome giallo sul PDF)
-  const righeBold = {}; // indice riga body -> tutta la riga in grassetto
+  const righeFmt = {}; // indice riga body -> formato dell'intera riga {b,i}
+  const righeCs = {}; // indice riga body -> stili per singola cella (r.cs)
+  // colonna PDF -> campo della riga briefing (per gli stili per cella)
+  const campiCol = valet
+    ? [null, null, 'nome', 'turno', 'uscita', 'firma', 'radio', 'badge']
+    : generico
+      ? [null, null, 'nome', 'turno', 'uscita', 'firma']
+      : [null, null, 'nome', 'turno', 'cd', 'uscita', 'firma'];
   let gPrec = null;
   (_briefState.righe || []).forEach((r) => {
     if (!r.nome && !r.turno) return;
@@ -2712,7 +2719,8 @@ function pdfBriefingGiorno() {
     gPrec = g;
     const nomePdf = (r.nome || '') + (r.fm ? ' (formazione)' : '');
     if (r.col || r.fm) righeFm[body.length] = r.col || '#FFFF00';
-    if (r.bold) righeBold[body.length] = true;
+    if (r.bold || r.ital) righeFmt[body.length] = { b: !!r.bold, i: !!r.ital };
+    if (r.cs) righeCs[body.length] = r.cs;
     body.push(
       valet
         ? ['', '', nomePdf, r.turno || '', r.uscita || '', r.firma || '', r.radio || '', r.badge || '']
@@ -2778,18 +2786,26 @@ function pdfBriefingGiorno() {
         if (d.column.index <= 1) d.cell.styles.textColor = [255, 255, 255];
         return;
       }
-      if (righeBold[d.row.index]) d.cell.styles.fontStyle = 'bold';
+      // stile della cella singola + formato riga + regole fisse delle colonne
+      const fmtR = righeFmt[d.row.index] || {};
+      const campo = campiCol[d.column.index];
+      const stC = _stileCella(campo && righeCs[d.row.index] ? righeCs[d.row.index][campo] : '');
+      let bold = stC.b || fmtR.b;
+      let ital = stC.i || fmtR.i;
+      let fill = stC.c || '';
       if (d.column.index === 2 && righeFm[d.row.index]) {
-        d.cell.styles.fillColor = _peHexRgb(righeFm[d.row.index]);
-        d.cell.styles.fontStyle = 'bold';
+        fill = fill || righeFm[d.row.index];
+        bold = true;
       } else if (d.column.index === 3 && d.cell.raw) {
         const hex = _pianoColore(String(d.cell.raw).trim());
-        if (hex && hex[0] === '#') d.cell.styles.fillColor = _peHexRgb(hex);
-        d.cell.styles.fontStyle = 'bold';
+        if (!fill && hex && hex[0] === '#') fill = hex;
+        bold = true;
       } else if (d.column.index === 4 && !valet && !generico && d.cell.raw) {
-        d.cell.styles.fillColor = [255, 255, 0];
-        d.cell.styles.fontStyle = 'bold';
+        fill = fill || '#FFFF00';
+        bold = true;
       }
+      if (fill) d.cell.styles.fillColor = _peHexRgb(fill);
+      if (bold || ital) d.cell.styles.fontStyle = bold && ital ? 'bolditalic' : bold ? 'bold' : 'italic';
     },
   });
   if (!valet) {

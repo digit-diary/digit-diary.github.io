@@ -4177,7 +4177,28 @@ body.dark-theme .stat {
   background: var(--paper2);
 }
 /* riga del briefing marcata per la colorazione */
-tr.brief-bold input {
+td.brief-cella-sel {
+  outline: 2px solid #e67e22;
+  outline-offset: -2px;
+}
+.pundo {
+  opacity: 0.35;
+}
+.pundo-on {
+  opacity: 1;
+  background: #1a4a7a;
+  color: #fff;
+  border-color: #1a4a7a;
+}
+#piano-autosave {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-left: 6px;
+  white-space: nowrap;
+  transition: color 0.3s;
+}
+#piano-autosave.pas-on {
+  color: #2c6e49;
   font-weight: 700;
 }
 tr.brief-riga-sel td {
