@@ -7843,13 +7843,22 @@ async function _briefAssegnaCd(righe, dstr) {
     const r = ieriRighe.find((x) => String(x.turno).toUpperCase() === turno && String(x.cd || '').trim());
     return r ? String(r.cd).trim() : '';
   };
+  // gli ULTIMI a chiudere sono i C8 (quando ci sono): la cassa che riapre
+  // domani e' la loro; senza C8 vale il turno di chiusura della coppia
+  const cdIeriC8 = (a, b) => {
+    const r = ieriRighe.find(
+      (x) => String(x.turno).toUpperCase() === 'C8' && [a, b].includes(String(x.cd || '').trim()),
+    );
+    return r ? String(r.cd).trim() : '';
+  };
   const trovaOggi = (turno) => righe.find((x) => String(x.turno).toUpperCase() === turno);
   const apreCds = [];
   const coppieCalc = [];
   cfg.coppie.forEach((cp) => {
     const [a, b] = cp.cd.map(String);
-    // chi ha chiuso ieri riapre oggi (fallback: primo numero della coppia)
-    const chiusoIeri = cdIeriDi(cp.chiude.toUpperCase()) || cdIeriDi(cp.apre.toUpperCase());
+    // chi ha chiuso PER ULTIMO ieri riapre oggi: prima i C8 (se c'erano),
+    // poi il turno di chiusura; fallback: primo numero della coppia
+    const chiusoIeri = cdIeriC8(a, b) || cdIeriDi(cp.chiude.toUpperCase()) || cdIeriDi(cp.apre.toUpperCase());
     const apreCd = chiusoIeri === a || chiusoIeri === b ? chiusoIeri : a;
     const chiudeCd = apreCd === a ? b : a;
     apreCds.push(apreCd);
