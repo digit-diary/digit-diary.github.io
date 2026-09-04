@@ -432,6 +432,7 @@ const _PIANO_TABS = [
   ],
 ];
 function pianoCambiaTab(t) {
+  _pianoFlushSalva();
   _pianoTab = t;
   localStorage.setItem('piano_tab', t);
   renderPiano();
@@ -8282,6 +8283,40 @@ function _briefDirtySalva() {
   const el = document.getElementById('brief-stato');
   if (el) el.textContent = 'salvataggio…';
   _briefSaveTimer = setTimeout(briefSalvaBriefing, 900);
+}
+// SALVATAGGI IN SOSPESO. Il piano salva a ogni cella; il briefing aspetta
+// 900ms dall'ultimo tasto per non scrivere a ogni lettera. Prima di cambiare
+// pagina o tab, o di chiudere l'app, si forza il salvataggio: cosi' non si
+// perde mai neanche l'ultima battitura.
+function _pianoFlushSalva() {
+  try {
+    // cella del piano ancora aperta in modifica: si conferma e si salva
+    document.querySelectorAll('#piano-content td.piano-cella input').forEach((el) => {
+      el.blur();
+      el.dispatchEvent(new FocusEvent('blur'));
+    });
+    if (_briefSaveTimer) {
+      clearTimeout(_briefSaveTimer);
+      _briefSaveTimer = null;
+      if (_briefState) briefSalvaBriefing();
+    }
+  } catch (e) {}
+}
+if (!window._pianoUnloadBound) {
+  window._pianoUnloadBound = true;
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') _pianoFlushSalva();
+  });
+  window.addEventListener('pagehide', _pianoFlushSalva);
+  // unico caso in cui si avvisa prima di uscire: un salvataggio e' ancora
+  // in corso in questo istante (meno di un secondo)
+  window.addEventListener('beforeunload', (e) => {
+    if (_briefSaveTimer || _briefSaving) {
+      _pianoFlushSalva();
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
 }
 async function briefSalvaBriefing() {
   if (!_briefState || _briefSaving) {
