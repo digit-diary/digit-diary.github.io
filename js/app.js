@@ -6,6 +6,7 @@
 
 function switchPage(name) {
   flushRapportoSave();
+  if (typeof _pianoFlushSalva === 'function') _pianoFlushSalva();
   // Controllo visibilità: blocca accesso a pagine nascoste (dashboard/diario/impostazioni sempre accessibili)
   const _pagesAlwaysVisible = ['dashboard', 'diario', 'impostazioni'];
   const _visKey = name.replace(/-/g, '_');
