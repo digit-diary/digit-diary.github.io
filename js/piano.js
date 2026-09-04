@@ -1154,6 +1154,7 @@ async function renderPiano() {
       _pianoTipBind();
       _pianoApplicaNascosti();
     }
+    if (_pianoTab === 'briefing') _briefSelezioneBind();
     if (_pianoTab === 'statistiche' && typeof caricaStatisticheAnnoPiano === 'function')
       setTimeout(() => caricaStatisticheAnnoPiano(), 50);
     if (_pianoTab === 'timbrature' && typeof caricaConfrontoTimbrature === 'function')
@@ -7970,17 +7971,17 @@ async function _renderPianoBriefingTab() {
         '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="pdfBriefingGiorno()">Stampa briefing</button>' +
         '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="document.getElementById(\'brief-xlsx\').click()">Importa da Excel</button>' +
         '<input type="file" id="brief-xlsx" accept=".xlsx,.xls,.xlsm" style="display:none" onchange="importaBriefingExcel(this)">' +
-        '<span style="position:relative;display:inline-flex;align-items:center"><button class="btn-export" style="font-size:.82rem;padding:5px 12px;border-color:#e67e22;color:#e67e22" title="Scegli un colore e poi clicca sulle righe da colorare" onclick="event.stopPropagation();briefColoriToggle()">Colori</button>' +
+        '<span style="position:relative;display:inline-flex;align-items:center"><button class="btn-export" style="font-size:.82rem;padding:5px 12px;border-color:#e67e22;color:#e67e22" title="Clicca su una o più righe per marcarle, poi scegli qui il colore" onclick="event.stopPropagation();briefColoriToggle()">Colori</button>' +
         '<div id="brief-colori-bar" style="display:none;position:absolute;top:110%;left:0;z-index:1000;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:8px;box-shadow:0 4px 14px rgba(0,0,0,.25);white-space:nowrap">' +
         PIANO_COLORI_CELLA.map(
           (c) =>
-            '<span onclick="briefPennello(\'' +
+            '<span onclick="briefColoreApplica(\'' +
             c +
             '\')" style="display:inline-block;width:22px;height:22px;background:' +
             c +
             ';border:1px solid #999;border-radius:3px;margin:2px;cursor:pointer;vertical-align:middle"></span>',
         ).join('') +
-        '<button class="btn-export" style="font-size:.7rem;padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="briefPennello(null)">Nessuno</button>' +
+        '<button class="btn-export" style="font-size:.7rem;padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="briefColoreApplica(null)">Nessuno</button>' +
         '</div></span>'
       : '') +
     '<span id="brief-stato" style="font-size:.78rem;color:var(--muted)">' +
@@ -8299,40 +8300,56 @@ function briefColoriToggle() {
   const b = document.getElementById('brief-colori-bar');
   if (b) b.style.display = b.style.display === 'none' ? 'block' : 'none';
 }
-// MODALITA' PENNELLO: scegli il colore in alto, poi clicca le righe da
-// colorare; Esc (o di nuovo Colori) per uscire
-function briefPennello(col) {
+// SEMPLICE come nel piano: clicchi le righe per MARCARLE (bordo arancione),
+// poi scegli il colore in alto e si applica alle righe marcate
+function _briefRigheSel() {
+  if (!window._briefSelSet) window._briefSelSet = new Set();
+  return window._briefSelSet;
+}
+function _briefSelezioneBind() {
+  if (window._briefSelBound) return;
+  window._briefSelBound = true;
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('input, select, textarea, button, a, span[onclick], #brief-colori-bar')) return;
+    const tr = e.target.closest('tr[data-bidx]');
+    const sel = _briefRigheSel();
+    if (!tr) {
+      // click fuori: deseleziona
+      if (sel.size) {
+        sel.clear();
+        document.querySelectorAll('.brief-riga-sel').forEach((x) => x.classList.remove('brief-riga-sel'));
+      }
+      return;
+    }
+    if (!puoGestireBriefing()) return;
+    const i = tr.dataset.bidx;
+    if (sel.has(i)) {
+      sel.delete(i);
+      tr.classList.remove('brief-riga-sel');
+    } else {
+      sel.add(i);
+      tr.classList.add('brief-riga-sel');
+    }
+  });
+}
+async function briefColoreApplica(col) {
   const b = document.getElementById('brief-colori-bar');
   if (b) b.style.display = 'none';
-  if (!puoGestireBriefing()) return;
-  window._briefPennello = { attivo: true, col: col };
-  toast(
-    (col ? 'Pennello attivo: clicca sulle righe da colorare' : 'Gomma attiva: clicca sulle righe da pulire') +
-      ' · Esc per finire',
-  );
-  if (!window._briefPennelloBound) {
-    window._briefPennelloBound = true;
-    document.addEventListener(
-      'click',
-      (e) => {
-        const pn = window._briefPennello;
-        if (!pn || !pn.attivo) return;
-        if (e.target.closest('#brief-colori-bar')) return;
-        const tr = e.target.closest('tr[data-bidx]');
-        if (!tr) return;
-        e.stopPropagation();
-        e.preventDefault();
-        briefColoreRigaSet(parseInt(tr.dataset.bidx), pn.col);
-      },
-      true,
-    );
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && window._briefPennello && window._briefPennello.attivo) {
-        window._briefPennello.attivo = false;
-        toast('Pennello disattivato');
-      }
-    });
+  if (!puoGestireBriefing() || !_briefState) return;
+  const sel = _briefRigheSel();
+  if (!sel.size) {
+    toast('Prima clicca sulle righe da colorare, poi scegli il colore');
+    return;
   }
+  sel.forEach((i) => {
+    if (_briefState.righe[parseInt(i)]) _briefState.righe[parseInt(i)].col = col || null;
+  });
+  const n = sel.size;
+  sel.clear();
+  clearTimeout(_briefSaveTimer);
+  await briefSalvaBriefing();
+  toast(col ? 'Colorate ' + n + ' righe' : 'Colore tolto da ' + n + ' righe');
+  renderPiano();
 }
 async function briefColoreRigaSet(i, col) {
   const pop = document.getElementById('brief-colori-pop');
