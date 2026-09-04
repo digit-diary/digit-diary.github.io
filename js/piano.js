@@ -6219,7 +6219,14 @@ function _renderPianoImpostazioniCard() {
   h +=
     '<p style="font-size:.85rem;font-weight:700;margin:12px 0 4px">Competenze Formazione → gruppi del piano</p>' +
     '<p style="font-size:.78rem;color:var(--muted);margin-bottom:6px">Chi ha la competenza CERTIFICATA in Formazione diventa idoneo anche al gruppo indicato (in aggiunta ai suoi Settori). "-" = nessun collegamento.</p>';
-  const gruppiDisp = [...new Set(pianoTurniCache.map((t) => (t.gruppo || '').toUpperCase()).filter(Boolean))].sort();
+  // solo i gruppi dei turni DI QUESTO settore (i turni sono divisi per settore)
+  const gruppiDisp = [
+    ...new Set(
+      _pianoTurniReparto()
+        .map((t) => (t.gruppo || '').toUpperCase())
+        .filter(Boolean),
+    ),
+  ].sort();
   const mappaCG = _pianoCompetenzeGruppi();
   const compRep = typeof getCompetenzeConfigAll === 'function' ? getCompetenzeConfigAll()[_pianoReparto()] || [] : [];
   if (compRep.length) {
@@ -6964,7 +6971,13 @@ function _renderPianoGuidaTab() {
 
 function _renderPianoRegoleGruppoCard() {
   if (!isAdmin()) return '';
-  const gruppi = [...new Set(pianoTurniCache.map((t) => (t.gruppo || '').toUpperCase()).filter(Boolean))].sort();
+  const gruppi = [
+    ...new Set(
+      _pianoTurniReparto()
+        .map((t) => (t.gruppo || '').toUpperCase())
+        .filter(Boolean),
+    ),
+  ].sort();
   let h =
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Regole di gruppo (admin)</div><div style="padding:10px 14px">';
   h +=
