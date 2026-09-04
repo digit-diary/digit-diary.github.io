@@ -670,7 +670,7 @@ async function renderPiano() {
         '<span style="font-size:.8rem;color:var(--muted);margin-left:auto">' +
         _pianoRighe.length +
         ' assegnazioni' +
-        (puoMod ? ' · click seleziona, doppio click modifica' : ' · sola lettura') +
+        (puoMod ? ' · click modifica, trascina o Shift+click per selezionare' : ' · sola lettura') +
         '</span></div>';
       h += '<div id="piano-violazioni"></div>';
 
@@ -792,12 +792,9 @@ async function renderPiano() {
             '"' +
             (titolo ? ' title="' + escP(titolo) + '"' : '') +
             (r && r.commento ? ' data-commento="' + escP(r.commento) + '"' : '') +
-            ' onclick="pianoCellaClick(\'' +
-            ne +
-            "','" +
-            dstr +
-            '\',this)"' +
-            (puoMod ? ' ondblclick="pianoCellaInline(\'' + ne + "','" + dstr + '\',this)"' : '') +
+            (puoMod
+              ? ' onclick="pianoCellaInline(\'' + ne + "','" + dstr + '\',this)"'
+              : ' onclick="pianoCellaClick(\'' + ne + "','" + dstr + '\',this)"') +
             '>' +
             cella +
             '</td>';
@@ -861,8 +858,7 @@ async function renderPiano() {
 
       // legenda
       h += '<div style="display:flex;gap:14px;flex-wrap:wrap;padding:10px 14px;font-size:.8rem;color:var(--muted)">';
-      h +=
-        '<span><span class="piano-leg piano-prot" style="background:var(--paper2)"></span> bordo rosso = inserito a mano (protetto)</span>';
+
       h +=
         '<span><span class="piano-leg piano-comm" style="background:var(--paper2)"></span> triangolo = commento (passa il mouse)</span>';
       h += '<span><span class="piano-leg piano-malattia-c"></span> MC = malattia su giorno di congedo (0 ore)</span>';
@@ -987,12 +983,9 @@ async function renderPiano() {
                 stile +
                 (puoMod ? 'cursor:pointer' : '') +
                 '"' +
-                ' onclick="fabbCellaClick(\'' +
-                escP(cod) +
-                "','" +
-                dstr +
-                '\',this)"' +
-                (puoMod ? ' ondblclick="fabbisognoInline(\'' + escP(cod) + "','" + dstr + '\',this)"' : '') +
+                (puoMod
+                  ? ' onclick="fabbisognoInline(\'' + escP(cod) + "','" + dstr + '\',this)"'
+                  : ' onclick="fabbCellaClick(\'' + escP(cod) + "','" + dstr + '\',this)"') +
                 ' oncontextmenu="fabbCtxMenu(event,\'' +
                 escP(cod) +
                 "','" +
@@ -8965,18 +8958,51 @@ function _pianoDragBind() {
       pianoCopiaBlocco();
     }
   });
-  document.addEventListener('mouseover', (e) => {
-    if (!drag) return;
-    const td = e.target.closest('td[data-g]');
-    if (!td || td.closest('table') !== drag.table) return;
+  const estendi = (td) => {
+    if (!drag || !td || td.closest('table') !== drag.table) return;
     if (td === drag.start && !drag.moved) return;
     drag.moved = true;
     drag.table.classList.add('sel-noselect');
     _pianoBloccoPulisci();
     window._pianoBlocco = { tab: drag.tab, t1: drag.start, t2: td, completo: true };
     _pianoBloccoEvidenzia();
+  };
+  document.addEventListener('mouseover', (e) => {
+    if (!drag) return;
+    estendi(e.target.closest('td[data-g]'));
+  });
+  // AUTO-SCROLL: trascinando verso il bordo la pagina scorre da sola e la
+  // selezione continua (in basso/alto la finestra, a destra/sinistra la griglia)
+  let scrollTimer = null;
+  document.addEventListener('mousemove', (e) => {
+    if (!drag) return;
+    drag.cx = e.clientX;
+    drag.cy = e.clientY;
+    if (!scrollTimer) {
+      scrollTimer = setInterval(() => {
+        if (!drag || !drag.moved) return;
+        const M = 70;
+        let dy = 0;
+        if (drag.cy > window.innerHeight - M) dy = 24;
+        else if (drag.cy < 130) dy = -24;
+        if (dy) window.scrollBy(0, dy);
+        const wrap = drag.table.closest('.piano-wrap');
+        let dx = 0;
+        if (drag.cx > window.innerWidth - M) dx = 24;
+        else if (drag.cx < M) dx = -24;
+        if (dx && wrap) wrap.scrollLeft += dx;
+        if (dy || dx) {
+          const sotto = document.elementFromPoint(drag.cx, drag.cy);
+          if (sotto) estendi(sotto.closest && sotto.closest('td[data-g]'));
+        }
+      }, 60);
+    }
   });
   document.addEventListener('mouseup', () => {
+    if (scrollTimer) {
+      clearInterval(scrollTimer);
+      scrollTimer = null;
+    }
     if (!drag) return;
     if (drag.moved) {
       drag.table.classList.remove('sel-noselect');
