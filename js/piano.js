@@ -868,21 +868,21 @@ async function renderPiano() {
           Math.round(perc * 100) +
           '%</span></td>' +
           riga +
-          '<td class="piano-tot piano-sep-left">' +
+          '<td class="piano-tot piano-sep-left" data-tot="0">' +
           (ore ? ore.toFixed(1) : '') +
-          '</td><td class="piano-tot">' +
+          '</td><td class="piano-tot" data-tot="1">' +
           (nD || '') +
-          '</td><td class="piano-tot">' +
+          '</td><td class="piano-tot" data-tot="2">' +
           (nN || '') +
-          '</td><td class="piano-tot" style="color:var(--muted)">' +
+          '</td><td class="piano-tot" data-tot="3" style="color:var(--muted)">' +
           (dovute ? dovute.toFixed(1) : '') +
-          '</td><td class="piano-tot">' +
+          '</td><td class="piano-tot" data-tot="4">' +
           (orePiano ? orePiano.toFixed(1) : '') +
-          '</td><td class="piano-tot" style="color:' +
+          '</td><td class="piano-tot" data-tot="5" style="color:' +
           (saldo > 0 ? '#2c6e49' : saldo < 0 ? '#c0392b' : 'var(--muted)') +
           '">' +
           (orePiano || dovute ? (saldo > 0 ? '+' : '') + saldo.toFixed(1) : '') +
-          '</td><td class="piano-tot" style="font-weight:700;color:' +
+          '</td><td class="piano-tot" data-tot="6" style="font-weight:700;color:' +
           (ytd > 0 ? '#2c6e49' : ytd < 0 ? '#c0392b' : 'var(--muted)') +
           '">' +
           (orePiano || _pianoYtdMap[nome] ? (ytd > 0 ? '+' : '') + ytd.toFixed(1) : '') +
@@ -4486,6 +4486,12 @@ function _pianoInitSelezione() {
       // barra di calcolo mostra somma e media anche di queste
       const tdTot = e.target.closest('#piano-content tbody td.piano-tot');
       if (tdTot) {
+        if (window._pianoTotDragged) {
+          // click di rilascio subito dopo un trascinamento: si ignora una
+          // volta sola, la selezione trascinata resta
+          window._pianoTotDragged = false;
+          return;
+        }
         if (e.ctrlKey || e.metaKey) tdTot.classList.toggle('tot-sel');
         else {
           document.querySelectorAll('#piano-content .tot-sel').forEach((x) => x.classList.remove('tot-sel'));
@@ -9603,6 +9609,80 @@ function _pianoDragBind() {
         }
       }, 60);
     }
+  });
+  // TOTALI (Ore, D, N, OD, OP, SM, YTD): selezione a trascinamento come
+  // nella griglia, oltre a click e Ctrl+click. Rettangolo righe x colonne.
+  let dragT = null;
+  const totCelle = (t) => [...t.querySelectorAll('tbody td[data-tot]')];
+  const estendiTot = (td) => {
+    if (!dragT || !td || td.closest('table') !== dragT.table) return;
+    if (td === dragT.start && !dragT.moved) return;
+    dragT.moved = true;
+    dragT.table.classList.add('sel-noselect');
+    const rIdx = (x) => [...dragT.table.querySelectorAll('tbody tr')].indexOf(x.closest('tr'));
+    const r1 = rIdx(dragT.start);
+    const r2 = rIdx(td);
+    const c1 = parseInt(dragT.start.dataset.tot);
+    const c2 = parseInt(td.dataset.tot);
+    document.querySelectorAll('#piano-content .tot-sel').forEach((x) => x.classList.remove('tot-sel'));
+    totCelle(dragT.table).forEach((x) => {
+      const ri = rIdx(x);
+      const ci = parseInt(x.dataset.tot);
+      if (ri >= Math.min(r1, r2) && ri <= Math.max(r1, r2) && ci >= Math.min(c1, c2) && ci <= Math.max(c1, c2))
+        x.classList.add('tot-sel');
+    });
+    _pianoStatSelezione();
+  };
+  document.addEventListener('mousedown', (e) => {
+    window._pianoTotDragged = false;
+    if (e.button !== 0 || e.shiftKey || e.ctrlKey || e.metaKey) return;
+    const td = e.target.closest('td[data-tot]');
+    if (!td) return;
+    e.preventDefault();
+    dragT = { table: td.closest('table'), start: td, moved: false };
+  });
+  document.addEventListener('mouseover', (e) => {
+    if (!dragT) return;
+    estendiTot(e.target.closest('td[data-tot]'));
+  });
+  // trascinando verso il bordo la pagina scorre da sola, come nella griglia
+  let scrollTimerT = null;
+  document.addEventListener('mousemove', (e) => {
+    if (!dragT) return;
+    dragT.cx = e.clientX;
+    dragT.cy = e.clientY;
+    if (!scrollTimerT) {
+      scrollTimerT = setInterval(() => {
+        if (!dragT || !dragT.moved) return;
+        const M = 70;
+        let dy = 0;
+        if (dragT.cy > window.innerHeight - M) dy = 24;
+        else if (dragT.cy < 130) dy = -24;
+        if (dy) window.scrollBy(0, dy);
+        const wrap = dragT.table.closest('.piano-wrap');
+        let dx = 0;
+        if (dragT.cx > window.innerWidth - M) dx = 24;
+        else if (dragT.cx < M) dx = -24;
+        if (dx && wrap) wrap.scrollLeft += dx;
+        if (dy || dx) {
+          const sotto = document.elementFromPoint(dragT.cx, dragT.cy);
+          if (sotto && sotto.closest) estendiTot(sotto.closest('td[data-tot]'));
+        }
+      }, 60);
+    }
+  });
+  document.addEventListener('mouseup', () => {
+    if (scrollTimerT) {
+      clearInterval(scrollTimerT);
+      scrollTimerT = null;
+    }
+    if (!dragT) return;
+    if (dragT.moved) {
+      dragT.table.classList.remove('sel-noselect');
+      // il click di rilascio non deve ridurre la selezione a una sola cella
+      window._pianoTotDragged = true;
+    }
+    dragT = null;
   });
   document.addEventListener('mouseup', () => {
     if (scrollTimer) {
