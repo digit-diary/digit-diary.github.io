@@ -761,6 +761,15 @@ async function renderPiano() {
               cls += ' piano-comm';
               titolo += (titolo ? ' · ' : '') + r.commento;
             }
+            // MALATTIA SU GIORNO DI CONGEDO: il giorno C dentro un periodo di
+            // malattia si mostra come MC (0 ore, la C resta nei dati) così la
+            // malattia si vede anche dove non c'era un turno da coprire
+            if (codice === 'C' && malattie[nome + '|' + dstr]) {
+              cella = 'MC';
+              cls += ' piano-malattia-c';
+              stile = '';
+              titolo = 'Malattia su giorno di congedo (C) · 0 ore · dal Diario' + (titolo ? ' · ' + titolo : '');
+            }
           } else if (malattie[nome + '|' + dstr]) {
             cella = 'M';
             cls += ' piano-malattia-auto';
@@ -856,6 +865,7 @@ async function renderPiano() {
         '<span><span class="piano-leg piano-prot" style="background:var(--paper2)"></span> bordo rosso = inserito a mano (protetto)</span>';
       h +=
         '<span><span class="piano-leg piano-comm" style="background:var(--paper2)"></span> triangolo = commento (passa il mouse)</span>';
+      h += '<span><span class="piano-leg piano-malattia-c"></span> MC = malattia su giorno di congedo (0 ore)</span>';
       h +=
         '<span><span class="piano-leg piano-malattia-auto" style="background:var(--paper2)">M</span> = malattia dal Diario (automatica)</span>';
       h += '<span>icona rossa = stampa piano del collaboratore · tasto destro su una cella = menu opzioni</span>';
@@ -1862,7 +1872,10 @@ async function generaBozzaPiano() {
   // Chi ha lavorato un giorno festivo (flag CGF) matura una compensazione:
   // la bozza gliela assegna da sola nei BUCHI del mese (giorni senza turno),
   // nei giorni successivi al festivo. I CGF già goduti vengono scalati.
-  const festiviCgf = new Set(pianoFestiviCache.filter((f) => f.cgf !== false).map((f) => f.data));
+  // festivo di DOMENICA: mai CGF (regola aziendale), qualunque sia il flag
+  const festiviCgf = new Set(
+    pianoFestiviCache.filter((f) => f.cgf !== false && _festivoCgfDefault(f.data)).map((f) => f.data),
+  );
   const annoCorr = ym.split('-')[0];
   const annoPrec = String(Number(annoCorr) - 1);
   const cgfDovuti = {}; // nome -> [{daGiorno}]
@@ -3257,20 +3270,30 @@ function _pianoFestiviAnno(anno) {
       d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
     );
   };
-  // FESTIVI ITALIANI (scelta confermata dall'utente il 29/08/2026)
+  // FESTIVI DEL CANTON TICINO (richiesta utente 04/09/2026): la lista segue
+  // il calendario cantonale ufficiale — le feste fisse sono di legge, quelle
+  // mobili si calcolano da Pasqua, quindi risultano sempre esatte anno per anno
   return [
     { data: anno + '-01-01', descrizione: 'Capodanno' },
     { data: anno + '-01-06', descrizione: 'Epifania' },
-    { data: add(pasqua, 1), descrizione: "Lunedì dell'Angelo" },
-    { data: anno + '-04-25', descrizione: 'Festa della Liberazione' },
+    { data: anno + '-03-19', descrizione: 'San Giuseppe' },
+    { data: add(pasqua, 1), descrizione: 'Lunedì di Pasqua' },
     { data: anno + '-05-01', descrizione: 'Festa del Lavoro' },
-    { data: anno + '-06-02', descrizione: 'Festa della Repubblica' },
-    { data: anno + '-08-15', descrizione: 'Ferragosto' },
+    { data: add(pasqua, 39), descrizione: 'Ascensione' },
+    { data: add(pasqua, 50), descrizione: 'Lunedì di Pentecoste' },
+    { data: add(pasqua, 60), descrizione: 'Corpus Domini' },
+    { data: anno + '-06-29', descrizione: 'SS. Pietro e Paolo' },
+    { data: anno + '-08-01', descrizione: 'Festa nazionale' },
+    { data: anno + '-08-15', descrizione: 'Assunzione' },
     { data: anno + '-11-01', descrizione: 'Ognissanti' },
     { data: anno + '-12-08', descrizione: 'Immacolata Concezione' },
     { data: anno + '-12-25', descrizione: 'Natale' },
     { data: anno + '-12-26', descrizione: 'Santo Stefano' },
   ];
+}
+// REGOLA CGF: il festivo che cade di DOMENICA non matura compensazione
+function _festivoCgfDefault(dstr) {
+  return new Date(dstr + 'T12:00:00').getDay() !== 0;
 }
 // Se l'anno selezionato non ha festivi li genera da solo (sono deterministici)
 async function _generaFestiviSeMancanti() {
@@ -3281,7 +3304,11 @@ async function _generaFestiviSeMancanti() {
   const nuovi = _pianoFestiviAnno(anno).filter((f) => !esistenti.has(f.data));
   try {
     for (const f of nuovi) {
-      const r = await secPost('piano_festivi', { data: f.data, descrizione: f.descrizione, cgf: true });
+      const r = await secPost('piano_festivi', {
+        data: f.data,
+        descrizione: f.descrizione,
+        cgf: _festivoCgfDefault(f.data),
+      });
       if (r && r[0]) pianoFestiviCache.push(r[0]);
     }
     if (nuovi.length) {
@@ -3319,7 +3346,11 @@ async function generaPianoFestivi() {
     return;
   try {
     for (const f of nuovi) {
-      const r = await secPost('piano_festivi', { data: f.data, descrizione: f.descrizione, cgf: true });
+      const r = await secPost('piano_festivi', {
+        data: f.data,
+        descrizione: f.descrizione,
+        cgf: _festivoCgfDefault(f.data),
+      });
       if (r && r[0]) pianoFestiviCache.push(r[0]);
     }
     logAzione('Piano: festivi generati', anno + ' (' + nuovi.length + ')');
@@ -4906,7 +4937,7 @@ async function caricaStatisticheAnnoPiano() {
       if (dow === 0) o.dom++;
       // CGF MATURATO: ha lavorato in un festivo con flag CGF (automatico)
       const fest = pianoFestiviCache.find((f) => f.data === r.data);
-      if (fest && fest.cgf !== false) o.cgfMat++;
+      if (fest && fest.cgf !== false && _festivoCgfDefault(fest.data)) o.cgfMat++;
     } else if (cs) {
       if (r.codice === 'V' || r.codice === 'V1') o.v++;
       if (r.codice === 'M' || r.codice === 'M1') o.m++;

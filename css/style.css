@@ -3713,6 +3713,13 @@ button:focus-visible,
   border: 1px dashed #c0392b !important;
   font-weight: 700;
 }
+/* malattia su giorno di CONGEDO (MC): si vede che è malattia ma conta 0 ore */
+.piano-malattia-c {
+  background: repeating-linear-gradient(45deg, #fde9ec, #fde9ec 5px, #f8cdd5 5px, #f8cdd5 10px) !important;
+  color: #8e2437;
+  border: 1px dashed #c0392b !important;
+  font-weight: 700;
+}
 .piano-tot {
   background: var(--paper2);
   font-weight: 700;
