@@ -3624,30 +3624,29 @@ button:focus-visible,
   text-align: left;
   font-weight: 600;
   padding: 2px 8px;
-  width: 150px;
-  min-width: 150px;
-  max-width: 150px;
-  overflow: hidden;
+  /* larghezza automatica sul nome piu' lungo, con un tetto di sicurezza */
+  /* la larghezza reale arriva dal colgroup, calcolata sul nome piu' lungo */
+  min-width: 0;
   white-space: nowrap;
   position: sticky;
   left: 0;
   background: var(--paper);
   z-index: 1;
-  max-width: 150px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 /* Colonna Fun (funzione + percentuale) come Turnivo, sticky dopo il nome */
 .piano-table .piano-fun {
   position: sticky;
-  left: 150px;
+  left: 150px; /* riallineata via JS alla larghezza reale del nome */
   z-index: 2;
   background: var(--paper);
-  min-width: 48px;
-  max-width: 48px;
+  /* larghezza dal colgroup: ci sta per intero "JOLLY 100%" */
+  min-width: 0;
+  white-space: nowrap;
+  padding: 2px 5px;
   font-size: 0.72rem;
   line-height: 1.1;
-  overflow: hidden;
 }
 .piano-table thead .piano-fun {
   z-index: 3;

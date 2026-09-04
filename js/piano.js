@@ -704,10 +704,15 @@ async function renderPiano() {
       h += '<div id="piano-violazioni"></div>';
 
       // GRIGLIA
+      const LC = _pianoCalcolaLarghezze(nomi);
       h +=
         '<div class="piano-wrap"><table data-seltab="piano" class="piano-table piano-fixed" style="width:' +
-        (194 + 37 * nGiorni + 326) +
-        'px"><colgroup><col style="width:150px"><col style="width:44px">' +
+        (LC.tot + 37 * nGiorni + 326) +
+        'px"><colgroup><col style="width:' +
+        LC.nome +
+        'px"><col style="width:' +
+        LC.fun +
+        'px">' +
         _pianoColgroupGiorni(nGiorni) +
         '<col style="width:54px"><col style="width:30px"><col style="width:30px"><col style="width:54px"><col style="width:54px"><col style="width:50px"><col style="width:54px"></colgroup><thead><tr><th class="piano-nome">Collaboratore</th><th class="piano-fun">Fun</th>';
       for (let g = 1; g <= nGiorni; g++) {
@@ -858,7 +863,7 @@ async function renderPiano() {
           '" onclick="event.stopPropagation();stampaPianoCollaboratore(\'' +
           ne +
           '\')"></i>' +
-          escP(nome.length > 20 ? nome.substring(0, 20) : nome) +
+          escP(nome) +
           (infoC && infoC.lingue
             ? ' <span style="font-size:.62rem;color:var(--muted);font-weight:700">' + escP(infoC.lingue) + '</span>'
             : '') +
@@ -968,8 +973,10 @@ async function renderPiano() {
         };
         hFabb +=
           '<div class="piano-wrap"><table data-seltab="fabb" class="piano-table piano-fixed" style="width:' +
-          (194 + 37 * nGiorni) +
-          'px"><colgroup><col style="width:194px">' +
+          (_pianoLC().tot + 37 * nGiorni) +
+          'px"><colgroup><col style="width:' +
+          _pianoLC().tot +
+          'px">' +
           _pianoColgroupGiorni(nGiorni) +
           '</colgroup>' +
           testataGiorni(false) +
@@ -1064,8 +1071,10 @@ async function renderPiano() {
           ' <span style="font-size:.76rem;color:#b8a98a;font-weight:400">(effettivi − pianificazione)</span></div>';
         h +=
           '<div class="piano-wrap"><table data-seltab="diff" class="piano-table piano-fixed" style="width:' +
-          (194 + 37 * nGiorni) +
-          'px"><colgroup><col style="width:194px">' +
+          (_pianoLC().tot + 37 * nGiorni) +
+          'px"><colgroup><col style="width:' +
+          _pianoLC().tot +
+          'px">' +
           _pianoColgroupGiorni(nGiorni) +
           '</colgroup>' +
           testataGiorni(false) +
@@ -1102,8 +1111,10 @@ async function renderPiano() {
           '</div>';
         h +=
           '<div class="piano-wrap"><table data-seltab="eff" class="piano-table piano-fixed" style="width:' +
-          (194 + 37 * nGiorni + 44) +
-          'px"><colgroup><col style="width:194px">' +
+          (_pianoLC().tot + 37 * nGiorni + 44) +
+          'px"><colgroup><col style="width:' +
+          _pianoLC().tot +
+          'px">' +
           _pianoColgroupGiorni(nGiorni) +
           '<col style="width:44px"></colgroup>' +
           testataGiorni(true) +
@@ -4293,7 +4304,66 @@ async function confermaCoperturaMalattia() {
 // il piano scorre col resto della pagina (nessuno scrollbox interno) e le
 // intestazioni vengono traslate per restare in cima allo schermo. Vale per
 // tutte le tabelle piano-wrap (griglia collaboratori e fabbisogno).
+// LARGHEZZA AUTOMATICA delle due colonne fisse (nome e funzione): si misura
+// il testo piu' lungo prima di disegnare, perche' le tabelle del piano hanno
+// colonne a larghezza fissa (servono ad allineare i giorni con fabbisogno,
+// differenze ed effettivi: la somma nome+funzione dev'essere uguale ovunque)
+function _pianoMisura(txt, font) {
+  const c = (window._pianoCanvasMis = window._pianoCanvasMis || document.createElement('canvas'));
+  const ctx = c.getContext('2d');
+  ctx.font = font;
+  return ctx.measureText(txt || '').width;
+}
+function _pianoCalcolaLarghezze(nomi) {
+  const ff = ' system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+  let maxN = 0;
+  let maxF = 0;
+  (nomi || []).forEach((n) => {
+    const info = _pianoCollabInfo(n);
+    let w = _pianoMisura(n, '600 14px' + ff);
+    if (info && info.lingue) w += 6 + _pianoMisura(info.lingue, '700 10px' + ff);
+    if (w > maxN) maxN = w;
+    const perc = info ? parseFloat(info.percentuale) || 1 : 1;
+    const t = (
+      (info && info.is_jolly ? 'JOLLY' : (info && info.funzione) || '') +
+      ' ' +
+      Math.round(perc * 100) +
+      '%'
+    ).trim();
+    const wf = _pianoMisura(t, '700 11.5px' + ff);
+    if (wf > maxF) maxF = wf;
+  });
+  // icona stampa + margini nel nome, respiro nella colonna funzione
+  window._pianoLargCol = {
+    nome: Math.min(330, Math.max(150, Math.ceil(maxN + 36))),
+    fun: Math.min(110, Math.max(44, Math.ceil(maxF + 14))),
+  };
+  window._pianoLargCol.tot = window._pianoLargCol.nome + window._pianoLargCol.fun;
+  return window._pianoLargCol;
+}
+function _pianoLC() {
+  return window._pianoLargCol || { nome: 150, fun: 44, tot: 194 };
+}
+// La colonna del nome si allarga da sola in base al nome piu' lungo (CSS):
+// qui si riallinea la colonna Fun (funzione + percentuale), che resta
+// appiccicata subito dopo, alla larghezza reale che il browser ha calcolato
+function _pianoLarghezzaNomi() {
+  document.querySelectorAll('#piano-content .piano-wrap table').forEach((tab) => {
+    const nome = tab.querySelector('.piano-nome');
+    if (!nome) return;
+    const w = Math.round(nome.getBoundingClientRect().width);
+    if (!w) return;
+    tab.querySelectorAll('.piano-fun').forEach((el) => {
+      if (el.style.left !== w + 'px') el.style.left = w + 'px';
+    });
+  });
+}
 function _pianoInitSticky() {
+  requestAnimationFrame(_pianoLarghezzaNomi);
+  if (!window._pianoLargBound) {
+    window._pianoLargBound = true;
+    window.addEventListener('resize', () => requestAnimationFrame(_pianoLarghezzaNomi), { passive: true });
+  }
   const wraps = document.querySelectorAll('#piano-content .piano-wrap');
   window._pianoStickyEls = [...wraps]
     .map((w) => {
