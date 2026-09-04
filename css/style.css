@@ -3692,8 +3692,9 @@ button:focus-visible,
   outline: 2px solid var(--accent2);
   outline-offset: -2px;
 }
+/* celle protette: nessun segno visivo (richiesta utente) — la protezione
+   resta nei dati, la classe serve solo alla logica */
 .piano-prot {
-  box-shadow: inset 0 -3px 0 0 #c0392b;
 }
 .piano-comm {
   position: relative;
