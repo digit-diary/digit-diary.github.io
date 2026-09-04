@@ -4175,3 +4175,8 @@ body.dark-theme .stat {
 .tipo-item:hover {
   background: var(--paper2);
 }
+/* riga del briefing marcata per la colorazione */
+tr.brief-riga-sel td {
+  outline: 2px solid #e67e22;
+  outline-offset: -2px;
+}
