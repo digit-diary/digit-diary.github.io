@@ -4177,7 +4177,27 @@ body.dark-theme .stat {
   background: var(--paper2);
 }
 /* riga del briefing marcata per la colorazione */
+tr.brief-bold input {
+  font-weight: 700;
+}
 tr.brief-riga-sel td {
   outline: 2px solid #e67e22;
   outline-offset: -2px;
+}
+/* barra di calcolo della selezione (come la barra di stato di Excel) */
+#piano-statbar {
+  position: fixed;
+  right: 18px;
+  bottom: 16px;
+  z-index: 9000;
+  background: #212529;
+  color: #e9ecef;
+  font-size: 0.8rem;
+  padding: 7px 14px;
+  border-radius: 4px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+#piano-statbar b {
+  color: #ffd166;
 }

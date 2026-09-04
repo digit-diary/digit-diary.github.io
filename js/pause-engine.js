@@ -2702,6 +2702,7 @@ function pdfBriefingGiorno() {
       : ['E', 'U', 'HOST', 'T', 'CD', 'USCITA', 'FIRMA'];
   const body = [];
   const righeFm = {}; // indice riga body -> in formazione (nome giallo sul PDF)
+  const righeBold = {}; // indice riga body -> tutta la riga in grassetto
   let gPrec = null;
   (_briefState.righe || []).forEach((r) => {
     if (!r.nome && !r.turno) return;
@@ -2711,6 +2712,7 @@ function pdfBriefingGiorno() {
     gPrec = g;
     const nomePdf = (r.nome || '') + (r.fm ? ' (formazione)' : '');
     if (r.col || r.fm) righeFm[body.length] = r.col || '#FFFF00';
+    if (r.bold) righeBold[body.length] = true;
     body.push(
       valet
         ? ['', '', nomePdf, r.turno || '', r.uscita || '', r.firma || '', r.radio || '', r.badge || '']
@@ -2774,7 +2776,10 @@ function pdfBriefingGiorno() {
         d.cell.styles.fillColor =
           d.column.index === 0 ? [0, 176, 80] : d.column.index === 1 ? [255, 0, 0] : [255, 255, 0];
         if (d.column.index <= 1) d.cell.styles.textColor = [255, 255, 255];
-      } else if (d.section === 'body' && d.column.index === 2 && righeFm[d.row.index]) {
+        return;
+      }
+      if (righeBold[d.row.index]) d.cell.styles.fontStyle = 'bold';
+      if (d.column.index === 2 && righeFm[d.row.index]) {
         d.cell.styles.fillColor = _peHexRgb(righeFm[d.row.index]);
         d.cell.styles.fontStyle = 'bold';
       } else if (d.column.index === 3 && d.cell.raw) {

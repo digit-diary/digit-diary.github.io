@@ -624,6 +624,21 @@ async function renderPiano() {
             '</option>';
         });
       h += '</select>';
+      if (puoMod) {
+        const nU = (window._pianoUndo || []).length;
+        const nR = (window._pianoRedo || []).length;
+        h +=
+          '<button class="btn-act pin" title="' +
+          (nU ? 'Annulla: ' + escP(window._pianoUndo[nU - 1].label) : 'Niente da annullare') +
+          '"' +
+          (nU ? '' : ' disabled style="opacity:.4"') +
+          ' onclick="pianoAnnulla()">&#8630;</button>' +
+          '<button class="btn-act pin" title="' +
+          (nR ? 'Ripristina: ' + escP(window._pianoRedo[nR - 1].label) : 'Niente da ripristinare') +
+          '"' +
+          (nR ? '' : ' disabled style="opacity:.4"') +
+          ' onclick="pianoRipristina()">&#8631;</button>';
+      }
       // barra comandi ORDINATA in gruppi: Pianifica · Controlla · Strumenti · Esporta
       const pbtn = (label, onclick, tipo, title) =>
         '<button class="btn-export pbar-btn' +
@@ -1171,6 +1186,7 @@ function pianoCambiaMese(delta) {
 // (la vecchia finestra di modifica cella è stata sostituita dalla
 // scrittura diretta nella cella · pianoCellaInline / pianoSalvaCella)
 async function rimuoviPianoCella(giaChiuso) {
+  _pianoUndoSnap('rimozione cella');
   const sel = _pianoCellaSel;
   if (!sel) return;
   if (!giaChiuso) document.getElementById('pwd-modal').classList.add('hidden');
@@ -1545,6 +1561,7 @@ function _pianoRenderViolazioni() {
 // Le celle esistenti (V, protette, malattie Diario) non si toccano.
 // ================================================================
 async function generaBozzaPiano() {
+  _pianoUndoSnap('genera bozza ' + _pianoMeseSel);
   if (!puoGestirePiano()) return;
   const ym = _pianoMeseSel;
   const nGiorni = _pianoUltimoGiorno(ym);
@@ -2038,6 +2055,7 @@ async function cancellaBozzaPiano() {
 async function eseguiCancellaPiano(tutto) {
   // cancellare ANCHE le celle protette (piano reale) e' riservato all'admin
   if (tutto && !isAdmin()) return;
+  _pianoUndoSnap('cancella piano ' + _pianoMeseSel + (tutto ? ' (tutto)' : ''));
   document.getElementById('pwd-modal').classList.add('hidden');
   const ym = _pianoMeseSel;
   const da = ym + '-01';
@@ -7521,6 +7539,7 @@ async function confermaCambioEsigenze() {
 // validazione del codice, commento conservato, cella protetta)
 async function pianoSalvaCella(nome, dstr, codice) {
   if (!puoGestirePiano()) return false;
+  _pianoUndoSnap('modifica cella ' + nome.split(' ')[0] + ' ' + dstr.substring(8));
   // sigla inesistente (né turno né codice speciale) = errore, niente salvataggio
   // (solo a config caricata: con le cache vuote non si blocca nulla)
   if (
@@ -7818,43 +7837,83 @@ async function _briefAggiungiScoperti(righe, dstr) {
 async function _briefAssegnaCd(righe, dstr) {
   const cfg = window._pianoCdCfg;
   if (!cfg || !cfg.coppie || !cfg.coppie.length) return;
-  const ieriD = new Date(dstr + 'T12:00:00');
-  ieriD.setDate(ieriD.getDate() - 1);
-  const ieriStr =
-    ieriD.getFullYear() +
-    '-' +
-    String(ieriD.getMonth() + 1).padStart(2, '0') +
-    '-' +
-    String(ieriD.getDate()).padStart(2, '0');
-  let ieriRighe = [];
+  // La rotazione NON dipende dall'aver salvato ieri: si ricostruisce la
+  // catena "chi chiude riapre" all'indietro (max 14 giorni) dall'ultimo
+  // briefing salvato; nei giorni senza salvataggio vale la regola pura e,
+  // se nel piano c'erano C8, la cassa del presto resta anche il giorno dopo.
+  const giorni = [];
+  for (let gi = 14; gi >= 1; gi--) {
+    const d0 = new Date(dstr + 'T12:00:00');
+    d0.setDate(d0.getDate() - gi);
+    giorni.push(
+      d0.getFullYear() + '-' + String(d0.getMonth() + 1).padStart(2, '0') + '-' + String(d0.getDate()).padStart(2, '0'),
+    );
+  }
+  let salvatiRange = [];
+  let pianoRange = [];
   try {
-    const sv = await secGet(
-      'piano_briefing?data=eq.' + ieriStr + '&sezione=eq.briefing&reparto_dip=eq.' + _pianoReparto(),
-    );
-    if (sv && sv[0] && sv[0].contenuto && Array.isArray(sv[0].contenuto.righe)) ieriRighe = sv[0].contenuto.righe;
+    [salvatiRange, pianoRange] = await Promise.all([
+      secGet(
+        'piano_briefing?data=gte.' +
+          giorni[0] +
+          '&data=lte.' +
+          giorni[giorni.length - 1] +
+          '&sezione=eq.briefing&reparto_dip=eq.' +
+          _pianoReparto(),
+      ),
+      secGet(
+        'piano?data=gte.' + giorni[0] + '&data=lte.' + giorni[giorni.length - 1] + '&reparto_dip=eq.' + _pianoReparto(),
+      ),
+    ]);
   } catch (e) {}
-  const cdIeriDi = (turno) => {
-    const r = ieriRighe.find((x) => String(x.turno).toUpperCase() === turno && String(x.cd || '').trim());
-    return r ? String(r.cd).trim() : '';
-  };
-  // gli ULTIMI a chiudere sono i C8 (quando ci sono): la cassa che riapre
-  // domani e' la loro; senza C8 vale il turno di chiusura della coppia
-  const cdIeriC8 = (a, b) => {
-    const r = ieriRighe.find(
-      (x) => String(x.turno).toUpperCase() === 'C8' && [a, b].includes(String(x.cd || '').trim()),
-    );
-    return r ? String(r.cd).trim() : '';
-  };
+  const salvatoDi = {};
+  (salvatiRange || []).forEach((s) => {
+    if (s.contenuto && Array.isArray(s.contenuto.righe) && s.contenuto.righe.length)
+      salvatoDi[String(s.data).substring(0, 10)] = s.contenuto.righe;
+  });
+  const c8Nei = new Set(
+    (pianoRange || [])
+      .filter((r) => String(r.codice || '').toUpperCase() === 'C8')
+      .map((r) => String(r.data).substring(0, 10)),
+  );
   const trovaOggi = (turno) => righe.find((x) => String(x.turno).toUpperCase() === turno);
   const apreCds = [];
   const coppieCalc = [];
   cfg.coppie.forEach((cp) => {
     const [a, b] = cp.cd.map(String);
-    // chi ha chiuso PER ULTIMO ieri riapre oggi: prima i C8 (se c'erano),
-    // poi il turno di chiusura; fallback: primo numero della coppia
-    const chiusoIeri = cdIeriC8(a, b) || cdIeriDi(cp.chiude.toUpperCase()) || cdIeriDi(cp.apre.toUpperCase());
-    const apreCd = chiusoIeri === a || chiusoIeri === b ? chiusoIeri : a;
-    const chiudeCd = apreCd === a ? b : a;
+    const altroCd = (n) => (n === a ? b : a);
+    // dal briefing salvato di un giorno G ricava chi APRE il giorno G+1:
+    // prima il C8 (ultimo a chiudere), poi il turno di chiusura della coppia
+    const apreDomaniDa = (rr) => {
+      const inCoppia = (x) => [a, b].includes(String(x.cd || '').trim());
+      const rc8 = rr.find((x) => String(x.turno).toUpperCase() === 'C8' && inCoppia(x));
+      if (rc8) return String(rc8.cd).trim();
+      const rch = rr.find((x) => String(x.turno).toUpperCase() === cp.chiude.toUpperCase() && inCoppia(x));
+      if (rch) return String(rch.cd).trim();
+      const rap = rr.find((x) => String(x.turno).toUpperCase() === cp.apre.toUpperCase() && inCoppia(x));
+      if (rap) return altroCd(String(rap.cd).trim());
+      return '';
+    };
+    let apreCd = '';
+    let anc = -1;
+    for (let gi = giorni.length - 1; gi >= 0 && !apreCd; gi--) {
+      if (salvatoDi[giorni[gi]]) {
+        apreCd = apreDomaniDa(salvatoDi[giorni[gi]]);
+        if (apreCd) anc = gi;
+      }
+    }
+    if (!apreCd) {
+      // nessun briefing salvato nel periodo: alternanza deterministica per data
+      const ep = Math.floor(new Date(giorni[0] + 'T12:00:00').getTime() / 86400000);
+      apreCd = ep % 2 === 0 ? a : b;
+      anc = -1;
+    }
+    // propaga la rotazione dai giorni dopo l'ancora fino a ieri: ogni giorno
+    // senza C8 la cassa che apre si scambia, con C8 resta la stessa
+    for (let gi = anc + 1; gi < giorni.length; gi++) {
+      if (!c8Nei.has(giorni[gi])) apreCd = altroCd(apreCd);
+    }
+    const chiudeCd = altroCd(apreCd);
     apreCds.push(apreCd);
     coppieCalc.push({ apreCd, chiudeCd });
     const rA = trovaOggi(cp.apre.toUpperCase());
@@ -7968,13 +8027,17 @@ async function _renderPianoBriefingTab() {
         '<div id="brief-colori-bar" style="display:none;position:absolute;top:110%;left:0;z-index:1000;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:8px;box-shadow:0 4px 14px rgba(0,0,0,.25);white-space:nowrap">' +
         PIANO_COLORI_CELLA.map(
           (c) =>
-            '<span onclick="briefColoreApplica(\'' +
+            '<span data-c="' +
+            c +
+            '" onclick="briefColoreApplica(\'' +
             c +
             '\')" style="display:inline-block;width:22px;height:22px;background:' +
             c +
             ';border:1px solid #999;border-radius:3px;margin:2px;cursor:pointer;vertical-align:middle"></span>',
         ).join('') +
-        '<button class="btn-export" style="font-size:.7rem;padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="briefColoreApplica(null)">Nessuno</button>' +
+        '<button data-c="" class="btn-export" style="font-size:.7rem;padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="briefColoreApplica(null)">Nessuno</button>' +
+        '<span style="display:inline-block;width:1px;height:20px;background:var(--line);margin:0 8px;vertical-align:middle"></span>' +
+        '<button class="btn-export" style="font-size:.75rem;font-weight:700;padding:2px 10px;vertical-align:middle" title="Grassetto sulle righe marcate (vista e stampa)" onclick="briefGrassettoApplica()">G</button>' +
         '</div></span>'
       : '') +
     '<span id="brief-stato" style="font-size:.78rem;color:var(--muted)">' +
@@ -8031,7 +8094,7 @@ async function _renderPianoBriefingTab() {
       'style="width:' +
       larghezza +
       'px;border:none;background:transparent;padding:4px 6px;font:inherit;color:inherit"></td>';
-    h += '<tr data-bidx="' + i + '">';
+    h += '<tr data-bidx="' + i + '"' + (r.bold ? ' class="brief-bold"' : '') + '>';
     // E e U si spuntano A PENNA sul foglio stampato: celle vuote
     h += '<td style="border:1px solid #999;width:34px;padding:3px 4px">&nbsp;</td>';
     h += '<td style="border:1px solid #999;width:34px;padding:3px 4px">&nbsp;</td>';
@@ -8106,16 +8169,7 @@ async function _renderPianoBriefingTab() {
         ',1)">▼</span> ' +
         '<span style="cursor:pointer;color:#c0392b;font-weight:bold" title="Elimina riga" onclick="briefEliminaRiga(' +
         i +
-        ')">×</span> ' +
-        '<span style="cursor:pointer;display:inline-block;width:15px;height:15px;border:1.5px solid #777;border-radius:3px;vertical-align:middle;background:' +
-        (r.col || 'transparent') +
-        '" title="Colore riga: apri la palette" onclick="briefColoreRiga(' +
-        i +
-        ',event)">' +
-        (r.col
-          ? ''
-          : '<span style="font-size:.6rem;color:#999;line-height:15px;display:block;text-align:center">🎨</span>') +
-        '</span></td>';
+        ')">×</span></td>';
     h += '</tr>';
   });
   h += '</tbody></table>';
@@ -8249,49 +8303,26 @@ async function briefInserisciRiga(i) {
   await briefSalvaBriefing();
   renderPiano();
 }
-// Colore della riga del briefing: il quadratino apre la STESSA palette
-// del piano, con scelta diretta del colore (vista + PDF)
-function briefColoreRiga(i, ev) {
-  if (!_briefState || !puoGestireBriefing()) return;
-  if (ev) ev.stopPropagation();
-  let pop = document.getElementById('brief-colori-pop');
-  if (pop) pop.remove();
-  pop = document.createElement('div');
-  pop.id = 'brief-colori-pop';
-  pop.style.cssText =
-    'position:fixed;z-index:10001;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:8px;box-shadow:0 4px 14px rgba(0,0,0,.25);white-space:nowrap';
-  pop.innerHTML =
-    PIANO_COLORI_CELLA.map(
-      (c) =>
-        '<span onclick="briefColoreRigaSet(' +
-        i +
-        ",'" +
-        c +
-        '\')" style="display:inline-block;width:22px;height:22px;background:' +
-        c +
-        ';border:1px solid #999;border-radius:3px;margin:2px;cursor:pointer;vertical-align:middle"></span>',
-    ).join('') +
-    '<button class="btn-export" style="font-size:.7rem;padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="briefColoreRigaSet(' +
-    i +
-    ',null)">Nessuno</button>';
-  document.body.appendChild(pop);
-  const x = ev ? ev.clientX : 200;
-  const y = ev ? ev.clientY : 200;
-  pop.style.left = Math.min(x, window.innerWidth - 300) + 'px';
-  pop.style.top = Math.min(y + 8, window.innerHeight - 60) + 'px';
-  setTimeout(() => {
-    const chiudi = (e2) => {
-      if (!e2.target.closest('#brief-colori-pop')) {
-        pop.remove();
-        document.removeEventListener('click', chiudi);
-      }
-    };
-    document.addEventListener('click', chiudi);
-  }, 50);
-}
 function briefColoriToggle() {
   const b = document.getElementById('brief-colori-bar');
-  if (b) b.style.display = b.style.display === 'none' ? 'block' : 'none';
+  if (!b) return;
+  if (b.style.display !== 'none') {
+    b.style.display = 'none';
+    return;
+  }
+  // all'apertura si evidenzia il colore che le righe marcate hanno adesso
+  const cc = [];
+  _briefRigheSel().forEach((i) => {
+    const r = _briefState && _briefState.righe[parseInt(i)];
+    if (r) cc.push(r.col || '');
+  });
+  const cur = cc.length && cc.every((x) => x === cc[0]) ? cc[0] : '__misto__';
+  b.querySelectorAll('[data-c]').forEach((s) => {
+    const on = s.dataset.c === cur;
+    s.style.outline = on ? '2.5px solid #1a4a7a' : 'none';
+    s.style.outlineOffset = on ? '1px' : '0';
+  });
+  b.style.display = 'block';
 }
 // SEMPLICE come nel piano: clicchi le righe per MARCARLE (bordo arancione),
 // poi scegli il colore in alto e si applica alle righe marcate
@@ -8344,13 +8375,25 @@ async function briefColoreApplica(col) {
   toast(col ? 'Colorate ' + n + ' righe' : 'Colore tolto da ' + n + ' righe');
   renderPiano();
 }
-async function briefColoreRigaSet(i, col) {
-  const pop = document.getElementById('brief-colori-pop');
-  if (pop) pop.remove();
-  if (!_briefState || !_briefState.righe[i]) return;
-  _briefState.righe[i].col = col || null;
+// GRASSETTO stile Excel: si marcano le righe e si preme G (vista + PDF)
+async function briefGrassettoApplica() {
+  const b = document.getElementById('brief-colori-bar');
+  if (b) b.style.display = 'none';
+  if (!puoGestireBriefing() || !_briefState) return;
+  const sel = _briefRigheSel();
+  if (!sel.size) {
+    toast('Prima clicca sulle righe, poi premi G');
+    return;
+  }
+  const giaTutte = [...sel].every((i) => _briefState.righe[parseInt(i)] && _briefState.righe[parseInt(i)].bold);
+  sel.forEach((i) => {
+    if (_briefState.righe[parseInt(i)]) _briefState.righe[parseInt(i)].bold = !giaTutte;
+  });
+  const n = sel.size;
+  sel.clear();
   clearTimeout(_briefSaveTimer);
   await briefSalvaBriefing();
+  toast(!giaTutte ? 'Grassetto su ' + n + ' righe' : 'Grassetto tolto da ' + n + ' righe');
   renderPiano();
 }
 async function briefMuoviRiga(i, delta) {
@@ -8758,6 +8801,204 @@ async function pianoInserisciCorso() {
 // accetta anche celle copiate da Excel (formato tab-separato).
 // ============================================================
 window._pianoBlocco = null; // {tab, t1, t2, completo}
+// BARRA DI CALCOLO (come la barra di stato di Excel): con una selezione
+// attiva mostra in basso Conteggio, Somma e Media dei valori selezionati;
+// per le celle coi turni la somma usa le ORE del turno
+function _pianoStatSelezione() {
+  let box = document.getElementById('piano-statbar');
+  const sel = [...document.querySelectorAll('#piano-content .blocco-sel, #piano-content .col-selected')];
+  const valori = [];
+  let piene = 0;
+  sel.forEach((td) => {
+    const txt = (td.textContent || '').trim();
+    if (!txt) return;
+    piene++;
+    const num = parseFloat(txt.replace(',', '.'));
+    if (!isNaN(num) && /^[-+]?[0-9.,]+$/.test(txt)) {
+      valori.push(num);
+    } else {
+      const t = _pianoTurnoInfo(txt.toUpperCase());
+      if (t && parseFloat(t.durata_ore)) valori.push(parseFloat(t.durata_ore));
+    }
+  });
+  if (!sel.length) {
+    if (box) box.style.display = 'none';
+    return;
+  }
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'piano-statbar';
+    document.body.appendChild(box);
+  }
+  const somma = Math.round(valori.reduce((a, b) => a + b, 0) * 100) / 100;
+  const media = valori.length ? Math.round((somma / valori.length) * 100) / 100 : 0;
+  box.innerHTML =
+    '<b>' +
+    sel.length +
+    '</b> celle (' +
+    piene +
+    ' piene)' +
+    (valori.length
+      ? ' &nbsp;&middot;&nbsp; Somma <b>' + somma + '</b> &nbsp;&middot;&nbsp; Media <b>' + media + '</b>'
+      : '') +
+    (valori.length > 1
+      ? ' &nbsp;&middot;&nbsp; Min <b>' +
+        Math.min.apply(null, valori) +
+        '</b> &nbsp;&middot;&nbsp; Max <b>' +
+        Math.max.apply(null, valori) +
+        '</b>'
+      : '');
+  box.style.display = 'block';
+}
+// ================= ANNULLA / RIPRISTINA (stile Excel) =================
+// Prima di ogni modifica al piano si salva una copia del mese (dalla memoria,
+// costo zero): le frecce nella barra riportano il mese a com'era, avanti e
+// indietro fino a 15 passi. Vale per il mese e il settore correnti.
+function _pianoStatoMese() {
+  const rep = _pianoReparto();
+  return {
+    ym: _pianoMeseSel,
+    rep: rep,
+    righe: (_pianoRighe || [])
+      .filter((r) => (r.reparto_dip || 'slots') === rep)
+      .map((r) => ({
+        collaboratore: r.collaboratore,
+        data: r.data,
+        codice: r.codice,
+        protetto: r.protetto,
+        generato: r.generato,
+        ora_inizio: r.ora_inizio,
+        ora_fine: r.ora_fine,
+        commento: r.commento,
+        colore: r.colore,
+        reparto_dip: rep,
+      })),
+  };
+}
+function _pianoUndoSnap(label) {
+  try {
+    const st = _pianoStatoMese();
+    st.label = label;
+    window._pianoUndo = window._pianoUndo || [];
+    window._pianoUndo.push(st);
+    if (window._pianoUndo.length > 15) window._pianoUndo.shift();
+    window._pianoRedo = [];
+  } catch (e) {}
+}
+async function _pianoRipristinaStato(st) {
+  const fine = st.ym + '-' + String(_pianoUltimoGiorno(st.ym)).padStart(2, '0');
+  await secDel('piano', 'data=gte.' + st.ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + st.rep);
+  for (let i = 0; i < st.righe.length; i += 2000) {
+    await sbRpc('piano_bulk_upsert', { p_token: getOpToken(), p_rows: st.righe.slice(i, i + 2000) });
+  }
+}
+async function pianoAnnulla() {
+  const u = window._pianoUndo || [];
+  if (!u.length) {
+    toast('Niente da annullare');
+    return;
+  }
+  if (!puoGestirePiano()) return;
+  const st = u.pop();
+  // torna al mese/settore dell'operazione se nel frattempo sei altrove
+  _pianoMeseSel = st.ym;
+  if (st.rep !== currentReparto) _pianoRepartoSel = st.rep;
+  else _pianoRepartoSel = _pianoRepartoSel === null ? null : st.rep;
+  // lo stato corrente (dal DB) diventa il "Ripristina"
+  try {
+    const fine = st.ym + '-' + String(_pianoUltimoGiorno(st.ym)).padStart(2, '0');
+    const cur =
+      (await secGet(
+        'piano?data=gte.' + st.ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + st.rep + '&limit=8000',
+      )) || [];
+    window._pianoRedo = window._pianoRedo || [];
+    window._pianoRedo.push({
+      ym: st.ym,
+      rep: st.rep,
+      label: st.label,
+      righe: cur.map((r) => ({
+        collaboratore: r.collaboratore,
+        data: r.data,
+        codice: r.codice,
+        protetto: r.protetto,
+        generato: r.generato,
+        ora_inizio: r.ora_inizio,
+        ora_fine: r.ora_fine,
+        commento: r.commento,
+        colore: r.colore,
+        reparto_dip: st.rep,
+      })),
+    });
+  } catch (e) {}
+  await _pianoRipristinaStato(st);
+  logAzione('Piano: annullato', st.label + ' (' + st.ym + ')');
+  toast('Annullato: ' + st.label);
+  renderPiano();
+}
+async function pianoRipristina() {
+  const rd = window._pianoRedo || [];
+  if (!rd.length) {
+    toast('Niente da ripristinare');
+    return;
+  }
+  if (!puoGestirePiano()) return;
+  const st = rd.pop();
+  _pianoMeseSel = st.ym;
+  if (st.rep !== currentReparto) _pianoRepartoSel = st.rep;
+  // lo stato corrente torna sull'Annulla (senza svuotare il redo)
+  try {
+    const prima = _pianoStatoMese();
+    prima.label = st.label;
+    window._pianoUndo = window._pianoUndo || [];
+    window._pianoUndo.push(prima);
+  } catch (e) {}
+  await _pianoRipristinaStato(st);
+  logAzione('Piano: ripristinato', st.label + ' (' + st.ym + ')');
+  toast('Ripristinato: ' + st.label);
+  renderPiano();
+}
+// CANC sulla selezione: cancella tutte le celle del blocco (con conferma)
+async function pianoCancellaSelezione() {
+  const b = window._pianoBlocco;
+  if (!b || !b.completo || b.tab !== 'piano' || !puoGestirePiano()) return;
+  const celle = _pianoBloccoCelle();
+  const daCanc = [];
+  celle.forEach((rigaC) =>
+    rigaC.forEach((td) => {
+      const tr = td.closest('tr');
+      const g = parseInt(td.dataset.g);
+      if (!tr || !tr.dataset.nome || !g) return;
+      const dstr = _pianoMeseSel + '-' + String(g).padStart(2, '0');
+      const r = _pianoRighe.find((x) => x.collaboratore === tr.dataset.nome && x.data === dstr);
+      if (r) daCanc.push(r);
+    }),
+  );
+  if (!daCanc.length) {
+    toast('Nessuna cella piena nella selezione');
+    return;
+  }
+  const prot = daCanc.filter((r) => r.protetto).length;
+  if (
+    !confirm(
+      'Cancellare ' + daCanc.length + ' celle selezionate' + (prot ? ' (di cui ' + prot + ' protette)' : '') + '?',
+    )
+  )
+    return;
+  _pianoUndoSnap('cancellazione di ' + daCanc.length + ' celle');
+  try {
+    const ids = daCanc.map((r) => r.id);
+    // il canale sicuro accetta solo filtri semplici: cancellazione per id, a gruppi
+    for (let i = 0; i < ids.length; i += 10) {
+      await Promise.all(ids.slice(i, i + 10).map((idr) => secDel('piano', 'id=eq.' + idr)));
+    }
+    _pianoRighe = _pianoRighe.filter((r) => !ids.includes(r.id));
+    logAzione('Piano: celle cancellate da selezione', daCanc.length + ' celle (' + _pianoMeseSel + ')');
+    toast('Cancellate ' + daCanc.length + ' celle');
+    renderPiano();
+  } catch (e) {
+    toast('Errore cancellazione');
+  }
+}
 function pianoBloccoClick(tab, el) {
   const b = window._pianoBlocco;
   if (b && b.tab === tab && b.t1.closest('table') === el.closest('table')) {
@@ -8805,6 +9046,7 @@ async function pianoApplicaColore(colore) {
     toast('Seleziona prima le celle nella griglia (click o trascinamento)');
     return;
   }
+  _pianoUndoSnap(colore ? 'colore celle' : 'rimozione colore');
   const celle = _pianoBloccoCelle();
   let fatte = 0;
   let senza = 0;
@@ -8907,12 +9149,14 @@ function _pianoBloccoEvidenzia() {
     const primo = riga[0] && riga[0].closest('tr') && riga[0].closest('tr').firstElementChild;
     if (primo && !primo.dataset.g) primo.classList.add('blocco-sel-head');
   });
+  setTimeout(_pianoStatSelezione, 30);
 }
 function _pianoBloccoPulisci() {
   document
     .querySelectorAll('.blocco-sel, .bs-t, .bs-b, .bs-l, .bs-r, .blocco-sel-head')
     .forEach((c) => c.classList.remove('blocco-sel', 'bs-t', 'bs-b', 'bs-l', 'bs-r', 'blocco-sel-head'));
   window._pianoBlocco = null;
+  setTimeout(_pianoStatSelezione, 30);
 }
 // === SELEZIONE COL TRASCINAMENTO (come Excel): mousedown su una cella e
 // trascina; il click semplice continua ad aprire l'editor della cella ===
@@ -8940,11 +9184,24 @@ function _pianoDragBind() {
   });
   // click fuori dalle tabelle = deseleziona (come Excel); Esc idem
   document.addEventListener('click', (e) => {
-    if (e.target.closest('table[data-seltab], #piano-ctx, #piano-colori-pop')) return;
-    if (window._pianoBlocco) _pianoBloccoPulisci();
+    if (!e.target.closest('table[data-seltab], #piano-ctx, #piano-colori-pop')) {
+      if (window._pianoBlocco) _pianoBloccoPulisci();
+    }
+    setTimeout(_pianoStatSelezione, 60);
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && window._pianoBlocco) _pianoBloccoPulisci();
+    // CANC/Backspace: cancella le celle selezionate (con conferma)
+    if (
+      (e.key === 'Delete' || e.key === 'Backspace') &&
+      window._pianoBlocco &&
+      window._pianoBlocco.completo &&
+      window._pianoBlocco.tab === 'piano' &&
+      !e.target.closest('input,textarea,select')
+    ) {
+      e.preventDefault();
+      pianoCancellaSelezione();
+    }
     // Ctrl/Cmd+C copia il blocco marcato (solo le celle, mai i nomi)
     if (
       (e.ctrlKey || e.metaKey) &&
@@ -9344,6 +9601,7 @@ async function pianoIncollaDaClipboard(target) {
     )
   )
     return;
+  _pianoUndoSnap('incolla nel piano');
   try {
     for (let i = 0; i < daPatch.length; i += 10)
       await Promise.all(
@@ -9481,6 +9739,7 @@ async function fabbIncollaDaClipboard() {
 // riposo 11h, tolleranza). La copertura del fabbisogno non cambia.
 // ============================================================
 async function miglioraOrePiano() {
+  _pianoUndoSnap('migliora ore ' + _pianoMeseSel);
   if (!puoGestirePiano()) return;
   const ym = _pianoMeseSel;
   const nGiorni = _pianoUltimoGiorno(ym);
