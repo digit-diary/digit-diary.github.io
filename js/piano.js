@@ -628,16 +628,21 @@ async function renderPiano() {
         const nU = (window._pianoUndo || []).length;
         const nR = (window._pianoRedo || []).length;
         h +=
-          '<button class="btn-act pin" title="' +
+          '<button class="btn-act pin pundo' +
+          (nU ? ' pundo-on' : '') +
+          '" title="' +
           (nU ? 'Annulla: ' + escP(window._pianoUndo[nU - 1].label) : 'Niente da annullare') +
           '"' +
-          (nU ? '' : ' disabled style="opacity:.4"') +
+          (nU ? '' : ' disabled') +
           ' onclick="pianoAnnulla()">&#8630;</button>' +
-          '<button class="btn-act pin" title="' +
+          '<button class="btn-act pin pundo' +
+          (nR ? ' pundo-on' : '') +
+          '" title="' +
           (nR ? 'Ripristina: ' + escP(window._pianoRedo[nR - 1].label) : 'Niente da ripristinare') +
           '"' +
-          (nR ? '' : ' disabled style="opacity:.4"') +
-          ' onclick="pianoRipristina()">&#8631;</button>';
+          (nR ? '' : ' disabled') +
+          ' onclick="pianoRipristina()">&#8631;</button>' +
+          '<span id="piano-autosave" title="Ogni modifica al piano si salva da sola nel database, subito. Le frecce servono per tornare indietro o avanti se sbagli.">Salvataggio automatico</span>';
       }
       // barra comandi ORDINATA in gruppi: Pianifica · Controlla · Strumenti · Esporta
       const pbtn = (label, onclick, tipo, title) =>
@@ -795,8 +800,13 @@ async function renderPiano() {
             cls += ' piano-viol';
             titolo += (titolo ? ' · ' : '') + '⚠ ' + violMsg.join(' | ');
           }
-          // colore personalizzato della cella: vince sul colore del turno (solo qui nel piano)
-          if (r && r.colore) stile += (stile ? ';' : '') + 'background:' + r.colore;
+          // stile personalizzato della cella: colore (vince sul turno) + formato
+          if (r && r.colore) {
+            const stC = _stileCella(r.colore);
+            if (stC.c) stile += (stile ? ';' : '') + 'background:' + stC.c;
+            if (stC.b) stile += ';font-weight:700';
+            if (stC.i) stile += ';font-style:italic';
+          }
           riga +=
             '<td class="' +
             cls +
@@ -2055,7 +2065,6 @@ async function cancellaBozzaPiano() {
 async function eseguiCancellaPiano(tutto) {
   // cancellare ANCHE le celle protette (piano reale) e' riservato all'admin
   if (tutto && !isAdmin()) return;
-  _pianoUndoSnap('cancella piano ' + _pianoMeseSel + (tutto ? ' (tutto)' : ''));
   document.getElementById('pwd-modal').classList.add('hidden');
   const ym = _pianoMeseSel;
   const da = ym + '-01';
@@ -2070,6 +2079,7 @@ async function eseguiCancellaPiano(tutto) {
     !confirm('ATTENZIONE: verranno eliminate ANCHE le celle protette (vacanze, inserimenti manuali). Confermi?')
   )
     return;
+  _pianoUndoSnap('cancella piano ' + _pianoMeseSel + (tutto ? ' (tutto)' : ''));
   try {
     await secDel(
       'piano',
@@ -3438,7 +3448,10 @@ async function stampaPianoPDF() {
       if (d.section === 'body' && d.column.index > 0 && d.cell.raw) {
         // colore personalizzato della cella: vince sul colore del turno anche in stampa
         const ovr = mappaCol[nomi[d.row.index] + '|' + giorniVis[d.column.index - 1]];
-        const col = ovr || _pianoColore(String(d.cell.raw));
+        const stC = ovr ? _stileCella(ovr) : null;
+        if (stC && (stC.b || stC.i))
+          d.cell.styles.fontStyle = stC.b && stC.i ? 'bolditalic' : stC.b ? 'bold' : 'italic';
+        const col = (stC && stC.c) || _pianoColore(String(d.cell.raw));
         if (col) {
           const hex = col.replace('#', '');
           d.cell.styles.fillColor = [
@@ -7742,7 +7755,7 @@ function _briefComponi(pianoRighe) {
       // SOLO VALET: il colore dato alla cella del PIANO (es. X1 rosso =
       // coordinatore) arriva anche sul briefing; negli altri reparti il
       // colore riga si mette solo a mano col quadratino
-      col: (_pianoReparto() === 'valet' && r.colore) || undefined,
+      col: (_pianoReparto() === 'valet' && r.colore && _stileCella(r.colore).c) || undefined,
     });
   });
   // cognomi uguali di persone diverse (es. BIANCHI Milena e BIANCHI Chiara):
@@ -8023,7 +8036,10 @@ async function _renderPianoBriefingTab() {
         '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="pdfBriefingGiorno()">Stampa briefing</button>' +
         '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="document.getElementById(\'brief-xlsx\').click()">Importa da Excel</button>' +
         '<input type="file" id="brief-xlsx" accept=".xlsx,.xls,.xlsm" style="display:none" onchange="importaBriefingExcel(this)">' +
-        '<span style="position:relative;display:inline-flex;align-items:center"><button class="btn-export" style="font-size:.82rem;padding:5px 12px;border-color:#e67e22;color:#e67e22" title="Clicca su una o più righe per marcarle, poi scegli qui il colore" onclick="event.stopPropagation();briefColoriToggle()">Colori</button>' +
+        '<span style="position:relative;display:inline-flex;align-items:center"><button class="btn-export" style="font-size:.82rem;padding:5px 10px;border-color:#e67e22;color:#e67e22;display:inline-flex;align-items:center;gap:6px" title="Applica l\'ultimo colore alle celle o righe marcate" onclick="event.stopPropagation();briefColoreApplica(_colUltimo())">Colori <span class="col-ultimo-chip" style="display:inline-block;width:13px;height:13px;border:1px solid #999;border-radius:3px;background:' +
+        _colUltimo() +
+        '"></span></button>' +
+        '<button class="btn-export" style="font-size:.82rem;padding:5px 7px;border-color:#e67e22;color:#e67e22" title="Scegli colore o formato" onclick="event.stopPropagation();briefColoriToggle()">&#9662;</button>' +
         '<div id="brief-colori-bar" style="display:none;position:absolute;top:110%;left:0;z-index:1000;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:8px;box-shadow:0 4px 14px rgba(0,0,0,.25);white-space:nowrap">' +
         PIANO_COLORI_CELLA.map(
           (c) =>
@@ -8037,7 +8053,8 @@ async function _renderPianoBriefingTab() {
         ).join('') +
         '<button data-c="" class="btn-export" style="font-size:.7rem;padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="briefColoreApplica(null)">Nessuno</button>' +
         '<span style="display:inline-block;width:1px;height:20px;background:var(--line);margin:0 8px;vertical-align:middle"></span>' +
-        '<button class="btn-export" style="font-size:.75rem;font-weight:700;padding:2px 10px;vertical-align:middle" title="Grassetto sulle righe marcate (vista e stampa)" onclick="briefGrassettoApplica()">G</button>' +
+        '<button class="btn-export" style="font-size:.75rem;font-weight:700;padding:2px 10px;vertical-align:middle" title="Grassetto sulle celle o righe marcate (vista e stampa)" onclick="briefFormatoApplica(\'b\')">G</button> ' +
+        '<button class="btn-export" style="font-size:.75rem;font-style:italic;padding:2px 10px;vertical-align:middle" title="Corsivo sulle celle o righe marcate (vista e stampa)" onclick="briefFormatoApplica(\'i\')">C</button>' +
         '</div></span>'
       : '') +
     '<span id="brief-stato" style="font-size:.78rem;color:var(--muted)">' +
@@ -8080,29 +8097,45 @@ async function _renderPianoBriefingTab() {
         (puo ? '<td style="border:none"></td>' : '') +
         '</tr>';
     gPrec = g;
-    const inp = (campo, val, larghezza, extra) =>
-      '<td style="border:1px solid #999;padding:0"><input ' +
-      (puo ? '' : 'disabled ') +
-      (extra || '') +
-      ' value="' +
-      escP(val || '') +
-      '" oninput="briefCella(' +
-      i +
-      ",'" +
-      campo +
-      '\',this.value)" ' +
-      'style="width:' +
-      larghezza +
-      'px;border:none;background:transparent;padding:4px 6px;font:inherit;color:inherit"></td>';
-    h += '<tr data-bidx="' + i + '"' + (r.bold ? ' class="brief-bold"' : '') + '>';
+    // stile della SINGOLA cella (r.cs[campo] = "#RRGGBB|bi") combinato col
+    // formato dell'intera riga (r.bold / r.ital) e con i default della colonna
+    const stDi = (campo) => _stileCella(r.cs && r.cs[campo]);
+    const inp = (campo, val, larghezza, extra, bgDef, fwDef) => {
+      const stC = stDi(campo);
+      const bg = stC.c || bgDef || '';
+      return (
+        '<td data-campo="' +
+        campo +
+        '" style="border:1px solid #999;padding:0' +
+        (bg ? ';background:' + bg : '') +
+        '"><input ' +
+        (puo ? '' : 'disabled ') +
+        (extra || '') +
+        ' value="' +
+        escP(val || '') +
+        '" oninput="briefCella(' +
+        i +
+        ",'" +
+        campo +
+        '\',this.value)" ' +
+        'style="width:' +
+        larghezza +
+        'px;border:none;background:transparent;padding:4px 6px;font:inherit;color:inherit' +
+        (stC.b || r.bold || fwDef ? ';font-weight:700' : '') +
+        (stC.i || r.ital ? ';font-style:italic' : '') +
+        '"></td>'
+      );
+    };
+    h += '<tr data-bidx="' + i + '">';
     // E e U si spuntano A PENNA sul foglio stampato: celle vuote
     h += '<td style="border:1px solid #999;width:34px;padding:3px 4px">&nbsp;</td>';
     h += '<td style="border:1px solid #999;width:34px;padding:3px 4px">&nbsp;</td>';
-    const bgNome = r.col || (r.fm ? '#FFFF00' : '');
+    const stNome = stDi('nome');
+    const bgNome = stNome.c || r.col || (r.fm ? '#FFFF00' : '');
     if (r.fm || bgNome) {
-      // in formazione (giallo) o colorata a mano: sfondo sulla cella del nome
+      // in formazione (giallo) o colorata: sfondo sulla cella del nome
       h +=
-        '<td style="border:1px solid #999;padding:0;white-space:nowrap;background:' +
+        '<td data-campo="nome" style="border:1px solid #999;padding:0;white-space:nowrap;background:' +
         (bgNome || 'transparent') +
         '"><input ' +
         (puo ? '' : 'disabled ') +
@@ -8113,25 +8146,17 @@ async function _renderPianoBriefingTab() {
         ",'nome',this.value)\" " +
         'style="width:' +
         (r.fm ? 86 : 138) +
-        'px;border:none;background:transparent;padding:4px 2px 4px 6px;font:inherit;color:#000">' +
+        'px;border:none;background:transparent;padding:4px 2px 4px 6px;font:inherit;color:#000' +
+        (stNome.b || r.bold || r.fm ? ';font-weight:700' : '') +
+        (stNome.i || r.ital ? ';font-style:italic' : '') +
+        '">' +
         (r.fm
           ? '<span style="font-size:.66rem;font-weight:700;color:#000;padding-right:3px">(formazione)</span>'
           : '') +
         '</td>';
     } else h += inp('nome', r.nome, 150);
     const colTurno = _pianoColore(r.turno) || '';
-    h =
-      h.substring(0) +
-      '<td style="border:1px solid #999;padding:0;background:' +
-      colTurno +
-      '"><input ' +
-      (puo ? '' : 'disabled ') +
-      'value="' +
-      escP(r.turno || '') +
-      '" oninput="briefCella(' +
-      i +
-      ",'turno',this.value)\" " +
-      'style="width:52px;border:none;background:transparent;padding:4px 6px;font:inherit;font-weight:bold;color:inherit"></td>';
+    h += inp('turno', r.turno, 52, '', colTurno, true);
     if (valet) {
       h += inp('uscita', r.uscita, 70);
       h += inp('firma', r.firma, 90);
@@ -8141,17 +8166,7 @@ async function _renderPianoBriefingTab() {
       h += inp('uscita', r.uscita, 70);
       h += inp('firma', r.firma, 90);
     } else {
-      h +=
-        '<td style="border:1px solid #999;padding:0;background:' +
-        (r.cd ? '#FFFF00' : 'transparent') +
-        '"><input ' +
-        (puo ? '' : 'disabled ') +
-        'value="' +
-        escP(r.cd || '') +
-        '" oninput="briefCella(' +
-        i +
-        ",'cd',this.value)\" " +
-        'style="width:40px;border:none;background:transparent;padding:4px 6px;font:inherit;font-weight:bold;color:inherit"></td>';
+      h += inp('cd', r.cd, 40, '', r.cd ? '#FFFF00' : '', true);
       h += inp('uscita', r.uscita, 70);
       h += inp('firma', r.firma, 90);
     }
@@ -8310,8 +8325,12 @@ function briefColoriToggle() {
     b.style.display = 'none';
     return;
   }
-  // all'apertura si evidenzia il colore che le righe marcate hanno adesso
+  // all'apertura si evidenzia il colore che le celle/righe marcate hanno adesso
   const cc = [];
+  _briefCelleSel().forEach((k) => {
+    const r = _briefState && _briefState.righe[parseInt(k.split('|')[0])];
+    if (r) cc.push(_stileCella(r.cs && r.cs[k.split('|')[1]]).c);
+  });
   _briefRigheSel().forEach((i) => {
     const r = _briefState && _briefState.righe[parseInt(i)];
     if (r) cc.push(r.col || '');
@@ -8330,22 +8349,47 @@ function _briefRigheSel() {
   if (!window._briefSelSet) window._briefSelSet = new Set();
   return window._briefSelSet;
 }
+function _briefCelleSel() {
+  if (!window._briefCelleSet) window._briefCelleSet = new Set();
+  return window._briefCelleSet;
+}
+function _briefSelPulisci() {
+  _briefRigheSel().clear();
+  _briefCelleSel().clear();
+  document.querySelectorAll('.brief-riga-sel').forEach((x) => x.classList.remove('brief-riga-sel'));
+  document.querySelectorAll('.brief-cella-sel').forEach((x) => x.classList.remove('brief-cella-sel'));
+}
 function _briefSelezioneBind() {
   if (window._briefSelBound) return;
   window._briefSelBound = true;
   document.addEventListener('click', (e) => {
-    if (e.target.closest('input, select, textarea, button, a, span[onclick], #brief-colori-bar')) return;
+    if (e.target.closest('select, textarea, button, a, span[onclick], #brief-colori-bar')) return;
     const tr = e.target.closest('tr[data-bidx]');
-    const sel = _briefRigheSel();
     if (!tr) {
-      // click fuori: deseleziona
-      if (sel.size) {
-        sel.clear();
-        document.querySelectorAll('.brief-riga-sel').forEach((x) => x.classList.remove('brief-riga-sel'));
-      }
+      // click fuori dal briefing: deseleziona tutto (gli input di altre
+      // pagine non c'entrano con la selezione)
+      if (e.target.closest('input')) return;
+      if (_briefRigheSel().size || _briefCelleSel().size) _briefSelPulisci();
       return;
     }
     if (!puoGestireBriefing()) return;
+    const td = e.target.closest('td[data-campo]');
+    if (td && e.target.closest('input')) {
+      // click su una cella: la marca (come Excel, la cella attiva e'
+      // selezionata); ci si puo' scrivere normalmente
+      const selC = _briefCelleSel();
+      const k = tr.dataset.bidx + '|' + td.dataset.campo;
+      if (selC.has(k)) {
+        selC.delete(k);
+        td.classList.remove('brief-cella-sel');
+      } else {
+        selC.add(k);
+        td.classList.add('brief-cella-sel');
+      }
+      return;
+    }
+    if (e.target.closest('input')) return;
+    const sel = _briefRigheSel();
     const i = tr.dataset.bidx;
     if (sel.has(i)) {
       sel.delete(i);
@@ -8361,39 +8405,85 @@ async function briefColoreApplica(col) {
   if (b) b.style.display = 'none';
   if (!puoGestireBriefing() || !_briefState) return;
   const sel = _briefRigheSel();
-  if (!sel.size) {
-    toast('Prima clicca sulle righe da colorare, poi scegli il colore');
+  const selC = _briefCelleSel();
+  if (!sel.size && !selC.size) {
+    toast('Prima clicca le celle o le righe da colorare, poi scegli il colore');
     return;
   }
-  sel.forEach((i) => {
-    if (_briefState.righe[parseInt(i)]) _briefState.righe[parseInt(i)].col = col || null;
+  let n = 0;
+  selC.forEach((k) => {
+    const i = k.split('|')[0];
+    const campo = k.split('|')[1];
+    const r = _briefState.righe[parseInt(i)];
+    if (!r) return;
+    r.cs = r.cs || {};
+    const stC = _stileCella(r.cs[campo]);
+    stC.c = col || '';
+    const s = _stileStr(stC);
+    if (s) r.cs[campo] = s;
+    else delete r.cs[campo];
+    n++;
   });
-  const n = sel.size;
-  sel.clear();
+  sel.forEach((i) => {
+    if (_briefState.righe[parseInt(i)]) {
+      _briefState.righe[parseInt(i)].col = col || null;
+      n++;
+    }
+  });
+  _briefSelPulisci();
+  if (col) _colUltimoSet(col);
   clearTimeout(_briefSaveTimer);
   await briefSalvaBriefing();
-  toast(col ? 'Colorate ' + n + ' righe' : 'Colore tolto da ' + n + ' righe');
+  toast(col ? 'Colore applicato (' + n + ')' : 'Colore tolto (' + n + ')');
   renderPiano();
 }
-// GRASSETTO stile Excel: si marcano le righe e si preme G (vista + PDF)
-async function briefGrassettoApplica() {
+// GRASSETTO / CORSIVO come Excel: celle marcate (o righe intere); se tutto
+// il selezionato ha gia' il formato lo toglie, altrimenti lo applica
+async function briefFormatoApplica(f) {
   const b = document.getElementById('brief-colori-bar');
   if (b) b.style.display = 'none';
   if (!puoGestireBriefing() || !_briefState) return;
   const sel = _briefRigheSel();
-  if (!sel.size) {
-    toast('Prima clicca sulle righe, poi premi G');
+  const selC = _briefCelleSel();
+  if (!sel.size && !selC.size) {
+    toast('Prima clicca le celle o le righe, poi scegli il formato');
     return;
   }
-  const giaTutte = [...sel].every((i) => _briefState.righe[parseInt(i)] && _briefState.righe[parseInt(i)].bold);
-  sel.forEach((i) => {
-    if (_briefState.righe[parseInt(i)]) _briefState.righe[parseInt(i)].bold = !giaTutte;
+  const prop = f === 'b' ? 'bold' : 'ital';
+  let tutte = true;
+  selC.forEach((k) => {
+    const r = _briefState.righe[parseInt(k.split('|')[0])];
+    if (r && !_stileCella(r.cs && r.cs[k.split('|')[1]])[f]) tutte = false;
   });
-  const n = sel.size;
-  sel.clear();
+  sel.forEach((i) => {
+    const r = _briefState.righe[parseInt(i)];
+    if (r && !r[prop]) tutte = false;
+  });
+  const on = !tutte;
+  let n = 0;
+  selC.forEach((k) => {
+    const i = k.split('|')[0];
+    const campo = k.split('|')[1];
+    const r = _briefState.righe[parseInt(i)];
+    if (!r) return;
+    r.cs = r.cs || {};
+    const stC = _stileCella(r.cs[campo]);
+    stC[f] = on;
+    const s = _stileStr(stC);
+    if (s) r.cs[campo] = s;
+    else delete r.cs[campo];
+    n++;
+  });
+  sel.forEach((i) => {
+    if (_briefState.righe[parseInt(i)]) {
+      _briefState.righe[parseInt(i)][prop] = on;
+      n++;
+    }
+  });
+  _briefSelPulisci();
   clearTimeout(_briefSaveTimer);
   await briefSalvaBriefing();
-  toast(!giaTutte ? 'Grassetto su ' + n + ' righe' : 'Grassetto tolto da ' + n + ' righe');
+  toast((f === 'b' ? 'Grassetto' : 'Corsivo') + (on ? ' applicato (' : ' tolto (') + n + ')');
   renderPiano();
 }
 async function briefMuoviRiga(i, delta) {
@@ -8883,7 +8973,25 @@ function _pianoUndoSnap(label) {
     window._pianoUndo.push(st);
     if (window._pianoUndo.length > 15) window._pianoUndo.shift();
     window._pianoRedo = [];
+    _pianoSalvatoFlash();
   } catch (e) {}
+}
+// Feedback visivo del salvataggio automatico: "Salvato" per qualche secondo
+function _pianoSalvatoFlash() {
+  clearTimeout(window._pasT);
+  window._pasT = setTimeout(() => {
+    const el = document.getElementById('piano-autosave');
+    if (!el) return;
+    el.textContent = 'Salvato \u2713';
+    el.classList.add('pas-on');
+    clearTimeout(window._pasT2);
+    window._pasT2 = setTimeout(() => {
+      const el2 = document.getElementById('piano-autosave');
+      if (!el2) return;
+      el2.textContent = 'Salvataggio automatico';
+      el2.classList.remove('pas-on');
+    }, 2600);
+  }, 900);
 }
 async function _pianoRipristinaStato(st) {
   const fine = st.ym + '-' + String(_pianoUltimoGiorno(st.ym)).padStart(2, '0');
@@ -9016,26 +9124,88 @@ function pianoBloccoClick(tab, el) {
 // === COLORI CELLE (come il secchiello di Excel): palette in alto, si
 // applica alle celle SELEZIONATE; solo visivo per quella cella del piano,
 // il colore predefinito del turno non cambia mai ===
+// Stile di una cella in un'unica stringa ("#RRGGBB|bi": colore + flag
+// b=grassetto i=corsivo), salvata dov'era il solo colore: nessun campo nuovo
+function _stileCella(s) {
+  const out = { c: '', b: false, i: false };
+  if (!s) return out;
+  const parti = String(s).split('|');
+  if (parti[0] && parti[0][0] === '#') out.c = parti[0];
+  const f = parti[1] || '';
+  out.b = f.indexOf('b') >= 0;
+  out.i = f.indexOf('i') >= 0;
+  return out;
+}
+function _stileStr(st) {
+  const f = (st.b ? 'b' : '') + (st.i ? 'i' : '');
+  if (!st.c && !f) return null;
+  return (st.c || '') + (f ? '|' + f : '');
+}
+// Ultimo colore usato (secchiello stile Excel, condiviso piano+briefing)
+function _colUltimo() {
+  return localStorage.getItem('piano_col_ult') || PIANO_COLORI_CELLA[0];
+}
+function _colUltimoSet(c) {
+  localStorage.setItem('piano_col_ult', c);
+  document.querySelectorAll('.col-ultimo-chip').forEach((el) => (el.style.background = c));
+}
 const PIANO_COLORI_CELLA = ['#FF6B6B', '#FFB86B', '#FFF06B', '#95E06C', '#6BCBFF', '#B39DDB', '#F48FB1', '#D7CCC8'];
 function _pianoColoriBarHtml() {
+  // secchiello stile Excel: il bottone applica subito l'ultimo colore usato
+  // (chip colorata), la freccia apre la palette con formato G/C
   return (
-    '<span style="position:relative;display:inline-flex;align-items:center"><button class="btn-export pbar-btn pbar-color" title="Colora le celle selezionate (solo qui nel piano, il turno non cambia)" onclick="event.stopPropagation();pianoColoriToggle()">Colori</button>' +
+    '<span style="position:relative;display:inline-flex;align-items:center">' +
+    '<button class="btn-export pbar-btn pbar-color" style="display:inline-flex;align-items:center;gap:6px" title="Applica l\'ultimo colore alle celle selezionate (solo qui nel piano, il turno non cambia)" onclick="event.stopPropagation();pianoApplicaColore(_colUltimo())">Colori <span class="col-ultimo-chip" style="display:inline-block;width:13px;height:13px;border:1px solid #999;border-radius:3px;background:' +
+    _colUltimo() +
+    '"></span></button>' +
+    '<button class="btn-export pbar-btn pbar-color" style="padding-left:6px;padding-right:6px" title="Scegli colore o formato" onclick="event.stopPropagation();pianoColoriToggle()">&#9662;</button>' +
     '<div id="piano-colori-pop" style="display:none;position:absolute;top:110%;left:0;z-index:1000;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:8px;box-shadow:0 4px 14px rgba(0,0,0,.25);white-space:nowrap">' +
     PIANO_COLORI_CELLA.map(
       (c) =>
-        '<span onclick="pianoApplicaColore(\'' +
+        '<span data-c="' +
+        c +
+        '" onclick="pianoApplicaColore(\'' +
         c +
         '\')" style="display:inline-block;width:22px;height:22px;background:' +
         c +
         ';border:1px solid #999;border-radius:3px;margin:2px;cursor:pointer;vertical-align:middle"></span>',
     ).join('') +
-    '<button class="btn-export" style="font-size:.7rem;padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="pianoApplicaColore(null)">Colore del turno</button>' +
+    '<button data-c="" class="btn-export" style="font-size:.7rem;padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="pianoApplicaColore(null)">Colore del turno</button>' +
+    '<span style="display:inline-block;width:1px;height:20px;background:var(--line);margin:0 8px;vertical-align:middle"></span>' +
+    '<button class="btn-export" style="font-size:.75rem;font-weight:700;padding:2px 10px;vertical-align:middle" title="Grassetto sulle celle selezionate (vista e stampa)" onclick="pianoApplicaFormato(\'b\')">G</button> ' +
+    '<button class="btn-export" style="font-size:.75rem;font-style:italic;padding:2px 10px;vertical-align:middle" title="Corsivo sulle celle selezionate (vista e stampa)" onclick="pianoApplicaFormato(\'i\')">C</button>' +
     '</div></span>'
   );
 }
 function pianoColoriToggle() {
   const p = document.getElementById('piano-colori-pop');
-  if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none';
+  if (!p) return;
+  if (p.style.display !== 'none') {
+    p.style.display = 'none';
+    return;
+  }
+  // all'apertura si evidenzia il colore che le celle selezionate hanno adesso
+  const cc = [];
+  const b = window._pianoBlocco;
+  if (b && b.completo && b.tab === 'piano') {
+    _pianoBloccoCelle().forEach((rigaC) =>
+      rigaC.forEach((td) => {
+        const tr = td.closest('tr');
+        const g = parseInt(td.dataset.g);
+        if (!tr || !g) return;
+        const dstr = _pianoMeseSel + '-' + String(g).padStart(2, '0');
+        const r = _pianoRighe.find((x) => x.collaboratore === tr.dataset.nome && x.data === dstr);
+        cc.push(r ? _stileCella(r.colore).c : '');
+      }),
+    );
+  }
+  const cur = cc.length && cc.every((x) => x === cc[0]) ? cc[0] : '__misto__';
+  p.querySelectorAll('[data-c]').forEach((s) => {
+    const on = s.dataset.c === cur;
+    s.style.outline = on ? '2.5px solid #1a4a7a' : 'none';
+    s.style.outlineOffset = on ? '1px' : '0';
+  });
+  p.style.display = 'block';
 }
 async function pianoApplicaColore(colore) {
   const p = document.getElementById('piano-colori-pop');
@@ -9063,12 +9233,16 @@ async function pianoApplicaColore(colore) {
           senza++;
           continue;
         }
-        if ((r.colore || null) === colore) continue;
-        await secPatch('piano', 'id=eq.' + r.id, { colore: colore });
-        r.colore = colore;
+        const stC = _stileCella(r.colore);
+        stC.c = colore || '';
+        const nuovo = _stileStr(stC);
+        if ((r.colore || null) === nuovo) continue;
+        await secPatch('piano', 'id=eq.' + r.id, { colore: nuovo });
+        r.colore = nuovo;
         fatte++;
       }
     }
+    if (colore) _colUltimoSet(colore);
     logAzione('Piano: colore celle', (colore || 'rimosso') + ' su ' + fatte + ' celle');
     toast(
       colore
@@ -9078,6 +9252,53 @@ async function pianoApplicaColore(colore) {
     renderPiano();
   } catch (e) {
     toast('Errore salvataggio colore');
+  }
+}
+// GRASSETTO / CORSIVO sulle celle selezionate (come Excel: se tutte le
+// celle piene hanno gia' il formato lo toglie, altrimenti lo applica)
+async function pianoApplicaFormato(f) {
+  const p2 = document.getElementById('piano-colori-pop');
+  if (p2) p2.style.display = 'none';
+  if (!puoGestirePiano()) return;
+  const b = window._pianoBlocco;
+  if (!b || !b.completo || b.tab !== 'piano') {
+    toast('Seleziona prima le celle nella griglia (click o trascinamento)');
+    return;
+  }
+  const righeSel = [];
+  _pianoBloccoCelle().forEach((rigaC) =>
+    rigaC.forEach((td) => {
+      const tr = td.closest('tr');
+      const g = parseInt(td.dataset.g);
+      if (!tr || !g) return;
+      const dstr = _pianoMeseSel + '-' + String(g).padStart(2, '0');
+      const r = _pianoRighe.find((x) => x.collaboratore === tr.dataset.nome && x.data === dstr);
+      if (r) righeSel.push(r);
+    }),
+  );
+  if (!righeSel.length) {
+    toast('Nessuna cella piena nella selezione');
+    return;
+  }
+  const on = !righeSel.every((r) => _stileCella(r.colore)[f]);
+  _pianoUndoSnap(f === 'b' ? 'grassetto celle' : 'corsivo celle');
+  try {
+    for (const r of righeSel) {
+      const stC = _stileCella(r.colore);
+      if (stC[f] === on) continue;
+      stC[f] = on;
+      const nuovo = _stileStr(stC);
+      await secPatch('piano', 'id=eq.' + r.id, { colore: nuovo });
+      r.colore = nuovo;
+    }
+    logAzione(
+      'Piano: formato celle',
+      (f === 'b' ? 'grassetto ' : 'corsivo ') + (on ? 'applicato' : 'tolto') + ' su ' + righeSel.length + ' celle',
+    );
+    toast((f === 'b' ? 'Grassetto' : 'Corsivo') + (on ? ' su ' : ' tolto da ') + righeSel.length + ' celle');
+    renderPiano();
+  } catch (e) {
+    toast('Errore salvataggio formato');
   }
 }
 // Click SINGOLO sulla cella della griglia: la MARCA soltanto (come Excel);
