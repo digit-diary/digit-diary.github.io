@@ -585,6 +585,9 @@ const _AREE_MATCH = [
   { key: 'impegno', match: 'impegno' },
   { key: 'servizio_cliente', match: 'servizio al cliente' },
   { key: 'versatilita', match: 'versatilita' },
+  // dalla revisione HR 09/2026 la stessa area si chiama "Polivalenza e
+  // adattabilita' operativa": si riconoscono entrambi i nomi
+  { key: 'versatilita', match: 'polivalenza' },
   // voce unica: nel file può comparire come "Affidabilità e disponibilità" o come righe separate
   { key: 'affidabilita_disponibilita', match: 'affidabilita' },
   { key: 'affidabilita_disponibilita', match: 'disponibilita' },
