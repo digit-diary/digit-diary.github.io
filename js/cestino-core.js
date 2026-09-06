@@ -200,6 +200,225 @@ async function svuotaCestino() {
     toast('Errore svuotamento');
   }
 }
+// ===== SISTEMAZIONE GUIDATA DEI DATI =====
+// Due strumenti richiamati dal controllo salute: assegnare l'impiego a chi
+// non ce l'ha e sistemare i nomi che hanno turni ma nessuna scheda.
+async function apriFixImpiego() {
+  const el = document.getElementById('salute-content');
+  if (!el) return;
+  el.innerHTML = '<p style="color:var(--muted)">Caricamento...</p>';
+  const tutti =
+    (await secGet(
+      'collaboratori?select=id,nome,reparto_dip,is_jolly,percentuale,funzione,impiego,attivo&limit=2000',
+    )) || [];
+  const senza = tutti
+    .filter((c) => c.attivo !== false && !c.impiego)
+    .sort((a, b) => (a.reparto_dip || '').localeCompare(b.reparto_dip || '') || a.nome.localeCompare(b.nome));
+  if (!senza.length) {
+    el.innerHTML =
+      '<p style="color:#2c6e49;font-weight:700">Tutti i collaboratori attivi hanno gia&#39; l&#39;impiego indicato.</p>';
+    return;
+  }
+  let h =
+    '<p style="font-size:.85rem;margin-bottom:10px"><b>' +
+    senza.length +
+    ' collaboratori senza impiego.</b> La proposta qui sotto &egrave; gi&agrave; compilata in base al vecchio campo del piano: correggi le righe sbagliate e salva. Serve per i recuperi festivi (CGF) e per i limiti di ore.</p>' +
+    '<div style="margin-bottom:10px"><button class="btn-salva" style="font-size:.8rem;padding:6px 14px" onclick="salvaFixImpiego()">Salva tutti</button> ' +
+    '<button class="btn-export" style="font-size:.8rem;padding:6px 14px" onclick="controlloSalute()">Annulla</button></div>';
+  let repCorr = '';
+  senza.forEach((c) => {
+    const rep = c.reparto_dip || 'slots';
+    if (rep !== repCorr) {
+      repCorr = rep;
+      h +=
+        '<p style="font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:12px 0 4px">' +
+        escP(repartoLabel(rep)) +
+        '</p>';
+    }
+    h +=
+      '<div style="display:flex;gap:10px;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)">' +
+      '<span style="flex:1;font-size:.85rem">' +
+      escP(c.nome) +
+      ' <span style="color:var(--muted);font-size:.76rem">' +
+      escP(c.funzione || '-') +
+      ' &middot; ' +
+      Math.round((parseFloat(c.percentuale) || 1) * 100) +
+      '%</span></span>' +
+      '<select data-fix-imp="' +
+      c.id +
+      '" style="font-size:.8rem;padding:3px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)">' +
+      '<option value="fisso"' +
+      (c.is_jolly ? '' : ' selected') +
+      '>Fisso</option>' +
+      '<option value="jolly"' +
+      (c.is_jolly ? ' selected' : '') +
+      '>Jolly</option>' +
+      '<option value="">Non indicare</option></select></div>';
+  });
+  el.innerHTML = h;
+}
+async function salvaFixImpiego() {
+  const sel = [...document.querySelectorAll('[data-fix-imp]')];
+  if (!sel.length) return;
+  if (!confirm("Salvo l'impiego di " + sel.length + ' collaboratori?')) return;
+  let n = 0;
+  for (const s of sel) {
+    const id = parseInt(s.dataset.fixImp);
+    const val = s.value;
+    if (!val) continue;
+    try {
+      await secPatch('collaboratori', 'id=eq.' + id, { impiego: val, is_jolly: val === 'jolly' });
+      const c = collaboratoriCache.find((x) => x.id === id);
+      if (c) {
+        c.impiego = val;
+        c.is_jolly = val === 'jolly';
+      }
+      n++;
+    } catch (e) {}
+  }
+  logAzione('Impiego assegnato in blocco', n + ' collaboratori');
+  toast('Impiego salvato per ' + n + ' collaboratori');
+  controlloSalute();
+}
+async function apriFixOrfani() {
+  const el = document.getElementById('salute-content');
+  if (!el) return;
+  el.innerHTML = '<p style="color:var(--muted)">Caricamento...</p>';
+  const [collab, righe] = await Promise.all([
+    secGet('collaboratori?select=nome,attivo,reparto_dip&limit=2000'),
+    secGet('piano?select=collaboratore,data,reparto_dip&limit=40000'),
+  ]);
+  const esiste = new Set((collab || []).map((c) => c.nome.toLowerCase()));
+  const orf = {};
+  (righe || []).forEach((r) => {
+    if (esiste.has(r.collaboratore.toLowerCase())) return;
+    const o = (orf[r.collaboratore] = orf[r.collaboratore] || {
+      n: 0,
+      rep: r.reparto_dip || 'slots',
+      da: r.data,
+      a: r.data,
+    });
+    o.n++;
+    if (r.data < o.da) o.da = r.data;
+    if (r.data > o.a) o.a = r.data;
+  });
+  const lista = Object.entries(orf).sort((a, b) => b[1].n - a[1].n);
+  if (!lista.length) {
+    el.innerHTML =
+      '<p style="color:#2c6e49;font-weight:700">Nessun nome senza scheda: tutti i turni appartengono a un collaboratore.</p>';
+    return;
+  }
+  const attivi = (collab || [])
+    .filter((c) => c.attivo !== false)
+    .map((c) => c.nome)
+    .sort();
+  let h =
+    '<p style="font-size:.85rem;margin-bottom:10px"><b>' +
+    lista.length +
+    ' nomi hanno turni ma nessuna scheda.</b> Per ognuno puoi creare la scheda, spostare i turni su un collaboratore esistente (se &egrave; un nome scritto male) oppure eliminare i turni se non &egrave; una persona.</p>' +
+    '<div style="margin-bottom:10px"><button class="btn-export" style="font-size:.8rem;padding:6px 14px" onclick="controlloSalute()">Torna al controllo</button></div>';
+  lista.forEach(([nome, o], i) => {
+    const nomeJs = nome.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    h +=
+      '<div style="padding:8px 0;border-bottom:1px solid var(--line)">' +
+      '<b style="font-size:.9rem">' +
+      escP(nome) +
+      '</b> <span style="font-size:.78rem;color:var(--muted)">' +
+      o.n +
+      ' turni &middot; ' +
+      escP(repartoLabel(o.rep)) +
+      ' &middot; dal ' +
+      o.da.split('-').reverse().join('.') +
+      ' al ' +
+      o.a.split('-').reverse().join('.') +
+      '</span><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">' +
+      '<button class="btn-export" style="font-size:.76rem;padding:4px 10px;border-color:#2c6e49;color:#2c6e49" onclick="orfanoCreaScheda(\'' +
+      nomeJs +
+      "','" +
+      o.rep +
+      '\')">Crea la scheda</button>' +
+      '<select id="orf-dest-' +
+      i +
+      '" style="font-size:.76rem;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><option value="">sposta i turni su...</option>' +
+      attivi.map((n) => '<option value="' + escP(n) + '">' + escP(n) + '</option>').join('') +
+      '</select>' +
+      '<button class="btn-export" style="font-size:.76rem;padding:4px 10px" onclick="orfanoSposta(\'' +
+      nomeJs +
+      "'," +
+      i +
+      ')">Sposta</button>' +
+      '<button class="btn-export" style="font-size:.76rem;padding:4px 10px;border-color:#c0392b;color:#c0392b" onclick="orfanoElimina(\'' +
+      nomeJs +
+      "'," +
+      o.n +
+      ')">Elimina i turni</button></div></div>';
+  });
+  el.innerHTML = h;
+}
+async function orfanoCreaScheda(nome, rep) {
+  if (
+    !confirm(
+      'Creo la scheda di "' +
+        nome +
+        '" nel settore ' +
+        repartoLabel(rep) +
+        '?\n\nI suoi turni resteranno dove sono e da ora verranno conteggiati.',
+    )
+  )
+    return;
+  try {
+    const r = await secPost('collaboratori', { nome: nome, attivo: true, reparto_dip: rep, percentuale: 1 });
+    if (r && r[0]) collaboratoriCache.push(r[0]);
+    logAzione('Collaboratore creato da turni orfani', nome + ' (' + rep + ')');
+    toast('Scheda creata: ' + nome);
+    apriFixOrfani();
+  } catch (e) {
+    toast('Errore creazione scheda');
+  }
+}
+async function orfanoSposta(nome, idx) {
+  const sel = document.getElementById('orf-dest-' + idx);
+  const dest = sel ? sel.value : '';
+  if (!dest) {
+    toast('Scegli prima su chi spostare i turni');
+    return;
+  }
+  if (
+    !confirm(
+      'Sposto tutti i turni di "' + nome + '" su "' + dest + '"?\n\nSi usa quando il nome era scritto in modo diverso.',
+    )
+  )
+    return;
+  try {
+    await secPatch('piano', 'collaboratore=eq.' + encodeURIComponent(nome), { collaboratore: dest });
+    logAzione('Turni riassegnati', nome + ' -> ' + dest);
+    toast('Turni spostati su ' + dest);
+    apriFixOrfani();
+  } catch (e) {
+    toast('Errore spostamento turni');
+  }
+}
+async function orfanoElimina(nome, n) {
+  if (
+    !confirm(
+      'ATTENZIONE: elimino ' +
+        n +
+        ' turni intestati a "' +
+        nome +
+        "\".\n\nDa fare solo se non e' una persona (righe rimaste da vecchie importazioni). L'operazione non si annulla.",
+    )
+  )
+    return;
+  if (!confirm("Confermi definitivamente l'eliminazione dei " + n + ' turni di "' + nome + '"?')) return;
+  try {
+    await secDel('piano', 'collaboratore=eq.' + encodeURIComponent(nome));
+    logAzione('Turni orfani eliminati', nome + ' (' + n + ' righe)');
+    toast(n + ' turni eliminati');
+    apriFixOrfani();
+  } catch (e) {
+    toast('Errore eliminazione');
+  }
+}
 // ===== CONTROLLO SALUTE DEL SISTEMA =====
 // Verifiche automatiche sui dati: l'app segnala da sola le incoerenze che
 // altrimenti nessuno vedrebbe (schede incomplete, turni orfani, festivi
@@ -239,7 +458,7 @@ async function controlloSalute() {
             (senzaImpiego.length > 6 ? ' e altri' : '') +
             '. Senza questo dato i CGF e i limiti di ore non si calcolano correttamente.'
         : "Tutti i collaboratori attivi hanno l'impiego indicato.",
-      senzaImpiego.length ? 'Gestione Collaboratori' : '',
+      senzaImpiego.length ? "FIX:apriFixImpiego()|Assegna l'impiego adesso" : '',
     );
 
     // 2) i due campi impiego/jolly in contraddizione
@@ -263,7 +482,7 @@ async function controlloSalute() {
       orfani.length
         ? orfani.slice(0, 6).join(', ') + ': hanno turni nel piano ma non esistono in Gestione collaboratori.'
         : 'Ogni turno del piano appartiene a un collaboratore esistente.',
-      orfani.length ? 'Gestione Collaboratori' : '',
+      orfani.length ? 'FIX:apriFixOrfani()|Sistema questi nomi' : '',
     );
 
     // 4) disattivati che hanno ancora turni
@@ -376,9 +595,15 @@ async function controlloSalute() {
         escP(e.dettaglio) +
         '</span>' +
         (e.azione
-          ? '<br><span style="font-size:.78rem;color:#1a4a7a;font-weight:700">Dove sistemarlo: ' +
-            escP(e.azione) +
-            '</span>'
+          ? e.azione.indexOf('FIX:') === 0
+            ? '<br><button class="btn-export" style="font-size:.76rem;padding:4px 12px;margin-top:5px;border-color:#1a4a7a;color:#1a4a7a" onclick="' +
+              e.azione.split('|')[0].substring(4) +
+              '">' +
+              escP(e.azione.split('|')[1] || 'Sistema') +
+              '</button>'
+            : '<br><span style="font-size:.78rem;color:#1a4a7a;font-weight:700">Dove sistemarlo: ' +
+              escP(e.azione) +
+              '</span>'
           : '') +
         '</div></div>';
     });
