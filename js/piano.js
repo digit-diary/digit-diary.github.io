@@ -1397,6 +1397,19 @@ function _pianoIsLavoro(codice) {
 }
 
 // Calcola le violazioni del mese corrente. Ritorna la lista e riempie _pianoViolCelle.
+// Il sabato "chiude entro le 23"? Se il turno finisce oltre (o dopo la
+// mezzanotte), la domenica seguente NON conta tra le 12 libere (LL art. 18)
+function _pianoSabatoEntro23(codice) {
+  if (!codice) return true;
+  const t = _pianoTurnoInfo(codice);
+  if (!t) return true; // codici speciali: niente lavoro
+  if (t.oltre23) return false;
+  const fi = _pianoOra(String(t.ora_fine || '').substring(0, 5));
+  const ii = _pianoOra(String(t.ora_inizio || '').substring(0, 5));
+  if (fi == null) return true;
+  if (ii != null && fi < ii) return false; // finisce dopo mezzanotte
+  return fi <= 23 * 60;
+}
 function _pianoCalcolaViolazioni() {
   const ym = _pianoMeseSel;
   const nGiorni = _pianoUltimoGiorno(ym);
@@ -1670,6 +1683,35 @@ function _pianoCalcolaViolazioni() {
       }
     }
   }
+  // DOMENICHE LIBERE (OLL2 art. 24: minimo 12 all'anno · regola aziendale:
+  // la domenica conta solo se il sabato si finisce entro le 23)
+  if (_pianoRegolaVal('domeniche_libere_anno') != null) {
+    const chkSab = _pianoRegolaVal('turno_prima_domenica_libera') === 'TRUE';
+    Object.keys(perNome).forEach((nome) => {
+      const info = _pianoCollabInfo(nome);
+      if (!info || info.funzione === 'RESP') return;
+      let libere = 0;
+      let ultimaDom = 0;
+      for (let g = 1; g <= nGiorni; g++) {
+        const dow = new Date(ym + '-' + String(g).padStart(2, '0') + 'T12:00:00').getDay();
+        if (dow !== 0) continue;
+        ultimaDom = g;
+        const cod = perNome[nome][g];
+        const lavora = cod && _pianoTurnoInfo(cod);
+        if (lavora) continue;
+        if (cod === 'V') continue; // in vacanza: non conta tra le 12
+        const codSab = g > 1 ? perNome[nome][g - 1] : null;
+        if (chkSab && !_pianoSabatoEntro23(codSab)) {
+          aggiungi(nome, g, 'domenica non conteggiabile come libera: il sabato finisce oltre le 23');
+          continue;
+        }
+        libere++;
+      }
+      if (ultimaDom && libere === 0)
+        aggiungi(nome, ultimaDom, "nessuna domenica libera valida nel mese (minimo 12 all'anno)");
+    });
+  }
+
   return { celle: celle, lista: lista };
 }
 
@@ -2301,6 +2343,8 @@ const PIANO_REGOLE_FONTE = {
   tolleranza_ore_sopra: 'RAP 3.1: max 45 ore in alta stagione',
 };
 const PIANO_REGOLE_DOVE = {
+  domeniche_libere_anno: 'Validatore + Statistiche',
+  turno_prima_domenica_libera: 'Validatore + Statistiche',
   nd_jolly_giorno: 'Formulario non disponibilità (scheda Formulari + PDF)',
   tolleranza_ore: 'Validatore + Bozza + Migliora ore',
   tolleranza_ore_sopra: 'Validatore + Bozza + Migliora ore',
@@ -6100,13 +6144,29 @@ async function _applicaVacanzeMese(interattivo) {
         (vacGiorni[v.collaboratore] = vacGiorni[v.collaboratore] || new Set()).add(parseInt(p[2]));
     });
   });
-  if (!Object.keys(vacGiorni).length) {
-    if (interattivo) toast('Nessuna vacanza cade in ' + ym + ' per questo settore');
-    return { v: 0, c: 0, wd: 0 };
-  }
   const da = ym + '-01';
   const a = ym + '-' + String(nGiorni).padStart(2, '0');
-  // come Turnivo: via le V/C/WD auto non protette rimaste da giri precedenti
+  // V ORFANE: se una vacanza e' stata spostata o tolta dalla scheda Vacanze,
+  // le V rimaste nel piano senza settimana corrispondente vengono rimosse
+  let nOrfane = 0;
+  {
+    const righeV =
+      (await secGet(
+        'piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&codice=eq.V&limit=2000',
+      )) || [];
+    const orfane = righeV.filter((r) => {
+      if (!nomiRep.includes(r.collaboratore)) return false;
+      const g = parseInt(r.data.split('-')[2]);
+      return !(vacGiorni[r.collaboratore] && vacGiorni[r.collaboratore].has(g));
+    });
+    for (let i = 0; i < orfane.length; i += 10) {
+      await Promise.all(orfane.slice(i, i + 10).map((r) => secDel('piano', 'id=eq.' + r.id)));
+    }
+    nOrfane = orfane.length;
+    if (nOrfane) logAzione('Vacanze: V rimosse', ym + ' · ' + nOrfane + " giorni non piu' in vacanza");
+  }
+  // via le V/C/WD dei giri precedenti: i WD (non protetti) e i C scritti da
+  // "Applica" (protetti ma generati); gli inserimenti a mano restano
   await secDel(
     'piano',
     'data=gte.' +
@@ -6117,6 +6177,25 @@ async function _applicaVacanzeMese(interattivo) {
       _pianoReparto() +
       '&protetto=eq.false&generato=eq.true&codice=in.(V,C,WD)',
   );
+  await secDel(
+    'piano',
+    'data=gte.' +
+      da +
+      '&data=lte.' +
+      a +
+      '&reparto_dip=eq.' +
+      _pianoReparto() +
+      '&protetto=eq.true&generato=eq.true&codice=eq.C',
+  );
+  if (!Object.keys(vacGiorni).length) {
+    if (interattivo)
+      toast(
+        nOrfane
+          ? nOrfane + ' V rimosse (vacanze spostate); nessuna vacanza cade in ' + ym
+          : 'Nessuna vacanza cade in ' + ym + ' per questo settore',
+      );
+    return { v: 0, c: 0, wd: 0, orfane: nOrfane };
+  }
   const righe =
     (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=5000')) ||
     [];
@@ -6241,7 +6320,7 @@ async function _applicaVacanzeMese(interattivo) {
     }
   }
   logAzione('Piano: vacanze applicate', ym + ' · ' + nV + ' V, ' + nC + ' C, ' + nWdP + ' WD');
-  return { v: nV, c: nC, wd: nWdP };
+  return { v: nV, c: nC, wd: nWdP, orfane: nOrfane };
 }
 async function applicaVacanzePiano() {
   const MESI_L = MESI_FULL || [];
@@ -6256,8 +6335,19 @@ async function applicaVacanzePiano() {
     )
   )
     return;
+  _pianoUndoSnap('applica vacanze ' + _pianoMeseSel);
   const r = await _applicaVacanzeMese(true);
-  if (r) toast('Piazzate ' + r.v + ' V, ' + r.c + ' C, ' + r.wd + ' WD');
+  if (r)
+    toast(
+      'Piazzate ' +
+        r.v +
+        ' V, ' +
+        r.c +
+        ' C, ' +
+        r.wd +
+        ' WD' +
+        (r.orfane ? ' · rimosse ' + r.orfane + ' V di vacanze spostate' : ''),
+    );
   _pianoTab = 'calendario';
   localStorage.setItem('piano_tab', 'calendario');
   renderPiano();
