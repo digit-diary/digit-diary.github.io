@@ -256,6 +256,18 @@ function _pianoAccompagnamentoDi(info) {
     .map((x) => x.trim().toUpperCase())
     .filter(Boolean);
 }
+// loadAll tiene in memoria solo i collaboratori ATTIVI: per distinguere
+// "non attivo" da "non esiste" si tiene un elenco leggero dei disattivati
+async function _pianoCaricaInattivi() {
+  if (window._collabInattivi) return;
+  window._collabInattivi = [];
+  try {
+    window._collabInattivi = (await secGet('collaboratori?attivo=eq.false&select=nome,reparto_dip')) || [];
+  } catch (e) {}
+}
+function _pianoInattivoInfo(nome) {
+  return (window._collabInattivi || []).find((c) => (c.nome || '').toLowerCase() === nome.toLowerCase());
+}
 function _pianoCollabInfo(nome) {
   return collaboratoriCache.find((c) => c.nome.toLowerCase() === nome.toLowerCase());
 }
@@ -867,6 +879,29 @@ async function renderPiano() {
           (infoC && infoC.lingue
             ? ' <span style="font-size:.62rem;color:var(--muted);font-weight:700">' + escP(infoC.lingue) + '</span>'
             : '') +
+          // il collaboratore non e' dell'anagrafica di QUESTO settore (o non
+          // c'e' affatto): si segnala, cosi' l'anomalia non passa inosservata
+          (!infoC
+            ? (() => {
+                const ina = _pianoInattivoInfo(nome);
+                if (!ina)
+                  return '<span class="piano-estraneo" title="Non presente in Gestione collaboratori: funzione, percentuale e ore dovute non vengono calcolate">fuori anagrafica</span>';
+                const repIna = ina.reparto_dip || 'slots';
+                return (
+                  '<span class="piano-estraneo" title="Disattivato in Gestione collaboratori ma presente nel piano' +
+                  (repIna !== _pianoReparto() ? ' · settore ' + escP(repartoLabel(repIna)) : '') +
+                  '">non attivo' +
+                  (repIna !== _pianoReparto() ? ' · ' + escP(repartoLabel(repIna)) : '') +
+                  '</span>'
+                );
+              })()
+            : (infoC.reparto_dip || 'slots') !== _pianoReparto()
+              ? '<span class="piano-estraneo" title="Collaboratore del settore ' +
+                escP(repartoLabel(infoC.reparto_dip || 'slots')) +
+                ': il suo piano dovrebbe stare nel suo settore">' +
+                escP(repartoLabel(infoC.reparto_dip || 'slots')) +
+                '</span>'
+              : '') +
           '</td><td class="piano-fun"><strong>' +
           escP(infoC && infoC.is_jolly ? 'JOLLY' : (infoC && infoC.funzione) || '') +
           '</strong> <span style="font-size:.7rem">' +
@@ -1185,6 +1220,12 @@ async function renderPiano() {
     if (typeof initCardRichiudibili === 'function' && document.getElementById('piano-config'))
       initCardRichiudibili('piano-config', []);
     if (_pianoTab === 'calendario') {
+      _pianoCaricaInattivi().then(() => {
+        if (!window._collabInattiviReso && (window._collabInattivi || []).length) {
+          window._collabInattiviReso = true;
+          renderPiano();
+        }
+      });
       _pianoInitSelezione();
       _pianoInitSticky();
       _pianoRenderViolazioni();

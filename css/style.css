@@ -3662,6 +3662,18 @@ button:focus-visible,
 .piano-table tr.row-selected .piano-fun {
   box-shadow: inset 0 0 0 100px rgba(13, 110, 253, 0.35) !important;
 }
+.piano-nome .piano-estraneo {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: #fbd4b4;
+  color: #7a3b00;
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
 .piano-table thead .piano-nome {
   z-index: 3;
   background: #212529;
