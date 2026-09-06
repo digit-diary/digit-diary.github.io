@@ -1328,6 +1328,12 @@ function _pianoOra(hhmm) {
   const p = String(hhmm).split(':');
   return parseInt(p[0]) + (parseInt(p[1]) || 0) / 60;
 }
+// Giorno del mese entro cui i Jolly consegnano le non disponibilita':
+// regola 'nd_jolly_giorno' modificabile dall'admin (direttiva 16-007)
+function _pianoGiornoNd() {
+  const v = parseInt(_pianoRegolaVal('nd_jolly_giorno'));
+  return v > 0 && v <= 28 ? v : 3;
+}
 function _pianoRegolaVal(nome) {
   const r = pianoRegoleCache.find((x) => x.nome === nome);
   if (!r || r.attivo === false) return null;
@@ -2256,7 +2262,21 @@ async function eseguiCancellaPiano(tutto) {
 // REGOLE DEL PIANO · card admin: elenco ordinato, valori e stato
 // modificabili. Etichetta onesta su DOVE ogni regola è applicata.
 // ================================================================
+// Fonte normativa di ogni regola: si legge accanto al valore, cosi' chi la
+// modifica sa da dove viene (RAP, direttiva interna, legge sul lavoro)
+const PIANO_REGOLE_FONTE = {
+  min_riposo_ore: 'LL art. 15a · direttiva 16-007',
+  max_consecutivi: 'LL art. 21 · OLL1 art. 20',
+  domeniche_libere_anno: 'OLL2 art. 24 cpv. 2 · direttiva 16-007',
+  turno_prima_domenica_libera: 'LL art. 18: la domenica libera vale se il sabato si finisce entro le 23:00',
+  nd_jolly_giorno: 'Direttiva 16-007 · formulario HR 1187',
+  jolly_ore_min: 'RAP All. 1 · personale ausiliario',
+  jolly_ore_max: 'RAP All. 1 · personale ausiliario',
+  tolleranza_ore: 'RAP 3.1: 41 ore settimanali su media mensile',
+  tolleranza_ore_sopra: 'RAP 3.1: max 45 ore in alta stagione',
+};
 const PIANO_REGOLE_DOVE = {
+  nd_jolly_giorno: 'Formulario non disponibilità (scheda Formulari + PDF)',
   tolleranza_ore: 'Validatore + Bozza + Migliora ore',
   tolleranza_ore_sopra: 'Validatore + Bozza + Migliora ore',
   tolleranza_ore_sotto: 'Validatore',
@@ -2326,8 +2346,13 @@ function _renderPianoRegoleCard() {
       r.id +
       ',\'attivo\',this.checked)"></td><td style="font-size:.78rem;color:' +
       (_pianoRegoleDove(r.nome).indexOf('Fase 3') === -1 ? '#2c6e49;font-weight:700' : 'var(--muted)') +
-      '">' +
+      ';text-align:left">' +
       _pianoRegoleDove(r.nome) +
+      (PIANO_REGOLE_FONTE[r.nome]
+        ? '<br><span style="font-weight:400;color:var(--muted);font-size:.72rem">' +
+          escP(PIANO_REGOLE_FONTE[r.nome]) +
+          '</span>'
+        : '') +
       '</td></tr>';
   });
   h += '</tbody></table></div></div></div>';
@@ -6757,7 +6782,9 @@ async function _renderPianoFormulariTab() {
   );
   h += riga(
     'Lista di non disponibilità (Jolly)',
-    'Modulo ufficiale HR 1187: i jolly indicano i giorni del mese in cui non sono disponibili (da consegnare entro il 3° giorno del mese).',
+    'Modulo ufficiale HR 1187: i jolly indicano i giorni del mese in cui non sono disponibili (da consegnare entro il ' +
+      _pianoGiornoNd() +
+      '° giorno del mese).',
     'pdfNonDisponibilitaJolly()',
   );
   const rigaProtocollo = (titolo, nomeOriginale, chiave) =>
@@ -6985,9 +7012,14 @@ async function pdfNonDisponibilitaJolly() {
   doc.text('LISTA DI NON DISPONIBILITÀ (JOLLY)', 105, y, { align: 'center' });
   y += 5;
   doc.setFontSize(8.5);
-  doc.text('- da trasmettere al massimo entro il 3° giorno del mese al Responsabile di settore -', 105, y, {
-    align: 'center',
-  });
+  doc.text(
+    '- da trasmettere al massimo entro il ' + _pianoGiornoNd() + '° giorno del mese al Responsabile di settore -',
+    105,
+    y,
+    {
+      align: 'center',
+    },
+  );
   y += 9;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9.5);
