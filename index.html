@@ -2,23 +2,14 @@
 <html lang="it">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
-    />
-    <meta
-      http-equiv="Cache-Control"
-      content="no-cache, no-store, must-revalidate"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <link rel="manifest" href="manifest.json" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta
-      name="apple-mobile-web-app-status-bar-style"
-      content="black-translucent"
-    />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Diario CL" />
     <link rel="apple-touch-icon" href="icon-192.png" />
     <link rel="icon" type="image/png" href="icon-192.png" />
@@ -87,45 +78,41 @@
   <body>
     <script>
       (function () {
-        var ts = parseInt(localStorage.getItem("diario_auth_ts") || "0");
-        var c = localStorage.getItem("webauthn_cred");
-        var op = localStorage.getItem("operatore_corrente");
+        var ts = parseInt(localStorage.getItem('diario_auth_ts') || '0');
+        var c = localStorage.getItem('webauthn_cred');
+        var op = localStorage.getItem('operatore_corrente');
         var hasBio = false;
         try {
           var o = c && JSON.parse(c);
           if (o && (!o.v || o.v < 2)) {
-            localStorage.removeItem("webauthn_cred");
+            localStorage.removeItem('webauthn_cred');
             o = null;
           }
           hasBio = o && o.op === op;
         } catch (e) {}
-        var verified = sessionStorage.getItem("bio_verified") === "1";
-        var active = sessionStorage.getItem("session_active") === "1";
-        if (
-          ts > 0 &&
-          ((hasBio && verified) ||
-            (!hasBio && active && Date.now() - ts < 28800000))
-        ) {
-          document.documentElement.classList.add("authed");
-          var sp = localStorage.getItem("pagina_corrente");
+        var verified = sessionStorage.getItem('bio_verified') === '1';
+        var active = sessionStorage.getItem('session_active') === '1';
+        if (ts > 0 && ((hasBio && verified) || (!hasBio && active && Date.now() - ts < 28800000))) {
+          document.documentElement.classList.add('authed');
+          var sp = localStorage.getItem('pagina_corrente');
           var safePages = [
-            "diario",
-            "rapporto",
-            "note-collega",
-            "statistiche",
-            "moduli",
-            "assistente",
-            "consegna",
-            "promemoria",
-            "maison",
-            "impostazioni",
-            "registro",
+            'diario',
+            'rapporto',
+            'note-collega',
+            'statistiche',
+            'moduli',
+            'assistente',
+            'consegna',
+            'promemoria',
+            'maison',
+            'impostazioni',
+            'registro',
           ];
-          if (sp && sp !== "dashboard" && safePages.indexOf(sp) !== -1) {
+          if (sp && sp !== 'dashboard' && safePages.indexOf(sp) !== -1) {
             document.write(
               '<style id=\"early-page-fix\">#page-dashboard{display:none!important}#page-' +
                 sp +
-                "{display:block!important}</style>",
+                '{display:block!important}</style>',
             );
           }
         }
@@ -133,11 +120,7 @@
     </script>
     <div id="login-overlay">
       <div class="login-box">
-        <img
-          src="logo_casino.png"
-          alt="Casino Lugano SA"
-          style="width: 140px; margin-bottom: 16px"
-        />
+        <img src="logo_casino.png" alt="Casino Lugano SA" style="width: 140px; margin-bottom: 16px" />
         <h2>Accesso Protetto</h2>
         <p>Seleziona settore, operatore e password</p>
         <select
@@ -152,7 +135,7 @@
             border: 1.5px solid var(--line);
             border-radius: 2px;
             font-size: 1rem;
-            font-family: &quot;Source Sans 3&quot;, sans-serif;
+            font-family: 'Source Sans 3', sans-serif;
             color: var(--ink);
             background: var(--paper2);
             cursor: pointer;
@@ -175,7 +158,7 @@
             border: 1.5px solid var(--line);
             border-radius: 2px;
             font-size: 1rem;
-            font-family: &quot;Source Sans 3&quot;, sans-serif;
+            font-family: 'Source Sans 3', sans-serif;
             color: var(--ink);
             background: var(--paper2);
             cursor: pointer;
@@ -190,28 +173,16 @@
           onkeydown="if (event.key === 'Enter') checkPwd();"
         />
         <button class="btn-login" onclick="checkPwd()">Entra</button>
-        <button class="btn-recupero" onclick="recuperoPassword()">
-          Password dimenticata?
-        </button>
-        <div
-          id="biometric-login"
-          style="display: none; margin-top: 12px; text-align: center"
-        >
-          <div
-            style="
-              width: 100%;
-              height: 1px;
-              background: var(--line);
-              margin: 8px 0 14px;
-            "
-          ></div>
+        <button class="btn-recupero" onclick="recuperoPassword()">Password dimenticata?</button>
+        <div id="biometric-login" style="display: none; margin-top: 12px; text-align: center">
+          <div style="width: 100%; height: 1px; background: var(--line); margin: 8px 0 14px"></div>
           <button
             id="bio-login-btn"
             onclick="tentaBiometrico()"
             style="
               padding: 12px 28px;
               font-size: 1rem;
-              font-family: &quot;Source Sans 3&quot;, sans-serif;
+              font-family: 'Source Sans 3', sans-serif;
               font-weight: 600;
               border: 1.5px solid var(--accent2);
               color: var(--accent2);
@@ -240,11 +211,8 @@
         <p>Seleziona il nuovo tipo</p>
         <div class="modal-tipo-tags" id="modal-tipo-tags"></div>
         <div class="modal-btns">
-          <button class="btn-modal-cancel" onclick="chiudiModal()">
-            Annulla</button
-          ><button class="btn-modal-ok" onclick="confermaCambioTipo()">
-            Conferma
-          </button>
+          <button class="btn-modal-cancel" onclick="chiudiModal()">Annulla</button
+          ><button class="btn-modal-ok" onclick="confermaCambioTipo()">Conferma</button>
         </div>
       </div>
     </div>
@@ -261,11 +229,7 @@
         style="max-width: 500px; max-height: 80vh; overflow-y: auto"
       ></div>
     </div>
-    <div
-      id="pdf-preview-modal"
-      class="hidden"
-      onclick="if (event.target === this) chiudiPdfPreview();"
-    >
+    <div id="pdf-preview-modal" class="hidden" onclick="if (event.target === this) chiudiPdfPreview();">
       <div
         style="
           background: var(--paper);
@@ -291,12 +255,7 @@
         >
           <span
             id="pdf-preview-title"
-            style="
-              font-family: &quot;Playfair Display&quot;, serif;
-              font-size: 1.1rem;
-              font-weight: 600;
-              color: var(--ink);
-            "
+            style="font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 600; color: var(--ink)"
             >Anteprima PDF</span
           >
           <div style="display: flex; gap: 8px">
@@ -316,7 +275,7 @@
                 padding: 8px 14px;
                 border-radius: 2px;
                 cursor: pointer;
-                font-family: &quot;Source Sans 3&quot;, sans-serif;
+                font-family: 'Source Sans 3', sans-serif;
                 font-size: 0.82rem;
               "
             >
@@ -324,17 +283,13 @@
             </button>
           </div>
         </div>
-        <iframe
-          id="pdf-preview-iframe"
-          style="flex: 1; border: none; background: #525659"
-        ></iframe>
+        <iframe id="pdf-preview-iframe" style="flex: 1; border: none; background: #525659"></iframe>
       </div>
     </div>
 
     <header>
       <h1>
-        <span class="subtitle">Registro Aziendale</span>Diario
-        Collaboratori<span class="casino">Casinò Lugano SA</span>
+        <span class="subtitle">Registro Aziendale</span>Diario Collaboratori<span class="casino">Casinò Lugano SA</span>
       </h1>
       <div class="header-right">
         <div class="date-badge" id="today-date"></div>
@@ -343,25 +298,15 @@
           <button class="btn-header" id="btn-tema" onclick="toggleTema()">
             <i class="icx icx-luna"></i> Tema scuro
           </button>
-          <button class="btn-header" onclick="window.print()">
-            <i class="icx icx-stampa"></i> Stampa
-          </button>
-          <button
-            class="btn-header"
-            onclick="esci()"
-            style="color: var(--accent)"
-          >
+          <button class="btn-header" onclick="window.print()"><i class="icx icx-stampa"></i> Stampa</button>
+          <button class="btn-header" onclick="esci()" style="color: var(--accent)">
             <i class="icx icx-esci"></i> Esci
           </button>
         </div>
       </div>
     </header>
 
-    <div
-      class="scadenze-banner hidden"
-      id="scadenze-banner"
-      onclick="toggleScadenzeDropdown()"
-    ></div>
+    <div class="scadenze-banner hidden" id="scadenze-banner" onclick="toggleScadenzeDropdown()"></div>
     <div class="scadenze-dropdown hidden" id="scadenze-dropdown"></div>
     <div
       class="scadenze-banner hidden"
@@ -386,31 +331,17 @@
     </div>
 
     <div class="reparto-switch" id="reparto-switch" style="display: none"></div>
-    <button
-      class="hamburger-btn"
-      onclick="toggleMobileNav()"
-      id="hamburger-btn"
-    >
+    <button class="hamburger-btn" onclick="toggleMobileNav()" id="hamburger-btn">
       <i class="icx icx-menu"></i> Menu
     </button>
-    <div
-      class="mobile-nav"
-      id="mobile-nav"
-      onclick="if (event.target === this) chiudiMobileNav();"
-    >
+    <div class="mobile-nav" id="mobile-nav" onclick="if (event.target === this) chiudiMobileNav();">
       <div class="mobile-nav-panel">
-        <button class="mobile-nav-close" onclick="chiudiMobileNav()">
-          &#10005; Chiudi
-        </button>
+        <button class="mobile-nav-close" onclick="chiudiMobileNav()">&#10005; Chiudi</button>
         <div id="mobile-nav-items"></div>
       </div>
     </div>
     <div class="nav-tabs">
-      <button
-        class="nav-tab active"
-        data-page="dashboard"
-        onclick="switchPage('dashboard')"
-      >
+      <button class="nav-tab active" data-page="dashboard" onclick="switchPage('dashboard')">
         <i class="icx icx-home"></i> Home
       </button>
       <button class="nav-tab" data-page="diario" onclick="switchPage('diario')">
@@ -446,11 +377,7 @@
           title="Note non lette"
         ></span>
       </button>
-      <button
-        class="nav-tab"
-        data-page="statistiche"
-        onclick="switchPage('statistiche')"
-      >
+      <button class="nav-tab" data-page="statistiche" onclick="switchPage('statistiche')">
         <i class="icx icx-stats"></i> Statistiche
       </button>
       <button
@@ -507,12 +434,7 @@
           title="Consegne non lette"
         ></span>
       </button>
-      <button
-        class="nav-tab"
-        data-page="promemoria"
-        onclick="switchPage('promemoria')"
-        title="Promemoria con scadenze"
-      >
+      <button class="nav-tab" data-page="promemoria" onclick="switchPage('promemoria')" title="Promemoria con scadenze">
         <i class="icx icx-clipboard"></i> Promemoria
         <span
           id="promemoria-badge"
@@ -529,19 +451,10 @@
           title="Promemoria in scadenza"
         ></span>
       </button>
-      <button
-        class="nav-tab"
-        data-page="maison"
-        onclick="switchPage('maison')"
-        title="Gestione costi e clienti Maison"
-      >
+      <button class="nav-tab" data-page="maison" onclick="switchPage('maison')" title="Gestione costi e clienti Maison">
         <i class="icx icx-maison"></i> Maison
       </button>
-      <button
-        class="nav-tab"
-        data-page="inventario"
-        onclick="switchPage('inventario')"
-      >
+      <button class="nav-tab" data-page="inventario" onclick="switchPage('inventario')">
         <i class="icx icx-inventario"></i> Inventario
       </button>
       <button
@@ -553,11 +466,11 @@
       >
         <i class="icx icx-clipboard"></i> Registro
       </button>
-      <button
-        class="nav-tab"
-        data-page="impostazioni"
-        onclick="switchPage('impostazioni')"
-      >
+      <button class="nav-tab" data-page="guida" onclick="switchPage('guida')" title="Guida del programma">
+        <i class="icx icx-clipboard"></i> Guida
+      </button>
+
+      <button class="nav-tab" data-page="impostazioni" onclick="switchPage('impostazioni')">
         <i class="icx icx-settings"></i> Impostazioni
       </button>
     </div>
@@ -566,149 +479,69 @@
     <div class="page active" id="page-dashboard">
       <div style="text-align: center; margin-bottom: 20px">
         <h2
-          style="
-            font-family: &quot;Playfair Display&quot;, serif;
-            font-size: 1.6rem;
-            color: var(--ink);
-            margin-bottom: 4px;
-          "
+          style="font-family: 'Playfair Display', serif; font-size: 1.6rem; color: var(--ink); margin-bottom: 4px"
           id="dash-titolo"
         ></h2>
-        <p
-          style="color: var(--muted); font-size: 0.9rem"
-          id="dash-sottotitolo"
-        ></p>
+        <p style="color: var(--muted); font-size: 0.9rem" id="dash-sottotitolo"></p>
       </div>
-      <div
-        class="stats-bar"
-        id="dash-stats"
-        style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr))"
-      ></div>
-      <div
-        style="
-          display: flex;
-          flex-wrap: wrap;
-          gap: 10px;
-          justify-content: center;
-          margin-top: 16px;
-        "
-      >
+      <div class="stats-bar" id="dash-stats" style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr))"></div>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 16px">
         <button
           class="btn-salva"
           onclick="switchPage('diario')"
-          style="
-            padding: 10px 20px;
-            font-size: 0.82rem;
-            width: auto;
-            background: var(--ink);
-          "
+          style="padding: 10px 20px; font-size: 0.82rem; width: auto; background: var(--ink)"
         >
           &#43; Nuova registrazione
         </button>
         <button
           class="btn-salva"
           onclick="switchPage('consegna')"
-          style="
-            padding: 10px 20px;
-            font-size: 0.82rem;
-            width: auto;
-            background: #2c3e50;
-          "
+          style="padding: 10px 20px; font-size: 0.82rem; width: auto; background: #2c3e50"
         >
           <i class="icx icx-modifica"></i> Scrivi consegna
         </button>
         <button
           class="btn-salva"
           onclick="switchPage('promemoria')"
-          style="
-            padding: 10px 20px;
-            font-size: 0.82rem;
-            width: auto;
-            background: #8e44ad;
-          "
+          style="padding: 10px 20px; font-size: 0.82rem; width: auto; background: #8e44ad"
         >
           <i class="icx icx-clipboard"></i> Nuovo promemoria
         </button>
       </div>
-      <div
-        style="
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 20px;
-          margin-top: 20px;
-        "
-        id="dash-grid"
-      >
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px" id="dash-grid">
         <div class="main-card" id="dash-todo">
           <div class="card-header">Da fare oggi</div>
-          <div
-            id="dash-todo-list"
-            style="padding: 14px; max-height: 300px; overflow-y: auto"
-          ></div>
+          <div id="dash-todo-list" style="padding: 14px; max-height: 300px; overflow-y: auto"></div>
         </div>
         <div class="main-card" id="dash-domani">
           <div class="card-header">Da fare domani</div>
-          <div
-            id="dash-domani-list"
-            style="padding: 14px; max-height: 300px; overflow-y: auto"
-          ></div>
+          <div id="dash-domani-list" style="padding: 14px; max-height: 300px; overflow-y: auto"></div>
         </div>
         <div class="main-card" id="dash-alerts">
           <div class="card-header">Alert attivi</div>
-          <div
-            id="dash-alert-list"
-            style="padding: 14px; max-height: 300px; overflow-y: auto"
-          ></div>
+          <div id="dash-alert-list" style="padding: 14px; max-height: 300px; overflow-y: auto"></div>
         </div>
         <div class="main-card" id="dash-compleanni">
-          <div class="card-header">
-            <i class="icx icx-torta"></i> Compleanni
-          </div>
-          <div
-            id="dash-compleanni-list"
-            style="padding: 14px; max-height: 300px; overflow-y: auto"
-          ></div>
+          <div class="card-header"><i class="icx icx-torta"></i> Compleanni</div>
+          <div id="dash-compleanni-list" style="padding: 14px; max-height: 300px; overflow-y: auto"></div>
         </div>
         <div class="main-card" id="dash-recenti">
           <div class="card-header">Ultime registrazioni</div>
-          <div
-            id="dash-recenti-list"
-            style="padding: 14px; max-height: 300px; overflow-y: auto"
-          ></div>
+          <div id="dash-recenti-list" style="padding: 14px; max-height: 300px; overflow-y: auto"></div>
         </div>
         <div class="main-card" id="dash-maison">
           <div class="card-header">Maison oggi</div>
-          <div
-            id="dash-maison-content"
-            style="padding: 14px; max-height: 300px; overflow-y: auto"
-          ></div>
+          <div id="dash-maison-content" style="padding: 14px; max-height: 300px; overflow-y: auto"></div>
         </div>
       </div>
       <div class="stats-grid" style="margin-top: 20px">
         <div class="chart-card full">
-          <div
-            style="
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              margin-bottom: 8px;
-            "
-          >
-            <button
-              class="btn-act pin"
-              onclick="navigaDashSettimana(-1)"
-              style="font-size: 0.82rem"
-            >
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
+            <button class="btn-act pin" onclick="navigaDashSettimana(-1)" style="font-size: 0.82rem">
               &larr; Settimana precedente
             </button>
-            <h4 style="margin: 0" id="dash-sett-titolo">
-              Andamento settimanale
-            </h4>
-            <button
-              class="btn-act pin"
-              onclick="navigaDashSettimana(1)"
-              style="font-size: 0.82rem"
-            >
+            <h4 style="margin: 0" id="dash-sett-titolo">Andamento settimanale</h4>
+            <button class="btn-act pin" onclick="navigaDashSettimana(1)" style="font-size: 0.82rem">
               Settimana successiva &rarr;
             </button>
           </div>
@@ -735,24 +568,14 @@
         <button
           class="btn-export btn-export-pdf"
           onclick="apriReportConfig('annuale')"
-          style="
-            padding: 12px 28px;
-            font-size: 0.92rem;
-            border-color: #b8860b;
-            color: #b8860b;
-          "
+          style="padding: 12px 28px; font-size: 0.92rem; border-color: #b8860b; color: #b8860b"
         >
           Report Annuale PDF
         </button>
         <button
           class="btn-export"
           onclick="generaReportAnnualeCSV()"
-          style="
-            padding: 12px 28px;
-            font-size: 0.92rem;
-            border-color: #b8860b;
-            color: #b8860b;
-          "
+          style="padding: 12px 28px; font-size: 0.92rem; border-color: #b8860b; color: #b8860b"
         >
           Report Annuale CSV
         </button>
@@ -797,79 +620,36 @@
                 "
                 >Ctrl+Invio per salvare</small
               ></label
-            ><textarea
-              id="inp-testo"
-              placeholder="Descrivi brevemente l'evento..."
-            ></textarea>
+            ><textarea id="inp-testo" placeholder="Descrivi brevemente l'evento..."></textarea>
           </div>
-          <div
-            id="malattia-extra-row"
-            style="margin-bottom: 16px; display: none"
-          >
-            <div
-              class="form-row"
-              style="
-                grid-template-columns: 1fr 1fr auto;
-                gap: 10px;
-                align-items: flex-end;
-              "
-            >
+          <div id="malattia-extra-row" style="margin-bottom: 16px; display: none">
+            <div class="form-row" style="grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: flex-end">
               <div class="field">
                 <label>Dal</label
-                ><input
-                  type="text"
-                  id="inp-mal-dal"
-                  placeholder="Seleziona..."
-                  readonly
-                  style="cursor: pointer"
-                />
+                ><input type="text" id="inp-mal-dal" placeholder="Seleziona..." readonly style="cursor: pointer" />
               </div>
               <div class="field">
                 <label>Al</label
-                ><input
-                  type="text"
-                  id="inp-mal-al"
-                  placeholder="Seleziona..."
-                  readonly
-                  style="cursor: pointer"
-                />
+                ><input type="text" id="inp-mal-al" placeholder="Seleziona..." readonly style="cursor: pointer" />
               </div>
               <div class="field">
                 <label style="visibility: hidden">x</label
-                ><button
-                  class="btn-reset"
-                  onclick="resetMalFiltri()"
-                  style="padding: 8px 14px"
-                >
-                  Reset
-                </button>
+                ><button class="btn-reset" onclick="resetMalFiltri()" style="padding: 8px 14px">Reset</button>
               </div>
             </div>
             <p style="color: var(--muted); font-size: 0.78rem; margin-top: 6px">
-              Se specifichi un periodo, verrà creata una registrazione per ogni
-              giorno
+              Se specifichi un periodo, verrà creata una registrazione per ogni giorno
             </p>
           </div>
           <div id="nd-extra-row" style="margin-bottom: 16px; display: none">
             <div id="nd-cal-container" style="max-width: 320px"></div>
-            <div
-              id="nd-cal-selected"
-              style="margin-top: 8px; font-size: 0.84rem; color: var(--ink)"
-            ></div>
+            <div id="nd-cal-selected" style="margin-top: 8px; font-size: 0.84rem; color: var(--ink)"></div>
             <p style="color: var(--muted); font-size: 0.78rem; margin-top: 4px">
-              Clicca sui giorni in cui non era disponibile. Clicca di nuovo per
-              deselezionare.
+              Clicca sui giorni in cui non era disponibile. Clicca di nuovo per deselezionare.
             </p>
           </div>
           <div id="errore-extra-row" style="margin-bottom: 16px; display: none">
-            <div
-              class="form-row"
-              style="
-                grid-template-columns: auto auto auto auto;
-                gap: 10px;
-                align-items: flex-end;
-              "
-            >
+            <div class="form-row" style="grid-template-columns: auto auto auto auto; gap: 10px; align-items: flex-end">
               <div class="field">
                 <label>Reparto</label
                 ><select id="inp-reparto">
@@ -885,14 +665,7 @@
               </div>
               <div class="field">
                 <label>Importo (opzionale)</label
-                ><input
-                  type="number"
-                  id="inp-importo"
-                  placeholder="0.00"
-                  step="0.01"
-                  min="0"
-                  style="width: 140px"
-                />
+                ><input type="number" id="inp-importo" placeholder="0.00" step="0.01" min="0" style="width: 140px" />
               </div>
               <div class="field">
                 <label>Valuta</label
@@ -941,19 +714,12 @@
           </div>
           <div class="filter-group">
             <span class="filter-label">Cerca</span
-            ><input
-              type="text"
-              id="filt-cerca"
-              placeholder="Parola chiave..."
-              oninput="render()"
-            />
+            ><input type="text" id="filt-cerca" placeholder="Parola chiave..." oninput="render()" />
           </div>
           <button class="btn-reset" onclick="resetFiltri()">Reset</button>
           <div class="export-btns">
             <button class="btn-export" onclick="esportaCSV()">CSV</button>
-            <button class="btn-export btn-export-pdf" onclick="esportaPDF()">
-              PDF
-            </button>
+            <button class="btn-export btn-export-pdf" onclick="esportaPDF()">PDF</button>
           </div>
         </div>
         <div class="entries-list" id="entries-list"></div>
@@ -1014,14 +780,7 @@
                   sans-serif;
               "
             />
-            <span
-              id="note-search-count"
-              style="
-                font-size: 0.78rem;
-                color: var(--muted);
-                white-space: nowrap;
-              "
-            ></span>
+            <span id="note-search-count" style="font-size: 0.78rem; color: var(--muted); white-space: nowrap"></span>
             <button
               onclick="cercaInChatNav(-1)"
               style="
@@ -1056,13 +815,7 @@
             </button>
             <button
               onclick="chiudiCercaChat()"
-              style="
-                background: none;
-                border: none;
-                cursor: pointer;
-                color: var(--muted);
-                font-size: 1.1rem;
-              "
+              style="background: none; border: none; cursor: pointer; color: var(--muted); font-size: 1.1rem"
               title="Chiudi"
             >
               &#10005;
@@ -1070,12 +823,7 @@
           </div>
           <div
             id="note-chat-star-filter"
-            style="
-              display: none;
-              padding: 4px 16px;
-              border-bottom: 1px solid var(--line);
-              background: var(--paper2);
-            "
+            style="display: none; padding: 4px 16px; border-bottom: 1px solid var(--line); background: var(--paper2)"
           >
             <button class="btn-star-filter" onclick="toggleStarFilter()">
               <i class="icx icx-stella-piena"></i> Solo importanti
@@ -1083,34 +831,15 @@
           </div>
           <div
             id="note-chat-messages"
-            style="
-              flex: 1;
-              overflow-y: auto;
-              padding: 16px;
-              display: flex;
-              flex-direction: column;
-              gap: 8px;
-            "
+            style="flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px"
           ></div>
-          <div
-            id="note-chat-reply-bar"
-            class="chat-reply-bar"
-            style="display: none"
-          >
+          <div id="note-chat-reply-bar" class="chat-reply-bar" style="display: none">
             <div class="reply-preview">
-              <span
-                id="reply-preview-name"
-                style="font-weight: 600; color: var(--accent2)"
-              ></span
-              ><br /><span id="reply-preview-text"></span>
+              <span id="reply-preview-name" style="font-weight: 600; color: var(--accent2)"></span><br /><span
+                id="reply-preview-text"
+              ></span>
             </div>
-            <button
-              class="reply-close"
-              onclick="annullaRispondi()"
-              title="Annulla"
-            >
-              &#10005;
-            </button>
+            <button class="reply-close" onclick="annullaRispondi()" title="Annulla">&#10005;</button>
           </div>
           <div
             id="note-chat-input"
@@ -1152,12 +881,7 @@
                 this.style.height = Math.min(this.scrollHeight, 100) + 'px';
               "
             ></textarea>
-            <button
-              id="btn-urgent-mode"
-              class="btn-urgent-toggle"
-              onclick="toggleUrgentMode()"
-              title="Urgente"
-            >
+            <button id="btn-urgent-mode" class="btn-urgent-toggle" onclick="toggleUrgentMode()" title="Urgente">
               &#10071;
             </button>
             <button
@@ -1201,9 +925,7 @@
           flex-wrap: wrap;
         "
       >
-        <div
-          style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap"
-        >
+        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap">
           <div class="filter-group">
             <span class="filter-label">Dal</span
             ><input
@@ -1224,81 +946,30 @@
               style="cursor: pointer; min-width: 150px"
             />
           </div>
-          <button
-            class="btn-act pin"
-            onclick="resetStatsFiltri()"
-            style="font-size: 0.82rem"
-          >
-            Reset
-          </button>
+          <button class="btn-act pin" onclick="resetStatsFiltri()" style="font-size: 0.82rem">Reset</button>
         </div>
-        <span
-          style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap"
-        >
-          <span
-            id="report-direzione-wrap"
-            style="
-              display: none;
-              gap: 8px;
-              align-items: center;
-              flex-wrap: wrap;
-            "
-          >
-            <select
-              id="rd-tipo"
-              style="padding: 9px"
-              onchange="aggiornaRdPeriodo()"
-            >
+        <span style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+          <span id="report-direzione-wrap" style="display: none; gap: 8px; align-items: center; flex-wrap: wrap">
+            <select id="rd-tipo" style="padding: 9px" onchange="aggiornaRdPeriodo()">
               <option value="mese">Mese</option>
               <option value="anno">Anno</option>
               <option value="periodo">Periodo</option>
             </select>
             <select id="rd-mese" style="padding: 9px"></select>
-            <span
-              id="rd-mese-a-wrap"
-              style="display: none; gap: 6px; align-items: center"
-            >
+            <span id="rd-mese-a-wrap" style="display: none; gap: 6px; align-items: center">
               <span style="font-size: 0.85rem">→</span>
               <select id="rd-mese-a" style="padding: 9px"></select>
             </span>
             <select id="rd-anno" style="padding: 9px; display: none"></select>
-            <span
-              style="
-                display: inline-flex;
-                gap: 10px;
-                align-items: center;
-                font-size: 0.8rem;
-              "
-            >
-              <label
-                style="
-                  display: inline-flex;
-                  gap: 4px;
-                  align-items: center;
-                  cursor: pointer;
-                "
-                ><input type="checkbox" id="rd-cb-org" checked />
-                Organico</label
+            <span style="display: inline-flex; gap: 10px; align-items: center; font-size: 0.8rem">
+              <label style="display: inline-flex; gap: 4px; align-items: center; cursor: pointer"
+                ><input type="checkbox" id="rd-cb-org" checked /> Organico</label
               >
-              <label
-                style="
-                  display: inline-flex;
-                  gap: 4px;
-                  align-items: center;
-                  cursor: pointer;
-                "
-                ><input type="checkbox" id="rd-cb-ope" checked />
-                Operativo</label
+              <label style="display: inline-flex; gap: 4px; align-items: center; cursor: pointer"
+                ><input type="checkbox" id="rd-cb-ope" checked /> Operativo</label
               >
-              <label
-                style="
-                  display: inline-flex;
-                  gap: 4px;
-                  align-items: center;
-                  cursor: pointer;
-                "
-                ><input type="checkbox" id="rd-cb-svi" checked />
-                Sviluppo</label
+              <label style="display: inline-flex; gap: 4px; align-items: center; cursor: pointer"
+                ><input type="checkbox" id="rd-cb-svi" checked /> Sviluppo</label
               >
             </span>
             <button
@@ -1328,9 +999,7 @@
         </div>
         <div class="chart-card">
           <h4>Tipologia eventi</h4>
-          <p
-            style="color: var(--muted); font-size: 0.82rem; margin-bottom: 8px"
-          >
+          <p style="color: var(--muted); font-size: 0.82rem; margin-bottom: 8px">
             Distribuzione per tipo di registrazione
           </p>
           <div class="chart-wrap" style="max-height: 320px">
@@ -1339,20 +1008,14 @@
         </div>
         <div class="chart-card">
           <h4>Attività per giorno della settimana</h4>
-          <p
-            style="color: var(--muted); font-size: 0.82rem; margin-bottom: 8px"
-          >
-            Quando si registrano più eventi
-          </p>
+          <p style="color: var(--muted); font-size: 0.82rem; margin-bottom: 8px">Quando si registrano più eventi</p>
           <div class="chart-wrap" style="max-height: 320px">
             <canvas id="chart-giorni"></canvas>
           </div>
         </div>
         <div class="chart-card full">
           <h4>Collaboratori con più registrazioni</h4>
-          <p
-            style="color: var(--muted); font-size: 0.82rem; margin-bottom: 8px"
-          >
+          <p style="color: var(--muted); font-size: 0.82rem; margin-bottom: 8px">
             I 15 collaboratori più attivi nel diario
           </p>
           <div class="chart-wrap" style="max-height: 400px">
@@ -1361,18 +1024,14 @@
         </div>
         <div class="chart-card full">
           <h4>Tabella completa per collaboratore</h4>
-          <p
-            style="color: var(--muted); font-size: 0.82rem; margin-bottom: 8px"
-          >
+          <p style="color: var(--muted); font-size: 0.82rem; margin-bottom: 8px">
             Tutti i collaboratori con il dettaglio per tipo di evento
           </p>
           <div style="overflow-x: auto" id="collab-table-wrap"></div>
         </div>
         <div class="chart-card full">
           <h4>Riepilogo errori e importi</h4>
-          <p
-            style="color: var(--muted); font-size: 0.82rem; margin-bottom: 8px"
-          >
+          <p style="color: var(--muted); font-size: 0.82rem; margin-bottom: 8px">
             Errori per collaboratore con reparto e importi in CHF/EUR
           </p>
           <div style="overflow-x: auto" id="errori-table-wrap"></div>
@@ -1385,11 +1044,8 @@
       <div class="main-card">
         <div class="card-header">Consegna turno</div>
         <div class="form-area">
-          <p
-            style="color: var(--muted); font-size: 0.84rem; margin-bottom: 14px"
-          >
-            Scrivi le informazioni importanti per il collega che prende il turno
-            successivo.
+          <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 14px">
+            Scrivi le informazioni importanti per il collega che prende il turno successivo.
           </p>
           <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr">
             <div class="field">
@@ -1404,13 +1060,7 @@
               ><button
                 type="button"
                 id="cons-destinatario-btn"
-                onclick="
-                  apriMultiSelectOperatori(
-                    'cons-destinatario',
-                    'cons-destinatario-btn',
-                    'Destinatari consegna',
-                  )
-                "
+                onclick="apriMultiSelectOperatori('cons-destinatario', 'cons-destinatario-btn', 'Destinatari consegna')"
                 style="
                   padding: 11px 14px;
                   background: var(--paper2);
@@ -1456,9 +1106,7 @@
               style="min-height: 120px"
             ></textarea>
           </div>
-          <button class="btn-salva" onclick="inviaConsegnaTurno()">
-            Invia consegna
-          </button>
+          <button class="btn-salva" onclick="inviaConsegnaTurno()">Invia consegna</button>
         </div>
       </div>
       <div class="main-card" style="margin-top: 20px">
@@ -1498,44 +1146,24 @@
           <div class="form-row">
             <div class="field">
               <label>Titolo</label
-              ><input
-                type="text"
-                id="pm-titolo"
-                placeholder="Es: Verificare uniformi, Corso aggiornamento..."
-              />
+              ><input type="text" id="pm-titolo" placeholder="Es: Verificare uniformi, Corso aggiornamento..." />
             </div>
             <div class="field">
               <label>Scadenza</label
-              ><input
-                type="text"
-                id="pm-scadenza"
-                placeholder="Seleziona data..."
-                readonly
-                style="cursor: pointer"
-              />
+              ><input type="text" id="pm-scadenza" placeholder="Seleziona data..." readonly style="cursor: pointer" />
             </div>
           </div>
           <div class="form-row">
             <div class="field">
               <label>Descrizione (opzionale)</label
-              ><textarea
-                id="pm-descrizione"
-                placeholder="Dettagli aggiuntivi..."
-                style="min-height: 60px"
-              ></textarea>
+              ><textarea id="pm-descrizione" placeholder="Dettagli aggiuntivi..." style="min-height: 60px"></textarea>
             </div>
             <div class="field">
               <label>Assegnato a</label
               ><button
                 type="button"
                 id="pm-assegnato-btn"
-                onclick="
-                  apriMultiSelectOperatori(
-                    'pm-assegnato',
-                    'pm-assegnato-btn',
-                    'Assegnatari promemoria',
-                  )
-                "
+                onclick="apriMultiSelectOperatori('pm-assegnato', 'pm-assegnato-btn', 'Assegnatari promemoria')"
                 style="
                   padding: 11px 14px;
                   background: var(--paper2);
@@ -1593,9 +1221,7 @@
               </select>
             </div>
           </div>
-          <button class="btn-salva" onclick="salvaPromemoria()">
-            Crea promemoria
-          </button>
+          <button class="btn-salva" onclick="salvaPromemoria()">Crea promemoria</button>
         </div>
       </div>
       <div class="main-card" style="margin-top: 20px">
@@ -1647,21 +1273,11 @@
       <div class="main-card">
         <div class="card-header">Costi Maison - Caricamento dati</div>
         <div class="form-area">
-          <p
-            style="color: var(--muted); font-size: 0.84rem; margin-bottom: 14px"
-          >
-            Carica il formulario ristorante (Excel). Il sistema riconosce
-            automaticamente nomi, importi, buoni (BU/BL) e divide i costi per
-            nomi multipli.
+          <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 14px">
+            Carica il formulario ristorante (Excel). Il sistema riconosce automaticamente nomi, importi, buoni (BU/BL) e
+            divide i costi per nomi multipli.
           </p>
-          <div
-            style="
-              display: flex;
-              gap: 12px;
-              align-items: center;
-              flex-wrap: wrap;
-            "
-          >
+          <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap">
             <button
               class="btn-salva"
               onclick="document.getElementById('maison-file-input').click()"
@@ -1676,22 +1292,14 @@
               style="display: none"
               onchange="caricaMaisonFile(this)"
             />
-            <span
-              id="maison-upload-status"
-              style="font-size: 0.82rem; color: var(--muted)"
-            ></span>
+            <span id="maison-upload-status" style="font-size: 0.82rem; color: var(--muted)"></span>
           </div>
         </div>
         <div class="form-area" style="border-top: 1px solid var(--line)">
-          <p
-            style="color: var(--muted); font-size: 0.84rem; margin-bottom: 14px"
-          >
+          <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 14px">
             Oppure aggiungi manualmente una spesa ristorante maison.
           </p>
-          <div
-            class="form-row"
-            style="grid-template-columns: repeat(auto-fit, minmax(100px, 1fr))"
-          >
+          <div class="form-row" style="grid-template-columns: repeat(auto-fit, minmax(100px, 1fr))">
             <div class="field">
               <label>Cliente</label>
               <div class="ac-wrap">
@@ -1706,14 +1314,7 @@
               </div>
             </div>
             <div class="field">
-              <label>PX</label
-              ><input
-                type="number"
-                id="maison-man-px"
-                value="1"
-                min="1"
-                style="width: 80px"
-              />
+              <label>PX</label><input type="number" id="maison-man-px" value="1" min="1" style="width: 80px" />
             </div>
             <div class="field">
               <label>Importo CHF</label
@@ -1732,8 +1333,7 @@
                 id="maison-man-tipo"
                 style="padding: 11px"
                 onchange="
-                  document.getElementById('maison-man-qty-wrap').style.display =
-                    this.value ? '' : 'none';
+                  document.getElementById('maison-man-qty-wrap').style.display = this.value ? '' : 'none';
                   _autoCalcolaBuoniManuale();
                 "
               >
@@ -1746,31 +1346,14 @@
             </div>
             <div class="field" id="maison-man-qty-wrap" style="display: none">
               <label>N° buoni</label
-              ><input
-                type="number"
-                id="maison-man-qty"
-                value="1"
-                min="1"
-                max="10"
-                style="width: 70px"
-              />
+              ><input type="number" id="maison-man-qty" value="1" min="1" max="10" style="width: 70px" />
             </div>
             <div class="field">
               <label>Data</label
-              ><input
-                type="text"
-                id="maison-man-data"
-                placeholder="Oggi"
-                readonly
-                style="cursor: pointer"
-              />
+              ><input type="text" id="maison-man-data" placeholder="Oggi" readonly style="cursor: pointer" />
             </div>
           </div>
-          <button
-            class="btn-salva"
-            onclick="salvaMaisonManuale()"
-            style="background: var(--accent2)"
-          >
+          <button class="btn-salva" onclick="salvaMaisonManuale()" style="background: var(--accent2)">
             + Aggiungi spesa maison
           </button>
         </div>
@@ -1843,12 +1426,7 @@
           <button class="btn-reset" onclick="resetMaisonFiltri()">Reset</button>
           <div class="export-btns">
             <button class="btn-export" onclick="esportaMaisonCSV()">CSV</button>
-            <button
-              class="btn-export btn-export-pdf"
-              onclick="esportaMaisonPDF()"
-            >
-              PDF
-            </button>
+            <button class="btn-export btn-export-pdf" onclick="esportaMaisonPDF()">PDF</button>
           </div>
         </div>
         <div id="maison-stats-bar" style="padding: 16px"></div>
@@ -1874,18 +1452,8 @@
           </div>
         </div>
       </div>
-      <div
-        class="settings-section"
-        style="margin-top: 20px"
-        id="maison-budget-section"
-      >
-        <h4
-          style="
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-          "
-        >
+      <div class="settings-section" style="margin-top: 20px" id="maison-budget-section">
+        <h4 style="display: flex; justify-content: space-between; align-items: center">
           Scheda clienti Maison
           <button
             class="btn-reset"
@@ -1898,14 +1466,8 @@
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
           Gestisci categoria (Maison/Full Maison), budget, data nascita.
         </p>
-        <div
-          style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap"
-        >
-          <button
-            class="btn-export"
-            onclick="esportaListaMaisonCSV()"
-            style="font-size: 0.78rem; padding: 5px 14px"
-          >
+        <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap">
+          <button class="btn-export" onclick="esportaListaMaisonCSV()" style="font-size: 0.78rem; padding: 5px 14px">
             CSV</button
           ><button
             class="btn-export btn-export-pdf"
@@ -1916,34 +1478,19 @@
           ><button
             class="btn-export"
             onclick="apriListaClientiMaison()"
-            style="
-              font-size: 0.78rem;
-              padding: 5px 14px;
-              border-color: var(--accent2);
-              color: var(--accent2);
-            "
+            style="font-size: 0.78rem; padding: 5px 14px; border-color: var(--accent2); color: var(--accent2)"
           >
             Mostra Lista</button
           ><button
             class="btn-export"
             onclick="apriConfrontoClienti()"
-            style="
-              font-size: 0.78rem;
-              padding: 5px 14px;
-              border-color: #1a7a6d;
-              color: #1a7a6d;
-            "
+            style="font-size: 0.78rem; padding: 5px 14px; border-color: #1a7a6d; color: #1a7a6d"
           >
             Confronta clienti</button
           ><button
             class="btn-export"
             onclick="document.getElementById('import-cat-file').click()"
-            style="
-              font-size: 0.78rem;
-              padding: 5px 14px;
-              border-color: #b8860b;
-              color: #b8860b;
-            "
+            style="font-size: 0.78rem; padding: 5px 14px; border-color: #b8860b; color: #b8860b"
           >
             <i class="icx icx-download"></i> Importa Categorie</button
           ><input
@@ -1955,12 +1502,7 @@
           /><button
             class="btn-export"
             onclick="document.getElementById('import-compl-file').click()"
-            style="
-              font-size: 0.78rem;
-              padding: 5px 14px;
-              border-color: #8e44ad;
-              color: #8e44ad;
-            "
+            style="font-size: 0.78rem; padding: 5px 14px; border-color: #8e44ad; color: #8e44ad"
           >
             <i class="icx icx-torta"></i> Importa Compleanni</button
           ><input
@@ -1972,23 +1514,13 @@
           /><button
             class="btn-export"
             onclick="riallineaNomiMaison()"
-            style="
-              font-size: 0.78rem;
-              padding: 5px 14px;
-              border-color: #c0392b;
-              color: #c0392b;
-            "
+            style="font-size: 0.78rem; padding: 5px 14px; border-color: #c0392b; color: #c0392b"
           >
             <i class="icx icx-refresh"></i> Riallinea Nomi</button
           ><button
             class="btn-export"
             onclick="unisciDuplicatiMaison()"
-            style="
-              font-size: 0.78rem;
-              padding: 5px 14px;
-              border-color: #1a4a7a;
-              color: #1a4a7a;
-            "
+            style="font-size: 0.78rem; padding: 5px 14px; border-color: #1a4a7a; color: #1a4a7a"
           >
             <i class="icx icx-link"></i> Unisci Duplicati
           </button>
@@ -2002,12 +1534,8 @@
                 type="text"
                 id="maison-budget-nome"
                 placeholder="Nome..."
-                oninput="
-                  acFiltraMaison('maison-budget-nome', 'ac-maison-budget')
-                "
-                onfocus="
-                  acFiltraMaison('maison-budget-nome', 'ac-maison-budget')
-                "
+                oninput="acFiltraMaison('maison-budget-nome', 'ac-maison-budget')"
+                onfocus="acFiltraMaison('maison-budget-nome', 'ac-maison-budget')"
               />
               <div class="ac-drop" id="ac-maison-budget"></div>
             </div>
@@ -2025,23 +1553,11 @@
           </div>
           <div class="field">
             <label>Max BU</label
-            ><input
-              type="number"
-              id="maison-budget-bu"
-              placeholder="-"
-              min="0"
-              style="width: 80px"
-            />
+            ><input type="number" id="maison-budget-bu" placeholder="-" min="0" style="width: 80px" />
           </div>
           <div class="field">
             <label>Max BL</label
-            ><input
-              type="number"
-              id="maison-budget-bl"
-              placeholder="-"
-              min="0"
-              style="width: 80px"
-            />
+            ><input type="number" id="maison-budget-bl" placeholder="-" min="0" style="width: 80px" />
           </div>
           <div class="field">
             <label>Categoria</label
@@ -2056,22 +1572,13 @@
           </div>
           <div class="field">
             <label>Data nascita</label
-            ><input
-              type="text"
-              id="maison-budget-nascita"
-              placeholder="es: 12.01.1997"
-              style="width: 120px"
-            />
+            ><input type="text" id="maison-budget-nascita" placeholder="es: 12.01.1997" style="width: 120px" />
           </div>
-          <button class="btn-add-tipo" onclick="salvaMaisonBudget()">
-            + Salva
-          </button>
+          <button class="btn-add-tipo" onclick="salvaMaisonBudget()">+ Salva</button>
         </div>
       </div>
       <div class="main-card" style="margin-top: 20px">
-        <div class="card-header">
-          Spese Extra (cene esterne, viaggi, rimborsi, biglietti)
-        </div>
+        <div class="card-header">Spese Extra (cene esterne, viaggi, rimborsi, biglietti)</div>
         <div class="form-area">
           <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr">
             <div class="field">
@@ -2102,56 +1609,26 @@
             </div>
             <div class="field">
               <label>Data</label
-              ><input
-                type="text"
-                id="se-data"
-                placeholder="Seleziona..."
-                readonly
-                style="cursor: pointer"
-              />
+              ><input type="text" id="se-data" placeholder="Seleziona..." readonly style="cursor: pointer" />
             </div>
           </div>
           <div class="form-row" style="grid-template-columns: 1fr 1fr 80px">
             <div class="field">
               <label>Luogo / Ristorante</label
-              ><input
-                type="text"
-                id="se-luogo"
-                placeholder="Es: Ristorante Da Mario, Zurigo..."
-              />
+              ><input type="text" id="se-luogo" placeholder="Es: Ristorante Da Mario, Zurigo..." />
             </div>
             <div class="field">
-              <label>Importo CHF</label
-              ><input
-                type="number"
-                id="se-importo"
-                placeholder="0.00"
-                min="0"
-                step="0.01"
-              />
+              <label>Importo CHF</label><input type="number" id="se-importo" placeholder="0.00" min="0" step="0.01" />
             </div>
             <div class="field">
-              <label>PX</label
-              ><input
-                type="number"
-                id="se-px"
-                value="1"
-                min="1"
-                style="width: 70px"
-              />
+              <label>PX</label><input type="number" id="se-px" value="1" min="1" style="width: 70px" />
             </div>
           </div>
           <div class="field" style="margin-bottom: 16px">
             <label>Descrizione (opzionale)</label
-            ><input
-              type="text"
-              id="se-descrizione"
-              placeholder="Dettagli aggiuntivi..."
-            />
+            ><input type="text" id="se-descrizione" placeholder="Dettagli aggiuntivi..." />
           </div>
-          <button class="btn-salva" onclick="salvaSpeseExtra()">
-            Aggiungi spesa
-          </button>
+          <button class="btn-salva" onclick="salvaSpeseExtra()">Aggiungi spesa</button>
         </div>
         <div class="filters">
           <div class="filter-group">
@@ -2217,29 +1694,12 @@
               style="cursor: pointer; min-width: 130px"
             />
           </div>
-          <button class="btn-reset" onclick="resetSpeseExtraFiltri()">
-            Reset
-          </button>
+          <button class="btn-reset" onclick="resetSpeseExtraFiltri()">Reset</button>
           <div class="export-btns">
-            <button class="btn-export" onclick="esportaSpeseExtraCSV()">
-              CSV
-            </button>
-            <button
-              class="btn-export btn-export-pdf"
-              onclick="esportaSpeseExtraPDF()"
-            >
-              PDF
-            </button>
+            <button class="btn-export" onclick="esportaSpeseExtraCSV()">CSV</button>
+            <button class="btn-export btn-export-pdf" onclick="esportaSpeseExtraPDF()">PDF</button>
           </div>
-          <span
-            id="se-del-wrap"
-            style="
-              display: none;
-              gap: 6px;
-              align-items: center;
-              flex-wrap: wrap;
-            "
-          ></span>
+          <span id="se-del-wrap" style="display: none; gap: 6px; align-items: center; flex-wrap: wrap"></span>
         </div>
         <div id="spese-extra-list" style="padding: 16px"></div>
       </div>
@@ -2262,38 +1722,20 @@
             </div>
             <div class="field">
               <label>Descrizione regalo</label
-              ><input
-                type="text"
-                id="regalo-desc"
-                placeholder="Es: Bottiglia di vino..."
-              />
+              ><input type="text" id="regalo-desc" placeholder="Es: Bottiglia di vino..." />
             </div>
             <div class="field">
               <label>Importo CHF (opzionale)</label
-              ><input
-                type="number"
-                id="regalo-importo"
-                placeholder="-"
-                min="0"
-                step="0.01"
-              />
+              ><input type="number" id="regalo-importo" placeholder="-" min="0" step="0.01" />
             </div>
           </div>
           <div class="form-row">
             <div class="field">
               <label>Data</label
-              ><input
-                type="text"
-                id="regalo-data"
-                placeholder="Seleziona..."
-                readonly
-                style="cursor: pointer"
-              />
+              ><input type="text" id="regalo-data" placeholder="Seleziona..." readonly style="cursor: pointer" />
             </div>
           </div>
-          <button class="btn-salva" onclick="salvaRegalo()">
-            Aggiungi regalo
-          </button>
+          <button class="btn-salva" onclick="salvaRegalo()">Aggiungi regalo</button>
         </div>
         <div id="regali-list" style="padding: 16px"></div>
       </div>
@@ -2301,10 +1743,7 @@
 
     <!-- INVENTARIO -->
     <div class="page" id="page-inventario">
-      <div
-        id="inv-tabs"
-        style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap"
-      >
+      <div id="inv-tabs" style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap">
         <button
           class="inv-tab-btn active"
           data-tab="buoni"
@@ -2362,21 +1801,10 @@
         <div class="main-card" style="margin-top: 16px">
           <div class="card-header">Carico Buoni</div>
           <div class="form-area">
-            <p
-              style="
-                color: var(--muted);
-                font-size: 0.84rem;
-                margin-bottom: 14px;
-              "
-            >
+            <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 14px">
               Registra l'arrivo di nuovi buoni in scorta.
             </p>
-            <div
-              class="form-row"
-              style="
-                grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-              "
-            >
+            <div class="form-row" style="grid-template-columns: repeat(auto-fit, minmax(100px, 1fr))">
               <div class="field">
                 <label>Tipo</label
                 ><select
@@ -2398,38 +1826,17 @@
               </div>
               <div class="field">
                 <label>Quantit&agrave;</label
-                ><input
-                  type="number"
-                  id="inv-carico-qty"
-                  placeholder="0"
-                  min="1"
-                  step="1"
-                />
+                ><input type="number" id="inv-carico-qty" placeholder="0" min="1" step="1" />
               </div>
               <div class="field">
                 <label>Data</label
-                ><input
-                  type="text"
-                  id="inv-carico-data"
-                  placeholder="Oggi"
-                  readonly
-                  style="cursor: pointer"
-                />
+                ><input type="text" id="inv-carico-data" placeholder="Oggi" readonly style="cursor: pointer" />
               </div>
               <div class="field">
-                <label>Nota</label
-                ><input
-                  type="text"
-                  id="inv-carico-nota"
-                  placeholder="Opzionale..."
-                />
+                <label>Nota</label><input type="text" id="inv-carico-nota" placeholder="Opzionale..." />
               </div>
             </div>
-            <button
-              class="btn-salva"
-              onclick="salvaInventarioCarico()"
-              style="background: #2c6e49"
-            >
+            <button class="btn-salva" onclick="salvaInventarioCarico()" style="background: #2c6e49">
               &#9650; Carica buoni
             </button>
           </div>
@@ -2438,22 +1845,11 @@
         <div class="main-card" style="margin-top: 16px">
           <div class="card-header">Buono a Cliente</div>
           <div class="form-area">
-            <p
-              style="
-                color: var(--muted);
-                font-size: 0.84rem;
-                margin-bottom: 14px;
-              "
-            >
-              Pre-assegna buoni a un cliente. Verr&agrave; pareggiato
-              automaticamente quando il cliente consuma in Maison.
+            <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 14px">
+              Pre-assegna buoni a un cliente. Verr&agrave; pareggiato automaticamente quando il cliente consuma in
+              Maison.
             </p>
-            <div
-              class="form-row"
-              style="
-                grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-              "
-            >
+            <div class="form-row" style="grid-template-columns: repeat(auto-fit, minmax(100px, 1fr))">
               <div class="field">
                 <label>Cliente</label>
                 <div class="ac-wrap">
@@ -2488,39 +1884,17 @@
               </div>
               <div class="field">
                 <label>Quantit&agrave;</label
-                ><input
-                  type="number"
-                  id="inv-usc-qty"
-                  placeholder="1"
-                  min="1"
-                  step="1"
-                  value="1"
-                />
+                ><input type="number" id="inv-usc-qty" placeholder="1" min="1" step="1" value="1" />
               </div>
               <div class="field">
                 <label>Data</label
-                ><input
-                  type="text"
-                  id="inv-usc-data"
-                  placeholder="Oggi"
-                  readonly
-                  style="cursor: pointer"
-                />
+                ><input type="text" id="inv-usc-data" placeholder="Oggi" readonly style="cursor: pointer" />
               </div>
               <div class="field">
-                <label>Nota</label
-                ><input
-                  type="text"
-                  id="inv-usc-nota"
-                  placeholder="Opzionale..."
-                />
+                <label>Nota</label><input type="text" id="inv-usc-nota" placeholder="Opzionale..." />
               </div>
             </div>
-            <button
-              class="btn-salva"
-              onclick="salvaInventarioUscita()"
-              style="background: #e67e22"
-            >
+            <button class="btn-salva" onclick="salvaInventarioUscita()" style="background: #e67e22">
               &#9660; Assegna buono
             </button>
           </div>
@@ -2702,23 +2076,9 @@
               Reset
             </button>
           </div>
-          <div
-            id="inv-buoni-table"
-            style="padding: 12px 18px; overflow-x: auto"
-          ></div>
-          <div
-            style="
-              padding: 8px 18px 16px;
-              display: flex;
-              gap: 8px;
-              flex-wrap: wrap;
-            "
-          >
-            <button
-              class="btn-export"
-              onclick="esportaInventarioCSV()"
-              style="padding: 6px 14px; font-size: 0.82rem"
-            >
+          <div id="inv-buoni-table" style="padding: 12px 18px; overflow-x: auto"></div>
+          <div style="padding: 8px 18px 16px; display: flex; gap: 8px; flex-wrap: wrap">
+            <button class="btn-export" onclick="esportaInventarioCSV()" style="padding: 6px 14px; font-size: 0.82rem">
               CSV
             </button>
             <button
@@ -2750,29 +2110,12 @@
         <div class="main-card" style="margin-top: 16px">
           <div class="card-header">Sigaretta Sbagliata (entrata)</div>
           <div class="form-area">
-            <p
-              style="
-                color: var(--muted);
-                font-size: 0.84rem;
-                margin-bottom: 14px;
-              "
-            >
-              Registra una sigaretta sbagliata data al cliente (entra in
-              scorta).
+            <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 14px">
+              Registra una sigaretta sbagliata data al cliente (entra in scorta).
             </p>
-            <div
-              class="form-row"
-              style="
-                grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-              "
-            >
+            <div class="form-row" style="grid-template-columns: repeat(auto-fit, minmax(100px, 1fr))">
               <div class="field">
-                <label>Marca</label
-                ><input
-                  type="text"
-                  id="inv-sig-marca"
-                  placeholder="Es: Marlboro Gold..."
-                />
+                <label>Marca</label><input type="text" id="inv-sig-marca" placeholder="Es: Marlboro Gold..." />
               </div>
               <div class="field">
                 <label>Collaboratore</label>
@@ -2802,30 +2145,14 @@
               </div>
               <div class="field">
                 <label>Qty</label
-                ><input
-                  type="number"
-                  id="inv-sig-qty"
-                  value="1"
-                  min="1"
-                  style="width: 70px; max-width: 100%"
-                />
+                ><input type="number" id="inv-sig-qty" value="1" min="1" style="width: 70px; max-width: 100%" />
               </div>
               <div class="field">
                 <label>Data</label
-                ><input
-                  type="text"
-                  id="inv-sig-data"
-                  placeholder="Oggi"
-                  readonly
-                  style="cursor: pointer"
-                />
+                ><input type="text" id="inv-sig-data" placeholder="Oggi" readonly style="cursor: pointer" />
               </div>
             </div>
-            <button
-              class="btn-salva"
-              onclick="salvaInventarioSigEntrata()"
-              style="background: #2c6e49"
-            >
+            <button class="btn-salva" onclick="salvaInventarioSigEntrata()" style="background: #2c6e49">
               &#9650; Aggiungi alla scorta
             </button>
           </div>
@@ -2834,21 +2161,10 @@
         <div class="main-card" style="margin-top: 16px">
           <div class="card-header">Usa dalla Scorta (uscita)</div>
           <div class="form-area">
-            <p
-              style="
-                color: var(--muted);
-                font-size: 0.84rem;
-                margin-bottom: 14px;
-              "
-            >
+            <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 14px">
               Dai una sigaretta dalla scorta a un cliente.
             </p>
-            <div
-              class="form-row"
-              style="
-                grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-              "
-            >
+            <div class="form-row" style="grid-template-columns: repeat(auto-fit, minmax(100px, 1fr))">
               <div class="field">
                 <label>Marca</label
                 ><select
@@ -2871,42 +2187,22 @@
                     type="text"
                     id="inv-sig-usc-cliente"
                     placeholder="A chi..."
-                    oninput="
-                      acFiltraMaison('inv-sig-usc-cliente', 'ac-inv-sig-usc')
-                    "
-                    onfocus="
-                      acFiltraMaison('inv-sig-usc-cliente', 'ac-inv-sig-usc')
-                    "
+                    oninput="acFiltraMaison('inv-sig-usc-cliente', 'ac-inv-sig-usc')"
+                    onfocus="acFiltraMaison('inv-sig-usc-cliente', 'ac-inv-sig-usc')"
                   />
                   <div class="ac-drop" id="ac-inv-sig-usc"></div>
                 </div>
               </div>
               <div class="field">
                 <label>Qty</label
-                ><input
-                  type="number"
-                  id="inv-sig-usc-qty"
-                  value="1"
-                  min="1"
-                  style="width: 70px; max-width: 100%"
-                />
+                ><input type="number" id="inv-sig-usc-qty" value="1" min="1" style="width: 70px; max-width: 100%" />
               </div>
               <div class="field">
                 <label>Data</label
-                ><input
-                  type="text"
-                  id="inv-sig-usc-data"
-                  placeholder="Oggi"
-                  readonly
-                  style="cursor: pointer"
-                />
+                ><input type="text" id="inv-sig-usc-data" placeholder="Oggi" readonly style="cursor: pointer" />
               </div>
             </div>
-            <button
-              class="btn-salva"
-              onclick="salvaInventarioSigUscita()"
-              style="background: #c0392b"
-            >
+            <button class="btn-salva" onclick="salvaInventarioSigUscita()" style="background: #c0392b">
               &#9660; Dai a cliente
             </button>
           </div>
@@ -3046,23 +2342,9 @@
               Reset
             </button>
           </div>
-          <div
-            id="inv-sig-table"
-            style="padding: 12px 18px; overflow-x: auto"
-          ></div>
-          <div
-            style="
-              padding: 8px 18px 16px;
-              display: flex;
-              gap: 8px;
-              flex-wrap: wrap;
-            "
-          >
-            <button
-              class="btn-export"
-              onclick="esportaInventarioCSV()"
-              style="padding: 6px 14px; font-size: 0.82rem"
-            >
+          <div id="inv-sig-table" style="padding: 12px 18px; overflow-x: auto"></div>
+          <div style="padding: 8px 18px 16px; display: flex; gap: 8px; flex-wrap: wrap">
+            <button class="btn-export" onclick="esportaInventarioCSV()" style="padding: 6px 14px; font-size: 0.82rem">
               CSV
             </button>
             <button
@@ -3079,6 +2361,9 @@
 
     <!-- IMPOSTAZIONI -->
     <!-- REGISTRO ATTIVITA -->
+    <div class="page" id="page-guida">
+      <div id="guida-content"></div>
+    </div>
     <div class="page" id="page-registro">
       <div class="main-card">
         <div class="card-header">Registro attività operatori</div>
@@ -3171,11 +2456,7 @@
               style="cursor: pointer; min-width: 150px"
             />
           </div>
-          <button
-            class="btn-export"
-            onclick="esportaRegistroCSV()"
-            style="padding: 6px 14px; font-size: 0.82rem"
-          >
+          <button class="btn-export" onclick="esportaRegistroCSV()" style="padding: 6px 14px; font-size: 0.82rem">
             CSV
           </button>
         </div>
@@ -3187,14 +2468,7 @@
     <div class="page" id="page-moduli">
       <div class="main-card">
         <div class="card-header">Moduli disciplinari</div>
-        <p
-          style="
-            color: var(--muted);
-            font-size: 0.86rem;
-            margin: 0 0 12px;
-            padding: 0 16px;
-          "
-        >
+        <p style="color: var(--muted); font-size: 0.86rem; margin: 0 0 12px; padding: 0 16px">
           Seleziona un modulo, compila i campi e genera il PDF.
         </p>
         <div style="padding: 0 16px 12px">
@@ -3209,65 +2483,29 @@
             >Template rapidi</span
           >
           <div class="template-rapidi-wrap" style="margin-top: 6px">
-            <button
-              class="template-rapido-btn"
-              onclick="templateRapido('allineamento', 'cassa_errore')"
-            >
+            <button class="template-rapido-btn" onclick="templateRapido('allineamento', 'cassa_errore')">
               Errore cassa
             </button>
-            <button
-              class="template-rapido-btn"
-              onclick="templateRapido('allineamento', 'ritardo')"
-            >
-              Ritardo
-            </button>
-            <button
-              class="template-rapido-btn"
-              onclick="templateRapido('allineamento', 'uniforme')"
-            >
+            <button class="template-rapido-btn" onclick="templateRapido('allineamento', 'ritardo')">Ritardo</button>
+            <button class="template-rapido-btn" onclick="templateRapido('allineamento', 'uniforme')">
               Uniforme non conforme
             </button>
-            <button
-              class="template-rapido-btn"
-              onclick="templateRapido('allineamento', 'comportamento')"
-            >
+            <button class="template-rapido-btn" onclick="templateRapido('allineamento', 'comportamento')">
               Comportamento inadeguato
             </button>
-            <button
-              class="template-rapido-btn"
-              onclick="templateRapido('allineamento', 'procedura')"
-            >
+            <button class="template-rapido-btn" onclick="templateRapido('allineamento', 'procedura')">
               Mancato rispetto procedura
             </button>
-            <button
-              class="template-rapido-btn"
-              onclick="templateRapido('apprezzamento', 'prestazione')"
-            >
+            <button class="template-rapido-btn" onclick="templateRapido('apprezzamento', 'prestazione')">
               Prestazione eccellente
             </button>
-            <button
-              class="template-rapido-btn"
-              onclick="templateRapido('apprezzamento', 'cliente')"
-            >
+            <button class="template-rapido-btn" onclick="templateRapido('apprezzamento', 'cliente')">
               Feedback positivo cliente
             </button>
-            <button
-              class="template-rapido-btn"
-              onclick="templateRapido('rdi', 'recidiva')"
-            >
-              Recidiva (RDI)
-            </button>
+            <button class="template-rapido-btn" onclick="templateRapido('rdi', 'recidiva')">Recidiva (RDI)</button>
           </div>
         </div>
-        <div
-          style="
-            display: flex;
-            gap: 14px;
-            flex-wrap: wrap;
-            padding: 0 16px 16px;
-          "
-          id="moduli-cards"
-        >
+        <div style="display: flex; gap: 14px; flex-wrap: wrap; padding: 0 16px 16px" id="moduli-cards">
           <div
             class="modulo-card"
             onclick="apriModulo('allineamento')"
@@ -3281,15 +2519,7 @@
               transition: border-color 0.2s;
             "
           >
-            <h4
-              style="
-                margin: 0 0 6px;
-                font-family: &quot;Playfair Display&quot;, serif;
-                color: var(--ink);
-              "
-            >
-              Allineamento
-            </h4>
+            <h4 style="margin: 0 0 6px; font-family: 'Playfair Display', serif; color: var(--ink)">Allineamento</h4>
             <p style="color: var(--muted); font-size: 0.82rem; margin: 0">
               Rilevamento di non conformità e colloquio di allineamento
             </p>
@@ -3307,18 +2537,8 @@
               transition: border-color 0.2s;
             "
           >
-            <h4
-              style="
-                margin: 0 0 6px;
-                font-family: &quot;Playfair Display&quot;, serif;
-                color: var(--ink);
-              "
-            >
-              Apprezzamento
-            </h4>
-            <p style="color: var(--muted); font-size: 0.82rem; margin: 0">
-              Colloquio di apprezzamento
-            </p>
+            <h4 style="margin: 0 0 6px; font-family: 'Playfair Display', serif; color: var(--ink)">Apprezzamento</h4>
+            <p style="color: var(--muted); font-size: 0.82rem; margin: 0">Colloquio di apprezzamento</p>
           </div>
           <div
             class="modulo-card"
@@ -3333,15 +2553,7 @@
               transition: border-color 0.2s;
             "
           >
-            <h4
-              style="
-                margin: 0 0 6px;
-                font-family: &quot;Playfair Display&quot;, serif;
-                color: var(--ink);
-              "
-            >
-              RDI
-            </h4>
+            <h4 style="margin: 0 0 6px; font-family: 'Playfair Display', serif; color: var(--ink)">RDI</h4>
             <p style="color: var(--muted); font-size: 0.82rem; margin: 0">
               Rapporto disciplinare interno (I° e II° livello)
             </p>
@@ -3369,14 +2581,7 @@
     <!-- FORMAZIONE / MULTIDISCIPLINARITA -->
     <div class="page" id="page-formazione">
       <div style="text-align: center; margin-bottom: 16px">
-        <h2
-          style="
-            font-family: &quot;Playfair Display&quot;, serif;
-            font-size: 1.5rem;
-            color: var(--ink);
-            margin-bottom: 4px;
-          "
-        >
+        <h2 style="font-family: 'Playfair Display', serif; font-size: 1.5rem; color: var(--ink); margin-bottom: 4px">
           Progetto Multidisciplinarità
         </h2>
         <p style="color: var(--muted); font-size: 0.88rem">
@@ -3396,37 +2601,22 @@
       <div class="main-card">
         <div class="card-header">Assistente – Scrittura veloce</div>
         <div class="form-area">
-          <p
-            style="color: var(--muted); font-size: 0.84rem; margin-bottom: 16px"
-          >
-            Scrivi un testo veloce e l'AI lo riscrive in modo formale e
-            professionale, usando le procedure e regole del casinò. Nessun dato
-            viene salvato.
+          <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 16px">
+            Scrivi un testo veloce e l'AI lo riscrive in modo formale e professionale, usando le procedure e regole del
+            casinò. Nessun dato viene salvato.
           </p>
           <div class="form-row">
             <div class="field">
               <label>Tipo di testo</label>
               <select id="assist-tipo">
-                <option value="mail_formale">
-                  Mail formale (a Direzione / HR / CFCG)
-                </option>
-                <option value="mail_colleghi">
-                  Mail colleghi / comunicazione interna
-                </option>
-                <option value="nota_collaboratore">
-                  Nota al collaboratore
-                </option>
-                <option value="comunicazione_servizio">
-                  Comunicazione di servizio
-                </option>
+                <option value="mail_formale">Mail formale (a Direzione / HR / CFCG)</option>
+                <option value="mail_colleghi">Mail colleghi / comunicazione interna</option>
+                <option value="nota_collaboratore">Nota al collaboratore</option>
+                <option value="comunicazione_servizio">Comunicazione di servizio</option>
                 <option value="segnalazione">Segnalazione / rapporto</option>
                 <option value="risposta">Risposta a richiesta / reclamo</option>
-                <option value="libero">
-                  Testo libero (migliora solo la forma)
-                </option>
-                <option value="correzione">
-                  Solo correzione (grammatica e refusi, testo intatto)
-                </option>
+                <option value="libero">Testo libero (migliora solo la forma)</option>
+                <option value="correzione">Solo correzione (grammatica e refusi, testo intatto)</option>
               </select>
             </div>
             <div class="field">
@@ -3467,8 +2657,7 @@
                   letter-spacing: 0;
                   font-size: 0.75rem;
                 "
-                >Scrivi in modo veloce, anche appunti – l'AI sistema
-                tutto</small
+                >Scrivi in modo veloce, anche appunti – l'AI sistema tutto</small
               ></label
             >
             <textarea
@@ -3491,22 +2680,11 @@
                 >Opzionale – l'AI analizzerà anche l'immagine</small
               ></label
             >
-            <div
-              style="
-                display: flex;
-                gap: 10px;
-                align-items: center;
-                flex-wrap: wrap;
-              "
-            >
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap">
               <button
                 class="btn-salva"
                 onclick="document.getElementById('assist-foto-input').click()"
-                style="
-                  background: var(--accent2);
-                  font-size: 0.78rem;
-                  padding: 8px 16px;
-                "
+                style="background: var(--accent2); font-size: 0.78rem; padding: 8px 16px"
               >
                 Allega foto
               </button>
@@ -3517,11 +2695,7 @@
                 style="display: none"
                 onchange="assistenteFotoPreview(this)"
               />
-              <span
-                id="assist-foto-name"
-                style="font-size: 0.82rem; color: var(--muted)"
-                >Nessuna foto</span
-              >
+              <span id="assist-foto-name" style="font-size: 0.82rem; color: var(--muted)">Nessuna foto</span>
               <button
                 id="assist-foto-remove"
                 onclick="assistenteFotoRimuovi()"
@@ -3535,47 +2709,24 @@
                   font-size: 0.72rem;
                   font-weight: 700;
                   cursor: pointer;
-                  font-family: &quot;Source Sans 3&quot;, sans-serif;
+                  font-family: 'Source Sans 3', sans-serif;
                 "
               >
                 Rimuovi
               </button>
             </div>
-            <div
-              id="assist-foto-preview"
-              style="display: none; margin-top: 10px"
-            >
+            <div id="assist-foto-preview" style="display: none; margin-top: 10px">
               <img
                 id="assist-foto-img"
-                style="
-                  max-width: 300px;
-                  max-height: 200px;
-                  border-radius: 3px;
-                  border: 1px solid var(--line);
-                "
+                style="max-width: 300px; max-height: 200px; border-radius: 3px; border: 1px solid var(--line)"
               />
             </div>
           </div>
-          <div
-            style="
-              display: flex;
-              gap: 10px;
-              align-items: center;
-              flex-wrap: wrap;
-            "
-          >
-            <button
-              class="btn-salva"
-              id="btn-assist-gen"
-              onclick="assistenteGenera()"
-              style="background: var(--ink)"
-            >
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap">
+            <button class="btn-salva" id="btn-assist-gen" onclick="assistenteGenera()" style="background: var(--ink)">
               Riscrivi con AI
             </button>
-            <span
-              id="assist-status"
-              style="font-size: 0.82rem; color: var(--muted)"
-            ></span>
+            <span id="assist-status" style="font-size: 0.82rem; color: var(--muted)"></span>
           </div>
           <div id="assist-output-wrap" style="display: none; margin-top: 20px">
             <div class="field">
@@ -3583,41 +2734,21 @@
               <textarea
                 id="assist-output"
                 readonly
-                style="
-                  min-height: 180px;
-                  background: var(--paper2);
-                  font-size: 0.95rem;
-                  line-height: 1.6;
-                "
+                style="min-height: 180px; background: var(--paper2); font-size: 0.95rem; line-height: 1.6"
               ></textarea>
             </div>
-            <div
-              style="
-                display: flex;
-                gap: 10px;
-                margin-top: 10px;
-                flex-wrap: wrap;
-              "
-            >
+            <div style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap">
               <button
                 class="btn-salva"
                 onclick="assistenteCopia()"
-                style="
-                  background: var(--ink);
-                  font-size: 0.78rem;
-                  padding: 10px 20px;
-                "
+                style="background: var(--ink); font-size: 0.78rem; padding: 10px 20px"
               >
                 Copia negli appunti
               </button>
               <button
                 class="btn-salva"
                 onclick="assistenteGenera()"
-                style="
-                  background: var(--accent2);
-                  font-size: 0.78rem;
-                  padding: 10px 20px;
-                "
+                style="background: var(--accent2); font-size: 0.78rem; padding: 10px 20px"
               >
                 Riprova
               </button>
@@ -3650,20 +2781,10 @@
         <div class="tipo-list" id="tipo-list"></div>
         <div class="add-tipo-row">
           <div class="field">
-            <label>Nome nuovo tipo</label
-            ><input
-              type="text"
-              id="new-tipo-nome"
-              placeholder="es. Ritardo, Lode..."
-            />
+            <label>Nome nuovo tipo</label><input type="text" id="new-tipo-nome" placeholder="es. Ritardo, Lode..." />
           </div>
-          <div class="field">
-            <label>Colore</label
-            ><input type="color" id="new-tipo-colore" value="#e67e22" />
-          </div>
-          <button class="btn-add-tipo" onclick="aggiungiTipoPersonalizzato()">
-            + Aggiungi
-          </button>
+          <div class="field"><label>Colore</label><input type="color" id="new-tipo-colore" value="#e67e22" /></div>
+          <button class="btn-add-tipo" onclick="aggiungiTipoPersonalizzato()">+ Aggiungi</button>
         </div>
       </div>
       <div class="settings-section">
@@ -3674,36 +2795,23 @@
         <div id="rapporto-campi-list"></div>
         <div class="add-tipo-row" style="margin-top: 14px">
           <div class="field">
-            <label>Nome nuovo campo</label
-            ><input
-              type="text"
-              id="new-campo-nome"
-              placeholder="es. Bar, VIP Area..."
-            />
+            <label>Nome nuovo campo</label><input type="text" id="new-campo-nome" placeholder="es. Bar, VIP Area..." />
           </div>
-          <button class="btn-add-tipo" onclick="aggiungiCampoRapporto()">
-            + Aggiungi
-          </button>
+          <button class="btn-add-tipo" onclick="aggiungiCampoRapporto()">+ Aggiungi</button>
         </div>
       </div>
       <div class="settings-section" id="collab-section" style="display: none">
         <h4>Gestione Collaboratori</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Lista master dei nomi collaboratori per l'autocomplete nel diario e
-          nei moduli.
+          Lista master dei nomi collaboratori per l'autocomplete nel diario e nei moduli.
         </p>
         <div id="collaboratori-list" style="margin-bottom: 14px"></div>
         <div class="add-tipo-row">
           <div class="field">
             <label>Nome nuovo collaboratore</label
-            ><input
-              type="text"
-              id="new-collab-nome"
-              placeholder="Nome e Cognome..."
-            />
+            ><input type="text" id="new-collab-nome" placeholder="Nome e Cognome..." />
           </div>
-          <button class="btn-add-tipo" onclick="aggiungiCollaboratore()">
-            + Aggiungi</button
+          <button class="btn-add-tipo" onclick="aggiungiCollaboratore()">+ Aggiungi</button
           ><button
             class="btn-add-tipo"
             onclick="document.getElementById('import-collab-file').click()"
@@ -3722,30 +2830,18 @@
       <div class="settings-section">
         <h4>Operatori</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Operatore attuale: <strong id="op-attuale">-</strong>. Ogni operatore
-          accede con il proprio nome e password.
+          Operatore attuale: <strong id="op-attuale">-</strong>. Ogni operatore accede con il proprio nome e password.
         </p>
         <div id="operatori-list" style="margin-bottom: 14px"></div>
         <div class="add-tipo-row" style="align-items: flex-end">
           <div class="field">
-            <label>Nome</label
-            ><input type="text" id="new-operatore-nome" placeholder="Nome..." />
+            <label>Nome</label><input type="text" id="new-operatore-nome" placeholder="Nome..." />
           </div>
           <div class="field">
-            <label>Password</label
-            ><input
-              type="password"
-              id="new-operatore-pwd"
-              placeholder="Min 4 caratteri..."
-            />
+            <label>Password</label><input type="password" id="new-operatore-pwd" placeholder="Min 4 caratteri..." />
           </div>
           <div class="field">
-            <label>Conferma password</label
-            ><input
-              type="password"
-              id="new-operatore-pwd2"
-              placeholder="Ripeti..."
-            />
+            <label>Conferma password</label><input type="password" id="new-operatore-pwd2" placeholder="Ripeti..." />
           </div>
           <div class="field">
             <label>Reparto</label
@@ -3757,32 +2853,23 @@
               <option value="cleaning">Cleaning</option>
             </select>
           </div>
-          <button class="btn-add-tipo" onclick="aggiungiOperatoreConPwd()">
-            + Crea operatore
-          </button>
+          <button class="btn-add-tipo" onclick="aggiungiOperatoreConPwd()">+ Crea operatore</button>
         </div>
       </div>
       <div class="settings-section" id="settori-section" style="display: none">
         <h4>Settori</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Gestisci i settori del casinò: aggiungi nuovi settori (es. Bar,
-          Sicurezza), rinominali, scegli il colore e quali pagine sono visibili
-          in ognuno (es. niente Maison nel Valet). Slots e Tavoli sono fissi.
-          Disattivare un settore lo nasconde senza toccare i dati.
+          Gestisci i settori del casinò: aggiungi nuovi settori (es. Bar, Sicurezza), rinominali, scegli il colore e
+          quali pagine sono visibili in ognuno (es. niente Maison nel Valet). Slots e Tavoli sono fissi. Disattivare un
+          settore lo nasconde senza toccare i dati.
         </p>
         <div id="settori-list"></div>
       </div>
-      <div
-        class="settings-section"
-        id="visibilita-section"
-        style="display: none"
-      >
+      <div class="settings-section" id="visibilita-section" style="display: none">
         <h4>Visibilità pagine e funzioni</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Controlla <b>chi</b> vede o modifica pagine e funzioni (tutti, solo
-          admin, operatori scelti). Per decidere invece
-          <b>quali pagine esistono in ogni settore</b> usa la sezione «Settori»
-          qui sopra.
+          Controlla <b>chi</b> vede o modifica pagine e funzioni (tutti, solo admin, operatori scelti). Per decidere
+          invece <b>quali pagine esistono in ogni settore</b> usa la sezione «Settori» qui sopra.
         </p>
         <div id="visibilita-list"></div>
       </div>
@@ -3791,94 +2878,50 @@
         <div class="settings-btn-row" id="sicurezza-btns"></div>
         <div
           id="biometric-settings"
-          style="
-            margin-top: 14px;
-            padding: 12px 16px;
-            background: var(--paper2);
-            border-radius: 3px;
-          "
+          style="margin-top: 14px; padding: 12px 16px; background: var(--paper2); border-radius: 3px"
         ></div>
       </div>
       <div class="settings-section" id="ai-section" style="display: none">
         <h4>Assistente AI (Groq)</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Migliora automaticamente i testi nei moduli disciplinari. Ottieni una
-          chiave gratuita su
-          <a
-            href="https://console.groq.com/keys"
-            target="_blank"
-            style="color: var(--accent2)"
-            >console.groq.com</a
-          >.
+          Migliora automaticamente i testi nei moduli disciplinari. Ottieni una chiave gratuita su
+          <a href="https://console.groq.com/keys" target="_blank" style="color: var(--accent2)">console.groq.com</a>.
         </p>
         <div class="add-tipo-row">
           <div class="field" style="flex: 2">
-            <label>Chiave API Groq</label
-            ><input type="password" id="groq-key-input" placeholder="gsk_..." />
+            <label>Chiave API Groq</label><input type="password" id="groq-key-input" placeholder="gsk_..." />
           </div>
           <button class="btn-add-tipo" onclick="salvaGroqKey()">Salva</button>
         </div>
         <p id="groq-status" style="font-size: 0.82rem; margin-top: 8px"></p>
         <div style="margin-top: 14px">
           <p style="color: var(--muted); font-size: 0.8rem; margin-bottom: 8px">
-            Modelli AI (se Groq ne dismette uno, basta aggiornare il nome qui ·
-            vale per tutte le copie dell'app):
+            Modelli AI (se Groq ne dismette uno, basta aggiornare il nome qui · vale per tutte le copie dell'app):
           </p>
-          <div
-            class="form-row"
-            style="
-              grid-template-columns: 1fr 1fr 1fr auto;
-              gap: 10px;
-              align-items: flex-end;
-            "
-          >
-            <div class="field">
-              <label>Testi</label><input type="text" id="groq-mod-testo" />
-            </div>
-            <div class="field">
-              <label>Moduli (JSON)</label
-              ><input type="text" id="groq-mod-json" />
-            </div>
-            <div class="field">
-              <label>Foto</label><input type="text" id="groq-mod-vision" />
-            </div>
-            <button class="btn-add-tipo" onclick="salvaGroqModelli()">
-              Salva modelli
-            </button>
+          <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; align-items: flex-end">
+            <div class="field"><label>Testi</label><input type="text" id="groq-mod-testo" /></div>
+            <div class="field"><label>Moduli (JSON)</label><input type="text" id="groq-mod-json" /></div>
+            <div class="field"><label>Foto</label><input type="text" id="groq-mod-vision" /></div>
+            <button class="btn-add-tipo" onclick="salvaGroqModelli()">Salva modelli</button>
           </div>
-          <button
-            class="btn-del-tipo"
-            onclick="ripristinaGroqModelli()"
-            style="margin-top: 6px; font-size: 0.72rem"
-          >
+          <button class="btn-del-tipo" onclick="ripristinaGroqModelli()" style="margin-top: 6px; font-size: 0.72rem">
             Ripristina default
           </button>
         </div>
       </div>
-      <div
-        class="settings-section"
-        id="maison-privacy-section"
-        style="display: none"
-      >
+      <div class="settings-section" id="maison-privacy-section" style="display: none">
         <h4>Maison · Conservazione dati</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Per privacy puoi far cancellare automaticamente le registrazioni dei
-          Costi Maison più vecchie: all'apertura dell'app i dati oltre il
-          periodo scelto vengono eliminati definitivamente (le funzioni manuali
-          Elimina giorno/mese restano disponibili).
+          Per privacy puoi far cancellare automaticamente le registrazioni dei Costi Maison più vecchie: all'apertura
+          dell'app i dati oltre il periodo scelto vengono eliminati definitivamente (le funzioni manuali Elimina
+          giorno/mese restano disponibili).
         </p>
         <div class="add-tipo-row" style="align-items: center">
           <div class="field" style="max-width: 340px">
             <label>Cancellazione automatica</label>
-            <select
-              id="maison-autodelete-sel"
-              onchange="salvaMaisonAutoDelete(this.value)"
-              style="padding: 10px"
-            >
+            <select id="maison-autodelete-sel" onchange="salvaMaisonAutoDelete(this.value)" style="padding: 10px">
               <option value="0">Disattivata (conserva tutto)</option>
-              <option value="1">
-                Conserva solo il GD corrente (cancella dal GD successivo)
-              </option>
+              <option value="1">Conserva solo il GD corrente (cancella dal GD successivo)</option>
               <option value="2">Conserva 2 giorni</option>
               <option value="3">Conserva 3 giorni</option>
               <option value="7">Conserva 7 giorni</option>
@@ -3886,53 +2929,27 @@
             </select>
           </div>
         </div>
-        <p
-          id="maison-autodelete-status"
-          style="font-size: 0.8rem; color: var(--muted); margin-top: 8px"
-        ></p>
+        <p id="maison-autodelete-status" style="font-size: 0.8rem; color: var(--muted); margin-top: 8px"></p>
       </div>
-      <div
-        class="settings-section"
-        id="soglie-alert-section"
-        style="display: none"
-      >
+      <div class="settings-section" id="soglie-alert-section" style="display: none">
         <h4>Alert differenze cassa · Soglie</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Personalizza gli importi che fanno scattare gli alert in Panoramica:
-          una differenza singola pari o superiore alla prima soglia suggerisce
-          l'<strong>Allineamento</strong>; le differenze cumulative dall'ultimo
-          RDI pari o superiori alla seconda soglia suggeriscono
-          l'<strong>RDI</strong>.
+          Personalizza gli importi che fanno scattare gli alert in Panoramica: una differenza singola pari o superiore
+          alla prima soglia suggerisce l'<strong>Allineamento</strong>; le differenze cumulative dall'ultimo RDI pari o
+          superiori alla seconda soglia suggeriscono l'<strong>RDI</strong>.
         </p>
         <div class="add-tipo-row" style="align-items: flex-end">
           <div class="field">
             <label>Allineamento: differenza singola da CHF</label
-            ><input
-              type="number"
-              id="soglia-allin-input"
-              min="1"
-              step="1"
-              style="width: 140px"
-            />
+            ><input type="number" id="soglia-allin-input" min="1" step="1" style="width: 140px" />
           </div>
           <div class="field">
             <label>RDI: cumulativo da CHF</label
-            ><input
-              type="number"
-              id="soglia-rdi-input"
-              min="1"
-              step="1"
-              style="width: 140px"
-            />
+            ><input type="number" id="soglia-rdi-input" min="1" step="1" style="width: 140px" />
           </div>
-          <button class="btn-add-tipo" onclick="salvaSoglieAlert()">
-            Salva soglie
-          </button>
+          <button class="btn-add-tipo" onclick="salvaSoglieAlert()">Salva soglie</button>
         </div>
-        <p
-          id="soglie-alert-status"
-          style="font-size: 0.8rem; color: var(--muted); margin-top: 8px"
-        ></p>
+        <p id="soglie-alert-status" style="font-size: 0.8rem; color: var(--muted); margin-top: 8px"></p>
         <p
           style="
             color: var(--muted);
@@ -3942,127 +2959,56 @@
             padding-top: 14px;
           "
         >
-          <strong>Percorso disciplinare</strong> · quanti episodi fanno scattare
-          i suggerimenti.
+          <strong>Percorso disciplinare</strong> · quanti episodi fanno scattare i suggerimenti.
         </p>
         <div class="add-tipo-row" style="align-items: flex-end">
           <div class="field">
             <label>Ammonimenti stesso motivo → Allineamento</label
-            ><input
-              type="number"
-              id="soglia-amm-input"
-              min="1"
-              step="1"
-              style="width: 120px"
-            />
+            ><input type="number" id="soglia-amm-input" min="1" step="1" style="width: 120px" />
           </div>
           <div class="field">
             <label>Allineamenti stesso motivo → RDI</label
-            ><input
-              type="number"
-              id="soglia-recidiva-input"
-              min="1"
-              step="1"
-              style="width: 120px"
-            />
+            ><input type="number" id="soglia-recidiva-input" min="1" step="1" style="width: 120px" />
           </div>
           <div class="field">
             <label>Allineamenti totali → Valutare RDI</label
-            ><input
-              type="number"
-              id="soglia-accumulo-input"
-              min="1"
-              step="1"
-              style="width: 120px"
-            />
+            ><input type="number" id="soglia-accumulo-input" min="1" step="1" style="width: 120px" />
           </div>
-          <button class="btn-add-tipo" onclick="salvaSoglieDisciplinari()">
-            Salva
-          </button>
+          <button class="btn-add-tipo" onclick="salvaSoglieDisciplinari()">Salva</button>
         </div>
       </div>
-      <div
-        class="settings-section"
-        id="buoni-valori-section"
-        style="display: none"
-      >
+      <div class="settings-section" id="buoni-valori-section" style="display: none">
         <h4>Maison · Valori buoni (CHF)</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Valore in CHF di ogni tipo di buono: usato per l'auto-calcolo del
-          numero di buoni dal costo e per la divisione dei costi nei gruppi.
+          Valore in CHF di ogni tipo di buono: usato per l'auto-calcolo del numero di buoni dal costo e per la divisione
+          dei costi nei gruppi.
         </p>
         <div class="add-tipo-row" style="align-items: flex-end">
           <div class="field">
-            <label>BU</label
-            ><input
-              type="number"
-              id="buono-bu-input"
-              min="1"
-              step="1"
-              style="width: 100px"
-            />
+            <label>BU</label><input type="number" id="buono-bu-input" min="1" step="1" style="width: 100px" />
           </div>
           <div class="field">
-            <label>BL</label
-            ><input
-              type="number"
-              id="buono-bl-input"
-              min="1"
-              step="1"
-              style="width: 100px"
-            />
+            <label>BL</label><input type="number" id="buono-bl-input" min="1" step="1" style="width: 100px" />
           </div>
           <div class="field">
-            <label>CG</label
-            ><input
-              type="number"
-              id="buono-cg-input"
-              min="1"
-              step="1"
-              style="width: 100px"
-            />
+            <label>CG</label><input type="number" id="buono-cg-input" min="1" step="1" style="width: 100px" />
           </div>
           <div class="field">
-            <label>WL</label
-            ><input
-              type="number"
-              id="buono-wl-input"
-              min="1"
-              step="1"
-              style="width: 100px"
-            />
+            <label>WL</label><input type="number" id="buono-wl-input" min="1" step="1" style="width: 100px" />
           </div>
-          <button class="btn-add-tipo" onclick="salvaBuonoValori()">
-            Salva valori
-          </button>
+          <button class="btn-add-tipo" onclick="salvaBuonoValori()">Salva valori</button>
         </div>
       </div>
       <div class="settings-section" id="giubileo-section" style="display: none">
         <h4>Premio giubileo</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Somma in denaro riconosciuta ai collaboratori al raggiungimento degli
-          anni di servizio (dall'inizio contratto). Gli importi sono
-          personalizzabili; i giubilei maturati appaiono nello Storico HR della
-          scheda collaboratore e sono visibili solo ad admin e operatori con
-          permesso "Storico HR" (es. HR).
+          Somma in denaro riconosciuta ai collaboratori al raggiungimento degli anni di servizio (dall'inizio
+          contratto). Gli importi sono personalizzabili; i giubilei maturati appaiono nello Storico HR della scheda
+          collaboratore e sono visibili solo ad admin e operatori con permesso "Storico HR" (es. HR).
         </p>
-        <div
-          style="
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-bottom: 12px;
-          "
-        >
-          <span style="font-size: 0.84rem; color: var(--muted)"
-            >Notifica anticipata agli operatori HR:</span
-          >
-          <select
-            id="giubileo-preavviso-sel"
-            onchange="salvaGiubileoPreavviso(this.value)"
-            style="padding: 8px"
-          >
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px">
+          <span style="font-size: 0.84rem; color: var(--muted)">Notifica anticipata agli operatori HR:</span>
+          <select id="giubileo-preavviso-sel" onchange="salvaGiubileoPreavviso(this.value)" style="padding: 8px">
             <option value="0">Disattivata</option>
             <option value="30">30 giorni prima</option>
             <option value="60">60 giorni prima</option>
@@ -4074,42 +3020,24 @@
           >
         </div>
         <div id="giubileo-list"></div>
-        <div
-          class="add-tipo-row"
-          style="align-items: flex-end; margin-top: 8px"
-        >
+        <div class="add-tipo-row" style="align-items: flex-end; margin-top: 8px">
           <div class="field">
             <label>Anni di servizio</label
-            ><input
-              type="number"
-              id="giubileo-anni-input"
-              min="1"
-              step="1"
-              style="width: 110px"
-            />
+            ><input type="number" id="giubileo-anni-input" min="1" step="1" style="width: 110px" />
           </div>
           <div class="field">
             <label>Importo CHF</label
-            ><input
-              type="number"
-              id="giubileo-importo-input"
-              min="0"
-              step="50"
-              style="width: 130px"
-            />
+            ><input type="number" id="giubileo-importo-input" min="0" step="50" style="width: 130px" />
           </div>
-          <button class="btn-add-tipo" onclick="aggiungiGiubileo()">
-            + Aggiungi scaglione
-          </button>
+          <button class="btn-add-tipo" onclick="aggiungiGiubileo()">+ Aggiungi scaglione</button>
         </div>
       </div>
       <div class="settings-section" id="backup-section" style="display: none">
         <h4>Backup dati</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Scarica una copia completa di tutti i dati (registrazioni, moduli,
-          collaboratori, maison, valutazioni, punti, storico HR, impostazioni)
-          in un file JSON. Conservala in un posto sicuro: serve per ripristini e
-          per la migrazione IT.
+          Scarica una copia completa di tutti i dati (registrazioni, moduli, collaboratori, maison, valutazioni, punti,
+          storico HR, impostazioni) in un file JSON. Conservala in un posto sicuro: serve per ripristini e per la
+          migrazione IT.
         </p>
         <button
           class="btn-salva"
@@ -4118,15 +3046,7 @@
         >
           Esporta backup completo
         </button>
-        <div
-          style="
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-top: 14px;
-          "
-        >
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px">
           <label style="font-size: 0.84rem"
             >Backup automatico: scarica da solo ogni
             <input
@@ -4139,49 +3059,32 @@
             />
             giorni all'accesso admin (0 = disattivato)</label
           >
-          <span
-            id="backup-ultimo-info"
-            style="font-size: 0.78rem; color: var(--muted)"
-          ></span>
+          <span id="backup-ultimo-info" style="font-size: 0.78rem; color: var(--muted)"></span>
         </div>
-        <p
-          id="backup-status"
-          style="font-size: 0.8rem; color: var(--muted); margin-top: 8px"
-        ></p>
+        <p id="backup-status" style="font-size: 0.8rem; color: var(--muted); margin-top: 8px"></p>
       </div>
       <div class="settings-section" id="db-stats-section" style="display: none">
         <h4>Stato del sistema</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Controllo automatico dei dati (schede incomplete, turni orfani,
-          festivi mancanti) e spazio occupato sul database. Solo lettura: non
-          modifica nulla.
+          Controllo automatico dei dati (schede incomplete, turni orfani, festivi mancanti) e spazio occupato sul
+          database. Solo lettura: non modifica nulla.
         </p>
         <div style="padding: 6px 0 12px">
           <button
             class="btn-salva"
             onclick="controlloSalute()"
-            style="
-              background: var(--ink);
-              font-size: 0.82rem;
-              padding: 8px 20px;
-            "
+            style="background: var(--ink); font-size: 0.82rem; padding: 8px 20px"
           >
             Controlla il sistema
           </button>
         </div>
         <div id="salute-content" style="padding: 4px 0 14px"></div>
-        <p style="color: var(--muted); font-size: 0.84rem; margin: 10px 0 6px">
-          Spazio database (500 MB disponibili)
-        </p>
+        <p style="color: var(--muted); font-size: 0.84rem; margin: 10px 0 6px">Spazio database (500 MB disponibili)</p>
         <div id="db-stats-content" style="padding: 6px 0">
           <button
             class="btn-salva"
             onclick="caricaDbStats()"
-            style="
-              background: var(--ink);
-              font-size: 0.82rem;
-              padding: 8px 20px;
-            "
+            style="background: var(--ink); font-size: 0.82rem; padding: 8px 20px"
           >
             Verifica spazio
           </button>
@@ -4195,24 +3098,11 @@
         <button
           class="btn-salva"
           onclick="caricaCestino()"
-          style="
-            background: var(--ink);
-            font-size: 0.82rem;
-            padding: 8px 20px;
-            margin-bottom: 12px;
-          "
+          style="background: var(--ink); font-size: 0.82rem; padding: 8px 20px; margin-bottom: 12px"
         >
           Carica cestino
         </button>
-        <div
-          style="
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-bottom: 12px;
-            align-items: center;
-          "
-        >
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; align-items: center">
           <select
             id="cestino-filt-tipo"
             onchange="renderCestino()"
@@ -4319,6 +3209,7 @@
     <script src="js/maison-core.js"></script>
     <script src="js/maison-budget.js"></script>
     <script src="js/maison-helpers.js"></script>
+    <script src="js/guida.js"></script>
     <script src="js/piano.js"></script>
     <script src="js/pause-engine.js"></script>
   </body>
