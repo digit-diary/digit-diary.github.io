@@ -120,6 +120,15 @@ function _initNdCal() {
   _ndCalYear = new Date().getFullYear();
   _renderNdCal();
 }
+// Una non disponibilita' per il mese M va consegnata entro il giorno limite
+// del mese precedente (regola nd_jolly_giorno, direttiva 16-007): oltre quel
+// termine il giorno e' "fuori tempo" (si puo' comunque registrare, con conferma)
+function ndGiornoFuoriTempo(dstr) {
+  const lim = typeof _pianoGiornoNd === 'function' ? _pianoGiornoNd() : 3;
+  const p = String(dstr).split('-');
+  const scadenza = new Date(parseInt(p[0]), parseInt(p[1]) - 2, lim, 23, 59, 59);
+  return new Date() > scadenza;
+}
 function _renderNdCal() {
   const container = document.getElementById('nd-cal-container');
   if (!container) return;
@@ -159,11 +168,26 @@ function _renderNdCal() {
     const ds = _ndCalYear + '-' + String(_ndCalMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
     const isSel = _ndSelectedDates.includes(ds);
     const isToday = ds === oggi;
+    const fuori = ndGiornoFuoriTempo(ds);
     let style = 'padding:6px 0;border-radius:2px;cursor:pointer;font-size:.84rem;font-weight:600;';
-    if (isSel) style += 'background:var(--accent2);color:white;';
+    if (isSel) style += fuori ? 'background:#c0392b;color:white;' : 'background:var(--accent2);color:white;';
+    else if (fuori) style += 'background:#fdecea;color:#c0392b;';
     else if (isToday) style += 'background:var(--paper2);border:1px solid var(--accent2);';
     else style += 'background:var(--paper);';
-    html += '<div onclick="_ndToggleDate(\'' + ds + '\')" style="' + style + '">' + d + '</div>';
+    html +=
+      '<div onclick="_ndToggleDate(\'' +
+      ds +
+      '\')" title="' +
+      (fuori
+        ? 'FUORI TEMPO: il termine per questo mese era il ' +
+          (typeof _pianoGiornoNd === 'function' ? _pianoGiornoNd() : 3) +
+          ' del mese precedente'
+        : '') +
+      '" style="' +
+      style +
+      '">' +
+      d +
+      '</div>';
   }
   html += '</div>';
   if (_ndSelectedDates.length) {
