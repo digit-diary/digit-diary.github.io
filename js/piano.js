@@ -694,7 +694,19 @@ async function renderPiano() {
       const psep = '<span class="pbar-sep"></span>';
       if (puoMod) {
         h += psep;
-        h += pbtn('Genera bozza', 'generaBozzaPiano()', 'pbar-ok');
+        h += pbtn(
+          'Genera bozza',
+          'generaBozzaPiano()',
+          'pbar-ok',
+          'Riempie il fabbisogno con i collaboratori di questo settore (chi copre da altri settori NON viene usato)',
+        );
+        if (collaboratoriCache.some((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && _pianoCoperturaCfg(c)))
+          h += pbtn(
+            'Completa con coperture',
+            'completaConCoperture()',
+            '',
+            'Tappa i buchi rimasti usando i collaboratori di altri settori abilitati a coprire qui. Da usare DOPO aver generato i piani dei loro reparti',
+          );
         h += pbtn(
           'Migliora ore',
           'miglioraOrePiano()',
@@ -1662,8 +1674,33 @@ function _pianoRenderViolazioni() {
 // consecutivi, idoneità storica (gruppi già fatti), equità ore.
 // Le celle esistenti (V, protette, malattie Diario) non si toccano.
 // ================================================================
-async function generaBozzaPiano() {
-  _pianoUndoSnap('genera bozza ' + _pianoMeseSel);
+async function completaConCoperture() {
+  if (!puoGestirePiano()) return;
+  const chi = collaboratoriCache
+    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && _pianoCoperturaCfg(c))
+    .map((c) => c.nome + ' (' + repartoLabel(c.reparto_dip || 'slots') + ')');
+  if (!chi.length) {
+    toast('Nessun collaboratore abilitato a coprire in questo settore');
+    return;
+  }
+  if (
+    !confirm(
+      'Tappo i buchi rimasti di ' +
+        _pianoMeseSel +
+        ' usando chi copre da altri settori:\n\n' +
+        chi.map((x) => '\u2022 ' + x).join('\n') +
+        "\n\nI turni gia' inseriti non vengono toccati. Fallo DOPO aver generato i piani dei loro reparti, cosi' si vede chi e' davvero libero.",
+    )
+  )
+    return;
+  await generaBozzaPiano(true);
+}
+// usaCoperture = false (predefinito): riempie SOLO con i collaboratori del
+// reparto, cosi' l'ordine con cui generi i piani non toglie nessuno al suo
+// settore d'origine. Con true (bottone "Completa con coperture") si tappano i
+// buchi rimasti usando chi e' abilitato a coprire da altri settori.
+async function generaBozzaPiano(usaCoperture) {
+  _pianoUndoSnap((usaCoperture ? 'coperture ' : 'genera bozza ') + _pianoMeseSel);
   if (!puoGestirePiano()) return;
   const ym = _pianoMeseSel;
   const nGiorni = _pianoUltimoGiorno(ym);
@@ -1819,6 +1856,7 @@ async function generaBozzaPiano() {
             // COPERTURA da un altro settore: rispetta i gruppi ammessi e il
             // tetto mensile di turni impostati nella scheda del collaboratore
             const cop = _pianoCoperturaCfg(infoC);
+            if (cop && !usaCoperture) return false; // prima il reparto, le coperture in un secondo passaggio
             if (cop) {
               if (cop.gruppi && String(cop.gruppi).toUpperCase() !== (t.gruppo || '').toUpperCase()) return false;
               if (cop.max_turni) {
