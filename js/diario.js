@@ -542,9 +542,19 @@ async function salvaModificaRegistrazione(id, conCopertura) {
   if (repEl) update.reparto = repEl.value;
   if (valEl) update.valuta = update.importo ? valEl.value : '';
   try {
+    const eV = datiCache.find((x) => x.id === id);
+    const testoVecchio = eV ? eV.testo : '';
+    const dataVecchia = eV ? eV.data : '';
     await secPatch('registrazioni', 'id=eq.' + id, update);
     const e = datiCache.find((x) => x.id === id);
     if (e) Object.assign(e, update);
+    // malattia con date corrette: il piano si allinea da solo (le M salvate
+    // nei giorni sbagliati vengono tolte, i giorni giusti ricevono la M)
+    if (tipo === nomeCorrente('Malattia') && typeof sincronizzaMalattiaPiano === 'function' && testoVecchio !== testo) {
+      const sync = await sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testo);
+      if (sync && (sync.tolte || sync.messe))
+        toast('Piano allineato: ' + sync.tolte + ' M tolte, ' + sync.messe + ' M spostate');
+    }
     logAzione('Modifica registrazione', nome + ' - ' + tipo + ': ' + testo.substring(0, 60));
     document.getElementById('pwd-modal').classList.add('hidden');
     render();
