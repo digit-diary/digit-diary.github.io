@@ -200,6 +200,193 @@ async function svuotaCestino() {
     toast('Errore svuotamento');
   }
 }
+// ===== CONTROLLO SALUTE DEL SISTEMA =====
+// Verifiche automatiche sui dati: l'app segnala da sola le incoerenze che
+// altrimenti nessuno vedrebbe (schede incomplete, turni orfani, festivi
+// mancanti per l'anno prossimo...). Solo lettura: non modifica niente.
+async function controlloSalute() {
+  const el = document.getElementById('salute-content');
+  if (!el) return;
+  el.innerHTML = '<p style="color:var(--muted)">Controllo in corso...</p>';
+  const esiti = [];
+  const add = (stato, titolo, dettaglio, azione) => esiti.push({ stato, titolo, dettaglio, azione });
+  try {
+    const oggi = new Date();
+    const ym = oggi.getFullYear() + '-' + String(oggi.getMonth() + 1).padStart(2, '0');
+    const annoPross = oggi.getFullYear() + 1;
+    const [collab, righe, festivi, turni] = await Promise.all([
+      secGet('collaboratori?select=nome,attivo,impiego,is_jolly,reparto_dip,reparti_extra,percentuale&limit=2000'),
+      secGet('piano?data=gte.' + ym + '-01&limit=20000'),
+      secGet('piano_festivi?select=data&limit=500'),
+      secGet('piano_turni?select=codice,reparto_dip,attivo&limit=500'),
+    ]);
+    const attivi = (collab || []).filter((c) => c.attivo !== false);
+    const perNome = {};
+    (collab || []).forEach((c) => (perNome[c.nome.toLowerCase()] = c));
+
+    // 1) impiego non indicato (serve per CGF, limiti ore, report)
+    const senzaImpiego = attivi.filter((c) => !c.impiego);
+    add(
+      senzaImpiego.length ? 'ko' : 'ok',
+      'Impiego (fisso o jolly) indicato',
+      senzaImpiego.length
+        ? senzaImpiego.length +
+            ' collaboratori attivi senza impiego: ' +
+            senzaImpiego
+              .slice(0, 6)
+              .map((c) => c.nome)
+              .join(', ') +
+            (senzaImpiego.length > 6 ? ' e altri' : '') +
+            '. Senza questo dato i CGF e i limiti di ore non si calcolano correttamente.'
+        : "Tutti i collaboratori attivi hanno l'impiego indicato.",
+      senzaImpiego.length ? 'Gestione Collaboratori' : '',
+    );
+
+    // 2) i due campi impiego/jolly in contraddizione
+    const contrad = attivi.filter(
+      (c) => (c.impiego === 'fisso' && c.is_jolly) || (c.impiego === 'jolly' && !c.is_jolly),
+    );
+    add(
+      contrad.length ? 'attenzione' : 'ok',
+      'Coerenza fisso/jolly',
+      contrad.length
+        ? contrad.map((c) => c.nome).join(', ') + ": la scheda dice una cosa e il piano un'altra."
+        : 'Nessuna contraddizione tra scheda e piano.',
+      contrad.length ? 'Gestione Collaboratori' : '',
+    );
+
+    // 3) turni di persone che non esistono in anagrafica
+    const orfani = [...new Set((righe || []).map((r) => r.collaboratore).filter((n) => !perNome[n.toLowerCase()]))];
+    add(
+      orfani.length ? 'ko' : 'ok',
+      'Turni collegati a una scheda',
+      orfani.length
+        ? orfani.slice(0, 6).join(', ') + ': hanno turni nel piano ma non esistono in Gestione collaboratori.'
+        : 'Ogni turno del piano appartiene a un collaboratore esistente.',
+      orfani.length ? 'Gestione Collaboratori' : '',
+    );
+
+    // 4) disattivati che hanno ancora turni
+    const disattiviConTurni = [
+      ...new Set(
+        (righe || [])
+          .map((r) => perNome[r.collaboratore.toLowerCase()])
+          .filter((c) => c && c.attivo === false)
+          .map((c) => c.nome),
+      ),
+    ];
+    add(
+      disattiviConTurni.length ? 'attenzione' : 'ok',
+      'Collaboratori disattivati senza turni',
+      disattiviConTurni.length
+        ? disattiviConTurni.slice(0, 6).join(', ') +
+            ': risultano disattivati ma hanno turni pianificati. Vanno riattivati oppure il loro piano va tolto.'
+        : 'Nessun disattivato ha turni pianificati.',
+      disattiviConTurni.length ? 'Gestione Collaboratori' : '',
+    );
+
+    // 5) turni in un settore non suo e senza copertura configurata
+    const fuoriSettore = [
+      ...new Set(
+        (righe || [])
+          .filter((r) => {
+            const c = perNome[r.collaboratore.toLowerCase()];
+            if (!c) return false;
+            const suo = c.reparto_dip || 'slots';
+            const rep = r.reparto_dip || 'slots';
+            if (suo === rep) return false;
+            return !String(c.reparti_extra || '')
+              .split(',')
+              .map((x) => x.trim())
+              .includes(rep);
+          })
+          .map((r) => r.collaboratore),
+      ),
+    ];
+    add(
+      fuoriSettore.length ? 'attenzione' : 'ok',
+      'Turni nel settore giusto',
+      fuoriSettore.length
+        ? fuoriSettore.slice(0, 6).join(', ') +
+            ": hanno turni in un settore che non e' il loro e senza copertura configurata."
+        : 'Nessun turno in un settore non previsto.',
+      fuoriSettore.length ? 'Gestione Collaboratori' : '',
+    );
+
+    // 6) festivi dell'anno prossimo
+    const haFestiviPross = (festivi || []).some((f) => String(f.data).startsWith(String(annoPross)));
+    add(
+      haFestiviPross ? 'ok' : 'attenzione',
+      "Giorni festivi dell'anno prossimo",
+      haFestiviPross
+        ? 'I festivi ' + annoPross + " sono gia' in archivio."
+        : 'Mancano i festivi ' + annoPross + ": si creano da soli aprendo Piano → Festivi con quell'anno selezionato.",
+      haFestiviPross ? '' : 'Piano · Festivi',
+    );
+
+    // 7) sigle turno usate da piu' settori (fonte di confusione nei briefing)
+    const perCodice = {};
+    (turni || [])
+      .filter((t) => t.attivo !== false)
+      .forEach((t) => {
+        (perCodice[t.codice] = perCodice[t.codice] || new Set()).add(t.reparto_dip || 'slots');
+      });
+    const doppi = Object.entries(perCodice).filter(([, s]) => s.size > 1);
+    add(
+      doppi.length ? 'info' : 'ok',
+      "Sigle turno uguali in piu' settori",
+      doppi.length
+        ? doppi.map(([c, s]) => c + ' (' + [...s].join(', ') + ')').join(' · ') +
+            '. Il programma li tiene separati, ma attenzione quando si leggono i piani.'
+        : 'Nessuna sigla usata da due settori.',
+      '',
+    );
+
+    // 8) schede di prova rimaste
+    const prova = attivi.filter((c) => /^(sig\.|test|mario rossi|zztest)/i.test(c.nome.trim()));
+    add(
+      prova.length ? 'attenzione' : 'ok',
+      'Schede di prova',
+      prova.length
+        ? prova.map((c) => c.nome).join(', ') + ': sembrano schede segnaposto ancora attive.'
+        : 'Nessuna scheda di prova attiva.',
+      prova.length ? 'Gestione Collaboratori' : '',
+    );
+
+    const ko = esiti.filter((e) => e.stato === 'ko').length;
+    const att = esiti.filter((e) => e.stato === 'attenzione').length;
+    const col = { ok: '#2c6e49', attenzione: '#e67e22', ko: '#c0392b', info: '#1a4a7a' };
+    const lbl = { ok: 'OK', attenzione: 'DA VEDERE', ko: 'DA SISTEMARE', info: 'NOTA' };
+    let h =
+      '<p style="font-size:.85rem;margin-bottom:10px"><b>' +
+      (ko || att ? ko + ' da sistemare, ' + att + ' da vedere' : 'Tutto in ordine') +
+      '</b> · controllo del ' +
+      new Date().toLocaleString('it-CH') +
+      '</p>';
+    esiti.forEach((e) => {
+      h +=
+        '<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)">' +
+        '<span style="flex:0 0 auto;font-size:.66rem;font-weight:700;letter-spacing:.04em;color:#fff;background:' +
+        col[e.stato] +
+        ';padding:2px 7px;border-radius:3px;margin-top:2px">' +
+        lbl[e.stato] +
+        '</span><div style="flex:1"><b style="font-size:.88rem">' +
+        escP(e.titolo) +
+        '</b><br><span style="font-size:.82rem;color:var(--muted)">' +
+        escP(e.dettaglio) +
+        '</span>' +
+        (e.azione
+          ? '<br><span style="font-size:.78rem;color:#1a4a7a;font-weight:700">Dove sistemarlo: ' +
+            escP(e.azione) +
+            '</span>'
+          : '') +
+        '</div></div>';
+    });
+    el.innerHTML = h;
+  } catch (e) {
+    el.innerHTML = '<p style="color:var(--accent)">Errore durante il controllo: ' + escP(e.message || '') + '</p>';
+  }
+}
 async function caricaDbStats() {
   const el = document.getElementById('db-stats-content');
   if (!el) return;
