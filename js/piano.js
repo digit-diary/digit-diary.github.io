@@ -283,6 +283,15 @@ async function _pianoCaricaInattivi() {
 function _pianoInattivoInfo(nome) {
   return (window._collabInattivi || []).find((c) => (c.nome || '').toLowerCase() === nome.toLowerCase());
 }
+// CGF = riposo compensativo per i festivi (RAP 4.3): spetta al personale
+// d'esercizio FISSO. Il personale ausiliario (jolly) non lo matura: per il
+// RAP Allegato 1 prende il supplemento del 50% sul salario orario.
+function _pianoMaturaCgf(info) {
+  if (!info) return false;
+  if (info.impiego === 'jolly') return false;
+  if (info.impiego === 'fisso') return true;
+  return !info.is_jolly; // schede senza impiego indicato: vale il vecchio campo
+}
 function _pianoCollabInfo(nome) {
   return collaboratoriCache.find((c) => c.nome.toLowerCase() === nome.toLowerCase());
 }
@@ -842,6 +851,16 @@ async function renderPiano() {
               cls += ' piano-malattia-c';
               stile = '';
               titolo = 'Malattia su giorno di congedo (C) · 0 ore · dal Diario' + (titolo ? ' · ' + titolo : '');
+            }
+            // MALATTIA SU GIORNO DI CGF: il recupero non e' stato goduto, il
+            // credito resta. Si mostra MCG e non conta come CGF preso
+            if (codice === 'CGF' && malattie[nome + '|' + dstr]) {
+              cella = 'MCG';
+              cls += ' piano-malattia-c';
+              stile = '';
+              titolo =
+                "Malattia nel giorno di recupero festivo (CGF): il recupero non e' goduto e resta a credito" +
+                (titolo ? ' · ' + titolo : '');
             }
           } else if (malattie[nome + '|' + dstr]) {
             cella = 'M';
@@ -2068,11 +2087,13 @@ async function generaBozzaPiano(usaCoperture) {
   const contaturaCgf = {};
   storia.forEach((r) => {
     if (!r.data.startsWith(annoCorr) && !r.data.startsWith(annoPrec)) return;
+    if (!_pianoMaturaCgf(_pianoCollabInfo(r.collaboratore))) return; // jolly: 50% in busta, niente recupero
     if (festiviCgf.has(r.data) && _pianoTurnoInfo(r.codice))
       contaturaCgf[r.collaboratore] = (contaturaCgf[r.collaboratore] || 0) + 1;
     if (r.codice === 'CGF') contaturaCgf[r.collaboratore] = (contaturaCgf[r.collaboratore] || 0) - 1;
   });
   nomi.forEach((n) => {
+    if (!_pianoMaturaCgf(_pianoCollabInfo(n))) return;
     // mese corrente: festivi lavorati (celle esistenti + appena generate) e CGF già presenti
     const eventiMese = [];
     let cgfPresentiMese = 0;
@@ -5199,6 +5220,10 @@ async function caricaStatisticheAnnoPiano() {
   h += '</div>';
   // statistiche per collaboratore
   const st = {};
+  // malattie di tutto l'anno: un CGF che cade in malattia non e' goduto
+  const malattieAnno = {};
+  for (let m = 1; m <= 12; m++)
+    Object.assign(malattieAnno, _pianoMalattieMese(anno + '-' + String(m).padStart(2, '0')));
   const mesiConPiano = new Set(righe.map((r) => r.data.substring(5, 7)));
   righe.forEach((r) => {
     const t = _pianoTurnoInfo(r.codice);
@@ -5214,6 +5239,8 @@ async function caricaStatisticheAnnoPiano() {
       m: 0,
       cgfMat: 0,
       cgfGod: 0,
+      cgfPersi: 0,
+      sup50: 0,
     });
     const dow = new Date(r.data + 'T12:00:00').getDay();
     const info = _pianoCollabInfo(r.collaboratore) || {};
@@ -5226,11 +5253,18 @@ async function caricaStatisticheAnnoPiano() {
       if (dow === 0) o.dom++;
       // CGF MATURATO: ha lavorato in un festivo con flag CGF (automatico)
       const fest = pianoFestiviCache.find((f) => f.data === r.data);
-      if (fest && fest.cgf !== false && _festivoCgfDefault(fest.data)) o.cgfMat++;
+      // i jolly non maturano recuperi: prendono il supplemento del 50% (RAP All. 1)
+      if (fest && fest.cgf !== false && _festivoCgfDefault(fest.data) && _pianoMaturaCgf(info)) o.cgfMat++;
+      if (fest && fest.cgf !== false && _festivoCgfDefault(fest.data) && !_pianoMaturaCgf(info)) o.sup50++;
     } else if (cs) {
       if (r.codice === 'V' || r.codice === 'V1') o.v++;
       if (r.codice === 'M' || r.codice === 'M1') o.m++;
-      if (r.codice === 'CGF') o.cgfGod++; // CGF goduto
+      // CGF goduto, ma se quel giorno c'e' malattia il recupero non e' stato
+      // goduto e il credito resta (come per le vacanze)
+      if (r.codice === 'CGF') {
+        if (malattieAnno[r.collaboratore + '|' + r.data]) o.cgfPersi++;
+        else o.cgfGod++;
+      }
       const oCs = parseFloat(cs.ore) || 0;
       o.ore += cs.scala_percentuale ? oCs * (parseFloat(info.percentuale) || 1) : oCs;
     }
@@ -5244,7 +5278,7 @@ async function caricaStatisticheAnnoPiano() {
     return Math.round((ggDovuti / 7) * _pianoOreSett * (parseFloat(info.percentuale) || 1) * 10) / 10;
   };
   h +=
-    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Ore anno</th><th title="Sui mesi con un piano">Ore dovute</th><th>Giorni lavorati</th><th>Diurni</th><th>Notturni</th><th>Weekend</th><th>Domeniche</th><th>Vacanze</th><th>Malattie</th><th title="Festivi con flag CGF lavorati (maturati automaticamente)">CGF maturati</th><th title="Giorni CGF presi nel piano">CGF goduti</th><th title="Maturati − goduti">Saldo CGF</th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Ore anno</th><th title="Sui mesi con un piano">Ore dovute</th><th>Giorni lavorati</th><th>Diurni</th><th>Notturni</th><th>Weekend</th><th>Domeniche</th><th>Vacanze</th><th>Malattie</th><th title="Festivi lavorati che danno diritto al recupero (solo personale fisso)">CGF maturati</th><th title="Giorni CGF effettivamente goduti (quelli caduti in malattia non contano)">CGF goduti</th><th title="Maturati − goduti: quanti recuperi restano da dare">Saldo CGF</th><th title="Festivi lavorati dai jolly: danno diritto al supplemento del 50% sul salario orario (RAP Allegato 1), non al recupero">Suppl. 50%</th></tr></thead><tbody>';
   Object.keys(st)
     .sort()
     .forEach((n) => {
@@ -5278,12 +5312,19 @@ async function caricaStatisticheAnnoPiano() {
         o.m +
         '</td><td>' +
         (o.cgfMat || '') +
-        '</td><td>' +
+        '</td><td' +
+        (o.cgfPersi ? ' title="' + o.cgfPersi + ' recuperi caduti in malattia: restano a credito"' : '') +
+        '>' +
         (o.cgfGod || '') +
+        (o.cgfPersi ? ' <span style="color:#c0392b;font-size:.72rem">+' + o.cgfPersi + ' in malattia</span>' : '') +
         '</td><td style="font-weight:700;color:' +
         (o.cgfMat - o.cgfGod > 0 ? '#2c6e49' : o.cgfMat - o.cgfGod < 0 ? '#c0392b' : 'var(--muted)') +
         '">' +
         (o.cgfMat || o.cgfGod ? o.cgfMat - o.cgfGod : '') +
+        '</td><td style="font-weight:700;color:' +
+        (o.sup50 ? '#8b6914' : 'var(--muted)') +
+        '" title="Festivi lavorati come personale ausiliario">' +
+        (o.sup50 || '') +
         '</td></tr>';
     });
   h += '</tbody></table></div>';
