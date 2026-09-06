@@ -1531,6 +1531,10 @@ function _pianoCalcolaViolazioni() {
         const grAcc = _pianoAccompagnamentoDi(infoAcc);
         if (grAcc.includes(gr)) r._accGruppo = gr;
       }
+      // chi copre da un altro settore ed e' segnato "accompagnato" non deve
+      // restare da solo nel gruppo, esattamente come sopra
+      const copAcc = _pianoCoperturaCfg(infoAcc);
+      if (copAcc && copAcc.accompagnato) r._accGruppo = gr;
     });
     // accompagnamento: da solo nel gruppo quel giorno
     _pianoRighe.forEach((r) => {
@@ -1940,6 +1944,8 @@ async function generaBozzaPiano(usaCoperture) {
               const grAcc = _pianoAccompagnamentoDi(infoC);
               if (grAcc.includes(gruppoT) && !(contaGiornoTot[gruppoT + '|' + g] || 0)) return false;
             }
+            // accompagnato SOLO dove copre (spunta nella scheda): stessa regola
+            if (cop && cop.accompagnato && !(contaGiornoTot[gruppoT + '|' + g] || 0)) return false;
             const mapp = _pianoMappFunzione(fz);
             if (mapp) {
               const voci = mapp
@@ -7251,11 +7257,22 @@ function _renderPianoPreferenzeCard() {
       escP(c.accompagnamento_settori || '') +
       '" placeholder="Es: REC" onchange="salvaPreferenzaCollab(' +
       c.id +
-      ',\'accompagnamento_settori\',this.value)" style="width:90px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td style="text-align:left"><input type="text" value="' +
-      escP(c.reparti_extra || '') +
-      '" placeholder="Es: valet" onchange="salvaPreferenzaCollab(' +
-      c.id +
-      ',\'reparti_extra\',this.value)" style="width:90px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td style="text-align:left;font-size:.78rem;color:var(--muted)" title="Si gestiscono con le spunte in Formazione">' +
+      ',\'accompagnamento_settori\',this.value)" style="width:90px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td style="text-align:left">' +
+      (typeof apriCoperturaCollab === 'function'
+        ? '<button class="btn-export" style="font-size:.72rem;padding:2px 8px" title="Copertura altri settori: si imposta qui e in Gestione collaboratori (stessa finestra)" onclick="apriCoperturaCollab(' +
+          c.id +
+          ')">' +
+          escP(
+            String(c.reparti_extra || '')
+              .split(',')
+              .map((x) => x.trim())
+              .filter(Boolean)
+              .map((k) => repartoLabel(k))
+              .join(', ') || 'imposta...',
+          ) +
+          '</button>'
+        : escP(c.reparti_extra || '-')) +
+      '</td><td style="text-align:left;font-size:.78rem;color:var(--muted)" title="Si gestiscono con le spunte in Formazione">' +
       escP((_pianoSettoriEffettivi(c) || []).join(', ') || '-') +
       '</td></tr>';
   });
