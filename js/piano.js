@@ -5393,8 +5393,10 @@ async function _renderPianoVacanzeTab() {
     h +=
       '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49" onclick="apriNuovaVacanza()">Nuova vacanza</button>';
     h +=
-      '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#d4b86a;color:#d4b86a" onclick="document.getElementById(\'vac-file\').click()">Importa da Excel</button>' +
-      '<input type="file" id="vac-file" accept=".xlsx,.xls" style="display:none" onchange="importaVacanzePiano(this)">';
+      '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#d4b86a;color:#d4b86a" onclick="document.getElementById(\'vac-file\').click()">Importa (Excel o PDF)</button>' +
+      '<input type="file" id="vac-file" accept=".xlsx,.xls,.pdf" style="display:none" onchange="importaVacanzePiano(this)">' +
+      '<button class="btn-export" style="font-size:.8rem;padding:4px 12px" title="Scarica il piano vacanze del settore nello stesso formato del file HR" onclick="esportaVacanzeExcel()">Scarica Excel</button>' +
+      '<button class="btn-export" style="font-size:.8rem;padding:4px 12px" onclick="esportaVacanzePdf()">Scarica PDF</button>';
     h +=
       '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#1a4a7a;color:#7ea8d8" onclick="applicaVacanzePiano()">Applica al piano · ' +
       escP(meseLbl) +
@@ -6237,69 +6239,365 @@ async function applicaVacanzePiano() {
   renderPiano();
 }
 
+// Abbinamento del nome scritto nel file HR con l'anagrafica: tollera refusi
+// (Blader/Bledar), nomi invertiti, abbreviazioni (AZEVEDO M. / MARCO P.) e
+// cerca prima nel settore, poi in tutta l'anagrafica, perche' chi copre altri
+// reparti compare anche nei loro fogli vacanze.
+function _vacNorm(s) {
+  return String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+function _vacLev(a, b) {
+  const m = a.length;
+  const n = b.length;
+  if (!m || !n) return Math.max(m, n);
+  const d = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
+  for (let j = 1; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[m][n];
+}
+function _vacSimile(a, b) {
+  if (a === b) return 3;
+  if (a.length > 3 && b.length > 3) {
+    const d = _vacLev(a, b);
+    if (d === 1) return 2.5;
+    if (d === 2 && Math.min(a.length, b.length) > 5) return 2;
+  }
+  if (a.startsWith(b) || b.startsWith(a)) return 2;
+  return 0;
+}
+function _vacAbbina(cognome, nome, rep) {
+  const tok = (_vacNorm(cognome) + ' ' + _vacNorm(nome)).split(' ').filter((x) => x.length > 1);
+  if (!tok.length) return null;
+  const punteggio = (c) => {
+    const ct = _vacNorm(c.nome).split(' ');
+    const usati = new Set();
+    let s = 0;
+    tok.forEach((w) => {
+      let best = 0;
+      let bi = -1;
+      ct.forEach((y, i) => {
+        if (usati.has(i)) return;
+        const v = _vacSimile(w, y);
+        if (v > best) {
+          best = v;
+          bi = i;
+        }
+      });
+      if (best > 0) {
+        s += best;
+        usati.add(bi);
+      }
+    });
+    return s;
+  };
+  const cerca = (lista) => {
+    let best = null;
+    let bs = 0;
+    lista.forEach((c) => {
+      const s = punteggio(c);
+      if (s > bs) {
+        bs = s;
+        best = c;
+      }
+    });
+    return bs >= 4 ? { c: best, score: bs } : null;
+  };
+  const attivi = collaboratoriCache.filter((c) => c.attivo !== false);
+  const delRep = attivi.filter((c) => (c.reparto_dip || 'slots') === (rep || _pianoReparto()));
+  return cerca(delRep) || cerca(attivi) || cerca(collaboratoriCache);
+}
+// ===== IMPORT VACANZE (Excel o PDF nel formato HR) =====
+// Formato ufficiale: riga di intestazione con COGNOME | NOME | anno |
+// Pianificate | 52 | 1..52, poi una riga per persona con la X sulle settimane.
+// Vale sia per il file Excel sia per il PDF stampato dallo stesso foglio.
+function _vacRigheDaExcel(wb) {
+  // il foglio giusto e' quello che contiene l'intestazione COGNOME/NOME
+  let rows = null;
+  for (const sn of wb.SheetNames) {
+    const r = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' });
+    if (r.some((x) => /cognome/i.test(String(x[0] || '')) && /nome/i.test(String(x[1] || '')))) {
+      rows = r;
+      break;
+    }
+  }
+  if (!rows) rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+  const out = [];
+  rows.forEach((r) => {
+    const cognome = String(r[0] || '').trim();
+    const nome = String(r[1] || '').trim();
+    if (!cognome || /cognome/i.test(cognome)) return;
+    const sett = [];
+    for (let w = 1; w <= 52; w++) {
+      if (
+        String(r[4 + w] || '')
+          .trim()
+          .toUpperCase() === 'X'
+      )
+        sett.push(w);
+    }
+    if (sett.length) out.push({ cognome: cognome, nome: nome, settimane: sett });
+  });
+  return out;
+}
+async function _vacRigheDaPdf(file) {
+  // pdf.js: si prendono le posizioni orizzontali dei numeri di settimana
+  // nell'intestazione e si assegna ogni X alla colonna piu' vicina
+  const lib = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
+  if (!lib) throw new Error('lettore PDF non disponibile');
+  lib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const buf = await file.arrayBuffer();
+  const pdf = await lib.getDocument({ data: buf }).promise;
+  const out = [];
+  for (let np = 1; np <= pdf.numPages; np++) {
+    const page = await pdf.getPage(np);
+    const txt = await page.getTextContent();
+    const items = txt.items
+      .map((i) => ({ s: String(i.str || '').trim(), x: i.transform[4], y: Math.round(i.transform[5]) }))
+      .filter((i) => i.s);
+    // righe: raggruppo per y (tolleranza 3 punti)
+    const righe = [];
+    items.forEach((i) => {
+      let r = righe.find((x) => Math.abs(x.y - i.y) <= 3);
+      if (!r) {
+        r = { y: i.y, items: [] };
+        righe.push(r);
+      }
+      r.items.push(i);
+    });
+    righe.forEach((r) => r.items.sort((a, b) => a.x - b.x));
+    righe.sort((a, b) => b.y - a.y);
+    // intestazione: la riga che contiene i numeri 1..52 in sequenza
+    let head = null;
+    for (const r of righe) {
+      const nums = r.items.filter((i) => /^\d{1,2}$/.test(i.s)).map((i) => ({ n: parseInt(i.s), x: i.x }));
+      if (nums.length >= 40 && nums.some((v) => v.n === 1) && nums.some((v) => v.n === 52)) {
+        head = nums;
+        break;
+      }
+    }
+    if (!head) continue;
+    const colonne = {};
+    head.forEach((v) => {
+      if (v.n >= 1 && v.n <= 52 && colonne[v.n] == null) colonne[v.n] = v.x;
+    });
+    const headY = righe.find((r) => r.items.some((i) => head.some((h) => h.x === i.x)))?.y;
+    righe.forEach((r) => {
+      if (headY != null && r.y >= headY) return; // sopra l'intestazione: titoli
+      const testo = r.items.filter((i) => /[A-Za-zÀ-ÿ.]{2,}/.test(i.s) && !/^x$/i.test(i.s));
+      if (!testo.length) return;
+      const cognome = testo[0].s;
+      const nome = testo[1] && testo[1].x < (colonne[1] || 9999) ? testo[1].s : '';
+      const sett = [];
+      r.items
+        .filter((i) => /^x$/i.test(i.s))
+        .forEach((i) => {
+          let best = null;
+          let bd = 1e9;
+          Object.keys(colonne).forEach((w) => {
+            const d = Math.abs(colonne[w] - i.x);
+            if (d < bd) {
+              bd = d;
+              best = parseInt(w);
+            }
+          });
+          if (best && bd < 12) sett.push(best);
+        });
+      if (sett.length) out.push({ cognome: cognome, nome: nome, settimane: [...new Set(sett)].sort((a, b) => a - b) });
+    });
+  }
+  return out;
+}
 async function importaVacanzePiano(input) {
-  // IDENTICO a Turnivo (vacanze.importa_excel): colonna A cognome, B nome,
-  // colonne F-BE = settimane 1-52 con X. Scrive settimane in piano_vacanze
-  // (confermata=true); le V arrivano nel piano con "Applica al piano".
   if (!puoGestirePiano()) return;
   const file = input.files[0];
   input.value = '';
-  if (!file || !window.XLSX) return;
+  if (!file) return;
   const anno = window._pianoVacAnno || parseInt(_pianoMeseSel.split('-')[0]);
   try {
-    const buf = await file.arrayBuffer();
-    const wb = XLSX.read(buf);
-    const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
-    const nomi = collaboratoriCache.filter((c) => c.attivo !== false);
-    const nuove = [];
-    let collabTrovati = 0;
-    data.forEach((row) => {
-      const cognome = String(row[0] || '').trim();
-      const nome = String(row[1] || '').trim();
-      if (!cognome) return;
-      const completo = (cognome + ' ' + nome).toLowerCase().trim();
-      const hit = nomi.find(
-        (c) =>
-          c.nome.toLowerCase() === completo ||
-          c.nome.toLowerCase() === (nome + ' ' + cognome).toLowerCase().trim() ||
-          (new Set(c.nome.toLowerCase().split(/\s+/)).size === new Set(completo.split(/\s+/)).size &&
-            completo.split(/\s+/).every((p) => c.nome.toLowerCase().includes(p))),
-      );
-      if (!hit) return;
-      collabTrovati++;
-      for (let w = 1; w <= 52; w++) {
-        const cella = String(row[4 + w] || '')
-          .trim()
-          .toUpperCase(); // col F = indice 5 = settimana 1
-        if (cella !== 'X') continue;
-        if (_pianoVacCache.find((v) => v.collaboratore === hit.nome && v.settimana === w)) continue;
-        nuove.push({ collaboratore: hit.nome, settimana: w, anno: anno, confermata: true, operatore: getOperatore() });
-      }
-    });
-    if (!nuove.length) {
-      toast('Nessuna settimana nuova nel file (' + collabTrovati + ' collaboratori riconosciuti)');
+    const isPdf = /\.pdf$/i.test(file.name);
+    let righe;
+    if (isPdf) {
+      righe = await _vacRigheDaPdf(file);
+    } else {
+      if (!window.XLSX) return;
+      righe = _vacRigheDaExcel(XLSX.read(await file.arrayBuffer()));
+    }
+    if (!righe.length) {
+      toast('Nessuna settimana trovata nel file');
       return;
     }
-    if (
-      !confirm(
-        'Importare le vacanze ' +
-          anno +
-          '?\n\n• ' +
-          collabTrovati +
-          ' collaboratori riconosciuti\n• ' +
-          nuove.length +
-          ' settimane da inserire\n\nPoi usa "Applica al piano" per scrivere le V nel calendario.',
-      )
-    )
+    // abbinamento con l'anagrafica
+    const trovati = [];
+    const persi = [];
+    const deboli = [];
+    righe.forEach((r) => {
+      const m = _vacAbbina(r.cognome, r.nome);
+      if (!m) {
+        persi.push((r.cognome + ' ' + r.nome).trim() + ' (' + r.settimane.length + ' settimane)');
+        return;
+      }
+      if (m.score < 6) deboli.push((r.cognome + ' ' + r.nome).trim() + ' letto come ' + m.c.nome);
+      const g = trovati.find((t) => t.nome === m.c.nome);
+      if (g) g.settimane = [...new Set(g.settimane.concat(r.settimane))].sort((a, b) => a - b);
+      else trovati.push({ nome: m.c.nome, settimane: r.settimane.slice() });
+    });
+    if (!trovati.length) {
+      toast('Nessun collaboratore riconosciuto nel file');
       return;
-    for (const v of nuove) await secPost('piano_vacanze', v);
-    logAzione('Vacanze importate', anno + ' · ' + nuove.length + ' settimane');
-    toast('Vacanze importate: ' + nuove.length + ' settimane');
+    }
+    const nSett = trovati.reduce((s, t) => s + t.settimane.length, 0);
+    const gia = _pianoVacCache.filter((v) => trovati.some((t) => t.nome === v.collaboratore)).length;
+    let msg =
+      'File ' +
+      (isPdf ? 'PDF' : 'Excel') +
+      ' letto per l’anno ' +
+      anno +
+      ':\n\n• ' +
+      trovati.length +
+      ' collaboratori riconosciuti\n• ' +
+      nSett +
+      ' settimane nel file';
+    if (gia) msg += '\n• ' + gia + ' settimane gia’ in archivio per queste persone';
+    if (deboli.length)
+      msg += '\n\nLetti con piccole differenze di scrittura:\n' + deboli.map((x) => '  ' + x).join('\n');
+    if (persi.length) msg += '\n\nNON riconosciuti (restano fuori):\n' + persi.map((x) => '  ' + x).join('\n');
+    msg += gia
+      ? '\n\nOK = SOSTITUISCO le settimane di queste persone con quelle del file.\nAnnulla = non faccio nulla.'
+      : '\n\nProcedo con l’inserimento?';
+    if (!confirm(msg)) return;
+    // sostituzione: si toccano solo le persone presenti nel file
+    for (const t of trovati) {
+      const vecchie = _pianoVacCache.filter((v) => v.collaboratore === t.nome && v.anno === anno);
+      for (const v of vecchie) await secDel('piano_vacanze', 'id=eq.' + v.id);
+    }
+    let ins = 0;
+    for (const t of trovati) {
+      for (const w of t.settimane) {
+        await secPost('piano_vacanze', {
+          collaboratore: t.nome,
+          settimana: w,
+          anno: anno,
+          confermata: true,
+          operatore: getOperatore(),
+        });
+        ins++;
+      }
+    }
+    logAzione('Vacanze importate', anno + ' · ' + ins + ' settimane · ' + trovati.length + ' collaboratori');
+    toast('Vacanze importate: ' + ins + ' settimane');
     renderPiano();
   } catch (e) {
     console.error(e);
-    toast('Errore lettura file vacanze');
+    toast('Errore lettura file vacanze: ' + (e.message || ''));
   }
+}
+// ===== ESPORTAZIONE nello stesso formato del file HR =====
+function _vacDatiEsport(anno) {
+  const rep = _pianoReparto();
+  const collab = collaboratoriCache
+    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
+    .sort((a, b) => a.nome.localeCompare(b.nome));
+  return collab.map((c) => {
+    const parti = c.nome.trim().split(/\s+/);
+    const cognome = parti.length > 1 ? parti.slice(0, -1).join(' ') : parti[0];
+    const nome = parti.length > 1 ? parti[parti.length - 1] : '';
+    const sett = _pianoVacCache
+      .filter((v) => v.collaboratore === c.nome && v.anno === anno)
+      .map((v) => v.settimana)
+      .sort((a, b) => a - b);
+    return { cognome: cognome.toUpperCase(), nome: nome.toUpperCase(), spettanti: '', settimane: sett, rep: rep };
+  });
+}
+function esportaVacanzeExcel() {
+  const anno = window._pianoVacAnno || parseInt(_pianoMeseSel.split('-')[0]);
+  const dati = _vacDatiEsport(anno);
+  const aoa = [];
+  aoa.push([
+    '1) Selezionare la settimana di preferenza con una X. Scegliere 5 settimane in modo da facilitare la pianificazione.',
+  ]);
+  aoa.push([
+    '2) Devono essere effettuate 2 settimane consecutive . Durante le vacanze scolastiche si darà precedenza a genitori con i figli in età scolastica.',
+  ]);
+  aoa.push([]);
+  const r4 = [repartoLabel(_pianoReparto()).toUpperCase(), '', '', 'PIANIFICAZIONE VACANZE ANNO ' + anno];
+  aoa.push(r4);
+  const head = ['COGNOME', 'NOME', String(anno), 'Pianificate', 52];
+  for (let w = 1; w <= 52; w++) head.push(w);
+  aoa.push(head);
+  dati.forEach((d) => {
+    const r = [d.cognome, d.nome, '', d.settimane.length, ''];
+    for (let w = 1; w <= 52; w++) r.push(d.settimane.includes(w) ? 'X' : '');
+    aoa.push(r);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 22 }, { wch: 18 }, { wch: 7 }, { wch: 10 }, { wch: 4 }].concat(
+    Array.from({ length: 52 }, () => ({ wch: 3 })),
+  );
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'preferenze');
+  const nomeFile = 'VACANZE ' + repartoLabel(_pianoReparto()).toUpperCase() + ' ' + anno + '.xlsx';
+  XLSX.writeFile(wb, nomeFile);
+  logAzione('Vacanze esportate', anno + ' · Excel · ' + dati.length + ' collaboratori');
+  toast('File Excel creato');
+}
+function esportaVacanzePdf() {
+  const anno = window._pianoVacAnno || parseInt(_pianoMeseSel.split('-')[0]);
+  const dati = _vacDatiEsport(anno);
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('landscape', 'mm', 'a3');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('PIANIFICAZIONE VACANZE ANNO ' + anno + ' · ' + repartoLabel(_pianoReparto()).toUpperCase(), 210, 10, {
+    align: 'center',
+  });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.text(
+    '1) Selezionare la settimana di preferenza con una X. 2) Devono essere effettuate 2 settimane consecutive. Durante le vacanze scolastiche si dà precedenza a genitori con figli in età scolastica.',
+    8,
+    15,
+  );
+  const head = ['COGNOME', 'NOME', 'Pianificate'];
+  for (let w = 1; w <= 52; w++) head.push(String(w));
+  const body = dati.map((d) => {
+    const r = [d.cognome, d.nome, String(d.settimane.length)];
+    for (let w = 1; w <= 52; w++) r.push(d.settimane.includes(w) ? 'X' : '');
+    return r;
+  });
+  const colStyles = {
+    0: { cellWidth: 30, halign: 'left' },
+    1: { cellWidth: 24, halign: 'left' },
+    2: { cellWidth: 12 },
+  };
+  for (let i = 3; i < 55; i++) colStyles[i] = { cellWidth: 5.5 };
+  doc.autoTable({
+    startY: 18,
+    head: [head],
+    body: body,
+    theme: 'grid',
+    margin: { left: 6, right: 6 },
+    styles: { fontSize: 5.4, cellPadding: 0.7, halign: 'center', lineColor: [150, 150, 150], lineWidth: 0.1 },
+    headStyles: { fillColor: [26, 74, 122], textColor: [255, 255, 255], fontSize: 5.2 },
+    columnStyles: colStyles,
+    didParseCell: (d) => {
+      if (d.section === 'body' && d.column.index > 2 && d.cell.raw === 'X') {
+        d.cell.styles.fillColor = [255, 214, 102];
+        d.cell.styles.fontStyle = 'bold';
+      }
+    },
+  });
+  const nomeFile = 'VACANZE_' + repartoLabel(_pianoReparto()).toUpperCase() + '_' + anno + '.pdf';
+  if (typeof mostraPdfPreview === 'function') mostraPdfPreview(doc, nomeFile, 'Vacanze ' + anno);
+  else doc.save(nomeFile);
+  logAzione('Vacanze esportate', anno + ' · PDF · ' + dati.length + ' collaboratori');
 }
 
 // ================================================================
