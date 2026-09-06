@@ -1038,7 +1038,9 @@ async function renderCollaboratoriUI() {
           selStyle +
           '">' +
           opzioniRepartoHtml(rep === 'entrambi' ? 'entrambi' : rep, true) +
-          '</select><button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2)" onclick="rinominaCollaboratore(\'' +
+          '</select>' +
+          _coperturaChipHtml(c) +
+          '<button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2)" onclick="rinominaCollaboratore(\'' +
           c.nome.replace(/'/g, "\\'") +
           '\')">Rinomina</button><button class="btn-del-tipo" onclick="disattivaCollaboratore(\'' +
           c.nome.replace(/'/g, "\\'") +
@@ -1213,6 +1215,179 @@ async function salvaRinominaCollaboratore(vecchio) {
     toast('Collaboratore rinominato');
   } catch (e) {
     toast('Errore: nome già esistente?');
+  }
+}
+// ===== COPERTURA ALTRI SETTORI =====
+// Il collaboratore appartiene al SUO settore; se serve puo' coprire i buchi
+// in altri settori (es. Balliu Foboslot che copre al Valet). Non si divide la
+// percentuale del contratto: si dichiara solo dove puo' andare, con che
+// limiti e se lavora accompagnato.
+function _coperturaDi(c) {
+  let o = c && c.copertura_reparti;
+  if (typeof o === 'string') {
+    try {
+      o = JSON.parse(o);
+    } catch (e) {
+      o = null;
+    }
+  }
+  return o && typeof o === 'object' ? o : {};
+}
+function _coperturaSettori(c) {
+  return String((c && c.reparti_extra) || '')
+    .split(',')
+    .map((x) => x.trim().toLowerCase())
+    .filter(Boolean);
+}
+function _coperturaChipHtml(c) {
+  const sett = _coperturaSettori(c);
+  const cfg = _coperturaDi(c);
+  const testo = sett.length
+    ? sett
+        .map((k) => {
+          const d = cfg[k] || {};
+          return (
+            repartoLabel(k) +
+            (d.max_turni ? ' ' + d.max_turni + '/mese' : '') +
+            (d.gruppi ? ' ' + String(d.gruppi).toUpperCase() : '') +
+            (d.accompagnato ? ' (acc.)' : '')
+          );
+        })
+        .join(' · ')
+    : 'Copertura...';
+  return (
+    '<button class="btn-del-tipo" title="Settori in cui questo collaboratore puo\' coprire i buchi" style="' +
+    (sett.length ? 'color:#1a4a7a;border-color:#1a4a7a;font-weight:600' : 'color:var(--muted)') +
+    '" onclick="apriCoperturaCollab(' +
+    c.id +
+    ')">' +
+    escP(testo) +
+    '</button>'
+  );
+}
+function apriCoperturaCollab(id) {
+  const c = collaboratoriCache.find((x) => x.id === id) || {};
+  const principale = c.reparto_dip || 'slots';
+  const sett = _coperturaSettori(c);
+  const cfg = _coperturaDi(c);
+  const gruppiDi = (key) =>
+    [
+      ...new Set(
+        (typeof pianoTurniCache !== 'undefined' ? pianoTurniCache : [])
+          .filter((t) => (t.reparto_dip || 'slots') === key && t.attivo !== false)
+          .map((t) => (t.gruppo || '').toUpperCase())
+          .filter(Boolean),
+      ),
+    ].sort();
+  let h =
+    '<h3>Copertura altri settori</h3>' +
+    '<p style="font-size:.85rem;color:var(--muted);margin-bottom:4px"><b>' +
+    escP(c.nome || '') +
+    '</b> &middot; settore: <b>' +
+    escP(repartoLabel(principale)) +
+    '</b></p>' +
+    "<p style=\"font-size:.78rem;color:var(--muted);margin-bottom:12px\">Il contratto e le ore dovute restano nel suo settore. Qui indichi dove puo' andare a coprire i buchi: comparira' anche in quei piani e la generazione automatica potra' usarlo, entro i limiti che imposti.</p>";
+  getReparti()
+    .filter((r) => r.key !== principale)
+    .forEach((r) => {
+      const on = sett.includes(r.key);
+      const d = cfg[r.key] || {};
+      const gg = gruppiDi(r.key);
+      h +=
+        '<div style="border:1px solid var(--line);border-radius:4px;padding:8px 10px;margin-bottom:8px;background:var(--paper2)">' +
+        '<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:.88rem;cursor:pointer">' +
+        '<input type="checkbox" id="cop-on-' +
+        r.key +
+        '"' +
+        (on ? ' checked' : '') +
+        ' onchange="document.getElementById(\'cop-det-' +
+        r.key +
+        "').style.display=this.checked?'block':'none'\">" +
+        escP(r.label) +
+        '</label>' +
+        '<div id="cop-det-' +
+        r.key +
+        '" style="display:' +
+        (on ? 'block' : 'none') +
+        ';margin-top:8px;padding-left:24px;display:' +
+        (on ? 'block' : 'none') +
+        '">' +
+        '<label style="font-size:.8rem;display:block;margin-bottom:6px">Massimo turni al mese <input type="number" min="0" max="31" id="cop-max-' +
+        r.key +
+        '" value="' +
+        (d.max_turni || '') +
+        '" placeholder="nessun limite" style="width:110px;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></label>' +
+        (gg.length
+          ? '<label style="font-size:.8rem;display:block;margin-bottom:6px">Solo questi gruppi di turni <select id="cop-gr-' +
+            r.key +
+            '" style="padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><option value="">tutti</option>' +
+            gg
+              .map(
+                (g) =>
+                  '<option value="' +
+                  g +
+                  '"' +
+                  (String(d.gruppi || '').toUpperCase() === g ? ' selected' : '') +
+                  '>' +
+                  g +
+                  '</option>',
+              )
+              .join('') +
+            '</select></label>'
+          : '') +
+        '<label style="font-size:.8rem;display:flex;align-items:center;gap:6px"><input type="checkbox" id="cop-acc-' +
+        r.key +
+        '"' +
+        (d.accompagnato ? ' checked' : '') +
+        '>Lavora accompagnato in questo settore</label>' +
+        '</div></div>';
+    });
+  h +=
+    '<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button>' +
+    '<button class="btn-modal-ok" onclick="salvaCoperturaCollab(' +
+    id +
+    ')">Salva</button></div>';
+  document.getElementById('pwd-modal-content').innerHTML = h;
+  document.getElementById('pwd-modal').classList.remove('hidden');
+}
+async function salvaCoperturaCollab(id) {
+  const c = collaboratoriCache.find((x) => x.id === id);
+  if (!c) return;
+  const principale = c.reparto_dip || 'slots';
+  const scelti = [];
+  const cfg = {};
+  getReparti()
+    .filter((r) => r.key !== principale)
+    .forEach((r) => {
+      const on = document.getElementById('cop-on-' + r.key);
+      if (!on || !on.checked) return;
+      scelti.push(r.key);
+      const max = parseInt((document.getElementById('cop-max-' + r.key) || {}).value || '') || 0;
+      const gr = ((document.getElementById('cop-gr-' + r.key) || {}).value || '').trim();
+      const acc = !!(document.getElementById('cop-acc-' + r.key) || {}).checked;
+      const d = {};
+      if (max > 0) d.max_turni = max;
+      if (gr) d.gruppi = gr;
+      if (acc) d.accompagnato = true;
+      cfg[r.key] = d;
+    });
+  try {
+    const patch = {
+      reparti_extra: scelti.join(','),
+      copertura_reparti: scelti.length ? cfg : null,
+    };
+    await secPatch('collaboratori', 'id=eq.' + id, patch);
+    c.reparti_extra = patch.reparti_extra;
+    c.copertura_reparti = patch.copertura_reparti;
+    logAzione(
+      'Copertura settori',
+      c.nome + ' → ' + (scelti.length ? scelti.map((k) => repartoLabel(k)).join(', ') : 'nessuna'),
+    );
+    document.getElementById('pwd-modal').classList.add('hidden');
+    toast(scelti.length ? 'Copertura aggiornata' : 'Copertura rimossa');
+    renderCollaboratoriUI();
+  } catch (e) {
+    toast('Errore salvataggio copertura');
   }
 }
 async function cambiaRepartoCollaboratore(id, rep) {

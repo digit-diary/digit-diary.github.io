@@ -232,6 +232,21 @@ function _pianoMappFunzione(funzione) {
 }
 // multi-reparto: appartiene al reparto corrente se è il suo principale
 // oppure se elencato nei suoi "reparti extra" (es. valet che fa anche slots)
+// Condizioni di copertura in un settore che NON e' il suo (impostate in
+// Gestione collaboratori): tetto mensile di turni, gruppi ammessi, accompagnato
+function _pianoCoperturaCfg(info, rep) {
+  const r = rep || _pianoReparto();
+  if (!info || (info.reparto_dip || 'slots') === r) return null;
+  let o = info.copertura_reparti;
+  if (typeof o === 'string') {
+    try {
+      o = JSON.parse(o);
+    } catch (e) {
+      o = null;
+    }
+  }
+  return (o && o[r]) || {};
+}
 function _pianoAppartieneAlReparto(c, rep) {
   const r = rep || _pianoReparto();
   if ((c.reparto_dip || 'slots') === r) return true;
@@ -896,11 +911,27 @@ async function renderPiano() {
                 );
               })()
             : (infoC.reparto_dip || 'slots') !== _pianoReparto()
-              ? '<span class="piano-estraneo" title="Collaboratore del settore ' +
-                escP(repartoLabel(infoC.reparto_dip || 'slots')) +
-                ': il suo piano dovrebbe stare nel suo settore">' +
-                escP(repartoLabel(infoC.reparto_dip || 'slots')) +
-                '</span>'
+              ? _pianoAppartieneAlReparto(infoC)
+                ? // copertura prevista in Gestione collaboratori: normale, non un errore
+                  (() => {
+                    const cop = _pianoCoperturaCfg(infoC) || {};
+                    return (
+                      '<span class="piano-copre" title="Collaboratore ' +
+                      escP(repartoLabel(infoC.reparto_dip || 'slots')) +
+                      ' abilitato a coprire in questo settore' +
+                      (cop.max_turni ? ' · max ' + cop.max_turni + ' turni al mese' : '') +
+                      (cop.gruppi ? ' · solo ' + escP(String(cop.gruppi).toUpperCase()) : '') +
+                      (cop.accompagnato ? ' · accompagnato' : '') +
+                      '">copre &middot; ' +
+                      escP(repartoLabel(infoC.reparto_dip || 'slots')) +
+                      '</span>'
+                    );
+                  })()
+                : '<span class="piano-estraneo" title="Collaboratore del settore ' +
+                  escP(repartoLabel(infoC.reparto_dip || 'slots')) +
+                  ': non e\' abilitato a coprire qui, il suo piano dovrebbe stare nel suo settore">' +
+                  escP(repartoLabel(infoC.reparto_dip || 'slots')) +
+                  '</span>'
               : '') +
           '</td><td class="piano-fun"><strong>' +
           escP(infoC && infoC.is_jolly ? 'JOLLY' : (infoC && infoC.funzione) || '') +
@@ -1785,6 +1816,21 @@ async function generaBozzaPiano() {
                 .includes(f.turno_codice)
             )
               return false;
+            // COPERTURA da un altro settore: rispetta i gruppi ammessi e il
+            // tetto mensile di turni impostati nella scheda del collaboratore
+            const cop = _pianoCoperturaCfg(infoC);
+            if (cop) {
+              if (cop.gruppi && String(cop.gruppi).toUpperCase() !== (t.gruppo || '').toUpperCase()) return false;
+              if (cop.max_turni) {
+                let fatti = 0;
+                for (let k = 1; k <= nGiorni; k++) {
+                  const cod = cella[n + '|' + k];
+                  const tk = cod && _pianoTurniReparto().find((x) => x.codice === cod);
+                  if (tk) fatti++;
+                }
+                if (fatti >= cop.max_turni) return false;
+              }
+            }
             // mappature per funzione (SUP/BO limitati ai loro turni; regole settimana SUP)
             const fz = infoC && infoC.funzione;
             // regola HARD l1_solo_bo_sup: L1 e 9 riservati a BO e SUP
@@ -1917,7 +1963,13 @@ async function generaBozzaPiano() {
             };
             const jx = (_pianoCollabInfo(x) || {}).is_jolly ? 1 : 0;
             const jy = (_pianoCollabInfo(y) || {}).is_jolly ? 1 : 0;
+            // chi COPRE da un altro settore va usato solo se il settore non ha
+            // nessun altro disponibile: cosi' l'ordine di generazione dei piani
+            // non toglie una persona al suo reparto d'origine
+            const cx = _pianoCoperturaCfg(_pianoCollabInfo(x)) ? 1 : 0;
+            const cy = _pianoCoperturaCfg(_pianoCollabInfo(y)) ? 1 : 0;
             return (
+              cx - cy ||
               pattern(x) - pattern(y) ||
               bonus(mx) - bonus(my) ||
               gapOre(y) - gapOre(x) || // chi è più lontano dal proprio obiettivo ore viene prima
