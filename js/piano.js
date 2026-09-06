@@ -7116,69 +7116,116 @@ async function pdfCambioTurnoVuoto() {
 }
 
 function _renderPianoGuidaTab() {
-  const sez = (titolo, righe) =>
-    '<div class="main-card" style="margin-top:12px"><div class="card-header">' +
-    titolo +
-    '</div><div style="padding:10px 16px;font-size:.9rem;line-height:1.55">' +
-    righe.map((r) => '<p style="margin:4px 0">• ' + r + '</p>').join('') +
-    '</div></div>';
-  let h = '';
-  h += sez('Briefing', [
-    'La data parte da <b>domani</b> (frecce o calendario per cambiarla). <b>Compila dal piano</b> riempie nomi e turni del giorno; ogni cella è modificabile e ogni riga ha + (inserisci sotto), le frecce per riordinare e × per eliminare. Tutto si salva da solo: una versione per data, rigenerare sovrascrive.',
-    'Le colonne <b>E</b> e <b>U</b> restano vuote: si spuntano <b>a penna</b> sul foglio stampato il giorno dopo, per confermare le timbrature di entrata e uscita.',
-    '<b>Genera pause</b> crea la distribuzione: per Slots usa i tuoi schemi (distributori S1/S22, S3, S7C…), per Valet e gli altri reparti il motore automatico (durata pause per fascia, minimo 45 minuti fra le pause, mai due in pausa insieme, ven/sab evita la fascia 23–01). Anche le pause sono modificabili cella per cella, con inserimento/eliminazione righe.',
-    'In fondo alla card Pause trovi <b>Regole · turni, orari e pause spettanti</b>: la tabella mostra la pausa di ogni turno e puoi personalizzarla per singolo turno (es. S3 = 15+15) o per fascia di durata. Gli orari dei turni si cambiano nella tab Turni e tutto si aggiorna da solo.',
-    '<b>Stampa briefing</b> e <b>Stampa pause</b> generano i PDF A4 da appendere/firmare; <b>Importa da Excel</b> legge nomi e turni da un foglio esistente.',
+  // ogni argomento ha il suo nome e la sua ancora: l'indice in alto porta
+  // direttamente alla voce, cosi' chi non sa da dove iniziare si orienta
+  const VOCI = [];
+  const sez = (titolo, righe) => {
+    const id = 'guida-' + titolo.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    VOCI.push({ id: id, titolo: titolo });
+    return (
+      '<div class="main-card" id="' +
+      id +
+      '" style="margin-top:12px"><div class="card-header">' +
+      titolo +
+      '</div><div style="padding:10px 16px;font-size:.9rem;line-height:1.55">' +
+      righe.map((r) => '<p style="margin:4px 0">• ' + r + '</p>').join('') +
+      '</div></div>'
+    );
+  };
+  let corpo = '';
+  corpo += sez('Da dove iniziare', [
+    "Se e' la prima volta: apri <b>Calendario</b>, scegli il mese in alto e guarda la griglia. Ogni riga e' un collaboratore, ogni colonna un giorno.",
+    'Per scrivere un turno <b>clicca la cella</b> e digita la sigla (Invio salva, Esc annulla, cella vuota cancella). Non serve premere Salva: <b>tutto si salva da solo</b> nel momento in cui esci dalla cella.',
+    "Se sbagli usa le <b>frecce Annulla e Ripristina</b> in alto: diventano blu quando c'e' qualcosa da annullare. Il bottone rosso <b>Annulla tutto</b> riporta il mese a com'era quando hai iniziato a lavorarci.",
+    "Per preparare un mese nuovo l'ordine e': <b>Vacanze</b> (applica al piano) → <b>Fabbisogno</b> (quante persone servono per turno) → <b>Genera bozza</b> → <b>Valida regole</b> → eventuale <b>Completa con coperture</b>.",
+    'Per il giorno dopo: tab <b>Briefing</b> → <b>Compila dal piano</b> → <b>Genera pause</b> → <b>Stampa</b>.',
   ]);
-  h += sez('Calendario', [
-    '<b>Clicca una cella</b> e scrivi direttamente la sigla del turno (Invio salva, Esc annulla, vuoto elimina). Le sigle inesistenti vengono rifiutate.',
-    '<b>Tasto destro</b> (o pressione lunga sul tablet) su una cella: modifica, commento, cambio turno con collega (con eventuale restituzione), cambio per esigenze operative, rimozione, stampa.',
-    "L'<b>icona rossa</b> prima del nome stampa il piano del collaboratore in PDF; i nomi si possono <b>riordinare trascinandoli</b> (pulsante Ordine predefinito per tornare a SUP, BO, poi gli altri).",
-    "Clicca l'intestazione di un giorno per evidenziare la colonna su tutte le tabelle; clicca un nome per evidenziare la riga.",
-    'Bordo rosso = cella protetta (inserita a mano); triangolo = commento; M gialla = malattia dal Diario (automatica).',
-    '<b>Genera bozza</b>: applica prima le vacanze (V + congedi C + WD), poi riempie il fabbisogno rispettando tutte le regole. <b>Valida regole</b> elenca le violazioni. <b>Cancella piano</b> rimuove le celle non protette (o tutte).',
-    'Sotto la griglia: <b>Fabbisogno vs assegnati</b> (clicca una cella per impostare le persone necessarie, import da Excel), <b>Differenze</b> (verde surplus, rosso carenza) ed <b>Effettivi</b>.',
-    'Colonne finali: Ore (solo turni), D/N (diurni/notturni), OD (ore dovute), OP (ore pianificate), SM (saldo mese), YTD (saldo da inizio anno).',
+  corpo += sez('Calendario', [
+    '<b>Clicca una cella</b> e scrivi la sigla del turno (Invio salva, Esc annulla, vuoto elimina). Le sigle inesistenti vengono rifiutate.',
+    '<b>Tasto destro</b> (o pressione lunga sul tablet) su una cella: modifica, commento, cambio turno con collega, cambio per esigenze operative, rimozione, stampa.',
+    "Si seleziona come in Excel: <b>trascinando</b> col mouse, oppure cliccando l'intestazione di un giorno per l'intera colonna. Sulla selezione funzionano <b>Canc</b> (con conferma), <b>Ctrl+C</b> e i colori.",
+    'La barra in basso a destra mostra <b>somma, media, minimo e massimo</b> delle celle selezionate; vale anche per le colonne delle ore, dove puoi selezionare celle sparse con Ctrl+click.',
+    "L'<b>icona di stampa</b> prima del nome stampa il piano del singolo collaboratore; i nomi si riordinano trascinandoli.",
+    'Bordo/segni nelle celle: triangolo = commento, <b>M</b> gialla = malattia dal Diario, <b>MC</b> = malattia su giorno di congedo, <b>MCG</b> = malattia sul giorno di recupero festivo (il recupero resta a credito).',
+    'Colonne finali: Ore (solo turni), D/N (diurni e notturni), OD (ore dovute), OP (ore pianificate), SM (saldo del mese), YTD (saldo da inizio anno). Si aggiornano da sole a ogni modifica.',
   ]);
-  h += sez('Vacanze', [
-    'Le vacanze sono <b>settimane intere</b> (lun-dom) per collaboratore per anno, con spunta di conferma.',
-    '<b>Applica al piano</b> scrive le V (protette) del mese e i congedi C prima (1 per i fissi, 2 per i jolly) e dopo (in base alla percentuale: 100%→1, 80%→2, 60%→3, 40%→4), più i WD (giorni a turno diurno obbligato prima della vacanza). Anche Genera bozza lo fa da sola.',
-    'Import da Excel formato Turnivo (colonna A cognome, B nome, colonne F-BE con X sulle settimane).',
-    '<b>Formulario cambio vacanza</b> stampa il modulo vuoto da far firmare.',
+  corpo += sez('Generare il piano', [
+    '<b>Genera bozza</b> riempie il fabbisogno usando <b>solo i collaboratori di questo settore</b>, dopo aver applicato vacanze e congedi. I posti che restano scoperti te li elenca.',
+    "<b>Completa con coperture</b> (compare solo se serve) tappa i buchi rimasti con chi e' abilitato a coprire da un altro settore, rispettando i limiti impostati nella sua scheda. Da usare <b>dopo</b> aver generato i piani degli altri reparti.",
+    "<b>Valida regole</b> elenca le violazioni (riposi, consecutivi, idoneita', ore fuori tolleranza). <b>Migliora ore</b> riequilibra chi e' lontano dal proprio obiettivo.",
+    "<b>Cancella piano</b> agisce solo sul mese e sul settore che stai guardando: puoi togliere solo le celle generate oppure tutte (quest'ultima solo da admin, con doppia conferma).",
+    'Sotto la griglia: <b>Fabbisogno vs assegnati</b>, <b>Differenze</b> (verde surplus, rosso carenza) ed <b>Effettivi</b>.',
   ]);
-  h += sez('Turni, Codici e Regole', [
-    '<b>Turni</b>: orari, ore, tipo (diurno/notturno), colore della sigla nel piano · tutto modificabile; nuovi turni con + Aggiungi.',
-    "<b>Codici speciali</b> (V, M, C, ...): ore CCL, Scala % = le ore seguono la percentuale d'impiego, Riposo = conta come giorno di riposo.",
-    '<b>Regole del piano</b>: le regole HARD/SOFT con i pesi (max consecutivi, riposo 11h, 4+1+1, L1 solo BO/SUP, congedi C, ...).',
-    '<b>Regole di gruppo</b>: chi può lavorare in ogni settore (es. SUP richiesto nel gruppo SUP, niente notturni in BO, massimo 1 SUP al giorno in BO, almeno 1 SUP nei notturni di venerdì e sabato in SALA).',
+  corpo += sez('Briefing e pause', [
+    "La data parte da <b>domani</b>. <b>Compila dal piano</b> riempie nomi e turni del giorno; ogni cella e' modificabile, ogni riga ha + (inserisci sotto), le frecce per riordinare e × per eliminare. Si salva da solo.",
+    'I <b>numeri cassa</b> si assegnano da soli con la regola "chi chiude riapre": le casse che finiscono piu\' tardi aprono il giorno dopo di presto. Restano modificabili a mano.',
+    'Le colonne <b>E</b> e <b>U</b> restano vuote apposta: si spuntano a penna sul foglio stampato.',
+    'Per colorare o mettere in grassetto: <b>clicca la cella</b> (o la riga fuori dalle caselle) per marcarla, con Ctrl aggiungi le altre, poi usa <b>Colora</b> (applica il colore della barretta), la freccia per cambiarlo, <b>G</b> per il grassetto e <b>C</b> per il corsivo.',
+    '<b>Genera pause</b> crea la distribuzione (schemi Slots o motore automatico per gli altri reparti); anche le pause si modificano cella per cella. <b>Stampa briefing</b> e <b>Stampa pause</b> danno i PDF A4, sempre su un foglio solo.',
   ]);
-  h += sez('Timbrature e Saldo', [
-    "Timbrature a mano, da file della timbratrice, o <b>in automatico</b> con lo script collegato alla timbratrice (chiedere all'IT).",
-    'Clicca un collaboratore nel confronto per il dettaglio giorno per giorno (entrata, uscita, ore effettive vs pianificate).',
-    'Nel <b>Saldo</b> le ore lavorate sono le timbrate quando esistono, altrimenti il piano. YTD = cumulato da gennaio.',
+  corpo += sez('Vacanze', [
+    'Le vacanze sono <b>settimane intere</b> (lunedi-domenica) per collaboratore e per anno, con spunta di conferma.',
+    '<b>Applica al piano</b> scrive le V protette del mese, i congedi C prima e dopo (in base alla percentuale) e i WD (giorno diurno obbligato prima della vacanza). Lo fa anche Genera bozza.',
+    'Import da Excel in formato Turnivo; <b>Formulario cambio vacanza</b> stampa il modulo da far firmare.',
   ]);
-  h += sez('Festivi, Statistiche, Storico, Impostazioni', [
-    "I <b>festivi italiani</b> si generano da soli per ogni anno (Lunedì dell'Angelo calcolato dalla Pasqua); si possono aggiungere date manuali.",
-    "<b>Statistiche</b>: totali per collaboratore sull'anno e panoramica dei 12 mesi.",
-    '<b>Storico</b>: chi ha modificato cosa e quando, filtrabile per azione.',
-    '<b>Impostazioni</b>: export/import dati e template, turni per funzione (mappature), preferenze collaboratori (solo diurni, turni bloccati, preferisce L1, accoglienza, accompagnamento), ore settimanali del contratto.',
+  corpo += sez('Collaboratori e copertura di altri settori', [
+    "L'anagrafica (nome, funzione, percentuale, impiego, categoria, lingue) sta in <b>Impostazioni → Gestione Collaboratori</b>; le competenze e i livelli stanno in <b>Formazione</b>; le preferenze di turno in <b>Piano → Impostazioni</b>.",
+    'Ogni collaboratore appartiene a <b>un settore</b>. Se copre i buchi anche altrove, apri il bottone <b>Copertura</b> nella sua riga: scegli i settori, il <b>massimo di turni al mese</b>, i <b>gruppi ammessi</b> (es. solo REC) e se lavora <b>accompagnato</b>.',
+    "Chi copre compare nella griglia dell'altro settore con l'etichetta azzurra <b>\"copre\"</b>, e nei due piani vedi sempre gli stessi turni: cosi' nessuno puo' essere prenotato due volte lo stesso giorno.",
+    'La percentuale del contratto resta una sola, nel settore di appartenenza: la copertura non la divide.',
   ]);
-  h += sez('Import dai file Excel reali', [
-    'Nella tab Calendario, <b>Importa piano</b> legge direttamente il file <b>PIANO SLOTS/VALET 2026.xlsx</b>: riconosce da solo il foglio del mese selezionato, le colonne dei giorni e i nomi (anche con maiuscole o piccoli refusi). Le celle esistenti non vengono toccate.',
-    'Se nel file ci sono <b>collaboratori nuovi</b> li crea (funzione e percentuale lette dal file); quelli <b>disattivati ma presenti</b> te li propone da riattivare; quelli <b>attivi ma assenti dal file</b> te li propone da disattivare. Ogni passo ha la sua conferma.',
-    'Nella tab Calendario (fabbisogno), <b>Importa fabbisogno</b> legge la sezione <b>PIANIFICAZIONE</b> del foglio del mese dello stesso file e SOSTITUISCE il fabbisogno del mese. Funziona anche col formato semplice (turno + giorni).',
+  corpo += sez('Turni, codici e regole', [
+    '<b>Turni</b>: orari, ore, tipo (diurno/notturno) e colore, <b>divisi per settore</b> (due reparti possono usare la stessa sigla senza confondersi).',
+    '<b>Codici speciali</b> (V, M, C, CGF, ND, ASS...): sono comuni a tutti i settori. "Scala %" = le ore seguono la percentuale d\'impiego, "Riposo" = conta come giorno di riposo.',
+    '<b>Regole del piano</b> (tab Regole, solo admin): qui ci sono i valori normativi con accanto <b>la fonte</b> (RAP, direttiva interna 16-007, legge sul lavoro) e la colonna che dice <b>dove vengono applicati</b>. Si modificano scrivendo il valore: se domani cambia il RAP, si aggiorna il numero e basta.',
+    "<b>Regole di gruppo</b>: chi puo' lavorare in ogni gruppo del proprio settore, minimi e limiti per funzione.",
   ]);
-  h += sez('Formulari e CGF', [
-    'La tab <b>Formulari</b> raccoglie i moduli standard (cambio turno, cambio vacanza, non-disponibilità jolly 1187, protocolli formazione) e un archivio per cartelle dove caricare Word/PDF/Excel, rinominarli e stamparli.',
-    'I <b>CGF</b> sono automatici: chi lavora un festivo (con flag CGF) matura il compenso e la bozza glielo piazza nel primo buco dopo il festivo; i crediti passano ai mesi successivi, anche a cavallo d&#39;anno. Il conteggio maturati/goduti/saldo è nelle Statistiche.',
+  corpo += sez('Festivi, CGF e supplementi', [
+    'I <b>festivi</b> sono quelli ufficiali del Canton Ticino e si generano da soli per qualsiasi anno futuro aprendo la tab Festivi.',
+    "Il <b>CGF</b> e' il recupero per il lavoro nei giorni festivi. Secondo il RAP (punto 4.3) spetta al <b>personale fisso</b> e solo per i festivi <b>diversi dalla domenica</b>. Chi lavora un festivo lo matura, e la bozza glielo assegna nei giorni liberi.",
+    "I <b>jolly non maturano CGF</b>: per l'Allegato 1 del RAP ricevono il <b>supplemento del 50%</b> sul salario orario quando lavorano un festivo parificato alla domenica. Nelle Statistiche hanno la colonna <b>Suppl. 50%</b>, che e' la base da passare alle paghe.",
+    'Se una persona si ammala nel giorno del recupero, il CGF <b>non risulta goduto</b> e il credito resta (cella MCG).',
+    "Il conteggio maturati, goduti e saldo parte da <b>gennaio</b> ed e' nelle <b>Statistiche</b>: serve anche a verificare se nei mesi passati i recuperi sono stati dati.",
   ]);
-  h += sez('Permessi e sicurezza', [
-    'La sezione Piano si può nascondere o limitare da Impostazioni del Diario → Visibilità.',
-    'Ogni modifica è protetta dal login operatore e registrata nello Storico.',
+  corpo += sez('Timbrature e saldo ore', [
+    "Timbrature a mano, da file della timbratrice o in automatico con lo script collegato (chiedere all'IT).",
+    'Clicca un collaboratore nel confronto per il dettaglio giorno per giorno (entrata, uscita, ore effettive contro pianificate).',
+    'Nel <b>Saldo</b> le ore lavorate sono quelle timbrate quando esistono, altrimenti quelle del piano. YTD = cumulato da gennaio.',
   ]);
-  return h;
+  corpo += sez('Import dai file Excel', [
+    '<b>Importa piano</b> legge il file dei piani (PIANO SLOTS/VALET/TAVOLI): riconosce il foglio del mese, le colonne dei giorni e i nomi anche con piccoli refusi. Le celle esistenti non vengono toccate.',
+    'Se nel file ci sono <b>collaboratori nuovi</b> li crea; quelli disattivati ma presenti te li propone da riattivare; quelli attivi ma assenti te li propone da disattivare. Ogni passo ha la sua conferma.',
+    '<b>Importa fabbisogno</b> legge la sezione PIANIFICAZIONE dello stesso file e sostituisce il fabbisogno del mese.',
+  ]);
+  corpo += sez('Formulari', [
+    "Moduli standard pronti: cambio turno, cambio vacanza, <b>non disponibilita' jolly</b> (modulo HR 1187, con il termine di consegna preso dalle regole) e i protocolli di formazione.",
+    "C'e' anche un archivio a cartelle dove caricare Word, PDF ed Excel, rinominarli e stamparli.",
+  ]);
+  corpo += sez('Controllo e manutenzione', [
+    "In <b>Impostazioni → Stato del sistema</b> il bottone <b>Controlla il sistema</b> esegue le verifiche sui dati e dice cosa non torna: impiego mancante, nomi con turni ma senza scheda, disattivati che hanno ancora turni, festivi dell'anno prossimo, schede di prova rimaste.",
+    "Da li' partono due strumenti: <b>Assegna l'impiego adesso</b> (fisso o jolly per tutti quelli che non ce l'hanno, gia' precompilato) e <b>Sistema questi nomi</b> (crea la scheda, sposta i turni sul collaboratore giusto oppure elimina le righe che non sono persone).",
+    'Il <b>Registro</b> (tab Storico) elenca chi ha modificato cosa e quando. I <b>backup</b> sono automatici e si scaricano da Impostazioni.',
+  ]);
+  corpo += sez('Permessi e sicurezza', [
+    "La sezione Piano e le singole funzioni si possono nascondere o limitare da <b>Impostazioni → Visibilita' pagine e funzioni</b>.",
+    "Ogni modifica e' protetta dal login operatore e registrata nello Storico.",
+  ]);
+  // indice in cima, costruito dai nomi delle sezioni
+  const indice =
+    '<div class="main-card"><div class="card-header">Guida &middot; scegli l\'argomento</div><div style="padding:12px 14px">' +
+    '<p style="font-size:.85rem;color:var(--muted);margin-bottom:10px">Clicca un argomento per andarci. Se e\' la prima volta, parti da <b>Da dove iniziare</b>.</p>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:8px">' +
+    VOCI.map(
+      (v) =>
+        '<button class="btn-export" style="font-size:.85rem;padding:6px 14px" onclick="document.getElementById(\'' +
+        v.id +
+        "').scrollIntoView({behavior:'smooth',block:'start'})\">" +
+        escP(v.titolo) +
+        '</button>',
+    ).join('') +
+    '</div></div></div>';
+  return indice + corpo;
 }
-
 function _renderPianoRegoleGruppoCard() {
   if (!isAdmin()) return '';
   const gruppi = [
