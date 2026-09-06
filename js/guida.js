@@ -185,6 +185,8 @@ function GUIDA_CAPITOLI() {
         'Le vacanze si assegnano a <b>settimane intere</b> (da lunedi a domenica) per collaboratore e per anno.',
         '<b>Applica al piano</b> scrive le V protette, i congedi C prima e dopo la vacanza in base alla percentuale e il giorno diurno obbligato prima della partenza.',
         'Le regole aziendali da rispettare: settimane a blocchi di sette giorni, nei settori con piu di otto persone si pianifica in vacanza uno ogni otto o nove collaboratori, nei settori piu piccoli mai piu di due contemporaneamente.',
+        'Le vacanze si <b>importano dal file HR</b> sia in Excel sia in PDF: il programma riconosce i collaboratori dai nomi, anche con refusi o abbreviazioni, e mostra chi ha trovato prima di sostituire.',
+        'Con <b>Scarica Excel</b> e <b>Scarica PDF</b> ottieni la scheda vacanze del settore nello stesso formato del file HR; il PDF si apre in anteprima prima di salvare.',
       ],
     },
     {
