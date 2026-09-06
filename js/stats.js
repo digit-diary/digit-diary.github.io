@@ -393,7 +393,7 @@ async function caricaJsPDF() {
   try {
     await new Promise((ok, ko) => {
       const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s.src = 'libs/jspdf.umd.min.js';
       s.integrity = 'sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk';
       s.crossOrigin = 'anonymous';
       s.onload = ok;
@@ -402,7 +402,7 @@ async function caricaJsPDF() {
     });
     await new Promise((ok, ko) => {
       const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js';
+      s.src = 'libs/jspdf.plugin.autotable.min.js';
       s.integrity = 'sha384-Xl/CUCfJbzsngMp0CFxkmF0VW/8C160IsGujqeQlIhaGxKz2+JsIGORFqtCPeldF';
       s.crossOrigin = 'anonymous';
       s.onload = ok;
