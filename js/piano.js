@@ -679,7 +679,10 @@ async function renderPiano() {
           '"' +
           (nR ? '' : ' disabled') +
           ' onclick="pianoRipristina()">&#8631;</button>' +
-          '<span id="piano-autosave" title="Ogni modifica al piano si salva da sola nel database, subito. Le frecce servono per tornare indietro o avanti se sbagli.">Salvataggio automatico</span>';
+          '<span id="piano-autosave" title="Ogni modifica al piano si salva da sola nel database, subito. Le frecce servono per tornare indietro o avanti se sbagli.">Salvataggio automatico</span>' +
+          '<input type="text" id="piano-cerca" placeholder="Cerca nome o sigla..." value="' +
+          escP(window._pianoCercaTesto || '') +
+          '" oninput="pianoCercaFiltra(this.value)" title="Mostra solo i collaboratori il cui nome contiene il testo, oppure chi ha quella sigla nel mese (es. C8). Vuoto = tutti" style="font-size:.78rem;padding:4px 8px;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--ink);width:150px;margin-left:6px">';
         const ssnap = (window._pianoSessSnap || {})[_pianoMeseSel + '|' + _pianoReparto()];
         if (ssnap)
           h +=
@@ -878,6 +881,7 @@ async function renderPiano() {
             if (stC.c) stile += (stile ? ';' : '') + 'background:' + stC.c;
             if (stC.b) stile += ';font-weight:700';
             if (stC.i) stile += ';font-style:italic';
+            if (stC.t) stile += ';color:' + stC.t;
           }
           riga +=
             '<td class="' +
@@ -3603,7 +3607,7 @@ function copiaPianoExcel() {
     .catch(() => toast('Copia non riuscita'));
 }
 
-async function stampaPianoPDF() {
+async function stampaPianoPDF(soloNomi) {
   if (!window.jspdf) {
     toast('Caricamento PDF...');
     if (!(await caricaJsPDF())) {
@@ -3623,7 +3627,9 @@ async function stampaPianoPDF() {
   // righe/giorni NASCOSTI nella griglia restano fuori anche dalla stampa
   // (serve p.es. per stampare il piano senza i SUP)
   const nasc = _pianoNascosti();
-  const nomi = [...new Set(_pianoRighe.map((r) => r.collaboratore))].filter((n) => !nasc.nomi.includes(n)).sort();
+  let nomi = [...new Set(_pianoRighe.map((r) => r.collaboratore))].filter((n) => !nasc.nomi.includes(n)).sort();
+  // stampa di una SELEZIONE di collaboratori (barra della selezione multipla)
+  if (Array.isArray(soloNomi) && soloNomi.length) nomi = nomi.filter((n) => soloNomi.includes(n));
   const giorniVis = [];
   for (let g = 1; g <= nGiorni; g++) if (!nasc.giorni.includes(g)) giorniVis.push(g);
   const head = ['Collaboratore'];
@@ -3654,6 +3660,14 @@ async function stampaPianoPDF() {
         const stC = ovr ? _stileCella(ovr) : null;
         if (stC && (stC.b || stC.i))
           d.cell.styles.fontStyle = stC.b && stC.i ? 'bolditalic' : stC.b ? 'bold' : 'italic';
+        if (stC && stC.t && stC.t[0] === '#') {
+          const ht = stC.t.replace('#', '');
+          d.cell.styles.textColor = [
+            parseInt(ht.substring(0, 2), 16),
+            parseInt(ht.substring(2, 4), 16),
+            parseInt(ht.substring(4, 6), 16),
+          ];
+        }
         const col = (stC && stC.c) || _pianoColore(String(d.cell.raw));
         if (col) {
           const hex = col.replace('#', '');
@@ -4653,6 +4667,11 @@ function _pianoInitSelezione() {
           _pianoBloccoDaColonne(tab, ga, gb);
           return;
         }
+        // Ctrl/Cmd+click: selezione SPARSA di giorni con barra azioni
+        if ((e.ctrlKey || e.metaKey) && g) {
+          _pianoSparseToggleGiorno(g);
+          return;
+        }
         const idSel = g ? 'g' + g : tab.dataset.selInit + ':' + colIdx;
         const era = selTipo === 'col' && idSel === selIdx;
         clearAll();
@@ -4672,6 +4691,11 @@ function _pianoInitSelezione() {
       nomeCella.addEventListener('click', (e) => {
         if (e.target.closest('a, .piano-pdf-ico')) return;
         e.stopPropagation();
+        // Ctrl/Cmd+click: selezione SPARSA di collaboratori con barra azioni
+        if ((e.ctrlKey || e.metaKey) && riga.dataset.nome) {
+          _pianoSparseToggleNome(riga.dataset.nome, riga);
+          return;
+        }
         const righeT = [...tbody.querySelectorAll('tr')];
         // Shift+click su un altro nome = intervallo di righe (come Excel), pronto da copiare
         if (e.shiftKey && selTipo === 'row' && selTab === tab && selIdx >= 0 && selIdx !== rowIdx) {
@@ -9802,19 +9826,20 @@ function pianoBloccoClick(tab, el) {
 // Stile di una cella in un'unica stringa ("#RRGGBB|bi": colore + flag
 // b=grassetto i=corsivo), salvata dov'era il solo colore: nessun campo nuovo
 function _stileCella(s) {
-  const out = { c: '', b: false, i: false };
+  const out = { c: '', b: false, i: false, t: '' };
   if (!s) return out;
   const parti = String(s).split('|');
   if (parti[0] && parti[0][0] === '#') out.c = parti[0];
   const f = parti[1] || '';
   out.b = f.indexOf('b') >= 0;
   out.i = f.indexOf('i') >= 0;
+  if (parti[2] && parti[2][0] === '#') out.t = parti[2];
   return out;
 }
 function _stileStr(st) {
   const f = (st.b ? 'b' : '') + (st.i ? 'i' : '');
-  if (!st.c && !f) return null;
-  return (st.c || '') + (f ? '|' + f : '');
+  if (!st.c && !f && !st.t) return null;
+  return (st.c || '') + '|' + f + (st.t ? '|' + st.t : '');
 }
 // Ultimo colore usato (secchiello stile Excel, condiviso piano+briefing).
 // Ricorda anche "nessuno" ('' = barretta bianca barrata, il bottone toglie il colore)
@@ -9864,8 +9889,128 @@ function _pianoColoriBarHtml() {
     '<span style="display:inline-block;width:1px;height:20px;background:var(--line);margin:0 8px;vertical-align:middle"></span>' +
     '<button class="btn-export" style="font-size:.75rem;font-weight:700;padding:2px 10px;vertical-align:middle" title="Grassetto sulle celle selezionate (vista e stampa)" onclick="pianoApplicaFormato(\'b\')">G</button> ' +
     '<button class="btn-export" style="font-size:.75rem;font-style:italic;padding:2px 10px;vertical-align:middle" title="Corsivo sulle celle selezionate (vista e stampa)" onclick="pianoApplicaFormato(\'i\')">C</button>' +
+    '<div style="margin-top:7px;padding-top:6px;border-top:1px solid var(--line)">' +
+    '<span style="font-size:.72rem;color:var(--muted);vertical-align:middle;margin-right:4px">Testo:</span>' +
+    PIANO_COLORI_TESTO.map(
+      (c) =>
+        '<span title="Colore del testo" onclick="pianoApplicaColoreTesto(\'' +
+        c +
+        '\')" style="display:inline-block;width:18px;height:18px;background:' +
+        c +
+        ';border:1px solid #999;border-radius:3px;margin:2px;cursor:pointer;vertical-align:middle"></span>',
+    ).join('') +
+    '<button class="btn-export" style="font-size:.68rem;padding:2px 8px;margin-left:4px;vertical-align:middle" onclick="pianoApplicaColoreTesto(null)">Auto</button>' +
+    '</div>' +
+    '<div style="margin-top:7px;padding-top:6px;border-top:1px solid var(--line)">' +
+    '<button class="btn-export" style="font-size:.72rem;padding:2px 10px;vertical-align:middle" title="Memorizza colore e formato della prima cella selezionata" onclick="pianoCopiaFormato()">Copia formato</button> ' +
+    '<button class="btn-export" style="font-size:.72rem;padding:2px 10px;vertical-align:middle" title="Applica il formato memorizzato alle celle selezionate" onclick="pianoIncollaFormato()">Incolla formato</button> ' +
+    '<button class="btn-export" style="font-size:.72rem;padding:2px 10px;vertical-align:middle;border-color:#c0392b;color:#c0392b" title="Toglie colori, grassetto e corsivo dalle celle selezionate (i turni non cambiano)" onclick="pianoCancellaFormato()">Cancella formato</button>' +
+    '</div>' +
     '</div></span>'
   );
+}
+const PIANO_COLORI_TESTO = ['#000000', '#c0392b', '#1a4a7a', '#2c6e49', '#e67e22', '#8e44ad', '#ffffff'];
+// helper comune: righe del piano dentro la selezione corrente della griglia
+function _pianoRigheSelezione() {
+  const b = window._pianoBlocco;
+  if (!b || !b.completo || b.tab !== 'piano') return null;
+  const righe = [];
+  _pianoBloccoCelle().forEach((rigaC) =>
+    rigaC.forEach((td) => {
+      const tr = td.closest('tr');
+      const g = parseInt(td.dataset.g);
+      if (!tr || !g) return;
+      const dstr = _pianoMeseSel + '-' + String(g).padStart(2, '0');
+      const r = _pianoRighe.find((x) => x.collaboratore === tr.dataset.nome && x.data === dstr);
+      if (r) righe.push(r);
+    }),
+  );
+  return righe;
+}
+async function _pianoScriviStili(righe, trasforma, label, msg) {
+  _pianoUndoSnap(label);
+  let fatte = 0;
+  try {
+    for (const r of righe) {
+      const nuovo = trasforma(_stileCella(r.colore));
+      if ((r.colore || null) === nuovo) continue;
+      await secPatch('piano', 'id=eq.' + r.id, { colore: nuovo });
+      r.colore = nuovo;
+      fatte++;
+    }
+    logAzione('Piano: ' + label, fatte + ' celle');
+    toast(msg.replace('{n}', fatte));
+    renderPiano();
+  } catch (e) {
+    toast('Errore salvataggio formato');
+  }
+}
+async function pianoApplicaColoreTesto(colore) {
+  const p2 = document.getElementById('piano-colori-pop');
+  if (p2) p2.style.display = 'none';
+  if (!puoGestirePiano()) return;
+  const righe = _pianoRigheSelezione();
+  if (!righe || !righe.length) {
+    toast('Seleziona prima le celle nella griglia');
+    return;
+  }
+  await _pianoScriviStili(
+    righe,
+    (st) => {
+      st.t = colore || '';
+      return _stileStr(st);
+    },
+    colore ? 'colore testo' : 'colore testo tolto',
+    colore ? 'Testo colorato su {n} celle' : 'Colore del testo tolto da {n} celle',
+  );
+}
+function pianoCopiaFormato() {
+  const p2 = document.getElementById('piano-colori-pop');
+  if (p2) p2.style.display = 'none';
+  const righe = _pianoRigheSelezione();
+  if (!righe || !righe.length) {
+    toast('Seleziona prima la cella da cui copiare il formato');
+    return;
+  }
+  window._pianoFormatoCopiato = righe[0].colore || null;
+  const st = _stileCella(window._pianoFormatoCopiato);
+  toast(
+    'Formato copiato' +
+      (st.c || st.b || st.i || st.t
+        ? ' (' +
+          [st.c ? 'sfondo' : '', st.t ? 'testo' : '', st.b ? 'grassetto' : '', st.i ? 'corsivo' : '']
+            .filter(Boolean)
+            .join(', ') +
+          ')'
+        : ' (nessuno: incollandolo si pulisce)'),
+  );
+}
+async function pianoIncollaFormato() {
+  const p2 = document.getElementById('piano-colori-pop');
+  if (p2) p2.style.display = 'none';
+  if (!puoGestirePiano()) return;
+  if (window._pianoFormatoCopiato === undefined) {
+    toast('Prima usa "Copia formato" su una cella');
+    return;
+  }
+  const righe = _pianoRigheSelezione();
+  if (!righe || !righe.length) {
+    toast('Seleziona le celle a cui applicare il formato');
+    return;
+  }
+  const f = window._pianoFormatoCopiato;
+  await _pianoScriviStili(righe, () => f, 'incolla formato', 'Formato applicato a {n} celle');
+}
+async function pianoCancellaFormato() {
+  const p2 = document.getElementById('piano-colori-pop');
+  if (p2) p2.style.display = 'none';
+  if (!puoGestirePiano()) return;
+  const righe = _pianoRigheSelezione();
+  if (!righe || !righe.length) {
+    toast('Seleziona prima le celle nella griglia');
+    return;
+  }
+  await _pianoScriviStili(righe, () => null, 'cancella formato', 'Formato tolto da {n} celle');
 }
 function pianoColoriToggle() {
   const p = document.getElementById('piano-colori-pop');
@@ -10328,6 +10473,172 @@ function _pianoNascosti() {
 }
 function _pianoSalvaNascosti(o) {
   localStorage.setItem(_pianoNascostiKey(), JSON.stringify(o));
+}
+// ===== SELEZIONE MULTIPLA SPARSA (Ctrl+click su nomi e giorni) =====
+// Shift+click prende un intervallo (gia' presente); Ctrl/Cmd+click aggiunge
+// righe o giorni anche non vicini, e compare la barra con le azioni in blocco.
+function _pianoSparse() {
+  if (!window._pianoSparseSel) window._pianoSparseSel = { nomi: [], giorni: [] };
+  return window._pianoSparseSel;
+}
+function _pianoSparseToggleNome(nome, riga) {
+  const s = _pianoSparse();
+  const i = s.nomi.indexOf(nome);
+  if (i >= 0) {
+    s.nomi.splice(i, 1);
+    if (riga) riga.classList.remove('row-selected');
+  } else {
+    s.nomi.push(nome);
+    if (riga) riga.classList.add('row-selected');
+  }
+  _pianoSparseBar();
+}
+function _pianoSparseToggleGiorno(g) {
+  const s = _pianoSparse();
+  const i = s.giorni.indexOf(g);
+  if (i >= 0) s.giorni.splice(i, 1);
+  else s.giorni.push(g);
+  document.querySelectorAll('#piano-content table[data-seltab]').forEach((t) => {
+    const th = t.querySelector('thead th[data-g="' + g + '"]');
+    if (th) th.classList.toggle('col-selected-header', i < 0);
+    t.querySelectorAll('tbody td[data-g="' + g + '"]').forEach((c) => c.classList.toggle('col-selected', i < 0));
+  });
+  _pianoSparseBar();
+}
+function _pianoSparseBar() {
+  const s = _pianoSparse();
+  let bar = document.getElementById('piano-multibar');
+  if (!s.nomi.length && !s.giorni.length) {
+    if (bar) bar.remove();
+    return;
+  }
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'piano-multibar';
+    document.body.appendChild(bar);
+  }
+  const b = (label, onclick, rosso) =>
+    '<button class="btn-export" style="font-size:.78rem;padding:4px 12px' +
+    (rosso ? ';border-color:#c0392b;color:#c0392b' : '') +
+    '" onclick="' +
+    onclick +
+    '">' +
+    label +
+    '</button>';
+  let h = '';
+  if (s.nomi.length) {
+    h +=
+      '<b>' +
+      s.nomi.length +
+      (s.nomi.length === 1 ? ' collaboratore' : ' collaboratori') +
+      '</b> ' +
+      b('Nascondi', 'pianoSparseNascondi()') +
+      b('Stampa PDF', 'pianoSparseStampa()') +
+      b('Colora celle', 'pianoSparseColora()');
+  }
+  if (s.giorni.length) {
+    h +=
+      (s.nomi.length ? ' &nbsp;&middot;&nbsp; ' : '') +
+      '<b>' +
+      s.giorni.length +
+      (s.giorni.length === 1 ? ' giorno' : ' giorni') +
+      '</b> ' +
+      b('Nascondi giorni', 'pianoSparseNascondiGiorni()');
+  }
+  h += b('&#10005;', 'pianoSparsePulisci()', true);
+  bar.innerHTML = h;
+}
+// ===== TROVA NEL PIANO =====
+// Filtra le righe per nome oppure per sigla presente nel mese (es. "C8"):
+// le celle che corrispondono alla sigla vengono evidenziate
+function pianoCercaFiltra(q) {
+  window._pianoCercaTesto = q || '';
+  const testo = (q || '').trim().toLowerCase();
+  const tab = document.querySelector('#piano-content table[data-seltab="piano"]');
+  if (!tab) return;
+  tab.querySelectorAll('td.cerca-hit').forEach((c) => c.classList.remove('cerca-hit'));
+  tab.querySelectorAll('tbody tr[data-nome]').forEach((tr) => {
+    if (!testo) {
+      tr.style.display = '';
+      return;
+    }
+    const nomeOk = tr.dataset.nome.toLowerCase().includes(testo);
+    let siglaOk = false;
+    if (!nomeOk) {
+      tr.querySelectorAll('td[data-g]').forEach((td) => {
+        if (td.textContent.trim().toLowerCase() === testo) {
+          siglaOk = true;
+          td.classList.add('cerca-hit');
+        }
+      });
+    }
+    tr.style.display = nomeOk || siglaOk ? '' : 'none';
+  });
+}
+function pianoSparsePulisci() {
+  const s = _pianoSparse();
+  s.nomi = [];
+  s.giorni = [];
+  document.querySelectorAll('#piano-content .row-selected').forEach((el) => el.classList.remove('row-selected'));
+  document
+    .querySelectorAll('#piano-content .col-selected, #piano-content .col-selected-header')
+    .forEach((el) => el.classList.remove('col-selected', 'col-selected-header'));
+  _pianoSparseBar();
+}
+function pianoSparseNascondi() {
+  const s = _pianoSparse();
+  if (s.nomi.length) pianoNascondiRighe(s.nomi.slice());
+  pianoSparsePulisci();
+}
+function pianoSparseNascondiGiorni() {
+  const s = _pianoSparse();
+  if (s.giorni.length) pianoNascondiGiorni(s.giorni.slice());
+  pianoSparsePulisci();
+}
+function pianoSparseStampa() {
+  const s = _pianoSparse();
+  if (s.nomi.length) stampaPianoPDF(s.nomi.slice());
+}
+async function pianoSparseColora() {
+  const s = _pianoSparse();
+  if (!s.nomi.length || !puoGestirePiano()) return;
+  const colore = _colUltimo() || null;
+  const righe = _pianoRighe.filter((r) => s.nomi.includes(r.collaboratore));
+  if (!righe.length) {
+    toast('Nessuna cella piena per i collaboratori selezionati');
+    return;
+  }
+  if (
+    !confirm(
+      (colore ? 'Applico il colore del secchiello a ' : 'Tolgo il colore da ') +
+        righe.length +
+        ' celle di ' +
+        s.nomi.length +
+        ' collaboratori (mese ' +
+        _pianoMeseSel +
+        ')?',
+    )
+  )
+    return;
+  _pianoUndoSnap('colore righe selezionate');
+  let fatte = 0;
+  try {
+    for (const r of righe) {
+      const stC = _stileCella(r.colore);
+      stC.c = colore || '';
+      const nuovo = _stileStr(stC);
+      if ((r.colore || null) === nuovo) continue;
+      await secPatch('piano', 'id=eq.' + r.id, { colore: nuovo });
+      r.colore = nuovo;
+      fatte++;
+    }
+    logAzione('Piano: colore righe multiple', s.nomi.length + ' collaboratori · ' + fatte + ' celle');
+    toast('Colorate ' + fatte + ' celle');
+    pianoSparsePulisci();
+    renderPiano();
+  } catch (e) {
+    toast('Errore salvataggio colore');
+  }
 }
 function pianoNascondiRighe(nomi) {
   const o = _pianoNascosti();

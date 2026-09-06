@@ -4218,6 +4218,27 @@ td.brief-cella-sel {
   color: #fff;
   border-color: #1a4a7a;
 }
+td.cerca-hit {
+  outline: 2px solid #ffd166;
+  outline-offset: -2px;
+}
+#piano-multibar {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  padding: 8px 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
 #piano-autosave {
   font-size: 0.72rem;
   color: var(--muted);
