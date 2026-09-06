@@ -8,7 +8,7 @@ function switchPage(name) {
   flushRapportoSave();
   if (typeof _pianoFlushSalva === 'function') _pianoFlushSalva();
   // Controllo visibilità: blocca accesso a pagine nascoste (dashboard/diario/impostazioni sempre accessibili)
-  const _pagesAlwaysVisible = ['dashboard', 'diario', 'impostazioni'];
+  const _pagesAlwaysVisible = ['dashboard', 'diario', 'impostazioni', 'guida'];
   const _visKey = name.replace(/-/g, '_');
   if (!_pagesAlwaysVisible.includes(name) && typeof isVis === 'function' && !isVis(_visKey)) {
     name = 'dashboard';
@@ -162,6 +162,7 @@ function switchPage(name) {
   }
   if (name === 'formazione') renderFormazione();
   if (name === 'piano' && typeof renderPiano === 'function') renderPiano();
+  if (name === 'guida' && typeof renderGuida === 'function') renderGuida();
   if (name === 'registro') renderRegistro();
   if (name === 'maison') {
     if (typeof _maisonAutoCleanup === 'function') _maisonAutoCleanup().catch(() => {});
