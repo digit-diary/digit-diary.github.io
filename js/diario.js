@@ -102,7 +102,31 @@ async function salva() {
     const sorted = [..._ndSelectedDates].sort();
     const dateLabel = sorted.map((ds) => new Date(ds + 'T12:00:00').toLocaleDateString('it-IT')).join(', ');
     const nGiorni = sorted.length;
-    const descDate = ' (' + nGiorni + ' giorn' + (nGiorni === 1 ? 'o' : 'i') + ': ' + dateLabel + ')';
+    // giorni oltre il termine di consegna: si registrano lo stesso, ma con
+    // conferma esplicita e nota "fuori termine" che resta nella registrazione
+    const fuoriT = typeof ndGiornoFuoriTempo === 'function' ? sorted.filter((ds) => ndGiornoFuoriTempo(ds)) : [];
+    if (fuoriT.length) {
+      if (
+        !confirm(
+          '\u26a0 ' +
+            fuoriT.length +
+            (fuoriT.length === 1 ? " giorno e'" : ' giorni sono') +
+            " FUORI TEMPO (il termine di consegna era gia' passato):\n\n" +
+            fuoriT.map((ds) => '\u2022 ' + new Date(ds + 'T12:00:00').toLocaleDateString('it-IT')).join('\n') +
+            '\n\nRegistro comunque? La nota "fuori termine" restera\' scritta.',
+        )
+      )
+        return;
+    }
+    const descDate =
+      ' (' +
+      nGiorni +
+      ' giorn' +
+      (nGiorni === 1 ? 'o' : 'i') +
+      ': ' +
+      dateLabel +
+      ')' +
+      (fuoriT.length ? ' [consegna fuori termine]' : '');
     const rec = {
       id: Date.now(),
       nome,

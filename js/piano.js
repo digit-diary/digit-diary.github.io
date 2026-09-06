@@ -860,9 +860,9 @@ async function renderPiano() {
         '</span></div>';
       h += '<div id="piano-violazioni"></div>';
 
-      // AVVISO NON DISPONIBILITA' JOLLY: promemoria fino alla scadenza
-      // (regola nd_jolly_giorno), avviso FUORI TEMPO dopo
-      if (puoMod) {
+      // NON DISPONIBILITA' JOLLY: promemoria discreto (una riga, chiudibile),
+      // scadenza dalla regola nd_jolly_giorno. Niente toni allarmistici.
+      if (puoMod && localStorage.getItem('piano_nd_banner_off') !== ym) {
         const oggi = new Date();
         const gLim = _pianoGiornoNd();
         const prossimo = new Date(oggi.getFullYear(), oggi.getMonth() + 1, 15);
@@ -877,28 +877,27 @@ async function renderPiano() {
               (c.impiego === 'jolly' || (!c.impiego && c.is_jolly)) &&
               !consegnato.has(c.nome.toLowerCase()),
           )
-          .map((c) => c.nome);
-        const lblNext = (MESI_FULL[prossimo.getMonth()] || '') + ' ' + prossimo.getFullYear();
-        if (jollyMancanti.length && oggi.getDate() <= gLim) {
+          .map((c) => c.nome.split(' ')[0]);
+        if (jollyMancanti.length) {
+          const lblNext = (MESI_FULL[prossimo.getMonth()] || '') + ' ' + prossimo.getFullYear();
+          const inTempo = oggi.getDate() <= gLim;
           h +=
-            '<div style="margin:8px 0;padding:8px 12px;background:#fff8e1;border:1px solid #d4b86a;border-radius:4px;font-size:.82rem;color:#5a4300"><b>Non disponibilita\' ' +
+            '<div style="margin:6px 0;padding:4px 10px;font-size:.76rem;color:var(--muted);border-left:3px solid ' +
+            (inTempo ? '#d4b86a' : '#c0392b') +
+            '">Non disponibilita\' ' +
             escP(lblNext) +
-            '</b> · consegna entro il ' +
+            ' (termine: il ' +
             gLim +
-            ' del mese (modulo HR 1187). Mancano: ' +
-            escP(jollyMancanti.slice(0, 8).join(', ')) +
-            (jollyMancanti.length > 8 ? ' e altri ' + (jollyMancanti.length - 8) : '') +
-            '</div>';
-        } else if (jollyMancanti.length && oggi.getDate() > gLim) {
-          h +=
-            '<div style="margin:8px 0;padding:8px 12px;background:#fdecea;border:1px solid #c0392b;border-radius:4px;font-size:.82rem;color:#7a1f14"><b>FUORI TEMPO</b> · il termine del ' +
-            gLim +
-            " per le non disponibilita' di " +
-            escP(lblNext) +
-            " e' passato. Mancano ancora: " +
-            escP(jollyMancanti.slice(0, 8).join(', ')) +
-            (jollyMancanti.length > 8 ? ' e altri ' + (jollyMancanti.length - 8) : '') +
-            " · si possono comunque registrare dal Diario (tipo Non Disponibilita')</div>";
+            ' del mese)' +
+            (inTempo ? '' : ' \u00b7 termine passato') +
+            ' \u00b7 senza giorni registrati: ' +
+            jollyMancanti.length +
+            ' jolly <span title="' +
+            escP(jollyMancanti.join(', ')) +
+            '" style="cursor:help;text-decoration:underline dotted">(quali?)</span> \u00b7 si registrano dal Diario' +
+            ' <a href="#" style="color:inherit;font-weight:700;margin-left:6px" onclick="localStorage.setItem(\'piano_nd_banner_off\',\'' +
+            ym +
+            '\');renderPiano();return false" title="Nascondi per questo mese">\u2715</a></div>';
         }
       }
       // GRIGLIA
@@ -4124,6 +4123,280 @@ function _pdfCambioTurno(dati) {
   return doc;
 }
 
+// ---- CERCA CAMBIO · "vorrei essere libero il giorno X" ----
+// Il collaboratore chiede il giorno libero: il sistema trova i colleghi a
+// riposo (C) quel giorno che possono coprire il suo turno e propone i giorni
+// di RESTITUZIONE (stesso mese o successivo) in cui lui prende un turno del
+// collega. Tutto verificato: idoneita', riposo minimo, massimo consecutivi.
+let _ccDati = null;
+async function apriCercaCambioLibero() {
+  const sel = _pianoCellaSel;
+  if (!sel || !puoGestirePiano()) return;
+  const r = _pianoRighe.find((x) => x.collaboratore === sel.nome && x.data === sel.data);
+  const tMio = r ? _pianoTurnoInfo(r.codice) : null;
+  if (!tMio) {
+    toast('La cella deve avere un turno da coprire');
+    return;
+  }
+  toast("Cerco con chi puo' cambiare...");
+  const ym = _pianoMeseSel;
+  const anno = parseInt(ym.split('-')[0]);
+  const mese = parseInt(ym.split('-')[1]);
+  const fineMeseSucc = new Date(anno, mese + 1, 0);
+  const iso = (d) => d.toISOString().substring(0, 10);
+  const daRange = new Date(sel.data + 'T12:00:00');
+  daRange.setDate(daRange.getDate() - 8);
+  const righeTutte =
+    (await secGet(
+      'piano?data=gte.' +
+        iso(daRange) +
+        '&data=lte.' +
+        iso(fineMeseSucc) +
+        '&reparto_dip=eq.' +
+        _pianoReparto() +
+        '&limit=8000',
+    )) || [];
+  const mappe = {}; // nome -> {data: codice}
+  righeTutte.forEach((x) => ((mappe[x.collaboratore] = mappe[x.collaboratore] || {})[x.data] = x.codice));
+  const minRiposo = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 11;
+  const maxCons = parseInt(_pianoRegolaVal('max_consecutivi')) || 5;
+  const giornoRel = (dstr, n) => {
+    const d = new Date(dstr + 'T12:00:00');
+    d.setDate(d.getDate() + n);
+    return iso(d);
+  };
+  const riposoTra = (codA, codB) => {
+    const t1 = _pianoTurnoInfo(codA);
+    const t2 = _pianoTurnoInfo(codB);
+    if (!t1 || !t2) return null;
+    const fine1 = _pianoOra(t1.ora_fine);
+    const inizio2 = _pianoOra(t2.ora_inizio);
+    if (fine1 == null || inizio2 == null) return null;
+    const fineAbs = t1.oltre23 || fine1 < _pianoOra(t1.ora_inizio) ? 24 + fine1 : fine1;
+    return 24 + inizio2 - fineAbs;
+  };
+  // simula: nella mappa di "nome", il giorno dstr diventa "codice"; ritorna
+  // l'eventuale problema (riposo o consecutivi), null se tutto ok
+  const problema = (mappa, dstr, codice) => {
+    const m2 = Object.assign({}, mappa);
+    m2[dstr] = codice;
+    if (_pianoTurnoInfo(codice)) {
+      const rP = riposoTra(m2[giornoRel(dstr, -1)], codice);
+      if (rP != null && rP < minRiposo) return 'riposo ' + rP.toFixed(1) + 'h';
+      const rD = riposoTra(codice, m2[giornoRel(dstr, 1)]);
+      if (rD != null && rD < minRiposo) return 'riposo ' + rD.toFixed(1) + 'h';
+      let cons = 1;
+      for (let n = -1; n >= -maxCons - 2 && _pianoIsLavoro(m2[giornoRel(dstr, n)] || ''); n--) cons++;
+      for (let n = 1; n <= maxCons + 2 && _pianoIsLavoro(m2[giornoRel(dstr, n)] || ''); n++) cons++;
+      if (cons > maxCons) return cons + ' consecutivi';
+    }
+    return null;
+  };
+  const eLibero = (cod) => !cod || (!_pianoTurnoInfo(cod) && ['C', ''].includes(String(cod)));
+  // CANDIDATI: a riposo il giorno X, idonei al turno, regole rispettate
+  const candidati = [];
+  collaboratoriCache
+    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && c.nome !== sel.nome && c.funzione !== 'RESP')
+    .forEach((c) => {
+      const mia = mappe[c.nome] || {};
+      if (!eLibero(mia[sel.data])) return;
+      if (!_pianoIdoneoPerTurno(c.nome, tMio)) return;
+      const prob = problema(mia, sel.data, r.codice);
+      if (prob) return;
+      // RESTITUZIONI: giorni dopo X (fino a fine mese successivo) dove il
+      // collega lavora e il richiedente e' libero, con scambio inverso valido
+      const mioPiano = Object.assign({}, mappe[sel.nome] || {});
+      mioPiano[sel.data] = 'C'; // dopo il cambio il richiedente e' libero il giorno X
+      const suoPiano = Object.assign({}, mia);
+      suoPiano[sel.data] = r.codice;
+      const rest = [];
+      let d = new Date(sel.data + 'T12:00:00');
+      for (let k = 0; k < 62 && rest.length < 14; k++) {
+        d.setDate(d.getDate() + 1);
+        const y = iso(d);
+        if (y > iso(fineMeseSucc)) break;
+        const codSuo = suoPiano[y];
+        const tSuo = _pianoTurnoInfo(codSuo);
+        if (!tSuo) continue;
+        if (!eLibero(mioPiano[y])) continue;
+        if (!_pianoIdoneoPerTurno(sel.nome, tSuo)) continue;
+        if (problema(mioPiano, y, codSuo)) continue;
+        rest.push({ data: y, codice: codSuo, stesso: codSuo === r.codice, meseDopo: y.substring(0, 7) !== ym });
+      }
+      rest.sort((a, b) => (b.stesso ? 1 : 0) - (a.stesso ? 1 : 0) || (a.data < b.data ? -1 : 1));
+      candidati.push({ nome: c.nome, jolly: c.impiego === 'jolly' || c.is_jolly, rest: rest });
+    });
+  candidati.sort((a, b) => b.rest.length - a.rest.length || a.nome.localeCompare(b.nome));
+  if (!candidati.length) {
+    toast("Nessun collega a riposo quel giorno puo' coprire " + r.codice + ' rispettando le regole');
+    return;
+  }
+  _ccDati = { nome: sel.nome, data: sel.data, codice: r.codice, candidati: candidati };
+  const dataIt = sel.data.split('-').reverse().join('.');
+  let h =
+    '<h3>Cerca cambio · ' +
+    escP(sel.nome) +
+    ' libero il ' +
+    dataIt +
+    '</h3><p style="font-size:.85rem;margin-bottom:10px">' +
+    escP(sel.nome.split(' ')[0]) +
+    ' cede il turno <b>' +
+    escP(r.codice) +
+    '</b> a un collega a riposo e lo restituisce prendendo un turno del collega in un altro giorno. Tutte le proposte rispettano idoneità, riposo minimo e giorni consecutivi.</p>' +
+    '<div class="field" style="text-align:left"><label>Chi copre il ' +
+    dataIt +
+    '</label><select id="cc-collega" style="width:100%;padding:9px" onchange="ccAggiornaRestituzioni()">' +
+    candidati
+      .map(
+        (c, i) =>
+          '<option value="' +
+          i +
+          '">' +
+          escP(c.nome) +
+          (c.jolly ? ' (jolly)' : '') +
+          ' · ' +
+          c.rest.length +
+          ' date possibili per la restituzione</option>',
+      )
+      .join('') +
+    '</select></div>' +
+    '<div class="field" style="text-align:left;margin-top:8px"><label>Giorno di restituzione</label><select id="cc-rest" style="width:100%;padding:9px"></select></div>' +
+    '<div class="field" style="text-align:left;margin-top:8px"><label>Motivazione</label><input type="text" id="cc-motivo" placeholder="Es: esigenze personali..."></div>' +
+    '<p style="font-size:.76rem;color:var(--muted);margin-top:8px">Nel piano: il giorno del cambio in <span style="background:#6BCBFF;padding:0 6px;border-radius:2px;color:#000">azzurro</span>, la restituzione in <span style="background:#B39DDB;padding:0 6px;border-radius:2px;color:#000">viola</span> (nel mese successivo se serve).</p>' +
+    '<div class="pwd-modal-btns" style="margin-top:12px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button>' +
+    '<button class="btn-modal-ok" onclick="confermaCercaCambioLibero()">Applica cambio</button></div>';
+  document.getElementById('pwd-modal-content').innerHTML = h;
+  document.getElementById('pwd-modal').classList.remove('hidden');
+  ccAggiornaRestituzioni();
+}
+function ccAggiornaRestituzioni() {
+  if (!_ccDati) return;
+  const i = parseInt((document.getElementById('cc-collega') || {}).value) || 0;
+  const c = _ccDati.candidati[i];
+  const sel = document.getElementById('cc-rest');
+  if (!sel || !c) return;
+  sel.innerHTML =
+    '<option value="">senza restituzione (solo copertura)</option>' +
+    c.rest
+      .map(
+        (x) =>
+          '<option value="' +
+          x.data +
+          '">' +
+          x.data.split('-').reverse().join('.') +
+          ' · prende ' +
+          escP(x.codice) +
+          (x.stesso ? ' (stesso turno)' : '') +
+          (x.meseDopo ? ' · mese successivo' : '') +
+          '</option>',
+      )
+      .join('');
+}
+async function confermaCercaCambioLibero() {
+  if (!_ccDati || !puoGestirePiano()) return;
+  const i = parseInt((document.getElementById('cc-collega') || {}).value) || 0;
+  const cand = _ccDati.candidati[i];
+  const dataRest = (document.getElementById('cc-rest') || {}).value || '';
+  const motivo = ((document.getElementById('cc-motivo') || {}).value || '').trim();
+  const rInfo = cand.rest.find((x) => x.data === dataRest);
+  const dataIt = _ccDati.data.split('-').reverse().join('.');
+  let msg =
+    _ccDati.nome + ' sarà LIBERO (C) il ' + dataIt + ';\n' + cand.nome + ' coprirà il turno ' + _ccDati.codice + '.';
+  if (rInfo)
+    msg +=
+      '\n\nRESTITUZIONE il ' +
+      dataRest.split('-').reverse().join('.') +
+      ': ' +
+      _ccDati.nome.split(' ')[0] +
+      ' prende il turno ' +
+      rInfo.codice +
+      ' di ' +
+      cand.nome.split(' ')[0] +
+      ', che va a riposo (C).';
+  else msg += '\n\nSenza restituzione automatica.';
+  if (!confirm(msg + '\n\nConfermi?')) return;
+  const op = getOperatore();
+  _pianoUndoSnap('cerca cambio ' + _ccDati.data);
+  const scrivi = async (nome, dstr, codice, colore, commento) => {
+    const righe =
+      (await secGet('piano?collaboratore=' + encodeURIComponent(nome) + '&data=eq.' + dstr + '&limit=5')) || [];
+    const r0 = righe[0];
+    const body = {
+      codice: codice,
+      protetto: true,
+      generato: false,
+      colore: colore,
+      commento: commento.substring(0, 400),
+      operatore: op,
+    };
+    if (r0) {
+      body.updated_at = new Date().toISOString();
+      await secPatch('piano', 'id=eq.' + r0.id, body);
+      const inMem = _pianoRighe.find((x) => x.id === r0.id);
+      if (inMem) Object.assign(inMem, body);
+    } else {
+      body.collaboratore = nome;
+      body.data = dstr;
+      body.reparto_dip = _pianoReparto();
+      await secPost('piano', body);
+    }
+  };
+  try {
+    const motTxt = motivo ? ' · ' + motivo : '';
+    await scrivi(
+      _ccDati.nome,
+      _ccDati.data,
+      'C',
+      '#6BCBFF|',
+      'Cambio: giorno libero, turno ' + _ccDati.codice + ' coperto da ' + cand.nome + motTxt + ' - ' + op,
+    );
+    await scrivi(
+      cand.nome,
+      _ccDati.data,
+      _ccDati.codice,
+      '#6BCBFF|',
+      'Cambio: copre ' +
+        _ccDati.nome +
+        (dataRest ? ' · restituzione il ' + dataRest.split('-').reverse().join('.') : '') +
+        motTxt +
+        ' - ' +
+        op,
+    );
+    if (rInfo) {
+      await scrivi(
+        cand.nome,
+        dataRest,
+        'C',
+        '#B39DDB|',
+        'Restituzione cambio del ' + dataIt + ': turno ' + rInfo.codice + ' preso da ' + _ccDati.nome + ' - ' + op,
+      );
+      await scrivi(
+        _ccDati.nome,
+        dataRest,
+        rInfo.codice,
+        '#B39DDB|',
+        'Restituzione: prende il turno di ' + cand.nome + ' (cambio del ' + dataIt + ') - ' + op,
+      );
+    }
+    logAzione(
+      'Piano: scambio turno',
+      _ccDati.nome +
+        ' (giorno libero il ' +
+        _ccDati.data +
+        ' coperto da ' +
+        cand.nome +
+        (dataRest ? ', restituzione ' + dataRest : ', senza restituzione') +
+        ')',
+    );
+    document.getElementById('pwd-modal').classList.add('hidden');
+    toast('Cambio applicato' + (rInfo ? ' con restituzione' : ''));
+    _ccDati = null;
+    renderPiano();
+  } catch (e) {
+    console.error(e);
+    toast('Errore applicazione cambio');
+  }
+}
 // ---- Scambio turno tra colleghi (come Turnivo cap. 19) ----
 async function apriScambioTurno() {
   const sel = _pianoCellaSel;
@@ -8346,6 +8619,7 @@ function mostraPianoCtx(e, nome, dstr) {
     puoMod && !!r,
   );
   h += voce('Cambia turno con...', 'icx-refresh', "pianoCtxAzione('scambio')", puoMod && !!haTurno);
+  h += voce('Cerca cambio · giorno libero', 'icx-cerca', "pianoCtxAzione('liberogiorno')", puoMod && !!haTurno);
   h += voce('Cambio per esigenze', 'icx-settings', "pianoCtxAzione('esigenze')", puoMod && !!haTurno);
   h += voce('Rimuovi cella', 'icx-cestino', "pianoCtxAzione('rimuovi')", puoMod && !!r);
   h += voce('Copia cella', 'icx-modifica', "pianoCtxAzione('copia')", !!r);
@@ -8482,6 +8756,9 @@ function pianoCtxAzione(azione) {
   else if (azione === 'scambio') {
     _pianoCellaSel = { nome: sel.nome, data: sel.data };
     apriScambioTurno();
+  } else if (azione === 'liberogiorno') {
+    _pianoCellaSel = { nome: sel.nome, data: sel.data };
+    apriCercaCambioLibero();
   } else if (azione === 'esigenze') apriCambioEsigenze(sel.nome, sel.data);
   else if (azione === 'copia') {
     const r2 = _pianoRighe.find((x) => x.collaboratore === sel.nome && x.data === sel.data);
