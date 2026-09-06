@@ -8972,6 +8972,23 @@ async function _renderPianoBriefingTab() {
         '<span style="display:inline-block;width:1px;height:20px;background:var(--line);margin:0 8px;vertical-align:middle"></span>' +
         '<button class="btn-export" style="font-size:.75rem;font-weight:700;padding:2px 10px;vertical-align:middle" title="Grassetto sulle celle o righe marcate (vista e stampa)" onclick="briefFormatoApplica(\'b\')">G</button> ' +
         '<button class="btn-export" style="font-size:.75rem;font-style:italic;padding:2px 10px;vertical-align:middle" title="Corsivo sulle celle o righe marcate (vista e stampa)" onclick="briefFormatoApplica(\'i\')">C</button>' +
+        '<div style="margin-top:7px;padding-top:6px;border-top:1px solid var(--line)">' +
+        '<span style="font-size:.72rem;color:var(--muted);vertical-align:middle;margin-right:4px">Testo:</span>' +
+        PIANO_COLORI_TESTO.map(
+          (c) =>
+            '<span title="Colore del testo" onclick="briefTestoApplica(\'' +
+            c +
+            '\')" style="display:inline-block;width:18px;height:18px;background:' +
+            c +
+            ';border:1px solid #999;border-radius:3px;margin:2px;cursor:pointer;vertical-align:middle"></span>',
+        ).join('') +
+        '<button class="btn-export" style="font-size:.68rem;padding:2px 8px;margin-left:4px;vertical-align:middle" onclick="briefTestoApplica(null)">Auto</button>' +
+        '</div>' +
+        '<div style="margin-top:7px;padding-top:6px;border-top:1px solid var(--line)">' +
+        '<button class="btn-export" style="font-size:.72rem;padding:2px 10px;vertical-align:middle" title="Memorizza il formato della prima cella marcata" onclick="briefCopiaFormato()">Copia formato</button> ' +
+        '<button class="btn-export" style="font-size:.72rem;padding:2px 10px;vertical-align:middle" title="Applica il formato memorizzato alle celle marcate" onclick="briefIncollaFormato()">Incolla formato</button> ' +
+        '<button class="btn-export" style="font-size:.72rem;padding:2px 10px;vertical-align:middle;border-color:#c0392b;color:#c0392b" title="Toglie colori e formato dalle celle o righe marcate" onclick="briefCancellaFormato()">Cancella formato</button>' +
+        '</div>' +
         '</div></span>'
       : '') +
     (puo && !valet && rep === 'slots' && salvato
@@ -9046,6 +9063,7 @@ async function _renderPianoBriefingTab() {
         'px;border:none;background:transparent;padding:4px 6px;font:inherit;color:inherit' +
         (stC.b || r.bold || fwDef ? ';font-weight:700' : '') +
         (stC.i || r.ital ? ';font-style:italic' : '') +
+        (stC.t || r.colT ? ';color:' + (stC.t || r.colT) : '') +
         '"></td>'
       );
     };
@@ -9072,6 +9090,7 @@ async function _renderPianoBriefingTab() {
         'px;border:none;background:transparent;padding:4px 2px 4px 6px;font:inherit;color:#000' +
         (stNome.b || r.bold || r.fm ? ';font-weight:700' : '') +
         (stNome.i || r.ital ? ';font-style:italic' : '') +
+        (stNome.t || r.colT ? ';color:' + (stNome.t || r.colT) : '') +
         '">' +
         (r.fm
           ? '<span style="font-size:.66rem;font-weight:700;color:#000;padding-right:3px">(formazione)</span>'
@@ -9267,6 +9286,129 @@ async function briefAggiungiRiga() {
 }
 function _briefRigaVuota() {
   return { e: '', u: '', nome: '', nomeFull: null, turno: '', cd: '', uscita: '', firma: '', radio: '', badge: '' };
+}
+// COLORE DEL TESTO nel briefing: sulle celle marcate (r.cs) o sull'intera
+// riga (r.colT), come nel piano
+async function briefTestoApplica(col) {
+  const b = document.getElementById('brief-colori-bar');
+  if (b) b.style.display = 'none';
+  if (!puoGestireBriefing() || !_briefState) return;
+  const sel = _briefRigheSel();
+  const selC = _briefCelleSel();
+  if (!sel.size && !selC.size) {
+    toast('Prima clicca le celle o le righe, poi scegli il colore del testo');
+    return;
+  }
+  let n = 0;
+  selC.forEach((k) => {
+    const i = k.split('|')[0];
+    const campo = k.split('|')[1];
+    const r = _briefState.righe[parseInt(i)];
+    if (!r) return;
+    r.cs = r.cs || {};
+    const stC = _stileCella(r.cs[campo]);
+    stC.t = col || '';
+    const s = _stileStr(stC);
+    if (s) r.cs[campo] = s;
+    else delete r.cs[campo];
+    n++;
+  });
+  sel.forEach((i) => {
+    if (_briefState.righe[parseInt(i)]) {
+      _briefState.righe[parseInt(i)].colT = col || null;
+      n++;
+    }
+  });
+  _briefSelPulisci();
+  clearTimeout(_briefSaveTimer);
+  await briefSalvaBriefing();
+  toast(col ? 'Testo colorato (' + n + ')' : 'Colore del testo tolto (' + n + ')');
+  renderPiano();
+}
+function briefCopiaFormato() {
+  const b = document.getElementById('brief-colori-bar');
+  if (b) b.style.display = 'none';
+  const selC = _briefCelleSel();
+  if (!selC.size || !_briefState) {
+    toast('Marca prima la cella da cui copiare il formato');
+    return;
+  }
+  const k = [...selC][0];
+  const r = _briefState.righe[parseInt(k.split('|')[0])];
+  window._briefFormatoCopiato = (r && r.cs && r.cs[k.split('|')[1]]) || null;
+  const st = _stileCella(window._briefFormatoCopiato);
+  toast(
+    'Formato copiato' +
+      (st.c || st.b || st.i || st.t
+        ? ' (' +
+          [st.c ? 'sfondo' : '', st.t ? 'testo' : '', st.b ? 'grassetto' : '', st.i ? 'corsivo' : '']
+            .filter(Boolean)
+            .join(', ') +
+          ')'
+        : ' (nessuno: incollandolo si pulisce)'),
+  );
+}
+async function briefIncollaFormato() {
+  const b = document.getElementById('brief-colori-bar');
+  if (b) b.style.display = 'none';
+  if (!puoGestireBriefing() || !_briefState) return;
+  if (window._briefFormatoCopiato === undefined) {
+    toast('Prima usa "Copia formato" su una cella');
+    return;
+  }
+  const selC = _briefCelleSel();
+  if (!selC.size) {
+    toast('Marca le celle a cui applicare il formato');
+    return;
+  }
+  let n = 0;
+  selC.forEach((k) => {
+    const r = _briefState.righe[parseInt(k.split('|')[0])];
+    if (!r) return;
+    r.cs = r.cs || {};
+    if (window._briefFormatoCopiato) r.cs[k.split('|')[1]] = window._briefFormatoCopiato;
+    else delete r.cs[k.split('|')[1]];
+    n++;
+  });
+  _briefSelPulisci();
+  clearTimeout(_briefSaveTimer);
+  await briefSalvaBriefing();
+  toast('Formato applicato a ' + n + ' celle');
+  renderPiano();
+}
+async function briefCancellaFormato() {
+  const b = document.getElementById('brief-colori-bar');
+  if (b) b.style.display = 'none';
+  if (!puoGestireBriefing() || !_briefState) return;
+  const sel = _briefRigheSel();
+  const selC = _briefCelleSel();
+  if (!sel.size && !selC.size) {
+    toast('Prima marca le celle o le righe da pulire');
+    return;
+  }
+  let n = 0;
+  selC.forEach((k) => {
+    const r = _briefState.righe[parseInt(k.split('|')[0])];
+    if (r && r.cs) {
+      delete r.cs[k.split('|')[1]];
+      n++;
+    }
+  });
+  sel.forEach((i) => {
+    const r = _briefState.righe[parseInt(i)];
+    if (!r) return;
+    r.col = null;
+    r.colT = null;
+    r.bold = false;
+    r.ital = false;
+    r.cs = undefined;
+    n++;
+  });
+  _briefSelPulisci();
+  clearTimeout(_briefSaveTimer);
+  await briefSalvaBriefing();
+  toast('Formato tolto (' + n + ')');
+  renderPiano();
 }
 async function briefInserisciRiga(i) {
   if (!_briefState || !puoGestireBriefing()) return;
@@ -10342,6 +10484,29 @@ async function pianoCancellaFormato() {
     return;
   }
   await _pianoScriviStili(righe, () => null, 'cancella formato', 'Formato tolto da {n} celle');
+}
+// i pannelli a comparsa (palette colori del piano e del briefing) si
+// chiudono cliccando in un punto qualsiasi fuori dal pannello
+if (!window._popupCloseBound) {
+  window._popupCloseBound = true;
+  document.addEventListener('click', (e) => {
+    const pop = document.getElementById('piano-colori-pop');
+    if (
+      pop &&
+      pop.style.display !== 'none' &&
+      !e.target.closest('#piano-colori-pop') &&
+      !e.target.closest('.pbar-color')
+    )
+      pop.style.display = 'none';
+    const bb = document.getElementById('brief-colori-bar');
+    if (
+      bb &&
+      bb.style.display !== 'none' &&
+      !e.target.closest('#brief-colori-bar') &&
+      !e.target.closest('[onclick*="briefColoriToggle"], [onclick*="briefColoreApplica(_colUltimo"]')
+    )
+      bb.style.display = 'none';
+  });
 }
 function pianoColoriToggle() {
   const p = document.getElementById('piano-colori-pop');
