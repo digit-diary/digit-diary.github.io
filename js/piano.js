@@ -4062,6 +4062,15 @@ function _pdfCambioTurno(dati) {
   doc.setDrawColor(51, 51, 51);
   doc.setLineWidth(0.5);
   doc.rect(M + 6, yy - 4, 5, 5);
+  if (dati.autorizzato) {
+    // spunta gia' marcata: il cambio e' stato applicato nel piano,
+    // il foglio si stampa e si firma
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(34, 34, 34);
+    doc.text('X', M + 7.2, yy);
+    doc.setFont('helvetica', 'normal');
+  }
   doc.setFontSize(11);
   doc.setTextColor(34, 34, 34);
   doc.text('Autorizzato', M + 14, yy);
@@ -4262,7 +4271,7 @@ async function apriCercaCambioLibero() {
     '</select></div>' +
     '<div class="field" style="text-align:left;margin-top:8px"><label>Giorno di restituzione</label><select id="cc-rest" style="width:100%;padding:9px"></select></div>' +
     '<div class="field" style="text-align:left;margin-top:8px"><label>Motivazione</label><input type="text" id="cc-motivo" placeholder="Es: esigenze personali..."></div>' +
-    '<p style="font-size:.76rem;color:var(--muted);margin-top:8px">Nel piano: il giorno del cambio in <span style="background:#6BCBFF;padding:0 6px;border-radius:2px;color:#000">azzurro</span>, la restituzione in <span style="background:#B39DDB;padding:0 6px;border-radius:2px;color:#000">viola</span> (nel mese successivo se serve).</p>' +
+    '<p style="font-size:.76rem;color:var(--muted);margin-top:8px">Alla conferma: celle aggiornate con il commento del cambio, formulario cambio turno gia\' compilato da stampare e firmare, conteggio nel limite cambi del richiedente.</p>' +
     '<div class="pwd-modal-btns" style="margin-top:12px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button>' +
     '<button class="btn-modal-ok" onclick="confermaCercaCambioLibero()">Applica cambio</button></div>';
   document.getElementById('pwd-modal-content').innerHTML = h;
@@ -4300,8 +4309,30 @@ async function confermaCercaCambioLibero() {
   const motivo = ((document.getElementById('cc-motivo') || {}).value || '').trim();
   const rInfo = cand.rest.find((x) => x.data === dataRest);
   const dataIt = _ccDati.data.split('-').reverse().join('.');
+  const op = getOperatore();
+  // limite cambi mensile: a carico di chi RICHIEDE il giorno libero
+  const maxC = _pianoMaxCambi();
+  if (maxC > 0) {
+    const richiesti = await _pianoCambiRichiesti(_pianoMeseSel);
+    const n = richiesti[_ccDati.nome] || 0;
+    if (n >= maxC) {
+      if (
+        !confirm(
+          'ATTENZIONE: ' +
+            _ccDati.nome +
+            " ha gia' richiesto " +
+            n +
+            '/' +
+            maxC +
+            " cambi questo mese.\n\nAutorizzi comunque il cambio come responsabile? (verra' registrato nello storico come autorizzazione in deroga)",
+        )
+      )
+        return;
+      logAzione('Piano: scambio autorizzato oltre limite', _ccDati.nome + ' (' + (n + 1) + '/' + maxC + ') da ' + op);
+    }
+  }
   let msg =
-    _ccDati.nome + ' sarà LIBERO (C) il ' + dataIt + ';\n' + cand.nome + ' coprirà il turno ' + _ccDati.codice + '.';
+    _ccDati.nome + " sara' LIBERO (C) il " + dataIt + ';\n' + cand.nome + " coprira' il turno " + _ccDati.codice + '.';
   if (rInfo)
     msg +=
       '\n\nRESTITUZIONE il ' +
@@ -4314,18 +4345,16 @@ async function confermaCercaCambioLibero() {
       cand.nome.split(' ')[0] +
       ', che va a riposo (C).';
   else msg += '\n\nSenza restituzione automatica.';
-  if (!confirm(msg + '\n\nConfermi?')) return;
-  const op = getOperatore();
+  if (!confirm(msg + "\n\nConfermi? Verra' generato il formulario cambio turno da stampare e firmare.")) return;
   _pianoUndoSnap('cerca cambio ' + _ccDati.data);
-  const scrivi = async (nome, dstr, codice, colore, commento) => {
+  const scrivi = async (nome, dstr, codice, exCod, commento) => {
     const righe =
-      (await secGet('piano?collaboratore=' + encodeURIComponent(nome) + '&data=eq.' + dstr + '&limit=5')) || [];
+      (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=eq.' + dstr + '&limit=5')) || [];
     const r0 = righe[0];
     const body = {
       codice: codice,
       protetto: true,
       generato: false,
-      colore: colore,
       commento: commento.substring(0, 400),
       operatore: op,
     };
@@ -4342,40 +4371,29 @@ async function confermaCercaCambioLibero() {
     }
   };
   try {
-    const motTxt = motivo ? ' · ' + motivo : '';
+    // commenti nello stesso formato dello scambio classico: Ex <vecchio> - cambio con <nome> - <operatore>
     await scrivi(
       _ccDati.nome,
       _ccDati.data,
       'C',
-      '#6BCBFF|',
-      'Cambio: giorno libero, turno ' + _ccDati.codice + ' coperto da ' + cand.nome + motTxt + ' - ' + op,
-    );
-    await scrivi(
-      cand.nome,
-      _ccDati.data,
       _ccDati.codice,
-      '#6BCBFF|',
-      'Cambio: copre ' +
-        _ccDati.nome +
-        (dataRest ? ' · restituzione il ' + dataRest.split('-').reverse().join('.') : '') +
-        motTxt +
-        ' - ' +
-        op,
+      'Ex ' + _ccDati.codice + ' - cambio con ' + cand.nome + ' - ' + op,
     );
+    await scrivi(cand.nome, _ccDati.data, _ccDati.codice, 'C', 'Ex C - cambio con ' + _ccDati.nome + ' - ' + op);
     if (rInfo) {
       await scrivi(
         cand.nome,
         dataRest,
         'C',
-        '#B39DDB|',
-        'Restituzione cambio del ' + dataIt + ': turno ' + rInfo.codice + ' preso da ' + _ccDati.nome + ' - ' + op,
+        rInfo.codice,
+        'Ex ' + rInfo.codice + ' - restituzione cambio con ' + _ccDati.nome + ' - ' + op,
       );
       await scrivi(
         _ccDati.nome,
         dataRest,
         rInfo.codice,
-        '#B39DDB|',
-        'Restituzione: prende il turno di ' + cand.nome + ' (cambio del ' + dataIt + ') - ' + op,
+        'C',
+        'Ex C - restituzione cambio con ' + cand.nome + ' - ' + op,
       );
     }
     logAzione(
@@ -4389,6 +4407,40 @@ async function confermaCercaCambioLibero() {
         ')',
     );
     document.getElementById('pwd-modal').classList.add('hidden');
+    // FORMULARIO gia' compilato, con la spunta Autorizzato: si stampa e si firma
+    if (!window.jspdf) await caricaJsPDF();
+    if (window.jspdf) {
+      const t = _pianoTurnoInfo(_ccDati.codice);
+      const fmtOra = (tt) =>
+        tt
+          ? '(' +
+            (tt.ora_inizio || '').substring(0, 5) +
+            '-' +
+            (tt.ora_fine || '').substring(0, 5) +
+            ', ' +
+            (tt.gruppo || '') +
+            ')'
+          : '';
+      const doc = _pdfCambioTurno({
+        tipo: 'SCAMBIO',
+        data: new Date(_ccDati.data + 'T12:00:00').toLocaleDateString('it-IT'),
+        a: { nome: _ccDati.nome, settore: repartoLabel(_pianoReparto()), turno: _ccDati.codice, orari: fmtOra(t) },
+        b: { nome: cand.nome, settore: repartoLabel(_pianoReparto()), turno: 'C (riposo)', orari: '' },
+        motivo: motivo || 'Richiesta giorno libero',
+        richiesto: op,
+        autorizzato: true,
+        restituzione: rInfo
+          ? new Date(dataRest + 'T12:00:00').toLocaleDateString('it-IT') +
+            ' \u00b7 ' +
+            _ccDati.nome.split(' ')[0] +
+            ' prende il turno ' +
+            rInfo.codice +
+            ' di ' +
+            cand.nome.split(' ')[0]
+          : null,
+      });
+      mostraPdfPreview(doc, 'cambio_turno_' + _ccDati.data + '.pdf', 'Cambio turno ' + _ccDati.data);
+    }
     toast('Cambio applicato' + (rInfo ? ' con restituzione' : ''));
     _ccDati = null;
     renderPiano();
@@ -4397,6 +4449,7 @@ async function confermaCercaCambioLibero() {
     toast('Errore applicazione cambio');
   }
 }
+
 // ---- Scambio turno tra colleghi (come Turnivo cap. 19) ----
 async function apriScambioTurno() {
   const sel = _pianoCellaSel;
@@ -4617,6 +4670,7 @@ async function confermaScambioTurno() {
         b: { nome: collega, settore: repartoLabel(_pianoReparto()), turno: c2, orari: fmtOra(t2) },
         motivo: motivo,
         richiesto: getOperatore(),
+        autorizzato: true,
         restituzione: dataRest ? new Date(dataRest + 'T12:00:00').toLocaleDateString('it-IT') : null,
       });
       mostraPdfPreview(doc, 'cambio_turno_' + sel.data + '.pdf', 'Cambio turno ' + sel.data);
@@ -4893,7 +4947,7 @@ async function confermaCoperturaMalattia() {
           codice: 'M',
           protetto: true,
           generato: false,
-          commento: ('Malattia · era ' + d.codice + ' - ' + op).substring(0, 400),
+          commento: ('Ex ' + d.codice + ' - assenza - ' + op).substring(0, 400),
           operatore: op,
           updated_at: new Date().toISOString(),
         });
@@ -4912,13 +4966,7 @@ async function confermaCoperturaMalattia() {
       // turno al sostituto (protetto)
       if (d.sostituto) {
         const rS = rigaDi[d.sostituto + '|' + d.g];
-        const commento = (
-          'Copertura malattia di ' +
-          m.nome +
-          (d.era ? ' (era ' + d.era + ')' : '') +
-          ' - ' +
-          op
-        ).substring(0, 400);
+        const commento = ('Ex ' + (d.era || '-') + ' - cambio per esigenze operative - ' + op).substring(0, 400);
         if (rS) {
           await secPatch('piano', 'id=eq.' + rS.id, {
             codice: d.codice,
@@ -8841,31 +8889,7 @@ async function confermaCambioEsigenze() {
     r.protetto = true;
     logAzione('Piano: cambio per esigenze', sel.nome + ' ' + sel.data + ': ' + vecchio + ' -> ' + nuovo);
     toast('Turno cambiato: ' + vecchio + ' -> ' + nuovo);
-    if (!window.jspdf) await caricaJsPDF();
-    if (window.jspdf) {
-      const tv = _pianoTurnoInfo(vecchio);
-      const tn = _pianoTurnoInfo(nuovo);
-      const fmtOra = (t) =>
-        t
-          ? '(' +
-            (t.ora_inizio || '').substring(0, 5) +
-            '-' +
-            (t.ora_fine || '').substring(0, 5) +
-            ', ' +
-            (t.gruppo || '') +
-            ')'
-          : '';
-      const doc = _pdfCambioTurno({
-        tipo: 'ESIGENZE',
-        data: new Date(sel.data + 'T12:00:00').toLocaleDateString('it-IT'),
-        a: { nome: sel.nome, settore: repartoLabel(_pianoReparto()), turno: vecchio, orari: fmtOra(tv) },
-        nuovoTurno: nuovo,
-        nuovoOrari: fmtOra(tn),
-        motivo: motivo,
-        richiesto: getOperatore(),
-      });
-      mostraPdfPreview(doc, 'cambio_esigenze_' + sel.data + '.pdf', 'Cambio per esigenze ' + sel.data);
-    }
+    // niente formulario: e' una decisione dell'operatore, basta il commento
     renderPiano();
   } catch (e) {
     console.error(e);
@@ -8896,7 +8920,7 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
     fin.setDate(fin.getDate() + Math.max(7, maxCons + 1));
     const righe =
       (await secGet(
-        'piano?collaboratore=' +
+        'piano?collaboratore=eq.' +
           encodeURIComponent(nome) +
           '&data=gte.' +
           iso(da) +
