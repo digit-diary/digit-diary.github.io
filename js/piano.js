@@ -8541,6 +8541,9 @@ function pianoCellaInline(nome, dstr, el) {
   }
   if (!puoGestirePiano() || !el || el.querySelector('input')) return;
   _pianoBloccoPulisci();
+  // la cella cliccata resta SELEZIONATA (come la cella attiva di Excel):
+  // cosi' "clicco la cella e poi scelgo il colore" funziona al primo colpo
+  window._pianoBlocco = { tab: 'piano', t1: el, t2: el, completo: true };
   const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
   const attuale = r ? r.codice : '';
   const vecchio = el.innerHTML;
