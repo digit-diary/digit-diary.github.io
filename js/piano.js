@@ -5419,8 +5419,8 @@ async function _renderPianoVacanzeTab() {
     h +=
       '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#d4b86a;color:#d4b86a" onclick="document.getElementById(\'vac-file\').click()">Importa (Excel o PDF)</button>' +
       '<input type="file" id="vac-file" accept=".xlsx,.xls,.pdf" style="display:none" onchange="importaVacanzePiano(this)">' +
-      '<button class="btn-export" style="font-size:.8rem;padding:4px 12px" title="Scarica il piano vacanze del settore nello stesso formato del file HR" onclick="esportaVacanzeExcel()">Scarica Excel</button>' +
-      '<button class="btn-export" style="font-size:.8rem;padding:4px 12px" onclick="esportaVacanzePdf()">Scarica PDF</button>';
+      '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49" title="Scarica il piano vacanze del settore nello stesso formato del file HR" onclick="esportaVacanzeExcel()">Scarica Excel</button>' +
+      '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#1a4a7a;color:#7ea8d8" onclick="esportaVacanzePdf()">Scarica PDF</button>';
     h +=
       '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#1a4a7a;color:#7ea8d8" onclick="applicaVacanzePiano()">Applica al piano · ' +
       escP(meseLbl) +
@@ -6376,7 +6376,7 @@ async function _vacRigheDaPdf(file) {
   // nell'intestazione e si assegna ogni X alla colonna piu' vicina
   const lib = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
   if (!lib) throw new Error('lettore PDF non disponibile');
-  lib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  lib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
   const buf = await file.arrayBuffer();
   const pdf = await lib.getDocument({ data: buf }).promise;
   const out = [];

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'diario-cl-v174';
+const CACHE_NAME = 'diario-cl-v175';
 const SHELL_URLS = ['/', '/manifest.json', '/logo_casino.png', '/icon-192.png', '/icon-512.png',
   '/css/style.css',
   '/js/config.js', '/js/crypto.js', '/js/chat-core.js', '/js/realtime.js',
@@ -7,7 +7,11 @@ const SHELL_URLS = ['/', '/manifest.json', '/logo_casino.png', '/icon-192.png', 
   '/js/chat-ui.js', '/js/moduli.js', '/js/formazione.js', '/js/valutazioni.js',
   '/js/rapporto.js', '/js/stats.js',
   '/js/consegna.js', '/js/promemoria.js',
-  '/js/maison-core.js', '/js/maison-budget.js', '/js/maison-helpers.js', '/js/piano.js', '/js/pause-engine.js'
+  '/js/maison-core.js', '/js/maison-budget.js', '/js/maison-helpers.js', '/js/piano.js', '/js/pause-engine.js',
+  '/js/guida.js',
+  '/libs/supabase.min.js', '/libs/chart.umd.min.js', '/libs/flatpickr.min.css', '/libs/flatpickr.min.js',
+  '/libs/flatpickr.it.js', '/libs/qrcode.min.js', '/libs/xlsx.full.min.js', '/libs/jspdf.umd.min.js',
+  '/libs/jspdf.plugin.autotable.min.js', '/libs/mammoth.browser.min.js', '/libs/pdf.min.js', '/libs/pdf.worker.min.js'
 ];
 
 self.addEventListener('install', e => {
