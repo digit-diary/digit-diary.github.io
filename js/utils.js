@@ -42,11 +42,12 @@ function capitalizzaNome(s) {
 }
 
 // TOAST & UTILS
-function toast(m) {
+function toast(m, durata) {
   const t = document.getElementById('toast');
   t.textContent = m;
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => t.classList.remove('show'), durata || 2500);
 }
 function esc(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');

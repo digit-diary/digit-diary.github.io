@@ -366,6 +366,111 @@ function _pianoUltimoGiorno(ym) {
 // Malattie registrate nel Diario → celle "M" automatiche (solo visuali, non salvate).
 // Legge le registrazioni tipo Malattia: range "dal gg/mm/aaaa al gg/mm/aaaa" nel testo,
 // oppure "N giorni" dalla data della registrazione, altrimenti il singolo giorno.
+// NON DISPONIBILITA' dal Diario: le date sono scritte nel testo della
+// registrazione ("(2 giorni: 05/10/2026, 07/10/2026)"): si estraggono e la
+// cella del piano mostra ND in automatico; il generatore non assegna turni
+function _pianoNdMese(ym) {
+  const out = {}; // 'nome|YYYY-MM-DD' -> true
+  const tipoNd = typeof nomeCorrente === 'function' ? nomeCorrente('Non Disponibilità') : 'Non Disponibilità';
+  (typeof datiCache !== 'undefined' ? datiCache : []).forEach((e) => {
+    if (e.tipo !== tipoNd || e.eliminato) return;
+    const m = String(e.testo || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/g);
+    if (!m) return;
+    m.forEach((dd) => {
+      const par = dd.split('/');
+      const dstr = par[2] + '-' + par[1].padStart(2, '0') + '-' + par[0].padStart(2, '0');
+      if (dstr.startsWith(ym)) out[e.nome + '|' + dstr] = true;
+    });
+  });
+  return out;
+}
+// Date coperte da una registrazione di malattia: "dal X al Y", "il X (1
+// giorno)", "N giorni" dalla data della registrazione
+function _pianoDateMalattia(testo, dataReg) {
+  testo = String(testo || '');
+  let da = String(dataReg || '').substring(0, 10);
+  let a = da;
+  const mRange = testo.match(/dal\s+(\d{1,2})[./](\d{1,2})[./](\d{4})\s+al\s+(\d{1,2})[./](\d{1,2})[./](\d{4})/i);
+  const mIl = testo.match(/\bil\s+(\d{1,2})[./](\d{1,2})[./](\d{4})/i);
+  const mGiorni = testo.match(/(\d+)\s*giorni/i);
+  if (mRange) {
+    da = mRange[3] + '-' + mRange[2].padStart(2, '0') + '-' + mRange[1].padStart(2, '0');
+    a = mRange[6] + '-' + mRange[5].padStart(2, '0') + '-' + mRange[4].padStart(2, '0');
+  } else if (mIl) {
+    da = mIl[3] + '-' + mIl[2].padStart(2, '0') + '-' + mIl[1].padStart(2, '0');
+    a = da;
+  } else if (mGiorni && da) {
+    const d = new Date(da + 'T12:00:00');
+    d.setDate(d.getDate() + parseInt(mGiorni[1]) - 1);
+    a = d.toISOString().substring(0, 10);
+  }
+  const out = [];
+  if (!da) return out;
+  const cur = new Date(da + 'T12:00:00');
+  let n = 0;
+  while (cur.toISOString().substring(0, 10) <= a && n < 400) {
+    out.push(cur.toISOString().substring(0, 10));
+    cur.setDate(cur.getDate() + 1);
+    n++;
+  }
+  return out;
+}
+// SINCRONIZZAZIONE PIANO dopo la correzione di una malattia nel Diario:
+// le M salvate nei giorni non piu' coperti vengono tolte, i giorni nuovi
+// ricevono la M protetta. Chiamata da salvaModificaRegistrazione
+async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNuovo) {
+  try {
+    const vecchie = _pianoDateMalattia(testoVecchio, dataVecchia);
+    const nuove = _pianoDateMalattia(testoNuovo, dataVecchia);
+    if (!vecchie.length && !nuove.length) return null;
+    const daTogliere = vecchie.filter((d) => !nuove.includes(d));
+    const daMettere = nuove.filter((d) => !vecchie.includes(d));
+    if (!daTogliere.length && !daMettere.length) return null;
+    const info = collaboratoriCache.find((c) => c.nome.toLowerCase() === String(nome).toLowerCase());
+    const rep = (info && info.reparto_dip) || 'slots';
+    let tolte = 0;
+    let messe = 0;
+    // via le M salvate nei giorni sbagliati
+    for (const d of daTogliere) {
+      const righe =
+        (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=eq.' + d + '&codice=eq.M')) || [];
+      for (const r of righe) {
+        await secDel('piano', 'id=eq.' + r.id);
+        tolte++;
+      }
+    }
+    // M protetta sui giorni corretti (solo se nel piano esiste gia' qualcosa
+    // o il mese e' pianificato: altrimenti la M automatica dal Diario basta)
+    for (const d of daMettere) {
+      const righe = (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=eq.' + d)) || [];
+      const r = righe[0];
+      if (r && r.codice !== 'M') {
+        await secPatch('piano', 'id=eq.' + r.id, {
+          codice: 'M',
+          protetto: true,
+          generato: false,
+          commento: ('Malattia (data corretta) · era ' + r.codice).substring(0, 400),
+          operatore: getOperatore(),
+          updated_at: new Date().toISOString(),
+        });
+        messe++;
+      }
+    }
+    if (tolte || messe) {
+      logAzione('Malattia corretta: piano allineato', nome + ' · ' + tolte + ' M tolte, ' + messe + ' M spostate');
+      if (typeof _pianoRighe !== 'undefined' && _pianoRighe.length && typeof renderPiano === 'function') {
+        _pianoRighe = _pianoRighe.filter(
+          (r) => !(r.collaboratore === nome && r.codice === 'M' && daTogliere.includes(r.data)),
+        );
+        renderPiano();
+      }
+    }
+    return { tolte: tolte, messe: messe };
+  } catch (e) {
+    console.error('sync malattia piano', e);
+    return null;
+  }
+}
 function _pianoMalattieMese(ym) {
   const out = {}; // 'nome|YYYY-MM-DD' -> true
   const tipoMal = typeof nomeCorrente === 'function' ? nomeCorrente('Malattia') : 'Malattia';
@@ -601,6 +706,7 @@ async function renderPiano() {
     const mappa = {}; // 'nome|data' -> riga
     _pianoRighe.forEach((r) => (mappa[r.collaboratore + '|' + r.data] = r));
     const malattie = _pianoMalattieMese(ym);
+    const ndMap = _pianoNdMese(ym);
     const festiviSet = {};
     pianoFestiviCache.forEach((f) => (festiviSet[f.data] = f.descrizione));
 
@@ -754,6 +860,47 @@ async function renderPiano() {
         '</span></div>';
       h += '<div id="piano-violazioni"></div>';
 
+      // AVVISO NON DISPONIBILITA' JOLLY: promemoria fino alla scadenza
+      // (regola nd_jolly_giorno), avviso FUORI TEMPO dopo
+      if (puoMod) {
+        const oggi = new Date();
+        const gLim = _pianoGiornoNd();
+        const prossimo = new Date(oggi.getFullYear(), oggi.getMonth() + 1, 15);
+        const ymNext = prossimo.getFullYear() + '-' + String(prossimo.getMonth() + 1).padStart(2, '0');
+        const ndNext = _pianoNdMese(ymNext);
+        const consegnato = new Set(Object.keys(ndNext).map((k) => k.split('|')[0].toLowerCase()));
+        const jollyMancanti = collaboratoriCache
+          .filter(
+            (c) =>
+              c.attivo !== false &&
+              (c.reparto_dip || 'slots') === _pianoReparto() &&
+              (c.impiego === 'jolly' || (!c.impiego && c.is_jolly)) &&
+              !consegnato.has(c.nome.toLowerCase()),
+          )
+          .map((c) => c.nome);
+        const lblNext = (MESI_FULL[prossimo.getMonth()] || '') + ' ' + prossimo.getFullYear();
+        if (jollyMancanti.length && oggi.getDate() <= gLim) {
+          h +=
+            '<div style="margin:8px 0;padding:8px 12px;background:#fff8e1;border:1px solid #d4b86a;border-radius:4px;font-size:.82rem;color:#5a4300"><b>Non disponibilita\' ' +
+            escP(lblNext) +
+            '</b> · consegna entro il ' +
+            gLim +
+            ' del mese (modulo HR 1187). Mancano: ' +
+            escP(jollyMancanti.slice(0, 8).join(', ')) +
+            (jollyMancanti.length > 8 ? ' e altri ' + (jollyMancanti.length - 8) : '') +
+            '</div>';
+        } else if (jollyMancanti.length && oggi.getDate() > gLim) {
+          h +=
+            '<div style="margin:8px 0;padding:8px 12px;background:#fdecea;border:1px solid #c0392b;border-radius:4px;font-size:.82rem;color:#7a1f14"><b>FUORI TEMPO</b> · il termine del ' +
+            gLim +
+            " per le non disponibilita' di " +
+            escP(lblNext) +
+            " e' passato. Mancano ancora: " +
+            escP(jollyMancanti.slice(0, 8).join(', ')) +
+            (jollyMancanti.length > 8 ? ' e altri ' + (jollyMancanti.length - 8) : '') +
+            " · si possono comunque registrare dal Diario (tipo Non Disponibilita')</div>";
+        }
+      }
       // GRIGLIA
       const LC = _pianoCalcolaLarghezze(nomi);
       h +=
@@ -869,6 +1016,10 @@ async function renderPiano() {
             cella = 'M';
             cls += ' piano-malattia-auto';
             titolo = 'Malattia registrata nel Diario (automatica, non salvata nel piano)';
+          } else if (ndMap[nome + '|' + dstr]) {
+            cella = 'ND';
+            cls += ' piano-nd-auto';
+            titolo = "Non disponibilita' registrata nel Diario (automatica): la bozza non assegna turni";
           }
           const violMsg = _pianoViolCelle[nome + '|' + dstr];
           if (violMsg) {
@@ -1408,7 +1559,7 @@ function _pianoSabatoEntro23(codice) {
   const ii = _pianoOra(String(t.ora_inizio || '').substring(0, 5));
   if (fi == null) return true;
   if (ii != null && fi < ii) return false; // finisce dopo mezzanotte
-  return fi <= 23 * 60;
+  return fi <= 23; // _pianoOra e' in ore decimali
 }
 function _pianoCalcolaViolazioni() {
   const ym = _pianoMeseSel;
@@ -1683,6 +1834,17 @@ function _pianoCalcolaViolazioni() {
       }
     }
   }
+  // NON DISPONIBILITA': un turno assegnato in un giorno dichiarato ND
+  const ndV = _pianoNdMese(ym);
+  _pianoRighe.forEach((r) => {
+    if (!_pianoTurnoInfo(r.codice)) return;
+    if (ndV[r.collaboratore + '|' + r.data])
+      aggiungi(
+        r.collaboratore,
+        parseInt(r.data.split('-')[2]),
+        "turno su un giorno di NON disponibilita' (dal Diario)",
+      );
+  });
   // DOMENICHE LIBERE (OLL2 art. 24: minimo 12 all'anno · regola aziendale:
   // la domenica conta solo se il sabato si finisce entro le 23)
   if (_pianoRegolaVal('domeniche_libere_anno') != null) {
@@ -1828,6 +1990,7 @@ async function generaBozzaPiano(usaCoperture) {
     familiarita[r.collaboratore + '|' + r.codice] = (familiarita[r.collaboratore + '|' + r.codice] || 0) + 1;
   });
   const malattie = _pianoMalattieMese(ym);
+  const ndDiario = _pianoNdMese(ym);
   // stato griglia: esistenti + assegnazioni della bozza
   const cella = {}; // 'nome|g' -> codice
   const rigaDi = {}; // 'nome|g' -> riga (per sostituire i segnaposto WD)
@@ -1914,6 +2077,7 @@ async function generaBozzaPiano(usaCoperture) {
           .filter((n) => {
             const esistente = cella[n + '|' + g];
             if (malattie[n + '|' + dstr]) return false;
+            if (ndDiario[n + '|' + dstr]) return false; // non disponibile (dal Diario)
             if (esistente && esistente !== 'WD') return false;
             if (esistente === 'WD' && t.tipo === 'NOTTURNO') return false; // WD = diurno forzato
             const infoC = _pianoCollabInfo(n);
@@ -8439,6 +8603,71 @@ async function confermaCambioEsigenze() {
 // ================================================================
 // Salvataggio cella (regole Turnivo: vuoto elimina senza conferma, nessuna
 // validazione del codice, commento conservato, cella protetta)
+// CONTROLLO IMMEDIATO delle regole quando si scrive un turno A MANO:
+// riposo minimo con il giorno prima e dopo, massimo di giorni consecutivi.
+// Legge i giorni vicini dal database, quindi vale anche a cavallo di mese
+async function _pianoAvvisaViolazioniCella(nome, dstr) {
+  try {
+    const maxCons = parseInt(_pianoRegolaVal('max_consecutivi')) || 0;
+    const minRiposo = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 0;
+    if (!maxCons && !minRiposo) return;
+    const d0 = new Date(dstr + 'T12:00:00');
+    const iso = (d) => d.toISOString().substring(0, 10);
+    const da = new Date(d0);
+    da.setDate(da.getDate() - Math.max(7, maxCons + 1));
+    const fin = new Date(d0);
+    fin.setDate(fin.getDate() + Math.max(7, maxCons + 1));
+    const righe =
+      (await secGet(
+        'piano?collaboratore=' +
+          encodeURIComponent(nome) +
+          '&data=gte.' +
+          iso(da) +
+          '&data=lte.' +
+          iso(fin) +
+          '&limit=100',
+      )) || [];
+    const mappa = {};
+    righe.forEach((r) => (mappa[r.data] = r.codice));
+    const avvisi = [];
+    const giornoRel = (n) => {
+      const d = new Date(d0);
+      d.setDate(d.getDate() + n);
+      return iso(d);
+    };
+    // riposo minimo tra due turni adiacenti
+    const riposoTra = (codA, codB) => {
+      const t1 = _pianoTurnoInfo(codA);
+      const t2 = _pianoTurnoInfo(codB);
+      if (!t1 || !t2) return null;
+      const fine1 = _pianoOra(t1.ora_fine);
+      const inizio2 = _pianoOra(t2.ora_inizio);
+      if (fine1 == null || inizio2 == null) return null;
+      const fineAbs = t1.oltre23 || fine1 < _pianoOra(t1.ora_inizio) ? 24 + fine1 : fine1;
+      return 24 + inizio2 - fineAbs;
+    };
+    if (minRiposo && mappa[dstr]) {
+      const rPrima = riposoTra(mappa[giornoRel(-1)], mappa[dstr]);
+      if (rPrima != null && rPrima < minRiposo)
+        avvisi.push(
+          'solo ' + rPrima.toFixed(1) + 'h di riposo dopo il turno del giorno prima (minimo ' + minRiposo + 'h)',
+        );
+      const rDopo = riposoTra(mappa[dstr], mappa[giornoRel(1)]);
+      if (rDopo != null && rDopo < minRiposo)
+        avvisi.push(
+          'solo ' + rDopo.toFixed(1) + 'h di riposo prima del turno del giorno dopo (minimo ' + minRiposo + 'h)',
+        );
+    }
+    // massimo giorni consecutivi (attraversa i confini del mese)
+    if (maxCons && _pianoIsLavoro(mappa[dstr] || '')) {
+      let cons = 1;
+      for (let n = -1; n >= -maxCons - 2 && _pianoIsLavoro(mappa[giornoRel(n)] || ''); n--) cons++;
+      for (let n = 1; n <= maxCons + 2 && _pianoIsLavoro(mappa[giornoRel(n)] || ''); n++) cons++;
+      if (cons > maxCons) avvisi.push(cons + ' giorni di lavoro consecutivi (massimo ' + maxCons + ')');
+    }
+    if (avvisi.length) toast('\u26a0 ' + nome.split(' ')[0] + ': ' + avvisi.join(' \u00b7 '), 6000);
+  } catch (e) {}
+}
 async function pianoSalvaCella(nome, dstr, codice) {
   if (!puoGestirePiano()) return false;
   // le sigle si possono scrivere in minuscolo: nel piano restano sempre MAIUSCOLE
@@ -8516,6 +8745,15 @@ async function pianoSalvaCella(nome, dstr, codice) {
     }
     logAzione('Piano modificato', nome + ' ' + dstr + ' → ' + codice);
     renderPiano();
+    // le regole valgono anche a mano: controllo immediato di riposi e giorni
+    // consecutivi (anche a cavallo di mese) + rivalidazione se era attiva
+    _pianoAvvisaViolazioniCella(nome, dstr);
+    if (_pianoViolLista !== null) {
+      const rv = _pianoCalcolaViolazioni();
+      _pianoViolCelle = rv.celle;
+      _pianoViolLista = rv.lista.sort((a, b) => a.nome.localeCompare(b.nome) || a.giorno - b.giorno);
+      _pianoRenderViolazioni();
+    }
     // formazione: avvisa se il collaboratore non risulta formato per il settore
     const gNF = _pianoGruppoNonFormato(nome, codice, '');
     if (gNF) setTimeout(() => _pianoProponiCertificazione(nome, gNF), 300);
@@ -8908,7 +9146,7 @@ async function _renderPianoBriefingTab() {
   } else {
     righe = _briefComponi(pianoRighe);
     await _briefAggiungiScoperti(righe, dstr);
-    if (!valetR) await _briefAssegnaCd(righe, dstr);
+    if (!valetR && rep === 'slots') await _briefAssegnaCd(righe, dstr);
     salvato = false;
   }
   _briefState = {
@@ -9636,7 +9874,7 @@ async function briefCompila() {
     return;
   _briefState.righe = _briefComponi(_briefState.pianoRighe);
   await _briefAggiungiScoperti(_briefState.righe, _briefData);
-  if (!_briefIsValet()) await _briefAssegnaCd(_briefState.righe, _briefData);
+  if (!_briefIsValet() && _pianoReparto() === 'slots') await _briefAssegnaCd(_briefState.righe, _briefData);
   clearTimeout(_briefSaveTimer);
   await briefSalvaBriefing();
   renderPiano();
@@ -11165,6 +11403,13 @@ function pianoMostraRighe(nomi) {
   _pianoApplicaNascosti();
   toast('Mostrate: ' + nomi.join(', '));
 }
+function pianoMostraGiorni(gg) {
+  const o = _pianoNascosti();
+  o.giorni = o.giorni.filter((g) => !gg.includes(g));
+  _pianoSalvaNascosti(o);
+  _pianoApplicaNascosti();
+  toast('Giorni rimostrati: ' + gg.join(', '));
+}
 function pianoMostraNascosti() {
   _pianoSalvaNascosti({ nomi: [], giorni: [] });
   _pianoApplicaNascosti();
@@ -11196,6 +11441,48 @@ function _pianoApplicaNascosti() {
     });
     t.style.width = parseInt(t.dataset.wOrig) - tolti + 'px';
   });
+  // GIORNI nascosti: chip sull'intestazione (come per le righe), cosi' si
+  // vede subito che mancano colonne e si rimostrano con un click
+  document.querySelectorAll('.chip-giorni-nascosti').forEach((c) => c.remove());
+  const tabG = document.querySelector('#piano-content table[data-seltab="piano"]');
+  if (tabG && o.giorni.length) {
+    const ordinati = [...o.giorni].sort((a, b) => a - b);
+    // gruppi contigui
+    const gruppi = [];
+    let cur = [ordinati[0]];
+    ordinati.slice(1).forEach((g) => {
+      if (g === cur[cur.length - 1] + 1) cur.push(g);
+      else {
+        gruppi.push(cur);
+        cur = [g];
+      }
+    });
+    gruppi.push(cur);
+    gruppi.forEach((gr) => {
+      // aggancio: il primo giorno visibile dopo il gruppo (o prima, se in coda)
+      let th = null;
+      for (let g = gr[gr.length - 1] + 1; g <= 31 && !th; g++)
+        if (!o.giorni.includes(g)) th = tabG.querySelector('thead th[data-g="' + g + '"]');
+      let inCoda = false;
+      if (!th) {
+        inCoda = true;
+        for (let g = gr[0] - 1; g >= 1 && !th; g--)
+          if (!o.giorni.includes(g)) th = tabG.querySelector('thead th[data-g="' + g + '"]');
+      }
+      if (!th) return;
+      const chip = document.createElement('span');
+      chip.className = 'chip-giorni-nascosti';
+      chip.textContent = (inCoda ? '\u25c2' : '\u25b8') + gr.length;
+      chip.title = 'Giorni nascosti: ' + gr.join(', ') + ' \u00b7 clicca per rimostrarli';
+      const gr2 = gr.slice();
+      chip.onclick = (e) => {
+        e.stopPropagation();
+        pianoMostraGiorni(gr2);
+      };
+      th.style.position = 'relative';
+      th.prepend(chip);
+    });
+  }
   // righe: solo la griglia collaboratori
   document.querySelectorAll('#piano-content table[data-seltab="piano"] tbody tr[data-nome]').forEach((tr) => {
     tr.style.display = o.nomi.includes(tr.dataset.nome) ? 'none' : '';

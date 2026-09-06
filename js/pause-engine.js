@@ -3100,30 +3100,36 @@ function _briefRenderPauseCfg() {
   let h =
     '<details style="margin-top:14px;font-size:.82rem"><summary style="cursor:pointer;font-weight:bold">Regole · turni, orari e pause spettanti (personalizza)</summary><div style="padding:10px 4px;display:flex;flex-direction:column;gap:8px">';
   h += tab;
+  // ogni settore vede SOLO le sue regole: minuti pausa per tutti, fascia
+  // di punta e nota solo al valet, numeri cassa solo agli slots
+  const repCorr = typeof _pianoReparto === 'function' ? _pianoReparto() : 'slots';
   h +=
-    '<div><b>Slots</b> · minuti di pausa per durata turno: 6–7 ore ' +
+    '<div><b>Pause</b> · minuti per durata turno: 6–7 ore ' +
     num('pcfg-6h', c.slots_6h || 30) +
     ' &nbsp; 7–9 ore ' +
     num('pcfg-7h', c.slots_7h || 45) +
     ' &nbsp; 9 ore o più ' +
     num('pcfg-9h', c.slots_9h || 60) +
     ' &nbsp; <span style="color:var(--muted)">(sotto le 6 ore: nessuna pausa)</span></div>';
-  h +=
-    '<div><b>Valet</b> · distanza minima tra pause ' +
-    num('pcfg-gap', c.valet_gap || 45) +
-    ' min &nbsp; fascia di punta ven/sab: da <input id="pcfg-picco-da" value="' +
-    escP(c.picco_da || '23.00') +
-    '" style="width:64px;padding:4px"> a <input id="pcfg-picco-a" value="' +
-    escP(c.picco_a || '01.00') +
-    '" style="width:64px;padding:4px"></div>';
-  h +=
-    '<div>Nota in fondo alle pause valet:<br><input id="pcfg-nota" value="' +
-    escP(c.valet_nota || '') +
-    '" placeholder="(testo standard)" style="width:100%;max-width:560px;padding:5px"></div>';
-  // numeri cassa (CD): coppie e rotazione giornaliera
-  const cdCfg = (window._pianoCdCfg && window._pianoCdCfg.coppie) || [];
-  h +=
-    '<div style="margin-top:6px"><b>Numeri cassa (CD)</b> · chi ha chiuso ieri riapre oggi; i C8 di ven/sab riprendono in ordine la cassa del presto di ogni coppia. Tutto resta modificabile nel briefing.<br>';
+  if (repCorr === 'valet') {
+    h +=
+      '<div><b>Valet</b> · distanza minima tra pause ' +
+      num('pcfg-gap', c.valet_gap || 45) +
+      ' min &nbsp; fascia di punta ven/sab: da <input id="pcfg-picco-da" value="' +
+      escP(c.picco_da || '23.00') +
+      '" style="width:64px;padding:4px"> a <input id="pcfg-picco-a" value="' +
+      escP(c.picco_a || '01.00') +
+      '" style="width:64px;padding:4px"></div>';
+    h +=
+      '<div>Nota in fondo alle pause valet:<br><input id="pcfg-nota" value="' +
+      escP(c.valet_nota || '') +
+      '" placeholder="(testo standard)" style="width:100%;max-width:560px;padding:5px"></div>';
+  }
+  // numeri cassa (CD): coppie e rotazione giornaliera · solo settore slots
+  const cdCfg = repCorr === 'slots' ? (window._pianoCdCfg && window._pianoCdCfg.coppie) || [] : [];
+  if (repCorr === 'slots')
+    h +=
+      '<div style="margin-top:6px"><b>Numeri cassa (CD)</b> · chi ha chiuso ieri riapre oggi; i C8 di ven/sab riprendono in ordine la cassa del presto di ogni coppia. Tutto resta modificabile nel briefing.<br>';
   cdCfg.forEach((cp, i) => {
     h +=
       '<div style="margin:4px 0">Coppia CD <input class="cdcfg" data-i="' +
@@ -3140,7 +3146,7 @@ function _briefRenderPauseCfg() {
       escP(cp.chiude || '') +
       '" style="width:52px;padding:3px;text-align:center"></div>';
   });
-  h += '</div>';
+  if (repCorr === 'slots') h += '</div>';
   h +=
     '<div><button class="btn-export" style="font-size:.8rem;padding:4px 14px" onclick="salvaPauseCfg()">Salva regole</button></div>';
   h += '</div></details>';
@@ -3153,15 +3159,22 @@ async function salvaPauseCfg() {
     const val = el.value.trim();
     if (val) turni[el.dataset.turno.toUpperCase()] = val;
   });
+  // i campi che questo settore non vede (es. quelli del valet salvati dai
+  // tavoli) conservano il valore esistente, non tornano al default
+  const c0 = window._briefPauseCfgObj || {};
+  const turniTutti = Object.assign({}, c0.turni || {});
+  if (typeof _pianoTurniReparto === 'function')
+    _pianoTurniReparto().forEach((t) => delete turniTutti[String(t.codice).toUpperCase()]);
+  Object.assign(turniTutti, turni);
   const obj = {
-    slots_6h: parseInt(v('pcfg-6h')) || 30,
-    slots_7h: parseInt(v('pcfg-7h')) || 45,
-    slots_9h: parseInt(v('pcfg-9h')) || 60,
-    valet_gap: parseInt(v('pcfg-gap')) || 45,
-    picco_da: v('pcfg-picco-da') || '23.00',
-    picco_a: v('pcfg-picco-a') || '01.00',
-    valet_nota: v('pcfg-nota').trim(),
-    turni: turni,
+    slots_6h: parseInt(v('pcfg-6h')) || c0.slots_6h || 30,
+    slots_7h: parseInt(v('pcfg-7h')) || c0.slots_7h || 45,
+    slots_9h: parseInt(v('pcfg-9h')) || c0.slots_9h || 60,
+    valet_gap: document.getElementById('pcfg-gap') ? parseInt(v('pcfg-gap')) || 45 : c0.valet_gap || 45,
+    picco_da: document.getElementById('pcfg-picco-da') ? v('pcfg-picco-da') || '23.00' : c0.picco_da || '23.00',
+    picco_a: document.getElementById('pcfg-picco-a') ? v('pcfg-picco-a') || '01.00' : c0.picco_a || '01.00',
+    valet_nota: document.getElementById('pcfg-nota') ? v('pcfg-nota').trim() : c0.valet_nota || '',
+    turni: turniTutti,
   };
   await setImp('piano_pause_cfg', JSON.stringify(obj));
   window._briefPauseCfgObj = obj;
