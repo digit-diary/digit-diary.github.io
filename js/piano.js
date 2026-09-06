@@ -8606,11 +8606,11 @@ async function confermaCambioEsigenze() {
 // CONTROLLO IMMEDIATO delle regole quando si scrive un turno A MANO:
 // riposo minimo con il giorno prima e dopo, massimo di giorni consecutivi.
 // Legge i giorni vicini dal database, quindi vale anche a cavallo di mese
-async function _pianoAvvisaViolazioniCella(nome, dstr) {
+async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
   try {
     const maxCons = parseInt(_pianoRegolaVal('max_consecutivi')) || 0;
     const minRiposo = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 0;
-    if (!maxCons && !minRiposo) return;
+    if (!maxCons && !minRiposo) return [];
     const d0 = new Date(dstr + 'T12:00:00');
     const iso = (d) => d.toISOString().substring(0, 10);
     const da = new Date(d0);
@@ -8629,6 +8629,7 @@ async function _pianoAvvisaViolazioniCella(nome, dstr) {
       )) || [];
     const mappa = {};
     righe.forEach((r) => (mappa[r.data] = r.codice));
+    if (codiceNuovo !== undefined) mappa[dstr] = codiceNuovo; // simulazione prima del salvataggio
     const avvisi = [];
     const giornoRel = (n) => {
       const d = new Date(d0);
@@ -8665,8 +8666,10 @@ async function _pianoAvvisaViolazioniCella(nome, dstr) {
       for (let n = 1; n <= maxCons + 2 && _pianoIsLavoro(mappa[giornoRel(n)] || ''); n++) cons++;
       if (cons > maxCons) avvisi.push(cons + ' giorni di lavoro consecutivi (massimo ' + maxCons + ')');
     }
-    if (avvisi.length) toast('\u26a0 ' + nome.split(' ')[0] + ': ' + avvisi.join(' \u00b7 '), 6000);
-  } catch (e) {}
+    return avvisi;
+  } catch (e) {
+    return [];
+  }
 }
 async function pianoSalvaCella(nome, dstr, codice) {
   if (!puoGestirePiano()) return false;
@@ -8704,6 +8707,30 @@ async function pianoSalvaCella(nome, dstr, codice) {
     }
     orarioJG = { ora_inizio: String(ini).trim().replace('.', ':'), ora_fine: String(fin).trim().replace('.', ':') };
   }
+  // REGOLE ANCHE A MANO: controllo prima di salvare (riposo minimo e
+  // consecutivi, anche a cavallo di mese); se si conferma comunque, la
+  // violazione resta scritta nel commento della cella
+  let commentoRegole = '';
+  if (codice && _pianoTurnoInfo(codice)) {
+    const avvisi = await _pianoAvvisaViolazioniCella(nome, dstr, codice);
+    if (avvisi.length) {
+      if (
+        !confirm(
+          '\u26a0 ATTENZIONE \u00b7 ' +
+            nome +
+            ' \u00b7 ' +
+            dstr.split('-').reverse().join('.') +
+            ':\n\n\u2022 ' +
+            avvisi.join('\n\u2022 ') +
+            '\n\nConfermi comunque il turno ' +
+            codice +
+            "? La segnalazione restera' scritta nel commento della cella.",
+        )
+      )
+        return false;
+      commentoRegole = '\u26a0 ' + avvisi.join(' \u00b7 ');
+    }
+  }
   try {
     if (!codice) {
       if (r) {
@@ -8716,7 +8743,7 @@ async function pianoSalvaCella(nome, dstr, codice) {
     }
     if (codice === attuale) return;
     if (r) {
-      await secPatch('piano', 'id=eq.' + r.id, {
+      const patchCella = {
         codice: codice,
         protetto: true,
         generato: false,
@@ -8724,7 +8751,11 @@ async function pianoSalvaCella(nome, dstr, codice) {
         ora_fine: orarioJG ? orarioJG.ora_fine : null,
         operatore: getOperatore(),
         updated_at: new Date().toISOString(),
-      });
+      };
+      if (commentoRegole)
+        patchCella.commento = (commentoRegole + (r.commento ? ' \u00b7 ' + r.commento : '')).substring(0, 400);
+      await secPatch('piano', 'id=eq.' + r.id, patchCella);
+      if (commentoRegole) r.commento = patchCella.commento;
       r.codice = codice;
       r.protetto = true;
       r.ora_inizio = orarioJG ? orarioJG.ora_inizio : null;
@@ -8738,6 +8769,7 @@ async function pianoSalvaCella(nome, dstr, codice) {
         generato: false,
         ora_inizio: orarioJG ? orarioJG.ora_inizio : null,
         ora_fine: orarioJG ? orarioJG.ora_fine : null,
+        commento: commentoRegole ? commentoRegole.substring(0, 400) : null,
         reparto_dip: _pianoReparto(),
         operatore: getOperatore(),
       });
@@ -8745,9 +8777,7 @@ async function pianoSalvaCella(nome, dstr, codice) {
     }
     logAzione('Piano modificato', nome + ' ' + dstr + ' → ' + codice);
     renderPiano();
-    // le regole valgono anche a mano: controllo immediato di riposi e giorni
-    // consecutivi (anche a cavallo di mese) + rivalidazione se era attiva
-    _pianoAvvisaViolazioniCella(nome, dstr);
+    // rivalidazione del mese se era attiva (tutte le altre regole)
     if (_pianoViolLista !== null) {
       const rv = _pianoCalcolaViolazioni();
       _pianoViolCelle = rv.celle;
