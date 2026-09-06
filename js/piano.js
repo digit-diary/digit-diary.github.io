@@ -6614,8 +6614,68 @@ async function importaVacanzePiano(input) {
   }
 }
 // ===== ESPORTAZIONE nello stesso formato del file HR =====
+// La scheda esportata replica il file ufficiale: istruzioni in alto, titolo,
+// intestazione con le settimane 1-52, X sulle settimane, fasce colorate dei
+// periodi (Natale rosso, Carnevale/Pasqua/autunno arancio, estate verde) e
+// legenda a destra con le date di ogni settimana.
+var VAC_COLORI_FASCE = { rosso: 'FF0000', arancio: 'FFC000', verde: 'C5E0B4', giallo: 'FFFF00', azzurro: '9DC3E6' };
+// fasce del file HR 2026 (estratte dal file ufficiale); per gli altri anni si
+// calcolano dalle feste: Natale/Capodanno rosso, Carnevale e la settimana del
+// Lunedi' di Pasqua arancio, estate (giugno-agosto) verde, autunno arancio
+function _vacFasce(anno) {
+  if (anno === 2026) {
+    var m = {
+      0: 'rosso',
+      1: 'rosso',
+      8: 'arancio',
+      15: 'arancio',
+      45: 'arancio',
+      49: 'azzurro',
+      51: 'rosso',
+      52: 'rosso',
+    };
+    for (var w = 22; w <= 37; w++) m[w] = 'verde';
+    for (var w2 = 46; w2 <= 48; w2++) m[w2] = 'giallo';
+    return m;
+  }
+  var out = { 0: 'rosso', 1: 'rosso', 51: 'rosso', 52: 'rosso' };
+  var settDi = function (dstr) {
+    for (var w3 = 1; w3 <= 52; w3++) if (_pianoGiorniSettimana(anno, w3).includes(dstr)) return w3;
+    return null;
+  };
+  try {
+    var pasqua = _pianoPasqua ? _pianoPasqua(anno) : null;
+    if (pasqua) {
+      var lun = new Date(pasqua.getTime() + 86400000);
+      var lstr =
+        lun.getFullYear() +
+        '-' +
+        String(lun.getMonth() + 1).padStart(2, '0') +
+        '-' +
+        String(lun.getDate()).padStart(2, '0');
+      var wP = settDi(lstr);
+      if (wP) out[wP] = 'arancio';
+      var mart = new Date(pasqua.getTime() - 47 * 86400000); // martedi' grasso
+      var mstr =
+        mart.getFullYear() +
+        '-' +
+        String(mart.getMonth() + 1).padStart(2, '0') +
+        '-' +
+        String(mart.getDate()).padStart(2, '0');
+      var wC = settDi(mstr);
+      if (wC) out[wC] = 'arancio';
+    }
+  } catch (e) {}
+  var wN = settDi(anno + '-11-02');
+  if (wN) out[wN] = 'arancio'; // vacanze autunnali
+  for (var w4 = 1; w4 <= 52; w4++) {
+    var gg = _pianoGiorniSettimana(anno, w4);
+    var mm = parseInt(gg[0].split('-')[1]);
+    if (mm >= 6 && mm <= 8 && !out[w4]) out[w4] = 'verde';
+  }
+  return out;
+}
 function _vacDatiEsport(anno) {
-  const rep = _pianoReparto();
   const collab = collaboratoriCache
     .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
     .sort((a, b) => a.nome.localeCompare(b.nome));
@@ -6627,85 +6687,225 @@ function _vacDatiEsport(anno) {
       .filter((v) => v.collaboratore === c.nome && v.anno === anno)
       .map((v) => v.settimana)
       .sort((a, b) => a - b);
-    return { cognome: cognome.toUpperCase(), nome: nome.toUpperCase(), spettanti: '', settimane: sett, rep: rep };
+    return { cognome: cognome.toUpperCase(), nome: nome.toUpperCase(), settimane: sett };
   });
 }
-function esportaVacanzeExcel() {
-  const anno = window._pianoVacAnno || parseInt(_pianoMeseSel.split('-')[0]);
-  const dati = _vacDatiEsport(anno);
-  const aoa = [];
-  aoa.push([
-    '1) Selezionare la settimana di preferenza con una X. Scegliere 5 settimane in modo da facilitare la pianificazione.',
-  ]);
-  aoa.push([
-    '2) Devono essere effettuate 2 settimane consecutive . Durante le vacanze scolastiche si darà precedenza a genitori con i figli in età scolastica.',
-  ]);
-  aoa.push([]);
-  const r4 = [repartoLabel(_pianoReparto()).toUpperCase(), '', '', 'PIANIFICAZIONE VACANZE ANNO ' + anno];
-  aoa.push(r4);
-  const head = ['COGNOME', 'NOME', String(anno), 'Pianificate', 52];
-  for (let w = 1; w <= 52; w++) head.push(w);
-  aoa.push(head);
-  dati.forEach((d) => {
-    const r = [d.cognome, d.nome, '', d.settimane.length, ''];
-    for (let w = 1; w <= 52; w++) r.push(d.settimane.includes(w) ? 'X' : '');
-    aoa.push(r);
+function _vacDataIt(dstr) {
+  const p = dstr.split('-');
+  return p[2] + '.' + p[1] + '.' + p[0];
+}
+// libreria Excel CON stili (colori): si carica solo quando serve, senza
+// toccare la XLSX globale usata da tutto il resto del programma
+function _vacXlsxStyle() {
+  return new Promise((resolve, reject) => {
+    if (window._XLSXStyle) return resolve(window._XLSXStyle);
+    const orig = window.XLSX;
+    const s = document.createElement('script');
+    s.src = 'libs/xlsx-style.min.js';
+    s.onload = () => {
+      window._XLSXStyle = window.XLSX;
+      window.XLSX = orig;
+      resolve(window._XLSXStyle);
+    };
+    s.onerror = () => {
+      window.XLSX = orig;
+      reject(new Error('libreria stili non caricata'));
+    };
+    document.head.appendChild(s);
   });
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{ wch: 22 }, { wch: 18 }, { wch: 7 }, { wch: 10 }, { wch: 4 }].concat(
-    Array.from({ length: 52 }, () => ({ wch: 3 })),
+}
+async function esportaVacanzeExcel() {
+  const anno = window._pianoVacAnno || parseInt(_pianoMeseSel.split('-')[0]);
+  let XS;
+  try {
+    XS = await _vacXlsxStyle();
+  } catch (e) {
+    toast('Libreria per i colori non disponibile');
+    return;
+  }
+  const dati = _vacDatiEsport(anno);
+  const fasce = _vacFasce(anno);
+  const bordo = {
+    top: { style: 'thin' },
+    bottom: { style: 'thin' },
+    left: { style: 'thin' },
+    right: { style: 'thin' },
+  };
+  const fillDi = (w) => (fasce[w] ? { patternType: 'solid', fgColor: { rgb: VAC_COLORI_FASCE[fasce[w]] } } : undefined);
+  const ws = {};
+  const set = (r, c, v, stile) => {
+    const a = XS.utils.encode_cell({ r: r, c: c });
+    ws[a] = { v: v === undefined ? '' : v, t: typeof v === 'number' ? 'n' : 's' };
+    if (stile) ws[a].s = stile;
+  };
+  // istruzioni (identiche al file HR)
+  set(
+    0,
+    0,
+    '1) Selezionare la settimana di preferenza con una X. Scegliere 5 settimane in modo da facilitare la pianificazione.',
+    { font: { sz: 9, italic: true } },
   );
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'preferenze');
-  const nomeFile = 'VACANZE ' + repartoLabel(_pianoReparto()).toUpperCase() + ' ' + anno + '.xlsx';
-  XLSX.writeFile(wb, nomeFile);
+  set(
+    1,
+    0,
+    '2) Devono essere effettuate 2 settimane consecutive . Durante le vacanze scolastiche si darà precedenza a genitori con i figli in età scolastica.',
+    { font: { sz: 9, italic: true } },
+  );
+  // titolo
+  set(3, 0, repartoLabel(_pianoReparto()).toUpperCase(), { font: { bold: true, sz: 12 } });
+  set(3, 3, ' PIANIFICAZIONE VACANZE ANNO ' + anno, { font: { bold: true, sz: 14 } });
+  // intestazione riga 5: COGNOME NOME anno Pianificate 52 1..52
+  const hStile = (w) => ({
+    font: { bold: true, sz: 9 },
+    alignment: { horizontal: 'center' },
+    border: bordo,
+    fill: fillDi(w),
+  });
+  set(4, 0, 'COGNOME', { font: { bold: true }, border: bordo });
+  set(4, 1, 'NOME', { font: { bold: true }, border: bordo });
+  set(4, 2, String(anno), { font: { bold: true }, alignment: { horizontal: 'center' }, border: bordo });
+  set(4, 3, 'Pianificate', { font: { bold: true }, alignment: { horizontal: 'center' }, border: bordo });
+  set(4, 4, 52, hStile(0));
+  for (let w = 1; w <= 52; w++) set(4, 4 + w, w, hStile(w));
+  // righe collaboratori
+  dati.forEach((d, i) => {
+    const r = 5 + i;
+    set(r, 0, d.cognome, { border: bordo });
+    set(r, 1, d.nome, { border: bordo });
+    set(r, 2, '', { border: bordo });
+    set(r, 3, d.settimane.length, { alignment: { horizontal: 'center' }, border: bordo });
+    set(r, 4, '', { border: bordo, fill: fillDi(0) });
+    for (let w = 1; w <= 52; w++) {
+      const stile = { alignment: { horizontal: 'center' }, border: bordo, font: { bold: true, sz: 9 } };
+      const f = fillDi(w);
+      if (f) stile.fill = f;
+      set(r, 4 + w, d.settimane.includes(w) ? 'X' : '', stile);
+    }
+  });
+  // LEGENDA a destra (colonne BH-BJ come nel file)
+  const cL = 59;
+  set(0, cL, 'LEGENDA', { font: { bold: true } });
+  set(1, cL, 'N° Sett.', { font: { bold: true, sz: 9 }, border: bordo });
+  set(1, cL + 1, 'dal', { font: { bold: true, sz: 9 }, border: bordo });
+  set(1, cL + 2, 'al', { font: { bold: true, sz: 9 }, border: bordo });
+  const legRiga = (rr, w, wLbl, annoW) => {
+    const gg = _pianoGiorniSettimana(annoW, w);
+    const f = fillDi(wLbl);
+    set(rr, cL, wLbl === 0 ? 52 : wLbl, { alignment: { horizontal: 'center' }, border: bordo, font: { sz: 9 } });
+    const stD = { border: bordo, font: { sz: 9 } };
+    if (f) stD.fill = f;
+    set(rr, cL + 1, _vacDataIt(gg[0]), stD);
+    set(rr, cL + 2, _vacDataIt(gg[6]), Object.assign({}, stD));
+  };
+  legRiga(2, 52, 0, anno - 1); // settimana 52 dell'anno precedente
+  for (let w = 1; w <= 52; w++) legRiga(2 + w, w, w, anno);
+  ws['!ref'] = XS.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(5 + dati.length, 55), c: cL + 2 } });
+  ws['!cols'] = [{ wch: 30 }, { wch: 20 }, { wch: 9 }, { wch: 11 }].concat(
+    Array.from({ length: 53 }, () => ({ wch: 3.2 })),
+    [{ wch: 2 }, { wch: 2 }],
+    [{ wch: 8 }, { wch: 11 }, { wch: 11 }],
+  );
+  ws['!merges'] = [{ s: { r: 3, c: 3 }, e: { r: 3, c: 56 } }];
+  const wb = XS.utils.book_new();
+  XS.utils.book_append_sheet(wb, ws, 'preferenze');
+  XS.writeFile(wb, 'VACANZE ' + repartoLabel(_pianoReparto()).toUpperCase() + ' ' + anno + '.xlsx');
   logAzione('Vacanze esportate', anno + ' · Excel · ' + dati.length + ' collaboratori');
-  toast('File Excel creato');
+  toast('File Excel creato (formato HR con colori)');
 }
 function esportaVacanzePdf() {
   const anno = window._pianoVacAnno || parseInt(_pianoMeseSel.split('-')[0]);
   const dati = _vacDatiEsport(anno);
+  const fasce = _vacFasce(anno);
+  const rgbDi = (w) => {
+    if (!fasce[w]) return null;
+    const hex = VAC_COLORI_FASCE[fasce[w]];
+    return [parseInt(hex.substring(0, 2), 16), parseInt(hex.substring(2, 4), 16), parseInt(hex.substring(4, 6), 16)];
+  };
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF('landscape', 'mm', 'a3');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.text('PIANIFICAZIONE VACANZE ANNO ' + anno + ' · ' + repartoLabel(_pianoReparto()).toUpperCase(), 210, 10, {
+  doc.setFontSize(12);
+  doc.text('PIANIFICAZIONE VACANZE ANNO ' + anno + ' · ' + repartoLabel(_pianoReparto()).toUpperCase(), 180, 9, {
     align: 'center',
   });
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.text(
-    '1) Selezionare la settimana di preferenza con una X. 2) Devono essere effettuate 2 settimane consecutive. Durante le vacanze scolastiche si dà precedenza a genitori con figli in età scolastica.',
+    '1) Selezionare la settimana di preferenza con una X. Scegliere 5 settimane in modo da facilitare la pianificazione.',
     8,
-    15,
+    14,
   );
-  const head = ['COGNOME', 'NOME', 'Pianificate'];
+  doc.text(
+    '2) Devono essere effettuate 2 settimane consecutive. Durante le vacanze scolastiche si darà precedenza a genitori con i figli in età scolastica.',
+    8,
+    17.5,
+  );
+  const head = ['COGNOME', 'NOME', 'Pianificate', '52'];
   for (let w = 1; w <= 52; w++) head.push(String(w));
   const body = dati.map((d) => {
-    const r = [d.cognome, d.nome, String(d.settimane.length)];
+    const r = [d.cognome, d.nome, String(d.settimane.length), ''];
     for (let w = 1; w <= 52; w++) r.push(d.settimane.includes(w) ? 'X' : '');
     return r;
   });
   const colStyles = {
-    0: { cellWidth: 30, halign: 'left' },
-    1: { cellWidth: 24, halign: 'left' },
-    2: { cellWidth: 12 },
+    0: { cellWidth: 28, halign: 'left' },
+    1: { cellWidth: 21, halign: 'left' },
+    2: { cellWidth: 11 },
   };
-  for (let i = 3; i < 55; i++) colStyles[i] = { cellWidth: 5.5 };
+  for (let i = 3; i < 57; i++) colStyles[i] = { cellWidth: 4.6 };
   doc.autoTable({
-    startY: 18,
+    startY: 20,
     head: [head],
     body: body,
     theme: 'grid',
-    margin: { left: 6, right: 6 },
-    styles: { fontSize: 5.4, cellPadding: 0.7, halign: 'center', lineColor: [150, 150, 150], lineWidth: 0.1 },
-    headStyles: { fillColor: [26, 74, 122], textColor: [255, 255, 255], fontSize: 5.2 },
+    margin: { left: 6, right: 60 },
+    styles: {
+      fontSize: 5.2,
+      cellPadding: 0.6,
+      halign: 'center',
+      lineColor: [130, 130, 130],
+      lineWidth: 0.1,
+      textColor: [0, 0, 0],
+    },
+    headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 5 },
     columnStyles: colStyles,
     didParseCell: (d) => {
-      if (d.section === 'body' && d.column.index > 2 && d.cell.raw === 'X') {
-        d.cell.styles.fillColor = [255, 214, 102];
-        d.cell.styles.fontStyle = 'bold';
-      }
+      if (d.column.index < 3) return;
+      const w = d.column.index === 3 ? 0 : d.column.index - 3;
+      const rgb = rgbDi(w);
+      if (rgb) d.cell.styles.fillColor = rgb;
+      if (d.section === 'body' && d.cell.raw === 'X') d.cell.styles.fontStyle = 'bold';
+    },
+  });
+  // LEGENDA a destra
+  const legBody = [];
+  const gg52 = _pianoGiorniSettimana(anno - 1, 52);
+  legBody.push(['52', _vacDataIt(gg52[0]), _vacDataIt(gg52[6])]);
+  for (let w = 1; w <= 52; w++) {
+    const gg = _pianoGiorniSettimana(anno, w);
+    legBody.push([String(w), _vacDataIt(gg[0]), _vacDataIt(gg[6])]);
+  }
+  doc.autoTable({
+    startY: 20,
+    margin: { left: 366 },
+    tableWidth: 48,
+    head: [['N° Sett.', 'dal', 'al']],
+    body: legBody,
+    theme: 'grid',
+    styles: {
+      fontSize: 4.6,
+      cellPadding: 0.5,
+      halign: 'center',
+      lineColor: [130, 130, 130],
+      lineWidth: 0.1,
+      textColor: [0, 0, 0],
+    },
+    headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 4.8 },
+    didParseCell: (d) => {
+      if (d.section !== 'body') return;
+      const w = d.row.index === 0 ? 0 : d.row.index;
+      const rgb = rgbDi(w);
+      if (rgb && d.column.index > 0) d.cell.styles.fillColor = rgb;
     },
   });
   const nomeFile = 'VACANZE_' + repartoLabel(_pianoReparto()).toUpperCase() + '_' + anno + '.pdf';
@@ -8715,6 +8915,20 @@ async function _renderPianoBriefingTab() {
     pianoRighe: pianoRighe || [],
     chiave: dstr + '|' + rep,
   };
+  // se il briefing era gia' salvato, controlla che i numeri cassa seguano
+  // ancora la rotazione (ieri potrebbe essere stato corretto a mano)
+  let cdDaAggiornare = false;
+  if (salvato && !valetR && rep === 'slots') {
+    try {
+      const clone = righe.map((r) => Object.assign({}, r, { cd: '' }));
+      await _briefAssegnaCd(clone, dstr);
+      cdDaAggiornare = clone.some((c, i) => {
+        const attuale = String((righe[i] && righe[i].cd) || '').trim();
+        const atteso = String(c.cd || '').trim();
+        return atteso && attuale && atteso !== attuale;
+      });
+    } catch (e) {}
+  }
   const puo = puoGestireBriefing();
   const valet = _briefIsValet();
   let h =
@@ -8759,6 +8973,12 @@ async function _renderPianoBriefingTab() {
         '<button class="btn-export" style="font-size:.75rem;font-weight:700;padding:2px 10px;vertical-align:middle" title="Grassetto sulle celle o righe marcate (vista e stampa)" onclick="briefFormatoApplica(\'b\')">G</button> ' +
         '<button class="btn-export" style="font-size:.75rem;font-style:italic;padding:2px 10px;vertical-align:middle" title="Corsivo sulle celle o righe marcate (vista e stampa)" onclick="briefFormatoApplica(\'i\')">C</button>' +
         '</div></span>'
+      : '') +
+    (puo && !valet && rep === 'slots' && salvato
+      ? '<button class="btn-export" style="font-size:.78rem;padding:4px 10px" title="Riassegna la colonna CD con la rotazione (chi ha chiuso ieri riapre oggi), lasciando intatto tutto il resto" onclick="briefAggiornaCd()">Aggiorna numeri cassa</button>'
+      : '') +
+    (cdDaAggiornare
+      ? '<span style="font-size:.78rem;background:#ffd166;color:#5a4300;padding:3px 10px;border-radius:3px;font-weight:700">I numeri cassa di ieri sono cambiati: premi "Aggiorna numeri cassa"</span>'
       : '') +
     '<span id="brief-stato" style="font-size:.78rem;color:var(--muted)">' +
     (salvato
@@ -9242,6 +9462,27 @@ async function briefEliminaRiga(i) {
   _briefState.righe.splice(i, 1);
   clearTimeout(_briefSaveTimer);
   await briefSalvaBriefing();
+  renderPiano();
+}
+// RICALCOLO dei soli numeri cassa su un briefing gia' salvato: si usa
+// quando i CD di ieri sono stati cambiati a mano e la rotazione di oggi
+// deve seguire. Le righe (nomi, turni, orari, colori) restano intatte.
+async function briefAggiornaCd() {
+  if (!_briefState || !puoGestireBriefing() || _briefIsValet()) return;
+  if (
+    !confirm(
+      'Ricalcolo i numeri cassa di questo briefing con la rotazione aggiornata (chi ha chiuso ieri riapre oggi)?\n\nI nomi e i turni restano come sono; solo la colonna CD viene riassegnata.',
+    )
+  )
+    return;
+  _briefState.righe.forEach((r) => {
+    r.cd = '';
+  });
+  await _briefAssegnaCd(_briefState.righe, _briefData);
+  clearTimeout(_briefSaveTimer);
+  await briefSalvaBriefing();
+  logAzione('Briefing: numeri cassa ricalcolati', _briefData);
+  toast('Numeri cassa aggiornati');
   renderPiano();
 }
 async function briefCompila() {
