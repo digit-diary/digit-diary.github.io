@@ -2574,6 +2574,9 @@ async function eseguiCancellaPiano(tutto) {
 // Fonte normativa di ogni regola: si legge accanto al valore, cosi' chi la
 // modifica sa da dove viene (RAP, direttiva interna, legge sul lavoro)
 const PIANO_REGOLE_FONTE = {
+  notte_inizio: 'RAP Allegato 1 (personale ausiliario) · fascia notturna di legge',
+  notte_fine: 'RAP Allegato 1 (personale ausiliario) · fascia notturna di legge',
+  notte_percentuale: 'RAP Allegato 1: 10% del tempo di lavoro notturno come tempo libero pagato',
   min_riposo_ore: 'LL art. 15a · direttiva 16-007',
   max_consecutivi: 'LL art. 21 · OLL1 art. 20',
   domeniche_libere_anno: 'OLL2 art. 24 cpv. 2 · direttiva 16-007',
@@ -2585,6 +2588,9 @@ const PIANO_REGOLE_FONTE = {
   tolleranza_ore_sopra: 'RAP 3.1: max 45 ore in alta stagione',
 };
 const PIANO_REGOLE_DOVE = {
+  notte_inizio: 'Statistiche anno (colonna Notte 10%)',
+  notte_fine: 'Statistiche anno (colonna Notte 10%)',
+  notte_percentuale: 'Statistiche anno (colonna Notte 10%)',
   domeniche_libere_anno: 'Validatore + Statistiche',
   turno_prima_domenica_libera: 'Validatore + Statistiche',
   nd_jolly_giorno: 'Formulario non disponibilità (scheda Formulari + PDF)',
@@ -3905,6 +3911,69 @@ function _pianoFestiviAnno(anno) {
 // REGOLA CGF: il festivo che cade di DOMENICA non matura compensazione
 function _festivoCgfDefault(dstr) {
   return new Date(dstr + 'T12:00:00').getDay() !== 0;
+}
+// FESTIVI PARIFICATI ALLE DOMENICHE — RAP Allegato 1 (Personale ausiliario,
+// versione 3.0 del 1° gennaio 2022). Sono i SOLI nove giorni per cui il
+// personale ausiliario (jolly) che lavora ha diritto al supplemento del 50%
+// sul salario orario lordo. Gli altri festivi cantonali (San Giuseppe, Festa
+// del Lavoro, Pentecoste, Corpus Domini, SS. Pietro e Paolo, Immacolata) NON
+// sono parificati e non danno il supplemento.
+const PIANO_FESTIVI_PARIFICATI = [
+  'capodanno',
+  'epifania',
+  'lunedì di pasqua',
+  'lunedi di pasqua',
+  'ascensione',
+  'festa nazionale', // 1° agosto
+  '1 agosto',
+  'assunzione',
+  'ognissanti',
+  'natale',
+  'santo stefano',
+];
+// ORE DI LAVORO NOTTURNO di un turno, cioe' quante ore cadono nella fascia
+// notturna (per legge 23:00-06:00, modificabile dalle regole notte_inizio /
+// notte_fine). Serve per il supplemento del 10% in tempo libero pagato dovuto
+// al personale ausiliario (RAP Allegato 1).
+function _pianoOreNotturneTurno(t) {
+  if (!t) return 0;
+  const ni = parseFloat(_pianoRegolaVal('notte_inizio'));
+  const nf = parseFloat(_pianoRegolaVal('notte_fine'));
+  const inizioN = !isNaN(ni) ? ni : 23;
+  const fineN = !isNaN(nf) ? nf : 6;
+  const i = _pianoOra(t.ora_inizio);
+  let f = _pianoOra(t.ora_fine);
+  if (i == null || f == null) return 0;
+  if (f <= i) f += 24; // turno che passa la mezzanotte
+  // due finestre notturne: quella della notte in corso e quella del mattino
+  const finestre = [
+    [inizioN, fineN + 24],
+    [inizioN - 24, fineN],
+  ];
+  let ore = 0;
+  finestre.forEach((w) => {
+    const a = Math.max(i, w[0]);
+    const b = Math.min(f, w[1]);
+    if (b > a) ore += b - a;
+  });
+  return Math.round(ore * 100) / 100;
+}
+// Tempo libero pagato maturato sulle ore notturne: 10% (RAP Allegato 1),
+// percentuale modificabile dalle regole (notte_percentuale)
+function _pianoNotteRecupero(oreNotturne) {
+  const p = parseFloat(_pianoRegolaVal('notte_percentuale'));
+  const perc = !isNaN(p) && p > 0 ? p : 10;
+  return Math.round((((oreNotturne || 0) * perc) / 100) * 100) / 100;
+}
+function _pianoFestivoParificato(fest) {
+  if (!fest) return false;
+  const d = String(fest.descrizione || '')
+    .trim()
+    .toLowerCase();
+  if (PIANO_FESTIVI_PARIFICATI.includes(d)) return true;
+  // riconoscimento anche dalla data, per festivi rinominati a mano
+  const md = String(fest.data || '').substring(5);
+  return ['01-01', '01-06', '08-01', '08-15', '11-01', '12-25', '12-26'].includes(md);
 }
 // Se l'anno selezionato non ha festivi li genera da solo (sono deterministici)
 async function _generaFestiviSeMancanti() {
@@ -6779,6 +6848,7 @@ async function caricaStatisticheAnnoPiano() {
       cgfGod: 0,
       cgfPersi: 0,
       sup50: 0,
+      oreNotte: 0,
     });
     const dow = new Date(r.data + 'T12:00:00').getDay();
     const info = _pianoCollabInfo(r.collaboratore) || {};
@@ -6791,9 +6861,17 @@ async function caricaStatisticheAnnoPiano() {
       if (dow === 0) o.dom++;
       // CGF MATURATO: ha lavorato in un festivo con flag CGF (automatico)
       const fest = pianoFestiviCache.find((f) => f.data === r.data);
-      // i jolly non maturano recuperi: prendono il supplemento del 50% (RAP All. 1)
+      // DUE MONDI SEPARATI:
+      // FISSI (RAP 4.3): recupero CGF sui festivi con il flag attivo, esclusi
+      // quelli che cadono di domenica.
       if (fest && fest.cgf !== false && _festivoCgfDefault(fest.data) && _pianoMaturaCgf(info)) o.cgfMat++;
-      if (fest && fest.cgf !== false && _festivoCgfDefault(fest.data) && !_pianoMaturaCgf(info)) o.sup50++;
+      // AUSILIARI/JOLLY (RAP Allegato 1): supplemento del 50% sul salario orario
+      // per i NOVE festivi parificati alle domeniche. Lista fissa che non cambia
+      // di anno in anno, e vale SEMPRE, anche quando il festivo cade di domenica.
+      if (fest && !_pianoMaturaCgf(info) && _pianoFestivoParificato(fest)) o.sup50++;
+      // ore di lavoro notturno degli ausiliari: il 10% matura come tempo
+      // libero pagato (RAP Allegato 1)
+      if (!_pianoMaturaCgf(info)) o.oreNotte += _pianoOreNotturneTurno(t);
     } else if (cs) {
       if (r.codice === 'V' || r.codice === 'V1') o.v++;
       if (r.codice === 'M' || r.codice === 'M1') o.m++;
@@ -6818,7 +6896,7 @@ async function caricaStatisticheAnnoPiano() {
   h +=
     '<div style="padding:4px 0"><input type="text" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-statanno-table\')" style="padding:4px 8px;font-size:.8rem;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--ink);width:180px"></div>';
   h +=
-    '<div style="overflow-x:auto"><table id="piano-statanno-table" class="piano-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Ore anno</th><th title="Sui mesi con un piano">Ore dovute</th><th>Giorni lavorati</th><th>Diurni</th><th>Notturni</th><th>Weekend</th><th>Domeniche</th><th>Vacanze</th><th>Malattie</th><th title="Festivi lavorati che danno diritto al recupero (solo personale fisso)">CGF maturati</th><th title="Giorni CGF effettivamente goduti (quelli caduti in malattia non contano)">CGF goduti</th><th title="Maturati − goduti: quanti recuperi restano da dare">Saldo CGF</th><th title="Festivi lavorati dai jolly: danno diritto al supplemento del 50% sul salario orario (RAP Allegato 1), non al recupero">Suppl. 50%</th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table id="piano-statanno-table" class="piano-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Ore anno</th><th title="Sui mesi con un piano">Ore dovute</th><th>Giorni lavorati</th><th>Diurni</th><th>Notturni</th><th>Weekend</th><th>Domeniche</th><th>Vacanze</th><th>Malattie</th><th title="Festivi lavorati che danno diritto al recupero (solo personale fisso)">CGF maturati</th><th title="Giorni CGF effettivamente goduti (quelli caduti in malattia non contano)">CGF goduti</th><th title="Maturati − goduti: quanti recuperi restano da dare">Saldo CGF</th><th title="Festivi parificati alle domeniche lavorati dagli ausiliari (jolly): danno diritto al supplemento del 50% sul salario orario lordo (RAP Allegato 1). Sono nove giorni fissi e valgono anche di domenica">Suppl. 50%</th><th title="Ore di lavoro notturno degli ausiliari (jolly) e tempo libero pagato maturato: 10% delle ore notturne (RAP Allegato 1)">Notte 10%</th></tr></thead><tbody>';
   ordineCollabPiano(Object.keys(st), _pianoReparto()).forEach((n) => {
     const o = st[n];
     h +=
@@ -6863,8 +6941,19 @@ async function caricaStatisticheAnnoPiano() {
       (o.cgfMat || o.cgfGod ? o.cgfMat - o.cgfGod : '') +
       '</td><td style="font-weight:700;color:' +
       (o.sup50 ? '#8b6914' : 'var(--muted)') +
-      '" title="Festivi lavorati come personale ausiliario">' +
+      '" title="Festivi parificati lavorati come personale ausiliario">' +
       (o.sup50 || '') +
+      '</td><td style="font-weight:700;color:' +
+      (o.oreNotte ? '#1a4a7a' : 'var(--muted)') +
+      '" title="' +
+      (o.oreNotte
+        ? Math.round(o.oreNotte * 10) / 10 +
+          'h di lavoro notturno: spettano ' +
+          _pianoNotteRecupero(o.oreNotte) +
+          'h di tempo libero pagato'
+        : '') +
+      '">' +
+      (o.oreNotte ? _pianoNotteRecupero(o.oreNotte) + 'h' : '') +
       '</td></tr>';
   });
   h += '</tbody></table></div>';
