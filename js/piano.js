@@ -664,6 +664,24 @@ function _pianoTabBar() {
   );
 }
 
+// ORE REALI DEL MESE scritte a mano (tabella piano_ore_mese). Finche' la
+// timbratrice non e' collegata, chi gestisce il piano puo' correggere il totale
+// del mese: dove esiste una rettifica, saldo del mese e YTD usano quella invece
+// delle ore pianificate. Si tiene traccia di chi ha scritto e quando.
+let _pianoOreMese = {}; // 'nome|YYYY-MM' -> record
+let _pianoOreMeseKey = '';
+async function _pianoCaricaOreMese(ym) {
+  if (_pianoOreMeseKey === ym) return;
+  _pianoOreMeseKey = ym;
+  _pianoOreMese = {};
+  const r = (await secGet('piano_ore_mese?anno_mese=eq.' + ym + '&limit=3000')) || [];
+  r.forEach((x) => (_pianoOreMese[x.collaboratore + '|' + x.anno_mese] = x));
+}
+// Rettifica del mese per un collaboratore (null se non c'e')
+function _pianoRettificaMese(nome, ym) {
+  return _pianoOreMese[nome + '|' + (ym || _pianoMeseSel)] || null;
+}
+
 // YTD saldo cumulato da gennaio al mese precedente (port di
 // compute_ytd_saldo_map di Turnivo): per ogni mese usa le ore timbrate se
 // presenti, altrimenti le ore piano (turni + codici speciali scalati);
@@ -726,6 +744,14 @@ async function _pianoAggiornaYtd(nomi) {
     const m = parseInt(t.data.split('-')[1]);
     timbMese[t.collaboratore + '|' + m] = (timbMese[t.collaboratore + '|' + m] || 0) + (parseFloat(t.ore) || 0);
   });
+  // ore reali scritte a mano nei mesi passati: hanno la precedenza su tutto,
+  // perche' sono il totale verificato da chi gestisce il piano
+  const rettMese = {}; // nome|m -> ore reali
+  const rett = (await secGet('piano_ore_mese?anno_mese=gte.' + anno + '-01&anno_mese=lt.' + ym + '&limit=5000')) || [];
+  rett.forEach((x) => {
+    const m = parseInt(String(x.anno_mese).split('-')[1]);
+    rettMese[x.collaboratore + '|' + m] = parseFloat(x.ore_reali) || 0;
+  });
   nomi.forEach((n) => {
     const info = _pianoCollabInfo(n) || {};
     if (info.is_jolly) return;
@@ -736,11 +762,85 @@ async function _pianoAggiornaYtd(nomi) {
       const dim = new Date(anno, m, 0).getDate();
       const dovute = Math.round((dim / 7) * _pianoOreSett * pct * 100) / 100;
       const k = n + '|' + m;
-      const effettive = timbMese[k] != null ? timbMese[k] : perMese[k] || 0;
+      const effettive = rettMese[k] != null ? rettMese[k] : timbMese[k] != null ? timbMese[k] : perMese[k] || 0;
       cum += effettive - dovute;
     }
     _pianoYtdMap[n] = Math.round(cum * 100) / 100;
   });
+}
+
+// Scrive le ORE REALI di un mese per un collaboratore. Il saldo del mese e'
+// un valore calcolato (ore meno dovute): si corregge la causa, cioe' le ore,
+// non l'effetto. Cosi' il numero resta spiegabile e continua ad aggiornarsi.
+async function pianoScriviOreMese(nome) {
+  if (!puoGestirePiano() && !isAdmin()) {
+    toast('Non hai il permesso di modificare il piano');
+    return;
+  }
+  const ym = _pianoMeseSel;
+  const info = _pianoCollabInfo(nome) || {};
+  if (info.is_jolly) {
+    // per gli ausiliari non esistono ore dovute, quindi non esiste un saldo da
+    // correggere: le loro ore sono quelle che risultano dai turni fatti
+    toast('Gli ausiliari non hanno ore dovute: il saldo non si applica');
+    return;
+  }
+  const att = _pianoRettificaMese(nome, ym);
+  const riga = document.querySelector('#piano-content .piano-table tbody tr[data-nome="' + CSS.escape(nome) + '"]');
+  const pianificate = riga ? (riga.querySelector('td[data-tot="4"]') || {}).textContent : '';
+  const val = prompt(
+    'Ore realmente lavorate da ' +
+      nome +
+      ' nel mese ' +
+      ym +
+      '.\n\nPianificate dal programma: ' +
+      String(pianificate || '').replace('*', '') +
+      ' ore.\nScrivi il totale reale (vuoto = torna alle ore del piano):',
+    att ? String(att.ore_reali) : '',
+  );
+  if (val === null) return;
+  const testo = String(val).trim().replace(',', '.');
+  try {
+    if (testo === '') {
+      if (att) {
+        await secDel('piano_ore_mese', 'id=eq.' + att.id);
+        delete _pianoOreMese[nome + '|' + ym];
+        logAzione('Ore reali del mese tolte', nome + ' ' + ym);
+        toast('Rettifica tolta: torna alle ore del piano');
+      }
+    } else {
+      const ore = parseFloat(testo);
+      if (isNaN(ore) || ore < 0 || ore > 400) {
+        toast('Valore non valido');
+        return;
+      }
+      const nota = prompt('Motivo della correzione (facoltativo, resta nello storico):', (att && att.nota) || '');
+      if (nota === null) return;
+      const dati = {
+        collaboratore: nome,
+        anno_mese: ym,
+        ore_reali: ore,
+        nota: String(nota).trim() || null,
+        operatore: getOperatore(),
+        reparto_dip: _pianoReparto(),
+        modificato_il: new Date().toISOString(),
+      };
+      if (att) {
+        await secPatch('piano_ore_mese', 'id=eq.' + att.id, dati);
+        _pianoOreMese[nome + '|' + ym] = Object.assign({}, att, dati);
+      } else {
+        const nuovo = await secPost('piano_ore_mese', dati);
+        _pianoOreMese[nome + '|' + ym] = (nuovo && nuovo[0]) || Object.assign({ creato_il: dati.modificato_il }, dati);
+      }
+      logAzione('Ore reali del mese', nome + ' ' + ym + ' = ' + ore + 'h' + (dati.nota ? ' (' + dati.nota + ')' : ''));
+      toast('Ore reali registrate: ' + ore + 'h');
+    }
+    _pianoYtdKey = ''; // l'YTD dei mesi seguenti cambia: si ricalcola
+    renderPiano();
+  } catch (e) {
+    toast('Errore nel salvataggio (la tabella piano_ore_mese esiste?)');
+    console.error('pianoScriviOreMese', e);
+  }
 }
 
 // Carica le righe di un mese per un settore, in modo che SCALI con molti
@@ -1053,6 +1153,7 @@ async function renderPiano() {
         '<th class="piano-tot" title="Saldo Mensile">SM</th><th class="piano-tot" title="Saldo Anno">YTD</th></tr></thead><tbody>';
 
       await _pianoAggiornaYtd(nomi);
+      await _pianoCaricaOreMese(_pianoMeseSel);
       nomi.forEach((nome) => {
         const ne = nome.replace(/'/g, "\\'");
         const infoC0 = _pianoCollabInfo(nome);
@@ -1165,7 +1266,11 @@ async function renderPiano() {
         const perc = perc0;
         // come Turnivo: OD=(giorni/7)*ore_sett*pct (jolly=0), OP=turni+speciali, SM=OP-OD, YTD=cumulato da gennaio
         const dovute = infoC && infoC.is_jolly ? 0 : Math.round(((_pianoOreSett * perc * nGiorni) / 7) * 10) / 10;
-        const orePiano = Math.round((ore + oreSpec) * 100) / 100;
+        const _rett = _pianoRettificaMese(nome);
+        const orePianificate = Math.round((ore + oreSpec) * 100) / 100;
+        // dove c'e' una rettifica scritta a mano, vale quella: e' il totale
+        // reale del mese, quello che finisce in busta paga
+        const orePiano = _rett ? Math.round(parseFloat(_rett.ore_reali) * 100) / 100 : orePianificate;
         const saldo = Math.round((orePiano - dovute) * 10) / 10;
         const ytd = Math.round(((_pianoYtdMap[nome] || 0) + saldo) * 10) / 10;
         const _clsRiga =
@@ -1243,9 +1348,21 @@ async function renderPiano() {
           (nN || '') +
           '</td><td class="piano-tot" data-tot="3" style="color:var(--muted)">' +
           (dovute ? dovute.toFixed(1) : '') +
-          '</td><td class="piano-tot" data-tot="4">' +
+          '</td><td class="piano-tot piano-op" data-tot="4"' +
+          (_rett
+            ? ' title="Ore reali del mese scritte da ' +
+              escP(_rett.operatore || '') +
+              ' il ' +
+              String(_rett.creato_il || '').substring(0, 10) +
+              (_rett.nota ? ' · ' + escP(_rett.nota) : '') +
+              ' · pianificate ' +
+              orePianificate.toFixed(1) +
+              'h · doppio clic per correggere"'
+            : ' title="Ore pianificate. Doppio clic per scrivere le ore realmente fatte nel mese"') +
+          '>' +
           (orePiano ? orePiano.toFixed(1) : '') +
-          '</td><td class="piano-tot" data-tot="5" style="color:' +
+          (_rett ? '<span class="piano-rett" title="valore scritto a mano">*</span>' : '') +
+          '</td><td class="piano-tot piano-sm" data-tot="5" title="Saldo del mese. Doppio clic per scrivere le ore realmente fatte" style="color:' +
           (saldo > 0 ? '#2c6e49' : saldo < 0 ? '#c0392b' : 'var(--muted)') +
           '">' +
           (orePiano || dovute ? (saldo > 0 ? '+' : '') + saldo.toFixed(1) : '') +
@@ -2135,6 +2252,7 @@ async function generaBozzaPiano(usaCoperture) {
   // dei mesi precedenti. La bozza dà i turni a chi è più LONTANO dal
   // proprio obiettivo: prima i fissi al 100%, i jolly coprono il resto.
   await _pianoAggiornaYtd(nomi);
+  await _pianoCaricaOreMese(_pianoMeseSel);
   const obiettivo = {};
   nomi.forEach((n) => {
     const info = _pianoCollabInfo(n) || {};
@@ -6959,9 +7077,24 @@ function _pianoInitSelezione() {
       });
     });
     tbody.querySelectorAll('tr').forEach((riga, rowIdx) => {
+      // doppio clic su ore pianificate o saldo: si scrivono le ore reali del mese
+      riga.querySelectorAll('td.piano-op, td.piano-sm').forEach((td) => {
+        td.addEventListener('dblclick', (e) => {
+          e.stopPropagation();
+          if (riga.dataset.nome) pianoScriviOreMese(riga.dataset.nome);
+        });
+      });
       const nomeCella = riga.querySelector('.piano-nome');
       if (!nomeCella) return;
       nomeCella.style.cursor = 'pointer';
+      // doppio clic sul nome: scheda del collaboratore (il clic singolo resta
+      // la selezione della riga, con Ctrl/Shift per piu' collaboratori)
+      nomeCella.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        if (riga.dataset.nome && typeof apriSchedaCollaboratore === 'function')
+          apriSchedaCollaboratore(riga.dataset.nome);
+      });
       if (riga.dataset.nome) nomeCella.addEventListener('contextmenu', (e) => mostraPianoCtxNome(e, riga.dataset.nome));
       nomeCella.addEventListener('click', (e) => {
         if (e.target.closest('a, .piano-pdf-ico')) return;
@@ -7691,8 +7824,14 @@ async function caricaStatisticheAnnoPiano() {
     });
     const dow = new Date(r.data + 'T12:00:00').getDay();
     const info = _pianoCollabInfo(r.collaboratore) || {};
+    const _mese = String(r.data).substring(0, 7);
+    const _addMese = (q) => {
+      if (!o.perMese) o.perMese = {};
+      o.perMese[_mese] = (o.perMese[_mese] || 0) + q;
+    };
     if (t) {
       o.ore += parseFloat(t.durata_ore) || 0;
+      _addMese(parseFloat(t.durata_ore) || 0);
       o.gg++;
       if (t.tipo === 'NOTTURNO') o.n++;
       else o.d++;
@@ -7722,9 +7861,24 @@ async function caricaStatisticheAnnoPiano() {
         if (malattieAnno[r.collaboratore + '|' + r.data]) o.cgfPersi++;
         else o.cgfGod++;
       }
-      o.ore += _pianoOreCodiceSpeciale(cs, info, r.codice);
+      const _oCs = _pianoOreCodiceSpeciale(cs, info, r.codice);
+      o.ore += _oCs;
+      _addMese(_oCs);
     }
   });
+  // ORE REALI SCRITTE A MANO: dove esistono, sostituiscono le ore del piano di
+  // quel mese, cosi' le statistiche dell'anno dicono lo stesso numero del saldo
+  // e del calendario. Un dato solo, in tutto il programma.
+  const rettAnno =
+    (await secGet('piano_ore_mese?anno_mese=gte.' + anno + '-01&anno_mese=lte.' + anno + '-12&limit=5000')) || [];
+  rettAnno.forEach((x) => {
+    const o = st[x.collaboratore];
+    if (!o || !o.perMese) return;
+    const pian = o.perMese[x.anno_mese] || 0;
+    o.ore = Math.round((o.ore - pian + (parseFloat(x.ore_reali) || 0)) * 100) / 100;
+    o.rettifiche = (o.rettifiche || 0) + 1;
+  });
+
   // ore dovute sull'anno: solo sui mesi che hanno un piano (come confronto sensato)
   let ggDovuti = 0;
   mesiConPiano.forEach((mm) => (ggDovuti += new Date(parseInt(anno), parseInt(mm), 0).getDate()));
@@ -7739,13 +7893,21 @@ async function caricaStatisticheAnnoPiano() {
     '<div style="overflow-x:auto"><table id="piano-statanno-table" class="piano-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Ore anno</th><th title="Sui mesi con un piano">Ore dovute</th><th>Giorni lavorati</th><th>Diurni</th><th>Notturni</th><th>Weekend</th><th>Domeniche</th><th>Vacanze</th><th>Malattie</th><th title="Festivi lavorati che danno diritto al recupero (solo personale fisso)">CGF maturati</th><th title="Giorni CGF effettivamente goduti (quelli caduti in malattia non contano)">CGF goduti</th><th title="Maturati − goduti: quanti recuperi restano da dare">Saldo CGF</th><th title="Festivi parificati alle domeniche lavorati dagli ausiliari (jolly): danno diritto al supplemento del 50% sul salario orario lordo (RAP Allegato 1). Sono nove giorni fissi e valgono anche di domenica">Suppl. 50%</th><th title="Ore lavorate nella fascia notturna (23:00-06:00). Il supplemento del 10% e gia compreso nella durata dei turni: questa colonna serve da controllo, non e un credito da dare a parte">Ore notte</th><th title="Solo ausiliari (jolly): ore effettivamente lavorate nell anno e indennita calcolate su quel totale secondo il RAP Allegato 1 (vacanze 8.33% con 4 settimane o 10.65% con 5, tredicesima 8.33%). I jolly non hanno una percentuale contrattuale: tutto si calcola sulle ore fatte">Ore lavorate · indennita</th></tr></thead><tbody>';
   ordineCollabPiano(Object.keys(st), _pianoReparto()).forEach((n) => {
     const o = st[n];
+    const info = _pianoCollabInfo(n) || {};
     h +=
       '<tr data-nome="' +
       escP(n) +
       '"><td style="text-align:left;font-weight:600">' +
       escP(n) +
-      '</td><td>' +
+      '</td><td' +
+      (o.rettifiche
+        ? ' title="Comprende ' +
+          o.rettifiche +
+          (o.rettifiche === 1 ? ' mese con ore reali scritte a mano"' : ' mesi con ore reali scritte a mano"')
+        : '') +
+      '>' +
       o.ore.toFixed(1) +
+      (o.rettifiche ? '<span class="piano-rett">*</span>' : '') +
       '</td><td style="color:var(--muted)">' +
       (dovuteDi(n) ? dovuteDi(n).toFixed(1) : '-') +
       '</td><td>' +
@@ -7895,6 +8057,8 @@ function _pianoVacDirittoCard(anno) {
       (x.r.bonus
         ? ' + ' + x.r.bonus + ' per anzianita (' + x.r.voci.map((v) => v.anni + ' anni dal ' + v.dal).join(', ') + ')'
         : '') +
+      '" data-nome="' +
+      escP(x.c.nome) +
       '"><td style="text-align:left;font-weight:600">' +
       escP(x.c.nome) +
       '</td><td>' +
@@ -8026,7 +8190,11 @@ async function _renderPianoVacanzeTab() {
   gruppi.forEach((nome) => {
     const lista = perCollab[nome];
     h +=
-      '<div style="margin:10px 14px;border:1px solid var(--line);border-radius:3px;overflow:hidden"><div style="background:#ffc107;color:#212529;padding:6px 10px;font-weight:700;font-size:.82rem">' +
+      '<div style="margin:10px 14px;border:1px solid var(--line);border-radius:3px;overflow:hidden"><div data-collab="' +
+      escP(nome) +
+      '" title="Apri la scheda di ' +
+      escP(nome) +
+      '" style="background:#ffc107;color:#212529;padding:6px 10px;font-weight:700;font-size:.82rem">' +
       escP(nome) +
       ' (' +
       lista.length +
@@ -8087,6 +8255,7 @@ async function _renderPianoSaldoTab() {
     .map((c) => c.nome)
     .sort((x, y) => (pos[x] != null ? pos[x] : 9999) - (pos[y] != null ? pos[y] : 9999) || x.localeCompare(y));
   await _pianoAggiornaYtd(nomi);
+  await _pianoCaricaOreMese(_pianoMeseSel);
   // come Turnivo: ore LAVORATE = timbrate del mese se presenti, altrimenti piano
   const da = ym + '-01';
   const aFine = ym + '-' + String(nGiorni).padStart(2, '0');
@@ -8123,6 +8292,9 @@ async function _renderPianoSaldoTab() {
       op += _pianoOreDiRiga(r, pct);
     });
     if (timbNome[nome] != null) op = timbNome[nome]; // timbrate del mese: hanno la precedenza
+    // ore reali scritte a mano: precedenza su tutto, come nel calendario
+    const rettSaldo = _pianoRettificaMese(nome);
+    if (rettSaldo) op = Math.round(parseFloat(rettSaldo.ore_reali) * 100) / 100;
     const od = info.is_jolly ? 0 : Math.round((nGiorni / 7) * _pianoOreSett * pct * 100) / 100;
     const sm = Math.round((op - od) * 10) / 10;
     const ytd = Math.round(((_pianoYtdMap[nome] || 0) + sm) * 10) / 10;
@@ -8143,6 +8315,12 @@ async function _renderPianoSaldoTab() {
       (od ? od.toFixed(1) : '-') +
       '</td><td>' +
       (op ? op.toFixed(1) : '') +
+      (rettSaldo
+        ? '<span class="piano-rett" title="Ore reali scritte da ' +
+          escP(rettSaldo.operatore || '') +
+          (rettSaldo.nota ? ' · ' + escP(rettSaldo.nota) : '') +
+          '">*</span>'
+        : '') +
       '</td><td style="font-weight:700;color:' +
       col(sm) +
       '">' +
@@ -14549,6 +14727,7 @@ async function miglioraOrePiano() {
     ore[r.collaboratore] = (ore[r.collaboratore] || 0) + _pianoOreDiRiga(r, pct);
   });
   await _pianoAggiornaYtd(nomi);
+  await _pianoCaricaOreMese(_pianoMeseSel);
   const saldo = {};
   const fissi = nomi.filter((n) => !infoDi[n].is_jolly);
   fissi.forEach((n) => {

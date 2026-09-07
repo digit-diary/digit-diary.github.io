@@ -231,6 +231,28 @@ function GUIDA_CAPITOLI() {
     },
     {
       area: 'piano',
+      titolo: 'Piano: correggere il saldo del mese (ore reali)',
+      vis: () => _guidaVis('piano'),
+      righe: [
+        'Finche il programma non e collegato alla timbratrice, le ore vere di un mese possono non coincidere con il piano: chi finisce prima, chi resta oltre.',
+        'Nel <b>Calendario</b> fai <b>doppio clic</b> sulla colonna <b>OP</b> (ore pianificate) o su <b>SM</b> (saldo del mese) del collaboratore: il programma chiede le <b>ore realmente lavorate</b> nel mese e, se vuoi, il motivo.',
+        'Da quel momento il saldo del mese, l <b>YTD</b>, la scheda <b>Saldo</b> e le <b>Statistiche</b> dell anno usano quel totale. Il valore scritto a mano si riconosce da un <b>asterisco</b>, e passandoci sopra si legge chi lo ha scritto, quando e perche.',
+        'Si corregge la <b>causa</b> (le ore), non l effetto (il saldo): cosi il numero resta spiegabile e continua ad aggiornarsi da solo.',
+        'Per tornare alle ore del piano basta rifare il doppio clic e <b>lasciare il campo vuoto</b>.',
+        'Se serve la precisione del singolo giorno, resta la scheda <b>Timbrature</b>: li si registra entrata e uscita di una giornata. Ordine di precedenza: ore reali del mese, poi timbrature, poi piano.',
+        'Gli <b>ausiliari</b> non hanno ore dovute, quindi per loro non esiste un saldo da correggere.',
+      ],
+    },
+    {
+      area: 'piano',
+      titolo: 'Scheda del collaboratore: si apre da ogni tabella',
+      righe: [
+        'Il nome di un collaboratore apre la sua scheda ovunque compaia come prima colonna di una tabella: Diario, Statistiche, Moduli, Formazione, Valutazioni, e nel Piano le schede Saldo, Statistiche, Benessere e Vacanze.',
+        'Nel <b>Piano di lavoro</b> fa eccezione: li il clic sul nome seleziona la riga (con Ctrl o Shift piu collaboratori), quindi la scheda si apre con il <b>doppio clic</b> sul nome.',
+      ],
+    },
+    {
+      area: 'piano',
       titolo: 'Piano: giorni di vacanza spettanti',
       vis: () => _guidaVis('piano'),
       righe: [
