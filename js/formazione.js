@@ -115,6 +115,9 @@ async function saveCompetenzeConfig(cfg) {
 function getPuntiConfig() {
   const cfg = puntiConfig && typeof puntiConfig === 'object' ? puntiConfig : PUNTI_DEFAULT;
   return {
+    // interruttore generale del sistema incentivi: se la direzione lo spegne,
+    // niente punti e niente popup da nessuna parte (default: acceso)
+    attivo: cfg.attivo !== false,
     azioni: Array.isArray(cfg.azioni) && cfg.azioni.length ? cfg.azioni : PUNTI_DEFAULT.azioni,
     soglie: Array.isArray(cfg.soglie) ? cfg.soglie : PUNTI_DEFAULT.soglie,
     premi_livello: cfg.premi_livello || PUNTI_DEFAULT.premi_livello,
@@ -122,6 +125,17 @@ function getPuntiConfig() {
     notifiche: cfg.notifiche === 'tutti' || cfg.notifiche === 'off' ? cfg.notifiche : 'privato',
     inventario: Array.isArray(cfg.inventario) ? cfg.inventario : [],
   };
+}
+// Il sistema incentivi (o la singola azione) e' acceso? Un solo punto di
+// verita' usato ovunque: assegnazione punti E apertura dei popup.
+function incentiviAttivi(azioneKey) {
+  const cfg = getPuntiConfig();
+  if (cfg.attivo === false) return false;
+  if (azioneKey) {
+    const az = (cfg.azioni || []).find((a) => a.key === azioneKey);
+    if (az && az.attiva === false) return false;
+  }
+  return true;
 }
 
 // === LIMITI MENSILI, INVENTARIO E ATTESE PREMI ===
@@ -1488,6 +1502,10 @@ async function toggleCompetenza(collabId, key, cb) {
   }
 }
 async function _insertPuntiEvento(nome, punti, azione, descrizione) {
+  // INTERRUTTORE INCENTIVI: se il sistema (o questa azione) e' spento dalla
+  // direzione, non si scrive nulla. Blocco all'origine, cosi' vale per ogni
+  // percorso (popup, manuale, automatico) senza doverlo ripetere ovunque.
+  if (typeof incentiviAttivi === 'function' && !incentiviAttivi(azione)) return false;
   // ANTI-DOPPIONI (vale per OGNI incentivo: coperture, cambi, competenze, livelli, premi, manuali).
   // Controlla sul database, non solo in cache, cosi' vede anche i punti dati da altri operatori.
   const _desc = (descrizione || '').trim();
@@ -2003,12 +2021,29 @@ function _renderFormazioneConfig() {
         rep +
         '\')">+ Aggiungi</button></div>';
     });
-  // punti azioni
+  // INTERRUTTORE GENERALE del sistema incentivi
   html +=
-    '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Azioni e punti</p>';
+    '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Sistema incentivi</p>' +
+    '<label class="tipo-item" style="cursor:pointer;font-size:.95rem"><input type="checkbox"' +
+    (cfgP.attivo ? ' checked' : '') +
+    ' onchange="toggleIncentiviGlobale(this.checked)" style="width:18px;height:18px;margin-right:10px"><b>Incentivi attivi</b>' +
+    '<span style="margin-left:8px;color:var(--muted);font-size:.82rem">' +
+    (cfgP.attivo ? 'accesi: punti e popup funzionano' : 'SPENTI: nessun punto e nessun popup in tutto il programma') +
+    '</span></label>';
+  // punti azioni (ciascuna con la sua spunta attiva/disattiva)
+  html +=
+    '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Azioni e punti</p>' +
+    '<p style="font-size:.75rem;color:var(--muted);margin:0 0 6px">La spunta a sinistra accende o spegne la singola azione. Il numero sono i punti. Se il sistema qui sopra e spento, tutte le azioni sono spente.</p>';
   cfgP.azioni.forEach((a, i) => {
+    const attiva = a.attiva !== false;
     html +=
-      '<div class="tipo-item"><div class="tipo-item-name">' +
+      '<div class="tipo-item" style="' +
+      (attiva && cfgP.attivo ? '' : 'opacity:.55') +
+      '"><input type="checkbox"' +
+      (attiva ? ' checked' : '') +
+      ' onchange="toggleAzioneCfg(' +
+      i +
+      ',this.checked)" title="Accendi o spegni questa azione" style="width:17px;height:17px;margin-right:8px"><div class="tipo-item-name">' +
       escP(a.label) +
       '</div><input type="number" value="' +
       a.punti +
@@ -2216,6 +2251,31 @@ async function modificaPuntiAzione(idx, val) {
   await savePuntiConfig(cfg);
   toast('Punti aggiornati');
 }
+// Interruttore generale: accende/spegne tutto il sistema incentivi
+async function toggleIncentiviGlobale(on) {
+  if (typeof puoModificare === 'function' && !puoModificare('gestione_punti')) {
+    toast('Non hai il permesso di gestire gli incentivi');
+    return;
+  }
+  const cfg = getPuntiConfig();
+  cfg.attivo = !!on;
+  await savePuntiConfig(cfg);
+  toast(on ? 'Incentivi ACCESI' : 'Incentivi SPENTI: nessun punto e nessun popup');
+  if (typeof renderFormazione === 'function') renderFormazione();
+}
+// Accende/spegne una singola azione degli incentivi
+async function toggleAzioneCfg(idx, on) {
+  if (typeof puoModificare === 'function' && !puoModificare('gestione_punti')) {
+    toast('Non hai il permesso di gestire gli incentivi');
+    return;
+  }
+  const cfg = getPuntiConfig();
+  if (!cfg.azioni[idx]) return;
+  cfg.azioni[idx].attiva = !!on;
+  await savePuntiConfig(cfg);
+  toast('"' + cfg.azioni[idx].label + '" ' + (on ? 'attivata' : 'disattivata'));
+  if (typeof renderFormazione === 'function') renderFormazione();
+}
 // Rinomina azione punti: cambia solo l'etichetta; il registro storico resta coerente
 // perché i movimenti referenziano la chiave interna, non il nome.
 async function rinominaAzioneCfg(idx) {
@@ -2374,6 +2434,9 @@ function badgeCoperturaHtml(entry) {
 function apriPopupCopertura(assente, dataRif, modo) {
   // modo 'cambio' = cambio turno per esigenze operative: chi accetta prende
   // i punti "Cambio turno accettato" invece di quelli di copertura malattia
+  // Se gli incentivi (o l'azione collegata) sono spenti, il popup non si apre.
+  const azione = (modo || 'malattia') === 'cambio' ? 'cambio_turno' : 'copertura';
+  if (typeof incentiviAttivi === 'function' && !incentiviAttivi(azione)) return Promise.resolve(null);
   return new Promise((resolve) => {
     window._copResolve = resolve;
     window._copCtx = { assente, dataRif: dataRif || new Date().toISOString().split('T')[0], modo: modo || 'malattia' };

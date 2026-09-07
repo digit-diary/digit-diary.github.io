@@ -257,6 +257,7 @@ function GUIDA_CAPITOLI() {
         'Al completamento di un livello il programma assegna i punti previsti e avvisa la persona interessata.',
         'I <b>punti e i premi</b> seguono le azioni configurate (coperture, cambi turno, formazioni svolte) e sono consultabili nella scheda del collaboratore.',
         "Ogni assegnazione di punti richiede la <b>conferma del responsabile</b>: nessun punto parte da solo. Il programma controlla anche i <b>doppioni</b>: se la stessa persona ha gia' ricevuto punti per lo stesso motivo, o altri punti nello stesso giorno, appare un avviso e si decide se procedere.",
+        "Il sistema incentivi si puo' <b>accendere e spegnere</b> dalla configurazione (sezione Sistema incentivi): con l'interruttore generale spento non vengono assegnati punti e non appare nessun popup in tutto il programma. Si puo' anche spegnere una <b>singola azione</b> (per esempio solo la copertura malattia) lasciando attive le altre. Lo storico dei punti gia' assegnati resta consultabile.",
         "Il cerca cambio per il giorno libero <b>non</b> assegna punti: e' uno scambio alla pari tra colleghi.",
         'Le <b>formazioni svolte</b> si registrano con data, formatore ed eventuali allegati.',
       ],

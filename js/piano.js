@@ -5702,9 +5702,15 @@ async function confermaCoperturaMalattia() {
         nSost++;
       }
     }
-    // punti incentivo: MAI automatici, il responsabile conferma prima
+    // punti incentivo: MAI automatici, il responsabile conferma prima; e solo
+    // se il sistema incentivi (e l'azione copertura) e' acceso
     let puntiDati = false;
-    if (typeof _insertPuntiEvento === 'function' && typeof getPuntiConfig === 'function' && sostituti.size) {
+    if (
+      typeof _insertPuntiEvento === 'function' &&
+      typeof getPuntiConfig === 'function' &&
+      sostituti.size &&
+      (typeof incentiviAttivi !== 'function' || incentiviAttivi('copertura'))
+    ) {
       const az = (getPuntiConfig().azioni || []).find((a) => a.key === 'copertura');
       const dataLbl = new Date(ym + '-' + String(m.da).padStart(2, '0') + 'T12:00:00').toLocaleDateString('it-IT');
       if (
