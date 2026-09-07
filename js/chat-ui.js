@@ -2069,8 +2069,24 @@ document.addEventListener('click', function (e) {
   // solo nomi veri: cosi' un data-nome usato per altro non apre nulla
   if (!(collaboratoriCache || []).some((c) => c.nome === nome)) return;
   e.stopPropagation();
-  apriSchedaCollaboratore(nome);
+  apriSchedaCollaboratoreSicuro(nome);
 });
+// Apertura protetta: se qualcosa va storto l'operatore deve VEDERE il motivo.
+// Un clic che non produce nulla e' il peggior modo di fallire, perche' sembra
+// che il programma ignori il comando.
+function apriSchedaCollaboratoreSicuro(nome) {
+  try {
+    apriSchedaCollaboratore(nome);
+    const box = document.getElementById('profilo-modal');
+    if (!box || box.classList.contains('hidden')) {
+      console.error('Scheda non aperta per', nome);
+      if (typeof toast === 'function') toast('Non riesco ad aprire la scheda di ' + nome);
+    }
+  } catch (err) {
+    console.error('Scheda collaboratore', nome, err);
+    if (typeof toast === 'function') toast('Errore aprendo la scheda: ' + (err && err.message ? err.message : err));
+  }
+}
 
 function apriSchedaCollaboratore(nome) {
   _destroySchedaCharts();
