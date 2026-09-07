@@ -4920,56 +4920,17 @@ async function ripristinaOrdinePiano() {
 // alla conferma mette M al malato e i turni (protetti) ai sostituti.
 // ================================================================
 function _pianoIdoneoPerTurno(nome, turno) {
-  // idoneità come il generatore: settori (fonte di verità), regole di
-  // gruppo, solo_diurni, turni bloccati
+  // idoneita' (settori, regole di gruppo, solo_diurni, turni bloccati, mappatura
+  // funzione, regola L1): la logica vive nel motore puro PianoRegole, qui si
+  // iniettano solo gli accessi allo stato dell'app
   const info = _pianoCollabInfo(nome) || {};
-  if (info.solo_diurni && turno.tipo === 'NOTTURNO') return false;
-  if (
-    info.turni_bloccati &&
-    info.turni_bloccati
-      .split(',')
-      .map((x) => x.trim())
-      .includes(turno.codice)
-  )
-    return false;
-  const gruppoT = (turno.gruppo || '').toUpperCase();
-  const fzU = ((info.funzione || '') + '').toUpperCase();
-  const settoriC = _pianoSettoriEffettivi(info);
-  const haSettore = settoriC ? settoriC.includes(gruppoT) : true;
-  let campoGrant = false;
-  for (const rg of _pianoRegoleGruppoDi(gruppoT)) {
-    const tipoR = (rg.tipo_regola || '').toLowerCase();
-    if (tipoR === 'richiede_funzione') {
-      const ammesse = rg.valore.split(',').map((x) => x.trim().toUpperCase());
-      if (!haSettore && !ammesse.includes(fzU)) return false;
-    } else if (tipoR === 'blocca_tipo_turno') {
-      if (
-        rg.valore
-          .split(',')
-          .map((x) => x.trim().toUpperCase())
-          .includes((turno.tipo || '').toUpperCase())
-      )
-        return false;
-    } else if (tipoR === 'richiede_campo') {
-      if (!_pianoCampoOk(info, rg.valore)) return false;
-      campoGrant = true;
-    }
-  }
-  if (settoriC && !haSettore && !campoGrant) return false;
-  const mapp = _pianoMappFunzione(info.funzione);
-  if (mapp) {
-    const voci = mapp.filter((m) => m.tipo === 'PRINCIPALE' || m.tipo === 'AMMESSO').map((m) => m.turno_codice);
-    if (voci.length && !voci.includes(turno.codice)) return false;
-  }
-  if (
-    (turno.codice === 'L1' || turno.codice === '9') &&
-    String(_pianoRegolaVal('l1_solo_bo_sup')).toUpperCase() === 'TRUE' &&
-    fzU !== 'SUP' &&
-    fzU !== 'BO' &&
-    !(settoriC || []).some((x) => x === 'BO' || x === 'SUP')
-  )
-    return false;
-  return true;
+  return PianoRegole.idoneoPerTurno(info, turno, {
+    settoriDi: (i) => _pianoSettoriEffettivi(i),
+    regoleGruppoDi: (gr) => _pianoRegoleGruppoDi(gr),
+    campoOk: (i, v) => _pianoCampoOk(i, v),
+    mappFunzione: (fz) => _pianoMappFunzione(fz),
+    regolaVal: (n) => _pianoRegolaVal(n),
+  });
 }
 function apriCoperturaMalattia() {
   if (!puoGestirePiano()) return;
@@ -9842,30 +9803,28 @@ function _pianoAccompagnamentoAvviso(overrides) {
       overrides.forEach((o) => {
         if (o.data === dstr) perNome[o.nome] = o.codice || '';
       });
-      // conteggio per gruppo e lista degli accompagnati che lavorano
-      const conta = {};
-      const accompagnati = [];
-      Object.keys(perNome).forEach((nm) => {
-        const t = _pianoTurnoInfo(perNome[nm]);
-        if (!t) return;
-        const gr = (t.gruppo || '').toUpperCase();
-        if (!gr) return;
-        conta[gr] = (conta[gr] || 0) + 1;
-        const info = _pianoCollabInfo(nm);
-        if (!info) return;
-        let acc = false;
-        if (info.accompagnamento_settori && _pianoAccompagnamentoDi(info).includes(gr)) acc = true;
-        const cop = _pianoCoperturaCfg(info);
-        if (cop && cop.accompagnato) acc = true;
-        if (acc) accompagnati.push({ nome: nm, gruppo: gr });
+      // il conteggio per gruppo e chi resta solo lo calcola il motore puro
+      const soli = PianoRegole.violazioniAccompagnamento({
+        perNome: perNome,
+        turnoDi: (c) => _pianoTurnoInfo(c),
+        gruppoDi: (c) => {
+          const t = _pianoTurnoInfo(c);
+          return t ? (t.gruppo || '').toUpperCase() : '';
+        },
+        isAccompagnato: (nm, gr) => {
+          const info = _pianoCollabInfo(nm);
+          if (!info) return false;
+          if (info.accompagnamento_settori && _pianoAccompagnamentoDi(info).includes(gr)) return true;
+          const cop = _pianoCoperturaCfg(info);
+          return !!(cop && cop.accompagnato);
+        },
       });
-      accompagnati.forEach((a) => {
-        if ((conta[a.gruppo] || 0) <= 1)
-          avvisi.push({
-            nome: a.nome,
-            testo: 'resta da solo nel gruppo ' + a.gruppo + ' il ' + g + ' ma richiede accompagnamento',
-          });
-      });
+      soli.forEach((a) =>
+        avvisi.push({
+          nome: a.nome,
+          testo: 'resta da solo nel gruppo ' + a.gruppo + ' il ' + g + ' ma richiede accompagnamento',
+        }),
+      );
     }
     return avvisi;
   } catch (e) {
@@ -9896,52 +9855,18 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
     const mappa = {};
     righe.forEach((r) => (mappa[r.data] = r.codice));
     if (codiceNuovo !== undefined) mappa[dstr] = codiceNuovo; // simulazione prima del salvataggio
-    const avvisi = [];
-    const giornoRel = (n) => {
-      const d = new Date(d0);
-      d.setDate(d.getDate() + n);
-      return iso(d);
-    };
-    // riposo minimo tra due turni adiacenti
-    const riposoTra = (codA, codB) => {
-      const t1 = _pianoTurnoInfo(codA);
-      const t2 = _pianoTurnoInfo(codB);
-      if (!t1 || !t2) return null;
-      const fine1 = _pianoOra(t1.ora_fine);
-      const inizio2 = _pianoOra(t2.ora_inizio);
-      if (fine1 == null || inizio2 == null) return null;
-      const fineAbs = t1.oltre23 || fine1 < _pianoOra(t1.ora_inizio) ? 24 + fine1 : fine1;
-      return 24 + inizio2 - fineAbs;
-    };
-    if (minRiposo && mappa[dstr]) {
-      const rPrima = riposoTra(mappa[giornoRel(-1)], mappa[dstr]);
-      if (rPrima != null && rPrima < minRiposo)
-        avvisi.push(
-          'solo ' + rPrima.toFixed(1) + 'h di riposo dopo il turno del giorno prima (minimo ' + minRiposo + 'h)',
-        );
-      const rDopo = riposoTra(mappa[dstr], mappa[giornoRel(1)]);
-      if (rDopo != null && rDopo < minRiposo)
-        avvisi.push(
-          'solo ' + rDopo.toFixed(1) + 'h di riposo prima del turno del giorno dopo (minimo ' + minRiposo + 'h)',
-        );
-    }
-    // idoneita' alla posizione: settori assegnati, regole di gruppo,
-    // solo diurni, turni bloccati (vale per manuale, esigenze e scambi)
+    // la logica riposo/consecutivi/idoneita' vive nel motore puro PianoRegole
     const tNuovo = codiceNuovo !== undefined ? _pianoTurnoInfo(codiceNuovo) : null;
-    if (tNuovo && typeof _pianoIdoneoPerTurno === 'function' && !_pianoIdoneoPerTurno(nome, tNuovo))
-      avvisi.push(
-        'non risulta formato/idoneo per il turno ' +
-          codiceNuovo +
-          ' (settore, regole di gruppo o turni bloccati in Gestione collaboratori)',
-      );
-    // massimo giorni consecutivi (attraversa i confini del mese)
-    if (maxCons && _pianoIsLavoro(mappa[dstr] || '')) {
-      let cons = 1;
-      for (let n = -1; n >= -maxCons - 2 && _pianoIsLavoro(mappa[giornoRel(n)] || ''); n--) cons++;
-      for (let n = 1; n <= maxCons + 2 && _pianoIsLavoro(mappa[giornoRel(n)] || ''); n++) cons++;
-      if (cons > maxCons) avvisi.push(cons + ' giorni di lavoro consecutivi (massimo ' + maxCons + ')');
-    }
-    return avvisi;
+    return PianoRegole.violazioniCella({
+      mappaGiorni: mappa,
+      giorno: dstr,
+      minRiposo: minRiposo,
+      maxCons: maxCons,
+      turnoDi: (c) => _pianoTurnoInfo(c),
+      isLavoro: (c) => _pianoIsLavoro(c),
+      idoneo: tNuovo ? _pianoIdoneoPerTurno(nome, tNuovo) : null,
+      codiceNuovo: codiceNuovo,
+    });
   } catch (e) {
     return [];
   }
