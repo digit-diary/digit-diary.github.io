@@ -843,6 +843,28 @@ async function pianoScriviOreMese(nome) {
   }
 }
 
+// Scrive una cella del piano gestendo il caso "riga gia' presente": puo'
+// succedere quando la riga esiste in un ALTRO settore (coperture) e quindi non
+// e' tra quelle caricate in memoria. In quel caso si aggiorna invece di
+// inserire, cosi' una generazione non si ferma a meta' lavoro.
+async function _pianoInserisciCella(dati) {
+  try {
+    const n = await secPost('piano', dati);
+    return n && n[0] ? n[0] : null;
+  } catch (e) {
+    const msg = (e && (e.message || String(e))) || '';
+    if (!/duplicate key|already exists|23505/i.test(msg)) throw e;
+    const filtro = 'collaboratore=eq.' + encodeURIComponent(dati.collaboratore) + '&data=eq.' + dati.data;
+    const patch = Object.assign({}, dati);
+    delete patch.collaboratore;
+    delete patch.data;
+    patch.updated_at = new Date().toISOString();
+    await secPatch('piano', filtro, patch);
+    const ora = await secGet('piano?' + filtro + '&limit=1');
+    return ora && ora[0] ? ora[0] : null;
+  }
+}
+
 // Carica le righe di un mese per un settore, in modo che SCALI con molti
 // settori. Una query filtrata per il settore corrente, piu' le righe dei
 // collaboratori di ALTRI settori che coprono qui (reparti_extra): di ognuno si
@@ -4614,7 +4636,7 @@ async function pianoAssegnaCgfMese() {
   let fatti = 0;
   try {
     for (const x of daFare) {
-      const nuovo = await secPost('piano', {
+      const nuovo = await _pianoInserisciCella({
         collaboratore: x.nome,
         data: x.data,
         codice: 'CGF',
@@ -5636,7 +5658,7 @@ async function confermaCercaCambioLibero() {
       body.collaboratore = nome;
       body.data = dstr;
       body.reparto_dip = _pianoReparto();
-      await secPost('piano', body);
+      await _pianoInserisciCella(body);
     }
   };
   try {
@@ -6017,7 +6039,7 @@ async function confermaScambioTurno() {
           riga.protetto = true;
           riga.commento = commento;
         } else if (nuovoCod) {
-          const n = await secPost('piano', {
+          const n = await _pianoInserisciCella({
             collaboratore: nomeC,
             data: dataRest,
             codice: nuovoCod,
@@ -6699,7 +6721,7 @@ async function confermaCoperturaMalattia() {
           updated_at: new Date().toISOString(),
         });
       } else {
-        await secPost('piano', {
+        await _pianoInserisciCella({
           collaboratore: m.nome,
           data: dstrDi(d.g),
           codice: 'M',
@@ -6788,7 +6810,7 @@ async function confermaCoperturaMalattia() {
                 updated_at: new Date().toISOString(),
               });
             } else {
-              await secPost('piano', {
+              await _pianoInserisciCella({
                 collaboratore: d.catena.con,
                 data: dstrDi(g1),
                 codice: d.catena.turnoX,
@@ -6814,7 +6836,7 @@ async function confermaCoperturaMalattia() {
             updated_at: new Date().toISOString(),
           });
         } else {
-          await secPost('piano', {
+          await _pianoInserisciCella({
             collaboratore: d.sostituto,
             data: dstrDi(d.g),
             codice: d.codice,
@@ -8955,7 +8977,7 @@ async function _applicaVacanzeMese(interattivo) {
       r.codice = codice;
       r.protetto = protetto;
     } else {
-      const n = await secPost('piano', {
+      const n = await _pianoInserisciCella({
         collaboratore: nome,
         data: dstrDi(g),
         codice: codice,
@@ -8964,7 +8986,7 @@ async function _applicaVacanzeMese(interattivo) {
         reparto_dip: _pianoReparto(),
         operatore: op,
       });
-      if (n && n[0]) perCella[nome + '|' + g] = n[0];
+      if (n) perCella[nome + '|' + g] = n;
     }
     return true;
   };
@@ -9040,7 +9062,7 @@ async function _applicaVacanzeMese(interattivo) {
           nC++;
         }
       } else {
-        await secPost('piano', {
+        await _pianoInserisciCella({
           collaboratore: nome,
           data: dstrP,
           codice: 'C',
@@ -10848,7 +10870,7 @@ async function _pianoNotaRapida(nome, dstr) {
   try {
     if (!r) {
       if (!commento) return;
-      const nuovo = await secPost('piano', {
+      const nuovo = await _pianoInserisciCella({
         collaboratore: nome,
         data: dstr,
         codice: '',
@@ -11414,7 +11436,7 @@ async function pianoSalvaCella(nome, dstr, codice) {
       r.ora_inizio = orarioJG ? orarioJG.ora_inizio : null;
       r.ora_fine = orarioJG ? orarioJG.ora_fine : null;
     } else {
-      const nuovo = await secPost('piano', {
+      const nuovo = await _pianoInserisciCella({
         collaboratore: nome,
         data: dstr,
         codice: codice,
@@ -14844,7 +14866,7 @@ async function miglioraOrePiano() {
           await secPatch('piano', 'id=eq.' + sc.rT.id, { codice: 'C' });
           if (sc.rigaR) await secPatch('piano', 'id=eq.' + sc.rigaR.id, { codice: sc.cod });
           else
-            await secPost('piano', {
+            await _pianoInserisciCella({
               collaboratore: sc.ric,
               data: ym + '-' + String(sc.g).padStart(2, '0'),
               codice: sc.cod,

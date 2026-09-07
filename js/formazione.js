@@ -2398,20 +2398,43 @@ function _dataRifCopertura(entry) {
   return (entry.data || '').substring(0, 10);
 }
 // Eventi copertura/rifiuto già registrati per una specifica assenza
-function eventiCopertura(assente, dataRif) {
+function eventiCopertura(assente, dataRif, dataFine) {
   if (!assente) return [];
-  const dataLabel = dataRif ? new Date(dataRif + 'T12:00:00').toLocaleDateString('it-IT') : '';
   const nomeL = assente.toLowerCase();
+  // Un'assenza puo' durare piu' giorni e la copertura viene registrata sul
+  // giorno effettivamente coperto: si accettano tutti i giorni del periodo,
+  // altrimenti una copertura del secondo giorno risulterebbe inesistente.
+  const etichette = [];
+  if (dataRif) {
+    const d = new Date(dataRif + 'T12:00:00');
+    const fine = dataFine ? new Date(dataFine + 'T12:00:00') : new Date(d);
+    let giri = 0;
+    while (d <= fine && giri < 200) {
+      etichette.push(d.toLocaleDateString('it-IT'));
+      d.setDate(d.getDate() + 1);
+      giri++;
+    }
+  }
+  if (!etichette.length) return [];
   return getPuntiReparto().filter(
     (p) =>
       (p.azione === 'copertura' || p.azione === 'disponibilita_negata') &&
       (p.descrizione || '').toLowerCase().includes(nomeL) &&
-      (p.descrizione || '').includes('del ' + dataLabel),
+      etichette.some((lab) => (p.descrizione || '').includes('del ' + lab)),
   );
+}
+// Periodo di un'assenza letto dal testo: "dal 08/09/2026 al 10/09/2026".
+// Senza periodo scritto vale il giorno della registrazione.
+function _periodoCopertura(entry) {
+  const dal = _dataRifCopertura(entry);
+  const m = (entry.testo || '').match(/al (\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  const al = m ? m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0') : dal;
+  return { dal: dal, al: al };
 }
 // Badge riassuntivo per la riga del diario ("Coperto: X" / "Senza copertura" / rifiuti)
 function badgeCoperturaHtml(entry) {
-  const ev = eventiCopertura(entry.nome, _dataRifCopertura(entry));
+  const per = _periodoCopertura(entry);
+  const ev = eventiCopertura(entry.nome, per.dal, per.al);
   const cop = ev.find((p) => p.azione === 'copertura');
   const rifiuti = ev.filter((p) => p.azione === 'disponibilita_negata').length;
   let h = '';
