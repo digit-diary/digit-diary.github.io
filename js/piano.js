@@ -4733,6 +4733,36 @@ async function confermaScambioTurno() {
       if (av2.length) nota2 = '⚠ ' + av2.join(' · ') + ' · ';
     }
   }
+  // Restituzione: valido lo scambio inverso del giorno di restituzione PRIMA di
+  // applicare qualsiasi cosa, cosi' se l'operatore annulla non e' stato toccato
+  // nulla. Le note vanno poi nei commenti delle celle di restituzione.
+  let notaRa = '';
+  let notaRb = '';
+  if (dataRest && typeof _pianoAvvisaViolazioniCella === 'function') {
+    const raPre = _pianoRighe.find((x) => x.collaboratore === sel.nome && x.data === dataRest);
+    const rbPre = _pianoRighe.find((x) => x.collaboratore === collega && x.data === dataRest);
+    const caPre = raPre ? raPre.codice : '';
+    const cbPre = rbPre ? rbPre.codice : '';
+    const avA = _pianoTurnoInfo(cbPre) ? await _pianoAvvisaViolazioniCella(sel.nome, dataRest, cbPre) : [];
+    const avB = _pianoTurnoInfo(caPre) ? await _pianoAvvisaViolazioniCella(collega, dataRest, caPre) : [];
+    if (avA.length || avB.length) {
+      const det = []
+        .concat(avA.map((a) => sel.nome.split(' ')[0] + ': ' + a))
+        .concat(avB.map((a) => collega.split(' ')[0] + ': ' + a));
+      if (
+        !confirm(
+          '⚠ ATTENZIONE · restituzione del ' +
+            dataRest.split('-').reverse().join('.') +
+            ':\n\n• ' +
+            det.join('\n• ') +
+            "\n\nConfermi comunque tutto lo scambio? La segnalazione restera' scritta nel commento delle celle.",
+        )
+      )
+        return;
+      if (avA.length) notaRa = '⚠ ' + avA.join(' · ') + ' · ';
+      if (avB.length) notaRb = '⚠ ' + avB.join(' · ') + ' · ';
+    }
+  }
   try {
     await secPatch('piano', 'id=eq.' + r1.id, {
       codice: c2,
@@ -4764,8 +4794,8 @@ async function confermaScambioTurno() {
       const rb = _pianoRighe.find((x) => x.collaboratore === collega && x.data === dataRest);
       const ca = ra ? ra.codice : '';
       const cb = rb ? rb.codice : '';
-      const applica = async (riga, nomeC, nuovoCod, exCod, altroNome) => {
-        const commento = 'Ex ' + exCod + ' - restituzione cambio con ' + altroNome + ' - ' + op;
+      const applica = async (riga, nomeC, nuovoCod, exCod, altroNome, notaR) => {
+        const commento = (notaR || '') + 'Ex ' + exCod + ' - restituzione cambio con ' + altroNome + ' - ' + op;
         if (riga) {
           await secPatch('piano', 'id=eq.' + riga.id, {
             codice: nuovoCod,
@@ -4792,8 +4822,8 @@ async function confermaScambioTurno() {
           if (n && n[0]) _pianoRighe.push(n[0]);
         }
       };
-      await applica(ra, sel.nome, cb, ca, collega);
-      await applica(rb, collega, ca, cb, sel.nome);
+      await applica(ra, sel.nome, cb, ca, collega, notaRa);
+      await applica(rb, collega, ca, cb, sel.nome, notaRb);
       logAzione('Piano: restituzione programmata', sel.nome + ' <-> ' + collega + ' il ' + dataRest);
     }
     logAzione('Piano: scambio turno', sel.nome + ' (' + c1 + ') <-> ' + collega + ' (' + c2 + ') il ' + sel.data);
@@ -4985,6 +5015,34 @@ async function cercaSostitutiMalattia() {
     }
     return true;
   };
+  // controllo COMPLETO per la persona n attorno al giorno g0, leggendo la
+  // mappa `cella` gia' simulata: riposo 11h (prima e dopo) E max consecutivi.
+  // Usato dalle mosse a catena per verificare TUTTI i collaboratori toccati.
+  const regolaOkSost = (n, g0) => {
+    const cod0 = cella[n + '|' + g0] || '';
+    const t0 = _pianoTurnoInfo(cod0);
+    if (t0) {
+      const tPrev = _pianoTurnoInfo(cella[n + '|' + (g0 - 1)] || '');
+      if (tPrev) {
+        const fp = _pianoOra(tPrev.ora_fine);
+        const fpAbs = tPrev.oltre23 || fp < _pianoOra(tPrev.ora_inizio) ? 24 + fp : fp;
+        if (24 + _pianoOra(t0.ora_inizio) - fpAbs < minRiposo) return false;
+      }
+      const tNext = _pianoTurnoInfo(cella[n + '|' + (g0 + 1)] || '');
+      if (tNext) {
+        const f0 = _pianoOra(t0.ora_fine);
+        const f0Abs = t0.oltre23 || f0 < _pianoOra(t0.ora_inizio) ? 24 + f0 : f0;
+        if (24 + _pianoOra(tNext.ora_inizio) - f0Abs < minRiposo) return false;
+      }
+    }
+    if (_pianoIsLavoro(cod0)) {
+      let cons = 1;
+      for (let k = g0 - 1; k >= 1 && _pianoIsLavoro(cella[n + '|' + k] || ''); k--) cons++;
+      for (let k = g0 + 1; _pianoIsLavoro(cella[n + '|' + k] || ''); k++) cons++;
+      if (cons > maxCons) return false;
+    }
+    return true;
+  };
   const giorni = [];
   for (let g = da; g <= al; g++) {
     const cod = cella[nome + '|' + g] || '';
@@ -5051,7 +5109,9 @@ async function cercaSostitutiMalattia() {
         const sbloccato = riposoOkSost(x, g, t);
         cella[x + '|' + (g - 1)] = salvaP;
         if (!sbloccato) continue;
-        // opzione 1: SCAMBIO alla pari del giorno prima con un collega
+        // opzione 1: SCAMBIO alla pari del giorno prima con un collega. Dopo
+        // lo scambio si controllano TUTTE le regole (riposo + consecutivi) per
+        // x (giorno prima e giorno della copertura) e per z (giorno prima)
         for (const z of nomi) {
           if (z === x || z === nome) continue;
           const codS = cella[z + '|' + (g - 1)] || '';
@@ -5060,18 +5120,22 @@ async function cercaSostitutiMalattia() {
           if (!_pianoIdoneoPerTurno(x, tS) || !_pianoIdoneoPerTurno(z, tP)) continue;
           const s1 = cella[x + '|' + (g - 1)];
           const s2 = cella[z + '|' + (g - 1)];
+          const sG = cella[x + '|' + g];
           cella[x + '|' + (g - 1)] = codS;
           cella[z + '|' + (g - 1)] = codP;
-          const okX = riposoOkSost(x, g - 1, tS) && riposoOkSost(x, g, t);
-          const okZ = riposoOkSost(z, g - 1, tP);
+          cella[x + '|' + g] = cod; // x copre la malattia il giorno g
+          const ok = regolaOkSost(x, g - 1) && regolaOkSost(x, g) && regolaOkSost(z, g - 1) && regolaOkSost(z, g);
           cella[x + '|' + (g - 1)] = s1;
           cella[z + '|' + (g - 1)] = s2;
-          if (okX && okZ) {
+          cella[x + '|' + g] = sG;
+          if (ok) {
             catena = { tipo: 'scambio', g1: g - 1, turnoX: codP, con: z, turnoCon: codS };
             break;
           }
         }
-        // opzione 2: il turno del giorno prima PASSA a un terzo libero
+        // opzione 2: il turno del giorno prima PASSA a un terzo libero. Si
+        // controllano TUTTE le regole per il terzo (che si carica il turno) e
+        // per x (liberato il giorno prima, che copre il giorno g)
         if (!catena) {
           for (const y of nomi) {
             if (y === x || y === nome) continue;
@@ -5082,10 +5146,20 @@ async function cercaSostitutiMalattia() {
               if (!(csY && csY.is_riposo && !(rY && rY.protetto && codY === 'V'))) continue;
             }
             if (!_pianoIdoneoPerTurno(y, tP)) continue;
-            if (consecFinoA(y, g - 1) >= maxCons) continue;
-            if (!riposoOkSost(y, g - 1, tP)) continue;
-            catena = { tipo: 'riassegna', g1: g - 1, turnoX: codP, con: y, eraCon: cella[y + '|' + (g - 1)] || '' };
-            break;
+            const sy = cella[y + '|' + (g - 1)];
+            const sx1 = cella[x + '|' + (g - 1)];
+            const sxG = cella[x + '|' + g];
+            cella[y + '|' + (g - 1)] = codP; // il terzo prende il turno
+            cella[x + '|' + (g - 1)] = 'C'; // x liberato il giorno prima
+            cella[x + '|' + g] = cod; // x copre la malattia
+            const ok = regolaOkSost(y, g - 1) && regolaOkSost(x, g - 1) && regolaOkSost(x, g);
+            cella[y + '|' + (g - 1)] = sy;
+            cella[x + '|' + (g - 1)] = sx1;
+            cella[x + '|' + g] = sxG;
+            if (ok) {
+              catena = { tipo: 'riassegna', g1: g - 1, turnoX: codP, con: y, eraCon: cella[y + '|' + (g - 1)] || '' };
+              break;
+            }
           }
         }
         if (catena) {
