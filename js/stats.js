@@ -447,8 +447,35 @@ function renderStatistiche() {
       '<p style="color:var(--muted)">Nessun errore registrato</p>';
 }
 function renderChart(id, type, data, opts) {
-  if (charts[id]) charts[id].destroy();
-  charts[id] = new Chart(document.getElementById(id), {
+  // AGGIORNAMENTO SENZA SFARFALLIO: se il grafico c'e' gia' ed e' dello stesso
+  // tipo, si sostituiscono solo i dati. Distruggerlo e ricrearlo faceva sparire
+  // tutto per un istante a ogni cambio di filtro.
+  const el = document.getElementById(id);
+  if (!el) return;
+  const esistente = charts[id];
+  if (
+    esistente &&
+    esistente.config &&
+    esistente.config.type === type &&
+    esistente.canvas === el
+  ) {
+    esistente.data.labels = data.labels;
+    // riuso i dataset gia' disegnati quando sono nello stesso numero
+    if (esistente.data.datasets.length === data.datasets.length) {
+      data.datasets.forEach((ds, i) =>
+        Object.assign(esistente.data.datasets[i], ds),
+      );
+    } else {
+      esistente.data.datasets = data.datasets;
+    }
+    // le opzioni NON si toccano: sono gia' state elaborate da Chart.js e
+    // rifonderle grezze le corrompe. Cambiano solo i dati, che e' quello che
+    // serve quando si cambia il filtro.
+    esistente.update();
+    return;
+  }
+  if (esistente) esistente.destroy();
+  charts[id] = new Chart(el, {
     type,
     data,
     options: Object.assign(
