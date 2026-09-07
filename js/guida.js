@@ -201,6 +201,7 @@ function GUIDA_CAPITOLI() {
         '<b>Turni</b>: orari, ore, tipo diurno o notturno e colore. Sono <b>divisi per settore</b>, quindi due reparti possono usare la stessa sigla senza confondersi.',
         '<b>Codici speciali</b> (V, M, C, CGF, ND, ASS e simili) sono comuni a tutti i settori.',
         '<b>Regole del piano</b>: i valori normativi con accanto <b>la fonte</b> (RAP, direttiva interna 16-007, legge sul lavoro) e la colonna che dice dove vengono applicati. Se domani cambia il regolamento si aggiorna il numero, senza toccare il programma.',
+        'Ogni regola vale per <b>tutti i settori</b>, ma si puo aggiungere un eccezione per uno o piu settori con il pulsante <b>Eccezione per un settore</b> nella colonna "Vale per". Esempio: riposo minimo 11 ore ovunque, ma 12 ore ai Tavoli. La regola specifica vince nel suo settore, la generale continua a valere in tutti gli altri: non serve duplicare le regole settore per settore.',
         '<b>Regole di gruppo</b>: chi puo lavorare in ogni gruppo del proprio settore, con minimi e limiti per funzione.',
       ],
     },
