@@ -511,12 +511,19 @@ function ordineCollabPiano(nomi, reparto) {
 
 // Data di nascita leggibile: se l'anno e' 1900 significa "anno non noto"
 // (import da liste che riportano solo giorno e mese) e si mostra solo gg/mm
-function dataNascitaLabel(d) {
+function dataNascitaLabel(d, conNota) {
   if (!d) return '';
   const dt = new Date(d + 'T12:00:00');
   if (isNaN(dt.getTime())) return '';
   const gg = String(dt.getDate()).padStart(2, '0') + '/' + String(dt.getMonth() + 1).padStart(2, '0');
-  return dt.getFullYear() <= 1900 ? gg : gg + '/' + dt.getFullYear();
+  if (dt.getFullYear() > 1900) return gg + '/' + dt.getFullYear();
+  // anno non indicato (liste compleanni con solo giorno e mese): si dice, cosi'
+  // non sembra un dato incompleto per errore
+  return conNota === false ? gg : gg + ' (anno non indicato)';
+}
+// Solo giorno e mese, per gli elenchi compatti
+function compleannoLabel(d) {
+  return dataNascitaLabel(d, false);
 }
 
 // Importo di una registrazione con segno: per le differenze cassa la
