@@ -4421,7 +4421,7 @@ async function confermaCercaCambioLibero() {
             (tt.gruppo || '') +
             ')'
           : '';
-      const doc = _pdfCambioTurno({
+      const datiPdf = {
         tipo: 'SCAMBIO',
         data: new Date(_ccDati.data + 'T12:00:00').toLocaleDateString('it-IT'),
         a: { nome: _ccDati.nome, settore: repartoLabel(_pianoReparto()), turno: _ccDati.codice, orari: fmtOra(t) },
@@ -4438,8 +4438,10 @@ async function confermaCercaCambioLibero() {
             ' di ' +
             cand.nome.split(' ')[0]
           : null,
-      });
+      };
+      const doc = _pdfCambioTurno(datiPdf);
       mostraPdfPreview(doc, 'cambio_turno_' + _ccDati.data + '.pdf', 'Cambio turno ' + _ccDati.data);
+      await _salvaFoglioCambio(datiPdf, _ccDati.nome, _ccDati.data);
     }
     toast('Cambio applicato' + (rInfo ? ' con restituzione' : ''));
     _ccDati = null;
@@ -4450,6 +4452,47 @@ async function confermaCercaCambioLibero() {
   }
 }
 
+// Il foglio del cambio resta ARCHIVIATO (tabella moduli, tipo cambio_turno):
+// si ristampa in qualsiasi momento dal menu della cella
+async function _salvaFoglioCambio(datiPdf, collaboratore, dataCambio) {
+  try {
+    const rec = {
+      tipo: 'cambio_turno',
+      collaboratore: collaboratore,
+      data_modulo: dataCambio,
+      dati: datiPdf,
+      operatore: getOperatore(),
+      reparto_dip: _pianoReparto(),
+    };
+    const saved = await secPost('moduli', rec);
+    if (saved && saved[0] && typeof moduliCache !== 'undefined') moduliCache.unshift(saved[0]);
+  } catch (e) {
+    console.error('archivio foglio cambio', e);
+  }
+}
+async function ristampaFoglioCambio(nome, dstr) {
+  try {
+    const tutti = (await secGet('moduli?tipo=eq.cambio_turno&data_modulo=eq.' + dstr + '&limit=50')) || [];
+    const miei = tutti
+      .filter(
+        (m) =>
+          !m.eliminato &&
+          m.dati &&
+          ((m.dati.a && m.dati.a.nome === nome) || (m.dati.b && m.dati.b.nome === nome) || m.collaboratore === nome),
+      )
+      .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+    if (!miei.length) {
+      toast('Nessun foglio cambio archiviato per ' + nome.split(' ')[0] + ' in questa data');
+      return;
+    }
+    if (!window.jspdf) await caricaJsPDF();
+    const doc = _pdfCambioTurno(miei[0].dati);
+    mostraPdfPreview(doc, 'cambio_turno_' + dstr + '.pdf', 'Cambio turno ' + dstr);
+  } catch (e) {
+    console.error(e);
+    toast('Errore ristampa foglio');
+  }
+}
 // ---- Scambio turno tra colleghi (come Turnivo cap. 19) ----
 async function apriScambioTurno() {
   const sel = _pianoCellaSel;
@@ -4663,7 +4706,7 @@ async function confermaScambioTurno() {
             (t.gruppo || '') +
             ')'
           : '';
-      const doc = _pdfCambioTurno({
+      const datiPdf = {
         tipo: 'SCAMBIO',
         data: new Date(sel.data + 'T12:00:00').toLocaleDateString('it-IT'),
         a: { nome: sel.nome, settore: repartoLabel(_pianoReparto()), turno: c1, orari: fmtOra(t1) },
@@ -4672,8 +4715,10 @@ async function confermaScambioTurno() {
         richiesto: getOperatore(),
         autorizzato: true,
         restituzione: dataRest ? new Date(dataRest + 'T12:00:00').toLocaleDateString('it-IT') : null,
-      });
+      };
+      const doc = _pdfCambioTurno(datiPdf);
       mostraPdfPreview(doc, 'cambio_turno_' + sel.data + '.pdf', 'Cambio turno ' + sel.data);
+      await _salvaFoglioCambio(datiPdf, sel.nome, sel.data);
     }
     renderPiano();
   } catch (e) {
@@ -4995,13 +5040,14 @@ async function confermaCoperturaMalattia() {
     // punti incentivo (azione 'copertura' della sezione Formazione)
     if (typeof _insertPuntiEvento === 'function' && typeof getPuntiConfig === 'function') {
       const az = (getPuntiConfig().azioni || []).find((a) => a.key === 'copertura');
+      const dataLbl = new Date(ym + '-' + String(m.da).padStart(2, '0') + 'T12:00:00').toLocaleDateString('it-IT');
       if (az)
         for (const n of sostituti)
           await _insertPuntiEvento(
             n,
             az.punti,
             'copertura',
-            'Copertura malattia di ' + m.nome + ' (' + m.da + '-' + m.al + ' ' + ym + ')',
+            'Copertura malattia di ' + m.nome + ' del ' + dataLbl + ' (giorni ' + m.da + '-' + m.al + ' ' + ym + ')',
           );
     }
     logAzione(
@@ -5016,6 +5062,10 @@ async function confermaCoperturaMalattia() {
         ' sostituzioni' +
         (sostituti.size ? ', punti assegnati' : ''),
     );
+    // popup incentivi come per la malattia dal rapporto: i sostituti hanno
+    // gia' i punti (compaiono in "Gia' registrato"), qui si segnano i rifiuti
+    if (typeof apriPopupCopertura === 'function')
+      setTimeout(() => apriPopupCopertura(m.nome, ym + '-' + String(m.da).padStart(2, '0')), 500);
     _malattiaPiano = null;
     _pianoViolCelle = {};
     _pianoViolLista = null;
@@ -8208,6 +8258,7 @@ async function pdfCambioTurnoVuoto() {
     b: { nome: linea, settore: '', turno: '_____', orari: '' },
     motivo: linea + '___________________',
     richiesto: '',
+    restituzione: '____/____/________  con turno _________',
   });
   mostraPdfPreview(doc, 'cambio_turno_vuoto.pdf', 'Formulario cambio turno');
 }
@@ -8668,6 +8719,7 @@ function mostraPianoCtx(e, nome, dstr) {
   );
   h += voce('Cambia turno con...', 'icx-refresh', "pianoCtxAzione('scambio')", puoMod && !!haTurno);
   h += voce('Cerca cambio · giorno libero', 'icx-cerca', "pianoCtxAzione('liberogiorno')", puoMod && !!haTurno);
+  h += voce('Ristampa foglio cambio', 'icx-stampa', "pianoCtxAzione('ristampaCambio')", puoMod);
   h += voce('Cambio per esigenze', 'icx-settings', "pianoCtxAzione('esigenze')", puoMod && !!haTurno);
   h += voce('Rimuovi cella', 'icx-cestino', "pianoCtxAzione('rimuovi')", puoMod && !!r);
   h += voce('Copia cella', 'icx-modifica', "pianoCtxAzione('copia')", !!r);
@@ -8807,7 +8859,8 @@ function pianoCtxAzione(azione) {
   } else if (azione === 'liberogiorno') {
     _pianoCellaSel = { nome: sel.nome, data: sel.data };
     apriCercaCambioLibero();
-  } else if (azione === 'esigenze') apriCambioEsigenze(sel.nome, sel.data);
+  } else if (azione === 'ristampaCambio') ristampaFoglioCambio(sel.nome, sel.data);
+  else if (azione === 'esigenze') apriCambioEsigenze(sel.nome, sel.data);
   else if (azione === 'copia') {
     const r2 = _pianoRighe.find((x) => x.collaboratore === sel.nome && x.data === sel.data);
     if (r2) navigator.clipboard.writeText(r2.codice).then(() => toast('Copiato: ' + r2.codice));
@@ -8889,6 +8942,10 @@ async function confermaCambioEsigenze() {
     r.protetto = true;
     logAzione('Piano: cambio per esigenze', sel.nome + ' ' + sel.data + ': ' + vecchio + ' -> ' + nuovo);
     toast('Turno cambiato: ' + vecchio + ' -> ' + nuovo);
+    // incentivi: chi accetta il cambio prende i punti "Cambio turno
+    // accettato", chi ha rifiutato si segna nello stesso popup
+    if (typeof apriPopupCopertura === 'function')
+      setTimeout(() => apriPopupCopertura(sel.nome, sel.data, 'cambio'), 400);
     // niente formulario: e' una decisione dell'operatore, basta il commento
     renderPiano();
   } catch (e) {
