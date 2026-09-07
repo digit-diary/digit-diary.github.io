@@ -930,6 +930,43 @@ async function eliminaModulo(id) {
 }
 
 // GESTIONE COLLABORATORI
+// Salva data di nascita o inizio contratto dalla riga di Gestione collaboratori.
+// Sono i due dati da cui dipendono compleanni, anzianita, giubilei e giorni di
+// vacanza: si correggono qui, dove sta l'anagrafica, e si leggono nella scheda.
+async function cambiaDataCollaboratore(id, campo, valore) {
+  if (campo !== 'data_nascita' && campo !== 'data_assunzione') return;
+  const c = (collaboratoriCache || []).find((x) => x.id === id);
+  const etichetta = campo === 'data_nascita' ? 'Data di nascita' : 'Inizio contratto';
+  const val = valore || null;
+  if (
+    c &&
+    c[campo] &&
+    !confirm(
+      etichetta +
+        ' di ' +
+        c.nome +
+        ':\n\nda ' +
+        String(c[campo]).substring(0, 10).split('-').reverse().join('.') +
+        '\na ' +
+        (val ? val.split('-').reverse().join('.') : 'nessuna data') +
+        '\n\nConfermi la modifica?',
+    )
+  ) {
+    renderCollaboratoriUI();
+    return;
+  }
+  try {
+    const patch = {};
+    patch[campo] = val;
+    await secPatch('collaboratori', 'id=eq.' + id, patch);
+    if (c) c[campo] = val;
+    logAzione(etichetta + ' modificata', (c ? c.nome : id) + ': ' + (val || 'tolta'));
+    toast(etichetta + ' aggiornata');
+  } catch (e) {
+    toast('Errore nel salvataggio');
+    renderCollaboratoriUI();
+  }
+}
 async function renderCollaboratoriUI() {
   const section = document.getElementById('collab-section');
   if (!section) return;
@@ -1029,7 +1066,19 @@ async function renderCollaboratoriUI() {
           c.id +
           ',this.value)" style="' +
           selStyle +
-          ';width:76px">'
+          ';width:76px"><input type="date" value="' +
+          (c.data_nascita ? String(c.data_nascita).substring(0, 10) : '') +
+          '" title="Data di nascita: serve per il compleanno nel piano" onchange="cambiaDataCollaboratore(' +
+          c.id +
+          ',\'data_nascita\',this.value)" style="' +
+          selStyle +
+          ';width:132px"><input type="date" value="' +
+          (c.data_assunzione ? String(c.data_assunzione).substring(0, 10) : '') +
+          '" title="Inizio contratto: serve per anzianita, giubilei e giorni di vacanza" onchange="cambiaDataCollaboratore(' +
+          c.id +
+          ',\'data_assunzione\',this.value)" style="' +
+          selStyle +
+          ';width:132px">'
         : '') +
       (adminFull
         ? '<select onchange="cambiaRepartoCollaboratore(' +

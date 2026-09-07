@@ -4961,6 +4961,11 @@ async function pianoRecuperoScrivi(nome, dstr, valore) {
     toast('Non hai il permesso di modificare il piano');
     return false;
   }
+  const _info = _pianoCollabInfo(nome) || {};
+  if (_info.is_jolly || _info.impiego === 'jolly') {
+    toast('Gli ausiliari non hanno ore dovute: nessun recupero da registrare');
+    return false;
+  }
   const chiave = nome + '|' + dstr;
   const att = _pianoRecupero[chiave];
   // si accetta sia il decimale (1.5) sia l'orologio (1:30): un'ora e mezza si
@@ -5053,6 +5058,10 @@ function _pianoRecuperoTotaliGenerali() {
     netto +
     'h</b>';
 }
+function pianoRecuperoOrdina(campo) {
+  window._pianoRecuperoOrdine = campo;
+  renderPiano();
+}
 async function _renderPianoRecuperoTab() {
   const ym = _pianoMeseSel;
   await _pianoCaricaRecupero(ym);
@@ -5062,12 +5071,30 @@ async function _renderPianoRecuperoTab() {
   const GG3 = ['DOM', 'LUN', 'MAR', 'MER', 'GIO', 'VEN', 'SAB'];
   const MESI_L = typeof MESI_FULL !== 'undefined' ? MESI_FULL : [];
   const puoMod = puoGestirePiano() || isAdmin();
-  const nomi = ordineCollabPiano(
-    collaboratoriCache.filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c)).map((c) => c.nome),
+  // SOLO PERSONALE FISSO: gli ausiliari non hanno ore dovute, quindi non esiste
+  // uno scostamento dal turno da recuperare. Le loro ore si contano su quelle
+  // effettivamente lavorate (RAP Allegato 1).
+  let nomi = ordineCollabPiano(
+    collaboratoriCache
+      .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && !(c.is_jolly || c.impiego === 'jolly'))
+      .map((c) => c.nome),
     _pianoReparto(),
   );
+  // ordinamento scelto dall'operatore (resta finche' non lo cambia)
+  const _ord = window._pianoRecuperoOrdine || 'nome';
+  if (_ord === 'totale') {
+    nomi = nomi.slice().sort((a5, b5) => _pianoRecuperoTotale(a5, ym) - _pianoRecuperoTotale(b5, ym));
+  } else if (_ord === 'percentuale') {
+    nomi = nomi
+      .slice()
+      .sort(
+        (a5, b5) =>
+          (parseFloat((_pianoCollabInfo(b5) || {}).percentuale) || 1) -
+            (parseFloat((_pianoCollabInfo(a5) || {}).percentuale) || 1) || a5.localeCompare(b5),
+      );
+  }
   let h =
-    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">Recupero ore &middot; ' +
+    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">Recupero ore &middot; personale fisso &middot; ' +
     (MESI_L[parseInt(ym.split('-')[1]) - 1] || ym) +
     ' ' +
     ym.split('-')[0] +
@@ -5079,9 +5106,32 @@ async function _renderPianoRecuperoTab() {
     return h;
   }
   h +=
+    '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">' +
+    '<span style="font-size:.85rem;color:var(--muted)">Ordina per</span>' +
+    '<select onchange="pianoRecuperoOrdina(this.value)" style="padding:5px 9px;font-size:.85rem;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--ink)">' +
+    [
+      ['nome', 'Nome'],
+      ['totale', 'Totale del mese'],
+      ['percentuale', 'Percentuale'],
+    ]
+      .map(
+        (o) =>
+          '<option value="' +
+          o[0] +
+          '"' +
+          ((window._pianoRecuperoOrdine || 'nome') === o[0] ? ' selected' : '') +
+          '>' +
+          o[1] +
+          '</option>',
+      )
+      .join('') +
+    '</select>' +
+    '<input type="text" class="piano-cerca" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-recupero-table\')">' +
+    '</div>';
+  h +=
     '<div style="overflow-x:auto"><table id="piano-recupero-table" class="piano-table" style="width:' +
-    (210 + 46 * nGiorni + 90) +
-    'px"><thead><tr><th class="piano-nome" style="width:210px">Collaboratore</th>';
+    (270 + 46 * nGiorni + 90) +
+    'px"><thead><tr><th class="piano-nome" style="width:210px">Collaboratore</th><th style="width:60px" title="Percentuale d impiego: le ore dovute si calcolano su questa">%</th>';
   for (let g = 1; g <= nGiorni; g++) {
     const dstr = ym + '-' + String(g).padStart(2, '0');
     const dow = new Date(dstr + 'T12:00:00').getDay();
@@ -5096,7 +5146,15 @@ async function _renderPianoRecuperoTab() {
   }
   h += '<th style="width:90px" title="Somma degli scostamenti del mese">Totale</th></tr></thead><tbody>';
   nomi.forEach((nome) => {
-    h += '<tr data-nome="' + escP(nome) + '"><td class="piano-nome" style="text-align:left">' + escP(nome) + '</td>';
+    const _infoR = _pianoCollabInfo(nome) || {};
+    h +=
+      '<tr data-nome="' +
+      escP(nome) +
+      '"><td class="piano-nome" style="text-align:left">' +
+      escP(nome) +
+      '</td><td style="color:var(--muted)">' +
+      Math.round((parseFloat(_infoR.percentuale) || 1) * 100) +
+      '%</td>';
     for (let g = 1; g <= nGiorni; g++) {
       const dstr = ym + '-' + String(g).padStart(2, '0');
       const r = _pianoRecupero[nome + '|' + dstr];
@@ -5323,9 +5381,9 @@ function _renderPianoFestivitaCard() {
     cfg.oraTardi +
     ':00</b> il ' +
     cfg.giorniTardi.map((g) => GG[g]).join(' e il ') +
-    '. Nei giorni di festivita si chiude alle <b>' +
+    '. <b>La notte prima di un giorno di festa</b> si chiude alle <b>' +
     cfg.oraTardi +
-    ':00</b> anche in mezzo alla settimana, e il <b>31 dicembre</b> alle <b>' +
+    ':00</b> anche in mezzo alla settimana, perche e quella la sera in cui la gente esce; il <b>31 dicembre</b> si chiude alle <b>' +
     cfg.oraFineAnno +
     ':00</b>. Quei giorni compaiono nel calendario con il marcatore <b>CH' +
     cfg.oraTardi +
@@ -5347,10 +5405,19 @@ function _renderPianoFestivitaCard() {
   } else {
     h +=
       '<div style="overflow-x:auto"><table class="piano-table" style="min-width:560px"><thead><tr>' +
-      '<th style="text-align:left">Data</th><th>Giorno</th><th style="text-align:left">Festivita</th><th title="Cosa compare in cima alla colonna nel calendario">Nel piano</th><th>Chiusura</th><th></th></tr></thead><tbody>';
+      '<th style="text-align:left">Data</th><th>Giorno</th><th style="text-align:left">Festivita</th><th title="Il giorno prima della festa: e quella la notte in cui si chiude piu tardi">Si chiude tardi il</th><th title="Cosa compare in cima alla colonna del calendario, quel giorno">Nel piano</th><th></th></tr></thead><tbody>';
     righe.forEach((f) => {
       const d = String(f.data).substring(0, 10);
-      const ch = _pianoChiusuraGiorno(d);
+      // il marcatore si mette la VIGILIA, cioe' il giorno prima della festa
+      const vig = new Date(d + 'T12:00:00');
+      vig.setDate(vig.getDate() - 1);
+      const dVig =
+        vig.getFullYear() +
+        '-' +
+        String(vig.getMonth() + 1).padStart(2, '0') +
+        '-' +
+        String(vig.getDate()).padStart(2, '0');
+      const ch = _pianoChiusuraGiorno(dVig);
       const spento = f.attivo === false;
       h +=
         '<tr style="' +
@@ -5361,14 +5428,29 @@ function _renderPianoFestivitaCard() {
         GG[new Date(d + 'T12:00:00').getDay()] +
         '</td><td style="text-align:left;font-weight:600">' +
         escP(f.nome) +
+        '</td><td' +
+        (spento
+          ? ''
+          : ' title="notte fra il ' +
+            dVig.split('-').reverse().join('.') +
+            ' e il ' +
+            d.split('-').reverse().join('.') +
+            '"') +
+        '>' +
+        (spento
+          ? '-'
+          : GG[new Date(dVig + 'T12:00:00').getDay()] +
+            ' ' +
+            dVig.split('-').reverse().join('.') +
+            ' &middot; ' +
+            ch.ora +
+            ':00') +
         '</td><td>' +
         (spento
           ? '<span style="color:var(--muted)">spenta</span>'
           : ch.marcatore
             ? '<b style="background:#8b4a8b;color:#fff;padding:2px 8px;border-radius:2px">' + ch.marcatore + '</b>'
-            : '<span style="color:var(--muted)" title="quel giorno si chiude gia tardi: non serve segnalarlo">-</span>') +
-        '</td><td>' +
-        (spento ? '-' : ch.ora + ':00') +
+            : '<span style="color:var(--muted)" title="quella notte si chiude gia tardi per prassi: non serve segnalarlo">-</span>') +
         '</td><td style="white-space:nowrap"><button class="btn-act" style="font-size:.82rem" onclick="pianoFestivitaToggle(' +
         f.id +
         ')">' +
