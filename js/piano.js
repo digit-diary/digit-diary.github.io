@@ -324,8 +324,17 @@ function _pianoOreDiRiga(r, pct) {
     if (e != null && u != null) return Math.round((u >= e ? u - e : 24 + u - e) * 100) / 100;
   }
   const cs = _pianoCodiceInfo(r.codice);
-  if (cs && parseFloat(cs.ore) > 0)
-    return cs.scala_percentuale ? (parseFloat(cs.ore) || 0) * (pct || 1) : parseFloat(cs.ore) || 0;
+  if (cs && parseFloat(cs.ore) > 0) {
+    if (!cs.scala_percentuale) return parseFloat(cs.ore) || 0;
+    // AUSILIARI (jolly): non hanno una percentuale contrattuale. Quella scritta
+    // in scheda serve solo da indicazione per la generazione del piano, quindi
+    // NON deve ridurre il valore delle assenze: per loro si conta il valore
+    // pieno, e le indennita' (vacanze, tredicesima) si calcolano in percentuale
+    // sulle ore lavorate (RAP Allegato 1).
+    const infoR = r && r.collaboratore ? _pianoCollabInfo(r.collaboratore) : null;
+    if (infoR && (infoR.is_jolly || infoR.impiego === 'jolly')) return parseFloat(cs.ore) || 0;
+    return (parseFloat(cs.ore) || 0) * (pct || 1);
+  }
   return 0;
 }
 function _pianoColore(codice) {
@@ -2581,6 +2590,9 @@ async function eseguiCancellaPiano(tutto) {
 // Fonte normativa di ogni regola: si legge accanto al valore, cosi' chi la
 // modifica sa da dove viene (RAP, direttiva interna, legge sul lavoro)
 const PIANO_REGOLE_FONTE = {
+  jolly_indennita_vacanze_4sett: 'RAP Allegato 1: indennita vacanze 8.33% (4 settimane) sul salario orario',
+  jolly_indennita_vacanze_5sett: 'RAP Allegato 1: indennita vacanze 10.65% (5 settimane) sul salario orario',
+  jolly_indennita_tredicesima: 'RAP Allegato 1: tredicesima 8.33% sul salario orario',
   notte_inizio: 'RAP Allegato 1 (personale ausiliario) · fascia notturna di legge',
   notte_fine: 'RAP Allegato 1 (personale ausiliario) · fascia notturna di legge',
   notte_percentuale: 'RAP Allegato 1: 10% del tempo di lavoro notturno come tempo libero pagato',
@@ -2595,6 +2607,9 @@ const PIANO_REGOLE_FONTE = {
   tolleranza_ore_sopra: 'RAP 3.1: max 45 ore in alta stagione',
 };
 const PIANO_REGOLE_DOVE = {
+  jolly_indennita_vacanze_4sett: 'Statistiche anno (colonna Ore lavorate ausiliari)',
+  jolly_indennita_vacanze_5sett: 'Statistiche anno (colonna Ore lavorate ausiliari)',
+  jolly_indennita_tredicesima: 'Statistiche anno (colonna Ore lavorate ausiliari)',
   notte_inizio: 'Statistiche anno (colonna Notte 10%)',
   notte_fine: 'Statistiche anno (colonna Notte 10%)',
   notte_percentuale: 'Statistiche anno (colonna Notte 10%)',
@@ -4277,6 +4292,34 @@ function _pianoNotteRecupero(oreNotturne) {
   const p = parseFloat(_pianoRegolaVal('notte_percentuale'));
   const perc = !isNaN(p) && p > 0 ? p : 10;
   return Math.round((((oreNotturne || 0) * perc) / 100) * 100) / 100;
+}
+// INDENNITA' DEGLI AUSILIARI (RAP Allegato 1): si calcolano in percentuale
+// sulle ore effettivamente lavorate, perche' gli ausiliari non hanno una
+// percentuale contrattuale. Percentuali modificabili dalle regole.
+function _pianoIndennitaJolly(oreLavorate) {
+  const v4 = parseFloat(_pianoRegolaVal('jolly_indennita_vacanze_4sett'));
+  const v5 = parseFloat(_pianoRegolaVal('jolly_indennita_vacanze_5sett'));
+  const t13 = parseFloat(_pianoRegolaVal('jolly_indennita_tredicesima'));
+  const pV4 = !isNaN(v4) ? v4 : 8.33;
+  const pV5 = !isNaN(v5) ? v5 : 10.65;
+  const pT = !isNaN(t13) ? t13 : 8.33;
+  const h = (p) => Math.round(((oreLavorate * p) / 100) * 100) / 100;
+  return (
+    Math.round(oreLavorate * 10) / 10 +
+    'h lavorate · vacanze ' +
+    pV4 +
+    '% = ' +
+    h(pV4) +
+    'h (con 5 settimane ' +
+    pV5 +
+    '% = ' +
+    h(pV5) +
+    'h) · tredicesima ' +
+    pT +
+    '% = ' +
+    h(pT) +
+    'h'
+  );
 }
 function _pianoFestivoParificato(fest) {
   if (!fest) return false;
@@ -7162,6 +7205,7 @@ async function caricaStatisticheAnnoPiano() {
       cgfPersi: 0,
       sup50: 0,
       oreNotte: 0,
+      oreLav: 0,
     });
     const dow = new Date(r.data + 'T12:00:00').getDay();
     const info = _pianoCollabInfo(r.collaboratore) || {};
@@ -7185,6 +7229,8 @@ async function caricaStatisticheAnnoPiano() {
       // ore di lavoro notturno degli ausiliari: il 10% matura come tempo
       // libero pagato (RAP Allegato 1)
       if (!_pianoMaturaCgf(info)) o.oreNotte += _pianoOreNotturneTurno(t);
+      // ore realmente lavorate: base per le indennita' degli ausiliari
+      o.oreLav += _pianoOreEffettiveTurno(t, r);
     } else if (cs) {
       if (r.codice === 'V' || r.codice === 'V1') o.v++;
       if (r.codice === 'M' || r.codice === 'M1') o.m++;
@@ -7209,7 +7255,7 @@ async function caricaStatisticheAnnoPiano() {
   h +=
     '<div style="padding:4px 0"><input type="text" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-statanno-table\')" style="padding:4px 8px;font-size:.8rem;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--ink);width:180px"></div>';
   h +=
-    '<div style="overflow-x:auto"><table id="piano-statanno-table" class="piano-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Ore anno</th><th title="Sui mesi con un piano">Ore dovute</th><th>Giorni lavorati</th><th>Diurni</th><th>Notturni</th><th>Weekend</th><th>Domeniche</th><th>Vacanze</th><th>Malattie</th><th title="Festivi lavorati che danno diritto al recupero (solo personale fisso)">CGF maturati</th><th title="Giorni CGF effettivamente goduti (quelli caduti in malattia non contano)">CGF goduti</th><th title="Maturati − goduti: quanti recuperi restano da dare">Saldo CGF</th><th title="Festivi parificati alle domeniche lavorati dagli ausiliari (jolly): danno diritto al supplemento del 50% sul salario orario lordo (RAP Allegato 1). Sono nove giorni fissi e valgono anche di domenica">Suppl. 50%</th><th title="Ore lavorate nella fascia notturna (23:00-06:00). Il supplemento del 10% e gia compreso nella durata dei turni: questa colonna serve da controllo, non e un credito da dare a parte">Ore notte</th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table id="piano-statanno-table" class="piano-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Ore anno</th><th title="Sui mesi con un piano">Ore dovute</th><th>Giorni lavorati</th><th>Diurni</th><th>Notturni</th><th>Weekend</th><th>Domeniche</th><th>Vacanze</th><th>Malattie</th><th title="Festivi lavorati che danno diritto al recupero (solo personale fisso)">CGF maturati</th><th title="Giorni CGF effettivamente goduti (quelli caduti in malattia non contano)">CGF goduti</th><th title="Maturati − goduti: quanti recuperi restano da dare">Saldo CGF</th><th title="Festivi parificati alle domeniche lavorati dagli ausiliari (jolly): danno diritto al supplemento del 50% sul salario orario lordo (RAP Allegato 1). Sono nove giorni fissi e valgono anche di domenica">Suppl. 50%</th><th title="Ore lavorate nella fascia notturna (23:00-06:00). Il supplemento del 10% e gia compreso nella durata dei turni: questa colonna serve da controllo, non e un credito da dare a parte">Ore notte</th><th title="Solo ausiliari (jolly): ore effettivamente lavorate nell anno e indennita calcolate su quel totale secondo il RAP Allegato 1 (vacanze 8.33% con 4 settimane o 10.65% con 5, tredicesima 8.33%). I jolly non hanno una percentuale contrattuale: tutto si calcola sulle ore fatte">Ore lavorate · indennita</th></tr></thead><tbody>';
   ordineCollabPiano(Object.keys(st), _pianoReparto()).forEach((n) => {
     const o = st[n];
     h +=
@@ -7267,6 +7313,12 @@ async function caricaStatisticheAnnoPiano() {
         : '') +
       '">' +
       (o.oreNotte ? Math.round(o.oreNotte * 10) / 10 + 'h' : '') +
+      '</td><td style="font-weight:700;color:' +
+      (!_pianoMaturaCgf(info) && o.oreLav ? '#8b6914' : 'var(--muted)') +
+      '" title="' +
+      (!_pianoMaturaCgf(info) && o.oreLav ? _pianoIndennitaJolly(o.oreLav) : '') +
+      '">' +
+      (!_pianoMaturaCgf(info) && o.oreLav ? Math.round(o.oreLav * 10) / 10 + 'h' : '') +
       '</td></tr>';
   });
   h += '</tbody></table></div>';
