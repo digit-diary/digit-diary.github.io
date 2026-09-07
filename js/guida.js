@@ -231,6 +231,17 @@ function GUIDA_CAPITOLI() {
     },
     {
       area: 'piano',
+      titolo: 'Piano: festivita e orari di chiusura (CH5 e CH7)',
+      righe: [
+        'Il casino chiude alle <b>04:00</b> nei giorni feriali e alle <b>05:00</b> il venerdi e il sabato. Nei giorni di <b>festivita</b> si chiude alle 05:00 anche in mezzo alla settimana, e il <b>31 dicembre</b> alle 07:00.',
+        'Nel calendario quei giorni portano in cima alla colonna il marcatore viola <b>CH5</b> (o CH7), cosi si sa in anticipo dove serve piu personale. Il marcatore <b>non</b> compare il venerdi e il sabato, perche li si chiude tardi per prassi e segnalarlo sarebbe rumore.',
+        'L elenco si gestisce nella scheda <b>Festivi</b>, riquadro "Festivita e orari di chiusura": un bottone inserisce le festivita dell anno (per il 2026 e il 2027 gli elenchi forniti dalla direzione, per gli altri anni le dodici festivita italiane di legge con Pasqua calcolata), e ogni riga si puo spegnere o eliminare. Se ne possono aggiungere altre a mano.',
+        'Gli orari (4, 5, 7 e i giorni che chiudono tardi) sono <b>regole modificabili</b> nella scheda Regole: chiusura_ora_normale, chiusura_ora_tardi, chiusura_ora_fine_anno, chiusura_giorni_tardi.',
+        'Attenzione a non confondere: i <b>festivi cantonali</b> (stessa scheda, riquadro sopra) servono ad altro, cioe al recupero <b>CGF</b> dei fissi e al supplemento del 50% degli ausiliari. La lista cantonale segue la legge ticinese del 15 dicembre 2009 e coincide con il calendario ufficiale del Cantone: undici feste fisse piu quattro mobili calcolate da Pasqua.',
+      ],
+    },
+    {
+      area: 'piano',
       titolo: 'Regole e Festivi: chi puo vederli',
       righe: [
         'Le schede <b>Regole</b> e <b>Festivi</b> del piano erano riservate agli amministratori e per gli altri restavano vuote, senza spiegazione.',
