@@ -35,6 +35,8 @@ async function loadAll() {
     repPag,
     giubCfg,
     giubPre,
+    consAnni,
+    consGrazia,
   ] = await Promise.all([
     getImp('tipi_personalizzati'),
     getImp('colori_override'),
@@ -60,6 +62,8 @@ async function loadAll() {
     getImp('reparti_pagine'),
     getImp('giubileo_config'),
     getImp('giubileo_preavviso'),
+    getImp('conservazione_anni'),
+    getImp('conservazione_giorni_grazia'),
   ]);
   if (tp)
     try {
@@ -151,6 +155,9 @@ async function loadAll() {
       if (Array.isArray(gc)) giubileoConfig = gc;
     } catch (e) {}
   if (giubPre != null && giubPre !== '' && !isNaN(parseInt(giubPre))) giubileoPreavviso = parseInt(giubPre);
+  if (consAnni != null && consAnni !== '' && !isNaN(parseInt(consAnni))) conservazioneAnniCfg = parseInt(consAnni);
+  if (consGrazia != null && consGrazia !== '' && !isNaN(parseInt(consGrazia)))
+    conservazioneGraziaCfg = parseInt(consGrazia);
   try {
     const cmr = await getImp('campi_rapporto_reparti');
     if (cmr) campiReparti = JSON.parse(cmr);

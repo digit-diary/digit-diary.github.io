@@ -165,6 +165,19 @@ async function ripristinaCestino(tabella, id) {
   }
 }
 async function eliminaDefinitivo(tabella, id) {
+  // CONSERVAZIONE (regolamento aziendale / RAP): un record dell'archivio degli
+  // ultimi N anni non si cancella. Restano eliminabili le voci inserite da poco
+  // (correzioni di battitura), che archivio non sono.
+  const rec = tabella === 'moduli' ? _cestinoModuli.find((x) => x.id === id) : _cestinoReg.find((x) => x.id === id);
+  const dataRec = rec ? rec.data || rec.data_modulo || rec.created_at : null;
+  if (typeof inArchivioProtetto === 'function' && dataRec && inArchivioProtetto(dataRec)) {
+    alert(
+      "Non si puo' eliminare definitivamente.\n\nQuesta voce fa parte dell'archivio da conservare per " +
+        conservazioneAnni() +
+        " anni (regolamento aziendale).\n\nResta nel Cestino e si puo' ripristinare in qualsiasi momento.",
+    );
+    return;
+  }
   if (!confirm('Eliminare DEFINITIVAMENTE? Non potrà essere recuperato.')) return;
   try {
     await secDel(tabella, 'id=eq.' + id);
@@ -183,19 +196,59 @@ async function svuotaCestino() {
     toast('Cestino già vuoto');
     return;
   }
-  if (!confirm('Svuotare il cestino? ' + tot + ' elementi verranno eliminati DEFINITIVAMENTE.')) return;
+  // CONSERVAZIONE: si svuota solo cio' che NON e' archivio protetto; le voci
+  // degli ultimi N anni restano nel Cestino e si possono sempre ripristinare
+  const protetto = (r) =>
+    typeof inArchivioProtetto === 'function' && inArchivioProtetto(r.data || r.data_modulo || r.created_at);
+  const modOk = _cestinoModuli.filter((m) => !protetto(m));
+  const regOk = _cestinoReg.filter((r) => !protetto(r));
+  const nProt = tot - modOk.length - regOk.length;
+  if (!modOk.length && !regOk.length) {
+    alert(
+      'Niente da svuotare.\n\nTutte le ' +
+        tot +
+        " voci nel Cestino fanno parte dell'archivio da conservare per " +
+        conservazioneAnni() +
+        ' anni (regolamento aziendale): restano disponibili e si possono ripristinare.',
+    );
+    return;
+  }
+  if (
+    !confirm(
+      'Svuotare il cestino? ' +
+        (modOk.length + regOk.length) +
+        ' element' +
+        (modOk.length + regOk.length === 1 ? 'o verra' : 'i verranno') +
+        ' eliminat' +
+        (modOk.length + regOk.length === 1 ? 'o' : 'i') +
+        ' DEFINITIVAMENTE.' +
+        (nProt
+          ? '\n\n' +
+            nProt +
+            " voci NON vengono toccate: fanno parte dell'archivio da conservare per " +
+            conservazioneAnni() +
+            ' anni.'
+          : ''),
+    )
+  )
+    return;
   try {
-    for (const m of _cestinoModuli) {
+    for (const m of modOk) {
       await secDel('moduli', 'id=eq.' + m.id);
     }
-    for (const r of _cestinoReg) {
+    for (const r of regOk) {
       await secDel('registrazioni', 'id=eq.' + r.id);
     }
-    logAzione('Cestino svuotato', tot + ' elementi eliminati definitivamente');
-    _cestinoModuli = [];
-    _cestinoReg = [];
+    logAzione(
+      'Cestino svuotato',
+      modOk.length + regOk.length + ' elementi eliminati definitivamente' + (nProt ? ', ' + nProt + ' protetti' : ''),
+    );
+    const idsM = new Set(modOk.map((m) => m.id));
+    const idsR = new Set(regOk.map((r) => r.id));
+    _cestinoModuli = _cestinoModuli.filter((m) => !idsM.has(m.id));
+    _cestinoReg = _cestinoReg.filter((r) => !idsR.has(r.id));
     renderCestino();
-    toast('Cestino svuotato');
+    toast('Cestino svuotato' + (nProt ? ' (' + nProt + ' voci protette restano)' : ''));
   } catch (e) {
     toast('Errore svuotamento');
   }

@@ -212,7 +212,12 @@ let valutazioniCache = [],
   repartiConfig = null, // settori personalizzati [{key,label,colore,attivo}] · null = default valet+cleaning
   repartiPagineCfg = null, // pagine visibili per settore {repKey:{maison:false,...}} · assente = tutte
   giubileoConfig = null, // premio giubileo [{anni,importo}] · null = default 5/10/15/20/25/30 anni
-  giubileoPreavviso = 60; // giorni di preavviso notifica giubileo a HR (0 = disattivata)
+  giubileoPreavviso = 60, // giorni di preavviso notifica giubileo a HR (0 = disattivata)
+  // CONSERVAZIONE DATI (regolamento aziendale / RAP): anni minimi in cui i dati
+  // del personale NON possono essere cancellati definitivamente. 0 = protezione
+  // spenta. La finestra di grazia lascia correggere quanto inserito da poco.
+  conservazioneAnniCfg = 5,
+  conservazioneGraziaCfg = 30;
 let currentReparto = 'slots',
   operatoriRepartoMap = {};
 function nomeCorrente(orig) {

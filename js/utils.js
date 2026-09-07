@@ -448,6 +448,35 @@ function _getNascitaValue(id) {
   return _parseDataNascita(el.value);
 }
 
+// ===== CONSERVAZIONE DEI DATI (regolamento aziendale / RAP) =====
+// I dati del personale vanno conservati per un numero minimo di anni. La
+// cancellazione definitiva di un record che rientra nell'archivio protetto
+// viene bloccata; restano possibili le correzioni di quanto inserito da poco
+// (errori di battitura), che non sono "archivio".
+function conservazioneAnni() {
+  const v = typeof conservazioneAnniCfg !== 'undefined' ? parseInt(conservazioneAnniCfg) : NaN;
+  return !isNaN(v) && v >= 0 ? v : 5; // default: 5 anni
+}
+// Giorni entro i quali un record e' considerato "appena inserito" e si puo'
+// ancora eliminare davvero (correzione), configurabile, default 30 giorni.
+function conservazioneGiorniGrazia() {
+  const v = typeof conservazioneGraziaCfg !== 'undefined' ? parseInt(conservazioneGraziaCfg) : NaN;
+  return !isNaN(v) && v >= 0 ? v : 30;
+}
+// true = il record e' nell'archivio protetto e NON va eliminato definitivamente
+function inArchivioProtetto(dataRecord) {
+  const anni = conservazioneAnni();
+  if (!anni) return false; // protezione disattivata
+  const d = new Date(dataRecord);
+  if (isNaN(d.getTime())) return true; // data illeggibile: si protegge per prudenza
+  const oggi = new Date();
+  const eta = (oggi - d) / 86400000; // giorni
+  if (eta < conservazioneGiorniGrazia()) return false; // inserito da poco: correzione ammessa
+  const limite = new Date(oggi);
+  limite.setFullYear(limite.getFullYear() - anni);
+  return d >= limite; // dentro la finestra dei N anni = protetto
+}
+
 // ORDINE UNICO dei collaboratori in tutto il programma = ordine della lista
 // del piano (supervisori in alto, poi back office, fissi, jolly). Per chi non
 // e' nell'ordine salvato: gruppo per funzione e poi alfabetico.

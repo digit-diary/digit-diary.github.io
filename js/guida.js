@@ -294,6 +294,7 @@ function GUIDA_CAPITOLI() {
         'In <b>Impostazioni → Stato del sistema</b> il bottone <b>Controlla il sistema</b> verifica i dati e dice cosa non torna: impiego mancante, nomi con turni ma senza scheda, disattivati che hanno ancora turni, festivi dell anno prossimo, schede di prova rimaste.',
         'Da li partono due strumenti: <b>Assegna l impiego adesso</b>, che compila fisso o jolly per tutti quelli che non ce l hanno, e <b>Sistema questi nomi</b>, che crea la scheda mancante, sposta i turni sul collaboratore giusto oppure elimina le righe che non sono persone.',
         'Il <b>Registro</b> elenca chi ha modificato cosa e quando. I dati eliminati restano nel <b>Cestino</b> e si recuperano.',
+        'CONSERVAZIONE: il regolamento aziendale impone di tenere i dati del personale per almeno <b>5 anni</b>. Le voci che rientrano nell archivio non si possono eliminare definitivamente: restano nel Cestino e si ripristinano quando serve. Si possono invece cancellare davvero le voci inserite da poco (correzione di errori di battitura). Anni e finestra di correzione si impostano in Impostazioni, sezione Conservazione dei dati.',
         'La legge impone di conservare piani e registrazioni degli orari per <b>cinque anni</b>: gli archivi non vanno svuotati prima.',
       ],
     },
