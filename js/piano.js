@@ -138,6 +138,7 @@ async function _pianoCaricaCfg() {
     corsiOrari,
     ggFormazione,
     cdConfig,
+    evidCfg,
   ] = await Promise.all([
     secGet('piano_turni?order=ordine.asc&limit=500'),
     secGet('piano_codici?order=codice.asc&limit=200'),
@@ -155,12 +156,18 @@ async function _pianoCaricaCfg() {
     getImp('piano_corsi_orari'),
     getImp('piano_giorni_formazione'),
     getImp('piano_cd_config'),
+    getImp('brief_evidenziazioni'),
   ]);
   pianoRegoleGruppoCache = regoleGruppo || [];
   try {
     window._pianoCompGruppiCfg = compGruppi ? JSON.parse(compGruppi) : null;
   } catch (e) {
     window._pianoCompGruppiCfg = null;
+  }
+  try {
+    window._briefEvidCfg = evidCfg ? JSON.parse(evidCfg) : {};
+  } catch (e) {
+    window._briefEvidCfg = {};
   }
   window._pianoMaxCambiCfg = parseInt(maxCambi) || 0;
   try {
@@ -10252,6 +10259,32 @@ function _briefGruppo(cod) {
 function _briefOrarioHM(s) {
   return s ? String(s).substring(0, 5) : '';
 }
+// EVIDENZIAZIONI DAL PIANO AL BRIEFING
+// Regole per settore: una cella colorata nel piano puo' arrivare sul briefing
+// con un ALTRO colore e un'etichetta (es. valet: coordinatore segnato in rosso
+// nel piano, sul foglio del briefing si vede verde). Configurabili dalla tab
+// Briefing. Impostazione 'brief_evidenziazioni':
+//   { valet: [ { da:'#FF6B6B', a:'#95E06C', label:'Coordinatore' } ] }
+function _briefEvidenziazioni(rep) {
+  const cfg = window._briefEvidCfg || {};
+  const lista = cfg[rep || _pianoReparto()];
+  return Array.isArray(lista) ? lista : [];
+}
+function _briefColoreDaPiano(colorePiano) {
+  if (!colorePiano) return '';
+  const su = String(colorePiano).toUpperCase();
+  const reg = _briefEvidenziazioni().find((x) => String(x.da || '').toUpperCase() === su);
+  if (reg) return reg.a || colorePiano;
+  // senza regole configurate il valet mantiene il comportamento di sempre
+  // (il colore del piano arriva tale e quale); gli altri settori no
+  return _pianoReparto() === 'valet' ? colorePiano : '';
+}
+function _briefEtichettaColore(coloreBriefing) {
+  if (!coloreBriefing) return '';
+  const su = String(coloreBriefing).toUpperCase();
+  const reg = _briefEvidenziazioni().find((x) => String(x.a || '').toUpperCase() === su);
+  return reg && reg.label ? reg.label : '';
+}
 function _briefComponi(pianoRighe) {
   const righe = [];
   (pianoRighe || []).forEach((r) => {
@@ -10293,10 +10326,11 @@ function _briefComponi(pianoRighe) {
       radio: '',
       badge: '',
       fm: /formazion|affianc/i.test(r.commento || '') || undefined,
-      // SOLO VALET: il colore dato alla cella del PIANO (es. X1 rosso =
-      // coordinatore) arriva anche sul briefing; negli altri reparti il
-      // colore riga si mette solo a mano col quadratino
-      col: (_pianoReparto() === 'valet' && r.colore && _stileCella(r.colore).c) || undefined,
+      // Il colore dato alla cella del PIANO arriva sul briefing. Con le
+      // "evidenziazioni" configurate (Briefing → Evidenziazioni dal piano) un
+      // colore del piano puo' diventarne un altro sul briefing: es. valet,
+      // coordinatore segnato in rosso nel piano che sul foglio si vede verde.
+      col: (r.colore && _briefColoreDaPiano(_stileCella(r.colore).c)) || undefined,
     });
   });
   // cognomi uguali di persone diverse (es. BIANCHI Milena e BIANCHI Chiara):
@@ -10853,6 +10887,7 @@ async function _renderPianoBriefingTab() {
   h += '</tbody></table></div></div>';
   h += '</div></div>';
   h += _briefRenderPauseCard();
+  h += _briefRenderEvidCard();
   return h;
 }
 function briefCambiaData(delta) {
@@ -11318,6 +11353,96 @@ async function briefCompila() {
   if (!_briefIsValet() && _pianoReparto() === 'slots') await _briefAssegnaCd(_briefState.righe, _briefData);
   clearTimeout(_briefSaveTimer);
   await briefSalvaBriefing();
+  renderPiano();
+}
+// Card di configurazione delle evidenziazioni: quale colore messo nel PIANO
+// diventa quale colore sul BRIEFING, con un'etichetta che dice cosa significa
+function _briefRenderEvidCard() {
+  if (!puoGestireBriefing()) return '';
+  const rep = _pianoReparto();
+  const lista = _briefEvidenziazioni(rep);
+  const opz = (sel, cb) =>
+    PIANO_COLORI_CELLA.map(
+      (c) =>
+        '<option value="' +
+        c +
+        '"' +
+        (String(sel).toUpperCase() === c.toUpperCase() ? ' selected' : '') +
+        ' style="background:' +
+        c +
+        '">' +
+        c +
+        '</option>',
+    ).join('');
+  let h =
+    '<div class="main-card" style="margin-top:14px"><div class="card-header">Evidenziazioni dal piano · ' +
+    escP(repartoLabel(rep)) +
+    '</div><div style="padding:12px 14px">' +
+    '<p style="font-size:.85rem;color:var(--muted);margin-bottom:8px">Quando una cella del piano ha un colore, sul briefing il nome di quella persona si evidenzia. Qui si decide <b>con quale colore</b> e <b>che cosa significa</b>: per esempio nel valet il coordinatore si segna in rosso sul piano e sul foglio del briefing appare in verde.</p>';
+  if (!lista.length)
+    h += '<p style="font-size:.85rem;color:var(--muted)">Nessuna evidenziazione configurata per questo settore.</p>';
+  lista.forEach((ev, i) => {
+    h +=
+      '<div class="tipo-item"><span style="font-size:.85rem">nel piano</span> <select onchange="briefEvidSalva(' +
+      i +
+      ',\'da\',this.value)" style="padding:3px;background:' +
+      escP(ev.da || '') +
+      '">' +
+      opz(ev.da) +
+      '</select> <span style="font-size:.85rem">sul briefing diventa</span> <select onchange="briefEvidSalva(' +
+      i +
+      ',\'a\',this.value)" style="padding:3px;background:' +
+      escP(ev.a || '') +
+      '">' +
+      opz(ev.a) +
+      '</select> <input type="text" value="' +
+      escP(ev.label || '') +
+      '" placeholder="Significato (es. Coordinatore)" onchange="briefEvidSalva(' +
+      i +
+      ',\'label\',this.value)" style="flex:1;min-width:150px;padding:4px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"> <button class="btn-del-tipo" onclick="briefEvidRimuovi(' +
+      i +
+      ')">Rimuovi</button></div>';
+  });
+  h +=
+    '<button class="btn-add-tipo" style="margin-top:8px" onclick="briefEvidAggiungi()">+ Aggiungi evidenziazione</button>';
+  h += '</div></div>';
+  return h;
+}
+async function _briefEvidPersisti(rep, lista) {
+  const cfg = window._briefEvidCfg || {};
+  cfg[rep] = lista;
+  window._briefEvidCfg = cfg;
+  await setImp('brief_evidenziazioni', JSON.stringify(cfg));
+}
+async function briefEvidAggiungi() {
+  if (!puoGestireBriefing()) return;
+  const rep = _pianoReparto();
+  const lista = _briefEvidenziazioni(rep).slice();
+  lista.push({ da: PIANO_COLORI_CELLA[0], a: PIANO_COLORI_CELLA[3], label: '' });
+  await _briefEvidPersisti(rep, lista);
+  toast('Evidenziazione aggiunta');
+  renderPiano();
+}
+async function briefEvidSalva(i, campo, val) {
+  if (!puoGestireBriefing()) return;
+  const rep = _pianoReparto();
+  const lista = _briefEvidenziazioni(rep).slice();
+  if (!lista[i]) return;
+  lista[i][campo] = String(val || '').trim();
+  await _briefEvidPersisti(rep, lista);
+  logAzione('Briefing: evidenziazione', rep + ' ' + (lista[i].label || '') + ' ' + lista[i].da + ' -> ' + lista[i].a);
+  toast('Evidenziazione aggiornata');
+  renderPiano();
+}
+async function briefEvidRimuovi(i) {
+  if (!puoGestireBriefing()) return;
+  const rep = _pianoReparto();
+  const lista = _briefEvidenziazioni(rep).slice();
+  if (!lista[i]) return;
+  if (!confirm('Rimuovere questa evidenziazione?')) return;
+  lista.splice(i, 1);
+  await _briefEvidPersisti(rep, lista);
+  toast('Evidenziazione rimossa');
   renderPiano();
 }
 function _briefRenderPauseCard() {
