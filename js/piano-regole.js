@@ -176,5 +176,101 @@
     return true;
   }
 
-  return { oraNum, riposoOre, violazioniCella, violazioniAccompagnamento, idoneoPerTurno };
+  // ===== INDICE DI BENESSERE =====
+  // Misura, su dati oggettivi del piano, quanto e' sostenibile il carico di una
+  // persona. Non giudica la persona: fotografa come e' distribuito il lavoro.
+  // Le malattie NON tolgono punti (non sono una colpa): si mostrano a parte
+  // come segnale da leggere insieme al resto.
+  //
+  // dati: {
+  //   domenicheLibere, domenicheTot,   // riposo domenicale
+  //   weekendLavorati, weekendMediaSettore,
+  //   notti, giorniLavorati,
+  //   riposiIsolati,                   // riposo di UN solo giorno tra due periodi di lavoro
+  //   serieMax,                        // giorni consecutivi piu' lunga serie
+  //   vacanzeGiorni,
+  //   cambiRitmo                       // passaggi notte->giorno ravvicinati
+  // }
+  // soglie: { domenicheAnno, maxConsecutivi, vacanzeAnno }
+  // Ritorna { punteggio 0-100, voci: [{nome, punti, max, valore, nota}] }
+  function indiceBenessere(dati, soglie) {
+    const s = soglie || {};
+    const domObiettivo = s.domenicheAnno || 12;
+    const maxCons = s.maxConsecutivi || 5;
+    const vacObiettivo = s.vacanzeAnno || 20;
+    const clamp = (v) => Math.max(0, Math.min(1, v));
+    const voci = [];
+    // 1) DOMENICHE LIBERE (25): diritto al riposo domenicale
+    const dom = clamp((dati.domenicheLibere || 0) / domObiettivo);
+    voci.push({
+      nome: 'Domeniche libere',
+      punti: Math.round(dom * 25),
+      max: 25,
+      valore: (dati.domenicheLibere || 0) + ' su ' + domObiettivo + ' attese',
+      nota: dom >= 1 ? 'nella norma' : 'sotto il minimo previsto',
+    });
+    // 2) EQUITA' WEEKEND (20): quanto si discosta dalla media del settore
+    let eqW = 1;
+    if (dati.weekendMediaSettore > 0) {
+      const scarto = (dati.weekendLavorati - dati.weekendMediaSettore) / dati.weekendMediaSettore;
+      eqW = clamp(1 - Math.max(0, scarto) / 0.5); // +50% sulla media = 0 punti
+    }
+    voci.push({
+      nome: 'Equita nei weekend',
+      punti: Math.round(eqW * 20),
+      max: 20,
+      valore:
+        (dati.weekendLavorati || 0) + ' weekend (media settore ' + Math.round(dati.weekendMediaSettore || 0) + ')',
+      nota: eqW >= 0.8 ? 'in linea col settore' : 'piu carico della media',
+    });
+    // 3) CARICO NOTTURNO (15): quota di notti sui giorni lavorati
+    const quotaN = dati.giorniLavorati > 0 ? (dati.notti || 0) / dati.giorniLavorati : 0;
+    const notti = clamp(1 - Math.max(0, quotaN - 0.3) / 0.4); // oltre il 30% inizia a pesare
+    voci.push({
+      nome: 'Carico notturno',
+      punti: Math.round(notti * 15),
+      max: 15,
+      valore:
+        (dati.notti || 0) + ' notti su ' + (dati.giorniLavorati || 0) + ' giorni (' + Math.round(quotaN * 100) + '%)',
+      nota: quotaN <= 0.3 ? 'sostenibile' : 'quota notturna elevata',
+    });
+    // 4) QUALITA' DEL RIPOSO (15): i riposi isolati recuperano poco
+    const isolati = clamp(1 - (dati.riposiIsolati || 0) / 8);
+    voci.push({
+      nome: 'Qualita del riposo',
+      punti: Math.round(isolati * 15),
+      max: 15,
+      valore: (dati.riposiIsolati || 0) + ' riposi di un solo giorno',
+      nota: (dati.riposiIsolati || 0) <= 2 ? 'riposi ben raggruppati' : 'troppi riposi isolati',
+    });
+    // 5) SERIE DI LAVORO (15): giorni consecutivi
+    const serie = clamp(1 - Math.max(0, (dati.serieMax || 0) - maxCons) / 3);
+    voci.push({
+      nome: 'Giorni consecutivi',
+      punti: Math.round(serie * 15),
+      max: 15,
+      valore: 'serie piu lunga: ' + (dati.serieMax || 0) + ' giorni (limite ' + maxCons + ')',
+      nota: (dati.serieMax || 0) <= maxCons ? 'entro il limite' : 'oltre il limite',
+    });
+    // 6) VACANZE GODUTE (10): staccare davvero
+    const vac = clamp((dati.vacanzeGiorni || 0) / vacObiettivo);
+    voci.push({
+      nome: 'Vacanze godute',
+      punti: Math.round(vac * 10),
+      max: 10,
+      valore: (dati.vacanzeGiorni || 0) + ' giorni',
+      nota: vac >= 0.8 ? 'stacca regolarmente' : 'ha goduto poche vacanze',
+    });
+    const punteggio = voci.reduce((s2, v) => s2 + v.punti, 0);
+    return { punteggio: punteggio, voci: voci };
+  }
+
+  return {
+    oraNum,
+    riposoOre,
+    violazioniCella,
+    violazioniAccompagnamento,
+    idoneoPerTurno,
+    indiceBenessere,
+  };
 });

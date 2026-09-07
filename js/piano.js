@@ -568,6 +568,11 @@ const _PIANO_TABS = [
     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M11 2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12h.5a.5.5 0 0 1 0 1H.5a.5.5 0 0 1 0-1H1v-3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3h1V7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v7h1zm1 12h2V2h-2zm-3 0V7H7v7zm-5 0v-3H2v3z"/></svg>',
   ],
   [
+    'benessere',
+    'Benessere',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="m8 2.748-.717-.737C5.6.281 2.514.878 1.4 3.053c-.523 1.023-.641 2.5.314 4.385.92 1.815 2.834 3.989 6.286 6.357 3.452-2.368 5.365-4.542 6.286-6.357.955-1.886.838-3.362.314-4.385C13.486.878 10.4.28 8.717 2.01zM8 15C-7.333 4.868 3.279-3.04 7.824 1.143q.09.083.176.171a3 3 0 0 1 .176-.17C12.72-3.042 23.333 4.867 8 15"/></svg>',
+  ],
+  [
     'storico',
     'Storico',
     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M5 10.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5m0-2a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m0-2a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m0-2a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5"/><path d="M3 0h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2v-1h1v1a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v1H1V2a2 2 0 0 1 2-2"/><path d="M1 5v-.5a.5.5 0 0 1 1 0V5h.5a.5.5 0 0 1 0 1h-2a.5.5 0 0 1 0-1zm0 3v-.5a.5.5 0 0 1 1 0V8h.5a.5.5 0 0 1 0 1h-2a.5.5 0 0 1 0-1zm0 3v-.5a.5.5 0 0 1 1 0v.5h.5a.5.5 0 0 1 0 1h-2a.5.5 0 0 1 0-1z"/></svg>',
@@ -597,7 +602,7 @@ function pianoCambiaTab(t) {
 // Le 13 tab raggruppate in 3 famiglie: si trova tutto a colpo d'occhio
 const PIANO_TAB_GRUPPI = [
   ['Giornata', ['calendario', 'briefing']],
-  ['Gestione', ['vacanze', 'saldo', 'timbrature', 'statistiche', 'storico', 'formulari']],
+  ['Gestione', ['vacanze', 'saldo', 'timbrature', 'statistiche', 'benessere', 'storico', 'formulari']],
   ['Configurazione', ['turni', 'regole', 'festivi', 'impostazioni', 'guida']],
 ];
 function _pianoTabBar() {
@@ -1495,6 +1500,8 @@ async function renderPiano() {
       h += '<div id="piano-config">' + _renderPianoFestiviCard() + '</div>';
     } else if (_pianoTab === 'timbrature') {
       h += '<div id="piano-config">' + _renderPianoTimbratureCard() + '</div>';
+    } else if (_pianoTab === 'benessere') {
+      h += '<div id="piano-config">' + _renderPianoBenessereCard() + '</div>';
     } else if (_pianoTab === 'statistiche') {
       h += '<div id="piano-config">' + _renderPianoStatCard() + '</div>';
     } else if (_pianoTab === 'saldo') {
@@ -1534,6 +1541,8 @@ async function renderPiano() {
       _pianoApplicaNascosti();
     }
     if (_pianoTab === 'briefing') _briefSelezioneBind();
+    if (_pianoTab === 'benessere' && typeof caricaBenesserePiano === 'function')
+      setTimeout(() => caricaBenesserePiano(), 60);
     if (_pianoTab === 'statistiche' && typeof caricaStatisticheAnnoPiano === 'function')
       setTimeout(() => caricaStatisticheAnnoPiano(), 50);
     if (_pianoTab === 'statistiche' && typeof caricaConfrontoAnniPiano === 'function')
@@ -3560,6 +3569,222 @@ async function pianoCorreggiDurateNotte() {
     renderPiano();
   } catch (e) {
     toast('Errore: aggiornati ' + fatti + ' su ' + lista.length);
+  }
+}
+// ===== BENESSERE DEI COLLABORATORI =====
+// Fotografia oggettiva di come e' distribuito il carico di lavoro nell'anno,
+// separata tra personale fisso e ausiliario perche' hanno regole diverse.
+// Il punteggio (0-100) lo calcola il motore PianoRegole.indiceBenessere: qui
+// si raccolgono solo i dati dal piano.
+function _renderPianoBenessereCard() {
+  return (
+    '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px">Benessere · ' +
+    escP(repartoLabel(_pianoReparto())) +
+    ' ' +
+    escP(_pianoMeseSel.split('-')[0]) +
+    '<button class="btn-act pin" onclick="pianoBenessereAnno(-1)">&larr;</button><button class="btn-act pin" onclick="pianoBenessereAnno(1)">&rarr;</button>' +
+    '</div><div style="padding:10px 14px" id="piano-benessere-body"><p style="color:var(--muted);font-size:.85rem">Caricamento...</p></div></div>'
+  );
+}
+function pianoBenessereAnno(d) {
+  window._pianoBenessereAnno = (window._pianoBenessereAnno || parseInt(_pianoMeseSel.split('-')[0])) + d;
+  caricaBenesserePiano();
+}
+async function caricaBenesserePiano() {
+  const el = document.getElementById('piano-benessere-body');
+  if (!el) return;
+  const anno = window._pianoBenessereAnno || parseInt(_pianoMeseSel.split('-')[0]);
+  el.innerHTML = '<p style="color:var(--muted);font-size:.85rem">Calcolo del ' + anno + ' in corso...</p>';
+  try {
+    const righe =
+      (await secGet(
+        'piano?data=gte.' +
+          anno +
+          '-01-01&data=lte.' +
+          anno +
+          '-12-31&reparto_dip=eq.' +
+          _pianoReparto() +
+          '&limit=40000',
+      )) || [];
+    const nomi = collaboratoriCache
+      .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && c.funzione !== 'RESP')
+      .map((c) => c.nome);
+    // dati per persona
+    const per = {};
+    nomi.forEach((n) => (per[n] = { giorni: {}, lav: 0, notti: 0, we: 0, vac: 0, mal: 0, domLib: 0, oreLav: 0 }));
+    righe.forEach((r) => {
+      const p = per[r.collaboratore];
+      if (!p) return;
+      p.giorni[r.data] = r.codice;
+    });
+    const domeniche = {};
+    for (let m = 0; m < 12; m++) {
+      const ultimo = new Date(anno, m + 1, 0).getDate();
+      for (let g = 1; g <= ultimo; g++) {
+        const d = new Date(anno, m, g);
+        if (d.getDay() === 0)
+          domeniche[
+            d.getFullYear() +
+              '-' +
+              String(d.getMonth() + 1).padStart(2, '0') +
+              '-' +
+              String(d.getDate()).padStart(2, '0')
+          ] = true;
+      }
+    }
+    const oggiIso = new Date().toISOString().substring(0, 10);
+    nomi.forEach((n) => {
+      const p = per[n];
+      const date = Object.keys(p.giorni).sort();
+      let serie = 0;
+      p.serieMax = 0;
+      p.riposiIsolati = 0;
+      date.forEach((d, i) => {
+        const cod = p.giorni[d];
+        const t = _pianoTurnoInfo(cod);
+        if (t) {
+          p.lav++;
+          p.oreLav += _pianoOreEffettiveTurno(t, { codice: cod });
+          if (t.tipo === 'NOTTURNO') p.notti++;
+          const dow = new Date(d + 'T12:00:00').getDay();
+          if (dow === 0 || dow === 6) p.we++;
+          serie++;
+          if (serie > p.serieMax) p.serieMax = serie;
+        } else {
+          serie = 0;
+          if (cod === 'V') p.vac++;
+          if (cod === 'M' || cod === 'M1') p.mal++;
+          // riposo isolato: lavoro il giorno prima E il giorno dopo
+          const prima = _pianoTurnoInfo(p.giorni[date[i - 1]]);
+          const dopo = _pianoTurnoInfo(p.giorni[date[i + 1]]);
+          const cs = _pianoCodiceInfo(cod);
+          if (cs && cs.is_riposo && prima && dopo) p.riposiIsolati++;
+        }
+      });
+      // domeniche libere: solo quelle gia' passate, per non contare il futuro
+      Object.keys(domeniche).forEach((d) => {
+        if (d > oggiIso) return;
+        const cod = p.giorni[d];
+        if (!_pianoTurnoInfo(cod)) p.domLib++;
+      });
+    });
+    const conPiano = nomi.filter((n) => per[n].lav > 0);
+    const mediaWe = conPiano.length ? conPiano.reduce((s, n) => s + per[n].we, 0) / conPiano.length : 0;
+    const soglie = {
+      domenicheAnno: parseInt(_pianoRegolaVal('domeniche_libere_anno')) || 12,
+      maxConsecutivi: parseInt(_pianoRegolaVal('max_consecutivi')) || 5,
+      vacanzeAnno: parseInt(_pianoRegolaVal('vacanze_giorni_anno')) || 20,
+    };
+    const calcolati = conPiano
+      .map((n) => {
+        const p = per[n];
+        const info = _pianoCollabInfo(n) || {};
+        const res = PianoRegole.indiceBenessere(
+          {
+            domenicheLibere: p.domLib,
+            weekendLavorati: p.we,
+            weekendMediaSettore: mediaWe,
+            notti: p.notti,
+            giorniLavorati: p.lav,
+            riposiIsolati: p.riposiIsolati,
+            serieMax: p.serieMax,
+            vacanzeGiorni: p.vac,
+          },
+          soglie,
+        );
+        return { nome: n, jolly: !!(info.is_jolly || info.impiego === 'jolly'), p: p, res: res };
+      })
+      .sort((a, b) => a.res.punteggio - b.res.punteggio);
+    if (!calcolati.length) {
+      el.innerHTML = '<p style="font-size:.85rem">Nessun piano nel ' + anno + ' per questo settore.</p>';
+      return;
+    }
+    const colore = (v) => (v >= 75 ? '#2c6e49' : v >= 55 ? '#b8860b' : '#c0392b');
+    const etichetta = (v) => (v >= 75 ? 'buono' : v >= 55 ? "da tenere d'occhio" : 'critico');
+    const tabella = (lista, titolo) => {
+      if (!lista.length) return '';
+      const media = Math.round(lista.reduce((s, x) => s + x.res.punteggio, 0) / lista.length);
+      let t =
+        '<p style="font-size:.85rem;font-weight:700;margin:14px 0 6px">' +
+        titolo +
+        ' <span style="font-weight:400;color:var(--muted)">· ' +
+        lista.length +
+        ' persone, media ' +
+        '<b style="color:' +
+        colore(media) +
+        '">' +
+        media +
+        '/100</b></span></p>';
+      t +=
+        '<div style="overflow-x:auto"><table class="piano-table" style="min-width:820px;font-size:.85rem"><thead><tr>' +
+        '<th style="text-align:left">Collaboratore</th><th title="Punteggio complessivo, 100 = carico ben distribuito">Indice</th>' +
+        '<th title="Domeniche libere gia trascorse quest anno">Dom. libere</th><th title="Sabati e domeniche lavorati">Weekend</th>' +
+        '<th title="Turni notturni sul totale dei giorni lavorati">Notti</th><th title="Riposi di un solo giorno tra due periodi di lavoro">Riposi isolati</th>' +
+        '<th title="Serie piu lunga di giorni consecutivi">Serie max</th><th>Vacanze</th>' +
+        '<th title="Giorni di malattia: segnale da leggere, non tolgono punti">Malattie</th><th>Ore lavorate</th></tr></thead><tbody>';
+      lista.forEach((x) => {
+        t +=
+          '<tr title="' +
+          escP(x.res.voci.map((v) => v.nome + ': ' + v.punti + '/' + v.max + ' (' + v.valore + ')').join(' · ')) +
+          '"><td style="text-align:left;font-weight:600">' +
+          escP(x.nome) +
+          '</td><td style="font-weight:700;color:' +
+          colore(x.res.punteggio) +
+          '">' +
+          x.res.punteggio +
+          ' <span style="font-weight:400;font-size:.78rem">' +
+          etichetta(x.res.punteggio) +
+          '</span></td><td>' +
+          x.p.domLib +
+          '</td><td>' +
+          x.p.we +
+          '</td><td>' +
+          x.p.notti +
+          '</td><td' +
+          (x.p.riposiIsolati > 2 ? ' style="color:#c0392b;font-weight:700"' : '') +
+          '>' +
+          x.p.riposiIsolati +
+          '</td><td' +
+          (x.p.serieMax > soglie.maxConsecutivi ? ' style="color:#c0392b;font-weight:700"' : '') +
+          '>' +
+          x.p.serieMax +
+          '</td><td>' +
+          x.p.vac +
+          '</td><td' +
+          (x.p.mal > 20 ? ' style="color:#b8860b;font-weight:700"' : '') +
+          '>' +
+          x.p.mal +
+          '</td><td>' +
+          Math.round(x.p.oreLav) +
+          'h</td></tr>';
+      });
+      t += '</tbody></table></div>';
+      return t;
+    };
+    let h =
+      '<p style="font-size:.82rem;color:var(--muted);margin-bottom:6px">Come e distribuito il carico di lavoro nel ' +
+      anno +
+      ', su dati del piano. L indice va da 0 a 100 e pesa: domeniche libere (25), equita nei weekend (20), carico notturno (15), qualita del riposo (15), giorni consecutivi (15), vacanze godute (10). ' +
+      'Le <b>malattie non tolgono punti</b>: sono un segnale da leggere insieme al resto, non una colpa. Passa il mouse su una riga per il dettaglio dei punti.</p>';
+    h += tabella(
+      calcolati.filter((x) => !x.jolly),
+      'Personale fisso',
+    );
+    h += tabella(
+      calcolati.filter((x) => x.jolly),
+      'Personale ausiliario (jolly)',
+    );
+    const critici = calcolati.filter((x) => x.res.punteggio < 55);
+    if (critici.length)
+      h +=
+        '<p style="font-size:.85rem;margin-top:12px;padding:8px 10px;background:#fdecea;border-left:3px solid #c0392b;border-radius:2px"><b>Da guardare per primi:</b> ' +
+        escP(critici.map((x) => x.nome.split(' ')[0] + ' (' + x.res.punteggio + ')').join(', ')) +
+        '</p>';
+    el.innerHTML = h;
+  } catch (e) {
+    console.error(e);
+    el.innerHTML =
+      '<p style="color:var(--accent);font-size:.85rem">Errore nel calcolo: ' + escP(e.message || '') + '</p>';
   }
 }
 function _renderPianoTurniCard() {

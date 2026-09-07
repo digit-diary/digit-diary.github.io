@@ -231,6 +231,18 @@ function GUIDA_CAPITOLI() {
     },
     {
       area: 'piano',
+      titolo: 'Piano: benessere dei collaboratori',
+      vis: () => _guidaVis('piano'),
+      righe: [
+        'La scheda <b>Benessere</b> mostra come e distribuito il carico di lavoro nell anno, separando <b>personale fisso</b> e <b>ausiliari</b>, perche hanno regole diverse.',
+        'Ogni persona ha un <b>indice da 0 a 100</b> calcolato su dati oggettivi del piano: domeniche libere (25 punti), equita nei weekend rispetto alla media del settore (20), carico notturno (15), qualita del riposo cioe pochi riposi isolati di un solo giorno (15), giorni consecutivi entro il limite (15), vacanze godute (10).',
+        'Sopra 75 la situazione e buona, tra 55 e 75 va tenuta d occhio, sotto 55 e critica: in fondo compare l elenco di chi guardare per primo. Passando il mouse su una riga si vede il dettaglio di ogni punteggio.',
+        'Le <b>malattie non tolgono punti</b>: non sono una colpa. Si vedono in colonna come segnale da leggere insieme al resto, per esempio accanto a molti weekend e molte notti.',
+        'I valori di riferimento (domeniche libere all anno, massimo giorni consecutivi) sono le stesse regole del piano, quindi cambiando quelle cambia anche la valutazione.',
+      ],
+    },
+    {
+      area: 'piano',
       titolo: 'Piano: timbrature e saldo ore',
       vis: () => _guidaVis('piano'),
       righe: [
