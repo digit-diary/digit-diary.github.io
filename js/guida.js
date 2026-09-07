@@ -49,6 +49,7 @@ function GUIDA_CAPITOLI() {
         'Scegli il <b>tipo</b>, il <b>collaboratore</b> e scrivi il testo. La data e il tuo nome vengono messi in automatico.',
         'Le voci si possono cercare, filtrare per tipo o collaboratore, modificare e mettere in evidenza. Quelle eliminate finiscono nel Cestino e si possono recuperare.',
         "Le <b>malattie</b> registrate qui compaiono da sole nel piano di lavoro, quindi non vanno riscritte due volte. Vale anche al contrario: una M scritta nel piano o una copertura malattia si registrano nel Diario e contano nella scheda del collaboratore. Ognuno puo' partire dal punto che preferisce, il risultato non cambia.",
+        'Vale anche quando si toglie: se una M viene rimossa dal piano o sovrascritta con un turno, il programma propone di togliere quei giorni anche dal Diario. Le registrazioni finiscono nel Cestino e si possono recuperare.',
       ],
     },
     {
