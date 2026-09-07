@@ -972,14 +972,14 @@ async function renderPiano() {
       const LC = _pianoCalcolaLarghezze(nomi);
       h +=
         '<div class="piano-wrap"><table data-seltab="piano" class="piano-table piano-fixed" style="width:' +
-        (LC.tot + 37 * nGiorni + 380) +
+        (LC.tot + 37 * nGiorni + 326) +
         'px"><colgroup><col style="width:' +
         LC.nome +
         'px"><col style="width:' +
         LC.fun +
         'px">' +
         _pianoColgroupGiorni(nGiorni) +
-        '<col style="width:54px"><col style="width:54px"><col style="width:30px"><col style="width:30px"><col style="width:54px"><col style="width:54px"><col style="width:50px"><col style="width:54px"></colgroup><thead><tr><th class="piano-nome">Collaboratore</th><th class="piano-fun">Fun</th>';
+        '<col style="width:54px"><col style="width:30px"><col style="width:30px"><col style="width:54px"><col style="width:54px"><col style="width:50px"><col style="width:54px"></colgroup><thead><tr><th class="piano-nome">Collaboratore</th><th class="piano-fun">Fun</th>';
       for (let g = 1; g <= nGiorni; g++) {
         const dstr = ym + '-' + String(g).padStart(2, '0');
         const dow = new Date(dstr + 'T12:00:00').getDay();
@@ -1011,8 +1011,7 @@ async function renderPiano() {
           '</div></th>';
       }
       h +=
-        '<th class="piano-tot piano-sep-left" title="Ore contrattuali del mese: somma della durata dei turni, supplemento notturno del 10% compreso">Ore</th>' +
-        '<th class="piano-tot" title="Ore effettivamente lavorate: dall\'entrata all\'uscita, senza il supplemento del 10% e senza malattie, vacanze, CGF, permessi, maternita, matrimonio, militare, nascita, protezione civile, trasloco e assistenza familiare">OL</th>' +
+        '<th class="piano-tot piano-sep-left" title="Ore effettivamente lavorate: dall\'entrata all\'uscita, senza il supplemento del 10% e senza malattie, vacanze, CGF, permessi, maternita, matrimonio, militare, nascita, protezione civile, trasloco e assistenza familiare">OL</th>' +
         '<th class="piano-tot" title="Turni diurni">D</th><th class="piano-tot" title="Turni notturni">N</th>' +
         '<th class="piano-tot" title="Ore Dovute">OD</th><th class="piano-tot" title="Ore Pianificate">OP</th>' +
         '<th class="piano-tot" title="Saldo Mensile">SM</th><th class="piano-tot" title="Saldo Anno">YTD</th></tr></thead><tbody>';
@@ -1200,23 +1199,21 @@ async function renderPiano() {
           Math.round(perc * 100) +
           '%</span></td>' +
           riga +
-          '<td class="piano-tot piano-sep-left" data-tot="0">' +
-          (ore ? ore.toFixed(1) : '') +
-          '</td><td class="piano-tot" data-tot="1" title="ore effettivamente lavorate">' +
+          '<td class="piano-tot piano-sep-left" data-tot="0" title="ore effettivamente lavorate">' +
           (oreLav ? oreLav.toFixed(1) : '') +
-          '</td><td class="piano-tot" data-tot="2">' +
+          '</td><td class="piano-tot" data-tot="1">' +
           (nD || '') +
-          '</td><td class="piano-tot" data-tot="3">' +
+          '</td><td class="piano-tot" data-tot="2">' +
           (nN || '') +
-          '</td><td class="piano-tot" data-tot="4" style="color:var(--muted)">' +
+          '</td><td class="piano-tot" data-tot="3" style="color:var(--muted)">' +
           (dovute ? dovute.toFixed(1) : '') +
-          '</td><td class="piano-tot" data-tot="5">' +
+          '</td><td class="piano-tot" data-tot="4">' +
           (orePiano ? orePiano.toFixed(1) : '') +
-          '</td><td class="piano-tot" data-tot="6" style="color:' +
+          '</td><td class="piano-tot" data-tot="5" style="color:' +
           (saldo > 0 ? '#2c6e49' : saldo < 0 ? '#c0392b' : 'var(--muted)') +
           '">' +
           (orePiano || dovute ? (saldo > 0 ? '+' : '') + saldo.toFixed(1) : '') +
-          '</td><td class="piano-tot" data-tot="7" style="font-weight:700;color:' +
+          '</td><td class="piano-tot" data-tot="6" style="font-weight:700;color:' +
           (ytd > 0 ? '#2c6e49' : ytd < 0 ? '#c0392b' : 'var(--muted)') +
           '">' +
           (orePiano || _pianoYtdMap[nome] ? (ytd > 0 ? '+' : '') + ytd.toFixed(1) : '') +
