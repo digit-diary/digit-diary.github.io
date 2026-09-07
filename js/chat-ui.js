@@ -2174,6 +2174,28 @@ function apriSchedaCollaboratore(nome) {
       new Date(dataNascita + 'T12:00:00').toLocaleDateString('it-IT') +
       '</span>';
   }
+  // INIZIO CONTRATTO: si legge qui, dove si consulta il fascicolo. Si modifica
+  // in Gestione collaboratori, che e' il posto dell'anagrafica.
+  if (collabRec && collabRec.data_assunzione) {
+    const _dAss = String(collabRec.data_assunzione).substring(0, 10);
+    const _anni =
+      typeof anzianitaLabel === 'function'
+        ? anzianitaLabel(_dAss, collabRec.mesi_congedo_non_pagato)
+        : Math.floor((Date.now() - new Date(_dAss + 'T12:00:00').getTime()) / 31557600000) + ' anni';
+    html +=
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px">' +
+      '<span style="font-size:.84rem;color:var(--muted)">In servizio dal</span>' +
+      '<b style="font-size:.9rem">' +
+      _dAss.split('-').reverse().join('.') +
+      '</b>' +
+      '<span class="mini-badge" style="background:#1a7a6d;font-size:.82rem"' +
+      (parseInt(collabRec.mesi_congedo_non_pagato) > 0
+        ? ' title="Tolti ' + parseInt(collabRec.mesi_congedo_non_pagato) + ' mesi di congedo non pagato"'
+        : '') +
+      '>' +
+      escP(String(_anni)) +
+      '</span></div>';
+  }
   html += '</div></div>';
   html +=
     '<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-export btn-export-pdf" onclick="stampaSchedaPDF(\'' +

@@ -351,12 +351,17 @@ ok(
 );
 // Chiusure
 const FEST = { '2027-01-06': 'Epifania', '2027-12-25': 'Natale' };
-const merc = R.chiusuraDelGiorno('2027-01-06', FEST, {}); // Epifania di mercoledi
-eq(merc.ora, 5, 'festivita infrasettimanale: chiusura alle 5');
-eq(merc.marcatore, 'CH5', 'e va segnalata nel piano');
-const sab = R.chiusuraDelGiorno('2027-12-25', FEST, {}); // Natale 2027 e sabato
-eq(sab.ora, 5, 'festivita di sabato: sempre alle 5');
-eq(sab.marcatore, '', 'ma nessun marcatore: il sabato chiude gia alle 5');
+// SI CHIUDE TARDI LA NOTTE PRIMA DEL FESTIVO, non la notte del festivo
+const vigilia = R.chiusuraDelGiorno('2027-01-05', FEST, {}); // martedi, vigilia dell Epifania
+eq(vigilia.ora, 5, 'vigilia infrasettimanale: chiusura alle 5');
+eq(vigilia.marcatore, 'CH5', 'e va segnalata nel piano');
+ok(/Epifania/.test(vigilia.motivo), 'il motivo dice di quale festa e la vigilia');
+const ilFestivo = R.chiusuraDelGiorno('2027-01-06', FEST, {}); // il giorno di festa in se
+eq(ilFestivo.ora, 4, 'il giorno di festa chiude all orario normale: la sera dopo si lavora');
+eq(ilFestivo.marcatore, '', 'nessun marcatore sul festivo stesso');
+const vigiliaVen = R.chiusuraDelGiorno('2027-12-24', FEST, {}); // 24 dicembre 2027 e venerdi
+eq(vigiliaVen.ora, 5, 'vigilia di venerdi: sempre alle 5');
+eq(vigiliaVen.marcatore, '', 'ma nessun marcatore: il venerdi chiude gia alle 5');
 const feriale = R.chiusuraDelGiorno('2027-01-07', FEST, {}); // giovedi qualunque
 eq(feriale.ora, 4, 'giorno feriale normale: chiusura alle 4');
 eq(feriale.marcatore, '', 'nessun marcatore');
@@ -366,7 +371,7 @@ const fine = R.chiusuraDelGiorno('2026-12-31', {}, {});
 eq(fine.ora, 7, '31 dicembre: chiusura alle 7');
 eq(fine.marcatore, 'CH7', 'e si segnala sempre');
 // tutto configurabile: se un giorno si decidesse di chiudere alle 6
-const alt = R.chiusuraDelGiorno('2027-01-06', FEST, { oraTardi: 6 });
+const alt = R.chiusuraDelGiorno('2027-01-05', FEST, { oraTardi: 6 });
 eq(alt.marcatore, 'CH6', 'orario di chiusura configurabile');
 
 console.log('\n=======================================');

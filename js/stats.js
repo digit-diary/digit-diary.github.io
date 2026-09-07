@@ -10,27 +10,27 @@
 // STATISTICHE
 function initStatsFlatpickr() {
   if (
-    document.getElementById('stats-filt-dal') &&
-    !document.getElementById('stats-filt-dal')._flatpickr &&
+    document.getElementById("stats-filt-dal") &&
+    !document.getElementById("stats-filt-dal")._flatpickr &&
     window.flatpickr
   ) {
     const o = {
-      locale: 'it',
-      dateFormat: 'Y-m-d',
+      locale: "it",
+      dateFormat: "Y-m-d",
       altInput: true,
-      altFormat: 'd/m/Y',
+      altFormat: "d/m/Y",
       allowInput: false,
       onChange: () => renderStatistiche(),
     };
-    flatpickr('#stats-filt-dal', o);
-    flatpickr('#stats-filt-al', o);
+    flatpickr("#stats-filt-dal", o);
+    flatpickr("#stats-filt-al", o);
   }
 }
 function resetStatsFiltri() {
-  ['stats-filt-dal', 'stats-filt-al'].forEach((id) => {
+  ["stats-filt-dal", "stats-filt-al"].forEach((id) => {
     const el = document.getElementById(id);
     if (el) {
-      el.value = '';
+      el.value = "";
       if (el._flatpickr) el._flatpickr.clear();
     }
   });
@@ -38,65 +38,77 @@ function resetStatsFiltri() {
 }
 function renderStatistiche() {
   const _dsAll = getDatiReparto();
-  const _sfDal = (document.getElementById('stats-filt-dal') || {}).value || '';
-  const _sfAl = (document.getElementById('stats-filt-al') || {}).value || '';
+  const _sfDal = (document.getElementById("stats-filt-dal") || {}).value || "";
+  const _sfAl = (document.getElementById("stats-filt-al") || {}).value || "";
   const _ds = _dsAll.filter((e) => {
-    const d = (e.data || '').substring(0, 10);
+    const d = (e.data || "").substring(0, 10);
     if (_sfDal && d < _sfDal) return false;
     if (_sfAl && d > _sfAl) return false;
     return true;
   });
   if (!_ds.length) {
-    document.getElementById('stats-summary').innerHTML =
+    document.getElementById("stats-summary").innerHTML =
       '<p style="color:var(--muted);text-align:center;padding:40px">Nessun dato da analizzare</p>';
-    ['chart-mesi', 'chart-tipi', 'chart-giorni', 'chart-collab'].forEach(function (id) {
-      if (charts[id]) {
-        charts[id].destroy();
-        delete charts[id];
-      }
-    });
+    ["chart-mesi", "chart-tipi", "chart-giorni", "chart-collab"].forEach(
+      function (id) {
+        if (charts[id]) {
+          charts[id].destroy();
+          delete charts[id];
+        }
+      },
+    );
     return;
   }
   // Summary with month-over-month trends
   const nCollab = new Set(_ds.map((e) => e.nome)).size;
-  const nErr = _ds.filter((e) => e.tipo === nomeCorrente('Errore')).length;
+  const nErr = _ds.filter((e) => e.tipo === nomeCorrente("Errore")).length;
   const totImp = _ds.reduce((s, e) => s + (parseFloat(e.importo) || 0), 0);
-  const _nMalStat = _contaTotaleMalattie(_ds, nomeCorrente('Malattia'));
+  const _nMalStat = _contaTotaleMalattie(_ds, nomeCorrente("Malattia"));
   // Trend: current month vs previous month
   const _tNow = new Date(),
-    _tCurrM = _tNow.getFullYear() + '-' + String(_tNow.getMonth() + 1).padStart(2, '0');
+    _tCurrM =
+      _tNow.getFullYear() + "-" + String(_tNow.getMonth() + 1).padStart(2, "0");
   const _tPrevD = new Date(_tNow.getFullYear(), _tNow.getMonth() - 1, 1);
-  const _tPrevM = _tPrevD.getFullYear() + '-' + String(_tPrevD.getMonth() + 1).padStart(2, '0');
+  const _tPrevM =
+    _tPrevD.getFullYear() +
+    "-" +
+    String(_tPrevD.getMonth() + 1).padStart(2, "0");
   const _tPrevName = MESI[_tPrevD.getMonth()].toLowerCase();
-  const _errCurr = _dsAll.filter((e) => e.tipo === nomeCorrente('Errore') && (e.data || '').startsWith(_tCurrM)).length;
-  const _errPrev = _dsAll.filter((e) => e.tipo === nomeCorrente('Errore') && (e.data || '').startsWith(_tPrevM)).length;
+  const _errCurr = _dsAll.filter(
+    (e) =>
+      e.tipo === nomeCorrente("Errore") && (e.data || "").startsWith(_tCurrM),
+  ).length;
+  const _errPrev = _dsAll.filter(
+    (e) =>
+      e.tipo === nomeCorrente("Errore") && (e.data || "").startsWith(_tPrevM),
+  ).length;
   const _malCurr = _contaTotaleMalattie(
-    _dsAll.filter((e) => (e.data || '').startsWith(_tCurrM)),
-    nomeCorrente('Malattia'),
+    _dsAll.filter((e) => (e.data || "").startsWith(_tCurrM)),
+    nomeCorrente("Malattia"),
   );
   const _malPrev = _contaTotaleMalattie(
-    _dsAll.filter((e) => (e.data || '').startsWith(_tPrevM)),
-    nomeCorrente('Malattia'),
+    _dsAll.filter((e) => (e.data || "").startsWith(_tPrevM)),
+    nomeCorrente("Malattia"),
   );
   function _trendBadge(curr, prev, label) {
     const d = curr - prev;
-    if (d === 0) return '';
-    const col = d > 0 ? 'var(--accent)' : '#2c6e49';
-    const sign = d > 0 ? '+' : '';
+    if (d === 0) return "";
+    const col = d > 0 ? "var(--accent)" : "#2c6e49";
+    const sign = d > 0 ? "+" : "";
     return (
       ' <span style="font-size:.82rem;font-weight:600;color:' +
       col +
-      ';background:' +
+      ";background:" +
       col +
       '15;padding:1px 6px;border-radius:8px">' +
       sign +
       d +
-      ' vs ' +
+      " vs " +
       label +
-      '</span>'
+      "</span>"
     );
   }
-  document.getElementById('stats-summary').innerHTML =
+  document.getElementById("stats-summary").innerHTML =
     '<div class="stats-bar" style="margin-bottom:0"><div class="stat"><div class="stat-num">' +
     _ds.length +
     '</div><div class="stat-label">Registrazioni totali</div></div><div class="stat"><div class="stat-num blue">' +
@@ -104,16 +116,16 @@ function renderStatistiche() {
     '</div><div class="stat-label">Collaboratori</div></div><div class="stat"><div class="stat-num red">' +
     nErr +
     '</div><div class="stat-label">' +
-    nomeCorrente('Errore') +
+    nomeCorrente("Errore") +
     _trendBadge(_errCurr, _errPrev, _tPrevName) +
     '</div></div><div class="stat"><div class="stat-num teal">' +
     _nMalStat +
     '</div><div class="stat-label">' +
-    nomeCorrente('Malattia') +
-    ' (giorni)' +
+    nomeCorrente("Malattia") +
+    " (giorni)" +
     _trendBadge(_malCurr, _malPrev, _tPrevName) +
     '</div></div><div class="stat"><div class="stat-num gold">' +
-    (totImp ? fmtCHF(totImp) : '0') +
+    (totImp ? fmtCHF(totImp) : "0") +
     '</div><div class="stat-label">Importo totale</div></div></div>';
   // Grafico mensile (full width, primo)
   const tipiCount = {};
@@ -127,34 +139,53 @@ function renderStatistiche() {
     me = [];
   for (let i = 11; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    ml.push(MESI[d.getMonth()] + ' ' + d.getFullYear());
+    ml.push(MESI[d.getMonth()] + " " + d.getFullYear());
     md.push(
       _ds.filter((e) => {
         const ed = new Date(e.data);
-        return ed.getMonth() === d.getMonth() && ed.getFullYear() === d.getFullYear();
+        return (
+          ed.getMonth() === d.getMonth() && ed.getFullYear() === d.getFullYear()
+        );
       }).length,
     );
     me.push(
       _ds.filter((e) => {
         const ed = new Date(e.data);
         return (
-          e.tipo === nomeCorrente('Errore') && ed.getMonth() === d.getMonth() && ed.getFullYear() === d.getFullYear()
+          e.tipo === nomeCorrente("Errore") &&
+          ed.getMonth() === d.getMonth() &&
+          ed.getFullYear() === d.getFullYear()
         );
       }).length,
     );
   }
   renderChart(
-    'chart-mesi',
-    'bar',
+    "chart-mesi",
+    "bar",
     {
       labels: ml,
       datasets: [
-        { label: 'Tutte le registrazioni', data: md, backgroundColor: 'rgba(26,74,122,0.7)', borderRadius: 4 },
-        { label: 'Di cui errori', data: me, backgroundColor: 'rgba(192,57,43,0.7)', borderRadius: 4 },
+        {
+          label: "Tutte le registrazioni",
+          data: md,
+          backgroundColor: "rgba(26,74,122,0.7)",
+          borderRadius: 4,
+        },
+        {
+          label: "Di cui errori",
+          data: me,
+          backgroundColor: "rgba(192,57,43,0.7)",
+          borderRadius: 4,
+        },
       ],
     },
     {
-      plugins: { legend: { position: 'top', labels: { font: { size: 13 }, padding: 16 } } },
+      plugins: {
+        legend: {
+          position: "top",
+          labels: { font: { size: 13 }, padding: 16 },
+        },
+      },
       scales: {
         y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 12 } } },
         x: { ticks: { font: { size: 11 } } },
@@ -163,20 +194,27 @@ function renderStatistiche() {
   );
   // Doughnut tipi
   renderChart(
-    'chart-tipi',
-    'doughnut',
+    "chart-tipi",
+    "doughnut",
     {
-      labels: tl.map((t) => t + ' (' + tipiCount[t] + ')'),
+      labels: tl.map((t) => t + " (" + tipiCount[t] + ")"),
       datasets: [
         {
           data: tl.map((t) => tipiCount[t]),
           backgroundColor: tl.map((t) => getColore(t)),
           borderWidth: 2,
-          borderColor: 'white',
+          borderColor: "white",
         },
       ],
     },
-    { plugins: { legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 12, usePointStyle: true } } } },
+    {
+      plugins: {
+        legend: {
+          position: "bottom",
+          labels: { font: { size: 12 }, padding: 12, usePointStyle: true },
+        },
+      },
+    },
   );
   // Giorni settimana
   const gc = [0, 0, 0, 0, 0, 0, 0];
@@ -185,15 +223,17 @@ function renderStatistiche() {
   });
   const go = [1, 2, 3, 4, 5, 6, 0];
   renderChart(
-    'chart-giorni',
-    'bar',
+    "chart-giorni",
+    "bar",
     {
       labels: go.map((i) => GIORNI[i]),
       datasets: [
         {
-          label: 'Eventi',
+          label: "Eventi",
           data: go.map((i) => gc[i]),
-          backgroundColor: go.map((i) => (i === 0 || i === 6 ? 'rgba(192,57,43,0.7)' : 'rgba(44,110,73,0.7)')),
+          backgroundColor: go.map((i) =>
+            i === 0 || i === 6 ? "rgba(192,57,43,0.7)" : "rgba(44,110,73,0.7)",
+          ),
           borderRadius: 4,
         },
       ],
@@ -215,16 +255,21 @@ function renderStatistiche() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 15);
   renderChart(
-    'chart-collab',
-    'bar',
+    "chart-collab",
+    "bar",
     {
       labels: cs.map((c) => c[0]),
       datasets: [
-        { label: 'Registrazioni', data: cs.map((c) => c[1]), backgroundColor: 'rgba(139,105,20,0.7)', borderRadius: 4 },
+        {
+          label: "Registrazioni",
+          data: cs.map((c) => c[1]),
+          backgroundColor: "rgba(139,105,20,0.7)",
+          borderRadius: 4,
+        },
       ],
     },
     {
-      indexAxis: 'y',
+      indexAxis: "y",
       plugins: { legend: { display: false } },
       scales: {
         x: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 12 } } },
@@ -232,7 +277,7 @@ function renderStatistiche() {
       },
     },
   );
-  const _tipoMalStat = nomeCorrente('Malattia');
+  const _tipoMalStat = nomeCorrente("Malattia");
   const tutti = getTuttiTipi(),
     cd = {};
   _ds.forEach((e) => {
@@ -248,67 +293,89 @@ function renderStatistiche() {
     tp = tutti.filter((t) => _ds.some((e) => e.tipo === t.nome));
   let th =
     '<table class="collab-table"><thead><tr><th>Collaboratore</th><th class="num">Tot</th>' +
-    tp.map((t) => '<th class="num">' + t.nome + '</th>').join('') +
-    '</tr></thead><tbody>';
+    tp.map((t) => '<th class="num">' + t.nome + "</th>").join("") +
+    "</tr></thead><tbody>";
   cr.forEach(([n, d]) => {
     const ne = n.replace(/'/g, "\\'");
     th +=
       '<tr><td><span class="entry-name" onclick="apriSchedaCollaboratore(\'' +
       ne +
-      '\')"><strong>' +
+      "')\"><strong>" +
       escP(n) +
       '</strong></span></td><td class="num"><strong>' +
       d.tot +
-      '</strong></td>' +
+      "</strong></td>" +
       tp
         .map((t) => {
           const v = d[t.nome] || 0;
           return (
             '<td class="num">' +
-            (v ? '<span class="mini-badge" style="background:' + t.colore + '">' + v + '</span>' : '-') +
-            '</td>'
+            (v
+              ? '<span class="mini-badge" style="background:' +
+                t.colore +
+                '">' +
+                v +
+                "</span>"
+              : "-") +
+            "</td>"
           );
         })
-        .join('') +
-      '</tr>';
+        .join("") +
+      "</tr>";
   });
   const totGen = cr.reduce((s, c) => s + c[1].tot, 0);
   th +=
     '<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td class="num"><strong>' +
     totGen +
-    '</strong></td>' +
+    "</strong></td>" +
     tp
       .map((t) => {
         const v = cr.reduce((s, c) => s + (c[1][t.nome] || 0), 0);
         return (
           '<td class="num"><strong>' +
-          (v ? '<span class="mini-badge" style="background:' + t.colore + '">' + v + '</span>' : '-') +
-          '</strong></td>'
+          (v
+            ? '<span class="mini-badge" style="background:' +
+              t.colore +
+              '">' +
+              v +
+              "</span>"
+            : "-") +
+          "</strong></td>"
         );
       })
-      .join('') +
-    '</tr>';
-  th += '</tbody></table>';
-  document.getElementById('collab-table-wrap').innerHTML = th;
+      .join("") +
+    "</tr>";
+  th += "</tbody></table>";
+  document.getElementById("collab-table-wrap").innerHTML = th;
   // Tabella errori con importi e reparto
-  const errori = _ds.filter((e) => e.tipo === nomeCorrente('Errore'));
+  const errori = _ds.filter((e) => e.tipo === nomeCorrente("Errore"));
   const errMap = {};
   errori.forEach((e) => {
-    if (!errMap[e.nome]) errMap[e.nome] = { count: 0, totCHF: 0, totEUR: 0, amm: 0, ecc: 0, reparti: {} };
+    if (!errMap[e.nome])
+      errMap[e.nome] = {
+        count: 0,
+        totCHF: 0,
+        totEUR: 0,
+        amm: 0,
+        ecc: 0,
+        reparti: {},
+      };
     errMap[e.nome].count++;
     const imp = parseFloat(e.importo) || 0;
     if (imp) {
-      if (e.valuta === 'EUR') errMap[e.nome].totEUR += imp;
+      if (e.valuta === "EUR") errMap[e.nome].totEUR += imp;
       else {
         errMap[e.nome].totCHF += imp;
-        if (/ammanco/i.test(e.testo || '')) errMap[e.nome].amm += imp;
-        else if (/eccedenza/i.test(e.testo || '')) errMap[e.nome].ecc += imp;
+        if (/ammanco/i.test(e.testo || "")) errMap[e.nome].amm += imp;
+        else if (/eccedenza/i.test(e.testo || "")) errMap[e.nome].ecc += imp;
       }
     }
-    const rep = e.reparto || 'N/D';
+    const rep = e.reparto || "N/D";
     errMap[e.nome].reparti[rep] = (errMap[e.nome].reparti[rep] || 0) + 1;
   });
-  const errSorted = Object.entries(errMap).sort((a, b) => b[1].count - a[1].count);
+  const errSorted = Object.entries(errMap).sort(
+    (a, b) => b[1].count - a[1].count,
+  );
   if (errSorted.length) {
     let et =
       '<table class="collab-table"><thead><tr><th>Collaboratore</th><th class="num">N. Errori</th><th>Reparti</th><th class="num">Totale CHF</th><th class="num">Totale EUR</th></tr></thead><tbody>';
@@ -324,17 +391,24 @@ function renderStatistiche() {
       gAmm += d.amm;
       gEcc += d.ecc;
       const reps = Object.entries(d.reparti)
-        .map(([r, c]) => '<span class="mini-badge" style="background:var(--muted)">' + r + ': ' + c + '</span>')
-        .join(' ');
+        .map(
+          ([r, c]) =>
+            '<span class="mini-badge" style="background:var(--muted)">' +
+            r +
+            ": " +
+            c +
+            "</span>",
+        )
+        .join(" ");
       const ne = n.replace(/'/g, "\\'");
       et +=
         '<tr><td><span class="entry-name" onclick="apriSchedaCollaboratore(\'' +
         ne +
-        '\')"><strong>' +
+        "')\"><strong>" +
         escP(n) +
         '</strong></span></td><td class="num"><span class="mini-badge" style="background:var(--accent)">' +
         d.count +
-        '</span></td><td>' +
+        "</span></td><td>" +
         reps +
         '</td><td class="num">' +
         (d.totCHF
@@ -344,32 +418,32 @@ function renderStatistiche() {
                 fmtCHF(d.amm) +
                 '</span> / <span style="color:#2e7d32">+' +
                 fmtCHF(d.ecc) +
-                '</span></span>'
-              : '')
-          : '-') +
+                "</span></span>"
+              : "")
+          : "-") +
         '</td><td class="num">' +
-        (d.totEUR ? d.totEUR.toFixed(2) : '-') +
-        '</td></tr>';
+        (d.totEUR ? d.totEUR.toFixed(2) : "-") +
+        "</td></tr>";
     });
     et +=
       '<tr style="border-top:2px solid var(--ink)"><td><strong>TOTALE</strong></td><td class="num"><strong>' +
       gCount +
       '</strong></td><td></td><td class="num"><strong>' +
-      (gCHF ? fmtCHF(gCHF) + ' CHF' : '-') +
+      (gCHF ? fmtCHF(gCHF) + " CHF" : "-") +
       (gAmm || gEcc
         ? '<br><span style="font-size:.82rem;font-weight:400"><span style="color:#c62828">-' +
           fmtCHF(gAmm) +
           '</span> / <span style="color:#2e7d32">+' +
           fmtCHF(gEcc) +
-          '</span></span>'
-        : '') +
+          "</span></span>"
+        : "") +
       '</strong></td><td class="num"><strong>' +
-      (gEUR ? gEUR.toFixed(2) + ' EUR' : '-') +
-      '</strong></td></tr>';
-    et += '</tbody></table>';
-    document.getElementById('errori-table-wrap').innerHTML = et;
+      (gEUR ? gEUR.toFixed(2) + " EUR" : "-") +
+      "</strong></td></tr>";
+    et += "</tbody></table>";
+    document.getElementById("errori-table-wrap").innerHTML = et;
   } else
-    document.getElementById('errori-table-wrap').innerHTML =
+    document.getElementById("errori-table-wrap").innerHTML =
       '<p style="color:var(--muted)">Nessun errore registrato</p>';
 }
 function renderChart(id, type, data, opts) {
@@ -377,7 +451,14 @@ function renderChart(id, type, data, opts) {
   charts[id] = new Chart(document.getElementById(id), {
     type,
     data,
-    options: Object.assign({ responsive: true, maintainAspectRatio: true, animation: { duration: 600 } }, opts || {}),
+    options: Object.assign(
+      {
+        responsive: true,
+        maintainAspectRatio: true,
+        animation: { duration: 600 },
+      },
+      opts || {},
+    ),
   });
 }
 
@@ -385,30 +466,47 @@ function renderChart(id, type, data, opts) {
 function esportaCSV() {
   const f = getFiltrati();
   if (!f.length) {
-    toast('Nessun dato');
+    toast("Nessun dato");
     return;
   }
-  const rows = [['Data', 'Ora', 'Collaboratore', 'Tipo', 'Reparto', 'Descrizione', 'Importo', 'Valuta', 'Operatore']];
+  const rows = [
+    [
+      "Data",
+      "Ora",
+      "Collaboratore",
+      "Tipo",
+      "Reparto",
+      "Descrizione",
+      "Importo",
+      "Valuta",
+      "Operatore",
+    ],
+  ];
   f.forEach((e) => {
     const d = new Date(e.data);
     rows.push([
-      d.toLocaleDateString('it-IT'),
-      d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
+      d.toLocaleDateString("it-IT"),
+      d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }),
       e.nome,
       e.tipo,
-      e.reparto || '',
-      '"' + e.testo.replace(/"/g, '""').replace(/\n/g, ' ') + '"',
-      e.importo || '',
-      e.valuta || '',
-      e.operatore || '',
+      e.reparto || "",
+      '"' + e.testo.replace(/"/g, '""').replace(/\n/g, " ") + '"',
+      e.importo || "",
+      e.valuta || "",
+      e.operatore || "",
     ]);
   });
-  const blob = new Blob(['\uFEFF' + rows.map((r) => r.join(';')).join('\n')], { type: 'text/csv;charset=utf-8' });
-  Object.assign(document.createElement('a'), {
+  const blob = new Blob(["\uFEFF" + rows.map((r) => r.join(";")).join("\n")], {
+    type: "text/csv;charset=utf-8",
+  });
+  Object.assign(document.createElement("a"), {
     href: URL.createObjectURL(blob),
-    download: 'diario_' + new Date().toLocaleDateString('it-IT').replace(/\//g, '-') + '.csv',
+    download:
+      "diario_" +
+      new Date().toLocaleDateString("it-IT").replace(/\//g, "-") +
+      ".csv",
   }).click();
-  toast('CSV esportato!');
+  toast("CSV esportato!");
 }
 
 // EXPORT PDF
@@ -416,19 +514,21 @@ async function caricaJsPDF() {
   if (window.jspdf) return true;
   try {
     await new Promise((ok, ko) => {
-      const s = document.createElement('script');
-      s.src = 'libs/jspdf.umd.min.js';
-      s.integrity = 'sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk';
-      s.crossOrigin = 'anonymous';
+      const s = document.createElement("script");
+      s.src = "libs/jspdf.umd.min.js";
+      s.integrity =
+        "sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk";
+      s.crossOrigin = "anonymous";
       s.onload = ok;
       s.onerror = ko;
       document.head.appendChild(s);
     });
     await new Promise((ok, ko) => {
-      const s = document.createElement('script');
-      s.src = 'libs/jspdf.plugin.autotable.min.js';
-      s.integrity = 'sha384-Xl/CUCfJbzsngMp0CFxkmF0VW/8C160IsGujqeQlIhaGxKz2+JsIGORFqtCPeldF';
-      s.crossOrigin = 'anonymous';
+      const s = document.createElement("script");
+      s.src = "libs/jspdf.plugin.autotable.min.js";
+      s.integrity =
+        "sha384-Xl/CUCfJbzsngMp0CFxkmF0VW/8C160IsGujqeQlIhaGxKz2+JsIGORFqtCPeldF";
+      s.crossOrigin = "anonymous";
       s.onload = ok;
       s.onerror = ko;
       document.head.appendChild(s);
@@ -441,57 +541,87 @@ async function caricaJsPDF() {
 async function esportaPDF() {
   const f = getFiltrati();
   if (!f.length) {
-    toast('Nessun dato');
+    toast("Nessun dato");
     return;
   }
   if (!window.jspdf) {
-    toast('Caricamento PDF...');
+    toast("Caricamento PDF...");
     if (!(await caricaJsPDF())) {
-      toast('Errore caricamento libreria PDF');
+      toast("Errore caricamento libreria PDF");
       return;
     }
   }
   try {
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('landscape', 'mm', 'a4');
+    const doc = new jsPDF("landscape", "mm", "a4");
     doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Diario Collaboratori - Casino Lugano SA', 14, 15);
+    doc.setFont("helvetica", "bold");
+    doc.text("Diario Collaboratori - Casino Lugano SA", 14, 15);
     doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont("helvetica", "normal");
     doc.setTextColor(120);
-    doc.text('Generato il ' + new Date().toLocaleDateString('it-IT') + ' - ' + f.length + ' registrazioni', 14, 21);
+    doc.text(
+      "Generato il " +
+        new Date().toLocaleDateString("it-IT") +
+        " - " +
+        f.length +
+        " registrazioni",
+      14,
+      21,
+    );
     doc.setTextColor(0);
     doc.autoTable({
-      theme: 'grid',
+      theme: "grid",
       startY: 26,
-      head: [['Data', 'Ora', 'Collaboratore', 'Tipo', 'Reparto', 'Descrizione', 'Importo']],
+      head: [
+        [
+          "Data",
+          "Ora",
+          "Collaboratore",
+          "Tipo",
+          "Reparto",
+          "Descrizione",
+          "Importo",
+        ],
+      ],
       body: f.map((e) => {
         const d = new Date(e.data);
         return [
-          d.toLocaleDateString('it-IT'),
-          d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
+          d.toLocaleDateString("it-IT"),
+          d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }),
           e.nome,
           e.tipo,
-          e.reparto || '',
-          e.testo.replace(/\n/g, ' '),
-          importoConSegno(e) ? importoConSegno(e).txt + ' ' + (e.valuta || 'CHF') : '',
+          e.reparto || "",
+          e.testo.replace(/\n/g, " "),
+          importoConSegno(e)
+            ? importoConSegno(e).txt + " " + (e.valuta || "CHF")
+            : "",
         ];
       }),
-      styles: { lineColor: [220, 215, 205], lineWidth: 0.15, fontSize: 8, cellPadding: 2, overflow: 'linebreak' },
-      headStyles: { fillColor: [26, 18, 8], textColor: [250, 247, 242], fontStyle: 'bold' },
+      styles: {
+        lineColor: [220, 215, 205],
+        lineWidth: 0.15,
+        fontSize: 8,
+        cellPadding: 2,
+        overflow: "linebreak",
+      },
+      headStyles: {
+        fillColor: [26, 18, 8],
+        textColor: [250, 247, 242],
+        fontStyle: "bold",
+      },
       columnStyles: {
         0: { cellWidth: 22 },
         1: { cellWidth: 15 },
         2: { cellWidth: 30 },
         3: { cellWidth: 25 },
         4: { cellWidth: 18 },
-        5: { cellWidth: 'auto' },
+        5: { cellWidth: "auto" },
         6: { cellWidth: 22 },
       },
       alternateRowStyles: { fillColor: [250, 247, 242] },
       didParseCell: function (d) {
-        if (d.section === 'body' && d.column.index === 3) {
+        if (d.section === "body" && d.column.index === 3) {
           var c = getColore(d.cell.raw);
           if (c) {
             var r = parseInt(c.slice(1, 3), 16),
@@ -499,24 +629,30 @@ async function esportaPDF() {
               b = parseInt(c.slice(5, 7), 16);
             d.cell.styles.textColor = [r, g, b];
           }
-          d.cell.styles.fontStyle = 'bold';
+          d.cell.styles.fontStyle = "bold";
         }
       },
       margin: { top: 26, left: 14, right: 14 },
       didDrawPage: function () {
         doc.setFontSize(7);
         doc.setTextColor(150);
-        doc.text('Casino Lugano SA - Pag. ' + doc.internal.getNumberOfPages(), 14, doc.internal.pageSize.height - 8);
+        doc.text(
+          "Casino Lugano SA - Pag. " + doc.internal.getNumberOfPages(),
+          14,
+          doc.internal.pageSize.height - 8,
+        );
       },
     });
     mostraPdfPreview(
       doc,
-      'diario_' + new Date().toLocaleDateString('it-IT').replace(/\//g, '-') + '.pdf',
-      'Diario Collaboratori',
+      "diario_" +
+        new Date().toLocaleDateString("it-IT").replace(/\//g, "-") +
+        ".pdf",
+      "Diario Collaboratori",
     );
   } catch (e) {
-    console.error('PDF error:', e);
-    toast('Errore generazione PDF: ' + e.message);
+    console.error("PDF error:", e);
+    toast("Errore generazione PDF: " + e.message);
   }
 }
 
@@ -528,116 +664,141 @@ async function esportaPDF() {
 // disciplinare, sviluppo multidisciplinare, incentivi e spese HR
 // ================================================================
 const _RD_MESI_FULL = [
-  'Gennaio',
-  'Febbraio',
-  'Marzo',
-  'Aprile',
-  'Maggio',
-  'Giugno',
-  'Luglio',
-  'Agosto',
-  'Settembre',
-  'Ottobre',
-  'Novembre',
-  'Dicembre',
+  "Gennaio",
+  "Febbraio",
+  "Marzo",
+  "Aprile",
+  "Maggio",
+  "Giugno",
+  "Luglio",
+  "Agosto",
+  "Settembre",
+  "Ottobre",
+  "Novembre",
+  "Dicembre",
 ];
 function _rdInPeriodo(campo, da, a) {
-  const ym = (campo || '').substring(0, 7);
+  const ym = (campo || "").substring(0, 7);
   return ym >= da && ym <= a;
 }
 // Mostra/nasconde i controlli periodo in base al tipo scelto (Mese/Anno/Periodo)
+// e scrive accanto ai menu quale periodo finira' nel PDF: prima cambiare mese
+// non produceva nessun segno visibile e sembrava che il comando non funzionasse.
+function _rdMostraPeriodoScelto() {
+  const el = document.getElementById("rd-periodo-scelto");
+  if (!el || typeof _rdPeriodo !== "function") return;
+  try {
+    el.textContent = "PDF su: " + _rdPeriodo().label;
+  } catch (e) {
+    el.textContent = "";
+  }
+}
 function aggiornaRdPeriodo() {
-  const tipo = (document.getElementById('rd-tipo') || {}).value || 'mese';
-  const m = document.getElementById('rd-mese');
-  const aW = document.getElementById('rd-mese-a-wrap');
-  const an = document.getElementById('rd-anno');
-  if (m) m.style.display = tipo === 'anno' ? 'none' : '';
-  if (aW) aW.style.display = tipo === 'periodo' ? 'inline-flex' : 'none';
-  if (an) an.style.display = tipo === 'anno' ? '' : 'none';
+  setTimeout(_rdMostraPeriodoScelto, 0);
+  const tipo = (document.getElementById("rd-tipo") || {}).value || "mese";
+  const m = document.getElementById("rd-mese");
+  const aW = document.getElementById("rd-mese-a-wrap");
+  const an = document.getElementById("rd-anno");
+  if (m) m.style.display = tipo === "anno" ? "none" : "";
+  if (aW) aW.style.display = tipo === "periodo" ? "inline-flex" : "none";
+  if (an) an.style.display = tipo === "anno" ? "" : "none";
 }
 // Periodo selezionato → intervallo di mesi + periodo equivalente precedente per il confronto
 function _rdPeriodo() {
-  const tipo = (document.getElementById('rd-tipo') || {}).value || 'mese';
+  const tipo = (document.getElementById("rd-tipo") || {}).value || "mese";
   const val = (id, fb) => (document.getElementById(id) || {}).value || fb;
   const oggiYm = new Date().toISOString().substring(0, 7);
   const addMesi = (ym, n) => {
-    const d = new Date(ym + '-15T12:00:00');
+    const d = new Date(ym + "-15T12:00:00");
     d.setMonth(d.getMonth() + n);
-    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
   };
   const lbl = (ym) => {
-    const d = new Date(ym + '-15T12:00:00');
-    return _RD_MESI_FULL[d.getMonth()] + ' ' + d.getFullYear();
+    const d = new Date(ym + "-15T12:00:00");
+    return _RD_MESI_FULL[d.getMonth()] + " " + d.getFullYear();
   };
-  if (tipo === 'anno') {
-    const anno = val('rd-anno', String(new Date().getFullYear()));
+  if (tipo === "anno") {
+    const anno = val("rd-anno", String(new Date().getFullYear()));
     const prec = String(parseInt(anno) - 1);
     return {
-      da: anno + '-01',
-      a: anno + '-12',
-      label: 'Anno ' + anno,
-      daPrec: prec + '-01',
-      aPrec: prec + '-12',
-      labelPrec: 'anno ' + prec,
+      da: anno + "-01",
+      a: anno + "-12",
+      label: "Anno " + anno,
+      daPrec: prec + "-01",
+      aPrec: prec + "-12",
+      labelPrec: "anno " + prec,
     };
   }
-  if (tipo === 'periodo') {
-    let da = val('rd-mese', oggiYm);
-    let a = val('rd-mese-a', oggiYm);
+  if (tipo === "periodo") {
+    let da = val("rd-mese", oggiYm);
+    let a = val("rd-mese-a", oggiYm);
     if (da > a) {
       const t = da;
       da = a;
       a = t;
     }
-    const d1 = new Date(da + '-15T12:00:00');
-    const d2 = new Date(a + '-15T12:00:00');
-    const n = (d2.getFullYear() - d1.getFullYear()) * 12 + (d2.getMonth() - d1.getMonth()) + 1;
+    const d1 = new Date(da + "-15T12:00:00");
+    const d2 = new Date(a + "-15T12:00:00");
+    const n =
+      (d2.getFullYear() - d1.getFullYear()) * 12 +
+      (d2.getMonth() - d1.getMonth()) +
+      1;
     return {
       da,
       a,
-      label: da === a ? lbl(da) : lbl(da) + ' – ' + lbl(a),
+      label: da === a ? lbl(da) : lbl(da) + " – " + lbl(a),
       daPrec: addMesi(da, -n),
       aPrec: addMesi(da, -1),
-      labelPrec: 'periodo precedente',
+      labelPrec: "periodo precedente",
     };
   }
-  const ym = val('rd-mese', oggiYm);
+  const ym = val("rd-mese", oggiYm);
   const prec = addMesi(ym, -1);
-  return { da: ym, a: ym, label: lbl(ym), daPrec: prec, aPrec: prec, labelPrec: 'mese precedente' };
+  return {
+    da: ym,
+    a: ym,
+    label: lbl(ym),
+    daPrec: prec,
+    aPrec: prec,
+    labelPrec: "mese precedente",
+  };
 }
 function _rdGiorniMalattia(entries) {
   let g = 0;
   entries.forEach((e) => {
-    const m = (e.testo || '').match(/(\d+)\s*giorni/);
+    const m = (e.testo || "").match(/(\d+)\s*giorni/);
     g += m ? parseInt(m[1]) : 1;
   });
   return g;
 }
 async function esportaReportDirezionePDF() {
   if (!isAdmin()) {
-    toast('Solo admin');
+    toast("Solo admin");
     return;
   }
   if (!window.jspdf) {
-    toast('Caricamento PDF...');
+    toast("Caricamento PDF...");
     if (!(await caricaJsPDF())) {
-      toast('Errore caricamento libreria PDF');
+      toast("Errore caricamento libreria PDF");
       return;
     }
   }
   const per = _rdPeriodo();
-  const sezOrg = (document.getElementById('rd-cb-org') || { checked: true }).checked;
-  const sezOpe = (document.getElementById('rd-cb-ope') || { checked: true }).checked;
-  const sezSvi = (document.getElementById('rd-cb-svi') || { checked: true }).checked;
+  const sezOrg = (document.getElementById("rd-cb-org") || { checked: true })
+    .checked;
+  const sezOpe = (document.getElementById("rd-cb-ope") || { checked: true })
+    .checked;
+  const sezSvi = (document.getElementById("rd-cb-svi") || { checked: true })
+    .checked;
   if (!sezOrg && !sezOpe && !sezSvi) {
-    toast('Seleziona almeno una sezione');
+    toast("Seleziona almeno una sezione");
     return;
   }
   const annoDa = parseInt(per.da);
   const annoA = parseInt(per.a);
-  const tipoErr = nomeCorrente('Errore');
-  const tipoMal = nomeCorrente('Malattia');
-  const tipoAmm = nomeCorrente('Ammonimento Verbale');
+  const tipoErr = nomeCorrente("Errore");
+  const tipoMal = nomeCorrente("Malattia");
+  const tipoAmm = nomeCorrente("Ammonimento Verbale");
 
   const reparti = getReparti();
   const curSave = currentReparto;
@@ -666,37 +827,72 @@ async function esportaReportDirezionePDF() {
   reparti.forEach((r) => {
     currentReparto = r.key;
     const collabs = getCollaboratoriReparto().filter((c) => c.attivo !== false);
-    const fissi = collabs.filter((c) => c.impiego === 'fisso').length;
-    const jolly = collabs.filter((c) => c.impiego === 'jolly').length;
-    const partTime = collabs.filter((c) => c.percentuale != null && parseFloat(c.percentuale) < 1).length;
+    const fissi = collabs.filter((c) => c.impiego === "fisso").length;
+    const jolly = collabs.filter((c) => c.impiego === "jolly").length;
+    const partTime = collabs.filter(
+      (c) => c.percentuale != null && parseFloat(c.percentuale) < 1,
+    ).length;
     const liv = { 1: 0, 2: 0, 3: 0 };
     collabs.forEach((c) => {
       const l = livelloDiCollaboratore(c);
       if (l) liv[l]++;
     });
-    righeOrganico.push([r.label, collabs.length, fissi, jolly, partTime, liv[1], liv[2], liv[3]]);
+    righeOrganico.push([
+      r.label,
+      collabs.length,
+      fissi,
+      jolly,
+      partTime,
+      liv[1],
+      liv[2],
+      liv[3],
+    ]);
     tot.collab += collabs.length;
 
     const dati = getDatiReparto();
-    const mal = dati.filter((e) => e.tipo === tipoMal && _rdInPeriodo(e.data, per.da, per.a));
+    const mal = dati.filter(
+      (e) => e.tipo === tipoMal && _rdInPeriodo(e.data, per.da, per.a),
+    );
     const malG = _rdGiorniMalattia(mal);
-    const err = dati.filter((e) => e.tipo === tipoErr && _rdInPeriodo(e.data, per.da, per.a));
+    const err = dati.filter(
+      (e) => e.tipo === tipoErr && _rdInPeriodo(e.data, per.da, per.a),
+    );
     const errChf = err.reduce((s2, e) => s2 + (parseFloat(e.importo) || 0), 0);
     // dettaglio differenze cassa: la direzione vede ammanchi ed eccedenze separati
-    const errAmm = err.reduce((s2, e) => s2 + (/ammanco/i.test(e.testo || '') ? parseFloat(e.importo) || 0 : 0), 0);
-    const errEcc = err.reduce((s2, e) => s2 + (/eccedenza/i.test(e.testo || '') ? parseFloat(e.importo) || 0 : 0), 0);
-    const amm = dati.filter((e) => e.tipo === tipoAmm && _rdInPeriodo(e.data, per.da, per.a)).length;
-    malPrecTot += dati.filter((e) => e.tipo === tipoMal && _rdInPeriodo(e.data, per.daPrec, per.aPrec)).length;
-    errPrecTot += dati.filter((e) => e.tipo === tipoErr && _rdInPeriodo(e.data, per.daPrec, per.aPrec)).length;
-    const mods = getModuliReparto().filter((m) => _rdInPeriodo(m.created_at || m.data_modulo, per.da, per.a));
-    const allin = mods.filter((m) => m.tipo === 'allineamento').length;
-    const rdi = mods.filter((m) => m.tipo === 'rdi').length;
-    const appr = mods.filter((m) => m.tipo === 'apprezzamento').length;
+    const errAmm = err.reduce(
+      (s2, e) =>
+        s2 + (/ammanco/i.test(e.testo || "") ? parseFloat(e.importo) || 0 : 0),
+      0,
+    );
+    const errEcc = err.reduce(
+      (s2, e) =>
+        s2 +
+        (/eccedenza/i.test(e.testo || "") ? parseFloat(e.importo) || 0 : 0),
+      0,
+    );
+    const amm = dati.filter(
+      (e) => e.tipo === tipoAmm && _rdInPeriodo(e.data, per.da, per.a),
+    ).length;
+    malPrecTot += dati.filter(
+      (e) => e.tipo === tipoMal && _rdInPeriodo(e.data, per.daPrec, per.aPrec),
+    ).length;
+    errPrecTot += dati.filter(
+      (e) => e.tipo === tipoErr && _rdInPeriodo(e.data, per.daPrec, per.aPrec),
+    ).length;
+    const mods = getModuliReparto().filter((m) =>
+      _rdInPeriodo(m.created_at || m.data_modulo, per.da, per.a),
+    );
+    const allin = mods.filter((m) => m.tipo === "allineamento").length;
+    const rdi = mods.filter((m) => m.tipo === "rdi").length;
+    const appr = mods.filter((m) => m.tipo === "apprezzamento").length;
     righeMese.push([
       r.label,
-      mal.length + (malG > mal.length ? ' (' + malG + ' gg)' : ''),
+      mal.length + (malG > mal.length ? " (" + malG + " gg)" : ""),
       err.length,
-      fmtCHF(errChf) + (errAmm || errEcc ? ' (-' + fmtCHF(errAmm) + ' / +' + fmtCHF(errEcc) + ')' : ''),
+      fmtCHF(errChf) +
+        (errAmm || errEcc
+          ? " (-" + fmtCHF(errAmm) + " / +" + fmtCHF(errEcc) + ")"
+          : ""),
       amm,
       allin,
       rdi,
@@ -713,16 +909,31 @@ async function esportaReportDirezionePDF() {
     tot.rdi += rdi;
     tot.appr += appr;
 
-    const hrEv = getHrEventiReparto().filter((e) => _rdInPeriodo(e.data_evento, per.da, per.a));
-    const form = hrEv.filter((e) => e.tipo === 'formazione').length;
-    const giubChf = hrEv.filter((e) => e.tipo === 'giubileo').reduce((s2, e) => s2 + _estraiChf(e.descrizione), 0);
-    const puntiM = getPuntiReparto().filter((p) => _rdInPeriodo(p.data_evento, per.da, per.a));
-    const puntiTot = puntiM.filter((p) => p.punti > 0).reduce((s2, p) => s2 + p.punti, 0);
-    const premi = puntiM.filter((p) => p.azione === 'premio').length;
+    const hrEv = getHrEventiReparto().filter((e) =>
+      _rdInPeriodo(e.data_evento, per.da, per.a),
+    );
+    const form = hrEv.filter((e) => e.tipo === "formazione").length;
+    const giubChf = hrEv
+      .filter((e) => e.tipo === "giubileo")
+      .reduce((s2, e) => s2 + _estraiChf(e.descrizione), 0);
+    const puntiM = getPuntiReparto().filter((p) =>
+      _rdInPeriodo(p.data_evento, per.da, per.a),
+    );
+    const puntiTot = puntiM
+      .filter((p) => p.punti > 0)
+      .reduce((s2, p) => s2 + p.punti, 0);
+    const premi = puntiM.filter((p) => p.azione === "premio").length;
     const valAnno = getValutazioniReparto().filter(
       (v) => parseInt(v.anno) >= annoDa && parseInt(v.anno) <= annoA,
     ).length;
-    righeSviluppo.push([r.label, form, puntiTot, premi, giubChf ? fmtCHF(giubChf) : '-', valAnno]);
+    righeSviluppo.push([
+      r.label,
+      form,
+      puntiTot,
+      premi,
+      giubChf ? fmtCHF(giubChf) : "-",
+      valAnno,
+    ]);
     tot.form += form;
     tot.punti += puntiTot;
     tot.premi += premi;
@@ -731,53 +942,81 @@ async function esportaReportDirezionePDF() {
   currentReparto = curSave;
 
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF('portrait', 'mm', 'a4');
+  const doc = new jsPDF("portrait", "mm", "a4");
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
   let y = 14;
   if (_logoB64)
     try {
-      doc.addImage(_logoB64, 'PNG', pw / 2 - 20, y, 40, 22.5);
+      doc.addImage(_logoB64, "PNG", pw / 2 - 20, y, 40, 22.5);
     } catch (e) {}
   y += 28;
-  doc.setFont('helvetica', 'bold');
+  doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.text('Report Direzione · ' + per.label, pw / 2, y, { align: 'center' });
+  doc.text("Report Direzione · " + per.label, pw / 2, y, { align: "center" });
   y += 6;
-  doc.setFont('helvetica', 'normal');
+  doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(100);
   doc.text(
-    'Diario Collaboratori · generato il ' + new Date().toLocaleDateString('it-IT') + ' · Riservato alla Direzione',
+    "Diario Collaboratori · generato il " +
+      new Date().toLocaleDateString("it-IT") +
+      " · Riservato alla Direzione",
     pw / 2,
     y,
-    { align: 'center' },
+    { align: "center" },
   );
   doc.setTextColor(0);
   y += 8;
   const stile = {
-    theme: 'grid',
+    theme: "grid",
     margin: { left: 14, right: 14 },
-    headStyles: { fillColor: [26, 18, 8], textColor: [250, 247, 242], fontSize: 8 },
-    styles: { lineColor: [220, 215, 205], lineWidth: 0.15, fontSize: 8.5, cellPadding: 2, halign: 'center' },
-    columnStyles: { 0: { halign: 'left', fontStyle: 'bold' } },
+    headStyles: {
+      fillColor: [26, 18, 8],
+      textColor: [250, 247, 242],
+      fontSize: 8,
+    },
+    styles: {
+      lineColor: [220, 215, 205],
+      lineWidth: 0.15,
+      fontSize: 8.5,
+      cellPadding: 2,
+      halign: "center",
+    },
+    columnStyles: { 0: { halign: "left", fontStyle: "bold" } },
     alternateRowStyles: { fillColor: [250, 247, 242] },
   };
   const sezioneRd = (titolo) => {
-    doc.setFont('helvetica', 'bold');
+    doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
     doc.text(titolo, 14, y);
     y += 4;
   };
   if (sezOrg) {
-    sezioneRd('Organico e progetto multidisciplinarità');
+    sezioneRd("Organico e progetto multidisciplinarità");
     doc.autoTable(
       Object.assign({}, stile, {
         startY: y,
-        head: [['Settore', 'Collaboratori', 'Fissi', 'Jolly', 'Part-time', 'Livello 1', 'Livello 2', 'Livello 3']],
+        head: [
+          [
+            "Settore",
+            "Collaboratori",
+            "Fissi",
+            "Jolly",
+            "Part-time",
+            "Livello 1",
+            "Livello 2",
+            "Livello 3",
+          ],
+        ],
         body: righeOrganico,
-        foot: [['Totale', tot.collab, '', '', '', '', '', '']],
-        footStyles: { fillColor: [240, 236, 228], textColor: [26, 18, 8], fontStyle: 'bold', fontSize: 8.5 },
+        foot: [["Totale", tot.collab, "", "", "", "", "", ""]],
+        footStyles: {
+          fillColor: [240, 236, 228],
+          textColor: [26, 18, 8],
+          fontStyle: "bold",
+          fontSize: 8.5,
+        },
       }),
     );
     y = doc.lastAutoTable.finalY + 8;
@@ -785,39 +1024,60 @@ async function esportaReportDirezionePDF() {
   if (sezOpe) {
     sezioneRd(
       per.da === per.a
-        ? 'Andamento operativo del mese'
-        : per.label.startsWith('Anno')
+        ? "Andamento operativo del mese"
+        : per.label.startsWith("Anno")
           ? "Andamento operativo dell'anno"
-          : 'Andamento operativo del periodo',
+          : "Andamento operativo del periodo",
     );
     doc.autoTable(
       Object.assign({}, stile, {
         startY: y,
-        head: [['Settore', 'Malattie', 'Errori', 'Errori CHF', 'Amm. verbali', 'Allineamenti', 'RDI', 'Apprezzamenti']],
+        head: [
+          [
+            "Settore",
+            "Malattie",
+            "Errori",
+            "Errori CHF",
+            "Amm. verbali",
+            "Allineamenti",
+            "RDI",
+            "Apprezzamenti",
+          ],
+        ],
         body: righeMese,
         foot: [
           [
-            'Totale',
-            tot.mal + (tot.malG > tot.mal ? ' (' + tot.malG + ' gg)' : ''),
+            "Totale",
+            tot.mal + (tot.malG > tot.mal ? " (" + tot.malG + " gg)" : ""),
             tot.err,
             fmtCHF(tot.errChf) +
-              (tot.errAmm || tot.errEcc ? ' (-' + fmtCHF(tot.errAmm) + ' / +' + fmtCHF(tot.errEcc) + ')' : ''),
+              (tot.errAmm || tot.errEcc
+                ? " (-" + fmtCHF(tot.errAmm) + " / +" + fmtCHF(tot.errEcc) + ")"
+                : ""),
             tot.amm,
             tot.allin,
             tot.rdi,
             tot.appr,
           ],
         ],
-        footStyles: { fillColor: [240, 236, 228], textColor: [26, 18, 8], fontStyle: 'bold', fontSize: 8.5 },
+        footStyles: {
+          fillColor: [240, 236, 228],
+          textColor: [26, 18, 8],
+          fontStyle: "bold",
+          fontSize: 8.5,
+        },
       }),
     );
     y = doc.lastAutoTable.finalY + 4;
-    doc.setFont('helvetica', 'normal');
+    doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(100);
-    const trend = (cur, prec, label) => label + ': ' + cur + ' (' + per.labelPrec + ': ' + (prec || 0) + ')';
+    const trend = (cur, prec, label) =>
+      label + ": " + cur + " (" + per.labelPrec + ": " + (prec || 0) + ")";
     doc.text(
-      trend(tot.mal, malPrecTot, 'Malattie') + '   ·   ' + trend(tot.err, errPrecTot, 'Errori cassa'),
+      trend(tot.mal, malPrecTot, "Malattie") +
+        "   ·   " +
+        trend(tot.err, errPrecTot, "Errori cassa"),
       14,
       y + 2,
     );
@@ -825,33 +1085,54 @@ async function esportaReportDirezionePDF() {
     y += 10;
   }
   if (sezSvi) {
-    sezioneRd('Sviluppo del personale e incentivi');
+    sezioneRd("Sviluppo del personale e incentivi");
     doc.autoTable(
       Object.assign({}, stile, {
         startY: y,
         head: [
           [
-            'Settore',
-            'Formazioni svolte',
-            'Punti assegnati',
-            'Premi consegnati',
-            'Giubilei CHF',
-            'Valutazioni ' + (annoDa === annoA ? annoDa : annoDa + '-' + annoA),
+            "Settore",
+            "Formazioni svolte",
+            "Punti assegnati",
+            "Premi consegnati",
+            "Giubilei CHF",
+            "Valutazioni " + (annoDa === annoA ? annoDa : annoDa + "-" + annoA),
           ],
         ],
         body: righeSviluppo,
-        foot: [['Totale', tot.form, tot.punti, tot.premi, tot.giub ? fmtCHF(tot.giub) : '-', '']],
-        footStyles: { fillColor: [240, 236, 228], textColor: [26, 18, 8], fontStyle: 'bold', fontSize: 8.5 },
+        foot: [
+          [
+            "Totale",
+            tot.form,
+            tot.punti,
+            tot.premi,
+            tot.giub ? fmtCHF(tot.giub) : "-",
+            "",
+          ],
+        ],
+        footStyles: {
+          fillColor: [240, 236, 228],
+          textColor: [26, 18, 8],
+          fontStyle: "bold",
+          fontSize: 8.5,
+        },
       }),
     );
   }
   doc.setFontSize(6.5);
   doc.setTextColor(150);
-  doc.text('Casino Lugano SA · Report Direzione · Documento riservato', 14, ph - 8);
-  logAzione('Report Direzione', 'PDF esportato · ' + per.label);
+  doc.text(
+    "Casino Lugano SA · Report Direzione · Documento riservato",
+    14,
+    ph - 8,
+  );
+  logAzione("Report Direzione", "PDF esportato · " + per.label);
   mostraPdfPreview(
     doc,
-    'report_direzione_' + per.da + (per.a !== per.da ? '_' + per.a : '') + '.pdf',
-    'Report Direzione ' + per.label,
+    "report_direzione_" +
+      per.da +
+      (per.a !== per.da ? "_" + per.a : "") +
+      ".pdf",
+    "Report Direzione " + per.label,
   );
 }

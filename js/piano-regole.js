@@ -428,13 +428,25 @@
     // 31 dicembre: chiusura piu' lunga, vale sempre e va segnalata sempre
     if (mmgg === '12-31') return { ora: oraFineAnno, motivo: 'ultimo dell anno', marcatore: 'CH' + oraFineAnno };
     const tardiPerGiorno = giorniTardi.indexOf(d.getDay()) >= 0;
-    const nomeFesta = (festivita || {})[dstr] || '';
-    if (nomeFesta) {
+    // LA NOTTE PRIMA DEL FESTIVO: il casino chiude alle 05:00 la notte che
+    // PRECEDE il giorno di festa, non la notte del giorno di festa. Il primo
+    // gennaio la gente esce la sera del 31; la sera del primo, se il 2 si
+    // lavora, si chiude all'orario normale.
+    const domani = new Date(d);
+    domani.setDate(domani.getDate() + 1);
+    const dstrDomani =
+      domani.getFullYear() +
+      '-' +
+      String(domani.getMonth() + 1).padStart(2, '0') +
+      '-' +
+      String(domani.getDate()).padStart(2, '0');
+    const festaDomani = (festivita || {})[dstrDomani] || '';
+    if (festaDomani) {
       // gia' venerdi o sabato: l'orario e' quello solito, nessun marcatore, ma
       // il motivo resta perche' serve comunque a prevedere l'affluenza
       return {
         ora: oraTardi,
-        motivo: nomeFesta,
+        motivo: 'vigilia di ' + festaDomani,
         marcatore: tardiPerGiorno ? '' : 'CH' + oraTardi,
       };
     }
