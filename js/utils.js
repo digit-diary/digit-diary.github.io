@@ -448,6 +448,38 @@ function _getNascitaValue(id) {
   return _parseDataNascita(el.value);
 }
 
+// ORDINE UNICO dei collaboratori in tutto il programma = ordine della lista
+// del piano (supervisori in alto, poi back office, fissi, jolly). Per chi non
+// e' nell'ordine salvato: gruppo per funzione e poi alfabetico.
+function ordineCollabPiano(nomi, reparto) {
+  const rep =
+    reparto ||
+    (typeof _pianoRepartoSel !== 'undefined' && _pianoRepartoSel
+      ? _pianoRepartoSel
+      : typeof currentReparto !== 'undefined'
+        ? currentReparto
+        : 'slots');
+  const pos = {};
+  ((window._pianoOrdineCollab || {})[rep] || []).forEach((n, i) => (pos[n] = i));
+  const info = {};
+  (typeof collaboratoriCache !== 'undefined' ? collaboratoriCache : []).forEach((c) => (info[c.nome] = c));
+  const rank = (n) => {
+    const c = info[n] || {};
+    if (c.is_jolly || c.impiego === 'jolly') return 4;
+    const f = c.funzione || '';
+    if (f === 'RESP' || f === 'SOSTRESP') return 0;
+    if (f === 'SUP') return 1;
+    if (f === 'BO') return 2;
+    return 3;
+  };
+  return nomi.slice().sort((a, b) => {
+    const pa = pos[a] != null ? pos[a] : 9999;
+    const pb = pos[b] != null ? pos[b] : 9999;
+    if (pa !== pb) return pa - pb;
+    return rank(a) - rank(b) || a.localeCompare(b);
+  });
+}
+
 // Importo di una registrazione con segno: per le differenze cassa la
 // direzione sta nel testo (ammanco = negativo, eccedenza = positivo).
 // Ritorna { txt: '-100.00', colore: '#c62828' } pronto da mostrare.
