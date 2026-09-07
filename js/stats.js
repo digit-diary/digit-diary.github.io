@@ -84,7 +84,7 @@ function renderStatistiche() {
     const col = d > 0 ? 'var(--accent)' : '#2c6e49';
     const sign = d > 0 ? '+' : '';
     return (
-      ' <span style="font-size:.72rem;font-weight:600;color:' +
+      ' <span style="font-size:.78rem;font-weight:600;color:' +
       col +
       ';background:' +
       col +
@@ -340,7 +340,7 @@ function renderStatistiche() {
         (d.totCHF
           ? fmtCHF(d.totCHF) +
             (d.amm || d.ecc
-              ? '<br><span style="font-size:.72rem"><span style="color:#c62828">-' +
+              ? '<br><span style="font-size:.78rem"><span style="color:#c62828">-' +
                 fmtCHF(d.amm) +
                 '</span> / <span style="color:#2e7d32">+' +
                 fmtCHF(d.ecc) +
@@ -357,7 +357,7 @@ function renderStatistiche() {
       '</strong></td><td></td><td class="num"><strong>' +
       (gCHF ? fmtCHF(gCHF) + ' CHF' : '-') +
       (gAmm || gEcc
-        ? '<br><span style="font-size:.72rem;font-weight:400"><span style="color:#c62828">-' +
+        ? '<br><span style="font-size:.78rem;font-weight:400"><span style="color:#c62828">-' +
           fmtCHF(gAmm) +
           '</span> / <span style="color:#2e7d32">+' +
           fmtCHF(gEcc) +

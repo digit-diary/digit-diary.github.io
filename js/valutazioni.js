@@ -160,9 +160,9 @@ function _renderValutazioneSezione(nome) {
       ne +
       "'" +
       (v ? ',' + v.anno + ",'" + escP(v.tipo) + "'" : '') +
-      ')" style="font-size:.72rem;padding:4px 12px">+ Nuova / Modifica</button>';
+      ')" style="font-size:.78rem;padding:4px 12px">+ Nuova / Modifica</button>';
     html +=
-      '<button class="btn-export" onclick="document.getElementById(\'val-import-file\').click()" style="font-size:.72rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49">Importa Excel</button>' +
+      '<button class="btn-export" onclick="document.getElementById(\'val-import-file\').click()" style="font-size:.78rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49">Importa Excel</button>' +
       '<input type="file" id="val-import-file" accept=".xlsx,.xls" style="display:none" onchange="importaValutazioneExcel(this,\'' +
       ne +
       '\')">';
@@ -171,12 +171,12 @@ function _renderValutazioneSezione(nome) {
     html +=
       '<button class="btn-export btn-export-pdf" onclick="esportaValutazionePDF(' +
       v.id +
-      ')" style="font-size:.72rem;padding:4px 12px">PDF scheda HR</button>';
+      ')" style="font-size:.78rem;padding:4px 12px">PDF scheda HR</button>';
   }
   html += '</h4>';
   if (!vals.length) {
     html +=
-      '<p style="font-size:.86rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="mini-badge" style="background:#8a1c1c;color:#fff;font-size:.72rem;letter-spacing:.05em">VALUTAZIONE ASSENTE</span><span style="color:var(--muted)">Nessuna scheda di valutazione registrata' +
+      '<p style="font-size:.86rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="mini-badge" style="background:#8a1c1c;color:#fff;font-size:.78rem;letter-spacing:.05em">VALUTAZIONE ASSENTE</span><span style="color:var(--muted)">Nessuna scheda di valutazione registrata' +
       (puoVal ? ': creane una nuova o importa la scheda Excel compilata.' : '.') +
       '</span></p></div>';
     return html;
@@ -187,7 +187,7 @@ function _renderValutazioneSezione(nome) {
     vals.forEach((x) => {
       const att = x.id === v.id;
       html +=
-        '<span class="mini-badge" style="cursor:pointer;font-size:.74rem;' +
+        '<span class="mini-badge" style="cursor:pointer;font-size:.75rem;' +
         (att
           ? 'background:var(--accent2);color:white'
           : 'background:var(--paper2);color:var(--ink);border:1px solid var(--line)') +
@@ -214,9 +214,9 @@ function _renderValutazioneSezione(nome) {
   const deltaBadge = function (cur, old) {
     if (cur == null || old == null) return '';
     const d = cur - old;
-    if (d === 0) return '<span style="font-size:.7rem;color:var(--muted);min-width:34px;text-align:right">=</span>';
+    if (d === 0) return '<span style="font-size:.78rem;color:var(--muted);min-width:34px;text-align:right">=</span>';
     return (
-      '<span style="font-size:.7rem;font-weight:700;min-width:34px;text-align:right;color:' +
+      '<span style="font-size:.78rem;font-weight:700;min-width:34px;text-align:right;color:' +
       (d > 0 ? '#2c6e49' : 'var(--accent)') +
       '">' +
       (d > 0 ? '&#9650; +' : '&#9660; ') +
@@ -260,7 +260,7 @@ function _renderValutazioneSezione(nome) {
     if (a.gruppo !== gruppoCorr) {
       gruppoCorr = a.gruppo;
       html +=
-        '<div style="font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:8px 0 3px">' +
+        '<div style="font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:8px 0 3px">' +
         gruppoCorr +
         '</div>';
     }
@@ -281,7 +281,7 @@ function _renderValutazioneSezione(nome) {
       '</strong>' +
       (prec ? deltaBadge(val, areePrec[a.key]) : '') +
       ((v.auto_aree || {})[a.key] != null
-        ? '<span style="font-size:.7rem;color:#1a4a7a;min-width:58px;text-align:right" title="Autovalutazione del collaboratore">auto: ' +
+        ? '<span style="font-size:.78rem;color:#1a4a7a;min-width:58px;text-align:right" title="Autovalutazione del collaboratore">auto: ' +
           v.auto_aree[a.key] +
           '%</span>'
         : '') +
@@ -401,7 +401,7 @@ function apriValutazioneEditor(nome, anno, tipo) {
     if (ar.gruppo !== gruppoCorr) {
       gruppoCorr = ar.gruppo;
       html +=
-        '<div style="font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent2);font-weight:700;margin:14px 0 6px;border-bottom:1px solid var(--line);padding-bottom:3px">' +
+        '<div style="font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent2);font-weight:700;margin:14px 0 6px;border-bottom:1px solid var(--line);padding-bottom:3px">' +
         gruppoCorr +
         '</div>';
     }
@@ -410,7 +410,7 @@ function apriValutazioneEditor(nome, anno, tipo) {
     html +=
       '<div style="display:flex;align-items:center;gap:10px;padding:5px 0;flex-wrap:wrap"><div style="flex:1;min-width:220px"><strong style="font-size:.88rem">' +
       ar.label +
-      '</strong><div style="font-size:.74rem;color:var(--muted);line-height:1.35">' +
+      '</strong><div style="font-size:.75rem;color:var(--muted);line-height:1.35">' +
       ar.desc +
       '</div></div><input type="number" id="val-area-' +
       ar.key +
@@ -422,7 +422,7 @@ function apriValutazioneEditor(nome, anno, tipo) {
           ar.key +
           "').value=" +
           s +
-          '" title="Suggerito dai dati del Diario" style="font-size:.68rem">Suggerito: ' +
+          '" title="Suggerito dai dati del Diario" style="font-size:.75rem">Suggerito: ' +
           s +
           '</button>'
         : '') +
@@ -439,7 +439,7 @@ function apriValutazioneEditor(nome, anno, tipo) {
   const ef = (esistente && esistente.esigenze_formative) || '';
   const os = (esistente && esistente.osservazioni) || '';
   html +=
-    '<div style="font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent2);font-weight:700;margin:14px 0 6px;border-bottom:1px solid var(--line);padding-bottom:3px">COMMENTO ALLA VALUTAZIONE</div>';
+    '<div style="font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent2);font-weight:700;margin:14px 0 6px;border-bottom:1px solid var(--line);padding-bottom:3px">COMMENTO ALLA VALUTAZIONE</div>';
   html +=
     '<div class="field" style="margin-bottom:10px"><label>Punti di forza</label><textarea id="val-punti-forza" style="min-height:50px">' +
     escP(pf) +

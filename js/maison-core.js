@@ -398,15 +398,15 @@ function renderRegali() {
     }
     var _regCatBadge =
       _regBudget && _regBudget.categoria === 'full_maison'
-        ? ' <span class="mini-badge" style="background:#b8860b;font-size:.7rem">Full Maison</span>'
+        ? ' <span class="mini-badge" style="background:#b8860b;font-size:.78rem">Full Maison</span>'
         : _regBudget && _regBudget.categoria === 'maison'
-          ? ' <span class="mini-badge" style="background:#2980b9;font-size:.7rem">Maison</span>'
+          ? ' <span class="mini-badge" style="background:#2980b9;font-size:.78rem">Maison</span>'
           : _regBudget && _regBudget.categoria === 'direzione'
-            ? ' <span class="mini-badge" style="background:#8e44ad;font-size:.7rem">Direzione</span>'
+            ? ' <span class="mini-badge" style="background:#8e44ad;font-size:.78rem">Direzione</span>'
             : _regBudget && _regBudget.categoria === 'bu'
-              ? ' <span class="mini-badge" style="background:#e67e22;font-size:.7rem">Buono Unico</span>'
+              ? ' <span class="mini-badge" style="background:#e67e22;font-size:.78rem">Buono Unico</span>'
               : _regBudget && _regBudget.categoria === 'bl'
-                ? ' <span class="mini-badge" style="background:#2c6e49;font-size:.7rem">Buono Lounge</span>'
+                ? ' <span class="mini-badge" style="background:#2c6e49;font-size:.78rem">Buono Lounge</span>'
                 : '';
     html +=
       '<tr><td style="font-weight:600">' +
@@ -870,9 +870,9 @@ function renderMaisonGdOggi() {
     (_gdWL ? ' &middot; ' + _gdWL + ' WL' : '') +
     '</span>';
   h +=
-    '<button onclick="esportaGdOggiCSV()" style="font-size:.72rem;padding:4px 10px;background:none;border:1px solid white;color:white;border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif;font-weight:600">CSV</button>';
+    '<button onclick="esportaGdOggiCSV()" style="font-size:.78rem;padding:4px 10px;background:none;border:1px solid white;color:white;border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif;font-weight:600">CSV</button>';
   h +=
-    '<button onclick="esportaGdOggiPDF()" style="font-size:.72rem;padding:4px 10px;background:none;border:1px solid #c0392b;color:#c0392b;border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif;font-weight:600">PDF</button></div></div>';
+    '<button onclick="esportaGdOggiPDF()" style="font-size:.78rem;padding:4px 10px;background:none;border:1px solid #c0392b;color:#c0392b;border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif;font-weight:600">PDF</button></div></div>';
   h +=
     '<div style="padding:0 16px 16px;overflow-x:auto"><table class="collab-table"><thead><tr><th style="background:var(--paper)">Cliente</th><th style="background:var(--paper)">Tipo</th><th class="num" style="background:var(--paper)">PX</th><th class="num" style="background:var(--paper)">Costo CHF</th><th style="background:var(--paper)"></th></tr></thead><tbody>';
   // Raggruppa righe con stesso gruppo (es. Bonomelli/Grignani)
@@ -936,7 +936,7 @@ function renderMaisonGdOggi() {
                   bu: '#e67e22',
                   bl: '#2c6e49',
                 }[bAltro.categoria] || 'var(--muted)') +
-                ';font-size:.65rem">' +
+                ';font-size:.78rem">' +
                 ({
                   full_maison: 'FM',
                   maison: 'M',
@@ -1643,27 +1643,27 @@ function apriDettaglioMaison(nome) {
   html +=
     '<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.2rem;font-weight:700;color:#b8860b">CHF ' +
     fmtCHF(tot) +
-    '</div><div style="font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Totale Ristorante</div></div>';
+    '</div><div style="font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Totale Ristorante</div></div>';
   html +=
     '<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.2rem;font-weight:700;color:#2980b9">CHF ' +
     fmtCHF(totSE) +
-    '</div><div style="font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Totale Extra</div></div>';
+    '</div><div style="font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Totale Extra</div></div>';
   html +=
     '<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.2rem;font-weight:700;color:#1a7a6d">CHF ' +
     fmtCHF(totReg) +
-    '</div><div style="font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Totale Regali</div></div>';
+    '</div><div style="font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Totale Regali</div></div>';
   html +=
     '<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.2rem;font-weight:700;color:var(--ink)">CHF ' +
     fmtCHF(_mediaVisita) +
-    '</div><div style="font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Media/visita</div></div>';
+    '</div><div style="font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Media/visita</div></div>';
   html +=
     '<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.2rem;font-weight:700;color:var(--ink)">' +
     righe.length +
-    '</div><div style="font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Visite totali</div></div>';
+    '</div><div style="font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Visite totali</div></div>';
   html +=
     '<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.2rem;font-weight:700;color:var(--ink)">' +
     _ultimoStr +
-    '</div><div style="font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Ultimo passaggio</div></div>';
+    '</div><div style="font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Ultimo passaggio</div></div>';
   html += '</div>';
   // --- Frequenza visite + giorno preferito ---
   if (righe.length) {
@@ -1717,7 +1717,7 @@ function apriDettaglioMaison(nome) {
           const pct = (((val - prev) / prev) * 100).toFixed(0);
           const isUp = val > prev;
           deltaHtml =
-            ' <span style="font-size:.7rem;font-weight:700;color:' +
+            ' <span style="font-size:.78rem;font-weight:700;color:' +
             (isUp ? '#c0392b' : '#27ae60') +
             ';background:' +
             (isUp ? '#c0392b1a' : '#27ae601a') +
@@ -1735,7 +1735,7 @@ function apriDettaglioMaison(nome) {
         ' CHF' +
         deltaHtml +
         '</div>';
-      if (i < _mesiArr.length - 1) html += '<span style="color:var(--muted);font-size:.7rem">&rarr;</span>';
+      if (i < _mesiArr.length - 1) html += '<span style="color:var(--muted);font-size:.78rem">&rarr;</span>';
     });
     html += '</div>';
   }
@@ -1743,7 +1743,7 @@ function apriDettaglioMaison(nome) {
   if (_mesiArr.length > 1) {
     const _maxMese = Math.max(..._mesiArr.map((m) => m[1]));
     html +=
-      '<div style="margin-bottom:16px;padding:10px;background:var(--paper2);border-radius:3px"><div style="font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Trend mensile</div>';
+      '<div style="margin-bottom:16px;padding:10px;background:var(--paper2);border-radius:3px"><div style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Trend mensile</div>';
     html += '<div style="display:flex;gap:4px;align-items:flex-end;height:120px">';
     _mesiArr.forEach(function (m) {
       const h = _maxMese > 0 ? Math.max(4, Math.round((m[1] / _maxMese) * 100)) : 4;
@@ -2087,12 +2087,12 @@ function stampaSchedaCliente() {
   win.document.write('h3,h4{font-family:Playfair Display,serif}');
   win.document.write('table{width:100%;border-collapse:collapse;font-size:.85rem;margin:10px 0}');
   win.document.write(
-    'th{text-align:left;padding:6px 8px;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:#8a7d6b;border-bottom:2px solid #e8dfd0}',
+    'th{text-align:left;padding:6px 8px;font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:#8a7d6b;border-bottom:2px solid #e8dfd0}',
   );
   win.document.write('td{padding:6px 8px;border-bottom:1px solid #e8dfd0}');
   win.document.write('.num{text-align:center;font-weight:600}');
   win.document.write(
-    '.mini-badge{display:inline-block;font-size:.6rem;font-weight:700;padding:1px 5px;border-radius:2px;color:white;margin:1px}',
+    '.mini-badge{display:inline-block;font-size:.75rem;font-weight:700;padding:1px 5px;border-radius:2px;color:white;margin:1px}',
   );
   win.document.write(
     '.budget-bar{height:4px;border-radius:2px;background:#e8dfd0;margin-top:4px;overflow:hidden;min-width:60px}',

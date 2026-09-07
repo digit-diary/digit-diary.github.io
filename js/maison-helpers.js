@@ -860,7 +860,7 @@ function acFiltraMaison(inputId, dropId) {
       const badge = item.cat
         ? '<span class="mini-badge" style="background:' +
           (_catColorsAc[item.cat] || 'var(--muted)') +
-          ';margin-left:6px;font-size:.6rem;vertical-align:middle">' +
+          ';margin-left:6px;font-size:.75rem;vertical-align:middle">' +
           escP(_catLabelsAc[item.cat] || '') +
           '</span>'
         : '';
@@ -1588,22 +1588,22 @@ function renderSpeseExtra() {
     }
     const _seCatBadge =
       _seBudget && _seBudget.categoria === 'full_maison'
-        ? ' <span class="mini-badge" style="background:#b8860b;font-size:.7rem">Full Maison</span>'
+        ? ' <span class="mini-badge" style="background:#b8860b;font-size:.78rem">Full Maison</span>'
         : _seBudget && _seBudget.categoria === 'maison'
-          ? ' <span class="mini-badge" style="background:#2980b9;font-size:.7rem">Maison</span>'
+          ? ' <span class="mini-badge" style="background:#2980b9;font-size:.78rem">Maison</span>'
           : _seBudget && _seBudget.categoria === 'direzione'
-            ? ' <span class="mini-badge" style="background:#8e44ad;font-size:.7rem">Direzione</span>'
+            ? ' <span class="mini-badge" style="background:#8e44ad;font-size:.78rem">Direzione</span>'
             : _seBudget && _seBudget.categoria === 'bu'
-              ? ' <span class="mini-badge" style="background:#e67e22;font-size:.7rem">Buono Unico</span>'
+              ? ' <span class="mini-badge" style="background:#e67e22;font-size:.78rem">Buono Unico</span>'
               : _seBudget && _seBudget.categoria === 'bl'
-                ? ' <span class="mini-badge" style="background:#2c6e49;font-size:.7rem">Buono Lounge</span>'
+                ? ' <span class="mini-badge" style="background:#2c6e49;font-size:.78rem">Buono Lounge</span>'
                 : '';
     const tipiBadges = Object.entries(d.tipi)
       .map(
         ([t, n]) =>
           '<span class="mini-badge" style="background:' +
           (SE_TIPI_COLOR[t] || 'var(--muted)') +
-          ';font-size:.7rem">' +
+          ';font-size:.78rem">' +
           n +
           ' ' +
           (SE_TIPI_LABEL[t] || t) +
@@ -2588,9 +2588,9 @@ function renderInventarioCustom(cat) {
     (adm
       ? '<span><button onclick="rinominaCategoriaInventario(\'' +
         cat.key +
-        '\')" style="font-size:.7rem;padding:3px 10px;background:none;border:1px solid var(--paper);color:var(--paper);border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif">Rinomina</button> <button onclick="rimuoviCategoriaInventario(\'' +
+        '\')" style="font-size:.78rem;padding:3px 10px;background:none;border:1px solid var(--paper);color:var(--paper);border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif">Rinomina</button> <button onclick="rimuoviCategoriaInventario(\'' +
         cat.key +
-        '\')" style="font-size:.7rem;padding:3px 10px;background:none;border:1px solid #e74c3c;color:#e74c3c;border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif">Rimuovi categoria</button></span>'
+        '\')" style="font-size:.78rem;padding:3px 10px;background:none;border:1px solid #e74c3c;color:#e74c3c;border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif">Rimuovi categoria</button></span>'
       : '') +
     '</div>';
   html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;padding:16px">';

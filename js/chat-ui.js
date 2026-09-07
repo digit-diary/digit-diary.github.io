@@ -358,7 +358,7 @@ function renderNoteCollega() {
       '</div>';
     html += '<div style="display:flex;align-items:center;gap:6px">';
     if (c.unread > 0) html += '<span class="conv-badge">' + c.unread + '</span>';
-    html += '<span style="font-size:.7rem;color:var(--muted)">' + timeStr + '</span>';
+    html += '<span style="font-size:.78rem;color:var(--muted)">' + timeStr + '</span>';
     html += '</div></div>';
     html +=
       '<div style="font-size:.8rem;color:var(--muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' +
@@ -1030,7 +1030,7 @@ function renderNoteChat(partner) {
     _grpAdmin = _allGrpNotes.length ? _allGrpNotes[0].da_operatore : '';
     const _isMyAdmin = _grpAdmin === op;
     const _adminBadge =
-      '<span style="background:var(--accent2);color:white;font-size:.6rem;padding:0 4px;border-radius:8px;margin-left:2px;font-weight:700;vertical-align:middle">A</span>';
+      '<span style="background:var(--accent2);color:white;font-size:.75rem;padding:0 4px;border-radius:8px;margin-left:2px;font-weight:700;vertical-align:middle">A</span>';
     _groupMembersHtml =
       '<div class="group-members-tooltip" style="display:none;position:absolute;top:100%;left:0;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:8px 12px;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:100;font-size:.82rem;max-width:300px;line-height:1.6">' +
       ['Tu' + (_isMyAdmin ? _adminBadge : '')]
@@ -1123,7 +1123,7 @@ function renderNoteChat(partner) {
     (isPersistentGroup ? 'pointer' : 'default') +
     "\" onclick=\"var t=this.parentElement.querySelector('.group-members-tooltip');if(t)t.style.display=t.style.display==='none'?'block':'none'\" onmouseenter=\"var t=this.parentElement.querySelector('.group-members-tooltip');if(t)t.style.display='block'\" onmouseleave=\"var t=this.parentElement.querySelector('.group-members-tooltip');if(t)t.style.display='none'\">" +
     headerLabel +
-    (isPersistentGroup ? ' <span style="font-size:.7rem;color:var(--muted)">&#9660;</span>' : '') +
+    (isPersistentGroup ? ' <span style="font-size:.78rem;color:var(--muted)">&#9660;</span>' : '') +
     '</div>' +
     _groupMembersHtml +
     _lastSeenHtml +
@@ -1209,7 +1209,7 @@ function renderNoteChat(partner) {
             nonLettiList.map((n) => '<div style="padding:1px 0">' + escP(n) + '</div>').join('');
         tooltipHtml += '</div>';
         destLabel =
-          '<div class="chat-group-label" style="font-size:.7rem;color:var(--muted);cursor:pointer;position:relative" onmouseenter="document.getElementById(\'' +
+          '<div class="chat-group-label" style="font-size:.78rem;color:var(--muted);cursor:pointer;position:relative" onmouseenter="document.getElementById(\'' +
           tooltipId +
           "').style.display='block'\" onmouseleave=\"document.getElementById('" +
           tooltipId +
@@ -1238,7 +1238,7 @@ function renderNoteChat(partner) {
     const canEdit = isSent && !_qualcunoLetto;
     let actions = '<div class="chat-msg-actions">';
     actions +=
-      '<button class="btn-act" style="font-size:.65rem;padding:2px 6px;color:#d4a017;border-color:#d4a017" onclick="event.stopPropagation();toggleImportante(' +
+      '<button class="btn-act" style="font-size:.78rem;padding:2px 6px;color:#d4a017;border-color:#d4a017" onclick="event.stopPropagation();toggleImportante(' +
       n.id +
       ')" title="' +
       (n.importante ? 'Rimuovi importante' : 'Segna importante') +
@@ -1247,25 +1247,25 @@ function renderNoteChat(partner) {
       '</button>';
     if (canEdit)
       actions +=
-        '<button class="btn-act tipo" style="font-size:.65rem;padding:2px 6px" onclick="event.stopPropagation();modificaNotaCollega(' +
+        '<button class="btn-act tipo" style="font-size:.78rem;padding:2px 6px" onclick="event.stopPropagation();modificaNotaCollega(' +
         n.id +
         ')" title="Modifica"><i class="icx icx-modifica"></i></button>';
     if (isSent)
       actions +=
-        '<button class="btn-act del" style="font-size:.65rem;padding:2px 6px" onclick="event.stopPropagation();eliminaNotaSmart(' +
+        '<button class="btn-act del" style="font-size:.78rem;padding:2px 6px" onclick="event.stopPropagation();eliminaNotaSmart(' +
         n.id +
         ')" title="Elimina"><i class="icx icx-cestino"></i></button>';
     else
       actions +=
-        '<button class="btn-act" style="font-size:.65rem;padding:2px 6px;color:var(--muted);border-color:var(--muted)" onclick="event.stopPropagation();eliminaNotaCollega(' +
+        '<button class="btn-act" style="font-size:.78rem;padding:2px 6px;color:var(--muted);border-color:var(--muted)" onclick="event.stopPropagation();eliminaNotaCollega(' +
         n.id +
         ',\'dest\')" title="Elimina per me"><i class="icx icx-cestino"></i></button>';
     actions +=
-      '<button class="btn-act" style="font-size:.65rem;padding:2px 6px;color:var(--accent2);border-color:var(--accent2)" onclick="event.stopPropagation();rispondiAMessaggio(' +
+      '<button class="btn-act" style="font-size:.78rem;padding:2px 6px;color:var(--accent2);border-color:var(--accent2)" onclick="event.stopPropagation();rispondiAMessaggio(' +
       n.id +
       ')" title="Rispondi">&#8617;</button>';
     actions +=
-      '<button class="btn-act" style="font-size:.65rem;padding:2px 6px;color:var(--muted);border-color:var(--muted)" onclick="event.stopPropagation();inoltraMessaggio(' +
+      '<button class="btn-act" style="font-size:.78rem;padding:2px 6px;color:var(--muted);border-color:var(--muted)" onclick="event.stopPropagation();inoltraMessaggio(' +
       n.id +
       ')" title="Inoltra">&#10132;</button>';
     actions += '</div>';
@@ -2103,12 +2103,12 @@ function apriSchedaCollaboratore(nome) {
     (collabRec && collabRec.impiego
       ? ' <span class="mini-badge" style="background:' +
         (collabRec.impiego === 'fisso' ? '#1a7a6d' : '#e67e22') +
-        ';font-size:.68rem;vertical-align:middle">' +
+        ';font-size:.75rem;vertical-align:middle">' +
         (collabRec.impiego === 'fisso' ? 'Fisso' : 'Jolly') +
         '</span>'
       : '') +
     (collabRec && collabRec.categoria && typeof puoVedereCategorie === 'function' && puoVedereCategorie()
-      ? ' <span class="mini-badge" style="background:var(--accent2);font-size:.68rem;vertical-align:middle" title="Categoria professionale (5&ordf; = ingresso, 1&ordf; = massima)">Cat. ' +
+      ? ' <span class="mini-badge" style="background:var(--accent2);font-size:.75rem;vertical-align:middle" title="Categoria professionale (5&ordf; = ingresso, 1&ordf; = massima)">Cat. ' +
         collabRec.categoria +
         '&ordf;</span>'
       : '') +
@@ -2212,7 +2212,7 @@ function apriSchedaCollaboratore(nome) {
     _malColor +
     '">' +
     totMal +
-    (_totGiorniMal > totMal ? ' <span style="font-size:.7rem;font-weight:400">(' + _totGiorniMal + 'gg)</span>' : '') +
+    (_totGiorniMal > totMal ? ' <span style="font-size:.78rem;font-weight:400">(' + _totGiorniMal + 'gg)</span>' : '') +
     '</div><div class="kpi-lbl">Malattie</div></div>';
   if (totAmm)
     html +=
@@ -2278,7 +2278,7 @@ function apriSchedaCollaboratore(nome) {
           _mdComps.map((k) => escP(k.label)).join(' · ') +
           '</span>';
       html +=
-        '<span class="mini-badge" style="background:var(--accent2);font-size:.72rem" title="Punti ' +
+        '<span class="mini-badge" style="background:var(--accent2);font-size:.78rem" title="Punti ' +
         new Date().getFullYear() +
         '">' +
         _mdPts +
@@ -2292,12 +2292,12 @@ function apriSchedaCollaboratore(nome) {
           '</span>';
       if (_mdCop)
         html +=
-          '<span class="mini-badge" style="background:#2c6e49;font-size:.7rem" title="Coperture turno">' +
+          '<span class="mini-badge" style="background:#2c6e49;font-size:.78rem" title="Coperture turno">' +
           _mdCop +
           ' coperture</span>';
       if (_mdRif)
         html +=
-          '<span class="mini-badge" style="background:var(--accent);font-size:.7rem" title="Disponibilità negate">' +
+          '<span class="mini-badge" style="background:var(--accent);font-size:.78rem" title="Disponibilità negate">' +
           _mdRif +
           ' rifiuti</span>';
       html += '</div>';
@@ -2463,9 +2463,9 @@ function apriSchedaCollaboratore(nome) {
       html +=
         '<div style="text-align:center;min-width:45px"><div style="font-weight:700;font-size:.9rem;color:var(--ink)">' +
         dayDist[i] +
-        '</div><div style="font-size:.7rem;color:var(--muted)">' +
+        '</div><div style="font-size:.78rem;color:var(--muted)">' +
         GIORNI_SHORT[i] +
-        '</div><div style="font-size:.65rem;color:var(--muted)">' +
+        '</div><div style="font-size:.78rem;color:var(--muted)">' +
         pct +
         '%</div></div>';
     });
@@ -2505,7 +2505,7 @@ function apriSchedaCollaboratore(nome) {
   html +=
     '<div class="scheda-section"><h4>Cronologia completa' +
     (vistaCompleta
-      ? ' <span class="mini-badge" style="background:var(--accent2);font-size:.62rem" title="Stai vedendo gli eventi di tutti i settori (vista admin/HR)">TUTTI I SETTORI</span>'
+      ? ' <span class="mini-badge" style="background:var(--accent2);font-size:.75rem" title="Stai vedendo gli eventi di tutti i settori (vista admin/HR)">TUTTI I SETTORI</span>'
       : '') +
     '</h4>';
   html += '<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">';
@@ -2622,26 +2622,26 @@ function _renderSchedaTimeline(nome, entries, moduli, dal, al) {
       var impBadge = impSeg
         ? '<span style="margin-left:4px;padding:1px 6px;background:' +
           (impSeg.colore || 'var(--accent)') +
-          ';color:white;border-radius:2px;font-size:.72rem;font-weight:700">' +
+          ';color:white;border-radius:2px;font-size:.78rem;font-weight:700">' +
           impSeg.txt +
           ' ' +
           (i.valuta || 'CHF') +
           '</span>'
         : '';
       var repBadge = i.reparto
-        ? '<span style="margin-left:4px;padding:1px 6px;background:var(--muted);color:white;border-radius:2px;font-size:.72rem">' +
+        ? '<span style="margin-left:4px;padding:1px 6px;background:var(--muted);color:white;border-radius:2px;font-size:.78rem">' +
           escP(i.reparto) +
           '</span>'
         : '';
       var srcBadge =
         i.source === 'mod'
-          ? '<span style="margin-left:4px;padding:1px 5px;border:1px solid var(--line);border-radius:2px;font-size:.65rem;color:var(--muted)">MODULO</span>'
+          ? '<span style="margin-left:4px;padding:1px 5px;border:1px solid var(--line);border-radius:2px;font-size:.78rem;color:var(--muted)">MODULO</span>'
           : '';
       var setBadge =
         window._schedaVistaCompleta && i.repDip && typeof repartoLabel === 'function'
           ? '<span class="mini-badge" style="margin-left:4px;background:' +
             repartoColore(i.repDip) +
-            ';font-size:.62rem">' +
+            ';font-size:.75rem">' +
             escP(repartoLabel(i.repDip)) +
             '</span>'
           : '';
@@ -2664,7 +2664,7 @@ function _renderSchedaTimeline(nome, entries, moduli, dal, al) {
         '<span style="flex:1;overflow:hidden;text-overflow:ellipsis">' +
         esc(i.text) +
         '</span>' +
-        (i.operatore ? '<span style="font-size:.72rem;color:var(--accent2)">' + escP(i.operatore) + '</span>' : '') +
+        (i.operatore ? '<span style="font-size:.78rem;color:var(--accent2)">' + escP(i.operatore) + '</span>' : '') +
         '</div>'
       );
     })
@@ -2678,7 +2678,7 @@ function schedaKpiFiltra(nome, source, tipo) {
   var chip = document.getElementById('scheda-tl-tipo-chip');
   if (chip)
     chip.innerHTML = tipo
-      ? '<span class="mini-badge" style="background:var(--accent2);cursor:pointer;font-size:.72rem" title="Rimuovi filtro" onclick="schedaKpiFiltra(\'' +
+      ? '<span class="mini-badge" style="background:var(--accent2);cursor:pointer;font-size:.78rem" title="Rimuovi filtro" onclick="schedaKpiFiltra(\'' +
         nome.replace(/'/g, "\\'") +
         "','','')\">" +
         escP(tipo) +
@@ -2723,8 +2723,8 @@ function _renderStoricoHrSezione(nome) {
     });
   var neS = nome.replace(/'/g, "\\'");
   var html = _soloFormazioni
-    ? '<div class="scheda-section"><h4 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Formazioni svolte <span class="mini-badge" style="background:#1a4a7a;font-size:.65rem">SUPERVISOR</span></h4>'
-    : '<div class="scheda-section"><h4 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Storico HR <span class="mini-badge" style="background:var(--accent);font-size:.65rem">RISERVATO</span></h4>';
+    ? '<div class="scheda-section"><h4 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Formazioni svolte <span class="mini-badge" style="background:#1a4a7a;font-size:.78rem">SUPERVISOR</span></h4>'
+    : '<div class="scheda-section"><h4 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Storico HR <span class="mini-badge" style="background:var(--accent);font-size:.78rem">RISERVATO</span></h4>';
   // Inizio contratto + anzianità (solo vista HR completa)
   var dataAss = (c && c.data_assunzione) || '';
   if (_soloFormazioni) dataAss = '';
@@ -2741,7 +2741,7 @@ function _renderStoricoHrSezione(nome) {
       '\')" style="font-size:.75rem;padding:5px 14px;background:var(--accent2)">Salva</button>';
     if (dataAss)
       html +=
-        '<span class="mini-badge" style="background:#1a7a6d;font-size:.72rem">Anzianità: ' +
+        '<span class="mini-badge" style="background:#1a7a6d;font-size:.78rem">Anzianità: ' +
         anzianitaLabel(dataAss) +
         '</span>';
     html += '</div>';
@@ -2756,13 +2756,13 @@ function _renderStoricoHrSezione(nome) {
         html += '<span style="font-size:.84rem;color:var(--muted)">Premio giubileo:</span>';
         daConsegnare.forEach(function (g) {
           html +=
-            '<span class="mini-badge" style="background:#8b6914;font-size:.72rem">' +
+            '<span class="mini-badge" style="background:#8b6914;font-size:.78rem">' +
             g.anni +
             ' anni maturato il ' +
             g.dataLabel +
             ' · ' +
             fmtCHF(g.importo) +
-            ' CHF</span><button class="btn-salva" style="font-size:.72rem;padding:4px 12px;background:#8b6914" onclick="registraGiubileo(\'' +
+            ' CHF</span><button class="btn-salva" style="font-size:.78rem;padding:4px 12px;background:#8b6914" onclick="registraGiubileo(\'' +
             nome.replace(/'/g, "\\'") +
             "'," +
             g.anni +
@@ -2799,18 +2799,18 @@ function _renderStoricoHrSezione(nome) {
         (e.data_evento ? new Date(e.data_evento + 'T12:00:00').toLocaleDateString('it-IT') : '') +
         '</span><span class="mini-badge" style="background:' +
         st.col +
-        ';font-size:.68rem">' +
+        ';font-size:.75rem">' +
         st.label +
         '</span><span style="flex:1">' +
         escP(e.descrizione || '') +
         '</span>' +
-        (e.operatore ? '<span style="font-size:.72rem;color:var(--accent2)">' + escP(e.operatore) + '</span>' : '') +
+        (e.operatore ? '<span style="font-size:.78rem;color:var(--accent2)">' + escP(e.operatore) + '</span>' : '') +
         (isAdmin()
           ? '<button class="btn-act del" onclick="eliminaHrEvento(' +
             e.id +
             ",'" +
             neS +
-            '\')" style="font-size:.68rem">X</button>'
+            '\')" style="font-size:.75rem">X</button>'
           : '') +
         '</div>';
     });
@@ -2821,14 +2821,14 @@ function _renderStoricoHrSezione(nome) {
     html +=
       '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px">' +
       '<span style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700">Allegati (schede originali)</span>' +
-      '<button class="btn-export" style="font-size:.72rem;padding:3px 10px" onclick="caricaAllegatiCollab(\'' +
+      '<button class="btn-export" style="font-size:.78rem;padding:3px 10px" onclick="caricaAllegatiCollab(\'' +
       neS +
       '\')">Mostra</button>' +
-      '<button class="btn-export" style="font-size:.72rem;padding:3px 10px;border-color:#2c6e49;color:#2c6e49" onclick="document.getElementById(\'hr-allegato-file\').click()">+ Carica file</button>' +
+      '<button class="btn-export" style="font-size:.78rem;padding:3px 10px;border-color:#2c6e49;color:#2c6e49" onclick="document.getElementById(\'hr-allegato-file\').click()">+ Carica file</button>' +
       '<input type="file" id="hr-allegato-file" accept=".pdf,.xlsx,.xls,.jpg,.jpeg,.png" style="display:none" onchange="caricaNuovoAllegatoScheda(this,\'' +
       neS +
       '\')">' +
-      '<span style="font-size:.72rem;color:var(--muted)">PDF, Excel o immagine · max 2 MB</span>' +
+      '<span style="font-size:.78rem;color:var(--muted)">PDF, Excel o immagine · max 2 MB</span>' +
       '</div><div id="hr-allegati-list" style="margin-top:6px"></div>';
   }
   html += '</div>';
@@ -2889,7 +2889,7 @@ function apriVoceTimeline(source, id) {
   var riga = function (label, val) {
     if (!val) return '';
     return (
-      '<div style="margin-bottom:8px"><div style="font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700">' +
+      '<div style="margin-bottom:8px"><div style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700">' +
       label +
       '</div><div style="font-size:.88rem;line-height:1.45">' +
       esc(String(val)) +

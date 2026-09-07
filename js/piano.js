@@ -853,7 +853,7 @@ async function renderPiano() {
         const ssnap = (window._pianoSessSnap || {})[_pianoMeseSel + '|' + _pianoReparto()];
         if (ssnap)
           h +=
-            '<button class="btn-export" style="font-size:.72rem;padding:3px 9px;border-color:#c0392b;color:#c0392b" title="Riporta questo mese a com\'era quando hai iniziato a modificarlo in questa sessione (' +
+            '<button class="btn-export" style="font-size:.78rem;padding:3px 9px;border-color:#c0392b;color:#c0392b" title="Riporta questo mese a com\'era quando hai iniziato a modificarlo in questa sessione (' +
             ssnap.n +
             ' operazioni tue)" onclick="pianoAnnullaTutto()">Annulla tutto (' +
             ssnap.n +
@@ -993,7 +993,7 @@ async function renderPiano() {
           (puoMod ? ' ondblclick="pianoMarkerEdit(' + g + ')"' : '') +
           '>' +
           (_pianoMarkerGiorno(ym, g)
-            ? '<div style="font-size:.58rem;background:#FFFF00;color:#000;font-weight:bold;line-height:1.1">' +
+            ? '<div style="font-size:.75rem;background:#FFFF00;color:#000;font-weight:bold;line-height:1.1">' +
               escP(_pianoMarkerGiorno(ym, g)) +
               '</div>'
             : '') +
@@ -1138,7 +1138,7 @@ async function renderPiano() {
           '\')"></i>' +
           escP(nome) +
           (infoC && infoC.lingue
-            ? ' <span style="font-size:.62rem;color:var(--muted);font-weight:700">' + escP(infoC.lingue) + '</span>'
+            ? ' <span style="font-size:.75rem;color:var(--muted);font-weight:700">' + escP(infoC.lingue) + '</span>'
             : '') +
           // il collaboratore non e' dell'anagrafica di QUESTO settore (o non
           // c'e' affatto): si segnala, cosi' l'anomalia non passa inosservata
@@ -1181,7 +1181,7 @@ async function renderPiano() {
               : '') +
           '</td><td class="piano-fun"><strong>' +
           escP(infoC && infoC.is_jolly ? 'JOLLY' : (infoC && infoC.funzione) || '') +
-          '</strong> <span style="font-size:.7rem">' +
+          '</strong> <span style="font-size:.78rem">' +
           Math.round(perc * 100) +
           '%</span></td>' +
           riga +
@@ -1270,7 +1270,7 @@ async function renderPiano() {
               (festiviSet[dstr] ? ' title="' + escP(festiviSet[dstr]) + '"' : '') +
               '>' +
               (_pianoMarkerGiorno(ym, g)
-                ? '<div style="font-size:.58rem;background:#FFFF00;color:#000;font-weight:bold;line-height:1.1">' +
+                ? '<div style="font-size:.75rem;background:#FFFF00;color:#000;font-weight:bold;line-height:1.1">' +
                   escP(_pianoMarkerGiorno(ym, g)) +
                   '</div>'
                 : '') +
@@ -2638,7 +2638,7 @@ function _renderPianoRegoleCard() {
       ';text-align:left">' +
       _pianoRegoleDove(r.nome) +
       (PIANO_REGOLE_FONTE[r.nome]
-        ? '<br><span style="font-weight:400;color:var(--muted);font-size:.72rem">' +
+        ? '<br><span style="font-weight:400;color:var(--muted);font-size:.78rem">' +
           escP(PIANO_REGOLE_FONTE[r.nome]) +
           '</span>'
         : '') +
@@ -6754,7 +6754,7 @@ async function caricaStatisticheAnnoPiano() {
       (o.cgfPersi ? ' title="' + o.cgfPersi + ' recuperi caduti in malattia: restano a credito"' : '') +
       '>' +
       (o.cgfGod || '') +
-      (o.cgfPersi ? ' <span style="color:#c0392b;font-size:.72rem">+' + o.cgfPersi + ' in malattia</span>' : '') +
+      (o.cgfPersi ? ' <span style="color:#c0392b;font-size:.78rem">+' + o.cgfPersi + ' in malattia</span>' : '') +
       '</td><td style="font-weight:700;color:' +
       (o.cgfMat - o.cgfGod > 0 ? '#2c6e49' : o.cgfMat - o.cgfGod < 0 ? '#c0392b' : 'var(--muted)') +
       '">' +
@@ -8881,7 +8881,7 @@ async function _renderPianoFormulariTab() {
           icona +
           ' ' +
           escP(f.nome) +
-          ' <span style="font-size:.72rem;color:var(--muted)">(' +
+          ' <span style="font-size:.78rem;color:var(--muted)">(' +
           Math.round((f.dimensione || 0) / 1024) +
           ' KB)</span></span>' +
           '<button class="btn-export" style="font-size:.76rem;padding:3px 10px" onclick="apriFormulario(' +
@@ -9269,7 +9269,7 @@ function _renderPianoPreferenzeCard() {
       c.id +
       ',\'accompagnamento_settori\',this.value)" style="width:90px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td style="text-align:left">' +
       (typeof apriCoperturaCollab === 'function'
-        ? '<button class="btn-export" style="font-size:.72rem;padding:2px 8px" title="Copertura altri settori: si imposta qui e in Gestione collaboratori (stessa finestra)" onclick="apriCoperturaCollab(' +
+        ? '<button class="btn-export" style="font-size:.78rem;padding:2px 8px" title="Copertura altri settori: si imposta qui e in Gestione collaboratori (stessa finestra)" onclick="apriCoperturaCollab(' +
           c.id +
           ')">' +
           escP(
@@ -10511,12 +10511,12 @@ async function _renderPianoBriefingTab() {
             c +
             ';border:1px solid #999;border-radius:3px;margin:2px;cursor:pointer;vertical-align:middle"></span>',
         ).join('') +
-        '<button data-c="" class="btn-export" style="font-size:.7rem;padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="briefColoreApplica(null)">Nessuno</button>' +
+        '<button data-c="" class="btn-export" style="font-size:.78rem;padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="briefColoreApplica(null)">Nessuno</button>' +
         '<span style="display:inline-block;width:1px;height:20px;background:var(--line);margin:0 8px;vertical-align:middle"></span>' +
         '<button class="btn-export" style="font-size:.75rem;font-weight:700;padding:2px 10px;vertical-align:middle" title="Grassetto sulle celle o righe marcate (vista e stampa)" onclick="briefFormatoApplica(\'b\')">G</button> ' +
         '<button class="btn-export" style="font-size:.75rem;font-style:italic;padding:2px 10px;vertical-align:middle" title="Corsivo sulle celle o righe marcate (vista e stampa)" onclick="briefFormatoApplica(\'i\')">C</button>' +
         '<div style="margin-top:7px;padding-top:6px;border-top:1px solid var(--line)">' +
-        '<span style="font-size:.72rem;color:var(--muted);vertical-align:middle;margin-right:4px">Testo:</span>' +
+        '<span style="font-size:.78rem;color:var(--muted);vertical-align:middle;margin-right:4px">Testo:</span>' +
         PIANO_COLORI_TESTO.map(
           (c) =>
             '<span title="Colore del testo" onclick="briefTestoApplica(\'' +
@@ -10525,12 +10525,12 @@ async function _renderPianoBriefingTab() {
             c +
             ';border:1px solid #999;border-radius:3px;margin:2px;cursor:pointer;vertical-align:middle"></span>',
         ).join('') +
-        '<button class="btn-export" style="font-size:.68rem;padding:2px 8px;margin-left:4px;vertical-align:middle" onclick="briefTestoApplica(null)">Auto</button>' +
+        '<button class="btn-export" style="font-size:.75rem;padding:2px 8px;margin-left:4px;vertical-align:middle" onclick="briefTestoApplica(null)">Auto</button>' +
         '</div>' +
         '<div style="margin-top:7px;padding-top:6px;border-top:1px solid var(--line)">' +
-        '<button class="btn-export" style="font-size:.72rem;padding:2px 10px;vertical-align:middle" title="Memorizza il formato della prima cella marcata" onclick="briefCopiaFormato()">Copia formato</button> ' +
-        '<button class="btn-export" style="font-size:.72rem;padding:2px 10px;vertical-align:middle" title="Applica il formato memorizzato alle celle marcate" onclick="briefIncollaFormato()">Incolla formato</button> ' +
-        '<button class="btn-export" style="font-size:.72rem;padding:2px 10px;vertical-align:middle;border-color:#c0392b;color:#c0392b" title="Toglie colori e formato dalle celle o righe marcate" onclick="briefCancellaFormato()">Cancella formato</button>' +
+        '<button class="btn-export" style="font-size:.78rem;padding:2px 10px;vertical-align:middle" title="Memorizza il formato della prima cella marcata" onclick="briefCopiaFormato()">Copia formato</button> ' +
+        '<button class="btn-export" style="font-size:.78rem;padding:2px 10px;vertical-align:middle" title="Applica il formato memorizzato alle celle marcate" onclick="briefIncollaFormato()">Incolla formato</button> ' +
+        '<button class="btn-export" style="font-size:.78rem;padding:2px 10px;vertical-align:middle;border-color:#c0392b;color:#c0392b" title="Toglie colori e formato dalle celle o righe marcate" onclick="briefCancellaFormato()">Cancella formato</button>' +
         '</div>' +
         '</div></span>'
       : '') +
@@ -10636,7 +10636,7 @@ async function _renderPianoBriefingTab() {
         (stNome.t || r.colT ? ';color:' + (stNome.t || r.colT) : '') +
         '">' +
         (r.fm
-          ? '<span style="font-size:.66rem;font-weight:700;color:#000;padding-right:3px">(formazione)</span>'
+          ? '<span style="font-size:.75rem;font-weight:700;color:#000;padding-right:3px">(formazione)</span>'
           : '') +
         '</td>';
     } else h += inp('nome', r.nome, 150);
@@ -11362,7 +11362,7 @@ function _renderPianoCorsiCard() {
   h +=
     '<div class="field"><label>Fine</label><input type="time" id="corso-fine" value="' + (preCS[1] || '') + '"></div>';
   h +=
-    '<button class="btn-export" style="font-size:.72rem;padding:4px 10px" title="La prossima volta questo corso partirà con questo orario" onclick="corsoSalvaOrarioDefault()">Salva orario predefinito</button>';
+    '<button class="btn-export" style="font-size:.78rem;padding:4px 10px" title="La prossima volta questo corso partirà con questo orario" onclick="corsoSalvaOrarioDefault()">Salva orario predefinito</button>';
   h += '</div>';
   h +=
     '<div style="margin-bottom:6px;font-size:.82rem"><b>Partecipanti</b> · <span style="cursor:pointer;color:#1a4a7a;text-decoration:underline" onclick="document.querySelectorAll(\'.corso-part\').forEach(c=>c.checked=true)">tutti</span> / <span style="cursor:pointer;color:#1a4a7a;text-decoration:underline" onclick="document.querySelectorAll(\'.corso-part\').forEach(c=>c.checked=false)">nessuno</span></div>';
@@ -11909,12 +11909,12 @@ function _pianoColoriBarHtml() {
         c +
         ';border:1px solid #999;border-radius:3px;margin:2px;cursor:pointer;vertical-align:middle"></span>',
     ).join('') +
-    '<button data-c="" class="btn-export" style="font-size:.7rem;padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="pianoApplicaColore(null)">Colore del turno</button>' +
+    '<button data-c="" class="btn-export" style="font-size:.78rem;padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="pianoApplicaColore(null)">Colore del turno</button>' +
     '<span style="display:inline-block;width:1px;height:20px;background:var(--line);margin:0 8px;vertical-align:middle"></span>' +
     '<button class="btn-export" style="font-size:.75rem;font-weight:700;padding:2px 10px;vertical-align:middle" title="Grassetto sulle celle selezionate (vista e stampa)" onclick="pianoApplicaFormato(\'b\')">G</button> ' +
     '<button class="btn-export" style="font-size:.75rem;font-style:italic;padding:2px 10px;vertical-align:middle" title="Corsivo sulle celle selezionate (vista e stampa)" onclick="pianoApplicaFormato(\'i\')">C</button>' +
     '<div style="margin-top:7px;padding-top:6px;border-top:1px solid var(--line)">' +
-    '<span style="font-size:.72rem;color:var(--muted);vertical-align:middle;margin-right:4px">Testo:</span>' +
+    '<span style="font-size:.78rem;color:var(--muted);vertical-align:middle;margin-right:4px">Testo:</span>' +
     PIANO_COLORI_TESTO.map(
       (c) =>
         '<span title="Colore del testo" onclick="pianoApplicaColoreTesto(\'' +
@@ -11923,12 +11923,12 @@ function _pianoColoriBarHtml() {
         c +
         ';border:1px solid #999;border-radius:3px;margin:2px;cursor:pointer;vertical-align:middle"></span>',
     ).join('') +
-    '<button class="btn-export" style="font-size:.68rem;padding:2px 8px;margin-left:4px;vertical-align:middle" onclick="pianoApplicaColoreTesto(null)">Auto</button>' +
+    '<button class="btn-export" style="font-size:.75rem;padding:2px 8px;margin-left:4px;vertical-align:middle" onclick="pianoApplicaColoreTesto(null)">Auto</button>' +
     '</div>' +
     '<div style="margin-top:7px;padding-top:6px;border-top:1px solid var(--line)">' +
-    '<button class="btn-export" style="font-size:.72rem;padding:2px 10px;vertical-align:middle" title="Memorizza colore e formato della prima cella selezionata" onclick="pianoCopiaFormato()">Copia formato</button> ' +
-    '<button class="btn-export" style="font-size:.72rem;padding:2px 10px;vertical-align:middle" title="Applica il formato memorizzato alle celle selezionate" onclick="pianoIncollaFormato()">Incolla formato</button> ' +
-    '<button class="btn-export" style="font-size:.72rem;padding:2px 10px;vertical-align:middle;border-color:#c0392b;color:#c0392b" title="Toglie colori, grassetto e corsivo dalle celle selezionate (i turni non cambiano)" onclick="pianoCancellaFormato()">Cancella formato</button>' +
+    '<button class="btn-export" style="font-size:.78rem;padding:2px 10px;vertical-align:middle" title="Memorizza colore e formato della prima cella selezionata" onclick="pianoCopiaFormato()">Copia formato</button> ' +
+    '<button class="btn-export" style="font-size:.78rem;padding:2px 10px;vertical-align:middle" title="Applica il formato memorizzato alle celle selezionate" onclick="pianoIncollaFormato()">Incolla formato</button> ' +
+    '<button class="btn-export" style="font-size:.78rem;padding:2px 10px;vertical-align:middle;border-color:#c0392b;color:#c0392b" title="Toglie colori, grassetto e corsivo dalle celle selezionate (i turni non cambiano)" onclick="pianoCancellaFormato()">Cancella formato</button>' +
     '</div>' +
     '</div></span>'
   );
@@ -12864,7 +12864,7 @@ function _pianoApplicaNascosti() {
     (o.nomi.length ? o.nomi.length + ' righe' : '') +
     (o.nomi.length && o.giorni.length ? ' + ' : '') +
     (o.giorni.length ? o.giorni.length + ' giorni (' + o.giorni.sort((a, b) => a - b).join(', ') + ')' : '') +
-    '</span> <button class="btn-export" style="font-size:.72rem;padding:2px 10px;margin-left:8px" onclick="pianoMostraNascosti()">Mostra tutto</button>';
+    '</span> <button class="btn-export" style="font-size:.78rem;padding:2px 10px;margin-left:8px" onclick="pianoMostraNascosti()">Mostra tutto</button>';
   bar.style.cssText = 'padding:4px 2px 6px';
 }
 function pianoCopiaBlocco() {

@@ -262,7 +262,7 @@ function livelloBadgeHtml(lv, c) {
         .filter((k) => (parseInt(k.livello) || 0) < maxCert && spunte[k.key] !== true)
         .map((k) => k.label);
       return (
-        '<span class="mini-badge" style="background:#d4a017;color:#000;font-size:.72rem" title="Certificato fino a ' +
+        '<span class="mini-badge" style="background:#d4a017;color:#000;font-size:.78rem" title="Certificato fino a ' +
         escP(livelloNome(maxCert)) +
         ' ma manca: ' +
         escP(mancanti.join(', ')) +
@@ -275,7 +275,7 @@ function livelloBadgeHtml(lv, c) {
   if (!lv) return '<span class="mini-badge" style="background:var(--muted)">-</span>';
   const col = { 1: '#1a4a7a', 2: '#e67e22', 3: '#2c6e49', 4: '#8e44ad', 5: '#c0392b' }[lv] || 'var(--muted)';
   return (
-    '<span class="mini-badge" style="background:' + col + ';font-size:.72rem">' + escP(livelloNome(lv)) + '</span>'
+    '<span class="mini-badge" style="background:' + col + ';font-size:.78rem">' + escP(livelloNome(lv)) + '</span>'
   );
 }
 function puntiTotali(nome, anno) {
@@ -807,7 +807,7 @@ function renderFormazione() {
       (cc ? ' style="background:' + cc + ' !important;color:#000"' : '') +
       '>' +
       escP(k.label) +
-      (k.livello ? ' <span style="font-size:.6rem;color:#00000099">L' + k.livello + '</span>' : '') +
+      (k.livello ? ' <span style="font-size:.75rem;color:#00000099">L' + k.livello + '</span>' : '') +
       '</th>';
   });
   html += '<th class="num">Livello</th><th class="num">Punti ' + new Date().getFullYear() + '</th></tr></thead><tbody>';
@@ -826,12 +826,12 @@ function renderFormazione() {
       (c.impiego
         ? ' <span class="mini-badge" style="background:' +
           (c.impiego === 'fisso' ? '#1a7a6d' : '#e67e22') +
-          ';font-size:.62rem">' +
+          ';font-size:.75rem">' +
           (c.impiego === 'fisso' ? 'Fisso' : 'Jolly') +
           '</span>'
         : '') +
       (c.categoria && typeof puoVedereCategorie === 'function' && puoVedereCategorie()
-        ? ' <span class="mini-badge" style="background:var(--accent2);font-size:.62rem">' +
+        ? ' <span class="mini-badge" style="background:var(--accent2);font-size:.75rem">' +
           c.categoria +
           '&ordf;</span>'
         : '') +
@@ -968,7 +968,7 @@ function renderFormazione() {
         (adm
           ? '<td><button class="btn-act del" onclick="eliminaPuntiEvento(' +
             p.id +
-            ')" style="font-size:.7rem">X</button></td>'
+            ')" style="font-size:.78rem">X</button></td>'
           : '') +
         '</tr>';
     });
@@ -1047,7 +1047,7 @@ function renderFormazione() {
               new Date((a.data_evento || '') + 'T12:00:00').toLocaleDateString('it-IT') +
               ')</span></span>' +
               (adm || puoPunti
-                ? '<button class="btn-export" style="font-size:.7rem;padding:2px 10px" onclick="registraPremioConsegnato(\'' +
+                ? '<button class="btn-export" style="font-size:.78rem;padding:2px 10px" onclick="registraPremioConsegnato(\'' +
                   a.collaboratore.replace(/'/g, "\\'") +
                   "','" +
                   prem.replace(/'/g, "\\'") +
@@ -1139,7 +1139,7 @@ function renderFormazione() {
       '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">' +
       '<span style="font-size:.8rem;color:var(--muted)">Allega scheda (facoltativo):</span>' +
       '<input type="file" id="frm-allegato" accept=".pdf,.xlsx,.xls,.jpg,.jpeg,.png" style="font-size:.78rem;max-width:260px">' +
-      '<span style="font-size:.72rem;color:var(--muted)">PDF, Excel o immagine · max 2 MB, visibile nello Storico HR</span></div>';
+      '<span style="font-size:.78rem;color:var(--muted)">PDF, Excel o immagine · max 2 MB, visibile nello Storico HR</span></div>';
     html +=
       '<p style="color:var(--muted);font-size:.75rem;margin-top:6px">La formazione viene tracciata con data e formatore nello Storico HR del collaboratore (visibile solo a admin e operatori autorizzati).</p>';
     html += '</div></div>';
@@ -1269,9 +1269,9 @@ function _renderEquitaCard(collabs) {
   });
   const conDati = righe.filter((r) => r.categoria || r.dataAss);
   let html =
-    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:8px">Equità categorie · analisi meritocratica <span class="mini-badge" style="background:var(--accent);font-size:.65rem">RISERVATO</span>' +
+    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:8px">Equità categorie · analisi meritocratica <span class="mini-badge" style="background:var(--accent);font-size:.78rem">RISERVATO</span>' +
     (isAdmin()
-      ? '<span style="margin-left:auto;font-size:.72rem;font-weight:400;display:flex;align-items:center;gap:6px">Segnala da <select onchange="salvaEquitaMesi(this.value)" style="padding:4px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);font-size:.75rem">' +
+      ? '<span style="margin-left:auto;font-size:.78rem;font-weight:400;display:flex;align-items:center;gap:6px">Segnala da <select onchange="salvaEquitaMesi(this.value)" style="padding:4px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);font-size:.75rem">' +
         [3, 6, 9, 12]
           .map(
             (m) =>
@@ -2416,15 +2416,15 @@ function badgeCoperturaHtml(entry) {
   let h = '';
   if (cop)
     h +=
-      '<span style="display:inline-block;margin-left:6px;padding:2px 8px;background:#1a7a6d;color:white;border-radius:2px;font-size:.74rem;font-weight:700">Coperto: ' +
+      '<span style="display:inline-block;margin-left:6px;padding:2px 8px;background:#1a7a6d;color:white;border-radius:2px;font-size:.75rem;font-weight:700">Coperto: ' +
       escP(cop.collaboratore) +
       '</span>';
   else
     h +=
-      '<span style="display:inline-block;margin-left:6px;padding:2px 8px;background:var(--muted);color:white;border-radius:2px;font-size:.74rem;font-weight:600">Senza copertura</span>';
+      '<span style="display:inline-block;margin-left:6px;padding:2px 8px;background:var(--muted);color:white;border-radius:2px;font-size:.75rem;font-weight:600">Senza copertura</span>';
   if (rifiuti)
     h +=
-      '<span style="display:inline-block;margin-left:4px;padding:2px 8px;background:var(--accent);color:white;border-radius:2px;font-size:.74rem;font-weight:700">' +
+      '<span style="display:inline-block;margin-left:4px;padding:2px 8px;background:var(--accent);color:white;border-radius:2px;font-size:.75rem;font-weight:700">' +
       rifiuti +
       ' rifiut' +
       (rifiuti === 1 ? 'o' : 'i') +
@@ -2476,7 +2476,7 @@ function _renderPopupCopertura() {
   const esistenti = eventiCopertura(assente, ctx.dataRif);
   if (esistenti.length) {
     html +=
-      '<div style="margin-bottom:14px;padding:10px 12px;background:var(--paper2);border-radius:3px;border-left:3px solid var(--accent2)"><div style="font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:6px">Già registrato</div>' +
+      '<div style="margin-bottom:14px;padding:10px 12px;background:var(--paper2);border-radius:3px;border-left:3px solid var(--accent2)"><div style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:6px">Già registrato</div>' +
       esistenti
         .map(
           (p) =>
@@ -2489,7 +2489,7 @@ function _renderPopupCopertura() {
             p.punti +
             '</span><span style="color:var(--muted);font-size:.78rem;flex:1">' +
             (p.azione === 'copertura' ? 'copertura' : 'rifiuto disponibilità') +
-            '</span><button class="btn-act del" style="font-size:.68rem" onclick="_rimuoviEventoCopertura(' +
+            '</span><button class="btn-act del" style="font-size:.75rem" onclick="_rimuoviEventoCopertura(' +
             p.id +
             ')">Rimuovi</button></div>',
         )
@@ -2527,7 +2527,7 @@ function _renderPopupCopertura() {
   html +=
     '<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="_chiudiPopupCopertura(false)">Nessuna copertura</button><button class="btn-modal-ok" onclick="_chiudiPopupCopertura(true)">Conferma</button></div>';
   html +=
-    '<p style="font-size:.72rem;color:var(--muted);text-align:center;margin-top:8px">Puoi sempre assegnare o correggere i punti dopo, dalla pagina Formazione.</p>';
+    '<p style="font-size:.78rem;color:var(--muted);text-align:center;margin-top:8px">Puoi sempre assegnare o correggere i punti dopo, dalla pagina Formazione.</p>';
   document.getElementById('pwd-modal-content').innerHTML = html;
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
@@ -2638,7 +2638,7 @@ function _renderGiubileiCard(collabs) {
   });
   if (!daConsegnare.length && !inArrivo.length) return '';
   let html =
-    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:8px">Premi giubileo <span class="mini-badge" style="background:var(--accent);font-size:.65rem">RISERVATO</span></div><div style="padding:14px 16px">';
+    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:8px">Premi giubileo <span class="mini-badge" style="background:var(--accent);font-size:.78rem">RISERVATO</span></div><div style="padding:14px 16px">';
   if (daConsegnare.length) {
     html +=
       '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:6px">Da consegnare</p>';
@@ -2648,7 +2648,7 @@ function _renderGiubileiCard(collabs) {
         x.nome.replace(/'/g, "\\'") +
         '\')">' +
         escP(x.nome) +
-        '</strong><span class="mini-badge" style="background:#8b6914;font-size:.72rem">' +
+        '</strong><span class="mini-badge" style="background:#8b6914;font-size:.78rem">' +
         x.g.anni +
         ' anni</span><span style="font-size:.84rem">maturato il ' +
         x.g.dataLabel +
@@ -2715,7 +2715,7 @@ function _renderPanoramicaHrCard(collabs) {
   let html =
     '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:8px">Panoramica HR · ' +
     escP(repartoLabel(currentReparto)) +
-    ' <span class="mini-badge" style="background:var(--accent);font-size:.65rem">RISERVATO</span></div><div style="padding:14px 16px">';
+    ' <span class="mini-badge" style="background:var(--accent);font-size:.78rem">RISERVATO</span></div><div style="padding:14px 16px">';
   html +=
     '<div class="stats-bar" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr));margin-bottom:12px">';
   const kpi = (n, lbl, col) =>
