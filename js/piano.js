@@ -10868,20 +10868,59 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
           '&limit=100',
       )) || [];
     const mappa = {};
-    righe.forEach((r) => (mappa[r.data] = r.codice));
+    const codPrec = {};
+    righe.forEach((r) => {
+      mappa[r.data] = r.codice;
+      codPrec[r.data] = r.codice; // stato PRIMA della modifica, per i controlli sotto
+    });
     if (codiceNuovo !== undefined) mappa[dstr] = codiceNuovo; // simulazione prima del salvataggio
+    // CONGEDI DEDICATI ALLE VACANZE: le C (e i WD) messi prima e dopo un
+    // periodo di vacanza servono al riposo previsto dalle regole. Scriverci
+    // sopra un turno toglie quel riposo, quindi si avvisa.
+    const avvisiExtra = [];
+    const codOra = codPrec[dstr];
+    if (codiceNuovo && _pianoTurnoInfo(codiceNuovo) && (codOra === 'C' || codOra === 'WD')) {
+      const info = _pianoCollabInfo(nome) || {};
+      const pct = parseFloat(info.percentuale) || 1;
+      const nPrima =
+        (info.is_jolly ? parseInt(_pianoRegolaVal('c_prima_jolly')) : parseInt(_pianoRegolaVal('c_prima_fissi'))) || 1;
+      const nDopo =
+        parseInt(
+          _pianoRegolaVal(pct >= 1 ? 'c_dopo_100' : pct >= 0.8 ? 'c_dopo_80' : pct >= 0.6 ? 'c_dopo_60' : 'c_dopo_40'),
+        ) || 1;
+      const nWd = parseInt(_pianoRegolaVal('wd_prima_vacanza')) || 0;
+      const rel = (n) => {
+        const d = new Date(dstr + 'T12:00:00');
+        d.setDate(d.getDate() + n);
+        return d.toISOString().substring(0, 10);
+      };
+      let dedicato = '';
+      // vacanza che INIZIA nei giorni successivi: questo e' un congedo "prima"
+      for (let k = 1; k <= nPrima + nWd && !dedicato; k++)
+        if (codPrec[rel(k)] === 'V')
+          dedicato = 'congedo previsto PRIMA delle vacanze (' + (codOra === 'WD' ? 'WD' : 'C') + ')';
+      // vacanza che FINISCE nei giorni precedenti: congedo "dopo"
+      for (let k = 1; k <= nDopo && !dedicato; k++)
+        if (codPrec[rel(-k)] === 'V') dedicato = 'congedo di recupero DOPO le vacanze';
+      if (dedicato)
+        avvisiExtra.push(
+          "questo giorno e' un " + dedicato + ': assegnandogli il turno ' + codiceNuovo + ' quel riposo viene tolto',
+        );
+    }
     // la logica riposo/consecutivi/idoneita' vive nel motore puro PianoRegole
     const tNuovo = codiceNuovo !== undefined ? _pianoTurnoInfo(codiceNuovo) : null;
-    return PianoRegole.violazioniCella({
-      mappaGiorni: mappa,
-      giorno: dstr,
-      minRiposo: minRiposo,
-      maxCons: maxCons,
-      turnoDi: (c) => _pianoTurnoInfo(c),
-      isLavoro: (c) => _pianoIsLavoro(c),
-      idoneo: tNuovo ? _pianoIdoneoPerTurno(nome, tNuovo) : null,
-      codiceNuovo: codiceNuovo,
-    });
+    return avvisiExtra.concat(
+      PianoRegole.violazioniCella({
+        mappaGiorni: mappa,
+        giorno: dstr,
+        minRiposo: minRiposo,
+        maxCons: maxCons,
+        turnoDi: (c) => _pianoTurnoInfo(c),
+        isLavoro: (c) => _pianoIsLavoro(c),
+        idoneo: tNuovo ? _pianoIdoneoPerTurno(nome, tNuovo) : null,
+        codiceNuovo: codiceNuovo,
+      }),
+    );
   } catch (e) {
     return [];
   }
