@@ -269,6 +269,66 @@ ok(meta.punteggio < ideale.punteggio, 'meno domeniche libere = punteggio piu bas
 // la malattia non deve influire: non e' tra i criteri
 ok(!ideale.voci.some((v) => /malatt/i.test(v.nome)), 'le malattie non tolgono punti (non sono una colpa)');
 
+console.log('\n== giorniVacanzaSpettanti ==');
+// scala per anzianita' (assunto il 1 gennaio, cosi' gli anni sono pieni)
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2001).giorni, 28, 'primo anno = 28 giorni');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2002).giorni, 35, 'dal secondo anniversario = 35 giorni');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2009).giorni, 35, 'nove anni = ancora 35');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2010).giorni, 36, 'dieci anni = 36 (+1)');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2015).giorni, 38, 'quindici anni = 38 (+2 cumulato)');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2020).giorni, 41, 'venti anni = 41 (+3 cumulato)');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2025).giorni, 46, 'venticinque anni = 46 (+5 cumulato)');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2030).giorni, 46, 'oltre i venticinque resta 46');
+
+// PRO RATA nell'anno in cui si compiono i due anni: assunto 1 maggio 2024,
+// nel 2026 compie 2 anni il 1 maggio -> gen-apr a 28/12, mag-dic a 35/12
+const pr = R.giorniVacanzaSpettanti('2024-05-01', 2026);
+eq(pr.mesiBase1, 4, 'quattro mesi ancora a 28 giorni');
+eq(pr.mesiBase2, 8, 'otto mesi gia a 35 giorni');
+eq(pr.giorni, 32.67, 'anno del passaggio: 32.67 giorni (9.33 + 23.33)');
+
+// anno di assunzione: contano solo i mesi lavorati
+const primo = R.giorniVacanzaSpettanti('2026-07-01', 2026);
+eq(primo.mesiBase1, 6, 'assunto a luglio: sei mesi nel primo anno');
+eq(primo.giorni, 14, 'assunto a luglio: 14 giorni (mezza annata a 28)');
+
+// il bonus e' pieno nell'anno dell'anniversario, non proporzionato
+const b10 = R.giorniVacanzaSpettanti('2016-05-01', 2026);
+eq(b10.bonus, 1, 'compie dieci anni a maggio: il giorno in piu vale per intero');
+eq(b10.giorni, 36, 'dieci anni compiuti in corso d anno = 36 giorni pieni');
+
+// nessuna data di assunzione = nessun calcolo
+// il giorno in piu' spetta DAL GIORNO DOPO l'anniversario
+eq(
+  R.giorniVacanzaSpettanti('2016-12-31', 2026).bonus,
+  0,
+  'dieci anni compiuti il 31 dicembre: il giorno in piu vale dall anno dopo',
+);
+eq(R.giorniVacanzaSpettanti('2016-12-31', 2027).bonus, 1, 'lo stesso caso, l anno seguente vale');
+eq(R.giorniVacanzaSpettanti('2016-12-30', 2026).bonus, 1, 'anniversario il 30 dicembre: vale gia quest anno');
+eq(
+  R.giorniVacanzaSpettanti('2016-01-01', 2026, { mesiCongedo: 0 }).bonus,
+  1,
+  'dieci anni senza congedi: il giorno in piu spetta',
+);
+eq(
+  R.giorniVacanzaSpettanti('2016-01-01', 2026, { mesiCongedo: 6 }).bonus,
+  1,
+  'sei mesi di congedo: i dieci anni cadono comunque dentro il 2026 (a luglio)',
+);
+eq(
+  R.giorniVacanzaSpettanti('2016-01-01', 2026, { mesiCongedo: 12 }).bonus,
+  0,
+  'un anno intero di congedo non pagato: i dieci anni slittano al 2027',
+);
+eq(
+  R.giorniVacanzaSpettanti('2016-01-01', 2027, { mesiCongedo: 12 }).bonus,
+  1,
+  'lo stesso caso: nel 2027 il giorno in piu spetta',
+);
+ok(R.giorniVacanzaSpettanti('', 2026) === null, 'senza data di assunzione non si calcola');
+eq(R.giorniVacanzaSpettanti('2027-01-01', 2026).giorni, 0, 'assunto l anno dopo: zero giorni');
+
 console.log('\n=======================================');
 console.log('  ' + passati + ' passati, ' + falliti + ' falliti');
 console.log('=======================================\n');

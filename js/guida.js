@@ -231,6 +231,20 @@ function GUIDA_CAPITOLI() {
     },
     {
       area: 'piano',
+      titolo: 'Piano: giorni di vacanza spettanti',
+      vis: () => _guidaVis('piano'),
+      righe: [
+        'Nella scheda <b>Vacanze</b> il programma calcola quanti giorni spettano a ogni collaboratore fisso, partendo dalla data di inizio contratto.',
+        'La regola: <b>28 giorni</b> nei primi due anni, <b>35</b> dal compimento dei due anni. Nell anno del passaggio il diritto matura mese per mese: i mesi prima dell anniversario valgono 28 diviso 12, quelli dopo 35 diviso 12.',
+        'Giorni in piu per anzianita, che si <b>sommano</b> tra loro e valgono per intero dal giorno dopo l anniversario: <b>10 anni +1</b> (36), <b>15 anni +2</b> (38), <b>20 anni +3</b> (41), <b>25 anni +5</b> (46).',
+        'I mesi di <b>congedo non pagato</b> spostano in avanti anche questi scaglioni, esattamente come fanno con i giubilei: l anzianita di servizio e una sola.',
+        'Da <b>ottobre</b> compare l avviso con chi avra piu giorni l anno successivo, per pianificare le vacanze con il numero giusto.',
+        'Gli <b>ausiliari non compaiono</b>: per loro le vacanze sono un indennita in percentuale sulle ore lavorate (RAP Allegato 1), non giorni.',
+        'Tutti i valori (28, 35 e i quattro scaglioni) sono modificabili nella scheda Regole.',
+      ],
+    },
+    {
+      area: 'piano',
       titolo: 'Piano: benessere dei collaboratori',
       vis: () => _guidaVis('piano'),
       righe: [

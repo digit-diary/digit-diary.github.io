@@ -265,6 +265,87 @@
     return { punteggio: punteggio, voci: voci };
   }
 
+  // ===== GIORNI DI VACANZA SPETTANTI (personale fisso) =====
+  // Regola aziendale:
+  //  - primi 2 anni di contratto: 28 giorni all'anno
+  //  - dal compimento dei 2 anni: 35 giorni all'anno
+  //  - nell'anno del passaggio il diritto si matura mese per mese (pro rata):
+  //    i mesi prima dell'anniversario valgono 28/12, quelli dopo 35/12
+  //  - giorni in piu' per anzianita', CUMULATIVI e riconosciuti per intero
+  //    nell'anno in cui cade l'anniversario: 10 anni +1, 15 anni +2,
+  //    20 anni +3, 25 anni +5 (quindi 36, 38, 41, 46 giorni)
+  // Gli ausiliari non rientrano: hanno l'indennita' in percentuale (RAP All. 1).
+  //
+  // dataAssunzione: 'YYYY-MM-DD' · anno: anno civile da calcolare
+  // cfg: { base1: 28, base2: 35, bonus: [{anni:10,giorni:1}, ...] }
+  // cfg.mesiCongedo: mesi di congedo non pagato, che non maturano anzianita' e
+  // spostano in avanti sia i giubilei sia gli scaglioni delle vacanze (sono la
+  // stessa anzianita' di servizio).
+  function giorniVacanzaSpettanti(dataAssunzione, anno, cfg) {
+    const c = cfg || {};
+    const base1 = c.base1 != null ? c.base1 : 28;
+    const base2 = c.base2 != null ? c.base2 : 35;
+    const bonus = Array.isArray(c.bonus)
+      ? c.bonus
+      : [
+          { anni: 10, giorni: 1 },
+          { anni: 15, giorni: 2 },
+          { anni: 20, giorni: 3 },
+          { anni: 25, giorni: 5 },
+        ];
+    if (!dataAssunzione) return null;
+    const ass = new Date(dataAssunzione + 'T12:00:00');
+    if (isNaN(ass.getTime())) return null;
+    // i mesi fermi spostano in avanti la maturazione, come per i giubilei
+    const mesiFermo = Math.max(0, parseInt(c.mesiCongedo) || 0);
+    if (mesiFermo) ass.setMonth(ass.getMonth() + mesiFermo);
+    // se assunto dopo l'anno richiesto: nessun diritto
+    if (ass.getFullYear() > anno) return { giorni: 0, base: 0, bonus: 0, voci: [], mesi: 0 };
+    // data in cui compie 2 anni
+    const dueAnni = new Date(ass);
+    dueAnni.setFullYear(ass.getFullYear() + 2);
+    let mesiBase1 = 0;
+    let mesiBase2 = 0;
+    for (let m = 1; m <= 12; m++) {
+      // il mese conta solo se il rapporto era gia' in corso
+      const fineMese = new Date(anno, m, 0, 12);
+      if (fineMese < ass) continue;
+      // il mese in cui cade l'anniversario matura gia' alla quota nuova
+      const inizioMese = new Date(anno, m - 1, 1, 12);
+      const fineM = new Date(anno, m, 0, 12);
+      if (fineM >= dueAnni) mesiBase2++;
+      else mesiBase1++;
+      void inizioMese;
+    }
+    const parteBase = (base1 / 12) * mesiBase1 + (base2 / 12) * mesiBase2;
+    // bonus: tutti quelli il cui anniversario cade entro la fine dell'anno
+    const fineAnno = new Date(anno, 11, 31, 12);
+    const voci = [];
+    let totBonus = 0;
+    bonus
+      .slice()
+      .sort((x, y) => x.anni - y.anni)
+      .forEach((b) => {
+        const dataB = new Date(ass);
+        dataB.setFullYear(ass.getFullYear() + parseInt(b.anni));
+        // il giorno in piu' spetta DAL GIORNO DOPO l'anniversario: se cade il
+        // 31 dicembre, vale dall'anno seguente
+        dataB.setDate(dataB.getDate() + 1);
+        if (dataB <= fineAnno) {
+          totBonus += parseFloat(b.giorni) || 0;
+          voci.push({ anni: parseInt(b.anni), giorni: parseFloat(b.giorni) || 0, dal: dataB.getFullYear() });
+        }
+      });
+    return {
+      giorni: Math.round((parteBase + totBonus) * 100) / 100,
+      base: Math.round(parteBase * 100) / 100,
+      bonus: totBonus,
+      voci: voci,
+      mesiBase1: mesiBase1,
+      mesiBase2: mesiBase2,
+    };
+  }
+
   return {
     oraNum,
     riposoOre,
@@ -272,5 +353,6 @@
     violazioniAccompagnamento,
     idoneoPerTurno,
     indiceBenessere,
+    giorniVacanzaSpettanti,
   };
 });

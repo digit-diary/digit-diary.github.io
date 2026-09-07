@@ -7801,6 +7801,138 @@ function _vacDateSettimana(anno, settimana) {
   const f = (x) => x.split('-')[2] + '/' + x.split('-')[1];
   return 'dal ' + f(gg[0]) + ' al ' + f(gg[6]);
 }
+// GIORNI DI VACANZA SPETTANTI (personale fisso): quanti ne matura ciascuno
+// nell'anno secondo anzianita', e quanti ne ha gia' pianificati nel piano.
+function _pianoVacDirittoCard(anno) {
+  const cfg = {
+    base1: parseFloat(_pianoRegolaVal('vacanze_giorni_primi2anni')) || 28,
+    base2: parseFloat(_pianoRegolaVal('vacanze_giorni_base')) || 35,
+    bonus: [
+      { anni: 10, giorni: parseFloat(_pianoRegolaVal('vacanze_bonus_10anni')) || 1 },
+      { anni: 15, giorni: parseFloat(_pianoRegolaVal('vacanze_bonus_15anni')) || 2 },
+      { anni: 20, giorni: parseFloat(_pianoRegolaVal('vacanze_bonus_20anni')) || 3 },
+      { anni: 25, giorni: parseFloat(_pianoRegolaVal('vacanze_bonus_25anni')) || 5 },
+    ],
+  };
+  // giorni V gia' presenti nel piano dell'anno (dal mese caricato in memoria
+  // non basta: si contano quelli del settore gia' noti)
+  const gia = {};
+  (_pianoRighe || []).forEach((r) => {
+    if (r.codice === 'V' && String(r.data).startsWith(String(anno)))
+      gia[r.collaboratore] = (gia[r.collaboratore] || 0) + 1;
+  });
+  const righe = collaboratoriCache
+    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && _pianoMaturaCgf(c) && c.data_assunzione)
+    .map((c) => ({
+      c: c,
+      r: PianoRegole.giorniVacanzaSpettanti(String(c.data_assunzione).substring(0, 10), anno, {
+        ...cfg,
+        mesiCongedo: c.mesi_congedo_non_pagato,
+      }),
+    }))
+    .filter((x) => x.r)
+    .sort((a, b2) => a.c.nome.localeCompare(b2.c.nome));
+  const senzaData = collaboratoriCache.filter(
+    (c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && _pianoMaturaCgf(c) && !c.data_assunzione,
+  ).length;
+  let h =
+    '<div class="main-card" style="margin-bottom:14px"><div class="card-header">Giorni di vacanza spettanti ' +
+    anno +
+    ' · ' +
+    escP(repartoLabel(_pianoReparto())) +
+    '</div><div style="padding:10px 14px">';
+  h +=
+    '<p style="font-size:.85rem;color:var(--muted);margin-bottom:8px">Primi due anni ' +
+    cfg.base1 +
+    ' giorni, poi ' +
+    cfg.base2 +
+    '; nell anno del passaggio si matura mese per mese. Giorni in piu per anzianita, cumulativi e pieni dall anno dell anniversario: 10 anni +' +
+    cfg.bonus[0].giorni +
+    ', 15 anni +' +
+    cfg.bonus[1].giorni +
+    ', 20 anni +' +
+    cfg.bonus[2].giorni +
+    ', 25 anni +' +
+    cfg.bonus[3].giorni +
+    '. Gli ausiliari non compaiono: hanno l indennita in percentuale sulle ore.</p>';
+  if (!righe.length) {
+    h +=
+      '<p style="font-size:.85rem">Nessun calcolo possibile: manca la data di inizio contratto nelle schede.</p></div></div>';
+    return h;
+  }
+  h +=
+    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:640px;font-size:.9rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>In servizio dal</th><th>Anni</th><th>Spettanti</th><th>Pianificati</th><th>Restano</th></tr></thead><tbody>';
+  righe.forEach((x) => {
+    const dal = String(x.c.data_assunzione).substring(0, 10);
+    const anni = Math.floor((new Date(anno, 11, 31) - new Date(dal + 'T12:00:00')) / (365.25 * 86400000));
+    const pian = gia[x.c.nome] || 0;
+    const resta = Math.round((x.r.giorni - pian) * 10) / 10;
+    h +=
+      '<tr title="' +
+      x.r.base +
+      ' giorni di base' +
+      (x.r.bonus
+        ? ' + ' + x.r.bonus + ' per anzianita (' + x.r.voci.map((v) => v.anni + ' anni dal ' + v.dal).join(', ') + ')'
+        : '') +
+      '"><td style="text-align:left;font-weight:600">' +
+      escP(x.c.nome) +
+      '</td><td>' +
+      dal.split('-').reverse().join('.') +
+      '</td><td>' +
+      anni +
+      '</td><td style="font-weight:700">' +
+      x.r.giorni +
+      '</td><td>' +
+      (pian || '') +
+      '</td><td style="font-weight:700;color:' +
+      (resta > 0 ? '#8b6914' : resta < 0 ? '#c0392b' : '#2c6e49') +
+      '">' +
+      (pian ? resta : '') +
+      '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  if (senzaData)
+    h +=
+      '<p style="font-size:.82rem;color:#c0392b;margin-top:8px">' +
+      senzaData +
+      ' collaboratori non compaiono perche manca la data di inizio contratto nella loro scheda.</p>';
+  // AVVISO DI OTTOBRE: quando si pianificano le vacanze dell'anno dopo serve
+  // sapere in anticipo chi cambia scaglione, per non assegnare giorni sbagliati
+  const mese = new Date().getMonth() + 1;
+  const annoOggi = new Date().getFullYear();
+  if (mese >= 10 && anno === annoOggi) {
+    const cambi = righe
+      .map((x) => {
+        const pros = PianoRegole.giorniVacanzaSpettanti(String(x.c.data_assunzione).substring(0, 10), anno + 1, {
+          ...cfg,
+          mesiCongedo: x.c.mesi_congedo_non_pagato,
+        });
+        return pros && pros.giorni > x.r.giorni
+          ? { nome: x.c.nome, da: x.r.giorni, a: pros.giorni, diff: Math.round((pros.giorni - x.r.giorni) * 10) / 10 }
+          : null;
+      })
+      .filter(Boolean)
+      .sort((p, q) => q.diff - p.diff);
+    if (cambi.length)
+      h +=
+        '<div style="margin-top:12px;padding:10px 12px;background:#fff8e1;border-left:4px solid #b8860b;border-radius:3px">' +
+        '<b style="font-size:.92rem">Da tenere presente per il ' +
+        (anno + 1) +
+        '</b><p style="font-size:.86rem;margin:4px 0 0">Nel pianificare le vacanze del prossimo anno, ' +
+        cambi.length +
+        (cambi.length === 1 ? ' collaboratore avra' : ' collaboratori avranno') +
+        ' piu giorni:</p><ul style="margin:6px 0 0 18px;font-size:.88rem">' +
+        cambi
+          .map(
+            (x) =>
+              '<li><b>' + escP(x.nome) + '</b>: da ' + x.da + ' a <b>' + x.a + '</b> giorni (+' + x.diff + ')</li>',
+          )
+          .join('') +
+        '</ul></div>';
+  }
+  h += '</div></div>';
+  return h;
+}
 async function _renderPianoVacanzeTab() {
   const anno = window._pianoVacAnno || parseInt(_pianoMeseSel.split('-')[0]);
   window._pianoVacAnno = anno;
@@ -7827,6 +7959,7 @@ async function _renderPianoVacanzeTab() {
   const meseLbl = (MESI_L[parseInt(_pianoMeseSel.split('-')[1]) - 1] || '') + ' ' + _pianoMeseSel.split('-')[0];
 
   let h =
+    _pianoVacDirittoCard(anno) +
     '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Vacanze ' +
     anno +
     ' (' +
