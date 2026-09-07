@@ -1452,6 +1452,8 @@ async function renderPiano() {
     if (_pianoTab === 'briefing') _briefSelezioneBind();
     if (_pianoTab === 'statistiche' && typeof caricaStatisticheAnnoPiano === 'function')
       setTimeout(() => caricaStatisticheAnnoPiano(), 50);
+    if (_pianoTab === 'statistiche' && typeof caricaConfrontoAnniPiano === 'function')
+      setTimeout(() => caricaConfrontoAnniPiano(), 80);
     if (_pianoTab === 'timbrature' && typeof caricaConfrontoTimbrature === 'function')
       setTimeout(() => caricaConfrontoTimbrature(), 50);
   } catch (e) {
@@ -5907,8 +5909,138 @@ function _renderPianoStatCard() {
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Statistiche anno e panoramica mesi</div><div style="padding:10px 14px" id="piano-stat-body">' +
     '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="caricaStatisticheAnnoPiano()">Carica statistiche ' +
     _pianoMeseSel.split('-')[0] +
-    '</button><div id="piano-stat-anno"></div></div></div>'
+    '</button><div id="piano-stat-anno"></div></div></div>' +
+    '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px">Confronto anni · ' +
+    escP(repartoLabel(_pianoReparto())) +
+    '<button class="btn-act pin" onclick="pianoConfrontoCambiaAnno(-1)">&larr;</button><button class="btn-act pin" onclick="pianoConfrontoCambiaAnno(1)">&rarr;</button></div>' +
+    '<div style="padding:10px 14px" id="piano-confronto-anni"><p style="color:var(--muted);font-size:.8rem">Caricamento confronto...</p></div></div>'
   );
+}
+function pianoConfrontoCambiaAnno(delta) {
+  window._pianoConfrontoAnno = (window._pianoConfrontoAnno || parseInt(_pianoMeseSel.split('-')[0])) + delta;
+  caricaConfrontoAnniPiano();
+}
+// Aggregati di un anno del settore corrente, per il confronto anno su anno
+async function _pianoAggregatiAnno(anno) {
+  const righe =
+    (await secGet(
+      'piano?data=gte.' +
+        anno +
+        '-01-01&data=lte.' +
+        anno +
+        '-12-31&reparto_dip=eq.' +
+        _pianoReparto() +
+        '&limit=40000',
+    )) || [];
+  const tot = {
+    ore: 0,
+    oreTimb: 0,
+    collab: new Set(),
+    jolly: new Set(),
+    mal: 0,
+    weekend: 0,
+    domeniche: 0,
+    vac: 0,
+    cgf: 0,
+    mesi: new Set(),
+  };
+  righe.forEach((r) => {
+    const cod = r.codice;
+    if (!cod) return;
+    tot.mesi.add(String(r.data).substring(0, 7));
+    const info = _pianoCollabInfo(r.collaboratore) || {};
+    tot.ore += _pianoOreDiRiga(r, parseFloat(info.percentuale) || 1);
+    if (cod === 'M' || cod === 'M1') {
+      tot.mal++;
+      return;
+    }
+    if (cod === 'V') {
+      tot.vac++;
+      return;
+    }
+    if (cod === 'CGF') {
+      tot.cgf++;
+      return;
+    }
+    if (!_pianoTurnoInfo(cod)) return;
+    tot.collab.add(r.collaboratore);
+    if (info.is_jolly || info.impiego === 'jolly') tot.jolly.add(r.collaboratore);
+    const gw = new Date(r.data + 'T12:00:00').getDay();
+    if (gw === 0) {
+      tot.domeniche++;
+      tot.weekend++;
+    } else if (gw === 6) tot.weekend++;
+  });
+  const nomiSettore = tot.collab;
+  const timb =
+    (await secGet('piano_timbrature?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&limit=20000')) || [];
+  timb.forEach((t) => {
+    if (nomiSettore.has(t.collaboratore)) tot.oreTimb += parseFloat(t.ore) || 0;
+  });
+  return tot;
+}
+async function caricaConfrontoAnniPiano() {
+  const el = document.getElementById('piano-confronto-anni');
+  if (!el) return;
+  const anno = window._pianoConfrontoAnno || parseInt(_pianoMeseSel.split('-')[0]);
+  el.innerHTML =
+    '<p style="color:var(--muted);font-size:.8rem">Caricamento confronto ' + (anno - 1) + ' / ' + anno + '...</p>';
+  try {
+    const [prec, corr] = await Promise.all([_pianoAggregatiAnno(anno - 1), _pianoAggregatiAnno(anno)]);
+    const f1 = (v) => (Math.round(v * 10) / 10).toLocaleString('de-CH');
+    // verso: +1 se crescere e' positivo (verde), -1 se e' negativo (rosso,
+    // es. malattie), 0 se neutro (grigio)
+    const voci = [
+      ['Ore pianificate', prec.ore, corr.ore, 1, f1],
+      ['Ore timbrate', prec.oreTimb, corr.oreTimb, 1, f1],
+      ['Collaboratori con turni', prec.collab.size, corr.collab.size, 1, (v) => v],
+      ['di cui jolly', prec.jolly.size, corr.jolly.size, 0, (v) => v],
+      ['Giorni di malattia', prec.mal, corr.mal, -1, (v) => v],
+      ['Weekend lavorati (turni sab+dom)', prec.weekend, corr.weekend, 0, (v) => v],
+      ['di cui domeniche', prec.domeniche, corr.domeniche, 0, (v) => v],
+      ['Giorni di vacanza (V)', prec.vac, corr.vac, 0, (v) => v],
+      ['Recuperi festivi goduti (CGF)', prec.cgf, corr.cgf, 0, (v) => v],
+    ];
+    let h =
+      '<p style="font-size:.78rem;color:var(--muted);margin-bottom:8px">Confronto sui piani presenti in archivio: ' +
+      (anno - 1) +
+      ' (' +
+      prec.mesi.size +
+      ' mesi) contro ' +
+      anno +
+      ' (' +
+      corr.mesi.size +
+      ' mesi). Se un anno ha meno mesi pianificati, il confronto va letto di conseguenza.</p>';
+    h +=
+      '<div style="overflow-x:auto"><table class="piano-table" style="min-width:560px;font-size:.85rem"><thead><tr><th style="text-align:left">Voce</th><th>' +
+      (anno - 1) +
+      '</th><th>' +
+      anno +
+      '</th><th>Differenza</th></tr></thead><tbody>';
+    voci.forEach(([label, a, b, verso, fmt]) => {
+      const d = Math.round((b - a) * 10) / 10;
+      const colD = d === 0 || verso === 0 ? 'var(--muted)' : d * verso > 0 ? '#2c6e49' : '#c0392b';
+      const pct = a > 0 ? Math.round((d / a) * 100) : null;
+      h +=
+        '<tr><td style="text-align:left;font-weight:600">' +
+        label +
+        '</td><td>' +
+        fmt(a) +
+        '</td><td>' +
+        fmt(b) +
+        '</td><td style="color:' +
+        colD +
+        ';font-weight:700">' +
+        (d > 0 ? '+' : '') +
+        fmt(d) +
+        (pct != null && d !== 0 ? ' (' + (pct > 0 ? '+' : '') + pct + '%)' : '') +
+        '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+    el.innerHTML = h;
+  } catch (e) {
+    el.innerHTML = '<p style="color:var(--accent);font-size:.8rem">Errore confronto: ' + escP(e.message || '') + '</p>';
+  }
 }
 async function caricaStatisticheAnnoPiano() {
   const el = document.getElementById('piano-stat-anno');
@@ -6239,8 +6371,18 @@ async function _renderPianoSaldoTab() {
   nomi.forEach((nome) => {
     const info = _pianoCollabInfo(nome) || {};
     const pct = parseFloat(info.percentuale) || 1;
+    const righeMese = perNome[nome] || [];
+    // mese fatto SOLO di congedo C senza commenti, turni, malattie, vacanze o
+    // CGF, e senza timbrature: il collaboratore non e' in servizio quel mese
+    // (es. uscito ma non ancora disattivato), non si conteggia nel saldo
+    if (
+      righeMese.length &&
+      righeMese.every((r) => r.codice === 'C' && !(r.commento || '').trim()) &&
+      timbNome[nome] == null
+    )
+      return;
     let op = 0;
-    (perNome[nome] || []).forEach((r) => {
+    righeMese.forEach((r) => {
       op += _pianoOreDiRiga(r, pct);
     });
     if (timbNome[nome] != null) op = timbNome[nome]; // timbrate del mese: hanno la precedenza
@@ -6523,7 +6665,7 @@ async function pdfCambioVacanza(dati) {
   });
   doc.setFontSize(8);
   doc.setTextColor(150, 150, 150);
-  doc.text('Generato dal Diario Collaboratori · formulario cambio vacanza', 105, 287, { align: 'center' });
+  doc.text('Casino Lugano SA · formulario cambio vacanza', 105, 287, { align: 'center' });
   mostraPdfPreview(doc, 'cambio_vacanza.pdf', 'Formulario cambio vacanza');
 }
 
