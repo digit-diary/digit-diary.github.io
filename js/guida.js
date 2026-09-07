@@ -263,6 +263,17 @@ function GUIDA_CAPITOLI() {
     },
     {
       area: 'piano',
+      titolo: 'Piano: turni che finiscono piu tardi (es. Z0)',
+      righe: [
+        'Alcuni turni finiscono piu tardi nei giorni in cui il casino chiude alle <b>05:00</b>. Il caso noto e <b>Z0</b>: finisce alle <b>19:45</b> nei giorni normali e alle <b>20:30</b> il venerdi, il sabato, nelle vigilie di festivita e il 31 dicembre.',
+        'La sigla resta <b>una sola</b>: nel piano si scrive Z0 come sempre e il programma calcola da solo le ore di quel giorno. Passando il mouse sulla cella si legge l orario effettivo e la durata.',
+        'Il programma usa <b>due criteri, ne basta uno</b>: il giorno chiude tardi, oppure nel piano di quel giorno c e il turno che da il cambio (per Z0 e <b>Z12</b>, che inizia alle 20:30). Cosi il conteggio resta giusto anche in un giorno fuori dal solito.',
+        'Si imposta nella scheda <b>Turni</b>: la colonna <b>Fine (chiusura 5)</b> per l orario prolungato. Lasciandola vuota il turno finisce sempre alla stessa ora.',
+        'Le ore in piu entrano da sole in <b>OP</b>, <b>SM</b>, <b>YTD</b>, nella scheda Saldo e nelle Statistiche: non c e niente da aggiungere a mano.',
+      ],
+    },
+    {
+      area: 'piano',
       titolo: 'Piano: festivita e orari di chiusura (CH5 e CH7)',
       righe: [
         'Il casino chiude alle <b>04:00</b> nei giorni feriali e alle <b>05:00</b> il venerdi e il sabato. Nei giorni di <b>festivita</b> si chiude alle 05:00 anche in mezzo alla settimana, e il <b>31 dicembre</b> alle 07:00.',
