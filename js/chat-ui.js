@@ -2806,11 +2806,13 @@ function _renderStoricoHrSezione(nome) {
     if (dataAss)
       html +=
         '<span class="mini-badge" style="background:#1a7a6d;font-size:.82rem" title="' +
-        (collabRec && parseInt(collabRec.mesi_congedo_non_pagato) > 0
-          ? 'Tolti ' + parseInt(collabRec.mesi_congedo_non_pagato) + ' mesi di congedo non pagato'
+        // il record del collaboratore in questa funzione si chiama 'c':
+        // 'collabRec' e' la variabile dell'altra funzione e qui non esiste
+        (c && parseInt(c.mesi_congedo_non_pagato) > 0
+          ? 'Tolti ' + parseInt(c.mesi_congedo_non_pagato) + ' mesi di congedo non pagato'
           : '') +
         '">Anzianità: ' +
-        anzianitaLabel(dataAss, collabRec && collabRec.mesi_congedo_non_pagato) +
+        anzianitaLabel(dataAss, c && c.mesi_congedo_non_pagato) +
         '</span>';
     html += '</div>';
     // Premio giubileo (ogni N anni di servizio, importi configurabili da admin)
