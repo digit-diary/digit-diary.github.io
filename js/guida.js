@@ -155,7 +155,7 @@ function GUIDA_CAPITOLI() {
         'La barra in basso a destra mostra <b>somma, media, minimo e massimo</b> delle celle selezionate. Vale anche per le colonne delle ore, dove con Ctrl+click prendi celle sparse.',
         'Le <b>frecce Annulla e Ripristina</b> in alto tornano indietro fino a 15 passaggi e diventano blu quando c e qualcosa da annullare. Il bottone rosso <b>Annulla tutto</b> riporta il mese a com era a inizio sessione.',
         'Segni nelle celle: triangolo = commento, <b>M</b> = malattia dal Diario, <b>MC</b> = malattia su giorno di congedo, <b>MCG</b> = malattia sul giorno di recupero festivo, che resta a credito.',
-        'Colonne finali: Ore, D e N (diurni e notturni), OD (ore dovute), OP (ore pianificate), SM (saldo del mese), YTD (saldo da inizio anno). Si aggiornano da sole a ogni modifica.',
+        'Colonne finali: <b>Ore</b> (ore contrattuali del mese: somma della durata dei turni, supplemento notturno del 10% compreso), <b>OL</b> (ore effettivamente lavorate: dall entrata all uscita, senza il 10% e senza malattie, vacanze, CGF, permessi, maternita, matrimonio, militare, nascita, protezione civile, trasloco e assistenza familiare), <b>D</b> e <b>N</b> (turni diurni e notturni), <b>OD</b> (ore dovute), <b>OP</b> (ore pianificate), <b>SM</b> (saldo del mese), <b>YTD</b> (saldo da inizio anno). Si aggiornano da sole a ogni modifica.',
       ],
     },
     {
