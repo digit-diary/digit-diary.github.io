@@ -4651,18 +4651,49 @@ async function confermaScambioTurno() {
   if (!r1 || !r2) return;
   const c1 = r1.codice;
   const c2 = r2.codice;
+  // STESSE REGOLE DEL PIANO MANUALE, per TUTTI E DUE i lati dello scambio:
+  // avviso + conferma del responsabile e violazione scritta nel commento
+  let nota1 = '';
+  let nota2 = '';
+  if (typeof _pianoAvvisaViolazioniCella === 'function') {
+    const av1 = _pianoTurnoInfo(c2) ? await _pianoAvvisaViolazioniCella(sel.nome, sel.data, c2) : [];
+    const av2 = _pianoTurnoInfo(c1) ? await _pianoAvvisaViolazioniCella(collega, sel.data, c1) : [];
+    if (av1.length || av2.length) {
+      const dettagli = []
+        .concat(av1.map((a) => sel.nome.split(' ')[0] + ': ' + a))
+        .concat(av2.map((a) => collega.split(' ')[0] + ': ' + a));
+      if (
+        !confirm(
+          '⚠ ATTENZIONE · scambio ' +
+            sel.data.split('-').reverse().join('.') +
+            ':\n\n• ' +
+            dettagli.join('\n• ') +
+            "\n\nConfermi comunque lo scambio? La segnalazione restera' scritta nel commento delle celle.",
+        )
+      )
+        return;
+      if (av1.length) nota1 = '⚠ ' + av1.join(' · ') + ' · ';
+      if (av2.length) nota2 = '⚠ ' + av2.join(' · ') + ' · ';
+    }
+  }
   try {
     await secPatch('piano', 'id=eq.' + r1.id, {
       codice: c2,
       protetto: true,
-      commento: ((c1 ? 'Ex ' + c1 + ' - ' : '') + 'cambio con ' + collega + ' - ' + getOperatore()).substring(0, 400),
+      commento: (nota1 + (c1 ? 'Ex ' + c1 + ' - ' : '') + 'cambio con ' + collega + ' - ' + getOperatore()).substring(
+        0,
+        400,
+      ),
       operatore: getOperatore(),
       updated_at: new Date().toISOString(),
     });
     await secPatch('piano', 'id=eq.' + r2.id, {
       codice: c1,
       protetto: true,
-      commento: ((c2 ? 'Ex ' + c2 + ' - ' : '') + 'cambio con ' + sel.nome + ' - ' + getOperatore()).substring(0, 400),
+      commento: (nota2 + (c2 ? 'Ex ' + c2 + ' - ' : '') + 'cambio con ' + sel.nome + ' - ' + getOperatore()).substring(
+        0,
+        400,
+      ),
       operatore: getOperatore(),
       updated_at: new Date().toISOString(),
     });
@@ -9212,11 +9243,35 @@ async function confermaCambioEsigenze() {
   const r = _pianoRighe.find((x) => x.collaboratore === sel.nome && x.data === sel.data);
   if (!r) return;
   const vecchio = r.codice;
+  // STESSE REGOLE DEL PIANO MANUALE: se il nuovo turno viola riposo 11h,
+  // consecutivi o le altre regole, avviso + conferma e violazione a verbale
+  let notaRegole = '';
+  if (typeof _pianoAvvisaViolazioniCella === 'function') {
+    const avvisi = await _pianoAvvisaViolazioniCella(sel.nome, sel.data, nuovo);
+    if (avvisi.length) {
+      if (
+        !confirm(
+          '⚠ ATTENZIONE · ' +
+            sel.nome +
+            ' · ' +
+            sel.data.split('-').reverse().join('.') +
+            ':\n\n• ' +
+            avvisi.join('\n• ') +
+            '\n\nConfermi comunque il cambio per esigenze in ' +
+            nuovo +
+            "? La segnalazione restera' scritta nel commento della cella.",
+        )
+      )
+        return;
+      notaRegole = '⚠ ' + avvisi.join(' · ') + ' · ';
+    }
+  }
   try {
     await secPatch('piano', 'id=eq.' + r.id, {
       codice: nuovo,
       protetto: true,
       commento: (
+        notaRegole +
         (vecchio ? 'Ex ' + vecchio + ' - ' : '') +
         'cambio per esigenze operative - ' +
         getOperatore()
