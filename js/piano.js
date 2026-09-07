@@ -4968,6 +4968,84 @@ async function cercaSostitutiMalattia() {
         migliore = n;
       }
     }
+    // SOLUZIONE A CATENA: nessun candidato diretto. Provo a liberare chi
+    // avrebbe il giorno libero ma e' bloccato dal turno del giorno prima
+    // (es. notte): quel turno si scambia con un collega o passa a un terzo,
+    // sempre rispettando idoneita', riposo 11h e consecutivi.
+    let catena = null;
+    if (!migliore) {
+      for (const x of nomi) {
+        if (catena) break;
+        if (x === nome) continue;
+        const codX = cella[x + '|' + g] || '';
+        if (codX) {
+          const csX = _pianoCodiceInfo(codX);
+          const rX = rigaDi[x + '|' + g];
+          if (!(csX && csX.is_riposo && !(rX && rX.protetto && codX === 'V'))) continue;
+        }
+        if (!_pianoIdoneoPerTurno(x, t)) continue;
+        if (consecFinoA(x, g) >= maxCons) continue;
+        const codP = cella[x + '|' + (g - 1)] || '';
+        const tP = _pianoTurnoInfo(codP);
+        if (!tP) continue; // non e' bloccato da un turno del giorno prima
+        if (riposoOkSost(x, g, t)) continue; // sarebbe gia' un candidato diretto
+        const salvaP = cella[x + '|' + (g - 1)];
+        cella[x + '|' + (g - 1)] = '';
+        const sbloccato = riposoOkSost(x, g, t);
+        cella[x + '|' + (g - 1)] = salvaP;
+        if (!sbloccato) continue;
+        // opzione 1: SCAMBIO alla pari del giorno prima con un collega
+        for (const z of nomi) {
+          if (z === x || z === nome) continue;
+          const codS = cella[z + '|' + (g - 1)] || '';
+          const tS = _pianoTurnoInfo(codS);
+          if (!tS || codS === codP) continue;
+          if (!_pianoIdoneoPerTurno(x, tS) || !_pianoIdoneoPerTurno(z, tP)) continue;
+          const s1 = cella[x + '|' + (g - 1)];
+          const s2 = cella[z + '|' + (g - 1)];
+          cella[x + '|' + (g - 1)] = codS;
+          cella[z + '|' + (g - 1)] = codP;
+          const okX = riposoOkSost(x, g - 1, tS) && riposoOkSost(x, g, t);
+          const okZ = riposoOkSost(z, g - 1, tP);
+          cella[x + '|' + (g - 1)] = s1;
+          cella[z + '|' + (g - 1)] = s2;
+          if (okX && okZ) {
+            catena = { tipo: 'scambio', g1: g - 1, turnoX: codP, con: z, turnoCon: codS };
+            break;
+          }
+        }
+        // opzione 2: il turno del giorno prima PASSA a un terzo libero
+        if (!catena) {
+          for (const y of nomi) {
+            if (y === x || y === nome) continue;
+            const codY = cella[y + '|' + (g - 1)] || '';
+            if (codY) {
+              const csY = _pianoCodiceInfo(codY);
+              const rY = rigaDi[y + '|' + (g - 1)];
+              if (!(csY && csY.is_riposo && !(rY && rY.protetto && codY === 'V'))) continue;
+            }
+            if (!_pianoIdoneoPerTurno(y, tP)) continue;
+            if (consecFinoA(y, g - 1) >= maxCons) continue;
+            if (!riposoOkSost(y, g - 1, tP)) continue;
+            catena = { tipo: 'riassegna', g1: g - 1, turnoX: codP, con: y, eraCon: cella[y + '|' + (g - 1)] || '' };
+            break;
+          }
+        }
+        if (catena) {
+          migliore = x;
+          // aggiorno la simulazione progressiva anche per la mossa a catena
+          if (catena.tipo === 'scambio') {
+            cella[x + '|' + (g - 1)] = catena.turnoCon;
+            cella[catena.con + '|' + (g - 1)] = catena.turnoX;
+          } else {
+            cella[x + '|' + (g - 1)] = 'C';
+            cella[catena.con + '|' + (g - 1)] = catena.turnoX;
+            oreMese[catena.con] = (oreMese[catena.con] || 0) + (parseFloat(tP.durata_ore) || 0);
+            oreMese[x] = Math.max(0, (oreMese[x] || 0) - (parseFloat(tP.durata_ore) || 0));
+          }
+        }
+      }
+    }
     if (migliore) {
       giorni.push({
         g: g,
@@ -4975,6 +5053,7 @@ async function cercaSostitutiMalattia() {
         orari: (t.ora_inizio || '').substring(0, 5) + '-' + (t.ora_fine || '').substring(0, 5),
         sostituto: migliore,
         era: cella[migliore + '|' + g] || '',
+        catena: catena,
       });
       cella[migliore + '|' + g] = cod; // override progressivo, come il greedy Turnivo
       oreMese[migliore] = (oreMese[migliore] || 0) + (parseFloat(t.durata_ore) || 0);
@@ -4983,22 +5062,55 @@ async function cercaSostitutiMalattia() {
     }
   }
   _malattiaPiano = { nome: nome, da: da, al: al, giorni: giorni };
+  const descCatena = (d) =>
+    !d.catena
+      ? ''
+      : d.catena.tipo === 'scambio'
+        ? "In piu' il " +
+          d.catena.g1 +
+          ': ' +
+          d.sostituto.split(' ')[0] +
+          ' fa ' +
+          d.catena.turnoCon +
+          ' e ' +
+          d.catena.con.split(' ')[0] +
+          ' fa ' +
+          d.catena.turnoX +
+          ' (scambio alla pari)'
+        : "In piu' il " +
+          d.catena.g1 +
+          ': il turno ' +
+          d.catena.turnoX +
+          ' di ' +
+          d.sostituto.split(' ')[0] +
+          ' passa a ' +
+          d.catena.con.split(' ')[0] +
+          ", cosi' " +
+          d.sostituto.split(' ')[0] +
+          " puo' coprire";
+  _malattiaPiano.descCatena = descCatena;
   let h =
-    '<table class="piano-table" style="min-width:100%;font-size:.82rem"><thead><tr><th>Giorno</th><th>Turno</th><th style="text-align:left">Sostituto proposto</th></tr></thead><tbody>';
+    '<table class="piano-table" style="min-width:100%;font-size:.82rem"><thead><tr><th></th><th>Giorno</th><th>Turno</th><th style="text-align:left">Sostituto proposto</th></tr></thead><tbody>';
   giorni.forEach((d) => {
     if (d.salta)
       h +=
-        '<tr><td>' + d.g + '</td><td colspan="2" style="color:var(--muted);text-align:left">' + d.salta + '</td></tr>';
+        '<tr><td></td><td>' +
+        d.g +
+        '</td><td colspan="2" style="color:var(--muted);text-align:left">' +
+        d.salta +
+        '</td></tr>';
     else if (d.scoperto)
       h +=
-        '<tr><td>' +
+        '<tr><td></td><td>' +
         d.g +
         '</td><td>' +
         escP(d.codice) +
-        '</td><td style="color:#c0392b;font-weight:700;text-align:left">NESSUN SOSTITUTO DISPONIBILE</td></tr>';
+        '</td><td style="color:#c0392b;font-weight:700;text-align:left">NESSUN SOSTITUTO DISPONIBILE (nemmeno con cambi a catena)</td></tr>';
     else
       h +=
-        '<tr><td>' +
+        '<tr><td><input type="checkbox" class="mal-sel" data-g="' +
+        d.g +
+        '" checked title="Togli la spunta per NON applicare questa soluzione (la M al malato resta)"></td><td>' +
         d.g +
         '</td><td><b>' +
         escP(d.codice) +
@@ -5007,6 +5119,9 @@ async function cercaSostitutiMalattia() {
         '</td><td style="text-align:left;color:#2c6e49;font-weight:700">' +
         escP(d.sostituto) +
         (d.era ? ' <span style="color:var(--muted);font-weight:400">(era ' + escP(d.era) + ')</span>' : '') +
+        (d.catena
+          ? '<div style="font-weight:400;color:#b8860b;font-size:.78rem">' + escP(descCatena(d)) + '</div>'
+          : '') +
         '</td></tr>';
   });
   h += '</tbody></table>';
@@ -5017,11 +5132,60 @@ async function cercaSostitutiMalattia() {
     coperti +
     ' giorni coperti' +
     (scoperti ? ', <b style="color:#c0392b">' + scoperti + ' scoperti</b>' : '') +
-    '. Alla conferma: M (protetta) al malato, turni protetti ai sostituti' +
-    (coperti ? ' e punti incentivo per la copertura' : '') +
-    '.</p>';
+    '. Alla conferma: M (protetta) al malato su tutti i giorni; turni protetti SOLO per le soluzioni con la spunta' +
+    (coperti ? ', punti incentivo con conferma' : '') +
+    '. Le mosse a catena scrivono il commento anche sulle celle del giorno prima.</p>';
+  h +=
+    '<button class="btn-export" style="font-size:.8rem;padding:5px 14px;margin-top:4px" onclick="stampaPropostaCopertura()">Stampa proposta</button>';
   out.innerHTML = h;
   document.getElementById('mal-btn-conferma').style.display = coperti || giorni.some((d) => d.codice) ? '' : 'none';
+}
+// PDF della proposta di copertura: lista giorni, sostituti e mosse a catena,
+// da stampare e discutere prima di confermare
+async function stampaPropostaCopertura() {
+  const m = _malattiaPiano;
+  if (!m) return;
+  if (!window.jspdf) await caricaJsPDF();
+  const doc = new window.jspdf.jsPDF();
+  const pw = doc.internal.pageSize.getWidth();
+  doc.setFontSize(13);
+  doc.text('Proposta copertura malattia', pw / 2, 16, { align: 'center' });
+  doc.setFontSize(9);
+  doc.text(
+    m.nome +
+      ' · giorni ' +
+      m.da +
+      '-' +
+      m.al +
+      ' ' +
+      _pianoMeseSel +
+      ' · settore ' +
+      repartoLabel(_pianoReparto()) +
+      ' · preparata da ' +
+      getOperatore() +
+      ' il ' +
+      new Date().toLocaleDateString('it-IT'),
+    pw / 2,
+    23,
+    { align: 'center' },
+  );
+  doc.autoTable({
+    theme: 'grid',
+    startY: 30,
+    head: [['Giorno', 'Turno', 'Sostituto proposto', 'Mossa aggiuntiva']],
+    body: m.giorni.map((d) => [
+      d.g,
+      d.salta ? '-' : d.codice + (d.orari ? ' ' + d.orari : ''),
+      d.salta ? d.salta : d.scoperto ? 'NESSUN SOSTITUTO' : d.sostituto + (d.era ? ' (era ' + d.era + ')' : ''),
+      d.catena ? m.descCatena(d) : '',
+    ]),
+    headStyles: { fillColor: [26, 74, 122], fontSize: 8 },
+    bodyStyles: { fontSize: 8 },
+    margin: { left: 12, right: 12 },
+  });
+  doc.setFontSize(8);
+  doc.text('Casino Lugano SA · proposta operativa, non vincolante', 14, doc.internal.pageSize.getHeight() - 8);
+  mostraPdfPreview(doc, 'proposta_copertura_' + _pianoMeseSel + '.pdf', 'Proposta copertura');
 }
 // PIANO → DIARIO: una malattia scritta nel piano si registra anche nel Diario,
 // cosi' la scheda collaboratore conta i giorni (i giorni C dentro il range,
@@ -5129,6 +5293,8 @@ async function _pianoMalattiaViaDiario(nome, giorniDstr) {
 async function confermaCoperturaMalattia() {
   const m = _malattiaPiano;
   if (!m) return;
+  // soluzioni selezionate: senza spunta la M resta ma il sostituto non si tocca
+  const selGiorni = new Set([...document.querySelectorAll('.mal-sel:checked')].map((c) => parseInt(c.dataset.g)));
   document.getElementById('pwd-modal').classList.add('hidden');
   const ym = _pianoMeseSel;
   const op = getOperatore();
@@ -5164,8 +5330,98 @@ async function confermaCoperturaMalattia() {
         });
       }
       nM++;
-      // turno al sostituto (protetto)
-      if (d.sostituto) {
+      // turno al sostituto (protetto), SOLO se la soluzione ha la spunta
+      if (d.sostituto && selGiorni.has(d.g)) {
+        // MOSSA A CATENA sul giorno prima, se prevista dalla proposta
+        if (d.catena) {
+          const g1 = d.catena.g1;
+          const rX1 = rigaDi[d.sostituto + '|' + g1];
+          if (d.catena.tipo === 'scambio') {
+            const rZ = rigaDi[d.catena.con + '|' + g1];
+            if (rX1 && rZ) {
+              await secPatch('piano', 'id=eq.' + rX1.id, {
+                codice: d.catena.turnoCon,
+                protetto: true,
+                generato: false,
+                commento: (
+                  'Ex ' +
+                  d.catena.turnoX +
+                  ' - scambio per coprire malattia di ' +
+                  m.nome +
+                  ' - ' +
+                  op
+                ).substring(0, 400),
+                operatore: op,
+                updated_at: new Date().toISOString(),
+              });
+              await secPatch('piano', 'id=eq.' + rZ.id, {
+                codice: d.catena.turnoX,
+                protetto: true,
+                generato: false,
+                commento: (
+                  'Ex ' +
+                  d.catena.turnoCon +
+                  ' - scambio per coprire malattia di ' +
+                  m.nome +
+                  ' - ' +
+                  op
+                ).substring(0, 400),
+                operatore: op,
+                updated_at: new Date().toISOString(),
+              });
+            }
+          } else {
+            // riassegna: il sostituto viene liberato, il suo turno passa al terzo
+            if (rX1)
+              await secPatch('piano', 'id=eq.' + rX1.id, {
+                codice: 'C',
+                protetto: true,
+                generato: false,
+                commento: (
+                  'Ex ' +
+                  d.catena.turnoX +
+                  ' - liberato per coprire malattia di ' +
+                  m.nome +
+                  ' - ' +
+                  op
+                ).substring(0, 400),
+                operatore: op,
+                updated_at: new Date().toISOString(),
+              });
+            const rY = rigaDi[d.catena.con + '|' + g1];
+            const commY = (
+              (d.catena.eraCon ? 'Ex ' + d.catena.eraCon + ' - ' : '') +
+              'prende il turno di ' +
+              d.sostituto.split(' ')[0] +
+              ' (copertura malattia di ' +
+              m.nome.split(' ')[0] +
+              ') - ' +
+              op
+            ).substring(0, 400);
+            if (rY) {
+              await secPatch('piano', 'id=eq.' + rY.id, {
+                codice: d.catena.turnoX,
+                protetto: true,
+                generato: false,
+                commento: commY,
+                operatore: op,
+                updated_at: new Date().toISOString(),
+              });
+            } else {
+              await secPost('piano', {
+                collaboratore: d.catena.con,
+                data: dstrDi(g1),
+                codice: d.catena.turnoX,
+                protetto: true,
+                generato: false,
+                commento: commY,
+                reparto_dip: _pianoReparto(),
+                operatore: op,
+              });
+            }
+            sostituti.add(d.catena.con); // si carica un turno in piu': incentivi con conferma
+          }
+        }
         const rS = rigaDi[d.sostituto + '|' + d.g];
         const commento = ('Ex ' + (d.era || '-') + ' - cambio per esigenze operative - ' + op).substring(0, 400);
         if (rS) {
@@ -9226,7 +9482,9 @@ function apriCambioEsigenze(nome, dstr) {
           (t.ora_inizio || '').substring(0, 5) +
           '-' +
           (t.ora_fine || '').substring(0, 5) +
-          ')</option>',
+          ')' +
+          (_pianoIdoneoPerTurno(nome, t) ? '' : ' ⚠ NON FORMATO') +
+          '</option>',
       )
       .join('') +
     '</select></div>' +
@@ -9358,6 +9616,15 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
           'solo ' + rDopo.toFixed(1) + 'h di riposo prima del turno del giorno dopo (minimo ' + minRiposo + 'h)',
         );
     }
+    // idoneita' alla posizione: settori assegnati, regole di gruppo,
+    // solo diurni, turni bloccati (vale per manuale, esigenze e scambi)
+    const tNuovo = codiceNuovo !== undefined ? _pianoTurnoInfo(codiceNuovo) : null;
+    if (tNuovo && typeof _pianoIdoneoPerTurno === 'function' && !_pianoIdoneoPerTurno(nome, tNuovo))
+      avvisi.push(
+        'non risulta formato/idoneo per il turno ' +
+          codiceNuovo +
+          ' (settore, regole di gruppo o turni bloccati in Gestione collaboratori)',
+      );
     // massimo giorni consecutivi (attraversa i confini del mese)
     if (maxCons && _pianoIsLavoro(mappa[dstr] || '')) {
       let cons = 1;

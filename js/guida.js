@@ -50,6 +50,8 @@ function GUIDA_CAPITOLI() {
         'Le voci si possono cercare, filtrare per tipo o collaboratore, modificare e mettere in evidenza. Quelle eliminate finiscono nel Cestino e si possono recuperare.',
         "Le <b>malattie</b> registrate qui compaiono da sole nel piano di lavoro, quindi non vanno riscritte due volte. Vale anche al contrario: una M scritta nel piano o una copertura malattia si registrano nel Diario e contano nella scheda del collaboratore. Ognuno puo' partire dal punto che preferisce, il risultato non cambia.",
         'Vale anche quando si toglie: se una M viene rimossa dal piano o sovrascritta con un turno, il programma propone di togliere quei giorni anche dal Diario. Le registrazioni finiscono nel Cestino e si possono recuperare.',
+        'La <b>copertura malattia</b> propone prima chi e libero quel giorno e in regola; se non basta prova le <b>soluzioni a catena</b> (libera un collega spostando il suo turno del giorno prima a un altro), sempre nel rispetto di riposo, consecutivi e formazione. Ogni proposta ha la sua spunta: si sceglie cosa applicare e si puo stampare la lista.',
+        'Tutte le regole valgono anche a mano e nei cambi (per esigenze, scambio, cerca cambio): riposo di 11 ore, massimo giorni consecutivi, e <b>avviso se il collaboratore non e formato</b> per quel turno. Si puo confermare lo stesso, ma la segnalazione resta scritta nel commento della cella. I commenti automatici si possono sempre modificare o cancellare col tasto destro.',
       ],
     },
     {
