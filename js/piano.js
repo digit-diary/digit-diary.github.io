@@ -10436,38 +10436,59 @@ async function _briefAssegnaCd(righe, dstr) {
   cfg.coppie.forEach((cp) => {
     const [a, b] = cp.cd.map(String);
     const altroCd = (n) => (n === a ? b : a);
-    // dal briefing salvato di un giorno G ricava chi APRE il giorno G+1:
-    // prima il C8 (ultimo a chiudere), poi il turno di chiusura della coppia
+    // REGOLA: la cassa che CHIUDE un giorno e' quella che APRE il giorno dopo.
+    // Si leggono i numeri EFFETTIVI del briefing di ieri (anche se cambiati a
+    // mano e diversi dalla coppia configurata): comanda quello che c'e' scritto,
+    // non la configurazione. La coppia serve solo a sapere QUALI turni aprono e
+    // chiudono, e come punto di partenza quando non esiste alcuno storico.
     const apreDomaniDa = (rr) => {
-      const inCoppia = (x) => [a, b].includes(String(x.cd || '').trim());
-      const rc8 = rr.find((x) => String(x.turno).toUpperCase() === 'C8' && inCoppia(x));
-      if (rc8) return String(rc8.cd).trim();
-      const rch = rr.find((x) => String(x.turno).toUpperCase() === cp.chiude.toUpperCase() && inCoppia(x));
-      if (rch) return String(rch.cd).trim();
-      const rap = rr.find((x) => String(x.turno).toUpperCase() === cp.apre.toUpperCase() && inCoppia(x));
-      if (rap) return altroCd(String(rap.cd).trim());
-      return '';
+      const cdDi = (turno) => {
+        const x = rr.find((y) => String(y.turno).toUpperCase() === turno && String(y.cd || '').trim());
+        return x ? String(x.cd).trim() : '';
+      };
+      // il C8 chiude piu' tardi di tutti: se c'e' ed e' su una cassa di questa
+      // postazione (quella che apriva o chiudeva ieri), riapre lui domani
+      const cdApriva = cdDi(cp.apre.toUpperCase());
+      const cdChiudeva = cdDi(cp.chiude.toUpperCase());
+      const c8 = rr.filter((y) => String(y.turno).toUpperCase() === 'C8' && String(y.cd || '').trim());
+      const c8Qui = c8.find((y) => [cdApriva, cdChiudeva].includes(String(y.cd).trim()));
+      if (c8Qui)
+        return { apre: String(c8Qui.cd).trim(), altra: cdApriva === String(c8Qui.cd).trim() ? cdChiudeva : cdApriva };
+      if (cdChiudeva) return { apre: cdChiudeva, altra: cdApriva || altroCd(cdChiudeva) };
+      if (cdApriva) return { apre: altroCd(cdApriva), altra: cdApriva };
+      return null;
     };
     let apreCd = '';
+    let altraCd = '';
     let anc = -1;
     for (let gi = giorni.length - 1; gi >= 0 && !apreCd; gi--) {
       if (salvatoDi[giorni[gi]]) {
-        apreCd = apreDomaniDa(salvatoDi[giorni[gi]]);
-        if (apreCd) anc = gi;
+        const res = apreDomaniDa(salvatoDi[giorni[gi]]);
+        if (res && res.apre) {
+          apreCd = res.apre;
+          altraCd = res.altra || altroCd(res.apre);
+          anc = gi;
+        }
       }
     }
     if (!apreCd) {
       // nessun briefing salvato nel periodo: alternanza deterministica per data
       const ep = Math.floor(new Date(giorni[0] + 'T12:00:00').getTime() / 86400000);
       apreCd = ep % 2 === 0 ? a : b;
+      altraCd = apreCd === a ? b : a;
       anc = -1;
     }
-    // propaga la rotazione dai giorni dopo l'ancora fino a ieri: ogni giorno
-    // senza C8 la cassa che apre si scambia, con C8 resta la stessa
+    // propaga la rotazione dai giorni SENZA briefing salvato fino a ieri: ogni
+    // giorno senza C8 le due casse si scambiano, con C8 restano come sono
+    const scambia = () => {
+      const t = apreCd;
+      apreCd = altraCd;
+      altraCd = t;
+    };
     for (let gi = anc + 1; gi < giorni.length; gi++) {
-      if (!c8Nei.has(giorni[gi])) apreCd = altroCd(apreCd);
+      if (!c8Nei.has(giorni[gi])) scambia();
     }
-    const chiudeCd = altroCd(apreCd);
+    const chiudeCd = altraCd || altroCd(apreCd);
     apreCds.push(apreCd);
     coppieCalc.push({ apreCd, chiudeCd });
     const rA = trovaOggi(cp.apre.toUpperCase());
@@ -10560,11 +10581,31 @@ async function _renderPianoBriefingTab() {
     try {
       const clone = righe.map((r) => Object.assign({}, r, { cd: '' }));
       await _briefAssegnaCd(clone, dstr);
-      cdDaAggiornare = clone.some((c, i) => {
-        const attuale = String((righe[i] && righe[i].cd) || '').trim();
-        const atteso = String(c.cd || '').trim();
-        return atteso && attuale && atteso !== attuale;
-      });
+      const diverse = clone
+        .map((c, i) => ({
+          i: i,
+          atteso: String(c.cd || '').trim(),
+          attuale: String((righe[i] && righe[i].cd) || '').trim(),
+        }))
+        .filter((x) => x.atteso && x.attuale && x.atteso !== x.attuale);
+      if (diverse.length) {
+        // I numeri cassa seguono la rotazione (chi chiude riapre il giorno
+        // dopo): se ieri e' cambiato, oggi si aggiorna DA SOLO, senza premere
+        // nulla. Se pero' i numeri di oggi sono stati scritti a mano, non si
+        // sovrascrive niente: si avvisa e decide l'operatore.
+        if (_briefState && _briefState.cdManuale) {
+          cdDaAggiornare = true;
+        } else {
+          diverse.forEach((x) => {
+            righe[x.i].cd = x.atteso;
+          });
+          if (_briefState) _briefState.righe = righe;
+          clearTimeout(_briefSaveTimer);
+          await briefSalvaBriefing();
+          logAzione('Briefing: numeri cassa allineati', dstr + ' (' + diverse.length + ' celle, rotazione di ieri)');
+          toast('Numeri cassa aggiornati dalla rotazione di ieri');
+        }
+      }
     } catch (e) {}
   }
   const puo = puoGestireBriefing();
@@ -10830,6 +10871,9 @@ function briefCella(i, campo, val) {
   if (!puoGestireBriefing() || !_briefState) return;
   _briefState.righe[i][campo] = val;
   if (campo === 'nome') _briefState.righe[i].nomeFull = null; // ri-matcha al salvataggio timbratura
+  // numero cassa scritto a mano: da qui in poi la rotazione non lo sovrascrive
+  // da sola, ma avvisa e lascia decidere (bottone "Aggiorna numeri cassa")
+  if (campo === 'cd') _briefState.cdManuale = true;
   _briefDirtySalva();
 }
 function _briefDirtySalva() {
