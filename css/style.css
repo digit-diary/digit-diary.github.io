@@ -4324,3 +4324,24 @@ tr.brief-riga-sel td {
 #piano-statbar b {
   color: #ffd166;
 }
+
+/* NOME CLICCABILE: ovunque compaia il nome di un collaboratore come prima
+   colonna di una tabella, il clic apre la sua scheda. Nel piano di lavoro no:
+   li' il clic sul nome seleziona la riga, e la scheda si apre col doppio clic. */
+[data-collab],
+tr[data-nome] > td:first-child:not(.piano-nome) {
+  cursor: pointer;
+}
+[data-collab]:hover,
+tr[data-nome] > td:first-child:not(.piano-nome):hover {
+  text-decoration: underline;
+}
+.piano-nome {
+  cursor: pointer;
+}
+/* asterisco delle ore scritte a mano al posto di quelle pianificate */
+.piano-rett {
+  color: #b8860b;
+  font-weight: 700;
+  margin-left: 2px;
+}

@@ -2046,6 +2046,32 @@ function _destroySchedaCharts() {
   _schedaCharts = {};
 }
 
+// CLIC SUL NOME = SCHEDA DEL COLLABORATORE, in tutto il sistema.
+// Un solo gestore per tutta la pagina invece di un onclick per ogni tabella:
+// funziona anche sulle tabelle che verranno aggiunte in futuro, purche' la
+// riga porti data-nome (o l'elemento data-collab).
+// Nel piano di lavoro il clic singolo sul nome resta la selezione della riga:
+// li' la scheda si apre col doppio clic, gestito in piano.js.
+document.addEventListener('click', function (e) {
+  if (typeof apriSchedaCollaboratore !== 'function') return;
+  if (e.target.closest('input, select, textarea, button, a, .piano-pdf-ico, .icx')) return;
+  let nome = null;
+  const esplicito = e.target.closest('[data-collab]');
+  if (esplicito) nome = esplicito.getAttribute('data-collab');
+  else {
+    const td = e.target.closest('td');
+    if (td && td.cellIndex === 0 && !td.classList.contains('piano-nome')) {
+      const tr = td.closest('tr[data-nome]');
+      if (tr) nome = tr.dataset.nome;
+    }
+  }
+  if (!nome) return;
+  // solo nomi veri: cosi' un data-nome usato per altro non apre nulla
+  if (!(collaboratoriCache || []).some((c) => c.nome === nome)) return;
+  e.stopPropagation();
+  apriSchedaCollaboratore(nome);
+});
+
 function apriSchedaCollaboratore(nome) {
   _destroySchedaCharts();
   window._schedaTlTipo = null;
