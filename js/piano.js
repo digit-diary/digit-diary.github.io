@@ -4950,7 +4950,9 @@ let _pianoRecuperoMese = null;
 async function _pianoCaricaRecupero(ym) {
   if (_pianoRecuperoMese === ym) return;
   const da = ym + '-01';
-  const a = ym + '-31';
+  // ultimo giorno VERO del mese: scrivere sempre 31 fa rifiutare la richiesta
+  // dal database nei mesi che non ce l'hanno (30 settembre, 28 febbraio...)
+  const a = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
   const r = (await secGet('piano_recupero_ore?data=gte.' + da + '&data=lte.' + a + '&limit=5000')) || [];
   _pianoRecupero = {};
   r.forEach((x) => (_pianoRecupero[x.collaboratore + '|' + String(x.data).substring(0, 10)] = x));
