@@ -209,6 +209,66 @@ ok(
   'settore REC assegnato = idoneo',
 );
 
+console.log('\n== indiceBenessere ==');
+const soglie = { domenicheAnno: 12, maxConsecutivi: 5, vacanzeAnno: 20 };
+// caso ideale: tutto nella norma
+const ideale = R.indiceBenessere(
+  {
+    domenicheLibere: 12,
+    domenicheTot: 52,
+    weekendLavorati: 20,
+    weekendMediaSettore: 20,
+    notti: 30,
+    giorniLavorati: 200,
+    riposiIsolati: 0,
+    serieMax: 5,
+    vacanzeGiorni: 20,
+  },
+  soglie,
+);
+eq(ideale.punteggio, 100, 'situazione ideale = 100 punti');
+// caso pesante: nessuna domenica libera, molti weekend, tante notti, serie lunghe
+const pesante = R.indiceBenessere(
+  {
+    domenicheLibere: 0,
+    domenicheTot: 52,
+    weekendLavorati: 40,
+    weekendMediaSettore: 20,
+    notti: 150,
+    giorniLavorati: 200,
+    riposiIsolati: 10,
+    serieMax: 9,
+    vacanzeGiorni: 0,
+  },
+  soglie,
+);
+eq(pesante.punteggio, 0, 'situazione critica = 0 punti');
+ok(ideale.voci.length === 6, 'sei indicatori valutati');
+eq(
+  ideale.voci.reduce((s, v) => s + v.max, 0),
+  100,
+  'i pesi sommano a 100',
+);
+// mezze misure: 6 domeniche su 12 = meta dei punti di quella voce
+const meta = R.indiceBenessere(
+  {
+    domenicheLibere: 6,
+    domenicheTot: 52,
+    weekendLavorati: 20,
+    weekendMediaSettore: 20,
+    notti: 30,
+    giorniLavorati: 200,
+    riposiIsolati: 0,
+    serieMax: 5,
+    vacanzeGiorni: 20,
+  },
+  soglie,
+);
+eq(meta.voci[0].punti, 13, 'sei domeniche su dodici = circa meta punti');
+ok(meta.punteggio < ideale.punteggio, 'meno domeniche libere = punteggio piu basso');
+// la malattia non deve influire: non e' tra i criteri
+ok(!ideale.voci.some((v) => /malatt/i.test(v.nome)), 'le malattie non tolgono punti (non sono una colpa)');
+
 console.log('\n=======================================');
 console.log('  ' + passati + ' passati, ' + falliti + ' falliti');
 console.log('=======================================\n');
