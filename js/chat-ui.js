@@ -3680,7 +3680,12 @@ function checkCompleanniBanner() {
   if (!banner) return;
   var compleanni = [];
   collaboratoriCache.forEach(function (c) {
-    if (!c.data_nascita) return;
+    // stesso criterio del riquadro in home: settore dall'anagrafica e solo un
+    // 'attivo' esplicitamente falso esclude. Prima la fascia mostrava tutti i
+    // settori e includeva i disattivati, quindi i due elenchi non coincidevano.
+    if (c.attivo === false || !c.data_nascita) return;
+    var repC = c.reparto_dip || 'slots';
+    if (repC !== currentReparto && repC !== 'entrambi') return;
     if (_isCompleannoOggi(c.data_nascita)) compleanni.push(c.nome);
   });
   if (compleanni.length) {
