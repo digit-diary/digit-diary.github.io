@@ -566,6 +566,11 @@ let _pianoTab = localStorage.getItem('piano_tab') || 'calendario';
 // Icone = Bootstrap Icons (le stesse della navbar di Turnivo), incorporate SVG
 const _PIANO_TABS = [
   [
+    'recupero',
+    'Recupero ore',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z"/><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0"/></svg>',
+  ],
+  [
     'calendario',
     'Calendario',
     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M11 6.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm-3 0a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm-5 3a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3 0a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5z"/><path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/></svg>',
@@ -645,7 +650,7 @@ function pianoCambiaTab(t) {
 // Le 13 tab raggruppate in 3 famiglie: si trova tutto a colpo d'occhio
 const PIANO_TAB_GRUPPI = [
   ['Giornata', ['calendario', 'briefing']],
-  ['Gestione', ['vacanze', 'saldo', 'timbrature', 'statistiche', 'benessere', 'storico', 'formulari']],
+  ['Gestione', ['vacanze', 'saldo', 'recupero', 'timbrature', 'statistiche', 'benessere', 'storico', 'formulari']],
   ['Configurazione', ['turni', 'regole', 'festivi', 'impostazioni', 'guida']],
 ];
 function _pianoTabBar() {
@@ -773,6 +778,14 @@ async function _pianoAggiornaYtd(nomi) {
     const m = parseInt(String(x.anno_mese).split('-')[1]);
     rettMese[x.collaboratore + '|' + m] = parseFloat(x.ore_reali) || 0;
   });
+  // scostamenti giornalieri dei mesi gia' passati (scheda Recupero ore)
+  const recMese = {}; // nome|m -> ore in piu'/in meno
+  const recAnno = (await secGet('piano_recupero_ore?data=gte.' + _daA + '&data=lt.' + fine + '&limit=20000')) || [];
+  recAnno.forEach((x) => {
+    const m = parseInt(String(x.data).split('-')[1]);
+    const k = x.collaboratore + '|' + m;
+    recMese[k] = (recMese[k] || 0) + (parseFloat(x.ore) || 0);
+  });
   nomi.forEach((n) => {
     const info = _pianoCollabInfo(n) || {};
     if (info.is_jolly) return;
@@ -783,7 +796,8 @@ async function _pianoAggiornaYtd(nomi) {
       const dim = new Date(anno, m, 0).getDate();
       const dovute = Math.round((dim / 7) * _pianoOreSett * pct * 100) / 100;
       const k = n + '|' + m;
-      const effettive = rettMese[k] != null ? rettMese[k] : timbMese[k] != null ? timbMese[k] : perMese[k] || 0;
+      const effettive =
+        rettMese[k] != null ? rettMese[k] : timbMese[k] != null ? timbMese[k] : (perMese[k] || 0) + (recMese[k] || 0);
       cum += effettive - dovute;
     }
     _pianoYtdMap[n] = Math.round(cum * 100) / 100;
@@ -1151,6 +1165,7 @@ async function renderPiano() {
       // le festivita' servono PRIMA di disegnare l'intestazione: e' li' che
       // compare il marcatore di chiusura (CH5/CH7) sopra il numero del giorno
       await _pianoCaricaFestivita(parseInt(ym.split('-')[0]));
+      await _pianoCaricaRecupero(ym);
       const LC = _pianoCalcolaLarghezze(nomi);
       h +=
         '<div class="piano-wrap"><table data-seltab="piano" class="piano-table piano-fixed" style="width:' +
@@ -1329,7 +1344,10 @@ async function renderPiano() {
         // come Turnivo: OD=(giorni/7)*ore_sett*pct (jolly=0), OP=turni+speciali, SM=OP-OD, YTD=cumulato da gennaio
         const dovute = infoC && infoC.is_jolly ? 0 : Math.round(((_pianoOreSett * perc * nGiorni) / 7) * 10) / 10;
         const _rett = _pianoRettificaMese(nome);
-        const orePianificate = Math.round((ore + oreSpec) * 100) / 100;
+        // scostamenti giornaliati (scheda Recupero ore): sommati alle ore del
+        // piano, cosi' il saldo e' aggiornato giorno per giorno
+        const _rec = _pianoRecuperoTotale(nome, ym);
+        const orePianificate = Math.round((ore + oreSpec + _rec) * 100) / 100;
         // dove c'e' una rettifica scritta a mano, vale quella: e' il totale
         // reale del mese, quello che finisce in busta paga
         const orePiano = _rett ? Math.round(parseFloat(_rett.ore_reali) * 100) / 100 : orePianificate;
@@ -1420,7 +1438,14 @@ async function renderPiano() {
               ' · pianificate ' +
               orePianificate.toFixed(1) +
               'h · doppio clic per correggere"'
-            : ' title="Ore pianificate. Doppio clic per scrivere le ore realmente fatte nel mese"') +
+            : _rec
+              ? ' title="Ore del piano ' +
+                Math.round((orePianificate - _rec) * 100) / 100 +
+                'h con ' +
+                (_rec > 0 ? '+' : '') +
+                _rec +
+                'h dalla scheda Recupero ore. Doppio clic per scrivere le ore realmente fatte nel mese"'
+              : ' title="Ore pianificate. Doppio clic per scrivere le ore realmente fatte nel mese"') +
           '>' +
           (orePiano ? orePiano.toFixed(1) : '') +
           (_rett ? '<span class="piano-rett" title="valore scritto a mano">*</span>' : '') +
@@ -1708,6 +1733,8 @@ async function renderPiano() {
       h += '<div id="piano-config">' + _renderPianoStatCard() + '</div>';
     } else if (_pianoTab === 'saldo') {
       h += await _renderPianoSaldoTab();
+    } else if (_pianoTab === 'recupero') {
+      h += await _renderPianoRecuperoTab();
     } else if (_pianoTab === 'storico') {
       h += await _renderPianoStoricoTab();
     } else if (_pianoTab === 'formulari') {
@@ -1742,6 +1769,7 @@ async function renderPiano() {
       _pianoTipBind();
       _pianoApplicaNascosti();
     }
+    if (_pianoTab === 'recupero' && typeof _pianoRecuperoTotaliGenerali === 'function') _pianoRecuperoTotaliGenerali();
     if (_pianoTab === 'briefing') _briefSelezioneBind();
     if (_pianoTab === 'benessere' && typeof caricaBenesserePiano === 'function')
       setTimeout(() => caricaBenesserePiano(), 60);
@@ -4885,6 +4913,225 @@ function _pianoFestiviAnno(anno) {
     { data: anno + '-12-25', descrizione: 'Natale' },
     { data: anno + '-12-26', descrizione: 'Santo Stefano' },
   ];
+}
+// ===========================================================================
+// RECUPERO ORE (griglia giornaliera, come il foglio Excel di slots e tavoli)
+// Ogni giorno si segna lo scostamento dal turno previsto: -1 se ha fatto un ora
+// in meno, +3 se ne ha fatte tre in piu. Il totale del mese entra nel saldo.
+// ===========================================================================
+let _pianoRecupero = {}; // 'nome|YYYY-MM-DD' -> record
+let _pianoRecuperoMese = null;
+async function _pianoCaricaRecupero(ym) {
+  if (_pianoRecuperoMese === ym) return;
+  const da = ym + '-01';
+  const a = ym + '-31';
+  const r = (await secGet('piano_recupero_ore?data=gte.' + da + '&data=lte.' + a + '&limit=5000')) || [];
+  _pianoRecupero = {};
+  r.forEach((x) => (_pianoRecupero[x.collaboratore + '|' + String(x.data).substring(0, 10)] = x));
+  _pianoRecuperoMese = ym;
+}
+// totale del mese per un collaboratore (0 se non ha scostamenti)
+function _pianoRecuperoTotale(nome, ym) {
+  let t = 0;
+  Object.keys(_pianoRecupero).forEach((k) => {
+    if (k.indexOf(nome + '|') !== 0) return;
+    if (k.substring(nome.length + 1, nome.length + 8) !== (ym || _pianoMeseSel)) return;
+    t += parseFloat(_pianoRecupero[k].ore) || 0;
+  });
+  return Math.round(t * 100) / 100;
+}
+// Converte quello che scrive l'operatore in ore decimali.
+// '1:30' e '-1:30' -> 1.5 / -1.5 (sessantesimi) · '1,5' e '1.5' -> 1.5
+// Ritorna stringa vuota quando il campo e' vuoto.
+function _pianoOreDaTesto(valore) {
+  let t = String(valore == null ? '' : valore).trim();
+  if (t === '') return '';
+  t = t.replace(',', '.');
+  const m = t.match(/^([+-]?)(\d+):([0-5]?\d)$/);
+  if (m) {
+    const segno = m[1] === '-' ? -1 : 1;
+    const ore = parseInt(m[2]) + parseInt(m[3]) / 60;
+    return String(segno * (Math.round(ore * 100) / 100));
+  }
+  return t;
+}
+// Scrive/aggiorna/cancella uno scostamento del giorno
+async function pianoRecuperoScrivi(nome, dstr, valore) {
+  if (!puoGestirePiano() && !isAdmin()) {
+    toast('Non hai il permesso di modificare il piano');
+    return false;
+  }
+  const chiave = nome + '|' + dstr;
+  const att = _pianoRecupero[chiave];
+  // si accetta sia il decimale (1.5) sia l'orologio (1:30): un'ora e mezza si
+  // puo' scrivere in tutti e due i modi, cosi' nessuno sbaglia scrivendo 1.30
+  const testo = _pianoOreDaTesto(valore);
+  try {
+    if (testo === '' || parseFloat(testo) === 0) {
+      if (att) {
+        await secDel('piano_recupero_ore', 'id=eq.' + att.id);
+        delete _pianoRecupero[chiave];
+        logAzione('Recupero ore tolto', nome + ' ' + dstr);
+      }
+      return true;
+    }
+    const ore = parseFloat(testo);
+    if (isNaN(ore) || ore < -24 || ore > 24) {
+      toast('Valore fuori scala (da -24 a +24)');
+      return false;
+    }
+    if (att) {
+      await secPatch('piano_recupero_ore', 'id=eq.' + att.id, {
+        ore: ore,
+        operatore: getOperatore(),
+        modificato_il: new Date().toISOString(),
+      });
+      att.ore = ore;
+    } else {
+      const nuovo = await secPost('piano_recupero_ore', {
+        collaboratore: nome,
+        data: dstr,
+        ore: ore,
+        reparto_dip: _pianoReparto(),
+        operatore: getOperatore(),
+      });
+      _pianoRecupero[chiave] = (nuovo && nuovo[0]) || { collaboratore: nome, data: dstr, ore: ore };
+    }
+    logAzione('Recupero ore', nome + ' ' + dstr + ': ' + (ore > 0 ? '+' : '') + ore + 'h');
+    return true;
+  } catch (e) {
+    console.error('recupero ore', e);
+    toast('Errore nel salvataggio');
+    return false;
+  }
+}
+// modifica dalla cella della griglia
+async function pianoRecuperoCella(el, nome, dstr) {
+  const ok = await pianoRecuperoScrivi(nome, dstr, el.value);
+  if (!ok) {
+    const att = _pianoRecupero[nome + '|' + dstr];
+    el.value = att ? att.ore : '';
+    return;
+  }
+  _pianoYtdKey = ''; // il saldo dei mesi seguenti cambia
+  _pianoRecuperoAggiornaRiga(nome);
+}
+// aggiorna colori e totali della riga senza ridisegnare tutta la pagina
+function _pianoRecuperoAggiornaRiga(nome) {
+  const tr = document.querySelector('#piano-recupero-table tbody tr[data-nome="' + CSS.escape(nome) + '"]');
+  if (!tr) return;
+  tr.querySelectorAll('input[data-data]').forEach((inp) => {
+    const v = parseFloat(inp.value);
+    inp.className = 'rec-cella' + (v > 0 ? ' rec-piu' : v < 0 ? ' rec-meno' : '');
+  });
+  const tot = _pianoRecuperoTotale(nome, _pianoMeseSel);
+  const cel = tr.querySelector('.rec-totale');
+  if (cel) {
+    cel.textContent = tot ? (tot > 0 ? '+' : '') + tot.toFixed(2).replace(/\.00$/, '') : '';
+    cel.className = 'rec-totale' + (tot > 0 ? ' rec-piu' : tot < 0 ? ' rec-meno' : '');
+  }
+  _pianoRecuperoTotaliGenerali();
+}
+function _pianoRecuperoTotaliGenerali() {
+  const box = document.getElementById('piano-recupero-riepilogo');
+  if (!box) return;
+  let piu = 0;
+  let meno = 0;
+  Object.keys(_pianoRecupero).forEach((k) => {
+    const v = parseFloat(_pianoRecupero[k].ore) || 0;
+    if (v > 0) piu += v;
+    else meno += v;
+  });
+  const netto = Math.round((piu + meno) * 100) / 100;
+  box.innerHTML =
+    '<span class="rec-piu">+' +
+    Math.round(piu * 100) / 100 +
+    'h</span> in piu &middot; <span class="rec-meno">' +
+    Math.round(meno * 100) / 100 +
+    'h</span> in meno &middot; saldo del settore <b>' +
+    (netto > 0 ? '+' : '') +
+    netto +
+    'h</b>';
+}
+async function _renderPianoRecuperoTab() {
+  const ym = _pianoMeseSel;
+  await _pianoCaricaRecupero(ym);
+  const anno = parseInt(ym.split('-')[0]);
+  const mese = parseInt(ym.split('-')[1]);
+  const nGiorni = new Date(anno, mese, 0).getDate();
+  const GG3 = ['DOM', 'LUN', 'MAR', 'MER', 'GIO', 'VEN', 'SAB'];
+  const MESI_L = typeof MESI_FULL !== 'undefined' ? MESI_FULL : [];
+  const puoMod = puoGestirePiano() || isAdmin();
+  const nomi = ordineCollabPiano(
+    collaboratoriCache.filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c)).map((c) => c.nome),
+    _pianoReparto(),
+  );
+  let h =
+    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">Recupero ore &middot; ' +
+    (MESI_L[parseInt(ym.split('-')[1]) - 1] || ym) +
+    ' ' +
+    ym.split('-')[0] +
+    '<span id="piano-recupero-riepilogo" style="margin-left:auto;font-size:.85rem;font-weight:400"></span></div><div style="padding:10px 14px">';
+  h +=
+    '<p style="font-size:.85rem;color:var(--muted);line-height:1.55;margin-bottom:10px">Si aggiorna <b>ogni giorno</b>: nella casella del giorno si scrive quanto il collaboratore ha lavorato in piu o in meno rispetto al turno previsto. <b>-1</b> significa un ora in meno (rosso), <b>+3</b> tre ore in piu (verde). Casella vuota = ha fatto esattamente il suo turno. Il totale del mese entra nel <b>saldo ore</b>, quindi il conteggio resta aggiornato senza aspettare la fine del mese.</p>';
+  if (!nomi.length) {
+    h += '<p style="color:var(--muted);padding:10px 0">Nessun collaboratore in questo settore.</p></div></div>';
+    return h;
+  }
+  h +=
+    '<div style="overflow-x:auto"><table id="piano-recupero-table" class="piano-table" style="width:' +
+    (210 + 46 * nGiorni + 90) +
+    'px"><thead><tr><th class="piano-nome" style="width:210px">Collaboratore</th>';
+  for (let g = 1; g <= nGiorni; g++) {
+    const dstr = ym + '-' + String(g).padStart(2, '0');
+    const dow = new Date(dstr + 'T12:00:00').getDay();
+    h +=
+      '<th style="width:46px' +
+      (dow === 0 ? ';background:#7a2e2e;color:#fff' : dow === 6 ? ';background:#5a4a3a;color:#fff' : '') +
+      '"><div>' +
+      GG3[dow] +
+      '</div><div>' +
+      g +
+      '</div></th>';
+  }
+  h += '<th style="width:90px" title="Somma degli scostamenti del mese">Totale</th></tr></thead><tbody>';
+  nomi.forEach((nome) => {
+    h += '<tr data-nome="' + escP(nome) + '"><td class="piano-nome" style="text-align:left">' + escP(nome) + '</td>';
+    for (let g = 1; g <= nGiorni; g++) {
+      const dstr = ym + '-' + String(g).padStart(2, '0');
+      const r = _pianoRecupero[nome + '|' + dstr];
+      const v = r ? parseFloat(r.ore) : '';
+      h +=
+        '<td style="padding:1px"><input class="rec-cella' +
+        (v > 0 ? ' rec-piu' : v < 0 ? ' rec-meno' : '') +
+        '" data-data="' +
+        dstr +
+        '" type="text" inputmode="decimal" value="' +
+        (v === '' ? '' : v) +
+        '"' +
+        (puoMod
+          ? ' onchange="pianoRecuperoCella(this,\'' + escP(nome).replace(/'/g, "\\'") + "','" + dstr + '\')"'
+          : ' readonly') +
+        ' title="' +
+        escP(nome) +
+        ' &middot; ' +
+        dstr.split('-').reverse().join('.') +
+        (r && r.operatore ? ' &middot; ' + escP(r.operatore) : '') +
+        '"></td>';
+    }
+    const tot = _pianoRecuperoTotale(nome, ym);
+    h +=
+      '<td class="rec-totale' +
+      (tot > 0 ? ' rec-piu' : tot < 0 ? ' rec-meno' : '') +
+      '">' +
+      (tot ? (tot > 0 ? '+' : '') + String(tot).replace(/\.00$/, '') : '') +
+      '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  h +=
+    '<p style="font-size:.85rem;color:var(--muted);margin-top:10px">Le stesse ore compaiono nella colonna <b>SM</b> del calendario e nella scheda <b>Saldo</b>, sommate alle ore del piano. Chi scrive e quando resta nel registro.</p>';
+  h += '</div></div>';
+  return h;
 }
 // ===========================================================================
 // FESTIVITA' E ORARI DI CHIUSURA
@@ -8188,6 +8435,18 @@ async function caricaStatisticheAnnoPiano() {
   // ORE REALI SCRITTE A MANO: dove esistono, sostituiscono le ore del piano di
   // quel mese, cosi' le statistiche dell'anno dicono lo stesso numero del saldo
   // e del calendario. Un dato solo, in tutto il programma.
+  // scostamenti giornalieri dell'anno: entrano nelle ore, mese per mese
+  const recStat =
+    (await secGet('piano_recupero_ore?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&limit=20000')) || [];
+  recStat.forEach((x) => {
+    const o = st[x.collaboratore];
+    if (!o) return;
+    const meseK = String(x.data).substring(0, 7);
+    const v = parseFloat(x.ore) || 0;
+    o.ore = Math.round((o.ore + v) * 100) / 100;
+    if (!o.perMese) o.perMese = {};
+    o.perMese[meseK] = (o.perMese[meseK] || 0) + v;
+  });
   const rettAnno =
     (await secGet('piano_ore_mese?anno_mese=gte.' + anno + '-01&anno_mese=lte.' + anno + '-12&limit=5000')) || [];
   rettAnno.forEach((x) => {
@@ -8561,6 +8820,7 @@ async function _renderPianoVacanzeTab() {
 // del mese per collaboratore + totali (YTD dalla stessa mappa della griglia)
 async function _renderPianoSaldoTab() {
   const ym = _pianoMeseSel;
+  await _pianoCaricaRecupero(ym);
   const nGiorni = _pianoUltimoGiorno(ym);
   const MESI_L = MESI_FULL || [];
   const label = (MESI_L[parseInt(ym.split('-')[1]) - 1] || ym) + ' ' + ym.split('-')[0];
@@ -8610,12 +8870,16 @@ async function _renderPianoSaldoTab() {
     righeMese.forEach((r) => {
       op += _pianoOreDiRiga(r, pct);
     });
+    op += _pianoRecuperoTotale(nome, ym); // scostamenti giornalieri
     if (timbNome[nome] != null) op = timbNome[nome]; // timbrate del mese: hanno la precedenza
     // ore reali scritte a mano: precedenza su tutto, come nel calendario
     const rettSaldo = _pianoRettificaMese(nome);
     if (rettSaldo) op = Math.round(parseFloat(rettSaldo.ore_reali) * 100) / 100;
-    const od = info.is_jolly ? 0 : Math.round((nGiorni / 7) * _pianoOreSett * pct * 100) / 100;
-    const sm = Math.round((op - od) * 10) / 10;
+    // stesso arrotondamento del calendario (una cifra decimale sulle ore
+    // dovute), altrimenti la stessa persona mostra due saldi diversi nelle due
+    // schede per un centesimo di differenza
+    const od = info.is_jolly ? 0 : Math.round((nGiorni / 7) * _pianoOreSett * pct * 10) / 10;
+    const sm = Math.round((Math.round(op * 100) / 100 - od) * 10) / 10;
     const ytd = Math.round(((_pianoYtdMap[nome] || 0) + sm) * 10) / 10;
     totD += od;
     totP += op;

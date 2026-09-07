@@ -231,6 +231,18 @@ function GUIDA_CAPITOLI() {
     },
     {
       area: 'piano',
+      titolo: 'Piano: recupero ore (griglia giornaliera)',
+      righe: [
+        'La scheda <b>Recupero ore</b> e il foglio giornaliero: si aggiorna <b>ogni giorno</b>, come si faceva sul file Excel di slots e tavoli.',
+        'Nella casella del giorno si scrive quanto il collaboratore ha lavorato in piu o in meno rispetto al suo turno: <b>-1</b> un ora in meno (casella rossa), <b>+3</b> tre ore in piu (casella verde). Casella vuota vuol dire che ha fatto esattamente il turno previsto.',
+        'Si puo scrivere sia in decimali (<b>1.5</b>) sia come orologio (<b>1:30</b>): il programma capisce tutti e due, cosi nessuno sbaglia scrivendo 1.30 per intendere un ora e mezza.',
+        'A destra c e il <b>totale del mese</b> per ogni collaboratore, e in alto il riepilogo del settore: ore in piu, ore in meno e saldo complessivo.',
+        'Tutto e collegato: quelle ore si sommano nella colonna <b>OP</b> del calendario, quindi entrano in <b>SM</b> (saldo del mese), nell <b>YTD</b> (saldo da inizio anno), nella scheda <b>Saldo</b> e nelle <b>Statistiche</b> dell anno. Chi scrive e quando resta nel registro.',
+        'Non va confusa con la correzione del <b>saldo mensile</b> (doppio clic su OP o SM nel calendario): quella serve a scrivere il totale reale di un mese chiuso, questa e la registrazione di ogni giorno. Se ci sono tutte e due, il totale scritto a mano ha la precedenza.',
+      ],
+    },
+    {
+      area: 'piano',
       titolo: 'Piano: festivita e orari di chiusura (CH5 e CH7)',
       righe: [
         'Il casino chiude alle <b>04:00</b> nei giorni feriali e alle <b>05:00</b> il venerdi e il sabato. Nei giorni di <b>festivita</b> si chiude alle 05:00 anche in mezzo alla settimana, e il <b>31 dicembre</b> alle 07:00.',
