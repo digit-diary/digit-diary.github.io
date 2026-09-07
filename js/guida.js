@@ -231,7 +231,8 @@ function GUIDA_CAPITOLI() {
       righe: [
         'Le timbrature si inseriscono a mano, si importano da file oppure arrivano in automatico dalla timbratrice.',
         'Nel confronto si clicca un collaboratore per vedere giorno per giorno entrata, uscita e ore effettive rispetto a quelle pianificate.',
-        'Nel <b>Saldo</b> valgono le ore timbrate quando esistono, altrimenti quelle del piano. Il saldo da inizio anno si chiama YTD.',
+        'Nel <b>Saldo</b> valgono le ore timbrate quando esistono, altrimenti quelle del piano. Il saldo da inizio anno si chiama YTD. Chi ha il mese fatto solo di congedo C, senza turni ne assenze ne timbrature, non viene conteggiato: vuol dire che non e in servizio quel mese.',
+        'Nella scheda Statistiche c e il <b>Confronto anni</b>: l anno scelto contro il precedente, per settore, con ore, collaboratori, jolly, malattie, weekend, vacanze e recuperi. Le frecce cambiano l anno.',
       ],
     },
     {
