@@ -81,15 +81,15 @@ function renderCestino() {
         escP(r.tipo || '') +
         '</span> · ' +
         d +
-        '<div style="font-size:.75rem;color:var(--muted)">' +
+        '<div style="font-size:.82rem;color:var(--muted)">' +
         escP((r.testo || '').substring(0, 60)) +
-        '</div><div style="font-size:.78rem;color:var(--accent)">Eliminato da ' +
+        '</div><div style="font-size:.82rem;color:var(--accent)">Eliminato da ' +
         escP(r.eliminato_da || '') +
         ' il ' +
         delAt +
-        '</div></div><button class="btn-salva" style="font-size:.75rem;padding:4px 10px;background:#2c6e49" onclick="ripristinaCestino(\'registrazioni\',' +
+        '</div></div><button class="btn-salva" style="font-size:.82rem;padding:4px 10px;background:#2c6e49" onclick="ripristinaCestino(\'registrazioni\',' +
         r.id +
-        ')">Ripristina</button><button class="btn-salva" style="font-size:.75rem;padding:4px 10px;background:var(--accent)" onclick="eliminaDefinitivo(\'registrazioni\',' +
+        ')">Ripristina</button><button class="btn-salva" style="font-size:.82rem;padding:4px 10px;background:var(--accent)" onclick="eliminaDefinitivo(\'registrazioni\',' +
         r.id +
         ')">Elimina</button></div>';
     });
@@ -111,13 +111,13 @@ function renderCestino() {
         escP(m.tipo || '') +
         '</span> · ' +
         escP(m.data_modulo || '') +
-        '<div style="font-size:.78rem;color:var(--accent)">Eliminato da ' +
+        '<div style="font-size:.82rem;color:var(--accent)">Eliminato da ' +
         escP(m.eliminato_da || '') +
         ' il ' +
         delAt +
-        '</div></div><button class="btn-salva" style="font-size:.75rem;padding:4px 10px;background:#2c6e49" onclick="ripristinaCestino(\'moduli\',' +
+        '</div></div><button class="btn-salva" style="font-size:.82rem;padding:4px 10px;background:#2c6e49" onclick="ripristinaCestino(\'moduli\',' +
         m.id +
-        ')">Ripristina</button><button class="btn-salva" style="font-size:.75rem;padding:4px 10px;background:var(--accent)" onclick="eliminaDefinitivo(\'moduli\',' +
+        ')">Ripristina</button><button class="btn-salva" style="font-size:.82rem;padding:4px 10px;background:var(--accent)" onclick="eliminaDefinitivo(\'moduli\',' +
         m.id +
         ')">Elimina</button></div>';
     });
@@ -284,7 +284,7 @@ async function apriFixImpiego() {
     if (rep !== repCorr) {
       repCorr = rep;
       h +=
-        '<p style="font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:12px 0 4px">' +
+        '<p style="font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:12px 0 4px">' +
         escP(repartoLabel(rep)) +
         '</p>';
     }
@@ -292,7 +292,7 @@ async function apriFixImpiego() {
       '<div style="display:flex;gap:10px;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)">' +
       '<span style="flex:1;font-size:.85rem">' +
       escP(c.nome) +
-      ' <span style="color:var(--muted);font-size:.76rem">' +
+      ' <span style="color:var(--muted);font-size:.82rem">' +
       escP(c.funzione || '-') +
       ' &middot; ' +
       Math.round((parseFloat(c.percentuale) || 1) * 100) +
@@ -591,7 +591,7 @@ async function apriFixOrfani() {
       '<div style="padding:8px 0;border-bottom:1px solid var(--line)">' +
       '<b style="font-size:.9rem">' +
       escP(nome) +
-      '</b> <span style="font-size:.78rem;color:var(--muted)">' +
+      '</b> <span style="font-size:.82rem;color:var(--muted)">' +
       o.n +
       ' turni &middot; ' +
       escP(repartoLabel(o.rep)) +
@@ -600,22 +600,22 @@ async function apriFixOrfani() {
       ' al ' +
       o.a.split('-').reverse().join('.') +
       '</span><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">' +
-      '<button class="btn-export" style="font-size:.76rem;padding:4px 10px;border-color:#2c6e49;color:#2c6e49" onclick="orfanoCreaScheda(\'' +
+      '<button class="btn-export" style="font-size:.82rem;padding:4px 10px;border-color:#2c6e49;color:#2c6e49" onclick="orfanoCreaScheda(\'' +
       nomeJs +
       "','" +
       o.rep +
       '\')">Crea la scheda</button>' +
       '<select id="orf-dest-' +
       i +
-      '" style="font-size:.76rem;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><option value="">sposta i turni su...</option>' +
+      '" style="font-size:.82rem;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><option value="">sposta i turni su...</option>' +
       attivi.map((n) => '<option value="' + escP(n) + '">' + escP(n) + '</option>').join('') +
       '</select>' +
-      '<button class="btn-export" style="font-size:.76rem;padding:4px 10px" onclick="orfanoSposta(\'' +
+      '<button class="btn-export" style="font-size:.82rem;padding:4px 10px" onclick="orfanoSposta(\'' +
       nomeJs +
       "'," +
       i +
       ')">Sposta</button>' +
-      '<button class="btn-export" style="font-size:.76rem;padding:4px 10px;border-color:#c0392b;color:#c0392b" onclick="orfanoElimina(\'' +
+      '<button class="btn-export" style="font-size:.82rem;padding:4px 10px;border-color:#c0392b;color:#c0392b" onclick="orfanoElimina(\'' +
       nomeJs +
       "'," +
       o.n +
@@ -900,7 +900,7 @@ async function controlloSalute() {
     esiti.forEach((e) => {
       h +=
         '<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)">' +
-        '<span style="flex:0 0 auto;font-size:.75rem;font-weight:700;letter-spacing:.04em;color:#fff;background:' +
+        '<span style="flex:0 0 auto;font-size:.82rem;font-weight:700;letter-spacing:.04em;color:#fff;background:' +
         col[e.stato] +
         ';padding:2px 7px;border-radius:3px;margin-top:2px">' +
         lbl[e.stato] +
@@ -911,12 +911,12 @@ async function controlloSalute() {
         '</span>' +
         (e.azione
           ? e.azione.indexOf('FIX:') === 0
-            ? '<br><button class="btn-export" style="font-size:.76rem;padding:4px 12px;margin-top:5px;border-color:#1a4a7a;color:#1a4a7a" onclick="' +
+            ? '<br><button class="btn-export" style="font-size:.82rem;padding:4px 12px;margin-top:5px;border-color:#1a4a7a;color:#1a4a7a" onclick="' +
               e.azione.split('|')[0].substring(4) +
               '">' +
               escP(e.azione.split('|')[1] || 'Sistema') +
               '</button>'
-            : '<br><span style="font-size:.78rem;color:#1a4a7a;font-weight:700">Dove sistemarlo: ' +
+            : '<br><span style="font-size:.82rem;color:#1a4a7a;font-weight:700">Dove sistemarlo: ' +
               escP(e.azione) +
               '</span>'
           : '') +
@@ -1016,14 +1016,14 @@ async function caricaDbStats() {
     h +=
       '<div style="background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.3rem;font-weight:700;color:var(--ink)">' +
       t.righe +
-      '</div><div style="font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">' +
+      '</div><div style="font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">' +
       (labelMap[t.nome] || t.nome) +
-      '</div><div style="font-size:.78rem;color:var(--accent2);font-weight:600;margin-top:3px">' +
+      '</div><div style="font-size:.82rem;color:var(--accent2);font-weight:600;margin-top:3px">' +
       t.dimensione +
       '</div></div>';
   });
   h += '</div>';
-  h += '<p style="color:var(--muted);font-size:.78rem">Sessioni attive: ' + r.sessioni_attive + '</p>';
+  h += '<p style="color:var(--muted);font-size:.82rem">Sessioni attive: ' + r.sessioni_attive + '</p>';
   el.innerHTML = h;
 }
 async function _healthCheck() {

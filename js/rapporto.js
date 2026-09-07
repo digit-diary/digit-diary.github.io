@@ -99,7 +99,7 @@ async function renderRapportoCalendario() {
   }
   html += '</div>';
   html +=
-    '<div style="margin-top:20px;text-align:center"><div style="display:flex;justify-content:center;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:12px"><div class="field"><label style="font-size:.78rem;color:var(--muted);display:block;margin-bottom:2px">Dal</label><input type="text" id="rapp-dal" readonly style="width:120px;padding:7px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper2);color:var(--ink);cursor:pointer"></div><div class="field"><label style="font-size:.78rem;color:var(--muted);display:block;margin-bottom:2px">Al</label><input type="text" id="rapp-al" readonly style="width:120px;padding:7px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper2);color:var(--ink);cursor:pointer"></div></div><div style="display:flex;justify-content:center;gap:12px"><button class="btn-export" onclick="esportaRapportoCSV()" style="padding:10px 24px;font-size:.85rem">Esporta CSV</button><button class="btn-export btn-export-pdf" onclick="esportaRapportoPDF()" style="padding:10px 24px;font-size:.85rem">Esporta PDF</button></div></div>';
+    '<div style="margin-top:20px;text-align:center"><div style="display:flex;justify-content:center;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:12px"><div class="field"><label style="font-size:.82rem;color:var(--muted);display:block;margin-bottom:2px">Dal</label><input type="text" id="rapp-dal" readonly style="width:120px;padding:7px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper2);color:var(--ink);cursor:pointer"></div><div class="field"><label style="font-size:.82rem;color:var(--muted);display:block;margin-bottom:2px">Al</label><input type="text" id="rapp-al" readonly style="width:120px;padding:7px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper2);color:var(--ink);cursor:pointer"></div></div><div style="display:flex;justify-content:center;gap:12px"><button class="btn-export" onclick="esportaRapportoCSV()" style="padding:10px 24px;font-size:.85rem">Esporta CSV</button><button class="btn-export btn-export-pdf" onclick="esportaRapportoPDF()" style="padding:10px 24px;font-size:.85rem">Esporta PDF</button></div></div>';
   v.innerHTML = html;
   if (window.flatpickr) {
     const ms = rapportoAnno + '-' + String(rapportoMese + 1).padStart(2, '0') + '-01';
@@ -206,7 +206,7 @@ async function apriGiorno(ds) {
       fields +
       '<div class="autosave-status" id="status-' +
       cls +
-      '" style="text-align:center;font-size:.75rem;color:var(--muted);margin-top:8px;min-height:18px"></div></div></div>'
+      '" style="text-align:center;font-size:.82rem;color:var(--muted);margin-top:8px;min-height:18px"></div></div></div>'
     );
   }
   v.innerHTML =

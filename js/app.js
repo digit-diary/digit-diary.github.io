@@ -428,7 +428,7 @@ function renderTipiUI() {
         tipiNascosti
           .map(
             (n) =>
-              '<button style="margin:2px 4px;padding:3px 10px;font-size:.78rem;cursor:pointer;border:1px dashed var(--accent2);color:var(--accent2);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif" onclick="ripristinaTipoDefault(\'' +
+              '<button style="margin:2px 4px;padding:3px 10px;font-size:.82rem;cursor:pointer;border:1px dashed var(--accent2);color:var(--accent2);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif" onclick="ripristinaTipoDefault(\'' +
               n.replace(/'/g, "\\'") +
               '\')">+ ' +
               escP(n) +

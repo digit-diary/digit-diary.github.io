@@ -124,7 +124,7 @@ function renderCassaAlerts() {
       allinAlerts.length +
       ' collaboratore/i con differenza cassa &#8805; CHF ' +
       SA.allineamento +
-      ' &middot; Preparare allineamento <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
+      ' &middot; Preparare allineamento <span style="font-size:.82rem;opacity:.8">&#9660;</span></div>';
     html += '<div class="cassa-alerts-dropdown hidden" id="cassa-allin-dd">';
     allinAlerts.forEach((a) => {
       html +=
@@ -146,7 +146,7 @@ function renderCassaAlerts() {
       rdiAlerts.length +
       ' collaboratore/i con differenze cumulative &#8805; CHF ' +
       SA.rdi +
-      ' &middot; Fare RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
+      ' &middot; Fare RDI <span style="font-size:.82rem;opacity:.8">&#9660;</span></div>';
     html += '<div class="cassa-alerts-dropdown hidden" id="cassa-rdi-dd">';
     rdiAlerts.forEach((a) => {
       html +=
@@ -443,7 +443,7 @@ function renderRischioAlerts() {
       recidive.length +
       ' collaboratore/i con ' +
       getSoglieDisciplinari().recidiva +
-      '+ allineamenti stesso motivo · Preparare RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
+      '+ allineamenti stesso motivo · Preparare RDI <span style="font-size:.82rem;opacity:.8">&#9660;</span></div>';
     html += '<div class="rischio-alerts-dropdown hidden" id="rischio-dd">';
     recidive.forEach((a) => {
       const dt = a.lastDate ? new Date(a.lastDate + 'T12:00:00').toLocaleDateString('it-IT') : '';
@@ -468,7 +468,7 @@ function renderRischioAlerts() {
       accumuli.length +
       ' collaboratore/i con ' +
       getSoglieDisciplinari().accumulo +
-      '+ allineamenti totali · Valutare RDI <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
+      '+ allineamenti totali · Valutare RDI <span style="font-size:.82rem;opacity:.8">&#9660;</span></div>';
     html += '<div class="rischio-alerts-dropdown hidden" id="acc-dd">';
     accumuli.forEach((a) => {
       const dt = a.lastDate ? new Date(a.lastDate + 'T12:00:00').toLocaleDateString('it-IT') : '';
@@ -575,7 +575,7 @@ function renderAmmonimentiAlerts() {
     ammAlerts.length +
     ' collaboratore/i con ' +
     getSoglieDisciplinari().amm +
-    '+ ammonimenti stesso motivo · Preparare allineamento <span style="font-size:.75rem;opacity:.8">&#9660;</span></div>';
+    '+ ammonimenti stesso motivo · Preparare allineamento <span style="font-size:.82rem;opacity:.8">&#9660;</span></div>';
   html += '<div class="cassa-alerts-dropdown hidden" id="amm-dd">';
   ammAlerts.forEach((a) => {
     const dt = a.last ? new Date(a.last).toLocaleDateString('it-IT') : '';

@@ -256,14 +256,14 @@ function renderPromemoria() {
         (p.completata ? 'text-decoration:line-through' : '') +
         '">' +
         escP(p.titolo) +
-        '</strong><span style="font-size:.78rem;padding:2px 8px;border-radius:2px;background:' +
+        '</strong><span style="font-size:.82rem;padding:2px 8px;border-radius:2px;background:' +
         (p.assegnato_a === 'tutti' ? 'var(--accent2)' : '#2980b9') +
         ';color:white;font-weight:600">' +
         escP(p.assegnato_a === 'tutti' ? 'Tutti' : p.assegnato_a) +
         '</span>' +
-        (scaduto ? '<span style="font-size:.75rem;color:var(--accent);font-weight:700">SCADUTO</span>' : '') +
+        (scaduto ? '<span style="font-size:.82rem;color:var(--accent);font-weight:700">SCADUTO</span>' : '') +
         (p.completata
-          ? '<span style="font-size:.78rem;color:#2c6e49;font-weight:600">Fatto da ' +
+          ? '<span style="font-size:.82rem;color:#2c6e49;font-weight:600">Fatto da ' +
             escP(p.completata_da || '?') +
             ' il ' +
             new Date(p.completata_at).toLocaleDateString('it-IT') +
@@ -282,7 +282,7 @@ function renderPromemoria() {
             esc(p.descrizione) +
             '</div>'
           : '') +
-        '<div style="width:100%;font-size:.78rem;color:var(--muted);margin-top:4px">Creato da ' +
+        '<div style="width:100%;font-size:.82rem;color:var(--muted);margin-top:4px">Creato da ' +
         escP(p.creato_da || 'Admin') +
         '</div></div>'
       );
@@ -385,7 +385,7 @@ function mostraPromemoriaLogin() {
         (scaduto ? 'var(--accent)' : '#e67e22') +
         '"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><strong>' +
         escP(p.titolo) +
-        '</strong><span style="font-size:.78rem;color:' +
+        '</strong><span style="font-size:.82rem;color:' +
         (scaduto ? 'var(--accent)' : '#e67e22') +
         ';font-weight:600">' +
         new Date(p.data_scadenza + 'T12:00:00').toLocaleDateString('it-IT') +
@@ -699,7 +699,7 @@ async function caricaMaisonFile(input, forzaSostituisci) {
             const badge =
               '<span class="mini-badge" style="background:' +
               catColor +
-              ';margin-left:6px;font-size:.78rem">' +
+              ';margin-left:6px;font-size:.82rem">' +
               escP(catLabel) +
               '</span>';
             mHtml +=
@@ -964,7 +964,7 @@ async function caricaMaisonFile(input, forzaSostituisci) {
         giorniSaltati.join(', ') +
         '</span>';
       msg +=
-        ' <button onclick="caricaMaisonFile(document.getElementById(\'maison-file-input\'),true)" style="font-size:.78rem;padding:3px 10px;cursor:pointer;border:1px solid var(--accent);color:var(--accent);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif;font-weight:600;margin-left:6px">Sostituisci tutto</button>';
+        ' <button onclick="caricaMaisonFile(document.getElementById(\'maison-file-input\'),true)" style="font-size:.82rem;padding:3px 10px;cursor:pointer;border:1px solid var(--accent);color:var(--accent);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif;font-weight:600;margin-left:6px">Sostituisci tutto</button>';
     }
     if (!totalRows && !giorniSaltati.length) msg = '<span style="color:var(--muted)">Nessun dato nuovo trovato</span>';
     if (dupCount) {

@@ -160,9 +160,9 @@ function _renderValutazioneSezione(nome) {
       ne +
       "'" +
       (v ? ',' + v.anno + ",'" + escP(v.tipo) + "'" : '') +
-      ')" style="font-size:.78rem;padding:4px 12px">+ Nuova / Modifica</button>';
+      ')" style="font-size:.82rem;padding:4px 12px">+ Nuova / Modifica</button>';
     html +=
-      '<button class="btn-export" onclick="document.getElementById(\'val-import-file\').click()" style="font-size:.78rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49">Importa Excel</button>' +
+      '<button class="btn-export" onclick="document.getElementById(\'val-import-file\').click()" style="font-size:.82rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49">Importa Excel</button>' +
       '<input type="file" id="val-import-file" accept=".xlsx,.xls" style="display:none" onchange="importaValutazioneExcel(this,\'' +
       ne +
       '\')">';
@@ -171,12 +171,12 @@ function _renderValutazioneSezione(nome) {
     html +=
       '<button class="btn-export btn-export-pdf" onclick="esportaValutazionePDF(' +
       v.id +
-      ')" style="font-size:.78rem;padding:4px 12px">PDF scheda HR</button>';
+      ')" style="font-size:.82rem;padding:4px 12px">PDF scheda HR</button>';
   }
   html += '</h4>';
   if (!vals.length) {
     html +=
-      '<p style="font-size:.86rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="mini-badge" style="background:#8a1c1c;color:#fff;font-size:.78rem;letter-spacing:.05em">VALUTAZIONE ASSENTE</span><span style="color:var(--muted)">Nessuna scheda di valutazione registrata' +
+      '<p style="font-size:.86rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="mini-badge" style="background:#8a1c1c;color:#fff;font-size:.82rem;letter-spacing:.05em">VALUTAZIONE ASSENTE</span><span style="color:var(--muted)">Nessuna scheda di valutazione registrata' +
       (puoVal ? ': creane una nuova o importa la scheda Excel compilata.' : '.') +
       '</span></p></div>';
     return html;
@@ -187,7 +187,7 @@ function _renderValutazioneSezione(nome) {
     vals.forEach((x) => {
       const att = x.id === v.id;
       html +=
-        '<span class="mini-badge" style="cursor:pointer;font-size:.75rem;' +
+        '<span class="mini-badge" style="cursor:pointer;font-size:.82rem;' +
         (att
           ? 'background:var(--accent2);color:white'
           : 'background:var(--paper2);color:var(--ink);border:1px solid var(--line)') +
@@ -214,9 +214,9 @@ function _renderValutazioneSezione(nome) {
   const deltaBadge = function (cur, old) {
     if (cur == null || old == null) return '';
     const d = cur - old;
-    if (d === 0) return '<span style="font-size:.78rem;color:var(--muted);min-width:34px;text-align:right">=</span>';
+    if (d === 0) return '<span style="font-size:.82rem;color:var(--muted);min-width:34px;text-align:right">=</span>';
     return (
-      '<span style="font-size:.78rem;font-weight:700;min-width:34px;text-align:right;color:' +
+      '<span style="font-size:.82rem;font-weight:700;min-width:34px;text-align:right;color:' +
       (d > 0 ? '#2c6e49' : 'var(--accent)') +
       '">' +
       (d > 0 ? '&#9650; +' : '&#9660; ') +
@@ -241,11 +241,11 @@ function _renderValutazioneSezione(nome) {
     _coloreValore(media) +
     '">' +
     media +
-    '%</strong> <span style="font-size:.78rem">(' +
+    '%</strong> <span style="font-size:.82rem">(' +
     _giudizioScala(media) +
     ')</span>' +
     (mediaPrec != null
-      ? ' <span style="font-size:.78rem;font-weight:700;color:' +
+      ? ' <span style="font-size:.82rem;font-weight:700;color:' +
         (media - mediaPrec > 0 ? '#2c6e49' : media - mediaPrec < 0 ? 'var(--accent)' : 'var(--muted)') +
         '">' +
         (media - mediaPrec > 0 ? '▲ +' : media - mediaPrec < 0 ? '▼ ' : '= ') +
@@ -260,7 +260,7 @@ function _renderValutazioneSezione(nome) {
     if (a.gruppo !== gruppoCorr) {
       gruppoCorr = a.gruppo;
       html +=
-        '<div style="font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:8px 0 3px">' +
+        '<div style="font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:8px 0 3px">' +
         gruppoCorr +
         '</div>';
     }
@@ -281,14 +281,14 @@ function _renderValutazioneSezione(nome) {
       '</strong>' +
       (prec ? deltaBadge(val, areePrec[a.key]) : '') +
       ((v.auto_aree || {})[a.key] != null
-        ? '<span style="font-size:.78rem;color:#1a4a7a;min-width:58px;text-align:right" title="Autovalutazione del collaboratore">auto: ' +
+        ? '<span style="font-size:.82rem;color:#1a4a7a;min-width:58px;text-align:right" title="Autovalutazione del collaboratore">auto: ' +
           v.auto_aree[a.key] +
           '%</span>'
         : '') +
       '</div>';
     if (note[a.key])
       html +=
-        '<div style="font-size:.76rem;color:var(--muted);font-style:italic;padding:0 0 3px 12px;line-height:1.3">&#8618; ' +
+        '<div style="font-size:.82rem;color:var(--muted);font-style:italic;padding:0 0 3px 12px;line-height:1.3">&#8618; ' +
         escP(note[a.key]) +
         '</div>';
   });
@@ -377,7 +377,7 @@ function apriValutazioneEditor(nome, anno, tipo) {
     SCALA_VALUTAZIONE +
     '</p></div><button class="btn-modal-cancel" onclick="apriSchedaCollaboratore(\'' +
     ne +
-    '\')" style="padding:6px 12px;font-size:.75rem">← Scheda</button></div>';
+    '\')" style="padding:6px 12px;font-size:.82rem">← Scheda</button></div>';
   html +=
     '<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap"><span class="filter-label">Anno</span><input type="number" id="val-anno" value="' +
     a +
@@ -401,7 +401,7 @@ function apriValutazioneEditor(nome, anno, tipo) {
     if (ar.gruppo !== gruppoCorr) {
       gruppoCorr = ar.gruppo;
       html +=
-        '<div style="font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent2);font-weight:700;margin:14px 0 6px;border-bottom:1px solid var(--line);padding-bottom:3px">' +
+        '<div style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent2);font-weight:700;margin:14px 0 6px;border-bottom:1px solid var(--line);padding-bottom:3px">' +
         gruppoCorr +
         '</div>';
     }
@@ -410,7 +410,7 @@ function apriValutazioneEditor(nome, anno, tipo) {
     html +=
       '<div style="display:flex;align-items:center;gap:10px;padding:5px 0;flex-wrap:wrap"><div style="flex:1;min-width:220px"><strong style="font-size:.88rem">' +
       ar.label +
-      '</strong><div style="font-size:.75rem;color:var(--muted);line-height:1.35">' +
+      '</strong><div style="font-size:.82rem;color:var(--muted);line-height:1.35">' +
       ar.desc +
       '</div></div><input type="number" id="val-area-' +
       ar.key +
@@ -422,7 +422,7 @@ function apriValutazioneEditor(nome, anno, tipo) {
           ar.key +
           "').value=" +
           s +
-          '" title="Suggerito dai dati del Diario" style="font-size:.75rem">Suggerito: ' +
+          '" title="Suggerito dai dati del Diario" style="font-size:.82rem">Suggerito: ' +
           s +
           '</button>'
         : '') +
@@ -439,7 +439,7 @@ function apriValutazioneEditor(nome, anno, tipo) {
   const ef = (esistente && esistente.esigenze_formative) || '';
   const os = (esistente && esistente.osservazioni) || '';
   html +=
-    '<div style="font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent2);font-weight:700;margin:14px 0 6px;border-bottom:1px solid var(--line);padding-bottom:3px">COMMENTO ALLA VALUTAZIONE</div>';
+    '<div style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent2);font-weight:700;margin:14px 0 6px;border-bottom:1px solid var(--line);padding-bottom:3px">COMMENTO ALLA VALUTAZIONE</div>';
   html +=
     '<div class="field" style="margin-bottom:10px"><label>Punti di forza</label><textarea id="val-punti-forza" style="min-height:50px">' +
     escP(pf) +
@@ -816,7 +816,7 @@ async function importaValutazioneExcel(input, nome) {
         (extra.obiettivi || []).length ||
         extra.aree_note ||
         extra.dati_personali)
-        ? '<p style="font-size:.78rem;color:var(--muted);margin:0 0 10px">Testi trovati: ' +
+        ? '<p style="font-size:.82rem;color:var(--muted);margin:0 0 10px">Testi trovati: ' +
           [
             extra.dati_personali
               ? 'dati ufficiali (' +
@@ -833,11 +833,11 @@ async function importaValutazioneExcel(input, nome) {
           '</p>'
         : '') +
       (autoAree && Object.keys(autoAree).length
-        ? '<p style="font-size:.78rem;color:#1a4a7a;margin:0 0 10px">Autovalutazione trovata: ' +
+        ? '<p style="font-size:.82rem;color:#1a4a7a;margin:0 0 10px">Autovalutazione trovata: ' +
           Object.keys(autoAree).length +
           ' aree (verrà salvata accanto alla valutazione)</p>'
         : '') +
-      '<p style="font-size:.75rem;color:var(--muted);margin:0 0 10px">Il file Excel originale verrà salvato come allegato nello Storico HR.</p>' +
+      '<p style="font-size:.82rem;color:var(--muted);margin:0 0 10px">Il file Excel originale verrà salvato come allegato nello Storico HR.</p>' +
       '</div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="_confermaImportValutazione()">Importa</button></div>';
     document.getElementById('pwd-modal').classList.remove('hidden');
   } catch (e) {

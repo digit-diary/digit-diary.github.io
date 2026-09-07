@@ -2428,7 +2428,7 @@ function _briefRenderPauseSlots(c) {
     }
     if (!righe.length) return;
     let t =
-      '<table style="border-collapse:collapse;font-size:.78rem;table-layout:fixed"><colgroup><col style="width:46px"><col style="width:88px"></colgroup>';
+      '<table style="border-collapse:collapse;font-size:.82rem;table-layout:fixed"><colgroup><col style="width:46px"><col style="width:88px"></colgroup>';
     righe.forEach((riga, idx) => {
       const isHdr = (riga.a && riga.a.hdr) || (riga.b && riga.b.hdr);
       if (isHdr && idx > 0) t += '<tr><td colspan="2" style="border:none;height:12px"></td></tr>';
@@ -2478,7 +2478,7 @@ function _briefRenderPauseSlots(c) {
             col +
             ',this.value)" style="width:100%;border:none;background:transparent;color:inherit;font:inherit;' +
             (cell.b ? 'font-weight:bold;' : '') +
-            'padding:2px 4px;font-size:.78rem"></td>';
+            'padding:2px 4px;font-size:.82rem"></td>';
         } else {
           t +=
             '<td style="' +
@@ -2519,7 +2519,7 @@ function _briefRenderPauseSlots(c) {
     h += '<div>' + t;
     if (puo)
       h +=
-        '<button class="btn-export" style="font-size:.78rem;padding:2px 8px;margin-top:4px" onclick="briefPausaInsRiga(' +
+        '<button class="btn-export" style="font-size:.82rem;padding:2px 8px;margin-top:4px" onclick="briefPausaInsRiga(' +
         base +
         ',' +
         (righe.length ? righe[righe.length - 1].r : 6) +
@@ -2529,7 +2529,7 @@ function _briefRenderPauseSlots(c) {
   h += '</div>';
   if (puo)
     h +=
-      '<div style="margin-top:8px"><button class="btn-export" style="font-size:.78rem;padding:4px 10px;border-color:#c0392b;color:#c0392b" onclick="briefEliminaPause()">Elimina pause</button></div>';
+      '<div style="margin-top:8px"><button class="btn-export" style="font-size:.82rem;padding:4px 10px;border-color:#c0392b;color:#c0392b" onclick="briefEliminaPause()">Elimina pause</button></div>';
   return h;
 }
 function _briefParseIntv(s) {
@@ -2557,7 +2557,7 @@ function _briefRenderCronoValet(c) {
     '<tr>' +
     ['ORARIO', 'NOME', 'TURNO', 'DURATA']
       .map(
-        (x) => '<th style="border:1px solid #999;background:#DCDCDC;padding:3px 8px;font-size:.75rem">' + x + '</th>',
+        (x) => '<th style="border:1px solid #999;background:#DCDCDC;padding:3px 8px;font-size:.82rem">' + x + '</th>',
       )
       .join('') +
     '</tr>';
@@ -2603,7 +2603,7 @@ function _briefRenderPauseValet(c) {
     '</td></tr><tr>' +
     ['TURNO', 'NOME', 'ORARIO', 'PAUSA 1', 'PAUSA 2', 'PAUSA 3']
       .map(
-        (x) => '<th style="border:1px solid #999;background:#DCDCDC;padding:3px 8px;font-size:.75rem">' + x + '</th>',
+        (x) => '<th style="border:1px solid #999;background:#DCDCDC;padding:3px 8px;font-size:.82rem">' + x + '</th>',
       )
       .join('') +
     '</tr>';
@@ -2621,7 +2621,7 @@ function _briefRenderPauseValet(c) {
           larg +
           'px;border:none;background:transparent;font:inherit;' +
           (extra || '') +
-          'padding:2px 6px;font-size:.78rem"></td>'
+          'padding:2px 6px;font-size:.82rem"></td>'
         : '<td style="border:1px solid #999;padding:2px 8px;' + (extra || '') + '">' + escP(val || '') + '</td>';
     h += cInp('turno', r.turno, 55, 'font-weight:bold;');
     h += cInp('nome', r.nome, 150);
@@ -2638,7 +2638,7 @@ function _briefRenderPauseValet(c) {
           i +
           ",'p" +
           k +
-          '\',this.value)" style="width:86px;border:none;background:transparent;font:inherit;text-align:center;padding:2px 4px;font-size:.78rem"></td>';
+          '\',this.value)" style="width:86px;border:none;background:transparent;font:inherit;text-align:center;padding:2px 4px;font-size:.82rem"></td>';
       } else {
         h +=
           '<td style="border:1px solid #999;background:' +
@@ -2658,16 +2658,16 @@ function _briefRenderPauseValet(c) {
   h += '</table></div>';
   if (puo)
     h +=
-      '<button class="btn-export" style="font-size:.78rem;padding:2px 8px;margin-top:4px" onclick="briefValetAddRiga()">+ Aggiungi riga</button>';
+      '<button class="btn-export" style="font-size:.82rem;padding:2px 8px;margin-top:4px" onclick="briefValetAddRiga()">+ Aggiungi riga</button>';
   h += '<div id="brief-crono">' + _briefRenderCronoValet(c) + '</div>';
   if (c.nota)
     h +=
-      '<p style="font-size:.75rem;font-style:italic;background:#FFFFCC;border:1px solid #999;padding:6px 10px;margin-top:10px;max-width:560px">' +
+      '<p style="font-size:.82rem;font-style:italic;background:#FFFFCC;border:1px solid #999;padding:6px 10px;margin-top:10px;max-width:560px">' +
       escP(c.nota) +
       '</p>';
   if (puo)
     h +=
-      '<div style="margin-top:8px"><button class="btn-export" style="font-size:.78rem;padding:4px 10px;border-color:#c0392b;color:#c0392b" onclick="briefEliminaPause()">Elimina pause</button></div>';
+      '<div style="margin-top:8px"><button class="btn-export" style="font-size:.82rem;padding:4px 10px;border-color:#c0392b;color:#c0392b" onclick="briefEliminaPause()">Elimina pause</button></div>';
   return h;
 }
 
@@ -3040,7 +3040,7 @@ function _briefRenderPauseCfg() {
   // tabella "turni, orari e pause spettanti" calcolata LIVE dalle regole:
   // cambi un orario nella tab Turni o una fascia qui sotto e si aggiorna
   let tab =
-    '<table style="border-collapse:collapse;font-size:.78rem;margin:8px 0"><tr>' +
+    '<table style="border-collapse:collapse;font-size:.82rem;margin:8px 0"><tr>' +
     ['TURNO', 'ORARIO', 'DURATA', 'PAUSA SPETTANTE']
       .map((x) => '<th style="border:1px solid #999;background:#FFFF00;padding:3px 10px">' + x + '</th>')
       .join('') +
@@ -3088,7 +3088,7 @@ function _briefRenderPauseCfg() {
         '" style="width:80px;border:none;background:transparent;font:inherit;font-weight:bold;padding:2px 8px"></td></tr>';
     });
   tab +=
-    '</table><p style="font-size:.78rem;color:var(--muted)">Colonna PAUSA: scrivi la composizione che vuoi per quel turno (es. <b>15+15</b> per S3, <b>30+15+15</b>), oppure lasciala vuota per usare la regola per fascia di durata (il valore grigio è quello attuale). Gli orari dei turni si modificano nella tab <b>Turni</b>. Tutto si aggiorna da solo.</p>';
+    '</table><p style="font-size:.82rem;color:var(--muted)">Colonna PAUSA: scrivi la composizione che vuoi per quel turno (es. <b>15+15</b> per S3, <b>30+15+15</b>), oppure lasciala vuota per usare la regola per fascia di durata (il valore grigio è quello attuale). Gli orari dei turni si modificano nella tab <b>Turni</b>. Tutto si aggiorna da solo.</p>';
   const num = (id, val, larg) =>
     '<input id="' +
     id +
