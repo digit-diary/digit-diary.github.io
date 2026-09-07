@@ -333,12 +333,86 @@ function _pianoTurnoInfo(codice) {
 function _pianoCodiceInfo(codice) {
   return pianoCodiciCache.find((c) => c.codice === codice);
 }
+// Giorni in cui una certa sigla e' presente nel piano: { 'Z12': {'2026-09-11':1} }.
+// Si riempie con le righe che vengono caricate, cosi' vale anche per i mesi che
+// il saldo annuale e le statistiche attraversano.
+let _pianoGiorniConTurno = {};
+function _pianoRegistraGiorniTurno(righe) {
+  const sigle = (pianoTurniCache || []).map((t) => t.prolunga_se_turno).filter(Boolean);
+  if (!sigle.length || !righe || !righe.length) return;
+  const cerca = new Set(sigle.map((x) => String(x).toUpperCase()));
+  righe.forEach((r) => {
+    const cod = String(r.codice || '').toUpperCase();
+    if (!cerca.has(cod)) return;
+    if (!_pianoGiorniConTurno[cod]) _pianoGiorniConTurno[cod] = {};
+    _pianoGiorniConTurno[cod][String(r.data).substring(0, 10)] = 1;
+  });
+}
+function _pianoTurnoPresenteIlGiorno(codice, dstr) {
+  if (!codice || !dstr) return false;
+  const m = _pianoGiorniConTurno[String(codice).toUpperCase()];
+  return !!(m && m[dstr]);
+}
+// GIORNI DI CHIUSURA TARDI: venerdi e sabato per prassi, le vigilie di
+// festivita' e il 31 dicembre. Sono i giorni in cui alcuni turni finiscono piu'
+// tardi (es. Z0 alle 20:30 invece che alle 19:45).
+function _pianoGiornoChiusuraTardi(dstr) {
+  if (!dstr) return false;
+  try {
+    const cfg = _pianoChiusuraCfg();
+    return _pianoChiusuraGiorno(dstr).ora > cfg.oraNormale;
+  } catch (e) {
+    return false;
+  }
+}
+// Orario e durata EFFETTIVI di un turno in un dato giorno: se il turno ha un
+// orario prolungato e quel giorno si chiude tardi, valgono quelli.
+function _pianoTurnoDelGiorno(t, dstr) {
+  if (!t) return null;
+  const base = {
+    ora_inizio: t.ora_inizio,
+    ora_fine: t.ora_fine,
+    durata: parseFloat(t.durata_ore) || 0,
+    prolungato: false,
+    oltre23: t.oltre23,
+    tipo: t.tipo,
+  };
+  // due criteri, uno solo basta: il giorno chiude tardi, oppure nel piano di
+  // quel giorno c'e' il turno che da' il cambio (es. Z12 per Z0)
+  const siProlunga =
+    !!t.ora_fine_tardi && (_pianoGiornoChiusuraTardi(dstr) || _pianoTurnoPresenteIlGiorno(t.prolunga_se_turno, dstr));
+  if (!siProlunga) return base;
+  const durataTardi =
+    t.durata_ore_tardi != null && t.durata_ore_tardi !== ''
+      ? parseFloat(t.durata_ore_tardi)
+      : (() => {
+          // senza durata scritta si somma la differenza fra i due orari di fine,
+          // cosi' resta dentro qualunque correzione gia' presente nella durata
+          const f1 = _pianoOra(t.ora_fine);
+          const f2 = _pianoOra(t.ora_fine_tardi);
+          if (f1 == null || f2 == null) return base.durata;
+          const extra = f2 >= f1 ? f2 - f1 : 24 + f2 - f1;
+          return Math.round((base.durata + extra) * 100) / 100;
+        })();
+  return {
+    ora_inizio: t.ora_inizio,
+    ora_fine: t.ora_fine_tardi,
+    durata: durataTardi,
+    prolungato: true,
+    oltre23: t.oltre23,
+    tipo: t.tipo,
+  };
+}
 // Ore pianificate di una RIGA del piano: turno → durata del turno;
 // codice con orario personalizzato (es. JG con inizio/fine) → differenza;
 // altrimenti ore CCL del codice speciale (scalate per percentuale se previsto)
 function _pianoOreDiRiga(r, pct) {
   const t = _pianoTurnoInfo(r.codice);
-  if (t) return parseFloat(t.durata_ore) || 0;
+  if (t) {
+    // il turno puo' finire piu' tardi nei giorni di chiusura alle 5
+    const eff = _pianoTurnoDelGiorno(t, r.data ? String(r.data).substring(0, 10) : '');
+    return eff ? eff.durata : parseFloat(t.durata_ore) || 0;
+  }
   if (r.ora_inizio && r.ora_fine) {
     const e = _pianoOra(r.ora_inizio);
     const u = _pianoOra(r.ora_fine);
@@ -716,6 +790,8 @@ let _pianoYtdMap = {};
 let _pianoYtdKey = '';
 async function _pianoAggiornaYtd(nomi) {
   const ym = _pianoMeseSel;
+  // servono per sapere quali giorni chiudono tardi (turni con orario prolungato)
+  await _pianoCaricaFestivita(parseInt(ym.split('-')[0]));
   const chiave = ym + '|' + _pianoReparto();
   if (_pianoYtdKey === chiave) return;
   const anno = parseInt(ym.split('-')[0]);
@@ -754,7 +830,12 @@ async function _pianoAggiornaYtd(nomi) {
           ),
         ),
     );
-    res.slice(0, grp.length).forEach((rr) => rr && righe.push(...rr));
+    res.slice(0, grp.length).forEach((rr) => {
+      if (rr) {
+        righe.push(...rr);
+        _pianoRegistraGiorniTurno(rr);
+      }
+    });
     res.slice(grp.length).forEach((rr) => rr && timbrate.push(...rr));
   }
   const perMese = {}; // nome|m -> ore piano
@@ -910,6 +991,9 @@ async function _pianoInserisciCella(dati) {
 async function _pianoCaricaMeseSettore(da, a, rep) {
   const righe =
     (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + rep + '&limit=20000')) || [];
+  // subito, PRIMA di qualunque uscita anticipata: serve a sapere in quali giorni
+  // e' previsto il turno che fa prolungare un altro (es. Z12 per Z0)
+  _pianoRegistraGiorniTurno(righe);
   const coprenti = collaboratoriCache
     .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') !== rep && _pianoAppartieneAlReparto(c))
     .map((c) => c.nome);
@@ -960,6 +1044,11 @@ async function renderPiano() {
   try {
     await _pianoCaricaCfg();
     const ym = _pianoMeseSel;
+    // FESTIVITA' PRIMA DI TUTTO: da queste dipende quali giorni chiudono tardi,
+    // e quindi la durata dei turni che si prolungano. Se il dato non c'e', le
+    // ore risulterebbero corte senza che nessuno se ne accorga: va caricato per
+    // OGNI scheda, non solo per il calendario.
+    await _pianoCaricaFestivita(parseInt(ym.split('-')[0]));
     const nGiorni = _pianoUltimoGiorno(ym);
     const da = ym + '-01';
     const a = ym + '-' + String(nGiorni).padStart(2, '0');
@@ -1261,11 +1350,20 @@ async function renderPiano() {
             const _col = _pianoColore(codice);
             if (_col) stile = 'background:' + _col;
             if (t) {
-              ore += parseFloat(t.durata_ore) || 0;
+              // orario del GIORNO: alcuni turni finiscono piu' tardi quando il
+              // casino chiude alle 5 (o quando c'e' il turno che da' il cambio)
+              const _eff = _pianoTurnoDelGiorno(t, dstr);
+              ore += _eff ? _eff.durata : parseFloat(t.durata_ore) || 0;
               oreLav += _pianoOreEffettiveTurno(t, r);
               if (t.tipo === 'NOTTURNO') nN++;
               else nD++;
-              titolo = codice + ' ' + (t.ora_inizio || '').substring(0, 5) + '-' + (t.ora_fine || '').substring(0, 5);
+              titolo =
+                codice +
+                ' ' +
+                (_eff.ora_inizio || '').substring(0, 5) +
+                '-' +
+                (_eff.ora_fine || '').substring(0, 5) +
+                (_eff.prolungato ? ' (prolungato: chiusura tardi) ' + _eff.durata + 'h' : '');
             } else if (cs) {
               oreSpec += _pianoOreDiRiga(r, perc0);
               titolo =
@@ -4326,7 +4424,7 @@ function _renderPianoTurniCard() {
     '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="pianoVerificaDurateNotte()">Controlla le durate dei turni</button>' +
     '</div>';
   h +=
-    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:720px;font-size:.85rem"><thead><tr><th>Codice</th><th>Gruppo</th><th>Inizio</th><th>Fine</th><th>Ore</th><th>Tipo</th><th>Colore</th><th>Oltre 23</th><th>Attivo</th><th></th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:720px;font-size:.85rem"><thead><tr><th>Codice</th><th>Gruppo</th><th>Inizio</th><th>Fine</th><th title="Ora di fine nei giorni in cui il casino chiude alle 5: venerdi, sabato, vigilie di festivita, 31 dicembre. Vuoto = il turno finisce sempre alla stessa ora">Fine (chiusura 5)</th><th>Ore</th><th>Tipo</th><th>Colore</th><th>Oltre 23</th><th>Attivo</th><th></th></tr></thead><tbody>';
   turni
     .slice()
     .sort((x, y) => (x.gruppo || '').localeCompare(y.gruppo || '') || x.codice.localeCompare(y.codice))
@@ -4348,7 +4446,11 @@ function _renderPianoTurniCard() {
         escP((t.ora_fine || '').substring(0, 5)) +
         '" onchange="salvaPianoTurno(' +
         t.id +
-        ',\'ora_fine\',this.value)" style="padding:2px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td><input type="number" step="0.25" value="' +
+        ',\'ora_fine\',this.value)" style="padding:2px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td><input type="time" value="' +
+        escP((t.ora_fine_tardi || '').substring(0, 5)) +
+        '" title="Ora di fine nei giorni in cui si chiude alle 5 (venerdi, sabato, vigilie di festivita, 31 dicembre). Vuoto = finisce sempre alla stessa ora" onchange="salvaPianoTurno(' +
+        t.id +
+        ',\'ora_fine_tardi\',this.value)" style="padding:2px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"></td><td><input type="number" step="0.25" value="' +
         (t.durata_ore || 0) +
         '" onchange="salvaPianoTurno(' +
         t.id +
@@ -5224,20 +5326,34 @@ async function _renderPianoRecuperoTab() {
 // Giorni in cui si chiude alle 05:00 invece che alle 04:00 (o alle 07:00 il 31
 // dicembre). Servono a sapere in anticipo quando mettere piu' personale.
 // ===========================================================================
+// Cache PER ANNO: il saldo annuale e le statistiche attraversano mesi diversi,
+// e un solo anno in memoria faceva sparire le festivita' degli altri. Da questo
+// dipende anche l'orario prolungato dei turni nei giorni di chiusura tardi,
+// quindi un dato mancante diventerebbe un conteggio di ore sbagliato.
+let _pianoFestivitaPerAnno = {};
 let pianoFestivitaCache = [];
 let _pianoFestivitaAnnoCaricato = null;
 async function _pianoCaricaFestivita(anno) {
-  if (_pianoFestivitaAnnoCaricato === anno) return pianoFestivitaCache;
-  const r = (await secGet('piano_festivita?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&limit=500')) || [];
-  pianoFestivitaCache = r;
+  anno = parseInt(anno);
+  if (!_pianoFestivitaPerAnno[anno]) {
+    _pianoFestivitaPerAnno[anno] =
+      (await secGet('piano_festivita?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&limit=500')) || [];
+  }
+  pianoFestivitaCache = _pianoFestivitaPerAnno[anno]; // l'anno mostrato nella scheda Festivi
   _pianoFestivitaAnnoCaricato = anno;
-  return r;
+  return pianoFestivitaCache;
 }
-// mappa { 'YYYY-MM-DD': nome } delle sole festivita' attive
+function _pianoFestivitaScarta(anno) {
+  delete _pianoFestivitaPerAnno[parseInt(anno)];
+  _pianoFestivitaAnnoCaricato = null;
+}
+// mappa { 'YYYY-MM-DD': nome } delle festivita' attive di TUTTI gli anni caricati
 function _pianoFestivitaMappa() {
   const m = {};
-  (pianoFestivitaCache || []).forEach((f) => {
-    if (f.attivo !== false) m[String(f.data).substring(0, 10)] = f.nome;
+  Object.keys(_pianoFestivitaPerAnno).forEach((a) => {
+    (_pianoFestivitaPerAnno[a] || []).forEach((f) => {
+      if (f.attivo !== false) m[String(f.data).substring(0, 10)] = f.nome;
+    });
   });
   return m;
 }
@@ -5337,7 +5453,7 @@ async function pianoImportaFestivita(anno) {
       console.warn('festivita', f.data, e && e.message);
     }
   }
-  _pianoFestivitaAnnoCaricato = null;
+  _pianoFestivitaScarta(anno);
   await _pianoCaricaFestivita(anno);
   logAzione('Festivita importate', anno + ': ' + n + ' giorni');
   toast(n + ' festivita inserite per il ' + anno);
@@ -5381,7 +5497,7 @@ async function pianoFestivitaAggiungi() {
       attivo: true,
       operatore: getOperatore(),
     });
-    _pianoFestivitaAnnoCaricato = null;
+    _pianoFestivitaScarta(parseInt(data.split('-')[0]));
     await _pianoCaricaFestivita(parseInt(data.split('-')[0]));
     logAzione('Festivita aggiunta', nome + ' ' + data);
     toast('Aggiunta: ' + nome);
@@ -5531,8 +5647,10 @@ const PIANO_FESTIVI_PARIFICATI = [
 // compreso nella durata contrattuale del turno). Se la cella ha orari suoi
 // (turno personalizzato, JG) valgono quelli.
 function _pianoOreEffettiveTurno(t, riga) {
-  const oi = (riga && riga.ora_inizio) || (t && t.ora_inizio);
-  const of = (riga && riga.ora_fine) || (t && t.ora_fine);
+  // se il turno si prolunga nei giorni di chiusura tardi, valgono quegli orari
+  const eff = t && riga && riga.data ? _pianoTurnoDelGiorno(t, String(riga.data).substring(0, 10)) : null;
+  const oi = (riga && riga.ora_inizio) || (eff && eff.ora_inizio) || (t && t.ora_inizio);
+  const of = (riga && riga.ora_fine) || (eff && eff.ora_fine) || (t && t.ora_fine);
   const i = _pianoOra(oi);
   let f = _pianoOra(of);
   if (i == null || f == null) return 0;
@@ -8429,6 +8547,8 @@ async function caricaStatisticheAnnoPiano() {
   if (!el) return;
   el.innerHTML = '<p style="color:var(--muted);font-size:.8rem;padding:6px 0">Caricamento anno...</p>';
   const anno = _pianoMeseSel.split('-')[0];
+  // le festivita dell anno servono per i turni con orario prolungato
+  await _pianoCaricaFestivita(parseInt(anno));
   const righe =
     (await secGet(
       'piano?data=gte.' +
@@ -8439,6 +8559,7 @@ async function caricaStatisticheAnnoPiano() {
         _pianoReparto() +
         '&limit=20000',
     )) || [];
+  _pianoRegistraGiorniTurno(righe);
   const fabb =
     (await secGet(
       'piano_fabbisogni?data=gte.' +
