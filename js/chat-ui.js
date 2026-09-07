@@ -2069,6 +2069,12 @@ function apriSchedaCollaboratore(nome) {
   const errori = entries.filter((e) => e.tipo === tipoErr);
   const totErr = errori.length;
   const totErrCost = errori.reduce((s, e) => s + (parseFloat(e.importo) || 0), 0);
+  // Differenze cassa con segno: la direzione sta nel testo (ammanco/eccedenza)
+  const totAmmanchi = errori.reduce((s, e) => s + (/ammanco/i.test(e.testo || '') ? parseFloat(e.importo) || 0 : 0), 0);
+  const totEccedenze = errori.reduce(
+    (s, e) => s + (/eccedenza/i.test(e.testo || '') ? parseFloat(e.importo) || 0 : 0),
+    0,
+  );
   const totMal = _contaTotaleMalattie(entries, tipoMal);
   const totAmm = entries.filter((e) => e.tipo === tipoAmm).length;
   const tipoND = nomeCorrente('Non Disponibilità');
@@ -2190,7 +2196,15 @@ function apriSchedaCollaboratore(nome) {
       _kpiAttr('reg', tipoErr) +
       '><div class="kpi-val" style="color:var(--accent)">' +
       fmtCHF(totErrCost) +
-      ' CHF</div><div class="kpi-lbl">Costo errori</div></div>';
+      ' CHF</div>' +
+      (totAmmanchi || totEccedenze
+        ? '<div style="font-size:11px;margin-top:2px;font-weight:600"><span style="color:#c62828">-' +
+          fmtCHF(totAmmanchi) +
+          '</span> / <span style="color:#2e7d32">+' +
+          fmtCHF(totEccedenze) +
+          '</span></div>'
+        : '') +
+      '<div class="kpi-lbl">Costo errori</div></div>';
   html +=
     '<div class="scheda-kpi"' +
     _kpiAttr('reg', tipoMal) +
@@ -3165,6 +3179,14 @@ function stampaSchedaPDF(nome) {
     .reduce(function (s, e) {
       return s + (parseFloat(e.importo) || 0);
     }, 0);
+  var _pdfAmm = 0,
+    _pdfEcc = 0;
+  entries.forEach(function (e) {
+    if (e.tipo !== tipoErr) return;
+    var v = parseFloat(e.importo) || 0;
+    if (/ammanco/i.test(e.testo || '')) _pdfAmm += v;
+    else if (/eccedenza/i.test(e.testo || '')) _pdfEcc += v;
+  });
   var allin = moduli.filter(function (m) {
     return m.tipo === 'allineamento';
   }).length;
@@ -3220,7 +3242,20 @@ function stampaSchedaPDF(nome) {
       ['Registrazioni', 'Errori', 'Costo Errori', 'Malattie', 'Amm. Verbali', 'Allineamenti', 'Apprezzamenti', 'RDI'],
     ],
     body: [
-      [entries.length, totErr, totErrCost ? 'CHF ' + fmtCHF(totErrCost) : '0', totMal, totAmm, allin, apprMod, rdi],
+      [
+        entries.length,
+        totErr,
+        totErrCost
+          ? 'CHF ' +
+            fmtCHF(totErrCost) +
+            (_pdfAmm || _pdfEcc ? ' (-' + fmtCHF(_pdfAmm) + ' / +' + fmtCHF(_pdfEcc) + ')' : '')
+          : '0',
+        totMal,
+        totAmm,
+        allin,
+        apprMod,
+        rdi,
+      ],
     ],
     headStyles: { fillColor: [26, 74, 122], fontSize: 7 },
     bodyStyles: { fontSize: 8, halign: 'center' },

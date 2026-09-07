@@ -1488,6 +1488,62 @@ async function toggleCompetenza(collabId, key, cb) {
   }
 }
 async function _insertPuntiEvento(nome, punti, azione, descrizione) {
+  // ANTI-DOPPIONI (vale per OGNI incentivo: coperture, cambi, competenze, livelli, premi, manuali).
+  // Controlla sul database, non solo in cache, cosi' vede anche i punti dati da altri operatori.
+  const _desc = (descrizione || '').trim();
+  const _oggi = new Date().toISOString().split('T')[0];
+  let _giaDati = null;
+  try {
+    _giaDati = await secGet(
+      'punti_eventi?collaboratore=eq.' +
+        encodeURIComponent(nome) +
+        '&azione=eq.' +
+        encodeURIComponent(azione) +
+        '&order=id.desc&limit=300',
+    );
+  } catch (e) {}
+  if (!Array.isArray(_giaDati))
+    _giaDati = (puntiEventiCache || []).filter((x) => x.collaboratore === nome && x.azione === azione);
+  const _fmtIt = (d) => (d ? String(d).split('-').reverse().join('/') : '');
+  const _stessoMotivo = _desc ? _giaDati.find((x) => (x.descrizione || '').trim() === _desc) : null;
+  if (_stessoMotivo) {
+    if (
+      !confirm(
+        "ATTENZIONE: punti gia' assegnati.\n\n" +
+          nome +
+          " ha gia' ricevuto " +
+          (_stessoMotivo.punti > 0 ? '+' : '') +
+          _stessoMotivo.punti +
+          ' punti per questo stesso motivo il ' +
+          _fmtIt(_stessoMotivo.data_evento) +
+          ':\n"' +
+          _desc +
+          '"\n\nAssegnare comunque una SECONDA volta?\nOK = doppio accredito consapevole · Annulla = nessun doppione',
+      )
+    ) {
+      toast('Nessun doppione: punti non assegnati a ' + nome);
+      return false;
+    }
+  } else {
+    const _stessoGiorno = _giaDati.find((x) => x.data_evento === _oggi);
+    if (
+      _stessoGiorno &&
+      !confirm(
+        nome +
+          " ha gia' ricevuto oggi " +
+          (_stessoGiorno.punti > 0 ? '+' : '') +
+          _stessoGiorno.punti +
+          ' punti per "' +
+          azione +
+          '"' +
+          (_stessoGiorno.descrizione ? ' (' + _stessoGiorno.descrizione + ')' : '') +
+          '.\n\nQuesto sembra un motivo diverso: assegnare anche questi punti?',
+      )
+    ) {
+      toast('Punti non assegnati a ' + nome);
+      return false;
+    }
+  }
   const r = await secPost('punti_eventi', {
     collaboratore: nome,
     punti: punti,
@@ -1506,6 +1562,7 @@ async function _insertPuntiEvento(nome, punti, azione, descrizione) {
       (descrizione || azione) + ' · totale ' + puntiTotali(nome) + ' punti',
       true,
     );
+  return true;
 }
 async function assegnaPuntiRapido() {
   if (typeof puoModificare === 'function' && !puoModificare('gestione_punti')) {
