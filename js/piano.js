@@ -3424,6 +3424,122 @@ async function copiaFabbisognoMese() {
 }
 
 // ---- Card TURNI (admin) ----
+// ===== CONTROLLO DEL SUPPLEMENTO NOTTURNO NELLE DURATE DEI TURNI =====
+// Chi lavora nella fascia notturna matura il 10% di quelle ore in piu': il
+// supplemento e' compreso nella DURATA del turno, quindi entra da solo nelle
+// ore del mese e nel saldo. Qui si verifica turno per turno che la durata
+// dichiarata corrisponda a "ore effettive + 10% delle ore notturne".
+function _pianoDurataAttesa(t) {
+  const i = _pianoOra(t.ora_inizio);
+  let f = _pianoOra(t.ora_fine);
+  if (i == null || f == null) return null;
+  if (f <= i) f += 24;
+  const eff = f - i;
+  const nott = _pianoOreNotturneTurno(t);
+  return Math.round((eff + _pianoNotteRecupero(nott)) * 100) / 100;
+}
+async function pianoVerificaDurateNotte() {
+  if (!isAdmin()) return;
+  const tutti = pianoTurniCache.filter((t) => t.attivo !== false && t.ora_inizio && t.ora_fine);
+  const perc = parseFloat(_pianoRegolaVal('notte_percentuale')) || 10;
+  const problemi = [];
+  tutti.forEach((t) => {
+    const nott = _pianoOreNotturneTurno(t);
+    if (nott <= 0) return;
+    const attesa = _pianoDurataAttesa(t);
+    const dich = parseFloat(t.durata_ore);
+    if (attesa == null || isNaN(dich)) return;
+    const diff = Math.round((attesa - dich) * 100) / 100;
+    if (Math.abs(diff) >= 0.06) problemi.push({ t: t, nott: nott, attesa: attesa, dich: dich, diff: diff });
+  });
+  const conNotte = tutti.filter((t) => _pianoOreNotturneTurno(t) > 0).length;
+  const b = document.getElementById('pwd-modal-content');
+  let h =
+    '<h3>Supplemento notturno del ' +
+    perc +
+    '%</h3><p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Fascia notturna ' +
+    (parseFloat(_pianoRegolaVal('notte_inizio')) || 23) +
+    ':00-' +
+    (parseFloat(_pianoRegolaVal('notte_fine')) || 6) +
+    ':00. Turni con ore notturne: <b>' +
+    conNotte +
+    '</b>, di cui <b>' +
+    problemi.length +
+    '</b> con durata da sistemare.</p>';
+  if (!problemi.length) {
+    h +=
+      '<p style="font-size:.9rem;color:#2c6e49;font-weight:700">Tutte le durate comprendono correttamente il supplemento notturno.</p>';
+  } else {
+    h +=
+      '<div style="max-height:48vh;overflow:auto"><table class="piano-table" style="min-width:100%;font-size:.82rem"><thead><tr><th style="text-align:left">Turno</th><th>Orario</th><th>Ore notturne</th><th>Durata ora</th><th>Durata corretta</th><th>Differenza</th></tr></thead><tbody>';
+    problemi.forEach((p) => {
+      h +=
+        '<tr><td style="text-align:left;font-weight:600">' +
+        escP(p.t.codice) +
+        ' <span style="font-weight:400;color:var(--muted)">' +
+        escP(repartoLabel(p.t.reparto_dip || 'slots')) +
+        '</span></td><td>' +
+        (p.t.ora_inizio || '').substring(0, 5) +
+        '-' +
+        (p.t.ora_fine || '').substring(0, 5) +
+        '</td><td>' +
+        p.nott.toFixed(2) +
+        'h</td><td>' +
+        p.dich +
+        'h</td><td style="font-weight:700">' +
+        p.attesa +
+        'h</td><td style="font-weight:700;color:' +
+        (p.diff > 0 ? '#c0392b' : '#8b6914') +
+        '">' +
+        (p.diff > 0 ? '+' : '') +
+        p.diff +
+        'h</td></tr>';
+    });
+    h += '</tbody></table></div>';
+    h +=
+      '<p style="font-size:.8rem;color:var(--muted);margin-top:8px">In rosso i turni in cui manca il supplemento (le ore andrebbero aumentate), in giallo quelli che ne hanno piu\' del previsto. Controlla prima di correggere: un turno puo\' avere una durata diversa per accordi particolari (per esempio pause non pagate).</p>';
+    h +=
+      '<div class="pwd-modal-btns" style="margin-top:12px;flex-wrap:wrap;gap:6px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button>' +
+      '<button class="btn-modal-ok" onclick="pianoCorreggiDurateNotte()">Correggi tutte le durate</button></div>';
+    window._pianoDurateDaFixare = problemi.map((p) => ({ id: p.t.id, codice: p.t.codice, attesa: p.attesa }));
+    b.innerHTML = h;
+    document.getElementById('pwd-modal').classList.remove('hidden');
+    return;
+  }
+  h +=
+    '<div class="pwd-modal-btns" style="margin-top:12px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
+  b.innerHTML = h;
+  document.getElementById('pwd-modal').classList.remove('hidden');
+}
+async function pianoCorreggiDurateNotte() {
+  if (!isAdmin()) return;
+  const lista = window._pianoDurateDaFixare || [];
+  if (!lista.length) return;
+  if (
+    !confirm(
+      'Aggiorno la durata di ' +
+        lista.length +
+        " turni con il supplemento notturno compreso?\n\nLe ore gia' salvate nei piani non cambiano da sole: il nuovo valore vale dai prossimi conteggi.",
+    )
+  )
+    return;
+  document.getElementById('pwd-modal').classList.add('hidden');
+  let fatti = 0;
+  try {
+    for (const x of lista) {
+      await secPatch('piano_turni', 'id=eq.' + x.id, { durata_ore: x.attesa });
+      const t = pianoTurniCache.find((y) => y.id === x.id);
+      if (t) t.durata_ore = x.attesa;
+      fatti++;
+    }
+    logAzione('Turni: durate con supplemento notturno', fatti + ' turni aggiornati');
+    toast(fatti + ' durate aggiornate');
+    window._pianoDurateDaFixare = [];
+    renderPiano();
+  } catch (e) {
+    toast('Errore: aggiornati ' + fatti + ' su ' + lista.length);
+  }
+}
 function _renderPianoTurniCard() {
   if (!isAdmin()) {
     // operatori: vedono i turni del PROPRIO settore in sola lettura
@@ -3461,6 +3577,15 @@ function _renderPianoTurniCard() {
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Turni · ' +
     escP(repartoLabel(_pianoReparto())) +
     ' (admin)</div><div style="padding:10px 14px">';
+  // Il supplemento del 10% sul lavoro notturno (23:00-06:00) e' incluso nella
+  // DURATA del turno: questo controllo verifica che tutte le durate lo
+  // rispettino e propone la correzione dove manca.
+  h +=
+    '<div style="background:var(--paper2);border:1px solid var(--line);border-radius:3px;padding:10px 12px;margin-bottom:12px">' +
+    '<b style="font-size:.9rem">Supplemento notturno del 10%</b>' +
+    '<p style="font-size:.82rem;color:var(--muted);margin:4px 0 8px">Chi lavora nella fascia notturna (23:00-06:00) matura il 10% di quelle ore in piu\', e questo supplemento deve essere gia\' compreso nella durata del turno. Il controllo confronta ogni turno con la durata attesa.</p>' +
+    '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="pianoVerificaDurateNotte()">Controlla le durate dei turni</button>' +
+    '</div>';
   h +=
     '<div style="overflow-x:auto"><table class="piano-table" style="min-width:720px;font-size:.85rem"><thead><tr><th>Codice</th><th>Gruppo</th><th>Inizio</th><th>Fine</th><th>Ore</th><th>Tipo</th><th>Colore</th><th>Oltre 23</th><th>Attivo</th><th></th></tr></thead><tbody>';
   turni
@@ -7064,7 +7189,7 @@ async function caricaStatisticheAnnoPiano() {
   h +=
     '<div style="padding:4px 0"><input type="text" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-statanno-table\')" style="padding:4px 8px;font-size:.8rem;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--ink);width:180px"></div>';
   h +=
-    '<div style="overflow-x:auto"><table id="piano-statanno-table" class="piano-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Ore anno</th><th title="Sui mesi con un piano">Ore dovute</th><th>Giorni lavorati</th><th>Diurni</th><th>Notturni</th><th>Weekend</th><th>Domeniche</th><th>Vacanze</th><th>Malattie</th><th title="Festivi lavorati che danno diritto al recupero (solo personale fisso)">CGF maturati</th><th title="Giorni CGF effettivamente goduti (quelli caduti in malattia non contano)">CGF goduti</th><th title="Maturati − goduti: quanti recuperi restano da dare">Saldo CGF</th><th title="Festivi parificati alle domeniche lavorati dagli ausiliari (jolly): danno diritto al supplemento del 50% sul salario orario lordo (RAP Allegato 1). Sono nove giorni fissi e valgono anche di domenica">Suppl. 50%</th><th title="Ore di lavoro notturno degli ausiliari (jolly) e tempo libero pagato maturato: 10% delle ore notturne (RAP Allegato 1)">Notte 10%</th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table id="piano-statanno-table" class="piano-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Ore anno</th><th title="Sui mesi con un piano">Ore dovute</th><th>Giorni lavorati</th><th>Diurni</th><th>Notturni</th><th>Weekend</th><th>Domeniche</th><th>Vacanze</th><th>Malattie</th><th title="Festivi lavorati che danno diritto al recupero (solo personale fisso)">CGF maturati</th><th title="Giorni CGF effettivamente goduti (quelli caduti in malattia non contano)">CGF goduti</th><th title="Maturati − goduti: quanti recuperi restano da dare">Saldo CGF</th><th title="Festivi parificati alle domeniche lavorati dagli ausiliari (jolly): danno diritto al supplemento del 50% sul salario orario lordo (RAP Allegato 1). Sono nove giorni fissi e valgono anche di domenica">Suppl. 50%</th><th title="Ore lavorate nella fascia notturna (23:00-06:00). Il supplemento del 10% e gia compreso nella durata dei turni: questa colonna serve da controllo, non e un credito da dare a parte">Ore notte</th></tr></thead><tbody>';
   ordineCollabPiano(Object.keys(st), _pianoReparto()).forEach((n) => {
     const o = st[n];
     h +=
@@ -7116,12 +7241,12 @@ async function caricaStatisticheAnnoPiano() {
       '" title="' +
       (o.oreNotte
         ? Math.round(o.oreNotte * 10) / 10 +
-          'h di lavoro notturno: spettano ' +
+          'h nella fascia notturna: il supplemento del 10% (' +
           _pianoNotteRecupero(o.oreNotte) +
-          'h di tempo libero pagato'
+          "h) e' gia' compreso nelle ore dei turni"
         : '') +
       '">' +
-      (o.oreNotte ? _pianoNotteRecupero(o.oreNotte) + 'h' : '') +
+      (o.oreNotte ? Math.round(o.oreNotte * 10) / 10 + 'h' : '') +
       '</td></tr>';
   });
   h += '</tbody></table></div>';
