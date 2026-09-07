@@ -391,7 +391,26 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno) {
     const dataRapp = new Date(ds + 'T12:00:00');
     let dataInizio = new Date(ds + 'T12:00:00'),
       dataFine = new Date(ds + 'T12:00:00');
-    if (dopodomaniMatch && domaniMatch) {
+    // "oggi e domani" / "oggi e dopodomani": il periodo parte dal giorno del
+    // rapporto e arriva al giorno indicato. Vanno prima delle altre, altrimenti
+    // "domani" da solo vincerebbe e il primo giorno andrebbe perso.
+    if (oggiMatch && dopodomaniMatch) {
+      dataInizio = new Date(dataRapp);
+      dataFine = new Date(dataRapp);
+      dataFine.setDate(dataFine.getDate() + 2);
+    } else if (oggiMatch && domaniMatch) {
+      dataInizio = new Date(dataRapp);
+      dataFine = new Date(dataRapp);
+      dataFine.setDate(dataFine.getDate() + 1);
+    } else if (oggiMatch && _giorniTrovati.length === 1) {
+      // "oggi e venerdi": dal giorno del rapporto fino a quel giorno
+      dataInizio = new Date(dataRapp);
+      const _t = _giorniTrovati[0];
+      dataFine = new Date(dataRapp);
+      let _d = (_t - dataFine.getDay() + 7) % 7;
+      if (_d === 0) _d = 7;
+      dataFine.setDate(dataFine.getDate() + _d);
+    } else if (dopodomaniMatch && domaniMatch) {
       dataInizio = new Date(dataRapp);
       dataInizio.setDate(dataInizio.getDate() + 1);
       dataFine = new Date(dataRapp);
@@ -510,7 +529,16 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno) {
           ' giorni, ' +
           _rapLabel +
           ')'
-        : 'Assente per malattia' + codeTxt + ' (' + _rapLabel + ')';
+        : // un giorno solo: si scrive la data SEMPRE quando non e' il giorno del
+          // rapporto (es. "domani"), altrimenti l'assenza risulterebbe datata al
+          // giorno del rapporto e la copertura, registrata sul giorno vero, non
+          // verrebbe piu' collegata
+          'Assente per malattia' +
+          codeTxt +
+          (dalStr !== new Date(ds + 'T12:00:00').toLocaleDateString('it-IT') ? ' dal ' + dalStr : '') +
+          ' (' +
+          _rapLabel +
+          ')';
     _nomiProcessati.add(nomeFinale.toLowerCase());
     const esiste = _esistenti.find(
       (e) => e.nome.toLowerCase() === nomeFinale.toLowerCase() && !_usedEsistentiIds.has(e.id),

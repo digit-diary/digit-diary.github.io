@@ -392,7 +392,8 @@ function modificaRegistrazione(id) {
   // Stato copertura attuale (mostrato nel modal per le malattie)
   let _copStatusHtml = '';
   if (_isMalattia && typeof eventiCopertura === 'function') {
-    const _ev = eventiCopertura(e.nome, _dataRifCopertura(e));
+    const _per = typeof _periodoCopertura === 'function' ? _periodoCopertura(e) : null;
+    const _ev = _per ? eventiCopertura(e.nome, _per.dal, _per.al) : eventiCopertura(e.nome, _dataRifCopertura(e));
     const _cop = _ev.find((p) => p.azione === 'copertura');
     const _rif = _ev.filter((p) => p.azione === 'disponibilita_negata').length;
     _copStatusHtml =

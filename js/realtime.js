@@ -394,6 +394,7 @@ async function sbDel(table, filter) {
     headers: sbH(),
   });
 }
+let _sbUltimoErrore = null; // ultimo errore ricevuto dal database via RPC
 async function sbRpc(fn, params) {
   const r = await fetch(SB_URL + '/rest/v1/rpc/' + fn, {
     method: 'POST',
@@ -401,12 +402,18 @@ async function sbRpc(fn, params) {
     body: JSON.stringify(params || {}),
   });
   if (!r.ok) {
+    let errTxt = '';
     try {
-      const errTxt = await r.text();
+      errTxt = await r.text();
       console.error('sbRpc ' + fn + ' ' + r.status + ':', errTxt);
     } catch (e) {}
+    // l'errore resta a disposizione di chi ha chiamato: senza questo, un rifiuto
+    // del database (riga doppia, vincolo) sarebbe indistinguibile da "funzione
+    // non raggiungibile" e porterebbe a un ripiego che non puo' funzionare
+    _sbUltimoErrore = { fn: fn, status: r.status, testo: errTxt, quando: Date.now() };
     return null;
   }
+  _sbUltimoErrore = null;
   const txt = await r.text();
   if (!txt) return null;
   try {
@@ -496,6 +503,16 @@ async function secGet(path) {
   }
   return sbGet(path);
 }
+// Un errore che arriva DAL DATABASE (riga doppia, vincolo, permesso) non e' un
+// guasto del canale protetto: ripiegare sulla scrittura anonima non lo risolve,
+// perche' le regole di sicurezza la bloccano comunque, e trasforma un problema
+// spiegabile ("riga gia' presente") in un errore oscuro che ferma tutto.
+// Il ripiego serve solo quando la funzione protetta non e' raggiungibile.
+function _erroreDalDatabase(e) {
+  const t = (e && (e.message || e.toString())) || '';
+  if (/"code"\s*:\s*"[0-9A-Z]{5}"/.test(t)) return true;
+  return /duplicate key|violates|already exists|row-level security/i.test(t);
+}
 async function secPost(table, data) {
   const tk = getOpToken();
   if (tk) {
@@ -506,9 +523,15 @@ async function secPost(table, data) {
         p_data: data,
       });
       if (r) return [r];
+      if (_sbUltimoErrore && _erroreDalDatabase({ message: _sbUltimoErrore.testo })) {
+        const err = new Error(_sbUltimoErrore.testo);
+        err.dalDatabase = true;
+        throw err;
+      }
       console.warn('secPost: secure_insert null, fallback');
       return sbPost(table, data);
     } catch (e) {
+      if (_erroreDalDatabase(e)) throw e; // lo gestisce chi ha chiamato
       console.warn('secPost fallback:', e.message);
       return sbPost(table, data);
     }
