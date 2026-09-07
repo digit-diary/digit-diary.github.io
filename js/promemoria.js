@@ -282,7 +282,7 @@ function renderPromemoria() {
             esc(p.descrizione) +
             '</div>'
           : '') +
-        '<div style="width:100%;font-size:.72rem;color:var(--muted);margin-top:4px">Creato da ' +
+        '<div style="width:100%;font-size:.78rem;color:var(--muted);margin-top:4px">Creato da ' +
         escP(p.creato_da || 'Admin') +
         '</div></div>'
       );
@@ -699,7 +699,7 @@ async function caricaMaisonFile(input, forzaSostituisci) {
             const badge =
               '<span class="mini-badge" style="background:' +
               catColor +
-              ';margin-left:6px;font-size:.7rem">' +
+              ';margin-left:6px;font-size:.78rem">' +
               escP(catLabel) +
               '</span>';
             mHtml +=

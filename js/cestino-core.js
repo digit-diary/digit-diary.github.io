@@ -83,7 +83,7 @@ function renderCestino() {
         d +
         '<div style="font-size:.75rem;color:var(--muted)">' +
         escP((r.testo || '').substring(0, 60)) +
-        '</div><div style="font-size:.72rem;color:var(--accent)">Eliminato da ' +
+        '</div><div style="font-size:.78rem;color:var(--accent)">Eliminato da ' +
         escP(r.eliminato_da || '') +
         ' il ' +
         delAt +
@@ -111,7 +111,7 @@ function renderCestino() {
         escP(m.tipo || '') +
         '</span> · ' +
         escP(m.data_modulo || '') +
-        '<div style="font-size:.72rem;color:var(--accent)">Eliminato da ' +
+        '<div style="font-size:.78rem;color:var(--accent)">Eliminato da ' +
         escP(m.eliminato_da || '') +
         ' il ' +
         delAt +
@@ -650,7 +650,7 @@ async function controlloSalute() {
     esiti.forEach((e) => {
       h +=
         '<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)">' +
-        '<span style="flex:0 0 auto;font-size:.66rem;font-weight:700;letter-spacing:.04em;color:#fff;background:' +
+        '<span style="flex:0 0 auto;font-size:.75rem;font-weight:700;letter-spacing:.04em;color:#fff;background:' +
         col[e.stato] +
         ';padding:2px 7px;border-radius:3px;margin-top:2px">' +
         lbl[e.stato] +
@@ -768,7 +768,7 @@ async function caricaDbStats() {
       t.righe +
       '</div><div style="font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">' +
       (labelMap[t.nome] || t.nome) +
-      '</div><div style="font-size:.72rem;color:var(--accent2);font-weight:600;margin-top:3px">' +
+      '</div><div style="font-size:.78rem;color:var(--accent2);font-weight:600;margin-top:3px">' +
       t.dimensione +
       '</div></div>';
   });

@@ -835,7 +835,7 @@ function renderCampiRapportoUI() {
         reps
           .map(
             (r) =>
-              '<label style="display:inline-flex;align-items:center;gap:3px;font-size:.72rem;color:var(--muted);cursor:pointer" title="Il campo appare nel rapporto di questo settore"><input type="checkbox"' +
+              '<label style="display:inline-flex;align-items:center;gap:3px;font-size:.78rem;color:var(--muted);cursor:pointer" title="Il campo appare nel rapporto di questo settore"><input type="checkbox"' +
               (campoInReparto(key, r.key) ? ' checked' : '') +
               ' onchange="toggleCampoReparto(\'' +
               key +
@@ -1121,7 +1121,7 @@ function renderSettoriUI() {
         '\')" style="margin-left:4px">' +
         (disattivo ? 'Riattiva' : 'Disattiva') +
         '</button>';
-      if (nDati) html += '<span style="font-size:.72rem;color:var(--muted)">' + nDati + ' record collegati</span>';
+      if (nDati) html += '<span style="font-size:.78rem;color:var(--muted)">' + nDati + ' record collegati</span>';
     }
     html += '</div>';
     // pagine abilitate per questo settore

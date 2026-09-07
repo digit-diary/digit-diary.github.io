@@ -166,13 +166,13 @@ function renderConsegne() {
           btns +=
             '<button class="btn-act edit" onclick="modificaConsegna(' +
             c.id +
-            ')" style="font-size:.7rem">Modifica</button>';
+            ')" style="font-size:.78rem">Modifica</button>';
           btns +=
             '<button class="btn-act del" onclick="annullaConsegna(' +
             c.id +
-            ')" style="font-size:.7rem">Annulla invio</button>';
+            ')" style="font-size:.78rem">Annulla invio</button>';
         } else if (letto) {
-          btns += '<span style="font-size:.72rem;color:var(--muted);font-style:italic">Non modificabile (letta)</span>';
+          btns += '<span style="font-size:.78rem;color:var(--muted);font-style:italic">Non modificabile (letta)</span>';
         }
       }
       if (!isMia && !letto) {
@@ -649,22 +649,22 @@ function renderDashboard() {
   const _consRecenti = getConsegneReparto().slice(0, 3);
   if (_consRecenti.length) {
     alertH +=
-      '<div style="font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:10px;margin-bottom:6px;font-weight:600">Ultime consegne</div>';
+      '<div style="font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:10px;margin-bottom:6px;font-weight:600">Ultime consegne</div>';
     _consRecenti.forEach((c) => {
       const cd = new Date(c.created_at);
       const isAlta = c.priorita === 'alta';
       alertH +=
         '<div style="padding:6px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.85rem" onclick="switchPage(\'consegna\')"><span class="mini-badge" style="background:' +
         (c.turno_uscente === 'PRESTO' ? '#e67e22' : '#2c3e50') +
-        ';font-size:.65rem">' +
+        ';font-size:.78rem">' +
         c.turno_uscente +
         '</span><strong>' +
         escP(c.operatore) +
         '</strong><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)">' +
         escP(c.messaggio.substring(0, 50)) +
         '</span>' +
-        (isAlta ? '<span style="color:var(--accent);font-size:.7rem;font-weight:700">!</span>' : '') +
-        '<span style="color:var(--muted);font-size:.72rem">' +
+        (isAlta ? '<span style="color:var(--accent);font-size:.78rem;font-weight:700">!</span>' : '') +
+        '<span style="color:var(--muted);font-size:.78rem">' +
         cd.toLocaleDateString('it-IT') +
         '</span></div>';
     });

@@ -2519,7 +2519,7 @@ function _briefRenderPauseSlots(c) {
     h += '<div>' + t;
     if (puo)
       h +=
-        '<button class="btn-export" style="font-size:.72rem;padding:2px 8px;margin-top:4px" onclick="briefPausaInsRiga(' +
+        '<button class="btn-export" style="font-size:.78rem;padding:2px 8px;margin-top:4px" onclick="briefPausaInsRiga(' +
         base +
         ',' +
         (righe.length ? righe[righe.length - 1].r : 6) +
@@ -2658,7 +2658,7 @@ function _briefRenderPauseValet(c) {
   h += '</table></div>';
   if (puo)
     h +=
-      '<button class="btn-export" style="font-size:.72rem;padding:2px 8px;margin-top:4px" onclick="briefValetAddRiga()">+ Aggiungi riga</button>';
+      '<button class="btn-export" style="font-size:.78rem;padding:2px 8px;margin-top:4px" onclick="briefValetAddRiga()">+ Aggiungi riga</button>';
   h += '<div id="brief-crono">' + _briefRenderCronoValet(c) + '</div>';
   if (c.nota)
     h +=
@@ -3088,7 +3088,7 @@ function _briefRenderPauseCfg() {
         '" style="width:80px;border:none;background:transparent;font:inherit;font-weight:bold;padding:2px 8px"></td></tr>';
     });
   tab +=
-    '</table><p style="font-size:.72rem;color:var(--muted)">Colonna PAUSA: scrivi la composizione che vuoi per quel turno (es. <b>15+15</b> per S3, <b>30+15+15</b>), oppure lasciala vuota per usare la regola per fascia di durata (il valore grigio è quello attuale). Gli orari dei turni si modificano nella tab <b>Turni</b>. Tutto si aggiorna da solo.</p>';
+    '</table><p style="font-size:.78rem;color:var(--muted)">Colonna PAUSA: scrivi la composizione che vuoi per quel turno (es. <b>15+15</b> per S3, <b>30+15+15</b>), oppure lasciala vuota per usare la regola per fascia di durata (il valore grigio è quello attuale). Gli orari dei turni si modificano nella tab <b>Turni</b>. Tutto si aggiorna da solo.</p>';
   const num = (id, val, larg) =>
     '<input id="' +
     id +

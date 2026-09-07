@@ -161,7 +161,7 @@ function _renderNdCal() {
   html += '</div>';
   html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center">';
   giorni.forEach((g) => {
-    html += '<div style="font-size:.72rem;font-weight:700;color:var(--muted);padding:4px 0">' + g + '</div>';
+    html += '<div style="font-size:.78rem;font-weight:700;color:var(--muted);padding:4px 0">' + g + '</div>';
   });
   for (let i = 0; i < startDay; i++) html += '<div></div>';
   for (let d = 1; d <= ultimoGiorno; d++) {
@@ -558,12 +558,12 @@ function repartoLettera(key) {
 function _repBadge(rep, piccolo) {
   if (!rep || rep === 'entrambi' || !getRepartoInfo(rep)) return '';
   return piccolo
-    ? '<span style="font-size:.6rem;color:' +
+    ? '<span style="font-size:.75rem;color:' +
         repartoColore(rep) +
         ';font-weight:700;margin-left:4px">' +
         repartoLettera(rep) +
         '</span>'
-    : ' <span style="font-size:.65rem;color:' +
+    : ' <span style="font-size:.78rem;color:' +
         repartoColore(rep) +
         ';font-weight:700">' +
         repartoLettera(rep) +

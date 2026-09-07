@@ -156,7 +156,7 @@ body {
   min-height: 18px;
 }
 .login-hint {
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   color: var(--muted);
   margin-top: 12px;
   line-height: 1.4;
@@ -217,7 +217,7 @@ body {
 }
 .pwd-field label {
   display: block;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
@@ -365,7 +365,7 @@ header h1 .casino {
   right: -4px;
   background: var(--accent);
   color: white;
-  font-size: 0.65rem;
+  font-size: 0.78rem;
   font-weight: 700;
   min-width: 18px;
   height: 18px;
@@ -592,7 +592,7 @@ header h1 .casino {
 }
 .rg-section {
   padding: 6px 14px;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
@@ -613,7 +613,7 @@ header h1 .casino {
   background: var(--paper2);
 }
 .rg-item .rg-badge {
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 2px;
@@ -749,7 +749,7 @@ header h1 .casino {
 }
 .firma-canvas-box button {
   padding: 4px 14px;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
   border: 1px solid var(--line);
@@ -884,7 +884,7 @@ header h1 .casino {
   background: var(--accent);
   color: white;
   border-radius: 9px;
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   padding: 1px 6px;
   margin-left: 6px;
   font-weight: 700;
@@ -972,7 +972,7 @@ header h1 .casino {
   line-height: 1;
 }
 .stat-label {
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
@@ -1262,7 +1262,7 @@ header h1 .casino {
   color: var(--accent2);
 }
 .badge {
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -1388,7 +1388,7 @@ header h1 .casino {
   border: 1px solid;
   border-radius: 2px;
   cursor: pointer;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1943,7 +1943,7 @@ header h1 .casino {
 .collab-table th {
   text-align: left;
   padding: 8px 10px;
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
@@ -1964,7 +1964,7 @@ header h1 .casino {
 }
 .mini-badge {
   display: inline-block;
-  font-size: 0.6rem;
+  font-size: 0.75rem;
   font-weight: 700;
   padding: 1px 5px;
   border-radius: 2px;
@@ -2024,7 +2024,7 @@ header h1 .casino {
   color: var(--ink);
 }
 .tipo-item-default {
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   color: var(--muted);
   font-weight: 400;
 }
@@ -2049,7 +2049,7 @@ header h1 .casino {
   color: var(--muted);
   width: 26px;
   height: 24px;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   cursor: pointer;
   border-radius: 2px;
   display: flex;
@@ -2126,7 +2126,7 @@ header h1 .casino {
   font-weight: 700;
 }
 .op-remove {
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   font-weight: 700;
   opacity: 0.6;
   margin-left: 4px;
@@ -2365,7 +2365,7 @@ header h1 .casino {
     font-size: 0.75rem;
   }
   header h1 .casino {
-    font-size: 0.7rem;
+    font-size: 0.78rem;
   }
   .header-right {
     align-items: flex-start;
@@ -2400,7 +2400,7 @@ header h1 .casino {
   }
   .collab-table .mini-badge {
     white-space: nowrap;
-    font-size: 0.65rem !important;
+    font-size: 0.78rem !important;
   }
   .entry {
     grid-template-columns: 70px 1fr;
@@ -2461,7 +2461,7 @@ header h1 .casino {
   }
   .tipo-tag {
     padding: 6px 10px;
-    font-size: 0.72rem;
+    font-size: 0.78rem;
   }
   .btn-salva {
     width: 100%;
@@ -2482,7 +2482,7 @@ header h1 .casino {
     gap: 2px;
   }
   .rapporto-day-header {
-    font-size: 0.7rem;
+    font-size: 0.78rem;
     padding: 6px 0;
   }
   .rapporto-day-cell {
@@ -2546,7 +2546,7 @@ header h1 .casino {
     font-size: 1.1rem;
   }
   .scheda-kpi .kpi-lbl {
-    font-size: 0.6rem;
+    font-size: 0.75rem;
   }
   .pwd-modal-box {
     min-width: auto;
@@ -2603,7 +2603,7 @@ header h1 .casino {
   }
   .template-rapido-btn {
     padding: 6px 10px;
-    font-size: 0.72rem;
+    font-size: 0.78rem;
   }
   .firma-canvas {
     width: 220px;
@@ -2619,7 +2619,7 @@ header h1 .casino {
     font-size: 1.5rem;
   }
   .stat-label {
-    font-size: 0.65rem;
+    font-size: 0.78rem;
   }
   .chart-card {
     padding: 14px;
@@ -2670,7 +2670,7 @@ header h1 .casino {
   #inv-buoni-table .entry-action-btn,
   #inv-sig-table .entry-action-btn {
     padding: 3px 5px !important;
-    font-size: 0.7rem !important;
+    font-size: 0.78rem !important;
   }
 }
 @media (max-width: 400px) {
@@ -2678,7 +2678,7 @@ header h1 .casino {
     font-size: 1.3rem;
   }
   .nav-tab {
-    font-size: 0.55rem;
+    font-size: 0.75rem;
     padding: 7px 4px;
   }
   .entry {
@@ -2688,7 +2688,7 @@ header h1 .casino {
     font-size: 1rem;
   }
   .entry-month {
-    font-size: 0.6rem;
+    font-size: 0.75rem;
   }
   .rapporto-day-cell {
     padding: 6px 2px;
@@ -2825,7 +2825,7 @@ button:focus-visible,
 }
 /* CATEGORY GROUP HEADERS */
 .cat-group-header {
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   font-weight: 700;
@@ -2876,7 +2876,7 @@ button:focus-visible,
   line-height: 1;
 }
 .mini-stat-label {
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted);
@@ -2904,7 +2904,7 @@ button:focus-visible,
   border-bottom-left-radius: 4px;
 }
 .chat-bubble .chat-time {
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   color: var(--muted);
   margin-top: 4px;
   display: flex;
@@ -2941,7 +2941,7 @@ button:focus-visible,
   border-radius: 50%;
   min-width: 20px;
   height: 20px;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -2975,18 +2975,18 @@ button:focus-visible,
 .chat-date-sep {
   text-align: center;
   margin: 12px 0 6px;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   color: var(--muted);
   font-weight: 600;
   letter-spacing: 0.06em;
 }
 .chat-group-label {
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   color: var(--muted);
   margin-bottom: 2px;
 }
 .chat-sender-label {
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   font-weight: 700;
   color: var(--accent2);
   margin-bottom: 2px;
@@ -3072,7 +3072,7 @@ button:focus-visible,
 .reaction-badge .r-count {
   font-weight: 600;
   color: var(--ink);
-  font-size: 0.72rem;
+  font-size: 0.78rem;
 }
 .reaction-tooltip {
   display: none;
@@ -3084,7 +3084,7 @@ button:focus-visible,
   color: var(--paper);
   border-radius: 4px;
   padding: 4px 8px;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   white-space: nowrap;
   margin-bottom: 4px;
   z-index: 130;
@@ -3257,7 +3257,7 @@ button:focus-visible,
   opacity: 1;
 }
 .urgente-label {
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   font-weight: 700;
   color: var(--accent);
   letter-spacing: 0.06em;
@@ -3469,7 +3469,7 @@ button:focus-visible,
 }
 .settings-section > h4 .sec-chev {
   margin-left: auto;
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   color: var(--muted);
   transition: transform 0.2s;
 }
@@ -3490,7 +3490,7 @@ button:focus-visible,
 }
 .main-card > .card-header .sec-chev {
   margin-left: auto;
-  font-size: 0.65rem;
+  font-size: 0.78rem;
   opacity: 0.7;
   transition: transform 0.2s;
 }
@@ -3516,7 +3516,7 @@ button:focus-visible,
 }
 .alert-compatto .sec-chev {
   margin-left: auto;
-  font-size: 0.65rem;
+  font-size: 0.78rem;
   transition: transform 0.2s;
 }
 .alert-compatto.aperto .sec-chev {
@@ -3542,7 +3542,7 @@ button:focus-visible,
   gap: 1px;
 }
 .piano-tabgroup-label {
-  font-size: 0.56rem;
+  font-size: 0.75rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: #6c757d;
@@ -3645,7 +3645,7 @@ button:focus-visible,
   min-width: 0;
   white-space: nowrap;
   padding: 2px 5px;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   line-height: 1.1;
 }
 .piano-table thead .piano-fun {
@@ -3672,7 +3672,7 @@ button:focus-visible,
   border-radius: 3px;
   background: #dbe5f1;
   color: #1a4a7a;
-  font-size: 0.58rem;
+  font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
   vertical-align: 1px;
@@ -3684,7 +3684,7 @@ button:focus-visible,
   border-radius: 3px;
   background: #fbd4b4;
   color: #7a3b00;
-  font-size: 0.58rem;
+  font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
   vertical-align: 1px;
@@ -3770,7 +3770,7 @@ button:focus-visible,
   vertical-align: middle;
   margin-right: 3px;
   text-align: center;
-  font-size: 0.62rem;
+  font-size: 0.75rem;
   line-height: 13px;
 }
 .piano-viol {
@@ -3869,7 +3869,7 @@ table[data-seltab] textarea {
   display: inline-block;
   background: #555;
   color: #fff;
-  font-size: 0.6rem;
+  font-size: 0.75rem;
   font-weight: 700;
   padding: 0 4px;
   border-radius: 2px;
@@ -3934,7 +3934,7 @@ table[data-seltab] textarea {
   padding: 7px 12px;
   background: var(--ink);
   color: var(--paper);
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   font-weight: 700;
 }
 .piano-ctx-item {
@@ -4253,7 +4253,7 @@ td.brief-cella-sel {
   z-index: 5;
   background: #e67e22;
   color: #fff;
-  font-size: 0.58rem;
+  font-size: 0.75rem;
   font-weight: 700;
   padding: 1px 5px;
   border-radius: 8px;
@@ -4293,7 +4293,7 @@ td.cerca-hit {
   white-space: nowrap;
 }
 #piano-autosave {
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   color: var(--muted);
   margin-left: 6px;
   white-space: nowrap;
