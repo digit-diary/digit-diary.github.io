@@ -5830,67 +5830,65 @@ async function caricaConfrontoTimbrature() {
   let h =
     '<div style="overflow-x:auto;margin-top:8px"><table class="piano-table" style="min-width:560px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Giorni timbrati</th><th>Ore timbrate</th><th>Ore pianificate</th><th>Differenza</th></tr></thead><tbody>';
   let iDet = 0;
-  Object.keys(timbOre)
-    .sort()
-    .forEach((n) => {
-      const diff = Math.round((timbOre[n] - (pianOre[n] || 0)) * 10) / 10;
-      iDet++;
-      h +=
-        '<tr style="cursor:pointer" title="Clicca per il dettaglio dei giorni" onclick="const d=document.getElementById(\'timb-det-' +
-        iDet +
-        "');d.style.display=d.style.display==='none'?'':'none'\"><td style=\"text-align:left;font-weight:600\">▸ " +
-        escP(n) +
-        '</td><td>' +
-        timbGg[n] +
-        '</td><td>' +
-        timbOre[n].toFixed(1) +
-        '</td><td>' +
-        (pianOre[n] || 0).toFixed(1) +
-        '</td><td style="font-weight:700;color:' +
-        (diff > 0 ? '#2c6e49' : diff < 0 ? '#c0392b' : 'var(--muted)') +
-        '">' +
-        (diff > 0 ? '+' : '') +
-        diff.toFixed(1) +
-        '</td></tr>';
-      // dettaglio per giorno (chiuso di default, per non fare confusione)
-      let det =
-        '<table class="piano-table" style="min-width:100%;font-size:.8rem"><thead><tr><th>Giorno</th><th>Turno</th><th>Entrata</th><th>Uscita</th><th>Ore eff.</th><th>Ore pian.</th><th>Diff</th><th></th></tr></thead><tbody>';
-      (perNomeT[n] || [])
-        .slice()
-        .sort((x, y) => x.data.localeCompare(y.data))
-        .forEach((t) => {
-          const p = pianoGiorno[n + '|' + t.data];
-          const dg = Math.round(((parseFloat(t.ore) || 0) - (p ? p.ore : 0)) * 100) / 100;
-          det +=
-            '<tr><td>' +
-            t.data.split('-')[2] +
-            '</td><td>' +
-            escP(p ? p.codice : '-') +
-            '</td><td>' +
-            escP((t.ora_entrata || '').substring(0, 5)) +
-            '</td><td>' +
-            escP((t.ora_uscita || '').substring(0, 5)) +
-            '</td><td style="font-weight:700">' +
-            (parseFloat(t.ore) || 0).toFixed(2) +
-            '</td><td>' +
-            (p ? p.ore.toFixed(2) : '') +
-            '</td><td style="color:' +
-            (dg > 0 ? '#2c6e49' : dg < 0 ? '#c0392b' : 'var(--muted)') +
-            '">' +
-            (dg > 0 ? '+' : '') +
-            dg.toFixed(2) +
-            '</td><td><button class="btn-del-tipo" onclick="eliminaTimbratura(' +
-            t.id +
-            ')">Elimina</button></td></tr>';
-        });
-      det += '</tbody></table>';
-      h +=
-        '<tr id="timb-det-' +
-        iDet +
-        '" style="display:none"><td colspan="5" style="padding:6px 10px;background:var(--paper2)">' +
-        det +
-        '</td></tr>';
-    });
+  ordineCollabPiano(Object.keys(timbOre), _pianoReparto()).forEach((n) => {
+    const diff = Math.round((timbOre[n] - (pianOre[n] || 0)) * 10) / 10;
+    iDet++;
+    h +=
+      '<tr style="cursor:pointer" title="Clicca per il dettaglio dei giorni" onclick="const d=document.getElementById(\'timb-det-' +
+      iDet +
+      "');d.style.display=d.style.display==='none'?'':'none'\"><td style=\"text-align:left;font-weight:600\">▸ " +
+      escP(n) +
+      '</td><td>' +
+      timbGg[n] +
+      '</td><td>' +
+      timbOre[n].toFixed(1) +
+      '</td><td>' +
+      (pianOre[n] || 0).toFixed(1) +
+      '</td><td style="font-weight:700;color:' +
+      (diff > 0 ? '#2c6e49' : diff < 0 ? '#c0392b' : 'var(--muted)') +
+      '">' +
+      (diff > 0 ? '+' : '') +
+      diff.toFixed(1) +
+      '</td></tr>';
+    // dettaglio per giorno (chiuso di default, per non fare confusione)
+    let det =
+      '<table class="piano-table" style="min-width:100%;font-size:.8rem"><thead><tr><th>Giorno</th><th>Turno</th><th>Entrata</th><th>Uscita</th><th>Ore eff.</th><th>Ore pian.</th><th>Diff</th><th></th></tr></thead><tbody>';
+    (perNomeT[n] || [])
+      .slice()
+      .sort((x, y) => x.data.localeCompare(y.data))
+      .forEach((t) => {
+        const p = pianoGiorno[n + '|' + t.data];
+        const dg = Math.round(((parseFloat(t.ore) || 0) - (p ? p.ore : 0)) * 100) / 100;
+        det +=
+          '<tr><td>' +
+          t.data.split('-')[2] +
+          '</td><td>' +
+          escP(p ? p.codice : '-') +
+          '</td><td>' +
+          escP((t.ora_entrata || '').substring(0, 5)) +
+          '</td><td>' +
+          escP((t.ora_uscita || '').substring(0, 5)) +
+          '</td><td style="font-weight:700">' +
+          (parseFloat(t.ore) || 0).toFixed(2) +
+          '</td><td>' +
+          (p ? p.ore.toFixed(2) : '') +
+          '</td><td style="color:' +
+          (dg > 0 ? '#2c6e49' : dg < 0 ? '#c0392b' : 'var(--muted)') +
+          '">' +
+          (dg > 0 ? '+' : '') +
+          dg.toFixed(2) +
+          '</td><td><button class="btn-del-tipo" onclick="eliminaTimbratura(' +
+          t.id +
+          ')">Elimina</button></td></tr>';
+      });
+    det += '</tbody></table>';
+    h +=
+      '<tr id="timb-det-' +
+      iDet +
+      '" style="display:none"><td colspan="5" style="padding:6px 10px;background:var(--paper2)">' +
+      det +
+      '</td></tr>';
+  });
   h += '</tbody></table></div>';
   h +=
     '<p style="font-size:.78rem;color:var(--muted);margin-top:6px">Differenza = timbrate − pianificate del mese (' +
@@ -6020,55 +6018,57 @@ async function caricaStatisticheAnnoPiano() {
     return Math.round((ggDovuti / 7) * _pianoOreSett * (parseFloat(info.percentuale) || 1) * 10) / 10;
   };
   h +=
-    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Ore anno</th><th title="Sui mesi con un piano">Ore dovute</th><th>Giorni lavorati</th><th>Diurni</th><th>Notturni</th><th>Weekend</th><th>Domeniche</th><th>Vacanze</th><th>Malattie</th><th title="Festivi lavorati che danno diritto al recupero (solo personale fisso)">CGF maturati</th><th title="Giorni CGF effettivamente goduti (quelli caduti in malattia non contano)">CGF goduti</th><th title="Maturati − goduti: quanti recuperi restano da dare">Saldo CGF</th><th title="Festivi lavorati dai jolly: danno diritto al supplemento del 50% sul salario orario (RAP Allegato 1), non al recupero">Suppl. 50%</th></tr></thead><tbody>';
-  Object.keys(st)
-    .sort()
-    .forEach((n) => {
-      const o = st[n];
-      h +=
-        '<tr><td style="text-align:left;font-weight:600">' +
-        escP(n) +
-        '</td><td>' +
-        o.ore.toFixed(1) +
-        '</td><td style="color:var(--muted)">' +
-        (dovuteDi(n) ? dovuteDi(n).toFixed(1) : '-') +
-        '</td><td>' +
-        o.gg +
-        '</td><td>' +
-        o.d +
-        '</td><td>' +
-        o.n +
-        '</td><td' +
-        (o.we > 20
-          ? ' style="color:#c0392b;font-weight:700"'
-          : o.we >= 12
-            ? ' style="color:#b39b00;font-weight:700"'
-            : '') +
-        '>' +
-        o.we +
-        '</td><td>' +
-        o.dom +
-        '</td><td>' +
-        o.v +
-        '</td><td>' +
-        o.m +
-        '</td><td>' +
-        (o.cgfMat || '') +
-        '</td><td' +
-        (o.cgfPersi ? ' title="' + o.cgfPersi + ' recuperi caduti in malattia: restano a credito"' : '') +
-        '>' +
-        (o.cgfGod || '') +
-        (o.cgfPersi ? ' <span style="color:#c0392b;font-size:.72rem">+' + o.cgfPersi + ' in malattia</span>' : '') +
-        '</td><td style="font-weight:700;color:' +
-        (o.cgfMat - o.cgfGod > 0 ? '#2c6e49' : o.cgfMat - o.cgfGod < 0 ? '#c0392b' : 'var(--muted)') +
-        '">' +
-        (o.cgfMat || o.cgfGod ? o.cgfMat - o.cgfGod : '') +
-        '</td><td style="font-weight:700;color:' +
-        (o.sup50 ? '#8b6914' : 'var(--muted)') +
-        '" title="Festivi lavorati come personale ausiliario">' +
-        (o.sup50 || '') +
-        '</td></tr>';
-    });
+    '<div style="padding:4px 0"><input type="text" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-statanno-table\')" style="padding:4px 8px;font-size:.8rem;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--ink);width:180px"></div>';
+  h +=
+    '<div style="overflow-x:auto"><table id="piano-statanno-table" class="piano-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Ore anno</th><th title="Sui mesi con un piano">Ore dovute</th><th>Giorni lavorati</th><th>Diurni</th><th>Notturni</th><th>Weekend</th><th>Domeniche</th><th>Vacanze</th><th>Malattie</th><th title="Festivi lavorati che danno diritto al recupero (solo personale fisso)">CGF maturati</th><th title="Giorni CGF effettivamente goduti (quelli caduti in malattia non contano)">CGF goduti</th><th title="Maturati − goduti: quanti recuperi restano da dare">Saldo CGF</th><th title="Festivi lavorati dai jolly: danno diritto al supplemento del 50% sul salario orario (RAP Allegato 1), non al recupero">Suppl. 50%</th></tr></thead><tbody>';
+  ordineCollabPiano(Object.keys(st), _pianoReparto()).forEach((n) => {
+    const o = st[n];
+    h +=
+      '<tr data-nome="' +
+      escP(n) +
+      '"><td style="text-align:left;font-weight:600">' +
+      escP(n) +
+      '</td><td>' +
+      o.ore.toFixed(1) +
+      '</td><td style="color:var(--muted)">' +
+      (dovuteDi(n) ? dovuteDi(n).toFixed(1) : '-') +
+      '</td><td>' +
+      o.gg +
+      '</td><td>' +
+      o.d +
+      '</td><td>' +
+      o.n +
+      '</td><td' +
+      (o.we > 20
+        ? ' style="color:#c0392b;font-weight:700"'
+        : o.we >= 12
+          ? ' style="color:#b39b00;font-weight:700"'
+          : '') +
+      '>' +
+      o.we +
+      '</td><td>' +
+      o.dom +
+      '</td><td>' +
+      o.v +
+      '</td><td>' +
+      o.m +
+      '</td><td>' +
+      (o.cgfMat || '') +
+      '</td><td' +
+      (o.cgfPersi ? ' title="' + o.cgfPersi + ' recuperi caduti in malattia: restano a credito"' : '') +
+      '>' +
+      (o.cgfGod || '') +
+      (o.cgfPersi ? ' <span style="color:#c0392b;font-size:.72rem">+' + o.cgfPersi + ' in malattia</span>' : '') +
+      '</td><td style="font-weight:700;color:' +
+      (o.cgfMat - o.cgfGod > 0 ? '#2c6e49' : o.cgfMat - o.cgfGod < 0 ? '#c0392b' : 'var(--muted)') +
+      '">' +
+      (o.cgfMat || o.cgfGod ? o.cgfMat - o.cgfGod : '') +
+      '</td><td style="font-weight:700;color:' +
+      (o.sup50 ? '#8b6914' : 'var(--muted)') +
+      '" title="Festivi lavorati come personale ausiliario">' +
+      (o.sup50 || '') +
+      '</td></tr>';
+  });
   h += '</tbody></table></div>';
   h +=
     '<p style="font-size:.78rem;color:var(--muted);margin-top:6px">Weekend: giallo da 12, rosso oltre 20 (equità). Click su un mese per aprirlo.</p>';
@@ -6227,11 +6227,12 @@ async function _renderPianoSaldoTab() {
     (t) => (timbNome[t.collaboratore] = (timbNome[t.collaboratore] || 0) + (parseFloat(t.ore) || 0)),
   );
   let h =
-    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:10px">Saldo ore · ' +
+    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Saldo ore · ' +
     escP(label) +
-    '<button class="btn-act pin" onclick="pianoCambiaMese(-1)">&larr;</button><button class="btn-act pin" onclick="pianoCambiaMese(1)">&rarr;</button></div>';
+    '<button class="btn-act pin" onclick="pianoCambiaMese(-1)">&larr;</button><button class="btn-act pin" onclick="pianoCambiaMese(1)">&rarr;</button>' +
+    '<input type="text" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-saldo-table\')" style="padding:4px 8px;font-size:.8rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a;width:170px;margin-left:auto"></div>';
   h +=
-    '<div style="overflow-x:auto;padding:0 6px 8px"><table class="piano-table" style="min-width:760px;font-size:.8rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Fun</th><th>%</th><th>Ore dovute</th><th title="Timbrate se presenti, altrimenti piano">Ore lavorate</th><th>Saldo mese</th><th>Saldo anno (YTD)</th></tr></thead><tbody>';
+    '<div style="overflow-x:auto;padding:0 6px 8px"><table id="piano-saldo-table" class="piano-table" style="min-width:760px;font-size:.8rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Fun</th><th>%</th><th>Ore dovute</th><th title="Timbrate se presenti, altrimenti piano">Ore lavorate</th><th>Saldo mese</th><th>Saldo anno (YTD)</th></tr></thead><tbody>';
   let totD = 0;
   let totP = 0;
   let totS = 0;
@@ -6251,7 +6252,9 @@ async function _renderPianoSaldoTab() {
     totS += sm;
     const col = (v) => (v > 0 ? '#2c6e49' : v < 0 ? '#c0392b' : 'var(--muted)');
     h +=
-      '<tr><td style="text-align:left;font-weight:600">' +
+      '<tr data-nome="' +
+      escP(nome) +
+      '"><td style="text-align:left;font-weight:600">' +
       escP(nome) +
       '</td><td>' +
       escP(info.is_jolly ? 'JOLLY' : info.funzione || '') +
@@ -11836,6 +11839,16 @@ function _pianoSparseBar() {
 // ===== TROVA NEL PIANO =====
 // Filtra le righe per nome oppure per sigla presente nel mese (es. "C8"):
 // le celle che corrispondono alla sigla vengono evidenziate
+// Ricerca dentro le tabelle riepilogo (Saldo, Statistiche): mostra solo le
+// righe del collaboratore cercato; le righe senza data-nome (totali) restano
+function pianoTabellaFiltra(q, tableId) {
+  const testo = (q || '').trim().toLowerCase();
+  const tab = document.getElementById(tableId);
+  if (!tab) return;
+  tab.querySelectorAll('tbody tr[data-nome]').forEach((tr) => {
+    tr.style.display = !testo || tr.dataset.nome.toLowerCase().includes(testo) ? '' : 'none';
+  });
+}
 function pianoCercaFiltra(q) {
   window._pianoCercaTesto = q || '';
   const testo = (q || '').trim().toLowerCase();
