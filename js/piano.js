@@ -6197,15 +6197,30 @@ function _renderPianoStatCard() {
     '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="caricaStatisticheAnnoPiano()">Carica statistiche ' +
     _pianoMeseSel.split('-')[0] +
     '</button><div id="piano-stat-anno"></div></div></div>' +
-    '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px">Confronto anni · ' +
+    '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Confronto anni · ' +
     escP(repartoLabel(_pianoReparto())) +
-    '<button class="btn-act pin" onclick="pianoConfrontoCambiaAnno(-1)">&larr;</button><button class="btn-act pin" onclick="pianoConfrontoCambiaAnno(1)">&rarr;</button></div>' +
+    '<span id="piano-confronto-sel"></span></div>' +
     '<div style="padding:10px 14px" id="piano-confronto-anni"><p style="color:var(--muted);font-size:.8rem">Caricamento confronto...</p></div></div>'
   );
 }
-function pianoConfrontoCambiaAnno(delta) {
-  window._pianoConfrontoAnno = (window._pianoConfrontoAnno || parseInt(_pianoMeseSel.split('-')[0])) + delta;
-  caricaConfrontoAnniPiano();
+// due anni QUALSIASI, scelti liberamente dalle tendine (non solo adiacenti)
+function _pianoConfrontoSelHtml() {
+  const annoBase = parseInt(_pianoMeseSel.split('-')[0]);
+  const a = window._pianoConfrontoAnno || annoBase;
+  const b = window._pianoConfrontoAnnoB != null ? window._pianoConfrontoAnnoB : a - 1;
+  const opt = (sel) => {
+    let s = '';
+    for (let y = annoBase + 1; y >= annoBase - 8; y--)
+      s += '<option value="' + y + '"' + (y === sel ? ' selected' : '') + '>' + y + '</option>';
+    return s;
+  };
+  return (
+    '<label style="font-size:.8rem;font-weight:400">confronta <select onchange="window._pianoConfrontoAnnoB=parseInt(this.value);caricaConfrontoAnniPiano()" style="padding:3px 6px;font-size:.8rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a">' +
+    opt(b) +
+    '</select> con <select onchange="window._pianoConfrontoAnno=parseInt(this.value);caricaConfrontoAnniPiano()" style="padding:3px 6px;font-size:.8rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a">' +
+    opt(a) +
+    '</select></label>'
+  );
 }
 // Aggregati di un anno del settore corrente, per il confronto anno su anno
 async function _pianoAggregatiAnno(anno) {
@@ -6269,11 +6284,14 @@ async function _pianoAggregatiAnno(anno) {
 async function caricaConfrontoAnniPiano() {
   const el = document.getElementById('piano-confronto-anni');
   if (!el) return;
+  const selBox = document.getElementById('piano-confronto-sel');
+  if (selBox) selBox.innerHTML = _pianoConfrontoSelHtml();
   const anno = window._pianoConfrontoAnno || parseInt(_pianoMeseSel.split('-')[0]);
+  const annoB = window._pianoConfrontoAnnoB != null ? window._pianoConfrontoAnnoB : anno - 1;
   el.innerHTML =
-    '<p style="color:var(--muted);font-size:.8rem">Caricamento confronto ' + (anno - 1) + ' / ' + anno + '...</p>';
+    '<p style="color:var(--muted);font-size:.8rem">Caricamento confronto ' + annoB + ' / ' + anno + '...</p>';
   try {
-    const [prec, corr] = await Promise.all([_pianoAggregatiAnno(anno - 1), _pianoAggregatiAnno(anno)]);
+    const [prec, corr] = await Promise.all([_pianoAggregatiAnno(annoB), _pianoAggregatiAnno(anno)]);
     const f1 = (v) => (Math.round(v * 10) / 10).toLocaleString('de-CH');
     // verso: +1 se crescere e' positivo (verde), -1 se e' negativo (rosso,
     // es. malattie), 0 se neutro (grigio)
@@ -6290,7 +6308,7 @@ async function caricaConfrontoAnniPiano() {
     ];
     let h =
       '<p style="font-size:.78rem;color:var(--muted);margin-bottom:8px">Confronto sui piani presenti in archivio: ' +
-      (anno - 1) +
+      annoB +
       ' (' +
       prec.mesi.size +
       ' mesi) contro ' +
@@ -6300,7 +6318,7 @@ async function caricaConfrontoAnniPiano() {
       ' mesi). Se un anno ha meno mesi pianificati, il confronto va letto di conseguenza.</p>';
     h +=
       '<div style="overflow-x:auto"><table class="piano-table" style="min-width:560px;font-size:.85rem"><thead><tr><th style="text-align:left">Voce</th><th>' +
-      (anno - 1) +
+      annoB +
       '</th><th>' +
       anno +
       '</th><th>Differenza</th></tr></thead><tbody>';
