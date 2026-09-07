@@ -1571,10 +1571,25 @@ function _pianoGiornoNd() {
   const v = parseInt(_pianoRegolaVal('nd_jolly_giorno'));
   return v > 0 && v <= 28 ? v : 3;
 }
-function _pianoRegolaVal(nome) {
-  const r = pianoRegoleCache.find((x) => x.nome === nome);
-  if (!r || r.attivo === false) return null;
-  return r.valore;
+// Valore di una regola PER IL SETTORE CORRENTE. Se esiste una regola scritta
+// apposta per questo settore vince lei; altrimenti vale quella generale (campo
+// settori vuoto). Una regola spenta non si applica.
+function _pianoRegolaSettori(r) {
+  return String((r && r.settori) || '')
+    .split(',')
+    .map((x) => x.trim().toLowerCase())
+    .filter(Boolean);
+}
+function _pianoRegolaVal(nome, rep) {
+  const settore = (rep || (typeof _pianoReparto === 'function' ? _pianoReparto() : 'slots') || '').toLowerCase();
+  const candidate = pianoRegoleCache.filter((x) => x.nome === nome);
+  // 1) regola specifica del settore (ha la precedenza)
+  const spec = candidate.find((x) => _pianoRegolaSettori(x).includes(settore));
+  if (spec) return spec.attivo === false ? null : spec.valore;
+  // 2) regola generale (nessun settore indicato)
+  const gen = candidate.find((x) => !_pianoRegolaSettori(x).length);
+  if (!gen || gen.attivo === false) return null;
+  return gen.valore;
 }
 // Limiti ORE MENSILI personalizzabili (pannello Regole):
 // - fissi e jolly CON percentuale: obiettivo = giorni/7 × ore sett × %;
@@ -2609,25 +2624,38 @@ function _renderPianoRegoleCard() {
   let tipoCorr = '';
   h += '<div style="overflow-x:auto"><table class="piano-table" style="min-width:720px;font-size:.85rem">';
   h +=
-    '<thead><tr><th style="text-align:left">Regola</th><th style="text-align:left">Descrizione</th><th>Valore</th><th>Peso</th><th>Attiva</th><th>Applicata da</th></tr></thead><tbody>';
+    '<thead><tr><th style="text-align:left">Regola</th><th style="text-align:left">Descrizione</th><th>Valore</th><th style="min-width:150px">Vale per</th><th>Peso</th><th>Attiva</th><th>Applicata da</th></tr></thead><tbody>';
   regole.forEach((r) => {
     if (r.tipo !== tipoCorr) {
       tipoCorr = r.tipo;
       h +=
-        '<tr><td colspan="6" style="text-align:left;background:var(--paper2);font-weight:700;letter-spacing:.06em">' +
+        '<tr><td colspan="7" style="text-align:left;background:var(--paper2);font-weight:700;letter-spacing:.06em">' +
         escP(tipoCorr) +
         '</td></tr>';
     }
+    const settR = _pianoRegolaSettori(r);
     h +=
       '<tr><td style="text-align:left;font-weight:600">' +
       escP(r.nome) +
+      (settR.length
+        ? ' <span style="font-weight:400;font-size:.78rem;color:#8b6914">(solo ' + escP(settR.join(', ')) + ')</span>'
+        : '') +
       '</td><td style="text-align:left;white-space:normal;min-width:220px">' +
       escP(r.descrizione || '') +
       '</td><td><input type="text" value="' +
       escP(r.valore || '') +
       '" onchange="salvaPianoRegola(' +
       r.id +
-      ',\'valore\',this.value)" style="width:64px;padding:3px;text-align:center;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td>' +
+      ',\'valore\',this.value)" style="width:64px;padding:3px;text-align:center;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td style="text-align:left;font-size:.8rem">' +
+      (settR.length
+        ? escP(settR.map((s) => repartoLabel(s)).join(', ')) +
+          ' <button class="btn-del-tipo" style="font-size:.75rem;padding:1px 6px" onclick="pianoRegolaSettoriEdit(' +
+          r.id +
+          ')">cambia</button>'
+        : '<span style="color:var(--muted)">tutti i settori</span> <button class="btn-del-tipo" style="font-size:.75rem;padding:1px 6px" onclick="pianoRegolaEccezione(\'' +
+          escP(r.nome) +
+          '\')">eccezione per un settore</button>') +
+      '</td><td>' +
       (r.peso || 0) +
       '</td><td><input type="checkbox"' +
       (r.attivo !== false ? ' checked' : '') +
@@ -2646,6 +2674,73 @@ function _renderPianoRegoleCard() {
   });
   h += '</tbody></table></div></div></div>';
   return h;
+}
+// Crea una regola SPECIFICA per uno o piu' settori a partire da quella
+// generale: la generale resta e continua a valere ovunque, la nuova vince nei
+// settori indicati. Non si duplicano tutte le regole, solo l'eccezione.
+async function pianoRegolaEccezione(nome) {
+  if (!isAdmin()) return;
+  const gen = pianoRegoleCache.find((x) => x.nome === nome && !_pianoRegolaSettori(x).length);
+  if (!gen) return;
+  const elenco = (typeof getReparti === 'function' ? getReparti() : []).map((r) => r.key).join(', ');
+  const sett = prompt(
+    'Per quali settori vale l\'eccezione a "' +
+      nome +
+      '"?\n\nScrivi i settori separati da virgola.' +
+      (elenco ? '\nDisponibili: ' + elenco : ''),
+    typeof _pianoReparto === 'function' ? _pianoReparto() : '',
+  );
+  if (sett === null) return;
+  const pulito = String(sett)
+    .split(',')
+    .map((x) => x.trim().toLowerCase())
+    .filter(Boolean)
+    .join(',');
+  if (!pulito) return;
+  const val = prompt('Valore di "' + nome + '" per ' + pulito + ':', gen.valore || '');
+  if (val === null) return;
+  try {
+    const nuova = await secPost('piano_regole', {
+      nome: nome,
+      valore: String(val).trim(),
+      tipo: gen.tipo,
+      peso: gen.peso,
+      attivo: true,
+      descrizione: gen.descrizione,
+      settori: pulito,
+    });
+    if (nuova && nuova[0]) pianoRegoleCache.push(nuova[0]);
+    logAzione('Regola per settore', nome + ' = ' + val + ' per ' + pulito);
+    toast('Eccezione creata: ' + nome + ' = ' + val + ' per ' + pulito);
+    renderPiano();
+  } catch (e) {
+    toast('Errore: esiste gia\' una regola "' + nome + '" per quei settori');
+  }
+}
+// Cambia i settori di una regola specifica (vuoto = torna generale)
+async function pianoRegolaSettoriEdit(id) {
+  if (!isAdmin()) return;
+  const r = pianoRegoleCache.find((x) => x.id === id);
+  if (!r) return;
+  const sett = prompt(
+    'Settori per la regola "' + r.nome + '" (vuoto = vale per tutti i settori):',
+    _pianoRegolaSettori(r).join(','),
+  );
+  if (sett === null) return;
+  const pulito = String(sett)
+    .split(',')
+    .map((x) => x.trim().toLowerCase())
+    .filter(Boolean)
+    .join(',');
+  try {
+    await secPatch('piano_regole', 'id=eq.' + id, { settori: pulito || null });
+    r.settori = pulito || null;
+    logAzione('Regola per settore', r.nome + ' -> ' + (pulito || 'tutti i settori'));
+    toast(pulito ? 'Ora vale per: ' + pulito : 'Ora vale per tutti i settori');
+    renderPiano();
+  } catch (e) {
+    toast('Errore aggiornamento settori');
+  }
 }
 async function salvaPianoRegola(id, campo, valore) {
   if (!isAdmin()) return;
