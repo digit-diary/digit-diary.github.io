@@ -637,10 +637,39 @@ async function _pianoAggiornaYtd(nomi) {
   _pianoYtdKey = chiave;
   if (mese <= 1) return;
   const fine = ym + '-01';
-  const [righe, timbrate] = await Promise.all([
-    secGet('piano?data=gte.' + anno + '-01-01&data=lt.' + fine + '&limit=40000'),
-    secGet('piano_timbrature?data=gte.' + anno + '-01-01&data=lt.' + fine + '&limit=20000'),
-  ]);
+  // SCALA CON MOLTI SETTORI: le ore YTD di un collaboratore possono stare in
+  // piu' reparti (coperture), quindi si caricano per collaboratore (solo i nomi
+  // del settore corrente) a piccoli gruppi, senza scaricare l'intero anno di
+  // tutti i settori (che con 20+ settori troncherebbe e falserebbe il saldo)
+  const righe = [];
+  const timbrate = [];
+  const _daA = anno + '-01-01';
+  for (let i = 0; i < nomi.length; i += 8) {
+    const grp = nomi.slice(i, i + 8);
+    const res = await Promise.all(
+      grp
+        .map((n) =>
+          secGet(
+            'piano?collaboratore=eq.' + encodeURIComponent(n) + '&data=gte.' + _daA + '&data=lt.' + fine + '&limit=500',
+          ),
+        )
+        .concat(
+          grp.map((n) =>
+            secGet(
+              'piano_timbrature?collaboratore=eq.' +
+                encodeURIComponent(n) +
+                '&data=gte.' +
+                _daA +
+                '&data=lt.' +
+                fine +
+                '&limit=500',
+            ),
+          ),
+        ),
+    );
+    res.slice(0, grp.length).forEach((rr) => rr && righe.push(...rr));
+    res.slice(grp.length).forEach((rr) => rr && timbrate.push(...rr));
+  }
   const perMese = {}; // nome|m -> ore piano
   (righe || []).forEach((r) => {
     const m = parseInt(r.data.split('-')[1]);
@@ -671,6 +700,46 @@ async function _pianoAggiornaYtd(nomi) {
   });
 }
 
+// Carica le righe di un mese per un settore, in modo che SCALI con molti
+// settori. Una query filtrata per il settore corrente, piu' le righe dei
+// collaboratori di ALTRI settori che coprono qui (reparti_extra): di ognuno si
+// caricano TUTTE le righe del mese, in qualunque settore lavori, cosi' si vede
+// quando e' gia' occupato altrove e non lo si assegna due volte. Le query dei
+// coprenti girano in parallelo a gruppi: il tempo dipende dai coprenti del
+// settore aperto, non dal numero totale di settori, e non c'e' troncamento.
+async function _pianoCaricaMeseSettore(da, a, rep) {
+  const righe =
+    (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + rep + '&limit=20000')) || [];
+  const coprenti = collaboratoriCache
+    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') !== rep && _pianoAppartieneAlReparto(c))
+    .map((c) => c.nome);
+  if (!coprenti.length) return righe;
+  // dedup per id: una copertura del coprente gia' nel settore corrente e' gia'
+  // tra le righe caricate sopra e non va aggiunta due volte
+  const visti = new Set(righe.map((r) => r.id));
+  for (let i = 0; i < coprenti.length; i += 25) {
+    const blocchi = await Promise.all(
+      coprenti
+        .slice(i, i + 25)
+        .map((n) =>
+          secGet(
+            'piano?collaboratore=eq.' + encodeURIComponent(n) + '&data=gte.' + da + '&data=lte.' + a + '&limit=400',
+          ),
+        ),
+    );
+    blocchi.forEach(
+      (rr) =>
+        rr &&
+        rr.forEach((r) => {
+          if (!visti.has(r.id)) {
+            visti.add(r.id);
+            righe.push(r);
+          }
+        }),
+    );
+  }
+  return righe;
+}
 async function renderPiano() {
   const el = document.getElementById('piano-content');
   if (!el) return;
@@ -694,15 +763,7 @@ async function renderPiano() {
     const nGiorni = _pianoUltimoGiorno(ym);
     const da = ym + '-01';
     const a = ym + '-' + String(nGiorni).padStart(2, '0');
-    {
-      const tutteRighe = (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&limit=8000')) || [];
-      const rep = _pianoReparto();
-      _pianoRighe = tutteRighe.filter((r) => {
-        if ((r.reparto_dip || 'slots') === rep) return true;
-        const info = _pianoCollabInfo(r.collaboratore);
-        return !!(info && String(info.reparti_extra || '').trim() && _pianoAppartieneAlReparto(info));
-      });
-    }
+    _pianoRighe = await _pianoCaricaMeseSettore(da, a, _pianoReparto());
     const mappa = {}; // 'nome|data' -> riga
     _pianoRighe.forEach((r) => (mappa[r.collaboratore + '|' + r.data] = r));
     const malattie = _pianoMalattieMese(ym);
@@ -1968,15 +2029,8 @@ async function generaBozzaPiano(usaCoperture) {
   // Step 0 come Turnivo: prima le vacanze (V protette + C + WD)
   await _applicaVacanzeMese(false);
   // ricarico includendo le celle degli ALTRI reparti dei multi-reparto
-  {
-    const tutteRighe = (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&limit=8000')) || [];
-    const repG = _pianoReparto();
-    _pianoRighe = tutteRighe.filter((r) => {
-      if ((r.reparto_dip || 'slots') === repG) return true;
-      const infoG = _pianoCollabInfo(r.collaboratore);
-      return !!(infoG && String(infoG.reparti_extra || '').trim() && _pianoAppartieneAlReparto(infoG));
-    });
-  }
+  // (stessa funzione scalabile di renderPiano)
+  _pianoRighe = await _pianoCaricaMeseSettore(da, a, _pianoReparto());
   const maxCons = parseInt(_pianoRegolaVal('max_consecutivi')) || 5;
   const minRiposo = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 11;
   // storia per idoneità (chi ha già fatto quel gruppo) e familiarità:
