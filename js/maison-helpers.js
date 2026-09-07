@@ -296,11 +296,11 @@ function _renderRiallineaUI() {
     mc.innerHTML =
       '<div style="text-align:center;padding:20px"><div style="font-size:2.5rem;margin-bottom:8px"><i class="icx icx-check"></i></div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Riallineamento completato</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:#2c6e49">' +
       st.confermati +
-      '</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Confermati</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--muted)">' +
+      '</div><div style="font-size:.82rem;color:var(--muted);text-transform:uppercase">Confermati</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--muted)">' +
       st.saltati +
-      '</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Saltati</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--ink)">' +
+      '</div><div style="font-size:.82rem;color:var(--muted);text-transform:uppercase">Saltati</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--ink)">' +
       st.vociCorr +
-      '</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Voci corrette</div></div></div><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
+      '</div><div style="font-size:.82rem;color:var(--muted);text-transform:uppercase">Voci corrette</div></div></div><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
     renderMaisonDashboard();
     renderSpeseExtra();
     logAzione('Riallinea nomi', st.confermati + ' confermati, ' + st.saltati + ' saltati, ' + st.vociCorr + ' voci');
@@ -330,18 +330,18 @@ function _renderRiallineaUI() {
       '<span style="font-size:.85rem;color:var(--accent);text-decoration:line-through">' + escP(c.vecchio) + '</span>';
     html += '<span style="color:var(--muted)">&#8594;</span>';
     html += '<strong style="font-size:.85rem;color:#2c6e49">' + escP(c.nuovo) + '</strong>';
-    html += '<span style="font-size:.75rem;color:var(--muted)">';
+    html += '<span style="font-size:.82rem;color:var(--muted)">';
     if (c.costiCount) html += c.costiCount + ' costi';
     if (c.costiCount && c.extraCount) html += ' + ';
     if (c.extraCount) html += c.extraCount + ' extra';
     html += '</span>';
     html += '<div style="margin-left:auto;display:flex;gap:6px;flex-shrink:0">';
     html +=
-      '<button class="btn-salva" style="font-size:.75rem;padding:5px 12px;background:#2c6e49" onclick="confermaRiallinea(' +
+      '<button class="btn-salva" style="font-size:.82rem;padding:5px 12px;background:#2c6e49" onclick="confermaRiallinea(' +
       idx +
       ')">Conferma</button>';
     html +=
-      '<button class="btn-modal-cancel" style="font-size:.75rem;padding:5px 12px" onclick="saltaRiallinea(' +
+      '<button class="btn-modal-cancel" style="font-size:.82rem;padding:5px 12px" onclick="saltaRiallinea(' +
       idx +
       ')">Salta</button>';
     html += '</div></div>';
@@ -504,11 +504,11 @@ function _renderUnisciUI() {
     mc.innerHTML =
       '<div style="text-align:center;padding:20px"><div style="font-size:2.5rem;margin-bottom:8px"><i class="icx icx-check"></i></div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Unione duplicati completata</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:#2c6e49">' +
       st.confermati +
-      '</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Uniti</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--muted)">' +
+      '</div><div style="font-size:.82rem;color:var(--muted);text-transform:uppercase">Uniti</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--muted)">' +
       st.saltati +
-      '</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Saltati</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--ink)">' +
+      '</div><div style="font-size:.82rem;color:var(--muted);text-transform:uppercase">Saltati</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--ink)">' +
       st.vociCorr +
-      '</div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Voci aggiornate</div></div></div><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
+      '</div><div style="font-size:.82rem;color:var(--muted);text-transform:uppercase">Voci aggiornate</div></div></div><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
     renderMaisonBudgetUI();
     renderMaisonDashboard();
     renderSpeseExtra();
@@ -570,11 +570,11 @@ function _renderUnisciUI() {
       '<div style="font-size:.85rem;margin-bottom:4px"><strong>' +
       escP(c.remove.nome) +
       '</strong>' +
-      (rInfo.length ? ' <span style="color:var(--muted);font-size:.78rem">(' + rInfo.join(', ') + ')</span>' : '') +
+      (rInfo.length ? ' <span style="color:var(--muted);font-size:.82rem">(' + rInfo.join(', ') + ')</span>' : '') +
       ' <span style="color:var(--muted)">+</span> <strong>' +
       escP(c.keep.nome) +
       '</strong>' +
-      (kInfo.length ? ' <span style="color:var(--muted);font-size:.78rem">(' + kInfo.join(', ') + ')</span>' : '') +
+      (kInfo.length ? ' <span style="color:var(--muted);font-size:.82rem">(' + kInfo.join(', ') + ')</span>' : '') +
       '</div>';
     html +=
       '<div style="font-size:.82rem;color:#1a4a7a;margin-bottom:8px">&#8594; Unisci in: <strong>' +
@@ -584,11 +584,11 @@ function _renderUnisciUI() {
       '</div>';
     html += '<div style="display:flex;gap:6px;justify-content:flex-end">';
     html +=
-      '<button class="btn-salva" style="font-size:.75rem;padding:5px 12px;background:#2c6e49" onclick="confermaUnisci(' +
+      '<button class="btn-salva" style="font-size:.82rem;padding:5px 12px;background:#2c6e49" onclick="confermaUnisci(' +
       idx +
       ')">Conferma</button>';
     html +=
-      '<button class="btn-modal-cancel" style="font-size:.75rem;padding:5px 12px" onclick="saltaUnisci(' +
+      '<button class="btn-modal-cancel" style="font-size:.82rem;padding:5px 12px" onclick="saltaUnisci(' +
       idx +
       ')">Salta</button>';
     html += '</div></div>';
@@ -860,7 +860,7 @@ function acFiltraMaison(inputId, dropId) {
       const badge = item.cat
         ? '<span class="mini-badge" style="background:' +
           (_catColorsAc[item.cat] || 'var(--muted)') +
-          ';margin-left:6px;font-size:.75rem;vertical-align:middle">' +
+          ';margin-left:6px;font-size:.82rem;vertical-align:middle">' +
           escP(_catLabelsAc[item.cat] || '') +
           '</span>'
         : '';
@@ -1588,22 +1588,22 @@ function renderSpeseExtra() {
     }
     const _seCatBadge =
       _seBudget && _seBudget.categoria === 'full_maison'
-        ? ' <span class="mini-badge" style="background:#b8860b;font-size:.78rem">Full Maison</span>'
+        ? ' <span class="mini-badge" style="background:#b8860b;font-size:.82rem">Full Maison</span>'
         : _seBudget && _seBudget.categoria === 'maison'
-          ? ' <span class="mini-badge" style="background:#2980b9;font-size:.78rem">Maison</span>'
+          ? ' <span class="mini-badge" style="background:#2980b9;font-size:.82rem">Maison</span>'
           : _seBudget && _seBudget.categoria === 'direzione'
-            ? ' <span class="mini-badge" style="background:#8e44ad;font-size:.78rem">Direzione</span>'
+            ? ' <span class="mini-badge" style="background:#8e44ad;font-size:.82rem">Direzione</span>'
             : _seBudget && _seBudget.categoria === 'bu'
-              ? ' <span class="mini-badge" style="background:#e67e22;font-size:.78rem">Buono Unico</span>'
+              ? ' <span class="mini-badge" style="background:#e67e22;font-size:.82rem">Buono Unico</span>'
               : _seBudget && _seBudget.categoria === 'bl'
-                ? ' <span class="mini-badge" style="background:#2c6e49;font-size:.78rem">Buono Lounge</span>'
+                ? ' <span class="mini-badge" style="background:#2c6e49;font-size:.82rem">Buono Lounge</span>'
                 : '';
     const tipiBadges = Object.entries(d.tipi)
       .map(
         ([t, n]) =>
           '<span class="mini-badge" style="background:' +
           (SE_TIPI_COLOR[t] || 'var(--muted)') +
-          ';font-size:.78rem">' +
+          ';font-size:.82rem">' +
           n +
           ' ' +
           (SE_TIPI_LABEL[t] || t) +
@@ -1629,9 +1629,9 @@ function renderSpeseExtra() {
       fmtCHF(d.tot / d.visite) +
       '</td><td style="white-space:nowrap"><button class="btn-act edit" onclick="rinominaSpeseExtraBenef(\'' +
       ne +
-      '\')" style="font-size:.78rem;padding:3px 8px">Rinomina</button> <button class="btn-act del" onclick="eliminaSpeseExtraBenef(\'' +
+      '\')" style="font-size:.82rem;padding:3px 8px">Rinomina</button> <button class="btn-act del" onclick="eliminaSpeseExtraBenef(\'' +
       ne +
-      '\')" style="font-size:.78rem;padding:3px 8px">Elimina</button></td></tr>';
+      '\')" style="font-size:.82rem;padding:3px 8px">Elimina</button></td></tr>';
   });
   h +=
     '<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td class="num"><strong>' +
@@ -2596,9 +2596,9 @@ function renderInventarioCustom(cat) {
     (adm
       ? '<span><button onclick="rinominaCategoriaInventario(\'' +
         cat.key +
-        '\')" style="font-size:.78rem;padding:3px 10px;background:none;border:1px solid var(--paper);color:var(--paper);border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif">Rinomina</button> <button onclick="rimuoviCategoriaInventario(\'' +
+        '\')" style="font-size:.82rem;padding:3px 10px;background:none;border:1px solid var(--paper);color:var(--paper);border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif">Rinomina</button> <button onclick="rimuoviCategoriaInventario(\'' +
         cat.key +
-        '\')" style="font-size:.78rem;padding:3px 10px;background:none;border:1px solid #e74c3c;color:#e74c3c;border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif">Rimuovi categoria</button></span>'
+        '\')" style="font-size:.82rem;padding:3px 10px;background:none;border:1px solid #e74c3c;color:#e74c3c;border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif">Rimuovi categoria</button></span>'
       : '') +
     '</div>';
   html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;padding:16px">';
@@ -2926,7 +2926,7 @@ function renderInventarioBuoniTable() {
       d +
       '</td><td style="padding:6px 8px"><span style="background:' +
       (tipColors[r.tipo] || 'var(--muted)') +
-      ';color:white;padding:2px 8px;border-radius:2px;font-size:.78rem;font-weight:600">' +
+      ';color:white;padding:2px 8px;border-radius:2px;font-size:.82rem;font-weight:600">' +
       escP(r.tipo) +
       '</span></td><td style="padding:6px 8px;font-weight:700;color:' +
       col +
@@ -3746,7 +3746,7 @@ window.addEventListener('load', async () => {
     MESI[n.getMonth()] +
     ' ' +
     n.getFullYear() +
-    '<br><small style="color:var(--muted);font-size:.75rem">' +
+    '<br><small style="color:var(--muted);font-size:.82rem">' +
     GIORNI[n.getDay()] +
     '</small>';
   // Render gia eseguito nel blocco login sopra (dopo loadAll)

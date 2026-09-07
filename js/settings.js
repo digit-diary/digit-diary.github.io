@@ -42,6 +42,9 @@ const VIS_ITEMS = {
     gestione_valutazioni: 'Valutazioni · inserire e importare schede',
     gestione_formazioni: 'Formazioni · registrare sessioni formative svolte (es. supervisor)',
     gestione_piano: 'Piano di lavoro · modificare la griglia turni del mese (es. supervisor)',
+    gestione_regole:
+      'Regole del piano · vedere e modificare le regole (riposo minimo, giorni consecutivi, RAP, vacanze)',
+    gestione_festivi: 'Festivi e CGF · gestire il calendario dei giorni festivi e i recuperi',
     gestione_corsi: 'Corsi · pianificare corsi nel piano: data, orario e partecipanti (es. supervisor)',
     gestione_briefing:
       'Briefing · compilare e modificare il foglio del giorno e le pause (senza toccare la griglia turni)',
@@ -397,7 +400,7 @@ function apriAccessiExtra(nome) {
       pagineDisponibili
         .map(
           ([k, lbl]) =>
-            '<label style="font-size:.78rem;background:var(--paper2);padding:3px 8px;border-radius:10px;border:1px solid var(--line)"><input type="checkbox" class="ae-pag-' +
+            '<label style="font-size:.82rem;background:var(--paper2);padding:3px 8px;border-radius:10px;border:1px solid var(--line)"><input type="checkbox" class="ae-pag-' +
             r.key +
             '" value="' +
             k +
@@ -571,17 +574,17 @@ function renderOperatoriUI() {
                   : '') +
                 '</button><select onchange="cambiaRepartoOperatore(\'' +
                 ne +
-                '\',this.value)" style="font-size:.75rem;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)">' +
+                '\',this.value)" style="font-size:.82rem;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)">' +
                 opzioniRepartoHtml(rep, true) +
                 '</select>'
               : '') +
             (admin && hasAuth
-              ? '<button style="font-size:.75rem;padding:3px 8px;cursor:pointer;border:1px solid var(--accent2);color:var(--accent2);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif;font-weight:600" onclick="resetPasswordOperatore(\'' +
+              ? '<button style="font-size:.82rem;padding:3px 8px;cursor:pointer;border:1px solid var(--accent2);color:var(--accent2);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif;font-weight:600" onclick="resetPasswordOperatore(\'' +
                 ne +
                 '\')">Pwd</button>'
               : '') +
             (admin
-              ? '<button style="font-size:.75rem;padding:3px 8px;cursor:pointer;border:1px solid var(--accent);color:var(--accent);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif;font-weight:600" onclick="rimuoviOperatore(\'' +
+              ? '<button style="font-size:.82rem;padding:3px 8px;cursor:pointer;border:1px solid var(--accent);color:var(--accent);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif;font-weight:600" onclick="rimuoviOperatore(\'' +
                 ne +
                 '\')">Rimuovi</button>'
               : '') +
@@ -835,7 +838,7 @@ function renderCampiRapportoUI() {
         reps
           .map(
             (r) =>
-              '<label style="display:inline-flex;align-items:center;gap:3px;font-size:.78rem;color:var(--muted);cursor:pointer" title="Il campo appare nel rapporto di questo settore"><input type="checkbox"' +
+              '<label style="display:inline-flex;align-items:center;gap:3px;font-size:.82rem;color:var(--muted);cursor:pointer" title="Il campo appare nel rapporto di questo settore"><input type="checkbox"' +
               (campoInReparto(key, r.key) ? ' checked' : '') +
               ' onchange="toggleCampoReparto(\'' +
               key +
@@ -887,7 +890,7 @@ function renderCampiRapportoUI() {
         .map((k) => {
           const d = CAMPI_RAPPORTO_DEFAULT.find((x) => x.key === k);
           return (
-            '<button style="margin:2px 4px;padding:3px 10px;font-size:.78rem;cursor:pointer;border:1px dashed var(--accent2);color:var(--accent2);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif" onclick="ripristinaCampoDefault(\'' +
+            '<button style="margin:2px 4px;padding:3px 10px;font-size:.82rem;cursor:pointer;border:1px dashed var(--accent2);color:var(--accent2);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif" onclick="ripristinaCampoDefault(\'' +
             k +
             '\')">+ ' +
             (d ? escP(d.label) : k) +
@@ -1135,7 +1138,7 @@ function renderSettoriUI() {
       (disattivo ? ';opacity:.55' : '') +
       '"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">';
     html +=
-      '<span class="mini-badge" style="background:' + r.colore + ';font-size:.78rem">' + escP(r.label) + '</span>';
+      '<span class="mini-badge" style="background:' + r.colore + ';font-size:.82rem">' + escP(r.label) + '</span>';
     if (custom) {
       html +=
         '<input type="text" id="settore-label-' +
@@ -1144,7 +1147,7 @@ function renderSettoriUI() {
         escP(r.label) +
         '" style="width:150px;padding:5px 10px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink);font-size:.84rem">';
     } else {
-      html += '<span style="font-size:.78rem;color:var(--muted)">settore di base (fisso)</span>';
+      html += '<span style="font-size:.82rem;color:var(--muted)">settore di base (fisso)</span>';
     }
     html +=
       '<input type="color" id="settore-colore-' +
@@ -1161,14 +1164,14 @@ function renderSettoriUI() {
         '\')" style="margin-left:4px">' +
         (disattivo ? 'Riattiva' : 'Disattiva') +
         '</button>';
-      if (nDati) html += '<span style="font-size:.78rem;color:var(--muted)">' + nDati + ' record collegati</span>';
+      if (nDati) html += '<span style="font-size:.82rem;color:var(--muted)">' + nDati + ' record collegati</span>';
     }
     html += '</div>';
     // pagine abilitate per questo settore
     html += '<div style="display:flex;flex-wrap:wrap;gap:4px 14px;padding-left:4px">';
     Object.entries(PAGINE_REPARTO).forEach(([pk, plabel]) => {
       html +=
-        '<label style="display:flex;align-items:center;gap:4px;font-size:.78rem;color:var(--muted);cursor:pointer"><input type="checkbox"' +
+        '<label style="display:flex;align-items:center;gap:4px;font-size:.82rem;color:var(--muted);cursor:pointer"><input type="checkbox"' +
         (paginaAbilitataReparto(pk, r.key) ? ' checked' : '') +
         ' onchange="salvaPaginaSettore(\'' +
         r.key +

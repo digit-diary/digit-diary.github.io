@@ -19,9 +19,9 @@ function apriModulo(tipo) {
   });
   let html = '<div class="main-card" style="margin-top:18px"><div class="card-header">';
   const aiBox =
-    '<div class="ai-gen-box" style="margin-bottom:16px;padding:14px;background:linear-gradient(135deg,rgba(102,126,234,.08),rgba(118,75,162,.08));border:1.5px solid rgba(102,126,234,.25);border-radius:6px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:1.1rem"><i class="icx icx-stella-piena"></i></span><strong style="font-size:.92rem">Genera con AI</strong><span style="font-size:.78rem;color:var(--muted)">Descrivi la situazione e l\'AI compila tutti i campi</span></div><textarea id="ai-gen-prompt" placeholder="Es: Cognome Nome – cassa – acquisto crediti senza documento – cliente non identificato – 22:45 – 08.03.2026 – 2000 CHF – LOG 7834&#10;&#10;Oppure: Cognome Nome – valet – alle 23:10 ha consegnato il veicolo sbagliato al cliente – 05.03.2026 – IR 4521" style="width:100%;min-height:70px;padding:10px;border:1px solid var(--line);border-radius:4px;font-size:.88rem;background:var(--paper);color:var(--ink);resize:vertical"></textarea><div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn-ai" id="btn-ai-gen" onclick="generaModuloAI(\'' +
+    '<div class="ai-gen-box" style="margin-bottom:16px;padding:14px;background:linear-gradient(135deg,rgba(102,126,234,.08),rgba(118,75,162,.08));border:1.5px solid rgba(102,126,234,.25);border-radius:6px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:1.1rem"><i class="icx icx-stella-piena"></i></span><strong style="font-size:.92rem">Genera con AI</strong><span style="font-size:.82rem;color:var(--muted)">Descrivi la situazione e l\'AI compila tutti i campi</span></div><textarea id="ai-gen-prompt" placeholder="Es: Cognome Nome – cassa – acquisto crediti senza documento – cliente non identificato – 22:45 – 08.03.2026 – 2000 CHF – LOG 7834&#10;&#10;Oppure: Cognome Nome – valet – alle 23:10 ha consegnato il veicolo sbagliato al cliente – 05.03.2026 – IR 4521" style="width:100%;min-height:70px;padding:10px;border:1px solid var(--line);border-radius:4px;font-size:.88rem;background:var(--paper);color:var(--ink);resize:vertical"></textarea><div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn-ai" id="btn-ai-gen" onclick="generaModuloAI(\'' +
     tipo +
-    '\')">Genera tutti i campi</button><button class="btn-ai" onclick="document.getElementById(\'modulo-foto-input\').click()" style="background:linear-gradient(135deg,#b8860b,#d4a017)">Allega foto per AI</button><input type="file" id="modulo-foto-input" accept="image/*" style="display:none" onchange="moduloFotoPreview(this)"><span id="modulo-foto-name" style="font-size:.78rem;color:var(--muted)"></span><button id="modulo-foto-remove" onclick="moduloFotoRimuovi()" style="display:none;background:none;border:1px solid var(--accent);color:var(--accent);padding:2px 8px;border-radius:2px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:Source Sans 3,sans-serif">X</button><span id="ai-gen-status" style="font-size:.78rem;color:var(--muted)"></span></div><div id="modulo-foto-preview" style="display:none;margin-top:8px"><img id="modulo-foto-img" style="max-width:200px;max-height:140px;border-radius:3px;border:1px solid var(--line)"></div></div>';
+    '\')">Genera tutti i campi</button><button class="btn-ai" onclick="document.getElementById(\'modulo-foto-input\').click()" style="background:linear-gradient(135deg,#b8860b,#d4a017)">Allega foto per AI</button><input type="file" id="modulo-foto-input" accept="image/*" style="display:none" onchange="moduloFotoPreview(this)"><span id="modulo-foto-name" style="font-size:.82rem;color:var(--muted)"></span><button id="modulo-foto-remove" onclick="moduloFotoRimuovi()" style="display:none;background:none;border:1px solid var(--accent);color:var(--accent);padding:2px 8px;border-radius:2px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:Source Sans 3,sans-serif">X</button><span id="ai-gen-status" style="font-size:.82rem;color:var(--muted)"></span></div><div id="modulo-foto-preview" style="display:none;margin-top:8px"><img id="modulo-foto-img" style="max-width:200px;max-height:140px;border-radius:3px;border:1px solid var(--line)"></div></div>';
   if (tipo === 'allineamento') {
     html += 'Rilevamento di non conformità e colloquio di allineamento</div><div style="padding:18px">';
     html += aiBox;
@@ -796,9 +796,9 @@ function aggiornaModuliLista() {
         escP(m.collaboratore) +
         '</strong></span><span class="badge" style="background:' +
         tc[m.tipo] +
-        ';color:white;padding:2px 10px;border-radius:2px;font-size:.78rem">' +
+        ';color:white;padding:2px 10px;border-radius:2px;font-size:.82rem">' +
         tl[m.tipo] +
-        '</span><span style="font-size:.78rem;color:var(--muted)">Resp: ' +
+        '</span><span style="font-size:.82rem;color:var(--muted)">Resp: ' +
         escP(m.resp_settore) +
         (m.operatore ? ' · Creato da ' + escP(m.operatore) : '') +
         (m.modificato_da ? ' · Modificato da ' + escP(m.modificato_da) : '') +
@@ -959,7 +959,7 @@ async function renderCollaboratoriUI() {
     '<a href="#" onclick="switchPage(\'formazione\');return false" style="color:#2c6e49;font-weight:700">Competenze e livelli → Formazione</a> · ' +
     '<a href="#" onclick="switchPage(\'piano\');if(typeof pianoCambiaTab===\'function\')pianoCambiaTab(\'impostazioni\');return false" style="color:#1a4a7a;font-weight:700">Preferenze turni → Piano/Impostazioni</a></p>';
   const selStyle =
-    'font-size:.75rem;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)';
+    'font-size:.82rem;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)';
   const rigaCollab = (c) => {
     const rep = c.reparto_dip || 'slots';
     const imp = c.impiego || '';
@@ -970,7 +970,7 @@ async function renderCollaboratoriUI() {
       '" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border:1px solid var(--line);flex-wrap:wrap"><span style="flex:1;font-weight:400;min-width:140px">' +
       escP(c.nome) +
       (cat && (puoCat || (typeof puoVedereCategorie === 'function' && puoVedereCategorie()))
-        ? ' <span class="mini-badge" style="background:var(--accent2);font-size:.75rem">' + cat + '&ordf;</span>'
+        ? ' <span class="mini-badge" style="background:var(--accent2);font-size:.82rem">' + cat + '&ordf;</span>'
         : '') +
       '</span><select ' +
       (puoImp ? '' : 'disabled ') +
@@ -1063,7 +1063,7 @@ async function renderCollaboratoriUI() {
   const jolly = ordina(attivi.filter((c) => c.impiego === 'jolly'));
   const senza = ordina(attivi.filter((c) => !c.impiego));
   const titoloSez = (t, n) =>
-    '<p style="font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:12px 0 6px">' +
+    '<p style="font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:12px 0 6px">' +
     t +
     ' (' +
     n +
@@ -1286,7 +1286,7 @@ function apriCoperturaCollab(id) {
     '</b> &middot; settore: <b>' +
     escP(repartoLabel(principale)) +
     '</b></p>' +
-    "<p style=\"font-size:.78rem;color:var(--muted);margin-bottom:12px\">Il contratto e le ore dovute restano nel suo settore. Qui indichi dove puo' andare a coprire i buchi: comparira' anche in quei piani e la generazione automatica potra' usarlo, entro i limiti che imposti.</p>";
+    "<p style=\"font-size:.82rem;color:var(--muted);margin-bottom:12px\">Il contratto e le ore dovute restano nel suo settore. Qui indichi dove puo' andare a coprire i buchi: comparira' anche in quei piani e la generazione automatica potra' usarlo, entro i limiti che imposti.</p>";
   getReparti()
     .filter((r) => r.key !== principale)
     .forEach((r) => {
@@ -2353,7 +2353,7 @@ function render() {
         te = e.tipo.replace(/'/g, "\\'"),
         pin = pinnedIds.has(e.id);
       const rep = e.reparto
-        ? '<span style="display:inline-block;margin-left:6px;padding:2px 8px;background:var(--muted);color:white;border-radius:2px;font-size:.78rem;font-weight:600">' +
+        ? '<span style="display:inline-block;margin-left:6px;padding:2px 8px;background:var(--muted);color:white;border-radius:2px;font-size:.82rem;font-weight:600">' +
           escP(e.reparto) +
           '</span>'
         : '';
@@ -2373,7 +2373,7 @@ function render() {
       const gdDiff = d.getHours() < 6;
       const gdDate = gdDiff ? new Date(d.getTime() - 86400000) : d;
       const gdBadge = gdDiff
-        ? '<span style="font-size:.78rem;padding:2px 7px;border-radius:2px;background:var(--accent2);color:white;font-weight:700">GD ' +
+        ? '<span style="font-size:.82rem;padding:2px 7px;border-radius:2px;background:var(--accent2);color:white;font-weight:700">GD ' +
           gdDate.getDate() +
           '.' +
           String(gdDate.getMonth() + 1).padStart(2, '0') +

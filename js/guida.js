@@ -231,6 +231,16 @@ function GUIDA_CAPITOLI() {
     },
     {
       area: 'piano',
+      titolo: 'Regole e Festivi: chi puo vederli',
+      righe: [
+        'Le schede <b>Regole</b> e <b>Festivi</b> del piano erano riservate agli amministratori e per gli altri restavano vuote, senza spiegazione.',
+        'Ora sono <b>permessi delegabili</b>: un amministratore li assegna da <b>Impostazioni · Visibilita e permessi</b> scegliendo "Operatori selezionati" (es. il responsabile del settore o HR).',
+        'Chi non ha il permesso legge un messaggio che dice cosa serve e a chi chiederlo, invece di trovare una pagina bianca.',
+        'Stessa cosa vale gia per le <b>categorie professionali</b> (5ª-1ª): permessi separati per vederle e per assegnarle.',
+      ],
+    },
+    {
+      area: 'piano',
       titolo: 'Piano: correggere il saldo del mese (ore reali)',
       vis: () => _guidaVis('piano'),
       righe: [

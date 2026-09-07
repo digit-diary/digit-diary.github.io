@@ -410,7 +410,7 @@ function modificaRegistrazione(id) {
           (_rif === 1 ? 'o' : 'i') +
           '</span>'
         : '') +
-      '<br><span style="color:var(--muted);font-size:.76rem">Usa "Salva + Copertura" per inserire o correggere</span></div>';
+      '<br><span style="color:var(--muted);font-size:.82rem">Usa "Salva + Copertura" per inserire o correggere</span></div>';
   }
   b.innerHTML =
     '<h3>Modifica registrazione</h3><div class="pwd-field"><label>Collaboratore</label><div class="ac-wrap"><input type="text" id="edit-nome" value="' +
@@ -763,7 +763,7 @@ function toggleScadenzeDropdown() {
       html = '<p style="color:var(--muted);text-align:center;padding:8px">Nessuna scadenza attiva</p>';
     if (fatte.length) {
       html +=
-        '<div style="margin-top:12px;padding-top:10px;border-top:2px solid var(--line)"><span style="font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600">Completate</span></div>';
+        '<div style="margin-top:12px;padding-top:10px;border-top:2px solid var(--line)"><span style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600">Completate</span></div>';
       html += fatte
         .map(
           (s) =>
@@ -773,7 +773,7 @@ function toggleScadenzeDropdown() {
             escP(s.titolo) +
             '</strong>' +
             (s.descrizione ? ' - ' + escP(s.descrizione) : '') +
-            '</span><span style="color:#2c6e49;font-weight:700;font-size:.78rem">' +
+            '</span><span style="color:#2c6e49;font-weight:700;font-size:.82rem">' +
             (s.completata_da ? 'Fatto da ' + escP(s.completata_da) : 'Fatto') +
             '</span></div>',
         )

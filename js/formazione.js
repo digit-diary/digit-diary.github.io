@@ -262,7 +262,7 @@ function livelloBadgeHtml(lv, c) {
         .filter((k) => (parseInt(k.livello) || 0) < maxCert && spunte[k.key] !== true)
         .map((k) => k.label);
       return (
-        '<span class="mini-badge" style="background:#d4a017;color:#000;font-size:.78rem" title="Certificato fino a ' +
+        '<span class="mini-badge" style="background:#d4a017;color:#000;font-size:.82rem" title="Certificato fino a ' +
         escP(livelloNome(maxCert)) +
         ' ma manca: ' +
         escP(mancanti.join(', ')) +
@@ -275,7 +275,7 @@ function livelloBadgeHtml(lv, c) {
   if (!lv) return '<span class="mini-badge" style="background:var(--muted)">-</span>';
   const col = { 1: '#1a4a7a', 2: '#e67e22', 3: '#2c6e49', 4: '#8e44ad', 5: '#c0392b' }[lv] || 'var(--muted)';
   return (
-    '<span class="mini-badge" style="background:' + col + ';font-size:.78rem">' + escP(livelloNome(lv)) + '</span>'
+    '<span class="mini-badge" style="background:' + col + ';font-size:.82rem">' + escP(livelloNome(lv)) + '</span>'
   );
 }
 function puntiTotali(nome, anno) {
@@ -493,10 +493,10 @@ function _renderProtocolliCard() {
     h +=
       '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0"><b style="min-width:180px">' +
       escP(c ? c.label : k) +
-      '</b><button class="btn-export" style="font-size:.78rem;padding:3px 10px" onclick="scaricaProtocolloExcel(\'' +
+      '</b><button class="btn-export" style="font-size:.82rem;padding:3px 10px" onclick="scaricaProtocolloExcel(\'' +
       k +
       '\')">Scarica template</button>' +
-      '<button class="btn-export" style="font-size:.78rem;padding:3px 10px;border-color:#2c6e49;color:#2c6e49" onclick="document.getElementById(\'prot-file-' +
+      '<button class="btn-export" style="font-size:.82rem;padding:3px 10px;border-color:#2c6e49;color:#2c6e49" onclick="document.getElementById(\'prot-file-' +
       k +
       '\').click()">Importa compilato</button><input type="file" id="prot-file-' +
       k +
@@ -807,7 +807,7 @@ function renderFormazione() {
       (cc ? ' style="background:' + cc + ' !important;color:#000"' : '') +
       '>' +
       escP(k.label) +
-      (k.livello ? ' <span style="font-size:.75rem;color:#00000099">L' + k.livello + '</span>' : '') +
+      (k.livello ? ' <span style="font-size:.82rem;color:#00000099">L' + k.livello + '</span>' : '') +
       '</th>';
   });
   html += '<th class="num">Livello</th><th class="num">Punti ' + new Date().getFullYear() + '</th></tr></thead><tbody>';
@@ -826,12 +826,12 @@ function renderFormazione() {
       (c.impiego
         ? ' <span class="mini-badge" style="background:' +
           (c.impiego === 'fisso' ? '#1a7a6d' : '#e67e22') +
-          ';font-size:.75rem">' +
+          ';font-size:.82rem">' +
           (c.impiego === 'fisso' ? 'Fisso' : 'Jolly') +
           '</span>'
         : '') +
       (c.categoria && typeof puoVedereCategorie === 'function' && puoVedereCategorie()
-        ? ' <span class="mini-badge" style="background:var(--accent2);font-size:.75rem">' +
+        ? ' <span class="mini-badge" style="background:var(--accent2);font-size:.82rem">' +
           c.categoria +
           '&ordf;</span>'
         : '') +
@@ -893,7 +893,7 @@ function renderFormazione() {
       '<div class="field"><label>Nota (opzionale)</label><input type="text" id="pt-nota" placeholder="Es: copertura turno del 15/08 per..."></div>';
     html += '<button class="btn-add-tipo" onclick="assegnaPuntiRapido()">+ Assegna</button></div>';
     html +=
-      '<p style="color:var(--muted);font-size:.78rem;margin-top:6px">I punti si guadagnano con azioni positive (coperture, formazione, apprezzamenti). Le malattie NON tolgono mai punti: solo il rifiuto esplicito di una disponibilità richiesta può essere conteggiato, se configurato.</p>';
+      '<p style="color:var(--muted);font-size:.82rem;margin-top:6px">I punti si guadagnano con azioni positive (coperture, formazione, apprezzamenti). Le malattie NON tolgono mai punti: solo il rifiuto esplicito di una disponibilità richiesta può essere conteggiato, se configurato.</p>';
   } else {
     html += '<p style="color:var(--muted);font-size:.88rem">I punti vengono assegnati dal responsabile.</p>';
   }
@@ -968,7 +968,7 @@ function renderFormazione() {
         (adm
           ? '<td><button class="btn-act del" onclick="eliminaPuntiEvento(' +
             p.id +
-            ')" style="font-size:.78rem">X</button></td>'
+            ')" style="font-size:.82rem">X</button></td>'
           : '') +
         '</tr>';
     });
@@ -981,14 +981,14 @@ function renderFormazione() {
   html +=
     '<div class="main-card"><div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">Traguardi e premi' +
     (adm || puoPunti
-      ? '<span style="display:flex;align-items:center;gap:6px"><select id="ri-anno" style="padding:4px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);font-size:.75rem">' +
+      ? '<span style="display:flex;align-items:center;gap:6px"><select id="ri-anno" style="padding:4px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);font-size:.82rem">' +
         [0, 1, 2, 3]
           .map((d) => {
             const a = new Date().getFullYear() - d;
             return '<option value="' + a + '">' + a + '</option>';
           })
           .join('') +
-        '</select><button class="btn-export btn-export-pdf" onclick="esportaReportIncentiviPDF()" style="font-size:.75rem;padding:4px 12px">Report Incentivi PDF</button></span>'
+        '</select><button class="btn-export btn-export-pdf" onclick="esportaReportIncentiviPDF()" style="font-size:.82rem;padding:4px 12px">Report Incentivi PDF</button></span>'
       : '') +
     '</div><div style="padding:16px">';
   html +=
@@ -1047,7 +1047,7 @@ function renderFormazione() {
               new Date((a.data_evento || '') + 'T12:00:00').toLocaleDateString('it-IT') +
               ')</span></span>' +
               (adm || puoPunti
-                ? '<button class="btn-export" style="font-size:.78rem;padding:2px 10px" onclick="registraPremioConsegnato(\'' +
+                ? '<button class="btn-export" style="font-size:.82rem;padding:2px 10px" onclick="registraPremioConsegnato(\'' +
                   a.collaboratore.replace(/'/g, "\\'") +
                   "','" +
                   prem.replace(/'/g, "\\'") +
@@ -1086,14 +1086,14 @@ function renderFormazione() {
         pct +
         '%;background:var(--accent2)"></div></div>' +
         (next
-          ? '<span style="font-size:.78rem;color:var(--muted)">-' +
+          ? '<span style="font-size:.82rem;color:var(--muted)">-' +
             (next.punti - x.punti) +
             ' a: ' +
             escP(next.premio) +
             '</span>'
-          : '<span style="font-size:.78rem;color:#2c6e49;font-weight:700">Tutte le soglie raggiunte!</span>') +
+          : '<span style="font-size:.82rem;color:#2c6e49;font-weight:700">Tutte le soglie raggiunte!</span>') +
         (raggiunti.length
-          ? '<span style="font-size:.78rem;color:#2c6e49"><i class="icx icx-trofeo"></i> ' +
+          ? '<span style="font-size:.82rem;color:#2c6e49"><i class="icx icx-trofeo"></i> ' +
             raggiunti.map(escP).join(', ') +
             '</span>'
           : '') +
@@ -1138,10 +1138,10 @@ function renderFormazione() {
     html +=
       '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">' +
       '<span style="font-size:.8rem;color:var(--muted)">Allega scheda (facoltativo):</span>' +
-      '<input type="file" id="frm-allegato" accept=".pdf,.xlsx,.xls,.jpg,.jpeg,.png" style="font-size:.78rem;max-width:260px">' +
-      '<span style="font-size:.78rem;color:var(--muted)">PDF, Excel o immagine · max 2 MB, visibile nello Storico HR</span></div>';
+      '<input type="file" id="frm-allegato" accept=".pdf,.xlsx,.xls,.jpg,.jpeg,.png" style="font-size:.82rem;max-width:260px">' +
+      '<span style="font-size:.82rem;color:var(--muted)">PDF, Excel o immagine · max 2 MB, visibile nello Storico HR</span></div>';
     html +=
-      '<p style="color:var(--muted);font-size:.75rem;margin-top:6px">La formazione viene tracciata con data e formatore nello Storico HR del collaboratore (visibile solo a admin e operatori autorizzati).</p>';
+      '<p style="color:var(--muted);font-size:.82rem;margin-top:6px">La formazione viene tracciata con data e formatore nello Storico HR del collaboratore (visibile solo a admin e operatori autorizzati).</p>';
     html += '</div></div>';
   }
 
@@ -1270,9 +1270,9 @@ function _renderEquitaCard(collabs) {
   });
   const conDati = righe.filter((r) => r.categoria || r.dataAss);
   let html =
-    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:8px">Equità categorie · analisi meritocratica <span class="mini-badge" style="background:var(--accent);font-size:.78rem">RISERVATO</span>' +
+    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:8px">Equità categorie · analisi meritocratica <span class="mini-badge" style="background:var(--accent);font-size:.82rem">RISERVATO</span>' +
     (isAdmin()
-      ? '<span style="margin-left:auto;font-size:.78rem;font-weight:400;display:flex;align-items:center;gap:6px">Segnala da <select onchange="salvaEquitaMesi(this.value)" style="padding:4px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);font-size:.75rem">' +
+      ? '<span style="margin-left:auto;font-size:.82rem;font-weight:400;display:flex;align-items:center;gap:6px">Segnala da <select onchange="salvaEquitaMesi(this.value)" style="padding:4px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);font-size:.82rem">' +
         [3, 6, 9, 12]
           .map(
             (m) =>
@@ -1314,13 +1314,13 @@ function _renderEquitaCard(collabs) {
       r.punti +
       '</td><td class="num">' +
       (r.media != null ? r.media + '%' : '-') +
-      '</td><td style="font-size:.78rem;color:var(--accent)">' +
+      '</td><td style="font-size:.82rem;color:var(--accent)">' +
       (r.flag ? '<i class="icx icx-avviso"></i> ' + escP(r.flag) : '') +
       '</td></tr>';
   });
   html += '</tbody></table></div>';
   html +=
-    '<p style="color:var(--muted);font-size:.75rem;padding:0 16px 14px">Analisi indicativa basata su anzianità (inizio contratto), categoria e livello multidisciplinare · segnala con almeno ' +
+    '<p style="color:var(--muted);font-size:.82rem;padding:0 16px 14px">Analisi indicativa basata su anzianità (inizio contratto), categoria e livello multidisciplinare · segnala con almeno ' +
     (typeof equitaMesi !== 'undefined' ? equitaMesi : 6) +
     ' mesi di anzianità in più a parità di livello: la decisione sulle categorie resta al responsabile e a HR.</p></div>';
   return html;
@@ -1972,7 +1972,7 @@ function _renderFormazioneConfig() {
   html +=
     '<p style="font-size:.85rem;font-weight:700;margin:8px 0 4px">Nomi dei livelli · ' +
     escP(repartoLabel(currentReparto)) +
-    '</p><p style="font-size:.78rem;color:var(--muted);margin-bottom:6px">Personalizza come si chiamano i livelli (es. L1 = "Base Sala"). Vuoto = nome standard.</p><div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">';
+    '</p><p style="font-size:.82rem;color:var(--muted);margin-bottom:6px">Personalizza come si chiamano i livelli (es. L1 = "Base Sala"). Vuoto = nome standard.</p><div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">';
   for (let lv = 1; lv <= 5; lv++) {
     const attuale = ((window._livelliNomiCfg || {})[currentReparto] || {})[String(lv)] || '';
     html +=
@@ -1992,7 +1992,7 @@ function _renderFormazioneConfig() {
     .map((r) => r.key)
     .forEach((rep) => {
       html +=
-        '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:12px 0 6px">Competenze ' +
+        '<p style="font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:12px 0 6px">Competenze ' +
         escP(repartoLabel(rep)) +
         '</p>';
       (cfgC[rep] || []).forEach((k, i) => {
@@ -2024,7 +2024,7 @@ function _renderFormazioneConfig() {
     });
   // INTERRUTTORE GENERALE del sistema incentivi
   html +=
-    '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Sistema incentivi</p>' +
+    '<p style="font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Sistema incentivi</p>' +
     '<label class="tipo-item" style="cursor:pointer;font-size:.95rem"><input type="checkbox"' +
     (cfgP.attivo ? ' checked' : '') +
     ' onchange="toggleIncentiviGlobale(this.checked)" style="width:18px;height:18px;margin-right:10px"><b>Incentivi attivi</b>' +
@@ -2033,8 +2033,8 @@ function _renderFormazioneConfig() {
     '</span></label>';
   // punti azioni (ciascuna con la sua spunta attiva/disattiva)
   html +=
-    '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Azioni e punti</p>' +
-    '<p style="font-size:.75rem;color:var(--muted);margin:0 0 6px">La spunta a sinistra accende o spegne la singola azione. Il numero sono i punti. Se il sistema qui sopra e spento, tutte le azioni sono spente.</p>';
+    '<p style="font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Azioni e punti</p>' +
+    '<p style="font-size:.82rem;color:var(--muted);margin:0 0 6px">La spunta a sinistra accende o spegne la singola azione. Il numero sono i punti. Se il sistema qui sopra e spento, tutte le azioni sono spente.</p>';
   cfgP.azioni.forEach((a, i) => {
     const attiva = a.attiva !== false;
     html +=
@@ -2060,9 +2060,9 @@ function _renderFormazioneConfig() {
     '<div class="add-tipo-row" style="margin:6px 0 4px"><div class="field"><label>Nuova azione</label><input type="text" id="cfg-az-nome" placeholder="Es: Straordinario festivo..."></div><div class="field"><label>Punti</label><input type="number" id="cfg-az-punti" value="5" style="width:90px"></div><button class="btn-add-tipo" onclick="aggiungiAzioneCfg()">+ Aggiungi</button></div>';
   // soglie premi
   html +=
-    '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Soglie premi (punti annuali)</p>';
+    '<p style="font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Soglie premi (punti annuali)</p>';
   html +=
-    '<p style="font-size:.75rem;color:var(--muted);margin:0 0 6px">Max/mese: quanti se ne possono consegnare al mese (vuoto = senza limite, dipende dal budget). Chi resta fuori va in attesa con priorità dal mese dopo. Inventario: se il premio è un oggetto aziendale, alla consegna viene scalato di 1.</p>';
+    '<p style="font-size:.82rem;color:var(--muted);margin:0 0 6px">Max/mese: quanti se ne possono consegnare al mese (vuoto = senza limite, dipende dal budget). Chi resta fuori va in attesa con priorità dal mese dopo. Inventario: se il premio è un oggetto aziendale, alla consegna viene scalato di 1.</p>';
   const invNomi = (cfgP.inventario || []).map((x) => x.nome).filter(Boolean);
   cfgP.soglie.forEach((s, i) => {
     html +=
@@ -2097,7 +2097,7 @@ function _renderFormazioneConfig() {
     '<div class="add-tipo-row" style="margin:6px 0 4px"><div class="field"><label>Punti</label><input type="number" id="cfg-soglia-punti" value="100" style="width:90px"></div><div class="field"><label>Premio</label><input type="text" id="cfg-soglia-premio" placeholder="Es: Buono ristorante..."></div><button class="btn-add-tipo" onclick="aggiungiSoglia()">+ Aggiungi</button></div>';
   // inventario premi (oggetti aziendali: watch, cuffie...)
   html +=
-    '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Inventario premi (oggetti aziendali)</p>';
+    '<p style="font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Inventario premi (oggetti aziendali)</p>';
   (cfgP.inventario || []).forEach((it, i) => {
     html +=
       '<div class="tipo-item"><input type="text" value="' +
@@ -2119,10 +2119,10 @@ function _renderFormazioneConfig() {
   html +=
     '<div class="add-tipo-row" style="margin:6px 0 4px"><div class="field"><label>Oggetto</label><input type="text" id="cfg-inv-nome" placeholder="Es: Smartwatch, Cuffie..."></div><div class="field"><label>Pezzi</label><input type="number" id="cfg-inv-qta" value="1" min="0" style="width:80px"></div><button class="btn-add-tipo" onclick="aggiungiInvIncentivo()">+ Aggiungi</button></div>';
   html +=
-    '<p style="font-size:.75rem;color:var(--muted);margin:2px 0 0">Ogni scarico alla consegna resta tracciato nel Registro attività.</p>';
+    '<p style="font-size:.82rem;color:var(--muted);margin:2px 0 0">Ogni scarico alla consegna resta tracciato nel Registro attività.</p>';
   // punti passaggio livello
   html +=
-    '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Punti al raggiungimento del livello (0 = disattivato)</p>';
+    '<p style="font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Punti al raggiungimento del livello (0 = disattivato)</p>';
   [1, 2, 3].forEach((l) => {
     html +=
       '<div class="tipo-item"><div class="tipo-item-name">Livello ' +
@@ -2136,7 +2136,7 @@ function _renderFormazioneConfig() {
   });
   // premi livello
   html +=
-    '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Premi passaggio livello</p>';
+    '<p style="font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Premi passaggio livello</p>';
   [2, 3].forEach((l) => {
     html +=
       '<div class="tipo-item"><div class="tipo-item-name">Livello ' +
@@ -2150,7 +2150,7 @@ function _renderFormazioneConfig() {
   });
   // notifiche incentivi
   html +=
-    '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Notifiche incentivi</p>';
+    '<p style="font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Notifiche incentivi</p>';
   html +=
     '<div class="tipo-item"><div class="tipo-item-name">Premi e passaggi di livello</div><select onchange="modificaNotificheCfg(this.value)" style="padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)">' +
     '<option value="privato"' +
@@ -2161,7 +2161,7 @@ function _renderFormazioneConfig() {
     (cfgP.notifiche === 'off' ? ' selected' : '') +
     '>Disattivate</option></select></div>';
   html +=
-    '<p style="font-size:.75rem;color:var(--muted);margin:4px 0 0">I punti personali arrivano sempre e solo all\'interessato (se ha un account operatore con notifiche attive). La scelta qui sopra riguarda premi raggiunti, premi consegnati e passaggi di livello. Per HR usa il pulsante "Report Incentivi PDF" nella sezione Traguardi.</p>';
+    '<p style="font-size:.82rem;color:var(--muted);margin:4px 0 0">I punti personali arrivano sempre e solo all\'interessato (se ha un account operatore con notifiche attive). La scelta qui sopra riguarda premi raggiunti, premi consegnati e passaggi di livello. Per HR usa il pulsante "Report Incentivi PDF" nella sezione Traguardi.</p>';
   html += '</div>';
   return html;
 }
@@ -2440,15 +2440,15 @@ function badgeCoperturaHtml(entry) {
   let h = '';
   if (cop)
     h +=
-      '<span style="display:inline-block;margin-left:6px;padding:2px 8px;background:#1a7a6d;color:white;border-radius:2px;font-size:.75rem;font-weight:700">Coperto: ' +
+      '<span style="display:inline-block;margin-left:6px;padding:2px 8px;background:#1a7a6d;color:white;border-radius:2px;font-size:.82rem;font-weight:700">Coperto: ' +
       escP(cop.collaboratore) +
       '</span>';
   else
     h +=
-      '<span style="display:inline-block;margin-left:6px;padding:2px 8px;background:var(--muted);color:white;border-radius:2px;font-size:.75rem;font-weight:600">Senza copertura</span>';
+      '<span style="display:inline-block;margin-left:6px;padding:2px 8px;background:var(--muted);color:white;border-radius:2px;font-size:.82rem;font-weight:600">Senza copertura</span>';
   if (rifiuti)
     h +=
-      '<span style="display:inline-block;margin-left:4px;padding:2px 8px;background:var(--accent);color:white;border-radius:2px;font-size:.75rem;font-weight:700">' +
+      '<span style="display:inline-block;margin-left:4px;padding:2px 8px;background:var(--accent);color:white;border-radius:2px;font-size:.82rem;font-weight:700">' +
       rifiuti +
       ' rifiut' +
       (rifiuti === 1 ? 'o' : 'i') +
@@ -2549,7 +2549,7 @@ function _renderPopupCopertura() {
   const esistenti = eventiCopertura(assente, ctx.dataRif);
   if (esistenti.length) {
     html +=
-      '<div style="margin-bottom:14px;padding:10px 12px;background:var(--paper2);border-radius:3px;border-left:3px solid var(--accent2)"><div style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:6px">Già registrato</div>' +
+      '<div style="margin-bottom:14px;padding:10px 12px;background:var(--paper2);border-radius:3px;border-left:3px solid var(--accent2)"><div style="font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:6px">Già registrato</div>' +
       esistenti
         .map(
           (p) =>
@@ -2560,9 +2560,9 @@ function _renderPopupCopertura() {
             ';font-weight:700">' +
             (p.punti > 0 ? '+' : '') +
             p.punti +
-            '</span><span style="color:var(--muted);font-size:.78rem;flex:1">' +
+            '</span><span style="color:var(--muted);font-size:.82rem;flex:1">' +
             (p.azione === 'copertura' ? 'copertura' : 'rifiuto disponibilità') +
-            '</span><button class="btn-act del" style="font-size:.75rem" onclick="_rimuoviEventoCopertura(' +
+            '</span><button class="btn-act del" style="font-size:.82rem" onclick="_rimuoviEventoCopertura(' +
             p.id +
             ')">Rimuovi</button></div>',
         )
@@ -2596,7 +2596,7 @@ function _renderPopupCopertura() {
       .join('') +
     '</select>' +
     (ctx.turnoAssente
-      ? '<p style="font-size:.76rem;color:var(--muted);margin-top:5px">Accanto a ogni nome: che turno ha quel giorno e se e formato per il turno scoperto. Chi non e formato si puo scegliere lo stesso, ma resta scritto nel registro.</p>'
+      ? '<p style="font-size:.82rem;color:var(--muted);margin-top:5px">Accanto a ogni nome: che turno ha quel giorno e se e formato per il turno scoperto. Chi non e formato si puo scegliere lo stesso, ma resta scritto nel registro.</p>'
       : '') +
     '</div>';
   if (azNeg) {
@@ -2616,7 +2616,7 @@ function _renderPopupCopertura() {
         .map((c) => {
           const st = _copStatoCollega(c.nome);
           const tag = (testo, colore) =>
-            '<span style="font-size:.72rem;padding:1px 7px;border-radius:9px;background:' +
+            '<span style="font-size:.82rem;padding:1px 7px;border-radius:9px;background:' +
             colore +
             ';color:#fff;font-weight:700">' +
             testo +
@@ -2644,7 +2644,7 @@ function _renderPopupCopertura() {
   html +=
     '<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="_chiudiPopupCopertura(false)">Nessuna copertura</button><button class="btn-modal-ok" onclick="_chiudiPopupCopertura(true)">Conferma</button></div>';
   html +=
-    '<p style="font-size:.78rem;color:var(--muted);text-align:center;margin-top:8px">Puoi sempre assegnare o correggere i punti dopo, dalla pagina Formazione.</p>';
+    '<p style="font-size:.82rem;color:var(--muted);text-align:center;margin-top:8px">Puoi sempre assegnare o correggere i punti dopo, dalla pagina Formazione.</p>';
   document.getElementById('pwd-modal-content').innerHTML = html;
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
@@ -2755,17 +2755,17 @@ function _renderGiubileiCard(collabs) {
   });
   if (!daConsegnare.length && !inArrivo.length) return '';
   let html =
-    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:8px">Premi giubileo <span class="mini-badge" style="background:var(--accent);font-size:.78rem">RISERVATO</span></div><div style="padding:14px 16px">';
+    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:8px">Premi giubileo <span class="mini-badge" style="background:var(--accent);font-size:.82rem">RISERVATO</span></div><div style="padding:14px 16px">';
   if (daConsegnare.length) {
     html +=
-      '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:6px">Da consegnare</p>';
+      '<p style="font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:6px">Da consegnare</p>';
     daConsegnare.forEach((x) => {
       html +=
         '<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--line);flex-wrap:wrap"><strong style="min-width:170px;cursor:pointer" onclick="apriSchedaCollaboratore(\'' +
         x.nome.replace(/'/g, "\\'") +
         '\')">' +
         escP(x.nome) +
-        '</strong><span class="mini-badge" style="background:#8b6914;font-size:.78rem">' +
+        '</strong><span class="mini-badge" style="background:#8b6914;font-size:.82rem">' +
         x.g.anni +
         ' anni</span><span style="font-size:.84rem">maturato il ' +
         x.g.dataLabel +
@@ -2776,7 +2776,7 @@ function _renderGiubileiCard(collabs) {
   }
   if (inArrivo.length) {
     html +=
-      '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:12px 0 6px">In arrivo (12 mesi)</p>';
+      '<p style="font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:12px 0 6px">In arrivo (12 mesi)</p>';
     inArrivo.forEach((x) => {
       html +=
         '<div style="display:flex;align-items:center;gap:10px;padding:4px 0;font-size:.84rem;color:var(--muted);flex-wrap:wrap"><span style="min-width:170px;color:var(--ink)">' +
@@ -2791,7 +2791,7 @@ function _renderGiubileiCard(collabs) {
     });
   }
   html +=
-    '<p style="color:var(--muted);font-size:.75rem;margin-top:10px">La consegna si registra dalla scheda del collaboratore (Storico HR). Importi configurabili in Impostazioni → Premio giubileo.</p></div></div>';
+    '<p style="color:var(--muted);font-size:.82rem;margin-top:10px">La consegna si registra dalla scheda del collaboratore (Storico HR). Importi configurabili in Impostazioni → Premio giubileo.</p></div></div>';
   return html;
 }
 
@@ -2832,7 +2832,7 @@ function _renderPanoramicaHrCard(collabs) {
   let html =
     '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:8px">Panoramica HR · ' +
     escP(repartoLabel(currentReparto)) +
-    ' <span class="mini-badge" style="background:var(--accent);font-size:.78rem">RISERVATO</span></div><div style="padding:14px 16px">';
+    ' <span class="mini-badge" style="background:var(--accent);font-size:.82rem">RISERVATO</span></div><div style="padding:14px 16px">';
   html +=
     '<div class="stats-bar" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr));margin-bottom:12px">';
   const kpi = (n, lbl, col) =>
@@ -2865,7 +2865,7 @@ function _renderPanoramicaHrCard(collabs) {
   if (livStr) righe.push('<span style="color:var(--muted)">Livelli multidisciplinari ·</span> ' + livStr);
   if (righe.length) html += '<p style="font-size:.86rem;line-height:1.8">' + righe.join('<br>') + '</p>';
   html +=
-    '<p style="color:var(--muted);font-size:.75rem;margin-top:8px">Dati del settore corrente: usa lo switch settori in alto per vedere gli altri. Dettaglio per persona nella card Equità categorie.</p></div></div>';
+    '<p style="color:var(--muted);font-size:.82rem;margin-top:8px">Dati del settore corrente: usa lo switch settori in alto per vedere gli altri. Dettaglio per persona nella card Equità categorie.</p></div></div>';
   return html;
 }
 

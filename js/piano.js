@@ -37,6 +37,27 @@ const PIANO_COLORI_SPECIALI = {
   ND: '#F2DBDB',
 };
 
+// REGOLE e FESTIVI: erano riservati ad admin e per gli altri la scheda restava
+// completamente vuota, senza spiegazione. Ora sono permessi delegabili (es. al
+// responsabile o a HR) dalle Impostazioni, e chi non li ha legge il perche'.
+function puoGestireRegole() {
+  return isAdmin() || (typeof puoModificare === 'function' && puoModificare('gestione_regole'));
+}
+function puoGestireFestivi() {
+  return isAdmin() || (typeof puoModificare === 'function' && puoModificare('gestione_festivi'));
+}
+function _pianoSchedaRiservata(titolo, permesso) {
+  return (
+    '<div class="main-card"><div class="card-header">' +
+    titolo +
+    '</div><div style="padding:18px 20px;font-size:.9rem;line-height:1.6">' +
+    '<p>Questa scheda e riservata. Serve il permesso <b>' +
+    permesso +
+    '</b>.</p>' +
+    '<p style="color:var(--muted);font-size:.85rem;margin-top:8px">Lo assegna un amministratore da <b>Impostazioni · Visibilita e permessi</b>, scegliendo "Operatori selezionati" e aggiungendo il tuo nome.</p>' +
+    '</div></div>'
+  );
+}
 function puoGestirePiano() {
   return typeof puoModificare === 'function' ? puoModificare('gestione_piano') : isAdmin();
 }
@@ -1014,11 +1035,11 @@ async function renderPiano() {
           '<span id="piano-autosave" title="Ogni modifica al piano si salva da sola nel database, subito. Le frecce servono per tornare indietro o avanti se sbagli.">Salvataggio automatico</span>' +
           '<input type="text" id="piano-cerca" placeholder="Cerca nome o sigla..." value="' +
           escP(window._pianoCercaTesto || '') +
-          '" oninput="pianoCercaFiltra(this.value)" title="Mostra solo i collaboratori il cui nome contiene il testo, oppure chi ha quella sigla nel mese (es. C8). Vuoto = tutti" style="font-size:.78rem;padding:4px 8px;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--ink);width:150px;margin-left:6px">';
+          '" oninput="pianoCercaFiltra(this.value)" title="Mostra solo i collaboratori il cui nome contiene il testo, oppure chi ha quella sigla nel mese (es. C8). Vuoto = tutti" style="font-size:.82rem;padding:4px 8px;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--ink);width:150px;margin-left:6px">';
         const ssnap = (window._pianoSessSnap || {})[_pianoMeseSel + '|' + _pianoReparto()];
         if (ssnap)
           h +=
-            '<button class="btn-export" style="font-size:.78rem;padding:3px 9px;border-color:#c0392b;color:#c0392b" title="Riporta questo mese a com\'era quando hai iniziato a modificarlo in questa sessione (' +
+            '<button class="btn-export" style="font-size:.82rem;padding:3px 9px;border-color:#c0392b;color:#c0392b" title="Riporta questo mese a com\'era quando hai iniziato a modificarlo in questa sessione (' +
             ssnap.n +
             ' operazioni tue)" onclick="pianoAnnullaTutto()">Annulla tutto (' +
             ssnap.n +
@@ -1108,7 +1129,7 @@ async function renderPiano() {
           const lblNext = (MESI_FULL[prossimo.getMonth()] || '') + ' ' + prossimo.getFullYear();
           const inTempo = oggi.getDate() <= gLim;
           h +=
-            '<div style="margin:6px 0;padding:4px 10px;font-size:.76rem;color:var(--muted);border-left:3px solid ' +
+            '<div style="margin:6px 0;padding:4px 10px;font-size:.82rem;color:var(--muted);border-left:3px solid ' +
             (inTempo ? '#d4b86a' : '#c0392b') +
             '">Non disponibilita\' ' +
             escP(lblNext) +
@@ -1158,7 +1179,7 @@ async function renderPiano() {
           (puoMod ? ' ondblclick="pianoMarkerEdit(' + g + ')"' : '') +
           '>' +
           (_pianoMarkerGiorno(ym, g)
-            ? '<div style="font-size:.75rem;background:#FFFF00;color:#000;font-weight:bold;line-height:1.1">' +
+            ? '<div style="font-size:.82rem;background:#FFFF00;color:#000;font-weight:bold;line-height:1.1">' +
               escP(_pianoMarkerGiorno(ym, g)) +
               '</div>'
             : '') +
@@ -1315,7 +1336,7 @@ async function renderPiano() {
           '\')"></i>' +
           escP(nome) +
           (infoC && infoC.lingue
-            ? ' <span style="font-size:.75rem;color:var(--muted);font-weight:700">' + escP(infoC.lingue) + '</span>'
+            ? ' <span style="font-size:.82rem;color:var(--muted);font-weight:700">' + escP(infoC.lingue) + '</span>'
             : '') +
           // il collaboratore non e' dell'anagrafica di QUESTO settore (o non
           // c'e' affatto): si segnala, cosi' l'anomalia non passa inosservata
@@ -1358,7 +1379,7 @@ async function renderPiano() {
               : '') +
           '</td><td class="piano-fun"><strong>' +
           escP(infoC && infoC.is_jolly ? 'JOLLY' : (infoC && infoC.funzione) || '') +
-          '</strong> <span style="font-size:.78rem">' +
+          '</strong> <span style="font-size:.82rem">' +
           Math.round(perc * 100) +
           '%</span></td>' +
           riga +
@@ -1432,11 +1453,11 @@ async function renderPiano() {
           escP(label);
         if (puoMod)
           hFabb +=
-            '<button class="btn-export" style="font-size:.78rem;padding:3px 10px;border-color:#d4b86a;color:#d4b86a" onclick="copiaFabbisognoMese()">Copia dal mese precedente</button>' +
-            '<button class="btn-export" style="font-size:.78rem;padding:3px 10px;border-color:#2c6e49;color:#2c6e49" onclick="document.getElementById(\'fabb-file\').click()">Importa da Excel</button>' +
+            '<button class="btn-export" style="font-size:.82rem;padding:3px 10px;border-color:#d4b86a;color:#d4b86a" onclick="copiaFabbisognoMese()">Copia dal mese precedente</button>' +
+            '<button class="btn-export" style="font-size:.82rem;padding:3px 10px;border-color:#2c6e49;color:#2c6e49" onclick="document.getElementById(\'fabb-file\').click()">Importa da Excel</button>' +
             '<input type="file" id="fabb-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="importaFabbisognoExcel(this)">' +
-            '<button class="btn-export" style="font-size:.78rem;padding:3px 10px;border-color:var(--accent);color:var(--accent)" onclick="eliminaFabbisognoMese()">Svuota mese</button>' +
-            '<span style="font-size:.76rem;color:#b8a98a;font-weight:400">clicca una cella per impostare le persone necessarie</span>';
+            '<button class="btn-export" style="font-size:.82rem;padding:3px 10px;border-color:var(--accent);color:var(--accent)" onclick="eliminaFabbisognoMese()">Svuota mese</button>' +
+            '<span style="font-size:.82rem;color:#b8a98a;font-weight:400">clicca una cella per impostare le persone necessarie</span>';
         hFabb += '</div>';
         // testata giorni con sigla settimana (D/L/M...), festivi e weekend:
         // usata da fabbisogno, differenze ed effettivi
@@ -1459,7 +1480,7 @@ async function renderPiano() {
               (festiviSet[dstr] ? ' title="' + escP(festiviSet[dstr]) + '"' : '') +
               '>' +
               (_pianoMarkerGiorno(ym, g)
-                ? '<div style="font-size:.75rem;background:#FFFF00;color:#000;font-weight:bold;line-height:1.1">' +
+                ? '<div style="font-size:.82rem;background:#FFFF00;color:#000;font-weight:bold;line-height:1.1">' +
                   escP(_pianoMarkerGiorno(ym, g)) +
                   '</div>'
                 : '') +
@@ -1569,7 +1590,7 @@ async function renderPiano() {
         h +=
           '<div class="main-card" style="margin-top:16px"><div class="card-header">Differenze · ' +
           escP(label) +
-          ' <span style="font-size:.76rem;color:#b8a98a;font-weight:400">(effettivi − pianificazione)</span></div>';
+          ' <span style="font-size:.82rem;color:#b8a98a;font-weight:400">(effettivi − pianificazione)</span></div>';
         h +=
           '<div class="piano-wrap"><table data-seltab="diff" class="piano-table piano-fixed" style="width:' +
           (_pianoLC().tot + 37 * nGiorni) +
@@ -2808,7 +2829,7 @@ function _pianoRegoleDove(nome) {
   return PIANO_REGOLE_DOVE[nome] || 'Solver (Fase 3)';
 }
 function _renderPianoRegoleCard() {
-  if (!isAdmin()) return '';
+  if (!puoGestireRegole()) return _pianoSchedaRiservata('Regole del piano', 'Regole del piano');
   const ordineTipo = { HARD: 1, SOFT: 2, PIPELINE: 3 };
   const tutteRegole = pianoRegoleCache
     .slice()
@@ -2848,7 +2869,7 @@ function _renderPianoRegoleCard() {
       '<tr><td style="text-align:left;font-weight:600">' +
       escP(r.nome) +
       (settR.length
-        ? ' <span style="font-weight:400;font-size:.78rem;color:#8b6914">(solo ' + escP(settR.join(', ')) + ')</span>'
+        ? ' <span style="font-weight:400;font-size:.82rem;color:#8b6914">(solo ' + escP(settR.join(', ')) + ')</span>'
         : '') +
       '</td><td style="text-align:left;white-space:normal;min-width:220px">' +
       escP(r.descrizione || '') +
@@ -2859,10 +2880,10 @@ function _renderPianoRegoleCard() {
       ',\'valore\',this.value)" style="width:64px;padding:3px;text-align:center;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td style="text-align:left;font-size:.8rem">' +
       (settR.length
         ? escP(settR.map((s) => repartoLabel(s)).join(', ')) +
-          ' <button class="btn-del-tipo" style="font-size:.75rem;padding:1px 6px" onclick="pianoRegolaSettoriEdit(' +
+          ' <button class="btn-del-tipo" style="font-size:.82rem;padding:1px 6px" onclick="pianoRegolaSettoriEdit(' +
           r.id +
           ')">cambia</button>'
-        : '<span style="color:var(--muted)">tutti i settori</span> <button class="btn-del-tipo" style="font-size:.75rem;padding:1px 6px" onclick="pianoRegolaEccezione(\'' +
+        : '<span style="color:var(--muted)">tutti i settori</span> <button class="btn-del-tipo" style="font-size:.82rem;padding:1px 6px" onclick="pianoRegolaEccezione(\'' +
           escP(r.nome) +
           '\')">eccezione per un settore</button>') +
       '</td><td>' +
@@ -2871,12 +2892,12 @@ function _renderPianoRegoleCard() {
       (r.attivo !== false ? ' checked' : '') +
       ' onchange="salvaPianoRegola(' +
       r.id +
-      ',\'attivo\',this.checked)"></td><td style="font-size:.78rem;color:' +
+      ',\'attivo\',this.checked)"></td><td style="font-size:.82rem;color:' +
       (_pianoRegoleDove(r.nome).indexOf('Fase 3') === -1 ? '#2c6e49;font-weight:700' : 'var(--muted)') +
       ';text-align:left">' +
       _pianoRegoleDove(r.nome) +
       (PIANO_REGOLE_FONTE[r.nome]
-        ? '<br><span style="font-weight:400;color:var(--muted);font-size:.78rem">' +
+        ? '<br><span style="font-weight:400;color:var(--muted);font-size:.82rem">' +
           escP(PIANO_REGOLE_FONTE[r.nome]) +
           '</span>'
         : '') +
@@ -3749,7 +3770,7 @@ function _renderPianoBenessereCard() {
     ' ' +
     escP(_pianoMeseSel.split('-')[0]) +
     '<button class="btn-act pin" onclick="pianoBenessereAnno(-1)">&larr;</button><button class="btn-act pin" onclick="pianoBenessereAnno(1)">&rarr;</button>' +
-    '<input type="text" id="benessere-cerca" placeholder="Cerca collaboratore..." oninput="pianoBenessereFiltra(this.value)" style="padding:4px 8px;font-size:.85rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a;width:180px;margin-left:auto">' +
+    '<input type="text" id="benessere-cerca" class="piano-cerca" placeholder="Cerca collaboratore..." oninput="pianoBenessereFiltra(this.value)">' +
     '</div><div style="padding:10px 14px" id="piano-benessere-body"><p style="color:var(--muted);font-size:.85rem">Caricamento...</p></div></div>'
   );
 }
@@ -4213,7 +4234,7 @@ function _renderPianoTurniCard() {
         '</td></tr>';
     });
     hRO +=
-      '</tbody></table></div><p style="font-size:.78rem;color:var(--muted);margin-top:6px">Sola lettura: i turni si modificano solo da admin o da chi ha il permesso.</p></div></div>';
+      '</tbody></table></div><p style="font-size:.82rem;color:var(--muted);margin-top:6px">Sola lettura: i turni si modificano solo da admin o da chi ha il permesso.</p></div></div>';
     return hRO;
   }
   const turni = _pianoTurniReparto();
@@ -4656,7 +4677,7 @@ async function pianoAssegnaCgfMese() {
   }
 }
 function _renderPianoFestiviCard() {
-  if (!isAdmin()) return '';
+  if (!puoGestireFestivi()) return _pianoSchedaRiservata('Festivi e CGF', 'Festivi e CGF');
   // selettore anno: si vedono (e generano) anche i festivi degli anni futuri
   const anniPresenti = [...new Set(pianoFestiviCache.map((f) => parseInt(f.data.split('-')[0])))];
   const annoCorrente = parseInt(_pianoMeseSel.split('-')[0]);
@@ -5505,7 +5526,7 @@ async function apriCercaCambioLibero() {
     '</select></div>' +
     '<div class="field" style="text-align:left;margin-top:8px"><label>Giorno di restituzione</label><select id="cc-rest" style="width:100%;padding:9px"></select></div>' +
     '<div class="field" style="text-align:left;margin-top:8px"><label>Motivazione</label><input type="text" id="cc-motivo" placeholder="Es: esigenze personali..."></div>' +
-    '<p style="font-size:.76rem;color:var(--muted);margin-top:8px">Puoi stampare la lista dei colleghi con cui puo\' cambiare e consegnarla al collaboratore: lui chiede a chi vuole, poi si torna qui e si conferma. Alla conferma: celle aggiornate col commento del cambio, formulario cambio turno gia\' compilato da stampare e firmare, conteggio nel limite cambi del richiedente.</p>' +
+    '<p style="font-size:.82rem;color:var(--muted);margin-top:8px">Puoi stampare la lista dei colleghi con cui puo\' cambiare e consegnarla al collaboratore: lui chiede a chi vuole, poi si torna qui e si conferma. Alla conferma: celle aggiornate col commento del cambio, formulario cambio turno gia\' compilato da stampare e firmare, conteggio nel limite cambi del richiedente.</p>' +
     '<div class="pwd-modal-btns" style="margin-top:12px;flex-wrap:wrap;gap:6px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button>' +
     '<button class="btn-export" style="padding:8px 14px" onclick="stampaListaCambioLibero()">Stampa lista colleghi</button>' +
     '<button class="btn-modal-ok" onclick="confermaCercaCambioLibero()">Applica cambio</button></div>';
@@ -5853,7 +5874,7 @@ async function apriScambioTurno() {
     escP(r.codice) +
     ') scambia con:</p>' +
     (maxCambi > 0
-      ? '<p style="font-size:.78rem;color:' +
+      ? '<p style="font-size:.82rem;color:' +
         (mieiCambi >= maxCambi ? '#c0392b' : 'var(--muted)') +
         ';margin-bottom:6px">Cambi richiesti da ' +
         escP(sel.nome.split(' ')[0]) +
@@ -6522,7 +6543,7 @@ async function cercaSostitutiMalattia() {
         escP(d.sostituto) +
         (d.era ? ' <span style="color:var(--muted);font-weight:400">(era ' + escP(d.era) + ')</span>' : '') +
         (d.catena
-          ? '<div style="font-weight:400;color:#b8860b;font-size:.78rem">' + escP(descCatena(d)) + '</div>'
+          ? '<div style="font-weight:400;color:#b8860b;font-size:.82rem">' + escP(descCatena(d)) + '</div>'
           : '') +
         '</td></tr>';
   });
@@ -7349,7 +7370,7 @@ function _renderPianoTimbratureCard() {
     '<input type="file" id="timb-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="importaTimbrature(this)">' +
     '<span style="font-size:.8rem;color:var(--muted)">CSV o Excel con colonne nome / data / entrata / uscita (riconosciute in automatico)</span></div>';
   h +=
-    '<p style="font-size:.78rem;color:var(--muted);margin-bottom:10px">Collegamento automatico alla timbratrice: nel pacchetto IT c\'è lo script <b>sync_timbratrice.py</b> che legge gli export della timbratrice e carica le timbrature qui da solo (in automatico ogni pochi minuti, lo configura l\'IT).</p>';
+    '<p style="font-size:.82rem;color:var(--muted);margin-bottom:10px">Collegamento automatico alla timbratrice: nel pacchetto IT c\'è lo script <b>sync_timbratrice.py</b> che legge gli export della timbratrice e carica le timbrature qui da solo (in automatico ogni pochi minuti, lo configura l\'IT).</p>';
   // inserimento manuale
   h +=
     '<div class="add-tipo-row"><div class="field"><label>Collaboratore</label><select id="timb-collab" style="padding:8px">' +
@@ -7603,7 +7624,7 @@ async function caricaConfrontoTimbrature() {
   });
   h += '</tbody></table></div>';
   h +=
-    '<p style="font-size:.78rem;color:var(--muted);margin-top:6px">Differenza = timbrate − pianificate del mese (' +
+    '<p style="font-size:.82rem;color:var(--muted);margin-top:6px">Differenza = timbrate − pianificate del mese (' +
     _pianoMeseSel +
     ', ' +
     escP(repartoLabel(_pianoReparto())) +
@@ -7730,7 +7751,7 @@ async function caricaConfrontoAnniPiano() {
       ['Recuperi festivi goduti (CGF)', prec.cgf, corr.cgf, 0, (v) => v],
     ];
     let h =
-      '<p style="font-size:.78rem;color:var(--muted);margin-bottom:8px">Confronto sui piani presenti in archivio: ' +
+      '<p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Confronto sui piani presenti in archivio: ' +
       annoB +
       ' (' +
       prec.mesi.size +
@@ -7805,7 +7826,7 @@ async function caricaStatisticheAnnoPiano() {
     const mm = String(m).padStart(2, '0');
     const ha = mesiDati[mm];
     h +=
-      '<button class="btn-export" style="font-size:.78rem;padding:4px 10px;' +
+      '<button class="btn-export" style="font-size:.82rem;padding:4px 10px;' +
       (ha ? 'border-color:#2c6e49;color:#2c6e49;font-weight:700' : 'color:var(--muted)') +
       '" onclick="_pianoMeseSel=\'' +
       anno +
@@ -7910,7 +7931,7 @@ async function caricaStatisticheAnnoPiano() {
     return Math.round((ggDovuti / 7) * _pianoOreSett * (parseFloat(info.percentuale) || 1) * 10) / 10;
   };
   h +=
-    '<div style="padding:4px 0"><input type="text" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-statanno-table\')" style="padding:4px 8px;font-size:.8rem;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--ink);width:180px"></div>';
+    '<div style="display:flex;padding:6px 0"><input type="text" class="piano-cerca" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-statanno-table\')"></div>';
   h +=
     '<div style="overflow-x:auto"><table id="piano-statanno-table" class="piano-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Ore anno</th><th title="Sui mesi con un piano">Ore dovute</th><th>Giorni lavorati</th><th>Diurni</th><th>Notturni</th><th>Weekend</th><th>Domeniche</th><th>Vacanze</th><th>Malattie</th><th title="Festivi lavorati che danno diritto al recupero (solo personale fisso)">CGF maturati</th><th title="Giorni CGF effettivamente goduti (quelli caduti in malattia non contano)">CGF goduti</th><th title="Maturati − goduti: quanti recuperi restano da dare">Saldo CGF</th><th title="Festivi parificati alle domeniche lavorati dagli ausiliari (jolly): danno diritto al supplemento del 50% sul salario orario lordo (RAP Allegato 1). Sono nove giorni fissi e valgono anche di domenica">Suppl. 50%</th><th title="Ore lavorate nella fascia notturna (23:00-06:00). Il supplemento del 10% e gia compreso nella durata dei turni: questa colonna serve da controllo, non e un credito da dare a parte">Ore notte</th><th title="Solo ausiliari (jolly): ore effettivamente lavorate nell anno e indennita calcolate su quel totale secondo il RAP Allegato 1 (vacanze 8.33% con 4 settimane o 10.65% con 5, tredicesima 8.33%). I jolly non hanno una percentuale contrattuale: tutto si calcola sulle ore fatte">Ore lavorate · indennita</th></tr></thead><tbody>';
   ordineCollabPiano(Object.keys(st), _pianoReparto()).forEach((n) => {
@@ -7958,7 +7979,7 @@ async function caricaStatisticheAnnoPiano() {
       (o.cgfPersi ? ' title="' + o.cgfPersi + ' recuperi caduti in malattia: restano a credito"' : '') +
       '>' +
       (o.cgfGod || '') +
-      (o.cgfPersi ? ' <span style="color:#c0392b;font-size:.78rem">+' + o.cgfPersi + ' in malattia</span>' : '') +
+      (o.cgfPersi ? ' <span style="color:#c0392b;font-size:.82rem">+' + o.cgfPersi + ' in malattia</span>' : '') +
       '</td><td style="font-weight:700;color:' +
       (o.cgfMat - o.cgfGod > 0 ? '#2c6e49' : o.cgfMat - o.cgfGod < 0 ? '#c0392b' : 'var(--muted)') +
       '">' +
@@ -7988,7 +8009,7 @@ async function caricaStatisticheAnnoPiano() {
   });
   h += '</tbody></table></div>';
   h +=
-    '<p style="font-size:.78rem;color:var(--muted);margin-top:6px">Weekend: giallo da 12, rosso oltre 20 (equità). Click su un mese per aprirlo.</p>';
+    '<p style="font-size:.82rem;color:var(--muted);margin-top:6px">Weekend: giallo da 12, rosso oltre 20 (equità). Click su un mese per aprirlo.</p>';
   el.innerHTML = h;
 }
 
@@ -8290,7 +8311,7 @@ async function _renderPianoSaldoTab() {
     '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Saldo ore · ' +
     escP(label) +
     '<button class="btn-act pin" onclick="pianoCambiaMese(-1)">&larr;</button><button class="btn-act pin" onclick="pianoCambiaMese(1)">&rarr;</button>' +
-    '<input type="text" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-saldo-table\')" style="padding:4px 8px;font-size:.8rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a;width:170px;margin-left:auto"></div>';
+    '<input type="text" class="piano-cerca" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-saldo-table\')"></div>';
   h +=
     '<div style="overflow-x:auto;padding:0 6px 8px"><table id="piano-saldo-table" class="piano-table" style="min-width:760px;font-size:.8rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Fun</th><th>%</th><th>Ore dovute</th><th title="Timbrate se presenti, altrimenti piano">Ore lavorate</th><th>Saldo mese</th><th>Saldo anno (YTD)</th></tr></thead><tbody>';
   let totD = 0;
@@ -8640,7 +8661,7 @@ function apriScambioSettimane() {
     '</select></div><div class="field" style="text-align:left;margin-top:8px"><label>Collaboratore B (accetta lo scambio)</label><select id="ss-b" style="width:100%;padding:8px">' +
     opzioni +
     '</select></div>' +
-    '<p style="font-size:.78rem;color:var(--muted);margin-top:8px">Le due settimane vengono scambiate; nei mesi già pianificati le V e i congedi vengono sistemati di conseguenza. Alla fine si genera il modulo PDF precompilato per le firme.</p>' +
+    '<p style="font-size:.82rem;color:var(--muted);margin-top:8px">Le due settimane vengono scambiate; nei mesi già pianificati le V e i congedi vengono sistemati di conseguenza. Alla fine si genera il modulo PDF precompilato per le firme.</p>' +
     '<div class="pwd-modal-btns" style="margin-top:14px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="confermaScambioSettimane()">Scambia</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
@@ -9771,7 +9792,7 @@ function _renderPianoImpostazioniCard() {
   const wk = _pianoGiorniWeekend();
   h +=
     '<p style="font-size:.85rem;font-weight:700;margin:12px 0 4px">Giorni weekend</p>' +
-    '<p style="font-size:.78rem;color:var(--muted);margin-bottom:6px">Colonne evidenziate in verde nel calendario e conteggio weekend nelle statistiche. La domenica ha sempre il suo colore.</p>' +
+    '<p style="font-size:.82rem;color:var(--muted);margin-bottom:6px">Colonne evidenziate in verde nel calendario e conteggio weekend nelle statistiche. La domenica ha sempre il suo colore.</p>' +
     '<div style="display:flex;gap:12px;flex-wrap:wrap">' +
     [1, 2, 3, 4, 5, 6, 0]
       .map(
@@ -9789,7 +9810,7 @@ function _renderPianoImpostazioniCard() {
   // competenze Formazione -> gruppi del piano
   h +=
     '<p style="font-size:.85rem;font-weight:700;margin:12px 0 4px">Competenze Formazione → gruppi del piano</p>' +
-    '<p style="font-size:.78rem;color:var(--muted);margin-bottom:6px">Chi ha la competenza CERTIFICATA in Formazione diventa idoneo anche al gruppo indicato (in aggiunta ai suoi Settori). "-" = nessun collegamento.</p>';
+    '<p style="font-size:.82rem;color:var(--muted);margin-bottom:6px">Chi ha la competenza CERTIFICATA in Formazione diventa idoneo anche al gruppo indicato (in aggiunta ai suoi Settori). "-" = nessun collegamento.</p>';
   // solo i gruppi dei turni DI QUESTO settore (i turni sono divisi per settore)
   const gruppiDisp = [
     ...new Set(
@@ -10141,7 +10162,7 @@ function _renderPianoImportExportCard() {
   h += btn('Template timbrature', "scaricaTemplatePiano('timbrature')", '#2c6e49');
   h += '</div>';
   h +=
-    '<p style="font-size:.78rem;color:var(--muted);margin-top:8px">Gli import si fanno nelle rispettive schermate: fabbisogno nel Calendario, vacanze nella tab Vacanze, timbrature nella tab Timbrature (o in automatico dalla timbratrice). L\'export copre anche il backup completo in Impostazioni del Diario.</p>';
+    '<p style="font-size:.82rem;color:var(--muted);margin-top:8px">Gli import si fanno nelle rispettive schermate: fabbisogno nel Calendario, vacanze nella tab Vacanze, timbrature nella tab Timbrature (o in automatico dalla timbratrice). L\'export copre anche il backup completo in Impostazioni del Diario.</p>';
   h += '</div></div>';
   return h;
 }
@@ -10203,7 +10224,7 @@ async function _renderPianoFormulariTab() {
     '<button class="btn-export" style="font-size:.82rem;padding:5px 14px;border-color:#1a4a7a;color:#1a4a7a" onclick="apriFormularioPerNome(\'' +
     nomeOriginale.replace(/'/g, "\\'") +
     '\')">Scarica Word (originale)</button>' +
-    '<button class="btn-export" style="font-size:.78rem;padding:4px 10px" onclick="pianoScaricaProtocollo(\'' +
+    '<button class="btn-export" style="font-size:.82rem;padding:4px 10px" onclick="pianoScaricaProtocollo(\'' +
     chiave +
     '\')">Excel per import</button></div>';
   h += rigaProtocollo(
@@ -10228,7 +10249,7 @@ async function _renderPianoFormulariTab() {
     ')';
   if (puoMod)
     h +=
-      '<button class="btn-export" style="font-size:.78rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49" onclick="document.getElementById(\'form-arch-file\').click()">Carica formulario</button>' +
+      '<button class="btn-export" style="font-size:.82rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49" onclick="document.getElementById(\'form-arch-file\').click()">Carica formulario</button>' +
       '<input type="file" id="form-arch-file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv" style="display:none" onchange="caricaFormulario(this)">';
   h += '</div><div style="padding:6px 16px 14px">';
   h +=
@@ -10254,18 +10275,18 @@ async function _renderPianoFormulariTab() {
           icona +
           ' ' +
           escP(f.nome) +
-          ' <span style="font-size:.78rem;color:var(--muted)">(' +
+          ' <span style="font-size:.82rem;color:var(--muted)">(' +
           Math.round((f.dimensione || 0) / 1024) +
           ' KB)</span></span>' +
-          '<button class="btn-export" style="font-size:.76rem;padding:3px 10px" onclick="apriFormulario(' +
+          '<button class="btn-export" style="font-size:.82rem;padding:3px 10px" onclick="apriFormulario(' +
           f.id +
           ')">' +
           (f.mime === 'application/pdf' ? 'Apri / Stampa' : 'Scarica') +
           '</button>' +
           (puoMod
-            ? '<button class="btn-export" style="font-size:.76rem;padding:3px 10px;border-color:#1a4a7a;color:#1a4a7a" onclick="rinominaFormulario(' +
+            ? '<button class="btn-export" style="font-size:.82rem;padding:3px 10px;border-color:#1a4a7a;color:#1a4a7a" onclick="rinominaFormulario(' +
               f.id +
-              ')">Rinomina/Sposta</button><button class="btn-export" style="font-size:.76rem;padding:3px 10px;border-color:var(--accent);color:var(--accent)" onclick="eliminaFormulario(' +
+              ')">Rinomina/Sposta</button><button class="btn-export" style="font-size:.82rem;padding:3px 10px;border-color:var(--accent);color:var(--accent)" onclick="eliminaFormulario(' +
               f.id +
               ')">Elimina</button>'
             : '') +
@@ -10490,7 +10511,7 @@ function _renderPianoGuidaTab() {
   return '<div class="main-card"><div style="padding:16px">Guida non disponibile.</div></div>';
 }
 function _renderPianoRegoleGruppoCard() {
-  if (!isAdmin()) return '';
+  if (!puoGestireRegole()) return '';
   const gruppi = [
     ...new Set(
       _pianoTurniReparto()
@@ -10537,7 +10558,7 @@ function _renderPianoRegoleGruppoCard() {
       .join('') +
     '</select></div><div class="field"><label>Valore</label><input type="text" id="rg-valore" placeholder="SUP:1" style="width:150px"></div>' +
     '<button class="btn-add-tipo" onclick="aggiungiRegolaGruppo()">+ Aggiungi regola</button></div>' +
-    '<p id="rg-aiuto" style="font-size:.78rem;color:var(--muted);margin-top:4px">' +
+    '<p id="rg-aiuto" style="font-size:.82rem;color:var(--muted);margin-top:4px">' +
     _REGOLE_GRUPPO_TIPI.richiede_funzione +
     '</p>';
   h += '</div></div>';
@@ -10607,7 +10628,7 @@ function _renderPianoPreferenzeCard() {
     escP(repartoLabel(_pianoReparto())) +
     '</div><div style="padding:10px 14px">';
   h +=
-    '<input type="text" id="pref-collab-cerca" placeholder="Cerca collaboratore..." oninput="_filtraPrefCollab(this.value)" style="width:100%;max-width:260px;padding:6px 10px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);font-size:.85rem;margin-bottom:8px">';
+    '<div style="display:flex;margin-bottom:8px"><input type="text" id="pref-collab-cerca" class="piano-cerca" placeholder="Cerca collaboratore..." oninput="_filtraPrefCollab(this.value)"></div>';
   h +=
     '<div style="overflow-x:auto"><table class="piano-table" id="pref-collab-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th><th>Solo diurni</th><th style="text-align:left">Turni bloccati (CSV)</th><th title="La bozza le privilegia sui turni L1">Preferisce L1</th><th title="Livello accoglienza (0-2): serve per il gruppo ACCOGLIENZA">Accoglienza</th><th style="text-align:left" title="Gruppi dove NON può lavorare da solo (CSV, es: REC)">Accompagnamento</th><th style="text-align:left" title="Altri reparti in cui lavora (CSV, es: valet): appare anche nei loro piani e le ore si sommano">Reparti extra</th><th style="text-align:left" title="Derivati dalle competenze certificate in Formazione (sola lettura)">Settori</th></tr></thead><tbody>';
   collabs.forEach((c) => {
@@ -10642,7 +10663,7 @@ function _renderPianoPreferenzeCard() {
       c.id +
       ',\'accompagnamento_settori\',this.value)" style="width:90px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td style="text-align:left">' +
       (typeof apriCoperturaCollab === 'function'
-        ? '<button class="btn-export" style="font-size:.78rem;padding:2px 8px" title="Copertura altri settori: si imposta qui e in Gestione collaboratori (stessa finestra)" onclick="apriCoperturaCollab(' +
+        ? '<button class="btn-export" style="font-size:.82rem;padding:2px 8px" title="Copertura altri settori: si imposta qui e in Gestione collaboratori (stessa finestra)" onclick="apriCoperturaCollab(' +
           c.id +
           ')">' +
           escP(
@@ -10655,13 +10676,13 @@ function _renderPianoPreferenzeCard() {
           ) +
           '</button>'
         : escP(c.reparti_extra || '-')) +
-      '</td><td style="text-align:left;font-size:.78rem;color:var(--muted)" title="Si gestiscono con le spunte in Formazione">' +
+      '</td><td style="text-align:left;font-size:.82rem;color:var(--muted)" title="Si gestiscono con le spunte in Formazione">' +
       escP((_pianoSettoriEffettivi(c) || []).join(', ') || '-') +
       '</td></tr>';
   });
   h += '</tbody></table></div>';
   h +=
-    '<p style="font-size:.78rem;color:var(--muted);margin-top:6px">"Solo diurni" e i turni bloccati vengono rispettati dalla bozza automatica. Funzione e percentuale si modificano in Impostazioni del Diario → Gestione collaboratori; i <b>Settori</b> derivano dalle competenze certificate in <b>Formazione</b> (spunta = idoneo, sola lettura qui).</p>';
+    '<p style="font-size:.82rem;color:var(--muted);margin-top:6px">"Solo diurni" e i turni bloccati vengono rispettati dalla bozza automatica. Funzione e percentuale si modificano in Impostazioni del Diario → Gestione collaboratori; i <b>Settori</b> derivano dalle competenze certificate in <b>Formazione</b> (spunta = idoneo, sola lettura qui).</p>';
   h += '</div></div>';
   return h;
 }
@@ -11991,12 +12012,12 @@ async function _renderPianoBriefingTab() {
             c +
             ';border:1px solid #999;border-radius:3px;margin:2px;cursor:pointer;vertical-align:middle"></span>',
         ).join('') +
-        '<button data-c="" class="btn-export" style="font-size:.78rem;padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="briefColoreApplica(null)">Nessuno</button>' +
+        '<button data-c="" class="btn-export" style="font-size:.82rem;padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="briefColoreApplica(null)">Nessuno</button>' +
         '<span style="display:inline-block;width:1px;height:20px;background:var(--line);margin:0 8px;vertical-align:middle"></span>' +
-        '<button class="btn-export" style="font-size:.75rem;font-weight:700;padding:2px 10px;vertical-align:middle" title="Grassetto sulle celle o righe marcate (vista e stampa)" onclick="briefFormatoApplica(\'b\')">G</button> ' +
-        '<button class="btn-export" style="font-size:.75rem;font-style:italic;padding:2px 10px;vertical-align:middle" title="Corsivo sulle celle o righe marcate (vista e stampa)" onclick="briefFormatoApplica(\'i\')">C</button>' +
+        '<button class="btn-export" style="font-size:.82rem;font-weight:700;padding:2px 10px;vertical-align:middle" title="Grassetto sulle celle o righe marcate (vista e stampa)" onclick="briefFormatoApplica(\'b\')">G</button> ' +
+        '<button class="btn-export" style="font-size:.82rem;font-style:italic;padding:2px 10px;vertical-align:middle" title="Corsivo sulle celle o righe marcate (vista e stampa)" onclick="briefFormatoApplica(\'i\')">C</button>' +
         '<div style="margin-top:7px;padding-top:6px;border-top:1px solid var(--line)">' +
-        '<span style="font-size:.78rem;color:var(--muted);vertical-align:middle;margin-right:4px">Testo:</span>' +
+        '<span style="font-size:.82rem;color:var(--muted);vertical-align:middle;margin-right:4px">Testo:</span>' +
         PIANO_COLORI_TESTO.map(
           (c) =>
             '<span title="Colore del testo" onclick="briefTestoApplica(\'' +
@@ -12005,22 +12026,22 @@ async function _renderPianoBriefingTab() {
             c +
             ';border:1px solid #999;border-radius:3px;margin:2px;cursor:pointer;vertical-align:middle"></span>',
         ).join('') +
-        '<button class="btn-export" style="font-size:.75rem;padding:2px 8px;margin-left:4px;vertical-align:middle" onclick="briefTestoApplica(null)">Auto</button>' +
+        '<button class="btn-export" style="font-size:.82rem;padding:2px 8px;margin-left:4px;vertical-align:middle" onclick="briefTestoApplica(null)">Auto</button>' +
         '</div>' +
         '<div style="margin-top:7px;padding-top:6px;border-top:1px solid var(--line)">' +
-        '<button class="btn-export" style="font-size:.78rem;padding:2px 10px;vertical-align:middle" title="Memorizza il formato della prima cella marcata" onclick="briefCopiaFormato()">Copia formato</button> ' +
-        '<button class="btn-export" style="font-size:.78rem;padding:2px 10px;vertical-align:middle" title="Applica il formato memorizzato alle celle marcate" onclick="briefIncollaFormato()">Incolla formato</button> ' +
-        '<button class="btn-export" style="font-size:.78rem;padding:2px 10px;vertical-align:middle;border-color:#c0392b;color:#c0392b" title="Toglie colori e formato dalle celle o righe marcate" onclick="briefCancellaFormato()">Cancella formato</button>' +
+        '<button class="btn-export" style="font-size:.82rem;padding:2px 10px;vertical-align:middle" title="Memorizza il formato della prima cella marcata" onclick="briefCopiaFormato()">Copia formato</button> ' +
+        '<button class="btn-export" style="font-size:.82rem;padding:2px 10px;vertical-align:middle" title="Applica il formato memorizzato alle celle marcate" onclick="briefIncollaFormato()">Incolla formato</button> ' +
+        '<button class="btn-export" style="font-size:.82rem;padding:2px 10px;vertical-align:middle;border-color:#c0392b;color:#c0392b" title="Toglie colori e formato dalle celle o righe marcate" onclick="briefCancellaFormato()">Cancella formato</button>' +
         '</div>' +
         '</div></span>'
       : '') +
     (puo && !valet && rep === 'slots' && salvato
-      ? '<button class="btn-export" style="font-size:.78rem;padding:4px 10px" title="Riassegna la colonna CD con la rotazione (chi ha chiuso ieri riapre oggi), lasciando intatto tutto il resto" onclick="briefAggiornaCd()">Aggiorna numeri cassa</button>'
+      ? '<button class="btn-export" style="font-size:.82rem;padding:4px 10px" title="Riassegna la colonna CD con la rotazione (chi ha chiuso ieri riapre oggi), lasciando intatto tutto il resto" onclick="briefAggiornaCd()">Aggiorna numeri cassa</button>'
       : '') +
     (cdDaAggiornare
-      ? '<span style="font-size:.78rem;background:#ffd166;color:#5a4300;padding:3px 10px;border-radius:3px;font-weight:700">I numeri cassa di ieri sono cambiati: premi "Aggiorna numeri cassa"</span>'
+      ? '<span style="font-size:.82rem;background:#ffd166;color:#5a4300;padding:3px 10px;border-radius:3px;font-weight:700">I numeri cassa di ieri sono cambiati: premi "Aggiorna numeri cassa"</span>'
       : '') +
-    '<span id="brief-stato" style="font-size:.78rem;color:var(--muted)">' +
+    '<span id="brief-stato" style="font-size:.82rem;color:var(--muted)">' +
     (salvato
       ? 'Salvato'
       : righe.length
@@ -12045,7 +12066,7 @@ async function _renderPianoBriefingTab() {
       bg +
       ';color:' +
       fg +
-      ';padding:4px 8px;font-size:.78rem">' +
+      ';padding:4px 8px;font-size:.82rem">' +
       c +
       '</th>';
   });
@@ -12116,7 +12137,7 @@ async function _renderPianoBriefingTab() {
         (stNome.t || r.colT ? ';color:' + (stNome.t || r.colT) : '') +
         '">' +
         (r.fm
-          ? '<span style="font-size:.75rem;font-weight:700;color:#000;padding-right:3px">(formazione)</span>'
+          ? '<span style="font-size:.82rem;font-weight:700;color:#000;padding-right:3px">(formazione)</span>'
           : '') +
         '</td>';
     } else h += inp('nome', r.nome, 150);
@@ -12175,7 +12196,7 @@ async function _renderPianoBriefingTab() {
       return a.codice < b.codice ? -1 : 1;
     });
   h +=
-    '<div><table style="border-collapse:collapse;font-size:.8rem"><thead><tr><th colspan="3" style="border:1px solid #999;background:#FFFF00;color:#000;padding:4px 10px;font-size:.78rem">ORARI</th></tr></thead><tbody>';
+    '<div><table style="border-collapse:collapse;font-size:.8rem"><thead><tr><th colspan="3" style="border:1px solid #999;background:#FFFF00;color:#000;padding:4px 10px;font-size:.82rem">ORARI</th></tr></thead><tbody>';
   let gT = null;
   turni.forEach((t) => {
     const g = _briefGruppo(t.codice);
@@ -12912,7 +12933,7 @@ function _renderPianoCorsiCard() {
         '\',null,this.value)" style="padding:2px 4px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td></tr>';
     });
     hRO +=
-      '</tbody></table><p style="font-size:.75rem;color:var(--muted);margin-top:6px">L&#39;orario del corso cambia di volta in volta: qui puoi aggiornarlo, viene proposto alla prossima pianificazione.</p></div></div>';
+      '</tbody></table><p style="font-size:.82rem;color:var(--muted);margin-top:6px">L&#39;orario del corso cambia di volta in volta: qui puoi aggiornarlo, viene proposto alla prossima pianificazione.</p></div></div>';
     return hRO;
   }
   const collabs = collaboratoriCache
@@ -12936,7 +12957,7 @@ function _renderPianoCorsiCard() {
   h +=
     '<div class="field"><label>Fine</label><input type="time" id="corso-fine" value="' + (preCS[1] || '') + '"></div>';
   h +=
-    '<button class="btn-export" style="font-size:.78rem;padding:4px 10px" title="La prossima volta questo corso partirà con questo orario" onclick="corsoSalvaOrarioDefault()">Salva orario predefinito</button>';
+    '<button class="btn-export" style="font-size:.82rem;padding:4px 10px" title="La prossima volta questo corso partirà con questo orario" onclick="corsoSalvaOrarioDefault()">Salva orario predefinito</button>';
   h += '</div>';
   h +=
     '<div style="margin-bottom:6px;font-size:.82rem"><b>Partecipanti</b> · <span style="cursor:pointer;color:#1a4a7a;text-decoration:underline" onclick="document.querySelectorAll(\'.corso-part\').forEach(c=>c.checked=true)">tutti</span> / <span style="cursor:pointer;color:#1a4a7a;text-decoration:underline" onclick="document.querySelectorAll(\'.corso-part\').forEach(c=>c.checked=false)">nessuno</span></div>';
@@ -12956,7 +12977,7 @@ function _renderPianoCorsiCard() {
   // gestione della LISTA corsi (admin): aggiungi sigla, rinomina, rimuovi
   if (isAdmin()) {
     h +=
-      '<p style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Gestisci corsi (admin)</p>';
+      '<p style="font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Gestisci corsi (admin)</p>';
     corsi.forEach((c) => {
       h +=
         '<div class="tipo-item"><div class="tipo-item-name" style="min-width:90px;font-weight:700">' +
@@ -12976,7 +12997,7 @@ function _renderPianoCorsiCard() {
     h +=
       '<div class="add-tipo-row" style="margin:6px 0 0"><div class="field"><label>Nuova sigla corso</label><input type="text" id="corso-nuovo-cod" placeholder="Es: PRIMO SOCCORSO" maxlength="14" style="width:150px"></div><div class="field"><label>Descrizione</label><input type="text" id="corso-nuovo-desc" placeholder="descrizione"></div><div class="field"><label>Ore</label><input type="number" id="corso-nuovo-ore" value="2" step="0.5" min="0" style="width:70px"></div><button class="btn-add-tipo" onclick="corsoAggiungi()">+ Aggiungi</button></div>';
     h +=
-      '<p style="font-size:.75rem;color:var(--muted);margin:4px 0 0">Rimuovere un corso lo toglie solo da questa lista: il codice resta tra i codici del piano e le celle gi&agrave; inserite non cambiano.</p>';
+      '<p style="font-size:.82rem;color:var(--muted);margin:4px 0 0">Rimuovere un corso lo toglie solo da questa lista: il codice resta tra i codici del piano e le celle gi&agrave; inserite non cambiano.</p>';
   }
   h += '</div></div>';
   return h;
@@ -13483,12 +13504,12 @@ function _pianoColoriBarHtml() {
         c +
         ';border:1px solid #999;border-radius:3px;margin:2px;cursor:pointer;vertical-align:middle"></span>',
     ).join('') +
-    '<button data-c="" class="btn-export" style="font-size:.78rem;padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="pianoApplicaColore(null)">Colore del turno</button>' +
+    '<button data-c="" class="btn-export" style="font-size:.82rem;padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="pianoApplicaColore(null)">Colore del turno</button>' +
     '<span style="display:inline-block;width:1px;height:20px;background:var(--line);margin:0 8px;vertical-align:middle"></span>' +
-    '<button class="btn-export" style="font-size:.75rem;font-weight:700;padding:2px 10px;vertical-align:middle" title="Grassetto sulle celle selezionate (vista e stampa)" onclick="pianoApplicaFormato(\'b\')">G</button> ' +
-    '<button class="btn-export" style="font-size:.75rem;font-style:italic;padding:2px 10px;vertical-align:middle" title="Corsivo sulle celle selezionate (vista e stampa)" onclick="pianoApplicaFormato(\'i\')">C</button>' +
+    '<button class="btn-export" style="font-size:.82rem;font-weight:700;padding:2px 10px;vertical-align:middle" title="Grassetto sulle celle selezionate (vista e stampa)" onclick="pianoApplicaFormato(\'b\')">G</button> ' +
+    '<button class="btn-export" style="font-size:.82rem;font-style:italic;padding:2px 10px;vertical-align:middle" title="Corsivo sulle celle selezionate (vista e stampa)" onclick="pianoApplicaFormato(\'i\')">C</button>' +
     '<div style="margin-top:7px;padding-top:6px;border-top:1px solid var(--line)">' +
-    '<span style="font-size:.78rem;color:var(--muted);vertical-align:middle;margin-right:4px">Testo:</span>' +
+    '<span style="font-size:.82rem;color:var(--muted);vertical-align:middle;margin-right:4px">Testo:</span>' +
     PIANO_COLORI_TESTO.map(
       (c) =>
         '<span title="Colore del testo" onclick="pianoApplicaColoreTesto(\'' +
@@ -13497,12 +13518,12 @@ function _pianoColoriBarHtml() {
         c +
         ';border:1px solid #999;border-radius:3px;margin:2px;cursor:pointer;vertical-align:middle"></span>',
     ).join('') +
-    '<button class="btn-export" style="font-size:.75rem;padding:2px 8px;margin-left:4px;vertical-align:middle" onclick="pianoApplicaColoreTesto(null)">Auto</button>' +
+    '<button class="btn-export" style="font-size:.82rem;padding:2px 8px;margin-left:4px;vertical-align:middle" onclick="pianoApplicaColoreTesto(null)">Auto</button>' +
     '</div>' +
     '<div style="margin-top:7px;padding-top:6px;border-top:1px solid var(--line)">' +
-    '<button class="btn-export" style="font-size:.78rem;padding:2px 10px;vertical-align:middle" title="Memorizza colore e formato della prima cella selezionata" onclick="pianoCopiaFormato()">Copia formato</button> ' +
-    '<button class="btn-export" style="font-size:.78rem;padding:2px 10px;vertical-align:middle" title="Applica il formato memorizzato alle celle selezionate" onclick="pianoIncollaFormato()">Incolla formato</button> ' +
-    '<button class="btn-export" style="font-size:.78rem;padding:2px 10px;vertical-align:middle;border-color:#c0392b;color:#c0392b" title="Toglie colori, grassetto e corsivo dalle celle selezionate (i turni non cambiano)" onclick="pianoCancellaFormato()">Cancella formato</button>' +
+    '<button class="btn-export" style="font-size:.82rem;padding:2px 10px;vertical-align:middle" title="Memorizza colore e formato della prima cella selezionata" onclick="pianoCopiaFormato()">Copia formato</button> ' +
+    '<button class="btn-export" style="font-size:.82rem;padding:2px 10px;vertical-align:middle" title="Applica il formato memorizzato alle celle selezionate" onclick="pianoIncollaFormato()">Incolla formato</button> ' +
+    '<button class="btn-export" style="font-size:.82rem;padding:2px 10px;vertical-align:middle;border-color:#c0392b;color:#c0392b" title="Toglie colori, grassetto e corsivo dalle celle selezionate (i turni non cambiano)" onclick="pianoCancellaFormato()">Cancella formato</button>' +
     '</div>' +
     '</div></span>'
   );
@@ -14139,7 +14160,7 @@ function _pianoSparseBar() {
     document.body.appendChild(bar);
   }
   const b = (label, onclick, rosso) =>
-    '<button class="btn-export" style="font-size:.78rem;padding:4px 12px' +
+    '<button class="btn-export" style="font-size:.82rem;padding:4px 12px' +
     (rosso ? ';border-color:#c0392b;color:#c0392b' : '') +
     '" onclick="' +
     onclick +
@@ -14434,11 +14455,11 @@ function _pianoApplicaNascosti() {
     wrap.closest('.piano-wrap').parentNode.insertBefore(bar, wrap.closest('.piano-wrap'));
   }
   bar.innerHTML =
-    '<span style="font-size:.78rem;color:var(--muted)">Nascosti: ' +
+    '<span style="font-size:.82rem;color:var(--muted)">Nascosti: ' +
     (o.nomi.length ? o.nomi.length + ' righe' : '') +
     (o.nomi.length && o.giorni.length ? ' + ' : '') +
     (o.giorni.length ? o.giorni.length + ' giorni (' + o.giorni.sort((a, b) => a - b).join(', ') + ')' : '') +
-    '</span> <button class="btn-export" style="font-size:.78rem;padding:2px 10px;margin-left:8px" onclick="pianoMostraNascosti()">Mostra tutto</button>';
+    '</span> <button class="btn-export" style="font-size:.82rem;padding:2px 10px;margin-left:8px" onclick="pianoMostraNascosti()">Mostra tutto</button>';
   bar.style.cssText = 'padding:4px 2px 6px';
 }
 function pianoCopiaBlocco() {

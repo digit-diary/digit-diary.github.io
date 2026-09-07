@@ -55,7 +55,10 @@ body.dark-theme select {
 }
 body {
   font-family: 'Source Sans 3', sans-serif;
-  font-size: 16px;
+  /* 17px invece di 16: su schermo PC il testo secondario (0.8rem) passa da
+     12.8 a 13.6px e resta leggibile senza avvicinarsi allo schermo. Tutte le
+     misure in rem crescono in proporzione, quindi le proporzioni restano. */
+  font-size: 17px;
   background: #d4c9b5;
   min-height: 100vh;
   display: flex;
@@ -4347,4 +4350,28 @@ tr[data-nome] > td:first-child:not(.piano-nome):hover {
   color: #b8860b;
   font-weight: 700;
   margin-left: 2px;
+}
+
+/* CAMPO DI RICERCA: uno stile solo per tutto il piano. Prima ogni scheda aveva
+   la sua misura e la sua posizione (a sinistra nel calendario, a destra nel
+   saldo, invisibile nelle statistiche): stessa cosa, stesso aspetto, sempre
+   in fondo a destra dell'intestazione. */
+.piano-cerca {
+  padding: 5px 10px;
+  font-size: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--paper);
+  color: var(--ink);
+  width: 190px;
+  max-width: 100%;
+  margin-left: auto;
+}
+.card-header .piano-cerca {
+  border-color: #d4b86a;
+  background: transparent;
+  color: #d4b86a;
+}
+.card-header .piano-cerca::placeholder {
+  color: #b39a55;
 }

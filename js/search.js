@@ -287,7 +287,7 @@ async function generaRiepilogoMensile() {
   });
   html += '</div>';
   html +=
-    '<div style="display:flex;gap:8px;margin-bottom:8px"><button style="flex:1;padding:6px;font-size:.78rem;cursor:pointer;border:1px solid var(--line);border-radius:2px;background:var(--paper2);font-family:Source Sans 3,sans-serif" onclick="document.querySelectorAll(\'[id^=rm-sez-]\').forEach(c=>c.checked=true)">Seleziona tutti</button><button style="flex:1;padding:6px;font-size:.78rem;cursor:pointer;border:1px solid var(--line);border-radius:2px;background:var(--paper2);font-family:Source Sans 3,sans-serif" onclick="document.querySelectorAll(\'[id^=rm-sez-]\').forEach(c=>c.checked=false)">Deseleziona tutti</button></div>';
+    '<div style="display:flex;gap:8px;margin-bottom:8px"><button style="flex:1;padding:6px;font-size:.82rem;cursor:pointer;border:1px solid var(--line);border-radius:2px;background:var(--paper2);font-family:Source Sans 3,sans-serif" onclick="document.querySelectorAll(\'[id^=rm-sez-]\').forEach(c=>c.checked=true)">Seleziona tutti</button><button style="flex:1;padding:6px;font-size:.82rem;cursor:pointer;border:1px solid var(--line);border-radius:2px;background:var(--paper2);font-family:Source Sans 3,sans-serif" onclick="document.querySelectorAll(\'[id^=rm-sez-]\').forEach(c=>c.checked=false)">Deseleziona tutti</button></div>';
   html +=
     '<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="_eseguiRiepilogoMensile()">Genera PDF</button></div>';
   mc.innerHTML = html;

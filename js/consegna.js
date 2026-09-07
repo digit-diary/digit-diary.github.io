@@ -166,13 +166,13 @@ function renderConsegne() {
           btns +=
             '<button class="btn-act edit" onclick="modificaConsegna(' +
             c.id +
-            ')" style="font-size:.78rem">Modifica</button>';
+            ')" style="font-size:.82rem">Modifica</button>';
           btns +=
             '<button class="btn-act del" onclick="annullaConsegna(' +
             c.id +
-            ')" style="font-size:.78rem">Annulla invio</button>';
+            ')" style="font-size:.82rem">Annulla invio</button>';
         } else if (letto) {
-          btns += '<span style="font-size:.78rem;color:var(--muted);font-style:italic">Non modificabile (letta)</span>';
+          btns += '<span style="font-size:.82rem;color:var(--muted);font-style:italic">Non modificabile (letta)</span>';
         }
       }
       if (!isMia && !letto) {
@@ -189,16 +189,16 @@ function renderConsegne() {
         c.turno_uscente +
         '</span><strong>' +
         escP(c.operatore) +
-        '</strong><span style="font-size:.78rem;color:#2980b9;font-weight:600">→ ' +
+        '</strong><span style="font-size:.82rem;color:#2980b9;font-weight:600">→ ' +
         escP(destLabel) +
-        '</span><span style="color:var(--muted);font-size:.78rem">' +
+        '</span><span style="color:var(--muted);font-size:.82rem">' +
         d.toLocaleDateString('it-IT') +
         ' ' +
         d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) +
         '</span>' +
-        (isAlta ? '<span style="color:var(--accent);font-size:.78rem;font-weight:700">PRIORITA ALTA</span>' : '') +
+        (isAlta ? '<span style="color:var(--accent);font-size:.82rem;font-weight:700">PRIORITA ALTA</span>' : '') +
         (letto
-          ? '<span style="color:#2c6e49;font-size:.78rem;font-weight:600">Letto da ' +
+          ? '<span style="color:#2c6e49;font-size:.82rem;font-weight:600">Letto da ' +
             escP(c.letto_da) +
             ' il ' +
             new Date(c.letto_at).toLocaleDateString('it-IT') +
@@ -428,13 +428,13 @@ function renderDashboard() {
       escP(p.titolo) +
       '</strong>' +
       (p.data_scadenza !== oggi
-        ? ' <span style="color:var(--muted);font-size:.78rem">scade ' +
+        ? ' <span style="color:var(--muted);font-size:.82rem">scade ' +
           new Date(p.data_scadenza + 'T12:00:00').toLocaleDateString('it-IT') +
           '</span>'
         : '') +
       '</span><button class="btn-act pin" onclick="completaPromemoria(' +
       p.id +
-      ');renderDashboard()" style="color:#2c6e49;border-color:#2c6e49;font-size:.78rem">Fatto</button></div>';
+      ');renderDashboard()" style="color:#2c6e49;border-color:#2c6e49;font-size:.82rem">Fatto</button></div>';
   });
   if (noteNL)
     todoH +=
@@ -473,7 +473,7 @@ function renderDashboard() {
     domH +=
       '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="switchPage(\'promemoria\')"><span style="color:#8e44ad;font-size:1.1rem">&#9679;</span><span style="flex:1"><strong>' +
       escP(p.titolo) +
-      '</strong> <span style="color:var(--muted);font-size:.78rem">scade ' +
+      '</strong> <span style="color:var(--muted);font-size:.82rem">scade ' +
       new Date(p.data_scadenza + 'T12:00:00').toLocaleDateString('it-IT') +
       '</span></span></div>';
   });
@@ -518,7 +518,7 @@ function renderDashboard() {
     let compH = '';
     if (bdaysCollab.length) {
       compH +=
-        '<div style="font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;font-weight:600">Collaboratori</div>';
+        '<div style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;font-weight:600">Collaboratori</div>';
       bdaysCollab
         .sort((a, b) => a.giorni - b.giorni)
         .forEach((bd) => {
@@ -539,7 +539,7 @@ function renderDashboard() {
     }
     if (bdaysMaison.length) {
       compH +=
-        '<div style="font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent2);margin:' +
+        '<div style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent2);margin:' +
         (bdaysCollab.length ? '10px' : '0') +
         ' 0 6px;font-weight:600">Clienti Maison</div>';
       bdaysMaison
@@ -649,22 +649,22 @@ function renderDashboard() {
   const _consRecenti = getConsegneReparto().slice(0, 3);
   if (_consRecenti.length) {
     alertH +=
-      '<div style="font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:10px;margin-bottom:6px;font-weight:600">Ultime consegne</div>';
+      '<div style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:10px;margin-bottom:6px;font-weight:600">Ultime consegne</div>';
     _consRecenti.forEach((c) => {
       const cd = new Date(c.created_at);
       const isAlta = c.priorita === 'alta';
       alertH +=
         '<div style="padding:6px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.85rem" onclick="switchPage(\'consegna\')"><span class="mini-badge" style="background:' +
         (c.turno_uscente === 'PRESTO' ? '#e67e22' : '#2c3e50') +
-        ';font-size:.78rem">' +
+        ';font-size:.82rem">' +
         c.turno_uscente +
         '</span><strong>' +
         escP(c.operatore) +
         '</strong><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)">' +
         escP(c.messaggio.substring(0, 50)) +
         '</span>' +
-        (isAlta ? '<span style="color:var(--accent);font-size:.78rem;font-weight:700">!</span>' : '') +
-        '<span style="color:var(--muted);font-size:.78rem">' +
+        (isAlta ? '<span style="color:var(--accent);font-size:.82rem;font-weight:700">!</span>' : '') +
+        '<span style="color:var(--muted);font-size:.82rem">' +
         cd.toLocaleDateString('it-IT') +
         '</span></div>';
     });
@@ -690,7 +690,7 @@ function renderDashboard() {
               '</span>'
             : '';
           return (
-            '<div style="padding:6px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:.88rem"><span style="color:var(--muted);font-size:.78rem;min-width:38px">' +
+            '<div style="padding:6px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:.88rem"><span style="color:var(--muted);font-size:.82rem;min-width:38px">' +
             d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) +
             '</span><span class="mini-badge" style="background:' +
             getColore(e.tipo) +
