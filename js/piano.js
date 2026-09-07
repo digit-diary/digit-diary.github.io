@@ -4226,6 +4226,14 @@ async function apriCercaCambioLibero() {
       if (!_pianoIdoneoPerTurno(c.nome, tMio)) return;
       const prob = problema(mia, sel.data, r.codice);
       if (prob) return;
+      // accompagnamento il giorno X: il richiedente esce (C), il collega entra
+      if (
+        _pianoAccompagnamentoAvviso([
+          { nome: sel.nome, data: sel.data, codice: 'C' },
+          { nome: c.nome, data: sel.data, codice: r.codice },
+        ]).length
+      )
+        return;
       // RESTITUZIONI: giorni dopo X (fino a fine mese successivo) dove il
       // collega lavora e il richiedente e' libero, con scambio inverso valido
       const mioPiano = Object.assign({}, mappe[sel.nome] || {});
@@ -4244,6 +4252,15 @@ async function apriCercaCambioLibero() {
         if (!eLibero(mioPiano[y])) continue;
         if (!_pianoIdoneoPerTurno(sel.nome, tSuo)) continue;
         if (problema(mioPiano, y, codSuo)) continue;
+        // accompagnamento il giorno di restituzione: il collega esce (C), il
+        // richiedente entra prendendo il turno del collega
+        if (
+          _pianoAccompagnamentoAvviso([
+            { nome: c.nome, data: y, codice: 'C' },
+            { nome: sel.nome, data: y, codice: codSuo },
+          ]).length
+        )
+          continue;
         rest.push({ data: y, codice: codSuo, stesso: codSuo === r.codice, meseDopo: y.substring(0, 7) !== ym });
       }
       rest.sort((a, b) => (b.stesso ? 1 : 0) - (a.stesso ? 1 : 0) || (a.data < b.data ? -1 : 1));
@@ -4715,6 +4732,12 @@ async function confermaScambioTurno() {
   if (typeof _pianoAvvisaViolazioniCella === 'function') {
     const av1 = _pianoTurnoInfo(c2) ? await _pianoAvvisaViolazioniCella(sel.nome, sel.data, c2) : [];
     const av2 = _pianoTurnoInfo(c1) ? await _pianoAvvisaViolazioniCella(collega, sel.data, c1) : [];
+    // accompagnamento: valutato UNA volta con ENTRAMBE le celle scambiate,
+    // instradato nel lato giusto per collaboratore
+    _pianoAccompagnamentoAvviso([
+      { nome: sel.nome, data: sel.data, codice: c2 },
+      { nome: collega, data: sel.data, codice: c1 },
+    ]).forEach((a) => (a.nome === collega ? av2 : av1).push(a.testo));
     if (av1.length || av2.length) {
       const dettagli = []
         .concat(av1.map((a) => sel.nome.split(' ')[0] + ': ' + a))
@@ -4745,6 +4768,10 @@ async function confermaScambioTurno() {
     const cbPre = rbPre ? rbPre.codice : '';
     const avA = _pianoTurnoInfo(cbPre) ? await _pianoAvvisaViolazioniCella(sel.nome, dataRest, cbPre) : [];
     const avB = _pianoTurnoInfo(caPre) ? await _pianoAvvisaViolazioniCella(collega, dataRest, caPre) : [];
+    _pianoAccompagnamentoAvviso([
+      { nome: sel.nome, data: dataRest, codice: cbPre },
+      { nome: collega, data: dataRest, codice: caPre },
+    ]).forEach((a) => (a.nome === collega ? avB : avA).push(a.testo));
     if (avA.length || avB.length) {
       const det = []
         .concat(avA.map((a) => sel.nome.split(' ')[0] + ': ' + a))
@@ -4988,6 +5015,38 @@ async function cercaSostitutiMalattia() {
     cella[k] = r.codice;
     rigaDi[k] = r;
   });
+  // CROSS-MESE: carico gli ultimi giorni del mese precedente e i primi del
+  // successivo con indice continuo (0, -1... e oltre l'ultimo del mese), cosi'
+  // riposo e consecutivi valgono anche a cavallo tra un mese e l'altro
+  const _primoDelMese = new Date(ym + '-01T12:00:00');
+  const _nGiorniMese = _pianoUltimoGiorno(ym);
+  const _isoB = (d) => d.toISOString().substring(0, 10);
+  const _bDa = new Date(_primoDelMese);
+  _bDa.setDate(_bDa.getDate() - 8);
+  const _bAl = new Date(_primoDelMese);
+  _bAl.setDate(_bAl.getDate() + _nGiorniMese + 7);
+  try {
+    const _righeBordo =
+      (await secGet(
+        'piano?data=gte.' + _isoB(_bDa) + '&data=lt.' + ym + '-01&reparto_dip=eq.' + _pianoReparto() + '&limit=4000',
+      )) || [];
+    const _righeBordo2 =
+      (await secGet(
+        'piano?data=gt.' +
+          ym +
+          '-' +
+          String(_nGiorniMese).padStart(2, '0') +
+          '&data=lte.' +
+          _isoB(_bAl) +
+          '&reparto_dip=eq.' +
+          _pianoReparto() +
+          '&limit=4000',
+      )) || [];
+    [..._righeBordo, ..._righeBordo2].forEach((r) => {
+      const idx = Math.round((new Date(r.data + 'T12:00:00') - _primoDelMese) / 86400000) + 1;
+      cella[r.collaboratore + '|' + idx] = r.codice;
+    });
+  } catch (e) {}
   const oreMese = {};
   _pianoRighe.forEach((r) => {
     const t = _pianoTurnoInfo(r.codice);
@@ -4997,7 +5056,8 @@ async function cercaSostitutiMalattia() {
   const minRiposo = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 11;
   const consecFinoA = (n, g) => {
     let c = 0;
-    for (let k = g - 1; k >= 1 && _pianoIsLavoro(cella[n + '|' + k] || ''); k--) c++;
+    // scende anche nel mese precedente (indici 0, -1, ...) per i consecutivi
+    for (let k = g - 1; k >= g - 40 && _pianoIsLavoro(cella[n + '|' + k] || ''); k--) c++;
     return c;
   };
   const riposoOkSost = (n, g, t) => {
@@ -5037,11 +5097,32 @@ async function cercaSostitutiMalattia() {
     }
     if (_pianoIsLavoro(cod0)) {
       let cons = 1;
-      for (let k = g0 - 1; k >= 1 && _pianoIsLavoro(cella[n + '|' + k] || ''); k--) cons++;
-      for (let k = g0 + 1; _pianoIsLavoro(cella[n + '|' + k] || ''); k++) cons++;
+      // conta a cavallo del mese in entrambe le direzioni
+      for (let k = g0 - 1; k >= g0 - 40 && _pianoIsLavoro(cella[n + '|' + k] || ''); k--) cons++;
+      for (let k = g0 + 1; k <= g0 + 40 && _pianoIsLavoro(cella[n + '|' + k] || ''); k++) cons++;
       if (cons > maxCons) return false;
     }
     return true;
+  };
+  // ACCOMPAGNAMENTO nella simulazione `cella`: nel giorno g0 nessun collega
+  // "accompagnato" deve restare da solo nel suo gruppo
+  const accompagnamentoOkSost = (g0) => {
+    const conta = {};
+    const accs = [];
+    for (const nm of nomi) {
+      const tt = _pianoTurnoInfo(cella[nm + '|' + g0] || '');
+      if (!tt) continue;
+      const gr = (tt.gruppo || '').toUpperCase();
+      if (!gr) continue;
+      conta[gr] = (conta[gr] || 0) + 1;
+      const info = _pianoCollabInfo(nm);
+      if (!info) continue;
+      let acc = !!(info.accompagnamento_settori && _pianoAccompagnamentoDi(info).includes(gr));
+      const cop = _pianoCoperturaCfg(info);
+      if (cop && cop.accompagnato) acc = true;
+      if (acc) accs.push(gr);
+    }
+    return accs.every((gr) => (conta[gr] || 0) > 1);
   };
   const giorni = [];
   for (let g = da; g <= al; g++) {
@@ -5077,6 +5158,15 @@ async function cercaSostitutiMalattia() {
       if (!_pianoIdoneoPerTurno(n, t)) continue;
       if (consecFinoA(n, g) >= maxCons) continue;
       if (!riposoOkSost(n, g, t)) continue;
+      // accompagnamento: simula malato→M e sostituto→turno, poi verifica
+      const _accM = cella[nome + '|' + g];
+      const _accN = cella[n + '|' + g];
+      cella[nome + '|' + g] = 'M';
+      cella[n + '|' + g] = cod;
+      const _accOk = accompagnamentoOkSost(g);
+      cella[nome + '|' + g] = _accM;
+      cella[n + '|' + g] = _accN;
+      if (!_accOk) continue;
       const punteggio = (oreMese[n] || 0) + consecFinoA(n, g) * 10;
       if (punteggio < migliorePunteggio) {
         migliorePunteggio = punteggio;
@@ -5121,13 +5211,22 @@ async function cercaSostitutiMalattia() {
           const s1 = cella[x + '|' + (g - 1)];
           const s2 = cella[z + '|' + (g - 1)];
           const sG = cella[x + '|' + g];
+          const sMal = cella[nome + '|' + g];
           cella[x + '|' + (g - 1)] = codS;
           cella[z + '|' + (g - 1)] = codP;
           cella[x + '|' + g] = cod; // x copre la malattia il giorno g
-          const ok = regolaOkSost(x, g - 1) && regolaOkSost(x, g) && regolaOkSost(z, g - 1) && regolaOkSost(z, g);
+          cella[nome + '|' + g] = 'M'; // il malato esce dal gruppo
+          const ok =
+            regolaOkSost(x, g - 1) &&
+            regolaOkSost(x, g) &&
+            regolaOkSost(z, g - 1) &&
+            regolaOkSost(z, g) &&
+            accompagnamentoOkSost(g) &&
+            accompagnamentoOkSost(g - 1);
           cella[x + '|' + (g - 1)] = s1;
           cella[z + '|' + (g - 1)] = s2;
           cella[x + '|' + g] = sG;
+          cella[nome + '|' + g] = sMal;
           if (ok) {
             catena = { tipo: 'scambio', g1: g - 1, turnoX: codP, con: z, turnoCon: codS };
             break;
@@ -5149,13 +5248,21 @@ async function cercaSostitutiMalattia() {
             const sy = cella[y + '|' + (g - 1)];
             const sx1 = cella[x + '|' + (g - 1)];
             const sxG = cella[x + '|' + g];
+            const sMal2 = cella[nome + '|' + g];
             cella[y + '|' + (g - 1)] = codP; // il terzo prende il turno
             cella[x + '|' + (g - 1)] = 'C'; // x liberato il giorno prima
             cella[x + '|' + g] = cod; // x copre la malattia
-            const ok = regolaOkSost(y, g - 1) && regolaOkSost(x, g - 1) && regolaOkSost(x, g);
+            cella[nome + '|' + g] = 'M'; // il malato esce dal gruppo
+            const ok =
+              regolaOkSost(y, g - 1) &&
+              regolaOkSost(x, g - 1) &&
+              regolaOkSost(x, g) &&
+              accompagnamentoOkSost(g) &&
+              accompagnamentoOkSost(g - 1);
             cella[y + '|' + (g - 1)] = sy;
             cella[x + '|' + (g - 1)] = sx1;
             cella[x + '|' + g] = sxG;
+            cella[nome + '|' + g] = sMal2;
             if (ok) {
               catena = { tipo: 'riassegna', g1: g - 1, turnoX: codP, con: y, eraCon: cella[y + '|' + (g - 1)] || '' };
               break;
@@ -9655,6 +9762,9 @@ async function confermaCambioEsigenze() {
   let notaRegole = '';
   if (typeof _pianoAvvisaViolazioniCella === 'function') {
     const avvisi = await _pianoAvvisaViolazioniCella(sel.nome, sel.data, nuovo);
+    _pianoAccompagnamentoAvviso([{ nome: sel.nome, data: sel.data, codice: nuovo }]).forEach((a) =>
+      avvisi.push(a.testo),
+    );
     if (avvisi.length) {
       if (
         !confirm(
@@ -9712,6 +9822,56 @@ async function confermaCambioEsigenze() {
 // CONTROLLO IMMEDIATO delle regole quando si scrive un turno A MANO:
 // riposo minimo con il giorno prima e dopo, massimo di giorni consecutivi.
 // Legge i giorni vicini dal database, quindi vale anche a cavallo di mese
+// ACCOMPAGNAMENTO: chi e' segnato "accompagnato" in un gruppo (o copre da un
+// altro settore con la spunta accompagnato) non deve restare DA SOLO in quel
+// gruppo in un dato giorno. Simula uno o piu' cambi di cella insieme (override)
+// e ritorna gli avvisi per il giorno. Usa il piano in memoria (_pianoRighe).
+function _pianoAccompagnamentoAvviso(overrides) {
+  try {
+    if (typeof _pianoRighe === 'undefined' || !overrides || !overrides.length) return [];
+    // solo i giorni toccati dai cambi
+    const giorni = [...new Set(overrides.map((o) => o.data))];
+    const avvisi = [];
+    for (const dstr of giorni) {
+      const g = parseInt(dstr.split('-')[2]);
+      // stato del giorno dal piano, poi applico gli override
+      const perNome = {};
+      _pianoRighe.forEach((r) => {
+        if (r.data === dstr) perNome[r.collaboratore] = r.codice;
+      });
+      overrides.forEach((o) => {
+        if (o.data === dstr) perNome[o.nome] = o.codice || '';
+      });
+      // conteggio per gruppo e lista degli accompagnati che lavorano
+      const conta = {};
+      const accompagnati = [];
+      Object.keys(perNome).forEach((nm) => {
+        const t = _pianoTurnoInfo(perNome[nm]);
+        if (!t) return;
+        const gr = (t.gruppo || '').toUpperCase();
+        if (!gr) return;
+        conta[gr] = (conta[gr] || 0) + 1;
+        const info = _pianoCollabInfo(nm);
+        if (!info) return;
+        let acc = false;
+        if (info.accompagnamento_settori && _pianoAccompagnamentoDi(info).includes(gr)) acc = true;
+        const cop = _pianoCoperturaCfg(info);
+        if (cop && cop.accompagnato) acc = true;
+        if (acc) accompagnati.push({ nome: nm, gruppo: gr });
+      });
+      accompagnati.forEach((a) => {
+        if ((conta[a.gruppo] || 0) <= 1)
+          avvisi.push({
+            nome: a.nome,
+            testo: 'resta da solo nel gruppo ' + a.gruppo + ' il ' + g + ' ma richiede accompagnamento',
+          });
+      });
+    }
+    return avvisi;
+  } catch (e) {
+    return [];
+  }
+}
 async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
   try {
     const maxCons = parseInt(_pianoRegolaVal('max_consecutivi')) || 0;
@@ -9828,6 +9988,7 @@ async function pianoSalvaCella(nome, dstr, codice) {
   let commentoRegole = '';
   if (codice && _pianoTurnoInfo(codice)) {
     const avvisi = await _pianoAvvisaViolazioniCella(nome, dstr, codice);
+    _pianoAccompagnamentoAvviso([{ nome: nome, data: dstr, codice: codice }]).forEach((a) => avvisi.push(a.testo));
     if (avvisi.length) {
       if (
         !confirm(
