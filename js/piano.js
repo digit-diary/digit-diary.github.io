@@ -3967,11 +3967,54 @@ function _benesserePeriodoLbl(calcolati, anno) {
     '). I mesi incompleti o non ancora pianificati restano fuori dal conteggio, cosi i confronti sono corretti.'
   );
 }
+// Ordina le tabelle del benessere SENZA ricaricare i dati: si riordinano le
+// righe gia' presenti, cosi' la pagina non sfarfalla.
 function pianoBenessereOrdina(campo) {
   const so = window._benessereSort;
-  window._benessereSort =
-    so && so.campo === campo ? { campo: campo, dir: -so.dir } : { campo: campo, dir: campo === 'nome' ? 1 : -1 };
-  caricaBenesserePiano();
+  const dir = so && so.campo === campo ? -so.dir : campo === 'nome' ? 1 : -1;
+  window._benessereSort = { campo: campo, dir: dir };
+  // indice di colonna corrispondente al campo
+  const col = {
+    nome: 0,
+    indice: 1,
+    domLib: 2,
+    domLav: 3,
+    we: 4,
+    notti: 5,
+    riposiIsolati: 6,
+    serieMax: 7,
+    vac: 8,
+    mal: 9,
+    oreLav: 10,
+  }[campo];
+  if (col == null) return;
+  document.querySelectorAll('#piano-benessere-body table').forEach((tab) => {
+    const tbody = tab.querySelector('tbody');
+    if (!tbody) return;
+    const righe = [...tbody.querySelectorAll('tr[data-nome]')];
+    const val = (tr) => {
+      const testo = (tr.cells[col] || {}).textContent || '';
+      if (campo === 'nome') return tr.dataset.nome.toLowerCase();
+      const n = parseFloat(
+        String(testo)
+          .replace(',', '.')
+          .replace(/[^0-9.\-]/g, ''),
+      );
+      return isNaN(n) ? 0 : n;
+    };
+    righe
+      .sort((a, b) => {
+        const va = val(a);
+        const vb = val(b);
+        return typeof va === 'string' ? dir * va.localeCompare(vb) : dir * (va - vb);
+      })
+      .forEach((tr) => tbody.appendChild(tr));
+    // freccia sull'intestazione ordinata
+    [...tab.querySelectorAll('thead th')].forEach((th, i) => {
+      th.innerHTML = th.innerHTML.replace(/\s*[▲▼]\s*$/, '');
+      if (i === col) th.innerHTML += dir > 0 ? ' ▲' : ' ▼';
+    });
+  });
 }
 function pianoBenessereFiltra(q) {
   const testo = (q || '').trim().toLowerCase();
