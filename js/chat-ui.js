@@ -2115,7 +2115,7 @@ function apriSchedaCollaboratore(nome) {
     '</h3>';
   html += '<div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap">';
   html += '<span style="font-size:.82rem;color:var(--muted)">Data di nascita:</span>';
-  const dnDisplay = dataNascita ? new Date(dataNascita + 'T12:00:00').toLocaleDateString('it-IT') : '';
+  const dnDisplay = dataNascita ? dataNascitaLabel(dataNascita) : '';
   html +=
     '<input type="text" id="scheda-nascita" value="' +
     escP(dnDisplay) +
@@ -2741,8 +2741,12 @@ function _renderStoricoHrSezione(nome) {
       '\')" style="font-size:.75rem;padding:5px 14px;background:var(--accent2)">Salva</button>';
     if (dataAss)
       html +=
-        '<span class="mini-badge" style="background:#1a7a6d;font-size:.78rem">Anzianità: ' +
-        anzianitaLabel(dataAss) +
+        '<span class="mini-badge" style="background:#1a7a6d;font-size:.78rem" title="' +
+        (collabRec && parseInt(collabRec.mesi_congedo_non_pagato) > 0
+          ? 'Tolti ' + parseInt(collabRec.mesi_congedo_non_pagato) + ' mesi di congedo non pagato'
+          : '') +
+        '">Anzianità: ' +
+        anzianitaLabel(dataAss, collabRec && collabRec.mesi_congedo_non_pagato) +
         '</span>';
     html += '</div>';
     // Premio giubileo (ogni N anni di servizio, importi configurabili da admin)
@@ -3230,8 +3234,7 @@ function stampaSchedaPDF(nome) {
   if (cRec && cRec.impiego) anag.push(cRec.impiego === 'fisso' ? 'Fisso' : 'Jolly');
   if (cRec && cRec.categoria && typeof puoVedereCategorie === 'function' && puoVedereCategorie())
     anag.push('Categoria ' + cRec.categoria + 'ª');
-  if (cRec && cRec.data_nascita)
-    anag.push('Nato/a il ' + new Date(cRec.data_nascita + 'T12:00:00').toLocaleDateString('it-IT'));
+  if (cRec && cRec.data_nascita) anag.push('Nato/a il ' + dataNascitaLabel(cRec.data_nascita));
   anag.push('Reparto ' + currentReparto.charAt(0).toUpperCase() + currentReparto.slice(1));
   anag.push('Generata il ' + new Date().toLocaleDateString('it-IT'));
   if (dal || al) anag.push('Periodo: ' + (dal || 'inizio') + ' · ' + (al || 'oggi'));

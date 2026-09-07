@@ -1238,6 +1238,7 @@ function _renderEquitaCard(collabs) {
       impiego: c.impiego || '',
       categoria: c.categoria || null,
       dataAss: c.data_assunzione || '',
+      mesiFermo: parseInt(c.mesi_congedo_non_pagato) || 0,
       anzGiorni,
       lv: livelloDiCollaboratore(c),
       punti: puntiTotali(c.nome),
@@ -1306,7 +1307,7 @@ function _renderEquitaCard(collabs) {
       '</td><td class="num"><strong>' +
       (r.categoria ? r.categoria + 'ª' : '-') +
       '</strong></td><td>' +
-      (r.dataAss ? anzianitaLabel(r.dataAss) : '-') +
+      (r.dataAss ? anzianitaLabel(r.dataAss, r.mesiFermo) : '-') +
       '</td><td class="num">' +
       (r.lv ? 'L' + r.lv : '-') +
       '</td><td class="num">' +

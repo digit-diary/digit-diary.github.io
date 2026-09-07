@@ -2461,12 +2461,16 @@ async function generaBozzaPiano(usaCoperture) {
       const dstrG = ym + '-' + String(g).padStart(2, '0');
       if (malattie[n + '|' + dstrG]) continue;
       cella[n + '|' + g] = 'C';
+      // COMPLEANNO: il congedo di quel giorno porta la nota, cosi' si vede
+      // subito nel piano e nel briefing (la data di nascita e' in scheda)
+      const _dnMD = infoN.data_nascita ? String(infoN.data_nascita).substring(5, 10) : '';
       nuove.push({
         collaboratore: n,
         data: dstrG,
         codice: 'C',
         protetto: false,
         generato: true,
+        commento: _dnMD && _dnMD === dstrG.substring(5, 10) ? 'Compleanno' : null,
         reparto_dip: _pianoReparto(),
       });
       nCongedi++;
@@ -3583,6 +3587,7 @@ function _renderPianoBenessereCard() {
     ' ' +
     escP(_pianoMeseSel.split('-')[0]) +
     '<button class="btn-act pin" onclick="pianoBenessereAnno(-1)">&larr;</button><button class="btn-act pin" onclick="pianoBenessereAnno(1)">&rarr;</button>' +
+    '<input type="text" id="benessere-cerca" placeholder="Cerca collaboratore..." oninput="pianoBenessereFiltra(this.value)" style="padding:4px 8px;font-size:.85rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a;width:180px;margin-left:auto">' +
     '</div><div style="padding:10px 14px" id="piano-benessere-body"><p style="color:var(--muted);font-size:.85rem">Caricamento...</p></div></div>'
   );
 }
@@ -3632,14 +3637,31 @@ async function caricaBenesserePiano() {
           ] = true;
       }
     }
-    const oggiIso = new Date().toISOString().substring(0, 10);
+    // PERIODO CONSIDERATO: solo i MESI CON PIANO COMPLETO (tutti i giorni del
+    // mese hanno una cella), anche se sono nel futuro. Un mese a meta' o non
+    // ancora pianificato falserebbe medie e conteggi, quindi resta fuori.
+    const giorniDelMese = {};
+    for (let m = 1; m <= 12; m++) {
+      const ym = anno + '-' + String(m).padStart(2, '0');
+      giorniDelMese[ym] = new Date(anno, m, 0).getDate();
+    }
     nomi.forEach((n) => {
       const p = per[n];
       const date = Object.keys(p.giorni).sort();
+      // mesi completi di questa persona
+      const perMese = {};
+      date.forEach((d) => {
+        const ym = d.substring(0, 7);
+        perMese[ym] = (perMese[ym] || 0) + 1;
+      });
+      const mesiOk = new Set(Object.keys(perMese).filter((ym) => perMese[ym] >= giorniDelMese[ym]));
+      p.mesiPiano = mesiOk.size;
+      p.mesiElenco = [...mesiOk].sort();
       let serie = 0;
       p.serieMax = 0;
       p.riposiIsolati = 0;
       date.forEach((d, i) => {
+        if (!mesiOk.has(d.substring(0, 7))) return; // mese non completo: fuori
         const cod = p.giorni[d];
         const t = _pianoTurnoInfo(cod);
         if (t) {
@@ -3648,24 +3670,41 @@ async function caricaBenesserePiano() {
           if (t.tipo === 'NOTTURNO') p.notti++;
           const dow = new Date(d + 'T12:00:00').getDay();
           if (dow === 0 || dow === 6) p.we++;
+          if (dow === 0) p.domLav = (p.domLav || 0) + 1;
           serie++;
           if (serie > p.serieMax) p.serieMax = serie;
         } else {
           serie = 0;
           if (cod === 'V') p.vac++;
           if (cod === 'M' || cod === 'M1') p.mal++;
-          // riposo isolato: lavoro il giorno prima E il giorno dopo
           const prima = _pianoTurnoInfo(p.giorni[date[i - 1]]);
           const dopo = _pianoTurnoInfo(p.giorni[date[i + 1]]);
           const cs = _pianoCodiceInfo(cod);
           if (cs && cs.is_riposo && prima && dopo) p.riposiIsolati++;
         }
       });
-      // domeniche libere: solo quelle gia' passate, per non contare il futuro
+      // DOMENICHE LIBERE nei soli mesi completi. Vale la regola LL art. 18: la
+      // domenica libera conta solo se il sabato prima si finisce entro le 23.
+      p.domTot = 0;
+      p.domTardi = 0;
       Object.keys(domeniche).forEach((d) => {
-        if (d > oggiIso) return;
+        if (!mesiOk.has(d.substring(0, 7))) return;
+        p.domTot++;
         const cod = p.giorni[d];
-        if (!_pianoTurnoInfo(cod)) p.domLib++;
+        if (_pianoTurnoInfo(cod)) return; // domenica lavorata
+        const sab = new Date(d + 'T12:00:00');
+        sab.setDate(sab.getDate() - 1);
+        const isoSab =
+          sab.getFullYear() +
+          '-' +
+          String(sab.getMonth() + 1).padStart(2, '0') +
+          '-' +
+          String(sab.getDate()).padStart(2, '0');
+        if (!_pianoSabatoEntro23(p.giorni[isoSab])) {
+          p.domTardi++;
+          return;
+        }
+        p.domLib++;
       });
     });
     const conPiano = nomi.filter((n) => per[n].lav > 0);
@@ -3694,7 +3733,16 @@ async function caricaBenesserePiano() {
         );
         return { nome: n, jolly: !!(info.is_jolly || info.impiego === 'jolly'), p: p, res: res };
       })
-      .sort((a, b) => a.res.punteggio - b.res.punteggio);
+      .sort((a, b) => {
+        const so = window._benessereSort;
+        if (!so) return a.res.punteggio - b.res.punteggio; // default: prima i piu critici
+        const val = (x) =>
+          so.campo === 'nome' ? x.nome : so.campo === 'indice' ? x.res.punteggio : x.p[so.campo] || 0;
+        const va = val(a);
+        const vb = val(b);
+        if (typeof va === 'string') return so.dir * va.localeCompare(vb);
+        return so.dir * (va - vb);
+      });
     if (!calcolati.length) {
       el.innerHTML = '<p style="font-size:.85rem">Nessun piano nel ' + anno + ' per questo settore.</p>';
       return;
@@ -3715,17 +3763,45 @@ async function caricaBenesserePiano() {
         '">' +
         media +
         '/100</b></span></p>';
+      const thOrd = (campo, testo, tip) =>
+        '<th style="cursor:pointer" title="' +
+        (tip || '') +
+        ' · clicca per ordinare" onclick="pianoBenessereOrdina(\'' +
+        campo +
+        '\')">' +
+        testo +
+        (window._benessereSort && window._benessereSort.campo === campo
+          ? window._benessereSort.dir > 0
+            ? ' &#9650;'
+            : ' &#9660;'
+          : '') +
+        '</th>';
       t +=
-        '<div style="overflow-x:auto"><table class="piano-table" style="min-width:820px;font-size:.85rem"><thead><tr>' +
-        '<th style="text-align:left">Collaboratore</th><th title="Punteggio complessivo, 100 = carico ben distribuito">Indice</th>' +
-        '<th title="Domeniche libere gia trascorse quest anno">Dom. libere</th><th title="Sabati e domeniche lavorati">Weekend</th>' +
-        '<th title="Turni notturni sul totale dei giorni lavorati">Notti</th><th title="Riposi di un solo giorno tra due periodi di lavoro">Riposi isolati</th>' +
-        '<th title="Serie piu lunga di giorni consecutivi">Serie max</th><th>Vacanze</th>' +
-        '<th title="Giorni di malattia: segnale da leggere, non tolgono punti">Malattie</th><th>Ore lavorate</th></tr></thead><tbody>';
+        '<div style="overflow-x:auto"><table class="piano-table benessere-tab" style="min-width:860px;font-size:.95rem"><thead><tr>' +
+        '<th style="text-align:left;cursor:pointer" onclick="pianoBenessereOrdina(\'nome\')">Collaboratore' +
+        (window._benessereSort && window._benessereSort.campo === 'nome'
+          ? window._benessereSort.dir > 0
+            ? ' &#9650;'
+            : ' &#9660;'
+          : '') +
+        '</th>' +
+        thOrd('indice', 'Indice', 'Punteggio complessivo, 100 = carico ben distribuito') +
+        thOrd('domLib', 'Dom. libere', 'Domeniche libere gia trascorse quest anno') +
+        thOrd('domLav', 'Dom. lavorate', 'Domeniche in cui ha lavorato') +
+        thOrd('we', 'Weekend', 'Sabati e domeniche lavorati (giornate, non fine settimana interi)') +
+        thOrd('notti', 'Notti', 'Turni notturni') +
+        thOrd('riposiIsolati', 'Riposi isolati', 'Riposi di un solo giorno tra due periodi di lavoro') +
+        thOrd('serieMax', 'Serie max', 'Serie piu lunga di giorni consecutivi') +
+        thOrd('vac', 'Vacanze', 'Giorni di vacanza goduti') +
+        thOrd('mal', 'Malattie', 'Giorni di malattia: segnale da leggere, non tolgono punti') +
+        thOrd('oreLav', 'Ore lavorate', 'Ore effettivamente lavorate nell anno') +
+        '</tr></thead><tbody>';
       lista.forEach((x) => {
         t +=
           '<tr title="' +
           escP(x.res.voci.map((v) => v.nome + ': ' + v.punti + '/' + v.max + ' (' + v.valore + ')').join(' · ')) +
+          '" data-nome="' +
+          escP(x.nome) +
           '"><td style="text-align:left;font-weight:600">' +
           escP(x.nome) +
           '</td><td style="font-weight:700;color:' +
@@ -3734,8 +3810,20 @@ async function caricaBenesserePiano() {
           x.res.punteggio +
           ' <span style="font-weight:400;font-size:.78rem">' +
           etichetta(x.res.punteggio) +
-          '</span></td><td>' +
+          '</span></td><td title="' +
           x.p.domLib +
+          ' libere su ' +
+          (x.p.domTot || 0) +
+          ' domeniche nei mesi con piano completo (' +
+          (x.p.mesiPiano || 0) +
+          ' mesi)' +
+          (x.p.domTardi ? ' · ' + x.p.domTardi + ' non valide: il sabato si finisce dopo le 23' : '') +
+          '">' +
+          x.p.domLib +
+          '<span style="font-weight:400;color:var(--muted);font-size:.85rem">/' +
+          (x.p.domTot || 0) +
+          '</span></td><td>' +
+          (x.p.domLav || 0) +
           '</td><td>' +
           x.p.we +
           '</td><td>' +
@@ -3762,10 +3850,15 @@ async function caricaBenesserePiano() {
       return t;
     };
     let h =
-      '<p style="font-size:.82rem;color:var(--muted);margin-bottom:6px">Come e distribuito il carico di lavoro nel ' +
-      anno +
+      '<p style="font-size:.88rem;color:var(--muted);margin-bottom:6px">' +
+      _benesserePeriodoLbl(calcolati, anno) +
+      ' ' +
       ', su dati del piano. L indice va da 0 a 100 e pesa: domeniche libere (25), equita nei weekend (20), carico notturno (15), qualita del riposo (15), giorni consecutivi (15), vacanze godute (10). ' +
       'Le <b>malattie non tolgono punti</b>: sono un segnale da leggere insieme al resto, non una colpa. Passa il mouse su una riga per il dettaglio dei punti.</p>';
+    h +=
+      '<div style="margin:10px 0 4px"><canvas id="benessere-chart" height="' +
+      Math.max(140, Math.min(420, calcolati.length * 22)) +
+      '"></canvas></div>';
     h += tabella(
       calcolati.filter((x) => !x.jolly),
       'Personale fisso',
@@ -3781,11 +3874,92 @@ async function caricaBenesserePiano() {
         escP(critici.map((x) => x.nome.split(' ')[0] + ' (' + x.res.punteggio + ')').join(', ')) +
         '</p>';
     el.innerHTML = h;
+    if (typeof Chart !== 'undefined' && document.getElementById('benessere-chart')) {
+      const ord = calcolati.slice().sort((a, b) => a.res.punteggio - b.res.punteggio);
+      renderChart(
+        'benessere-chart',
+        'bar',
+        {
+          labels: ord.map((x) => x.nome.split(' ')[0] + (x.jolly ? ' (jolly)' : '')),
+          datasets: [
+            {
+              label: 'Indice di benessere',
+              data: ord.map((x) => x.res.punteggio),
+              backgroundColor: ord.map((x) => colore(x.res.punteggio)),
+              borderRadius: 3,
+            },
+          ],
+        },
+        {
+          indexAxis: 'y',
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                afterLabel: (ctx) => {
+                  const x = ord[ctx.dataIndex];
+                  return x ? x.res.voci.map((v) => v.nome + ': ' + v.punti + '/' + v.max) : '';
+                },
+              },
+            },
+          },
+          scales: {
+            x: { min: 0, max: 100, ticks: { font: { size: 12 } }, title: { display: true, text: 'indice 0-100' } },
+            y: { ticks: { font: { size: 12 } } },
+          },
+        },
+      );
+    }
   } catch (e) {
     console.error(e);
     el.innerHTML =
       '<p style="color:var(--accent);font-size:.85rem">Errore nel calcolo: ' + escP(e.message || '') + '</p>';
   }
+}
+// Etichetta del periodo davvero considerato: solo i mesi con piano completo
+function _benesserePeriodoLbl(calcolati, anno) {
+  const MESI_N = [
+    'gennaio',
+    'febbraio',
+    'marzo',
+    'aprile',
+    'maggio',
+    'giugno',
+    'luglio',
+    'agosto',
+    'settembre',
+    'ottobre',
+    'novembre',
+    'dicembre',
+  ];
+  const tutti = new Set();
+  calcolati.forEach((x) => (x.p.mesiElenco || []).forEach((m) => tutti.add(m)));
+  const lista = [...tutti].sort();
+  if (!lista.length) return '<b>Nessun mese con piano completo nel ' + anno + '.</b>';
+  const nome = (ym) => MESI_N[parseInt(ym.split('-')[1]) - 1];
+  const periodo = lista.length === 1 ? nome(lista[0]) : 'da ' + nome(lista[0]) + ' a ' + nome(lista[lista.length - 1]);
+  return (
+    '<b>Periodo considerato: ' +
+    periodo +
+    ' ' +
+    anno +
+    '</b> (' +
+    lista.length +
+    (lista.length === 1 ? ' mese con piano completo' : ' mesi con piano completo') +
+    '). I mesi incompleti o non ancora pianificati restano fuori dal conteggio, cosi i confronti sono corretti.'
+  );
+}
+function pianoBenessereOrdina(campo) {
+  const so = window._benessereSort;
+  window._benessereSort =
+    so && so.campo === campo ? { campo: campo, dir: -so.dir } : { campo: campo, dir: campo === 'nome' ? 1 : -1 };
+  caricaBenesserePiano();
+}
+function pianoBenessereFiltra(q) {
+  const testo = (q || '').trim().toLowerCase();
+  document.querySelectorAll('#piano-benessere-body table tbody tr[data-nome]').forEach((tr) => {
+    tr.style.display = !testo || tr.dataset.nome.toLowerCase().includes(testo) ? '' : 'none';
+  });
 }
 function _renderPianoTurniCard() {
   if (!isAdmin()) {

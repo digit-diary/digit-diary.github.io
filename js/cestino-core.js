@@ -398,6 +398,88 @@ async function pulisciPianoDisattivati() {
     toast('Errore pulizia: ' + (e.message || ''));
   }
 }
+// ===== CONGEDO NON PAGATO E GIUBILEI =====
+// Un mese intero senza turni e senza assenze retribuite (solo C) e' congedo non
+// pagato: non matura anzianita', quindi sposta in avanti i giubilei. Qui si
+// leggono dal piano i mesi cosi' fatti e si propone di registrarli sulla scheda.
+async function pianoRilevaCongedoNonPagato() {
+  try {
+    const [collab, righe] = await Promise.all([
+      secGet('collaboratori?select=id,nome,attivo,data_assunzione,mesi_congedo_non_pagato&limit=2000'),
+      secGet('piano?select=collaboratore,data,codice,commento&limit=40000'),
+    ]);
+    const perMese = {};
+    (righe || []).forEach((r) => {
+      const k = r.collaboratore + '|' + String(r.data).substring(0, 7);
+      if (!perMese[k]) perMese[k] = { tot: 0, soloC: true };
+      perMese[k].tot++;
+      const cod = String(r.codice || '').toUpperCase();
+      if (cod !== 'C' || (r.commento || '').trim()) perMese[k].soloC = false;
+    });
+    const fermiDi = {};
+    Object.keys(perMese).forEach((k) => {
+      const [nome, ym] = k.split('|');
+      const m = perMese[k];
+      // mese "pieno" di sole C: almeno 26 celle, tutte C senza commento
+      if (m.soloC && m.tot >= 26) (fermiDi[nome] = fermiDi[nome] || []).push(ym);
+    });
+    const proposte = (collab || [])
+      .filter((c) => fermiDi[c.nome] && fermiDi[c.nome].length)
+      .map((c) => ({
+        id: c.id,
+        nome: c.nome,
+        attivo: c.attivo,
+        mesi: fermiDi[c.nome].sort(),
+        attuale: parseInt(c.mesi_congedo_non_pagato) || 0,
+      }))
+      .filter((x) => x.mesi.length !== x.attuale);
+    if (!proposte.length) {
+      alert(
+        'Nessun congedo non pagato da registrare.\n\nNel piano non risultano mesi interi di sola "C" diversi da quanto gia\' segnato nelle schede.',
+      );
+      return;
+    }
+    const elenco = proposte
+      .slice(0, 20)
+      .map(
+        (x) =>
+          '• ' +
+          x.nome +
+          ': ' +
+          x.mesi.length +
+          ' mes' +
+          (x.mesi.length === 1 ? 'e' : 'i') +
+          ' (' +
+          x.mesi.join(', ') +
+          ')' +
+          (x.attuale ? ' — ora segnati ' + x.attuale : ''),
+      )
+      .join('\n');
+    if (
+      !confirm(
+        'CONGEDO NON PAGATO (mesi interi di sola "C" nel piano)\n\n' +
+          elenco +
+          (proposte.length > 20 ? '\n... e altri ' + (proposte.length - 20) : '') +
+          "\n\nRegistro questi mesi sulle schede? I giubilei si sposteranno in avanti di altrettanto.\n\nATTENZIONE: il piano copre solo gli anni presenti nel programma. I congedi piu' vecchi vanno aggiunti a mano nella scheda del collaboratore.",
+      )
+    )
+      return;
+    let fatti = 0;
+    for (const x of proposte) {
+      try {
+        await secPatch('collaboratori', 'id=eq.' + x.id, { mesi_congedo_non_pagato: x.mesi.length });
+        const c = collaboratoriCache.find((y) => y.id === x.id);
+        if (c) c.mesi_congedo_non_pagato = x.mesi.length;
+        fatti++;
+      } catch (e) {}
+    }
+    logAzione('Congedo non pagato registrato', fatti + ' collaboratori aggiornati');
+    toast(fatti + ' schede aggiornate: i giubilei tengono conto dei mesi fermi');
+    controlloSalute();
+  } catch (e) {
+    toast('Errore rilevamento: ' + (e.message || ''));
+  }
+}
 async function apriFixOrfani() {
   const el = document.getElementById('salute-content');
   if (!el) return;
@@ -552,7 +634,9 @@ async function controlloSalute() {
     const ym = oggi.getFullYear() + '-' + String(oggi.getMonth() + 1).padStart(2, '0');
     const annoPross = oggi.getFullYear() + 1;
     const [collab, righe, festivi, turni] = await Promise.all([
-      secGet('collaboratori?select=nome,attivo,impiego,is_jolly,reparto_dip,reparti_extra,percentuale&limit=2000'),
+      secGet(
+        'collaboratori?select=nome,attivo,impiego,is_jolly,reparto_dip,reparti_extra,percentuale,mesi_congedo_non_pagato&limit=2000',
+      ),
       secGet('piano?data=gte.' + ym + '-01&limit=20000'),
       secGet('piano_festivi?select=data&limit=500'),
       secGet('piano_turni?select=codice,reparto_dip,attivo&limit=500'),
@@ -601,6 +685,33 @@ async function controlloSalute() {
         ? orfani.slice(0, 6).join(', ') + ': hanno turni nel piano ma non esistono in Gestione collaboratori.'
         : 'Ogni turno del piano appartiene a un collaboratore esistente.',
       orfani.length ? 'FIX:apriFixOrfani()|Sistema questi nomi' : '',
+    );
+
+    // 3-bis) congedo non pagato: mesi interi di sola C che non maturano anzianita'
+    const perMeseC = {};
+    (righe || []).forEach((r) => {
+      const k = r.collaboratore + '|' + String(r.data).substring(0, 7);
+      if (!perMeseC[k]) perMeseC[k] = { tot: 0, soloC: true };
+      perMeseC[k].tot++;
+      if (String(r.codice || '').toUpperCase() !== 'C') perMeseC[k].soloC = false;
+    });
+    const fermi = {};
+    Object.keys(perMeseC).forEach((k) => {
+      const [nome] = k.split('|');
+      if (perMeseC[k].soloC && perMeseC[k].tot >= 26) fermi[nome] = (fermi[nome] || 0) + 1;
+    });
+    const daRegistrare = Object.keys(fermi).filter((n) => {
+      const c = perNome[n.toLowerCase()];
+      return c && (parseInt(c.mesi_congedo_non_pagato) || 0) !== fermi[n];
+    });
+    add(
+      daRegistrare.length ? 'attenzione' : 'ok',
+      'Congedo non pagato e giubilei',
+      daRegistrare.length
+        ? daRegistrare.slice(0, 6).join(', ') +
+            ': nel piano risultano mesi interi senza lavoro (solo C). Sono congedo non pagato e non maturano anzianita, quindi spostano in avanti i giubilei.'
+        : 'I mesi di congedo non pagato risultano registrati sulle schede.',
+      daRegistrare.length ? 'FIX:pianoRilevaCongedoNonPagato()|Registra i mesi di congedo' : '',
     );
 
     // 4) disattivati che hanno ancora turni
