@@ -2115,13 +2115,13 @@ function apriSchedaCollaboratore(nome) {
     '</h3>';
   html += '<div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap">';
   html += '<span style="font-size:.82rem;color:var(--muted)">Data di nascita:</span>';
-  const dnDisplay = dataNascita ? dataNascitaLabel(dataNascita) : '';
+  const dnDisplay = dataNascita ? compleannoLabel(dataNascita) : '';
   html +=
     '<input type="text" id="scheda-nascita" value="' +
     escP(dnDisplay) +
     '" data-iso-value="' +
     escP(dataNascita) +
-    '" placeholder="es: 12.01.1997" style="padding:4px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper2);color:var(--ink);width:120px">';
+    '" placeholder="12.01 o 12.01.1997" title="Basta giorno e mese per il compleanno; l anno solo se lo conosci" style="padding:4px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper2);color:var(--ink);width:120px">';
   html +=
     '<button class="btn-salva" onclick="salvaSchedaNascita(\'' +
     neS +
@@ -3257,7 +3257,11 @@ function stampaSchedaPDF(nome) {
   if (cRec && cRec.impiego) anag.push(cRec.impiego === 'fisso' ? 'Fisso' : 'Jolly');
   if (cRec && cRec.categoria && typeof puoVedereCategorie === 'function' && puoVedereCategorie())
     anag.push('Categoria ' + cRec.categoria + 'ª');
-  if (cRec && cRec.data_nascita) anag.push('Nato/a il ' + dataNascitaLabel(cRec.data_nascita));
+  if (cRec && cRec.data_nascita)
+    anag.push(
+      (String(cRec.data_nascita).substring(0, 4) <= '1900' ? 'Compleanno ' : 'Nato/a il ') +
+        compleannoLabel(cRec.data_nascita),
+    );
   anag.push('Reparto ' + currentReparto.charAt(0).toUpperCase() + currentReparto.slice(1));
   anag.push('Generata il ' + new Date().toLocaleDateString('it-IT'));
   if (dal || al) anag.push('Periodo: ' + (dal || 'inizio') + ' · ' + (al || 'oggi'));
