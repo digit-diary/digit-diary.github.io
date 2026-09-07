@@ -4472,15 +4472,23 @@ async function _salvaFoglioCambio(datiPdf, collaboratore, dataCambio) {
 }
 async function ristampaFoglioCambio(nome, dstr) {
   try {
-    const tutti = (await secGet('moduli?tipo=eq.cambio_turno&data_modulo=eq.' + dstr + '&limit=50')) || [];
-    const miei = tutti
-      .filter(
+    let tutti = (await secGet('moduli?tipo=eq.cambio_turno&data_modulo=eq.' + dstr + '&limit=50')) || [];
+    const perNome = (lista) =>
+      lista.filter(
         (m) =>
           !m.eliminato &&
           m.dati &&
           ((m.dati.a && m.dati.a.nome === nome) || (m.dati.b && m.dati.b.nome === nome) || m.collaboratore === nome),
-      )
-      .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+      );
+    let miei = perNome(tutti);
+    if (!miei.length) {
+      // cella della RESTITUZIONE: il foglio e' archiviato sul giorno del
+      // cambio, ma la data di restituzione compare nel campo dedicato
+      const dataIt = new Date(dstr + 'T12:00:00').toLocaleDateString('it-IT');
+      const recenti = (await secGet('moduli?tipo=eq.cambio_turno&order=created_at.desc&limit=100')) || [];
+      miei = perNome(recenti).filter((m) => String(m.dati.restituzione || '').includes(dataIt));
+    }
+    miei = miei.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
     if (!miei.length) {
       toast('Nessun foglio cambio archiviato per ' + nome.split(' ')[0] + ' in questa data');
       return;
@@ -4970,6 +4978,60 @@ async function cercaSostitutiMalattia() {
   out.innerHTML = h;
   document.getElementById('mal-btn-conferma').style.display = coperti || giorni.some((d) => d.codice) ? '' : 'none';
 }
+// PIANO → DIARIO: una malattia scritta nel piano si registra anche nel Diario,
+// cosi' la scheda collaboratore conta i giorni (i giorni C dentro il range,
+// mostrati come MC, sono inclusi). Un giorno gia' registrato non si duplica.
+async function _pianoMalattiaNelDiario(nome, dal, al, chiedi) {
+  if (typeof datiCache === 'undefined' || typeof secPost !== 'function') return 0;
+  const tipoMal = typeof nomeCorrente === 'function' ? nomeCorrente('Malattia') : 'Malattia';
+  const dI = new Date(dal + 'T12:00:00'),
+    dF = new Date(al + 'T12:00:00');
+  const giorniNuovi = [];
+  for (let d = new Date(dI); d <= dF; d.setDate(d.getDate() + 1)) {
+    const dStr =
+      d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const esiste = datiCache.find(
+      (e) =>
+        (e.nome || '').toLowerCase() === nome.toLowerCase() &&
+        e.tipo === tipoMal &&
+        String(e.data || '').startsWith(dStr),
+    );
+    if (!esiste) giorniNuovi.push(dStr);
+  }
+  if (!giorniNuovi.length) return 0;
+  if (
+    chiedi &&
+    !confirm(
+      'Registrare la malattia anche nel Diario di ' +
+        nome +
+        ' (' +
+        giorniNuovi.length +
+        (giorniNuovi.length === 1 ? ' giorno' : ' giorni') +
+        ")?\n\nCosi' i giorni contano nella scheda del collaboratore.",
+    )
+  )
+    return 0;
+  const lbl = ' (dal ' + dI.toLocaleDateString('it-IT') + ' al ' + dF.toLocaleDateString('it-IT') + ')';
+  let creati = 0;
+  for (const dStr of giorniNuovi) {
+    const rec = {
+      id: Date.now() + creati,
+      nome: nome,
+      tipo: tipoMal,
+      testo: 'Malattia registrata dal piano' + lbl,
+      data: dStr + 'T08:00:00.000Z',
+      operatore: getOperatore(),
+      reparto_dip: _pianoReparto(),
+    };
+    try {
+      await secPost('registrazioni', rec);
+      datiCache.unshift(rec);
+      creati++;
+    } catch (e) {}
+  }
+  if (creati) logAzione('Malattia dal piano', nome + ' · ' + creati + ' giorni registrati nel Diario');
+  return creati;
+}
 async function confermaCoperturaMalattia() {
   const m = _malattiaPiano;
   if (!m) return;
@@ -5037,30 +5099,46 @@ async function confermaCoperturaMalattia() {
         nSost++;
       }
     }
-    // punti incentivo (azione 'copertura' della sezione Formazione)
-    if (typeof _insertPuntiEvento === 'function' && typeof getPuntiConfig === 'function') {
+    // punti incentivo: MAI automatici, il responsabile conferma prima
+    let puntiDati = false;
+    if (typeof _insertPuntiEvento === 'function' && typeof getPuntiConfig === 'function' && sostituti.size) {
       const az = (getPuntiConfig().azioni || []).find((a) => a.key === 'copertura');
       const dataLbl = new Date(ym + '-' + String(m.da).padStart(2, '0') + 'T12:00:00').toLocaleDateString('it-IT');
-      if (az)
-        for (const n of sostituti)
-          await _insertPuntiEvento(
+      if (
+        az &&
+        confirm(
+          'Incentivi: assegnare +' +
+            az.punti +
+            ' punti (copertura) a ' +
+            [...sostituti].join(', ') +
+            "?\n\nAnnulla = nessun punto ora (si puo' fare dopo dal popup o da Formazione).",
+        )
+      ) {
+        for (const n of sostituti) {
+          const ok = await _insertPuntiEvento(
             n,
             az.punti,
             'copertura',
             'Copertura malattia di ' + m.nome + ' del ' + dataLbl + ' (giorni ' + m.da + '-' + m.al + ' ' + ym + ')',
           );
+          if (ok) puntiDati = true;
+        }
+      }
     }
     logAzione(
       'Copertura malattia',
       m.nome + ' ' + m.da + '-' + m.al + ' ' + ym + ': ' + nM + ' M, ' + nSost + ' sostituzioni',
     );
+    // piano e Diario sempre allineati: la malattia si registra anche nel Diario
+    const nDiario = await _pianoMalattiaNelDiario(m.nome, dstrDi(m.da), dstrDi(m.al), false);
     toast(
       'Copertura registrata: ' +
         nM +
         ' giorni M, ' +
         nSost +
         ' sostituzioni' +
-        (sostituti.size ? ', punti assegnati' : ''),
+        (nDiario ? ', ' + nDiario + ' giorni nel Diario' : '') +
+        (puntiDati ? ', punti assegnati' : ''),
     );
     // popup incentivi come per la malattia dal rapporto: i sostituti hanno
     // gia' i punti (compaiono in "Gia' registrato"), qui si segnano i rifiuti
@@ -8719,7 +8797,9 @@ function mostraPianoCtx(e, nome, dstr) {
   );
   h += voce('Cambia turno con...', 'icx-refresh', "pianoCtxAzione('scambio')", puoMod && !!haTurno);
   h += voce('Cerca cambio · giorno libero', 'icx-cerca', "pianoCtxAzione('liberogiorno')", puoMod && !!haTurno);
-  h += voce('Ristampa foglio cambio', 'icx-stampa', "pianoCtxAzione('ristampaCambio')", puoMod);
+  // solo dove c'e' stato un cambio (commento "cambio con" o restituzione)
+  const _haCambio = !!(r && /cambio con/i.test(r.commento || ''));
+  if (_haCambio) h += voce('Ristampa foglio cambio', 'icx-stampa', "pianoCtxAzione('ristampaCambio')", puoMod);
   h += voce('Cambio per esigenze', 'icx-settings', "pianoCtxAzione('esigenze')", puoMod && !!haTurno);
   h += voce('Rimuovi cella', 'icx-cestino', "pianoCtxAzione('rimuovi')", puoMod && !!r);
   h += voce('Copia cella', 'icx-modifica', "pianoCtxAzione('copia')", !!r);
@@ -9134,6 +9214,12 @@ async function pianoSalvaCella(nome, dstr, codice) {
       if (nuovo && nuovo[0]) _pianoRighe.push(nuovo[0]);
     }
     logAzione('Piano modificato', nome + ' ' + dstr + ' → ' + codice);
+    // M scritta a mano nel piano: proposta di registrarla anche nel Diario,
+    // cosi' piano, Diario e scheda collaboratore restano allineati
+    if (codice === 'M' || codice === 'M1') {
+      const nDia = await _pianoMalattiaNelDiario(nome, dstr, dstr, true);
+      if (nDia) toast('Malattia registrata anche nel Diario: conta nella scheda di ' + nome);
+    }
     renderPiano();
     // rivalidazione del mese se era attiva (tutte le altre regole)
     if (_pianoViolLista !== null) {

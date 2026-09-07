@@ -48,7 +48,7 @@ function GUIDA_CAPITOLI() {
         "Serve a registrare cosa succede in turno: attivita', richieste, errori, ammonimenti, malattie, non disponibilita', note.",
         'Scegli il <b>tipo</b>, il <b>collaboratore</b> e scrivi il testo. La data e il tuo nome vengono messi in automatico.',
         'Le voci si possono cercare, filtrare per tipo o collaboratore, modificare e mettere in evidenza. Quelle eliminate finiscono nel Cestino e si possono recuperare.',
-        'Le <b>malattie</b> registrate qui compaiono da sole nel piano di lavoro, quindi non vanno riscritte due volte.',
+        "Le <b>malattie</b> registrate qui compaiono da sole nel piano di lavoro, quindi non vanno riscritte due volte. Vale anche al contrario: una M scritta nel piano o una copertura malattia si registrano nel Diario e contano nella scheda del collaboratore. Ognuno puo' partire dal punto che preferisce, il risultato non cambia.",
       ],
     },
     {
@@ -251,6 +251,8 @@ function GUIDA_CAPITOLI() {
         'La <b>matrice delle competenze</b> mostra chi sa fare cosa: le spunte segnano le competenze certificate e i livelli raggiunti.',
         'Al completamento di un livello il programma assegna i punti previsti e avvisa la persona interessata.',
         'I <b>punti e i premi</b> seguono le azioni configurate (coperture, cambi turno, formazioni svolte) e sono consultabili nella scheda del collaboratore.',
+        "Ogni assegnazione di punti richiede la <b>conferma del responsabile</b>: nessun punto parte da solo. Il programma controlla anche i <b>doppioni</b>: se la stessa persona ha gia' ricevuto punti per lo stesso motivo, o altri punti nello stesso giorno, appare un avviso e si decide se procedere.",
+        "Il cerca cambio per il giorno libero <b>non</b> assegna punti: e' uno scambio alla pari tra colleghi.",
         'Le <b>formazioni svolte</b> si registrano con data, formatore ed eventuali allegati.',
       ],
     },
