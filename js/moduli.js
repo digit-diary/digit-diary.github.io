@@ -2311,7 +2311,10 @@ function parseModuloTesto(testo, tipo) {
 
 // PROFILO COLLABORATORE
 function apriProfilo(nome) {
-  apriSchedaCollaboratore(nome);
+  // punto di ingresso storico (diario, statistiche, moduli): passa dalla
+  // versione protetta, cosi' un errore si vede invece di sembrare un clic perso
+  if (typeof apriSchedaCollaboratoreSicuro === 'function') apriSchedaCollaboratoreSicuro(nome);
+  else apriSchedaCollaboratore(nome);
 }
 
 // FILTER & RENDER

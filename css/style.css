@@ -1451,7 +1451,11 @@ header h1 .casino {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 8888;
+  /* SOPRA gli altri pannelli. Era 8888, cioe' piu' in basso dei popup (10000),
+     della barra di selezione, della barra statistiche e delle notifiche: se
+     restava aperto uno di quelli, la scheda del collaboratore si apriva
+     DIETRO e sembrava non aprirsi affatto. */
+  z-index: 10010;
   -webkit-backdrop-filter: blur(3px);
   backdrop-filter: blur(3px);
 }
