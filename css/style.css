@@ -1175,19 +1175,58 @@ header h1 .casino {
   background: none;
   border: 1.5px solid var(--ink);
   color: var(--ink);
-  padding: 8px 16px;
-  font-size: 0.82rem;
+  padding: 8px 17px;
+  font-size: 0.84rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
   cursor: pointer;
-  border-radius: 2px;
+  border-radius: 3px;
   font-family: "Source Sans 3", sans-serif;
-  transition: all 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    box-shadow 0.15s,
+    transform 0.08s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  line-height: 1.2;
+  min-height: 34px;
 }
 .btn-export:hover {
   background: var(--ink);
   color: var(--paper);
+  box-shadow: 0 2px 6px rgba(26, 18, 8, 0.22);
+}
+/* il tasto si abbassa quando lo premi: dice che il comando e' partito */
+.btn-export:active,
+.btn-act:active,
+.btn-add-tipo:active,
+.btn-modal-ok:active,
+.btn-modal-cancel:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+/* chi naviga da tastiera deve vedere dove si trova */
+.btn-export:focus-visible,
+.btn-act:focus-visible,
+.btn-add-tipo:focus-visible,
+.btn-modal-ok:focus-visible,
+.btn-modal-cancel:focus-visible {
+  outline: 2px solid #d4b86a;
+  outline-offset: 2px;
+}
+/* un bottone spento deve sembrare spento, non rotto */
+.btn-export:disabled,
+.btn-act:disabled,
+.btn-add-tipo:disabled,
+.btn-modal-ok:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 .btn-export-pdf {
   border-color: var(--accent);
@@ -1389,16 +1428,24 @@ header h1 .casino {
 .btn-act {
   background: none;
   border: 1px solid;
-  border-radius: 2px;
+  border-radius: 3px;
   cursor: pointer;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  padding: 4px 9px;
+  padding: 5px 11px;
   font-family: "Source Sans 3", sans-serif;
-  transition: all 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    box-shadow 0.15s,
+    transform 0.08s;
   white-space: nowrap;
+  line-height: 1.25;
+}
+.btn-act:hover {
+  box-shadow: 0 1px 4px rgba(26, 18, 8, 0.18);
 }
 .btn-act.tipo {
   color: var(--accent2);
@@ -1527,24 +1574,41 @@ header h1 .casino {
   justify-content: center;
 }
 .modal-btns button {
-  padding: 10px 24px;
-  border-radius: 2px;
+  padding: 11px 26px;
+  border-radius: 3px;
   font-family: "Source Sans 3", sans-serif;
-  font-size: 0.82rem;
+  font-size: 0.86rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   cursor: pointer;
+  min-height: 40px;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    box-shadow 0.15s,
+    transform 0.08s;
 }
+/* CONFERMA: e' il tasto che porta avanti l'azione, si vede subito qual e' */
 .btn-modal-ok {
   background: var(--ink);
   color: var(--paper);
   border: none;
+  box-shadow: 0 2px 5px rgba(26, 18, 8, 0.24);
+}
+.btn-modal-ok:hover {
+  box-shadow: 0 3px 9px rgba(26, 18, 8, 0.32);
+  filter: brightness(1.12);
 }
 .btn-modal-cancel {
   background: var(--paper2);
   color: var(--muted);
   border: 1px solid var(--line);
+}
+.btn-modal-cancel:hover {
+  background: var(--paper);
+  color: var(--ink);
+  border-color: var(--ink);
 }
 /* PROFILO */
 .profilo-box {
@@ -2101,15 +2165,21 @@ header h1 .casino {
   background: var(--ink);
   color: var(--paper);
   border: none;
-  padding: 10px 20px;
-  font-size: 0.8rem;
+  padding: 10px 21px;
+  font-size: 0.84rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   cursor: pointer;
-  border-radius: 2px;
+  border-radius: 3px;
   font-family: "Source Sans 3", sans-serif;
   white-space: nowrap;
+  min-height: 40px;
+  box-shadow: 0 2px 5px rgba(26, 18, 8, 0.2);
+  transition:
+    box-shadow 0.15s,
+    filter 0.15s,
+    transform 0.08s;
 }
 .operatore-chip {
   display: inline-flex;
