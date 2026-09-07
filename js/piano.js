@@ -1484,6 +1484,7 @@ async function rimuoviPianoCella(giaChiuso) {
     _pianoRighe = _pianoRighe.filter((x) => x.id !== r.id);
     logAzione('Piano: cella rimossa', sel.nome + ' ' + sel.data + ' (era ' + r.codice + ')');
     toast('Cella rimossa');
+    if (r.codice === 'M' || r.codice === 'M1') await _pianoMalattiaViaDiario(sel.nome, [sel.data]);
     renderPiano();
   } catch (e) {
     toast('Errore rimozione');
@@ -5031,6 +5032,55 @@ async function _pianoMalattiaNelDiario(nome, dal, al, chiedi) {
   }
   if (creati) logAzione('Malattia dal piano', nome + ' · ' + creati + ' giorni registrati nel Diario');
   return creati;
+}
+// PIANO → DIARIO anche in rimozione: se una M sparisce dal piano (tolta o
+// sovrascritta con un turno), il programma propone di togliere quei giorni
+// anche dal Diario. Le registrazioni finiscono nel Cestino, recuperabili.
+async function _pianoMalattiaViaDiario(nome, giorniDstr) {
+  if (typeof datiCache === 'undefined' || typeof secPatch !== 'function') return 0;
+  const tipoMal = typeof nomeCorrente === 'function' ? nomeCorrente('Malattia') : 'Malattia';
+  const daTogliere = datiCache.filter(
+    (e) =>
+      (e.nome || '').toLowerCase() === nome.toLowerCase() &&
+      e.tipo === tipoMal &&
+      !e.eliminato &&
+      giorniDstr.some((d) => String(e.data || '').startsWith(d)),
+  );
+  if (!daTogliere.length) return 0;
+  const gg = daTogliere
+    .map((e) => String(e.data).substring(8, 10) + '/' + String(e.data).substring(5, 7))
+    .sort()
+    .join(', ');
+  const nG = daTogliere.length;
+  if (
+    !confirm(
+      'Nel Diario ' +
+        nome +
+        ' risulta in malattia ' +
+        (nG === 1 ? 'il giorno ' : 'nei giorni ') +
+        gg +
+        '.\n\nTogliere ' +
+        (nG === 1 ? 'questo giorno' : 'questi ' + nG + ' giorni') +
+        " anche dal Diario? Le registrazioni finiscono nel Cestino (recuperabili) e la scheda del collaboratore si aggiorna.\n\nOK = togli anche dal Diario · Annulla = il Diario resta com'e'",
+    )
+  )
+    return 0;
+  const op = getOperatore();
+  const now = new Date().toISOString();
+  let tolte = 0;
+  for (const e of daTogliere) {
+    try {
+      await secPatch('registrazioni', 'id=eq.' + e.id, { eliminato: true, eliminato_da: op, eliminato_at: now });
+      e.eliminato = true;
+      tolte++;
+    } catch (err) {}
+  }
+  datiCache = datiCache.filter((e) => !e.eliminato);
+  if (tolte) {
+    logAzione('Malattia tolta dal piano', nome + ' · ' + tolte + ' giorni spostati nel cestino del Diario');
+    toast('Diario aggiornato: ' + tolte + (tolte === 1 ? ' giorno' : ' giorni') + ' di malattia nel Cestino');
+  }
+  return tolte;
 }
 async function confermaCoperturaMalattia() {
   const m = _malattiaPiano;
@@ -9175,6 +9225,8 @@ async function pianoSalvaCella(nome, dstr, codice) {
         await secDel('piano', 'id=eq.' + r.id);
         _pianoRighe = _pianoRighe.filter((x) => x.id !== r.id);
         logAzione('Piano: turno rimosso', nome + ' ' + dstr + ' (era ' + attuale + ')');
+        // era una malattia: proposta di toglierla anche dal Diario
+        if (attuale === 'M' || attuale === 'M1') await _pianoMalattiaViaDiario(nome, [dstr]);
         renderPiano();
       }
       return;
@@ -9219,6 +9271,9 @@ async function pianoSalvaCella(nome, dstr, codice) {
     if (codice === 'M' || codice === 'M1') {
       const nDia = await _pianoMalattiaNelDiario(nome, dstr, dstr, true);
       if (nDia) toast('Malattia registrata anche nel Diario: conta nella scheda di ' + nome);
+    } else if (attuale === 'M' || attuale === 'M1') {
+      // la M e' stata sovrascritta con un turno: il giorno non e' piu' malattia
+      await _pianoMalattiaViaDiario(nome, [dstr]);
     }
     renderPiano();
     // rivalidazione del mese se era attiva (tutte le altre regole)
@@ -10989,6 +11044,14 @@ async function pianoCancellaSelezione() {
     _pianoRighe = _pianoRighe.filter((r) => !ids.includes(r.id));
     logAzione('Piano: celle cancellate da selezione', daCanc.length + ' celle (' + _pianoMeseSel + ')');
     toast('Cancellate ' + daCanc.length + ' celle');
+    // tra le celle cancellate c'erano malattie: proposta di aggiornare il
+    // Diario, una domanda per collaboratore con l'elenco dei giorni
+    const perNomeM = {};
+    daCanc.forEach((r) => {
+      if (r.codice === 'M' || r.codice === 'M1')
+        (perNomeM[r.collaboratore] = perNomeM[r.collaboratore] || []).push(r.data);
+    });
+    for (const nomeM of Object.keys(perNomeM)) await _pianoMalattiaViaDiario(nomeM, perNomeM[nomeM]);
     renderPiano();
   } catch (e) {
     toast('Errore cancellazione');

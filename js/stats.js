@@ -294,12 +294,16 @@ function renderStatistiche() {
   const errori = _ds.filter((e) => e.tipo === nomeCorrente('Errore'));
   const errMap = {};
   errori.forEach((e) => {
-    if (!errMap[e.nome]) errMap[e.nome] = { count: 0, totCHF: 0, totEUR: 0, reparti: {} };
+    if (!errMap[e.nome]) errMap[e.nome] = { count: 0, totCHF: 0, totEUR: 0, amm: 0, ecc: 0, reparti: {} };
     errMap[e.nome].count++;
     const imp = parseFloat(e.importo) || 0;
     if (imp) {
       if (e.valuta === 'EUR') errMap[e.nome].totEUR += imp;
-      else errMap[e.nome].totCHF += imp;
+      else {
+        errMap[e.nome].totCHF += imp;
+        if (/ammanco/i.test(e.testo || '')) errMap[e.nome].amm += imp;
+        else if (/eccedenza/i.test(e.testo || '')) errMap[e.nome].ecc += imp;
+      }
     }
     const rep = e.reparto || 'N/D';
     errMap[e.nome].reparti[rep] = (errMap[e.nome].reparti[rep] || 0) + 1;
@@ -310,11 +314,15 @@ function renderStatistiche() {
       '<table class="collab-table"><thead><tr><th>Collaboratore</th><th class="num">N. Errori</th><th>Reparti</th><th class="num">Totale CHF</th><th class="num">Totale EUR</th></tr></thead><tbody>';
     let gCHF = 0,
       gEUR = 0,
-      gCount = 0;
+      gCount = 0,
+      gAmm = 0,
+      gEcc = 0;
     errSorted.forEach(([n, d]) => {
       gCHF += d.totCHF;
       gEUR += d.totEUR;
       gCount += d.count;
+      gAmm += d.amm;
+      gEcc += d.ecc;
       const reps = Object.entries(d.reparti)
         .map(([r, c]) => '<span class="mini-badge" style="background:var(--muted)">' + r + ': ' + c + '</span>')
         .join(' ');
@@ -329,7 +337,16 @@ function renderStatistiche() {
         '</span></td><td>' +
         reps +
         '</td><td class="num">' +
-        (d.totCHF ? fmtCHF(d.totCHF) : '-') +
+        (d.totCHF
+          ? fmtCHF(d.totCHF) +
+            (d.amm || d.ecc
+              ? '<br><span style="font-size:.72rem"><span style="color:#c62828">-' +
+                fmtCHF(d.amm) +
+                '</span> / <span style="color:#2e7d32">+' +
+                fmtCHF(d.ecc) +
+                '</span></span>'
+              : '')
+          : '-') +
         '</td><td class="num">' +
         (d.totEUR ? d.totEUR.toFixed(2) : '-') +
         '</td></tr>';
@@ -339,6 +356,13 @@ function renderStatistiche() {
       gCount +
       '</strong></td><td></td><td class="num"><strong>' +
       (gCHF ? fmtCHF(gCHF) + ' CHF' : '-') +
+      (gAmm || gEcc
+        ? '<br><span style="font-size:.72rem;font-weight:400"><span style="color:#c62828">-' +
+          fmtCHF(gAmm) +
+          '</span> / <span style="color:#2e7d32">+' +
+          fmtCHF(gEcc) +
+          '</span></span>'
+        : '') +
       '</strong></td><td class="num"><strong>' +
       (gEUR ? gEUR.toFixed(2) + ' EUR' : '-') +
       '</strong></td></tr>';
@@ -626,6 +650,8 @@ async function esportaReportDirezionePDF() {
     malG: 0,
     err: 0,
     errChf: 0,
+    errAmm: 0,
+    errEcc: 0,
     amm: 0,
     allin: 0,
     rdi: 0,
@@ -656,6 +682,9 @@ async function esportaReportDirezionePDF() {
     const malG = _rdGiorniMalattia(mal);
     const err = dati.filter((e) => e.tipo === tipoErr && _rdInPeriodo(e.data, per.da, per.a));
     const errChf = err.reduce((s2, e) => s2 + (parseFloat(e.importo) || 0), 0);
+    // dettaglio differenze cassa: la direzione vede ammanchi ed eccedenze separati
+    const errAmm = err.reduce((s2, e) => s2 + (/ammanco/i.test(e.testo || '') ? parseFloat(e.importo) || 0 : 0), 0);
+    const errEcc = err.reduce((s2, e) => s2 + (/eccedenza/i.test(e.testo || '') ? parseFloat(e.importo) || 0 : 0), 0);
     const amm = dati.filter((e) => e.tipo === tipoAmm && _rdInPeriodo(e.data, per.da, per.a)).length;
     malPrecTot += dati.filter((e) => e.tipo === tipoMal && _rdInPeriodo(e.data, per.daPrec, per.aPrec)).length;
     errPrecTot += dati.filter((e) => e.tipo === tipoErr && _rdInPeriodo(e.data, per.daPrec, per.aPrec)).length;
@@ -667,7 +696,7 @@ async function esportaReportDirezionePDF() {
       r.label,
       mal.length + (malG > mal.length ? ' (' + malG + ' gg)' : ''),
       err.length,
-      fmtCHF(errChf),
+      fmtCHF(errChf) + (errAmm || errEcc ? ' (-' + fmtCHF(errAmm) + ' / +' + fmtCHF(errEcc) + ')' : ''),
       amm,
       allin,
       rdi,
@@ -677,6 +706,8 @@ async function esportaReportDirezionePDF() {
     tot.malG += malG;
     tot.err += err.length;
     tot.errChf += errChf;
+    tot.errAmm += errAmm;
+    tot.errEcc += errEcc;
     tot.amm += amm;
     tot.allin += allin;
     tot.rdi += rdi;
@@ -769,7 +800,8 @@ async function esportaReportDirezionePDF() {
             'Totale',
             tot.mal + (tot.malG > tot.mal ? ' (' + tot.malG + ' gg)' : ''),
             tot.err,
-            fmtCHF(tot.errChf),
+            fmtCHF(tot.errChf) +
+              (tot.errAmm || tot.errEcc ? ' (-' + fmtCHF(tot.errAmm) + ' / +' + fmtCHF(tot.errEcc) + ')' : ''),
             tot.amm,
             tot.allin,
             tot.rdi,
