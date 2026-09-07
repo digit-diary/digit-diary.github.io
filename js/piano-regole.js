@@ -318,7 +318,9 @@
       void inizioMese;
     }
     const parteBase = (base1 / 12) * mesiBase1 + (base2 / 12) * mesiBase2;
-    // bonus: tutti quelli il cui anniversario cade entro la fine dell'anno
+    // bonus: NON si sommano tra loro, lo scaglione nuovo SOSTITUISCE il vecchio.
+    // Chi ha 10 anni ha 1 giorno; quando arriva a 15 ne ha 2 in tutto, non 3.
+    // Vale quindi lo scaglione piu' alto gia' raggiunto entro la fine dell'anno.
     const fineAnno = new Date(anno, 11, 31, 12);
     const voci = [];
     let totBonus = 0;
@@ -332,7 +334,8 @@
         // 31 dicembre, vale dall'anno seguente
         dataB.setDate(dataB.getDate() + 1);
         if (dataB <= fineAnno) {
-          totBonus += parseFloat(b.giorni) || 0;
+          totBonus = parseFloat(b.giorni) || 0;
+          voci.length = 0;
           voci.push({ anni: parseInt(b.anni), giorni: parseFloat(b.giorni) || 0, dal: dataB.getFullYear() });
         }
       });
