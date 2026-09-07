@@ -2250,9 +2250,14 @@ function giubileiCollaboratore(c) {
   const oggi = new Date();
   const maturati = [];
   let prossimo = null;
+  // CONGEDO NON PAGATO: i mesi in cui il collaboratore e' rimasto fermo (nessun
+  // turno e nessuna assenza retribuita) non maturano anzianita', quindi ogni
+  // giubileo si sposta in avanti di altrettanti mesi.
+  const mesiFermo = Math.max(0, parseInt(c.mesi_congedo_non_pagato) || 0);
   getGiubileoConfig().forEach(function (g) {
     const dataMat = new Date(base);
     dataMat.setFullYear(base.getFullYear() + parseInt(g.anni));
+    if (mesiFermo) dataMat.setMonth(dataMat.getMonth() + mesiFermo);
     const voce = {
       anni: parseInt(g.anni),
       importo: parseFloat(g.importo),
@@ -2350,9 +2355,12 @@ function puoVedereStoricoHr() {
   return isAdmin() || (typeof puoModificare === 'function' && puoModificare('storico_hr'));
 }
 // Anzianità leggibile da data_assunzione
-function anzianitaLabel(dataAss) {
+function anzianitaLabel(dataAss, mesiFermo) {
   if (!dataAss) return '';
-  const giorni = Math.floor((Date.now() - new Date(dataAss + 'T12:00:00').getTime()) / 86400000);
+  let giorni = Math.floor((Date.now() - new Date(dataAss + 'T12:00:00').getTime()) / 86400000);
+  // i mesi di congedo non pagato non contano come servizio
+  const fermo = Math.max(0, parseInt(mesiFermo) || 0);
+  if (fermo) giorni -= Math.round(fermo * 30.44);
   if (giorni < 0) return '';
   const anni = Math.floor(giorni / 365);
   const mesi = Math.floor((giorni % 365) / 30);
