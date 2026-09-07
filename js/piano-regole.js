@@ -349,6 +349,98 @@
     };
   }
 
+  // ---------------------------------------------------------------------------
+  // FESTIVITA' E ORARI DI CHIUSURA
+  //
+  // Il casino chiude alle 04:00 nei giorni feriali e alle 05:00 il venerdi' e
+  // il sabato. Nei giorni di festivita' (soprattutto quelle italiane, per la
+  // clientela di frontiera) la chiusura e' alle 05:00 anche se cade in un altro
+  // giorno della settimana, e il 31 dicembre alle 07:00. Sapere in anticipo
+  // quali sono quei giorni serve a mettere piu' personale a lavorare.
+  // ---------------------------------------------------------------------------
+
+  // Pasqua (algoritmo di Meeus, calendario gregoriano) -> 'YYYY-MM-DD'
+  function pasqua(anno) {
+    const a = anno % 19;
+    const b = Math.floor(anno / 100);
+    const c = anno % 100;
+    const d = Math.floor(b / 4);
+    const e = b % 4;
+    const f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const hh = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - hh - k) % 7;
+    const m = Math.floor((a + 11 * hh + 22 * l) / 451);
+    const mese = Math.floor((hh + l - 7 * m + 114) / 31);
+    const giorno = ((hh + l - 7 * m + 114) % 31) + 1;
+    return anno + '-' + String(mese).padStart(2, '0') + '-' + String(giorno).padStart(2, '0');
+  }
+
+  function _piu(dstr, giorni) {
+    const d = new Date(dstr + 'T12:00:00');
+    d.setDate(d.getDate() + giorni);
+    return (
+      d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+    );
+  }
+
+  // Festivita' italiane di un anno: fisse di legge piu' Pasqua e Lunedi
+  // dell'Angelo calcolati. Sono i giorni in cui la clientela italiana e' in
+  // vacanza, quindi il casino chiude piu' tardi.
+  function festivitaItaliane(anno) {
+    const p = pasqua(anno);
+    return [
+      { data: anno + '-01-01', nome: 'Capodanno' },
+      { data: anno + '-01-06', nome: 'Epifania' },
+      { data: p, nome: 'Pasqua' },
+      { data: _piu(p, 1), nome: "Lunedi dell'Angelo" },
+      { data: anno + '-04-25', nome: 'Festa della Liberazione' },
+      { data: anno + '-05-01', nome: 'Festa del Lavoro' },
+      { data: anno + '-06-02', nome: 'Festa della Repubblica' },
+      { data: anno + '-08-15', nome: 'Ferragosto' },
+      { data: anno + '-11-01', nome: 'Tutti i Santi' },
+      { data: anno + '-12-08', nome: 'Immacolata Concezione' },
+      { data: anno + '-12-25', nome: 'Natale' },
+      { data: anno + '-12-26', nome: 'Santo Stefano' },
+    ];
+  }
+
+  // Orario di chiusura di un giorno.
+  //   dstr        : 'YYYY-MM-DD'
+  //   festivita   : { 'YYYY-MM-DD': 'nome' }  (elenco in vigore, modificabile)
+  //   cfg.giorniTardi : giorni della settimana che chiudono tardi (default ven=5, sab=6)
+  //   cfg.oraNormale / cfg.oraTardi / cfg.oraFineAnno
+  // Ritorna { ora, motivo, marcatore } dove marcatore e' cio' che si scrive in
+  // cima alla colonna del giorno nel piano ('' quando non serve segnalare
+  // niente, cioe' quando l'orario e' quello che tutti gia' conoscono).
+  function chiusuraDelGiorno(dstr, festivita, cfg) {
+    const c = cfg || {};
+    const oraNormale = c.oraNormale != null ? c.oraNormale : 4;
+    const oraTardi = c.oraTardi != null ? c.oraTardi : 5;
+    const oraFineAnno = c.oraFineAnno != null ? c.oraFineAnno : 7;
+    const giorniTardi = Array.isArray(c.giorniTardi) ? c.giorniTardi : [5, 6];
+    if (!dstr) return { ora: oraNormale, motivo: '', marcatore: '' };
+    const d = new Date(dstr + 'T12:00:00');
+    if (isNaN(d.getTime())) return { ora: oraNormale, motivo: '', marcatore: '' };
+    const mmgg = dstr.substring(5);
+    // 31 dicembre: chiusura piu' lunga, vale sempre e va segnalata sempre
+    if (mmgg === '12-31') return { ora: oraFineAnno, motivo: 'ultimo dell anno', marcatore: 'CH' + oraFineAnno };
+    const tardiPerGiorno = giorniTardi.indexOf(d.getDay()) >= 0;
+    const nomeFesta = (festivita || {})[dstr] || '';
+    if (nomeFesta) {
+      // gia' venerdi o sabato: l'orario e' quello solito, nessun marcatore, ma
+      // il motivo resta perche' serve comunque a prevedere l'affluenza
+      return {
+        ora: oraTardi,
+        motivo: nomeFesta,
+        marcatore: tardiPerGiorno ? '' : 'CH' + oraTardi,
+      };
+    }
+    return { ora: tardiPerGiorno ? oraTardi : oraNormale, motivo: '', marcatore: '' };
+  }
+
   return {
     oraNum,
     riposoOre,
@@ -357,5 +449,8 @@
     idoneoPerTurno,
     indiceBenessere,
     giorniVacanzaSpettanti,
+    pasqua,
+    festivitaItaliane,
+    chiusuraDelGiorno,
   };
 });

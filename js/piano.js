@@ -1148,6 +1148,9 @@ async function renderPiano() {
         }
       }
       // GRIGLIA
+      // le festivita' servono PRIMA di disegnare l'intestazione: e' li' che
+      // compare il marcatore di chiusura (CH5/CH7) sopra il numero del giorno
+      await _pianoCaricaFestivita(parseInt(ym.split('-')[0]));
       const LC = _pianoCalcolaLarghezze(nomi);
       h +=
         '<div class="piano-wrap"><table data-seltab="piano" class="piano-table piano-fixed" style="width:' +
@@ -1173,14 +1176,30 @@ async function renderPiano() {
           '" data-g="' +
           g +
           '"' +
-          (festiviSet[dstr]
-            ? ' title="' + escP(festiviSet[dstr]) + '"'
-            : ' title="Doppio click: marcatore del giorno (CS, MN, LRD...)"') +
+          (() => {
+            // il suggerimento riunisce festivo cantonale e orario di chiusura
+            const _ch = _pianoChiusuraGiorno(dstr);
+            const _voci = [];
+            if (festiviSet[dstr]) _voci.push(escP(festiviSet[dstr]));
+            if (_ch.motivo) _voci.push(escP(_ch.motivo) + ': si chiude alle ' + _ch.ora + ':00');
+            else if (_ch.ora !== _pianoChiusuraCfg().oraNormale) _voci.push('si chiude alle ' + _ch.ora + ':00');
+            _voci.push('Doppio click: marcatore del giorno (CS, MN, LRD...)');
+            return ' title="' + _voci.join(' \u00b7 ') + '"';
+          })() +
           (puoMod ? ' ondblclick="pianoMarkerEdit(' + g + ')"' : '') +
           '>' +
           (_pianoMarkerGiorno(ym, g)
             ? '<div style="font-size:.82rem;background:#FFFF00;color:#000;font-weight:bold;line-height:1.1">' +
               escP(_pianoMarkerGiorno(ym, g)) +
+              '</div>'
+            : '') +
+          // CHIUSURA PIU' TARDI: si segnala solo quando NON e' gia' scontato
+          // (venerdi e sabato chiudono alle 5 per prassi, non serve dirlo)
+          (_pianoChiusuraGiorno(dstr).marcatore
+            ? '<div style="font-size:.82rem;background:#8b4a8b;color:#fff;font-weight:bold;line-height:1.1" title="' +
+              escP(_pianoChiusuraGiorno(dstr).motivo || 'chiusura posticipata') +
+              '">' +
+              _pianoChiusuraGiorno(dstr).marcatore +
               '</div>'
             : '') +
           '<div>' +
@@ -1679,7 +1698,8 @@ async function renderPiano() {
       h += '<div id="piano-config">' + _renderPianoRegoleCard() + _renderPianoRegoleGruppoCard() + '</div>';
     } else if (_pianoTab === 'festivi') {
       await _generaFestiviSeMancanti();
-      h += '<div id="piano-config">' + _renderPianoFestiviCard() + '</div>';
+      await _pianoCaricaFestivita(window._pianoFestiviAnnoSel || parseInt(_pianoMeseSel.split('-')[0]));
+      h += '<div id="piano-config">' + _renderPianoFestiviCard() + _renderPianoFestivitaCard() + '</div>';
     } else if (_pianoTab === 'timbrature') {
       h += '<div id="piano-config">' + _renderPianoTimbratureCard() + '</div>';
     } else if (_pianoTab === 'benessere') {
@@ -4865,6 +4885,262 @@ function _pianoFestiviAnno(anno) {
     { data: anno + '-12-25', descrizione: 'Natale' },
     { data: anno + '-12-26', descrizione: 'Santo Stefano' },
   ];
+}
+// ===========================================================================
+// FESTIVITA' E ORARI DI CHIUSURA
+// Giorni in cui si chiude alle 05:00 invece che alle 04:00 (o alle 07:00 il 31
+// dicembre). Servono a sapere in anticipo quando mettere piu' personale.
+// ===========================================================================
+let pianoFestivitaCache = [];
+let _pianoFestivitaAnnoCaricato = null;
+async function _pianoCaricaFestivita(anno) {
+  if (_pianoFestivitaAnnoCaricato === anno) return pianoFestivitaCache;
+  const r = (await secGet('piano_festivita?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&limit=500')) || [];
+  pianoFestivitaCache = r;
+  _pianoFestivitaAnnoCaricato = anno;
+  return r;
+}
+// mappa { 'YYYY-MM-DD': nome } delle sole festivita' attive
+function _pianoFestivitaMappa() {
+  const m = {};
+  (pianoFestivitaCache || []).forEach((f) => {
+    if (f.attivo !== false) m[String(f.data).substring(0, 10)] = f.nome;
+  });
+  return m;
+}
+// configurazione degli orari, modificabile dalle regole
+function _pianoChiusuraCfg() {
+  const giorni = String(_pianoRegolaVal('chiusura_giorni_tardi') || '5,6')
+    .split(',')
+    .map((x) => parseInt(x.trim()))
+    .filter((x) => !isNaN(x));
+  return {
+    oraNormale: parseFloat(_pianoRegolaVal('chiusura_ora_normale')) || 4,
+    oraTardi: parseFloat(_pianoRegolaVal('chiusura_ora_tardi')) || 5,
+    oraFineAnno: parseFloat(_pianoRegolaVal('chiusura_ora_fine_anno')) || 7,
+    giorniTardi: giorni.length ? giorni : [5, 6],
+  };
+}
+function _pianoChiusuraGiorno(dstr) {
+  return PianoRegole.chiusuraDelGiorno(dstr, _pianoFestivitaMappa(), _pianoChiusuraCfg());
+}
+// ELENCHI FORNITI DALLA DIREZIONE (2026 e 2027). Per gli altri anni il
+// programma calcola le dodici festivita' italiane di legge (Pasqua compresa).
+const PIANO_FESTIVITA_ELENCHI = {
+  2026: [
+    ['2026-01-01', 'Capodanno'],
+    ['2026-01-06', 'Epifania del Signore'],
+    ['2026-03-08', 'Festa internazionale della donna'],
+    ['2026-04-05', 'Pasqua'],
+    ['2026-04-06', "Lunedi dell'Angelo"],
+    ['2026-04-25', 'Festa della Liberazione'],
+    ['2026-05-01', 'Festa del Lavoro'],
+    ['2026-06-02', 'Festa della Repubblica Italiana'],
+    ['2026-08-15', 'Ferragosto'],
+    ['2026-08-24', "Giorno dell'indipendenza dell'Ucraina"],
+    ['2026-10-01', "Giornata dei difensori dell'Ucraina"],
+    ['2026-10-04', "Festa nazionale San Francesco d'Assisi"],
+    ['2026-11-01', 'Tutti i Santi'],
+    ['2026-12-08', 'Immacolata Concezione'],
+    ['2026-12-25', 'Natale'],
+    ['2026-12-26', 'Santo Stefano'],
+  ],
+  2027: [
+    ['2027-01-01', 'Capodanno'],
+    ['2027-01-06', 'Epifania'],
+    ['2027-03-28', 'Pasqua'],
+    ['2027-03-29', "Lunedi dell'Angelo"],
+    ['2027-04-25', 'Festa della Liberazione'],
+    ['2027-05-01', 'Festa dei Lavoratori'],
+    ['2027-06-02', 'Festa della Repubblica'],
+    ['2027-08-15', 'Ferragosto'],
+    ['2027-11-01', 'Tutti i Santi'],
+    ['2027-12-08', 'Immacolata Concezione'],
+    ['2027-12-25', 'Natale'],
+    ['2027-12-26', 'Santo Stefano'],
+  ],
+};
+function _pianoFestivitaProposte(anno) {
+  const elenco = PIANO_FESTIVITA_ELENCHI[anno];
+  if (elenco) return elenco.map((x) => ({ data: x[0], nome: x[1] }));
+  return PianoRegole.festivitaItaliane(anno);
+}
+async function pianoImportaFestivita(anno) {
+  if (!puoGestireFestivi()) {
+    toast('Serve il permesso Festivi e CGF');
+    return;
+  }
+  await _pianoCaricaFestivita(anno);
+  const gia = new Set((pianoFestivitaCache || []).map((f) => String(f.data).substring(0, 10) + '|' + f.nome));
+  const nuovi = _pianoFestivitaProposte(anno).filter((f) => !gia.has(f.data + '|' + f.nome));
+  if (!nuovi.length) {
+    toast('Le festivita del ' + anno + ' sono gia inserite');
+    return;
+  }
+  if (
+    !confirm(
+      'Inserisco ' +
+        nuovi.length +
+        ' festivita per il ' +
+        anno +
+        ':\n\n' +
+        nuovi.map((f) => '\u2022 ' + f.data.split('-').reverse().join('.') + '  ' + f.nome).join('\n') +
+        '\n\nQuelle gia presenti non vengono toccate.',
+    )
+  )
+    return;
+  let n = 0;
+  for (const f of nuovi) {
+    try {
+      await secPost('piano_festivita', {
+        data: f.data,
+        nome: f.nome,
+        paese: 'IT',
+        attivo: true,
+        operatore: getOperatore(),
+      });
+      n++;
+    } catch (e) {
+      console.warn('festivita', f.data, e && e.message);
+    }
+  }
+  _pianoFestivitaAnnoCaricato = null;
+  await _pianoCaricaFestivita(anno);
+  logAzione('Festivita importate', anno + ': ' + n + ' giorni');
+  toast(n + ' festivita inserite per il ' + anno);
+  renderPiano();
+}
+async function pianoFestivitaToggle(id) {
+  if (!puoGestireFestivi()) return;
+  const f = (pianoFestivitaCache || []).find((x) => x.id === id);
+  if (!f) return;
+  const nuovo = f.attivo === false;
+  await secPatch('piano_festivita', 'id=eq.' + id, { attivo: nuovo });
+  f.attivo = nuovo;
+  logAzione('Festivita ' + (nuovo ? 'riattivata' : 'disattivata'), f.nome + ' ' + f.data);
+  renderPiano();
+}
+async function pianoFestivitaElimina(id) {
+  if (!puoGestireFestivi()) return;
+  const f = (pianoFestivitaCache || []).find((x) => x.id === id);
+  if (!f) return;
+  if (!confirm('Elimino "' + f.nome + '" del ' + String(f.data).split('-').reverse().join('.') + '?')) return;
+  await secDel('piano_festivita', 'id=eq.' + id);
+  pianoFestivitaCache = pianoFestivitaCache.filter((x) => x.id !== id);
+  logAzione('Festivita eliminata', f.nome + ' ' + f.data);
+  renderPiano();
+}
+async function pianoFestivitaAggiungi() {
+  if (!puoGestireFestivi()) return;
+  const data = (document.getElementById('festivita-data') || {}).value;
+  const nome = ((document.getElementById('festivita-nome') || {}).value || '').trim();
+  const ora = (document.getElementById('festivita-ora') || {}).value;
+  if (!data || !nome) {
+    toast('Servono data e nome');
+    return;
+  }
+  try {
+    await secPost('piano_festivita', {
+      data: data,
+      nome: nome,
+      paese: 'IT',
+      ora_chiusura: ora ? parseFloat(ora) : null,
+      attivo: true,
+      operatore: getOperatore(),
+    });
+    _pianoFestivitaAnnoCaricato = null;
+    await _pianoCaricaFestivita(parseInt(data.split('-')[0]));
+    logAzione('Festivita aggiunta', nome + ' ' + data);
+    toast('Aggiunta: ' + nome);
+    renderPiano();
+  } catch (e) {
+    toast('Gia presente o errore');
+  }
+}
+function _renderPianoFestivitaCard() {
+  if (!puoGestireFestivi()) return '';
+  const anno = window._pianoFestiviAnnoSel || parseInt(_pianoMeseSel.split('-')[0]);
+  const cfg = _pianoChiusuraCfg();
+  const GG = ['domenica', 'lunedi', 'martedi', 'mercoledi', 'giovedi', 'venerdi', 'sabato'];
+  const righe = (pianoFestivitaCache || [])
+    .filter((f) => parseInt(String(f.data).substring(0, 4)) === anno)
+    .sort((a, b) => String(a.data).localeCompare(String(b.data)));
+  let h =
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Festivita e orari di chiusura ' +
+    anno +
+    '</div><div style="padding:12px 16px">';
+  h +=
+    '<p style="font-size:.85rem;color:var(--muted);line-height:1.55;margin-bottom:10px">Si chiude alle <b>' +
+    cfg.oraNormale +
+    ':00</b> nei giorni feriali e alle <b>' +
+    cfg.oraTardi +
+    ':00</b> il ' +
+    cfg.giorniTardi.map((g) => GG[g]).join(' e il ') +
+    '. Nei giorni di festivita si chiude alle <b>' +
+    cfg.oraTardi +
+    ':00</b> anche in mezzo alla settimana, e il <b>31 dicembre</b> alle <b>' +
+    cfg.oraFineAnno +
+    ':00</b>. Quei giorni compaiono nel calendario con il marcatore <b>CH' +
+    cfg.oraTardi +
+    '</b> in cima alla colonna, cosi si sa dove serve piu personale. Gli orari si cambiano nella scheda Regole.</p>';
+  h +=
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">' +
+    '<button class="btn-export" onclick="pianoImportaFestivita(' +
+    anno +
+    ')">Inserisci le festivita del ' +
+    anno +
+    '</button>' +
+    '<span style="font-size:.82rem;color:var(--muted)">' +
+    (PIANO_FESTIVITA_ELENCHI[anno]
+      ? 'elenco fornito dalla direzione'
+      : 'calcolate: dodici festivita italiane di legge, Pasqua compresa') +
+    '</span></div>';
+  if (!righe.length) {
+    h += '<p style="padding:8px 0;color:var(--muted)">Nessuna festivita registrata per il ' + anno + '.</p>';
+  } else {
+    h +=
+      '<div style="overflow-x:auto"><table class="piano-table" style="min-width:560px"><thead><tr>' +
+      '<th style="text-align:left">Data</th><th>Giorno</th><th style="text-align:left">Festivita</th><th title="Cosa compare in cima alla colonna nel calendario">Nel piano</th><th>Chiusura</th><th></th></tr></thead><tbody>';
+    righe.forEach((f) => {
+      const d = String(f.data).substring(0, 10);
+      const ch = _pianoChiusuraGiorno(d);
+      const spento = f.attivo === false;
+      h +=
+        '<tr style="' +
+        (spento ? 'opacity:.45' : '') +
+        '"><td style="text-align:left">' +
+        d.split('-').reverse().join('.') +
+        '</td><td>' +
+        GG[new Date(d + 'T12:00:00').getDay()] +
+        '</td><td style="text-align:left;font-weight:600">' +
+        escP(f.nome) +
+        '</td><td>' +
+        (spento
+          ? '<span style="color:var(--muted)">spenta</span>'
+          : ch.marcatore
+            ? '<b style="background:#8b4a8b;color:#fff;padding:2px 8px;border-radius:2px">' + ch.marcatore + '</b>'
+            : '<span style="color:var(--muted)" title="quel giorno si chiude gia tardi: non serve segnalarlo">-</span>') +
+        '</td><td>' +
+        (spento ? '-' : ch.ora + ':00') +
+        '</td><td style="white-space:nowrap"><button class="btn-act" style="font-size:.82rem" onclick="pianoFestivitaToggle(' +
+        f.id +
+        ')">' +
+        (spento ? 'Riattiva' : 'Spegni') +
+        '</button> <button class="btn-act del" style="font-size:.82rem" onclick="pianoFestivitaElimina(' +
+        f.id +
+        ')">Elimina</button></td></tr>';
+    });
+    h += '</tbody></table></div>';
+  }
+  h +=
+    '<div class="add-tipo-row" style="margin-top:12px"><div class="field"><label>Data</label><input type="date" id="festivita-data"></div>' +
+    '<div class="field"><label>Festivita</label><input type="text" id="festivita-nome" placeholder="Es. Santo patrono"></div>' +
+    '<div class="field"><label>Chiusura (facoltativa)</label><input type="number" id="festivita-ora" step="0.5" min="0" max="12" placeholder="' +
+    cfg.oraTardi +
+    '"></div>' +
+    '<button class="btn-add-tipo" onclick="pianoFestivitaAggiungi()">+ Aggiungi</button></div>';
+  h += '</div></div>';
+  return h;
 }
 // REGOLA CGF: il festivo che cade di DOMENICA non matura compensazione
 function _festivoCgfDefault(dstr) {

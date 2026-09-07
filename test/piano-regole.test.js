@@ -333,6 +333,42 @@ eq(
 ok(R.giorniVacanzaSpettanti('', 2026) === null, 'senza data di assunzione non si calcola');
 eq(R.giorniVacanzaSpettanti('2027-01-01', 2026).giorni, 0, 'assunto l anno dopo: zero giorni');
 
+console.log('\n== festivita e orari di chiusura ==');
+// Pasqua: date verificate sul calendario
+eq(R.pasqua(2026), '2026-04-05', 'Pasqua 2026');
+eq(R.pasqua(2027), '2027-03-28', 'Pasqua 2027');
+eq(R.pasqua(2028), '2028-04-16', 'Pasqua 2028');
+// L'elenco 2027 deve coincidere con quello fornito dalla direzione
+const f27 = R.festivitaItaliane(2027);
+eq(f27.length, 12, 'dodici festivita italiane');
+ok(
+  f27.some((x) => x.data === '2027-03-29' && /Angelo/.test(x.nome)),
+  'Lunedi dell Angelo 2027 = 29 marzo',
+);
+ok(
+  f27.some((x) => x.data === '2027-08-15' && /Ferragosto/.test(x.nome)),
+  'Ferragosto 15 agosto',
+);
+// Chiusure
+const FEST = { '2027-01-06': 'Epifania', '2027-12-25': 'Natale' };
+const merc = R.chiusuraDelGiorno('2027-01-06', FEST, {}); // Epifania di mercoledi
+eq(merc.ora, 5, 'festivita infrasettimanale: chiusura alle 5');
+eq(merc.marcatore, 'CH5', 'e va segnalata nel piano');
+const sab = R.chiusuraDelGiorno('2027-12-25', FEST, {}); // Natale 2027 e sabato
+eq(sab.ora, 5, 'festivita di sabato: sempre alle 5');
+eq(sab.marcatore, '', 'ma nessun marcatore: il sabato chiude gia alle 5');
+const feriale = R.chiusuraDelGiorno('2027-01-07', FEST, {}); // giovedi qualunque
+eq(feriale.ora, 4, 'giorno feriale normale: chiusura alle 4');
+eq(feriale.marcatore, '', 'nessun marcatore');
+const ven = R.chiusuraDelGiorno('2027-01-08', FEST, {}); // venerdi
+eq(ven.ora, 5, 'venerdi: chiusura alle 5 anche senza festivita');
+const fine = R.chiusuraDelGiorno('2026-12-31', {}, {});
+eq(fine.ora, 7, '31 dicembre: chiusura alle 7');
+eq(fine.marcatore, 'CH7', 'e si segnala sempre');
+// tutto configurabile: se un giorno si decidesse di chiudere alle 6
+const alt = R.chiusuraDelGiorno('2027-01-06', FEST, { oraTardi: 6 });
+eq(alt.marcatore, 'CH6', 'orario di chiusura configurabile');
+
 console.log('\n=======================================');
 console.log('  ' + passati + ' passati, ' + falliti + ' falliti');
 console.log('=======================================\n');
