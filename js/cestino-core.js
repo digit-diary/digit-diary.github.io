@@ -402,6 +402,74 @@ async function pulisciPianoDisattivati() {
 // Un mese intero senza turni e senza assenze retribuite (solo C) e' congedo non
 // pagato: non matura anzianita', quindi sposta in avanti i giubilei. Qui si
 // leggono dal piano i mesi cosi' fatti e si propone di registrarli sulla scheda.
+// Elenco compatto per inserire le date di nascita mancanti: servono per i
+// compleanni (nota nel piano) e per gli auguri. Si compila e si salva tutto
+// insieme, senza aprire la scheda di ognuno.
+async function apriFixDateNascita() {
+  const mancanti = (collaboratoriCache || [])
+    .filter((c) => c.attivo !== false && !c.data_nascita && !/^sig\.|^cognome/i.test(c.nome))
+    .sort((a, b) => (a.reparto_dip || '').localeCompare(b.reparto_dip || '') || a.nome.localeCompare(b.nome));
+  const b = document.getElementById('pwd-modal-content');
+  if (!mancanti.length) {
+    alert('Tutti i collaboratori attivi hanno la data di nascita.');
+    return;
+  }
+  let h =
+    '<h3>Date di nascita mancanti (' +
+    mancanti.length +
+    ')</h3><p style="font-size:.85rem;color:var(--muted);margin-bottom:8px">Scrivi giorno e mese (per esempio 02.03) oppure la data completa (02.03.1985). Servono per i compleanni: il giorno del compleanno il piano segna il congedo con la nota. Si salvano solo le righe compilate.</p>' +
+    '<div style="max-height:52vh;overflow:auto"><table class="piano-table" style="min-width:100%;font-size:.9rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Settore</th><th>Data di nascita</th></tr></thead><tbody>';
+  mancanti.forEach((c) => {
+    h +=
+      '<tr><td style="text-align:left;font-weight:600">' +
+      escP(c.nome) +
+      '</td><td style="font-size:.85rem;color:var(--muted)">' +
+      escP(repartoLabel(c.reparto_dip || 'slots')) +
+      '</td><td><input type="text" data-nasc-id="' +
+      c.id +
+      '" placeholder="gg.mm" style="width:110px;padding:4px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);text-align:center"></td></tr>';
+  });
+  h +=
+    '</tbody></table></div><div class="pwd-modal-btns" style="margin-top:12px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button><button class="btn-modal-ok" onclick="salvaFixDateNascita()">Salva le date inserite</button></div>';
+  b.innerHTML = h;
+  document.getElementById('pwd-modal').classList.remove('hidden');
+}
+async function salvaFixDateNascita() {
+  const campi = [...document.querySelectorAll('input[data-nasc-id]')].filter((i) => i.value.trim());
+  if (!campi.length) {
+    toast('Nessuna data inserita');
+    return;
+  }
+  let ok = 0;
+  const errori = [];
+  for (const inp of campi) {
+    const v = inp.value.trim();
+    const m = v.match(/^(\d{1,2})[.\/-](\d{1,2})(?:[.\/-](\d{2,4}))?$/);
+    if (!m) {
+      errori.push(v);
+      continue;
+    }
+    const gg = String(parseInt(m[1])).padStart(2, '0');
+    const mm = String(parseInt(m[2])).padStart(2, '0');
+    let anno = m[3] ? parseInt(m[3]) : 1900;
+    if (anno < 100) anno += anno > 30 ? 1900 : 2000;
+    const iso = anno + '-' + mm + '-' + gg;
+    try {
+      await secPatch('collaboratori', 'id=eq.' + inp.dataset.nascId, { data_nascita: iso });
+      const c = collaboratoriCache.find((x) => String(x.id) === String(inp.dataset.nascId));
+      if (c) c.data_nascita = iso;
+      ok++;
+    } catch (e) {
+      errori.push(v);
+    }
+  }
+  logAzione('Date di nascita inserite', ok + ' collaboratori');
+  document.getElementById('pwd-modal').classList.add('hidden');
+  toast(ok + ' date salvate' + (errori.length ? ', ' + errori.length + ' non valide' : ''));
+  if (errori.length)
+    alert('Non ho capito questi valori: ' + errori.join(', ') + '\n\nUsa il formato gg.mm oppure gg.mm.aaaa');
+  if (typeof controlloSalute === 'function') controlloSalute();
+}
 async function pianoRilevaCongedoNonPagato() {
   try {
     const [collab, righe] = await Promise.all([
@@ -635,7 +703,7 @@ async function controlloSalute() {
     const annoPross = oggi.getFullYear() + 1;
     const [collab, righe, festivi, turni] = await Promise.all([
       secGet(
-        'collaboratori?select=nome,attivo,impiego,is_jolly,reparto_dip,reparti_extra,percentuale,mesi_congedo_non_pagato&limit=2000',
+        'collaboratori?select=nome,attivo,impiego,is_jolly,reparto_dip,reparti_extra,percentuale,mesi_congedo_non_pagato,data_nascita&limit=2000',
       ),
       secGet('piano?data=gte.' + ym + '-01&limit=20000'),
       secGet('piano_festivi?select=data&limit=500'),
@@ -712,6 +780,24 @@ async function controlloSalute() {
             ': nel piano risultano mesi interi senza lavoro (solo C). Sono congedo non pagato e non maturano anzianita, quindi spostano in avanti i giubilei.'
         : 'I mesi di congedo non pagato risultano registrati sulle schede.',
       daRegistrare.length ? 'FIX:pianoRilevaCongedoNonPagato()|Registra i mesi di congedo' : '',
+    );
+
+    // 3-ter) date di nascita mancanti (servono per i compleanni)
+    const senzaNascita = attivi.filter((c) => !c.data_nascita && !/^sig\.|^cognome/i.test(c.nome));
+    add(
+      senzaNascita.length ? 'attenzione' : 'ok',
+      'Date di nascita per i compleanni',
+      senzaNascita.length
+        ? senzaNascita.length +
+            ' collaboratori attivi senza data di nascita (' +
+            senzaNascita
+              .slice(0, 5)
+              .map((c) => c.nome)
+              .join(', ') +
+            (senzaNascita.length > 5 ? ' e altri' : '') +
+            '). Senza la data il compleanno non viene segnato nel piano.'
+        : 'Tutti hanno la data di nascita.',
+      senzaNascita.length ? 'FIX:apriFixDateNascita()|Inserisci le date mancanti' : '',
     );
 
     // 4) disattivati che hanno ancora turni
