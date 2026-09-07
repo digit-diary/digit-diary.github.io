@@ -3689,8 +3689,14 @@ async function caricaBenesserePiano() {
       p.domTardi = 0;
       Object.keys(domeniche).forEach((d) => {
         if (!mesiOk.has(d.substring(0, 7))) return;
-        p.domTot++;
         const cod = p.giorni[d];
+        // Una domenica passata in VACANZA (o in malattia) non e' un riposo
+        // settimanale: non conta ne' come libera ne' nel totale.
+        if (cod === 'V' || cod === 'M' || cod === 'M1') {
+          p.domAssenza = (p.domAssenza || 0) + 1;
+          return;
+        }
+        p.domTot++;
         if (_pianoTurnoInfo(cod)) return; // domenica lavorata
         const sab = new Date(d + 'T12:00:00');
         sab.setDate(sab.getDate() - 1);
@@ -3804,13 +3810,18 @@ async function caricaBenesserePiano() {
           escP(x.nome) +
           '"><td style="text-align:left;font-weight:600">' +
           escP(x.nome) +
-          '</td><td style="font-weight:700;color:' +
+          '</td><td style="min-width:120px"><div style="display:flex;align-items:center;gap:6px">' +
+          '<div style="flex:1;height:7px;background:var(--line);border-radius:4px;overflow:hidden"><div style="width:' +
+          x.res.punteggio +
+          '%;height:100%;background:' +
+          colore(x.res.punteggio) +
+          '"></div></div><b style="color:' +
           colore(x.res.punteggio) +
           '">' +
           x.res.punteggio +
-          ' <span style="font-weight:400;font-size:.78rem">' +
+          '</b></div><div style="font-size:.8rem;color:var(--muted);text-align:center">' +
           etichetta(x.res.punteggio) +
-          '</span></td><td title="' +
+          '</div></td><td title="' +
           x.p.domLib +
           ' libere su ' +
           (x.p.domTot || 0) +
@@ -3818,6 +3829,7 @@ async function caricaBenesserePiano() {
           (x.p.mesiPiano || 0) +
           ' mesi)' +
           (x.p.domTardi ? ' · ' + x.p.domTardi + ' non valide: il sabato si finisce dopo le 23' : '') +
+          (x.p.domAssenza ? ' · ' + x.p.domAssenza + ' escluse perche in vacanza o malattia' : '') +
           '">' +
           x.p.domLib +
           '<span style="font-weight:400;color:var(--muted);font-size:.85rem">/' +
@@ -3855,10 +3867,7 @@ async function caricaBenesserePiano() {
       ' ' +
       ', su dati del piano. L indice va da 0 a 100 e pesa: domeniche libere (25), equita nei weekend (20), carico notturno (15), qualita del riposo (15), giorni consecutivi (15), vacanze godute (10). ' +
       'Le <b>malattie non tolgono punti</b>: sono un segnale da leggere insieme al resto, non una colpa. Passa il mouse su una riga per il dettaglio dei punti.</p>';
-    h +=
-      '<div style="margin:10px 0 4px"><canvas id="benessere-chart" height="' +
-      Math.max(140, Math.min(420, calcolati.length * 22)) +
-      '"></canvas></div>';
+    h += '<div style="margin:8px 0 10px;max-width:720px"><canvas id="benessere-chart" height="150"></canvas></div>';
     h += tabella(
       calcolati.filter((x) => !x.jolly),
       'Personale fisso',
@@ -3875,37 +3884,46 @@ async function caricaBenesserePiano() {
         '</p>';
     el.innerHTML = h;
     if (typeof Chart !== 'undefined' && document.getElementById('benessere-chart')) {
-      const ord = calcolati.slice().sort((a, b) => a.res.punteggio - b.res.punteggio);
+      // Grafico compatto: la MEDIA di ogni indicatore, in percentuale del suo
+      // massimo, confrontando personale fisso e ausiliari. Dice a colpo d'occhio
+      // dove il settore e' solido e dove no, senza una barra per ogni persona.
+      const medieDi = (lista) => {
+        if (!lista.length) return null;
+        const n = lista[0].res.voci.length;
+        const out = [];
+        for (let k = 0; k < n; k++) {
+          const somma = lista.reduce((sm, x) => sm + x.res.voci[k].punti, 0);
+          out.push(Math.round((somma / lista.length / lista[0].res.voci[k].max) * 100));
+        }
+        return out;
+      };
+      const fissi = calcolati.filter((x) => !x.jolly);
+      const jolly = calcolati.filter((x) => x.jolly);
+      const etichette = calcolati[0].res.voci.map((v) => v.nome);
+      const dataset = [];
+      const mf = medieDi(fissi);
+      const mj = medieDi(jolly);
+      if (mf)
+        dataset.push({ label: 'Fissi (' + fissi.length + ')', data: mf, backgroundColor: '#1a4a7a', borderRadius: 3 });
+      if (mj)
+        dataset.push({
+          label: 'Ausiliari (' + jolly.length + ')',
+          data: mj,
+          backgroundColor: '#b8860b',
+          borderRadius: 3,
+        });
       renderChart(
         'benessere-chart',
         'bar',
+        { labels: etichette, datasets: dataset },
         {
-          labels: ord.map((x) => x.nome.split(' ')[0] + (x.jolly ? ' (jolly)' : '')),
-          datasets: [
-            {
-              label: 'Indice di benessere',
-              data: ord.map((x) => x.res.punteggio),
-              backgroundColor: ord.map((x) => colore(x.res.punteggio)),
-              borderRadius: 3,
-            },
-          ],
-        },
-        {
-          indexAxis: 'y',
           plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                afterLabel: (ctx) => {
-                  const x = ord[ctx.dataIndex];
-                  return x ? x.res.voci.map((v) => v.nome + ': ' + v.punti + '/' + v.max) : '';
-                },
-              },
-            },
+            legend: { position: 'top', labels: { font: { size: 12 }, boxWidth: 12 } },
+            tooltip: { callbacks: { label: (c) => c.dataset.label + ': ' + c.parsed.y + '% del massimo' } },
           },
           scales: {
-            x: { min: 0, max: 100, ticks: { font: { size: 12 } }, title: { display: true, text: 'indice 0-100' } },
-            y: { ticks: { font: { size: 12 } } },
+            y: { min: 0, max: 100, ticks: { stepSize: 25, font: { size: 11 }, callback: (v) => v + '%' } },
+            x: { ticks: { font: { size: 11 } } },
           },
         },
       );

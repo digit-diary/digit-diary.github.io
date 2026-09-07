@@ -3133,13 +3133,36 @@ async function salvaSchedaNascita(nome) {
     return c.nome === nome;
   });
   if (coll) {
+    // La data di nascita e' un dato personale: modificarla o cancellarla
+    // richiede una conferma esplicita, cosi' non si perde per un clic
+    var _vecchia = coll.data_nascita || '';
+    if (_vecchia && !val) {
+      if (!confirm('ELIMINA\n\nCancellare la data di nascita di ' + nome + ' (' + dataNascitaLabel(_vecchia) + ')?')) {
+        apriSchedaCollaboratore(nome);
+        return;
+      }
+    } else if (_vecchia && val && _vecchia !== val) {
+      if (
+        !confirm(
+          'MODIFICA\n\nCambiare la data di nascita di ' +
+            nome +
+            '?\n\nDa ' +
+            dataNascitaLabel(_vecchia) +
+            ' a ' +
+            dataNascitaLabel(val),
+        )
+      ) {
+        apriSchedaCollaboratore(nome);
+        return;
+      }
+    }
     try {
       await secPatch('collaboratori', 'id=eq.' + coll.id, {
         data_nascita: val || null,
       });
       coll.data_nascita = val || null;
       logAzione('Data nascita collaboratore', nome + ' → ' + (val || 'rimossa'));
-      toast('Data nascita salvata');
+      toast(val ? 'Data nascita salvata' : 'Data nascita eliminata');
     } catch (e) {
       toast('Errore salvataggio');
     }
