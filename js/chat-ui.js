@@ -2618,14 +2618,16 @@ function _renderSchedaTimeline(nome, entries, moduli, dal, al) {
               ? '#1a4a7a'
               : '#b8860b'
           : getColore(i.tipo);
-      var impBadge =
-        i.importo && parseFloat(i.importo)
-          ? '<span style="margin-left:4px;padding:1px 6px;background:var(--accent);color:white;border-radius:2px;font-size:.72rem;font-weight:700">' +
-            fmtCHF(i.importo) +
-            ' ' +
-            (i.valuta || 'CHF') +
-            '</span>'
-          : '';
+      var impSeg = importoConSegno(i);
+      var impBadge = impSeg
+        ? '<span style="margin-left:4px;padding:1px 6px;background:' +
+          (impSeg.colore || 'var(--accent)') +
+          ';color:white;border-radius:2px;font-size:.72rem;font-weight:700">' +
+          impSeg.txt +
+          ' ' +
+          (i.valuta || 'CHF') +
+          '</span>'
+        : '';
       var repBadge = i.reparto
         ? '<span style="margin-left:4px;padding:1px 6px;background:var(--muted);color:white;border-radius:2px;font-size:.72rem">' +
           escP(i.reparto) +
@@ -2912,10 +2914,13 @@ function apriVoceTimeline(source, id) {
       (e.reparto ? ' · ' + escP(e.reparto) : '') +
       (e.operatore ? ' · inserito da ' + escP(e.operatore) : '') +
       '</p>';
-    if (e.importo && parseFloat(e.importo))
+    const _impSeg = importoConSegno(e);
+    if (_impSeg)
       html +=
-        '<p style="margin-bottom:10px"><span class="mini-badge" style="background:var(--accent);font-size:.8rem">' +
-        fmtCHF(e.importo) +
+        '<p style="margin-bottom:10px"><span class="mini-badge" style="background:' +
+        (_impSeg.colore || 'var(--accent)') +
+        ';font-size:.8rem">' +
+        _impSeg.txt +
         ' ' +
         (e.valuta || 'CHF') +
         '</span></p>';
@@ -3367,7 +3372,8 @@ function stampaSchedaPDF(nome) {
   }
   filteredEntries.forEach(function (e) {
     var txt = e.testo || '';
-    if (e.importo && parseFloat(e.importo)) txt += ' (' + fmtCHF(e.importo) + ' ' + (e.valuta || 'CHF') + ')';
+    var _iSeg = importoConSegno(e);
+    if (_iSeg) txt += ' (' + _iSeg.txt + ' ' + (e.valuta || 'CHF') + ')';
     items.push([new Date(e.data).toLocaleDateString('it-IT'), e.tipo, txt.substring(0, 110), e.operatore || '']);
   });
   filteredModuli.forEach(function (m) {

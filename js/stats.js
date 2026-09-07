@@ -475,7 +475,7 @@ async function esportaPDF() {
           e.tipo,
           e.reparto || '',
           e.testo.replace(/\n/g, ' '),
-          e.importo ? fmtCHF(e.importo) + ' ' + (e.valuta || 'CHF') : '',
+          importoConSegno(e) ? importoConSegno(e).txt + ' ' + (e.valuta || 'CHF') : '',
         ];
       }),
       styles: { lineColor: [220, 215, 205], lineWidth: 0.15, fontSize: 8, cellPadding: 2, overflow: 'linebreak' },

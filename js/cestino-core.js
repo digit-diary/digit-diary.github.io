@@ -280,6 +280,71 @@ async function salvaFixImpiego() {
   toast('Impiego salvato per ' + n + ' collaboratori');
   controlloSalute();
 }
+// I disattivati con mesi interi di soli riposi (C/V/WD senza commento) sono
+// righe di riempimento arrivate dagli import Excel: si tolgono dal piano,
+// i mesi con turni veri restano come storia di lavoro
+async function pulisciPianoDisattivati() {
+  try {
+    const [collab, righe] = await Promise.all([
+      secGet('collaboratori?select=nome,attivo&limit=2000'),
+      secGet('piano?select=id,collaboratore,data,codice,commento&limit=40000'),
+    ]);
+    const inattivi = new Set((collab || []).filter((c) => c.attivo === false).map((c) => (c.nome || '').toLowerCase()));
+    const isRiposo = (cod) => {
+      if (cod === 'C' || cod === 'V' || cod === 'WD') return true;
+      const cs = typeof _pianoCodiceInfo === 'function' ? _pianoCodiceInfo(cod) : null;
+      return !!(cs && cs.is_riposo);
+    };
+    const mesi = {};
+    (righe || []).forEach((r) => {
+      if (!inattivi.has((r.collaboratore || '').toLowerCase())) return;
+      const k = r.collaboratore + '|' + String(r.data).substring(0, 7);
+      if (!mesi[k]) mesi[k] = { ids: [], solo: true };
+      mesi[k].ids.push(r.id);
+      if (!isRiposo(r.codice) || (r.commento || '').trim()) mesi[k].solo = false;
+    });
+    const daPulire = Object.entries(mesi).filter(([, v]) => v.solo);
+    if (!daPulire.length) {
+      toast('Niente da pulire: nessun mese di soli riposi tra i disattivati');
+      return;
+    }
+    const perNome = {};
+    daPulire.forEach(([k]) => {
+      const [n, m] = k.split('|');
+      (perNome[n] = perNome[n] || []).push(m);
+    });
+    const elenco = Object.entries(perNome)
+      .map(([n, ms]) => '• ' + n + ': ' + ms.sort().join(', '))
+      .join('\n');
+    const totIds = daPulire.reduce((s, [, v]) => s + v.ids.length, 0);
+    if (
+      !confirm(
+        'Questi mesi contengono SOLO riposi (C/V) senza commenti: sono righe di riempimento degli import, non storia di lavoro.\n\n' +
+          elenco +
+          '\n\nTogliere queste ' +
+          totIds +
+          ' celle dal piano? I mesi con turni veri restano.',
+      )
+    )
+      return;
+    const ids = daPulire.flatMap(([, v]) => v.ids);
+    for (let i = 0; i < ids.length; i += 10) {
+      await Promise.all(ids.slice(i, i + 10).map((id) => secDel('piano', 'id=eq.' + id)));
+    }
+    if (typeof _pianoRighe !== 'undefined') {
+      const idsSet = new Set(ids);
+      _pianoRighe = _pianoRighe.filter((r) => !idsSet.has(r.id));
+    }
+    logAzione(
+      'Pulizia piani disattivati',
+      totIds + ' celle di solo riposo tolte (' + Object.keys(perNome).length + ' collaboratori)',
+    );
+    toast('Tolte ' + totIds + ' celle di riempimento');
+    controlloSalute();
+  } catch (e) {
+    toast('Errore pulizia: ' + (e.message || ''));
+  }
+}
 async function apriFixOrfani() {
   const el = document.getElementById('salute-content');
   if (!el) return;
@@ -499,9 +564,9 @@ async function controlloSalute() {
       'Collaboratori disattivati senza turni',
       disattiviConTurni.length
         ? disattiviConTurni.slice(0, 6).join(', ') +
-            ': risultano disattivati ma hanno turni pianificati. Vanno riattivati oppure il loro piano va tolto.'
+            ': risultano disattivati ma hanno turni pianificati. Se sono mesi di soli riposi (righe di riempimento degli import) si tolgono col bottone qui sotto; se invece devono lavorare vanno riattivati in Gestione Collaboratori.'
         : 'Nessun disattivato ha turni pianificati.',
-      disattiviConTurni.length ? 'Gestione Collaboratori' : '',
+      disattiviConTurni.length ? 'FIX:pulisciPianoDisattivati()|Togli i mesi di solo riposo' : '',
     );
 
     // 5) turni in un settore non suo e senza copertura configurata

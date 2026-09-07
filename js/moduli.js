@@ -2174,8 +2174,7 @@ async function importaModuloFile(input) {
         input.value = '';
         return;
       }
-      pdfjsLib.GlobalWorkerOptions.workerSrc =
-        'libs/pdf.worker.min.js';
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
       const buf = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
       for (let i = 1; i <= pdf.numPages; i++) {
@@ -2358,14 +2357,16 @@ function render() {
           escP(e.reparto) +
           '</span>'
         : '';
-      const imp =
-        e.importo && parseFloat(e.importo)
-          ? '<span style="display:inline-block;margin-left:6px;padding:2px 8px;background:var(--accent);color:white;border-radius:2px;font-size:.82rem;font-weight:700">' +
-            fmtCHF(e.importo) +
-            ' ' +
-            (e.valuta || 'CHF') +
-            '</span>'
-          : '';
+      const _impS = importoConSegno(e);
+      const imp = _impS
+        ? '<span style="display:inline-block;margin-left:6px;padding:2px 8px;background:' +
+          (_impS.colore || 'var(--accent)') +
+          ';color:white;border-radius:2px;font-size:.82rem;font-weight:700">' +
+          _impS.txt +
+          ' ' +
+          (e.valuta || 'CHF') +
+          '</span>'
+        : '';
       const metaLines = [];
       if (e.operatore) metaLines.push('Inserita da ' + escP(e.operatore));
       if (e.modificato_da) metaLines.push('Modificata da ' + escP(e.modificato_da));
