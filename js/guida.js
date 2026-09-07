@@ -215,7 +215,7 @@ function GUIDA_CAPITOLI() {
         'Il <b>CGF</b> e il recupero per il lavoro nei giorni festivi. Per il regolamento aziendale spetta al <b>personale fisso</b> e solo per i festivi diversi dalla domenica.',
         'Gli <b>ausiliari (jolly) non maturano CGF</b>: ricevono il <b>supplemento del 50%</b> sul salario orario lordo quando lavorano uno dei <b>nove festivi parificati alle domeniche</b> (Capodanno, Epifania, Lunedi di Pasqua, Ascensione, 1 Agosto, Assunzione, Ognissanti, Natale, Santo Stefano). Sono sempre quei nove, non cambiano di anno in anno e valgono anche quando cadono di domenica. Gli altri festivi cantonali (San Giuseppe, 1 Maggio, Pentecoste, Corpus Domini, SS. Pietro e Paolo, Immacolata) non danno il supplemento. In piu, per il lavoro notturno maturano <b>tempo libero pagato pari al 10% delle ore notturne</b>. Entrambi i conteggi sono nelle Statistiche anno, colonne Suppl. 50% e Notte 10%, pronti per le paghe. Fonte: RAP Allegato 1.',
         'Se la persona si ammala nel giorno del recupero, il CGF non risulta goduto e il credito resta.',
-        'Il conteggio di maturati, goduti e saldo parte da gennaio e serve anche a controllare se nei mesi passati i recuperi sono stati dati.',
+        'Il conteggio di maturati, goduti e saldo parte da gennaio e serve anche a controllare se nei mesi passati i recuperi sono stati dati. Chi compila il piano <b>a mano</b> trova nella scheda Festivi due pulsanti: <b>Chi ha diritto a un recupero</b> (elenco con maturati, goduti e saldo dell anno) e <b>Assegna i CGF del mese</b>, che mette i recuperi nei giorni liberi tenendo conto di quelli gia dati nei mesi precedenti, senza doppioni e senza toccare le celle occupate.',
       ],
     },
     {
