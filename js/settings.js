@@ -1069,6 +1069,46 @@ async function _aggiornaBackupInfo() {
         : 'Nessun backup registrato finora.';
   } catch (e) {}
 }
+// ===== CONSERVAZIONE DATI (regolamento aziendale / RAP) =====
+function renderConservazioneUI() {
+  const a = document.getElementById('conservazione-anni');
+  const g = document.getElementById('conservazione-grazia');
+  const st = document.getElementById('conservazione-stato');
+  const anni = typeof conservazioneAnni === 'function' ? conservazioneAnni() : 5;
+  const gg = typeof conservazioneGiorniGrazia === 'function' ? conservazioneGiorniGrazia() : 30;
+  if (a) a.value = String(anni);
+  if (g) g.value = String(gg);
+  if (st)
+    st.textContent = anni
+      ? "Protezione ATTIVA: le voci piu' vecchie di " +
+        gg +
+        ' giorni e degli ultimi ' +
+        anni +
+        ' anni non si possono eliminare definitivamente.'
+      : "Protezione DISATTIVATA: tutto e' eliminabile definitivamente dal Cestino.";
+}
+async function salvaConservazioneAnni(v) {
+  if (!isAdmin()) return;
+  const n = Math.max(0, Math.min(30, parseInt(v) || 0));
+  if (n < 5 && !confirm('Il regolamento chiede almeno 5 anni.\n\nConfermi comunque ' + n + ' anni?')) {
+    renderConservazioneUI();
+    return;
+  }
+  conservazioneAnniCfg = n;
+  await setImp('conservazione_anni', String(n));
+  logAzione('Conservazione dati', n ? 'minimo ' + n + ' anni' : 'protezione disattivata');
+  toast(n ? 'Conservazione: ' + n + ' anni' : 'Protezione conservazione disattivata');
+  renderConservazioneUI();
+}
+async function salvaConservazioneGrazia(v) {
+  if (!isAdmin()) return;
+  const n = Math.max(0, Math.min(365, parseInt(v) || 0));
+  conservazioneGraziaCfg = n;
+  await setImp('conservazione_giorni_grazia', String(n));
+  logAzione('Conservazione dati', 'finestra correzione ' + n + ' giorni');
+  toast('Correzione possibile entro ' + n + ' giorni');
+  renderConservazioneUI();
+}
 async function salvaBackupAutoGiorni(v) {
   if (!isAdmin()) return;
   const n = Math.max(0, Math.min(90, parseInt(v) || 0));

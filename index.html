@@ -3032,6 +3032,44 @@
           <button class="btn-add-tipo" onclick="aggiungiGiubileo()">+ Aggiungi scaglione</button>
         </div>
       </div>
+      <div class="settings-section" id="conservazione-section" style="display: none">
+        <h4>Conservazione dei dati</h4>
+        <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
+          Il regolamento aziendale impone di conservare i dati del personale per un numero minimo di anni. Con la
+          protezione attiva, le voci dell'archivio non si possono eliminare definitivamente: restano nel Cestino e si
+          possono sempre ripristinare. Restano invece cancellabili le voci inserite da poco, per correggere gli errori
+          di battitura.
+        </p>
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+          <label style="font-size: 0.84rem"
+            >Conserva i dati per almeno
+            <input
+              type="number"
+              id="conservazione-anni"
+              min="0"
+              max="30"
+              style="width: 60px; padding: 4px; text-align: center"
+              onchange="salvaConservazioneAnni(this.value)"
+            />
+            anni (0 = protezione disattivata)</label
+          >
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px">
+          <label style="font-size: 0.84rem"
+            >Si puo' correggere (eliminare davvero) entro
+            <input
+              type="number"
+              id="conservazione-grazia"
+              min="0"
+              max="365"
+              style="width: 60px; padding: 4px; text-align: center"
+              onchange="salvaConservazioneGrazia(this.value)"
+            />
+            giorni dall'inserimento</label
+          >
+        </div>
+        <p id="conservazione-stato" style="font-size: 0.82rem; color: var(--muted); margin-top: 10px"></p>
+      </div>
       <div class="settings-section" id="backup-section" style="display: none">
         <h4>Backup dati</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">

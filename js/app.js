@@ -135,6 +135,11 @@ function switchPage(name) {
     }
     const bkSec = document.getElementById('backup-section');
     if (bkSec) bkSec.style.display = isAdmin() ? '' : 'none';
+    const consSec = document.getElementById('conservazione-section');
+    if (consSec) {
+      consSec.style.display = isAdmin() ? '' : 'none';
+      if (isAdmin() && typeof renderConservazioneUI === 'function') renderConservazioneUI();
+    }
     const cestSec = document.getElementById('cestino-section');
     if (cestSec) cestSec.style.display = isAdmin() ? '' : 'none';
     const setSec = document.getElementById('settori-section');
