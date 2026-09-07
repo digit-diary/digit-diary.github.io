@@ -3729,6 +3729,163 @@ async function salvaPianoCodice(id, campo, valore) {
 }
 
 // ---- Card FESTIVI (admin) ----
+// ===== CGF PER IL PIANO FATTO A MANO =====
+// Stessa contabilita' del generatore automatico, ma applicabile da sola: si
+// contano i festivi lavorati e i CGF gia' goduti dall'inizio dell'anno (anche
+// dei mesi precedenti e del dicembre passato), cosi' il saldo e' sempre giusto
+// e non si assegnano recuperi doppi. Vale solo per il personale FISSO: gli
+// ausiliari prendono il supplemento del 50% (RAP Allegato 1), non il recupero.
+async function _pianoSaldoCgf(ym) {
+  const annoCorr = ym.split('-')[0];
+  const annoPrec = String(Number(annoCorr) - 1);
+  const festiviCgf = new Set(
+    pianoFestiviCache.filter((f) => f.cgf !== false && _festivoCgfDefault(f.data)).map((f) => f.data),
+  );
+  const nomi = collaboratoriCache
+    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && _pianoMaturaCgf(c))
+    .map((c) => c.nome);
+  const storia =
+    (await secGet(
+      'piano?data=gte.' +
+        annoPrec +
+        '-01-01&data=lte.' +
+        annoCorr +
+        '-12-31&reparto_dip=eq.' +
+        _pianoReparto() +
+        '&limit=40000',
+    )) || [];
+  const saldo = {};
+  nomi.forEach((n) => (saldo[n] = { maturati: 0, goduti: 0, festiviMese: [] }));
+  storia.forEach((r) => {
+    const s = saldo[r.collaboratore];
+    if (!s) return;
+    if (festiviCgf.has(r.data) && _pianoTurnoInfo(r.codice)) {
+      s.maturati++;
+      if (String(r.data).startsWith(ym)) s.festiviMese.push(parseInt(r.data.split('-')[2]));
+    }
+    if (r.codice === 'CGF') s.goduti++;
+  });
+  return { saldo: saldo, storia: storia, nomi: nomi };
+}
+// Elenco informativo: chi ha diritto a un recupero e quanti
+async function pianoElencoCgfDaDare() {
+  if (!puoGestirePiano()) return;
+  toast('Calcolo i recuperi...');
+  const { saldo, nomi } = await _pianoSaldoCgf(_pianoMeseSel);
+  const righe = nomi
+    .map((n) => ({ nome: n, ...saldo[n], resta: saldo[n].maturati - saldo[n].goduti }))
+    .filter((x) => x.maturati || x.goduti)
+    .sort((a, b) => b.resta - a.resta || a.nome.localeCompare(b.nome));
+  const b = document.getElementById('pwd-modal-content');
+  let h =
+    '<h3>Recuperi festivi (CGF) · ' +
+    escP(_pianoMeseSel.split('-')[0]) +
+    '</h3><p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Conteggio da gennaio (piu\' il dicembre precedente): festivi lavorati meno recuperi gia\' goduti. Solo personale fisso.</p>';
+  if (!righe.length) h += '<p style="font-size:.85rem">Nessun festivo lavorato quest\'anno.</p>';
+  else {
+    h +=
+      '<div style="max-height:52vh;overflow:auto"><table class="piano-table" style="min-width:100%;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Maturati</th><th>Goduti</th><th>Da dare</th></tr></thead><tbody>';
+    righe.forEach((r) => {
+      h +=
+        '<tr><td style="text-align:left;font-weight:600">' +
+        escP(r.nome) +
+        '</td><td>' +
+        r.maturati +
+        '</td><td>' +
+        r.goduti +
+        '</td><td style="font-weight:700;color:' +
+        (r.resta > 0 ? '#c0392b' : r.resta < 0 ? '#8b6914' : '#2c6e49') +
+        '">' +
+        (r.resta > 0 ? r.resta : r.resta < 0 ? r.resta + " (in piu')" : '0') +
+        '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+  }
+  h +=
+    '<div class="pwd-modal-btns" style="margin-top:12px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
+  b.innerHTML = h;
+  document.getElementById('pwd-modal').classList.remove('hidden');
+}
+// Assegna i CGF mancanti nei giorni liberi del mese aperto
+async function pianoAssegnaCgfMese() {
+  if (!puoGestirePiano()) return;
+  const ym = _pianoMeseSel;
+  toast('Calcolo i recuperi da assegnare...');
+  const { saldo, nomi } = await _pianoSaldoCgf(ym);
+  const nGiorni = _pianoUltimoGiorno(ym);
+  const malattie = _pianoMalattieMese(ym);
+  const occupato = {};
+  _pianoRighe.forEach((r) => (occupato[r.collaboratore + '|' + parseInt(r.data.split('-')[2])] = r.codice));
+  const daFare = [];
+  nomi.forEach((n) => {
+    const s = saldo[n];
+    let resta = s.maturati - s.goduti;
+    if (resta <= 0) return;
+    // prima i giorni dopo i festivi lavorati questo mese, poi qualsiasi buco
+    const partenze = s.festiviMese.map((g) => g + 1).concat([1]);
+    for (const p of partenze) {
+      if (resta <= 0) break;
+      for (let g = Math.max(1, p); g <= nGiorni && resta > 0; g++) {
+        const dstrG = ym + '-' + String(g).padStart(2, '0');
+        if (occupato[n + '|' + g]) continue;
+        if (malattie[n + '|' + dstrG]) continue;
+        if (daFare.some((x) => x.nome === n && x.giorno === g)) continue;
+        daFare.push({ nome: n, giorno: g, data: dstrG });
+        resta--;
+        break;
+      }
+    }
+  });
+  if (!daFare.length) {
+    alert(
+      'Nessun recupero da assegnare in ' +
+        ym +
+        ".\n\nO i saldi sono gia' a posto, oppure non ci sono giorni liberi dove metterli (le celle gia' occupate non vengono toccate).",
+    );
+    return;
+  }
+  const elenco = daFare
+    .slice(0, 25)
+    .map((x) => '• ' + x.nome.split(' ')[0] + ' → giorno ' + x.giorno)
+    .join('\n');
+  if (
+    !confirm(
+      'Assegno ' +
+        daFare.length +
+        ' recuper' +
+        (daFare.length === 1 ? 'o' : 'i') +
+        ' (CGF) nei giorni liberi di ' +
+        ym +
+        ':\n\n' +
+        elenco +
+        (daFare.length > 25 ? '\n... e altri ' + (daFare.length - 25) : '') +
+        "\n\nIl conteggio tiene conto dei recuperi gia' dati nei mesi precedenti. Le celle occupate non vengono toccate.",
+    )
+  )
+    return;
+  _pianoUndoSnap('assegnazione CGF ' + ym);
+  let fatti = 0;
+  try {
+    for (const x of daFare) {
+      const nuovo = await secPost('piano', {
+        collaboratore: x.nome,
+        data: x.data,
+        codice: 'CGF',
+        protetto: false,
+        generato: true,
+        reparto_dip: _pianoReparto(),
+        operatore: getOperatore(),
+      });
+      if (nuovo && nuovo[0]) _pianoRighe.push(nuovo[0]);
+      fatti++;
+    }
+    logAzione('Piano: CGF assegnati a mano', ym + ' · ' + fatti + ' recuperi');
+    toast(fatti + ' recuperi assegnati');
+    renderPiano();
+  } catch (e) {
+    toast('Errore: assegnati ' + fatti + ' su ' + daFare.length);
+  }
+}
 function _renderPianoFestiviCard() {
   if (!isAdmin()) return '';
   // selettore anno: si vedono (e generano) anche i festivi degli anni futuri
@@ -3760,6 +3917,17 @@ function _renderPianoFestiviCard() {
       (anniPresenti.includes(a) ? '' : ' (vuoto)') +
       '</option>';
   h += '</select></div><div style="padding:10px 14px">';
+  // Chi compila il piano A MANO non passa dalla generazione automatica: con
+  // questi pulsanti assegna i CGF del mese senza rifare il piano.
+  h +=
+    '<div style="background:var(--paper2);border:1px solid var(--line);border-radius:3px;padding:10px 12px;margin-bottom:12px">' +
+    '<b style="font-size:.9rem">Recuperi festivi (CGF) sul piano</b>' +
+    '<p style="font-size:.82rem;color:var(--muted);margin:4px 0 8px">Per chi compila il piano a mano: assegna i giorni di recupero ai <b>fissi</b> che hanno lavorato nei festivi, senza rigenerare nulla. Gli ausiliari non ricevono CGF: per loro vale il supplemento del 50% (RAP Allegato 1), che si legge nelle Statistiche.</p>' +
+    '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="pianoAssegnaCgfMese()">Assegna i CGF del mese di ' +
+    escP(_pianoMeseSel) +
+    '</button> ' +
+    '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="pianoElencoCgfDaDare()">Chi ha diritto a un recupero</button>' +
+    '</div>';
   if (!visibili.length)
     h +=
       '<p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Nessun festivo per il ' +
