@@ -4285,12 +4285,69 @@ async function apriCercaCambioLibero() {
     '</select></div>' +
     '<div class="field" style="text-align:left;margin-top:8px"><label>Giorno di restituzione</label><select id="cc-rest" style="width:100%;padding:9px"></select></div>' +
     '<div class="field" style="text-align:left;margin-top:8px"><label>Motivazione</label><input type="text" id="cc-motivo" placeholder="Es: esigenze personali..."></div>' +
-    '<p style="font-size:.76rem;color:var(--muted);margin-top:8px">Alla conferma: celle aggiornate con il commento del cambio, formulario cambio turno gia\' compilato da stampare e firmare, conteggio nel limite cambi del richiedente.</p>' +
-    '<div class="pwd-modal-btns" style="margin-top:12px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button>' +
+    '<p style="font-size:.76rem;color:var(--muted);margin-top:8px">Puoi stampare la lista dei colleghi con cui puo\' cambiare e consegnarla al collaboratore: lui chiede a chi vuole, poi si torna qui e si conferma. Alla conferma: celle aggiornate col commento del cambio, formulario cambio turno gia\' compilato da stampare e firmare, conteggio nel limite cambi del richiedente.</p>' +
+    '<div class="pwd-modal-btns" style="margin-top:12px;flex-wrap:wrap;gap:6px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button>' +
+    '<button class="btn-export" style="padding:8px 14px" onclick="stampaListaCambioLibero()">Stampa lista colleghi</button>' +
     '<button class="btn-modal-ok" onclick="confermaCercaCambioLibero()">Applica cambio</button></div>';
   document.getElementById('pwd-modal-content').innerHTML = h;
   document.getElementById('pwd-modal').classList.remove('hidden');
   ccAggiornaRestituzioni();
+}
+// PDF della lista colleghi con cui il collaboratore puo' cambiare il giorno X,
+// da consegnargli PRIMA di confermare: lui chiede, poi si torna e si applica
+async function stampaListaCambioLibero() {
+  if (!_ccDati) return;
+  if (!window.jspdf) await caricaJsPDF();
+  const doc = new window.jspdf.jsPDF();
+  const pw = doc.internal.pageSize.getWidth();
+  const dataIt = _ccDati.data.split('-').reverse().join('.');
+  doc.setFontSize(13);
+  doc.text('Cambio turno · colleghi disponibili', pw / 2, 16, { align: 'center' });
+  doc.setFontSize(10);
+  doc.text(_ccDati.nome + ' chiede di essere libero il ' + dataIt + ' (turno ' + _ccDati.codice + ')', pw / 2, 24, {
+    align: 'center',
+  });
+  doc.setFontSize(8.5);
+  doc.text(
+    'Questi colleghi sono a riposo quel giorno e possono coprire rispettando le regole. ' +
+      'Il turno va restituito prendendo un turno del collega in una delle date indicate.',
+    pw / 2,
+    31,
+    { align: 'center', maxWidth: pw - 28 },
+  );
+  doc.autoTable({
+    theme: 'grid',
+    startY: 38,
+    head: [['Collega', 'Tipo', 'Date possibili per restituire il turno']],
+    body: _ccDati.candidati.map((c) => [
+      c.nome,
+      c.jolly ? 'jolly' : 'fisso',
+      c.rest.length
+        ? c.rest
+            .slice(0, 10)
+            .map((rr) => rr.data.split('-').reverse().join('.') + ' (' + rr.codice + ')' + (rr.stesso ? ' =' : ''))
+            .join(',  ') + (c.rest.length > 10 ? '  ...' : '')
+        : 'nessuna data compatibile',
+    ]),
+    headStyles: { fillColor: [26, 74, 122], fontSize: 8.5 },
+    bodyStyles: { fontSize: 8.5 },
+    columnStyles: { 0: { fontStyle: 'bold' }, 2: { cellWidth: 105 } },
+    margin: { left: 12, right: 12 },
+  });
+  let y = doc.lastAutoTable.finalY + 10;
+  doc.setFontSize(8.5);
+  doc.text('"=" indica una data in cui il collega fa lo stesso turno (' + _ccDati.codice + ').', 14, y);
+  y += 12;
+  doc.text('Collega scelto: ______________________     Data restituzione: ______________', 14, y);
+  y += 10;
+  doc.text('Firma richiedente: __________________     Firma collega: __________________', 14, y);
+  doc.setFontSize(8);
+  doc.text(
+    'Casino Lugano SA · lista informativa, il cambio va confermato dal responsabile',
+    14,
+    doc.internal.pageSize.getHeight() - 8,
+  );
+  mostraPdfPreview(doc, 'colleghi_cambio_' + _ccDati.data + '.pdf', 'Colleghi per il cambio');
 }
 function ccAggiornaRestituzioni() {
   if (!_ccDati) return;
