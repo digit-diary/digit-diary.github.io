@@ -230,6 +230,16 @@ function GUIDA_CAPITOLI() {
       ],
     },
     {
+      area: 'home',
+      titolo: 'Compleanni: dove compaiono e chi ci finisce',
+      righe: [
+        'I compleanni si vedono in due posti: la <b>fascia dorata in cima</b> alla pagina, che saluta chi compie gli anni <b>oggi</b>, e il riquadro <b>Compleanni</b> nella Home, che elenca <b>oggi e i prossimi sette giorni</b>.',
+        'Nel riquadro della Home ci sono sia i <b>collaboratori</b> del settore sia i <b>clienti Maison</b>: sono due elenchi diversi uniti nello stesso posto, per questo si puo trovare un nome in uno e non nell altro.',
+        'Il settore si legge dall <b>anagrafica</b> del collaboratore. Prima il riquadro mostrava solo chi aveva gia registrazioni nel diario, quindi un collaboratore nuovo compariva nella fascia in alto ma non nella Home: adesso i due elenchi usano lo stesso criterio e coincidono sempre.',
+        'Serve la <b>data di nascita</b> in anagrafica: si mette in Gestione collaboratori. Basta giorno e mese, l anno non e obbligatorio.',
+      ],
+    },
+    {
       area: 'piano',
       titolo: 'Piano: controllo delle durate dei turni (in ore e minuti)',
       righe: [
