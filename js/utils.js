@@ -448,6 +448,17 @@ function _getNascitaValue(id) {
   return _parseDataNascita(el.value);
 }
 
+// Importo di una registrazione con segno: per le differenze cassa la
+// direzione sta nel testo (ammanco = negativo, eccedenza = positivo).
+// Ritorna { txt: '-100.00', colore: '#c62828' } pronto da mostrare.
+function importoConSegno(e) {
+  const v = parseFloat(e && e.importo) || 0;
+  if (!v) return null;
+  if (/ammanco/i.test((e && e.testo) || '')) return { txt: '-' + fmtCHF(v), colore: '#c62828' };
+  if (/eccedenza/i.test((e && e.testo) || '')) return { txt: '+' + fmtCHF(v), colore: '#2e7d32' };
+  return { txt: fmtCHF(v), colore: '' };
+}
+
 // Conta giorni malattia da una registrazione (1 se singola, N se range)
 function _contaGiorniMalattia(entry) {
   const m = (entry.testo || '').match(/\((\d+)\s*giorni/);

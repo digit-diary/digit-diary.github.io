@@ -2879,7 +2879,7 @@ async function importaFabbisognoExcel(input) {
           nuovi.length +
           ' celle da caricare' +
           (errori ? '\n• ' + errori + ' righe con codice turno sconosciuto (saltate)' : '') +
-          '\n\nATTENZIONE: il fabbisogno esistente del mese viene SOSTITUITO (come in Turnivo).',
+          '\n\nATTENZIONE: il fabbisogno esistente del mese viene SOSTITUITO.',
       )
     )
       return;
@@ -2990,6 +2990,7 @@ async function importaPianoExcel(input) {
         .toLowerCase()
         .replace(/(^|[\s.'-])(\w)/g, (m, a, b) => a + b.toUpperCase());
     const righeCollab = []; // {nome, celle:[{g,cod}], stato:'ok'|'riattiva'|'nuovo', funzione, percentuale, ref}
+    const saltatiDisattivati = []; // disattivati con soli riposi nel file: righe di riempimento, non si importano
     const nomiOk = new Set();
     let sigleScartate = 0;
     dati.slice(inizio).forEach((riga, idxRiga) => {
@@ -3014,6 +3015,18 @@ async function importaPianoExcel(input) {
         nomiOk.add(hit.nome);
       } else if (hit) {
         if (!celle.length) return;
+        // disattivato con SOLI riposi nel file: e' la riga di riempimento del
+        // foglio HR (es. tutto C dopo che ha smesso), non va importata,
+        // altrimenti il collaboratore riappare nel piano con mesi di sole C
+        const soloRiposi = celle.every((c) => {
+          if (c.cod === 'C' || c.cod === 'V' || c.cod === 'WD') return true;
+          const cs = _pianoCodiceInfo(c.cod);
+          return !!(cs && cs.is_riposo);
+        });
+        if (soloRiposi) {
+          saltatiDisattivati.push(hit.nome);
+          return;
+        }
         righeCollab.push({ nome: hit.nome, celle: celle, stato: 'riattiva', ref: hit });
       } else if (celle.length >= 3 && celle.some((c) => c.cod !== 'C')) {
         // collaboratore NUOVO trovato nel file: funzione e % dalle colonne
@@ -3073,6 +3086,9 @@ async function importaPianoExcel(input) {
             : '') +
           (daRiattivare.length
             ? '\n• Da RIATTIVARE (disattivati ma presenti nel file): ' + daRiattivare.map((x) => x.nome).join(', ')
+            : '') +
+          (saltatiDisattivati.length
+            ? '\n• Saltati (disattivati, nel file solo riposi): ' + saltatiDisattivati.join(', ')
             : '') +
           '\n\nLe celle già presenti NON vengono toccate.',
       )
@@ -4122,14 +4138,9 @@ function _pdfCambioTurno(dati) {
   doc.line(M, ph - 14, 210 - M, ph - 14);
   doc.setFontSize(7.5);
   doc.setTextColor(85, 85, 85);
-  doc.text(
-    'Generato da Turnivo · Casino Lugano SA · Richiesto da: ' + (dati.richiesto || getOperatore()),
-    105,
-    ph - 9,
-    {
-      align: 'center',
-    },
-  );
+  doc.text('Casino Lugano SA · Richiesto da: ' + (dati.richiesto || getOperatore()), 105, ph - 9, {
+    align: 'center',
+  });
   return doc;
 }
 
@@ -4821,7 +4832,7 @@ function apriCoperturaMalattia() {
   b.innerHTML =
     '<h3>Copertura malattia · ' +
     _pianoMeseSel +
-    '</h3><p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Cerca i migliori sostituti liberi per i turni del collaboratore malato (come in Turnivo).</p>' +
+    '</h3><p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Cerca i migliori sostituti liberi per i turni del collaboratore malato.</p>' +
     '<div class="field" style="text-align:left"><label>Collaboratore malato</label><select id="mal-collab" style="width:100%;padding:8px">' +
     nomi.map((n) => '<option>' + escP(n) + '</option>').join('') +
     '</select></div>' +
@@ -6141,7 +6152,7 @@ async function _renderPianoVacanzeTab() {
   }
   h += '</div>';
   h +=
-    '<p style="font-size:.8rem;color:var(--muted);padding:8px 14px 0">Le vacanze sono settimane intere (lun-dom). "Applica al piano" scrive le V (protette) del mese scelto nel Calendario e i congedi C prima/dopo secondo le regole (1 C prima per i fissi, 2 per i jolly; C dopo scalati per percentuale). Import Excel formato Turnivo: colonna A cognome, B nome, colonne F-BE settimane 1-52 con X.</p>';
+    '<p style="font-size:.8rem;color:var(--muted);padding:8px 14px 0">Le vacanze sono settimane intere (lun-dom). "Applica al piano" scrive le V (protette) del mese scelto nel Calendario e i congedi C prima/dopo secondo le regole (1 C prima per i fissi, 2 per i jolly; C dopo scalati per percentuale). Import Excel: colonna A cognome, B nome, colonne F-BE settimane 1-52 con X.</p>';
   if (!gruppi.length) h += '<p style="padding:14px;color:var(--muted)">Nessuna vacanza per il ' + anno + '.</p>';
   gruppi.forEach((nome) => {
     const lista = perCollab[nome];
@@ -8408,7 +8419,7 @@ function _renderPianoRegoleGruppoCard() {
   let h =
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Regole di gruppo (admin)</div><div style="padding:10px 14px">';
   h +=
-    '<p style="font-size:.82rem;color:var(--muted);margin-bottom:6px">Regole di idoneità per settore/gruppo, come in Turnivo: chi può lavorare in un gruppo, limiti e minimi per funzione. Applicate dalla bozza automatica e dal validatore.</p>';
+    '<p style="font-size:.82rem;color:var(--muted);margin-bottom:6px">Regole di idoneità per settore/gruppo: chi può lavorare in un gruppo, limiti e minimi per funzione. Applicate dalla bozza automatica e dal validatore.</p>';
   h +=
     '<div style="overflow-x:auto"><table class="piano-table" style="min-width:680px;font-size:.85rem"><thead><tr><th>Gruppo</th><th style="text-align:left">Regola</th><th style="text-align:left">Valore</th><th>Attiva</th><th></th></tr></thead><tbody>';
   pianoRegoleGruppoCache

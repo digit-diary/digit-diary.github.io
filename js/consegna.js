@@ -999,7 +999,12 @@ async function generaReportSettimanale(sez) {
           head: [['Data', 'Collaboratore', 'Importo']],
           body: errCassa.map((e) => {
             const d = new Date(e.data);
-            return [d.toLocaleDateString('it-IT'), e.nome, fmtCHF(e.importo) + ' ' + (e.valuta || 'CHF')];
+            const _is = importoConSegno(e);
+            return [
+              d.toLocaleDateString('it-IT'),
+              e.nome,
+              (_is ? _is.txt : fmtCHF(e.importo)) + ' ' + (e.valuta || 'CHF'),
+            ];
           }),
           headStyles: { fillColor: [192, 57, 43] },
           styles: { lineColor: [220, 215, 205], lineWidth: 0.15, fontSize: 9, cellPadding: 3 },
