@@ -325,17 +325,39 @@ function _pianoOreDiRiga(r, pct) {
   }
   const cs = _pianoCodiceInfo(r.codice);
   if (cs && parseFloat(cs.ore) > 0) {
-    if (!cs.scala_percentuale) return parseFloat(cs.ore) || 0;
-    // AUSILIARI (jolly): non hanno una percentuale contrattuale. Quella scritta
-    // in scheda serve solo da indicazione per la generazione del piano, quindi
-    // NON deve ridurre il valore delle assenze: per loro si conta il valore
-    // pieno, e le indennita' (vacanze, tredicesima) si calcolano in percentuale
-    // sulle ore lavorate (RAP Allegato 1).
     const infoR = r && r.collaboratore ? _pianoCollabInfo(r.collaboratore) : null;
-    if (infoR && (infoR.is_jolly || infoR.impiego === 'jolly')) return parseFloat(cs.ore) || 0;
-    return (parseFloat(cs.ore) || 0) * (pct || 1);
+    return _pianoOreCodiceSpeciale(cs, infoR || { percentuale: pct }, r.codice);
   }
   return 0;
+}
+// Codici che per gli AUSILIARI (jolly) valgono ZERO ore, perche' l'indennita'
+// e' gia' compresa e pagata nel salario orario dei giorni lavorati (RAP
+// Allegato 1): le vacanze di un jolly non sono giornate pagate a parte, quindi
+// contarle in ore le farebbe risultare due volte. Elenco modificabile dalle
+// regole (jolly_codici_gia_pagati) senza toccare il programma.
+function _pianoCodiciGiaNellaPagaJolly() {
+  const v = _pianoRegolaVal('jolly_codici_gia_pagati');
+  return String(v == null || v === '' ? 'V,V1' : v)
+    .split(',')
+    .map((s) => s.trim().toUpperCase())
+    .filter(Boolean);
+}
+// Ore di un codice speciale per un dato collaboratore. Unico punto di verita':
+// lo usano sia il piano mensile sia le statistiche dell'anno.
+function _pianoOreCodiceSpeciale(cs, info, codice) {
+  if (!cs) return 0;
+  const ore = parseFloat(cs.ore) || 0;
+  if (!ore) return 0;
+  const jolly = !!(info && (info.is_jolly || info.impiego === 'jolly'));
+  const cod = String(codice || cs.codice || '').toUpperCase();
+  if (jolly && _pianoCodiciGiaNellaPagaJolly().indexOf(cod) >= 0) return 0;
+  if (!cs.scala_percentuale) return ore;
+  // AUSILIARI (jolly): non hanno una percentuale contrattuale. Quella scritta
+  // in scheda serve solo da indicazione per la generazione del piano, quindi
+  // NON deve ridurre il valore delle assenze: per loro si conta il valore
+  // pieno, e le indennita' si calcolano in percentuale sulle ore lavorate.
+  if (jolly) return ore;
+  return ore * (parseFloat(info && info.percentuale) || 1);
 }
 function _pianoColore(codice) {
   const t = _pianoTurnoInfo(codice);
@@ -7700,8 +7722,7 @@ async function caricaStatisticheAnnoPiano() {
         if (malattieAnno[r.collaboratore + '|' + r.data]) o.cgfPersi++;
         else o.cgfGod++;
       }
-      const oCs = parseFloat(cs.ore) || 0;
-      o.ore += cs.scala_percentuale ? oCs * (parseFloat(info.percentuale) || 1) : oCs;
+      o.ore += _pianoOreCodiceSpeciale(cs, info, r.codice);
     }
   });
   // ore dovute sull'anno: solo sui mesi che hanno un piano (come confronto sensato)
@@ -7811,7 +7832,7 @@ function _pianoVacDirittoCard(anno) {
       { anni: 10, giorni: parseFloat(_pianoRegolaVal('vacanze_bonus_10anni')) || 1 },
       { anni: 15, giorni: parseFloat(_pianoRegolaVal('vacanze_bonus_15anni')) || 2 },
       { anni: 20, giorni: parseFloat(_pianoRegolaVal('vacanze_bonus_20anni')) || 3 },
-      { anni: 25, giorni: parseFloat(_pianoRegolaVal('vacanze_bonus_25anni')) || 5 },
+      { anni: 25, giorni: parseFloat(_pianoRegolaVal('vacanze_bonus_25anni')) || 4 },
     ],
   };
   // giorni V gia' presenti nel piano dell'anno (dal mese caricato in memoria
@@ -7907,7 +7928,10 @@ function _pianoVacDirittoCard(anno) {
           ...cfg,
           mesiCongedo: x.c.mesi_congedo_non_pagato,
         });
-        return pros && pros.giorni > x.r.giorni
+        // si segnala solo chi SUPERA la base dei primi due anni: chi arriva a 28
+        // sta semplicemente completando l'anno intero, non e' una novita' da
+        // tenere presente per la pianificazione
+        return pros && pros.giorni > x.r.giorni && pros.giorni > cfg.base1
           ? { nome: x.c.nome, da: x.r.giorni, a: pros.giorni, diff: Math.round((pros.giorni - x.r.giorni) * 10) / 10 }
           : null;
       })
