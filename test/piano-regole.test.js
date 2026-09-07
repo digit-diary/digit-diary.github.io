@@ -275,10 +275,14 @@ eq(R.giorniVacanzaSpettanti('2000-01-01', 2001).giorni, 28, 'primo anno = 28 gio
 eq(R.giorniVacanzaSpettanti('2000-01-01', 2002).giorni, 35, 'dal secondo anniversario = 35 giorni');
 eq(R.giorniVacanzaSpettanti('2000-01-01', 2009).giorni, 35, 'nove anni = ancora 35');
 eq(R.giorniVacanzaSpettanti('2000-01-01', 2010).giorni, 36, 'dieci anni = 36 (+1)');
-eq(R.giorniVacanzaSpettanti('2000-01-01', 2015).giorni, 38, 'quindici anni = 38 (+2 cumulato)');
-eq(R.giorniVacanzaSpettanti('2000-01-01', 2020).giorni, 41, 'venti anni = 41 (+3 cumulato)');
-eq(R.giorniVacanzaSpettanti('2000-01-01', 2025).giorni, 46, 'venticinque anni = 46 (+5 cumulato)');
-eq(R.giorniVacanzaSpettanti('2000-01-01', 2030).giorni, 46, 'oltre i venticinque resta 46');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2015).giorni, 37, 'quindici anni = 37 (+2, sostituisce l +1)');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2020).giorni, 38, 'venti anni = 38 (+3, sostituisce l +2)');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2025).giorni, 40, 'venticinque anni = 40 (+5, sostituisce l +3)');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2030).giorni, 40, 'oltre i venticinque resta 40');
+// gli scaglioni NON si sommano: vale solo il piu' alto raggiunto
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2016).bonus, 2, 'a 16 anni il bonus e 2, non 1+2');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2026).voci.length, 1, 'resta una sola voce di bonus, la piu alta');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2026).voci[0].anni, 25, 'la voce e lo scaglione dei 25 anni');
 
 // PRO RATA nell'anno in cui si compiono i due anni: assunto 1 maggio 2024,
 // nel 2026 compie 2 anni il 1 maggio -> gen-apr a 28/12, mag-dic a 35/12

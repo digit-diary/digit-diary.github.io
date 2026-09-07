@@ -7846,7 +7846,7 @@ function _pianoVacDirittoCard(anno) {
     cfg.base1 +
     ' giorni, poi ' +
     cfg.base2 +
-    '; nell anno del passaggio si matura mese per mese. Giorni in piu per anzianita, cumulativi e pieni dall anno dell anniversario: 10 anni +' +
+    '; nell anno del passaggio si matura mese per mese. Giorni in piu per anzianita, NON cumulativi (vale lo scaglione piu alto raggiunto) e pieni dall anno dell anniversario: 10 anni +' +
     cfg.bonus[0].giorni +
     ', 15 anni +' +
     cfg.bonus[1].giorni +
