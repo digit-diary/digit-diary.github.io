@@ -1,4 +1,4 @@
-const CACHE_NAME = 'diario-cl-v210';
+const CACHE_NAME = 'diario-cl-v211';
 const SHELL_URLS = ['/', '/manifest.json', '/logo_casino.png', '/icon-192.png', '/icon-512.png',
   '/css/style.css',
   '/js/config.js', '/js/crypto.js', '/js/chat-core.js', '/js/realtime.js',
