@@ -277,8 +277,8 @@ eq(R.giorniVacanzaSpettanti('2000-01-01', 2009).giorni, 35, 'nove anni = ancora 
 eq(R.giorniVacanzaSpettanti('2000-01-01', 2010).giorni, 36, 'dieci anni = 36 (+1)');
 eq(R.giorniVacanzaSpettanti('2000-01-01', 2015).giorni, 37, 'quindici anni = 37 (+2, sostituisce l +1)');
 eq(R.giorniVacanzaSpettanti('2000-01-01', 2020).giorni, 38, 'venti anni = 38 (+3, sostituisce l +2)');
-eq(R.giorniVacanzaSpettanti('2000-01-01', 2025).giorni, 40, 'venticinque anni = 40 (+5, sostituisce l +3)');
-eq(R.giorniVacanzaSpettanti('2000-01-01', 2030).giorni, 40, 'oltre i venticinque resta 40');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2025).giorni, 39, 'venticinque anni = 39 (+4, sostituisce l +3)');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2030).giorni, 39, 'oltre i venticinque resta 39');
 // gli scaglioni NON si sommano: vale solo il piu' alto raggiunto
 eq(R.giorniVacanzaSpettanti('2000-01-01', 2016).bonus, 2, 'a 16 anni il bonus e 2, non 1+2');
 eq(R.giorniVacanzaSpettanti('2000-01-01', 2026).voci.length, 1, 'resta una sola voce di bonus, la piu alta');

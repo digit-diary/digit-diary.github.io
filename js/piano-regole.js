@@ -291,7 +291,7 @@
           { anni: 10, giorni: 1 },
           { anni: 15, giorni: 2 },
           { anni: 20, giorni: 3 },
-          { anni: 25, giorni: 5 },
+          { anni: 25, giorni: 4 },
         ];
     if (!dataAssunzione) return null;
     const ass = new Date(dataAssunzione + 'T12:00:00');
