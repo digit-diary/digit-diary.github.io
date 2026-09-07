@@ -985,7 +985,16 @@ const _TABELLE_BACKUP = [
   'piano_regole_gruppo',
   'piano_formulari',
   'piano_briefing',
+  'hr_allegati',
+  'push_subscriptions',
+  'chat_message_letti',
+  'chat_message_hidden',
+  // note tra colleghi: il canale sicuro restituisce solo quelle visibili a
+  // chi esporta; i messaggi chat restano cifrati anche nel backup
+  'note_colleghi',
 ];
+// operatori_auth NON passa dall'app per sicurezza (contiene le password):
+// per la migrazione completa c'e' il backup server nel pacchetto IT
 async function esportaBackupCompleto() {
   if (!isAdmin()) {
     toast('Solo admin');
