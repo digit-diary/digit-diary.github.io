@@ -972,14 +972,14 @@ async function renderPiano() {
       const LC = _pianoCalcolaLarghezze(nomi);
       h +=
         '<div class="piano-wrap"><table data-seltab="piano" class="piano-table piano-fixed" style="width:' +
-        (LC.tot + 37 * nGiorni + 326) +
+        (LC.tot + 37 * nGiorni + 380) +
         'px"><colgroup><col style="width:' +
         LC.nome +
         'px"><col style="width:' +
         LC.fun +
         'px">' +
         _pianoColgroupGiorni(nGiorni) +
-        '<col style="width:54px"><col style="width:30px"><col style="width:30px"><col style="width:54px"><col style="width:54px"><col style="width:50px"><col style="width:54px"></colgroup><thead><tr><th class="piano-nome">Collaboratore</th><th class="piano-fun">Fun</th>';
+        '<col style="width:54px"><col style="width:54px"><col style="width:30px"><col style="width:30px"><col style="width:54px"><col style="width:54px"><col style="width:50px"><col style="width:54px"></colgroup><thead><tr><th class="piano-nome">Collaboratore</th><th class="piano-fun">Fun</th>';
       for (let g = 1; g <= nGiorni; g++) {
         const dstr = ym + '-' + String(g).padStart(2, '0');
         const dow = new Date(dstr + 'T12:00:00').getDay();
@@ -1011,7 +1011,9 @@ async function renderPiano() {
           '</div></th>';
       }
       h +=
-        '<th class="piano-tot piano-sep-left">Ore</th><th class="piano-tot">D</th><th class="piano-tot">N</th>' +
+        '<th class="piano-tot piano-sep-left" title="Ore contrattuali del mese: somma della durata dei turni, supplemento notturno del 10% compreso">Ore</th>' +
+        '<th class="piano-tot" title="Ore effettivamente lavorate: dall\'entrata all\'uscita, senza il supplemento del 10% e senza malattie, vacanze, CGF, permessi, maternita, matrimonio, militare, nascita, protezione civile, trasloco e assistenza familiare">OL</th>' +
+        '<th class="piano-tot" title="Turni diurni">D</th><th class="piano-tot" title="Turni notturni">N</th>' +
         '<th class="piano-tot" title="Ore Dovute">OD</th><th class="piano-tot" title="Ore Pianificate">OP</th>' +
         '<th class="piano-tot" title="Saldo Mensile">SM</th><th class="piano-tot" title="Saldo Anno">YTD</th></tr></thead><tbody>';
 
@@ -1021,6 +1023,11 @@ async function renderPiano() {
         const infoC0 = _pianoCollabInfo(nome);
         const perc0 = infoC0 ? parseFloat(infoC0.percentuale) || 1 : 1;
         let ore = 0; // solo turni (colonna Ore = ore_stimate Turnivo)
+        // OL = ore EFFETTIVAMENTE lavorate: solo turni di lavoro, senza il
+        // supplemento del 10% notturno e senza nessuna assenza retribuita
+        // (malattia, vacanza, CGF, maternita', matrimonio, militare, nascita,
+        // permesso, protezione civile, trasloco, assistenza familiare)
+        let oreLav = 0;
         let oreSpec = 0; // codici speciali (scala_percentuale come Turnivo)
         let nD = 0;
         let nN = 0;
@@ -1042,6 +1049,7 @@ async function renderPiano() {
             if (_col) stile = 'background:' + _col;
             if (t) {
               ore += parseFloat(t.durata_ore) || 0;
+              oreLav += _pianoOreEffettiveTurno(t, r);
               if (t.tipo === 'NOTTURNO') nN++;
               else nD++;
               titolo = codice + ' ' + (t.ora_inizio || '').substring(0, 5) + '-' + (t.ora_fine || '').substring(0, 5);
@@ -1194,19 +1202,21 @@ async function renderPiano() {
           riga +
           '<td class="piano-tot piano-sep-left" data-tot="0">' +
           (ore ? ore.toFixed(1) : '') +
-          '</td><td class="piano-tot" data-tot="1">' +
-          (nD || '') +
+          '</td><td class="piano-tot" data-tot="1" title="ore effettivamente lavorate">' +
+          (oreLav ? oreLav.toFixed(1) : '') +
           '</td><td class="piano-tot" data-tot="2">' +
+          (nD || '') +
+          '</td><td class="piano-tot" data-tot="3">' +
           (nN || '') +
-          '</td><td class="piano-tot" data-tot="3" style="color:var(--muted)">' +
+          '</td><td class="piano-tot" data-tot="4" style="color:var(--muted)">' +
           (dovute ? dovute.toFixed(1) : '') +
-          '</td><td class="piano-tot" data-tot="4">' +
+          '</td><td class="piano-tot" data-tot="5">' +
           (orePiano ? orePiano.toFixed(1) : '') +
-          '</td><td class="piano-tot" data-tot="5" style="color:' +
+          '</td><td class="piano-tot" data-tot="6" style="color:' +
           (saldo > 0 ? '#2c6e49' : saldo < 0 ? '#c0392b' : 'var(--muted)') +
           '">' +
           (orePiano || dovute ? (saldo > 0 ? '+' : '') + saldo.toFixed(1) : '') +
-          '</td><td class="piano-tot" data-tot="6" style="font-weight:700;color:' +
+          '</td><td class="piano-tot" data-tot="7" style="font-weight:700;color:' +
           (ytd > 0 ? '#2c6e49' : ytd < 0 ? '#c0392b' : 'var(--muted)') +
           '">' +
           (orePiano || _pianoYtdMap[nome] ? (ytd > 0 ? '+' : '') + ytd.toFixed(1) : '') +
@@ -4228,6 +4238,19 @@ const PIANO_FESTIVI_PARIFICATI = [
 // notturna (per legge 23:00-06:00, modificabile dalle regole notte_inizio /
 // notte_fine). Serve per il supplemento del 10% in tempo libero pagato dovuto
 // al personale ausiliario (RAP Allegato 1).
+// ORE EFFETTIVAMENTE LAVORATE di un turno: dalla timbratura di entrata a
+// quella di uscita, SENZA il supplemento del 10% sul lavoro notturno (che e'
+// compreso nella durata contrattuale del turno). Se la cella ha orari suoi
+// (turno personalizzato, JG) valgono quelli.
+function _pianoOreEffettiveTurno(t, riga) {
+  const oi = (riga && riga.ora_inizio) || (t && t.ora_inizio);
+  const of = (riga && riga.ora_fine) || (t && t.ora_fine);
+  const i = _pianoOra(oi);
+  let f = _pianoOra(of);
+  if (i == null || f == null) return 0;
+  if (f <= i) f += 24;
+  return Math.round((f - i) * 100) / 100;
+}
 function _pianoOreNotturneTurno(t) {
   if (!t) return 0;
   const ni = parseFloat(_pianoRegolaVal('notte_inizio'));
