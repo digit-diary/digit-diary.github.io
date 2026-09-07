@@ -1466,7 +1466,10 @@ header h1 .casino {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9997;
+  /* sopra i popup (10000): l'anteprima di stampa si apre SEMPRE da un popup
+     gia' aperto (lista colleghi per il cambio, proposta di copertura), quindi
+     sotto non si vedrebbe */
+  z-index: 10050;
   -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
 }

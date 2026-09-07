@@ -2465,8 +2465,48 @@ function apriPopupCopertura(assente, dataRif, modo) {
     window._copResolve = resolve;
     window._copCtx = { assente, dataRif: dataRif || new Date().toISOString().split('T')[0], modo: modo || 'malattia' };
     _renderPopupCopertura();
+    // il piano del giorno arriva subito dopo: dice che turno aveva l'assente,
+    // che turno hanno gli altri e chi e' formato per quella posizione
+    _copCaricaPianoDelGiorno();
   });
 }
+// Piano del giorno dell'assenza: serve per dire all'operatore CHI puo'
+// davvero coprire. Un elenco di nomi senza il turno di ciascuno costringe a
+// controllare il piano a parte, ed e' li' che nascono gli errori.
+async function _copCaricaPianoDelGiorno() {
+  const ctx = window._copCtx;
+  if (!ctx || !ctx.dataRif) return;
+  try {
+    const righe = (await secGet('piano?data=eq.' + ctx.dataRif + '&limit=2000')) || [];
+    const perNome = {};
+    righe.forEach((r) => (perNome[r.collaboratore] = r.codice));
+    ctx.piano = perNome;
+    ctx.turnoAssente = perNome[ctx.assente] || '';
+    _renderPopupCopertura();
+  } catch (e) {
+    /* senza piano il popup resta comunque utilizzabile */
+  }
+}
+// Stato di un collega per la copertura: che turno ha quel giorno e se e'
+// formato per il turno scoperto.
+function _copStatoCollega(nome) {
+  const ctx = window._copCtx || {};
+  const cod = (ctx.piano || {})[nome] || '';
+  const turnoScoperto =
+    ctx.turnoAssente && typeof _pianoTurnoInfo === 'function' ? _pianoTurnoInfo(ctx.turnoAssente) : null;
+  const suo = cod && typeof _pianoTurnoInfo === 'function' ? _pianoTurnoInfo(cod) : null;
+  const libero = !cod || (!suo && cod !== 'M' && cod !== 'V');
+  let formato = null;
+  if (turnoScoperto && typeof _pianoIdoneoPerTurno === 'function') {
+    try {
+      formato = _pianoIdoneoPerTurno(nome, turnoScoperto);
+    } catch (e) {
+      formato = null;
+    }
+  }
+  return { codice: cod, suoTurno: suo, libero: libero, formato: formato };
+}
+
 function _renderPopupCopertura() {
   const ctx = window._copCtx;
   if (!ctx) return;
@@ -2493,9 +2533,18 @@ function _renderPopupCopertura() {
       ": chi ha accettato la modifica puo' ricevere i punti disponibilita'; chi ha rifiutato si puo' segnare qui sotto.</p>"
     : '<h3>Copertura turno · ' +
       escP(assente) +
-      '</h3><p style="color:var(--muted);font-size:.84rem;margin-bottom:14px">Assenza del ' +
+      '</h3><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding:8px 12px;background:var(--paper2);border-left:3px solid var(--accent2);border-radius:3px">' +
+      '<span style="font-size:.86rem">Assenza del <b>' +
       dataLabel +
-      '. Se il turno non viene sostituito, chiudi con "Nessuna copertura".</p>';
+      '</b></span>' +
+      (ctx.turnoAssente
+        ? '<span style="font-size:.86rem">Turno scoperto: <b style="background:#c0392b;color:#fff;padding:2px 8px;border-radius:2px">' +
+          escP(ctx.turnoAssente) +
+          '</b></span>'
+        : ctx.piano
+          ? '<span style="font-size:.82rem;color:var(--muted)">Nessun turno nel piano quel giorno</span>'
+          : '<span style="font-size:.82rem;color:var(--muted)">lettura del piano...</span>') +
+      '</div><p style="color:var(--muted);font-size:.82rem;margin-bottom:12px">Se il turno non viene sostituito, chiudi con "Nessuna copertura".</p>';
   // Già registrato per questa assenza (con possibilità di rimuovere/correggere)
   const esistenti = eventiCopertura(assente, ctx.dataRif);
   if (esistenti.length) {
@@ -2526,23 +2575,67 @@ function _renderPopupCopertura() {
     (azCop ? ' (+' + azCop.punti + ' punti)' : '') +
     '</label><select id="cop-chi" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"><option value="">· Nessuno / da decidere ·</option>' +
     collabs
-      .map((c) => '<option' + (modoCambio && c.nome === assente ? ' selected' : '') + '>' + escP(c.nome) + '</option>')
+      .map((c) => {
+        const st = _copStatoCollega(c.nome);
+        const etichette = [];
+        if (st.codice) etichette.push(st.suoTurno ? 'turno ' + st.codice : st.codice);
+        else if (ctx.piano) etichette.push('libero');
+        if (st.formato === true) etichette.push('formato');
+        else if (st.formato === false) etichette.push('NON formato');
+        return (
+          '<option' +
+          (modoCambio && c.nome === assente ? ' selected' : '') +
+          ' value="' +
+          escP(c.nome).replace(/"/g, '&quot;') +
+          '">' +
+          escP(c.nome) +
+          (etichette.length ? '  ·  ' + etichette.join(' · ') : '') +
+          '</option>'
+        );
+      })
       .join('') +
-    '</select></div>';
+    '</select>' +
+    (ctx.turnoAssente
+      ? '<p style="font-size:.76rem;color:var(--muted);margin-top:5px">Accanto a ogni nome: che turno ha quel giorno e se e formato per il turno scoperto. Chi non e formato si puo scegliere lo stesso, ma resta scritto nel registro.</p>'
+      : '') +
+    '</div>';
   if (azNeg) {
     html +=
       '<div class="pwd-field"><label>Chi NON ha dato disponibilità (' +
       azNeg.punti +
       ' punti ciascuno)</label><div style="max-height:170px;overflow-y:auto;border:1px solid var(--line);border-radius:2px;padding:6px 10px;background:var(--paper2)">' +
       collabs
-        .map(
-          (c) =>
-            '<label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:.9rem"><input type="checkbox" class="cop-negato-cb" value="' +
+        .slice()
+        .sort((x, y) => {
+          // prima chi puo' davvero coprire: formato e libero quel giorno
+          const a1 = _copStatoCollega(x.nome);
+          const b1 = _copStatoCollega(y.nome);
+          const peso = (s2) => (s2.formato === true ? 0 : s2.formato === false ? 2 : 1) + (s2.libero ? 0 : 0.5);
+          return peso(a1) - peso(b1) || x.nome.localeCompare(y.nome);
+        })
+        .map((c) => {
+          const st = _copStatoCollega(c.nome);
+          const tag = (testo, colore) =>
+            '<span style="font-size:.72rem;padding:1px 7px;border-radius:9px;background:' +
+            colore +
+            ';color:#fff;font-weight:700">' +
+            testo +
+            '</span>';
+          let badge = '';
+          if (st.formato === true) badge += tag('formato', '#1a7a6d');
+          else if (st.formato === false) badge += tag('non formato', '#b0803a');
+          if (st.codice) badge += ' ' + tag(st.codice, st.suoTurno ? '#4a5568' : '#8a94a6');
+          else if (ctx.piano) badge += ' ' + tag('libero', '#2c6e49');
+          return (
+            '<label style="display:flex;align-items:center;gap:9px;padding:5px 2px;cursor:pointer;font-size:.9rem;border-bottom:1px solid var(--line)"><input type="checkbox" class="cop-negato-cb" value="' +
             escP(c.nome).replace(/"/g, '&quot;') +
-            '" style="width:16px;height:16px"> ' +
+            '" style="width:16px;height:16px"><span style="flex:1">' +
             escP(c.nome) +
-            '</label>',
-        )
+            '</span>' +
+            badge +
+            '</label>'
+          );
+        })
         .join('') +
       '</div></div>';
   }
