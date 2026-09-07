@@ -3704,21 +3704,39 @@ function _pianoDurataAttesa(t) {
   const nott = _pianoOreNotturneTurno(t);
   return Math.round((eff + _pianoNotteRecupero(nott)) * 100) / 100;
 }
+// Ore decimali scritte come le legge una persona: 8.5 -> "8h30".
+// Serve a controllare i turni in sessantesimi, che e' come si ragiona sui turni.
+function _pianoOreHm(ore) {
+  const v = parseFloat(ore);
+  if (isNaN(v)) return '-';
+  const segno = v < 0 ? '-' : '';
+  const min = Math.round(Math.abs(v) * 60);
+  return segno + Math.floor(min / 60) + 'h' + String(min % 60).padStart(2, '0');
+}
+// Durata dall'orologio: differenza fra entrata e uscita, senza supplementi
+function _pianoDurataOrologio(t) {
+  const e = _pianoOra(t.ora_inizio);
+  const u = _pianoOra(t.ora_fine);
+  if (e == null || u == null) return null;
+  return Math.round((u >= e ? u - e : 24 + u - e) * 100) / 100;
+}
 async function pianoVerificaDurateNotte() {
   if (!isAdmin()) return;
   const tutti = pianoTurniCache.filter((t) => t.attivo !== false && t.ora_inizio && t.ora_fine);
   const perc = parseFloat(_pianoRegolaVal('notte_percentuale')) || 10;
   const problemi = [];
   tutti.forEach((t) => {
+    // si controllano TUTTI i turni con orario, anche quelli senza ore notturne:
+    // una durata sbagliata di un turno diurno vale come una di un notturno
     const nott = _pianoOreNotturneTurno(t);
-    if (nott <= 0) return;
     const attesa = _pianoDurataAttesa(t);
     const dich = parseFloat(t.durata_ore);
     if (attesa == null || isNaN(dich)) return;
     const diff = Math.round((attesa - dich) * 100) / 100;
-    if (Math.abs(diff) >= 0.06) problemi.push({ t: t, nott: nott, attesa: attesa, dich: dich, diff: diff });
+    // sotto i 3 minuti e' arrotondamento, non un errore
+    if (Math.abs(diff) * 60 >= 3) problemi.push({ t: t, nott: nott, attesa: attesa, dich: dich, diff: diff });
   });
-  const conNotte = tutti.filter((t) => _pianoOreNotturneTurno(t) > 0).length;
+  const conNotte = tutti.length;
   const b = document.getElementById('pwd-modal-content');
   let h =
     '<h3>Supplemento notturno del ' +
@@ -3727,17 +3745,17 @@ async function pianoVerificaDurateNotte() {
     (parseFloat(_pianoRegolaVal('notte_inizio')) || 23) +
     ':00-' +
     (parseFloat(_pianoRegolaVal('notte_fine')) || 6) +
-    ':00. Turni con ore notturne: <b>' +
+    ':00. Turni con orario: <b>' +
     conNotte +
     '</b>, di cui <b>' +
     problemi.length +
-    '</b> con durata da sistemare.</p>';
+    '</b> con durata da sistemare (scarto di almeno 3 minuti; sotto e arrotondamento).</p>';
   if (!problemi.length) {
     h +=
       '<p style="font-size:.9rem;color:#2c6e49;font-weight:700">Tutte le durate comprendono correttamente il supplemento notturno.</p>';
   } else {
     h +=
-      '<div style="max-height:48vh;overflow:auto"><table class="piano-table" style="min-width:100%;font-size:.82rem"><thead><tr><th style="text-align:left">Turno</th><th>Orario</th><th>Ore notturne</th><th>Durata ora</th><th>Durata corretta</th><th>Differenza</th></tr></thead><tbody>';
+      '<div style="max-height:48vh;overflow:auto"><table class="piano-table" style="min-width:100%;font-size:.82rem"><thead><tr><th style="text-align:left">Turno</th><th>Orario</th><th title="Dall entrata all uscita">Durata reale</th><th>Ore notturne</th><th title="10% delle ore notturne">Supplemento</th><th>Durata scritta ora</th><th>Durata corretta</th><th>Differenza</th></tr></thead><tbody>';
     problemi.forEach((p) => {
       h +=
         '<tr><td style="text-align:left;font-weight:600">' +
@@ -3749,17 +3767,25 @@ async function pianoVerificaDurateNotte() {
         '-' +
         (p.t.ora_fine || '').substring(0, 5) +
         '</td><td>' +
-        p.nott.toFixed(2) +
-        'h</td><td>' +
+        _pianoOreHm(_pianoDurataOrologio(p.t)) +
+        '</td><td>' +
+        _pianoOreHm(p.nott) +
+        '</td><td>' +
+        _pianoOreHm(_pianoNotteRecupero(p.nott)) +
+        '</td><td>' +
+        _pianoOreHm(p.dich) +
+        ' <span style="color:var(--muted)">(' +
         p.dich +
-        'h</td><td style="font-weight:700">' +
+        ')</span></td><td style="font-weight:700">' +
+        _pianoOreHm(p.attesa) +
+        ' <span style="font-weight:400;color:var(--muted)">(' +
         p.attesa +
-        'h</td><td style="font-weight:700;color:' +
+        ')</span></td><td style="font-weight:700;color:' +
         (p.diff > 0 ? '#c0392b' : '#8b6914') +
         '">' +
         (p.diff > 0 ? '+' : '') +
-        p.diff +
-        'h</td></tr>';
+        Math.round(p.diff * 60) +
+        ' min</td></tr>';
     });
     h += '</tbody></table></div>';
     h +=

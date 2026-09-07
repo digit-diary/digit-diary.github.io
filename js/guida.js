@@ -231,6 +231,16 @@ function GUIDA_CAPITOLI() {
     },
     {
       area: 'piano',
+      titolo: 'Piano: controllo delle durate dei turni (in ore e minuti)',
+      righe: [
+        'Nella scheda <b>Turni</b> il bottone <b>Controlla le durate dei turni</b> confronta, per ogni turno con orario, la durata scritta con quella che risulta dall orologio piu il supplemento del <b>10%</b> sulle ore notturne (23:00-06:00).',
+        'La tabella mostra tutto sia in <b>ore e minuti</b> (8h30) sia in decimali (8.5), perche sui turni si ragiona in sessantesimi ma il programma calcola in decimali: cosi i due modi si vedono affiancati e non ci si sbaglia.',
+        'Vengono segnalati solo gli scarti di <b>almeno tre minuti</b>: sotto e arrotondamento, non un errore.',
+        'Il bottone che corregge riscrive la durata dei turni, quindi cambia i conteggi delle ore: si usa solo dopo aver controllato riga per riga. Un turno puo avere una durata diversa per accordi particolari, per esempio pause non pagate.',
+      ],
+    },
+    {
+      area: 'piano',
       titolo: 'Piano: recupero ore (griglia giornaliera)',
       righe: [
         'La scheda <b>Recupero ore</b> e il foglio giornaliero: si aggiorna <b>ogni giorno</b>, come si faceva sul file Excel di slots e tavoli.',
