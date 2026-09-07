@@ -2314,10 +2314,12 @@ function badgeCoperturaHtml(entry) {
       '</span>';
   return h;
 }
-function apriPopupCopertura(assente, dataRif) {
+function apriPopupCopertura(assente, dataRif, modo) {
+  // modo 'cambio' = cambio turno per esigenze operative: chi accetta prende
+  // i punti "Cambio turno accettato" invece di quelli di copertura malattia
   return new Promise((resolve) => {
     window._copResolve = resolve;
-    window._copCtx = { assente, dataRif: dataRif || new Date().toISOString().split('T')[0] };
+    window._copCtx = { assente, dataRif: dataRif || new Date().toISOString().split('T')[0], modo: modo || 'malattia' };
     _renderPopupCopertura();
   });
 }
@@ -2326,22 +2328,30 @@ function _renderPopupCopertura() {
   if (!ctx) return;
   const assente = ctx.assente;
   const collabs = getCollaboratoriReparto()
-    .filter((c) => c.attivo !== false && c.nome.toLowerCase() !== (assente || '').toLowerCase())
+    .filter(
+      (c) => c.attivo !== false && (ctx.modo === 'cambio' || c.nome.toLowerCase() !== (assente || '').toLowerCase()),
+    )
     .sort((a, b) => a.nome.localeCompare(b.nome));
   if (!collabs.length) {
     _chiudiPopupCopertura(false);
     return;
   }
   const cfg = getPuntiConfig();
-  const azCop = cfg.azioni.find((a) => a.key === 'copertura');
+  const modoCambio = ctx.modo === 'cambio';
+  const azCop = cfg.azioni.find((a) => a.key === (modoCambio ? 'cambio_turno' : 'copertura'));
   const azNeg = cfg.azioni.find((a) => a.key === 'disponibilita_negata');
   const dataLabel = ctx.dataRif ? new Date(ctx.dataRif + 'T12:00:00').toLocaleDateString('it-IT') : 'oggi';
-  let html =
-    '<h3>Copertura turno · ' +
-    escP(assente) +
-    '</h3><p style="color:var(--muted);font-size:.84rem;margin-bottom:14px">Assenza del ' +
-    dataLabel +
-    '. Se il turno non viene sostituito, chiudi con "Nessuna copertura".</p>';
+  let html = modoCambio
+    ? '<h3>Incentivi · cambio per esigenze · ' +
+      escP(assente) +
+      '</h3><p style="color:var(--muted);font-size:.84rem;margin-bottom:14px">Cambio turno del ' +
+      dataLabel +
+      ": chi ha accettato la modifica puo' ricevere i punti disponibilita'; chi ha rifiutato si puo' segnare qui sotto.</p>"
+    : '<h3>Copertura turno · ' +
+      escP(assente) +
+      '</h3><p style="color:var(--muted);font-size:.84rem;margin-bottom:14px">Assenza del ' +
+      dataLabel +
+      '. Se il turno non viene sostituito, chiudi con "Nessuna copertura".</p>';
   // Già registrato per questa assenza (con possibilità di rimuovere/correggere)
   const esistenti = eventiCopertura(assente, ctx.dataRif);
   if (esistenti.length) {
@@ -2367,10 +2377,13 @@ function _renderPopupCopertura() {
       '</div>';
   }
   html +=
-    '<div class="pwd-field"><label>Chi copre il turno' +
+    '<div class="pwd-field"><label>' +
+    (modoCambio ? 'Chi ha accettato il cambio' : 'Chi copre il turno') +
     (azCop ? ' (+' + azCop.punti + ' punti)' : '') +
     '</label><select id="cop-chi" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"><option value="">· Nessuno / da decidere ·</option>' +
-    collabs.map((c) => '<option>' + escP(c.nome) + '</option>').join('') +
+    collabs
+      .map((c) => '<option' + (modoCambio && c.nome === assente ? ' selected' : '') + '>' + escP(c.nome) + '</option>')
+      .join('') +
     '</select></div>';
   if (azNeg) {
     html +=
@@ -2434,7 +2447,8 @@ async function _chiudiPopupCopertura(conferma) {
     const nota = ((document.getElementById('cop-nota') || {}).value || '').trim();
     const negati = [...document.querySelectorAll('.cop-negato-cb:checked')].map((cb) => cb.value);
     const cfg = getPuntiConfig();
-    const azCop = cfg.azioni.find((a) => a.key === 'copertura');
+    const modoCambio = ctx.modo === 'cambio';
+    const azCop = cfg.azioni.find((a) => a.key === (modoCambio ? 'cambio_turno' : 'copertura'));
     const azNeg = cfg.azioni.find((a) => a.key === 'disponibilita_negata');
     // Chi copre non può essere anche tra i rifiuti
     const negatiValidi = negati.filter((n) => n !== chi);
@@ -2443,8 +2457,10 @@ async function _chiudiPopupCopertura(conferma) {
         await _insertPuntiEvento(
           chi,
           azCop.punti,
-          'copertura',
-          'Copertura per ' + ctx.assente + ' del ' + dataLabel + (nota ? ' · ' + nota : ''),
+          modoCambio ? 'cambio_turno' : 'copertura',
+          (modoCambio ? 'Cambio turno per esigenze accettato, del ' : 'Copertura per ' + ctx.assente + ' del ') +
+            dataLabel +
+            (nota ? ' · ' + nota : ''),
         );
       }
       if (azNeg) {
@@ -2453,7 +2469,11 @@ async function _chiudiPopupCopertura(conferma) {
             n,
             azNeg.punti,
             'disponibilita_negata',
-            'Disponibilità negata per assenza di ' + ctx.assente + ' del ' + dataLabel + (nota ? ' · ' + nota : ''),
+            (modoCambio
+              ? 'Disponibilità negata per cambio turno del '
+              : 'Disponibilità negata per assenza di ' + ctx.assente + ' del ') +
+              dataLabel +
+              (nota ? ' · ' + nota : ''),
           );
         }
       }
