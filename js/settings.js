@@ -349,7 +349,7 @@ const MATRICE_PROFILI = {
   gestione_corsi: ['V', 'M', 'M', 'M', 'M'],
   gestione_briefing: ['-', 'M', 'M', 'M', '-'],
   storico_hr: ['V', 'V', 'V', 'V', 'M'],
-  gestione_regole: ['-', 'M', 'M', '-', '-'],
+  gestione_regole: ['-', 'M', 'M', '-', 'M'],
   gestione_festivi: ['V', 'M', 'M', 'V', 'M'],
   sblocco_piano_chiuso: ['V', 'M', 'M', 'V', 'M'],
   vista_malattie_pct: ['V', 'V', 'V', '-', 'V'],

@@ -13,8 +13,9 @@ const COMPETENZE_DEFAULT = {
     { key: 'sala', label: 'Sala Slot', livello: 1 },
     { key: 'reception', label: 'Reception', livello: 2 },
     { key: 'cassa', label: 'Cassa', livello: 3 },
-    { key: 'bo', label: 'Back Office (BO)', livello: 4 },
-    { key: 'sup', label: 'Supervisor (SUP)', livello: 5 },
+    { key: 'accoglienza', label: 'Accoglienza', livello: 4 },
+    { key: 'bo', label: 'Back Office (BO)', livello: 5 },
+    { key: 'sup', label: 'Supervisor (SUP)', livello: 6 },
   ],
   tavoli: [
     { key: 'croupier', label: 'Croupier', livello: 1 },
@@ -104,6 +105,16 @@ function getCompetenzeConfigAll() {
     out[r.key] = Array.isArray(cfg[r.key]) ? cfg[r.key] : COMPETENZE_DEFAULT[r.key] || [];
   });
   return out;
+}
+// Livelli offerti quando si aggiunge una competenza: quelli che il settore ha
+// gia' piu' uno, cosi' si puo' sempre creare il gradino successivo senza dover
+// toccare il programma. "Extra" resta fuori dalla scala.
+function _opzioniLivello(rep) {
+  const comps = getCompetenzeConfigAll()[rep] || [];
+  const max = Math.max(3, ...comps.map((k) => parseInt(k.livello) || 0));
+  let h = '';
+  for (let lv = 1; lv <= max + 1; lv++) h += '<option value="' + lv + '">L' + lv + '</option>';
+  return h + '<option value="0">Extra</option>';
 }
 function getCompetenzeReparto() {
   return getCompetenzeConfigAll()[currentReparto] || [];
@@ -1973,7 +1984,10 @@ function _renderFormazioneConfig() {
     '<p style="font-size:.85rem;font-weight:700;margin:8px 0 4px">Nomi dei livelli · ' +
     escP(repartoLabel(currentReparto)) +
     '</p><p style="font-size:.82rem;color:var(--muted);margin-bottom:6px">Personalizza come si chiamano i livelli (es. L1 = "Base Sala"). Vuoto = nome standard.</p><div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">';
-  for (let lv = 1; lv <= 5; lv++) {
+  // quanti livelli ha davvero questo settore: prima erano fissi a cinque e un
+  // livello aggiunto dopo (es. Accoglienza) restava senza nome
+  const _lvMax = Math.max(3, ...getCompetenzeReparto().map((k) => parseInt(k.livello) || 0));
+  for (let lv = 1; lv <= _lvMax; lv++) {
     const attuale = ((window._livelliNomiCfg || {})[currentReparto] || {})[String(lv)] || '';
     html +=
       '<label style="font-size:.8rem;display:flex;align-items:center;gap:4px">L' +
@@ -2018,7 +2032,9 @@ function _renderFormazioneConfig() {
         (rep === 'tavoli' ? 'Chef de table' : 'Nuova competenza') +
         '..."></div><div class="field"><label>Livello</label><select id="cfg-comp-lv-' +
         rep +
-        '" style="padding:10px;width:90px"><option value="1">L1</option><option value="2">L2</option><option value="3">L3</option><option value="4">L4</option><option value="5">L5</option><option value="0">Extra</option></select></div><button class="btn-add-tipo" onclick="aggiungiCompetenzaCfg(\'' +
+        '" style="padding:10px;width:90px">' +
+        _opzioniLivello(rep) +
+        '</select></div><button class="btn-add-tipo" onclick="aggiungiCompetenzaCfg(\'' +
         rep +
         '\')">+ Aggiungi</button></div>';
     });
