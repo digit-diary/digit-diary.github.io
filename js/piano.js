@@ -58,6 +58,55 @@ function _pianoSchedaRiservata(titolo, permesso) {
     '</div></div>'
   );
 }
+// GIORNI CHIUSI: passata la giornata di gioco (piu' il respiro fino all'ora
+// limite del giorno dopo), il piano di quel giorno si modifica solo con uno
+// sblocco motivato e tracciato. Permesso dedicato, assegnabile per nome.
+function puoSbloccareGiorniChiusi() {
+  return isAdmin() || (typeof puoModificare === 'function' && puoModificare('sblocco_piano_chiuso'));
+}
+function _pianoGiornoBloccato(dstr) {
+  return PianoRegole.giornoBloccato(dstr, new Date(), {
+    attivo: String(_pianoRegolaVal('blocco_giorni_chiusi')).toUpperCase() !== 'FALSE',
+    oraLimite: parseFloat(_pianoRegolaVal('blocco_ora_limite')) || 12,
+  });
+}
+// giorni sbloccati in questa sessione: { 'YYYY-MM-DD': scadenza in ms }
+let _pianoSbloccati = {};
+function _pianoGiornoSbloccato(dstr) {
+  const fino = _pianoSbloccati[dstr];
+  if (!fino) return false;
+  if (Date.now() > fino) {
+    delete _pianoSbloccati[dstr];
+    return false;
+  }
+  return true;
+}
+// Controllo unico prima di ogni scrittura sul piano. Ritorna true se si puo'
+// procedere; se il giorno e' chiuso e l'operatore ha il permesso, chiede il
+// motivo e sblocca per dieci minuti (tutto finisce nel registro).
+function _pianoConsentiScrittura(dstr, silenzioso) {
+  if (!dstr || !_pianoGiornoBloccato(dstr)) return true;
+  if (_pianoGiornoSbloccato(dstr)) return true;
+  const dataIt = String(dstr).split('-').reverse().join('.');
+  if (!puoSbloccareGiorniChiusi()) {
+    if (!silenzioso) toast('Giornata del ' + dataIt + ' chiusa: per correggerla serve il permesso "Giorni chiusi"');
+    return false;
+  }
+  if (silenzioso) return false;
+  const motivo = prompt(
+    'GIORNATA CHIUSA \u00b7 ' +
+      dataIt +
+      "\n\nIl piano dei giorni passati non si modifica piu' per distrazione: e' un documento.\n\nScrivi il MOTIVO della correzione (obbligatorio, resta nel registro).\nIl giorno restera' sbloccato per dieci minuti:",
+  );
+  if (motivo === null || !String(motivo).trim()) {
+    toast('Correzione annullata: senza motivo il giorno resta chiuso');
+    return false;
+  }
+  _pianoSbloccati[dstr] = Date.now() + 10 * 60 * 1000;
+  logAzione('Giorno chiuso sbloccato', dstr + ': ' + String(motivo).trim().substring(0, 200));
+  toast('Giorno ' + dataIt + ' sbloccato per 10 minuti');
+  return true;
+}
 function puoGestirePiano() {
   return typeof puoModificare === 'function' ? puoModificare('gestione_piano') : isAdmin();
 }
@@ -964,6 +1013,10 @@ async function pianoScriviOreMese(nome) {
 // e' tra quelle caricate in memoria. In quel caso si aggiorna invece di
 // inserire, cosi' una generazione non si ferma a meta' lavoro.
 async function _pianoInserisciCella(dati) {
+  // stessa regola dei giorni chiusi per OGNI inserimento, da qualunque flusso
+  // arrivi (bozza, scambi, coperture): il controllo sta nel punto unico
+  if (dati && dati.data && !_pianoConsentiScrittura(String(dati.data).substring(0, 10)))
+    throw new Error('giorno chiuso: ' + dati.data);
   try {
     const n = await secPost('piano', dati);
     return n && n[0] ? n[0] : null;
@@ -1287,6 +1340,7 @@ async function renderPiano() {
             if (festiviSet[dstr]) _voci.push(escP(festiviSet[dstr]));
             if (_ch.motivo) _voci.push(escP(_ch.motivo) + ': si chiude alle ' + _ch.ora + ':00');
             else if (_ch.ora !== _pianoChiusuraCfg().oraNormale) _voci.push('si chiude alle ' + _ch.ora + ':00');
+            if (_pianoGiornoBloccato(dstr)) _voci.push('GIORNATA CHIUSA: si modifica solo con lo sblocco motivato');
             _voci.push('Doppio click: marcatore del giorno (CS, MN, LRD...)');
             return ' title="' + _voci.join(' \u00b7 ') + '"';
           })() +
@@ -1310,7 +1364,11 @@ async function renderPiano() {
           GG3[dow] +
           '</div><div>' +
           g +
-          '</div></th>';
+          '</div>' +
+          (_pianoGiornoBloccato(dstr)
+            ? '<div style="font-size:.6rem;line-height:1;opacity:.55" title="Giornata chiusa">&#128274;</div>'
+            : '') +
+          '</th>';
       }
       h +=
         '<th class="piano-tot piano-sep-left" title="Ore effettivamente lavorate: dall\'entrata all\'uscita, senza il supplemento del 10% e senza malattie, vacanze, CGF, permessi, maternita, matrimonio, militare, nascita, protezione civile, trasloco e assistenza familiare">OL</th>' +
@@ -6366,6 +6424,7 @@ function ccAggiornaRestituzioni() {
 }
 async function confermaCercaCambioLibero() {
   if (!_ccDati || !puoGestirePiano()) return;
+  if (!_pianoConsentiScrittura(_ccDati.data)) return; // giorno chiuso
   const i = parseInt((document.getElementById('cc-collega') || {}).value) || 0;
   const cand = _ccDati.candidati[i];
   const dataRest = (document.getElementById('cc-rest') || {}).value || '';
@@ -6661,6 +6720,7 @@ async function apriScambioTurno() {
 }
 async function confermaScambioTurno() {
   const sel = _pianoCellaSel;
+  if (sel && sel.data && !_pianoConsentiScrittura(sel.data)) return; // giorno chiuso
   const collega = (document.getElementById('scambio-collega') || {}).value;
   const motivo = ((document.getElementById('scambio-motivo') || {}).value || '').trim();
   const conRest = (document.getElementById('scambio-restituito') || {}).checked;
@@ -7467,6 +7527,10 @@ async function _pianoMalattiaViaDiario(nome, giorniDstr) {
 async function confermaCoperturaMalattia() {
   const m = _malattiaPiano;
   if (!m) return;
+  // basta lo sblocco sul primo giorno: copre il flusso, e gli inserimenti sui
+  // singoli giorni passano comunque dal controllo dentro _pianoInserisciCella
+  const _g0 = m.giorni && m.giorni.length ? _pianoMeseSel + '-' + String(m.giorni[0].g).padStart(2, '0') : null;
+  if (_g0 && !_pianoConsentiScrittura(_g0)) return;
   // soluzioni selezionate: senza spunta la M resta ma il sostituto non si tocca
   const selGiorni = new Set([...document.querySelectorAll('.mal-sel:checked')].map((c) => parseInt(c.dataset.g)));
   document.getElementById('pwd-modal').classList.add('hidden');
@@ -12137,6 +12201,8 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
 }
 async function pianoSalvaCella(nome, dstr, codice) {
   if (!puoGestirePiano()) return false;
+  // giorno chiuso: si procede solo con lo sblocco motivato
+  if (!_pianoConsentiScrittura(dstr)) return false;
   // le sigle si possono scrivere in minuscolo: nel piano restano sempre MAIUSCOLE
   codice = String(codice == null ? '' : codice)
     .trim()
