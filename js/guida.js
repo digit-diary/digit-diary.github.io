@@ -299,6 +299,25 @@ function GUIDA_CAPITOLI() {
     },
     {
       area: 'piano',
+      titolo: 'Piano: ogni scheda personalizzabile (visibile, modificabile, nascosta)',
+      righe: [
+        'Da <b>Impostazioni · Visibilita e permessi</b> ogni scheda del Piano si regola in due modi separati: <b>chi la vede</b> (sezione "Piano · schede visibili") e <b>chi la puo modificare</b> (sezione "Piano · schede modificabili").',
+        'Tre stati possibili per ogni operatore: <b>nascosta</b> (sparisce dal menu), <b>solo lettura</b> (la vede ma i comandi di modifica sono spenti), <b>visibile e modificabile</b>.',
+        'La restrizione di modifica vale <b>in aggiunta</b> ai permessi esistenti: chi non ha "Piano di lavoro" non modifica comunque, e l admin vede e modifica sempre tutto.',
+        'La <b>Guida</b> resta visibile a tutti di default. E ogni operatore continua a lavorare solo sui collaboratori del <b>suo settore</b>: queste regole decidono cosa si vede, la separazione dei dati resta quella dei settori.',
+        'Le scritture automatiche (es. la malattia registrata dal Diario che si sincronizza nel piano) non c entrano con le schede e passano sempre.',
+      ],
+    },
+    {
+      area: 'diario',
+      titolo: 'Scheda collaboratore: pattern malattie riservato e data di nascita',
+      righe: [
+        'Su richiesta HR, il blocco <b>Pattern malattie</b> della scheda collaboratore (percentuali per giorno della settimana, avviso Lunedi/Venerdi, confronto con la media del team) e riservato: lo vedono l admin e gli operatori scelti col permesso <b>Pattern malattie</b> in Impostazioni. Il <b>conteggio</b> dei giorni di malattia resta visibile a tutti.',
+        'La <b>data di nascita</b>: se c e, si legge soltanto (si modifica in Gestione collaboratori, con conferma); campo e tasto Salva compaiono solo quando manca. Se e stato inserito solo giorno e mese, l anno segnaposto 1900 <b>non viene mostrato</b>: si legge "02/11 (anno non indicato)". Con l anno vero si legge la data completa.',
+      ],
+    },
+    {
+      area: 'piano',
       titolo: 'Regole e Festivi: chi puo vederli',
       righe: [
         'Le schede <b>Regole</b> e <b>Festivi</b> del piano erano riservate agli amministratori e per gli altri restavano vuote, senza spiegazione.',

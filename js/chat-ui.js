@@ -2157,22 +2157,22 @@ function apriSchedaCollaboratore(nome) {
     '</h3>';
   html += '<div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap">';
   html += '<span style="font-size:.82rem;color:var(--muted)">Data di nascita:</span>';
-  const dnDisplay = dataNascita ? compleannoLabel(dataNascita) : '';
-  html +=
-    '<input type="text" id="scheda-nascita" value="' +
-    escP(dnDisplay) +
-    '" data-iso-value="' +
-    escP(dataNascita) +
-    '" placeholder="12.01 o 12.01.1997" title="Basta giorno e mese per il compleanno; l anno solo se lo conosci" style="padding:4px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper2);color:var(--ink);width:120px">';
-  html +=
-    '<button class="btn-salva" onclick="salvaSchedaNascita(\'' +
-    neS +
-    '\')" style="font-size:.82rem;padding:5px 14px;background:var(--accent2)">Salva</button>';
   if (dataNascita) {
+    // DATA PRESENTE: solo lettura, come l'inizio contratto. L'anno 1900 e' il
+    // segnaposto di "solo giorno e mese": non si mostra, cosi' non sembra un
+    // errore. La modifica passa da Gestione collaboratori (con conferma).
     html +=
-      '<span style="font-size:.82rem;color:var(--muted)">' +
-      new Date(dataNascita + 'T12:00:00').toLocaleDateString('it-IT') +
-      '</span>';
+      '<b style="font-size:.9rem" title="Si modifica in Gestione collaboratori, dove sta l anagrafica">' +
+      escP(dataNascitaLabel(dataNascita)) +
+      '</b>';
+  } else {
+    // DATA MANCANTE: campo e Salva compaiono solo qui, per inserirla al volo
+    html +=
+      '<input type="text" id="scheda-nascita" value="" data-iso-value="" placeholder="12.01 o 12.01.1997" title="Basta giorno e mese per il compleanno; l anno solo se lo conosci" style="padding:4px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper2);color:var(--ink);width:120px">';
+    html +=
+      '<button class="btn-salva" onclick="salvaSchedaNascita(\'' +
+      neS +
+      '\')" style="font-size:.82rem;padding:5px 14px;background:var(--accent2)">Salva</button>';
   }
   // INIZIO CONTRATTO: si legge qui, dove si consulta il fascicolo. Si modifica
   // in Gestione collaboratori, che e' il posto dell'anagrafica.
@@ -2502,8 +2502,12 @@ function apriSchedaCollaboratore(nome) {
     html += '</div>';
   } // fine percorso disciplinare
 
-  // SICK DAY PATTERNS
-  if (totMal > 0) {
+  // SICK DAY PATTERNS · analisi riservata (richiesta HR): percentuali per
+  // giorno, avviso Lunedi/Venerdi e confronto col team li vede solo chi ha il
+  // permesso "Pattern malattie" (o l'admin). Il CONTEGGIO dei giorni di
+  // malattia nei riquadri in alto resta visibile a tutti.
+  const _vedePatternMal = isAdmin() || (typeof puoModificare === 'function' && puoModificare('vista_malattie_pct'));
+  if (totMal > 0 && _vedePatternMal) {
     html += '<div class="scheda-section"><h4>Pattern malattie</h4>';
     const malEntries = entries.filter((e) => e.tipo === tipoMal);
     const dayDist = [0, 0, 0, 0, 0, 0, 0];
