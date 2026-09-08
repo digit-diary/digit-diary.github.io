@@ -9129,6 +9129,9 @@ function _pianoVacDirittoCard(anno) {
       { anni: 20, giorni: parseFloat(_pianoRegolaVal('vacanze_bonus_20anni')) || 3 },
       { anni: 25, giorni: parseFloat(_pianoRegolaVal('vacanze_bonus_25anni')) || 4 },
     ],
+    // arrotondamento al giorno pieno: dalla soglia in su si sale (32.67 -> 33,
+    // 32.37 -> 33), sotto si resta al giorno intero (32.3 -> 32)
+    arrotondaDa: _pianoRegolaVal('vacanze_arrotonda_da') != null ? _pianoRegolaVal('vacanze_arrotonda_da') : 0.35,
   };
   // giorni V gia' presenti nel piano dell'anno (dal mese caricato in memoria
   // non basta: si contano quelli del settore gia' noti)
@@ -9189,6 +9192,9 @@ function _pianoVacDirittoCard(anno) {
       ' giorni di base' +
       (x.r.bonus
         ? ' + ' + x.r.bonus + ' per anzianita (' + x.r.voci.map((v) => v.anni + ' anni dal ' + v.dal).join(', ') + ')'
+        : '') +
+      (x.r.giorniEsatti != null && x.r.giorniEsatti !== x.r.giorni
+        ? ' · esatti ' + x.r.giorniEsatti + ', arrotondati a ' + x.r.giorni
         : '') +
       '" data-nome="' +
       escP(x.c.nome) +
