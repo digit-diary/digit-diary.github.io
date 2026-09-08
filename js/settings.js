@@ -20,6 +20,8 @@ const VIS_ITEMS = {
     consegna: 'Consegna Turno',
     promemoria: 'Promemoria',
     maison: 'Costi Maison',
+    inventario: 'Inventario',
+    registro: 'Registro attivita',
   },
   funzioni: {
     ricerca_globale: 'Ricerca globale',
