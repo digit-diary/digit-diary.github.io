@@ -9822,6 +9822,321 @@ async function _renderPianoVacanzeTab() {
   h += '</div>';
   return h;
 }
+// ================================================================
+// SALDO ORE DELL'ANNO · come il foglio "Saldo Ore" del piano Excel
+//
+// Saldo dell'anno = RIPORTO iniziale + somma dei saldi di ogni mese.
+// Il saldo del mese e' lo stesso della scheda Saldo (ore piano meno ore dovute
+// piu' gli scostamenti del recupero ore, con la precedenza alle timbrature e
+// alle ore reali scritte a mano), quindi i due numeri non possono divergere.
+// I mesi futuri gia' pianificati entrano nel conto: e' questo che permette di
+// vedere in anticipo chi andra' fuori dalla banda e chi deve recuperare.
+// ================================================================
+let _pianoSaldoIniz = {}; // 'nome|anno' -> record del riporto
+async function _pianoCaricaSaldoIniziale(anno) {
+  const r =
+    (await secGet('piano_saldo_iniziale?anno=eq.' + anno + '&reparto_dip=eq.' + _pianoReparto() + '&limit=500')) || [];
+  _pianoSaldoIniz = {};
+  r.forEach((x) => (_pianoSaldoIniz[x.collaboratore + '|' + x.anno] = x));
+}
+function _pianoRiporto(nome, anno) {
+  const r = _pianoSaldoIniz[nome + '|' + anno];
+  return r ? parseFloat(r.ore) || 0 : 0;
+}
+// Il riporto e' il saldo A UNA CERTA DATA, quindi contiene gia' i mesi fino a
+// li'. Quei mesi non si sommano una seconda volta, altrimenti gennaio-agosto
+// verrebbero contati due volte. E' esattamente quello che fa il foglio Excel,
+// dove le colonne dei mesi gia' compresi nel riporto sono lasciate vuote.
+// Senza data il riporto vale da inizio anno e tutti i mesi contano.
+function _pianoMeseDentroRiporto(nome, anno, mm) {
+  const r = _pianoSaldoIniz[nome + '|' + anno];
+  if (!r || !r.data_riferimento) return false;
+  const rif = String(r.data_riferimento).substring(0, 10);
+  if (rif.substring(0, 4) !== String(anno)) return rif < String(anno) + '-01-01';
+  // il mese conta solo se finisce DOPO la data del riporto
+  const ultimo = anno + '-' + mm + '-' + String(new Date(anno, parseInt(mm), 0).getDate()).padStart(2, '0');
+  return ultimo <= rif;
+}
+function _pianoSaldoBanda() {
+  const max = parseFloat(_pianoRegolaVal('saldo_ore_max'));
+  const min = parseFloat(_pianoRegolaVal('saldo_ore_min'));
+  return { max: isNaN(max) ? 15 : max, min: isNaN(min) ? -15 : min };
+}
+// Scrive il riporto con cui la persona entra nell'anno. Nel foglio era una
+// colonna a mano aggiornata al 31.08: qui si tiene anche la data, altrimenti
+// fra sei mesi nessuno sa piu' a quando si riferisce quel numero.
+async function pianoSaldoIniziale(nome) {
+  if (!puoGestirePiano() && !isAdmin()) {
+    toast('Non hai il permesso di modificare il piano');
+    return;
+  }
+  const anno = parseInt(_pianoMeseSel.split('-')[0]);
+  const att = _pianoSaldoIniz[nome + '|' + anno];
+  const val = prompt(
+    'Riporto ore di ' +
+      nome +
+      ' per il ' +
+      anno +
+      '.\n\nE il saldo con cui entra nell anno, prima dei mesi di questo piano.\nSi somma ai saldi mensili. Vuoto = nessun riporto.',
+    att ? String(att.ore) : '',
+  );
+  if (val === null) return;
+  const testo = String(val).trim().replace(',', '.');
+  try {
+    if (testo === '') {
+      if (att) {
+        await secDel('piano_saldo_iniziale', 'id=eq.' + att.id);
+        delete _pianoSaldoIniz[nome + '|' + anno];
+        logAzione('Saldo: riporto tolto', nome + ' ' + anno + ' (era ' + att.ore + 'h)');
+        _pianoRegistraModifica('Saldo anno', nome, 'riporto ' + anno, att.ore + 'h', 'nessuno');
+        toast('Salvato · riporto tolto per ' + nome);
+      }
+    } else {
+      const ore = parseFloat(testo);
+      if (isNaN(ore) || ore < -500 || ore > 500) {
+        toast('Valore fuori scala (da -500 a +500)');
+        return;
+      }
+      const quando = prompt(
+        'A quando e aggiornato questo riporto? (giorno.mese.anno)\n\nNel foglio Excel era il 31.08.2026.',
+        att && att.data_riferimento
+          ? String(att.data_riferimento).split('-').reverse().join('.')
+          : '31.12.' + (anno - 1),
+      );
+      if (quando === null) return;
+      const pz = String(quando).trim().split(/[./-]/);
+      const dataRif =
+        pz.length === 3 ? pz[2].padStart(4, '20') + '-' + pz[1].padStart(2, '0') + '-' + pz[0].padStart(2, '0') : null;
+      const dati = {
+        collaboratore: nome,
+        reparto_dip: _pianoReparto(),
+        anno: anno,
+        ore: ore,
+        data_riferimento: dataRif,
+        operatore: getOperatore(),
+        modificato_il: new Date().toISOString(),
+      };
+      if (att) {
+        await secPatch('piano_saldo_iniziale', 'id=eq.' + att.id, dati);
+        _pianoSaldoIniz[nome + '|' + anno] = Object.assign({}, att, dati);
+      } else {
+        const nuovo = await secPost('piano_saldo_iniziale', dati);
+        _pianoSaldoIniz[nome + '|' + anno] = (nuovo && nuovo[0]) || dati;
+      }
+      logAzione('Saldo: riporto', nome + ' ' + anno + ': ' + (att ? att.ore + 'h → ' : '') + ore + 'h');
+      _pianoRegistraModifica('Saldo anno', nome, 'riporto ' + anno, att ? att.ore + 'h' : 'nessuno', ore + 'h');
+      toast('Salvato · riporto di ' + nome + ': ' + ore + 'h');
+    }
+    window._pianoSaldoAnnoDati = null;
+    renderPiano();
+  } catch (e) {
+    console.error('riporto saldo', e);
+    toast('Errore nel salvataggio del riporto');
+  }
+}
+// Calcola il saldo di OGNI mese dell'anno per ogni collaboratore del settore,
+// con gli stessi criteri della scheda Saldo. Si carica una volta sola e resta
+// in memoria finche' non si cambia anno o non si tocca qualcosa.
+async function _pianoSaldoAnnoCalcola(anno) {
+  const rep = _pianoReparto();
+  const righe =
+    (await secGet(
+      'piano?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&reparto_dip=eq.' + rep + '&limit=40000',
+    )) || [];
+  _pianoRegistraGiorniTurno(righe);
+  const rec =
+    (await secGet('piano_recupero_ore?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&limit=20000')) || [];
+  const rett =
+    (await secGet('piano_ore_mese?anno_mese=gte.' + anno + '-01&anno_mese=lte.' + anno + '-12&limit=5000')) || [];
+  const timb =
+    (await secGet('piano_timbrature?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&limit=20000')) || [];
+  const perMese = {}; // 'nome|MM' -> ore piano
+  righe.forEach((r) => {
+    const info = _pianoCollabInfo(r.collaboratore) || {};
+    const pct = parseFloat(info.percentuale) || 1;
+    const mm = String(r.data).substring(5, 7);
+    const k = r.collaboratore + '|' + mm;
+    perMese[k] = (perMese[k] || 0) + _pianoOreDiRiga(r, pct);
+  });
+  rec.forEach((x) => {
+    const k = x.collaboratore + '|' + String(x.data).substring(5, 7);
+    perMese[k] = (perMese[k] || 0) + (parseFloat(x.ore) || 0);
+  });
+  const timbMese = {};
+  timb.forEach((t) => {
+    const k = t.collaboratore + '|' + String(t.data).substring(5, 7);
+    timbMese[k] = (timbMese[k] || 0) + (parseFloat(t.ore) || 0);
+  });
+  const rettMese = {};
+  rett.forEach(
+    (x) => (rettMese[x.collaboratore + '|' + String(x.anno_mese).substring(5, 7)] = parseFloat(x.ore_reali)),
+  );
+  // mesi che hanno davvero un piano: sugli altri non si conta niente, altrimenti
+  // un mese non ancora pianificato risulterebbe come un buco di 175 ore
+  const mesiConPiano = {};
+  righe.forEach((r) => (mesiConPiano[String(r.data).substring(5, 7)] = true));
+  return { perMese: perMese, timbMese: timbMese, rettMese: rettMese, mesiConPiano: mesiConPiano, anno: anno };
+}
+// Saldo di un mese: le stesse precedenze della scheda Saldo (ore reali scritte
+// a mano, poi timbrature, poi piano) meno le ore dovute.
+function _pianoSaldoDelMese(dati, nome, mm, info) {
+  if (!dati.mesiConPiano[mm]) return null;
+  const k = nome + '|' + mm;
+  const pct = parseFloat(info.percentuale) || 1;
+  let op = dati.perMese[k] || 0;
+  if (dati.timbMese[k] != null) op = dati.timbMese[k];
+  if (dati.rettMese[k] != null) op = dati.rettMese[k];
+  if (!op) return null;
+  const gg = new Date(dati.anno, parseInt(mm), 0).getDate();
+  const od = info.is_jolly ? 0 : Math.round((gg / 7) * _pianoOreSett * pct * 10) / 10;
+  return Math.round((Math.round(op * 100) / 100 - od) * 10) / 10;
+}
+async function pianoCaricaSaldoAnno() {
+  const anno = parseInt(_pianoMeseSel.split('-')[0]);
+  const el = document.getElementById('piano-saldoanno');
+  if (el) el.innerHTML = '<p style="color:var(--muted);font-size:.85rem;padding:8px 0">Calcolo dei dodici mesi...</p>';
+  await _pianoCaricaSaldoIniziale(anno);
+  window._pianoSaldoAnnoDati = await _pianoSaldoAnnoCalcola(anno);
+  window._pianoSaldoAnnoAperto = true;
+  renderPiano();
+}
+function _renderPianoSaldoAnnoCard() {
+  const anno = parseInt(_pianoMeseSel.split('-')[0]);
+  const dati = window._pianoSaldoAnnoDati;
+  let h =
+    '<div class="main-card" style="margin-bottom:14px"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Saldo ore ' +
+    anno +
+    ' · anno intero';
+  if (dati && dati.anno === anno)
+    h +=
+      '<input type="text" class="piano-cerca" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-saldoanno-table\')">' +
+      '<button class="btn-export" style="font-size:.8rem;padding:4px 12px" onclick="pianoCaricaSaldoAnno()">Ricalcola</button>';
+  h += '</div><div style="padding:10px 14px" id="piano-saldoanno">';
+  if (!dati || dati.anno !== anno) {
+    h +=
+      '<p style="font-size:.85rem;color:var(--muted);margin-bottom:8px">Riporto di inizio anno piu il saldo di ogni mese, come il foglio Saldo Ore del piano. I mesi gia pianificati contano anche se sono nel futuro, cosi si vede in anticipo chi andra fuori dalla banda e chi deve recuperare.</p>' +
+      '<button class="btn-export" style="font-size:.85rem;padding:6px 14px;border-color:#2c6e49;color:#2c6e49" onclick="pianoCaricaSaldoAnno()">Calcola l anno ' +
+      anno +
+      '</button></div></div>';
+    return h;
+  }
+  const banda = _pianoSaldoBanda();
+  const ordSalv = (window._pianoOrdineCollab || {})[_pianoReparto()] || [];
+  const pos = {};
+  ordSalv.forEach((n, i) => (pos[n] = i));
+  const nomi = collaboratoriCache
+    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
+    .map((c) => c.nome)
+    .sort((x, y) => (pos[x] != null ? pos[x] : 9999) - (pos[y] != null ? pos[y] : 9999) || x.localeCompare(y));
+  h +=
+    '<p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Saldo del mese = ore fatte meno ore dovute, con dentro gli scostamenti del Recupero ore. Il totale e il riporto piu i mesi. E in ordine (verde) se resta fra ' +
+    banda.min +
+    ' e +' +
+    banda.max +
+    ' ore: la banda si cambia nella scheda Regole. Clic sul riporto per scriverlo: se gli dai una data, i mesi gia compresi restano grigi con un punto e non vengono contati due volte.</p>';
+  h +=
+    '<div style="overflow:auto;max-height:72vh"><table id="piano-saldoanno-table" class="piano-table piano-fisse3" style="min-width:1100px;font-size:.8rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Fun</th><th>%</th><th title="Saldo con cui entra nell anno. Clic per scriverlo">Riporto</th>';
+  for (let m = 1; m <= 12; m++) h += '<th>' + (MESI[m - 1] || m) + '</th>';
+  h += '<th>Totale mesi</th><th>Saldo ' + anno + '</th><th></th></tr></thead><tbody>';
+  let righeScritte = 0;
+  nomi.forEach((nome) => {
+    const info = _pianoCollabInfo(nome) || {};
+    const pct = parseFloat(info.percentuale) || 1;
+    const mesi = [];
+    let somma = 0;
+    let qualcosa = false;
+    for (let m = 1; m <= 12; m++) {
+      const mm = String(m).padStart(2, '0');
+      if (_pianoMeseDentroRiporto(nome, anno, mm)) {
+        mesi.push('riporto'); // gia' compreso nel riporto: non si somma
+        continue;
+      }
+      const v = _pianoSaldoDelMese(dati, nome, mm, info);
+      mesi.push(v);
+      if (v != null) {
+        somma += v;
+        qualcosa = true;
+      }
+    }
+    const rip = _pianoRiporto(nome, anno);
+    if (!qualcosa && !rip) return;
+    void pct;
+    righeScritte++;
+    somma = Math.round(somma * 10) / 10;
+    const tot = Math.round((rip + somma) * 10) / 10;
+    // gli ausiliari non hanno ore dovute: per loro il saldo non vuol dire nulla
+    const jolly = !!info.is_jolly;
+    const dentro = tot <= banda.max && tot >= banda.min;
+    const col = (v) => (v > 0 ? '#2c6e49' : v < 0 ? '#c0392b' : 'var(--muted)');
+    const rec = _pianoSaldoIniz[nome + '|' + anno];
+    h +=
+      '<tr data-nome="' +
+      escP(nome) +
+      '"><td style="text-align:left;font-weight:600">' +
+      escP(nome) +
+      '</td><td>' +
+      escP(jolly ? 'JOLLY' : info.funzione || '') +
+      '</td><td>' +
+      (jolly ? '-' : Math.round(pct * 100) + '%') +
+      '</td><td style="cursor:pointer;font-weight:600;color:' +
+      col(rip) +
+      '" title="' +
+      (rec && rec.data_riferimento
+        ? 'Aggiornato al ' + String(rec.data_riferimento).split('-').reverse().join('.')
+        : 'Clic per scrivere il riporto') +
+      '" onclick="pianoSaldoIniziale(\'' +
+      escP(nome).replace(/'/g, "\\'") +
+      '\')">' +
+      (rip ? (rip > 0 ? '+' : '') + rip : '–') +
+      '</td>';
+    mesi.forEach((v) => {
+      // ausiliari: non hanno ore dovute, quindi il saldo del mese non esiste.
+      // Mostrare le ore fatte al posto del saldo faceva leggere +150 come se
+      // fossero ore in credito.
+      if (v === 'riporto') {
+        h +=
+          '<td style="color:var(--line);background:var(--paper2)" title="Mese gia compreso nel riporto: non si conta due volte">\u00b7</td>';
+        return;
+      }
+      if (jolly) {
+        h += '<td style="color:var(--muted)">' + (v == null ? '' : '\u2013') + '</td>';
+        return;
+      }
+      h +=
+        '<td style="color:' +
+        (v == null ? 'var(--line)' : col(v)) +
+        (v != null && Math.abs(v) >= 10 ? ';font-weight:700' : '') +
+        '">' +
+        (v == null ? '' : (v > 0 ? '+' : '') + v.toFixed(1)) +
+        '</td>';
+    });
+    h +=
+      '<td style="font-weight:600;color:' +
+      (jolly ? 'var(--muted)' : col(somma)) +
+      '">' +
+      (jolly ? '\u2013' : (somma > 0 ? '+' : '') + somma.toFixed(1)) +
+      '</td><td style="font-weight:700;color:' +
+      col(tot) +
+      '">' +
+      (jolly ? '–' : (tot > 0 ? '+' : '') + tot.toFixed(1)) +
+      '</td><td>' +
+      (jolly
+        ? '<span style="color:var(--muted)">–</span>'
+        : dentro
+          ? '<span style="color:#2c6e49;font-weight:700">ok</span>'
+          : '<span style="color:#c0392b;font-weight:700" title="Fuori dalla banda ' +
+            banda.min +
+            ' / +' +
+            banda.max +
+            '">no</span>') +
+      '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  if (!righeScritte)
+    h += '<p style="color:var(--muted);font-size:.85rem">Nessun mese pianificato per il ' + anno + '.</p>';
+  h += '</div></div>';
+  return h;
+}
 // TAB SALDO · come la pagina Saldo Ore di Turnivo: dovute/pianificate/saldo
 // del mese per collaboratore + totali (YTD dalla stessa mappa della griglia)
 async function _renderPianoSaldoTab() {
@@ -9849,7 +10164,8 @@ async function _renderPianoSaldoTab() {
   timbrateMese.forEach(
     (t) => (timbNome[t.collaboratore] = (timbNome[t.collaboratore] || 0) + (parseFloat(t.ore) || 0)),
   );
-  let h =
+  let h = _renderPianoSaldoAnnoCard();
+  h +=
     '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Saldo ore · ' +
     escP(label) +
     '<button class="btn-act pin" onclick="pianoCambiaMese(-1)">&larr;</button><button class="btn-act pin" onclick="pianoCambiaMese(1)">&rarr;</button>' +
@@ -9891,7 +10207,7 @@ async function _renderPianoSaldoTab() {
     const ytd = Math.round(((_pianoYtdMap[nome] || 0) + sm) * 10) / 10;
     totD += od;
     totP += op;
-    totS += sm;
+    if (!info.is_jolly) totS += sm;
     const col = (v) => (v > 0 ? '#2c6e49' : v < 0 ? '#c0392b' : 'var(--muted)');
     h +=
       '<tr data-nome="' +
@@ -9913,13 +10229,17 @@ async function _renderPianoSaldoTab() {
           '">*</span>'
         : '') +
       '</td><td class="piano-sm" style="font-weight:700;cursor:pointer;color:' +
-      col(sm) +
-      '" title="Clic per scrivere le ore realmente lavorate nel mese">' +
-      (op || od ? (sm > 0 ? '+' : '') + sm.toFixed(1) : '') +
-      '</td><td style="font-weight:700;color:' +
-      col(ytd) +
+      (info.is_jolly ? 'var(--muted)' : col(sm)) +
+      '" title="' +
+      (info.is_jolly
+        ? 'Gli ausiliari non hanno ore dovute: il saldo non si applica'
+        : 'Clic per scrivere le ore realmente lavorate nel mese') +
       '">' +
-      (op || _pianoYtdMap[nome] ? (ytd > 0 ? '+' : '') + ytd.toFixed(1) : '') +
+      (info.is_jolly ? '\u2013' : op || od ? (sm > 0 ? '+' : '') + sm.toFixed(1) : '') +
+      '</td><td style="font-weight:700;color:' +
+      (info.is_jolly ? 'var(--muted)' : col(ytd)) +
+      '">' +
+      (info.is_jolly ? '\u2013' : op || _pianoYtdMap[nome] ? (ytd > 0 ? '+' : '') + ytd.toFixed(1) : '') +
       '</td></tr>';
   });
   h +=
