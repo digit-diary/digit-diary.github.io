@@ -4510,14 +4510,8 @@ body.dark-theme .rec-totale.rec-piu {
   border-color: #2f6444;
 }
 
-/* RECUPERO ORE: selezione di righe, colonne e celle (come il calendario) */
-#piano-recupero-table tr.rec-sel-riga td {
-  box-shadow: inset 0 0 0 99px rgba(255, 152, 0, 0.28);
-}
-#piano-recupero-table .rec-sel-col,
-#piano-recupero-table td.rec-sel-cella {
-  box-shadow: inset 0 0 0 99px rgba(255, 152, 0, 0.35);
-}
+/* RECUPERO ORE: la selezione usa le STESSE classi del calendario
+   (row-selected, col-selected, blocco-sel), quindi nessuna regola dedicata. */
 /* angolo in alto a sinistra: fisso in tutte e due le direzioni */
 #piano-recupero-table thead th.piano-nome {
   left: 0;
