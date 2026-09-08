@@ -4444,7 +4444,7 @@ function _renderPianoTurniCard() {
     let hRO =
       '<div class="main-card" style="margin-top:16px"><div class="card-header">Turni · ' +
       escP(repartoLabel(_pianoReparto())) +
-      '</div><div style="padding:10px 14px"><div style="overflow-x:auto"><table class="piano-table" style="min-width:520px;font-size:.85rem"><thead><tr><th>Codice</th><th>Gruppo</th><th>Inizio</th><th>Fine</th><th>Ore</th><th>Tipo</th></tr></thead><tbody>';
+      '</div><div style="padding:10px 14px"><div style="overflow-x:auto"><table class="piano-table" style="min-width:520px;font-size:.85rem"><thead><tr><th>Codice</th><th>Gruppo</th><th>Inizio</th><th>Fine</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perche 20 minuti sono un terzo di ora">Ore</th><th>Tipo</th></tr></thead><tbody>';
     turniRO.forEach((t) => {
       hRO +=
         '<tr><td style="font-weight:700;background:' +
@@ -4459,7 +4459,9 @@ function _renderPianoTurniCard() {
         (t.ora_fine || '-').substring(0, 5) +
         '</td><td>' +
         (t.durata_ore || 0) +
-        '</td><td>' +
+        ' <span style="font-size:.82rem;color:var(--muted)">= ' +
+        _pianoOreHm(t.durata_ore) +
+        '</span></td><td>' +
         escP(t.tipo || '') +
         '</td></tr>';
     });
@@ -4482,7 +4484,7 @@ function _renderPianoTurniCard() {
     '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="pianoVerificaDurateNotte()">Controlla le durate dei turni</button>' +
     '</div>';
   h +=
-    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:720px;font-size:.85rem"><thead><tr><th>Codice</th><th>Gruppo</th><th>Inizio</th><th>Fine</th><th title="Ora di fine nei giorni in cui il casino chiude alle 5: venerdi, sabato, vigilie di festivita, 31 dicembre. Vuoto = il turno finisce sempre alla stessa ora">Fine (chiusura 5)</th><th>Ore</th><th>Tipo</th><th>Colore</th><th>Oltre 23</th><th>Attivo</th><th></th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:720px;font-size:.85rem"><thead><tr><th>Codice</th><th>Gruppo</th><th>Inizio</th><th>Fine</th><th title="Ora di fine nei giorni in cui il casino chiude alle 5: venerdi, sabato, vigilie di festivita, 31 dicembre. Vuoto = il turno finisce sempre alla stessa ora">Fine (chiusura 5)</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perche 20 minuti sono un terzo di ora">Ore</th><th>Tipo</th><th>Colore</th><th>Oltre 23</th><th>Attivo</th><th></th></tr></thead><tbody>';
   turni
     .slice()
     .sort((x, y) => (x.gruppo || '').localeCompare(y.gruppo || '') || x.codice.localeCompare(y.codice))
@@ -4512,7 +4514,9 @@ function _renderPianoTurniCard() {
         (t.durata_ore || 0) +
         '" onchange="salvaPianoTurno(' +
         t.id +
-        ',\'durata_ore\',this.value)" style="width:58px;padding:2px;text-align:center;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td><select onchange="salvaPianoTurno(' +
+        ',\'durata_ore\',this.value)" style="width:58px;padding:2px;text-align:center;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"> <span style="font-size:.82rem;color:var(--muted);white-space:nowrap" title="Stessa durata scritta in ore e minuti: 8.33 in decimali = 8h20 (20 minuti sono un terzo di ora)">= ' +
+        _pianoOreHm(t.durata_ore) +
+        '</span></td><td><select onchange="salvaPianoTurno(' +
         t.id +
         ',\'tipo\',this.value)" style="padding:2px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><option' +
         (t.tipo === 'DIURNO' ? ' selected' : '') +
@@ -4635,7 +4639,7 @@ function _renderPianoCodiciCard() {
   h +=
     '<p style="font-size:.82rem;color:var(--muted);margin-bottom:6px">Assenze e situazioni non lavorative. "Riposo" = il codice conta come giorno di riposo per le regole. Le ore seguono le formule CCL originali.</p>';
   h +=
-    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:640px;font-size:.85rem"><thead><tr><th>Codice</th><th style="text-align:left">Descrizione</th><th>Ore</th><th title="Le ore vengono scalate per la percentuale d\'impiego">Scala %</th><th title="Inserendolo nel piano chiede orario di inizio e fine (es. JG)">Chiede orario</th><th>Riposo</th><th>Attivo</th><th></th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:640px;font-size:.85rem"><thead><tr><th>Codice</th><th style="text-align:left">Descrizione</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perche 20 minuti sono un terzo di ora">Ore</th><th title="Le ore vengono scalate per la percentuale d\'impiego">Scala %</th><th title="Inserendolo nel piano chiede orario di inizio e fine (es. JG)">Chiede orario</th><th>Riposo</th><th>Attivo</th><th></th></tr></thead><tbody>';
   pianoCodiciCache
     .slice()
     .sort((x, y) => x.codice.localeCompare(y.codice))
@@ -13914,7 +13918,7 @@ function _renderPianoCorsiCard() {
   // operatori senza permesso corsi: elenco in sola lettura (orario aggiornabile)
   if (!puoCorsi) {
     let hRO =
-      '<div class="main-card" style="margin-top:16px"><div class="card-header">Corsi</div><div style="padding:12px 14px"><table class="piano-table" style="min-width:420px;font-size:.85rem"><thead><tr><th>Sigla</th><th style="text-align:left">Descrizione</th><th>Ore</th><th>Orario</th></tr></thead><tbody>';
+      '<div class="main-card" style="margin-top:16px"><div class="card-header">Corsi</div><div style="padding:12px 14px"><table class="piano-table" style="min-width:420px;font-size:.85rem"><thead><tr><th>Sigla</th><th style="text-align:left">Descrizione</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perche 20 minuti sono un terzo di ora">Ore</th><th>Orario</th></tr></thead><tbody>';
     corsi.forEach((c) => {
       const orario = ((window._pianoCorsiOrari || {})[c.codice] || '').split('-');
       hRO +=
