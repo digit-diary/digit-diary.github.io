@@ -2012,11 +2012,12 @@ async function renderPiano() {
       _recApplicaColoriDom();
       _recDragBind();
     }
+    if (_pianoTab === 'saldo') _pianoSaldoBind();
     if (_pianoTab === 'briefing') _briefSelezioneBind();
     if (_pianoTab === 'benessere' && typeof caricaBenesserePiano === 'function')
       setTimeout(() => caricaBenesserePiano(), 60);
     if (_pianoTab === 'statistiche' && typeof caricaStatisticheAnnoPiano === 'function')
-      setTimeout(() => caricaStatisticheAnnoPiano(), 50);
+      setTimeout(() => caricaStatisticheAnnoPiano(true), 50);
     if (_pianoTab === 'statistiche' && typeof caricaConfrontoAnniPiano === 'function')
       setTimeout(() => caricaConfrontoAnniPiano(), 80);
     if (_pianoTab === 'timbrature' && typeof caricaConfrontoTimbrature === 'function')
@@ -8318,6 +8319,23 @@ function _pianoInitSticky() {
   window.addEventListener('resize', applica, { passive: true });
 }
 
+// SCHEDA SALDO: clic su "Ore lavorate" o "Saldo mese" per scrivere le ore
+// realmente lavorate. Nel calendario la stessa cosa si fa col doppio clic, ma
+// li' il clic singolo serve gia' a selezionare; qui non seleziona niente, quindi
+// basta un clic solo. Prima non succedeva nulla: il collegamento esisteva solo
+// nella scheda Calendario.
+function _pianoSaldoBind() {
+  const tab = document.getElementById('piano-saldo-table');
+  if (!tab) return;
+  tab.querySelectorAll('tbody tr[data-nome]').forEach((riga) => {
+    riga.querySelectorAll('td.piano-op, td.piano-sm').forEach((td) => {
+      td.addEventListener('click', (e) => {
+        e.stopPropagation();
+        pianoScriviOreMese(riga.dataset.nome);
+      });
+    });
+  });
+}
 function _pianoInitSelezione() {
   // IDENTICA a Turnivo (main.js data-selectable): click header giorno =
   // colonna con velo azzurro + header blu; click nome = riga; ri-click =
@@ -8932,7 +8950,7 @@ async function caricaConfrontoTimbrature() {
 function _renderPianoStatCard() {
   return (
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Statistiche anno e panoramica mesi</div><div style="padding:10px 14px" id="piano-stat-body">' +
-    '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="caricaStatisticheAnnoPiano()">Carica statistiche ' +
+    '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="caricaStatisticheAnnoPiano(true)">Ricarica statistiche ' +
     _pianoMeseSel.split('-')[0] +
     '</button><div id="piano-stat-anno"></div></div></div>' +
     '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Confronto anni · ' +
@@ -9085,56 +9103,96 @@ async function caricaConfrontoAnniPiano() {
     el.innerHTML = '<p style="color:var(--accent);font-size:.8rem">Errore confronto: ' + escP(e.message || '') + '</p>';
   }
 }
-async function caricaStatisticheAnnoPiano() {
+// Filtro mese della scheda Statistiche: '' = tutto l'anno, altrimenti 'AAAA-MM'.
+// Cambiarlo non ricarica niente dal server e non tocca il mese del calendario:
+// i dati dell'anno sono gia' in memoria, si mostra solo la fetta scelta.
+function pianoStatMese(ym) {
+  window._pianoStatMese = ym || '';
+  caricaStatisticheAnnoPiano();
+}
+// Porta il calendario sul mese che si sta guardando nelle statistiche.
+function pianoStatApriMese() {
+  const ym = window._pianoStatMese;
+  if (!ym) return;
+  _pianoMeseSel = ym;
+  _pianoViolCelle = {};
+  _pianoViolLista = null;
+  pianoCambiaTab('calendario');
+}
+async function caricaStatisticheAnnoPiano(forza) {
   const el = document.getElementById('piano-stat-anno');
   if (!el) return;
-  el.innerHTML = '<p style="color:var(--muted);font-size:.8rem;padding:6px 0">Caricamento anno...</p>';
   const anno = _pianoMeseSel.split('-')[0];
-  // le festivita dell anno servono per i turni con orario prolungato
-  await _pianoCaricaFestivita(parseInt(anno));
-  const righe =
-    (await secGet(
-      'piano?data=gte.' +
-        anno +
-        '-01-01&data=lte.' +
-        anno +
-        '-12-31&reparto_dip=eq.' +
-        _pianoReparto() +
-        '&limit=20000',
-    )) || [];
-  _pianoRegistraGiorniTurno(righe);
-  const fabb =
-    (await secGet(
-      'piano_fabbisogni?data=gte.' +
-        anno +
-        '-01-01&data=lte.' +
-        anno +
-        '-12-31&reparto_dip=eq.' +
-        _pianoReparto() +
-        '&limit=5000',
-    )) || [];
+  const rep = _pianoReparto();
+  const c = window._pianoStatCache;
+  if (forza || !c || c.anno !== anno || c.reparto !== rep) {
+    el.innerHTML = '<p style="color:var(--muted);font-size:.8rem;padding:6px 0">Caricamento anno...</p>';
+    // le festivita dell anno servono per i turni con orario prolungato
+    await _pianoCaricaFestivita(parseInt(anno));
+    const rg =
+      (await secGet(
+        'piano?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&reparto_dip=eq.' + rep + '&limit=20000',
+      )) || [];
+    _pianoRegistraGiorniTurno(rg);
+    const fb =
+      (await secGet(
+        'piano_fabbisogni?data=gte.' +
+          anno +
+          '-01-01&data=lte.' +
+          anno +
+          '-12-31&reparto_dip=eq.' +
+          rep +
+          '&limit=5000',
+      )) || [];
+    const rc =
+      (await secGet('piano_recupero_ore?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&limit=20000')) || [];
+    const rt =
+      (await secGet('piano_ore_mese?anno_mese=gte.' + anno + '-01&anno_mese=lte.' + anno + '-12&limit=5000')) || [];
+    window._pianoStatCache = { anno: anno, reparto: rep, righe: rg, fabb: fb, rec: rc, rett: rt };
+  }
+  const cache = window._pianoStatCache;
+  // il filtro vale solo dentro l'anno che si sta guardando
+  const meseFiltro =
+    window._pianoStatMese && String(window._pianoStatMese).substring(0, 4) === anno ? window._pianoStatMese : '';
+  window._pianoStatMese = meseFiltro;
+  const righe = meseFiltro ? cache.righe.filter((r) => String(r.data).substring(0, 7) === meseFiltro) : cache.righe;
+  const fabb = cache.fabb;
   // panoramica mesi
   const mesiDati = {};
-  righe.forEach((r) => (mesiDati[r.data.substring(5, 7)] = (mesiDati[r.data.substring(5, 7)] || 0) + 1));
+  cache.righe.forEach((r) => (mesiDati[r.data.substring(5, 7)] = (mesiDati[r.data.substring(5, 7)] || 0) + 1));
   const mesiFabb = {};
   fabb.forEach((f) => (mesiFabb[f.data.substring(5, 7)] = true));
-  let h = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0">';
+  // I mesi sono un FILTRO della tabella qui sotto, non un salto nel calendario:
+  // prima cliccarli cambiava il mese del piano e ricaricava tutto, e i numeri
+  // restavano quelli dell'anno intero. Ora si vede il mese scelto.
+  const _attivo = 'border-color:#2c6e49;background:#2c6e49;color:#fff;font-weight:700';
+  let h = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0;align-items:center">';
+  h +=
+    '<button class="btn-export" style="font-size:.82rem;padding:4px 10px;' +
+    (meseFiltro ? '' : _attivo) +
+    '" onclick="pianoStatMese(\'\')">Anno intero</button>';
   for (let m = 1; m <= 12; m++) {
     const mm = String(m).padStart(2, '0');
     const ha = mesiDati[mm];
+    const sel = meseFiltro === anno + '-' + mm;
     h +=
       '<button class="btn-export" style="font-size:.82rem;padding:4px 10px;' +
-      (ha ? 'border-color:#2c6e49;color:#2c6e49;font-weight:700' : 'color:var(--muted)') +
-      '" onclick="_pianoMeseSel=\'' +
+      (sel ? _attivo : ha ? 'border-color:#2c6e49;color:#2c6e49;font-weight:700' : 'color:var(--muted)') +
+      '" onclick="pianoStatMese(\'' +
       anno +
       '-' +
       mm +
-      '\';_pianoViolCelle={};_pianoViolLista=null;renderPiano()">' +
+      '\')">' +
       (MESI[m - 1] || mm) +
       (ha ? ' (' + ha + ')' : '') +
       (mesiFabb[mm] ? ' <span style="color:#d4b86a">F</span>' : '') +
       '</button>';
   }
+  if (meseFiltro)
+    h +=
+      '<button class="btn-export" style="font-size:.82rem;padding:4px 10px" onclick="pianoStatApriMese()">Apri ' +
+      (MESI[parseInt(meseFiltro.substring(5, 7)) - 1] || '') +
+      ' nel calendario</button>';
   h += '</div>';
   // statistiche per collaboratore
   const st = {};
@@ -9210,8 +9268,7 @@ async function caricaStatisticheAnnoPiano() {
   // quel mese, cosi' le statistiche dell'anno dicono lo stesso numero del saldo
   // e del calendario. Un dato solo, in tutto il programma.
   // scostamenti giornalieri dell'anno: entrano nelle ore, mese per mese
-  const recStat =
-    (await secGet('piano_recupero_ore?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&limit=20000')) || [];
+  const recStat = meseFiltro ? cache.rec.filter((x) => String(x.data).substring(0, 7) === meseFiltro) : cache.rec;
   recStat.forEach((x) => {
     const o = st[x.collaboratore];
     if (!o) return;
@@ -9221,8 +9278,7 @@ async function caricaStatisticheAnnoPiano() {
     if (!o.perMese) o.perMese = {};
     o.perMese[meseK] = (o.perMese[meseK] || 0) + v;
   });
-  const rettAnno =
-    (await secGet('piano_ore_mese?anno_mese=gte.' + anno + '-01&anno_mese=lte.' + anno + '-12&limit=5000')) || [];
+  const rettAnno = meseFiltro ? cache.rett.filter((x) => x.anno_mese === meseFiltro) : cache.rett;
   rettAnno.forEach((x) => {
     const o = st[x.collaboratore];
     if (!o || !o.perMese) return;
@@ -9242,7 +9298,9 @@ async function caricaStatisticheAnnoPiano() {
   h +=
     '<div style="display:flex;padding:6px 0"><input type="text" class="piano-cerca" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-statanno-table\')"></div>';
   h +=
-    '<div style="overflow-x:auto"><table id="piano-statanno-table" class="piano-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Ore anno</th><th title="Sui mesi con un piano">Ore dovute</th><th>Giorni lavorati</th><th>Diurni</th><th>Notturni</th><th>Weekend</th><th>Domeniche</th><th>Vacanze</th><th>Malattie</th><th title="Festivi lavorati che danno diritto al recupero (solo personale fisso)">CGF maturati</th><th title="Giorni CGF effettivamente goduti (quelli caduti in malattia non contano)">CGF goduti</th><th title="Maturati − goduti: quanti recuperi restano da dare">Saldo CGF</th><th title="Festivi parificati alle domeniche lavorati dagli ausiliari (jolly): danno diritto al supplemento del 50% sul salario orario lordo (RAP Allegato 1). Sono nove giorni fissi e valgono anche di domenica">Suppl. 50%</th><th title="Ore lavorate nella fascia notturna (23:00-06:00). Il supplemento del 10% e gia compreso nella durata dei turni: questa colonna serve da controllo, non e un credito da dare a parte">Ore notte</th><th title="Solo ausiliari (jolly): ore effettivamente lavorate nell anno e indennita calcolate su quel totale secondo il RAP Allegato 1 (vacanze 8.33% con 4 settimane o 10.65% con 5, tredicesima 8.33%). I jolly non hanno una percentuale contrattuale: tutto si calcola sulle ore fatte">Ore lavorate · indennita</th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table id="piano-statanno-table" class="piano-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Ore ' +
+    (meseFiltro ? escP(MESI[parseInt(meseFiltro.substring(5, 7)) - 1] || meseFiltro) : 'anno') +
+    '</th><th title="Sui mesi con un piano">Ore dovute</th><th>Giorni lavorati</th><th>Diurni</th><th>Notturni</th><th>Weekend</th><th>Domeniche</th><th>Vacanze</th><th>Malattie</th><th title="Festivi lavorati che danno diritto al recupero (solo personale fisso)">CGF maturati</th><th title="Giorni CGF effettivamente goduti (quelli caduti in malattia non contano)">CGF goduti</th><th title="Maturati − goduti: quanti recuperi restano da dare">Saldo CGF</th><th title="Festivi parificati alle domeniche lavorati dagli ausiliari (jolly): danno diritto al supplemento del 50% sul salario orario lordo (RAP Allegato 1). Sono nove giorni fissi e valgono anche di domenica">Suppl. 50%</th><th title="Ore lavorate nella fascia notturna (23:00-06:00). Il supplemento del 10% e gia compreso nella durata dei turni: questa colonna serve da controllo, non e un credito da dare a parte">Ore notte</th><th title="Solo ausiliari (jolly): ore effettivamente lavorate nell anno e indennita calcolate su quel totale secondo il RAP Allegato 1 (vacanze 8.33% con 4 settimane o 10.65% con 5, tredicesima 8.33%). I jolly non hanno una percentuale contrattuale: tutto si calcola sulle ore fatte">Ore lavorate · indennita</th></tr></thead><tbody>';
   ordineCollabPiano(Object.keys(st), _pianoReparto()).forEach((n) => {
     const o = st[n];
     const info = _pianoCollabInfo(n) || {};
@@ -9318,7 +9376,7 @@ async function caricaStatisticheAnnoPiano() {
   });
   h += '</tbody></table></div>';
   h +=
-    '<p style="font-size:.82rem;color:var(--muted);margin-top:6px">Weekend: giallo da 12, rosso oltre 20 (equità). Click su un mese per aprirlo.</p>';
+    '<p style="font-size:.82rem;color:var(--muted);margin-top:6px">Weekend: giallo da 12, rosso oltre 20 (equità). Click su un mese per vedere solo quel mese, "Anno intero" per tornare al totale.</p>';
   el.innerHTML = h;
 }
 
@@ -9338,7 +9396,7 @@ function _vacDateSettimana(anno, settimana) {
 }
 // GIORNI DI VACANZA SPETTANTI (personale fisso): quanti ne matura ciascuno
 // nell'anno secondo anzianita', e quanti ne ha gia' pianificati nel piano.
-function _pianoVacDirittoCard(anno) {
+async function _pianoVacDirittoCard(anno) {
   const cfg = {
     base1: parseFloat(_pianoRegolaVal('vacanze_giorni_primi2anni')) || 28,
     base2: parseFloat(_pianoRegolaVal('vacanze_giorni_base')) || 35,
@@ -9352,13 +9410,33 @@ function _pianoVacDirittoCard(anno) {
     // 32.37 -> 33), sotto si resta al giorno intero (32.3 -> 32)
     arrotondaDa: _pianoRegolaVal('vacanze_arrotonda_da') != null ? _pianoRegolaVal('vacanze_arrotonda_da') : 0.35,
   };
-  // giorni V gia' presenti nel piano dell'anno (dal mese caricato in memoria
-  // non basta: si contano quelli del settore gia' noti)
+  // GIORNI GIA' PIANIFICATI: le settimane registrate per l'anno in questa
+  // scheda, contate giorno per giorno (una settimana intera vale 7 giorni, come
+  // i 35 giorni di diritto che sono 5 settimane). Prima si contavano le V del
+  // SOLO mese aperto nel calendario, e "Restano" cambiava numero a ogni mese.
   const gia = {};
-  (_pianoRighe || []).forEach((r) => {
-    if (r.codice === 'V' && String(r.data).startsWith(String(anno)))
-      gia[r.collaboratore] = (gia[r.collaboratore] || 0) + 1;
+  (_pianoVacCache || []).forEach((v) => {
+    const sett = parseInt(v.settimana);
+    if (!sett) return;
+    // una settimana a cavallo d'anno porta giorni nell'altro anno: non contano
+    const gg = _pianoGiorniSettimana(anno, sett).filter((d) => d.substring(0, 4) === String(anno));
+    gia[v.collaboratore] = (gia[v.collaboratore] || 0) + gg.length;
   });
+  // Colonna di controllo: le V davvero scritte nel calendario dell'anno. Se il
+  // numero non corrisponde alle settimane, vuol dire che "Applica al piano" non
+  // e' ancora stato fatto per tutti i mesi.
+  const vCal = {};
+  (
+    (await secGet(
+      'piano?codice=eq.V&data=gte.' +
+        anno +
+        '-01-01&data=lte.' +
+        anno +
+        '-12-31&reparto_dip=eq.' +
+        _pianoReparto() +
+        '&select=collaboratore,data&limit=20000',
+    )) || []
+  ).forEach((r) => (vCal[r.collaboratore] = (vCal[r.collaboratore] || 0) + 1));
   const righe = collaboratoriCache
     .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && _pianoMaturaCgf(c) && c.data_assunzione)
     .map((c) => ({
@@ -9399,11 +9477,12 @@ function _pianoVacDirittoCard(anno) {
     return h;
   }
   h +=
-    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:640px;font-size:.9rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>In servizio dal</th><th>Anni</th><th>Spettanti</th><th>Pianificati</th><th>Restano</th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:640px;font-size:.9rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>In servizio dal</th><th>Anni</th><th>Spettanti</th><th title="Giorni delle settimane registrate qui sotto per l anno">Pianificati</th><th title="Giorni V davvero scritti nel calendario dell anno: se sono meno delle settimane registrate, manca Applica al piano per qualche mese">V nel calendario</th><th>Restano</th></tr></thead><tbody>';
   righe.forEach((x) => {
     const dal = String(x.c.data_assunzione).substring(0, 10);
     const anni = Math.floor((new Date(anno, 11, 31) - new Date(dal + 'T12:00:00')) / (365.25 * 86400000));
     const pian = gia[x.c.nome] || 0;
+    const inCal = vCal[x.c.nome] || 0;
     const resta = Math.round((x.r.giorni - pian) * 10) / 10;
     h +=
       '<tr title="' +
@@ -9427,10 +9506,16 @@ function _pianoVacDirittoCard(anno) {
       x.r.giorni +
       '</td><td>' +
       (pian || '') +
+      '</td><td style="color:' +
+      (pian && inCal !== pian ? '#8b6914' : 'var(--muted)') +
+      '" title="' +
+      (pian && inCal !== pian ? 'Registrate ' + pian + ' giornate, nel calendario ce ne sono ' + inCal : '') +
+      '">' +
+      (inCal || '') +
       '</td><td style="font-weight:700;color:' +
       (resta > 0 ? '#8b6914' : resta < 0 ? '#c0392b' : '#2c6e49') +
       '">' +
-      (pian ? resta : '') +
+      resta +
       '</td></tr>';
   });
   h += '</tbody></table></div>';
@@ -9505,7 +9590,7 @@ async function _renderPianoVacanzeTab() {
   const meseLbl = (MESI_L[parseInt(_pianoMeseSel.split('-')[1]) - 1] || '') + ' ' + _pianoMeseSel.split('-')[0];
 
   let h =
-    _pianoVacDirittoCard(anno) +
+    (await _pianoVacDirittoCard(anno)) +
     '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Vacanze ' +
     anno +
     ' (' +
@@ -9543,7 +9628,7 @@ async function _renderPianoVacanzeTab() {
   }
   h += '</div>';
   h +=
-    '<p style="font-size:.8rem;color:var(--muted);padding:8px 14px 0">Le vacanze sono settimane intere (lun-dom). "Applica al piano" scrive le V (protette) del mese scelto nel Calendario e i congedi C prima/dopo secondo le regole (1 C prima per i fissi, 2 per i jolly; C dopo scalati per percentuale). Import Excel: colonna A cognome, B nome, colonne F-BE settimane 1-52 con X.</p>';
+    '<p style="font-size:.8rem;color:var(--muted);padding:8px 14px 0">Le vacanze sono settimane intere (lun-dom): una settimana vale 7 giornate di diritto, quindi 35 giorni sono 5 settimane. "Applica al piano" scrive le V (protette) del mese scelto nel Calendario e i congedi C prima/dopo secondo le regole (1 C prima per i fissi, 2 per i jolly; C dopo scalati per percentuale). Import Excel: colonna A cognome, B nome, colonne F-BE settimane 1-52 con X.</p>';
   if (!gruppi.length) h += '<p style="padding:14px;color:var(--muted)">Nessuna vacanza per il ' + anno + '.</p>';
   gruppi.forEach((nome) => {
     const lista = perCollab[nome];
@@ -9678,7 +9763,7 @@ async function _renderPianoSaldoTab() {
       Math.round(pct * 100) +
       '%</td><td>' +
       (od ? od.toFixed(1) : '-') +
-      '</td><td>' +
+      '</td><td class="piano-op" style="cursor:pointer" title="Clic per scrivere le ore realmente lavorate nel mese">' +
       (op ? op.toFixed(1) : '') +
       (rettSaldo
         ? '<span class="piano-rett" title="Ore reali scritte da ' +
@@ -9686,9 +9771,9 @@ async function _renderPianoSaldoTab() {
           (rettSaldo.nota ? ' · ' + escP(rettSaldo.nota) : '') +
           '">*</span>'
         : '') +
-      '</td><td style="font-weight:700;color:' +
+      '</td><td class="piano-sm" style="font-weight:700;cursor:pointer;color:' +
       col(sm) +
-      '">' +
+      '" title="Clic per scrivere le ore realmente lavorate nel mese">' +
       (op || od ? (sm > 0 ? '+' : '') + sm.toFixed(1) : '') +
       '</td><td style="font-weight:700;color:' +
       col(ytd) +
@@ -9710,7 +9795,7 @@ async function _renderPianoSaldoTab() {
   h +=
     '</tbody></table></div><p style="font-size:.8rem;color:var(--muted);padding:8px 14px">Dovute = giorni/7 × ' +
     _pianoOreSett +
-    'h × percentuale (jolly esclusi). Pianificate = ore turni + codici speciali (V, M... scalati per percentuale). YTD = cumulato da gennaio: nei mesi passati valgono le ore timbrate se presenti, altrimenti il piano.</p></div>';
+    'h × percentuale (jolly esclusi). Pianificate = ore turni + codici speciali (V, M... scalati per percentuale). YTD = cumulato da gennaio: nei mesi passati valgono le ore timbrate se presenti, altrimenti il piano. Clic su "Ore lavorate" o "Saldo mese" per scrivere le ore reali del mese: un mese gia chiuso si corregge solo indicando il motivo.</p></div>';
   return h;
 }
 

@@ -22,6 +22,7 @@ async function loadAll() {
     clo,
     tr,
     vis,
+    profOp,
     compCfg,
     livNomi,
     pntCfg,
@@ -49,6 +50,7 @@ async function loadAll() {
     getImp('campi_label_override'),
     getImp('tipi_rinominati'),
     getImp('visibilita'),
+    getImp('profili_operatori'),
     getImp('competenze_config'),
     getImp('formazione_livelli_nomi'),
     getImp('punti_config'),
@@ -108,6 +110,10 @@ async function loadAll() {
   if (vis)
     try {
       visibilitaConfig = JSON.parse(vis);
+    } catch (e) {}
+  if (profOp)
+    try {
+      profiliOperatori = JSON.parse(profOp);
     } catch (e) {}
   if (livNomi)
     try {
