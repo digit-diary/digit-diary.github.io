@@ -5246,6 +5246,131 @@ function _pianoRecuperoTotaliGenerali() {
     netto +
     'h</b>';
 }
+// SELEZIONE E COLORI del Recupero ore, come nel calendario del piano:
+// click sul nome = riga, click sull'intestazione del giorno = colonna,
+// Ctrl+click su una casella = singola cella. Poi si applica un colore dalla
+// barretta. I colori restano salvati per mese e settore (impostazioni), cosi'
+// li ritrovano tutti gli operatori.
+let _recSel = { righe: {}, colonne: {}, celle: {} };
+let _recColori = { righe: {}, colonne: {}, celle: {} };
+let _recColoriKey = null;
+function _recImpKey(ym) {
+  return 'recupero_colori_' + _pianoReparto() + '_' + ym;
+}
+async function _recCaricaColori(ym) {
+  const k = _recImpKey(ym);
+  if (_recColoriKey === k) return;
+  _recColoriKey = k;
+  _recColori = { righe: {}, colonne: {}, celle: {} };
+  try {
+    const v = await getImp(k);
+    if (v) {
+      const o = JSON.parse(v);
+      _recColori = { righe: o.righe || {}, colonne: o.colonne || {}, celle: o.celle || {} };
+    }
+  } catch (e) {}
+}
+async function _recSalvaColori() {
+  try {
+    await setImp(_recImpKey(_pianoMeseSel), JSON.stringify(_recColori));
+  } catch (e) {
+    toast('Colori non salvati');
+  }
+}
+// colore effettivo di una cella: cella > riga > colonna
+function _recColoreDi(nome, dstr) {
+  const gg = dstr.substring(8);
+  return _recColori.celle[nome + '|' + dstr] || _recColori.righe[nome] || _recColori.colonne[gg] || '';
+}
+function _recSelVuota() {
+  return (
+    !Object.keys(_recSel.righe).length && !Object.keys(_recSel.colonne).length && !Object.keys(_recSel.celle).length
+  );
+}
+function _recSelAggiornaBarra() {
+  const el = document.getElementById('rec-sel-info');
+  if (!el) return;
+  const r = Object.keys(_recSel.righe).length;
+  const c = Object.keys(_recSel.colonne).length;
+  const s = Object.keys(_recSel.celle).length;
+  const parti = [];
+  if (r) parti.push(r + (r === 1 ? ' riga' : ' righe'));
+  if (c) parti.push(c + (c === 1 ? ' colonna' : ' colonne'));
+  if (s) parti.push(s + (s === 1 ? ' cella' : ' celle'));
+  el.textContent = parti.length ? 'Selezione: ' + parti.join(' + ') : '';
+}
+function pianoRecSelRiga(nome, td) {
+  if (_recSel.righe[nome]) delete _recSel.righe[nome];
+  else _recSel.righe[nome] = 1;
+  const tr = td.closest('tr');
+  if (tr) tr.classList.toggle('rec-sel-riga', !!_recSel.righe[nome]);
+  _recSelAggiornaBarra();
+}
+function pianoRecSelColonna(gg, th) {
+  if (_recSel.colonne[gg]) delete _recSel.colonne[gg];
+  else _recSel.colonne[gg] = 1;
+  const on = !!_recSel.colonne[gg];
+  th.classList.toggle('rec-sel-col', on);
+  document
+    .querySelectorAll('#piano-recupero-table tbody td[data-gg="' + gg + '"]')
+    .forEach((c) => c.classList.toggle('rec-sel-col', on));
+  _recSelAggiornaBarra();
+}
+function pianoRecSelCella(ev, inp) {
+  if (!ev || (!ev.ctrlKey && !ev.metaKey)) return; // il click normale scrive le ore
+  ev.preventDefault();
+  inp.blur();
+  const k = inp.dataset.nome + '|' + inp.dataset.data;
+  if (_recSel.celle[k]) delete _recSel.celle[k];
+  else _recSel.celle[k] = 1;
+  inp.closest('td').classList.toggle('rec-sel-cella', !!_recSel.celle[k]);
+  _recSelAggiornaBarra();
+}
+function pianoRecSelPulisci() {
+  _recSel = { righe: {}, colonne: {}, celle: {} };
+  document
+    .querySelectorAll(
+      '#piano-recupero-table .rec-sel-riga, #piano-recupero-table .rec-sel-col, #piano-recupero-table .rec-sel-cella',
+    )
+    .forEach((x) => x.classList.remove('rec-sel-riga', 'rec-sel-col', 'rec-sel-cella'));
+  _recSelAggiornaBarra();
+}
+// applica (o toglie, con colore vuoto) il colore alla selezione e salva
+async function pianoRecColora(colore) {
+  if (_recSelVuota()) {
+    toast('Prima seleziona: click sul nome (riga), sull intestazione del giorno (colonna) o Ctrl+click su una casella');
+    return;
+  }
+  Object.keys(_recSel.righe).forEach((n) => {
+    if (colore) _recColori.righe[n] = colore;
+    else delete _recColori.righe[n];
+  });
+  Object.keys(_recSel.colonne).forEach((g) => {
+    if (colore) _recColori.colonne[g] = colore;
+    else delete _recColori.colonne[g];
+  });
+  Object.keys(_recSel.celle).forEach((k) => {
+    if (colore) _recColori.celle[k] = colore;
+    else delete _recColori.celle[k];
+  });
+  _recApplicaColoriDom();
+  await _recSalvaColori();
+  toast(colore ? 'Colore applicato' : 'Colore tolto');
+}
+// riapplica i colori alle celle visibili senza ridisegnare la scheda
+function _recApplicaColoriDom() {
+  const tab = document.getElementById('piano-recupero-table');
+  if (!tab) return;
+  tab.querySelectorAll('tbody tr[data-nome]').forEach((tr) => {
+    const nome = tr.dataset.nome;
+    const tdNome = tr.querySelector('.piano-nome');
+    if (tdNome) tdNome.style.background = _recColori.righe[nome] || '';
+    tr.querySelectorAll('td[data-gg]').forEach((td) => {
+      const dstr = _pianoMeseSel + '-' + td.dataset.gg;
+      td.style.background = _recColoreDi(nome, dstr);
+    });
+  });
+}
 function pianoRecuperoOrdina(campo) {
   window._pianoRecuperoOrdine = campo;
   renderPiano();
@@ -5253,6 +5378,8 @@ function pianoRecuperoOrdina(campo) {
 async function _renderPianoRecuperoTab() {
   const ym = _pianoMeseSel;
   await _pianoCaricaRecupero(ym);
+  await _recCaricaColori(ym);
+  _recSel = { righe: {}, colonne: {}, celle: {} };
   const anno = parseInt(ym.split('-')[0]);
   const mese = parseInt(ym.split('-')[1]);
   const nGiorni = new Date(anno, mese, 0).getDate();
@@ -5316,15 +5443,39 @@ async function _renderPianoRecuperoTab() {
     '</select>' +
     '<input type="text" class="piano-cerca" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-recupero-table\')">' +
     '</div>';
+  // barretta selezione e colori, come nel calendario
   h +=
-    '<div style="overflow-x:auto"><table id="piano-recupero-table" class="piano-table" style="width:' +
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">' +
+    '<span style="font-size:.85rem;color:var(--muted)">Colora:</span>' +
+    PIANO_COLORI_CELLA.map(
+      (c) =>
+        '<span onclick="pianoRecColora(\'' +
+        c +
+        '\')" title="Applica questo colore alla selezione" style="display:inline-block;width:24px;height:24px;background:' +
+        c +
+        ';border:1px solid #999;border-radius:3px;cursor:pointer"></span>',
+    ).join('') +
+    '<button class="btn-act" style="font-size:.82rem" onclick="pianoRecColora(null)">Togli colore</button>' +
+    '<button class="btn-act" style="font-size:.82rem" onclick="pianoRecSelPulisci()">Deseleziona</button>' +
+    '<b id="rec-sel-info" style="font-size:.85rem;color:#b8860b"></b>' +
+    '<span style="font-size:.82rem;color:var(--muted);margin-left:auto">Click sul nome = riga &middot; click sul giorno = colonna &middot; Ctrl+click su una casella = cella</span>' +
+    '</div>';
+  h +=
+    // scorrimento DENTRO il riquadro: cosi' la riga delle date resta fissa in
+    // alto e la colonna dei collaboratori resta fissa a sinistra
+    '<div style="overflow:auto;max-height:72vh"><table id="piano-recupero-table" class="piano-table" style="width:' +
     (270 + 46 * nGiorni + 90) +
     'px"><thead><tr><th class="piano-nome" style="width:210px">Collaboratore</th><th style="width:60px" title="Percentuale d impiego: le ore dovute si calcolano su questa">%</th>';
   for (let g = 1; g <= nGiorni; g++) {
     const dstr = ym + '-' + String(g).padStart(2, '0');
     const dow = new Date(dstr + 'T12:00:00').getDay();
+    const _gg = String(g).padStart(2, '0');
     h +=
-      '<th style="width:46px' +
+      '<th data-gg="' +
+      _gg +
+      '" onclick="pianoRecSelColonna(\'' +
+      _gg +
+      '\',this)" title="Click: seleziona la colonna del giorno" style="width:46px;cursor:pointer' +
       (dow === 0 ? ';background:#7a2e2e;color:#fff' : dow === 6 ? ';background:#5a4a3a;color:#fff' : '') +
       '"><div>' +
       GG3[dow] +
@@ -5335,10 +5486,17 @@ async function _renderPianoRecuperoTab() {
   h += '<th style="width:90px" title="Somma degli scostamenti del mese">Totale</th></tr></thead><tbody>';
   nomi.forEach((nome) => {
     const _infoR = _pianoCollabInfo(nome) || {};
+    const _colRiga = _recColori.righe[nome] || '';
     h +=
       '<tr data-nome="' +
       escP(nome) +
-      '"><td class="piano-nome" style="text-align:left">' +
+      '"><td class="piano-nome" onclick="pianoRecSelRiga(\'' +
+      escP(nome).replace(/'/g, "\\'") +
+      '\',this)" title="Click: seleziona la riga di ' +
+      escP(nome) +
+      '" style="text-align:left;cursor:pointer' +
+      (_colRiga ? ';background:' + _colRiga : '') +
+      '">' +
       escP(nome) +
       '</td><td style="color:var(--muted)">' +
       Math.round((parseFloat(_infoR.percentuale) || 1) * 100) +
@@ -5347,12 +5505,19 @@ async function _renderPianoRecuperoTab() {
       const dstr = ym + '-' + String(g).padStart(2, '0');
       const r = _pianoRecupero[nome + '|' + dstr];
       const v = r ? parseFloat(r.ore) : '';
+      const _colCella = _recColoreDi(nome, dstr);
       h +=
-        '<td style="padding:1px"><input class="rec-cella' +
+        '<td data-gg="' +
+        dstr.substring(8) +
+        '" style="padding:1px' +
+        (_colCella ? ';background:' + _colCella : '') +
+        '"><input class="rec-cella' +
         (v > 0 ? ' rec-piu' : v < 0 ? ' rec-meno' : '') +
+        '" data-nome="' +
+        escP(nome).replace(/"/g, '&quot;') +
         '" data-data="' +
         dstr +
-        '" type="text" inputmode="decimal" value="' +
+        '" onmousedown="pianoRecSelCella(event,this)" type="text" inputmode="decimal" value="' +
         (v === '' ? '' : v) +
         '"' +
         (puoMod

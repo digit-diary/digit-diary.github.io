@@ -259,6 +259,8 @@ function GUIDA_CAPITOLI() {
         'A destra c e il <b>totale del mese</b> per ogni collaboratore, e in alto il riepilogo del settore: ore in piu, ore in meno e saldo complessivo.',
         'Tutto e collegato: quelle ore si sommano nella colonna <b>OP</b> del calendario, quindi entrano in <b>SM</b> (saldo del mese), nell <b>YTD</b> (saldo da inizio anno), nella scheda <b>Saldo</b> e nelle <b>Statistiche</b> dell anno. Chi scrive e quando resta nel registro.',
         'Non va confusa con la correzione del <b>saldo mensile</b> (doppio clic su OP o SM nel calendario): quella serve a scrivere il totale reale di un mese chiuso, questa e la registrazione di ogni giorno. Se ci sono tutte e due, il totale scritto a mano ha la precedenza.',
+        'Come nel calendario si possono <b>selezionare e colorare</b> righe, colonne e celle: click sul <b>nome</b> seleziona la riga, click sull <b>intestazione del giorno</b> la colonna, <b>Ctrl+click</b> su una casella la singola cella. Poi si sceglie un colore dalla barretta (o "Togli colore"). I colori restano salvati per mese e settore, e li vedono tutti gli operatori.',
+        'Scorrendo la griglia, la <b>riga delle date</b> resta fissa in alto e la <b>colonna dei collaboratori</b> resta fissa a sinistra.',
       ],
     },
     {
