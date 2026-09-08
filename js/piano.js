@@ -3953,6 +3953,20 @@ async function eliminaFabbisognoMese() {
     toast('Errore eliminazione fabbisogno');
   }
 }
+// PROFILO DI UN GIORNO per il fabbisogno: quello che conta non e' il numero del
+// giorno ma che giornata e'. Un venerdi ha piu' gente di un martedi, la domenica
+// ha il suo assetto, e i festivi seguono la domenica mentre le vigilie seguono
+// il sabato perche' si chiude alle 5.
+function _pianoProfiloGiorno(dstr) {
+  const fest = pianoFestiviCache.find((f) => f.data === dstr);
+  if (fest) return 'FESTIVO';
+  const dow = new Date(dstr + 'T12:00:00').getDay();
+  if (dow === 0) return 'FESTIVO'; // la domenica e il festivo hanno lo stesso assetto
+  const ch = typeof _pianoChiusuraGiorno === 'function' ? _pianoChiusuraGiorno(dstr) : null;
+  if (ch && ch.marcatore) return 'CHIUSURA5'; // venerdi, sabato, vigilie di festivita
+  if (dow === 5 || dow === 6) return 'CHIUSURA5';
+  return 'D' + dow; // lunedi..giovedi restano distinti
+}
 async function copiaFabbisognoMese() {
   if (!puoGestirePiano()) return;
   const p = _pianoMeseSel.split('-');
@@ -3968,31 +3982,85 @@ async function copiaFabbisognoMese() {
     toast('Nessun fabbisogno nel mese precedente (' + ymPrec + ')');
     return;
   }
+  // I FESTIVI DEI DUE MESI: servono a riconoscere i giorni che seguono la
+  // domenica e le vigilie che chiudono alle 5.
+  await _pianoCaricaFestivita(parseInt(p[0]));
+  await _pianoCaricaFestivita(dPrec.getFullYear());
   const nGiorni = _pianoUltimoGiorno(_pianoMeseSel);
   const giaPresenti = new Set(_pianoFabbCache.map((f) => f.data + '|' + f.turno_codice));
-  const nuovi = prec
-    .map((f) => ({ giorno: parseInt(f.data.split('-')[2]), turno_codice: f.turno_codice, quantita: f.quantita }))
-    .filter((f) => f.giorno <= nGiorni)
-    .map((f) => ({
-      data: _pianoMeseSel + '-' + String(f.giorno).padStart(2, '0'),
-      turno_codice: f.turno_codice,
-      quantita: f.quantita,
-      reparto_dip: _pianoReparto(),
-    }))
-    .filter((f) => !giaPresenti.has(f.data + '|' + f.turno_codice));
+  // MODELLO PER TIPO DI GIORNATA, non per numero del giorno. Copiare il 7 sul 7
+  // spostava i venerdi sui lunedi e faceva saltare tutto: qui si prende, per
+  // ogni tipo di giornata, l'assetto piu' ricorrente del mese di partenza.
+  const perData = {};
+  prec.forEach((f) => {
+    perData[f.data] = perData[f.data] || {};
+    perData[f.data][f.turno_codice] = f.quantita;
+  });
+  const perProfilo = {};
+  Object.keys(perData).forEach((d) => {
+    const pr = _pianoProfiloGiorno(d);
+    const firma = JSON.stringify(
+      Object.keys(perData[d])
+        .sort()
+        .map((k) => k + ':' + perData[d][k]),
+    );
+    perProfilo[pr] = perProfilo[pr] || {};
+    perProfilo[pr][firma] = perProfilo[pr][firma] || { n: 0, celle: perData[d] };
+    perProfilo[pr][firma].n++;
+  });
+  const modello = {};
+  Object.keys(perProfilo).forEach((pr) => {
+    let best = null;
+    Object.keys(perProfilo[pr]).forEach((f) => {
+      if (!best || perProfilo[pr][f].n > best.n) best = perProfilo[pr][f];
+    });
+    if (best) modello[pr] = best.celle;
+  });
+  const nuovi = [];
+  const riepilogo = {};
+  for (let g = 1; g <= nGiorni; g++) {
+    const dstr = _pianoMeseSel + '-' + String(g).padStart(2, '0');
+    const pr = _pianoProfiloGiorno(dstr);
+    const m = modello[pr];
+    riepilogo[pr] = (riepilogo[pr] || 0) + 1;
+    if (!m) continue;
+    Object.keys(m).forEach((cod) => {
+      if (giaPresenti.has(dstr + '|' + cod)) return;
+      nuovi.push({ data: dstr, turno_codice: cod, quantita: m[cod], reparto_dip: _pianoReparto() });
+    });
+  }
   if (!nuovi.length) {
     toast('Fabbisogno già presente per tutte le celle del mese');
     return;
   }
+  const nomiProfilo = {
+    FESTIVO: 'domeniche e festivi',
+    CHIUSURA5: 'venerdi, sabato e vigilie (chiusura alle 5)',
+    D1: 'lunedi',
+    D2: 'martedi',
+    D3: 'mercoledi',
+    D4: 'giovedi',
+  };
+  const senzaModello = Object.keys(riepilogo).filter((k) => !modello[k]);
   if (
     !confirm(
-      'Copiare ' +
-        nuovi.length +
-        ' fabbisogni da ' +
+      'Copiare il fabbisogno da ' +
         ymPrec +
         ' a ' +
         _pianoMeseSel +
-        '?\n(le celle già impostate non vengono toccate)',
+        '?\n\nNon si copia giorno per giorno ma per tipo di giornata, cosi i venerdi\nrestano venerdi: ' +
+        Object.keys(riepilogo)
+          .filter((k) => modello[k])
+          .map((k) => (nomiProfilo[k] || k) + ' (' + riepilogo[k] + ')')
+          .join(', ') +
+        '.\nI festivi prendono l assetto della domenica, le vigilie quello del sabato.\n\n' +
+        nuovi.length +
+        ' celle da scrivere. Le celle gia impostate non vengono toccate.' +
+        (senzaModello.length
+          ? '\n\nAttenzione: per ' +
+            senzaModello.map((k) => nomiProfilo[k] || k).join(', ') +
+            ' non c e un giorno di riferimento nel mese precedente: restano vuoti.'
+          : ''),
     )
   )
     return;
@@ -4000,8 +4068,11 @@ async function copiaFabbisognoMese() {
     for (let i = 0; i < nuovi.length; i += 10) {
       await Promise.all(nuovi.slice(i, i + 10).map((f) => secPost('piano_fabbisogni', f)));
     }
-    logAzione('Piano: fabbisogno copiato', ymPrec + ' → ' + _pianoMeseSel + ' (' + nuovi.length + ' celle)');
-    toast('Fabbisogno copiato (' + nuovi.length + ' celle)');
+    logAzione(
+      'Piano: fabbisogno copiato per tipo di giornata',
+      ymPrec + ' → ' + _pianoMeseSel + ' (' + nuovi.length + ' celle)',
+    );
+    toast('Fabbisogno copiato per tipo di giornata (' + nuovi.length + ' celle)');
     renderPiano();
   } catch (e) {
     toast('Errore copia fabbisogno');
