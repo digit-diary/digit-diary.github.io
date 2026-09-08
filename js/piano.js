@@ -1509,7 +1509,10 @@ async function renderPiano() {
               titolo =
                 (cs.descrizione || codice) + (r.ora_inizio && r.ora_fine ? ' ' + r.ora_inizio + '-' + r.ora_fine : '');
             }
-            if (r.protetto) cls += ' piano-prot';
+            if (r.protetto) {
+              cls += ' piano-prot';
+              titolo += (titolo ? ' \u00b7 ' : '') + 'BLOCCATA' + (r.motivo_blocco ? ': ' + r.motivo_blocco : '');
+            }
             if ((r.reparto_dip || 'slots') !== _pianoReparto()) {
               // cella dell'ALTRO reparto di un collaboratore multi-reparto
               stile += (stile ? ';' : '') + 'opacity:.65;font-style:italic';
@@ -2067,7 +2070,10 @@ async function rimuoviPianoCella(giaChiuso) {
         String(sel.data).split('-').reverse().join('.') +
         ' · ' +
         r.codice +
-        '\n\nE una cella protetta (piano consolidato, vacanza o assenza confermata).\nCancellarla comunque?',
+        (r.motivo_blocco
+          ? '\n\nE BLOCCATA per: ' + r.motivo_blocco
+          : '\n\nE una cella protetta (piano consolidato, vacanza o assenza confermata).') +
+        '\nCancellarla comunque?',
     )
   )
     return;
@@ -12386,6 +12392,11 @@ function mostraPianoCtx(e, nome, dstr) {
   const _haCambio = !!(r && /cambio con/i.test(r.commento || ''));
   if (_haCambio) h += voce('Ristampa foglio cambio', 'icx-stampa', "pianoCtxAzione('ristampaCambio')", puoMod);
   h += voce('Cambio per esigenze', 'icx-settings', "pianoCtxAzione('esigenze')", puoMod && !!haTurno);
+  // BLOCCO DELLA CELLA: il contrassegno "protetto" lo metteva solo il programma
+  // (vacanze, assenze, scambi). Cosi' si puo' fermare a mano un giorno che non
+  // si deve toccare, scrivendo perche'.
+  if (r && r.protetto) h += voce('Sblocca questa cella', 'icx-refresh', "pianoCtxAzione('sblocca')", puoMod);
+  else h += voce('Blocca questa cella (con motivo)', 'icx-settings', "pianoCtxAzione('blocca')", puoMod && !!r);
   h += voce('Rimuovi cella', 'icx-cestino', "pianoCtxAzione('rimuovi')", puoMod && !!r);
   h += voce('Copia cella', 'icx-modifica', "pianoCtxAzione('copia')", !!r);
   h += voce(
@@ -12456,6 +12467,78 @@ function mostraPianoCtxNome(e, nome) {
   menu.style.left = Math.min(e.clientX, window.innerWidth - 230) + 'px';
   menu.style.top = Math.min(e.clientY, window.innerHeight - menu.offsetHeight - 10) + 'px';
 }
+// Blocca o sblocca UNA cella del piano. Bloccata significa: fuori dalla
+// generazione della bozza, fuori da "cancella mese", non la prendono gli scambi
+// turno ne' la ricerca coperture, e per cambiarla o cancellarla serve una
+// conferma esplicita che mostra il motivo. Chi blocca, quando e perche' finisce
+// nel Registro attivita, come per lo sblocco dei giorni chiusi.
+async function pianoBloccaCella(nome, dstr, blocca) {
+  if (!puoGestirePiano() && !isAdmin()) {
+    toast('Non hai il permesso di modificare il piano');
+    return;
+  }
+  if (!_pianoConsentiScrittura(dstr)) return;
+  const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
+  if (!r) {
+    toast('Questa cella e vuota: prima scrivi il turno, poi la blocchi');
+    return;
+  }
+  const giorno = String(dstr).split('-').reverse().join('.');
+  if (blocca) {
+    const motivo = prompt(
+      'Perche questa cella non si deve toccare?\n\n' +
+        nome +
+        ' \u00b7 ' +
+        giorno +
+        ' \u00b7 ' +
+        (r.codice || '') +
+        '\n\nEsempi: visita medica, appuntamento fissato, corso obbligatorio.\nIl motivo lo legge chi domani prova a cambiare il turno.',
+      r.motivo_blocco || '',
+    );
+    if (motivo === null) return;
+    const testo = String(motivo).trim();
+    if (!testo) {
+      toast('Serve il motivo: senza, il blocco non si capisce');
+      return;
+    }
+    try {
+      await secPatch('piano', 'id=eq.' + r.id, { protetto: true, motivo_blocco: testo });
+      r.protetto = true;
+      r.motivo_blocco = testo;
+      logAzione('Piano: cella bloccata', nome + ' ' + dstr + ' (' + (r.codice || '') + '): ' + testo);
+      toast('Cella bloccata: ' + testo);
+      renderPiano();
+    } catch (e) {
+      console.error('blocco cella', e);
+      toast('Errore nel salvataggio del blocco');
+    }
+    return;
+  }
+  if (
+    !confirm(
+      'Sbloccare questa cella?\n\n' +
+        nome +
+        ' \u00b7 ' +
+        giorno +
+        ' \u00b7 ' +
+        (r.codice || '') +
+        (r.motivo_blocco ? '\n\nEra bloccata per: ' + r.motivo_blocco : '') +
+        '\n\nDa quel momento torna modificabile come le altre.',
+    )
+  )
+    return;
+  try {
+    await secPatch('piano', 'id=eq.' + r.id, { protetto: false, motivo_blocco: null });
+    logAzione('Piano: cella sbloccata', nome + ' ' + dstr + (r.motivo_blocco ? ' (era: ' + r.motivo_blocco + ')' : ''));
+    r.protetto = false;
+    r.motivo_blocco = null;
+    toast('Cella sbloccata');
+    renderPiano();
+  } catch (e) {
+    console.error('sblocco cella', e);
+    toast('Errore nello sblocco');
+  }
+}
 function pianoCtxAzione(azione) {
   nascondiPianoCtx();
   const sel = _pianoCtxSel;
@@ -12480,6 +12563,8 @@ function pianoCtxAzione(azione) {
         toast('Errore eliminazione commento');
       }
     })();
+  } else if (azione === 'blocca' || azione === 'sblocca') {
+    pianoBloccaCella(sel.nome, sel.data, azione === 'blocca');
   } else if (azione === 'colore') {
     // seleziona la cella e apre la palette in alto (stessa di Excel)
     const tr = document.querySelector('#piano-content .piano-table tbody tr[data-nome="' + CSS.escape(sel.nome) + '"]');
@@ -12837,7 +12922,12 @@ async function pianoSalvaCella(nome, dstr, codice) {
     const protetta = !!(r && r.protetto && codice !== attuale);
     if (avvisi.length || protetta) {
       const righe = avvisi.slice();
-      if (protetta) righe.push('cella protetta (piano consolidato, vacanza o assenza confermata): la stai sostituendo');
+      if (protetta)
+        righe.push(
+          r.motivo_blocco
+            ? 'cella BLOCCATA per: ' + r.motivo_blocco + ' (la stai sostituendo)'
+            : 'cella protetta (piano consolidato, vacanza o assenza confermata): la stai sostituendo',
+        );
       if (
         !confirm(
           '\u26a0 ATTENZIONE \u00b7 ' +
