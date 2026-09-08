@@ -1047,8 +1047,9 @@ async function pianoScriviOreMese(nome) {
       if (att) {
         await secDel('piano_ore_mese', 'id=eq.' + att.id);
         delete _pianoOreMese[nome + '|' + ym];
-        logAzione('Ore reali del mese tolte', nome + ' ' + ym);
-        toast('Rettifica tolta: torna alle ore del piano');
+        logAzione('Ore reali del mese tolte', nome + ' ' + ym + ' (erano ' + att.ore_reali + 'h)');
+        _pianoRegistraModifica('Saldo ore', nome, 'ore reali ' + ym, att.ore_reali + 'h', 'ore del piano');
+        toast('Salvato \u00b7 rettifica tolta: ' + nome + ' torna alle ore del piano');
       }
     } else {
       const ore = parseFloat(testo);
@@ -1074,8 +1075,26 @@ async function pianoScriviOreMese(nome) {
         const nuovo = await secPost('piano_ore_mese', dati);
         _pianoOreMese[nome + '|' + ym] = (nuovo && nuovo[0]) || Object.assign({ creato_il: dati.modificato_il }, dati);
       }
-      logAzione('Ore reali del mese', nome + ' ' + ym + ' = ' + ore + 'h' + (dati.nota ? ' (' + dati.nota + ')' : ''));
-      toast('Ore reali registrate: ' + ore + 'h');
+      logAzione(
+        'Ore reali del mese',
+        nome +
+          ' ' +
+          ym +
+          ': ' +
+          (att ? att.ore_reali + 'h' : 'ore del piano') +
+          ' \u2192 ' +
+          ore +
+          'h' +
+          (dati.nota ? ' (' + dati.nota + ')' : ''),
+      );
+      _pianoRegistraModifica(
+        'Saldo ore',
+        nome,
+        'ore reali ' + ym,
+        att ? att.ore_reali + 'h' : 'ore del piano',
+        ore + 'h',
+      );
+      toast('Salvato \u00b7 ' + nome + ' ' + ym + ': ' + ore + 'h (' + _pianoOreHm(ore) + ')');
     }
     _pianoYtdKey = ''; // l'YTD dei mesi seguenti cambia: si ricalcola
     renderPiano();
@@ -1228,7 +1247,7 @@ async function renderPiano() {
     const MESI_L = MESI_FULL || [];
     const label = (MESI_L[parseInt(ym.split('-')[1]) - 1] || ym) + ' ' + ym.split('-')[0];
 
-    let h = _pianoTabBar();
+    let h = _pianoTabBar() + _pianoModificheHtml();
     if (_pianoTab === 'calendario') {
       h +=
         '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
@@ -3303,11 +3322,24 @@ async function salvaPianoRegola(id, campo, valore) {
     patch[campo] = campo === 'attivo' ? !!valore : String(valore).trim();
     await secPatch('piano_regole', 'id=eq.' + id, patch);
     const r = pianoRegoleCache.find((x) => x.id === id);
+    const prima = r ? r[campo] : '';
     if (r) r[campo] = patch[campo];
-    logAzione('Piano: regola modificata', (r ? r.nome : id) + ' ' + campo + ' → ' + patch[campo]);
-    toast('Regola aggiornata');
+    const mostra = (v) => (campo === 'attivo' ? (v ? 'si' : 'no') : String(v == null || v === '' ? 'vuoto' : v));
+    logAzione(
+      'Piano: regola modificata',
+      (r ? r.nome : id) + ' \u00b7 ' + campo + ': ' + mostra(prima) + ' \u2192 ' + mostra(patch[campo]),
+    );
+    _pianoRegistraModifica(
+      'Regole',
+      r ? r.nome || r.chiave || String(id) : String(id),
+      campo,
+      mostra(prima),
+      mostra(patch[campo]),
+    );
+    toast('Salvato \u00b7 ' + (r ? r.nome : id) + ': ' + mostra(prima) + ' \u2192 ' + mostra(patch[campo]));
     _pianoViolCelle = {};
     _pianoViolLista = null;
+    renderPiano();
   } catch (e) {
     toast('Errore salvataggio regola');
   }
@@ -4008,8 +4040,11 @@ async function pianoVerificaDurateNotte() {
     const dich = parseFloat(t.durata_ore);
     if (attesa == null || isNaN(dich)) return;
     const diff = Math.round((attesa - dich) * 100) / 100;
-    // sotto i 3 minuti e' arrotondamento, non un errore
-    if (Math.abs(diff) * 60 >= 3) problemi.push({ t: t, nott: nott, attesa: attesa, dich: dich, diff: diff });
+    // si segnala QUALUNQUE scarto che valga almeno mezzo minuto: un turno fatto
+    // 200 volte in un anno con un minuto di troppo sono piu' di tre ore nel
+    // saldo di qualcuno, quindi gli arrotondamenti di uno o due minuti non si
+    // lasciano passare
+    if (Math.abs(diff) * 60 >= 0.5) problemi.push({ t: t, nott: nott, attesa: attesa, dich: dich, diff: diff });
   });
   const conNotte = tutti.length;
   const b = document.getElementById('pwd-modal-content');
@@ -4024,7 +4059,7 @@ async function pianoVerificaDurateNotte() {
     conNotte +
     '</b>, di cui <b>' +
     problemi.length +
-    '</b> con durata da sistemare (scarto di almeno 3 minuti; sotto e arrotondamento).</p>';
+    '</b> con durata da sistemare (qualunque scarto, anche di un solo minuto).</p>';
   if (!problemi.length) {
     h +=
       '<p style="font-size:.9rem;color:#2c6e49;font-weight:700">Tutte le durate comprendono correttamente il supplemento notturno.</p>';
@@ -4608,11 +4643,21 @@ function _renderPianoTurniCard() {
     .slice()
     .sort((x, y) => (x.gruppo || '').localeCompare(y.gruppo || '') || x.codice.localeCompare(y.codice))
     .forEach((t) => {
+      const _mod = (window._pianoModifiche || []).filter((m) => m.scheda === 'Turni' && m.codice === t.codice);
       h +=
-        '<tr><td style="font-weight:700;background:' +
+        '<tr id="pt-riga-' +
+        t.id +
+        '"' +
+        (_mod.length ? ' style="background:#fff8e1"' : '') +
+        '><td style="font-weight:700;background:' +
         (t.colore || '#fff') +
         '">' +
         escP(t.codice) +
+        (_mod.length
+          ? ' <span title="Modificato adesso: ' +
+            escP(_mod.map((m) => m.campo + ' ' + m.prima + ' \u2192 ' + m.dopo).join(' \u00b7 ')) +
+            '" style="color:#b8860b">\u25cf</span>'
+          : '') +
         '</td><td><input type="text" value="' +
         escP(t.gruppo || '') +
         '" onchange="salvaPianoTurno(' +
@@ -4633,7 +4678,11 @@ function _renderPianoTurniCard() {
         (t.durata_ore || 0) +
         '" onchange="salvaPianoTurno(' +
         t.id +
-        ',\'durata_ore\',this.value)" style="width:58px;padding:2px;text-align:center;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"> <span style="font-size:.82rem;color:var(--muted);white-space:nowrap" title="Stessa durata scritta in ore e minuti: 8.33 in decimali = 8h20 (20 minuti sono un terzo di ora)">= ' +
+        ',\'durata_ore\',this.value)" oninput="_pianoTurnoHmVivo(' +
+        t.id +
+        ',this.value)" style="width:58px;padding:2px;text-align:center;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"> <span id="pt-hm-' +
+        t.id +
+        '" style="font-size:.82rem;color:var(--muted);white-space:nowrap" title="Stessa durata scritta in ore e minuti: 8.33 in decimali = 8h20 (20 minuti sono un terzo di ora)">= ' +
         _pianoOreHm(t.durata_ore) +
         '</span></td><td><select onchange="salvaPianoTurno(' +
         t.id +
@@ -4668,18 +4717,103 @@ function _renderPianoTurniCard() {
   h += '</div></div>';
   return h;
 }
+// Ore e minuti aggiornati MENTRE si scrive la durata: prima il "= 8h20" a
+// fianco restava fermo al valore vecchio finche' non si ricaricava la scheda,
+// e chi scriveva in centesimi non vedeva subito che cosa stava facendo.
+function _pianoTurnoHmVivo(id, valore) {
+  const el = document.getElementById('pt-hm-' + id);
+  if (!el) return;
+  const v = parseFloat(String(valore).replace(',', '.'));
+  el.textContent = '= ' + (isNaN(v) ? '-' : _pianoOreHm(v));
+}
+// MEMORIA DI QUELLO CHE SI E' CAMBIATO ADESSO.
+// Turni, regole e impostazioni del piano si salvano da soli appena si tocca un
+// campo: e' comodo, ma la scritta che passa in basso non basta e dopo cinque
+// modifiche non ci si ricorda piu' che cosa si e' toccato. Qui resta l'elenco,
+// visibile in cima alla scheda finche' non lo si chiude. Tutto finisce anche
+// nel Registro attivita', con nome e ora.
+function _pianoRegistraModifica(scheda, oggetto, campo, prima, dopo) {
+  window._pianoModifiche = window._pianoModifiche || [];
+  window._pianoModifiche.push({
+    scheda: scheda,
+    codice: oggetto,
+    campo: campo,
+    prima: prima,
+    dopo: dopo,
+    ora: new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
+  });
+}
+function _pianoModificheHtml() {
+  const lista = window._pianoModifiche || [];
+  if (!lista.length) return '';
+  return (
+    '<div style="background:#fff8e1;border-left:4px solid #b8860b;border-radius:3px;padding:10px 12px;margin:0 0 12px">' +
+    '<b style="font-size:.9rem">Modifiche fatte adesso (' +
+    lista.length +
+    ')</b>' +
+    '<p style="font-size:.82rem;color:var(--muted);margin:4px 0 6px">Sono gia salvate: il programma registra ogni campo appena lo cambi. Questo elenco serve solo a ricordare che cosa hai toccato in questa sessione. Resta anche nel Registro attivita, con nome e ora.</p>' +
+    '<ul style="margin:0 0 8px 18px;font-size:.86rem">' +
+    lista
+      .map(
+        (m) =>
+          '<li><span style="color:var(--muted)">' +
+          escP(m.scheda) +
+          '</span> \u00b7 <b>' +
+          escP(m.codice) +
+          '</b> \u00b7 ' +
+          escP(m.campo) +
+          ': ' +
+          escP(String(m.prima)) +
+          ' \u2192 <b>' +
+          escP(String(m.dopo)) +
+          '</b> <span style="color:var(--muted)">(' +
+          escP(m.ora) +
+          ')</span></li>',
+      )
+      .join('') +
+    '</ul>' +
+    '<button class="btn-export" style="font-size:.8rem;padding:4px 10px" onclick="window._pianoModifiche=[];renderPiano()">Ho visto, chiudi l elenco</button>' +
+    '</div>'
+  );
+}
+const _PT_ETICHETTE = {
+  gruppo: 'gruppo',
+  ora_inizio: 'ora di inizio',
+  ora_fine: 'ora di fine',
+  ora_fine_tardi: 'ora di fine con chiusura alle 5',
+  durata_ore: 'durata',
+  tipo: 'tipo',
+  colore: 'colore',
+  oltre23: 'oltre le 23',
+  attivo: 'attivo',
+};
 async function salvaPianoTurno(id, campo, valore) {
   if (!isAdmin()) return;
   try {
     const patch = {};
     if (campo === 'attivo' || campo === 'oltre23') patch[campo] = !!valore;
-    else if (campo === 'durata_ore') patch[campo] = parseFloat(valore) || 0;
+    else if (campo === 'durata_ore') patch[campo] = parseFloat(String(valore).replace(',', '.')) || 0;
     else patch[campo] = String(valore).trim();
-    await secPatch('piano_turni', 'id=eq.' + id, patch);
     const t = pianoTurniCache.find((x) => x.id === id);
+    const prima = t ? t[campo] : '';
+    await secPatch('piano_turni', 'id=eq.' + id, patch);
     if (t) t[campo] = patch[campo];
-    logAzione('Piano: turno modificato', (t ? t.codice : id) + ' ' + campo + ' → ' + patch[campo]);
-    toast('Turno aggiornato');
+    const et = _PT_ETICHETTE[campo] || campo;
+    const daA = (v) =>
+      campo === 'durata_ore'
+        ? v + ' (' + _pianoOreHm(v) + ')'
+        : campo === 'attivo' || campo === 'oltre23'
+          ? v
+            ? 'si'
+            : 'no'
+          : String(v == null || v === '' ? 'vuoto' : v).substring(0, 20);
+    logAzione(
+      'Piano: turno modificato',
+      (t ? t.codice : id) + ' \u00b7 ' + et + ': ' + daA(prima) + ' \u2192 ' + daA(patch[campo]),
+    );
+    _pianoRegistraModifica('Turni', t ? t.codice : String(id), et, daA(prima), daA(patch[campo]));
+    toast('Salvato \u00b7 ' + (t ? t.codice : id) + ': ' + et + ' ' + daA(prima) + ' \u2192 ' + daA(patch[campo]));
+    renderPiano();
   } catch (e) {
     toast('Errore salvataggio turno');
   }
@@ -8334,7 +8468,8 @@ function _pianoSaldoBind() {
   const tab = document.getElementById('piano-saldo-table');
   if (!tab) return;
   tab.querySelectorAll('tbody tr[data-nome]').forEach((riga) => {
-    riga.querySelectorAll('td.piano-op, td.piano-sm').forEach((td) => {
+    // solo la colonna "Saldo mese": le ore lavorate si leggono, non si scrivono
+    riga.querySelectorAll('td.piano-sm').forEach((td) => {
       td.addEventListener('click', (e) => {
         e.stopPropagation();
         pianoScriviOreMese(riga.dataset.nome);
@@ -9769,7 +9904,7 @@ async function _renderPianoSaldoTab() {
       Math.round(pct * 100) +
       '%</td><td>' +
       (od ? od.toFixed(1) : '-') +
-      '</td><td class="piano-op" style="cursor:pointer" title="Clic per scrivere le ore realmente lavorate nel mese">' +
+      '</td><td>' +
       (op ? op.toFixed(1) : '') +
       (rettSaldo
         ? '<span class="piano-rett" title="Ore reali scritte da ' +
@@ -9801,7 +9936,7 @@ async function _renderPianoSaldoTab() {
   h +=
     '</tbody></table></div><p style="font-size:.8rem;color:var(--muted);padding:8px 14px">Dovute = giorni/7 × ' +
     _pianoOreSett +
-    'h × percentuale (jolly esclusi). Pianificate = ore turni + codici speciali (V, M... scalati per percentuale). YTD = cumulato da gennaio: nei mesi passati valgono le ore timbrate se presenti, altrimenti il piano. Clic su "Ore lavorate" o "Saldo mese" per scrivere le ore reali del mese: un mese gia chiuso si corregge solo indicando il motivo.</p></div>';
+    'h × percentuale (jolly esclusi). Pianificate = ore turni + codici speciali (V, M... scalati per percentuale). YTD = cumulato da gennaio: nei mesi passati valgono le ore timbrate se presenti, altrimenti il piano. Clic su "Saldo mese" per scrivere le ore reali del mese: un mese gia chiuso si corregge solo indicando il motivo.</p></div>';
   return h;
 }
 
@@ -11282,10 +11417,18 @@ function _pianoMaxCambi() {
 async function salvaMaxCambi(v) {
   if (!isAdmin()) return;
   const n = Math.max(0, parseInt(v) || 0);
+  const prima = window._pianoMaxCambiCfg;
   window._pianoMaxCambiCfg = n;
   await setImp('piano_max_cambi_mese', String(n));
-  logAzione('Piano: max cambi mese', String(n));
-  toast(n ? 'Massimo ' + n + ' cambi al mese' : 'Cambi illimitati');
+  logAzione('Piano: max cambi mese', (prima != null ? prima : 'vuoto') + ' \u2192 ' + n);
+  _pianoRegistraModifica(
+    'Impostazioni',
+    'Cambi turno',
+    'massimo al mese',
+    prima != null ? prima : 'vuoto',
+    n || 'illimitati',
+  );
+  toast('Salvato \u00b7 ' + (n ? 'massimo ' + n + ' cambi al mese' : 'cambi illimitati'));
 }
 function _pianoGiorniWeekend() {
   const v = window._pianoWeekendCfg;
@@ -11297,28 +11440,42 @@ async function salvaGiornoWeekend(dow, attivo) {
   let wk = _pianoGiorniWeekend().slice();
   if (attivo && !wk.includes(dow)) wk.push(dow);
   if (!attivo) wk = wk.filter((x) => x !== dow);
+  const primaW = _pianoGiorniWeekend().join(',');
   window._pianoWeekendCfg = wk;
   await setImp('piano_giorni_weekend', JSON.stringify(wk));
-  logAzione('Piano: giorni weekend', wk.join(','));
-  toast('Giorni weekend aggiornati');
+  const _gg = ['domenica', 'lunedi', 'martedi', 'mercoledi', 'giovedi', 'venerdi', 'sabato'];
+  const nomi = (v) =>
+    v
+      ? v
+          .split(',')
+          .map((x) => _gg[parseInt(x)] || x)
+          .join(', ')
+      : 'nessuno';
+  logAzione('Piano: giorni weekend', primaW + ' \u2192 ' + wk.join(','));
+  _pianoRegistraModifica('Impostazioni', 'Weekend', 'giorni', nomi(primaW), nomi(wk.join(',')));
+  toast('Salvato \u00b7 weekend: ' + nomi(wk.join(',')));
   renderPiano();
 }
 async function salvaCompetenzaGruppo(chiave, gruppo) {
   if (!isAdmin()) return;
   const cfg = Object.assign({}, window._pianoCompGruppiCfg || {});
+  const primaG = cfg[chiave] || 'nessuno';
   cfg[chiave] = gruppo || '';
   window._pianoCompGruppiCfg = cfg;
   await setImp('piano_competenze_gruppi', JSON.stringify(cfg));
-  logAzione('Piano: competenza-gruppo', chiave + ' → ' + (gruppo || 'nessuno'));
-  toast('Collegamento salvato');
+  logAzione('Piano: competenza-gruppo', chiave + ': ' + primaG + ' \u2192 ' + (gruppo || 'nessuno'));
+  _pianoRegistraModifica('Impostazioni', chiave, 'gruppo di turni', primaG, gruppo || 'nessuno');
+  toast('Salvato \u00b7 ' + chiave + ': ' + primaG + ' \u2192 ' + (gruppo || 'nessuno'));
 }
 async function salvaOreSettimanali(v) {
   if (!isAdmin()) return;
   const n = parseFloat(v) || 41;
+  const primaO = _pianoOreSett;
   _pianoOreSett = n;
   await setImp('piano_ore_settimanali', String(n));
-  logAzione('Piano: ore settimanali', String(n));
-  toast('Ore settimanali: ' + n);
+  logAzione('Piano: ore settimanali', primaO + ' \u2192 ' + n);
+  _pianoRegistraModifica('Impostazioni', 'Orario', 'ore settimanali', primaO, n);
+  toast('Salvato \u00b7 ore settimanali: ' + primaO + ' \u2192 ' + n);
   renderPiano();
 }
 async function salvaPianoFunzioni(v) {
