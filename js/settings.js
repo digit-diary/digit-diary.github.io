@@ -362,15 +362,29 @@ async function aggiungiOperatoreConPwd() {
     p = document.getElementById('new-operatore-pwd').value,
     p2 = document.getElementById('new-operatore-pwd2').value;
   if (!n) {
-    toast('Inserisci un nome');
+    toast('Scrivi il nome del nuovo operatore');
+    return;
+  }
+  // messaggi distinti: "minimo 4 caratteri" con il campo vuoto faceva pensare a
+  // una password rifiutata, mentre il campo non era stato compilato
+  if (!p) {
+    toast('Manca la password: scrivila nel campo Password');
+    const el = document.getElementById('new-operatore-pwd');
+    if (el) el.focus();
     return;
   }
   if (p.length < 4) {
-    toast('Password minimo 4 caratteri');
+    toast('La password deve avere almeno 4 caratteri (ne hai scritti ' + p.length + ')');
+    return;
+  }
+  if (!p2) {
+    toast('Manca la conferma: ripeti la password nel campo Conferma password');
+    const el2 = document.getElementById('new-operatore-pwd2');
+    if (el2) el2.focus();
     return;
   }
   if (p !== p2) {
-    toast('Le password non coincidono');
+    toast('Le due password non coincidono');
     return;
   }
   if (operatoriAuthCache.find((o) => o.nome.toLowerCase() === n.toLowerCase())) {
