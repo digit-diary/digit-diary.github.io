@@ -187,6 +187,8 @@ let campiRapportoExtra = [],
   campiReparti = {}, // campo -> [settori dove appare]; assente = tutti i settori
   tipiRinominati = {};
 let visibilitaConfig = {};
+// nome operatore -> profilo (direzione/resp/sost/sup/hr) del documento Profili e permessi
+let profiliOperatori = {};
 let collaboratoriCache = [],
   moduliCache = [],
   logCache = [],

@@ -270,11 +270,199 @@ function _visRadioHtml(k, v, opList) {
   html += '</div>';
   return html;
 }
+// ---------------------------------------------------------------------------
+// PROFILI · le cinque figure del documento "Profili e permessi"
+// Ogni voce dice cosa fa quel profilo: 'M' modifica, 'V' vede in sola lettura,
+// '-' non la vede. Assegnando un profilo a un operatore e premendo "Applica i
+// profili" tutte le righe qui sotto (Visibilita e permessi) vengono riscritte
+// da sole: e' la stessa tabella firmata su carta, tradotta nel programma.
+// L'admin vede sempre tutto e non e' toccato da questa tabella.
+// ---------------------------------------------------------------------------
+const PROFILI = {
+  direzione: 'Direzione',
+  resp: 'Responsabile FoBoSlot',
+  sost: 'Sostituto Responsabile',
+  sup: 'Supervisor',
+  hr: 'HR',
+};
+const PROFILI_ORDINE = ['direzione', 'resp', 'sost', 'sup', 'hr'];
+// chiave voce -> [Direzione, Resp, Sost, SUP, HR]
+const MATRICE_PROFILI = {
+  // 1 - Pagine del Diario
+  rapporto: ['V', 'M', 'M', 'M', '-'],
+  note_collega: ['V', 'V', 'M', 'M', '-'],
+  statistiche: ['V', 'M', 'M', 'M', 'V'],
+  moduli: ['V', 'M', 'M', 'M', 'V'],
+  formazione: ['V', 'M', 'M', 'V', 'V'],
+  piano: ['V', 'M', 'M', 'M', 'M'],
+  assistente: ['M', 'M', 'M', 'M', 'M'],
+  consegna: ['-', 'M', 'M', 'M', '-'],
+  promemoria: ['V', 'M', 'M', 'M', 'V'],
+  maison: ['V', 'M', 'M', 'M', '-'],
+  inventario: ['V', 'M', 'M', 'M', 'M'],
+  registro: ['-', '-', '-', '-', '-'],
+  // 2 - Funzioni
+  ricerca_globale: ['M', 'M', 'M', 'M', 'M'],
+  alert_cassa: ['-', 'M', 'M', 'M', '-'],
+  alert_rischio: ['-', 'M', 'M', 'M', '-'],
+  alert_compleanni: ['V', 'M', 'M', 'M', 'V'],
+  template_rapidi: ['-', 'M', 'M', 'M', '-'],
+  firma_digitale: ['-', 'M', 'M', 'M', '-'],
+  qr_code: ['V', 'M', 'M', 'V', 'V'],
+  ai_moduli: ['-', 'M', 'M', 'M', '-'],
+  // 3 - Piano di lavoro: le quindici schede (chi la vede)
+  ptab_calendario: ['V', 'M', 'M', 'M', 'V'],
+  ptab_briefing: ['V', 'M', 'M', 'M', '-'],
+  ptab_vacanze: ['V', 'M', 'M', 'V', 'V'],
+  ptab_saldo: ['V', 'M', 'M', 'V', 'M'],
+  ptab_recupero: ['-', 'M', 'M', 'V', '-'],
+  ptab_timbrature: ['V', 'M', 'M', 'M', 'M'],
+  ptab_statistiche: ['V', 'M', 'M', 'V', 'V'],
+  ptab_benessere: ['V', 'M', 'M', 'V', 'V'],
+  ptab_storico: ['-', 'M', 'M', 'V', '-'],
+  ptab_formulari: ['V', 'M', 'M', 'V', 'V'],
+  ptab_turni: ['V', 'M', 'M', 'V', 'M'],
+  ptab_regole: ['V', 'M', 'M', 'V', 'M'],
+  ptab_festivi: ['V', 'M', 'M', 'V', 'M'],
+  ptab_impostazioni: ['-', 'M', 'M', 'V', 'M'],
+  ptab_guida: ['V', 'V', 'V', 'V', 'V'],
+  // 3 - le stesse schede, ma chi le puo' MODIFICARE (solo le M qui sopra)
+  ptabmod_calendario: ['V', 'M', 'M', 'M', 'V'],
+  ptabmod_briefing: ['V', 'M', 'M', 'M', '-'],
+  ptabmod_vacanze: ['V', 'M', 'M', 'V', 'V'],
+  ptabmod_saldo: ['V', 'M', 'M', 'V', 'M'],
+  ptabmod_recupero: ['-', 'M', 'M', 'V', '-'],
+  ptabmod_timbrature: ['V', 'M', 'M', 'M', 'M'],
+  ptabmod_turni: ['V', 'M', 'M', 'V', 'M'],
+  ptabmod_regole: ['V', 'M', 'M', 'V', 'M'],
+  ptabmod_festivi: ['V', 'M', 'M', 'V', 'M'],
+  ptabmod_impostazioni: ['-', 'M', 'M', 'V', 'M'],
+  // 4 - Permessi delegabili
+  gestione_punti: ['V', 'M', 'M', 'V', 'M'],
+  gestione_impiego: ['V', 'M', 'M', 'V', 'M'],
+  gestione_categorie: ['V', 'M', 'M', '-', '-'],
+  vista_categorie: ['V', 'V', 'V', '-', '-'],
+  gestione_competenze: ['V', 'M', 'M', 'V', 'V'],
+  gestione_valutazioni: ['V', 'M', 'M', 'V', 'V'],
+  gestione_formazioni: ['V', 'M', 'M', 'V', 'V'],
+  gestione_piano: ['V', 'M', 'M', 'M', 'V'],
+  gestione_corsi: ['V', 'M', 'M', 'M', 'M'],
+  gestione_briefing: ['-', 'M', 'M', 'M', '-'],
+  storico_hr: ['V', 'V', 'V', 'V', 'M'],
+  gestione_regole: ['-', 'M', 'M', '-', '-'],
+  gestione_festivi: ['V', 'M', 'M', 'V', 'M'],
+  sblocco_piano_chiuso: ['V', 'M', 'M', 'V', 'M'],
+  vista_malattie_pct: ['V', 'V', 'V', '-', 'V'],
+};
+// Le voci dove basta la V per essere abilitati: sono viste riservate, non
+// azioni di modifica. Tutte le altre "gestione_*" richiedono la M.
+const PROFILI_VOCI_DI_SOLA_VISTA = ['vista_categorie', 'vista_malattie_pct', 'storico_hr'];
+
+// Un profilo concede la voce? Le pagine, le funzioni e le schede del Piano si
+// aprono sia con V sia con M; i permessi di modifica solo con M, tranne le
+// viste riservate qui sopra.
+function _profiloConcede(key, prof) {
+  const riga = MATRICE_PROFILI[key];
+  if (!riga) return null;
+  const i = PROFILI_ORDINE.indexOf(prof);
+  if (i < 0) return null;
+  const val = riga[i];
+  if (val === '-') return false;
+  if (val === 'M') return true;
+  const soloModifica =
+    (VIS_ITEMS.piano_modifica && VIS_ITEMS.piano_modifica[key]) ||
+    (VIS_ITEMS.permessi && VIS_ITEMS.permessi[key] && PROFILI_VOCI_DI_SOLA_VISTA.indexOf(key) < 0);
+  return !soloModifica;
+}
+// Con la configurazione di oggi, questo operatore ha accesso alla voce?
+// Serve per non toccare chi non ha un profilo assegnato.
+function _visHaAccessoOggi(key, nome) {
+  const permesso = !!(VIS_ITEMS.permessi && VIS_ITEMS.permessi[key]);
+  const v = visibilitaConfig[key] != null ? visibilitaConfig[key] : permesso ? 'admin' : 'tutti';
+  if (v === 'tutti') return true;
+  if (v === 'admin' || v === 'nascosto') return false;
+  if (typeof v === 'object' && v.tipo === 'selezionati') return !!(v.operatori && v.operatori.indexOf(nome) >= 0);
+  return true;
+}
+function _profiloDi(nome) {
+  const p = profiliOperatori && profiliOperatori[nome];
+  return PROFILI[p] ? p : '';
+}
+async function cambiaProfiloOperatore(nome, prof) {
+  if (prof && !PROFILI[prof]) return;
+  if (prof) profiliOperatori[nome] = prof;
+  else delete profiliOperatori[nome];
+  await setImp('profili_operatori', JSON.stringify(profiliOperatori));
+  renderVisibilitaUI();
+}
+// Riscrive Visibilita e permessi partendo dai profili assegnati. Chi non ha un
+// profilo resta esattamente com'e' adesso: si tocca solo chi e' stato deciso.
+async function applicaProfili() {
+  const tutti = operatoriAuthCache.map((o) => o.nome);
+  const conProfilo = tutti.filter((n) => _profiloDi(n));
+  if (!conProfilo.length) {
+    toast('Assegna prima un profilo ad almeno un operatore');
+    return;
+  }
+  const senzaProfilo = tutti.filter((n) => !_profiloDi(n));
+  const elenco = conProfilo.map((n) => n + ' = ' + PROFILI[_profiloDi(n)]).join('\n');
+  const ok = confirm(
+    'Applicare i profili?\n\n' +
+      elenco +
+      '\n\nVengono riscritte tutte le righe di Visibilita e permessi per questi ' +
+      conProfilo.length +
+      ' operatori.' +
+      (senzaProfilo.length ? ' Gli altri ' + senzaProfilo.length + ' restano come sono adesso.' : ''),
+  );
+  if (!ok) return;
+  Object.keys(MATRICE_PROFILI).forEach((key) => {
+    const lista = [];
+    senzaProfilo.forEach((n) => {
+      if (_visHaAccessoOggi(key, n)) lista.push(n);
+    });
+    conProfilo.forEach((n) => {
+      if (_profiloConcede(key, _profiloDi(n))) lista.push(n);
+    });
+    if (!lista.length) visibilitaConfig[key] = 'admin';
+    else if (lista.length === tutti.length) visibilitaConfig[key] = 'tutti';
+    else visibilitaConfig[key] = { tipo: 'selezionati', operatori: lista.slice().sort() };
+  });
+  await setImp('visibilita', JSON.stringify(visibilitaConfig));
+  applicaVisibilita();
+  renderVisibilitaUI();
+  toast('Profili applicati a ' + conProfilo.length + ' operatori');
+  if (typeof logAzione === 'function') logAzione('Profili permessi applicati', elenco.replace(/\n/g, '; '));
+}
+function renderProfiliUI(opList) {
+  let html =
+    '<div style="margin-bottom:6px"><strong style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Profili</strong></div>';
+  html +=
+    '<p style="color:var(--muted);font-size:.8rem;margin-bottom:10px">Assegna a ogni operatore la sua figura, poi premi "Applica i profili": tutte le righe qui sotto vengono impostate da sole come nel documento firmato. Chi resta senza profilo non viene toccato. Dopo, si puo\' sempre correggere la singola riga a mano.</p>';
+  html += '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">';
+  opList.forEach((nome) => {
+    html +=
+      '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="min-width:180px;font-weight:600">' +
+      escP(nome) +
+      '</span><select class="form-control" style="max-width:260px" onchange="cambiaProfiloOperatore(\'' +
+      escP(nome).replace(/'/g, "\\'") +
+      '\', this.value)"><option value="">Nessun profilo</option>';
+    PROFILI_ORDINE.forEach((p) => {
+      html +=
+        '<option value="' + p + '"' + (_profiloDi(nome) === p ? ' selected' : '') + '>' + PROFILI[p] + '</option>';
+    });
+    html += '</select></div>';
+  });
+  if (!opList.length) html += '<span style="color:var(--muted);font-size:.82rem">Nessun operatore creato</span>';
+  html += '</div>';
+  html +=
+    '<button class="btn btn-primary" onclick="applicaProfili()" style="margin-bottom:22px">Applica i profili</button>';
+  return html;
+}
 function renderVisibilitaUI() {
   const el = document.getElementById('visibilita-list');
   if (!el) return;
   const opList = operatoriAuthCache.map((o) => o.nome).sort();
-  let html = '';
+  let html = renderProfiliUI(opList);
   html +=
     '<div style="margin-bottom:14px"><strong style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Pagine</strong></div>';
   Object.entries(VIS_ITEMS.pagine).forEach(([k, label]) => {
