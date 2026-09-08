@@ -4579,3 +4579,19 @@ body.dark-theme .piano-fisse3 td:nth-child(-n + 3) {
 body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   background: #0d0d1a;
 }
+
+/* BOTTONI DENTRO UN'INTESTAZIONE SCURA (es. frecce del mese nel Recupero ore):
+   il bottone normale ha contorno e testo del colore dell'inchiostro, che sul
+   fondo scuro dell'intestazione risultava quasi invisibile finche' non ci si
+   passava sopra. Qui prendono i colori chiari. */
+.card-header .btn-export,
+.card-header .btn-act {
+  border-color: var(--paper);
+  color: var(--paper);
+  background: transparent;
+}
+.card-header .btn-export:hover,
+.card-header .btn-act:hover {
+  background: var(--paper);
+  color: var(--ink);
+}

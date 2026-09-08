@@ -12721,24 +12721,6 @@ async function pianoSalvaCella(nome, dstr, codice) {
   // CELLA PROTETTA: sovrascriverla e' possibile, ma si dice chiaramente cosa si
   // sta sostituendo. Le protette sono il piano consolidato, le vacanze e le
   // assenze confermate: non devono cambiare per un clic distratto.
-  if (
-    r &&
-    r.protetto &&
-    codice &&
-    codice !== attuale &&
-    !confirm(
-      'CELLA PROTETTA\n\n' +
-        nome +
-        ' · ' +
-        String(dstr).split('-').reverse().join('.') +
-        '\n\nDa ' +
-        attuale +
-        ' a ' +
-        codice +
-        '\n\nE una cella protetta (piano consolidato, vacanza o assenza confermata).\nSostituirla comunque?',
-    )
-  )
-    return false;
   _pianoCellaSel = { nome: nome, data: dstr };
   // codici con orario personalizzato (es. JG): chiedi inizio e fine
   let orarioJG = null;
@@ -12759,25 +12741,34 @@ async function pianoSalvaCella(nome, dstr, codice) {
   // consecutivi, anche a cavallo di mese); se si conferma comunque, la
   // violazione resta scritta nel commento della cella
   let commentoRegole = '';
-  if (codice && _pianoTurnoInfo(codice)) {
-    const avvisi = await _pianoAvvisaViolazioniCella(nome, dstr, codice);
-    _pianoAccompagnamentoAvviso([{ nome: nome, data: dstr, codice: codice }]).forEach((a) => avvisi.push(a.testo));
-    if (avvisi.length) {
+  if (codice) {
+    // UN SOLO AVVISO con tutto quello che l'operatore deve sapere: prima le
+    // regole (non formato, riposo, consecutivi, accompagnamento), poi la nota
+    // sulla cella protetta. Prima erano due finestre in fila e la prima
+    // copriva la seconda: si leggeva "protetto" e non si vedeva "non formato".
+    const avvisi = _pianoTurnoInfo(codice) ? await _pianoAvvisaViolazioniCella(nome, dstr, codice) : [];
+    if (_pianoTurnoInfo(codice))
+      _pianoAccompagnamentoAvviso([{ nome: nome, data: dstr, codice: codice }]).forEach((a) => avvisi.push(a.testo));
+    const protetta = !!(r && r.protetto && codice !== attuale);
+    if (avvisi.length || protetta) {
+      const righe = avvisi.slice();
+      if (protetta) righe.push('cella protetta (piano consolidato, vacanza o assenza confermata): la stai sostituendo');
       if (
         !confirm(
           '\u26a0 ATTENZIONE \u00b7 ' +
             nome +
             ' \u00b7 ' +
             dstr.split('-').reverse().join('.') +
+            (attuale ? ' \u00b7 da ' + attuale + ' a ' + codice : ' \u00b7 ' + codice) +
             ':\n\n\u2022 ' +
-            avvisi.join('\n\u2022 ') +
+            righe.join('\n\u2022 ') +
             '\n\nConfermi comunque il turno ' +
             codice +
             "? La segnalazione restera' scritta nel commento della cella.",
         )
       )
         return false;
-      commentoRegole = '\u26a0 ' + avvisi.join(' \u00b7 ');
+      if (avvisi.length) commentoRegole = '\u26a0 ' + avvisi.join(' \u00b7 ');
     }
   }
   try {
