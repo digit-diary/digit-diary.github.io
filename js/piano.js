@@ -41,10 +41,10 @@ const PIANO_COLORI_SPECIALI = {
 // completamente vuota, senza spiegazione. Ora sono permessi delegabili (es. al
 // responsabile o a HR) dalle Impostazioni, e chi non li ha legge il perche'.
 function puoGestireRegole() {
-  return isAdmin() || (typeof puoModificare === 'function' && puoModificare('gestione_regole'));
+  return (isAdmin() || (typeof puoModificare === 'function' && puoModificare('gestione_regole'))) && _pianoModTabOk();
 }
 function puoGestireFestivi() {
-  return isAdmin() || (typeof puoModificare === 'function' && puoModificare('gestione_festivi'));
+  return (isAdmin() || (typeof puoModificare === 'function' && puoModificare('gestione_festivi'))) && _pianoModTabOk();
 }
 function _pianoSchedaRiservata(titolo, permesso) {
   return (
@@ -61,6 +61,34 @@ function _pianoSchedaRiservata(titolo, permesso) {
 // GIORNI CHIUSI: passata la giornata di gioco (piu' il respiro fino all'ora
 // limite del giorno dopo), il piano di quel giorno si modifica solo con uno
 // sblocco motivato e tracciato. Permesso dedicato, assegnabile per nome.
+// SCHEDE DEL PIANO personalizzabili (Impostazioni · Visibilita e permessi):
+// ogni scheda puo' essere nascosta, visibile a tutti o a operatori scelti, e la
+// modifica puo' essere ristretta separatamente (chi resta fuori vede in sola
+// lettura). L'admin vede e modifica sempre; i permessi esistenti (gestione
+// piano, regole, festivi...) continuano a valere IN AGGIUNTA.
+function _pianoVisOk(chiave) {
+  if (isAdmin()) return true;
+  const v = typeof visGet === 'function' ? visGet(chiave) : 'tutti';
+  if (v === 'nascosto' || v === 'admin') return false;
+  if (v && typeof v === 'object' && v.tipo === 'selezionati')
+    return !!(v.operatori && v.operatori.includes(getOperatore()));
+  return true;
+}
+function pianoTabVisibile(id) {
+  return _pianoVisOk('ptab_' + id);
+}
+function pianoTabModificabile(id) {
+  return _pianoVisOk('ptabmod_' + id);
+}
+// La restrizione di modifica vale per le AZIONI fatte dentro la pagina Piano:
+// le scritture di sistema (es. la malattia registrata dal Diario che si
+// sincronizza nel piano) non c'entrano con la scheda aperta e passano.
+function _pianoModTabOk() {
+  if (isAdmin()) return true;
+  const pg = document.querySelector('.page.active');
+  if (pg && pg.id && pg.id !== 'page-piano') return true;
+  return pianoTabModificabile(_pianoTab);
+}
 function puoSbloccareGiorniChiusi() {
   return isAdmin() || (typeof puoModificare === 'function' && puoModificare('sblocco_piano_chiuso'));
 }
@@ -108,12 +136,16 @@ function _pianoConsentiScrittura(dstr, silenzioso) {
   return true;
 }
 function puoGestirePiano() {
-  return typeof puoModificare === 'function' ? puoModificare('gestione_piano') : isAdmin();
+  const base = typeof puoModificare === 'function' ? puoModificare('gestione_piano') : isAdmin();
+  return base && _pianoModTabOk();
 }
 // BRIEFING: permesso separato dal piano · gli operatori possono compilare e
 // modificare il foglio del giorno senza toccare la griglia dei turni
 function puoGestireBriefing() {
-  return puoGestirePiano() || (typeof puoModificare === 'function' && puoModificare('gestione_briefing'));
+  return (
+    (puoGestirePiano() || (typeof puoModificare === 'function' && puoModificare('gestione_briefing'))) &&
+    _pianoModTabOk()
+  );
 }
 
 let pianoMappatureCache = [];
@@ -766,6 +798,10 @@ const _PIANO_TABS = [
 ];
 function pianoCambiaTab(t) {
   _pianoFlushSalva();
+  if (!pianoTabVisibile(t)) {
+    toast('Questa scheda non e visibile per il tuo operatore');
+    return;
+  }
   _pianoTab = t;
   localStorage.setItem('piano_tab', t);
   renderPiano();
@@ -780,6 +816,7 @@ function _pianoTabBar() {
   const tabHtml = (k) => {
     const t = _PIANO_TABS.find((x) => x[0] === k);
     if (!t) return '';
+    if (!pianoTabVisibile(k)) return ''; // scheda nascosta a questo operatore
     return (
       '<span class="piano-tab' +
       (k === _pianoTab ? ' attiva' : '') +
@@ -796,14 +833,19 @@ function _pianoTabBar() {
   const fuori = _PIANO_TABS.map(([k]) => k).filter((k) => !inGruppi.includes(k));
   return (
     '<div class="piano-tabs">' +
-    PIANO_TAB_GRUPPI.map(
-      ([lbl, keys]) =>
+    PIANO_TAB_GRUPPI.map(([lbl, keys]) => {
+      const dentro = keys.map(tabHtml).join('');
+      if (!dentro) return ''; // nessuna scheda visibile in questo gruppo
+      return (
         '<div class="piano-tabgroup"><span class="piano-tabgroup-label">' +
         lbl +
         '</span><div class="piano-tabgroup-tabs">' +
-        keys.map(tabHtml).join('') +
-        '</div></div>',
-    ).join('<div class="piano-tabsep"></div>') +
+        dentro +
+        '</div></div>'
+      );
+    })
+      .filter(Boolean)
+      .join('<div class="piano-tabsep"></div>') +
     (fuori.length
       ? '<div class="piano-tabsep"></div><div class="piano-tabgroup"><span class="piano-tabgroup-label">&nbsp;</span><div class="piano-tabgroup-tabs">' +
         fuori.map(tabHtml).join('') +
@@ -1096,6 +1138,11 @@ async function renderPiano() {
   else el.style.opacity = '0.55';
   try {
     await _pianoCaricaCfg();
+    // la scheda ricordata potrebbe essere stata nascosta a questo operatore
+    if (!pianoTabVisibile(_pianoTab)) {
+      const prima = _PIANO_TABS.map((x) => x[0]).find((k) => pianoTabVisibile(k));
+      _pianoTab = prima || 'calendario';
+    }
     const ym = _pianoMeseSel;
     // FESTIVITA' PRIMA DI TUTTO: da queste dipende quali giorni chiudono tardi,
     // e quindi la durata dei turni che si prolungano. Se il dato non c'e', le

@@ -47,10 +47,49 @@ const VIS_ITEMS = {
     gestione_festivi: 'Festivi e CGF · gestire il calendario dei giorni festivi e i recuperi',
     sblocco_piano_chiuso:
       'Giorni chiusi · sbloccare un giorno passato del piano per correggerlo (con motivo obbligatorio, tracciato nel registro)',
+    vista_malattie_pct:
+      'Pattern malattie · percentuali per giorno della settimana, avviso Lunedi/Venerdi e confronto con la media del team nella scheda collaboratore (analisi riservata, richiesta HR)',
     gestione_corsi: 'Corsi · pianificare corsi nel piano: data, orario e partecipanti (es. supervisor)',
     gestione_briefing:
       'Briefing · compilare e modificare il foglio del giorno e le pause (senza toccare la griglia turni)',
     storico_hr: 'Storico HR · inizio contratto, tracciato categorie/premi/formazioni, equità (sezione riservata)',
+  },
+  // Schede del PIANO: chi le VEDE. Default 'tutti'; 'nascosto' le toglie dal
+  // menu, 'operatori selezionati' le mostra solo a quei nomi. L'admin vede
+  // sempre tutto. La separazione per settore resta quella dei dati: ogni
+  // operatore lavora comunque solo sui collaboratori del suo settore.
+  piano_schede: {
+    ptab_calendario: 'Piano · Calendario',
+    ptab_briefing: 'Piano · Briefing',
+    ptab_vacanze: 'Piano · Vacanze',
+    ptab_saldo: 'Piano · Saldo',
+    ptab_recupero: 'Piano · Recupero ore',
+    ptab_timbrature: 'Piano · Timbrature',
+    ptab_statistiche: 'Piano · Statistiche',
+    ptab_benessere: 'Piano · Benessere',
+    ptab_storico: 'Piano · Storico',
+    ptab_formulari: 'Piano · Formulari',
+    ptab_turni: 'Piano · Turni',
+    ptab_regole: 'Piano · Regole',
+    ptab_festivi: 'Piano · Festivi',
+    ptab_impostazioni: 'Piano · Impostazioni',
+    ptab_guida: 'Piano · Guida',
+  },
+  // Schede del PIANO: chi le puo' MODIFICARE, in aggiunta ai permessi che gia'
+  // esistono (gestione piano, regole, festivi...). Default 'tutti' = nessuna
+  // restrizione in piu'; restringendo, la scheda per gli altri resta in sola
+  // lettura. Solo le schede dove si modifica qualcosa.
+  piano_modifica: {
+    ptabmod_calendario: 'Piano · Calendario (modifica turni)',
+    ptabmod_briefing: 'Piano · Briefing (compilazione)',
+    ptabmod_vacanze: 'Piano · Vacanze (import e applica)',
+    ptabmod_saldo: 'Piano · Saldo (ore reali del mese)',
+    ptabmod_recupero: 'Piano · Recupero ore (scostamenti)',
+    ptabmod_timbrature: 'Piano · Timbrature (inserimento)',
+    ptabmod_turni: 'Piano · Turni (durate e orari)',
+    ptabmod_regole: 'Piano · Regole (valori)',
+    ptabmod_festivi: 'Piano · Festivi (calendario e festivita)',
+    ptabmod_impostazioni: 'Piano · Impostazioni (preferenze e mappature)',
   },
 };
 // Visione categorie: admin, chi le gestisce, chi ha lo Storico HR, o chi è abilitato apposta
@@ -247,6 +286,30 @@ function renderVisibilitaUI() {
   html +=
     '<div style="margin:18px 0 14px"><strong style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Funzioni</strong></div>';
   Object.entries(VIS_ITEMS.funzioni).forEach(([k, label]) => {
+    html +=
+      '<div style="padding:10px 0;border-bottom:1px solid var(--line)"><div style="font-weight:600;margin-bottom:6px">' +
+      label +
+      '</div>';
+    html += _visRadioHtml(k, visGet(k), opList);
+    html += '</div>';
+  });
+  html +=
+    '<div style="margin:18px 0 14px"><strong style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Piano &middot; schede visibili</strong></div>';
+  html +=
+    '<p style="color:var(--muted);font-size:.8rem;margin-bottom:10px">Chi vede ogni scheda del Piano. "Nascosto" la toglie dal menu; con "Operatori selezionati" la vedono solo quei nomi. L\'admin vede sempre tutto, e ogni operatore lavora comunque solo sui collaboratori del suo settore.</p>';
+  Object.entries(VIS_ITEMS.piano_schede).forEach(([k, label]) => {
+    html +=
+      '<div style="padding:10px 0;border-bottom:1px solid var(--line)"><div style="font-weight:600;margin-bottom:6px">' +
+      label +
+      '</div>';
+    html += _visRadioHtml(k, visGet(k), opList);
+    html += '</div>';
+  });
+  html +=
+    '<div style="margin:18px 0 14px"><strong style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Piano &middot; schede modificabili</strong></div>';
+  html +=
+    '<p style="color:var(--muted);font-size:.8rem;margin-bottom:10px">Restringe la MODIFICA di una scheda senza nasconderla: chi resta fuori la vede in sola lettura. Vale in aggiunta ai permessi qui sotto (chi non ha "Piano di lavoro" non modifica comunque). "Tutti" = nessuna restrizione in piu\'.</p>';
+  Object.entries(VIS_ITEMS.piano_modifica).forEach(([k, label]) => {
     html +=
       '<div style="padding:10px 0;border-bottom:1px solid var(--line)"><div style="font-weight:600;margin-bottom:6px">' +
       label +
