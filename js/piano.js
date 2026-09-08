@@ -112,6 +112,39 @@ function _pianoGiornoSbloccato(dstr) {
 // Controllo unico prima di ogni scrittura sul piano. Ritorna true se si puo'
 // procedere; se il giorno e' chiuso e l'operatore ha il permesso, chiede il
 // motivo e sblocca per dieci minuti (tutto finisce nel registro).
+// MESE CHIUSO: stesso principio dei giorni, applicato al saldo del mese.
+// Passato il mese (piu' il respiro), il saldo di quel mese si corregge solo con
+// motivo tracciato: e' un dato che finisce in busta paga.
+function _pianoMeseBloccato(ym) {
+  return PianoRegole.meseBloccato(ym, new Date(), {
+    attivo: String(_pianoRegolaVal('blocco_giorni_chiusi')).toUpperCase() !== 'FALSE',
+    oraLimite: parseFloat(_pianoRegolaVal('blocco_ora_limite')) || 12,
+  });
+}
+function _pianoConsentiSaldoMese(ym) {
+  if (!_pianoMeseBloccato(ym)) return true;
+  const chiave = 'mese-' + ym;
+  if (_pianoGiornoSbloccato(chiave)) return true;
+  const MESI = typeof MESI_FULL !== 'undefined' ? MESI_FULL : [];
+  const lbl = (MESI[parseInt(ym.split('-')[1]) - 1] || ym) + ' ' + ym.split('-')[0];
+  if (!puoSbloccareGiorniChiusi()) {
+    toast('Il mese di ' + lbl + ' e chiuso: per correggerlo serve il permesso "Giorni chiusi"');
+    return false;
+  }
+  const motivo = prompt(
+    'MESE CHIUSO \u00b7 ' +
+      lbl +
+      "\n\nIl saldo di un mese passato e' un dato consolidato: si corregge solo con un motivo, che resta nel registro.\n\nScrivi il MOTIVO della correzione (obbligatorio):",
+  );
+  if (motivo === null || !String(motivo).trim()) {
+    toast('Correzione annullata: senza motivo il mese resta chiuso');
+    return false;
+  }
+  _pianoSbloccati[chiave] = Date.now() + 10 * 60 * 1000;
+  logAzione('Mese chiuso sbloccato', ym + ': ' + String(motivo).trim().substring(0, 200));
+  toast('Mese ' + lbl + ' sbloccato per 10 minuti');
+  return true;
+}
 function _pianoConsentiScrittura(dstr, silenzioso) {
   if (!dstr || !_pianoGiornoBloccato(dstr)) return true;
   if (_pianoGiornoSbloccato(dstr)) return true;
@@ -992,6 +1025,8 @@ async function pianoScriviOreMese(nome) {
     toast('Gli ausiliari non hanno ore dovute: il saldo non si applica');
     return;
   }
+  // mese passato: si corregge solo con motivo tracciato
+  if (!_pianoConsentiSaldoMese(ym)) return;
   const att = _pianoRettificaMese(nome, ym);
   const riga = document.querySelector('#piano-content .piano-table tbody tr[data-nome="' + CSS.escape(nome) + '"]');
   const pianificate = riga ? (riga.querySelector('td[data-tot="4"]') || {}).textContent : '';
@@ -1975,6 +2010,7 @@ async function renderPiano() {
     if (_pianoTab === 'recupero' && typeof _pianoRecuperoTotaliGenerali === 'function') {
       _pianoRecuperoTotaliGenerali();
       _recApplicaColoriDom();
+      _recDragBind();
     }
     if (_pianoTab === 'briefing') _briefSelezioneBind();
     if (_pianoTab === 'benessere' && typeof caricaBenesserePiano === 'function')
@@ -2011,12 +2047,31 @@ function pianoCambiaMese(delta) {
 // (la vecchia finestra di modifica cella è stata sostituita dalla
 // scrittura diretta nella cella · pianoCellaInline / pianoSalvaCella)
 async function rimuoviPianoCella(giaChiuso) {
-  _pianoUndoSnap('rimozione cella');
   const sel = _pianoCellaSel;
   if (!sel) return;
-  if (!giaChiuso) document.getElementById('pwd-modal').classList.add('hidden');
+  // GIORNO CHIUSO: la cancellazione e' una modifica come le altre e passa dallo
+  // stesso controllo della scrittura (prima sfuggiva, si poteva cancellare una
+  // cella di un mese passato senza sblocco motivato)
+  if (!_pianoConsentiScrittura(sel.data)) return;
   const r = _pianoRighe.find((x) => x.collaboratore === sel.nome && x.data === sel.data);
   if (!r) return;
+  // CELLA PROTETTA: non si cancella per sbaglio. Si puo' fare, ma con una
+  // conferma esplicita che dice cosa si sta togliendo.
+  if (
+    r.protetto &&
+    !confirm(
+      'CELLA PROTETTA\n\n' +
+        sel.nome +
+        ' · ' +
+        String(sel.data).split('-').reverse().join('.') +
+        ' · ' +
+        r.codice +
+        '\n\nE una cella protetta (piano consolidato, vacanza o assenza confermata).\nCancellarla comunque?',
+    )
+  )
+    return;
+  _pianoUndoSnap('rimozione cella');
+  if (!giaChiuso) document.getElementById('pwd-modal').classList.add('hidden');
   try {
     await secDel('piano', 'id=eq.' + r.id);
     _pianoRighe = _pianoRighe.filter((x) => x.id !== r.id);
@@ -5437,6 +5492,65 @@ function pianoRecSelCella(ev, inp) {
   else _recSel.celle[k] = 1;
   inp.closest('td').classList.toggle('blocco-sel', !!_recSel.celle[k]);
   _recSelAggiornaBarra();
+}
+// TRASCINAMENTO anche qui, come nel calendario: si tiene premuto Ctrl (o Cmd)
+// e si trascina da una casella all'altra. Senza Ctrl il trascinamento non parte,
+// perche' il click normale serve a scrivere le ore.
+function _recDragBind() {
+  const tab = document.getElementById('piano-recupero-table');
+  if (!tab || tab.dataset.dragBound) return;
+  tab.dataset.dragBound = '1';
+  let attivo = false;
+  let partenza = null;
+  const cellaDi = (ev) => {
+    const td = ev.target.closest('td[data-gg]');
+    return td && tab.contains(td) ? td : null;
+  };
+  const segna = (a, b2) => {
+    const righe = [...tab.querySelectorAll('tbody tr[data-nome]')];
+    const r1 = righe.indexOf(a.closest('tr'));
+    const r2 = righe.indexOf(b2.closest('tr'));
+    const g1 = a.dataset.gg;
+    const g2 = b2.dataset.gg;
+    const da = Math.min(r1, r2);
+    const aR = Math.max(r1, r2);
+    const dg = Math.min(parseInt(g1), parseInt(g2));
+    const ag = Math.max(parseInt(g1), parseInt(g2));
+    _recSel = { righe: {}, colonne: {}, celle: {} };
+    tab
+      .querySelectorAll('.row-selected, .col-selected, .col-selected-header, .blocco-sel')
+      .forEach((x) => x.classList.remove('row-selected', 'col-selected', 'col-selected-header', 'blocco-sel'));
+    for (let i2 = da; i2 <= aR; i2++) {
+      const tr = righe[i2];
+      if (!tr) continue;
+      for (let g = dg; g <= ag; g++) {
+        const td = tr.querySelector('td[data-gg="' + String(g).padStart(2, '0') + '"]');
+        if (!td) continue;
+        td.classList.add('blocco-sel');
+        const inp = td.querySelector('input');
+        if (inp) _recSel.celle[inp.dataset.nome + '|' + inp.dataset.data] = 1;
+      }
+    }
+    _recSelAggiornaBarra();
+  };
+  tab.addEventListener('mousedown', (ev) => {
+    if (!ev.ctrlKey && !ev.metaKey) return;
+    const td = cellaDi(ev);
+    if (!td) return;
+    ev.preventDefault();
+    attivo = true;
+    partenza = td;
+    segna(td, td);
+  });
+  tab.addEventListener('mouseover', (ev) => {
+    if (!attivo) return;
+    const td = cellaDi(ev);
+    if (td && partenza) segna(partenza, td);
+  });
+  document.addEventListener('mouseup', () => {
+    attivo = false;
+    partenza = null;
+  });
 }
 function pianoRecSelPulisci() {
   _recSel = { righe: {}, colonne: {}, celle: {} };
@@ -12604,6 +12718,27 @@ async function pianoSalvaCella(nome, dstr, codice) {
   }
   const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
   const attuale = r ? r.codice : '';
+  // CELLA PROTETTA: sovrascriverla e' possibile, ma si dice chiaramente cosa si
+  // sta sostituendo. Le protette sono il piano consolidato, le vacanze e le
+  // assenze confermate: non devono cambiare per un clic distratto.
+  if (
+    r &&
+    r.protetto &&
+    codice &&
+    codice !== attuale &&
+    !confirm(
+      'CELLA PROTETTA\n\n' +
+        nome +
+        ' · ' +
+        String(dstr).split('-').reverse().join('.') +
+        '\n\nDa ' +
+        attuale +
+        ' a ' +
+        codice +
+        '\n\nE una cella protetta (piano consolidato, vacanza o assenza confermata).\nSostituirla comunque?',
+    )
+  )
+    return false;
   _pianoCellaSel = { nome: nome, data: dstr };
   // codici con orario personalizzato (es. JG): chiedi inizio e fine
   let orarioJG = null;
@@ -15040,7 +15175,22 @@ function _pianoBloccoCelle() {
   }
   return out;
 }
+// Toglie le marcature di riga e colonna: quando parte una selezione a
+// trascinamento, quella precedente deve sparire (e viceversa).
+function _pianoPulisciSelezioneRighe() {
+  const s = typeof _pianoSparse === 'function' ? _pianoSparse() : null;
+  if (s) {
+    s.nomi.length = 0;
+    s.giorni.length = 0;
+  }
+  document
+    .querySelectorAll('#piano-content .row-selected, #piano-content .col-selected, #piano-content .col-selected-header')
+    .forEach((el) => el.classList.remove('row-selected', 'col-selected', 'col-selected-header'));
+  const bar = document.getElementById('piano-multibar');
+  if (bar) bar.remove();
+}
 function _pianoBloccoEvidenzia() {
+  _pianoPulisciSelezioneRighe();
   const celle = _pianoBloccoCelle();
   celle.forEach((riga, ri) =>
     riga.forEach((c, ci) => {
@@ -15344,6 +15494,8 @@ function _pianoSparse() {
   return window._pianoSparseSel;
 }
 function _pianoSparseToggleNome(nome, riga) {
+  // una selezione alla volta: quella a trascinamento sparisce, come in Excel
+  if (window._pianoBlocco) _pianoBloccoPulisci();
   const s = _pianoSparse();
   const i = s.nomi.indexOf(nome);
   if (i >= 0) {
@@ -15356,6 +15508,7 @@ function _pianoSparseToggleNome(nome, riga) {
   _pianoSparseBar();
 }
 function _pianoSparseToggleGiorno(g) {
+  if (window._pianoBlocco) _pianoBloccoPulisci();
   const s = _pianoSparse();
   const i = s.giorni.indexOf(g);
   if (i >= 0) s.giorni.splice(i, 1);

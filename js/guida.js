@@ -273,6 +273,8 @@ function GUIDA_CAPITOLI() {
         'Per correggere un giorno chiuso serve il permesso <b>Giorni chiusi</b> (si assegna per nome da Impostazioni · Visibilita e permessi). Chi lo ha clicca la cella, scrive il <b>motivo</b> (obbligatorio) e il giorno si apre per <b>dieci minuti</b>. Sblocco e motivo finiscono nel registro.',
         'Il blocco vale per ogni strada: modifica manuale, bozza, scambi e coperture su giorni passati. <b>Non</b> vale per il Recupero ore e per le timbrature, che per natura si compilano il giorno dopo, ne per i commenti.',
         'L interruttore generale e la regola blocco_giorni_chiusi: FALSE lo spegne del tutto.',
+        'Vale anche per il <b>saldo del mese</b>: passato il mese (col solito respiro fino a mezzogiorno del giorno dopo), correggere le ore reali di quel mese richiede lo stesso sblocco motivato. Il 1 ottobre a mezzogiorno settembre e chiuso; il mese in corso resta sempre modificabile.',
+        'Le <b>celle protette</b> del piano (piano consolidato, vacanze, assenze confermate) si possono ancora modificare o cancellare, ma solo dopo una conferma che dice esattamente cosa si sta sostituendo o togliendo.',
       ],
     },
     {
