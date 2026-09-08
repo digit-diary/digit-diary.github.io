@@ -493,6 +493,24 @@
     return adesso.getTime() >= soglia.getTime();
   }
 
+  // MESE CHIUSO: come il giorno, ma sull'ultimo giorno del mese. Settembre e'
+  // chiuso dal 1 ottobre (piu' il respiro fino all'ora limite): da li' il saldo
+  // di settembre si corregge solo con motivo tracciato.
+  //   ym : 'YYYY-MM'
+  function meseBloccato(ym, adesso, cfg) {
+    if (!ym || !adesso) return false;
+    const p = String(ym).split('-');
+    if (p.length < 2) return false;
+    const ultimo = new Date(parseInt(p[0]), parseInt(p[1]), 0, 12);
+    const iso =
+      ultimo.getFullYear() +
+      '-' +
+      String(ultimo.getMonth() + 1).padStart(2, '0') +
+      '-' +
+      String(ultimo.getDate()).padStart(2, '0');
+    return giornoBloccato(iso, adesso, cfg);
+  }
+
   return {
     oraNum,
     riposoOre,
@@ -505,5 +523,6 @@
     festivitaItaliane,
     chiusuraDelGiorno,
     giornoBloccato,
+    meseBloccato,
   };
 });

@@ -410,6 +410,15 @@ eq(
 );
 eq(R.giornoBloccato('2026-09-07', ORA('2026-09-08T14:00:00'), { oraLimite: 14 }), true, 'alle 14 in punto: chiuso');
 
+console.log('\n== mese chiuso (saldo dei mesi passati) ==');
+const OR = (x) => new Date(x);
+eq(R.meseBloccato('2026-09', OR('2026-09-30T23:00:00'), {}), false, 'settembre il 30 settembre: ancora aperto');
+eq(R.meseBloccato('2026-09', OR('2026-10-01T11:00:00'), {}), false, 'il 1 ottobre alle 11: ancora aperto (respiro)');
+eq(R.meseBloccato('2026-09', OR('2026-10-01T12:00:00'), {}), true, 'il 1 ottobre a mezzogiorno: settembre chiuso');
+eq(R.meseBloccato('2026-10', OR('2026-10-15T12:00:00'), {}), false, 'il mese in corso non si chiude mai');
+eq(R.meseBloccato('2026-02', OR('2026-10-01T09:00:00'), {}), true, 'febbraio: chiuso da un pezzo');
+eq(R.meseBloccato('2026-09', OR('2026-10-05T12:00:00'), { attivo: false }), false, 'blocco spento dalla regola');
+
 console.log('\n=======================================');
 console.log('  ' + passati + ' passati, ' + falliti + ' falliti');
 console.log('=======================================\n');
