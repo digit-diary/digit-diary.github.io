@@ -396,6 +396,15 @@ function _parseDataNascita(input) {
   input = input.trim();
   // Prova formato ISO (YYYY-MM-DD) già valido
   if (/^\d{4}-\d{2}-\d{2}$/.test(input)) return input;
+  // Solo giorno e mese (12.01): l'anno non e' noto, si usa 1900 come segnaposto
+  // e in lettura non viene mostrato. Serve per i compleanni presi dalle liste.
+  const sm = input.match(/^(\d{1,2})[\/\.\-](\d{1,2})$/);
+  if (sm) {
+    const g0 = parseInt(sm[1]);
+    const m0 = parseInt(sm[2]);
+    if (g0 < 1 || g0 > 31 || m0 < 1 || m0 > 12) return '';
+    return '1900-' + String(m0).padStart(2, '0') + '-' + String(g0).padStart(2, '0');
+  }
   // Match: gg.mm.aaaa, gg/mm/aaaa, gg-mm-aaaa, gg.mm.aa, gg/mm/aa, ecc.
   const m = input.match(/^(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{2,4})$/);
   if (!m) return '';

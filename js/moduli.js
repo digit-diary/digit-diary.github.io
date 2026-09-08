@@ -936,8 +936,21 @@ async function eliminaModulo(id) {
 async function cambiaDataCollaboratore(id, campo, valore) {
   if (campo !== 'data_nascita' && campo !== 'data_assunzione') return;
   const c = (collaboratoriCache || []).find((x) => x.id === id);
-  const etichetta = campo === 'data_nascita' ? 'Data di nascita' : 'Inizio contratto';
-  const val = valore || null;
+  const etichetta = campo === 'data_nascita' ? 'Data di nascita' : 'Inizio attivita';
+  const testo = String(valore == null ? '' : valore).trim();
+  // si accetta 12.01.1997, 12/01/1997, 1997-01-12 e, per la nascita, anche
+  // solo 12.01 (anno non noto). Per l'inizio attivita l'anno serve sempre.
+  const val = testo ? _parseDataNascita(testo) : null;
+  if (testo && !val) {
+    toast('Data non valida: scrivi 12.01.1997' + (campo === 'data_nascita' ? ' oppure solo 12.01' : ''));
+    renderCollaboratoriUI();
+    return;
+  }
+  if (campo === 'data_assunzione' && val && val.startsWith('1900-')) {
+    toast('Per l inizio attivita serve anche l anno (es. 01.05.2024)');
+    renderCollaboratoriUI();
+    return;
+  }
   if (
     c &&
     c[campo] &&
@@ -946,9 +959,15 @@ async function cambiaDataCollaboratore(id, campo, valore) {
         ' di ' +
         c.nome +
         ':\n\nda ' +
-        String(c[campo]).substring(0, 10).split('-').reverse().join('.') +
+        (campo === 'data_nascita'
+          ? dataNascitaLabel(String(c[campo]).substring(0, 10))
+          : String(c[campo]).substring(0, 10).split('-').reverse().join('.')) +
         '\na ' +
-        (val ? val.split('-').reverse().join('.') : 'nessuna data') +
+        (val
+          ? campo === 'data_nascita'
+            ? dataNascitaLabel(val)
+            : val.split('-').reverse().join('.')
+          : 'nessuna data') +
         '\n\nConfermi la modifica?',
     )
   ) {
@@ -1066,19 +1085,26 @@ async function renderCollaboratoriUI() {
           c.id +
           ',this.value)" style="' +
           selStyle +
-          ';width:76px"><input type="date" value="' +
-          (c.data_nascita ? String(c.data_nascita).substring(0, 10) : '') +
-          '" title="Data di nascita: serve per il compleanno nel piano" onchange="cambiaDataCollaboratore(' +
+          ';width:76px">' +
+          // DATE scritte a mano, come nella scheda: si accetta 12.01.1997 e
+          // anche solo 12.01 quando l'anno non si conosce. Il campo calendario
+          // obbligava a passare dal selettore e rendeva scomodo mettere l'anno.
+          '<span style="display:inline-flex;align-items:center;gap:4px"><span style="font-size:.8rem;color:var(--muted)">Nascita</span>' +
+          '<input type="text" value="' +
+          escP(c.data_nascita ? dataNascitaLabel(c.data_nascita, false) : '') +
+          '" placeholder="12.01.1997" title="Data di nascita: 12.01.1997 oppure solo 12.01 se l anno non si conosce" onchange="cambiaDataCollaboratore(' +
           c.id +
           ',\'data_nascita\',this.value)" style="' +
           selStyle +
-          ';width:132px"><input type="date" value="' +
-          (c.data_assunzione ? String(c.data_assunzione).substring(0, 10) : '') +
-          '" title="Inizio contratto: serve per anzianita, giubilei e giorni di vacanza" onchange="cambiaDataCollaboratore(' +
+          ';width:104px"></span>' +
+          '<span style="display:inline-flex;align-items:center;gap:4px"><span style="font-size:.8rem;color:var(--muted)">Inizio attivita</span>' +
+          '<input type="text" value="' +
+          escP(c.data_assunzione ? String(c.data_assunzione).substring(0, 10).split('-').reverse().join('.') : '') +
+          '" placeholder="01.05.2024" title="Inizio attivita: serve per anzianita, giubilei e giorni di vacanza" onchange="cambiaDataCollaboratore(' +
           c.id +
           ',\'data_assunzione\',this.value)" style="' +
           selStyle +
-          ';width:132px">'
+          ';width:104px"></span>'
         : '') +
       (adminFull
         ? '<select onchange="cambiaRepartoCollaboratore(' +

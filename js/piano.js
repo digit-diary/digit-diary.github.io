@@ -1992,6 +1992,13 @@ async function renderPiano() {
   }
 }
 
+// Torna al mese in corso da qualunque scheda (frecce del Recupero ore)
+function pianoVaiMeseCorrente() {
+  _pianoMeseSel = new Date().toISOString().substring(0, 7);
+  _pianoViolCelle = {};
+  _pianoViolLista = null;
+  renderPiano();
+}
 function pianoCambiaMese(delta) {
   const p = _pianoMeseSel.split('-');
   const d = new Date(parseInt(p[0]), parseInt(p[1]) - 1 + delta, 15);
@@ -5597,11 +5604,22 @@ async function _renderPianoRecuperoTab() {
             (parseFloat((_pianoCollabInfo(a5) || {}).percentuale) || 1) || a5.localeCompare(b5),
       );
   }
+  const _oggiYm = new Date().toISOString().substring(0, 7);
   let h =
-    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">Recupero ore &middot; personale fisso &middot; ' +
+    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">Recupero ore &middot; personale fisso' +
+    // stesse frecce del calendario, per cambiare mese senza uscire dalla scheda
+    '<span style="display:inline-flex;align-items:center;gap:6px">' +
+    '<button class="btn-export" style="padding:2px 10px;font-size:.9rem" title="Mese precedente" onclick="pianoCambiaMese(-1)">&#8592;</button>' +
+    '<b style="min-width:150px;text-align:center">' +
     (MESI_L[parseInt(ym.split('-')[1]) - 1] || ym) +
     ' ' +
     ym.split('-')[0] +
+    '</b>' +
+    '<button class="btn-export" style="padding:2px 10px;font-size:.9rem" title="Mese successivo" onclick="pianoCambiaMese(1)">&#8594;</button>' +
+    (ym !== _oggiYm
+      ? '<button class="btn-act" style="font-size:.82rem" title="Torna al mese corrente" onclick="pianoVaiMeseCorrente()">Mese corrente</button>'
+      : '') +
+    '</span>' +
     '<span id="piano-recupero-riepilogo" style="margin-left:auto;font-size:.85rem;font-weight:400"></span></div><div style="padding:10px 14px">';
   h +=
     '<p style="font-size:.85rem;color:var(--muted);line-height:1.55;margin-bottom:10px">Si aggiorna <b>ogni giorno</b>: nella casella del giorno si scrive quanto il collaboratore ha lavorato in piu o in meno rispetto al turno previsto. <b>-1</b> significa un ora in meno (rosso), <b>+3</b> tre ore in piu (verde). Casella vuota = ha fatto esattamente il suo turno. Il totale del mese entra nel <b>saldo ore</b>, quindi il conteggio resta aggiornato senza aspettare la fine del mese.</p>';
@@ -9497,7 +9515,9 @@ async function _renderPianoSaldoTab() {
     '<button class="btn-act pin" onclick="pianoCambiaMese(-1)">&larr;</button><button class="btn-act pin" onclick="pianoCambiaMese(1)">&rarr;</button>' +
     '<input type="text" class="piano-cerca" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-saldo-table\')"></div>';
   h +=
-    '<div style="overflow-x:auto;padding:0 6px 8px"><table id="piano-saldo-table" class="piano-table" style="min-width:760px;font-size:.8rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Fun</th><th>%</th><th>Ore dovute</th><th title="Timbrate se presenti, altrimenti piano">Ore lavorate</th><th>Saldo mese</th><th>Saldo anno (YTD)</th></tr></thead><tbody>';
+    // scorrimento DENTRO il riquadro: l'intestazione resta in alto e le prime
+    // tre colonne (nome, funzione, percentuale) restano ferme a sinistra
+    '<div style="overflow:auto;max-height:72vh;padding:0 6px 8px"><table id="piano-saldo-table" class="piano-table piano-fisse3" style="min-width:760px;font-size:.8rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Fun</th><th>%</th><th>Ore dovute</th><th title="Timbrate se presenti, altrimenti piano">Ore lavorate</th><th>Saldo mese</th><th>Saldo anno (YTD)</th></tr></thead><tbody>';
   let totD = 0;
   let totP = 0;
   let totS = 0;
@@ -12112,20 +12132,34 @@ async function _pianoNotaRapida(nome, dstr) {
 // ================================================================
 let _pianoCtxSel = null; // {nome, data}
 
+// Il menu del tasto destro e' uno solo, condiviso fra cella e nome. La
+// chiusura si registra QUI, una volta sola: prima stava dentro il menu della
+// cella, quindi aprendo per primo quello del nome nessuno lo chiudeva. E si
+// ascolta in fase di CATTURA, perche' il clic sul nome ferma la propagazione
+// (serve alla selezione delle righe) e altrimenti non arriverebbe mai.
+function _pianoCtxElemento() {
+  let menu = document.getElementById('piano-ctx');
+  if (menu) return menu;
+  menu = document.createElement('div');
+  menu.id = 'piano-ctx';
+  document.body.appendChild(menu);
+  document.addEventListener(
+    'mousedown',
+    (ev) => {
+      if (!ev.target.closest('#piano-ctx')) nascondiPianoCtx();
+    },
+    true,
+  );
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape') nascondiPianoCtx();
+  });
+  // scorrendo la pagina il menu resterebbe appeso lontano dal punto cliccato
+  window.addEventListener('scroll', () => nascondiPianoCtx(), true);
+  return menu;
+}
 function mostraPianoCtx(e, nome, dstr) {
   _pianoCtxSel = { nome: nome, data: dstr };
-  let menu = document.getElementById('piano-ctx');
-  if (!menu) {
-    menu = document.createElement('div');
-    menu.id = 'piano-ctx';
-    document.body.appendChild(menu);
-    document.addEventListener('click', (ev) => {
-      if (!ev.target.closest('#piano-ctx')) nascondiPianoCtx();
-    });
-    document.addEventListener('keydown', (ev) => {
-      if (ev.key === 'Escape') nascondiPianoCtx();
-    });
-  }
+  const menu = _pianoCtxElemento();
   const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
   const haTurno = r && _pianoTurnoInfo(r.codice);
   const puoMod = puoGestirePiano();
@@ -12200,12 +12234,8 @@ function nascondiPianoCtx() {
 function mostraPianoCtxNome(e, nome) {
   e.preventDefault();
   _pianoCtxSel = { nome: nome, data: _pianoMeseSel + '-01' };
-  let menu = document.getElementById('piano-ctx');
-  if (!menu) {
-    mostraPianoCtx(e, nome, _pianoMeseSel + '-01');
-    _pianoCtxSel = { nome: nome, data: _pianoMeseSel + '-01' };
-  }
-  menu = document.getElementById('piano-ctx');
+  // stesso menu della cella, con i comandi di chiusura gia' registrati
+  const menu = _pianoCtxElemento();
   const voce = (label, icona, azione, attiva) =>
     attiva
       ? '<div class="piano-ctx-item" onclick="' + azione + '"><i class="icx ' + icona + '"></i> ' + label + '</div>'
