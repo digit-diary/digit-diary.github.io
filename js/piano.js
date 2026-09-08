@@ -5316,22 +5316,57 @@ function _recSelAggiornaBarra() {
   if (s2) parti.push(s2 + (s2 === 1 ? ' cella' : ' celle'));
   el.textContent = parti.length ? 'Selezione: ' + parti.join(' + ') : '';
 }
-// le marcature usano le STESSE classi del calendario (row-selected ecc.)
-function pianoRecSelRiga(nome, td) {
-  if (_recSel.righe[nome]) delete _recSel.righe[nome];
-  else _recSel.righe[nome] = 1;
+// le marcature usano le STESSE classi del calendario (row-selected ecc.) e lo
+// STESSO comportamento: il click semplice fa una selezione NUOVA (quella di
+// prima sparisce), Ctrl/Cmd+click AGGIUNGE alla selezione esistente.
+function pianoRecSelRiga(ev, nome, td) {
+  const aggiunge = ev && (ev.ctrlKey || ev.metaKey);
+  const eraSelezionata = !!_recSel.righe[nome];
+  const eraLUnica =
+    eraSelezionata &&
+    Object.keys(_recSel.righe).length === 1 &&
+    !Object.keys(_recSel.colonne).length &&
+    !Object.keys(_recSel.celle).length;
+  if (!aggiunge) {
+    pianoRecSelPulisci();
+    if (eraLUnica) return; // ri-click sull'unica riga selezionata: deseleziona
+  } else if (eraSelezionata) {
+    delete _recSel.righe[nome];
+    const tr0 = td.closest('tr');
+    if (tr0) tr0.classList.remove('row-selected');
+    _recSelAggiornaBarra();
+    return;
+  }
+  _recSel.righe[nome] = 1;
   const tr = td.closest('tr');
-  if (tr) tr.classList.toggle('row-selected', !!_recSel.righe[nome]);
+  if (tr) tr.classList.add('row-selected');
   _recSelAggiornaBarra();
 }
-function pianoRecSelColonna(gg, th) {
-  if (_recSel.colonne[gg]) delete _recSel.colonne[gg];
-  else _recSel.colonne[gg] = 1;
-  const on = !!_recSel.colonne[gg];
-  th.classList.toggle('col-selected-header', on);
-  document
-    .querySelectorAll('#piano-recupero-table tbody td[data-gg="' + gg + '"]')
-    .forEach((c) => c.classList.toggle('col-selected', on));
+function pianoRecSelColonna(ev, gg, th) {
+  const aggiunge = ev && (ev.ctrlKey || ev.metaKey);
+  const eraSelezionata = !!_recSel.colonne[gg];
+  const eraLUnica =
+    eraSelezionata &&
+    Object.keys(_recSel.colonne).length === 1 &&
+    !Object.keys(_recSel.righe).length &&
+    !Object.keys(_recSel.celle).length;
+  const segna = (on) => {
+    th.classList.toggle('col-selected-header', on);
+    document
+      .querySelectorAll('#piano-recupero-table tbody td[data-gg="' + gg + '"]')
+      .forEach((c) => c.classList.toggle('col-selected', on));
+  };
+  if (!aggiunge) {
+    pianoRecSelPulisci();
+    if (eraLUnica) return; // ri-click sull'unica colonna selezionata: deseleziona
+  } else if (eraSelezionata) {
+    delete _recSel.colonne[gg];
+    segna(false);
+    _recSelAggiornaBarra();
+    return;
+  }
+  _recSel.colonne[gg] = 1;
+  segna(true);
   _recSelAggiornaBarra();
 }
 function pianoRecSelCella(ev, inp) {
@@ -5552,7 +5587,7 @@ async function _renderPianoRecuperoTab() {
     _recColoriBarHtml() +
     '<button class="btn-export" style="font-size:.82rem;padding:4px 12px" onclick="pianoRecSelPulisci()">Deseleziona</button>' +
     '<b id="rec-sel-info" style="font-size:.85rem;color:#b8860b"></b>' +
-    '<span style="font-size:.82rem;color:var(--muted);margin-left:auto">Click sul nome = riga &middot; click sul giorno = colonna &middot; Ctrl+click su una casella = cella</span>' +
+    '<span style="font-size:.82rem;color:var(--muted);margin-left:auto">Click sul nome = riga &middot; click sul giorno = colonna &middot; Ctrl+click aggiunge (anche singole caselle)</span>' +
     '</div>';
   h +=
     // scorrimento DENTRO il riquadro: cosi' la riga delle date resta fissa in
@@ -5567,9 +5602,9 @@ async function _renderPianoRecuperoTab() {
     h +=
       '<th data-gg="' +
       _gg +
-      '" onclick="pianoRecSelColonna(\'' +
+      '" onclick="pianoRecSelColonna(event,\'' +
       _gg +
-      '\',this)" title="Click: seleziona la colonna del giorno" style="width:46px;cursor:pointer' +
+      '\',this)" title="Click: seleziona la colonna &middot; Ctrl+click: aggiunge alla selezione" style="width:46px;cursor:pointer' +
       (dow === 0 ? ';background:#7a2e2e;color:#fff' : dow === 6 ? ';background:#5a4a3a;color:#fff' : '') +
       '"><div>' +
       GG3[dow] +
@@ -5583,9 +5618,9 @@ async function _renderPianoRecuperoTab() {
     h +=
       '<tr data-nome="' +
       escP(nome) +
-      '"><td class="piano-nome" onclick="pianoRecSelRiga(\'' +
+      '"><td class="piano-nome" onclick="pianoRecSelRiga(event,\'' +
       escP(nome).replace(/'/g, "\\'") +
-      '\',this)" title="Click: seleziona la riga di ' +
+      '\',this)" title="Click: seleziona la riga &middot; Ctrl+click: aggiunge &middot; ' +
       escP(nome) +
       '" style="text-align:left;cursor:pointer">' +
       escP(nome) +
