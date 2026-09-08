@@ -5370,7 +5370,12 @@ function pianoRecSelColonna(ev, gg, th) {
   _recSelAggiornaBarra();
 }
 function pianoRecSelCella(ev, inp) {
-  if (!ev || (!ev.ctrlKey && !ev.metaKey)) return; // il click normale scrive le ore
+  if (!ev || (!ev.ctrlKey && !ev.metaKey)) {
+    // click normale: si va a scrivere le ore, quindi la selezione in corso
+    // si azzera (come nel calendario, dove il click su una cella ricomincia)
+    if (!_recSelVuota()) pianoRecSelPulisci();
+    return;
+  }
   ev.preventDefault();
   inp.blur();
   const k = inp.dataset.nome + '|' + inp.dataset.data;
