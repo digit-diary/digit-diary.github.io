@@ -45,6 +45,8 @@ const VIS_ITEMS = {
     gestione_regole:
       'Regole del piano · vedere e modificare le regole (riposo minimo, giorni consecutivi, RAP, vacanze)',
     gestione_festivi: 'Festivi e CGF · gestire il calendario dei giorni festivi e i recuperi',
+    sblocco_piano_chiuso:
+      'Giorni chiusi · sbloccare un giorno passato del piano per correggerlo (con motivo obbligatorio, tracciato nel registro)',
     gestione_corsi: 'Corsi · pianificare corsi nel piano: data, orario e partecipanti (es. supervisor)',
     gestione_briefing:
       'Briefing · compilare e modificare il foglio del giorno e le pause (senza toccare la griglia turni)',

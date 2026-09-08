@@ -374,6 +374,18 @@ eq(fine.marcatore, 'CH7', 'e si segnala sempre');
 const alt = R.chiusuraDelGiorno('2027-01-05', FEST, { oraTardi: 6 });
 eq(alt.marcatore, 'CH6', 'orario di chiusura configurabile');
 
+console.log('\n== giorni chiusi (blocco del piano passato) ==');
+const ORA = (x) => new Date(x);
+// ieri e' bloccato solo da mezzogiorno di oggi in poi
+eq(R.giornoBloccato('2026-09-07', ORA('2026-09-08T11:59:00'), {}), false, 'ieri, alle 11:59: ancora aperto');
+eq(R.giornoBloccato('2026-09-07', ORA('2026-09-08T12:00:00'), {}), true, 'ieri, a mezzogiorno: chiuso');
+eq(R.giornoBloccato('2026-09-08', ORA('2026-09-08T23:00:00'), {}), false, 'oggi non si blocca mai');
+eq(R.giornoBloccato('2026-09-09', ORA('2026-09-08T12:00:00'), {}), false, 'il futuro non si blocca');
+eq(R.giornoBloccato('2026-06-15', ORA('2026-09-08T09:00:00'), {}), true, 'giugno: chiuso da un pezzo');
+eq(R.giornoBloccato('2026-09-07', ORA('2026-09-08T13:00:00'), { attivo: false }), false, 'blocco spento dalla regola');
+eq(R.giornoBloccato('2026-09-07', ORA('2026-09-08T13:30:00'), { oraLimite: 14 }), false, 'ora limite configurabile: alle 14 non ancora');
+eq(R.giornoBloccato('2026-09-07', ORA('2026-09-08T14:00:00'), { oraLimite: 14 }), true, 'alle 14 in punto: chiuso');
+
 console.log('\n=======================================');
 console.log('  ' + passati + ' passati, ' + falliti + ' falliti');
 console.log('=======================================\n');

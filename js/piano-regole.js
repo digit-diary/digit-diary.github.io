@@ -453,6 +453,32 @@
     return { ora: tardiPerGiorno ? oraTardi : oraNormale, motivo: '', marcatore: '' };
   }
 
+  // ---------------------------------------------------------------------------
+  // GIORNI CHIUSI (piano bloccato)
+  //
+  // Passata la giornata di gioco, il piano di quel giorno e' un documento: non
+  // si modifica piu' per distrazione, solo con uno sblocco motivato e tracciato.
+  // La giornata di gioco del giorno D si chiude la mattina di D+1 (alle 4, alle
+  // 5 o alle 7), poi resta un margine di respiro fino all'ora limite di D+1:
+  // chi apre al mattino sistema le ultime cose senza sbloccare niente.
+  //
+  //   dstr    : 'YYYY-MM-DD' del giorno da controllare
+  //   adesso  : Date corrente (iniettata, cosi' la funzione e' testabile)
+  //   cfg.oraLimite : ora di D+1 oltre la quale D e' chiuso (default 12)
+  //   cfg.attivo    : false = blocco spento del tutto
+  // ---------------------------------------------------------------------------
+  function giornoBloccato(dstr, adesso, cfg) {
+    const c = cfg || {};
+    if (c.attivo === false) return false;
+    if (!dstr || !adesso) return false;
+    const oraLimite = c.oraLimite != null ? c.oraLimite : 12;
+    const soglia = new Date(dstr + 'T12:00:00');
+    if (isNaN(soglia.getTime())) return false;
+    soglia.setDate(soglia.getDate() + 1);
+    soglia.setHours(Math.floor(oraLimite), Math.round((oraLimite % 1) * 60), 0, 0);
+    return adesso.getTime() >= soglia.getTime();
+  }
+
   return {
     oraNum,
     riposoOre,
@@ -464,5 +490,6 @@
     pasqua,
     festivitaItaliane,
     chiusuraDelGiorno,
+    giornoBloccato,
   };
 });

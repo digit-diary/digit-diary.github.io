@@ -263,6 +263,17 @@ function GUIDA_CAPITOLI() {
     },
     {
       area: 'piano',
+      titolo: 'Piano: giorni chiusi (il passato si corregge solo con motivo)',
+      righe: [
+        'Passata la giornata di gioco, il piano di quel giorno diventa un <b>documento</b>: non si modifica piu per distrazione. Nel calendario i giorni chiusi portano un piccolo lucchetto sotto il numero.',
+        'C e un margine di respiro: il giorno resta aperto <b>fino a mezzogiorno del giorno dopo</b>, cosi chi apre al mattino sistema le ultime cose della giornata appena finita senza sbloccare niente. L ora si cambia nella regola blocco_ora_limite.',
+        'Per correggere un giorno chiuso serve il permesso <b>Giorni chiusi</b> (si assegna per nome da Impostazioni · Visibilita e permessi). Chi lo ha clicca la cella, scrive il <b>motivo</b> (obbligatorio) e il giorno si apre per <b>dieci minuti</b>. Sblocco e motivo finiscono nel registro.',
+        'Il blocco vale per ogni strada: modifica manuale, bozza, scambi e coperture su giorni passati. <b>Non</b> vale per il Recupero ore e per le timbrature, che per natura si compilano il giorno dopo, ne per i commenti.',
+        'L interruttore generale e la regola blocco_giorni_chiusi: FALSE lo spegne del tutto.',
+      ],
+    },
+    {
+      area: 'piano',
       titolo: 'Piano: turni che finiscono piu tardi (es. Z0)',
       righe: [
         'Alcuni turni finiscono piu tardi nei giorni in cui il casino chiude alle <b>05:00</b>. Il caso noto e <b>Z0</b>: finisce alle <b>19:45</b> nei giorni normali e alle <b>20:30</b> il venerdi, il sabato, nelle vigilie di festivita e il 31 dicembre.',
