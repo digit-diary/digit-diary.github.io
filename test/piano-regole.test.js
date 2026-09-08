@@ -374,6 +374,26 @@ eq(fine.marcatore, 'CH7', 'e si segnala sempre');
 const alt = R.chiusuraDelGiorno('2027-01-05', FEST, { oraTardi: 6 });
 eq(alt.marcatore, 'CH6', 'orario di chiusura configurabile');
 
+console.log('\n== arrotondamento vacanze al giorno pieno ==');
+// assunzione 01/05/2024: nel 2026 il pro-rata esatto e' 32.67
+const arr = { arrotondaDa: 0.35 };
+eq(R.giorniVacanzaSpettanti('2024-05-01', 2026, arr).giorni, 33, '32.67 arrotonda a 33');
+eq(R.giorniVacanzaSpettanti('2024-05-01', 2026, arr).giorniEsatti, 32.67, 'il valore esatto resta disponibile');
+// assunzione 01/03/2026: 10 mesi a 28/12 = 23.33 -> resta 23 (sotto la soglia)
+eq(R.giorniVacanzaSpettanti('2026-03-01', 2026, arr).giorni, 23, '23.33 resta 23');
+// assunzione 01/08/2024: 7 mesi a 28/12 + 5 a 35/12 = 30.92 -> 31
+eq(R.giorniVacanzaSpettanti('2024-08-01', 2026, arr).giorni, 31, '30.92 arrotonda a 31');
+// senza soglia: nessun arrotondamento
+eq(R.giorniVacanzaSpettanti('2024-05-01', 2026, {}).giorni, 32.67, 'senza regola resta il valore esatto');
+// soglia diversa (0.33): anche i .33 salgono
+eq(
+  R.giorniVacanzaSpettanti('2026-03-01', 2026, { arrotondaDa: 0.33 }).giorni,
+  24,
+  'con soglia 0.33 il 23.33 sale a 24',
+);
+// i valori interi non cambiano mai
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2010, arr).giorni, 36, 'i valori interi restano interi');
+
 console.log('\n== giorni chiusi (blocco del piano passato) ==');
 const ORA = (x) => new Date(x);
 // ieri e' bloccato solo da mezzogiorno di oggi in poi
@@ -383,7 +403,11 @@ eq(R.giornoBloccato('2026-09-08', ORA('2026-09-08T23:00:00'), {}), false, 'oggi 
 eq(R.giornoBloccato('2026-09-09', ORA('2026-09-08T12:00:00'), {}), false, 'il futuro non si blocca');
 eq(R.giornoBloccato('2026-06-15', ORA('2026-09-08T09:00:00'), {}), true, 'giugno: chiuso da un pezzo');
 eq(R.giornoBloccato('2026-09-07', ORA('2026-09-08T13:00:00'), { attivo: false }), false, 'blocco spento dalla regola');
-eq(R.giornoBloccato('2026-09-07', ORA('2026-09-08T13:30:00'), { oraLimite: 14 }), false, 'ora limite configurabile: alle 14 non ancora');
+eq(
+  R.giornoBloccato('2026-09-07', ORA('2026-09-08T13:30:00'), { oraLimite: 14 }),
+  false,
+  'ora limite configurabile: alle 14 non ancora',
+);
 eq(R.giornoBloccato('2026-09-07', ORA('2026-09-08T14:00:00'), { oraLimite: 14 }), true, 'alle 14 in punto: chiuso');
 
 console.log('\n=======================================');

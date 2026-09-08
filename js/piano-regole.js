@@ -339,8 +339,22 @@
           voci.push({ anni: parseInt(b.anni), giorni: parseFloat(b.giorni) || 0, dal: dataB.getFullYear() });
         }
       });
+    // ARROTONDAMENTO AL GIORNO PIENO (regola aziendale): dalla soglia in su si
+    // arrotonda in alto, a favore del collaboratore (32.67 -> 33, 32.37 -> 33),
+    // sotto la soglia si tiene il giorno intero (32.3 -> 32). La soglia e'
+    // configurabile; senza soglia si mostra il valore esatto.
+    const esatti = Math.round((parteBase + totBonus) * 100) / 100;
+    let giorniFinali = esatti;
+    if (c.arrotondaDa != null && c.arrotondaDa !== '') {
+      const soglia = parseFloat(c.arrotondaDa);
+      if (!isNaN(soglia)) {
+        const frazione = esatti - Math.floor(esatti);
+        giorniFinali = frazione >= soglia - 0.001 ? Math.ceil(esatti) : Math.floor(esatti);
+      }
+    }
     return {
-      giorni: Math.round((parteBase + totBonus) * 100) / 100,
+      giorni: giorniFinali,
+      giorniEsatti: esatti,
       base: Math.round(parteBase * 100) / 100,
       bonus: totBonus,
       voci: voci,
