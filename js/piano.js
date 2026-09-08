@@ -1988,7 +1988,7 @@ async function renderPiano() {
     } else if (_pianoTab === 'timbrature') {
       h += '<div id="piano-config">' + _renderPianoTimbratureCard() + '</div>';
     } else if (_pianoTab === 'benessere') {
-      h += '<div id="piano-config">' + _renderPianoBenessereCard() + '</div>';
+      h += '<div id="piano-config">' + _renderPianoBenessereCard() + _renderPianoDomenicheCard() + '</div>';
     } else if (_pianoTab === 'statistiche') {
       h += '<div id="piano-config">' + _renderPianoStatCard() + '</div>';
     } else if (_pianoTab === 'saldo') {
@@ -2038,6 +2038,8 @@ async function renderPiano() {
     if (_pianoTab === 'briefing') _briefSelezioneBind();
     if (_pianoTab === 'benessere' && typeof caricaBenesserePiano === 'function')
       setTimeout(() => caricaBenesserePiano(), 60);
+    if (_pianoTab === 'benessere' && typeof pianoCaricaDomenicheAnno === 'function')
+      setTimeout(() => pianoCaricaDomenicheAnno(), 90);
     if (_pianoTab === 'statistiche' && typeof caricaStatisticheAnnoPiano === 'function')
       setTimeout(() => caricaStatisticheAnnoPiano(true), 50);
     if (_pianoTab === 'statistiche' && typeof caricaConfrontoAnniPiano === 'function')
@@ -4230,6 +4232,184 @@ async function pianoCorreggiDurateNotte() {
 // separata tra personale fisso e ausiliario perche' hanno regole diverse.
 // Il punteggio (0-100) lo calcola il motore PianoRegole.indiceBenessere: qui
 // si raccolgono solo i dati dal piano.
+// ================================================================
+// DOMENICHE LIBERE DELL'ANNO · come il foglio DOMENICHE del piano Excel
+//
+// Ogni collaboratore ha diritto a 12 domeniche libere all'anno (OLL2 art. 24,
+// regola domeniche_libere_anno). Qui si conta, mese per mese, quante ne ha
+// GIA' avute e quante ne restano da dare: quando per mancanza di personale si
+// mette al lavoro qualcuno in una domenica, il conto scende e si vede subito
+// a chi bisogna restituirla nei mesi che rimangono.
+//
+// Una domenica conta come libera se non c'e' un turno; la vacanza (V) NON
+// conta tra le 12, e se la regola del sabato e' accesa non conta nemmeno la
+// domenica il cui sabato finisce oltre le 23 (LL art. 18). Sono gli stessi
+// criteri del validatore del mese: un conto solo, in tutto il programma.
+// ================================================================
+async function pianoCaricaDomenicheAnno() {
+  const anno = parseInt(_pianoMeseSel.split('-')[0]);
+  const el = document.getElementById('piano-domeniche-body');
+  if (el) el.innerHTML = '<p style="color:var(--muted);font-size:.85rem">Conto le domeniche dell anno...</p>';
+  const rep = _pianoReparto();
+  const righe =
+    (await secGet(
+      'piano?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&reparto_dip=eq.' + rep + '&limit=40000',
+    )) || [];
+  const perGiorno = {}; // 'nome|data' -> codice
+  const mesiConPiano = {};
+  righe.forEach((r) => {
+    perGiorno[r.collaboratore + '|' + r.data] = r.codice;
+    mesiConPiano[String(r.data).substring(5, 7)] = true;
+  });
+  window._pianoDomenicheDati = { anno: anno, perGiorno: perGiorno, mesiConPiano: mesiConPiano };
+  _renderPianoDomenicheBody();
+}
+function _renderPianoDomenicheBody() {
+  const el = document.getElementById('piano-domeniche-body');
+  const dati = window._pianoDomenicheDati;
+  if (!el || !dati) return;
+  const anno = dati.anno;
+  const diritto = parseInt(_pianoRegolaVal('domeniche_libere_anno')) || 12;
+  const chkSab = _pianoRegolaVal('turno_prima_domenica_libera') === 'TRUE';
+  const oggiStr = new Date().toISOString().split('T')[0];
+  // tutte le domeniche dell'anno, divise per mese
+  const domMese = {}; // 'MM' -> [dstr...]
+  const d = new Date(anno, 0, 1, 12);
+  while (d.getDay() !== 0) d.setDate(d.getDate() + 1);
+  while (d.getFullYear() === anno) {
+    const dstr = anno + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const mm = dstr.substring(5, 7);
+    (domMese[mm] = domMese[mm] || []).push(dstr);
+    d.setDate(d.getDate() + 7);
+  }
+  const ordSalv = (window._pianoOrdineCollab || {})[_pianoReparto()] || [];
+  const pos = {};
+  ordSalv.forEach((n, i) => (pos[n] = i));
+  const nomi = collaboratoriCache
+    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
+    .map((c) => c.nome)
+    .sort((x, y) => (pos[x] != null ? pos[x] : 9999) - (pos[y] != null ? pos[y] : 9999) || x.localeCompare(y));
+  // domeniche future ancora disponibili (nei mesi con o senza piano): serve a
+  // capire se le restanti si POSSONO ancora dare
+  let domFuture = 0;
+  Object.keys(domMese).forEach((mm) => domMese[mm].forEach((dstr) => dstr > oggiStr && domFuture++));
+  let h =
+    '<p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Diritto: ' +
+    diritto +
+    ' domeniche libere all anno (regola "domeniche_libere_anno"). La vacanza non conta tra le libere' +
+    (chkSab ? '; il sabato deve finire entro le 23, come nel validatore' : '') +
+    '. Nei mesi senza piano non si conta nulla. Rosso = le domeniche rimaste nell anno non bastano piu per arrivare al diritto: da li in poi vanno restituite per prime.</p>';
+  h +=
+    '<div style="overflow:auto;max-height:66vh"><table id="piano-domeniche-table" class="piano-table piano-fisse3" style="min-width:1050px;font-size:.8rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Fun</th><th>%</th>';
+  for (let m = 1; m <= 12; m++) h += '<th title="Domeniche libere nel mese">' + (MESI[m - 1] || m) + '</th>';
+  h +=
+    '<th title="Domeniche libere gia avute nei mesi pianificati">Libere</th><th title="Domeniche con un turno">Lavorate</th><th>Diritto</th><th title="Quante ne mancano al diritto">Restano</th></tr></thead><tbody>';
+  let scritte = 0;
+  nomi.forEach((nome) => {
+    const info = _pianoCollabInfo(nome) || {};
+    let libere = 0;
+    let lavorate = 0;
+    let visto = false;
+    let cols = '';
+    for (let m = 1; m <= 12; m++) {
+      const mm = String(m).padStart(2, '0');
+      if (!dati.mesiConPiano[mm]) {
+        cols += '<td style="color:var(--line)"></td>';
+        continue;
+      }
+      let lib = 0;
+      let lav = 0;
+      (domMese[mm] || []).forEach((dstr) => {
+        const cod = perG(nome, dstr);
+        if (cod && _pianoTurnoInfo(cod)) {
+          lav++;
+          return;
+        }
+        if (cod === 'V' || cod === 'V1') return; // vacanza: non conta tra le 12
+        if (chkSab) {
+          const prima = new Date(dstr + 'T12:00:00');
+          prima.setDate(prima.getDate() - 1);
+          const sab =
+            prima.getFullYear() +
+            '-' +
+            String(prima.getMonth() + 1).padStart(2, '0') +
+            '-' +
+            String(prima.getDate()).padStart(2, '0');
+          if (!_pianoSabatoEntro23(perG(nome, sab))) return;
+        }
+        lib++;
+      });
+      libere += lib;
+      lavorate += lav;
+      visto = true;
+      cols +=
+        '<td style="color:' +
+        (lib ? '#2c6e49' : lav ? '#c0392b' : 'var(--muted)') +
+        (lav && !lib ? ';font-weight:700' : '') +
+        '" title="' +
+        lib +
+        ' libere' +
+        (lav ? ', ' + lav + ' lavorate' : '') +
+        '">' +
+        (lib || (lav ? '0' : '')) +
+        '</td>';
+    }
+    function perG(n, dstr) {
+      return dati.perGiorno[n + '|' + dstr] || null;
+    }
+    if (!visto) return;
+    scritte++;
+    const restano = Math.max(0, diritto - libere);
+    // le restanti si possono ancora dare? confronto con le domeniche future
+    const critico = restano > domFuture;
+    h +=
+      '<tr data-nome="' +
+      escP(nome) +
+      '"><td style="text-align:left;font-weight:600">' +
+      escP(nome) +
+      '</td><td>' +
+      escP(info.is_jolly ? 'JOLLY' : info.funzione || '') +
+      '</td><td>' +
+      (info.is_jolly ? '-' : Math.round((parseFloat(info.percentuale) || 1) * 100) + '%') +
+      '</td>' +
+      cols +
+      '<td style="font-weight:700;color:' +
+      (libere >= diritto ? '#2c6e49' : '#8b6914') +
+      '">' +
+      libere +
+      '</td><td style="color:' +
+      (lavorate ? '#c0392b' : 'var(--muted)') +
+      '">' +
+      (lavorate || '') +
+      '</td><td>' +
+      diritto +
+      '</td><td style="font-weight:700;color:' +
+      (restano === 0 ? '#2c6e49' : critico ? '#c0392b' : '#8b6914') +
+      '"' +
+      (critico
+        ? ' title="Restano ' + restano + ' da dare ma nell anno ci sono solo ' + domFuture + ' domeniche future"'
+        : '') +
+      '>' +
+      restano +
+      (critico ? ' !' : '') +
+      '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  if (!scritte) h = '<p style="color:var(--muted);font-size:.85rem">Nessun mese pianificato per il ' + anno + '.</p>';
+  el.innerHTML = h;
+}
+function _renderPianoDomenicheCard() {
+  const anno = parseInt(_pianoMeseSel.split('-')[0]);
+  return (
+    '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Domeniche libere ' +
+    anno +
+    ' · ' +
+    escP(repartoLabel(_pianoReparto())) +
+    '<input type="text" class="piano-cerca" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-domeniche-table\')">' +
+    '<button class="btn-export" style="font-size:.8rem;padding:4px 12px" onclick="pianoCaricaDomenicheAnno()">Ricalcola</button>' +
+    '</div><div style="padding:10px 14px" id="piano-domeniche-body"><p style="color:var(--muted);font-size:.85rem">Caricamento...</p></div></div>'
+  );
+}
 function _renderPianoBenessereCard() {
   return (
     '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px">Benessere · ' +
