@@ -2137,33 +2137,43 @@ function _renderFormazioneConfig() {
   html +=
     '<p style="font-size:.82rem;color:var(--muted);margin:2px 0 0">Ogni scarico alla consegna resta tracciato nel Registro attività.</p>';
   // punti passaggio livello
+  // I livelli non sono piu' fissi a tre: si segue la scala piu' lunga fra i
+  // settori (oggi Slot arriva a L6), cosi' aggiungendo un livello compare da
+  // solo anche qui. L'assegnazione gestiva gia' qualsiasi livello: era solo
+  // questa lista a fermarsi a L3.
+  const _lvMaxTutti = Math.max(
+    3,
+    ...Object.values(getCompetenzeConfigAll()).flatMap((lista) => lista.map((k) => parseInt(k.livello) || 0)),
+  );
   html +=
     '<p style="font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Punti al raggiungimento del livello (0 = disattivato)</p>';
-  [1, 2, 3].forEach((l) => {
+  html +=
+    '<p style="font-size:.8rem;color:var(--muted);margin-bottom:6px">Un livello vale nei settori dove esiste: i settori con una scala piu corta si fermano prima.</p>';
+  for (let l = 1; l <= _lvMaxTutti; l++) {
     html +=
       '<div class="tipo-item"><div class="tipo-item-name">Livello ' +
       l +
-      (l === 3 ? ' <span class="tipo-item-default">(completamento di tutti i livelli)</span>' : '') +
+      (l === _lvMaxTutti ? ' <span class="tipo-item-default">(completamento di tutti i livelli)</span>' : '') +
       '</div><input type="number" value="' +
       (parseInt(cfgP.punti_livello[String(l)]) || 0) +
       '" onchange="modificaPuntiLivello(' +
       l +
       ',this.value)" style="width:70px;padding:5px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);text-align:center"></div>';
-  });
-  // premi livello
+  }
+  // premi livello (dal 2 in su: il passaggio al livello 1 non e' un traguardo)
   html +=
     '<p style="font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Premi passaggio livello</p>';
-  [2, 3].forEach((l) => {
+  for (let l = 2; l <= _lvMaxTutti; l++) {
     html +=
       '<div class="tipo-item"><div class="tipo-item-name">Livello ' +
       l +
-      (l === 3 ? ' <span class="tipo-item-default">(completamento di tutti i livelli)</span>' : '') +
+      (l === _lvMaxTutti ? ' <span class="tipo-item-default">(completamento di tutti i livelli)</span>' : '') +
       '</div><input type="text" value="' +
       escP(cfgP.premi_livello[String(l)] || '') +
       '" onchange="modificaPremioLivello(' +
       l +
       ',this.value)" style="flex:1;padding:5px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></div>';
-  });
+  }
   // notifiche incentivi
   html +=
     '<p style="font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Notifiche incentivi</p>';
