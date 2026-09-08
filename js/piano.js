@@ -2158,13 +2158,21 @@ function _pianoLimitiOre(nome, nGiorni) {
   // jolly con percentuale PIENA (o vuota) = jolly puro → range assoluto;
   // jolly con percentuale ridotta (es. 80%) = obiettivo % come i fissi
   const pctJ = parseFloat(info.percentuale);
-  const jollySenzaPct = info.is_jolly && !(pctJ > 0 && pctJ < 1);
+  let jollySenzaPct = info.is_jolly && !(pctJ > 0 && pctJ < 1);
+  // AUSILIARI: nella generazione del piano si punta a una percentuale, perche'
+  // di norma un jolly fa circa l'80% di un tempo pieno. Vale SOLO qui, per
+  // decidere quanti turni proporgli: le loro ore dovute restano zero e le
+  // assenze continuano a contare per intero. La percentuale si cambia dalla
+  // scheda Regole; lasciandola vuota si torna al vecchio range assoluto
+  // jolly_ore_min / jolly_ore_max.
+  const pctJollyPiano = parseFloat(_pianoRegolaVal('jolly_percentuale_piano'));
+  if (jollySenzaPct && pctJollyPiano > 0 && pctJollyPiano <= 1) jollySenzaPct = false;
   if (jollySenzaPct) {
     const jMin = parseFloat(_pianoRegolaVal('jolly_ore_min'));
     const jMax = parseFloat(_pianoRegolaVal('jolly_ore_max'));
     return { obiettivo: null, min: isNaN(jMin) ? null : jMin, max: isNaN(jMax) ? null : jMax };
   }
-  const pct = parseFloat(info.percentuale) || 1;
+  const pct = info.is_jolly && !(pctJ > 0 && pctJ < 1) ? pctJollyPiano : parseFloat(info.percentuale) || 1;
   const obiettivo = (nGiorni / 7) * _pianoOreSett * pct;
   const sim = parseFloat(_pianoRegolaVal('tolleranza_ore'));
   const sopra = parseFloat(_pianoRegolaVal('tolleranza_ore_sopra'));
@@ -3139,6 +3147,7 @@ const PIANO_REGOLE_FONTE = {
   domeniche_libere_anno: 'OLL2 art. 24 cpv. 2 · direttiva 16-007',
   turno_prima_domenica_libera: 'LL art. 18: la domenica libera vale se il sabato si finisce entro le 23:00',
   nd_jolly_giorno: 'Direttiva 16-007 · formulario HR 1187',
+  jolly_percentuale_piano: 'RAP All. 1 · personale ausiliario: bersaglio della generazione, non ore dovute',
   jolly_ore_min: 'RAP All. 1 · personale ausiliario',
   jolly_ore_max: 'RAP All. 1 · personale ausiliario',
   tolleranza_ore: 'RAP 3.1: 41 ore settimanali su media mensile',
@@ -3151,12 +3160,15 @@ const PIANO_REGOLE_DOVE = {
   notte_inizio: 'Statistiche anno (colonna Notte 10%)',
   notte_fine: 'Statistiche anno (colonna Notte 10%)',
   notte_percentuale: 'Statistiche anno (colonna Notte 10%)',
+  saldo_ore_max: 'Saldo ore anno (semaforo ok/no)',
+  saldo_ore_min: 'Saldo ore anno (semaforo ok/no)',
   domeniche_libere_anno: 'Validatore + Statistiche',
   turno_prima_domenica_libera: 'Validatore + Statistiche',
   nd_jolly_giorno: 'Formulario non disponibilità (scheda Formulari + PDF)',
   tolleranza_ore: 'Validatore + Bozza + Migliora ore',
   tolleranza_ore_sopra: 'Validatore + Bozza + Migliora ore',
   tolleranza_ore_sotto: 'Validatore',
+  jolly_percentuale_piano: 'Bozza del piano (obiettivo ore degli ausiliari)',
   jolly_ore_min: 'Validatore',
   jolly_ore_max: 'Validatore + Bozza',
   max_consecutivi: 'Validatore + Bozza',
