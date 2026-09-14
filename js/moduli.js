@@ -28,21 +28,29 @@ function apriModulo(tipo) {
     html +=
       '<div class="modulo-field"><label>Collaboratore</label><div class="ac-wrap"><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." oninput="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')" onfocus="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')"><div class="ac-drop" id="ac-mod-nomi"></div></div></div>';
     html +=
-      '<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="Sig.ra Fertitta Lara"></div>';
+      '<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="' +
+      escP(moduloRespSettore()) +
+      '"></div>';
     html += '<div class="modulo-field"><label>Data</label><input type="text" id="mod-data" value="' + oggi + '"></div>';
     html +=
       '<div class="modulo-field"><label>Non conformità rilevata (descrizione)</label><textarea id="mod-non-conf" placeholder="Descrizione della non conformità..."></textarea><div class="btn-ai-wrap"><button class="btn-ai" onclick="miglioraTesto(\'mod-non-conf\',\'non conformità\')">Migliora testo con AI</button></div></div>';
     html +=
       '<div class="modulo-field"><label>Obiettivo concordato onde evitare il ripetersi della non conformità</label><textarea id="mod-obiettivo" placeholder="Obiettivo concordato..."></textarea><div class="btn-ai-wrap"><button class="btn-ai" onclick="miglioraTesto(\'mod-obiettivo\',\'obiettivo concordato\')">Migliora testo con AI</button></div></div>';
     html +=
-      '<div class="modulo-field"><label>Scadenza</label><input type="text" id="mod-scadenza" placeholder="Termine di verifica..."></div>';
+      '<div class="modulo-field"><label>Scadenza</label><input type="text" id="mod-scadenza" placeholder="' +
+      escP(MODULI_SCADENZA_DEFAULT) +
+      '">' +
+      _moduloScadenzaAiuti() +
+      '</div>';
   } else if (tipo === 'apprezzamento') {
     html += 'Colloquio di apprezzamento</div><div style="padding:18px">';
     html += aiBox;
     html +=
       '<div class="modulo-field"><label>Collaboratore</label><div class="ac-wrap"><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." oninput="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')" onfocus="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')"><div class="ac-drop" id="ac-mod-nomi"></div></div></div>';
     html +=
-      '<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="Sig.ra Fertitta Lara"></div>';
+      '<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="' +
+      escP(moduloRespSettore()) +
+      '"></div>';
     html += '<div class="modulo-field"><label>Data</label><input type="text" id="mod-data" value="' + oggi + '"></div>';
     html +=
       '<div class="modulo-field"><label>Descrizione</label><textarea id="mod-descrizione" placeholder="Descrizione dell\'apprezzamento..."></textarea><div class="btn-ai-wrap"><button class="btn-ai" onclick="miglioraTesto(\'mod-descrizione\',\'apprezzamento\')">Migliora testo con AI</button></div></div>';
@@ -54,14 +62,20 @@ function apriModulo(tipo) {
     html +=
       '<div class="modulo-field"><label>Collaboratore</label><div class="ac-wrap"><input type="text" id="mod-collaboratore" placeholder="Nome collaboratore..." oninput="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')" onfocus="acFiltra(\'mod-collaboratore\',\'ac-mod-nomi\')"><div class="ac-drop" id="ac-mod-nomi"></div></div></div>';
     html +=
-      '<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="Sig.ra Fertitta Lara"></div>';
+      '<div class="modulo-field"><label>Resp. Settore</label><input type="text" id="mod-resp" value="' +
+      escP(moduloRespSettore()) +
+      '"></div>';
     html += '<div class="modulo-field"><label>Data</label><input type="text" id="mod-data" value="' + oggi + '"></div>';
     html +=
       '<div class="modulo-field"><label>Non conformità rilevata</label><textarea id="mod-non-conf" placeholder="Descrizione della non conformità..."></textarea><div class="btn-ai-wrap"><button class="btn-ai" onclick="miglioraTesto(\'mod-non-conf\',\'non conformità\')">Migliora testo con AI</button></div></div>';
     html +=
       '<div class="modulo-field"><label>Obiettivo concordato onde evitare il ripetersi della non conformità</label><textarea id="mod-obiettivo" placeholder="Obiettivo concordato..."></textarea><div class="btn-ai-wrap"><button class="btn-ai" onclick="miglioraTesto(\'mod-obiettivo\',\'obiettivo concordato\')">Migliora testo con AI</button></div></div>';
     html +=
-      '<div class="modulo-field"><label>Scadenza (termine di verifica)</label><input type="text" id="mod-scadenza" placeholder="Termine di verifica..."></div>';
+      '<div class="modulo-field"><label>Scadenza (termine di verifica)</label><input type="text" id="mod-scadenza" placeholder="' +
+      escP(MODULI_SCADENZA_DEFAULT) +
+      '">' +
+      _moduloScadenzaAiuti() +
+      '</div>';
     html +=
       '<div class="modulo-field"><label>Livello RDI</label><select id="mod-livello"><option value="I">I° livello</option><option value="II">II° livello (grave)</option></select></div>';
   }
@@ -214,6 +228,60 @@ async function _loadLogo() {
     });
   } catch (e) {}
 }
+// Esempi pronti sotto il campo: e' un TERMINE, non una frase. Senza un aiuto
+// chiaro ci si scriveva dentro l'obiettivo, e sul documento ufficiale non ci
+// stava bene.
+function _moduloScadenzaAiuti() {
+  const oggi = new Date();
+  oggi.setDate(oggi.getDate() + 30);
+  const fra30 = 'Entro il ' + oggi.toLocaleDateString('it-IT');
+  const voci = [MODULI_SCADENZA_DEFAULT, 'Entro 30 giorni', fra30];
+  return (
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px;align-items:center">' +
+    '<span style="font-size:.78rem;color:var(--muted)">E un termine, non una frase. Vuoto = "' +
+    escP(MODULI_SCADENZA_DEFAULT) +
+    '". Esempi:</span>' +
+    voci
+      .map(
+        (v) =>
+          '<button type="button" onclick="_moduloScadenzaMetti(\'' +
+          escP(v).replace(/'/g, "\\'") +
+          '\')" style="font-size:.78rem;padding:2px 8px;border:1px solid var(--line);border-radius:10px;background:var(--paper2);color:var(--ink);cursor:pointer">' +
+          escP(v) +
+          '</button>',
+      )
+      .join('') +
+    '</div>'
+  );
+}
+function _moduloScadenzaMetti(v) {
+  const el = document.getElementById('mod-scadenza');
+  if (!el) return;
+  el.value = v;
+  el.focus();
+}
+// SCADENZA DEI MODULI DISCIPLINARI
+// Il campo e' il TERMINE entro cui va raggiunto l'obiettivo, non una frase.
+// Lasciandolo vuoto vale la formula standard; scrivendoci qualcosa vale quello
+// che ha scritto l'operatore. Il valore finisce in UN SOLO punto del PDF: prima
+// veniva stampato sia sotto il titolo "Scadenza" sia dentro la frase di
+// chiusura, e chi ci scriveva una frase se la ritrovava ripetuta due volte.
+const MODULI_SCADENZA_DEFAULT = 'A partire da subito';
+function _moduloScadenza(valore) {
+  const v = String(valore == null ? '' : valore).trim();
+  return v || MODULI_SCADENZA_DEFAULT;
+}
+// Responsabile di settore proposto nei moduli: personalizzabile per reparto in
+// Impostazioni. Prima il nome era scritto fisso dentro il programma, quindi
+// ogni settore si trovava davanti il responsabile di un altro.
+const MODULI_RESP_DEFAULT = { slots: 'Sig.ra Fertitta Lara' };
+function moduloRespSettore(rep) {
+  const cfg = (typeof moduliRespCfg !== 'undefined' && moduliRespCfg) || {};
+  const k = rep || (typeof currentReparto !== 'undefined' ? currentReparto : 'slots');
+  const v = cfg[k];
+  if (v != null && String(v).trim()) return String(v).trim();
+  return MODULI_RESP_DEFAULT[k] || '';
+}
 async function generaModuloPDF(tipo) {
   // Cattura SUBITO i flag, prima di qualsiasi await (race condition con ristampaModuloPDF)
   const _isRistampaSnap = !!window._isRistampa;
@@ -228,6 +296,30 @@ async function generaModuloPDF(tipo) {
   }
   collab = await _verificaNome(collab);
   document.getElementById('mod-collaboratore').value = collab;
+  // ALLINEAMENTO e RDI finiscono nel fascicolo personale: se mancano la non
+  // conformita' o l'obiettivo il documento esce ufficiale ma vuoto, quindi si
+  // chiede conferma invece di stamparlo in silenzio.
+  if (!_isRistampaSnap && (tipo === 'allineamento' || tipo === 'rdi')) {
+    const vuoti = [];
+    if (!((document.getElementById('mod-non-conf') || {}).value || '').trim()) vuoti.push('Non conformita rilevata');
+    if (!((document.getElementById('mod-obiettivo') || {}).value || '').trim()) vuoti.push('Obiettivo concordato');
+    if (vuoti.length) {
+      if (
+        !confirm(
+          'Questo documento va nel fascicolo personale di ' +
+            collab +
+            ' e manca:\n\n\u2022 ' +
+            vuoti.join('\n\u2022 ') +
+            '\n\nGenerarlo comunque?',
+        )
+      ) {
+        _highlightField(
+          vuoti.length === 2 || vuoti[0].indexOf('Non conformita') === 0 ? 'mod-non-conf' : 'mod-obiettivo',
+        );
+        return;
+      }
+    }
+  }
   // Firma digitale
   const isDigFirma = document.querySelector('input[name="firma-tipo"][value="digitale"]');
   const _fResp = isDigFirma && isDigFirma.checked ? getFirmaB64('firma-resp-canvas') : null;
@@ -322,6 +414,39 @@ async function generaModuloPDF(tipo) {
     }
     y += 2;
   }
+  // Riquadro "Scadenza": titolo sottolineato, nota esplicativa e valore. Il
+  // valore va a capo se e' lungo (prima usciva dal bordo destro e si perdeva) ed
+  // e' scritto una volta sola.
+  function drawScadenza(valore) {
+    const maxW = pw - mx * 2;
+    checkPage(18);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(0);
+    const lbl = 'Scadenza';
+    doc.text(lbl, mx, y);
+    const lw = doc.getTextWidth(lbl);
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.3);
+    doc.line(mx, y + 1.2, mx + lw, y + 1.2);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(
+      " (termine di verifica entro il quale si \u00E8 concordato di raggiungere l'obiettivo di cui sopra)",
+      mx + lw,
+      y,
+    );
+    y += 6;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9.5);
+    doc.setTextColor(0);
+    doc.splitTextToSize(_moduloScadenza(valore), maxW).forEach(function (riga) {
+      checkPage(5);
+      doc.text(riga, mx, y);
+      y += 4.5;
+    });
+    y += 3;
+  }
   if (tipo === 'allineamento') {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
@@ -336,41 +461,23 @@ async function generaModuloPDF(tipo) {
       'Obiettivo concordato tra Collaboratore e Resp. Settore onde evitare il ripetersi della non conformit\u00E0',
       obiettivo,
     );
-    const scad = (document.getElementById('mod-scadenza') || {}).value || '';
-    checkPage(16);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(0);
-    const scLabel = 'Scadenza';
-    doc.text(scLabel, mx, y);
-    const scW = doc.getTextWidth(scLabel);
-    doc.setDrawColor(0);
-    doc.setLineWidth(0.3);
-    doc.line(mx, y + 1.2, mx + scW, y + 1.2);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.text(
-      " (termine di verifica entro il quale si \u00E8 concordato di raggiungere l'obiettivo di cui sopra)",
-      mx + scW,
-      y,
-    );
-    y += 6;
-    if (scad) {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9.5);
-      doc.setTextColor(0);
-      doc.text(scad, mx, y);
-      y += 5;
-    } else {
-      y += 4;
-    }
-    y += 3;
+    drawScadenza((document.getElementById('mod-scadenza') || {}).value);
     checkPage(10);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'italic');
     doc.setTextColor(60);
-    const scadTxt = scad && scad.toLowerCase() !== 'a partire da subito' ? scad : 'a partire da subito';
-    doc.text('Chiediamo che, ' + scadTxt + ", venga raggiunto l'obiettivo di cui sopra.", mx, y);
+    // la frase NON ripete il termine: sta gia' scritto qui sopra
+    doc
+      .splitTextToSize(
+        "Chiediamo che, entro il termine sopra indicato, venga raggiunto l'obiettivo di cui sopra.",
+        pw - mx * 2,
+      )
+      .forEach(function (riga) {
+        checkPage(5);
+        doc.text(riga, mx, y);
+        y += 4;
+      });
+    y -= 4;
     y += 10;
     checkPage(25);
     const fy1 = drawFirmePro(doc, mx, y, pw, false, _fResp, _fCollab);
@@ -408,35 +515,7 @@ async function generaModuloPDF(tipo) {
       'Obiettivo concordato tra Collaboratore e Resp. Settore onde evitare il ripetersi della non conformit\u00E0',
       obiettivo,
     );
-    const scad = (document.getElementById('mod-scadenza') || {}).value || '';
-    checkPage(16);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(0);
-    const scLbl2 = 'Scadenza';
-    doc.text(scLbl2, mx, y);
-    const scW2 = doc.getTextWidth(scLbl2);
-    doc.setDrawColor(0);
-    doc.setLineWidth(0.3);
-    doc.line(mx, y + 1.2, mx + scW2, y + 1.2);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.text(
-      " (termine di verifica entro il quale si \u00E8 concordato di raggiungere l'obiettivo di cui sopra)",
-      mx + scW2,
-      y,
-    );
-    y += 6;
-    if (scad) {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9.5);
-      doc.setTextColor(0);
-      doc.text(scad, mx, y);
-      y += 5;
-    } else {
-      y += 4;
-    }
-    y += 3;
+    drawScadenza((document.getElementById('mod-scadenza') || {}).value);
     const livello = (document.getElementById('mod-livello') || {}).value || 'I';
     checkPage(20);
     doc.setFont('helvetica', 'bold');

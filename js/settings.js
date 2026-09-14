@@ -458,6 +458,43 @@ function renderProfiliUI(opList) {
     '<button class="btn btn-primary" onclick="applicaProfili()" style="margin-bottom:22px">Applica i profili</button>';
   return html;
 }
+// RESPONSABILE DI SETTORE NEI MODULI
+// Allineamenti, RDI e apprezzamenti propongono un nome gia' scritto nel campo
+// "Resp. Settore". Prima era fisso dentro il programma, quindi Tavoli, Valet e
+// Cleaning si trovavano davanti il responsabile degli Slot e bisognava
+// correggerlo a mano ogni volta.
+function renderModuliRespUI() {
+  const el = document.getElementById('moduli-resp-list');
+  if (!el) return;
+  let html =
+    '<p style="color:var(--muted);font-size:.84rem;margin-bottom:10px">Nome proposto nel campo "Resp. Settore" dei moduli (allineamento, RDI, apprezzamento). Resta modificabile a mano su ogni singolo modulo. Vuoto = campo da compilare ogni volta.</p>';
+  getReparti().forEach((r) => {
+    const v =
+      (moduliRespCfg && moduliRespCfg[r.key]) ||
+      (typeof MODULI_RESP_DEFAULT !== 'undefined' ? MODULI_RESP_DEFAULT[r.key] || '' : '');
+    html +=
+      '<div class="tipo-item"><div class="tipo-item-name" style="min-width:120px">' +
+      escP(r.label) +
+      '</div><input type="text" value="' +
+      escP(v) +
+      '" placeholder="Es: Sig.ra Cognome Nome" onchange="salvaModuloResp(\'' +
+      r.key +
+      '\',this.value)" style="flex:1;padding:6px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></div>';
+  });
+  el.innerHTML = html;
+}
+async function salvaModuloResp(rep, val) {
+  if (!isAdmin()) return;
+  const cfg = Object.assign({}, moduliRespCfg || {});
+  const prima = cfg[rep] || '';
+  const v = String(val || '').trim();
+  if (v) cfg[rep] = v;
+  else delete cfg[rep];
+  moduliRespCfg = cfg;
+  await setImp('moduli_responsabili', JSON.stringify(cfg));
+  logAzione('Moduli: responsabile di settore', repartoLabel(rep) + ': ' + (prima || 'vuoto') + ' → ' + (v || 'vuoto'));
+  toast('Salvato · ' + repartoLabel(rep) + ': ' + (v || 'nessun nome proposto'));
+}
 function renderVisibilitaUI() {
   const el = document.getElementById('visibilita-list');
   if (!el) return;

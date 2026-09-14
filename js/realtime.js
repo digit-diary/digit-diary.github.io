@@ -189,6 +189,8 @@ let campiRapportoExtra = [],
 let visibilitaConfig = {};
 // nome operatore -> profilo (direzione/resp/sost/sup/hr) del documento Profili e permessi
 let profiliOperatori = {};
+// nome del responsabile proposto nei moduli, per settore
+let moduliRespCfg = {};
 let collaboratoriCache = [],
   moduliCache = [],
   logCache = [],
