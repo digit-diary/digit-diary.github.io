@@ -23,6 +23,7 @@ async function loadAll() {
     tr,
     vis,
     profOp,
+    modResp,
     compCfg,
     livNomi,
     pntCfg,
@@ -51,6 +52,7 @@ async function loadAll() {
     getImp('tipi_rinominati'),
     getImp('visibilita'),
     getImp('profili_operatori'),
+    getImp('moduli_responsabili'),
     getImp('competenze_config'),
     getImp('formazione_livelli_nomi'),
     getImp('punti_config'),
@@ -114,6 +116,10 @@ async function loadAll() {
   if (profOp)
     try {
       profiliOperatori = JSON.parse(profOp);
+    } catch (e) {}
+  if (modResp)
+    try {
+      moduliRespCfg = JSON.parse(modResp);
     } catch (e) {}
   if (livNomi)
     try {

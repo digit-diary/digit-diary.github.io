@@ -147,6 +147,11 @@ function switchPage(name) {
       setSec.style.display = isAdmin() ? '' : 'none';
       if (isAdmin() && typeof renderSettoriUI === 'function') renderSettoriUI();
     }
+    const mrSec = document.getElementById('moduli-resp-section');
+    if (mrSec) {
+      mrSec.style.display = isAdmin() ? '' : 'none';
+      if (isAdmin() && typeof renderModuliRespUI === 'function') renderModuliRespUI();
+    }
     const nuovoOpRep = document.getElementById('new-operatore-rep');
     if (nuovoOpRep && typeof opzioniRepartoHtml === 'function')
       nuovoOpRep.innerHTML = opzioniRepartoHtml(nuovoOpRep.value || 'entrambi', true);
