@@ -21,7 +21,7 @@ function apriModulo(tipo) {
   const aiBox =
     '<div class="ai-gen-box" style="margin-bottom:16px;padding:14px;background:linear-gradient(135deg,rgba(102,126,234,.08),rgba(118,75,162,.08));border:1.5px solid rgba(102,126,234,.25);border-radius:6px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:1.1rem"><i class="icx icx-stella-piena"></i></span><strong style="font-size:.92rem">Genera con AI</strong><span style="font-size:.82rem;color:var(--muted)">Descrivi la situazione e l\'AI compila tutti i campi</span></div><textarea id="ai-gen-prompt" placeholder="Es: Cognome Nome – cassa – acquisto crediti senza documento – cliente non identificato – 22:45 – 08.03.2026 – 2000 CHF – LOG 7834&#10;&#10;Oppure: Cognome Nome – valet – alle 23:10 ha consegnato il veicolo sbagliato al cliente – 05.03.2026 – IR 4521" style="width:100%;min-height:70px;padding:10px;border:1px solid var(--line);border-radius:4px;font-size:.88rem;background:var(--paper);color:var(--ink);resize:vertical"></textarea><div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn-ai" id="btn-ai-gen" onclick="generaModuloAI(\'' +
     tipo +
-    '\')">Genera tutti i campi</button><button class="btn-ai" onclick="document.getElementById(\'modulo-foto-input\').click()" style="background:linear-gradient(135deg,#b8860b,#d4a017)">Allega foto per AI</button><input type="file" id="modulo-foto-input" accept="image/*" style="display:none" onchange="moduloFotoPreview(this)"><span id="modulo-foto-name" style="font-size:.82rem;color:var(--muted)"></span><button id="modulo-foto-remove" onclick="moduloFotoRimuovi()" style="display:none;background:none;border:1px solid var(--accent);color:var(--accent);padding:2px 8px;border-radius:2px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:Source Sans 3,sans-serif">X</button><span id="ai-gen-status" style="font-size:.82rem;color:var(--muted)"></span></div><div id="modulo-foto-preview" style="display:none;margin-top:8px"><img id="modulo-foto-img" style="max-width:200px;max-height:140px;border-radius:3px;border:1px solid var(--line)"></div></div>';
+    '\')">Genera tutti i campi</button><button class="btn-ai" onclick="document.getElementById(\'modulo-foto-input\').click()" title="La foto resta sul tuo computer come riferimento: per riservatezza non viene inviata all\'AI" style="background:linear-gradient(135deg,#b8860b,#d4a017)">Allega foto (resta locale)</button><input type="file" id="modulo-foto-input" accept="image/*" style="display:none" onchange="moduloFotoPreview(this)"><span id="modulo-foto-name" style="font-size:.82rem;color:var(--muted)"></span><button id="modulo-foto-remove" onclick="moduloFotoRimuovi()" style="display:none;background:none;border:1px solid var(--accent);color:var(--accent);padding:2px 8px;border-radius:2px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:Source Sans 3,sans-serif">X</button><span id="ai-gen-status" style="font-size:.82rem;color:var(--muted)"></span></div><div id="modulo-foto-preview" style="display:none;margin-top:8px"><img id="modulo-foto-img" style="max-width:200px;max-height:140px;border-radius:3px;border:1px solid var(--line)"></div></div>';
   if (tipo === 'allineamento') {
     html += 'Rilevamento di non conformità e colloquio di allineamento</div><div style="padding:18px">';
     html += aiBox;
@@ -204,16 +204,22 @@ function getFirmaB64(canvasId) {
   }
   return null;
 }
+// Ritorna una Promise risolta a firma disegnata: chi ristampa il PDF la
+// attende, altrimenti il documento usciva prima del caricamento dell'immagine.
 function loadFirmaToCanvas(canvasId, b64) {
   const c = document.getElementById(canvasId);
-  if (!c || !b64) return;
-  const ctx = c.getContext('2d');
-  const img = new Image();
-  img.onload = () => {
-    ctx.clearRect(0, 0, c.width, c.height);
-    ctx.drawImage(img, 0, 0, c.width, c.height);
-  };
-  img.src = b64;
+  if (!c || !b64) return Promise.resolve(false);
+  return new Promise((res) => {
+    const ctx = c.getContext('2d');
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      res(true);
+    };
+    img.onerror = () => res(false);
+    img.src = b64;
+  });
 }
 let _logoB64 = null;
 async function _loadLogo() {
@@ -286,6 +292,11 @@ async function generaModuloPDF(tipo) {
   // Cattura SUBITO i flag, prima di qualsiasi await (race condition con ristampaModuloPDF)
   const _isRistampaSnap = !!window._isRistampa;
   const _isEditSnap = !!window._editModuloId;
+  // la ristampa non scrive nulla; creare o modificare si'
+  if (!_isRistampaSnap && !_puoScrivereModuli()) {
+    toast('Non hai il permesso');
+    return;
+  }
   let collab = capitalizzaNome((document.getElementById('mod-collaboratore') || {}).value || '');
   const resp = (document.getElementById('mod-resp') || {}).value || '';
   const data = (document.getElementById('mod-data') || {}).value || '';
@@ -894,7 +905,7 @@ function aggiornaModuliLista() {
 }
 function apriModuloSalvato(id) {
   const m = moduliCache.find((x) => x.id === id);
-  if (!m) return;
+  if (!m) return Promise.resolve(false);
   apriModulo(m.tipo);
   window._editModuloId = id;
   // Salva snapshot originale per confronto
@@ -904,55 +915,53 @@ function apriModuloSalvato(id) {
     data_modulo: m.data_modulo,
     dati: JSON.stringify(m.dati || {}),
   };
-  setTimeout(() => {
-    const ce = document.getElementById('mod-collaboratore');
-    if (ce) ce.value = m.collaboratore;
-    const re = document.getElementById('mod-resp');
-    if (re) re.value = m.resp_settore;
-    const de = document.getElementById('mod-data');
-    if (de) de.value = m.data_modulo;
-    const dt = m.dati || {};
-    if (m.tipo === 'allineamento' || m.tipo === 'rdi') {
-      const nc = document.getElementById('mod-non-conf');
-      if (nc) nc.value = dt.non_conformita || '';
-      const ob = document.getElementById('mod-obiettivo');
-      if (ob) ob.value = dt.obiettivo || '';
-      const sc = document.getElementById('mod-scadenza');
-      if (sc) sc.value = dt.scadenza || '';
-      if (m.tipo === 'rdi') {
-        const lv = document.getElementById('mod-livello');
-        if (lv) lv.value = dt.livello || 'I';
-      }
-    } else if (m.tipo === 'apprezzamento') {
-      const ds = document.getElementById('mod-descrizione');
-      if (ds) ds.value = dt.descrizione || '';
-      const os = document.getElementById('mod-osservazioni');
-      if (os) os.value = dt.osservazioni || '';
+  // Il form e' gia' nel DOM (apriModulo lo scrive in modo sincrono): si
+  // compila subito, senza timer a occhio. Le firme arrivano da immagini
+  // caricate in modo asincrono: la Promise si risolve quando sono sui canvas,
+  // cosi' la ristampa del PDF le trova davvero.
+  const ce = document.getElementById('mod-collaboratore');
+  if (ce) ce.value = m.collaboratore;
+  const re = document.getElementById('mod-resp');
+  if (re) re.value = m.resp_settore;
+  const de = document.getElementById('mod-data');
+  if (de) de.value = m.data_modulo;
+  const dt = m.dati || {};
+  if (m.tipo === 'allineamento' || m.tipo === 'rdi') {
+    const nc = document.getElementById('mod-non-conf');
+    if (nc) nc.value = dt.non_conformita || '';
+    const ob = document.getElementById('mod-obiettivo');
+    if (ob) ob.value = dt.obiettivo || '';
+    const sc = document.getElementById('mod-scadenza');
+    if (sc) sc.value = dt.scadenza || '';
+    if (m.tipo === 'rdi') {
+      const lv = document.getElementById('mod-livello');
+      if (lv) lv.value = dt.livello || 'I';
     }
-    // Ripristina firma digitale se presente
-    if (dt.firma_digitale) {
-      setTimeout(() => {
-        const radio = document.querySelector('input[name="firma-tipo"][value="digitale"]');
-        if (radio) {
-          radio.checked = true;
-          toggleFirmaDigitale();
-          setTimeout(() => {
-            if (dt.firma_resp) loadFirmaToCanvas('firma-resp-canvas', dt.firma_resp);
-            if (dt.firma_collab) loadFirmaToCanvas('firma-collab-canvas', dt.firma_collab);
-          }, 150);
-        }
-      }, 100);
+  } else if (m.tipo === 'apprezzamento') {
+    const ds = document.getElementById('mod-descrizione');
+    if (ds) ds.value = dt.descrizione || '';
+    const os = document.getElementById('mod-osservazioni');
+    if (os) os.value = dt.osservazioni || '';
+  }
+  // Ripristina firma digitale se presente
+  const attese = [];
+  if (dt.firma_digitale) {
+    const radio = document.querySelector('input[name="firma-tipo"][value="digitale"]');
+    if (radio) {
+      radio.checked = true;
+      toggleFirmaDigitale();
+      if (dt.firma_resp) attese.push(loadFirmaToCanvas('firma-resp-canvas', dt.firma_resp));
+      if (dt.firma_collab) attese.push(loadFirmaToCanvas('firma-collab-canvas', dt.firma_collab));
     }
-    // Auto-resize textarea dopo populate
-    setTimeout(() => {
-      document.querySelectorAll('#modulo-form-area textarea').forEach((ta) => {
-        if (ta.value) {
-          ta.style.height = 'auto';
-          ta.style.height = Math.max(80, ta.scrollHeight) + 'px';
-        }
-      });
-    }, 200);
-  }, 50);
+  }
+  // Auto-resize textarea dopo populate
+  document.querySelectorAll('#modulo-form-area textarea').forEach((ta) => {
+    if (ta.value) {
+      ta.style.height = 'auto';
+      ta.style.height = Math.max(80, ta.scrollHeight) + 'px';
+    }
+  });
+  return Promise.all(attese).then(() => true);
 }
 function checkQrHash() {
   const h = window.location.hash;
@@ -969,16 +978,28 @@ function checkQrHash() {
 }
 async function ristampaModuloPDF(id) {
   window._isRistampa = true;
-  apriModuloSalvato(id);
-  await new Promise((r) => setTimeout(r, 150));
   const m = moduliCache.find((x) => x.id === id);
   try {
-    if (m) await generaModuloPDF(m.tipo);
+    // si attende che campi, radio firma e canvas siano davvero pronti
+    if (m && (await apriModuloSalvato(id))) await generaModuloPDF(m.tipo);
   } finally {
     window._isRistampa = false;
   }
 }
+// Chi puo' scrivere sui moduli: admin, oppure chi vede la pagina nel proprio
+// settore. In un settore extra concesso in sola lettura non si scrive. Il
+// controllo sta qui e non solo nei pulsanti, perche' le funzioni sono globali.
+function _puoScrivereModuli() {
+  if (isAdmin()) return true;
+  if (typeof isVis === 'function' && !isVis('moduli')) return false;
+  if (typeof _inRepartoExtra === 'function' && _inRepartoExtra() && !_extraPuoModificare()) return false;
+  return true;
+}
 async function eliminaModulo(id) {
+  if (!_puoScrivereModuli()) {
+    toast('Non hai il permesso');
+    return;
+  }
   if (!confirm('Eliminare questo modulo? Sarà spostato nel cestino.')) return;
   const _m = moduliCache.find((x) => x.id === id);
   const op = getOperatore();
@@ -1014,6 +1035,11 @@ async function eliminaModulo(id) {
 // vacanza: si correggono qui, dove sta l'anagrafica, e si leggono nella scheda.
 async function cambiaDataCollaboratore(id, campo, valore) {
   if (campo !== 'data_nascita' && campo !== 'data_assunzione') return;
+  if (!isAdmin() && !(typeof puoModificare === 'function' && puoModificare('storico_hr'))) {
+    toast('Non hai il permesso');
+    renderCollaboratoriUI();
+    return;
+  }
   const c = (collaboratoriCache || []).find((x) => x.id === id);
   const etichetta = campo === 'data_nascita' ? 'Data di nascita' : 'Inizio attivita';
   const testo = String(valore == null ? '' : valore).trim();
@@ -1257,7 +1283,16 @@ function filtraCollaboratoriUI(testo) {
     r.style.display = !q || (r.dataset.nome || '').includes(q) ? '' : 'none';
   });
 }
+// Anagrafica (aggiungere, rinominare, disattivare, settore, copertura,
+// importare): solo admin, come i pulsanti che la mostrano. Il controllo si
+// ripete qui perche' le funzioni sono globali e richiamabili anche da console.
+function _soloAdminAnagrafica() {
+  if (isAdmin()) return true;
+  toast('Non hai il permesso');
+  return false;
+}
 async function aggiungiCollaboratore() {
+  if (!_soloAdminAnagrafica()) return;
   const nome = capitalizzaNome(document.getElementById('new-collab-nome').value.trim());
   if (!nome) {
     toast('Inserisci un nome');
@@ -1305,6 +1340,7 @@ function rinominaCollaboratore(nome) {
   }, 100);
 }
 async function salvaRinominaCollaboratore(vecchio) {
+  if (!_soloAdminAnagrafica()) return;
   const nuovo = document.getElementById('rin-collab-nuovo').value.trim();
   if (!nuovo) {
     toast('Inserisci un nome');
@@ -1505,6 +1541,7 @@ function apriCoperturaCollab(id) {
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
 async function salvaCoperturaCollab(id) {
+  if (!_soloAdminAnagrafica()) return;
   const c = collaboratoriCache.find((x) => x.id === id);
   if (!c) return;
   const principale = c.reparto_dip || 'slots';
@@ -1545,6 +1582,10 @@ async function salvaCoperturaCollab(id) {
   }
 }
 async function cambiaRepartoCollaboratore(id, rep) {
+  if (!_soloAdminAnagrafica()) {
+    renderCollaboratoriUI();
+    return;
+  }
   try {
     await secPatch('collaboratori', 'id=eq.' + id, { reparto_dip: rep });
     const c = collaboratoriCache.find((x) => x.id === id);
@@ -1604,6 +1645,7 @@ async function cambiaCategoriaCollaboratore(id, cat) {
   }
 }
 async function disattivaCollaboratore(nome) {
+  if (!_soloAdminAnagrafica()) return;
   if (!confirm('Disattivare "' + nome + '"? Non apparirà più nell\'autocomplete.')) return;
   try {
     await secPatch('collaboratori', 'nome=eq.' + encodeURIComponent(nome), {
@@ -1619,12 +1661,20 @@ async function disattivaCollaboratore(nome) {
   }
 }
 async function riattivaCollaboratore(nome) {
+  if (!_soloAdminAnagrafica()) return;
   try {
     await secPatch('collaboratori', 'nome=eq.' + encodeURIComponent(nome), {
       attivo: true,
     });
-    collaboratoriCache.push({ nome, attivo: true });
+    // in cache va il record vero (id, settore, impiego...): un oggetto con
+    // solo il nome rompeva select e modifiche finche' non si ricaricava
+    const r = await secGet('collaboratori?nome=eq.' + encodeURIComponent(nome) + '&limit=1');
+    const rec = Array.isArray(r) && r[0] ? r[0] : null;
+    const idx = collaboratoriCache.findIndex((c) => c.nome === nome);
+    if (idx !== -1) Object.assign(collaboratoriCache[idx], rec || { attivo: true });
+    else if (rec) collaboratoriCache.push(rec);
     collaboratoriCache.sort((a, b) => a.nome.localeCompare(b.nome));
+    logAzione('Collaboratore riattivato', nome);
     renderCollaboratoriUI();
     aggiornaNomi();
     toast('Collaboratore riattivato');
@@ -1786,6 +1836,10 @@ function esportaRegistroCSV() {
 async function importaCollaboratori(input) {
   const file = input.files[0];
   if (!file) return;
+  if (!_soloAdminAnagrafica()) {
+    input.value = '';
+    return;
+  }
   const ext = file.name.split('.').pop().toLowerCase();
   let nomi = [];
   if (ext === 'csv' || ext === 'txt') {
@@ -1967,6 +2021,59 @@ async function salvaGroqKey() {
     '<span style="color:#2c6e49;font-weight:600">Chiave salvata</span>';
   toast('Chiave Groq salvata');
 }
+// PRIVACY: i dati personali dei collaboratori non escono mai verso l'AI
+// esterna (regola aziendale). Prima dell'invio ogni nome in anagrafica, anche
+// scritto al contrario o con il solo cognome/nome, diventa un segnaposto
+// [COLLABORATORE], [COLLABORATORE 2]...; la risposta viene rimessa a posto con
+// _aiRipristina. La mappa vale per una sola chiamata. Le foto non partono piu'.
+const _AI_SEGNAPOSTO_RE = /\[\s*COLLABORATORE(?:\s*(\d+))?\s*\]/gi;
+let _aiNomiMappa = [];
+function _aiNomeRe(parte) {
+  const esc = parte.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp('(^|[^\\p{L}])' + esc + '(?![\\p{L}])', 'giu');
+}
+function _aiAnonimizza(testo, nomi) {
+  _aiNomiMappa = [];
+  let out = String(testo || '');
+  if (!out.trim()) return out;
+  const visti = {};
+  const tutti = [];
+  (nomi || []).concat((collaboratoriCache || []).map((c) => c.nome)).forEach((n) => {
+    const k = String(n || '').trim();
+    if (k.length < 3 || visti[k.toLowerCase()]) return;
+    visti[k.toLowerCase()] = true;
+    tutti.push(k);
+  });
+  tutti.forEach((nome) => {
+    // pezzi corti (es. "Di", "Lo") da soli non si toccano: troppi falsi positivi
+    const parti = nome.split(/\s+/).filter((p) => p.length >= 3);
+    const varianti = [nome];
+    if (parti.length > 1) varianti.push(parti.slice().reverse().join(' '));
+    parti
+      .slice()
+      .sort((a, b) => b.length - a.length)
+      .forEach((p) => varianti.push(p));
+    let seg = null;
+    varianti.forEach((v) => {
+      if (!_aiNomeRe(v).test(out)) return;
+      if (!seg) {
+        seg = _aiNomiMappa.length ? '[COLLABORATORE ' + (_aiNomiMappa.length + 1) + ']' : '[COLLABORATORE]';
+        _aiNomiMappa.push({ seg, nome });
+      }
+      out = out.replace(_aiNomeRe(v), '$1' + seg);
+    });
+  });
+  return out;
+}
+function _aiRipristina(testo) {
+  return String(testo || '').replace(_AI_SEGNAPOSTO_RE, (tutto, n) => {
+    const seg = n ? '[COLLABORATORE ' + parseInt(n) + ']' : '[COLLABORATORE]';
+    const m = _aiNomiMappa.find((x) => x.seg === seg);
+    return m ? m.nome : tutto;
+  });
+}
+const _AI_REGOLA_SEGNAPOSTO =
+  '\n- I nomi dei collaboratori compaiono come segnaposto [COLLABORATORE], [COLLABORATORE 2]...: lasciali ESATTAMENTE cosi\', non inventare nomi. Il genere si ricava solo dal testo (es. "la collaboratrice"); se non e\' indicato usa "il/la collaboratore/trice"';
 async function miglioraTesto(fieldId, contesto) {
   const el = document.getElementById(fieldId);
   if (!el) return;
@@ -1985,18 +2092,21 @@ async function miglioraTesto(fieldId, contesto) {
     btn.textContent = 'Elaborazione...';
   }
   try {
+    const testoAnon = _aiAnonimizza(testo, [(document.getElementById('mod-collaboratore') || {}).value || '']);
     const prompt =
       'Sei il Responsabile del Settore del Casinò Lugano SA (CLSA), casa da gioco regolata dalla CFCG. Devi riscrivere il seguente testo per un documento formale di ' +
       contesto +
-      '.\n\nSTILE RICHIESTO:\n- Italiano formale e professionale, tipico di documenti di un casinò svizzero\n- Terza persona: "il/la collaboratore/trice", "il Sig./la Sig.ra [Cognome Nome]"\n- MANTIENI tutti i dettagli specifici: date, orari, luoghi, importi, circostanze\n- Per fatti: "In data [data], durante il turno [turno], presso [luogo]..." → "si è verificato quanto segue:"\n- Per telecamere: "dalla revisione delle immagini del sistema CCTV risulta che..."\n- Per violazioni: "Tale comportamento costituisce una violazione della procedura QM [codice]" citando la procedura specifica\n- Per soglie: usa SEMPRE "pari o superiore a" (NON "superiore a")\n- Per obiettivi: "Si invita formalmente il/la collaboratore/trice a:" seguito da elenco puntato con -\n- Chiudi con: "consapevole che il ripetersi di tale comportamento potrà comportare l\'adozione di provvedimenti disciplinari più severi"\n- NON inventare fatti, migliora SOLO la forma professionale del testo esistente\n- Scrivi come un RESPONSABILE DI SETTORE esperto, NON come un\'intelligenza artificiale. Il testo deve sembrare scritto da una persona reale con esperienza nel settore. Evita frasi generiche, template o formule troppo perfette. Usa il linguaggio naturale di chi lavora in un casinò svizzero ogni giorno.\n- Rispondi SOLO con il testo migliorato, senza commenti o spiegazioni\n\nABBREVIAZIONI E TERMINOLOGIA CASINO:\nDIR=Direttore, CdA=Consiglio Amministrazione, CdD=Collegio Direzione, MgrTeam=Management Team, CO=Compliance, RLRD=Resp.LRD, RCS=Resp.Concezione Sociale, RSS=Resp.Sicurezza&Sorveglianza, R_FBS=Resp.FoBoSlot, SUP_FBS=Supervisor FoBoSlot, R_LG=Resp.Live Game, SUP_LG=Supervisor Live Game, CAS=Cassiere, REC=Receptionist, SA=Slot Attendant, GUARD=Guardaroba, BOK=Back Office, CT=Counting Team, CR=Croupier, ISP=Ispettore tavolo, SIC=Sicurezza, SURV=Sorveglianza, SECC=Sistema elettronico conteggio/controllo, AAGA=Apparecchi automatici da gioco, IR=Incident Report, SOL=Surveillance Operator Log, TRAKA=sistema gestione chiavi, GD=giornata di gioco, PLG=prodotto lordo giochi, RDI=Rapporto Disciplinare Interno, LRD=Legge riciclaggio denaro, CFCG=Commissione federale case da gioco, QM=Quality Management, VP=Valet Parking, MG=Manutenzione Giochi, FAC=Facility, PUL=Pulizie, F&C=Finanze&Controlling, F&B=Food&Beverage, MKTG=Marketing, VC=gettoni valore, NN=fiches non negoziabili, CLI/CLO=Cashless In/Out, NRT=Note Recycler Terminal, JP=Jackpot, CD=Cassa.\n\nPRINCIPI TRASVERSALI:\n- Pulizia delle mani: sfregamento palmi verso alto verso CCTV\n- Principio dei quattro occhi: un funzionario esegue, uno+ indipendenti attestano\n- Percorso più breve: rientro immediato alla postazione senza soste\n- Tutte le operazioni sotto copertura CCTV (art.33 OCG-DFGP)\n\nSOGLIE CHF:\n- CHF 3\'000: identificazione LRD obbligatoria (pari o superiore)\n- CHF 4\'000: registrazione Form III (pari o superiore)\n- CHF 10: discrepanza cassa → verifica con SUP_FBS\n- CHF 100: discrepanza cassa → indagine formale + IR\n- CHF 15\'000: pagamento → notifica preventiva SURV + verifica KYC/PEP immediata\n- CHF 30\'000: acquisto gettoni → chiarimento speciale con SUP_FBS\n- CHF 50\'000: riscossione/jackpot → chiarimento speciale + fax CFCG entro fine GD\n\nLIVELLI DISCIPLINARI: 1)Allineamento verbale 2)Allineamento scritto 3)RDI 1°grado 4)RDI 2°grado (può portare a disdetta). Dal 3° allineamento scritto stesso motivo → scatta RDI.\n\nTesto originale:\n' +
-      testo;
+      '.\n\nSTILE RICHIESTO:\n- Italiano formale e professionale, tipico di documenti di un casinò svizzero\n- Terza persona: "il/la collaboratore/trice", "il Sig./la Sig.ra [COLLABORATORE]"' +
+      _AI_REGOLA_SEGNAPOSTO +
+      '\n- MANTIENI tutti i dettagli specifici: date, orari, luoghi, importi, circostanze\n- Per fatti: "In data [data], durante il turno [turno], presso [luogo]..." → "si è verificato quanto segue:"\n- Per telecamere: "dalla revisione delle immagini del sistema CCTV risulta che..."\n- Per violazioni: "Tale comportamento costituisce una violazione della procedura QM [codice]" citando la procedura specifica\n- Per soglie: usa SEMPRE "pari o superiore a" (NON "superiore a")\n- Per obiettivi: "Si invita formalmente il/la collaboratore/trice a:" seguito da elenco puntato con -\n- Chiudi con: "consapevole che il ripetersi di tale comportamento potrà comportare l\'adozione di provvedimenti disciplinari più severi"\n- NON inventare fatti, migliora SOLO la forma professionale del testo esistente\n- Scrivi come un RESPONSABILE DI SETTORE esperto, NON come un\'intelligenza artificiale. Il testo deve sembrare scritto da una persona reale con esperienza nel settore. Evita frasi generiche, template o formule troppo perfette. Usa il linguaggio naturale di chi lavora in un casinò svizzero ogni giorno.\n- Rispondi SOLO con il testo migliorato, senza commenti o spiegazioni\n\nABBREVIAZIONI E TERMINOLOGIA CASINO:\nDIR=Direttore, CdA=Consiglio Amministrazione, CdD=Collegio Direzione, MgrTeam=Management Team, CO=Compliance, RLRD=Resp.LRD, RCS=Resp.Concezione Sociale, RSS=Resp.Sicurezza&Sorveglianza, R_FBS=Resp.FoBoSlot, SUP_FBS=Supervisor FoBoSlot, R_LG=Resp.Live Game, SUP_LG=Supervisor Live Game, CAS=Cassiere, REC=Receptionist, SA=Slot Attendant, GUARD=Guardaroba, BOK=Back Office, CT=Counting Team, CR=Croupier, ISP=Ispettore tavolo, SIC=Sicurezza, SURV=Sorveglianza, SECC=Sistema elettronico conteggio/controllo, AAGA=Apparecchi automatici da gioco, IR=Incident Report, SOL=Surveillance Operator Log, TRAKA=sistema gestione chiavi, GD=giornata di gioco, PLG=prodotto lordo giochi, RDI=Rapporto Disciplinare Interno, LRD=Legge riciclaggio denaro, CFCG=Commissione federale case da gioco, QM=Quality Management, VP=Valet Parking, MG=Manutenzione Giochi, FAC=Facility, PUL=Pulizie, F&C=Finanze&Controlling, F&B=Food&Beverage, MKTG=Marketing, VC=gettoni valore, NN=fiches non negoziabili, CLI/CLO=Cashless In/Out, NRT=Note Recycler Terminal, JP=Jackpot, CD=Cassa.\n\nPRINCIPI TRASVERSALI:\n- Pulizia delle mani: sfregamento palmi verso alto verso CCTV\n- Principio dei quattro occhi: un funzionario esegue, uno+ indipendenti attestano\n- Percorso più breve: rientro immediato alla postazione senza soste\n- Tutte le operazioni sotto copertura CCTV (art.33 OCG-DFGP)\n\nSOGLIE CHF:\n- CHF 3\'000: identificazione LRD obbligatoria (pari o superiore)\n- CHF 4\'000: registrazione Form III (pari o superiore)\n- CHF 10: discrepanza cassa → verifica con SUP_FBS\n- CHF 100: discrepanza cassa → indagine formale + IR\n- CHF 15\'000: pagamento → notifica preventiva SURV + verifica KYC/PEP immediata\n- CHF 30\'000: acquisto gettoni → chiarimento speciale con SUP_FBS\n- CHF 50\'000: riscossione/jackpot → chiarimento speciale + fax CFCG entro fine GD\n\nLIVELLI DISCIPLINARI: 1)Allineamento verbale 2)Allineamento scritto 3)RDI 1°grado 4)RDI 2°grado (può portare a disdetta). Dal 3° allineamento scritto stesso motivo → scatta RDI.\n\nTesto originale:\n' +
+      testoAnon;
     const migliorato = await _groqChat({
       model: groqModel('testo'),
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.3,
       max_tokens: 2000,
     });
-    el.value = migliorato.trim();
+    el.value = _aiRipristina(migliorato).trim();
     el.style.height = 'auto';
     el.style.height = Math.max(80, el.scrollHeight) + 'px';
     toast('Testo migliorato!');
@@ -2023,7 +2133,7 @@ function moduloFotoPreview(inp) {
     _moduloFotoB64 = e.target.result;
     document.getElementById('modulo-foto-img').src = _moduloFotoB64;
     document.getElementById('modulo-foto-preview').style.display = 'block';
-    document.getElementById('modulo-foto-name').textContent = file.name;
+    document.getElementById('modulo-foto-name').textContent = file.name + " (resta locale, non inviata all'AI)";
     document.getElementById('modulo-foto-remove').style.display = 'inline-block';
   };
   reader.readAsDataURL(file);
@@ -2036,9 +2146,9 @@ function moduloFotoRimuovi() {
   document.getElementById('modulo-foto-remove').style.display = 'none';
 }
 async function generaModuloAI(tipo) {
-  const prompt = (document.getElementById('ai-gen-prompt') || {}).value || '';
-  if (!prompt.trim() && !_moduloFotoB64) {
-    toast('Scrivi una descrizione o allega una foto');
+  const promptRaw = (document.getElementById('ai-gen-prompt') || {}).value || '';
+  if (!promptRaw.trim()) {
+    toast("Scrivi una descrizione: la foto resta locale e non viene inviata all'AI");
     return;
   }
   if (!groqKey) {
@@ -2052,39 +2162,29 @@ async function generaModuloAI(tipo) {
     btn.textContent = 'Generazione in corso...';
   }
   if (status)
-    status.textContent = _moduloFotoB64 ? "L'AI sta analizzando foto e dati..." : "L'AI sta compilando i campi...";
+    status.textContent =
+      "L'AI sta compilando i campi..." + (_moduloFotoB64 ? ' (la foto resta locale, non viene inviata)' : '');
+  // nomi in anagrafica -> segnaposto; il nome gia' scritto nel campo ha la priorita'
+  const prompt = _aiAnonimizza(promptRaw, [(document.getElementById('mod-collaboratore') || {}).value || '']);
   let sysPrompt = '';
   if (tipo === 'allineamento' || tipo === 'rdi') {
     sysPrompt =
-      'Sei un assistente aziendale esperto per Casinò Lugano SA (casa da gioco in Svizzera, regolata dalla CFCG - Commissione Federale delle Case da Gioco). Genera un "Rilevamento di non conformità e colloquio di allineamento".\nTesto: formale, chiaro, oggettivo, solo fatti.\n\nABBREVIAZIONI: DIR=Direttore, CO=Compliance, RLRD=Resp.LRD, RCS=Resp.Concezione Sociale, RSS=Resp.Sicurezza&Sorveglianza, R_FBS=Resp.FoBoSlot, SUP_FBS=Supervisor FoBoSlot, SUP_LG=Supervisor Live Game, R_LG=Resp.Live Game, CAS=Cassiere, REC=Receptionist, SA=Slot Attendant, GUARD=Guardaroba, BOK=Back Office, CR=Croupier, ISP=Ispettore tavolo, SIC=Sicurezza, SURV=Sorveglianza, CT=Counting Team, VP=Valet Parking, SECC=Sistema elettronico conteggio/controllo, AAGA=Apparecchi automatici da gioco, IR=Incident Report, SOL=Surveillance Operator Log, TRAKA=sistema gestione chiavi, QM=Quality Management, GD=giornata di gioco, CD=Cassa/Differenza cassa, PLG=prodotto lordo giochi, RDI=Rapporto Disciplinare Interno. Il programma cassa si chiama Asterix. Il programma controllo documenti alla reception si chiama Reception. Le postazioni NRT si chiamano Kiosk.\n\nCONTESTO NORMATIVO E PROCEDURALE DEL CASINÒ (usa per spiegare PERCHÉ una condotta è non conforme, citando la procedura QM specifica):\n\n• LRD - IDENTIFICAZIONE (QM 3-002): obbligo documento identità valido per transazioni a partire da CHF 3\'000 (da CHF 3\'000 in su, sotto i CHF 3\'000 non si identifica), apertura deposito gettoni e carta Lugano Class (senza soglia). CAS deve verificare se cliente già identificato nel programma LRD, richiedere documento, registrare dati anagrafici completi, scansionare documento, far firmare Form I/II per avente economicamente diritto, chiedere esplicitamente se è PEP. Se transazione ≥CHF 15\'000: SIC verifica KYC/PEP immediata. Se acquisto crediti/cambio valuta ≥CHF 30\'000: chiarimento speciale con SUP_FBS prima di procedere. Se riscossione ≥CHF 50\'000: idem. Smurfing (frazionamento per aggirare soglia) VIETATO. Al tavolo: CR deve avvisare ISP se importo da CHF 3\'000 in su; se ≥CHF 30\'000 rifiutare e indirizzare a cassa.\n\n• LRD - REGISTRAZIONE (QM 3-003): Form III obbligatorio per riscossioni ≥CHF 4\'000, acquisti gettoni/cashless ≥CHF 30\'000, movimenti deposito (senza soglia). Tutti i collaboratori devono segnalare comportamenti sospetti (Red Flags LRD) a SUP_FBS e RLRD.\n\n• CASSA (QM 5-001/5-002/5-003/5-004): CAS deve timbrare in divisa, recarsi alla postazione per via più breve senza soste. Pulizia mani obbligatoria (sfregamento palmi verso alto) ogni volta che tocca valori/corpo/entra-esce postazione. Valori sempre nel carrello quando si allontana. Apertura cassa con doppia chiave (CAS+SUP_FBS), conteggio fisico obbligatorio, confronto con formulario chiusura precedente. Discrepanza >CHF 10: contatta SUP_FBS. Transazioni sotto copertura CCTV (art.33 OCG-DFGP). Principio quattro occhi per transazioni interne. Verifica autenticità banconote con lampada UV. Carte credito: verificare autenticità, firma, documento; rifiutare carte aziendali. Hand Pay/Jackpot: documento identità obbligatorio, ricevuta firmata da cliente+CAS+SUP_FBS. Deposito gettoni: procedura LRD senza soglia, avvisare SURV e SUP_FBS.\n\n• RECEPTION (QM 4-001/4-002/4-004): REC deve verificare volto visibile, stato di decoro, no alterazione. Documento identità valido obbligatorio (≥18 anni). Inserimento dati nel sistema Reception (VETO). Divieto accesso assoluto: negare ingresso, informare SUP_FBS e SIC. Accesso con divieto gioco: compilare registro visitatori, targhetta Visitor, informare SUP_FBS e SURV. Carta Lugano Class: verifica periodica annuale obbligatoria, disabilitazione immediata se esclusione.\n\n• GUARDAROBA (QM 4-003): targhetta numerata per ogni capo, mostrare al cliente cosa si inserisce nel sacchetto. Convalida autosilo: verificare coincidenza orario ingresso autosilo/CLSA, importi >CHF 30: avvisare SUP_FBS. VIETATO convalidare biglietto autosilo per uso personale (nessun collaboratore). Cassa Ward: cassetta trasferita sempre chiusa.\n\n• CROUPIER/LIVE GAME (QM 8-001/8-002/8-003/8-014): CR deve presentarsi in divisa, pulizia mani obbligatoria (entrata/uscita tavolo, prima di toccare dolly, prima di scalinare numero, dopo prelevare gettoni da chipping machine, dopo aver toccato corpo). Apertura/chiusura tavolo: autorizzazione SURV, conta fisica ad alta voce, formulario firmato da ISP+CR, copia nel Drop Box. Principio quattro occhi (Gaming+SURV). Fill/Credit: conteggio ad alta voce, formulario firmato, corrispondenza sistema. Banconote CHF 200/1\'000 e TUTTE le EUR: controllo UV una a una. Gettoni mai passati mano a mano al cliente. Cambio gettoni colore ≥CHF 20: controllo chipping machine; ≥CHF 50: taglio stecche da 5. Errori pagamento/dispute: notifica SUP_LG e SURV, decisione solo dopo verifica CCTV. Circostanze particolari: SURV redige IR e salva immagini.\n\n• MATERIALE DI GIOCO (QM 8-011): accesso locale carte con doppio badge, SURV informata. Trasporto carte sotto CCTV con almeno 2 membri staff. Controllo carte prima del gioco: completezza, danni, lampada UV, marchio sicurezza. Carta danneggiata: SUP_LG taglia a metà, avvisa SURV. Distruzione carte: SIC+SUP_LG presenti, monitoraggio SURV. Gettoni colore: verifica giornaliera, differenza >10 pezzi: avviso SURV, indagine. Caduta materiale: annuncio ad alta voce, ISP chiama SURV.\n\n• SLOTS/AAGA (QM 7-001/7-002/7-003): SA deve mantenersi in movimento nell\'area assegnata, no soste non autorizzate. Mance: mostrare platealmente palmo verso alto verso CCTV, recarsi immediatamente al box raccolta, pulizia mani dopo. Hand Pay: verificare display AAGA, informare SURV e SUP_FBS per ≥CHF 15\'000. Jackpot: comunicare tipologia/numero AAGA/importo a SUP_FBS, richiedere documento identità. Swiss Jackpot: SURV e CFCG da avvisare, AAGA sigillata. Carte cashless: autorizzazione SUP_FBS per raccolta, separare con/senza credito. Contestazioni Kiosk: trattenere carta cashless, chiedere ricevuta failed, contattare SUP_FBS. Rimborso >CHF 2\'000: conferma collega/R_FBS. Jackpot >CHF 50\'000: modulo fax CFCG entro fine giornata.\n\n• CONCEZIONE SOCIALE (QM 2-001/2-002) - LGD 2017: Art.52: vietato giocare a minorenni, esclusi, impiegati, CDA/CFCG. Ingresso minorenne/escluso: notifica immediata SUP_FBS, SURV verifica video, IR dettagliato, comunicazione CFCG obbligatoria (art.43 LGD). Opuscoli: generici (≥26 residenti TI=Progetto Residenti), giovani (<25=Progetto Giovani). Riconoscimento precoce: notifica per criteri A (gravi: problemi finanziari, richiesta prestiti) e B (frequenza, recupero). Cassetta piano 0/spogliatoi o ufficio CS. Coinvolgere Supervisor per criteri A. Ogni notifica va fatta anche se cliente già segnalato. Monitoraggio: 8 settimane (max 16), osservazione mirata, REC avvisa colleghi ingresso monitorato. Colloqui: prevenzione (Supervisor) e comportamento (RCS/SRCS). Esclusione imposta (art.80 cpv 1/2): debiti, poste sproporzionate, servizi sociali. Esclusione volontaria (art.80 cpv 5): revoca dopo 3 mesi. Revoca (art.81): documentazione finanziaria+IRGA+Direzione, monitoraggio 8 sett. post-revoca. Allarme TI 50K: identificare possessore cashcard anonima.\n\n• SICUREZZA (QM 13-001/13-003/13-006/13-007/13-008): SIC in divisa, badge, chiavi TRAKA. Ronde regolari. Accesso locali solo con autorizzazione e badge personale. Chiavi: registrazione ogni transazione, restituzione TRAKA fine turno, perdita chiave=informare RSS immediatamente. Personale esterno: solo con comunicazione scritta del Resp.settore. Esclusioni: inserimento VETO immediato con motivo e articolo di legge. Gestione conflitti: CR resta concentrato sul gioco, SUP_LG/SUP_FBS informano SURV e SIC prima di intervenire, colloquio in VIP Room. Denaro falso: segnalare immediatamente a SIC, trattenere banconota e cliente, chiamare Polizia, VIETATO restituire banconota falsa.\n\n• SORVEGLIANZA/CCTV (QM 14-001/14-002/14-003/14-004): SURV deve monitorare attività di gioco, redigere IR per ogni irregolarità/mancanza procedurale, salvare filmati CCTV. Camera check obbligatorio ogni turno. Guasto CCTV prima apertura: tavoli/AAGA NON in esercizio. Guasto durante giornata: interrompere esercizio fine unità di gioco. Guasto CCTV: comunicazione CFCG il giorno stesso. Accesso locale CCTV solo SURV/SIC. Registrazioni conservate minimo 4 settimane, VIETATO cancellare senza autorizzazione CFCG. Mancata segnalazione anomalie=negligenza/coinvolgimento diretto=procedimento disciplinare.\n\n• PRESENZE/HR (QM 16-003/16-005): timbratura entrata/uscita obbligatoria. Malattia: informare tempestivamente + certificato medico. Corsi aggiornamento obbligatori. Sistema disciplinare: allineamento verbale → allineamento scritto → RDI 1° → RDI 2° (può portare a disdetta). Dal 3° allineamento stesso motivo scatta RDI automatico.\n\n• CAVEAU/BACKOFFICE (QM 6-002): apertura sempre con principio quattro occhi (BOK+SIC). Conteggio fisico, confronto formulario chiusura precedente. Trapasso straordinario: avvisare SURV e SIC prima, registrare nel sistema. Assegni pre-firmati: accesso solo a 2 persone delegate. Chiavi nel TRAKA prima di uscire.\n\n• VALET PARKING: verifica tagliando/numero prima della consegna veicolo. Errore=rischio patrimoniale/sicurezza cliente.\n\n• REGOLE GENERALI: tutte le operazioni sotto CCTV. Obblighi comunicazione (art.43 LGD): segnalare immediatamente eventi che pregiudicano sicurezza/trasparenza giochi. Nuovi dipendenti: formazione LRD prima dell\'impiego, refresh biennale. Dati personali (QM 1-002): documentazione buona reputazione obbligatoria, mancata presentazione=disdetta contratto.\n\nCAMPO non_conformita (STRINGA):\n- PIÙ PARAGRAFI separati da \\n\\n\n- Par 1: Descrizione del FATTO (cosa, quando, dove, chi)\n- Par 2: Spiega PERCHÉ è una non conformità, citando il regolamento/procedura/legge specifica violata (LRD, procedure interne, organigramma, ecc.)\n- Par 3 (SOLO se LOG/IR nei dati): "Per i dettagli operativi si faccia riferimento al LOG / IR {numero}." Se NON c\'è LOG/IR: ometti questo paragrafo, NON scrivere "non disponibile"\n- NON inventare fatti non presenti nei dati\n- Se CCTV nei dati: "Dalla revisione delle immagini CCTV risulta che..."\n\nCAMPO obiettivo (STRINGA):\n- Inizia con "Si invita formalmente il collaboratore a:"\n- Elenco puntato con \\n- per ogni punto\n- Minimo 3 punti SPECIFICI alla situazione\n- RIPRENDI OGNI dettaglio/indicazione dell\'operatore come punto\n\nCAMPO scadenza: SEMPRE "A partire da subito"\nCAMPO collaboratore: Sig./Sig.ra + Cognome Nome\n\nREGOLE: donna→la collaboratrice/l\'impiegata, uomo→il collaboratore/l\'impiegato. Menziona reparto. Importi: CHF X\'XXX.·\nScrivi come un RESPONSABILE DI SETTORE esperto che lavora nel casinò ogni giorno, NON come un\'intelligenza artificiale. Il testo deve sembrare scritto da una persona reale. Evita frasi generiche o troppo perfette. Usa il linguaggio naturale e diretto di chi conosce le procedure. Per le soglie usa SEMPRE "pari o superiore a" (MAI "superiore a")\n\nFORMATO: JSON con 4 campi STRINGA: {"collaboratore":"...","non_conformita":"...","obiettivo":"...","scadenza":"..."}\n\nDATI:\n' +
+      "Sei un assistente aziendale esperto per Casinò Lugano SA (casa da gioco in Svizzera, regolata dalla CFCG - Commissione Federale delle Case da Gioco). Genera un \"Rilevamento di non conformità e colloquio di allineamento\".\nTesto: formale, chiaro, oggettivo, solo fatti.\n\nABBREVIAZIONI: DIR=Direttore, CO=Compliance, RLRD=Resp.LRD, RCS=Resp.Concezione Sociale, RSS=Resp.Sicurezza&Sorveglianza, R_FBS=Resp.FoBoSlot, SUP_FBS=Supervisor FoBoSlot, SUP_LG=Supervisor Live Game, R_LG=Resp.Live Game, CAS=Cassiere, REC=Receptionist, SA=Slot Attendant, GUARD=Guardaroba, BOK=Back Office, CR=Croupier, ISP=Ispettore tavolo, SIC=Sicurezza, SURV=Sorveglianza, CT=Counting Team, VP=Valet Parking, SECC=Sistema elettronico conteggio/controllo, AAGA=Apparecchi automatici da gioco, IR=Incident Report, SOL=Surveillance Operator Log, TRAKA=sistema gestione chiavi, QM=Quality Management, GD=giornata di gioco, CD=Cassa/Differenza cassa, PLG=prodotto lordo giochi, RDI=Rapporto Disciplinare Interno. Il programma cassa si chiama Asterix. Il programma controllo documenti alla reception si chiama Reception. Le postazioni NRT si chiamano Kiosk.\n\nCONTESTO NORMATIVO E PROCEDURALE DEL CASINÒ (usa per spiegare PERCHÉ una condotta è non conforme, citando la procedura QM specifica):\n\n• LRD - IDENTIFICAZIONE (QM 3-002): obbligo documento identità valido per transazioni a partire da CHF 3'000 (da CHF 3'000 in su, sotto i CHF 3'000 non si identifica), apertura deposito gettoni e carta Lugano Class (senza soglia). CAS deve verificare se cliente già identificato nel programma LRD, richiedere documento, registrare dati anagrafici completi, scansionare documento, far firmare Form I/II per avente economicamente diritto, chiedere esplicitamente se è PEP. Se transazione ≥CHF 15'000: SIC verifica KYC/PEP immediata. Se acquisto crediti/cambio valuta ≥CHF 30'000: chiarimento speciale con SUP_FBS prima di procedere. Se riscossione ≥CHF 50'000: idem. Smurfing (frazionamento per aggirare soglia) VIETATO. Al tavolo: CR deve avvisare ISP se importo da CHF 3'000 in su; se ≥CHF 30'000 rifiutare e indirizzare a cassa.\n\n• LRD - REGISTRAZIONE (QM 3-003): Form III obbligatorio per riscossioni ≥CHF 4'000, acquisti gettoni/cashless ≥CHF 30'000, movimenti deposito (senza soglia). Tutti i collaboratori devono segnalare comportamenti sospetti (Red Flags LRD) a SUP_FBS e RLRD.\n\n• CASSA (QM 5-001/5-002/5-003/5-004): CAS deve timbrare in divisa, recarsi alla postazione per via più breve senza soste. Pulizia mani obbligatoria (sfregamento palmi verso alto) ogni volta che tocca valori/corpo/entra-esce postazione. Valori sempre nel carrello quando si allontana. Apertura cassa con doppia chiave (CAS+SUP_FBS), conteggio fisico obbligatorio, confronto con formulario chiusura precedente. Discrepanza >CHF 10: contatta SUP_FBS. Transazioni sotto copertura CCTV (art.33 OCG-DFGP). Principio quattro occhi per transazioni interne. Verifica autenticità banconote con lampada UV. Carte credito: verificare autenticità, firma, documento; rifiutare carte aziendali. Hand Pay/Jackpot: documento identità obbligatorio, ricevuta firmata da cliente+CAS+SUP_FBS. Deposito gettoni: procedura LRD senza soglia, avvisare SURV e SUP_FBS.\n\n• RECEPTION (QM 4-001/4-002/4-004): REC deve verificare volto visibile, stato di decoro, no alterazione. Documento identità valido obbligatorio (≥18 anni). Inserimento dati nel sistema Reception (VETO). Divieto accesso assoluto: negare ingresso, informare SUP_FBS e SIC. Accesso con divieto gioco: compilare registro visitatori, targhetta Visitor, informare SUP_FBS e SURV. Carta Lugano Class: verifica periodica annuale obbligatoria, disabilitazione immediata se esclusione.\n\n• GUARDAROBA (QM 4-003): targhetta numerata per ogni capo, mostrare al cliente cosa si inserisce nel sacchetto. Convalida autosilo: verificare coincidenza orario ingresso autosilo/CLSA, importi >CHF 30: avvisare SUP_FBS. VIETATO convalidare biglietto autosilo per uso personale (nessun collaboratore). Cassa Ward: cassetta trasferita sempre chiusa.\n\n• CROUPIER/LIVE GAME (QM 8-001/8-002/8-003/8-014): CR deve presentarsi in divisa, pulizia mani obbligatoria (entrata/uscita tavolo, prima di toccare dolly, prima di scalinare numero, dopo prelevare gettoni da chipping machine, dopo aver toccato corpo). Apertura/chiusura tavolo: autorizzazione SURV, conta fisica ad alta voce, formulario firmato da ISP+CR, copia nel Drop Box. Principio quattro occhi (Gaming+SURV). Fill/Credit: conteggio ad alta voce, formulario firmato, corrispondenza sistema. Banconote CHF 200/1'000 e TUTTE le EUR: controllo UV una a una. Gettoni mai passati mano a mano al cliente. Cambio gettoni colore ≥CHF 20: controllo chipping machine; ≥CHF 50: taglio stecche da 5. Errori pagamento/dispute: notifica SUP_LG e SURV, decisione solo dopo verifica CCTV. Circostanze particolari: SURV redige IR e salva immagini.\n\n• MATERIALE DI GIOCO (QM 8-011): accesso locale carte con doppio badge, SURV informata. Trasporto carte sotto CCTV con almeno 2 membri staff. Controllo carte prima del gioco: completezza, danni, lampada UV, marchio sicurezza. Carta danneggiata: SUP_LG taglia a metà, avvisa SURV. Distruzione carte: SIC+SUP_LG presenti, monitoraggio SURV. Gettoni colore: verifica giornaliera, differenza >10 pezzi: avviso SURV, indagine. Caduta materiale: annuncio ad alta voce, ISP chiama SURV.\n\n• SLOTS/AAGA (QM 7-001/7-002/7-003): SA deve mantenersi in movimento nell'area assegnata, no soste non autorizzate. Mance: mostrare platealmente palmo verso alto verso CCTV, recarsi immediatamente al box raccolta, pulizia mani dopo. Hand Pay: verificare display AAGA, informare SURV e SUP_FBS per ≥CHF 15'000. Jackpot: comunicare tipologia/numero AAGA/importo a SUP_FBS, richiedere documento identità. Swiss Jackpot: SURV e CFCG da avvisare, AAGA sigillata. Carte cashless: autorizzazione SUP_FBS per raccolta, separare con/senza credito. Contestazioni Kiosk: trattenere carta cashless, chiedere ricevuta failed, contattare SUP_FBS. Rimborso >CHF 2'000: conferma collega/R_FBS. Jackpot >CHF 50'000: modulo fax CFCG entro fine giornata.\n\n• CONCEZIONE SOCIALE (QM 2-001/2-002) - LGD 2017: Art.52: vietato giocare a minorenni, esclusi, impiegati, CDA/CFCG. Ingresso minorenne/escluso: notifica immediata SUP_FBS, SURV verifica video, IR dettagliato, comunicazione CFCG obbligatoria (art.43 LGD). Opuscoli: generici (≥26 residenti TI=Progetto Residenti), giovani (<25=Progetto Giovani). Riconoscimento precoce: notifica per criteri A (gravi: problemi finanziari, richiesta prestiti) e B (frequenza, recupero). Cassetta piano 0/spogliatoi o ufficio CS. Coinvolgere Supervisor per criteri A. Ogni notifica va fatta anche se cliente già segnalato. Monitoraggio: 8 settimane (max 16), osservazione mirata, REC avvisa colleghi ingresso monitorato. Colloqui: prevenzione (Supervisor) e comportamento (RCS/SRCS). Esclusione imposta (art.80 cpv 1/2): debiti, poste sproporzionate, servizi sociali. Esclusione volontaria (art.80 cpv 5): revoca dopo 3 mesi. Revoca (art.81): documentazione finanziaria+IRGA+Direzione, monitoraggio 8 sett. post-revoca. Allarme TI 50K: identificare possessore cashcard anonima.\n\n• SICUREZZA (QM 13-001/13-003/13-006/13-007/13-008): SIC in divisa, badge, chiavi TRAKA. Ronde regolari. Accesso locali solo con autorizzazione e badge personale. Chiavi: registrazione ogni transazione, restituzione TRAKA fine turno, perdita chiave=informare RSS immediatamente. Personale esterno: solo con comunicazione scritta del Resp.settore. Esclusioni: inserimento VETO immediato con motivo e articolo di legge. Gestione conflitti: CR resta concentrato sul gioco, SUP_LG/SUP_FBS informano SURV e SIC prima di intervenire, colloquio in VIP Room. Denaro falso: segnalare immediatamente a SIC, trattenere banconota e cliente, chiamare Polizia, VIETATO restituire banconota falsa.\n\n• SORVEGLIANZA/CCTV (QM 14-001/14-002/14-003/14-004): SURV deve monitorare attività di gioco, redigere IR per ogni irregolarità/mancanza procedurale, salvare filmati CCTV. Camera check obbligatorio ogni turno. Guasto CCTV prima apertura: tavoli/AAGA NON in esercizio. Guasto durante giornata: interrompere esercizio fine unità di gioco. Guasto CCTV: comunicazione CFCG il giorno stesso. Accesso locale CCTV solo SURV/SIC. Registrazioni conservate minimo 4 settimane, VIETATO cancellare senza autorizzazione CFCG. Mancata segnalazione anomalie=negligenza/coinvolgimento diretto=procedimento disciplinare.\n\n• PRESENZE/HR (QM 16-003/16-005): timbratura entrata/uscita obbligatoria. Malattia: informare tempestivamente + certificato medico. Corsi aggiornamento obbligatori. Sistema disciplinare: allineamento verbale → allineamento scritto → RDI 1° → RDI 2° (può portare a disdetta). Dal 3° allineamento stesso motivo scatta RDI automatico.\n\n• CAVEAU/BACKOFFICE (QM 6-002): apertura sempre con principio quattro occhi (BOK+SIC). Conteggio fisico, confronto formulario chiusura precedente. Trapasso straordinario: avvisare SURV e SIC prima, registrare nel sistema. Assegni pre-firmati: accesso solo a 2 persone delegate. Chiavi nel TRAKA prima di uscire.\n\n• VALET PARKING: verifica tagliando/numero prima della consegna veicolo. Errore=rischio patrimoniale/sicurezza cliente.\n\n• REGOLE GENERALI: tutte le operazioni sotto CCTV. Obblighi comunicazione (art.43 LGD): segnalare immediatamente eventi che pregiudicano sicurezza/trasparenza giochi. Nuovi dipendenti: formazione LRD prima dell'impiego, refresh biennale. Dati personali (QM 1-002): documentazione buona reputazione obbligatoria, mancata presentazione=disdetta contratto.\n\nCAMPO non_conformita (STRINGA):\n- PIÙ PARAGRAFI separati da \\n\\n\n- Par 1: Descrizione del FATTO (cosa, quando, dove, chi)\n- Par 2: Spiega PERCHÉ è una non conformità, citando il regolamento/procedura/legge specifica violata (LRD, procedure interne, organigramma, ecc.)\n- Par 3 (SOLO se LOG/IR nei dati): \"Per i dettagli operativi si faccia riferimento al LOG / IR {numero}.\" Se NON c'è LOG/IR: ometti questo paragrafo, NON scrivere \"non disponibile\"\n- NON inventare fatti non presenti nei dati\n- Se CCTV nei dati: \"Dalla revisione delle immagini CCTV risulta che...\"\n\nCAMPO obiettivo (STRINGA):\n- Inizia con \"Si invita formalmente il collaboratore a:\"\n- Elenco puntato con \\n- per ogni punto\n- Minimo 3 punti SPECIFICI alla situazione\n- RIPRENDI OGNI dettaglio/indicazione dell'operatore come punto\n\nCAMPO scadenza: SEMPRE \"A partire da subito\"\nCAMPO collaboratore: Sig./Sig.ra + il segnaposto [COLLABORATORE] cosi' com'e' (il nome vero lo rimette il programma)" +
+      _AI_REGOLA_SEGNAPOSTO +
+      '\n\nREGOLE: donna→la collaboratrice/l\'impiegata, uomo→il collaboratore/l\'impiegato. Menziona reparto. Importi: CHF X\'XXX.·\nScrivi come un RESPONSABILE DI SETTORE esperto che lavora nel casinò ogni giorno, NON come un\'intelligenza artificiale. Il testo deve sembrare scritto da una persona reale. Evita frasi generiche o troppo perfette. Usa il linguaggio naturale e diretto di chi conosce le procedure. Per le soglie usa SEMPRE "pari o superiore a" (MAI "superiore a")\n\nFORMATO: JSON con 4 campi STRINGA: {"collaboratore":"...","non_conformita":"...","obiettivo":"...","scadenza":"..."}\n\nDATI:\n' +
       prompt;
   } else if (tipo === 'apprezzamento') {
     sysPrompt =
-      'Sei un responsabile di settore esperto del Casinò Lugano SA (CLSA). Scrivi come una persona REALE, NON come un\'AI. Genera un "Colloquio di apprezzamento" (procedura QM 16-005).\nTono: formale ma naturale, sintetico, professionale. Evidenzia il contributo positivo con fatti concreti. Frasi brevi e dirette come le scriverebbe un responsabile di settore.\n\nAbbreviazioni: DIR=Direttore, SUP_FBS=Supervisor FoBoSlot, SUP_LG=Supervisor Live Game, CAS=Cassiere, REC=Receptionist, SA=Slot Attendant, CR=Croupier, ISP=Ispettore, SIC=Sicurezza, SURV=Sorveglianza, AAGA=Apparecchi automatici da gioco.\n\nRispondi SOLO con un JSON valido con questi campi:\n- collaboratore: nome con prefisso Sig./Sig.ra\n- descrizione: testo del merito/apprezzamento\n- osservazioni: breve nota di apprezzamento del Resp. Settore\n\nDATI DA ELABORARE:\n' +
+      "Sei un responsabile di settore esperto del Casinò Lugano SA (CLSA). Scrivi come una persona REALE, NON come un'AI. Genera un \"Colloquio di apprezzamento\" (procedura QM 16-005).\nTono: formale ma naturale, sintetico, professionale. Evidenzia il contributo positivo con fatti concreti. Frasi brevi e dirette come le scriverebbe un responsabile di settore.\n\nAbbreviazioni: DIR=Direttore, SUP_FBS=Supervisor FoBoSlot, SUP_LG=Supervisor Live Game, CAS=Cassiere, REC=Receptionist, SA=Slot Attendant, CR=Croupier, ISP=Ispettore, SIC=Sicurezza, SURV=Sorveglianza, AAGA=Apparecchi automatici da gioco.\n\nRispondi SOLO con un JSON valido con questi campi:\n- collaboratore: Sig./Sig.ra + il segnaposto [COLLABORATORE] cosi' com'e' (il nome vero lo rimette il programma)\n- descrizione: testo del merito/apprezzamento\n- osservazioni: breve nota di apprezzamento del Resp. Settore" +
+      _AI_REGOLA_SEGNAPOSTO +
+      '\n\nDATI DA ELABORARE:\n' +
       prompt;
   }
-  if (_moduloFotoB64)
-    sysPrompt +=
-      '\n\nHo allegato una foto che mostra la situazione (screenshot, documento, log, schermata). Analizzala e usa le informazioni visibili per compilare i campi. Integra foto e testo.';
   try {
-    let model = groqModel('json');
-    let messages;
-    let bodyOpts = { temperature: 0.2, top_p: 0.9, max_tokens: 1500 };
-    if (_moduloFotoB64) {
-      model = groqModel('vision');
-      messages = [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: sysPrompt },
-            { type: 'image_url', image_url: { url: _moduloFotoB64 } },
-          ],
-        },
-      ];
-    } else {
-      messages = [{ role: 'user', content: sysPrompt }];
-      bodyOpts.response_format = { type: 'json_object' };
-    }
+    // solo testo anonimizzato: la foto resta sul dispositivo
+    const model = groqModel('json');
+    const messages = [{ role: 'user', content: sysPrompt }];
+    const bodyOpts = { temperature: 0.2, top_p: 0.9, max_tokens: 1500, response_format: { type: 'json_object' } };
     let txt = await _groqChat(Object.assign({ model: model, messages: messages }, bodyOpts));
     txt = txt
       .replace(/```json\s*/g, '')
@@ -2099,6 +2199,10 @@ async function generaModuloAI(tipo) {
       console.error('JSON parse error:', txt);
       throw new Error('Risposta AI non valida');
     }
+    // i segnaposto tornano nomi veri solo qui, in locale
+    Object.keys(parsed).forEach((k) => {
+      if (typeof parsed[k] === 'string') parsed[k] = _aiRipristina(parsed[k]);
+    });
     if (parsed.collaboratore) {
       const el = document.getElementById('mod-collaboratore');
       if (el) el.value = parsed.collaboratore;
@@ -2163,7 +2267,7 @@ function assistenteFotoPreview(inp) {
     _assistFotoB64 = e.target.result;
     document.getElementById('assist-foto-img').src = _assistFotoB64;
     document.getElementById('assist-foto-preview').style.display = 'block';
-    document.getElementById('assist-foto-name').textContent = file.name;
+    document.getElementById('assist-foto-name').textContent = file.name + " (resta locale, non inviata all'AI)";
     document.getElementById('assist-foto-remove').style.display = 'inline-block';
   };
   reader.readAsDataURL(file);
@@ -2177,8 +2281,8 @@ function assistenteFotoRimuovi() {
 }
 async function assistenteGenera() {
   const input = document.getElementById('assist-input').value.trim();
-  if (!input && !_assistFotoB64) {
-    toast('Scrivi qualcosa o allega una foto');
+  if (!input) {
+    toast("Scrivi il testo: la foto resta locale e non viene inviata all'AI");
     return;
   }
   if (!groqKey) {
@@ -2194,7 +2298,8 @@ async function assistenteGenera() {
   btn.disabled = true;
   btn.textContent = 'Elaborazione...';
   if (status)
-    status.textContent = _assistFotoB64 ? "L'AI sta analizzando foto e testo..." : "L'AI sta riscrivendo il testo...";
+    status.textContent =
+      "L'AI sta riscrivendo il testo..." + (_assistFotoB64 ? ' (la foto resta locale, non viene inviata)' : '');
   const tipoLabels = {
     mail_formale: 'una mail formale (destinatario: Direzione, HR, CFCG o ente esterno)',
     mail_colleghi: 'una comunicazione interna tra colleghi',
@@ -2235,27 +2340,10 @@ async function assistenteGenera() {
     promptText =
       'Sei un correttore di bozze professionale. Correggi SOLO grammatica, ortografia, punteggiatura e refusi del testo seguente. NON riformulare le frasi, NON cambiare stile o tono, NON aggiungere né togliere contenuti. Rispondi SOLO con il testo corretto, senza commenti.' +
       (linguaLabels[lingua] || '');
-  if (_assistFotoB64)
-    promptText +=
-      '\n\nHo allegato una foto. Analizzala e integra le informazioni visibili nella foto con il testo scritto. Se la foto mostra documenti, schermate, situazioni o dettagli rilevanti, includili nel testo riscritto.';
-  promptText +=
-    '\n\nTesto originale:\n' + (input || '[Vedi foto allegata - descrivi e riscrivi in base a ciò che vedi]');
-  let model = groqModel('testo');
-  let messages;
-  if (_assistFotoB64) {
-    model = groqModel('vision');
-    messages = [
-      {
-        role: 'user',
-        content: [
-          { type: 'text', text: promptText },
-          { type: 'image_url', image_url: { url: _assistFotoB64 } },
-        ],
-      },
-    ];
-  } else {
-    messages = [{ role: 'user', content: promptText }];
-  }
+  // solo testo anonimizzato: nomi in anagrafica -> segnaposto, foto mai inviata
+  promptText += _AI_REGOLA_SEGNAPOSTO + '\n\nTesto originale:\n' + _aiAnonimizza(input, []);
+  const model = groqModel('testo');
+  const messages = [{ role: 'user', content: promptText }];
   try {
     const result = await _groqChat({
       model: model,
@@ -2263,7 +2351,7 @@ async function assistenteGenera() {
       temperature: 0.3,
       max_tokens: 2000,
     });
-    document.getElementById('assist-output').value = result.trim();
+    document.getElementById('assist-output').value = _aiRipristina(result).trim();
     document.getElementById('assist-output-wrap').style.display = 'block';
     if (status) status.innerHTML = '<span style="color:#2c6e49">Testo riscritto!</span>';
     toast('Testo riscritto!');

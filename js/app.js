@@ -203,21 +203,22 @@ function switchPage(name) {
 }
 
 // TIPI
+// Tornano false se il salvataggio e' rifiutato (errore gia' mostrato)
 async function saveTipiP() {
-  await setImp('tipi_personalizzati', JSON.stringify(tipiPersonalizzati));
+  return salvaImp('tipi_personalizzati', JSON.stringify(tipiPersonalizzati));
 }
 async function saveColoriOverride() {
-  await setImp('colori_override', JSON.stringify(coloriOverride));
+  return salvaImp('colori_override', JSON.stringify(coloriOverride));
 }
 async function saveOperatori() {
-  await setImp('operatori_lista', JSON.stringify(operatoriSalvati));
+  return salvaImp('operatori_lista', JSON.stringify(operatoriSalvati));
 }
 async function cambiaColoreTipo(nome, colore) {
   coloriOverride[nome] = colore;
   const tp = tipiPersonalizzati.find((t) => t.nome === nome);
   if (tp) tp.colore = colore;
-  await saveColoriOverride();
-  if (tp) await saveTipiP();
+  if (!(await saveColoriOverride())) return;
+  if (tp && !(await saveTipiP())) return;
   renderTipiUI();
 }
 async function aggiungiTipoPersonalizzato() {
@@ -232,7 +233,7 @@ async function aggiungiTipoPersonalizzato() {
     return;
   }
   tipiPersonalizzati.push({ nome: n, colore: c });
-  await saveTipiP();
+  if (!(await saveTipiP())) return;
   logAzione('Tipo aggiunto', n);
   document.getElementById('new-tipo-nome').value = '';
   renderTipiUI();
@@ -242,21 +243,21 @@ async function rimuoviTipo(n) {
   if (!confirm('Rimuovere "' + n + '"?')) return;
   tipiPersonalizzati = tipiPersonalizzati.filter((t) => t.nome !== n);
   delete coloriOverride[n];
-  await saveTipiP();
-  await saveColoriOverride();
+  if (!(await saveTipiP())) return;
+  if (!(await saveColoriOverride())) return;
   renderTipiUI();
   toast('Rimosso');
 }
 async function nascondiTipoDefault(n) {
   if (!confirm('Nascondere il tipo "' + n + '"? Le registrazioni esistenti non verranno eliminate.')) return;
   tipiNascosti.push(n);
-  await setImp('tipi_nascosti', JSON.stringify(tipiNascosti));
+  if (!(await salvaImp('tipi_nascosti', JSON.stringify(tipiNascosti)))) return;
   renderTipiUI();
   toast('Tipo "' + n + '" nascosto');
 }
 async function ripristinaTipoDefault(n) {
   tipiNascosti = tipiNascosti.filter((t) => t !== n);
-  await setImp('tipi_nascosti', JSON.stringify(tipiNascosti));
+  if (!(await salvaImp('tipi_nascosti', JSON.stringify(tipiNascosti)))) return;
   renderTipiUI();
   toast('Tipo "' + n + '" ripristinato');
 }
@@ -327,7 +328,7 @@ function renderTipiUI() {
         '<button class="tipo-tag' +
         (tipoSelezionato === t.nome ? ' active' : '') +
         '" data-tipo="' +
-        esc(t.nome) +
+        escP(t.nome) +
         '" style="' +
         (tipoSelezionato === t.nome ? 'background:' + t.colore + ';border-color:' + t.colore : '') +
         '">' +
@@ -370,7 +371,7 @@ function renderTipiUI() {
         '<button class="modal-tipo-tag' +
         (modalTipoSel === t.nome ? ' selected' : '') +
         '" data-tipo="' +
-        esc(t.nome) +
+        escP(t.nome) +
         '" style="' +
         (modalTipoSel === t.nome ? 'background:' + t.colore + ';border-color:' + t.colore : '') +
         '">' +
@@ -452,7 +453,20 @@ function renderTipiUI() {
     s.id = 'dyn-styles';
     document.head.appendChild(s);
   }
-  s.textContent = tutti.map((t) => '.badge-' + t.nome.replace(/ /g, '-') + '{background:' + t.colore + '}').join('\n');
+  // Selettore e colore vanno protetti: un nome con "}" o un colore non valido
+  // rompevano l'intero foglio di stile dinamico (tutti i badge senza colore).
+  // CSS.escape tiene la classe identica a quella applicata in moduli.js
+  // ('badge-' + nome con trattini), anche con accenti o maiuscole
+  s.textContent = tutti
+    .map(
+      (t) =>
+        '.' +
+        CSS.escape('badge-' + t.nome.replace(/ /g, '-')) +
+        '{background:' +
+        String(t.colore || '').replace(/[^#a-zA-Z0-9(),.%\s-]/g, '') +
+        '}',
+    )
+    .join('\n');
 }
 
 // CAPITALIZZAZIONE NOMI

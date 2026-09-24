@@ -239,8 +239,7 @@ async function salva() {
 }
 function _suggerisciFollowUp(nome, testo) {
   const b = document.getElementById('pwd-modal-content');
-  const _ne = nome.replace(/'/g, "\\'");
-  const _te = escP(testo.substring(0, 80).replace(/'/g, "\\'"));
+  const testoBreve = testo.substring(0, 80);
   const fra3 = new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0];
   const fra7 = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
   const fra14 = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
@@ -251,46 +250,34 @@ function _suggerisciFollowUp(nome, testo) {
       month: '2-digit',
     });
   }
+  const opzioni = [
+    [fra3, 'Fra 3 giorni'],
+    [fra7, 'Fra 1 settimana'],
+    [fra14, 'Fra 2 settimane'],
+    [fra30, 'Fra 1 mese'],
+  ];
+  // Niente dati dentro onclick: un a-capo o una virgoletta nel testo della
+  // richiesta rendeva morti tutti i bottoni. Nome e testo restano in chiusura.
   b.innerHTML =
     '<h3>Scadenza follow-up</h3><p style="margin-bottom:14px">Richiesta registrata per <strong>' +
     escP(nome) +
-    '</strong>. Entro quando va risolta?</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px"><button class="btn-salva" style="background:var(--accent2);padding:10px" onclick="_creaFollowUp(\'' +
-    _ne +
-    "','" +
-    _te +
-    "','" +
-    fra3 +
-    '\')">Fra 3 giorni<br><small style="opacity:.7">' +
-    _fmtD(fra3) +
-    '</small></button><button class="btn-salva" style="background:var(--accent2);padding:10px" onclick="_creaFollowUp(\'' +
-    _ne +
-    "','" +
-    _te +
-    "','" +
-    fra7 +
-    '\')">Fra 1 settimana<br><small style="opacity:.7">' +
-    _fmtD(fra7) +
-    '</small></button><button class="btn-salva" style="background:var(--accent2);padding:10px" onclick="_creaFollowUp(\'' +
-    _ne +
-    "','" +
-    _te +
-    "','" +
-    fra14 +
-    '\')">Fra 2 settimane<br><small style="opacity:.7">' +
-    _fmtD(fra14) +
-    '</small></button><button class="btn-salva" style="background:var(--accent2);padding:10px" onclick="_creaFollowUp(\'' +
-    _ne +
-    "','" +
-    _te +
-    "','" +
-    fra30 +
-    '\')">Fra 1 mese<br><small style="opacity:.7">' +
-    _fmtD(fra30) +
-    '</small></button></div><div class="pwd-field"><label>Oppure data personalizzata</label><input type="text" id="followup-data" placeholder="Seleziona..." readonly style="cursor:pointer"></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="_creaFollowUp(\'' +
-    _ne +
-    "','" +
-    _te +
-    '\')">Crea con data personalizzata</button><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Nessun promemoria</button></div>';
+    '</strong>. Entro quando va risolta?</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">' +
+    opzioni
+      .map(
+        ([iso, label]) =>
+          '<button class="btn-salva" style="background:var(--accent2);padding:10px" data-followup-data="' +
+          iso +
+          '">' +
+          label +
+          '<br><small style="opacity:.7">' +
+          _fmtD(iso) +
+          '</small></button>',
+      )
+      .join('') +
+    '</div><div class="pwd-field"><label>Oppure data personalizzata</label><input type="text" id="followup-data" placeholder="Seleziona..." readonly style="cursor:pointer"></div><div class="pwd-modal-btns"><button class="btn-modal-ok" data-followup-data="">Crea con data personalizzata</button><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Nessun promemoria</button></div>';
+  b.querySelectorAll('[data-followup-data]').forEach((btn) => {
+    btn.addEventListener('click', () => _creaFollowUp(nome, testoBreve, btn.dataset.followupData));
+  });
   document.getElementById('pwd-modal').classList.remove('hidden');
   if (window.flatpickr)
     flatpickr('#followup-data', {
@@ -719,6 +706,7 @@ function renderScadenzeBanner() {
   const oggi = new Date().toISOString().split('T')[0];
   const attive = scadenzeCache.filter((s) => !s.completata);
   const scadute = attive.filter((s) => s.data_scadenza < oggi);
+  const diOggi = attive.filter((s) => s.data_scadenza === oggi);
   const prossime = attive.filter((s) => s.data_scadenza > oggi);
   const tot = attive.length;
   if (!tot) {
@@ -727,9 +715,13 @@ function renderScadenzeBanner() {
     return;
   }
   banner.classList.remove('hidden');
-  banner.innerHTML =
-    (scadute.length ? '<i class="icx icx-avviso"></i> ' + scadute.length + ' scadenza/e scaduta/e! ' : '') +
-    (prossime.length ? prossime.length + ' in arrivo' : '');
+  // Le scadenze di oggi contano nel totale: senza il loro gruppo la striscia
+  // compariva vuota quando c'erano solo quelle
+  const parti = [];
+  if (scadute.length) parti.push('<i class="icx icx-avviso"></i> ' + scadute.length + ' scadenza/e scaduta/e!');
+  if (diOggi.length) parti.push(diOggi.length + ' in scadenza oggi');
+  if (prossime.length) parti.push(prossime.length + ' in arrivo');
+  banner.innerHTML = parti.join(' ');
   banner.style.background = scadute.length ? 'var(--accent)' : 'var(--accent2)';
 }
 function toggleScadenzeDropdown() {

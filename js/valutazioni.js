@@ -115,8 +115,11 @@ function _suggerisciAree(nome) {
   // Versatilità dal livello multidisciplinare
   const c = getCollaboratoriReparto().find((x) => x.nome.toLowerCase() === nome.toLowerCase());
   if (c && typeof livelloDiCollaboratore === 'function') {
+    // 100% al livello massimo della scala del settore (Slots ne ha 6), 40% senza
+    // livello, in proporzione nel mezzo: la scala non e' fissa a tre
     const lv = livelloDiCollaboratore(c);
-    sug.versatilita = lv >= 3 ? 100 : lv === 2 ? 80 : lv === 1 ? 60 : 40;
+    const lvMax = typeof _lvMaxReparto === 'function' ? _lvMaxReparto() : 3;
+    sug.versatilita = Math.min(100, 40 + Math.round((60 * lv) / lvMax));
   }
   // Affidabilità e disponibilità (voce unica): metà dal tasso di errori/ammonimenti
   // degli ultimi 12 mesi, metà da coperture/rifiuti registrati nei punti
@@ -388,13 +391,13 @@ function apriValutazioneEditor(nome, anno, tipo) {
       .join('') +
     '</select>' +
     '<span class="filter-label">Valutatore</span><input type="text" id="val-valutatore" value="' +
-    escP((esistente && esistente.valutatore) || getOperatore() || '') +
+    _escAttr((esistente && esistente.valutatore) || getOperatore() || '') +
     '" style="width:200px;padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)">' +
     '<span class="filter-label">Settore</span><input type="text" id="val-settore" value="' +
-    escP(((esistente && esistente.dati_personali) || {}).settore || '') +
+    _escAttr(((esistente && esistente.dati_personali) || {}).settore || '') +
     '" placeholder="Es: Foboslot" style="width:130px;padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)">' +
     '<span class="filter-label">Funzione</span><input type="text" id="val-funzione" value="' +
-    escP(((esistente && esistente.dati_personali) || {}).funzione || '') +
+    _escAttr(((esistente && esistente.dati_personali) || {}).funzione || '') +
     '" placeholder="Es: Casinò Host" style="width:150px;padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"></div>';
   let gruppoCorr = '';
   AREE_VALUTAZIONE.forEach((ar) => {
@@ -431,7 +434,7 @@ function apriValutazioneEditor(nome, anno, tipo) {
       '<input type="text" id="val-nota-' +
       ar.key +
       '" value="' +
-      escP(note[ar.key] || '') +
+      _escAttr(note[ar.key] || '') +
       '" placeholder="Nota del valutatore (opzionale)..." style="width:100%;margin:0 0 4px;padding:6px 10px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--muted);font-size:.8rem;font-style:italic">';
   });
   const pf = (esistente && esistente.punti_forza) || '';
@@ -451,7 +454,7 @@ function apriValutazioneEditor(nome, anno, tipo) {
       '<input type="text" id="val-obiettivo-' +
       i +
       '" value="' +
-      escP(ob[i] || '') +
+      _escAttr(ob[i] || '') +
       '" placeholder="Obiettivo ' +
       (i + 1) +
       '..." style="margin-bottom:5px;padding:8px 10px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)">';
@@ -550,6 +553,10 @@ async function salvaValutazione(nome) {
   }
 }
 async function eliminaValutazione(id, nome) {
+  if (typeof puoModificare === 'function' && !puoModificare('gestione_valutazioni')) {
+    toast('Non hai il permesso');
+    return;
+  }
   if (!confirm('Eliminare questa valutazione?')) return;
   try {
     await secDel('valutazioni', 'id=eq.' + id);

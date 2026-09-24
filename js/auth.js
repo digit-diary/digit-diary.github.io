@@ -318,11 +318,19 @@ async function eseguiForzaCambioPwdOp(nome) {
     err.textContent = 'Errore salvataggio';
   }
 }
-function esci() {
+async function esci() {
   const tk = getOpToken() || getAdminToken();
   if (tk) {
-    sbRpc('invalidate_op_session', { p_token: tk }).catch(() => {});
-    sbRpc('invalidate_admin_session', { p_token: tk }).catch(() => {});
+    // La sessione va chiusa sul server PRIMA del reload: senza attesa il
+    // ricaricamento interrompeva le chiamate e il token restava valido.
+    // Si aspetta al massimo 1,5 s, poi si esce comunque.
+    await Promise.race([
+      Promise.allSettled([
+        sbRpc('invalidate_op_session', { p_token: tk }),
+        sbRpc('invalidate_admin_session', { p_token: tk }),
+      ]),
+      new Promise((r) => setTimeout(r, 1500)),
+    ]);
   }
   // FIX BUG #20: cleanup polling interval e canale realtime al logout
   if (window._notePollingId) {
@@ -433,32 +441,73 @@ async function registraBiometrico() {
       },
     });
     var credId = btoa(String.fromCharCode.apply(null, new Uint8Array(cred.rawId)));
-    localStorage.setItem('webauthn_cred', JSON.stringify({ id: credId, op: op, v: 3 }));
+    // SEGRETO DEL DISPOSITIVO: creato qui, resta solo su questo dispositivo;
+    // il server conserva la sua impronta. All'accesso biometrico il server
+    // rilascia la sessione SOLO se l'impronta coincide: prima bastava il nome.
+    var segreto = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+    var impronta = await secureHash(segreto, op);
+    await _rpcSicura('set_bio_device', {
+      p_token: getOpToken(),
+      p_impronta: impronta,
+      p_nome_dispositivo: (navigator.platform || '') + ' ' + (navigator.userAgent || '').substring(0, 60),
+    });
+    localStorage.setItem('webauthn_cred', JSON.stringify({ id: credId, op: op, v: 4, segreto: segreto }));
     localStorage.removeItem('bio_declined_' + op);
     document.getElementById('pwd-modal').classList.add('hidden');
     toast(getBioName() + ' attivato!');
   } catch (e) {
     document.getElementById('pwd-modal').classList.add('hidden');
-    if (e.name !== 'NotAllowedError') toast('Non disponibile su questo dispositivo');
+    if (e && e.dalDatabase) toastErrore('Attivazione non riuscita: ' + (e.message || ''));
+    else if (e.name !== 'NotAllowedError') toast('Non disponibile su questo dispositivo');
   }
 }
+// Impronta del dispositivo biometrico registrato per 'op' (null se non c'e').
+// La usa anche il rinnovo automatico della sessione (realtime.js).
+async function _bioImprontaLocale(op) {
+  try {
+    var stored = JSON.parse(localStorage.getItem('webauthn_cred') || 'null');
+    if (!stored || stored.op !== op || !stored.segreto) return null;
+    return await secureHash(stored.segreto, op);
+  } catch (e) {
+    return null;
+  }
+}
+// Motivo dell'ultimo rifiuto biometrico, per dare all'operatore un messaggio
+// preciso invece del generico "Autenticazione fallita"
+var _bioRifiuto = '';
 async function loginBiometrico() {
+  _bioRifiuto = '';
   try {
     var stored = JSON.parse(localStorage.getItem('webauthn_cred'));
     if (!stored) return false;
-    // Rimuovi credenziali vecchie PRIMA di tentare
-    if (!stored.v || stored.v < 3) {
+    // Rimuovi credenziali vecchie PRIMA di tentare: dalla versione 4 il
+    // dispositivo ha un segreto verificato dal server, le precedenti no
+    if (!stored.v || stored.v < 4) {
       localStorage.removeItem('webauthn_cred');
+      _bioRifiuto =
+        getBioName() + ' va riattivato dalle Impostazioni (nuovo sistema di verifica): accedi con la password';
       return false;
     }
-    await navigator.credentials.get({
+    // Si chiede SOLO la credenziale registrata e si controlla che sia quella
+    // usata: senza allowCredentials e senza confronto del rawId, una passkey
+    // di un altro operatore rimasta sul dispositivo apriva la sessione
+    var storedId = Uint8Array.from(atob(stored.id), (c) => c.charCodeAt(0));
+    var cred = await navigator.credentials.get({
       publicKey: {
         challenge: crypto.getRandomValues(new Uint8Array(32)),
         rpId: location.hostname,
+        allowCredentials: [{ type: 'public-key', id: storedId }],
         userVerification: 'required',
         timeout: 60000,
       },
     });
+    var usataId = btoa(String.fromCharCode.apply(null, new Uint8Array(cred.rawId)));
+    if (usataId !== stored.id) {
+      _bioRifiuto = 'Credenziale biometrica diversa da quella registrata: accedi con la password';
+      return false;
+    }
     return true;
   } catch (e) {
     if (e.name !== 'NotAllowedError') {
@@ -481,14 +530,22 @@ async function tentaBiometrico() {
     localStorage.setItem('operatore_corrente', stored.op);
     sessionStorage.setItem('bio_verified', '1');
     sessionStorage.setItem('session_active', '1');
-    // Crea sessione server per il login biometrico
-    var bioSession = await sbRpc('create_bio_session', { p_nome: stored.op });
+    // Sessione server: il server controlla l'impronta del dispositivo
+    var impronta = await _bioImprontaLocale(stored.op);
+    var bioSession = impronta ? await sbRpc('create_bio_session', { p_nome: stored.op, p_impronta: impronta }) : null;
     if (bioSession && bioSession.session_token) {
       setOpToken(bioSession.session_token);
+      if (bioSession.is_admin) sessionStorage.setItem('is_admin', '1');
     } else {
-      var bioH = await secureHash('__bio_fallback__', stored.op);
-      var bioRes = await sbRpc('verify_login', { p_nome: stored.op, p_hash: bioH, p_legacy_hash: null });
-      if (bioRes && bioRes.session_token) setOpToken(bioRes.session_token);
+      sessionStorage.removeItem('session_active');
+      sessionStorage.removeItem('bio_verified');
+      toastErrore(
+        bioSession && bioSession.locked
+          ? 'Troppi tentativi: riprova fra 30 secondi'
+          : 'Dispositivo non riconosciuto dal server: accedi con la password e riattiva ' + getBioName(),
+        8000,
+      );
+      return;
     }
     var loginSettore = document.getElementById('login-settore');
     if (loginSettore && loginSettore.value) currentReparto = loginSettore.value;
@@ -514,11 +571,20 @@ async function tentaBiometrico() {
       setTimeout(() => mostraPromemoriaLogin(), 1200);
       setTimeout(() => mostraConsegnaLogin(), 1800);
     }
-  } else toast('Autenticazione fallita');
+  } else toast(_bioRifiuto || 'Autenticazione fallita');
 }
-function disattivaBiometrico() {
+async function disattivaBiometrico() {
   if (!_hasBioForCurrentOp()) {
     toast('Non puoi disattivare il biometrico di un altro operatore');
+    return;
+  }
+  // anche il server dimentica il dispositivo: senza, l'impronta resterebbe valida
+  try {
+    var impronta = await _bioImprontaLocale(getOperatore());
+    if (impronta && getOpToken())
+      await _rpcSicura('remove_bio_device', { p_token: getOpToken(), p_impronta: impronta });
+  } catch (e) {
+    toastErrore('Il server non ha potuto dimenticare il dispositivo: ' + (e.message || ''));
     return;
   }
   localStorage.removeItem('webauthn_cred');

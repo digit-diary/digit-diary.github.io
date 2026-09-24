@@ -427,11 +427,8 @@ eq(
   '73 giorni di congedo (1/5 anno) = 35 x 292/365 = 28',
 );
 eq(R.giorniVacanzaSpettanti('2000-01-01', 2010, { giorniAnzianita: 0 }).giorni, 36, 'dieci anni senza congedo = 36');
-eq(
-  R.giorniVacanzaSpettanti('2000-01-01', 2010, { giorniAnzianita: 200 }).giorni,
-  35,
-  '200 giorni di congedo lungo: i 10 anni slittano al 2010 inoltrato, ma il giorno in piu vale dall anno dopo l anniversario slittato',
-);
+eq(R.giorniVacanzaSpettanti('2000-06-01', 2010, { giorniAnzianita: 250 }).giorni, 35, '250 giorni di congedo lungo: i 10 anni slittano al 2011, nel 2010 niente giorno in piu');
+eq(R.giorniVacanzaSpettanti('2000-06-01', 2010, {}).giorni, 36, 'stesso caso senza congedo = 36');
 
 console.log('\n=======================================');
 console.log('  ' + passati + ' passati, ' + falliti + ' falliti');
