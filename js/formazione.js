@@ -85,6 +85,28 @@ function livelloSigla(lv) {
   } catch (e) {}
   return 'L' + lv;
 }
+// Testo dentro un attributo HTML (value="...", title="..."): escP non converte
+// le virgolette, quindi una nota con " veniva troncata e poi risalvata monca.
+// Definita qui e usata anche da valutazioni.js (stesso scope globale).
+function _escAttr(s) {
+  return escP(String(s == null ? '' : s)).replace(/"/g, '&quot;');
+}
+// Scala dei livelli: la lunghezza la decidono le competenze configurate
+// (Slots arriva a L6, altri settori a L3), mai il programma. Minimo tre come
+// nella configurazione. Da usare ovunque si elencano i livelli.
+function _lvMaxReparto(rep) {
+  const comps = getCompetenzeConfigAll()[rep || currentReparto] || [];
+  return Math.max(3, ...comps.map((k) => parseInt(k.livello) || 0));
+}
+function _lvMaxTutti() {
+  return Math.max(3, ...getRepartiTutti().map((r) => _lvMaxReparto(r.key)));
+}
+// Colore del livello: tavolozza che segue la scala, non si ferma a L5
+const _LV_COLORI = ['#1a4a7a', '#e67e22', '#2c6e49', '#8e44ad', '#c0392b', '#1a7a6d', '#8b6914', '#34495e'];
+function _lvColore(lv) {
+  const n = parseInt(lv) || 0;
+  return n > 0 ? _LV_COLORI[(n - 1) % _LV_COLORI.length] : 'var(--muted)';
+}
 async function salvaNomeLivello(lv, nome) {
   if (!isAdmin()) return;
   const cfg = window._livelliNomiCfg || {};
@@ -110,8 +132,7 @@ function getCompetenzeConfigAll() {
 // gia' piu' uno, cosi' si puo' sempre creare il gradino successivo senza dover
 // toccare il programma. "Extra" resta fuori dalla scala.
 function _opzioniLivello(rep) {
-  const comps = getCompetenzeConfigAll()[rep] || [];
-  const max = Math.max(3, ...comps.map((k) => parseInt(k.livello) || 0));
+  const max = _lvMaxReparto(rep);
   let h = '';
   for (let lv = 1; lv <= max + 1; lv++) h += '<option value="' + lv + '">L' + lv + '</option>';
   return h + '<option value="0">Extra</option>';
@@ -274,9 +295,9 @@ function livelloBadgeHtml(lv, c) {
         .map((k) => k.label);
       return (
         '<span class="mini-badge" style="background:#d4a017;color:#000;font-size:.82rem" title="Certificato fino a ' +
-        escP(livelloNome(maxCert)) +
+        _escAttr(livelloNome(maxCert)) +
         ' ma manca: ' +
-        escP(mancanti.join(', ')) +
+        _escAttr(mancanti.join(', ')) +
         '">' +
         escP(livelloSigla(maxCert)) +
         ' parziale</span>'
@@ -284,9 +305,12 @@ function livelloBadgeHtml(lv, c) {
     }
   }
   if (!lv) return '<span class="mini-badge" style="background:var(--muted)">-</span>';
-  const col = { 1: '#1a4a7a', 2: '#e67e22', 3: '#2c6e49', 4: '#8e44ad', 5: '#c0392b' }[lv] || 'var(--muted)';
   return (
-    '<span class="mini-badge" style="background:' + col + ';font-size:.82rem">' + escP(livelloNome(lv)) + '</span>'
+    '<span class="mini-badge" style="background:' +
+    _lvColore(lv) +
+    ';font-size:.82rem">' +
+    escP(livelloNome(lv)) +
+    '</span>'
   );
 }
 function puntiTotali(nome, anno) {
@@ -760,28 +784,29 @@ function renderFormazione() {
   const comps = getCompetenzeReparto();
   _formCaricaOrdinePiano();
   const collabs = _formOrdineComePiano(getCollaboratoriReparto().filter((c) => c.attivo !== false));
-  // KPI livelli
-  const perLivello = [0, 0, 0, 0];
+  // KPI livelli: un riquadro per ogni livello della scala del settore
+  const lvMax = _lvMaxReparto();
+  const perLivello = {};
   collabs.forEach((c) => {
-    perLivello[livelloDiCollaboratore(c)]++;
+    const lv = livelloDiCollaboratore(c);
+    perLivello[lv] = (perLivello[lv] || 0) + 1;
   });
   let html = '<div class="stats-bar" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">';
   html +=
     '<div class="stat"><div class="stat-num">' +
     collabs.length +
     '</div><div class="stat-label">Collaboratori</div></div>';
-  html +=
-    '<div class="stat"><div class="stat-num blue">' +
-    perLivello[1] +
-    '</div><div class="stat-label">Livello 1</div></div>';
-  html +=
-    '<div class="stat"><div class="stat-num" style="color:#e67e22">' +
-    perLivello[2] +
-    '</div><div class="stat-label">Livello 2</div></div>';
-  html +=
-    '<div class="stat"><div class="stat-num teal">' +
-    perLivello[3] +
-    '</div><div class="stat-label">Livello 3 (multiruolo)</div></div>';
+  for (let l = 1; l <= lvMax; l++) {
+    html +=
+      '<div class="stat"><div class="stat-num" style="color:' +
+      _lvColore(l) +
+      '">' +
+      (perLivello[l] || 0) +
+      '</div><div class="stat-label">' +
+      escP(livelloNome(l)) +
+      (l === lvMax ? ' (multiruolo)' : '') +
+      '</div></div>';
+  }
   // copertura per competenza
   comps.forEach((k) => {
     const n = collabs.filter((c) => (c.competenze || {})[k.key] === true).length;
@@ -818,7 +843,9 @@ function renderFormazione() {
       (cc ? ' style="background:' + cc + ' !important;color:#000"' : '') +
       '>' +
       escP(k.label) +
-      (k.livello ? ' <span style="font-size:.82rem;color:#00000099">L' + k.livello + '</span>' : '') +
+      (k.livello
+        ? ' <span style="font-size:.82rem;color:#00000099">' + escP(livelloSigla(k.livello)) + '</span>'
+        : '') +
       '</th>';
   });
   html += '<th class="num">Livello</th><th class="num">Punti ' + new Date().getFullYear() + '</th></tr></thead><tbody>';
@@ -929,7 +956,7 @@ function renderFormazione() {
   html +=
     '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">' +
     '<input type="text" value="' +
-    escP(window._formStoricoCerca || '') +
+    _escAttr(window._formStoricoCerca || '') +
     '" placeholder="Cerca nome o voce nello storico..." onchange="window._formStoricoCerca=this.value;renderFormazione()" style="padding:6px 10px;font-size:.82rem;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);width:220px"></div>';
   if (!eventi.length) html += '<p style="color:var(--muted);padding:10px">Nessun punto assegnato finora.</p>';
   else {
@@ -1007,7 +1034,7 @@ function renderFormazione() {
     cfgP.soglie.map((s) => '<strong>' + s.punti + '</strong> = ' + escP(s.premio)).join(' · ') +
     ' · Passaggio livello: ' +
     Object.entries(cfgP.premi_livello)
-      .map(([l, p]) => 'L' + l + ' = ' + escP(p))
+      .map(([l, p]) => escP(livelloSigla(l)) + ' = ' + escP(p))
       .join(' · ') +
     '</p>';
   // limiti mensili: consegnati/limite del mese corrente + attese con priorità
@@ -1127,7 +1154,7 @@ function renderFormazione() {
       '<div class="field"><label>Formazione svolta</label><input type="text" id="frm-desc" placeholder="Es: formazione Reception, procedura LRD..."></div>';
     html +=
       '<div class="field"><label>Formatore</label><input type="text" id="frm-formatore" value="' +
-      escP(getOperatore() || '') +
+      _escAttr(getOperatore() || '') +
       '"></div>';
     html +=
       '<div class="field"><label>Data</label><input type="date" id="frm-data" value="' +
@@ -1320,7 +1347,7 @@ function _renderEquitaCard(collabs) {
       '</strong></td><td>' +
       (r.dataAss ? anzianitaLabel(r.dataAss, r.mesiFermo) : '-') +
       '</td><td class="num">' +
-      (r.lv ? 'L' + r.lv : '-') +
+      (r.lv ? escP(livelloSigla(r.lv)) : '-') +
       '</td><td class="num">' +
       r.punti +
       '</td><td class="num">' +
@@ -1656,6 +1683,13 @@ async function registraPremioConsegnato(nome, premio) {
     toast('Non hai il permesso di registrare premi');
     return;
   }
+  // con gli incentivi spenti _insertPuntiEvento non scrive nulla: allora
+  // niente attese, niente scarico inventario, niente riga nello Storico HR e
+  // nessun "registrato", altrimenti i due archivi raccontavano cose diverse
+  if (typeof incentiviAttivi === 'function' && !incentiviAttivi('premio')) {
+    toast('Incentivi disattivati: premio non registrato');
+    return;
+  }
   try {
     const soglia = _premioSogliaDi(premio);
     const ym = new Date().toISOString().substring(0, 7);
@@ -1709,7 +1743,12 @@ async function registraPremioConsegnato(nome, premio) {
         }
       }
     }
-    await _insertPuntiEvento(nome, 0, 'premio', 'Premio consegnato: ' + premio);
+    // movimento non scritto (doppione rifiutato): niente riga HR
+    const scritto = await _insertPuntiEvento(nome, 0, 'premio', 'Premio consegnato: ' + premio);
+    if (!scritto) {
+      renderFormazione();
+      return;
+    }
     if (typeof _insertHrEvento === 'function') _insertHrEvento(nome, 'premio', 'Premio consegnato: ' + premio);
     _notificaIncentivo(nome, '🎁 Premio consegnato', nome + ': ' + premio);
     renderFormazione();
@@ -1719,6 +1758,10 @@ async function registraPremioConsegnato(nome, premio) {
   }
 }
 async function eliminaPuntiEvento(id) {
+  if (typeof puoModificare === 'function' && !puoModificare('gestione_punti')) {
+    toast('Non hai il permesso');
+    return;
+  }
   if (!confirm('Eliminare questo movimento punti?')) return;
   try {
     await secDel('punti_eventi', 'id=eq.' + id);
@@ -1741,16 +1784,19 @@ function _matriceRows() {
     .sort((a, b) => a.nome.localeCompare(b.nome));
   const head = [
     'Collaboratore',
-    ...comps.map((k) => k.label + ' (L' + k.livello + ')'),
+    ...comps.map((k) => k.label + (k.livello ? ' (' + livelloSigla(k.livello) + ')' : '')),
     'Livello',
     'Punti ' + new Date().getFullYear(),
   ];
-  const rows = collabs.map((c) => [
-    c.nome,
-    ...comps.map((k) => ((c.competenze || {})[k.key] === true ? 'SI' : '-')),
-    livelloDiCollaboratore(c) || '-',
-    puntiTotali(c.nome),
-  ]);
+  const rows = collabs.map((c) => {
+    const lv = livelloDiCollaboratore(c);
+    return [
+      c.nome,
+      ...comps.map((k) => ((c.competenze || {})[k.key] === true ? 'SI' : '-')),
+      lv ? livelloSigla(lv) : '-',
+      puntiTotali(c.nome),
+    ];
+  });
   return { head, rows };
 }
 function esportaMatriceCSV() {
@@ -1912,7 +1958,15 @@ async function esportaReportIncentiviPDF() {
       startY: y,
       head: [['Collaboratore', 'Livello', 'Punti ' + anno, 'Coperture', 'Rifiuti', 'Premi raggiunti', 'Consegnati']],
       body: righe.length
-        ? righe.map((r) => [r.nome, r.lv ? 'L' + r.lv : '-', r.punti, r.cop, r.rif, r.raggiunti || '-', r.consegnati])
+        ? righe.map((r) => [
+            r.nome,
+            r.lv ? livelloSigla(r.lv) : '-',
+            r.punti,
+            r.cop,
+            r.rif,
+            r.raggiunti || '-',
+            r.consegnati,
+          ])
         : [['Nessun dato per il ' + anno, '', '', '', '', '', '']],
       columnStyles: { 0: { halign: 'left', fontStyle: 'bold' } },
     }),
@@ -1986,14 +2040,14 @@ function _renderFormazioneConfig() {
     '</p><p style="font-size:.82rem;color:var(--muted);margin-bottom:6px">Personalizza come si chiamano i livelli (es. L1 = "Base Sala"). Vuoto = nome standard.</p><div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">';
   // quanti livelli ha davvero questo settore: prima erano fissi a cinque e un
   // livello aggiunto dopo (es. Accoglienza) restava senza nome
-  const _lvMax = Math.max(3, ...getCompetenzeReparto().map((k) => parseInt(k.livello) || 0));
+  const _lvMax = _lvMaxReparto();
   for (let lv = 1; lv <= _lvMax; lv++) {
     const attuale = ((window._livelliNomiCfg || {})[currentReparto] || {})[String(lv)] || '';
     html +=
       '<label style="font-size:.8rem;display:flex;align-items:center;gap:4px">L' +
       lv +
       ' = <input type="text" value="' +
-      escP(attuale) +
+      _escAttr(attuale) +
       '" placeholder="Livello ' +
       lv +
       '" maxlength="30" onchange="salvaNomeLivello(' +
@@ -2087,7 +2141,7 @@ function _renderFormazioneConfig() {
       '" onchange="modificaSoglia(' +
       i +
       ',\'punti\',this.value)" style="width:80px;padding:5px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);text-align:center"><input type="text" value="' +
-      escP(s.premio) +
+      _escAttr(s.premio) +
       '" onchange="modificaSoglia(' +
       i +
       ',\'premio\',this.value)" style="flex:1;padding:5px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><input type="number" min="0" value="' +
@@ -2102,7 +2156,13 @@ function _renderFormazioneConfig() {
       invNomi
         .map(
           (n) =>
-            '<option value="' + escP(n) + '"' + (s.inventario === n ? ' selected' : '') + '>' + escP(n) + '</option>',
+            '<option value="' +
+            _escAttr(n) +
+            '"' +
+            (s.inventario === n ? ' selected' : '') +
+            '>' +
+            escP(n) +
+            '</option>',
         )
         .join('') +
       '</select><button class="btn-del-tipo" onclick="rimuoviSoglia(' +
@@ -2117,7 +2177,7 @@ function _renderFormazioneConfig() {
   (cfgP.inventario || []).forEach((it, i) => {
     html +=
       '<div class="tipo-item"><input type="text" value="' +
-      escP(it.nome || '') +
+      _escAttr(it.nome || '') +
       '" onchange="modificaInvIncentivo(' +
       i +
       ',\'nome\',this.value)" style="flex:1;padding:5px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><input type="number" min="0" value="' +
@@ -2125,7 +2185,7 @@ function _renderFormazioneConfig() {
       '" title="Pezzi disponibili" onchange="modificaInvIncentivo(' +
       i +
       ',\'qta\',this.value)" style="width:70px;padding:5px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);text-align:center"><input type="text" value="' +
-      escP(it.note || '') +
+      _escAttr(it.note || '') +
       '" placeholder="note" onchange="modificaInvIncentivo(' +
       i +
       ',\'note\',this.value)" style="width:160px;padding:5px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><button class="btn-del-tipo" onclick="rimuoviInvIncentivo(' +
@@ -2141,19 +2201,16 @@ function _renderFormazioneConfig() {
   // settori (oggi Slot arriva a L6), cosi' aggiungendo un livello compare da
   // solo anche qui. L'assegnazione gestiva gia' qualsiasi livello: era solo
   // questa lista a fermarsi a L3.
-  const _lvMaxTutti = Math.max(
-    3,
-    ...Object.values(getCompetenzeConfigAll()).flatMap((lista) => lista.map((k) => parseInt(k.livello) || 0)),
-  );
+  const _lvMaxT = _lvMaxTutti();
   html +=
     '<p style="font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Punti al raggiungimento del livello (0 = disattivato)</p>';
   html +=
     '<p style="font-size:.8rem;color:var(--muted);margin-bottom:6px">Un livello vale nei settori dove esiste: i settori con una scala piu corta si fermano prima.</p>';
-  for (let l = 1; l <= _lvMaxTutti; l++) {
+  for (let l = 1; l <= _lvMaxT; l++) {
     html +=
       '<div class="tipo-item"><div class="tipo-item-name">Livello ' +
       l +
-      (l === _lvMaxTutti ? ' <span class="tipo-item-default">(completamento di tutti i livelli)</span>' : '') +
+      (l === _lvMaxT ? ' <span class="tipo-item-default">(completamento di tutti i livelli)</span>' : '') +
       '</div><input type="number" value="' +
       (parseInt(cfgP.punti_livello[String(l)]) || 0) +
       '" onchange="modificaPuntiLivello(' +
@@ -2163,13 +2220,13 @@ function _renderFormazioneConfig() {
   // premi livello (dal 2 in su: il passaggio al livello 1 non e' un traguardo)
   html +=
     '<p style="font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Premi passaggio livello</p>';
-  for (let l = 2; l <= _lvMaxTutti; l++) {
+  for (let l = 2; l <= _lvMaxT; l++) {
     html +=
       '<div class="tipo-item"><div class="tipo-item-name">Livello ' +
       l +
-      (l === _lvMaxTutti ? ' <span class="tipo-item-default">(completamento di tutti i livelli)</span>' : '') +
+      (l === _lvMaxT ? ' <span class="tipo-item-default">(completamento di tutti i livelli)</span>' : '') +
       '</div><input type="text" value="' +
-      escP(cfgP.premi_livello[String(l)] || '') +
+      _escAttr(cfgP.premi_livello[String(l)] || '') +
       '" onchange="modificaPremioLivello(' +
       l +
       ',this.value)" style="flex:1;padding:5px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></div>';
@@ -2191,7 +2248,16 @@ function _renderFormazioneConfig() {
   html += '</div>';
   return html;
 }
+// La configurazione (competenze, azioni, soglie, inventario, livelli,
+// notifiche) la vede e la salva solo l'admin: il controllo si ripete qui
+// perche' le funzioni sono globali e richiamabili anche fuori dai pulsanti.
+function _soloAdminCfg() {
+  if (isAdmin()) return true;
+  toast('Non hai il permesso');
+  return false;
+}
 async function modificaNotificheCfg(val) {
+  if (!_soloAdminCfg()) return;
   const cfg = getPuntiConfig();
   cfg.notifiche = val === 'tutti' || val === 'off' ? val : 'privato';
   await savePuntiConfig(cfg);
@@ -2202,6 +2268,7 @@ async function modificaNotificheCfg(val) {
   );
 }
 async function aggiungiCompetenzaCfg(rep) {
+  if (!_soloAdminCfg()) return;
   const nome = (document.getElementById('cfg-comp-nome-' + rep) || {}).value.trim();
   const lv = parseInt((document.getElementById('cfg-comp-lv-' + rep) || {}).value) || 1;
   if (!nome) {
@@ -2226,6 +2293,7 @@ async function aggiungiCompetenzaCfg(rep) {
 // Rinomina: cambia solo l'etichetta visualizzata; la chiave interna resta invariata,
 // quindi le spunte già assegnate ai collaboratori vengono conservate.
 async function rinominaCompetenzaCfg(rep, idx) {
+  if (!_soloAdminCfg()) return;
   const cfg = getCompetenzeConfigAll();
   const k = cfg[rep][idx];
   if (!k) return;
@@ -2244,6 +2312,7 @@ async function rinominaCompetenzaCfg(rep, idx) {
   toast(vecchio + ' → ' + label);
 }
 async function rimuoviCompetenzaCfg(rep, idx) {
+  if (!_soloAdminCfg()) return;
   const cfg = getCompetenzeConfigAll();
   const k = cfg[rep][idx];
   if (!k) return;
@@ -2255,6 +2324,7 @@ async function rimuoviCompetenzaCfg(rep, idx) {
   renderFormazione();
 }
 async function aggiungiAzioneCfg() {
+  if (!_soloAdminCfg()) return;
   const nome = (document.getElementById('cfg-az-nome') || {}).value.trim();
   const punti = parseInt((document.getElementById('cfg-az-punti') || {}).value) || 0;
   if (!nome) {
@@ -2272,6 +2342,7 @@ async function aggiungiAzioneCfg() {
   toast('Azione aggiunta');
 }
 async function modificaPuntiAzione(idx, val) {
+  if (!_soloAdminCfg()) return;
   const cfg = getPuntiConfig();
   if (!cfg.azioni[idx]) return;
   cfg.azioni[idx].punti = parseInt(val) || 0;
@@ -2306,6 +2377,7 @@ async function toggleAzioneCfg(idx, on) {
 // Rinomina azione punti: cambia solo l'etichetta; il registro storico resta coerente
 // perché i movimenti referenziano la chiave interna, non il nome.
 async function rinominaAzioneCfg(idx) {
+  if (!_soloAdminCfg()) return;
   const cfg = getPuntiConfig();
   const a = cfg.azioni[idx];
   if (!a) return;
@@ -2324,6 +2396,7 @@ async function rinominaAzioneCfg(idx) {
   toast(vecchio + ' → ' + label);
 }
 async function rimuoviAzioneCfg(idx) {
+  if (!_soloAdminCfg()) return;
   const cfg = getPuntiConfig();
   const a = cfg.azioni[idx];
   if (!a) return;
@@ -2333,6 +2406,7 @@ async function rimuoviAzioneCfg(idx) {
   renderFormazione();
 }
 async function aggiungiSoglia() {
+  if (!_soloAdminCfg()) return;
   const punti = parseInt((document.getElementById('cfg-soglia-punti') || {}).value) || 0;
   const premio = ((document.getElementById('cfg-soglia-premio') || {}).value || '').trim();
   if (!punti || !premio) {
@@ -2346,6 +2420,7 @@ async function aggiungiSoglia() {
   toast('Soglia aggiunta');
 }
 async function modificaSoglia(idx, campo, val) {
+  if (!_soloAdminCfg()) return;
   const cfg = getPuntiConfig();
   if (!cfg.soglie[idx]) return;
   if (campo === 'punti') cfg.soglie[idx][campo] = parseInt(val) || 0;
@@ -2355,6 +2430,7 @@ async function modificaSoglia(idx, campo, val) {
   toast('Soglia aggiornata');
 }
 async function aggiungiInvIncentivo() {
+  if (!_soloAdminCfg()) return;
   const nome = ((document.getElementById('cfg-inv-nome') || {}).value || '').trim();
   const qta = parseInt((document.getElementById('cfg-inv-qta') || {}).value) || 0;
   if (!nome) {
@@ -2372,6 +2448,7 @@ async function aggiungiInvIncentivo() {
   renderFormazione();
 }
 async function modificaInvIncentivo(idx, campo, val) {
+  if (!_soloAdminCfg()) return;
   const cfg = getPuntiConfig();
   if (!cfg.inventario[idx]) return;
   const prima = cfg.inventario[idx][campo];
@@ -2382,6 +2459,7 @@ async function modificaInvIncentivo(idx, campo, val) {
   toast('Inventario aggiornato');
 }
 async function rimuoviInvIncentivo(idx) {
+  if (!_soloAdminCfg()) return;
   const cfg = getPuntiConfig();
   if (!cfg.inventario[idx]) return;
   if (!confirm('Rimuovere "' + cfg.inventario[idx].nome + '" dall\'inventario premi?')) return;
@@ -2391,18 +2469,21 @@ async function rimuoviInvIncentivo(idx) {
   renderFormazione();
 }
 async function rimuoviSoglia(idx) {
+  if (!_soloAdminCfg()) return;
   const cfg = getPuntiConfig();
   cfg.soglie = cfg.soglie.filter((_, i) => i !== idx);
   await savePuntiConfig(cfg);
   renderFormazione();
 }
 async function modificaPremioLivello(lv, val) {
+  if (!_soloAdminCfg()) return;
   const cfg = getPuntiConfig();
   cfg.premi_livello[String(lv)] = val.trim();
   await savePuntiConfig(cfg);
   toast('Premio livello aggiornato');
 }
 async function modificaPuntiLivello(lv, val) {
+  if (!_soloAdminCfg()) return;
   const cfg = getPuntiConfig();
   cfg.punti_livello[String(lv)] = parseInt(val) || 0;
   await savePuntiConfig(cfg);
@@ -2481,7 +2562,19 @@ function badgeCoperturaHtml(entry) {
       '</span>';
   return h;
 }
-function apriPopupCopertura(assente, dataRif, modo) {
+// Fine dell'assenza letta dalla registrazione di malattia che inizia quel
+// giorno: il popup deve vedere le coperture di tutto il periodo, come il badge
+// nel diario, altrimenti una copertura del secondo giorno risultava assente.
+function _dataFineAssenza(assente, dataRif) {
+  if (!assente || !dataRif) return dataRif;
+  const tipoMal = typeof nomeCorrente === 'function' ? nomeCorrente('Malattia') : 'Malattia';
+  const nomeL = assente.toLowerCase();
+  const e = (typeof datiCache !== 'undefined' ? datiCache : []).find(
+    (x) => x.tipo === tipoMal && (x.nome || '').toLowerCase() === nomeL && _dataRifCopertura(x) === dataRif,
+  );
+  return e ? _periodoCopertura(e).al : dataRif;
+}
+function apriPopupCopertura(assente, dataRif, modo, dataFine) {
   // modo 'cambio' = cambio turno per esigenze operative: chi accetta prende
   // i punti "Cambio turno accettato" invece di quelli di copertura malattia
   // Se gli incentivi (o l'azione collegata) sono spenti, il popup non si apre.
@@ -2489,7 +2582,13 @@ function apriPopupCopertura(assente, dataRif, modo) {
   if (typeof incentiviAttivi === 'function' && !incentiviAttivi(azione)) return Promise.resolve(null);
   return new Promise((resolve) => {
     window._copResolve = resolve;
-    window._copCtx = { assente, dataRif: dataRif || new Date().toISOString().split('T')[0], modo: modo || 'malattia' };
+    const dal = dataRif || new Date().toISOString().split('T')[0];
+    window._copCtx = {
+      assente,
+      dataRif: dal,
+      dataFine: dataFine || _dataFineAssenza(assente, dal),
+      modo: modo || 'malattia',
+    };
     _renderPopupCopertura();
     // il piano del giorno arriva subito dopo: dice che turno aveva l'assente,
     // che turno hanno gli altri e chi e' formato per quella posizione
@@ -2572,7 +2671,8 @@ function _renderPopupCopertura() {
           : '<span style="font-size:.82rem;color:var(--muted)">lettura del piano...</span>') +
       '</div><p style="color:var(--muted);font-size:.82rem;margin-bottom:12px">Se il turno non viene sostituito, chiudi con "Nessuna copertura".</p>';
   // Già registrato per questa assenza (con possibilità di rimuovere/correggere)
-  const esistenti = eventiCopertura(assente, ctx.dataRif);
+  // tutto il periodo dell'assenza, come il badge nel diario
+  const esistenti = eventiCopertura(assente, ctx.dataRif, ctx.dataFine);
   if (esistenti.length) {
     html +=
       '<div style="margin-bottom:14px;padding:10px 12px;background:var(--paper2);border-radius:3px;border-left:3px solid var(--accent2)"><div style="font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:6px">Già registrato</div>' +
@@ -2612,7 +2712,7 @@ function _renderPopupCopertura() {
           '<option' +
           (modoCambio && c.nome === assente ? ' selected' : '') +
           ' value="' +
-          escP(c.nome).replace(/"/g, '&quot;') +
+          _escAttr(c.nome) +
           '">' +
           escP(c.nome) +
           (etichette.length ? '  ·  ' + etichette.join(' · ') : '') +
@@ -2654,7 +2754,7 @@ function _renderPopupCopertura() {
           else if (ctx.piano) badge += ' ' + tag('libero', '#2c6e49');
           return (
             '<label style="display:flex;align-items:center;gap:9px;padding:5px 2px;cursor:pointer;font-size:.9rem;border-bottom:1px solid var(--line)"><input type="checkbox" class="cop-negato-cb" value="' +
-            escP(c.nome).replace(/"/g, '&quot;') +
+            _escAttr(c.nome) +
             '" style="width:16px;height:16px"><span style="flex:1">' +
             escP(c.nome) +
             '</span>' +
@@ -2823,9 +2923,13 @@ function _renderGiubileiCard(collabs) {
 
 // Card riservata HR: numeri chiave del settore corrente · organico (fissi/jolly),
 // distribuzione categorie e livelli, spese giubilei e premi incentivi consegnati
+// Inverso esatto di fmtCHF (locale de-CH): le migliaia sono separate
+// dall'apostrofo tipografico U+2019 (in altri runtime l'apostrofo ASCII o lo
+// spazio sottile). Con il solo apostrofo ASCII "1'000.00 CHF" valeva 0 e i
+// giubilei sopra i mille franchi sparivano dalla Panoramica HR.
 function _estraiChf(testo) {
-  const m = String(testo || '').match(/([\d']+(?:\.\d+)?) CHF/);
-  return m ? parseFloat(m[1].replace(/'/g, '')) : 0;
+  const m = String(testo || '').match(/(\d[\d'’  ]*(?:\.\d+)?)\s*CHF/);
+  return m ? parseFloat(m[1].replace(/['’  ]/g, '')) || 0 : 0;
 }
 function _renderPanoramicaHrCard(collabs) {
   const anno = new Date().getFullYear();
@@ -2884,11 +2988,11 @@ function _renderPanoramicaHrCard(collabs) {
     .map((n) => n + 'ª: <strong>' + perCat[n] + '</strong>')
     .join(' · ');
   if (catStr) righe.push('<span style="color:var(--muted)">Categorie ·</span> ' + catStr);
-  const livStr = [1, 2, 3]
-    .filter((n) => perLiv[n])
-    .map((n) => 'L' + n + ': <strong>' + perLiv[n] + '</strong>')
-    .join(' · ');
-  if (livStr) righe.push('<span style="color:var(--muted)">Livelli multidisciplinari ·</span> ' + livStr);
+  const livStr = [];
+  for (let n = 1; n <= _lvMaxReparto(); n++)
+    if (perLiv[n]) livStr.push(escP(livelloSigla(n)) + ': <strong>' + perLiv[n] + '</strong>');
+  const livStrTesto = livStr.join(' · ');
+  if (livStrTesto) righe.push('<span style="color:var(--muted)">Livelli multidisciplinari ·</span> ' + livStrTesto);
   if (righe.length) html += '<p style="font-size:.86rem;line-height:1.8">' + righe.join('<br>') + '</p>';
   html +=
     '<p style="color:var(--muted);font-size:.82rem;margin-top:8px">Dati del settore corrente: usa lo switch settori in alto per vedere gli altri. Dettaglio per persona nella card Equità categorie.</p></div></div>';

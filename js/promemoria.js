@@ -119,27 +119,42 @@ async function salvaPromemoria() {
     toast('Errore creazione promemoria');
   }
 }
+// Somma n mesi tenendo l'ultimo giorno del mese se il giorno non esiste
+// (31/01 + 1 mese = 28/02, non 03/03 come faceva setMonth)
+function _aggiungiMesi(data, n) {
+  const d = new Date(data.getTime());
+  const giorno = d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + n);
+  const ultimo = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(giorno, ultimo));
+  return d;
+}
+const _pmCompletaInCorso = new Set();
 async function completaPromemoria(id) {
   const op = getOperatore();
+  const p = promemoriaCache.find((x) => x.id === id);
+  // Guardia: un secondo click (o un doppio click) creava un'altra occorrenza del ripetitivo
+  if ((p && p.completata) || _pmCompletaInCorso.has(id)) return;
+  _pmCompletaInCorso.add(id);
   try {
     await secPatch('promemoria', 'id=eq.' + id, {
       completata: true,
       completata_da: op,
       completata_at: new Date().toISOString(),
     });
-    const p = promemoriaCache.find((x) => x.id === id);
     if (p) {
       p.completata = true;
       p.completata_da = op;
       p.completata_at = new Date().toISOString();
       // Se ripetitivo → crea prossima occorrenza
       if (p.ripetizione) {
-        const d = new Date(p.data_scadenza + 'T12:00:00');
+        let d = new Date(p.data_scadenza + 'T12:00:00');
         if (p.ripetizione === 'giornaliero') d.setDate(d.getDate() + 1);
         else if (p.ripetizione === 'settimanale') d.setDate(d.getDate() + 7);
-        else if (p.ripetizione === 'mensile') d.setMonth(d.getMonth() + 1);
-        else if (p.ripetizione === 'semestrale') d.setMonth(d.getMonth() + 6);
-        else if (p.ripetizione === 'annuale') d.setFullYear(d.getFullYear() + 1);
+        else if (p.ripetizione === 'mensile') d = _aggiungiMesi(d, 1);
+        else if (p.ripetizione === 'semestrale') d = _aggiungiMesi(d, 6);
+        else if (p.ripetizione === 'annuale') d = _aggiungiMesi(d, 12);
         const nuovaData =
           d.getFullYear() +
           '-' +
@@ -167,6 +182,8 @@ async function completaPromemoria(id) {
     toast('Completato!');
   } catch (e) {
     toast('Errore completamento');
+  } finally {
+    _pmCompletaInCorso.delete(id);
   }
 }
 async function riattivaPromemoria(id) {
@@ -185,6 +202,11 @@ async function riattivaPromemoria(id) {
   }
 }
 async function eliminaPromemoria(id) {
+  // Il bottone e' solo per admin, ma il controllo va anche qui (chiamata diretta)
+  if (!isAdmin()) {
+    toast("Solo un amministratore puo' eliminare i promemoria");
+    return;
+  }
   if (!confirm('Eliminare questo promemoria?')) return;
   try {
     await secDel('promemoria', 'id=eq.' + id);
@@ -481,6 +503,92 @@ function _trovaNomeSimileMaison(nome) {
 }
 // Valori CHF dei buoni Maison · personalizzabili da admin in Impostazioni (chiave 'buono_valori')
 let BUONO_VALORI = { BU: 15, BL: 40, CG: 80, WL: 40 };
+// Ripartisce il costo di una riga Maison fra piu' nomi. Regola unica per import Excel,
+// form manuale e righe vecchie "A / B": chi ha un buono paga qty x valore (mai oltre il costo
+// della riga), il resto va a chi non ha buono; se tutti hanno un buono il resto si divide fra
+// tutti. Le quote sono in centesimi e l'ultima prende la differenza, cosi' la somma e' ESATTA.
+// Prima la quantita' veniva ricavata dal costo dell'intera riga (ceil(costo/valore)) e chi
+// aveva il buono si prendeva tutto: "Aili BL / Bertaggia" 360 CHF dava Aili 9 BL e 360, Bertaggia 0.
+// nomi: [{nome, tipoBuono, qty, tipi?:[{tipo, qty}]}] · valoreBuono(tipo) ritorna il CHF del buono
+function _ripartisciCostoBuoni(costoRiga, nomi, valoreBuono) {
+  if (!nomi || !nomi.length) return [];
+  const totale = Math.round((parseFloat(costoRiga) || 0) * 100);
+  let residuo = totale;
+  const quote = nomi.map((n) => {
+    const tipi =
+      n.tipi && n.tipi.length
+        ? n.tipi
+        : n.tipoBuono
+          ? [{ tipo: n.tipoBuono, qty: Math.max(1, parseInt(n.qty) || 1) }]
+          : [];
+    let costoBuoni = 0;
+    tipi.forEach((t) => {
+      const val = Math.round((parseFloat(valoreBuono(t.tipo)) || 0) * 100);
+      const c = Math.min(val * Math.max(1, parseInt(t.qty) || 1), residuo);
+      costoBuoni += c;
+      residuo -= c;
+    });
+    const haBuono = tipi.some((t) => (parseFloat(valoreBuono(t.tipo)) || 0) > 0);
+    return {
+      nome: n.nome,
+      tipoBuono: n.tipoBuono || (tipi[0] && tipi[0].tipo) || null,
+      qty: tipi.length ? tipi.reduce((s, t) => s + Math.max(1, parseInt(t.qty) || 1), 0) : 0,
+      tipi,
+      haBuono,
+      costo: costoBuoni,
+    };
+  });
+  const destinatari = quote.filter((q) => !q.haBuono);
+  const beneficiari = destinatari.length ? destinatari : quote;
+  const base = Math.floor(residuo / beneficiari.length);
+  beneficiari.forEach((q) => {
+    q.costo += base;
+  });
+  beneficiari[beneficiari.length - 1].costo += residuo - base * beneficiari.length;
+  return quote.map((q) => Object.assign({}, q, { costo: q.costo / 100 }));
+}
+// Persone (px) divise fra n nomi: parte intera a tutti, resto all'ultimo, mai meno di 1 a testa
+// (prima Math.round(px/n) per ognuno gonfiava il totale: 3 px su 2 nomi diventavano 4)
+function _ripartisciPx(px, n) {
+  const tot = parseInt(px) || 0;
+  if (n <= 0) return [];
+  if (tot < n) return Array(n).fill(1);
+  const base = Math.floor(tot / n);
+  const out = Array(n).fill(base);
+  out[n - 1] += tot - base * n;
+  return out;
+}
+// Il budget Maison e' mensile ("CHF/mese"): lo speso si confronta con il MESE CORRENTE
+// (o con l'anno corrente dove l'utente lo sceglie, budget x12). Un'unica funzione per lista
+// Budget, alert, Home e dashboard: prima ogni schermata usava un periodo diverso.
+function _righePerBudget(nome, periodo) {
+  const now = new Date();
+  const prefisso =
+    periodo === 'anno'
+      ? String(now.getFullYear())
+      : now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  const nl = (nome || '').toLowerCase();
+  return getMaisonRepartoExpanded().filter(
+    (r) => r.nome.toLowerCase() === nl && (r.data_giornata || '').startsWith(prefisso),
+  );
+}
+function _spesoPerBudget(nome, periodo) {
+  return _righePerBudget(nome, periodo).reduce((s, r) => s + parseFloat(r.costo || 0), 0);
+}
+// Cancellazioni/aggiornamenti per settore sul DB: le righe vecchie hanno reparto_dip NULL e
+// l'app le considera 'slots' (vedi getMaisonReparto), quindi per slots vanno toccate anche quelle
+function _filtriReparto(filtro) {
+  const base = filtro ? filtro + '&' : '';
+  const out = [base + 'reparto_dip=eq.' + currentReparto];
+  if (currentReparto === 'slots') out.push(base + 'reparto_dip=is.null');
+  return out;
+}
+async function _secDelReparto(table, filtro) {
+  for (const f of _filtriReparto(filtro)) await secDel(table, f);
+}
+async function _secPatchReparto(table, filtro, data) {
+  for (const f of _filtriReparto(filtro)) await secPatch(table, f, data);
+}
 function _contaBuoni(righe, tipo) {
   return righe
     .filter((r) => r.tipo_buono === tipo)
@@ -782,13 +890,10 @@ async function caricaMaisonFile(input, forzaSostituisci) {
       } else {
         giorniNuovi++;
       }
-      // Cancella dati esistenti per questa data (solo reparto corrente)
-      await secDel('costi_maison', 'data_giornata=eq.' + dataGiornata + '&reparto_dip=eq.' + currentReparto);
+      // Cancella dati esistenti per questa data (solo reparto corrente, comprese righe senza settore)
+      await _secDelReparto('costi_maison', 'data_giornata=eq.' + dataGiornata);
       // Cancella anche spese_extra Seven di questa data (evita duplicati su reimport)
-      await secDel(
-        'spese_extra',
-        'data_spesa=eq.' + dataGiornata + '&reparto_dip=eq.' + currentReparto + '&luogo=eq.Ristorante%20Seven',
-      );
+      await _secDelReparto('spese_extra', 'data_spesa=eq.' + dataGiornata + '&luogo=eq.Ristorante%20Seven');
       // Parsing righe
       const _giornoDuplicati = new Set();
       for (let i = startRow; i < data.length; i++) {
@@ -805,30 +910,19 @@ async function caricaMaisonFile(input, forzaSostituisci) {
         const nNomiNoSeven = parsedAll.filter((p) => !p.isSeven && p.nome).length;
         const nNomi = nNomiNoSeven || 1;
         const rigaHaSeven = parsedAll.some((p) => p.isSeven);
-        // Auto-calcola quantità buoni dal costo se non specificata nel testo
-        parsedAll.forEach((p) => {
-          if (p.tipoBuono && BUONO_VALORI[p.tipoBuono]) {
-            const valBuono = BUONO_VALORI[p.tipoBuono];
-            // Calcola qty dal costo: se supera il valore di 1 buono, sono 2+
-            if (p.tipiBuono && p.tipiBuono.length === 1 && p.tipiBuono[0].qty <= 1) {
-              const calcQty = Math.ceil(costo / valBuono);
-              if (calcQty >= 1) {
-                p.tipiBuono[0].qty = calcQty;
-                p.note = calcQty + p.tipoBuono;
-              }
-            }
-          }
-        });
-        // Se un nome nel gruppo ha tipo_buono, calcola splitting intelligente
-        const gruppoTipo = parsedAll.find((p) => p.tipoBuono);
-        let _grpBuonoCosto = 0,
-          _grpRestoCosto = costo;
-        if (gruppoTipo && nNomi > 1 && BUONO_VALORI[gruppoTipo.tipoBuono]) {
-          const qMatch = (gruppoTipo.note || '').match(/(\d+)\s*(BU|BL|CG|WL)/i);
-          const qTot = qMatch ? parseInt(qMatch[1]) : 1;
-          _grpBuonoCosto = Math.min(qTot * BUONO_VALORI[gruppoTipo.tipoBuono], costo);
-          _grpRestoCosto = costo - _grpBuonoCosto;
-        }
+        // Quote di costo e persone per i nomi non-Seven della riga: la quantita' di buoni e'
+        // quella scritta nel file (default 1), mai ricavata dal costo (vedi _ripartisciCostoBuoni)
+        const _idxNoSeven = parsedAll.map((p, i) => i).filter((i) => !parsedAll[i].isSeven && parsedAll[i].nome);
+        const _quote = _ripartisciCostoBuoni(
+          costo,
+          _idxNoSeven.map((i) => ({
+            nome: parsedAll[i].nome,
+            tipoBuono: parsedAll[i].tipoBuono,
+            tipi: parsedAll[i].tipiBuono,
+          })),
+          (t) => BUONO_VALORI[t],
+        );
+        const _pxQuote = _ripartisciPx(px, _idxNoSeven.length || 1);
         for (let _ni = 0; _ni < nomiRaw.length; _ni++) {
           const parsed = parsedAll[_ni];
           if (!parsed.nome) continue;
@@ -891,24 +985,25 @@ async function caricaMaisonFile(input, forzaSostituisci) {
           } else {
             _giornoDuplicati.add(_dupKey);
           }
-          // Calcola costo per questo nome nel gruppo
-          let _nomeCosto;
-          if (gruppoTipo && nNomi > 1 && BUONO_VALORI[gruppoTipo.tipoBuono]) {
-            _nomeCosto = parsed.tipoBuono
-              ? Math.round(_grpBuonoCosto * 100) / 100
-              : Math.round((_grpRestoCosto / (nNomi - 1)) * 100) / 100;
-          } else {
-            _nomeCosto = Math.round((costo / nNomi) * 100) / 100;
-          }
-          // Se ha più tipi buono (es. 1BL + 2CG), crea righe separate
+          // Quota di costo e persone di questo nome (calcolate sopra per tutta la riga)
+          const _qi = _idxNoSeven.indexOf(_ni);
+          const _nomeCosto = _qi === -1 ? 0 : _quote[_qi].costo;
+          const _nomePx = _qi === -1 ? 1 : _pxQuote[_qi];
+          // Se ha più tipi buono (es. 1BL + 2CG), crea righe separate: ogni riga vale i suoi
+          // buoni, l'ultima prende il resto della quota del nome (somma esatta)
           if (parsed.tipiBuono && parsed.tipiBuono.length > 1) {
-            const totQty = parsed.tipiBuono.reduce((s, t) => s + t.qty, 0);
-            for (const tb of parsed.tipiBuono) {
-              const quotaCosto = Math.round(((_nomeCosto * tb.qty) / totQty) * 100) / 100;
+            let _residuoNome = Math.round(_nomeCosto * 100);
+            const _pxTipi = _ripartisciPx(_nomePx, parsed.tipiBuono.length);
+            for (let _ti = 0; _ti < parsed.tipiBuono.length; _ti++) {
+              const tb = parsed.tipiBuono[_ti];
+              let _centesimi = Math.min(Math.round((BUONO_VALORI[tb.tipo] || 0) * tb.qty * 100), _residuoNome);
+              if (_ti === parsed.tipiBuono.length - 1) _centesimi = _residuoNome;
+              _residuoNome -= _centesimi;
+              const quotaCosto = _centesimi / 100;
               const rec = {
                 data_giornata: dataGiornata,
                 nome: parsed.nome,
-                px: Math.round(((px / nNomi) * tb.qty) / totQty) || 1,
+                px: _pxTipi[_ti],
                 costo: quotaCosto,
                 tipo_buono: tb.tipo,
                 note:
@@ -930,7 +1025,7 @@ async function caricaMaisonFile(input, forzaSostituisci) {
             const rec = {
               data_giornata: dataGiornata,
               nome: parsed.nome,
-              px: Math.round(px / nNomi) || 1,
+              px: _nomePx,
               costo: _nomeCosto,
               tipo_buono: parsed.tipoBuono,
               note: parsed.note,

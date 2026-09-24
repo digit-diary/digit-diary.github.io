@@ -54,11 +54,35 @@ function toast(m, durata, tipo) {
 function toastErrore(m, durata) {
   toast(m, durata, 'errore');
 }
+// Anche le virgolette vanno convertite: un nome con " o ' finiva dentro
+// value="..." e chiudeva l'attributo (iniezione di attributi)
 function esc(s) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/\n/g, '<br>');
 }
 function escP(s) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+// Salva un'impostazione e rende visibile il rifiuto: setImp lancia se il
+// database non risponde e chi chiama da un bottone non avrebbe altro avviso.
+// Ritorna false se non salvata, cosi' chi chiama non annuncia un successo.
+async function salvaImp(k, v) {
+  try {
+    await setImp(k, v);
+    return true;
+  } catch (e) {
+    toastErrore('Impostazione non salvata: ' + (e.message || e));
+    return false;
+  }
 }
 
 // PDF PREVIEW
@@ -338,26 +362,23 @@ async function _verificaNome(nome) {
   if (best && bestDist <= 2) {
     return new Promise((res) => {
       const b = document.getElementById('pwd-modal-content');
+      // Niente dati dentro codice inline: con un apostrofo nel nome (D'Amico)
+      // l'onclick era un errore di sintassi e il modal restava bloccato
       b.innerHTML =
         '<h3>Nome simile trovato</h3><p style="margin-bottom:16px">Hai scritto <strong>"' +
         escP(nome) +
-        "\"</strong> ma esiste gia un collaboratore simile:</p><div style=\"text-align:center;margin-bottom:20px\"><button class=\"btn-salva\" onclick=\"document.getElementById('pwd-modal').classList.add('hidden');document.querySelector('[data-verify-resolve]').dataset.result='" +
+        '"</strong> ma esiste gia un collaboratore simile:</p><div style="text-align:center;margin-bottom:20px"><button class="btn-salva" data-verify-usa="best" style="background:#2c6e49;padding:12px 24px;font-size:1rem">Usa "' +
         escP(best) +
-        '\';document.querySelector(\'[data-verify-resolve]\').click()" style="background:#2c6e49;padding:12px 24px;font-size:1rem">Usa "' +
-        escP(best) +
-        "\"</button></div><div style=\"text-align:center\"><button class=\"btn-salva\" onclick=\"document.getElementById('pwd-modal').classList.add('hidden');document.querySelector('[data-verify-resolve]').dataset.result='" +
-        escP(nome) +
-        '\';document.querySelector(\'[data-verify-resolve]\').click()" style="background:var(--paper2);color:var(--muted);border:1px solid var(--line);padding:10px 20px;font-size:.88rem;box-shadow:none">No, usa "' +
+        '"</button></div><div style="text-align:center"><button class="btn-salva" data-verify-usa="nome" style="background:var(--paper2);color:var(--muted);border:1px solid var(--line);padding:10px 20px;font-size:.88rem;box-shadow:none">No, usa "' +
         escP(nome) +
         '" cosi com\'e</button></div>';
-      const resolver = document.createElement('button');
-      resolver.style.display = 'none';
-      resolver.dataset.verifyResolve = '1';
-      resolver.onclick = function () {
-        res(this.dataset.result);
-        this.remove();
-      };
-      document.body.appendChild(resolver);
+      const scelte = { best, nome };
+      b.querySelectorAll('[data-verify-usa]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          document.getElementById('pwd-modal').classList.add('hidden');
+          res(scelte[btn.dataset.verifyUsa]);
+        });
+      });
       document.getElementById('pwd-modal').classList.remove('hidden');
     });
   }

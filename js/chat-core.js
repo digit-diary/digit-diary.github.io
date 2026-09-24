@@ -126,13 +126,20 @@ async function _chatPatchMessage(chatMessageId, updates) {
   for (const k in updates) {
     const v = updates[k];
     if (k === 'letta' && v === true) {
-      // Marca come letto per l'operatore corrente (idempotent)
+      // Marca come letto per l'operatore corrente (idempotent).
+      // La cache si aggiorna solo se il server ha risposto: sbRpc non lancia
+      // sull'errore del database (torna null e lascia _sbUltimoErrore), e
+      // segnare "letta" in locale senza averlo scritto faceva sparire il
+      // messaggio dai non letti fino al prossimo ricaricamento
+      let segnata = false;
       try {
         await sbRpc('chat_mark_letta', { p_token: tk, p_message_id: chatMessageId });
+        segnata = !(_sbUltimoErrore && _sbUltimoErrore.fn === 'chat_mark_letta');
       } catch (e) {
         console.warn('chat_mark_letta:', e.message);
       }
-      if (!chatLettiCache.some((l) => l.message_id === chatMessageId && l.operatore === op)) {
+      if (!segnata) console.warn('chat_mark_letta non registrata, cache non aggiornata');
+      else if (!chatLettiCache.some((l) => l.message_id === chatMessageId && l.operatore === op)) {
         chatLettiCache.push({ message_id: chatMessageId, operatore: op, letta_at: new Date().toISOString() });
       }
     } else if ((k === 'nascosta_mitt' || k === 'nascosta_dest') && v === true) {
@@ -214,6 +221,19 @@ async function _chatInsertMessage(opts) {
         p_nome: nome,
         p_members: opts.gruppoMembers || [da],
       });
+      // Senza gruppo non si invia: prima il messaggio partiva con group_id
+      // nullo e senza destinatario, quindi invisibile a tutti. Si avvisa qui e
+      // si lancia, cosi' anche chi chiama (try/catch con toast) non annuncia
+      // "inviato"
+      if (newGroupId === null || newGroupId === undefined) {
+        const msg =
+          'Gruppo chat non disponibile: ' +
+          (_sbUltimoErrore && _sbUltimoErrore.fn === 'chat_get_or_create_group'
+            ? _sbErroreTesto(_sbUltimoErrore)
+            : 'nessuna risposta dal server');
+        toastErrore(msg);
+        throw new Error(msg);
+      }
       group = { id: newGroupId, nome, tipo, legacy_gid: legacyGid, creato_da: da, created_at: _batchTs };
       chatGroupsCache.push(group);
       for (const m of opts.gruppoMembers || [da]) {

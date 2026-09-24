@@ -500,7 +500,23 @@ function toggleConvNewDropdown(ev) {
     );
   }, 0);
 }
+// Amministratore di un gruppo personalizzato = chi lo ha creato (primo
+// messaggio). Unica fonte per l'intestazione e per le azioni: rinominare e
+// cambiare i membri si controllano anche qui, non solo nei pulsanti.
+function _adminGruppo(gid) {
+  const note = noteColleghiCache
+    .filter((x) => x.gruppo_id === gid)
+    .sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+  return note.length ? note[0].da_operatore : '';
+}
+function _sonoAdminGruppo(gid) {
+  const adm = String(gid || '').startsWith('__gruppo_custom_') ? _adminGruppo(gid) : '';
+  if (adm && adm === getOperatore()) return true;
+  toast('Solo chi ha creato il gruppo puo modificarlo');
+  return false;
+}
 async function _rinominaGruppo(gid, partner) {
+  if (!_sonoAdminGruppo(gid)) return;
   const nomeAttuale = _getGruppoNome(gid) || '';
   const nuovo = prompt('Nuovo nome del gruppo:', nomeAttuale);
   if (nuovo === null) return;
@@ -538,6 +554,7 @@ async function _rinominaGruppo(gid, partner) {
   toast('Gruppo rinominato');
 }
 function _apriRimuoviMembri(gid, partner) {
+  if (!_sonoAdminGruppo(gid)) return;
   const op = getOperatore();
   const allGruppo = noteColleghiCache.filter((x) => x.gruppo_id === gid);
   const membri = new Set();
@@ -574,6 +591,7 @@ function _apriRimuoviMembri(gid, partner) {
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
 async function _confermaRimuoviMembri(gid, partner) {
+  if (!_sonoAdminGruppo(gid)) return;
   const cbs = document.querySelectorAll('.rm-member-cb:checked');
   const daRimuovere = [...cbs].map((cb) => cb.value);
   if (!daRimuovere.length) {
@@ -687,6 +705,7 @@ function _getGruppoNome(gid) {
   return '';
 }
 function _apriAggiungiMembri(gid, partner) {
+  if (!_sonoAdminGruppo(gid)) return;
   const op = getOperatore();
   // Trova membri attuali dal DB
   const allGruppo = noteColleghiCache.filter((x) => x.gruppo_id === gid);
@@ -734,6 +753,7 @@ function _apriAggiungiMembri(gid, partner) {
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
 async function _confermaAggiungiMembri(gid, partner) {
+  if (!_sonoAdminGruppo(gid)) return;
   const cbs = document.querySelectorAll('.add-member-cb:checked');
   const nuovi = [...cbs].map((cb) => cb.value);
   if (!nuovi.length) {
@@ -1023,11 +1043,8 @@ function renderNoteChat(partner) {
           return r === rep || r === 'entrambi';
         });
     }
-    // Trova admin del gruppo (creatore = primo messaggio)
-    const _allGrpNotes = noteColleghiCache
-      .filter((x) => x.gruppo_id === _gidChat)
-      .sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
-    _grpAdmin = _allGrpNotes.length ? _allGrpNotes[0].da_operatore : '';
+    // Trova admin del gruppo (creatore = primo messaggio): stessa fonte delle azioni
+    _grpAdmin = _adminGruppo(_gidChat);
     const _isMyAdmin = _grpAdmin === op;
     const _adminBadge =
       '<span style="background:var(--accent2);color:white;font-size:.82rem;padding:0 4px;border-radius:8px;margin-left:2px;font-weight:700;vertical-align:middle">A</span>';
@@ -2088,19 +2105,70 @@ function apriSchedaCollaboratoreSicuro(nome) {
   }
 }
 
+// Sorgente UNICA della scheda, del suo PDF e del grafico: chi ha lo Storico HR
+// vede il fascicolo intero (tutti i settori), gli altri solo il settore
+// corrente. Prima il PDF e il grafico leggevano sempre il solo settore e i
+// numeri non tornavano con quelli a video.
+function _schedaSorgenti(nome) {
+  var completa = typeof puoVedereStoricoHr === 'function' && puoVedereStoricoHr();
+  var nomeL = (nome || '').toLowerCase();
+  return {
+    completa: completa,
+    entries: (completa ? datiCache : getDatiReparto()).filter(function (e) {
+      return e.nome === nome;
+    }),
+    moduli: (completa ? moduliCache : getModuliReparto()).filter(function (m) {
+      return m.collaboratore && m.collaboratore.toLowerCase() === nomeL;
+    }),
+  };
+}
+// I moduli salvano i campi dentro m.dati (moduli.js); quelli piu' vecchi li
+// hanno alla radice. Unico punto di lettura per anteprima e suggerimenti.
+function _moduloCampi(m) {
+  var dt = (m && m.dati) || {};
+  var leggi = function (k) {
+    return dt[k] != null && dt[k] !== '' ? dt[k] : (m && m[k]) || '';
+  };
+  return {
+    non_conformita: leggi('non_conformita'),
+    descrizione: leggi('descrizione'),
+    obiettivo: leggi('obiettivo'),
+    scadenza: leggi('scadenza'),
+    osservazioni: leggi('osservazioni'),
+    livello: leggi('livello'),
+  };
+}
+// Malattie: UNA unita' in scheda, confronto, media team e PDF. Si contano i
+// giorni (somma dei range, via _contaGiorniMalattia di utils.js) e, tra
+// parentesi, gli episodi. Prima la scheda mostrava giorni e il confronto episodi.
+function _malattieDi(entries, tipoMal) {
+  var ep = entries.filter(function (e) {
+    return e.tipo === tipoMal;
+  });
+  return {
+    giorni: ep.reduce(function (s, e) {
+      return s + _contaGiorniMalattia(e);
+    }, 0),
+    episodi: ep.length,
+  };
+}
+function _malattieLabel(m) {
+  if (!m.episodi) return '0';
+  return m.giorni + ' gg (' + m.episodi + (m.episodi === 1 ? ' episodio)' : ' episodi)');
+}
+
 function apriSchedaCollaboratore(nome) {
   _destroySchedaCharts();
   window._schedaTlTipo = null;
   // Vista completa (admin + permesso Storico HR): la storia del collaboratore attraverso
   // TUTTI i settori · i record restano archiviati nel settore dove sono avvenuti,
   // ma il fascicolo della persona si vede intero. Gli altri vedono solo il settore corrente.
-  const vistaCompleta = typeof puoVedereStoricoHr === 'function' && puoVedereStoricoHr();
+  const _src = _schedaSorgenti(nome);
+  const vistaCompleta = _src.completa;
   window._schedaVistaCompleta = vistaCompleta;
   const allData = getDatiReparto();
-  const entries = (vistaCompleta ? datiCache : allData).filter((e) => e.nome === nome);
-  const moduli = (vistaCompleta ? moduliCache : getModuliReparto()).filter(
-    (m) => m.collaboratore && m.collaboratore.toLowerCase() === nome.toLowerCase(),
-  );
+  const entries = _src.entries;
+  const moduli = _src.moduli;
   const now = new Date();
   const tipoErr = nomeCorrente('Errore'),
     tipoMal = nomeCorrente('Malattia'),
@@ -2117,7 +2185,8 @@ function apriSchedaCollaboratore(nome) {
     (s, e) => s + (/eccedenza/i.test(e.testo || '') ? parseFloat(e.importo) || 0 : 0),
     0,
   );
-  const totMal = _contaTotaleMalattie(entries, tipoMal);
+  const _mal = _malattieDi(entries, tipoMal);
+  const totMal = _mal.giorni;
   const totAmm = entries.filter((e) => e.tipo === tipoAmm).length;
   const tipoND = nomeCorrente('Non Disponibilità');
   const totND = entries.filter((e) => e.tipo === tipoND).length;
@@ -2208,14 +2277,6 @@ function apriSchedaCollaboratore(nome) {
   html +=
     '<button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\');_destroySchedaCharts()" style="padding:6px 12px;font-size:.82rem">Chiudi</button></div></div>';
 
-  // Calcola giorni malattia totali
-  const _malEntries = entries.filter((e) => e.tipo === tipoMal);
-  let _totGiorniMal = 0;
-  _malEntries.forEach((e) => {
-    const rm = (e.testo || '').match(/(\d+)\s*giorni/);
-    if (rm) _totGiorniMal += parseInt(rm[1]);
-    else _totGiorniMal++;
-  });
   const _malColor = totMal >= 5 ? 'var(--accent)' : totMal >= 3 ? '#e67e22' : '#1a7a6d';
   // Ultima registrazione
   const _lastEntry = entries.length ? entries.sort((a, b) => (b.data || '').localeCompare(a.data || ''))[0] : null;
@@ -2276,8 +2337,13 @@ function apriSchedaCollaboratore(nome) {
     _malColor +
     '">' +
     totMal +
-    (_totGiorniMal > totMal ? ' <span style="font-size:.82rem;font-weight:400">(' + _totGiorniMal + 'gg)</span>' : '') +
-    '</div><div class="kpi-lbl">Malattie</div></div>';
+    (_mal.episodi
+      ? ' <span style="font-size:.82rem;font-weight:400">(' +
+        _mal.episodi +
+        (_mal.episodi === 1 ? ' episodio' : ' episodi') +
+        ')</span>'
+      : '') +
+    '</div><div class="kpi-lbl">Malattie (giorni)</div></div>';
   if (totAmm)
     html +=
       '<div class="scheda-kpi"' +
@@ -2462,15 +2528,16 @@ function apriSchedaCollaboratore(nome) {
     const _allinMods = moduli.filter((m) => m.tipo === 'allineamento');
     const _allinGruppi = [];
     _allinMods.forEach((m) => {
+      const _nc = _moduloCampi(m).non_conformita;
       let trovato = false;
       for (const g of _allinGruppi) {
-        if (_motivoSimile(m.non_conformita || '', g.motivo, nome)) {
+        if (_motivoSimile(_nc, g.motivo, nome)) {
           g.count++;
           trovato = true;
           break;
         }
       }
-      if (!trovato) _allinGruppi.push({ motivo: m.non_conformita || '', count: 1 });
+      if (!trovato) _allinGruppi.push({ motivo: _nc, count: 1 });
     });
     const _allinMaxSame = _allinGruppi.reduce((mx, g) => Math.max(mx, g.count), 0);
     if (_allinMaxSame >= getSoglieDisciplinari().recidiva && rdiCount === 0) {
@@ -2549,13 +2616,13 @@ function apriSchedaCollaboratore(nome) {
         ')</div>';
     }
     // Team average comparison
-    const teamMal = _contaTotaleMalattie(allData, tipoMal);
+    const teamMal = _malattieDi(allData, tipoMal).giorni;
     const teamCollabs = new Set(allData.map((e) => e.nome)).size;
     const avgMal = teamCollabs > 0 ? teamMal / teamCollabs : 0;
     html +=
       '<div style="font-size:.82rem;color:var(--muted);margin-top:6px">Media team: ' +
       avgMal.toFixed(1) +
-      ' malattie/collaboratore · ' +
+      ' giorni di malattia/collaboratore · ' +
       (totMal > avgMal
         ? '<span style="color:var(--accent);font-weight:600">Sopra media</span>'
         : '<span style="color:#2c6e49;font-weight:600">Nella norma</span>') +
@@ -3005,6 +3072,7 @@ function apriVoceTimeline(source, id) {
     });
     if (!m) return;
     var label = { allineamento: 'Allineamento', apprezzamento: 'Apprezzamento', rdi: 'RDI' }[m.tipo] || m.tipo;
+    var mc = _moduloCampi(m);
     var rawD = m.data_modulo || m.created_at || '';
     var dObj = rawD ? new Date(String(rawD).length <= 10 ? rawD + 'T12:00:00' : rawD) : null;
     var dm = dObj && !isNaN(dObj) ? dObj.toLocaleDateString('it-IT') : '';
@@ -3017,13 +3085,13 @@ function apriVoceTimeline(source, id) {
       dm +
       (m.resp_settore ? ' · Resp. settore: ' + escP(m.resp_settore) : '') +
       (m.operatore ? ' · inserito da ' + escP(m.operatore) : '') +
-      (m.livello ? ' · Livello ' + escP(m.livello) : '') +
+      (mc.livello ? ' · Livello ' + escP(mc.livello) : '') +
       '</p>';
-    html += riga('Non conformità', m.non_conformita);
-    html += riga('Descrizione', m.descrizione);
-    html += riga('Obiettivo', m.obiettivo);
-    html += riga('Scadenza', m.scadenza);
-    html += riga('Osservazioni', m.osservazioni);
+    html += riga('Non conformità', mc.non_conformita);
+    html += riga('Descrizione', mc.descrizione);
+    html += riga('Obiettivo', mc.obiettivo);
+    html += riga('Scadenza', mc.scadenza);
+    html += riga('Osservazioni', mc.osservazioni);
   }
   html += '<div class="pwd-modal-btns" style="margin-top:14px">';
   if (source === 'mod')
@@ -3042,7 +3110,8 @@ function apriPdfModuloDaScheda(id) {
   document.getElementById('pwd-modal').classList.add('hidden');
   document.getElementById('profilo-modal').classList.add('hidden');
   _destroySchedaCharts();
-  if (typeof ristampaModuloPDF === 'function') ristampaModuloPDF(id);
+  // ristampaModuloPDF attende che il modulo (firme comprese) sia caricato
+  if (typeof ristampaModuloPDF === 'function') return ristampaModuloPDF(id);
 }
 
 // Mini-indice della scheda: scrolla alla sezione con quel titolo
@@ -3063,14 +3132,9 @@ function _schedaFilterTimeline(nome) {
     alEl = document.getElementById('scheda-tl-al');
   var dal = dalEl ? dalEl.value : '',
     al = alEl ? alEl.value : '';
-  var entries = (window._schedaVistaCompleta ? datiCache : getDatiReparto()).filter(function (e) {
-    return e.nome === nome;
-  });
-  var moduli = (window._schedaVistaCompleta ? moduliCache : getModuliReparto()).filter(function (m) {
-    return m.collaboratore && m.collaboratore.toLowerCase() === nome.toLowerCase();
-  });
+  var src = _schedaSorgenti(nome);
   var tl = document.getElementById('scheda-timeline');
-  if (tl) tl.innerHTML = _renderSchedaTimeline(nome, entries, moduli, dal, al);
+  if (tl) tl.innerHTML = _renderSchedaTimeline(nome, src.entries, src.moduli, dal, al);
 }
 
 function schedaResetTlFilter(nome) {
@@ -3089,9 +3153,8 @@ function schedaResetTlFilter(nome) {
 
 function _renderSchedaTrendChart(nome, entries) {
   var tipoErr = nomeCorrente('Errore');
-  var moduli = getModuliReparto().filter(function (m) {
-    return m.collaboratore && m.collaboratore.toLowerCase() === nome.toLowerCase();
-  });
+  // stessa sorgente della scheda a video (tutti i settori con lo Storico HR)
+  var moduli = _schedaSorgenti(nome).moduli;
   var now = new Date();
   var labels = [],
     errData = [],
@@ -3257,20 +3320,17 @@ function stampaSchedaPDF(nome) {
     toast('Libreria PDF non caricata');
     return;
   }
-  var allData = getDatiReparto();
-  var entries = allData.filter(function (e) {
-    return e.nome === nome;
-  });
-  var moduli = getModuliReparto().filter(function (m) {
-    return m.collaboratore && m.collaboratore.toLowerCase() === nome.toLowerCase();
-  });
+  // stessa sorgente della scheda a video (tutti i settori con lo Storico HR)
+  var _src = _schedaSorgenti(nome);
+  var entries = _src.entries;
+  var moduli = _src.moduli;
   var tipoErr = nomeCorrente('Errore'),
     tipoMal = nomeCorrente('Malattia'),
     tipoAmm = nomeCorrente('Ammonimento Verbale');
   var totErr = entries.filter(function (e) {
     return e.tipo === tipoErr;
   }).length;
-  var totMal = _contaTotaleMalattie(entries, tipoMal);
+  var totMal = _malattieLabel(_malattieDi(entries, tipoMal));
   var totAmm = entries.filter(function (e) {
     return e.tipo === tipoAmm;
   }).length;
@@ -3344,7 +3404,16 @@ function stampaSchedaPDF(nome) {
     theme: 'grid',
     startY: y,
     head: [
-      ['Registrazioni', 'Errori', 'Costo Errori', 'Malattie', 'Amm. Verbali', 'Allineamenti', 'Apprezzamenti', 'RDI'],
+      [
+        'Registrazioni',
+        'Errori',
+        'Costo Errori',
+        'Malattie (giorni)',
+        'Amm. Verbali',
+        'Allineamenti',
+        'Apprezzamenti',
+        'RDI',
+      ],
     ],
     body: [
       [
@@ -3392,7 +3461,15 @@ function stampaSchedaPDF(nome) {
           'Competenze certificate',
         ],
       ],
-      body: [[lvPdf ? 'Livello ' + lvPdf : '-', ptsPdf, copPdf, rifPdf, compsPdf.length ? compsPdf.join(', ') : '-']],
+      body: [
+        [
+          lvPdf ? (typeof livelloNome === 'function' ? livelloNome(lvPdf) : 'Livello ' + lvPdf) : '-',
+          ptsPdf,
+          copPdf,
+          rifPdf,
+          compsPdf.length ? compsPdf.join(', ') : '-',
+        ],
+      ],
       headStyles: { fillColor: [139, 105, 20], fontSize: 7 },
       bodyStyles: { fontSize: 8, halign: 'center' },
       margin: { left: 14, right: 14 },
@@ -3619,9 +3696,7 @@ function _mostraConfronto(nomi) {
           return e.tipo === tipoErr;
         }).length +
         '</td><td class="num">' +
-        entries.filter(function (e) {
-          return e.tipo === tipoMal;
-        }).length +
+        _malattieLabel(_malattieDi(entries, tipoMal)) +
         '</td><td class="num">' +
         entries.filter(function (e) {
           return e.tipo === tipoAmm;
@@ -3646,7 +3721,7 @@ function _mostraConfronto(nomi) {
   html +=
     '<button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\');_destroySchedaCharts()" style="padding:6px 12px;font-size:.82rem">Chiudi</button></div>';
   html +=
-    '<table class="collab-table" style="margin-bottom:16px"><thead><tr><th>Collaboratore</th><th class="num">Tot</th><th class="num">Errori</th><th class="num">Malattie</th><th class="num">Amm. Verb.</th><th class="num">Allineam.</th><th class="num">Appr.</th></tr></thead><tbody>' +
+    '<table class="collab-table" style="margin-bottom:16px"><thead><tr><th>Collaboratore</th><th class="num">Tot</th><th class="num">Errori</th><th class="num">Malattie (giorni)</th><th class="num">Amm. Verb.</th><th class="num">Allineam.</th><th class="num">Appr.</th></tr></thead><tbody>' +
     tableRows +
     '</tbody></table>';
   html +=

@@ -165,6 +165,11 @@ async function ripristinaCestino(tabella, id) {
   }
 }
 async function eliminaDefinitivo(tabella, id) {
+  // il controllo era solo nell'interfaccia: la funzione resta richiamabile dalla console
+  if (!isAdmin()) {
+    toast('Riservato all amministratore');
+    return;
+  }
   // CONSERVAZIONE (regolamento aziendale / RAP): un record dell'archivio degli
   // ultimi N anni non si cancella. Restano eliminabili le voci inserite da poco
   // (correzioni di battitura), che archivio non sono.
@@ -191,6 +196,10 @@ async function eliminaDefinitivo(tabella, id) {
   }
 }
 async function svuotaCestino() {
+  if (!isAdmin()) {
+    toast('Riservato all amministratore');
+    return;
+  }
   const tot = _cestinoModuli.length + _cestinoReg.length;
   if (!tot) {
     toast('Cestino già vuoto');
@@ -311,6 +320,11 @@ async function apriFixImpiego() {
   el.innerHTML = h;
 }
 async function salvaFixImpiego() {
+  // stesso permesso della scheda collaboratore (Impiego)
+  if (!puoModificare('gestione_impiego')) {
+    toast('Riservato all amministratore');
+    return;
+  }
   const sel = [...document.querySelectorAll('[data-fix-imp]')];
   if (!sel.length) return;
   if (!confirm("Salvo l'impiego di " + sel.length + ' collaboratori?')) return;
@@ -337,6 +351,11 @@ async function salvaFixImpiego() {
 // righe di riempimento arrivate dagli import Excel: si tolgono dal piano,
 // i mesi con turni veri restano come storia di lavoro
 async function pulisciPianoDisattivati() {
+  // cancella righe del piano: stesso permesso della griglia turni
+  if (!puoModificare('gestione_piano')) {
+    toast('Riservato all amministratore');
+    return;
+  }
   try {
     const [collab, righe] = await Promise.all([
       secGet('collaboratori?select=nome,attivo&limit=2000'),
@@ -556,11 +575,14 @@ async function apriFixOrfani() {
     secGet('collaboratori?select=nome,attivo,reparto_dip&limit=2000'),
     secGet('piano?select=collaboratore,data,reparto_dip&limit=40000'),
   ]);
-  const esiste = new Set((collab || []).map((c) => c.nome.toLowerCase()));
+  // una riga del piano senza nome (collaboratore nullo) non deve far saltare
+  // tutto il controllo: si raggruppa a parte e si segnala come "senza nome"
+  const esiste = new Set((collab || []).map((c) => String(c.nome || '').toLowerCase()));
   const orf = {};
   (righe || []).forEach((r) => {
-    if (esiste.has(r.collaboratore.toLowerCase())) return;
-    const o = (orf[r.collaboratore] = orf[r.collaboratore] || {
+    const nomeRiga = String(r.collaboratore || '').trim();
+    if (nomeRiga && esiste.has(nomeRiga.toLowerCase())) return;
+    const o = (orf[nomeRiga] = orf[nomeRiga] || {
       n: 0,
       rep: r.reparto_dip || 'slots',
       da: r.data,
@@ -590,16 +612,30 @@ async function apriFixOrfani() {
     h +=
       '<div style="padding:8px 0;border-bottom:1px solid var(--line)">' +
       '<b style="font-size:.9rem">' +
-      escP(nome) +
+      (nome ? escP(nome) : '(senza nome)') +
       '</b> <span style="font-size:.82rem;color:var(--muted)">' +
       o.n +
       ' turni &middot; ' +
       escP(repartoLabel(o.rep)) +
       ' &middot; dal ' +
-      o.da.split('-').reverse().join('.') +
+      String(o.da || '')
+        .split('-')
+        .reverse()
+        .join('.') +
       ' al ' +
-      o.a.split('-').reverse().join('.') +
-      '</span><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">' +
+      String(o.a || '')
+        .split('-')
+        .reverse()
+        .join('.') +
+      '</span>';
+    if (!nome) {
+      // senza nome non c'e' niente su cui creare, spostare o filtrare: solo segnalazione
+      h +=
+        '<div style="font-size:.82rem;color:var(--muted);margin-top:4px">Righe del piano senza collaboratore: vanno corrette nel piano.</div></div>';
+      return;
+    }
+    h +=
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">' +
       '<button class="btn-export" style="font-size:.82rem;padding:4px 10px;border-color:#2c6e49;color:#2c6e49" onclick="orfanoCreaScheda(\'' +
       nomeJs +
       "','" +
@@ -667,6 +703,11 @@ async function orfanoSposta(nome, idx) {
   }
 }
 async function orfanoElimina(nome, n) {
+  // cancella righe del piano: stesso permesso della griglia turni
+  if (!puoModificare('gestione_piano')) {
+    toast('Riservato all amministratore');
+    return;
+  }
   if (
     !confirm(
       'ATTENZIONE: elimino ' +
@@ -710,8 +751,11 @@ async function controlloSalute() {
       secGet('piano_turni?select=codice,reparto_dip,attivo&limit=500'),
     ]);
     const attivi = (collab || []).filter((c) => c.attivo !== false);
+    // nomi sempre come stringa: una scheda o una riga del piano senza nome
+    // faceva fallire l'intero controllo su .toLowerCase()
+    const nomeDi = (x) => String(x || '').trim();
     const perNome = {};
-    (collab || []).forEach((c) => (perNome[c.nome.toLowerCase()] = c));
+    (collab || []).forEach((c) => (perNome[nomeDi(c.nome).toLowerCase()] = c));
 
     // 1) impiego non indicato (serve per CGF, limiti ore, report)
     const senzaImpiego = attivi.filter((c) => !c.impiego);
@@ -745,7 +789,13 @@ async function controlloSalute() {
     );
 
     // 3) turni di persone che non esistono in anagrafica
-    const orfani = [...new Set((righe || []).map((r) => r.collaboratore).filter((n) => !perNome[n.toLowerCase()]))];
+    const orfani = [
+      ...new Set(
+        (righe || [])
+          .map((r) => nomeDi(r.collaboratore) || '(senza nome)')
+          .filter((n) => n === '(senza nome)' || !perNome[n.toLowerCase()]),
+      ),
+    ];
     add(
       orfani.length ? 'ko' : 'ok',
       'Turni collegati a una scheda',
@@ -755,31 +805,29 @@ async function controlloSalute() {
       orfani.length ? 'FIX:apriFixOrfani()|Sistema questi nomi' : '',
     );
 
-    // 3-bis) congedo non pagato: mesi interi di sola C che non maturano anzianita'
+    // 3-bis) mesi interi di sola C nel piano: solo informativo. Trattarli in
+    // automatico come congedo non pagato che sposta i giubilei e' contrario al
+    // regolamento (RAP 5.14: un congedo fino a 6 mesi NON interrompe
+    // l'anzianita'), quindi niente FIX automatico: se ne occupera' la sezione
+    // Congedi non pagati in arrivo
     const perMeseC = {};
     (righe || []).forEach((r) => {
-      const k = r.collaboratore + '|' + String(r.data).substring(0, 7);
+      const k = nomeDi(r.collaboratore) + '|' + String(r.data).substring(0, 7);
       if (!perMeseC[k]) perMeseC[k] = { tot: 0, soloC: true };
       perMeseC[k].tot++;
       if (String(r.codice || '').toUpperCase() !== 'C') perMeseC[k].soloC = false;
     });
-    const fermi = {};
+    let mesiFermi = 0;
     Object.keys(perMeseC).forEach((k) => {
-      const [nome] = k.split('|');
-      if (perMeseC[k].soloC && perMeseC[k].tot >= 26) fermi[nome] = (fermi[nome] || 0) + 1;
-    });
-    const daRegistrare = Object.keys(fermi).filter((n) => {
-      const c = perNome[n.toLowerCase()];
-      return c && (parseInt(c.mesi_congedo_non_pagato) || 0) !== fermi[n];
+      if (perMeseC[k].soloC && perMeseC[k].tot >= 26) mesiFermi++;
     });
     add(
-      daRegistrare.length ? 'attenzione' : 'ok',
+      'ok',
       'Congedo non pagato e giubilei',
-      daRegistrare.length
-        ? daRegistrare.slice(0, 6).join(', ') +
-            ': nel piano risultano mesi interi senza lavoro (solo C). Sono congedo non pagato e non maturano anzianita, quindi spostano in avanti i giubilei.'
-        : 'I mesi di congedo non pagato risultano registrati sulle schede.',
-      daRegistrare.length ? 'FIX:pianoRilevaCongedoNonPagato()|Registra i mesi di congedo' : '',
+      mesiFermi
+        ? 'Mesi senza turni rilevati: ' + mesiFermi + ' (da verificare nella sezione Congedi non pagati, in arrivo)'
+        : 'Nessun mese intero senza turni nel piano.',
+      '',
     );
 
     // 3-ter) date di nascita mancanti (servono per i compleanni)
@@ -804,7 +852,7 @@ async function controlloSalute() {
     const disattiviConTurni = [
       ...new Set(
         (righe || [])
-          .map((r) => perNome[r.collaboratore.toLowerCase()])
+          .map((r) => perNome[nomeDi(r.collaboratore).toLowerCase()])
           .filter((c) => c && c.attivo === false)
           .map((c) => c.nome),
       ),
@@ -824,7 +872,7 @@ async function controlloSalute() {
       ...new Set(
         (righe || [])
           .filter((r) => {
-            const c = perNome[r.collaboratore.toLowerCase()];
+            const c = perNome[nomeDi(r.collaboratore).toLowerCase()];
             if (!c) return false;
             const suo = c.reparto_dip || 'slots';
             const rep = r.reparto_dip || 'slots';
@@ -877,7 +925,7 @@ async function controlloSalute() {
     );
 
     // 8) schede di prova rimaste
-    const prova = attivi.filter((c) => /^(sig\.|test|mario rossi|zztest)/i.test(c.nome.trim()));
+    const prova = attivi.filter((c) => /^(sig\.|test|mario rossi|zztest)/i.test(nomeDi(c.nome)));
     add(
       prova.length ? 'attenzione' : 'ok',
       'Schede di prova',

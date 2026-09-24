@@ -4,6 +4,18 @@
  * Maison: budget, categorie, profilo
  */
 
+// Etichetta leggibile della categoria budget: unica mappa per lista, CSV e PDF
+// (il CSV conosceva solo Full Maison/Maison e lasciava vuote Direzione/BU/BL)
+const MAISON_CAT_LABEL = {
+  full_maison: 'Full Maison',
+  maison: 'Maison',
+  direzione: 'Direzione',
+  bu: 'Buono Unico',
+  bl: 'Buono Lounge',
+};
+function _maisonCatLabel(cat) {
+  return (cat && MAISON_CAT_LABEL[cat]) || '';
+}
 function renderMaisonBudgetUI() {
   const el = document.getElementById('maison-budget-list');
   if (!el) return;
@@ -54,9 +66,8 @@ function renderMaisonBudgetUI() {
   // Build client data
   const clients = tuttiNomi.map((nome) => {
     const b = _br.find((x) => x.nome.toLowerCase() === nome.toLowerCase());
-    const spent = _mr
-      .filter((r) => r.nome.toLowerCase() === nome.toLowerCase())
-      .reduce((s, r) => s + parseFloat(r.costo || 0), 0);
+    // Budget mensile: la percentuale si calcola sullo speso di questo mese, non sullo storico
+    const spent = _spesoPerBudget(nome);
     const cat = b ? b.categoria || '' : '';
     return { nome, b, spent, cat };
   });
@@ -97,7 +108,7 @@ function renderMaisonBudgetUI() {
         ? new Date(c.b.data_nascita + 'T12:00:00').toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })
         : '';
     const isBday = c.b ? _isCompleannoOggi(c.b.data_nascita) : false;
-    const ne = c.nome.replace(/'/g, "\\'");
+    const ne = _jsArg(c.nome);
     const budgetBar =
       c.b && c.b.budget_chf
         ? '<div class="budget-bar"><div class="budget-bar-fill" style="width:' +
@@ -139,7 +150,9 @@ function renderMaisonBudgetUI() {
       _catBadgeRow +
       (isBday ? ' <span style="font-size:1.1rem"><i class="icx icx-torta"></i></span>' : '') +
       '</span>' +
-      (c.spent ? '<span style="font-size:.82rem;color:var(--muted)">' + fmtCHF(c.spent) + ' CHF</span>' : '') +
+      (c.spent
+        ? '<span style="font-size:.82rem;color:var(--muted)">' + fmtCHF(c.spent) + ' CHF questo mese</span>'
+        : '') +
       (c.b && c.b.budget_chf
         ? '<span style="font-size:.82rem;color:' + pctColor + ';font-weight:600">' + pct + '%</span>' + budgetBar
         : '') +
@@ -245,15 +258,15 @@ function assegnaCatRapida(nome) {
     '<h3>Assegna categoria</h3><p style="color:var(--muted);margin-bottom:16px">' +
     escP(nome) +
     '</p><div style="display:flex;flex-direction:column;gap:10px"><button class="btn-salva" style="background:#b8860b" onclick="salvaAssegnaCat(\'' +
-    nome.replace(/'/g, "\\'") +
+    _jsArg(nome) +
     '\',\'full_maison\')">Full Maison</button><button class="btn-salva" style="background:#2980b9" onclick="salvaAssegnaCat(\'' +
-    nome.replace(/'/g, "\\'") +
+    _jsArg(nome) +
     '\',\'maison\')">Maison</button><button class="btn-salva" style="background:#8e44ad" onclick="salvaAssegnaCat(\'' +
-    nome.replace(/'/g, "\\'") +
+    _jsArg(nome) +
     '\',\'direzione\')">Direzione</button><button class="btn-salva" style="background:#e67e22" onclick="salvaAssegnaCat(\'' +
-    nome.replace(/'/g, "\\'") +
+    _jsArg(nome) +
     '\',\'bu\')">Buono Unico</button><button class="btn-salva" style="background:#2c6e49" onclick="salvaAssegnaCat(\'' +
-    nome.replace(/'/g, "\\'") +
+    _jsArg(nome) +
     "','bl')\">Buono Lounge</button><button class=\"btn-modal-cancel\" onclick=\"document.getElementById('pwd-modal').classList.add('hidden')\">Annulla</button></div>";
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
@@ -436,7 +449,7 @@ function esportaListaMaisonCSV() {
   _br.forEach((b) => {
     rows.push([
       b.nome,
-      b.categoria === 'full_maison' ? 'Full Maison' : b.categoria === 'maison' ? 'Maison' : '',
+      _maisonCatLabel(b.categoria),
       b.budget_chf || '',
       b.budget_bu || '',
       b.budget_bl || '',
@@ -492,17 +505,7 @@ async function esportaListaMaisonPDF() {
       .sort((a, b) => catOrder.indexOf(a.categoria) - catOrder.indexOf(b.categoria) || a.nome.localeCompare(b.nome));
     const body = sorted.map((b) => [
       b.nome,
-      b.categoria === 'full_maison'
-        ? 'Full Maison'
-        : b.categoria === 'maison'
-          ? 'Maison'
-          : b.categoria === 'direzione'
-            ? 'Direzione'
-            : b.categoria === 'bu'
-              ? 'Buono Unico'
-              : b.categoria === 'bl'
-                ? 'Buono Lounge'
-                : '-',
+      _maisonCatLabel(b.categoria) || '-',
       b.budget_chf ? parseFloat(b.budget_chf).toFixed(0) : '-',
       b.data_nascita ? new Date(b.data_nascita + 'T12:00:00').toLocaleDateString('it-IT') : '',
     ]);
@@ -925,28 +928,27 @@ async function importaCompleanniMaison(input) {
       toast('Nessun compleanno trovato nel file');
       return;
     }
-    // Fuzzy match con nomi esistenti in maison_budget
+    // Si aggiorna in automatico SOLO il nome completo identico (case-insensitive). Un match
+    // "simile" (es. "Rossi" per "Rossi Mario") va confermato voce per voce: prima sovrascriveva
+    // la data di nascita del cliente con quella di un familiare e lo rinominava pure.
     const matched = [];
-    const nonTrovati = [];
-    compleanni.forEach((c) => {
-      // Match esatto
-      let found = maisonBudgetCache.find(
-        (b) => b.nome.toLowerCase() === c.nome.toLowerCase() && (b.reparto_dip || 'slots') === currentReparto,
-      );
-      if (!found) {
-        // Fuzzy match con Levenshtein
-        const sim = _trovaNomeSimileMaison(c.nome);
-        if (sim)
-          found = maisonBudgetCache.find(
-            (b) =>
-              b.nome.toLowerCase() === (sim.nome || sim).toLowerCase() && (b.reparto_dip || 'slots') === currentReparto,
-          );
+    compleanni.forEach((c, idx) => {
+      const found = getBudgetReparto().find((b) => b.nome.toLowerCase() === c.nome.toLowerCase());
+      if (found) {
+        matched.push({ ...c, idx, budgetId: found.id, nomeDB: found.nome, isNew: false, simile: null });
+        return;
       }
-      if (found) matched.push({ ...c, budgetId: found.id, nomeDB: found.nome, isNew: false });
-      else matched.push({ ...c, budgetId: null, nomeDB: null, isNew: true });
+      const sim = _trovaNomeSimileMaison(c.nome);
+      const bSim =
+        sim && sim.tipo === 'simile'
+          ? getBudgetReparto().find((b) => b.nome.toLowerCase() === sim.nome.toLowerCase())
+          : null;
+      if (bSim) matched.push({ ...c, idx, budgetId: null, nomeDB: bSim.nome, isNew: false, simile: bSim });
+      else matched.push({ ...c, idx, budgetId: null, nomeDB: null, isNew: true, simile: null });
     });
     const nuovi = matched.filter((m) => m.isNew);
-    const esistenti = matched.filter((m) => !m.isNew);
+    const esistenti = matched.filter((m) => m.budgetId);
+    const daConfermare = matched.filter((m) => m.simile);
     // Mostra anteprima professionale
     const mc = document.getElementById('pwd-modal-content');
     const mesiNomi = [
@@ -981,7 +983,32 @@ async function importaCompleanniMaison(input) {
       '<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.3rem;font-weight:700;color:#2980b9">' +
       nuovi.length +
       '</div><div style="font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Familiari / Nuovi</div></div>';
+    if (daConfermare.length)
+      prev +=
+        '<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.3rem;font-weight:700;color:#e67e22">' +
+        daConfermare.length +
+        '</div><div style="font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Da confermare</div></div>';
     prev += '</div>';
+    // Nomi simili: l'operatore decide per ognuno (default: salta). Nessuna rinomina automatica.
+    if (daConfermare.length) {
+      prev +=
+        '<div style="margin-bottom:12px;padding:10px;background:rgba(230,126,34,0.08);border-left:3px solid #e67e22;border-radius:3px"><div style="font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:#e67e22;font-weight:700;margin-bottom:6px">Nomi simili: conferma cosa fare</div>';
+      daConfermare.forEach((m) => {
+        prev +=
+          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0;font-size:.85rem"><strong>' +
+          escP(m.nome) +
+          '</strong><span style="color:var(--muted)">' +
+          new Date(m.data + 'T12:00:00').toLocaleDateString('it-IT') +
+          '</span><select class="import-compl-scelta" data-idx="' +
+          m.idx +
+          '" style="padding:3px 6px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper);color:var(--ink)"><option value="salta" selected>Salta</option><option value="aggiorna">Aggiorna data di ' +
+          escP(m.nomeDB) +
+          '</option><option value="nuovo">Crea nuovo cliente ' +
+          escP(m.nome) +
+          '</option></select></div>';
+      });
+      prev += '</div>';
+    }
     // Raggruppa per mese
     const byMese = {};
     matched.forEach((m) => {
@@ -1008,17 +1035,9 @@ async function importaCompleanniMaison(input) {
       lista.forEach((m) => {
         const d = new Date(m.data + 'T12:00:00');
         const giorno = d.getDate();
-        const bg = m.isNew ? 'rgba(41,128,185,0.1)' : 'rgba(44,110,73,0.1)';
-        const border = m.isNew ? '#2980b9' : '#2c6e49';
-        const isRename =
-          !m.isNew &&
-          m.nomeDB &&
-          m.nome.length > m.nomeDB.length &&
-          m.nome.toLowerCase().startsWith(m.nomeDB.split(/\s+/)[0].toLowerCase());
-        const fuzzyNote =
-          !m.isNew && m.nome !== m.nomeDB
-            ? ' title="DB: ' + escP(m.nomeDB) + (isRename ? ' → ' + escP(m.nome) : '') + '" style="cursor:help"'
-            : '';
+        const bg = m.simile ? 'rgba(230,126,34,0.1)' : m.isNew ? 'rgba(41,128,185,0.1)' : 'rgba(44,110,73,0.1)';
+        const border = m.simile ? '#e67e22' : m.isNew ? '#2980b9' : '#2c6e49';
+        const fuzzyNote = m.simile ? ' title="Simile a: ' + escP(m.nomeDB) + '" style="cursor:help"' : '';
         prev +=
           '<span style="font-size:.82rem;padding:3px 8px;border-radius:2px;background:' +
           bg +
@@ -1033,7 +1052,7 @@ async function importaCompleanniMaison(input) {
           '</strong> ' +
           escP(m.nome) +
           (m.isNew ? ' <span style="font-size:.82rem;color:#2980b9;font-weight:700">NEW</span>' : '') +
-          (isRename ? ' <span style="font-size:.82rem;color:#e67e22;font-weight:700">&#8593;</span>' : '') +
+          (m.simile ? ' <span style="font-size:.82rem;color:#e67e22;font-weight:700">?</span>' : '') +
           '</span>';
       });
       prev += '</div></div>';
@@ -1049,35 +1068,37 @@ async function importaCompleanniMaison(input) {
     mc.innerHTML = prev;
     document.getElementById('pwd-modal').classList.remove('hidden');
     document.getElementById('btn-conf-import-compl').onclick = async function () {
+      // Scelte sui nomi simili: aggiorna il cliente indicato, crea nuovo, oppure salta
+      document.querySelectorAll('.import-compl-scelta').forEach((sel) => {
+        const m = matched.find((x) => x.idx === parseInt(sel.dataset.idx));
+        if (!m) return;
+        if (sel.value === 'aggiorna') m.budgetId = m.simile.id;
+        else if (sel.value === 'nuovo') m.isNew = true;
+        else m.salta = true;
+      });
       document.getElementById('import-compl-btns').style.display = 'none';
       document.getElementById('import-compl-progress').style.display = 'block';
       const bar = document.getElementById('import-compl-bar');
       const status = document.getElementById('import-compl-status');
       let nAggiornati = 0,
         nNuovi = 0,
+        nSaltati = 0,
         nErrori = 0,
         done = 0;
       for (const m of matched) {
-        if (m.budgetId) {
+        if (m.salta) {
+          nSaltati++;
+        } else if (m.budgetId) {
           try {
+            // Solo la data di nascita: il nome del cliente non si tocca mai in automatico
             const updateData = {
               data_nascita: m.data,
               aggiornato_da: getOperatore(),
               aggiornato_at: new Date().toISOString(),
             };
-            // Arricchisci nome: se il file ha cognome+nome e il DB ha solo cognome, aggiorna
             const b = maisonBudgetCache.find((x) => x.id === m.budgetId);
-            if (
-              b &&
-              m.nome.length > b.nome.length &&
-              m.nome.toLowerCase().startsWith(b.nome.split(/\s+/)[0].toLowerCase())
-            )
-              updateData.nome = m.nome;
             await secPatch('maison_budget', 'id=eq.' + m.budgetId, updateData);
-            if (b) {
-              b.data_nascita = m.data;
-              if (updateData.nome) b.nome = updateData.nome;
-            }
+            if (b) b.data_nascita = m.data;
             nAggiornati++;
           } catch (e) {
             nErrori++;
@@ -1111,6 +1132,11 @@ async function importaCompleanniMaison(input) {
         '</div><div style="font-size:.82rem;color:var(--muted);text-transform:uppercase">Aggiornati</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:#2980b9">' +
         nNuovi +
         '</div><div style="font-size:.82rem;color:var(--muted);text-transform:uppercase">Nuovi / Familiari</div></div>' +
+        (nSaltati
+          ? '<div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:#e67e22">' +
+            nSaltati +
+            '</div><div style="font-size:.82rem;color:var(--muted);text-transform:uppercase">Saltati</div></div>'
+          : '') +
         (nErrori
           ? '<div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--accent)">' +
             nErrori +
@@ -1119,7 +1145,10 @@ async function importaCompleanniMaison(input) {
         '</div><p style="font-size:.84rem;color:var(--muted)">I compleanni appariranno nella dashboard e nelle notifiche.</p><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')" style="margin-top:12px">Chiudi</button></div>';
       renderMaisonBudgetUI();
       renderMaisonDashboard();
-      logAzione('Importa compleanni', compleanni.length + ' (' + nAggiornati + ' aggiornati, ' + nNuovi + ' nuovi)');
+      logAzione(
+        'Importa compleanni',
+        compleanni.length + ' (' + nAggiornati + ' aggiornati, ' + nNuovi + ' nuovi, ' + nSaltati + ' saltati)',
+      );
     };
   } catch (e) {
     toast('Errore lettura file: ' + e.message);

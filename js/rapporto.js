@@ -15,6 +15,29 @@ function getGiornataCasino() {
     now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0')
   );
 }
+// Testo da mettere in un attributo onclick tra apici singoli. Prima si scappava solo
+// l'apostrofo: un nome con virgolette, backslash o "<" rompeva il click in ogni schermata.
+function _jsArg(s) {
+  return String(s == null ? '' : s)
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/</g, '\\x3c')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;');
+}
+// La cache dei rapporti e' indicizzata per data E settore: con la sola data, dopo un cambio
+// settore la Home mostrava lo stato del rapporto del settore precedente.
+function _rapportoKey(ds, reparto) {
+  return ds + '|' + (reparto || currentReparto);
+}
+function _rapportoCacheGet(ds) {
+  return rapportiCache[_rapportoKey(ds)] || {};
+}
+function _rapportoCacheSet(ds, turno, rec) {
+  const k = _rapportoKey(ds);
+  if (!rapportiCache[k]) rapportiCache[k] = {};
+  rapportiCache[k][turno] = rec;
+}
 async function fetchRapportiMese(a, m) {
   const start = a + '-' + String(m + 1).padStart(2, '0') + '-01';
   const nm = m === 11 ? new Date(a + 1, 0, 1) : new Date(a, m + 1, 1);
@@ -29,9 +52,7 @@ async function fetchRapportiMese(a, m) {
       currentReparto,
   );
   data.forEach((r) => {
-    const k = r.data_rapporto;
-    if (!rapportiCache[k]) rapportiCache[k] = {};
-    rapportiCache[k][r.turno] = r;
+    _rapportoCacheSet(r.data_rapporto, r.turno, r);
   });
 }
 function flushRapportoSave() {
@@ -76,7 +97,7 @@ async function renderRapportoCalendario() {
   }
   for (let d = 1; d <= daysInMonth; d++) {
     const ds = rapportoAnno + '-' + String(rapportoMese + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-    const rdata = rapportiCache[ds] || {};
+    const rdata = _rapportoCacheGet(ds);
     const hasP = rdata.PRESTO && (rdata.PRESTO.sup_note || rdata.PRESTO.cassa_note || rdata.PRESTO.sala_note);
     const hasN = rdata.NOTTE && (rdata.NOTTE.sup_note || rdata.NOTTE.cassa_note || rdata.NOTTE.sala_note);
     html +=
@@ -139,7 +160,7 @@ async function apriGiorno(ds) {
   flushRapportoSave();
   rapportoGiornoAperto = ds;
   const d = new Date(ds + 'T12:00:00');
-  const rdata = rapportiCache[ds] || {};
+  const rdata = _rapportoCacheGet(ds);
   const p = rdata.PRESTO || {};
   const n = rdata.NOTTE || {};
   const v = document.getElementById('rapporto-view');
@@ -283,6 +304,56 @@ function _recIsCurrentRapporto(rec, _rapLabel, _rapLabelOld, ds) {
   return false;
 }
 // === ANALYZE: parsa il campo assenze e ritorna lista operazioni (NESSUN side effect) ===
+// Parole che indicano un'assenza NON per malattia (nessuna registrazione da creare)
+const _ASSENZE_ALTRO_RE =
+  /\b(lutto|ferie|vacanza|vacanze|infortunio|permesso|giorno libero|riposo|congedo|ritardo|in ritardo)\b/i;
+// Parole che indicano malattia/assenza, al singolare E al plurale ("assenti", "malati")
+const _ASSENZE_MAL_RE =
+  /\b(assent[ei]|malattia|malat[oaie]|malessere|non.{0,10}present[ei]|non.{0,10}vien[ei]|non.{0,10}vengono|chiamat[oaie]|si (?:è|e'|sono) sentit[oaie]|non.{0,10}sar[àa]|non.{0,10}saranno|non sta bene|non stanno bene|sta male|stanno male|ricoverat[oaie]|ospedale|pronto soccorso|visita medica|controllo medico|certificato medico)\b/i;
+// Segnaposto tipo "nessuna", "-", "/" nel campo assenze: non sono errori
+const _ASSENZE_VUOTO_RE = /^(nessun[oa]|niente|nulla|no|n\/a|-+|\/+|\.+)$/i;
+// Da un frammento ("Rossi e Bianchi assenti domani") ricava le voci [riga, nome, stato, lettera, numero],
+// una per nome. Ritorna null se il frammento e' un'assenza di altro tipo o un segnaposto,
+// [] se non si capisce (il chiamante lo segnala in ops.errors).
+function _vociAssenzaDaFrammento(riga, _rigaPulita) {
+  if (_ASSENZE_VUOTO_RE.test(riga.trim())) return null;
+  const haMal = _ASSENZE_MAL_RE.test(riga) || /\b[A-Z]\s*\d{1,2}\b/.test(riga);
+  if (_ASSENZE_ALTRO_RE.test(riga) && !haMal) return null;
+  let m = _rigaPulita.match(/^([A-ZÀ-Üa-zà-ü\s.'-]+?)\s*(assent[ei]|malattia|malat[oaie]|([A-Z])\s*(\d{1,2}))\b/);
+  if (m && m[1]) m[1] = m[1].replace(/\s+(da|dal|fino|al|a)$/i, '');
+  if (!m) {
+    const _preDate = _rigaPulita.match(/^(.+?)\s+(?:dal\s|fino\s|domani|dopodomani|oggi)/i);
+    if (_preDate) {
+      let _pn = _preDate[1].replace(/\s+(da|dal|fino|a)$/i, '').trim();
+      if (_pn.length >= 3 && /^[A-ZÀ-Üa-zà-ü\s.'-]+$/.test(_pn)) m = [_rigaPulita, _pn, 'assente', null, null];
+    }
+  }
+  if (m) {
+    // "Rossi e Bianchi assenti": un nome per voce; chi e' in ferie nello stesso frammento si salta
+    const nomi = m[1]
+      .split(/\s+(?:e|ed|&)\s+/i)
+      .map((n) => n.trim())
+      .filter((n) => n && n.split(/\s+/).length <= 4 && !_ASSENZE_ALTRO_RE.test(n));
+    return nomi.map((n) => [riga, n, m[2], m[3], m[4]]);
+  }
+  if (!_ASSENZE_MAL_RE.test(riga)) return [];
+  // Parola chiave in mezzo alla frase: si cercano i collaboratori nominati. Con lo stato al
+  // plurale valgono tutti quelli trovati, al singolare solo il primo (come prima)
+  const plurale = /\b(assenti|malat[ie]|vengono|saranno|stanno)\b/i.test(riga);
+  const trovati = [];
+  for (const c of collaboratoriCache) {
+    const words = c.nome.toLowerCase().split(/\s+/);
+    for (const w of words) {
+      if (w.length >= 3 && new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i').test(riga)) {
+        if (!trovati.includes(c.nome)) trovati.push(c.nome);
+        break;
+      }
+    }
+    if (trovati.length && !plurale) break;
+  }
+  const _cm = riga.match(/\b([A-Z])\s*(\d{1,2})\b/);
+  return trovati.map((n) => [riga, n, _cm ? _cm[0] : 'assente', _cm ? _cm[1] : null, _cm ? _cm[2] : null]);
+}
 function _analizzaAssenzeRapporto(assenzeText, ds, turno) {
   const _rappDateStr = new Date(ds + 'T12:00:00').toLocaleDateString('it-IT');
   const _rapLabel = 'da rapporto ' + turno + ' del ' + _rappDateStr;
@@ -313,296 +384,282 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno) {
   const _nomiProcessati = new Set();
   const _usedEsistentiIds = new Set();
   const righe = assenzeText.split('\n').filter((r) => r.trim());
-  for (const riga of righe) {
-    if (
-      /\b(lutto|ferie|vacanza|vacanze|infortunio|permesso|giorno libero|riposo|congedo|ritardo|in ritardo)\b/i.test(
-        riga,
-      )
-    )
-      continue;
-    let _rigaPulita = riga.replace(/([a-zà-ü])(dal\s|fino\s)/gi, '$1 $2');
-    let m = _rigaPulita.match(/^([A-ZÀ-Üa-zà-ü\s.'-]+?)\s*(assente|malattia|malato|malata|([A-Z])\s*(\d{1,2}))\b/);
-    if (m && m[1]) m[1] = m[1].replace(/\s+(da|dal|fino|al|a)$/i, '');
-    if (!m) {
-      const _preDate = _rigaPulita.match(/^(.+?)\s+(?:dal\s|fino\s|domani|dopodomani|oggi)/i);
-      if (_preDate) {
-        let _pn = _preDate[1].replace(/\s+(da|dal|fino|a)$/i, '').trim();
-        if (_pn.length >= 3 && /^[A-ZÀ-Üa-zà-ü\s.'-]+$/.test(_pn)) m = [_rigaPulita, _pn, 'assente', null, null];
-      }
-    }
-    if (m && m[1].trim().split(/\s+/).length > 4) m = null;
-    if (
-      !m &&
-      /\b(assente|malattia|malato|malata|malessere|non.{0,10}present[ei]|non.{0,10}vien[ei]|chiamat[oa]|si è sentit[oa]|non.{0,10}sar[àa]|non sta bene|sta male|ricoverat[oa]|ospedale|pronto soccorso|visita medica|controllo medico|certificato medico)\b/i.test(
-        riga,
-      )
-    ) {
-      let _foundNome = null,
-        _codice = null;
-      for (const c of collaboratoriCache) {
-        const words = c.nome.toLowerCase().split(/\s+/);
-        for (const w of words) {
-          if (w.length >= 3 && new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i').test(riga)) {
-            _foundNome = c.nome;
-            break;
-          }
-        }
-        if (_foundNome) break;
-      }
-      if (_foundNome) {
-        const _cm = riga.match(/\b([A-Z])\s*(\d{1,2})\b/);
-        if (_cm) _codice = _cm;
-        m = [riga, _foundNome, _codice ? _cm[0] : 'assente', _codice ? _cm[1] : null, _codice ? _cm[2] : null];
-      }
-    }
-    if (!m) continue;
-    const nome = m[1] && m[1] === m[1] ? capitalizzaNome(m[1].trim()) : capitalizzaNome(m[1]);
-    const isCodice = !!m[3] && /^[a-zA-Z]$/.test(m[3]);
-    const codiceNum = m[4] ? parseInt(m[4]) : 0;
-    const domaniMatch = /\bdomani\b/i.test(riga);
-    const dopodomaniMatch = /\bdopodomani\b/i.test(riga);
-    const oggiMatch = /\b(oggi|stasera|questa sera)\b/i.test(riga);
-    const finoMatch = riga.match(/fino\s+(?:al?\s+)?(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?/i);
-    const dalAlMatch = _rigaPulita.match(
-      /dal\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?\s+al\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?/i,
-    );
-    const _giorniSett = {
-      lunedi: 1,
-      lunedì: 1,
-      martedi: 2,
-      martedì: 2,
-      mercoledi: 3,
-      mercoledì: 3,
-      giovedi: 4,
-      giovedì: 4,
-      venerdi: 5,
-      venerdì: 5,
-      sabato: 6,
-      domenica: 0,
-    };
-    const _giorniTrovati = [];
-    const rigaLow = riga.toLowerCase();
-    for (const [g, idx] of Object.entries(_giorniSett)) {
-      if (rigaLow.includes(g)) _giorniTrovati.push(idx);
-    }
-    const finoGiornoMatch = riga.match(
-      /fino\s+(?:a\s+)?(luned[iì]|marted[iì]|mercoled[iì]|gioved[iì]|venerd[iì]|sabato|domenica)/i,
-    );
-    const dataRapp = new Date(ds + 'T12:00:00');
-    let dataInizio = new Date(ds + 'T12:00:00'),
-      dataFine = new Date(ds + 'T12:00:00');
-    // "oggi e domani" / "oggi e dopodomani": il periodo parte dal giorno del
-    // rapporto e arriva al giorno indicato. Vanno prima delle altre, altrimenti
-    // "domani" da solo vincerebbe e il primo giorno andrebbe perso.
-    if (oggiMatch && dopodomaniMatch) {
-      dataInizio = new Date(dataRapp);
-      dataFine = new Date(dataRapp);
-      dataFine.setDate(dataFine.getDate() + 2);
-    } else if (oggiMatch && domaniMatch) {
-      dataInizio = new Date(dataRapp);
-      dataFine = new Date(dataRapp);
-      dataFine.setDate(dataFine.getDate() + 1);
-    } else if (oggiMatch && _giorniTrovati.length === 1) {
-      // "oggi e venerdi": dal giorno del rapporto fino a quel giorno
-      dataInizio = new Date(dataRapp);
-      const _t = _giorniTrovati[0];
-      dataFine = new Date(dataRapp);
-      let _d = (_t - dataFine.getDay() + 7) % 7;
-      if (_d === 0) _d = 7;
-      dataFine.setDate(dataFine.getDate() + _d);
-    } else if (dopodomaniMatch && domaniMatch) {
-      dataInizio = new Date(dataRapp);
-      dataInizio.setDate(dataInizio.getDate() + 1);
-      dataFine = new Date(dataRapp);
-      dataFine.setDate(dataFine.getDate() + 2);
-    } else if (domaniMatch && _giorniTrovati.length) {
-      dataInizio = new Date(dataRapp);
-      dataInizio.setDate(dataInizio.getDate() + 1);
-      const targetDay = _giorniTrovati[0];
-      dataFine = new Date(dataRapp);
-      let diff = (targetDay - dataFine.getDay() + 7) % 7;
-      if (diff === 0) diff = 7;
-      dataFine.setDate(dataFine.getDate() + diff);
-      if (dataFine < dataInizio) dataFine.setDate(dataFine.getDate() + 7);
-    } else if (finoGiornoMatch) {
-      const targetDay = _giorniSett[finoGiornoMatch[1].toLowerCase()];
-      dataFine = new Date(dataRapp);
-      let diff = (targetDay - dataFine.getDay() + 7) % 7;
-      if (diff === 0) diff = 7;
-      dataFine.setDate(dataFine.getDate() + diff);
-    } else if (_giorniTrovati.length >= 2) {
-      const dates = _giorniTrovati
-        .map((g) => {
-          const d = new Date(dataRapp);
-          let diff = (g - d.getDay() + 7) % 7;
-          if (diff === 0) diff = 7;
-          d.setDate(d.getDate() + diff);
-          return d;
-        })
-        .sort((a, b) => a - b);
-      dataInizio = dates[0];
-      dataFine = dates[dates.length - 1];
-    } else if (_giorniTrovati.length === 1) {
-      const targetDay = _giorniTrovati[0];
-      dataInizio = new Date(dataRapp);
-      let diff = (targetDay - dataInizio.getDay() + 7) % 7;
-      if (diff === 0) diff = 7;
-      dataInizio.setDate(dataInizio.getDate() + diff);
-      dataFine = new Date(dataInizio);
-    } else if (dopodomaniMatch) {
-      dataInizio = new Date(dataRapp);
-      dataInizio.setDate(dataInizio.getDate() + 1);
-      dataFine = new Date(dataRapp);
-      dataFine.setDate(dataFine.getDate() + 2);
-    } else if (domaniMatch) {
-      dataInizio = new Date(dataRapp);
-      dataInizio.setDate(dataInizio.getDate() + 1);
-      dataFine = new Date(dataInizio);
-    } else if (dalAlMatch) {
-      const gInizio = parseInt(dalAlMatch[1]),
-        mInizio = dalAlMatch[2] ? parseInt(dalAlMatch[2]) - 1 : dataRapp.getMonth();
-      const _aInizio = dalAlMatch[3] ? parseInt(dalAlMatch[3]) : null;
-      const annoInizio = _aInizio ? (_aInizio < 100 ? 2000 + _aInizio : _aInizio) : dataRapp.getFullYear();
-      const gFine = parseInt(dalAlMatch[4]),
-        mFine = dalAlMatch[5] ? parseInt(dalAlMatch[5]) - 1 : mInizio;
-      const _aFine = dalAlMatch[6] ? parseInt(dalAlMatch[6]) : null;
-      const annoFine = _aFine ? (_aFine < 100 ? 2000 + _aFine : _aFine) : annoInizio;
-      dataInizio = new Date(annoInizio, mInizio, gInizio, 12);
-      dataFine = new Date(annoFine, mFine, gFine, 12);
-    } else if (finoMatch) {
-      const gFine = parseInt(finoMatch[1]),
-        mFine = finoMatch[2] ? parseInt(finoMatch[2]) - 1 : dataRapp.getMonth();
-      dataFine = new Date(dataRapp.getFullYear(), mFine, gFine, 12);
-      if (dataFine < dataInizio) dataFine.setFullYear(dataFine.getFullYear() + 1);
-    }
-    const nomeFinale = matchCollaboratore(nome) || capitalizzaNome(nome);
-    // === D7: VALIDAZIONE DATE ===
-    if (dataFine < dataInizio) {
-      const _tmp = dataInizio;
-      dataInizio = dataFine;
-      dataFine = _tmp;
-    } // auto-swap
-    const _oggi = new Date();
-    _oggi.setHours(12, 0, 0, 0);
-    const _maxFuturo = new Date(_oggi);
-    _maxFuturo.setDate(_maxFuturo.getDate() + 365);
-    const _maxPassato = new Date(_oggi);
-    _maxPassato.setDate(_maxPassato.getDate() - 180);
-    if (dataInizio > _maxFuturo) {
-      ops.errors.push({
-        nome: nomeFinale,
-        motivo: 'data inizio oltre 12 mesi nel futuro (' + dataInizio.toLocaleDateString('it-IT') + ')',
-        riga,
-      });
-      continue;
-    }
-    if (dataFine < _maxPassato) {
-      ops.errors.push({
-        nome: nomeFinale,
-        motivo: 'data fine oltre 6 mesi nel passato (' + dataFine.toLocaleDateString('it-IT') + ')',
-        riga,
-      });
-      continue;
-    }
-    const nGiorni = Math.round((dataFine - dataInizio) / 86400000) + 1;
-    if (nGiorni > 180) {
-      ops.errors.push({
-        nome: nomeFinale,
-        motivo: 'range eccessivo (' + nGiorni + ' giorni) - probabile errore di data',
-        riga,
-      });
-      continue;
-    }
-    const dalStr = dataInizio.toLocaleDateString('it-IT'),
-      alStr = dataFine.toLocaleDateString('it-IT');
-    const codeTxt = isCodice ? ' (' + m[2].toUpperCase() + ')' : '';
-    const testo =
-      nGiorni > 1
-        ? 'Assente per malattia' +
-          codeTxt +
-          ' dal ' +
-          dalStr +
-          ' al ' +
-          alStr +
-          ' (' +
-          nGiorni +
-          ' giorni, ' +
-          _rapLabel +
-          ')'
-        : // un giorno solo: si scrive la data SEMPRE quando non e' il giorno del
-          // rapporto (es. "domani"), altrimenti l'assenza risulterebbe datata al
-          // giorno del rapporto e la copertura, registrata sul giorno vero, non
-          // verrebbe piu' collegata
-          'Assente per malattia' +
-          codeTxt +
-          (dalStr !== new Date(ds + 'T12:00:00').toLocaleDateString('it-IT') ? ' dal ' + dalStr : '') +
-          ' (' +
-          _rapLabel +
-          ')';
-    _nomiProcessati.add(nomeFinale.toLowerCase());
-    const esiste = _esistenti.find(
-      (e) => e.nome.toLowerCase() === nomeFinale.toLowerCase() && !_usedEsistentiIds.has(e.id),
-    );
-    if (esiste) {
-      _usedEsistentiIds.add(esiste.id);
-      if (esiste.testo !== testo) {
-        ops.updates.push({ id: esiste.id, nome: nomeFinale, vecchioTesto: esiste.testo, nuovoTesto: testo, nGiorni });
-      }
-      // else: no-op
-    } else {
-      // Cross-rapporto dedup: include ANCHE record manuali (per evitare duplicati visivi)
-      const _newKeyI = dataInizio.toISOString().substring(0, 10);
-      const _newKeyF = dataFine.toISOString().substring(0, 10);
-      const _giaInAltro = datiCache.find((e) => {
-        if (e.tipo !== _malTipo) return false;
-        if (e.nome.toLowerCase() !== nomeFinale.toLowerCase()) return false;
-        if ((e.reparto_dip || currentReparto) !== currentReparto) return false;
-        if (_recIsCurrentRapporto(e, _rapLabel, _rapLabelOld, ds)) return false;
-        const r = _getRangeMalattiaRec(e);
-        if (!r) return false;
-        return r.i === _newKeyI && r.f === _newKeyF;
-      });
-      if (_giaInAltro) {
-        let _motivo;
-        if (_giaInAltro.origine === 'manual') {
-          _motivo = 'già inserita manualmente';
-        } else {
-          const _refMatch = (_giaInAltro.testo || '').match(
-            /da rapporto (PRESTO|NOTTE)(?:\s+del\s+(\d{2}\/\d{2}\/\d{4}))?/,
-          );
-          const _refTxt = _refMatch ? _refMatch[1] + (_refMatch[2] ? ' del ' + _refMatch[2] : '') : 'altro rapporto';
-          _motivo = 'già documentata nel rapporto ' + _refTxt;
-        }
-        ops.skipped.push({ nome: nomeFinale, motivo: _motivo, existingId: _giaInAltro.id });
+  for (const rigaIntera of righe) {
+    // Ogni riga puo' contenere piu' persone separate da virgola o punto e virgola: si valuta
+    // ogni frammento da solo, cosi' "Rossi ferie, Bianchi malato" non perde piu' Bianchi
+    const frammenti = rigaIntera.split(/\s*[;,]\s*/).filter((f) => f.trim());
+    for (const riga of frammenti) {
+      const _rigaPulita = riga.replace(/([a-zà-ü])(dal\s|fino\s)/gi, '$1 $2');
+      const voci = _vociAssenzaDaFrammento(riga, _rigaPulita);
+      // null = assenza non per malattia (ferie, permesso...) o segnaposto: si ignora senza errore
+      if (voci === null) continue;
+      if (!voci.length) {
+        // Prima il frammento spariva in silenzio: ora chi compila lo vede e lo controlla a mano
+        ops.errors.push({
+          nome: riga.substring(0, 40),
+          motivo: 'frammento non riconosciuto, controllare a mano',
+          riga,
+        });
         continue;
       }
-      // Nuovo record da creare
-      const _now = new Date();
-      const _evtDate = new Date(
-        ds +
-          'T' +
-          String(_now.getHours()).padStart(2, '0') +
-          ':' +
-          String(_now.getMinutes()).padStart(2, '0') +
-          ':' +
-          String(_now.getSeconds()).padStart(2, '0'),
-      ).toISOString();
-      ops.creates.push({
-        nome: nomeFinale,
-        nGiorni,
-        dataInizio,
-        dataFine,
-        record: {
-          id: Date.now() + Math.floor(Math.random() * 1000),
-          nome: nomeFinale,
-          tipo: _malTipo,
-          testo,
-          data: _evtDate,
-          operatore: getOperatore(),
-          reparto_dip: currentReparto,
-          origine: 'rapporto',
-        },
-      });
+      for (const m of voci) {
+        const nome = capitalizzaNome(m[1].trim());
+        const isCodice = !!m[3] && /^[a-zA-Z]$/.test(m[3]);
+        const codiceNum = m[4] ? parseInt(m[4]) : 0;
+        const domaniMatch = /\bdomani\b/i.test(riga);
+        const dopodomaniMatch = /\bdopodomani\b/i.test(riga);
+        const oggiMatch = /\b(oggi|stasera|questa sera)\b/i.test(riga);
+        const finoMatch = riga.match(/fino\s+(?:al?\s+)?(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?/i);
+        const dalAlMatch = _rigaPulita.match(
+          /dal\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?\s+al\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?/i,
+        );
+        const _giorniSett = {
+          lunedi: 1,
+          lunedì: 1,
+          martedi: 2,
+          martedì: 2,
+          mercoledi: 3,
+          mercoledì: 3,
+          giovedi: 4,
+          giovedì: 4,
+          venerdi: 5,
+          venerdì: 5,
+          sabato: 6,
+          domenica: 0,
+        };
+        const _giorniTrovati = [];
+        const rigaLow = riga.toLowerCase();
+        for (const [g, idx] of Object.entries(_giorniSett)) {
+          if (rigaLow.includes(g)) _giorniTrovati.push(idx);
+        }
+        const finoGiornoMatch = riga.match(
+          /fino\s+(?:a\s+)?(luned[iì]|marted[iì]|mercoled[iì]|gioved[iì]|venerd[iì]|sabato|domenica)/i,
+        );
+        const dataRapp = new Date(ds + 'T12:00:00');
+        let dataInizio = new Date(ds + 'T12:00:00'),
+          dataFine = new Date(ds + 'T12:00:00');
+        // "oggi e domani" / "oggi e dopodomani": il periodo parte dal giorno del
+        // rapporto e arriva al giorno indicato. Vanno prima delle altre, altrimenti
+        // "domani" da solo vincerebbe e il primo giorno andrebbe perso.
+        if (oggiMatch && dopodomaniMatch) {
+          dataInizio = new Date(dataRapp);
+          dataFine = new Date(dataRapp);
+          dataFine.setDate(dataFine.getDate() + 2);
+        } else if (oggiMatch && domaniMatch) {
+          dataInizio = new Date(dataRapp);
+          dataFine = new Date(dataRapp);
+          dataFine.setDate(dataFine.getDate() + 1);
+        } else if (oggiMatch && _giorniTrovati.length === 1) {
+          // "oggi e venerdi": dal giorno del rapporto fino a quel giorno
+          dataInizio = new Date(dataRapp);
+          const _t = _giorniTrovati[0];
+          dataFine = new Date(dataRapp);
+          let _d = (_t - dataFine.getDay() + 7) % 7;
+          if (_d === 0) _d = 7;
+          dataFine.setDate(dataFine.getDate() + _d);
+        } else if (dopodomaniMatch && domaniMatch) {
+          dataInizio = new Date(dataRapp);
+          dataInizio.setDate(dataInizio.getDate() + 1);
+          dataFine = new Date(dataRapp);
+          dataFine.setDate(dataFine.getDate() + 2);
+        } else if (domaniMatch && _giorniTrovati.length) {
+          dataInizio = new Date(dataRapp);
+          dataInizio.setDate(dataInizio.getDate() + 1);
+          const targetDay = _giorniTrovati[0];
+          dataFine = new Date(dataRapp);
+          let diff = (targetDay - dataFine.getDay() + 7) % 7;
+          if (diff === 0) diff = 7;
+          dataFine.setDate(dataFine.getDate() + diff);
+          if (dataFine < dataInizio) dataFine.setDate(dataFine.getDate() + 7);
+        } else if (finoGiornoMatch) {
+          const targetDay = _giorniSett[finoGiornoMatch[1].toLowerCase()];
+          dataFine = new Date(dataRapp);
+          let diff = (targetDay - dataFine.getDay() + 7) % 7;
+          if (diff === 0) diff = 7;
+          dataFine.setDate(dataFine.getDate() + diff);
+        } else if (_giorniTrovati.length >= 2) {
+          const dates = _giorniTrovati
+            .map((g) => {
+              const d = new Date(dataRapp);
+              let diff = (g - d.getDay() + 7) % 7;
+              if (diff === 0) diff = 7;
+              d.setDate(d.getDate() + diff);
+              return d;
+            })
+            .sort((a, b) => a - b);
+          dataInizio = dates[0];
+          dataFine = dates[dates.length - 1];
+        } else if (_giorniTrovati.length === 1) {
+          const targetDay = _giorniTrovati[0];
+          dataInizio = new Date(dataRapp);
+          let diff = (targetDay - dataInizio.getDay() + 7) % 7;
+          if (diff === 0) diff = 7;
+          dataInizio.setDate(dataInizio.getDate() + diff);
+          dataFine = new Date(dataInizio);
+        } else if (dopodomaniMatch) {
+          dataInizio = new Date(dataRapp);
+          dataInizio.setDate(dataInizio.getDate() + 1);
+          dataFine = new Date(dataRapp);
+          dataFine.setDate(dataFine.getDate() + 2);
+        } else if (domaniMatch) {
+          dataInizio = new Date(dataRapp);
+          dataInizio.setDate(dataInizio.getDate() + 1);
+          dataFine = new Date(dataInizio);
+        } else if (dalAlMatch) {
+          const gInizio = parseInt(dalAlMatch[1]),
+            mInizio = dalAlMatch[2] ? parseInt(dalAlMatch[2]) - 1 : dataRapp.getMonth();
+          const _aInizio = dalAlMatch[3] ? parseInt(dalAlMatch[3]) : null;
+          const annoInizio = _aInizio ? (_aInizio < 100 ? 2000 + _aInizio : _aInizio) : dataRapp.getFullYear();
+          const gFine = parseInt(dalAlMatch[4]),
+            mFine = dalAlMatch[5] ? parseInt(dalAlMatch[5]) - 1 : mInizio;
+          const _aFine = dalAlMatch[6] ? parseInt(dalAlMatch[6]) : null;
+          const annoFine = _aFine ? (_aFine < 100 ? 2000 + _aFine : _aFine) : annoInizio;
+          dataInizio = new Date(annoInizio, mInizio, gInizio, 12);
+          dataFine = new Date(annoFine, mFine, gFine, 12);
+        } else if (finoMatch) {
+          const gFine = parseInt(finoMatch[1]),
+            mFine = finoMatch[2] ? parseInt(finoMatch[2]) - 1 : dataRapp.getMonth();
+          dataFine = new Date(dataRapp.getFullYear(), mFine, gFine, 12);
+          if (dataFine < dataInizio) dataFine.setFullYear(dataFine.getFullYear() + 1);
+        }
+        const nomeFinale = matchCollaboratore(nome) || capitalizzaNome(nome);
+        // === D7: VALIDAZIONE DATE ===
+        if (dataFine < dataInizio) {
+          const _tmp = dataInizio;
+          dataInizio = dataFine;
+          dataFine = _tmp;
+        } // auto-swap
+        const _oggi = new Date();
+        _oggi.setHours(12, 0, 0, 0);
+        const _maxFuturo = new Date(_oggi);
+        _maxFuturo.setDate(_maxFuturo.getDate() + 365);
+        const _maxPassato = new Date(_oggi);
+        _maxPassato.setDate(_maxPassato.getDate() - 180);
+        if (dataInizio > _maxFuturo) {
+          ops.errors.push({
+            nome: nomeFinale,
+            motivo: 'data inizio oltre 12 mesi nel futuro (' + dataInizio.toLocaleDateString('it-IT') + ')',
+            riga,
+          });
+          continue;
+        }
+        if (dataFine < _maxPassato) {
+          ops.errors.push({
+            nome: nomeFinale,
+            motivo: 'data fine oltre 6 mesi nel passato (' + dataFine.toLocaleDateString('it-IT') + ')',
+            riga,
+          });
+          continue;
+        }
+        const nGiorni = Math.round((dataFine - dataInizio) / 86400000) + 1;
+        if (nGiorni > 180) {
+          ops.errors.push({
+            nome: nomeFinale,
+            motivo: 'range eccessivo (' + nGiorni + ' giorni) - probabile errore di data',
+            riga,
+          });
+          continue;
+        }
+        const dalStr = dataInizio.toLocaleDateString('it-IT'),
+          alStr = dataFine.toLocaleDateString('it-IT');
+        const codeTxt = isCodice ? ' (' + m[2].toUpperCase() + ')' : '';
+        const testo =
+          nGiorni > 1
+            ? 'Assente per malattia' +
+              codeTxt +
+              ' dal ' +
+              dalStr +
+              ' al ' +
+              alStr +
+              ' (' +
+              nGiorni +
+              ' giorni, ' +
+              _rapLabel +
+              ')'
+            : // un giorno solo: si scrive la data SEMPRE quando non e' il giorno del
+              // rapporto (es. "domani"), altrimenti l'assenza risulterebbe datata al
+              // giorno del rapporto e la copertura, registrata sul giorno vero, non
+              // verrebbe piu' collegata
+              'Assente per malattia' +
+              codeTxt +
+              (dalStr !== new Date(ds + 'T12:00:00').toLocaleDateString('it-IT') ? ' dal ' + dalStr : '') +
+              ' (' +
+              _rapLabel +
+              ')';
+        _nomiProcessati.add(nomeFinale.toLowerCase());
+        const esiste = _esistenti.find(
+          (e) => e.nome.toLowerCase() === nomeFinale.toLowerCase() && !_usedEsistentiIds.has(e.id),
+        );
+        if (esiste) {
+          _usedEsistentiIds.add(esiste.id);
+          if (esiste.testo !== testo) {
+            ops.updates.push({
+              id: esiste.id,
+              nome: nomeFinale,
+              vecchioTesto: esiste.testo,
+              nuovoTesto: testo,
+              nGiorni,
+            });
+          }
+          // else: no-op
+        } else {
+          // Cross-rapporto dedup: include ANCHE record manuali (per evitare duplicati visivi)
+          const _newKeyI = dataInizio.toISOString().substring(0, 10);
+          const _newKeyF = dataFine.toISOString().substring(0, 10);
+          const _giaInAltro = datiCache.find((e) => {
+            if (e.tipo !== _malTipo) return false;
+            if (e.nome.toLowerCase() !== nomeFinale.toLowerCase()) return false;
+            if ((e.reparto_dip || currentReparto) !== currentReparto) return false;
+            if (_recIsCurrentRapporto(e, _rapLabel, _rapLabelOld, ds)) return false;
+            const r = _getRangeMalattiaRec(e);
+            if (!r) return false;
+            return r.i === _newKeyI && r.f === _newKeyF;
+          });
+          if (_giaInAltro) {
+            let _motivo;
+            if (_giaInAltro.origine === 'manual') {
+              _motivo = 'già inserita manualmente';
+            } else {
+              const _refMatch = (_giaInAltro.testo || '').match(
+                /da rapporto (PRESTO|NOTTE)(?:\s+del\s+(\d{2}\/\d{2}\/\d{4}))?/,
+              );
+              const _refTxt = _refMatch
+                ? _refMatch[1] + (_refMatch[2] ? ' del ' + _refMatch[2] : '')
+                : 'altro rapporto';
+              _motivo = 'già documentata nel rapporto ' + _refTxt;
+            }
+            ops.skipped.push({ nome: nomeFinale, motivo: _motivo, existingId: _giaInAltro.id });
+            continue;
+          }
+          // Nuovo record da creare
+          const _now = new Date();
+          const _evtDate = new Date(
+            ds +
+              'T' +
+              String(_now.getHours()).padStart(2, '0') +
+              ':' +
+              String(_now.getMinutes()).padStart(2, '0') +
+              ':' +
+              String(_now.getSeconds()).padStart(2, '0'),
+          ).toISOString();
+          ops.creates.push({
+            nome: nomeFinale,
+            nGiorni,
+            dataInizio,
+            dataFine,
+            record: {
+              id: Date.now() + Math.floor(Math.random() * 1000),
+              nome: nomeFinale,
+              tipo: _malTipo,
+              testo,
+              data: _evtDate,
+              operatore: getOperatore(),
+              reparto_dip: currentReparto,
+              origine: 'rapporto',
+            },
+          });
+        }
+      }
     }
   }
   // Cleanup orfani: nomi non più nel campo assenze diventano deletes
@@ -830,7 +887,7 @@ async function salvaRapportoTurno(ds, turno, cls) {
   try {
     // Prova UPDATE, se nessuna riga aggiornata → INSERT
     const filtro = 'data_rapporto=eq.' + ds + '&turno=eq.' + turno + '&reparto_dip=eq.' + currentReparto;
-    const existing = rapportiCache[ds] && rapportiCache[ds][turno];
+    const existing = _rapportoCacheGet(ds)[turno];
     if (existing) {
       await secPatch('rapporti_giornalieri', filtro, data);
     } else {
@@ -840,8 +897,7 @@ async function salvaRapportoTurno(ds, turno, cls) {
         await secPatch('rapporti_giornalieri', filtro, data);
       }
     }
-    if (!rapportiCache[ds]) rapportiCache[ds] = {};
-    rapportiCache[ds][turno] = data;
+    _rapportoCacheSet(ds, turno, data);
     // Auto-malattia: parse assenze field via _processaAssenzeRapporto (analyze + execute)
     // D-Full: D1 origine, D4 audit log, D6 transactional RPC, D7 date validation
     await _processaAssenzeRapporto(data.assenze || '', ds, turno);

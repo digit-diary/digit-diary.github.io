@@ -21,7 +21,7 @@ async function salvaSoglieAlert() {
     return;
   }
   soglieAlertCfg = { allineamento: a, rdi: r };
-  await setImp('soglie_alert', JSON.stringify(soglieAlertCfg));
+  if (!(await salvaImp('soglie_alert', JSON.stringify(soglieAlertCfg)))) return;
   logAzione('Soglie alert modificate', 'Allineamento >= ' + a + ' CHF, RDI cumulativo >= ' + r + ' CHF');
   const st = document.getElementById('soglie-alert-status');
   if (st) st.textContent = 'Salvato: allineamento da CHF ' + a + ', RDI cumulativo da CHF ' + r + '.';
@@ -50,7 +50,7 @@ async function salvaSoglieDisciplinari() {
     return;
   }
   soglieDisciplinariCfg = { amm: a, recidiva: r, accumulo: c };
-  await setImp('soglie_disciplinari', JSON.stringify(soglieDisciplinariCfg));
+  if (!(await salvaImp('soglie_disciplinari', JSON.stringify(soglieDisciplinariCfg)))) return;
   logAzione('Soglie disciplinari modificate', a + '+ amm, ' + r + '+ allin. recidiva, ' + c + '+ allin. totali');
   renderCassaAlerts();
   renderRischioAlerts();
@@ -484,7 +484,7 @@ function renderRischioAlerts() {
         '). Valutare provvedimento.</span><button class="alert-action" style="background:#e67e22" onclick="apriModuloVeloce(\'rdi\',\'' +
         a.nome.replace(/'/g, "\\'") +
         '\')">Crea RDI</button><button class="alert-action" style="background:var(--muted);margin-left:4px" onclick="ignoraAlertSuggerimento(\'' +
-        escP(a.nome).replace(/'/g, "\\'") +
+        escP(a.nome.replace(/'/g, "\\'")) +
         "','acc')\">Ignora</button></div>";
     });
     html += '</div>';

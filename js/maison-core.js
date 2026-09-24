@@ -124,12 +124,9 @@ async function salvaMaisonManuale() {
     return;
   }
   const tipo = document.getElementById('maison-man-tipo').value || null;
-  let qty = parseInt(document.getElementById('maison-man-qty').value) || 1;
-  // Auto-calcola qty se l'utente lascia 1 ma il costo suggerisce di più
-  if (tipo && qty === 1 && BUONO_VALORI[tipo]) {
-    const calcQ = Math.ceil(importo / BUONO_VALORI[tipo]);
-    if (calcQ >= 1) qty = calcQ;
-  }
+  // La quantita' di buoni e' quella scritta dall'operatore (default 1): ricavarla dal costo
+  // dell'intera riga assegnava 9 BL a chi ne aveva usato uno solo
+  const qty = Math.max(1, parseInt(document.getElementById('maison-man-qty').value) || 1);
   const dataVal = document.getElementById('maison-man-data').value || getGiornataCasino();
   // Gestione nomi multipli con /
   const nomiRaw = rawNome
@@ -168,81 +165,35 @@ async function salvaMaisonManuale() {
       return n;
     });
   }
-  // === SPLITTING INTELLIGENTE PER NOMI MULTIPLI (/) ===
-  // Auto-detect categoria buono dal budget se l'utente non seleziona tipo manualmente.
+  // === RIPARTIZIONE PER NOMI MULTIPLI (/) ===
+  // Chi ha un buono paga qty x valore, il resto va agli altri (regola unica in _ripartisciCostoBuoni).
   // Es: Aili(BL)/Bertaggia(full), px=2, 360 CHF → Aili 40 (1BL), Bertaggia 320 (resto)
-  const _pxBase = Math.floor(px / nNomi) || 1;
-  const _pxExtra = px - _pxBase * nNomi;
-  // Per ogni nome: calcola costo, tipo_buono, px, note
-  const _nomiSplit = nomiFinali.map((n, i) => {
-    const pxI = _pxBase + (i < _pxExtra ? 1 : 0);
-    return {
-      nome: n,
-      px: pxI,
-      tipo_buono: null,
-      costo: 0,
-      note: '',
-      autoDetected: false,
-    };
-  });
+  const _pxQuote = _ripartisciPx(px, nNomi);
+  let _voci;
   if (tipo && BUONO_VALORI[tipo]) {
-    // Utente ha selezionato tipo manualmente
-    if (nNomi > 1) {
-      // Primo nome prende il buono, gli altri il resto
-      const buonoCosto = Math.min(qty * BUONO_VALORI[tipo], importo);
-      const restoCosto = importo - buonoCosto;
-      _nomiSplit[0].costo = Math.round(buonoCosto * 100) / 100;
-      _nomiSplit[0].tipo_buono = tipo;
-      _nomiSplit[0].note = qty > 1 ? qty + tipo : '';
-      for (let i = 1; i < nNomi; i++) _nomiSplit[i].costo = Math.round((restoCosto / (nNomi - 1)) * 100) / 100;
-    } else {
-      _nomiSplit[0].costo = importo;
-      _nomiSplit[0].tipo_buono = tipo;
-      _nomiSplit[0].note = qty > 1 ? qty + tipo : '';
-    }
+    // Tipo scelto a mano: il primo nome ha il buono con la quantita' scritta, gli altri il resto
+    _voci = nomiFinali.map((n, i) => ({ nome: n, tipoBuono: i === 0 ? tipo : null, qty: i === 0 ? qty : 0 }));
   } else if (nNomi > 1) {
-    // Nessun tipo selezionato + nomi multipli: AUTO-DETECT dal budget
-    const budgetCats = nomiFinali.map((n) => {
-      const b = getBudgetReparto().find((b) => b.nome.toLowerCase() === n.toLowerCase());
-      return b ? b.categoria : null;
-    });
-    // Mappa categoria budget → tipo buono
+    // Nessun tipo scelto + nomi multipli: il buono si riconosce dalla categoria budget (bu/bl),
+    // una quantita' per persona (px) di quel nome
     const catToTipo = { bu: 'BU', bl: 'BL' };
-    const buonoIdxs = [];
-    const fullIdxs = [];
-    budgetCats.forEach((cat, i) => {
-      if (cat && catToTipo[cat]) buonoIdxs.push(i);
-      else fullIdxs.push(i);
+    _voci = nomiFinali.map((n, i) => {
+      const b = getBudgetReparto().find((b) => b.nome.toLowerCase() === n.toLowerCase());
+      const tb = b && catToTipo[b.categoria] ? catToTipo[b.categoria] : null;
+      return { nome: n, tipoBuono: tb, qty: tb ? _pxQuote[i] : 0 };
     });
-    if (buonoIdxs.length > 0 && fullIdxs.length > 0) {
-      // Mix: chi ha buoni prende quota buono, chi e' full prende il resto
-      let totalBuonoCosto = 0;
-      buonoIdxs.forEach((i) => {
-        const tipoBuono = catToTipo[budgetCats[i]];
-        const pxI = _nomiSplit[i].px;
-        const buonoCosto = pxI * BUONO_VALORI[tipoBuono];
-        _nomiSplit[i].tipo_buono = tipoBuono;
-        _nomiSplit[i].costo = Math.round(Math.min(buonoCosto, importo) * 100) / 100;
-        _nomiSplit[i].note = pxI > 1 ? pxI + tipoBuono : tipoBuono;
-        _nomiSplit[i].autoDetected = true;
-        totalBuonoCosto += _nomiSplit[i].costo;
-      });
-      const restoCosto = Math.max(0, importo - totalBuonoCosto);
-      fullIdxs.forEach((i) => {
-        _nomiSplit[i].costo = Math.round((restoCosto / fullIdxs.length) * 100) / 100;
-      });
-    } else {
-      // Tutti dello stesso tipo: dividi equamente
-      _nomiSplit.forEach((s) => {
-        s.costo = Math.round((importo / nNomi) * 100) / 100;
-      });
-    }
   } else {
-    // Nome singolo
-    _nomiSplit[0].costo = importo;
-    _nomiSplit[0].tipo_buono = tipo || null;
-    if (tipo && qty > 1) _nomiSplit[0].note = qty + tipo;
+    _voci = [{ nome: nomiFinali[0], tipoBuono: tipo || null, qty }];
   }
+  const _nomiSplit = _ripartisciCostoBuoni(importo, _voci, (t) => BUONO_VALORI[t]).map((q, i) => ({
+    nome: q.nome,
+    px: _pxQuote[i],
+    tipo_buono: q.tipoBuono,
+    costo: q.costo,
+    // Nota "2BL" solo quando i buoni sono piu' di uno (come prima); con il tipo riconosciuto
+    // dal budget si scrive anche il tipo, cosi' si vede che non e' stato scelto a mano
+    note: q.tipoBuono ? (q.qty > 1 ? q.qty + q.tipoBuono : tipo ? '' : q.tipoBuono) : '',
+  }));
   try {
     for (let i = 0; i < _nomiSplit.length; i++) {
       const s = _nomiSplit[i];
@@ -385,7 +336,7 @@ function renderRegali() {
     '<table class="collab-table"><thead><tr><th>Data</th><th>Cliente</th><th>Descrizione</th><th class="num">CHF</th><th>Operatore</th><th></th></tr></thead><tbody>';
   data.forEach(function (r) {
     var d = new Date((r.data_regalo || r.created_at) + 'T12:00:00');
-    var ne = r.nome.replace(/'/g, "\\'");
+    var ne = _jsArg(r.nome);
     var _regBudget = getBudgetReparto().find(function (b) {
       return b.nome.toLowerCase() === r.nome.toLowerCase();
     });
@@ -651,8 +602,10 @@ function renderMaisonDashboard() {
       const _cog = nome.toLowerCase().split(/\s+/)[0];
       if (_cog.length >= 3) budget = _brDash.find((b) => b.nome.toLowerCase().split(/\s+/)[0] === _cog);
     }
-    const overBudget = budget && budget.budget_chf && d.tot >= budget.budget_chf;
-    const nearBudget = budget && budget.budget_chf && d.tot >= budget.budget_chf * 0.8 && !overBudget;
+    // Il budget e' mensile: si confronta con lo speso di questo mese, non con il periodo filtrato
+    const _spesoMese = budget && budget.budget_chf ? _spesoPerBudget(budget.nome) : 0;
+    const overBudget = budget && budget.budget_chf && _spesoMese >= budget.budget_chf;
+    const nearBudget = budget && budget.budget_chf && _spesoMese >= budget.budget_chf * 0.8 && !overBudget;
     const catBg =
       budget && budget.categoria === 'full_maison'
         ? 'background:rgba(184,134,11,0.12)'
@@ -672,7 +625,7 @@ function renderMaisonDashboard() {
       : nearBudget
         ? 'background:rgba(230,126,34,0.1)'
         : catBg;
-    const ne = nome.replace(/'/g, "\\'");
+    const ne = _jsArg(nome);
     const clientInfo = budget;
     const catBadge =
       clientInfo && clientInfo.categoria === 'full_maison'
@@ -703,9 +656,9 @@ function renderMaisonDashboard() {
       '</span></strong>' +
       catBadge +
       (overBudget
-        ? ' <span style="color:var(--accent);font-size:.82rem;font-weight:700">BUDGET SUPERATO</span>'
+        ? ' <span style="color:var(--accent);font-size:.82rem;font-weight:700">BUDGET SUPERATO (questo mese)</span>'
         : nearBudget
-          ? ' <span style="color:#e67e22;font-size:.82rem;font-weight:700">80% BUDGET</span>'
+          ? ' <span style="color:#e67e22;font-size:.82rem;font-weight:700">80% BUDGET (questo mese)</span>'
           : '') +
       '</td><td class="num">' +
       d.visite +
@@ -879,7 +832,7 @@ function renderMaisonGdOggi() {
   const _gdVisti = new Set();
   righe.forEach(function (r) {
     if (_gdVisti.has(r.id)) return;
-    var ne = r.nome.replace(/'/g, "\\'");
+    var ne = _jsArg(r.nome);
     // Se ha un gruppo, mostra la riga raggruppata
     if (r.gruppo && r.gruppo.length > 1) {
       const gruppoRighe = righe.filter((x) => x.gruppo === r.gruppo);
@@ -887,7 +840,7 @@ function renderMaisonGdOggi() {
       const totGruppo = gruppoRighe.reduce((s, x) => s + parseFloat(x.costo || 0), 0);
       const totPxGruppo = gruppoRighe.reduce((s, x) => s + (x.px || 0), 0);
       const primoNome = gruppoRighe[0].nome;
-      const neP = primoNome.replace(/'/g, "\\'");
+      const neP = _jsArg(primoNome);
       var budget = _brGd.find(function (b) {
         return b.nome.toLowerCase() === primoNome.toLowerCase();
       });
@@ -1079,8 +1032,22 @@ function renderMaisonGdOggi() {
     });
   }
 }
+// Riga vecchia "A / B" vista come due voci: cancellarne una cancella la riga originale con
+// entrambi i nomi, e l'operatore deve saperlo prima
+function _confermaEliminaRigaMaison(id, domanda) {
+  const rec = maisonCache.find((x) => x.id === id);
+  if (rec && rec.nome && rec.nome.includes('/'))
+    return confirm(
+      'Questa voce fa parte della riga condivisa "' +
+        rec.nome +
+        '": verra\' eliminata la riga originale con entrambi i nomi (' +
+        fmtCHF(rec.costo) +
+        ' CHF). Continuare?',
+    );
+  return confirm(domanda);
+}
 async function eliminaMaisonRigaGd(id) {
-  if (!confirm('Eliminare questa riga?')) return;
+  if (!_confermaEliminaRigaMaison(id, 'Eliminare questa riga?')) return;
   try {
     await secDel('costi_maison', 'id=eq.' + id);
     maisonCache = maisonCache.filter(function (r) {
@@ -1507,7 +1474,9 @@ function _maisonFilePeriodo(data) {
 }
 // Dettaglio cliente: mostra tutte le visite giorno per giorno
 function apriDettaglioMaison(nome) {
-  const righe = getMaisonFiltrati()
+  // Tutte le righe del settore: i filtri della pagina Maison non devono cambiare la scheda
+  // (si apre anche da Home, Regali, Spese e Budget)
+  const righe = getMaisonRepartoExpanded()
     .filter((r) => r.nome === nome)
     .sort((a, b) => a.data_giornata.localeCompare(b.data_giornata));
   let budget = getBudgetReparto().find((b) => b.nome.toLowerCase() === nome.toLowerCase());
@@ -1553,7 +1522,9 @@ function apriDettaglioMaison(nome) {
               : '';
   const nascitaStr =
     budget && budget.data_nascita ? new Date(budget.data_nascita + 'T12:00:00').toLocaleDateString('it-IT') : '';
-  const ne = nome.replace(/'/g, "\\'");
+  const ne = _jsArg(nome);
+  // Budget mensile: la scheda confronta lo speso di questo mese come tutte le altre schermate
+  const _spesoMeseD = budget && budget.budget_chf ? _spesoPerBudget(budget.nome) : 0;
   const _curCat = (budget && budget.categoria) || '';
   const catSelect =
     ' <select id="detail-cat-select" onchange="salvaDetailCat(\'' +
@@ -1590,13 +1561,17 @@ function apriDettaglioMaison(nome) {
     '</p>' +
     (budget && budget.budget_chf
       ? '<p style="font-size:.82rem;color:' +
-        (tot >= budget.budget_chf ? 'var(--accent)' : tot >= budget.budget_chf * 0.8 ? '#e67e22' : '#2c6e49') +
-        ';font-weight:600">Budget: ' +
-        fmtCHF(tot) +
+        (_spesoMeseD >= budget.budget_chf
+          ? 'var(--accent)'
+          : _spesoMeseD >= budget.budget_chf * 0.8
+            ? '#e67e22'
+            : '#2c6e49') +
+        ';font-weight:600">Budget questo mese: ' +
+        fmtCHF(_spesoMeseD) +
         ' / ' +
         fmtCHF(parseFloat(budget.budget_chf)) +
         ' CHF (' +
-        Math.round((tot / budget.budget_chf) * 100) +
+        Math.round((_spesoMeseD / budget.budget_chf) * 100) +
         '%)</p>'
       : '') +
     '<div style="display:flex;align-items:center;gap:8px;margin-top:6px"><span style="font-size:.82rem;color:var(--muted)">Data nascita:</span><input type="text" id="detail-nascita" value="' +
@@ -1914,7 +1889,7 @@ function apriDettaglioMaison(nome) {
   if (noteRighe.length) {
     html += '<h4 style="font-family:Playfair Display,serif;margin:16px 0 8px;color:var(--ink)">Note Private</h4>';
     noteRighe.forEach(function (r) {
-      var ne2 = r.nome.replace(/'/g, "\\'");
+      var ne2 = _jsArg(r.nome);
       html +=
         '<div style="padding:10px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border-left:3px solid var(--accent2);display:flex;justify-content:space-between;align-items:start"><div><p style="margin-bottom:4px">' +
         esc(r.nota) +
@@ -1951,9 +1926,9 @@ function apriDettaglioMaison(nome) {
     '\')" style="margin-top:6px;font-size:.82rem;padding:8px 16px">Salva nota</button></div>';
   html +=
     '<div style="display:flex;gap:10px;justify-content:center;margin-top:14px"><button class="btn-export" onclick="esportaMaisonClienteCSV(\'' +
-    nome.replace(/'/g, "\\'") +
+    _jsArg(nome) +
     '\')">CSV</button><button class="btn-export btn-export-pdf" onclick="apriPdfSchedaMaison(\'' +
-    nome.replace(/'/g, "\\'") +
+    _jsArg(nome) +
     '\')">PDF</button><button class="btn-export" onclick="stampaSchedaCliente()" style="border-color:#2c6e49;color:#2c6e49">Stampa</button></div>';
   var _pb = document.getElementById('profilo-content');
   _pb.className = 'profilo-box';
@@ -2395,7 +2370,7 @@ function eseguiConfrontoMaison() {
   document.getElementById('conf-risultato').innerHTML = h;
 }
 function esportaMaisonClienteCSV(nome) {
-  const righe = getMaisonFiltrati()
+  const righe = getMaisonRepartoExpanded()
     .filter((r) => r.nome === nome)
     .sort((a, b) => a.data_giornata.localeCompare(b.data_giornata));
   const seRighe = getSpeseReparto()
@@ -2503,7 +2478,7 @@ function apriPdfSchedaMaison(nome) {
       '<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="pdf-mc-regali"> Regali</label>',
     ].join('') +
     '</div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="esportaMaisonClientePDF(\'' +
-    nome.replace(/'/g, "\\'") +
+    _jsArg(nome) +
     '\')">Genera PDF</button><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
@@ -2516,7 +2491,7 @@ async function esportaMaisonClientePDF(nome) {
     regali: document.getElementById('pdf-mc-regali')?.checked,
   };
   document.getElementById('pwd-modal').classList.add('hidden');
-  const righe = getMaisonFiltrati()
+  const righe = getMaisonRepartoExpanded()
     .filter((r) => r.nome === nome)
     .sort((a, b) => a.data_giornata.localeCompare(b.data_giornata));
   const _seRighePdf = getSpeseReparto().filter((r) => r.beneficiario.toLowerCase() === nome.toLowerCase());
@@ -2801,7 +2776,7 @@ async function eliminaMaisonCliente(nome) {
   }
   if (!confirm('Eliminare tutte le ' + count + ' registrazioni di "' + nome + '" (' + currentReparto + ')?')) return;
   try {
-    await secDel('costi_maison', 'nome=eq.' + encodeURIComponent(nome) + '&reparto_dip=eq.' + currentReparto);
+    await _secDelReparto('costi_maison', 'nome=eq.' + encodeURIComponent(nome));
     maisonCache = maisonCache.filter((r) => !(r.nome === nome && (r.reparto_dip || 'slots') === currentReparto));
     logAzione('Maison: eliminato cliente', nome + ' (' + count + ' righe, ' + currentReparto + ')');
     renderMaisonDashboard();
@@ -2821,7 +2796,7 @@ function _eliminaCondivisoModal(nome) {
       .join(', '),
   );
   const count = getMaisonReparto().filter((r) => orig.includes(r.nome)).length;
-  const ne = nome.replace(/'/g, "\\'");
+  const ne = _jsArg(nome);
   const b = document.getElementById('pwd-modal-content');
   b.innerHTML =
     '<h3>Eliminare ' +
@@ -2892,7 +2867,7 @@ function rinominaMaisonCliente(nome) {
   const b = document.getElementById('pwd-modal-content');
   if (_isSoloCondiviso(nome)) {
     const orig = _getNomiCondivisiOriginali(nome);
-    const ne = nome.replace(/'/g, "\\'");
+    const ne = _jsArg(nome);
     b.innerHTML =
       '<h3>Rinomina cliente Maison</h3><p style="margin-bottom:8px;font-size:.88rem;color:var(--accent2)">' +
       escP(nome) +
@@ -2919,7 +2894,7 @@ function rinominaMaisonCliente(nome) {
     '" readonly style="background:var(--paper2);color:var(--muted)"></div><div class="pwd-field"><label>Nuovo nome</label><input type="text" id="rin-maison-nuovo" value="' +
     escP(nome) +
     '"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiRinominaMaison(\'' +
-    nome.replace(/'/g, "\\'") +
+    _jsArg(nome) +
     '\')">Salva</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
   setTimeout(() => {
@@ -2939,9 +2914,7 @@ async function eseguiRinominaMaison(vecchio) {
     return;
   }
   try {
-    await secPatch('costi_maison', 'nome=eq.' + encodeURIComponent(vecchio) + '&reparto_dip=eq.' + currentReparto, {
-      nome: nuovo,
-    });
+    await _secPatchReparto('costi_maison', 'nome=eq.' + encodeURIComponent(vecchio), { nome: nuovo });
     maisonCache.forEach((r) => {
       if (r.nome === vecchio && (r.reparto_dip || 'slots') === currentReparto) r.nome = nuovo;
     });
@@ -3004,7 +2977,7 @@ async function _eseguiRinominaCondiviso(vecchio) {
 function modificaMaisonRiga(id, nome) {
   const r = maisonCache.find((x) => x.id === id);
   if (!r) return;
-  const ne = nome.replace(/'/g, "\\'");
+  const ne = _jsArg(nome);
   const mc = document.getElementById('pwd-modal-content');
   mc.innerHTML =
     '<h3>Modifica riga</h3><p style="color:var(--muted);font-size:.85rem;margin-bottom:12px">' +
@@ -3067,7 +3040,8 @@ async function eliminaMaisonRigaDettaglio(id, nome) {
   const r = maisonCache.find((x) => x.id === id);
   if (!r) return;
   if (
-    !confirm(
+    !_confermaEliminaRigaMaison(
+      id,
       'Eliminare la spesa di ' +
         r.nome +
         ' del ' +
@@ -3171,7 +3145,7 @@ async function eliminaMaisonGiorno() {
   const count = getMaisonReparto().filter((r) => r.data_giornata === giorno).length;
   if (!confirm('Eliminare tutte le ' + count + ' registrazioni del ' + label + ' (' + currentReparto + ')?')) return;
   try {
-    await secDel('costi_maison', 'data_giornata=eq.' + giorno + '&reparto_dip=eq.' + currentReparto);
+    await _secDelReparto('costi_maison', 'data_giornata=eq.' + giorno);
     maisonCache = maisonCache.filter(
       (r) => !(r.data_giornata === giorno && (r.reparto_dip || 'slots') === currentReparto),
     );
@@ -3204,10 +3178,7 @@ async function eliminaMaisonMese() {
   }
   if (!confirm('Eliminare tutte le ' + count + ' registrazioni di ' + label + ' (' + currentReparto + ')?')) return;
   try {
-    await secDel(
-      'costi_maison',
-      'data_giornata=gte.' + meseStart + '&data_giornata=lte.' + meseEnd + '&reparto_dip=eq.' + currentReparto,
-    );
+    await _secDelReparto('costi_maison', 'data_giornata=gte.' + meseStart + '&data_giornata=lte.' + meseEnd);
     maisonCache = maisonCache.filter(
       (r) =>
         !(r.data_giornata >= meseStart && r.data_giornata <= meseEnd && (r.reparto_dip || 'slots') === currentReparto),

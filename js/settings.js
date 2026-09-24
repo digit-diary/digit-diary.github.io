@@ -392,7 +392,7 @@ async function cambiaProfiloOperatore(nome, prof) {
   if (prof && !PROFILI[prof]) return;
   if (prof) profiliOperatori[nome] = prof;
   else delete profiliOperatori[nome];
-  await setImp('profili_operatori', JSON.stringify(profiliOperatori));
+  if (!(await salvaImp('profili_operatori', JSON.stringify(profiliOperatori)))) return;
   renderVisibilitaUI();
 }
 // Riscrive Visibilita e permessi partendo dai profili assegnati. Chi non ha un
@@ -427,7 +427,7 @@ async function applicaProfili() {
     else if (lista.length === tutti.length) visibilitaConfig[key] = 'tutti';
     else visibilitaConfig[key] = { tipo: 'selezionati', operatori: lista.slice().sort() };
   });
-  await setImp('visibilita', JSON.stringify(visibilitaConfig));
+  if (!(await salvaImp('visibilita', JSON.stringify(visibilitaConfig)))) return;
   applicaVisibilita();
   renderVisibilitaUI();
   toast('Profili applicati a ' + conProfilo.length + ' operatori');
@@ -444,7 +444,7 @@ function renderProfiliUI(opList) {
       '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="min-width:180px;font-weight:600">' +
       escP(nome) +
       '</span><select class="form-control" style="max-width:260px" onchange="cambiaProfiloOperatore(\'' +
-      escP(nome).replace(/'/g, "\\'") +
+      escP(nome.replace(/'/g, "\\'")) +
       '\', this.value)"><option value="">Nessun profilo</option>';
     PROFILI_ORDINE.forEach((p) => {
       html +=
@@ -491,7 +491,7 @@ async function salvaModuloResp(rep, val) {
   if (v) cfg[rep] = v;
   else delete cfg[rep];
   moduliRespCfg = cfg;
-  await setImp('moduli_responsabili', JSON.stringify(cfg));
+  if (!(await salvaImp('moduli_responsabili', JSON.stringify(cfg)))) return;
   logAzione('Moduli: responsabile di settore', repartoLabel(rep) + ': ' + (prima || 'vuoto') + ' → ' + (v || 'vuoto'));
   toast('Salvato · ' + repartoLabel(rep) + ': ' + (v || 'nessun nome proposto'));
 }
@@ -559,6 +559,11 @@ function renderVisibilitaUI() {
   el.innerHTML = html;
 }
 async function cambiaVisibilita(key, val) {
+  // il controllo era solo nell'interfaccia: la funzione resta richiamabile dalla console
+  if (!isAdmin()) {
+    toast('Riservato all amministratore');
+    return;
+  }
   if (val === 'selezionati') {
     visibilitaConfig[key] = { tipo: 'selezionati', operatori: [] };
     const box = document.getElementById('vis-ops-' + key);
@@ -570,16 +575,20 @@ async function cambiaVisibilita(key, val) {
     const box = document.getElementById('vis-ops-' + key);
     if (box) box.style.display = 'none';
   }
-  await setImp('visibilita', JSON.stringify(visibilitaConfig));
+  if (!(await salvaImp('visibilita', JSON.stringify(visibilitaConfig)))) return;
   applicaVisibilita();
   toast('Visibilità aggiornata');
 }
 async function aggiornaVisOps(key) {
+  if (!isAdmin()) {
+    toast('Riservato all amministratore');
+    return;
+  }
   const box = document.getElementById('vis-ops-' + key);
   if (!box) return;
   const checked = [...box.querySelectorAll('input[type=checkbox]:checked')].map((cb) => cb.value);
   visibilitaConfig[key] = { tipo: 'selezionati', operatori: checked };
-  await setImp('visibilita', JSON.stringify(visibilitaConfig));
+  if (!(await salvaImp('visibilita', JSON.stringify(visibilitaConfig)))) return;
   applicaVisibilita();
 }
 async function aggiungiOperatoreConPwd() {
@@ -744,7 +753,7 @@ async function salvaAccessiExtra(nome) {
   window._operatoriAccessiExtra = window._operatoriAccessiExtra || {};
   if (Object.keys(cfg).length) window._operatoriAccessiExtra[nome] = cfg;
   else delete window._operatoriAccessiExtra[nome];
-  await setImp('operatori_accessi_extra', JSON.stringify(window._operatoriAccessiExtra));
+  if (!(await salvaImp('operatori_accessi_extra', JSON.stringify(window._operatoriAccessiExtra)))) return;
   localStorage.setItem('_cache_operatori_accessi_extra', JSON.stringify(window._operatoriAccessiExtra));
   logAzione(
     'Accessi extra operatore',
@@ -766,20 +775,20 @@ async function salvaAccessiExtra(nome) {
 }
 async function cambiaRepartoOperatore(nome, rep) {
   operatoriRepartoMap[nome] = rep;
-  await setImp('operatori_reparto', JSON.stringify(operatoriRepartoMap));
+  if (!(await salvaImp('operatori_reparto', JSON.stringify(operatoriRepartoMap)))) return;
   renderOperatoriUI();
   toast(nome + ' → ' + rep);
 }
 async function rimuoviOperatore(n) {
   if (!confirm('Rimuovere operatore "' + n + '"?')) return;
   operatoriSalvati = operatoriSalvati.filter((o) => o !== n);
-  await saveOperatori();
+  if (!(await saveOperatori())) return;
   try {
     await sbRpc('remove_operator', { p_nome: n, p_token: getAdminToken() });
     operatoriAuthCache = operatoriAuthCache.filter((o) => o.nome !== n);
   } catch (e) {}
   delete operatoriRepartoMap[n];
-  await setImp('operatori_reparto', JSON.stringify(operatoriRepartoMap));
+  if (!(await salvaImp('operatori_reparto', JSON.stringify(operatoriRepartoMap)))) return;
   logAzione('Operatore rimosso', n);
   renderOperatoriUI();
   toast('Rimosso');
@@ -945,12 +954,12 @@ async function toggleCampoReparto(key, repKey, attivo) {
   // se copre tutti i settori torna al default "ovunque" (robusto ai settori futuri)
   if (tuttiRep.every((k) => rr.includes(k))) delete campiReparti[key];
   else campiReparti[key] = rr;
-  await setImp('campi_rapporto_reparti', JSON.stringify(campiReparti));
+  if (!(await salvaImp('campi_rapporto_reparti', JSON.stringify(campiReparti)))) return;
   logAzione('Campi rapporto', key + ' → settori: ' + (campiReparti[key] ? campiReparti[key].join(',') : 'tutti'));
   renderCampiRapportoUI();
 }
 async function saveCampiExtra() {
-  await setImp('campi_rapporto_extra', JSON.stringify(campiRapportoExtra));
+  return salvaImp('campi_rapporto_extra', JSON.stringify(campiRapportoExtra));
 }
 async function aggiungiCampoRapporto() {
   const n = document.getElementById('new-campo-nome').value.trim();
@@ -964,7 +973,7 @@ async function aggiungiCampoRapporto() {
     return;
   }
   campiRapportoExtra.push({ key, label: n, type: 'text' });
-  await saveCampiExtra();
+  if (!(await saveCampiExtra())) return;
   document.getElementById('new-campo-nome').value = '';
   renderCampiRapportoUI();
   toast('Campo aggiunto');
@@ -972,7 +981,7 @@ async function aggiungiCampoRapporto() {
 async function rimuoviCampoRapporto(key) {
   if (!confirm('Rimuovere questo campo?')) return;
   campiRapportoExtra = campiRapportoExtra.filter((c) => c.key !== key);
-  await saveCampiExtra();
+  if (!(await saveCampiExtra())) return;
   renderCampiRapportoUI();
   toast('Campo rimosso');
 }
@@ -980,13 +989,13 @@ async function nascondiCampoDefault(key) {
   const d = CAMPI_RAPPORTO_DEFAULT.find((x) => x.key === key);
   if (!confirm('Nascondere il campo "' + (d ? d.label : key) + '"? I dati esistenti non verranno eliminati.')) return;
   campiNascosti.push(key);
-  await setImp('campi_nascosti', JSON.stringify(campiNascosti));
+  if (!(await salvaImp('campi_nascosti', JSON.stringify(campiNascosti)))) return;
   renderCampiRapportoUI();
   toast('Campo nascosto');
 }
 async function ripristinaCampoDefault(key) {
   campiNascosti = campiNascosti.filter((k) => k !== key);
-  await setImp('campi_nascosti', JSON.stringify(campiNascosti));
+  if (!(await salvaImp('campi_nascosti', JSON.stringify(campiNascosti)))) return;
   renderCampiRapportoUI();
   toast('Campo ripristinato');
 }
@@ -998,7 +1007,7 @@ async function spostaTipo(nome, dir) {
   if (ni < 0 || ni >= tutti.length) return;
   [tutti[i], tutti[ni]] = [tutti[ni], tutti[i]];
   tipiOrdine = tutti;
-  await setImp('tipi_ordine', JSON.stringify(tipiOrdine));
+  if (!(await salvaImp('tipi_ordine', JSON.stringify(tipiOrdine)))) return;
   renderTipiUI();
 }
 async function spostaCampo(key, dir) {
@@ -1009,7 +1018,7 @@ async function spostaCampo(key, dir) {
   if (ni < 0 || ni >= campi.length) return;
   [campi[i], campi[ni]] = [campi[ni], campi[i]];
   campiOrdine = campi;
-  await setImp('campi_ordine', JSON.stringify(campiOrdine));
+  if (!(await salvaImp('campi_ordine', JSON.stringify(campiOrdine)))) return;
   renderCampiRapportoUI();
 }
 function rinominaCampo(key) {
@@ -1039,12 +1048,12 @@ async function eseguiRinominaCampo(key) {
   const isDefault = CAMPI_RAPPORTO_DEFAULT.find((d) => d.key === key);
   if (isDefault) {
     campiLabelOverride[key] = val;
-    await setImp('campi_label_override', JSON.stringify(campiLabelOverride));
+    if (!(await salvaImp('campi_label_override', JSON.stringify(campiLabelOverride)))) return;
   } else {
     const c = campiRapportoExtra.find((x) => x.key === key);
     if (c) {
       c.label = val;
-      await saveCampiExtra();
+      if (!(await saveCampiExtra())) return;
     }
   }
   document.getElementById('pwd-modal').classList.add('hidden');
@@ -1086,16 +1095,16 @@ async function eseguiRinominaTipo(vecchioNome) {
   const isDefault = TIPI_DEFAULT.find((d) => d.nome === nomeOriginale);
   if (isDefault) {
     tipiRinominati[nomeOriginale] = nuovoNome;
-    await setImp('tipi_rinominati', JSON.stringify(tipiRinominati));
+    if (!(await salvaImp('tipi_rinominati', JSON.stringify(tipiRinominati)))) return;
     if (coloriOverride[vecchioNome]) {
       coloriOverride[nomeOriginale] = coloriOverride[vecchioNome];
       if (vecchioNome !== nomeOriginale) delete coloriOverride[vecchioNome];
-      await saveColoriOverride();
+      if (!(await saveColoriOverride())) return;
     }
     const oi = tipiOrdine.indexOf(vecchioNome);
     if (oi !== -1) {
       tipiOrdine[oi] = nuovoNome;
-      await setImp('tipi_ordine', JSON.stringify(tipiOrdine));
+      if (!(await salvaImp('tipi_ordine', JSON.stringify(tipiOrdine)))) return;
     }
     // Aggiorna registrazioni nel DB e nella cache
     try {
@@ -1114,9 +1123,9 @@ async function eseguiRinominaTipo(vecchioNome) {
       }
       const oi = tipiOrdine.indexOf(vecchioNome);
       if (oi !== -1) tipiOrdine[oi] = nuovoNome;
-      await saveTipiP();
-      await saveColoriOverride();
-      if (tipiOrdine.length) await setImp('tipi_ordine', JSON.stringify(tipiOrdine));
+      if (!(await saveTipiP())) return;
+      if (!(await saveColoriOverride())) return;
+      if (tipiOrdine.length && !(await salvaImp('tipi_ordine', JSON.stringify(tipiOrdine)))) return;
       try {
         await secPatch('registrazioni', 'tipo=eq.' + encodeURIComponent(vecchioNome), { tipo: nuovoNome });
       } catch (e) {}
@@ -1250,7 +1259,7 @@ async function salvaBuonoValori() {
     nuovi[k] = v;
   }
   Object.assign(BUONO_VALORI, nuovi);
-  await setImp('buono_valori', JSON.stringify(nuovi));
+  if (!(await salvaImp('buono_valori', JSON.stringify(nuovi)))) return;
   logAzione(
     'Valori buoni Maison',
     'BU ' + nuovi.BU + ' / BL ' + nuovi.BL + ' / CG ' + nuovi.CG + ' / WL ' + nuovi.WL + ' CHF',
@@ -1404,7 +1413,7 @@ async function salvaConservazioneAnni(v) {
     return;
   }
   conservazioneAnniCfg = n;
-  await setImp('conservazione_anni', String(n));
+  if (!(await salvaImp('conservazione_anni', String(n)))) return;
   logAzione('Conservazione dati', n ? 'minimo ' + n + ' anni' : 'protezione disattivata');
   toast(n ? 'Conservazione: ' + n + ' anni' : 'Protezione conservazione disattivata');
   renderConservazioneUI();
@@ -1413,7 +1422,7 @@ async function salvaConservazioneGrazia(v) {
   if (!isAdmin()) return;
   const n = Math.max(0, Math.min(365, parseInt(v) || 0));
   conservazioneGraziaCfg = n;
-  await setImp('conservazione_giorni_grazia', String(n));
+  if (!(await salvaImp('conservazione_giorni_grazia', String(n)))) return;
   logAzione('Conservazione dati', 'finestra correzione ' + n + ' giorni');
   toast('Correzione possibile entro ' + n + ' giorni');
   renderConservazioneUI();
@@ -1421,7 +1430,7 @@ async function salvaConservazioneGrazia(v) {
 async function salvaBackupAutoGiorni(v) {
   if (!isAdmin()) return;
   const n = Math.max(0, Math.min(90, parseInt(v) || 0));
-  await setImp('backup_auto_giorni', String(n));
+  if (!(await salvaImp('backup_auto_giorni', String(n)))) return;
   logAzione('Backup automatico', n ? 'ogni ' + n + ' giorni' : 'disattivato');
   toast(n ? 'Backup automatico: ogni ' + n + ' giorni' : 'Backup automatico disattivato');
 }
@@ -1494,12 +1503,13 @@ function renderSettoriUI() {
   el.innerHTML = html;
 }
 async function _salvaRepartiConfig() {
-  await setImp('reparti_config', JSON.stringify(getRepartiCustom()));
+  if (!(await salvaImp('reparti_config', JSON.stringify(getRepartiCustom())))) return false;
   _salvaCacheReparti();
   if (typeof renderRepartoSwitch === 'function') renderRepartoSwitch();
   if (typeof applicaVisibilita === 'function') applicaVisibilita();
   if (typeof aggiornaMenuMobile === 'function') aggiornaMenuMobile();
   popolaLoginSettore();
+  return true;
 }
 async function aggiungiSettore() {
   const nome = ((document.getElementById('nuovo-settore-nome') || {}).value || '').trim();
@@ -1517,7 +1527,7 @@ async function aggiungiSettore() {
     return;
   }
   repartiConfig = [...getRepartiCustom(), { key, label: nome, colore, attivo: true }];
-  await _salvaRepartiConfig();
+  if (!(await _salvaRepartiConfig())) return;
   logAzione('Settore aggiunto', nome);
   renderSettoriUI();
   toast('Settore "' + nome + '" creato');
@@ -1536,7 +1546,7 @@ async function salvaSettore(key) {
     const base = REPARTI_BASE.find((x) => x.key === key);
     if (base && colore) base.colore = colore;
   }
-  await _salvaRepartiConfig();
+  if (!(await _salvaRepartiConfig())) return;
   logAzione('Settore modificato', key);
   renderSettoriUI();
   toast('Settore salvato');
@@ -1564,7 +1574,7 @@ async function toggleAttivoSettore(key) {
   r.attivo = !disattiva ? true : false;
   repartiConfig = lista;
   if (currentReparto === key && disattiva) currentReparto = 'slots';
-  await _salvaRepartiConfig();
+  if (!(await _salvaRepartiConfig())) return;
   logAzione('Settore ' + (disattiva ? 'disattivato' : 'riattivato'), r.label);
   renderSettoriUI();
   toast('Settore ' + (disattiva ? 'disattivato' : 'riattivato'));
@@ -1575,7 +1585,7 @@ async function salvaPaginaSettore(repKey, pageKey, abilitata) {
   if (abilitata) delete repartiPagineCfg[repKey][pageKey];
   else repartiPagineCfg[repKey][pageKey] = false;
   if (!Object.keys(repartiPagineCfg[repKey]).length) delete repartiPagineCfg[repKey];
-  await setImp('reparti_pagine', JSON.stringify(repartiPagineCfg));
+  if (!(await salvaImp('reparti_pagine', JSON.stringify(repartiPagineCfg)))) return;
   logAzione('Pagine settore', repartoLabel(repKey) + ' · ' + pageKey + ': ' + (abilitata ? 'attiva' : 'disattivata'));
   if (typeof applicaVisibilita === 'function') applicaVisibilita();
   if (typeof aggiornaMenuMobile === 'function') aggiornaMenuMobile();
@@ -1614,8 +1624,9 @@ function renderGiubileoUI() {
 }
 async function _salvaGiubileoConfig(cfg) {
   giubileoConfig = cfg;
-  await setImp('giubileo_config', JSON.stringify(cfg));
+  if (!(await salvaImp('giubileo_config', JSON.stringify(cfg)))) return false;
   renderGiubileoUI();
+  return true;
 }
 async function aggiungiGiubileo() {
   const anni = parseInt((document.getElementById('giubileo-anni-input') || {}).value);
@@ -1630,7 +1641,7 @@ async function aggiungiGiubileo() {
     return;
   }
   cfg.push({ anni, importo });
-  await _salvaGiubileoConfig(cfg.sort((a, b) => a.anni - b.anni));
+  if (!(await _salvaGiubileoConfig(cfg.sort((a, b) => a.anni - b.anni)))) return;
   logAzione('Giubileo: scaglione aggiunto', anni + ' anni = ' + fmtCHF(importo) + ' CHF');
   toast('Scaglione ' + anni + ' anni aggiunto');
 }
@@ -1639,7 +1650,7 @@ async function modificaGiubileo(idx, val) {
   const n = parseFloat(val);
   if (!cfg[idx] || !(n >= 0)) return;
   cfg[idx].importo = n;
-  await _salvaGiubileoConfig(cfg);
+  if (!(await _salvaGiubileoConfig(cfg))) return;
   logAzione('Giubileo: importo modificato', cfg[idx].anni + ' anni = ' + fmtCHF(n) + ' CHF');
   toast('Importo aggiornato');
 }
@@ -1648,14 +1659,14 @@ async function rimuoviGiubileo(idx) {
   if (!cfg[idx]) return;
   if (!confirm('Rimuovere lo scaglione ' + cfg[idx].anni + ' anni?')) return;
   const rimosso = cfg.splice(idx, 1)[0];
-  await _salvaGiubileoConfig(cfg);
+  if (!(await _salvaGiubileoConfig(cfg))) return;
   logAzione('Giubileo: scaglione rimosso', rimosso.anni + ' anni');
 }
 
 async function salvaGiubileoPreavviso(val) {
   const g = parseInt(val) || 0;
   giubileoPreavviso = g;
-  await setImp('giubileo_preavviso', String(g));
+  if (!(await salvaImp('giubileo_preavviso', String(g)))) return;
   logAzione('Giubileo: preavviso notifica', g ? g + ' giorni' : 'disattivato');
   toast(g ? 'Notifica giubileo: ' + g + ' giorni prima' : 'Notifica giubileo disattivata');
 }

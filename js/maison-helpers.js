@@ -733,9 +733,6 @@ function renderMaisonBudgetAlerts() {
     mese = now.getMonth(),
     anno = now.getFullYear();
   const periodo = (document.getElementById('maison-budget-periodo') || {}).value || 'mese';
-  let dataStart;
-  if (periodo === 'anno') dataStart = anno + '-01-01';
-  else dataStart = anno + '-' + String(mese + 1).padStart(2, '0') + '-01';
   const periodoLabel =
     periodo === 'anno'
       ? 'anno ' + anno
@@ -756,11 +753,9 @@ function renderMaisonBudgetAlerts() {
         ' ' +
         anno;
   const alerts = [];
-  const _mrAlerts = getMaisonRepartoExpanded();
   getBudgetReparto().forEach((b) => {
-    const periodoData = _mrAlerts.filter(
-      (r) => r.nome.toLowerCase() === b.nome.toLowerCase() && r.data_giornata >= dataStart,
-    );
+    // Stesso calcolo di lista Budget, Home e dashboard (mese corrente; anno = budget x12)
+    const periodoData = _righePerBudget(b.nome, periodo);
     const spent = periodoData.reduce((s, r) => s + parseFloat(r.costo || 0), 0);
     const nBU = _contaBuoni(periodoData, 'BU');
     const nBL = _contaBuoni(periodoData, 'BL');
@@ -869,7 +864,7 @@ function acFiltraMaison(inputId, dropId) {
         '<div onmousedown="document.getElementById(\'' +
         inputId +
         "').value='" +
-        item.nome.replace(/'/g, "\\'") +
+        _jsArg(item.nome) +
         "';document.getElementById('" +
         dropId +
         "').classList.remove('show');_preimpostaTipoMaison('" +
@@ -899,13 +894,13 @@ function _preimpostaTipoMaison(cat) {
   // Ricalcola qty se c'è già un importo
   _autoCalcolaBuoniManuale();
 }
+// Il numero di buoni resta quello scritto dall'operatore (default 1): ricavarlo dal costo
+// (ceil(importo/valore)) proponeva 9 BL per una cena da 360 CHF condivisa con un ospite
 function _autoCalcolaBuoniManuale() {
   const tipo = (document.getElementById('maison-man-tipo') || {}).value;
-  const importo = parseFloat((document.getElementById('maison-man-importo') || {}).value) || 0;
   const qtyEl = document.getElementById('maison-man-qty');
-  if (!tipo || !importo || !BUONO_VALORI[tipo] || !qtyEl) return;
-  const calcQ = Math.ceil(importo / BUONO_VALORI[tipo]);
-  if (calcQ >= 1) qtyEl.value = calcQ;
+  if (!tipo || !qtyEl) return;
+  if (!(parseInt(qtyEl.value) >= 1)) qtyEl.value = 1;
 }
 // Export
 function esportaMaisonCSV() {
@@ -1229,7 +1224,7 @@ function acFiltraSpeseExtra() {
     .map(
       (n) =>
         "<div onmousedown=\"document.getElementById('se-beneficiario').value='" +
-        n.replace(/'/g, "\\'") +
+        _jsArg(n) +
         "';document.getElementById('ac-se-benef').classList.remove('show')\">" +
         escP(n) +
         '</div>',
@@ -1453,7 +1448,10 @@ function _renderSpeseExtraDel() {
     '</select><button class="btn-act del" onclick="eliminaSpeseExtraMese()" style="padding:5px 12px">Elimina mese</button>';
 }
 async function eliminaSpeseExtraGiorno() {
-  if (!isAdmin()) return;
+  if (!isAdmin()) {
+    toast("Solo un amministratore puo' eliminare le spese extra di un giorno");
+    return;
+  }
   const sel = document.getElementById('se-del-giorno');
   if (!sel || !sel.value) {
     toast('Seleziona un giorno');
@@ -1475,7 +1473,7 @@ async function eliminaSpeseExtraGiorno() {
   )
     return;
   try {
-    await secDel('spese_extra', 'data_spesa=eq.' + giorno + '&reparto_dip=eq.' + currentReparto);
+    await _secDelReparto('spese_extra', 'data_spesa=eq.' + giorno);
     speseExtraCache = speseExtraCache.filter(
       (r) => !(r.data_spesa === giorno && (r.reparto_dip || 'slots') === currentReparto),
     );
@@ -1487,7 +1485,10 @@ async function eliminaSpeseExtraGiorno() {
   }
 }
 async function eliminaSpeseExtraMese() {
-  if (!isAdmin()) return;
+  if (!isAdmin()) {
+    toast("Solo un amministratore puo' eliminare le spese extra di un mese");
+    return;
+  }
   const sel = document.getElementById('se-del-mese');
   if (!sel || !sel.value) {
     toast('Seleziona un mese');
@@ -1518,10 +1519,7 @@ async function eliminaSpeseExtraMese() {
   )
     return;
   try {
-    await secDel(
-      'spese_extra',
-      'data_spesa=gte.' + meseStart + '&data_spesa=lte.' + meseEnd + '&reparto_dip=eq.' + currentReparto,
-    );
+    await _secDelReparto('spese_extra', 'data_spesa=gte.' + meseStart + '&data_spesa=lte.' + meseEnd);
     speseExtraCache = speseExtraCache.filter(
       (r) => !(r.data_spesa >= meseStart && r.data_spesa <= meseEnd && (r.reparto_dip || 'slots') === currentReparto),
     );
@@ -1580,7 +1578,7 @@ function renderSpeseExtra() {
   h +=
     '<div style="overflow-x:auto"><table class="collab-table"><thead><tr><th>Beneficiario</th><th class="num">Visite</th><th>Tipi</th><th class="num">Totale CHF</th><th class="num">Media CHF</th><th></th></tr></thead><tbody>';
   sorted.forEach(([nome, d], idx) => {
-    const ne = nome.replace(/'/g, "\\'");
+    const ne = _jsArg(nome);
     let _seBudget = getBudgetReparto().find((b) => b.nome.toLowerCase() === nome.toLowerCase());
     if (!_seBudget) {
       const _cog = nome.toLowerCase().split(/\s+/)[0];
@@ -1671,7 +1669,7 @@ function rinominaSpeseExtraBenef(vecchio) {
     '</strong></p><div class="pwd-field"><label>Nuovo nome</label><input type="text" id="se-rename-nuovo" value="' +
     escP(vecchio) +
     '"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiRinominaSE(\'' +
-    vecchio.replace(/'/g, "\\'") +
+    _jsArg(vecchio) +
     '\')">Rinomina tutti</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
   setTimeout(() => {
@@ -2003,6 +2001,20 @@ function getMaisonReparto() {
     return (r.reparto_dip || 'slots') === currentReparto;
   });
 }
+// Riga vecchia "A / B" con un buono: il buono appartiene al nome con categoria budget
+// corrispondente (bu/bl), altrimenti al primo. Prima veniva copiato su tutti e contato due volte.
+function _indiceNomeConBuono(nomi, r) {
+  if (!r.tipo_buono) return -1;
+  var catToTipo = { bu: 'BU', bl: 'BL' };
+  var _br = getBudgetReparto();
+  for (var i = 0; i < nomi.length; i++) {
+    var b = _br.find(function (x) {
+      return x.nome.toLowerCase() === capitalizzaNome(nomi[i]).toLowerCase();
+    });
+    if (b && catToTipo[b.categoria] === r.tipo_buono) return i;
+  }
+  return 0;
+}
 function getMaisonRepartoExpanded() {
   return getMaisonReparto().flatMap(function (r) {
     if (!r.nome || !r.nome.includes('/')) return [r];
@@ -2013,11 +2025,25 @@ function getMaisonRepartoExpanded() {
       })
       .filter(Boolean);
     if (nomi.length < 2) return [r];
-    return nomi.map(function (n) {
+    // Costo e persone divisi con il resto all'ultimo (somme esatte), buono solo su chi lo ha
+    var idxBuono = _indiceNomeConBuono(nomi, r);
+    var pxQuote = _ripartisciPx(r.px || 0, nomi.length);
+    var costoTot = Math.round(parseFloat(r.costo || 0) * 100);
+    var costoBase = Math.floor(costoTot / nomi.length);
+    return nomi.map(function (n, i) {
+      var haBuono = i === idxBuono;
+      var centesimi = i === nomi.length - 1 ? costoTot - costoBase * (nomi.length - 1) : costoBase;
       return Object.assign({}, r, {
         nome: capitalizzaNome(n),
-        costo: Math.round((parseFloat(r.costo || 0) / nomi.length) * 100) / 100,
-        px: Math.round((r.px || 0) / nomi.length) || 1,
+        costo: centesimi / 100,
+        px: pxQuote[i],
+        tipo_buono: haBuono ? r.tipo_buono : null,
+        note: haBuono
+          ? r.note
+          : (r.note || '')
+              .replace(/\d*\s*(BU|BL|CG|WL)\b/gi, '')
+              .replace(/^[,\s]+|[,\s]+$/g, '')
+              .trim(),
         _costoOriginale: parseFloat(r.costo || 0),
         _nCondiviso: nomi.length,
         _gruppoOriginale: r.nome,
@@ -2160,7 +2186,7 @@ async function caricaAllegatiCollab(nome) {
             ? '<button class="btn-del-tipo" style="margin-left:4px" onclick="eliminaHrAllegato(' +
               a.id +
               ",'" +
-              nome.replace(/'/g, "\\'") +
+              _jsArg(nome) +
               '\')">Elimina</button>'
             : '') +
           '</div>'
@@ -2189,7 +2215,10 @@ function apriHrAllegato(id) {
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 async function eliminaHrAllegato(id, nome) {
-  if (!isAdmin()) return;
+  if (!isAdmin()) {
+    toast("Solo un amministratore puo' eliminare gli allegati");
+    return;
+  }
   if (!confirm('Eliminare questo allegato? Operazione definitiva.')) return;
   try {
     await secDel('hr_allegati', 'id=eq.' + id);
@@ -2250,14 +2279,19 @@ function giubileiCollaboratore(c) {
   const oggi = new Date();
   const maturati = [];
   let prossimo = null;
-  // CONGEDO NON PAGATO: i mesi in cui il collaboratore e' rimasto fermo (nessun
-  // turno e nessuna assenza retribuita) non maturano anzianita', quindi ogni
-  // giubileo si sposta in avanti di altrettanti mesi.
+  // CONGEDO NON PAGATO (RAP 5.14): solo i congedi registrati oltre la soglia
+  // in mesi (regola congedo_np_mesi_anzianita) spostano i giubilei, di tutta
+  // la loro durata in giorni. Il vecchio campo a mesi resta per compatibilita'.
   const mesiFermo = Math.max(0, parseInt(c.mesi_congedo_non_pagato) || 0);
+  const ggFermo =
+    typeof _pianoCongedoNpEffetti === 'function'
+      ? _pianoCongedoNpEffetti(c.nome, oggi.getFullYear()).giorniAnzianita
+      : 0;
   getGiubileoConfig().forEach(function (g) {
     const dataMat = new Date(base);
     dataMat.setFullYear(base.getFullYear() + parseInt(g.anni));
     if (mesiFermo) dataMat.setMonth(dataMat.getMonth() + mesiFermo);
+    if (ggFermo) dataMat.setDate(dataMat.getDate() + ggFermo);
     const voce = {
       anni: parseInt(g.anni),
       importo: parseFloat(g.importo),
@@ -2355,12 +2389,14 @@ function puoVedereStoricoHr() {
   return isAdmin() || (typeof puoModificare === 'function' && puoModificare('storico_hr'));
 }
 // Anzianità leggibile da data_assunzione
-function anzianitaLabel(dataAss, mesiFermo) {
+function anzianitaLabel(dataAss, mesiFermo, nome) {
   if (!dataAss) return '';
   let giorni = Math.floor((Date.now() - new Date(dataAss + 'T12:00:00').getTime()) / 86400000);
-  // i mesi di congedo non pagato non contano come servizio
+  // i congedi non pagati oltre la soglia non contano come servizio (RAP 5.14)
   const fermo = Math.max(0, parseInt(mesiFermo) || 0);
   if (fermo) giorni -= Math.round(fermo * 30.44);
+  if (nome && typeof _pianoCongedoNpEffetti === 'function')
+    giorni -= _pianoCongedoNpEffetti(nome, new Date().getFullYear()).giorniAnzianita;
   if (giorni < 0) return '';
   const anni = Math.floor(giorni / 365);
   const mesi = Math.floor((giorni % 365) / 30);
@@ -2372,6 +2408,9 @@ function anzianitaLabel(dataAss, mesiFermo) {
 
 // === INVENTARIO ===
 let _invTab = 'buoni';
+// Campo dell'inventario che collega un preassegno alla riga Maison che lo ha pareggiato.
+// Va usato ovunque: leggere r.maison_id (che non esiste) faceva comparire la riga due volte.
+const INV_CAMPO_PAREGGIO = 'pareggio_maison_id';
 function getInventarioReparto() {
   return inventarioCache.filter((r) => (r.reparto_dip || 'slots') === currentReparto);
 }
@@ -2388,7 +2427,7 @@ function calcolaGiacenzaBuoni() {
     giacenze[t] = entrate - uscite - preAss;
   });
   const maisonBuoni = getMaisonReparto().filter((r) => r.tipo_buono);
-  const linkedIds = new Set(inv.filter((r) => r.maison_id).map((r) => r.maison_id));
+  const linkedIds = new Set(inv.filter((r) => r[INV_CAMPO_PAREGGIO]).map((r) => r[INV_CAMPO_PAREGGIO]));
   maisonBuoni.forEach((r) => {
     if (linkedIds.has(r.id)) return;
     const preMatch = inv.find(
@@ -2852,8 +2891,8 @@ function renderInventarioBuoniTable() {
   if (fs === 'non_pareggiato') rows = rows.filter((r) => r.movimento === 'preassegno' && !r.pareggiato);
   const linkedIds = new Set(
     getInventarioReparto()
-      .filter((r) => r.maison_id)
-      .map((r) => r.maison_id),
+      .filter((r) => r[INV_CAMPO_PAREGGIO])
+      .map((r) => r[INV_CAMPO_PAREGGIO]),
   );
   let autoRows = getMaisonReparto()
     .filter((r) => r.tipo_buono && !linkedIds.has(r.id))
@@ -3280,30 +3319,43 @@ async function salvaModificaInventario(id) {
     toast('Errore modifica');
   }
 }
-function sincronizzaPareggioBuoni() {
+async function sincronizzaPareggioBuoni() {
   const inv = getInventarioReparto().filter(
     (r) => r.categoria === 'buono' && r.movimento === 'preassegno' && !r.pareggiato,
   );
   if (!inv.length) return;
-  const maison = getMaisonReparto().filter((r) => r.tipo_buono);
-  inv.forEach(async (pre) => {
+  // Una riga Maison pareggia UN solo preassegno (stesso tipo, cliente, quantita', data non
+  // precedente): prima la stessa riga chiudeva piu' preassegni e i salvataggi partivano
+  // in parallelo senza essere attesi
+  const usati = new Set(
+    getInventarioReparto()
+      .filter((r) => r[INV_CAMPO_PAREGGIO])
+      .map((r) => r[INV_CAMPO_PAREGGIO]),
+  );
+  const maison = getMaisonReparto().filter((r) => r.tipo_buono && !usati.has(r.id));
+  let nPareggiati = 0;
+  for (const pre of inv) {
     const match = maison.find(
       (m) =>
+        !usati.has(m.id) &&
         m.tipo_buono === pre.tipo &&
         m.nome.toLowerCase() === pre.cliente.toLowerCase() &&
-        m.data_giornata >= pre.data_movimento,
+        m.data_giornata >= pre.data_movimento &&
+        _contaBuoniFromNote(m) === (parseInt(pre.quantita) || 1),
     );
-    if (match) {
-      try {
-        await secPatch('inventario', 'id=eq.' + pre.id, {
-          pareggiato: true,
-          pareggio_maison_id: match.id,
-        });
-        pre.pareggiato = true;
-        pre.pareggio_maison_id = match.id;
-      } catch (e) {}
-    }
-  });
+    if (!match) continue;
+    try {
+      const dati = { pareggiato: true };
+      dati[INV_CAMPO_PAREGGIO] = match.id;
+      await secPatch('inventario', 'id=eq.' + pre.id, dati);
+      pre.pareggiato = true;
+      pre[INV_CAMPO_PAREGGIO] = match.id;
+      usati.add(match.id);
+      nPareggiati++;
+    } catch (e) {}
+  }
+  const pg = document.getElementById('page-inventario');
+  if (nPareggiati && pg && pg.classList.contains('active')) renderInventario();
 }
 function _aggiornaMarche() {
   const sel = document.getElementById('inv-sig-usc-marca');
@@ -3672,14 +3724,13 @@ window.addEventListener('load', async () => {
       }
     }
     if (!_opTk) {
-      var _ropN = getOperatore();
-      if (_ropN) {
-        var _bioS = await sbRpc('create_bio_session', { p_nome: _ropN });
-        if (_bioS && _bioS.session_token) setOpToken(_bioS.session_token);
-        else {
-          var _bioS2 = await sbRpc('create_bio_session', { p_nome: _ropN });
-          if (_bioS2 && _bioS2.session_token) setOpToken(_bioS2.session_token);
-        }
+      // rinnovo con il token scaduto o con il dispositivo biometrico registrato;
+      // se nessuno dei due funziona si rientra con la password (prima bastava
+      // il nome dell'operatore per ottenere una sessione nuova)
+      if (!(await _renewToken())) {
+        sessionStorage.removeItem('session_active');
+        document.getElementById('login-overlay').classList.remove('hidden');
+        return;
       }
     }
     await loadAll();

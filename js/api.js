@@ -9,7 +9,46 @@
 // ================================================================
 // DATA LOADING
 async function loadAll() {
-  // Caricamento parallelo: impostazioni + dati + tabelle
+  // Caricamento parallelo: impostazioni + dati + tabelle.
+  // secGet ora lancia se il database rifiuta: se la lettura fallisce si avvisa
+  // e si esce lasciando in memoria le impostazioni e le cache gia' presenti,
+  // invece di ripartire con tutto azzerato come se non ci fossero dati
+  let impostazioni;
+  try {
+    impostazioni = await Promise.all([
+      getImp('tipi_personalizzati'),
+      getImp('colori_override'),
+      getImp('operatori_lista'),
+      getImp('campi_rapporto_extra'),
+      getImp('tipi_nascosti'),
+      getImp('campi_nascosti'),
+      getImp('tipi_ordine'),
+      getImp('campi_ordine'),
+      getImp('campi_label_override'),
+      getImp('tipi_rinominati'),
+      getImp('visibilita'),
+      getImp('profili_operatori'),
+      getImp('moduli_responsabili'),
+      getImp('competenze_config'),
+      getImp('formazione_livelli_nomi'),
+      getImp('punti_config'),
+      getImp('maison_auto_delete_giorni'),
+      getImp('inventario_categorie_extra'),
+      getImp('soglie_alert'),
+      getImp('soglie_disciplinari'),
+      getImp('buono_valori'),
+      getImp('equita_mesi'),
+      getImp('reparti_config'),
+      getImp('reparti_pagine'),
+      getImp('giubileo_config'),
+      getImp('giubileo_preavviso'),
+      getImp('conservazione_anni'),
+      getImp('conservazione_giorni_grazia'),
+    ]);
+  } catch (e) {
+    toastErrore('Caricamento dati non riuscito: ' + e.message);
+    return;
+  }
   const [
     tp,
     co,
@@ -39,36 +78,7 @@ async function loadAll() {
     giubPre,
     consAnni,
     consGrazia,
-  ] = await Promise.all([
-    getImp('tipi_personalizzati'),
-    getImp('colori_override'),
-    getImp('operatori_lista'),
-    getImp('campi_rapporto_extra'),
-    getImp('tipi_nascosti'),
-    getImp('campi_nascosti'),
-    getImp('tipi_ordine'),
-    getImp('campi_ordine'),
-    getImp('campi_label_override'),
-    getImp('tipi_rinominati'),
-    getImp('visibilita'),
-    getImp('profili_operatori'),
-    getImp('moduli_responsabili'),
-    getImp('competenze_config'),
-    getImp('formazione_livelli_nomi'),
-    getImp('punti_config'),
-    getImp('maison_auto_delete_giorni'),
-    getImp('inventario_categorie_extra'),
-    getImp('soglie_alert'),
-    getImp('soglie_disciplinari'),
-    getImp('buono_valori'),
-    getImp('equita_mesi'),
-    getImp('reparti_config'),
-    getImp('reparti_pagine'),
-    getImp('giubileo_config'),
-    getImp('giubileo_preavviso'),
-    getImp('conservazione_anni'),
-    getImp('conservazione_giorni_grazia'),
-  ]);
+  ] = impostazioni;
   if (tp)
     try {
       tipiPersonalizzati = JSON.parse(tp);
@@ -176,7 +186,14 @@ async function loadAll() {
   } catch (e) {}
   if (typeof _salvaCacheReparti === 'function') _salvaCacheReparti();
   if (typeof popolaLoginSettore === 'function') popolaLoginSettore();
-  const opRep = await getImp('operatori_reparto');
+  // La mappa operatori/reparto si considera "letta" solo se arriva dal server:
+  // da cache locale non va mai riscritta (una copia vecchia sovrascriveva quella vera)
+  let opRep = null,
+    opRepDalServer = false;
+  try {
+    opRep = await getImp('operatori_reparto');
+    opRepDalServer = true;
+  } catch (e) {}
   try {
     const accExtra = await getImp('operatori_accessi_extra');
     if (accExtra) {
@@ -228,6 +245,8 @@ async function loadAll() {
     puntiD,
     hrEv,
   ] = await Promise.all([
+    // niente ripiego silenzioso: se una tabella non si legge, l'errore ferma
+    // il caricamento (catch qui sotto) e le cache precedenti restano intatte
     secGet('registrazioni?order=data.desc'),
     secGet('note_fissate?select=registrazione_id'),
     secGet('scadenze?order=data_scadenza.asc'),
@@ -252,7 +271,12 @@ async function loadAll() {
     secGet('valutazioni?order=anno.desc'),
     secGet('punti_eventi?order=data_evento.desc'),
     secGet('hr_eventi?order=data_evento.desc'),
-  ]);
+  ]).catch((e) => {
+    toastErrore('Caricamento dati non riuscito: ' + e.message);
+    return [];
+  });
+  // lettura fallita: si esce senza toccare le cache (dati resta undefined)
+  if (!dati) return;
   datiCache = (dati || []).filter((e) => !e.eliminato);
   pinnedIds = new Set(pins.map((p) => p.registrazione_id));
   scadenzeCache = scadenze;
@@ -271,7 +295,10 @@ async function loadAll() {
       if (cached) operatoriAuthCache = JSON.parse(cached);
     } catch (e) {}
   }
-  // Sync: assicura che tutti gli operatori abbiano un reparto nella mappa
+  // Sync: gli operatori senza reparto valgono 'entrambi' per questa sessione.
+  // L'impostazione globale la scrive SOLO l'admin e SOLO se la mappa e' stata
+  // letta dal server: prima qualsiasi operatore, anche partendo dalla cache
+  // locale vecchia, riscriveva la mappa di tutti
   let _mapChanged = false;
   operatoriAuthCache.forEach((o) => {
     if (!operatoriRepartoMap[o.nome]) {
@@ -279,8 +306,12 @@ async function loadAll() {
       _mapChanged = true;
     }
   });
-  if (_mapChanged) {
-    setImp('operatori_reparto', JSON.stringify(operatoriRepartoMap));
+  if (
+    _mapChanged &&
+    opRepDalServer &&
+    isAdmin() &&
+    (await salvaImp('operatori_reparto', JSON.stringify(operatoriRepartoMap)))
+  ) {
     localStorage.setItem('_cache_operatori_reparto', JSON.stringify(operatoriRepartoMap));
   }
   collaboratoriCache = collabs;
