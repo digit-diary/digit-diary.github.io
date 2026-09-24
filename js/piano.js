@@ -13606,6 +13606,33 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
     return [];
   }
 }
+// Testo dell'avviso per una sigla che non esiste: dice cosa e' stato rifiutato
+// e, se c'e' una sigla del settore a una lettera di distanza, la propone.
+function _pianoMessaggioSiglaSbagliata(codice) {
+  const sigle = _pianoTurniReparto()
+    .map((t) => t.codice)
+    .concat(pianoCodiciCache.filter((c) => c.attivo !== false).map((c) => c.codice))
+    .filter(Boolean);
+  let vicina = '';
+  if (typeof _levenshtein === 'function') {
+    let best = 2;
+    sigle.forEach((sg) => {
+      const d = _levenshtein(String(sg).toUpperCase(), codice);
+      if (d < best) {
+        best = d;
+        vicina = sg;
+      }
+    });
+  }
+  return (
+    'Sigla o codice sbagliato: "' +
+    codice +
+    '" non esiste tra i turni e i codici speciali di ' +
+    repartoLabel(_pianoReparto()) +
+    ". La cella e' rimasta com'era." +
+    (vicina ? ' Forse intendevi "' + vicina + '"?' : '')
+  );
+}
 async function pianoSalvaCella(nome, dstr, codice) {
   if (!puoGestirePiano()) return false;
   // giorno chiuso: si procede solo con lo sblocco motivato
@@ -13614,18 +13641,21 @@ async function pianoSalvaCella(nome, dstr, codice) {
   codice = String(codice == null ? '' : codice)
     .trim()
     .toUpperCase();
-  _pianoUndoSnap('modifica cella ' + nome.split(' ')[0] + ' ' + dstr.substring(8));
   // sigla inesistente (né turno né codice speciale) = errore, niente salvataggio
-  // (solo a config caricata: con le cache vuote non si blocca nulla)
+  // (solo a config caricata: con le cache vuote non si blocca nulla).
+  // L'avviso e' rosso, resta a lungo e propone la sigla piu' vicina: il
+  // vecchio avviso scuro di due secondi in basso a destra passava inosservato
+  // e l'operatore vedeva solo la cella tornare com'era.
   if (
     codice &&
     (pianoTurniCache.length || pianoCodiciCache.length) &&
     !_pianoTurnoInfo(codice) &&
     !_pianoCodiceInfo(codice)
   ) {
-    toast('Errore: la sigla "' + codice + '" non esiste (né turno né codice speciale)');
+    toastErrore(_pianoMessaggioSiglaSbagliata(codice));
     return false;
   }
+  _pianoUndoSnap('modifica cella ' + nome.split(' ')[0] + ' ' + dstr.substring(8));
   const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
   const attuale = r ? r.codice : '';
   // CELLA PROTETTA: sovrascriverla e' possibile, ma si dice chiaramente cosa si
@@ -13798,7 +13828,14 @@ function pianoCellaInline(nome, dstr, el) {
       return;
     }
     const ok = await pianoSalvaCella(nome, dstr, v);
-    if (ok === false) el.innerHTML = vecchio;
+    if (ok === false) {
+      el.innerHTML = vecchio;
+      // la cella rifiutata lampeggia in rosso: si vede QUALE cella e' tornata indietro
+      el.classList.remove('piano-cella-rifiutata');
+      void el.offsetWidth;
+      el.classList.add('piano-cella-rifiutata');
+      setTimeout(() => el.classList.remove('piano-cella-rifiutata'), 1700);
+    }
   };
   inp.addEventListener('keydown', (e) => {
     e.stopPropagation();

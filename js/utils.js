@@ -42,12 +42,17 @@ function capitalizzaNome(s) {
 }
 
 // TOAST & UTILS
-function toast(m, durata) {
+function toast(m, durata, tipo) {
   const t = document.getElementById('toast');
   t.textContent = m;
+  // tipo 'errore': rosso e piu' a lungo, per i rifiuti che l'operatore deve vedere
+  t.classList.toggle('errore', tipo === 'errore');
   t.classList.add('show');
   clearTimeout(window._toastTimer);
-  window._toastTimer = setTimeout(() => t.classList.remove('show'), durata || 2500);
+  window._toastTimer = setTimeout(() => t.classList.remove('show'), durata || (tipo === 'errore' ? 6000 : 2500));
+}
+function toastErrore(m, durata) {
+  toast(m, durata, 'errore');
 }
 function esc(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
