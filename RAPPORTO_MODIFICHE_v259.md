@@ -462,3 +462,8 @@ rifiutata con avviso; ogni modifica finisce nell elenco delle modifiche e nel Re
 - **Scheda collaboratore**: riga "Crediti: vacanze restano N, CGF restano N, saldo ore, congedo non pagato" in fondo ai dati personali.
 - **Compleanno e celle bloccate riservate**: il congedo del compleanno (C con commento Compleanno) e le celle bloccate con motivo non vengono piu proposti come sostituti nella copertura malattia, negli scambi con restituzione, nella catena sul giorno prima ne nel cambio per esigenze. Prima il compleanno contava come giorno libero qualsiasi.
 - Questionario rigenerato (v277, 404 voci) e scheda permessi rigenerata con la voce Piano · Crediti; guida aggiornata (capitolo "Piano: crediti").
+
+## v278 · Verifica incrociata della scheda Crediti (fatta con codice e dati veri)
+- Nuovo banco di prova `strumenti/verifica_crediti.js` (con `strumenti/esporta_dati_verifica.py`): carica il codice vero del Piano in Node sopra i dati veri esportati dal database e confronta, per ogni settore e collaboratore, la scheda Crediti con le schede Vacanze, Festivi e Saldo. Risultato del 25/09/2026: 224 confronti uguali, 0 differenze (Slots 45, Tavoli 61, Valet 10, Cleaning 5 collaboratori).
+- Correzione trovata dalla verifica: due collaboratori Slots con impiego "fisso" ma vecchio contrassegno "jolly" attivo comparivano nella scheda Vacanze ma non nei Crediti. Ora Crediti usa lo stesso criterio della scheda Vacanze (vale il campo impiego).
+- Rilevato per il titolare: nessun collaboratore di Tavoli e Valet ha la data di assunzione nella scheda, quindi vacanze spettanti non calcolabili per quei settori; due schede Slots (impiego fisso + contrassegno jolly) sono incoerenti e Saldo e Recupero ore le trattano ancora da ausiliari.
