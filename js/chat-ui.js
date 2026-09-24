@@ -340,7 +340,7 @@ function renderNoteCollega() {
       '" data-conv-name="' +
       (c.partner + ' ' + preview).toLowerCase().replace(/"/g, '') +
       '" onclick="apriConversazione(\'' +
-      escP(c.partner).replace(/'/g, "\\'") +
+      escP(c.partner.replace(/'/g, "\\'")) +
       '\')">';
     html += '<div style="display:flex;justify-content:space-between;align-items:center">';
     const _pLog = !isGroup ? logCache.find((l) => l.operatore === c.partner) : null;
@@ -478,7 +478,7 @@ function toggleConvNewDropdown(ev) {
       '<div style="display:flex;align-items:center;gap:8px" onclick="event.stopPropagation()"><input type="checkbox" class="conv-group-cb" value="' +
       escP(n).replace(/"/g, '&quot;') +
       '" onchange="_aggiornaGruppoBtn()" style="cursor:pointer;width:16px;height:16px;flex-shrink:0"><span onclick="apriConversazione(\'' +
-      escP(n).replace(/'/g, "\\'") +
+      escP(n.replace(/'/g, "\\'")) +
       "');document.getElementById('conv-new-dropdown').style.display='none'\" style=\"flex:1;cursor:pointer\">" +
       escP(n) +
       badge +
@@ -583,9 +583,9 @@ function _apriRimuoviMembri(gid, partner) {
   html += '</div>';
   html +=
     '<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" style="background:var(--accent)" onclick="_confermaRimuoviMembri(\'' +
-    escP(gid).replace(/'/g, "\\'") +
+    escP(gid.replace(/'/g, "\\'")) +
     "','" +
-    escP(partner).replace(/'/g, "\\'") +
+    escP(partner.replace(/'/g, "\\'")) +
     '\')">Rimuovi</button></div>';
   mc.innerHTML = html;
   document.getElementById('pwd-modal').classList.remove('hidden');
@@ -745,9 +745,9 @@ function _apriAggiungiMembri(gid, partner) {
   html += '</div>';
   html +=
     '<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="_confermaAggiungiMembri(\'' +
-    escP(gid).replace(/'/g, "\\'") +
+    escP(gid.replace(/'/g, "\\'")) +
     "','" +
-    escP(partner).replace(/'/g, "\\'") +
+    escP(partner.replace(/'/g, "\\'")) +
     '\')">Aggiungi</button></div>';
   mc.innerHTML = html;
   document.getElementById('pwd-modal').classList.remove('hidden');
@@ -1111,8 +1111,8 @@ function renderNoteChat(partner) {
     '<button class="chat-back-btn" onclick="_chatBackToList()" style="display:none;background:none;border:none;cursor:pointer;font-size:1.2rem;color:var(--ink);padding:4px 8px" title="Indietro">&#8592;</button>';
   const searchBtn =
     '<button onclick="apriCercaChat()" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:1.1rem;color:var(--muted);padding:4px 8px" title="Cerca"><i class="icx icx-cerca"></i></button>';
-  const _gpEsc = escP(_gidChat).replace(/'/g, "\\'");
-  const _ptEsc = escP(partner).replace(/'/g, "\\'");
+  const _gpEsc = escP(_gidChat.replace(/'/g, "\\'"));
+  const _ptEsc = escP(partner.replace(/'/g, "\\'"));
   const _amIAdmin = isCustomGroup && _grpAdmin === op;
   const addMemberBtn =
     isCustomGroup && _amIAdmin
@@ -1574,7 +1574,7 @@ function inoltraMessaggio(noteId) {
       '<div onclick="_eseguiInoltro(' +
       noteId +
       ",'" +
-      escP(nome).replace(/'/g, "\\'") +
+      escP(nome.replace(/'/g, "\\'")) +
       '\',true)" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--line);font-size:.88rem" onmouseenter="this.style.background=\'rgba(184,134,11,.08)\'" onmouseleave="this.style.background=\'\'">' +
       escP(nome) +
       badge +
@@ -2249,7 +2249,7 @@ function apriSchedaCollaboratore(nome) {
     const _dAss = String(collabRec.data_assunzione).substring(0, 10);
     const _anni =
       typeof anzianitaLabel === 'function'
-        ? anzianitaLabel(_dAss, collabRec.mesi_congedo_non_pagato)
+        ? anzianitaLabel(_dAss, collabRec.mesi_congedo_non_pagato, collabRec.nome)
         : Math.floor((Date.now() - new Date(_dAss + 'T12:00:00').getTime()) / 31557600000) + ' anni';
     html +=
       '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px">' +
@@ -2883,7 +2883,7 @@ function _renderStoricoHrSezione(nome) {
           ? 'Tolti ' + parseInt(c.mesi_congedo_non_pagato) + ' mesi di congedo non pagato'
           : '') +
         '">Anzianità: ' +
-        anzianitaLabel(dataAss, c && c.mesi_congedo_non_pagato) +
+        anzianitaLabel(dataAss, c && c.mesi_congedo_non_pagato, c && c.nome) +
         '</span>';
     html += '</div>';
     // Premio giubileo (ogni N anni di servizio, importi configurabili da admin)
@@ -3976,7 +3976,7 @@ function mostraNoteNonLette() {
           '</span></div><div style="font-size:.95rem">' +
           esc(testoPulito) +
           "</div><button style=\"margin-top:8px;color:var(--accent2);border:1px solid var(--accent2);background:none;padding:4px 14px;border-radius:2px;font-size:.82rem;font-weight:600;cursor:pointer;font-family:Source Sans 3,sans-serif\" onclick=\"document.getElementById('note-modal').classList.add('hidden');switchPage('note-collega');setTimeout(function(){rispondiNota('" +
-          escP(n.da_operatore).replace(/'/g, "\\'") +
+          escP(n.da_operatore.replace(/'/g, "\\'")) +
           "'," +
           n.id +
           ')},300)">Rispondi</button></div>'
