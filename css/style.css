@@ -2280,6 +2280,20 @@ header h1 .casino {
   opacity: 1;
   transform: translateY(0);
 }
+.toast.errore {
+  background: #c0392b;
+  color: #fff;
+  font-weight: 600;
+  max-width: min(520px, calc(100vw - 60px));
+}
+/* cella del piano rifiutata (sigla inesistente): lampeggio rosso */
+@keyframes pianoCellaRifiutata {
+  0%, 100% { box-shadow: none; }
+  20%, 60% { box-shadow: inset 0 0 0 2px #c0392b; background: rgba(192, 57, 43, 0.18); }
+}
+.piano-cella-rifiutata {
+  animation: pianoCellaRifiutata 1.6s ease-out 1;
+}
 .notif-banner {
   position: fixed;
   top: -80px;
