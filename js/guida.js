@@ -169,6 +169,8 @@ function GUIDA_CAPITOLI() {
         'Chi ha giorni di vacanza, malattia o recupero nel mese riceve turni solo fino alle ore dovute: quei codici valgono ore anche per la bozza, come nel validatore e nel calendario.',
         '<b>Completa con coperture</b> compare solo se qualcuno e abilitato a coprire da un altro settore: tappa i buchi rimasti rispettando i limiti della sua scheda. Va usato dopo aver generato i piani degli altri reparti.',
         '<b>Valida regole</b> elenca le violazioni (riposi, giorni consecutivi, idoneita, ore fuori tolleranza). <b>Migliora ore</b> riequilibra chi e lontano dal proprio obiettivo.',
+        '<b>Passata di riparazione</b>: dopo il primo giro, per ogni posto rimasto scoperto la bozza prova a spostare un turno appena assegnato a chi e idoneo al posto scoperto, dando il suo turno a un collega libero: tutte le regole valgono per entrambi. I posti che restano scoperti sono quelli senza nessuna combinazione valida.',
+        '<b>Genera con il solver</b> compare solo se l amministratore ha scritto l indirizzo del servizio sul server interno (Piano · Impostazioni): e il motore di ottimizzazione globale (OR-Tools) che calcola il piano ottimo del mese con equita garantita. Senza servizio resta la bozza integrata.',
         '<b>Cancella piano</b> agisce solo sul mese e sul settore che stai guardando: puoi togliere solo le celle generate oppure tutte, e in ogni caso si torna indietro con la freccia Annulla.',
       ],
     },
@@ -458,6 +460,7 @@ function GUIDA_CAPITOLI() {
       titolo: 'Impostazioni del programma',
       vis: () => _guidaAdmin(),
       righe: [
+        '<b>Stampa scheda permessi</b> (in Visibilita pagine e funzioni): produce il foglio con lo stato REALE dei permessi, operatore per operatore, con profilo, settori e accessi extra, pronto per la stampa o il PDF. Serve per farlo controllare a chi decide chi puo vedere e fare cosa.',
         '<b>Sessioni</b>: ogni dispositivo ha la sua sessione, che si rinnova da sola con il token che possiede; aprire il programma sul telefono non fa piu uscire dal PC. Se il rinnovo non e possibile compare un avviso e si rientra con la password. Lo <b>sblocco biometrico</b> va riattivato una volta dalle Impostazioni: da questa versione il dispositivo ha un segreto che il server verifica, quindi nessuno puo ottenere una sessione con il solo nome dell operatore.',
         'Le impostazioni di configurazione (visibilita, profili, settori, punti, soglie, moduli, opzioni del piano) le salva solo una sessione amministratore: il server lo verifica, non basta l interfaccia. Ogni salvataggio fallito viene segnalato con un avviso rosso, mai in silenzio.',
         '<b>Settori</b>: si creano, rinominano e si scelgono le pagine attive per ognuno.',
