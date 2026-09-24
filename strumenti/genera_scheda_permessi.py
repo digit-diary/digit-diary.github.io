@@ -5,11 +5,12 @@ import json, html, datetime, sys, os
 import psycopg2
 E = html.escape
 c = psycopg2.connect(f"host=aws-0-eu-central-1.pooler.supabase.com port=5432 user=postgres.brdhxzgegxhjbcgxcnfd password={os.environ['PW']} dbname=postgres sslmode=require")
-cur = c.cursor(); cur.execute("select chiave, valore from impostazioni where chiave in ('visibilita','profili_operatori','operatori_reparto','operatori_accessi_extra','reparti_pagine')")
+cur = c.cursor(); cur.execute("select chiave, valore from impostazioni where chiave in ('visibilita','profili_operatori','operatori_reparto','operatori_accessi_extra','reparti_pagine','profili_custom')")
 imp = {k: json.loads(v) for k, v in cur.fetchall()}
 cur.execute("select nome from operatori_auth order by nome"); ops = [r[0] for r in cur.fetchall()]
 vis = imp.get('visibilita', {}); prof = imp.get('profili_operatori', {}); rep = imp.get('operatori_reparto', {}); extra = imp.get('operatori_accessi_extra', {}); rpag = imp.get('reparti_pagine', {})
 PROF = {'direzione': 'Direzione', 'resp': 'Responsabile FoBoSlot', 'sost': 'Sostituto Responsabile', 'sup': 'Supervisor', 'hr': 'HR'}
+for _k, _v in (imp.get('profili_custom') or {}).items(): PROF[_k] = _v.get('nome', _k) + ' (personalizzato)'
 voci = [('Pagine', [('rapporto','Rapporto'),('note_collega','Note Colleghi (chat)'),('statistiche','Statistiche'),('moduli','Moduli disciplinari'),('formazione','Formazione'),('piano','Piano di lavoro'),('assistente','Assistente AI'),('consegna','Consegna Turno'),('promemoria','Promemoria'),('maison','Costi Maison'),('inventario','Inventario'),('registro','Registro attivita (solo amministratore)')]),
  ('Funzioni', [('ricerca_globale','Ricerca globale'),('alert_cassa','Alert cassa'),('alert_rischio','Alert rischio'),('alert_compleanni','Compleanni Maison'),('template_rapidi','Template rapidi'),('firma_digitale','Firma digitale'),('qr_code','QR Code su PDF'),('ai_moduli','AI (genera e migliora testo)')]),
  ('Piano: schede visibili', [('ptab_'+k, 'Piano · '+l) for k, l in [('calendario','Calendario'),('briefing','Briefing'),('vacanze','Vacanze'),('saldo','Saldo'),('recupero','Recupero ore'),('timbrature','Timbrature'),('statistiche','Statistiche'),('benessere','Benessere'),('storico','Storico'),('formulari','Formulari'),('turni','Turni'),('regole','Regole'),('festivi','Festivi'),('impostazioni','Impostazioni'),('guida','Guida')]]),

@@ -354,12 +354,46 @@ const PROFILI_VOCI_DI_SOLA_VISTA = ['vista_categorie', 'vista_malattie_pct', 'st
 // Un profilo concede la voce? Le pagine, le funzioni e le schede del Piano si
 // aprono sia con V sia con M; i permessi di modifica solo con M, tranne le
 // viste riservate qui sopra.
+// ---------------------------------------------------------------------------
+// PROFILI PERSONALIZZATI · figure in piu (es. Compliance, Segretariato) create
+// dall admin in Visibilita e permessi, impostazione profili_custom:
+//   { id: { nome, voci: { chiave: 'M' | 'V' | '-' } } }
+// I cinque profili del documento restano fissi; un profilo personalizzato si
+// usa esattamente come loro (assegnazione, Applica i profili, scheda stampata).
+// ---------------------------------------------------------------------------
+function _profiliCustom() {
+  return window._profiliCustom || {};
+}
+async function _caricaProfiliCustom() {
+  if (window._profiliCustom != null) return;
+  window._profiliCustom = {};
+  try {
+    const v = await getImp('profili_custom');
+    if (v) window._profiliCustom = JSON.parse(v) || {};
+  } catch (e) {}
+}
+function _profiloNome(p) {
+  return PROFILI[p] || (_profiliCustom()[p] || {}).nome || '';
+}
+function _profiliTuttiIds() {
+  return PROFILI_ORDINE.concat(
+    Object.keys(_profiliCustom()).sort((a, b) => _profiloNome(a).localeCompare(_profiloNome(b))),
+  );
+}
+// valore 'M' | 'V' | '-' della voce per un profilo (fisso o personalizzato)
+function _profiloVoce(key, prof) {
+  if (PROFILI[prof]) {
+    const riga = MATRICE_PROFILI[key];
+    if (!riga) return null;
+    return riga[PROFILI_ORDINE.indexOf(prof)];
+  }
+  const c = _profiliCustom()[prof];
+  if (!c) return null;
+  return (c.voci || {})[key] || '-';
+}
 function _profiloConcede(key, prof) {
-  const riga = MATRICE_PROFILI[key];
-  if (!riga) return null;
-  const i = PROFILI_ORDINE.indexOf(prof);
-  if (i < 0) return null;
-  const val = riga[i];
+  const val = _profiloVoce(key, prof);
+  if (val == null) return null;
   if (val === '-') return false;
   if (val === 'M') return true;
   const soloModifica =
@@ -379,10 +413,10 @@ function _visHaAccessoOggi(key, nome) {
 }
 function _profiloDi(nome) {
   const p = profiliOperatori && profiliOperatori[nome];
-  return PROFILI[p] ? p : '';
+  return _profiloNome(p) ? p : '';
 }
 async function cambiaProfiloOperatore(nome, prof) {
-  if (prof && !PROFILI[prof]) return;
+  if (prof && !_profiloNome(prof)) return;
   if (prof) profiliOperatori[nome] = prof;
   else delete profiliOperatori[nome];
   if (!(await salvaImp('profili_operatori', JSON.stringify(profiliOperatori)))) return;
@@ -398,7 +432,7 @@ async function applicaProfili() {
     return;
   }
   const senzaProfilo = tutti.filter((n) => !_profiloDi(n));
-  const elenco = conProfilo.map((n) => n + ' = ' + PROFILI[_profiloDi(n)]).join('\n');
+  const elenco = conProfilo.map((n) => n + ' = ' + _profiloNome(_profiloDi(n))).join('\n');
   const ok = confirm(
     'Applicare i profili?\n\n' +
       elenco +
@@ -438,9 +472,16 @@ function renderProfiliUI(opList) {
       '</span><select onchange="cambiaProfiloOperatore(\'' +
       escP(nome.replace(/'/g, "\\'")) +
       '\', this.value)"><option value="">Nessun profilo</option>';
-    PROFILI_ORDINE.forEach((p) => {
+    _profiliTuttiIds().forEach((p) => {
       html +=
-        '<option value="' + p + '"' + (_profiloDi(nome) === p ? ' selected' : '') + '>' + PROFILI[p] + '</option>';
+        '<option value="' +
+        p +
+        '"' +
+        (_profiloDi(nome) === p ? ' selected' : '') +
+        '>' +
+        escP(_profiloNome(p)) +
+        (PROFILI[p] ? '' : ' (personalizzato)') +
+        '</option>';
     });
     html += '</select></div>';
   });
@@ -448,7 +489,203 @@ function renderProfiliUI(opList) {
   html += '</div>';
   html +=
     '<button class="btn-add-tipo" onclick="applicaProfili()" style="margin-bottom:8px">Applica i profili</button>';
+  html += _profiliCustomHtml();
   return html;
+}
+// ---- profili personalizzati: elenco, creazione, tabella voce per voce ----
+const _PROF_VAL_LBL = { M: 'Modifica', V: 'Vede', '-': 'No' };
+function _profCustomOpzioni(gruppo, key) {
+  // dove la V ha un senso: pagine, funzioni, schede del Piano e le viste riservate
+  if (gruppo === 'pagine' || gruppo === 'funzioni' || gruppo === 'piano_schede') return ['M', 'V', '-'];
+  if (gruppo === 'permessi' && PROFILI_VOCI_DI_SOLA_VISTA.indexOf(key) >= 0) return ['M', 'V', '-'];
+  return ['M', '-'];
+}
+function _profiliCustomHtml() {
+  const cust = _profiliCustom();
+  const ids = Object.keys(cust).sort((a, b) => _profiloNome(a).localeCompare(_profiloNome(b)));
+  let h = '<div class="vis-gruppo">Profili personalizzati</div>';
+  h +=
+    '<p class="sez-desc" style="margin-bottom:10px">I cinque profili del documento firmato sono fissi. Qui si creano altre figure (per esempio Compliance o Segretariato) partendo da una copia di un profilo esistente e decidendo voce per voce cosa vede e cosa modifica. Poi si assegnano agli operatori come gli altri.</p>';
+  h += '<div class="tipo-list" style="margin-bottom:10px">';
+  ids.forEach((id) => {
+    const voci = cust[id].voci || {};
+    const nM = Object.values(voci).filter((v) => v === 'M').length;
+    const nV = Object.values(voci).filter((v) => v === 'V').length;
+    const usato = Object.keys(profiliOperatori || {}).filter((n) => profiliOperatori[n] === id);
+    h +=
+      '<div class="tipo-item"><span class="tipo-item-name">' +
+      escP(cust[id].nome) +
+      '</span><span style="font-size:.8rem;color:var(--muted)">' +
+      nM +
+      ' voci in modifica · ' +
+      nV +
+      ' in sola vista' +
+      (usato.length ? ' · assegnato a ' + escP(usato.join(', ')) : '') +
+      '</span><span style="flex:1"></span><button class="btn-del-tipo" onclick="profCustomModifica(\'' +
+      id +
+      '\')">Modifica</button><button class="btn-del-tipo pericolo" style="margin-left:4px" onclick="profCustomElimina(\'' +
+      id +
+      '\')">Elimina</button></div>';
+  });
+  if (!ids.length) h += '<p style="color:var(--muted);font-size:.84rem;margin:0">Nessun profilo personalizzato.</p>';
+  h += '</div>';
+  h +=
+    '<div class="add-tipo-row sez-form"><div class="field"><label>Nome del nuovo profilo</label><input type="text" id="prof-nuovo-nome" placeholder="es. Compliance"></div><div class="field"><label>Parti da una copia di</label><select id="prof-nuovo-base">' +
+    _profiliTuttiIds()
+      .map((p) => '<option value="' + p + '">' + escP(_profiloNome(p)) + '</option>')
+      .join('') +
+    '<option value="">Tutto a No</option></select></div><button class="btn-add-tipo" onclick="profCustomCrea()">Crea e apri la tabella</button></div>';
+  h += '<div id="prof-editor">' + (window._profCustomEdit ? _profCustomEditorHtml() : '') + '</div>';
+  return h;
+}
+function _profCustomEditorHtml() {
+  const ed = window._profCustomEdit;
+  if (!ed) return '';
+  const gruppi = [
+    ['pagine', 'Pagine'],
+    ['funzioni', 'Funzioni'],
+    ['piano_schede', 'Piano · schede visibili'],
+    ['piano_modifica', 'Piano · schede modificabili'],
+    ['permessi', 'Permessi di modifica'],
+  ];
+  let h =
+    '<div class="sez-box" style="margin-top:12px"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px"><b>' +
+    (ed.id ? 'Modifica profilo' : 'Nuovo profilo') +
+    '</b><input type="text" id="prof-edit-nome" value="' +
+    escP(ed.nome) +
+    '" style="padding:6px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);min-width:220px"><span style="flex:1"></span>' +
+    '<button class="btn-add-tipo" onclick="profCustomSalva()">Salva profilo</button><button class="btn-secondario" onclick="profCustomAnnulla()">Annulla</button></div>' +
+    '<p class="sez-desc" style="margin-bottom:8px">Modifica = puo cambiare; Vede = solo lettura; No = non la vede. Le voci di modifica del Piano e i permessi non hanno la sola vista, tranne le viste riservate.</p>';
+  gruppi.forEach(([g, titolo]) => {
+    const voci = VIS_ITEMS[g] || {};
+    h +=
+      '<div class="vis-gruppo">' +
+      titolo +
+      '</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:4px 16px">';
+    Object.entries(voci).forEach(([k, label]) => {
+      const cur = ed.voci[k] || '-';
+      h +=
+        '<label style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 8px;background:var(--paper);border:1px solid var(--line);border-radius:3px;font-size:.84rem"><span>' +
+        label +
+        '</span><select class="prof-edit-voce" data-k="' +
+        k +
+        '" style="padding:3px 6px">' +
+        _profCustomOpzioni(g, k)
+          .map(
+            (v) => '<option value="' + v + '"' + (cur === v ? ' selected' : '') + '>' + _PROF_VAL_LBL[v] + '</option>',
+          )
+          .join('') +
+        '</select></label>';
+    });
+    h += '</div>';
+  });
+  h += '</div>';
+  return h;
+}
+function _profCustomVociDa(base) {
+  const voci = {};
+  Object.keys(MATRICE_PROFILI).forEach((k) => {
+    voci[k] = base ? _profiloVoce(k, base) || '-' : '-';
+  });
+  return voci;
+}
+function profCustomCrea() {
+  if (!isAdmin()) return;
+  const nome = ((document.getElementById('prof-nuovo-nome') || {}).value || '').trim();
+  const base = (document.getElementById('prof-nuovo-base') || {}).value || '';
+  if (!nome) {
+    toast('Scrivi il nome del profilo');
+    return;
+  }
+  if (_profiliTuttiIds().some((p) => _profiloNome(p).toLowerCase() === nome.toLowerCase())) {
+    toast('Esiste gia un profilo con questo nome');
+    return;
+  }
+  window._profCustomEdit = { id: '', nome: nome, voci: _profCustomVociDa(base) };
+  renderVisibilitaUI();
+  setTimeout(() => {
+    const el = document.getElementById('prof-editor');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 50);
+}
+function profCustomModifica(id) {
+  const c = _profiliCustom()[id];
+  if (!c) return;
+  window._profCustomEdit = { id: id, nome: c.nome, voci: Object.assign(_profCustomVociDa(''), c.voci || {}) };
+  renderVisibilitaUI();
+}
+function profCustomAnnulla() {
+  window._profCustomEdit = null;
+  renderVisibilitaUI();
+}
+async function _salvaProfiliCustom(obj) {
+  if (!(await salvaImp('profili_custom', JSON.stringify(obj)))) return false;
+  window._profiliCustom = obj;
+  return true;
+}
+async function profCustomSalva() {
+  if (!isAdmin()) return;
+  const ed = window._profCustomEdit;
+  if (!ed) return;
+  const nome = ((document.getElementById('prof-edit-nome') || {}).value || '').trim();
+  if (!nome) {
+    toast('Scrivi il nome del profilo');
+    return;
+  }
+  const doppio = _profiliTuttiIds().some((p) => p !== ed.id && _profiloNome(p).toLowerCase() === nome.toLowerCase());
+  if (doppio) {
+    toast('Esiste gia un profilo con questo nome');
+    return;
+  }
+  const voci = {};
+  document.querySelectorAll('.prof-edit-voce').forEach((sel) => (voci[sel.dataset.k] = sel.value));
+  if (
+    !Object.values(voci).some((v) => v !== '-') &&
+    !confirm('Il profilo non concede nessuna voce: chi lo riceve non vede nulla. Salvare lo stesso?')
+  )
+    return;
+  const id =
+    ed.id ||
+    'p_' +
+      nome
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_|_$/g, '') +
+      '_' +
+      Date.now().toString(36);
+  const obj = Object.assign({}, _profiliCustom());
+  obj[id] = { nome: nome, voci: voci };
+  if (!(await _salvaProfiliCustom(obj))) return;
+  logAzione('Profili personalizzati', (ed.id ? 'modificato ' : 'creato ') + nome);
+  toast('Profilo "' + nome + '" salvato. Assegnalo agli operatori e premi "Applica i profili"');
+  window._profCustomEdit = null;
+  renderVisibilitaUI();
+}
+async function profCustomElimina(id) {
+  if (!isAdmin()) return;
+  const c = _profiliCustom()[id];
+  if (!c) return;
+  const usato = Object.keys(profiliOperatori || {}).filter((n) => profiliOperatori[n] === id);
+  const msg =
+    'Eliminare il profilo "' +
+    c.nome +
+    '"?' +
+    (usato.length
+      ? '\n\nE assegnato a: ' +
+        usato.join(', ') +
+        '. Questi operatori restano senza profilo; i loro permessi attuali non cambiano finche non premi "Applica i profili".'
+      : '');
+  if (!confirm(msg)) return;
+  const obj = Object.assign({}, _profiliCustom());
+  delete obj[id];
+  if (!(await _salvaProfiliCustom(obj))) return;
+  if (usato.length) {
+    usato.forEach((n) => delete profiliOperatori[n]);
+    await salvaImp('profili_operatori', JSON.stringify(profiliOperatori));
+  }
+  logAzione('Profili personalizzati', 'eliminato ' + c.nome);
+  toast('Profilo eliminato');
+  renderVisibilitaUI();
 }
 // RESPONSABILE DI SETTORE NEI MODULI
 // Allineamenti, RDI e apprezzamenti propongono un nome gia' scritto nel campo
@@ -486,9 +723,10 @@ async function salvaModuloResp(rep, val) {
   logAzione('Moduli: responsabile di settore', repartoLabel(rep) + ': ' + (prima || 'vuoto') + ' → ' + (v || 'vuoto'));
   toast('Salvato · ' + repartoLabel(rep) + ': ' + (v || 'nessun nome proposto'));
 }
-function renderVisibilitaUI() {
+async function renderVisibilitaUI() {
   const el = document.getElementById('visibilita-list');
   if (!el) return;
+  await _caricaProfiliCustom();
   const opList = operatoriAuthCache.map((o) => o.nome).sort();
   let html = renderProfiliUI(opList);
   html += '<div class="vis-gruppo">Pagine</div>';
@@ -1808,7 +2046,8 @@ function stampaSchedaPermessi() {
   const prof = typeof profiliOperatori !== 'undefined' && profiliOperatori ? profiliOperatori : {};
   const rep = typeof operatoriRepartoMap !== 'undefined' && operatoriRepartoMap ? operatoriRepartoMap : {};
   const extra = window._operatoriAccessiExtra || {};
-  const nomiProf = typeof PROFILI !== 'undefined' ? PROFILI : {};
+  const nomiProf = Object.assign({}, typeof PROFILI !== 'undefined' ? PROFILI : {});
+  Object.keys(_profiliCustom()).forEach((id) => (nomiProf[id] = _profiliCustom()[id].nome));
   const concesso = (key, op) => {
     const v = visibilitaConfig[key] != null ? visibilitaConfig[key] : key === 'piano' ? 'admin' : 'tutti';
     if (v === 'nascosto' || v === 'admin') return false;
