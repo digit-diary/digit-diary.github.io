@@ -147,8 +147,13 @@
     for (const rg of ctx.regoleGruppoDi(gruppoT)) {
       const tipoR = (rg.tipo_regola || '').toLowerCase();
       if (tipoR === 'richiede_funzione') {
+        // "Funzioni ammesse": chi ha la funzione fa i turni del gruppo anche
+        // senza averlo fra i settori; chi non ce l'ha deve avere il gruppo fra
+        // i settori. Prima la funzione non dava mai il permesso (la riga finale
+        // bloccava comunque chi non aveva il gruppo).
         const ammesse = rg.valore.split(',').map((x) => x.trim().toUpperCase());
-        if (!haSettore && !ammesse.includes(fzU)) return false;
+        if (ammesse.includes(fzU)) campoGrant = true;
+        else if (!haSettore) return false;
       } else if (tipoR === 'blocca_tipo_turno') {
         if (
           rg.valore
@@ -459,12 +464,16 @@
       String(domani.getDate()).padStart(2, '0');
     const festaDomani = (festivita || {})[dstrDomani] || '';
     if (festaDomani) {
-      // gia' venerdi o sabato: l'orario e' quello solito, nessun marcatore, ma
-      // il motivo resta perche' serve comunque a prevedere l'affluenza
+      // orario proprio della festivita' (campo "Chiusura" della scheda), se
+      // c'e'; altrimenti la chiusura tardi standard
+      const oraProp = c.orePerData && c.orePerData[dstrDomani] != null ? c.orePerData[dstrDomani] : null;
+      const oraV = oraProp != null && !isNaN(oraProp) ? oraProp : oraTardi;
+      // gia' venerdi o sabato con l'orario solito: nessun marcatore, ma il
+      // motivo resta perche' serve comunque a prevedere l'affluenza
       return {
-        ora: oraTardi,
+        ora: oraV,
         motivo: 'vigilia di ' + festaDomani,
-        marcatore: tardiPerGiorno ? '' : 'CH' + oraTardi,
+        marcatore: tardiPerGiorno && oraV === oraTardi ? '' : 'CH' + oraV,
       };
     }
     return { ora: tardiPerGiorno ? oraTardi : oraNormale, motivo: '', marcatore: '' };
