@@ -441,3 +441,7 @@ rifiutata con avviso; ogni modifica finisce nell elenco delle modifiche e nel Re
 
 ## v274 · Tabella del profilo personalizzato: "Parti da una copia di"
 - Nella tabella del profilo (anche quando si apre dalla creazione di un operatore) una casella "Parti da una copia di" con i profili fissi e personalizzati e i permessi reali di ogni operatore ("Come Rossi"). "Riempi la tabella" compila le caselle; poi si cambia quello che serve e si salva. I permessi reali di un operatore diventano Modifica dove ha accesso, Vede per le viste riservate, No altrove.
+
+## v275 · Regola di partenza delle pause corretta
+- Slots: la regola di partenza per durata e ora 6 ore = 15+15, 7 ore = 30+15, da 8 ore in su = 30+15+15 (prima i turni di 8 ore risultavano 30+15 nelle pause extra e nella tabella; gli schemi fissi dell Excel avevano gia le pause giuste e non sono cambiati). Valet invariato (era gia cosi).
+- Dicitura delle fasce senza ambiguita: "Turni di 7 ore", "Turni da 8 ore in su", "Turni da 6 a meno di 8 ore". Nel modulo: "Turni da almeno X ore e meno di Y ore".

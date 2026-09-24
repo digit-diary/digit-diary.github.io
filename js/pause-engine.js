@@ -67,8 +67,8 @@ const PAUSE_REGOLE_TIPI = {
   durata: {
     nome: 'Pause per durata del turno',
     spiega:
-      'Per i turni che durano da X a Y ore (Y escluso) la composizione delle pause, per esempio 30+15. Con i giorni scelti vale solo in quei giorni.',
-    esempio: 'Turni da 7 a 9 ore, venerdi e sabato: 30+15+15',
+      'Per i turni che durano almeno X ore e meno di Y ore, la composizione delle pause. Per un solo valore scrivi 7 e 8 (= turni di 7 ore); per "8 ore in su" scrivi 8 e 24.',
+    esempio: 'Turni di 7 ore: 30+15 · Turni da 8 ore in su: 30+15+15',
   },
   turno: {
     nome: 'Pause di un turno preciso',
@@ -130,9 +130,10 @@ function _peRegolePause(settore) {
   if (cfg.regole && Array.isArray(cfg.regole[sett])) return cfg.regole[sett];
   const out = [];
   if (sett === 'slots') {
-    out.push({ tipo: 'durata', da: 6, a: 7, pause: _pePauseDaTotale(parseInt(cfg.slots_6h) || 30) });
-    out.push({ tipo: 'durata', da: 7, a: 9, pause: _pePauseDaTotale(parseInt(cfg.slots_7h) || 45) });
-    out.push({ tipo: 'durata', da: 9, a: 24, pause: _pePauseDaTotale(parseInt(cfg.slots_9h) || 60) });
+    // regola del casino: 6 ore = 15+15 · 7 ore = 30+15 · 8 ore e oltre = 30+15+15
+    out.push({ tipo: 'durata', da: 6, a: 7, pause: '15+15' });
+    out.push({ tipo: 'durata', da: 7, a: 8, pause: '30+15' });
+    out.push({ tipo: 'durata', da: 8, a: 24, pause: '30+15+15' });
   } else {
     // motore algoritmico (ex Valet): le fasce che usava finora
     out.push({ tipo: 'durata', da: 0, a: 6, pause: '15' });
@@ -175,10 +176,7 @@ function _pePauseSplit(orari, turno, settore, dow) {
   const rd = perDurata.find(conGiorni) || perDurata[0];
   if (rd) return _pePauseParse(rd.pause);
   if (dur < 360) return [];
-  const cfg = _briefPauseCfg();
-  const tot =
-    dur < 420 ? parseInt(cfg.slots_6h) || 30 : dur < 540 ? parseInt(cfg.slots_7h) || 45 : parseInt(cfg.slots_9h) || 60;
-  return _pePauseParse(_pePauseDaTotale(tot));
+  return dur < 420 ? [15, 15] : dur < 480 ? [30, 15] : [30, 15, 15];
 }
 // etichetta dei giorni: i tre gruppi del casino hanno un nome breve
 function _peGiorniLbl(giorni) {
@@ -189,6 +187,15 @@ function _peGiorniLbl(giorni) {
   if (k === '0') return 'domenica';
   return (giorni || []).map((g) => GG[g]).join(', ');
 }
+// "Turni di 7 ore", "Turni da 8 ore in su", "Turni da 6 a meno di 8 ore"
+function _peDurataLbl(da, a) {
+  const d = parseFloat(da);
+  const f = parseFloat(a);
+  if (f >= 24) return d <= 0 ? 'Tutti i turni' : 'Turni da ' + d + ' ore in su';
+  if (f - d === 1 && Number.isInteger(d)) return 'Turni di ' + d + ' ore';
+  if (d <= 0) return 'Turni sotto le ' + f + ' ore';
+  return 'Turni da ' + d + ' a meno di ' + f + ' ore';
+}
 // descrizione in parole di una regola (pannello, guida, stampa)
 function _peRegolaDescr(r) {
   const GG = ['domenica', 'lunedi', 'martedi', 'mercoledi', 'giovedi', 'venerdi', 'sabato'];
@@ -196,7 +203,7 @@ function _peRegolaDescr(r) {
   const gg = r.giorni && r.giorni.length ? ', ' + _peGiorniLbl(r.giorni) : '';
   switch (r.tipo) {
     case 'durata':
-      return 'Turni da ' + r.da + ' a ' + r.a + ' ore' + gg + ': ' + pause(r.pause);
+      return _peDurataLbl(r.da, r.a) + gg + ': ' + pause(r.pause);
     case 'turno':
       return 'Turno ' + r.turno + gg + ': ' + pause(r.pause);
     case 'distanza':
@@ -3445,10 +3452,10 @@ function _briefRenderPauseCfg() {
     ' <button type="button" class="btn-del-tipo" onclick="pePauseGiorni([1,2,3,4])">Lun-Gio</button><button type="button" class="btn-del-tipo" onclick="pePauseGiorni([5,6])">Ven-Sab</button><button type="button" class="btn-del-tipo" onclick="pePauseGiorni([0])">Dom</button><button type="button" class="btn-del-tipo" onclick="pePauseGiorni([])">Sempre</button>' +
     ' <span style="color:var(--muted)">(nessuno = sempre)</span>';
   form +=
-    '<div data-pt="durata" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">Turni da ' +
+    '<div data-pt="durata" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">Turni da almeno ' +
     inp('pcfg-da', '7', 56, 'number') +
-    ' a ' +
-    inp('pcfg-a', '9', 56, 'number') +
+    ' ore e meno di ' +
+    inp('pcfg-a', '8', 56, 'number') +
     ' ore: pause ' +
     inp('pcfg-pause-d', '30+15', 90) +
     '</div>';
