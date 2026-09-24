@@ -1314,8 +1314,7 @@ async function renderPiano() {
 
     let h = _pianoTabBar() + _pianoModificheHtml();
     if (_pianoTab === 'calendario') {
-      h +=
-        '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
+      h += '<div class="main-card"><div class="card-header pbar"><div class="pbar-riga">';
       h +=
         '<button class="btn-act pin" onclick="pianoCambiaMese(-1)">&larr;</button><span style="min-width:150px;text-align:center;font-weight:700">' +
         escP(label) +
@@ -1357,7 +1356,7 @@ async function renderPiano() {
           '<span id="piano-autosave" title="Ogni modifica al piano si salva da sola nel database, subito. Le frecce servono per tornare indietro o avanti se sbagli.">Salvataggio automatico</span>' +
           '<input type="text" id="piano-cerca" placeholder="Cerca nome o sigla..." value="' +
           escP(window._pianoCercaTesto || '') +
-          '" oninput="pianoCercaFiltra(this.value)" title="Mostra solo i collaboratori il cui nome contiene il testo, oppure chi ha quella sigla nel mese (es. C8). Vuoto = tutti" style="font-size:.82rem;padding:4px 8px;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--ink);width:150px;margin-left:6px">';
+          '" oninput="pianoCercaFiltra(this.value)" title="Mostra solo i collaboratori il cui nome contiene il testo, oppure chi ha quella sigla nel mese (es. C8). Vuoto = tutti">';
         const ssnap = (window._pianoSessSnap || {})[_pianoMeseSel + '|' + _pianoReparto()];
         if (ssnap)
           h +=
@@ -1367,7 +1366,8 @@ async function renderPiano() {
             ssnap.n +
             ')</button>';
       }
-      // barra comandi ORDINATA in gruppi: Pianifica · Controlla · Strumenti · Esporta
+      h += '</div>'; // fine riga navigazione
+      // barra comandi in gruppi etichettati: Pianifica · Controlla · Strumenti · Esporta
       const pbtn = (label, onclick, tipo, title) =>
         '<button class="btn-export pbar-btn' +
         (tipo ? ' ' + tipo : '') +
@@ -1378,62 +1378,83 @@ async function renderPiano() {
         '">' +
         label +
         '</button>';
-      const psep = '<span class="pbar-sep"></span>';
+      const pgrp = (label, inner) =>
+        inner ? '<span class="pbar-grp"><span class="pbar-grp-lbl">' + label + '</span>' + inner + '</span>' : '';
+      h += '<div class="pbar-riga">';
       if (puoMod) {
-        h += psep;
-        h += pbtn(
+        let g = pbtn(
           'Genera bozza',
           'generaBozzaPiano()',
           'pbar-ok',
           'Riempie il fabbisogno con i collaboratori di questo settore (chi copre da altri settori NON viene usato)',
         );
-        if (collaboratoriCache.some((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && _pianoCoperturaCfg(c)))
-          h += pbtn(
-            'Completa con coperture',
-            'completaConCoperture()',
-            '',
-            'Tappa i buchi rimasti usando i collaboratori di altri settori abilitati a coprire qui. Da usare DOPO aver generato i piani dei loro reparti',
-          );
         if (window._pianoSolverUrl)
-          h += pbtn(
+          g += pbtn(
             'Genera con il solver',
             'generaConSolver()',
             'pbar-ok',
             'Motore di ottimizzazione sul server interno (OR-Tools): piano ottimo del mese, equita garantita. Usa le stesse regole del settore e non tocca le celle esistenti',
           );
-        h += pbtn(
+        if (collaboratoriCache.some((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && _pianoCoperturaCfg(c)))
+          g += pbtn(
+            'Completa con coperture',
+            'completaConCoperture()',
+            '',
+            'Tappa i buchi rimasti usando i collaboratori di altri settori abilitati a coprire qui. Da usare DOPO aver generato i piani dei loro reparti',
+          );
+        g += pbtn(
           'Migliora ore',
           'miglioraOrePiano()',
           '',
           'Dopo la bozza: scambia turni generati tra chi è sopra e chi è sotto le ore dovute (stesso giorno, regole rispettate)',
         );
-        h += pbtn('Valida regole', 'validaPiano()', '');
-        h += psep;
-        h += pbtn('Copertura malattia', 'apriCoperturaMalattia()', '');
-        h += pbtn('Cancella piano', 'cancellaBozzaPiano()', 'pbar-warn');
-        h += psep;
-        h += pbtn(
-          'Ordine predefinito',
-          'ripristinaOrdinePiano()',
-          '',
-          'Trascina i nomi per riordinare; questo pulsante ripristina SUP, BO, poi gli altri',
+        h += pgrp('Pianifica', g);
+        h += pgrp(
+          'Controlla',
+          pbtn(
+            'Valida regole',
+            'validaPiano()',
+            '',
+            'Controlla tutto il mese contro le regole del settore e mostra le violazioni',
+          ) +
+            pbtn(
+              'Copertura malattia',
+              'apriCoperturaMalattia()',
+              '',
+              'Trova chi puo coprire i turni di un collaboratore in malattia',
+            ),
         );
-        h += _pianoColoriBarHtml();
+        h += pgrp(
+          'Strumenti',
+          pbtn(
+            'Ordine predefinito',
+            'ripristinaOrdinePiano()',
+            '',
+            'Trascina i nomi per riordinare; questo pulsante ripristina SUP, BO, poi gli altri',
+          ) +
+            _pianoColoriBarHtml() +
+            pbtn(
+              'Cancella piano',
+              'cancellaBozzaPiano()',
+              'pbar-warn',
+              'Svuota il mese di questo settore (si puo annullare)',
+            ),
+        );
       }
-      h += psep;
-      h += pbtn('Copia per Excel', 'copiaPianoExcel()', 'pbar-soft');
-      h += pbtn('Stampa PDF', 'stampaPianoPDF()', 'pbar-soft');
+      let ge =
+        pbtn('Copia per Excel', 'copiaPianoExcel()', 'pbar-soft') + pbtn('Stampa PDF', 'stampaPianoPDF()', 'pbar-soft');
       if (puoMod) {
-        h += pbtn('Importa piano', "document.getElementById('piano-imp-file').click()", 'pbar-soft');
-        h +=
+        ge += pbtn('Importa piano', "document.getElementById('piano-imp-file').click()", 'pbar-soft');
+        ge +=
           '<input type="file" id="piano-imp-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importaPianoExcel(this)">';
       }
+      h += pgrp('Esporta', ge);
       h +=
-        '<span style="font-size:.8rem;color:var(--muted);margin-left:auto">' +
+        '<span class="pbar-info">' +
         _pianoRighe.length +
         ' assegnazioni' +
         (puoMod ? ' · click modifica, trascina o Shift+click per selezionare' : ' · sola lettura') +
-        '</span></div>';
+        '</span></div></div>';
       h += '<div id="piano-violazioni"></div>';
 
       // NON DISPONIBILITA' JOLLY: promemoria discreto (una riga, chiudibile),
@@ -16433,11 +16454,11 @@ async function _renderPianoBriefingTab() {
   h +=
     '<div class="brief-toolbar">' +
     '<span class="brief-grp"><span class="brief-grp-lbl">Giorno</span>' +
-    '<button class="btn-export" style="padding:4px 10px" title="Giorno precedente" onclick="briefCambiaData(-1)">&#8592;</button>' +
+    '<button class="btn-export brief-btn" title="Giorno precedente" onclick="briefCambiaData(-1)">&#8592;</button>' +
     '<input type="date" id="brief-data" value="' +
     dstr +
     '" onchange="briefSetData(this.value)" style="padding:6px">' +
-    '<button class="btn-export" style="padding:4px 10px" title="Giorno successivo" onclick="briefCambiaData(1)">&#8594;</button>' +
+    '<button class="btn-export brief-btn" title="Giorno successivo" onclick="briefCambiaData(1)">&#8594;</button>' +
     '<strong style="font-size:1.05rem;background:#FFFF00;color:#000;padding:3px 12px;border:1px solid #999">' +
     _briefGiornoLbl(dstr) +
     ' ' +
@@ -16445,15 +16466,18 @@ async function _renderPianoBriefingTab() {
     '</strong></span>' +
     (puo
       ? '<span class="brief-grp"><span class="brief-grp-lbl">Azioni</span>' +
-        '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="briefCompila()">Compila dal piano</button>' +
-        '<button class="btn-export" style="font-size:.82rem;padding:5px 12px;border-color:#2c6e49;color:#2c6e49" onclick="briefGeneraPause()">Genera pause</button>' +
-        '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="pdfBriefingGiorno()">Stampa briefing</button>' +
-        '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="document.getElementById(\'brief-xlsx\').click()">Importa da Excel</button></span>' +
+        '<button class="btn-export brief-btn brief-btn-ok" title="Riempie il briefing con i turni del piano di questo giorno" onclick="briefCompila()">Compila dal piano</button>' +
+        '<button class="btn-export brief-btn" title="Assegna le pause secondo le regole del settore" onclick="briefGeneraPause()">Genera pause</button>' +
+        (puo && !valet && rep === 'slots' && salvato
+          ? '<button class="btn-export brief-btn" title="Riassegna la colonna CD con la rotazione (chi ha chiuso ieri riapre oggi), lasciando intatto tutto il resto" onclick="briefAggiornaCd()">Aggiorna numeri cassa</button>'
+          : '') +
+        '<button class="btn-export brief-btn" onclick="pdfBriefingGiorno()">Stampa briefing</button>' +
+        '<button class="btn-export brief-btn" onclick="document.getElementById(\'brief-xlsx\').click()">Importa da Excel</button></span>' +
         '<input type="file" id="brief-xlsx" accept=".xlsx,.xls,.xlsm" style="display:none" onchange="importaBriefingExcel(this)">' +
-        '<span class="brief-grp"><span class="brief-grp-lbl">Formato</span><span style="position:relative;display:inline-flex;align-items:center"><button class="btn-export" style="font-size:.82rem;padding:4px 10px;border-color:#e67e22;color:#e67e22" title="Applica alle celle o righe marcate il colore mostrato nella barretta (per cambiarlo usa la freccia accanto)" onclick="event.stopPropagation();briefColoreApplica(_colUltimo() || null)"><span style="display:flex;flex-direction:column;gap:3px;min-width:44px">Colora' +
+        '<span class="brief-grp"><span class="brief-grp-lbl">Formato</span><span style="position:relative;display:inline-flex;align-items:center"><button class="btn-export brief-btn brief-btn-col" title="Applica alle celle o righe marcate il colore mostrato nella barretta (per cambiarlo usa la freccia accanto)" onclick="event.stopPropagation();briefColoreApplica(_colUltimo() || null)"><span style="display:flex;flex-direction:column;gap:3px;min-width:44px">Colora' +
         _colChipHtml() +
         '</span></button>' +
-        '<button class="btn-export" style="font-size:.82rem;padding:5px 7px;border-color:#e67e22;color:#e67e22" title="Scegli colore o formato" onclick="event.stopPropagation();briefColoriToggle()">&#9662;</button>' +
+        '<button class="btn-export brief-btn brief-btn-col" style="padding-left:7px;padding-right:7px" title="Scegli colore o formato" onclick="event.stopPropagation();briefColoriToggle()">&#9662;</button>' +
         '<div id="brief-colori-bar" style="display:none;position:absolute;top:110%;left:0;z-index:1000;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:8px;box-shadow:0 4px 14px rgba(0,0,0,.25);white-space:nowrap">' +
         PIANO_COLORI_CELLA.map(
           (c) =>
@@ -16487,9 +16511,6 @@ async function _renderPianoBriefingTab() {
         '<button class="btn-export" style="font-size:.82rem;padding:2px 10px;vertical-align:middle;border-color:#c0392b;color:#c0392b" title="Toglie colori e formato dalle celle o righe marcate" onclick="briefCancellaFormato()">Cancella formato</button>' +
         '</div>' +
         '</div></span></span>'
-      : '') +
-    (puo && !valet && rep === 'slots' && salvato
-      ? '<button class="btn-export" style="font-size:.82rem;padding:4px 10px" title="Riassegna la colonna CD con la rotazione (chi ha chiuso ieri riapre oggi), lasciando intatto tutto il resto" onclick="briefAggiornaCd()">Aggiorna numeri cassa</button>'
       : '') +
     (cdDaAggiornare
       ? '<span style="font-size:.82rem;background:#ffd166;color:#5a4300;padding:3px 10px;border-radius:3px;font-weight:700">I numeri cassa di ieri sono cambiati: premi "Aggiorna numeri cassa"</span>'

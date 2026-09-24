@@ -3693,702 +3693,93 @@
     <div class="page" id="page-impostazioni">
       <nav id="settings-indice" class="settings-indice" aria-label="Sezioni delle impostazioni"></nav>
       <div class="settings-section" data-gruppo="Registrazioni">
-        <h4>Tipi di evento</h4>
-        <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 16px">
-          I tipi predefiniti non possono essere eliminati.
-        </p>
+        <div class="sez-head"><div><h4>Tipi di evento</h4><p class="sez-desc">Le voci con cui si registra nel Diario. I tipi predefiniti si possono rinominare o nascondere, non eliminare.</p></div></div>
         <div class="tipo-list" id="tipo-list"></div>
-        <div class="add-tipo-row">
-          <div class="field">
-            <label>Nome nuovo tipo</label
-            ><input
-              type="text"
-              id="new-tipo-nome"
-              placeholder="es. Ritardo, Lode..."
-            />
-          </div>
-          <div class="field">
-            <label>Colore</label
-            ><input type="color" id="new-tipo-colore" value="#e67e22" />
-          </div>
-          <button class="btn-add-tipo" onclick="aggiungiTipoPersonalizzato()">
-            + Aggiungi
-          </button>
-        </div>
+        <div class="add-tipo-row sez-form"><div class="field"><label>Nome nuovo tipo</label><input type="text" id="new-tipo-nome" placeholder="es. Ritardo, Lode" /></div><div class="field"><label>Colore</label><input type="color" id="new-tipo-colore" value="#e67e22" /></div><button class="btn-add-tipo" onclick="aggiungiTipoPersonalizzato()">Aggiungi tipo</button></div>
       </div>
       <div class="settings-section" data-gruppo="Registrazioni">
-        <h4>Campi Rapporto Giornaliero</h4>
-        <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Gestisci le sezioni visibili nel rapporto giornaliero.
-        </p>
-        <div id="rapporto-campi-list"></div>
-        <div class="add-tipo-row" style="margin-top: 14px">
-          <div class="field">
-            <label>Nome nuovo campo</label
-            ><input
-              type="text"
-              id="new-campo-nome"
-              placeholder="es. Bar, VIP Area..."
-            />
-          </div>
-          <button class="btn-add-tipo" onclick="aggiungiCampoRapporto()">
-            + Aggiungi
-          </button>
-        </div>
+        <div class="sez-head"><div><h4>Campi del rapporto giornaliero</h4><p class="sez-desc">Le sezioni che compaiono nel rapporto, con le spunte dei settori in cui ognuna e visibile.</p></div></div>
+        <div id="rapporto-campi-list" class="tipo-list"></div>
+        <div class="add-tipo-row sez-form"><div class="field"><label>Nome nuovo campo</label><input type="text" id="new-campo-nome" placeholder="es. Bar, VIP Area" /></div><button class="btn-add-tipo" onclick="aggiungiCampoRapporto()">Aggiungi campo</button></div>
       </div>
       <div class="settings-section" data-gruppo="Persone e accessi" id="collab-section" style="display: none">
-        <h4>Gestione Collaboratori</h4>
-        <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Lista master dei nomi collaboratori per l'autocomplete nel diario e
-          nei moduli.
-        </p>
-        <div id="collaboratori-list" style="margin-bottom: 14px"></div>
-        <div class="add-tipo-row">
-          <div class="field">
-            <label>Nome nuovo collaboratore</label
-            ><input
-              type="text"
-              id="new-collab-nome"
-              placeholder="Nome e Cognome..."
-            />
-          </div>
-          <button class="btn-add-tipo" onclick="aggiungiCollaboratore()">
-            + Aggiungi</button
-          ><button
-            class="btn-add-tipo"
-            onclick="document.getElementById('import-collab-file').click()"
-            style="background: var(--accent2)"
-          >
-            Importa Excel/CSV</button
-          ><input
-            type="file"
-            id="import-collab-file"
-            accept=".xlsx,.xls,.csv,.txt"
-            style="display: none"
-            onchange="importaCollaboratori(this)"
-          />
-        </div>
+        <div class="sez-head"><div><h4>Collaboratori</h4><p class="sez-desc">Anagrafica del settore aperto: nome, impiego, categoria, funzione, percentuale, lingue, date. Competenze e livelli si gestiscono in Formazione, preferenze e coperture nel Piano.</p></div></div>
+        <div id="collaboratori-list"></div>
+        <div class="add-tipo-row sez-form"><div class="field"><label>Nome nuovo collaboratore</label><input type="text" id="new-collab-nome" placeholder="Cognome Nome" /></div><button class="btn-add-tipo" onclick="aggiungiCollaboratore()">Aggiungi</button><button class="btn-secondario" onclick="document.getElementById('import-collab-file').click()">Importa da Excel o CSV</button><input type="file" id="import-collab-file" accept=".xlsx,.xls,.csv,.txt" style="display: none" onchange="importaCollaboratori(this)" /></div>
       </div>
       <div class="settings-section" data-gruppo="Persone e accessi">
-        <h4>Operatori</h4>
-        <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Operatore attuale: <strong id="op-attuale">-</strong>. Ogni operatore
-          accede con il proprio nome e password.
-        </p>
-        <div id="operatori-list" style="margin-bottom: 14px"></div>
-        <div class="add-tipo-row" style="align-items: flex-end">
-          <div class="field">
-            <label>Nome</label
-            ><input type="text" id="new-operatore-nome" placeholder="Nome..." />
-          </div>
-          <div class="field">
-            <label>Password</label
-            ><input
-              type="password"
-              id="new-operatore-pwd"
-              autocomplete="new-password"
-              placeholder="Min 4 caratteri..."
-            />
-          </div>
-          <div class="field">
-            <label>Conferma password</label
-            ><input
-              type="password"
-              id="new-operatore-pwd2"
-              autocomplete="new-password"
-              placeholder="Ripeti..."
-            />
-          </div>
-          <div class="field">
-            <label>Reparto</label
-            ><select id="new-operatore-rep" style="padding: 10px">
-              <option value="entrambi">Tutti i reparti</option>
-              <option value="slots">Slots</option>
-              <option value="tavoli">Tavoli</option>
-              <option value="valet">Valet</option>
-              <option value="cleaning">Cleaning</option>
-            </select>
-          </div>
-          <button class="btn-add-tipo" onclick="aggiungiOperatoreConPwd()">
-            + Crea operatore
-          </button>
-        </div>
+        <div class="sez-head"><div><h4>Operatori</h4><p class="sez-desc">Chi accede al programma con nome e password. Operatore attuale: <strong id="op-attuale">-</strong>.</p></div></div>
+        <div id="operatori-list" class="tipo-list"></div>
+        <div class="add-tipo-row sez-form"><div class="field"><label>Nome</label><input type="text" id="new-operatore-nome" placeholder="Nome e cognome" /></div><div class="field"><label>Password (minimo 4 caratteri)</label><input type="password" id="new-operatore-pwd" autocomplete="new-password" placeholder="Password" /></div><div class="field"><label>Conferma password</label><input type="password" id="new-operatore-pwd2" autocomplete="new-password" placeholder="Ripeti la password" /></div><div class="field"><label>Settore</label><select id="new-operatore-rep"><option value="entrambi">Tutti i settori</option><option value="slots">Slots</option><option value="tavoli">Tavoli</option><option value="valet">Valet</option><option value="cleaning">Cleaning</option></select></div><button class="btn-add-tipo" onclick="aggiungiOperatoreConPwd()">Crea operatore</button></div>
       </div>
       <div class="settings-section" data-gruppo="Persone e accessi" id="settori-section" style="display: none">
-        <h4>Settori</h4>
-        <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Gestisci i settori del casinò: aggiungi nuovi settori (es. Bar,
-          Sicurezza), rinominali, scegli il colore e quali pagine sono visibili
-          in ognuno (es. niente Maison nel Valet). Slots e Tavoli sono fissi.
-          Disattivare un settore lo nasconde senza toccare i dati.
-        </p>
+        <div class="sez-head"><div><h4>Settori</h4><p class="sez-desc">Slots e Tavoli sono fissi; gli altri si aggiungono, si rinominano, hanno un colore e le pagine visibili al loro interno. Disattivare un settore lo nasconde senza toccare i dati.</p></div></div>
         <div id="settori-list"></div>
       </div>
-      <div
-        class="settings-section" data-gruppo="Persone e accessi"
-        id="moduli-resp-section"
-        style="display: none"
-      >
-        <h4>Moduli · responsabile di settore</h4>
-        <div id="moduli-resp-list"></div>
+      <div class="settings-section" data-gruppo="Persone e accessi" id="moduli-resp-section" style="display: none">
+        <div class="sez-head"><div><h4>Responsabile di settore nei moduli</h4><p class="sez-desc">Nome proposto nel campo "Responsabile di settore" di allineamenti, RDI e apprezzamenti, per ogni settore.</p></div></div>
+        <div id="moduli-resp-list" class="tipo-list"></div>
       </div>
-      <div
-        class="settings-section" data-gruppo="Persone e accessi"
-        id="visibilita-section"
-        style="display: none"
-      >
-        <h4>Visibilità pagine e funzioni</h4>
-        <p style="margin: -6px 0 12px"><button class="btn-settings" onclick="stampaSchedaPermessi()">Stampa scheda permessi (stato attuale)</button></p>
-        <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Controlla <b>chi</b> vede o modifica pagine e funzioni (tutti, solo
-          admin, operatori scelti). Per decidere invece
-          <b>quali pagine esistono in ogni settore</b> usa la sezione «Settori»
-          qui sopra.
-        </p>
+      <div class="settings-section" data-gruppo="Persone e accessi" id="visibilita-section" style="display: none">
+        <div class="sez-head"><div><h4>Visibilita e permessi</h4><p class="sez-desc">Chi vede e chi modifica ogni pagina, funzione e scheda del Piano. Prima si assegna a ogni operatore la sua figura e si applicano i profili; poi si ritocca la singola voce se serve. Quali pagine esistono in ogni settore si decide nella sezione Settori.</p></div><div class="sez-azione"><button class="btn-secondario" onclick="stampaSchedaPermessi()">Stampa scheda permessi</button></div></div>
         <div id="visibilita-list"></div>
       </div>
       <div class="settings-section" data-gruppo="Persone e accessi">
-        <h4>Sicurezza</h4>
+        <div class="sez-head"><div><h4>Sicurezza</h4><p class="sez-desc">Password personale e password master. Lo sblocco biometrico serve solo se il programma viene usato da un dispositivo personale.</p></div></div>
         <div class="settings-btn-row" id="sicurezza-btns"></div>
-        <div
-          id="biometric-settings"
-          style="
-            margin-top: 14px;
-            padding: 12px 16px;
-            background: var(--paper2);
-            border-radius: 3px;
-          "
-        ></div>
+        <div id="biometric-settings" class="sez-box"></div>
       </div>
       <div class="settings-section" data-gruppo="Persone e accessi" id="ai-section" style="display: none">
-        <h4>Assistente AI (Groq)</h4>
-        <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Migliora automaticamente i testi nei moduli disciplinari. Ottieni una
-          chiave gratuita su
-          <a
-            href="https://console.groq.com/keys"
-            target="_blank"
-            style="color: var(--accent2)"
-            >console.groq.com</a
-          >.
-        </p>
-        <div class="add-tipo-row">
-          <div class="field" style="flex: 2">
-            <label>Chiave API Groq</label
-            ><input type="password" id="groq-key-input" placeholder="gsk_..." />
-          </div>
-          <button class="btn-add-tipo" onclick="salvaGroqKey()">Salva</button>
-        </div>
-        <p id="groq-status" style="font-size: 0.82rem; margin-top: 8px"></p>
-        <div style="margin-top: 14px">
-          <p style="color: var(--muted); font-size: 0.8rem; margin-bottom: 8px">
-            Modelli AI (se Groq ne dismette uno, basta aggiornare il nome qui ·
-            vale per tutte le copie dell'app):
-          </p>
-          <div
-            class="form-row"
-            style="
-              grid-template-columns: 1fr 1fr 1fr auto;
-              gap: 10px;
-              align-items: flex-end;
-            "
-          >
-            <div class="field">
-              <label>Testi</label><input type="text" id="groq-mod-testo" />
-            </div>
-            <div class="field">
-              <label>Moduli (JSON)</label
-              ><input type="text" id="groq-mod-json" />
-            </div>
-            <div class="field">
-              <label>Foto</label><input type="text" id="groq-mod-vision" />
-            </div>
-            <button class="btn-add-tipo" onclick="salvaGroqModelli()">
-              Salva modelli
-            </button>
-          </div>
-          <button
-            class="btn-del-tipo"
-            onclick="ripristinaGroqModelli()"
-            style="margin-top: 6px; font-size: 0.75rem"
-          >
-            Ripristina default
-          </button>
-        </div>
+        <div class="sez-head"><div><h4>Assistente AI</h4><p class="sez-desc">Migliora i testi dei moduli disciplinari. I nomi dei collaboratori non escono mai dal programma (vengono sostituiti da segnaposto) e le foto non vengono inviate. Chiave gratuita su <a href="https://console.groq.com/keys" target="_blank">console.groq.com</a>.</p></div></div>
+        <div class="add-tipo-row sez-form"><div class="field"><label>Chiave API Groq</label><input type="password" id="groq-key-input" placeholder="gsk_..." /></div><button class="btn-add-tipo" onclick="salvaGroqKey()">Salva chiave</button></div>
+        <p id="groq-status" class="sez-stato"></p>
+        <p class="sez-sottotitolo">Modelli</p><p class="sez-desc">Se Groq ne dismette uno basta aggiornare il nome qui.</p>
+        <div class="add-tipo-row sez-form"><div class="field"><label>Testi</label><input type="text" id="groq-mod-testo" /></div><div class="field"><label>Moduli (JSON)</label><input type="text" id="groq-mod-json" /></div><input type="hidden" id="groq-mod-vision" /><button class="btn-add-tipo" onclick="salvaGroqModelli()">Salva modelli</button><button class="btn-secondario" onclick="ripristinaGroqModelli()">Ripristina predefiniti</button></div>
       </div>
-      <div
-        class="settings-section" data-gruppo="Maison"
-        id="maison-privacy-section"
-        style="display: none"
-      >
-        <h4>Maison · Conservazione dati</h4>
-        <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Per privacy puoi far cancellare automaticamente le registrazioni dei
-          Costi Maison più vecchie: all'apertura dell'app i dati oltre il
-          periodo scelto vengono eliminati definitivamente (le funzioni manuali
-          Elimina giorno/mese restano disponibili).
-        </p>
-        <div class="add-tipo-row" style="align-items: center">
-          <div class="field" style="max-width: 340px">
-            <label>Cancellazione automatica</label>
-            <select
-              id="maison-autodelete-sel"
-              onchange="salvaMaisonAutoDelete(this.value)"
-              style="padding: 10px"
-            >
-              <option value="0">Disattivata (conserva tutto)</option>
-              <option value="1">
-                Conserva solo il GD corrente (cancella dal GD successivo)
-              </option>
-              <option value="2">Conserva 2 giorni</option>
-              <option value="3">Conserva 3 giorni</option>
-              <option value="7">Conserva 7 giorni</option>
-              <option value="31">Conserva 31 giorni</option>
-            </select>
-          </div>
-        </div>
-        <p
-          id="maison-autodelete-status"
-          style="font-size: 0.8rem; color: var(--muted); margin-top: 8px"
-        ></p>
+      <div class="settings-section" data-gruppo="Maison" id="maison-privacy-section" style="display: none">
+        <div class="sez-head"><div><h4>Conservazione dati Maison</h4><p class="sez-desc">Per privacy le registrazioni dei Costi Maison piu vecchie del periodo scelto vengono cancellate definitivamente all apertura del programma. Le funzioni manuali Elimina giorno e Elimina mese restano.</p></div></div>
+        <div class="add-tipo-row sez-form"><div class="field"><label>Cancellazione automatica</label><select id="maison-autodelete-sel" onchange="salvaMaisonAutoDelete(this.value)"><option value="0">Disattivata (conserva tutto)</option><option value="1">Conserva solo il giorno di gioco corrente</option><option value="2">Conserva 2 giorni</option><option value="3">Conserva 3 giorni</option><option value="7">Conserva 7 giorni</option><option value="31">Conserva 31 giorni</option></select></div></div>
+        <p id="maison-autodelete-status" class="sez-stato"></p>
       </div>
-      <div
-        class="settings-section" data-gruppo="Maison"
-        id="soglie-alert-section"
-        style="display: none"
-      >
-        <h4>Alert differenze cassa · Soglie</h4>
-        <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Personalizza gli importi che fanno scattare gli alert in Panoramica:
-          una differenza singola pari o superiore alla prima soglia suggerisce
-          l'<strong>Allineamento</strong>; le differenze cumulative dall'ultimo
-          RDI pari o superiori alla seconda soglia suggeriscono
-          l'<strong>RDI</strong>.
-        </p>
-        <div class="add-tipo-row" style="align-items: flex-end">
-          <div class="field">
-            <label>Allineamento: differenza singola da CHF</label
-            ><input
-              type="number"
-              id="soglia-allin-input"
-              min="1"
-              step="1"
-              style="width: 140px"
-            />
-          </div>
-          <div class="field">
-            <label>RDI: cumulativo da CHF</label
-            ><input
-              type="number"
-              id="soglia-rdi-input"
-              min="1"
-              step="1"
-              style="width: 140px"
-            />
-          </div>
-          <button class="btn-add-tipo" onclick="salvaSoglieAlert()">
-            Salva soglie
-          </button>
-        </div>
-        <p
-          id="soglie-alert-status"
-          style="font-size: 0.8rem; color: var(--muted); margin-top: 8px"
-        ></p>
-        <p
-          style="
-            color: var(--muted);
-            font-size: 0.84rem;
-            margin: 16px 0 12px;
-            border-top: 1px solid var(--line);
-            padding-top: 14px;
-          "
-        >
-          <strong>Percorso disciplinare</strong> · quanti episodi fanno scattare
-          i suggerimenti.
-        </p>
-        <div class="add-tipo-row" style="align-items: flex-end">
-          <div class="field">
-            <label>Ammonimenti stesso motivo → Allineamento</label
-            ><input
-              type="number"
-              id="soglia-amm-input"
-              min="1"
-              step="1"
-              style="width: 120px"
-            />
-          </div>
-          <div class="field">
-            <label>Allineamenti stesso motivo → RDI</label
-            ><input
-              type="number"
-              id="soglia-recidiva-input"
-              min="1"
-              step="1"
-              style="width: 120px"
-            />
-          </div>
-          <div class="field">
-            <label>Allineamenti totali → Valutare RDI</label
-            ><input
-              type="number"
-              id="soglia-accumulo-input"
-              min="1"
-              step="1"
-              style="width: 120px"
-            />
-          </div>
-          <button class="btn-add-tipo" onclick="salvaSoglieDisciplinari()">
-            Salva
-          </button>
-        </div>
+      <div class="settings-section" data-gruppo="Maison" id="soglie-alert-section" style="display: none">
+        <div class="sez-head"><div><h4>Alert cassa e percorso disciplinare</h4><p class="sez-desc">Gli importi e il numero di episodi che fanno scattare i suggerimenti nella Panoramica.</p></div></div>
+        <p class="sez-sottotitolo">Differenze di cassa</p>
+        <div class="add-tipo-row sez-form"><div class="field"><label>Allineamento: differenza singola da CHF</label><input type="number" id="soglia-allin-input" min="1" step="1" /></div><div class="field"><label>RDI: cumulativo dall ultima RDI da CHF</label><input type="number" id="soglia-rdi-input" min="1" step="1" /></div><button class="btn-add-tipo" onclick="salvaSoglieAlert()">Salva soglie</button></div>
+        <p id="soglie-alert-status" class="sez-stato"></p>
+        <p class="sez-sottotitolo">Percorso disciplinare</p>
+        <div class="add-tipo-row sez-form"><div class="field"><label>Ammonimenti stesso motivo, poi Allineamento</label><input type="number" id="soglia-amm-input" min="1" step="1" /></div><div class="field"><label>Allineamenti stesso motivo, poi RDI</label><input type="number" id="soglia-recidiva-input" min="1" step="1" /></div><div class="field"><label>Allineamenti totali, poi valutare RDI</label><input type="number" id="soglia-accumulo-input" min="1" step="1" /></div><button class="btn-add-tipo" onclick="salvaSoglieDisciplinari()">Salva</button></div>
       </div>
-      <div
-        class="settings-section" data-gruppo="Maison"
-        id="buoni-valori-section"
-        style="display: none"
-      >
-        <h4>Maison · Valori buoni (CHF)</h4>
-        <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Valore in CHF di ogni tipo di buono: usato per l'auto-calcolo del
-          numero di buoni dal costo e per la divisione dei costi nei gruppi.
-        </p>
-        <div class="add-tipo-row" style="align-items: flex-end">
-          <div class="field">
-            <label>BU</label
-            ><input
-              type="number"
-              id="buono-bu-input"
-              min="1"
-              step="1"
-              style="width: 100px"
-            />
-          </div>
-          <div class="field">
-            <label>BL</label
-            ><input
-              type="number"
-              id="buono-bl-input"
-              min="1"
-              step="1"
-              style="width: 100px"
-            />
-          </div>
-          <div class="field">
-            <label>CG</label
-            ><input
-              type="number"
-              id="buono-cg-input"
-              min="1"
-              step="1"
-              style="width: 100px"
-            />
-          </div>
-          <div class="field">
-            <label>WL</label
-            ><input
-              type="number"
-              id="buono-wl-input"
-              min="1"
-              step="1"
-              style="width: 100px"
-            />
-          </div>
-          <button class="btn-add-tipo" onclick="salvaBuonoValori()">
-            Salva valori
-          </button>
-        </div>
+      <div class="settings-section" data-gruppo="Maison" id="buoni-valori-section" style="display: none">
+        <div class="sez-head"><div><h4>Valori dei buoni</h4><p class="sez-desc">Valore in CHF di ogni buono: serve per dividere il costo fra gli ospiti e per la giacenza.</p></div></div>
+        <div class="add-tipo-row sez-form"><div class="field"><label>BU</label><input type="number" id="buono-bu-input" min="1" step="1" /></div><div class="field"><label>BL</label><input type="number" id="buono-bl-input" min="1" step="1" /></div><div class="field"><label>CG</label><input type="number" id="buono-cg-input" min="1" step="1" /></div><div class="field"><label>WL</label><input type="number" id="buono-wl-input" min="1" step="1" /></div><button class="btn-add-tipo" onclick="salvaBuonoValori()">Salva valori</button></div>
       </div>
       <div class="settings-section" data-gruppo="Personale" id="giubileo-section" style="display: none">
-        <h4>Premio giubileo</h4>
-        <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Somma in denaro riconosciuta ai collaboratori al raggiungimento degli
-          anni di servizio (dall'inizio contratto). Gli importi sono
-          personalizzabili; i giubilei maturati appaiono nello Storico HR della
-          scheda collaboratore e sono visibili solo ad admin e operatori con
-          permesso "Storico HR" (es. HR).
-        </p>
-        <div
-          style="
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-bottom: 12px;
-          "
-        >
-          <span style="font-size: 0.84rem; color: var(--muted)"
-            >Notifica anticipata agli operatori HR:</span
-          >
-          <select
-            id="giubileo-preavviso-sel"
-            onchange="salvaGiubileoPreavviso(this.value)"
-            style="padding: 8px"
-          >
-            <option value="0">Disattivata</option>
-            <option value="30">30 giorni prima</option>
-            <option value="60">60 giorni prima</option>
-            <option value="90">90 giorni prima</option>
-            <option value="120">120 giorni prima</option>
-          </select>
-          <span style="font-size: 0.75rem; color: var(--muted)"
-            >(push agli operatori selezionati nel permesso "Storico HR")</span
-          >
-        </div>
-        <div id="giubileo-list"></div>
-        <div
-          class="add-tipo-row"
-          style="align-items: flex-end; margin-top: 8px"
-        >
-          <div class="field">
-            <label>Anni di servizio</label
-            ><input
-              type="number"
-              id="giubileo-anni-input"
-              min="1"
-              step="1"
-              style="width: 110px"
-            />
-          </div>
-          <div class="field">
-            <label>Importo CHF</label
-            ><input
-              type="number"
-              id="giubileo-importo-input"
-              min="0"
-              step="50"
-              style="width: 130px"
-            />
-          </div>
-          <button class="btn-add-tipo" onclick="aggiungiGiubileo()">
-            + Aggiungi scaglione
-          </button>
-        </div>
+        <div class="sez-head"><div><h4>Premio giubileo</h4><p class="sez-desc">Somma riconosciuta al raggiungimento degli anni di servizio, dalla data di assunzione. I giubilei maturati compaiono nello Storico HR della scheda, visibile a chi ha il permesso.</p></div></div>
+        <div class="add-tipo-row sez-form"><div class="field"><label>Avviso anticipato agli operatori con permesso Storico HR</label><select id="giubileo-preavviso-sel" onchange="salvaGiubileoPreavviso(this.value)"><option value="0">Disattivato</option><option value="30">30 giorni prima</option><option value="60">60 giorni prima</option><option value="90">90 giorni prima</option><option value="120">120 giorni prima</option></select></div></div>
+        <p class="sez-sottotitolo">Scaglioni</p>
+        <div id="giubileo-list" class="tipo-list"></div>
+        <div class="add-tipo-row sez-form"><div class="field"><label>Anni di servizio</label><input type="number" id="giubileo-anni-input" min="1" step="1" /></div><div class="field"><label>Importo CHF</label><input type="number" id="giubileo-importo-input" min="0" step="50" /></div><button class="btn-add-tipo" onclick="aggiungiGiubileo()">Aggiungi scaglione</button></div>
       </div>
-      <div
-        class="settings-section" data-gruppo="Sistema"
-        id="conservazione-section"
-        style="display: none"
-      >
-        <h4>Conservazione dei dati</h4>
-        <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Il regolamento aziendale impone di conservare i dati del personale per
-          un numero minimo di anni. Con la protezione attiva, le voci
-          dell'archivio non si possono eliminare definitivamente: restano nel
-          Cestino e si possono sempre ripristinare. Restano invece cancellabili
-          le voci inserite da poco, per correggere gli errori di battitura.
-        </p>
-        <div
-          style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap"
-        >
-          <label style="font-size: 0.84rem"
-            >Conserva i dati per almeno
-            <input
-              type="number"
-              id="conservazione-anni"
-              min="0"
-              max="30"
-              style="width: 60px; padding: 4px; text-align: center"
-              onchange="salvaConservazioneAnni(this.value)"
-            />
-            anni (0 = protezione disattivata)</label
-          >
-        </div>
-        <div
-          style="
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-top: 10px;
-          "
-        >
-          <label style="font-size: 0.84rem"
-            >Si puo' correggere (eliminare davvero) entro
-            <input
-              type="number"
-              id="conservazione-grazia"
-              min="0"
-              max="365"
-              style="width: 60px; padding: 4px; text-align: center"
-              onchange="salvaConservazioneGrazia(this.value)"
-            />
-            giorni dall'inserimento</label
-          >
-        </div>
-        <p
-          id="conservazione-stato"
-          style="font-size: 0.82rem; color: var(--muted); margin-top: 10px"
-        ></p>
+      <div class="settings-section" data-gruppo="Sistema" id="conservazione-section" style="display: none">
+        <div class="sez-head"><div><h4>Conservazione dei dati</h4><p class="sez-desc">Il regolamento aziendale impone di conservare i dati del personale per un numero minimo di anni: con la protezione attiva le voci dell archivio restano nel Cestino e si ripristinano sempre. Le voci recenti si possono ancora eliminare, per correggere gli errori.</p></div></div>
+        <div class="add-tipo-row sez-form"><div class="field"><label>Conserva i dati per almeno (anni, 0 = protezione disattivata)</label><input type="number" id="conservazione-anni" min="0" max="30" onchange="salvaConservazioneAnni(this.value)" /></div><div class="field"><label>Si puo eliminare davvero entro (giorni dall inserimento)</label><input type="number" id="conservazione-grazia" min="0" max="365" onchange="salvaConservazioneGrazia(this.value)" /></div></div>
+        <p id="conservazione-stato" class="sez-stato"></p>
       </div>
       <div class="settings-section" data-gruppo="Sistema" id="backup-section" style="display: none">
-        <h4>Backup dati</h4>
-        <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Scarica una copia completa di tutti i dati (registrazioni, moduli,
-          collaboratori, maison, valutazioni, punti, storico HR, impostazioni)
-          in un file JSON. Conservala in un posto sicuro: serve per ripristini e
-          per la migrazione IT.
-        </p>
-        <button
-          class="btn-salva"
-          onclick="esportaBackupCompleto()"
-          style="background: var(--ink); font-size: 0.82rem; padding: 8px 20px"
-        >
-          Esporta backup completo
-        </button>
-        <div
-          style="
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-top: 14px;
-          "
-        >
-          <label style="font-size: 0.84rem"
-            >Backup automatico: scarica da solo ogni
-            <input
-              type="number"
-              id="backup-auto-giorni"
-              min="0"
-              max="90"
-              style="width: 60px; padding: 4px; text-align: center"
-              onchange="salvaBackupAutoGiorni(this.value)"
-            />
-            giorni all'accesso admin (0 = disattivato)</label
-          >
-          <span
-            id="backup-ultimo-info"
-            style="font-size: 0.78rem; color: var(--muted)"
-          ></span>
-        </div>
-        <p
-          id="backup-status"
-          style="font-size: 0.8rem; color: var(--muted); margin-top: 8px"
-        ></p>
+        <div class="sez-head"><div><h4>Backup dei dati</h4><p class="sez-desc">Una copia completa di tutti i dati in un file JSON: serve per i ripristini e per la consegna all IT. Da rifare prima di ogni consegna.</p></div></div>
+        <div class="add-tipo-row sez-form"><div class="field"><label>Backup automatico ogni (giorni, all accesso admin; 0 = disattivato)</label><input type="number" id="backup-auto-giorni" min="0" max="90" onchange="salvaBackupAutoGiorni(this.value)" /></div><button class="btn-add-tipo" onclick="esportaBackupCompleto()">Esporta backup completo</button></div>
+        <p class="sez-stato"><span id="backup-ultimo-info"></span> <span id="backup-status"></span></p>
       </div>
       <div class="settings-section" data-gruppo="Sistema" id="db-stats-section" style="display: none">
-        <h4>Stato del sistema</h4>
-        <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Controllo automatico dei dati (schede incomplete, turni orfani,
-          festivi mancanti) e spazio occupato sul database. Solo lettura: non
-          modifica nulla.
-        </p>
-        <div style="padding: 6px 0 12px">
-          <button
-            class="btn-salva"
-            onclick="controlloSalute()"
-            style="
-              background: var(--ink);
-              font-size: 0.82rem;
-              padding: 8px 20px;
-            "
-          >
-            Controlla il sistema
-          </button>
-        </div>
-        <div id="salute-content" style="padding: 4px 0 14px"></div>
-        <p style="color: var(--muted); font-size: 0.84rem; margin: 10px 0 6px">
-          Spazio database (500 MB disponibili)
-        </p>
-        <div id="db-stats-content" style="padding: 6px 0">
-          <button
-            class="btn-salva"
-            onclick="caricaDbStats()"
-            style="
-              background: var(--ink);
-              font-size: 0.82rem;
-              padding: 8px 20px;
-            "
-          >
-            Verifica spazio
-          </button>
-        </div>
+        <div class="sez-head"><div><h4>Stato del sistema</h4><p class="sez-desc">Controllo dei dati (schede incomplete, turni senza scheda, festivi mancanti) e spazio occupato. Solo lettura.</p></div></div>
+        <div class="sez-azioni-riga"><button class="btn-add-tipo" onclick="controlloSalute()">Controlla il sistema</button></div>
+        <div id="salute-content"></div>
+        <p class="sez-sottotitolo">Spazio database (500 MB disponibili)</p>
+        <div id="db-stats-content"><button class="btn-secondario" onclick="caricaDbStats()">Verifica spazio</button></div>
       </div>
       <div class="settings-section" data-gruppo="Sistema" id="cestino-section" style="display: none">
-        <h4><i class="icx icx-cestino"></i> Cestino</h4>
-        <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
-          Elementi eliminati. Puoi ripristinarli o svuotare il cestino.
-        </p>
-        <button
-          class="btn-salva"
-          onclick="caricaCestino()"
-          style="
-            background: var(--ink);
-            font-size: 0.82rem;
-            padding: 8px 20px;
-            margin-bottom: 12px;
-          "
-        >
-          Carica cestino
-        </button>
-        <div
-          style="
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-bottom: 12px;
-            align-items: center;
-          "
-        >
-          <select
-            id="cestino-filt-tipo"
-            onchange="renderCestino()"
-            style="
-              padding: 6px 10px;
-              border: 1px solid var(--line);
-              border-radius: 2px;
-              font-size: 0.84rem;
-              background: var(--paper);
-              color: var(--ink);
-            "
-          >
-            <option value="">Tutti i tipi</option>
-            <option value="registrazioni">Registrazioni</option>
-            <option value="moduli">Moduli</option>
-          </select>
-          <input
-            type="text"
-            id="cestino-filt-nome"
-            placeholder="Cerca nome..."
-            oninput="renderCestino()"
-            style="
-              padding: 6px 10px;
-              border: 1px solid var(--line);
-              border-radius: 2px;
-              font-size: 0.84rem;
-              background: var(--paper);
-              color: var(--ink);
-              width: 160px;
-            "
-          />
-          <input
-            type="text"
-            id="cestino-filt-chi"
-            placeholder="Eliminato da..."
-            oninput="renderCestino()"
-            style="
-              padding: 6px 10px;
-              border: 1px solid var(--line);
-              border-radius: 2px;
-              font-size: 0.84rem;
-              background: var(--paper);
-              color: var(--ink);
-              width: 140px;
-            "
-          />
-          <button
-            class="btn-reset"
-            onclick="
-              document.getElementById('cestino-filt-tipo').value = '';
-              document.getElementById('cestino-filt-nome').value = '';
-              document.getElementById('cestino-filt-chi').value = '';
-              renderCestino();
-            "
-            style="padding: 6px 14px; font-size: 0.82rem"
-          >
-            Reset
-          </button>
-        </div>
+        <div class="sez-head"><div><h4>Cestino</h4><p class="sez-desc">Le voci eliminate: si ripristinano o, se il periodo di conservazione lo consente, si eliminano definitivamente.</p></div></div>
+        <div class="add-tipo-row sez-form sez-filtri"><button class="btn-add-tipo" onclick="caricaCestino()">Carica cestino</button><div class="field"><label>Tipo</label><select id="cestino-filt-tipo" onchange="renderCestino()"><option value="">Tutti i tipi</option><option value="registrazioni">Registrazioni</option><option value="moduli">Moduli</option></select></div><div class="field"><label>Nome</label><input type="text" id="cestino-filt-nome" placeholder="Cerca nome" oninput="renderCestino()" /></div><div class="field"><label>Eliminato da</label><input type="text" id="cestino-filt-chi" placeholder="Operatore" oninput="renderCestino()" /></div><button class="btn-secondario" onclick="document.getElementById('cestino-filt-tipo').value='';document.getElementById('cestino-filt-nome').value='';document.getElementById('cestino-filt-chi').value='';renderCestino();">Azzera filtri</button></div>
         <div id="cestino-content"></div>
       </div>
     </div>

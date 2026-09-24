@@ -9,3 +9,8 @@ backups/
 CREDENZIALI_LOCALI.md
 IT/
 _dati_turnivo/
+
+# documenti con dati del personale: mai nel repo pubblico
+QUESTIONARIO_VERIFICA_REGOLE_*.html
+SCHEDA_PERMESSI_ATTUALI*.html
+strumenti/dati_questionario_*.json
