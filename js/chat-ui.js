@@ -2264,6 +2264,23 @@ function apriSchedaCollaboratore(nome) {
       '>' +
       escP(String(_anni)) +
       '</span></div>';
+    // CONGEDI NON PAGATI registrati (Piano, scheda Collaboratori): si leggono
+    // qui perche' spiegano l'anzianita' e il diritto vacanze
+    const _cnp = typeof _pianoCongediDi === 'function' ? _pianoCongediDi(collabRec.nome) : [];
+    if (_cnp.length) {
+      html +=
+        '<div style="font-size:.82rem;color:var(--muted);margin-top:4px">Congedi non pagati: ' +
+        _cnp
+          .map(
+            (c) =>
+              escP(String(c.dal).substring(0, 10).split('-').reverse().join('.')) +
+              ' / ' +
+              escP(String(c.al).substring(0, 10).split('-').reverse().join('.')) +
+              (c.motivo ? ' (' + escP(c.motivo) + ')' : ''),
+          )
+          .join('; ') +
+        '</div>';
+    }
   }
   html += '</div></div>';
   html +=

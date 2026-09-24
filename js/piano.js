@@ -616,7 +616,7 @@ async function pianoMarkerEdit(g) {
     delete tutti[ym][String(g)];
   }
   window._pianoGiornoMarker = tutti;
-  await setImp('piano_giorno_marker', JSON.stringify(tutti));
+  if (!(await salvaImp('piano_giorno_marker', JSON.stringify(tutti)))) return;
   logAzione('Marcatore giorno', ym + '-' + g + ': ' + (v.trim() || '(rimosso)'));
   renderPiano();
 }
@@ -5853,8 +5853,45 @@ const _PT_ETICHETTE = {
   oltre23: 'oltre le 23',
   attivo: 'attivo',
 };
+// CONTROLLI SUI TURNI: sigla, orari e durata devono avere senso PRIMA di
+// finire nel piano (una sigla vuota o un orario "25:00" rompono i conteggi).
+function _pianoValidaTurno(campo, valore, t) {
+  const v = String(valore == null ? '' : valore).trim();
+  if (campo === 'codice') {
+    if (!/^[A-Z0-9]{1,6}$/i.test(v))
+      return 'La sigla deve avere da 1 a 6 lettere o cifre, senza spazi (es. C0, Z8, L1)';
+    if (pianoCodiciCache.some((c) => String(c.codice).toUpperCase() === v.toUpperCase()))
+      return 'La sigla ' + v.toUpperCase() + ' e gia un codice speciale (V, M, C, CGF...): scegline un altra';
+    if (
+      pianoTurniCache.some(
+        (x) =>
+          x !== t &&
+          String(x.codice).toUpperCase() === v.toUpperCase() &&
+          (x.reparto_dip || 'slots') === _pianoReparto(),
+      )
+    )
+      return 'La sigla ' + v.toUpperCase() + ' esiste gia in questo settore';
+  }
+  if (campo === 'gruppo' && !/^[A-Z0-9_ ]{1,20}$/i.test(v))
+    return 'Il gruppo deve essere una parola (es. SALA, CASSA, BO)';
+  if (campo === 'ora_inizio' || campo === 'ora_fine') {
+    if (!/^([01]?\d|2[0-3])[:.][0-5]\d$/.test(v)) return 'Orario non valido: usa hh:mm, per esempio 19:45';
+  }
+  if (campo === 'durata_ore') {
+    const n = parseFloat(v.replace(',', '.'));
+    if (isNaN(n) || n < 0.5 || n > 14) return 'La durata deve essere fra 0.5 e 14 ore (hai scritto ' + v + ')';
+  }
+  return null;
+}
 async function salvaPianoTurno(id, campo, valore) {
   if (!isAdmin()) return;
+  const tV = pianoTurniCache.find((x) => x.id === id);
+  const erroreT = _pianoValidaTurno(campo, valore, tV);
+  if (erroreT) {
+    toastErrore(erroreT + '. Il valore precedente resta.', 8000);
+    renderPiano();
+    return;
+  }
   try {
     const patch = {};
     if (campo === 'attivo' || campo === 'oltre23') patch[campo] = !!valore;
@@ -5892,12 +5929,22 @@ async function aggiungiPianoTurno() {
   const fine = (document.getElementById('pt-nuovo-fine') || {}).value || '';
   const oreV = parseFloat((document.getElementById('pt-nuovo-ore') || {}).value) || 8.25;
   if (!codice || !gruppo || !inizio || !fine) {
-    toast('Compila codice, gruppo e orari');
+    toastErrore('Compila sigla, gruppo, ora di inizio e ora di fine');
     return;
   }
-  if (pianoTurniCache.some((t) => t.codice === codice && (t.reparto_dip || 'slots') === _pianoReparto())) {
-    toast('Codice turno già esistente in questo settore');
-    return;
+  const oreTxt = (document.getElementById('pt-nuovo-ore') || {}).value;
+  for (const [campo, val] of [
+    ['codice', codice],
+    ['gruppo', gruppo],
+    ['ora_inizio', inizio],
+    ['ora_fine', fine],
+    ['durata_ore', oreTxt === '' || oreTxt == null ? String(oreV) : oreTxt],
+  ]) {
+    const errore = _pianoValidaTurno(campo, val, null);
+    if (errore) {
+      toastErrore(errore, 8000);
+      return;
+    }
   }
   const oltre23 = _pianoOra(fine) < _pianoOra(inizio) || _pianoOra(fine) > 23;
   try {
@@ -6013,11 +6060,12 @@ async function aggiungiPianoCodice() {
   const scala = (document.getElementById('pc-nuovo-scala') || {}).checked;
   const riposo = (document.getElementById('pc-nuovo-riposo') || {}).checked;
   if (!codice) {
-    toast('Inserisci il codice');
+    toastErrore('Inserisci il codice');
     return;
   }
-  if (pianoCodiciCache.some((c) => c.codice === codice)) {
-    toast('Codice già esistente');
+  const erroreC = _pianoValidaCodice('codice', codice, null) || _pianoValidaCodice('ore', String(oreV), null);
+  if (erroreC) {
+    toastErrore(erroreC, 8000);
     return;
   }
   try {
@@ -6057,8 +6105,33 @@ async function eliminaPianoCodice(id) {
     toast('Errore eliminazione codice');
   }
 }
+// CONTROLLI SUI CODICI SPECIALI: sigla unica (anche rispetto ai turni di
+// ogni settore) e ore fra 0 e 24
+function _pianoValidaCodice(campo, valore, c) {
+  const v = String(valore == null ? '' : valore).trim();
+  if (campo === 'codice') {
+    if (!/^[A-Z0-9]{1,8}$/i.test(v)) return 'Il codice deve avere da 1 a 8 lettere o cifre, senza spazi';
+    if (pianoCodiciCache.some((x) => x !== c && String(x.codice).toUpperCase() === v.toUpperCase()))
+      return 'Il codice ' + v.toUpperCase() + ' esiste gia';
+    const turnoUguale = pianoTurniCache.find((x) => String(x.codice).toUpperCase() === v.toUpperCase());
+    if (turnoUguale)
+      return 'La sigla ' + v.toUpperCase() + ' e gia un turno di ' + repartoLabel(turnoUguale.reparto_dip || 'slots');
+  }
+  if (campo === 'ore') {
+    const n = parseFloat(v.replace(',', '.'));
+    if (v !== '' && (isNaN(n) || n < 0 || n > 24)) return 'Le ore di un codice vanno da 0 a 24 (hai scritto ' + v + ')';
+  }
+  return null;
+}
 async function salvaPianoCodice(id, campo, valore) {
   if (!isAdmin()) return;
+  const cV = pianoCodiciCache.find((x) => x.id === id);
+  const erroreC = _pianoValidaCodice(campo, valore, cV);
+  if (erroreC) {
+    toastErrore(erroreC + '. Il valore precedente resta.', 8000);
+    renderPiano();
+    return;
+  }
   try {
     const patch = {};
     if (campo === 'attivo' || campo === 'is_riposo' || campo === 'scala_percentuale' || campo === 'richiede_orario')
@@ -6394,7 +6467,15 @@ async function aggiungiPianoFestivo() {
   const desc = ((document.getElementById('pf-nuova-desc') || {}).value || '').trim();
   const cgf = !!(document.getElementById('pf-nuovo-cgf') || {}).checked;
   if (!data || !desc) {
-    toast('Compila data e descrizione');
+    toastErrore('Compila data e descrizione');
+    return;
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || isNaN(new Date(data + 'T12:00:00').getTime())) {
+    toastErrore('Data non valida');
+    return;
+  }
+  if (pianoFestiviCache.some((f) => String(f.data).substring(0, 10) === data)) {
+    toastErrore('Il ' + data.split('-').reverse().join('.') + ' e gia in elenco');
     return;
   }
   try {
@@ -6690,7 +6771,7 @@ async function _recCaricaColori(ym) {
 }
 async function _recSalvaColori() {
   try {
-    await setImp(_recImpKey(_pianoMeseSel), JSON.stringify(_recColori));
+    if (!(await salvaImp(_recImpKey(_pianoMeseSel), JSON.stringify(_recColori)))) return;
   } catch (e) {
     toast('Colori non salvati');
   }
@@ -7324,7 +7405,11 @@ async function pianoFestivitaAggiungi() {
   const nome = ((document.getElementById('festivita-nome') || {}).value || '').trim();
   const ora = (document.getElementById('festivita-ora') || {}).value;
   if (!data || !nome) {
-    toast('Servono data e nome');
+    toastErrore('Servono data e nome');
+    return;
+  }
+  if (ora !== '' && ora != null && (isNaN(parseFloat(ora)) || parseFloat(ora) < 0 || parseFloat(ora) > 12)) {
+    toastErrore('L ora di chiusura va da 0 a 12 (es. 5 per le cinque del mattino)');
     return;
   }
   try {
@@ -9021,7 +9106,7 @@ async function salvaOrdinePiano(nomi) {
   if (!puoGestirePiano()) return;
   window._pianoOrdineCollab = window._pianoOrdineCollab || {};
   window._pianoOrdineCollab[_pianoReparto()] = nomi;
-  await setImp('piano_ordine_collab', JSON.stringify(window._pianoOrdineCollab));
+  if (!(await salvaImp('piano_ordine_collab', JSON.stringify(window._pianoOrdineCollab)))) return;
   logAzione('Piano: ordine collaboratori', _pianoReparto());
   toast('Ordine salvato');
 }
@@ -9029,7 +9114,7 @@ async function ripristinaOrdinePiano() {
   if (!puoGestirePiano()) return;
   window._pianoOrdineCollab = window._pianoOrdineCollab || {};
   delete window._pianoOrdineCollab[_pianoReparto()];
-  await setImp('piano_ordine_collab', JSON.stringify(window._pianoOrdineCollab));
+  if (!(await salvaImp('piano_ordine_collab', JSON.stringify(window._pianoOrdineCollab)))) return;
   logAzione('Piano: ordine predefinito', _pianoReparto());
   toast('Ordine predefinito: SUP, BO, poi gli altri');
   renderPiano();
@@ -13276,10 +13361,15 @@ function _pianoMaxCambi() {
 }
 async function salvaMaxCambi(v) {
   if (!isAdmin()) return;
-  const n = Math.max(0, parseInt(v) || 0);
+  const n = parseInt(v);
+  if (isNaN(n) || n < 0 || n > 31) {
+    toastErrore('Il massimo di cambi al mese va da 0 (illimitati) a 31');
+    renderPiano();
+    return;
+  }
   const prima = window._pianoMaxCambiCfg;
   window._pianoMaxCambiCfg = n;
-  await setImp('piano_max_cambi_mese', String(n));
+  if (!(await salvaImp('piano_max_cambi_mese', String(n)))) return;
   logAzione('Piano: max cambi mese', (prima != null ? prima : 'vuoto') + ' \u2192 ' + n);
   _pianoRegistraModifica(
     'Impostazioni',
@@ -13302,7 +13392,7 @@ async function salvaGiornoWeekend(dow, attivo) {
   if (!attivo) wk = wk.filter((x) => x !== dow);
   const primaW = _pianoGiorniWeekend().join(',');
   window._pianoWeekendCfg = wk;
-  await setImp('piano_giorni_weekend', JSON.stringify(wk));
+  if (!(await salvaImp('piano_giorni_weekend', JSON.stringify(wk)))) return;
   const _gg = ['domenica', 'lunedi', 'martedi', 'mercoledi', 'giovedi', 'venerdi', 'sabato'];
   const nomi = (v) =>
     v
@@ -13322,17 +13412,22 @@ async function salvaCompetenzaGruppo(chiave, gruppo) {
   const primaG = cfg[chiave] || 'nessuno';
   cfg[chiave] = gruppo || '';
   window._pianoCompGruppiCfg = cfg;
-  await setImp('piano_competenze_gruppi', JSON.stringify(cfg));
+  if (!(await salvaImp('piano_competenze_gruppi', JSON.stringify(cfg)))) return;
   logAzione('Piano: competenza-gruppo', chiave + ': ' + primaG + ' \u2192 ' + (gruppo || 'nessuno'));
   _pianoRegistraModifica('Impostazioni', chiave, 'gruppo di turni', primaG, gruppo || 'nessuno');
   toast('Salvato \u00b7 ' + chiave + ': ' + primaG + ' \u2192 ' + (gruppo || 'nessuno'));
 }
 async function salvaOreSettimanali(v) {
   if (!isAdmin()) return;
-  const n = parseFloat(v) || 41;
+  const n = parseFloat(String(v).replace(',', '.'));
+  if (isNaN(n) || n < 1 || n > 60) {
+    toastErrore('Le ore settimanali vanno da 1 a 60 (contratto: 41). Resta ' + _pianoOreSett + '.');
+    renderPiano();
+    return;
+  }
   const primaO = _pianoOreSett;
   _pianoOreSett = n;
-  await setImp('piano_ore_settimanali', String(n));
+  if (!(await salvaImp('piano_ore_settimanali', String(n)))) return;
   logAzione('Piano: ore settimanali', primaO + ' \u2192 ' + n);
   _pianoRegistraModifica('Impostazioni', 'Orario', 'ore settimanali', primaO, n);
   toast('Salvato \u00b7 ore settimanali: ' + primaO + ' \u2192 ' + n);
@@ -13345,11 +13440,34 @@ async function salvaPianoFunzioni(v) {
     .map((x) => x.trim().toUpperCase())
     .filter(Boolean);
   if (!lista.length) {
-    toast('Inserisci almeno una funzione');
+    toastErrore('Inserisci almeno una funzione');
+    return;
+  }
+  const nonValide = lista.filter((f) => !/^[A-Z0-9_]{1,12}$/.test(f));
+  if (nonValide.length) {
+    toastErrore('Funzioni non valide (solo lettere, cifre e _, max 12): ' + nonValide.join(', '));
+    return;
+  }
+  // una funzione ancora assegnata a qualcuno non si toglie per sbaglio
+  const inUso = [
+    ...new Set(
+      collaboratoriCache.filter((c) => c.attivo !== false && c.funzione).map((c) => String(c.funzione).toUpperCase()),
+    ),
+  ];
+  const tolteInUso = inUso.filter((f) => !lista.includes(f));
+  if (
+    tolteInUso.length &&
+    !confirm(
+      'Queste funzioni sono assegnate a collaboratori attivi: ' +
+        tolteInUso.join(', ') +
+        '.\n\nToglierle dall elenco? (le schede le mantengono, ma non compariranno piu nei menu)',
+    )
+  ) {
+    renderPiano();
     return;
   }
   window._pianoFunzioni = lista;
-  await setImp('piano_funzioni', JSON.stringify(lista));
+  if (!(await salvaImp('piano_funzioni', JSON.stringify(lista)))) return;
   logAzione('Piano: funzioni', lista.join(','));
   toast('Funzioni aggiornate');
 }
@@ -16609,7 +16727,7 @@ async function _briefEvidPersisti(rep, lista) {
   const cfg = window._briefEvidCfg || {};
   cfg[rep] = lista;
   window._briefEvidCfg = cfg;
-  await setImp('brief_evidenziazioni', JSON.stringify(cfg));
+  if (!(await salvaImp('brief_evidenziazioni', JSON.stringify(cfg)))) return;
 }
 async function briefEvidAggiungi() {
   if (!puoGestireBriefing()) return;
@@ -16688,7 +16806,7 @@ async function corsoOrarioRapido(cod, inizio, fine) {
   window._pianoCorsiOrari = window._pianoCorsiOrari || {};
   window._pianoCorsiOrari[cod] = oi && of2 ? oi + '-' + of2 : oi || of2 || '';
   try {
-    await setImp('piano_corsi_orari', JSON.stringify(window._pianoCorsiOrari));
+    if (!(await salvaImp('piano_corsi_orari', JSON.stringify(window._pianoCorsiOrari)))) return;
     logAzione('Corsi', cod + ' orario aggiornato: ' + window._pianoCorsiOrari[cod]);
     toast('Orario corso ' + cod + ' salvato');
   } catch (e) {
@@ -16696,7 +16814,7 @@ async function corsoOrarioRapido(cod, inizio, fine) {
   }
 }
 async function _corsiSalvaLista() {
-  await setImp('piano_corsi_lista', window._pianoCorsiLista.join(','));
+  if (!(await salvaImp('piano_corsi_lista', window._pianoCorsiLista.join(',')))) return;
 }
 async function corsoAggiungi() {
   if (!isAdmin()) return;
@@ -16885,7 +17003,7 @@ async function corsoSalvaOrarioDefault() {
   window._pianoCorsiOrari = window._pianoCorsiOrari || {};
   if (inizio && fine) window._pianoCorsiOrari[cod] = inizio + '-' + fine;
   else delete window._pianoCorsiOrari[cod];
-  await setImp('piano_corsi_orari', JSON.stringify(window._pianoCorsiOrari));
+  if (!(await salvaImp('piano_corsi_orari', JSON.stringify(window._pianoCorsiOrari)))) return;
   toast('Orario predefinito di ' + cod + (inizio && fine ? ': ' + inizio + '-' + fine : ' rimosso'));
 }
 async function pianoInserisciCorso() {
@@ -18993,11 +19111,11 @@ async function controllaFormazioniCompletate(silenzioso) {
 }
 async function salvaGiorniFormazione() {
   const v = parseInt((document.getElementById('imp-gg-formazione') || {}).value);
-  if (!v || v < 1) {
-    toast('Inserisci un numero di giorni valido');
+  if (!v || v < 1 || v > 30) {
+    toastErrore('I giorni di formazione per certificare vanno da 1 a 30');
     return;
   }
-  await setImp('piano_giorni_formazione', String(v));
+  if (!(await salvaImp('piano_giorni_formazione', String(v)))) return;
   window._pianoGgFormazione = v;
   toast('Soglia giorni di formazione: ' + v);
 }
