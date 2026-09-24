@@ -427,8 +427,41 @@ eq(
   '73 giorni di congedo (1/5 anno) = 35 x 292/365 = 28',
 );
 eq(R.giorniVacanzaSpettanti('2000-01-01', 2010, { giorniAnzianita: 0 }).giorni, 36, 'dieci anni senza congedo = 36');
-eq(R.giorniVacanzaSpettanti('2000-06-01', 2010, { giorniAnzianita: 250 }).giorni, 35, '250 giorni di congedo lungo: i 10 anni slittano al 2011, nel 2010 niente giorno in piu');
+eq(
+  R.giorniVacanzaSpettanti('2000-06-01', 2010, { giorniAnzianita: 250 }).giorni,
+  35,
+  '250 giorni di congedo lungo: i 10 anni slittano al 2011, nel 2010 niente giorno in piu',
+);
 eq(R.giorniVacanzaSpettanti('2000-06-01', 2010, {}).giorni, 36, 'stesso caso senza congedo = 36');
+
+console.log('\n== regole chi fa cosa (turni_solo_funzioni, funzione_turni_giorni) ==');
+const RG = [
+  { tipo_regola: 'turni_solo_funzioni', valore: 'L1,9:BO,SUP' },
+  { tipo_regola: 'funzione_turni_giorni', valore: 'SUP:Z*,L1,9:0,1,2,3' },
+  { tipo_regola: 'funzione_turni_giorni', valore: 'SUP:Z*,S*,L1,9:4,5' },
+];
+const tL1 = { codice: 'L1', gruppo: 'BO' };
+const tC0 = { codice: 'C0', gruppo: 'SALA' };
+const tZ8 = { codice: 'Z8', gruppo: 'SALA' };
+const tS1 = { codice: 'S1', gruppo: 'SALA' };
+eq(R.violazioneFunzioneTurno({ funzione: 'HOST' }, tL1, 2, RG) !== null, true, 'HOST su L1 = riservato');
+eq(R.violazioneFunzioneTurno({ funzione: 'BO' }, tL1, 2, RG), null, 'BO su L1 ok');
+eq(R.violazioneFunzioneTurno({ funzione: 'HOST', _settori: ['BO'] }, tL1, 2, RG), null, 'HOST con settore BO su L1 ok');
+eq(R.violazioneFunzioneTurno({ funzione: 'SUP' }, tC0, 2, RG) !== null, true, 'SUP con C0 martedi = vietato');
+eq(R.violazioneFunzioneTurno({ funzione: 'SUP' }, tZ8, 2, RG), null, 'SUP con Z8 martedi ok');
+eq(R.violazioneFunzioneTurno({ funzione: 'SUP' }, tS1, 5, RG), null, 'SUP con S1 venerdi ok');
+eq(R.violazioneFunzioneTurno({ funzione: 'SUP' }, tS1, 2, RG) !== null, true, 'SUP con S1 martedi = vietato');
+eq(
+  R.violazioneFunzioneTurno({ funzione: 'SUP' }, tC0, 0, RG),
+  null,
+  'SUP con C0 domenica: nessuna regola sulla domenica',
+);
+eq(
+  R.violazioneFunzioneTurno({ funzione: 'SUP' }, tC0, null, RG),
+  null,
+  'senza giorno le regole a giorni non si applicano',
+);
+eq(R.violazioneFunzioneTurno({ funzione: 'HOST' }, tC0, 2, RG), null, 'HOST con C0 ok');
 
 console.log('\n=======================================');
 console.log('  ' + passati + ' passati, ' + falliti + ' falliti');

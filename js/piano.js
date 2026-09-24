@@ -194,6 +194,21 @@ function puoGestireBriefing() {
 let pianoMappatureCache = [];
 let pianoRegoleGruppoCache = [];
 // regole attive per un gruppo (maiuscolo), port di eligibility.py
+// regole "chi fa cosa" del settore aperto (turni_solo_funzioni, funzione_turni_giorni)
+function _pianoRegoleTurnoFunzione() {
+  return pianoRegoleGruppoCache.filter(
+    (r) =>
+      r.attivo !== false &&
+      (r.reparto_dip || 'slots') === _pianoReparto() &&
+      /^(turni_solo_funzioni|funzione_turni_giorni)$/.test(String(r.tipo_regola || '').toLowerCase()),
+  );
+}
+// motivo della violazione per 'nome' con il turno t nel giorno dow (JS, 0=dom), o null
+function _pianoViolazioneFunzioneTurno(nome, t, dow) {
+  const info = _pianoCollabInfo(nome) || {};
+  const infoS = Object.assign({}, info, { _settori: _pianoSettoriEffettivi(info) || [] });
+  return PianoRegole.violazioneFunzioneTurno(infoS, t, dow, _pianoRegoleTurnoFunzione());
+}
 function _pianoRegoleGruppoDi(gruppo) {
   const g = (gruppo || '').toUpperCase();
   return pianoRegoleGruppoCache.filter(
@@ -726,6 +741,7 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
           codice: 'M',
           protetto: true,
           generato: false,
+          motivo_blocco: null, // la malattia scioglie il blocco con motivo
           commento: ('Malattia (data corretta) · era ' + r.codice).substring(0, 400),
           operatore: getOperatore(),
           updated_at: new Date().toISOString(),
@@ -733,6 +749,8 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
         messe++;
       }
     }
+    // festivo saltato per malattia: i recuperi automatici in piu' tornano C
+    for (const ymM of new Set(nuove.map((d) => d.substring(0, 7)))) await _pianoRiconciliaCgf(nome, ymM);
     if (tolte || messe) {
       logAzione('Malattia corretta: piano allineato', nome + ' · ' + tolte + ' M tolte, ' + messe + ' M spostate');
       if (typeof _pianoRighe !== 'undefined' && _pianoRighe.length && typeof renderPiano === 'function') {
@@ -2243,9 +2261,6 @@ function _pianoCalcolaViolazioni() {
   const minRiposo = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 0;
   const no4w1c1w = _pianoRegolaVal('no_4w1c1w') === 'TRUE';
   const diurnoPreV = _pianoRegolaVal('diurno_prima_vacanza') === 'TRUE';
-  const supSoloZ = _pianoRegolaVal('sup_solo_z_settimana') === 'TRUE';
-  const supVenSab = _pianoRegolaVal('sup_ven_sab_z_e_s') === 'TRUE';
-  const l1SoloBoSup = _pianoRegolaVal('l1_solo_bo_sup') === 'TRUE';
   const celle = {};
   const lista = [];
   const aggiungi = (nome, giorno, msg) => {
@@ -2304,23 +2319,13 @@ function _pianoCalcolaViolazioni() {
         if (tp && tp.tipo === 'NOTTURNO')
           aggiungi(nome, g - 1, 'turno notturno il giorno prima delle vacanze (deve essere diurno)');
       }
-      // 5) regole per funzione (SUP solo turni Z in settimana; L1/9 solo BO e SUP)
+      // 5) regole "chi fa cosa" del settore (regole di gruppo turni_solo_funzioni
+      //    e funzione_turni_giorni: create e modificate dalla scheda Regole di gruppo)
       if (lavoro) {
-        const infoC = _pianoCollabInfo(nome);
-        const fz = infoC && infoC.funzione;
         const t = _pianoTurnoInfo(cod);
         const dow = new Date(ym + '-' + String(g).padStart(2, '0') + 'T12:00:00').getDay();
-        if (supSoloZ && fz === 'SUP' && t && dow >= 1 && dow <= 4) {
-          // lun-gio: SUP solo turni Z (o BO L1/9)
-          if (!(cod[0] === 'Z' || cod === 'L1' || cod === '9'))
-            aggiungi(nome, g, 'SUP con turno ' + cod + ' in settimana (lun-gio solo turni Z)');
-        }
-        if (supVenSab && fz === 'SUP' && t && _pianoGiorniWeekend().includes(dow)) {
-          if (!(cod[0] === 'Z' || cod[0] === 'S' || cod === 'L1' || cod === '9'))
-            aggiungi(nome, g, 'SUP con turno ' + cod + ' nel weekend (ven/sab solo Z o S)');
-        }
-        if (l1SoloBoSup && (cod === 'L1' || cod === '9') && fz !== 'BO' && fz !== 'SUP' && fz !== 'RESP')
-          aggiungi(nome, g, 'turno ' + cod + ' riservato a BO e SUP (funzione: ' + (fz || 'nessuna') + ')');
+        const vfz = t ? _pianoViolazioneFunzioneTurno(nome, t, dow) : null;
+        if (vfz) aggiungi(nome, g, vfz);
       }
     }
   });
@@ -2812,9 +2817,11 @@ async function generaBozzaPiano(usaCoperture) {
   // 2) CGF ARRETRATI: recuperi maturati nei mesi (e nell'anno) precedenti e
   //    non ancora goduti, con la contabilita' unica e le regole cgf_*
   await _pianoCaricaCgfRiporto(annoBozza);
-  const righeCgf = (await _pianoCaricaRigheCgf(annoBozza)).filter((r) => !String(r.data).startsWith(ym));
+  // solo i mesi PRIMA di questo: il mese si legge dalla griglia, il futuro mai
+  const righeCgf = (await _pianoCaricaRigheCgf(annoBozza, da)).filter((r) => !String(r.data).startsWith(ym));
   const nomiCgf = nomi.filter((n) => _pianoMaturaCgf(_pianoCollabInfo(n)));
-  const contoCgf = _pianoContabilitaCgf(righeCgf, nomiCgf, annoBozza);
+  const contoCgf = _pianoContabilitaCgf(righeCgf, nomiCgf, annoBozza, da);
+  const daCancellareCgf = []; // CGF generati che non spettano piu' (festivo saltato per malattia)
   const festiviCgf = _pianoFestiviCgfSet();
   let nCgfAuto = 0;
   const ctxCgf = {
@@ -2841,15 +2848,29 @@ async function generaBozzaPiano(usaCoperture) {
   };
   nomiCgf.forEach((n) => {
     // credito arretrato = resta dei mesi precedenti + festivi gia' nel mese
-    // (celle esistenti) - CGF gia' presenti nel mese
+    // (celle esistenti, non in malattia) - CGF gia' presenti nel mese
     let credito = contoCgf[n].resta;
     for (let g = 1; g <= nGiorni; g++) {
       const cod = cella[n + '|' + g];
       if (!cod) continue;
-      if (festiviCgf.has(ym + '-' + String(g).padStart(2, '0')) && _pianoTurnoInfo(cod)) credito++;
+      const dstrG = ym + '-' + String(g).padStart(2, '0');
+      if (festiviCgf.has(dstrG) && _pianoTurnoInfo(cod) && !malattie[n + '|' + dstrG]) credito++;
       if (cod === 'CGF') credito--;
     }
     if (credito > 0) scriviCgf(n, _pianoPiazzaCgf(n, credito, ctxCgf));
+    // credito negativo: recuperi automatici dati per un festivo poi saltato
+    // (malattia). Si tolgono i CGF generati e non protetti, dall'ultimo
+    if (credito < 0) {
+      for (let g = nGiorni; g >= 1 && credito < 0; g--) {
+        const rg = rigaDi[n + '|' + g];
+        if (rg && rg.codice === 'CGF' && rg.generato && !rg.protetto && !giorniChiusi.has(g)) {
+          daCancellareCgf.push(rg.id);
+          delete cella[n + '|' + g];
+          delete rigaDi[n + '|' + g];
+          credito++;
+        }
+      }
+    }
   });
   for (let g = 1; g <= nGiorni; g++) {
     if (giorniChiusi.has(g)) continue; // giorno chiuso: resta com'e'
@@ -2897,15 +2918,8 @@ async function generaBozzaPiano(usaCoperture) {
             }
             // mappature per funzione (SUP/BO limitati ai loro turni; regole settimana SUP)
             const fz = infoC && infoC.funzione;
-            // regola HARD l1_solo_bo_sup: L1 e 9 riservati a BO e SUP
-            if (
-              (f.turno_codice === 'L1' || f.turno_codice === '9') &&
-              String(_pianoRegolaVal('l1_solo_bo_sup')).toUpperCase() === 'TRUE' &&
-              fz !== 'SUP' &&
-              fz !== 'BO' &&
-              !(_pianoSettoriEffettivi(infoC) || []).some((x) => x === 'BO' || x === 'SUP')
-            )
-              return false;
+            // regole "chi fa cosa" del settore (turni riservati, funzione-turni-giorni)
+            if (_pianoViolazioneFunzioneTurno(n, t, dowG)) return false;
             // regola HARD no_4w1c1w: niente rientro dopo UN solo giorno di riposo
             // se prima c'erano 4+ giorni di lavoro consecutivi
             if (String(_pianoRegolaVal('no_4w1c1w')).toUpperCase() === 'TRUE') {
@@ -2976,13 +2990,6 @@ async function generaBozzaPiano(usaCoperture) {
                 .filter((m) => m.tipo === 'PRINCIPALE' || m.tipo === 'AMMESSO')
                 .map((m) => m.turno_codice);
               if (voci.length && !voci.includes(f.turno_codice)) return false;
-              if (
-                fz === 'SUP' &&
-                dowG >= 1 &&
-                dowG <= 4 &&
-                !(f.turno_codice[0] === 'Z' || f.turno_codice === 'L1' || f.turno_codice === '9')
-              )
-                return false;
             } else if (!haStoria && !campoGrant) return false;
             return consecPrima(n, g) < maxCons && riposoOk(n, g, t);
           })
@@ -3096,7 +3103,8 @@ async function generaBozzaPiano(usaCoperture) {
     for (let g = 1; g <= nGiorni; g++) {
       const cod = cella[n + '|' + g];
       if (!cod) continue;
-      if (festiviCgf.has(ym + '-' + String(g).padStart(2, '0')) && _pianoTurnoInfo(cod)) festiviLav.push(g);
+      const dstrG = ym + '-' + String(g).padStart(2, '0');
+      if (festiviCgf.has(dstrG) && _pianoTurnoInfo(cod) && !malattie[n + '|' + dstrG]) festiviLav.push(g);
       if (cod === 'CGF') cgfMese++;
     }
     // quanti restano da dare per il mese: festivi del mese + resta precedente - CGF gia' nel mese
@@ -3154,6 +3162,9 @@ async function generaBozzaPiano(usaCoperture) {
         (nuove.length + sostituzioniWd.length - nCgfAuto - nCongedi) +
         ' turni da assegnare' +
         (nCgfAuto ? '\n• ' + nCgfAuto + ' CGF automatici (compensazione festivi lavorati)' : '') +
+        (daCancellareCgf.length
+          ? '\n• ' + daCancellareCgf.length + ' CGF automatici tolti (festivo non lavorato)'
+          : '') +
         (nCongedi ? '\n• ' + nCongedi + ' congedi C di riempimento (giorni senza turno)' : '') +
         '\n• ' +
         scoperti.length +
@@ -3166,6 +3177,7 @@ async function generaBozzaPiano(usaCoperture) {
     return;
   }
   try {
+    for (const idC of daCancellareCgf) await secDel('piano', 'id=eq.' + idC);
     let inseriteTot = 0;
     for (let i = 0; i < nuove.length; i += 2500) {
       const r2 = await _rpcSicura('piano_bulk_upsert', { p_token: getOpToken(), p_rows: nuove.slice(i, i + 2500) });
@@ -3617,24 +3629,6 @@ const PIANO_REGOLE_GUIDA = {
     t: 'numero',
     d: 'Tutto il piano',
   },
-  l1_solo_bo_sup: {
-    g: 'Funzioni e turni',
-    n: 'I turni L1 e 9 solo a Back Office e Supervisor',
-    t: 'sino',
-    d: 'Validatore e bozza',
-  },
-  sup_solo_z_settimana: {
-    g: 'Funzioni e turni',
-    n: 'I Supervisor da lunedi a giovedi fanno solo turni Z',
-    t: 'sino',
-    d: 'Validatore e bozza',
-  },
-  sup_ven_sab_z_e_s: {
-    g: 'Funzioni e turni',
-    n: 'I Supervisor il venerdi e il sabato possono fare turni Z e S',
-    t: 'sino',
-    d: 'Validatore e bozza',
-  },
 };
 // LIMITI DI BUON SENSO per i valori numerici: un valore fuori scala (riposo
 // di 3 ore, 40 giorni consecutivi, 300 domeniche) viene rifiutato con un
@@ -3709,24 +3703,12 @@ function _pianoContestoSettore(settore) {
 // Regole che parlano di turni o funzioni precisi: valgono solo dove esistono
 function _pianoValidaRegolaSettore(nome, valore, settore) {
   const ctx = _pianoContestoSettore(settore);
-  const on = String(valore || '').toUpperCase() === 'TRUE';
   const manca = (cosa) =>
     'Regola non valida per ' +
     ctx.label +
     ': ' +
     cosa +
     '. Qui non avrebbe alcun effetto: lasciala su No o non crearla.';
-  if (nome === 'l1_solo_bo_sup' && on) {
-    if (!ctx.codici.has('L1') && !ctx.codici.has('9')) return manca('non esistono i turni L1 e 9');
-    if (!ctx.funzioni.has('BO') && !ctx.funzioni.has('SUP'))
-      return manca('nessun collaboratore ha la funzione BO o SUP');
-  }
-  if ((nome === 'sup_solo_z_settimana' || nome === 'sup_ven_sab_z_e_s') && on) {
-    if (!ctx.funzioni.has('SUP')) return manca('nessun collaboratore ha la funzione SUP');
-    if (![...ctx.codici].some((c) => c.startsWith('Z'))) return manca('non esistono turni Z');
-    if (nome === 'sup_ven_sab_z_e_s' && ![...ctx.codici].some((c) => c.startsWith('S')))
-      return manca('non esistono turni S');
-  }
   if (/^jolly_|^c_prima_jolly$/.test(nome) && settore && !ctx.jolly)
     return manca('non ci sono ausiliari (jolly) in questo settore');
   return null;
@@ -6247,8 +6229,9 @@ async function _pianoSaldoCgf(ym) {
     .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && _pianoMaturaCgf(c))
     .map((c) => c.nome);
   await _pianoCaricaCgfRiporto(annoCorr);
-  const storia = await _pianoCaricaRigheCgf(annoCorr);
-  const saldo = _pianoContabilitaCgf(storia, nomi, annoCorr);
+  const finoA = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
+  const storia = await _pianoCaricaRigheCgf(annoCorr, finoA);
+  const saldo = _pianoContabilitaCgf(storia, nomi, annoCorr, finoA);
   nomi.forEach((n) => (saldo[n].festiviMeseSel = saldo[n].festiviMese[ym] || []));
   return { saldo: saldo, storia: storia, nomi: nomi };
 }
@@ -6265,7 +6248,9 @@ async function pianoElencoCgfDaDare() {
   let h =
     '<h3>Recuperi festivi (CGF) · ' +
     escP(_pianoMeseSel.split('-')[0]) +
-    "</h3><p style=\"font-size:.82rem;color:var(--muted);margin-bottom:8px\">Riporto dall'anno prima + festivi con diritto lavorati - recuperi goduti. Senza riporto registrato si conta anche l'anno precedente. Un CGF caduto in malattia non e' goduto: resta a credito. Solo personale fisso" +
+    '</h3><p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Conteggio fino alla fine di ' +
+    escP(_pianoMeseSel) +
+    " (i mesi futuri non contano). Riporto dall'anno prima + festivi con diritto lavorati (non in malattia) - recuperi goduti. Senza riporto registrato si conta anche l'anno precedente. Un CGF caduto in malattia non e' goduto: resta a credito. Solo personale fisso" +
     (_pianoCgfSoloParificati() ? ', solo festivi parificati alla domenica (regola cgf_solo_parificati)' : '') +
     '.</p>';
   if (!righe.length) h += '<p style="font-size:.85rem">Nessun festivo lavorato quest\'anno.</p>';
@@ -6317,8 +6302,22 @@ async function pianoAssegnaCgfMese() {
   const cella = {};
   Object.keys(occupato).forEach((k) => (cella[k] = occupato[k]));
   const ctx = { ym: ym, nGiorni: nGiorni, cella: cella, malattie: malattie, compleanni: compleanni };
+  const daTogliere = []; // CGF generati in piu' (festivo saltato per malattia)
   nomi.forEach((n) => {
     const s = saldo[n];
+    if (s.resta < 0) {
+      let extra = -s.resta;
+      _pianoRighe
+        .filter((r) => r.collaboratore === n && r.codice === 'CGF' && r.generato && !r.protetto && !r.motivo_blocco)
+        .sort((a, b) => String(b.data).localeCompare(String(a.data)))
+        .forEach((r) => {
+          if (extra > 0 && _pianoConsentiScrittura(r.data, true)) {
+            daTogliere.push(r);
+            extra--;
+          }
+        });
+      return;
+    }
     if (s.resta <= 0) return;
     // prima i giorni dopo i festivi lavorati questo mese, poi il resto
     const preferiti = [];
@@ -6329,7 +6328,39 @@ async function pianoAssegnaCgfMese() {
       daFare.push({ nome: n, giorno: g, data: ym + '-' + String(g).padStart(2, '0') }),
     );
   });
+  if (daTogliere.length) {
+    if (
+      confirm(
+        daTogliere.length +
+          ' recuper' +
+          (daTogliere.length === 1 ? 'o' : 'i') +
+          ' automatic' +
+          (daTogliere.length === 1 ? 'o' : 'i') +
+          ' non spetta' +
+          (daTogliere.length === 1 ? '' : 'no') +
+          " piu' (festivo non lavorato, per esempio per malattia):\n\n" +
+          daTogliere.map((r) => '• ' + r.collaboratore.split(' ')[0] + ' ' + r.data).join('\n') +
+          '\n\nLi trasformo in congedo C?',
+      )
+    ) {
+      _pianoUndoSnap('CGF in piu tolti ' + ym);
+      for (const r of daTogliere) {
+        await secPatch('piano', 'id=eq.' + r.id, {
+          codice: 'C',
+          commento: ('CGF tolto: festivo non lavorato - ' + getOperatore()).substring(0, 400),
+          operatore: getOperatore(),
+          updated_at: new Date().toISOString(),
+        });
+        r.codice = 'C';
+      }
+      logAzione('Piano: CGF in piu tolti', ym + ' · ' + daTogliere.length);
+    }
+  }
   if (!daFare.length) {
+    if (daTogliere.length) {
+      renderPiano();
+      return;
+    }
     alert(
       'Nessun recupero da assegnare in ' +
         ym +
@@ -7612,6 +7643,68 @@ function _pianoCongedoNpEffetti(nome, anno) {
   });
   return { giorniVacanze: giorniVacanze, giorniAnzianita: giorniAnzianita };
 }
+// RICONCILIAZIONE: se per 'nome' nel mese ym i recuperi goduti superano
+// quelli maturati (un festivo e' saltato per malattia dopo che la bozza aveva
+// gia' messo il CGF), i CGF automatici in piu' del mese tornano congedo C.
+async function _pianoRiconciliaCgf(nome, ym) {
+  try {
+    const info = _pianoCollabInfo(nome);
+    if (!info || !_pianoMaturaCgf(info)) return 0;
+    const anno = ym.substring(0, 4);
+    const finoA = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
+    await _pianoCaricaCgfRiporto(anno);
+    const righe = await _pianoCaricaRigheCgf(anno, finoA);
+    const conto = _pianoContabilitaCgf(righe, [nome], anno, finoA)[nome];
+    if (!conto || conto.resta >= 0) return 0;
+    let extra = -conto.resta;
+    const candidati = righe
+      .filter(
+        (r) =>
+          r.collaboratore === nome &&
+          String(r.data).startsWith(ym) &&
+          r.codice === 'CGF' &&
+          r.generato &&
+          !r.protetto &&
+          !r.motivo_blocco,
+      )
+      .sort((a, b) => String(b.data).localeCompare(String(a.data)));
+    let fatte = 0;
+    for (const r of candidati) {
+      if (extra <= 0) break;
+      if (_pianoGiornoBloccato(r.data) && !_pianoGiornoSbloccato(r.data)) continue;
+      await secPatch('piano', 'id=eq.' + r.id, {
+        codice: 'C',
+        commento: 'CGF tolto: festivo non lavorato (malattia)',
+        operatore: getOperatore(),
+        updated_at: new Date().toISOString(),
+      });
+      const inMem = _pianoRighe.find((x) => x.id === r.id);
+      if (inMem) {
+        inMem.codice = 'C';
+        inMem.commento = 'CGF tolto: festivo non lavorato (malattia)';
+      }
+      extra--;
+      fatte++;
+    }
+    if (fatte) {
+      logAzione('Piano: CGF tolti (festivo in malattia)', nome + ' ' + ym + ' · ' + fatte);
+      toast(
+        fatte +
+          ' recuper' +
+          (fatte === 1 ? 'o' : 'i') +
+          ' di ' +
+          nome.split(' ')[0] +
+          ' tolt' +
+          (fatte === 1 ? 'o' : 'i') +
+          ': festivo non lavorato',
+      );
+    }
+    return fatte;
+  } catch (e) {
+    console.error('riconcilia CGF', e);
+    return 0;
+  }
+}
 // Le celle del piano seguono il congedo: CNP protetto sui giorni del periodo
 // (rimuovi = true le toglie). Scrive anche nei giorni chiusi: registrare un
 // congedo e' un atto amministrativo, non una modifica del turno.
@@ -7700,17 +7793,15 @@ async function _pianoCaricaCgfRiporto(anno) {
 }
 // Righe del piano del settore su anno precedente + anno corrente: la base
 // di ogni conteggio CGF (un festivo di fine dicembre si compensa a gennaio).
-async function _pianoCaricaRigheCgf(anno) {
+// finoA = ultimo giorno da considerare (di norma la fine del mese aperto):
+// i CGF gia' messi nei mesi FUTURI non contano, ne' come goduti ne' come
+// maturati. Il credito si legge solo dal passato e dal mese in corso.
+async function _pianoCaricaRigheCgf(anno, finoA) {
   const annoPrec = String(Number(anno) - 1);
+  const stop = finoA && finoA < anno + '-12-31' ? finoA : anno + '-12-31';
   return (
     (await secGet(
-      'piano?data=gte.' +
-        annoPrec +
-        '-01-01&data=lte.' +
-        anno +
-        '-12-31&reparto_dip=eq.' +
-        _pianoReparto() +
-        '&limit=60000',
+      'piano?data=gte.' + annoPrec + '-01-01&data=lte.' + stop + '&reparto_dip=eq.' + _pianoReparto() + '&limit=60000',
     )) || []
   );
 }
@@ -7720,9 +7811,13 @@ async function _pianoCaricaRigheCgf(anno) {
 // Se esiste un riporto per l'anno, l'anno precedente non si conta (e' gia'
 // dentro il riporto); altrimenti si contano anche i festivi e i CGF dell'anno
 // prima. resta = riporto + maturati - goduti.
-function _pianoContabilitaCgf(righe, nomi, anno) {
+// finoA (facoltativo): le righe dopo quella data non contano (niente futuro).
+// Un festivo conta come LAVORATO solo se c'e' il turno E la persona non e' in
+// malattia quel giorno: chi manca al festivo non matura il recupero.
+function _pianoContabilitaCgf(righe, nomi, anno, finoA) {
   const fest = _pianoFestiviCgfSet();
   const mal = {};
+  if (finoA) righe = righe.filter((r) => String(r.data).substring(0, 10) <= finoA);
   new Set(righe.map((r) => String(r.data).substring(0, 7))).forEach((m) => Object.assign(mal, _pianoMalattieMese(m)));
   const s = {};
   nomi.forEach((n) => {
@@ -7742,7 +7837,7 @@ function _pianoContabilitaCgf(righe, nomi, anno) {
     if (!o) return;
     const a = String(r.data).substring(0, 4);
     if (o.conRiporto && a !== String(anno)) return;
-    if (fest.has(r.data) && _pianoTurnoInfo(r.codice)) {
+    if (fest.has(r.data) && _pianoTurnoInfo(r.codice) && !mal[r.collaboratore + '|' + r.data]) {
       o.maturati++;
       o.festivi.push(r.data);
       const m = String(r.data).substring(0, 7);
@@ -9137,6 +9232,7 @@ function _pianoIdoneoPerTurno(nome, turno) {
     campoOk: (i, v) => _pianoCampoOk(i, v),
     mappFunzione: (fz) => _pianoMappFunzione(fz),
     regolaVal: (n) => _pianoRegolaVal(n),
+    regoleTurnoFunzione: () => _pianoRegoleTurnoFunzione(),
   });
 }
 function apriCoperturaMalattia() {
@@ -10903,6 +10999,14 @@ async function caricaStatisticheAnnoPiano(forza) {
   h += '</div>';
   // statistiche per collaboratore
   const st = {};
+  // CGF: si contano solo fino alla fine del mese aperto nel Piano (mai i mesi
+  // futuri gia' pianificati), come nella bozza e in "Chi ha diritto"
+  const _cgfFinoA =
+    String(anno) < _pianoMeseSel.substring(0, 4)
+      ? anno + '-12-31'
+      : String(anno) > _pianoMeseSel.substring(0, 4)
+        ? anno + '-00-00'
+        : _pianoMeseSel + '-' + String(_pianoUltimoGiorno(_pianoMeseSel)).padStart(2, '0');
   // malattie di tutto l'anno: un CGF che cade in malattia non e' goduto
   const malattieAnno = {};
   for (let m = 1; m <= 12; m++)
@@ -10950,7 +11054,13 @@ async function caricaStatisticheAnnoPiano(forza) {
       // DUE MONDI SEPARATI:
       // FISSI (RAP 4.3): recupero CGF sui festivi con il flag attivo, esclusi
       // quelli che cadono di domenica.
-      if (_pianoFestivoDaCgf(fest) && _pianoMaturaCgf(info)) o.cgfMat++;
+      if (
+        _pianoFestivoDaCgf(fest) &&
+        _pianoMaturaCgf(info) &&
+        String(r.data) <= _cgfFinoA &&
+        !malattieAnno[r.collaboratore + '|' + r.data]
+      )
+        o.cgfMat++;
       // AUSILIARI/JOLLY (RAP Allegato 1): supplemento del 50% sul salario orario
       // per i NOVE festivi parificati alle domeniche. Lista fissa che non cambia
       // di anno in anno, e vale SEMPRE, anche quando il festivo cade di domenica.
@@ -10965,7 +11075,7 @@ async function caricaStatisticheAnnoPiano(forza) {
       if (r.codice === 'M' || r.codice === 'M1') o.m++;
       // CGF goduto, ma se quel giorno c'e' malattia il recupero non e' stato
       // goduto e il credito resta (come per le vacanze)
-      if (r.codice === 'CGF') {
+      if (r.codice === 'CGF' && String(r.data) <= _cgfFinoA) {
         if (malattieAnno[r.collaboratore + '|' + r.data]) o.cgfPersi++;
         else o.cgfGod++;
       }
@@ -11018,7 +11128,7 @@ async function caricaStatisticheAnnoPiano(forza) {
   h +=
     '<div style="overflow-x:auto"><table id="piano-statanno-table" class="piano-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Ore ' +
     (meseFiltro ? escP(MESI[parseInt(meseFiltro.substring(5, 7)) - 1] || meseFiltro) : 'anno') +
-    '</th><th title="Sui mesi con un piano">Ore dovute</th><th>Giorni lavorati</th><th>Diurni</th><th>Notturni</th><th>Weekend</th><th>Domeniche</th><th>Vacanze</th><th>Malattie</th><th title="Festivi lavorati che danno diritto al recupero (solo personale fisso)">CGF maturati</th><th title="Giorni CGF effettivamente goduti (quelli caduti in malattia non contano)">CGF goduti</th><th title="Riporto dall anno prima + maturati - goduti: quanti recuperi restano da dare">Saldo CGF</th><th title="Festivi parificati alle domeniche lavorati dagli ausiliari (jolly): danno diritto al supplemento del 50% sul salario orario lordo (RAP Allegato 1). Sono nove giorni fissi e valgono anche di domenica">Suppl. 50%</th><th title="Ore lavorate nella fascia notturna (23:00-06:00). Il supplemento del 10% e gia compreso nella durata dei turni: questa colonna serve da controllo, non e un credito da dare a parte">Ore notte</th><th title="Solo ausiliari (jolly): ore effettivamente lavorate nell anno e indennita calcolate su quel totale secondo il RAP Allegato 1 (vacanze 8.33% con 4 settimane o 10.65% con 5, tredicesima 8.33%). I jolly non hanno una percentuale contrattuale: tutto si calcola sulle ore fatte">Ore lavorate · indennita</th></tr></thead><tbody>';
+    '</th><th title="Sui mesi con un piano">Ore dovute</th><th>Giorni lavorati</th><th>Diurni</th><th>Notturni</th><th>Weekend</th><th>Domeniche</th><th>Vacanze</th><th>Malattie</th><th title="Festivi con diritto lavorati, non in malattia, fino alla fine del mese aperto nel Piano (solo personale fisso)">CGF maturati</th><th title="Giorni CGF effettivamente goduti (quelli caduti in malattia non contano)">CGF goduti</th><th title="Riporto dall anno prima + maturati - goduti: quanti recuperi restano da dare">Saldo CGF</th><th title="Festivi parificati alle domeniche lavorati dagli ausiliari (jolly): danno diritto al supplemento del 50% sul salario orario lordo (RAP Allegato 1). Sono nove giorni fissi e valgono anche di domenica">Suppl. 50%</th><th title="Ore lavorate nella fascia notturna (23:00-06:00). Il supplemento del 10% e gia compreso nella durata dei turni: questa colonna serve da controllo, non e un credito da dare a parte">Ore notte</th><th title="Solo ausiliari (jolly): ore effettivamente lavorate nell anno e indennita calcolate su quel totale secondo il RAP Allegato 1 (vacanze 8.33% con 4 settimane o 10.65% con 5, tredicesima 8.33%). I jolly non hanno una percentuale contrattuale: tutto si calcola sulle ore fatte">Ore lavorate · indennita</th></tr></thead><tbody>';
   ordineCollabPiano(Object.keys(st), _pianoReparto()).forEach((n) => {
     const o = st[n];
     const info = _pianoCollabInfo(n) || {};
@@ -13724,6 +13834,21 @@ const _REGOLE_GRUPPO_TIPI = {
   limite_funzione_mese: 'Max N persone di una funzione al mese (es: SUP:1)',
   minimo_funzione_mese: 'Almeno N di una funzione al mese (es: SUP:1)',
   minimo_funzione_giorno: 'Almeno N al giorno, con filtri (es: SUP:1:NOTTURNO:4,5 · 4,5=ven,sab)',
+  turni_solo_funzioni: 'Questi turni solo a queste funzioni (es: L1,9:BO,SUP · gruppo "tutti" = qualsiasi)',
+  funzione_turni_giorni:
+    'In questi giorni la funzione fa SOLO questi turni (es: SUP:Z*,L1,9:0,1,2,3 · Z* = tutte le sigle che iniziano con Z · giorni 0=lun ... 6=dom, vuoto = sempre)',
+};
+// Etichette in italiano per la scheda (la lingua di chi la usa)
+const _REGOLE_GRUPPO_ETICHETTE = {
+  richiede_funzione: 'Funzioni ammesse nel gruppo',
+  blocca_tipo_turno: 'Tipo di turno vietato nel gruppo',
+  richiede_campo: 'Requisito sulla scheda del collaboratore',
+  limite_funzione_giorno: 'Massimo di una funzione al giorno',
+  limite_funzione_mese: 'Massimo persone di una funzione al mese',
+  minimo_funzione_mese: 'Minimo di una funzione al mese',
+  minimo_funzione_giorno: 'Minimo di una funzione al giorno',
+  turni_solo_funzioni: 'Turni riservati a certe funzioni',
+  funzione_turni_giorni: 'Una funzione fa solo certi turni (per giorno)',
 };
 // TAB GUIDA · manuale rapido della sezione Piano (come la Guida di Turnivo)
 // ================================================================
@@ -14080,12 +14205,14 @@ function _renderPianoRegoleGruppoCard() {
     .forEach((r) => {
       h +=
         '<tr><td style="font-weight:700">' +
-        escP(r.gruppo) +
+        escP(r.gruppo === '*' ? 'tutti' : r.gruppo) +
         '</td><td style="text-align:left" title="' +
         escP(_REGOLE_GRUPPO_TIPI[r.tipo_regola] || '') +
-        '">' +
+        '"><b>' +
+        escP(_REGOLE_GRUPPO_ETICHETTE[r.tipo_regola] || r.tipo_regola) +
+        '</b><br><span style="font-size:.78rem;color:var(--muted)">' +
         escP(r.tipo_regola) +
-        '</td><td style="text-align:left"><input type="text" value="' +
+        '</span></td><td style="text-align:left"><input type="text" value="' +
         escP(r.valore || '') +
         '" onchange="salvaRegolaGruppo(' +
         r.id +
@@ -14099,11 +14226,20 @@ function _renderPianoRegoleGruppoCard() {
     });
   h += '</tbody></table></div>';
   h +=
+    '<details style="margin:10px 0;background:var(--paper2);border:1px solid var(--line);border-radius:3px;padding:8px 12px"><summary style="cursor:pointer;font-weight:700;font-size:.9rem">Come si crea una regola di gruppo (esempi)</summary>' +
+    '<ol style="font-size:.85rem;margin:8px 0 4px 18px;line-height:1.5">' +
+    '<li>Scegli il <b>gruppo</b> di turni a cui la regola si riferisce (quello scritto nella scheda Turni, colonna Gruppo). "tutti" vale per ogni gruppo del settore.</li>' +
+    '<li>Scegli il <b>tipo</b>: sotto compare la spiegazione con un esempio del valore.</li>' +
+    '<li>Scrivi il <b>valore</b> nel formato dell esempio e premi Aggiungi. Il programma controlla che gruppo, funzioni e sigle esistano in questo settore: se qualcosa non torna te lo dice.</li>' +
+    '<li>Esempi: <b>Turni riservati</b> con valore <code>L1,9:BO,SUP</code> = i turni L1 e 9 li fanno solo Back Office e Supervisor. <b>Una funzione fa solo certi turni</b> con <code>SUP:Z*,L1,9:0,1,2,3</code> = da lunedi a giovedi i Supervisor fanno solo turni che iniziano con Z (oppure L1 e 9); con <code>SUP:Z*,S*,L1,9:4,5</code> venerdi e sabato anche i turni S. <b>Massimo al giorno</b> con <code>SUP:1</code> nel gruppo BO = al massimo un Supervisor al giorno in Back Office.</li>' +
+    '<li>Le regole valgono per il <b>settore aperto</b>: ogni settore ha le sue, con le sue sigle e le sue funzioni. Agiscono nel validatore, nella bozza, nei cambi turno e nella scrittura manuale (avviso).</li>' +
+    '</ol></details>' +
     '<div class="add-tipo-row" style="margin-top:8px"><div class="field"><label>Gruppo</label><select id="rg-gruppo" style="padding:8px">' +
     gruppi.map((g) => '<option>' + escP(g) + '</option>').join('') +
+    '<option value="*">tutti</option>' +
     '</select></div><div class="field"><label>Regola</label><select id="rg-tipo" style="padding:8px" onchange="document.getElementById(\'rg-aiuto\').textContent=_REGOLE_GRUPPO_TIPI[this.value]||\'\'" >' +
     Object.keys(_REGOLE_GRUPPO_TIPI)
-      .map((t) => '<option>' + t + '</option>')
+      .map((t) => '<option value="' + t + '">' + escP(_REGOLE_GRUPPO_ETICHETTE[t] || t) + '</option>')
       .join('') +
     '</select></div><div class="field"><label>Valore</label><input type="text" id="rg-valore" placeholder="SUP:1" style="width:150px"></div>' +
     '<button class="btn-add-tipo" onclick="aggiungiRegolaGruppo()">+ Aggiungi regola</button></div>' +
@@ -14121,7 +14257,7 @@ function _pianoValidaRegolaGruppo(gruppo, tipo, valore, settore) {
   const v = String(valore || '')
     .trim()
     .toUpperCase();
-  if (!ctx.gruppi.has(gr))
+  if (gr !== '*' && !ctx.gruppi.has(gr))
     return 'Il gruppo ' + gr + ' non esiste fra i turni di ' + ctx.label + ' (scheda Turni, colonna Gruppo)';
   const funzioniNote = new Set(
     (Array.isArray(window._pianoFunzioni) ? window._pianoFunzioni : [])
@@ -14164,6 +14300,49 @@ function _pianoValidaRegolaGruppo(gruppo, tipo, valore, settore) {
     const m = v.match(/^([A-Z0-9_]+):(\d+)$/);
     if (!m) return 'Formato atteso FUNZIONE:NUMERO, per esempio SUP:1';
     if (!fzOk(m[1])) return 'Funzione sconosciuta in ' + ctx.label + ': ' + m[1];
+    return null;
+  }
+  const sigleIgnote = (lista) =>
+    lista.filter((m) => {
+      const mm = m.toUpperCase();
+      if (mm.endsWith('*')) return ![...ctx.codici].some((c) => c.startsWith(mm.slice(0, -1)));
+      return !ctx.codici.has(mm);
+    });
+  if (t === 'turni_solo_funzioni') {
+    const parti = v.split(':');
+    if (parti.length !== 2) return 'Formato atteso TURNI:FUNZIONI, per esempio L1,9:BO,SUP';
+    const turni = parti[0]
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean);
+    const funzioni = parti[1]
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean);
+    if (!turni.length || !funzioni.length) return 'Servono almeno un turno e una funzione (es. L1,9:BO,SUP)';
+    const ign = sigleIgnote(turni);
+    if (ign.length) return 'Sigle di turno che in ' + ctx.label + ' non esistono: ' + ign.join(', ');
+    const fzIgn = funzioni.filter((f) => !fzOk(f));
+    if (fzIgn.length) return 'Funzioni sconosciute in ' + ctx.label + ': ' + fzIgn.join(', ');
+    return null;
+  }
+  if (t === 'funzione_turni_giorni') {
+    const parti = v.split(':');
+    if (parti.length < 2 || parti.length > 3)
+      return 'Formato atteso FUNZIONE:TURNI[:giorni], per esempio SUP:Z*,L1,9:0,1,2,3';
+    if (!fzOk(parti[0].trim())) return 'Funzione sconosciuta in ' + ctx.label + ': ' + parti[0];
+    const modelli = parti[1]
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean);
+    if (!modelli.length) return 'Scrivi almeno una sigla o un modello (es. Z* per tutte le sigle che iniziano con Z)';
+    const ign = sigleIgnote(modelli);
+    if (ign.length) return 'Sigle o modelli senza riscontro fra i turni di ' + ctx.label + ': ' + ign.join(', ');
+    if (parti[2] != null && parti[2].trim() !== '') {
+      const gg = parti[2].split(',').map((x) => x.trim());
+      if (gg.some((x) => !/^[0-6]$/.test(x)))
+        return 'I giorni vanno scritti come numeri da 0 (lunedi) a 6 (domenica), separati da virgola';
+    }
     return null;
   }
   if (t === 'minimo_funzione_giorno') {
@@ -14889,12 +15068,46 @@ async function pianoBloccaCella(nome, dstr, blocca) {
   }
   if (!_pianoConsentiScrittura(dstr)) return;
   const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
-  if (!r) {
-    toast('Questa cella e vuota: prima scrivi il turno, poi la blocchi');
-    return;
-  }
+  if (!r && !blocca) return;
   const giorno = String(dstr).split('-').reverse().join('.');
   if (blocca) {
+    // cella vuota: il blocco crea un congedo C (il giorno e' libero ma va
+    // tenuto libero: visita, appuntamento). Scambi e coperture lo saltano.
+    if (!r) {
+      const motivoV = prompt(
+        "Il giorno e' vuoto: lo segno come congedo C bloccato.\n\n" +
+          nome +
+          ' \u00b7 ' +
+          giorno +
+          "\n\nPerche' non si deve toccare? (es. visita medica, appuntamento)",
+        '',
+      );
+      if (motivoV === null) return;
+      const testoV = String(motivoV).trim();
+      if (!testoV) {
+        toast('Serve il motivo: senza, il blocco non si capisce');
+        return;
+      }
+      try {
+        const nuovo = await _pianoInserisciCella({
+          collaboratore: nome,
+          data: dstr,
+          codice: 'C',
+          protetto: true,
+          generato: false,
+          motivo_blocco: testoV,
+          reparto_dip: _pianoReparto(),
+          operatore: getOperatore(),
+        });
+        if (nuovo) _pianoRighe.push(Array.isArray(nuovo) ? nuovo[0] : nuovo);
+        logAzione('Piano: cella bloccata', nome + ' ' + dstr + ' (C nuovo): ' + testoV);
+        toast('Congedo C bloccato: ' + testoV);
+        renderPiano();
+      } catch (e) {
+        toastErrore('Errore nel salvataggio del blocco: ' + (e.message || ''));
+      }
+      return;
+    }
     const motivo = prompt(
       'Perche questa cella non si deve toccare?\n\n' +
         nome +
@@ -15268,6 +15481,10 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
     }
     // la logica riposo/consecutivi/idoneita' vive nel motore puro PianoRegole
     const tNuovo = codiceNuovo !== undefined ? _pianoTurnoInfo(codiceNuovo) : null;
+    if (tNuovo) {
+      const vfz = _pianoViolazioneFunzioneTurno(nome, tNuovo, new Date(dstr + 'T12:00:00').getDay());
+      if (vfz) avvisiExtra.push(vfz);
+    }
     return avvisiExtra.concat(
       PianoRegole.violazioniCella({
         mappaGiorni: mappa,
@@ -15417,6 +15634,11 @@ async function pianoSalvaCella(nome, dstr, codice) {
         operatore: getOperatore(),
         updated_at: new Date().toISOString(),
       };
+      // la malattia scioglie il blocco con motivo: il giorno non e' piu' "da tenere libero"
+      if (r.motivo_blocco && (codice === 'M' || codice === 'M1' || codice === 'I')) {
+        patchCella.motivo_blocco = null;
+        r.motivo_blocco = null;
+      }
       if (commentoRegole)
         patchCella.commento = (commentoRegole + (r.commento ? ' \u00b7 ' + r.commento : '')).substring(0, 400);
       await secPatch('piano', 'id=eq.' + r.id, patchCella);
