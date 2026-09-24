@@ -102,6 +102,19 @@ function _pianoModTabOk() {
 function puoSbloccareGiorniChiusi() {
   return isAdmin() || (typeof puoModificare === 'function' && puoModificare('sblocco_piano_chiuso'));
 }
+// Cella che coperture, scambi e ricerche NON devono usare: bloccata con
+// motivo (visita medica, corso...) oppure il congedo del compleanno.
+function _pianoCellaRiservata(r) {
+  if (!r) return '';
+  if (r.motivo_blocco) return r.motivo_blocco;
+  if (
+    String(r.commento || '')
+      .trim()
+      .toLowerCase() === 'compleanno'
+  )
+    return 'Compleanno';
+  return '';
+}
 function _pianoGiornoBloccato(dstr) {
   return PianoRegole.giornoBloccato(dstr, new Date(), {
     attivo: String(_pianoRegolaVal('blocco_giorni_chiusi')).toUpperCase() !== 'FALSE',
@@ -823,6 +836,11 @@ let _pianoTab = localStorage.getItem('piano_tab') || 'calendario';
 // Icone = Bootstrap Icons (le stesse della navbar di Turnivo), incorporate SVG
 const _PIANO_TABS = [
   [
+    'crediti',
+    'Crediti',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M1 3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1H1zm7 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/><path d="M0 5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H1a1 1 0 0 1-1-1V5zm3 0a2 2 0 0 1-2 2v4a2 2 0 0 1 2 2h10a2 2 0 0 1 2-2V7a2 2 0 0 1-2-2H3z"/></svg>',
+  ],
+  [
     'recupero',
     'Recupero ore',
     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z"/><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0"/></svg>',
@@ -911,7 +929,10 @@ function pianoCambiaTab(t) {
 // Le 13 tab raggruppate in 3 famiglie: si trova tutto a colpo d'occhio
 const PIANO_TAB_GRUPPI = [
   ['Giornata', ['calendario', 'briefing']],
-  ['Gestione', ['vacanze', 'saldo', 'recupero', 'timbrature', 'statistiche', 'benessere', 'storico', 'formulari']],
+  [
+    'Gestione',
+    ['crediti', 'vacanze', 'saldo', 'recupero', 'timbrature', 'statistiche', 'benessere', 'storico', 'formulari'],
+  ],
   ['Configurazione', ['turni', 'regole', 'festivi', 'impostazioni', 'guida']],
 ];
 function _pianoTabBar() {
@@ -2081,6 +2102,8 @@ async function renderPiano() {
       }
     } else if (_pianoTab === 'briefing') {
       h += await _renderPianoBriefingTab();
+    } else if (_pianoTab === 'crediti') {
+      h += await _renderPianoCreditiTab();
     } else if (_pianoTab === 'vacanze') {
       h += await _renderPianoVacanzeTab();
     } else if (_pianoTab === 'turni') {
@@ -8586,7 +8609,7 @@ async function apriCercaCambioLibero() {
   const bloccate = {}; // nome|data -> motivo (celle bloccate con motivo: non si toccano)
   righeTutte.forEach((x) => {
     (mappe[x.collaboratore] = mappe[x.collaboratore] || {})[x.data] = x.codice;
-    if (x.motivo_blocco) bloccate[x.collaboratore + '|' + x.data] = x.motivo_blocco;
+    if (_pianoCellaRiservata(x)) bloccate[x.collaboratore + '|' + x.data] = _pianoCellaRiservata(x);
   });
   const minRiposo = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 11;
   const maxCons = parseInt(_pianoRegolaVal('max_consecutivi')) || 5;
@@ -8851,7 +8874,8 @@ async function confermaCercaCambioLibero() {
     const r0 = righe[0];
     if (r0 && (r0.reparto_dip || 'slots') !== _pianoReparto())
       throw new Error(nome + ' il ' + dstr + ' ha una cella nel piano ' + repartoLabel(r0.reparto_dip));
-    if (r0 && r0.motivo_blocco) throw new Error(nome + ' il ' + dstr + ': cella bloccata (' + r0.motivo_blocco + ')');
+    if (r0 && _pianoCellaRiservata(r0))
+      throw new Error(nome + ' il ' + dstr + ': cella riservata (' + _pianoCellaRiservata(r0) + ')');
     const body = {
       codice: codice,
       protetto: true,
@@ -9572,7 +9596,7 @@ async function cercaSostitutiMalattia() {
       if (codC) {
         const csC = _pianoCodiceInfo(codC);
         const rC = rigaDi[n + '|' + g];
-        if (rC && rC.motivo_blocco) continue; // bloccata con motivo: non si tocca
+        if (rC && _pianoCellaRiservata(rC)) continue; // bloccata con motivo: non si tocca
         if (!(csC && csC.is_riposo && !(rC && rC.protetto && codC === 'V'))) continue; // occupato o vacanza protetta
       }
       if (!_pianoIdoneoPerTurno(n, t)) continue;
@@ -9607,7 +9631,7 @@ async function cercaSostitutiMalattia() {
         if (codX) {
           const csX = _pianoCodiceInfo(codX);
           const rX = rigaDi[x + '|' + g];
-          if (rX && rX.motivo_blocco) continue;
+          if (rX && _pianoCellaRiservata(rX)) continue;
           if (!(csX && csX.is_riposo && !(rX && rX.protetto && codX === 'V'))) continue;
         }
         if ((rigaDi[x + '|' + (g - 1)] || {}).motivo_blocco) continue; // il suo giorno prima e' bloccato
@@ -9665,6 +9689,7 @@ async function cercaSostitutiMalattia() {
             if (codY) {
               const csY = _pianoCodiceInfo(codY);
               const rY = rigaDi[y + '|' + (g - 1)];
+              if (rY && _pianoCellaRiservata(rY)) continue; // bloccata con motivo o compleanno
               if (!(csY && csY.is_riposo && !(rY && rY.protetto && codY === 'V'))) continue;
             }
             if (!_pianoIdoneoPerTurno(y, tP)) continue;
@@ -11381,8 +11406,8 @@ function _vacDateSettimana(anno, settimana) {
 }
 // GIORNI DI VACANZA SPETTANTI (personale fisso): quanti ne matura ciascuno
 // nell'anno secondo anzianita', e quanti ne ha gia' pianificati nel piano.
-async function _pianoVacDirittoCard(anno) {
-  const cfg = {
+function _pianoVacCfg() {
+  return {
     base1: parseFloat(_pianoRegolaVal('vacanze_giorni_primi2anni')) || 28,
     base2: parseFloat(_pianoRegolaVal('vacanze_giorni_base')) || 35,
     bonus: [
@@ -11395,6 +11420,9 @@ async function _pianoVacDirittoCard(anno) {
     // 32.37 -> 33), sotto si resta al giorno intero (32.3 -> 32)
     arrotondaDa: _pianoRegolaVal('vacanze_arrotonda_da') != null ? _pianoRegolaVal('vacanze_arrotonda_da') : 0.35,
   };
+}
+async function _pianoVacDirittoCard(anno) {
+  const cfg = _pianoVacCfg();
   // GIORNI GIA' PIANIFICATI: le settimane registrate per l'anno in questa
   // scheda, contate giorno per giorno (una settimana intera vale 7 giorni, come
   // i 35 giorni di diritto che sono 5 settimane). Prima si contavano le V del
@@ -19654,4 +19682,294 @@ async function salvaGiorniFormazione() {
   if (!(await salvaImp('piano_giorni_formazione', String(v)))) return;
   window._pianoGgFormazione = v;
   toast('Soglia giorni di formazione: ' + v);
+}
+
+// ============================================================
+// TAB CREDITI · una riga per collaboratore con quello che gli resta o che
+// deve recuperare: vacanze, CGF, saldo ore dell anno, recupero del mese,
+// congedi non pagati. Nessun calcolo nuovo: sono gli stessi numeri delle
+// schede Vacanze, Festivi, Saldo e Recupero ore, messi uno accanto all altro.
+// ============================================================
+async function _pianoCreditiDati(anno, soloNomi) {
+  const nomi = soloNomi
+    ? soloNomi
+    : ordineCollabPiano(
+        collaboratoriCache.filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c)).map((c) => c.nome),
+        _pianoReparto(),
+      );
+  const cfg = _pianoVacCfg();
+  // vacanze: settimane registrate nell anno (come la scheda Vacanze)
+  const vac = (await secGet('piano_vacanze?anno=eq.' + anno + '&limit=2000')) || [];
+  const gia = {};
+  vac.forEach((v) => {
+    const sett = parseInt(v.settimana);
+    if (!sett) return;
+    const gg = _pianoGiorniSettimana(anno, sett).filter((d) => d.substring(0, 4) === String(anno));
+    gia[v.collaboratore] = (gia[v.collaboratore] || 0) + gg.length;
+  });
+  const vRest = {};
+  (
+    (await secGet(
+      'piano?codice=eq.M&commento=like.Malattia%20dal%20Diario%20*era%20V*&data=gte.' +
+        anno +
+        '-01-01&data=lte.' +
+        anno +
+        '-12-31&select=collaboratore,data,commento&limit=5000',
+    )) || []
+  ).forEach((r) => {
+    if (/era V1?\b/.test(String(r.commento || ''))) vRest[r.collaboratore] = (vRest[r.collaboratore] || 0) + 1;
+  });
+  // CGF: fino alla fine del mese aperto nel Piano, mai i mesi futuri
+  const annoSel = _pianoMeseSel.substring(0, 4);
+  const finoA =
+    String(anno) < annoSel
+      ? anno + '-12-31'
+      : String(anno) > annoSel
+        ? anno + '-00-00'
+        : _pianoMeseSel + '-' + String(_pianoUltimoGiorno(_pianoMeseSel)).padStart(2, '0');
+  const nomiCgf = nomi.filter((n) => {
+    const c = _pianoCollabInfo(n);
+    return c && _pianoMaturaCgf(c);
+  });
+  await _pianoCaricaCgfRiporto(anno);
+  const storia = await _pianoCaricaRigheCgf(anno, finoA);
+  const cgf = nomiCgf.length ? _pianoContabilitaCgf(storia, nomiCgf, anno, finoA) : {};
+  // recupero ore del mese aperto (solo del settore aperto)
+  if (!soloNomi) await _pianoCaricaRecupero(_pianoMeseSel);
+  // saldo ore dell anno: se e gia stato calcolato nella scheda Saldo
+  const saldo =
+    window._pianoSaldoAnnoDati && window._pianoSaldoAnnoDati.anno === anno ? window._pianoSaldoAnnoDati : null;
+  return nomi.map((n) => {
+    const info = _pianoCollabInfo(n) || {};
+    const jolly = !!(info.is_jolly || info.impiego === 'jolly');
+    const eff = _pianoCongedoNpEffetti(n, anno);
+    const dir =
+      info.data_assunzione && !jolly
+        ? PianoRegole.giorniVacanzaSpettanti(String(info.data_assunzione).substring(0, 10), anno, {
+            ...cfg,
+            giorniCongedo: eff.giorniVacanze,
+            giorniAnzianita: eff.giorniAnzianita,
+          })
+        : null;
+    const pian = gia[n] || 0;
+    const rest = vRest[n] || 0;
+    let saldoOre = null;
+    if (saldo && !jolly) {
+      let somma = 0;
+      let q = false;
+      for (let m = 1; m <= 12; m++) {
+        const mm = String(m).padStart(2, '0');
+        if (_pianoMeseDentroRiporto(n, anno, mm)) continue;
+        const v = _pianoSaldoDelMese(saldo, n, mm, info);
+        if (v != null) {
+          somma += v;
+          q = true;
+        }
+      }
+      const rip = _pianoRiporto(n, anno);
+      if (q || rip) saldoOre = Math.round((rip + somma) * 10) / 10;
+    }
+    const cnp = _pianoCongediDi(n).filter(
+      (c) => String(c.dal).substring(0, 4) <= String(anno) && String(c.al).substring(0, 4) >= String(anno),
+    );
+    return {
+      nome: n,
+      funzione: jolly ? 'JOLLY' : info.funzione || '',
+      pct: jolly ? null : Math.round((parseFloat(info.percentuale) || 1) * 100),
+      jolly: jolly,
+      senzaData: !info.data_assunzione && !jolly,
+      vac: dir
+        ? { spett: dir.giorni, pian: pian, rest: rest, resta: Math.round((dir.giorni - pian + rest) * 10) / 10 }
+        : null,
+      cgf: cgf[n]
+        ? { mat: cgf[n].maturati, god: cgf[n].goduti, rip: cgf[n].riporto, persi: cgf[n].persi, resta: cgf[n].resta }
+        : null,
+      saldoOre: saldoOre,
+      recMese: soloNomi || jolly ? null : _pianoRecuperoTotale(n, _pianoMeseSel),
+      cnp: cnp.reduce((a, c) => a + _pianoGiorniCongedo(c), 0),
+    };
+  });
+}
+function _pianoCreditiNum(v, unita, colore) {
+  if (v == null) return '<td style="color:var(--muted)">-</td>';
+  const c = colore ? (v > 0 ? '#8b6914' : v < 0 ? '#c0392b' : '#2c6e49') : 'inherit';
+  return '<td style="font-weight:' + (colore ? 700 : 400) + ';color:' + c + '">' + v + (unita || '') + '</td>';
+}
+async function _renderPianoCreditiTab() {
+  const anno = parseInt(_pianoMeseSel.split('-')[0]);
+  const MESI_L = MESI_FULL || [];
+  const meseLbl = (MESI_L[parseInt(_pianoMeseSel.split('-')[1]) - 1] || '') + ' ' + anno;
+  const dati = await _pianoCreditiDati(anno);
+  const saldoPronto = !!(window._pianoSaldoAnnoDati && window._pianoSaldoAnnoDati.anno === anno);
+  let h =
+    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">Crediti ' +
+    anno +
+    ' &middot; ' +
+    escP(repartoLabel(_pianoReparto())) +
+    '<span style="display:inline-flex;align-items:center;gap:6px">' +
+    '<button class="btn-export" style="padding:2px 10px;font-size:.9rem" title="Mese precedente" onclick="pianoCambiaMese(-1)">&#8592;</button>' +
+    '<b style="min-width:150px;text-align:center">' +
+    escP(meseLbl) +
+    '</b>' +
+    '<button class="btn-export" style="padding:2px 10px;font-size:.9rem" title="Mese successivo" onclick="pianoCambiaMese(1)">&#8594;</button></span>' +
+    '<input type="text" class="piano-cerca" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-crediti-table\')">' +
+    '<button class="btn-export" style="font-size:.8rem;padding:4px 12px" onclick="pianoCaricaSaldoAnno()">' +
+    (saldoPronto ? 'Ricalcola saldo ore' : 'Calcola saldo ore ' + anno) +
+    '</button>' +
+    '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;margin-left:auto" onclick="pianoCreditiStampa()">Stampa</button>' +
+    '</div><div style="padding:10px 14px">';
+  h +=
+    '<p style="font-size:.85rem;color:var(--muted);line-height:1.55;margin-bottom:10px">Per ogni collaboratore quello che gli resta o che deve recuperare. <b>Vacanze</b>: giorni spettanti nell anno meno le settimane registrate, piu i giorni restituiti per malattia (scheda Vacanze). <b>CGF</b>: recuperi festivi maturati e goduti fino alla fine di ' +
+    escP(meseLbl) +
+    ', mai i mesi futuri (scheda Festivi). <b>Saldo ore</b>: riporto piu i mesi dell anno, positivo = ore in piu fatte, negativo = ore da fare (scheda Saldo; va calcolato con il pulsante). <b>Recupero</b>: scostamenti del mese aperto (scheda Recupero ore). <b>Congedo NP</b>: giorni di congedo non pagato nell anno. Clic sulla riga per il dettaglio.</p>';
+  h +=
+    '<div style="overflow:auto;max-height:72vh"><table id="piano-crediti-table" class="piano-table" style="min-width:1100px;font-size:.82rem"><thead><tr>' +
+    '<th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th>' +
+    '<th title="Giorni di vacanza dell anno secondo anzianita">Vacanze spettanti</th><th title="Giorni delle settimane registrate">Pianificate</th><th title="Giorni V coperti da malattia, tornati disponibili">Restituite</th><th>Vacanze restano</th>' +
+    '<th title="Riporto dall anno prima">CGF riporto</th><th>CGF maturati</th><th>CGF goduti</th><th>CGF restano</th>' +
+    '<th title="Riporto piu i mesi dell anno">Saldo ore ' +
+    anno +
+    '</th><th title="Scostamenti del mese aperto">Recupero mese</th><th>Congedo NP</th></tr></thead><tbody>';
+  dati.forEach((d, i) => {
+    h +=
+      '<tr data-nome="' +
+      escP(d.nome) +
+      '" style="cursor:pointer" onclick="pianoCreditiDettaglio(' +
+      i +
+      ')"><td style="text-align:left;font-weight:600">' +
+      escP(d.nome) +
+      (d.senzaData
+        ? ' <span title="Manca la data di assunzione: vacanze non calcolabili" style="color:#c0392b">*</span>'
+        : '') +
+      '</td><td>' +
+      escP(d.funzione) +
+      '</td><td>' +
+      (d.pct == null ? '-' : d.pct + '%') +
+      '</td>' +
+      _pianoCreditiNum(d.vac ? d.vac.spett : null) +
+      _pianoCreditiNum(d.vac ? d.vac.pian : null) +
+      _pianoCreditiNum(d.vac ? d.vac.rest || null : null) +
+      _pianoCreditiNum(d.vac ? d.vac.resta : null, '', true) +
+      _pianoCreditiNum(d.cgf ? d.cgf.rip : null) +
+      _pianoCreditiNum(d.cgf ? d.cgf.mat : null) +
+      _pianoCreditiNum(d.cgf ? d.cgf.god : null) +
+      _pianoCreditiNum(d.cgf ? d.cgf.resta : null, '', true) +
+      (d.jolly
+        ? '<td style="color:var(--muted)">-</td>'
+        : saldoPronto
+          ? _pianoCreditiNum(d.saldoOre, ' h', true)
+          : '<td style="color:var(--muted)" title="Premi Calcola saldo ore">da calcolare</td>') +
+      _pianoCreditiNum(d.recMese == null ? null : d.recMese, ' h', true) +
+      _pianoCreditiNum(d.cnp || null, ' gg') +
+      '</tr>';
+  });
+  h += '</tbody></table></div>';
+  if (!dati.length) h += '<p style="color:var(--muted);padding:10px 0">Nessun collaboratore in questo settore.</p>';
+  h += '</div></div>';
+  window._pianoCreditiUltimi = { anno: anno, dati: dati, meseLbl: meseLbl };
+  return h;
+}
+function pianoCreditiDettaglio(i) {
+  const u = window._pianoCreditiUltimi;
+  const d = u && u.dati[i];
+  if (!d) return;
+  const righe = [];
+  if (d.vac)
+    righe.push(
+      'Vacanze ' +
+        u.anno +
+        ': spettano ' +
+        d.vac.spett +
+        ' giorni, registrate ' +
+        d.vac.pian +
+        (d.vac.rest ? ', restituite per malattia ' + d.vac.rest : '') +
+        ' → restano ' +
+        d.vac.resta +
+        ' (scheda Vacanze).',
+    );
+  else if (d.senzaData) righe.push('Vacanze: manca la data di assunzione nella scheda del collaboratore.');
+  else if (d.jolly) righe.push('Ausiliario: niente giorni di vacanza fissi ne saldo ore (RAP Allegato 1).');
+  if (d.cgf)
+    righe.push(
+      'CGF fino a ' +
+        u.meseLbl +
+        ': riporto ' +
+        d.cgf.rip +
+        ', maturati ' +
+        d.cgf.mat +
+        ', goduti ' +
+        d.cgf.god +
+        (d.cgf.persi ? ', caduti in malattia ' + d.cgf.persi : '') +
+        ' → restano ' +
+        d.cgf.resta +
+        ' (scheda Festivi).',
+    );
+  if (d.saldoOre != null)
+    righe.push('Saldo ore ' + u.anno + ': ' + d.saldoOre + ' h, riporto piu i mesi con un piano (scheda Saldo).');
+  if (d.recMese != null)
+    righe.push('Recupero ore di ' + u.meseLbl + ': ' + d.recMese + ' h di scostamenti (scheda Recupero ore).');
+  if (d.cnp)
+    righe.push(
+      'Congedo non pagato nell anno: ' + d.cnp + ' giorni (scheda Impostazioni del Piano, Congedi non pagati).',
+    );
+  alert(d.nome + '\n\n' + righe.join('\n\n'));
+}
+function pianoCreditiStampa() {
+  const t = document.getElementById('piano-crediti-table');
+  const u = window._pianoCreditiUltimi;
+  if (!t || !u) return;
+  const w = window.open('', '_blank');
+  if (!w) {
+    toastErrore('Finestra bloccata dal browser: consenti i popup');
+    return;
+  }
+  w.document.write(
+    '<!DOCTYPE html><html lang="it"><head><meta charset="utf-8"><title>Crediti ' +
+      u.anno +
+      '</title><style>@page{size:A4 landscape;margin:10mm}body{font-family:Georgia,serif;font-size:11px;color:#000;margin:0}h1{font-size:15px;margin:0 0 4px}p{margin:0 0 8px;color:#333}table{border-collapse:collapse;width:100%}th,td{border:1px solid #888;padding:3px 5px;text-align:center}th{background:#eee}td:first-child{text-align:left;font-weight:700}</style></head><body><h1>Crediti ' +
+      u.anno +
+      ' · ' +
+      escP(repartoLabel(_pianoReparto())) +
+      '</h1><p>CGF e recupero fino a ' +
+      escP(u.meseLbl) +
+      ' · stampato il ' +
+      new Date().toLocaleDateString('it-IT') +
+      ' da ' +
+      escP(getOperatore() || '') +
+      '</p>' +
+      t.outerHTML.replace(/ style="[^"]*"/g, '').replace(/ onclick="[^"]*"/g, '') +
+      '</body></html>',
+  );
+  w.document.close();
+  setTimeout(() => w.print(), 300);
+}
+// riga di riepilogo nella scheda del collaboratore
+async function _pianoCreditiScheda(nome) {
+  const el = document.getElementById('collab-crediti');
+  if (!el) return;
+  try {
+    const anno = new Date().getFullYear();
+    const d = (await _pianoCreditiDati(anno, [nome]))[0];
+    if (!d) return;
+    const parti = [];
+    if (d.vac)
+      parti.push(
+        'vacanze ' +
+          anno +
+          ': restano <b>' +
+          d.vac.resta +
+          '</b> giorni' +
+          (d.vac.rest ? ' (' + d.vac.rest + ' restituiti per malattia)' : ''),
+      );
+    if (d.cgf) parti.push('CGF: restano <b>' + d.cgf.resta + '</b>');
+    if (d.saldoOre != null) parti.push('saldo ore: <b>' + d.saldoOre + ' h</b>');
+    if (d.cnp) parti.push('congedo non pagato: ' + d.cnp + ' giorni');
+    el.innerHTML = parti.length
+      ? 'Crediti: ' +
+        parti.join(' · ') +
+        ' <span style="color:var(--muted)">(dettaglio nella scheda Crediti del Piano)</span>'
+      : '';
+  } catch (e) {
+    el.innerHTML = '';
+  }
 }

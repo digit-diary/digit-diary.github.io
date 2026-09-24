@@ -454,3 +454,11 @@ rifiutata con avviso; ogni modifica finisce nell elenco delle modifiche e nel Re
 - **Scheda Vacanze**: nuova colonna "Restituite per malattia" e "Restano" la tiene conto (spettanti - pianificate + restituite).
 - Regola di riferimento: CO art. 329c e prassi dei RAP (malattia con certificato durante le vacanze: i giorni non contano come vacanza). Il programma non chiede il certificato: e la registrazione della malattia nel Diario a fare fede.
 - Questionario rigenerato (v276) con le tre voci aggiornate.
+
+## v277 · Scheda Crediti, riepilogo nella scheda collaboratore, compleanno e celle bloccate riservate
+
+- **Scheda Crediti** (Piano, gruppo Gestione): una riga per collaboratore del settore con vacanze spettanti, pianificate, restituite per malattia e quante restano; CGF riporto, maturati, goduti e quanti restano (fino alla fine del mese aperto); saldo ore dell anno (pulsante Calcola, come nella scheda Saldo); recupero ore del mese aperto; giorni di congedo non pagato. Clic sulla riga = dettaglio con la provenienza di ogni numero; Stampa = foglio A4 orizzontale. Stessi numeri delle schede Vacanze, Festivi, Saldo e Recupero ore: nessun calcolo nuovo.
+- **Permesso** "Piano · Crediti" in Visibilita e permessi (matrice: Direzione vede, Responsabile e Sostituto modificano, Supervisor vede, HR modifica). Chi non ce l ha non vede la scheda ne la riga nella scheda del collaboratore.
+- **Scheda collaboratore**: riga "Crediti: vacanze restano N, CGF restano N, saldo ore, congedo non pagato" in fondo ai dati personali.
+- **Compleanno e celle bloccate riservate**: il congedo del compleanno (C con commento Compleanno) e le celle bloccate con motivo non vengono piu proposti come sostituti nella copertura malattia, negli scambi con restituzione, nella catena sul giorno prima ne nel cambio per esigenze. Prima il compleanno contava come giorno libero qualsiasi.
+- Questionario rigenerato (v277, 404 voci) e scheda permessi rigenerata con la voce Piano · Crediti; guida aggiornata (capitolo "Piano: crediti").
