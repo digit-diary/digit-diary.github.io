@@ -422,7 +422,7 @@ function renderTipiUI() {
               (idx === tutti.length - 1 ? ' disabled' : '') +
               '>&#9660;</button></div><button class="btn-del-tipo" style="margin-left:6px" onclick="rinominaTipo(\'' +
               ne +
-              '\')">Rinomina</button><button class="btn-del-tipo" style="margin-left:4px" onclick="' +
+              '\')">Rinomina</button><button class="btn-del-tipo pericolo" style="margin-left:4px" onclick="' +
               (d ? "nascondiTipoDefault('" + origNe + "')" : "rimuoviTipo('" + ne + "')") +
               '">Rimuovi</button>'
             : '') +

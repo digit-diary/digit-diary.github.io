@@ -221,42 +221,35 @@ function applicaVisibilita() {
   applicaRepartoVisibilita();
 }
 function _visRadioHtml(k, v, opList) {
-  let html = '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
   const curTipo = typeof v === 'object' ? 'selezionati' : v || 'tutti';
-  ['tutti', 'admin', 'selezionati', 'nascosto'].forEach((opt) => {
-    const label =
-      opt === 'tutti'
-        ? 'Tutti'
-        : opt === 'admin'
-          ? 'Solo admin'
-          : opt === 'selezionati'
-            ? 'Operatori selezionati'
-            : 'Nascosto';
-    html +=
-      '<label style="display:flex;align-items:center;gap:4px;font-size:.85rem;cursor:pointer"><input type="radio" name="vis-' +
-      k +
-      '" value="' +
-      opt +
-      '"' +
-      (curTipo === opt ? ' checked' : '') +
-      ' onchange="cambiaVisibilita(\'' +
-      k +
-      '\',this.value)"> ' +
-      label +
-      '</label>';
-  });
-  html += '</div>';
-  // Operatori checkboxes (visibili solo se selezionati)
+  const opzioni = [
+    ['tutti', 'Tutti'],
+    ['admin', 'Solo admin'],
+    ['selezionati', 'Operatori selezionati'],
+    ['nascosto', 'Nascosto'],
+  ];
+  let html =
+    '<select onchange="cambiaVisibilita(\'' +
+    k +
+    '\',this.value)" aria-label="Chi">' +
+    opzioni
+      .map(
+        ([opt, label]) =>
+          '<option value="' + opt + '"' + (curTipo === opt ? ' selected' : '') + '>' + label + '</option>',
+      )
+      .join('') +
+    '</select>';
+  // Operatori (visibili solo con "Operatori selezionati")
   const selOps = typeof v === 'object' && v.operatori ? v.operatori : [];
   html +=
     '<div id="vis-ops-' +
     k +
-    '" style="display:' +
+    '" class="vis-ops" style="display:' +
     (curTipo === 'selezionati' ? 'flex' : 'none') +
-    ';flex-wrap:wrap;gap:6px 14px;margin-top:8px;padding:8px 12px;background:var(--paper2);border-radius:3px">';
+    '">';
   opList.forEach((nome) => {
     html +=
-      '<label style="display:flex;align-items:center;gap:4px;font-size:.82rem;cursor:pointer"><input type="checkbox" value="' +
+      '<label><input type="checkbox" value="' +
       escP(nome) +
       '"' +
       (selOps.includes(nome) ? ' checked' : '') +
@@ -434,16 +427,15 @@ async function applicaProfili() {
   if (typeof logAzione === 'function') logAzione('Profili permessi applicati', elenco.replace(/\n/g, '; '));
 }
 function renderProfiliUI(opList) {
-  let html =
-    '<div style="margin-bottom:6px"><strong style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Profili</strong></div>';
+  let html = '<div class="vis-gruppo">Profili</div>';
   html +=
-    '<p style="color:var(--muted);font-size:.8rem;margin-bottom:10px">Assegna a ogni operatore la sua figura, poi premi "Applica i profili": tutte le righe qui sotto vengono impostate da sole come nel documento firmato. Chi resta senza profilo non viene toccato. Dopo, si puo\' sempre correggere la singola riga a mano.</p>';
-  html += '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">';
+    '<p class="sez-desc" style="margin-bottom:10px">Assegna a ogni operatore la sua figura, poi premi "Applica i profili": tutte le righe qui sotto vengono impostate da sole come nel documento firmato. Chi resta senza profilo non viene toccato. Dopo, si puo\' sempre correggere la singola riga a mano.</p>';
+  html += '<div style="margin-bottom:12px">';
   opList.forEach((nome) => {
     html +=
-      '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="min-width:180px;font-weight:600">' +
+      '<div class="prof-riga"><span class="vis-nome">' +
       escP(nome) +
-      '</span><select class="form-control" style="max-width:260px" onchange="cambiaProfiloOperatore(\'' +
+      '</span><select onchange="cambiaProfiloOperatore(\'' +
       escP(nome.replace(/'/g, "\\'")) +
       '\', this.value)"><option value="">Nessun profilo</option>';
     PROFILI_ORDINE.forEach((p) => {
@@ -455,7 +447,7 @@ function renderProfiliUI(opList) {
   if (!opList.length) html += '<span style="color:var(--muted);font-size:.82rem">Nessun operatore creato</span>';
   html += '</div>';
   html +=
-    '<button class="btn btn-primary" onclick="applicaProfili()" style="margin-bottom:22px">Applica i profili</button>';
+    '<button class="btn-add-tipo" onclick="applicaProfili()" style="margin-bottom:8px">Applica i profili</button>';
   return html;
 }
 // RESPONSABILE DI SETTORE NEI MODULI
@@ -466,8 +458,7 @@ function renderProfiliUI(opList) {
 function renderModuliRespUI() {
   const el = document.getElementById('moduli-resp-list');
   if (!el) return;
-  let html =
-    '<p style="color:var(--muted);font-size:.84rem;margin-bottom:10px">Nome proposto nel campo "Resp. Settore" dei moduli (allineamento, RDI, apprezzamento). Resta modificabile a mano su ogni singolo modulo. Vuoto = campo da compilare ogni volta.</p>';
+  let html = '';
   getReparti().forEach((r) => {
     const v =
       (moduliRespCfg && moduliRespCfg[r.key]) ||
@@ -477,9 +468,9 @@ function renderModuliRespUI() {
       escP(r.label) +
       '</div><input type="text" value="' +
       escP(v) +
-      '" placeholder="Es: Sig.ra Cognome Nome" onchange="salvaModuloResp(\'' +
+      '" placeholder="Es: Sig.ra Cognome Nome (vuoto = da compilare ogni volta)" onchange="salvaModuloResp(\'' +
       r.key +
-      '\',this.value)" style="flex:1;padding:6px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></div>';
+      '\',this.value)" style="flex:1"></div>';
   });
   el.innerHTML = html;
 }
@@ -500,59 +491,39 @@ function renderVisibilitaUI() {
   if (!el) return;
   const opList = operatoriAuthCache.map((o) => o.nome).sort();
   let html = renderProfiliUI(opList);
-  html +=
-    '<div style="margin-bottom:14px"><strong style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Pagine</strong></div>';
+  html += '<div class="vis-gruppo">Pagine</div>';
   Object.entries(VIS_ITEMS.pagine).forEach(([k, label]) => {
-    html +=
-      '<div style="padding:10px 0;border-bottom:1px solid var(--line)"><div style="font-weight:600;margin-bottom:6px">' +
-      label +
-      '</div>';
+    html += '<div class="vis-riga"><span class="vis-nome">' + label + '</span>';
     html += _visRadioHtml(k, visGet(k), opList);
     html += '</div>';
   });
-  html +=
-    '<div style="margin:18px 0 14px"><strong style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Funzioni</strong></div>';
+  html += '<div class="vis-gruppo">Funzioni</div>';
   Object.entries(VIS_ITEMS.funzioni).forEach(([k, label]) => {
-    html +=
-      '<div style="padding:10px 0;border-bottom:1px solid var(--line)"><div style="font-weight:600;margin-bottom:6px">' +
-      label +
-      '</div>';
+    html += '<div class="vis-riga"><span class="vis-nome">' + label + '</span>';
     html += _visRadioHtml(k, visGet(k), opList);
     html += '</div>';
   });
+  html += '<div class="vis-gruppo">Piano &middot; schede visibili</div>';
   html +=
-    '<div style="margin:18px 0 14px"><strong style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Piano &middot; schede visibili</strong></div>';
-  html +=
-    '<p style="color:var(--muted);font-size:.8rem;margin-bottom:10px">Chi vede ogni scheda del Piano. "Nascosto" la toglie dal menu; con "Operatori selezionati" la vedono solo quei nomi. L\'admin vede sempre tutto, e ogni operatore lavora comunque solo sui collaboratori del suo settore.</p>';
+    '<p class="sez-desc" style="margin-bottom:10px">Chi vede ogni scheda del Piano. "Nascosto" la toglie dal menu; con "Operatori selezionati" la vedono solo quei nomi. L\'admin vede sempre tutto, e ogni operatore lavora comunque solo sui collaboratori del suo settore.</p>';
   Object.entries(VIS_ITEMS.piano_schede).forEach(([k, label]) => {
-    html +=
-      '<div style="padding:10px 0;border-bottom:1px solid var(--line)"><div style="font-weight:600;margin-bottom:6px">' +
-      label +
-      '</div>';
+    html += '<div class="vis-riga"><span class="vis-nome">' + label + '</span>';
     html += _visRadioHtml(k, visGet(k), opList);
     html += '</div>';
   });
+  html += '<div class="vis-gruppo">Piano &middot; schede modificabili</div>';
   html +=
-    '<div style="margin:18px 0 14px"><strong style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Piano &middot; schede modificabili</strong></div>';
-  html +=
-    '<p style="color:var(--muted);font-size:.8rem;margin-bottom:10px">Restringe la MODIFICA di una scheda senza nasconderla: chi resta fuori la vede in sola lettura. Vale in aggiunta ai permessi qui sotto (chi non ha "Piano di lavoro" non modifica comunque). "Tutti" = nessuna restrizione in piu\'.</p>';
+    '<p class="sez-desc" style="margin-bottom:10px">Restringe la MODIFICA di una scheda senza nasconderla: chi resta fuori la vede in sola lettura. Vale in aggiunta ai permessi qui sotto (chi non ha "Piano di lavoro" non modifica comunque). "Tutti" = nessuna restrizione in piu\'.</p>';
   Object.entries(VIS_ITEMS.piano_modifica).forEach(([k, label]) => {
-    html +=
-      '<div style="padding:10px 0;border-bottom:1px solid var(--line)"><div style="font-weight:600;margin-bottom:6px">' +
-      label +
-      '</div>';
+    html += '<div class="vis-riga"><span class="vis-nome">' + label + '</span>';
     html += _visRadioHtml(k, visGet(k), opList);
     html += '</div>';
   });
+  html += '<div class="vis-gruppo">Permessi di modifica</div>';
   html +=
-    '<div style="margin:18px 0 4px"><strong style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Permessi di modifica</strong></div>';
-  html +=
-    '<p style="color:var(--muted);font-size:.8rem;margin-bottom:10px">Chi non è abilitato vede comunque punti, premi, categorie, competenze e valutazioni in sola lettura. Usa "Operatori selezionati" per delegare, ad esempio, all\'operatore HR.</p>';
+    '<p class="sez-desc" style="margin-bottom:10px">Chi non è abilitato vede comunque punti, premi, categorie, competenze e valutazioni in sola lettura. Usa "Operatori selezionati" per delegare, ad esempio, all\'operatore HR.</p>';
   Object.entries(VIS_ITEMS.permessi).forEach(([k, label]) => {
-    html +=
-      '<div style="padding:10px 0;border-bottom:1px solid var(--line)"><div style="font-weight:600;margin-bottom:6px">' +
-      label +
-      '</div>';
+    html += '<div class="vis-riga"><span class="vis-nome">' + label + '</span>';
     html += _visRadioHtml(k, visibilitaConfig[k] || 'admin', opList);
     html += '</div>';
   });
@@ -871,17 +842,17 @@ function renderOperatoriUI() {
                 '</span>';
           const ne = n.replace(/'/g, "\\'");
           return (
-            '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border:1px solid ' +
-            (n === cur ? 'var(--accent2)' : 'var(--line)') +
-            ';flex-wrap:wrap"><span style="font-weight:' +
-            (n === cur ? '700' : '400') +
+            '<div class="tipo-item" style="flex-wrap:wrap' +
+            (n === cur ? ';border-color:var(--accent2)' : '') +
+            '"><span class="tipo-item-name" style="flex:0 1 auto;font-weight:' +
+            (n === cur ? '700' : '600') +
             '">' +
             escP(n) +
             '</span>' +
             repBadge +
             (hasAuth ? '<span style="font-size:.82rem;color:#2c6e49;font-weight:600">Con password</span>' : '') +
             (admin
-              ? '<button class="btn-del-tipo" style="color:#1a4a7a;border-color:#1a4a7a" onclick="apriAccessiExtra(\'' +
+              ? '<span style="flex:1"></span><button class="btn-del-tipo" onclick="apriAccessiExtra(\'' +
                 ne +
                 '\')">Accessi extra' +
                 (Object.keys((window._operatoriAccessiExtra || {})[n] || {}).length
@@ -889,19 +860,15 @@ function renderOperatoriUI() {
                   : '') +
                 '</button><select onchange="cambiaRepartoOperatore(\'' +
                 ne +
-                '\',this.value)" style="font-size:.82rem;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)">' +
+                '\',this.value)" title="Settore dell operatore">' +
                 opzioniRepartoHtml(rep, true) +
                 '</select>'
               : '') +
             (admin && hasAuth
-              ? '<button style="font-size:.82rem;padding:3px 8px;cursor:pointer;border:1px solid var(--accent2);color:var(--accent2);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif;font-weight:600" onclick="resetPasswordOperatore(\'' +
-                ne +
-                '\')">Pwd</button>'
+              ? '<button class="btn-del-tipo" onclick="resetPasswordOperatore(\'' + ne + '\')">Nuova password</button>'
               : '') +
             (admin
-              ? '<button style="font-size:.82rem;padding:3px 8px;cursor:pointer;border:1px solid var(--accent);color:var(--accent);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif;font-weight:600" onclick="rimuoviOperatore(\'' +
-                ne +
-                '\')">Rimuovi</button>'
+              ? '<button class="btn-del-tipo pericolo" onclick="rimuoviOperatore(\'' + ne + '\')">Rimuovi</button>'
               : '') +
             '</div>'
           );
@@ -1188,7 +1155,7 @@ function renderCampiRapportoUI() {
             (idx === campi.length - 1 ? ' disabled' : '') +
             '>&#9660;</button></div><button class="btn-del-tipo" style="margin-left:6px" onclick="rinominaCampo(\'' +
             c.key +
-            '\')">Rinomina</button><button class="btn-del-tipo" style="margin-left:4px" onclick="' +
+            '\')">Rinomina</button><button class="btn-del-tipo pericolo" style="margin-left:4px" onclick="' +
             (isDefault ? 'nascondiCampoDefault' : 'rimuoviCampoRapporto') +
             "('" +
             c.key +
@@ -1440,8 +1407,7 @@ async function salvaBackupAutoGiorni(v) {
 function renderSettoriUI() {
   const el = document.getElementById('settori-list');
   if (!el || !isAdmin()) return;
-  let html =
-    '<p style="color:var(--muted);font-size:.84rem;margin-bottom:10px">Qui decidi <b>quali pagine esistono</b> in ogni settore (spunte sotto a ogni settore). <b>Chi</b> le vede o le modifica si regola invece in «Visibilità pagine e funzioni».</p>';
+  let html = '';
   getRepartiTutti().forEach((r) => {
     const custom = !r.fisso;
     const disattivo = custom && r.attivo === false;
@@ -1449,18 +1415,13 @@ function renderSettoriUI() {
       collaboratoriCache.filter((c) => c.reparto_dip === r.key).length +
       datiCache.filter((d) => d.reparto_dip === r.key).length;
     html +=
-      '<div style="padding:12px 0;border-bottom:1px solid var(--line)' +
+      '<div class="tipo-item" style="flex-direction:column;align-items:stretch;margin-bottom:8px' +
       (disattivo ? ';opacity:.55' : '') +
       '"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">';
     html +=
       '<span class="mini-badge" style="background:' + r.colore + ';font-size:.82rem">' + escP(r.label) + '</span>';
     if (custom) {
-      html +=
-        '<input type="text" id="settore-label-' +
-        r.key +
-        '" value="' +
-        escP(r.label) +
-        '" style="width:150px;padding:5px 10px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink);font-size:.84rem">';
+      html += '<input type="text" id="settore-label-' + r.key + '" value="' + escP(r.label) + '" style="width:170px">';
     } else {
       html += '<span style="font-size:.82rem;color:var(--muted)">settore di base (fisso)</span>';
     }
@@ -1469,9 +1430,8 @@ function renderSettoriUI() {
       r.key +
       '" value="' +
       (r.colore || '#8a7d6b') +
-      '" style="width:40px;height:30px;border:1px solid var(--line);border-radius:2px;cursor:pointer;background:var(--paper2)">';
-    html +=
-      '<button class="btn-add-tipo" onclick="salvaSettore(\'' + r.key + '\')" style="padding:6px 14px">Salva</button>';
+      '" style="width:40px;height:30px;border:1px solid var(--line);border-radius:2px;cursor:pointer;background:var(--paper2)" title="Colore del settore">';
+    html += '<button class="btn-del-tipo" onclick="salvaSettore(\'' + r.key + '\')">Salva</button>';
     if (custom) {
       html +=
         '<button class="btn-del-tipo" onclick="toggleAttivoSettore(\'' +
@@ -1499,7 +1459,7 @@ function renderSettoriUI() {
     html += '</div></div>';
   });
   html +=
-    '<div class="add-tipo-row" style="margin-top:12px;align-items:flex-end"><div class="field"><label>Nuovo settore</label><input type="text" id="nuovo-settore-nome" placeholder="Es: Bar, Sicurezza, Reception..."></div><div class="field"><label>Colore</label><input type="color" id="nuovo-settore-colore" value="#b8860b" style="width:50px;height:38px;border:1px solid var(--line);border-radius:2px;cursor:pointer;background:var(--paper2)"></div><button class="btn-add-tipo" onclick="aggiungiSettore()">+ Aggiungi settore</button></div>';
+    '<div class="add-tipo-row sez-form"><div class="field"><label>Nuovo settore</label><input type="text" id="nuovo-settore-nome" placeholder="Es: Bar, Sicurezza, Reception"></div><div class="field" style="flex:0 0 auto;min-width:0"><label>Colore</label><input type="color" id="nuovo-settore-colore" value="#b8860b"></div><button class="btn-add-tipo" onclick="aggiungiSettore()">Aggiungi settore</button></div>';
   el.innerHTML = html;
 }
 async function _salvaRepartiConfig() {
@@ -1615,7 +1575,7 @@ function renderGiubileoUI() {
             g.importo +
             '" min="0" step="50" onchange="modificaGiubileo(' +
             i +
-            ',this.value)" style="width:110px;padding:5px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);text-align:center"> <span style="font-size:.8rem;color:var(--muted)">CHF</span><button class="btn-del-tipo" style="margin-left:6px" onclick="rimuoviGiubileo(' +
+            ',this.value)" style="width:110px;text-align:center"> <span style="font-size:.8rem;color:var(--muted)">CHF</span><span style="flex:1"></span><button class="btn-del-tipo pericolo" onclick="rimuoviGiubileo(' +
             i +
             ')">Rimuovi</button></div>',
         )
