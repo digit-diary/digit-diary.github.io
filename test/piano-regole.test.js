@@ -419,6 +419,20 @@ eq(R.meseBloccato('2026-10', OR('2026-10-15T12:00:00'), {}), false, 'il mese in 
 eq(R.meseBloccato('2026-02', OR('2026-10-01T09:00:00'), {}), true, 'febbraio: chiuso da un pezzo');
 eq(R.meseBloccato('2026-09', OR('2026-10-05T12:00:00'), { attivo: false }), false, 'blocco spento dalla regola');
 
+console.log('\n== congedi non pagati (RAP 5.14) ==');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2009, { giorniCongedo: 0 }).giorni, 35, 'senza congedo = 35');
+eq(
+  R.giorniVacanzaSpettanti('2000-01-01', 2009, { giorniCongedo: 73 }).giorni,
+  28,
+  '73 giorni di congedo (1/5 anno) = 35 x 292/365 = 28',
+);
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2010, { giorniAnzianita: 0 }).giorni, 36, 'dieci anni senza congedo = 36');
+eq(
+  R.giorniVacanzaSpettanti('2000-01-01', 2010, { giorniAnzianita: 200 }).giorni,
+  35,
+  '200 giorni di congedo lungo: i 10 anni slittano al 2010 inoltrato, ma il giorno in piu vale dall anno dopo l anniversario slittato',
+);
+
 console.log('\n=======================================');
 console.log('  ' + passati + ' passati, ' + falliti + ' falliti');
 console.log('=======================================\n');

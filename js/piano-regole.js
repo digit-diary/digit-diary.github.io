@@ -304,9 +304,13 @@
     if (!dataAssunzione) return null;
     const ass = new Date(dataAssunzione + 'T12:00:00');
     if (isNaN(ass.getTime())) return null;
-    // i mesi fermi spostano in avanti la maturazione, come per i giubilei
+    // CONGEDO NON PAGATO (RAP 5.14): solo i congedi oltre la soglia in mesi
+    // spostano l'anzianita' (cfg.giorniAnzianita, in giorni); cfg.mesiCongedo
+    // resta per compatibilita' con il vecchio conteggio a mesi.
     const mesiFermo = Math.max(0, parseInt(c.mesiCongedo) || 0);
     if (mesiFermo) ass.setMonth(ass.getMonth() + mesiFermo);
+    const ggAnz = Math.max(0, parseInt(c.giorniAnzianita) || 0);
+    if (ggAnz) ass.setDate(ass.getDate() + ggAnz);
     // se assunto dopo l'anno richiesto: nessun diritto
     if (ass.getFullYear() > anno) return { giorni: 0, base: 0, bonus: 0, voci: [], mesi: 0 };
     // data in cui compie 2 anni
@@ -351,7 +355,12 @@
     // arrotonda in alto, a favore del collaboratore (32.67 -> 33, 32.37 -> 33),
     // sotto la soglia si tiene il giorno intero (32.3 -> 32). La soglia e'
     // configurabile; senza soglia si mostra il valore esatto.
-    const esatti = Math.round((parteBase + totBonus) * 100) / 100;
+    // congedo non pagato oltre la soglia: "il diritto alle vacanze decade per
+    // tutta la durata del congedo" -> in proporzione ai giorni di congedo
+    // dell'anno (cfg.giorniCongedo), sull'intero diritto
+    const ggCong = Math.max(0, parseInt(c.giorniCongedo) || 0);
+    const fattoreCongedo = ggCong ? Math.max(0, (365 - ggCong) / 365) : 1;
+    const esatti = Math.round((parteBase + totBonus) * fattoreCongedo * 100) / 100;
     let giorniFinali = esatti;
     if (c.arrotondaDa != null && c.arrotondaDa !== '') {
       const soglia = parseFloat(c.arrotondaDa);
@@ -365,6 +374,7 @@
       giorniEsatti: esatti,
       base: Math.round(parteBase * 100) / 100,
       bonus: totBonus,
+      giorniCongedo: ggCong,
       voci: voci,
       mesiBase1: mesiBase1,
       mesiBase2: mesiBase2,
