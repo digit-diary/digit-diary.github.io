@@ -923,14 +923,17 @@ header h1 .casino {
   border-radius: 3px 3px 0 0;
 }
 .nav-tab {
-  flex: 0 1 auto; /* larghezza del testo: se la riga e' piena, le tab in piu' vanno a capo, centrate */
-  min-width: 0;
+  /* ogni tab ha una larghezza minima leggibile e cresce per riempire la riga;
+     quando non ci stanno tutte (admin: 16 pagine) vanno su due righe,
+     larghe uguali e centrate, senza mai tagliare il testo */
+  flex: 1 1 auto;
+  min-width: 118px;
   white-space: nowrap;
-  padding: 12px 14px;
+  padding: 12px 10px;
   text-align: center;
   font-size: 0.8rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   cursor: pointer;
   border: none;
