@@ -89,7 +89,14 @@ eq(ctx._pePauseSplit(orari, 'X1'), [30, 15, 15], '9 ore: fascia 9-24');
 eq(ctx._pePauseSplit(orari, 'N1'), [30, 15], '7 ore: fascia 7-9');
 ctx._briefPauseCfgObj = { regole: { slots: [{ tipo: 'turno', turno: 'S3', pause: '0' }] }, slots_7h: 45 };
 eq(ctx._pePauseSplit(orari, 'S3'), [], 'turno con 0 = nessuna pausa');
-eq(ctx._pePauseSplit(orari, 'X1'), [30, 15, 15], 'senza regola per durata: valore di base');
+eq(ctx._pePauseSplit(orari, 'X1'), [30, 15, 15], 'senza regola per durata: valore di base (9 ore)');
+eq(ctx._pePauseSplit(orari, 'N1'), [30, 15], 'senza regola per durata: 7 ore = 30+15');
+ok(
+  ctx._peDurataLbl(7, 8) === 'Turni di 7 ore' &&
+    ctx._peDurataLbl(8, 24) === 'Turni da 8 ore in su' &&
+    ctx._peDurataLbl(6, 8) === 'Turni da 6 a meno di 8 ore',
+  'dicitura delle fasce',
+);
 
 console.log('\n== controlli ==');
 ctx._briefPauseCfgObj = {};
