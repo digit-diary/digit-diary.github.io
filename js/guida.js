@@ -190,6 +190,16 @@ function GUIDA_CAPITOLI() {
     },
     {
       area: 'piano',
+      titolo: 'Piano: crediti',
+      vis: () => _guidaVis('piano'),
+      righe: [
+        'La scheda <b>Crediti</b> mostra per ogni collaboratore del settore quello che gli resta o che deve recuperare: vacanze spettanti, pianificate, restituite per malattia e quante restano; CGF riportati, maturati, goduti e quanti restano (fino alla fine del mese aperto, mai i mesi futuri); saldo ore dell anno (con il pulsante Calcola, come nella scheda Saldo); recupero ore del mese aperto; giorni di congedo non pagato. Clic sulla riga per il dettaglio, Stampa per il foglio A4.',
+        'Sono gli stessi numeri delle schede Vacanze, Festivi, Saldo e Recupero ore, senza calcoli nuovi. Chi la vede si decide in Visibilita e permessi (Piano · Crediti). La stessa riga di riepilogo compare in fondo alla scheda del collaboratore.',
+        'Il congedo del compleanno e le celle bloccate con motivo (visita medica, corso) non vengono mai usati per coprire una malattia ne proposti negli scambi: contano come giorni riservati.',
+      ],
+    },
+    {
+      area: 'piano',
       titolo: 'Piano: vacanze',
       vis: () => _guidaVis('piano'),
       righe: [

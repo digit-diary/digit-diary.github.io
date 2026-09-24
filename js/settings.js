@@ -63,6 +63,7 @@ const VIS_ITEMS = {
   piano_schede: {
     ptab_calendario: 'Piano · Calendario',
     ptab_briefing: 'Piano · Briefing',
+    ptab_crediti: 'Piano · Crediti (vacanze, CGF, saldo, recupero)',
     ptab_vacanze: 'Piano · Vacanze',
     ptab_saldo: 'Piano · Saldo',
     ptab_recupero: 'Piano · Recupero ore',
@@ -306,6 +307,7 @@ const MATRICE_PROFILI = {
   // 3 - Piano di lavoro: le quindici schede (chi la vede)
   ptab_calendario: ['V', 'M', 'M', 'M', 'V'],
   ptab_briefing: ['V', 'M', 'M', 'M', '-'],
+  ptab_crediti: ['V', 'M', 'M', 'V', 'M'],
   ptab_vacanze: ['V', 'M', 'M', 'V', 'V'],
   ptab_saldo: ['V', 'M', 'M', 'V', 'M'],
   ptab_recupero: ['-', 'M', 'M', 'V', '-'],

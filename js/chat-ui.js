@@ -2282,6 +2282,7 @@ function apriSchedaCollaboratore(nome) {
         '</div>';
     }
   }
+  html += '<div id="collab-crediti" style="font-size:.82rem;margin-top:6px"></div>';
   html += '</div></div>';
   html +=
     '<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-export btn-export-pdf" onclick="stampaSchedaPDF(\'' +
@@ -2679,6 +2680,8 @@ function apriSchedaCollaboratore(nome) {
   box.className = 'profilo-box scheda-wide';
   box.innerHTML = html;
   document.getElementById('profilo-modal').classList.remove('hidden');
+  if (typeof _pianoCreditiScheda === 'function' && typeof _pianoVisOk === 'function' && _pianoVisOk('ptab_crediti'))
+    _pianoCreditiScheda(nome);
 
   // Init flatpickrs
   setTimeout(function () {
