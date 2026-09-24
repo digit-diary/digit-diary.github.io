@@ -48,30 +48,333 @@ function _peOrariTurni() {
 function _peDurataMin(orari, turno) {
   return orari[turno] ? orari[turno].dur : 0;
 }
-// regola pause slots (personalizzabile in futuro): <6h 0', 6-7h 30', 7-9h 45', 9h+ 60'
+// ============================================================
+// REGOLE PAUSE · per settore, create e modificate dal pannello del briefing
+// (impostazione piano_pause_cfg, chiave regole[settore]). Ogni regola e un
+// oggetto {tipo, ...}. I tipi che il motore sa applicare:
+//   durata   {da, a, pause, giorni?}       turni da `da` a `a` ore (a escluso): composizione es. "30+15"
+//   turno    {turno, pause, giorni?}       composizione per una sigla ("0" = nessuna pausa)
+//   (giorni = [1,2,3,4] lun-gio, [5,6] ven-sab, [0] dom; vuoto = sempre; la regola con i giorni vince)
+//   distanza {minuti}                      minuti minimi dall inizio turno e fra una pausa e la successiva
+//   fascia   {giorni:[5,6], da, a}         in questi giorni nessuna pausa fra `da` e `a` (giorni vuoto = sempre)
+//   insieme  {n}                           al massimo N persone in pausa nello stesso momento
+//   nota     {testo}                       nota in fondo al foglio delle pause
+// Se un settore non ha ancora regole salvate, quelle attuali (Slots ed
+// ex Valet) vengono ricavate dai vecchi valori: niente cambia finche non si
+// tocca qualcosa.
+// ============================================================
+const PAUSE_REGOLE_TIPI = {
+  durata: {
+    nome: 'Pause per durata del turno',
+    spiega:
+      'Per i turni che durano da X a Y ore (Y escluso) la composizione delle pause, per esempio 30+15. Con i giorni scelti vale solo in quei giorni.',
+    esempio: 'Turni da 7 a 9 ore, venerdi e sabato: 30+15+15',
+  },
+  turno: {
+    nome: 'Pause di un turno preciso',
+    spiega:
+      'Vale piu della regola per durata. Scrivi 0 per un turno senza pausa. Con i giorni scelti vale solo in quei giorni.',
+    esempio: 'Turno S3, domenica: 15+15',
+  },
+  distanza: {
+    nome: 'Distanza minima',
+    spiega: 'Minuti minimi fra l inizio del turno e la prima pausa, e fra una pausa e la successiva.',
+    esempio: '45 minuti',
+  },
+  fascia: {
+    nome: 'Fascia senza pause',
+    spiega: 'Nei giorni scelti nessuna pausa in questa fascia oraria (ora di punta). Senza giorni vale sempre.',
+    esempio: 'Venerdi e sabato dalle 23.00 alle 01.00',
+  },
+  insieme: {
+    nome: 'Persone in pausa insieme',
+    spiega: 'Quante persone al massimo possono essere in pausa nello stesso momento.',
+    esempio: '1 persona',
+  },
+  nota: {
+    nome: 'Nota in fondo al foglio',
+    spiega: 'Testo stampato sotto le pause.',
+    esempio: 'Chi esce prima non fa l ultima pausa.',
+  },
+};
 function _briefPauseCfg() {
   return window._briefPauseCfgObj || {};
 }
-// composizione pause di un turno: personalizzata per turno (es. "15+15")
-// oppure default dalla fascia di durata
-function _pePauseSplit(orari, turno) {
+function _pePauseParse(txt) {
+  return String(txt == null ? '' : txt)
+    .split(/[+,;\s]+/)
+    .map((x) => parseInt(x))
+    .filter((x) => x > 0);
+}
+function _pePauseDaTotale(tot) {
+  if (tot <= 30) return '15+15';
+  if (tot <= 45) return '30+15';
+  return '30+15+15';
+}
+function _peSettoreCorrente() {
+  return typeof _pianoReparto === 'function' ? _pianoReparto() : 'slots';
+}
+// giorno della settimana per cui si stanno calcolando le pause (0=dom)
+function _peDow(dstr) {
+  const d = dstr || (typeof _briefData !== 'undefined' ? _briefData : null);
+  if (window._peDowCorrente != null) return window._peDowCorrente;
+  return d ? new Date(d + 'T12:00:00').getDay() : new Date().getDay();
+}
+function _peGiorniOk(r, dow) {
+  return !r.giorni || !r.giorni.length || r.giorni.map(Number).includes(dow);
+}
+// regole del settore: quelle salvate, altrimenti la traduzione dei vecchi valori
+function _peRegolePause(settore) {
   const cfg = _briefPauseCfg();
-  const pers = cfg.turni && cfg.turni[String(turno).toUpperCase()];
-  if (pers) {
-    const arr = String(pers)
-      .split(/[+,;\s]+/)
-      .map((x) => parseInt(x))
-      .filter((x) => x > 0);
-    if (arr.length) return arr;
-    return []; // "0" o "-" = nessuna pausa
+  const sett = settore || _peSettoreCorrente();
+  if (cfg.regole && Array.isArray(cfg.regole[sett])) return cfg.regole[sett];
+  const out = [];
+  if (sett === 'slots') {
+    out.push({ tipo: 'durata', da: 6, a: 7, pause: _pePauseDaTotale(parseInt(cfg.slots_6h) || 30) });
+    out.push({ tipo: 'durata', da: 7, a: 9, pause: _pePauseDaTotale(parseInt(cfg.slots_7h) || 45) });
+    out.push({ tipo: 'durata', da: 9, a: 24, pause: _pePauseDaTotale(parseInt(cfg.slots_9h) || 60) });
+  } else {
+    // motore algoritmico (ex Valet): le fasce che usava finora
+    out.push({ tipo: 'durata', da: 0, a: 6, pause: '15' });
+    out.push({ tipo: 'durata', da: 6, a: 7, pause: '15+15' });
+    out.push({ tipo: 'durata', da: 7, a: 8, pause: '30+15' });
+    out.push({ tipo: 'durata', da: 8, a: 24, pause: '30+15+15' });
+    out.push({ tipo: 'distanza', minuti: parseInt(cfg.valet_gap) || 45 });
+    out.push({ tipo: 'fascia', giorni: [5, 6], da: cfg.picco_da || '23.00', a: cfg.picco_a || '01.00' });
+    out.push({ tipo: 'insieme', n: 1 });
+    if (cfg.valet_nota) out.push({ tipo: 'nota', testo: cfg.valet_nota });
   }
+  const codici =
+    typeof _pianoTurniReparto === 'function' ? _pianoTurniReparto().map((t) => String(t.codice).toUpperCase()) : [];
+  Object.keys(cfg.turni || {}).forEach((k) => {
+    if (codici.includes(k.toUpperCase()))
+      out.push({ tipo: 'turno', turno: k.toUpperCase(), pause: String(cfg.turni[k]) });
+  });
+  return out;
+}
+function _peRegola(tipo, settore) {
+  return _peRegolePause(settore).find((r) => r.tipo === tipo) || null;
+}
+// composizione pause di un turno: regola per il turno, poi regola per
+// durata, poi il comportamento di sempre
+function _pePauseSplit(orari, turno, settore, dow) {
+  const cod = String(turno || '').toUpperCase();
+  const regole = _peRegolePause(settore);
+  const g = dow == null ? _peDow() : dow;
+  const conGiorni = (r) => r.giorni && r.giorni.length;
+  const perTurno = regole.filter(
+    (r) => r.tipo === 'turno' && String(r.turno).toUpperCase() === cod && _peGiorniOk(r, g),
+  );
+  const rt = perTurno.find(conGiorni) || perTurno[0];
+  if (rt) return _pePauseParse(rt.pause);
   const dur = _peDurataMin(orari, turno);
+  const ore = dur / 60;
+  const perDurata = regole.filter(
+    (r) => r.tipo === 'durata' && ore >= parseFloat(r.da) && ore < parseFloat(r.a) && _peGiorniOk(r, g),
+  );
+  const rd = perDurata.find(conGiorni) || perDurata[0];
+  if (rd) return _pePauseParse(rd.pause);
   if (dur < 360) return [];
+  const cfg = _briefPauseCfg();
   const tot =
     dur < 420 ? parseInt(cfg.slots_6h) || 30 : dur < 540 ? parseInt(cfg.slots_7h) || 45 : parseInt(cfg.slots_9h) || 60;
-  if (tot <= 30) return [15, 15];
-  if (tot <= 45) return [30, 15];
-  return [30, 15, 15];
+  return _pePauseParse(_pePauseDaTotale(tot));
+}
+// etichetta dei giorni: i tre gruppi del casino hanno un nome breve
+function _peGiorniLbl(giorni) {
+  const GG = ['domenica', 'lunedi', 'martedi', 'mercoledi', 'giovedi', 'venerdi', 'sabato'];
+  const k = (giorni || []).map(Number).sort().join(',');
+  if (k === '1,2,3,4') return 'lunedi-giovedi';
+  if (k === '5,6') return 'venerdi-sabato';
+  if (k === '0') return 'domenica';
+  return (giorni || []).map((g) => GG[g]).join(', ');
+}
+// descrizione in parole di una regola (pannello, guida, stampa)
+function _peRegolaDescr(r) {
+  const GG = ['domenica', 'lunedi', 'martedi', 'mercoledi', 'giovedi', 'venerdi', 'sabato'];
+  const pause = (p) => (_pePauseParse(p).length ? _pePauseParse(p).join('+') + ' minuti' : 'nessuna pausa');
+  const gg = r.giorni && r.giorni.length ? ', ' + _peGiorniLbl(r.giorni) : '';
+  switch (r.tipo) {
+    case 'durata':
+      return 'Turni da ' + r.da + ' a ' + r.a + ' ore' + gg + ': ' + pause(r.pause);
+    case 'turno':
+      return 'Turno ' + r.turno + gg + ': ' + pause(r.pause);
+    case 'distanza':
+      return 'Almeno ' + r.minuti + ' minuti fra inizio turno, una pausa e la successiva';
+    case 'fascia':
+      return (
+        (r.giorni && r.giorni.length ? r.giorni.map((g) => GG[g]).join(', ') : 'Tutti i giorni') +
+        ': nessuna pausa dalle ' +
+        r.da +
+        ' alle ' +
+        r.a
+      );
+    case 'insieme':
+      return 'Al massimo ' + r.n + (r.n == 1 ? ' persona' : ' persone') + ' in pausa nello stesso momento';
+    case 'nota':
+      return 'Nota: ' + r.testo;
+  }
+  return '';
+}
+function _peGiorniStessi(a, b) {
+  return (a || []).map(Number).sort().join(',') === (b || []).map(Number).sort().join(',');
+}
+function _peGiorniIncrocio(a, b) {
+  if (!a || !a.length || !b || !b.length) return true;
+  return a.map(Number).some((g) => b.map(Number).includes(g));
+}
+// controllo alla creazione: {errore} blocca, {avvisi:[]} avverte
+function _peValidaRegolaPausa(r, settore, altre) {
+  const av = [];
+  const sett = settore || _peSettoreCorrente();
+  const codici =
+    typeof _pianoTurniReparto === 'function' ? _pianoTurniReparto().map((t) => String(t.codice).toUpperCase()) : [];
+  const oraOk = (t) => _peOraMin(t) != null;
+  if (!PAUSE_REGOLE_TIPI[r.tipo]) return { errore: 'Tipo di regola sconosciuto' };
+  if (r.tipo === 'durata') {
+    const da = parseFloat(r.da);
+    const a = parseFloat(r.a);
+    if (!(da >= 0 && a <= 24 && a > da))
+      return { errore: 'Le ore vanno da 0 a 24 e la seconda deve essere maggiore della prima' };
+    if (String(r.pause).trim() !== '0' && !_pePauseParse(r.pause).length)
+      return { errore: 'Scrivi la composizione delle pause, per esempio 30+15, oppure 0 per nessuna pausa' };
+    (altre || []).forEach((o) => {
+      if (o.tipo === 'durata' && parseFloat(o.da) < a && parseFloat(o.a) > da && _peGiorniIncrocio(o.giorni, r.giorni))
+        av.push(
+          'Si sovrappone a "' +
+            _peRegolaDescr(o) +
+            '": ' +
+            (_peGiorniStessi(o.giorni, r.giorni)
+              ? 'per un turno vale la prima regola dell elenco'
+              : 'nei giorni comuni vince quella con i giorni indicati'),
+        );
+    });
+    if (_pePauseParse(r.pause).reduce((x, y) => x + y, 0) > da * 60 && da > 0)
+      av.push('Le pause superano la durata minima del turno');
+  }
+  if (r.tipo === 'turno') {
+    const cod = String(r.turno || '')
+      .trim()
+      .toUpperCase();
+    if (!cod) return { errore: 'Scrivi la sigla del turno' };
+    if (codici.length && !codici.includes(cod))
+      return { errore: 'La sigla ' + cod + ' non esiste nel settore ' + sett + ' (scheda Turni)' };
+    if (String(r.pause).trim() !== '0' && !_pePauseParse(r.pause).length)
+      return { errore: 'Scrivi la composizione delle pause, per esempio 15+15, oppure 0 per nessuna pausa' };
+    if (
+      (altre || []).some(
+        (o) => o.tipo === 'turno' && String(o.turno).toUpperCase() === cod && _peGiorniStessi(o.giorni, r.giorni),
+      )
+    )
+      av.push('Esiste gia una regola per il turno ' + cod + ' negli stessi giorni: questa la sostituisce');
+  }
+  if (r.tipo === 'distanza') {
+    const m = parseInt(r.minuti);
+    if (!(m >= 0 && m <= 240)) return { errore: 'I minuti vanno da 0 a 240' };
+    if ((altre || []).some((o) => o.tipo === 'distanza'))
+      av.push('Esiste gia una distanza minima: questa la sostituisce');
+  }
+  if (r.tipo === 'fascia') {
+    if (!oraOk(r.da) || !oraOk(r.a)) return { errore: 'Scrivi gli orari come 23.00 e 01.00' };
+    if (_peOraMin(r.da) === _peOraMin(r.a)) return { errore: 'Inizio e fine della fascia sono uguali' };
+    if (sett === 'slots')
+      av.push(
+        'Negli Slots le pause seguono gli schemi fissi: questa regola segnala le pause fuori fascia, non le sposta',
+      );
+  }
+  if (r.tipo === 'insieme') {
+    const n = parseInt(r.n);
+    if (!(n >= 1 && n <= 20)) return { errore: 'Il numero di persone va da 1 a 20' };
+    if ((altre || []).some((o) => o.tipo === 'insieme'))
+      av.push('Esiste gia un massimo di persone in pausa: questa lo sostituisce');
+    if (sett === 'slots')
+      av.push('Negli Slots le pause seguono gli schemi fissi: questa regola segnala le sovrapposizioni, non le sposta');
+  }
+  if (r.tipo === 'nota' && !String(r.testo || '').trim()) return { errore: 'Scrivi il testo della nota' };
+  return { avvisi: av };
+}
+// verifica delle pause generate contro le regole (per gli Slots e l unico
+// modo di far valere fascia, distanza e persone insieme)
+function _peVerificaRegolePause(contenuto, dstr, settore) {
+  if (!contenuto) return [];
+  const regole = _peRegolePause(settore);
+  const dow = new Date(dstr + 'T12:00:00').getDay();
+  const norm = (m) => (m < 660 ? m + 1440 : m);
+  const intv = (txt) => {
+    const m = String(txt || '').match(/(\d{1,2}[.:]\d{2})\s*-\s*(\d{1,2}[.:]\d{2})/);
+    if (!m) return null;
+    const a = _peOraMin(m[1]);
+    const b = _peOraMin(m[2]);
+    if (a == null || b == null) return null;
+    return [norm(a), norm(b) <= norm(a) ? norm(b) + 1440 : norm(b)];
+  };
+  // elenco pause {nome, ini, fin, iniTurno}
+  const pause = [];
+  if (contenuto.tipo === 'slots') {
+    [1, 4, 7].forEach((base) => {
+      let nome = '';
+      let iniTurno = null;
+      for (let r = 4; r <= (contenuto.nR || 0); r++) {
+        const a = contenuto.celle[r + '|' + base];
+        const b = contenuto.celle[r + '|' + (base + 1)];
+        if (a && a.hdr) {
+          nome = String(a.v || '');
+          const t = b && intv(b.v);
+          iniTurno = t ? t[0] : null;
+          continue;
+        }
+        if (a && String(a.v).toUpperCase() === 'PAUSA' && b) {
+          const t = intv(b.v);
+          if (t) pause.push({ nome: nome, ini: t[0], fin: t[1], iniTurno: iniTurno });
+        }
+      }
+    });
+  } else {
+    (contenuto.righe || []).forEach((r) => {
+      const t = intv(r.orario);
+      (r.pause || []).forEach((p) => {
+        const i = intv(p);
+        if (i) pause.push({ nome: r.nome, ini: i[0], fin: i[1], iniTurno: t ? t[0] : null });
+      });
+    });
+  }
+  const out = [];
+  regole.forEach((rg) => {
+    if (rg.tipo === 'fascia') {
+      if (rg.giorni && rg.giorni.length && !rg.giorni.map(Number).includes(dow)) return;
+      const fs = norm(_peOraMin(rg.da));
+      let fe = norm(_peOraMin(rg.a));
+      if (fe <= fs) fe += 1440;
+      pause.forEach((p) => {
+        if (p.ini < fe && p.fin > fs)
+          out.push(
+            p.nome + ' in pausa alle ' + _peMinToOra(p.ini) + ' (fascia senza pause ' + rg.da + '-' + rg.a + ')',
+          );
+      });
+    }
+    if (rg.tipo === 'distanza') {
+      const gap = parseInt(rg.minuti) || 0;
+      const perNome = {};
+      pause.forEach((p) => (perNome[p.nome] = perNome[p.nome] || []).push(p));
+      Object.keys(perNome).forEach((n) => {
+        const l = perNome[n].sort((x, y) => x.ini - y.ini);
+        l.forEach((p, i) => {
+          const prev = i ? l[i - 1].fin : p.iniTurno;
+          if (prev != null && p.ini - prev < gap)
+            out.push(n + ': pausa alle ' + _peMinToOra(p.ini) + ' a meno di ' + gap + ' minuti dalla precedente');
+        });
+      });
+    }
+    if (rg.tipo === 'insieme') {
+      const n = parseInt(rg.n) || 1;
+      pause.forEach((p) => {
+        const ins = pause.filter((q) => q !== p && q.ini < p.fin && q.fin > p.ini && q.nome !== p.nome).length;
+        if (ins + 1 > n)
+          out.push(_peMinToOra(p.ini) + ': ' + (ins + 1) + ' persone in pausa insieme (massimo ' + n + ')');
+      });
+    }
+  });
+  return [...new Set(out)];
 }
 function _peMinutiPausa(orari, turno) {
   return _pePauseSplit(orari, turno).reduce((a, b) => a + b, 0);
@@ -1943,9 +2246,12 @@ function _peGeneraPauseAuto(sh, startR, col, turno, ctx, pauseMin) {
   const numPause = split.length;
   if (!numPause) return;
   const intervallo = durTot / (numPause + 1);
+  const rDist = _peRegola('distanza');
+  const gap = rDist ? parseInt(rDist.minuti) || 0 : 0;
   let prevEnd = o.ini;
   for (let k = 1; k <= numPause; k++) {
     let curMin = Math.floor((o.ini + intervallo * k) / 15) * 15;
+    if (curMin < prevEnd + gap) curMin = Math.ceil((prevEnd + gap) / 15) * 15;
     const curDur = split[k - 1];
     if (curMin > prevEnd)
       r = _peSS(sh, r, col, _peNomeSettore(sett), _peMinToOra(prevEnd) + ' - ' + _peMinToOra(curMin));
@@ -2020,6 +2326,7 @@ function _peGeneraSlots(righe, dstr) {
   });
   if (!Object.keys(dT).length) return null;
   const ctx = { dT: dT, dN: dN, dc: _peCompetenze(righe), orari: _peOrariTurni(), c8Nomi: c8Nomi, c8Cd: c8Cd };
+  window._peDowCorrente = dow;
   const sh = _peSheet();
   const dataStr = dstr.split('-').reverse().join('.');
   if (tipoGiorno === 'LUN-GIO') _peGeneraLunGio(sh, ctx, dataStr);
@@ -2027,6 +2334,7 @@ function _peGeneraSlots(righe, dstr) {
   else _peGeneraDomenica(sh, ctx, dataStr);
   _peGeneraExtra(sh, ctx, tipoGiorno);
   _peCompattaSala(sh);
+  window._peDowCorrente = null;
   return { tipo: 'slots', celle: sh.celle, nR: _peMaxR(sh), tipoGiorno: tipoGiorno };
 }
 
@@ -2034,13 +2342,22 @@ function _peGeneraSlots(righe, dstr) {
 function _peGeneraValet(righe, dstr) {
   const dow = new Date(dstr + 'T12:00:00').getDay();
   const isWknd = dow === 5 || dow === 6;
-  const cfg = _briefPauseCfg();
-  const GAP_MIN = parseInt(cfg.valet_gap) || 45;
+  const regole = _peRegolePause();
+  const rDist = regole.find((r) => r.tipo === 'distanza');
+  const GAP_MIN = rDist ? parseInt(rDist.minuti) || 0 : 45;
   const WIN_MIN = 90;
-  const PEAK_S =
-    _peOraMin(cfg.picco_da) != null ? _peOraMin(cfg.picco_da) + (_peOraMin(cfg.picco_da) < 660 ? 1440 : 0) : 1380;
-  const PEAK_E =
-    _peOraMin(cfg.picco_a) != null ? _peOraMin(cfg.picco_a) + (_peOraMin(cfg.picco_a) < 660 ? 1440 : 0) : 1500;
+  const rIns = regole.find((r) => r.tipo === 'insieme');
+  const N_INSIEME = rIns ? parseInt(rIns.n) || 1 : 1;
+  const norm = (m) => (m < 660 ? m + 1440 : m);
+  // fasce senza pause valide oggi
+  const fasce = regole
+    .filter((r) => r.tipo === 'fascia' && (!r.giorni || !r.giorni.length || r.giorni.map(Number).includes(dow)))
+    .map((r) => {
+      const fs = norm(_peOraMin(r.da));
+      let fe = norm(_peOraMin(r.a));
+      if (fe <= fs) fe += 1440;
+      return [fs, fe];
+    });
   const orari = _peOrariTurni();
   const valet = [];
   (righe || []).forEach((r) => {
@@ -2059,50 +2376,31 @@ function _peGeneraValet(righe, dstr) {
       }
     }
     if (!o) return;
-    valet.push({ nome: nome.toUpperCase(), sigla: sigla, ini: o.ini, fin: o.fin });
+    valet.push({ nome: nome.toUpperCase(), sigla: sigla, ini: o.ini, fin: o.fin, o: o });
   });
   if (!valet.length) return null;
-  // elenco pause con ideale
+  // elenco pause con ideale: composizione dalle regole (turno, poi durata)
   const pause = []; // {vi, dur, ideal, start, end}
   valet.forEach((v, vi) => {
     const dur = v.fin - v.ini;
-    let arr;
-    const pers = (cfg.turni || {})[v.sigla];
-    if (pers) {
-      const split = String(pers)
-        .split(/[+,;\s]+/)
-        .map((x) => parseInt(x))
-        .filter((x) => x > 0);
-      const fr = { 1: [0.5], 2: [0.34, 0.67], 3: [0.22, 0.5, 0.78] }[Math.min(split.length, 3)] || [];
-      arr = split.slice(0, 3).map((d, k) => [d, fr[k]]);
-      if (!arr.length) return;
-    } else if (dur < 360) arr = [[15, 0.5]];
-    else if (dur < 420)
-      arr = [
-        [15, 0.34],
-        [15, 0.67],
-      ];
-    else if (dur < 480)
-      arr = [
-        [30, 0.3],
-        [15, 0.7],
-      ];
-    else
-      arr = [
-        [30, 0.22],
-        [15, 0.5],
-        [15, 0.78],
-      ];
+    const orariLoc = orari[v.sigla] ? orari : Object.assign({}, orari, { [v.sigla]: v.o });
+    const split = _pePauseSplit(orariLoc, v.sigla, null, dow);
+    if (!split.length) return;
+    const fr =
+      { 1: [0.5], 2: [0.34, 0.67], 3: [0.22, 0.5, 0.78] }[split.length] ||
+      split.map((_, k) => (k + 1) / (split.length + 1));
+    const arr = split.map((d, k) => [d, fr[k]]);
     arr.forEach(([d, fr]) => {
       pause.push({ vi: vi, dur: d, ideal: Math.floor((v.ini + dur * fr) / 15) * 15, start: 0, end: 0 });
     });
   });
   const ord = pause.map((_, i) => i).sort((a, b) => pause[a].ideal - pause[b].ideal);
   const slotLibero = (s, e, selfIdx) => {
+    let n = 0;
     for (let j = 0; j < pause.length; j++) {
-      if (j !== selfIdx && pause[j].end > 0 && s < pause[j].end && e > pause[j].start) return false;
+      if (j !== selfIdx && pause[j].end > 0 && s < pause[j].end && e > pause[j].start) n++;
     }
-    return true;
+    return n < N_INSIEME;
   };
   const cercaSlot = (lo, hi, L, ideal, minStart, selfIdx) => {
     let best = -1;
@@ -2113,7 +2411,7 @@ function _peGeneraValet(righe, dstr) {
     while (c + L <= hi) {
       if (slotLibero(c, c + L, selfIdx)) {
         let sc = -Math.abs(c - ideal);
-        if (isWknd && c < PEAK_E && c + L > PEAK_S) sc -= 100000;
+        for (let f = 0; f < fasce.length; f++) if (c < fasce[f][1] && c + L > fasce[f][0]) sc -= 100000;
         if (sc > bestScore) {
           bestScore = sc;
           best = c;
@@ -2164,7 +2462,7 @@ function _peGeneraValet(righe, dstr) {
     tipoGiorno: isWknd ? 'VEN-SAB' : dow === 0 ? 'DOM' : 'LUN-GIO',
     righe: out,
     nota:
-      _briefPauseCfg().valet_nota ||
+      (regole.find((r) => r.tipo === 'nota') || {}).testo ||
       "NOTA: chi termina il turno prima del previsto (es. un X1 che esce alle 19.00) di norma NON fa l'ultima pausa da 15 min.",
   };
 }
@@ -3045,18 +3343,21 @@ function pdfPauseGiorno() {
 // ---------- regole pause personalizzabili ----------
 function _briefRenderPauseCfg() {
   if (typeof isAdmin === 'function' && !isAdmin()) return '';
-  const c = _briefPauseCfg();
+  const sett = _peSettoreCorrente();
+  const regole = _peRegolePause(sett);
   const orari = _peOrariTurni();
-  // tabella "turni, orari e pause spettanti" calcolata LIVE dalle regole:
-  // cambi un orario nella tab Turni o una fascia qui sotto e si aggiorna
+  const turniSett = _pianoTurniReparto().slice();
+  const salvate = !!(_briefPauseCfg().regole && Array.isArray(_briefPauseCfg().regole[sett]));
+  const dowTab = _peDow();
+  const GGL = ['domenica', 'lunedi', 'martedi', 'mercoledi', 'giovedi', 'venerdi', 'sabato'];
+  // tabella "turni, orari e pause spettanti" calcolata LIVE dalle regole
   let tab =
     '<table style="border-collapse:collapse;font-size:.82rem;margin:8px 0"><tr>' +
-    ['TURNO', 'ORARIO', 'DURATA', 'PAUSA SPETTANTE']
+    ['TURNO', 'ORARIO', 'DURATA', 'PAUSE', 'DA QUALE REGOLA']
       .map((x) => '<th style="border:1px solid #999;background:#FFFF00;padding:3px 10px">' + x + '</th>')
       .join('') +
     '</tr>';
-  _pianoTurniReparto()
-    .slice()
+  turniSett
     .sort((a, b) => {
       const g = _briefGruppo(a.codice) - _briefGruppo(b.codice);
       if (g) return g;
@@ -3064,77 +3365,152 @@ function _briefRenderPauseCfg() {
     })
     .forEach((t) => {
       const o = orari[t.codice];
+      const td = (x, extra) => '<td style="border:1px solid #999;padding:2px 10px' + (extra || '') + '">' + x + '</td>';
       if (!o) {
         tab +=
-          '<tr><td style="border:1px solid #999;padding:2px 10px;font-weight:bold;background:' +
-          (_pianoColore(t.codice) || '') +
-          '">' +
-          escP(t.codice) +
-          '</td><td colspan="3" style="border:1px solid #999;padding:2px 10px;color:#c0392b">orari mancanti · impostali nella tab Turni per far funzionare le pause</td></tr>';
+          '<tr>' +
+          td(escP(t.codice), ';font-weight:bold;background:' + (_pianoColore(t.codice) || '')) +
+          '<td colspan="4" style="border:1px solid #999;padding:2px 10px;color:#c0392b">orari mancanti · impostali nella scheda Turni per far funzionare le pause</td></tr>';
         return;
       }
-      const split = _pePauseSplit(orari, t.codice);
-      const pers = (c.turni || {})[t.codice] || '';
-      const ore = Math.floor(o.dur / 60) + 'h' + (o.dur % 60 ? String(o.dur % 60).padStart(2, '0') : '');
+      const split = _pePauseSplit(orari, t.codice, sett, dowTab);
+      const cod = String(t.codice).toUpperCase();
+      const ore = o.dur / 60;
+      const conG = (r) => r.giorni && r.giorni.length;
+      const pt = regole.filter(
+        (r) => r.tipo === 'turno' && String(r.turno).toUpperCase() === cod && _peGiorniOk(r, dowTab),
+      );
+      const rt = pt.find(conG) || pt[0];
+      const pd = regole.filter(
+        (r) => r.tipo === 'durata' && ore >= parseFloat(r.da) && ore < parseFloat(r.a) && _peGiorniOk(r, dowTab),
+      );
+      const rd = pd.find(conG) || pd[0];
+      const fonte = rt ? _peRegolaDescr(rt) : rd ? _peRegolaDescr(rd) : 'nessuna regola: valore di base';
+      const oreLbl = Math.floor(o.dur / 60) + 'h' + (o.dur % 60 ? String(o.dur % 60).padStart(2, '0') : '');
       tab +=
-        '<tr><td style="border:1px solid #999;padding:2px 10px;font-weight:bold;background:' +
-        (_pianoColore(t.codice) || '') +
-        '">' +
-        escP(t.codice) +
-        '</td><td style="border:1px solid #999;padding:2px 10px">' +
-        o.iniStr +
-        ' - ' +
-        o.finStr +
-        '</td><td style="border:1px solid #999;padding:2px 10px">' +
-        ore +
-        '</td><td style="border:1px solid #999;padding:0;background:' +
-        (pers ? '#FFF3C4' : 'transparent') +
-        '"><input class="pcfg-turno" data-turno="' +
-        escP(t.codice) +
-        '" value="' +
-        escP(pers) +
-        '" placeholder="' +
-        (split.length ? split.join('+') : '-') +
-        '" style="width:80px;border:none;background:transparent;font:inherit;font-weight:bold;padding:2px 8px"></td></tr>';
+        '<tr>' +
+        td(escP(t.codice), ';font-weight:bold;background:' + (_pianoColore(t.codice) || '')) +
+        td(o.iniStr + ' - ' + o.finStr) +
+        td(oreLbl) +
+        td('<b>' + (split.length ? split.join('+') : 'nessuna') + '</b>') +
+        td('<span style="color:var(--muted)">' + escP(fonte) + '</span>') +
+        '</tr>';
     });
-  tab +=
-    '</table><p style="font-size:.82rem;color:var(--muted)">Colonna PAUSA: scrivi la composizione che vuoi per quel turno (es. <b>15+15</b> per S3, <b>30+15+15</b>), oppure lasciala vuota per usare la regola per fascia di durata (il valore grigio è quello attuale). Gli orari dei turni si modificano nella tab <b>Turni</b>. Tutto si aggiorna da solo.</p>';
-  const num = (id, val, larg) =>
+  tab += '</table>';
+  // elenco regole del settore
+  let lista = '';
+  if (!regole.length) lista = '<p style="color:var(--muted)">Nessuna regola: le pause seguono i valori di base.</p>';
+  regole.forEach((r, i) => {
+    lista +=
+      '<div class="tipo-item" style="padding:6px 10px"><span class="mini-badge" style="background:var(--accent2)">' +
+      escP((PAUSE_REGOLE_TIPI[r.tipo] || {}).nome || r.tipo) +
+      '</span><span class="tipo-item-name">' +
+      escP(_peRegolaDescr(r)) +
+      '</span><span style="flex:1"></span><button class="btn-del-tipo" onclick="pePauseModifica(' +
+      i +
+      ')">Modifica</button><button class="btn-del-tipo pericolo" style="margin-left:4px" onclick="pePauseElimina(' +
+      i +
+      ')">Elimina</button></div>';
+  });
+  // modulo nuova regola / modifica (i campi compaiono in base al tipo)
+  const GG = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
+  const GGV = [1, 2, 3, 4, 5, 6, 0];
+  const inp = (id, ph, larg, tipo) =>
     '<input id="' +
     id +
-    '" type="number" value="' +
-    escP(String(val)) +
+    '" type="' +
+    (tipo || 'text') +
+    '" placeholder="' +
+    ph +
     '" style="width:' +
-    (larg || 60) +
-    'px;padding:4px">';
+    (larg || 90) +
+    'px;padding:5px 7px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)">';
+  let form =
+    '<div id="pcfg-form" class="sez-form" style="display:none;flex-direction:column;align-items:stretch;gap:8px;margin-top:8px;padding:12px 14px;background:var(--paper2);border-radius:3px">' +
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b id="pcfg-titolo">Nuova regola</b> · tipo: <select id="pcfg-tipo" onchange="pePauseTipoCambiato()">' +
+    Object.keys(PAUSE_REGOLE_TIPI)
+      .map((k) => '<option value="' + k + '">' + escP(PAUSE_REGOLE_TIPI[k].nome) + '</option>')
+      .join('') +
+    '</select><span id="pcfg-spiega" style="color:var(--muted)"></span></div>';
+  const giorniHtml =
+    'Giorni: ' +
+    GG.map(
+      (g, k) =>
+        '<label style="display:inline-flex;align-items:center;gap:2px"><input type="checkbox" class="pcfg-g" value="' +
+        GGV[k] +
+        '">' +
+        g +
+        '</label>',
+    ).join('') +
+    ' <button type="button" class="btn-del-tipo" onclick="pePauseGiorni([1,2,3,4])">Lun-Gio</button><button type="button" class="btn-del-tipo" onclick="pePauseGiorni([5,6])">Ven-Sab</button><button type="button" class="btn-del-tipo" onclick="pePauseGiorni([0])">Dom</button><button type="button" class="btn-del-tipo" onclick="pePauseGiorni([])">Sempre</button>' +
+    ' <span style="color:var(--muted)">(nessuno = sempre)</span>';
+  form +=
+    '<div data-pt="durata" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">Turni da ' +
+    inp('pcfg-da', '7', 56, 'number') +
+    ' a ' +
+    inp('pcfg-a', '9', 56, 'number') +
+    ' ore: pause ' +
+    inp('pcfg-pause-d', '30+15', 90) +
+    '</div>';
+  form +=
+    '<div data-pt="turno" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">Turno <select id="pcfg-turno" style="padding:5px">' +
+    turniSett.map((t) => '<option value="' + escP(t.codice) + '">' + escP(t.codice) + '</option>').join('') +
+    '</select> pause ' +
+    inp('pcfg-pause-t', '15+15 oppure 0', 120) +
+    '</div>';
+  form += '<div data-pt="distanza">Almeno ' + inp('pcfg-minuti', '45', 60, 'number') + ' minuti</div>';
+  form +=
+    '<div data-pt="fascia" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">Nessuna pausa dalle ' +
+    inp('pcfg-fda', '23.00', 64) +
+    ' alle ' +
+    inp('pcfg-fa', '01.00', 64) +
+    '</div>';
+  form +=
+    '<div id="pcfg-giorni" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' + giorniHtml + '</div>';
+  form += '<div data-pt="insieme">Al massimo ' + inp('pcfg-n', '1', 56, 'number') + ' persone in pausa insieme</div>';
+  form += '<div data-pt="nota">Testo: ' + inp('pcfg-testo', 'Chi esce prima non fa l ultima pausa', 420) + '</div>';
+  form +=
+    '<div id="pcfg-esito" style="font-size:.8rem"></div>' +
+    '<div style="display:flex;gap:8px"><button class="btn-add-tipo" onclick="pePauseSalva()">Salva regola</button><button class="btn-secondario" onclick="pePauseAnnulla()">Annulla</button></div></div>';
+  // guida rapida, senza parole tecniche
+  const guida =
+    '<details style="margin-top:8px"><summary style="cursor:pointer;font-weight:bold">Come si crea una regola (guida rapida)</summary>' +
+    '<ol style="margin:8px 0 4px 18px;line-height:1.5">' +
+    '<li>Premi <b>Nuova regola</b> e scegli il tipo dal menu: accanto compare a cosa serve.</li>' +
+    '<li>Compila le caselle. Le pause si scrivono come somma di minuti: <b>30+15</b> vuol dire una pausa da 30 e una da 15; <b>0</b> vuol dire nessuna pausa.</li>' +
+    '<li>Premi <b>Salva regola</b>. Se qualcosa non torna (una sigla che nel settore non esiste, un orario scritto male, due regole che si accavallano) il programma lo dice subito.</li>' +
+    '<li>La tabella in alto si aggiorna da sola: mostra per ogni turno le pause che risultano e da quale regola vengono.</li>' +
+    '</ol>' +
+    '<p style="margin:6px 0"><b>Esempi</b></p><ul style="margin:0 0 6px 18px;line-height:1.5">' +
+    Object.keys(PAUSE_REGOLE_TIPI)
+      .map((k) => '<li><b>' + escP(PAUSE_REGOLE_TIPI[k].nome) + '</b>: ' + escP(PAUSE_REGOLE_TIPI[k].esempio) + '</li>')
+      .join('') +
+    '</ul>' +
+    '<p style="margin:6px 0;color:var(--muted)">Ogni settore ha le sue regole. Una regola per un turno preciso vale piu di quella per durata; una regola con i giorni indicati (Lun-Gio, Ven-Sab, Dom) vale piu di una senza giorni. Cosi si possono avere pause diverse da lunedi a giovedi, venerdi e sabato, e domenica. ' +
+    (sett === 'slots'
+      ? 'Negli Slots gli schemi di copertura (BG1, Q2, BG3, chi copre chi) restano quelli di sempre: le regole decidono quante pause e quanto lunghe, e segnalano in giallo le pause che non rispettano fascia, distanza o persone insieme.'
+      : 'In questo settore le regole guidano direttamente la generazione delle pause.') +
+    '</p></details>';
   let h =
-    '<details style="margin-top:14px;font-size:.82rem"><summary style="cursor:pointer;font-weight:bold">Regole · turni, orari e pause spettanti (personalizza)</summary><div style="padding:10px 4px;display:flex;flex-direction:column;gap:8px">';
-  h += tab;
-  // ogni settore vede SOLO le sue regole: minuti pausa per tutti, fascia
-  // di punta e nota solo al valet, numeri cassa solo agli slots
-  const repCorr = typeof _pianoReparto === 'function' ? _pianoReparto() : 'slots';
+    '<details style="margin-top:14px;font-size:.82rem"><summary style="cursor:pointer;font-weight:bold">Regole pause · ' +
+    escP(sett) +
+    ' (' +
+    regole.length +
+    ')</summary><div style="padding:10px 4px;display:flex;flex-direction:column;gap:8px">';
   h +=
-    '<div><b>Pause</b> · minuti per durata turno: 6–7 ore ' +
-    num('pcfg-6h', c.slots_6h || 30) +
-    ' &nbsp; 7–9 ore ' +
-    num('pcfg-7h', c.slots_7h || 45) +
-    ' &nbsp; 9 ore o più ' +
-    num('pcfg-9h', c.slots_9h || 60) +
-    ' &nbsp; <span style="color:var(--muted)">(sotto le 6 ore: nessuna pausa)</span></div>';
-  if (repCorr === 'valet') {
-    h +=
-      '<div><b>Valet</b> · distanza minima tra pause ' +
-      num('pcfg-gap', c.valet_gap || 45) +
-      ' min &nbsp; fascia di punta ven/sab: da <input id="pcfg-picco-da" value="' +
-      escP(c.picco_da || '23.00') +
-      '" style="width:64px;padding:4px"> a <input id="pcfg-picco-a" value="' +
-      escP(c.picco_a || '01.00') +
-      '" style="width:64px;padding:4px"></div>';
-    h +=
-      '<div>Nota in fondo alle pause valet:<br><input id="pcfg-nota" value="' +
-      escP(c.valet_nota || '') +
-      '" placeholder="(testo standard)" style="width:100%;max-width:560px;padding:5px"></div>';
-  }
+    '<div><b>Turni, orari e pause che risultano</b> per il giorno del briefing (' +
+    GGL[dowTab] +
+    ') · gli orari si cambiano nella scheda Turni</div>' +
+    tab;
+  h +=
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b>Regole del settore</b><span style="flex:1"></span><button class="btn-add-tipo" onclick="pePauseNuova()">Nuova regola</button>' +
+    (salvate
+      ? '<button class="btn-secondario" title="Torna alle regole con cui il settore e partito" onclick="pePauseRipristina()">Ripristina regole di partenza</button>'
+      : '') +
+    '</div>';
+  h += '<div class="tipo-list">' + lista + '</div>' + form + guida;
+  const repCorr = sett;
+  h += '<div style="margin-top:8px"></div>';
   // numeri cassa (CD): coppie e rotazione giornaliera · solo settore slots
   const cdCfg = repCorr === 'slots' ? (window._pianoCdCfg && window._pianoCdCfg.coppie) || [] : [];
   if (repCorr === 'slots')
@@ -3157,35 +3533,159 @@ function _briefRenderPauseCfg() {
       '" style="width:52px;padding:3px;text-align:center"></div>';
   });
   if (repCorr === 'slots') h += '</div>';
-  h +=
-    '<div><button class="btn-export" style="font-size:.8rem;padding:4px 14px" onclick="salvaPauseCfg()">Salva regole</button></div>';
+  if (repCorr === 'slots')
+    h +=
+      '<div><button class="btn-export" style="font-size:.8rem;padding:4px 14px" onclick="salvaPauseCfg()">Salva numeri cassa</button></div>';
   h += '</div></details>';
   return h;
 }
-async function salvaPauseCfg() {
-  const v = (id) => (document.getElementById(id) || {}).value || '';
-  const turni = {};
-  document.querySelectorAll('.pcfg-turno').forEach((el) => {
-    const val = el.value.trim();
-    if (val) turni[el.dataset.turno.toUpperCase()] = val;
+// ---- modulo regole: apertura, campi per tipo, salvataggio ----
+window._pePauseEditIdx = -1;
+function pePauseGiorni(lista) {
+  document.querySelectorAll('.pcfg-g').forEach((cb) => (cb.checked = lista.includes(parseInt(cb.value))));
+}
+function pePauseTipoCambiato() {
+  const tipo = (document.getElementById('pcfg-tipo') || {}).value || 'durata';
+  document
+    .querySelectorAll('#pcfg-form [data-pt]')
+    .forEach((el) => (el.style.display = el.dataset.pt === tipo ? '' : 'none'));
+  const gg = document.getElementById('pcfg-giorni');
+  if (gg) gg.style.display = ['durata', 'turno', 'fascia'].includes(tipo) ? '' : 'none';
+  const sp = document.getElementById('pcfg-spiega');
+  if (sp) sp.textContent = (PAUSE_REGOLE_TIPI[tipo] || {}).spiega || '';
+  const es = document.getElementById('pcfg-esito');
+  if (es) es.innerHTML = '';
+}
+function pePauseNuova() {
+  window._pePauseEditIdx = -1;
+  const f = document.getElementById('pcfg-form');
+  if (!f) return;
+  f.style.display = 'flex';
+  document.getElementById('pcfg-titolo').textContent = 'Nuova regola';
+  f.querySelectorAll('input').forEach((i) => {
+    if (i.type === 'checkbox') i.checked = false;
+    else i.value = '';
   });
-  // i campi che questo settore non vede (es. quelli del valet salvati dai
-  // tavoli) conservano il valore esistente, non tornano al default
-  const c0 = window._briefPauseCfgObj || {};
-  const turniTutti = Object.assign({}, c0.turni || {});
-  if (typeof _pianoTurniReparto === 'function')
-    _pianoTurniReparto().forEach((t) => delete turniTutti[String(t.codice).toUpperCase()]);
-  Object.assign(turniTutti, turni);
-  const obj = {
-    slots_6h: parseInt(v('pcfg-6h')) || c0.slots_6h || 30,
-    slots_7h: parseInt(v('pcfg-7h')) || c0.slots_7h || 45,
-    slots_9h: parseInt(v('pcfg-9h')) || c0.slots_9h || 60,
-    valet_gap: document.getElementById('pcfg-gap') ? parseInt(v('pcfg-gap')) || 45 : c0.valet_gap || 45,
-    picco_da: document.getElementById('pcfg-picco-da') ? v('pcfg-picco-da') || '23.00' : c0.picco_da || '23.00',
-    picco_a: document.getElementById('pcfg-picco-a') ? v('pcfg-picco-a') || '01.00' : c0.picco_a || '01.00',
-    valet_nota: document.getElementById('pcfg-nota') ? v('pcfg-nota').trim() : c0.valet_nota || '',
-    turni: turniTutti,
+  pePauseTipoCambiato();
+  f.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+function pePauseModifica(i) {
+  const r = _peRegolePause()[i];
+  if (!r) return;
+  pePauseNuova();
+  window._pePauseEditIdx = i;
+  document.getElementById('pcfg-titolo').textContent = 'Modifica regola';
+  document.getElementById('pcfg-tipo').value = r.tipo;
+  const v = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.value = val == null ? '' : val;
   };
+  v('pcfg-da', r.da);
+  v('pcfg-a', r.a);
+  v('pcfg-pause-d', r.pause);
+  v('pcfg-turno', r.turno);
+  v('pcfg-pause-t', r.pause);
+  v('pcfg-minuti', r.minuti);
+  v('pcfg-fda', r.da);
+  v('pcfg-fa', r.a);
+  v('pcfg-n', r.n);
+  v('pcfg-testo', r.testo);
+  document
+    .querySelectorAll('.pcfg-g')
+    .forEach((cb) => (cb.checked = !!(r.giorni || []).map(Number).includes(parseInt(cb.value))));
+  pePauseTipoCambiato();
+}
+function pePauseAnnulla() {
+  const f = document.getElementById('pcfg-form');
+  if (f) f.style.display = 'none';
+  window._pePauseEditIdx = -1;
+}
+function _pePauseLeggiForm() {
+  const v = (id) => ((document.getElementById(id) || {}).value || '').trim();
+  const tipo = v('pcfg-tipo');
+  const giorni = [...document.querySelectorAll('.pcfg-g:checked')].map((cb) => parseInt(cb.value));
+  if (tipo === 'durata')
+    return { tipo, da: parseFloat(v('pcfg-da')), a: parseFloat(v('pcfg-a')), pause: v('pcfg-pause-d'), giorni };
+  if (tipo === 'turno') return { tipo, turno: v('pcfg-turno').toUpperCase(), pause: v('pcfg-pause-t'), giorni };
+  if (tipo === 'distanza') return { tipo, minuti: parseInt(v('pcfg-minuti')) };
+  if (tipo === 'fascia')
+    return {
+      tipo,
+      giorni,
+      da: _peOrarioPunti(v('pcfg-fda')),
+      a: _peOrarioPunti(v('pcfg-fa')),
+    };
+  if (tipo === 'insieme') return { tipo, n: parseInt(v('pcfg-n')) };
+  return { tipo: 'nota', testo: v('pcfg-testo') };
+}
+async function _pePauseSalvaRegole(lista) {
+  const sett = _peSettoreCorrente();
+  const c0 = _briefPauseCfg();
+  const cfg = Object.assign({}, c0, { regole: Object.assign({}, c0.regole || {}) });
+  if (lista === null) delete cfg.regole[sett];
+  else cfg.regole[sett] = lista;
+  if (!(await salvaImp('piano_pause_cfg', JSON.stringify(cfg)))) return false;
+  window._briefPauseCfgObj = cfg;
+  return true;
+}
+async function pePauseSalva() {
+  if (!isAdmin()) return;
+  const r = _pePauseLeggiForm();
+  const lista = _peRegolePause().map((x) => Object.assign({}, x));
+  const idx = window._pePauseEditIdx;
+  const altre = lista.filter((_, i) => i !== idx);
+  const es = document.getElementById('pcfg-esito');
+  const chk = _peValidaRegolaPausa(r, _peSettoreCorrente(), altre);
+  if (chk.errore) {
+    if (es) es.innerHTML = '<span style="color:#c0392b;font-weight:700">' + escP(chk.errore) + '</span>';
+    return;
+  }
+  if (chk.avvisi.length && !confirm('Attenzione:\n\n- ' + chk.avvisi.join('\n- ') + '\n\nSalvare lo stesso?')) return;
+  // le regole "una sola" (distanza, persone insieme) e quelle per lo stesso turno sostituiscono la precedente
+  let nuova = altre.filter(
+    (o) =>
+      !(
+        (r.tipo === 'distanza' && o.tipo === 'distanza') ||
+        (r.tipo === 'insieme' && o.tipo === 'insieme') ||
+        (r.tipo === 'nota' && o.tipo === 'nota') ||
+        (r.tipo === 'turno' &&
+          o.tipo === 'turno' &&
+          String(o.turno).toUpperCase() === r.turno &&
+          _peGiorniStessi(o.giorni, r.giorni))
+      ),
+  );
+  if (idx >= 0 && idx <= nuova.length) nuova.splice(idx, 0, r);
+  else nuova.push(r);
+  if (!(await _pePauseSalvaRegole(nuova))) return;
+  logAzione('Regole pause', _peSettoreCorrente() + ': ' + (idx >= 0 ? 'modificata ' : 'nuova ') + _peRegolaDescr(r));
+  toast('Regola salvata · ' + _peRegolaDescr(r));
+  window._pePauseEditIdx = -1;
+  _briefRefreshPause();
+}
+async function pePauseElimina(i) {
+  if (!isAdmin()) return;
+  const lista = _peRegolePause().slice();
+  const r = lista[i];
+  if (!r) return;
+  if (!confirm('Eliminare la regola?\n\n' + _peRegolaDescr(r))) return;
+  lista.splice(i, 1);
+  if (!(await _pePauseSalvaRegole(lista))) return;
+  logAzione('Regole pause', _peSettoreCorrente() + ': eliminata ' + _peRegolaDescr(r));
+  toast('Regola eliminata');
+  _briefRefreshPause();
+}
+async function pePauseRipristina() {
+  if (!isAdmin()) return;
+  if (!confirm('Tornare alle regole di partenza di questo settore? Le regole create qui vengono tolte.')) return;
+  if (!(await _pePauseSalvaRegole(null))) return;
+  logAzione('Regole pause', _peSettoreCorrente() + ': ripristinate le regole di partenza');
+  toast('Regole di partenza ripristinate');
+  _briefRefreshPause();
+}
+// numeri cassa (CD): salvataggio delle coppie · le altre impostazioni restano
+async function salvaPauseCfg() {
+  const c0 = window._briefPauseCfgObj || {};
+  const obj = Object.assign({}, c0);
   if (!(await salvaImp('piano_pause_cfg', JSON.stringify(obj)))) return;
   window._briefPauseCfgObj = obj;
   // coppie CD
@@ -3207,10 +3707,6 @@ async function salvaPauseCfg() {
   }
   toast('Regole pause e numeri cassa salvati');
 }
-
-// Importa il briefing da un foglio Excel: cerca in ogni riga una cella che
-// corrisponde a un TURNO del reparto e prende come nome la cella non vuota
-// più vicina a sinistra (funziona con i fogli briefing slots e valet)
 async function importaBriefingExcel(input) {
   if (!puoGestireBriefing() || !_briefState) return;
   const file = input.files[0];

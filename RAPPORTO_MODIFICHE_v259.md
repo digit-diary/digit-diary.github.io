@@ -380,3 +380,36 @@ degli Slots; un Supervisor dei Tavoli non risultava idoneo a nessun turno dei Ta
 Dopo: ogni settore ha le sue mappature (le 26 esistenti restano agli Slots); il turno si sceglie
 da una tendina con le sigle del settore; una sigla inesistente o una mappatura doppia viene
 rifiutata con avviso; ogni modifica finisce nell elenco delle modifiche e nel Registro.
+
+## v269 · Restyle Impostazioni, barra calendario, briefing, documenti da firmare
+
+### Impostazioni (nessun cambio di comportamento: stessi id, stesse funzioni)
+- **Prima**: ogni sezione aveva un aspetto diverso (pulsanti con stili scritti a mano, descrizioni lunghe dentro le liste, form disallineati, "Pwd" e "Rimuovi" con colori diversi da sezione a sezione).
+- **Dopo**: tutte le 17 sezioni usano gli stessi componenti: intestazione con titolo e descrizione breve, elenco a righe uguali, modulo di inserimento su sfondo chiaro con etichette allineate, tre soli tipi di pulsante (principale scuro, secondario chiaro, "Rimuovi" in rosso). La sezione Visibilita e permessi usa un menu a tendina per voce al posto dei quattro pallini, con i nomi degli operatori che compaiono solo con "Operatori selezionati". Il campo modello "Foto" dell assistente AI e nascosto (le foto non vengono inviate).
+- Esempio: Operatori: la riga "Mario Rossi · Slots · Con password · Accessi extra · [settore] · Nuova password · Rimuovi" ha ora lo stesso aspetto della riga dei Tipi di evento.
+
+### Piano · Calendario
+- **Prima**: due righe di pulsanti tutti uguali, senza distinzione fra cio che pianifica, controlla o esporta.
+- **Dopo**: riga 1 = navigazione (mese, settore, annulla/ripristina, salvataggio automatico, ricerca). Riga 2 = quattro gruppi etichettati come nel menu delle schede: Pianifica (Genera bozza, Genera con il solver, Completa con coperture, Migliora ore), Controlla (Valida regole, Copertura malattia), Strumenti (Ordine predefinito, Colora, Cancella piano in rosso), Esporta (Copia per Excel, Stampa PDF, Importa piano). Stessi pulsanti, stesse funzioni.
+
+### Piano · Briefing
+- Pulsanti della barra tutti della stessa misura; "Compila dal piano" evidenziato come azione principale; "Aggiorna numeri cassa" spostato dentro il gruppo Azioni (prima era fuori dai gruppi).
+
+### Questionario e scheda permessi
+- Le caselle Nome e Data si toccavano (nella scheda mancava la regola di dimensionamento dei campi): corretto in entrambi i documenti, con piu spazio fra le caselle e i pulsanti "Cancella firma" e "Togli firmatario" sotto la firma invece che sopra.
+- Stampa rivista: formato A4 verticale per il questionario e A4 orizzontale per la scheda (tabella larga), colori delle risposte mantenuti, intestazioni delle tabelle ripetute su ogni pagina, blocchi firma mai spezzati fra due pagine, note lunghe stampate per intero, la voce "scegli" non viene stampata se non si e scelto il firmatario.
+- Il questionario ha gia un blocco firme alla fine di ogni blocco (HR, Responsabile/Supervisor, Compliance, Tutti) piu uno per le osservazioni generali; la scheda permessi ha tre blocchi firme (Compliance, HR, Direzione/Responsabile).
+
+### Privacy del repository pubblico
+- Il questionario, la scheda permessi (con i nomi degli operatori) e i dati esportati erano finiti nel repository GitHub, che e pubblico. Da questa versione sono esclusi dal repository (restano in locale, su USB e nella cartella IT). Sono ancora nella cronologia git delle versioni precedenti: per toglierli del tutto serve riscrivere la cronologia, da decidere.
+
+## v270 · Regole pause create e modificate per settore
+
+- **Prima**: sotto le pause del briefing c erano solo caselle fisse (minuti per fascia 6-7/7-9/9+ ore, composizione per turno, e solo per il Valet distanza minima, fascia di punta e nota). Nessuna regola nuova possibile, nessuna guida.
+- **Dopo**: pannello "Regole pause · settore" con l elenco delle regole in parole semplici, Modifica ed Elimina, Nuova regola con sei tipi: pause per durata del turno, pause di un turno preciso, distanza minima, fascia senza pause, persone in pausa insieme, nota in fondo al foglio. Le regole per durata e per turno possono valere solo in certi giorni (Lun-Gio, Ven-Sab, Dom, con pulsanti rapidi): la regola con i giorni vince su quella senza, e la regola per turno vince su quella per durata.
+- Le regole attuali di Slots e Valet compaiono gia come righe (ricavate dai vecchi valori): finche non si tocca nulla le pause escono identiche a prima. "Ripristina regole di partenza" riporta il settore alle regole iniziali.
+- Ogni regola viene controllata al salvataggio: sigla inesistente nel settore, ore invertite, orario scritto male, numero fuori scala bloccano; sovrapposizioni fra regole e regole che negli Slots possono solo segnalare (fascia, persone insieme) avvisano prima di salvare.
+- La tabella "turni, orari e pause che risultano" mostra per il giorno del briefing le pause di ogni turno e da quale regola vengono.
+- Slots: gli schemi di copertura (BG1, Q2, BG3) restano identici; le regole decidono quante pause e quanto lunghe e la distanza minima nelle pause automatiche. Fascia, distanza e persone insieme vengono verificate sul foglio generato e le violazioni elencate in giallo sotto le pause. Valet e altri settori: le regole guidano direttamente la generazione (fasce per giorno, massimo N insieme, distanza).
+- Esempio: regola "Turni da 7 a 9 ore, venerdi-sabato: 30+15+15" e "Turno S3, domenica: 15+15" → mercoledi S3 fa 30+15, sabato 30+15+15, domenica 15+15.
+- Test automatici: `node test/pause-regole.test.js` (31 controlli).
