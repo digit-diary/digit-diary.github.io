@@ -1,0 +1,67 @@
+# Scheda permessi correggibile: stato reale dei permessi per operatore, ogni
+# casella si puo cambiare (Si / no), le modifiche restano evidenziate, note
+# per operatore, copia compilata con le modifiche dentro, filtro e stampa.
+import json, html, datetime, sys, os
+import psycopg2
+E = html.escape
+c = psycopg2.connect(f"host=aws-0-eu-central-1.pooler.supabase.com port=5432 user=postgres.brdhxzgegxhjbcgxcnfd password={os.environ['PW']} dbname=postgres sslmode=require")
+cur = c.cursor(); cur.execute("select chiave, valore from impostazioni where chiave in ('visibilita','profili_operatori','operatori_reparto','operatori_accessi_extra','reparti_pagine')")
+imp = {k: json.loads(v) for k, v in cur.fetchall()}
+cur.execute("select nome from operatori_auth order by nome"); ops = [r[0] for r in cur.fetchall()]
+vis = imp.get('visibilita', {}); prof = imp.get('profili_operatori', {}); rep = imp.get('operatori_reparto', {}); extra = imp.get('operatori_accessi_extra', {}); rpag = imp.get('reparti_pagine', {})
+PROF = {'direzione': 'Direzione', 'resp': 'Responsabile FoBoSlot', 'sost': 'Sostituto Responsabile', 'sup': 'Supervisor', 'hr': 'HR'}
+voci = [('Pagine', [('rapporto','Rapporto'),('note_collega','Note Colleghi (chat)'),('statistiche','Statistiche'),('moduli','Moduli disciplinari'),('formazione','Formazione'),('piano','Piano di lavoro'),('assistente','Assistente AI'),('consegna','Consegna Turno'),('promemoria','Promemoria'),('maison','Costi Maison'),('inventario','Inventario'),('registro','Registro attivita (solo amministratore)')]),
+ ('Funzioni', [('ricerca_globale','Ricerca globale'),('alert_cassa','Alert cassa'),('alert_rischio','Alert rischio'),('alert_compleanni','Compleanni Maison'),('template_rapidi','Template rapidi'),('firma_digitale','Firma digitale'),('qr_code','QR Code su PDF'),('ai_moduli','AI (genera e migliora testo)')]),
+ ('Piano: schede visibili', [('ptab_'+k, 'Piano · '+l) for k, l in [('calendario','Calendario'),('briefing','Briefing'),('vacanze','Vacanze'),('saldo','Saldo'),('recupero','Recupero ore'),('timbrature','Timbrature'),('statistiche','Statistiche'),('benessere','Benessere'),('storico','Storico'),('formulari','Formulari'),('turni','Turni'),('regole','Regole'),('festivi','Festivi'),('impostazioni','Impostazioni'),('guida','Guida')]]),
+ ('Piano: schede modificabili', [('ptabmod_'+k, 'Piano · '+l) for k, l in [('calendario','Calendario (modifica turni)'),('briefing','Briefing (compilazione)'),('vacanze','Vacanze (import e applica)'),('saldo','Saldo (ore reali)'),('recupero','Recupero ore'),('timbrature','Timbrature'),('turni','Turni (durate e orari)'),('regole','Regole (valori)'),('festivi','Festivi'),('impostazioni','Impostazioni')]]),
+ ('Permessi delegabili', [('gestione_punti','Punti e premi'),('gestione_impiego','Impiego Jolly/Fisso'),('gestione_categorie','Assegnare la categoria'),('vista_categorie','Vedere la categoria'),('gestione_competenze','Certificare competenze'),('gestione_valutazioni','Valutazioni'),('gestione_formazioni','Registrare formazioni'),('gestione_piano','Modificare il piano'),('gestione_corsi','Corsi nel piano'),('gestione_briefing','Compilare briefing'),('storico_hr','Storico HR'),('gestione_regole','Regole del piano'),('gestione_festivi','Festivi e CGF'),('sblocco_piano_chiuso','Sbloccare giorni chiusi'),('vista_malattie_pct','Pattern malattie')])]
+def concesso(key, op):
+    v = vis.get(key, 'admin' if key == 'piano' else 'tutti')
+    if v in ('nascosto', 'admin'): return False
+    if isinstance(v, dict) and v.get('tipo') == 'selezionati': return op in (v.get('operatori') or [])
+    return True
+oggi = datetime.date.today().strftime('%d.%m.%Y')
+h = ['''<!DOCTYPE html><html lang="it"><head><meta charset="utf-8"><title>Scheda permessi</title><style>
+:root{--ink:#1c1a17;--paper:#fbf8f2;--paper2:#f1ece2;--line:#d7cfbf;--muted:#6c655a;--oro:#b8912f}
+body{font-family:Georgia,serif;color:var(--ink);margin:0;font-size:13px;background:var(--paper2)}header{background:var(--ink);color:var(--paper);padding:18px 26px}header h1{margin:0;font-size:1.3rem;font-weight:600}header p{margin:6px 0 0;color:#d9d0bd;font-size:.9rem;max-width:960px}
+.barra{position:sticky;top:0;z-index:5;background:var(--paper);border-bottom:1px solid var(--line);padding:8px 26px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}.barra button{font:inherit;font-size:.86rem;padding:6px 12px;border:1px solid var(--ink);background:var(--paper);cursor:pointer;border-radius:2px}.barra button.prim{background:var(--ink);color:var(--paper)}.barra .prog{margin-left:auto;color:var(--muted);font-size:.86rem}
+main{padding:18px 26px 60px}.intest{background:var(--paper);border:1px solid var(--line);padding:12px 16px;margin-bottom:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}.intest label{display:block;font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}.intest input{width:100%;font:inherit;padding:6px 8px;border:1px solid var(--line);background:#fff}
+h2{font-size:.95rem;margin:20px 0 6px;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--ink);padding-bottom:4px}
+table{border-collapse:collapse;width:100%;font-size:11.5px;background:#fff}th,td{border:1px solid #bbb;padding:3px 5px;text-align:center;vertical-align:middle}th{background:var(--paper2)}td.l{text-align:left}tr.g td{background:var(--paper2);text-align:left;font-weight:700}
+select.c{font:inherit;font-size:11px;padding:2px 3px;border:1px solid #ccc;background:#fff;width:52px}select.c.si{background:#e3f0e8;font-weight:700}select.c.mod{outline:2px solid #c0392b;background:#fbe9e7}
+textarea{font:inherit;font-size:11px;width:100%;min-height:30px;border:1px solid #ccc;padding:3px}
+body.solo-mod tr[data-r]:not(.ha-mod){display:none}
+@media print{.barra{display:none}body{background:#fff}main{padding:0}header{background:#fff;color:#000;border-bottom:2px solid #000;padding:6px 0}header p{color:#333}table{font-size:9.5px}select.c{-webkit-appearance:none;appearance:none;border:0;background:#fff;width:auto;padding:0}select.c.si{background:#ddd}select.c.mod{outline:1px solid #000;background:#eee}textarea{border:1px solid #444;min-height:24px}}
+</style></head><body>''']
+h.append('<header><h1>Diario Collaboratori · scheda dei permessi: stato attuale da controllare</h1><p>Ogni casella dice se l operatore <b>puo</b> (Si) vedere quella pagina o scheda, oppure eseguire quella funzione, cosi come e impostato oggi (' + oggi + '). Se qualcosa va cambiato, cambia la casella: resta evidenziata in rosso, e alla fine <b>Salva copia compilata</b> produce il file da rinviare con tutte le modifiche dentro. L amministratore (password master) puo tutto ed e escluso.</p></header>')
+h.append('<div class="barra"><button class="prim" onclick="salvaCopia()">Salva copia compilata (da inviare)</button><button id="btn-mod" onclick="soloMod()">Mostra solo le modifiche</button><button onclick="window.print()">Stampa / PDF</button><button onclick="azzera()">Azzera modifiche</button><span class="prog" id="prog"></span></div><main>')
+h.append('<div class="intest"><div><label>Controllato da</label><input data-meta="nome"></div><div><label>Funzione</label><input data-meta="funzione"></div><div><label>Data</label><input data-meta="data" value="' + oggi + '"></div></div>')
+h.append('<h2>Operatori, profilo e settori</h2><table><tr><th>Operatore</th><th>Profilo oggi</th><th>Profilo corretto</th><th>Settori</th><th>Accessi extra</th><th style="min-width:220px">Nota</th></tr>')
+prof_opts = ''.join('<option value="%s">%s</option>' % (k, v) for k, v in PROF.items())
+for o in ops:
+    ex = extra.get(o, {}); ext = ', '.join(f"{k}: {'modifica' if (v or {}).get('modifica') else 'sola lettura'}" for k, v in ex.items()) if isinstance(ex, dict) else ''
+    h.append(f'<tr data-r="op-{E(o)}"><td class="l"><b>{E(o)}</b></td><td>{E(PROF.get(prof.get(o,""),"nessuno"))}</td><td><select class="c" style="width:auto" data-orig="{E(prof.get(o,""))}" data-sel="prof|{E(o)}"><option value="">nessuno</option>{prof_opts}</select></td><td>{E(rep.get(o,"?"))}</td><td class="l">{E(ext) or "-"}</td><td><textarea data-nota="op|{E(o)}" placeholder="Nota"></textarea></td></tr>')
+h.append('</table>')
+h.append('<h2>Cosa puo vedere e fare ognuno (cambia le caselle sbagliate)</h2><table><tr><th style="text-align:left">Voce</th><th>Oggi</th>' + ''.join(f'<th>{E(o)}</th>' for o in ops) + '<th style="min-width:160px">Nota</th></tr>')
+for gt, lista in voci:
+    h.append(f'<tr class="g"><td colspan="{len(ops)+3}">{E(gt)}</td></tr>')
+    for k, l in lista:
+        v = vis.get(k, 'admin' if k == 'piano' else 'tutti'); vt = 'tutti' if v == 'tutti' else 'solo admin' if v == 'admin' else 'nascosta' if v == 'nascosto' else 'per nome' if isinstance(v, dict) else str(v)
+        celle = ''.join(f'<td><select class="c" data-orig="{"si" if concesso(k,o) else ""}" data-sel="{k}|{E(o)}"><option value="">no</option><option value="si">Si</option></select></td>' for o in ops)
+        h.append(f'<tr data-r="{k}"><td class="l">{E(l)} <span style="color:#888;font-size:9.5px">({k})</span></td><td style="font-size:10px;color:#555">{E(vt)}</td>{celle}<td><textarea data-nota="{k}" placeholder="Nota"></textarea></td></tr>')
+h.append('</table>')
+h.append('<h2>Osservazioni</h2><textarea data-nota="gen" style="min-height:90px" placeholder="Figure da aggiungere (es. Compliance), regole generali, casi particolari"></textarea></main>')
+h.append('''<script>
+const CH='diario_scheda_permessi';
+function init(){document.querySelectorAll('select.c').forEach(s=>{if(s.value===''&&s.dataset.orig!=null)s.value=s.dataset.orig})}
+function stato(){const s={meta:{},sel:{},note:{}};document.querySelectorAll('[data-meta]').forEach(i=>s.meta[i.dataset.meta]=i.value);document.querySelectorAll('select.c').forEach(x=>{if(x.value!==x.dataset.orig)s.sel[x.dataset.sel]=x.value});document.querySelectorAll('textarea[data-nota]').forEach(t=>{if(t.value.trim())s.note[t.dataset.nota]=t.value});return s}
+function applica(s){if(!s)return;Object.keys(s.meta||{}).forEach(k=>{const i=document.querySelector('[data-meta="'+k+'"]');if(i)i.value=s.meta[k]});Object.keys(s.sel||{}).forEach(k=>{const x=document.querySelector('select[data-sel="'+k+'"]');if(x)x.value=s.sel[k]});Object.keys(s.note||{}).forEach(k=>{const t=document.querySelector('textarea[data-nota="'+k+'"]');if(t)t.value=s.note[k]})}
+function colora(){let n=0;document.querySelectorAll('select.c').forEach(x=>{x.classList.toggle('si',x.value==='si');const m=x.value!==x.dataset.orig;x.classList.toggle('mod',m);if(m)n++});document.querySelectorAll('tr[data-r]').forEach(tr=>tr.classList.toggle('ha-mod',!!tr.querySelector('select.c.mod')||[...tr.querySelectorAll('textarea')].some(t=>t.value.trim())));document.getElementById('prog').textContent=n?'Modifiche: '+n:'Nessuna modifica'}
+function salvaLocale(){try{localStorage.setItem(CH,JSON.stringify(stato()))}catch(e){}}
+document.addEventListener('change',()=>{colora();salvaLocale()});document.addEventListener('input',salvaLocale);
+function soloMod(){document.body.classList.toggle('solo-mod');document.getElementById('btn-mod').textContent=document.body.classList.contains('solo-mod')?'Mostra tutto':'Mostra solo le modifiche'}
+function salvaCopia(){const s=stato();s.salvatoIl=new Date().toISOString();const tagS='<'+'script id="risposte-incorporate">';const tagE='<'+'/script>';let html=document.documentElement.outerHTML;const i1=html.indexOf(tagS);if(i1>=0){const i2=html.indexOf(tagE,i1);html=html.slice(0,i1)+html.slice(i2+tagE.length)}const json=JSON.stringify(s).split('</').join('<'+String.fromCharCode(92)+'/');html='<!DOCTYPE html>'+String.fromCharCode(10)+html.replace('</body>',tagS+'window.__RISPOSTE='+json+';'+tagE+'</body>');const b=new Blob([html],{type:'text/html'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='scheda_permessi_controllata_'+(s.meta.nome||'compilata').replace(/[^a-z0-9]+/gi,'_')+'.html';a.click()}
+function azzera(){if(!confirm('Togliere tutte le modifiche e tornare allo stato attuale?'))return;localStorage.removeItem(CH);document.querySelectorAll('select.c').forEach(x=>x.value=x.dataset.orig);document.querySelectorAll('textarea').forEach(t=>t.value='');colora()}
+init();if(window.__RISPOSTE){applica(window.__RISPOSTE)}else{try{applica(JSON.parse(localStorage.getItem(CH)||'null'))}catch(e){}}colora();
+</script></body></html>''')
+open('SCHEDA_PERMESSI_ATTUALI.html', 'w').write('\n'.join(h)); print('scheda ok', len(ops), 'operatori')
