@@ -128,6 +128,63 @@
   //   ctx.campoOk(info, valore)  : -> bool
   //   ctx.mappFunzione(funzione) : -> array {tipo, turno_codice} o null
   //   ctx.regolaVal(nome)        : -> valore regola o null
+  // REGOLE "CHI FA COSA" (regole di gruppo, per settore, create dall'utente):
+  //   turni_solo_funzioni   'L1,9:BO,SUP'          -> quei turni solo a quelle funzioni
+  //   funzione_turni_giorni 'SUP:Z*,L1,9:0,1,2,3'  -> in quei giorni (0=lun..6=dom,
+  //                         vuoto = sempre) la funzione fa SOLO turni che
+  //                         combaciano con i modelli (Z* = tutte le sigle che
+  //                         iniziano con Z)
+  // dow: giorno JS (0=dom) oppure null quando il giorno non e' noto (in quel
+  // caso le regole a giorni non si applicano). Ritorna il motivo o null.
+  function violazioneFunzioneTurno(info, turno, dow, regole) {
+    if (!turno || !turno.codice || !Array.isArray(regole) || !regole.length) return null;
+    const cod = String(turno.codice).toUpperCase();
+    const fz = String((info && info.funzione) || '').toUpperCase();
+    const settori = Array.isArray(info && info._settori) ? info._settori : [];
+    const combacia = (modello) => {
+      const m = String(modello || '')
+        .trim()
+        .toUpperCase();
+      if (!m) return false;
+      if (m.endsWith('*')) return cod.startsWith(m.slice(0, -1));
+      return cod === m;
+    };
+    const dowPy = dow == null ? null : (dow + 6) % 7;
+    for (const rg of regole) {
+      if (rg.attivo === false) continue;
+      const tipo = String(rg.tipo_regola || '').toLowerCase();
+      const parti = String(rg.valore || '').split(':');
+      if (tipo === 'turni_solo_funzioni') {
+        const turni = (parti[0] || '').split(',').map((x) => x.trim());
+        const funzioni = (parti[1] || '')
+          .split(',')
+          .map((x) => x.trim().toUpperCase())
+          .filter(Boolean);
+        if (!turni.some(combacia)) continue;
+        if (funzioni.includes(fz) || settori.some((x) => funzioni.includes(String(x).toUpperCase()))) continue;
+        return 'turno ' + cod + ' riservato a ' + funzioni.join(', ') + ' (funzione: ' + (fz || 'nessuna') + ')';
+      }
+      if (tipo === 'funzione_turni_giorni') {
+        if (dowPy == null) continue;
+        const funzione = (parti[0] || '').trim().toUpperCase();
+        if (funzione !== fz) continue;
+        const modelli = (parti[1] || '')
+          .split(',')
+          .map((x) => x.trim())
+          .filter(Boolean);
+        const giorni = (parti[2] || '')
+          .split(',')
+          .map((x) => parseInt(x))
+          .filter((x) => !isNaN(x));
+        if (giorni.length && !giorni.includes(dowPy)) continue;
+        if (modelli.some(combacia)) continue;
+        return (
+          fz + ' con turno ' + cod + (giorni.length ? ' in questo giorno' : '') + ': ammessi solo ' + modelli.join(', ')
+        );
+      }
+    }
+    return null;
+  }
   function idoneoPerTurno(info, turno, ctx) {
     info = info || {};
     if (info.solo_diurni && turno.tipo === 'NOTTURNO') return false;
@@ -173,14 +230,11 @@
       const voci = mapp.filter((m) => m.tipo === 'PRINCIPALE' || m.tipo === 'AMMESSO').map((m) => m.turno_codice);
       if (voci.length && !voci.includes(turno.codice)) return false;
     }
-    if (
-      (turno.codice === 'L1' || turno.codice === '9') &&
-      String(ctx.regolaVal('l1_solo_bo_sup')).toUpperCase() === 'TRUE' &&
-      fzU !== 'SUP' &&
-      fzU !== 'BO' &&
-      !(settoriC || []).some((x) => x === 'BO' || x === 'SUP')
-    )
-      return false;
+    // regole "chi fa cosa" del settore (senza giorno: solo turni_solo_funzioni)
+    if (typeof ctx.regoleTurnoFunzione === 'function') {
+      const infoS = Object.assign({}, info, { _settori: settoriC || [] });
+      if (violazioneFunzioneTurno(infoS, turno, null, ctx.regoleTurnoFunzione())) return false;
+    }
     return true;
   }
 
@@ -539,6 +593,7 @@
     violazioniCella,
     violazioniAccompagnamento,
     idoneoPerTurno,
+    violazioneFunzioneTurno,
     indiceBenessere,
     giorniVacanzaSpettanti,
     pasqua,
