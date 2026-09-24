@@ -4625,3 +4625,107 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   mask: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.5%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Crect x=%223%22 y=%2211%22 width=%2218%22 height=%2211%22 rx=%222%22/%3E%3Cpath d=%22M7 11V7a5 5 0 0 1 10 0v4%22/%3E%3C/svg%3E") center / contain no-repeat;
   pointer-events: none;
 }
+
+/* Impostazioni: indice a gruppi in cima e etichette dei gruppi */
+.settings-indice {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  box-shadow: 2px 2px 0 #b8aa95;
+  padding: 10px 14px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+}
+.settings-indice:empty {
+  display: none;
+}
+.settings-indice-gruppo {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.settings-indice-lbl {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+  margin-right: 4px;
+}
+.settings-chip {
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--paper2);
+  color: var(--ink);
+  cursor: pointer;
+}
+.settings-chip:hover {
+  border-color: var(--ink);
+}
+.settings-gruppo-titolo {
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+  margin: 26px 0 10px 2px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+.settings-gruppo-titolo:first-of-type {
+  margin-top: 0;
+}
+.settings-section {
+  border-left: 3px solid var(--line);
+}
+.settings-section h4 {
+  letter-spacing: 0.02em;
+}
+@keyframes settingsEvidenzia {
+  0% {
+    border-left-color: #d4b86a;
+    box-shadow: 0 0 0 2px #d4b86a;
+  }
+  100% {
+    border-left-color: var(--line);
+    box-shadow: 2px 2px 0 #b8aa95;
+  }
+}
+.settings-evidenzia {
+  animation: settingsEvidenzia 1.6s ease-out 1;
+}
+/* Briefing: barra dei comandi in gruppi leggibili */
+.brief-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin-bottom: 10px;
+}
+.brief-toolbar .brief-grp {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--paper2);
+}
+.brief-toolbar .brief-grp-lbl {
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+  margin-right: 2px;
+}

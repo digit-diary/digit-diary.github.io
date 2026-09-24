@@ -16180,25 +16180,28 @@ async function _renderPianoBriefingTab() {
     '<div class="main-card" style="margin-top:14px"><div class="card-header">Briefing · ' +
     escP(rep.toUpperCase()) +
     '</div><div style="padding:12px 14px">';
+  // barra dei comandi in tre gruppi: giorno, azioni, formato (piu' lo stato)
   h +=
-    '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">' +
-    '<button class="btn-export" style="padding:4px 10px" onclick="briefCambiaData(-1)">◀</button>' +
+    '<div class="brief-toolbar">' +
+    '<span class="brief-grp"><span class="brief-grp-lbl">Giorno</span>' +
+    '<button class="btn-export" style="padding:4px 10px" title="Giorno precedente" onclick="briefCambiaData(-1)">&#8592;</button>' +
     '<input type="date" id="brief-data" value="' +
     dstr +
     '" onchange="briefSetData(this.value)" style="padding:6px">' +
-    '<button class="btn-export" style="padding:4px 10px" onclick="briefCambiaData(1)">▶</button>' +
-    '<strong style="font-size:1.1rem;background:#FFFF00;color:#000;padding:3px 12px;border:1px solid #999">' +
+    '<button class="btn-export" style="padding:4px 10px" title="Giorno successivo" onclick="briefCambiaData(1)">&#8594;</button>' +
+    '<strong style="font-size:1.05rem;background:#FFFF00;color:#000;padding:3px 12px;border:1px solid #999">' +
     _briefGiornoLbl(dstr) +
     ' ' +
     dstr.split('-').reverse().join('.') +
-    '</strong>' +
+    '</strong></span>' +
     (puo
-      ? '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="briefCompila()">Compila dal piano</button>' +
+      ? '<span class="brief-grp"><span class="brief-grp-lbl">Azioni</span>' +
+        '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="briefCompila()">Compila dal piano</button>' +
         '<button class="btn-export" style="font-size:.82rem;padding:5px 12px;border-color:#2c6e49;color:#2c6e49" onclick="briefGeneraPause()">Genera pause</button>' +
         '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="pdfBriefingGiorno()">Stampa briefing</button>' +
-        '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="document.getElementById(\'brief-xlsx\').click()">Importa da Excel</button>' +
+        '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="document.getElementById(\'brief-xlsx\').click()">Importa da Excel</button></span>' +
         '<input type="file" id="brief-xlsx" accept=".xlsx,.xls,.xlsm" style="display:none" onchange="importaBriefingExcel(this)">' +
-        '<span style="position:relative;display:inline-flex;align-items:center"><button class="btn-export" style="font-size:.82rem;padding:4px 10px;border-color:#e67e22;color:#e67e22" title="Applica alle celle o righe marcate il colore mostrato nella barretta (per cambiarlo usa la freccia accanto)" onclick="event.stopPropagation();briefColoreApplica(_colUltimo() || null)"><span style="display:flex;flex-direction:column;gap:3px;min-width:44px">Colora' +
+        '<span class="brief-grp"><span class="brief-grp-lbl">Formato</span><span style="position:relative;display:inline-flex;align-items:center"><button class="btn-export" style="font-size:.82rem;padding:4px 10px;border-color:#e67e22;color:#e67e22" title="Applica alle celle o righe marcate il colore mostrato nella barretta (per cambiarlo usa la freccia accanto)" onclick="event.stopPropagation();briefColoreApplica(_colUltimo() || null)"><span style="display:flex;flex-direction:column;gap:3px;min-width:44px">Colora' +
         _colChipHtml() +
         '</span></button>' +
         '<button class="btn-export" style="font-size:.82rem;padding:5px 7px;border-color:#e67e22;color:#e67e22" title="Scegli colore o formato" onclick="event.stopPropagation();briefColoriToggle()">&#9662;</button>' +
@@ -16234,7 +16237,7 @@ async function _renderPianoBriefingTab() {
         '<button class="btn-export" style="font-size:.82rem;padding:2px 10px;vertical-align:middle" title="Applica il formato memorizzato alle celle marcate" onclick="briefIncollaFormato()">Incolla formato</button> ' +
         '<button class="btn-export" style="font-size:.82rem;padding:2px 10px;vertical-align:middle;border-color:#c0392b;color:#c0392b" title="Toglie colori e formato dalle celle o righe marcate" onclick="briefCancellaFormato()">Cancella formato</button>' +
         '</div>' +
-        '</div></span>'
+        '</div></span></span>'
       : '') +
     (puo && !valet && rep === 'slots' && salvato
       ? '<button class="btn-export" style="font-size:.82rem;padding:4px 10px" title="Riassegna la colonna CD con la rotazione (chi ha chiuso ieri riapre oggi), lasciando intatto tutto il resto" onclick="briefAggiornaCd()">Aggiorna numeri cassa</button>'

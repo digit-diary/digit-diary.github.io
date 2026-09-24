@@ -1770,3 +1770,59 @@ function initCardRichiudibili(rootId, aperteDefault) {
     });
   });
 }
+
+// ===== INDICE DELLE IMPOSTAZIONI =====
+// La pagina ha molte sezioni: in cima compare un indice a gruppi (Registrazioni,
+// Persone e accessi, Maison, Personale, Sistema) costruito dai titoli delle
+// sezioni visibili, e prima di ogni gruppo un'etichetta. Niente da mantenere a
+// mano: aggiungendo una sezione con data-gruppo compare da sola.
+function _settingsAggiornaIndice() {
+  const nav = document.getElementById('settings-indice');
+  const page = document.getElementById('page-impostazioni');
+  if (!nav || !page) return;
+  page.querySelectorAll('.settings-gruppo-titolo').forEach((el) => el.remove());
+  const ordine = ['Registrazioni', 'Persone e accessi', 'Maison', 'Personale', 'Sistema', 'Altro'];
+  const perGruppo = {};
+  page.querySelectorAll('.settings-section').forEach((sec, i) => {
+    if (sec.style.display === 'none') return;
+    const h4 = sec.querySelector('h4');
+    if (!h4) return;
+    if (!sec.id) sec.id = 'settings-sez-' + i;
+    const g = sec.getAttribute('data-gruppo') || 'Altro';
+    (perGruppo[g] = perGruppo[g] || []).push({ id: sec.id, titolo: h4.textContent.trim(), el: sec });
+  });
+  let h = '';
+  ordine.forEach((g) => {
+    const voci = perGruppo[g];
+    if (!voci || !voci.length) return;
+    h +=
+      '<div class="settings-indice-gruppo"><span class="settings-indice-lbl">' +
+      escP(g) +
+      '</span>' +
+      voci
+        .map(
+          (v) =>
+            '<button type="button" class="settings-chip" onclick="_settingsVai(\'' +
+            v.id +
+            '\')">' +
+            escP(v.titolo) +
+            '</button>',
+        )
+        .join('') +
+      '</div>';
+    const et = document.createElement('div');
+    et.className = 'settings-gruppo-titolo';
+    et.textContent = g;
+    voci[0].el.parentNode.insertBefore(et, voci[0].el);
+  });
+  nav.innerHTML = h;
+}
+function _settingsVai(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  el.classList.remove('settings-evidenzia');
+  void el.offsetWidth;
+  el.classList.add('settings-evidenzia');
+  setTimeout(() => el.classList.remove('settings-evidenzia'), 1600);
+}
