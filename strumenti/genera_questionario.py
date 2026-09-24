@@ -223,7 +223,7 @@ sez(B, 'S · Moduli disciplinari e alert', '', [
  ('Alert cassa: differenza fino a ' + str(sa.get('allineamento', 90)) + ' CHF suggerisce un Allineamento, oltre ' + str(sa.get('rdi', 500)) + ' CHF una RDI.', 'Differenza 120: allineamento.'),
  ('Alert rischio: ' + str(sd.get('amm', 2)) + ' ammonimenti, ' + str(sd.get('recidiva', 3)) + ' allineamenti con lo stesso motivo (recidiva) o ' + str(sd.get('accumulo', 3)) + ' in accumulo fanno scattare il suggerimento RDI.', 'Terzo allineamento uguale: "Recidiva".'),
  ('La ristampa di un modulo firmato digitalmente contiene le firme; ogni modulo va nel fascicolo e nel registro.', 'RDI ristampata: firme presenti.'),
- ('Le registrazioni di malattia con periodo creano una riga per giorno e la M nel piano; la correzione allinea il piano senza cancellare le M ancora coperte.', 'Malattia 1-7 accorciata a 1-3.'),
+ ('Una malattia registrata nel Diario (un giorno o un periodo) allinea subito il piano: i giorni con un turno diventano M protetta (8.787 ore, era il turno), i giorni di congedo C restano C e si vedono come MC (0 ore, era gia riposo), un CGF resta a credito (MCG); i recuperi automatici in piu tornano C. Correggere il periodo toglie le M dei giorni non piu coperti da nessuna registrazione.', 'Malattia 1-10 con turni 1-7 e C 8-10: sette M da 8.787 ore, tre MC da 0 ore; la scheda conta 10 giorni.'),
 ])
 buoni = J('buono_valori', {})
 sez(B, 'T · Diario, rapporto, Maison, consegne, promemoria', '', [
@@ -235,8 +235,7 @@ sez(B, 'T · Diario, rapporto, Maison, consegne, promemoria', '', [
  ('Inventario buoni e sigarette per Slots e Tavoli con categorie personalizzabili; il pareggio buoni collega un pre-assegno a una riga Maison uno a uno.', 'Pre-assegno BU pareggiato con una riga.'),
 ])
 sez(B, 'U · Sicurezza e sessioni', '', [
- ('Ogni dispositivo ha la sua sessione (24 ore, rinnovo con il token); aprire il programma sul telefono non fa uscire dal PC; se il rinnovo non riesce si rientra con la password.', 'PC e telefono insieme.'),
- ('Sblocco biometrico con segreto del dispositivo verificato dal server; 5 tentativi sbagliati bloccano per 30 secondi; va riattivato una volta su ogni dispositivo.', 'Face ID riattivato dalle Impostazioni.'),
+ ('Ogni postazione ha la sua sessione (24 ore, rinnovo automatico); piu postazioni aperte insieme restano tutte dentro; se il rinnovo non riesce si rientra con la password. Il programma sara usato solo dai PC interni; 5 tentativi di accesso sbagliati bloccano per 30 secondi.', 'Due PC aperti insieme: entrambi dentro.'),
  ('Password: minimo 4 caratteri, cambio forzato al primo accesso e dopo un reset; password master separata con codice di recupero.', 'Nuovo operatore: cambio al primo accesso.'),
  ('Ogni salvataggio fallito mostra un avviso rosso; il programma non dice mai "salvato" senza aver scritto; ogni azione importante finisce nel Registro attivita.', 'Sessione scaduta: "esci e rientra".'),
  ('Uscita automatica dopo 8 ore di inattivita.', '8 ore senza tocco: fuori.'),
