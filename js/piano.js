@@ -16,6 +16,7 @@ let pianoTurniCache = [];
 let pianoCodiciCache = [];
 let pianoFestiviCache = [];
 let pianoRegoleCache = [];
+let _pianoCongediNp = []; // congedi non pagati (RAP 5.14), tutti i settori
 let _pianoRighe = []; // righe del mese/settore correnti
 // Data di oggi in ORA LOCALE: toISOString() e' UTC e fra mezzanotte e le 2
 // del 1 del mese restituiva ancora il mese prima.
@@ -368,6 +369,11 @@ async function _pianoCaricaCfg() {
   pianoFestiviCache = festivi || [];
   pianoRegoleCache = regole || [];
   pianoMappatureCache = mappature || [];
+  try {
+    _pianoCongediNp = (await secGet('collab_congedi_np?order=dal.desc&limit=5000')) || [];
+  } catch (e) {
+    _pianoCongediNp = [];
+  }
   _pianoOreSett = parseFloat(oreSett) || 41;
   try {
     window._pianoFunzioni = funzioni ? JSON.parse(funzioni) : null;
@@ -1016,7 +1022,7 @@ async function _pianoAggiornaYtd(nomi) {
     const pct = parseFloat(info.percentuale) || 1; // senza percentuale vale 100%, come nel calcolo del mese
     let cum = 0;
     for (let m = 1; m < mese; m++) {
-      const dim = new Date(anno, m, 0).getDate();
+      const dim = _pianoGgDovuti(n, anno + '-' + String(m).padStart(2, '0')); // meno i giorni di congedo non pagato
       const dovute = Math.round((dim / 7) * _pianoOreSett * pct * 100) / 100;
       const k = n + '|' + m;
       const effettive =
@@ -2031,6 +2037,7 @@ async function renderPiano() {
         _renderPianoImportExportCard() +
         _renderPianoMappatureCard() +
         _renderPianoPreferenzeCard() +
+        _renderPianoCongediNpCard() +
         _renderPianoImpostazioniCard() +
         '</div>';
     }
@@ -2199,7 +2206,7 @@ function _pianoLimitiOre(nome, nGiorni) {
     return { obiettivo: null, min: isNaN(jMin) ? null : jMin, max: isNaN(jMax) ? null : jMax };
   }
   const pct = info.is_jolly && !(pctJ > 0 && pctJ < 1) ? pctJollyPiano : parseFloat(info.percentuale) || 1;
-  const obiettivo = (nGiorni / 7) * _pianoOreSett * pct;
+  const obiettivo = (_pianoGgDovuti(nome, _pianoMeseSel) / 7) * _pianoOreSett * pct;
   const sim = parseFloat(_pianoRegolaVal('tolleranza_ore'));
   const sopra = parseFloat(_pianoRegolaVal('tolleranza_ore_sopra'));
   const sotto = parseFloat(_pianoRegolaVal('tolleranza_ore_sotto'));
@@ -2666,7 +2673,7 @@ async function generaBozzaPiano(usaCoperture) {
     (idoneita[r.collaboratore] = idoneita[r.collaboratore] || new Set()).add(t.gruppo);
     familiarita[r.collaboratore + '|' + r.codice] = (familiarita[r.collaboratore + '|' + r.codice] || 0) + 1;
   });
-  const malattie = _pianoMalattieMese(ym);
+  const malattie = Object.assign(_pianoMalattieMese(ym), _pianoCnpMese(ym)); // malattie e congedi non pagati: giorni non assegnabili
   const ndDiario = _pianoNdMese(ym);
   // stato griglia: esistenti + assegnazioni della bozza
   const cella = {}; // 'nome|g' -> codice
@@ -2700,7 +2707,7 @@ async function generaBozzaPiano(usaCoperture) {
   nomi.forEach((n) => {
     const info = _pianoCollabInfo(n) || {};
     const pct = parseFloat(info.percentuale) || 1;
-    obiettivo[n] = (nGiorni / 7) * _pianoOreSett * pct - (_pianoYtdMap[n] || 0);
+    obiettivo[n] = (_pianoGgDovuti(n, ym) / 7) * _pianoOreSett * pct - (_pianoYtdMap[n] || 0);
   });
   const gapOre = (n) => (obiettivo[n] || 0) - (oreMese[n] || 0);
   const consecPrima = (nome, g) => {
@@ -3586,6 +3593,18 @@ const PIANO_REGOLE_GUIDA = {
     t: 'testo',
     d: 'Calendario, ore dei turni prolungati, briefing',
   },
+  congedo_np_giorni_vacanze: {
+    g: 'Congedi non pagati',
+    n: 'Oltre questi giorni di congedo il diritto vacanze dell anno si riduce in proporzione',
+    t: 'numero',
+    d: 'Scheda Vacanze (diritto), scheda Congedi',
+  },
+  congedo_np_mesi_anzianita: {
+    g: 'Congedi non pagati',
+    n: 'Oltre questi mesi di congedo l anzianita si sposta in avanti (giubilei e scaglioni)',
+    t: 'numero',
+    d: 'Giubilei, scheda Vacanze, scheda Congedi',
+  },
   blocco_giorni_chiusi: {
     g: 'Giorni chiusi',
     n: 'I giorni passati si modificano solo con uno sblocco motivato',
@@ -3617,6 +3636,141 @@ const PIANO_REGOLE_GUIDA = {
     d: 'Validatore e bozza',
   },
 };
+// LIMITI DI BUON SENSO per i valori numerici: un valore fuori scala (riposo
+// di 3 ore, 40 giorni consecutivi, 300 domeniche) viene rifiutato con un
+// avviso chiaro invece di finire nei calcoli. Chi crea l'eccezione per un
+// settore riceve lo stesso controllo.
+const PIANO_REGOLE_LIMITI = {
+  min_riposo_ore: [8, 16],
+  max_consecutivi: [1, 7],
+  pattern_lavoro: [1, 7],
+  domeniche_libere_anno: [0, 52],
+  tolleranza_ore: [0, 60],
+  tolleranza_ore_sopra: [0, 60],
+  tolleranza_ore_sotto: [0, 60],
+  saldo_ore_max: [0, 200],
+  saldo_ore_min: [-200, 0],
+  jolly_percentuale_piano: [0.1, 1],
+  jolly_ore_max: [1, 250],
+  jolly_ore_min: [0, 250],
+  jolly_indennita_vacanze_4sett: [0, 30],
+  jolly_indennita_vacanze_5sett: [0, 30],
+  jolly_indennita_tredicesima: [0, 30],
+  notte_inizio: [0, 24],
+  notte_fine: [0, 24],
+  notte_percentuale: [0, 100],
+  nd_jolly_giorno: [1, 28],
+  cgf_max_mese: [1, 10],
+  cgf_distanza_giorni: [0, 15],
+  vacanze_giorni_primi2anni: [20, 40],
+  vacanze_giorni_base: [20, 45],
+  vacanze_bonus_10anni: [0, 10],
+  vacanze_bonus_15anni: [0, 10],
+  vacanze_bonus_20anni: [0, 10],
+  vacanze_bonus_25anni: [0, 10],
+  vacanze_arrotonda_da: [0, 1],
+  vacanze_giorni_anno: [10, 45],
+  c_prima_fissi: [0, 5],
+  c_prima_jolly: [0, 5],
+  c_dopo_100: [0, 7],
+  c_dopo_80: [0, 7],
+  c_dopo_60: [0, 7],
+  c_dopo_40: [0, 7],
+  wd_prima_vacanza: [0, 7],
+  chiusura_ora_normale: [0, 12],
+  chiusura_ora_tardi: [0, 12],
+  chiusura_ora_fine_anno: [0, 12],
+  blocco_ora_limite: [0, 23],
+  congedo_np_giorni_vacanze: [0, 365],
+  congedo_np_mesi_anzianita: [0, 24],
+};
+// COSA ESISTE IN UN SETTORE: sigle dei turni, gruppi e funzioni presenti.
+// Serve a dire "questa regola qui non ha senso" (L1 e 9 ai Tavoli non esistono).
+function _pianoContestoSettore(settore) {
+  const chiave = String(settore || '').toLowerCase();
+  const tutti = !chiave;
+  const turni = pianoTurniCache.filter((t) => t.attivo !== false && (tutti || (t.reparto_dip || 'slots') === chiave));
+  const funzioni = new Set();
+  collaboratoriCache
+    .filter((c) => c.attivo !== false && (tutti || (c.reparto_dip || 'slots') === chiave))
+    .forEach((c) => c.funzione && funzioni.add(String(c.funzione).toUpperCase()));
+  const jolly = collaboratoriCache.some(
+    (c) =>
+      c.attivo !== false && (tutti || (c.reparto_dip || 'slots') === chiave) && (c.is_jolly || c.impiego === 'jolly'),
+  );
+  return {
+    label: tutti ? 'nessun settore' : repartoLabel(chiave),
+    codici: new Set(turni.map((t) => String(t.codice).toUpperCase())),
+    gruppi: new Set(turni.map((t) => String(t.gruppo || '').toUpperCase()).filter(Boolean)),
+    funzioni: funzioni,
+    jolly: jolly,
+  };
+}
+// Regole che parlano di turni o funzioni precisi: valgono solo dove esistono
+function _pianoValidaRegolaSettore(nome, valore, settore) {
+  const ctx = _pianoContestoSettore(settore);
+  const on = String(valore || '').toUpperCase() === 'TRUE';
+  const manca = (cosa) =>
+    'Regola non valida per ' +
+    ctx.label +
+    ': ' +
+    cosa +
+    '. Qui non avrebbe alcun effetto: lasciala su No o non crearla.';
+  if (nome === 'l1_solo_bo_sup' && on) {
+    if (!ctx.codici.has('L1') && !ctx.codici.has('9')) return manca('non esistono i turni L1 e 9');
+    if (!ctx.funzioni.has('BO') && !ctx.funzioni.has('SUP'))
+      return manca('nessun collaboratore ha la funzione BO o SUP');
+  }
+  if ((nome === 'sup_solo_z_settimana' || nome === 'sup_ven_sab_z_e_s') && on) {
+    if (!ctx.funzioni.has('SUP')) return manca('nessun collaboratore ha la funzione SUP');
+    if (![...ctx.codici].some((c) => c.startsWith('Z'))) return manca('non esistono turni Z');
+    if (nome === 'sup_ven_sab_z_e_s' && ![...ctx.codici].some((c) => c.startsWith('S')))
+      return manca('non esistono turni S');
+  }
+  if (/^jolly_|^c_prima_jolly$/.test(nome) && settore && !ctx.jolly)
+    return manca('non ci sono ausiliari (jolly) in questo settore');
+  return null;
+}
+// Controllo del valore PRIMA del salvataggio: ritorna il motivo dell'errore
+// oppure null se va bene. Usato dal salvataggio generale e da quello per settore.
+function _pianoValidaRegola(nome, valore, settore) {
+  const g = PIANO_REGOLE_GUIDA[nome];
+  const v = String(valore == null ? '' : valore).trim();
+  if (!g) return null;
+  const perSettore = _pianoValidaRegolaSettore(nome, v, settore);
+  if (perSettore) return perSettore;
+  if (g.t === 'sino') {
+    if (!/^(TRUE|FALSE)$/i.test(v)) return 'Questa regola accetta solo Si o No';
+    return null;
+  }
+  if (g.t === 'numero') {
+    const num = parseFloat(v.replace(',', '.'));
+    if (v === '' || isNaN(num)) return 'Serve un numero (per esempio 11 oppure 0.8), non "' + v + '"';
+    const lim = PIANO_REGOLE_LIMITI[nome];
+    if (lim && (num < lim[0] || num > lim[1]))
+      return (
+        'Valore fuori scala: per "' + g.n + '" e ammesso da ' + lim[0] + ' a ' + lim[1] + ' (hai scritto ' + v + ')'
+      );
+    return null;
+  }
+  if (nome === 'chiusura_giorni_tardi') {
+    const parti = v.split(',').map((x) => x.trim());
+    if (!parti.length || parti.some((x) => !/^[0-6]$/.test(x)))
+      return 'Scrivi i giorni della settimana come numeri da 0 (domenica) a 6 (sabato), separati da virgola: es. 5,6';
+    return null;
+  }
+  if (nome === 'jolly_codici_gia_pagati') {
+    const noti = new Set(pianoCodiciCache.map((c) => String(c.codice).toUpperCase()));
+    const ignoti = v
+      .split(',')
+      .map((x) => x.trim().toUpperCase())
+      .filter((x) => x && !noti.has(x));
+    if (ignoti.length)
+      return 'Codici speciali inesistenti: ' + ignoti.join(', ') + ' (vedi scheda Turni, codici speciali)';
+    return null;
+  }
+  return null;
+}
 const PIANO_REGOLE_GRUPPI_ORDINE = [
   'Riposo e giorni di lavoro',
   'Domeniche',
@@ -3627,6 +3781,7 @@ const PIANO_REGOLE_GRUPPI_ORDINE = [
   'Funzioni e turni',
   'Orari di chiusura',
   'Giorni chiusi',
+  'Congedi non pagati',
 ];
 function _pianoRegoleDove(nome) {
   const g = PIANO_REGOLE_GUIDA[nome];
@@ -3634,47 +3789,69 @@ function _pianoRegoleDove(nome) {
 }
 function _renderPianoRegoleCard() {
   if (!puoGestireRegole()) return _pianoSchedaRiservata('Regole del piano', 'Regole del piano');
-  const perGruppo = {};
+  // VISTA PER SETTORE: si sceglie il settore in alto e si cambiano i numeri
+  // direttamente. Per quel settore nasce (o si aggiorna) l'eccezione, la
+  // regola generale resta per gli altri. "Tutti i settori" mostra le generali.
+  const settori = typeof getReparti === 'function' ? getReparti() : [];
+  const vista = window._pianoRegoleSettoreVista || '';
+  const generali = {};
+  const specifiche = {}; // nome|settore -> regola
   const sconosciute = [];
   pianoRegoleCache.forEach((r) => {
-    const g = PIANO_REGOLE_GUIDA[r.nome];
-    if (!g) {
+    if (!PIANO_REGOLE_GUIDA[r.nome]) {
       sconosciute.push(r);
       return;
     }
-    (perGruppo[g.g] = perGruppo[g.g] || []).push(r);
+    const sett = _pianoRegolaSettori(r);
+    if (!sett.length) generali[r.nome] = r;
+    else sett.forEach((k) => (specifiche[r.nome + '|' + k] = r));
+  });
+  const perGruppo = {};
+  Object.keys(PIANO_REGOLE_GUIDA).forEach((nome) => {
+    if (!generali[nome] && !Object.keys(specifiche).some((k) => k.startsWith(nome + '|'))) return;
+    const g = PIANO_REGOLE_GUIDA[nome];
+    (perGruppo[g.g] = perGruppo[g.g] || []).push(nome);
   });
   let h =
-    '<div class="main-card" style="margin-top:16px"><div class="card-header">Regole del piano</div><div style="padding:10px 14px">';
-  // MINI GUIDA: come si usano le regole, senza parole tecniche
+    '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Regole del piano' +
+    '<select onchange="window._pianoRegoleSettoreVista=this.value;renderPiano()" style="padding:4px 8px;font-size:.8rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a"><option value=""' +
+    (vista ? '' : ' selected') +
+    '>Tutti i settori (valori generali)</option>' +
+    settori
+      .map(
+        (rp) =>
+          '<option value="' +
+          escP(rp.key) +
+          '"' +
+          (vista === rp.key ? ' selected' : '') +
+          '>' +
+          escP(rp.label) +
+          '</option>',
+      )
+      .join('') +
+    '</select></div><div style="padding:10px 14px">';
   h +=
     '<details style="margin-bottom:12px;background:var(--paper2);border:1px solid var(--line);border-radius:3px;padding:8px 12px"><summary style="cursor:pointer;font-weight:700;font-size:.9rem">Come si usano le regole (guida in 6 punti)</summary>' +
     '<ol style="font-size:.85rem;margin:8px 0 4px 18px;line-height:1.5">' +
-    '<li><b>Cambia il valore</b> nella casella e premi Invio o clicca fuori: si salva da solo e vale subito per tutto il programma (validatore, bozza, statistiche). Nella colonna "Dove agisce" leggi in quali schermate la regola conta.</li>' +
+    '<li><b>Cambia il valore</b> nella casella e premi Invio o clicca fuori: si salva da solo e vale subito in tutto il programma. La colonna "Dove agisce" dice in quali schermate la regola conta.</li>' +
     '<li><b>Si / No</b> accende o spegne una preferenza. La casella <b>Attiva</b> spegne qualsiasi regola senza perdere il valore: spenta, e come se non esistesse.</li>' +
-    '<li><b>Un valore diverso per un settore</b>: premi "Eccezione per un settore", scrivi il settore e il valore. La regola generale resta per gli altri; nel settore indicato vince l eccezione. Esempio: riposo 11 ore ovunque, 12 ai Tavoli.</li>' +
-    '<li><b>Regole nuove sui gruppi di lavoro</b> (chi puo fare cassa, quanti Supervisor al giorno, una funzione richiesta): si creano nella scheda <b>Regole di gruppo</b> qui sotto, scegliendo il tipo dall elenco. Non serve scrivere codice.</li>' +
-    '<li><b>Preferenze di una persona</b> (solo diurni, turni vietati, settori abilitati, copertura di altri settori): si impostano nella sua scheda in Gestione collaboratori. La bozza e il validatore le rispettano.</li>' +
+    '<li><b>Un valore diverso per un settore</b>: scegli il settore nel menu in alto e cambia il numero. Nasce l eccezione per quel settore; gli altri tengono il valore generale. "Torna al generale" la toglie. Esempio: riposo 11 ore ovunque, 12 ai Tavoli.</li>' +
+    '<li><b>Regole nuove sui gruppi di lavoro</b> (chi puo fare cassa, quanti Supervisor al giorno, una funzione richiesta): si creano nella scheda <b>Regole di gruppo</b> qui sotto scegliendo il tipo dall elenco. Non serve scrivere codice.</li>' +
+    '<li><b>Preferenze di una persona</b> (solo diurni, turni vietati, settori abilitati, copertura di altri settori): nella sua scheda in Gestione collaboratori. Bozza e validatore le rispettano.</li>' +
     '<li><b>Fonte</b>: sotto ogni regola normativa c e il riferimento (RAP, legge sul lavoro, direttiva). Se cambia il regolamento, cambia il numero qui: il programma non va toccato. Ogni modifica finisce nel Registro attivita.</li>' +
     '</ol></details>';
-  const settRow = (r) => {
-    const settR = _pianoRegolaSettori(r);
-    return settR.length
-      ? escP(settR.map((s) => repartoLabel(s)).join(', ')) +
-          ' <button class="btn-del-tipo" style="font-size:.82rem;padding:1px 6px" onclick="pianoRegolaSettoriEdit(' +
-          r.id +
-          ')">cambia</button>'
-      : '<span style="color:var(--muted)">tutti i settori</span> <button class="btn-del-tipo" style="font-size:.82rem;padding:1px 6px" onclick="pianoRegolaEccezione(\'' +
-          escP(r.nome) +
-          '\')">eccezione per un settore</button>';
-  };
-  const valoreInput = (r, tipo) => {
+  if (vista)
+    h +=
+      '<p style="font-size:.82rem;color:#8b6914;margin-bottom:8px">Stai vedendo i valori validi per <b>' +
+      escP(repartoLabel(vista)) +
+      '</b>. Le righe con il segno <b>eccezione</b> hanno un valore proprio; le altre usano quello generale. Modificando una casella crei l eccezione per questo settore.</p>';
+  const valoreInput = (r, tipo, onch) => {
     if (tipo === 'sino') {
       const on = String(r.valore || '').toUpperCase() === 'TRUE';
       return (
-        '<select onchange="salvaPianoRegola(' +
-        r.id +
-        ',\'valore\',this.value)" style="padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><option value="TRUE"' +
+        '<select onchange="' +
+        onch +
+        '" style="padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><option value="TRUE"' +
         (on ? ' selected' : '') +
         '>Si</option><option value="FALSE"' +
         (on ? '' : ' selected') +
@@ -3682,20 +3859,20 @@ function _renderPianoRegoleCard() {
       );
     }
     return (
-      '<input type="' +
-      (tipo === 'numero' ? 'text' : 'text') +
-      '" value="' +
+      '<input type="text" value="' +
       escP(r.valore || '') +
-      '" onchange="salvaPianoRegola(' +
-      r.id +
-      ',\'valore\',this.value)" style="width:' +
+      '" onchange="' +
+      onch +
+      '" style="width:' +
       (tipo === 'numero' ? '64' : '110') +
       'px;padding:3px;text-align:center;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)">'
     );
   };
   h += '<div style="overflow-x:auto"><table class="piano-table" style="min-width:760px;font-size:.85rem">';
   h +=
-    '<thead><tr><th style="text-align:left">Regola</th><th>Valore</th><th style="min-width:150px">Vale per</th><th>Attiva</th><th style="text-align:left">Dove agisce</th></tr></thead><tbody>';
+    '<thead><tr><th style="text-align:left">Regola</th><th>Valore</th><th style="min-width:170px">' +
+    (vista ? 'Per questo settore' : 'Eccezioni') +
+    '</th><th>Attiva</th><th style="text-align:left">Dove agisce</th></tr></thead><tbody>';
   const gruppi = PIANO_REGOLE_GRUPPI_ORDINE.filter((g) => perGruppo[g]).concat(
     Object.keys(perGruppo).filter((g) => !PIANO_REGOLE_GRUPPI_ORDINE.includes(g)),
   );
@@ -3706,37 +3883,53 @@ function _renderPianoRegoleCard() {
       '</td></tr>';
     perGruppo[gr]
       .slice()
-      .sort(
-        (a, b) =>
-          (PIANO_REGOLE_GUIDA[a.nome].n || '').localeCompare(PIANO_REGOLE_GUIDA[b.nome].n || '') ||
-          String(a.settori || '').localeCompare(String(b.settori || '')),
-      )
-      .forEach((r) => {
-        const g = PIANO_REGOLE_GUIDA[r.nome];
-        const settR = _pianoRegolaSettori(r);
+      .sort((a, b) => PIANO_REGOLE_GUIDA[a].n.localeCompare(PIANO_REGOLE_GUIDA[b].n))
+      .forEach((nome) => {
+        const g = PIANO_REGOLE_GUIDA[nome];
+        const gen = generali[nome];
+        const spec = vista ? specifiche[nome + '|' + vista] : null;
+        const r = spec || gen;
+        if (!r) return;
+        const eccezioni = Object.keys(specifiche)
+          .filter((k) => k.startsWith(nome + '|'))
+          .map((k) => k.split('|')[1]);
+        const onch = vista
+          ? "salvaPianoRegolaSettore('" + escP(nome) + "','" + escP(vista) + "','valore',this.value)"
+          : 'salvaPianoRegola(' + r.id + ",'valore',this.value)";
+        const onAtt = vista
+          ? "salvaPianoRegolaSettore('" + escP(nome) + "','" + escP(vista) + "','attivo',this.checked)"
+          : 'salvaPianoRegola(' + r.id + ",'attivo',this.checked)";
+        let colSett = '';
+        if (vista) {
+          colSett = spec
+            ? '<span style="color:#8b6914;font-weight:700">eccezione</span> <button class="btn-del-tipo" style="font-size:.8rem;padding:1px 6px" onclick="eliminaPianoRegolaSettore(' +
+              spec.id +
+              ')">Torna al generale</button>'
+            : '<span style="color:var(--muted)">valore generale</span>';
+        } else {
+          colSett = eccezioni.length
+            ? eccezioni
+                .map((k) => escP(repartoLabel(k)) + ': <b>' + escP(specifiche[nome + '|' + k].valore || '') + '</b>')
+                .join(', ')
+            : '<span style="color:var(--muted)">nessuna</span>';
+        }
         h +=
           '<tr' +
           (r.attivo === false ? ' style="opacity:.55"' : '') +
           '><td style="text-align:left;white-space:normal;min-width:260px"><b>' +
           escP(g.n) +
-          '</b>' +
-          (settR.length
-            ? ' <span style="font-size:.8rem;color:#8b6914">(solo ' +
-              escP(settR.map((x) => repartoLabel(x)).join(', ')) +
-              ')</span>'
-            : '') +
-          '<br><span style="font-size:.78rem;color:var(--muted)">' +
-          escP(r.nome) +
-          (PIANO_REGOLE_FONTE[r.nome] ? ' · ' + escP(PIANO_REGOLE_FONTE[r.nome]) : '') +
+          '</b><br><span style="font-size:.78rem;color:var(--muted)">' +
+          escP(nome) +
+          (PIANO_REGOLE_FONTE[nome] ? ' · ' + escP(PIANO_REGOLE_FONTE[nome]) : '') +
           '</span></td><td>' +
-          valoreInput(r, g.t) +
+          valoreInput(r, g.t, onch) +
           '</td><td style="text-align:left;font-size:.8rem">' +
-          settRow(r) +
+          colSett +
           '</td><td><input type="checkbox"' +
           (r.attivo !== false ? ' checked' : '') +
-          ' onchange="salvaPianoRegola(' +
-          r.id +
-          ',\'attivo\',this.checked)"></td><td style="font-size:.82rem;text-align:left;color:#2c6e49">' +
+          ' onchange="' +
+          onAtt +
+          '"></td><td style="font-size:.82rem;text-align:left;color:#2c6e49">' +
           escP(g.d) +
           '</td></tr>';
       });
@@ -3759,6 +3952,78 @@ function _renderPianoRegoleCard() {
   }
   h += '</tbody></table></div></div></div>';
   return h;
+}
+// Valore di una regola per UN settore: aggiorna l'eccezione se c'e', altrimenti
+// la crea copiando la generale. Cosi' "personalizzare per settore" e' una
+// casella da cambiare, non una procedura.
+async function salvaPianoRegolaSettore(nome, settore, campo, valore) {
+  if (!isAdmin()) return;
+  if (campo === 'valore') {
+    const errore = _pianoValidaRegola(nome, valore, settore);
+    if (errore) {
+      toastErrore(errore + ' Per ' + repartoLabel(settore) + ' resta il valore di prima.', 9000);
+      renderPiano();
+      return;
+    }
+  }
+  const spec = pianoRegoleCache.find((x) => x.nome === nome && _pianoRegolaSettori(x).includes(settore));
+  if (spec) return salvaPianoRegola(spec.id, campo, valore);
+  const gen = pianoRegoleCache.find((x) => x.nome === nome && !_pianoRegolaSettori(x).length);
+  if (!gen) return;
+  try {
+    const nuova = await secPost('piano_regole', {
+      nome: nome,
+      valore: campo === 'valore' ? String(valore).trim() : gen.valore,
+      tipo: gen.tipo,
+      peso: gen.peso,
+      attivo: campo === 'attivo' ? !!valore : true,
+      descrizione: gen.descrizione,
+      settori: settore,
+    });
+    if (nuova && nuova[0]) pianoRegoleCache.push(nuova[0]);
+    const mostra = campo === 'attivo' ? (valore ? 'si' : 'no') : String(valore).trim();
+    logAzione('Regola per settore', nome + ' = ' + mostra + ' per ' + settore);
+    _pianoRegistraModifica('Regole', nome + ' (' + repartoLabel(settore) + ')', campo, 'valore generale', mostra);
+    toast('Eccezione creata per ' + repartoLabel(settore) + ': ' + nome + ' = ' + mostra);
+    _pianoViolCelle = {};
+    _pianoViolLista = null;
+    renderPiano();
+  } catch (e) {
+    toastErrore('Errore nel salvataggio della regola: ' + (e.message || ''));
+  }
+}
+async function eliminaPianoRegolaSettore(id) {
+  if (!isAdmin()) return;
+  const r = pianoRegoleCache.find((x) => x.id === id);
+  if (!r) return;
+  if (
+    !confirm(
+      'Togliere il valore proprio di "' +
+        r.nome +
+        '" per ' +
+        _pianoRegolaSettori(r).map(repartoLabel).join(', ') +
+        "?\n\nTornera' a valere il valore generale.",
+    )
+  )
+    return;
+  try {
+    await secDel('piano_regole', 'id=eq.' + id);
+    pianoRegoleCache = pianoRegoleCache.filter((x) => x.id !== id);
+    logAzione('Regola per settore tolta', r.nome + ' (' + String(r.settori) + ')');
+    _pianoRegistraModifica(
+      'Regole',
+      r.nome + ' (' + String(r.settori) + ')',
+      'eccezione',
+      String(r.valore),
+      'valore generale',
+    );
+    toast('Torna il valore generale');
+    _pianoViolCelle = {};
+    _pianoViolLista = null;
+    renderPiano();
+  } catch (e) {
+    toastErrore('Errore: ' + (e.message || ''));
+  }
 }
 // Una regola che il programma non legge e' solo confusione: si puo' togliere
 async function eliminaPianoRegola(id) {
@@ -3800,6 +4065,11 @@ async function pianoRegolaEccezione(nome) {
   if (!pulito) return;
   const val = prompt('Valore di "' + nome + '" per ' + pulito + ':', gen.valore || '');
   if (val === null) return;
+  const erroreV = _pianoValidaRegola(nome, val, pulito.split(',').length === 1 ? pulito : '');
+  if (erroreV) {
+    toastErrore(erroreV, 9000);
+    return;
+  }
   try {
     const nuova = await secPost('piano_regole', {
       nome: nome,
@@ -3845,6 +4115,16 @@ async function pianoRegolaSettoriEdit(id) {
 }
 async function salvaPianoRegola(id, campo, valore) {
   if (!isAdmin()) return;
+  const rV = pianoRegoleCache.find((x) => x.id === id);
+  if (campo === 'valore' && rV) {
+    const settR = _pianoRegolaSettori(rV);
+    const errore = _pianoValidaRegola(rV.nome, valore, settR.length === 1 ? settR[0] : '');
+    if (errore) {
+      toastErrore(errore + ' Il valore precedente (' + String(rV.valore) + ') resta in vigore.', 9000);
+      renderPiano();
+      return;
+    }
+  }
   try {
     const patch = {};
     patch[campo] = campo === 'attivo' ? !!valore : String(valore).trim();
@@ -6815,7 +7095,7 @@ async function _renderPianoRecuperoTab() {
       '<tr data-nome="' +
       escP(nome) +
       '"><td class="piano-nome" onclick="pianoRecSelRiga(event,\'' +
-      escP(nome).replace(/'/g, "\\'") +
+      escP(nome.replace(/'/g, "\\'")) +
       '\',this)" title="Click: seleziona la riga &middot; Ctrl+click: aggiunge &middot; ' +
       escP(nome) +
       '" style="text-align:left;cursor:pointer">' +
@@ -6840,7 +7120,7 @@ async function _renderPianoRecuperoTab() {
         (v === '' ? '' : v) +
         '"' +
         (puoMod
-          ? ' onchange="pianoRecuperoCella(this,\'' + escP(nome).replace(/'/g, "\\'") + "','" + dstr + '\')"'
+          ? ' onchange="pianoRecuperoCella(this,\'' + escP(nome.replace(/'/g, "\\'")) + "','" + dstr + '\')"'
           : ' readonly') +
         ' title="' +
         escP(nome) +
@@ -7173,6 +7453,127 @@ function _renderPianoFestivitaCard() {
     '<button class="btn-add-tipo" onclick="pianoFestivitaAggiungi()">+ Aggiungi</button></div>';
   h += '</div></div>';
   return h;
+}
+// ===== CONGEDI NON PAGATI (RAP 5.14) =====
+// Un congedo e' un periodo dal/al. Tre effetti, con soglie dalle Regole:
+//  - i giorni del piano sono CNP (0 ore) e NON contano fra le ore dovute;
+//  - oltre congedo_np_giorni_vacanze il diritto vacanze dell'anno cala in
+//    proporzione ai giorni di congedo di quell'anno;
+//  - oltre congedo_np_mesi_anzianita l'anzianita' si sposta in avanti di
+//    tutta la durata (giubilei e scaglioni vacanze); sotto non si interrompe.
+function _pianoCongediDi(nome) {
+  const n = String(nome || '').toLowerCase();
+  return _pianoCongediNp.filter((c) => String(c.collaboratore || '').toLowerCase() === n);
+}
+function _pianoGiorniCongedo(c) {
+  const a = new Date(String(c.dal).substring(0, 10) + 'T12:00:00');
+  const b = new Date(String(c.al).substring(0, 10) + 'T12:00:00');
+  return Math.max(0, Math.round((b - a) / 86400000) + 1);
+}
+// giorni di congedo di 'nome' dentro il mese ym (per le ore dovute)
+function _pianoGiorniCnp(nome, ym) {
+  const inizio = ym + '-01';
+  const fine = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
+  let g = 0;
+  _pianoCongediDi(nome).forEach((c) => {
+    const da = String(c.dal).substring(0, 10) > inizio ? String(c.dal).substring(0, 10) : inizio;
+    const a = String(c.al).substring(0, 10) < fine ? String(c.al).substring(0, 10) : fine;
+    if (a < da) return;
+    g += Math.round((new Date(a + 'T12:00:00') - new Date(da + 'T12:00:00')) / 86400000) + 1;
+  });
+  return g;
+}
+// giorni del mese che contano per le ore dovute: tutti meno quelli di congedo
+function _pianoGgDovuti(nome, ym) {
+  return Math.max(0, _pianoUltimoGiorno(ym) - _pianoGiorniCnp(nome, ym));
+}
+// mappa 'nome|YYYY-MM-DD' -> true dei giorni di congedo nel mese (per la bozza)
+function _pianoCnpMese(ym) {
+  const out = {};
+  const inizio = ym + '-01';
+  const fine = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
+  _pianoCongediNp.forEach((c) => {
+    const da = String(c.dal).substring(0, 10);
+    const a = String(c.al).substring(0, 10);
+    if (a < inizio || da > fine) return;
+    const cur = new Date((da < inizio ? inizio : da) + 'T12:00:00');
+    const stop = a > fine ? fine : a;
+    while (cur.toISOString().substring(0, 10) <= stop) {
+      out[c.collaboratore + '|' + cur.toISOString().substring(0, 10)] = true;
+      cur.setDate(cur.getDate() + 1);
+    }
+  });
+  return out;
+}
+// effetti per l'anno: { giorniVacanze, giorniAnzianita }
+function _pianoCongedoNpEffetti(nome, anno) {
+  const sogliaGg = parseInt(_pianoRegolaVal('congedo_np_giorni_vacanze'));
+  const sogliaMesi = parseInt(_pianoRegolaVal('congedo_np_mesi_anzianita'));
+  const sg = isNaN(sogliaGg) ? 10 : sogliaGg;
+  const sm = isNaN(sogliaMesi) ? 6 : sogliaMesi;
+  let giorniVacanze = 0;
+  let giorniAnzianita = 0;
+  _pianoCongediDi(nome).forEach((c) => {
+    const tot = _pianoGiorniCongedo(c);
+    if (tot > sg) {
+      // solo la parte che cade nell'anno richiesto
+      const inizio = anno + '-01-01';
+      const fine = anno + '-12-31';
+      const da = String(c.dal).substring(0, 10) > inizio ? String(c.dal).substring(0, 10) : inizio;
+      const a = String(c.al).substring(0, 10) < fine ? String(c.al).substring(0, 10) : fine;
+      if (a >= da) giorniVacanze += Math.round((new Date(a + 'T12:00:00') - new Date(da + 'T12:00:00')) / 86400000) + 1;
+    }
+    if (tot > sm * 30.44) giorniAnzianita += tot;
+  });
+  return { giorniVacanze: giorniVacanze, giorniAnzianita: giorniAnzianita };
+}
+// Le celle del piano seguono il congedo: CNP protetto sui giorni del periodo
+// (rimuovi = true le toglie). Scrive anche nei giorni chiusi: registrare un
+// congedo e' un atto amministrativo, non una modifica del turno.
+async function _pianoSincronizzaCongedoNp(c, rimuovi) {
+  const giorni = [];
+  const cur = new Date(String(c.dal).substring(0, 10) + 'T12:00:00');
+  const stop = String(c.al).substring(0, 10);
+  let n = 0;
+  while (cur.toISOString().substring(0, 10) <= stop && n < 400) {
+    giorni.push(cur.toISOString().substring(0, 10));
+    cur.setDate(cur.getDate() + 1);
+    n++;
+  }
+  const op = getOperatore();
+  let fatte = 0;
+  for (const d of giorni) {
+    const righe =
+      (await secGet('piano?collaboratore=eq.' + encodeURIComponent(c.collaboratore) + '&data=eq.' + d + '&limit=2')) ||
+      [];
+    const r = righe[0];
+    if (rimuovi) {
+      if (r && r.codice === 'CNP') {
+        await secDel('piano', 'id=eq.' + r.id);
+        fatte++;
+      }
+      continue;
+    }
+    const body = {
+      codice: 'CNP',
+      protetto: true,
+      generato: false,
+      commento: ('Congedo non pagato' + (c.motivo ? ': ' + c.motivo : '')).substring(0, 400),
+      operatore: op,
+    };
+    if (r) {
+      if (r.codice === 'CNP') continue;
+      body.updated_at = new Date().toISOString();
+      await secPatch('piano', 'id=eq.' + r.id, body);
+    } else {
+      await secPost(
+        'piano',
+        Object.assign({ collaboratore: c.collaboratore, data: d, reparto_dip: c.reparto_dip || _pianoReparto() }, body),
+      );
+    }
+    fatte++;
+  }
+  return fatte;
 }
 // DOMENICHE LIBERE: una domenica passata in vacanza o in malattia non e' un
 // riposo settimanale concesso dal piano: non conta ne' come libera ne' come
@@ -10517,7 +10918,9 @@ async function caricaStatisticheAnnoPiano(forza) {
   const dovuteDi = (nome) => {
     const info = _pianoCollabInfo(nome) || {};
     if (info.is_jolly) return 0;
-    return Math.round((ggDovuti / 7) * _pianoOreSett * (parseFloat(info.percentuale) || 1) * 10) / 10;
+    let gg = 0; // giorni dei mesi con piano, meno i giorni di congedo non pagato
+    mesiConPiano.forEach((mm) => (gg += _pianoGgDovuti(nome, anno + '-' + mm)));
+    return Math.round((gg / 7) * _pianoOreSett * (parseFloat(info.percentuale) || 1) * 10) / 10;
   };
   // saldo CGF = riporto dall'anno prima + maturati - goduti (stessa contabilita' della bozza)
   Object.keys(st).forEach((n) => {
@@ -10675,7 +11078,8 @@ async function _pianoVacDirittoCard(anno) {
       c: c,
       r: PianoRegole.giorniVacanzaSpettanti(String(c.data_assunzione).substring(0, 10), anno, {
         ...cfg,
-        mesiCongedo: c.mesi_congedo_non_pagato,
+        giorniCongedo: _pianoCongedoNpEffetti(c.nome, anno).giorniVacanze,
+        giorniAnzianita: _pianoCongedoNpEffetti(c.nome, anno).giorniAnzianita,
       }),
     }))
     .filter((x) => x.r)
@@ -10765,7 +11169,8 @@ async function _pianoVacDirittoCard(anno) {
       .map((x) => {
         const pros = PianoRegole.giorniVacanzaSpettanti(String(x.c.data_assunzione).substring(0, 10), anno + 1, {
           ...cfg,
-          mesiCongedo: x.c.mesi_congedo_non_pagato,
+          giorniCongedo: _pianoCongedoNpEffetti(x.c.nome, anno + 1).giorniVacanze,
+          giorniAnzianita: _pianoCongedoNpEffetti(x.c.nome, anno + 1).giorniAnzianita,
         });
         // si segnala solo chi SUPERA la base dei primi due anni: chi arriva a 28
         // sta semplicemente completando l'anno intero, non e' una novita' da
@@ -11087,7 +11492,7 @@ function _pianoSaldoDelMese(dati, nome, mm, info) {
   if (dati.timbMese[k] != null) op = dati.timbMese[k];
   if (dati.rettMese[k] != null) op = dati.rettMese[k];
   if (!op) return null;
-  const gg = new Date(dati.anno, parseInt(mm), 0).getDate();
+  const gg = _pianoGgDovuti(nome, dati.anno + '-' + mm); // meno i giorni di congedo non pagato
   const od = info.is_jolly ? 0 : Math.round((gg / 7) * _pianoOreSett * pct * 10) / 10;
   return Math.round((Math.round(op * 100) / 100 - od) * 10) / 10;
 }
@@ -11185,7 +11590,7 @@ function _renderPianoSaldoAnnoCard() {
         ? 'Aggiornato al ' + String(rec.data_riferimento).split('-').reverse().join('.')
         : 'Clic per scrivere il riporto') +
       '" onclick="pianoSaldoIniziale(\'' +
-      escP(nome).replace(/'/g, "\\'") +
+      escP(nome.replace(/'/g, "\\'")) +
       '\')">' +
       (rip ? (rip > 0 ? '+' : '') + rip : '–') +
       '</td>';
@@ -11302,7 +11707,7 @@ async function _renderPianoSaldoTab() {
     // stesso arrotondamento del calendario (una cifra decimale sulle ore
     // dovute), altrimenti la stessa persona mostra due saldi diversi nelle due
     // schede per un centesimo di differenza
-    const od = info.is_jolly ? 0 : Math.round((nGiorni / 7) * _pianoOreSett * pct * 10) / 10;
+    const od = info.is_jolly ? 0 : Math.round((_pianoGgDovuti(nome, ym) / 7) * _pianoOreSett * pct * 10) / 10;
     const sm = Math.round((Math.round(op * 100) / 100 - od) * 10) / 10;
     const ytd = Math.round(((_pianoYtdMap[nome] || 0) + sm) * 10) / 10;
     totD += od;
@@ -13590,8 +13995,79 @@ function _renderPianoRegoleGruppoCard() {
   h += '</div></div>';
   return h;
 }
+// Il valore di una regola di gruppo deve avere il formato del suo tipo e
+// parlare di gruppi, funzioni e turni che nel settore esistono davvero.
+function _pianoValidaRegolaGruppo(gruppo, tipo, valore, settore) {
+  const ctx = _pianoContestoSettore(settore);
+  const gr = String(gruppo || '').toUpperCase();
+  const v = String(valore || '')
+    .trim()
+    .toUpperCase();
+  if (!ctx.gruppi.has(gr))
+    return 'Il gruppo ' + gr + ' non esiste fra i turni di ' + ctx.label + ' (scheda Turni, colonna Gruppo)';
+  const funzioniNote = new Set(
+    (Array.isArray(window._pianoFunzioni) ? window._pianoFunzioni : [])
+      .map((f) => String(f).toUpperCase())
+      .concat([...ctx.funzioni]),
+  );
+  const fzOk = (f) => funzioniNote.has(f);
+  const t = String(tipo || '').toLowerCase();
+  if (t === 'richiede_funzione') {
+    const ignote = v
+      .split(',')
+      .map((x) => x.trim())
+      .filter((x) => x && !fzOk(x));
+    if (!v) return 'Scrivi una o piu funzioni separate da virgola (es. SUP oppure BO,SUP)';
+    if (ignote.length)
+      return (
+        'Funzioni sconosciute in ' +
+        ctx.label +
+        ': ' +
+        ignote.join(', ') +
+        ' (Impostazioni del piano, Funzioni disponibili)'
+      );
+    return null;
+  }
+  if (t === 'blocca_tipo_turno') {
+    const ignoti = v
+      .split(',')
+      .map((x) => x.trim())
+      .filter((x) => x && x !== 'DIURNO' && x !== 'NOTTURNO');
+    if (!v || ignoti.length)
+      return 'Il tipo di turno puo essere solo DIURNO o NOTTURNO (anche entrambi: DIURNO,NOTTURNO)';
+    return null;
+  }
+  if (t === 'richiede_campo') {
+    if (!/^[A-Z_][A-Z0-9_]*\s*(>|>=|<|<=|=|!=)\s*[A-Z0-9_.]+$/.test(v))
+      return 'Scrivi campo, confronto e valore, per esempio ACCOGLIENZA>0 oppure LINGUE=EN';
+    return null;
+  }
+  if (t === 'limite_funzione_giorno' || t === 'limite_funzione_mese' || t === 'minimo_funzione_mese') {
+    const m = v.match(/^([A-Z0-9_]+):(\d+)$/);
+    if (!m) return 'Formato atteso FUNZIONE:NUMERO, per esempio SUP:1';
+    if (!fzOk(m[1])) return 'Funzione sconosciuta in ' + ctx.label + ': ' + m[1];
+    return null;
+  }
+  if (t === 'minimo_funzione_giorno') {
+    const m = v.match(/^([A-Z0-9_]+):(\d+)(?::(DIURNO|NOTTURNO)?)?(?::([0-6](,[0-6])*))?$/);
+    if (!m)
+      return 'Formato atteso FUNZIONE:NUMERO[:DIURNO|NOTTURNO[:giorni]], per esempio SUP:1:NOTTURNO:4,5 (0=lunedi ... 6=domenica)';
+    if (!fzOk(m[1])) return 'Funzione sconosciuta in ' + ctx.label + ': ' + m[1];
+    return null;
+  }
+  return 'Tipo di regola sconosciuto';
+}
 async function salvaRegolaGruppo(id, campo, valore) {
   if (!isAdmin()) return;
+  const rV = pianoRegoleGruppoCache.find((x) => x.id === id);
+  if (campo === 'valore' && rV) {
+    const errore = _pianoValidaRegolaGruppo(rV.gruppo, rV.tipo_regola, valore, rV.reparto_dip || _pianoReparto());
+    if (errore) {
+      toastErrore(errore + '. Il valore precedente (' + String(rV.valore) + ') resta in vigore.', 9000);
+      renderPiano();
+      return;
+    }
+  }
   try {
     const patch = {};
     patch[campo] = campo === 'attivo' ? !!valore : String(valore).trim().toUpperCase();
@@ -13611,6 +14087,11 @@ async function aggiungiRegolaGruppo() {
   const valore = ((document.getElementById('rg-valore') || {}).value || '').trim().toUpperCase();
   if (!gruppo || !tipo || !valore) {
     toast('Compila gruppo, regola e valore');
+    return;
+  }
+  const errore = _pianoValidaRegolaGruppo(gruppo, tipo, valore, _pianoReparto());
+  if (errore) {
+    toastErrore(errore, 9000);
     return;
   }
   try {
@@ -13644,6 +14125,201 @@ async function eliminaRegolaGruppo(id) {
   }
 }
 
+// ===== CARD CONGEDI NON PAGATI =====
+function _renderPianoCongediNpCard() {
+  if (!puoGestirePiano() && !isAdmin()) return '';
+  const rep = _pianoReparto();
+  const lista = _pianoCongediNp
+    .filter((c) => (c.reparto_dip || 'slots') === rep)
+    .slice()
+    .sort((a, b) => String(b.dal).localeCompare(String(a.dal)));
+  const sogliaGg = parseInt(_pianoRegolaVal('congedo_np_giorni_vacanze'));
+  const sogliaMesi = parseInt(_pianoRegolaVal('congedo_np_mesi_anzianita'));
+  const sg = isNaN(sogliaGg) ? 10 : sogliaGg;
+  const sm = isNaN(sogliaMesi) ? 6 : sogliaMesi;
+  const nomi = collaboratoriCache
+    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
+    .map((c) => c.nome)
+    .sort();
+  const fmt = (d) => String(d).substring(0, 10).split('-').reverse().join('.');
+  let h =
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Congedi non pagati · ' +
+    escP(repartoLabel(rep)) +
+    '</div><div style="padding:10px 14px">' +
+    '<p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Regolamento aziendale 5.14: domanda scritta, concessione della Direzione. Nel piano i giorni diventano <b>CNP</b> (zero ore, non contano fra le ore dovute). Oltre <b>' +
+    sg +
+    ' giorni</b> il diritto vacanze dell anno si riduce in proporzione; oltre <b>' +
+    sm +
+    ' mesi</b> l anzianita di servizio si sposta in avanti di tutta la durata (giubilei e scaglioni vacanze). Le due soglie si cambiano nella scheda Regole.</p>';
+  h +=
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:10px">' +
+    '<div class="field" style="margin:0"><label>Collaboratore</label><select id="cnp-nome" style="padding:6px">' +
+    nomi.map((n) => '<option value="' + escP(n) + '">' + escP(n) + '</option>').join('') +
+    '</select></div>' +
+    '<div class="field" style="margin:0"><label>Dal</label><input type="date" id="cnp-dal" style="padding:6px"></div>' +
+    '<div class="field" style="margin:0"><label>Al</label><input type="date" id="cnp-al" style="padding:6px"></div>' +
+    '<div class="field" style="margin:0;min-width:180px"><label>Motivo</label><input type="text" id="cnp-motivo" placeholder="es. viaggio, famiglia, studio" style="padding:6px"></div>' +
+    '<div class="field" style="margin:0"><label>Autorizzato da</label><input type="text" id="cnp-aut" placeholder="Direzione" style="padding:6px"></div>' +
+    '<button class="btn-add-tipo" onclick="aggiungiCongedoNp()">Registra congedo</button></div>';
+  if (!lista.length)
+    h += '<p style="font-size:.85rem;color:var(--muted)">Nessun congedo registrato in questo settore.</p>';
+  else {
+    h +=
+      '<div style="overflow-x:auto"><table class="piano-table" style="min-width:700px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Dal</th><th>Al</th><th>Giorni</th><th style="text-align:left">Motivo</th><th style="text-align:left">Autorizzato da</th><th style="text-align:left">Effetti</th><th></th></tr></thead><tbody>';
+    lista.forEach((c) => {
+      const gg = _pianoGiorniCongedo(c);
+      const eff = [];
+      if (gg > sg) eff.push('vacanze ridotte');
+      if (gg > sm * 30.44) eff.push('anzianita spostata di ' + gg + ' giorni');
+      if (!eff.length) eff.push('solo piano (CNP)');
+      h +=
+        '<tr><td style="text-align:left;font-weight:600">' +
+        escP(c.collaboratore) +
+        '</td><td>' +
+        fmt(c.dal) +
+        '</td><td>' +
+        fmt(c.al) +
+        '</td><td>' +
+        gg +
+        '</td><td style="text-align:left">' +
+        escP(c.motivo || '') +
+        '</td><td style="text-align:left">' +
+        escP(c.autorizzato_da || '') +
+        '</td><td style="text-align:left;font-size:.8rem;color:var(--muted)">' +
+        escP(eff.join(', ')) +
+        '</td><td><button class="btn-del-tipo" onclick="eliminaCongedoNp(' +
+        c.id +
+        ')">Elimina</button></td></tr>';
+    });
+    h += '</tbody></table></div>';
+  }
+  h += '</div></div>';
+  return h;
+}
+async function aggiungiCongedoNp() {
+  if (!puoGestirePiano() && !isAdmin()) return;
+  const nome = (document.getElementById('cnp-nome') || {}).value;
+  const dal = (document.getElementById('cnp-dal') || {}).value;
+  const al = (document.getElementById('cnp-al') || {}).value;
+  const motivo = ((document.getElementById('cnp-motivo') || {}).value || '').trim();
+  const aut = ((document.getElementById('cnp-aut') || {}).value || '').trim();
+  if (!nome || !dal || !al) {
+    toastErrore('Servono collaboratore, data di inizio e data di fine');
+    return;
+  }
+  if (al < dal) {
+    toastErrore('La data di fine e prima di quella di inizio');
+    return;
+  }
+  const gg = Math.round((new Date(al + 'T12:00:00') - new Date(dal + 'T12:00:00')) / 86400000) + 1;
+  if (gg > 366) {
+    toastErrore('Un congedo di piu di un anno non e previsto dal regolamento (massimo 6 mesi concordati)');
+    return;
+  }
+  if (!motivo) {
+    toastErrore('Scrivi il motivo: serve per la scheda e per HR');
+    return;
+  }
+  const sovrapposto = _pianoCongediDi(nome).find(
+    (c) => !(String(c.al).substring(0, 10) < dal || String(c.dal).substring(0, 10) > al),
+  );
+  if (sovrapposto) {
+    toastErrore(
+      'Si sovrappone a un congedo gia registrato (' +
+        String(sovrapposto.dal).substring(0, 10) +
+        ' / ' +
+        String(sovrapposto.al).substring(0, 10) +
+        ')',
+    );
+    return;
+  }
+  const sogliaMesi = parseInt(_pianoRegolaVal('congedo_np_mesi_anzianita'));
+  const sm = isNaN(sogliaMesi) ? 6 : sogliaMesi;
+  const avviso =
+    gg > sm * 30.44
+      ? '\n\nATTENZIONE: supera ' +
+        sm +
+        ' mesi: l anzianita di servizio si sposta in avanti di ' +
+        gg +
+        ' giorni (giubilei e scaglioni vacanze).'
+      : '';
+  if (
+    !confirm(
+      'Registro il congedo non pagato di ' +
+        nome +
+        ' dal ' +
+        dal.split('-').reverse().join('.') +
+        ' al ' +
+        al.split('-').reverse().join('.') +
+        ' (' +
+        gg +
+        ' giorni)?\n\nNel piano i giorni diventano CNP e non contano fra le ore dovute.' +
+        avviso,
+    )
+  )
+    return;
+  try {
+    const nuovo = await secPost('collab_congedi_np', {
+      collaboratore: nome,
+      reparto_dip: _pianoReparto(),
+      dal: dal,
+      al: al,
+      motivo: motivo,
+      autorizzato_da: aut || null,
+      operatore: getOperatore(),
+    });
+    const rec = (nuovo && nuovo[0]) || {
+      collaboratore: nome,
+      reparto_dip: _pianoReparto(),
+      dal: dal,
+      al: al,
+      motivo: motivo,
+    };
+    _pianoCongediNp.push(rec);
+    const celle = await _pianoSincronizzaCongedoNp(rec, false);
+    logAzione('Congedo non pagato registrato', nome + ' ' + dal + ' / ' + al + ' (' + gg + ' giorni): ' + motivo);
+    if (typeof _insertHrEvento === 'function')
+      _insertHrEvento({
+        tipo: 'congedo_np',
+        collaboratore: nome,
+        descrizione: 'Congedo non pagato dal ' + dal + ' al ' + al + ' (' + gg + ' giorni): ' + motivo,
+      });
+    toast('Congedo registrato · ' + celle + ' giorni segnati CNP nel piano');
+    renderPiano();
+  } catch (e) {
+    toastErrore('Errore nel salvataggio del congedo: ' + (e.message || ''));
+  }
+}
+async function eliminaCongedoNp(id) {
+  if (!puoGestirePiano() && !isAdmin()) return;
+  const c = _pianoCongediNp.find((x) => x.id === id);
+  if (!c) return;
+  if (
+    !confirm(
+      'Eliminare il congedo di ' +
+        c.collaboratore +
+        ' dal ' +
+        String(c.dal).substring(0, 10) +
+        ' al ' +
+        String(c.al).substring(0, 10) +
+        '?\n\nI giorni CNP nel piano vengono tolti.',
+    )
+  )
+    return;
+  try {
+    await secDel('collab_congedi_np', 'id=eq.' + id);
+    _pianoCongediNp = _pianoCongediNp.filter((x) => x.id !== id);
+    const tolte = await _pianoSincronizzaCongedoNp(c, true);
+    logAzione(
+      'Congedo non pagato eliminato',
+      c.collaboratore + ' ' + String(c.dal).substring(0, 10) + ' / ' + String(c.al).substring(0, 10),
+    );
+    toast('Congedo eliminato · ' + tolte + ' giorni CNP tolti dal piano');
+    renderPiano();
+  } catch (e) {
+    toastErrore('Errore: ' + (e.message || ''));
+  }
+}
 function _renderPianoPreferenzeCard() {
   if (!isAdmin() && !(typeof puoModificare === 'function' && puoModificare('storico_hr'))) return '';
   const collabs = collaboratoriCache
@@ -18028,7 +18704,7 @@ async function miglioraOrePiano() {
   const fissi = nomi.filter((n) => !infoDi[n].is_jolly);
   fissi.forEach((n) => {
     const pct = parseFloat(infoDi[n].percentuale) || 1;
-    const obiettivo = (nGiorni / 7) * _pianoOreSett * pct - (_pianoYtdMap[n] || 0);
+    const obiettivo = (_pianoGgDovuti(n, ym) / 7) * _pianoOreSett * pct - (_pianoYtdMap[n] || 0);
     saldo[n] = (ore[n] || 0) - obiettivo;
   });
   const maxCons = parseInt(_pianoRegolaVal('max_consecutivi')) || 5;

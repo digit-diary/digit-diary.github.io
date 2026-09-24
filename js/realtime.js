@@ -326,16 +326,37 @@ function getOpToken() {
 function setOpToken(t) {
   if (t) sessionStorage.setItem('op_token', t);
 }
+// RINNOVO DELLA SESSIONE: si passa il token che si ha (anche scaduto da
+// poco) e il server ne rilascia uno nuovo. Prima bastava il nome
+// dell'operatore, quindi chiunque con la chiave pubblica poteva ottenere una
+// sessione. Se il token non e' piu' rinnovabile si prova il dispositivo
+// biometrico registrato; altrimenti serve rifare l'accesso.
 async function _renewToken() {
   const op = getOperatore();
   if (!op) return false;
+  const tk = getOpToken();
   try {
-    const r = await sbRpc('create_bio_session', { p_nome: op });
-    if (r && r.session_token) {
-      setOpToken(r.session_token);
-      return true;
+    if (tk) {
+      const r = await sbRpc('renew_op_session', { p_token: tk });
+      if (r && r.session_token) {
+        setOpToken(r.session_token);
+        return true;
+      }
+    }
+    const impronta = typeof _bioImprontaLocale === 'function' ? await _bioImprontaLocale(op) : null;
+    if (impronta) {
+      const r2 = await sbRpc('create_bio_session', { p_nome: op, p_impronta: impronta });
+      if (r2 && r2.session_token) {
+        setOpToken(r2.session_token);
+        return true;
+      }
     }
   } catch (e) {}
+  if (!window._sessioneScadutaAvvisata) {
+    window._sessioneScadutaAvvisata = true;
+    if (typeof toastErrore === 'function')
+      toastErrore('Sessione scaduta: esci e rientra con la password per continuare a salvare.', 9000);
+  }
   return false;
 }
 let _renewingToken = false;
