@@ -2734,6 +2734,28 @@ async function generaBozzaPiano(usaCoperture) {
   const nuove = [];
   const sostituzioniWd = [];
   const scoperti = [];
+  // regole di preferenza lette UNA volta (Si/No) e contatori sul mese
+  const regSi = (nome) => {
+    const v = _pianoRegolaVal(nome);
+    return v == null ? false : String(v).toUpperCase() === 'TRUE';
+  };
+  const patternLavoro = parseInt(_pianoRegolaVal('pattern_lavoro')) || 99;
+  const contaTipo = (n, tipo) => {
+    let k = 0;
+    for (let d = 1; d <= nGiorni; d++) {
+      const tt = _pianoTurnoInfo(cella[n + '|' + d] || '');
+      if (tt && tt.tipo === tipo) k++;
+    }
+    return k;
+  };
+  const contaDomeniche = (n) => {
+    let k = 0;
+    for (let d = 1; d <= nGiorni; d++) {
+      if (new Date(ym + '-' + String(d).padStart(2, '0') + 'T12:00:00').getDay() !== 0) continue;
+      if (_pianoTurnoInfo(cella[n + '|' + d] || '')) k++;
+    }
+    return k;
+  };
   // contatori per le regole di gruppo (limite/minimo funzione per giorno/mese)
   const contaGiornoFz = {}; // gruppo|FZ|g -> n assegnati
   const contaGiornoTot = {}; // gruppo|g -> n assegnati (per accompagnamento)
@@ -2975,6 +2997,19 @@ async function generaBozzaPiano(usaCoperture) {
               if (cella[n + '|' + g] === 'WD') return -5; // WD = qui DEVE lavorare diurno: priorità massima
               let p = 0;
               const infoP = _pianoCollabInfo(n) || {};
+              // REGOLE DI PREFERENZA (scheda Regole): prima erano scritte ma
+              // il generatore non le leggeva. Ognuna sposta il punteggio.
+              // equilibrio notti / diurni-notturni: chi ne ha fatte meno viene prima
+              if (t.tipo === 'NOTTURNO' && regSi('equilibrio_notti')) p += contaTipo(n, 'NOTTURNO') * 0.5;
+              if (regSi('equilibrio_diurni_notturni'))
+                p += (contaTipo(n, t.tipo) - contaTipo(n, t.tipo === 'NOTTURNO' ? 'DIURNO' : 'NOTTURNO')) * 0.25;
+              // notte, un riposo, poi un turno che inizia presto: da evitare
+              if (regSi('no_notte_riposo_presto') && _pianoOra(t.ora_inizio) < 10) {
+                const t2 = _pianoTurnoInfo(cella[n + '|' + (g - 2)] || '');
+                if (t2 && t2.tipo === 'NOTTURNO' && !_pianoIsLavoro(cella[n + '|' + (g - 1)] || '')) p += 4;
+              }
+              // domeniche: chi ne ha gia' lavorate di piu' nel mese viene dopo
+              if (dowG === 0 && _pianoRegolaVal('domeniche_libere_anno') != null) p += contaDomeniche(n) * 1.5;
               // preferisce L1 (2 collaboratrici in produzione Turnivo)
               if (f.turno_codice === 'L1' && infoP.prefers_l1) p -= 1;
               // minimo_funzione_giorno non ancora soddisfatto: privilegia la funzione richiesta
@@ -2996,8 +3031,12 @@ async function generaBozzaPiano(usaCoperture) {
                   p -= 2;
               }
               const cp = consecPrima(n, g);
-              if (cp > 0 && cp < maxCons) return p - 3;
-              if (cp === 0 && _pianoIsLavoro(cella[n + '|' + (g - 2)] || '')) return p + 2;
+              // blocchi compatti: chi ha lavorato ieri continua il blocco fino
+              // alla lunghezza ideale (pattern_lavoro), poi non oltre
+              if (regSi('blocchi_compatti') && cp > 0 && cp < Math.min(maxCons, patternLavoro)) return p - 3;
+              // riposo isolato: chi ha riposato UN solo giorno non viene richiamato subito
+              if (regSi('penalita_riposo_isolato') && cp === 0 && _pianoIsLavoro(cella[n + '|' + (g - 2)] || ''))
+                return p + 2;
               return p;
             };
             const jx = (_pianoCollabInfo(x) || {}).is_jolly ? 1 : 0;
@@ -3241,112 +3280,501 @@ const PIANO_REGOLE_FONTE = {
   tolleranza_ore: 'RAP 3.1: 41 ore settimanali su media mensile',
   tolleranza_ore_sopra: 'RAP 3.1: max 45 ore in alta stagione',
 };
-const PIANO_REGOLE_DOVE = {
-  jolly_indennita_vacanze_4sett: 'Statistiche anno (colonna Ore lavorate ausiliari)',
-  jolly_indennita_vacanze_5sett: 'Statistiche anno (colonna Ore lavorate ausiliari)',
-  jolly_indennita_tredicesima: 'Statistiche anno (colonna Ore lavorate ausiliari)',
-  notte_inizio: 'Statistiche anno (colonna Notte 10%)',
-  notte_fine: 'Statistiche anno (colonna Notte 10%)',
-  notte_percentuale: 'Statistiche anno (colonna Notte 10%)',
-  saldo_ore_max: 'Saldo ore anno (semaforo ok/no)',
-  saldo_ore_min: 'Saldo ore anno (semaforo ok/no)',
-  domeniche_libere_anno: 'Validatore + Statistiche',
-  turno_prima_domenica_libera: 'Validatore + Statistiche',
-  nd_jolly_giorno: 'Formulario non disponibilità (scheda Formulari + PDF)',
-  tolleranza_ore: 'Validatore + Bozza + Migliora ore',
-  tolleranza_ore_sopra: 'Validatore + Bozza + Migliora ore',
-  tolleranza_ore_sotto: 'Validatore',
-  jolly_percentuale_piano: 'Bozza del piano (obiettivo ore degli ausiliari)',
-  jolly_ore_min: 'Validatore',
-  jolly_ore_max: 'Validatore + Bozza',
-  max_consecutivi: 'Validatore + Bozza',
-  min_riposo_ore: 'Validatore + Bozza',
-  no_4w1c1w: 'Validatore',
-  diurno_prima_vacanza: 'Validatore',
-  sup_solo_z_settimana: 'Validatore + Bozza',
-  sup_ven_sab_z_e_s: 'Validatore + Bozza',
-  l1_solo_bo_sup: 'Validatore + Bozza',
+// NOMI SEMPLICI, GRUPPO E TIPO DI OGNI REGOLA. La scheda Regole parla la
+// lingua di chi la usa: niente HARD/SOFT/peso, ma "cosa fa", "dove agisce",
+// "da dove viene". tipo: 'sino' (interruttore), 'numero', 'testo'.
+const PIANO_REGOLE_GUIDA = {
+  min_riposo_ore: {
+    g: 'Riposo e giorni di lavoro',
+    n: 'Ore minime di riposo fra due turni',
+    t: 'numero',
+    d: 'Validatore, bozza, cambi turno, coperture',
+  },
+  max_consecutivi: {
+    g: 'Riposo e giorni di lavoro',
+    n: 'Giorni di lavoro consecutivi al massimo',
+    t: 'numero',
+    d: 'Validatore, bozza, cambi turno, coperture',
+  },
+  no_4w1c1w: {
+    g: 'Riposo e giorni di lavoro',
+    n: 'Vietato: 4 giorni di lavoro, 1 di riposo, poi di nuovo lavoro',
+    t: 'sino',
+    d: 'Validatore e bozza',
+  },
+  blocchi_compatti: {
+    g: 'Riposo e giorni di lavoro',
+    n: 'Preferisci blocchi di lavoro e riposo compatti',
+    t: 'sino',
+    d: 'Bozza (ordine dei candidati)',
+  },
+  pattern_lavoro: {
+    g: 'Riposo e giorni di lavoro',
+    n: 'Lunghezza ideale di un blocco di lavoro (giorni)',
+    t: 'numero',
+    d: 'Bozza (con "blocchi compatti")',
+  },
+  penalita_riposo_isolato: {
+    g: 'Riposo e giorni di lavoro',
+    n: 'Evita il riposo di un giorno solo fra due blocchi',
+    t: 'sino',
+    d: 'Bozza (ordine dei candidati)',
+  },
+  no_notte_riposo_presto: {
+    g: 'Riposo e giorni di lavoro',
+    n: 'Evita: notte, un riposo, poi turno del mattino',
+    t: 'sino',
+    d: 'Bozza (ordine dei candidati)',
+  },
+  equilibrio_notti: {
+    g: 'Riposo e giorni di lavoro',
+    n: 'Distribuisci le notti in modo equo',
+    t: 'sino',
+    d: 'Bozza (ordine dei candidati)',
+  },
+  equilibrio_diurni_notturni: {
+    g: 'Riposo e giorni di lavoro',
+    n: 'Equilibra diurni e notturni per ogni persona',
+    t: 'sino',
+    d: 'Bozza (ordine dei candidati)',
+  },
+  domeniche_libere_anno: {
+    g: 'Domeniche',
+    n: 'Domeniche libere garantite in un anno',
+    t: 'numero',
+    d: 'Validatore, tabella Domeniche, Benessere, bozza',
+  },
+  turno_prima_domenica_libera: {
+    g: 'Domeniche',
+    n: 'La domenica libera vale solo se il sabato finisce entro le 23',
+    t: 'sino',
+    d: 'Validatore, tabella Domeniche, Benessere',
+  },
+  tolleranza_ore: {
+    g: 'Ore e saldo',
+    n: 'Scarto accettato dalle ore dovute del mese (piu o meno)',
+    t: 'numero',
+    d: 'Validatore, bozza, Migliora ore',
+  },
+  tolleranza_ore_sopra: {
+    g: 'Ore e saldo',
+    n: 'Ore massime sopra le dovute del mese (se attiva vince sulla precedente)',
+    t: 'numero',
+    d: 'Validatore, bozza, Migliora ore',
+  },
+  tolleranza_ore_sotto: {
+    g: 'Ore e saldo',
+    n: 'Ore massime sotto le dovute del mese (se attiva vince sulla precedente)',
+    t: 'numero',
+    d: 'Validatore',
+  },
+  saldo_ore_max: {
+    g: 'Ore e saldo',
+    n: 'Saldo ore dell anno: oltre questo valore e troppo alto',
+    t: 'numero',
+    d: 'Saldo ore anno (semaforo)',
+  },
+  saldo_ore_min: {
+    g: 'Ore e saldo',
+    n: 'Saldo ore dell anno: sotto questo valore e troppo basso',
+    t: 'numero',
+    d: 'Saldo ore anno (semaforo)',
+  },
+  jolly_percentuale_piano: {
+    g: 'Ausiliari (jolly)',
+    n: 'Percentuale di riferimento degli ausiliari solo per generare (0.8 = 80%)',
+    t: 'numero',
+    d: 'Bozza',
+  },
+  jolly_ore_max: {
+    g: 'Ausiliari (jolly)',
+    n: 'Ore massime al mese per gli ausiliari senza percentuale',
+    t: 'numero',
+    d: 'Validatore e bozza',
+  },
+  jolly_ore_min: {
+    g: 'Ausiliari (jolly)',
+    n: 'Ore minime al mese per gli ausiliari senza percentuale',
+    t: 'numero',
+    d: 'Validatore (solo avviso)',
+  },
+  jolly_codici_gia_pagati: {
+    g: 'Ausiliari (jolly)',
+    n: 'Codici che per gli ausiliari valgono zero ore (indennita gia pagata)',
+    t: 'testo',
+    d: 'Calendario, saldo, statistiche',
+  },
+  jolly_indennita_vacanze_4sett: {
+    g: 'Ausiliari (jolly)',
+    n: 'Indennita vacanze con 4 settimane (% sul salario orario)',
+    t: 'numero',
+    d: 'Statistiche anno',
+  },
+  jolly_indennita_vacanze_5sett: {
+    g: 'Ausiliari (jolly)',
+    n: 'Indennita vacanze con 5 settimane (% sul salario orario)',
+    t: 'numero',
+    d: 'Statistiche anno',
+  },
+  jolly_indennita_tredicesima: {
+    g: 'Ausiliari (jolly)',
+    n: 'Indennita tredicesima (% sul salario orario)',
+    t: 'numero',
+    d: 'Statistiche anno',
+  },
+  notte_inizio: {
+    g: 'Ausiliari (jolly)',
+    n: 'Inizio della fascia notturna (ora)',
+    t: 'numero',
+    d: 'Statistiche anno (colonna Ore notte)',
+  },
+  notte_fine: {
+    g: 'Ausiliari (jolly)',
+    n: 'Fine della fascia notturna (ora)',
+    t: 'numero',
+    d: 'Statistiche anno (colonna Ore notte)',
+  },
+  notte_percentuale: {
+    g: 'Ausiliari (jolly)',
+    n: 'Tempo libero pagato sulle ore notturne degli ausiliari (%)',
+    t: 'numero',
+    d: 'Statistiche anno',
+  },
+  nd_jolly_giorno: {
+    g: 'Ausiliari (jolly)',
+    n: 'Giorno del mese entro cui gli ausiliari consegnano le non disponibilita',
+    t: 'numero',
+    d: 'Formulario non disponibilita',
+  },
+  cgf_solo_parificati: {
+    g: 'Festivi e recuperi (CGF)',
+    n: 'Il recupero matura solo sui festivi parificati alla domenica (come nel foglio Excel)',
+    t: 'sino',
+    d: 'Bozza, Assegna CGF, Chi ha diritto, Statistiche, scheda Festivi',
+  },
+  cgf_max_mese: {
+    g: 'Festivi e recuperi (CGF)',
+    n: 'Recuperi automatici al massimo per persona in un mese',
+    t: 'numero',
+    d: 'Bozza e Assegna CGF',
+  },
+  cgf_distanza_giorni: {
+    g: 'Festivi e recuperi (CGF)',
+    n: 'Giorni minimi fra due recuperi della stessa persona',
+    t: 'numero',
+    d: 'Bozza e Assegna CGF',
+  },
+  cgf_non_con_vacanze: {
+    g: 'Festivi e recuperi (CGF)',
+    n: 'Mai un recupero il giorno prima o dopo una vacanza',
+    t: 'sino',
+    d: 'Bozza e Assegna CGF',
+  },
+  vacanze_giorni_primi2anni: {
+    g: 'Vacanze',
+    n: 'Giorni di vacanza nei primi due anni di contratto',
+    t: 'numero',
+    d: 'Scheda Vacanze (diritto)',
+  },
+  vacanze_giorni_base: {
+    g: 'Vacanze',
+    n: 'Giorni di vacanza dal compimento dei due anni',
+    t: 'numero',
+    d: 'Scheda Vacanze (diritto)',
+  },
+  vacanze_bonus_10anni: {
+    g: 'Vacanze',
+    n: 'Giorni in piu dopo 10 anni di servizio (in tutto, non si sommano)',
+    t: 'numero',
+    d: 'Scheda Vacanze (diritto)',
+  },
+  vacanze_bonus_15anni: {
+    g: 'Vacanze',
+    n: 'Giorni in piu dopo 15 anni di servizio (in tutto)',
+    t: 'numero',
+    d: 'Scheda Vacanze (diritto)',
+  },
+  vacanze_bonus_20anni: {
+    g: 'Vacanze',
+    n: 'Giorni in piu dopo 20 anni di servizio (in tutto)',
+    t: 'numero',
+    d: 'Scheda Vacanze (diritto)',
+  },
+  vacanze_bonus_25anni: {
+    g: 'Vacanze',
+    n: 'Giorni in piu dopo 25 anni di servizio (in tutto)',
+    t: 'numero',
+    d: 'Scheda Vacanze (diritto)',
+  },
+  vacanze_arrotonda_da: {
+    g: 'Vacanze',
+    n: 'Da questa frazione in su i giorni si arrotondano al giorno pieno (0.35: 32.37 diventa 33)',
+    t: 'numero',
+    d: 'Scheda Vacanze (diritto)',
+  },
+  vacanze_giorni_anno: { g: 'Vacanze', n: 'Giorni di vacanza per l indice di benessere', t: 'numero', d: 'Benessere' },
+  c_prima_dopo_vacanza: {
+    g: 'Vacanze',
+    n: 'Metti i congedi C attorno alle settimane di vacanza',
+    t: 'sino',
+    d: 'Applica vacanze e bozza',
+  },
+  c_prima_fissi: {
+    g: 'Vacanze',
+    n: 'Giorni di congedo C prima della vacanza (fissi)',
+    t: 'numero',
+    d: 'Applica vacanze e bozza',
+  },
+  c_prima_jolly: {
+    g: 'Vacanze',
+    n: 'Giorni di congedo C prima della vacanza (ausiliari)',
+    t: 'numero',
+    d: 'Applica vacanze e bozza',
+  },
+  c_dopo_100: {
+    g: 'Vacanze',
+    n: 'Giorni di congedo C dopo la vacanza (100%)',
+    t: 'numero',
+    d: 'Applica vacanze e bozza',
+  },
+  c_dopo_80: {
+    g: 'Vacanze',
+    n: 'Giorni di congedo C dopo la vacanza (80%)',
+    t: 'numero',
+    d: 'Applica vacanze e bozza',
+  },
+  c_dopo_60: {
+    g: 'Vacanze',
+    n: 'Giorni di congedo C dopo la vacanza (60%)',
+    t: 'numero',
+    d: 'Applica vacanze e bozza',
+  },
+  c_dopo_40: {
+    g: 'Vacanze',
+    n: 'Giorni di congedo C dopo la vacanza (40% o meno)',
+    t: 'numero',
+    d: 'Applica vacanze e bozza',
+  },
+  wd_prima_vacanza: {
+    g: 'Vacanze',
+    n: 'Giorni di lavoro diurno forzato (WD) prima dei congedi pre vacanza',
+    t: 'numero',
+    d: 'Applica vacanze e bozza',
+  },
+  diurno_prima_vacanza: { g: 'Vacanze', n: 'Turno diurno il giorno prima della vacanza', t: 'sino', d: 'Validatore' },
+  chiusura_ora_normale: {
+    g: 'Orari di chiusura',
+    n: 'Ora di chiusura nei giorni normali',
+    t: 'numero',
+    d: 'Calendario, ore dei turni prolungati, briefing',
+  },
+  chiusura_ora_tardi: {
+    g: 'Orari di chiusura',
+    n: 'Ora di chiusura il venerdi, il sabato e la notte prima di un festivo',
+    t: 'numero',
+    d: 'Calendario, ore dei turni prolungati, briefing',
+  },
+  chiusura_ora_fine_anno: {
+    g: 'Orari di chiusura',
+    n: 'Ora di chiusura del 31 dicembre',
+    t: 'numero',
+    d: 'Calendario, ore dei turni prolungati, briefing',
+  },
+  chiusura_giorni_tardi: {
+    g: 'Orari di chiusura',
+    n: 'Giorni della settimana che chiudono tardi (0 domenica, 5 venerdi, 6 sabato)',
+    t: 'testo',
+    d: 'Calendario, ore dei turni prolungati, briefing',
+  },
+  blocco_giorni_chiusi: {
+    g: 'Giorni chiusi',
+    n: 'I giorni passati si modificano solo con uno sblocco motivato',
+    t: 'sino',
+    d: 'Tutto il piano',
+  },
+  blocco_ora_limite: {
+    g: 'Giorni chiusi',
+    n: 'Ora del giorno dopo oltre la quale il giorno prima e chiuso',
+    t: 'numero',
+    d: 'Tutto il piano',
+  },
+  l1_solo_bo_sup: {
+    g: 'Funzioni e turni',
+    n: 'I turni L1 e 9 solo a Back Office e Supervisor',
+    t: 'sino',
+    d: 'Validatore e bozza',
+  },
+  sup_solo_z_settimana: {
+    g: 'Funzioni e turni',
+    n: 'I Supervisor da lunedi a giovedi fanno solo turni Z',
+    t: 'sino',
+    d: 'Validatore e bozza',
+  },
+  sup_ven_sab_z_e_s: {
+    g: 'Funzioni e turni',
+    n: 'I Supervisor il venerdi e il sabato possono fare turni Z e S',
+    t: 'sino',
+    d: 'Validatore e bozza',
+  },
 };
+const PIANO_REGOLE_GRUPPI_ORDINE = [
+  'Riposo e giorni di lavoro',
+  'Domeniche',
+  'Ore e saldo',
+  'Festivi e recuperi (CGF)',
+  'Vacanze',
+  'Ausiliari (jolly)',
+  'Funzioni e turni',
+  'Orari di chiusura',
+  'Giorni chiusi',
+];
 function _pianoRegoleDove(nome) {
-  return PIANO_REGOLE_DOVE[nome] || 'Solver (Fase 3)';
+  const g = PIANO_REGOLE_GUIDA[nome];
+  return g ? g.d : 'Non usata dal programma';
 }
 function _renderPianoRegoleCard() {
   if (!puoGestireRegole()) return _pianoSchedaRiservata('Regole del piano', 'Regole del piano');
-  const ordineTipo = { HARD: 1, SOFT: 2, PIPELINE: 3 };
-  const tutteRegole = pianoRegoleCache
-    .slice()
-    .sort((a, b) => (ordineTipo[a.tipo] || 9) - (ordineTipo[b.tipo] || 9) || (b.peso || 0) - (a.peso || 0));
-  // le regole non ancora attive nel Diario ("Solver Fase 3") sono rumore per
-  // chi consulta: nascoste dietro un interruttore
-  const nonAttive = tutteRegole.filter((r) => _pianoRegoleDove(r.nome).indexOf('Fase 3') !== -1);
-  const regole = window._pianoRegoleMostraTutte
-    ? tutteRegole
-    : tutteRegole.filter((r) => _pianoRegoleDove(r.nome).indexOf('Fase 3') === -1);
-  let h =
-    '<div class="main-card" style="margin-top:16px"><div class="card-header">Regole del piano (admin)</div><div style="padding:10px 14px">';
-  h +=
-    '<p style="font-size:.85rem;color:var(--muted);margin-bottom:8px">HARD = mai violabili (il validatore le segnala). SOFT = preferenze con peso. PIPELINE = usate dal generatore.' +
-    (nonAttive.length
-      ? ' <a href="#" style="color:#8b6914;font-weight:700" onclick="window._pianoRegoleMostraTutte=!window._pianoRegoleMostraTutte;renderPiano();return false">' +
-        (window._pianoRegoleMostraTutte
-          ? 'Nascondi le regole non attive'
-          : 'Mostra anche ' + nonAttive.length + ' regole conservate ma non ancora attive (Solver Fase 3)') +
-        '</a>'
-      : '') +
-    '</p>';
-  let tipoCorr = '';
-  h += '<div style="overflow-x:auto"><table class="piano-table" style="min-width:720px;font-size:.85rem">';
-  h +=
-    '<thead><tr><th style="text-align:left">Regola</th><th style="text-align:left">Descrizione</th><th>Valore</th><th style="min-width:150px">Vale per</th><th>Peso</th><th>Attiva</th><th>Applicata da</th></tr></thead><tbody>';
-  regole.forEach((r) => {
-    if (r.tipo !== tipoCorr) {
-      tipoCorr = r.tipo;
-      h +=
-        '<tr><td colspan="7" style="text-align:left;background:var(--paper2);font-weight:700;letter-spacing:.06em">' +
-        escP(tipoCorr) +
-        '</td></tr>';
+  const perGruppo = {};
+  const sconosciute = [];
+  pianoRegoleCache.forEach((r) => {
+    const g = PIANO_REGOLE_GUIDA[r.nome];
+    if (!g) {
+      sconosciute.push(r);
+      return;
     }
+    (perGruppo[g.g] = perGruppo[g.g] || []).push(r);
+  });
+  let h =
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Regole del piano</div><div style="padding:10px 14px">';
+  // MINI GUIDA: come si usano le regole, senza parole tecniche
+  h +=
+    '<details style="margin-bottom:12px;background:var(--paper2);border:1px solid var(--line);border-radius:3px;padding:8px 12px"><summary style="cursor:pointer;font-weight:700;font-size:.9rem">Come si usano le regole (guida in 6 punti)</summary>' +
+    '<ol style="font-size:.85rem;margin:8px 0 4px 18px;line-height:1.5">' +
+    '<li><b>Cambia il valore</b> nella casella e premi Invio o clicca fuori: si salva da solo e vale subito per tutto il programma (validatore, bozza, statistiche). Nella colonna "Dove agisce" leggi in quali schermate la regola conta.</li>' +
+    '<li><b>Si / No</b> accende o spegne una preferenza. La casella <b>Attiva</b> spegne qualsiasi regola senza perdere il valore: spenta, e come se non esistesse.</li>' +
+    '<li><b>Un valore diverso per un settore</b>: premi "Eccezione per un settore", scrivi il settore e il valore. La regola generale resta per gli altri; nel settore indicato vince l eccezione. Esempio: riposo 11 ore ovunque, 12 ai Tavoli.</li>' +
+    '<li><b>Regole nuove sui gruppi di lavoro</b> (chi puo fare cassa, quanti Supervisor al giorno, una funzione richiesta): si creano nella scheda <b>Regole di gruppo</b> qui sotto, scegliendo il tipo dall elenco. Non serve scrivere codice.</li>' +
+    '<li><b>Preferenze di una persona</b> (solo diurni, turni vietati, settori abilitati, copertura di altri settori): si impostano nella sua scheda in Gestione collaboratori. La bozza e il validatore le rispettano.</li>' +
+    '<li><b>Fonte</b>: sotto ogni regola normativa c e il riferimento (RAP, legge sul lavoro, direttiva). Se cambia il regolamento, cambia il numero qui: il programma non va toccato. Ogni modifica finisce nel Registro attivita.</li>' +
+    '</ol></details>';
+  const settRow = (r) => {
     const settR = _pianoRegolaSettori(r);
-    h +=
-      '<tr><td style="text-align:left;font-weight:600">' +
-      escP(r.nome) +
-      (settR.length
-        ? ' <span style="font-weight:400;font-size:.82rem;color:#8b6914">(solo ' + escP(settR.join(', ')) + ')</span>'
-        : '') +
-      '</td><td style="text-align:left;white-space:normal;min-width:220px">' +
-      escP(r.descrizione || '') +
-      '</td><td><input type="text" value="' +
-      escP(r.valore || '') +
-      '" onchange="salvaPianoRegola(' +
-      r.id +
-      ',\'valore\',this.value)" style="width:64px;padding:3px;text-align:center;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td style="text-align:left;font-size:.8rem">' +
-      (settR.length
-        ? escP(settR.map((s) => repartoLabel(s)).join(', ')) +
+    return settR.length
+      ? escP(settR.map((s) => repartoLabel(s)).join(', ')) +
           ' <button class="btn-del-tipo" style="font-size:.82rem;padding:1px 6px" onclick="pianoRegolaSettoriEdit(' +
           r.id +
           ')">cambia</button>'
-        : '<span style="color:var(--muted)">tutti i settori</span> <button class="btn-del-tipo" style="font-size:.82rem;padding:1px 6px" onclick="pianoRegolaEccezione(\'' +
+      : '<span style="color:var(--muted)">tutti i settori</span> <button class="btn-del-tipo" style="font-size:.82rem;padding:1px 6px" onclick="pianoRegolaEccezione(\'' +
           escP(r.nome) +
-          '\')">eccezione per un settore</button>') +
-      '</td><td>' +
-      (r.peso || 0) +
-      '</td><td><input type="checkbox"' +
-      (r.attivo !== false ? ' checked' : '') +
-      ' onchange="salvaPianoRegola(' +
+          '\')">eccezione per un settore</button>';
+  };
+  const valoreInput = (r, tipo) => {
+    if (tipo === 'sino') {
+      const on = String(r.valore || '').toUpperCase() === 'TRUE';
+      return (
+        '<select onchange="salvaPianoRegola(' +
+        r.id +
+        ',\'valore\',this.value)" style="padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><option value="TRUE"' +
+        (on ? ' selected' : '') +
+        '>Si</option><option value="FALSE"' +
+        (on ? '' : ' selected') +
+        '>No</option></select>'
+      );
+    }
+    return (
+      '<input type="' +
+      (tipo === 'numero' ? 'text' : 'text') +
+      '" value="' +
+      escP(r.valore || '') +
+      '" onchange="salvaPianoRegola(' +
       r.id +
-      ',\'attivo\',this.checked)"></td><td style="font-size:.82rem;color:' +
-      (_pianoRegoleDove(r.nome).indexOf('Fase 3') === -1 ? '#2c6e49;font-weight:700' : 'var(--muted)') +
-      ';text-align:left">' +
-      _pianoRegoleDove(r.nome) +
-      (PIANO_REGOLE_FONTE[r.nome]
-        ? '<br><span style="font-weight:400;color:var(--muted);font-size:.82rem">' +
-          escP(PIANO_REGOLE_FONTE[r.nome]) +
-          '</span>'
-        : '') +
+      ',\'valore\',this.value)" style="width:' +
+      (tipo === 'numero' ? '64' : '110') +
+      'px;padding:3px;text-align:center;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)">'
+    );
+  };
+  h += '<div style="overflow-x:auto"><table class="piano-table" style="min-width:760px;font-size:.85rem">';
+  h +=
+    '<thead><tr><th style="text-align:left">Regola</th><th>Valore</th><th style="min-width:150px">Vale per</th><th>Attiva</th><th style="text-align:left">Dove agisce</th></tr></thead><tbody>';
+  const gruppi = PIANO_REGOLE_GRUPPI_ORDINE.filter((g) => perGruppo[g]).concat(
+    Object.keys(perGruppo).filter((g) => !PIANO_REGOLE_GRUPPI_ORDINE.includes(g)),
+  );
+  gruppi.forEach((gr) => {
+    h +=
+      '<tr><td colspan="5" style="text-align:left;background:var(--paper2);font-weight:700;letter-spacing:.04em">' +
+      escP(gr) +
       '</td></tr>';
+    perGruppo[gr]
+      .slice()
+      .sort(
+        (a, b) =>
+          (PIANO_REGOLE_GUIDA[a.nome].n || '').localeCompare(PIANO_REGOLE_GUIDA[b.nome].n || '') ||
+          String(a.settori || '').localeCompare(String(b.settori || '')),
+      )
+      .forEach((r) => {
+        const g = PIANO_REGOLE_GUIDA[r.nome];
+        const settR = _pianoRegolaSettori(r);
+        h +=
+          '<tr' +
+          (r.attivo === false ? ' style="opacity:.55"' : '') +
+          '><td style="text-align:left;white-space:normal;min-width:260px"><b>' +
+          escP(g.n) +
+          '</b>' +
+          (settR.length
+            ? ' <span style="font-size:.8rem;color:#8b6914">(solo ' +
+              escP(settR.map((x) => repartoLabel(x)).join(', ')) +
+              ')</span>'
+            : '') +
+          '<br><span style="font-size:.78rem;color:var(--muted)">' +
+          escP(r.nome) +
+          (PIANO_REGOLE_FONTE[r.nome] ? ' · ' + escP(PIANO_REGOLE_FONTE[r.nome]) : '') +
+          '</span></td><td>' +
+          valoreInput(r, g.t) +
+          '</td><td style="text-align:left;font-size:.8rem">' +
+          settRow(r) +
+          '</td><td><input type="checkbox"' +
+          (r.attivo !== false ? ' checked' : '') +
+          ' onchange="salvaPianoRegola(' +
+          r.id +
+          ',\'attivo\',this.checked)"></td><td style="font-size:.82rem;text-align:left;color:#2c6e49">' +
+          escP(g.d) +
+          '</td></tr>';
+      });
   });
+  if (sconosciute.length) {
+    h +=
+      '<tr><td colspan="5" style="text-align:left;background:var(--paper2);font-weight:700">Regole che il programma non usa</td></tr>';
+    sconosciute.forEach((r) => {
+      h +=
+        '<tr style="opacity:.6"><td style="text-align:left;white-space:normal">' +
+        escP(r.nome) +
+        '<br><span style="font-size:.78rem;color:var(--muted)">' +
+        escP(r.descrizione || '') +
+        '</span></td><td>' +
+        escP(r.valore || '') +
+        '</td><td colspan="2" style="text-align:left;font-size:.8rem;color:var(--muted)">nessun effetto</td><td style="font-size:.8rem;text-align:left"><button class="btn-del-tipo" onclick="eliminaPianoRegola(' +
+        r.id +
+        ')">Elimina</button></td></tr>';
+    });
+  }
   h += '</tbody></table></div></div></div>';
   return h;
+}
+// Una regola che il programma non legge e' solo confusione: si puo' togliere
+async function eliminaPianoRegola(id) {
+  if (!isAdmin()) return;
+  const r = pianoRegoleCache.find((x) => x.id === id);
+  if (!r) return;
+  if (!confirm('Eliminare la regola "' + r.nome + '"? Il programma non la usa: non cambia nulla nei calcoli.')) return;
+  try {
+    await secDel('piano_regole', 'id=eq.' + id);
+    pianoRegoleCache = pianoRegoleCache.filter((x) => x.id !== id);
+    logAzione('Piano: regola eliminata', r.nome + ' (non usata)');
+    toast('Regola eliminata');
+    renderPiano();
+  } catch (e) {
+    toastErrore('Errore: ' + (e.message || ''));
+  }
 }
 // Crea una regola SPECIFICA per uno o piu' settori a partire da quella
 // generale: la generale resta e continua a valere ovunque, la nuova vince nei
@@ -11458,22 +11886,30 @@ function _pianoGiorniSettimana(anno, settimana) {
 // dai blocchi settimana, C prima (1 fissi / 2 jolly, con riporto sul mese
 // precedente) e dopo (scala per percentuale 100->1, 80->2, 60->3, 40->4),
 // WD (diurno forzato, non protetto) nei giorni prima dei C pre-vacanza.
+// Si / No della regola c_prima_dopo_vacanza (assente o spenta = Si, com'era)
+function _pianoCongediAttornoVacanze() {
+  const v = _pianoRegolaVal('c_prima_dopo_vacanza');
+  return v == null ? true : String(v).toUpperCase() !== 'FALSE';
+}
 async function _applicaVacanzeMese(interattivo) {
   if (!puoGestirePiano()) return null;
   const ym = _pianoMeseSel;
   const anno = parseInt(ym.split('-')[0]);
   const mese = parseInt(ym.split('-')[1]);
   const nGiorni = _pianoUltimoGiorno(ym);
-  const cPrimaFissi = parseInt(_pianoRegolaVal('c_prima_fissi')) || 1;
-  const cPrimaJolly = parseInt(_pianoRegolaVal('c_prima_jolly')) || 2;
+  // regola "congedi attorno alle vacanze" (c_prima_dopo_vacanza): spenta =
+  // nessuna C e nessun WD automatici, restano solo le V
+  const cAttorno = _pianoCongediAttornoVacanze();
+  const cPrimaFissi = cAttorno ? parseInt(_pianoRegolaVal('c_prima_fissi')) || 1 : 0;
+  const cPrimaJolly = cAttorno ? parseInt(_pianoRegolaVal('c_prima_jolly')) || 2 : 0;
   const cDopo = {
-    100: parseInt(_pianoRegolaVal('c_dopo_100')) || 1,
-    80: parseInt(_pianoRegolaVal('c_dopo_80')) || 2,
-    60: parseInt(_pianoRegolaVal('c_dopo_60')) || 3,
-    40: parseInt(_pianoRegolaVal('c_dopo_40')) || 4,
+    100: cAttorno ? parseInt(_pianoRegolaVal('c_dopo_100')) || 1 : 0,
+    80: cAttorno ? parseInt(_pianoRegolaVal('c_dopo_80')) || 2 : 0,
+    60: cAttorno ? parseInt(_pianoRegolaVal('c_dopo_60')) || 3 : 0,
+    40: cAttorno ? parseInt(_pianoRegolaVal('c_dopo_40')) || 4 : 0,
   };
   const wdPrima = parseInt(_pianoRegolaVal('wd_prima_vacanza'));
-  const nWd = isNaN(wdPrima) ? 4 : wdPrima;
+  const nWd = !cAttorno ? 0 : isNaN(wdPrima) ? 4 : wdPrima;
   const vacanze = (await secGet('piano_vacanze?anno=eq.' + anno + '&limit=2000')) || [];
   const nomiRep = collaboratoriCache
     .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
@@ -14003,7 +14439,12 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
     // sopra un turno toglie quel riposo, quindi si avvisa.
     const avvisiExtra = [];
     const codOra = codPrec[dstr];
-    if (codiceNuovo && _pianoTurnoInfo(codiceNuovo) && (codOra === 'C' || codOra === 'WD')) {
+    if (
+      codiceNuovo &&
+      _pianoTurnoInfo(codiceNuovo) &&
+      (codOra === 'C' || codOra === 'WD') &&
+      _pianoCongediAttornoVacanze()
+    ) {
       const info = _pianoCollabInfo(nome) || {};
       const pct = parseFloat(info.percentuale) || 1;
       const nPrima =
