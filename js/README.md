@@ -1,4 +1,4 @@
-# Diario Collaboratori — Struttura JavaScript (25 file)
+# Diario Collaboratori — Struttura JavaScript (28 file)
 
 ## Ordine di caricamento (IMPORTANTE)
 
@@ -10,35 +10,46 @@ da formazione/valutazioni (chiamati solo a runtime, dopo il caricamento completo
 
 ## File per area funzionale
 
-| #   | File              | Righe | Descrizione                                                                                                                                                                          |
-| --- | ----------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | config.js         | 81    | Costanti, chiavi offuscate (XOR), variabili base                                                                                                                                     |
-| 2   | crypto.js         | 90    | Cifratura AES-GCM messaggi chat                                                                                                                                                      |
-| 3   | chat-core.js      | 236   | Schema chat enterprise: cache, helpers, wrapper                                                                                                                                      |
-| 4   | realtime.js       | 668   | WebSocket Supabase, polling fallback, GLOBALS/cache (incl. valutazioni, punti, soglie alert, categorie inventario)                                                                   |
-| 5   | api.js            | 269   | secGet/Post/Patch/Del, loadAll, healthCheck                                                                                                                                          |
-| 6   | utils.js          | 534   | toast, escP, fmtCHF, capitalizzaNome, helpers                                                                                                                                        |
-| 7   | auth.js           | 597   | Login, password, sessioni, biometrico                                                                                                                                                |
-| 8   | cestino-core.js   | 335   | Soft delete, ripristino, DB stats                                                                                                                                                    |
-| 9   | settings.js       | 1085  | Visibilità pagine/funzioni, PERMESSI DI MODIFICA (puoModificare: punti, categorie, competenze, valutazioni), operatori, temi                                                         |
-| 10  | app.js            | 445   | Routing pagine, init, renderPostLogin                                                                                                                                                |
-| 11  | diario.js         | 942   | Registrazioni: salva, modifica, elimina; hook popup copertura malattie                                                                                                               |
-| 12  | alerts.js         | 701   | Alert cassa/rischio/ammonimenti, soglie personalizzabili (getSoglieAlert)                                                                                                            |
-| 13  | search.js         | 733   | Ricerca globale, riepilogo mensile PDF                                                                                                                                               |
-| 14  | chat-ui.js        | 3790  | Chat WhatsApp + SCHEDA COLLABORATORE (KPI cliccabili, cronologia con anteprima voci/PDF modulo, PDF scheda, push)                                                                    |
-| 15  | moduli.js         | 2357  | Moduli disciplinari, PDF, AI, gestione collaboratori (reparto, impiego Jolly/Fisso, categoria 5ª-1ª)                                                                                 |
-| 16  | formazione.js     | 1709  | MULTIDISCIPLINARITÀ: matrice competenze, livelli L1-L3, punti/premi, popup copertura, notifiche incentivi, Report Incentivi PDF                                                      |
-| 17  | valutazioni.js    | 1151  | VALUTAZIONE ANNUALE: 11 aree (9 HR + Versatilità + Affidabilità e disponibilità), editor multi-scheda, import Excel scheda ufficiale, PDF formato HR                                 |
-| 18  | rapporto.js       | 1012  | Rapporto giornaliero, parser assenze/cassa                                                                                                                                           |
-| 19  | stats.js          | 824   | Statistiche, grafici Chart.js                                                                                                                                                        |
-| 20  | consegna.js       | 1526  | Consegne turno, dashboard                                                                                                                                                            |
-| 21  | promemoria.js     | 1021  | Promemoria, scadenze, push                                                                                                                                                           |
-| 22  | maison-core.js    | 3224  | Maison: dashboard, costi, form manuale, auto-pulizia GD                                                                                                                              |
-| 23  | maison-budget.js  | 1152  | Maison: budget, categorie, profilo                                                                                                                                                   |
-| 24  | maison-helpers.js | 3810  | Maison import Excel/parser nomi + FILTRI REPARTO (getCollaboratoriReparto, getValutazioniReparto, getPuntiReparto, getInventarioReparto) + inventario con categorie personalizzabili |
-| 25  | piano.js          | 456   | PIANO DI LAVORO (da Turnivo): griglia mensile turni, codici speciali, malattie auto dal Diario, fabbisogno vs assegnati; tabelle piano_* on-demand                                   |
+Ordine = ordine di caricamento in index.html.
 
-**Totale: 25 file. ~28.762 righe formattate**
+| # | File | Righe | Descrizione |
+| --- | --- | --- | --- |
+| 1 | config.js | 81 | Costanti, chiavi offuscate (XOR), variabili base |
+| 2 | crypto.js | 90 | Cifratura AES-GCM messaggi chat |
+| 3 | chat-core.js | 256 | Schema chat enterprise: cache, helpers, wrapper |
+| 4 | realtime.js | 677 | WebSocket Supabase, polling fallback, GLOBALS/cache; canale sicuro secGet/secPatch/secDel/setImp con rinnovo sessione (renew_op_session) e filtri PostgREST convertiti in SQL |
+| 5 | api.js | 352 | loadAll, healthCheck, caricamento impostazioni |
+| 6 | utils.js | 794 | toast/toastErrore, escP, fmtCHF, salvaImp, settori (REPARTI_BASE), ordineCollabPiano, helpers |
+| 7 | auth.js | 663 | Login, password, sessioni a token, sblocco biometrico v4 (segreto per dispositivo) |
+| 8 | cestino-core.js | 1110 | Soft delete, ripristino, conservazione dati, controllo salute, DB stats |
+| 9 | settings.js | 2300 | Visibilita e permessi, PROFILI fissi (matrice) e PERSONALIZZATI, operatori (creazione con posizione/copia accessi), settori, scheda permessi stampabile, backup, Impostazioni a schede |
+| 10 | app.js | 474 | Routing pagine, init, renderPostLogin, tipi di evento |
+| 11 | diario.js | 992 | Registrazioni: salva, modifica, elimina; malattie a periodo sincronizzate nel Piano |
+| 12 | alerts.js | 701 | Alert cassa/rischio/ammonimenti, soglie personalizzabili |
+| 13 | search.js | 733 | Ricerca globale, riepilogo mensile PDF |
+| 14 | chat-ui.js | 4031 | Chat + SCHEDA COLLABORATORE (KPI, cronologia, PDF, congedi, riga Crediti) |
+| 15 | moduli.js | 2906 | Moduli disciplinari, PDF, AI (senza dati personali), anagrafica collaboratori |
+| 16 | formazione.js | 3060 | Multidisciplinarita: matrice competenze, livelli, punti/premi, Report Incentivi |
+| 17 | valutazioni.js | 1161 | Valutazione annuale: aree, import Excel, PDF HR |
+| 18 | rapporto.js | 1096 | Rapporto giornaliero, parser assenze/cassa |
+| 19 | stats.js | 975 | Statistiche, grafici |
+| 20 | consegna.js | 1640 | Consegne turno, dashboard |
+| 21 | promemoria.js | 1116 | Promemoria, scadenze, push |
+| 22 | maison-core.js | 3195 | Maison: dashboard, costi, form manuale, auto-pulizia |
+| 23 | maison-budget.js | 1181 | Maison: budget, categorie, profilo |
+| 24 | maison-helpers.js | 3908 | Maison import Excel/parser + filtri per settore + inventario; giubilei e anzianita con congedi non pagati |
+| 25 | guida.js | 542 | Guida in linea per capitoli, filtrata per permessi |
+| 26 | piano-regole.js | 611 | MOTORE REGOLE del piano in funzioni pure (UMD, testabile con node test/piano-regole.test.js): riposi, consecutivi, idoneita, vacanze spettanti, chiusure, giorni chiusi |
+| 27 | piano.js | 19976 | PIANO DI LAVORO: calendario, generatore bozza (prenotazioni compleanni/CGF, passata di riparazione, solver esterno opzionale), cambi turno e coperture, CGF (RAP 4.3), briefing, vacanze, saldo, recupero ore, crediti, timbrature, statistiche, regole per settore, festivi, congedi non pagati, guida |
+| 28 | pause-engine.js | 3791 | PAUSE del briefing: schemi Slots (porting Excel), motore algoritmico Valet/altri, REGOLE PAUSE per settore (durata/turno/distanza/fascia/insieme/nota, giorni), verifica, PDF |
+
+**Totale: 28 file, 58.412 righe (formattazione prettier --single-quote --print-width 120, solo JS).**
+
+## Test automatici
+
+- `node test/piano-regole.test.js` — regole del piano (115 controlli)
+- `node test/pause-regole.test.js` — regole pause (33 controlli)
+- `node strumenti/verifica_crediti.js` — verifica incrociata Crediti/Vacanze/Festivi/Saldo con il codice vero sopra i dati esportati (`strumenti/esporta_dati_verifica.py`)
 
 ## Settori (dinamici, personalizzabili da admin)
 

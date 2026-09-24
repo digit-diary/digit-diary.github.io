@@ -1652,6 +1652,13 @@ const _TABELLE_BACKUP = [
   'piano_regole_gruppo',
   'piano_formulari',
   'piano_briefing',
+  // tabelle del Piano aggiunte a settembre 2026: senza queste il backup era incompleto
+  'piano_ore_mese',
+  'piano_festivita',
+  'piano_recupero_ore',
+  'piano_saldo_iniziale',
+  'piano_cgf_riporto',
+  'collab_congedi_np',
   'hr_allegati',
   'push_subscriptions',
   'chat_message_letti',
