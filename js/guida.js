@@ -149,7 +149,8 @@ function GUIDA_CAPITOLI() {
       titolo: 'Piano: calendario',
       vis: () => _guidaVis('piano'),
       righe: [
-        'Ogni riga e un collaboratore, ogni colonna un giorno. <b>Clicca una cella</b> e scrivi la sigla del turno (Invio salva, Esc annulla, cella vuota cancella). Le sigle inesistenti vengono rifiutate.',
+        'Ogni riga e un collaboratore, ogni colonna un giorno. <b>Clicca una cella</b> e scrivi la sigla del turno (Invio salva, Esc annulla, cella vuota cancella). Una sigla che non esiste viene rifiutata con un <b>avviso rosso</b> che dice quale sigla hai scritto, in quale settore non esiste e, se c e, la sigla piu simile ("Forse intendevi C0?"); la cella lampeggia in rosso e torna com era.',
+        '<b>Lucchetto</b>: con il tasto destro, <b>Blocca questa cella (con motivo)</b> scrive il motivo (visita medica, corso, appuntamento) e mette un <b>lucchetto rosso</b> nella cella. Chi prova a cambiarla legge il motivo; scambi turno, cerca cambio e copertura malattia la saltano. <b>Sblocca</b> compare solo sulle celle bloccate cosi: le celle "protette" dall importazione (piano consolidato, vacanze) non hanno lucchetto e si sovrascrivono con una conferma.',
         '<b>Tasto destro</b> o pressione lunga su una cella: modifica, commento, cambio turno con un collega, cambio per esigenze operative, rimozione, stampa.',
         "Si seleziona come in Excel: trascinando col mouse, oppure cliccando l'intestazione di un giorno per l'intera colonna. Sulla selezione funzionano <b>Canc</b> (con conferma), <b>Ctrl+C</b> e i colori.",
         'La barra in basso a destra mostra <b>somma, media, minimo e massimo</b> delle celle selezionate. Vale anche per le colonne delle ore, dove con Ctrl+click prendi celle sparse.',
@@ -164,7 +165,8 @@ function GUIDA_CAPITOLI() {
       vis: () => _guidaVis('piano') && _guidaPuo('puoGestirePiano'),
       righe: [
         "L'ordine giusto e: <b>Vacanze</b> (applica al piano) → <b>Fabbisogno</b> (quante persone per turno) → <b>Genera bozza</b> → <b>Valida regole</b> → se serve <b>Completa con coperture</b>.",
-        '<b>Genera bozza</b> riempie il fabbisogno usando solo i collaboratori del settore e ti elenca i posti rimasti scoperti.',
+        '<b>Genera bozza</b> riempie il fabbisogno usando solo i collaboratori del settore e ti elenca i posti rimasti scoperti. Prima dei turni prenota i giorni che spettano: il <b>compleanno</b> (congedo C con la nota "Compleanno", anche per chi lavora in due settori, dove la cella e una sola e si vede in entrambi i piani) e i <b>recuperi festivi arretrati</b>. I giorni gia chiusi (passati) non vengono toccati. Se alla conferma rispondi Annulla, il mese torna esattamente com era.',
+        'Chi ha giorni di vacanza, malattia o recupero nel mese riceve turni solo fino alle ore dovute: quei codici valgono ore anche per la bozza, come nel validatore e nel calendario.',
         '<b>Completa con coperture</b> compare solo se qualcuno e abilitato a coprire da un altro settore: tappa i buchi rimasti rispettando i limiti della sua scheda. Va usato dopo aver generato i piani degli altri reparti.',
         '<b>Valida regole</b> elenca le violazioni (riposi, giorni consecutivi, idoneita, ore fuori tolleranza). <b>Migliora ore</b> riequilibra chi e lontano dal proprio obiettivo.',
         '<b>Cancella piano</b> agisce solo sul mese e sul settore che stai guardando: puoi togliere solo le celle generate oppure tutte, e in ogni caso si torna indietro con la freccia Annulla.',
@@ -201,9 +203,11 @@ function GUIDA_CAPITOLI() {
       righe: [
         '<b>Turni</b>: orari, ore, tipo diurno o notturno e colore. Sono <b>divisi per settore</b>, quindi due reparti possono usare la stessa sigla senza confondersi.',
         '<b>Codici speciali</b> (V, M, C, CGF, ND, ASS e simili) sono comuni a tutti i settori.',
-        '<b>Regole del piano</b>: i valori normativi con accanto <b>la fonte</b> (RAP, direttiva interna 16-007, legge sul lavoro) e la colonna che dice dove vengono applicati. Se domani cambia il regolamento si aggiorna il numero, senza toccare il programma.',
-        'Ogni regola vale per <b>tutti i settori</b>, ma si puo aggiungere un eccezione per uno o piu settori con il pulsante <b>Eccezione per un settore</b> nella colonna "Vale per". Esempio: riposo minimo 11 ore ovunque, ma 12 ore ai Tavoli. La regola specifica vince nel suo settore, la generale continua a valere in tutti gli altri: non serve duplicare le regole settore per settore.',
-        '<b>Regole di gruppo</b>: chi puo lavorare in ogni gruppo del proprio settore, con minimi e limiti per funzione.',
+        '<b>Regole del piano</b>: ogni regola ha un nome in italiano semplice, un valore (numero oppure Si / No), la colonna <b>Dove agisce</b> che dice in quali schermate conta, e sotto il nome tecnico con la <b>fonte</b> (RAP, direttiva 16-007, legge sul lavoro). Sono raggruppate per tema: riposo, domeniche, ore e saldo, festivi e recuperi, vacanze, ausiliari, funzioni, orari di chiusura, giorni chiusi, congedi non pagati. Se domani cambia il regolamento si aggiorna il numero, senza toccare il programma.',
+        '<b>Per un settore</b>: nel menu in alto della scheda Regole scegli il settore (Slots, Tavoli, Valet, Cleaning) e cambia il numero nella riga: nasce da sola l eccezione per quel settore, gli altri tengono il valore generale. La colonna dice "eccezione" o "valore generale"; <b>Torna al generale</b> la toglie. Esempio: riposo minimo 11 ore ovunque, 12 ai Tavoli.',
+        '<b>Controlli prima di salvare</b>: un valore fuori scala (riposo di 3 ore, 40 giorni consecutivi), un testo dove serve un numero, oppure una regola che cita turni o funzioni che in quel settore non esistono (per esempio "L1 e 9 solo a BO e SUP" ai Tavoli, dove L1 e 9 non ci sono) viene rifiutato con un avviso rosso che spiega il motivo, e resta il valore di prima. Lo stesso vale per le regole di gruppo: gruppo, funzione e formato vengono verificati sul settore.',
+        '<b>Regole nuove</b>: quelle sui gruppi di lavoro (chi puo fare cassa, quanti Supervisor al giorno, una funzione richiesta) si creano nella scheda <b>Regole di gruppo</b> scegliendo il tipo dall elenco; le preferenze di una persona (solo diurni, turni vietati, settori, coperture) nella sua scheda in Gestione collaboratori. Le regole con nome fisso sono quelle che il programma sa applicare: la scheda mostra solo quelle che agiscono davvero, e in fondo alla scheda stessa c e la guida in sei punti.',
+        'Le <b>regole di preferenza</b> della bozza (blocchi compatti, riposo isolato, notte poi turno del mattino, equilibrio delle notti e dei diurni, domeniche) ora spostano davvero l ordine con cui il generatore sceglie le persone: si accendono e si spengono con Si / No.',
       ],
     },
     {
@@ -212,7 +216,9 @@ function GUIDA_CAPITOLI() {
       vis: () => _guidaVis('piano'),
       righe: [
         'I <b>festivi</b> sono quelli ufficiali del Canton Ticino e si generano da soli per qualsiasi anno futuro aprendo la scheda Festivi.',
-        'Il <b>CGF</b> e il recupero per il lavoro nei giorni festivi. Per il regolamento aziendale spetta al <b>personale fisso</b> e solo per i festivi diversi dalla domenica.',
+        'Il <b>CGF</b> e il recupero per il lavoro nei giorni festivi. Per il regolamento aziendale spetta al <b>personale fisso</b> e solo per i festivi diversi dalla domenica. Con la regola <b>cgf_solo_parificati</b> (predefinita: Si) il recupero matura solo sui <b>nove festivi parificati alla domenica</b>, esattamente come nel foglio Excel del piano: gli altri festivi cantonali (San Giuseppe, 1 Maggio, Pentecoste, Corpus Domini, SS. Pietro e Paolo, Immacolata) non danno recupero. Nella scheda Festivi ogni giorno dice se da CGF, se e escluso perche non parificato o perche cade di domenica.',
+        'La <b>bozza</b> mette i recuperi arretrati PRIMA di distribuire i turni, con tre regole modificabili: al massimo <b>cgf_max_mese</b> recuperi a persona in un mese (2), almeno <b>cgf_distanza_giorni</b> giorni fra due recuperi (5), e mai il giorno prima o dopo una vacanza (<b>cgf_non_con_vacanze</b>, RAP 4.3). I recuperi dei festivi del mese vanno nei giorni dopo il festivo. Mai sul compleanno.',
+        'Il <b>riporto CGF</b> dall anno precedente (colonna "riporto" del foglio Excel) si scrive nella scheda Festivi con il pulsante <b>Riporto CGF dall anno precedente</b>: con un riporto registrato il programma non conta piu i festivi e i recuperi dell anno prima. Lo stesso conteggio (riporto + maturati - goduti, con i recuperi caduti in malattia che restano a credito) vale ovunque: bozza, Assegna i CGF, Chi ha diritto e Statistiche.',
         'Gli <b>ausiliari (jolly) non maturano CGF</b>: ricevono il <b>supplemento del 50%</b> sul salario orario lordo quando lavorano uno dei <b>nove festivi parificati alle domeniche</b> (Capodanno, Epifania, Lunedi di Pasqua, Ascensione, 1 Agosto, Assunzione, Ognissanti, Natale, Santo Stefano). Sono sempre quei nove, non cambiano di anno in anno e valgono anche quando cadono di domenica. Gli altri festivi cantonali (San Giuseppe, 1 Maggio, Pentecoste, Corpus Domini, SS. Pietro e Paolo, Immacolata) non danno il supplemento. In piu, per il lavoro notturno maturano <b>tempo libero pagato pari al 10% delle ore notturne</b>. Entrambi i conteggi sono nelle Statistiche anno, colonne Suppl. 50% e Notte 10%, pronti per le paghe. Fonte: RAP Allegato 1. Il <b>supplemento del 10% per il lavoro notturno</b> (fascia 23:00-06:00) e gia compreso nella durata dei turni, quindi entra da solo nelle ore del mese e nel saldo: nella scheda Turni il pulsante <b>Controlla le durate dei turni</b> verifica che tutti i turni notturni lo comprendano e propone la correzione dove manca.',
         'Se la persona si ammala nel giorno del recupero, il CGF non risulta goduto e il credito resta.',
         'Il conteggio di maturati, goduti e saldo parte da gennaio e serve anche a controllare se nei mesi passati i recuperi sono stati dati. Chi compila il piano <b>a mano</b> trova nella scheda Festivi due pulsanti: <b>Chi ha diritto a un recupero</b> (elenco con maturati, goduti e saldo dell anno) e <b>Assegna i CGF del mese</b>, che mette i recuperi nei giorni liberi tenendo conto di quelli gia dati nei mesi precedenti, senza doppioni e senza toccare le celle occupate.',
@@ -380,6 +386,28 @@ function GUIDA_CAPITOLI() {
     },
     {
       area: 'piano',
+      titolo: 'Piano: congedi non pagati',
+      vis: () => _guidaVis('piano'),
+      righe: [
+        'Regolamento aziendale 5.14: domanda scritta tre mesi prima, concessione della Direzione. Si registrano nella scheda <b>Collaboratori</b> del Piano (riquadro Congedi non pagati) con date dal / al, motivo e chi ha autorizzato. Il programma rifiuta date invertite, periodi sovrapposti e congedi senza motivo.',
+        'Nel piano i giorni diventano <b>CNP</b> (zero ore, cella protetta) e <b>non contano fra le ore dovute</b> del mese: saldo, statistiche e bozza lo sanno. Eliminando il congedo i giorni CNP spariscono.',
+        'Oltre <b>congedo_np_giorni_vacanze</b> giorni (10) il diritto alle vacanze dell anno si riduce in proporzione ai giorni di congedo ("decade per tutta la durata del congedo"). Oltre <b>congedo_np_mesi_anzianita</b> mesi (6) l anzianita di servizio si sposta in avanti di tutta la durata: giubilei e scaglioni vacanze arrivano piu tardi. Fino a sei mesi concordati, come dice il regolamento, l anzianita non si interrompe. Le due soglie sono nella scheda Regole.',
+        'Il vecchio automatismo "mese intero di sole C = congedo non pagato" non registra piu nulla da solo: il controllo salute segnala solo i mesi senza turni, da verificare a mano.',
+      ],
+    },
+    {
+      area: 'piano',
+      titolo: 'Piano: cambi turno, coperture e restituzioni',
+      vis: () => _guidaVis('piano'),
+      righe: [
+        'Dal tasto destro sulla cella: <b>Cambia turno con...</b> (scambio con un collega che quel giorno ha un turno nello stesso settore, con restituzione facoltativa), <b>Cerca cambio, giorno libero</b> (un collega libero prende il turno, con eventuale restituzione), <b>Cambio per esigenze</b> (la direzione cambia il turno con motivo), e dalla barra <b>Copertura malattia</b> (sostituti giorno per giorno, anche con una mossa a catena sul giorno prima).',
+        'Tutti i flussi controllano le regole per <b>entrambe</b> le persone (riposo 11 ore, giorni consecutivi, idoneita, accompagnamento), rispettano i giorni chiusi, saltano le celle bloccate con motivo e non toccano mai le celle di un altro settore: chi lavora in due settori e ha gia una cella nell altro piano non risulta libero.',
+        'La <b>restituzione</b> puo cadere anche nel mese dopo: le celle si leggono dal database e vengono scritte davvero (prima venivano solo annunciate). Chi quel giorno non aveva nulla riceve un congedo C. Ogni cambio produce il formulario da firmare e finisce nel Registro; l autorizzazione oltre il limite mensile viene registrata solo a scambio fatto.',
+        'Ogni cambio si puo annullare con la freccia <b>Annulla</b>, che ripristina anche colori, orari personalizzati e motivi di blocco del mese.',
+      ],
+    },
+    {
+      area: 'piano',
       titolo: 'Piano: timbrature e saldo ore',
       vis: () => _guidaVis('piano'),
       righe: [
@@ -430,6 +458,8 @@ function GUIDA_CAPITOLI() {
       titolo: 'Impostazioni del programma',
       vis: () => _guidaAdmin(),
       righe: [
+        '<b>Sessioni</b>: ogni dispositivo ha la sua sessione, che si rinnova da sola con il token che possiede; aprire il programma sul telefono non fa piu uscire dal PC. Se il rinnovo non e possibile compare un avviso e si rientra con la password. Lo <b>sblocco biometrico</b> va riattivato una volta dalle Impostazioni: da questa versione il dispositivo ha un segreto che il server verifica, quindi nessuno puo ottenere una sessione con il solo nome dell operatore.',
+        'Le impostazioni di configurazione (visibilita, profili, settori, punti, soglie, moduli, opzioni del piano) le salva solo una sessione amministratore: il server lo verifica, non basta l interfaccia. Ogni salvataggio fallito viene segnalato con un avviso rosso, mai in silenzio.',
         '<b>Settori</b>: si creano, rinominano e si scelgono le pagine attive per ognuno.',
         '<b>Visibilita pagine e funzioni</b>: si decide chi vede cosa, pagina per pagina e funzione per funzione, anche per singolo operatore.',
         '<b>Operatori</b>: account, password e permessi. Ogni azione resta registrata nel Registro.',
