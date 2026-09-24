@@ -564,6 +564,18 @@ function _profCustomEditorHtml() {
     escP(ed.nome) +
     '" style="padding:6px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);min-width:220px"><span style="flex:1"></span>' +
     '<button class="btn-add-tipo" onclick="profCustomSalva()">Salva profilo</button><button class="btn-secondario" onclick="profCustomAnnulla()">Annulla</button></div>' +
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;font-size:.84rem"><span>Parti da una copia di:</span><select id="prof-edit-base" style="padding:5px 8px"><option value="">scegli</option><optgroup label="Profilo">' +
+    _profiliTuttiIds()
+      .filter((p) => p !== ed.id)
+      .map((p) => '<option value="prof:' + p + '">' + escP(_profiloNome(p)) + '</option>')
+      .join('') +
+    '</optgroup><optgroup label="Permessi reali di un operatore">' +
+    operatoriAuthCache
+      .map((o) => o.nome)
+      .sort()
+      .map((o) => '<option value="op:' + escP(o) + '">Come ' + escP(o) + '</option>')
+      .join('') +
+    '</optgroup></select><button class="btn-secondario" onclick="profCustomPrecompila()">Riempi la tabella</button><span style="color:var(--muted)">Riempie le caselle qui sotto; poi cambi quello che vuoi e salvi.</span></div>' +
     '<p class="sez-desc" style="margin-bottom:8px">Modifica = puo cambiare; Vede = solo lettura; No = non la vede. Le voci di modifica del Piano e i permessi non hanno la sola vista, tranne le viste riservate.</p>';
   gruppi.forEach(([g, titolo]) => {
     const voci = VIS_ITEMS[g] || {};
@@ -590,6 +602,32 @@ function _profCustomEditorHtml() {
   });
   h += '</div>';
   return h;
+}
+// permessi REALI di un operatore tradotti in valori della tabella
+function _profCustomVociDaOperatore(nome) {
+  const voci = {};
+  Object.keys(MATRICE_PROFILI).forEach((k) => {
+    if (!_visHaAccessoOggi(k, nome)) voci[k] = '-';
+    else voci[k] = PROFILI_VOCI_DI_SOLA_VISTA.indexOf(k) >= 0 ? 'V' : 'M';
+  });
+  return voci;
+}
+function profCustomPrecompila() {
+  const val = (document.getElementById('prof-edit-base') || {}).value || '';
+  if (!val) {
+    toast('Scegli da cosa partire');
+    return;
+  }
+  const voci =
+    val.indexOf('op:') === 0 ? _profCustomVociDaOperatore(val.substring(3)) : _profCustomVociDa(val.substring(5));
+  let n = 0;
+  document.querySelectorAll('.prof-edit-voce').forEach((sel) => {
+    const v = voci[sel.dataset.k] || '-';
+    const ok = [...sel.options].some((o) => o.value === v);
+    sel.value = ok ? v : v === 'V' ? 'M' : '-';
+    n++;
+  });
+  toast('Tabella riempita (' + n + ' voci): ora cambia quello che vuoi e salva');
 }
 function _profCustomVociDa(base) {
   const voci = {};
