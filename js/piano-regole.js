@@ -34,7 +34,10 @@
     const fine1 = oraNum(t1.ora_fine);
     const inizio2 = oraNum(t2.ora_inizio);
     if (fine1 == null || inizio2 == null) return null;
-    const fineAbs = t1.oltre23 || fine1 < oraNum(t1.ora_inizio) ? 24 + fine1 : fine1;
+    // il giorno dopo si aggiunge solo se il turno finisce dopo la mezzanotte
+    // (fine <= inizio): il flag "oltre le 23" e' vero anche per chi chiude
+    // alle 23:30 e dava un riposo negativo
+    const fineAbs = fine1 <= oraNum(t1.ora_inizio) ? 24 + fine1 : fine1;
     return 24 + inizio2 - fineAbs;
   }
 

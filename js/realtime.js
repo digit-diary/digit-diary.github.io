@@ -445,64 +445,92 @@ function _parseRestFilter(path) {
     } else if (k === 'select') {
       selectCols = v;
     } else {
-      const m = v.match(/^(eq|neq|gt|gte|lt|lte|like|ilike|is)\.(.*)/);
-      if (m) {
-        const op = {
-          eq: '=',
-          neq: '!=',
-          gt: '>',
-          gte: '>=',
-          lt: '<',
-          lte: '<=',
-          like: 'LIKE',
-          ilike: 'ILIKE',
-          is: 'IS',
-        }[m[1]];
-        const val =
-          m[2] === 'true'
-            ? 'TRUE'
-            : m[2] === 'false'
-              ? 'FALSE'
-              : m[2] === 'null'
-                ? 'NULL'
-                : "'" + m[2].replace(/'/g, "''") + "'";
-        filters.push(k + ' ' + op + ' ' + val);
-      }
+      // Un filtro che il traduttore non conosce NON si scarta: scartarlo
+      // vorrebbe dire leggere (o cancellare) righe che non c'entrano. Meglio
+      // un errore chiaro subito, in fase di sviluppo, che dati sbagliati.
+      filters.push(_filtroSqlClausola(k, v));
     }
   }
   return { table, filter: filters.join(' AND '), order, limit };
 }
+// UNICO traduttore REST -> SQL per una clausola 'colonna' + 'op.valore'.
+// Operatori: eq neq gt gte lt lte like ilike is in. Tutto il resto e' errore.
+function _filtroSqlClausola(k, v) {
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(k)) throw new Error('Filtro non valido: colonna "' + k + '"');
+  let rest = v;
+  try {
+    rest = decodeURIComponent(v);
+  } catch (e) {}
+  const lit = (x) => {
+    if (x === 'true') return 'TRUE';
+    if (x === 'false') return 'FALSE';
+    if (x === 'null') return 'NULL';
+    return "'" + x.replace(/'/g, "''") + "'";
+  };
+  const mIn = rest.match(/^in\.\((.*)\)$/);
+  if (mIn) {
+    const vals = mIn[1]
+      .split(',')
+      .map((x) => x.trim())
+      .filter((x) => x !== '');
+    if (!vals.length) throw new Error('Filtro non valido: ' + k + '=in.() vuoto');
+    return k + ' IN (' + vals.map(lit).join(', ') + ')';
+  }
+  const m = rest.match(/^(eq|neq|gt|gte|lt|lte|like|ilike|is)\.([\s\S]*)$/);
+  if (!m) throw new Error('Filtro non valido: ' + k + '=' + v + ' (operatore non supportato dal canale sicuro)');
+  const op = { eq: '=', neq: '!=', gt: '>', gte: '>=', lt: '<', lte: '<=', like: 'LIKE', ilike: 'ILIKE', is: 'IS' }[
+    m[1]
+  ];
+  if (m[1] === 'is' && !/^(true|false|null)$/.test(m[2])) throw new Error('Filtro non valido: ' + k + '=is.' + m[2]);
+  return k + ' ' + op + ' ' + lit(m[2]);
+}
+// Chiamata RPC che NON puo' fallire in silenzio: se il database risponde con
+// un errore, qui diventa un'eccezione con il testo del database. Le funzioni
+// secure_* la usano tutte, cosi' "salvato" vuol dire salvato davvero.
+async function _rpcSicura(fn, params) {
+  const r = await sbRpc(fn, params);
+  if (r === null && _sbUltimoErrore && _sbUltimoErrore.fn === fn) {
+    const err = new Error(_sbErroreTesto(_sbUltimoErrore));
+    err.status = _sbUltimoErrore.status;
+    err.sessione = /Sessione non valida|sessione/i.test(_sbUltimoErrore.testo || '');
+    err.dalDatabase = true;
+    throw err;
+  }
+  return r;
+}
+function _sbErroreTesto(e) {
+  try {
+    const j = JSON.parse(e.testo);
+    if (j && (j.message || j.hint)) return String(j.message || j.hint);
+  } catch (x) {}
+  return (e.testo || 'errore ' + e.status).substring(0, 300);
+}
 async function secGet(path) {
   let tk = getOpToken();
   if (tk) {
-    try {
-      const p = _parseRestFilter(path);
-      const r = await sbRpc('secure_read', {
-        p_token: tk,
+    const p = _parseRestFilter(path); // un filtro non valido e' un errore del programma: si vede subito
+    const leggi = (t) =>
+      _rpcSicura('secure_read', {
+        p_token: t,
         p_table: p.table,
         p_filter: p.filter,
         p_order: p.order,
         p_limit: p.limit,
       });
-      return r || [];
+    try {
+      return (await leggi(tk)) || [];
     } catch (e) {
-      // Token scaduto → rinnova e riprova
-      if (await _renewToken()) {
-        tk = getOpToken();
-        try {
-          const p = _parseRestFilter(path);
-          const r = await sbRpc('secure_read', {
-            p_token: tk,
-            p_table: p.table,
-            p_filter: p.filter,
-            p_order: p.order,
-            p_limit: p.limit,
-          });
-          return r || [];
-        } catch (e2) {}
+      // Token scaduto o sessione chiusa: rinnova e riprova UNA volta. Ogni
+      // altro errore resta visibile: il vecchio ripiego anonimo tornava []
+      // (la RLS blocca tutto) e l'app mostrava liste vuote come se fosse
+      // normale, azzerando anche le cache.
+      if (e.sessione || /Failed to fetch|NetworkError/i.test(e.message || '')) {
+        if (await _renewToken()) {
+          tk = getOpToken();
+          return (await leggi(tk)) || [];
+        }
       }
-      console.warn('secGet fallback:', e.message);
-      return sbGet(path);
+      throw e;
     }
   }
   return sbGet(path);
@@ -543,76 +571,34 @@ async function secPost(table, data) {
   return sbPost(table, data);
 }
 // Converte un filtro REST (id=eq.123&nome=eq.X) nel filtro SQL per le RPC secure_*
+// Ogni clausola passa da _filtroSqlClausola: un operatore che il canale non
+// conosce (or=, not., cs. ...) e' un errore, non una clausola che sparisce.
 function _filtroSqlDaRest(filter) {
-  return filter
+  return String(filter || '')
     .split('&')
+    .filter((p) => p.trim() !== '')
     .map((p) => {
       const [k] = p.split('=');
       const rest = p.substring(k.length + 1);
-      const m = rest.match(/^(eq|neq|like|lt|lte|gt|gte)\.(.*)/);
-      if (!m) return null;
-      const op = { eq: '=', neq: '!=', like: 'LIKE', lt: '<', lte: '<=', gt: '>', gte: '>=' }[m[1]];
-      let raw = m[2];
-      try {
-        raw = decodeURIComponent(raw);
-      } catch (e) {}
-      const val = isNaN(raw) ? "'" + raw.replace(/'/g, "''") + "'" : raw;
-      return k + ' ' + op + ' ' + val;
+      return _filtroSqlClausola(k, rest);
     })
-    .filter(Boolean)
     .join(' AND ');
 }
 async function secPatch(table, filter, data) {
   const tk = getOpToken();
   if (tk) {
+    // Un filtro vuoto aggiornerebbe TUTTA la tabella: mai.
+    const sql = _filtroSqlDaRest(filter);
+    if (!sql) throw new Error('secPatch senza filtro su ' + table);
+    const scrivi = (t) => _rpcSicura('secure_update', { p_token: t, p_table: table, p_filter: sql, p_data: data });
     try {
-      // Converte filtro REST (id=eq.123&nome=eq.X) in SQL (id = 123 AND nome = 'X')
-      // I valori possono arrivare URL-encoded (encodeURIComponent nei chiamanti):
-      // vanno decodificati, altrimenti 'Rossi%20Mario' non matcha 'Rossi Mario'.
-      const parts = filter
-        .split('&')
-        .map((p) => {
-          const [k, v] = p.split('=');
-          const rest = p.substring(k.length + 1);
-          const m = rest.match(/^(eq|neq|lt|lte|gt|gte)\.(.*)/);
-          if (m) {
-            const op = {
-              eq: '=',
-              neq: '!=',
-              lt: '<',
-              lte: '<=',
-              gt: '>',
-              gte: '>=',
-            }[m[1]];
-            let raw = m[2];
-            try {
-              raw = decodeURIComponent(raw);
-            } catch (e) {}
-            const val = isNaN(raw) ? "'" + raw.replace(/'/g, "''") + "'" : raw;
-            return k + ' ' + op + ' ' + val;
-          }
-          return null;
-        })
-        .filter(Boolean)
-        .join(' AND ');
-      await sbRpc('secure_update', {
-        p_token: tk,
-        p_table: table,
-        p_filter: parts,
-        p_data: data,
-      });
+      await scrivi(tk);
     } catch (e) {
-      // Token scaduto? Rinnova e riprova UNA volta. Se fallisce ancora, ERRORE VISIBILE:
-      // il vecchio fallback anonimo veniva bloccato in silenzio dalla RLS (0 righe toccate
-      // ma nessun errore) e l'app credeva di aver salvato/cancellato · dati "fantasma".
-      if (await _renewToken()) {
-        const tk2 = getOpToken();
-        await sbRpc('secure_update', {
-          p_token: tk2,
-          p_table: table,
-          p_filter: _filtroSqlDaRest(filter),
-          p_data: data,
-        });
+      // Token scaduto? Rinnova e riprova UNA volta. Ogni altro errore e' VISIBILE:
+      // il vecchio fallback anonimo veniva bloccato in silenzio dalla RLS (0 righe
+      // toccate ma nessun errore) e l'app credeva di aver salvato · dati "fantasma".
+      if ((e.sessione || /Failed to fetch|NetworkError/i.test(e.message || '')) && (await _renewToken())) {
+        await scrivi(getOpToken());
       } else {
         throw e;
       }
@@ -624,45 +610,17 @@ async function secPatch(table, filter, data) {
 async function secDel(table, filter) {
   const tk = getOpToken();
   if (tk) {
+    // Un filtro vuoto o non tradotto cancellerebbe piu' del voluto: mai.
+    const sql = _filtroSqlDaRest(filter);
+    if (!sql) throw new Error('secDel senza filtro su ' + table);
+    const cancella = (t) => _rpcSicura('secure_delete', { p_token: t, p_table: table, p_filter: sql });
     try {
-      const parts = filter
-        .split('&')
-        .map((p) => {
-          const [k] = p.split('=');
-          const rest = p.substring(k.length + 1);
-          const m = rest.match(/^(eq|neq|like|lt|lte|gt|gte)\.(.*)/);
-          if (m) {
-            const op = {
-              eq: '=',
-              neq: '!=',
-              like: 'LIKE',
-              lt: '<',
-              lte: '<=',
-              gt: '>',
-              gte: '>=',
-            }[m[1]];
-            let raw = m[2];
-            try {
-              raw = decodeURIComponent(raw);
-            } catch (e) {}
-            const val = isNaN(raw) ? "'" + raw.replace(/'/g, "''") + "'" : raw;
-            return k + ' ' + op + ' ' + val;
-          }
-          return null;
-        })
-        .filter(Boolean)
-        .join(' AND ');
-      await sbRpc('secure_delete', {
-        p_token: tk,
-        p_table: table,
-        p_filter: parts,
-      });
+      await cancella(tk);
     } catch (e) {
       // Come secPatch: rinnova il token e riprova; mai fallback anonimo silenzioso
       // (la RLS rispondeva OK senza cancellare nulla → le righe "riapparivano")
-      if (await _renewToken()) {
-        const tk2 = getOpToken();
-        await sbRpc('secure_delete', { p_token: tk2, p_table: table, p_filter: _filtroSqlDaRest(filter) });
+      if ((e.sessione || /Failed to fetch|NetworkError/i.test(e.message || '')) && (await _renewToken())) {
+        await cancella(getOpToken());
       } else {
         throw e;
       }
@@ -678,24 +636,21 @@ async function getImp(k) {
 async function setImp(k, v) {
   const tk = getOpToken();
   if (tk) {
+    // Un'impostazione non salvata e' un errore da vedere (prima si tentavano
+    // tre strade in silenzio e l'ultima poteva fallire senza dirlo).
+    const salva = (t) => _rpcSicura('upsert_impostazione', { p_token: t, p_chiave: k, p_valore: v });
     try {
-      await sbRpc('upsert_impostazione', {
-        p_token: tk,
-        p_chiave: k,
-        p_valore: v,
-      });
-      return;
+      await salva(tk);
     } catch (e) {
-      console.warn('setImp upsert error:', e.message);
+      if ((e.sessione || /Failed to fetch|NetworkError/i.test(e.message || '')) && (await _renewToken())) {
+        await salva(getOpToken());
+      } else {
+        throw e;
+      }
     }
+    return;
   }
-  try {
-    await secPatch('impostazioni', 'chiave=eq.' + k, { valore: v });
-  } catch (e) {}
+  await secPatch('impostazioni', 'chiave=eq.' + k, { valore: v });
   const check = await getImp(k);
-  if (check !== v) {
-    try {
-      await secPost('impostazioni', { chiave: k, valore: v });
-    } catch (e2) {}
-  }
+  if (check !== v) await secPost('impostazioni', { chiave: k, valore: v });
 }
