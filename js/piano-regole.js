@@ -198,6 +198,12 @@
       return false;
     const gruppoT = (turno.gruppo || '').toUpperCase();
     const fzU = ((info.funzione || '') + '').toUpperCase();
+    // FUNZIONI CHE FANNO TUTTO (regola funzioni_fanno_tutto, es. SUP e RESP):
+    // come in Formazione il livello alto comprende quelli sotto, quindi a mano
+    // sono idonee a ogni gruppo e a ogni turno. Restano le preferenze personali
+    // (solo diurni, turni bloccati) gia' controllate sopra. La bozza automatica
+    // ha i suoi controlli e continua a rispettare le regole del settore.
+    if (typeof ctx.fannoTutto === 'function' && fzU && ctx.fannoTutto(fzU)) return true;
     const settoriC = ctx.settoriDi(info);
     const haSettore = settoriC ? settoriC.includes(gruppoT) : true;
     let campoGrant = false;

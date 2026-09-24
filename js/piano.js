@@ -203,9 +203,25 @@ function _pianoRegoleTurnoFunzione() {
       /^(turni_solo_funzioni|funzione_turni_giorni)$/.test(String(r.tipo_regola || '').toLowerCase()),
   );
 }
-// motivo della violazione per 'nome' con il turno t nel giorno dow (JS, 0=dom), o null
-function _pianoViolazioneFunzioneTurno(nome, t, dow) {
+// Funzioni che a mano possono fare qualsiasi turno (regola funzioni_fanno_tutto):
+// il Supervisor copre anche i livelli sotto, come in Formazione
+function _pianoFunzioniFannoTutto() {
+  const v = _pianoRegolaVal('funzioni_fanno_tutto');
+  const testo = v == null ? 'SUP,RESP' : String(v);
+  return new Set(
+    testo
+      .split(',')
+      .map((x) => x.trim().toUpperCase())
+      .filter(Boolean),
+  );
+}
+// motivo della violazione per 'nome' con il turno t nel giorno dow (JS, 0=dom), o null.
+// automatica = true quando decide la bozza: li' le regole del settore valgono
+// per tutti; a mano (scrittura, validatore, cambi) chi "fa tutto" passa.
+function _pianoViolazioneFunzioneTurno(nome, t, dow, automatica) {
   const info = _pianoCollabInfo(nome) || {};
+  const fz = String(info.funzione || '').toUpperCase();
+  if (!automatica && fz && _pianoFunzioniFannoTutto().has(fz)) return null;
   const infoS = Object.assign({}, info, { _settori: _pianoSettoriEffettivi(info) || [] });
   return PianoRegole.violazioneFunzioneTurno(infoS, t, dow, _pianoRegoleTurnoFunzione());
 }
@@ -2324,7 +2340,7 @@ function _pianoCalcolaViolazioni() {
       if (lavoro) {
         const t = _pianoTurnoInfo(cod);
         const dow = new Date(ym + '-' + String(g).padStart(2, '0') + 'T12:00:00').getDay();
-        const vfz = t ? _pianoViolazioneFunzioneTurno(nome, t, dow) : null;
+        const vfz = t ? _pianoViolazioneFunzioneTurno(nome, t, dow, false) : null;
         if (vfz) aggiungi(nome, g, vfz);
       }
     }
@@ -2919,7 +2935,7 @@ async function generaBozzaPiano(usaCoperture) {
             // mappature per funzione (SUP/BO limitati ai loro turni; regole settimana SUP)
             const fz = infoC && infoC.funzione;
             // regole "chi fa cosa" del settore (turni riservati, funzione-turni-giorni)
-            if (_pianoViolazioneFunzioneTurno(n, t, dowG)) return false;
+            if (_pianoViolazioneFunzioneTurno(n, t, dowG, true)) return false;
             // regola HARD no_4w1c1w: niente rientro dopo UN solo giorno di riposo
             // se prima c'erano 4+ giorni di lavoro consecutivi
             if (String(_pianoRegolaVal('no_4w1c1w')).toUpperCase() === 'TRUE') {
@@ -3581,6 +3597,12 @@ const PIANO_REGOLE_GUIDA = {
     d: 'Applica vacanze e bozza',
   },
   diurno_prima_vacanza: { g: 'Vacanze', n: 'Turno diurno il giorno prima della vacanza', t: 'sino', d: 'Validatore' },
+  funzioni_fanno_tutto: {
+    g: 'Funzioni e turni',
+    n: 'Funzioni che a mano possono fare qualsiasi turno (il livello alto comprende quelli sotto, come in Formazione)',
+    t: 'testo',
+    d: 'Scrittura manuale, validatore, cambi turno e coperture (la bozza automatica segue le regole del settore)',
+  },
   chiusura_ora_normale: {
     g: 'Orari di chiusura',
     n: 'Ora di chiusura nei giorni normali',
@@ -3739,6 +3761,19 @@ function _pianoValidaRegola(nome, valore, settore) {
     const parti = v.split(',').map((x) => x.trim());
     if (!parti.length || parti.some((x) => !/^[0-6]$/.test(x)))
       return 'Scrivi i giorni della settimana come numeri da 0 (domenica) a 6 (sabato), separati da virgola: es. 5,6';
+    return null;
+  }
+  if (nome === 'funzioni_fanno_tutto') {
+    const note = new Set(
+      (Array.isArray(window._pianoFunzioni) ? window._pianoFunzioni : []).map((f) => String(f).toUpperCase()),
+    );
+    collaboratoriCache.forEach((c) => c.funzione && note.add(String(c.funzione).toUpperCase()));
+    const ignote = v
+      .split(',')
+      .map((x) => x.trim().toUpperCase())
+      .filter((x) => x && !note.has(x));
+    if (ignote.length)
+      return 'Funzioni sconosciute: ' + ignote.join(', ') + ' (Impostazioni del piano, Funzioni disponibili)';
     return null;
   }
   if (nome === 'jolly_codici_gia_pagati') {
@@ -9233,6 +9268,7 @@ function _pianoIdoneoPerTurno(nome, turno) {
     mappFunzione: (fz) => _pianoMappFunzione(fz),
     regolaVal: (n) => _pianoRegolaVal(n),
     regoleTurnoFunzione: () => _pianoRegoleTurnoFunzione(),
+    fannoTutto: (fz) => _pianoFunzioniFannoTutto().has(fz),
   });
 }
 function apriCoperturaMalattia() {
@@ -15482,7 +15518,7 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
     // la logica riposo/consecutivi/idoneita' vive nel motore puro PianoRegole
     const tNuovo = codiceNuovo !== undefined ? _pianoTurnoInfo(codiceNuovo) : null;
     if (tNuovo) {
-      const vfz = _pianoViolazioneFunzioneTurno(nome, tNuovo, new Date(dstr + 'T12:00:00').getDay());
+      const vfz = _pianoViolazioneFunzioneTurno(nome, tNuovo, new Date(dstr + 'T12:00:00').getDay(), false);
       if (vfz) avvisiExtra.push(vfz);
     }
     return avvisiExtra.concat(
