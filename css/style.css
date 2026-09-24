@@ -915,16 +915,19 @@ header h1 .casino {
   width: 100%;
   max-width: 1280px;
   display: flex;
+  flex-wrap: wrap; /* 16 pagine: se non ci stanno su una riga vanno a capo, centrate, mai fuori dal bordo */
+  justify-content: center;
   gap: 0;
   margin-bottom: 24px;
 }
 .nav-tab {
-  flex: 1;
-  padding: 14px 10px;
+  flex: 1 1 0;
+  min-width: 0; /* senza, ogni tab pretende la larghezza del suo testo e la barra sborda a destra */
+  padding: 14px 6px;
   text-align: center;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
   border: none;
