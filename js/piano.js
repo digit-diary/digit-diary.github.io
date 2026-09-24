@@ -416,9 +416,11 @@ async function _pianoCaricaCfg() {
     window._pianoFunzioni = ['RESP', 'SUP', 'BO', 'HOST'];
   _pianoCfgCaricata = true;
 }
-function _pianoMappFunzione(funzione) {
+// mappature del SETTORE aperto: ogni settore ha le sue sigle
+function _pianoMappFunzione(funzione, rep) {
   if (!funzione) return null;
-  const m = pianoMappatureCache.filter((x) => x.funzione === funzione);
+  const settore = rep || _pianoReparto();
+  const m = pianoMappatureCache.filter((x) => x.funzione === funzione && (x.reparto_dip || 'slots') === settore);
   return m.length ? m : null;
 }
 // multi-reparto: appartiene al reparto corrente se è il suo principale
@@ -13420,12 +13422,16 @@ function esportaVacanzePdf() {
 function _renderPianoMappatureCard() {
   if (!isAdmin()) return '';
   let h =
-    '<div class="main-card" style="margin-top:16px"><div class="card-header">Turni per funzione (admin)</div><div style="padding:10px 14px">';
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Turni per funzione · ' +
+    escP(repartoLabel(_pianoReparto())) +
+    ' (admin)</div><div style="padding:10px 14px">';
   h +=
-    '<p style="font-size:.82rem;color:var(--muted);margin-bottom:6px">PRINCIPALE = turni normali della funzione. AMMESSO = permessi quando serve. PREFERITO = la bozza li privilegia. Chi ha una funzione con mappature riceve SOLO i turni elencati; chi non ne ha segue la storia dei gruppi.</p>';
+    '<p style="font-size:.82rem;color:var(--muted);margin-bottom:6px">Valgono per il settore aperto: ogni settore ha le sue sigle. PRINCIPALE = turni normali della funzione. AMMESSO = permessi quando serve. PREFERITO = la bozza li privilegia. Chi ha una funzione con mappature riceve SOLO i turni elencati; chi non ne ha segue i settori abilitati e le regole di gruppo.</p>';
   const ordine = { PRINCIPALE: 1, AMMESSO: 2, PREFERITO: 3 };
   const perFz = {};
-  pianoMappatureCache.forEach((m) => (perFz[m.funzione] = (perFz[m.funzione] || []).concat(m)));
+  pianoMappatureCache
+    .filter((m) => (m.reparto_dip || 'slots') === _pianoReparto())
+    .forEach((m) => (perFz[m.funzione] = (perFz[m.funzione] || []).concat(m)));
   Object.keys(perFz)
     .sort()
     .forEach((fz) => {
@@ -13453,7 +13459,15 @@ function _renderPianoMappatureCard() {
   h +=
     '<div class="add-tipo-row" style="margin-top:10px"><div class="field"><label>Funzione</label><select id="mp-funzione" style="padding:8px">' +
     (window._pianoFunzioni || ['RESP', 'SUP', 'BO', 'HOST']).map((f) => '<option>' + escP(f) + '</option>').join('') +
-    '</select></div><div class="field"><label>Turno</label><input type="text" id="mp-turno" placeholder="S22" style="width:80px"></div>' +
+    '</select></div><div class="field"><label>Turno</label><select id="mp-turno" style="padding:8px">' +
+    _pianoTurniReparto()
+      .slice()
+      .sort((a, b) => String(a.codice).localeCompare(String(b.codice)))
+      .map(
+        (t) => '<option value="' + escP(t.codice) + '">' + escP(t.codice) + ' (' + escP(t.gruppo || '') + ')</option>',
+      )
+      .join('') +
+    '</select></div>' +
     '<div class="field"><label>Tipo</label><select id="mp-tipo" style="padding:8px"><option>PRINCIPALE</option><option>AMMESSO</option><option>PREFERITO</option></select></div>' +
     '<button class="btn-add-tipo" onclick="aggiungiPianoMappatura()">+ Aggiungi</button></div>';
   h += '</div></div>';
@@ -13465,17 +13479,47 @@ async function aggiungiPianoMappatura() {
   const turno = ((document.getElementById('mp-turno') || {}).value || '').trim().toUpperCase();
   const tipo = (document.getElementById('mp-tipo') || {}).value || 'PRINCIPALE';
   if (!fz || !turno) {
-    toast('Compila funzione e turno');
+    toastErrore('Compila funzione e turno');
+    return;
+  }
+  if (!_pianoTurniReparto().some((t) => String(t.codice).toUpperCase() === turno)) {
+    toastErrore(
+      'Il turno ' +
+        turno +
+        ' non esiste in ' +
+        repartoLabel(_pianoReparto()) +
+        ': le mappature usano le sigle del settore',
+    );
+    return;
+  }
+  if (
+    pianoMappatureCache.some(
+      (m) => m.funzione === fz && m.turno_codice === turno && (m.reparto_dip || 'slots') === _pianoReparto(),
+    )
+  ) {
+    toastErrore('Mappatura gia presente: ' + fz + ' → ' + turno);
     return;
   }
   try {
-    const r = await secPost('piano_mappature', { funzione: fz, turno_codice: turno, tipo: tipo });
+    const r = await secPost('piano_mappature', {
+      funzione: fz,
+      turno_codice: turno,
+      tipo: tipo,
+      reparto_dip: _pianoReparto(),
+    });
     if (r && r[0]) pianoMappatureCache.push(r[0]);
-    logAzione('Piano: mappatura aggiunta', fz + ' ' + turno + ' ' + tipo);
+    logAzione('Piano: mappatura aggiunta', repartoLabel(_pianoReparto()) + ' · ' + fz + ' ' + turno + ' ' + tipo);
+    _pianoRegistraModifica(
+      'Impostazioni',
+      'Turni per funzione (' + repartoLabel(_pianoReparto()) + ')',
+      fz + ' → ' + turno,
+      'assente',
+      tipo,
+    );
     toast('Mappatura aggiunta');
     renderPiano();
   } catch (e) {
-    toast('Errore (mappatura già presente?)');
+    toastErrore('Errore nel salvataggio della mappatura: ' + (e.message || ''));
   }
 }
 async function rimuoviPianoMappatura(id) {

@@ -132,8 +132,8 @@ sez(B, 'L · Bozza automatica', 'Come il generatore decide.', [
  ('Preferenze: blocchi compatti di 4 giorni' + rs('blocchi_compatti') + rs('pattern_lavoro') + ', evita il riposo isolato' + rs('penalita_riposo_isolato') + ', evita notte-riposo-mattino' + rs('no_notte_riposo_presto') + ', equilibra notti e diurni' + rs('equilibrio_notti') + rs('equilibrio_diurni_notturni') + ', domeniche distribuite.', 'Chi ha piu notti viene dopo.'),
  ('Se per un posto nessuno e idoneo, resta scoperto e viene elencato: la bozza non forza mai una violazione; "Migliora ore" riequilibra dopo.', '"Z8 giorno 12" negli scoperti.'),
  ('Preferenze personali dalla scheda (solo diurni, turni vietati, settori abilitati, copertura di altri settori con gruppi e tetto mensile, accompagnamento) sono rispettate da bozza, validatore e cambi.', 'Solo diurni: mai una notte.'),
- ('Le mappature funzione → turni (Principale, Ammesso, Preferito) limitano i turni della funzione e danno priorita ai preferiti.', 'SUP: Z0, Z8, Z12, L1, 9 principali.'),
- T(['Funzione', 'Turno', 'Tipo'], [[m['funzione'], m['turno_codice'], m['tipo']] for m in DATI['mappature']]),
+ ('Le mappature funzione → turni (Principale, Ammesso, Preferito) sono per settore, limitano i turni della funzione e danno priorita ai preferiti; una sigla che nel settore non esiste viene rifiutata.', 'Slots, SUP: Z0, Z8, Z12, L1, 9 principali.'),
+ T(['Settore', 'Funzione', 'Turno', 'Tipo'], [[m.get('reparto_dip', 'slots'), m['funzione'], m['turno_codice'], m['tipo']] for m in DATI['mappature']]),
 ])
 sez(B, 'M · Regole di gruppo e "chi fa cosa"', 'Per settore; gruppo "*" = tutti i gruppi.', [
  T(['Settore', 'Gruppo', 'Tipo', 'Valore', 'Attiva'], [[r['settore'], r['gruppo'], r['tipo_regola'], r['valore'], 'si' if r['attivo'] else 'no'] for r in DATI['regole_gruppo']]),
