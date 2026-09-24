@@ -748,18 +748,30 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
       const righe =
         (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=eq.' + d + '&codice=eq.M')) || [];
       for (const r of righe) {
-        await secDel('piano', 'id=eq.' + r.id);
+        // la M aveva coperto un altra sigla (turno, V, CGF, JG...): quella torna al suo posto
+        const era = String(r.commento || '').match(/^Malattia dal Diario \u00b7 era ([A-Z0-9]+)/);
+        if (era && era[1] && era[1] !== 'M') {
+          await secPatch('piano', 'id=eq.' + r.id, {
+            codice: era[1],
+            protetto: ['V', 'V1', 'CGF'].includes(era[1]),
+            commento: '',
+            operatore: getOperatore(),
+            updated_at: new Date().toISOString(),
+          });
+        } else await secDel('piano', 'id=eq.' + r.id);
         tolte++;
       }
     }
-    // M protetta SOLO dove c'era un TURNO: il giorno di lavoro perso diventa
-    // malattia (8.787 ore). Un giorno di congedo C resta C e si vede come MC
-    // (0 ore: era gia' riposo), un CGF resta CGF e si vede come MCG (credito
-    // che resta). Senza cella, basta la M automatica dal Diario.
+    // M protetta su QUALSIASI sigla del giorno: turno, vacanza V, CGF, JG, C...
+    // La malattia prevale (regola del casino): il giorno di vacanza viene
+    // restituito, il CGF resta a credito, il turno perso diventa malattia.
+    // La sigla coperta resta scritta nel commento ("era V") cosi, se la
+    // malattia viene tolta dal Diario, torna al suo posto. Senza cella, basta
+    // la M automatica dal Diario.
     for (const d of daMettere) {
       const righe = (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=eq.' + d)) || [];
       const r = righe[0];
-      if (r && r.codice !== 'M' && _pianoTurnoInfo(r.codice)) {
+      if (r && r.codice !== 'M' && r.codice !== 'M1') {
         await secPatch('piano', 'id=eq.' + r.id, {
           codice: 'M',
           protetto: true,
@@ -775,7 +787,7 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
     // festivo saltato per malattia: i recuperi automatici in piu' tornano C
     for (const ymM of new Set(nuove.map((d) => d.substring(0, 7)))) await _pianoRiconciliaCgf(nome, ymM);
     if (tolte || messe) {
-      logAzione('Malattia: piano allineato', nome + ' · ' + tolte + ' M tolte, ' + messe + ' turni diventati M');
+      logAzione('Malattia: piano allineato', nome + ' · ' + tolte + ' M tolte, ' + messe + ' celle diventate M');
       if (typeof _pianoRighe !== 'undefined' && _pianoRighe.length && typeof renderPiano === 'function') {
         _pianoRighe = _pianoRighe.filter(
           (r) => !(r.collaboratore === nome && r.codice === 'M' && daTogliere.includes(r.data)),
@@ -11410,6 +11422,21 @@ async function _pianoVacDirittoCard(anno) {
         '&select=collaboratore,data&limit=20000',
     )) || []
   ).forEach((r) => (vCal[r.collaboratore] = (vCal[r.collaboratore] || 0) + 1));
+  // vacanze restituite: giorni V coperti da una malattia (M con "era V")
+  const vRest = {};
+  (
+    (await secGet(
+      'piano?codice=eq.M&commento=like.Malattia%20dal%20Diario%20*era%20V*&data=gte.' +
+        anno +
+        '-01-01&data=lte.' +
+        anno +
+        '-12-31&reparto_dip=eq.' +
+        _pianoReparto() +
+        '&select=collaboratore,data,commento&limit=5000',
+    )) || []
+  ).forEach((r) => {
+    if (/era V1?\b/.test(String(r.commento || ''))) vRest[r.collaboratore] = (vRest[r.collaboratore] || 0) + 1;
+  });
   const righe = collaboratoriCache
     .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && _pianoMaturaCgf(c) && c.data_assunzione)
     .map((c) => ({
@@ -11451,13 +11478,14 @@ async function _pianoVacDirittoCard(anno) {
     return h;
   }
   h +=
-    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:640px;font-size:.9rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>In servizio dal</th><th>Anni</th><th>Spettanti</th><th title="Giorni delle settimane registrate qui sotto per l anno">Pianificati</th><th title="Giorni V davvero scritti nel calendario dell anno: se sono meno delle settimane registrate, manca Applica al piano per qualche mese">V nel calendario</th><th>Restano</th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:640px;font-size:.9rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>In servizio dal</th><th>Anni</th><th>Spettanti</th><th title="Giorni delle settimane registrate qui sotto per l anno">Pianificati</th><th title="Giorni V davvero scritti nel calendario dell anno: se sono meno delle settimane registrate, manca Applica al piano per qualche mese">V nel calendario</th><th title="Giorni di vacanza coperti da una malattia registrata nel Diario: la V e diventata M e il giorno torna disponibile">Restituite per malattia</th><th>Restano</th></tr></thead><tbody>';
   righe.forEach((x) => {
     const dal = String(x.c.data_assunzione).substring(0, 10);
     const anni = Math.floor((new Date(anno, 11, 31) - new Date(dal + 'T12:00:00')) / (365.25 * 86400000));
     const pian = gia[x.c.nome] || 0;
     const inCal = vCal[x.c.nome] || 0;
-    const resta = Math.round((x.r.giorni - pian) * 10) / 10;
+    const rest = vRest[x.c.nome] || 0;
+    const resta = Math.round((x.r.giorni - pian + rest) * 10) / 10;
     h +=
       '<tr title="' +
       x.r.base +
@@ -11486,6 +11514,10 @@ async function _pianoVacDirittoCard(anno) {
       (pian && inCal !== pian ? 'Registrate ' + pian + ' giornate, nel calendario ce ne sono ' + inCal : '') +
       '">' +
       (inCal || '') +
+      '</td><td style="color:#2c6e49;font-weight:' +
+      (rest ? '700' : '400') +
+      '">' +
+      (rest || '') +
       '</td><td style="font-weight:700;color:' +
       (resta > 0 ? '#8b6914' : resta < 0 ? '#c0392b' : '#2c6e49') +
       '">' +
