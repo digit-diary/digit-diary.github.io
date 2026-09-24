@@ -2078,13 +2078,14 @@ function initCardRichiudibili(rootId, aperteDefault) {
 // Persone e accessi, Maison, Personale, Sistema) costruito dai titoli delle
 // sezioni visibili, e prima di ogni gruppo un'etichetta. Niente da mantenere a
 // mano: aggiungendo una sezione con data-gruppo compare da sola.
-function _settingsAggiornaIndice() {
-  const nav = document.getElementById('settings-indice');
+// SOTTO MENU DELLE IMPOSTAZIONI · cinque schede (Registrazioni, Persone e
+// accessi, Maison, Personale, Sistema): si vede solo il gruppo scelto, con
+// dentro le chip delle sue sezioni. L ultimo gruppo aperto viene ricordato.
+const SETTINGS_GRUPPI = ['Registrazioni', 'Persone e accessi', 'Maison', 'Personale', 'Sistema', 'Altro'];
+function _settingsGruppiVisibili() {
   const page = document.getElementById('page-impostazioni');
-  if (!nav || !page) return;
-  page.querySelectorAll('.settings-gruppo-titolo').forEach((el) => el.remove());
-  const ordine = ['Registrazioni', 'Persone e accessi', 'Maison', 'Personale', 'Sistema', 'Altro'];
   const perGruppo = {};
+  if (!page) return perGruppo;
   page.querySelectorAll('.settings-section').forEach((sec, i) => {
     if (sec.style.display === 'none') return;
     const h4 = sec.querySelector('h4');
@@ -2093,35 +2094,68 @@ function _settingsAggiornaIndice() {
     const g = sec.getAttribute('data-gruppo') || 'Altro';
     (perGruppo[g] = perGruppo[g] || []).push({ id: sec.id, titolo: h4.textContent.trim(), el: sec });
   });
-  let h = '';
-  ordine.forEach((g) => {
-    const voci = perGruppo[g];
-    if (!voci || !voci.length) return;
+  return perGruppo;
+}
+function _settingsAggiornaIndice() {
+  const nav = document.getElementById('settings-indice');
+  const page = document.getElementById('page-impostazioni');
+  if (!nav || !page) return;
+  page.querySelectorAll('.settings-gruppo-titolo').forEach((el) => el.remove());
+  const perGruppo = _settingsGruppiVisibili();
+  const gruppi = SETTINGS_GRUPPI.filter((g) => perGruppo[g] && perGruppo[g].length);
+  if (!gruppi.length) {
+    nav.innerHTML = '';
+    return;
+  }
+  let attivo = localStorage.getItem('settings_gruppo');
+  if (gruppi.indexOf(attivo) < 0) attivo = gruppi[0];
+  let h = '<div class="settings-tabs">';
+  gruppi.forEach((g) => {
     h +=
-      '<div class="settings-indice-gruppo"><span class="settings-indice-lbl">' +
+      '<button type="button" class="settings-tab" data-gruppo="' +
       escP(g) +
-      '</span>' +
-      voci
-        .map(
-          (v) =>
-            '<button type="button" class="settings-chip" onclick="_settingsVai(\'' +
-            v.id +
-            '\')">' +
-            escP(v.titolo) +
-            '</button>',
-        )
-        .join('') +
-      '</div>';
-    const et = document.createElement('div');
-    et.className = 'settings-gruppo-titolo';
-    et.textContent = g;
-    voci[0].el.parentNode.insertBefore(et, voci[0].el);
+      '" onclick="_settingsMostraGruppo(\'' +
+      escP(g) +
+      '\')">' +
+      escP(g) +
+      '<span class="settings-tab-n">' +
+      perGruppo[g].length +
+      '</span></button>';
   });
+  h += '</div><div class="settings-indice-gruppo" id="settings-indice-chip"></div>';
   nav.innerHTML = h;
+  _settingsMostraGruppo(attivo);
+}
+function _settingsMostraGruppo(g) {
+  const page = document.getElementById('page-impostazioni');
+  if (!page) return;
+  const perGruppo = _settingsGruppiVisibili();
+  page.querySelectorAll('.settings-section').forEach((sec) => {
+    const mio = (sec.getAttribute('data-gruppo') || 'Altro') === g;
+    if (mio) sec.removeAttribute('data-fuori-gruppo');
+    else sec.setAttribute('data-fuori-gruppo', '1');
+  });
+  document.querySelectorAll('.settings-tab').forEach((b) => b.classList.toggle('attiva', b.dataset.gruppo === g));
+  const chip = document.getElementById('settings-indice-chip');
+  if (chip)
+    chip.innerHTML = (perGruppo[g] || [])
+      .map(
+        (v) =>
+          '<button type="button" class="settings-chip" onclick="_settingsVai(\'' +
+          v.id +
+          '\')">' +
+          escP(v.titolo) +
+          '</button>',
+      )
+      .join('');
+  localStorage.setItem('settings_gruppo', g);
 }
 function _settingsVai(id) {
   const el = document.getElementById(id);
   if (!el) return;
+  // la sezione puo stare in un altro gruppo: prima si apre quello
+  const g = el.getAttribute('data-gruppo') || 'Altro';
+  if (el.hasAttribute('data-fuori-gruppo')) _settingsMostraGruppo(g);
   el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   el.classList.remove('settings-evidenzia');
   void el.offsetWidth;
