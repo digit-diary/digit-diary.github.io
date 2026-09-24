@@ -1,6 +1,11 @@
 # DIARIO COLLABORATORI · passaggio di consegne
 
-**Aggiornato al 24/09/2026** · versione in produzione **v257** · ultimo commit `55041d0`
+**Aggiornato al 24/09/2026 (sera)** · versione in produzione **v259** · ultimo commit `718bee3`
+
+> Sessione del 24/09 pomeriggio: audit completo e correzioni v258-v259. Leggere PRIMA
+> `AUDIT_2026-09-24.md` (cosa era rotto) e `RAPPORTO_MODIFICHE_v259.md` (cosa e' cambiato,
+> prima/dopo, e i test da fare). Migrazioni 20260865-20260869 applicate. Lo sblocco
+> biometrico va riattivato su ogni dispositivo. Test nel browser NON fatti da qui.
 
 Questo documento serve ad aprire una sessione nuova senza perdere niente.
 Contiene: dove sono i file, cosa è stato fatto, cosa resta aperto, come si rilascia,
