@@ -413,3 +413,13 @@ rifiutata con avviso; ogni modifica finisce nell elenco delle modifiche e nel Re
 - Slots: gli schemi di copertura (BG1, Q2, BG3) restano identici; le regole decidono quante pause e quanto lunghe e la distanza minima nelle pause automatiche. Fascia, distanza e persone insieme vengono verificate sul foglio generato e le violazioni elencate in giallo sotto le pause. Valet e altri settori: le regole guidano direttamente la generazione (fasce per giorno, massimo N insieme, distanza).
 - Esempio: regola "Turni da 7 a 9 ore, venerdi-sabato: 30+15+15" e "Turno S3, domenica: 15+15" → mercoledi S3 fa 30+15, sabato 30+15+15, domenica 15+15.
 - Test automatici: `node test/pause-regole.test.js` (31 controlli).
+
+## v271 · Profili personalizzati (Visibilita e permessi)
+
+- **Prima**: cinque profili fissi nel codice (Direzione, Responsabile FoBoSlot, Sostituto, Supervisor, HR). Per una figura diversa, per esempio Compliance, bisognava lasciare "Nessun profilo" e regolare le voci una per una.
+- **Dopo**: blocco "Profili personalizzati" sotto i profili: nome del nuovo profilo, "Parti da una copia di" (uno dei cinque fissi, un altro personalizzato, oppure tutto a No), poi la tabella con tutte le voci del programma divise per gruppo (Pagine, Funzioni, Piano schede visibili, Piano schede modificabili, Permessi) e per ognuna Modifica, Vede o No. Dove la sola vista non ha senso (modifica delle schede del Piano, permessi di modifica) le scelte sono solo Modifica o No.
+- Il profilo salvato compare nel menu di ogni operatore con la dicitura "(personalizzato)", "Applica i profili" lo tratta come gli altri, la scheda permessi stampata dal programma e quella generata per la firma lo mostrano con il suo nome. I cinque profili del documento firmato restano intoccabili.
+- Eliminando un profilo assegnato a qualcuno, il programma lo dice e toglie l assegnazione: i permessi attuali di quelle persone non cambiano finche non si preme "Applica i profili".
+- Controlli: nome obbligatorio e unico; un profilo che non concede nulla chiede conferma.
+- Sicurezza: la nuova impostazione `profili_custom` si salva solo da sessione amministratore (migrazione 20260873, applicata).
+- Esempio: "Compliance" partendo da HR, poi Storico HR = Vede, Moduli = Vede, Piano = No. Assegnato all operatore X, Applica i profili → X vede Storico HR e Moduli in sola lettura e non vede il Piano.
