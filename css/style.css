@@ -918,14 +918,17 @@ header h1 .casino {
   flex-wrap: wrap; /* 16 pagine: se non ci stanno su una riga vanno a capo, centrate, mai fuori dal bordo */
   justify-content: center;
   gap: 0;
-  margin-bottom: 24px;
+  margin: 0 auto 24px;
+  background: var(--paper2);
+  border-radius: 3px 3px 0 0;
 }
 .nav-tab {
-  flex: 1 1 0;
-  min-width: 0; /* senza, ogni tab pretende la larghezza del suo testo e la barra sborda a destra */
-  padding: 14px 6px;
+  flex: 0 1 auto; /* larghezza del testo: se la riga e' piena, le tab in piu' vanno a capo, centrate */
+  min-width: 0;
+  white-space: nowrap;
+  padding: 12px 14px;
   text-align: center;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
