@@ -2248,7 +2248,9 @@ function _pianoCalcolaViolazioni() {
         const fine1 = _pianoOra(t1.ora_fine);
         const inizio2 = _pianoOra(t2.ora_inizio);
         if (fine1 != null && inizio2 != null) {
-          const fineAbs = t1.oltre23 || fine1 < _pianoOra(t1.ora_inizio) ? 24 + fine1 : fine1;
+          // fine oltre mezzanotte = fine prima dell'inizio. Il flag "oltre le 23"
+          // vale anche per un turno che chiude alle 23:30 e NON sposta il giorno
+          const fineAbs = fine1 <= _pianoOra(t1.ora_inizio) ? 24 + fine1 : fine1;
           const riposo = 24 + inizio2 - fineAbs;
           if (riposo < minRiposo)
             aggiungi(
@@ -2665,14 +2667,14 @@ async function generaBozzaPiano(usaCoperture) {
     const prev = _pianoTurnoInfo(cella[nome + '|' + (g - 1)] || '');
     if (prev) {
       const finePrev = _pianoOra(prev.ora_fine);
-      const fineAbs = prev.oltre23 || finePrev < _pianoOra(prev.ora_inizio) ? 24 + finePrev : finePrev;
+      const fineAbs = finePrev <= _pianoOra(prev.ora_inizio) ? 24 + finePrev : finePrev;
       if (24 + _pianoOra(t.ora_inizio) - fineAbs < minRiposo) return false;
     }
     // verso il giorno dopo (se già assegnato, es. cella protetta)
     const next = _pianoTurnoInfo(cella[nome + '|' + (g + 1)] || '');
     if (next) {
       const fine = _pianoOra(t.ora_fine);
-      const fineAbs = t.oltre23 || fine < _pianoOra(t.ora_inizio) ? 24 + fine : fine;
+      const fineAbs = fine <= _pianoOra(t.ora_inizio) ? 24 + fine : fine;
       if (24 + _pianoOra(next.ora_inizio) - fineAbs < minRiposo) return false;
     }
     return true;
@@ -3034,15 +3036,20 @@ async function generaBozzaPiano(usaCoperture) {
         scoperti.length +
         ' posti senza candidato idoneo\n\nLe celle esistenti (vacanze, protette, malattie) NON vengono toccate.\nLa bozza si può eliminare con "Cancella piano". Procedere?',
     )
-  )
+  ) {
+    // Le C di riempimento e le vacanze sono gia' state riscritte per poter
+    // calcolare la bozza: chi rinuncia deve ritrovare il mese com'era.
+    await _pianoRipristinaUltimoSnapshot('Bozza annullata: il mese e\' tornato com\'era');
     return;
+  }
   try {
     let inseriteTot = 0;
     for (let i = 0; i < nuove.length; i += 2500) {
-      const r2 = await sbRpc('piano_bulk_upsert', { p_token: getOpToken(), p_rows: nuove.slice(i, i + 2500) });
+      const r2 = await _rpcSicura('piano_bulk_upsert', { p_token: getOpToken(), p_rows: nuove.slice(i, i + 2500) });
       inseriteTot += (r2 && r2.inserite) || 0;
     }
     const r = { inserite: inseriteTot };
+    if (nuove.length && !inseriteTot) throw new Error('nessuna cella scritta dal database');
     for (const sw of sostituzioniWd) {
       await secPatch('piano', 'id=eq.' + sw.id, {
         codice: sw.codice,
@@ -3055,8 +3062,9 @@ async function generaBozzaPiano(usaCoperture) {
     logAzione('Piano: bozza generata', ym + ' · ' + nuove.length + ' turni, ' + scoperti.length + ' scoperti');
     toast(
       'Bozza generata: ' +
-        ((r && r.inserite) || nuove.length) +
-        ' turni' +
+        r.inserite +
+        ' celle scritte' +
+        (r.inserite < nuove.length ? ' su ' + nuove.length + ' (le altre esistevano gia\')' : '') +
         (scoperti.length ? ' · ' + scoperti.length + ' scoperti' : ''),
     );
     _pianoViolLista = null;
@@ -3896,7 +3904,7 @@ async function importaPianoExcel(input) {
         logAzione('Collaboratore disattivato da import piano', c.nome + ' (assente dal file ' + ym + ')');
       }
     }
-    const r = await sbRpc('piano_bulk_upsert', { p_token: getOpToken(), p_rows: nuove });
+    const r = await _rpcSicura('piano_bulk_upsert', { p_token: getOpToken(), p_rows: nuove });
     logAzione('Piano importato da Excel', ym + ' · ' + ((r && r.inserite) || 0) + '/' + nuove.length + ' celle');
     toast('Piano importato: ' + ((r && r.inserite) || 0) + ' celle nuove');
     setTimeout(async () => {
@@ -7111,7 +7119,7 @@ async function apriCercaCambioLibero() {
     const fine1 = _pianoOra(t1.ora_fine);
     const inizio2 = _pianoOra(t2.ora_inizio);
     if (fine1 == null || inizio2 == null) return null;
-    const fineAbs = t1.oltre23 || fine1 < _pianoOra(t1.ora_inizio) ? 24 + fine1 : fine1;
+    const fineAbs = fine1 <= _pianoOra(t1.ora_inizio) ? 24 + fine1 : fine1;
     return 24 + inizio2 - fineAbs;
   };
   // simula: nella mappa di "nome", il giorno dstr diventa "codice"; ritorna
@@ -7530,13 +7538,13 @@ async function apriScambioTurno() {
     const prev = _pianoTurnoInfo(cellaMese[nomeX + '|' + (gX - 1)] || '');
     if (prev) {
       const finePrev = _pianoOra(prev.ora_fine);
-      const fineAbs = prev.oltre23 || finePrev < _pianoOra(prev.ora_inizio) ? 24 + finePrev : finePrev;
+      const fineAbs = finePrev <= _pianoOra(prev.ora_inizio) ? 24 + finePrev : finePrev;
       if (24 + _pianoOra(t.ora_inizio) - fineAbs < minRiposo) return false;
     }
     const next = _pianoTurnoInfo(cellaMese[nomeX + '|' + (gX + 1)] || '');
     if (next) {
       const fine = _pianoOra(t.ora_fine);
-      const fineAbs = t.oltre23 || fine < _pianoOra(t.ora_inizio) ? 24 + fine : fine;
+      const fineAbs = fine <= _pianoOra(t.ora_inizio) ? 24 + fine : fine;
       if (24 + _pianoOra(next.ora_inizio) - fineAbs < minRiposo) return false;
     }
     return true;
@@ -7943,13 +7951,13 @@ async function cercaSostitutiMalattia() {
     const prev = _pianoTurnoInfo(cella[n + '|' + (g - 1)] || '');
     if (prev) {
       const finePrev = _pianoOra(prev.ora_fine);
-      const fineAbs = prev.oltre23 || finePrev < _pianoOra(prev.ora_inizio) ? 24 + finePrev : finePrev;
+      const fineAbs = finePrev <= _pianoOra(prev.ora_inizio) ? 24 + finePrev : finePrev;
       if (24 + _pianoOra(t.ora_inizio) - fineAbs < minRiposo) return false;
     }
     const next = _pianoTurnoInfo(cella[n + '|' + (g + 1)] || '');
     if (next) {
       const fine = _pianoOra(t.ora_fine);
-      const fineAbs = t.oltre23 || fine < _pianoOra(t.ora_inizio) ? 24 + fine : fine;
+      const fineAbs = fine <= _pianoOra(t.ora_inizio) ? 24 + fine : fine;
       if (24 + _pianoOra(next.ora_inizio) - fineAbs < minRiposo) return false;
     }
     return true;
@@ -7964,13 +7972,13 @@ async function cercaSostitutiMalattia() {
       const tPrev = _pianoTurnoInfo(cella[n + '|' + (g0 - 1)] || '');
       if (tPrev) {
         const fp = _pianoOra(tPrev.ora_fine);
-        const fpAbs = tPrev.oltre23 || fp < _pianoOra(tPrev.ora_inizio) ? 24 + fp : fp;
+        const fpAbs = fp <= _pianoOra(tPrev.ora_inizio) ? 24 + fp : fp;
         if (24 + _pianoOra(t0.ora_inizio) - fpAbs < minRiposo) return false;
       }
       const tNext = _pianoTurnoInfo(cella[n + '|' + (g0 + 1)] || '');
       if (tNext) {
         const f0 = _pianoOra(t0.ora_fine);
-        const f0Abs = t0.oltre23 || f0 < _pianoOra(t0.ora_inizio) ? 24 + f0 : f0;
+        const f0Abs = f0 <= _pianoOra(t0.ora_inizio) ? 24 + f0 : f0;
         if (24 + _pianoOra(tNext.ora_inizio) - f0Abs < minRiposo) return false;
       }
     }
@@ -10115,8 +10123,9 @@ function _pianoMeseDentroRiporto(nome, anno, mm) {
   const r = _pianoSaldoIniz[nome + '|' + anno];
   if (!r || !r.data_riferimento) return false;
   const rif = String(r.data_riferimento).substring(0, 10);
-  if (rif.substring(0, 4) !== String(anno)) return rif < String(anno) + '-01-01';
-  // il mese conta solo se finisce DOPO la data del riporto
+  // il mese conta solo se finisce DOPO la data del riporto. Vale per qualsiasi
+  // anno: un riporto al 31.12 dell'anno prima non comprende nessun mese, uno
+  // datato nell'anno dopo li comprende tutti (prima era il contrario).
   const ultimo = anno + '-' + mm + '-' + String(new Date(anno, parseInt(mm), 0).getDate()).padStart(2, '0');
   return ultimo <= rif;
 }
@@ -15563,10 +15572,34 @@ function _pianoSalvatoFlash() {
 }
 async function _pianoRipristinaStato(st) {
   const fine = st.ym + '-' + String(_pianoUltimoGiorno(st.ym)).padStart(2, '0');
+  // Prima si verifica che la sessione sia valida: il mese si cancella SOLO se
+  // poi lo si puo' riscrivere. Un token scaduto tra i due passi lasciava il
+  // mese vuoto con il messaggio "Annullato".
+  const prova = await _rpcSicura('piano_bulk_upsert', { p_token: getOpToken(), p_rows: [] });
+  void prova;
   await secDel('piano', 'data=gte.' + st.ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + st.rep);
+  let scritte = 0;
   for (let i = 0; i < st.righe.length; i += 2000) {
-    await sbRpc('piano_bulk_upsert', { p_token: getOpToken(), p_rows: st.righe.slice(i, i + 2000) });
+    const r = await _rpcSicura('piano_bulk_upsert', { p_token: getOpToken(), p_rows: st.righe.slice(i, i + 2000) });
+    scritte += (r && r.inserite) || 0;
   }
+  if (scritte !== st.righe.length)
+    throw new Error('ripristinate ' + scritte + ' celle su ' + st.righe.length + ': controlla il mese');
+}
+// Annulla l'ultima operazione registrata (usato da chi rinuncia a meta' di
+// un'operazione che ha gia' scritto qualcosa, per esempio la bozza).
+async function _pianoRipristinaUltimoSnapshot(messaggio) {
+  const u = window._pianoUndo || [];
+  const st = u.pop();
+  if (!st) return;
+  try {
+    await _pianoRipristinaStato(st);
+    toast(messaggio || 'Operazione annullata');
+  } catch (e) {
+    toastErrore('Ripristino non riuscito: ' + (e.message || '') + '. Usa "Annulla" dal piano.');
+    u.push(st);
+  }
+  renderPiano();
 }
 function _pianoMappaRighe(rows, rep) {
   return rows.map((r) => ({
@@ -15579,6 +15612,8 @@ function _pianoMappaRighe(rows, rep) {
     ora_fine: r.ora_fine,
     commento: r.commento,
     colore: r.colore,
+    motivo_blocco: r.motivo_blocco,
+    operatore: r.operatore,
     reparto_dip: rep,
   }));
 }
@@ -16923,7 +16958,7 @@ async function pianoIncollaDaClipboard(target) {
           .slice(i, i + 10)
           .map((p) => secPatch('piano', 'id=eq.' + p.id, { codice: p.codice, protetto: true, generato: false })),
       );
-    if (daInserire.length) await sbRpc('piano_bulk_upsert', { p_token: getOpToken(), p_rows: daInserire });
+    if (daInserire.length) await _rpcSicura('piano_bulk_upsert', { p_token: getOpToken(), p_rows: daInserire });
     logAzione('Incolla nel piano', target.nome + ' g' + g0 + ' · ' + (daPatch.length + daInserire.length) + ' celle');
     toast('Incollate ' + (daPatch.length + daInserire.length) + ' celle');
     _pianoBloccoPulisci();
@@ -17108,13 +17143,13 @@ async function miglioraOrePiano() {
     const prev = _pianoTurnoInfo(cella[nome + '|' + (g - 1)] || '');
     if (prev && prev.ora_fine && t.ora_inizio) {
       const finePrev = _pianoOra(prev.ora_fine);
-      const fineAbs = prev.oltre23 || finePrev < _pianoOra(prev.ora_inizio) ? 24 + finePrev : finePrev;
+      const fineAbs = finePrev <= _pianoOra(prev.ora_inizio) ? 24 + finePrev : finePrev;
       if (24 + _pianoOra(t.ora_inizio) - fineAbs < minRiposo) return false;
     }
     const next = _pianoTurnoInfo(cella[nome + '|' + (g + 1)] || '');
     if (next && next.ora_fine && t.ora_fine) {
       const fineT = _pianoOra(t.ora_fine);
-      const fineTAbs = t.oltre23 || fineT < _pianoOra(t.ora_inizio) ? 24 + fineT : fineT;
+      const fineTAbs = fineT <= _pianoOra(t.ora_inizio) ? 24 + fineT : fineT;
       if (24 + _pianoOra(next.ora_inizio) - fineTAbs < minRiposo) return false;
     }
     return true;
