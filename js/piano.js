@@ -17,7 +17,16 @@ let pianoCodiciCache = [];
 let pianoFestiviCache = [];
 let pianoRegoleCache = [];
 let _pianoRighe = []; // righe del mese/settore correnti
-let _pianoMeseSel = new Date().toISOString().substring(0, 7);
+// Data di oggi in ORA LOCALE: toISOString() e' UTC e fra mezzanotte e le 2
+// del 1 del mese restituiva ancora il mese prima.
+function _pianoOggiStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function _pianoYmOggi() {
+  return _pianoOggiStr().substring(0, 7);
+}
+let _pianoMeseSel = _pianoYmOggi();
 let _pianoCellaSel = null; // {nome, data} in modifica
 
 // Colori dei codici speciali · PALETTE ORIGINALE TURNIVO (= formattazione
@@ -639,7 +648,7 @@ function _pianoDateMalattia(testo, dataReg) {
   let a = da;
   const mRange = testo.match(/dal\s+(\d{1,2})[./](\d{1,2})[./](\d{4})\s+al\s+(\d{1,2})[./](\d{1,2})[./](\d{4})/i);
   const mIl = testo.match(/\bil\s+(\d{1,2})[./](\d{1,2})[./](\d{4})/i);
-  const mGiorni = testo.match(/(\d+)\s*giorni/i);
+  const mGiorni = testo.match(/(\d+)\s*giorn[oi]/i);
   if (mRange) {
     da = mRange[3] + '-' + mRange[2].padStart(2, '0') + '-' + mRange[1].padStart(2, '0');
     a = mRange[6] + '-' + mRange[5].padStart(2, '0') + '-' + mRange[4].padStart(2, '0');
@@ -677,8 +686,23 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
     const rep = (info && info.reparto_dip) || 'slots';
     let tolte = 0;
     let messe = 0;
-    // via le M salvate nei giorni sbagliati
+    // via le M salvate nei giorni sbagliati, MA solo se nessun'altra
+    // registrazione di malattia copre ancora quel giorno: un periodo lungo e'
+    // salvato nel Diario come una registrazione per giorno, e accorciarne una
+    // non deve cancellare le M dei giorni delle altre
+    const tipoMal = typeof nomeCorrente === 'function' ? nomeCorrente('Malattia') : 'Malattia';
+    const dataVecchiaStr = String(dataVecchia || '').substring(0, 10);
+    const copertoAltrove = (d) =>
+      (typeof datiCache !== 'undefined' ? datiCache : []).some(
+        (e) =>
+          e.tipo === tipoMal &&
+          !e.eliminato &&
+          String(e.nome || '').toLowerCase() === String(nome).toLowerCase() &&
+          String(e.data || '').substring(0, 10) !== dataVecchiaStr &&
+          _pianoDateMalattia(e.testo || '', e.data).includes(d),
+      );
     for (const d of daTogliere) {
+      if (copertoAltrove(d)) continue;
       const righe =
         (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=eq.' + d + '&codice=eq.M')) || [];
       for (const r of righe) {
@@ -723,28 +747,14 @@ function _pianoMalattieMese(ym) {
   const tipoMal = typeof nomeCorrente === 'function' ? nomeCorrente('Malattia') : 'Malattia';
   const inizio = ym + '-01';
   const fine = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
+  // stesso parser della sincronizzazione (_pianoDateMalattia): "dal X al Y",
+  // "il X" (giorno singolo corretto dal Diario) e "N giorni". Prima "il X"
+  // non veniva capito e la M restava sul giorno della registrazione.
   (typeof datiCache !== 'undefined' ? datiCache : []).forEach((e) => {
     if (e.tipo !== tipoMal || e.eliminato) return;
-    const testo = e.testo || '';
-    let da = (e.data || '').substring(0, 10);
-    let a = da;
-    const mRange = testo.match(/dal\s+(\d{1,2})[./](\d{1,2})[./](\d{4})\s+al\s+(\d{1,2})[./](\d{1,2})[./](\d{4})/i);
-    const mGiorni = testo.match(/(\d+)\s*giorni/i);
-    if (mRange) {
-      da = mRange[3] + '-' + mRange[2].padStart(2, '0') + '-' + mRange[1].padStart(2, '0');
-      a = mRange[6] + '-' + mRange[5].padStart(2, '0') + '-' + mRange[4].padStart(2, '0');
-    } else if (mGiorni && da) {
-      const d = new Date(da + 'T12:00:00');
-      d.setDate(d.getDate() + parseInt(mGiorni[1]) - 1);
-      a = d.toISOString().substring(0, 10);
-    }
-    if (!da || a < inizio || da > fine) return;
-    const cur = new Date((da < inizio ? inizio : da) + 'T12:00:00');
-    const stop = a > fine ? fine : a;
-    while (cur.toISOString().substring(0, 10) <= stop) {
-      out[e.nome + '|' + cur.toISOString().substring(0, 10)] = true;
-      cur.setDate(cur.getDate() + 1);
-    }
+    _pianoDateMalattia(e.testo || '', e.data).forEach((d) => {
+      if (d >= inizio && d <= fine) out[e.nome + '|' + d] = true;
+    });
   });
   return out;
 }
@@ -985,7 +995,16 @@ async function _pianoAggiornaYtd(nomi) {
   });
   // scostamenti giornalieri dei mesi gia' passati (scheda Recupero ore)
   const recMese = {}; // nome|m -> ore in piu'/in meno
-  const recAnno = (await secGet('piano_recupero_ore?data=gte.' + _daA + '&data=lt.' + fine + '&limit=20000')) || [];
+  const recAnno =
+    (await secGet(
+      'piano_recupero_ore?data=gte.' +
+        _daA +
+        '&data=lt.' +
+        fine +
+        '&reparto_dip=eq.' +
+        _pianoReparto() +
+        '&limit=20000',
+    )) || [];
   recAnno.forEach((x) => {
     const m = parseInt(String(x.data).split('-')[1]);
     const k = x.collaboratore + '|' + m;
@@ -994,8 +1013,7 @@ async function _pianoAggiornaYtd(nomi) {
   nomi.forEach((n) => {
     const info = _pianoCollabInfo(n) || {};
     if (info.is_jolly) return;
-    const pct = parseFloat(info.percentuale) || 0;
-    if (!pct) return;
+    const pct = parseFloat(info.percentuale) || 1; // senza percentuale vale 100%, come nel calcolo del mese
     let cum = 0;
     for (let m = 1; m < mese; m++) {
       const dim = new Date(anno, m, 0).getDate();
@@ -2061,7 +2079,7 @@ async function renderPiano() {
 
 // Torna al mese in corso da qualunque scheda (frecce del Recupero ore)
 function pianoVaiMeseCorrente() {
-  _pianoMeseSel = new Date().toISOString().substring(0, 7);
+  _pianoMeseSel = _pianoYmOggi();
   _pianoViolCelle = {};
   _pianoViolLista = null;
   renderPiano();
@@ -2513,7 +2531,7 @@ function _pianoCalcolaViolazioni() {
         const cod = perNome[nome][g];
         const lavora = cod && _pianoTurnoInfo(cod);
         if (lavora) continue;
-        if (cod === 'V') continue; // in vacanza: non conta tra le 12
+        if (_pianoDomenicaEsclusa(cod)) continue; // vacanza o malattia: non conta tra le 12
         const codSab = g > 1 ? perNome[nome][g - 1] : null;
         if (chkSab && !_pianoSabatoEntro23(codSab)) {
           aggiungi(nome, g, 'domenica non conteggiabile come libera: il sabato finisce oltre le 23');
@@ -2603,12 +2621,26 @@ async function generaBozzaPiano(usaCoperture) {
     toast('Nessun fabbisogno configurato per questo mese: la bozza non sa cosa riempire');
     return;
   }
+  // GIORNI CHIUSI (gia' passati): la bozza non li tocca, ne' cancellando ne'
+  // assegnando. Prima cancellava e riempiva anche il passato senza motivo.
+  const giorniChiusi = new Set();
+  for (let g = 1; g <= nGiorni; g++) {
+    const dstrG = ym + '-' + String(g).padStart(2, '0');
+    if (_pianoGiornoBloccato(dstrG) && !_pianoGiornoSbloccato(dstrG)) giorniChiusi.add(g);
+  }
+  if (giorniChiusi.size === nGiorni) {
+    toastErrore('Tutti i giorni di ' + ym + ' sono chiusi: niente da generare');
+    return;
+  }
+  let primoApertoG = 1;
+  while (giorniChiusi.has(primoApertoG)) primoApertoG++;
+  const primoAperto = ym + '-' + String(primoApertoG).padStart(2, '0');
   // le C di RIEMPIMENTO generate da una bozza precedente si tolgono e si
   // rimettono alla fine: così rigenerare non trova i giorni "occupati"
   await secDel(
     'piano',
     'data=gte.' +
-      da +
+      primoAperto +
       '&data=lte.' +
       a +
       '&reparto_dip=eq.' +
@@ -2644,10 +2676,18 @@ async function generaBozzaPiano(usaCoperture) {
     cella[k] = r.codice;
     rigaDi[k] = r;
   });
-  const oreMese = {}; // equità
+  const oreMese = {}; // equità: ore gia' nel mese, turni E codici speciali (V, M, CGF...)
   Object.keys(cella).forEach((k) => {
+    const nomeK = k.substring(0, k.lastIndexOf('|'));
     const t = _pianoTurnoInfo(cella[k]);
-    if (t) oreMese[k.split('|')[0]] = (oreMese[k.split('|')[0]] || 0) + (parseFloat(t.durata_ore) || 0);
+    if (t) oreMese[nomeK] = (oreMese[nomeK] || 0) + (parseFloat(t.durata_ore) || 0);
+    else {
+      // vacanze, malattie, CGF valgono ore: chi ha 10 giorni di V non deve
+      // ricevere turni fino all'obiettivo pieno (validatore e calendario li contano)
+      const cs = _pianoCodiceInfo(cella[k]);
+      if (cs)
+        oreMese[nomeK] = (oreMese[nomeK] || 0) + _pianoOreCodiceSpeciale(cs, _pianoCollabInfo(nomeK) || {}, cella[k]);
+    }
   });
   const nomi = collaboratoriCache.filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c)).map((c) => c.nome);
   // OBIETTIVO ORE mensile (come la tolleranza ore del solver Turnivo):
@@ -2728,7 +2768,7 @@ async function generaBozzaPiano(usaCoperture) {
     if (!g || g > nGiorni) return;
     compleanni[n + '|' + g] = true;
     const dstrG = ym + '-' + String(g).padStart(2, '0');
-    if (cella[n + '|' + g] || malattie[n + '|' + dstrG]) return;
+    if (giorniChiusi.has(g) || cella[n + '|' + g] || malattie[n + '|' + dstrG]) return;
     cella[n + '|' + g] = 'C';
     nuove.push({
       collaboratore: n,
@@ -2755,6 +2795,7 @@ async function generaBozzaPiano(usaCoperture) {
     malattie: malattie,
     compleanni: compleanni,
     fabbTot: fabbTot,
+    chiusi: giorniChiusi,
   };
   const scriviCgf = (n, giorni) => {
     giorni.forEach((g) => {
@@ -2782,6 +2823,7 @@ async function generaBozzaPiano(usaCoperture) {
     if (credito > 0) scriviCgf(n, _pianoPiazzaCgf(n, credito, ctxCgf));
   });
   for (let g = 1; g <= nGiorni; g++) {
+    if (giorniChiusi.has(g)) continue; // giorno chiuso: resta com'e'
     (fabbG[g] || []).forEach((f) => {
       const t = _pianoTurnoInfo(f.turno_codice);
       if (!t) return;
@@ -2856,8 +2898,10 @@ async function generaBozzaPiano(usaCoperture) {
             for (const rg of _pianoRegoleGruppoDi(gruppoT)) {
               const tipoR = (rg.tipo_regola || '').toLowerCase();
               if (tipoR === 'richiede_funzione') {
+                // come in PianoRegole: la funzione ammessa e' un lasciapassare
                 const ammesse = rg.valore.split(',').map((x) => x.trim().toUpperCase());
-                if (!haStoria && !ammesse.includes(fzU)) return false;
+                if (ammesse.includes(fzU)) campoGrant = true;
+                else if (!haStoria) return false;
               } else if (tipoR === 'blocca_tipo_turno') {
                 const tipi = rg.valore.split(',').map((x) => x.trim().toUpperCase());
                 if (tipi.includes((t.tipo || '').toUpperCase())) return false;
@@ -3026,6 +3070,7 @@ async function generaBozzaPiano(usaCoperture) {
     const infoN = _pianoCollabInfo(n) || {};
     if (String(infoN.reparti_extra || '').trim()) return; // multi-reparto: niente C automatiche
     for (let g = 1; g <= nGiorni; g++) {
+      if (giorniChiusi.has(g)) continue;
       if (cella[n + '|' + g]) continue;
       const dstrG = ym + '-' + String(g).padStart(2, '0');
       if (malattie[n + '|' + dstrG]) continue;
@@ -3145,7 +3190,8 @@ async function eseguiCancellaPiano(tutto) {
   const ym = _pianoMeseSel;
   const da = ym + '-01';
   const a = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
-  const n = tutto ? _pianoRighe.length : _pianoRighe.filter((r) => !r.protetto).length;
+  const mie = _pianoRighe.filter((r) => (r.reparto_dip || 'slots') === _pianoReparto()); // non le celle degli altri settori
+  const n = tutto ? mie.length : mie.filter((r) => !r.protetto).length;
   if (!n) {
     toast('Niente da cancellare');
     return;
@@ -4297,11 +4343,18 @@ async function pianoCaricaDomenicheAnno() {
     )) || [];
   const perGiorno = {}; // 'nome|data' -> codice
   const mesiConPiano = {};
+  const mesiPersona = {}; // 'nome|MM' -> true: la persona ha celle in quel mese
   righe.forEach((r) => {
     perGiorno[r.collaboratore + '|' + r.data] = r.codice;
     mesiConPiano[String(r.data).substring(5, 7)] = true;
+    mesiPersona[r.collaboratore + '|' + String(r.data).substring(5, 7)] = true;
   });
-  window._pianoDomenicheDati = { anno: anno, perGiorno: perGiorno, mesiConPiano: mesiConPiano };
+  window._pianoDomenicheDati = {
+    anno: anno,
+    perGiorno: perGiorno,
+    mesiConPiano: mesiConPiano,
+    mesiPersona: mesiPersona,
+  };
   _renderPianoDomenicheBody();
 }
 function _renderPianoDomenicheBody() {
@@ -4311,7 +4364,7 @@ function _renderPianoDomenicheBody() {
   const anno = dati.anno;
   const diritto = parseInt(_pianoRegolaVal('domeniche_libere_anno')) || 12;
   const chkSab = _pianoRegolaVal('turno_prima_domenica_libera') === 'TRUE';
-  const oggiStr = new Date().toISOString().split('T')[0];
+  const oggiStr = _pianoOggiStr();
   // tutte le domeniche dell'anno, divise per mese
   const domMese = {}; // 'MM' -> [dstr...]
   const d = new Date(anno, 0, 1, 12);
@@ -4336,7 +4389,7 @@ function _renderPianoDomenicheBody() {
   let h =
     '<p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Diritto: ' +
     diritto +
-    ' domeniche libere all anno (regola "domeniche_libere_anno"). La vacanza non conta tra le libere' +
+    ' domeniche libere all anno (regola "domeniche_libere_anno"). Vacanza e malattia non contano ne\' tra le libere ne\' tra le lavorate (stesso criterio del validatore e di Benessere)' +
     (chkSab ? '; il sabato deve finire entro le 23, come nel validatore' : '') +
     '. Nei mesi senza piano non si conta nulla. Rosso = le domeniche rimaste nell anno non bastano piu per arrivare al diritto: da li in poi vanno restituite per prime.</p>';
   h +=
@@ -4353,7 +4406,9 @@ function _renderPianoDomenicheBody() {
     let cols = '';
     for (let m = 1; m <= 12; m++) {
       const mm = String(m).padStart(2, '0');
-      if (!dati.mesiConPiano[mm]) {
+      // un assunto a giugno non ha domeniche "libere" da gennaio a maggio:
+      // il mese conta solo se questa persona ha un piano in quel mese
+      if (!dati.mesiConPiano[mm] || !(dati.mesiPersona || {})[nome + '|' + mm]) {
         cols += '<td style="color:var(--line)"></td>';
         continue;
       }
@@ -4365,7 +4420,7 @@ function _renderPianoDomenicheBody() {
           lav++;
           return;
         }
-        if (cod === 'V' || cod === 'V1') return; // vacanza: non conta tra le 12
+        if (_pianoDomenicaEsclusa(cod)) return; // vacanza o malattia: non conta tra le 12
         if (chkSab) {
           const prima = new Date(dstr + 'T12:00:00');
           prima.setDate(prima.getDate() - 1);
@@ -4536,7 +4591,7 @@ async function caricaBenesserePiano() {
         const t = _pianoTurnoInfo(cod);
         if (t) {
           p.lav++;
-          p.oreLav += _pianoOreEffettiveTurno(t, { codice: cod });
+          p.oreLav += _pianoOreEffettiveTurno(t, { codice: cod, data: d });
           if (t.tipo === 'NOTTURNO') p.notti++;
           const dow = new Date(d + 'T12:00:00').getDay();
           if (dow === 0 || dow === 6) p.we++;
@@ -4562,7 +4617,7 @@ async function caricaBenesserePiano() {
         const cod = p.giorni[d];
         // Una domenica passata in VACANZA (o in malattia) non e' un riposo
         // settimanale: non conta ne' come libera ne' nel totale.
-        if (cod === 'V' || cod === 'M' || cod === 'M1') {
+        if (_pianoDomenicaEsclusa(cod)) {
           p.domAssenza = (p.domAssenza || 0) + 1;
           return;
         }
@@ -5753,7 +5808,10 @@ async function _pianoCaricaRecupero(ym) {
   // ultimo giorno VERO del mese: scrivere sempre 31 fa rifiutare la richiesta
   // dal database nei mesi che non ce l'hanno (30 settembre, 28 febbraio...)
   const a = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
-  const r = (await secGet('piano_recupero_ore?data=gte.' + da + '&data=lte.' + a + '&limit=5000')) || [];
+  const r =
+    (await secGet(
+      'piano_recupero_ore?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=5000',
+    )) || [];
   _pianoRecupero = {};
   r.forEach((x) => (_pianoRecupero[x.collaboratore + '|' + String(x.data).substring(0, 10)] = x));
   _pianoRecuperoMese = ym;
@@ -5794,6 +5852,8 @@ async function pianoRecuperoScrivi(nome, dstr, valore) {
     toast('Gli ausiliari non hanno ore dovute: nessun recupero da registrare');
     return false;
   }
+  // il recupero entra nel saldo del mese: vale la stessa chiusura del saldo
+  if (!_pianoConsentiSaldoMese(String(dstr).substring(0, 7))) return false;
   const chiave = nome + '|' + dstr;
   const att = _pianoRecupero[chiave];
   // si accetta sia il decimale (1.5) sia l'orologio (1:30): un'ora e mezza si
@@ -6242,7 +6302,7 @@ async function _renderPianoRecuperoTab() {
             (parseFloat((_pianoCollabInfo(a5) || {}).percentuale) || 1) || a5.localeCompare(b5),
       );
   }
-  const _oggiYm = new Date().toISOString().substring(0, 7);
+  const _oggiYm = _pianoYmOggi();
   let h =
     '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">Recupero ore &middot; personale fisso' +
     // stesse frecce del calendario, per cambiare mese senza uscire dalla scheda
@@ -6424,11 +6484,21 @@ function _pianoChiusuraCfg() {
     .split(',')
     .map((x) => parseInt(x.trim()))
     .filter((x) => !isNaN(x));
+  // chiusura "facoltativa" scritta nella scheda della festivita': vale per la
+  // notte che precede quel giorno (prima veniva salvata e mai letta)
+  const orePerData = {};
+  Object.keys(_pianoFestivitaPerAnno || {}).forEach((a) => {
+    (_pianoFestivitaPerAnno[a] || []).forEach((f) => {
+      if (f.attivo !== false && f.ora_chiusura != null && f.ora_chiusura !== '')
+        orePerData[String(f.data).substring(0, 10)] = parseFloat(f.ora_chiusura);
+    });
+  });
   return {
     oraNormale: parseFloat(_pianoRegolaVal('chiusura_ora_normale')) || 4,
     oraTardi: parseFloat(_pianoRegolaVal('chiusura_ora_tardi')) || 5,
     oraFineAnno: parseFloat(_pianoRegolaVal('chiusura_ora_fine_anno')) || 7,
     giorniTardi: giorni.length ? giorni : [5, 6],
+    orePerData: orePerData,
   };
 }
 function _pianoChiusuraGiorno(dstr) {
@@ -6676,6 +6746,13 @@ function _renderPianoFestivitaCard() {
   h += '</div></div>';
   return h;
 }
+// DOMENICHE LIBERE: una domenica passata in vacanza o in malattia non e' un
+// riposo settimanale concesso dal piano: non conta ne' come libera ne' come
+// lavorata. UNICO criterio per validatore, tabella Domeniche e Benessere
+// (prima ogni schermata escludeva codici diversi e i conteggi non tornavano).
+function _pianoDomenicaEsclusa(cod) {
+  return cod === 'V' || cod === 'V1' || cod === 'M' || cod === 'M1';
+}
 // REGOLA CGF: il festivo che cade di DOMENICA non matura compensazione
 function _festivoCgfDefault(dstr) {
   return new Date(dstr + 'T12:00:00').getDay() !== 0;
@@ -6784,6 +6861,7 @@ function _pianoPiazzaCgf(nome, quanti, ctx) {
   };
   const ok = (g) => {
     if (g < 1 || g > ctx.nGiorni) return false;
+    if (ctx.chiusi && ctx.chiusi.has(g)) return false;
     if (ctx.cella[nome + '|' + g]) return false;
     const dstr = ctx.ym + '-' + String(g).padStart(2, '0');
     if (ctx.malattie[nome + '|' + dstr]) return false;
@@ -9562,7 +9640,7 @@ async function caricaConfrontoTimbrature() {
   const pianOre = {};
   _pianoRighe.forEach((r) => {
     const t = _pianoTurnoInfo(r.codice);
-    if (t) pianOre[r.collaboratore] = (pianOre[r.collaboratore] || 0) + (parseFloat(t.durata_ore) || 0);
+    if (t) pianOre[r.collaboratore] = (pianOre[r.collaboratore] || 0) + _pianoOreDiRiga(r); // come Calendario e Saldo (chiusure tardi, orari propri)
   });
   const timbOre = {};
   const timbGg = {};
@@ -9574,7 +9652,7 @@ async function caricaConfrontoTimbrature() {
   const pianoGiorno = {}; // nome|data -> {codice, ore}
   _pianoRighe.forEach((r) => {
     const t = _pianoTurnoInfo(r.codice);
-    if (t) pianoGiorno[r.collaboratore + '|' + r.data] = { codice: r.codice, ore: parseFloat(t.durata_ore) || 0 };
+    if (t) pianoGiorno[r.collaboratore + '|' + r.data] = { codice: r.codice, ore: _pianoOreDiRiga(r) };
   });
   const perNomeT = {};
   _pianoTimbrature.forEach((t) => (perNomeT[t.collaboratore] = (perNomeT[t.collaboratore] || []).concat(t)));
@@ -9852,7 +9930,15 @@ async function caricaStatisticheAnnoPiano(forza) {
           '&limit=5000',
       )) || [];
     const rc =
-      (await secGet('piano_recupero_ore?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&limit=20000')) || [];
+      (await secGet(
+        'piano_recupero_ore?data=gte.' +
+          anno +
+          '-01-01&data=lte.' +
+          anno +
+          '-12-31&reparto_dip=eq.' +
+          _pianoReparto() +
+          '&limit=20000',
+      )) || [];
     const rt =
       (await secGet('piano_ore_mese?anno_mese=gte.' + anno + '-01&anno_mese=lte.' + anno + '-12&limit=5000')) || [];
     window._pianoStatCache = { anno: anno, reparto: rep, righe: rg, fabb: fb, rec: rc, rett: rt };
@@ -9935,8 +10021,11 @@ async function caricaStatisticheAnnoPiano(forza) {
       o.perMese[_mese] = (o.perMese[_mese] || 0) + q;
     };
     if (t) {
-      o.ore += parseFloat(t.durata_ore) || 0;
-      _addMese(parseFloat(t.durata_ore) || 0);
+      // stesse ore del Calendario e del Saldo: prolungamento nei giorni di
+      // chiusura tardi e orari personalizzati della cella (prima durata fissa)
+      const _oT = _pianoOreDiRiga(r, parseFloat(info.percentuale) || 1);
+      o.ore += _oT;
+      _addMese(_oT);
       o.gg++;
       if (t.tipo === 'NOTTURNO') o.n++;
       else o.d++;
@@ -10520,7 +10609,15 @@ async function _pianoSaldoAnnoCalcola(anno) {
     )) || [];
   _pianoRegistraGiorniTurno(righe);
   const rec =
-    (await secGet('piano_recupero_ore?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&limit=20000')) || [];
+    (await secGet(
+      'piano_recupero_ore?data=gte.' +
+        anno +
+        '-01-01&data=lte.' +
+        anno +
+        '-12-31&reparto_dip=eq.' +
+        _pianoReparto() +
+        '&limit=20000',
+    )) || [];
   const rett =
     (await secGet('piano_ore_mese?anno_mese=gte.' + anno + '-01&anno_mese=lte.' + anno + '-12&limit=5000')) || [];
   const timb =
@@ -11320,9 +11417,21 @@ async function eliminaVacanza(id) {
 async function eliminaTutteVacanze() {
   if (!puoGestirePiano()) return;
   const anno = window._pianoVacAnno;
-  if (!confirm('Eliminare TUTTE le vacanze del ' + anno + '? (' + _pianoVacCache.length + ' settimane)')) return;
+  if (
+    !confirm(
+      'Eliminare TUTTE le vacanze del ' +
+        anno +
+        ' di ' +
+        repartoLabel(_pianoReparto()) +
+        '? (' +
+        _pianoVacCache.length +
+        ' settimane)\n\nGli altri settori non vengono toccati.',
+    )
+  )
+    return;
   try {
-    await secDel('piano_vacanze', 'anno=eq.' + anno);
+    // la tabella non ha il settore: si cancellano le righe del settore aperto una per una
+    for (const v of _pianoVacCache) await secDel('piano_vacanze', 'id=eq.' + v.id);
     logAzione('Vacanze: eliminate tutte', String(anno));
     toast('Vacanze ' + anno + ' eliminate');
     renderPiano();
@@ -12648,7 +12757,8 @@ function _renderPianoImportExportCard() {
 }
 
 const _REGOLE_GRUPPO_TIPI = {
-  richiede_funzione: 'Solo queste funzioni (es: SUP oppure BO,SUP) · la storia nel gruppo vale come consenso',
+  richiede_funzione:
+    'Funzioni ammesse anche senza il gruppo fra i settori (es: SUP oppure BO,SUP) · chi non le ha deve avere il gruppo fra i settori',
   blocca_tipo_turno: 'Vieta un tipo di turno nel gruppo (es: NOTTURNO)',
   richiede_campo: 'Richiede un campo del collaboratore (es: accoglienza>0)',
   limite_funzione_giorno: 'Max N di una funzione al giorno (es: SUP:1)',
@@ -13360,6 +13470,7 @@ async function _pianoNotaRapida(nome, dstr) {
   // IDENTICO a Turnivo (commentCell/modifica_commento): "Commento per <codice>",
   // firma automatica "- <operatore>", il commento su cella vuota crea la riga.
   if (!puoGestirePiano()) return;
+  if (!_pianoConsentiScrittura(dstr)) return; // giorno chiuso
   const g = parseInt(dstr.split('-')[2]);
   const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
   const attuale = (r && r.commento) || '';
@@ -14568,6 +14679,9 @@ async function _renderPianoBriefingTab() {
     pause: rigaPause || null,
     pianoRighe: pianoRighe || [],
     chiave: dstr + '|' + rep,
+    // numeri cassa scritti a mano: si ricorda anche dopo un nuovo render, cosi'
+    // la rotazione non li sovrascrive (prima il flag spariva a ogni render)
+    cdManuale: !!(rigaBrief && rigaBrief.contenuto && rigaBrief.contenuto.cdManuale),
   };
   // se il briefing era gia' salvato, controlla che i numeri cassa seguano
   // ancora la rotazione (ieri potrebbe essere stato corretto a mano)
@@ -14918,23 +15032,28 @@ async function briefSalvaBriefing() {
     return;
   }
   _briefSaving = true;
+  // lo stato si fissa QUI: se nel frattempo l'operatore cambia giorno, il
+  // salvataggio resta agganciato al giorno e al settore di queste righe
+  // (prima usava la data corrente e le righe finivano sul giorno sbagliato)
+  const st = _briefState;
+  const [dataSt, repSt] = String(st.chiave || '').split('|');
   try {
-    const contenuto = { righe: _briefState.righe };
-    if (_briefState.id) {
-      await secPatch('piano_briefing', 'id=eq.' + _briefState.id, {
+    const contenuto = { righe: st.righe, cdManuale: !!st.cdManuale };
+    if (st.id) {
+      await secPatch('piano_briefing', 'id=eq.' + st.id, {
         contenuto: contenuto,
         operatore: getOperatore(),
         updated_at: new Date().toISOString(),
       });
     } else {
       const nuovo = await secPost('piano_briefing', {
-        data: _briefData,
-        reparto_dip: _pianoReparto(),
+        data: dataSt || _briefData,
+        reparto_dip: repSt || _pianoReparto(),
         sezione: 'briefing',
         contenuto: contenuto,
         operatore: getOperatore(),
       });
-      _briefState.id = nuovo && nuovo[0] ? nuovo[0].id : null;
+      st.id = nuovo && nuovo[0] ? nuovo[0].id : null;
     }
     const el = document.getElementById('brief-stato');
     if (el) el.textContent = 'Salvato ✓';
@@ -15663,8 +15782,12 @@ async function pianoInserisciCorso() {
     toast('Scegli corso, data e almeno un partecipante');
     return;
   }
+  if (!_pianoConsentiScrittura(data)) return; // giorno chiuso: stessa regola del piano
   try {
-    const esistenti = (await secGet('piano?data=eq.' + data + '&reparto_dip=eq.' + _pianoReparto())) || [];
+    // celle di QUEL giorno di tutti i settori: chi lavora in due settori puo'
+    // avere la cella nell'altro piano (prima risultava libero e l'inserimento
+    // falliva a meta' per la riga doppia)
+    const esistenti = (await secGet('piano?data=eq.' + data + '&limit=2000')) || [];
     const etichettaCorso = 'Corso ' + cod + (inizio && fine ? ' ' + inizio + '-' + fine : '');
     const ci = _pianoOra(inizio);
     const cf = _pianoOra(fine);
@@ -15744,12 +15867,16 @@ async function pianoInserisciCorso() {
       generato: false,
       commento: etichettaCorso + ' - ' + getOperatore(),
     };
+    const errori = [];
     for (const nome of liberi) {
-      await secPost(
-        'piano',
-        Object.assign({ collaboratore: nome, data: data, reparto_dip: _pianoReparto() }, datiCorso),
-      );
-      inseriti++;
+      try {
+        await _pianoInserisciCella(
+          Object.assign({ collaboratore: nome, data: data, reparto_dip: _pianoReparto() }, datiCorso),
+        );
+        inseriti++;
+      } catch (e) {
+        errori.push(nome + ': ' + (e.message || 'errore'));
+      }
     }
     for (const cx of compatibili) {
       await secPatch('piano', 'id=eq.' + cx.ex.id, {
@@ -15768,11 +15895,13 @@ async function pianoInserisciCorso() {
       'Corso inserito nel piano',
       cod + ' ' + data + ' · ' + inseriti + ' celle, ' + annotati + ' annotati sul turno',
     );
-    toast('Corso ' + cod + ': ' + inseriti + ' celle' + (annotati ? ' + ' + annotati + ' annotati sul turno' : ''));
+    if (errori.length) toastErrore('Corso non inserito per: ' + errori.join('; '));
+    else
+      toast('Corso ' + cod + ': ' + inseriti + ' celle' + (annotati ? ' + ' + annotati + ' annotati sul turno' : ''));
     if (_pianoMeseSel === data.substring(0, 7)) renderPiano();
   } catch (e) {
     console.error(e);
-    toast('Errore inserimento corso');
+    toastErrore('Errore inserimento corso: ' + (e.message || ''));
   }
 }
 
@@ -16058,6 +16187,8 @@ async function pianoCancellaSelezione() {
     )
   )
     return;
+  // giorni chiusi: ogni giorno toccato va sbloccato con motivo, come per la singola cella
+  for (const d of [...new Set(daCanc.map((x) => x.data))].sort()) if (!_pianoConsentiScrittura(d)) return;
   _pianoUndoSnap('cancellazione di ' + daCanc.length + ' celle');
   try {
     const ids = daCanc.map((r) => r.id);
@@ -17273,6 +17404,13 @@ async function pianoIncollaDaClipboard(target) {
     )
   )
     return;
+  // giorni chiusi: ogni giorno toccato va sbloccato con motivo, come per la singola cella
+  const dateIncolla = new Set(daInserire.map((x) => x.data));
+  daPatch.forEach((p) => {
+    const rr = _pianoRighe.find((x) => x.id === p.id);
+    if (rr) dateIncolla.add(rr.data);
+  });
+  for (const d of [...dateIncolla].sort()) if (!_pianoConsentiScrittura(d)) return;
   _pianoUndoSnap('incolla nel piano');
   try {
     for (let i = 0; i < daPatch.length; i += 10)

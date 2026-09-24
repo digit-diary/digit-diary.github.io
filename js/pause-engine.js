@@ -1378,9 +1378,19 @@ function _peGeneraVenSab(sh, ctx, dataStr) {
   let cdPrinc = 0;
   let nCassaSec = '';
   let cdSec = 0;
+  // numeri cassa delle coppie CONFIGURATE (Impostazioni del piano): la cassa
+  // principale e' la coppia che apre con C23, la secondaria quella di C0.
+  // Prima 3/4 e 2/7 erano scritti fissi e ignoravano le impostazioni.
+  const coppie = (window._pianoCdCfg && window._pianoCdCfg.coppie) || [];
+  const cdDi = (apre, fallback) => {
+    const c = coppie.find((x) => String(x.apre || '').toUpperCase() === apre);
+    return new Set((c && Array.isArray(c.cd) ? c.cd : fallback).map((x) => parseInt(x)));
+  };
+  const cdPrincSet = cdDi('C23', [3, 4]);
+  const cdSecSet = cdDi('C0', [2, 7]);
   if (numC8Eff >= 3) {
     for (let j = 0; j < numC8; j++)
-      if (ctx.c8Cd[j] === 3 || ctx.c8Cd[j] === 4) {
+      if (cdPrincSet.has(ctx.c8Cd[j])) {
         nCassaPrinc = ctx.c8Nomi[j];
         cdPrinc = ctx.c8Cd[j];
         break;
@@ -1390,7 +1400,7 @@ function _peGeneraVenSab(sh, ctx, dataStr) {
       cdPrinc = ctx.c8Cd[0];
     }
     for (let j = 0; j < numC8; j++)
-      if (ctx.c8Nomi[j] !== nCassaPrinc && (ctx.c8Cd[j] === 2 || ctx.c8Cd[j] === 7)) {
+      if (ctx.c8Nomi[j] !== nCassaPrinc && cdSecSet.has(ctx.c8Cd[j])) {
         nCassaSec = ctx.c8Nomi[j];
         cdSec = ctx.c8Cd[j];
         break;
@@ -1404,7 +1414,7 @@ function _peGeneraVenSab(sh, ctx, dataStr) {
         }
   } else {
     for (let j = 0; j < numC8; j++)
-      if (ctx.c8Cd[j] === 2 || ctx.c8Cd[j] === 7) {
+      if (cdSecSet.has(ctx.c8Cd[j])) {
         nCassaPrinc = ctx.c8Nomi[j];
         cdPrinc = ctx.c8Cd[j];
         break;
