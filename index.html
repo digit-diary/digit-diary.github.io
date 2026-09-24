@@ -3691,7 +3691,8 @@
     </div>
 
     <div class="page" id="page-impostazioni">
-      <div class="settings-section">
+      <nav id="settings-indice" class="settings-indice" aria-label="Sezioni delle impostazioni"></nav>
+      <div class="settings-section" data-gruppo="Registrazioni">
         <h4>Tipi di evento</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 16px">
           I tipi predefiniti non possono essere eliminati.
@@ -3715,7 +3716,7 @@
           </button>
         </div>
       </div>
-      <div class="settings-section">
+      <div class="settings-section" data-gruppo="Registrazioni">
         <h4>Campi Rapporto Giornaliero</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
           Gestisci le sezioni visibili nel rapporto giornaliero.
@@ -3735,7 +3736,7 @@
           </button>
         </div>
       </div>
-      <div class="settings-section" id="collab-section" style="display: none">
+      <div class="settings-section" data-gruppo="Persone e accessi" id="collab-section" style="display: none">
         <h4>Gestione Collaboratori</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
           Lista master dei nomi collaboratori per l'autocomplete nel diario e
@@ -3768,7 +3769,7 @@
           />
         </div>
       </div>
-      <div class="settings-section">
+      <div class="settings-section" data-gruppo="Persone e accessi">
         <h4>Operatori</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
           Operatore attuale: <strong id="op-attuale">-</strong>. Ogni operatore
@@ -3813,7 +3814,7 @@
           </button>
         </div>
       </div>
-      <div class="settings-section" id="settori-section" style="display: none">
+      <div class="settings-section" data-gruppo="Persone e accessi" id="settori-section" style="display: none">
         <h4>Settori</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
           Gestisci i settori del casinò: aggiungi nuovi settori (es. Bar,
@@ -3824,7 +3825,7 @@
         <div id="settori-list"></div>
       </div>
       <div
-        class="settings-section"
+        class="settings-section" data-gruppo="Persone e accessi"
         id="moduli-resp-section"
         style="display: none"
       >
@@ -3832,7 +3833,7 @@
         <div id="moduli-resp-list"></div>
       </div>
       <div
-        class="settings-section"
+        class="settings-section" data-gruppo="Persone e accessi"
         id="visibilita-section"
         style="display: none"
       >
@@ -3845,7 +3846,7 @@
         </p>
         <div id="visibilita-list"></div>
       </div>
-      <div class="settings-section">
+      <div class="settings-section" data-gruppo="Persone e accessi">
         <h4>Sicurezza</h4>
         <div class="settings-btn-row" id="sicurezza-btns"></div>
         <div
@@ -3858,7 +3859,7 @@
           "
         ></div>
       </div>
-      <div class="settings-section" id="ai-section" style="display: none">
+      <div class="settings-section" data-gruppo="Persone e accessi" id="ai-section" style="display: none">
         <h4>Assistente AI (Groq)</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
           Migliora automaticamente i testi nei moduli disciplinari. Ottieni una
@@ -3915,7 +3916,7 @@
         </div>
       </div>
       <div
-        class="settings-section"
+        class="settings-section" data-gruppo="Maison"
         id="maison-privacy-section"
         style="display: none"
       >
@@ -3951,7 +3952,7 @@
         ></p>
       </div>
       <div
-        class="settings-section"
+        class="settings-section" data-gruppo="Maison"
         id="soglie-alert-section"
         style="display: none"
       >
@@ -4041,7 +4042,7 @@
         </div>
       </div>
       <div
-        class="settings-section"
+        class="settings-section" data-gruppo="Maison"
         id="buoni-valori-section"
         style="display: none"
       >
@@ -4096,7 +4097,7 @@
           </button>
         </div>
       </div>
-      <div class="settings-section" id="giubileo-section" style="display: none">
+      <div class="settings-section" data-gruppo="Personale" id="giubileo-section" style="display: none">
         <h4>Premio giubileo</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
           Somma in denaro riconosciuta ai collaboratori al raggiungimento degli
@@ -4163,7 +4164,7 @@
         </div>
       </div>
       <div
-        class="settings-section"
+        class="settings-section" data-gruppo="Sistema"
         id="conservazione-section"
         style="display: none"
       >
@@ -4218,7 +4219,7 @@
           style="font-size: 0.82rem; color: var(--muted); margin-top: 10px"
         ></p>
       </div>
-      <div class="settings-section" id="backup-section" style="display: none">
+      <div class="settings-section" data-gruppo="Sistema" id="backup-section" style="display: none">
         <h4>Backup dati</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
           Scarica una copia completa di tutti i dati (registrazioni, moduli,
@@ -4264,7 +4265,7 @@
           style="font-size: 0.8rem; color: var(--muted); margin-top: 8px"
         ></p>
       </div>
-      <div class="settings-section" id="db-stats-section" style="display: none">
+      <div class="settings-section" data-gruppo="Sistema" id="db-stats-section" style="display: none">
         <h4>Stato del sistema</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
           Controllo automatico dei dati (schede incomplete, turni orfani,
@@ -4302,7 +4303,7 @@
           </button>
         </div>
       </div>
-      <div class="settings-section" id="cestino-section" style="display: none">
+      <div class="settings-section" data-gruppo="Sistema" id="cestino-section" style="display: none">
         <h4><i class="icx icx-cestino"></i> Cestino</h4>
         <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
           Elementi eliminati. Puoi ripristinarli o svuotare il cestino.

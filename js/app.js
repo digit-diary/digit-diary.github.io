@@ -160,6 +160,8 @@ function switchPage(name) {
       visSec.style.display = isAdmin() ? '' : 'none';
       if (isAdmin()) renderVisibilitaUI();
     }
+    // indice in cima alla pagina, dopo che le sezioni sanno se sono visibili
+    if (typeof _settingsAggiornaIndice === 'function') setTimeout(_settingsAggiornaIndice, 0);
     if (isAdmin() && groqKey) {
       const gs = document.getElementById('groq-status');
       if (gs) gs.innerHTML = '<span style="color:#2c6e49">Chiave configurata</span>';

@@ -292,3 +292,41 @@ l'invalidazione, banner scadenze di oggi, controllo salute con nomi vuoti, CSS d
 
 Se una prova non torna, scrivimi cosa hai visto: il Registro attivita' e gli avvisi rossi
 riportano il testo dell'errore del database, che serve per la diagnosi.
+
+---
+
+## 12 · Aggiunte v260 e v261 (24/09 sera)
+
+**CGF: solo passato e mese aperto, festivo in malattia, recuperi in piu' tolti (v260)**
+Prima: i CGF gia' pianificati nei mesi futuri contavano come goduti; un festivo con turno in
+cella ma malattia quel giorno contava come lavorato; un recupero dato in anticipo per un
+festivo poi saltato restava.
+Dopo: bozza, "Assegna i CGF", "Chi ha diritto" e Statistiche contano solo fino alla fine del
+mese aperto; il festivo matura solo se lavorato davvero (turno e nessuna malattia); i CGF
+automatici in piu' tornano C con la nota "CGF tolto: festivo non lavorato" (dalla bozza, da
+"Assegna i CGF" con conferma, dalla correzione della malattia nel Diario e scrivendo M nella
+cella). Esempio: Mario lavora il 25 ottobre, la bozza gli mette il CGF dopo il 25; se il 25
+si ammala, il CGF diventa C.
+
+**Blocco su cella vuota e sblocco con la malattia (v260)**
+Prima: "Blocca" chiedeva di scrivere prima un turno; il blocco restava anche se la persona si
+ammalava.
+Dopo: bloccare un giorno vuoto crea un congedo C bloccato (lucchetto, motivo visibile,
+saltato da scambi e coperture); la M scritta nella cella o arrivata dal Diario scioglie il
+blocco.
+
+**Regole "chi fa cosa" per settore (v260)**
+Prima: tre regole con le sigle degli Slots scritte fisse nel programma (L1/9 solo BO e SUP,
+SUP solo Z lun-gio, Z e S ven-sab), inutilizzabili altrove.
+Dopo: due tipi nuovi di regola di gruppo, creabili per ogni settore con le proprie sigle:
+"Turni riservati a certe funzioni" (`L1,9:BO,SUP,RESP`) e "Una funzione fa solo certi turni,
+per giorno" (`SUP:Z*,L1,9:0,1,2,3`). Le tre regole degli Slots sono state convertite in
+automatico. Valgono nel validatore, nella bozza, nei cambi e come avviso nella scrittura
+manuale; gruppo, funzioni e sigle vengono verificati sul settore; la scheda ha la guida con
+gli esempi e i tipi hanno nomi in italiano. Test motore: 112.
+
+**Restyle (v261)**
+Impostazioni: indice fisso in cima con i gruppi Registrazioni, Persone e accessi, Maison,
+Personale, Sistema; etichette di gruppo fra le sezioni; salto alla sezione con evidenziazione.
+Briefing: barra dei comandi in tre gruppi (Giorno, Azioni, Formato) con etichette, frecce
+coerenti. Nessun cambiamento di comportamento.
