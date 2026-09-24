@@ -315,6 +315,7 @@ async function _pianoCaricaCfg() {
     ggFormazione,
     cdConfig,
     evidCfg,
+    solverUrl,
   ] = await Promise.all([
     secGet('piano_turni?order=ordine.asc&limit=500'),
     secGet('piano_codici?order=codice.asc&limit=200'),
@@ -333,6 +334,7 @@ async function _pianoCaricaCfg() {
     getImp('piano_giorni_formazione'),
     getImp('piano_cd_config'),
     getImp('brief_evidenziazioni'),
+    getImp('piano_solver_url'),
   ]);
   pianoRegoleGruppoCache = regoleGruppo || [];
   try {
@@ -346,6 +348,7 @@ async function _pianoCaricaCfg() {
     window._briefEvidCfg = {};
   }
   window._pianoMaxCambiCfg = parseInt(maxCambi) || 0;
+  window._pianoSolverUrl = (solverUrl || '').trim(); // motore esterno (server interno), vuoto = non collegato
   try {
     window._pianoWeekendCfg = giorniWk ? JSON.parse(giorniWk) : null;
   } catch (e) {
@@ -1386,6 +1389,13 @@ async function renderPiano() {
             'completaConCoperture()',
             '',
             'Tappa i buchi rimasti usando i collaboratori di altri settori abilitati a coprire qui. Da usare DOPO aver generato i piani dei loro reparti',
+          );
+        if (window._pianoSolverUrl)
+          h += pbtn(
+            'Genera con il solver',
+            'generaConSolver()',
+            'pbar-ok',
+            'Motore di ottimizzazione sul server interno (OR-Tools): piano ottimo del mese, equita garantita. Usa le stesse regole del settore e non tocca le celle esistenti',
           );
         h += pbtn(
           'Migliora ore',
@@ -2762,6 +2772,8 @@ async function generaBozzaPiano(usaCoperture) {
   const nuove = [];
   const sostituzioniWd = [];
   const scoperti = [];
+  const scopertiObj = []; // posti scoperti da provare a riparare spostando un turno
+  const assegnatiRun = new Set(); // 'nome|g' assegnati da QUESTA bozza (spostabili)
   // regole di preferenza lette UNA volta (Si/No) e contatori sul mese
   const regSi = (nome) => {
     const v = _pianoRegolaVal(nome);
@@ -2888,6 +2900,120 @@ async function generaBozzaPiano(usaCoperture) {
       }
     }
   });
+  // IDONEITA' DI UN CANDIDATO per il turno f (oggetto con turno_codice) nel
+  // giorno g. E' l'unico posto in cui la bozza decide chi puo' fare cosa:
+  // lo usano il giro principale e la passata di riparazione (che chiede
+  // ignoraOccupato = true per chi ha gia' un turno da spostare, con oreDelta
+  // = ore del turno che lascia, negative).
+  const candidatoOk = (n, f, t, g, dstr, dowG, ignoraOccupato, oreDelta) => {
+    const esistente = cella[n + '|' + g];
+    if (malattie[n + '|' + dstr]) return false;
+    if (ndDiario[n + '|' + dstr]) return false; // non disponibile (dal Diario)
+    if (!ignoraOccupato && esistente && esistente !== 'WD') return false;
+    if (esistente === 'WD' && t.tipo === 'NOTTURNO') return false; // WD = diurno forzato
+    const infoC = _pianoCollabInfo(n);
+    // preferenze collaboratore
+    if (infoC && infoC.solo_diurni && t.tipo === 'NOTTURNO') return false;
+    if (
+      infoC &&
+      infoC.turni_bloccati &&
+      infoC.turni_bloccati
+        .split(',')
+        .map((x) => x.trim())
+        .includes(f.turno_codice)
+    )
+      return false;
+    // COPERTURA da un altro settore: rispetta i gruppi ammessi e il
+    // tetto mensile di turni impostati nella scheda del collaboratore
+    const cop = _pianoCoperturaCfg(infoC);
+    if (cop && !usaCoperture) return false; // prima il reparto, le coperture in un secondo passaggio
+    if (cop) {
+      if (cop.gruppi && String(cop.gruppi).toUpperCase() !== (t.gruppo || '').toUpperCase()) return false;
+      if (cop.max_turni) {
+        let fatti = 0;
+        for (let k = 1; k <= nGiorni; k++) {
+          const cod = cella[n + '|' + k];
+          const tk = cod && _pianoTurniReparto().find((x) => x.codice === cod);
+          if (tk) fatti++;
+        }
+        if (fatti >= cop.max_turni) return false;
+      }
+    }
+    // mappature per funzione (SUP/BO limitati ai loro turni; regole settimana SUP)
+    const fz = infoC && infoC.funzione;
+    // regole "chi fa cosa" del settore (turni riservati, funzione-turni-giorni)
+    if (_pianoViolazioneFunzioneTurno(n, t, dowG, true)) return false;
+    // regola HARD no_4w1c1w: niente rientro dopo UN solo giorno di riposo
+    // se prima c'erano 4+ giorni di lavoro consecutivi
+    if (String(_pianoRegolaVal('no_4w1c1w')).toUpperCase() === 'TRUE') {
+      const cp0 = consecPrima(n, g);
+      if (cp0 === 0 && !_pianoIsLavoro(cella[n + '|' + (g - 1)] || '')) {
+        let streakPrec = 0;
+        for (let k = g - 2; k >= 1 && _pianoIsLavoro(cella[n + '|' + k] || ''); k--) streakPrec++;
+        if (streakPrec >= 4) return false;
+      }
+    }
+    // REGOLE DI GRUPPO (port di eligibility.py Turnivo): i settori
+    // assegnati al collaboratore (settori_piano, M2M di Turnivo) sono la
+    // fonte di verità; la storia vale solo se i settori non sono configurati
+    const gruppoT = (t.gruppo || '').toUpperCase();
+    const fzU = (fz || '').toUpperCase();
+    const settoriC = _pianoSettoriEffettivi(infoC);
+    const haStoria = settoriC ? settoriC.includes(gruppoT) : !!(idoneita[n] && idoneita[n].has(t.gruppo));
+    let campoGrant = false;
+    for (const rg of _pianoRegoleGruppoDi(gruppoT)) {
+      const tipoR = (rg.tipo_regola || '').toLowerCase();
+      if (tipoR === 'richiede_funzione') {
+        // come in PianoRegole: la funzione ammessa e' un lasciapassare
+        const ammesse = rg.valore.split(',').map((x) => x.trim().toUpperCase());
+        if (ammesse.includes(fzU)) campoGrant = true;
+        else if (!haStoria) return false;
+      } else if (tipoR === 'blocca_tipo_turno') {
+        const tipi = rg.valore.split(',').map((x) => x.trim().toUpperCase());
+        if (tipi.includes((t.tipo || '').toUpperCase())) return false;
+      } else if (tipoR === 'richiede_campo') {
+        if (!_pianoCampoOk(infoC, rg.valore)) return false;
+        campoGrant = true;
+      } else if (tipoR === 'limite_funzione_giorno') {
+        const [fu, nMax] = rg.valore.split(':');
+        if (
+          fzU === (fu || '').toUpperCase() &&
+          (contaGiornoFz[gruppoT + '|' + fzU + '|' + g] || 0) >= (parseInt(nMax) || 99)
+        )
+          return false;
+      } else if (tipoR === 'limite_funzione_mese') {
+        const [fu, nMax] = rg.valore.split(':');
+        if (fzU === (fu || '').toUpperCase()) {
+          const set = collabMeseFz[gruppoT + '|' + fzU];
+          if (set && set.size >= (parseInt(nMax) || 99) && !set.has(n)) return false;
+        }
+      }
+    }
+    // limiti ore (regole tolleranza_ore/_sopra, jolly_ore_max):
+    // nessuno supera il PROPRIO massimo mensile; i jolly senza
+    // regola restano liberi di coprire il fabbisogno (come Turnivo)
+    {
+      const limN = _pianoLimitiOre(n, nGiorni);
+      if (limN.max != null) {
+        // per chi ha obiettivo il max segue anche il saldo cumulato (YTD)
+        const maxEff = limN.obiettivo != null ? limN.max - (_pianoYtdMap[n] || 0) : limN.max;
+        if ((oreMese[n] || 0) + (oreDelta || 0) + (parseFloat(t.durata_ore) || 0) > maxEff) return false;
+      }
+    }
+    // accompagnamento: nei gruppi indicati non puo essere il primo/solo
+    if (infoC && infoC.accompagnamento_settori) {
+      const grAcc = _pianoAccompagnamentoDi(infoC);
+      if (grAcc.includes(gruppoT) && !(contaGiornoTot[gruppoT + '|' + g] || 0)) return false;
+    }
+    // accompagnato SOLO dove copre (spunta nella scheda): stessa regola
+    if (cop && cop.accompagnato && !(contaGiornoTot[gruppoT + '|' + g] || 0)) return false;
+    const mapp = _pianoMappFunzione(fz);
+    if (mapp) {
+      const voci = mapp.filter((m) => m.tipo === 'PRINCIPALE' || m.tipo === 'AMMESSO').map((m) => m.turno_codice);
+      if (voci.length && !voci.includes(f.turno_codice)) return false;
+    } else if (!haStoria && !campoGrant) return false;
+    return consecPrima(n, g) < maxCons && riposoOk(n, g, t);
+  };
   for (let g = 1; g <= nGiorni; g++) {
     if (giorniChiusi.has(g)) continue; // giorno chiuso: resta com'e'
     (fabbG[g] || []).forEach((f) => {
@@ -2898,117 +3024,7 @@ async function generaBozzaPiano(usaCoperture) {
       while (have < f.quantita) {
         const dowG = new Date(dstr + 'T12:00:00').getDay();
         const candidati = nomi
-          .filter((n) => {
-            const esistente = cella[n + '|' + g];
-            if (malattie[n + '|' + dstr]) return false;
-            if (ndDiario[n + '|' + dstr]) return false; // non disponibile (dal Diario)
-            if (esistente && esistente !== 'WD') return false;
-            if (esistente === 'WD' && t.tipo === 'NOTTURNO') return false; // WD = diurno forzato
-            const infoC = _pianoCollabInfo(n);
-            // preferenze collaboratore
-            if (infoC && infoC.solo_diurni && t.tipo === 'NOTTURNO') return false;
-            if (
-              infoC &&
-              infoC.turni_bloccati &&
-              infoC.turni_bloccati
-                .split(',')
-                .map((x) => x.trim())
-                .includes(f.turno_codice)
-            )
-              return false;
-            // COPERTURA da un altro settore: rispetta i gruppi ammessi e il
-            // tetto mensile di turni impostati nella scheda del collaboratore
-            const cop = _pianoCoperturaCfg(infoC);
-            if (cop && !usaCoperture) return false; // prima il reparto, le coperture in un secondo passaggio
-            if (cop) {
-              if (cop.gruppi && String(cop.gruppi).toUpperCase() !== (t.gruppo || '').toUpperCase()) return false;
-              if (cop.max_turni) {
-                let fatti = 0;
-                for (let k = 1; k <= nGiorni; k++) {
-                  const cod = cella[n + '|' + k];
-                  const tk = cod && _pianoTurniReparto().find((x) => x.codice === cod);
-                  if (tk) fatti++;
-                }
-                if (fatti >= cop.max_turni) return false;
-              }
-            }
-            // mappature per funzione (SUP/BO limitati ai loro turni; regole settimana SUP)
-            const fz = infoC && infoC.funzione;
-            // regole "chi fa cosa" del settore (turni riservati, funzione-turni-giorni)
-            if (_pianoViolazioneFunzioneTurno(n, t, dowG, true)) return false;
-            // regola HARD no_4w1c1w: niente rientro dopo UN solo giorno di riposo
-            // se prima c'erano 4+ giorni di lavoro consecutivi
-            if (String(_pianoRegolaVal('no_4w1c1w')).toUpperCase() === 'TRUE') {
-              const cp0 = consecPrima(n, g);
-              if (cp0 === 0 && !_pianoIsLavoro(cella[n + '|' + (g - 1)] || '')) {
-                let streakPrec = 0;
-                for (let k = g - 2; k >= 1 && _pianoIsLavoro(cella[n + '|' + k] || ''); k--) streakPrec++;
-                if (streakPrec >= 4) return false;
-              }
-            }
-            // REGOLE DI GRUPPO (port di eligibility.py Turnivo): i settori
-            // assegnati al collaboratore (settori_piano, M2M di Turnivo) sono la
-            // fonte di verità; la storia vale solo se i settori non sono configurati
-            const gruppoT = (t.gruppo || '').toUpperCase();
-            const fzU = (fz || '').toUpperCase();
-            const settoriC = _pianoSettoriEffettivi(infoC);
-            const haStoria = settoriC ? settoriC.includes(gruppoT) : !!(idoneita[n] && idoneita[n].has(t.gruppo));
-            let campoGrant = false;
-            for (const rg of _pianoRegoleGruppoDi(gruppoT)) {
-              const tipoR = (rg.tipo_regola || '').toLowerCase();
-              if (tipoR === 'richiede_funzione') {
-                // come in PianoRegole: la funzione ammessa e' un lasciapassare
-                const ammesse = rg.valore.split(',').map((x) => x.trim().toUpperCase());
-                if (ammesse.includes(fzU)) campoGrant = true;
-                else if (!haStoria) return false;
-              } else if (tipoR === 'blocca_tipo_turno') {
-                const tipi = rg.valore.split(',').map((x) => x.trim().toUpperCase());
-                if (tipi.includes((t.tipo || '').toUpperCase())) return false;
-              } else if (tipoR === 'richiede_campo') {
-                if (!_pianoCampoOk(infoC, rg.valore)) return false;
-                campoGrant = true;
-              } else if (tipoR === 'limite_funzione_giorno') {
-                const [fu, nMax] = rg.valore.split(':');
-                if (
-                  fzU === (fu || '').toUpperCase() &&
-                  (contaGiornoFz[gruppoT + '|' + fzU + '|' + g] || 0) >= (parseInt(nMax) || 99)
-                )
-                  return false;
-              } else if (tipoR === 'limite_funzione_mese') {
-                const [fu, nMax] = rg.valore.split(':');
-                if (fzU === (fu || '').toUpperCase()) {
-                  const set = collabMeseFz[gruppoT + '|' + fzU];
-                  if (set && set.size >= (parseInt(nMax) || 99) && !set.has(n)) return false;
-                }
-              }
-            }
-            // limiti ore (regole tolleranza_ore/_sopra, jolly_ore_max):
-            // nessuno supera il PROPRIO massimo mensile; i jolly senza
-            // regola restano liberi di coprire il fabbisogno (come Turnivo)
-            {
-              const limN = _pianoLimitiOre(n, nGiorni);
-              if (limN.max != null) {
-                // per chi ha obiettivo il max segue anche il saldo cumulato (YTD)
-                const maxEff = limN.obiettivo != null ? limN.max - (_pianoYtdMap[n] || 0) : limN.max;
-                if ((oreMese[n] || 0) + (parseFloat(t.durata_ore) || 0) > maxEff) return false;
-              }
-            }
-            // accompagnamento: nei gruppi indicati non puo essere il primo/solo
-            if (infoC && infoC.accompagnamento_settori) {
-              const grAcc = _pianoAccompagnamentoDi(infoC);
-              if (grAcc.includes(gruppoT) && !(contaGiornoTot[gruppoT + '|' + g] || 0)) return false;
-            }
-            // accompagnato SOLO dove copre (spunta nella scheda): stessa regola
-            if (cop && cop.accompagnato && !(contaGiornoTot[gruppoT + '|' + g] || 0)) return false;
-            const mapp = _pianoMappFunzione(fz);
-            if (mapp) {
-              const voci = mapp
-                .filter((m) => m.tipo === 'PRINCIPALE' || m.tipo === 'AMMESSO')
-                .map((m) => m.turno_codice);
-              if (voci.length && !voci.includes(f.turno_codice)) return false;
-            } else if (!haStoria && !campoGrant) return false;
-            return consecPrima(n, g) < maxCons && riposoOk(n, g, t);
-          })
+          .filter((n) => candidatoOk(n, f, t, g, dstr, dowG, false, 0))
           .sort((x, y) => {
             const mx = _pianoMappFunzione((_pianoCollabInfo(x) || {}).funzione);
             const my = _pianoMappFunzione((_pianoCollabInfo(y) || {}).funzione);
@@ -3087,11 +3103,13 @@ async function generaBozzaPiano(usaCoperture) {
           });
         if (!candidati.length) {
           scoperti.push(f.turno_codice + ' giorno ' + g);
+          scopertiObj.push({ codice: f.turno_codice, t: t, g: g, dstr: dstr, dowG: dowG });
           break;
         }
         const scelto = candidati[0];
         const eraWd = cella[scelto + '|' + g] === 'WD';
         cella[scelto + '|' + g] = f.turno_codice;
+        assegnatiRun.add(scelto + '|' + g);
         registraAssegnazione(scelto, f.turno_codice, g);
         oreMese[scelto] = (oreMese[scelto] || 0) + (parseFloat(t.durata_ore) || 0);
         if (eraWd && rigaDi[scelto + '|' + g]) {
@@ -3110,6 +3128,68 @@ async function generaBozzaPiano(usaCoperture) {
       }
     });
   }
+  // ===== PASSATA DI RIPARAZIONE =====
+  // Il giro principale decide un giorno alla volta e non torna indietro: un
+  // posto resta scoperto anche quando basterebbe spostare un turno. Qui, per
+  // ogni scoperto, si cerca A (assegnato da questa bozza nello stesso giorno,
+  // idoneo al turno scoperto) e B (libero quel giorno, idoneo al turno di A):
+  // A passa al turno scoperto, B prende il turno di A. Tutte le regole
+  // valgono per entrambi. Niente catene piu' lunghe: restano scoperti.
+  let riparati = 0;
+  const scopertiRestanti = [];
+  scopertiObj.forEach((sc) => {
+    let fatto = false;
+    for (const a of nomi) {
+      if (fatto) break;
+      const kA = a + '|' + sc.g;
+      if (!assegnatiRun.has(kA)) continue;
+      const codA = cella[kA];
+      const tA = _pianoTurnoInfo(codA);
+      if (!tA || codA === sc.codice) continue;
+      const durA = parseFloat(tA.durata_ore) || 0;
+      if (!candidatoOk(a, { turno_codice: sc.codice }, sc.t, sc.g, sc.dstr, sc.dowG, true, -durA)) continue;
+      for (const b of nomi) {
+        if (b === a || cella[b + '|' + sc.g]) continue;
+        if (!candidatoOk(b, { turno_codice: codA }, tA, sc.g, sc.dstr, sc.dowG, false, 0)) continue;
+        // A: dal turno codA al turno scoperto
+        cella[kA] = sc.codice;
+        const nA = nuove.find((x) => x.collaboratore === a && x.data === sc.dstr);
+        if (nA) nA.codice = sc.codice;
+        else {
+          const sw = rigaDi[kA] && sostituzioniWd.find((x) => x.id === rigaDi[kA].id);
+          if (sw) sw.codice = sc.codice;
+        }
+        const grA = (tA.gruppo || '').toUpperCase();
+        const fzA = (((_pianoCollabInfo(a) || {}).funzione || '') + '').toUpperCase();
+        contaGiornoFz[grA + '|' + fzA + '|' + sc.g] = Math.max(
+          0,
+          (contaGiornoFz[grA + '|' + fzA + '|' + sc.g] || 0) - 1,
+        );
+        contaGiornoTot[grA + '|' + sc.g] = Math.max(0, (contaGiornoTot[grA + '|' + sc.g] || 0) - 1);
+        registraAssegnazione(a, sc.codice, sc.g);
+        oreMese[a] = (oreMese[a] || 0) - durA + (parseFloat(sc.t.durata_ore) || 0);
+        // B: prende il turno lasciato da A
+        cella[b + '|' + sc.g] = codA;
+        assegnatiRun.add(b + '|' + sc.g);
+        registraAssegnazione(b, codA, sc.g);
+        oreMese[b] = (oreMese[b] || 0) + durA;
+        nuove.push({
+          collaboratore: b,
+          data: sc.dstr,
+          codice: codA,
+          protetto: false,
+          generato: true,
+          reparto_dip: _pianoReparto(),
+        });
+        riparati++;
+        fatto = true;
+        break;
+      }
+    }
+    if (!fatto) scopertiRestanti.push(sc.codice + ' giorno ' + sc.g);
+  });
+  scoperti.length = 0;
+  scopertiRestanti.forEach((x) => scoperti.push(x));
   // ===== CGF DEI FESTIVI LAVORATI IN QUESTO MESE =====
   // Chi ha appena ricevuto un turno in un festivo con diritto matura un
   // recupero: si mette nei giorni DOPO il festivo, con le stesse regole.
@@ -3184,7 +3264,9 @@ async function generaBozzaPiano(usaCoperture) {
         (nCongedi ? '\n• ' + nCongedi + ' congedi C di riempimento (giorni senza turno)' : '') +
         '\n• ' +
         scoperti.length +
-        ' posti senza candidato idoneo\n\nLe celle esistenti (vacanze, protette, malattie) NON vengono toccate.\nLa bozza si può eliminare con "Cancella piano". Procedere?',
+        ' posti senza candidato idoneo' +
+        (riparati ? ' (altri ' + riparati + ' risolti spostando un turno)' : '') +
+        '\n\nLe celle esistenti (vacanze, protette, malattie) NON vengono toccate.\nLa bozza si può eliminare con "Cancella piano". Procedere?',
     )
   ) {
     // Le C di riempimento e le vacanze sono gia' state riscritte per poter
@@ -13423,6 +13505,9 @@ function _renderPianoImpostazioniCard() {
     '<div class="field"><label title="0 = illimitati">Max cambi turno al mese</label><input type="number" min="0" max="99" value="' +
     _pianoMaxCambi() +
     '" style="width:80px" onchange="salvaMaxCambi(this.value)"></div>' +
+    '<div class="field" style="flex:1;min-width:260px"><label title="Indirizzo del servizio solver sul server interno (es. http://diario.casinolg.local:8765). Vuoto = pulsante nascosto, resta la bozza integrata">Solver esterno (server interno), indirizzo</label><input type="text" id="pi-solver-url" placeholder="http://server:8765" value="' +
+    escP(window._pianoSolverUrl || '') +
+    '" onchange="salvaSolverUrl(this.value)"></div>' +
     '<div class="field"><label title="Giorni di affiancamento (dai commenti con formazione) prima della proposta di certificazione">Giorni formazione per certificare</label><input type="number" min="1" max="30" id="imp-gg-formazione" value="' +
     (window._pianoGgFormazione || 5) +
     '" style="width:80px" onchange="salvaGiorniFormazione()"></div></div>';
@@ -13504,6 +13589,88 @@ async function _pianoCambiRichiesti(ym) {
 function _pianoMaxCambi() {
   const v = parseInt(window._pianoMaxCambiCfg);
   return isNaN(v) ? 0 : v;
+}
+// ===== SOLVER ESTERNO (server interno, OR-Tools) =====
+// Il programma resta indipendente: con l'indirizzo vuoto la bozza integrata
+// fa tutto. Se l'IT attiva il servizio (cartella IT/solver), basta scrivere
+// qui l'indirizzo: compare il pulsante "Genera con il solver".
+async function salvaSolverUrl(v) {
+  if (!isAdmin()) return;
+  const url = String(v || '')
+    .trim()
+    .replace(/\/+$/, '');
+  if (url && !/^https?:\/\/[^\s]+$/.test(url)) {
+    toastErrore('Indirizzo non valido: deve iniziare con http:// o https://');
+    renderPiano();
+    return;
+  }
+  const prima = window._pianoSolverUrl || '';
+  if (!(await salvaImp('piano_solver_url', url))) return;
+  window._pianoSolverUrl = url;
+  logAzione('Piano: solver esterno', (prima || 'vuoto') + ' \u2192 ' + (url || 'vuoto'));
+  _pianoRegistraModifica('Impostazioni', 'Solver esterno', 'indirizzo', prima || 'vuoto', url || 'vuoto');
+  toast(url ? 'Solver collegato: ' + url : 'Solver scollegato: resta la bozza integrata');
+  renderPiano();
+}
+async function generaConSolver() {
+  if (!puoGestirePiano()) return;
+  const url = window._pianoSolverUrl;
+  if (!url) return;
+  const ym = _pianoMeseSel;
+  const rep = _pianoReparto();
+  if (
+    !confirm(
+      'Genero il piano di ' +
+        ym +
+        ' (' +
+        repartoLabel(rep) +
+        ') con il solver sul server interno?\n\nLe celle esistenti (vacanze, protette, malattie, blocchi) non vengono toccate; le celle generate da una bozza precedente vengono sostituite. Il calcolo puo durare fino a due minuti.',
+    )
+  )
+    return;
+  _pianoUndoSnap('solver ' + ym);
+  toast('Solver in esecuzione, attendi...', 6000);
+  try {
+    const risposta = await fetch(url + '/solve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        anno: parseInt(ym.split('-')[0]),
+        mese: parseInt(ym.split('-')[1]),
+        settore: rep,
+        sostituisci: true,
+        timeout: 120,
+        operatore: getOperatore(),
+        token: getOpToken(),
+      }),
+    });
+    const testo = await risposta.text();
+    let r = null;
+    try {
+      r = JSON.parse(testo);
+    } catch (e) {}
+    if (!risposta.ok || !r || r.ok === false) {
+      toastErrore(
+        'Solver: ' + ((r && (r.errore || r.error)) || testo.substring(0, 200) || 'risposta non valida'),
+        10000,
+      );
+      return;
+    }
+    logAzione(
+      'Piano: solver esterno eseguito',
+      ym + ' · ' + (r.inserite != null ? r.inserite + ' celle' : 'ok') + (r.stato ? ' · ' + r.stato : ''),
+    );
+    toast(
+      'Solver: ' +
+        (r.inserite != null ? r.inserite + ' celle scritte' : 'fatto') +
+        (r.stato ? ' (' + r.stato + ')' : ''),
+    );
+    _pianoViolCelle = {};
+    _pianoViolLista = null;
+    renderPiano();
+  } catch (e) {
+    toastErrore('Solver non raggiungibile (' + (e.message || '') + '). Resta disponibile "Genera bozza".', 10000);
+  }
 }
 async function salvaMaxCambi(v) {
   if (!isAdmin()) return;

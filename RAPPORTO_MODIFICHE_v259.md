@@ -339,3 +339,26 @@ turni): a mano queste funzioni sono idonee a ogni gruppo e a ogni turno, come in
 livello alto comprende quelli sotto; niente avvisi nel validatore, nei cambi e nelle
 coperture. Le preferenze personali (solo diurni, turni bloccati) restano. La bozza automatica
 continua a rispettare le regole del settore. Test motore: 115.
+
+**Bozza: passata di riparazione (v263)**
+Prima: la bozza decideva un giorno alla volta senza tornare indietro: un posto restava scoperto
+anche quando bastava spostare un turno.
+Dopo: per ogni scoperto la bozza cerca A (assegnato da questa bozza lo stesso giorno, idoneo al
+posto scoperto) e B (libero, idoneo al turno di A): A passa al posto scoperto, B prende il turno
+di A, con tutte le regole controllate per entrambi. Il messaggio di conferma dice quanti scoperti
+sono stati risolti cosi'. Il controllo di idoneita' della bozza e' ora una funzione unica.
+
+**Solver esterno pronto da collegare (v263)**
+Prima: il solver OR-Tools esisteva solo come script da lanciare a mano sul server.
+Dopo: `IT/solver/server_solver.py` (servizio HTTP con verifica del token di sessione sul
+database) e il pulsante "Genera con il solver" nel Piano, che compare quando in Piano ·
+Impostazioni c'e' l'indirizzo del servizio. Istruzioni per l'IT in `IT/solver/README_SOLVER.md`.
+Senza servizio resta la bozza integrata.
+
+**Questionario di verifica e scheda permessi (v263)**
+`QUESTIONARIO_VERIFICA_REGOLE_v262.html`: 400 voci Vero / Falso / Non so con nota, in quattro
+blocchi (HR e paghe; Responsabile e Supervisor; Compliance con matrice 60 voci e tabella dei dati
+personali; formazione, disciplinari, Maison, sicurezza), compilabile senza internet, salva il file
+delle risposte, stampabile. Generato da `strumenti/genera_questionario.py` dai dati reali.
+`SCHEDA_PERMESSI_ATTUALI.html` e il pulsante "Stampa scheda permessi" in Impostazioni: lo stato
+reale dei permessi, operatore per operatore.

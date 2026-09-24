@@ -1826,3 +1826,98 @@ function _settingsVai(id) {
   el.classList.add('settings-evidenzia');
   setTimeout(() => el.classList.remove('settings-evidenzia'), 1600);
 }
+
+// ===== SCHEDA PERMESSI STAMPABILE =====
+// Lo stato REALE dei permessi (non la matrice dei profili): per ogni
+// operatore, cosa vede e cosa puo fare, con profilo, settori e accessi
+// extra. Si apre in una finestra pronta per la stampa o il PDF.
+function stampaSchedaPermessi() {
+  if (!isAdmin()) {
+    toast('Riservato all amministratore');
+    return;
+  }
+  const ops = [
+    ...new Set(
+      (typeof operatoriSalvati !== 'undefined' ? operatoriSalvati : []).concat(
+        (typeof operatoriAuthCache !== 'undefined' ? operatoriAuthCache : []).map((o) => o.nome),
+      ),
+    ),
+  ]
+    .filter(Boolean)
+    .sort();
+  const prof = typeof profiliOperatori !== 'undefined' && profiliOperatori ? profiliOperatori : {};
+  const rep = typeof operatoriRepartoMap !== 'undefined' && operatoriRepartoMap ? operatoriRepartoMap : {};
+  const extra = window._operatoriAccessiExtra || {};
+  const nomiProf = typeof PROFILI !== 'undefined' ? PROFILI : {};
+  const concesso = (key, op) => {
+    const v = visibilitaConfig[key] != null ? visibilitaConfig[key] : key === 'piano' ? 'admin' : 'tutti';
+    if (v === 'nascosto' || v === 'admin') return false;
+    if (typeof v === 'object' && v.tipo === 'selezionati') return !!(v.operatori && v.operatori.includes(op));
+    return true;
+  };
+  const impostazione = (key) => {
+    const v = visibilitaConfig[key] != null ? visibilitaConfig[key] : key === 'piano' ? 'admin' : 'tutti';
+    return v === 'tutti'
+      ? 'tutti'
+      : v === 'admin'
+        ? 'solo amministratore'
+        : v === 'nascosto'
+          ? 'nascosta'
+          : 'selezionati';
+  };
+  const gruppi = [
+    ['Pagine', VIS_ITEMS.pagine],
+    ['Funzioni', VIS_ITEMS.funzioni],
+    ['Permessi e schede del Piano', VIS_ITEMS.permessi],
+  ];
+  const oggi = new Date().toLocaleDateString('it-IT');
+  let h =
+    '<!DOCTYPE html><html lang="it"><head><meta charset="utf-8"><title>Scheda permessi</title><style>body{font-family:Georgia,serif;color:#1c1a17;margin:24px;font-size:13px}h1{font-size:1.3rem;margin:0 0 4px}h2{font-size:1rem;margin:22px 0 6px;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid #000;padding-bottom:4px}table{border-collapse:collapse;width:100%;font-size:11.5px}th,td{border:1px solid #999;padding:3px 6px;text-align:center}th{background:#eee}td.l{text-align:left}tr.g td{background:#f3efe6;text-align:left;font-weight:700}.si{background:#e3f0e8;font-weight:700}.no{color:#999}p{margin:4px 0;color:#444}.nb{margin:12px 0}@media print{.nb{display:none}body{margin:10mm}table{font-size:10px}}</style></head><body>' +
+    '<h1>Diario Collaboratori · scheda dei permessi attuali</h1><p>Stato delle Impostazioni al ' +
+    oggi +
+    '. Si = puo (vedere la pagina o la scheda, oppure eseguire la funzione); vuoto = no. L amministratore puo tutto ed e escluso dalla tabella.</p><div class="nb"><button onclick="window.print()">Stampa / PDF</button></div>';
+  h +=
+    '<h2>Operatori, profilo e settori</h2><table><tr><th>Operatore</th><th>Profilo</th><th>Settori</th><th>Accessi extra</th></tr>';
+  ops.forEach((o) => {
+    const ex = extra[o] && typeof extra[o] === 'object' ? extra[o] : {};
+    const ext = Object.keys(ex)
+      .map((k) => k + ': ' + (ex[k] && ex[k].modifica ? 'modifica' : 'sola lettura'))
+      .join(', ');
+    h +=
+      '<tr><td class="l"><b>' +
+      escP(o) +
+      '</b></td><td>' +
+      escP(nomiProf[prof[o]] || 'nessuno') +
+      '</td><td>' +
+      escP(rep[o] || '?') +
+      '</td><td class="l">' +
+      (escP(ext) || '-') +
+      '</td></tr>';
+  });
+  h +=
+    '</table><h2>Cosa puo vedere e fare ognuno</h2><table><tr><th style="text-align:left">Voce</th><th>Impostazione</th>' +
+    ops.map((o) => '<th>' + escP(o) + '</th>').join('') +
+    '</tr>';
+  gruppi.forEach(([gt, voci]) => {
+    h += '<tr class="g"><td colspan="' + (ops.length + 2) + '">' + escP(gt) + '</td></tr>';
+    Object.keys(voci).forEach((k) => {
+      h +=
+        '<tr><td class="l">' +
+        escP(voci[k]) +
+        '</td><td style="font-size:10px;color:#555">' +
+        escP(impostazione(k)) +
+        '</td>' +
+        ops.map((o) => (concesso(k, o) ? '<td class="si">Si</td>' : '<td class="no"></td>')).join('') +
+        '</tr>';
+    });
+  });
+  h += '</table></body></html>';
+  const w = window.open('', '_blank');
+  if (!w) {
+    toastErrore('Il browser ha bloccato la finestra: consenti le finestre a comparsa per questo sito');
+    return;
+  }
+  w.document.write(h);
+  w.document.close();
+  logAzione('Scheda permessi stampata', ops.length + ' operatori');
+}
