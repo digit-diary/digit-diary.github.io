@@ -330,3 +330,12 @@ Impostazioni: indice fisso in cima con i gruppi Registrazioni, Persone e accessi
 Personale, Sistema; etichette di gruppo fra le sezioni; salto alla sezione con evidenziazione.
 Briefing: barra dei comandi in tre gruppi (Giorno, Azioni, Formato) con etichette, frecce
 coerenti. Nessun cambiamento di comportamento.
+
+**Funzioni che fanno tutto (v262)**
+Prima: la regola "SUP solo turni Z da lunedi a giovedi" bloccava (o avvisava) anche chi
+scriveva a mano un turno di cassa a un Supervisor.
+Dopo: regola `funzioni_fanno_tutto` (predefinita SUP,RESP, scheda Regole, gruppo Funzioni e
+turni): a mano queste funzioni sono idonee a ogni gruppo e a ogni turno, come in Formazione il
+livello alto comprende quelli sotto; niente avvisi nel validatore, nei cambi e nelle
+coperture. Le preferenze personali (solo diurni, turni bloccati) restano. La bozza automatica
+continua a rispettare le regole del settore. Test motore: 115.

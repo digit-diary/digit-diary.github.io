@@ -463,6 +463,32 @@ eq(
 );
 eq(R.violazioneFunzioneTurno({ funzione: 'HOST' }, tC0, 2, RG), null, 'HOST con C0 ok');
 
+console.log('\n== funzioni che fanno tutto (a mano) ==');
+const ctxFT = {
+  settoriDi: () => ['SALA'],
+  regoleGruppoDi: () => [{ tipo_regola: 'richiede_funzione', valore: 'BO' }],
+  campoOk: () => false,
+  mappFunzione: () => null,
+  regolaVal: () => null,
+  regoleTurnoFunzione: () => [{ tipo_regola: 'turni_solo_funzioni', valore: 'L1,9:BO' }],
+  fannoTutto: (fz) => fz === 'SUP' || fz === 'RESP',
+};
+eq(
+  R.idoneoPerTurno({ funzione: 'HOST' }, { codice: 'L1', gruppo: 'BO' }, ctxFT),
+  false,
+  'HOST non idoneo a L1 (riservato a BO)',
+);
+eq(
+  R.idoneoPerTurno({ funzione: 'SUP' }, { codice: 'L1', gruppo: 'BO' }, ctxFT),
+  true,
+  'SUP fa tutto: idoneo a L1 a mano',
+);
+eq(
+  R.idoneoPerTurno({ funzione: 'SUP', solo_diurni: true }, { codice: 'Z8', gruppo: 'SALA', tipo: 'NOTTURNO' }, ctxFT),
+  false,
+  'ma la preferenza personale solo diurni resta',
+);
+
 console.log('\n=======================================');
 console.log('  ' + passati + ' passati, ' + falliti + ' falliti');
 console.log('=======================================\n');
