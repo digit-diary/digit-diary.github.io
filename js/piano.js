@@ -17271,6 +17271,15 @@ function _briefPauseBodyHtml() {
     h +=
       '<div style="margin-bottom:8px"><button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="pdfPauseGiorno()">Stampa pause</button></div>';
     h += _briefRenderPause(p.contenuto);
+    const viol = typeof _peVerificaRegolePause === 'function' ? _peVerificaRegolePause(p.contenuto, _briefData) : [];
+    if (viol.length)
+      h +=
+        '<div style="margin:8px 0;padding:6px 10px;font-size:.82rem;background:#fff3c4;border-left:3px solid #d4b86a"><b>Regole pause non rispettate (' +
+        viol.length +
+        ')</b>: ' +
+        escP(viol.slice(0, 8).join(' · ')) +
+        (viol.length > 8 ? ' · ...' : '') +
+        '</div>';
   } else {
     h +=
       '<p style="font-size:.85rem;color:var(--muted)">Nessuna pausa generata per questa data. Compila il briefing e premi <b>Genera pause</b>.</p>';
