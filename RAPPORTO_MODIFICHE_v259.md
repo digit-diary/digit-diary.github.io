@@ -445,3 +445,12 @@ rifiutata con avviso; ogni modifica finisce nell elenco delle modifiche e nel Re
 ## v275 · Regola di partenza delle pause corretta
 - Slots: la regola di partenza per durata e ora 6 ore = 15+15, 7 ore = 30+15, da 8 ore in su = 30+15+15 (prima i turni di 8 ore risultavano 30+15 nelle pause extra e nella tabella; gli schemi fissi dell Excel avevano gia le pause giuste e non sono cambiati). Valet invariato (era gia cosi).
 - Dicitura delle fasce senza ambiguita: "Turni di 7 ore", "Turni da 8 ore in su", "Turni da 6 a meno di 8 ore". Nel modulo: "Turni da almeno X ore e meno di Y ore".
+
+## v276 · La malattia prevale su ogni sigla (V, CGF, JG, C)
+
+- **Prima**: la malattia registrata nel Diario trasformava in M solo i giorni con un turno. V restava V (e contava come vacanza goduta), C e CGF restavano e si vedevano come MC e MCG.
+- **Dopo**: ogni cella del periodo di malattia diventa M protetta, qualunque sigla avesse (turno, V, CGF, JG, C, cella bloccata con motivo). La sigla coperta resta nel commento ("Malattia dal Diario · era V"). Effetti: il giorno di vacanza torna disponibile, il CGF resta a credito, il turno perso conta come malattia (8.787 ore).
+- **Se la malattia viene tolta o accorciata dal Diario**, la sigla coperta torna al suo posto (prima la cella veniva semplicemente cancellata e il turno andava perso).
+- **Scheda Vacanze**: nuova colonna "Restituite per malattia" e "Restano" la tiene conto (spettanti - pianificate + restituite).
+- Regola di riferimento: CO art. 329c e prassi dei RAP (malattia con certificato durante le vacanze: i giorni non contano come vacanza). Il programma non chiede il certificato: e la registrazione della malattia nel Diario a fare fede.
+- Questionario rigenerato (v276) con le tre voci aggiornate.
