@@ -438,3 +438,6 @@ rifiutata con avviso; ogni modifica finisce nell elenco delle modifiche e nel Re
 
 - **Prima**: tutte le 17 sezioni una sotto l altra, con un indice di chip che faceva solo saltare alla sezione.
 - **Dopo**: cinque schede in testa (Registrazioni, Persone e accessi, Maison, Personale, Sistema) con il numero di sezioni; si vede solo il gruppo scelto, sotto le schede restano le chip delle sue sezioni. Il programma ricorda l ultima scheda aperta. I collegamenti interni (per esempio "Nuovo profilo personalizzato" dalla creazione di un operatore) aprono da soli la scheda giusta. Un operatore non admin vede solo le schede con sezioni a lui accessibili.
+
+## v274 · Tabella del profilo personalizzato: "Parti da una copia di"
+- Nella tabella del profilo (anche quando si apre dalla creazione di un operatore) una casella "Parti da una copia di" con i profili fissi e personalizzati e i permessi reali di ogni operatore ("Come Rossi"). "Riempi la tabella" compila le caselle; poi si cambia quello che serve e si salva. I permessi reali di un operatore diventano Modifica dove ha accesso, Vede per le viste riservate, No altrove.
