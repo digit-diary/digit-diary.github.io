@@ -373,3 +373,10 @@ diventano M protetta (8.787 ore, nota "era C0"), i giorni C restano C e si vedon
 (0 ore), i CGF restano a credito (MCG), i recuperi automatici in piu tornano C. Esempio:
 malattia 1-10 con turni 1-7 e C 8-10: sette M, tre MC, la scheda conta 10 giorni.
 Questionario rigenerato (v264, 399 voci) senza le voci su accesso da telefono e biometrico.
+
+**Turni per funzione (mappature) per settore (v265)**
+Prima: le mappature funzione → turno erano uniche per tutto il programma e citavano solo sigle
+degli Slots; un Supervisor dei Tavoli non risultava idoneo a nessun turno dei Tavoli.
+Dopo: ogni settore ha le sue mappature (le 26 esistenti restano agli Slots); il turno si sceglie
+da una tendina con le sigle del settore; una sigla inesistente o una mappatura doppia viene
+rifiutata con avviso; ogni modifica finisce nell elenco delle modifiche e nel Registro.
