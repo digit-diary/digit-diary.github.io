@@ -388,7 +388,7 @@ function checkRischioAlerts() {
     // 1) Recidiva: 3+ allineamenti stesso motivo → RDI obbligatorio
     const gruppi = [];
     allins.forEach((a) => {
-      const nc = a.non_conformita || '';
+      const nc = _moduloCampi(a).non_conformita || '';
       let trovato = false;
       for (const g of gruppi) {
         if (_motivoSimile(nc, g.motivo, nome)) {

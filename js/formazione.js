@@ -1529,7 +1529,7 @@ async function toggleCompetenza(collabId, key, cb) {
             "','Livello " +
             dopo +
             ': ' +
-            escP(premio).replace(/'/g, "\\'") +
+            escP(premio.replace(/'/g, "\\'")) +
             '\')">Registra premio consegnato</button><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Più tardi</button></div>'
           : '<div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">OK</button></div>');
       document.getElementById('pwd-modal').classList.remove('hidden');
@@ -1668,7 +1668,7 @@ async function assegnaPuntiRapido() {
           '</strong></p><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="registraPremioConsegnato(\'' +
           nome.replace(/'/g, "\\'") +
           "','" +
-          escP(raggiunta.premio).replace(/'/g, "\\'") +
+          escP(raggiunta.premio.replace(/'/g, "\\'")) +
           '\')">Registra premio consegnato</button><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Più tardi</button></div>';
         document.getElementById('pwd-modal').classList.remove('hidden');
       }, 300);

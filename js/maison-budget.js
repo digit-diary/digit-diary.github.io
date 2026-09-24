@@ -807,7 +807,7 @@ async function importaCategorieMaison(input) {
         }
         done++;
         bar.style.width = Math.round((done / nomi.length) * 100) + '%';
-        status.textContent = done + '/' + nomi.length + ' · ' + escP(nome);
+        status.textContent = done + '/' + nomi.length + ' · ' + nome;
         if (done % 5 === 0) await new Promise((r) => setTimeout(r, 50));
       }
       // Riepilogo finale
@@ -1120,7 +1120,7 @@ async function importaCompleanniMaison(input) {
         }
         done++;
         bar.style.width = Math.round((done / matched.length) * 100) + '%';
-        status.textContent = done + '/' + matched.length + ' · ' + escP(m.nome);
+        status.textContent = done + '/' + matched.length + ' · ' + m.nome;
         if (done % 5 === 0) await new Promise((r) => setTimeout(r, 50));
       }
       // Riepilogo finale

@@ -251,7 +251,7 @@ function _moduloScadenzaAiuti() {
       .map(
         (v) =>
           '<button type="button" onclick="_moduloScadenzaMetti(\'' +
-          escP(v).replace(/'/g, "\\'") +
+          escP(v.replace(/'/g, "\\'")) +
           '\')" style="font-size:.78rem;padding:2px 8px;border:1px solid var(--line);border-radius:10px;background:var(--paper2);color:var(--ink);cursor:pointer">' +
           escP(v) +
           '</button>',
