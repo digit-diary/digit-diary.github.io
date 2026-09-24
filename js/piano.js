@@ -19742,9 +19742,10 @@ async function _pianoCreditiDati(anno, soloNomi) {
   return nomi.map((n) => {
     const info = _pianoCollabInfo(n) || {};
     const jolly = !!(info.is_jolly || info.impiego === 'jolly');
+    const fisso = _pianoMaturaCgf(info); // stesso criterio della scheda Vacanze
     const eff = _pianoCongedoNpEffetti(n, anno);
     const dir =
-      info.data_assunzione && !jolly
+      info.data_assunzione && fisso
         ? PianoRegole.giorniVacanzaSpettanti(String(info.data_assunzione).substring(0, 10), anno, {
             ...cfg,
             giorniCongedo: eff.giorniVacanze,
@@ -19777,7 +19778,7 @@ async function _pianoCreditiDati(anno, soloNomi) {
       funzione: jolly ? 'JOLLY' : info.funzione || '',
       pct: jolly ? null : Math.round((parseFloat(info.percentuale) || 1) * 100),
       jolly: jolly,
-      senzaData: !info.data_assunzione && !jolly,
+      senzaData: !info.data_assunzione && fisso,
       vac: dir
         ? { spett: dir.giorni, pian: pian, rest: rest, resta: Math.round((dir.giorni - pian + rest) * 10) / 10 }
         : null,
