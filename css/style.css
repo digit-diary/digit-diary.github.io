@@ -4653,11 +4653,70 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
 .settings-indice:empty {
   display: none;
 }
+.settings-indice {
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 0 10px;
+  overflow: hidden;
+}
+.settings-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  background: var(--ink);
+}
+.settings-tab {
+  flex: 1 1 auto;
+  font: inherit;
+  font-family: "Source Sans 3", sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 12px 14px;
+  border: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: #cfc3ad;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.settings-tab:last-child {
+  border-right: 0;
+}
+.settings-tab:hover {
+  color: #fff;
+}
+.settings-tab.attiva {
+  background: var(--paper);
+  color: var(--ink);
+}
+.settings-tab-n {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.14);
+  color: inherit;
+}
+.settings-tab.attiva .settings-tab-n {
+  background: var(--paper2);
+}
 .settings-indice-gruppo {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
+  padding: 0 14px;
+}
+.settings-indice-gruppo:empty {
+  display: none;
+}
+.settings-section[data-fuori-gruppo] {
+  display: none !important;
 }
 .settings-indice-lbl {
   font-size: 0.72rem;

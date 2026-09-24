@@ -433,3 +433,8 @@ rifiutata con avviso; ogni modifica finisce nell elenco delle modifiche e nel Re
   - "Nuovo profilo personalizzato": crea l operatore, apre subito la tabella del profilo e, al salvataggio, lo assegna e lo applica all operatore appena creato.
 - Il pulsante "Applica i profili" ora usa lo stesso nucleo (applicazione a un elenco di operatori): comportamento invariato per chi lo usava.
 - Esempio: nuovo operatore "Neri", Posizione = "Come Rossi" → Neri ha lo stesso settore, profilo, accessi extra e voci di Rossi. Oppure Posizione = "Supervisor" → Neri riceve subito i permessi del profilo Supervisor.
+
+## v273 · Impostazioni a schede
+
+- **Prima**: tutte le 17 sezioni una sotto l altra, con un indice di chip che faceva solo saltare alla sezione.
+- **Dopo**: cinque schede in testa (Registrazioni, Persone e accessi, Maison, Personale, Sistema) con il numero di sezioni; si vede solo il gruppo scelto, sotto le schede restano le chip delle sue sezioni. Il programma ricorda l ultima scheda aperta. I collegamenti interni (per esempio "Nuovo profilo personalizzato" dalla creazione di un operatore) aprono da soli la scheda giusta. Un operatore non admin vede solo le schede con sezioni a lui accessibili.
