@@ -3186,7 +3186,7 @@ async function salvaPauseCfg() {
     valet_nota: document.getElementById('pcfg-nota') ? v('pcfg-nota').trim() : c0.valet_nota || '',
     turni: turniTutti,
   };
-  await setImp('piano_pause_cfg', JSON.stringify(obj));
+  if (!(await salvaImp('piano_pause_cfg', JSON.stringify(obj)))) return;
   window._briefPauseCfgObj = obj;
   // coppie CD
   const coppie = ((window._pianoCdCfg && window._pianoCdCfg.coppie) || []).map((cp) => Object.assign({}, cp));
@@ -3203,7 +3203,7 @@ async function salvaPauseCfg() {
   });
   if (coppie.length) {
     window._pianoCdCfg = { coppie: coppie };
-    await setImp('piano_cd_config', JSON.stringify(window._pianoCdCfg));
+    if (!(await salvaImp('piano_cd_config', JSON.stringify(window._pianoCdCfg)))) return;
   }
   toast('Regole pause e numeri cassa salvati');
 }
