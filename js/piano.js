@@ -750,18 +750,20 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
         tolte++;
       }
     }
-    // M protetta sui giorni corretti (solo se nel piano esiste gia' qualcosa
-    // o il mese e' pianificato: altrimenti la M automatica dal Diario basta)
+    // M protetta SOLO dove c'era un TURNO: il giorno di lavoro perso diventa
+    // malattia (8.787 ore). Un giorno di congedo C resta C e si vede come MC
+    // (0 ore: era gia' riposo), un CGF resta CGF e si vede come MCG (credito
+    // che resta). Senza cella, basta la M automatica dal Diario.
     for (const d of daMettere) {
       const righe = (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=eq.' + d)) || [];
       const r = righe[0];
-      if (r && r.codice !== 'M') {
+      if (r && r.codice !== 'M' && _pianoTurnoInfo(r.codice)) {
         await secPatch('piano', 'id=eq.' + r.id, {
           codice: 'M',
           protetto: true,
           generato: false,
           motivo_blocco: null, // la malattia scioglie il blocco con motivo
-          commento: ('Malattia (data corretta) · era ' + r.codice).substring(0, 400),
+          commento: ('Malattia dal Diario · era ' + r.codice).substring(0, 400),
           operatore: getOperatore(),
           updated_at: new Date().toISOString(),
         });
@@ -771,7 +773,7 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
     // festivo saltato per malattia: i recuperi automatici in piu' tornano C
     for (const ymM of new Set(nuove.map((d) => d.substring(0, 7)))) await _pianoRiconciliaCgf(nome, ymM);
     if (tolte || messe) {
-      logAzione('Malattia corretta: piano allineato', nome + ' · ' + tolte + ' M tolte, ' + messe + ' M spostate');
+      logAzione('Malattia: piano allineato', nome + ' · ' + tolte + ' M tolte, ' + messe + ' turni diventati M');
       if (typeof _pianoRighe !== 'undefined' && _pianoRighe.length && typeof renderPiano === 'function') {
         _pianoRighe = _pianoRighe.filter(
           (r) => !(r.collaboratore === nome && r.codice === 'M' && daTogliere.includes(r.data)),

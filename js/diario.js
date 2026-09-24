@@ -88,6 +88,21 @@ async function salva() {
       document.getElementById('inp-testo').value = '';
       resetMalFiltri();
       logAzione('Malattia range', nome + ' · ' + creati + ' giorni');
+      // PIANO: i giorni con un turno diventano M protetta, i C restano C (MC),
+      // i CGF in piu' tornano C. Prima succedeva solo correggendo la registrazione.
+      if (creati && typeof sincronizzaMalattiaPiano === 'function') {
+        try {
+          const sync = await sincronizzaMalattiaPiano(
+            nome,
+            '',
+            malDal,
+            'dal ' + dInizio.toLocaleDateString('it-IT') + ' al ' + dFine.toLocaleDateString('it-IT'),
+          );
+          if (sync && sync.messe) toast(nome + ': ' + sync.messe + ' turni del piano segnati M', 5000);
+        } catch (e) {
+          toastErrore('Piano non allineato alla malattia: ' + (e.message || ''));
+        }
+      }
       toast(nome + ': ' + creati + ' giorni malattia registrati');
       aggiornaNomi();
       render();
@@ -203,6 +218,14 @@ async function salva() {
   try {
     await secPost('registrazioni', rec);
     datiCache.unshift(rec);
+    // malattia di un giorno solo: stesso allineamento del piano del periodo
+    if (tipoSelezionato === nomeCorrente('Malattia') && typeof sincronizzaMalattiaPiano === 'function') {
+      try {
+        await sincronizzaMalattiaPiano(nome, '', rec.data, rec.testo || '');
+      } catch (e) {
+        toastErrore('Piano non allineato alla malattia: ' + (e.message || ''));
+      }
+    }
     document.getElementById('inp-testo').value = '';
     document.getElementById('inp-importo').value = '';
     document.getElementById('inp-reparto').value = '';

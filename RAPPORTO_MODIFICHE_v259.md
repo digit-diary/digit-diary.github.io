@@ -362,3 +362,14 @@ personali; formazione, disciplinari, Maison, sicurezza), compilabile senza inter
 delle risposte, stampabile. Generato da `strumenti/genera_questionario.py` dai dati reali.
 `SCHEDA_PERMESSI_ATTUALI.html` e il pulsante "Stampa scheda permessi" in Impostazioni: lo stato
 reale dei permessi, operatore per operatore.
+
+**Malattia dal Diario allinea subito il piano (v264)**
+Prima: una malattia registrata dal Diario mostrava la M automatica solo nelle celle vuote; dove
+c era un turno la cella restava con il turno e le sue ore finche qualcuno non usava "Copertura
+malattia" o scriveva M; l allineamento scattava solo correggendo la registrazione, e in quel caso
+trasformava in M anche le C.
+Dopo: alla registrazione (un giorno o un periodo) e alla correzione, i giorni con un turno
+diventano M protetta (8.787 ore, nota "era C0"), i giorni C restano C e si vedono come MC
+(0 ore), i CGF restano a credito (MCG), i recuperi automatici in piu tornano C. Esempio:
+malattia 1-10 con turni 1-7 e C 8-10: sette M, tre MC, la scheda conta 10 giorni.
+Questionario rigenerato (v264, 399 voci) senza le voci su accesso da telefono e biometrico.
