@@ -423,3 +423,13 @@ rifiutata con avviso; ogni modifica finisce nell elenco delle modifiche e nel Re
 - Controlli: nome obbligatorio e unico; un profilo che non concede nulla chiede conferma.
 - Sicurezza: la nuova impostazione `profili_custom` si salva solo da sessione amministratore (migrazione 20260873, applicata).
 - Esempio: "Compliance" partendo da HR, poi Storico HR = Vede, Moduli = Vede, Piano = No. Assegnato all operatore X, Applica i profili → X vede Storico HR e Moduli in sola lettura e non vede il Piano.
+
+## v272 · Nuovo operatore: posizione, copia accessi da un collega, nuovo profilo
+
+- **Prima**: si creava l operatore con nome, password e settore; poi bisognava andare in Visibilita e permessi, assegnare il profilo e premere "Applica i profili", oppure spuntarlo voce per voce.
+- **Dopo**: nel modulo di creazione c e la casella "Posizione e permessi" con tre possibilita:
+  - un profilo (fisso o personalizzato): viene assegnato e applicato subito, solo a quell operatore, senza toccare gli altri;
+  - "Come [collega]": copia profilo, accessi extra e presenza in tutte le voci "Operatori selezionati" del collega; se il settore e lasciato su "Tutti i settori" prende quello del collega;
+  - "Nuovo profilo personalizzato": crea l operatore, apre subito la tabella del profilo e, al salvataggio, lo assegna e lo applica all operatore appena creato.
+- Il pulsante "Applica i profili" ora usa lo stesso nucleo (applicazione a un elenco di operatori): comportamento invariato per chi lo usava.
+- Esempio: nuovo operatore "Neri", Posizione = "Come Rossi" → Neri ha lo stesso settore, profilo, accessi extra e voci di Rossi. Oppure Posizione = "Supervisor" → Neri riceve subito i permessi del profilo Supervisor.

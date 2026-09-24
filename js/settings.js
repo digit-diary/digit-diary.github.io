@@ -422,6 +422,28 @@ async function cambiaProfiloOperatore(nome, prof) {
   if (!(await salvaImp('profili_operatori', JSON.stringify(profiliOperatori)))) return;
   renderVisibilitaUI();
 }
+// Nucleo: riscrive ogni voce di Visibilita applicando il profilo SOLO agli
+// operatori indicati; tutti gli altri conservano l accesso che hanno oggi.
+async function _applicaProfiliA(nomi) {
+  const tutti = operatoriAuthCache.map((o) => o.nome);
+  const daProfilo = (nomi || []).filter((n) => _profiloDi(n));
+  const altri = tutti.filter((n) => daProfilo.indexOf(n) < 0);
+  Object.keys(MATRICE_PROFILI).forEach((key) => {
+    const lista = [];
+    altri.forEach((n) => {
+      if (_visHaAccessoOggi(key, n)) lista.push(n);
+    });
+    daProfilo.forEach((n) => {
+      if (_profiloConcede(key, _profiloDi(n))) lista.push(n);
+    });
+    if (!lista.length) visibilitaConfig[key] = 'admin';
+    else if (lista.length === tutti.length) visibilitaConfig[key] = 'tutti';
+    else visibilitaConfig[key] = { tipo: 'selezionati', operatori: lista.slice().sort() };
+  });
+  if (!(await salvaImp('visibilita', JSON.stringify(visibilitaConfig)))) return false;
+  applicaVisibilita();
+  return true;
+}
 // Riscrive Visibilita e permessi partendo dai profili assegnati. Chi non ha un
 // profilo resta esattamente com'e' adesso: si tocca solo chi e' stato deciso.
 async function applicaProfili() {
@@ -442,20 +464,7 @@ async function applicaProfili() {
       (senzaProfilo.length ? ' Gli altri ' + senzaProfilo.length + ' restano come sono adesso.' : ''),
   );
   if (!ok) return;
-  Object.keys(MATRICE_PROFILI).forEach((key) => {
-    const lista = [];
-    senzaProfilo.forEach((n) => {
-      if (_visHaAccessoOggi(key, n)) lista.push(n);
-    });
-    conProfilo.forEach((n) => {
-      if (_profiloConcede(key, _profiloDi(n))) lista.push(n);
-    });
-    if (!lista.length) visibilitaConfig[key] = 'admin';
-    else if (lista.length === tutti.length) visibilitaConfig[key] = 'tutti';
-    else visibilitaConfig[key] = { tipo: 'selezionati', operatori: lista.slice().sort() };
-  });
-  if (!(await salvaImp('visibilita', JSON.stringify(visibilitaConfig)))) return;
-  applicaVisibilita();
+  if (!(await _applicaProfiliA(conProfilo))) return;
   renderVisibilitaUI();
   toast('Profili applicati a ' + conProfilo.length + ' operatori');
   if (typeof logAzione === 'function') logAzione('Profili permessi applicati', elenco.replace(/\n/g, '; '));
@@ -616,6 +625,7 @@ function profCustomModifica(id) {
 }
 function profCustomAnnulla() {
   window._profCustomEdit = null;
+  window._profCustomAssegnaA = null;
   renderVisibilitaUI();
 }
 async function _salvaProfiliCustom(obj) {
@@ -657,9 +667,17 @@ async function profCustomSalva() {
   obj[id] = { nome: nome, voci: voci };
   if (!(await _salvaProfiliCustom(obj))) return;
   logAzione('Profili personalizzati', (ed.id ? 'modificato ' : 'creato ') + nome);
-  toast('Profilo "' + nome + '" salvato. Assegnalo agli operatori e premi "Applica i profili"');
+  const assegnaA = window._profCustomAssegnaA;
+  window._profCustomAssegnaA = null;
+  if (assegnaA && operatoriAuthCache.some((o) => o.nome === assegnaA)) {
+    profiliOperatori[assegnaA] = id;
+    await salvaImp('profili_operatori', JSON.stringify(profiliOperatori));
+    await _applicaProfiliA([assegnaA]);
+    toast('Profilo "' + nome + '" salvato e applicato a ' + assegnaA);
+  } else toast('Profilo "' + nome + '" salvato. Assegnalo agli operatori e premi "Applica i profili"');
   window._profCustomEdit = null;
   renderVisibilitaUI();
+  renderOperatoriUI();
 }
 async function profCustomElimina(id) {
   if (!isAdmin()) return;
@@ -847,18 +865,103 @@ async function aggiungiOperatoreConPwd() {
       operatoriSalvati.sort();
       await saveOperatori();
     }
-    const rep = document.getElementById('new-operatore-rep').value || 'entrambi';
+    let rep = document.getElementById('new-operatore-rep').value || 'entrambi';
+    const scelta = (document.getElementById('new-operatore-prof') || {}).value || '';
+    let esito = '';
+    if (scelta.indexOf('copia:') === 0) {
+      // stessi accessi di un collega: settore (se non scelto), profilo, accessi extra, voci selezionate
+      const src = scelta.substring(6);
+      if (rep === 'entrambi' && operatoriRepartoMap[src]) rep = operatoriRepartoMap[src];
+      esito = ' · accessi copiati da ' + src;
+    }
     operatoriRepartoMap[n] = rep;
     await setImp('operatori_reparto', JSON.stringify(operatoriRepartoMap));
-    logAzione('Operatore creato', n + ' (' + rep + ')');
+    if (scelta.indexOf('copia:') === 0) await _copiaAccessiDa(scelta.substring(6), n);
+    else if (scelta.indexOf('prof:') === 0) {
+      const pid = scelta.substring(5);
+      if (_profiloNome(pid)) {
+        profiliOperatori[n] = pid;
+        await salvaImp('profili_operatori', JSON.stringify(profiliOperatori));
+        await _applicaProfiliA([n]);
+        esito = ' · profilo ' + _profiloNome(pid) + ' applicato';
+      }
+    }
+    logAzione('Operatore creato', n + ' (' + rep + ')' + esito);
     document.getElementById('new-operatore-nome').value = '';
     document.getElementById('new-operatore-pwd').value = '';
     document.getElementById('new-operatore-pwd2').value = '';
+    const selP = document.getElementById('new-operatore-prof');
+    if (selP) selP.value = '';
     renderOperatoriUI();
-    toast('Operatore "' + n + '" creato (' + rep + ')');
+    toast('Operatore "' + n + '" creato (' + rep + ')' + esito);
+    if (scelta === 'nuovo') {
+      // apre subito la tabella del nuovo profilo: al salvataggio viene assegnato a questo operatore
+      window._profCustomEdit = { id: '', nome: '', voci: _profCustomVociDa('') };
+      window._profCustomAssegnaA = n;
+      await renderVisibilitaUI();
+      _settingsVai('visibilita-section');
+      setTimeout(() => {
+        const el = document.getElementById('prof-editor');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const nm = document.getElementById('prof-edit-nome');
+        if (nm) nm.focus();
+      }, 400);
+      toast('Scrivi il nome del nuovo profilo e scegli le voci: al salvataggio viene assegnato a ' + n, 6000);
+    }
   } catch (e) {
     toast('Errore creazione');
   }
+}
+// Copia da un collega: profilo, accessi extra e presenza nelle voci "Operatori
+// selezionati" di Visibilita. Il settore lo decide chi crea l operatore.
+async function _copiaAccessiDa(src, dst) {
+  if (profiliOperatori[src]) {
+    profiliOperatori[dst] = profiliOperatori[src];
+    await salvaImp('profili_operatori', JSON.stringify(profiliOperatori));
+  }
+  const extra = window._operatoriAccessiExtra || {};
+  if (extra[src]) {
+    extra[dst] = JSON.parse(JSON.stringify(extra[src]));
+    window._operatoriAccessiExtra = extra;
+    await salvaImp('operatori_accessi_extra', JSON.stringify(extra));
+    localStorage.setItem('_cache_operatori_accessi_extra', JSON.stringify(extra));
+  }
+  let toccate = 0;
+  Object.keys(visibilitaConfig).forEach((k) => {
+    const v = visibilitaConfig[k];
+    if (v && typeof v === 'object' && v.tipo === 'selezionati' && (v.operatori || []).indexOf(src) >= 0) {
+      if (v.operatori.indexOf(dst) < 0) v.operatori = v.operatori.concat([dst]).sort();
+      toccate++;
+    }
+  });
+  if (toccate && !(await salvaImp('visibilita', JSON.stringify(visibilitaConfig)))) return false;
+  applicaVisibilita();
+  logAzione('Accessi copiati', dst + ' come ' + src + ' (' + toccate + ' voci)');
+  return true;
+}
+// menu "Posizione e permessi" del nuovo operatore: profili fissi e
+// personalizzati, copia da un collega, nuovo profilo
+async function _popolaSelectProfiloNuovoOp() {
+  const sel = document.getElementById('new-operatore-prof');
+  if (!sel) return;
+  await _caricaProfiliCustom();
+  const cur = sel.value;
+  let h = '<option value="">Da impostare dopo</option><optgroup label="Profilo">';
+  _profiliTuttiIds().forEach((p) => {
+    h +=
+      '<option value="prof:' + p + '">' + escP(_profiloNome(p)) + (PROFILI[p] ? '' : ' (personalizzato)') + '</option>';
+  });
+  h += '<option value="nuovo">Nuovo profilo personalizzato...</option></optgroup>';
+  const ops = operatoriAuthCache.map((o) => o.nome).sort();
+  if (ops.length) {
+    h += '<optgroup label="Stessi accessi di un collega">';
+    ops.forEach((o) => {
+      h += '<option value="copia:' + escP(o) + '">Come ' + escP(o) + '</option>';
+    });
+    h += '</optgroup>';
+  }
+  sel.innerHTML = h;
+  if ([...sel.options].some((o) => o.value === cur)) sel.value = cur;
 }
 // ---- Accessi extra: modal di configurazione per operatore ----
 function apriAccessiExtra(nome) {
@@ -1116,6 +1219,7 @@ function renderOperatoriUI() {
   // Nascondi form creazione se non admin
   const addRow = el.parentElement.querySelector('.add-tipo-row');
   if (addRow) addRow.style.display = admin ? '' : 'none';
+  if (admin) _popolaSelectProfiloNuovoOp();
 }
 
 // CAMPI RAPPORTO
