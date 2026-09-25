@@ -37,6 +37,7 @@ function GUIDA_CAPITOLI() {
         "Il programma e' diviso in <b>pagine</b>, che trovi nella barra in alto. Vedi solo quelle che ti sono state abilitate: se una pagina non c'e', significa che non rientra nel tuo ruolo.",
         "La <b>Home</b> riassume la giornata: promemoria in scadenza, avvisi e scorciatoie. E' il punto di partenza consigliato ogni volta che entri.",
         'Quasi tutto si salva <b>da solo</b> nel momento in cui scrivi: non esiste un tasto Salva generale. Dove serve una conferma, il programma te la chiede.',
+        '<b>Annulla e Ripristina</b> valgono in tutto il programma: dopo una modifica compare in basso a sinistra la barretta con l ultima azione in parole (per esempio "Creato modulo rdi · Rossi"); Annulla la toglie, Ripristina la rimette. Ctrl+Z e Ctrl+Y fanno lo stesso fuori dai campi di testo. Regole: si annullano le proprie azioni della sessione corrente (le ultime 30), un azione intera alla volta; se nel frattempo un altro operatore ha toccato la stessa riga il programma avvisa e non sovrascrive; un documento creato e poi annullato va nel Cestino; ogni annullamento resta nel registro attivita. La griglia del calendario del Piano e il briefing hanno il loro Annulla; chat e registro non si annullano.',
         "Se una cosa non ti torna, in fondo a ogni pagina trovi la spiegazione qui nella Guida: usa l'indice in alto per saltare all'argomento.",
       ],
     },
