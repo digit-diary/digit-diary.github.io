@@ -1368,9 +1368,9 @@ header h1 .casino {
   overflow-y: hidden;
 }
 .btn-ai {
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: white;
-  border: none;
+  background: var(--ink);
+  color: var(--paper);
+  border: 1.5px solid var(--ink);
   border-radius: 3px;
   padding: 4px 12px;
   font-size: 0.78rem;
@@ -5159,4 +5159,24 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
 .brief-toolbar .brief-btn-col:hover {
   background: #e67e22;
   color: #fff;
+}
+
+/* Moduli · riquadro AI nella stessa lingua visiva del resto (carta, inchiostro, oro) */
+.ai-gen-box {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  background: var(--paper2);
+  border: 1px solid var(--line);
+  border-left: 3px solid #b8860b;
+  border-radius: 3px;
+}
+.btn-ai.btn-ai-oro {
+  background: var(--paper);
+  color: #8a6508;
+  border-color: #b8860b;
+}
+.btn-ai.btn-ai-oro:hover {
+  background: #b8860b;
+  color: #fff;
+  opacity: 1;
 }
