@@ -1,6 +1,20 @@
 # DIARIO COLLABORATORI · passaggio di consegne
 
-**Aggiornato al 24/09/2026 (sera)** · versione in produzione **v259** · ultimo commit `718bee3`
+**Aggiornato al 25/09/2026** · versione in produzione **v280** · ultimo commit `d121106`
+
+> **Sessione del 24-25/09 (v258-v280)**: tutto il dettaglio, con prima/dopo ed esempi, e in
+> `RAPPORTO_MODIFICHE_v259.md` (sezioni v259 -> v280). Punti chiave per chi riprende:
+> - `js/piano.js` NON esiste piu: e diviso in dieci `js/piano-*.js` caricati in ordine da index.html
+>   (stesso ambito globale). Per trovare una funzione: `grep -n '^function nome' js/piano-*.js`.
+> - Test: `node test/piano-regole.test.js` (115), `node test/pause-regole.test.js` (33),
+>   `node strumenti/verifica_crediti.js` (dopo `PW=... python3 strumenti/esporta_dati_verifica.py`).
+> - Regole pause per settore (`piano_pause_cfg.regole`), profili personalizzati (`profili_custom`),
+>   scheda Crediti, Impostazioni a schede, malattia che prevale su ogni sigla, compleanno riservato.
+> - Pacchetto IT rifatto (IT/LEGGIMI.txt del 25/09, backup 46 tabelle, NOVITA_SETTEMBRE_2026.txt,
+>   cartella CREDENZIALI/ da compilare a mano dal titolare).
+> - Aperti: riscrittura cronologia GitHub (documenti con nomi nelle versioni precedenti, serve il si
+>   del titolare); "Turni per funzione" solo admin (decidere); due schede Slots fisso+jolly incoerenti;
+>   date di assunzione mancanti in Tavoli e Valet; questionari da far compilare; solver da collegare (IT).
 
 > Sessione del 24/09 pomeriggio: audit completo e correzioni v258-v259. Leggere PRIMA
 > `AUDIT_2026-09-24.md` (cosa era rotto) e `RAPPORTO_MODIFICHE_v259.md` (cosa e' cambiato,
