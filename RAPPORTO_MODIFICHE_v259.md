@@ -494,3 +494,9 @@ rifiutata con avviso; ogni modifica finisce nell elenco delle modifiche e nel Re
 ## v285 · Moduli: fogli di cambio turno riconosciuti; pulsanti del modulo
 - **"undefined" nell elenco moduli**: erano i fogli di cambio turno, archiviati nella stessa tabella dei moduli quando si fa uno scambio dal piano. L elenco non li sapeva etichettare e "Apri" mostrava un modulo vuoto con i separatori (i due puntini). Ora compaiono come "Cambio turno" con la data del cambio e chi lo ha fatto; il pulsante "Apri PDF" mostra il foglio archiviato; c e il filtro per tipo. Chi li ha creati era gia salvato (campo Creato da).
 - **Pulsanti del modulo**: "Annulla" grigio sostituito dal pulsante secondario con contorno, stessa altezza di "Genera PDF" e stesso stile delle Impostazioni.
+
+## v286 · Valutazione annuale allineata alla scheda HR rev. 2026
+- **Aree**: "Versatilita" si chiama ora "Polivalenza e adattabilita operativa" (stessa chiave interna: le valutazioni gia salvate restano valide). Le 11 aree seguono l ordine e i due gruppi della scheda ufficiale: Competenze personali (Gestione delle risorse, Lavoro in Team, Comunicazione, Conoscenze, Polivalenza e adattabilita operativa, Affidabilita e disponibilita, Motivazione e gestione del cambiamento) e Prestazioni lavorative (Qualitative, Quantitative, Impegno, Servizio al cliente). Il gruppo separato "Competenze multidisciplinari" non esiste piu, come nella scheda.
+- **Descrizioni**: tutte copiate dal foglio ufficiale, comprese quelle riviste di Polivalenza, Affidabilita e disponibilita, Motivazione e Servizio al cliente.
+- **Commento alla valutazione**: aggiunti i campi "Sintesi" (prima dei punti di forza) e "Proposta sviluppo" (dopo le esigenze formative), nell editor, nel PDF e nell importazione dal file Excel.
+- Questionario v286 aggiornato.

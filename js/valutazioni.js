@@ -1,13 +1,14 @@
 /**
  * Diario Collaboratori · Casino Lugano SA
  * File: valutazioni.js
- * Valutazione annuale integrata: 9 aree scheda HR + Versatilità e
+ * Valutazione annuale integrata: 11 aree della scheda HR rev. 2026 (Polivalenza e adattabilità operativa,
  * "Affidabilità e disponibilità" (voce unica). Editor multi-scheda (anno/tipo),
  * note per area (colonna I), radar, import Excel, export PDF formato HR.
  */
 
 // Aree della scheda ufficiale HR (versione 02/25) + le 2 nuove concordate con HR
 const AREE_VALUTAZIONE = [
+  // Ordine, nomi e descrizioni = scheda ufficiale HR "Scheda di valutazione Foboslot" rev. 2026
   {
     key: 'gestione_risorse',
     label: 'Gestione delle risorse/dei mezzi',
@@ -33,16 +34,29 @@ const AREE_VALUTAZIONE = [
     desc: 'Dispone di conoscenze tecniche e teoriche per svolgere al meglio il proprio lavoro. Gestisce in modo propositivo i mutamenti del proprio settore di competenza e mette in pratica quanto appreso durante la propria attività e/o formazione.',
   },
   {
+    // chiave storica "versatilita": le valutazioni gia salvate restano valide
+    key: 'versatilita',
+    label: 'Polivalenza e adattabilità operativa',
+    gruppo: 'COMPETENZE PERSONALI',
+    desc: 'Dimostra capacità di adattarsi a diversi contesti e ruoli aziendali, acquisendo nuove competenze e affrontando con flessibilità le diverse esigenze operative.',
+  },
+  {
+    key: 'affidabilita_disponibilita',
+    label: 'Affidabilità e disponibilità',
+    gruppo: 'COMPETENZE PERSONALI',
+    desc: 'Dimostra puntualità, presenza e rispetto degli impegni assunti. Si mostra disponibile con colleghi e responsabili, rispondendo con flessibilità alle esigenze del servizio (cambi di turno, picchi di lavoro e richieste straordinarie).',
+  },
+  {
     key: 'motivazione',
     label: 'Motivazione e gestione del cambiamento',
     gruppo: 'COMPETENZE PERSONALI',
-    desc: 'È propositivo e porta suggerimenti che favoriscono le attività e il clima di lavoro. Lavora in modo autonomo ed affidabile, sa organizzarsi in modo da sopportare il carico di lavoro e/o di stress. Fornisce soluzioni costruttive, è disponibile e flessibile ai cambiamenti organizzativi.',
+    desc: 'È propositivo e offre suggerimenti utili a favorire le attività e un clima di lavoro positivo. Affronta i cambiamenti con motivazione e apertura, mantenendo un atteggiamento collaborativo. Propone soluzioni costruttive.',
   },
   {
     key: 'qualitative',
     label: 'Qualitative',
     gruppo: 'PRESTAZIONI LAVORATIVE',
-    desc: "Le attività svolte rispecchiano le aspettative qualitative del cliente e dell'azienda.",
+    desc: "La attività svolte rispecchiano le aspettative qualitative del cliente e dell'azienda.",
   },
   {
     key: 'quantitative',
@@ -60,19 +74,7 @@ const AREE_VALUTAZIONE = [
     key: 'servizio_cliente',
     label: 'Servizio al cliente',
     gruppo: 'PRESTAZIONI LAVORATIVE',
-    desc: 'Fornisce la corretta informazione, ascolta e riesce a relazionarsi con il cliente in modo adeguato. Trasmette positività e accoglie il cliente anticipandone i bisogni. È cortese, disponibile e sorridente.',
-  },
-  {
-    key: 'versatilita',
-    label: 'Versatilità',
-    gruppo: 'COMPETENZE MULTIDISCIPLINARI',
-    desc: 'Sa operare su più settori del reparto secondo il percorso multidisciplinare (es. Sala, Reception, Cassa). Si adatta rapidamente a ruoli e postazioni diverse in base alle necessità operative.',
-  },
-  {
-    key: 'affidabilita_disponibilita',
-    label: 'Affidabilità e disponibilità',
-    gruppo: 'COMPETENZE MULTIDISCIPLINARI',
-    desc: 'Svolge il proprio lavoro con costanza e precisione, con un basso tasso di errori; si può contare sul suo operato senza necessità di controlli continui. È disponibile a coprire turni scoperti, ad accettare cambi di turno e a supportare i colleghi nei momenti di necessità, contribuendo concretamente alla continuità del servizio.',
+    desc: 'Fornisce la corretta informazione, ascolta e trasmette positività, accoglie il cliente anticipandone i bisogni. È cortese, disponibile e sorridente.',
   },
 ];
 // Compatibilità: le valutazioni salvate prima della fusione avevano 'affidabilita' e
@@ -112,7 +114,7 @@ function getValutazioniCollab(nome) {
 // Suggerimenti dai dati del Diario (precompilazione: il valutatore può sempre correggere)
 function _suggerisciAree(nome) {
   const sug = {};
-  // Versatilità dal livello multidisciplinare
+  // Polivalenza e adattabilita operativa dal livello multidisciplinare
   const c = getCollaboratoriReparto().find((x) => x.nome.toLowerCase() === nome.toLowerCase());
   if (c && typeof livelloDiCollaboratore === 'function') {
     // 100% al livello massimo della scala del settore (Slots ne ha 6), 40% senza
@@ -441,8 +443,14 @@ function apriValutazioneEditor(nome, anno, tipo) {
   const ob = (esistente && esistente.obiettivi) || [];
   const ef = (esistente && esistente.esigenze_formative) || '';
   const os = (esistente && esistente.osservazioni) || '';
+  const si = (esistente && esistente.sintesi) || '';
+  const ps = (esistente && esistente.proposta_sviluppo) || '';
   html +=
     '<div style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent2);font-weight:700;margin:14px 0 6px;border-bottom:1px solid var(--line);padding-bottom:3px">COMMENTO ALLA VALUTAZIONE</div>';
+  html +=
+    '<div class="field" style="margin-bottom:10px"><label>Sintesi</label><textarea id="val-sintesi" style="min-height:44px">' +
+    escP(si) +
+    '</textarea></div>';
   html +=
     '<div class="field" style="margin-bottom:10px"><label>Punti di forza</label><textarea id="val-punti-forza" style="min-height:50px">' +
     escP(pf) +
@@ -463,6 +471,10 @@ function apriValutazioneEditor(nome, anno, tipo) {
   html +=
     '<div class="field" style="margin-bottom:10px"><label>Esigenze formative</label><textarea id="val-esigenze" style="min-height:44px">' +
     escP(ef) +
+    '</textarea></div>';
+  html +=
+    '<div class="field" style="margin-bottom:10px"><label>Proposta sviluppo</label><textarea id="val-proposta" style="min-height:44px">' +
+    escP(ps) +
     '</textarea></div>';
   html +=
     '<div class="field" style="margin-bottom:14px"><label>Osservazioni</label><textarea id="val-osservazioni" style="min-height:44px">' +
@@ -525,6 +537,8 @@ async function salvaValutazione(nome) {
     punti_forza: ((document.getElementById('val-punti-forza') || {}).value || '').trim(),
     obiettivi,
     esigenze_formative: ((document.getElementById('val-esigenze') || {}).value || '').trim(),
+    sintesi: ((document.getElementById('val-sintesi') || {}).value || '').trim(),
+    proposta_sviluppo: ((document.getElementById('val-proposta') || {}).value || '').trim(),
     osservazioni: ((document.getElementById('val-osservazioni') || {}).value || '').trim(),
     valutatore: ((document.getElementById('val-valutatore') || {}).value || '').trim(),
     data_valutazione: new Date().toISOString().split('T')[0],
@@ -752,6 +766,8 @@ function _parseValutazioneWorkbook(wb) {
         if (label === 'sintesi' && testoDopo && !extra.sintesi) extra.sintesi = testoDopo;
         if (label.startsWith('esigenze formative') && testoDopo && !extra.esigenze_formative)
           extra.esigenze_formative = testoDopo;
+        if (label.startsWith('proposta sviluppo') && testoDopo && !extra.proposta_sviluppo)
+          extra.proposta_sviluppo = testoDopo;
       }
       const n0 = parseInt(row[0]);
       if (!isNaN(n0) && n0 >= 1 && n0 <= 3 && String(row[0]).trim().length <= 2) {
@@ -820,6 +836,8 @@ async function importaValutazioneExcel(input, nome) {
       (extra &&
       (extra.punti_forza ||
         extra.esigenze_formative ||
+        extra.proposta_sviluppo ||
+        extra.sintesi ||
         (extra.obiettivi || []).length ||
         extra.aree_note ||
         extra.dati_personali)
@@ -1043,19 +1061,15 @@ async function esportaValutazionePDF(id) {
     }),
   );
   y = doc.lastAutoTable.finalY + 4;
-  const gruppi = ['COMPETENZE PERSONALI', 'PRESTAZIONI LAVORATIVE', 'COMPETENZE MULTIDISCIPLINARI'];
+  const gruppi = ['COMPETENZE PERSONALI', 'PRESTAZIONI LAVORATIVE'];
   gruppi.forEach((g) => {
     const righe = AREE_VALUTAZIONE.filter((a) => a.gruppo === g);
+    if (!righe.length) return;
     if (y + 30 > ph - 20) {
       doc.addPage();
       y = 14;
     }
-    sezione(
-      g +
-        (g === 'COMPETENZE MULTIDISCIPLINARI'
-          ? ' (progetto multidisciplinarità)'
-          : ' (in riferimento alla posizione ricoperta)'),
-    );
+    sezione(g + (g === 'COMPETENZE PERSONALI' ? ' (in riferimento alla posizione ricoperta)' : ''));
     // Conseguito = somma Totale / somma Punteggio (come nel foglio ufficiale)
     let sommaTot = 0;
     let sommaPunt = 0;
@@ -1118,6 +1132,7 @@ async function esportaValutazionePDF(id) {
     ob.length ? ob.map((o, i) => i + 1 + '. ' + o).join('\n') : '-',
   );
   blocco('Esigenze formative', v.esigenze_formative);
+  if (v.proposta_sviluppo) blocco('Proposta sviluppo', v.proposta_sviluppo);
   if (v.osservazioni) {
     if (y + 25 > ph - 30) {
       doc.addPage();
