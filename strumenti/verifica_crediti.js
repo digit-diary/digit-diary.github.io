@@ -147,7 +147,9 @@ vm.createContext(ctx);
 const carica = (f) => vm.runInContext(fs.readFileSync(__dirname + '/../js/' + f, 'utf8'), ctx, { filename: f });
 carica('piano-regole.js');
 carica('utils.js');
-carica('piano.js');
+[
+  ...fs.readFileSync(__dirname + '/../index.html', 'utf8').matchAll(/<script src="js\/(piano-(?!regole)[a-z-]+\.js)"/g),
+].forEach((m) => carica(m[1]));
 if (!ctx.MESI_FULL)
   ctx.MESI_FULL = [
     'Gennaio',
