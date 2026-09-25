@@ -2648,7 +2648,7 @@ function apriSchedaCollaboratore(nome) {
     html += '</div>';
   }
 
-  // VALUTAZIONE ANNUALE (9 aree HR + Versatilità/Affidabilità/Disponibilità)
+  // VALUTAZIONE ANNUALE (11 aree della scheda HR rev. 2026)
   if (typeof _renderValutazioneSezione === 'function') html += _renderValutazioneSezione(nome);
 
   // STORICO HR (riservato: admin + operatori con permesso storico_hr)

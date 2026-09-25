@@ -220,7 +220,7 @@ sez(B, 'R · Incentivi', 'Sistema punti, accensione globale = ' + ('si' if punti
  T(['Soglia punti', 'Premio'], [[str(s['punti']), s['premio']] for s in punti.get('soglie', [])]),
  T(['Livello raggiunto', 'Premio di livello'], [[k, v] for k, v in (punti.get('premi_livello') or {}).items()]),
  ('Gli incentivi richiedono sempre la conferma di un supervisore; con incentivi spenti il premio non viene registrato da nessuna parte; il limite mensile e l inventario premi sono gestiti nella configurazione.', 'Popup copertura: conferma del supervisor.'),
- ('La valutazione annuale ha 11 aree (9 HR piu Versatilita e Affidabilita e disponibilita); il suggerimento di Versatilita segue la scala del settore (100% al livello massimo).', 'L3 su 6: 70%.'),
+ ('La valutazione annuale ha le 11 aree della scheda HR rev. 2026 nello stesso ordine e con le stesse descrizioni: Gestione delle risorse, Lavoro in Team, Comunicazione, Conoscenze, Polivalenza e adattabilita operativa, Affidabilita e disponibilita, Motivazione; Qualitative, Quantitative, Impegno, Servizio al cliente. Commento: Sintesi, Punti di forza, Obiettivi, Esigenze formative, Proposta sviluppo, Osservazioni. Il suggerimento di Polivalenza segue il livello multidisciplinare (100% al livello massimo).', 'L3 su 6: 70%.'),
 ])
 sa = J('soglie_alert', {}) or {}; sd = J('soglie_disciplinari', {}) or {}
 sez(B, 'S · Moduli disciplinari e alert', '', [
