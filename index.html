@@ -3785,6 +3785,7 @@
     </div>
 
     <div class="toast" id="toast"></div>
+    <div id="annulla-bar" class="annulla-bar" style="display: none"><button type="button" id="annulla-btn" onclick="annullaGlobale()" title="Annulla l ultima azione (Ctrl+Z)">&#8630; Annulla</button><button type="button" id="ripristina-btn" onclick="ripristinaGlobale()" title="Ripristina (Ctrl+Y)">&#8631; Ripristina</button><span id="annulla-lbl"></span></div>
     <div class="notif-banner" id="notif-banner" onclick="notifBannerClick()">
       <span class="notif-icon" id="notif-icon"></span>
       <div class="notif-body">
@@ -3806,6 +3807,7 @@
     <script src="js/config.js"></script>
     <script src="js/crypto.js"></script>
     <script src="js/chat-core.js"></script>
+    <script src="js/annulla.js"></script>
     <script src="js/realtime.js"></script>
     <script src="js/api.js"></script>
     <script src="js/utils.js"></script>

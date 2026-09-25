@@ -566,7 +566,7 @@ function _erroreDalDatabase(e) {
   if (/"code"\s*:\s*"[0-9A-Z]{5}"/.test(t)) return true;
   return /duplicate key|violates|already exists|row-level security/i.test(t);
 }
-async function secPost(table, data) {
+async function _secPostRaw(table, data) {
   const tk = getOpToken();
   if (tk) {
     try {
@@ -605,7 +605,7 @@ function _filtroSqlDaRest(filter) {
     })
     .join(' AND ');
 }
-async function secPatch(table, filter, data) {
+async function _secPatchRaw(table, filter, data) {
   const tk = getOpToken();
   if (tk) {
     // Un filtro vuoto aggiornerebbe TUTTA la tabella: mai.
@@ -628,7 +628,7 @@ async function secPatch(table, filter, data) {
     await sbPatch(table, filter, data);
   }
 }
-async function secDel(table, filter) {
+async function _secDelRaw(table, filter) {
   const tk = getOpToken();
   if (tk) {
     // Un filtro vuoto o non tradotto cancellerebbe piu' del voluto: mai.
@@ -654,7 +654,7 @@ async function getImp(k) {
   const d = await secGet('impostazioni?chiave=eq.' + k + '&select=valore');
   return d.length ? d[0].valore : null;
 }
-async function setImp(k, v) {
+async function _setImpRaw(k, v) {
   const tk = getOpToken();
   if (tk) {
     // Un'impostazione non salvata e' un errore da vedere (prima si tentavano
@@ -674,4 +674,29 @@ async function setImp(k, v) {
   await secPatch('impostazioni', 'chiave=eq.' + k, { valore: v });
   const check = await getImp(k);
   if (check !== v) await secPost('impostazioni', { chiave: k, valore: v });
+}
+
+// ---- ANNULLA / RIPRISTINA generale: ogni scrittura viene annotata (js/annulla.js) ----
+function _annullaPronto() {
+  return typeof window !== 'undefined' && window.Annulla && typeof window.Annulla.primaDiPatch === 'function';
+}
+async function secPost(table, data) {
+  const r = await _secPostRaw(table, data);
+  if (_annullaPronto()) window.Annulla.dopoPost(table, Array.isArray(r) ? r : r ? [r] : []);
+  return r;
+}
+async function secPatch(table, filter, data) {
+  const op = _annullaPronto() ? await window.Annulla.primaDiPatch(table, filter, data) : null;
+  await _secPatchRaw(table, filter, data);
+  if (op) window.Annulla.conferma(op);
+}
+async function secDel(table, filter) {
+  const op = _annullaPronto() ? await window.Annulla.primaDiDel(table, filter) : null;
+  await _secDelRaw(table, filter);
+  if (op) window.Annulla.conferma(op);
+}
+async function setImp(k, v) {
+  const pre = _annullaPronto() ? await window.Annulla.primaDiImp(k) : null;
+  await _setImpRaw(k, v);
+  if (_annullaPronto()) window.Annulla.dopoImp(pre, k, v);
 }

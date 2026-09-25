@@ -5180,3 +5180,53 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   color: #fff;
   opacity: 1;
 }
+
+/* ===== ANNULLA / RIPRISTINA generale: barretta fissa in basso a sinistra ===== */
+.annulla-bar {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 950;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 4px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  font-family: "Source Sans 3", sans-serif;
+  font-size: 0.8rem;
+  max-width: min(520px, calc(100vw - 32px));
+}
+.annulla-bar button {
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 5px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--paper);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.annulla-bar button:hover:not(:disabled) {
+  background: var(--paper);
+  color: var(--ink);
+}
+.annulla-bar button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.annulla-bar #annulla-lbl {
+  color: #cfc3ad;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media print {
+  .annulla-bar {
+    display: none !important;
+  }
+}

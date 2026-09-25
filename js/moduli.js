@@ -642,9 +642,11 @@ async function generaModuloPDF(tipo) {
   }
   const isEdit = _isEditSnap;
   const isRistampa = _isRistampaSnap;
-  // Ristampa: solo PDF, non salva nel DB
+  let _ultimoEditCambiato = false;
+  // Ristampa: solo PDF, non salva nel DB; nel registro resta traccia della stampa
   if (isRistampa) {
     window._editModuloId = null;
+    logAzione('Ristampato modulo ' + tipo, collab + ' - ' + data);
     chiudiModulo();
     return;
   }
@@ -687,6 +689,7 @@ async function generaModuloPDF(tipo) {
       }
       window._editModuloId = null;
       window._editModuloOrig = null;
+      _ultimoEditCambiato = hasChanged;
       toast(hasChanged ? 'Modulo aggiornato e PDF generato!' : 'PDF rigenerato (nessuna modifica)');
     } else {
       const rec = {
@@ -703,7 +706,11 @@ async function generaModuloPDF(tipo) {
       toast('PDF generato e modulo salvato!');
     }
     window._importedFileData = null;
-    logAzione((isEdit ? 'Modificato' : 'Creato') + ' modulo ' + tipo, collab + ' - ' + data);
+    // nel registro: "Modificato" solo se e cambiato qualcosa; aprire e
+    // rigenerare il PDF senza toccare nulla non deve risultare una modifica
+    if (isEdit && !_ultimoEditCambiato)
+      logAzione('Rigenerato PDF modulo ' + tipo + ' (senza modifiche)', collab + ' - ' + data);
+    else logAzione((isEdit ? 'Modificato' : 'Creato') + ' modulo ' + tipo, collab + ' - ' + data);
     aggiornaModuliLista();
     const _cnt = document.getElementById('mod-list-count');
     if (_cnt) _cnt.textContent = getModuliReparto().length;
@@ -1703,6 +1710,10 @@ async function riattivaCollaboratore(nome) {
 
 // LOG ATTIVITA
 async function logAzione(azione, dettaglio) {
+  // il registro segna la fine di un azione: le scritture fatte finora
+  // diventano UN gruppo di Annulla con questa etichetta
+  if (window.Annulla && !/^(Annullata|Ripristinata) azione/.test(azione))
+    window.Annulla.chiudiGruppo(azione + (dettaglio ? ' \u00b7 ' + String(dettaglio).substring(0, 80) : ''));
   try {
     const rec = {
       operatore: getOperatore() || 'Admin',
