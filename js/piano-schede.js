@@ -854,7 +854,7 @@ async function _pianoVacDirittoCard(anno) {
   const gia = {};
   (_pianoVacCache || []).forEach((v) => {
     const sett = parseInt(v.settimana);
-    if (!sett) return;
+    if (!sett || !v.confermata) return; // le provvisorie non contano
     // una settimana a cavallo d'anno porta giorni nell'altro anno: non contano
     const gg = _pianoGiorniSettimana(anno, sett).filter((d) => d.substring(0, 4) === String(anno));
     gia[v.collaboratore] = (gia[v.collaboratore] || 0) + gg.length;
@@ -1102,12 +1102,16 @@ async function _renderPianoVacanzeTab() {
       lista.length +
       ' settimane)</div>';
     h +=
-      '<table class="piano-table" style="min-width:100%;font-size:.85rem"><thead><tr><th style="text-align:left">Settimana</th><th>Confermata</th>' +
+      '<table class="piano-table" style="min-width:100%;font-size:.85rem"><thead><tr><th style="text-align:left">Settimana</th><th title="Definitiva = va nel piano e conta nel saldo. Provvisoria = resta qui in attesa, non va nel piano e non conta">Definitiva</th>' +
       (puoMod ? '<th>Azioni</th>' : '') +
       '</tr></thead><tbody>';
     lista.forEach((v) => {
       h +=
-        '<tr><td style="text-align:left"><strong>Settimana ' +
+        '<tr' +
+        (v.confermata
+          ? ''
+          : ' style="background:#fff3c4" title="Provvisoria: non va nel piano e non conta nel saldo"') +
+        '><td style="text-align:left"><strong>Settimana ' +
         v.settimana +
         '</strong> <span style="color:var(--muted);font-size:.8rem">(' +
         _vacDateSettimana(anno, v.settimana) +
@@ -1116,15 +1120,15 @@ async function _renderPianoVacanzeTab() {
         '<td>' +
         (puoMod
           ? '<span class="mini-badge" style="cursor:pointer;background:' +
-            (v.confermata ? '#2c6e49' : '#888') +
-            '" onclick="toggleVacanzaConfermata(' +
+            (v.confermata ? '#2c6e49' : '#b8860b') +
+            '" title="Clic per cambiare" onclick="toggleVacanzaConfermata(' +
             v.id +
             ')">' +
-            (v.confermata ? 'Sì' : 'No') +
+            (v.confermata ? 'Definitiva' : 'Provvisoria') +
             '</span>'
           : v.confermata
-            ? 'Sì'
-            : 'No') +
+            ? 'Definitiva'
+            : 'Provvisoria') +
         '</td>';
       if (puoMod)
         h +=
@@ -1984,7 +1988,7 @@ function apriNuovaVacanza() {
     '</h3><div class="field" style="text-align:left"><label>Collaboratore</label><select id="nv-collab" style="width:100%;padding:8px">' +
     nomiRep.map((n) => '<option value="' + escP(n) + '">' + escP(n) + '</option>').join('') +
     '</select></div><div class="field" style="text-align:left;margin-top:8px"><label>Settimana (1-53)</label><input type="number" id="nv-sett" min="1" max="53" style="width:110px;padding:8px"></div>' +
-    '<div style="text-align:left;margin-top:8px"><label style="font-size:.82rem"><input type="checkbox" id="nv-conf" checked> Confermata</label></div>' +
+    '<div style="text-align:left;margin-top:8px"><label style="font-size:.82rem"><input type="checkbox" id="nv-conf" checked> Definitiva (va nel piano e conta nel saldo; senza spunta resta provvisoria)</label></div>' +
     '<div class="pwd-modal-btns" style="margin-top:14px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaNuovaVacanza()">Aggiungi</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
   setTimeout(() => {
@@ -2026,6 +2030,10 @@ async function toggleVacanzaConfermata(id) {
   if (!v) return;
   try {
     await secPatch('piano_vacanze', 'id=eq.' + id, { confermata: !v.confermata });
+    logAzione(
+      'Vacanza ' + (!v.confermata ? 'definitiva' : 'provvisoria'),
+      v.collaboratore + ' · settimana ' + v.settimana + ' · ' + v.anno,
+    );
     renderPiano();
   } catch (e) {
     toast('Errore');
@@ -2145,6 +2153,7 @@ async function _applicaVacanzeMese(interattivo) {
   const vacGiorni = {}; // nome -> Set(giorno)
   vacanze.forEach((v) => {
     if (!nomiRep.includes(v.collaboratore)) return;
+    if (!v.confermata) return; // provvisoria: resta in elenco, non va nel piano
     _pianoGiorniSettimana(anno, v.settimana).forEach((dstr) => {
       const p = dstr.split('-');
       if (parseInt(p[0]) === anno && parseInt(p[1]) === mese)

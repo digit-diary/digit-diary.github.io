@@ -205,6 +205,7 @@ function GUIDA_CAPITOLI() {
       titolo: 'Piano: vacanze',
       vis: () => _guidaVis('piano'),
       righe: [
+        'Ogni settimana e <b>Definitiva</b> o <b>Provvisoria</b> (clic sul badge per cambiare, se hai il permesso). Definitiva = va nel piano con Applica al piano e conta fra le pianificate e nel saldo; provvisoria = resta in elenco in giallo, in attesa, senza toccare il piano ne il saldo. Le settimane importate dal file HR sono definitive; quelle aggiunte a mano nascono definitive, togli la spunta se non e ancora sicura. Il cambio resta nel registro attivita.',
         'Le vacanze si assegnano a <b>settimane intere</b> (da lunedi a domenica) per collaboratore e per anno.',
         '<b>Applica al piano</b> scrive le V protette, i congedi C prima e dopo la vacanza in base alla percentuale e il giorno diurno obbligato prima della partenza.',
         'Le regole aziendali da rispettare: settimane a blocchi di sette giorni, nei settori con piu di otto persone si pianifica in vacanza uno ogni otto o nove collaboratori, nei settori piu piccoli mai piu di due contemporaneamente.',

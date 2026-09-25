@@ -485,3 +485,8 @@ rifiutata con avviso; ogni modifica finisce nell elenco delle modifiche e nel Re
 
 ## v282 · Moduli: riquadro AI nella stessa lingua visiva
 - Il riquadro "Genera con AI" e i suoi pulsanti avevano una sfumatura viola e una oro, estranee alla grafica carta/inchiostro del programma. Ora: riquadro su carta chiara con bordo oro, pulsante principale inchiostro, pulsante "Allega foto" in oro con contorno. Nessuna funzione cambiata.
+
+## v284 · Vacanze: settimana Definitiva o Provvisoria
+- **Prima**: la colonna "Confermata" (Si/No) era solo un etichetta: le settimane non confermate andavano comunque nel piano e nel saldo.
+- **Dopo**: la colonna si chiama "Definitiva". Definitiva = va nel piano con Applica al piano e conta fra le pianificate e nel saldo (scheda Vacanze e scheda Crediti). Provvisoria = resta in elenco in giallo, in attesa: non va nel piano, non conta, e se aveva gia V nel calendario queste vengono tolte al prossimo Applica come V orfane. Le settimane importate dal file HR sono definitive; quelle aggiunte a mano nascono definitive, con la spunta da togliere se non ancora sicura. Il cambio finisce nel registro attivita ("Vacanza provvisoria · Rossi · settimana 43 · 2026"). Chi puo cambiarla: chi modifica la scheda Vacanze (Responsabile, Sostituto), non il Supervisor.
+- Verifica incrociata Crediti/Vacanze rieseguita: 224 confronti, 0 differenze. Questionario v284 (407 voci) e guida aggiornati.
