@@ -5230,3 +5230,35 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
     display: none !important;
   }
 }
+
+/* Pulsante secondario (contorno) in tutto il programma: stesso stile delle Impostazioni */
+.btn-secondario {
+  background: var(--paper);
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
+  padding: 9px 18px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 2px;
+  cursor: pointer;
+  font-family: "Source Sans 3", sans-serif;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.btn-secondario:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+/* riga pulsanti del modulo: stessa altezza fra Genera PDF e Annulla */
+#modulo-form-area .btn-salva {
+  margin-top: 0;
+  padding: 11px 26px;
+  box-shadow: none;
+}
+#modulo-form-area .btn-secondario {
+  padding: 11px 22px;
+}
