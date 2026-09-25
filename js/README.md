@@ -1,4 +1,4 @@
-# Diario Collaboratori — Struttura JavaScript (28 file)
+# Diario Collaboratori — Struttura JavaScript (37 file)
 
 ## Ordine di caricamento (IMPORTANTE)
 
@@ -10,25 +10,25 @@ da formazione/valutazioni (chiamati solo a runtime, dopo il caricamento completo
 
 ## File per area funzionale
 
-Ordine = ordine di caricamento in index.html.
+Ordine = ordine di caricamento in index.html. Il Piano di lavoro e diviso in dieci file `piano-*.js` che si caricano in sequenza e condividono lo stesso ambito globale: ogni file e una scheda o un area (nucleo, generatore, configurazione, gestione, cambi, schede, impostazioni, celle, briefing, extra). Una modifica al Piano si fa nel file della sua area; l ordine di caricamento non va cambiato.
 
 | # | File | Righe | Descrizione |
 | --- | --- | --- | --- |
 | 1 | config.js | 81 | Costanti, chiavi offuscate (XOR), variabili base |
 | 2 | crypto.js | 90 | Cifratura AES-GCM messaggi chat |
 | 3 | chat-core.js | 256 | Schema chat enterprise: cache, helpers, wrapper |
-| 4 | realtime.js | 677 | WebSocket Supabase, polling fallback, GLOBALS/cache; canale sicuro secGet/secPatch/secDel/setImp con rinnovo sessione (renew_op_session) e filtri PostgREST convertiti in SQL |
+| 4 | realtime.js | 677 | WebSocket Supabase, polling fallback, GLOBALS/cache; canale sicuro secGet/secPatch/secDel/setImp con rinnovo sessione e filtri PostgREST convertiti in SQL |
 | 5 | api.js | 352 | loadAll, healthCheck, caricamento impostazioni |
 | 6 | utils.js | 794 | toast/toastErrore, escP, fmtCHF, salvaImp, settori (REPARTI_BASE), ordineCollabPiano, helpers |
-| 7 | auth.js | 663 | Login, password, sessioni a token, sblocco biometrico v4 (segreto per dispositivo) |
+| 7 | auth.js | 663 | Login, password, sessioni a token, sblocco biometrico v4 |
 | 8 | cestino-core.js | 1110 | Soft delete, ripristino, conservazione dati, controllo salute, DB stats |
-| 9 | settings.js | 2300 | Visibilita e permessi, PROFILI fissi (matrice) e PERSONALIZZATI, operatori (creazione con posizione/copia accessi), settori, scheda permessi stampabile, backup, Impostazioni a schede |
+| 9 | settings.js | 2307 | Visibilita e permessi, profili fissi e personalizzati, operatori (creazione con posizione/copia accessi), settori, scheda permessi stampabile, backup, Impostazioni a schede |
 | 10 | app.js | 474 | Routing pagine, init, renderPostLogin, tipi di evento |
-| 11 | diario.js | 992 | Registrazioni: salva, modifica, elimina; malattie a periodo sincronizzate nel Piano |
+| 11 | diario.js | 992 | Registrazioni; malattie a periodo sincronizzate nel Piano |
 | 12 | alerts.js | 701 | Alert cassa/rischio/ammonimenti, soglie personalizzabili |
 | 13 | search.js | 733 | Ricerca globale, riepilogo mensile PDF |
-| 14 | chat-ui.js | 4031 | Chat + SCHEDA COLLABORATORE (KPI, cronologia, PDF, congedi, riga Crediti) |
-| 15 | moduli.js | 2906 | Moduli disciplinari, PDF, AI (senza dati personali), anagrafica collaboratori |
+| 14 | chat-ui.js | 4031 | Chat + scheda collaboratore (KPI, cronologia, PDF, congedi, riga Crediti) |
+| 15 | moduli.js | 2906 | Moduli disciplinari, PDF, AI senza dati personali, anagrafica collaboratori |
 | 16 | formazione.js | 3060 | Multidisciplinarita: matrice competenze, livelli, punti/premi, Report Incentivi |
 | 17 | valutazioni.js | 1161 | Valutazione annuale: aree, import Excel, PDF HR |
 | 18 | rapporto.js | 1096 | Rapporto giornaliero, parser assenze/cassa |
@@ -39,11 +39,20 @@ Ordine = ordine di caricamento in index.html.
 | 23 | maison-budget.js | 1181 | Maison: budget, categorie, profilo |
 | 24 | maison-helpers.js | 3908 | Maison import Excel/parser + filtri per settore + inventario; giubilei e anzianita con congedi non pagati |
 | 25 | guida.js | 542 | Guida in linea per capitoli, filtrata per permessi |
-| 26 | piano-regole.js | 611 | MOTORE REGOLE del piano in funzioni pure (UMD, testabile con node test/piano-regole.test.js): riposi, consecutivi, idoneita, vacanze spettanti, chiusure, giorni chiusi |
-| 27 | piano.js | 19976 | PIANO DI LAVORO: calendario, generatore bozza (prenotazioni compleanni/CGF, passata di riparazione, solver esterno opzionale), cambi turno e coperture, CGF (RAP 4.3), briefing, vacanze, saldo, recupero ore, crediti, timbrature, statistiche, regole per settore, festivi, congedi non pagati, guida |
-| 28 | pause-engine.js | 3791 | PAUSE del briefing: schemi Slots (porting Excel), motore algoritmico Valet/altri, REGOLE PAUSE per settore (durata/turno/distanza/fascia/insieme/nota, giorni), verifica, PDF |
+| 26 | piano-regole.js | 611 | MOTORE REGOLE del piano in funzioni pure (UMD, testabile con Node): riposi, consecutivi, idoneita, vacanze spettanti, chiusure, giorni chiusi |
+| 27 | piano-core.js | 2248 | PIANO · nucleo: stato, helpers, sincronizzazione malattie, barra schede, rendering della griglia (primo dei file piano-*.js) |
+| 28 | piano-genera.js | 1191 | PIANO · validatore regole e generatore della bozza (prenotazioni, passata di riparazione) |
+| 29 | piano-config.js | 1758 | PIANO · scheda Regole (per settore, guida, controlli), fabbisogni, turni, codici, festivi |
+| 30 | piano-gestione.js | 3067 | PIANO · benessere e domeniche, settore, festivi automatici, recupero ore, festivita e chiusure, CGF (RAP 4.3), congedi non pagati |
+| 31 | piano-cambi.js | 2338 | PIANO · copia Excel, stampa PDF, cambi turno (scambio, esigenze, cerca cambio), copertura malattia |
+| 32 | piano-schede.js | 2922 | PIANO · timbrature, statistiche, import vacanze, saldo ore dell anno, esportazione formato HR |
+| 33 | piano-impostazioni.js | 1547 | PIANO · mappature e impostazioni, solver esterno, formulari, card congedi non pagati |
+| 34 | piano-celle.js | 1047 | PIANO · stampa singolo collaboratore, menu tasto destro, modifica rapida delle celle |
+| 35 | piano-briefing-ui.js | 1628 | PIANO · scheda Briefing (compilazione, numeri cassa, formato) e corsi |
+| 36 | piano-extra.js | 2276 | PIANO · copia/incolla a blocchi, annulla/ripristina, selezione sparsa, trova, migliora ore, formazione, scheda Crediti |
+| 37 | pause-engine.js | 3791 | PAUSE del briefing: schemi Slots (porting Excel), motore algoritmico Valet/altri, regole pause per settore, verifica, PDF |
 
-**Totale: 28 file, 58.412 righe (formattazione prettier --single-quote --print-width 120, solo JS).**
+**Totale: 37 file, 58.465 righe (prettier --single-quote --print-width 120, solo JS).**
 
 ## Test automatici
 
