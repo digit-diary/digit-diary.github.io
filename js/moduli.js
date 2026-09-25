@@ -92,7 +92,7 @@ function apriModulo(tipo) {
   html +=
     '<div style="display:flex;gap:12px;margin-top:18px"><button class="btn-salva" onclick="generaModuloPDF(\'' +
     tipo +
-    '\')">Genera PDF</button><button class="btn-modal-cancel" onclick="chiudiModulo()">Annulla</button></div>';
+    '\')">Genera PDF</button><button class="btn-secondario" onclick="chiudiModulo()">Annulla</button></div>';
   html += '</div></div>';
   area.innerHTML = html;
   area.scrollIntoView({ behavior: 'smooth' });
@@ -829,7 +829,7 @@ function renderModuliList() {
     hdr +=
       '<div class="filter-group"><span class="filter-label">Collaboratore</span><div class="ac-wrap"><input type="text" id="mod-filt-nome" placeholder="Cerca nome..." oninput="acFiltraModuli(\'mod-filt-nome\',\'ac-mod-filt-nomi\')" onfocus="acFiltraModuli(\'mod-filt-nome\',\'ac-mod-filt-nomi\')"><div class="ac-drop" id="ac-mod-filt-nomi"></div></div></div>';
     hdr +=
-      '<div class="filter-group"><span class="filter-label">Tipo</span><select id="mod-filt-tipo" onchange="aggiornaModuliLista()"><option value="">Tutti</option><option value="allineamento">Allineamento</option><option value="apprezzamento">Apprezzamento</option><option value="rdi">RDI</option></select></div>';
+      '<div class="filter-group"><span class="filter-label">Tipo</span><select id="mod-filt-tipo" onchange="aggiornaModuliLista()"><option value="">Tutti</option><option value="allineamento">Allineamento</option><option value="apprezzamento">Apprezzamento</option><option value="rdi">RDI</option><option value="cambio_turno">Cambio turno</option></select></div>';
     hdr +=
       '<div class="filter-group"><span class="filter-label">Dal</span><input type="text" id="mod-filt-dal" placeholder="Seleziona..." readonly style="cursor:pointer;min-width:150px"></div>';
     hdr +=
@@ -885,11 +885,13 @@ function aggiornaModuliLista() {
     allineamento: 'Allineamento',
     apprezzamento: 'Apprezzamento',
     rdi: 'RDI',
+    cambio_turno: 'Cambio turno',
   };
   const tc = {
     allineamento: '#1a4a7a',
     apprezzamento: '#b8860b',
     rdi: '#c0392b',
+    cambio_turno: '#5a6b7a',
   };
   const box = document.getElementById('mod-list-results');
   if (!box) return;
@@ -910,18 +912,30 @@ function aggiornaModuliLista() {
         '\')"><strong>' +
         escP(m.collaboratore) +
         '</strong></span><span class="badge" style="background:' +
-        tc[m.tipo] +
+        (tc[m.tipo] || '#888') +
         ';color:white;padding:2px 10px;border-radius:2px;font-size:.82rem">' +
-        tl[m.tipo] +
-        '</span><span style="font-size:.82rem;color:var(--muted)">Resp: ' +
-        escP(m.resp_settore) +
+        (tl[m.tipo] || escP(m.tipo || 'Modulo')) +
+        '</span><span style="font-size:.82rem;color:var(--muted)">' +
+        (m.tipo === 'cambio_turno'
+          ? 'Cambio del ' +
+            escP(
+              String(m.data_modulo || '')
+                .split('-')
+                .reverse()
+                .join('.'),
+            )
+          : 'Resp: ' + escP(m.resp_settore || '-')) +
         (m.operatore ? ' · Creato da ' + escP(m.operatore) : '') +
         (m.modificato_da ? ' · Modificato da ' + escP(m.modificato_da) : '') +
-        '</span><div style="margin-left:auto;display:flex;gap:6px"><button class="btn-act edit" onclick="apriModuloSalvato(' +
-        m.id +
-        ')">Apri</button><button class="btn-act tipo" onclick="ristampaModuloPDF(' +
-        m.id +
-        ')">PDF</button><button class="btn-act del" onclick="eliminaModulo(' +
+        '</span><div style="margin-left:auto;display:flex;gap:6px">' +
+        (m.tipo === 'cambio_turno'
+          ? '<button class="btn-act tipo" onclick="ristampaModuloPDF(' + m.id + ')">Apri PDF</button>'
+          : '<button class="btn-act edit" onclick="apriModuloSalvato(' +
+            m.id +
+            ')">Apri</button><button class="btn-act tipo" onclick="ristampaModuloPDF(' +
+            m.id +
+            ')">PDF</button>') +
+        '<button class="btn-act del" onclick="eliminaModulo(' +
         m.id +
         ')">Elimina</button></div></div></div>'
       );
@@ -931,6 +945,8 @@ function aggiornaModuliLista() {
 function apriModuloSalvato(id) {
   const m = moduliCache.find((x) => x.id === id);
   if (!m) return Promise.resolve(false);
+  // il foglio di cambio turno non ha un modulo di modifica: si apre il PDF archiviato
+  if (m.tipo === 'cambio_turno') return ristampaModuloPDF(id).then(() => false);
   apriModulo(m.tipo);
   window._editModuloId = id;
   // Salva snapshot originale per confronto
@@ -1002,8 +1018,20 @@ function checkQrHash() {
   history.replaceState(null, '', window.location.pathname);
 }
 async function ristampaModuloPDF(id) {
-  window._isRistampa = true;
   const m = moduliCache.find((x) => x.id === id);
+  if (m && m.tipo === 'cambio_turno') {
+    try {
+      if (!window.jspdf) await caricaJsPDF();
+      const doc = _pdfCambioTurno(m.dati || {});
+      mostraPdfPreview(doc, 'cambio_turno_' + (m.data_modulo || '') + '.pdf', 'Cambio turno ' + (m.data_modulo || ''));
+      logAzione('Ristampato foglio cambio turno', m.collaboratore + ' - ' + (m.data_modulo || ''));
+    } catch (e) {
+      console.error(e);
+      toastErrore('Foglio cambio non leggibile');
+    }
+    return;
+  }
+  window._isRistampa = true;
   try {
     // si attende che campi, radio firma e canvas siano davvero pronti
     if (m && (await apriModuloSalvato(id))) await generaModuloPDF(m.tipo);
