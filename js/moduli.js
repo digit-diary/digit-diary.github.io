@@ -9,6 +9,14 @@
 // ================================================================
 // MODULI DISCIPLINARI
 function apriModulo(tipo) {
+  // Modulo NUOVO = stato pulito. Prima, se era aperto un modulo salvato (per
+  // esempio un allineamento) e si premeva "Nuovo RDI" senza Annulla, il
+  // programma restava in modifica e salvava il contenuto del nuovo modulo
+  // SOPRA quello aperto prima. apriModuloSalvato imposta l id DOPO questa chiamata.
+  window._editModuloId = null;
+  window._editModuloOrig = null;
+  window._importedFileData = null;
+  _moduloFotoB64 = null;
   const area = document.getElementById('modulo-form-area');
   area.style.display = 'block';
   const op = getOperatore() || '';
@@ -291,7 +299,17 @@ function moduloRespSettore(rep) {
 async function generaModuloPDF(tipo) {
   // Cattura SUBITO i flag, prima di qualsiasi await (race condition con ristampaModuloPDF)
   const _isRistampaSnap = !!window._isRistampa;
-  const _isEditSnap = !!window._editModuloId;
+  let _isEditSnap = !!window._editModuloId;
+  // seconda barriera: si aggiorna un modulo esistente solo se e dello stesso
+  // tipo del modulo a video; altrimenti si crea un modulo nuovo
+  if (_isEditSnap) {
+    const m0 = moduliCache.find((x) => x.id === window._editModuloId);
+    if (!m0 || m0.tipo !== tipo) {
+      window._editModuloId = null;
+      window._editModuloOrig = null;
+      _isEditSnap = false;
+    }
+  }
   // la ristampa non scrive nulla; creare o modificare si'
   if (!_isRistampaSnap && !_puoScrivereModuli()) {
     toast('Non hai il permesso');

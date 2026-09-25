@@ -121,6 +121,7 @@ function GUIDA_CAPITOLI() {
       titolo: 'Moduli e formulari',
       vis: () => _guidaVis('moduli'),
       righe: [
+        'Ogni modulo nuovo (Allineamento, Apprezzamento, RDI) e un record separato: aprire un modulo salvato e poi premere un pulsante "Nuovo" crea un modulo nuovo, non sovrascrive quello aperto prima. Un modulo salvato si aggiorna solo riaprendolo dall elenco e rigenerando il PDF.',
         'Raccolta dei moduli compilabili e stampabili del settore, con archivio a cartelle per Word, PDF ed Excel.',
         'I moduli generati restano archiviati e si possono ristampare in qualsiasi momento.',
       ],
