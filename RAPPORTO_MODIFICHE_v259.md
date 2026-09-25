@@ -482,3 +482,6 @@ rifiutata con avviso; ogni modifica finisce nell elenco delle modifiche e nel Re
 - **Correzione alla radice**: ogni apertura di un modulo nuovo azzera lo stato di modifica (id, snapshot, file importato, foto). Seconda barriera al salvataggio: un modulo esistente si aggiorna solo se e dello stesso tipo di quello a video, altrimenti si crea un record nuovo.
 - Guida e questionario (v281, 405 voci) aggiornati.
 - Esempio: allineamento del 3.9 aperto dall elenco, poi Nuovo RDI compilato e generato: in elenco restano l allineamento del 3.9 intatto e un RDI nuovo.
+
+## v282 · Moduli: riquadro AI nella stessa lingua visiva
+- Il riquadro "Genera con AI" e i suoi pulsanti avevano una sfumatura viola e una oro, estranee alla grafica carta/inchiostro del programma. Ora: riquadro su carta chiara con bordo oro, pulsante principale inchiostro, pulsante "Allega foto" in oro con contorno. Nessuna funzione cambiata.
