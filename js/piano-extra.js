@@ -2003,7 +2003,7 @@ async function _pianoCreditiDati(anno, soloNomi) {
   const gia = {};
   vac.forEach((v) => {
     const sett = parseInt(v.settimana);
-    if (!sett) return;
+    if (!sett || !v.confermata) return; // come la scheda Vacanze: le provvisorie non contano
     const gg = _pianoGiorniSettimana(anno, sett).filter((d) => d.substring(0, 4) === String(anno));
     gia[v.collaboratore] = (gia[v.collaboratore] || 0) + gg.length;
   });
