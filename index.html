@@ -3753,10 +3753,6 @@
         <div class="sez-head"><div><h4>Valori dei buoni</h4><p class="sez-desc">Valore in CHF di ogni buono: serve per dividere il costo fra gli ospiti e per la giacenza.</p></div></div>
         <div class="add-tipo-row sez-form"><div class="field"><label>BU</label><input type="number" id="buono-bu-input" min="1" step="1" /></div><div class="field"><label>BL</label><input type="number" id="buono-bl-input" min="1" step="1" /></div><div class="field"><label>CG</label><input type="number" id="buono-cg-input" min="1" step="1" /></div><div class="field"><label>WL</label><input type="number" id="buono-wl-input" min="1" step="1" /></div><button class="btn-add-tipo" onclick="salvaBuonoValori()">Salva valori</button></div>
       </div>
-      <div class="settings-section" data-gruppo="Personale" id="valutatori-section" style="display: none">
-        <div class="sez-head"><div><h4>Valutatori della scheda annuale</h4><p class="sez-desc">Chi compila le valutazioni annuali, per settore, come nell elenco persone della scheda HR. Nella scheda il campo Valutatore propone questi nomi.</p></div></div>
-        <div id="valutatori-list" class="tipo-list"></div>
-      </div>
       <div class="settings-section" data-gruppo="Personale" id="giubileo-section" style="display: none">
         <div class="sez-head"><div><h4>Premio giubileo</h4><p class="sez-desc">Somma riconosciuta al raggiungimento degli anni di servizio, dalla data di assunzione. I giubilei maturati compaiono nello Storico HR della scheda, visibile a chi ha il permesso.</p></div></div>
         <div class="add-tipo-row sez-form"><div class="field"><label>Avviso anticipato agli operatori con permesso Storico HR</label><select id="giubileo-preavviso-sel" onchange="salvaGiubileoPreavviso(this.value)"><option value="0">Disattivato</option><option value="30">30 giorni prima</option><option value="60">60 giorni prima</option><option value="90">90 giorni prima</option><option value="120">120 giorni prima</option></select></div></div>

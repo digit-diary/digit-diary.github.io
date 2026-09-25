@@ -126,11 +126,6 @@ function switchPage(name) {
         });
       }
     }
-    const vtSec = document.getElementById('valutatori-section');
-    if (vtSec) {
-      vtSec.style.display = isAdmin() ? '' : 'none';
-      if (isAdmin() && typeof renderValutatoriUI === 'function') renderValutatoriUI();
-    }
     const gbSec = document.getElementById('giubileo-section');
     if (gbSec) {
       gbSec.style.display = isAdmin() ? '' : 'none';
