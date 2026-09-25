@@ -500,3 +500,8 @@ rifiutata con avviso; ogni modifica finisce nell elenco delle modifiche e nel Re
 - **Descrizioni**: tutte copiate dal foglio ufficiale, comprese quelle riviste di Polivalenza, Affidabilita e disponibilita, Motivazione e Servizio al cliente.
 - **Commento alla valutazione**: aggiunti i campi "Sintesi" (prima dei punti di forza) e "Proposta sviluppo" (dopo le esigenze formative), nell editor, nel PDF e nell importazione dal file Excel.
 - Questionario v286 aggiornato.
+
+## v287 · Valutatori della scheda annuale
+- **Verifica dell importazione** con il file ufficiale "Scheda di valutazione Foboslot rev. 2026" eseguita con il parser vero in Node: 11 aree su 11 lette con i punteggi giusti, anno, dati personali (ID valutato e valutatore, settore, funzione, data) e nome del valutatore. Lo strumento resta nel progetto: `node strumenti/verifica_valutazione.js <scheda.xlsx>`.
+- **Valutatori**: nuova sezione Impostazioni > Personale > "Valutatori della scheda annuale", un elenco di nomi per settore (impostazione riservata all amministratore, migrazione 20260874 applicata). Preimpostati per Slots i sei dell elenco persone della scheda: Fertitta Lara, Pisano Pamela, Bushi Musa, Pistocchi Mara, Rondinella Alessio, Fattorini Claudia Stefania. Nella scheda di valutazione il campo Valutatore propone questi nomi e parte da chi e collegato se e fra i valutatori; resta scrivibile a mano. Un nome non in anagrafica viene segnalato al salvataggio ma accettato (es. HR).
+- Guida e questionario (v287, 408 voci) aggiornati.
