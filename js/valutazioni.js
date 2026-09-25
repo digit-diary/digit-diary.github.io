@@ -392,14 +392,9 @@ function apriValutazioneEditor(nome, anno, tipo) {
       .map((t) => '<option value="' + t + '"' + (tp === t ? ' selected' : '') + '>' + t + '</option>')
       .join('') +
     '</select>' +
-    '<span class="filter-label">Valutatore</span><input type="text" id="val-valutatore" list="val-valutatori-lista" value="' +
-    _escAttr((esistente && esistente.valutatore) || _valutatoreProposto() || '') +
-    '" title="Chi compila la scheda: uno dei valutatori del settore (elenco in Impostazioni > Personale > Valutatori)" style="width:220px;padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)">' +
-    '<datalist id="val-valutatori-lista">' +
-    _valutatoriDi()
-      .map((n) => '<option value="' + _escAttr(n) + '"></option>')
-      .join('') +
-    '</datalist>' +
+    '<span class="filter-label">Valutatore</span><input type="text" id="val-valutatore" value="' +
+    _escAttr((esistente && esistente.valutatore) || getOperatore() || '') +
+    '" style="width:200px;padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)">' +
     '<span class="filter-label">Settore</span><input type="text" id="val-settore" value="' +
     _escAttr(((esistente && esistente.dati_personali) || {}).settore || '') +
     '" placeholder="Es: Foboslot" style="width:130px;padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)">' +
@@ -1178,31 +1173,4 @@ async function esportaValutazionePDF(id) {
     'valutazione_' + v.collaboratore.replace(/\s+/g, '_') + '_' + v.anno + '.pdf',
     'Valutazione ' + v.anno + ' · ' + v.collaboratore,
   );
-}
-
-// ---------------------------------------------------------------------------
-// VALUTATORI · chi compila la scheda annuale, per settore (impostazione
-// valutatori_config = { slots: ['Cognome Nome', ...], tavoli: [...] }). Si
-// gestiscono in Impostazioni > Personale > Valutatori; nella scheda il campo
-// Valutatore propone questi nomi (resta comunque scrivibile a mano).
-// ---------------------------------------------------------------------------
-async function _valutatoriCarica() {
-  try {
-    const v = await getImp('valutatori_config');
-    window._valutatoriCfg = v ? JSON.parse(v) || {} : {};
-  } catch (e) {
-    window._valutatoriCfg = window._valutatoriCfg || {};
-  }
-}
-function _valutatoriDi(rep) {
-  const cfg = window._valutatoriCfg || {};
-  const r = rep || (typeof currentReparto !== 'undefined' ? currentReparto : 'slots');
-  return Array.isArray(cfg[r]) ? cfg[r] : [];
-}
-// valutatore proposto: l operatore se e fra i valutatori, altrimenti il primo dell elenco
-function _valutatoreProposto() {
-  const lista = _valutatoriDi();
-  const op = typeof getOperatore === 'function' ? getOperatore() : '';
-  if (op && lista.some((n) => n.toLowerCase() === op.toLowerCase())) return op;
-  return lista[0] || op || '';
 }

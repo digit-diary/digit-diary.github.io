@@ -343,7 +343,6 @@ async function loadAll() {
   if (getOpToken()) _healthCheck();
   // dati pronti: se l'utente ha già aperto il Piano (era vuoto in attesa
   // dei dati), lo ridisegniamo ora che collaboratori e cache ci sono
-  if (typeof _valutatoriCarica === 'function') _valutatoriCarica().catch(() => {});
   window._loadAllDone = true;
   // backup automatico: parte da solo (solo admin) senza intralciare il login
   if (typeof _backupAutoCheck === 'function') setTimeout(() => _backupAutoCheck(), 6000);
