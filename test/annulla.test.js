@@ -230,6 +230,58 @@ function canaleSicuro(c, A) {
   }
   eq(A.stato().annulla, 3, 'si tengono solo gli ultimi gruppi');
 
+  console.log('\n== pulsanti della barretta nel browser (onclick) ==');
+  // Si carica il file intero come fa la pagina, con finestra e documento finti,
+  // e si preme Annulla/Ripristina con lo stesso testo degli onclick di index.html.
+  {
+    const fs = require('fs');
+    const vm = require('vm');
+    const path = require('path');
+    const cf = canaleFinto();
+    cf.db.piano_vacanze.push({ id: 7, collaboratore: 'Rossi Mario', settimana: 30, anno: 2026, confermata: true });
+    const els = {};
+    const messaggi = [];
+    const ctx = {
+      console,
+      setTimeout,
+      clearTimeout,
+      localStorage: { getItem: () => 'piano' },
+      confirm: () => true,
+      toast: (m) => messaggi.push(m),
+      toastErrore: (m) => messaggi.push('ERRORE ' + m),
+      getOperatore: () => 'Test',
+      secGet: (q) => cf.leggi(q),
+      getImp: async () => null,
+      setImp: async () => {},
+      secPost: (t, r) => cf.post(t, r),
+      secDel: (t, f) => cf.del(t, f),
+    };
+    ctx.secPatch = async (t, f, d) => {
+      const op = await ctx.Annulla.primaDiPatch(t, f, d);
+      await cf.patch(t, f, d);
+      if (op) ctx.Annulla.conferma(op);
+    };
+    ctx.window = ctx;
+    ctx.document = {
+      getElementById: (id) => (els[id] = els[id] || { style: {}, disabled: false }),
+      addEventListener: () => {},
+    };
+    vm.createContext(ctx);
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '../js/annulla.js'), 'utf8'), ctx);
+    eq(typeof ctx.annullaGlobale, 'function', 'annullaGlobale raggiungibile da onclick');
+    eq(typeof ctx.ripristinaGlobale, 'function', 'ripristinaGlobale raggiungibile da onclick');
+    const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+    const clic = (id) => (html.match(new RegExp('id="' + id + '"[^>]*onclick="([^"]+)"')) || [])[1];
+    ok(!!clic('annulla-btn') && !!clic('ripristina-btn'), 'i due pulsanti della barretta esistono in index.html');
+    await vm.runInContext("secPatch('piano_vacanze', 'id=eq.7', { confermata: false })", ctx);
+    eq(els['annulla-bar'].style.display, 'flex', 'dopo la modifica la barretta compare');
+    await vm.runInContext(clic('annulla-btn'), ctx);
+    eq(cf.db.piano_vacanze[0].confermata, true, 'clic su Annulla: la vacanza torna Definitiva');
+    await vm.runInContext(clic('ripristina-btn'), ctx);
+    eq(cf.db.piano_vacanze[0].confermata, false, 'clic su Ripristina: torna Provvisoria');
+    ok(!messaggi.some((m) => /^ERRORE/.test(m)), 'nessun messaggio di errore (' + messaggi.join(' / ') + ')');
+  }
+
   console.log(
     '\n=======================================\n  ' +
       passati +

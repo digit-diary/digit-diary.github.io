@@ -420,4 +420,10 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       ripristinaGlobale();
     }
   });
+  // I pulsanti della barretta le chiamano da onclick, quindi devono stare nello
+  // scope globale. Le "async function" dichiarate dentro un blocco restano
+  // chiuse nel blocco (le function normali no): senza queste righe il clic su
+  // Annulla dava "annullaGlobale is not defined" e non faceva nulla.
+  window.annullaGlobale = annullaGlobale;
+  window.ripristinaGlobale = ripristinaGlobale;
 }
