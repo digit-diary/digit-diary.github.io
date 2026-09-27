@@ -15,3 +15,9 @@ QUESTIONARIO_VERIFICA_REGOLE_*.html
 SCHEDA_PERMESSI_ATTUALI*.html
 strumenti/dati_questionario_*.json
 strumenti/dati_verifica/
+# documenti di lavoro con nomi del personale (restano in locale, IT e chiavetta)
+AUDIT_*.md
+RAPPORTO_MODIFICHE_*.md
+HANDOFF_SESSIONE_*.md
+NOTE_PROGETTO.txt
+MAIL_PRESENTAZIONE.txt
