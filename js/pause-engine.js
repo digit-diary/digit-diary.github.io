@@ -3336,7 +3336,10 @@ function _pbSincronizza(c, prima, base) {
         const blk = _pbBlocchi(c).find((b) => b.base === pb.base && b.r === pb.r);
         const riga = blk && blk.righe.find((x) => x.pos === 'PAUSA' && x.ini === v.ini && x.fin === v.fin);
         if (!riga) return;
-        const err = _pbSpostaPausa(c, blk, riga, nuovo);
+        // prima dentro le sue righe libere (SALA...), di quanto serve; se non si puo,
+        // con uno scambio con la riga vicina come con le frecce
+        const errLibero = _pbSpostaCambio(c, blk, riga, nuovo);
+        const err = errLibero ? _pbSpostaPausa(c, blk, riga, nuovo) : '';
         msg.push(
           err
             ? 'Pausa di ' + chi(blk) + ' non spostata: ' + err
@@ -3364,9 +3367,6 @@ function _pbSpostaQuarto(c, base, r, dir) {
   const x = blk.righe[k];
   const v = blk.righe[k + dir];
   if (!x || !v || _PC_LIBERE.includes(x.pos) || !_PC_LIBERE.includes(v.pos)) return null;
-  // cambio collegato alla pausa di chi ha una colonna (es. S3 dato da Nicole a Sassi):
-  // resta lo scambio intero, cosi la pausa collegata puo seguire
-  if ((c.legami || []).includes(x.pos)) return null;
   const d = x.fin - x.ini;
   // chi non conta: chi da il cambio (questa colonna) e chi riceve il cambio
   const persone = _pcPersone(_briefState.righe, _briefData);
@@ -3440,7 +3440,21 @@ function briefPausaSposta(base, r, dir) {
   const prima = _pbBlocchi(c);
   // vicino a una riga libera (SALA, REC, CASSA) la riga si sposta di un quarto d ora
   // alla volta, nel primo orario in cui la sala resta coperta; altrimenti scambio
-  const quarto = c.tipo === 'slots' ? _pbSpostaQuarto(c, base, r, dir) : null;
+  const copia = JSON.stringify({ celle: c.celle, nR: c.nR });
+  let quarto = c.tipo === 'slots' ? _pbSpostaQuarto(c, base, r, dir) : null;
+  let msg = null;
+  if (quarto === 'fatto') {
+    msg = _pbSincronizza(c, prima, base);
+    // la pausa collegata non riesce a seguire il quarto d ora: si torna indietro e si
+    // fa lo scambio intero (con cui la pausa collegata segue)
+    if (msg.some((x) => /non spostat/.test(x))) {
+      const o = JSON.parse(copia);
+      c.celle = o.celle;
+      c.nR = o.nR;
+      quarto = null;
+      msg = null;
+    }
+  }
   if (quarto && quarto !== 'fatto') {
     _briefDimentica();
     toast(quarto);
@@ -3451,7 +3465,7 @@ function briefPausaSposta(base, r, dir) {
     toast('Questa riga non si può scambiare (serve una riga di copertura adiacente)');
     return;
   }
-  const msg = _pbSincronizza(c, prima, base);
+  if (!msg) msg = _pbSincronizza(c, prima, base);
   window._briefPauseAvviso = msg.length ? msg.join(' · ') : null;
   if (msg.length) toast(msg.join(' · '), 5000);
   _briefSalvaPauseDebounce();
@@ -4103,6 +4117,9 @@ function pdfBriefingGiorno() {
   m.w[2] += avanza * (iF >= 0 ? 0.4 : 1);
   const larghezze = {};
   m.w.forEach((x, c) => (larghezze[c] = { cellWidth: Math.round(x * 10) / 10 }));
+  // sigle del turno (e numero cassa) al centro della casella
+  larghezze[3].halign = 'center';
+  if (!valet && !generico) larghezze[4].halign = 'center';
   const tabW = m.w.reduce((a, b) => a + b, 0);
   const rowH = m.rowH;
   const fontR = m.f;

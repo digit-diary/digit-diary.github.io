@@ -530,6 +530,16 @@ async function _renderPianoBriefingTab() {
   });
   h += (puo ? '<th style="border:none"></th>' : '') + '</tr></thead><tbody>';
   let gPrec = null;
+  // COLONNE CHE SI ALLARGANO DA SOLE: ogni colonna e larga almeno quanto il testo
+  // piu lungo che contiene (es. un cognome lungo non viene tagliato)
+  const lungMax = {};
+  righe.forEach((r) =>
+    ['nome', 'turno', 'cd', 'uscita', 'firma', 'radio', 'badge'].forEach((k) => {
+      lungMax[k] = Math.max(lungMax[k] || 0, String(r[k] || '').length);
+    }),
+  );
+  const largCol = (campo, base) =>
+    'max(' + base + 'px,calc(' + ((lungMax[campo] || 0) * 1.12).toFixed(1) + 'ch + 14px))';
   righe.forEach((r, i) => {
     const g = _briefGruppo(r.turno);
     if (gPrec !== null && g !== gPrec)
@@ -555,14 +565,18 @@ async function _renderPianoBriefingTab() {
         (extra || '') +
         ' value="' +
         escP(val || '') +
+        '" data-base="' +
+        larghezza +
         '" oninput="briefCella(' +
         i +
         ",'" +
         campo +
-        '\',this.value)" ' +
+        '\',this.value);_briefAllarga(this)" ' +
         'style="width:' +
-        larghezza +
-        'px;border:none;background:transparent;padding:4px 6px;font:inherit;color:inherit' +
+        largCol(campo, larghezza) +
+        ';border:none;background:transparent;padding:4px 6px;font:inherit;color:inherit' +
+        // sigle del turno e numero cassa al centro della casella
+        (campo === 'turno' || campo === 'cd' ? ';text-align:center' : '') +
         (stC.b || r.bold || fwDef ? ';font-weight:700' : '') +
         (stC.i || r.ital ? ';font-style:italic' : '') +
         (stC.t || r.colT ? ';color:' + (stC.t || r.colT) : '') +
@@ -584,12 +598,14 @@ async function _renderPianoBriefingTab() {
         (puo ? '' : 'disabled ') +
         'value="' +
         escP(r.nome || '') +
+        '" data-base="' +
+        (r.fm ? 86 : 138) +
         '" oninput="briefCella(' +
         i +
-        ",'nome',this.value)\" " +
+        ",'nome',this.value);_briefAllarga(this)\" " +
         'style="width:' +
-        (r.fm ? 86 : 138) +
-        'px;border:none;background:transparent;padding:4px 2px 4px 6px;font:inherit;color:#000' +
+        largCol('nome', r.fm ? 86 : 138) +
+        ';border:none;background:transparent;padding:4px 2px 4px 6px;font:inherit;color:#000' +
         (stNome.b || r.bold || r.fm ? ';font-weight:700' : '') +
         (stNome.i || r.ital ? ';font-style:italic' : '') +
         (stNome.t || r.colT ? ';color:' + (stNome.t || r.colT) : '') +
@@ -807,6 +823,17 @@ function briefSetData(v) {
   if (!v) return;
   _briefData = v;
   renderPiano();
+}
+// mentre si scrive: la colonna si allarga (tutte le caselle della colonna insieme)
+function _briefAllarga(el) {
+  const td = el && el.closest('td');
+  const campo = td && td.dataset.campo;
+  if (!campo) return;
+  const caselle = [...document.querySelectorAll('.brief-table td[data-campo="' + campo + '"] input')];
+  const n = Math.max(0, ...caselle.map((x) => x.value.length));
+  caselle.forEach(
+    (x) => (x.style.width = 'max(' + (x.dataset.base || 40) + 'px,calc(' + (n * 1.12).toFixed(1) + 'ch + 14px))'),
+  );
 }
 function briefCella(i, campo, val) {
   if (!puoGestireBriefing() || !_briefState) return;
