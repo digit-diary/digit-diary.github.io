@@ -62,6 +62,9 @@
   ];
   // tabelle con il Cestino: una creazione annullata finisce li
   const CON_CESTINO = ['registrazioni', 'moduli'];
+  // colonna che identifica la riga, se non e "id" (note_fissate: una riga per registrazione)
+  const CHIAVI = { note_fissate: 'registrazione_id' };
+  const chiave = (t) => CHIAVI[t] || 'id';
   const PAROLE = {
     registrazioni: 'registrazione',
     note_fissate: 'nota fissata',
@@ -125,7 +128,7 @@
       const op = st.pendenti[0];
       if (!op) return 'Modifica';
       const t = op.tipo === 'imp' ? 'impostazioni' : op.table;
-      const verbo = op.tipo === 'post' ? 'Nuovo' : op.tipo === 'del' ? 'Eliminazione' : 'Modifica';
+      const verbo = op.tipo === 'post' ? 'Aggiunta' : op.tipo === 'del' ? 'Eliminazione' : 'Modifica';
       return verbo + ' ' + parola(t) + (st.pendenti.length > 1 ? ' (+' + (st.pendenti.length - 1) + ')' : '');
     }
     function armaTimer() {
@@ -149,7 +152,7 @@
         return null;
       }
       if (!prima || !prima.length) return null;
-      if (prima.some((r) => r.id == null)) return null;
+      if (prima.some((r) => r[chiave(table)] == null)) return null;
       return { tipo: 'patch', table: table, prima: copia(prima), dati: copia(data) };
     }
     async function primaDiDel(table, filter) {
@@ -160,7 +163,7 @@
       } catch (e) {
         return null;
       }
-      if (!righe || !righe.length || righe.some((r) => r.id == null)) return null;
+      if (!righe || !righe.length || righe.some((r) => r[chiave(table)] == null)) return null;
       return { tipo: 'del', table: table, righe: copia(righe) };
     }
     function conferma(op) {
@@ -168,7 +171,7 @@
     }
     function dopoPost(table, righe) {
       if (st.inCorso || !tracciata(table)) return;
-      const ok = (righe || []).filter((r) => r && r.id != null);
+      const ok = (righe || []).filter((r) => r && r[chiave(table)] != null);
       if (!ok.length) return;
       aggiungi({ tipo: 'post', table: table, righe: copia(ok) });
     }
@@ -201,7 +204,7 @@
     }
     // ---- inversione e riapplicazione ----
     async function controllaConflitto(table, id, attesi) {
-      const cur = (await canale.leggi(table + '?id=eq.' + id))[0];
+      const cur = (await canale.leggi(table + '?' + chiave(table) + '=eq.' + id))[0];
       if (!cur) throw new Error('La riga ' + parola(table) + ' non esiste piu');
       Object.keys(attesi).forEach((k) => {
         if (!uguale(cur[k], attesi[k]))
@@ -212,23 +215,24 @@
           );
       });
     }
+    const filtroRiga = (t, r) => chiave(t) + '=eq.' + r[chiave(t)];
     async function inverti(op) {
       if (op.tipo === 'patch') {
         for (const r of op.prima) {
-          await controllaConflitto(op.table, r.id, op.dati);
+          await controllaConflitto(op.table, r[chiave(op.table)], op.dati);
           const indietro = {};
           Object.keys(op.dati).forEach((k) => (indietro[k] = r[k] === undefined ? null : r[k]));
-          await canale.patch(op.table, 'id=eq.' + r.id, indietro);
+          await canale.patch(op.table, filtroRiga(op.table, r), indietro);
         }
       } else if (op.tipo === 'post') {
         for (const r of op.righe) {
           if (CON_CESTINO.indexOf(op.table) >= 0 && 'eliminato' in r)
-            await canale.patch(op.table, 'id=eq.' + r.id, {
+            await canale.patch(op.table, filtroRiga(op.table, r), {
               eliminato: true,
               eliminato_da: canale.operatore(),
               eliminato_at: canale.adesso(),
             });
-          else await canale.del(op.table, 'id=eq.' + r.id);
+          else await canale.del(op.table, filtroRiga(op.table, r));
         }
       } else if (op.tipo === 'del') {
         for (const r of op.righe) await canale.post(op.table, r);
@@ -241,17 +245,21 @@
         for (const r of op.prima) {
           const attesi = {};
           Object.keys(op.dati).forEach((k) => (attesi[k] = r[k] === undefined ? null : r[k]));
-          await controllaConflitto(op.table, r.id, attesi);
-          await canale.patch(op.table, 'id=eq.' + r.id, op.dati);
+          await controllaConflitto(op.table, r[chiave(op.table)], attesi);
+          await canale.patch(op.table, filtroRiga(op.table, r), op.dati);
         }
       } else if (op.tipo === 'post') {
         for (const r of op.righe) {
           if (CON_CESTINO.indexOf(op.table) >= 0 && 'eliminato' in r)
-            await canale.patch(op.table, 'id=eq.' + r.id, { eliminato: false, eliminato_da: null, eliminato_at: null });
+            await canale.patch(op.table, filtroRiga(op.table, r), {
+              eliminato: false,
+              eliminato_da: null,
+              eliminato_at: null,
+            });
           else await canale.post(op.table, r);
         }
       } else if (op.tipo === 'del') {
-        for (const r of op.righe) await canale.del(op.table, 'id=eq.' + r.id);
+        for (const r of op.righe) await canale.del(op.table, filtroRiga(op.table, r));
       } else if (op.tipo === 'imp') {
         await canale.imp(op.chiave, op.dopo);
       }

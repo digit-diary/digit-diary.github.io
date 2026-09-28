@@ -17,7 +17,15 @@ const eq = (a, b, n) =>
 
 // canale finto: tabelle in memoria, impostazioni, orologio e timer controllati a mano
 function canaleFinto() {
-  const db = { moduli: [], registrazioni: [], piano_vacanze: [], piano_turni: [], log_attivita: [], piano: [] };
+  const db = {
+    moduli: [],
+    registrazioni: [],
+    piano_vacanze: [],
+    piano_turni: [],
+    log_attivita: [],
+    piano: [],
+    note_fissate: [],
+  };
   const impostazioni = {};
   let seq = 100;
   const timers = [];
@@ -46,7 +54,7 @@ function canaleFinto() {
     post: async (t, r) => {
       c.scritture.push(['post', t]);
       const riga = Object.assign({}, r);
-      if (riga.id == null) riga.id = ++seq;
+      if (riga.id == null && t !== 'note_fissate') riga.id = ++seq; // note_fissate non ha id, come nel database
       db[t].push(riga);
       return [riga];
     },
@@ -218,6 +226,31 @@ function canaleSicuro(c, A) {
   await S.patch('piano', 'id=eq.1', { codice: 'V' });
   eq(A.stato().annulla, 1, 'registro e griglia del piano non entrano nel diario');
   eq(c.scritture.filter((x) => x[0] === 'patch').length, 4, 'le letture di controllo non generano scritture');
+
+  console.log('\n== note fissate: chiave registrazione_id invece di id ==');
+  c = canaleFinto();
+  A = creaAnnulla(c);
+  S = canaleSicuro(c, A);
+  await S.post('note_fissate', { registrazione_id: 555, fissata_at: '2026-09-28T10:00:00' });
+  A.chiudiGruppo('Nota fissata');
+  eq(A.stato().annulla, 1, 'fissare una nota si puo annullare');
+  await A.annulla();
+  eq(c.db.note_fissate.length, 0, 'annulla toglie la nota fissata');
+  await A.ripristina();
+  eq(
+    c.db.note_fissate.map((r) => r.registrazione_id),
+    [555],
+    'ripristina la rimette',
+  );
+  await S.del('note_fissate', 'registrazione_id=eq.555');
+  A.chiudiGruppo('Nota sfissata');
+  eq(c.db.note_fissate.length, 0, 'sfissata');
+  await A.annulla();
+  eq(
+    c.db.note_fissate.map((r) => r.registrazione_id),
+    [555],
+    'annulla la rimette fissata',
+  );
 
   console.log('\n== limite della pila ==');
   c = canaleFinto();
