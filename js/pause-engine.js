@@ -3348,13 +3348,105 @@ function _pbSincronizza(c, prima, base) {
   return msg;
 }
 // frecce: scambia la riga con quella adiacente e tiene allineati pausa e cambio
+// FRECCE VICINO A UNA RIGA LIBERA. Se la riga vicina e SALA, REC o CASSA (tempo
+// libero di chi da i cambi) la riga (un cambio o una pausa) non salta oltre tutta
+// la riga libera: si sposta di un quarto d ora alla volta, fermandosi nel primo
+// orario in cui la sala resta coperta da qualcun altro (es. S3 in sala). Se in
+// quel quarto d ora nessun altro e in sala, passa direttamente al primo in cui
+// c e (es. S7 01.45 in su con S3 in cassa alle 01.30 e in sala fino alle 01.15
+// -> S7 01.00-01.15). Restituisce null se non si applica, 'fatto', o il motivo.
+function _pbSpostaQuarto(c, base, r, dir) {
+  const PC = window.PauseControlli;
+  if (!PC || !_briefState) return null;
+  const blk = PC.blocchi(c).find((b) => b.base === base && b.righe.some((x) => x.r === r));
+  if (!blk) return null;
+  const k = blk.righe.findIndex((x) => x.r === r);
+  const x = blk.righe[k];
+  const v = blk.righe[k + dir];
+  if (!x || !v || _PC_LIBERE.includes(x.pos) || !_PC_LIBERE.includes(v.pos)) return null;
+  // cambio collegato alla pausa di chi ha una colonna (es. S3 dato da Nicole a Sassi):
+  // resta lo scambio intero, cosi la pausa collegata puo seguire
+  if ((c.legami || []).includes(x.pos)) return null;
+  const d = x.fin - x.ini;
+  // chi non conta: chi da il cambio (questa colonna) e chi riceve il cambio
+  const persone = _pcPersone(_briefState.righe, _briefData);
+  const pp = PC.pausePersone(c, persone, _pcBigliettiFoglio(c));
+  const bl = PC.blocchi(c);
+  const esclusi = new Set([String(blk.nome).toUpperCase()]);
+  persone.forEach((p) => {
+    if (x.per ? p.nome.toUpperCase() === String(x.per).toUpperCase() : p.turno === x.pos)
+      esclusi.add(p.nome.toUpperCase());
+  });
+  const altri = persone.filter((p) => !esclusi.has(p.nome.toUpperCase()));
+  // in ogni quarto d ora: se ci sono altri di sala in turno, almeno uno e in sala
+  const salaCoperta = (t1, t2) => {
+    for (let t = t1; t < t2; t += 15) {
+      const inTurno = altri.filter((p) => /^S/.test(p.turno) && !p.acc && p.ini != null && p.ini <= t && t < p.fin);
+      if (inTurno.length && !altri.some((p) => PC.reparto(p, pp[p.nome], bl, t) === 'S')) return false;
+    }
+    return true;
+  };
+  // orari possibili dentro la riga libera, un quarto d ora alla volta
+  let nuovo = null;
+  for (let passo = 1; ; passo++) {
+    const t = x.ini + dir * 15 * passo;
+    if (dir < 0 && t < v.ini) break;
+    if (dir > 0 && t + d > v.fin) break;
+    if (salaCoperta(t, t + d)) {
+      nuovo = t;
+      break;
+    }
+  }
+  if (nuovo == null) return 'Nessun orario vicino con la sala coperta da un collega: la riga resta dove e';
+  // si riscrive la colonna: la riga libera si divide intorno alla nuova posizione
+  const warn = (rr) => (c.celle[rr + '|' + base] || {}).bg === _PE_CLR.rosso;
+  const seg = [];
+  blk.righe.forEach((y) => {
+    if (y === x) return;
+    if (y === v) {
+      const libero = { pos: v.pos, per: '' };
+      const pezzi = [];
+      if (dir < 0) {
+        if (nuovo > v.ini) pezzi.push(Object.assign({ ini: v.ini, fin: nuovo }, libero));
+        pezzi.push({ pos: x.pos, ini: nuovo, fin: nuovo + d, per: x.per, warn: warn(x.r) });
+        pezzi.push(Object.assign({ ini: nuovo + d, fin: x.fin }, libero));
+      } else {
+        pezzi.push(Object.assign({ ini: x.ini, fin: nuovo }, libero));
+        pezzi.push({ pos: x.pos, ini: nuovo, fin: nuovo + d, per: x.per, warn: warn(x.r) });
+        if (nuovo + d < v.fin) pezzi.push(Object.assign({ ini: nuovo + d, fin: v.fin }, libero));
+      }
+      pezzi.forEach((p) => seg.push(p));
+      return;
+    }
+    seg.push({ pos: y.pos, ini: y.ini, fin: y.fin, per: y.per, warn: warn(y.r) });
+  });
+  // righe libere uguali e attaccate diventano una sola
+  const uniti = [];
+  seg
+    .sort((a, b) => a.ini - b.ini)
+    .forEach((y) => {
+      const u = uniti[uniti.length - 1];
+      if (u && _PC_LIBERE.includes(y.pos) && u.pos === y.pos && u.fin === y.ini && !u.warn && !y.warn) u.fin = y.fin;
+      else uniti.push(Object.assign({}, y));
+    });
+  _pbScriviRighe(c, blk, uniti);
+  return 'fatto';
+}
 function briefPausaSposta(base, r, dir) {
   if (!puoGestireBriefing() || !_briefState || !_briefState.pause) return;
   const c = _briefState.pause.contenuto;
   _pbLegami(c);
   _briefRicorda();
   const prima = _pbBlocchi(c);
-  if (!_pbScambia(c, base, r, dir)) {
+  // vicino a una riga libera (SALA, REC, CASSA) la riga si sposta di un quarto d ora
+  // alla volta, nel primo orario in cui la sala resta coperta; altrimenti scambio
+  const quarto = c.tipo === 'slots' ? _pbSpostaQuarto(c, base, r, dir) : null;
+  if (quarto && quarto !== 'fatto') {
+    _briefDimentica();
+    toast(quarto);
+    return;
+  }
+  if (!quarto && !_pbScambia(c, base, r, dir)) {
     _briefDimentica();
     toast('Questa riga non si può scambiare (serve una riga di copertura adiacente)');
     return;
