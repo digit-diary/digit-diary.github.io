@@ -18,6 +18,9 @@
   --c-blu: #1a4a7a;
   --c-azzurro: #1f6fa3;
   --c-arancio: #b85c0e;
+  /* sfondi tenui per avvisi (informazione, errore) */
+  --c-azzurro-bg: #e6f0f8;
+  --c-rosso-bg: #fdecea;
   --c-oro: #8b6914;
   --c-verdeacqua: #1a7a6d;
   --c-viola: #7b2d8b;
@@ -33,6 +36,8 @@
 body.dark-theme {
   --c-verde: #6cc594;
   --c-rosso: #ff7d70;
+  --c-azzurro-bg: #1b2c3a;
+  --c-rosso-bg: #3a2220;
   --c-blu: #8ab8e8;
   --c-azzurro: #72b6e4;
   --c-arancio: #f0a35a;

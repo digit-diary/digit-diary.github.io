@@ -2520,6 +2520,8 @@ async function briefGeneraPause() {
   if (_briefState.pause && _briefState.pause.contenuto && _briefState.pause.contenuto.tipo) {
     if (!(await chiediConferma('Sovrascrivo le pause già generate per questa data?'))) return;
   }
+  _briefRicorda();
+  window._briefPauseAvviso = null;
   // slots = pattern manuali (dal tuo Excel); valet e ogni altro settore =
   // motore algoritmico (durate per fascia, gap, una-alla-volta)
   const contenuto = _pianoReparto() === 'slots' ? _peGeneraSlots(righe, _briefData) : _peGeneraValet(righe, _briefData);
@@ -2527,6 +2529,7 @@ async function briefGeneraPause() {
     toast('Nessun turno riconosciuto per generare le pause');
     return;
   }
+  if (contenuto.tipo === 'slots') contenuto.legami = _pbCalcolaLegami(contenuto);
   try {
     if (_briefState.pause && _briefState.pause.id) {
       await secPatch('piano_briefing', 'id=eq.' + _briefState.pause.id, {
@@ -2572,6 +2575,9 @@ function _briefRefreshPause() {
 }
 function briefPausaInsRiga(base, r) {
   if (!puoGestireBriefing() || !_briefState || !_briefState.pause) return;
+  _pbLegami(_briefState.pause.contenuto);
+  _briefRicorda();
+  window._briefPauseAvviso = null;
   const c = _briefState.pause.contenuto;
   // sposta in giù di 1 le celle di QUESTA coppia di colonne sotto la riga r
   for (let rr = c.nR + 1; rr > r + 1; rr--) {
@@ -2590,26 +2596,216 @@ function briefPausaInsRiga(base, r) {
   _briefSalvaPauseDebounce();
   _briefRefreshPause();
 }
-// scambia una riga di copertura con quella adiacente RICALCOLANDO gli
-// orari: l'inizio resta quello della prima, le durate seguono le postazioni
-// (es. R24 22.15-22.45 + S3 22.45-23.00 → S3 22.15-22.30 + R24 22.30-23.00)
-function briefPausaSposta(base, r, dir) {
-  if (!puoGestireBriefing() || !_briefState || !_briefState.pause) return;
-  const c = _briefState.pause.contenuto;
+// ---------- pause e cambi: coerenza tra le colonne (slots) ----------
+// Ogni colonna e un blocco: intestazione con la postazione (S3) e il nome, poi le
+// righe postazione + orario. La PAUSA di S3 nella colonna di Sassi e la riga "S3"
+// nella colonna di chi gli da il cambio devono avere lo stesso orario.
+function _pbOra(min) {
+  // stile Excel: la fascia 24:00-24:59 si scrive 24.xx
+  let m = min;
+  while (m >= 1500) m -= 1440;
+  if (m >= 1440) return '24.' + String(m - 1440).padStart(2, '0');
+  return _peMinToOra(m);
+}
+function _pbIntervallo(v) {
+  const orario = String(v || '');
+  if (!orario.includes(' - ')) return null;
+  const p = orario.split(' - ');
+  const ini = _peOraMin(p[0].trim());
+  const fin = _peOraMin(p[1].trim());
+  if (ini == null || fin == null) return null;
+  const iniA = ini < 660 ? ini + 1440 : ini;
+  let finA = fin < 660 ? fin + 1440 : fin;
+  if (finA <= iniA) finA += 1440;
+  return { ini: iniA, fin: finA };
+}
+function _pbBlocchi(c) {
+  const blocchi = [];
+  [1, 4, 7].forEach((base) => {
+    let blk = null;
+    for (let r = 4; r <= c.nR + 1; r++) {
+      const a = c.celle[r + '|' + base];
+      const b = c.celle[r + '|' + (base + 1)];
+      if (a && a.hdr) {
+        blk = {
+          base: base,
+          post: String(a.v || '')
+            .toUpperCase()
+            .trim(),
+          nome: b ? String(b.v || '').trim() : '',
+          r: r,
+          righe: [],
+        };
+        blocchi.push(blk);
+        continue;
+      }
+      if (!blk || !a || !b || a.span || b.hdr) continue;
+      const iv = _pbIntervallo(b.v);
+      if (!iv) continue;
+      blk.righe.push({
+        r: r,
+        pos: String(a.v || '')
+          .toUpperCase()
+          .trim(),
+        ini: iv.ini,
+        fin: iv.fin,
+      });
+    }
+  });
+  return blocchi;
+}
+// postazioni che hanno una colonna propria (una sola) e un cambio in un altra colonna
+function _pbCoperture(blocchi) {
+  const out = {};
+  const conta = {};
+  blocchi.forEach((b) => (conta[b.post] = (conta[b.post] || 0) + 1));
+  blocchi.forEach((b) => {
+    if (!b.post || b.post === 'PAUSA' || b.post === 'SALA' || conta[b.post] !== 1) return;
+    const cambi = [];
+    blocchi.forEach((o) => {
+      if (o === b) return;
+      o.righe.forEach((x) => {
+        if (x.pos === b.post) cambi.push({ blk: o, riga: x });
+      });
+    });
+    if (cambi.length) out[b.post] = { blk: b, pause: b.righe.filter((x) => x.pos === 'PAUSA'), cambi: cambi };
+  });
+  return out;
+}
+// Postazioni COLLEGATE: quelle in cui ogni pausa ha il suo cambio allo stesso orario
+// e ogni cambio cade in una pausa (es. S3 e chi gli da il cambio). Si fissano quando
+// il foglio nasce (o la prima volta che si apre) e restano nel foglio: solo per queste
+// il programma sposta il cambio insieme alla pausa e avvisa se non coincidono.
+// Le altre righe con la sigla di un collega (es. C8 a rotazione in cassa) non sono
+// cambi-pausa e non vengono toccate.
+function _pbCalcolaLegami(c) {
+  const cop = _pbCoperture(_pbBlocchi(c));
+  const stesso = (x, y) => x.ini === y.ini && x.fin === y.fin;
+  return Object.keys(cop).filter((post) => {
+    const { pause, cambi } = cop[post];
+    return (
+      pause.length &&
+      pause.every((p) => cambi.some((k) => stesso(k.riga, p))) &&
+      cambi.every((k) => pause.some((p) => stesso(k.riga, p)))
+    );
+  });
+}
+function _pbLegami(c) {
+  if (!c || !c.celle) return [];
+  if (!Array.isArray(c.legami)) c.legami = _pbCalcolaLegami(c);
+  return c.legami;
+}
+// avvisi (non bloccano): pausa senza cambio, cambio senza pausa
+function _pbControlla(c) {
+  const avvisi = [];
+  if (!c || !c.celle) return avvisi;
+  const legami = _pbLegami(c);
+  const tutte = _pbCoperture(_pbBlocchi(c));
+  const cop = {};
+  legami.forEach((k) => {
+    if (tutte[k]) cop[k] = tutte[k];
+  });
+  const chi = (b) => (b.nome ? b.nome.split(' ')[0] : b.post);
+  const ora = (x) => _pbOra(x.ini) + ' - ' + _pbOra(x.fin);
+  Object.keys(cop).forEach((post) => {
+    const { blk, pause, cambi } = cop[post];
+    pause.forEach((p) => {
+      if (!cambi.some((k) => k.riga.ini === p.ini && k.riga.fin === p.fin))
+        avvisi.push({
+          testo: chi(blk) + ' (' + post + ') e in pausa ' + ora(p) + ', ma nessuno copre ' + post + ' in quell orario',
+          celle: [p.r + '|' + blk.base],
+        });
+    });
+    cambi.forEach((k) => {
+      if (!pause.some((p) => p.ini === k.riga.ini && p.fin === k.riga.fin))
+        avvisi.push({
+          testo:
+            chi(k.blk) + ' copre ' + post + ' ' + ora(k.riga) + ', ma ' + chi(blk) + ' in quell orario non e in pausa',
+          celle: [k.riga.r + '|' + k.blk.base],
+        });
+    });
+  });
+  return avvisi;
+}
+// scrive le righe di un blocco (dalla prima riga del blocco in giu); se servono
+// piu righe sposta in basso le celle sottostanti della stessa colonna
+function _pbScriviRighe(c, blk, segmenti) {
+  const base = blk.base;
+  const primo = blk.righe[0].r;
+  const ultimo = blk.righe[blk.righe.length - 1].r;
+  const vecchie = ultimo - primo + 1;
+  const delta = segmenti.length - vecchie;
+  if (delta > 0) {
+    for (let rr = c.nR; rr > ultimo; rr--) {
+      [base, base + 1].forEach((col) => {
+        const k = rr + '|' + col;
+        if (c.celle[k]) {
+          c.celle[rr + delta + '|' + col] = c.celle[k];
+          delete c.celle[k];
+        }
+      });
+    }
+    c.nR += delta;
+  }
+  for (let rr = primo; rr <= ultimo; rr++) {
+    delete c.celle[rr + '|' + base];
+    delete c.celle[rr + '|' + (base + 1)];
+  }
+  segmenti.forEach((sg, i) => {
+    const clr = sg.warn ? _PE_CLR.rosso : _peColoreSettore(sg.pos);
+    const a = { v: sg.pos, b: 1, bg: clr, sz: 9 };
+    const b = { v: _pbOra(sg.ini) + ' - ' + _pbOra(sg.fin) + (sg.warn ? '  [!]' : ''), b: 1, bg: clr, sz: 9 };
+    if (sg.warn) {
+      a.fg = '#fff';
+      b.fg = '#fff';
+    }
+    c.celle[primo + i + '|' + base] = a;
+    c.celle[primo + i + '|' + (base + 1)] = b;
+  });
+}
+// chi da il cambio: la riga della postazione va al nuovo orario, dove c era la
+// copertura torna SALA e le sale vicine si uniscono. Serve che nel nuovo orario
+// chi copre sia in SALA; altrimenti non tocca nulla e restituisce il motivo.
+function _pbSpostaCambio(c, blk, riga, nuovo) {
+  const warn = (c.celle[riga.r + '|' + blk.base] || {}).bg === _PE_CLR.rosso;
+  const seg = blk.righe.map((x) => ({
+    pos: x === riga ? 'SALA' : x.pos,
+    ini: x.ini,
+    fin: x.fin,
+    warn: x !== riga && (c.celle[x.r + '|' + blk.base] || {}).bg === _PE_CLR.rosso,
+  }));
+  const libero = seg.filter((x) => x.pos === 'SALA' && x.fin > nuovo.ini && x.ini < nuovo.fin);
+  let copre = 0;
+  libero.forEach((x) => (copre += Math.min(x.fin, nuovo.fin) - Math.max(x.ini, nuovo.ini)));
+  if (copre !== nuovo.fin - nuovo.ini) return 'alle ' + _pbOra(nuovo.ini) + ' non e in sala';
+  const out = [];
+  seg.forEach((x) => {
+    if (x.pos !== 'SALA' || x.fin <= nuovo.ini || x.ini >= nuovo.fin) return out.push(x);
+    if (x.ini < nuovo.ini) out.push({ pos: 'SALA', ini: x.ini, fin: nuovo.ini });
+    if (x.ini <= nuovo.ini) out.push({ pos: riga.pos, ini: nuovo.ini, fin: nuovo.fin, warn: warn });
+    if (x.fin > nuovo.fin) out.push({ pos: 'SALA', ini: nuovo.fin, fin: x.fin });
+  });
+  const uniti = [];
+  out.forEach((x) => {
+    const u = uniti[uniti.length - 1];
+    if (u && u.pos === 'SALA' && x.pos === 'SALA' && u.fin === x.ini && !u.warn && !x.warn) u.fin = x.fin;
+    else uniti.push(Object.assign({}, x));
+  });
+  _pbScriviRighe(c, blk, uniti);
+  return '';
+}
+// scambio di due righe adiacenti della stessa colonna RICALCOLANDO gli orari:
+// l inizio resta quello della prima, le durate seguono le postazioni
+// (es. R24 22.15-22.45 + PAUSA 22.45-23.00 -> PAUSA 22.15-22.30 + R24 22.30-23.00).
+// Restituisce la riga dove e finita la riga r, oppure 0 se non si puo.
+function _pbScambia(c, base, r, dir) {
   const dati = (rr) => {
     const a = c.celle[rr + '|' + base];
     const b = c.celle[rr + '|' + (base + 1)];
     if (!a || !b || a.hdr || a.span || b.hdr) return null;
-    const orario = String(b.v || '');
-    if (!orario.includes(' - ')) return null;
-    const p = orario.split(' - ');
-    const ini = _peOraMin(p[0].trim());
-    let fin = _peOraMin(p[1].trim());
-    if (ini == null || fin == null) return null;
-    let iniA = ini < 660 ? ini + 1440 : ini;
-    let finA = fin < 660 ? fin + 1440 : fin;
-    if (finA <= iniA) finA += 1440;
-    return { a: a, b: b, ini: iniA, fin: finA, dur: finA - iniA };
+    const iv = _pbIntervallo(b.v);
+    if (!iv) return null;
+    return { a: a, b: b, ini: iv.ini, fin: iv.fin, dur: iv.fin - iv.ini };
   };
   // trova la riga adiacente (salta le righe vuote della stessa coppia)
   let r2 = r + dir;
@@ -2620,24 +2816,14 @@ function briefPausaSposta(base, r, dir) {
     r2 += dir;
   }
   const d1 = dati(r);
-  if (!d1 || !d2) {
-    toast('Questa riga non si può scambiare (serve una riga di copertura adiacente)');
-    return;
-  }
+  if (!d1 || !d2) return 0;
   const prima = dir < 0 ? d2 : d1;
   const seconda = dir < 0 ? d1 : d2;
-  // le POSTAZIONI si scambiano (e l'eventuale avviso rosso [!] le segue),
-  // gli orari si ricalcolano in sequenza dall'inizio della prima riga
+  // le POSTAZIONI si scambiano (e l eventuale avviso rosso [!] le segue),
+  // gli orari si ricalcolano in sequenza dall inizio della prima riga
   const inizio = prima.ini;
   const warnPrima = prima.a.bg === _PE_CLR.rosso;
   const warnSeconda = seconda.a.bg === _PE_CLR.rosso;
-  const oraStile = (min) => {
-    // stile Excel: la fascia 24:00-24:59 si scrive 24.xx
-    let m = min;
-    while (m >= 1500) m -= 1440;
-    if (m >= 1440) return '24.' + String(m - 1440).padStart(2, '0');
-    return _peMinToOra(m);
-  };
   const durPrima = seconda.dur;
   const nuovi = [
     { d: prima, pos: seconda.a.v, warn: warnSeconda, ini: inizio, fin: inizio + durPrima },
@@ -2647,7 +2833,7 @@ function briefPausaSposta(base, r, dir) {
     x.d.a.v = x.pos;
     const clr = x.warn ? _PE_CLR.rosso : _peColoreSettore(x.pos);
     x.d.a.bg = clr;
-    x.d.b.v = oraStile(x.ini) + ' - ' + oraStile(x.fin) + (x.warn ? '  [!]' : '');
+    x.d.b.v = _pbOra(x.ini) + ' - ' + _pbOra(x.fin) + (x.warn ? '  [!]' : '');
     x.d.b.bg = clr;
     if (x.warn) {
       x.d.a.fg = '#fff';
@@ -2657,11 +2843,107 @@ function briefPausaSposta(base, r, dir) {
       delete x.d.b.fg;
     }
   });
+  return r2;
+}
+// chi va in pausa: la PAUSA si sposta con UNO scambio con la riga vicina (come con
+// le frecce). Se ne servono di piu non si tocca nulla: scorrerebbero altre righe della
+// colonna, cioe i cambi dati ad altri colleghi, senza che l operatore lo veda.
+function _pbSpostaPausa(c, blk, riga, nuovo) {
+  const copia = JSON.stringify(c.celle);
+  let r = riga.r;
+  let ini = riga.ini;
+  for (let i = 0; i < 1 && ini !== nuovo.ini; i++) {
+    const dir = nuovo.ini < ini ? -1 : 1;
+    const r2 = _pbScambia(c, blk.base, r, dir);
+    if (!r2) break;
+    r = r2;
+    const iv = _pbIntervallo((c.celle[r + '|' + (blk.base + 1)] || {}).v);
+    if (!iv) break;
+    // oltrepassato: il nuovo orario non cade all inizio di una riga
+    if ((dir < 0 && iv.ini < nuovo.ini) || (dir > 0 && iv.ini > nuovo.ini)) break;
+    ini = iv.ini;
+  }
+  if (ini !== nuovo.ini) {
+    c.celle = JSON.parse(copia);
+    return 'spostala a mano con le frecce nella sua colonna (alle ' + _pbOra(nuovo.ini) + ')';
+  }
+  return '';
+}
+// dopo uno scambio: se si e spostata una PAUSA, si sposta anche il cambio di chi la
+// copre; se si e spostato un cambio, si sposta la PAUSA di chi e coperto
+function _pbSincronizza(c, prima, base) {
+  const dopo = _pbBlocchi(c);
+  const legami = _pbLegami(c);
+  const tutte = _pbCoperture(prima);
+  const cop = {};
+  legami.forEach((k) => {
+    if (tutte[k]) cop[k] = tutte[k];
+  });
+  const msg = [];
+  const bPrima = prima.filter((b) => b.base === base);
+  const bDopo = dopo.filter((b) => b.base === base);
+  bPrima.forEach((bp, i) => {
+    const bd = bDopo[i];
+    if (!bd) return;
+    const chiave = (x) => x.pos + '@' + x.ini + '-' + x.fin;
+    const prese = new Set(bd.righe.map(chiave));
+    const vecchie = bp.righe.filter((x) => !prese.has(chiave(x)));
+    vecchie.forEach((v) => {
+      const n = bd.righe.find((x) => x.pos === v.pos && !bp.righe.some((y) => chiave(y) === chiave(x)));
+      if (!n) return;
+      const nuovo = { ini: n.ini, fin: n.fin };
+      const chi = (b) => (b.nome ? b.nome.split(' ')[0] : b.post);
+      if (v.pos === 'PAUSA' && cop[bp.post]) {
+        const k = cop[bp.post].cambi.find((x) => x.riga.ini === v.ini && x.riga.fin === v.fin);
+        if (!k) return;
+        const blk = _pbBlocchi(c).find((b) => b.base === k.blk.base && b.r === k.blk.r);
+        const riga = blk && blk.righe.find((x) => x.pos === bp.post && x.ini === v.ini && x.fin === v.fin);
+        if (!riga) return;
+        const err = _pbSpostaCambio(c, blk, riga, nuovo);
+        msg.push(
+          err
+            ? 'Cambio di ' + chi(blk) + ' non spostato: ' + err
+            : 'Spostato anche il cambio di ' + chi(blk) + ': ' + bp.post + ' ' + _pbOra(n.ini) + '-' + _pbOra(n.fin),
+        );
+      } else if (cop[v.pos] && cop[v.pos].blk.base !== base) {
+        const pb = cop[v.pos].blk;
+        const blk = _pbBlocchi(c).find((b) => b.base === pb.base && b.r === pb.r);
+        const riga = blk && blk.righe.find((x) => x.pos === 'PAUSA' && x.ini === v.ini && x.fin === v.fin);
+        if (!riga) return;
+        const err = _pbSpostaPausa(c, blk, riga, nuovo);
+        msg.push(
+          err
+            ? 'Pausa di ' + chi(blk) + ' non spostata: ' + err
+            : 'Spostata anche la pausa di ' + chi(blk) + ': ' + _pbOra(n.ini) + '-' + _pbOra(n.fin),
+        );
+      }
+    });
+  });
+  return msg;
+}
+// frecce: scambia la riga con quella adiacente e tiene allineati pausa e cambio
+function briefPausaSposta(base, r, dir) {
+  if (!puoGestireBriefing() || !_briefState || !_briefState.pause) return;
+  const c = _briefState.pause.contenuto;
+  _pbLegami(c);
+  _briefRicorda();
+  const prima = _pbBlocchi(c);
+  if (!_pbScambia(c, base, r, dir)) {
+    _briefDimentica();
+    toast('Questa riga non si può scambiare (serve una riga di copertura adiacente)');
+    return;
+  }
+  const msg = _pbSincronizza(c, prima, base);
+  window._briefPauseAvviso = msg.length ? msg.join(' · ') : null;
+  if (msg.length) toast(msg.join(' · '), 5000);
   _briefSalvaPauseDebounce();
   _briefRefreshPause();
 }
 function briefPausaDelRiga(base, r) {
   if (!puoGestireBriefing() || !_briefState || !_briefState.pause) return;
+  _pbLegami(_briefState.pause.contenuto);
+  _briefRicorda();
+  window._briefPauseAvviso = null;
   const c = _briefState.pause.contenuto;
   delete c.celle[r + '|' + base];
   delete c.celle[r + '|' + (base + 1)];
@@ -2671,6 +2953,9 @@ function briefPausaDelRiga(base, r) {
 // modifica cella pause slots (r|c del foglio virtuale)
 function briefPausaCellaSlots(r, c, val) {
   if (!puoGestireBriefing() || !_briefState || !_briefState.pause) return;
+  _pbLegami(_briefState.pause.contenuto);
+  _briefRicorda();
+  window._briefPauseAvviso = null;
   const g = _briefState.pause.contenuto.celle;
   const k = r + '|' + c;
   if (!val.trim()) {
@@ -2696,10 +2981,12 @@ function briefPausaCellaSlots(r, c, val) {
     g[k] = nuovo;
   }
   _briefSalvaPauseDebounce();
+  _briefRefreshPause(); // avvisi pausa/cambio aggiornati
 }
 // modifica pause valet (riga i, pausa k o campo)
 function briefPausaCellaValet(i, campo, val) {
   if (!puoGestireBriefing() || !_briefState || !_briefState.pause) return;
+  _briefRicorda('valet|' + i + '|' + campo);
   const c = _briefState.pause.contenuto;
   if (campo === 'p0' || campo === 'p1' || campo === 'p2') {
     const k = parseInt(campo[1]);
@@ -2715,12 +3002,14 @@ function briefPausaCellaValet(i, campo, val) {
 }
 function briefValetAddRiga() {
   if (!puoGestireBriefing() || !_briefState || !_briefState.pause) return;
+  _briefRicorda();
   _briefState.pause.contenuto.righe.push({ turno: '', nome: '', orario: '', pause: [] });
   _briefSalvaPauseDebounce();
   _briefRefreshPause();
 }
 function briefValetDelRiga(i) {
   if (!puoGestireBriefing() || !_briefState || !_briefState.pause) return;
+  _briefRicorda();
   _briefState.pause.contenuto.righe.splice(i, 1);
   _briefSalvaPauseDebounce();
   _briefRefreshPause();
@@ -2728,6 +3017,8 @@ function briefValetDelRiga(i) {
 async function briefEliminaPause() {
   if (!puoGestireBriefing() || !_briefState || !_briefState.pause || !_briefState.pause.id) return;
   if (!(await chiediConferma('Elimino le pause di questa data?'))) return;
+  _briefRicorda();
+  window._briefPauseAvviso = null;
   await secDel('piano_briefing', 'id=eq.' + _briefState.pause.id);
   _briefState.pause = null;
   renderPiano();
@@ -2740,6 +3031,9 @@ function _briefRenderPause(c) {
 function _briefRenderPauseSlots(c) {
   const puo = puoGestireBriefing();
   let h = '';
+  // righe dove pausa e cambio non coincidono: bordo rosso
+  const errate = new Set();
+  (typeof _pbControlla === 'function' ? _pbControlla(c) : []).forEach((x) => x.celle.forEach((k) => errate.add(k)));
   const tit = c.celle['1|1'];
   const dataC = c.celle['2|1'];
   const sotto = c.celle['3|1'];
@@ -2748,7 +3042,7 @@ function _briefRenderPauseSlots(c) {
     h +=
       '<div style="border:1px solid #999;background:' +
       (tit.bg || '#FFFF00') +
-      ';font-weight:bold;text-align:center;padding:4px;font-size:var(--fs-base,.9375rem)">' +
+      ';color:#14100a;font-weight:bold;text-align:center;padding:4px;font-size:var(--fs-base,.9375rem)">' +
       escP(tit.v) +
       '</div>';
   if (dataC)
@@ -2757,7 +3051,7 @@ function _briefRenderPauseSlots(c) {
     h +=
       '<div style="border:1px solid #999;background:' +
       (sotto.bg || '#FFFF00') +
-      ';font-weight:bold;text-align:center;padding:3px;font-size:var(--fs-md,.875rem)">' +
+      ';color:#14100a;font-weight:bold;text-align:center;padding:3px;font-size:var(--fs-md,.875rem)">' +
       escP(sotto.v) +
       '</div>';
   h += '</div>';
@@ -2807,10 +3101,12 @@ function _briefRenderPauseSlots(c) {
           return;
         }
         const stile =
+          (errate.has(riga.r + '|' + base) ? 'box-shadow:inset 0 0 0 2px var(--c-rosso,#c0392b);' : '') +
           'border:1px solid #999;background:' +
           (cell.bg || 'transparent') +
           ';color:' +
-          (cell.fg || 'inherit') +
+          // fondo sempre chiaro (pastello o giallo): testo scuro anche nel tema scuro
+          (cell.fg || (cell.bg ? '#14100a' : 'inherit')) +
           ';padding:0';
         if (puo) {
           t +=
@@ -3014,7 +3310,7 @@ function _briefRenderPauseValet(c) {
   h += '<div id="brief-crono">' + _briefRenderCronoValet(c) + '</div>';
   if (c.nota)
     h +=
-      '<p style="font-size:var(--fs-sm,.8125rem);font-style:italic;background:#FFFFCC;border:1px solid #999;padding:6px 10px;margin-top:10px;max-width:560px">' +
+      '<p style="font-size:var(--fs-sm,.8125rem);font-style:italic;background:#FFFFCC;color:#14100a;border:1px solid #999;padding:6px 10px;margin-top:10px;max-width:560px">' +
       escP(c.nota) +
       '</p>';
   if (puo)

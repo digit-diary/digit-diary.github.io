@@ -498,6 +498,7 @@ async function _renderPianoBriefingTab() {
     (cdDaAggiornare
       ? '<span style="font-size:var(--fs-sm,.8125rem);background:#ffd166;color:#5a4300;padding:3px 10px;border-radius:3px;font-weight:700">I numeri cassa di ieri sono cambiati: premi "Aggiorna numeri cassa"</span>'
       : '') +
+    (puoGestireBriefing() ? _briefAnnullaBottoni() : '') +
     '<span id="brief-stato" style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
     (salvato
       ? 'Salvato'
@@ -678,6 +679,123 @@ async function _renderPianoBriefingTab() {
   h += _briefRenderEvidCard();
   return h;
 }
+// ANNULLA / RIPRISTINA del briefing: righe (nomi, turni, casse, colori, formato)
+// e pause insieme. Ogni modifica salva prima una fotografia del giorno; Annulla
+// torna alla fotografia precedente e la salva. Vale per il giorno e il settore
+// aperti (cambiando giorno si riparte da zero), come il calendario del Piano.
+let _briefUndo = { chiave: null, passi: [], rifatti: [], gruppo: null, t: 0 };
+function _briefFoto() {
+  return JSON.stringify({
+    righe: _briefState.righe,
+    cdManuale: !!_briefState.cdManuale,
+    pause: _briefState.pause && _briefState.pause.contenuto ? _briefState.pause.contenuto : null,
+  });
+}
+function _briefUndoCorrente() {
+  if (!_briefState) return null;
+  if (_briefUndo.chiave !== _briefState.chiave)
+    _briefUndo = { chiave: _briefState.chiave, passi: [], rifatti: [], gruppo: null, t: 0 };
+  return _briefUndo;
+}
+// gruppo: la battitura continua nello stesso campo diventa un solo passo
+function _briefRicorda(gruppo) {
+  const u = _briefUndoCorrente();
+  if (!u) return;
+  const ora = Date.now();
+  if (gruppo && gruppo === u.gruppo && ora - u.t < 2500) {
+    u.t = ora;
+    return;
+  }
+  u.gruppo = gruppo || null;
+  u.t = ora;
+  u.passi.push(_briefFoto());
+  if (u.passi.length > 40) u.passi.shift();
+  u.rifatti = [];
+  _briefAggiornaAnnulla();
+}
+function _briefDimentica() {
+  const u = _briefUndoCorrente();
+  if (u && u.passi.length) u.passi.pop();
+  _briefAggiornaAnnulla();
+}
+function _briefAnnullaBottoni() {
+  const u = _briefUndoCorrente() || { passi: [], rifatti: [] };
+  return (
+    '<span id="brief-annulla-box" style="display:inline-flex;gap:6px;margin-right:10px">' +
+    '<button class="btn-export" id="brief-btn-annulla" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" onclick="briefAnnulla()" title="Annulla l ultima modifica del briefing o delle pause (Ctrl+Z)"' +
+    (u.passi.length ? '' : ' disabled') +
+    '>Annulla</button>' +
+    '<button class="btn-export" id="brief-btn-ripristina" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" onclick="briefRipristina()" title="Rimette la modifica annullata (Ctrl+Y)"' +
+    (u.rifatti.length ? '' : ' disabled') +
+    '>Ripristina</button></span>'
+  );
+}
+function _briefAggiornaAnnulla() {
+  const u = _briefUndoCorrente() || { passi: [], rifatti: [] };
+  const a = document.getElementById('brief-btn-annulla');
+  const r = document.getElementById('brief-btn-ripristina');
+  if (a) a.disabled = !u.passi.length;
+  if (r) r.disabled = !u.rifatti.length;
+}
+async function _briefApplicaFoto(json) {
+  const f = JSON.parse(json);
+  _briefState.righe = f.righe;
+  _briefState.cdManuale = f.cdManuale;
+  clearTimeout(_briefSaveTimer);
+  await briefSalvaBriefing();
+  // pause: si riportano come erano (anche generate o eliminate)
+  if (typeof _briefPauseSaveTimer !== 'undefined') clearTimeout(_briefPauseSaveTimer);
+  const p = _briefState.pause;
+  try {
+    if (f.pause && p && p.id) {
+      p.contenuto = f.pause;
+      await secPatch('piano_briefing', 'id=eq.' + p.id, {
+        contenuto: f.pause,
+        operatore: getOperatore(),
+        updated_at: new Date().toISOString(),
+      });
+    } else if (f.pause) {
+      const [dataSt, repSt] = String(_briefState.chiave || '').split('|');
+      const nuovo = await secPost('piano_briefing', {
+        data: dataSt || _briefData,
+        reparto_dip: repSt || _pianoReparto(),
+        sezione: 'pause',
+        contenuto: f.pause,
+        operatore: getOperatore(),
+      });
+      _briefState.pause = nuovo && nuovo[0] ? nuovo[0] : { id: null, contenuto: f.pause };
+    } else if (p && p.id) {
+      await secDel('piano_briefing', 'id=eq.' + p.id);
+      _briefState.pause = null;
+    }
+  } catch (e) {
+    toastErrore('Pause non ripristinate: ' + (e.message || 'errore di salvataggio'));
+  }
+  window._briefPauseAvviso = null;
+  renderPiano();
+}
+async function briefAnnulla() {
+  if (!puoGestireBriefing() || !_briefState) return;
+  const u = _briefUndoCorrente();
+  if (!u.passi.length) return toast('Niente da annullare nel briefing');
+  const ora = _briefFoto();
+  const prima = u.passi.pop();
+  u.rifatti.push(ora);
+  u.gruppo = null;
+  await _briefApplicaFoto(prima);
+  logAzione('Briefing: annullata modifica', _briefData);
+  toast('Modifica annullata');
+}
+async function briefRipristina() {
+  if (!puoGestireBriefing() || !_briefState) return;
+  const u = _briefUndoCorrente();
+  if (!u.rifatti.length) return toast('Niente da ripristinare');
+  u.passi.push(_briefFoto());
+  u.gruppo = null;
+  await _briefApplicaFoto(u.rifatti.pop());
+  logAzione('Briefing: ripristinata modifica', _briefData);
+  toast('Modifica ripristinata');
+}
 function briefCambiaData(delta) {
   const d = new Date(_briefData + 'T12:00:00');
   d.setDate(d.getDate() + delta);
@@ -692,6 +810,7 @@ function briefSetData(v) {
 }
 function briefCella(i, campo, val) {
   if (!puoGestireBriefing() || !_briefState) return;
+  _briefRicorda('cella|' + i + '|' + campo);
   _briefState.righe[i][campo] = val;
   if (campo === 'nome') _briefState.righe[i].nomeFull = null; // ri-matcha al salvataggio timbratura
   // numero cassa scritto a mano: da qui in poi la rotazione non lo sovrascrive
@@ -778,6 +897,7 @@ async function briefSalvaBriefing() {
 }
 async function briefAggiungiRiga() {
   if (!_briefState) return;
+  _briefRicorda();
   _briefState.righe.push({
     e: '',
     u: '',
@@ -809,6 +929,7 @@ async function briefTestoApplica(col) {
     toast('Prima clicca le celle o le righe, poi scegli il colore del testo');
     return;
   }
+  _briefRicorda();
   let n = 0;
   selC.forEach((k) => {
     const i = k.split('|')[0];
@@ -871,6 +992,7 @@ async function briefIncollaFormato() {
     toast('Marca le celle a cui applicare il formato');
     return;
   }
+  _briefRicorda();
   let n = 0;
   selC.forEach((k) => {
     const r = _briefState.righe[parseInt(k.split('|')[0])];
@@ -896,6 +1018,7 @@ async function briefCancellaFormato() {
     toast('Prima marca le celle o le righe da pulire');
     return;
   }
+  _briefRicorda();
   let n = 0;
   selC.forEach((k) => {
     const r = _briefState.righe[parseInt(k.split('|')[0])];
@@ -922,6 +1045,7 @@ async function briefCancellaFormato() {
 }
 async function briefInserisciRiga(i) {
   if (!_briefState || !puoGestireBriefing()) return;
+  _briefRicorda();
   _briefState.righe.splice(i + 1, 0, _briefRigaVuota());
   clearTimeout(_briefSaveTimer);
   await briefSalvaBriefing();
@@ -1022,6 +1146,7 @@ async function briefColoreApplica(col) {
     toast('Prima clicca le celle o le righe da colorare, poi scegli il colore');
     return;
   }
+  _briefRicorda();
   let n = 0;
   selC.forEach((k) => {
     const i = k.split('|')[0];
@@ -1061,6 +1186,7 @@ async function briefFormatoApplica(f) {
     toast('Prima clicca le celle o le righe, poi scegli il formato');
     return;
   }
+  _briefRicorda();
   const prop = f === 'b' ? 'bold' : 'ital';
   let tutte = true;
   selC.forEach((k) => {
@@ -1102,6 +1228,7 @@ async function briefMuoviRiga(i, delta) {
   if (!_briefState || !puoGestireBriefing()) return;
   const j = i + delta;
   if (j < 0 || j >= _briefState.righe.length) return;
+  _briefRicorda();
   const tmp = _briefState.righe[i];
   _briefState.righe[i] = _briefState.righe[j];
   _briefState.righe[j] = tmp;
@@ -1111,6 +1238,7 @@ async function briefMuoviRiga(i, delta) {
 }
 async function briefEliminaRiga(i) {
   if (!_briefState || !puoGestireBriefing()) return;
+  _briefRicorda();
   _briefState.righe.splice(i, 1);
   clearTimeout(_briefSaveTimer);
   await briefSalvaBriefing();
@@ -1127,6 +1255,7 @@ async function briefAggiornaCd() {
     ))
   )
     return;
+  _briefRicorda();
   _briefState.righe.forEach((r) => {
     r.cd = '';
   });
@@ -1144,6 +1273,7 @@ async function briefCompila() {
     !(await chiediConferma('Sostituisco le righe attuali con i turni del piano di ' + _briefData + '?'))
   )
     return;
+  _briefRicorda();
   _briefState.righe = _briefComponi(_briefState.pianoRighe);
   await _briefAggiungiScoperti(_briefState.righe, _briefData);
   if (!_briefIsValet() && _pianoReparto() === 'slots') await _briefAssegnaCd(_briefState.righe, _briefData);
@@ -1257,6 +1387,19 @@ function _briefPauseBodyHtml() {
   if (p && p.contenuto && p.contenuto.tipo) {
     h +=
       '<div style="margin-bottom:8px"><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px" onclick="pdfPauseGiorno()">Stampa pause</button></div>';
+    if (window._briefPauseAvviso)
+      h +=
+        '<div class="pb-avviso" style="margin:0 0 8px;padding:6px 10px;font-size:var(--fs-sm,.8125rem);background:var(--c-azzurro-bg,#e6f0f8);border-left:3px solid var(--c-azzurro,#1f6fa3);display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span>' +
+        escP(window._briefPauseAvviso) +
+        '</span><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px" onclick="briefAnnulla()">Annulla</button></div>';
+    const avvisi = p.contenuto.tipo === 'slots' && typeof _pbControlla === 'function' ? _pbControlla(p.contenuto) : [];
+    if (avvisi.length)
+      h +=
+        '<div class="pb-errori" style="margin:0 0 8px;padding:6px 10px;font-size:var(--fs-sm,.8125rem);background:var(--c-rosso-bg,#fdecea);border-left:3px solid var(--c-rosso,#c0392b)"><b>Pause e cambi non coincidono (' +
+        avvisi.length +
+        ')</b><br>' +
+        avvisi.map((x) => escP(x.testo)).join('<br>') +
+        '<br><span style="color:var(--muted)">Le righe interessate sono bordate di rosso. Puoi correggere con le frecce o scrivendo nelle celle.</span></div>';
     h += _briefRenderPause(p.contenuto);
     const viol = typeof _peVerificaRegolePause === 'function' ? _peVerificaRegolePause(p.contenuto, _briefData) : [];
     if (viol.length)

@@ -17,8 +17,8 @@
  *  - un documento creato (modulo, registrazione) annullato va nel Cestino,
  *    non sparisce;
  *  - ogni annullamento e a sua volta un'azione nel registro;
- *  - la griglia del Piano (tabella piano) e il briefing hanno il loro Annulla
- *    e restano fuori; le chat e il registro non si annullano.
+ *  - la griglia del Piano (tabella piano) e il briefing (righe e pause, in
+ *    piano-briefing-ui.js) hanno il loro Annulla e restano fuori; le chat e il registro non si annullano.
  *
  * La parte di logica e una fabbrica pura (creaAnnulla) che riceve il canale
  * dati come parametro: cosi si prova con Node (test/annulla.test.js).
@@ -420,6 +420,22 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     const pg = localStorage.getItem('pagina_corrente') || '';
     if (pg === 'piano' && typeof _pianoTab !== 'undefined' && _pianoTab === 'calendario') return;
     const k = String(e.key || '').toLowerCase();
+    // nel briefing vale il suo Annulla (righe e pause del giorno aperto)
+    if (
+      pg === 'piano' &&
+      typeof _pianoTab !== 'undefined' &&
+      _pianoTab === 'briefing' &&
+      typeof briefAnnulla === 'function'
+    ) {
+      if (k === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        briefAnnulla();
+      } else if (k === 'y' || (k === 'z' && e.shiftKey)) {
+        e.preventDefault();
+        briefRipristina();
+      }
+      return;
+    }
     if (k === 'z' && !e.shiftKey) {
       e.preventDefault();
       annullaGlobale();
