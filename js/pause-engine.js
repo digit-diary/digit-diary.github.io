@@ -3868,18 +3868,22 @@ function _peHexRgb(hex) {
 function pdfBriefingGiorno() {
   if (!_briefState) return;
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF('portrait', 'mm', 'a4');
   const valet = _briefIsValet();
+  // sempre in verticale (deciso dal titolare): le colonne si allargano quanto il testo
+  // e il carattere si adatta perche ci stia tutto in un foglio
+  const doc = new jsPDF('portrait', 'mm', 'a4');
+  const PW = 210;
+  const PH = 297;
   const dstr = _briefData;
   const lbl = _briefGiornoLbl(dstr) + ' ' + dstr.split('-').reverse().join('.');
   doc.setFillColor(255, 255, 0);
-  doc.rect(10, 10, 190, 9, 'F');
+  doc.rect(10, 10, PW - 20, 10, 'F');
   doc.setDrawColor(120);
-  doc.rect(10, 10, 190, 9);
+  doc.rect(10, 10, PW - 20, 10);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
+  doc.setFontSize(15);
   doc.setTextColor(0);
-  doc.text('BRIEFING ' + repartoNomeDocumento(_pianoReparto()).toUpperCase() + ' · ' + lbl, 105, 16.2, {
+  doc.text('BRIEFING ' + repartoNomeDocumento(_pianoReparto()).toUpperCase() + ' · ' + lbl, PW / 2, 17, {
     align: 'center',
   });
   const generico = !valet && _pianoReparto() !== 'slots';
@@ -3917,15 +3921,100 @@ function pdfBriefingGiorno() {
           : ['', '', nomePdf, r.turno || '', r.cd || '', r.uscita || '', r.firma || ''],
     );
   });
-  // sempre in UN SOLO foglio: con tante righe compatta altezza e carattere
+  // sempre in UN SOLO foglio, con il carattere piu grande che ci sta (fino a 12)
+  // e colonne larghe quanto il testo piu lungo (cognomi lunghi, radio, badge)
   const nRighe = body.length || 1;
-  const rowH = nRighe > 32 ? Math.max(4.4, Math.floor((248 / nRighe) * 10) / 10) : 7;
-  const fontR = nRighe > 32 ? 7.4 : 8.5;
-  const padR = nRighe > 32 ? 1.1 : 1.8;
+  const largMax = valet ? PW - 20 : 142; // Slots/altri: a destra c e il riquadro ORARI
+  const altDisp = PH - 26 - 12;
+  const misura = (f) => {
+    doc.setFontSize(f);
+    const pad = Math.max(1, f * 0.17);
+    const larg = cols.map((h, c) => {
+      doc.setFont('helvetica', 'bold');
+      let w = doc.getTextWidth(String(h));
+      body.forEach((riga) => {
+        if (riga.length !== cols.length) return;
+        doc.setFont('helvetica', c === 2 || c === 3 || (c === 4 && !valet && !generico) ? 'bold' : 'normal');
+        w = Math.max(w, doc.getTextWidth(String(riga[c] == null ? '' : riga[c])));
+      });
+      return w + 2 * pad + 1.5;
+    });
+    const minimi = cols.map((h) => (h === 'E' || h === 'U' ? 9 : h === 'FIRMA' ? 30 : h === 'USCITA' ? 18 : 12));
+    const w = larg.map((x, c) => Math.max(x, minimi[c]));
+    const rowH = f * 0.3528 * 1.25 + 2 * pad;
+    return { f, pad, w, rowH, somma: w.reduce((a, b) => a + b, 0), naturale: w[2] };
+  };
+  // il nome si allarga quanto serve; se non ci sta nella larghezza del foglio va a
+  // capo su due righe (la riga si alza) invece di rimpicciolire tutto il testo
+  const adatta = (x, larghMax) => {
+    const altre = x.somma - x.w[2];
+    const spazio = larghMax - altre;
+    if (spazio < 30) return null;
+    let doppie = 0;
+    if (x.w[2] > spazio) {
+      doc.setFontSize(x.f);
+      doc.setFont('helvetica', 'bold');
+      body.forEach((riga) => {
+        if (riga.length === cols.length && doc.getTextWidth(String(riga[2] || '')) + 2 * x.pad + 1.5 > spazio) doppie++;
+      });
+      x.w[2] = spazio;
+      x.somma = altre + spazio;
+    }
+    x.doppie = doppie;
+    return x;
+  };
+  // Slots e altri: ORARI accanto (tabella fino a 142 mm) oppure sotto (tabella fino a
+  // 190 mm, se i nomi lunghi chiedono spazio): si sceglie la disposizione con il
+  // carattere piu grande che ci sta
+  const nOrari = valet
+    ? 0
+    : _pianoTurniReparto().filter((t) =>
+        (_briefState.righe || []).some(
+          (r) =>
+            String(r.turno || '')
+              .trim()
+              .toUpperCase() === String(t.codice).toUpperCase(),
+        ),
+      ).length;
+  const cerca = (larghMax, altMax) => {
+    // prima una misura grande (almeno 9) senza nomi a capo; se non c e, il nome
+    // lungo va a capo e il resto del foglio resta grande
+    for (const aCapo of [false, true]) {
+      for (let f = 12; f >= (aCapo ? 6.5 : 9); f -= 0.5) {
+        const x = adatta(misura(f), larghMax);
+        if (!x || (!aCapo && x.doppie)) continue;
+        if (x.somma <= larghMax && (nRighe + x.doppie) * x.rowH + 8 <= altMax) return x;
+      }
+    }
+    return null;
+  };
+  let m = cerca(largMax, altDisp);
+  let orariSotto = false;
+  if (!valet) {
+    // altezza del riquadro ORARI: righe da circa 6 mm, stacchi fra i gruppi, intestazione
+    const sotto = cerca(PW - 20, altDisp - (nOrari * 6.3 + 30));
+    if (sotto && (!m || sotto.f > m.f)) {
+      m = sotto;
+      orariSotto = true;
+    }
+  }
+  if (!m) m = misura(6.5);
+  const largUso = valet || orariSotto ? PW - 20 : largMax;
+  // lo spazio che avanza va soprattutto a FIRMA (per scrivere) e al nome
+  const avanza = Math.max(0, (valet || orariSotto ? largUso : Math.min(largUso, Math.max(m.somma, 138))) - m.somma);
+  const iF = cols.indexOf('FIRMA');
+  if (iF >= 0) m.w[iF] += avanza * 0.6;
+  m.w[2] += avanza * (iF >= 0 ? 0.4 : 1);
+  const larghezze = {};
+  m.w.forEach((x, c) => (larghezze[c] = { cellWidth: Math.round(x * 10) / 10 }));
+  const tabW = m.w.reduce((a, b) => a + b, 0);
+  const rowH = m.rowH;
+  const fontR = m.f;
+  const padR = m.pad;
   doc.autoTable({
-    startY: 24,
+    startY: 26,
     margin: { left: 10 },
-    tableWidth: valet ? 190 : 138,
+    tableWidth: tabW,
     head: [cols],
     body: body,
     theme: 'grid',
@@ -3938,35 +4027,7 @@ function pdfBriefingGiorno() {
       minCellHeight: rowH,
     },
     headStyles: { fontStyle: 'bold', halign: 'center', minCellHeight: 6 },
-    columnStyles: valet
-      ? {
-          0: { cellWidth: 10 },
-          1: { cellWidth: 10 },
-          2: { cellWidth: 56 },
-          3: { cellWidth: 16 },
-          4: { cellWidth: 24 },
-          5: { cellWidth: 34 },
-          6: { cellWidth: 20 },
-          7: { cellWidth: 20 },
-        }
-      : generico
-        ? {
-            0: { cellWidth: 10 },
-            1: { cellWidth: 10 },
-            2: { cellWidth: 50 },
-            3: { cellWidth: 14 },
-            4: { cellWidth: 24 },
-            5: { cellWidth: 30 },
-          }
-        : {
-            0: { cellWidth: 10 },
-            1: { cellWidth: 10 },
-            2: { cellWidth: 46 },
-            3: { cellWidth: 13 },
-            4: { cellWidth: 11 },
-            5: { cellWidth: 20 },
-            6: { cellWidth: 28 },
-          },
+    columnStyles: larghezze,
     didParseCell: (d) => {
       if (d.section === 'head') {
         d.cell.styles.fillColor =
@@ -4019,13 +4080,13 @@ function pdfBriefingGiorno() {
       bodyT.push([t.codice, _briefOrarioHM(t.ora_inizio), _briefOrarioHM(t.ora_fine)]);
     });
     doc.autoTable({
-      startY: 24,
-      margin: { left: 156 },
+      startY: orariSotto ? doc.lastAutoTable.finalY + 6 : 26,
+      margin: { left: orariSotto ? 10 : Math.max(156, 10 + tabW + 4) },
       tableWidth: 44,
       head: [[{ content: 'ORARI', colSpan: 3, styles: { halign: 'center' } }]],
       body: bodyT,
       theme: 'grid',
-      styles: { fontSize: 7.5, cellPadding: 1.1, lineColor: [120, 120, 120], lineWidth: 0.2, textColor: [0, 0, 0] },
+      styles: { fontSize: 10, cellPadding: 1.3, lineColor: [120, 120, 120], lineWidth: 0.2, textColor: [0, 0, 0] },
       headStyles: { fillColor: [255, 255, 0], textColor: [0, 0, 0], fontStyle: 'bold' },
       columnStyles: { 0: { cellWidth: 13, fontStyle: 'bold' }, 1: { cellWidth: 15.5 }, 2: { cellWidth: 15.5 } },
       didParseCell: (d) => {
@@ -4038,7 +4099,7 @@ function pdfBriefingGiorno() {
   }
   doc.setFontSize(6);
   doc.setTextColor(120);
-  doc.text('Casino Lugano SA · Briefing · E/U da spuntare a penna', 10, 292);
+  doc.text('Casino Lugano SA · Briefing · E/U da spuntare a penna', 10, PH - 5);
   logAzione('Briefing stampato', _pianoReparto() + ' ' + dstr);
   mostraPdfPreview(doc, 'briefing_' + dstr + '_' + _pianoReparto() + '.pdf', 'Briefing ' + lbl);
 }
@@ -4079,7 +4140,7 @@ function pdfPauseGiorno() {
         (r.pause || [])[2] || '',
       ]),
       theme: 'grid',
-      styles: Object.assign({}, stiliBase, { fontSize: 8, cellPadding: 1.4 }),
+      styles: Object.assign({}, stiliBase, { fontSize: 9.5, cellPadding: 1.6 }),
       columnStyles: {
         0: { cellWidth: 15 },
         1: { cellWidth: 42 },
@@ -4257,8 +4318,8 @@ function pdfPauseGiorno() {
     const corpi = posti.map((l) => l.reduce((acc, bl, i) => acc.concat(i ? [spazio] : [], bl), []));
     const quattro = corpi[3].length > 0;
     const maxRighe = Math.max(1, ...corpi.map((x) => x.length));
-    // altezza di una riga a scala 1: circa 4,8 mm; spazio utile 257 mm
-    const scala = Math.min(1, 257 / (4.8 * maxRighe));
+    // carattere 8,5 (piu leggibile); altezza di una riga a scala 1 circa 5,5 mm; spazio utile 250 mm
+    const scala = Math.min(1, 250 / (5.5 * maxRighe));
     corpi.forEach((body, k) => {
       if (!body.length) return;
       doc.setPage(1);
@@ -4269,8 +4330,8 @@ function pdfPauseGiorno() {
         body: body,
         theme: 'grid',
         styles: Object.assign({}, stiliBase, {
-          cellPadding: Math.max(0.35, 0.9 * scala),
-          fontSize: Math.max(5.2, 7 * scala),
+          cellPadding: Math.max(0.35, 1 * scala),
+          fontSize: Math.max(5.2, 8.5 * scala),
         }),
         columnStyles: { 0: { cellWidth: 13 }, 1: { cellWidth: 29 } },
       });
