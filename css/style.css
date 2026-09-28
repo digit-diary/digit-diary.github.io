@@ -5899,3 +5899,22 @@ header h1 {
 .settore-doc input {
   width: 160px;
 }
+
+/* ricerca globale: l elemento trovato si illumina per un momento dopo il clic */
+@keyframes rg-evidenzia {
+  0%, 60% {
+    box-shadow: 0 0 0 3px var(--accent2);
+    background-color: rgba(212, 184, 106, 0.18);
+  }
+  100% {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+.rg-evidenzia {
+  animation: rg-evidenzia 2.4s ease-out;
+}
+/* il menu delle pagine resta fisso in alto: quando il programma porta in vista un
+   elemento (ricerca globale, collegamenti) lascia libero il suo spazio */
+html {
+  scroll-padding-top: 100px;
+}

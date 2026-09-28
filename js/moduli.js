@@ -2567,6 +2567,8 @@ function render() {
       return (
         '<div class="entry' +
         (pin ? ' pinned' : '') +
+        '" data-id="' +
+        escP(String(e.id)) +
         '"><div class="entry-date"><div class="entry-day">' +
         d.getDate() +
         '</div><div class="entry-month">' +

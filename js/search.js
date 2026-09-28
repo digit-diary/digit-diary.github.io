@@ -30,9 +30,11 @@ function _eseguiRicercaGlobale(q) {
     diarioRes.forEach((e) => {
       const d = new Date(e.data);
       html +=
-        "<div class=\"rg-item\" onclick=\"chiudiRicercaGlobale();switchPage('diario');document.getElementById('filt-cerca').value='" +
+        '<div class="rg-item" onclick="_rgVai(this)" data-tipo="diario" data-id="' +
+        escP(String(e.id)) +
+        '" data-q="' +
         escP(q) +
-        '\';render()"><span class="rg-badge" style="background:' +
+        '"><span class="rg-badge" style="background:' +
         getColore(e.tipo) +
         '">' +
         escP(e.tipo) +
@@ -62,9 +64,9 @@ function _eseguiRicercaGlobale(q) {
     moduRes.forEach((m) => {
       const colB = { allineamento: '#e67e22', apprezzamento: '#b8860b', rdi: '#c0392b' }[m.tipo] || 'var(--muted)';
       html +=
-        '<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'moduli\');setTimeout(()=>apriModuloSalvato(' +
-        m.id +
-        '),300)"><span class="rg-badge" style="background:' +
+        '<div class="rg-item" onclick="_rgVai(this)" data-tipo="moduli" data-id="' +
+        escP(String(m.id)) +
+        '"><span class="rg-badge" style="background:' +
         colB +
         '">' +
         escP(m.tipo) +
@@ -96,7 +98,11 @@ function _eseguiRicercaGlobale(q) {
     html += '<div class="rg-section">Note Colleghi (' + noteRes.length + (noteRes.length >= 5 ? '+' : '') + ')</div>';
     noteRes.forEach((n) => {
       html +=
-        '<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'note-collega\')"><span class="rg-badge" style="background:#2980b9">Nota</span><span class="rg-text"><strong>' +
+        '<div class="rg-item" onclick="_rgVai(this)" data-tipo="note" data-x="' +
+        escP(n.da_operatore === _op ? n.a_operatore : n.da_operatore) +
+        '" data-q="' +
+        escP(q) +
+        '"><span class="rg-badge" style="background:#2980b9">Nota</span><span class="rg-text"><strong>' +
         escP(n.da_operatore) +
         '</strong> → ' +
         escP(n.a_operatore) +
@@ -122,9 +128,9 @@ function _eseguiRicercaGlobale(q) {
       '<div class="rg-section">Costi Maison (' + maisonRes.length + (maisonRes.length >= 6 ? '+' : '') + ')</div>';
     maisonRes.forEach((r) => {
       html +=
-        "<div class=\"rg-item\" onclick=\"chiudiRicercaGlobale();switchPage('maison');document.getElementById('maison-filt-nome').value='" +
+        '<div class="rg-item" onclick="_rgVai(this)" data-tipo="maison" data-x="' +
         escP(r.nome) +
-        '\';renderMaisonDashboard()"><span class="rg-badge" style="background:#b8860b">Maison</span><span class="rg-text"><strong>' +
+        '"><span class="rg-badge" style="background:#b8860b">Maison</span><span class="rg-text"><strong>' +
         escP(r.nome) +
         '</strong> · ' +
         fmtCHF(r.costo) +
@@ -150,7 +156,9 @@ function _eseguiRicercaGlobale(q) {
     pmRes.forEach((p) => {
       const scaduto = !p.completata && p.data_scadenza <= new Date().toISOString().split('T')[0];
       html +=
-        '<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'promemoria\')"><span class="rg-badge" style="background:' +
+        '<div class="rg-item" onclick="_rgVai(this)" data-tipo="promemoria" data-x="' +
+        escP(p.titolo) +
+        '"><span class="rg-badge" style="background:' +
         (p.completata ? '#2c6e49' : scaduto ? 'var(--accent)' : '#8e44ad') +
         '">' +
         (p.completata ? 'Fatto' : scaduto ? 'Scaduto' : 'Todo') +
@@ -179,7 +187,9 @@ function _eseguiRicercaGlobale(q) {
     seRes.forEach((r) => {
       const tc = SE_TIPI_COLOR[r.tipo] || 'var(--muted)';
       html +=
-        '<div class="rg-item" onclick="chiudiRicercaGlobale();switchPage(\'maison\')"><span class="rg-badge" style="background:' +
+        '<div class="rg-item" onclick="_rgVai(this)" data-tipo="spese" data-x="' +
+        escP(r.beneficiario) +
+        '"><span class="rg-badge" style="background:' +
         tc +
         '">' +
         (SE_TIPI_LABEL[r.tipo] || r.tipo) +
@@ -208,9 +218,9 @@ function _eseguiRicercaGlobale(q) {
     html += '<div class="rg-section">Registro (' + logRes.length + (logRes.length >= 5 ? '+' : '') + ')</div>';
     logRes.forEach((l) => {
       html +=
-        "<div class=\"rg-item\" onclick=\"chiudiRicercaGlobale();switchPage('registro');document.getElementById('log-filt-cerca').value='" +
+        '<div class="rg-item" onclick="_rgVai(this)" data-tipo="registro" data-q="' +
         escP(q) +
-        '\';renderRegistro()"><span class="rg-badge" style="background:var(--muted)">Log</span><span class="rg-text"><strong>' +
+        '"><span class="rg-badge" style="background:var(--muted)">Log</span><span class="rg-text"><strong>' +
         escP(l.operatore || '') +
         '</strong> · ' +
         escP(l.azione) +
@@ -229,6 +239,82 @@ function _eseguiRicercaGlobale(q) {
       '"</div>';
   dd.innerHTML = html;
   dd.classList.add('show');
+}
+// Clic su un risultato: si apre la pagina, si applica il filtro e si porta in vista
+// l elemento trovato, evidenziato per un momento. Prima la pagina si apriva in cima
+// e il risultato restava fuori dallo schermo: sembrava sparito.
+function _rgEvidenzia(trova) {
+  let n = 0;
+  const prova = () => {
+    const el = trova();
+    if (!el) {
+      if (++n < 12) setTimeout(prova, 150); // la pagina puo impiegare un attimo a disegnarsi
+      return;
+    }
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    el.classList.remove('rg-evidenzia');
+    void el.offsetWidth;
+    el.classList.add('rg-evidenzia');
+    setTimeout(() => el.classList.remove('rg-evidenzia'), 2600);
+  };
+  setTimeout(prova, 200);
+}
+function _rgImposta(id, valore) {
+  const el = document.getElementById(id);
+  if (el) el.value = valore;
+}
+function _rgVai(it) {
+  const tipo = it.dataset.tipo;
+  const id = it.dataset.id || '';
+  const q = it.dataset.q || '';
+  const x = it.dataset.x || '';
+  chiudiRicercaGlobale();
+  if (tipo === 'diario') {
+    switchPage('diario');
+    _rgImposta('filt-cerca', q);
+    render();
+    _rgEvidenzia(() => document.querySelector('#page-diario .entry[data-id="' + CSS.escape(id) + '"]'));
+  } else if (tipo === 'moduli') {
+    switchPage('moduli');
+    setTimeout(() => apriModuloSalvato(isNaN(Number(id)) ? id : Number(id)), 300);
+  } else if (tipo === 'note') {
+    switchPage('note-collega');
+    setTimeout(() => {
+      if (typeof apriConversazione === 'function') apriConversazione(x);
+      _rgImposta('note-chat-search', q);
+      if (typeof cercaInChat === 'function') cercaInChat();
+    }, 300);
+  } else if (tipo === 'maison') {
+    switchPage('maison');
+    _rgImposta('maison-filt-nome', x);
+    renderMaisonDashboard();
+    _rgEvidenzia(() => {
+      const f = document.getElementById('maison-filt-nome');
+      return f && f.closest('.main-card');
+    });
+  } else if (tipo === 'promemoria') {
+    switchPage('promemoria');
+    _rgImposta('pm-filt-stato', 'tutti'); // anche quelli gia completati
+    _rgImposta('pm-filt-cerca', x);
+    renderPromemoria();
+    _rgEvidenzia(() => {
+      const l = document.getElementById('promemoria-list');
+      return l && l.firstElementChild;
+    });
+  } else if (tipo === 'spese') {
+    switchPage('maison');
+    _rgImposta('se-filt-nome', x);
+    if (typeof renderSpeseExtra === 'function') renderSpeseExtra();
+    _rgEvidenzia(() => {
+      const f = document.getElementById('se-filt-nome');
+      return f && f.closest('.main-card');
+    });
+  } else if (tipo === 'registro') {
+    switchPage('registro');
+    _rgImposta('log-filt-cerca', q);
+    renderRegistro();
+    _rgEvidenzia(() => document.getElementById('registro-list'));
+  }
 }
 function chiudiRicercaGlobale() {
   document.getElementById('ricerca-globale-results').classList.remove('show');
