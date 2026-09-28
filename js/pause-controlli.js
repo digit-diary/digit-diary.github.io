@@ -423,6 +423,28 @@
     return /^S/.test(norm(p.turno)) ? 'sala' : 'altro';
   }
 
+  // in quale reparto e una persona in un momento, leggendo il foglio: 'S' sala,
+  // 'C' cassa, 'R' rec, 'pausa', oppure null (fuori turno). La sigla della riga dice
+  // dove si trova: S1 che nella sua colonna ha "S22" e in sala al posto di S22 (che e
+  // in pausa); con "C0" o "R22" e in cassa o al rec, e in sala resta S22.
+  function reparto(p, info, bl, t) {
+    const nome = norm(p.nome);
+    const propri = bl.filter((b) => norm(b.nome) === nome && !/ALT/.test(b.post));
+    for (const b of propri) {
+      const x = b.righe.find((y) => y.ini <= t && t < y.fin);
+      if (x) {
+        if (x.pos === 'PAUSA') return 'pausa';
+        if (x.pos === 'SALA') return 'S';
+        if (x.pos === 'REC') return 'R';
+        if (x.pos === 'CASSA') return 'C';
+        return /^[SCR]/.test(x.pos) ? x.pos[0] : 'S';
+      }
+    }
+    if (p.ini == null || t < p.ini || t >= p.fin) return null;
+    const alt = info && info.alternative[0];
+    if (alt && alt.pause.some((x) => x.ini <= t && t < x.fin)) return 'pausa';
+    return /^[SCR]/.test(norm(p.turno)) ? norm(p.turno)[0] : null;
+  }
   // quarti d ora in cui in sala non c e nessuno
   function salaVuota(c, persone, pp, biglietti) {
     const bl = blocchi(c);
@@ -525,6 +547,7 @@
     fissaAttribuzioni,
     problemiPause,
     posizione,
+    reparto,
     salaVuota,
     controlla,
   };

@@ -2448,16 +2448,31 @@ function _peCompletaPause(c, ctx, righe, dstr) {
     return l.concat(decise[q.nome] || []);
   };
   // un collega dello stesso reparto e al lavoro e non in pausa per tutta la fascia
-  const colleghiLiberi = (p, t1, t2, pp) =>
-    persone.filter(
-      (q) =>
-        q !== p &&
-        _peSettoreTurno(q.turno) === _peSettoreTurno(p.turno) &&
-        q.ini != null &&
-        q.ini <= t1 &&
-        q.fin >= t2 &&
-        !pauseDi(q, pp).some((x) => x.ini < t2 && x.fin > t1),
-    ).length;
+  // in ogni quarto d ora della pausa almeno un collega del suo reparto e davvero li
+  // (per la sala: su una riga SALA o su una sigla S; chi e in cassa o al rec a dare i
+  // cambi non conta). Prima bastava che il collega non fosse in pausa.
+  const colleghiLiberi = (p, t1, t2, pp) => {
+    const bl = PC.blocchi(c);
+    const sett = _peSettoreTurno(p.turno);
+    let minimo = Infinity;
+    for (let t = t1; t < t2; t += 15) {
+      let n = 0;
+      persone.forEach((q) => {
+        if (q === p) return;
+        const dove = PC.reparto(q, pp[q.nome], bl, t);
+        const dec = (decise[q.nome] || []).some((x) => x.ini <= t && t < x.fin);
+        if (dove === sett && !dec) n++;
+      });
+      // chi dal bigliettino copre una postazione del reparto (es. C4 su S22 alle 13.00)
+      (c.biglietti || []).forEach((bg) =>
+        (bg.righe || []).forEach((x) => {
+          if (x.chi && String(x.pos)[0] === sett && x.ini <= t && t < x.fin) n++;
+        }),
+      );
+      minimo = Math.min(minimo, n);
+    }
+    return minimo === Infinity ? 0 : minimo;
+  };
   const inPausaInsieme = (p, t1, t2, pp) =>
     persone.filter(
       (q) =>
