@@ -3287,6 +3287,43 @@ function briefPausaSposta(base, r, dir) {
   _briefSalvaPauseDebounce();
   _briefRefreshPause();
 }
+// elimina un intera colonna del foglio pause (intestazione, orario e righe fino
+// alla colonna successiva nella stessa pila); si annulla con Annulla del briefing
+async function briefPausaEliminaColonna(base, r) {
+  if (!puoGestireBriefing() || !_briefState || !_briefState.pause) return;
+  const c = _briefState.pause.contenuto;
+  const hdr = c.celle[r + '|' + base];
+  const nome = c.celle[r + '|' + (base + 1)];
+  if (!hdr || !hdr.hdr) return;
+  let fine = c.nR;
+  for (let rr = r + 1; rr <= c.nR; rr++) {
+    const a = c.celle[rr + '|' + base];
+    if (a && a.hdr) {
+      fine = rr - 1;
+      break;
+    }
+  }
+  const chi = String(hdr.v || '') + (nome && nome.v ? ' ' + nome.v : '');
+  if (
+    !(await chiediConferma('Elimino la colonna ' + chi + ' con tutte le sue righe?\n\nSi puo annullare con Annulla.'))
+  )
+    return;
+  _briefRicorda();
+  for (let rr = r; rr <= fine; rr++) {
+    delete c.celle[rr + '|' + base];
+    delete c.celle[rr + '|' + (base + 1)];
+  }
+  // le proposte di quella persona (pause da solo o senza cambio) non valgono piu
+  if (Array.isArray(c.proposte) && nome && nome.v) {
+    const n = String(nome.v).trim().toUpperCase();
+    c.proposte = c.proposte.filter((x) => !(String(x.nome).trim().toUpperCase() === n && x.modo !== 'cambio'));
+  }
+  window._briefPauseAvviso = null;
+  _briefSalvaPauseDebounce();
+  _briefRefreshPause();
+  logAzione('Pause: colonna eliminata', chi + ' ' + _briefData);
+  toast('Colonna ' + chi + ' eliminata (Annulla per rimetterla)');
+}
 function briefPausaDelRiga(base, r) {
   if (!puoGestireBriefing() || !_briefState || !_briefState.pause) return;
   _pbLegami(_briefState.pause.contenuto);
@@ -3489,7 +3526,21 @@ function _briefRenderPauseSlots(c) {
             '</td>';
         }
       });
-      if (puo)
+      if (puo && isHdr)
+        // intestazione della colonna: + aggiunge una riga sotto l orario, x elimina tutta la colonna
+        t +=
+          '<td style="border:none;padding:0 3px;white-space:nowrap">' +
+          '<span style="cursor:pointer;color:var(--c-verde,#2c6e49);font-weight:bold" title="Inserisci riga sotto" onclick="briefPausaInsRiga(' +
+          base +
+          ',' +
+          (riga.r + 1) +
+          ')">+</span> ' +
+          '<span style="cursor:pointer;color:var(--c-rosso,#c0392b);font-weight:bold" title="Elimina tutta la colonna" aria-label="Elimina tutta la colonna" onclick="briefPausaEliminaColonna(' +
+          base +
+          ',' +
+          riga.r +
+          ')">×</span></td>';
+      else if (puo)
         t +=
           '<td style="border:none;padding:0 3px;white-space:nowrap">' +
           '<span style="cursor:pointer;color:var(--c-verde,#2c6e49);font-weight:bold" title="Inserisci riga sotto" onclick="briefPausaInsRiga(' +
