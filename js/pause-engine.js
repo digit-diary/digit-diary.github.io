@@ -4429,25 +4429,41 @@ function pdfPauseGiorno() {
       { content: '', colSpan: 2, styles: { minCellHeight: 3.2, lineWidth: 0, fillColor: [255, 255, 255] } },
     ];
     const corpi = posti.map((l) => l.reduce((acc, bl, i) => acc.concat(i ? [spazio] : [], bl), []));
-    const quattro = corpi[3].length > 0;
     const maxRighe = Math.max(1, ...corpi.map((x) => x.length));
     // carattere 8,5 (piu leggibile); altezza di una riga a scala 1 circa 5,5 mm; spazio utile 250 mm
     const scala = Math.min(1, 250 / (5.5 * maxRighe));
-    corpi.forEach((body, k) => {
+    // bigliettini attaccati uno all altro (un solo taglio di forbici tra due) e
+    // larghi quanto serve: la colonna orario quanto "22.15 - 22.30" o il nome
+    const fs = Math.max(5.2, 8.5 * scala);
+    const pad = Math.max(0.35, 1 * scala);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(fs);
+    const largo = (body, i, min) =>
+      Math.min(
+        40,
+        Math.max(
+          min,
+          ...body
+            .filter((r) => r.length === 2)
+            .map((r) => doc.getTextWidth(String(r[i].content || '')) + 2 * pad + 0.8),
+        ),
+      );
+    let x = 10;
+    corpi.forEach((body) => {
       if (!body.length) return;
+      const w0 = largo(body, 0, 10);
+      const w1 = largo(body, 1, 18);
       doc.setPage(1);
       doc.autoTable({
         startY: 30,
-        margin: { left: 10 + k * (quattro ? 48 : 50) },
-        tableWidth: 42,
+        margin: { left: x },
+        tableWidth: w0 + w1,
         body: body,
         theme: 'grid',
-        styles: Object.assign({}, stiliBase, {
-          cellPadding: Math.max(0.35, 1 * scala),
-          fontSize: Math.max(5.2, 8.5 * scala),
-        }),
-        columnStyles: { 0: { cellWidth: 13 }, 1: { cellWidth: 29 } },
+        styles: Object.assign({}, stiliBase, { cellPadding: pad, fontSize: fs }),
+        columnStyles: { 0: { cellWidth: w0 }, 1: { cellWidth: w1 } },
       });
+      x += w0 + w1;
     });
   }
   const formTesto = c.tipo === 'slots' ? _pcFormazioneTesto(c) : '';
