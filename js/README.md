@@ -61,8 +61,8 @@ Ordine = ordine di caricamento in index.html. Il Piano di lavoro e diviso in die
 ## Test automatici
 
 - `node test/piano-regole.test.js` — regole del piano (115 controlli)
-- `node test/pause-regole.test.js` — regole pause (33 controlli)
-- `node test/pause-controlli.test.js` — controlli del foglio pause (27 controlli)
+- `node test/pause-regole.test.js` — regole pause (39 controlli)
+- `node test/pause-controlli.test.js` — controlli del foglio pause (29 controlli)
 - `node test/annulla.test.js` — Annulla/Ripristina generale (38 controlli)
 - `node strumenti/verifica_crediti.js` — verifica incrociata Crediti/Vacanze/Festivi/Saldo con il codice vero sopra i dati esportati (`strumenti/esporta_dati_verifica.py`)
 

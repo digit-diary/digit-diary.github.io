@@ -1393,6 +1393,8 @@ function _briefPauseBodyHtml() {
         escP(window._briefPauseAvviso) +
         '</span><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px" onclick="briefAnnulla()">Annulla</button></div>';
     if (p.contenuto.tipo === 'slots' && typeof _pcAvvisiHtml === 'function') {
+      h += _pcFormazioneHtml(p.contenuto);
+      h += _pcStampaOpzHtml(p.contenuto);
       h += _pcProposteHtml(p.contenuto);
       h += _pcAvvisiHtml(p.contenuto);
     }

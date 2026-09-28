@@ -213,12 +213,19 @@ const vuota = foglio([
 const solo = [persona('SOLO', 'S1', '14.00', '21.00', [15])];
 const buchi = PC.salaVuota(vuota, solo, PC.pausePersone(vuota, solo));
 eq(buchi.map((b) => PC.ora(b.ini) + '-' + PC.ora(b.fin)), ['14.00-14.30', '16.00-16.15'], 'S1 in cassa o in pausa e nessun altro in sala');
-const conCollega = solo.concat([persona('ALTRO', 'S31', '16.00', '01.00', [])]);
+const conCollega = solo.concat([persona('ALTRO', 'S24', '16.00', '01.00', [])]);
 eq(
   PC.salaVuota(vuota, conCollega, PC.pausePersone(vuota, conCollega)).map((b) => PC.ora(b.ini)),
   ['14.00'],
   'con un collega di sala dalle 16.00 resta scoperta solo la mezz ora delle 14.00',
 );
+const conAccoglienza = solo.concat([Object.assign(persona('ACC', 'S31', '16.00', '01.00', [30, 15, 15]), { acc: true })]);
+eq(
+  PC.salaVuota(vuota, conAccoglienza, PC.pausePersone(vuota, conAccoglienza)).length,
+  2,
+  'l accoglienza (S31) al suo posto non conta come presenza in sala',
+);
+ok(!PC.controlla(vuota, conAccoglienza).some((a) => a.nome === 'ACC'), 'l accoglienza non riceve avvisi (si organizza da sola)');
 const avvSala = PC.controlla(vuota, solo).filter((a) => a.tipo === 'sala');
 eq(avvSala.length, 2, 'due avvisi: i buchi distano piu di un ora');
 const vicini = foglio([

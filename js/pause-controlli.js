@@ -85,6 +85,7 @@
             post: norm(a.v),
             nome: b ? String(b.v || '').trim() : '',
             personale: !!a.pers,
+            opz: a.opz || '',
             righe: [],
           };
           out.push(blk);
@@ -172,6 +173,14 @@
         );
         return r;
       });
+      const restoCol = conCol.map((p, k) => {
+        const r = (p.attese || []).slice();
+        pauseCol[k].forEach((y) => {
+          const i = r.indexOf(y.fin - y.ini);
+          if (i >= 0) r.splice(i, 1);
+        });
+        return r;
+      });
       righe.forEach((x) => {
         if (x.per) {
           const p = liberi.find((q) => norm(q.nome) === norm(x.per));
@@ -185,9 +194,27 @@
             return;
           }
         }
-        if (!liberi.length && conCol.length === 1 && !spanCol[0].some((y) => y.ini < x.fin && y.fin > x.ini)) {
-          const p = conCol[0];
-          (fuori[p.nome] = fuori[p.nome] || []).push({ ini: x.ini, fin: x.fin, cella: x.cella, celle: [x.cella] });
+        // una riga con la sigla fuori dalla colonna di chi ha una colonna propria: va a chi
+        // in quel momento non ha righe nella sua colonna (es. due S5: quello con la colonna
+        // del rec dalle 21.00 riceve la mezz ora delle 19.30, non quello con la colonna
+        // dell intera giornata)
+        // prima chi ha la colonna e aspetta ancora una pausa di quella durata (non puo
+        // andare in pausa da solo), poi, se nessuno senza colonna la puo prendere, chiunque
+        // abbia la colonna libera in quel momento
+        const liberiOra = conCol
+          .map((p, k) => ({ p: p, k: k }))
+          .filter((o) => !spanCol[o.k].some((y) => y.ini < x.fin && y.fin > x.ini));
+        const chiAspetta = liberiOra.find((o) => restoCol[o.k].includes(x.fin - x.ini));
+        const scelto = chiAspetta || (!liberi.length ? liberiOra[0] : null);
+        if (scelto) {
+          const k = restoCol[scelto.k].indexOf(x.fin - x.ini);
+          if (k >= 0) restoCol[scelto.k].splice(k, 1);
+          (fuori[scelto.p.nome] = fuori[scelto.p.nome] || []).push({
+            ini: x.ini,
+            fin: x.fin,
+            cella: x.cella,
+            celle: [x.cella],
+          });
           return;
         }
         avanzo.push(x);
@@ -420,7 +447,7 @@
     if (p.ini == null || t < p.ini || t >= p.fin) return null;
     const alt = info && info.alternative[0];
     if (alt && alt.pause.some((x) => x.ini <= t && t < x.fin)) return 'pausa';
-    return /^S/.test(norm(p.turno)) ? 'sala' : 'altro';
+    return /^S/.test(norm(p.turno)) && !p.acc ? 'sala' : 'altro';
   }
 
   // in quale reparto e una persona in un momento, leggendo il foglio: 'S' sala,
@@ -443,12 +470,14 @@
     if (p.ini == null || t < p.ini || t >= p.fin) return null;
     const alt = info && info.alternative[0];
     if (alt && alt.pause.some((x) => x.ini <= t && t < x.fin)) return 'pausa';
+    // l accoglienza al suo posto non e in sala
+    if (p.acc) return 'A';
     return /^[SCR]/.test(norm(p.turno)) ? norm(p.turno)[0] : null;
   }
   // quarti d ora in cui in sala non c e nessuno
   function salaVuota(c, persone, pp, biglietti) {
     const bl = blocchi(c);
-    const sala = persone.filter((p) => /^S/.test(norm(p.turno)) && p.ini != null);
+    const sala = persone.filter((p) => /^S/.test(norm(p.turno)) && !p.acc && p.ini != null);
     if (!sala.length) return [];
     const da = Math.ceil(Math.min(...sala.map((p) => p.ini)) / 15) * 15;
     const a = Math.max(...sala.map((p) => p.fin));
@@ -480,7 +509,8 @@
     const avvisi = [];
     persone.forEach((p) => {
       const info = pp[p.nome];
-      if (!info || info.rotazione) return;
+      // accoglienza (es. S31): si organizzano da soli, nessun controllo
+      if (!info || info.rotazione || p.acc) return;
       if (!(p.attese && p.attese.length) && !info.alternative.some((a) => a.pause.length)) return;
       const esiti = info.alternative.map((a) => ({ a: a, prob: problemiPause(p, a.pause) }));
       if (esiti.some((e) => !e.prob.length)) return;

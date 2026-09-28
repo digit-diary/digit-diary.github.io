@@ -218,6 +218,22 @@ ok(
   'insieme: sovrapposizione segnalata',
 );
 
+console.log('\n== formazione: chi e in formazione va con il collega dello stesso turno ==');
+{
+  const r = (nome, turno, fm) => ({ nome, turno, fm: fm || undefined });
+  let f = ctx._pcFormazione([r('ROSSI', 'R22', true), r('GRASSO', 'R22'), r('BUJIC', 'S1')]);
+  eq(f.righe.map((x) => x.nome), ['GRASSO', 'BUJIC'], 'R22 in formazione non conta come persona a se');
+  eq(f.affiancati, [{ nome: 'ROSSI', turno: 'R22', con: 'GRASSO' }], 'va con GRASSO (R22)');
+  f = ctx._pcFormazione([r('GIANOTTI', 'R23', true), r('PAROLO', 'R23', true)]);
+  eq(f.righe.map((x) => x.nome), ['GIANOTTI'], 'tutti e due con la scritta formazione: contano come una persona');
+  f = ctx._pcFormazione([r('A', 'S22', true), r('B', 'S22', true), r('T1', 'S22'), r('T2', 'S22')]);
+  eq(f.affiancati.map((x) => x.nome + '>' + x.con), ['A>T1', 'B>T2'], 'due in formazione e due colleghi: uno per ciascuno');
+  f = ctx._pcFormazione([r('SOLO', 'C23', true), r('ALTRO', 'C0')]);
+  eq(f.righe.length, 2, 'in formazione ma solo sul suo turno: persona normale');
+  f = ctx._pcFormazione([r('BALLIU', 'C0', true), r('DACOSTA', 'C0')]);
+  eq(f.righe.map((x) => x.nome), ['DACOSTA'], 'vale anche in cassa (C0)');
+}
+
 console.log(
   '\n=======================================\n  ' +
     passati +

@@ -2283,7 +2283,41 @@ function _peCompattaSala(sh) {
 }
 
 // ---------- MAIN slots ----------
-function _peGeneraSlots(righe, dstr) {
+// FORMAZIONE: chi nel piano ha il commento "formazione" (o "affiancamento") e ha
+// un collega sullo stesso turno sta con lui: stessa postazione e stesse pause,
+// quindi per le pause conta come una persona sola (vale per tutti i turni: R22,
+// S22, casse...). Se sullo stesso turno non c e nessun altro, e una persona normale.
+// Restituisce le righe senza chi e in formazione e l elenco {nome, turno, con}.
+function _pcFormazione(righe) {
+  const valide = (righe || []).filter((r) => r && r.nome && r.turno);
+  const turno = (r) =>
+    String(r.turno || '')
+      .trim()
+      .toUpperCase();
+  const affiancati = [];
+  const tolti = new Set();
+  const perTurno = {};
+  valide.forEach((r) => (perTurno[turno(r)] = perTurno[turno(r)] || []).push(r));
+  Object.keys(perTurno).forEach((t) => {
+    const l = perTurno[t];
+    if (l.length < 2 || !l.some((r) => r.fm)) return;
+    // chi guida: chi non e in formazione; se sono tutti in formazione (spesso il
+    // commento e scritto su entrambi) il primo. Gli altri in formazione vanno con
+    // loro, uno per ciascuno a turno se i colleghi sono piu di uno.
+    const guide = l.filter((r) => !r.fm);
+    const capi = guide.length ? guide : [l.find((r) => r.fm)];
+    const seguono = l.filter((r) => r.fm && !capi.includes(r));
+    seguono.forEach((r, k) => {
+      const con = capi[k % capi.length];
+      tolti.add(r);
+      affiancati.push({ nome: String(r.nome).trim(), turno: t, con: String(con.nome).trim() });
+    });
+  });
+  return { righe: (righe || []).filter((r) => !tolti.has(r)), affiancati: affiancati };
+}
+function _peGeneraSlots(righeTutte, dstr) {
+  const form = _pcFormazione(righeTutte);
+  const righe = form.righe;
   const dow = new Date(dstr + 'T12:00:00').getDay();
   const tipoGiorno = dow === 0 ? 'DOM' : dow >= 5 ? 'VEN-SAB' : 'LUN-GIO';
   const dT = {};
@@ -2317,6 +2351,7 @@ function _peGeneraSlots(righe, dstr) {
   const biglietto = _peBigliettoMattino(ctx);
   const out = { tipo: 'slots', celle: sh.celle, nR: _peMaxR(sh), tipoGiorno: tipoGiorno };
   if (biglietto) out.biglietti = [biglietto];
+  if (form.affiancati.length) out.formazione = form.affiancati;
   const proposte = _peCompletaPause(out, ctx, righe, dstr).concat(_peRisolviSalaVuota(out, righe, dstr));
   if (proposte.length) out.proposte = proposte;
   window._peDowCorrente = null;
@@ -2458,7 +2493,7 @@ function _pcInserisciCambio(c, base, riga, pos, ini, fin, per) {
   }
 }
 // colonnina personale: intestazione (turno, nome, orario) e la giornata con le pause
-function _pcBloccoPersonale(c, p, pause) {
+function _pcBloccoPersonale(c, p, pause, opz) {
   const ultima = (base) => {
     let m = 0;
     Object.keys(c.celle).forEach((k) => {
@@ -2473,6 +2508,8 @@ function _pcBloccoPersonale(c, p, pause) {
   const clr = sett === 'S' ? _PE_CLR.sala : sett === 'R' ? _PE_CLR.rec : sett === 'C' ? _PE_CLR.cassa : _PE_CLR.grigio;
   // pers: colonnina personale (non da cambi ad altri)
   c.celle[r + '|' + base] = { v: p.turno, b: 1, bg: clr, sz: 10, hdr: 1, pers: 1 };
+  // opz: colonna facoltativa in stampa (accoglienza, secondo collega sullo stesso turno)
+  if (opz) c.celle[r + '|' + base].opz = opz;
   c.celle[r + '|' + (base + 1)] = { v: p.nome, b: 1, bg: clr, sz: 9, hdr: 1 };
   c.celle[r + 1 + '|' + (base + 1)] = { v: _pbOra(p.ini) + ' - ' + _pbOra(p.fin), b: 1, sz: 9, ora: 1 };
   r += 2;
@@ -2483,7 +2520,7 @@ function _pcBloccoPersonale(c, p, pause) {
     .sort((a, b) => a.ini - b.ini)
     .forEach((x) => {
       if (x.ini > t) _pcScriviRiga(c, r++, base, lbl, t, x.ini, null, false);
-      _pcScriviRiga(c, r++, base, 'PAUSA', x.ini, x.fin, null, !!x.nuova);
+      _pcScriviRiga(c, r++, base, 'PAUSA', x.ini, x.fin, null, !!x.nuova && !opz);
       t = x.fin;
     });
   if (t < p.fin) _pcScriviRiga(c, r++, base, lbl, t, p.fin, null, false);
@@ -2580,6 +2617,27 @@ function _peCompletaPause(c, ctx, righe, dstr) {
     let pp = leggi();
     const info = pp[p.nome];
     if (!info || info.colonna || info.rotazione) continue;
+    // accoglienza: le pause si suggeriscono in una colonna facoltativa (si organizzano
+    // da soli), senza cambi, senza proposte e senza avvisi
+    if (p.acc) {
+      const gia = (info.alternative[0] || { pause: [] }).pause.map((x) => ({ ini: x.ini, fin: x.fin }));
+      const resto = p.attese.slice().sort((a, b) => b - a);
+      gia.forEach((x) => {
+        const i = resto.indexOf(x.fin - x.ini);
+        if (i >= 0) resto.splice(i, 1);
+      });
+      const tutte = gia.slice();
+      resto.forEach((d) => {
+        let m = null;
+        for (let t = Math.ceil((p.ini + 30) / 15) * 15; t + d <= p.fin - 30; t += 15) {
+          const v = valuta(p, tutte, t, d);
+          if (v != null && (!m || v > m.v)) m = { v: v, t: t };
+        }
+        if (m) tutte.push({ ini: m.t, fin: m.t + d, nuova: true });
+      });
+      if (tutte.length) _pcBloccoPersonale(c, p, tutte, 'accoglienza');
+      continue;
+    }
     const esistenti = (info.alternative[0] || { pause: [] }).pause.map((x) => ({ ini: x.ini, fin: x.fin }));
     // cosa manca: le pause attese non ancora nel foglio (se ci sono pause di
     // durata diversa dalla regola non si tocca nulla: resta l avviso)
@@ -2670,7 +2728,19 @@ function _peCompletaPause(c, ctx, righe, dstr) {
       // colonnina personale con tutte le sue pause (quelle con cambio restano anche
       // nella colonna di chi le copre)
       const tutte = esistenti.map((x) => ({ ini: x.ini, fin: x.fin })).concat(soli);
-      _pcBloccoPersonale(c, p, tutte);
+      // con un collega sullo stesso turno (es. due S5) la colonnina e facoltativa in stampa
+      // (facoltativa solo se l altro e gia nel foglio: il primo dei due si stampa sempre)
+      const ppNow = leggi();
+      const doppio = persone.some(
+        (q) =>
+          q !== p &&
+          q.turno === p.turno &&
+          ppNow[q.nome] &&
+          ((ppNow[q.nome].colonna &&
+            !PC.blocchi(c).some((b) => b.opz && String(b.nome).toUpperCase() === q.nome.toUpperCase())) ||
+            (ppNow[q.nome].alternative[0] && ppNow[q.nome].alternative[0].pause.length)),
+      );
+      _pcBloccoPersonale(c, p, tutte, doppio ? 'secondo ' + p.turno : '');
       decise[p.nome] = (decise[p.nome] || []).concat(soli);
       soli.forEach((x) =>
         proposte.push({
@@ -2705,7 +2775,8 @@ function _peBigliettoMattino(ctx) {
 }
 // persone del giorno per i controlli: turno, orario (da Turni) e pause attese
 // (dalla regola del turno o di durata, scheda Regole pause)
-function _pcPersone(righe, dstr) {
+function _pcPersone(righeTutte, dstr) {
+  const righe = _pcFormazione(righeTutte).righe;
   const orari = _peOrariTurni();
   const dow = new Date(dstr + 'T12:00:00').getDay();
   const visti = new Set();
@@ -2722,12 +2793,19 @@ function _pcPersone(righe, dstr) {
     // stessa convenzione del foglio: prima delle 11.00 e dopo mezzanotte
     const ini = o ? (o.ini < 660 ? o.ini + 1440 : o.ini) : null;
     const fin = o ? ini + o.dur : null;
+    // accoglienza (gruppo ACCOGLIENZA nella tabella Turni, es. S31): si organizzano da soli
+    const info =
+      typeof _pianoTurniReparto === 'function'
+        ? _pianoTurniReparto().find((t) => String(t.codice).toUpperCase() === turno)
+        : null;
+    const acc = !!(info && String(info.gruppo || '').toUpperCase() === 'ACCOGLIENZA');
     out.push({
       nome: nome,
       turno: turno,
       ini: ini,
       fin: fin,
       attese: o ? _pePauseSplit(orari, turno, 'slots', dow) : [],
+      acc: acc,
     });
   });
   return out;
@@ -4029,11 +4107,16 @@ function pdfPauseGiorno() {
       doc.text(String(sotto.v), 105, 24, { align: 'center' });
     }
     const colonne = [];
+    const stampaOpz = c.stampaOpz || {};
     [1, 4, 7].forEach((base, bi) => {
       const body = [];
+      let salta = false;
       for (let r = 4; r <= c.nR; r++) {
         const a = c.celle[r + '|' + base];
         const b = c.celle[r + '|' + (base + 1)];
+        // colonne facoltative (accoglienza, secondo S5...): solo se scelte
+        if (a && a.hdr) salta = !!a.opz && !stampaOpz[String((b && b.v) || '').trim()];
+        if (salta) continue;
         const pieno = (x) => x && String(x.v).trim() !== '';
         if (!pieno(a) && !pieno(b)) continue;
         const isHdr = (a && a.hdr) || (b && b.hdr);
@@ -4117,6 +4200,13 @@ function pdfPauseGiorno() {
       });
     });
   }
+  const formTesto = c.tipo === 'slots' ? _pcFormazioneTesto(c) : '';
+  if (formTesto) {
+    doc.setPage(1);
+    doc.setFontSize(7);
+    doc.setTextColor(0);
+    doc.text(doc.splitTextToSize('In formazione (stesse pause del collega): ' + formTesto, 190), 10, 284);
+  }
   doc.setFontSize(6);
   doc.setTextColor(120);
   doc.text(
@@ -4135,7 +4225,7 @@ function _pcBigliettiFoglio(c) {
   if (c && Array.isArray(c.biglietti)) return c.biglietti;
   if (!_briefState || !Array.isArray(_briefState.righe)) return [];
   const dT = {};
-  _briefState.righe.forEach((r) => {
+  _pcFormazione(_briefState.righe).righe.forEach((r) => {
     const nome = String(r.nome || '').trim();
     const t = String(r.turno || '')
       .trim()
@@ -4173,6 +4263,54 @@ function _pcAvvisiHtml(c) {
     avvisi.map((x) => escP(x.testo)).join('<br>') +
     '<br><span style="color:var(--muted)">Le righe interessate sono bordate di rosso. Sono avvisi: puoi correggere con le frecce, scrivendo nelle celle o con Annulla.</span></div>'
   );
+}
+// chi e in formazione con un collega (va in pausa con lui)
+function _pcFormazioneTesto(c) {
+  let l = (c && c.formazione) || null;
+  if (!l && _briefState && Array.isArray(_briefState.righe)) l = _pcFormazione(_briefState.righe).affiancati;
+  return (l || []).map((x) => x.nome + ' con ' + x.con + ' (' + x.turno + ')').join(', ');
+}
+function _pcFormazioneHtml(c) {
+  const t = _pcFormazioneTesto(c);
+  return t
+    ? '<div class="pb-formazione" style="margin:0 0 8px;padding:5px 10px;font-size:var(--fs-sm,.8125rem);border-left:3px solid var(--c-verde,#2c6e49);background:var(--card-bg,transparent)"><b>In formazione</b> (stesse pause del collega, contano come una persona): ' +
+        escP(t) +
+        '</div>'
+    : '';
+}
+// colonne facoltative in stampa: una casella per ciascuna (spenta di partenza)
+function _pcStampaOpzHtml(c) {
+  if (!c || !puoGestireBriefing()) return '';
+  const l = window.PauseControlli ? window.PauseControlli.blocchi(c).filter((b) => b.opz) : [];
+  if (!l.length) return '';
+  const scelte = c.stampaOpz || {};
+  return (
+    '<div class="pb-stampaopz" style="margin:0 0 8px;font-size:var(--fs-sm,.8125rem);display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center"><b>In stampa anche:</b>' +
+    l
+      .map(
+        (b) =>
+          '<label style="display:inline-flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" data-nome="' +
+          escP(b.nome) +
+          '" onchange="briefPauseStampaOpz(this.dataset.nome,this.checked)"' +
+          (scelte[b.nome] ? ' checked' : '') +
+          '> ' +
+          escP(b.post + ' ' + b.nome) +
+          ' <span style="color:var(--muted)">(' +
+          escP(b.opz) +
+          ')</span></label>',
+      )
+      .join('') +
+    '</div>'
+  );
+}
+function briefPauseStampaOpz(nome, si) {
+  if (!puoGestireBriefing() || !_briefState || !_briefState.pause) return;
+  const c = _briefState.pause.contenuto;
+  _briefRicorda();
+  c.stampaOpz = Object.assign({}, c.stampaOpz || {});
+  if (si) c.stampaOpz[nome] = true;
+  else delete c.stampaOpz[nome];
+  _briefSalvaPauseDebounce();
 }
 function _pcProposteHtml(c) {
   const l = (c && c.proposte) || [];
