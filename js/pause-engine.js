@@ -3542,7 +3542,11 @@ function _briefRenderPauseSlots(c) {
     }
     for (let rr = b.r; rr <= fine; rr++) righeFac.add(rr + '|' + b.base);
   });
-  const disegna = (base, righe) => {
+  // senzaTesta: nelle schede facoltative nome e orario stanno nella striscia in alto
+  const disegna = (base, righeTutte, senzaTesta) => {
+    const righe = senzaTesta
+      ? righeTutte.filter((x, k) => !(k <= 1 && ((x.a && x.a.hdr) || (x.b && (x.b.hdr || x.b.ora)))))
+      : righeTutte;
     let t =
       '<table style="border-collapse:collapse;font-size:var(--fs-sm,.8125rem);table-layout:fixed"><colgroup><col style="width:46px"><col style="width:88px"></colgroup>';
     righe.forEach((riga, idx) => {
@@ -3681,35 +3685,35 @@ function _briefRenderPauseSlots(c) {
   if (facoltative.length || (c.biglietti || []).length) {
     const scelte = c.stampaOpz || {};
     h +=
-      '<div class="pb-facoltative" style="margin-top:16px;padding-top:10px;border-top:1px dashed var(--line,#bbb)"><div style="font-weight:bold;font-size:var(--fs-md,.875rem)">Facoltative <span style="font-weight:normal;color:var(--muted)">(non nel foglio stampato, a meno di spuntarle; si possono stampare a parte)</span></div><div style="display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;margin-top:8px">';
+      '<div class="pb-facoltative" style="margin-top:18px;padding-top:12px;border-top:1px dashed var(--line,#bbb)"><div style="font-weight:bold;font-size:var(--fs-md,.875rem)">Facoltative <span style="font-weight:normal;color:var(--muted)">(non nel foglio stampato, a meno di spuntarle; si possono stampare a parte)</span></div><div style="display:flex;gap:16px;align-items:stretch;flex-wrap:wrap;margin-top:10px">';
     facoltative.forEach((b) => {
       const righe = righeDi(b.base, (k) => righeFac.has(k) && Number(k.split('|')[0]) >= b.r).filter(
         (x) => x.r < (facoltative.find((o) => o.base === b.base && o.r > b.r) || { r: Infinity }).r,
       );
-      h +=
-        '<div><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:4px">' +
-        escP(b.opz) +
-        '</div>' +
-        disegna(b.base, righe) +
-        (puo
-          ? '<div style="margin-top:4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:var(--fs-sm,.8125rem)"><label style="display:inline-flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" data-nome="' +
-            escP(b.nome) +
-            '" onchange="briefPauseStampaOpz(this.dataset.nome,this.checked)"' +
-            (scelte[b.nome] ? ' checked' : '') +
-            '> nel foglio stampato</label><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px" onclick="pdfBigliettoColonna(' +
-            b.base +
-            ',' +
-            b.r +
-            ')">Stampa bigliettino</button></div>'
-          : '') +
-        '</div>';
+      const etichetta = String(b.opz || '');
+      const orario = (c.celle[b.r + 1 + '|' + (b.base + 1)] || {}).v || '';
+      h += _pcFacScheda(
+        etichetta.charAt(0).toUpperCase() +
+          etichetta.slice(1) +
+          ' · ' +
+          b.post +
+          ' ' +
+          b.nome +
+          (orario ? ' · ' + orario : ''),
+        _peColoreSettore(b.post) || '#e8e8e8',
+        disegna(b.base, righe, true),
+        b.nome,
+        'pdfBigliettoColonna(' + b.base + ',' + b.r + ')',
+        scelte[b.nome],
+        puo ? 'briefPausaEliminaColonna(' + b.base + ',' + b.r + ')' : '',
+      );
     });
     // bigliettino del mattino (C4) con le altre facoltative
     h += _pcBigliettoHtml(c) + '</div></div>';
   }
   if (puo)
     h +=
-      '<div style="margin-top:8px"><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;border-color:var(--c-rosso,#c0392b);color:var(--c-rosso,#c0392b)" onclick="briefEliminaPause()">Elimina pause</button></div>';
+      '<div style="margin-top:16px"><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;border-color:var(--c-rosso,#c0392b);color:var(--c-rosso,#c0392b)" onclick="briefEliminaPause()">Elimina pause</button></div>';
   return h;
 }
 function _briefParseIntv(s) {
@@ -4499,46 +4503,66 @@ function briefPauseTieniProposte() {
   _briefRefreshPause();
   toast('Proposte confermate');
 }
+// scheda di una facoltativa, uguale per tutte: striscia con il titolo (colore del
+// settore), contenuto, e in basso sempre casella "nel foglio stampato" e bottone
+function _pcFacScheda(titolo, colore, corpo, nome, azione, scelta, elimina) {
+  const puo = puoGestireBriefing();
+  return (
+    '<div class="pb-fac" style="display:flex;flex-direction:column;border:1px solid #999;border-radius:4px;overflow:hidden;background:var(--card-bg,#fff);width:300px;max-width:100%">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:' +
+    (colore || '#e8e8e8') +
+    ';color:#14100a;font-weight:bold;padding:6px 10px;font-size:var(--fs-sm,.8125rem);border-bottom:1px solid #999"><span>' +
+    escP(titolo) +
+    '</span>' +
+    (elimina
+      ? '<span role="button" tabindex="0" style="cursor:pointer;color:#a8321f;font-size:1.05em;line-height:1" title="Elimina tutta la colonna" aria-label="Elimina tutta la colonna" onclick="' +
+        elimina +
+        '">×</span>'
+      : '') +
+    '</div><div style="padding:10px;flex:1">' +
+    corpo +
+    '</div>' +
+    (puo
+      ? '<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:6px 10px;border-top:1px solid var(--line,#ccc);font-size:var(--fs-sm,.8125rem)"><label style="display:inline-flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" data-nome="' +
+        escP(nome) +
+        '" onchange="briefPauseStampaOpz(this.dataset.nome,this.checked)"' +
+        (scelta ? ' checked' : '') +
+        '> nel foglio stampato</label><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 12px" onclick="' +
+        azione +
+        '">Stampa bigliettino</button></div>'
+      : '') +
+    '</div>'
+  );
+}
+// bigliettino del mattino (C4) come scheda facoltativa
 function _pcBigliettoHtml(c) {
-  const pulsante = (azione) =>
-    '</table><div style="padding:4px 8px"><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px" onclick="' +
-    azione +
-    '">Stampa bigliettino</button></div></div>';
-  const carta = (bg, azione) =>
-    '<div class="pb-biglietto" style="margin:10px 10px 0 0;display:inline-block;vertical-align:top;border:1px solid #999;background:var(--card-bg,#fff)"><div style="background:#FFE0B2;color:#14100a;font-weight:bold;padding:3px 8px;font-size:var(--fs-sm,.8125rem)">Bigliettino · ' +
-    escP(bg.titolo) +
-    ' · ' +
-    escP(bg.nome) +
-    '</div><table style="border-collapse:collapse;font-size:var(--fs-sm,.8125rem)">' +
-    bg.righe
-      .map(
-        (x) =>
-          '<tr><td style="border-top:1px solid #999;padding:2px 8px;background:' +
-          (_peColoreSettore(x.pos) || '#fff') +
-          ';color:#14100a;font-weight:bold">' +
-          escP(x.pos) +
-          '</td><td style="border-top:1px solid #999;padding:2px 8px">' +
-          escP(x.pos === 'PAUSA' ? '' : x.nome || '') +
-          '</td><td style="border-top:1px solid #999;padding:2px 8px;font-variant-numeric:tabular-nums">' +
-          _pbOra(x.ini) +
-          ' - ' +
-          _pbOra(x.fin) +
-          '</td></tr>',
-      )
-      .join('') +
-    pulsante(azione);
   const scelte = (c && c.stampaOpz) || {};
   return ((c && c.biglietti) || [])
     .map((bg, i) =>
-      carta(bg, 'pdfBigliettoPause(' + i + ')').replace(
-        /<\/div><\/div>$/,
-        (puoGestireBriefing()
-          ? ' <label style="display:inline-flex;gap:5px;align-items:center;cursor:pointer;font-size:var(--fs-sm,.8125rem)"><input type="checkbox" data-nome="' +
-            escP(bg.nome) +
-            '" onchange="briefPauseStampaOpz(this.dataset.nome,this.checked)"' +
-            (scelte[bg.nome] ? ' checked' : '') +
-            '> nel foglio stampato</label>'
-          : '') + '</div></div>',
+      _pcFacScheda(
+        'Mattino · ' + (bg.turno || 'C4') + ' ' + bg.nome,
+        _peColoreSettore(bg.turno || 'C4') || '#FFE0B2',
+        '<table class="pb-biglietto" style="border-collapse:collapse;font-size:var(--fs-sm,.8125rem);width:100%">' +
+          bg.righe
+            .map(
+              (x) =>
+                '<tr><td style="border:1px solid #999;padding:3px 8px;background:' +
+                (_peColoreSettore(x.pos) || '#fff') +
+                ';color:#14100a;font-weight:bold;width:52px">' +
+                escP(x.pos) +
+                '</td><td style="border:1px solid #999;padding:3px 8px">' +
+                escP(x.pos === 'PAUSA' ? '' : x.nome || '') +
+                '</td><td style="border:1px solid #999;padding:3px 8px;font-variant-numeric:tabular-nums;white-space:nowrap">' +
+                _pbOra(x.ini) +
+                ' - ' +
+                _pbOra(x.fin) +
+                '</td></tr>',
+            )
+            .join('') +
+          '</table>',
+        bg.nome,
+        'pdfBigliettoPause(' + i + ')',
+        scelte[bg.nome],
       ),
     )
     .join('');
