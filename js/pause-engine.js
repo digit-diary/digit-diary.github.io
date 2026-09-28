@@ -4432,7 +4432,7 @@ function pdfPauseGiorno() {
     const maxRighe = Math.max(1, ...corpi.map((x) => x.length));
     // carattere 8,5 (piu leggibile); altezza di una riga a scala 1 circa 5,5 mm; spazio utile 250 mm
     const scala = Math.min(1, 250 / (5.5 * maxRighe));
-    // bigliettini attaccati uno all altro (un solo taglio di forbici tra due) e
+    // bigliettini vicini (3 mm tra uno e l altro, facili da tagliare) e
     // larghi quanto serve: la colonna orario quanto "22.15 - 22.30" o il nome
     const fs = Math.max(5.2, 8.5 * scala);
     const pad = Math.max(0.35, 1 * scala);
@@ -4463,7 +4463,7 @@ function pdfPauseGiorno() {
         styles: Object.assign({}, stiliBase, { cellPadding: pad, fontSize: fs }),
         columnStyles: { 0: { cellWidth: w0 }, 1: { cellWidth: w1 } },
       });
-      x += w0 + w1;
+      x += w0 + w1 + 3;
     });
   }
   const formTesto = c.tipo === 'slots' ? _pcFormazioneTesto(c) : '';
