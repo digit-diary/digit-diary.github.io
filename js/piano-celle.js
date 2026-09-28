@@ -82,7 +82,7 @@ async function stampaPianoCollaboratore(nome) {
   doc.setFont('helvetica', 'bold');
   doc.text('Settore/Dipartimento:', 12, y);
   doc.setFont('helvetica', 'normal');
-  doc.text(repartoLabel(_pianoReparto()) + (info && info.funzione ? ' · ' + info.funzione : ''), 45, y);
+  doc.text(repartoNomeDocumento(_pianoReparto()) + (info && info.funzione ? ' · ' + info.funzione : ''), 45, y);
   y += 4.5;
   doc.setFont('helvetica', 'bold');
   doc.text('Mese selezionato:', 12, y);

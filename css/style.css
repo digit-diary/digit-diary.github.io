@@ -5887,3 +5887,15 @@ header h1 {
   text-align: left;
   margin-bottom: 0;
 }
+
+/* Impostazioni > Settori: nome del settore nei documenti */
+.settore-doc {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.settore-doc input {
+  width: 160px;
+}

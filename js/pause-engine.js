@@ -3015,7 +3015,9 @@ function pdfBriefingGiorno() {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(13);
   doc.setTextColor(0);
-  doc.text('BRIEFING ' + _pianoReparto().toUpperCase() + ' · ' + lbl, 105, 16.2, { align: 'center' });
+  doc.text('BRIEFING ' + repartoNomeDocumento(_pianoReparto()).toUpperCase() + ' · ' + lbl, 105, 16.2, {
+    align: 'center',
+  });
   const generico = !valet && _pianoReparto() !== 'slots';
   const cols = valet
     ? ['E', 'U', 'COLLABORATORE', 'TURNO', 'USCITA', 'FIRMA', 'RADIO', 'BADGE']

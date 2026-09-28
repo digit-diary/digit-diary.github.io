@@ -829,7 +829,7 @@ function renderModuliList() {
     hdr +=
       '<div class="filter-group filter-cerca"><span class="filter-label">Collaboratore</span><div class="ac-wrap"><input type="text" id="mod-filt-nome" class="campo-cerca" placeholder="Cerca collaboratore..." oninput="acFiltraModuli(\'mod-filt-nome\',\'ac-mod-filt-nomi\')" onfocus="acFiltraModuli(\'mod-filt-nome\',\'ac-mod-filt-nomi\')"><div class="ac-drop" id="ac-mod-filt-nomi"></div></div></div>';
     hdr +=
-      '<div class="filter-group"><span class="filter-label">Tipo</span><select id="mod-filt-tipo" onchange="aggiornaModuliLista()"><option value="">Tutti</option><option value="allineamento">Allineamento</option><option value="apprezzamento">Apprezzamento</option><option value="rdi">RDI</option><option value="cambio_turno">Cambio turno</option></select></div>';
+      '<div class="filter-group"><span class="filter-label">Tipo</span><select id="mod-filt-tipo" onchange="aggiornaModuliLista()"><option value="">Tutti</option><option value="allineamento">Allineamento</option><option value="apprezzamento">Apprezzamento</option><option value="rdi">RDI</option></select></div>';
     hdr +=
       '<div class="filter-group"><span class="filter-label">Dal</span><input type="text" id="mod-filt-dal" placeholder="Seleziona..." readonly style="cursor:pointer;min-width:150px"></div>';
     hdr +=

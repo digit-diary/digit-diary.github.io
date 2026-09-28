@@ -71,6 +71,7 @@ const VIS_ITEMS = {
     ptab_statistiche: 'Piano · Statistiche',
     ptab_benessere: 'Piano · Benessere',
     ptab_storico: 'Piano · Storico',
+    ptab_cambi: 'Piano · Cambi turno (fogli archiviati)',
     ptab_formulari: 'Piano · Formulari',
     ptab_turni: 'Piano · Turni',
     ptab_regole: 'Piano · Regole',
@@ -1908,6 +1909,16 @@ function renderSettoriUI() {
       '" value="' +
       (r.colore || '#8a7d6b') +
       '" style="width:40px;height:30px;border:1px solid var(--line);border-radius:2px;cursor:pointer;background:var(--paper2)" title="Colore del settore">';
+    html +=
+      '<label class="settore-doc" title="Nome ufficiale usato nei fogli di cambio turno e nelle stampe (piano, briefing, vacanze, crediti). Vuoto = ' +
+      escP(r.label) +
+      '">Nome nei documenti <input type="text" id="settore-doc-' +
+      r.key +
+      '" value="' +
+      escP((repartiNomiDocumenti || {})[r.key] || '') +
+      '" placeholder="' +
+      escP(r.label) +
+      '"></label>';
     html += '<button class="btn-del-tipo" onclick="salvaSettore(\'' + r.key + '\')">Salva</button>';
     if (custom) {
       html +=
@@ -1986,7 +1997,16 @@ async function salvaSettore(key) {
     if (base && colore) base.colore = colore;
   }
   if (!(await _salvaRepartiConfig())) return;
-  logAzione('Settore modificato', key);
+  // nome nei documenti (vale anche per i settori di base)
+  const nomeDoc = ((document.getElementById('settore-doc-' + key) || {}).value || '').trim();
+  const nomi = Object.assign({}, repartiNomiDocumenti || {});
+  if (nomeDoc) nomi[key] = nomeDoc;
+  else delete nomi[key];
+  if (JSON.stringify(nomi) !== JSON.stringify(repartiNomiDocumenti || {})) {
+    if (!(await salvaImp('reparti_nomi_documenti', JSON.stringify(nomi)))) return;
+    repartiNomiDocumenti = nomi;
+  }
+  logAzione('Settore modificato', key + (nomeDoc ? ' · nei documenti: ' + nomeDoc : ''));
   renderSettoriUI();
   toast('Settore salvato');
 }

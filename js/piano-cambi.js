@@ -57,7 +57,7 @@ async function stampaPianoPDF(soloNomi) {
   const doc = new jsPDF('landscape', 'mm', 'a4');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(13);
-  doc.text('Piano di lavoro · ' + label + ' · ' + repartoLabel(_pianoReparto()), 148, 10, { align: 'center' });
+  doc.text('Piano di lavoro · ' + label + ' · ' + repartoNomeDocumento(_pianoReparto()), 148, 10, { align: 'center' });
   doc.autoTable({
     startY: 14,
     head: [head],
@@ -105,6 +105,11 @@ async function stampaPianoPDF(soloNomi) {
 // header centrato, sezioni con barra colorata (A blu, B arancio, motivazione
 // verde, autorizzazione viola con checkbox), chip turni, firme con data.
 function _pdfCambioTurno(dati) {
+  // fogli archiviati con il nome breve del settore di allora (es. "Slots"): si stampa il nome nei documenti
+  dati = Object.assign({}, dati, {
+    a: Object.assign({}, dati.a, { settore: settoreNomeDocumento(dati.a && dati.a.settore) }),
+    b: Object.assign({}, dati.b, { settore: settoreNomeDocumento(dati.b && dati.b.settore) }),
+  });
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF('portrait', 'mm', 'a4');
   const M = 15;
@@ -707,8 +712,13 @@ async function confermaCercaCambioLibero() {
       const datiPdf = {
         tipo: 'SCAMBIO',
         data: new Date(_ccDati.data + 'T12:00:00').toLocaleDateString('it-IT'),
-        a: { nome: _ccDati.nome, settore: repartoLabel(_pianoReparto()), turno: _ccDati.codice, orari: fmtOra(t) },
-        b: { nome: cand.nome, settore: repartoLabel(_pianoReparto()), turno: 'C (riposo)', orari: '' },
+        a: {
+          nome: _ccDati.nome,
+          settore: repartoNomeDocumento(_pianoReparto()),
+          turno: _ccDati.codice,
+          orari: fmtOra(t),
+        },
+        b: { nome: cand.nome, settore: repartoNomeDocumento(_pianoReparto()), turno: 'C (riposo)', orari: '' },
         motivo: motivo || 'Richiesta giorno libero',
         richiesto: op,
         autorizzato: true,
@@ -1114,8 +1124,8 @@ async function confermaScambioTurno() {
       const datiPdf = {
         tipo: 'SCAMBIO',
         data: new Date(sel.data + 'T12:00:00').toLocaleDateString('it-IT'),
-        a: { nome: sel.nome, settore: repartoLabel(_pianoReparto()), turno: c1, orari: fmtOra(t1) },
-        b: { nome: collega, settore: repartoLabel(_pianoReparto()), turno: c2, orari: fmtOra(t2) },
+        a: { nome: sel.nome, settore: repartoNomeDocumento(_pianoReparto()), turno: c1, orari: fmtOra(t1) },
+        b: { nome: collega, settore: repartoNomeDocumento(_pianoReparto()), turno: c2, orari: fmtOra(t2) },
         motivo: motivo,
         richiesto: getOperatore(),
         autorizzato: true,
@@ -1606,7 +1616,7 @@ async function stampaPropostaCopertura() {
       ' ' +
       _pianoMeseSel +
       ' · settore ' +
-      repartoLabel(_pianoReparto()) +
+      repartoNomeDocumento(_pianoReparto()) +
       ' · preparata da ' +
       getOperatore() +
       ' il ' +
@@ -2338,4 +2348,144 @@ function _pianoInitSelezione() {
       { passive: true },
     );
   });
+}
+
+// ---- Scheda CAMBI TURNO: tutti i fogli di cambio turno archiviati del settore ----
+// (prima comparivano nella sezione Moduli insieme ai moduli disciplinari)
+function _renderPianoCambiTab() {
+  const rep = _pianoReparto();
+  const fogli = getFogliCambioReparto(rep)
+    .slice()
+    .sort(
+      (a, b) =>
+        String(b.data_modulo || '').localeCompare(String(a.data_modulo || '')) ||
+        String(b.created_at || '').localeCompare(String(a.created_at || '')),
+    );
+  const mesi = [...new Set(fogli.map((m) => String(m.data_modulo || '').slice(0, 7)).filter(Boolean))].sort().reverse();
+  const mese = window._pianoCambiMese && mesi.includes(window._pianoCambiMese) ? window._pianoCambiMese : '';
+  const lista = mese ? fogli.filter((m) => String(m.data_modulo || '').startsWith(mese)) : fogli;
+  const nomeMese = (ym) => {
+    const [a, mm] = ym.split('-');
+    return (typeof MESI_FULL !== 'undefined' ? MESI_FULL[parseInt(mm) - 1] : mm) + ' ' + a;
+  };
+  const dataIt = (d) => (d ? String(d).slice(0, 10).split('-').reverse().join('.') : '');
+  let h =
+    '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">Fogli di cambio turno · ' +
+    escP(repartoLabel(rep)) +
+    ' (' +
+    lista.length +
+    ')<select onchange="window._pianoCambiMese=this.value;renderPiano()" style="padding:4px 8px;font-size:var(--fs-sm,.8125rem);border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a;letter-spacing:0;text-transform:none"><option value="" style="color:#000">Tutti i mesi</option>' +
+    mesi
+      .map(
+        (m) =>
+          '<option value="' +
+          m +
+          '"' +
+          (m === mese ? ' selected' : '') +
+          ' style="color:#000">' +
+          nomeMese(m) +
+          '</option>',
+      )
+      .join('') +
+    '</select><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;border-color:#d4b86a;color:#d4b86a" onclick="pdfCambioTurnoVuoto()">Formulario vuoto</button>' +
+    '<input type="text" class="piano-cerca campo-cerca" placeholder="Cerca nei cambi turno..." title="Cerca per collaboratore, motivo o chi l ha fatto" aria-label="Cerca nei cambi turno" oninput="pianoTabellaFiltra(this.value,\'piano-cambi-table\')"></div>';
+  h +=
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);padding:10px 14px 0">Ogni cambio fatto dal Piano (scambio, cerca cambio, esigenze operative) crea un foglio che resta archiviato qui. Apri PDF lo mostra per la stampa o la firma.</p>';
+  if (!lista.length) {
+    h +=
+      '<p style="padding:18px 14px;color:var(--muted)">' +
+      (fogli.length
+        ? 'Nessun cambio turno in questo mese.'
+        : 'Nessun foglio di cambio turno archiviato per questo settore.') +
+      '</p></div>';
+    return h;
+  }
+  h +=
+    '<div style="overflow-x:auto;padding:8px 6px 10px"><table class="piano-table" id="piano-cambi-table" style="width:100%;min-width:860px;font-size:var(--fs-md,.875rem)"><thead><tr>' +
+    '<th style="text-align:left">Data del cambio</th><th style="text-align:left">Tipo</th><th style="text-align:left">Collaboratori e turni</th><th style="text-align:left">Motivo</th><th style="text-align:left">Fatto da</th><th style="text-align:left">Creato il</th><th></th></tr></thead><tbody>';
+  lista.forEach((m) => {
+    const d = m.dati || {};
+    const a = d.a || {};
+    const b = d.b || {};
+    const tipo = d.tipo === 'ESIGENZE' ? 'Esigenze operative' : 'Scambio';
+    const coppia =
+      escP(a.nome || m.collaboratore || '') +
+      (a.turno ? ' <span style="color:var(--muted)">(' + escP(a.turno) + ')</span>' : '') +
+      (b.nome
+        ? ' &harr; ' +
+          escP(b.nome) +
+          (b.turno ? ' <span style="color:var(--muted)">(' + escP(b.turno) + ')</span>' : '')
+        : '');
+    const chiave = [a.nome, b.nome, m.collaboratore, d.motivo, m.operatore, d.richiesto, tipo]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    h +=
+      '<tr data-nome="' +
+      escP(chiave) +
+      '"><td style="text-align:left;white-space:nowrap">' +
+      dataIt(m.data_modulo) +
+      '</td><td style="text-align:left">' +
+      tipo +
+      '</td><td style="text-align:left">' +
+      coppia +
+      (d.restituzione
+        ? '<div style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">Restituzione: ' +
+          escP(d.restituzione) +
+          '</div>'
+        : '') +
+      '</td><td style="text-align:left">' +
+      escP(d.motivo || '') +
+      '</td><td style="text-align:left;white-space:nowrap">' +
+      escP(m.operatore || d.richiesto || '-') +
+      '</td><td style="text-align:left;white-space:nowrap">' +
+      dataIt(m.created_at) +
+      '</td><td><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px" onclick="ristampaModuloPDF(' +
+      Number(m.id) +
+      ')">Apri PDF</button></td></tr>';
+  });
+  h += '</tbody></table></div></div>';
+  return h;
+}
+
+// Scheda del collaboratore: riga con i suoi cambi turno e collegamento alla scheda del Piano
+function _schedaCambiTurnoRiga(nome) {
+  if (typeof _pianoVisOk === 'function' && !_pianoVisOk('ptab_cambi')) return '';
+  const fogli = moduliCache.filter(
+    (m) =>
+      m.tipo === 'cambio_turno' &&
+      ((m.dati && m.dati.a && m.dati.a.nome === nome) ||
+        (m.dati && m.dati.b && m.dati.b.nome === nome) ||
+        m.collaboratore === nome),
+  );
+  if (!fogli.length) return '';
+  const ultimo = fogli
+    .map((m) => String(m.data_modulo || ''))
+    .sort()
+    .pop();
+  return (
+    '<div style="font-size:var(--fs-sm,.8125rem);margin-top:6px">Cambi turno: <b>' +
+    fogli.length +
+    '</b>' +
+    (ultimo ? ' · ultimo il ' + ultimo.slice(0, 10).split('-').reverse().join('.') : '') +
+    ' <button class="btn-secondario" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;margin-left:6px" onclick="apriCambiTurnoDi(\'' +
+    escP(nome.replace(/'/g, "\\'")) +
+    '\')">Vedi nel Piano</button></div>'
+  );
+}
+function apriCambiTurnoDi(nome) {
+  const pm = document.getElementById('profilo-modal');
+  if (pm) pm.classList.add('hidden');
+  window._pianoCambiMese = '';
+  switchPage('piano');
+  setTimeout(() => {
+    pianoCambiaTab('cambi');
+    setTimeout(() => {
+      const i = document.querySelector('#piano-cambi-table') && document.querySelector('.card-header .campo-cerca');
+      if (i) {
+        i.value = nome;
+        pianoTabellaFiltra(nome, 'piano-cambi-table');
+      }
+    }, 700);
+  }, 300);
 }

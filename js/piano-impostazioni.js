@@ -1008,8 +1008,8 @@ async function pdfCambioTurnoVuoto() {
   const doc = _pdfCambioTurno({
     tipo: 'SCAMBIO',
     data: '____/____/________',
-    a: { nome: linea, settore: '', turno: '_____', orari: '' },
-    b: { nome: linea, settore: '', turno: '_____', orari: '' },
+    a: { nome: linea, settore: repartoNomeDocumento(_pianoReparto()), turno: '_____', orari: '' },
+    b: { nome: linea, settore: repartoNomeDocumento(_pianoReparto()), turno: '_____', orari: '' },
     motivo: linea + '___________________',
     richiesto: '',
     restituzione: '____/____/________  con turno _________',

@@ -334,7 +334,8 @@ function _renderRiallineaUI() {
       escP(c.vecchio) +
       '</span>';
     html += '<span style="color:var(--muted)">&#8594;</span>';
-    html += '<strong style="font-size:var(--fs-md,.875rem);color:var(--c-verde,#2c6e49)">' + escP(c.nuovo) + '</strong>';
+    html +=
+      '<strong style="font-size:var(--fs-md,.875rem);color:var(--c-verde,#2c6e49)">' + escP(c.nuovo) + '</strong>';
     html += '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">';
     if (c.costiCount) html += c.costiCount + ' costi';
     if (c.costiCount && c.extraCount) html += ' + ';
@@ -552,7 +553,9 @@ function _renderUnisciUI() {
     ' coppie</p></div>';
   html += '<div style="display:flex;gap:8px;margin-bottom:12px;justify-content:center">';
   html +=
-    '<span style="font-size:var(--fs-sm,.8125rem);color:var(--c-verde,#2c6e49);font-weight:600">' + st.confermati + ' uniti</span>';
+    '<span style="font-size:var(--fs-sm,.8125rem);color:var(--c-verde,#2c6e49);font-weight:600">' +
+    st.confermati +
+    ' uniti</span>';
   html += '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' + st.saltati + ' saltati</span>';
   html += '</div>';
   html += '<div id="unisci-lista" style="max-height:400px;overflow-y:auto">';
@@ -2077,9 +2080,18 @@ function getSpeseReparto() {
     return (r.reparto_dip || 'slots') === currentReparto;
   });
 }
+// MODULI DISCIPLINARI del settore (allineamenti, RDI, apprezzamenti). I fogli di
+// cambio turno stanno nella stessa tabella ma non sono moduli: si vedono in
+// Piano > Cambi turno e non entrano in conteggi, rapporti e ricerche dei moduli.
 function getModuliReparto() {
   return moduliCache.filter(function (m) {
-    return (m.reparto_dip || 'slots') === currentReparto;
+    return (m.reparto_dip || 'slots') === currentReparto && m.tipo !== 'cambio_turno';
+  });
+}
+function getFogliCambioReparto(rep) {
+  const r = rep || currentReparto;
+  return moduliCache.filter(function (m) {
+    return m.tipo === 'cambio_turno' && (m.reparto_dip || 'slots') === r;
   });
 }
 // Collaboratori del reparto corrente ('entrambi' visibile in tutti i reparti)

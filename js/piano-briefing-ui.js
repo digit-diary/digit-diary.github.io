@@ -431,7 +431,7 @@ async function _renderPianoBriefingTab() {
   const valet = _briefIsValet();
   let h =
     '<div class="main-card" style="margin-top:14px"><div class="card-header">Briefing · ' +
-    escP(rep.toUpperCase()) +
+    escP(repartoLabel(rep).toUpperCase()) +
     '</div><div style="padding:12px 14px">';
   // barra dei comandi in tre gruppi: giorno, azioni, formato (piu' lo stato)
   h +=
@@ -1245,7 +1245,7 @@ async function briefEvidRimuovi(i) {
 function _briefRenderPauseCard() {
   let h =
     '<div class="main-card" style="margin-top:14px"><div class="card-header">Pause · ' +
-    escP(_pianoReparto().toUpperCase()) +
+    escP(repartoLabel(_pianoReparto()).toUpperCase()) +
     '</div><div style="padding:12px 14px" id="brief-pause-body">';
   h += _briefPauseBodyHtml();
   h += '</div></div>';

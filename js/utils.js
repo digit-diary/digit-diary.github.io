@@ -628,6 +628,18 @@ function repartoLabel(key) {
   const r = getRepartoInfo(key);
   return r ? r.label : key || '';
 }
+// NOME DEL SETTORE NEI DOCUMENTI (fogli di cambio turno, stampe del Piano, briefing,
+// vacanze, crediti): si imposta per settore in Impostazioni > Settori. Vuoto = nome breve.
+let repartiNomiDocumenti = {};
+function repartoNomeDocumento(key) {
+  return (repartiNomiDocumenti && repartiNomiDocumenti[key]) || repartoLabel(key);
+}
+// testo gia salvato in un documento archiviato (es. "Slots"): nome attuale nei documenti
+function settoreNomeDocumento(testo) {
+  if (!testo) return testo;
+  const r = getRepartiTutti().find((x) => x.label === testo || x.key === testo);
+  return r ? repartoNomeDocumento(r.key) : testo;
+}
 function repartoColore(key) {
   const r = getRepartoInfo(key);
   return r && r.colore ? r.colore : 'var(--muted)';

@@ -1770,7 +1770,7 @@ async function pdfCambioVacanza(dati) {
     c
       ? [
           ['Nome:', c.nome],
-          ['Settore:', c.settore || repartoLabel(_pianoReparto())],
+          ['Settore:', c.settore || repartoNomeDocumento(_pianoReparto())],
           ['Numero settimana:', 'Settimana ' + c.settimana],
           ['Periodo vacanza:', c.dal + '  ·  ' + c.al],
         ]
@@ -2787,7 +2787,7 @@ async function esportaVacanzeExcel() {
     { font: { sz: 9, italic: true } },
   );
   // titolo
-  set(3, 0, repartoLabel(_pianoReparto()).toUpperCase(), { font: { bold: true, sz: 12 } });
+  set(3, 0, repartoNomeDocumento(_pianoReparto()).toUpperCase(), { font: { bold: true, sz: 12 } });
   set(3, 3, ' PIANIFICAZIONE VACANZE ANNO ' + anno, { font: { bold: true, sz: 14 } });
   // intestazione riga 5: COGNOME NOME anno Pianificate 52 1..52
   const hStile = (w) => ({
@@ -2843,7 +2843,7 @@ async function esportaVacanzeExcel() {
   ws['!merges'] = [{ s: { r: 3, c: 3 }, e: { r: 3, c: 56 } }];
   const wb = XS.utils.book_new();
   XS.utils.book_append_sheet(wb, ws, 'preferenze');
-  XS.writeFile(wb, 'VACANZE ' + repartoLabel(_pianoReparto()).toUpperCase() + ' ' + anno + '.xlsx');
+  XS.writeFile(wb, 'VACANZE ' + repartoNomeDocumento(_pianoReparto()).toUpperCase() + ' ' + anno + '.xlsx');
   logAzione('Vacanze esportate', anno + ' · Excel · ' + dati.length + ' collaboratori');
   toast('File Excel creato (formato HR con colori)');
 }
@@ -2860,7 +2860,7 @@ function esportaVacanzePdf() {
   const doc = new jsPDF('landscape', 'mm', 'a3');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
-  doc.text('PIANIFICAZIONE VACANZE ANNO ' + anno + ' · ' + repartoLabel(_pianoReparto()).toUpperCase(), 180, 9, {
+  doc.text('PIANIFICAZIONE VACANZE ANNO ' + anno + ' · ' + repartoNomeDocumento(_pianoReparto()).toUpperCase(), 180, 9, {
     align: 'center',
   });
   doc.setFont('helvetica', 'normal');
@@ -2943,7 +2943,7 @@ function esportaVacanzePdf() {
       if (rgb && d.column.index > 0) d.cell.styles.fillColor = rgb;
     },
   });
-  const nomeFile = 'VACANZE_' + repartoLabel(_pianoReparto()).toUpperCase() + '_' + anno + '.pdf';
+  const nomeFile = 'VACANZE_' + repartoNomeDocumento(_pianoReparto()).toUpperCase() + '_' + anno + '.pdf';
   if (typeof mostraPdfPreview === 'function') mostraPdfPreview(doc, nomeFile, 'Vacanze ' + anno);
   else doc.save(nomeFile);
   logAzione('Vacanze esportate', anno + ' · PDF · ' + dati.length + ' collaboratori');

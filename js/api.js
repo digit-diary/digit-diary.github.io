@@ -40,6 +40,7 @@ async function loadAll() {
       getImp('equita_mesi'),
       getImp('reparti_config'),
       getImp('reparti_pagine'),
+      getImp('reparti_nomi_documenti'),
       getImp('giubileo_config'),
       getImp('giubileo_preavviso'),
       getImp('conservazione_anni'),
@@ -74,6 +75,7 @@ async function loadAll() {
     eqMesi,
     repCfg,
     repPag,
+    repNomiDoc,
     giubCfg,
     giubPre,
     consAnni,
@@ -171,6 +173,11 @@ async function loadAll() {
     try {
       repartiPagineCfg = JSON.parse(repPag);
     } catch (e) {}
+  try {
+    repartiNomiDocumenti = (repNomiDoc && JSON.parse(repNomiDoc)) || {};
+  } catch (e) {
+    repartiNomiDocumenti = {};
+  }
   if (giubCfg)
     try {
       const gc = JSON.parse(giubCfg);

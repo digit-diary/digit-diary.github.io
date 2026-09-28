@@ -2232,7 +2232,7 @@ function pianoCreditiStampa() {
       '</title><style>@page{size:A4 landscape;margin:10mm}body{font-family:Georgia,serif;font-size:11px;color:#000;margin:0}h1{font-size:15px;margin:0 0 4px}p{margin:0 0 8px;color:#333}table{border-collapse:collapse;width:100%}th,td{border:1px solid #888;padding:3px 5px;text-align:center}th{background:#eee}td:first-child{text-align:left;font-weight:700}</style></head><body><h1>Crediti ' +
       u.anno +
       ' · ' +
-      escP(repartoLabel(_pianoReparto())) +
+      escP(repartoNomeDocumento(_pianoReparto())) +
       '</h1><p>CGF e recupero fino a ' +
       escP(u.meseLbl) +
       ' · stampato il ' +
