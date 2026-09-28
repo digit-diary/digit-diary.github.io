@@ -655,7 +655,9 @@ function _pePatternS22(sh, ctx, col, nBG1, numS22) {
   r = _peSPP(sh, ctx, r, col, 'S5', '18.45 - 19.00', nBG1);
   r = _peSS(sh, r, col, 'SALA', '19.00 - 20.00');
 }
-function _pePatternS3(sh, ctx, col, nS3, hasR24, bg3FaRec) {
+// s3PausaPrima (lunedi-giovedi): quando S3 fa R24, la pausa e alle 22.15 e R24 dopo,
+// 22.30-23.00; la domenica resta R24 22.15-22.45 e pausa 22.45
+function _pePatternS3(sh, ctx, col, nS3, hasR24, bg3FaRec, s3PausaPrima) {
   let r = 7;
   r = _peSS(sh, r, col, 'SALA', '20.00 - 20.30');
   r = _peSPP(sh, ctx, r, col, 'C15', '20.30 - 21.00', nS3);
@@ -668,8 +670,13 @@ function _pePatternS3(sh, ctx, col, nS3, hasR24, bg3FaRec) {
       r = _peSS(sh, r, col, 'SALA', '23.00 - 23.30');
     } else {
       r = _peSS(sh, r, col, 'SALA', '22.00 - 22.15');
-      r = _peSPP(sh, ctx, r, col, 'R24', '22.15 - 22.45', nS3);
-      r = _peSS(sh, r, col, 'PAUSA', '22.45 - 23.00');
+      if (s3PausaPrima) {
+        r = _peSS(sh, r, col, 'PAUSA', '22.15 - 22.30');
+        r = _peSPP(sh, ctx, r, col, 'R24', '22.30 - 23.00', nS3);
+      } else {
+        r = _peSPP(sh, ctx, r, col, 'R24', '22.15 - 22.45', nS3);
+        r = _peSS(sh, r, col, 'PAUSA', '22.45 - 23.00');
+      }
       r = _peSPP(sh, ctx, r, col, 'R23', '23.00 - 23.15', nS3);
       r = _peSS(sh, r, col, 'SALA', '23.15 - 23.30');
     }
@@ -776,6 +783,7 @@ function _pePatternBG3_S7C(
   hasR24,
   bg3FaRec,
   numS7,
+  s3PausaPrima,
 ) {
   let r = 7;
   if (haS7C) {
@@ -790,6 +798,9 @@ function _pePatternBG3_S7C(
           r = _peSN(sh, ctx, r, col, 'S3', '22.45 - 23.00', nS3, nBG3);
           r = _peSPP(sh, ctx, r, col, 'R23', '23.00 - 23.15', bgRec);
           r = _peSS(sh, r, col, 'SALA', '23.15 - 23.30');
+        } else if (s3PausaPrima) {
+          r = _peSN(sh, ctx, r, col, 'S3', '22.15 - 22.30', nS3, nBG3);
+          r = _peSS(sh, r, col, 'SALA', '22.30 - 23.30');
         } else {
           r = _peSS(sh, r, col, 'SALA', '22.15 - 22.45');
           r = _peSN(sh, ctx, r, col, 'S3', '22.45 - 23.00', nS3, nBG3);
@@ -833,11 +844,17 @@ function _pePatternBG3_S7C(
       r = _peSPP(sh, ctx, r, col, 'S7', '21.30 - 22.00', nBG3);
       r = _peSS(sh, r, col, 'PAUSA', '22.00 - 22.15');
       if (hasR24) {
-        if (bg3FaRec) r = _peSPP(sh, ctx, r, col, 'R24', '22.15 - 22.45', bgRec);
-        else r = _peSS(sh, r, col, 'SALA', '22.15 - 22.45');
-        r = _peSN(sh, ctx, r, col, 'S3', '22.45 - 23.00', nS3, nBG3);
-        if (bg3FaRec) r = _peSPP(sh, ctx, r, col, 'R23', '23.00 - 23.15', bgRec);
-        else r = _peSS(sh, r, col, 'SALA', '23.00 - 23.15');
+        if (!bg3FaRec && s3PausaPrima) {
+          // S3 in pausa alle 22.15 (lunedi-giovedi), poi fa R24
+          r = _peSN(sh, ctx, r, col, 'S3', '22.15 - 22.30', nS3, nBG3);
+          r = _peSS(sh, r, col, 'SALA', '22.30 - 23.15');
+        } else {
+          if (bg3FaRec) r = _peSPP(sh, ctx, r, col, 'R24', '22.15 - 22.45', bgRec);
+          else r = _peSS(sh, r, col, 'SALA', '22.15 - 22.45');
+          r = _peSN(sh, ctx, r, col, 'S3', '22.45 - 23.00', nS3, nBG3);
+          if (bg3FaRec) r = _peSPP(sh, ctx, r, col, 'R23', '23.00 - 23.15', bgRec);
+          else r = _peSS(sh, r, col, 'SALA', '23.00 - 23.15');
+        }
         r = _peSS(sh, r, col, 'SALA', '23.15 - 23.45');
         if (s7InQ2) {
           r = _peSS(sh, r, col, 'SALA', '23.45 - 24.00');
@@ -911,11 +928,17 @@ function _pePatternBG3_S7C(
     }
     r = _peSPP(sh, ctx, r, col, salaBreakLbl, '22.00 - 22.15', nBG3);
     if (hasR24) {
-      if (bg3FaRec) r = _peSPP(sh, ctx, r, col, 'R24', '22.15 - 22.45', bgRec);
-      else r = _peSS(sh, r, col, 'SALA', '22.15 - 22.45');
-      r = _peSN(sh, ctx, r, col, 'S3', '22.45 - 23.00', nS3, nBG3);
-      if (bg3FaRec) r = _peSPP(sh, ctx, r, col, 'R23', '23.00 - 23.15', bgRec);
-      else r = _peSS(sh, r, col, 'SALA', '23.00 - 23.15');
+      if (!bg3FaRec && s3PausaPrima) {
+        // S3 in pausa alle 22.15 (lunedi-giovedi), poi fa R24
+        r = _peSN(sh, ctx, r, col, 'S3', '22.15 - 22.30', nS3, nBG3);
+        r = _peSS(sh, r, col, 'SALA', '22.30 - 23.15');
+      } else {
+        if (bg3FaRec) r = _peSPP(sh, ctx, r, col, 'R24', '22.15 - 22.45', bgRec);
+        else r = _peSS(sh, r, col, 'SALA', '22.15 - 22.45');
+        r = _peSN(sh, ctx, r, col, 'S3', '22.45 - 23.00', nS3, nBG3);
+        if (bg3FaRec) r = _peSPP(sh, ctx, r, col, 'R23', '23.00 - 23.15', bgRec);
+        else r = _peSS(sh, r, col, 'SALA', '23.00 - 23.15');
+      }
       r = _peSS(sh, r, col, 'SALA', '23.15 - 23.45');
     } else {
       r = _peSN(sh, ctx, r, col, 'S3', '22.15 - 22.30', nS3, nBG3);
@@ -964,7 +987,7 @@ function _pePatternBG3_S7C(
     }
   }
 }
-function _pePatternBG3_S5(sh, ctx, col, nBG3, bgRec, nS3, bg3DaR23Sera, hasR24, s7InQ2, bg3FaRec) {
+function _pePatternBG3_S5(sh, ctx, col, nBG3, bgRec, nS3, bg3DaR23Sera, hasR24, s7InQ2, bg3FaRec, s3PausaPrima) {
   let r = 7;
   r = _peSS(sh, r, col, 'SALA', '17.00 - 18.30');
   r = _peSS(sh, r, col, 'PAUSA', '18.30 - 19.00');
@@ -978,11 +1001,17 @@ function _pePatternBG3_S5(sh, ctx, col, nBG3, bgRec, nS3, bg3DaR23Sera, hasR24, 
   r = _peSPP(sh, ctx, r, col, 'S7', '21.30 - 22.00', nBG3);
   r = _peSS(sh, r, col, 'PAUSA', '22.00 - 22.15');
   if (hasR24) {
-    if (bg3FaRec) r = _peSPP(sh, ctx, r, col, 'R24', '22.15 - 22.45', bgRec);
-    else r = _peSS(sh, r, col, 'SALA', '22.15 - 22.45');
-    r = _peSN(sh, ctx, r, col, 'S3', '22.45 - 23.00', nS3, nBG3);
-    if (bg3FaRec) r = _peSPP(sh, ctx, r, col, 'R23', '23.00 - 23.15', bgRec);
-    else r = _peSS(sh, r, col, 'SALA', '23.00 - 23.15');
+    if (!bg3FaRec && s3PausaPrima) {
+      // S3 in pausa alle 22.15 (lunedi-giovedi), poi fa R24
+      r = _peSN(sh, ctx, r, col, 'S3', '22.15 - 22.30', nS3, nBG3);
+      r = _peSS(sh, r, col, 'SALA', '22.30 - 23.15');
+    } else {
+      if (bg3FaRec) r = _peSPP(sh, ctx, r, col, 'R24', '22.15 - 22.45', bgRec);
+      else r = _peSS(sh, r, col, 'SALA', '22.15 - 22.45');
+      r = _peSN(sh, ctx, r, col, 'S3', '22.45 - 23.00', nS3, nBG3);
+      if (bg3FaRec) r = _peSPP(sh, ctx, r, col, 'R23', '23.00 - 23.15', bgRec);
+      else r = _peSS(sh, r, col, 'SALA', '23.00 - 23.15');
+    }
     r = _peSS(sh, r, col, 'SALA', '23.15 - 23.45');
     if (s7InQ2) {
       r = _peSS(sh, r, col, 'SALA', '23.45 - 24.00');
@@ -1333,7 +1362,7 @@ function _peScrHeaderQ2(sh, ctx, lblQ2, nS3, nC23bg, nC20, nS22) {
       break;
   }
 }
-function _peEseguiQ2(sh, ctx, lblQ2, nS3, nC23bg, nC20, nS22, nBG3, hasR24, bg3FaRec) {
+function _peEseguiQ2(sh, ctx, lblQ2, nS3, nC23bg, nC20, nS22, nBG3, hasR24, bg3FaRec, s3PausaPrima) {
   const dT = ctx.dT;
   switch (lblQ2) {
     case 'S22':
@@ -1343,13 +1372,13 @@ function _peEseguiQ2(sh, ctx, lblQ2, nS3, nC23bg, nC20, nS22, nBG3, hasR24, bg3F
       _pePatternC23_Cassa(sh, ctx, 4, nC23bg, true);
       break;
     case 'S3':
-      _pePatternS3(sh, ctx, 4, nS3, hasR24, bg3FaRec);
+      _pePatternS3(sh, ctx, 4, nS3, hasR24, bg3FaRec, s3PausaPrima);
       break;
     case 'S5':
-      _pePatternS3(sh, ctx, 4, _peGPN(dT, 'S5'), hasR24, bg3FaRec);
+      _pePatternS3(sh, ctx, 4, _peGPN(dT, 'S5'), hasR24, bg3FaRec, s3PausaPrima);
       break;
     case 'S7C':
-      _pePatternS3(sh, ctx, 4, _peGPN(dT, 'S7C'), hasR24, bg3FaRec);
+      _pePatternS3(sh, ctx, 4, _peGPN(dT, 'S7C'), hasR24, bg3FaRec, s3PausaPrima);
       break;
     case 'S8C':
       _pePatternS8C_Q2(sh, ctx, 4, _peGPN(dT, 'S8C'));
@@ -1486,7 +1515,7 @@ function _peGeneraLunGio(sh, ctx, dataStr) {
 
   // Q2
   const bg3FaRec = _pePuoCoprire(dc, bg3.bgRec, 'R23');
-  _peEseguiQ2(sh, ctx, lblQ2, nS3, nC23bg, nC20, nS22, bg3.nBG3, hasR24, bg3FaRec);
+  _peEseguiQ2(sh, ctx, lblQ2, nS3, nC23bg, nC20, nS22, bg3.nBG3, hasR24, bg3FaRec, true);
 
   // Q3
   const bg3DaR23Sera = bg1.isS22 || bg1.bg1IsC23 || (bgCassa !== 'S1' && !bg1FaRec);
@@ -1508,10 +1537,11 @@ function _peGeneraLunGio(sh, ctx, dataStr) {
         hasR24,
         bg3FaRec,
         _peConta(dT, 'S7'),
+        true,
       );
       break;
     case 'S5':
-      _pePatternBG3_S5(sh, ctx, 7, bg3.nBG3, bg3.bgRec, nS3, bg3DaR23Sera, hasR24, lblQ2 === 'S7', bg3FaRec);
+      _pePatternBG3_S5(sh, ctx, 7, bg3.nBG3, bg3.bgRec, nS3, bg3DaR23Sera, hasR24, lblQ2 === 'S7', bg3FaRec, true);
       break;
     case 'S3':
       _pePatternBG3_S3(sh, ctx, 7, bg3.nBG3, bg3.bgRec, bg3DaR23Sera);
