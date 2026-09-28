@@ -5830,7 +5830,6 @@ header h1 {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  min-width: min(440px, 80vw);
 }
 .ai-form label {
   font-size: var(--fs-xs);
@@ -5865,4 +5864,26 @@ header h1 {
   color: var(--muted);
   margin-top: 8px;
   line-height: 1.45;
+}
+/* finestra del fornitore AI: piu larga delle altre finestre (ha piu campi) e
+   ogni campo resta dentro il riquadro (prima uscivano a destra) */
+.pwd-modal-box:has(.ai-form) {
+  width: min(560px, calc(100vw - 32px));
+  max-width: none;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.ai-form {
+  min-width: 0;
+  width: 100%;
+}
+.ai-form input[type="text"],
+.ai-form input[type="password"],
+.ai-form select {
+  width: 100%;
+  box-sizing: border-box;
+}
+.pwd-modal-box .ai-nota {
+  text-align: left;
+  margin-bottom: 0;
 }
