@@ -267,6 +267,41 @@ console.log('\n== formazione: chi e in formazione va con il collega dello stesso
   );
 }
 
+console.log('\n== sistemazione automatica: attese troppo lunghe senza pausa ==');
+{
+  vm.runInContext(fs.readFileSync(__dirname + '/../js/pause-controlli.js', 'utf8'), ctx);
+  ctx._briefPauseCfgObj = {};
+  eq(ctx._peOttimizzaCfg(), { attivo: true, attesaMax: 180 }, 'di base attiva, massimo 3h senza pausa');
+  // S5 17.00-02.00 con pause 19.30, 23.00 e 24.45 (come il 02.10 prima della v316)
+  const p = { nome: 'PINCHERA', turno: 'S5', ini: 1020, fin: 1560, attese: [30, 15, 15] };
+  const c = {
+    celle: {},
+    nR: 0,
+    biglietti: [
+      {
+        righe: [
+          { pos: 'PAUSA', nome: 'PINCHERA', ini: 1170, fin: 1200 },
+          { pos: 'PAUSA', nome: 'PINCHERA', ini: 1380, fin: 1395 },
+          { pos: 'PAUSA', nome: 'PINCHERA', ini: 1485, fin: 1500 },
+        ],
+      },
+    ],
+  };
+  eq(ctx._pcPunteggio(c, [p], true).attesa, 0, '20.00-23.00 sono 3h: dentro il massimo');
+  ctx._briefPauseCfgObj = { ottimizza: { attesaMax: 150 } };
+  eq(ctx._pcPunteggio(c, [p], true).attesa, 30, 'con massimo 2h30: 30 minuti di troppo');
+  c.biglietti[0].righe[1] = { pos: 'PAUSA', nome: 'PINCHERA', ini: 1290, fin: 1305 };
+  c.biglietti[0].righe[2] = { pos: 'PAUSA', nome: 'PINCHERA', ini: 1425, fin: 1440 };
+  eq(
+    ctx._pcPunteggio(c, [p], true).attesa,
+    0,
+    'pause 19.30, 21.30, 23.45 (02.10 dalla v316): nessuna attesa di troppo',
+  );
+  ctx._briefPauseCfgObj = { ottimizza: { attivo: false } };
+  eq(ctx._peOttimizza(c, [], '2026-10-02'), [], 'spenta: nessuno spostamento');
+  ctx._briefPauseCfgObj = {};
+}
+
 console.log(
   '\n=======================================\n  ' +
     passati +

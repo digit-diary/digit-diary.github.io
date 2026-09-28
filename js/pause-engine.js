@@ -2379,36 +2379,200 @@ function _peGeneraSlots(righeTutte, dstr) {
   const out = { tipo: 'slots', celle: sh.celle, nR: _peMaxR(sh), tipoGiorno: tipoGiorno };
   if (biglietto) out.biglietti = [biglietto];
   if (form.affiancati.length) out.formazione = form.affiancati;
-  const proposte = _peCompletaPause(out, ctx, righe, dstr).concat(_peRisolviSalaVuota(out, righe, dstr));
+  const completate = _peCompletaPause(out, ctx, righe, dstr);
+  const spostate = _peRisolviSalaVuota(out, righe, dstr).concat(_peOttimizza(out, righe, dstr));
+  const proposte = completate.concat(spostate);
   if (proposte.length) out.proposte = proposte;
+  _peDecidiConferma(out, righe, dstr, spostate.length);
   window._peDowCorrente = null;
   return out;
 }
-// ---------- SALA MAI VUOTA: spostamenti come con le frecce ----------
-// Se in un momento nessuno e in sala (chi da i cambi e in cassa o al rec mentre
-// l altro di sala e in pausa), il programma prova gli spostamenti che farebbe un
-// responsabile con le frecce: scambiare una pausa o un cambio con la riga vicina.
-// Tiene lo spostamento che toglie piu sala vuota senza creare altri problemi
-// (regola delle ore, distanza, pause nella prima o nell ultima mezz ora) e
-// ripete finche migliora. Ogni spostamento e una proposta (blu) con il motivo.
-function _pcPunteggio(c, persone) {
+// ---------- OTTIMIZZATORE: il foglio migliore con le mosse delle frecce ----------
+// Dopo lo schema e il completamento il programma da un voto al foglio (piu basso e
+// meglio) e prova le mosse che farebbe un responsabile con le frecce: spostare un
+// cambio o una pausa di un quarto d ora dentro la sala (solo dove la sala resta
+// coperta) o scambiarlo con la riga vicina; la pausa e il cambio collegati si
+// spostano insieme, e se non possono seguire la mossa si scarta. Tiene la mossa
+// che migliora di piu (e solo se migliora chiaramente) e ripete finche trova
+// meglio. Le regole non si rompono mai: una mossa che crea un avviso costa piu di
+// quanto guadagna.
+// Voto: sala vuota, avvisi (regola delle ore, distanza, cambio senza pausa...),
+// pause nella prima o ultima mezz ora, attese troppo lunghe senza pausa (oltre il
+// massimo, 3h se non impostato: lo schema abituale arriva a 2h45), pause troppo
+// vicine (sotto 1h30).
+function _peDurata(m) {
+  return Math.floor(m / 60) + 'h' + (m % 60 ? String(m % 60).padStart(2, '0') : '');
+}
+function _peOttimizzaCfg() {
+  const o = (_briefPauseCfg() || {}).ottimizza || {};
+  return {
+    attivo: o.attivo !== false,
+    attesaMax: parseInt(o.attesaMax) > 0 ? parseInt(o.attesaMax) : 180,
+  };
+}
+const _PE_OTT = { COSTO_MOSSA: 60, MAX_GIRI: 20, MOSSE_NORMALI: 6 };
+function _pcPunteggio(c, persone, dettaglio) {
   const PC = window.PauseControlli;
+  const cfg = _peOttimizzaCfg();
   const pp = PC.pausePersone(c, persone, c.biglietti);
   let v = 0;
-  PC.salaVuota(c, persone, pp, c.biglietti).forEach((b) => (v += 100 * (b.fin - b.ini)));
+  let attesa = 0;
+  let vuota = 0;
+  let comodita = 0;
+  PC.salaVuota(c, persone, pp, c.biglietti).forEach((b) => (vuota += b.fin - b.ini));
+  v += 100 * vuota;
+  let avvisi = 0;
   PC.controlla(c, persone, { biglietti: c.biglietti }).forEach((a) => {
-    if (a.tipo !== 'sala') v += 5000;
+    if (a.tipo !== 'sala') {
+      v += 5000;
+      avvisi++;
+    }
   });
-  // pause nella prima o nell ultima mezz ora del turno: da evitare
   persone.forEach((p) => {
     const i = pp[p.nome];
-    if (!i || !i.alternative[0] || p.ini == null) return;
-    i.alternative[0].pause.forEach((x) => {
+    // chi ruota (C8) ha le pause vere nella colonna alternativa: non si giudica qui
+    if (!i || i.rotazione || !i.alternative[0] || p.ini == null || p.acc) return;
+    if ((PC.ROTAZIONE || []).includes(p.turno) || i.alternative.length > 1) return;
+    const pause = i.alternative[0].pause.slice().sort((a, b) => a.ini - b.ini);
+    // pause nella prima o nell ultima mezz ora del turno: da evitare
+    pause.forEach((x) => {
       if (x.ini < p.ini + 30 || x.fin > p.fin - 30) v += 400;
     });
+    if (!pause.length) return;
+    // attese: dall inizio del turno alla prima pausa, fra una pausa e l altra,
+    // dall ultima alla fine
+    let t = p.ini;
+    pause.forEach((x, k) => {
+      const d = x.ini - t;
+      if (d > cfg.attesaMax) attesa += d - cfg.attesaMax;
+      if (k > 0 && d < 90) comodita += 3 * (90 - d);
+      t = Math.max(t, x.fin);
+    });
+    if (p.fin - t > cfg.attesaMax) attesa += p.fin - t - cfg.attesaMax;
   });
+  // vRegole: solo sala vuota, avvisi e pause ai bordi del turno (il voto del
+  // risolutore della sala vuota); v aggiunge attese e distanze
+  const vRegole = v;
+  v += comodita;
+  v += 10 * attesa;
+  if (dettaglio) return { v: v, vRegole: vRegole, attesa: attesa, avvisi: avvisi, vuota: vuota };
   return v;
 }
+function _peOttimizza(c, righe, dstr) {
+  const PC = window.PauseControlli;
+  const out = [];
+  if (!PC || !_peOttimizzaCfg().attivo) return out;
+  const persone = _pcPersone(righe, dstr);
+  if (!Array.isArray(c.legami)) c.legami = _pbCalcolaLegami(c);
+  // le frecce di un quarto d ora leggono il briefing del giorno
+  const statoPrima = typeof _briefState !== 'undefined' ? _briefState : null;
+  const dataPrima = typeof _briefData !== 'undefined' ? _briefData : null;
+  if (!statoPrima || statoPrima.righe !== righe) _briefState = Object.assign({}, statoPrima || {}, { righe: righe });
+  _briefData = dstr;
+  const fermo = (x) => ({ celle: JSON.stringify(c.celle), nR: c.nR });
+  const torna = (f) => {
+    c.celle = JSON.parse(f.celle);
+    c.nR = f.nR;
+  };
+  // una mossa: come la freccia (quarto d ora dentro la riga libera, altrimenti
+  // scambio con la riga vicina) con pausa e cambio collegati che seguono
+  // tipo 'quarto': freccia di un quarto d ora dentro la riga libera; 'scambio':
+  // scambio intero con la riga vicina (tutte e due si provano)
+  const muovi = (b, x, dir, tipo) => {
+    const prima = _pbBlocchi(c);
+    if (tipo === 'quarto') {
+      if (c.tipo !== 'slots' || _pbSpostaQuarto(c, b.base, x.r, dir) !== 'fatto') return false;
+    } else if (!_pbScambia(c, b.base, x.r, dir)) return false;
+    const msg = _pbSincronizza(c, prima, b.base);
+    return !msg.some((m) => /non spostat/.test(m));
+  };
+  try {
+    let attuale = _pcPunteggio(c, persone);
+    // regole che non si scambiano con niente: la sala vuota e gli avvisi non
+    // possono aumentare, qualunque cosa la mossa guadagni altrove
+    let base = _pcPunteggio(c, persone, true);
+    for (let giro = 0; giro < _PE_OTT.MAX_GIRI; giro++) {
+      let meglio = null;
+      PC.blocchi(c)
+        .filter((b) => !/ALT/.test(b.post) && !(b.opz && !b.personale))
+        .forEach((b) => {
+          b.righe.forEach((x) => {
+            if (_PC_LIBERE.includes(x.pos)) return;
+            [
+              [-1, 'quarto'],
+              [1, 'quarto'],
+              [-1, 'scambio'],
+              [1, 'scambio'],
+            ].forEach(([dir, tipo]) => {
+              const f = fermo();
+              if (muovi(b, x, dir, tipo)) {
+                const det = _pcPunteggio(c, persone, true);
+                const v = det.vuota > base.vuota || det.avvisi > base.avvisi ? Infinity : det.v;
+                if (v + _PE_OTT.COSTO_MOSSA < attuale && (!meglio || v < meglio.v))
+                  meglio = { v: v, base: b.base, r: x.r, dir: dir, tipo: tipo, nome: b.nome, post: b.post, x: x };
+              }
+              torna(f);
+            });
+          });
+        });
+      if (!meglio) break;
+      const d0 = _pcPunteggio(c, persone, true);
+      muovi({ base: meglio.base }, { r: meglio.r }, meglio.dir, meglio.tipo);
+      const d1 = _pcPunteggio(c, persone, true);
+      const motivo =
+        d1.vuota < d0.vuota
+          ? 'cosi la sala non resta vuota'
+          : d1.avvisi < d0.avvisi
+            ? 'cosi le pause rispettano le regole'
+            : d1.attesa < d0.attesa
+              ? 'cosi nessuno aspetta la pausa oltre ' + _peDurata(_peOttimizzaCfg().attesaMax)
+              : 'pause distribuite meglio';
+      // dove e finita la riga spostata (stessa postazione, orario vicino)
+      const blk = PC.blocchi(c).find((b) => b.base === meglio.base && b.nome === meglio.nome);
+      const dopo =
+        (blk &&
+          blk.righe
+            .filter((y) => y.pos === meglio.x.pos)
+            .sort((a, b) => Math.abs(a.ini - meglio.x.ini) - Math.abs(b.ini - meglio.x.ini))[0]) ||
+        meglio.x;
+      // la stessa riga spostata di nuovo (quarto d ora dopo quarto d ora): una voce sola
+      const gia = out.find(
+        (y) => y.base === meglio.base && y.nome === meglio.nome && y.pos === meglio.x.pos && y.ini === meglio.x.ini,
+      );
+      if (gia) {
+        gia.ini = dopo.ini;
+        gia.fin = dopo.fin;
+        gia.r = dopo.r;
+        if (gia.ini === gia.daIni) out.splice(out.indexOf(gia), 1);
+        attuale = meglio.v;
+        base = _pcPunteggio(c, persone, true);
+        continue;
+      }
+      out.push({
+        modo: 'spostata',
+        nome: meglio.nome,
+        turno: meglio.post,
+        pos: meglio.x.pos,
+        ini: dopo.ini,
+        fin: dopo.fin,
+        daIni: meglio.x.ini,
+        daFin: meglio.x.fin,
+        motivo: motivo,
+        r: dopo.r,
+        base: meglio.base,
+      });
+      attuale = meglio.v;
+      base = _pcPunteggio(c, persone, true);
+    }
+  } finally {
+    _briefState = statoPrima;
+    _briefData = dataPrima;
+  }
+  return out;
+}
+// SALA MAI VUOTA (prima dell ottimizzatore): se in un momento nessuno e in sala il
+// programma prova gli scambi che farebbe un responsabile con le frecce e tiene quello
+// che toglie piu sala vuota senza creare altri problemi.
 function _peRisolviSalaVuota(c, righe, dstr) {
   const PC = window.PauseControlli;
   const out = [];
@@ -2416,7 +2580,7 @@ function _peRisolviSalaVuota(c, righe, dstr) {
   const persone = _pcPersone(righe, dstr);
   const vuota = () => PC.salaVuota(c, persone, PC.pausePersone(c, persone, c.biglietti), c.biglietti).length;
   if (!vuota()) return out;
-  let attuale = _pcPunteggio(c, persone);
+  let attuale = _pcPunteggio(c, persone, true).vRegole;
   for (let giro = 0; giro < 8 && vuota(); giro++) {
     let meglio = null;
     PC.blocchi(c)
@@ -2429,7 +2593,7 @@ function _peRisolviSalaVuota(c, righe, dstr) {
             const copia = JSON.stringify({ celle: c.celle, nR: c.nR });
             const r2 = _pbScambia(c, b.base, x.r, dir);
             if (r2) {
-              const v = _pcPunteggio(c, persone);
+              const v = _pcPunteggio(c, persone, true).vRegole;
               if (v < attuale && (!meglio || v < meglio.v)) meglio = { v: v, b: b, x: x, dir: dir, r2: r2 };
             }
             const o = JSON.parse(copia);
@@ -2456,10 +2620,40 @@ function _peRisolviSalaVuota(c, righe, dstr) {
       fin: dopo.fin,
       daIni: prima.ini,
       daFin: prima.fin,
+      motivo: 'cosi la sala non resta vuota',
+      r: meglio.r2,
+      base: meglio.b.base,
     });
     attuale = meglio.v;
   }
   return out;
+}
+// CONFERMA SOLO NEI CASI ECCEZIONALI: le proposte che rispettano le regole si
+// applicano da sole (nessun blu, restano elencate in "Sistemato dal programma");
+// il foglio chiede conferma (blu e bottone) solo se una postazione resta senza
+// cambio, se restano avvisi dopo la sistemazione o se il programma ha spostato
+// molte righe dello schema abituale.
+function _peDecidiConferma(c, righe, dstr, spostate) {
+  const l = c.proposte || [];
+  const persone = _pcPersone(righe, dstr);
+  const voto = _pcPunteggio(c, persone, true);
+  const motivi = [];
+  if (l.some((x) => x.modo === 'scoperta')) motivi.push('una postazione resta senza cambio');
+  if (voto.avvisi) motivi.push('restano avvisi da controllare');
+  if (spostate > _PE_OTT.MOSSE_NORMALI) motivi.push('spostate ' + spostate + ' righe dello schema abituale');
+  if (motivi.length) {
+    c.conferma = motivi;
+    // in blu anche le righe spostate dall ottimizzatore
+    l.forEach((x) => {
+      if (x.modo !== 'spostata' || !x.r) return;
+      [x.base, x.base + 1].forEach((col) => {
+        if (c.celle[x.r + '|' + col]) c.celle[x.r + '|' + col].prop = 1;
+      });
+    });
+  } else {
+    delete c.conferma;
+    Object.keys(c.celle).forEach((k) => delete c.celle[k].prop);
+  }
 }
 // ---------- COMPLETAMENTO: le pause che la regola prevede e il foglio non da ----------
 // Per ogni persona senza colonna propria a cui manca una pausa (es. S31, il
@@ -4613,6 +4807,8 @@ function briefPauseStampaOpz(nome, si) {
 function _pcProposteHtml(c) {
   const l = (c && c.proposte) || [];
   if (!l.length || !puoGestireBriefing()) return '';
+  // senza blu nel foglio le proposte sono gia applicate: solo una nota chiudibile
+  const daConfermare = Object.keys(c.celle || {}).some((k) => c.celle[k].prop);
   const o = (m) => _pbOra(m);
   const righe = l.map((x) => {
     const chi = escP(x.turno) + ' ' + escP(x.nome);
@@ -4623,14 +4819,14 @@ function _pcProposteHtml(c) {
       return (
         chi +
         ': ' +
-        (x.pos === 'PAUSA' ? 'pausa' : 'cambio ' + escP(x.pos)) +
-        ' spostato da ' +
+        (x.pos === 'PAUSA' ? 'pausa spostata' : 'cambio ' + escP(x.pos) + ' spostato') +
+        ' da ' +
         o(x.daIni) +
         '-' +
         o(x.daFin) +
         ' a ' +
         ora +
-        ', perche la sala non resti vuota'
+        (x.motivo ? ', ' + escP(x.motivo) : '')
       );
     return (
       '<b style="color:var(--c-rosso,#c0392b)">' +
@@ -4640,10 +4836,20 @@ function _pcProposteHtml(c) {
       ', nessun collega formato e libero: la postazione resta senza cambio</b>'
     );
   });
+  if (!daConfermare)
+    return (
+      '<details class="pb-proposte" style="margin:0 0 8px;padding:6px 10px;font-size:var(--fs-sm,.8125rem);background:var(--card-bg,#fff);border-left:3px solid var(--c-verde,#2e7d32)"><summary style="cursor:pointer"><b>Sistemato dal programma (' +
+      l.length +
+      ')</b>: pause aggiunte e spostamenti che rispettano tutte le regole, gia applicati</summary>' +
+      righe.join('<br>') +
+      '<div style="margin-top:4px;color:var(--muted)">Per cambiarli usa le frecce o scrivi nelle celle; Annulla torna al foglio di prima.</div></details>'
+    );
   return (
-    '<div class="pb-proposte" style="margin:0 0 8px;padding:6px 10px;font-size:var(--fs-sm,.8125rem);background:var(--c-azzurro-bg,#e6f0f8);border-left:3px solid var(--c-azzurro,#1f6fa3)"><b>Proposte del programma (' +
+    '<div class="pb-proposte" style="margin:0 0 8px;padding:6px 10px;font-size:var(--fs-sm,.8125rem);background:var(--c-azzurro-bg,#e6f0f8);border-left:3px solid var(--c-azzurro,#1f6fa3)"><b>Da confermare (' +
     l.length +
-    ')</b>: pause che la regola delle ore prevede e lo schema non dava. Sono bordate di blu nel foglio.<br>' +
+    ')</b>: ' +
+    escP((c.conferma || []).join('; ') || 'proposte del programma') +
+    '. Le righe interessate sono bordate di blu nel foglio.<br>' +
     righe.join('<br>') +
     '<div style="margin-top:6px"><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px" onclick="briefPauseTieniProposte()">Tengo le proposte</button> <span style="color:var(--muted)">(togli il blu; per cambiarle usa le frecce o scrivi nelle celle)</span></div></div>'
   );
@@ -4654,6 +4860,7 @@ function briefPauseTieniProposte() {
   _briefRicorda();
   Object.keys(c.celle).forEach((k) => delete c.celle[k].prop);
   c.proposte = [];
+  delete c.conferma;
   _briefSalvaPauseDebounce();
   _briefRefreshPause();
   toast('Proposte confermate');
@@ -4941,6 +5148,25 @@ function _briefRenderPauseCfg() {
       : '') +
     '</div>';
   h += '<div class="tipo-list">' + lista + '</div>' + form + guida;
+  // sistemazione automatica del foglio (ottimizzatore), valida per tutti i settori Slots
+  if (sett === 'slots') {
+    const oc = _peOttimizzaCfg();
+    h +=
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;padding:8px 10px;background:var(--paper2);border-radius:3px">' +
+      '<b>Sistemazione automatica</b>' +
+      '<label style="display:inline-flex;align-items:center;gap:4px"><input type="checkbox" id="pcfg-ott-attivo"' +
+      (oc.attivo ? ' checked' : '') +
+      '> attiva</label>' +
+      '<span>nessuno aspetta la pausa piu di</span><select id="pcfg-ott-max" style="padding:4px">' +
+      [120, 150, 165, 180, 195, 210, 240]
+        .map(
+          (m) =>
+            '<option value="' + m + '"' + (m === oc.attesaMax ? ' selected' : '') + '>' + _peDurata(m) + '</option>',
+        )
+        .join('') +
+      '</select><button class="btn-add-tipo" onclick="peOttimizzaSalva()">Salva</button>' +
+      '<div style="flex-basis:100%;color:var(--muted)">Dopo lo schema il programma sposta cambi e pause come con le frecce (sala mai vuota, regole sempre rispettate) per togliere sala vuota e attese troppo lunghe. Applica da solo; chiede conferma solo nei casi eccezionali (postazione senza cambio, avvisi che restano, molte righe spostate). Consigliato 3h: lo schema abituale arriva a 2h45.</div></div>';
+  }
   const repCorr = sett;
   h += '<div style="margin-top:8px"></div>';
   // numeri cassa (CD): coppie e rotazione giornaliera · solo settore slots
@@ -5059,6 +5285,25 @@ async function _pePauseSalvaRegole(lista) {
   if (!(await salvaImp('piano_pause_cfg', JSON.stringify(cfg)))) return false;
   window._briefPauseCfgObj = cfg;
   return true;
+}
+async function peOttimizzaSalva() {
+  if (!isAdmin()) return;
+  const c0 = _briefPauseCfg();
+  const att = document.getElementById('pcfg-ott-attivo');
+  const max = document.getElementById('pcfg-ott-max');
+  const cfg = Object.assign({}, c0, {
+    ottimizza: { attivo: !!(att && att.checked), attesaMax: parseInt(max && max.value) || 180 },
+  });
+  if (!(await salvaImp('piano_pause_cfg', JSON.stringify(cfg)))) {
+    toast('Errore salvataggio');
+    return;
+  }
+  window._briefPauseCfgObj = cfg;
+  logAzione(
+    'Sistemazione automatica pause',
+    (cfg.ottimizza.attivo ? 'attiva' : 'spenta') + ' ' + cfg.ottimizza.attesaMax + ' min',
+  );
+  toast('Salvato: vale per le prossime pause generate');
 }
 async function pePauseSalva() {
   if (!isAdmin()) return;
