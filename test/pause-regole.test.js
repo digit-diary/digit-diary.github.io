@@ -222,16 +222,49 @@ console.log('\n== formazione: chi e in formazione va con il collega dello stesso
 {
   const r = (nome, turno, fm) => ({ nome, turno, fm: fm || undefined });
   let f = ctx._pcFormazione([r('ROSSI', 'R22', true), r('GRASSO', 'R22'), r('BUJIC', 'S1')]);
-  eq(f.righe.map((x) => x.nome), ['GRASSO', 'BUJIC'], 'R22 in formazione non conta come persona a se');
+  eq(
+    f.righe.map((x) => x.nome),
+    ['GRASSO', 'BUJIC'],
+    'R22 in formazione non conta come persona a se',
+  );
   eq(f.affiancati, [{ nome: 'ROSSI', turno: 'R22', con: 'GRASSO' }], 'va con GRASSO (R22)');
   f = ctx._pcFormazione([r('GIANOTTI', 'R23', true), r('PAROLO', 'R23', true)]);
-  eq(f.righe.map((x) => x.nome), ['GIANOTTI'], 'tutti e due con la scritta formazione: contano come una persona');
-  f = ctx._pcFormazione([r('A', 'S22', true), r('B', 'S22', true), r('T1', 'S22'), r('T2', 'S22')]);
-  eq(f.affiancati.map((x) => x.nome + '>' + x.con), ['A>T1', 'B>T2'], 'due in formazione e due colleghi: uno per ciascuno');
+  eq(
+    f.righe.map((x) => x.nome),
+    ['GIANOTTI'],
+    'tutti e due con la scritta formazione: contano come una persona',
+  );
+  // 02.10.2026: TEPELUS e LETIZIA (R22) con FORMAZIONE REC, MUMINOVIC R22 senza
+  f = ctx._pcFormazione([r('MUMINOVIC', 'R22'), r('TEPELUS', 'R22', true), r('LETIZIA', 'R22', true)]);
+  eq(
+    f.affiancati.map((x) => x.nome + '>' + x.con),
+    ['LETIZIA>TEPELUS'],
+    'due con la scritta formazione sono la coppia (non con il terzo R22)',
+  );
+  eq(
+    f.righe.map((x) => x.nome),
+    ['MUMINOVIC', 'TEPELUS'],
+    'restano due persone: MUMINOVIC e la coppia',
+  );
+  eq(
+    ctx._pcFormazione(f.righe).righe.map((x) => x.nome),
+    ['MUMINOVIC', 'TEPELUS'],
+    'applicata di nuovo allo stesso elenco non rifa le coppie',
+  );
+  f = ctx._pcFormazione([r('A', 'S22', true), r('T1', 'S22'), r('B', 'C0', true), r('T2', 'C0')]);
+  eq(
+    f.affiancati.map((x) => x.nome + '>' + x.con),
+    ['A>T1', 'B>T2'],
+    'scritta su una persona sola: va con il collega del suo turno',
+  );
   f = ctx._pcFormazione([r('SOLO', 'C23', true), r('ALTRO', 'C0')]);
   eq(f.righe.length, 2, 'in formazione ma solo sul suo turno: persona normale');
   f = ctx._pcFormazione([r('BALLIU', 'C0', true), r('DACOSTA', 'C0')]);
-  eq(f.righe.map((x) => x.nome), ['DACOSTA'], 'vale anche in cassa (C0)');
+  eq(
+    f.righe.map((x) => x.nome),
+    ['DACOSTA'],
+    'vale anche in cassa (C0)',
+  );
 }
 
 console.log(

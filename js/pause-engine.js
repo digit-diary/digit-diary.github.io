@@ -2019,10 +2019,22 @@ function _peGeneraVenSab(sh, ctx, dataStr) {
       if (!sA) sA = 'S5';
       else if (!sB) sB = 'S5';
     }
-    if (numS7 >= 2) {
+    // con l S5 che non riceve cambi dall S7 (S3 e S7C gia nelle sue righe) e l S1 in
+    // sala fino alle 21: l S7 va in pausa prima (20.30) e crea spazio per l S5, che
+    // cosi non fa la pausa della sera troppo tardi
+    const s5Presto = dT['S5'] && dT['S1'] && recSost !== 'S5' && sA !== 'S5' && sB !== 'S5';
+    if (numS7 >= 2 && s5Presto) {
+      r = _peSS(sh, r, 1, 'SALA', '20.00 - 20.30');
+      r = _peSS(sh, r, 1, 'PAUSA', '20.30 - 21.00');
+      r = _peSPP(sh, ctx, r, 1, 'S7', '21.00 - 21.30', nS7);
+      r = _peSPP(sh, ctx, r, 1, 'S5', '21.30 - 21.45', nS7);
+      r = _peSS(sh, r, 1, 'SALA', '21.45 - 22.00');
+    } else if (numS7 >= 2) {
       r = _peSS(sh, r, 1, 'SALA', '20.00 - 21.00');
       r = _peSS(sh, r, 1, 'PAUSA', '21.00 - 21.30');
       r = _peSPP(sh, ctx, r, 1, 'S7', '21.30 - 22.00', nS7);
+    }
+    if (numS7 >= 2) {
       if (sA) r = _peSPP(sh, ctx, r, 1, sA, '22.00 - 22.15', nS7);
       else r = _peSS(sh, r, 1, 'SALA', '22.00 - 22.15');
       if (sB) r = _peSPP(sh, ctx, r, 1, sB, '22.15 - 22.30', nS7);
@@ -2210,6 +2222,8 @@ function _peGeneraExtra(sh, ctx, tipoGiorno) {
     const o = ctx.orari[turno];
     _peScrHeader(sh, startR, 1, turno, nome, o ? o.iniStr + ' - ' + o.finStr : '', clrH);
     sh.celle[startR + '|1'].pers = 1; // colonnina personale: non da cambi ad altri
+    // e non da cambi: facoltativa in stampa, come le altre colonnine personali
+    sh.celle[startR + '|1'].opz = 'pause da solo';
     _peGeneraPauseAuto(sh, startR + 2, 1, turno, ctx, pauseMin);
   });
 }
@@ -2296,24 +2310,37 @@ function _pcFormazione(righe) {
       .toUpperCase();
   const affiancati = [];
   const tolti = new Set();
+  // chi guida una coppia di formazione resta nell elenco segnato (fmCoppia): la
+  // funzione si puo applicare di nuovo allo stesso elenco senza rifare le coppie
+  const guidaCoppia = new Set();
+  const inF = (r) => r.fm && !r.fmCoppia;
   const perTurno = {};
   valide.forEach((r) => (perTurno[turno(r)] = perTurno[turno(r)] || []).push(r));
   Object.keys(perTurno).forEach((t) => {
     const l = perTurno[t];
-    if (l.length < 2 || !l.some((r) => r.fm)) return;
-    // chi guida: chi non e in formazione; se sono tutti in formazione (spesso il
-    // commento e scritto su entrambi) il primo. Gli altri in formazione vanno con
-    // loro, uno per ciascuno a turno se i colleghi sono piu di uno.
-    const guide = l.filter((r) => !r.fm);
-    const capi = guide.length ? guide : [l.find((r) => r.fm)];
-    const seguono = l.filter((r) => r.fm && !capi.includes(r));
+    if (l.length < 2 || !l.some(inF)) return;
+    // chi e in formazione va in coppia: se il commento e scritto su piu persone
+    // dello stesso turno (formatore e allievo, es. due R22 con FORMAZIONE REC e un
+    // terzo R22 senza) sono loro la coppia, il primo guida; se e scritto su una
+    // sola persona va con un collega del turno senza commento. Con piu allievi, uno
+    // per ciascun collega a turno.
+    const inForm = l.filter(inF);
+    const guide = l.filter((r) => !inF(r));
+    const capi = inForm.length >= 2 ? [inForm[0]] : guide.length ? guide : [inForm[0]];
+    const seguono = inForm.filter((r) => !capi.includes(r));
+    capi.forEach((r) => inF(r) && guidaCoppia.add(r));
     seguono.forEach((r, k) => {
       const con = capi[k % capi.length];
       tolti.add(r);
       affiancati.push({ nome: String(r.nome).trim(), turno: t, con: String(con.nome).trim() });
     });
   });
-  return { righe: (righe || []).filter((r) => !tolti.has(r)), affiancati: affiancati };
+  return {
+    righe: (righe || [])
+      .filter((r) => !tolti.has(r))
+      .map((r) => (guidaCoppia.has(r) ? Object.assign({}, r, { fmCoppia: true }) : r)),
+    affiancati: affiancati,
+  };
 }
 function _peGeneraSlots(righeTutte, dstr) {
   const form = _pcFormazione(righeTutte);
@@ -2520,7 +2547,7 @@ function _pcBloccoPersonale(c, p, pause, opz) {
     .sort((a, b) => a.ini - b.ini)
     .forEach((x) => {
       if (x.ini > t) _pcScriviRiga(c, r++, base, lbl, t, x.ini, null, false);
-      _pcScriviRiga(c, r++, base, 'PAUSA', x.ini, x.fin, null, !!x.nuova && !opz);
+      _pcScriviRiga(c, r++, base, 'PAUSA', x.ini, x.fin, null, !!x.nuova && !/^(accoglienza|secondo)/.test(opz));
       t = x.fin;
     });
   if (t < p.fin) _pcScriviRiga(c, r++, base, lbl, t, p.fin, null, false);
@@ -2740,7 +2767,10 @@ function _peCompletaPause(c, ctx, righe, dstr) {
             !PC.blocchi(c).some((b) => b.opz && String(b.nome).toUpperCase() === q.nome.toUpperCase())) ||
             (ppNow[q.nome].alternative[0] && ppNow[q.nome].alternative[0].pause.length)),
       );
-      _pcBloccoPersonale(c, p, tutte, doppio ? 'secondo ' + p.turno : '');
+      // chi non da cambi non riceve un bigliettino da stampare: la sua colonnina e
+      // facoltativa (sotto il foglio, in stampa solo se spuntata) ma le pause restano
+      // nei controlli
+      _pcBloccoPersonale(c, p, tutte, doppio ? 'secondo ' + p.turno : 'pause da solo');
       decise[p.nome] = (decise[p.nome] || []).concat(soli);
       soli.forEach((x) =>
         proposte.push({
