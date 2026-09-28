@@ -652,8 +652,9 @@ function _pePatternS22(sh, ctx, col, nBG1, numS22) {
   r = _peSPP(sh, ctx, r, col, 'C4', '18.00 - 18.15', nBG1);
   r = _peSPP(sh, ctx, r, col, 'C0', '18.15 - 18.30', nBG1);
   r = _peSPP(sh, ctx, r, col, 'C23', '18.30 - 18.45', nBG1);
-  r = _peSPP(sh, ctx, r, col, 'S5', '18.45 - 19.00', nBG1);
-  r = _peSS(sh, r, col, 'SALA', '19.00 - 20.00');
+  // S5 fa 9 ore: la mezz ora alle 19.30, come quando la da S1
+  r = _peSS(sh, r, col, 'SALA', '18.45 - 19.30');
+  r = _peSPP(sh, ctx, r, col, 'S5', '19.30 - 20.00', nBG1);
 }
 // s3PausaPrima (lunedi-giovedi): quando S3 fa R24, la pausa e alle 22.15 e R24 dopo,
 // 22.30-23.00; la domenica resta R24 22.15-22.45 e pausa 22.45
@@ -957,7 +958,9 @@ function _pePatternBG3_S7C(
       r = _peSPP(sh, ctx, r, col, 'S7', '24.15 - 24.30', nBG3);
       r = _peSPP(sh, ctx, r, col, salaBreakLbl, '24.30 - 24.45', nBG3);
       if (hasR24 && bg3FaRec) {
-        r = _peSPP(sh, ctx, r, col, 'R24', '24.45 - 01.15', bgRec);
+        // R24 fa 7 ore: 30+15 (qui un quarto d ora)
+        r = _peSPP(sh, ctx, r, col, 'R24', '24.45 - 01.00', bgRec);
+        r = _peSS(sh, r, col, 'SALA', '01.00 - 01.15');
         r = _peSS(sh, r, col, 'SALA', '01.15 - 01.30');
         r = _peSPP(sh, ctx, r, col, 'R23', '01.30 - 01.45', bgRec);
       } else if (bg3FaRec) {
@@ -1099,7 +1102,8 @@ function _pePatternBG3_S8C(sh, ctx, col, nBG3) {
   r = _peSPP(sh, ctx, r, col, 'R23', '01.00 - 01.15', nBG3);
   r = _peSPP(sh, ctx, r, col, 'C15', '01.15 - 01.30', nBG3);
   r = _peSPP(sh, ctx, r, col, 'C5', '01.30 - 01.45', nBG3);
-  r = _peSS(sh, r, col, 'PAUSA', '01.45 - 02.00');
+  // S8C fa 7 ore e 20: 30+15 (la terza pausa non spetta)
+  r = _peSS(sh, r, col, 'SALA', '01.45 - 02.00');
   r = _peSS(sh, r, col, 'SALA', '02.00 - 04.00');
 }
 function _pePatternBG3_S31(sh, ctx, col, nBG3, nS3, hasR24, bg3FaRec) {
@@ -1332,6 +1336,7 @@ function _pePatternS1_Standard(sh, ctx, nBG1, numS22, hasR24) {
 }
 function _peScrHeaderQ2(sh, ctx, lblQ2, nS3, nC23bg, nC20, nS22) {
   const dT = ctx.dT;
+  const q2 = ctx.q2Nome;
   switch (lblQ2) {
     case 'S22':
       _peScrHeader(sh, 5, 4, 'S22', nS22, '11.40 - 20.00', _PE_CLR.giallo);
@@ -1340,22 +1345,22 @@ function _peScrHeaderQ2(sh, ctx, lblQ2, nS3, nC23bg, nC20, nS22) {
       _peScrHeader(sh, 5, 4, 'C23', nC23bg, '11.40 - 20.10', _PE_CLR.c23);
       break;
     case 'S3':
-      _peScrHeader(sh, 5, 4, 'S3', nS3, '20.00 - 02.00', _PE_CLR.giallo);
+      _peScrHeader(sh, 5, 4, 'S3', q2 || nS3, '20.00 - 02.00', _PE_CLR.giallo);
       break;
     case 'S5':
-      _peScrHeader(sh, 5, 4, 'S5', _peGPN(dT, 'S5'), '17.00 - 02.00', _PE_CLR.giallo);
+      _peScrHeader(sh, 5, 4, 'S5', q2 || _peGPN(dT, 'S5'), '17.00 - 02.00', _PE_CLR.giallo);
       break;
     case 'S7C':
-      _peScrHeader(sh, 5, 4, 'S7C', _peGPN(dT, 'S7C'), '19.50 - 02.00', _PE_CLR.giallo);
+      _peScrHeader(sh, 5, 4, 'S7C', q2 || _peGPN(dT, 'S7C'), '19.50 - 02.00', _PE_CLR.giallo);
       break;
     case 'S8C':
-      _peScrHeader(sh, 5, 4, 'S8C', _peGPN(dT, 'S8C'), '20.50 - 04.10', _PE_CLR.giallo);
+      _peScrHeader(sh, 5, 4, 'S8C', q2 || _peGPN(dT, 'S8C'), '20.50 - 04.10', _PE_CLR.giallo);
       break;
     case 'S7':
-      _peScrHeader(sh, 5, 4, 'S7', _peGPN(dT, 'S7'), '19.50 - 04.00', _PE_CLR.giallo);
+      _peScrHeader(sh, 5, 4, 'S7', q2 || _peGPN(dT, 'S7'), '19.50 - 04.00', _PE_CLR.giallo);
       break;
     case 'S31':
-      _peScrHeader(sh, 5, 4, 'S31', _peGPN(dT, 'S31'), '16.00 - 01.00', _PE_CLR.giallo);
+      _peScrHeader(sh, 5, 4, 'S31', q2 || _peGPN(dT, 'S31'), '16.00 - 01.00', _PE_CLR.giallo);
       break;
     case 'C20':
       _peScrHeader(sh, 5, 4, 'C20', nC20, '19.40 - 03.10', _PE_CLR.azzurro);
@@ -1364,6 +1369,7 @@ function _peScrHeaderQ2(sh, ctx, lblQ2, nS3, nC23bg, nC20, nS22) {
 }
 function _peEseguiQ2(sh, ctx, lblQ2, nS3, nC23bg, nC20, nS22, nBG3, hasR24, bg3FaRec, s3PausaPrima) {
   const dT = ctx.dT;
+  const q2 = ctx.q2Nome;
   switch (lblQ2) {
     case 'S22':
       _pePatternS22_Cassa(sh, ctx, 4, nS22);
@@ -1372,22 +1378,22 @@ function _peEseguiQ2(sh, ctx, lblQ2, nS3, nC23bg, nC20, nS22, nBG3, hasR24, bg3F
       _pePatternC23_Cassa(sh, ctx, 4, nC23bg, true);
       break;
     case 'S3':
-      _pePatternS3(sh, ctx, 4, nS3, hasR24, bg3FaRec, s3PausaPrima);
+      _pePatternS3(sh, ctx, 4, q2 || nS3, hasR24, bg3FaRec, s3PausaPrima);
       break;
     case 'S5':
-      _pePatternS3(sh, ctx, 4, _peGPN(dT, 'S5'), hasR24, bg3FaRec, s3PausaPrima);
+      _pePatternS3(sh, ctx, 4, q2 || _peGPN(dT, 'S5'), hasR24, bg3FaRec, s3PausaPrima);
       break;
     case 'S7C':
-      _pePatternS3(sh, ctx, 4, _peGPN(dT, 'S7C'), hasR24, bg3FaRec, s3PausaPrima);
+      _pePatternS3(sh, ctx, 4, q2 || _peGPN(dT, 'S7C'), hasR24, bg3FaRec, s3PausaPrima);
       break;
     case 'S8C':
-      _pePatternS8C_Q2(sh, ctx, 4, _peGPN(dT, 'S8C'));
+      _pePatternS8C_Q2(sh, ctx, 4, q2 || _peGPN(dT, 'S8C'));
       break;
     case 'S7':
-      _pePatternS7_Q2(sh, ctx, 4, _peGPN(dT, 'S7'));
+      _pePatternS7_Q2(sh, ctx, 4, q2 || _peGPN(dT, 'S7'));
       break;
     case 'S31':
-      _pePatternS31_Q2(sh, ctx, 4, _peGPN(dT, 'S31'));
+      _pePatternS31_Q2(sh, ctx, 4, q2 || _peGPN(dT, 'S31'));
       break;
     case 'C20':
       _pePatternC20_BG(sh, ctx, 4, nC20, nBG3);
@@ -1396,25 +1402,37 @@ function _peEseguiQ2(sh, ctx, lblQ2, nS3, nC23bg, nC20, nS22, nBG3, hasR24, bg3F
 }
 
 // ---------- scelta Q2 (condivisa LUN-GIO / DOM) ----------
-function _peScegliQ2(ctx, bgCassa, nS3, s3FaCassa, nC20, bg1IsC23, conS22C23) {
+// escludi: chi fa gia la colonna dei cambi di sala e rec (BG3). La stessa persona
+// non puo fare due colonne nello stesso orario: si prende un altro collega dello
+// stesso turno o il prossimo dell elenco (prima capitava in una decina di giorni
+// l anno, es. "S1 - S7 - S7" con un solo S7). Il nome scelto va in ctx.q2Nome.
+function _peScegliQ2(ctx, bgCassa, nS3, s3FaCassa, nC20, bg1IsC23, conS22C23, escludi) {
   const dT = ctx.dT;
   const dc = ctx.dc;
-  if (conS22C23 && bgCassa === 'S22' && !nS3) return 'S22';
-  if (conS22C23 && bgCassa === 'C23' && !nS3 && !bg1IsC23) return 'C23';
-  if (nS3 && s3FaCassa) return 'S3';
-  if (nS3 && !s3FaCassa) {
-    if (_peGPN(dT, 'S5') && _pePuoCoprire(dc, _peGPN(dT, 'S5'), 'C0')) return 'S5';
-    if (nC20) return 'C20';
-    return 'S3';
+  const pers = (t) => (dT[t] || []).map((x) => String(x).trim()).find((n) => n && n !== escludi) || '';
+  const scegli = (lbl, nome) => {
+    ctx.q2Nome = nome;
+    return lbl;
+  };
+  ctx.q2Nome = '';
+  const s3 = nS3 && nS3 !== escludi ? nS3 : pers('S3');
+  const s3Cassa = s3 ? (s3 === nS3 ? s3FaCassa : _pePuoCoprire(dc, s3, 'C0')) : false;
+  const c20 = nC20 && nC20 !== escludi ? nC20 : '';
+  if (conS22C23 && bgCassa === 'S22' && !nS3) return scegli('S22', '');
+  if (conS22C23 && bgCassa === 'C23' && !nS3 && !bg1IsC23) return scegli('C23', '');
+  if (s3 && s3Cassa) return scegli('S3', s3);
+  if (s3 && !s3Cassa) {
+    const s5 = pers('S5');
+    if (s5 && _pePuoCoprire(dc, s5, 'C0')) return scegli('S5', s5);
+    if (c20) return scegli('C20', c20);
+    return scegli('S3', s3);
   }
-  if (!nS3) {
-    if (_peGPN(dT, 'S7C') && _pePuoCoprire(dc, _peGPN(dT, 'S7C'), 'C0')) return 'S7C';
-    if (_peGPN(dT, 'S8C') && _pePuoCoprire(dc, _peGPN(dT, 'S8C'), 'C0')) return 'S8C';
-    if (_peGPN(dT, 'S7') && _pePuoCoprire(dc, _peGPN(dT, 'S7'), 'C0')) return 'S7';
-    if (_peGPN(dT, 'S31') && _pePuoCoprire(dc, _peGPN(dT, 'S31'), 'C0')) return 'S31';
-    if (nC20) return 'C20';
+  for (const t of ['S7C', 'S8C', 'S7', 'S31']) {
+    const n = pers(t);
+    if (n && _pePuoCoprire(dc, n, 'C0')) return scegli(t, n);
   }
-  return '';
+  if (c20) return scegli('C20', c20);
+  return scegli('', '');
 }
 
 // aggiustamento BG1 comune: se BG1 non fa né cassa né rec, prova C23
@@ -1496,7 +1514,7 @@ function _peGeneraLunGio(sh, ctx, dataStr) {
     bg3 = { nBG3: nS3, lblBG3: 'S3', orBG3: '20.00 - 02.00', bgRec: nS3, nS7: bg3.nS7 };
     haS7C = false;
   }
-  const lblQ2 = _peScegliQ2(ctx, bgCassa, nS3, s3FaCassa, nC20, bg1.bg1IsC23, true);
+  const lblQ2 = _peScegliQ2(ctx, bgCassa, nS3, s3FaCassa, nC20, bg1.bg1IsC23, true, bg3.nBG3);
 
   let sotto = 'PAUSE ' + bg1.lblBG1;
   if (lblQ2) sotto += ' - ' + lblQ2;
@@ -1565,7 +1583,6 @@ function _peGeneraLunGio(sh, ctx, dataStr) {
     _peScrHeader(sh, startS1, 1, bg1.lblS1Orig, bg1.nS1Orig, '14.00 - 21.00', _PE_CLR.sala);
     _pePatternS1_SoloSala(sh, ctx, startS1 + 2, 1, bg1.nS1Orig);
   }
-  _pePiazzaPauseExtra(sh, ctx);
 }
 function _peGeneraDomenica(sh, ctx, dataStr) {
   const dT = ctx.dT;
@@ -1591,7 +1608,7 @@ function _peGeneraDomenica(sh, ctx, dataStr) {
     bg3 = { nBG3: nS3, lblBG3: 'S3', orBG3: '20.00 - 02.00', bgRec: nS3, nS7: bg3.nS7 };
     haS7C = false;
   }
-  const lblQ2d = _peScegliQ2(ctx, '', nS3, s3FaCassa, nC20, bg1.bg1IsC23, false);
+  const lblQ2d = _peScegliQ2(ctx, '', nS3, s3FaCassa, nC20, bg1.bg1IsC23, false, bg3.nBG3);
 
   let sotto = 'PAUSE ' + bg1.lblBG1;
   if (lblQ2d) sotto += ' - ' + lblQ2d;
@@ -1661,7 +1678,6 @@ function _peGeneraDomenica(sh, ctx, dataStr) {
     _peScrHeader(sh, startExtra, 1, 'R4', nR4, '14.00 - 20.00', _PE_CLR.rec);
     _pePatternR4(sh, ctx, startExtra + 2, 1, nR4);
   }
-  _pePiazzaPauseExtra(sh, ctx);
 }
 function _peGeneraVenSab(sh, ctx, dataStr) {
   const dT = ctx.dT;
@@ -1822,6 +1838,8 @@ function _peGeneraVenSab(sh, ctx, dataStr) {
 
   // Q2 REC
   let r = 7;
+  // la colonna del rec e di S3 o S5 (non di R8): le loro pause seguono la regola delle ore
+  const recBgBreve = !!bgRecPrima && bgRecPrima !== nR8;
   if (numR8 >= 2) {
     if (numR23 >= 2) {
       r = _peSPP(sh, ctx, r, 4, 'R23', '21.00 - 21.30', nR8);
@@ -1881,16 +1899,22 @@ function _peGeneraVenSab(sh, ctx, dataStr) {
       r = _peSPP(sh, ctx, r, 4, 'R23', '21.00 - 21.30', bgRecPrima);
       r = _peSS(sh, r, 4, 'REC', '21.30 - 22.00');
     }
-    r = _peSS(sh, r, 4, 'PAUSA', '22.00 - 22.15');
+    // la colonna e di S3/S5 (15+15) oppure di R8, che ha le sue pause alle 24.00,
+    // 02.00 e 03.30: per R8 qui niente pausa alle 22.00 (sarebbe la quarta)
+    r = _peSS(sh, r, 4, recBgBreve ? 'PAUSA' : 'REC', '22.00 - 22.15');
     r = _peSS(sh, r, 4, 'REC', '22.15 - 23.30');
     r = _peSN(sh, ctx, r, 4, 'R8', '23.30 - 24.00', nR8, bgRecPrima);
-    r = _peSS(sh, r, 4, 'PAUSA', '24.00 - 24.30');
+    // colonna di S3 o S5 che fa il rec: 15+15 (regola delle ore); di R8: 30
+    if (recBgBreve) {
+      r = _peSS(sh, r, 4, 'PAUSA', '24.00 - 24.15');
+      r = _peSS(sh, r, 4, 'REC', '24.15 - 24.30');
+    } else r = _peSS(sh, r, 4, 'PAUSA', '24.00 - 24.30');
     if (numR23 >= 2) {
       r = _peSPP(sh, ctx, r, 4, 'R23', '24.30 - 24.45', bgRecPrima);
       r = _peSPP(sh, ctx, r, 4, 'R23', '24.45 - 01.00', bgRecPrima);
     } else {
       r = _peSPP(sh, ctx, r, 4, 'R23', '24.30 - 24.45', bgRecPrima);
-      r = _peSS(sh, r, 4, 'PAUSA', '24.45 - 01.00');
+      r = _peSS(sh, r, 4, recBgBreve ? 'REC' : 'PAUSA', '24.45 - 01.00');
     }
     r = _peSS(sh, r, 4, 'REC', '01.00 - 01.45');
     r = _peSN(sh, ctx, r, 4, 'R8', '01.45 - 02.00', nR8, bgRecPrima);
@@ -1904,13 +1928,17 @@ function _peGeneraVenSab(sh, ctx, dataStr) {
     }
     r = _peSS(sh, r, 4, 'PAUSA', '22.00 - 22.15');
     r = _peSS(sh, r, 4, 'REC', '22.15 - 23.30');
-    r = _peSS(sh, r, 4, 'PAUSA', '24.00 - 24.30');
+    if (recBgBreve) {
+      r = _peSS(sh, r, 4, 'REC', '23.30 - 24.00');
+      r = _peSS(sh, r, 4, 'PAUSA', '24.00 - 24.15');
+      r = _peSS(sh, r, 4, 'REC', '24.15 - 24.30');
+    } else r = _peSS(sh, r, 4, 'PAUSA', '24.00 - 24.30');
     if (numR23 >= 2) {
       r = _peSPP(sh, ctx, r, 4, 'R23', '24.30 - 24.45', bgRecPrima);
       r = _peSPP(sh, ctx, r, 4, 'R23', '24.45 - 01.00', bgRecPrima);
     } else {
       r = _peSPP(sh, ctx, r, 4, 'R23', '24.30 - 24.45', bgRecPrima);
-      r = _peSS(sh, r, 4, 'PAUSA', '24.45 - 01.00');
+      r = _peSS(sh, r, 4, recBgBreve ? 'REC' : 'PAUSA', '24.45 - 01.00');
     }
     r = _peSS(sh, r, 4, 'REC', '01.00 - 02.00');
   }
@@ -2074,7 +2102,9 @@ function _peGeneraVenSab(sh, ctx, dataStr) {
     const startR8b = _peMaxR(sh) + 3;
     _peScrHeader(sh, startR8b, 4, 'R8', nR8, '20.50 - 05.00', _PE_CLR.verdeScuro);
     r = startR8b + 2;
-    r = _peSS(sh, r, 4, 'PAUSA', '02.00 - 02.15');
+    // se la colonna del rec e di S3/S5, R8 ha gia il quarto d ora delle 01.45 (dato da
+    // loro): qui niente pausa alle 02.00, sarebbe attaccata (30 invece di 15)
+    r = _peSS(sh, r, 4, recBgBreve ? 'REC' : 'PAUSA', '02.00 - 02.15');
     if (numR23 >= 2) {
       r = _peSPP(sh, ctx, r, 4, 'R23', '02.15 - 02.30', nR8);
       r = _peSPP(sh, ctx, r, 4, 'R23', '02.30 - 02.45', nR8);
@@ -2092,8 +2122,8 @@ function _peGeneraVenSab(sh, ctx, dataStr) {
     const startR23 = _peMaxR(sh) + 3;
     _peScrHeader(sh, startR23, 4, 'R23', nR23, '19.50 - 04.00', _PE_CLR.rec);
     r = startR23 + 2;
-    r = _peSS(sh, r, 4, 'PAUSA', '02.00 - 02.15');
-    r = _peSS(sh, r, 4, 'REC', '02.15 - 03.30');
+    // R23 ha gia 30 (21.00) e 15 (24.30) dalla colonna del rec: qui solo l ultima
+    r = _peSS(sh, r, 4, 'REC', '02.00 - 03.30');
     r = _peSS(sh, r, 4, 'PAUSA', '03.30 - 03.45');
     r = _peSS(sh, r, 4, 'REC', '03.45 - 04.00');
   }
@@ -2103,7 +2133,6 @@ function _peGeneraVenSab(sh, ctx, dataStr) {
     _peScrHeader(sh, startS1vs, 1, bg1.lblS1Orig, bg1.nS1Orig, '14.00 - 21.00', _PE_CLR.sala);
     _pePatternS1_SoloSala(sh, ctx, startS1vs + 2, 1, bg1.nS1Orig);
   }
-  _pePiazzaPauseExtra(sh, ctx);
 }
 
 // ---------- pause extra + blocchi automatici ----------
@@ -2119,93 +2148,6 @@ function _peSlotInTurno(ctx, oraCell, turno) {
   let tFin = o.fin;
   if (slotMin < 720 && tIni >= 720) slotMin += 1440;
   return slotMin >= tIni && slotMin < tFin;
-}
-function _pePiazzaPauseExtra(sh, ctx) {
-  const lastR = _peMaxR(sh);
-  if (lastR < 7) return;
-  Object.keys(ctx.dT).forEach((posStr) => {
-    if (['PAUSA', 'SALA', 'CASSA', 'REC'].includes(posStr)) return;
-    if (posStr[0] === 'C') return;
-    if (['R8', 'S31', 'R31', 'R30', 'R4', 'R23', 'R24', 'S5', '9', 'L1', 'Z0', 'Z8', 'Z5', 'Z12'].includes(posStr))
-      return;
-    // e' un BG? (header con nome e orario sotto)
-    for (let c = 1; c <= 7; c += 3) {
-      for (let hdrR = 1; hdrR < lastR; hdrR++) {
-        const a = _peGet(sh, hdrR, c);
-        if (a && String(a.v).toUpperCase().trim() === posStr.toUpperCase()) {
-          const nx = _peGet(sh, hdrR, c + 1);
-          const below = _peGet(sh, hdrR + 1, c + 1);
-          if (nx && String(nx.v).length && below && String(below.v).includes(' - ')) return;
-        }
-      }
-    }
-    // ha gia' slot?
-    for (let c = 1; c <= 7; c += 3)
-      for (let rr = 7; rr <= lastR; rr++) {
-        const cell = _peGet(sh, rr, c);
-        if (cell && String(cell.v) === posStr) return;
-      }
-    const minPausa = _peMinutiPausa(ctx.orari, posStr);
-    if (!minPausa) return;
-    const slotsNeeded = Math.floor(minPausa / 15);
-    // MIGLIORIA rispetto al VBA (che prendeva i primi slot SALA trovati,
-    // spesso ammucchiati): raccolgo TUTTI gli slot SALA nel turno e li
-    // scelgo distribuiti · ideali a frazioni del turno, minimo 45' tra loro
-    const candidati = [];
-    for (let c = 1; c <= 7; c += 3)
-      for (let rr = 7; rr <= lastR; rr++) {
-        const cell = _peGet(sh, rr, c);
-        if (cell && String(cell.v) === 'SALA') {
-          const ora = _peGet(sh, rr, c + 1);
-          if (ora && _peSlotInTurno(ctx, ora.v, posStr)) {
-            let min = _peOraMin(String(ora.v).split('-')[0].trim());
-            if (min != null) {
-              const oo = ctx.orari[posStr];
-              if (oo && min < 720 && oo.ini >= 720) min += 1440;
-              candidati.push({ cell: cell, ora: ora, min: min });
-            }
-          }
-        }
-      }
-    candidati.sort((a, b) => a.min - b.min);
-    let piazzati = 0;
-    const o = ctx.orari[posStr];
-    if (o && candidati.length) {
-      const usati = [];
-      for (let k = 1; k <= slotsNeeded; k++) {
-        const ideale = o.ini + ((o.fin - o.ini) * k) / (slotsNeeded + 1);
-        let best = null;
-        let bestScore = -Infinity;
-        candidati.forEach((cand) => {
-          if (usati.includes(cand)) return;
-          let score = -Math.abs(cand.min - ideale);
-          if (usati.some((u) => Math.abs(u.min - cand.min) < 45)) score -= 10000;
-          if (score > bestScore) {
-            bestScore = score;
-            best = cand;
-          }
-        });
-        if (best) usati.push(best);
-      }
-      usati.forEach((cand) => {
-        cand.cell.v = posStr;
-        cand.cell.bg = _PE_CLR.arancio;
-        cand.cell.b = 1;
-        cand.ora.bg = _PE_CLR.arancio;
-        cand.ora.b = 1;
-        piazzati++;
-      });
-    }
-    if (piazzati < slotsNeeded) {
-      const noteR = _peMaxR(sh) + 1;
-      _peSet(sh, noteR, 1, '! ' + posStr + ': pausa non coperta (' + piazzati * 15 + '/' + minPausa + ' min)', {
-        bg: _PE_CLR.rosso,
-        fg: '#fff',
-        b: 1,
-        span: 2,
-      });
-    }
-  });
 }
 function _peGeneraExtra(sh, ctx, tipoGiorno) {
   const dictCoperti = {};
@@ -2267,6 +2209,7 @@ function _peGeneraExtra(sh, ctx, tipoGiorno) {
     const startR = _peMaxR(sh) + 3;
     const o = ctx.orari[turno];
     _peScrHeader(sh, startR, 1, turno, nome, o ? o.iniStr + ' - ' + o.finStr : '', clrH);
+    sh.celle[startR + '|1'].pers = 1; // colonnina personale: non da cambi ad altri
     _peGeneraPauseAuto(sh, startR + 2, 1, turno, ctx, pauseMin);
   });
 }
@@ -2371,8 +2314,331 @@ function _peGeneraSlots(righe, dstr) {
   else _peGeneraDomenica(sh, ctx, dataStr);
   _peGeneraExtra(sh, ctx, tipoGiorno);
   _peCompattaSala(sh);
+  const biglietto = _peBigliettoMattino(ctx);
+  const out = { tipo: 'slots', celle: sh.celle, nR: _peMaxR(sh), tipoGiorno: tipoGiorno };
+  if (biglietto) out.biglietti = [biglietto];
+  const proposte = _peCompletaPause(out, ctx, righe, dstr);
+  if (proposte.length) out.proposte = proposte;
   window._peDowCorrente = null;
-  return { tipo: 'slots', celle: sh.celle, nR: _peMaxR(sh), tipoGiorno: tipoGiorno };
+  return out;
+}
+// ---------- COMPLETAMENTO: le pause che la regola prevede e il foglio non da ----------
+// Per ogni persona senza colonna propria a cui manca una pausa (es. S31, il
+// secondo C15, il secondo quarto d ora serale di S5 il venerdi), il programma
+// decide come farebbe un responsabile, secondo il reparto:
+//  - SALA: se in sala resta almeno un altro collega, va in pausa da solo; le
+//    pause dei colleghi si sfalsano;
+//  - REC: da solo se al rec resta un altro collega, altrimenti cambio;
+//  - CASSA: sempre un cambio da chi e formato in cassa ed e libero; se nessuno
+//    puo, la pausa si propone comunque e si avvisa che la cassa resta senza cambio.
+// Il cambio lo da una colonna libera in quel momento (SALA, REC, CASSA), formata
+// (Formazione); meglio chi gia copre quella postazione e chi ha meno cambi in
+// quell ora. Quando: non nella prima mezz ora ne nell ultima del turno, almeno
+// un ora dalle altre pause (si cerca l ora e mezza), al centro dello spazio
+// libero, senza lasciare la sala vuota. Chi va in pausa da solo riceve una sua
+// colonnina con tutte le sue pause. Le righe nuove sono proposte (in blu).
+const _PC_LIBERE = ['SALA', 'REC', 'CASSA'];
+function _pcRigaNuova(c, base, dopoR) {
+  // sposta in giu di una riga le celle di questa coppia di colonne sotto dopoR
+  for (let rr = c.nR; rr > dopoR; rr--) {
+    [base, base + 1].forEach((col) => {
+      const k = rr + '|' + col;
+      if (c.celle[k]) {
+        c.celle[rr + 1 + '|' + col] = c.celle[k];
+        delete c.celle[k];
+      }
+    });
+  }
+  c.nR += 1;
+  return dopoR + 1;
+}
+function _pcScriviRiga(c, r, base, pos, ini, fin, modello, prop, per) {
+  const clr = _peColoreSettore(pos) || (modello && modello.bg) || '';
+  const a = { v: pos, b: 1, bg: clr, sz: 9 };
+  const b = { v: _pbOra(ini) + ' - ' + _pbOra(fin), b: 1, bg: clr, sz: 9 };
+  if (prop) {
+    a.prop = 1;
+    b.prop = 1;
+  }
+  // per chi e la pausa (serve quando due persone hanno lo stesso turno)
+  if (per) a.per = per;
+  c.celle[r + '|' + base] = a;
+  c.celle[r + '|' + (base + 1)] = b;
+}
+// mette `pos` fra ini e fin dentro una riga libera (la divide se serve)
+function _pcInserisciCambio(c, base, riga, pos, ini, fin, per) {
+  const libera = riga.pos;
+  const modello = c.celle[riga.r + '|' + base];
+  let r = riga.r;
+  if (ini > riga.ini) {
+    _pcScriviRiga(c, r, base, libera, riga.ini, ini, modello, false);
+    r = _pcRigaNuova(c, base, r);
+  }
+  _pcScriviRiga(c, r, base, pos, ini, fin, modello, true, per);
+  if (fin < riga.fin) {
+    r = _pcRigaNuova(c, base, r);
+    _pcScriviRiga(c, r, base, libera, fin, riga.fin, modello, false);
+  }
+}
+// colonnina personale: intestazione (turno, nome, orario) e la giornata con le pause
+function _pcBloccoPersonale(c, p, pause) {
+  const ultima = (base) => {
+    let m = 0;
+    Object.keys(c.celle).forEach((k) => {
+      const [r, col] = k.split('|').map(Number);
+      if ((col === base || col === base + 1) && r > m) m = r;
+    });
+    return m;
+  };
+  const base = [1, 4, 7].sort((a, b) => ultima(a) - ultima(b))[0];
+  let r = Math.max(ultima(base) + 3, 7);
+  const sett = _peSettoreTurno(p.turno);
+  const clr = sett === 'S' ? _PE_CLR.sala : sett === 'R' ? _PE_CLR.rec : sett === 'C' ? _PE_CLR.cassa : _PE_CLR.grigio;
+  // pers: colonnina personale (non da cambi ad altri)
+  c.celle[r + '|' + base] = { v: p.turno, b: 1, bg: clr, sz: 10, hdr: 1, pers: 1 };
+  c.celle[r + '|' + (base + 1)] = { v: p.nome, b: 1, bg: clr, sz: 9, hdr: 1 };
+  c.celle[r + 1 + '|' + (base + 1)] = { v: _pbOra(p.ini) + ' - ' + _pbOra(p.fin), b: 1, sz: 9, ora: 1 };
+  r += 2;
+  const lbl = _peNomeSettore(sett);
+  let t = p.ini;
+  pause
+    .slice()
+    .sort((a, b) => a.ini - b.ini)
+    .forEach((x) => {
+      if (x.ini > t) _pcScriviRiga(c, r++, base, lbl, t, x.ini, null, false);
+      _pcScriviRiga(c, r++, base, 'PAUSA', x.ini, x.fin, null, !!x.nuova);
+      t = x.fin;
+    });
+  if (t < p.fin) _pcScriviRiga(c, r++, base, lbl, t, p.fin, null, false);
+  c.nR = Math.max(c.nR, r);
+}
+function _peCompletaPause(c, ctx, righe, dstr) {
+  const PC = window.PauseControlli;
+  const proposte = [];
+  if (!PC) return proposte;
+  const persone = _pcPersone(righe, dstr);
+  // a chi va ogni riga di copertura si decide una volta, all inizio; le righe che
+  // non coprono la pausa di nessuno (es. la seconda riga R22 con un solo R22)
+  // tornano libere (SALA, REC o CASSA come la colonna)
+  PC.attribuisci(c, persone, c.biglietti).avanzi.forEach((k) => {
+    const [r, col] = k.split('|').map(Number);
+    const blk = PC.blocchi(c).find((b) => b.base === col && b.righe.some((x) => x.r === r));
+    const libera = (blk && blk.righe.find((x) => _PC_LIBERE.includes(x.pos))) || null;
+    const lbl = libera ? libera.pos : 'SALA';
+    const a = c.celle[k];
+    const b = c.celle[r + '|' + (col + 1)];
+    if (!a || !b) return;
+    a.v = lbl;
+    a.bg = _peColoreSettore(lbl);
+    b.bg = a.bg;
+    delete a.per;
+    delete a.fg;
+    delete b.fg;
+    b.v = String(b.v).replace(/\s*\[!\]\s*$/, '');
+  });
+  PC.fissaAttribuzioni(c, persone, c.biglietti);
+
+  const leggi = () => PC.pausePersone(c, persone, c.biglietti);
+  const vuota = () => PC.salaVuota(c, persone, leggi(), c.biglietti).reduce((s, b) => s + b.fin - b.ini, 0);
+  // pause gia decise in questo giro per chi va in pausa da solo (non ancora nel foglio)
+  const decise = {};
+  const pauseDi = (q, pp) => {
+    const i = pp[q.nome];
+    const l = i && i.alternative[0] ? i.alternative[0].pause.map((x) => ({ ini: x.ini, fin: x.fin })) : [];
+    return l.concat(decise[q.nome] || []);
+  };
+  // un collega dello stesso reparto e al lavoro e non in pausa per tutta la fascia
+  const colleghiLiberi = (p, t1, t2, pp) =>
+    persone.filter(
+      (q) =>
+        q !== p &&
+        _peSettoreTurno(q.turno) === _peSettoreTurno(p.turno) &&
+        q.ini != null &&
+        q.ini <= t1 &&
+        q.fin >= t2 &&
+        !pauseDi(q, pp).some((x) => x.ini < t2 && x.fin > t1),
+    ).length;
+  const inPausaInsieme = (p, t1, t2, pp) =>
+    persone.filter(
+      (q) =>
+        q !== p &&
+        _peSettoreTurno(q.turno) === _peSettoreTurno(p.turno) &&
+        pauseDi(q, pp).some((x) => x.ini < t2 && x.fin > t1),
+    ).length;
+  // punteggio di un orario per la persona: equilibrio fra le sue pause
+  const valuta = (p, fatte, t, d) => {
+    if (t < p.ini + 30 || t + d > p.fin - 30) return null;
+    let prima = null;
+    let dopo = null;
+    for (const x of fatte) {
+      if (x.ini < t + d && x.fin > t) return null;
+      if (x.fin <= t && (prima == null || x.fin > prima)) prima = x.fin;
+      if (x.ini >= t + d && (dopo == null || x.ini < dopo)) dopo = x.ini;
+    }
+    const dPrima = prima == null ? t - p.ini : t - prima;
+    const dDopo = dopo == null ? p.fin - (t + d) : dopo - (t + d);
+    if ((prima != null && dPrima < PC.DISTANZA_MIN) || (dopo != null && dDopo < PC.DISTANZA_MIN)) return null;
+    let punti = Math.min(dPrima, dDopo);
+    if ((prima != null && dPrima < 90) || (dopo != null && dDopo < 90)) punti -= 60;
+    return punti;
+  };
+  const ordine = persone.filter((p) => p.ini != null && p.attese && p.attese.length).sort((a, b) => a.ini - b.ini);
+  for (const p of ordine) {
+    const sett = _peSettoreTurno(p.turno);
+    let pp = leggi();
+    const info = pp[p.nome];
+    if (!info || info.colonna || info.rotazione) continue;
+    const esistenti = (info.alternative[0] || { pause: [] }).pause.map((x) => ({ ini: x.ini, fin: x.fin }));
+    // cosa manca: le pause attese non ancora nel foglio (se ci sono pause di
+    // durata diversa dalla regola non si tocca nulla: resta l avviso)
+    const resto = p.attese.slice().sort((a, b) => b - a);
+    let diverse = false;
+    esistenti.forEach((x) => {
+      const i = resto.indexOf(x.fin - x.ini);
+      if (i >= 0) resto.splice(i, 1);
+      else diverse = true;
+    });
+    if (diverse || !resto.length) continue;
+    const soli = [];
+    for (const d of resto) {
+      pp = leggi();
+      const fatte = esistenti
+        .concat(soli, decise[p.nome] || [])
+        .concat((pauseDi(p, pp) || []).filter((x) => !esistenti.some((y) => y.ini === x.ini)));
+      // 1. da solo (sala e rec) se resta un collega del reparto
+      let daSolo = null;
+      if (sett !== 'C') {
+        for (let t = Math.ceil((p.ini + 30) / 15) * 15; t + d <= p.fin - 30; t += 15) {
+          let punti = valuta(p, fatte, t, d);
+          if (punti == null || !colleghiLiberi(p, t, t + d, pp)) continue;
+          punti -= 40 * inPausaInsieme(p, t, t + d, pp);
+          if (!daSolo || punti > daSolo.punti) daSolo = { punti: punti, t: t };
+        }
+      }
+      if (daSolo) {
+        soli.push({ ini: daSolo.t, fin: daSolo.t + d, nuova: true });
+        continue;
+      }
+      // 2. cambio da un collega formato e libero
+      let migliore = null;
+      PC.blocchi(c)
+        .filter((b) => !/ALT/.test(b.post) && !b.personale && b.nome && !/^\(/.test(b.nome))
+        .forEach((b) => {
+          if (String(b.nome).toUpperCase() === p.nome.toUpperCase()) return;
+          if (!_pePuoCoprire(ctx.dc, b.nome, p.turno)) return;
+          const giaCopre = b.righe.some((x) => x.pos === p.turno);
+          b.righe.forEach((riga) => {
+            if (!_PC_LIBERE.includes(riga.pos)) return;
+            for (let t = Math.ceil(riga.ini / 15) * 15; t + d <= riga.fin; t += 15) {
+              let punti = valuta(p, fatte, t, d);
+              if (punti == null) continue;
+              if (giaCopre) punti += 20;
+              // equita fra chi da i cambi: meno cambi nell ora intorno
+              punti -=
+                5 *
+                b.righe.filter(
+                  (x) => !_PC_LIBERE.includes(x.pos) && x.pos !== 'PAUSA' && x.ini < t + 60 && x.fin > t - 60,
+                ).length;
+              if (!migliore || punti > migliore.punti) migliore = { punti: punti, b: b, riga: riga, t: t };
+            }
+          });
+        });
+      if (migliore) {
+        const copia = JSON.stringify({ celle: c.celle, nR: c.nR });
+        const primaVuota = vuota();
+        _pcInserisciCambio(c, migliore.b.base, migliore.riga, p.turno, migliore.t, migliore.t + d, p.nome);
+        // la sala non deve restare vuota piu di prima: altrimenti si rinuncia al cambio
+        if (vuota() > primaVuota) {
+          const o = JSON.parse(copia);
+          c.celle = o.celle;
+          c.nR = o.nR;
+        } else {
+          esistenti.push({ ini: migliore.t, fin: migliore.t + d });
+          proposte.push({
+            modo: 'cambio',
+            nome: p.nome,
+            turno: p.turno,
+            ini: migliore.t,
+            fin: migliore.t + d,
+            chi: migliore.b.nome,
+            chiTurno: migliore.b.post,
+          });
+          continue;
+        }
+      }
+      // 3. nessuno puo dare il cambio: la pausa si propone comunque, con avviso
+      let ripiego = null;
+      for (let t = Math.ceil((p.ini + 30) / 15) * 15; t + d <= p.fin - 30; t += 15) {
+        const punti = valuta(p, fatte, t, d);
+        if (punti != null && (!ripiego || punti > ripiego.punti)) ripiego = { punti: punti, t: t };
+      }
+      if (ripiego) soli.push({ ini: ripiego.t, fin: ripiego.t + d, nuova: true, scoperta: true });
+    }
+    if (soli.length) {
+      // colonnina personale con tutte le sue pause (quelle con cambio restano anche
+      // nella colonna di chi le copre)
+      const tutte = esistenti.map((x) => ({ ini: x.ini, fin: x.fin })).concat(soli);
+      _pcBloccoPersonale(c, p, tutte);
+      decise[p.nome] = (decise[p.nome] || []).concat(soli);
+      soli.forEach((x) =>
+        proposte.push({
+          modo: x.scoperta ? 'scoperta' : 'solo',
+          nome: p.nome,
+          turno: p.turno,
+          ini: x.ini,
+          fin: x.fin,
+          chi: '',
+          chiTurno: '',
+        }),
+      );
+    }
+  }
+  return proposte;
+}
+// BIGLIETTINO DEL MATTINO (C4, cassa tavoli): apre alle 11.40, da la mezz ora ai
+// due R22 fra le 12.00 e le 13.00 e a S22 alle 13.00, poi va in pausa 13.30-14.00
+// (la cassa tavoli apre alle 14.00). Non entra nelle colonne del foglio: si
+// stampa a parte, ma le sue pause contano nei controlli.
+function _peBigliettoMattino(ctx) {
+  const nC4 = _peGPN(ctx.dT, 'C4');
+  if (!nC4) return null;
+  const r22 = (ctx.dT['R22'] || []).map((n) => String(n).trim()).filter(Boolean);
+  const nS22 = _peGPN(ctx.dT, 'S22');
+  const righe = [];
+  if (r22[0]) righe.push({ pos: 'R22', nome: r22[0], ini: 720, fin: 750, chi: nC4 });
+  if (r22[1]) righe.push({ pos: 'R22', nome: r22[1], ini: 750, fin: 780, chi: nC4 });
+  if (nS22) righe.push({ pos: 'S22', nome: nS22, ini: 780, fin: 810, chi: nC4 });
+  righe.push({ pos: 'PAUSA', nome: nC4, ini: 810, fin: 840 });
+  return { titolo: 'C4 · MATTINO', turno: 'C4', nome: nC4, righe: righe };
+}
+// persone del giorno per i controlli: turno, orario (da Turni) e pause attese
+// (dalla regola del turno o di durata, scheda Regole pause)
+function _pcPersone(righe, dstr) {
+  const orari = _peOrariTurni();
+  const dow = new Date(dstr + 'T12:00:00').getDay();
+  const visti = new Set();
+  const out = [];
+  (righe || []).forEach((r) => {
+    const nome = String(r.nome || '').trim();
+    const turno = String(r.turno || '')
+      .trim()
+      .toUpperCase();
+    if (!nome || !turno || visti.has(nome.toUpperCase())) return;
+    if (String(nome).toUpperCase() === 'XXX' || !_peSettoreTurno(turno)) return;
+    visti.add(nome.toUpperCase());
+    const o = orari[turno];
+    // stessa convenzione del foglio: prima delle 11.00 e dopo mezzanotte
+    const ini = o ? (o.ini < 660 ? o.ini + 1440 : o.ini) : null;
+    const fin = o ? ini + o.dur : null;
+    out.push({
+      nome: nome,
+      turno: turno,
+      ini: ini,
+      fin: fin,
+      attese: o ? _pePauseSplit(orari, turno, 'slots', dow) : [],
+    });
+  });
+  return out;
 }
 
 // ---------- MAIN valet (port ModuloPauseValet v2) ----------
@@ -2620,39 +2886,8 @@ function _pbIntervallo(v) {
   return { ini: iniA, fin: finA };
 }
 function _pbBlocchi(c) {
-  const blocchi = [];
-  [1, 4, 7].forEach((base) => {
-    let blk = null;
-    for (let r = 4; r <= c.nR + 1; r++) {
-      const a = c.celle[r + '|' + base];
-      const b = c.celle[r + '|' + (base + 1)];
-      if (a && a.hdr) {
-        blk = {
-          base: base,
-          post: String(a.v || '')
-            .toUpperCase()
-            .trim(),
-          nome: b ? String(b.v || '').trim() : '',
-          r: r,
-          righe: [],
-        };
-        blocchi.push(blk);
-        continue;
-      }
-      if (!blk || !a || !b || a.span || b.hdr) continue;
-      const iv = _pbIntervallo(b.v);
-      if (!iv) continue;
-      blk.righe.push({
-        r: r,
-        pos: String(a.v || '')
-          .toUpperCase()
-          .trim(),
-        ini: iv.ini,
-        fin: iv.fin,
-      });
-    }
-  });
-  return blocchi;
+  // stessa lettura del modulo dei controlli (con chi e la riga, proposte, colonnine personali)
+  return window.PauseControlli ? window.PauseControlli.blocchi(c) : [];
 }
 // postazioni che hanno una colonna propria (una sola) e un cambio in un altra colonna
 function _pbCoperture(blocchi) {
@@ -2755,6 +2990,7 @@ function _pbScriviRighe(c, blk, segmenti) {
     const clr = sg.warn ? _PE_CLR.rosso : _peColoreSettore(sg.pos);
     const a = { v: sg.pos, b: 1, bg: clr, sz: 9 };
     const b = { v: _pbOra(sg.ini) + ' - ' + _pbOra(sg.fin) + (sg.warn ? '  [!]' : ''), b: 1, bg: clr, sz: 9 };
+    if (sg.per) a.per = sg.per;
     if (sg.warn) {
       a.fg = '#fff';
       b.fg = '#fff';
@@ -2773,6 +3009,7 @@ function _pbSpostaCambio(c, blk, riga, nuovo) {
     ini: x.ini,
     fin: x.fin,
     warn: x !== riga && (c.celle[x.r + '|' + blk.base] || {}).bg === _PE_CLR.rosso,
+    per: x === riga ? '' : x.per,
   }));
   const libero = seg.filter((x) => x.pos === 'SALA' && x.fin > nuovo.ini && x.ini < nuovo.fin);
   let copre = 0;
@@ -2782,7 +3019,7 @@ function _pbSpostaCambio(c, blk, riga, nuovo) {
   seg.forEach((x) => {
     if (x.pos !== 'SALA' || x.fin <= nuovo.ini || x.ini >= nuovo.fin) return out.push(x);
     if (x.ini < nuovo.ini) out.push({ pos: 'SALA', ini: x.ini, fin: nuovo.ini });
-    if (x.ini <= nuovo.ini) out.push({ pos: riga.pos, ini: nuovo.ini, fin: nuovo.fin, warn: warn });
+    if (x.ini <= nuovo.ini) out.push({ pos: riga.pos, ini: nuovo.ini, fin: nuovo.fin, warn: warn, per: riga.per });
     if (x.fin > nuovo.fin) out.push({ pos: 'SALA', ini: nuovo.fin, fin: x.fin });
   });
   const uniti = [];
@@ -2824,13 +3061,32 @@ function _pbScambia(c, base, r, dir) {
   const inizio = prima.ini;
   const warnPrima = prima.a.bg === _PE_CLR.rosso;
   const warnSeconda = seconda.a.bg === _PE_CLR.rosso;
+  // per chi e la riga e se e una proposta seguono la postazione
+  const extra = (x) => ({ per: x.a.per, prop: x.a.prop });
+  const exPrima = extra(prima);
+  const exSeconda = extra(seconda);
   const durPrima = seconda.dur;
   const nuovi = [
-    { d: prima, pos: seconda.a.v, warn: warnSeconda, ini: inizio, fin: inizio + durPrima },
-    { d: seconda, pos: prima.a.v, warn: warnPrima, ini: inizio + durPrima, fin: inizio + durPrima + prima.dur },
+    { d: prima, pos: seconda.a.v, warn: warnSeconda, ex: exSeconda, ini: inizio, fin: inizio + durPrima },
+    {
+      d: seconda,
+      pos: prima.a.v,
+      warn: warnPrima,
+      ex: exPrima,
+      ini: inizio + durPrima,
+      fin: inizio + durPrima + prima.dur,
+    },
   ];
   nuovi.forEach((x) => {
     x.d.a.v = x.pos;
+    ['per', 'prop'].forEach((k) => {
+      if (x.ex[k]) x.d.a[k] = x.ex[k];
+      else delete x.d.a[k];
+      if (k === 'prop') {
+        if (x.ex.prop) x.d.b.prop = 1;
+        else delete x.d.b.prop;
+      }
+    });
     const clr = x.warn ? _PE_CLR.rosso : _peColoreSettore(x.pos);
     x.d.a.bg = clr;
     x.d.b.v = _pbOra(x.ini) + ' - ' + _pbOra(x.fin) + (x.warn ? '  [!]' : '');
@@ -2972,11 +3228,16 @@ function briefPausaCellaSlots(r, c, val) {
       if (ora && !ora.span) {
         ora.bg = clr;
         delete ora.fg;
+        delete ora.prop;
         ora.v = String(ora.v).replace(/\s*\[!\]\s*$/, '');
       }
     } else {
       nuovo.bg = prev.bg;
       nuovo.fg = prev.fg;
+      // orario scritto a mano: la riga non e piu una proposta; resta per chi e
+      const pos = g[r + '|' + (c - 1)];
+      if (pos) delete pos.prop;
+      if (prev.per) nuovo.per = prev.per;
     }
     g[k] = nuovo;
   }
@@ -3033,7 +3294,7 @@ function _briefRenderPauseSlots(c) {
   let h = '';
   // righe dove pausa e cambio non coincidono: bordo rosso
   const errate = new Set();
-  (typeof _pbControlla === 'function' ? _pbControlla(c) : []).forEach((x) => x.celle.forEach((k) => errate.add(k)));
+  _pcAvvisiFoglio(c).forEach((x) => (x.celle || []).forEach((k) => errate.add(k)));
   const tit = c.celle['1|1'];
   const dataC = c.celle['2|1'];
   const sotto = c.celle['3|1'];
@@ -3101,7 +3362,11 @@ function _briefRenderPauseSlots(c) {
           return;
         }
         const stile =
-          (errate.has(riga.r + '|' + base) ? 'box-shadow:inset 0 0 0 2px var(--c-rosso,#c0392b);' : '') +
+          (errate.has(riga.r + '|' + base)
+            ? 'box-shadow:inset 0 0 0 2px var(--c-rosso,#c0392b);'
+            : riga.a && riga.a.prop
+              ? 'box-shadow:inset 0 0 0 2px var(--c-azzurro,#1f6fa3);'
+              : '') +
           'border:1px solid #999;background:' +
           (cell.bg || 'transparent') +
           ';color:' +
@@ -3620,6 +3885,7 @@ function pdfPauseGiorno() {
       doc.setFontSize(9);
       doc.text(String(sotto.v), 105, 24, { align: 'center' });
     }
+    const colonne = [];
     [1, 4, 7].forEach((base, bi) => {
       const body = [];
       for (let r = 4; r <= c.nR; r++) {
@@ -3660,14 +3926,50 @@ function pdfPauseGiorno() {
         });
         body.push([mk(a), mk(b)]);
       }
+      if (body.length) colonne.push({ bi: bi, body: body });
+    });
+    // sempre su un foglio solo. Ogni colonna e fatta di blocchi (intestazione e
+    // righe): il primo blocco resta al suo posto, gli altri (colonnine personali,
+    // seconde colonne) vanno nella colonna piu corta, anche in una quarta colonna;
+    // se serve ancora il testo si rimpicciolisce, restando leggibile.
+    const posti = [[], [], [], []];
+    const altezza = (l) => l.reduce((n, x) => n + x.length, 0);
+    const extra = [];
+    colonne.forEach((x) => {
+      const blocchi = [];
+      x.body.forEach((riga) => {
+        const vuota = riga.length === 1 && riga[0].styles && riga[0].styles.lineWidth === 0;
+        if (vuota || !blocchi.length) blocchi.push([]);
+        if (!vuota) blocchi[blocchi.length - 1].push(riga);
+      });
+      posti[x.bi].push(blocchi[0]);
+      blocchi.slice(1).forEach((bl) => extra.push(bl));
+    });
+    extra.forEach((bl) => {
+      const k = [0, 1, 2, 3].sort((a, b) => altezza(posti[a]) - altezza(posti[b]))[0];
+      posti[k].push(bl);
+    });
+    const spazio = [
+      { content: '', colSpan: 2, styles: { minCellHeight: 3.2, lineWidth: 0, fillColor: [255, 255, 255] } },
+    ];
+    const corpi = posti.map((l) => l.reduce((acc, bl, i) => acc.concat(i ? [spazio] : [], bl), []));
+    const quattro = corpi[3].length > 0;
+    const maxRighe = Math.max(1, ...corpi.map((x) => x.length));
+    // altezza di una riga a scala 1: circa 4,8 mm; spazio utile 257 mm
+    const scala = Math.min(1, 257 / (4.8 * maxRighe));
+    corpi.forEach((body, k) => {
       if (!body.length) return;
+      doc.setPage(1);
       doc.autoTable({
         startY: 30,
-        margin: { left: 10 + bi * 50 },
+        margin: { left: 10 + k * (quattro ? 48 : 50) },
         tableWidth: 42,
         body: body,
         theme: 'grid',
-        styles: Object.assign({}, stiliBase, { cellPadding: 0.9, fontSize: 7 }),
+        styles: Object.assign({}, stiliBase, {
+          cellPadding: Math.max(0.35, 0.9 * scala),
+          fontSize: Math.max(5.2, 7 * scala),
+        }),
         columnStyles: { 0: { cellWidth: 13 }, 1: { cellWidth: 29 } },
       });
     });
@@ -3681,6 +3983,136 @@ function pdfPauseGiorno() {
   );
   logAzione('Pause stampate', _pianoReparto() + ' ' + dstr);
   mostraPdfPreview(doc, 'pause_' + dstr + '_' + _pianoReparto() + '.pdf', 'Pause ' + lbl);
+}
+// ---------- controlli, proposte e bigliettino nel briefing ----------
+// tutti gli avvisi del foglio: pausa e cambio collegati, regola delle ore,
+// distanza, sala vuota, righe che non coprono nessuno (senza doppioni)
+function _pcAvvisiFoglio(c) {
+  const out = (typeof _pbControlla === 'function' ? _pbControlla(c) : []).map((x) =>
+    Object.assign({ tipo: 'cambio' }, x),
+  );
+  if (!c || c.tipo !== 'slots' || !window.PauseControlli || !_briefState) return out;
+  const gia = new Set();
+  out.forEach((x) => x.celle.forEach((k) => gia.add(k)));
+  const persone = _pcPersone(_briefState.righe, _briefData);
+  window.PauseControlli.controlla(c, persone, { biglietti: c.biglietti }).forEach((x) => {
+    if (x.tipo === 'riga' && x.celle.some((k) => gia.has(k))) return;
+    out.push(x);
+  });
+  return out;
+}
+function _pcAvvisiHtml(c) {
+  const avvisi = _pcAvvisiFoglio(c);
+  if (!avvisi.length) return '';
+  const ordine = { cambio: 0, ore: 1, turno: 2, distanza: 3, riga: 4, sala: 5 };
+  avvisi.sort((a, b) => (ordine[a.tipo] || 9) - (ordine[b.tipo] || 9));
+  return (
+    '<div class="pb-errori" style="margin:0 0 8px;padding:6px 10px;font-size:var(--fs-sm,.8125rem);background:var(--c-rosso-bg,#fdecea);border-left:3px solid var(--c-rosso,#c0392b)"><b>Da controllare (' +
+    avvisi.length +
+    ')</b><br>' +
+    avvisi.map((x) => escP(x.testo)).join('<br>') +
+    '<br><span style="color:var(--muted)">Le righe interessate sono bordate di rosso. Sono avvisi: puoi correggere con le frecce, scrivendo nelle celle o con Annulla.</span></div>'
+  );
+}
+function _pcProposteHtml(c) {
+  const l = (c && c.proposte) || [];
+  if (!l.length || !puoGestireBriefing()) return '';
+  const o = (m) => _pbOra(m);
+  const righe = l.map((x) => {
+    const chi = escP(x.turno) + ' ' + escP(x.nome);
+    const ora = o(x.ini) + '-' + o(x.fin);
+    if (x.modo === 'cambio') return chi + ': pausa ' + ora + ', cambio da ' + escP(x.chiTurno) + ' ' + escP(x.chi);
+    if (x.modo === 'solo') return chi + ': pausa ' + ora + ' da solo (nel reparto resta un collega)';
+    return (
+      '<b style="color:var(--c-rosso,#c0392b)">' +
+      chi +
+      ': pausa ' +
+      ora +
+      ', nessun collega formato e libero: la postazione resta senza cambio</b>'
+    );
+  });
+  return (
+    '<div class="pb-proposte" style="margin:0 0 8px;padding:6px 10px;font-size:var(--fs-sm,.8125rem);background:var(--c-azzurro-bg,#e6f0f8);border-left:3px solid var(--c-azzurro,#1f6fa3)"><b>Proposte del programma (' +
+    l.length +
+    ')</b>: pause che la regola delle ore prevede e lo schema non dava. Sono bordate di blu nel foglio.<br>' +
+    righe.join('<br>') +
+    '<div style="margin-top:6px"><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px" onclick="briefPauseTieniProposte()">Tengo le proposte</button> <span style="color:var(--muted)">(togli il blu; per cambiarle usa le frecce o scrivi nelle celle)</span></div></div>'
+  );
+}
+function briefPauseTieniProposte() {
+  if (!puoGestireBriefing() || !_briefState || !_briefState.pause) return;
+  const c = _briefState.pause.contenuto;
+  _briefRicorda();
+  Object.keys(c.celle).forEach((k) => delete c.celle[k].prop);
+  c.proposte = [];
+  _briefSalvaPauseDebounce();
+  _briefRefreshPause();
+  toast('Proposte confermate');
+}
+function _pcBigliettoHtml(c) {
+  return ((c && c.biglietti) || [])
+    .map(
+      (bg, i) =>
+        '<div class="pb-biglietto" style="margin-top:10px;display:inline-block;border:1px solid #999;background:var(--card-bg,#fff)"><div style="background:#FFE0B2;color:#14100a;font-weight:bold;padding:3px 8px;font-size:var(--fs-sm,.8125rem)">Bigliettino · ' +
+        escP(bg.titolo) +
+        ' · ' +
+        escP(bg.nome) +
+        '</div><table style="border-collapse:collapse;font-size:var(--fs-sm,.8125rem)">' +
+        bg.righe
+          .map(
+            (x) =>
+              '<tr><td style="border-top:1px solid #999;padding:2px 8px;background:' +
+              (_peColoreSettore(x.pos) || '#fff') +
+              ';color:#14100a;font-weight:bold">' +
+              escP(x.pos) +
+              '</td><td style="border-top:1px solid #999;padding:2px 8px">' +
+              escP(x.pos === 'PAUSA' ? '' : x.nome) +
+              '</td><td style="border-top:1px solid #999;padding:2px 8px;font-variant-numeric:tabular-nums">' +
+              _pbOra(x.ini) +
+              ' - ' +
+              _pbOra(x.fin) +
+              '</td></tr>',
+          )
+          .join('') +
+        '</table><div style="padding:4px 8px"><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px" onclick="pdfBigliettoPause(' +
+        i +
+        ')">Stampa bigliettino</button></div></div>',
+    )
+    .join('');
+}
+// bigliettino da tagliare e dare a chi fa i cambi del mattino (formato A6)
+function pdfBigliettoPause(i) {
+  const c = _briefState && _briefState.pause && _briefState.pause.contenuto;
+  const bg = c && c.biglietti && c.biglietti[i];
+  if (!bg) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('portrait', 'mm', 'a6');
+  const dstr = _briefData;
+  doc.setFillColor(255, 224, 178);
+  doc.rect(8, 8, 89, 9, 'F');
+  doc.setDrawColor(120);
+  doc.rect(8, 8, 89, 9);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(0);
+  doc.text(bg.titolo + ' · ' + dstr.split('-').reverse().join('.'), 52.5, 14, { align: 'center' });
+  doc.setFontSize(9);
+  doc.text(String(bg.nome), 8, 23);
+  doc.autoTable({
+    startY: 26,
+    margin: { left: 8 },
+    tableWidth: 89,
+    body: bg.righe.map((x) => [x.pos, x.pos === 'PAUSA' ? '' : x.nome, _pbOra(x.ini) + ' - ' + _pbOra(x.fin)]),
+    theme: 'grid',
+    styles: { fontSize: 9, cellPadding: 1.6, lineColor: [120, 120, 120], lineWidth: 0.2, textColor: [0, 0, 0] },
+    columnStyles: { 0: { cellWidth: 18, fontStyle: 'bold' }, 1: { cellWidth: 45 }, 2: { cellWidth: 26 } },
+    didParseCell: (d) => {
+      const clr = _peColoreSettore(d.row.raw[0]);
+      if (d.column.index === 0 && clr) d.cell.styles.fillColor = _peHexRgb(clr);
+    },
+  });
+  logAzione('Bigliettino pause stampato', bg.titolo + ' ' + dstr);
+  mostraPdfPreview(doc, 'bigliettino_' + dstr + '.pdf', 'Bigliettino ' + bg.titolo);
 }
 // ---------- regole pause personalizzabili ----------
 function _briefRenderPauseCfg() {

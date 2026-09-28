@@ -51,17 +51,19 @@ Ordine = ordine di caricamento in index.html. Il Piano di lavoro e diviso in die
 | 35 | piano-schede.js | 2950 | PIANO · timbrature, statistiche, import vacanze, saldo ore dell anno, esportazione formato HR |
 | 36 | piano-impostazioni.js | 1550 | PIANO · mappature e impostazioni, solver esterno, formulari, card congedi non pagati |
 | 37 | piano-celle.js | 1051 | PIANO · stampa singolo collaboratore, menu tasto destro, modifica rapida delle celle |
-| 38 | piano-briefing-ui.js | 1633 | PIANO · scheda Briefing (compilazione, numeri cassa, formato) e corsi |
+| 38 | piano-briefing-ui.js | 1773 | PIANO · scheda Briefing (compilazione, numeri cassa, formato, Annulla/Ripristina del giorno) e corsi |
 | 39 | piano-extra.js | 2278 | PIANO · copia/incolla a blocchi, annulla/ripristina, selezione sparsa, trova, migliora ore, formazione, scheda Crediti |
-| 40 | pause-engine.js | 3803 | PAUSE del briefing: schemi Slots (porting Excel), motore algoritmico Valet/altri, regole pause per settore, verifica, PDF |
+| 40 | pause-controlli.js | 531 | PAUSE · controlli del foglio Slots in funzioni pure (test/pause-controlli.test.js): pause di ogni persona, regola delle ore, distanza, sala mai vuota, righe senza nessuno |
+| 41 | pause-engine.js | 4563 | PAUSE del briefing: schemi Slots (porting Excel), completamento delle pause mancanti, bigliettino del mattino, pausa e cambio collegati, motore algoritmico Valet/altri, regole pause per settore, PDF |
 
-**Totale: 38 file, 58.944 righe (prettier --single-quote --print-width 120, solo JS).**
+**Totale: 41 file, 61.813 righe (prettier --single-quote --print-width 120, solo JS).**
 
 ## Test automatici
 
 - `node test/piano-regole.test.js` — regole del piano (115 controlli)
 - `node test/pause-regole.test.js` — regole pause (33 controlli)
-- `node test/annulla.test.js` — Annulla/Ripristina generale (26 controlli)
+- `node test/pause-controlli.test.js` — controlli del foglio pause (27 controlli)
+- `node test/annulla.test.js` — Annulla/Ripristina generale (38 controlli)
 - `node strumenti/verifica_crediti.js` — verifica incrociata Crediti/Vacanze/Festivi/Saldo con il codice vero sopra i dati esportati (`strumenti/esporta_dati_verifica.py`)
 
 ## Settori (dinamici, personalizzabili da admin)

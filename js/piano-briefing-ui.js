@@ -1392,15 +1392,12 @@ function _briefPauseBodyHtml() {
         '<div class="pb-avviso" style="margin:0 0 8px;padding:6px 10px;font-size:var(--fs-sm,.8125rem);background:var(--c-azzurro-bg,#e6f0f8);border-left:3px solid var(--c-azzurro,#1f6fa3);display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span>' +
         escP(window._briefPauseAvviso) +
         '</span><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px" onclick="briefAnnulla()">Annulla</button></div>';
-    const avvisi = p.contenuto.tipo === 'slots' && typeof _pbControlla === 'function' ? _pbControlla(p.contenuto) : [];
-    if (avvisi.length)
-      h +=
-        '<div class="pb-errori" style="margin:0 0 8px;padding:6px 10px;font-size:var(--fs-sm,.8125rem);background:var(--c-rosso-bg,#fdecea);border-left:3px solid var(--c-rosso,#c0392b)"><b>Pause e cambi non coincidono (' +
-        avvisi.length +
-        ')</b><br>' +
-        avvisi.map((x) => escP(x.testo)).join('<br>') +
-        '<br><span style="color:var(--muted)">Le righe interessate sono bordate di rosso. Puoi correggere con le frecce o scrivendo nelle celle.</span></div>';
+    if (p.contenuto.tipo === 'slots' && typeof _pcAvvisiHtml === 'function') {
+      h += _pcProposteHtml(p.contenuto);
+      h += _pcAvvisiHtml(p.contenuto);
+    }
     h += _briefRenderPause(p.contenuto);
+    if (p.contenuto.tipo === 'slots' && typeof _pcBigliettoHtml === 'function') h += _pcBigliettoHtml(p.contenuto);
     const viol = typeof _peVerificaRegolePause === 'function' ? _peVerificaRegolePause(p.contenuto, _briefData) : [];
     if (viol.length)
       h +=
