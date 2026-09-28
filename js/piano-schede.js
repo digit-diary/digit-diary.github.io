@@ -597,7 +597,11 @@ async function caricaStatisticheAnnoPiano(forza) {
     const sel = meseFiltro === anno + '-' + mm;
     h +=
       '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;' +
-      (sel ? _attivo : ha ? 'border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49);font-weight:700' : 'color:var(--muted)') +
+      (sel
+        ? _attivo
+        : ha
+          ? 'border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49);font-weight:700'
+          : 'color:var(--muted)') +
       '" onclick="pianoStatMese(\'' +
       anno +
       '-' +
@@ -792,7 +796,9 @@ async function caricaStatisticheAnnoPiano(forza) {
       '>' +
       (o.cgfGod || '') +
       (o.cgfPersi
-        ? ' <span style="color:var(--c-rosso,#c0392b);font-size:var(--fs-sm,.8125rem)">+' + o.cgfPersi + ' in malattia</span>'
+        ? ' <span style="color:var(--c-rosso,#c0392b);font-size:var(--fs-sm,.8125rem)">+' +
+          o.cgfPersi +
+          ' in malattia</span>'
         : '') +
       '</td><td style="font-weight:700;color:' +
       (o.cgfSaldo > 0 ? '#2c6e49' : o.cgfSaldo < 0 ? '#c0392b' : 'var(--muted)') +
@@ -869,7 +875,7 @@ async function _pianoVacDirittoCard(anno) {
   const gia = {};
   (_pianoVacCache || []).forEach((v) => {
     const sett = parseInt(v.settimana);
-    if (!sett || !v.confermata) return; // le provvisorie non contano
+    if (!sett || !v.confermata || !_vacEVacanza(v)) return; // provvisorie e altre assenze (PC, MT) non contano
     // una settimana a cavallo d'anno porta giorni nell'altro anno: non contano
     const gg = _pianoGiorniSettimana(anno, sett).filter((d) => d.substring(0, 4) === String(anno));
     gia[v.collaboratore] = (gia[v.collaboratore] || 0) + gg.length;
@@ -1114,10 +1120,14 @@ async function _renderPianoVacanzeTab() {
       '" style="background:#ffc107;color:#212529;padding:6px 10px;font-weight:700;font-size:var(--fs-sm,.8125rem)">' +
       escP(nome) +
       ' (' +
-      lista.length +
-      ' settimane)</div>';
+      lista.filter(_vacEVacanza).length +
+      ' settimane di vacanza' +
+      (lista.some((v) => !_vacEVacanza(v))
+        ? ' · ' + lista.filter((v) => !_vacEVacanza(v)).length + ' altre assenze'
+        : '') +
+      ')</div>';
     h +=
-      '<table class="piano-table" style="min-width:100%;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Settimana</th><th title="Definitiva = va nel piano e conta nel saldo. Provvisoria = resta qui in attesa, non va nel piano e non conta">Definitiva</th>' +
+      '<table class="piano-table" style="min-width:100%;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Settimana</th><th style="text-align:left" title="V = vacanza (conta nei giorni di vacanza). Altre sigle del Piano (PC Protezione Civile, MT Matrimonio...) = altre assenze: non contano come vacanza">Tipo</th><th title="Definitiva = va nel piano e conta nel saldo. Provvisoria = resta qui in attesa, non va nel piano e non conta">Definitiva</th>' +
       (puoMod ? '<th>Azioni</th>' : '') +
       '</tr></thead><tbody>';
     lista.forEach((v) => {
@@ -1130,7 +1140,15 @@ async function _renderPianoVacanzeTab() {
         v.settimana +
         '</strong> <span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">(' +
         _vacDateSettimana(anno, v.settimana) +
-        ')</span></td>';
+        ')</span></td>' +
+        '<td style="text-align:left">' +
+        (_vacEVacanza(v)
+          ? 'Vacanza'
+          : '<span class="mini-badge" style="background:#5d6d7e" title="Non conta come vacanza">' +
+            escP(_vacCodice(v)) +
+            '</span> ' +
+            escP(_vacDescrSigla(_vacCodice(v)))) +
+        '</td>';
       h +=
         '<td>' +
         (puoMod
@@ -2005,7 +2023,21 @@ function apriNuovaVacanza() {
     window._pianoVacAnno +
     '</h3><div class="field" style="text-align:left"><label>Collaboratore</label><select id="nv-collab" style="width:100%;padding:8px">' +
     nomiRep.map((n) => '<option value="' + escP(n) + '">' + escP(n) + '</option>').join('') +
-    '</select></div><div class="field" style="text-align:left;margin-top:8px"><label>Settimana (1-53)</label><input type="number" id="nv-sett" min="1" max="53" style="width:110px;padding:8px"></div>' +
+    '</select></div><div class="field" style="text-align:left;margin-top:8px"><label>Settimana (1-53)</label><input type="number" id="nv-sett" min="1" max="53" style="width:110px;padding:8px"></div><div class="field" style="text-align:left;margin-top:8px"><label>Tipo</label><select id="nv-tipo" style="width:100%;padding:8px"><option value="V">V · Vacanza (conta nei giorni di vacanza)</option>' +
+    (typeof pianoCodiciCache !== 'undefined' ? pianoCodiciCache : [])
+      .filter((c) => c.attivo !== false && !['V', 'C'].includes(String(c.codice).toUpperCase()))
+      .map(
+        (c) =>
+          '<option value="' +
+          escP(c.codice) +
+          '">' +
+          escP(c.codice) +
+          ' · ' +
+          escP(c.descrizione || '') +
+          ' (altra assenza, non conta come vacanza)</option>',
+      )
+      .join('') +
+    '</select></div>' +
     '<div style="text-align:left;margin-top:8px"><label style="font-size:var(--fs-sm,.8125rem)"><input type="checkbox" id="nv-conf" checked> Definitiva (va nel piano e conta nel saldo; senza spunta resta provvisoria)</label></div>' +
     '<div class="pwd-modal-btns" style="margin-top:14px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaNuovaVacanza()">Aggiungi</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
@@ -2018,6 +2050,7 @@ async function salvaNuovaVacanza() {
   const nome = (document.getElementById('nv-collab') || {}).value;
   const sett = parseInt((document.getElementById('nv-sett') || {}).value);
   const conf = (document.getElementById('nv-conf') || {}).checked;
+  const tipo = String((document.getElementById('nv-tipo') || {}).value || 'V').toUpperCase();
   if (!nome || isNaN(sett) || sett < 1 || sett > 53) {
     toast('Collaboratore e settimana (1-53) obbligatori');
     return;
@@ -2033,6 +2066,7 @@ async function salvaNuovaVacanza() {
       settimana: sett,
       anno: window._pianoVacAnno,
       confermata: conf,
+      codice: tipo === 'V' ? null : tipo,
       operatore: getOperatore(),
     });
     logAzione('Vacanza aggiunta', nome + ' settimana ' + sett + '/' + window._pianoVacAnno);
@@ -2169,14 +2203,17 @@ async function _applicaVacanzeMese(interattivo) {
     .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
     .map((c) => c.nome);
   // settimane -> giorni del mese corrente
-  const vacGiorni = {}; // nome -> Set(giorno)
+  const vacGiorni = {}; // nome -> Set(giorno)   solo vacanze (V)
+  const altreGiorni = {}; // nome -> { giorno: sigla }   altre assenze della settimana (PC, MT...)
   vacanze.forEach((v) => {
     if (!nomiRep.includes(v.collaboratore)) return;
     if (!v.confermata) return; // provvisoria: resta in elenco, non va nel piano
+    const sigla = _vacCodice(v);
     _pianoGiorniSettimana(anno, v.settimana).forEach((dstr) => {
       const p = dstr.split('-');
-      if (parseInt(p[0]) === anno && parseInt(p[1]) === mese)
-        (vacGiorni[v.collaboratore] = vacGiorni[v.collaboratore] || new Set()).add(parseInt(p[2]));
+      if (parseInt(p[0]) !== anno || parseInt(p[1]) !== mese) return;
+      if (sigla === 'V') (vacGiorni[v.collaboratore] = vacGiorni[v.collaboratore] || new Set()).add(parseInt(p[2]));
+      else (altreGiorni[v.collaboratore] = altreGiorni[v.collaboratore] || {})[parseInt(p[2])] = sigla;
     });
   });
   const da = ym + '-01';
@@ -2222,14 +2259,60 @@ async function _applicaVacanzeMese(interattivo) {
       _pianoReparto() +
       '&protetto=eq.true&generato=eq.true&codice=eq.C',
   );
-  if (!Object.keys(vacGiorni).length) {
+  // ALTRE ASSENZE (PC, MT...): scritte con un commento che le riconosce, cosi ai giri
+  // successivi si aggiornano senza toccare le stesse sigle inserite a mano
+  const COMMENTO_ALTRE = 'Piano vacanze: ';
+  let nAltre = 0;
+  {
+    const righeMese =
+      (await secGet(
+        'piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=5000',
+      )) || [];
+    const giaScritte = righeMese.filter((r) => String(r.commento || '').startsWith(COMMENTO_ALTRE));
+    for (const r of giaScritte) {
+      const g = parseInt(r.data.split('-')[2]);
+      const voluta = altreGiorni[r.collaboratore] && altreGiorni[r.collaboratore][g];
+      if (voluta !== r.codice) await secDel('piano', 'id=eq.' + r.id);
+    }
+    const perCellaM = {};
+    righeMese.forEach((r) => (perCellaM[r.collaboratore + '|' + parseInt(r.data.split('-')[2])] = r));
+    for (const nome of Object.keys(altreGiorni)) {
+      for (const g of Object.keys(altreGiorni[nome])) {
+        const sigla = altreGiorni[nome][g];
+        const r = perCellaM[nome + '|' + g];
+        if (r && String(r.commento || '').startsWith(COMMENTO_ALTRE) && r.codice === sigla) continue;
+        if (r && r.protetto && !String(r.commento || '').startsWith(COMMENTO_ALTRE)) continue; // protette: mai toccate
+        const dati = {
+          codice: sigla,
+          protetto: true,
+          generato: true,
+          commento: COMMENTO_ALTRE + _vacDescrSigla(sigla),
+          operatore: getOperatore(),
+        };
+        if (r && !(String(r.commento || '').startsWith(COMMENTO_ALTRE) && r.codice !== sigla))
+          await secPatch('piano', 'id=eq.' + r.id, Object.assign({ updated_at: new Date().toISOString() }, dati));
+        else
+          await _pianoInserisciCella(
+            Object.assign(
+              { collaboratore: nome, data: ym + '-' + String(g).padStart(2, '0'), reparto_dip: _pianoReparto() },
+              dati,
+            ),
+          );
+        nAltre++;
+      }
+    }
+  }
+  // le altre assenze (PC, MT...) seguono la stessa regola delle vacanze per i C
+  // prima e dopo (e i diurni prima): insieme alle V formano un unico blocco
+  const nomiBlocchi = [...new Set(Object.keys(vacGiorni).concat(Object.keys(altreGiorni)))];
+  if (!nomiBlocchi.length) {
     if (interattivo)
       toast(
         nOrfane
           ? nOrfane + ' V rimosse (vacanze spostate); nessuna vacanza cade in ' + ym
           : 'Nessuna vacanza cade in ' + ym + ' per questo settore',
       );
-    return { v: 0, c: 0, wd: 0, orfane: nOrfane };
+    return { v: 0, c: 0, wd: 0, orfane: nOrfane, altre: nAltre };
   }
   const righe =
     (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=5000')) ||
@@ -2269,11 +2352,13 @@ async function _applicaVacanzeMese(interattivo) {
     }
     return true;
   };
-  for (const nome of Object.keys(vacGiorni)) {
-    const giorni = [...vacGiorni[nome]].sort((x, y) => x - y);
+  for (const nome of nomiBlocchi) {
+    const soloV = [...(vacGiorni[nome] || [])].sort((x, y) => x - y);
+    const setVac = new Set(soloV.concat(Object.keys(altreGiorni[nome] || {}).map((g) => parseInt(g))));
+    const giorni = [...setVac].sort((x, y) => x - y);
     const info = _pianoCollabInfo(nome) || {};
     // V protette su ogni giorno di vacanza (le protette esistenti restano)
-    for (const g of giorni) {
+    for (const g of soloV) {
       const r = perCella[nome + '|' + g];
       if (r && r.protetto) continue;
       if (await scrivi(nome, g, 'V', true, false)) nV++;
@@ -2294,7 +2379,6 @@ async function _applicaVacanzeMese(interattivo) {
     const pct = info.percentuale != null ? info.percentuale : 1.0;
     const nCPrima = info.is_jolly ? cPrimaJolly : cPrimaFissi;
     const nCDopo = pct >= 1.0 ? cDopo[100] : pct >= 0.8 ? cDopo[80] : pct >= 0.6 ? cDopo[60] : cDopo[40];
-    const setVac = vacGiorni[nome];
     const cGiorni = new Set();
     const cMesePrec = []; // giorni del mese precedente
     const dPrec = new Date(anno, mese - 2, 15);
@@ -2354,8 +2438,19 @@ async function _applicaVacanzeMese(interattivo) {
       }
     }
   }
-  logAzione('Piano: vacanze applicate', ym + ' · ' + nV + ' V, ' + nC + ' C, ' + nWdP + ' WD');
-  return { v: nV, c: nC, wd: nWdP, orfane: nOrfane };
+  logAzione(
+    'Piano: vacanze applicate',
+    ym +
+      ' · ' +
+      nV +
+      ' V, ' +
+      nC +
+      ' C, ' +
+      nWdP +
+      ' WD' +
+      (nAltre ? ', ' + nAltre + ' altre assenze (PC, MT...)' : ''),
+  );
+  return { v: nV, c: nC, wd: nWdP, orfane: nOrfane, altre: nAltre };
 }
 async function applicaVacanzePiano() {
   const MESI_L = MESI_FULL || [];
@@ -2381,6 +2476,7 @@ async function applicaVacanzePiano() {
         ' C, ' +
         r.wd +
         ' WD' +
+        (r.altre ? ', ' + r.altre + ' altre assenze' : '') +
         (r.orfane ? ' · rimosse ' + r.orfane + ' V di vacanze spostate' : ''),
     );
   _pianoTab = 'calendario';
@@ -2463,6 +2559,36 @@ function _vacAbbina(cognome, nome, rep) {
   const delRep = attivi.filter((c) => (c.reparto_dip || 'slots') === (rep || _pianoReparto()));
   return cerca(delRep) || cerca(attivi) || cerca(collaboratoriCache);
 }
+// SIGLA DI UNA SETTIMANA: vuota o V = vacanza (conta nei giorni di vacanza);
+// un altra sigla del Piano (PC Protezione Civile, MT Matrimonio...) = altra
+// assenza: sta nella scheda Vacanze ma NON conta come vacanza.
+function _vacCodice(v) {
+  return String((v && v.codice) || 'V').toUpperCase() || 'V';
+}
+function _vacEVacanza(v) {
+  return _vacCodice(v) === 'V';
+}
+function _vacDescrSigla(c) {
+  if (c === 'V') return 'Vacanza';
+  const i = (typeof pianoCodiciCache !== 'undefined' ? pianoCodiciCache : []).find(
+    (x) => String(x.codice).toUpperCase() === c,
+  );
+  return (i && i.descrizione) || c;
+}
+// cella del file: X (o V) = vacanza, sigla del Piano = altra assenza, vuota = niente,
+// qualsiasi altra cosa = simbolo non riconosciuto. Maiuscole e minuscole uguali.
+function _vacLeggiCella(testo) {
+  const t = String(testo == null ? '' : testo)
+    .trim()
+    .toUpperCase();
+  if (!t) return null;
+  if (t === 'X' || t === 'V') return 'V';
+  const sigle = []
+    .concat(typeof pianoCodiciCache !== 'undefined' ? pianoCodiciCache : [])
+    .concat(typeof pianoTurniCache !== 'undefined' ? pianoTurniCache : [])
+    .map((c) => String(c.codice || '').toUpperCase());
+  return sigle.includes(t) ? t : { ignoto: t };
+}
 // ===== IMPORT VACANZE (Excel o PDF nel formato HR) =====
 // Formato ufficiale: riga di intestazione con COGNOME | NOME | anno |
 // Pianificate | 52 | 1..52, poi una riga per persona con la X sulle settimane.
@@ -2479,22 +2605,20 @@ function _vacRigheDaExcel(wb) {
   }
   if (!rows) rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
   const out = [];
+  const ignoti = [];
   rows.forEach((r) => {
     const cognome = String(r[0] || '').trim();
     const nome = String(r[1] || '').trim();
     if (!cognome || /cognome/i.test(cognome)) return;
     const sett = [];
     for (let w = 1; w <= 52; w++) {
-      if (
-        String(r[4 + w] || '')
-          .trim()
-          .toUpperCase() === 'X'
-      )
-        sett.push(w);
+      const c = _vacLeggiCella(r[4 + w]);
+      if (c && c.ignoto) ignoti.push('"' + c.ignoto + '" per ' + (cognome + ' ' + nome).trim() + ', settimana ' + w);
+      else if (c) sett.push({ w: w, codice: c });
     }
-    if (sett.length) out.push({ cognome: cognome, nome: nome, settimane: sett });
+    out.push({ cognome: cognome, nome: nome, settimane: sett });
   });
-  return out;
+  return { righe: out, ignoti: ignoti };
 }
 async function _vacRigheDaPdf(file) {
   // pdf.js: si prendono le posizioni orizzontali dei numeri di settimana
@@ -2505,6 +2629,7 @@ async function _vacRigheDaPdf(file) {
   const buf = await file.arrayBuffer();
   const pdf = await lib.getDocument({ data: buf }).promise;
   const out = [];
+  const ignoti = [];
   for (let np = 1; np <= pdf.numPages; np++) {
     const page = await pdf.getPage(np);
     const txt = await page.getTextContent();
@@ -2538,31 +2663,40 @@ async function _vacRigheDaPdf(file) {
       if (v.n >= 1 && v.n <= 52 && colonne[v.n] == null) colonne[v.n] = v.x;
     });
     const headY = righe.find((r) => r.items.some((i) => head.some((h) => h.x === i.x)))?.y;
+    const primaColonna = Math.min(...Object.values(colonne));
+    const colonnaDi = (x) => {
+      let best = null;
+      let bd = 1e9;
+      Object.keys(colonne).forEach((w) => {
+        const d = Math.abs(colonne[w] - x);
+        if (d < bd) {
+          bd = d;
+          best = parseInt(w);
+        }
+      });
+      return bd < 12 ? best : null;
+    };
     righe.forEach((r) => {
       if (headY != null && r.y >= headY) return; // sopra l'intestazione: titoli
-      const testo = r.items.filter((i) => /[A-Za-zÀ-ÿ.]{2,}/.test(i.s) && !/^x$/i.test(i.s));
+      // celle delle settimane (sotto le colonne 1-52) e testo del nome (a sinistra)
+      const celle = r.items.filter((i) => i.x >= primaColonna - 12 && colonnaDi(i.x));
+      const testo = r.items.filter((i) => !celle.includes(i) && /[A-Za-zÀ-ÿ.]{2,}/.test(i.s));
       if (!testo.length) return;
       const cognome = testo[0].s;
-      const nome = testo[1] && testo[1].x < (colonne[1] || 9999) ? testo[1].s : '';
+      const nome = testo[1] ? testo[1].s : '';
       const sett = [];
-      r.items
-        .filter((i) => /^x$/i.test(i.s))
-        .forEach((i) => {
-          let best = null;
-          let bd = 1e9;
-          Object.keys(colonne).forEach((w) => {
-            const d = Math.abs(colonne[w] - i.x);
-            if (d < bd) {
-              bd = d;
-              best = parseInt(w);
-            }
-          });
-          if (best && bd < 12) sett.push(best);
-        });
-      if (sett.length) out.push({ cognome: cognome, nome: nome, settimane: [...new Set(sett)].sort((a, b) => a - b) });
+      celle.forEach((i) => {
+        const c = _vacLeggiCella(i.s);
+        const w = colonnaDi(i.x);
+        if (c && c.ignoto) {
+          if (!/^\d+$/.test(c.ignoto))
+            ignoti.push('"' + c.ignoto + '" per ' + (cognome + ' ' + nome).trim() + ', settimana ' + w);
+        } else if (c && !sett.some((x) => x.w === w)) sett.push({ w: w, codice: c });
+      });
+      out.push({ cognome: cognome, nome: nome, settimane: sett.sort((a, b) => a.w - b.w) });
     });
   }
-  return out;
+  return { righe: out, ignoti: ignoti };
 }
 async function importaVacanzePiano(input) {
   if (!puoGestirePiano()) return;
@@ -2572,14 +2706,15 @@ async function importaVacanzePiano(input) {
   const anno = window._pianoVacAnno || parseInt(_pianoMeseSel.split('-')[0]);
   try {
     const isPdf = /\.pdf$/i.test(file.name);
-    let righe;
+    let letto;
     if (isPdf) {
-      righe = await _vacRigheDaPdf(file);
+      letto = await _vacRigheDaPdf(file);
     } else {
       if (!window.XLSX) return;
-      righe = _vacRigheDaExcel(XLSX.read(await file.arrayBuffer()));
+      letto = _vacRigheDaExcel(XLSX.read(await file.arrayBuffer()));
     }
-    if (!righe.length) {
+    const righe = letto.righe;
+    if (!righe.some((r) => r.settimane.length)) {
       toast('Nessuna settimana trovata nel file');
       return;
     }
@@ -2590,58 +2725,108 @@ async function importaVacanzePiano(input) {
     righe.forEach((r) => {
       const m = _vacAbbina(r.cognome, r.nome);
       if (!m) {
-        persi.push((r.cognome + ' ' + r.nome).trim() + ' (' + r.settimane.length + ' settimane)');
+        if (r.settimane.length)
+          persi.push((r.cognome + ' ' + r.nome).trim() + ' (' + r.settimane.length + ' settimane)');
         return;
       }
       if (m.score < 6) deboli.push((r.cognome + ' ' + r.nome).trim() + ' letto come ' + m.c.nome);
-      const g = trovati.find((t) => t.nome === m.c.nome);
-      if (g) g.settimane = [...new Set(g.settimane.concat(r.settimane))].sort((a, b) => a - b);
-      else trovati.push({ nome: m.c.nome, settimane: r.settimane.slice() });
+      let g = trovati.find((t) => t.nome === m.c.nome);
+      if (!g) {
+        g = { nome: m.c.nome, settimane: {} };
+        trovati.push(g);
+      }
+      r.settimane.forEach((x) => (g.settimane[x.w] = x.codice));
     });
     if (!trovati.length) {
       toast('Nessun collaboratore riconosciuto nel file');
       return;
     }
-    const nSett = trovati.reduce((s, t) => s + t.settimane.length, 0);
-    const gia = _pianoVacCache.filter((v) => trovati.some((t) => t.nome === v.collaboratore)).length;
+    // CONFRONTO con l'archivio, persona per persona: si cambia solo cio che e diverso.
+    // Le settimane uguali restano come sono (anche Provvisoria).
+    const piano = [];
+    const righeMsg = [];
+    let nAgg = 0,
+      nTolte = 0,
+      nCamb = 0;
+    trovati.forEach((t) => {
+      const vecchie = _pianoVacCache.filter((v) => v.collaboratore === t.nome && v.anno === anno);
+      const perSett = {};
+      vecchie.forEach((v) => (perSett[v.settimana] = v));
+      const agg = [];
+      const tolte = [];
+      const camb = [];
+      Object.keys(t.settimane).forEach((w) => {
+        const c = t.settimane[w];
+        const v = perSett[w];
+        if (!v) agg.push({ w: parseInt(w), codice: c });
+        else if (_vacCodice(v) !== c) camb.push({ v: v, da: _vacCodice(v), a: c });
+      });
+      vecchie.forEach((v) => {
+        if (t.settimane[v.settimana] === undefined) tolte.push(v);
+      });
+      if (!agg.length && !tolte.length && !camb.length) return;
+      piano.push({ nome: t.nome, agg, tolte, camb });
+      nAgg += agg.length;
+      nTolte += tolte.length;
+      nCamb += camb.length;
+      const sig = (c) => (c === 'V' ? '' : ' ' + c);
+      const parti = [];
+      if (agg.length) parti.push('+ ' + agg.map((x) => x.w + sig(x.codice)).join(', '));
+      if (tolte.length) parti.push('- ' + tolte.map((v) => v.settimana + sig(_vacCodice(v))).join(', '));
+      if (camb.length) parti.push(camb.map((x) => 'sett. ' + x.v.settimana + ' ' + x.da + ' -> ' + x.a).join(', '));
+      righeMsg.push('  ' + t.nome + ': ' + parti.join(' · '));
+    });
     let msg =
-      'File ' +
-      (isPdf ? 'PDF' : 'Excel') +
-      ' letto per l’anno ' +
-      anno +
-      ':\n\n• ' +
-      trovati.length +
-      ' collaboratori riconosciuti\n• ' +
-      nSett +
-      ' settimane nel file';
-    if (gia) msg += '\n• ' + gia + ' settimane gia’ in archivio per queste persone';
+      'File ' + (isPdf ? 'PDF' : 'Excel') + ' letto per l anno ' + anno + ': ' + trovati.length + ' collaboratori.';
+    if (!piano.length) msg += '\n\nIl file coincide con l archivio: nessuna modifica da fare.';
+    else {
+      msg +=
+        '\n\nCambiamenti (+ settimane nuove, - settimane tolte; accanto la sigla se non e vacanza):\n' +
+        righeMsg.slice(0, 25).join('\n') +
+        (righeMsg.length > 25 ? '\n  ... e altri ' + (righeMsg.length - 25) : '') +
+        '\n\nTotale: ' +
+        nAgg +
+        ' nuove, ' +
+        nTolte +
+        ' tolte, ' +
+        nCamb +
+        ' con sigla cambiata. Le settimane che non cambiano restano come sono (anche Provvisoria).';
+    }
+    if (letto.ignoti.length)
+      msg +=
+        '\n\nSimboli non riconosciuti (non sono X ne sigle del Piano, restano fuori):\n' +
+        letto.ignoti
+          .slice(0, 15)
+          .map((x) => '  ' + x)
+          .join('\n') +
+        (letto.ignoti.length > 15 ? '\n  ... e altri ' + (letto.ignoti.length - 15) : '');
     if (deboli.length)
       msg += '\n\nLetti con piccole differenze di scrittura:\n' + deboli.map((x) => '  ' + x).join('\n');
     if (persi.length) msg += '\n\nNON riconosciuti (restano fuori):\n' + persi.map((x) => '  ' + x).join('\n');
-    msg += gia
-      ? '\n\nOK = SOSTITUISCO le settimane di queste persone con quelle del file.\nAnnulla = non faccio nulla.'
-      : '\n\nProcedo con l’inserimento?';
-    if (!(await chiediConferma(msg))) return;
-    // sostituzione: si toccano solo le persone presenti nel file
-    for (const t of trovati) {
-      const vecchie = _pianoVacCache.filter((v) => v.collaboratore === t.nome && v.anno === anno);
-      for (const v of vecchie) await secDel('piano_vacanze', 'id=eq.' + v.id);
+    if (!piano.length) {
+      await mostraAvviso(msg, { titolo: 'Importa vacanze' });
+      return;
     }
-    let ins = 0;
-    for (const t of trovati) {
-      for (const w of t.settimane) {
+    if (!(await chiediConferma(msg, { titolo: 'Importa vacanze', ok: 'Applica i cambiamenti', pericolo: false })))
+      return;
+    for (const p of piano) {
+      for (const v of p.tolte) await secDel('piano_vacanze', 'id=eq.' + v.id);
+      for (const x of p.camb) await secPatch('piano_vacanze', 'id=eq.' + x.v.id, { codice: x.a === 'V' ? null : x.a });
+      for (const x of p.agg)
         await secPost('piano_vacanze', {
-          collaboratore: t.nome,
-          settimana: w,
+          collaboratore: p.nome,
+          settimana: x.w,
           anno: anno,
           confermata: true,
+          codice: x.codice === 'V' ? null : x.codice,
           operatore: getOperatore(),
         });
-        ins++;
-      }
     }
-    logAzione('Vacanze importate', anno + ' · ' + ins + ' settimane · ' + trovati.length + ' collaboratori');
-    toast('Vacanze importate: ' + ins + ' settimane');
+    logAzione(
+      'Vacanze importate',
+      anno + ' · ' + nAgg + ' nuove, ' + nTolte + ' tolte, ' + nCamb + ' cambiate · ' + piano.length + ' collaboratori',
+    );
+    toast('Vacanze aggiornate: ' + nAgg + ' nuove, ' + nTolte + ' tolte, ' + nCamb + ' cambiate');
     renderPiano();
   } catch (e) {
     console.error(e);
@@ -2718,11 +2903,18 @@ function _vacDatiEsport(anno) {
     const parti = c.nome.trim().split(/\s+/);
     const cognome = parti.length > 1 ? parti.slice(0, -1).join(' ') : parti[0];
     const nome = parti.length > 1 ? parti[parti.length - 1] : '';
-    const sett = _pianoVacCache
-      .filter((v) => v.collaboratore === c.nome && v.anno === anno)
-      .map((v) => v.settimana)
-      .sort((a, b) => a - b);
-    return { cognome: cognome.toUpperCase(), nome: nome.toUpperCase(), settimane: sett };
+    const mie = _pianoVacCache.filter((v) => v.collaboratore === c.nome && v.anno === anno);
+    const sett = mie.map((v) => v.settimana).sort((a, b) => a - b);
+    // nel file: X per le vacanze, la sigla per le altre assenze (PC, MT...)
+    const segni = {};
+    mie.forEach((v) => (segni[v.settimana] = _vacEVacanza(v) ? 'X' : _vacCodice(v)));
+    return {
+      cognome: cognome.toUpperCase(),
+      nome: nome.toUpperCase(),
+      settimane: sett,
+      segni: segni,
+      nVacanze: mie.filter(_vacEVacanza).length,
+    };
   });
 }
 function _vacDataIt(dstr) {
@@ -2808,13 +3000,13 @@ async function esportaVacanzeExcel() {
     set(r, 0, d.cognome, { border: bordo });
     set(r, 1, d.nome, { border: bordo });
     set(r, 2, '', { border: bordo });
-    set(r, 3, d.settimane.length, { alignment: { horizontal: 'center' }, border: bordo });
+    set(r, 3, d.nVacanze, { alignment: { horizontal: 'center' }, border: bordo });
     set(r, 4, '', { border: bordo, fill: fillDi(0) });
     for (let w = 1; w <= 52; w++) {
       const stile = { alignment: { horizontal: 'center' }, border: bordo, font: { bold: true, sz: 9 } };
       const f = fillDi(w);
       if (f) stile.fill = f;
-      set(r, 4 + w, d.settimane.includes(w) ? 'X' : '', stile);
+      set(r, 4 + w, d.segni[w] || '', stile);
     }
   });
   // LEGENDA a destra (colonne BH-BJ come nel file)
@@ -2860,9 +3052,14 @@ function esportaVacanzePdf() {
   const doc = new jsPDF('landscape', 'mm', 'a3');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
-  doc.text('PIANIFICAZIONE VACANZE ANNO ' + anno + ' · ' + repartoNomeDocumento(_pianoReparto()).toUpperCase(), 180, 9, {
-    align: 'center',
-  });
+  doc.text(
+    'PIANIFICAZIONE VACANZE ANNO ' + anno + ' · ' + repartoNomeDocumento(_pianoReparto()).toUpperCase(),
+    180,
+    9,
+    {
+      align: 'center',
+    },
+  );
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.text(
@@ -2878,8 +3075,8 @@ function esportaVacanzePdf() {
   const head = ['COGNOME', 'NOME', 'Pianificate', '52'];
   for (let w = 1; w <= 52; w++) head.push(String(w));
   const body = dati.map((d) => {
-    const r = [d.cognome, d.nome, String(d.settimane.length), ''];
-    for (let w = 1; w <= 52; w++) r.push(d.settimane.includes(w) ? 'X' : '');
+    const r = [d.cognome, d.nome, String(d.nVacanze), ''];
+    for (let w = 1; w <= 52; w++) r.push(d.segni[w] || '');
     return r;
   });
   const colStyles = {
@@ -2909,7 +3106,7 @@ function esportaVacanzePdf() {
       const w = d.column.index === 3 ? 0 : d.column.index - 3;
       const rgb = rgbDi(w);
       if (rgb) d.cell.styles.fillColor = rgb;
-      if (d.section === 'body' && d.cell.raw === 'X') d.cell.styles.fontStyle = 'bold';
+      if (d.section === 'body' && d.cell.raw && d.column.index > 3) d.cell.styles.fontStyle = 'bold';
     },
   });
   // LEGENDA a destra

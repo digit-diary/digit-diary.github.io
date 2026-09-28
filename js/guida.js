@@ -221,6 +221,8 @@ function GUIDA_CAPITOLI() {
         '<b>Applica al piano</b> scrive le V protette, i congedi C prima e dopo la vacanza in base alla percentuale e il giorno diurno obbligato prima della partenza.',
         'Le regole aziendali da rispettare: settimane a blocchi di sette giorni, nei settori con piu di otto persone si pianifica in vacanza uno ogni otto o nove collaboratori, nei settori piu piccoli mai piu di due contemporaneamente.',
         'Le vacanze si <b>importano dal file HR</b> sia in Excel sia in PDF: il programma riconosce i collaboratori dai nomi, anche con refusi o abbreviazioni, e mostra chi ha trovato prima di sostituire.',
+        'Nel file, oltre alla <b>X</b> (vacanza), si puo scrivere una <b>sigla del Piano</b> sulla settimana: per esempio <b>PC</b> (Protezione Civile) o <b>MT</b> (Matrimonio). Maiuscole o minuscole e uguale. Queste settimane compaiono nella scheda con la loro sigla, <b>non contano come vacanza</b> e con Applica al piano vanno nel calendario con la loro sigla e gli stessi C prima e dopo delle vacanze. Un simbolo che non e una sigla del Piano viene segnalato e non importato.',
+        '<b>Reimportare il file</b> non cancella tutto: il programma confronta il file con l archivio e mostra, persona per persona, le settimane nuove, quelle tolte e quelle con la sigla cambiata; cambia solo quelle. Le settimane uguali restano come sono, anche se erano Provvisoria.',
         'Con <b>Scarica Excel</b> e <b>Scarica PDF</b> ottieni la scheda vacanze del settore nello stesso formato del file HR; il PDF si apre in anteprima prima di salvare.',
       ],
     },

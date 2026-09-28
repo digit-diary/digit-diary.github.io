@@ -2005,7 +2005,7 @@ async function _pianoCreditiDati(anno, soloNomi) {
   const gia = {};
   vac.forEach((v) => {
     const sett = parseInt(v.settimana);
-    if (!sett || !v.confermata) return; // come la scheda Vacanze: le provvisorie non contano
+    if (!sett || !v.confermata || !_vacEVacanza(v)) return; // come la scheda Vacanze: provvisorie e altre assenze non contano
     const gg = _pianoGiorniSettimana(anno, sett).filter((d) => d.substring(0, 4) === String(anno));
     gia[v.collaboratore] = (gia[v.collaboratore] || 0) + gg.length;
   });
