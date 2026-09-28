@@ -5918,3 +5918,26 @@ header h1 {
 html {
   scroll-padding-top: 100px;
 }
+
+/* scheda del collaboratore: ultimi cambi turno con anteprima del foglio */
+.scheda-cambi {
+  margin-top: 8px;
+  font-size: var(--fs-sm);
+}
+.scheda-cambi-tit {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.scheda-cambio {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 0 3px 10px;
+  border-left: 2px solid var(--line);
+}
+.scheda-cambi .btn-secondario {
+  font-size: var(--fs-sm);
+  padding: 2px 10px;
+}

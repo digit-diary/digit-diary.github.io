@@ -2448,29 +2448,52 @@ function _renderPianoCambiTab() {
   return h;
 }
 
-// Scheda del collaboratore: riga con i suoi cambi turno e collegamento alla scheda del Piano
+// Scheda del collaboratore: i suoi ultimi cambi turno, ognuno con l anteprima del foglio,
+// e il collegamento all elenco completo nel Piano
 function _schedaCambiTurnoRiga(nome) {
   if (typeof _pianoVisOk === 'function' && !_pianoVisOk('ptab_cambi')) return '';
-  const fogli = moduliCache.filter(
-    (m) =>
-      m.tipo === 'cambio_turno' &&
-      ((m.dati && m.dati.a && m.dati.a.nome === nome) ||
-        (m.dati && m.dati.b && m.dati.b.nome === nome) ||
-        m.collaboratore === nome),
-  );
+  const fogli = moduliCache
+    .filter(
+      (m) =>
+        m.tipo === 'cambio_turno' &&
+        !m.eliminato &&
+        ((m.dati && m.dati.a && m.dati.a.nome === nome) ||
+          (m.dati && m.dati.b && m.dati.b.nome === nome) ||
+          m.collaboratore === nome),
+    )
+    .sort((a, b) => String(b.data_modulo || '').localeCompare(String(a.data_modulo || '')));
   if (!fogli.length) return '';
-  const ultimo = fogli
-    .map((m) => String(m.data_modulo || ''))
-    .sort()
-    .pop();
+  const nomeJs = escP(nome.replace(/'/g, "\\'"));
+  const righe = fogli
+    .slice(0, 3)
+    .map((m) => {
+      const d = m.dati || {};
+      const collega = d.a && d.a.nome === nome ? (d.b || {}).nome : (d.a || {}).nome;
+      return (
+        '<div class="scheda-cambio"><span>' +
+        String(m.data_modulo || '')
+          .slice(0, 10)
+          .split('-')
+          .reverse()
+          .join('.') +
+        (collega ? ' · con ' + escP(collega) : '') +
+        (d.tipo === 'ESIGENZE' ? ' · esigenze operative' : '') +
+        '</span><button class="btn-secondario" onclick="ristampaModuloPDF(' +
+        Number(m.id) +
+        ')">Anteprima</button></div>'
+      );
+    })
+    .join('');
   return (
-    '<div style="font-size:var(--fs-sm,.8125rem);margin-top:6px">Cambi turno: <b>' +
+    '<div class="scheda-cambi"><div class="scheda-cambi-tit">Cambi turno: <b>' +
     fogli.length +
     '</b>' +
-    (ultimo ? ' · ultimo il ' + ultimo.slice(0, 10).split('-').reverse().join('.') : '') +
-    ' <button class="btn-secondario" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;margin-left:6px" onclick="apriCambiTurnoDi(\'' +
-    escP(nome.replace(/'/g, "\\'")) +
-    '\')">Vedi nel Piano</button></div>'
+    (fogli.length > 3 ? ' (ultimi 3)' : '') +
+    ' <button class="btn-secondario" onclick="apriCambiTurnoDi(\'' +
+    nomeJs +
+    '\')">Tutti nel Piano</button></div>' +
+    righe +
+    '</div>'
   );
 }
 function apriCambiTurnoDi(nome) {

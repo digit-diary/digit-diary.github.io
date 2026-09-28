@@ -920,12 +920,13 @@ async function importaCompleanniMaison(input) {
               const dm3 = dataRaw.match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})/);
               if (dm3) {
                 let y = parseInt(dm3[3]);
-                if (y < 100) y += y > 50 ? 1900 : 2000;
+                if (y < 100) y = annoNascitaDaDueCifre(y); // prima 43 -> 2043
                 isoDate = y + '-' + dm3[1].padStart(2, '0') + '-' + dm3[2].padStart(2, '0');
               }
             }
           }
           if (!isoDate) continue;
+          isoDate = nascitaNonFutura(isoDate); // anche le date gia convertite da Excel
           // Pulisci nome
           let nome = capitalizzaNome(nomeRaw.replace(/\*+/g, '').trim());
           if (nome.length < 2) continue;
@@ -1060,8 +1061,12 @@ async function importaCompleanniMaison(input) {
           giorno +
           '</strong> ' +
           escP(m.nome) +
-          (m.isNew ? ' <span style="font-size:var(--fs-sm,.8125rem);color:var(--c-azzurro,#1f6fa3);font-weight:700">NEW</span>' : '') +
-          (m.simile ? ' <span style="font-size:var(--fs-sm,.8125rem);color:var(--c-arancio,#b85c0e);font-weight:700">?</span>' : '') +
+          (m.isNew
+            ? ' <span style="font-size:var(--fs-sm,.8125rem);color:var(--c-azzurro,#1f6fa3);font-weight:700">NEW</span>'
+            : '') +
+          (m.simile
+            ? ' <span style="font-size:var(--fs-sm,.8125rem);color:var(--c-arancio,#b85c0e);font-weight:700">?</span>'
+            : '') +
           '</span>';
       });
       prev += '</div></div>';

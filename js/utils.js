@@ -418,6 +418,20 @@ async function _verificaNome(nome) {
 }
 
 // PARSER DATA NASCITA FLESSIBILE
+// ANNO DI NASCITA scritto con due cifre: una data di nascita non puo essere nel
+// futuro, quindi 20xx solo fino all anno in corso, altrimenti 19xx (43 -> 1943).
+function annoNascitaDaDueCifre(a) {
+  const y = parseInt(a);
+  if (isNaN(y) || y >= 100) return y;
+  const oggi = new Date().getFullYear();
+  return 2000 + y <= oggi ? 2000 + y : 1900 + y;
+}
+// data di nascita ISO nel futuro (anno letto male): la si riporta al secolo prima
+function nascitaNonFutura(iso) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso || '')) return iso;
+  const oggi = new Date().toISOString().slice(0, 10);
+  return iso > oggi ? String(parseInt(iso.slice(0, 4)) - 100) + iso.slice(4) : iso;
+}
 function _parseDataNascita(input) {
   if (!input) return '';
   input = input.trim();
@@ -438,9 +452,7 @@ function _parseDataNascita(input) {
   const g = parseInt(m[1]),
     me = parseInt(m[2]);
   let a = parseInt(m[3]);
-  if (a < 100) {
-    a = a <= 30 ? 2000 + a : 1900 + a;
-  } // 97→1997, 05→2005
+  if (a < 100) a = annoNascitaDaDueCifre(a); // 97 -> 1997, 05 -> 2005, 43 -> 1943
   if (g < 1 || g > 31 || me < 1 || me > 12 || a < 1900 || a > 2030) return '';
   return a + '-' + String(me).padStart(2, '0') + '-' + String(g).padStart(2, '0');
 }
