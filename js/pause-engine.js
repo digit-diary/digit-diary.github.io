@@ -3526,15 +3526,23 @@ function _briefRenderPauseSlots(c) {
   // 3 pile compatte affiancate: le righe vuote spariscono, resta solo un
   // piccolo stacco prima di ogni nuovo blocco (header turno)
   h += '<div style="display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;margin-top:10px">';
-  [1, 4, 7].forEach((base) => {
-    const righe = [];
-    for (let r = 4; r <= c.nR; r++) {
-      const a = c.celle[r + '|' + base];
-      const b = c.celle[r + '|' + (base + 1)];
-      if ((a && (String(a.v).trim() !== '' || a.ins)) || (b && (String(b.v).trim() !== '' || b.ins)))
-        righe.push({ r: r, a: a, b: b });
+  // colonne facoltative (accoglienza, secondo S5...): non nel foglio principale ma
+  // sotto, nella sezione Facoltative, con la loro casella per la stampa e il bigliettino
+  const PCx = window.PauseControlli;
+  const facoltative = PCx ? PCx.blocchi(c).filter((b) => b.opz) : [];
+  const righeFac = new Set();
+  facoltative.forEach((b) => {
+    let fine = c.nR;
+    for (let rr = b.r + 1; rr <= c.nR; rr++) {
+      const x = c.celle[rr + '|' + b.base];
+      if (x && x.hdr) {
+        fine = rr - 1;
+        break;
+      }
     }
-    if (!righe.length) return;
+    for (let rr = b.r; rr <= fine; rr++) righeFac.add(rr + '|' + b.base);
+  });
+  const disegna = (base, righe) => {
     let t =
       '<table style="border-collapse:collapse;font-size:var(--fs-sm,.8125rem);table-layout:fixed"><colgroup><col style="width:46px"><col style="width:88px"></colgroup>';
     righe.forEach((riga, idx) => {
@@ -3644,17 +3652,61 @@ function _briefRenderPauseSlots(c) {
       t += '</tr>';
     });
     t += '</table>';
-    h += '<div>' + t;
+    let out = '<div>' + t;
     if (puo)
-      h +=
+      out +=
         '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 8px;margin-top:4px" onclick="briefPausaInsRiga(' +
         base +
         ',' +
         (righe.length ? righe[righe.length - 1].r : 6) +
         ')">+ riga</button>';
-    h += '</div>';
+    return out + '</div>';
+  };
+  const righeDi = (base, dentro) => {
+    const righe = [];
+    for (let r = 4; r <= c.nR; r++) {
+      if (!dentro(r + '|' + base)) continue;
+      const a = c.celle[r + '|' + base];
+      const b = c.celle[r + '|' + (base + 1)];
+      if ((a && (String(a.v).trim() !== '' || a.ins)) || (b && (String(b.v).trim() !== '' || b.ins)))
+        righe.push({ r: r, a: a, b: b });
+    }
+    return righe;
+  };
+  [1, 4, 7].forEach((base) => {
+    const righe = righeDi(base, (k) => !righeFac.has(k));
+    if (righe.length) h += disegna(base, righe);
   });
   h += '</div>';
+  if (facoltative.length || (c.biglietti || []).length) {
+    const scelte = c.stampaOpz || {};
+    h +=
+      '<div class="pb-facoltative" style="margin-top:16px;padding-top:10px;border-top:1px dashed var(--line,#bbb)"><div style="font-weight:bold;font-size:var(--fs-md,.875rem)">Facoltative <span style="font-weight:normal;color:var(--muted)">(non nel foglio stampato, a meno di spuntarle; si possono stampare a parte)</span></div><div style="display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;margin-top:8px">';
+    facoltative.forEach((b) => {
+      const righe = righeDi(b.base, (k) => righeFac.has(k) && Number(k.split('|')[0]) >= b.r).filter(
+        (x) => x.r < (facoltative.find((o) => o.base === b.base && o.r > b.r) || { r: Infinity }).r,
+      );
+      h +=
+        '<div><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:4px">' +
+        escP(b.opz) +
+        '</div>' +
+        disegna(b.base, righe) +
+        (puo
+          ? '<div style="margin-top:4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:var(--fs-sm,.8125rem)"><label style="display:inline-flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" data-nome="' +
+            escP(b.nome) +
+            '" onchange="briefPauseStampaOpz(this.dataset.nome,this.checked)"' +
+            (scelte[b.nome] ? ' checked' : '') +
+            '> nel foglio stampato</label><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px" onclick="pdfBigliettoColonna(' +
+            b.base +
+            ',' +
+            b.r +
+            ')">Stampa bigliettino</button></div>'
+          : '') +
+        '</div>';
+    });
+    // bigliettino del mattino (C4) con le altre facoltative
+    h += _pcBigliettoHtml(c) + '</div></div>';
+  }
   if (puo)
     h +=
       '<div style="margin-top:8px"><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;border-color:var(--c-rosso,#c0392b);color:var(--c-rosso,#c0392b)" onclick="briefEliminaPause()">Elimina pause</button></div>';
@@ -4171,6 +4223,30 @@ function pdfPauseGiorno() {
       posti[x.bi].push(blocchi[0]);
       blocchi.slice(1).forEach((bl) => extra.push(bl));
     });
+    // bigliettino del mattino (C4) nel foglio grande, se spuntato in "In stampa anche"
+    (c.biglietti || []).forEach((bg) => {
+      if (!stampaOpz[String(bg.nome || '').trim()]) return;
+      const cella = (v, bgc, bold) => ({
+        content: v,
+        styles: {
+          fillColor: bgc ? _peHexRgb(bgc) : [255, 255, 255],
+          textColor: [0, 0, 0],
+          fontStyle: bold ? 'bold' : 'normal',
+        },
+      });
+      extra.push(
+        [[cella(bg.turno || 'C4', '#FFE0B2', true), cella(String(bg.nome) + ' · mattino', '#FFE0B2', true)]].concat(
+          bg.righe.map((x) => [
+            cella(x.pos, _peColoreSettore(x.pos), true),
+            cella(
+              _pbOra(x.ini) + ' - ' + _pbOra(x.fin) + (x.pos === 'PAUSA' ? '' : ' ' + x.nome),
+              _peColoreSettore(x.pos),
+              true,
+            ),
+          ]),
+        ),
+      );
+    });
     extra.forEach((bl) => {
       const k = [0, 1, 2, 3].sort((a, b) => altezza(posti[a]) - altezza(posti[b]))[0];
       posti[k].push(bl);
@@ -4281,7 +4357,9 @@ function _pcFormazioneHtml(c) {
 // colonne facoltative in stampa: una casella per ciascuna (spenta di partenza)
 function _pcStampaOpzHtml(c) {
   if (!c || !puoGestireBriefing()) return '';
-  const l = window.PauseControlli ? window.PauseControlli.blocchi(c).filter((b) => b.opz) : [];
+  const l = (window.PauseControlli ? window.PauseControlli.blocchi(c).filter((b) => b.opz) : []).concat(
+    (c.biglietti || []).map((bg) => ({ post: bg.turno || 'C4', nome: bg.nome, opz: 'bigliettino del mattino' })),
+  );
   if (!l.length) return '';
   const scelte = c.stampaOpz || {};
   return (
@@ -4361,41 +4439,70 @@ function briefPauseTieniProposte() {
   toast('Proposte confermate');
 }
 function _pcBigliettoHtml(c) {
+  const pulsante = (azione) =>
+    '</table><div style="padding:4px 8px"><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px" onclick="' +
+    azione +
+    '">Stampa bigliettino</button></div></div>';
+  const carta = (bg, azione) =>
+    '<div class="pb-biglietto" style="margin:10px 10px 0 0;display:inline-block;vertical-align:top;border:1px solid #999;background:var(--card-bg,#fff)"><div style="background:#FFE0B2;color:#14100a;font-weight:bold;padding:3px 8px;font-size:var(--fs-sm,.8125rem)">Bigliettino · ' +
+    escP(bg.titolo) +
+    ' · ' +
+    escP(bg.nome) +
+    '</div><table style="border-collapse:collapse;font-size:var(--fs-sm,.8125rem)">' +
+    bg.righe
+      .map(
+        (x) =>
+          '<tr><td style="border-top:1px solid #999;padding:2px 8px;background:' +
+          (_peColoreSettore(x.pos) || '#fff') +
+          ';color:#14100a;font-weight:bold">' +
+          escP(x.pos) +
+          '</td><td style="border-top:1px solid #999;padding:2px 8px">' +
+          escP(x.pos === 'PAUSA' ? '' : x.nome || '') +
+          '</td><td style="border-top:1px solid #999;padding:2px 8px;font-variant-numeric:tabular-nums">' +
+          _pbOra(x.ini) +
+          ' - ' +
+          _pbOra(x.fin) +
+          '</td></tr>',
+      )
+      .join('') +
+    pulsante(azione);
+  const scelte = (c && c.stampaOpz) || {};
   return ((c && c.biglietti) || [])
-    .map(
-      (bg, i) =>
-        '<div class="pb-biglietto" style="margin-top:10px;display:inline-block;border:1px solid #999;background:var(--card-bg,#fff)"><div style="background:#FFE0B2;color:#14100a;font-weight:bold;padding:3px 8px;font-size:var(--fs-sm,.8125rem)">Bigliettino · ' +
-        escP(bg.titolo) +
-        ' · ' +
-        escP(bg.nome) +
-        '</div><table style="border-collapse:collapse;font-size:var(--fs-sm,.8125rem)">' +
-        bg.righe
-          .map(
-            (x) =>
-              '<tr><td style="border-top:1px solid #999;padding:2px 8px;background:' +
-              (_peColoreSettore(x.pos) || '#fff') +
-              ';color:#14100a;font-weight:bold">' +
-              escP(x.pos) +
-              '</td><td style="border-top:1px solid #999;padding:2px 8px">' +
-              escP(x.pos === 'PAUSA' ? '' : x.nome) +
-              '</td><td style="border-top:1px solid #999;padding:2px 8px;font-variant-numeric:tabular-nums">' +
-              _pbOra(x.ini) +
-              ' - ' +
-              _pbOra(x.fin) +
-              '</td></tr>',
-          )
-          .join('') +
-        '</table><div style="padding:4px 8px"><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px" onclick="pdfBigliettoPause(' +
-        i +
-        ')">Stampa bigliettino</button></div></div>',
+    .map((bg, i) =>
+      carta(bg, 'pdfBigliettoPause(' + i + ')').replace(
+        /<\/div><\/div>$/,
+        (puoGestireBriefing()
+          ? ' <label style="display:inline-flex;gap:5px;align-items:center;cursor:pointer;font-size:var(--fs-sm,.8125rem)"><input type="checkbox" data-nome="' +
+            escP(bg.nome) +
+            '" onchange="briefPauseStampaOpz(this.dataset.nome,this.checked)"' +
+            (scelte[bg.nome] ? ' checked' : '') +
+            '> nel foglio stampato</label>'
+          : '') + '</div></div>',
+      ),
     )
     .join('');
 }
-// bigliettino da tagliare e dare a chi fa i cambi del mattino (formato A6)
+// bigliettino da tagliare (formato A6): cambi del mattino di C4 o una colonna
+// facoltativa (accoglienza, secondo S5...)
 function pdfBigliettoPause(i) {
   const c = _briefState && _briefState.pause && _briefState.pause.contenuto;
   const bg = c && c.biglietti && c.biglietti[i];
-  if (!bg) return;
+  if (bg) _pdfBiglietto(bg);
+}
+function _pcBigliettoDaColonna(c, blk) {
+  return {
+    titolo: blk.post + ' · ' + String(blk.opz || '').toUpperCase(),
+    nome: blk.nome,
+    righe: blk.righe.map((x) => ({ pos: x.pos, nome: '', ini: x.ini, fin: x.fin })),
+  };
+}
+function pdfBigliettoColonna(base, r) {
+  const c = _briefState && _briefState.pause && _briefState.pause.contenuto;
+  if (!c || !window.PauseControlli) return;
+  const blk = window.PauseControlli.blocchi(c).find((b) => b.base === base && b.r === r);
+  if (blk) _pdfBiglietto(_pcBigliettoDaColonna(c, blk));
+}
+function _pdfBiglietto(bg) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF('portrait', 'mm', 'a6');
   const dstr = _briefData;
@@ -4413,7 +4520,7 @@ function pdfBigliettoPause(i) {
     startY: 26,
     margin: { left: 8 },
     tableWidth: 89,
-    body: bg.righe.map((x) => [x.pos, x.pos === 'PAUSA' ? '' : x.nome, _pbOra(x.ini) + ' - ' + _pbOra(x.fin)]),
+    body: bg.righe.map((x) => [x.pos, x.pos === 'PAUSA' ? '' : x.nome || '', _pbOra(x.ini) + ' - ' + _pbOra(x.fin)]),
     theme: 'grid',
     styles: { fontSize: 9, cellPadding: 1.6, lineColor: [120, 120, 120], lineWidth: 0.2, textColor: [0, 0, 0] },
     columnStyles: { 0: { cellWidth: 18, fontStyle: 'bold' }, 1: { cellWidth: 45 }, 2: { cellWidth: 26 } },

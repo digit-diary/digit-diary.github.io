@@ -1394,12 +1394,10 @@ function _briefPauseBodyHtml() {
         '</span><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px" onclick="briefAnnulla()">Annulla</button></div>';
     if (p.contenuto.tipo === 'slots' && typeof _pcAvvisiHtml === 'function') {
       h += _pcFormazioneHtml(p.contenuto);
-      h += _pcStampaOpzHtml(p.contenuto);
       h += _pcProposteHtml(p.contenuto);
       h += _pcAvvisiHtml(p.contenuto);
     }
     h += _briefRenderPause(p.contenuto);
-    if (p.contenuto.tipo === 'slots' && typeof _pcBigliettoHtml === 'function') h += _pcBigliettoHtml(p.contenuto);
     const viol = typeof _peVerificaRegolePause === 'function' ? _peVerificaRegolePause(p.contenuto, _briefData) : [];
     if (viol.length)
       h +=
