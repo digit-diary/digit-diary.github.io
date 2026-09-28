@@ -19,6 +19,26 @@ function _eseguiRicercaGlobale(q) {
   const dd = document.getElementById('ricerca-globale-results');
   let html = '';
   let tot = 0;
+  // Collaboratori: il nome basta, anche senza registrazioni; il clic apre la scheda
+  const collabRes = getCollaboratoriReparto()
+    .filter((c) => (c.nome || '').toLowerCase().includes(q))
+    .sort((a, b) => (a.attivo === false) - (b.attivo === false) || a.nome.localeCompare(b.nome))
+    .slice(0, 6);
+  if (collabRes.length) {
+    html +=
+      '<div class="rg-section">Collaboratori (' + collabRes.length + (collabRes.length >= 6 ? '+' : '') + ')</div>';
+    collabRes.forEach((c) => {
+      html +=
+        '<div class="rg-item" onclick="_rgVai(this)" data-tipo="collaboratore" data-x="' +
+        escP(c.nome) +
+        '"><span class="rg-badge" style="background:var(--c-verdeacqua)">scheda</span><span class="rg-text"><strong>' +
+        escP(c.nome) +
+        '</strong>' +
+        (c.attivo === false ? ' · non piu attivo' : '') +
+        '</span></div>';
+    });
+    tot += collabRes.length;
+  }
   // Diario
   const diarioRes = getDatiReparto()
     .filter(
@@ -308,7 +328,9 @@ function _rgVai(it) {
   const q = it.dataset.q || '';
   const x = it.dataset.x || '';
   chiudiRicercaGlobale();
-  if (tipo === 'diario') {
+  if (tipo === 'collaboratore') {
+    apriSchedaCollaboratoreSicuro(x);
+  } else if (tipo === 'diario') {
     switchPage('diario');
     _rgImposta('filt-cerca', q);
     render();
