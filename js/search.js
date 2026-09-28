@@ -80,6 +80,45 @@ function _eseguiRicercaGlobale(q) {
     });
     tot += moduRes.length;
   }
+  // Cambi turno (fogli archiviati del settore, nella scheda Piano > Cambi turno)
+  if (isVis('piano') && (typeof _pianoVisOk !== 'function' || _pianoVisOk('ptab_cambi'))) {
+    const cambiRes = getFogliCambioReparto()
+      .filter((m) => [m.collaboratore, m.operatore, JSON.stringify(m.dati || {})].join(' ').toLowerCase().includes(q))
+      .sort((a, b) => String(b.data_modulo || '').localeCompare(String(a.data_modulo || '')))
+      .slice(0, 6);
+    if (cambiRes.length) {
+      html += '<div class="rg-section">Cambi turno (' + cambiRes.length + (cambiRes.length >= 6 ? '+' : '') + ')</div>';
+      cambiRes.forEach((m) => {
+        const d = m.dati || {};
+        const a = (d.a || {}).nome || m.collaboratore || '';
+        const b = (d.b || {}).nome || '';
+        // filtro della scheda: il nome trovato, altrimenti il primo collaboratore
+        const nome = b && b.toLowerCase().includes(q) && !a.toLowerCase().includes(q) ? b : a;
+        html +=
+          '<div class="rg-item" onclick="_rgVai(this)" data-tipo="cambi" data-id="' +
+          Number(m.id) +
+          '" data-x="' +
+          escP(nome) +
+          '"><span class="rg-badge" style="background:var(--c-azzurro)">' +
+          (d.tipo === 'ESIGENZE' ? 'esigenze' : 'scambio') +
+          '</span><span class="rg-text"><strong>' +
+          escP(a) +
+          (b ? ' &harr; ' + escP(b) : '') +
+          '</strong>' +
+          (d.motivo ? ' · ' + escP(String(d.motivo).substring(0, 60)) : '') +
+          '</span><span class="rg-date">' +
+          escP(
+            String(m.data_modulo || '')
+              .slice(0, 10)
+              .split('-')
+              .reverse()
+              .join('.'),
+          ) +
+          '</span></div>';
+      });
+      tot += cambiRes.length;
+    }
+  }
   // Note colleghi (solo quelle dove l'operatore è mittente o destinatario)
   const _op = getOperatore();
   const noteRes = noteColleghiCache
@@ -277,6 +316,8 @@ function _rgVai(it) {
   } else if (tipo === 'moduli') {
     switchPage('moduli');
     setTimeout(() => apriModuloSalvato(isNaN(Number(id)) ? id : Number(id)), 300);
+  } else if (tipo === 'cambi') {
+    apriCambiTurnoDi(x, id);
   } else if (tipo === 'note') {
     switchPage('note-collega');
     setTimeout(() => {

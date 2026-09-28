@@ -2421,7 +2421,9 @@ function _renderPianoCambiTab() {
       .join(' ')
       .toLowerCase();
     h +=
-      '<tr data-nome="' +
+      '<tr data-id="' +
+      Number(m.id) +
+      '" data-nome="' +
       escP(chiave) +
       '"><td style="text-align:left;white-space:nowrap">' +
       dataIt(m.data_modulo) +
@@ -2496,7 +2498,9 @@ function _schedaCambiTurnoRiga(nome) {
     '</div>'
   );
 }
-function apriCambiTurnoDi(nome) {
+// Apre Piano > Cambi turno filtrato su un nome; con l id porta in vista quel foglio
+// e lo evidenzia (usato dalla scheda del collaboratore e dalla ricerca globale)
+function apriCambiTurnoDi(nome, id) {
   const pm = document.getElementById('profilo-modal');
   if (pm) pm.classList.add('hidden');
   window._pianoCambiMese = '';
@@ -2509,6 +2513,8 @@ function apriCambiTurnoDi(nome) {
         i.value = nome;
         pianoTabellaFiltra(nome, 'piano-cambi-table');
       }
+      if (id && typeof _rgEvidenzia === 'function')
+        _rgEvidenzia(() => document.querySelector('#piano-cambi-table tr[data-id="' + Number(id) + '"]'));
     }, 700);
   }, 300);
 }
