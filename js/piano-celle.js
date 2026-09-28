@@ -174,11 +174,11 @@ async function _pianoNotaRapida(nome, dstr) {
   // IDENTICO a Turnivo (commentCell/modifica_commento): "Commento per <codice>",
   // firma automatica "- <operatore>", il commento su cella vuota crea la riga.
   if (!puoGestirePiano()) return;
-  if (!_pianoConsentiScrittura(dstr)) return; // giorno chiuso
+  if (!(await _pianoConsentiScrittura(dstr))) return; // giorno chiuso
   const g = parseInt(dstr.split('-')[2]);
   const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
   const attuale = (r && r.commento) || '';
-  const v = prompt('Commento per ' + (r && r.codice ? r.codice : 'giorno ' + g) + ':', attuale);
+  const v = await chiediTesto('Commento per ' + (r && r.codice ? r.codice : 'giorno ' + g) + ':', attuale);
   if (v === null) return;
   let commento = v.trim();
   const op = getOperatore();
@@ -361,7 +361,7 @@ async function pianoBloccaCella(nome, dstr, blocca) {
     toast('Non hai il permesso di modificare il piano');
     return;
   }
-  if (!_pianoConsentiScrittura(dstr)) return;
+  if (!(await _pianoConsentiScrittura(dstr))) return;
   const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
   if (!r && !blocca) return;
   const giorno = String(dstr).split('-').reverse().join('.');
@@ -369,7 +369,7 @@ async function pianoBloccaCella(nome, dstr, blocca) {
     // cella vuota: il blocco crea un congedo C (il giorno e' libero ma va
     // tenuto libero: visita, appuntamento). Scambi e coperture lo saltano.
     if (!r) {
-      const motivoV = prompt(
+      const motivoV = await chiediTesto(
         "Il giorno e' vuoto: lo segno come congedo C bloccato.\n\n" +
           nome +
           ' \u00b7 ' +
@@ -403,7 +403,7 @@ async function pianoBloccaCella(nome, dstr, blocca) {
       }
       return;
     }
-    const motivo = prompt(
+    const motivo = await chiediTesto(
       'Perche questa cella non si deve toccare?\n\n' +
         nome +
         ' \u00b7 ' +
@@ -433,7 +433,7 @@ async function pianoBloccaCella(nome, dstr, blocca) {
     return;
   }
   if (
-    !confirm(
+    !(await chiediConferma(
       'Sbloccare questa cella?\n\n' +
         nome +
         ' \u00b7 ' +
@@ -442,7 +442,7 @@ async function pianoBloccaCella(nome, dstr, blocca) {
         (r.codice || '') +
         (r.motivo_blocco ? '\n\nEra bloccata per: ' + r.motivo_blocco : '') +
         '\n\nDa quel momento torna modificabile come le altre.',
-    )
+    ))
   )
     return;
   try {
@@ -457,7 +457,7 @@ async function pianoBloccaCella(nome, dstr, blocca) {
     toast('Errore nello sblocco');
   }
 }
-function pianoCtxAzione(azione) {
+async function pianoCtxAzione(azione) {
   nascondiPianoCtx();
   const sel = _pianoCtxSel;
   if (!sel) return;
@@ -470,7 +470,7 @@ function pianoCtxAzione(azione) {
   else if (azione === 'commentoElimina') {
     (async () => {
       const r = _pianoRighe.find((x) => x.collaboratore === sel.nome && x.data === sel.data);
-      if (!r || !confirm('Eliminare il commento di ' + sel.nome + ' del ' + sel.data + '?')) return;
+      if (!r || !(await chiediConferma('Eliminare il commento di ' + sel.nome + ' del ' + sel.data + '?'))) return;
       try {
         await secPatch('piano', 'id=eq.' + r.id, { commento: null });
         r.commento = null;
@@ -533,7 +533,7 @@ function pianoCtxAzione(azione) {
   else if (azione === 'rimuovi') {
     _pianoCellaSel = { nome: sel.nome, data: sel.data };
     if (
-      confirm(
+      await chiediConferma(
         'Rimuovere la cella di ' +
           sel.nome +
           ' del ' +
@@ -589,10 +589,14 @@ async function confermaCambioEsigenze() {
   const motivo = ((document.getElementById('esig-motivo') || {}).value || '').trim();
   document.getElementById('pwd-modal').classList.add('hidden');
   if (!sel || !nuovo) return;
-  if (!_pianoConsentiScrittura(sel.data)) return; // giorno chiuso: stessa regola degli altri flussi
+  if (!(await _pianoConsentiScrittura(sel.data))) return; // giorno chiuso: stessa regola degli altri flussi
   const r = _pianoRighe.find((x) => x.collaboratore === sel.nome && x.data === sel.data);
   if (!r) return;
-  if (r.motivo_blocco && !confirm("La cella e' bloccata per: " + r.motivo_blocco + '\n\nLa cambi lo stesso?')) return;
+  if (
+    r.motivo_blocco &&
+    !(await chiediConferma("La cella e' bloccata per: " + r.motivo_blocco + '\n\nLa cambi lo stesso?'))
+  )
+    return;
   _pianoUndoSnap('cambio per esigenze ' + sel.data);
   const vecchio = r.codice;
   // STESSE REGOLE DEL PIANO MANUALE: se il nuovo turno viola riposo 11h,
@@ -605,7 +609,7 @@ async function confermaCambioEsigenze() {
     );
     if (avvisi.length) {
       if (
-        !confirm(
+        !(await chiediConferma(
           'ATTENZIONE · ' +
             sel.nome +
             ' · ' +
@@ -615,7 +619,7 @@ async function confermaCambioEsigenze() {
             '\n\nConfermi comunque il cambio per esigenze in ' +
             nuovo +
             "? La segnalazione restera' scritta nel commento della cella.",
-        )
+        ))
       )
         return;
       notaRegole = 'Avviso: ' + avvisi.join(' · ') + ' · ';
@@ -826,7 +830,7 @@ function _pianoMessaggioSiglaSbagliata(codice) {
 async function pianoSalvaCella(nome, dstr, codice) {
   if (!puoGestirePiano()) return false;
   // giorno chiuso: si procede solo con lo sblocco motivato
-  if (!_pianoConsentiScrittura(dstr)) return false;
+  if (!(await _pianoConsentiScrittura(dstr))) return false;
   // le sigle si possono scrivere in minuscolo: nel piano restano sempre MAIUSCOLE
   codice = String(codice == null ? '' : codice)
     .trim()
@@ -856,9 +860,9 @@ async function pianoSalvaCella(nome, dstr, codice) {
   let orarioJG = null;
   const csOr = codice ? _pianoCodiceInfo(codice) : null;
   if (csOr && csOr.richiede_orario) {
-    const ini = prompt('Orario di INIZIO per ' + codice + ' (es. 10:00):', (r && r.ora_inizio) || '10:00');
+    const ini = await chiediTesto('Orario di INIZIO per ' + codice + ' (es. 10:00):', (r && r.ora_inizio) || '10:00');
     if (ini === null) return;
-    const fin = prompt('Orario di FINE per ' + codice + ' (es. 18:00):', (r && r.ora_fine) || '18:00');
+    const fin = await chiediTesto('Orario di FINE per ' + codice + ' (es. 18:00):', (r && r.ora_fine) || '18:00');
     if (fin === null) return;
     const okOra = (v) => /^\d{1,2}[:.]\d{2}$/.test(String(v).trim());
     if (!okOra(ini) || !okOra(fin)) {
@@ -889,7 +893,7 @@ async function pianoSalvaCella(nome, dstr, codice) {
             : 'cella protetta (piano consolidato, vacanza o assenza confermata): la stai sostituendo',
         );
       if (
-        !confirm(
+        !(await chiediConferma(
           '\u26a0 ATTENZIONE \u00b7 ' +
             nome +
             ' \u00b7 ' +
@@ -900,7 +904,7 @@ async function pianoSalvaCella(nome, dstr, codice) {
             '\n\nConfermi comunque il turno ' +
             codice +
             "? La segnalazione restera' scritta nel commento della cella.",
-        )
+        ))
       )
         return false;
       if (avvisi.length) commentoRegole = '\u26a0 ' + avvisi.join(' \u00b7 ');
@@ -988,7 +992,7 @@ async function pianoCellaPrompt(nome, dstr) {
   if (!puoGestirePiano()) return;
   const g = parseInt(dstr.split('-')[2]);
   const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
-  const v = prompt('Turno per giorno ' + g + ' (vuoto per rimuovere):', r ? r.codice : '');
+  const v = await chiediTesto('Turno per giorno ' + g + ' (vuoto per rimuovere):', r ? r.codice : '');
   if (v === null) return;
   await pianoSalvaCella(nome, dstr, v.trim().toUpperCase());
 }

@@ -144,7 +144,7 @@ function _pianoMeseBloccato(ym) {
     oraLimite: parseFloat(_pianoRegolaVal('blocco_ora_limite')) || 12,
   });
 }
-function _pianoConsentiSaldoMese(ym) {
+async function _pianoConsentiSaldoMese(ym) {
   if (!_pianoMeseBloccato(ym)) return true;
   const chiave = 'mese-' + ym;
   if (_pianoGiornoSbloccato(chiave)) return true;
@@ -154,7 +154,7 @@ function _pianoConsentiSaldoMese(ym) {
     toast('Il mese di ' + lbl + ' e chiuso: per correggerlo serve il permesso "Giorni chiusi"');
     return false;
   }
-  const motivo = prompt(
+  const motivo = await chiediTesto(
     'MESE CHIUSO \u00b7 ' +
       lbl +
       "\n\nIl saldo di un mese passato e' un dato consolidato: si corregge solo con un motivo, che resta nel registro.\n\nScrivi il MOTIVO della correzione (obbligatorio):",
@@ -168,7 +168,11 @@ function _pianoConsentiSaldoMese(ym) {
   toast('Mese ' + lbl + ' sbloccato per 10 minuti');
   return true;
 }
-function _pianoConsentiScrittura(dstr, silenzioso) {
+// controllo senza finestre: il giorno si puo scrivere adesso (aperto o gia sbloccato)?
+function _pianoGiornoScrivibile(dstr) {
+  return !dstr || !_pianoGiornoBloccato(dstr) || _pianoGiornoSbloccato(dstr);
+}
+async function _pianoConsentiScrittura(dstr, silenzioso) {
   if (!dstr || !_pianoGiornoBloccato(dstr)) return true;
   if (_pianoGiornoSbloccato(dstr)) return true;
   const dataIt = String(dstr).split('-').reverse().join('.');
@@ -177,7 +181,7 @@ function _pianoConsentiScrittura(dstr, silenzioso) {
     return false;
   }
   if (silenzioso) return false;
-  const motivo = prompt(
+  const motivo = await chiediTesto(
     'GIORNATA CHIUSA \u00b7 ' +
       dataIt +
       "\n\nIl piano dei giorni passati non si modifica piu' per distrazione: e' un documento.\n\nScrivi il MOTIVO della correzione (obbligatorio, resta nel registro).\nIl giorno restera' sbloccato per dieci minuti:",
@@ -655,7 +659,7 @@ async function pianoMarkerEdit(g) {
   if (!puoGestirePiano()) return;
   const ym = _pianoMeseSel;
   const attuale = _pianoMarkerGiorno(ym, g);
-  const v = prompt('Marcatore per il giorno ' + g + ' (es. CS, MN, LRD · vuoto per togliere):', attuale);
+  const v = await chiediTesto('Marcatore per il giorno ' + g + ' (es. CS, MN, LRD · vuoto per togliere):', attuale);
   if (v === null) return;
   const tutti = window._pianoGiornoMarker || {};
   tutti[ym] = tutti[ym] || {};
@@ -1124,11 +1128,11 @@ async function pianoScriviOreMese(nome) {
     return;
   }
   // mese passato: si corregge solo con motivo tracciato
-  if (!_pianoConsentiSaldoMese(ym)) return;
+  if (!(await _pianoConsentiSaldoMese(ym))) return;
   const att = _pianoRettificaMese(nome, ym);
   const riga = document.querySelector('#piano-content .piano-table tbody tr[data-nome="' + CSS.escape(nome) + '"]');
   const pianificate = riga ? (riga.querySelector('td[data-tot="4"]') || {}).textContent : '';
-  const val = prompt(
+  const val = await chiediTesto(
     'Ore realmente lavorate da ' +
       nome +
       ' nel mese ' +
@@ -1155,7 +1159,10 @@ async function pianoScriviOreMese(nome) {
         toast('Valore non valido');
         return;
       }
-      const nota = prompt('Motivo della correzione (facoltativo, resta nello storico):', (att && att.nota) || '');
+      const nota = await chiediTesto(
+        'Motivo della correzione (facoltativo, resta nello storico):',
+        (att && att.nota) || '',
+      );
       if (nota === null) return;
       const dati = {
         collaboratore: nome,
@@ -1209,7 +1216,7 @@ async function pianoScriviOreMese(nome) {
 async function _pianoInserisciCella(dati) {
   // stessa regola dei giorni chiusi per OGNI inserimento, da qualunque flusso
   // arrivi (bozza, scambi, coperture): il controllo sta nel punto unico
-  if (dati && dati.data && !_pianoConsentiScrittura(String(dati.data).substring(0, 10)))
+  if (dati && dati.data && !(await _pianoConsentiScrittura(String(dati.data).substring(0, 10))))
     throw new Error('giorno chiuso: ' + dati.data);
   try {
     const n = await secPost('piano', dati);
@@ -2215,14 +2222,14 @@ async function rimuoviPianoCella(giaChiuso) {
   // GIORNO CHIUSO: la cancellazione e' una modifica come le altre e passa dallo
   // stesso controllo della scrittura (prima sfuggiva, si poteva cancellare una
   // cella di un mese passato senza sblocco motivato)
-  if (!_pianoConsentiScrittura(sel.data)) return;
+  if (!(await _pianoConsentiScrittura(sel.data))) return;
   const r = _pianoRighe.find((x) => x.collaboratore === sel.nome && x.data === sel.data);
   if (!r) return;
   // CELLA PROTETTA: non si cancella per sbaglio. Si puo' fare, ma con una
   // conferma esplicita che dice cosa si sta togliendo.
   if (
     r.protetto &&
-    !confirm(
+    !(await chiediConferma(
       'CELLA PROTETTA\n\n' +
         sel.nome +
         ' · ' +
@@ -2233,7 +2240,7 @@ async function rimuoviPianoCella(giaChiuso) {
           ? '\n\nE BLOCCATA per: ' + r.motivo_blocco
           : '\n\nE una cella protetta (piano consolidato, vacanza o assenza confermata).') +
         '\nCancellarla comunque?',
-    )
+    ))
   )
     return;
   _pianoUndoSnap('rimozione cella');

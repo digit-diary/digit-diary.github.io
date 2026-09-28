@@ -1,7 +1,7 @@
-const CACHE_NAME = 'diario-cl-v291';
+const CACHE_NAME = 'diario-cl-v292';
 const SHELL_URLS = ['/', '/manifest.json', '/logo_casino.png', '/icon-192.png', '/icon-512.png',
   '/css/style.css',
-  '/js/config.js', '/js/crypto.js', '/js/chat-core.js', '/js/annulla.js', '/js/realtime.js',
+  '/js/config.js', '/js/finestre.js', '/js/crypto.js', '/js/chat-core.js', '/js/annulla.js', '/js/realtime.js',
   '/js/api.js', '/js/utils.js', '/js/auth.js', '/js/cestino-core.js', '/js/settings.js',
   '/js/app.js', '/js/diario.js', '/js/alerts.js', '/js/search.js',
   '/js/chat-ui.js', '/js/moduli.js', '/js/formazione.js', '/js/valutazioni.js',

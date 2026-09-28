@@ -968,7 +968,7 @@ async function eliminaPianoTurno(id) {
     toast('Il turno ' + t.codice + ' è usato nel piano: disattivalo invece di eliminarlo');
     return;
   }
-  if (!confirm('Eliminare il turno ' + t.codice + '? (mai usato nel piano)')) return;
+  if (!(await chiediConferma('Eliminare il turno ' + t.codice + '? (mai usato nel piano)'))) return;
   try {
     await secDel('piano_turni', 'id=eq.' + id);
     pianoTurniCache = pianoTurniCache.filter((x) => x.id !== id);
@@ -1077,7 +1077,7 @@ async function eliminaPianoCodice(id) {
     toast('Il codice ' + c.codice + ' è usato nel piano: disattivalo invece di eliminarlo');
     return;
   }
-  if (!confirm('Eliminare il codice ' + c.codice + '?')) return;
+  if (!(await chiediConferma('Eliminare il codice ' + c.codice + '?'))) return;
   try {
     await secDel('piano_codici', 'id=eq.' + id);
     pianoCodiciCache = pianoCodiciCache.filter((x) => x.id !== id);
@@ -1312,7 +1312,7 @@ async function pianoAssegnaCgfMese() {
         .filter((r) => r.collaboratore === n && r.codice === 'CGF' && r.generato && !r.protetto && !r.motivo_blocco)
         .sort((a, b) => String(b.data).localeCompare(String(a.data)))
         .forEach((r) => {
-          if (extra > 0 && _pianoConsentiScrittura(r.data, true)) {
+          if (extra > 0 && _pianoGiornoScrivibile(r.data)) {
             daTogliere.push(r);
             extra--;
           }
@@ -1331,7 +1331,7 @@ async function pianoAssegnaCgfMese() {
   });
   if (daTogliere.length) {
     if (
-      confirm(
+      await chiediConferma(
         daTogliere.length +
           ' recuper' +
           (daTogliere.length === 1 ? 'o' : 'i') +
@@ -1362,7 +1362,7 @@ async function pianoAssegnaCgfMese() {
       renderPiano();
       return;
     }
-    alert(
+    await mostraAvviso(
       'Nessun recupero da assegnare in ' +
         ym +
         ".\n\nO i saldi sono gia' a posto, oppure non ci sono giorni liberi dove metterli (le celle gia' occupate non vengono toccate).",
@@ -1374,7 +1374,7 @@ async function pianoAssegnaCgfMese() {
     .map((x) => '• ' + x.nome.split(' ')[0] + ' → giorno ' + x.giorno)
     .join('\n');
   if (
-    !confirm(
+    !(await chiediConferma(
       'Assegno ' +
         daFare.length +
         ' recuper' +
@@ -1385,7 +1385,7 @@ async function pianoAssegnaCgfMese() {
         elenco +
         (daFare.length > 25 ? '\n... e altri ' + (daFare.length - 25) : '') +
         "\n\nIl conteggio tiene conto del riporto e dei recuperi gia' dati nei mesi precedenti; valgono le regole cgf_max_mese, cgf_distanza_giorni e cgf_non_con_vacanze. Le celle occupate non vengono toccate.",
-    )
+    ))
   )
     return;
   _pianoUndoSnap('assegnazione CGF ' + ym);
@@ -1523,7 +1523,7 @@ async function aggiungiPianoFestivo() {
 async function eliminaPianoFestivo(id) {
   if (!isAdmin()) return;
   const f = pianoFestiviCache.find((x) => x.id === id);
-  if (!f || !confirm('Rimuovere il festivo ' + f.data + ' (' + (f.descrizione || '') + ')?')) return;
+  if (!f || !(await chiediConferma('Rimuovere il festivo ' + f.data + ' (' + (f.descrizione || '') + ')?'))) return;
   try {
     await secDel('piano_festivi', 'id=eq.' + id);
     pianoFestiviCache = pianoFestiviCache.filter((x) => x.id !== id);
@@ -1674,7 +1674,7 @@ async function pianoRecuperoScrivi(nome, dstr, valore) {
     return false;
   }
   // il recupero entra nel saldo del mese: vale la stessa chiusura del saldo
-  if (!_pianoConsentiSaldoMese(String(dstr).substring(0, 7))) return false;
+  if (!(await _pianoConsentiSaldoMese(String(dstr).substring(0, 7)))) return false;
   const chiave = nome + '|' + dstr;
   const att = _pianoRecupero[chiave];
   // si accetta sia il decimale (1.5) sia l'orologio (1:30): un'ora e mezza si
@@ -2379,7 +2379,7 @@ async function pianoImportaFestivita(anno) {
     return;
   }
   if (
-    !confirm(
+    !(await chiediConferma(
       'Inserisco ' +
         nuovi.length +
         ' festivita per il ' +
@@ -2387,7 +2387,7 @@ async function pianoImportaFestivita(anno) {
         ':\n\n' +
         nuovi.map((f) => '\u2022 ' + f.data.split('-').reverse().join('.') + '  ' + f.nome).join('\n') +
         '\n\nQuelle gia presenti non vengono toccate.',
-    )
+    ))
   )
     return;
   let n = 0;
@@ -2425,7 +2425,8 @@ async function pianoFestivitaElimina(id) {
   if (!puoGestireFestivi()) return;
   const f = (pianoFestivitaCache || []).find((x) => x.id === id);
   if (!f) return;
-  if (!confirm('Elimino "' + f.nome + '" del ' + String(f.data).split('-').reverse().join('.') + '?')) return;
+  if (!(await chiediConferma('Elimino "' + f.nome + '" del ' + String(f.data).split('-').reverse().join('.') + '?')))
+    return;
   await secDel('piano_festivita', 'id=eq.' + id);
   pianoFestivitaCache = pianoFestivitaCache.filter((x) => x.id !== id);
   logAzione('Festivita eliminata', f.nome + ' ' + f.data);
@@ -3041,7 +3042,7 @@ async function generaPianoFestivi() {
     return;
   }
   if (
-    !confirm(
+    !(await chiediConferma(
       'Generare ' +
         nuovi.length +
         ' festivi per il ' +
@@ -3051,7 +3052,7 @@ async function generaPianoFestivi() {
           .map((f) => new Date(f.data + 'T12:00:00').toLocaleDateString('it-IT') + ' · ' + f.descrizione)
           .join('\n') +
         '\n\n(tutti con CGF attivo; quelli già presenti non vengono toccati)',
-    )
+    ))
   )
     return;
   try {

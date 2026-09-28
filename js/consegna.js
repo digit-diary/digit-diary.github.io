@@ -270,7 +270,7 @@ async function annullaConsegna(id) {
     toast('Non puoi annullare: già letta da ' + c.letto_da);
     return;
   }
-  if (!confirm("Annullare l'invio di questa consegna? Verrà eliminata.")) return;
+  if (!(await chiediConferma("Annullare l'invio di questa consegna? Verrà eliminata."))) return;
   try {
     await secDel('consegne_turno', 'id=eq.' + id);
     consegneCache = consegneCache.filter((x) => x.id !== id);

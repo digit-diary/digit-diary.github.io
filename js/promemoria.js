@@ -207,7 +207,7 @@ async function eliminaPromemoria(id) {
     toast("Solo un amministratore puo' eliminare i promemoria");
     return;
   }
-  if (!confirm('Eliminare questo promemoria?')) return;
+  if (!(await chiediConferma('Eliminare questo promemoria?'))) return;
   try {
     await secDel('promemoria', 'id=eq.' + id);
     promemoriaCache = promemoriaCache.filter((x) => x.id !== id);

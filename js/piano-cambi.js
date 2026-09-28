@@ -580,7 +580,7 @@ function ccAggiornaRestituzioni() {
 }
 async function confermaCercaCambioLibero() {
   if (!_ccDati || !puoGestirePiano()) return;
-  if (!_pianoConsentiScrittura(_ccDati.data)) return; // giorno chiuso
+  if (!(await _pianoConsentiScrittura(_ccDati.data))) return; // giorno chiuso
   const i = parseInt((document.getElementById('cc-collega') || {}).value) || 0;
   const cand = _ccDati.candidati[i];
   const dataRest = (document.getElementById('cc-rest') || {}).value || '';
@@ -595,7 +595,7 @@ async function confermaCercaCambioLibero() {
     const n = richiesti[_ccDati.nome] || 0;
     if (n >= maxC) {
       if (
-        !confirm(
+        !(await chiediConferma(
           'ATTENZIONE: ' +
             _ccDati.nome +
             " ha gia' richiesto " +
@@ -603,7 +603,7 @@ async function confermaCercaCambioLibero() {
             '/' +
             maxC +
             " cambi questo mese.\n\nAutorizzi comunque il cambio come responsabile? (verra' registrato nello storico come autorizzazione in deroga)",
-        )
+        ))
       )
         return;
       logAzione('Piano: scambio autorizzato oltre limite', _ccDati.nome + ' (' + (n + 1) + '/' + maxC + ') da ' + op);
@@ -623,7 +623,8 @@ async function confermaCercaCambioLibero() {
       cand.nome.split(' ')[0] +
       ', che va a riposo (C).';
   else msg += '\n\nSenza restituzione automatica.';
-  if (!confirm(msg + "\n\nConfermi? Verra' generato il formulario cambio turno da stampare e firmare.")) return;
+  if (!(await chiediConferma(msg + "\n\nConfermi? Verra' generato il formulario cambio turno da stampare e firmare.")))
+    return;
   _pianoUndoSnap('cerca cambio ' + _ccDati.data);
   const scrivi = async (nome, dstr, codice, exCod, commento) => {
     const righe =
@@ -891,7 +892,7 @@ async function apriScambioTurno() {
 }
 async function confermaScambioTurno() {
   const sel = _pianoCellaSel;
-  if (sel && sel.data && !_pianoConsentiScrittura(sel.data)) return; // giorno chiuso
+  if (sel && sel.data && !(await _pianoConsentiScrittura(sel.data))) return; // giorno chiuso
   const collega = (document.getElementById('scambio-collega') || {}).value;
   const motivo = ((document.getElementById('scambio-motivo') || {}).value || '').trim();
   const conRest = (document.getElementById('scambio-restituito') || {}).checked;
@@ -909,7 +910,7 @@ async function confermaScambioTurno() {
     if (n >= maxC) {
       // niente blocco duro: il responsabile può autorizzare l'eccezione
       if (
-        !confirm(
+        !(await chiediConferma(
           'ATTENZIONE: ' +
             sel.nome +
             ' ha già richiesto ' +
@@ -917,7 +918,7 @@ async function confermaScambioTurno() {
             '/' +
             maxC +
             ' cambi questo mese.\n\nAutorizzi comunque lo scambio come responsabile? (verrà registrato nello storico come autorizzazione in deroga)',
-        )
+        ))
       )
         return;
       window._pianoDerogaDaRegistrare = sel.nome + ' (' + (n + 1) + '/' + maxC + ') da ' + getOperatore();
@@ -946,13 +947,13 @@ async function confermaScambioTurno() {
         .concat(av1.map((a) => sel.nome.split(' ')[0] + ': ' + a))
         .concat(av2.map((a) => collega.split(' ')[0] + ': ' + a));
       if (
-        !confirm(
+        !(await chiediConferma(
           'ATTENZIONE · scambio ' +
             sel.data.split('-').reverse().join('.') +
             ':\n\n• ' +
             dettagli.join('\n• ') +
             "\n\nConfermi comunque lo scambio? La segnalazione restera' scritta nel commento delle celle.",
-        )
+        ))
       )
         return;
       if (av1.length) nota1 = 'Avviso: ' + av1.join(' · ') + ' · ';
@@ -980,13 +981,13 @@ async function confermaScambioTurno() {
         .concat(avA.map((a) => sel.nome.split(' ')[0] + ': ' + a))
         .concat(avB.map((a) => collega.split(' ')[0] + ': ' + a));
       if (
-        !confirm(
+        !(await chiediConferma(
           'ATTENZIONE · restituzione del ' +
             dataRest.split('-').reverse().join('.') +
             ':\n\n• ' +
             det.join('\n• ') +
             "\n\nConfermi comunque tutto lo scambio? La segnalazione restera' scritta nel commento delle celle.",
-        )
+        ))
       )
         return;
       if (avA.length) notaRa = 'Avviso: ' + avA.join(' · ') + ' · ';
@@ -1655,14 +1656,14 @@ async function _pianoMalattiaNelDiario(nome, dal, al, chiedi) {
   if (!giorniNuovi.length) return 0;
   if (
     chiedi &&
-    !confirm(
+    !(await chiediConferma(
       'Registrare la malattia anche nel Diario di ' +
         nome +
         ' (' +
         giorniNuovi.length +
         (giorniNuovi.length === 1 ? ' giorno' : ' giorni') +
         ")?\n\nCosi' i giorni contano nella scheda del collaboratore.",
-    )
+    ))
   )
     return 0;
   const lbl = ' (dal ' + dI.toLocaleDateString('it-IT') + ' al ' + dF.toLocaleDateString('it-IT') + ')';
@@ -1706,7 +1707,7 @@ async function _pianoMalattiaViaDiario(nome, giorniDstr) {
     .join(', ');
   const nG = daTogliere.length;
   if (
-    !confirm(
+    !(await chiediConferma(
       'Nel Diario ' +
         nome +
         ' risulta in malattia ' +
@@ -1715,7 +1716,7 @@ async function _pianoMalattiaViaDiario(nome, giorniDstr) {
         '.\n\nTogliere ' +
         (nG === 1 ? 'questo giorno' : 'questi ' + nG + ' giorni') +
         " anche dal Diario? Le registrazioni finiscono nel Cestino (recuperabili) e la scheda del collaboratore si aggiorna.\n\nOK = togli anche dal Diario · Annulla = il Diario resta com'e'",
-    )
+    ))
   )
     return 0;
   const op = getOperatore();
@@ -1741,7 +1742,7 @@ async function confermaCoperturaMalattia() {
   // basta lo sblocco sul primo giorno: copre il flusso, e gli inserimenti sui
   // singoli giorni passano comunque dal controllo dentro _pianoInserisciCella
   const _g0 = m.giorni && m.giorni.length ? _pianoMeseSel + '-' + String(m.giorni[0].g).padStart(2, '0') : null;
-  if (_g0 && !_pianoConsentiScrittura(_g0)) return;
+  if (_g0 && !(await _pianoConsentiScrittura(_g0))) return;
   // soluzioni selezionate: senza spunta la M resta ma il sostituto non si tocca
   const selGiorni = new Set([...document.querySelectorAll('.mal-sel:checked')].map((c) => parseInt(c.dataset.g)));
   document.getElementById('pwd-modal').classList.add('hidden');
@@ -1912,13 +1913,13 @@ async function confermaCoperturaMalattia() {
       const dataLbl = new Date(ym + '-' + String(m.da).padStart(2, '0') + 'T12:00:00').toLocaleDateString('it-IT');
       if (
         az &&
-        confirm(
+        (await chiediConferma(
           'Incentivi: assegnare +' +
             az.punti +
             ' punti (copertura) a ' +
             [...sostituti].join(', ') +
             "?\n\nAnnulla = nessun punto ora (si puo' fare dopo dal popup o da Formazione).",
-        )
+        ))
       ) {
         for (const n of sostituti) {
           const ok = await _insertPuntiEvento(

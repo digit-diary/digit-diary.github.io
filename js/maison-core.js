@@ -66,13 +66,13 @@ async function salvaMaisonAutoDelete(val) {
     const daEliminare = maisonCache.filter((r) => r.data_giornata < cutoffStr).length;
     if (daEliminare > 0) {
       if (
-        !confirm(
+        !(await chiediConferma(
           'ATTENZIONE: con questa impostazione ' +
             daEliminare +
             ' registrazioni Maison esistenti (precedenti al ' +
             new Date(cutoffStr + 'T12:00:00').toLocaleDateString('it-IT') +
             ') verranno ELIMINATE DEFINITIVAMENTE alla prossima apertura.\n\nConfermi?',
-        )
+        ))
       ) {
         const sel = document.getElementById('maison-autodelete-sel');
         if (sel) sel.value = String(maisonAutoDeleteGiorni || 0);
@@ -245,7 +245,9 @@ async function salvaRegalo() {
   if (!nomeEsistente) {
     const simile = _trovaNomeSimileMaison(nome);
     if (simile && simile.tipo === 'simile') {
-      if (confirm('Hai scritto "' + nome + '" ma esiste "' + simile.nome + '". Usare "' + simile.nome + '"?'))
+      if (
+        await chiediConferma('Hai scritto "' + nome + '" ma esiste "' + simile.nome + '". Usare "' + simile.nome + '"?')
+      )
         nome = simile.nome;
     }
   }
@@ -281,7 +283,7 @@ async function salvaRegalo() {
 async function rinominaRegalo(id) {
   const r = regaliCache.find((x) => x.id === id);
   if (!r) return;
-  const nuovo = prompt('Rinomina cliente regalo:', r.nome);
+  const nuovo = await chiediTesto('Rinomina cliente regalo:', r.nome);
   if (!nuovo || !nuovo.trim()) return;
   try {
     await secPatch('regali_maison', 'id=eq.' + id, {
@@ -295,7 +297,7 @@ async function rinominaRegalo(id) {
   }
 }
 async function eliminaRegalo(id) {
-  if (!confirm('Eliminare questo regalo?')) return;
+  if (!(await chiediConferma('Eliminare questo regalo?'))) return;
   try {
     await secDel('regali_maison', 'id=eq.' + id);
     regaliCache = regaliCache.filter(function (x) {
@@ -411,7 +413,7 @@ async function salvaNotaCliente(nome) {
   }
 }
 async function eliminaNotaCliente(id, nome) {
-  if (!confirm('Eliminare questa nota?')) return;
+  if (!(await chiediConferma('Eliminare questa nota?'))) return;
   try {
     await secDel('note_clienti', 'id=eq.' + id);
     noteClientiCache = noteClientiCache.filter(function (x) {
@@ -1042,20 +1044,20 @@ function renderMaisonGdOggi() {
 }
 // Riga vecchia "A / B" vista come due voci: cancellarne una cancella la riga originale con
 // entrambi i nomi, e l'operatore deve saperlo prima
-function _confermaEliminaRigaMaison(id, domanda) {
+async function _confermaEliminaRigaMaison(id, domanda) {
   const rec = maisonCache.find((x) => x.id === id);
   if (rec && rec.nome && rec.nome.includes('/'))
-    return confirm(
+    return await chiediConferma(
       'Questa voce fa parte della riga condivisa "' +
         rec.nome +
         '": verra\' eliminata la riga originale con entrambi i nomi (' +
         fmtCHF(rec.costo) +
         ' CHF). Continuare?',
     );
-  return confirm(domanda);
+  return await chiediConferma(domanda);
 }
 async function eliminaMaisonRigaGd(id) {
-  if (!_confermaEliminaRigaMaison(id, 'Eliminare questa riga?')) return;
+  if (!(await _confermaEliminaRigaMaison(id, 'Eliminare questa riga?'))) return;
   try {
     await secDel('costi_maison', 'id=eq.' + id);
     maisonCache = maisonCache.filter(function (r) {
@@ -1071,7 +1073,7 @@ async function eliminaMaisonRigaGd(id) {
 }
 async function eliminaMaisonGruppoGd(idsStr) {
   const ids = idsStr.split(',').map(Number);
-  if (!confirm('Eliminare questo gruppo (' + ids.length + ' righe)?')) return;
+  if (!(await chiediConferma('Eliminare questo gruppo (' + ids.length + ' righe)?'))) return;
   try {
     for (const id of ids) {
       await secDel('costi_maison', 'id=eq.' + id);
@@ -2794,7 +2796,12 @@ async function eliminaMaisonCliente(nome) {
     toast('Nessun record trovato per ' + nome);
     return;
   }
-  if (!confirm('Eliminare tutte le ' + count + ' registrazioni di "' + nome + '" (' + currentReparto + ')?')) return;
+  if (
+    !(await chiediConferma(
+      'Eliminare tutte le ' + count + ' registrazioni di "' + nome + '" (' + currentReparto + ')?',
+    ))
+  )
+    return;
   try {
     await _secDelReparto('costi_maison', 'nome=eq.' + encodeURIComponent(nome));
     maisonCache = maisonCache.filter((r) => !(r.nome === nome && (r.reparto_dip || 'slots') === currentReparto));
@@ -3060,7 +3067,7 @@ async function eliminaMaisonRigaDettaglio(id, nome) {
   const r = maisonCache.find((x) => x.id === id);
   if (!r) return;
   if (
-    !_confermaEliminaRigaMaison(
+    !(await _confermaEliminaRigaMaison(
       id,
       'Eliminare la spesa di ' +
         r.nome +
@@ -3069,7 +3076,7 @@ async function eliminaMaisonRigaDettaglio(id, nome) {
         ' (' +
         parseFloat(r.costo).toFixed(2) +
         ' CHF)?',
-    )
+    ))
   )
     return;
   try {
@@ -3087,9 +3094,9 @@ async function spostaMaisonToExtra(id, nome) {
   const r = maisonCache.find((x) => x.id === id);
   if (!r) return;
   if (
-    !confirm(
+    !(await chiediConferma(
       'Spostare ' + r.nome + ' (' + parseFloat(r.costo).toFixed(2) + ' CHF, ' + r.data_giornata + ') in Spese Extra?',
-    )
+    ))
   )
     return;
   try {
@@ -3119,7 +3126,7 @@ async function spostaExtraToMaison(id, nome) {
   const r = speseExtraCache.find((x) => x.id === id);
   if (!r) return;
   if (
-    !confirm(
+    !(await chiediConferma(
       'Spostare ' +
         r.beneficiario +
         ' (' +
@@ -3127,7 +3134,7 @@ async function spostaExtraToMaison(id, nome) {
         ' CHF, ' +
         r.data_spesa +
         ') in Costi Maison?',
-    )
+    ))
   )
     return;
   try {
@@ -3163,7 +3170,12 @@ async function eliminaMaisonGiorno() {
   const giorno = sel.value;
   const label = new Date(giorno + 'T12:00:00').toLocaleDateString('it-IT');
   const count = getMaisonReparto().filter((r) => r.data_giornata === giorno).length;
-  if (!confirm('Eliminare tutte le ' + count + ' registrazioni del ' + label + ' (' + currentReparto + ')?')) return;
+  if (
+    !(await chiediConferma(
+      'Eliminare tutte le ' + count + ' registrazioni del ' + label + ' (' + currentReparto + ')?',
+    ))
+  )
+    return;
   try {
     await _secDelReparto('costi_maison', 'data_giornata=eq.' + giorno);
     maisonCache = maisonCache.filter(
@@ -3196,7 +3208,10 @@ async function eliminaMaisonMese() {
     toast('Nessun dato per ' + label);
     return;
   }
-  if (!confirm('Eliminare tutte le ' + count + ' registrazioni di ' + label + ' (' + currentReparto + ')?')) return;
+  if (
+    !(await chiediConferma('Eliminare tutte le ' + count + ' registrazioni di ' + label + ' (' + currentReparto + ')?'))
+  )
+    return;
   try {
     await _secDelReparto('costi_maison', 'data_giornata=gte.' + meseStart + '&data_giornata=lte.' + meseEnd);
     maisonCache = maisonCache.filter(

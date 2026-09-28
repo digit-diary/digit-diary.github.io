@@ -728,13 +728,13 @@ async function eliminaPianoRegolaSettore(id) {
   const r = pianoRegoleCache.find((x) => x.id === id);
   if (!r) return;
   if (
-    !confirm(
+    !(await chiediConferma(
       'Togliere il valore proprio di "' +
         r.nome +
         '" per ' +
         _pianoRegolaSettori(r).map(repartoLabel).join(', ') +
         "?\n\nTornera' a valere il valore generale.",
-    )
+    ))
   )
     return;
   try {
@@ -761,7 +761,12 @@ async function eliminaPianoRegola(id) {
   if (!isAdmin()) return;
   const r = pianoRegoleCache.find((x) => x.id === id);
   if (!r) return;
-  if (!confirm('Eliminare la regola "' + r.nome + '"? Il programma non la usa: non cambia nulla nei calcoli.')) return;
+  if (
+    !(await chiediConferma(
+      'Eliminare la regola "' + r.nome + '"? Il programma non la usa: non cambia nulla nei calcoli.',
+    ))
+  )
+    return;
   try {
     await secDel('piano_regole', 'id=eq.' + id);
     pianoRegoleCache = pianoRegoleCache.filter((x) => x.id !== id);
@@ -780,7 +785,7 @@ async function pianoRegolaEccezione(nome) {
   const gen = pianoRegoleCache.find((x) => x.nome === nome && !_pianoRegolaSettori(x).length);
   if (!gen) return;
   const elenco = (typeof getReparti === 'function' ? getReparti() : []).map((r) => r.key).join(', ');
-  const sett = prompt(
+  const sett = await chiediTesto(
     'Per quali settori vale l\'eccezione a "' +
       nome +
       '"?\n\nScrivi i settori separati da virgola.' +
@@ -794,7 +799,7 @@ async function pianoRegolaEccezione(nome) {
     .filter(Boolean)
     .join(',');
   if (!pulito) return;
-  const val = prompt('Valore di "' + nome + '" per ' + pulito + ':', gen.valore || '');
+  const val = await chiediTesto('Valore di "' + nome + '" per ' + pulito + ':', gen.valore || '');
   if (val === null) return;
   const erroreV = _pianoValidaRegola(nome, val, pulito.split(',').length === 1 ? pulito : '');
   if (erroreV) {
@@ -824,7 +829,7 @@ async function pianoRegolaSettoriEdit(id) {
   if (!isAdmin()) return;
   const r = pianoRegoleCache.find((x) => x.id === id);
   if (!r) return;
-  const sett = prompt(
+  const sett = await chiediTesto(
     'Settori per la regola "' + r.nome + '" (vuoto = vale per tutti i settori):',
     _pianoRegolaSettori(r).join(','),
   );
@@ -899,7 +904,7 @@ async function setPianoFabbisogno(codice, dstr, qDiretta) {
   if (qDiretta != null) {
     q = qDiretta;
   } else {
-    const v = prompt(
+    const v = await chiediTesto(
       'Persone necessarie per ' +
         codice +
         ' il ' +
@@ -1146,7 +1151,7 @@ async function importaFabbisognoExcel(input) {
     const MESI_L = MESI_FULL || [];
     const lbl = (MESI_L[parseInt(ym.split('-')[1]) - 1] || ym) + ' ' + ym.split('-')[0];
     if (
-      !confirm(
+      !(await chiediConferma(
         'Importare il fabbisogno di ' +
           lbl +
           '?\n\n• Letto da: ' +
@@ -1156,7 +1161,7 @@ async function importaFabbisognoExcel(input) {
           ' celle da caricare' +
           (errori ? '\n• ' + errori + ' righe con codice turno sconosciuto (saltate)' : '') +
           '\n\nATTENZIONE: il fabbisogno esistente del mese viene SOSTITUITO.',
-      )
+      ))
     )
       return;
     const da = ym + '-01';
@@ -1345,7 +1350,7 @@ async function importaPianoExcel(input) {
     const MESI_L = MESI_FULL || [];
     const lbl = (MESI_L[parseInt(ym.split('-')[1]) - 1] || ym) + ' ' + ym.split('-')[0];
     if (
-      !confirm(
+      !(await chiediConferma(
         'Importare il piano di ' +
           lbl +
           '?\n\n• Letto da: ' +
@@ -1367,7 +1372,7 @@ async function importaPianoExcel(input) {
             ? '\n• Saltati (disattivati, nel file solo riposi): ' + saltatiDisattivati.join(', ')
             : '') +
           '\n\nLe celle già presenti NON vengono toccate.',
-      )
+      ))
     )
       return;
     for (const nc of nuoviCollab) {
@@ -1384,11 +1389,11 @@ async function importaPianoExcel(input) {
     }
     if (
       daRiattivare.length &&
-      confirm(
+      (await chiediConferma(
         'Riattivo anche i collaboratori disattivati presenti nel file?\n\n' +
           daRiattivare.map((x) => '• ' + x.nome).join('\n') +
           '\n\n(Se rispondi Annulla, le loro celle vengono importate comunque ma restano disattivati)',
-      )
+      ))
     ) {
       for (const rc of daRiattivare) {
         await secPatch('collaboratori', 'id=eq.' + rc.ref.id, { attivo: true });
@@ -1409,11 +1414,11 @@ async function importaPianoExcel(input) {
     );
     if (
       daDisattivare.length &&
-      confirm(
+      (await chiediConferma(
         'Questi collaboratori attivi NON hanno turni nel file (assenti o con solo congedo C): li disattivo?\n\n' +
           daDisattivare.map((x) => '• ' + x.nome).join('\n') +
           '\n\n(Se rispondi Annulla restano attivi)',
-      )
+      ))
     ) {
       for (const c of daDisattivare) {
         await secPatch('collaboratori', 'id=eq.' + c.id, { attivo: false });
@@ -1449,7 +1454,7 @@ async function eliminaFabbisognoMese() {
     return;
   }
   if (
-    !confirm(
+    !(await chiediConferma(
       'Eliminare TUTTO il fabbisogno di ' +
         ym +
         ' (' +
@@ -1457,7 +1462,7 @@ async function eliminaFabbisognoMese() {
         ')?\n\n' +
         n +
         ' celle verranno rimosse. Il piano già generato NON viene toccato.',
-    )
+    ))
   )
     return;
   try {
@@ -1570,7 +1575,7 @@ async function copiaFabbisognoMese() {
   };
   const senzaModello = Object.keys(riepilogo).filter((k) => !modello[k]);
   if (
-    !confirm(
+    !(await chiediConferma(
       'Copiare il fabbisogno da ' +
         ymPrec +
         ' a ' +
@@ -1588,7 +1593,7 @@ async function copiaFabbisognoMese() {
             senzaModello.map((k) => nomiProfilo[k] || k).join(', ') +
             ' non c e un giorno di riferimento nel mese precedente: restano vuoti.'
           : ''),
-    )
+    ))
   )
     return;
   try {
@@ -1728,11 +1733,11 @@ async function pianoCorreggiDurateNotte() {
   const lista = window._pianoDurateDaFixare || [];
   if (!lista.length) return;
   if (
-    !confirm(
+    !(await chiediConferma(
       'Aggiorno la durata di ' +
         lista.length +
         " turni con il supplemento notturno compreso?\n\nLe ore gia' salvate nei piani non cambiano da sole: il nuovo valore vale dai prossimi conteggi.",
-    )
+    ))
   )
     return;
   document.getElementById('pwd-modal').classList.add('hidden');

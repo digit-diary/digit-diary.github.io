@@ -663,7 +663,7 @@ async function importaProtocolloExcel(compKey, input) {
     }
     const completo = totale > 0 && fatti === totale;
     if (
-      !confirm(
+      !(await chiediConferma(
         'Protocollo ' +
           compKey.toUpperCase() +
           ' · ' +
@@ -678,7 +678,7 @@ async function importaProtocolloExcel(compKey, input) {
           (formatore ? '\n• Formatore: ' + formatore : '') +
           (voti.length ? '\n• Valutazioni riconosciute: ' + voti.length : '') +
           '\n\nRegistrare nello storico HR?',
-      )
+      ))
     )
       return;
     if (typeof _insertHrEvento === 'function') {
@@ -702,7 +702,7 @@ async function importaProtocolloExcel(compKey, input) {
     logAzione('Protocollo importato', collab.nome + ' ' + compKey + ' ' + fatti + '/' + totale);
     if (completo && !(collab.competenze || {})[compKey]) {
       if (
-        confirm(
+        await chiediConferma(
           'Protocollo COMPLETO: certificare la competenza a ' +
             collab.nome +
             '? (lo abilita anche nel Piano di lavoro)',
@@ -722,7 +722,7 @@ async function importaProtocolloExcel(compKey, input) {
         collab.competenze = nuove;
         logAzione('Competenza certificata', collab.nome + ' · ' + compKey + ' (da protocollo)');
         const az = getPuntiConfig().azioni.find((a) => a.key === 'competenza');
-        if (az && az.punti && confirm('Assegnare anche ' + az.punti + ' punti a ' + collab.nome + '?'))
+        if (az && az.punti && (await chiediConferma('Assegnare anche ' + az.punti + ' punti a ' + collab.nome + '?')))
           await _insertPuntiEvento(
             collab.nome,
             az.punti,
@@ -1403,14 +1403,14 @@ async function toggleCompetenza(collabId, key, cb) {
     const superiori = compsRep.filter((k) => (parseInt(k.livello) || 0) > lvAtt && nuove[k.key] === true);
     if (superiori.length) {
       if (
-        !confirm(
+        !(await chiediConferma(
           c.nome +
             ' ha anche ' +
             superiori.map((k) => k.label).join(', ') +
             ' (livelli superiori che implicano questo).\nTogliere comunque solo "' +
             (compAtt ? compAtt.label : key) +
             '"?',
-        )
+        ))
       ) {
         cb.checked = true;
         return;
@@ -1431,7 +1431,7 @@ async function toggleCompetenza(collabId, key, cb) {
     logAzione('Competenza ' + (attiva ? 'certificata' : 'rimossa'), c.nome + ' · ' + (compDef ? compDef.label : key));
     // Traccia nello storico HR: cosa è stato formato, quando e da chi
     if (attiva && typeof _insertHrEvento === 'function') {
-      const fmt = (prompt('Formatore che ha svolto la formazione (opzionale):', '') || '').trim();
+      const fmt = ((await chiediTesto('Formatore che ha svolto la formazione (opzionale):', '')) || '').trim();
       _insertHrEvento(
         c.nome,
         'formazione',
@@ -1447,7 +1447,7 @@ async function toggleCompetenza(collabId, key, cb) {
       );
       for (const ev of eventi) {
         if (
-          confirm(
+          await chiediConferma(
             'A ' +
               c.nome +
               ' erano stati assegnati ' +
@@ -1474,7 +1474,7 @@ async function toggleCompetenza(collabId, key, cb) {
       const az = getPuntiConfig().azioni.find((a) => a.key === 'competenza');
       if (az && az.punti) {
         if (
-          confirm(
+          await chiediConferma(
             'Assegnare ' +
               az.punti +
               ' punti a ' +
@@ -1566,7 +1566,7 @@ async function _insertPuntiEvento(nome, punti, azione, descrizione) {
   const _stessoMotivo = _desc ? _giaDati.find((x) => (x.descrizione || '').trim() === _desc) : null;
   if (_stessoMotivo) {
     if (
-      !confirm(
+      !(await chiediConferma(
         "ATTENZIONE: punti gia' assegnati.\n\n" +
           nome +
           " ha gia' ricevuto " +
@@ -1577,7 +1577,7 @@ async function _insertPuntiEvento(nome, punti, azione, descrizione) {
           ':\n"' +
           _desc +
           '"\n\nAssegnare comunque una SECONDA volta?\nOK = doppio accredito consapevole · Annulla = nessun doppione',
-      )
+      ))
     ) {
       toast('Nessun doppione: punti non assegnati a ' + nome);
       return false;
@@ -1586,7 +1586,7 @@ async function _insertPuntiEvento(nome, punti, azione, descrizione) {
     const _stessoGiorno = _giaDati.find((x) => x.data_evento === _oggi);
     if (
       _stessoGiorno &&
-      !confirm(
+      !(await chiediConferma(
         nome +
           " ha gia' ricevuto oggi " +
           (_stessoGiorno.punti > 0 ? '+' : '') +
@@ -1596,7 +1596,7 @@ async function _insertPuntiEvento(nome, punti, azione, descrizione) {
           '"' +
           (_stessoGiorno.descrizione ? ' (' + _stessoGiorno.descrizione + ')' : '') +
           '.\n\nQuesto sembra un motivo diverso: assegnare anche questi punti?',
-      )
+      ))
     ) {
       toast('Punti non assegnati a ' + nome);
       return false;
@@ -1634,7 +1634,7 @@ async function assegnaPuntiRapido() {
   let punti;
   let azione = azKey;
   if (azKey === 'manuale') {
-    const v = prompt('Quanti punti? (negativo per togliere)', '10');
+    const v = await chiediTesto('Quanti punti? (negativo per togliere)', '10');
     if (v === null) return;
     punti = parseInt(v) || 0;
   } else {
@@ -1699,7 +1699,7 @@ async function registraPremioConsegnato(nome, premio) {
       const usati = _consegnatiMesePremio(soglia.premio, ym);
       if (usati >= lim) {
         if (
-          confirm(
+          await chiediConferma(
             'Limite mensile raggiunto per "' +
               soglia.premio +
               '" (' +
@@ -1735,7 +1735,11 @@ async function registraPremioConsegnato(nome, premio) {
       if (item) {
         const q = parseInt(item.qta) || 0;
         if (q <= 0) {
-          if (!confirm('Inventario esaurito per "' + item.nome + '" (0 pezzi). Registrare comunque la consegna?'))
+          if (
+            !(await chiediConferma(
+              'Inventario esaurito per "' + item.nome + '" (0 pezzi). Registrare comunque la consegna?',
+            ))
+          )
             return;
         } else {
           item.qta = q - 1;
@@ -1763,7 +1767,7 @@ async function eliminaPuntiEvento(id) {
     toast('Non hai il permesso');
     return;
   }
-  if (!confirm('Eliminare questo movimento punti?')) return;
+  if (!(await chiediConferma('Eliminare questo movimento punti?'))) return;
   try {
     await secDel('punti_eventi', 'id=eq.' + id);
     puntiEventiCache = puntiEventiCache.filter((p) => p.id !== id);
@@ -2298,7 +2302,7 @@ async function rinominaCompetenzaCfg(rep, idx) {
   const cfg = getCompetenzeConfigAll();
   const k = cfg[rep][idx];
   if (!k) return;
-  const nuovo = prompt('Nuovo nome per "' + k.label + '":', k.label);
+  const nuovo = await chiediTesto('Nuovo nome per "' + k.label + '":', k.label);
   if (nuovo === null) return;
   const label = nuovo.trim();
   if (!label) {
@@ -2317,7 +2321,11 @@ async function rimuoviCompetenzaCfg(rep, idx) {
   const cfg = getCompetenzeConfigAll();
   const k = cfg[rep][idx];
   if (!k) return;
-  if (!confirm('Rimuovere "' + k.label + '"? Le spunte esistenti non verranno cancellate ma non saranno più visibili.'))
+  if (
+    !(await chiediConferma(
+      'Rimuovere "' + k.label + '"? Le spunte esistenti non verranno cancellate ma non saranno più visibili.',
+    ))
+  )
     return;
   cfg[rep] = cfg[rep].filter((_, i) => i !== idx);
   await saveCompetenzeConfig(cfg);
@@ -2382,7 +2390,7 @@ async function rinominaAzioneCfg(idx) {
   const cfg = getPuntiConfig();
   const a = cfg.azioni[idx];
   if (!a) return;
-  const nuovo = prompt('Nuovo nome per "' + a.label + '":', a.label);
+  const nuovo = await chiediTesto('Nuovo nome per "' + a.label + '":', a.label);
   if (nuovo === null) return;
   const label = nuovo.trim();
   if (!label) {
@@ -2401,7 +2409,7 @@ async function rimuoviAzioneCfg(idx) {
   const cfg = getPuntiConfig();
   const a = cfg.azioni[idx];
   if (!a) return;
-  if (!confirm('Rimuovere "' + a.label + '"?')) return;
+  if (!(await chiediConferma('Rimuovere "' + a.label + '"?'))) return;
   cfg.azioni = cfg.azioni.filter((_, i) => i !== idx);
   await savePuntiConfig(cfg);
   renderFormazione();
@@ -2463,7 +2471,7 @@ async function rimuoviInvIncentivo(idx) {
   if (!_soloAdminCfg()) return;
   const cfg = getPuntiConfig();
   if (!cfg.inventario[idx]) return;
-  if (!confirm('Rimuovere "' + cfg.inventario[idx].nome + '" dall\'inventario premi?')) return;
+  if (!(await chiediConferma('Rimuovere "' + cfg.inventario[idx].nome + '" dall\'inventario premi?'))) return;
   logAzione('Inventario premi', 'Rimosso: ' + cfg.inventario[idx].nome);
   cfg.inventario = cfg.inventario.filter((_, i) => i !== idx);
   await savePuntiConfig(cfg);
@@ -2779,7 +2787,7 @@ async function _rimuoviEventoCopertura(id) {
   const p = puntiEventiCache.find((x) => x.id === id);
   if (!p) return;
   if (
-    !confirm(
+    !(await chiediConferma(
       'Rimuovere "' +
         (p.azione === 'copertura' ? 'copertura' : 'rifiuto') +
         '" di ' +
@@ -2788,7 +2796,7 @@ async function _rimuoviEventoCopertura(id) {
         (p.punti > 0 ? '+' : '') +
         p.punti +
         ' punti)?',
-    )
+    ))
   )
     return;
   try {
@@ -3029,7 +3037,9 @@ async function certificaCompetenzaDaPiano(nome, key, chiediPunti) {
     nome + ' · ' + (compAtt ? compAtt.label : key) + (implicate.length ? ' + ' + implicate.join(', ') : ''),
   );
   if (typeof _insertHrEvento === 'function') {
-    const fmt = chiediPunti ? (prompt('Formatore che ha svolto la formazione (opzionale):', '') || '').trim() : '';
+    const fmt = chiediPunti
+      ? ((await chiediTesto('Formatore che ha svolto la formazione (opzionale):', '')) || '').trim()
+      : '';
     _insertHrEvento(
       nome,
       'formazione',
@@ -3041,7 +3051,9 @@ async function certificaCompetenzaDaPiano(nome, key, chiediPunti) {
     if (
       az &&
       az.punti &&
-      confirm('Assegnare ' + az.punti + ' punti a ' + nome + ' per "' + (compAtt ? compAtt.label : key) + '"?')
+      (await chiediConferma(
+        'Assegnare ' + az.punti + ' punti a ' + nome + ' per "' + (compAtt ? compAtt.label : key) + '"?',
+      ))
     )
       await _insertPuntiEvento(
         nome,

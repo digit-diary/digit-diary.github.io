@@ -418,7 +418,9 @@ async function registraBiometrico() {
       var exOp = JSON.parse(existing).op;
       if (
         exOp !== op &&
-        !confirm(getBioName() + ' è attivo per ' + exOp + ' su questo dispositivo. Sostituire con il tuo?')
+        !(await chiediConferma(
+          getBioName() + ' è attivo per ' + exOp + ' su questo dispositivo. Sostituire con il tuo?',
+        ))
       )
         return;
     }

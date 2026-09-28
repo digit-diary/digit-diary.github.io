@@ -108,7 +108,7 @@ function rispondiNota(mittente, notaId) {
   }, 200);
 }
 async function eliminaNotaCollega(id, ruolo) {
-  if (!confirm('Eliminare questa nota?')) return;
+  if (!(await chiediConferma('Eliminare questa nota?'))) return;
   // ENTERPRISE: id e' chat_messages.id, basta UNA operazione (nascondi per me)
   const campo = ruolo === 'mitt' ? 'nascosta_mitt' : 'nascosta_dest';
   try {
@@ -199,7 +199,7 @@ async function eliminaNotaSmart(id) {
   const letti = _chatLetti(id).filter((l) => l.operatore !== cm.da_operatore);
   const qualcunoHaLetto = letti.length > 0;
   if (!qualcunoHaLetto) {
-    if (!confirm("Nessuno ha ancora letto. Annullare l'invio per tutti?")) return;
+    if (!(await chiediConferma("Nessuno ha ancora letto. Annullare l'invio per tutti?"))) return;
     try {
       await _chatDeleteMessage(id);
       renderNoteCollega();
@@ -208,7 +208,7 @@ async function eliminaNotaSmart(id) {
       toast('Errore');
     }
   } else {
-    if (!confirm('Eliminare dalla tua vista?')) return;
+    if (!(await chiediConferma('Eliminare dalla tua vista?'))) return;
     try {
       await _chatPatchMessage(id, { nascosta_mitt: true });
       renderNoteCollega();
@@ -224,7 +224,7 @@ async function annullaInvioNota(id) {
   const letti = _chatLetti(id).filter((l) => l.operatore !== cm.da_operatore);
   const qualcunoHaLetto = letti.length > 0;
   if (qualcunoHaLetto) {
-    if (!confirm('Qualcuno ha già letto questo messaggio. Eliminare solo dalla tua vista?')) return;
+    if (!(await chiediConferma('Qualcuno ha già letto questo messaggio. Eliminare solo dalla tua vista?'))) return;
     try {
       await _chatPatchMessage(id, { nascosta_mitt: true });
       renderNoteCollega();
@@ -233,7 +233,7 @@ async function annullaInvioNota(id) {
       toast('Errore');
     }
   } else {
-    if (!confirm("Nessuno ha ancora letto. Annullare l'invio per tutti?")) return;
+    if (!(await chiediConferma("Nessuno ha ancora letto. Annullare l'invio per tutti?"))) return;
     try {
       await _chatDeleteMessage(id);
       renderNoteCollega();
@@ -518,7 +518,7 @@ function _sonoAdminGruppo(gid) {
 async function _rinominaGruppo(gid, partner) {
   if (!_sonoAdminGruppo(gid)) return;
   const nomeAttuale = _getGruppoNome(gid) || '';
-  const nuovo = prompt('Nuovo nome del gruppo:', nomeAttuale);
+  const nuovo = await chiediTesto('Nuovo nome del gruppo:', nomeAttuale);
   if (nuovo === null) return;
   const label = nuovo.trim();
   if (label) localStorage.setItem('_gruppo_nome_' + gid, label);
@@ -643,7 +643,7 @@ function _aggiornaGruppoBtn() {
   }
   if (count) count.textContent = cbs.length;
 }
-function _apriGruppoSelezionato() {
+async function _apriGruppoSelezionato() {
   const cbs = document.querySelectorAll('.conv-group-cb:checked');
   const dests = [...cbs].map((cb) => cb.value);
   if (dests.length < 2) {
@@ -655,7 +655,7 @@ function _apriGruppoSelezionato() {
     dests.length <= 3
       ? dests.map((n) => _nomeBreve(n)).join(', ')
       : _nomeBreve(dests[0]) + ', ' + _nomeBreve(dests[1]) + ' +' + (dests.length - 2);
-  const nomeGruppo = prompt('Nome del gruppo (oppure lascia vuoto):', nomeDefault);
+  const nomeGruppo = await chiediTesto('Nome del gruppo (oppure lascia vuoto):', nomeDefault);
   if (nomeGruppo === null) return; // annullato
   const label = nomeGruppo.trim() || nomeDefault;
   const op = getOperatore();
@@ -3038,7 +3038,7 @@ async function salvaDataAssunzione(nome) {
 }
 async function eliminaHrEvento(id, nome) {
   if (!isAdmin()) return;
-  if (!confirm('Eliminare questo evento dallo storico HR?')) return;
+  if (!(await chiediConferma('Eliminare questo evento dallo storico HR?'))) return;
   try {
     await secDel('hr_eventi', 'id=eq.' + id);
     hrEventiCache = hrEventiCache.filter(function (e) {
@@ -3299,20 +3299,24 @@ async function salvaSchedaNascita(nome) {
     // richiede una conferma esplicita, cosi' non si perde per un clic
     var _vecchia = coll.data_nascita || '';
     if (_vecchia && !val) {
-      if (!confirm('ELIMINA\n\nCancellare la data di nascita di ' + nome + ' (' + dataNascitaLabel(_vecchia) + ')?')) {
+      if (
+        !(await chiediConferma(
+          'ELIMINA\n\nCancellare la data di nascita di ' + nome + ' (' + dataNascitaLabel(_vecchia) + ')?',
+        ))
+      ) {
         apriSchedaCollaboratore(nome);
         return;
       }
     } else if (_vecchia && val && _vecchia !== val) {
       if (
-        !confirm(
+        !(await chiediConferma(
           'MODIFICA\n\nCambiare la data di nascita di ' +
             nome +
             '?\n\nDa ' +
             dataNascitaLabel(_vecchia) +
             ' a ' +
             dataNascitaLabel(val),
-        )
+        ))
       ) {
         apriSchedaCollaboratore(nome);
         return;

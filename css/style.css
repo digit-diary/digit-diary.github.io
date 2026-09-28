@@ -5337,3 +5337,98 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
 #modulo-form-area .btn-secondario {
   padding: 11px 22px;
 }
+
+/* FINESTRE DEL PROGRAMMA (js/finestre.js): conferme, domande e avvisi al posto di
+   quelle del browser. Sopra a tutto, anche alle altre finestre gia aperte. */
+.finestra-velo {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(26, 18, 8, 0.6);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+.finestra-box {
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 3px;
+  box-shadow: 6px 6px 0 #b8aa95;
+  width: min(480px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 26px 28px 22px;
+}
+body.dark-theme .finestra-box {
+  box-shadow: 6px 6px 0 #0d0d1a;
+}
+.finestra-box h3 {
+  font-family: "Playfair Display", serif;
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.finestra-testo {
+  font-size: var(--fs-base);
+  line-height: 1.5;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.finestra-campo {
+  width: 100%;
+  height: 2.5rem;
+  margin-top: 14px;
+  padding: 0 0.75rem;
+  font-family: "Source Sans 3", sans-serif;
+  font-size: var(--fs-base);
+  color: var(--ink);
+  background: var(--paper2);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  outline: none;
+}
+.finestra-campo:focus {
+  border-color: var(--accent2);
+}
+.finestra-pulsanti {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+.finestra-pulsanti button {
+  min-width: 110px;
+  padding: 10px 18px;
+  font-family: "Source Sans 3", sans-serif;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.finestra-ok {
+  background: var(--ink);
+  color: var(--paper);
+  border: 1px solid var(--ink);
+}
+.finestra-ok.finestra-pericolo {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.finestra-no {
+  background: var(--paper2);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+.finestra-pulsanti button:hover {
+  filter: brightness(1.1);
+}
+.finestra-pulsanti button:focus-visible {
+  outline: 2px solid var(--accent2);
+  outline-offset: 2px;
+}

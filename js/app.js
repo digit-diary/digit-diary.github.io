@@ -242,7 +242,7 @@ async function aggiungiTipoPersonalizzato() {
   toast('Tipo aggiunto');
 }
 async function rimuoviTipo(n) {
-  if (!confirm('Rimuovere "' + n + '"?')) return;
+  if (!(await chiediConferma('Rimuovere "' + n + '"?'))) return;
   tipiPersonalizzati = tipiPersonalizzati.filter((t) => t.nome !== n);
   delete coloriOverride[n];
   if (!(await saveTipiP())) return;
@@ -251,7 +251,8 @@ async function rimuoviTipo(n) {
   toast('Rimosso');
 }
 async function nascondiTipoDefault(n) {
-  if (!confirm('Nascondere il tipo "' + n + '"? Le registrazioni esistenti non verranno eliminate.')) return;
+  if (!(await chiediConferma('Nascondere il tipo "' + n + '"? Le registrazioni esistenti non verranno eliminate.')))
+    return;
   tipiNascosti.push(n);
   if (!(await salvaImp('tipi_nascosti', JSON.stringify(tipiNascosti)))) return;
   renderTipiUI();

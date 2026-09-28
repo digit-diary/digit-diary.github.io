@@ -446,13 +446,13 @@ async function completaConCoperture() {
     return;
   }
   if (
-    !confirm(
+    !(await chiediConferma(
       'Tappo i buchi rimasti di ' +
         _pianoMeseSel +
         ' usando chi copre da altri settori:\n\n' +
         chi.map((x) => '\u2022 ' + x).join('\n') +
         "\n\nI turni gia' inseriti non vengono toccati. Fallo DOPO aver generato i piani dei loro reparti, cosi' si vede chi e' davvero libero.",
-    )
+    ))
   )
     return;
   await generaBozzaPiano(true);
@@ -1066,7 +1066,7 @@ async function generaBozzaPiano(usaCoperture) {
     return;
   }
   if (
-    !confirm(
+    !(await chiediConferma(
       'Genera bozza per ' +
         ym +
         ' (' +
@@ -1084,7 +1084,7 @@ async function generaBozzaPiano(usaCoperture) {
         ' posti senza candidato idoneo' +
         (riparati ? ' (altri ' + riparati + ' risolti spostando un turno)' : '') +
         '\n\nLe celle esistenti (vacanze, protette, malattie) NON vengono toccate.\nLa bozza si può eliminare con "Cancella piano". Procedere?',
-    )
+    ))
   ) {
     // Le C di riempimento e le vacanze sono gia' state riscritte per poter
     // calcolare la bozza: chi rinuncia deve ritrovare il mese com'era.
@@ -1171,7 +1171,9 @@ async function eseguiCancellaPiano(tutto) {
   }
   if (
     tutto &&
-    !confirm('ATTENZIONE: verranno eliminate ANCHE le celle protette (vacanze, inserimenti manuali). Confermi?')
+    !(await chiediConferma(
+      'ATTENZIONE: verranno eliminate ANCHE le celle protette (vacanze, inserimenti manuali). Confermi?',
+    ))
   )
     return;
   _pianoUndoSnap('cancella piano ' + _pianoMeseSel + (tutto ? ' (tutto)' : ''));

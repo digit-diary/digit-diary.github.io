@@ -113,7 +113,7 @@ async function aggiungiPianoMappatura() {
 async function rimuoviPianoMappatura(id) {
   if (!isAdmin()) return;
   const m = pianoMappatureCache.find((x) => x.id === id);
-  if (!m || !confirm('Rimuovere ' + m.funzione + ' → ' + m.turno_codice + ' (' + m.tipo + ')?')) return;
+  if (!m || !(await chiediConferma('Rimuovere ' + m.funzione + ' → ' + m.turno_codice + ' (' + m.tipo + ')?'))) return;
   try {
     await secDel('piano_mappature', 'id=eq.' + id);
     pianoMappatureCache = pianoMappatureCache.filter((x) => x.id !== id);
@@ -253,13 +253,13 @@ async function generaConSolver() {
   const ym = _pianoMeseSel;
   const rep = _pianoReparto();
   if (
-    !confirm(
+    !(await chiediConferma(
       'Genero il piano di ' +
         ym +
         ' (' +
         repartoLabel(rep) +
         ') con il solver sul server interno?\n\nLe celle esistenti (vacanze, protette, malattie, blocchi) non vengono toccate; le celle generate da una bozza precedente vengono sostituite. Il calcolo puo durare fino a due minuti.',
-    )
+    ))
   )
     return;
   _pianoUndoSnap('solver ' + ym);
@@ -404,11 +404,11 @@ async function salvaPianoFunzioni(v) {
   const tolteInUso = inUso.filter((f) => !lista.includes(f));
   if (
     tolteInUso.length &&
-    !confirm(
+    !(await chiediConferma(
       'Queste funzioni sono assegnate a collaboratori attivi: ' +
         tolteInUso.join(', ') +
         '.\n\nToglierle dall elenco? (le schede le mantengono, ma non compariranno piu nei menu)',
-    )
+    ))
   ) {
     renderPiano();
     return;
@@ -833,9 +833,9 @@ async function caricaFormulario(input) {
     toast('File troppo grande (max 2 MB)');
     return;
   }
-  const cartella = (prompt('Cartella (es. Cambi, Formazione, HR...):', 'Generale') || '').trim();
+  const cartella = ((await chiediTesto('Cartella (es. Cambi, Formazione, HR...):', 'Generale')) || '').trim();
   if (cartella === '') return;
-  const nome = (prompt('Nome del formulario:', file.name.replace(/\.[^.]+$/, '')) || '').trim();
+  const nome = ((await chiediTesto('Nome del formulario:', file.name.replace(/\.[^.]+$/, ''))) || '').trim();
   if (!nome) return;
   try {
     const buf = await file.arrayBuffer();
@@ -893,9 +893,9 @@ async function rinominaFormulario(id) {
   if (!puoGestirePiano() && !isAdmin()) return;
   const f = _pianoFormulariCache.find((x) => x.id === id);
   if (!f) return;
-  const nome = (prompt('Nome:', f.nome) || '').trim();
+  const nome = ((await chiediTesto('Nome:', f.nome)) || '').trim();
   if (!nome) return;
-  const cartella = (prompt('Cartella:', f.cartella || 'Generale') || '').trim() || 'Generale';
+  const cartella = ((await chiediTesto('Cartella:', f.cartella || 'Generale')) || '').trim() || 'Generale';
   try {
     await secPatch('piano_formulari', 'id=eq.' + id, { nome: nome, cartella: cartella });
     f.nome = nome;
@@ -909,7 +909,7 @@ async function rinominaFormulario(id) {
 async function eliminaFormulario(id) {
   if (!puoGestirePiano() && !isAdmin()) return;
   const f = _pianoFormulariCache.find((x) => x.id === id);
-  if (!f || !confirm('Eliminare il formulario "' + f.nome + '"?')) return;
+  if (!f || !(await chiediConferma('Eliminare il formulario "' + f.nome + '"?'))) return;
   try {
     await secDel('piano_formulari', 'id=eq.' + id);
     _pianoFormulariCache = _pianoFormulariCache.filter((x) => x.id !== id);
@@ -1248,7 +1248,8 @@ async function aggiungiRegolaGruppo() {
 async function eliminaRegolaGruppo(id) {
   if (!isAdmin()) return;
   const r = pianoRegoleGruppoCache.find((x) => x.id === id);
-  if (!r || !confirm('Eliminare la regola ' + r.gruppo + ' ' + r.tipo_regola + ' = ' + r.valore + '?')) return;
+  if (!r || !(await chiediConferma('Eliminare la regola ' + r.gruppo + ' ' + r.tipo_regola + ' = ' + r.valore + '?')))
+    return;
   try {
     await secDel('piano_regole_gruppo', 'id=eq.' + id);
     pianoRegoleGruppoCache = pianoRegoleGruppoCache.filter((x) => x.id !== id);
@@ -1380,7 +1381,7 @@ async function aggiungiCongedoNp() {
         ' giorni (giubilei e scaglioni vacanze).'
       : '';
   if (
-    !confirm(
+    !(await chiediConferma(
       'Registro il congedo non pagato di ' +
         nome +
         ' dal ' +
@@ -1391,7 +1392,7 @@ async function aggiungiCongedoNp() {
         gg +
         ' giorni)?\n\nNel piano i giorni diventano CNP e non contano fra le ore dovute.' +
         avviso,
-    )
+    ))
   )
     return;
   try {
@@ -1431,7 +1432,7 @@ async function eliminaCongedoNp(id) {
   const c = _pianoCongediNp.find((x) => x.id === id);
   if (!c) return;
   if (
-    !confirm(
+    !(await chiediConferma(
       'Eliminare il congedo di ' +
         c.collaboratore +
         ' dal ' +
@@ -1439,7 +1440,7 @@ async function eliminaCongedoNp(id) {
         ' al ' +
         String(c.al).substring(0, 10) +
         '?\n\nI giorni CNP nel piano vengono tolti.',
-    )
+    ))
   )
     return;
   try {

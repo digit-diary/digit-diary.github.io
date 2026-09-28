@@ -572,7 +572,7 @@ async function eliminaValutazione(id, nome) {
     toast('Non hai il permesso');
     return;
   }
-  if (!confirm('Eliminare questa valutazione?')) return;
+  if (!(await chiediConferma('Eliminare questa valutazione?'))) return;
   try {
     await secDel('valutazioni', 'id=eq.' + id);
     valutazioniCache = valutazioniCache.filter((v) => v.id !== id);

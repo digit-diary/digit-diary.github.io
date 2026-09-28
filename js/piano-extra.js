@@ -204,7 +204,7 @@ async function pianoAnnullaTutto() {
   const snap = (window._pianoSessSnap || {})[k];
   if (!snap) return;
   if (
-    !confirm(
+    !(await chiediConferma(
       'Riporto il piano di ' +
         snap.ym +
         ' (' +
@@ -212,7 +212,7 @@ async function pianoAnnullaTutto() {
         ") a com'era all'inizio di questa sessione, annullando le tue " +
         snap.n +
         ' operazioni.\n\nATTENZIONE: se un altro operatore ha modificato questo stesso mese nel frattempo, anche le sue modifiche verranno sovrascritte.\n\nConfermare?',
-    )
+    ))
   )
     return;
   // lo stato attuale (dal DB) finisce sulla freccia Ripristina: si puo' tornare avanti
@@ -281,13 +281,13 @@ async function pianoCancellaSelezione() {
   }
   const prot = daCanc.filter((r) => r.protetto).length;
   if (
-    !confirm(
+    !(await chiediConferma(
       'Cancellare ' + daCanc.length + ' celle selezionate' + (prot ? ' (di cui ' + prot + ' protette)' : '') + '?',
-    )
+    ))
   )
     return;
   // giorni chiusi: ogni giorno toccato va sbloccato con motivo, come per la singola cella
-  for (const d of [...new Set(daCanc.map((x) => x.data))].sort()) if (!_pianoConsentiScrittura(d)) return;
+  for (const d of [...new Set(daCanc.map((x) => x.data))].sort()) if (!(await _pianoConsentiScrittura(d))) return;
   _pianoUndoSnap('cancellazione di ' + daCanc.length + ' celle');
   try {
     const ids = daCanc.map((r) => r.id);
@@ -1165,7 +1165,7 @@ async function pianoSparseColora() {
     return;
   }
   if (
-    !confirm(
+    !(await chiediConferma(
       (colore ? 'Applico il colore del secchiello a ' : 'Tolgo il colore da ') +
         righe.length +
         ' celle di ' +
@@ -1173,7 +1173,7 @@ async function pianoSparseColora() {
         ' collaboratori (mese ' +
         _pianoMeseSel +
         ')?',
-    )
+    ))
   )
     return;
   _pianoUndoSnap('colore righe selezionate');
@@ -1399,7 +1399,9 @@ async function _pianoTestoAppunti() {
     const m = document.getElementById('pwd-modal');
     const mc = document.getElementById('pwd-modal-content');
     if (!m || !mc) {
-      res(prompt('Incolla qui il contenuto copiato (una riga per collaboratore, celle separate da TAB):') || '');
+      chiediTesto('Incolla qui il contenuto copiato (una riga per collaboratore, celle separate da TAB):', '', {
+        titolo: 'Incolla',
+      }).then((v) => res(v || ''));
       return;
     }
     mc.innerHTML =
@@ -1488,7 +1490,7 @@ async function pianoIncollaDaClipboard(target) {
     return;
   }
   if (
-    !confirm(
+    !(await chiediConferma(
       'Incollo a partire da ' +
         target.nome +
         ' / giorno ' +
@@ -1500,7 +1502,7 @@ async function pianoIncollaDaClipboard(target) {
         ' celle sovrascritte' +
         (scartate ? '\n• ' + scartate + ' sigle sconosciute scartate' : '') +
         (fuori ? '\n• ' + fuori + ' celle oltre i bordi del mese/lista (ignorate)' : ''),
-    )
+    ))
   )
     return;
   // giorni chiusi: ogni giorno toccato va sbloccato con motivo, come per la singola cella
@@ -1509,7 +1511,7 @@ async function pianoIncollaDaClipboard(target) {
     const rr = _pianoRighe.find((x) => x.id === p.id);
     if (rr) dateIncolla.add(rr.data);
   });
-  for (const d of [...dateIncolla].sort()) if (!_pianoConsentiScrittura(d)) return;
+  for (const d of [...dateIncolla].sort()) if (!(await _pianoConsentiScrittura(d))) return;
   _pianoUndoSnap('incolla nel piano');
   try {
     for (let i = 0; i < daPatch.length; i += 10)
@@ -1602,7 +1604,7 @@ async function fabbIncollaDaClipboard() {
     return;
   }
   if (
-    !confirm(
+    !(await chiediConferma(
       'Incollo il fabbisogno da ' +
         target.codice +
         ' / giorno ' +
@@ -1611,7 +1613,7 @@ async function fabbIncollaDaClipboard() {
         ops.length +
         ' celle (0 = rimuove)' +
         (scartate ? '\n• ' + scartate + ' valori non numerici scartati' : ''),
-    )
+    ))
   )
     return;
   try {
@@ -1778,7 +1780,7 @@ async function miglioraOrePiano() {
   }
   const mediaDopo = fissi.reduce((acc, n) => acc + Math.abs(saldo[n] || 0), 0) / (fissi.length || 1);
   if (
-    !confirm(
+    !(await chiediConferma(
       'Migliora ore (' +
         ym +
         '):\n\n• ' +
@@ -1788,7 +1790,7 @@ async function miglioraOrePiano() {
         ' → ' +
         mediaDopo.toFixed(1) +
         ' ore\n\nSolo celle GENERATE, mai quelle protette. Procedere?',
-    )
+    ))
   )
     return;
   try {
@@ -1863,12 +1865,12 @@ function _pianoGruppoNonFormato(nome, codTurno, commento) {
 }
 async function _pianoProponiCertificazione(nome, gruppo) {
   if (
-    !confirm(
+    !(await chiediConferma(
       nome +
         ' non risulta formato per ' +
         gruppo +
         '.\nVuoi aggiungerlo in Formazione?\n\nOK = certifica (ti chiederà formatore e punti, come dalla Formazione)\nAnnulla = il turno resta ma la Formazione non cambia',
-    )
+    ))
   )
     return;
   const key = _pianoGruppoCompInv()[gruppo];
@@ -1887,11 +1889,11 @@ async function _pianoProponiCertificazioniBulk(coppie) {
   });
   if (!mancanti.length) return;
   if (
-    !confirm(
+    !(await chiediConferma(
       'Alcuni collaboratori hanno ricevuto turni di settori per cui NON risultano formati:\n\n' +
         mancanti.map((x) => '• ' + x.nome + ' → ' + x.gruppo).join('\n') +
         '\n\nVuoi certificarli in Formazione? (senza punti: i punti si assegnano poi dalla pagina Formazione)',
-    )
+    ))
   )
     return;
   const inv = _pianoGruppoCompInv();
@@ -1957,7 +1959,7 @@ async function controllaFormazioniCompletate(silenzioso) {
   }
   for (const f of complete) {
     if (
-      confirm(
+      await chiediConferma(
         f.nome +
           ' ha COMPLETATO la formazione in ' +
           f.sett +
@@ -2170,7 +2172,7 @@ async function _renderPianoCreditiTab() {
   window._pianoCreditiUltimi = { anno: anno, dati: dati, meseLbl: meseLbl };
   return h;
 }
-function pianoCreditiDettaglio(i) {
+async function pianoCreditiDettaglio(i) {
   const u = window._pianoCreditiUltimi;
   const d = u && u.dati[i];
   if (!d) return;
@@ -2213,7 +2215,7 @@ function pianoCreditiDettaglio(i) {
     righe.push(
       'Congedo non pagato nell anno: ' + d.cnp + ' giorni (scheda Impostazioni del Piano, Congedi non pagati).',
     );
-  alert(d.nome + '\n\n' + righe.join('\n\n'));
+  await mostraAvviso(d.nome + '\n\n' + righe.join('\n\n'));
 }
 function pianoCreditiStampa() {
   const t = document.getElementById('piano-crediti-table');

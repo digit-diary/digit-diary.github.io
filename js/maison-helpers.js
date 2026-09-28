@@ -725,7 +725,7 @@ function _checkUnisciDone() {
   if (!rimaste.length) _renderUnisciUI();
 }
 async function rimuoviMaisonBudget(id) {
-  if (!confirm('Rimuovere questo budget?')) return;
+  if (!(await chiediConferma('Rimuovere questo budget?'))) return;
   try {
     await secDel('maison_budget', 'id=eq.' + id);
     maisonBudgetCache = maisonBudgetCache.filter((b) => b.id !== id);
@@ -1262,7 +1262,11 @@ async function salvaSpeseExtra() {
   if (!nomeEsistente) {
     const simile = _trovaNomeSimileMaison(benef);
     if (simile && simile.tipo === 'simile') {
-      if (confirm('Hai scritto "' + benef + '" ma esiste "' + simile.nome + '". Usare "' + simile.nome + '"?'))
+      if (
+        await chiediConferma(
+          'Hai scritto "' + benef + '" ma esiste "' + simile.nome + '". Usare "' + simile.nome + '"?',
+        )
+      )
         benef = simile.nome;
     }
   }
@@ -1283,14 +1287,14 @@ async function salvaSpeseExtra() {
   );
   if (seDup) {
     if (
-      !confirm(
+      !(await chiediConferma(
         benef +
           ' ha già una spesa di ' +
           importo.toFixed(2) +
           ' CHF il ' +
           new Date(data + 'T12:00:00').toLocaleDateString('it-IT') +
           '.\n\nVuoi aggiungere comunque?',
-      )
+      ))
     )
       return;
   }
@@ -1324,7 +1328,7 @@ async function salvaSpeseExtra() {
   }
 }
 async function eliminaSpeseExtra(id) {
-  if (!confirm('Eliminare questa spesa?')) return;
+  if (!(await chiediConferma('Eliminare questa spesa?'))) return;
   try {
     await secDel('spese_extra', 'id=eq.' + id);
     speseExtraCache = speseExtraCache.filter((x) => x.id !== id);
@@ -1473,7 +1477,7 @@ async function eliminaSpeseExtraGiorno() {
   const label = new Date(giorno + 'T12:00:00').toLocaleDateString('it-IT');
   const count = getSpeseReparto().filter((r) => r.data_spesa === giorno).length;
   if (
-    !confirm(
+    !(await chiediConferma(
       'Eliminare le ' +
         count +
         ' spese extra del ' +
@@ -1481,7 +1485,7 @@ async function eliminaSpeseExtraGiorno() {
         ' (' +
         currentReparto +
         ')?\nRegali e bottiglie NON vengono toccati.',
-    )
+    ))
   )
     return;
   try {
@@ -1519,7 +1523,7 @@ async function eliminaSpeseExtraMese() {
     return;
   }
   if (
-    !confirm(
+    !(await chiediConferma(
       'Eliminare le ' +
         count +
         ' spese extra di ' +
@@ -1527,7 +1531,7 @@ async function eliminaSpeseExtraMese() {
         ' (' +
         currentReparto +
         ')?\nRegali e bottiglie NON vengono toccati.',
-    )
+    ))
   )
     return;
   try {
@@ -1657,7 +1661,7 @@ async function eliminaSpeseExtraBenef(nome) {
     toast('Nessuna spesa');
     return;
   }
-  if (!confirm('Eliminare tutte le ' + ids.length + ' spese extra di "' + nome + '"?')) return;
+  if (!(await chiediConferma('Eliminare tutte le ' + ids.length + ' spese extra di "' + nome + '"?'))) return;
   try {
     for (const r of ids) {
       await secDel('spese_extra', 'id=eq.' + r.id);
@@ -2231,7 +2235,7 @@ async function eliminaHrAllegato(id, nome) {
     toast("Solo un amministratore puo' eliminare gli allegati");
     return;
   }
-  if (!confirm('Eliminare questo allegato? Operazione definitiva.')) return;
+  if (!(await chiediConferma('Eliminare questo allegato? Operazione definitiva.'))) return;
   try {
     await secDel('hr_allegati', 'id=eq.' + id);
     logAzione('Allegato HR eliminato', 'id ' + id + ' (' + nome + ')');
@@ -2249,7 +2253,9 @@ async function caricaNuovoAllegatoScheda(input, nome) {
     toast('Non hai il permesso di caricare allegati');
     return;
   }
-  const titolo = (prompt('Titolo allegato (es. "Scheda valutazione 2026 · valutatore"):', file.name) || '').trim();
+  const titolo = (
+    (await chiediTesto('Titolo allegato (es. "Scheda valutazione 2026 · valutatore"):', file.name)) || ''
+  ).trim();
   if (!titolo) return;
   try {
     const r = await _uploadHrAllegato(file, nome, titolo);
@@ -2331,9 +2337,9 @@ async function registraGiubileo(nome, anni, importo, dataMat) {
     return;
   }
   if (
-    !confirm(
+    !(await chiediConferma(
       'Registrare la consegna del premio giubileo ' + anni + ' anni (' + fmtCHF(importo) + ' CHF) a ' + nome + '?',
-    )
+    ))
   )
     return;
   await _insertHrEvento(
@@ -2567,7 +2573,7 @@ function switchInvTab(tab) {
 }
 // --- Gestione categorie custom (admin) ---
 async function aggiungiCategoriaInventario() {
-  const nome = prompt('Nome della nuova categoria inventario (es: Accendini, Gadget, Ombrelli...):');
+  const nome = await chiediTesto('Nome della nuova categoria inventario (es: Accendini, Gadget, Ombrelli...):');
   if (nome === null) return;
   const label = nome.trim();
   if (!label) return;
@@ -2591,7 +2597,7 @@ async function aggiungiCategoriaInventario() {
 async function rinominaCategoriaInventario(key) {
   const cat = getInvCategorieExtra().find((c) => c.key === key);
   if (!cat) return;
-  const nuovo = prompt('Nuovo nome per "' + cat.label + '":', cat.label);
+  const nuovo = await chiediTesto('Nuovo nome per "' + cat.label + '":', cat.label);
   if (nuovo === null) return;
   const label = nuovo.trim();
   if (!label) return;
@@ -2606,12 +2612,12 @@ async function rimuoviCategoriaInventario(key) {
   if (!cat) return;
   const nMov = getInventarioReparto().filter((r) => r.categoria === key).length;
   if (
-    !confirm(
+    !(await chiediConferma(
       'Rimuovere la categoria "' +
         cat.label +
         '"?' +
         (nMov ? '\n\nI ' + nMov + ' movimenti registrati restano nel database ma non saranno più visibili.' : ''),
-    )
+    ))
   )
     return;
   _setInvCategorieReparto(getInvCategorieExtra().filter((c) => c.key !== key));
@@ -3240,7 +3246,7 @@ async function salvaInventarioSigUscita() {
   }
 }
 async function eliminaInventario(id) {
-  if (!confirm('Eliminare questo movimento?')) return;
+  if (!(await chiediConferma('Eliminare questo movimento?'))) return;
   try {
     await secDel('inventario', 'id=eq.' + id);
     inventarioCache = inventarioCache.filter((r) => r.id !== id);

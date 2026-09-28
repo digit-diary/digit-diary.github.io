@@ -2488,7 +2488,7 @@ async function briefGeneraPause() {
     return;
   }
   if (_briefState.pause && _briefState.pause.contenuto && _briefState.pause.contenuto.tipo) {
-    if (!confirm('Sovrascrivo le pause già generate per questa data?')) return;
+    if (!(await chiediConferma('Sovrascrivo le pause già generate per questa data?'))) return;
   }
   // slots = pattern manuali (dal tuo Excel); valet e ogni altro settore =
   // motore algoritmico (durate per fascia, gap, una-alla-volta)
@@ -2697,7 +2697,7 @@ function briefValetDelRiga(i) {
 }
 async function briefEliminaPause() {
   if (!puoGestireBriefing() || !_briefState || !_briefState.pause || !_briefState.pause.id) return;
-  if (!confirm('Elimino le pause di questa data?')) return;
+  if (!(await chiediConferma('Elimino le pause di questa data?'))) return;
   await secDel('piano_briefing', 'id=eq.' + _briefState.pause.id);
   _briefState.pause = null;
   renderPiano();
@@ -3654,7 +3654,11 @@ async function pePauseSalva() {
     if (es) es.innerHTML = '<span style="color:#c0392b;font-weight:700">' + escP(chk.errore) + '</span>';
     return;
   }
-  if (chk.avvisi.length && !confirm('Attenzione:\n\n- ' + chk.avvisi.join('\n- ') + '\n\nSalvare lo stesso?')) return;
+  if (
+    chk.avvisi.length &&
+    !(await chiediConferma('Attenzione:\n\n- ' + chk.avvisi.join('\n- ') + '\n\nSalvare lo stesso?'))
+  )
+    return;
   // le regole "una sola" (distanza, persone insieme) e quelle per lo stesso turno sostituiscono la precedente
   let nuova = altre.filter(
     (o) =>
@@ -3681,7 +3685,7 @@ async function pePauseElimina(i) {
   const lista = _peRegolePause().slice();
   const r = lista[i];
   if (!r) return;
-  if (!confirm('Eliminare la regola?\n\n' + _peRegolaDescr(r))) return;
+  if (!(await chiediConferma('Eliminare la regola?\n\n' + _peRegolaDescr(r)))) return;
   lista.splice(i, 1);
   if (!(await _pePauseSalvaRegole(lista))) return;
   logAzione('Regole pause', _peSettoreCorrente() + ': eliminata ' + _peRegolaDescr(r));
@@ -3690,7 +3694,8 @@ async function pePauseElimina(i) {
 }
 async function pePauseRipristina() {
   if (!isAdmin()) return;
-  if (!confirm('Tornare alle regole di partenza di questo settore? Le regole create qui vengono tolte.')) return;
+  if (!(await chiediConferma('Tornare alle regole di partenza di questo settore? Le regole create qui vengono tolte.')))
+    return;
   if (!(await _pePauseSalvaRegole(null))) return;
   logAzione('Regole pause', _peSettoreCorrente() + ': ripristinate le regole di partenza');
   toast('Regole di partenza ripristinate');
@@ -3778,7 +3783,7 @@ async function importaBriefingExcel(input) {
     }
     if (
       _briefState.righe.length &&
-      !confirm('Trovate ' + righe.length + ' righe nel file. Sostituisco il briefing attuale?')
+      !(await chiediConferma('Trovate ' + righe.length + ' righe nel file. Sostituisco il briefing attuale?'))
     )
       return;
     righe.sort((a, b) => {

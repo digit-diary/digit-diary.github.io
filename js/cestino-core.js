@@ -128,7 +128,7 @@ function renderCestino() {
   el.innerHTML = html;
 }
 async function ripristinaCestino(tabella, id) {
-  if (!confirm('Ripristinare questo elemento?')) return;
+  if (!(await chiediConferma('Ripristinare questo elemento?'))) return;
   try {
     await secPatch(tabella, 'id=eq.' + id, { eliminato: false, eliminato_da: null, eliminato_at: null });
     if (tabella === 'moduli') {
@@ -176,14 +176,14 @@ async function eliminaDefinitivo(tabella, id) {
   const rec = tabella === 'moduli' ? _cestinoModuli.find((x) => x.id === id) : _cestinoReg.find((x) => x.id === id);
   const dataRec = rec ? rec.data || rec.data_modulo || rec.created_at : null;
   if (typeof inArchivioProtetto === 'function' && dataRec && inArchivioProtetto(dataRec)) {
-    alert(
+    await mostraAvviso(
       "Non si puo' eliminare definitivamente.\n\nQuesta voce fa parte dell'archivio da conservare per " +
         conservazioneAnni() +
         " anni (regolamento aziendale).\n\nResta nel Cestino e si puo' ripristinare in qualsiasi momento.",
     );
     return;
   }
-  if (!confirm('Eliminare DEFINITIVAMENTE? Non potrà essere recuperato.')) return;
+  if (!(await chiediConferma('Eliminare DEFINITIVAMENTE? Non potrà essere recuperato.'))) return;
   try {
     await secDel(tabella, 'id=eq.' + id);
     if (tabella === 'moduli') _cestinoModuli = _cestinoModuli.filter((x) => x.id !== id);
@@ -213,7 +213,7 @@ async function svuotaCestino() {
   const regOk = _cestinoReg.filter((r) => !protetto(r));
   const nProt = tot - modOk.length - regOk.length;
   if (!modOk.length && !regOk.length) {
-    alert(
+    await mostraAvviso(
       'Niente da svuotare.\n\nTutte le ' +
         tot +
         " voci nel Cestino fanno parte dell'archivio da conservare per " +
@@ -223,7 +223,7 @@ async function svuotaCestino() {
     return;
   }
   if (
-    !confirm(
+    !(await chiediConferma(
       'Svuotare il cestino? ' +
         (modOk.length + regOk.length) +
         ' element' +
@@ -238,7 +238,7 @@ async function svuotaCestino() {
             conservazioneAnni() +
             ' anni.'
           : ''),
-    )
+    ))
   )
     return;
   try {
@@ -327,7 +327,7 @@ async function salvaFixImpiego() {
   }
   const sel = [...document.querySelectorAll('[data-fix-imp]')];
   if (!sel.length) return;
-  if (!confirm("Salvo l'impiego di " + sel.length + ' collaboratori?')) return;
+  if (!(await chiediConferma("Salvo l'impiego di " + sel.length + ' collaboratori?'))) return;
   let n = 0;
   for (const s of sel) {
     const id = parseInt(s.dataset.fixImp);
@@ -390,13 +390,13 @@ async function pulisciPianoDisattivati() {
       .join('\n');
     const totIds = daPulire.reduce((s, [, v]) => s + v.ids.length, 0);
     if (
-      !confirm(
+      !(await chiediConferma(
         'Questi mesi contengono SOLO riposi (C/V) senza commenti: sono righe di riempimento degli import, non storia di lavoro.\n\n' +
           elenco +
           '\n\nTogliere queste ' +
           totIds +
           ' celle dal piano? I mesi con turni veri restano.',
-      )
+      ))
     )
       return;
     const ids = daPulire.flatMap(([, v]) => v.ids);
@@ -430,7 +430,7 @@ async function apriFixDateNascita() {
     .sort((a, b) => (a.reparto_dip || '').localeCompare(b.reparto_dip || '') || a.nome.localeCompare(b.nome));
   const b = document.getElementById('pwd-modal-content');
   if (!mancanti.length) {
-    alert('Tutti i collaboratori attivi hanno la data di nascita.');
+    await mostraAvviso('Tutti i collaboratori attivi hanno la data di nascita.');
     return;
   }
   let h =
@@ -486,7 +486,9 @@ async function salvaFixDateNascita() {
   document.getElementById('pwd-modal').classList.add('hidden');
   toast(ok + ' date salvate' + (errori.length ? ', ' + errori.length + ' non valide' : ''));
   if (errori.length)
-    alert('Non ho capito questi valori: ' + errori.join(', ') + '\n\nUsa il formato gg.mm oppure gg.mm.aaaa');
+    await mostraAvviso(
+      'Non ho capito questi valori: ' + errori.join(', ') + '\n\nUsa il formato gg.mm oppure gg.mm.aaaa',
+    );
   if (typeof controlloSalute === 'function') controlloSalute();
 }
 async function pianoRilevaCongedoNonPagato() {
@@ -521,7 +523,7 @@ async function pianoRilevaCongedoNonPagato() {
       }))
       .filter((x) => x.mesi.length !== x.attuale);
     if (!proposte.length) {
-      alert(
+      await mostraAvviso(
         'Nessun congedo non pagato da registrare.\n\nNel piano non risultano mesi interi di sola "C" diversi da quanto gia\' segnato nelle schede.',
       );
       return;
@@ -543,12 +545,12 @@ async function pianoRilevaCongedoNonPagato() {
       )
       .join('\n');
     if (
-      !confirm(
+      !(await chiediConferma(
         'CONGEDO NON PAGATO (mesi interi di sola "C" nel piano)\n\n' +
           elenco +
           (proposte.length > 20 ? '\n... e altri ' + (proposte.length - 20) : '') +
           "\n\nRegistro questi mesi sulle schede? I giubilei si sposteranno in avanti di altrettanto.\n\nATTENZIONE: il piano copre solo gli anni presenti nel programma. I congedi piu' vecchi vanno aggiunti a mano nella scheda del collaboratore.",
-      )
+      ))
     )
       return;
     let fatti = 0;
@@ -661,13 +663,13 @@ async function apriFixOrfani() {
 }
 async function orfanoCreaScheda(nome, rep) {
   if (
-    !confirm(
+    !(await chiediConferma(
       'Creo la scheda di "' +
         nome +
         '" nel settore ' +
         repartoLabel(rep) +
         '?\n\nI suoi turni resteranno dove sono e da ora verranno conteggiati.',
-    )
+    ))
   )
     return;
   try {
@@ -688,9 +690,9 @@ async function orfanoSposta(nome, idx) {
     return;
   }
   if (
-    !confirm(
+    !(await chiediConferma(
       'Sposto tutti i turni di "' + nome + '" su "' + dest + '"?\n\nSi usa quando il nome era scritto in modo diverso.',
-    )
+    ))
   )
     return;
   try {
@@ -709,16 +711,16 @@ async function orfanoElimina(nome, n) {
     return;
   }
   if (
-    !confirm(
+    !(await chiediConferma(
       'ATTENZIONE: elimino ' +
         n +
         ' turni intestati a "' +
         nome +
         "\".\n\nDa fare solo se non e' una persona (righe rimaste da vecchie importazioni). L'operazione non si annulla.",
-    )
+    ))
   )
     return;
-  if (!confirm("Confermi definitivamente l'eliminazione dei " + n + ' turni di "' + nome + '"?')) return;
+  if (!(await chiediConferma("Confermi definitivamente l'eliminazione dei " + n + ' turni di "' + nome + '"?'))) return;
   try {
     await secDel('piano', 'collaboratore=eq.' + encodeURIComponent(nome));
     logAzione('Turni orfani eliminati', nome + ' (' + n + ' righe)');

@@ -458,7 +458,7 @@ async function applicaProfili() {
   }
   const senzaProfilo = tutti.filter((n) => !_profiloDi(n));
   const elenco = conProfilo.map((n) => n + ' = ' + _profiloNome(_profiloDi(n))).join('\n');
-  const ok = confirm(
+  const ok = await chiediConferma(
     'Applicare i profili?\n\n' +
       elenco +
       '\n\nVengono riscritte tutte le righe di Visibilita e permessi per questi ' +
@@ -694,7 +694,7 @@ async function profCustomSalva() {
   document.querySelectorAll('.prof-edit-voce').forEach((sel) => (voci[sel.dataset.k] = sel.value));
   if (
     !Object.values(voci).some((v) => v !== '-') &&
-    !confirm('Il profilo non concede nessuna voce: chi lo riceve non vede nulla. Salvare lo stesso?')
+    !(await chiediConferma('Il profilo non concede nessuna voce: chi lo riceve non vede nulla. Salvare lo stesso?'))
   )
     return;
   const id =
@@ -736,7 +736,7 @@ async function profCustomElimina(id) {
         usato.join(', ') +
         '. Questi operatori restano senza profilo; i loro permessi attuali non cambiano finche non premi "Applica i profili".'
       : '');
-  if (!confirm(msg)) return;
+  if (!(await chiediConferma(msg))) return;
   const obj = Object.assign({}, _profiliCustom());
   delete obj[id];
   if (!(await _salvaProfiliCustom(obj))) return;
@@ -1135,7 +1135,7 @@ async function cambiaRepartoOperatore(nome, rep) {
   toast(nome + ' → ' + rep);
 }
 async function rimuoviOperatore(n) {
-  if (!confirm('Rimuovere operatore "' + n + '"?')) return;
+  if (!(await chiediConferma('Rimuovere operatore "' + n + '"?'))) return;
   operatoriSalvati = operatoriSalvati.filter((o) => o !== n);
   if (!(await saveOperatori())) return;
   try {
@@ -1333,7 +1333,7 @@ async function aggiungiCampoRapporto() {
   toast('Campo aggiunto');
 }
 async function rimuoviCampoRapporto(key) {
-  if (!confirm('Rimuovere questo campo?')) return;
+  if (!(await chiediConferma('Rimuovere questo campo?'))) return;
   campiRapportoExtra = campiRapportoExtra.filter((c) => c.key !== key);
   if (!(await saveCampiExtra())) return;
   renderCampiRapportoUI();
@@ -1341,7 +1341,12 @@ async function rimuoviCampoRapporto(key) {
 }
 async function nascondiCampoDefault(key) {
   const d = CAMPI_RAPPORTO_DEFAULT.find((x) => x.key === key);
-  if (!confirm('Nascondere il campo "' + (d ? d.label : key) + '"? I dati esistenti non verranno eliminati.')) return;
+  if (
+    !(await chiediConferma(
+      'Nascondere il campo "' + (d ? d.label : key) + '"? I dati esistenti non verranno eliminati.',
+    ))
+  )
+    return;
   campiNascosti.push(key);
   if (!(await salvaImp('campi_nascosti', JSON.stringify(campiNascosti)))) return;
   renderCampiRapportoUI();
@@ -1817,7 +1822,7 @@ function renderConservazioneUI() {
 async function salvaConservazioneAnni(v) {
   if (!isAdmin()) return;
   const n = Math.max(0, Math.min(30, parseInt(v) || 0));
-  if (n < 5 && !confirm('Il regolamento chiede almeno 5 anni.\n\nConfermi comunque ' + n + ' anni?')) {
+  if (n < 5 && !(await chiediConferma('Il regolamento chiede almeno 5 anni.\n\nConfermi comunque ' + n + ' anni?'))) {
     renderConservazioneUI();
     return;
   }
@@ -1969,13 +1974,13 @@ async function toggleAttivoSettore(key) {
       collaboratoriCache.filter((c) => c.reparto_dip === key).length +
       datiCache.filter((d) => d.reparto_dip === key).length;
     if (
-      !confirm(
+      !(await chiediConferma(
         'Disattivare il settore "' +
           r.label +
           '"?\n\nSparisce dallo switch e dai menu ma NESSUN dato viene toccato' +
           (nDati ? ' (' + nDati + ' record restano al sicuro)' : '') +
           '. Puoi riattivarlo quando vuoi.',
-      )
+      ))
     )
       return;
   }
@@ -2065,7 +2070,7 @@ async function modificaGiubileo(idx, val) {
 async function rimuoviGiubileo(idx) {
   const cfg = getGiubileoConfig();
   if (!cfg[idx]) return;
-  if (!confirm('Rimuovere lo scaglione ' + cfg[idx].anni + ' anni?')) return;
+  if (!(await chiediConferma('Rimuovere lo scaglione ' + cfg[idx].anni + ' anni?'))) return;
   const rimosso = cfg.splice(idx, 1)[0];
   if (!(await _salvaGiubileoConfig(cfg))) return;
   logAzione('Giubileo: scaglione rimosso', rimosso.anni + ' anni');

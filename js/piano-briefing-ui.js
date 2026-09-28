@@ -1122,9 +1122,9 @@ async function briefEliminaRiga(i) {
 async function briefAggiornaCd() {
   if (!_briefState || !puoGestireBriefing() || _briefIsValet()) return;
   if (
-    !confirm(
+    !(await chiediConferma(
       'Ricalcolo i numeri cassa di questo briefing con la rotazione aggiornata (chi ha chiuso ieri riapre oggi)?\n\nI nomi e i turni restano come sono; solo la colonna CD viene riassegnata.',
-    )
+    ))
   )
     return;
   _briefState.righe.forEach((r) => {
@@ -1139,7 +1139,10 @@ async function briefAggiornaCd() {
 }
 async function briefCompila() {
   if (!_briefState || !puoGestireBriefing()) return;
-  if (_briefState.righe.length && !confirm('Sostituisco le righe attuali con i turni del piano di ' + _briefData + '?'))
+  if (
+    _briefState.righe.length &&
+    !(await chiediConferma('Sostituisco le righe attuali con i turni del piano di ' + _briefData + '?'))
+  )
     return;
   _briefState.righe = _briefComponi(_briefState.pianoRighe);
   await _briefAggiungiScoperti(_briefState.righe, _briefData);
@@ -1233,7 +1236,7 @@ async function briefEvidRimuovi(i) {
   const rep = _pianoReparto();
   const lista = _briefEvidenziazioni(rep).slice();
   if (!lista[i]) return;
-  if (!confirm('Rimuovere questa evidenziazione?')) return;
+  if (!(await chiediConferma('Rimuovere questa evidenziazione?'))) return;
   lista.splice(i, 1);
   await _briefEvidPersisti(rep, lista);
   toast('Evidenziazione rimossa');
@@ -1372,7 +1375,8 @@ async function corsoOre(cod, ore) {
 }
 async function corsoRimuovi(cod) {
   if (!isAdmin()) return;
-  if (!confirm('Togliere ' + cod + ' dalla lista corsi? (il codice resta tra i codici del piano)')) return;
+  if (!(await chiediConferma('Togliere ' + cod + ' dalla lista corsi? (il codice resta tra i codici del piano)')))
+    return;
   window._pianoCorsiLista = (window._pianoCorsiLista || []).filter((x) => x !== cod);
   await _corsiSalvaLista();
   logAzione('Corsi', 'Rimosso dalla lista: ' + cod);
@@ -1505,7 +1509,7 @@ async function pianoInserisciCorso() {
     toast('Scegli corso, data e almeno un partecipante');
     return;
   }
-  if (!_pianoConsentiScrittura(data)) return; // giorno chiuso: stessa regola del piano
+  if (!(await _pianoConsentiScrittura(data))) return; // giorno chiuso: stessa regola del piano
   try {
     // celle di QUEL giorno di tutti i settori: chi lavora in due settori puo'
     // avere la cella nell'altro piano (prima risultava libero e l'inserimento
@@ -1538,7 +1542,7 @@ async function pianoInserisciCorso() {
       }
     }
     if (
-      !confirm(
+      !(await chiediConferma(
         etichettaCorso +
           ' del ' +
           data.split('-').reverse().join('.') +
@@ -1572,12 +1576,12 @@ async function pianoInserisciCorso() {
             ? '\n• Altre celle (assenze/congedi), esclusi: ' +
               occupateAltre.map((x) => x.nome + ' (' + x.ex.codice + ')').join(', ')
             : ''),
-      )
+      ))
     )
       return;
     let sovrascrivi = false;
     if (conflitti.length || occupateAltre.length)
-      sovrascrivi = confirm(
+      sovrascrivi = await chiediConferma(
         'Sovrascrivo comunque le celle di chi ha turno sovrapposto o altra cella?\n(Annulla = restano come sono, consigliato)',
       );
     let inseriti = 0;

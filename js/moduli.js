@@ -334,13 +334,13 @@ async function generaModuloPDF(tipo) {
     if (!((document.getElementById('mod-obiettivo') || {}).value || '').trim()) vuoti.push('Obiettivo concordato');
     if (vuoti.length) {
       if (
-        !confirm(
+        !(await chiediConferma(
           'Questo documento va nel fascicolo personale di ' +
             collab +
             ' e manca:\n\n\u2022 ' +
             vuoti.join('\n\u2022 ') +
             '\n\nGenerarlo comunque?',
-        )
+        ))
       ) {
         _highlightField(
           vuoti.length === 2 || vuoti[0].indexOf('Non conformita') === 0 ? 'mod-non-conf' : 'mod-obiettivo',
@@ -1053,7 +1053,7 @@ async function eliminaModulo(id) {
     toast('Non hai il permesso');
     return;
   }
-  if (!confirm('Eliminare questo modulo? Sarà spostato nel cestino.')) return;
+  if (!(await chiediConferma('Eliminare questo modulo? Sarà spostato nel cestino.'))) return;
   const _m = moduliCache.find((x) => x.id === id);
   const op = getOperatore();
   const now = new Date().toISOString();
@@ -1112,7 +1112,7 @@ async function cambiaDataCollaboratore(id, campo, valore) {
   if (
     c &&
     c[campo] &&
-    !confirm(
+    !(await chiediConferma(
       etichetta +
         ' di ' +
         c.nome +
@@ -1127,7 +1127,7 @@ async function cambiaDataCollaboratore(id, campo, valore) {
             : val.split('-').reverse().join('.')
           : 'nessuna data') +
         '\n\nConfermi la modifica?',
-    )
+    ))
   ) {
     renderCollaboratoriUI();
     return;
@@ -1701,7 +1701,7 @@ async function cambiaCategoriaCollaboratore(id, cat) {
 }
 async function disattivaCollaboratore(nome) {
   if (!_soloAdminAnagrafica()) return;
-  if (!confirm('Disattivare "' + nome + '"? Non apparirà più nell\'autocomplete.')) return;
+  if (!(await chiediConferma('Disattivare "' + nome + '"? Non apparirà più nell\'autocomplete.'))) return;
   try {
     await secPatch('collaboratori', 'nome=eq.' + encodeURIComponent(nome), {
       attivo: false,

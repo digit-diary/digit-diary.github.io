@@ -279,7 +279,7 @@ function canaleSicuro(c, A) {
       setTimeout,
       clearTimeout,
       localStorage: { getItem: () => 'piano' },
-      confirm: () => true,
+      chiediConferma: async () => true,
       toast: (m) => messaggi.push(m),
       toastErrore: (m) => messaggi.push('ERRORE ' + m),
       getOperatore: () => 'Test',

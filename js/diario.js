@@ -31,7 +31,7 @@ async function salva() {
         dFine = new Date(malAl + 'T12:00:00');
       const nGiorni = Math.round((dFine - dInizio) / 86400000) + 1;
       if (
-        !confirm(
+        !(await chiediConferma(
           nome +
             ': registrare ' +
             nGiorni +
@@ -40,7 +40,7 @@ async function salva() {
             ' al ' +
             dFine.toLocaleDateString('it-IT') +
             '?',
-        )
+        ))
       )
         return;
       let creati = 0;
@@ -122,14 +122,14 @@ async function salva() {
     const fuoriT = typeof ndGiornoFuoriTempo === 'function' ? sorted.filter((ds) => ndGiornoFuoriTempo(ds)) : [];
     if (fuoriT.length) {
       if (
-        !confirm(
+        !(await chiediConferma(
           '\u26a0 ' +
             fuoriT.length +
             (fuoriT.length === 1 ? " giorno e'" : ' giorni sono') +
             " FUORI TEMPO (il termine di consegna era gia' passato):\n\n" +
             fuoriT.map((ds) => '\u2022 ' + new Date(ds + 'T12:00:00').toLocaleDateString('it-IT')).join('\n') +
             '\n\nRegistro comunque? La nota "fuori termine" restera\' scritta.',
-        )
+        ))
       )
         return;
     }
@@ -201,7 +201,7 @@ async function salva() {
         msg += '\n\nCon 2+ ammonimenti verbali per lo stesso motivo, valuta di preparare un modulo di Allineamento.';
     }
     msg += '\n\nVuoi aggiungere comunque?';
-    if (!confirm(msg)) return;
+    if (!(await chiediConferma(msg))) return;
   }
   const rec = {
     id: Date.now(),
@@ -335,7 +335,7 @@ async function _creaFollowUp(nome, testo, dataDirecta) {
   }
 }
 async function elimina(id) {
-  if (!confirm('Eliminare? Sarà spostata nel cestino.')) return;
+  if (!(await chiediConferma('Eliminare? Sarà spostata nel cestino.'))) return;
   const _e = datiCache.find((x) => x.id === id);
   const op = getOperatore();
   const now = new Date().toISOString();

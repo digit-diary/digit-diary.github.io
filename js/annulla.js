@@ -387,7 +387,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   async function annullaGlobale() {
     const s = window.Annulla.stato();
     if (!s.annulla || s.inCorso) return;
-    if (!confirm('Annullare: ' + s.ultima + '?')) return;
+    if (!(await chiediConferma('Annullare: ' + s.ultima + '?'))) return;
     try {
       const g = await window.Annulla.annulla();
       if (!g) return;

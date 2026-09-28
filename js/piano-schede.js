@@ -22,7 +22,7 @@ async function _pianoCaricaTimbrature() {
 async function eliminaTimbratura(id) {
   if (!puoGestirePiano()) return;
   const t = _pianoTimbrature.find((x) => x.id === id);
-  if (!t || !confirm('Eliminare la timbratura di ' + t.collaboratore + ' del ' + t.data + '?')) return;
+  if (!t || !(await chiediConferma('Eliminare la timbratura di ' + t.collaboratore + ' del ' + t.data + '?'))) return;
   try {
     await secDel('piano_timbrature', 'id=eq.' + id);
     _pianoTimbrature = _pianoTimbrature.filter((x) => x.id !== id);
@@ -196,13 +196,13 @@ async function importaTimbrature(input) {
       return;
     }
     if (
-      !confirm(
+      !(await chiediConferma(
         'Importare ' +
           valide.length +
           ' timbrature?' +
           (scartate.length ? '\n(' + scartate.length + ' righe scartate: nome/data non riconosciuti)' : '') +
           '\nLe timbrature già presenti per lo stesso giorno non vengono toccate.',
-      )
+      ))
     )
       return;
     let ok = 0;
@@ -1210,7 +1210,7 @@ async function pianoSaldoIniziale(nome) {
   }
   const anno = parseInt(_pianoMeseSel.split('-')[0]);
   const att = _pianoSaldoIniz[nome + '|' + anno];
-  const val = prompt(
+  const val = await chiediTesto(
     'Riporto ore di ' +
       nome +
       ' per il ' +
@@ -1235,7 +1235,7 @@ async function pianoSaldoIniziale(nome) {
         toast('Valore fuori scala (da -500 a +500)');
         return;
       }
-      const quando = prompt(
+      const quando = await chiediTesto(
         'A quando e aggiornato questo riporto? (giorno.mese.anno)\n\nNel foglio Excel era il 31.08.2026.',
         att && att.data_riferimento
           ? String(att.data_riferimento).split('-').reverse().join('.')
@@ -2062,7 +2062,7 @@ async function modificaVacanza(id) {
   if (!puoGestirePiano()) return;
   const v = _pianoVacCache.find((x) => x.id === id);
   if (!v) return;
-  const risp = prompt('Nuova settimana per ' + v.collaboratore + ' (1-53):', String(v.settimana));
+  const risp = await chiediTesto('Nuova settimana per ' + v.collaboratore + ' (1-53):', String(v.settimana));
   if (risp === null) return;
   const sett = parseInt(risp);
   if (isNaN(sett) || sett < 1 || sett > 53) {
@@ -2086,7 +2086,8 @@ async function modificaVacanza(id) {
 async function eliminaVacanza(id) {
   if (!puoGestirePiano()) return;
   const v = _pianoVacCache.find((x) => x.id === id);
-  if (!v || !confirm('Eliminare la vacanza di ' + v.collaboratore + ' settimana ' + v.settimana + '?')) return;
+  if (!v || !(await chiediConferma('Eliminare la vacanza di ' + v.collaboratore + ' settimana ' + v.settimana + '?')))
+    return;
   try {
     await secDel('piano_vacanze', 'id=eq.' + id);
     logAzione('Vacanza eliminata', v.collaboratore + ' settimana ' + v.settimana + '/' + v.anno);
@@ -2099,7 +2100,7 @@ async function eliminaTutteVacanze() {
   if (!puoGestirePiano()) return;
   const anno = window._pianoVacAnno;
   if (
-    !confirm(
+    !(await chiediConferma(
       'Eliminare TUTTE le vacanze del ' +
         anno +
         ' di ' +
@@ -2107,7 +2108,7 @@ async function eliminaTutteVacanze() {
         '? (' +
         _pianoVacCache.length +
         ' settimane)\n\nGli altri settori non vengono toccati.',
-    )
+    ))
   )
     return;
   try {
@@ -2360,13 +2361,13 @@ async function applicaVacanzePiano() {
   const MESI_L = MESI_FULL || [];
   const lbl = (MESI_L[parseInt(_pianoMeseSel.split('-')[1]) - 1] || '') + ' ' + _pianoMeseSel.split('-')[0];
   if (
-    !confirm(
+    !(await chiediConferma(
       'Applicare le vacanze a ' +
         lbl +
         ' (' +
         repartoLabel(_pianoReparto()) +
         ')?\n\nScrive le V (protette) sui giorni di vacanza, i congedi C prima/dopo i blocchi e i WD (diurno forzato) secondo le regole. Le celle protette esistenti non vengono toccate.',
-    )
+    ))
   )
     return;
   _pianoUndoSnap('applica vacanze ' + _pianoMeseSel);
@@ -2620,7 +2621,7 @@ async function importaVacanzePiano(input) {
     msg += gia
       ? '\n\nOK = SOSTITUISCO le settimane di queste persone con quelle del file.\nAnnulla = non faccio nulla.'
       : '\n\nProcedo con l’inserimento?';
-    if (!confirm(msg)) return;
+    if (!(await chiediConferma(msg))) return;
     // sostituzione: si toccano solo le persone presenti nel file
     for (const t of trovati) {
       const vecchie = _pianoVacCache.filter((v) => v.collaboratore === t.nome && v.anno === anno);
