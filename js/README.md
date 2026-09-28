@@ -1,4 +1,4 @@
-# Diario Collaboratori — Struttura JavaScript (39 file)
+# Diario Collaboratori — Struttura JavaScript (40 file)
 
 ## Ordine di caricamento (IMPORTANTE)
 
@@ -23,36 +23,37 @@ Ordine = ordine di caricamento in index.html. Il Piano di lavoro e diviso in die
 | 7 | api.js | 352 | loadAll, healthCheck, caricamento impostazioni |
 | 8 | utils.js | 795 | toast/toastErrore, escP, fmtCHF, salvaImp, settori (REPARTI_BASE), ordineCollabPiano, helpers |
 | 9 | auth.js | 669 | Login, password, sessioni a token, sblocco biometrico v4 |
-| 10 | cestino-core.js | 1112 | Soft delete, ripristino, conservazione dati, controllo salute, DB stats |
-| 11 | settings.js | 2371 | Visibilita e permessi, profili fissi e personalizzati, operatori (creazione con posizione/copia accessi), settori, scheda permessi stampabile, backup, Impostazioni a schede |
-| 12 | app.js | 475 | Routing pagine, init, renderPostLogin, tipi di evento |
+| 10 | cestino-core.js | 1107 | Soft delete, ripristino, conservazione dati, controllo salute, DB stats |
+| 11 | settings.js | 2397 | Visibilita e permessi, profili fissi e personalizzati, operatori (creazione con posizione/copia accessi), settori, scheda permessi stampabile, backup, Impostazioni a schede |
+| 12 | app.js | 472 | Routing pagine, init, renderPostLogin, tipi di evento |
 | 13 | diario.js | 992 | Registrazioni; malattie a periodo sincronizzate nel Piano |
 | 14 | alerts.js | 701 | Alert cassa/rischio/ammonimenti, soglie personalizzabili |
 | 15 | search.js | 734 | Ricerca globale, riepilogo mensile PDF |
 | 16 | chat-ui.js | 4044 | Chat + scheda collaboratore (KPI, cronologia, PDF, congedi, riga Crediti) |
-| 17 | moduli.js | 2965 | Moduli disciplinari, PDF, AI senza dati personali, anagrafica collaboratori |
-| 18 | formazione.js | 3073 | Multidisciplinarita: matrice competenze, livelli, punti/premi, Report Incentivi |
-| 19 | valutazioni.js | 1177 | Valutazione annuale: aree, import Excel, PDF HR |
-| 20 | rapporto.js | 1096 | Rapporto giornaliero, parser assenze/cassa |
-| 21 | stats.js | 975 | Statistiche, grafici |
-| 22 | consegna.js | 1650 | Consegne turno, dashboard |
-| 23 | promemoria.js | 1124 | Promemoria, scadenze, push |
-| 24 | maison-core.js | 3230 | Maison: dashboard, costi, form manuale, auto-pulizia |
-| 25 | maison-budget.js | 1190 | Maison: budget, categorie, profilo |
-| 26 | maison-helpers.js | 3926 | Maison import Excel/parser + filtri per settore + inventario; giubilei e anzianita con congedi non pagati |
-| 27 | guida.js | 545 | Guida in linea per capitoli, filtrata per permessi |
-| 28 | piano-regole.js | 611 | MOTORE REGOLE del piano in funzioni pure (UMD, testabile con Node): riposi, consecutivi, idoneita, vacanze spettanti, chiusure, giorni chiusi |
-| 29 | piano-core.js | 2258 | PIANO · nucleo: stato, helpers, sincronizzazione malattie, barra schede, rendering della griglia (primo dei file piano-*.js) |
-| 30 | piano-genera.js | 1193 | PIANO · validatore regole e generatore della bozza (prenotazioni, passata di riparazione) |
-| 31 | piano-config.js | 1764 | PIANO · scheda Regole (per settore, guida, controlli), fabbisogni, turni, codici, festivi |
-| 32 | piano-gestione.js | 3073 | PIANO · benessere e domeniche, settore, festivi automatici, recupero ore, festivita e chiusure, CGF (RAP 4.3), congedi non pagati |
-| 33 | piano-cambi.js | 2341 | PIANO · copia Excel, stampa PDF, cambi turno (scambio, esigenze, cerca cambio), copertura malattia |
-| 34 | piano-schede.js | 2950 | PIANO · timbrature, statistiche, import vacanze, saldo ore dell anno, esportazione formato HR |
-| 35 | piano-impostazioni.js | 1550 | PIANO · mappature e impostazioni, solver esterno, formulari, card congedi non pagati |
-| 36 | piano-celle.js | 1051 | PIANO · stampa singolo collaboratore, menu tasto destro, modifica rapida delle celle |
-| 37 | piano-briefing-ui.js | 1633 | PIANO · scheda Briefing (compilazione, numeri cassa, formato) e corsi |
-| 38 | piano-extra.js | 2278 | PIANO · copia/incolla a blocchi, annulla/ripristina, selezione sparsa, trova, migliora ore, formazione, scheda Crediti |
-| 39 | pause-engine.js | 3803 | PAUSE del briefing: schemi Slots (porting Excel), motore algoritmico Valet/altri, regole pause per settore, verifica, PDF |
+| 17 | ai.js | 457 | Intelligenza artificiale configurabile: fornitori compatibili (Groq, Ollama/Llama, LM Studio), in uso e riserva, chiavi nel database (get_ai_key/set_ai_key), prova collegamento, aiChat/aiModello/aiPronta |
+| 18 | moduli.js | 2846 | Moduli disciplinari, PDF, AI senza dati personali, anagrafica collaboratori |
+| 19 | formazione.js | 3073 | Multidisciplinarita: matrice competenze, livelli, punti/premi, Report Incentivi |
+| 20 | valutazioni.js | 1177 | Valutazione annuale: aree, import Excel, PDF HR |
+| 21 | rapporto.js | 1096 | Rapporto giornaliero, parser assenze/cassa |
+| 22 | stats.js | 983 | Statistiche, grafici |
+| 23 | consegna.js | 1650 | Consegne turno, dashboard |
+| 24 | promemoria.js | 1124 | Promemoria, scadenze, push |
+| 25 | maison-core.js | 3230 | Maison: dashboard, costi, form manuale, auto-pulizia |
+| 26 | maison-budget.js | 1190 | Maison: budget, categorie, profilo |
+| 27 | maison-helpers.js | 3926 | Maison import Excel/parser + filtri per settore + inventario; giubilei e anzianita con congedi non pagati |
+| 28 | guida.js | 545 | Guida in linea per capitoli, filtrata per permessi |
+| 29 | piano-regole.js | 611 | MOTORE REGOLE del piano in funzioni pure (UMD, testabile con Node): riposi, consecutivi, idoneita, vacanze spettanti, chiusure, giorni chiusi |
+| 30 | piano-core.js | 2258 | PIANO · nucleo: stato, helpers, sincronizzazione malattie, barra schede, rendering della griglia (primo dei file piano-*.js) |
+| 31 | piano-genera.js | 1193 | PIANO · validatore regole e generatore della bozza (prenotazioni, passata di riparazione) |
+| 32 | piano-config.js | 1764 | PIANO · scheda Regole (per settore, guida, controlli), fabbisogni, turni, codici, festivi |
+| 33 | piano-gestione.js | 3073 | PIANO · benessere e domeniche, settore, festivi automatici, recupero ore, festivita e chiusure, CGF (RAP 4.3), congedi non pagati |
+| 34 | piano-cambi.js | 2341 | PIANO · copia Excel, stampa PDF, cambi turno (scambio, esigenze, cerca cambio), copertura malattia |
+| 35 | piano-schede.js | 2950 | PIANO · timbrature, statistiche, import vacanze, saldo ore dell anno, esportazione formato HR |
+| 36 | piano-impostazioni.js | 1550 | PIANO · mappature e impostazioni, solver esterno, formulari, card congedi non pagati |
+| 37 | piano-celle.js | 1051 | PIANO · stampa singolo collaboratore, menu tasto destro, modifica rapida delle celle |
+| 38 | piano-briefing-ui.js | 1633 | PIANO · scheda Briefing (compilazione, numeri cassa, formato) e corsi |
+| 39 | piano-extra.js | 2278 | PIANO · copia/incolla a blocchi, annulla/ripristina, selezione sparsa, trova, migliora ore, formazione, scheda Crediti |
+| 40 | pause-engine.js | 3803 | PAUSE del briefing: schemi Slots (porting Excel), motore algoritmico Valet/altri, regole pause per settore, verifica, PDF |
 
 **Totale: 38 file, 58.944 righe (prettier --single-quote --print-width 120, solo JS).**
 

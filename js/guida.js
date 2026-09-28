@@ -147,6 +147,17 @@ function GUIDA_CAPITOLI() {
       ],
     },
     {
+      area: 'admin',
+      titolo: 'Intelligenza artificiale: quale usare',
+      vis: () => _guidaAdmin(),
+      righe: [
+        'In <b>Impostazioni > Persone e accessi > Intelligenza artificiale</b> c e l elenco dei fornitori. Uno e <b>In uso</b>; un altro puo fare da <b>Riserva</b>, usata da sola se il primo non risponde.',
+        '<b>Aggiungi fornitore</b>: si sceglie il tipo (Groq, Ollama o LM Studio sul server interno, altro servizio compatibile), l indirizzo, il modello per i testi e quello per i moduli, e la chiave se serve. Con un modello sul server interno (per esempio Llama con Ollama, indirizzo <b>/ai/v1</b>) i testi non escono dal casino.',
+        '<b>Prova</b> manda una domanda brevissima e mostra il tempo di risposta e i modelli disponibili; <b>Usa</b> rende attivo quel fornitore per tutti.',
+        'In ogni caso i nomi dei collaboratori vengono sostituiti prima dell invio e le fotografie non escono dal programma.',
+      ],
+    },
+    {
       area: 'piano',
       titolo: 'Piano: calendario',
       vis: () => _guidaVis('piano'),

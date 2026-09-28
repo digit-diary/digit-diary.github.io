@@ -3684,11 +3684,8 @@
         <div id="biometric-settings" class="sez-box"></div>
       </div>
       <div class="settings-section" data-gruppo="Persone e accessi" id="ai-section" style="display: none">
-        <div class="sez-head"><div><h4>Assistente AI</h4><p class="sez-desc">Migliora i testi dei moduli disciplinari. I nomi dei collaboratori non escono mai dal programma (vengono sostituiti da segnaposto) e le foto non vengono inviate. Chiave gratuita su <a href="https://console.groq.com/keys" target="_blank">console.groq.com</a>.</p></div></div>
-        <div class="add-tipo-row sez-form"><div class="field"><label>Chiave API Groq</label><input type="password" id="groq-key-input" placeholder="gsk_..." /></div><button class="btn-add-tipo" onclick="salvaGroqKey()">Salva chiave</button></div>
-        <p id="groq-status" class="sez-stato"></p>
-        <p class="sez-sottotitolo">Modelli</p><p class="sez-desc">Se Groq ne dismette uno basta aggiornare il nome qui.</p>
-        <div class="add-tipo-row sez-form"><div class="field"><label>Testi</label><input type="text" id="groq-mod-testo" /></div><div class="field"><label>Moduli (JSON)</label><input type="text" id="groq-mod-json" /></div><input type="hidden" id="groq-mod-vision" /><button class="btn-add-tipo" onclick="salvaGroqModelli()">Salva modelli</button><button class="btn-secondario" onclick="ripristinaGroqModelli()">Ripristina predefiniti</button></div>
+        <div class="sez-head"><div><h4>Intelligenza artificiale</h4><p class="sez-desc">Migliora i testi dei moduli e dell Assistente. Si puo usare un servizio esterno (Groq) oppure un modello sul server interno (Ollama o LM Studio con Llama, Qwen, Mistral): uno e in uso, un altro puo fare da riserva. I nomi dei collaboratori vengono sempre sostituiti prima dell invio e le fotografie non escono dal programma.</p></div></div>
+        <div id="ai-fornitori-ui"></div>
       </div>
       <div class="settings-section" data-gruppo="Maison" id="maison-privacy-section" style="display: none">
         <div class="sez-head"><div><h4>Conservazione dati Maison</h4><p class="sez-desc">Per privacy le registrazioni dei Costi Maison piu vecchie del periodo scelto vengono cancellate definitivamente all apertura del programma. Le funzioni manuali Elimina giorno e Elimina mese restano.</p></div></div>
@@ -3774,6 +3771,7 @@
     <script src="js/alerts.js"></script>
     <script src="js/search.js"></script>
     <script src="js/chat-ui.js"></script>
+    <script src="js/ai.js"></script>
     <script src="js/moduli.js"></script>
     <script src="js/formazione.js"></script>
     <script src="js/valutazioni.js"></script>

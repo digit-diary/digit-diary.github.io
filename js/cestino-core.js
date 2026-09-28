@@ -1085,16 +1085,11 @@ async function _healthCheck() {
   if (!window.Chart) problems.push('Libreria grafici (Chart.js) non caricata');
   if (!window.flatpickr) problems.push('Libreria calendario (Flatpickr) non caricata');
   if (!window.XLSX) problems.push('Libreria Excel (XLSX) non caricata');
-  // 3. Groq AI (solo se configurata)
-  if (groqKey) {
-    try {
-      const r = await fetch('https://api.groq.com/openai/v1/models', {
-        headers: { Authorization: 'Bearer ' + groqKey },
-      });
-      if (!r.ok) problems.push('API Groq AI non risponde (chiave scaduta?)');
-    } catch (e) {
-      problems.push('API Groq AI non raggiungibile');
-    }
+  // 3. Intelligenza artificiale (solo se configurata): prova il fornitore in uso
+  if (typeof aiPronta === 'function' && aiPronta()) {
+    const f = aiFornitoreAttivo();
+    const e = await aiProva(f.id);
+    if (!e.ok) problems.push('Intelligenza artificiale (' + f.nome + ') non risponde: ' + e.errore);
   }
   // 4. Token sessione
   const tk = getOpToken();

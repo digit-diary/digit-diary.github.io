@@ -5769,3 +5769,100 @@ header h1 {
 .nav-tab {
   padding: 9px 10px;
 }
+
+/* INTELLIGENZA ARTIFICIALE: elenco dei fornitori (Impostazioni) */
+.ai-riga {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.ai-riga.ai-attivo {
+  border-left: 3px solid var(--c-verde);
+}
+.ai-info {
+  flex: 1 1 360px;
+  min-width: 0;
+}
+.ai-nome {
+  font-weight: 700;
+  font-size: var(--fs-base);
+}
+.ai-dett {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  margin-top: 3px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.ai-esito {
+  font-size: var(--fs-sm);
+  margin-top: 4px;
+}
+.ai-attesa {
+  color: var(--muted);
+}
+.ai-azioni {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.ai-badge,
+.ai-badge-ris {
+  color: #fff;
+  font-size: var(--fs-xs);
+  padding: 1px 7px;
+  border-radius: 2px;
+  vertical-align: middle;
+}
+.ai-badge {
+  background: #2c6e49;
+}
+.ai-badge-ris {
+  background: #5d6d7e;
+}
+.btn-secondario.btn-pericolo {
+  color: var(--c-rosso);
+  border-color: var(--c-rosso);
+}
+.ai-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: min(440px, 80vw);
+}
+.ai-form label {
+  font-size: var(--fs-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+  margin-top: 8px;
+}
+.ai-form label.ai-check {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--fs-sm);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.ai-form input[type="text"],
+.ai-form input[type="password"],
+.ai-form select {
+  height: 2.25rem;
+  padding: 0 0.75rem;
+  font-family: "Source Sans 3", sans-serif;
+  font-size: var(--fs-md);
+  color: var(--ink);
+  background: var(--paper2);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+.ai-nota {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  margin-top: 8px;
+  line-height: 1.45;
+}

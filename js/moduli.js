@@ -1502,7 +1502,9 @@ function _coperturaChipHtml(c) {
     : 'Copertura...';
   return (
     '<button class="btn-del-tipo" title="Settori in cui questo collaboratore puo\' coprire i buchi" style="' +
-    (sett.length ? 'color:var(--c-blu,#1a4a7a);border-color:var(--c-blu,#1a4a7a);font-weight:600' : 'color:var(--muted)') +
+    (sett.length
+      ? 'color:var(--c-blu,#1a4a7a);border-color:var(--c-blu,#1a4a7a);font-weight:600'
+      : 'color:var(--muted)') +
     '" onclick="apriCoperturaCollab(' +
     c.id +
     ')">' +
@@ -1956,130 +1958,7 @@ async function importaCollaboratori(input) {
   if (aggiunti) logAzione('Importa collaboratori', aggiunti + ' nomi importati da ' + file.name);
 }
 
-// ASSISTENTE AI GROQ
-let groqKey = '';
-// Modelli correnti (ago 2026: Groq ha DISMESSO tutti i llama-3.x · un modello
-// hard-coded morto rompeva l'AI ovunque con l'errore fuorviante "verifica la chiave").
-// I nomi sono personalizzabili da Impostazioni (imp 'groq_modelli'): una futura dismissione
-// si risolve senza toccare il codice; su 404/429/503 scatta il fallback automatico.
-const GROQ_MODELLI_DEFAULT = {
-  testo: 'openai/gpt-oss-120b', // il migliore per testi formali (modello con reasoning: servono max_tokens abbondanti)
-  json: 'qwen/qwen3.8-27b', // affidabile con response_format json_object
-  vision: 'qwen/qwen3.8-27b', // supporta le immagini
-};
-const GROQ_FALLBACK = 'qwen/qwen3.8-27b'; // riserva se il modello principale è morto o sovraccarico
-let _groqModelli = Object.assign({}, GROQ_MODELLI_DEFAULT);
-function groqModel(tipo) {
-  return _groqModelli[tipo] || GROQ_MODELLI_DEFAULT[tipo] || GROQ_FALLBACK;
-}
-async function _groqChat(body, _ritentato) {
-  const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + groqKey },
-    body: JSON.stringify(body),
-  });
-  if (!r.ok) {
-    const t = await r.text();
-    console.error('Groq error', r.status, t);
-    // Fallback automatico: modello dismesso o sovraccarico → riprova col modello di riserva
-    if (!_ritentato && (r.status === 404 || r.status === 429 || r.status === 503)) {
-      if (body.model !== GROQ_FALLBACK) {
-        console.warn('Groq: riprovo con il modello di riserva', GROQ_FALLBACK);
-        return _groqChat(Object.assign({}, body, { model: GROQ_FALLBACK }), true);
-      }
-      if (r.status !== 404) {
-        await new Promise((res) => setTimeout(res, 2500));
-        return _groqChat(body, true);
-      }
-    }
-    if (r.status === 401 || r.status === 403) throw new Error('Chiave Groq non valida: controllala nelle Impostazioni');
-    if (r.status === 404)
-      throw new Error('Modello AI non più disponibile: aggiorna i nomi dei modelli nelle Impostazioni');
-    if (r.status === 429 || r.status === 503)
-      throw new Error('AI momentaneamente sovraccarica: riprova tra qualche secondo');
-    throw new Error('Errore AI (' + r.status + ')');
-  }
-  const data = await r.json();
-  const txt = data.choices?.[0]?.message?.content;
-  if (!txt) throw new Error("Nessuna risposta dall'AI");
-  return txt;
-}
-async function _loadGroqModelli() {
-  try {
-    const gm = await getImp('groq_modelli');
-    if (gm) _groqModelli = Object.assign({}, GROQ_MODELLI_DEFAULT, JSON.parse(gm));
-  } catch (e) {}
-  ['testo', 'json', 'vision'].forEach((t) => {
-    const el = document.getElementById('groq-mod-' + t);
-    if (el) el.value = _groqModelli[t];
-  });
-}
-async function salvaGroqModelli() {
-  const nuovo = {};
-  ['testo', 'json', 'vision'].forEach((t) => {
-    const v = ((document.getElementById('groq-mod-' + t) || {}).value || '').trim();
-    nuovo[t] = v || GROQ_MODELLI_DEFAULT[t];
-  });
-  _groqModelli = nuovo;
-  await setImp('groq_modelli', JSON.stringify(nuovo));
-  logAzione('Modelli AI aggiornati', nuovo.testo + ' / ' + nuovo.json + ' / ' + nuovo.vision);
-  toast('Modelli AI salvati');
-  _loadGroqModelli();
-}
-async function ripristinaGroqModelli() {
-  _groqModelli = Object.assign({}, GROQ_MODELLI_DEFAULT);
-  await setImp('groq_modelli', JSON.stringify(_groqModelli));
-  toast('Modelli AI ripristinati ai default');
-  _loadGroqModelli();
-}
-async function loadGroqKey() {
-  try {
-    const res = await sbRpc('get_groq_key');
-    if (res && res.key) {
-      const k = res.key;
-      if (k.startsWith('enc:')) {
-        groqKey = _d(k.substring(4));
-      } else {
-        groqKey = k;
-        await sbRpc('set_groq_key', {
-          p_key: 'enc:' + _e(k),
-          p_token: getAdminToken(),
-        }).catch(() => {});
-      }
-    }
-  } catch (e) {
-    let k = await getImp('groq_api_key');
-    if (!k) k = await getImp('gemini_api_key');
-    if (k) {
-      if (k.startsWith('enc:')) {
-        groqKey = _d(k.substring(4));
-      } else {
-        groqKey = k;
-      }
-    }
-  }
-  _loadGroqModelli().catch(() => {});
-}
-async function salvaGroqKey() {
-  const k = document.getElementById('groq-key-input').value.trim();
-  if (!k) {
-    toast('Inserisci la chiave');
-    return;
-  }
-  try {
-    await sbRpc('set_groq_key', {
-      p_key: 'enc:' + _e(k),
-      p_token: getAdminToken(),
-    });
-  } catch (e) {
-    await setImp('groq_api_key', 'enc:' + _e(k));
-  }
-  groqKey = k;
-  document.getElementById('groq-key-input').value = '';
-  document.getElementById('groq-status').innerHTML =
-    '<span style="color:var(--c-verde,#2c6e49);font-weight:600">Chiave salvata</span>';
-  toast('Chiave Groq salvata');
-}
+// ASSISTENTE AI: fornitori, modelli e chiamate in js/ai.js (aiChat, aiModello, aiPronta)
 // PRIVACY: i dati personali dei collaboratori non escono mai verso l'AI
 // esterna (regola aziendale). Prima dell'invio ogni nome in anagrafica, anche
 // scritto al contrario o con il solo cognome/nome, diventa un segnaposto
@@ -2141,8 +2020,8 @@ async function miglioraTesto(fieldId, contesto) {
     toast('Scrivi prima un testo da migliorare');
     return;
   }
-  if (!groqKey) {
-    toast('Configura la chiave Groq nelle Impostazioni');
+  if (!aiPronta()) {
+    toast('Intelligenza artificiale non configurata: Impostazioni > Persone e accessi > Intelligenza artificiale');
     return;
   }
   const btn = el.parentElement.querySelector('.btn-ai');
@@ -2159,8 +2038,8 @@ async function miglioraTesto(fieldId, contesto) {
       _AI_REGOLA_SEGNAPOSTO +
       '\n- MANTIENI tutti i dettagli specifici: date, orari, luoghi, importi, circostanze\n- Per fatti: "In data [data], durante il turno [turno], presso [luogo]..." → "si è verificato quanto segue:"\n- Per telecamere: "dalla revisione delle immagini del sistema CCTV risulta che..."\n- Per violazioni: "Tale comportamento costituisce una violazione della procedura QM [codice]" citando la procedura specifica\n- Per soglie: usa SEMPRE "pari o superiore a" (NON "superiore a")\n- Per obiettivi: "Si invita formalmente il/la collaboratore/trice a:" seguito da elenco puntato con -\n- Chiudi con: "consapevole che il ripetersi di tale comportamento potrà comportare l\'adozione di provvedimenti disciplinari più severi"\n- NON inventare fatti, migliora SOLO la forma professionale del testo esistente\n- Scrivi come un RESPONSABILE DI SETTORE esperto, NON come un\'intelligenza artificiale. Il testo deve sembrare scritto da una persona reale con esperienza nel settore. Evita frasi generiche, template o formule troppo perfette. Usa il linguaggio naturale di chi lavora in un casinò svizzero ogni giorno.\n- Rispondi SOLO con il testo migliorato, senza commenti o spiegazioni\n\nABBREVIAZIONI E TERMINOLOGIA CASINO:\nDIR=Direttore, CdA=Consiglio Amministrazione, CdD=Collegio Direzione, MgrTeam=Management Team, CO=Compliance, RLRD=Resp.LRD, RCS=Resp.Concezione Sociale, RSS=Resp.Sicurezza&Sorveglianza, R_FBS=Resp.FoBoSlot, SUP_FBS=Supervisor FoBoSlot, R_LG=Resp.Live Game, SUP_LG=Supervisor Live Game, CAS=Cassiere, REC=Receptionist, SA=Slot Attendant, GUARD=Guardaroba, BOK=Back Office, CT=Counting Team, CR=Croupier, ISP=Ispettore tavolo, SIC=Sicurezza, SURV=Sorveglianza, SECC=Sistema elettronico conteggio/controllo, AAGA=Apparecchi automatici da gioco, IR=Incident Report, SOL=Surveillance Operator Log, TRAKA=sistema gestione chiavi, GD=giornata di gioco, PLG=prodotto lordo giochi, RDI=Rapporto Disciplinare Interno, LRD=Legge riciclaggio denaro, CFCG=Commissione federale case da gioco, QM=Quality Management, VP=Valet Parking, MG=Manutenzione Giochi, FAC=Facility, PUL=Pulizie, F&C=Finanze&Controlling, F&B=Food&Beverage, MKTG=Marketing, VC=gettoni valore, NN=fiches non negoziabili, CLI/CLO=Cashless In/Out, NRT=Note Recycler Terminal, JP=Jackpot, CD=Cassa.\n\nPRINCIPI TRASVERSALI:\n- Pulizia delle mani: sfregamento palmi verso alto verso CCTV\n- Principio dei quattro occhi: un funzionario esegue, uno+ indipendenti attestano\n- Percorso più breve: rientro immediato alla postazione senza soste\n- Tutte le operazioni sotto copertura CCTV (art.33 OCG-DFGP)\n\nSOGLIE CHF:\n- CHF 3\'000: identificazione LRD obbligatoria (pari o superiore)\n- CHF 4\'000: registrazione Form III (pari o superiore)\n- CHF 10: discrepanza cassa → verifica con SUP_FBS\n- CHF 100: discrepanza cassa → indagine formale + IR\n- CHF 15\'000: pagamento → notifica preventiva SURV + verifica KYC/PEP immediata\n- CHF 30\'000: acquisto gettoni → chiarimento speciale con SUP_FBS\n- CHF 50\'000: riscossione/jackpot → chiarimento speciale + fax CFCG entro fine GD\n\nLIVELLI DISCIPLINARI: 1)Allineamento verbale 2)Allineamento scritto 3)RDI 1°grado 4)RDI 2°grado (può portare a disdetta). Dal 3° allineamento scritto stesso motivo → scatta RDI.\n\nTesto originale:\n' +
       testoAnon;
-    const migliorato = await _groqChat({
-      model: groqModel('testo'),
+    const migliorato = await aiChat({
+      model: aiModello('testo'),
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.3,
       max_tokens: 2000,
@@ -2210,8 +2089,8 @@ async function generaModuloAI(tipo) {
     toast("Scrivi una descrizione: la foto resta locale e non viene inviata all'AI");
     return;
   }
-  if (!groqKey) {
-    toast('Configura la chiave Groq nelle Impostazioni');
+  if (!aiPronta()) {
+    toast('Intelligenza artificiale non configurata: Impostazioni > Persone e accessi > Intelligenza artificiale');
     return;
   }
   const btn = document.getElementById('btn-ai-gen');
@@ -2241,10 +2120,10 @@ async function generaModuloAI(tipo) {
   }
   try {
     // solo testo anonimizzato: la foto resta sul dispositivo
-    const model = groqModel('json');
+    const model = aiModello('json');
     const messages = [{ role: 'user', content: sysPrompt }];
     const bodyOpts = { temperature: 0.2, top_p: 0.9, max_tokens: 1500, response_format: { type: 'json_object' } };
-    let txt = await _groqChat(Object.assign({ model: model, messages: messages }, bodyOpts));
+    let txt = await aiChat(Object.assign({ model: model, messages: messages }, bodyOpts));
     txt = txt
       .replace(/```json\s*/g, '')
       .replace(/```\s*/g, '')
@@ -2290,7 +2169,8 @@ async function generaModuloAI(tipo) {
       }
     }
     if (status)
-      status.innerHTML = '<span style="color:var(--c-verde,#2c6e49)">Campi compilati! Verifica e modifica se necessario.</span>';
+      status.innerHTML =
+        '<span style="color:var(--c-verde,#2c6e49)">Campi compilati! Verifica e modifica se necessario.</span>';
     // Auto-resize textarea dopo AI
     document.querySelectorAll('#modulo-form-area textarea').forEach((ta) => {
       if (ta.value) {
@@ -2344,8 +2224,8 @@ async function assistenteGenera() {
     toast("Scrivi il testo: la foto resta locale e non viene inviata all'AI");
     return;
   }
-  if (!groqKey) {
-    toast('Configura la chiave Groq nelle Impostazioni');
+  if (!aiPronta()) {
+    toast('Intelligenza artificiale non configurata: Impostazioni > Persone e accessi > Intelligenza artificiale');
     return;
   }
   const tipo = document.getElementById('assist-tipo').value;
@@ -2401,10 +2281,10 @@ async function assistenteGenera() {
       (linguaLabels[lingua] || '');
   // solo testo anonimizzato: nomi in anagrafica -> segnaposto, foto mai inviata
   promptText += _AI_REGOLA_SEGNAPOSTO + '\n\nTesto originale:\n' + _aiAnonimizza(input, []);
-  const model = groqModel('testo');
+  const model = aiModello('testo');
   const messages = [{ role: 'user', content: promptText }];
   try {
-    const result = await _groqChat({
+    const result = await aiChat({
       model: model,
       messages: messages,
       temperature: 0.3,
@@ -2416,7 +2296,8 @@ async function assistenteGenera() {
     toast('Testo riscritto!');
   } catch (e) {
     console.error(e);
-    if (status) status.innerHTML = '<span style="color:var(--c-rosso,#c0392b)">' + escP(e.message || 'Errore AI') + '</span>';
+    if (status)
+      status.innerHTML = '<span style="color:var(--c-rosso,#c0392b)">' + escP(e.message || 'Errore AI') + '</span>';
     toast(e.message || 'Errore AI');
   }
   btn.disabled = false;
