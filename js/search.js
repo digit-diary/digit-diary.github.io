@@ -258,13 +258,14 @@ async function generaRiepilogoMensile() {
   for (let a = _rmAnno; a >= _rmAnno - 3; a--)
     annoOpts += '<option value="' + a + '"' + (a === _rmAnno ? ' selected' : '') + '>' + a + '</option>';
   let html = '<h3>Riepilogo Mensile PDF</h3>';
-  html += '<p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Seleziona mese e sezioni da includere</p>';
   html +=
-    '<div style="display:flex;gap:10px;margin-bottom:14px"><select id="rm-mese" style="flex:1;padding:8px;border:1px solid var(--line);border-radius:2px;font-family:Source Sans 3,sans-serif;font-size:.9rem">' +
+    '<p style="color:var(--muted);font-size:var(--fs-md,.875rem);margin-bottom:12px">Seleziona mese e sezioni da includere</p>';
+  html +=
+    '<div style="display:flex;gap:10px;margin-bottom:14px"><select id="rm-mese" style="flex:1;padding:8px;border:1px solid var(--line);border-radius:2px;font-family:Source Sans 3,sans-serif;font-size:var(--fs-md,.875rem)">' +
     meseOpts +
     '</select>';
   html +=
-    '<select id="rm-anno" style="flex:1;padding:8px;border:1px solid var(--line);border-radius:2px;font-family:Source Sans 3,sans-serif;font-size:.9rem">' +
+    '<select id="rm-anno" style="flex:1;padding:8px;border:1px solid var(--line);border-radius:2px;font-family:Source Sans 3,sans-serif;font-size:var(--fs-md,.875rem)">' +
     annoOpts +
     '</select></div>';
   html += '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">';
@@ -279,7 +280,7 @@ async function generaRiepilogoMensile() {
   ];
   _sez.forEach(([k, l]) => {
     html +=
-      '<label style="display:flex;align-items:center;gap:8px;font-size:.88rem;cursor:pointer"><input type="checkbox" id="rm-sez-' +
+      '<label style="display:flex;align-items:center;gap:8px;font-size:var(--fs-md,.875rem);cursor:pointer"><input type="checkbox" id="rm-sez-' +
       k +
       '" checked style="width:16px;height:16px;accent-color:var(--accent2)"> ' +
       l +
@@ -287,7 +288,7 @@ async function generaRiepilogoMensile() {
   });
   html += '</div>';
   html +=
-    '<div style="display:flex;gap:8px;margin-bottom:8px"><button style="flex:1;padding:6px;font-size:.82rem;cursor:pointer;border:1px solid var(--line);border-radius:2px;background:var(--paper2);font-family:Source Sans 3,sans-serif" onclick="document.querySelectorAll(\'[id^=rm-sez-]\').forEach(c=>c.checked=true)">Seleziona tutti</button><button style="flex:1;padding:6px;font-size:.82rem;cursor:pointer;border:1px solid var(--line);border-radius:2px;background:var(--paper2);font-family:Source Sans 3,sans-serif" onclick="document.querySelectorAll(\'[id^=rm-sez-]\').forEach(c=>c.checked=false)">Deseleziona tutti</button></div>';
+    '<div style="display:flex;gap:8px;margin-bottom:8px"><button style="flex:1;padding:6px;font-size:var(--fs-sm,.8125rem);cursor:pointer;border:1px solid var(--line);border-radius:2px;background:var(--paper2);font-family:Source Sans 3,sans-serif" onclick="document.querySelectorAll(\'[id^=rm-sez-]\').forEach(c=>c.checked=true)">Seleziona tutti</button><button style="flex:1;padding:6px;font-size:var(--fs-sm,.8125rem);cursor:pointer;border:1px solid var(--line);border-radius:2px;background:var(--paper2);font-family:Source Sans 3,sans-serif" onclick="document.querySelectorAll(\'[id^=rm-sez-]\').forEach(c=>c.checked=false)">Deseleziona tutti</button></div>';
   html +=
     '<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="_eseguiRiepilogoMensile()">Genera PDF</button></div>';
   mc.innerHTML = html;

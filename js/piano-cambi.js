@@ -467,7 +467,7 @@ async function apriCercaCambioLibero() {
     escP(sel.nome) +
     ' libero il ' +
     dataIt +
-    '</h3><p style="font-size:.85rem;margin-bottom:10px">' +
+    '</h3><p style="font-size:var(--fs-md,.875rem);margin-bottom:10px">' +
     escP(sel.nome.split(' ')[0]) +
     ' cede il turno <b>' +
     escP(r.codice) +
@@ -491,7 +491,7 @@ async function apriCercaCambioLibero() {
     '</select></div>' +
     '<div class="field" style="text-align:left;margin-top:8px"><label>Giorno di restituzione</label><select id="cc-rest" style="width:100%;padding:9px"></select></div>' +
     '<div class="field" style="text-align:left;margin-top:8px"><label>Motivazione</label><input type="text" id="cc-motivo" placeholder="Es: esigenze personali..."></div>' +
-    '<p style="font-size:.82rem;color:var(--muted);margin-top:8px">Puoi stampare la lista dei colleghi con cui puo\' cambiare e consegnarla al collaboratore: lui chiede a chi vuole, poi si torna qui e si conferma. Alla conferma: celle aggiornate col commento del cambio, formulario cambio turno gia\' compilato da stampare e firmare, conteggio nel limite cambi del richiedente.</p>' +
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:8px">Puoi stampare la lista dei colleghi con cui puo\' cambiare e consegnarla al collaboratore: lui chiede a chi vuole, poi si torna qui e si conferma. Alla conferma: celle aggiornate col commento del cambio, formulario cambio turno gia\' compilato da stampare e firmare, conteggio nel limite cambi del richiedente.</p>' +
     '<div class="pwd-modal-btns" style="margin-top:12px;flex-wrap:wrap;gap:6px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button>' +
     '<button class="btn-export" style="padding:8px 14px" onclick="stampaListaCambioLibero()">Stampa lista colleghi</button>' +
     '<button class="btn-modal-ok" onclick="confermaCercaCambioLibero()">Applica cambio</button></div>';
@@ -849,13 +849,13 @@ async function apriScambioTurno() {
   b.innerHTML =
     '<h3>Scambio turno · ' +
     new Date(sel.data + 'T12:00:00').toLocaleDateString('it-IT') +
-    '</h3><p style="margin-bottom:10px;font-size:.86rem"><strong>' +
+    '</h3><p style="margin-bottom:10px;font-size:var(--fs-md,.875rem)"><strong>' +
     escP(sel.nome) +
     '</strong> (' +
     escP(r.codice) +
     ') scambia con:</p>' +
     (maxCambi > 0
-      ? '<p style="font-size:.82rem;color:' +
+      ? '<p style="font-size:var(--fs-sm,.8125rem);color:' +
         (mieiCambi >= maxCambi ? '#c0392b' : 'var(--muted)') +
         ';margin-bottom:6px">Cambi richiesti da ' +
         escP(sel.nome.split(' ')[0]) +
@@ -878,14 +878,14 @@ async function apriScambioTurno() {
           escP(c.collaboratore) +
           ' · ' +
           escP(c.codice) +
-          (prob ? ' ⚠ ' + prob : ' ✓') +
+          (prob ? ' · da verificare: ' + prob : ' · regole rispettate') +
           '</option>'
         );
       })
       .join('') +
     '</select><div class="field" style="text-align:left;margin-top:10px"><label>Motivazione</label><input type="text" id="scambio-motivo" placeholder="Es: esigenze personali..."></div>' +
-    '<div style="text-align:left;margin-top:10px"><label style="font-weight:700;font-size:.86rem"><input type="checkbox" id="scambio-restituito" onchange="document.getElementById(\'scambio-rest-wrap\').style.display=this.checked?\'block\':\'none\'"> Con restituzione</label>' +
-    '<div id="scambio-rest-wrap" style="display:none;margin-top:6px"><label style="font-size:.8rem">Data restituzione:</label> <input type="date" id="scambio-data-rest" style="padding:6px;max-width:180px"></div></div>' +
+    '<div style="text-align:left;margin-top:10px"><label style="font-weight:700;font-size:var(--fs-md,.875rem)"><input type="checkbox" id="scambio-restituito" onchange="document.getElementById(\'scambio-rest-wrap\').style.display=this.checked?\'block\':\'none\'"> Con restituzione</label>' +
+    '<div id="scambio-rest-wrap" style="display:none;margin-top:6px"><label style="font-size:var(--fs-sm,.8125rem)">Data restituzione:</label> <input type="date" id="scambio-data-rest" style="padding:6px;max-width:180px"></div></div>' +
     '<div class="pwd-modal-btns" style="margin-top:14px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="confermaScambioTurno()">Scambia</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
@@ -947,7 +947,7 @@ async function confermaScambioTurno() {
         .concat(av2.map((a) => collega.split(' ')[0] + ': ' + a));
       if (
         !confirm(
-          '⚠ ATTENZIONE · scambio ' +
+          'ATTENZIONE · scambio ' +
             sel.data.split('-').reverse().join('.') +
             ':\n\n• ' +
             dettagli.join('\n• ') +
@@ -955,8 +955,8 @@ async function confermaScambioTurno() {
         )
       )
         return;
-      if (av1.length) nota1 = '⚠ ' + av1.join(' · ') + ' · ';
-      if (av2.length) nota2 = '⚠ ' + av2.join(' · ') + ' · ';
+      if (av1.length) nota1 = 'Avviso: ' + av1.join(' · ') + ' · ';
+      if (av2.length) nota2 = 'Avviso: ' + av2.join(' · ') + ' · ';
     }
   }
   // Restituzione: valido lo scambio inverso del giorno di restituzione PRIMA di
@@ -981,7 +981,7 @@ async function confermaScambioTurno() {
         .concat(avB.map((a) => collega.split(' ')[0] + ': ' + a));
       if (
         !confirm(
-          '⚠ ATTENZIONE · restituzione del ' +
+          'ATTENZIONE · restituzione del ' +
             dataRest.split('-').reverse().join('.') +
             ':\n\n• ' +
             det.join('\n• ') +
@@ -989,8 +989,8 @@ async function confermaScambioTurno() {
         )
       )
         return;
-      if (avA.length) notaRa = '⚠ ' + avA.join(' · ') + ' · ';
-      if (avB.length) notaRb = '⚠ ' + avB.join(' · ') + ' · ';
+      if (avA.length) notaRa = 'Avviso: ' + avA.join(' · ') + ' · ';
+      if (avB.length) notaRb = 'Avviso: ' + avB.join(' · ') + ' · ';
     }
   }
   // RESTITUZIONE: le celle del giorno di restituzione si leggono dal database
@@ -1179,7 +1179,7 @@ function apriCoperturaMalattia() {
   b.innerHTML =
     '<h3>Copertura malattia · ' +
     _pianoMeseSel +
-    '</h3><p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Cerca i migliori sostituti liberi per i turni del collaboratore malato.</p>' +
+    '</h3><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Cerca i migliori sostituti liberi per i turni del collaboratore malato.</p>' +
     '<div class="field" style="text-align:left"><label>Collaboratore malato</label><select id="mal-collab" style="width:100%;padding:8px">' +
     nomi.map((n) => '<option>' + escP(n) + '</option>').join('') +
     '</select></div>' +
@@ -1533,7 +1533,7 @@ async function cercaSostitutiMalattia() {
           " puo' coprire";
   _malattiaPiano.descCatena = descCatena;
   let h =
-    '<table class="piano-table" style="min-width:100%;font-size:.82rem"><thead><tr><th></th><th>Giorno</th><th>Turno</th><th style="text-align:left">Sostituto proposto</th></tr></thead><tbody>';
+    '<table class="piano-table" style="min-width:100%;font-size:var(--fs-sm,.8125rem)"><thead><tr><th></th><th>Giorno</th><th>Turno</th><th style="text-align:left">Sostituto proposto</th></tr></thead><tbody>';
   giorni.forEach((d) => {
     if (d.salta)
       h +=
@@ -1563,7 +1563,9 @@ async function cercaSostitutiMalattia() {
         escP(d.sostituto) +
         (d.era ? ' <span style="color:var(--muted);font-weight:400">(era ' + escP(d.era) + ')</span>' : '') +
         (d.catena
-          ? '<div style="font-weight:400;color:#b8860b;font-size:.82rem">' + escP(descCatena(d)) + '</div>'
+          ? '<div style="font-weight:400;color:#b8860b;font-size:var(--fs-sm,.8125rem)">' +
+            escP(descCatena(d)) +
+            '</div>'
           : '') +
         '</td></tr>';
   });
@@ -1571,7 +1573,7 @@ async function cercaSostitutiMalattia() {
   const coperti = giorni.filter((d) => d.sostituto).length;
   const scoperti = giorni.filter((d) => d.scoperto).length;
   h +=
-    '<p style="font-size:.8rem;margin-top:6px">' +
+    '<p style="font-size:var(--fs-sm,.8125rem);margin-top:6px">' +
     coperti +
     ' giorni coperti' +
     (scoperti ? ', <b style="color:#c0392b">' + scoperti + ' scoperti</b>' : '') +
@@ -1579,7 +1581,7 @@ async function cercaSostitutiMalattia() {
     (coperti ? ', punti incentivo con conferma' : '') +
     '. Le mosse a catena scrivono il commento anche sulle celle del giorno prima.</p>';
   h +=
-    '<button class="btn-export" style="font-size:.8rem;padding:5px 14px;margin-top:4px" onclick="stampaPropostaCopertura()">Stampa proposta</button>';
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 14px;margin-top:4px" onclick="stampaPropostaCopertura()">Stampa proposta</button>';
   out.innerHTML = h;
   document.getElementById('mal-btn-conferma').style.display = coperti || giorni.some((d) => d.codice) ? '' : 'none';
 }

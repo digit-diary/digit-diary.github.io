@@ -513,12 +513,12 @@ function renderGuidaHtml(area) {
   const idDi = (t) => 'guida-' + t.toLowerCase().replace(/[^a-z0-9]+/g, '-');
   let h =
     '<div class="main-card"><div class="card-header">Guida &middot; scegli l\'argomento</div><div style="padding:12px 14px">' +
-    '<p style="font-size:.85rem;color:var(--muted);margin-bottom:10px">Qui trovi solo gli argomenti che riguardano quello che puoi fare tu. Se e la prima volta, parti da <b>Da dove iniziare</b>.</p>' +
+    '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);margin-bottom:10px">Qui trovi solo gli argomenti che riguardano quello che puoi fare tu. Se e la prima volta, parti da <b>Da dove iniziare</b>.</p>' +
     '<div style="display:flex;flex-wrap:wrap;gap:8px">' +
     cap
       .map(
         (c) =>
-          '<button class="btn-export" style="font-size:.85rem;padding:6px 14px" onclick="document.getElementById(\'' +
+          '<button class="btn-export" style="font-size:var(--fs-md,.875rem);padding:6px 14px" onclick="document.getElementById(\'' +
           idDi(c.titolo) +
           "').scrollIntoView({behavior:'smooth',block:'start'})\">" +
           escP(c.titolo) +
@@ -532,7 +532,7 @@ function renderGuidaHtml(area) {
       idDi(c.titolo) +
       '" style="margin-top:12px"><div class="card-header">' +
       escP(c.titolo) +
-      '</div><div style="padding:10px 16px;font-size:.9rem;line-height:1.55">' +
+      '</div><div style="padding:10px 16px;font-size:var(--fs-md,.875rem);line-height:1.55">' +
       c.righe.map((r) => '<p style="margin:4px 0">• ' + r + '</p>').join('') +
       '</div></div>';
   });

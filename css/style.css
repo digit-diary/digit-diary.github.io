@@ -1,4 +1,16 @@
 :root {
+  /* scala dei caratteri (standard PC). La base segue la dimensione scelta
+     dall operatore (--scala-testo, pulsanti A- / A+), salvata per operatore */
+  --scala-testo: 1;
+  --fs-xs: .75rem; /* 12px */
+  --fs-sm: .8125rem; /* 13px */
+  --fs-md: .875rem; /* 14px */
+  --fs-base: .9375rem; /* 15px */
+  --fs-lg: 1.0625rem; /* 17px */
+  --fs-xl: 1.25rem; /* 20px */
+  --fs-2xl: 1.5rem; /* 24px */
+  --fs-3xl: 2rem; /* 32px */
+  --fs-4xl: 2.5rem; /* 40px */
   --ink: #1a1208;
   --paper: #faf7f2;
   --paper2: #f3ede3;
@@ -48,6 +60,10 @@ body.dark-theme select {
   background: var(--paper2);
   border-color: var(--line);
 }
+html {
+  /* tutte le misure rem partono da qui: 16px per la dimensione scelta */
+  font-size: calc(16px * var(--scala-testo));
+}
 * {
   margin: 0;
   padding: 0;
@@ -55,10 +71,7 @@ body.dark-theme select {
 }
 body {
   font-family: "Source Sans 3", sans-serif;
-  /* 17px invece di 16: su schermo PC il testo secondario (0.8rem) passa da
-     12.8 a 13.6px e resta leggibile senza avvicinarsi allo schermo. Tutte le
-     misure in rem crescono in proporzione, quindi le proporzioni restano. */
-  font-size: 17px;
+  font-size: var(--fs-base);
   background: #d4c9b5;
   min-height: 100vh;
   display: flex;
@@ -102,13 +115,13 @@ body {
 }
 .login-box h2 {
   font-family: "Playfair Display", serif;
-  font-size: 1.6rem;
+  font-size: var(--fs-2xl);
   margin-bottom: 6px;
   color: var(--ink);
 }
 .login-box p {
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: var(--fs-md);
   margin-bottom: 22px;
 }
 .login-box input {
@@ -116,7 +129,7 @@ body {
   padding: 11px 14px;
   border: 1.5px solid var(--line);
   border-radius: 2px;
-  font-size: 1rem;
+  font-size: var(--fs-lg);
   font-family: "Source Sans 3", sans-serif;
   color: var(--ink);
   background: var(--paper2);
@@ -135,7 +148,7 @@ body {
   color: var(--paper);
   border: none;
   border-radius: 2px;
-  font-size: 0.85rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -147,19 +160,19 @@ body {
   background: none;
   border: none;
   color: var(--muted);
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   cursor: pointer;
   text-decoration: underline;
   font-family: "Source Sans 3", sans-serif;
 }
 .login-error {
   color: var(--accent);
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   margin-top: 10px;
   min-height: 18px;
 }
 .login-hint {
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   color: var(--muted);
   margin-top: 12px;
   line-height: 1.4;
@@ -208,14 +221,14 @@ body {
 }
 .pwd-modal-box h3 {
   font-family: "Playfair Display", serif;
-  font-size: 1.3rem;
+  font-size: var(--fs-xl);
   margin-bottom: 6px;
   color: var(--ink);
   text-align: center;
 }
 .pwd-modal-box p {
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   margin-bottom: 18px;
   text-align: center;
 }
@@ -224,7 +237,7 @@ body {
 }
 .pwd-field label {
   display: block;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
@@ -236,7 +249,7 @@ body {
   padding: 10px 12px;
   border: 1.5px solid var(--line);
   border-radius: 2px;
-  font-size: 0.95rem;
+  font-size: var(--fs-base);
   font-family: "Source Sans 3", sans-serif;
   color: var(--ink);
   background: var(--paper2);
@@ -252,7 +265,7 @@ body {
   padding: 10px 24px;
   border-radius: 2px;
   font-family: "Source Sans 3", sans-serif;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -260,7 +273,7 @@ body {
 }
 .pwd-modal-error {
   color: var(--accent);
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   text-align: center;
   margin-top: 10px;
   min-height: 18px;
@@ -275,7 +288,7 @@ body {
 }
 .recovery-code-box .code {
   font-family: monospace;
-  font-size: 1.4rem;
+  font-size: var(--fs-2xl);
   font-weight: 700;
   color: var(--accent);
   letter-spacing: 0.2em;
@@ -284,7 +297,7 @@ body {
   display: block;
   margin-top: 8px;
   color: var(--muted);
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
 }
 header {
   width: 100%;
@@ -300,13 +313,13 @@ header {
 }
 header h1 {
   font-family: "Playfair Display", serif;
-  font-size: 2.2rem;
+  font-size: var(--fs-3xl);
   color: var(--ink);
   line-height: 1.1;
 }
 header h1 .subtitle {
   display: block;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   font-family: "Source Sans 3", sans-serif;
   font-weight: 300;
   color: var(--muted);
@@ -316,7 +329,7 @@ header h1 .subtitle {
 }
 header h1 .casino {
   display: block;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   font-family: "Source Sans 3", sans-serif;
   font-weight: 600;
   color: var(--accent2);
@@ -332,7 +345,7 @@ header h1 .casino {
 }
 .date-badge {
   font-family: "Playfair Display", serif;
-  font-size: 1.05rem;
+  font-size: var(--fs-lg);
   color: var(--muted);
   text-align: right;
 }
@@ -346,7 +359,7 @@ header h1 .casino {
   border: 1px solid var(--line);
   color: var(--muted);
   padding: 6px 14px;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -355,13 +368,32 @@ header h1 .casino {
   font-family: "Source Sans 3", sans-serif;
   transition: all 0.15s;
 }
+/* dimensione del testo per operatore: A- 100% A+ */
+.testo-dim {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+.testo-dim .btn-header {
+  border: none;
+  padding: 6px 10px;
+  letter-spacing: 0;
+}
+.testo-dim span {
+  min-width: 3.2em;
+  text-align: center;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--muted);
+}
 .btn-header:hover {
   background: var(--ink);
   color: var(--paper);
   border-color: var(--ink);
 }
 .operatore-badge {
-  font-size: 0.98rem;
+  font-size: var(--fs-lg);
   color: var(--accent2);
   font-weight: 600;
   text-align: right;
@@ -372,7 +404,7 @@ header h1 .casino {
   right: -4px;
   background: var(--accent);
   color: white;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   min-width: 18px;
   height: 18px;
@@ -456,7 +488,7 @@ header h1 .casino {
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: var(--fs-md);
   font-weight: 600;
 }
 .scadenze-banner:hover {
@@ -473,7 +505,7 @@ header h1 .casino {
   box-shadow: 2px 2px 0 #b8aa95;
   margin-bottom: 16px;
   padding: 16px;
-  font-size: 0.85rem;
+  font-size: var(--fs-md);
 }
 .scadenze-dropdown.hidden {
   display: none;
@@ -491,7 +523,7 @@ header h1 .casino {
 .scad-item .scad-date {
   font-weight: 700;
   min-width: 80px;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
 }
 .scad-item .scad-date.overdue {
   color: var(--accent);
@@ -501,7 +533,7 @@ header h1 .casino {
 }
 .scad-item button {
   padding: 3px 8px;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   cursor: pointer;
   border-radius: 2px;
@@ -516,7 +548,7 @@ header h1 .casino {
   padding: 12px 20px;
   border-radius: 3px;
   margin-bottom: 10px;
-  font-size: 0.85rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   cursor: pointer;
   display: flex;
@@ -543,7 +575,7 @@ header h1 .casino {
   box-shadow: 2px 2px 0 #b8aa95;
   margin-bottom: 12px;
   padding: 16px;
-  font-size: 0.85rem;
+  font-size: var(--fs-md);
 }
 .cassa-alerts-dropdown.hidden {
   display: none;
@@ -560,7 +592,7 @@ header h1 .casino {
   padding: 12px 18px 12px 42px;
   border: 2px solid var(--line);
   border-radius: 3px;
-  font-size: 1rem;
+  font-size: var(--fs-lg);
   font-family: "Source Sans 3", sans-serif;
   background: var(--paper);
   color: var(--ink);
@@ -575,7 +607,7 @@ header h1 .casino {
   left: 14px;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 1.1rem;
+  font-size: var(--fs-lg);
   color: var(--muted);
   pointer-events: none;
 }
@@ -599,7 +631,7 @@ header h1 .casino {
 }
 .rg-section {
   padding: 6px 14px;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
@@ -614,13 +646,13 @@ header h1 .casino {
   display: flex;
   gap: 10px;
   align-items: center;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
 }
 .rg-item:hover {
   background: var(--paper2);
 }
 .rg-item .rg-badge {
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 2px;
@@ -634,7 +666,7 @@ header h1 .casino {
   white-space: nowrap;
 }
 .rg-item .rg-date {
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   color: var(--muted);
   white-space: nowrap;
 }
@@ -646,7 +678,7 @@ header h1 .casino {
   padding: 12px 20px;
   border-radius: 3px;
   margin-bottom: 10px;
-  font-size: 0.85rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   cursor: pointer;
   display: flex;
@@ -665,7 +697,7 @@ header h1 .casino {
   box-shadow: 2px 2px 0 #b8aa95;
   margin-bottom: 12px;
   padding: 16px;
-  font-size: 0.85rem;
+  font-size: var(--fs-md);
 }
 .rischio-alerts-dropdown.hidden {
   display: none;
@@ -683,7 +715,7 @@ header h1 .casino {
   border-radius: 3px;
   background: none;
   color: var(--accent2);
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   cursor: pointer;
   font-family: "Source Sans 3", sans-serif;
@@ -712,11 +744,11 @@ header h1 .casino {
 .cassa-alert-item .alert-detail {
   flex: 1;
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
 }
 .cassa-alert-item .alert-action {
   padding: 5px 14px;
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   font-weight: 700;
   cursor: pointer;
   border-radius: 2px;
@@ -739,7 +771,7 @@ header h1 .casino {
   gap: 6px;
 }
 .firma-canvas-box small {
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   color: var(--muted);
   font-weight: 600;
   text-transform: uppercase;
@@ -756,7 +788,7 @@ header h1 .casino {
 }
 .firma-canvas-box button {
   padding: 4px 14px;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   cursor: pointer;
   border: 1px solid var(--line);
@@ -782,7 +814,7 @@ header h1 .casino {
 }
 .reparto-btn {
   padding: 10px 28px;
-  font-size: 0.85rem;
+  font-size: var(--fs-md);
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -822,13 +854,26 @@ header h1 .casino {
 .reparto-switch.hidden {
   display: none;
 }
+/* telefono: i quattro settori si dividono la larghezza, niente piu uscite dallo schermo */
+@media (max-width: 600px) {
+  .reparto-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 10px 4px;
+    letter-spacing: 0.04em;
+    font-size: var(--fs-sm);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
 /* HAMBURGER MENU (mobile only) */
 .hamburger-btn {
   display: none;
   background: none;
   border: 1.5px solid var(--line);
   color: var(--ink);
-  font-size: 1.4rem;
+  font-size: var(--fs-2xl);
   padding: 8px 14px;
   border-radius: 3px;
   cursor: pointer;
@@ -870,7 +915,7 @@ header h1 .casino {
   border: none;
   background: none;
   text-align: left;
-  font-size: 0.92rem;
+  font-size: var(--fs-base);
   font-weight: 500;
   color: var(--ink);
   cursor: pointer;
@@ -891,14 +936,14 @@ header h1 .casino {
   background: var(--accent);
   color: white;
   border-radius: 9px;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   padding: 1px 6px;
   margin-left: 6px;
   font-weight: 700;
 }
 .mobile-nav-close {
   padding: 16px 24px;
-  font-size: 1rem;
+  font-size: var(--fs-lg);
   font-weight: 700;
   color: var(--muted);
   border: none;
@@ -931,7 +976,7 @@ header h1 .casino {
   white-space: nowrap;
   padding: 12px 10px;
   text-align: center;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -982,13 +1027,13 @@ header h1 .casino {
 }
 .stat-num {
   font-family: "Playfair Display", serif;
-  font-size: 1.8rem;
+  font-size: var(--fs-3xl);
   font-weight: 700;
   color: var(--ink);
   line-height: 1;
 }
 .stat-label {
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
@@ -1021,7 +1066,7 @@ header h1 .casino {
   background: var(--ink);
   color: var(--paper);
   padding: 16px 24px;
-  font-size: 0.85rem;
+  font-size: var(--fs-md);
   letter-spacing: 0.18em;
   text-transform: uppercase;
   font-weight: 600;
@@ -1043,7 +1088,7 @@ header h1 .casino {
   gap: 6px;
 }
 .field label {
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
@@ -1057,7 +1102,7 @@ header h1 .casino {
   border-radius: 2px;
   padding: 11px 14px;
   font-family: "Source Sans 3", sans-serif;
-  font-size: 1rem;
+  font-size: var(--fs-lg);
   color: var(--ink);
   outline: none;
   transition: border-color 0.2s;
@@ -1081,7 +1126,7 @@ header h1 .casino {
   padding: 7px 12px;
   border: 1.5px solid var(--line);
   border-radius: 2px;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s;
@@ -1101,7 +1146,7 @@ header h1 .casino {
   border: none;
   padding: 13px 32px;
   font-family: "Source Sans 3", sans-serif;
-  font-size: 0.85rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -1129,7 +1174,7 @@ header h1 .casino {
   gap: 6px;
 }
 .filter-label {
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
@@ -1139,32 +1184,35 @@ header h1 .casino {
 .filters select,
 .filters input[type="text"],
 .filters input[type="date"] {
+  /* misura standard dei campi nelle file di filtri: uguale alla casella di ricerca */
+  height: 2.125rem;
+  box-sizing: border-box;
   background: var(--paper);
   border: 1px solid var(--line);
-  border-radius: 2px;
-  padding: 10px 14px;
+  border-radius: 3px;
+  padding: 0 0.75rem;
   font-family: "Source Sans 3", sans-serif;
-  font-size: 1rem;
+  font-size: var(--fs-md);
   color: var(--ink);
   outline: none;
 }
 .flatpickr-calendar {
-  font-size: 1.1rem !important;
+  font-size: var(--fs-lg) !important;
   width: 340px !important;
 }
 .flatpickr-day {
   height: 44px !important;
   line-height: 44px !important;
-  font-size: 1rem !important;
+  font-size: var(--fs-lg) !important;
 }
 .flatpickr-months .flatpickr-month {
   height: 48px !important;
 }
 .flatpickr-current-month {
-  font-size: 1.15rem !important;
+  font-size: var(--fs-lg) !important;
 }
 .flatpickr-weekday {
-  font-size: 0.9rem !important;
+  font-size: var(--fs-md) !important;
 }
 .flatpickr-months .flatpickr-prev-month,
 .flatpickr-months .flatpickr-next-month {
@@ -1174,7 +1222,7 @@ header h1 .casino {
   background: none;
   border: none;
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: var(--fs-md);
   cursor: pointer;
   text-decoration: underline;
   font-family: "Source Sans 3", sans-serif;
@@ -1189,7 +1237,7 @@ header h1 .casino {
   border: 1.5px solid var(--ink);
   color: var(--ink);
   padding: 8px 17px;
-  font-size: 0.84rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -1278,20 +1326,20 @@ header h1 .casino {
 }
 .entry-day {
   font-family: "Playfair Display", serif;
-  font-size: 1.6rem;
+  font-size: var(--fs-2xl);
   font-weight: 700;
   color: var(--ink);
   line-height: 1;
 }
 .entry-month {
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--muted);
   margin-top: 2px;
 }
 .entry-time {
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--muted);
   margin-top: 6px;
 }
@@ -1307,7 +1355,7 @@ header h1 .casino {
 }
 .entry-name {
   font-weight: 700;
-  font-size: 1.05rem;
+  font-size: var(--fs-lg);
   color: var(--ink);
   cursor: pointer;
   text-decoration: none;
@@ -1317,7 +1365,7 @@ header h1 .casino {
   color: var(--accent2);
 }
 .badge {
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   font-weight: 700;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -1326,12 +1374,12 @@ header h1 .casino {
   color: white;
 }
 .entry-text {
-  font-size: 1rem;
+  font-size: var(--fs-lg);
   color: #3d3326;
   line-height: 1.5;
 }
 .entry-meta {
-  font-size: 0.88rem;
+  font-size: var(--fs-md);
   color: var(--muted);
   margin-top: 5px;
   font-style: italic;
@@ -1346,7 +1394,7 @@ header h1 .casino {
 .modulo-field label {
   display: block;
   font-weight: 700;
-  font-size: 0.84rem;
+  font-size: var(--fs-md);
   margin-bottom: 4px;
   color: var(--ink);
 }
@@ -1356,7 +1404,7 @@ header h1 .casino {
   width: 100%;
   padding: 10px;
   font-family: "Source Sans 3", sans-serif;
-  font-size: 0.95rem;
+  font-size: var(--fs-base);
   border: 1.5px solid var(--line);
   border-radius: 2px;
   background: var(--paper);
@@ -1373,7 +1421,7 @@ header h1 .casino {
   border: 1.5px solid var(--ink);
   border-radius: 3px;
   padding: 4px 12px;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   cursor: pointer;
   font-family: "Source Sans 3", sans-serif;
@@ -1416,7 +1464,7 @@ header h1 .casino {
 .ac-drop div {
   padding: 8px 12px;
   cursor: pointer;
-  font-size: 1rem;
+  font-size: var(--fs-lg);
   color: var(--ink);
 }
 .ac-drop div:hover,
@@ -1443,7 +1491,7 @@ header h1 .casino {
   border: 1px solid;
   border-radius: 3px;
   cursor: pointer;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1557,13 +1605,13 @@ header h1 .casino {
 }
 .modal-box h3 {
   font-family: "Playfair Display", serif;
-  font-size: 1.3rem;
+  font-size: var(--fs-xl);
   margin-bottom: 6px;
   color: var(--ink);
 }
 .modal-box p {
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   margin-bottom: 20px;
 }
 .modal-tipo-tags {
@@ -1577,7 +1625,7 @@ header h1 .casino {
   padding: 8px 14px;
   border: 1.5px solid var(--line);
   border-radius: 2px;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   cursor: pointer;
   background: var(--paper2);
@@ -1595,7 +1643,7 @@ header h1 .casino {
   padding: 11px 26px;
   border-radius: 3px;
   font-family: "Source Sans 3", sans-serif;
-  font-size: 0.86rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -1645,7 +1693,7 @@ header h1 .casino {
 }
 .profilo-box h3 {
   font-family: "Playfair Display", serif;
-  font-size: 1.5rem;
+  font-size: var(--fs-2xl);
   color: var(--ink);
   margin-bottom: 4px;
 }
@@ -1659,10 +1707,10 @@ header h1 .casino {
   padding: 6px 12px;
   background: var(--paper2);
   border-radius: 2px;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
 }
 .profilo-stat strong {
-  font-size: 1.1rem;
+  font-size: var(--fs-lg);
 }
 .profilo-entries {
   max-height: 400px;
@@ -1673,7 +1721,7 @@ header h1 .casino {
 .profilo-entry {
   padding: 10px 14px;
   border-bottom: 1px solid var(--line);
-  font-size: 0.85rem;
+  font-size: var(--fs-md);
 }
 .profilo-entry:last-child {
   border-bottom: none;
@@ -1697,12 +1745,12 @@ header h1 .casino {
 }
 .scheda-kpi .kpi-val {
   font-family: "Playfair Display", serif;
-  font-size: 1.4rem;
+  font-size: var(--fs-2xl);
   font-weight: 700;
   line-height: 1.1;
 }
 .scheda-kpi .kpi-lbl {
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted);
@@ -1715,14 +1763,14 @@ header h1 .casino {
 }
 .scheda-section h4 {
   font-family: "Playfair Display", serif;
-  font-size: 1rem;
+  font-size: var(--fs-lg);
   color: var(--ink);
   margin-bottom: 10px;
 }
 .scheda-timeline-item {
   padding: 8px 12px;
   border-bottom: 1px solid var(--line);
-  font-size: 0.84rem;
+  font-size: var(--fs-md);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1737,18 +1785,18 @@ header h1 .casino {
   gap: 6px;
   padding: 6px 14px;
   border-radius: 3px;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
 }
 .scheda-path-arrow {
   color: var(--muted);
-  font-size: 1.2rem;
+  font-size: var(--fs-xl);
   margin: 0 4px;
 }
 .scheda-suggestion {
   padding: 10px 14px;
   border-radius: 3px;
-  font-size: 0.84rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   margin-top: 8px;
   display: flex;
@@ -1765,7 +1813,7 @@ header h1 .casino {
 .scheda-mom-card {
   padding: 8px 14px;
   border-radius: 3px;
-  font-size: 0.88rem;
+  font-size: var(--fs-md);
   font-weight: 600;
 }
 .scheda-chart-wrap {
@@ -1777,7 +1825,7 @@ header h1 .casino {
 .scheda-sick-flag {
   padding: 6px 12px;
   border-radius: 3px;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   margin-top: 6px;
 }
@@ -1806,7 +1854,7 @@ header h1 .casino {
   height: 36px;
   border-radius: 2px;
   cursor: pointer;
-  font-size: 1.2rem;
+  font-size: var(--fs-xl);
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -1818,7 +1866,7 @@ header h1 .casino {
 }
 .rapporto-nav .month-label {
   font-family: "Playfair Display", serif;
-  font-size: 1.6rem;
+  font-size: var(--fs-2xl);
   color: var(--ink);
   min-width: 260px;
   text-align: center;
@@ -1836,7 +1884,7 @@ header h1 .casino {
 }
 .rapporto-day-header {
   text-align: center;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   font-weight: 700;
   color: var(--muted);
   text-transform: uppercase;
@@ -1857,7 +1905,7 @@ header h1 .casino {
 }
 .rapporto-day-cell .day-num {
   font-family: "Playfair Display", serif;
-  font-size: 1.5rem;
+  font-size: var(--fs-2xl);
   font-weight: 700;
   color: var(--ink);
 }
@@ -1892,7 +1940,7 @@ header h1 .casino {
 }
 .rapporto-detail h3 {
   font-family: "Playfair Display", serif;
-  font-size: 1.4rem;
+  font-size: var(--fs-2xl);
   color: var(--ink);
   margin-bottom: 20px;
 }
@@ -1900,7 +1948,7 @@ header h1 .casino {
   background: none;
   border: none;
   color: var(--accent);
-  font-size: 0.85rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   cursor: pointer;
   margin-bottom: 16px;
@@ -1921,7 +1969,7 @@ header h1 .casino {
 }
 .turno-header {
   padding: 14px 16px;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1942,7 +1990,7 @@ header h1 .casino {
 }
 .turno-field label {
   display: block;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
@@ -1957,7 +2005,7 @@ header h1 .casino {
   border: 1px solid var(--line);
   border-radius: 2px;
   font-family: "Source Sans 3", sans-serif;
-  font-size: 0.95rem;
+  font-size: var(--fs-base);
   background: var(--paper2);
   color: var(--ink);
   outline: none;
@@ -1974,7 +2022,7 @@ header h1 .casino {
   border: 1px solid var(--line);
   border-radius: 2px;
   font-family: "Source Sans 3", sans-serif;
-  font-size: 0.88rem;
+  font-size: var(--fs-md);
   background: var(--paper2);
   color: var(--ink);
   outline: none;
@@ -1990,7 +2038,7 @@ header h1 .casino {
   color: var(--paper);
   border: none;
   border-radius: 2px;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -2019,7 +2067,7 @@ header h1 .casino {
 }
 .chart-card h4 {
   font-family: "Playfair Display", serif;
-  font-size: 1rem;
+  font-size: var(--fs-lg);
   color: var(--ink);
   margin-bottom: 14px;
 }
@@ -2030,12 +2078,12 @@ header h1 .casino {
 .collab-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.85rem;
+  font-size: var(--fs-md);
 }
 .collab-table th {
   text-align: left;
   padding: 8px 10px;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
@@ -2056,7 +2104,7 @@ header h1 .casino {
 }
 .mini-badge {
   display: inline-block;
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   font-weight: 700;
   padding: 1px 5px;
   border-radius: 2px;
@@ -2073,7 +2121,7 @@ header h1 .casino {
 }
 .settings-section h4 {
   font-family: "Playfair Display", serif;
-  font-size: 1.1rem;
+  font-size: var(--fs-lg);
   color: var(--ink);
   margin-bottom: 16px;
   padding-bottom: 10px;
@@ -2112,11 +2160,11 @@ header h1 .casino {
 .tipo-item-name {
   flex: 1;
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   color: var(--ink);
 }
 .tipo-item-default {
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   color: var(--muted);
   font-weight: 400;
 }
@@ -2125,7 +2173,7 @@ header h1 .casino {
   border: 1px solid var(--accent);
   color: var(--accent);
   padding: 4px 10px;
-  font-size: 0.76rem;
+  font-size: var(--fs-xs);
   font-weight: 700;
   cursor: pointer;
   border-radius: 2px;
@@ -2141,7 +2189,7 @@ header h1 .casino {
   color: var(--muted);
   width: 26px;
   height: 24px;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   cursor: pointer;
   border-radius: 2px;
   display: flex;
@@ -2184,7 +2232,7 @@ header h1 .casino {
   color: var(--paper);
   border: none;
   padding: 10px 21px;
-  font-size: 0.84rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -2208,7 +2256,7 @@ header h1 .casino {
   border: 1.5px solid var(--line);
   border-radius: 2px;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--ink);
   transition: all 0.15s;
@@ -2224,7 +2272,7 @@ header h1 .casino {
   font-weight: 700;
 }
 .op-remove {
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   opacity: 0.6;
   margin-left: 4px;
@@ -2243,7 +2291,7 @@ header h1 .casino {
   border: 1.5px solid var(--ink);
   color: var(--ink);
   padding: 10px 20px;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -2262,10 +2310,10 @@ header h1 .casino {
 }
 .empty-state p {
   font-family: "Playfair Display", serif;
-  font-size: 1.1rem;
+  font-size: var(--fs-lg);
 }
 .empty-state small {
-  font-size: 0.83rem;
+  font-size: var(--fs-sm);
   margin-top: 6px;
   display: block;
 }
@@ -2277,7 +2325,7 @@ header h1 .casino {
   color: var(--paper);
   padding: 14px 24px;
   border-radius: 2px;
-  font-size: 0.95rem;
+  font-size: var(--fs-base);
   font-weight: 500;
   opacity: 0;
   transform: translateY(10px);
@@ -2312,7 +2360,7 @@ header h1 .casino {
   color: var(--paper);
   padding: 14px 24px;
   border-radius: 0 0 6px 6px;
-  font-size: 0.95rem;
+  font-size: var(--fs-base);
   font-weight: 500;
   z-index: 9999;
   transition: top 0.4s cubic-bezier(0.22, 0.68, 0, 1.1);
@@ -2328,7 +2376,7 @@ header h1 .casino {
   top: 0;
 }
 .notif-banner .notif-icon {
-  font-size: 1.4rem;
+  font-size: var(--fs-2xl);
   flex-shrink: 0;
 }
 .notif-banner .notif-body {
@@ -2337,11 +2385,11 @@ header h1 .casino {
 }
 .notif-banner .notif-title {
   font-weight: 700;
-  font-size: 0.88rem;
+  font-size: var(--fs-md);
   letter-spacing: 0.04em;
 }
 .notif-banner .notif-text {
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   opacity: 0.85;
   white-space: nowrap;
   overflow: hidden;
@@ -2353,7 +2401,7 @@ header h1 .casino {
   border: none;
   color: var(--paper);
   opacity: 0.6;
-  font-size: 1.2rem;
+  font-size: var(--fs-xl);
   cursor: pointer;
   padding: 0 4px;
   flex-shrink: 0;
@@ -2393,6 +2441,9 @@ header h1 .casino {
   }
 }
 @media print {
+  html {
+    font-size: 16px;
+  }
   #login-overlay,
   .nav-tabs,
   .form-area,
@@ -2471,13 +2522,13 @@ header h1 .casino {
     gap: 8px;
   }
   header h1 {
-    font-size: 1.5rem;
+    font-size: var(--fs-2xl);
   }
   header h1 .subtitle {
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
   }
   header h1 .casino {
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
   }
   .header-right {
     align-items: flex-start;
@@ -2512,7 +2563,7 @@ header h1 .casino {
   }
   .collab-table .mini-badge {
     white-space: nowrap;
-    font-size: 0.78rem !important;
+    font-size: var(--fs-sm) !important;
   }
   .entry {
     grid-template-columns: 70px 1fr;
@@ -2521,16 +2572,16 @@ header h1 .casino {
     padding: 12px 8px 12px 12px;
   }
   .entry-day {
-    font-size: 1.2rem;
+    font-size: var(--fs-xl);
   }
   .entry-body {
     padding: 12px 12px 12px 12px;
   }
   .entry-name {
-    font-size: 0.95rem;
+    font-size: var(--fs-base);
   }
   .entry-text {
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
   }
   .entry-actions {
     flex-wrap: wrap;
@@ -2557,7 +2608,7 @@ header h1 .casino {
   }
   .card-header {
     padding: 12px 16px;
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
   }
   .form-area {
     padding: 16px;
@@ -2566,19 +2617,19 @@ header h1 .casino {
   .field textarea,
   .field select {
     padding: 10px 12px;
-    font-size: 0.95rem;
+    font-size: var(--fs-base);
   }
   .tipo-tags {
     gap: 6px;
   }
   .tipo-tag {
     padding: 6px 10px;
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
   }
   .btn-salva {
     width: 100%;
     padding: 14px;
-    font-size: 0.82rem;
+    font-size: var(--fs-sm);
   }
   .rapporto-nav {
     gap: 10px;
@@ -2586,7 +2637,7 @@ header h1 .casino {
     justify-content: center;
   }
   .rapporto-nav .month-label {
-    font-size: 1.2rem;
+    font-size: var(--fs-xl);
     min-width: 180px;
   }
   .rapporto-calendar {
@@ -2594,7 +2645,7 @@ header h1 .casino {
     gap: 2px;
   }
   .rapporto-day-header {
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     padding: 6px 0;
   }
   .rapporto-day-cell {
@@ -2602,30 +2653,30 @@ header h1 .casino {
     min-height: 56px;
   }
   .rapporto-day-cell .day-num {
-    font-size: 1.1rem;
+    font-size: var(--fs-lg);
   }
   .rapporto-detail {
     padding: 16px;
   }
   .rapporto-detail h3 {
-    font-size: 1.1rem;
+    font-size: var(--fs-lg);
   }
   .turno-body {
     padding: 12px;
   }
   .turno-field textarea {
     min-height: 90px;
-    font-size: 0.88rem;
+    font-size: var(--fs-md);
   }
   .btn-salva-rapporto {
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     padding: 11px;
   }
   .settings-section {
     padding: 16px;
   }
   .settings-section h4 {
-    font-size: 1rem;
+    font-size: var(--fs-lg);
   }
   .add-tipo-row {
     flex-direction: column;
@@ -2645,7 +2696,7 @@ header h1 .casino {
     max-width: 95%;
   }
   .profilo-box h3 {
-    font-size: 1.2rem;
+    font-size: var(--fs-xl);
   }
   .profilo-entries {
     max-height: 300px;
@@ -2655,10 +2706,10 @@ header h1 .casino {
     gap: 6px;
   }
   .scheda-kpi .kpi-val {
-    font-size: 1.1rem;
+    font-size: var(--fs-lg);
   }
   .scheda-kpi .kpi-lbl {
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
   }
   .pwd-modal-box {
     min-width: auto;
@@ -2684,23 +2735,23 @@ header h1 .casino {
   .scadenze-banner,
   .cassa-alert-banner,
   .rischio-alert-banner {
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     padding: 8px 14px;
   }
   .ricerca-globale-input {
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     padding: 10px 14px 10px 36px;
   }
   .ricerca-globale-icon {
     left: 10px;
-    font-size: 1rem;
+    font-size: var(--fs-lg);
   }
   .ricerca-globale-results {
     max-height: 300px;
   }
   .rg-item {
     padding: 8px 10px;
-    font-size: 0.82rem;
+    font-size: var(--fs-sm);
     gap: 6px;
   }
   .rg-item .rg-text {
@@ -2715,7 +2766,7 @@ header h1 .casino {
   }
   .template-rapido-btn {
     padding: 6px 10px;
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
   }
   .firma-canvas {
     width: 220px;
@@ -2728,20 +2779,20 @@ header h1 .casino {
     padding: 10px 8px;
   }
   .stat-num {
-    font-size: 1.5rem;
+    font-size: var(--fs-2xl);
   }
   .stat-label {
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
   }
   .chart-card {
     padding: 14px;
   }
   .chart-card h4 {
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
   }
   .operatore-chip {
     padding: 6px 10px;
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
   }
   .add-tipo-row {
     flex-direction: column;
@@ -2752,7 +2803,7 @@ header h1 .casino {
   /* Inventario mobile */
   .inv-tab-btn {
     padding: 8px 14px !important;
-    font-size: 0.82rem !important;
+    font-size: var(--fs-sm) !important;
     flex: 1;
   }
   #inv-buoni-kpi,
@@ -2771,7 +2822,7 @@ header h1 .casino {
   }
   #inv-buoni-table table,
   #inv-sig-table table {
-    font-size: 0.78rem !important;
+    font-size: var(--fs-sm) !important;
   }
   #inv-buoni-table th,
   #inv-buoni-table td,
@@ -2782,40 +2833,40 @@ header h1 .casino {
   #inv-buoni-table .entry-action-btn,
   #inv-sig-table .entry-action-btn {
     padding: 3px 5px !important;
-    font-size: 0.78rem !important;
+    font-size: var(--fs-sm) !important;
   }
 }
 @media (max-width: 400px) {
   header h1 {
-    font-size: 1.3rem;
+    font-size: var(--fs-xl);
   }
   .nav-tab {
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
     padding: 7px 4px;
   }
   .entry {
     grid-template-columns: 60px 1fr;
   }
   .entry-day {
-    font-size: 1rem;
+    font-size: var(--fs-lg);
   }
   .entry-month {
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
   }
   .rapporto-day-cell {
     padding: 6px 2px;
     min-height: 46px;
   }
   .rapporto-day-cell .day-num {
-    font-size: 0.95rem;
+    font-size: var(--fs-base);
   }
   .ricerca-globale-input {
-    font-size: 0.85rem;
+    font-size: var(--fs-md);
     padding: 9px 12px 9px 32px;
   }
   .template-rapido-btn {
     padding: 5px 8px;
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
   }
   .firma-canvas {
     width: 180px;
@@ -2937,7 +2988,7 @@ button:focus-visible,
 }
 /* CATEGORY GROUP HEADERS */
 .cat-group-header {
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   font-weight: 700;
@@ -2952,7 +3003,7 @@ button:focus-visible,
   margin-top: 0;
 }
 .cat-group-header .cat-count {
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   padding: 1px 8px;
   border-radius: 9px;
@@ -2982,13 +3033,13 @@ button:focus-visible,
 }
 .mini-stat-num {
   font-family: "Playfair Display", serif;
-  font-size: 1.3rem;
+  font-size: var(--fs-xl);
   font-weight: 700;
   color: var(--ink);
   line-height: 1;
 }
 .mini-stat-label {
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted);
@@ -2999,7 +3050,7 @@ button:focus-visible,
   max-width: 75%;
   padding: 8px 12px;
   border-radius: 12px;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   line-height: 1.4;
   position: relative;
   word-wrap: break-word;
@@ -3016,7 +3067,7 @@ button:focus-visible,
   border-bottom-left-radius: 4px;
 }
 .chat-bubble .chat-time {
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   color: var(--muted);
   margin-top: 4px;
   display: flex;
@@ -3025,7 +3076,7 @@ button:focus-visible,
   justify-content: flex-end;
 }
 .chat-bubble .chat-ticks {
-  font-size: 0.85rem;
+  font-size: var(--fs-md);
   font-weight: 700;
 }
 .chat-ticks.read {
@@ -3053,7 +3104,7 @@ button:focus-visible,
   border-radius: 50%;
   min-width: 20px;
   height: 20px;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -3087,18 +3138,18 @@ button:focus-visible,
 .chat-date-sep {
   text-align: center;
   margin: 12px 0 6px;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   color: var(--muted);
   font-weight: 600;
   letter-spacing: 0.06em;
 }
 .chat-group-label {
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   color: var(--muted);
   margin-bottom: 2px;
 }
 .chat-sender-label {
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   color: var(--accent2);
   margin-bottom: 2px;
@@ -3142,7 +3193,7 @@ button:focus-visible,
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 1.2rem;
+  font-size: var(--fs-xl);
   padding: 4px 6px;
   border-radius: 50%;
   transition: background 0.15s;
@@ -3166,7 +3217,7 @@ button:focus-visible,
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 2px 8px;
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   cursor: pointer;
   transition: background 0.15s;
   position: relative;
@@ -3179,12 +3230,12 @@ button:focus-visible,
   background: rgba(184, 134, 11, 0.08);
 }
 .reaction-badge .r-emoji {
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
 }
 .reaction-badge .r-count {
   font-weight: 600;
   color: var(--ink);
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
 }
 .reaction-tooltip {
   display: none;
@@ -3196,7 +3247,7 @@ button:focus-visible,
   color: var(--paper);
   border-radius: 4px;
   padding: 4px 8px;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   white-space: nowrap;
   margin-bottom: 4px;
   z-index: 130;
@@ -3219,7 +3270,7 @@ button:focus-visible,
   border-left: 3px solid var(--accent2);
   background: var(--paper);
   border-radius: 0 4px 4px 0;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   color: var(--muted);
   max-height: 40px;
   overflow: hidden;
@@ -3229,7 +3280,7 @@ button:focus-visible,
   border: none;
   cursor: pointer;
   color: var(--muted);
-  font-size: 1.1rem;
+  font-size: var(--fs-lg);
   padding: 4px;
 }
 .chat-quote {
@@ -3238,7 +3289,7 @@ button:focus-visible,
   border-left: 3px solid var(--accent2);
   background: rgba(0, 0, 0, 0.04);
   border-radius: 0 4px 4px 0;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--muted);
   cursor: pointer;
   max-height: 50px;
@@ -3247,7 +3298,7 @@ button:focus-visible,
 .chat-quote .quote-name {
   font-weight: 600;
   color: var(--accent2);
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
 }
 .conv-new-btn {
   padding: 10px 14px;
@@ -3258,7 +3309,7 @@ button:focus-visible,
   cursor: pointer;
   color: var(--accent2);
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: var(--fs-md);
   transition: background 0.15s;
 }
 .conv-new-btn:hover {
@@ -3274,7 +3325,7 @@ button:focus-visible,
 .conv-new-dropdown div {
   padding: 10px 14px;
   cursor: pointer;
-  font-size: 0.88rem;
+  font-size: var(--fs-md);
   border-bottom: 1px solid var(--paper2);
   display: flex;
   align-items: center;
@@ -3330,10 +3381,10 @@ button:focus-visible,
     left: 8px;
   }
   .reaction-picker {
-    font-size: 1rem;
+    font-size: var(--fs-lg);
   }
   .reaction-picker button {
-    font-size: 1.1rem;
+    font-size: var(--fs-lg);
     padding: 4px 5px;
   }
   #note-chat-messages {
@@ -3359,7 +3410,7 @@ button:focus-visible,
 }
 .chat-star-icon {
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: var(--fs-md);
   margin-right: 2px;
   vertical-align: middle;
   opacity: 0.8;
@@ -3369,7 +3420,7 @@ button:focus-visible,
   opacity: 1;
 }
 .urgente-label {
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   color: var(--accent);
   letter-spacing: 0.06em;
@@ -3382,7 +3433,7 @@ button:focus-visible,
   width: 36px;
   height: 36px;
   cursor: pointer;
-  font-size: 1rem;
+  font-size: var(--fs-lg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3402,7 +3453,7 @@ button:focus-visible,
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 3px 10px;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   cursor: pointer;
   color: var(--muted);
   transition: all 0.15s;
@@ -3581,7 +3632,7 @@ button:focus-visible,
 }
 .settings-section > h4 .sec-chev {
   margin-left: auto;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   color: var(--muted);
   transition: transform 0.2s;
 }
@@ -3602,7 +3653,7 @@ button:focus-visible,
 }
 .main-card > .card-header .sec-chev {
   margin-left: auto;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   opacity: 0.7;
   transition: transform 0.2s;
 }
@@ -3618,7 +3669,7 @@ button:focus-visible,
   color: white;
   padding: 10px 16px;
   border-radius: 3px;
-  font-size: 0.88rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   cursor: pointer;
   margin-bottom: 8px;
@@ -3628,7 +3679,7 @@ button:focus-visible,
 }
 .alert-compatto .sec-chev {
   margin-left: auto;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   transition: transform 0.2s;
 }
 .alert-compatto.aperto .sec-chev {
@@ -3654,7 +3705,7 @@ button:focus-visible,
   gap: 1px;
 }
 .piano-tabgroup-label {
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: #6c757d;
@@ -3681,7 +3732,7 @@ button:focus-visible,
   color: #adb5bd;
   padding: 7px 16px;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   border-radius: 3px;
   user-select: none;
@@ -3708,7 +3759,7 @@ button:focus-visible,
 }
 .piano-table {
   border-collapse: collapse;
-  font-size: 0.88rem;
+  font-size: var(--fs-md);
   min-width: 100%;
 }
 .piano-table th,
@@ -3727,7 +3778,7 @@ button:focus-visible,
 .piano-table thead th {
   background: #212529; /* come Turnivo (thead table-dark) */
   color: #fff;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   position: sticky;
   top: 0;
   z-index: 2;
@@ -3757,7 +3808,7 @@ button:focus-visible,
   min-width: 0;
   white-space: nowrap;
   padding: 2px 5px;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   line-height: 1.1;
 }
 .piano-table thead .piano-fun {
@@ -3784,7 +3835,7 @@ button:focus-visible,
   border-radius: 3px;
   background: #dbe5f1;
   color: #1a4a7a;
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   font-weight: 700;
   text-transform: uppercase;
   vertical-align: 1px;
@@ -3796,7 +3847,7 @@ button:focus-visible,
   border-radius: 3px;
   background: #fbd4b4;
   color: #7a3b00;
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   font-weight: 700;
   text-transform: uppercase;
   vertical-align: 1px;
@@ -3888,7 +3939,7 @@ button:focus-visible,
   vertical-align: middle;
   margin-right: 3px;
   text-align: center;
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   line-height: 13px;
 }
 .piano-viol {
@@ -3987,7 +4038,7 @@ table[data-seltab] textarea {
   display: inline-block;
   background: #555;
   color: #fff;
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   font-weight: 700;
   padding: 0 4px;
   border-radius: 2px;
@@ -4007,7 +4058,7 @@ table[data-seltab] textarea {
   color: #faf7f2;
   padding: 6px 10px;
   border-radius: 3px;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   line-height: 1.35;
   box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
   pointer-events: none;
@@ -4045,14 +4096,14 @@ table[data-seltab] textarea {
   border-radius: 4px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
   min-width: 210px;
-  font-size: 0.84rem;
+  font-size: var(--fs-md);
   overflow: hidden;
 }
 .piano-ctx-head {
   padding: 7px 12px;
   background: var(--ink);
   color: var(--paper);
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
 }
 .piano-ctx-item {
@@ -4194,7 +4245,7 @@ div[style*="overflow-y:auto"]::-webkit-scrollbar-thumb {
   border-radius: 4px;
 }
 .settings-indice-chip {
-  font-size: 0.92rem;
+  font-size: var(--fs-base);
   font-weight: 600;
   padding: 6px 14px;
   border: 1px solid var(--line);
@@ -4213,7 +4264,7 @@ div[style*="overflow-y:auto"]::-webkit-scrollbar-thumb {
 }
 /* Barra comandi del calendario: gruppi ordinati e stile uniforme */
 .pbar-btn {
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   padding: 5px 13px;
   border-radius: 3px;
   border-color: #b8a98a;
@@ -4300,7 +4351,7 @@ div[style*="overflow-y:auto"]::-webkit-scrollbar-thumb {
   border-top-color: #b8860b;
 }
 .stat-num {
-  font-size: 2rem;
+  font-size: var(--fs-3xl);
   line-height: 1.15;
 }
 /* Bottoni azione rapida della Home: stessa altezza, sollevamento al passaggio */
@@ -4374,7 +4425,7 @@ td.brief-cella-sel {
   z-index: 5;
   background: #e67e22;
   color: #fff;
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   font-weight: 700;
   padding: 1px 5px;
   border-radius: 8px;
@@ -4410,11 +4461,11 @@ td.cerca-hit {
   display: flex;
   gap: 8px;
   align-items: center;
-  font-size: 0.85rem;
+  font-size: var(--fs-md);
   white-space: nowrap;
 }
 #piano-autosave {
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   color: var(--muted);
   margin-left: 6px;
   white-space: nowrap;
@@ -4436,7 +4487,7 @@ tr.brief-riga-sel td {
   z-index: 9000;
   background: #212529;
   color: #e9ecef;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   padding: 7px 14px;
   border-radius: 4px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
@@ -4471,23 +4522,59 @@ tr[data-nome] > td:first-child:not(.piano-nome):hover {
    la sua misura e la sua posizione (a sinistra nel calendario, a destra nel
    saldo, invisibile nelle statistiche): stessa cosa, stesso aspetto, sempre
    in fondo a destra dell'intestazione. */
-.piano-cerca {
-  padding: 5px 10px;
-  font-size: 0.85rem;
+/* CASELLA DI RICERCA: una sola per tutto il programma (la ricerca globale in alto
+   resta a parte). Stessa larghezza, altezza e lente ovunque; va sempre a destra:
+   nelle barre con margin-left:auto, nelle file di filtri con .filter-cerca. */
+.campo-cerca,
+.filters input.campo-cerca,
+.filters input[type="text"].campo-cerca {
+  width: 240px;
+  max-width: 100%;
+  height: 2.125rem;
+  box-sizing: border-box;
+  margin-left: auto;
+  padding: 0 0.75rem 0 2rem;
+  font-family: "Source Sans 3", sans-serif;
+  font-size: var(--fs-md);
+  color: var(--ink);
+  background: var(--paper) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a7d6b' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 0.65rem center / 0.9rem;
   border: 1px solid var(--line);
   border-radius: 3px;
-  background: var(--paper);
-  color: var(--ink);
-  width: 190px;
-  max-width: 100%;
+  outline: none;
+}
+.campo-cerca:focus {
+  border-color: var(--accent2);
+  box-shadow: 0 0 0 2px rgba(139, 105, 20, 0.15);
+}
+.campo-cerca::placeholder {
+  color: var(--muted);
+}
+.campo-cerca-pieno {
+  width: 100%;
+  margin-left: 0;
+}
+.filters .filter-cerca {
+  order: 99;
   margin-left: auto;
 }
-.card-header .piano-cerca {
-  border-color: #d4b86a;
-  background: transparent;
-  color: #d4b86a;
+.filters .filter-cerca .filter-label {
+  display: none;
 }
-.card-header .piano-cerca::placeholder {
+.filters .filter-cerca .ac-wrap {
+  width: 240px;
+  max-width: 100%;
+}
+.filters .filter-cerca .ac-wrap .campo-cerca {
+  width: 100%;
+}
+/* nelle barre scure (titoli di sezione, barra del Piano) */
+.card-header .campo-cerca {
+  width: 240px;
+  background: rgba(255, 255, 255, 0.06) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d4b86a' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 0.65rem center / 0.9rem;
+  border-color: #d4b86a;
+  color: #f3ede3;
+}
+.card-header .campo-cerca::placeholder {
   color: #b39a55;
 }
 
@@ -4501,7 +4588,7 @@ tr[data-nome] > td:first-child:not(.piano-nome):hover {
      le caselle con valore mantengono il loro rosso/verde, che vince */
   background: transparent;
   color: var(--ink);
-  font-size: 0.85rem;
+  font-size: var(--fs-md);
   font-weight: 700;
   text-align: center;
   padding: 3px 1px;
@@ -4526,7 +4613,7 @@ tr[data-nome] > td:first-child:not(.piano-nome):hover {
 .rec-totale {
   font-weight: 700;
   text-align: center;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
 }
 #piano-recupero-riepilogo .rec-piu {
   color: #2c6e49;
@@ -4668,7 +4755,7 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   flex: 1 1 auto;
   font: inherit;
   font-family: "Source Sans 3", sans-serif;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -4695,7 +4782,7 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   color: var(--ink);
 }
 .settings-tab-n {
-  font-size: 0.68rem;
+  font-size: var(--fs-xs);
   font-weight: 700;
   padding: 1px 6px;
   border-radius: 10px;
@@ -4719,7 +4806,7 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   display: none !important;
 }
 .settings-indice-lbl {
-  font-size: 0.72rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--muted);
@@ -4728,7 +4815,7 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
 }
 .settings-chip {
   font: inherit;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   padding: 3px 10px;
   border: 1px solid var(--line);
   border-radius: 2px;
@@ -4740,7 +4827,7 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   border-color: var(--ink);
 }
 .settings-gruppo-titolo {
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--muted);
@@ -4790,7 +4877,7 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   background: var(--paper2);
 }
 .brief-toolbar .brief-grp-lbl {
-  font-size: 0.7rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
@@ -4817,12 +4904,12 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   margin: 0 0 4px;
   padding: 0;
   border: 0;
-  font-size: 1.12rem;
+  font-size: var(--fs-lg);
 }
 #page-impostazioni .sez-desc {
   margin: 0;
   color: var(--muted);
-  font-size: 0.86rem;
+  font-size: var(--fs-md);
   line-height: 1.45;
   max-width: 860px;
 }
@@ -4834,7 +4921,7 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
 }
 #page-impostazioni .sez-sottotitolo {
   margin: 18px 0 6px;
-  font-size: 0.74rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--muted);
@@ -4842,7 +4929,7 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
 }
 #page-impostazioni .sez-stato {
   margin: 8px 0 0;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 #page-impostazioni .sez-stato:empty {
@@ -4874,7 +4961,7 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   margin: 0;
 }
 #page-impostazioni .sez-form .field label {
-  font-size: 0.72rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
@@ -4892,7 +4979,7 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   background: var(--paper);
   color: var(--ink);
   font: inherit;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
 }
 #page-impostazioni .sez-form input[type="number"] {
   max-width: 160px;
@@ -4914,7 +5001,7 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   color: var(--paper);
   border: 1.5px solid var(--ink);
   padding: 9px 18px;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -4930,7 +5017,7 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   color: var(--ink);
   border: 1.5px solid var(--ink);
   padding: 9px 16px;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -4944,7 +5031,7 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   border: 1px solid var(--line);
   color: var(--ink);
   padding: 4px 10px;
-  font-size: 0.76rem;
+  font-size: var(--fs-xs);
   font-weight: 600;
   border-radius: 2px;
   margin: 0;
@@ -4977,7 +5064,7 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   border-color: #b8aa95;
 }
 #page-impostazioni .tipo-item .tipo-item-name {
-  font-size: 0.92rem;
+  font-size: var(--fs-base);
 }
 #page-impostazioni .tipo-item-default {
   font-weight: 400;
@@ -4991,7 +5078,7 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   background: var(--paper2);
   color: var(--ink);
   font: inherit;
-  font-size: 0.84rem;
+  font-size: var(--fs-md);
 }
 #page-impostazioni .settings-btn-row {
   display: flex;
@@ -5012,7 +5099,7 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
 }
 #page-impostazioni .vis-riga .vis-nome {
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
 }
 #page-impostazioni .vis-riga select {
   width: 100%;
@@ -5022,7 +5109,7 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   background: var(--paper2);
   color: var(--ink);
   font: inherit;
-  font-size: 0.84rem;
+  font-size: var(--fs-md);
 }
 #page-impostazioni .vis-ops {
   grid-column: 1 / -1;
@@ -5037,12 +5124,12 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   cursor: pointer;
 }
 #page-impostazioni .vis-gruppo {
   margin: 20px 0 8px;
-  font-size: 0.74rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--muted);
@@ -5069,7 +5156,7 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   background: var(--paper2);
   color: var(--ink);
   font: inherit;
-  font-size: 0.84rem;
+  font-size: var(--fs-md);
 }
 @media (max-width: 700px) {
   #page-impostazioni .vis-riga,
@@ -5107,7 +5194,7 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   background: rgba(255, 255, 255, 0.04);
 }
 .card-header.pbar .pbar-grp-lbl {
-  font-size: 0.66rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: #9a8f7c;
@@ -5119,28 +5206,16 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   letter-spacing: 0.04em;
 }
 .card-header.pbar .pbar-info {
-  font-size: 0.72rem;
+  font-size: var(--fs-xs);
   color: var(--muted);
   margin-left: auto;
   letter-spacing: 0.08em;
   text-transform: none;
   font-weight: 400;
 }
-.card-header.pbar #piano-cerca {
-  font-size: 0.82rem;
-  padding: 5px 9px;
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  background: var(--paper);
-  color: var(--ink);
-  width: 170px;
-  margin-left: 4px;
-  letter-spacing: 0;
-  text-transform: none;
-}
 /* Briefing: stessi pulsanti nella stessa misura */
 .brief-toolbar .brief-btn {
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   padding: 5px 12px;
 }
 .brief-toolbar .brief-btn-ok {
@@ -5196,7 +5271,7 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   border-radius: 4px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
   font-family: "Source Sans 3", sans-serif;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   max-width: min(520px, calc(100vw - 32px));
 }
 .annulla-bar button {
@@ -5237,7 +5312,7 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   color: var(--ink);
   border: 1.5px solid var(--ink);
   padding: 9px 18px;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;

@@ -554,7 +554,7 @@ function apriCambioEsigenze(nome, dstr) {
   const turni = _pianoTurniReparto().filter((t) => t.codice !== r.codice);
   const b = document.getElementById('pwd-modal-content');
   b.innerHTML =
-    '<h3>Cambio per esigenze operative</h3><p style="margin-bottom:10px;font-size:.86rem"><strong>' +
+    '<h3>Cambio per esigenze operative</h3><p style="margin-bottom:10px;font-size:var(--fs-md,.875rem)"><strong>' +
     escP(nome) +
     '</strong> · ' +
     new Date(dstr + 'T12:00:00').toLocaleDateString('it-IT') +
@@ -574,7 +574,7 @@ function apriCambioEsigenze(nome, dstr) {
           '-' +
           (t.ora_fine || '').substring(0, 5) +
           ')' +
-          (_pianoIdoneoPerTurno(nome, t) ? '' : ' ⚠ NON FORMATO') +
+          (_pianoIdoneoPerTurno(nome, t) ? '' : ' · NON FORMATO') +
           '</option>',
       )
       .join('') +
@@ -606,7 +606,7 @@ async function confermaCambioEsigenze() {
     if (avvisi.length) {
       if (
         !confirm(
-          '⚠ ATTENZIONE · ' +
+          'ATTENZIONE · ' +
             sel.nome +
             ' · ' +
             sel.data.split('-').reverse().join('.') +
@@ -618,7 +618,7 @@ async function confermaCambioEsigenze() {
         )
       )
         return;
-      notaRegole = '⚠ ' + avvisi.join(' · ') + ' · ';
+      notaRegole = 'Avviso: ' + avvisi.join(' · ') + ' · ';
     }
   }
   try {

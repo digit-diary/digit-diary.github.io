@@ -21,7 +21,8 @@
 async function pianoCaricaDomenicheAnno() {
   const anno = parseInt(_pianoMeseSel.split('-')[0]);
   const el = document.getElementById('piano-domeniche-body');
-  if (el) el.innerHTML = '<p style="color:var(--muted);font-size:.85rem">Conto le domeniche dell anno...</p>';
+  if (el)
+    el.innerHTML = '<p style="color:var(--muted);font-size:var(--fs-md,.875rem)">Conto le domeniche dell anno...</p>';
   const rep = _pianoReparto();
   const righe =
     (await secGet(
@@ -73,13 +74,13 @@ function _renderPianoDomenicheBody() {
   let domFuture = 0;
   Object.keys(domMese).forEach((mm) => domMese[mm].forEach((dstr) => dstr > oggiStr && domFuture++));
   let h =
-    '<p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Diritto: ' +
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Diritto: ' +
     diritto +
     ' domeniche libere all anno (regola "domeniche_libere_anno"). Vacanza e malattia non contano ne\' tra le libere ne\' tra le lavorate (stesso criterio del validatore e di Benessere)' +
     (chkSab ? '; il sabato deve finire entro le 23, come nel validatore' : '') +
     '. Nei mesi senza piano non si conta nulla. Rosso = le domeniche rimaste nell anno non bastano piu per arrivare al diritto: da li in poi vanno restituite per prime.</p>';
   h +=
-    '<div style="overflow:auto;max-height:66vh"><table id="piano-domeniche-table" class="piano-table piano-fisse3" style="min-width:1050px;font-size:.8rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Fun</th><th>%</th>';
+    '<div style="overflow:auto;max-height:66vh"><table id="piano-domeniche-table" class="piano-table piano-fisse3" style="min-width:1050px;font-size:var(--fs-sm,.8125rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Fun</th><th>%</th>';
   for (let m = 1; m <= 12; m++) h += '<th title="Domeniche libere nel mese">' + (MESI[m - 1] || m) + '</th>';
   h +=
     '<th title="Domeniche libere gia avute nei mesi pianificati">Libere</th><th title="Domeniche con un turno">Lavorate</th><th>Diritto</th><th title="Quante ne mancano al diritto">Restano</th></tr></thead><tbody>';
@@ -176,7 +177,8 @@ function _renderPianoDomenicheBody() {
       '</td></tr>';
   });
   h += '</tbody></table></div>';
-  if (!scritte) h = '<p style="color:var(--muted);font-size:.85rem">Nessun mese pianificato per il ' + anno + '.</p>';
+  if (!scritte)
+    h = '<p style="color:var(--muted);font-size:var(--fs-md,.875rem)">Nessun mese pianificato per il ' + anno + '.</p>';
   el.innerHTML = h;
 }
 function _renderPianoDomenicheCard() {
@@ -186,9 +188,9 @@ function _renderPianoDomenicheCard() {
     anno +
     ' · ' +
     escP(repartoLabel(_pianoReparto())) +
-    '<input type="text" class="piano-cerca" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-domeniche-table\')">' +
-    '<button class="btn-export" style="font-size:.8rem;padding:4px 12px" onclick="pianoCaricaDomenicheAnno()">Ricalcola</button>' +
-    '</div><div style="padding:10px 14px" id="piano-domeniche-body"><p style="color:var(--muted);font-size:.85rem">Caricamento...</p></div></div>'
+    '<input type="text" class="piano-cerca campo-cerca" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-domeniche-table\')">' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px" onclick="pianoCaricaDomenicheAnno()">Ricalcola</button>' +
+    '</div><div style="padding:10px 14px" id="piano-domeniche-body"><p style="color:var(--muted);font-size:var(--fs-md,.875rem)">Caricamento...</p></div></div>'
   );
 }
 function _renderPianoBenessereCard() {
@@ -198,8 +200,8 @@ function _renderPianoBenessereCard() {
     ' ' +
     escP(_pianoMeseSel.split('-')[0]) +
     '<button class="btn-act pin" onclick="pianoBenessereAnno(-1)">&larr;</button><button class="btn-act pin" onclick="pianoBenessereAnno(1)">&rarr;</button>' +
-    '<input type="text" id="benessere-cerca" class="piano-cerca" placeholder="Cerca collaboratore..." oninput="pianoBenessereFiltra(this.value)">' +
-    '</div><div style="padding:10px 14px" id="piano-benessere-body"><p style="color:var(--muted);font-size:.85rem">Caricamento...</p></div></div>'
+    '<input type="text" id="benessere-cerca" class="piano-cerca campo-cerca" placeholder="Cerca collaboratore..." oninput="pianoBenessereFiltra(this.value)">' +
+    '</div><div style="padding:10px 14px" id="piano-benessere-body"><p style="color:var(--muted);font-size:var(--fs-md,.875rem)">Caricamento...</p></div></div>'
   );
 }
 function pianoBenessereAnno(d) {
@@ -210,7 +212,8 @@ async function caricaBenesserePiano() {
   const el = document.getElementById('piano-benessere-body');
   if (!el) return;
   const anno = window._pianoBenessereAnno || parseInt(_pianoMeseSel.split('-')[0]);
-  el.innerHTML = '<p style="color:var(--muted);font-size:.85rem">Calcolo del ' + anno + ' in corso...</p>';
+  el.innerHTML =
+    '<p style="color:var(--muted);font-size:var(--fs-md,.875rem)">Calcolo del ' + anno + ' in corso...</p>';
   try {
     const righe =
       (await secGet(
@@ -361,7 +364,7 @@ async function caricaBenesserePiano() {
         return so.dir * (va - vb);
       });
     if (!calcolati.length) {
-      el.innerHTML = '<p style="font-size:.85rem">Nessun piano nel ' + anno + ' per questo settore.</p>';
+      el.innerHTML = '<p style="font-size:var(--fs-md,.875rem)">Nessun piano nel ' + anno + ' per questo settore.</p>';
       return;
     }
     const colore = (v) => (v >= 75 ? '#2c6e49' : v >= 55 ? '#b8860b' : '#c0392b');
@@ -370,7 +373,7 @@ async function caricaBenesserePiano() {
       if (!lista.length) return '';
       const media = Math.round(lista.reduce((s, x) => s + x.res.punteggio, 0) / lista.length);
       let t =
-        '<p style="font-size:.85rem;font-weight:700;margin:14px 0 6px">' +
+        '<p style="font-size:var(--fs-md,.875rem);font-weight:700;margin:14px 0 6px">' +
         titolo +
         ' <span style="font-weight:400;color:var(--muted)">· ' +
         lista.length +
@@ -394,7 +397,7 @@ async function caricaBenesserePiano() {
           : '') +
         '</th>';
       t +=
-        '<div style="overflow-x:auto"><table class="piano-table benessere-tab" style="min-width:860px;font-size:.95rem"><thead><tr>' +
+        '<div style="overflow-x:auto"><table class="piano-table benessere-tab" style="min-width:860px;font-size:var(--fs-base,.9375rem)"><thead><tr>' +
         '<th style="text-align:left;cursor:pointer" onclick="pianoBenessereOrdina(\'nome\')">Collaboratore' +
         (window._benessereSort && window._benessereSort.campo === 'nome'
           ? window._benessereSort.dir > 0
@@ -430,7 +433,7 @@ async function caricaBenesserePiano() {
           colore(x.res.punteggio) +
           '">' +
           x.res.punteggio +
-          '</b></div><div style="font-size:.8rem;color:var(--muted);text-align:center">' +
+          '</b></div><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);text-align:center">' +
           etichetta(x.res.punteggio) +
           '</div></td><td title="' +
           x.p.domLib +
@@ -443,7 +446,7 @@ async function caricaBenesserePiano() {
           (x.p.domAssenza ? ' · ' + x.p.domAssenza + ' escluse perche in vacanza o malattia' : '') +
           '">' +
           x.p.domLib +
-          '<span style="font-weight:400;color:var(--muted);font-size:.85rem">/' +
+          '<span style="font-weight:400;color:var(--muted);font-size:var(--fs-md,.875rem)">/' +
           (x.p.domTot || 0) +
           '</span></td><td>' +
           (x.p.domLav || 0) +
@@ -473,7 +476,7 @@ async function caricaBenesserePiano() {
       return t;
     };
     let h =
-      '<p style="font-size:.88rem;color:var(--muted);margin-bottom:6px">' +
+      '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);margin-bottom:6px">' +
       _benesserePeriodoLbl(calcolati, anno) +
       ' ' +
       ', su dati del piano. L indice va da 0 a 100 e pesa: domeniche libere (25), equita nei weekend (20), carico notturno (15), qualita del riposo (15), giorni consecutivi (15), vacanze godute (10). ' +
@@ -490,7 +493,7 @@ async function caricaBenesserePiano() {
     const critici = calcolati.filter((x) => x.res.punteggio < 55);
     if (critici.length)
       h +=
-        '<p style="font-size:.85rem;margin-top:12px;padding:8px 10px;background:#fdecea;border-left:3px solid #c0392b;border-radius:2px"><b>Da guardare per primi:</b> ' +
+        '<p style="font-size:var(--fs-md,.875rem);margin-top:12px;padding:8px 10px;background:#fdecea;border-left:3px solid #c0392b;border-radius:2px"><b>Da guardare per primi:</b> ' +
         escP(critici.map((x) => x.nome.split(' ')[0] + ' (' + x.res.punteggio + ')').join(', ')) +
         '</p>';
     el.innerHTML = h;
@@ -542,7 +545,9 @@ async function caricaBenesserePiano() {
   } catch (e) {
     console.error(e);
     el.innerHTML =
-      '<p style="color:var(--accent);font-size:.85rem">Errore nel calcolo: ' + escP(e.message || '') + '</p>';
+      '<p style="color:var(--accent);font-size:var(--fs-md,.875rem)">Errore nel calcolo: ' +
+      escP(e.message || '') +
+      '</p>';
   }
 }
 // Etichetta del periodo davvero considerato: solo i mesi con piano completo
@@ -642,7 +647,7 @@ function _renderPianoTurniCard() {
     let hRO =
       '<div class="main-card" style="margin-top:16px"><div class="card-header">Turni · ' +
       escP(repartoLabel(_pianoReparto())) +
-      '</div><div style="padding:10px 14px"><div style="overflow-x:auto"><table class="piano-table" style="min-width:520px;font-size:.85rem"><thead><tr><th>Codice</th><th>Gruppo</th><th>Inizio</th><th>Fine</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perche 20 minuti sono un terzo di ora">Ore</th><th>Tipo</th></tr></thead><tbody>';
+      '</div><div style="padding:10px 14px"><div style="overflow-x:auto"><table class="piano-table" style="min-width:520px;font-size:var(--fs-md,.875rem)"><thead><tr><th>Codice</th><th>Gruppo</th><th>Inizio</th><th>Fine</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perche 20 minuti sono un terzo di ora">Ore</th><th>Tipo</th></tr></thead><tbody>';
     turniRO.forEach((t) => {
       hRO +=
         '<tr><td style="font-weight:700;background:' +
@@ -657,14 +662,14 @@ function _renderPianoTurniCard() {
         (t.ora_fine || '-').substring(0, 5) +
         '</td><td>' +
         (t.durata_ore || 0) +
-        ' <span style="font-size:.82rem;color:var(--muted)">= ' +
+        ' <span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">= ' +
         _pianoOreHm(t.durata_ore) +
         '</span></td><td>' +
         escP(t.tipo || '') +
         '</td></tr>';
     });
     hRO +=
-      '</tbody></table></div><p style="font-size:.82rem;color:var(--muted);margin-top:6px">Sola lettura: i turni si modificano solo da admin o da chi ha il permesso.</p></div></div>';
+      '</tbody></table></div><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:6px">Sola lettura: i turni si modificano solo da admin o da chi ha il permesso.</p></div></div>';
     return hRO;
   }
   const turni = _pianoTurniReparto();
@@ -677,12 +682,12 @@ function _renderPianoTurniCard() {
   // rispettino e propone la correzione dove manca.
   h +=
     '<div style="background:var(--paper2);border:1px solid var(--line);border-radius:3px;padding:10px 12px;margin-bottom:12px">' +
-    '<b style="font-size:.9rem">Supplemento notturno del 10%</b>' +
-    '<p style="font-size:.82rem;color:var(--muted);margin:4px 0 8px">Chi lavora nella fascia notturna (23:00-06:00) matura il 10% di quelle ore in piu\', e questo supplemento deve essere gia\' compreso nella durata del turno. Il controllo confronta ogni turno con la durata attesa.</p>' +
-    '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="pianoVerificaDurateNotte()">Controlla le durate dei turni</button>' +
+    '<b style="font-size:var(--fs-md,.875rem)">Supplemento notturno del 10%</b>' +
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:4px 0 8px">Chi lavora nella fascia notturna (23:00-06:00) matura il 10% di quelle ore in piu\', e questo supplemento deve essere gia\' compreso nella durata del turno. Il controllo confronta ogni turno con la durata attesa.</p>' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px" onclick="pianoVerificaDurateNotte()">Controlla le durate dei turni</button>' +
     '</div>';
   h +=
-    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:720px;font-size:.85rem"><thead><tr><th>Codice</th><th>Gruppo</th><th>Inizio</th><th>Fine</th><th title="Ora di fine nei giorni in cui il casino chiude alle 5: venerdi, sabato, vigilie di festivita, 31 dicembre. Vuoto = il turno finisce sempre alla stessa ora">Fine (chiusura 5)</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perche 20 minuti sono un terzo di ora">Ore</th><th>Tipo</th><th>Colore</th><th>Oltre 23</th><th>Attivo</th><th></th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:720px;font-size:var(--fs-md,.875rem)"><thead><tr><th>Codice</th><th>Gruppo</th><th>Inizio</th><th>Fine</th><th title="Ora di fine nei giorni in cui il casino chiude alle 5: venerdi, sabato, vigilie di festivita, 31 dicembre. Vuoto = il turno finisce sempre alla stessa ora">Fine (chiusura 5)</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perche 20 minuti sono un terzo di ora">Ore</th><th>Tipo</th><th>Colore</th><th>Oltre 23</th><th>Attivo</th><th></th></tr></thead><tbody>';
   turni
     .slice()
     .sort((x, y) => (x.gruppo || '').localeCompare(y.gruppo || '') || x.codice.localeCompare(y.codice))
@@ -726,7 +731,7 @@ function _renderPianoTurniCard() {
         t.id +
         ',this.value)" style="width:58px;padding:2px;text-align:center;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"> <span id="pt-hm-' +
         t.id +
-        '" style="font-size:.82rem;color:var(--muted);white-space:nowrap" title="Stessa durata scritta in ore e minuti: 8.33 in decimali = 8h20 (20 minuti sono un terzo di ora)">= ' +
+        '" style="font-size:var(--fs-sm,.8125rem);color:var(--muted);white-space:nowrap" title="Stessa durata scritta in ore e minuti: 8.33 in decimali = 8h20 (20 minuti sono un terzo di ora)">= ' +
         _pianoOreHm(t.durata_ore) +
         '</span></td><td><select onchange="salvaPianoTurno(' +
         t.id +
@@ -792,11 +797,11 @@ function _pianoModificheHtml() {
   if (!lista.length) return '';
   return (
     '<div style="background:#fff8e1;border-left:4px solid #b8860b;border-radius:3px;padding:10px 12px;margin:0 0 12px">' +
-    '<b style="font-size:.9rem">Modifiche fatte adesso (' +
+    '<b style="font-size:var(--fs-md,.875rem)">Modifiche fatte adesso (' +
     lista.length +
     ')</b>' +
-    '<p style="font-size:.82rem;color:var(--muted);margin:4px 0 6px">Sono gia salvate: il programma registra ogni campo appena lo cambi. Questo elenco serve solo a ricordare che cosa hai toccato in questa sessione. Resta anche nel Registro attivita, con nome e ora.</p>' +
-    '<ul style="margin:0 0 8px 18px;font-size:.86rem">' +
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:4px 0 6px">Sono gia salvate: il programma registra ogni campo appena lo cambi. Questo elenco serve solo a ricordare che cosa hai toccato in questa sessione. Resta anche nel Registro attivita, con nome e ora.</p>' +
+    '<ul style="margin:0 0 8px 18px;font-size:var(--fs-md,.875rem)">' +
     lista
       .map(
         (m) =>
@@ -816,7 +821,7 @@ function _pianoModificheHtml() {
       )
       .join('') +
     '</ul>' +
-    '<button class="btn-export" style="font-size:.8rem;padding:4px 10px" onclick="window._pianoModifiche=[];renderPiano()">Ho visto, chiudi l elenco</button>' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" onclick="window._pianoModifiche=[];renderPiano()">Ho visto, chiudi l elenco</button>' +
     '</div>'
   );
 }
@@ -981,9 +986,9 @@ function _renderPianoCodiciCard() {
   let h =
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Codici speciali (admin)</div><div style="padding:10px 14px">';
   h +=
-    '<p style="font-size:.82rem;color:var(--muted);margin-bottom:6px">Assenze e situazioni non lavorative. "Riposo" = il codice conta come giorno di riposo per le regole. Le ore seguono le formule CCL originali.</p>';
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:6px">Assenze e situazioni non lavorative. "Riposo" = il codice conta come giorno di riposo per le regole. Le ore seguono le formule CCL originali.</p>';
   h +=
-    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:640px;font-size:.85rem"><thead><tr><th>Codice</th><th style="text-align:left">Descrizione</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perche 20 minuti sono un terzo di ora">Ore</th><th title="Le ore vengono scalate per la percentuale d\'impiego">Scala %</th><th title="Inserendolo nel piano chiede orario di inizio e fine (es. JG)">Chiede orario</th><th>Riposo</th><th>Attivo</th><th></th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:640px;font-size:var(--fs-md,.875rem)"><thead><tr><th>Codice</th><th style="text-align:left">Descrizione</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perche 20 minuti sono un terzo di ora">Ore</th><th title="Le ore vengono scalate per la percentuale d\'impiego">Scala %</th><th title="Inserendolo nel piano chiede orario di inizio e fine (es. JG)">Chiede orario</th><th>Riposo</th><th>Attivo</th><th></th></tr></thead><tbody>';
   pianoCodiciCache
     .slice()
     .sort((x, y) => x.codice.localeCompare(y.codice))
@@ -1024,8 +1029,8 @@ function _renderPianoCodiciCard() {
     '<div class="add-tipo-row" style="margin-top:8px"><div class="field"><label>Codice</label><input type="text" id="pc-nuovo-codice" placeholder="XX" style="width:70px"></div>' +
     '<div class="field"><label>Descrizione</label><input type="text" id="pc-nuovo-desc" placeholder="Es: Permesso studio" style="width:200px"></div>' +
     '<div class="field"><label>Ore</label><input type="number" step="0.001" id="pc-nuovo-ore" value="0" style="width:80px"></div>' +
-    '<label style="font-size:.85rem"><input type="checkbox" id="pc-nuovo-scala"> Scala %</label>' +
-    '<label style="font-size:.85rem"><input type="checkbox" id="pc-nuovo-riposo"> Riposo</label>' +
+    '<label style="font-size:var(--fs-md,.875rem)"><input type="checkbox" id="pc-nuovo-scala"> Scala %</label>' +
+    '<label style="font-size:var(--fs-md,.875rem)"><input type="checkbox" id="pc-nuovo-riposo"> Riposo</label>' +
     '<button class="btn-add-tipo" onclick="aggiungiPianoCodice()">+ Aggiungi codice</button></div>';
   h += '</div></div>';
   return h;
@@ -1142,10 +1147,10 @@ async function pianoRiportoCgf() {
     anno +
     ' · ' +
     escP(repartoLabel(_pianoReparto())) +
-    '</h3><p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Recuperi festivi maturati fino al 31.12.' +
+    '</h3><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Recuperi festivi maturati fino al 31.12.' +
     (anno - 1) +
     " e non ancora goduti (negativo = presi in anticipo). Con un riporto registrato il programma non conta piu' i festivi e i CGF dell'anno prima. Vuoto = nessun riporto.</p>" +
-    '<div style="max-height:52vh;overflow:auto"><table class="piano-table" style="min-width:100%;font-size:.9rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Riporto</th></tr></thead><tbody>';
+    '<div style="max-height:52vh;overflow:auto"><table class="piano-table" style="min-width:100%;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Riporto</th></tr></thead><tbody>';
   nomi.forEach((n) => {
     const r = _pianoCgfRiporto[n + '|' + anno];
     h +=
@@ -1244,15 +1249,15 @@ async function pianoElencoCgfDaDare() {
   let h =
     '<h3>Recuperi festivi (CGF) · ' +
     escP(_pianoMeseSel.split('-')[0]) +
-    '</h3><p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Conteggio fino alla fine di ' +
+    '</h3><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Conteggio fino alla fine di ' +
     escP(_pianoMeseSel) +
     " (i mesi futuri non contano). Riporto dall'anno prima + festivi con diritto lavorati (non in malattia) - recuperi goduti. Senza riporto registrato si conta anche l'anno precedente. Un CGF caduto in malattia non e' goduto: resta a credito. Solo personale fisso" +
     (_pianoCgfSoloParificati() ? ', solo festivi parificati alla domenica (regola cgf_solo_parificati)' : '') +
     '.</p>';
-  if (!righe.length) h += '<p style="font-size:.85rem">Nessun festivo lavorato quest\'anno.</p>';
+  if (!righe.length) h += '<p style="font-size:var(--fs-md,.875rem)">Nessun festivo lavorato quest\'anno.</p>';
   else {
     h +=
-      '<div style="max-height:52vh;overflow:auto"><table class="piano-table" style="min-width:100%;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th title="Recuperi con cui entra nell anno (scheda Festivi, Riporto CGF)">Riporto</th><th>Maturati</th><th>Goduti</th><th title="CGF caduti in malattia: non goduti, restano a credito">In malattia</th><th>Da dare</th></tr></thead><tbody>';
+      '<div style="max-height:52vh;overflow:auto"><table class="piano-table" style="min-width:100%;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th title="Recuperi con cui entra nell anno (scheda Festivi, Riporto CGF)">Riporto</th><th>Maturati</th><th>Goduti</th><th title="CGF caduti in malattia: non goduti, restano a credito">In malattia</th><th>Da dare</th></tr></thead><tbody>';
     righe.forEach((r) => {
       h +=
         '<tr><td style="text-align:left;font-weight:600">' +
@@ -1425,7 +1430,7 @@ function _renderPianoFestiviCard() {
     visibili.length +
     ')';
   h +=
-    '<select onchange="window._pianoFestiviAnnoSel=parseInt(this.value);renderPiano()" style="padding:4px 8px;font-size:.8rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a">';
+    '<select onchange="window._pianoFestiviAnnoSel=parseInt(this.value);renderPiano()" style="padding:4px 8px;font-size:var(--fs-sm,.8125rem);border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a">';
   for (let a = 2024; a <= 2032; a++)
     h +=
       '<option value="' +
@@ -1441,17 +1446,17 @@ function _renderPianoFestiviCard() {
   // questi pulsanti assegna i CGF del mese senza rifare il piano.
   h +=
     '<div style="background:var(--paper2);border:1px solid var(--line);border-radius:3px;padding:10px 12px;margin-bottom:12px">' +
-    '<b style="font-size:.9rem">Recuperi festivi (CGF) sul piano</b>' +
-    '<p style="font-size:.82rem;color:var(--muted);margin:4px 0 8px">Per chi compila il piano a mano: assegna i giorni di recupero ai <b>fissi</b> che hanno lavorato nei festivi, senza rigenerare nulla. Gli ausiliari non ricevono CGF: per loro vale il supplemento del 50% (RAP Allegato 1), che si legge nelle Statistiche.</p>' +
-    '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="pianoAssegnaCgfMese()">Assegna i CGF del mese di ' +
+    '<b style="font-size:var(--fs-md,.875rem)">Recuperi festivi (CGF) sul piano</b>' +
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:4px 0 8px">Per chi compila il piano a mano: assegna i giorni di recupero ai <b>fissi</b> che hanno lavorato nei festivi, senza rigenerare nulla. Gli ausiliari non ricevono CGF: per loro vale il supplemento del 50% (RAP Allegato 1), che si legge nelle Statistiche.</p>' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px" onclick="pianoAssegnaCgfMese()">Assegna i CGF del mese di ' +
     escP(_pianoMeseSel) +
     '</button> ' +
-    '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="pianoElencoCgfDaDare()">Chi ha diritto a un recupero</button> ' +
-    '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="pianoRiportoCgf()">Riporto CGF dall\'anno precedente</button>' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px" onclick="pianoElencoCgfDaDare()">Chi ha diritto a un recupero</button> ' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px" onclick="pianoRiportoCgf()">Riporto CGF dall\'anno precedente</button>' +
     '</div>';
   if (!visibili.length)
     h +=
-      '<p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Nessun festivo per il ' +
+      '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Nessun festivo per il ' +
       annoSel +
       ': generali con il pulsante qui sotto.</p>';
   visibili
@@ -1477,14 +1482,14 @@ function _renderPianoFestiviCard() {
   h +=
     '<div class="add-tipo-row" style="margin-top:8px"><div class="field"><label>Data</label><input type="date" id="pf-nuova-data"></div>' +
     '<div class="field"><label>Descrizione</label><input type="text" id="pf-nuova-desc" placeholder="Es: Natale"></div>' +
-    '<label style="display:flex;align-items:center;gap:4px;font-size:.85rem;cursor:pointer"><input type="checkbox" id="pf-nuovo-cgf" checked> CGF</label>' +
+    '<label style="display:flex;align-items:center;gap:4px;font-size:var(--fs-md,.875rem);cursor:pointer"><input type="checkbox" id="pf-nuovo-cgf" checked> CGF</label>' +
     '<button class="btn-add-tipo" onclick="aggiungiPianoFestivo()">+ Aggiungi</button></div>';
   h +=
     '<div class="add-tipo-row" style="margin-top:6px;border-top:1px solid var(--line);padding-top:8px"><div class="field"><label>Genera automaticamente i festivi di un anno</label><input type="number" id="pf-genera-anno" value="' +
     annoSel +
     '" min="2024" max="2050" style="width:90px"></div>' +
     '<button class="btn-add-tipo" onclick="generaPianoFestivi()">Genera festivi anno</button>' +
-    '<span style="font-size:.8rem;color:var(--muted)">11 festivi italiani (Lunedì dell&#39;Angelo calcolato dalla Pasqua)</span></div>';
+    '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">11 festivi italiani (Lunedì dell&#39;Angelo calcolato dalla Pasqua)</span></div>';
   h += '</div></div>';
   return h;
 }
@@ -2040,12 +2045,12 @@ function _recColoriBarHtml() {
         c +
         ';border:1px solid #999;border-radius:3px;margin:2px;cursor:pointer;vertical-align:middle"></span>',
     ).join('') +
-    '<button class="btn-export" style="font-size:.82rem;padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="pianoRecColora(null)">Togli colore</button>' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="pianoRecColora(null)">Togli colore</button>' +
     '<span style="display:inline-block;width:1px;height:20px;background:var(--line);margin:0 8px;vertical-align:middle"></span>' +
-    '<button class="btn-export" style="font-size:.82rem;font-weight:700;padding:2px 10px;vertical-align:middle" title="Grassetto sulla selezione" onclick="pianoRecFormato(\'b\')">G</button> ' +
-    '<button class="btn-export" style="font-size:.82rem;font-style:italic;padding:2px 10px;vertical-align:middle" title="Corsivo sulla selezione" onclick="pianoRecFormato(\'i\')">C</button>' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);font-weight:700;padding:2px 10px;vertical-align:middle" title="Grassetto sulla selezione" onclick="pianoRecFormato(\'b\')">G</button> ' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);font-style:italic;padding:2px 10px;vertical-align:middle" title="Corsivo sulla selezione" onclick="pianoRecFormato(\'i\')">C</button>' +
     '<div style="margin-top:7px;padding-top:6px;border-top:1px solid var(--line)">' +
-    '<span style="font-size:.82rem;color:var(--muted);vertical-align:middle;margin-right:4px">Testo:</span>' +
+    '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted);vertical-align:middle;margin-right:4px">Testo:</span>' +
     PIANO_COLORI_TESTO.map(
       (c) =>
         '<span onclick="pianoRecColoreTesto(\'' +
@@ -2054,7 +2059,7 @@ function _recColoriBarHtml() {
         c +
         ';border:1px solid #999;border-radius:50%;margin:1px;cursor:pointer;vertical-align:middle"></span>',
     ).join('') +
-    '<button class="btn-export" style="font-size:.82rem;padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="pianoRecColoreTesto(null)">&#10005;</button>' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="pianoRecColoreTesto(null)">&#10005;</button>' +
     '</div></div></span>'
   );
 }
@@ -2123,28 +2128,28 @@ async function _renderPianoRecuperoTab() {
     '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">Recupero ore &middot; personale fisso' +
     // stesse frecce del calendario, per cambiare mese senza uscire dalla scheda
     '<span style="display:inline-flex;align-items:center;gap:6px">' +
-    '<button class="btn-export" style="padding:2px 10px;font-size:.9rem" title="Mese precedente" onclick="pianoCambiaMese(-1)">&#8592;</button>' +
+    '<button class="btn-export" style="padding:2px 10px;font-size:var(--fs-md,.875rem)" title="Mese precedente" onclick="pianoCambiaMese(-1)">&#8592;</button>' +
     '<b style="min-width:150px;text-align:center">' +
     (MESI_L[parseInt(ym.split('-')[1]) - 1] || ym) +
     ' ' +
     ym.split('-')[0] +
     '</b>' +
-    '<button class="btn-export" style="padding:2px 10px;font-size:.9rem" title="Mese successivo" onclick="pianoCambiaMese(1)">&#8594;</button>' +
+    '<button class="btn-export" style="padding:2px 10px;font-size:var(--fs-md,.875rem)" title="Mese successivo" onclick="pianoCambiaMese(1)">&#8594;</button>' +
     (ym !== _oggiYm
-      ? '<button class="btn-act" style="font-size:.82rem" title="Torna al mese corrente" onclick="pianoVaiMeseCorrente()">Mese corrente</button>'
+      ? '<button class="btn-act" style="font-size:var(--fs-sm,.8125rem)" title="Torna al mese corrente" onclick="pianoVaiMeseCorrente()">Mese corrente</button>'
       : '') +
     '</span>' +
-    '<span id="piano-recupero-riepilogo" style="margin-left:auto;font-size:.85rem;font-weight:400"></span></div><div style="padding:10px 14px">';
+    '<span id="piano-recupero-riepilogo" style="margin-left:auto;font-size:var(--fs-md,.875rem);font-weight:400"></span></div><div style="padding:10px 14px">';
   h +=
-    '<p style="font-size:.85rem;color:var(--muted);line-height:1.55;margin-bottom:10px">Si aggiorna <b>ogni giorno</b>: nella casella del giorno si scrive quanto il collaboratore ha lavorato in piu o in meno rispetto al turno previsto. <b>-1</b> significa un ora in meno (rosso), <b>+3</b> tre ore in piu (verde). Casella vuota = ha fatto esattamente il suo turno. Il totale del mese entra nel <b>saldo ore</b>, quindi il conteggio resta aggiornato senza aspettare la fine del mese.</p>';
+    '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);line-height:1.55;margin-bottom:10px">Si aggiorna <b>ogni giorno</b>: nella casella del giorno si scrive quanto il collaboratore ha lavorato in piu o in meno rispetto al turno previsto. <b>-1</b> significa un ora in meno (rosso), <b>+3</b> tre ore in piu (verde). Casella vuota = ha fatto esattamente il suo turno. Il totale del mese entra nel <b>saldo ore</b>, quindi il conteggio resta aggiornato senza aspettare la fine del mese.</p>';
   if (!nomi.length) {
     h += '<p style="color:var(--muted);padding:10px 0">Nessun collaboratore in questo settore.</p></div></div>';
     return h;
   }
   h +=
     '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">' +
-    '<span style="font-size:.85rem;color:var(--muted)">Ordina per</span>' +
-    '<select onchange="pianoRecuperoOrdina(this.value)" style="padding:5px 9px;font-size:.85rem;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--ink)">' +
+    '<span style="font-size:var(--fs-md,.875rem);color:var(--muted)">Ordina per</span>' +
+    '<select onchange="pianoRecuperoOrdina(this.value)" style="padding:5px 9px;font-size:var(--fs-md,.875rem);border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--ink)">' +
     [
       ['nome', 'Nome'],
       ['totale', 'Totale del mese'],
@@ -2162,16 +2167,16 @@ async function _renderPianoRecuperoTab() {
       )
       .join('') +
     '</select>' +
-    '<input type="text" class="piano-cerca" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-recupero-table\')">' +
+    '<input type="text" class="piano-cerca campo-cerca" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-recupero-table\')">' +
     '</div>';
   // barretta selezione e colori: la STESSA del calendario (secchiello con
   // l'ultimo colore condiviso, palette, grassetto, corsivo, colore del testo)
   h +=
     '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">' +
     _recColoriBarHtml() +
-    '<button class="btn-export" style="font-size:.82rem;padding:4px 12px" onclick="pianoRecSelPulisci()">Deseleziona</button>' +
-    '<b id="rec-sel-info" style="font-size:.85rem;color:#b8860b"></b>' +
-    '<span style="font-size:.82rem;color:var(--muted);margin-left:auto">Click sul nome = riga &middot; click sul giorno = colonna &middot; Ctrl+click aggiunge (anche singole caselle)</span>' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px" onclick="pianoRecSelPulisci()">Deseleziona</button>' +
+    '<b id="rec-sel-info" style="font-size:var(--fs-md,.875rem);color:#b8860b"></b>' +
+    '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-left:auto">Click sul nome = riga &middot; click sul giorno = colonna &middot; Ctrl+click aggiunge (anche singole caselle)</span>' +
     '</div>';
   h +=
     // scorrimento DENTRO il riquadro: cosi' la riga delle date resta fissa in
@@ -2254,7 +2259,7 @@ async function _renderPianoRecuperoTab() {
   });
   h += '</tbody></table></div>';
   h +=
-    '<p style="font-size:.85rem;color:var(--muted);margin-top:10px">Le stesse ore compaiono nella colonna <b>SM</b> del calendario e nella scheda <b>Saldo</b>, sommate alle ore del piano. Chi scrive e quando resta nel registro.</p>';
+    '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);margin-top:10px">Le stesse ore compaiono nella colonna <b>SM</b> del calendario e nella scheda <b>Saldo</b>, sommate alle ore del piano. Chi scrive e quando resta nel registro.</p>';
   h += '</div></div>';
   return h;
 }
@@ -2470,7 +2475,7 @@ function _renderPianoFestivitaCard() {
     anno +
     '</div><div style="padding:12px 16px">';
   h +=
-    '<p style="font-size:.85rem;color:var(--muted);line-height:1.55;margin-bottom:10px">Si chiude alle <b>' +
+    '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);line-height:1.55;margin-bottom:10px">Si chiude alle <b>' +
     cfg.oraNormale +
     ':00</b> nei giorni feriali e alle <b>' +
     cfg.oraTardi +
@@ -2490,7 +2495,7 @@ function _renderPianoFestivitaCard() {
     ')">Inserisci le festivita del ' +
     anno +
     '</button>' +
-    '<span style="font-size:.82rem;color:var(--muted)">' +
+    '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
     (PIANO_FESTIVITA_ELENCHI[anno]
       ? 'elenco fornito dalla direzione'
       : 'calcolate: dodici festivita italiane di legge, Pasqua compresa') +
@@ -2546,11 +2551,11 @@ function _renderPianoFestivitaCard() {
           : ch.marcatore
             ? '<b style="background:#8b4a8b;color:#fff;padding:2px 8px;border-radius:2px">' + ch.marcatore + '</b>'
             : '<span style="color:var(--muted)" title="quella notte si chiude gia tardi per prassi: non serve segnalarlo">-</span>') +
-        '</td><td style="white-space:nowrap"><button class="btn-act" style="font-size:.82rem" onclick="pianoFestivitaToggle(' +
+        '</td><td style="white-space:nowrap"><button class="btn-act" style="font-size:var(--fs-sm,.8125rem)" onclick="pianoFestivitaToggle(' +
         f.id +
         ')">' +
         (spento ? 'Riattiva' : 'Spegni') +
-        '</button> <button class="btn-act del" style="font-size:.82rem" onclick="pianoFestivitaElimina(' +
+        '</button> <button class="btn-act del" style="font-size:var(--fs-sm,.8125rem)" onclick="pianoFestivitaElimina(' +
         f.id +
         ')">Elimina</button></td></tr>';
     });

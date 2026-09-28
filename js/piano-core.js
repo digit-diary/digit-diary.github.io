@@ -60,11 +60,11 @@ function _pianoSchedaRiservata(titolo, permesso) {
   return (
     '<div class="main-card"><div class="card-header">' +
     titolo +
-    '</div><div style="padding:18px 20px;font-size:.9rem;line-height:1.6">' +
+    '</div><div style="padding:18px 20px;font-size:var(--fs-md,.875rem);line-height:1.6">' +
     '<p>Questa scheda e riservata. Serve il permesso <b>' +
     permesso +
     '</b>.</p>' +
-    '<p style="color:var(--muted);font-size:.85rem;margin-top:8px">Lo assegna un amministratore da <b>Impostazioni · Visibilita e permessi</b>, scegliendo "Operatori selezionati" e aggiungendo il tuo nome.</p>' +
+    '<p style="color:var(--muted);font-size:var(--fs-md,.875rem);margin-top:8px">Lo assegna un amministratore da <b>Impostazioni · Visibilita e permessi</b>, scegliendo "Operatori selezionati" e aggiungendo il tuo nome.</p>' +
     '</div></div>'
   );
 }
@@ -1353,7 +1353,7 @@ async function renderPiano() {
         escP(label) +
         '</span><button class="btn-act pin" onclick="pianoCambiaMese(1)">&rarr;</button>';
       h +=
-        '<select onchange="pianoCambiaReparto(this.value)" style="padding:4px 8px;font-size:.8rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a">';
+        '<select onchange="pianoCambiaReparto(this.value)" style="padding:4px 8px;font-size:var(--fs-sm,.8125rem);border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a">';
       const ammessiRep = _pianoRepartiAmmessi();
       getReparti()
         .filter((rp) => ammessiRep.includes(rp.key))
@@ -1387,13 +1387,13 @@ async function renderPiano() {
           (nR ? '' : ' disabled') +
           ' onclick="pianoRipristina()">&#8631;</button>' +
           '<span id="piano-autosave" title="Ogni modifica al piano si salva da sola nel database, subito. Le frecce servono per tornare indietro o avanti se sbagli.">Salvataggio automatico</span>' +
-          '<input type="text" id="piano-cerca" placeholder="Cerca nome o sigla..." value="' +
+          '<input type="text" id="piano-cerca" class="campo-cerca" placeholder="Cerca nome o sigla..." value="' +
           escP(window._pianoCercaTesto || '') +
           '" oninput="pianoCercaFiltra(this.value)" title="Mostra solo i collaboratori il cui nome contiene il testo, oppure chi ha quella sigla nel mese (es. C8). Vuoto = tutti">';
         const ssnap = (window._pianoSessSnap || {})[_pianoMeseSel + '|' + _pianoReparto()];
         if (ssnap)
           h +=
-            '<button class="btn-export" style="font-size:.82rem;padding:3px 9px;border-color:#c0392b;color:#c0392b" title="Riporta questo mese a com\'era quando hai iniziato a modificarlo in questa sessione (' +
+            '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 9px;border-color:#c0392b;color:#c0392b" title="Riporta questo mese a com\'era quando hai iniziato a modificarlo in questa sessione (' +
             ssnap.n +
             ' operazioni tue)" onclick="pianoAnnullaTutto()">Annulla tutto (' +
             ssnap.n +
@@ -1512,7 +1512,7 @@ async function renderPiano() {
           const lblNext = (MESI_FULL[prossimo.getMonth()] || '') + ' ' + prossimo.getFullYear();
           const inTempo = oggi.getDate() <= gLim;
           h +=
-            '<div style="margin:6px 0;padding:4px 10px;font-size:.82rem;color:var(--muted);border-left:3px solid ' +
+            '<div style="margin:6px 0;padding:4px 10px;font-size:var(--fs-sm,.8125rem);color:var(--muted);border-left:3px solid ' +
             (inTempo ? '#d4b86a' : '#c0392b') +
             '">Non disponibilita\' ' +
             escP(lblNext) +
@@ -1574,14 +1574,14 @@ async function renderPiano() {
           (puoMod ? ' ondblclick="pianoMarkerEdit(' + g + ')"' : '') +
           '>' +
           (_pianoMarkerGiorno(ym, g)
-            ? '<div style="font-size:.82rem;background:#FFFF00;color:#000;font-weight:bold;line-height:1.1">' +
+            ? '<div style="font-size:var(--fs-sm,.8125rem);background:#FFFF00;color:#000;font-weight:bold;line-height:1.1">' +
               escP(_pianoMarkerGiorno(ym, g)) +
               '</div>'
             : '') +
           // CHIUSURA PIU' TARDI: si segnala solo quando NON e' gia' scontato
           // (venerdi e sabato chiudono alle 5 per prassi, non serve dirlo)
           (_pianoChiusuraGiorno(dstr).marcatore
-            ? '<div style="font-size:.82rem;background:#8b4a8b;color:#fff;font-weight:bold;line-height:1.1" title="' +
+            ? '<div style="font-size:var(--fs-sm,.8125rem);background:#8b4a8b;color:#fff;font-weight:bold;line-height:1.1" title="' +
               escP(_pianoChiusuraGiorno(dstr).motivo || 'chiusura posticipata') +
               '">' +
               _pianoChiusuraGiorno(dstr).marcatore +
@@ -1593,7 +1593,7 @@ async function renderPiano() {
           g +
           '</div>' +
           (_pianoGiornoBloccato(dstr)
-            ? '<div style="font-size:.6rem;line-height:1;opacity:.55" title="Giornata chiusa">&#128274;</div>'
+            ? '<div style="font-size:var(--fs-xs,.75rem);line-height:1;opacity:.55" title="Giornata chiusa">&#128274;</div>'
             : '') +
           '</th>';
       }
@@ -1704,7 +1704,7 @@ async function renderPiano() {
           const violMsg = _pianoViolCelle[nome + '|' + dstr];
           if (violMsg) {
             cls += ' piano-viol';
-            titolo += (titolo ? ' · ' : '') + '⚠ ' + violMsg.join(' | ');
+            titolo += (titolo ? ' · ' : '') + 'Attenzione: ' + violMsg.join(' | ');
           }
           // stile personalizzato della cella: colore (vince sul turno) + formato
           if (r && r.colore) {
@@ -1765,7 +1765,9 @@ async function renderPiano() {
           '\')"></i>' +
           escP(nome) +
           (infoC && infoC.lingue
-            ? ' <span style="font-size:.82rem;color:var(--muted);font-weight:700">' + escP(infoC.lingue) + '</span>'
+            ? ' <span style="font-size:var(--fs-sm,.8125rem);color:var(--muted);font-weight:700">' +
+              escP(infoC.lingue) +
+              '</span>'
             : '') +
           // il collaboratore non e' dell'anagrafica di QUESTO settore (o non
           // c'e' affatto): si segnala, cosi' l'anomalia non passa inosservata
@@ -1808,7 +1810,7 @@ async function renderPiano() {
               : '') +
           '</td><td class="piano-fun"><strong>' +
           escP(infoC && infoC.is_jolly ? 'JOLLY' : (infoC && infoC.funzione) || '') +
-          '</strong> <span style="font-size:.82rem">' +
+          '</strong> <span style="font-size:var(--fs-sm,.8125rem)">' +
           Math.round(perc * 100) +
           '%</span></td>' +
           riga +
@@ -1854,7 +1856,8 @@ async function renderPiano() {
       h += '</tbody></table></div>';
 
       // legenda
-      h += '<div style="display:flex;gap:14px;flex-wrap:wrap;padding:10px 14px;font-size:.8rem;color:var(--muted)">';
+      h +=
+        '<div style="display:flex;gap:14px;flex-wrap:wrap;padding:10px 14px;font-size:var(--fs-sm,.8125rem);color:var(--muted)">';
 
       h +=
         '<span><span class="piano-leg piano-comm" style="background:var(--paper2)"></span> triangolo = commento (passa il mouse)</span>';
@@ -1889,11 +1892,11 @@ async function renderPiano() {
           escP(label);
         if (puoMod)
           hFabb +=
-            '<button class="btn-export" style="font-size:.82rem;padding:3px 10px;border-color:#d4b86a;color:#d4b86a" onclick="copiaFabbisognoMese()">Copia dal mese precedente</button>' +
-            '<button class="btn-export" style="font-size:.82rem;padding:3px 10px;border-color:#2c6e49;color:#2c6e49" onclick="document.getElementById(\'fabb-file\').click()">Importa da Excel</button>' +
+            '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:#d4b86a;color:#d4b86a" onclick="copiaFabbisognoMese()">Copia dal mese precedente</button>' +
+            '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:#2c6e49;color:#2c6e49" onclick="document.getElementById(\'fabb-file\').click()">Importa da Excel</button>' +
             '<input type="file" id="fabb-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="importaFabbisognoExcel(this)">' +
-            '<button class="btn-export" style="font-size:.82rem;padding:3px 10px;border-color:var(--accent);color:var(--accent)" onclick="eliminaFabbisognoMese()">Svuota mese</button>' +
-            '<span style="font-size:.82rem;color:#b8a98a;font-weight:400">clicca una cella per impostare le persone necessarie</span>';
+            '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:var(--accent);color:var(--accent)" onclick="eliminaFabbisognoMese()">Svuota mese</button>' +
+            '<span style="font-size:var(--fs-sm,.8125rem);color:#b8a98a;font-weight:400">clicca una cella per impostare le persone necessarie</span>';
         hFabb += '</div>';
         // testata giorni con sigla settimana (D/L/M...), festivi e weekend:
         // usata da fabbisogno, differenze ed effettivi
@@ -1916,7 +1919,7 @@ async function renderPiano() {
               (festiviSet[dstr] ? ' title="' + escP(festiviSet[dstr]) + '"' : '') +
               '>' +
               (_pianoMarkerGiorno(ym, g)
-                ? '<div style="font-size:.82rem;background:#FFFF00;color:#000;font-weight:bold;line-height:1.1">' +
+                ? '<div style="font-size:var(--fs-sm,.8125rem);background:#FFFF00;color:#000;font-weight:bold;line-height:1.1">' +
                   escP(_pianoMarkerGiorno(ym, g)) +
                   '</div>'
                 : '') +
@@ -1998,7 +2001,7 @@ async function renderPiano() {
           });
         hFabb += '</tbody></table></div>';
         hFabb +=
-          '<p style="font-size:.8rem;color:var(--muted);padding:8px 14px">assegnati/richiesti · celle gialle (weekend verdi) come la PIANIFICAZIONE dell&#39;Excel; numero <span style="color:#c0392b;font-weight:700">rosso</span> = carenza. Il fabbisogno guida "Genera bozza".</p></div>';
+          '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);padding:8px 14px">assegnati/richiesti · celle gialle (weekend verdi) come la PIANIFICAZIONE dell&#39;Excel; numero <span style="color:#c0392b;font-weight:700">rosso</span> = carenza. Il fabbisogno guida "Genera bozza".</p></div>';
 
         // DIFFERENZE + EFFETTIVI · schema IDENTICO a Turnivo (calendario.html):
         // differenze = effettivi - pianificazione (verde >0, rosso <0, vuoto 0),
@@ -2026,7 +2029,7 @@ async function renderPiano() {
         h +=
           '<div class="main-card" style="margin-top:16px"><div class="card-header">Differenze · ' +
           escP(label) +
-          ' <span style="font-size:.82rem;color:#b8a98a;font-weight:400">(effettivi − pianificazione)</span></div>';
+          ' <span style="font-size:var(--fs-sm,.8125rem);color:#b8a98a;font-weight:400">(effettivi − pianificazione)</span></div>';
         h +=
           '<div class="piano-wrap"><table data-seltab="diff" class="piano-table piano-fixed" style="width:' +
           (_pianoLC().tot + 37 * nGiorni) +

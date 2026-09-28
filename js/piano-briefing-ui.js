@@ -442,7 +442,7 @@ async function _renderPianoBriefingTab() {
     dstr +
     '" onchange="briefSetData(this.value)" style="padding:6px">' +
     '<button class="btn-export brief-btn" title="Giorno successivo" onclick="briefCambiaData(1)">&#8594;</button>' +
-    '<strong style="font-size:1.05rem;background:#FFFF00;color:#000;padding:3px 12px;border:1px solid #999">' +
+    '<strong style="font-size:var(--fs-lg,1.0625rem);background:#FFFF00;color:#000;padding:3px 12px;border:1px solid #999">' +
     _briefGiornoLbl(dstr) +
     ' ' +
     dstr.split('-').reverse().join('.') +
@@ -472,12 +472,12 @@ async function _renderPianoBriefingTab() {
             c +
             ';border:1px solid #999;border-radius:3px;margin:2px;cursor:pointer;vertical-align:middle"></span>',
         ).join('') +
-        '<button data-c="" class="btn-export" style="font-size:.82rem;padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="briefColoreApplica(null)">Nessuno</button>' +
+        '<button data-c="" class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="briefColoreApplica(null)">Nessuno</button>' +
         '<span style="display:inline-block;width:1px;height:20px;background:var(--line);margin:0 8px;vertical-align:middle"></span>' +
-        '<button class="btn-export" style="font-size:.82rem;font-weight:700;padding:2px 10px;vertical-align:middle" title="Grassetto sulle celle o righe marcate (vista e stampa)" onclick="briefFormatoApplica(\'b\')">G</button> ' +
-        '<button class="btn-export" style="font-size:.82rem;font-style:italic;padding:2px 10px;vertical-align:middle" title="Corsivo sulle celle o righe marcate (vista e stampa)" onclick="briefFormatoApplica(\'i\')">C</button>' +
+        '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);font-weight:700;padding:2px 10px;vertical-align:middle" title="Grassetto sulle celle o righe marcate (vista e stampa)" onclick="briefFormatoApplica(\'b\')">G</button> ' +
+        '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);font-style:italic;padding:2px 10px;vertical-align:middle" title="Corsivo sulle celle o righe marcate (vista e stampa)" onclick="briefFormatoApplica(\'i\')">C</button>' +
         '<div style="margin-top:7px;padding-top:6px;border-top:1px solid var(--line)">' +
-        '<span style="font-size:.82rem;color:var(--muted);vertical-align:middle;margin-right:4px">Testo:</span>' +
+        '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted);vertical-align:middle;margin-right:4px">Testo:</span>' +
         PIANO_COLORI_TESTO.map(
           (c) =>
             '<span title="Colore del testo" onclick="briefTestoApplica(\'' +
@@ -486,19 +486,19 @@ async function _renderPianoBriefingTab() {
             c +
             ';border:1px solid #999;border-radius:3px;margin:2px;cursor:pointer;vertical-align:middle"></span>',
         ).join('') +
-        '<button class="btn-export" style="font-size:.82rem;padding:2px 8px;margin-left:4px;vertical-align:middle" onclick="briefTestoApplica(null)">Auto</button>' +
+        '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 8px;margin-left:4px;vertical-align:middle" onclick="briefTestoApplica(null)">Auto</button>' +
         '</div>' +
         '<div style="margin-top:7px;padding-top:6px;border-top:1px solid var(--line)">' +
-        '<button class="btn-export" style="font-size:.82rem;padding:2px 10px;vertical-align:middle" title="Memorizza il formato della prima cella marcata" onclick="briefCopiaFormato()">Copia formato</button> ' +
-        '<button class="btn-export" style="font-size:.82rem;padding:2px 10px;vertical-align:middle" title="Applica il formato memorizzato alle celle marcate" onclick="briefIncollaFormato()">Incolla formato</button> ' +
-        '<button class="btn-export" style="font-size:.82rem;padding:2px 10px;vertical-align:middle;border-color:#c0392b;color:#c0392b" title="Toglie colori e formato dalle celle o righe marcate" onclick="briefCancellaFormato()">Cancella formato</button>' +
+        '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;vertical-align:middle" title="Memorizza il formato della prima cella marcata" onclick="briefCopiaFormato()">Copia formato</button> ' +
+        '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;vertical-align:middle" title="Applica il formato memorizzato alle celle marcate" onclick="briefIncollaFormato()">Incolla formato</button> ' +
+        '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;vertical-align:middle;border-color:#c0392b;color:#c0392b" title="Toglie colori e formato dalle celle o righe marcate" onclick="briefCancellaFormato()">Cancella formato</button>' +
         '</div>' +
         '</div></span></span>'
       : '') +
     (cdDaAggiornare
-      ? '<span style="font-size:.82rem;background:#ffd166;color:#5a4300;padding:3px 10px;border-radius:3px;font-weight:700">I numeri cassa di ieri sono cambiati: premi "Aggiorna numeri cassa"</span>'
+      ? '<span style="font-size:var(--fs-sm,.8125rem);background:#ffd166;color:#5a4300;padding:3px 10px;border-radius:3px;font-weight:700">I numeri cassa di ieri sono cambiati: premi "Aggiorna numeri cassa"</span>'
       : '') +
-    '<span id="brief-stato" style="font-size:.82rem;color:var(--muted)">' +
+    '<span id="brief-stato" style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
     (salvato
       ? 'Salvato'
       : righe.length
@@ -507,7 +507,7 @@ async function _renderPianoBriefingTab() {
     '</span></div>';
   // tabella briefing + tabella orari affiancate (stessa vista dell'Excel)
   h += '<div style="display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap"><div style="overflow-x:auto">';
-  h += '<table class="brief-table" style="border-collapse:collapse;font-size:.85rem"><thead><tr>';
+  h += '<table class="brief-table" style="border-collapse:collapse;font-size:var(--fs-md,.875rem)"><thead><tr>';
   // ogni reparto ha il SUO briefing: slots con CD (numeri cassa), valet con
   // radio/badge, gli altri (es. tavoli, senza casse) tabella essenziale
   const cols = valet
@@ -523,7 +523,7 @@ async function _renderPianoBriefingTab() {
       bg +
       ';color:' +
       fg +
-      ';padding:4px 8px;font-size:.82rem">' +
+      ';padding:4px 8px;font-size:var(--fs-sm,.8125rem)">' +
       c +
       '</th>';
   });
@@ -594,7 +594,7 @@ async function _renderPianoBriefingTab() {
         (stNome.t || r.colT ? ';color:' + (stNome.t || r.colT) : '') +
         '">' +
         (r.fm
-          ? '<span style="font-size:.82rem;font-weight:700;color:#000;padding-right:3px">(formazione)</span>'
+          ? '<span style="font-size:var(--fs-sm,.8125rem);font-weight:700;color:#000;padding-right:3px">(formazione)</span>'
           : '') +
         '</td>';
     } else h += inp('nome', r.nome, 150);
@@ -615,7 +615,7 @@ async function _renderPianoBriefingTab() {
     }
     if (puo)
       h +=
-        '<td style="border:none;padding:0 5px;white-space:nowrap;font-size:.85rem">' +
+        '<td style="border:none;padding:0 5px;white-space:nowrap;font-size:var(--fs-md,.875rem)">' +
         '<span style="cursor:pointer;color:#2c6e49;font-weight:bold" title="Inserisci riga sotto" onclick="briefInserisciRiga(' +
         i +
         ')">+</span> ' +
@@ -633,7 +633,7 @@ async function _renderPianoBriefingTab() {
   h += '</tbody></table>';
   if (puo)
     h +=
-      '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;margin-top:8px" onclick="briefAggiungiRiga()">+ Aggiungi riga</button>';
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;margin-top:8px" onclick="briefAggiungiRiga()">+ Aggiungi riga</button>';
   h += '</div>';
   // tabella ORARI (da piano_turni, sola lettura): SOLO i turni presenti
   // nel briefing di oggi
@@ -653,7 +653,7 @@ async function _renderPianoBriefingTab() {
       return a.codice < b.codice ? -1 : 1;
     });
   h +=
-    '<div><table style="border-collapse:collapse;font-size:.8rem"><thead><tr><th colspan="3" style="border:1px solid #999;background:#FFFF00;color:#000;padding:4px 10px;font-size:.82rem">ORARI</th></tr></thead><tbody>';
+    '<div><table style="border-collapse:collapse;font-size:var(--fs-sm,.8125rem)"><thead><tr><th colspan="3" style="border:1px solid #999;background:#FFFF00;color:#000;padding:4px 10px;font-size:var(--fs-sm,.8125rem)">ORARI</th></tr></thead><tbody>';
   let gT = null;
   turni.forEach((t) => {
     const g = _briefGruppo(t.codice);
@@ -769,7 +769,7 @@ async function briefSalvaBriefing() {
       st.id = nuovo && nuovo[0] ? nuovo[0].id : null;
     }
     const el = document.getElementById('brief-stato');
-    if (el) el.textContent = 'Salvato ✓';
+    if (el) el.textContent = 'Salvato';
   } catch (e) {
     const el = document.getElementById('brief-stato');
     if (el) el.textContent = 'ERRORE salvataggio';
@@ -1171,18 +1171,19 @@ function _briefRenderEvidCard() {
     '<div class="main-card" style="margin-top:14px"><div class="card-header">Evidenziazioni dal piano · ' +
     escP(repartoLabel(rep)) +
     '</div><div style="padding:12px 14px">' +
-    '<p style="font-size:.85rem;color:var(--muted);margin-bottom:8px">Quando una cella del piano ha un colore, sul briefing il nome di quella persona si evidenzia. Qui si decide <b>con quale colore</b> e <b>che cosa significa</b>: per esempio nel valet il coordinatore si segna in rosso sul piano e sul foglio del briefing appare in verde.</p>';
+    '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);margin-bottom:8px">Quando una cella del piano ha un colore, sul briefing il nome di quella persona si evidenzia. Qui si decide <b>con quale colore</b> e <b>che cosa significa</b>: per esempio nel valet il coordinatore si segna in rosso sul piano e sul foglio del briefing appare in verde.</p>';
   if (!lista.length)
-    h += '<p style="font-size:.85rem;color:var(--muted)">Nessuna evidenziazione configurata per questo settore.</p>';
+    h +=
+      '<p style="font-size:var(--fs-md,.875rem);color:var(--muted)">Nessuna evidenziazione configurata per questo settore.</p>';
   lista.forEach((ev, i) => {
     h +=
-      '<div class="tipo-item"><span style="font-size:.85rem">nel piano</span> <select onchange="briefEvidSalva(' +
+      '<div class="tipo-item"><span style="font-size:var(--fs-md,.875rem)">nel piano</span> <select onchange="briefEvidSalva(' +
       i +
       ',\'da\',this.value)" style="padding:3px;background:' +
       escP(ev.da || '') +
       '">' +
       opz(ev.da) +
-      '</select> <span style="font-size:.85rem">sul briefing diventa</span> <select onchange="briefEvidSalva(' +
+      '</select> <span style="font-size:var(--fs-md,.875rem)">sul briefing diventa</span> <select onchange="briefEvidSalva(' +
       i +
       ',\'a\',this.value)" style="padding:3px;background:' +
       escP(ev.a || '') +
@@ -1252,12 +1253,12 @@ function _briefPauseBodyHtml() {
   const p = _briefState && _briefState.pause;
   if (p && p.contenuto && p.contenuto.tipo) {
     h +=
-      '<div style="margin-bottom:8px"><button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="pdfPauseGiorno()">Stampa pause</button></div>';
+      '<div style="margin-bottom:8px"><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px" onclick="pdfPauseGiorno()">Stampa pause</button></div>';
     h += _briefRenderPause(p.contenuto);
     const viol = typeof _peVerificaRegolePause === 'function' ? _peVerificaRegolePause(p.contenuto, _briefData) : [];
     if (viol.length)
       h +=
-        '<div style="margin:8px 0;padding:6px 10px;font-size:.82rem;background:#fff3c4;border-left:3px solid #d4b86a"><b>Regole pause non rispettate (' +
+        '<div style="margin:8px 0;padding:6px 10px;font-size:var(--fs-sm,.8125rem);background:#fff3c4;border-left:3px solid #d4b86a"><b>Regole pause non rispettate (' +
         viol.length +
         ')</b>: ' +
         escP(viol.slice(0, 8).join(' · ')) +
@@ -1265,7 +1266,7 @@ function _briefPauseBodyHtml() {
         '</div>';
   } else {
     h +=
-      '<p style="font-size:.85rem;color:var(--muted)">Nessuna pausa generata per questa data. Compila il briefing e premi <b>Genera pause</b>.</p>';
+      '<p style="font-size:var(--fs-md,.875rem);color:var(--muted)">Nessuna pausa generata per questa data. Compila il briefing e premi <b>Genera pause</b>.</p>';
   }
   h += _briefRenderPauseCfg();
   return h;
@@ -1383,7 +1384,7 @@ function _renderPianoCorsiCard() {
   // operatori senza permesso corsi: elenco in sola lettura (orario aggiornabile)
   if (!puoCorsi) {
     let hRO =
-      '<div class="main-card" style="margin-top:16px"><div class="card-header">Corsi</div><div style="padding:12px 14px"><table class="piano-table" style="min-width:420px;font-size:.85rem"><thead><tr><th>Sigla</th><th style="text-align:left">Descrizione</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perche 20 minuti sono un terzo di ora">Ore</th><th>Orario</th></tr></thead><tbody>';
+      '<div class="main-card" style="margin-top:16px"><div class="card-header">Corsi</div><div style="padding:12px 14px"><table class="piano-table" style="min-width:420px;font-size:var(--fs-md,.875rem)"><thead><tr><th>Sigla</th><th style="text-align:left">Descrizione</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perche 20 minuti sono un terzo di ora">Ore</th><th>Orario</th></tr></thead><tbody>';
     corsi.forEach((c) => {
       const orario = ((window._pianoCorsiOrari || {})[c.codice] || '').split('-');
       hRO +=
@@ -1404,7 +1405,7 @@ function _renderPianoCorsiCard() {
         '\',null,this.value)" style="padding:2px 4px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td></tr>';
     });
     hRO +=
-      '</tbody></table><p style="font-size:.82rem;color:var(--muted);margin-top:6px">L&#39;orario del corso cambia di volta in volta: qui puoi aggiornarlo, viene proposto alla prossima pianificazione.</p></div></div>';
+      '</tbody></table><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:6px">L&#39;orario del corso cambia di volta in volta: qui puoi aggiornarlo, viene proposto alla prossima pianificazione.</p></div></div>';
     return hRO;
   }
   const collabs = collaboratoriCache
@@ -1413,7 +1414,7 @@ function _renderPianoCorsiCard() {
   let h =
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Corsi · inserimento automatico nel piano</div><div style="padding:12px 14px">';
   h +=
-    '<p style="font-size:.8rem;color:var(--muted);margin-bottom:10px">Scegli il corso, la data, l&#39;orario e i partecipanti: la sigla viene scritta da sola nelle loro celle del piano (protetta, con orario e ore contate).</p>';
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:10px">Scegli il corso, la data, l&#39;orario e i partecipanti: la sigla viene scritta da sola nelle loro celle del piano (protetta, con orario e ore contate).</p>';
   h += '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">';
   h +=
     '<div class="field"><label>Corso</label><select id="corso-cod" style="padding:8px" onchange="corsoPrefillOrari()">' +
@@ -1428,12 +1429,12 @@ function _renderPianoCorsiCard() {
   h +=
     '<div class="field"><label>Fine</label><input type="time" id="corso-fine" value="' + (preCS[1] || '') + '"></div>';
   h +=
-    '<button class="btn-export" style="font-size:.82rem;padding:4px 10px" title="La prossima volta questo corso partirà con questo orario" onclick="corsoSalvaOrarioDefault()">Salva orario predefinito</button>';
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" title="La prossima volta questo corso partirà con questo orario" onclick="corsoSalvaOrarioDefault()">Salva orario predefinito</button>';
   h += '</div>';
   h +=
-    '<div style="margin-bottom:6px;font-size:.82rem"><b>Partecipanti</b> · <span style="cursor:pointer;color:#1a4a7a;text-decoration:underline" onclick="document.querySelectorAll(\'.corso-part\').forEach(c=>c.checked=true)">tutti</span> / <span style="cursor:pointer;color:#1a4a7a;text-decoration:underline" onclick="document.querySelectorAll(\'.corso-part\').forEach(c=>c.checked=false)">nessuno</span></div>';
+    '<div style="margin-bottom:6px;font-size:var(--fs-sm,.8125rem)"><b>Partecipanti</b> · <span style="cursor:pointer;color:#1a4a7a;text-decoration:underline" onclick="document.querySelectorAll(\'.corso-part\').forEach(c=>c.checked=true)">tutti</span> / <span style="cursor:pointer;color:#1a4a7a;text-decoration:underline" onclick="document.querySelectorAll(\'.corso-part\').forEach(c=>c.checked=false)">nessuno</span></div>';
   h +=
-    '<div style="max-height:180px;overflow-y:auto;border:1px solid var(--border,#ccc);padding:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:2px 12px;font-size:.84rem">';
+    '<div style="max-height:180px;overflow-y:auto;border:1px solid var(--border,#ccc);padding:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:2px 12px;font-size:var(--fs-md,.875rem)">';
   collabs.forEach((c) => {
     h +=
       '<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="corso-part" value="' +
@@ -1444,11 +1445,11 @@ function _renderPianoCorsiCard() {
   });
   h += '</div>';
   h +=
-    '<button class="btn-export" style="font-size:.85rem;padding:6px 16px;margin-top:10px;border-color:#2c6e49;color:#2c6e49" onclick="pianoInserisciCorso()">Inserisci nel piano</button>';
+    '<button class="btn-export" style="font-size:var(--fs-md,.875rem);padding:6px 16px;margin-top:10px;border-color:#2c6e49;color:#2c6e49" onclick="pianoInserisciCorso()">Inserisci nel piano</button>';
   // gestione della LISTA corsi (admin): aggiungi sigla, rinomina, rimuovi
   if (isAdmin()) {
     h +=
-      '<p style="font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Gestisci corsi (admin)</p>';
+      '<p style="font-size:var(--fs-sm,.8125rem);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Gestisci corsi (admin)</p>';
     corsi.forEach((c) => {
       h +=
         '<div class="tipo-item"><div class="tipo-item-name" style="min-width:90px;font-weight:700">' +
@@ -1468,7 +1469,7 @@ function _renderPianoCorsiCard() {
     h +=
       '<div class="add-tipo-row" style="margin:6px 0 0"><div class="field"><label>Nuova sigla corso</label><input type="text" id="corso-nuovo-cod" placeholder="Es: PRIMO SOCCORSO" maxlength="14" style="width:150px"></div><div class="field"><label>Descrizione</label><input type="text" id="corso-nuovo-desc" placeholder="descrizione"></div><div class="field"><label>Ore</label><input type="number" id="corso-nuovo-ore" value="2" step="0.5" min="0" style="width:70px"></div><button class="btn-add-tipo" onclick="corsoAggiungi()">+ Aggiungi</button></div>';
     h +=
-      '<p style="font-size:.82rem;color:var(--muted);margin:4px 0 0">Rimuovere un corso lo toglie solo da questa lista: il codice resta tra i codici del piano e le celle gi&agrave; inserite non cambiano.</p>';
+      '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:4px 0 0">Rimuovere un corso lo toglie solo da questa lista: il codice resta tra i codici del piano e le celle gi&agrave; inserite non cambiano.</p>';
   }
   h += '</div></div>';
   return h;

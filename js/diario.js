@@ -409,7 +409,7 @@ function modificaRegistrazione(id) {
     _copStatusHtml =
       '<div style="margin-top:8px;padding:8px 12px;background:var(--paper2);border-radius:3px;border-left:3px solid ' +
       (_cop ? '#1a7a6d' : 'var(--muted)') +
-      ';font-size:.84rem"><strong>Copertura turno:</strong> ' +
+      ';font-size:var(--fs-md,.875rem)"><strong>Copertura turno:</strong> ' +
       (_cop
         ? '<span style="color:#1a7a6d;font-weight:700">' + escP(_cop.collaboratore) + ' (+' + _cop.punti + ')</span>'
         : '<span style="color:var(--muted)">nessuna registrata</span>') +
@@ -420,7 +420,7 @@ function modificaRegistrazione(id) {
           (_rif === 1 ? 'o' : 'i') +
           '</span>'
         : '') +
-      '<br><span style="color:var(--muted);font-size:.82rem">Usa "Salva + Copertura" per inserire o correggere</span></div>';
+      '<br><span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">Usa "Salva + Copertura" per inserire o correggere</span></div>';
   }
   b.innerHTML =
     '<h3>Modifica registrazione</h3><div class="pwd-field"><label>Collaboratore</label><div class="ac-wrap"><input type="text" id="edit-nome" value="' +
@@ -448,7 +448,7 @@ function modificaRegistrazione(id) {
     (_malAl ? new Date(_malAl + 'T12:00:00').toLocaleDateString('it-IT') : '') +
     '" placeholder="GG/MM/AAAA" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"></div></div>' +
     _copStatusHtml +
-    '<div class="pwd-field"><label>Descrizione</label><textarea id="edit-testo" rows="4" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:2px;font-family:Source Sans 3,sans-serif;font-size:.9rem;background:var(--paper2);color:var(--ink);resize:vertical">' +
+    '<div class="pwd-field"><label>Descrizione</label><textarea id="edit-testo" rows="4" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:2px;font-family:Source Sans 3,sans-serif;font-size:var(--fs-md,.875rem);background:var(--paper2);color:var(--ink);resize:vertical">' +
     escP(e.testo) +
     '</textarea></div>' +
     (e.tipo === nomeCorrente('Errore')
@@ -778,7 +778,7 @@ function toggleScadenzeDropdown() {
       html = '<p style="color:var(--muted);text-align:center;padding:8px">Nessuna scadenza attiva</p>';
     if (fatte.length) {
       html +=
-        '<div style="margin-top:12px;padding-top:10px;border-top:2px solid var(--line)"><span style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600">Completate</span></div>';
+        '<div style="margin-top:12px;padding-top:10px;border-top:2px solid var(--line)"><span style="font-size:var(--fs-sm,.8125rem);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600">Completate</span></div>';
       html += fatte
         .map(
           (s) =>
@@ -788,7 +788,7 @@ function toggleScadenzeDropdown() {
             escP(s.titolo) +
             '</strong>' +
             (s.descrizione ? ' - ' + escP(s.descrizione) : '') +
-            '</span><span style="color:#2c6e49;font-weight:700;font-size:.82rem">' +
+            '</span><span style="color:#2c6e49;font-weight:700;font-size:var(--fs-sm,.8125rem)">' +
             (s.completata_da ? 'Fatto da ' + escP(s.completata_da) : 'Fatto') +
             '</span></div>',
         )

@@ -151,7 +151,7 @@
             width: 100%;
             border: 1.5px solid var(--line);
             border-radius: 2px;
-            font-size: 1rem;
+            font-size: var(--fs-lg,1.0625rem);
             font-family: &quot;Source Sans 3&quot;, sans-serif;
             color: var(--ink);
             background: var(--paper2);
@@ -174,7 +174,7 @@
             width: 100%;
             border: 1.5px solid var(--line);
             border-radius: 2px;
-            font-size: 1rem;
+            font-size: var(--fs-lg,1.0625rem);
             font-family: &quot;Source Sans 3&quot;, sans-serif;
             color: var(--ink);
             background: var(--paper2);
@@ -210,7 +210,7 @@
             onclick="tentaBiometrico()"
             style="
               padding: 12px 28px;
-              font-size: 1rem;
+              font-size: var(--fs-lg,1.0625rem);
               font-family: &quot;Source Sans 3&quot;, sans-serif;
               font-weight: 600;
               border: 1.5px solid var(--accent2);
@@ -293,7 +293,7 @@
             id="pdf-preview-title"
             style="
               font-family: &quot;Playfair Display&quot;, serif;
-              font-size: 1.1rem;
+              font-size: var(--fs-lg,1.0625rem);
               font-weight: 600;
               color: var(--ink);
             "
@@ -303,7 +303,7 @@
             <button
               class="btn-export btn-export-pdf"
               onclick="scaricaPdfPreview()"
-              style="padding: 8px 18px; font-size: 0.82rem"
+              style="padding: 8px 18px; font-size: var(--fs-sm,.8125rem)"
             >
               Scarica PDF
             </button>
@@ -317,7 +317,7 @@
                 border-radius: 2px;
                 cursor: pointer;
                 font-family: &quot;Source Sans 3&quot;, sans-serif;
-                font-size: 0.82rem;
+                font-size: var(--fs-sm,.8125rem);
               "
             >
               Chiudi
@@ -340,6 +340,11 @@
         <div class="date-badge" id="today-date"></div>
         <div class="operatore-badge" id="operatore-display"></div>
         <div class="header-btns">
+          <div class="testo-dim" title="Dimensione del testo, salvata per il tuo operatore">
+            <button type="button" class="btn-header" onclick="cambiaDimensioneTesto(-1)" aria-label="Testo piu piccolo">A&minus;</button>
+            <span id="testo-dim-lbl">100%</span>
+            <button type="button" class="btn-header" onclick="cambiaDimensioneTesto(1)" aria-label="Testo piu grande">A+</button>
+          </div>
           <button class="btn-header" id="btn-tema" onclick="toggleTema()">
             <i class="icx icx-luna"></i> Tema scuro
           </button>
@@ -438,7 +443,7 @@
             background: var(--accent);
             color: white;
             border-radius: 9px;
-            font-size: 0.78rem;
+            font-size: var(--fs-sm,.8125rem);
             padding: 1px 6px;
             margin-left: 4px;
             font-weight: 700;
@@ -499,7 +504,7 @@
             background: var(--accent);
             color: white;
             border-radius: 9px;
-            font-size: 0.78rem;
+            font-size: var(--fs-sm,.8125rem);
             padding: 1px 6px;
             margin-left: 4px;
             font-weight: 700;
@@ -521,7 +526,7 @@
             background: var(--accent);
             color: white;
             border-radius: 9px;
-            font-size: 0.78rem;
+            font-size: var(--fs-sm,.8125rem);
             padding: 1px 6px;
             margin-left: 4px;
             font-weight: 700;
@@ -577,14 +582,14 @@
         <h2
           style="
             font-family: &quot;Playfair Display&quot;, serif;
-            font-size: 1.6rem;
+            font-size: var(--fs-2xl,1.5rem);
             color: var(--ink);
             margin-bottom: 4px;
           "
           id="dash-titolo"
         ></h2>
         <p
-          style="color: var(--muted); font-size: 0.9rem"
+          style="color: var(--muted); font-size: var(--fs-md,.875rem)"
           id="dash-sottotitolo"
         ></p>
       </div>
@@ -607,7 +612,7 @@
           onclick="switchPage('diario')"
           style="
             padding: 10px 20px;
-            font-size: 0.82rem;
+            font-size: var(--fs-sm,.8125rem);
             width: auto;
             background: var(--ink);
           "
@@ -619,7 +624,7 @@
           onclick="switchPage('consegna')"
           style="
             padding: 10px 20px;
-            font-size: 0.82rem;
+            font-size: var(--fs-sm,.8125rem);
             width: auto;
             background: #2c3e50;
           "
@@ -631,7 +636,7 @@
           onclick="switchPage('promemoria')"
           style="
             padding: 10px 20px;
-            font-size: 0.82rem;
+            font-size: var(--fs-sm,.8125rem);
             width: auto;
             background: #8e44ad;
           "
@@ -710,7 +715,7 @@
             <button
               class="btn-act pin"
               onclick="navigaDashSettimana(-1)"
-              style="font-size: 0.82rem"
+              style="font-size: var(--fs-sm,.8125rem)"
             >
               &larr; Settimana precedente
             </button>
@@ -720,7 +725,7 @@
             <button
               class="btn-act pin"
               onclick="navigaDashSettimana(1)"
-              style="font-size: 0.82rem"
+              style="font-size: var(--fs-sm,.8125rem)"
             >
               Settimana successiva &rarr;
             </button>
@@ -734,14 +739,14 @@
         <button
           class="btn-export btn-export-pdf"
           onclick="apriReportConfig('settimanale')"
-          style="padding: 12px 28px; font-size: 0.92rem"
+          style="padding: 12px 28px; font-size: var(--fs-base,.9375rem)"
         >
           Report Settimanale PDF
         </button>
         <button
           class="btn-export"
           onclick="generaReportSettimanaleCSV()"
-          style="padding: 12px 28px; font-size: 0.92rem"
+          style="padding: 12px 28px; font-size: var(--fs-base,.9375rem)"
         >
           Report Settimanale CSV
         </button>
@@ -750,7 +755,7 @@
           onclick="apriReportConfig('annuale')"
           style="
             padding: 12px 28px;
-            font-size: 0.92rem;
+            font-size: var(--fs-base,.9375rem);
             border-color: #b8860b;
             color: #b8860b;
           "
@@ -762,7 +767,7 @@
           onclick="generaReportAnnualeCSV()"
           style="
             padding: 12px 28px;
-            font-size: 0.92rem;
+            font-size: var(--fs-base,.9375rem);
             border-color: #b8860b;
             color: #b8860b;
           "
@@ -806,7 +811,7 @@
                   font-weight: 300;
                   text-transform: none;
                   letter-spacing: 0;
-                  font-size: 0.75rem;
+                  font-size: var(--fs-xs,.75rem);
                 "
                 >Ctrl+Invio per salvare</small
               ></label
@@ -858,7 +863,7 @@
                 </button>
               </div>
             </div>
-            <p style="color: var(--muted); font-size: 0.78rem; margin-top: 6px">
+            <p style="color: var(--muted); font-size: var(--fs-sm,.8125rem); margin-top: 6px">
               Se specifichi un periodo, verrà creata una registrazione per ogni
               giorno
             </p>
@@ -867,9 +872,9 @@
             <div id="nd-cal-container" style="max-width: 320px"></div>
             <div
               id="nd-cal-selected"
-              style="margin-top: 8px; font-size: 0.84rem; color: var(--ink)"
+              style="margin-top: 8px; font-size: var(--fs-md,.875rem); color: var(--ink)"
             ></div>
-            <p style="color: var(--muted); font-size: 0.78rem; margin-top: 4px">
+            <p style="color: var(--muted); font-size: var(--fs-sm,.8125rem); margin-top: 4px">
               Clicca sui giorni in cui non era disponibile. Clicca di nuovo per
               deselezionare.
             </p>
@@ -952,12 +957,12 @@
               style="cursor: pointer; min-width: 150px"
             />
           </div>
-          <div class="filter-group">
+          <div class="filter-group filter-cerca">
             <span class="filter-label">Cerca</span
-            ><input
+            ><input class="campo-cerca"
               type="text"
               id="filt-cerca"
-              placeholder="Parola chiave..."
+              placeholder="Cerca parola chiave..." aria-label="Cerca parola chiave"
               oninput="render()"
             />
           </div>
@@ -1009,28 +1014,16 @@
               align-items: center;
             "
           >
-            <input
+            <input class="campo-cerca"
               type="text"
               id="note-chat-search"
-              placeholder="Cerca nei messaggi..."
+              placeholder="Cerca nei messaggi..." aria-label="Cerca nei messaggi"
               oninput="cercaInChat()"
-              style="
-                flex: 1;
-                padding: 8px 14px;
-                border: 1px solid var(--line);
-                border-radius: 18px;
-                font-size: 0.85rem;
-                background: var(--paper);
-                color: var(--ink);
-                font-family:
-                  Source Sans 3,
-                  sans-serif;
-              "
             />
             <span
               id="note-search-count"
               style="
-                font-size: 0.78rem;
+                font-size: var(--fs-sm,.8125rem);
                 color: var(--muted);
                 white-space: nowrap;
               "
@@ -1045,7 +1038,7 @@
                 height: 28px;
                 cursor: pointer;
                 color: var(--ink);
-                font-size: 0.85rem;
+                font-size: var(--fs-md,.875rem);
               "
               title="Precedente"
             >
@@ -1061,7 +1054,7 @@
                 height: 28px;
                 cursor: pointer;
                 color: var(--ink);
-                font-size: 0.85rem;
+                font-size: var(--fs-md,.875rem);
               "
               title="Successivo"
             >
@@ -1074,7 +1067,7 @@
                 border: none;
                 cursor: pointer;
                 color: var(--muted);
-                font-size: 1.1rem;
+                font-size: var(--fs-lg,1.0625rem);
               "
               title="Chiudi"
             >
@@ -1146,7 +1139,7 @@
                 font-family:
                   Source Sans 3,
                   sans-serif;
-                font-size: 0.9rem;
+                font-size: var(--fs-md,.875rem);
                 resize: none;
                 max-height: 100px;
                 min-height: 40px;
@@ -1182,7 +1175,7 @@
                 border: none;
                 border-radius: 50%;
                 cursor: pointer;
-                font-size: 1.1rem;
+                font-size: var(--fs-lg,1.0625rem);
                 width: 42px;
                 height: 42px;
                 display: flex;
@@ -1240,7 +1233,7 @@
           <button
             class="btn-act pin"
             onclick="resetStatsFiltri()"
-            style="font-size: 0.82rem"
+            style="font-size: var(--fs-sm,.8125rem)"
           >
             Reset
           </button>
@@ -1288,7 +1281,7 @@
               id="rd-mese-a-wrap"
               style="display: none; gap: 6px; align-items: center"
             >
-              <span style="font-size: 0.85rem">→</span>
+              <span style="font-size: var(--fs-md,.875rem)">→</span>
               <select
                 id="rd-mese-a"
                 style="padding: 9px"
@@ -1303,7 +1296,7 @@
             <span
               id="rd-periodo-scelto"
               style="
-                font-size: 0.85rem;
+                font-size: var(--fs-md,.875rem);
                 font-weight: 700;
                 color: var(--accent2);
               "
@@ -1313,7 +1306,7 @@
                 display: inline-flex;
                 gap: 10px;
                 align-items: center;
-                font-size: 0.8rem;
+                font-size: var(--fs-sm,.8125rem);
               "
             >
               <label
@@ -1350,7 +1343,7 @@
             <button
               class="btn-export btn-export-pdf"
               onclick="esportaReportDirezionePDF()"
-              style="padding: 10px 20px; font-size: 0.88rem"
+              style="padding: 10px 20px; font-size: var(--fs-md,.875rem)"
             >
               <i class="icx icx-stats"></i> Report Direzione PDF
             </button>
@@ -1358,7 +1351,7 @@
           <button
             class="btn-export btn-export-pdf"
             onclick="generaRiepilogoMensile()"
-            style="padding: 10px 24px; font-size: 0.88rem"
+            style="padding: 10px 24px; font-size: var(--fs-md,.875rem)"
           >
             <i class="icx icx-clipboard"></i> Riepilogo mensile PDF
           </button>
@@ -1375,7 +1368,7 @@
         <div class="chart-card">
           <h4>Tipologia eventi</h4>
           <p
-            style="color: var(--muted); font-size: 0.82rem; margin-bottom: 8px"
+            style="color: var(--muted); font-size: var(--fs-sm,.8125rem); margin-bottom: 8px"
           >
             Distribuzione per tipo di registrazione
           </p>
@@ -1386,7 +1379,7 @@
         <div class="chart-card">
           <h4>Attività per giorno della settimana</h4>
           <p
-            style="color: var(--muted); font-size: 0.82rem; margin-bottom: 8px"
+            style="color: var(--muted); font-size: var(--fs-sm,.8125rem); margin-bottom: 8px"
           >
             Quando si registrano più eventi
           </p>
@@ -1397,7 +1390,7 @@
         <div class="chart-card full">
           <h4>Collaboratori con più registrazioni</h4>
           <p
-            style="color: var(--muted); font-size: 0.82rem; margin-bottom: 8px"
+            style="color: var(--muted); font-size: var(--fs-sm,.8125rem); margin-bottom: 8px"
           >
             I 15 collaboratori più attivi nel diario
           </p>
@@ -1408,7 +1401,7 @@
         <div class="chart-card full">
           <h4>Tabella completa per collaboratore</h4>
           <p
-            style="color: var(--muted); font-size: 0.82rem; margin-bottom: 8px"
+            style="color: var(--muted); font-size: var(--fs-sm,.8125rem); margin-bottom: 8px"
           >
             Tutti i collaboratori con il dettaglio per tipo di evento
           </p>
@@ -1417,7 +1410,7 @@
         <div class="chart-card full">
           <h4>Riepilogo errori e importi</h4>
           <p
-            style="color: var(--muted); font-size: 0.82rem; margin-bottom: 8px"
+            style="color: var(--muted); font-size: var(--fs-sm,.8125rem); margin-bottom: 8px"
           >
             Errori per collaboratore con reparto e importi in CHF/EUR
           </p>
@@ -1432,7 +1425,7 @@
         <div class="card-header">Consegna turno</div>
         <div class="form-area">
           <p
-            style="color: var(--muted); font-size: 0.84rem; margin-bottom: 14px"
+            style="color: var(--muted); font-size: var(--fs-md,.875rem); margin-bottom: 14px"
           >
             Scrivi le informazioni importanti per il collega che prende il turno
             successivo.
@@ -1468,7 +1461,7 @@
                   font-family:
                     Source Sans 3,
                     sans-serif;
-                  font-size: 0.9rem;
+                  font-size: var(--fs-md,.875rem);
                   width: 100%;
                 "
               >
@@ -1492,7 +1485,7 @@
                   font-weight: 300;
                   text-transform: none;
                   letter-spacing: 0;
-                  font-size: 0.75rem;
+                  font-size: var(--fs-xs,.75rem);
                 "
                 >Ctrl+Invio per inviare</small
               ></label
@@ -1531,6 +1524,9 @@
             />
           </div>
           <button class="btn-reset" onclick="resetConsFiltri()">Reset</button>
+          <div class="filter-group filter-cerca">
+            <input type="text" id="cons-filt-cerca" class="campo-cerca" placeholder="Cerca nelle consegne..." aria-label="Cerca nelle consegne" oninput="renderConsegne()" />
+          </div>
         </div>
         <div id="consegne-list" style="padding: 16px"></div>
       </div>
@@ -1593,7 +1589,7 @@
                   font-family:
                     Source Sans 3,
                     sans-serif;
-                  font-size: 0.9rem;
+                  font-size: var(--fs-md,.875rem);
                   width: 100%;
                 "
               >
@@ -1656,7 +1652,7 @@
                 padding: 6px 10px;
                 border: 1px solid var(--line);
                 border-radius: 2px;
-                font-size: 0.88rem;
+                font-size: var(--fs-md,.875rem);
                 background: var(--paper);
                 color: var(--ink);
               "
@@ -1675,13 +1671,16 @@
                 padding: 6px 10px;
                 border: 1px solid var(--line);
                 border-radius: 2px;
-                font-size: 0.88rem;
+                font-size: var(--fs-md,.875rem);
                 background: var(--paper);
                 color: var(--ink);
               "
             >
               <option value="">Tutti</option>
             </select>
+          </div>
+          <div class="filter-group filter-cerca">
+            <input type="text" id="pm-filt-cerca" class="campo-cerca" placeholder="Cerca promemoria..." aria-label="Cerca promemoria" oninput="renderPromemoria()" />
           </div>
         </div>
         <div id="promemoria-list" style="padding: 16px"></div>
@@ -1694,7 +1693,7 @@
         <div class="card-header">Costi Maison - Caricamento dati</div>
         <div class="form-area">
           <p
-            style="color: var(--muted); font-size: 0.84rem; margin-bottom: 14px"
+            style="color: var(--muted); font-size: var(--fs-md,.875rem); margin-bottom: 14px"
           >
             Carica il formulario ristorante (Excel). Il sistema riconosce
             automaticamente nomi, importi, buoni (BU/BL) e divide i costi per
@@ -1724,13 +1723,13 @@
             />
             <span
               id="maison-upload-status"
-              style="font-size: 0.82rem; color: var(--muted)"
+              style="font-size: var(--fs-sm,.8125rem); color: var(--muted)"
             ></span>
           </div>
         </div>
         <div class="form-area" style="border-top: 1px solid var(--line)">
           <p
-            style="color: var(--muted); font-size: 0.84rem; margin-bottom: 14px"
+            style="color: var(--muted); font-size: var(--fs-md,.875rem); margin-bottom: 14px"
           >
             Oppure aggiungi manualmente una spesa ristorante maison.
           </p>
@@ -1826,22 +1825,13 @@
       <div class="main-card" style="margin-top: 20px">
         <div class="card-header">Riepilogo Costi Maison</div>
         <div class="filters">
-          <div class="filter-group">
+          <div class="filter-group filter-cerca">
             <span class="filter-label">Cliente</span
-            ><input
+            ><input class="campo-cerca"
               type="text"
               id="maison-filt-nome"
-              placeholder="Cerca nome..."
+              placeholder="Cerca cliente..." aria-label="Cerca cliente"
               oninput="renderMaisonDashboard()"
-              style="
-                padding: 6px 10px;
-                border: 1px solid var(--line);
-                border-radius: 2px;
-                font-size: 0.88rem;
-                background: var(--paper);
-                color: var(--ink);
-                width: 180px;
-              "
             />
           </div>
           <div class="filter-group">
@@ -1853,7 +1843,7 @@
                 padding: 6px 10px;
                 border: 1px solid var(--line);
                 border-radius: 2px;
-                font-size: 0.88rem;
+                font-size: var(--fs-md,.875rem);
                 background: var(--paper);
                 color: var(--ink);
               "
@@ -1936,12 +1926,12 @@
           <button
             class="btn-reset"
             onclick="toggleSezione('maison-budget-list', this)"
-            style="font-size: 0.92rem; padding: 6px 16px"
+            style="font-size: var(--fs-base,.9375rem); padding: 6px 16px"
           >
             &#9650; Nascondi
           </button>
         </h4>
-        <p style="color: var(--muted); font-size: 0.84rem; margin-bottom: 12px">
+        <p style="color: var(--muted); font-size: var(--fs-md,.875rem); margin-bottom: 12px">
           Gestisci categoria (Maison/Full Maison), budget, data nascita.
         </p>
         <div
@@ -1950,20 +1940,20 @@
           <button
             class="btn-export"
             onclick="esportaListaMaisonCSV()"
-            style="font-size: 0.78rem; padding: 5px 14px"
+            style="font-size: var(--fs-sm,.8125rem); padding: 5px 14px"
           >
             CSV</button
           ><button
             class="btn-export btn-export-pdf"
             onclick="esportaListaMaisonPDF()"
-            style="font-size: 0.78rem; padding: 5px 14px"
+            style="font-size: var(--fs-sm,.8125rem); padding: 5px 14px"
           >
             PDF</button
           ><button
             class="btn-export"
             onclick="apriListaClientiMaison()"
             style="
-              font-size: 0.78rem;
+              font-size: var(--fs-sm,.8125rem);
               padding: 5px 14px;
               border-color: var(--accent2);
               color: var(--accent2);
@@ -1974,7 +1964,7 @@
             class="btn-export"
             onclick="apriConfrontoClienti()"
             style="
-              font-size: 0.78rem;
+              font-size: var(--fs-sm,.8125rem);
               padding: 5px 14px;
               border-color: #1a7a6d;
               color: #1a7a6d;
@@ -1985,7 +1975,7 @@
             class="btn-export"
             onclick="document.getElementById('import-cat-file').click()"
             style="
-              font-size: 0.78rem;
+              font-size: var(--fs-sm,.8125rem);
               padding: 5px 14px;
               border-color: #b8860b;
               color: #b8860b;
@@ -2002,7 +1992,7 @@
             class="btn-export"
             onclick="document.getElementById('import-compl-file').click()"
             style="
-              font-size: 0.78rem;
+              font-size: var(--fs-sm,.8125rem);
               padding: 5px 14px;
               border-color: #8e44ad;
               color: #8e44ad;
@@ -2019,7 +2009,7 @@
             class="btn-export"
             onclick="riallineaNomiMaison()"
             style="
-              font-size: 0.78rem;
+              font-size: var(--fs-sm,.8125rem);
               padding: 5px 14px;
               border-color: #c0392b;
               color: #c0392b;
@@ -2030,7 +2020,7 @@
             class="btn-export"
             onclick="unisciDuplicatiMaison()"
             style="
-              font-size: 0.78rem;
+              font-size: var(--fs-sm,.8125rem);
               padding: 5px 14px;
               border-color: #1a4a7a;
               color: #1a4a7a;
@@ -2200,22 +2190,13 @@
           </button>
         </div>
         <div class="filters">
-          <div class="filter-group">
+          <div class="filter-group filter-cerca">
             <span class="filter-label">Beneficiario</span
-            ><input
+            ><input class="campo-cerca"
               type="text"
               id="se-filt-nome"
-              placeholder="Cerca..."
+              placeholder="Cerca beneficiario..." aria-label="Cerca beneficiario"
               oninput="renderSpeseExtra()"
-              style="
-                padding: 6px 10px;
-                border: 1px solid var(--line);
-                border-radius: 2px;
-                font-size: 0.88rem;
-                background: var(--paper);
-                color: var(--ink);
-                width: 160px;
-              "
             />
           </div>
           <div class="filter-group">
@@ -2227,7 +2208,7 @@
                 padding: 6px 10px;
                 border: 1px solid var(--line);
                 border-radius: 2px;
-                font-size: 0.88rem;
+                font-size: var(--fs-md,.875rem);
                 background: var(--paper);
                 color: var(--ink);
               "
@@ -2361,7 +2342,7 @@
             background: var(--ink);
             color: var(--paper);
             border-radius: 2px;
-            font-size: 0.88rem;
+            font-size: var(--fs-md,.875rem);
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
@@ -2379,7 +2360,7 @@
             background: var(--paper);
             color: var(--ink);
             border-radius: 2px;
-            font-size: 0.88rem;
+            font-size: var(--fs-md,.875rem);
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
@@ -2411,7 +2392,7 @@
             <p
               style="
                 color: var(--muted);
-                font-size: 0.84rem;
+                font-size: var(--fs-md,.875rem);
                 margin-bottom: 14px;
               "
             >
@@ -2487,7 +2468,7 @@
             <p
               style="
                 color: var(--muted);
-                font-size: 0.84rem;
+                font-size: var(--fs-md,.875rem);
                 margin-bottom: 14px;
               "
             >
@@ -2595,7 +2576,7 @@
                   padding: 6px 10px;
                   border: 1px solid var(--line);
                   border-radius: 2px;
-                  font-size: 0.88rem;
+                  font-size: var(--fs-md,.875rem);
                   background: var(--paper);
                   color: var(--ink);
                 "
@@ -2607,22 +2588,13 @@
                 <option value="WL">WL</option>
               </select>
             </div>
-            <div class="filter-group">
+            <div class="filter-group filter-cerca">
               <span class="filter-label">Cliente</span
-              ><input
+              ><input class="campo-cerca"
                 type="text"
                 id="inv-b-filt-cliente"
-                placeholder="Cerca..."
+                placeholder="Cerca cliente..." aria-label="Cerca cliente"
                 oninput="renderInventarioBuoniTable()"
-                style="
-                  padding: 6px 10px;
-                  border: 1px solid var(--line);
-                  border-radius: 2px;
-                  font-size: 0.88rem;
-                  background: var(--paper);
-                  color: var(--ink);
-                  width: 140px;
-                "
               />
             </div>
             <div class="filter-group">
@@ -2636,7 +2608,7 @@
                   padding: 6px 10px;
                   border: 1px solid var(--line);
                   border-radius: 2px;
-                  font-size: 0.88rem;
+                  font-size: var(--fs-md,.875rem);
                   background: var(--paper);
                   color: var(--ink);
                   width: 140px;
@@ -2652,7 +2624,7 @@
                   padding: 6px 10px;
                   border: 1px solid var(--line);
                   border-radius: 2px;
-                  font-size: 0.88rem;
+                  font-size: var(--fs-md,.875rem);
                   background: var(--paper);
                   color: var(--ink);
                 "
@@ -2681,7 +2653,7 @@
                   padding: 6px 10px;
                   border: 1px solid var(--line);
                   border-radius: 2px;
-                  font-size: 0.88rem;
+                  font-size: var(--fs-md,.875rem);
                   background: var(--paper);
                   color: var(--ink);
                 "
@@ -2718,7 +2690,7 @@
                   padding: 6px 10px;
                   border: 1px solid var(--line);
                   border-radius: 2px;
-                  font-size: 0.88rem;
+                  font-size: var(--fs-md,.875rem);
                   background: var(--paper);
                   color: var(--ink);
                 "
@@ -2743,7 +2715,7 @@
                 });
                 renderInventarioBuoniTable();
               "
-              style="padding: 6px 14px; font-size: 0.82rem"
+              style="padding: 6px 14px; font-size: var(--fs-sm,.8125rem)"
             >
               Reset
             </button>
@@ -2763,14 +2735,14 @@
             <button
               class="btn-export"
               onclick="esportaInventarioCSV()"
-              style="padding: 6px 14px; font-size: 0.82rem"
+              style="padding: 6px 14px; font-size: var(--fs-sm,.8125rem)"
             >
               CSV
             </button>
             <button
               class="btn-export btn-export-pdf"
               onclick="esportaInventarioPDF()"
-              style="padding: 6px 14px; font-size: 0.82rem"
+              style="padding: 6px 14px; font-size: var(--fs-sm,.8125rem)"
             >
               PDF
             </button>
@@ -2799,7 +2771,7 @@
             <p
               style="
                 color: var(--muted);
-                font-size: 0.84rem;
+                font-size: var(--fs-md,.875rem);
                 margin-bottom: 14px;
               "
             >
@@ -2883,7 +2855,7 @@
             <p
               style="
                 color: var(--muted);
-                font-size: 0.84rem;
+                font-size: var(--fs-md,.875rem);
                 margin-bottom: 14px;
               "
             >
@@ -2972,22 +2944,13 @@
               background: var(--paper2);
             "
           >
-            <div class="filter-group">
+            <div class="filter-group filter-cerca">
               <span class="filter-label">Marca</span
-              ><input
+              ><input class="campo-cerca"
                 type="text"
                 id="inv-s-filt-marca"
-                placeholder="Cerca..."
+                placeholder="Cerca marca..." aria-label="Cerca marca"
                 oninput="renderInventarioSigTable()"
-                style="
-                  padding: 6px 10px;
-                  border: 1px solid var(--line);
-                  border-radius: 2px;
-                  font-size: 0.88rem;
-                  background: var(--paper);
-                  color: var(--ink);
-                  width: 140px;
-                "
               />
             </div>
             <div class="filter-group">
@@ -3001,7 +2964,7 @@
                   padding: 6px 10px;
                   border: 1px solid var(--line);
                   border-radius: 2px;
-                  font-size: 0.88rem;
+                  font-size: var(--fs-md,.875rem);
                   background: var(--paper);
                   color: var(--ink);
                   width: 140px;
@@ -3017,7 +2980,7 @@
                   padding: 6px 10px;
                   border: 1px solid var(--line);
                   border-radius: 2px;
-                  font-size: 0.88rem;
+                  font-size: var(--fs-md,.875rem);
                   background: var(--paper);
                   color: var(--ink);
                 "
@@ -3046,7 +3009,7 @@
                   padding: 6px 10px;
                   border: 1px solid var(--line);
                   border-radius: 2px;
-                  font-size: 0.88rem;
+                  font-size: var(--fs-md,.875rem);
                   background: var(--paper);
                   color: var(--ink);
                 "
@@ -3087,7 +3050,7 @@
                 });
                 renderInventarioSigTable();
               "
-              style="padding: 6px 14px; font-size: 0.82rem"
+              style="padding: 6px 14px; font-size: var(--fs-sm,.8125rem)"
             >
               Reset
             </button>
@@ -3107,14 +3070,14 @@
             <button
               class="btn-export"
               onclick="esportaInventarioCSV()"
-              style="padding: 6px 14px; font-size: 0.82rem"
+              style="padding: 6px 14px; font-size: var(--fs-sm,.8125rem)"
             >
               CSV
             </button>
             <button
               class="btn-export btn-export-pdf"
               onclick="esportaInventarioPDF()"
-              style="padding: 6px 14px; font-size: 0.82rem"
+              style="padding: 6px 14px; font-size: var(--fs-sm,.8125rem)"
             >
               PDF
             </button>
@@ -3151,7 +3114,7 @@
                 padding: 6px 10px;
                 border: 1px solid var(--line);
                 border-radius: 2px;
-                font-size: 0.88rem;
+                font-size: var(--fs-md,.875rem);
                 background: var(--paper);
                 color: var(--ink);
               "
@@ -3168,7 +3131,7 @@
                 padding: 6px 10px;
                 border: 1px solid var(--line);
                 border-radius: 2px;
-                font-size: 0.88rem;
+                font-size: var(--fs-md,.875rem);
                 background: var(--paper);
                 color: var(--ink);
               "
@@ -3182,22 +3145,13 @@
               <option value="tipo">Tipi evento</option>
             </select>
           </div>
-          <div class="filter-group">
+          <div class="filter-group filter-cerca">
             <span class="filter-label">Cerca</span
-            ><input
+            ><input class="campo-cerca"
               type="text"
               id="log-filt-cerca"
-              placeholder="Cerca..."
+              placeholder="Cerca nel registro..." aria-label="Cerca nel registro"
               oninput="renderRegistro()"
-              style="
-                padding: 6px 10px;
-                border: 1px solid var(--line);
-                border-radius: 2px;
-                font-size: 0.88rem;
-                background: var(--paper);
-                color: var(--ink);
-                width: 160px;
-              "
             />
           </div>
           <div class="filter-group">
@@ -3223,7 +3177,7 @@
           <button
             class="btn-export"
             onclick="esportaRegistroCSV()"
-            style="padding: 6px 14px; font-size: 0.82rem"
+            style="padding: 6px 14px; font-size: var(--fs-sm,.8125rem)"
           >
             CSV
           </button>
@@ -3239,7 +3193,7 @@
         <p
           style="
             color: var(--muted);
-            font-size: 0.86rem;
+            font-size: var(--fs-md,.875rem);
             margin: 0 0 12px;
             padding: 0 16px;
           "
@@ -3249,7 +3203,7 @@
         <div style="padding: 0 16px 12px">
           <span
             style="
-              font-size: 0.75rem;
+              font-size: var(--fs-xs,.75rem);
               letter-spacing: 0.1em;
               text-transform: uppercase;
               color: var(--muted);
@@ -3339,7 +3293,7 @@
             >
               Allineamento
             </h4>
-            <p style="color: var(--muted); font-size: 0.82rem; margin: 0">
+            <p style="color: var(--muted); font-size: var(--fs-sm,.8125rem); margin: 0">
               Rilevamento di non conformità e colloquio di allineamento
             </p>
           </div>
@@ -3365,7 +3319,7 @@
             >
               Apprezzamento
             </h4>
-            <p style="color: var(--muted); font-size: 0.82rem; margin: 0">
+            <p style="color: var(--muted); font-size: var(--fs-sm,.8125rem); margin: 0">
               Colloquio di apprezzamento
             </p>
           </div>
@@ -3391,7 +3345,7 @@
             >
               RDI
             </h4>
-            <p style="color: var(--muted); font-size: 0.82rem; margin: 0">
+            <p style="color: var(--muted); font-size: var(--fs-sm,.8125rem); margin: 0">
               Rapporto disciplinare interno (I° e II° livello)
             </p>
           </div>
@@ -3421,14 +3375,14 @@
         <h2
           style="
             font-family: &quot;Playfair Display&quot;, serif;
-            font-size: 1.5rem;
+            font-size: var(--fs-2xl,1.5rem);
             color: var(--ink);
             margin-bottom: 4px;
           "
         >
           Progetto Multidisciplinarità
         </h2>
-        <p style="color: var(--muted); font-size: 0.88rem">
+        <p style="color: var(--muted); font-size: var(--fs-md,.875rem)">
           Mappatura competenze, livelli di formazione e sistema punti
         </p>
       </div>
@@ -3446,7 +3400,7 @@
         <div class="card-header">Assistente – Scrittura veloce</div>
         <div class="form-area">
           <p
-            style="color: var(--muted); font-size: 0.84rem; margin-bottom: 16px"
+            style="color: var(--muted); font-size: var(--fs-md,.875rem); margin-bottom: 16px"
           >
             Scrivi un testo veloce e l'AI lo riscrive in modo formale e
             professionale, usando le procedure e regole del casinò. Nessun dato
@@ -3514,7 +3468,7 @@
                   font-weight: 300;
                   text-transform: none;
                   letter-spacing: 0;
-                  font-size: 0.75rem;
+                  font-size: var(--fs-xs,.75rem);
                 "
                 >Scrivi in modo veloce, anche appunti – l'AI sistema
                 tutto</small
@@ -3535,7 +3489,7 @@
                   font-weight: 300;
                   text-transform: none;
                   letter-spacing: 0;
-                  font-size: 0.75rem;
+                  font-size: var(--fs-xs,.75rem);
                 "
                 >Opzionale – l'AI analizzerà anche l'immagine</small
               ></label
@@ -3553,7 +3507,7 @@
                 onclick="document.getElementById('assist-foto-input').click()"
                 style="
                   background: var(--accent2);
-                  font-size: 0.78rem;
+                  font-size: var(--fs-sm,.8125rem);
                   padding: 8px 16px;
                 "
               >
@@ -3568,7 +3522,7 @@
               />
               <span
                 id="assist-foto-name"
-                style="font-size: 0.82rem; color: var(--muted)"
+                style="font-size: var(--fs-sm,.8125rem); color: var(--muted)"
                 >Nessuna foto</span
               >
               <button
@@ -3581,7 +3535,7 @@
                   color: var(--accent);
                   padding: 4px 10px;
                   border-radius: 2px;
-                  font-size: 0.75rem;
+                  font-size: var(--fs-xs,.75rem);
                   font-weight: 700;
                   cursor: pointer;
                   font-family: &quot;Source Sans 3&quot;, sans-serif;
@@ -3623,7 +3577,7 @@
             </button>
             <span
               id="assist-status"
-              style="font-size: 0.82rem; color: var(--muted)"
+              style="font-size: var(--fs-sm,.8125rem); color: var(--muted)"
             ></span>
           </div>
           <div id="assist-output-wrap" style="display: none; margin-top: 20px">
@@ -3635,7 +3589,7 @@
                 style="
                   min-height: 180px;
                   background: var(--paper2);
-                  font-size: 0.95rem;
+                  font-size: var(--fs-base,.9375rem);
                   line-height: 1.6;
                 "
               ></textarea>
@@ -3653,7 +3607,7 @@
                 onclick="assistenteCopia()"
                 style="
                   background: var(--ink);
-                  font-size: 0.78rem;
+                  font-size: var(--fs-sm,.8125rem);
                   padding: 10px 20px;
                 "
               >
@@ -3664,7 +3618,7 @@
                 onclick="assistenteGenera()"
                 style="
                   background: var(--accent2);
-                  font-size: 0.78rem;
+                  font-size: var(--fs-sm,.8125rem);
                   padding: 10px 20px;
                 "
               >
@@ -3677,7 +3631,7 @@
                   background: var(--paper2);
                   color: var(--muted);
                   border: 1px solid var(--line);
-                  font-size: 0.78rem;
+                  font-size: var(--fs-sm,.8125rem);
                   padding: 10px 20px;
                   box-shadow: none;
                 "
@@ -3779,7 +3733,7 @@
       </div>
       <div class="settings-section" data-gruppo="Sistema" id="cestino-section" style="display: none">
         <div class="sez-head"><div><h4>Cestino</h4><p class="sez-desc">Le voci eliminate: si ripristinano o, se il periodo di conservazione lo consente, si eliminano definitivamente.</p></div></div>
-        <div class="add-tipo-row sez-form sez-filtri"><button class="btn-add-tipo" onclick="caricaCestino()">Carica cestino</button><div class="field"><label>Tipo</label><select id="cestino-filt-tipo" onchange="renderCestino()"><option value="">Tutti i tipi</option><option value="registrazioni">Registrazioni</option><option value="moduli">Moduli</option></select></div><div class="field"><label>Nome</label><input type="text" id="cestino-filt-nome" placeholder="Cerca nome" oninput="renderCestino()" /></div><div class="field"><label>Eliminato da</label><input type="text" id="cestino-filt-chi" placeholder="Operatore" oninput="renderCestino()" /></div><button class="btn-secondario" onclick="document.getElementById('cestino-filt-tipo').value='';document.getElementById('cestino-filt-nome').value='';document.getElementById('cestino-filt-chi').value='';renderCestino();">Azzera filtri</button></div>
+        <div class="add-tipo-row sez-form sez-filtri"><button class="btn-add-tipo" onclick="caricaCestino()">Carica cestino</button><div class="field"><label>Tipo</label><select id="cestino-filt-tipo" onchange="renderCestino()"><option value="">Tutti i tipi</option><option value="registrazioni">Registrazioni</option><option value="moduli">Moduli</option></select></div><div class="field"><label>Nome</label><input class="campo-cerca" type="text" id="cestino-filt-nome" placeholder="Cerca nome..." aria-label="Cerca nome" oninput="renderCestino()" /></div><div class="field"><label>Eliminato da</label><input type="text" id="cestino-filt-chi" placeholder="Operatore" oninput="renderCestino()" /></div><button class="btn-secondario" onclick="document.getElementById('cestino-filt-tipo').value='';document.getElementById('cestino-filt-nome').value='';document.getElementById('cestino-filt-chi').value='';renderCestino();">Azzera filtri</button></div>
         <div id="cestino-content"></div>
       </div>
     </div>

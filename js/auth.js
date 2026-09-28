@@ -402,7 +402,7 @@ async function offriBiometrico() {
   b.innerHTML =
     '<h3>Attivare ' +
     bn +
-    '?</h3><p style="color:var(--muted);font-size:.9rem">Accedi più velocemente la prossima volta senza inserire la password.</p><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="localStorage.setItem(\'bio_declined_\'+getOperatore(),\'1\');document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">No grazie</button><button class="btn-modal-ok" onclick="registraBiometrico()">Attiva</button></div>';
+    '?</h3><p style="color:var(--muted);font-size:var(--fs-md,.875rem)">Accedi più velocemente la prossima volta senza inserire la password.</p><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="localStorage.setItem(\'bio_declined_\'+getOperatore(),\'1\');document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">No grazie</button><button class="btn-modal-ok" onclick="registraBiometrico()">Attiva</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
 async function registraBiometrico() {
@@ -605,16 +605,18 @@ function renderBiometricSettings() {
       el.innerHTML =
         '<div style="display:flex;align-items:center;justify-content:space-between"><div><strong>' +
         bn +
-        '</strong><br><span style="font-size:.84rem;color:var(--muted)">Attivo per: ' +
+        '</strong><br><span style="font-size:var(--fs-md,.875rem);color:var(--muted)">Attivo per: ' +
         escP(curOp) +
-        '</span></div><button onclick="disattivaBiometrico()" style="padding:8px 16px;font-size:.85rem;font-family:Source Sans 3,sans-serif;font-weight:600;border:1.5px solid #c0392b;color:#c0392b;background:none;border-radius:2px;cursor:pointer">Disattiva</button></div>';
+        '</span></div><button onclick="disattivaBiometrico()" style="padding:8px 16px;font-size:var(--fs-md,.875rem);font-family:Source Sans 3,sans-serif;font-weight:600;border:1.5px solid #c0392b;color:#c0392b;background:none;border-radius:2px;cursor:pointer">Disattiva</button></div>';
     } else {
       biometricAvailable().then(function (ok) {
         el.innerHTML = ok
           ? '<div style="display:flex;align-items:center;justify-content:space-between"><div><strong>' +
             bn +
-            '</strong><br><span style="font-size:.84rem;color:var(--muted)">Non attivo</span></div><button onclick="offriBiometrico()" style="padding:8px 16px;font-size:.85rem;font-family:Source Sans 3,sans-serif;font-weight:600;border:1.5px solid var(--accent2);color:var(--accent2);background:none;border-radius:2px;cursor:pointer">Attiva</button></div>'
-          : '<span style="font-size:.84rem;color:var(--muted)">' + bn + ' non disponibile su questo dispositivo</span>';
+            '</strong><br><span style="font-size:var(--fs-md,.875rem);color:var(--muted)">Non attivo</span></div><button onclick="offriBiometrico()" style="padding:8px 16px;font-size:var(--fs-md,.875rem);font-family:Source Sans 3,sans-serif;font-weight:600;border:1.5px solid var(--accent2);color:var(--accent2);background:none;border-radius:2px;cursor:pointer">Attiva</button></div>'
+          : '<span style="font-size:var(--fs-md,.875rem);color:var(--muted)">' +
+            bn +
+            ' non disponibile su questo dispositivo</span>';
       });
     }
   } else {
@@ -622,8 +624,10 @@ function renderBiometricSettings() {
       el.innerHTML = ok
         ? '<div style="display:flex;align-items:center;justify-content:space-between"><div><strong>' +
           bn +
-          '</strong><br><span style="font-size:.84rem;color:var(--muted)">Non attivo</span></div><button onclick="offriBiometrico()" style="padding:8px 16px;font-size:.85rem;font-family:Source Sans 3,sans-serif;font-weight:600;border:1.5px solid var(--accent2);color:var(--accent2);background:none;border-radius:2px;cursor:pointer">Attiva</button></div>'
-        : '<span style="font-size:.84rem;color:var(--muted)">' + bn + ' non disponibile su questo dispositivo</span>';
+          '</strong><br><span style="font-size:var(--fs-md,.875rem);color:var(--muted)">Non attivo</span></div><button onclick="offriBiometrico()" style="padding:8px 16px;font-size:var(--fs-md,.875rem);font-family:Source Sans 3,sans-serif;font-weight:600;border:1.5px solid var(--accent2);color:var(--accent2);background:none;border-radius:2px;cursor:pointer">Attiva</button></div>'
+        : '<span style="font-size:var(--fs-md,.875rem);color:var(--muted)">' +
+          bn +
+          ' non disponibile su questo dispositivo</span>';
     });
   }
 }

@@ -183,14 +183,15 @@ function _renderNdCal() {
   const oggi = new Date().toISOString().substring(0, 10);
   let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
   html +=
-    '<button onclick="_ndCalNav(-1)" style="background:none;border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:4px 10px;color:var(--ink);font-size:1rem">&#9664;</button>';
-  html += '<strong style="font-size:.92rem">' + mesi[_ndCalMonth] + ' ' + _ndCalYear + '</strong>';
+    '<button onclick="_ndCalNav(-1)" style="background:none;border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:4px 10px;color:var(--ink);font-size:var(--fs-lg,1.0625rem)">&#9664;</button>';
+  html += '<strong style="font-size:var(--fs-base,.9375rem)">' + mesi[_ndCalMonth] + ' ' + _ndCalYear + '</strong>';
   html +=
-    '<button onclick="_ndCalNav(1)" style="background:none;border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:4px 10px;color:var(--ink);font-size:1rem">&#9654;</button>';
+    '<button onclick="_ndCalNav(1)" style="background:none;border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:4px 10px;color:var(--ink);font-size:var(--fs-lg,1.0625rem)">&#9654;</button>';
   html += '</div>';
   html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center">';
   giorni.forEach((g) => {
-    html += '<div style="font-size:.82rem;font-weight:700;color:var(--muted);padding:4px 0">' + g + '</div>';
+    html +=
+      '<div style="font-size:var(--fs-sm,.8125rem);font-weight:700;color:var(--muted);padding:4px 0">' + g + '</div>';
   });
   for (let i = 0; i < startDay; i++) html += '<div></div>';
   for (let d = 1; d <= ultimoGiorno; d++) {
@@ -198,7 +199,7 @@ function _renderNdCal() {
     const isSel = _ndSelectedDates.includes(ds);
     const isToday = ds === oggi;
     const fuori = ndGiornoFuoriTempo(ds);
-    let style = 'padding:6px 0;border-radius:2px;cursor:pointer;font-size:.84rem;font-weight:600;';
+    let style = 'padding:6px 0;border-radius:2px;cursor:pointer;font-size:var(--fs-md,.875rem);font-weight:600;';
     if (isSel) style += fuori ? 'background:#c0392b;color:white;' : 'background:var(--accent2);color:white;';
     else if (fuori) style += 'background:#fdecea;color:#c0392b;';
     else if (isToday) style += 'background:var(--paper2);border:1px solid var(--accent2);';
@@ -221,7 +222,7 @@ function _renderNdCal() {
   html += '</div>';
   if (_ndSelectedDates.length) {
     html +=
-      '<div style="margin-top:6px"><button onclick="_ndSelectedDates=[];_renderNdCal()" style="font-size:.82rem;background:none;border:1px solid var(--line);border-radius:2px;padding:2px 8px;cursor:pointer;color:var(--muted)">Pulisci selezione</button></div>';
+      '<div style="margin-top:6px"><button onclick="_ndSelectedDates=[];_renderNdCal()" style="font-size:var(--fs-sm,.8125rem);background:none;border:1px solid var(--line);border-radius:2px;padding:2px 8px;cursor:pointer;color:var(--muted)">Pulisci selezione</button></div>';
   }
   container.innerHTML = html;
   // Update selected display
@@ -367,9 +368,9 @@ async function _verificaNome(nome) {
       b.innerHTML =
         '<h3>Nome simile trovato</h3><p style="margin-bottom:16px">Hai scritto <strong>"' +
         escP(nome) +
-        '"</strong> ma esiste gia un collaboratore simile:</p><div style="text-align:center;margin-bottom:20px"><button class="btn-salva" data-verify-usa="best" style="background:#2c6e49;padding:12px 24px;font-size:1rem">Usa "' +
+        '"</strong> ma esiste gia un collaboratore simile:</p><div style="text-align:center;margin-bottom:20px"><button class="btn-salva" data-verify-usa="best" style="background:#2c6e49;padding:12px 24px;font-size:var(--fs-lg,1.0625rem)">Usa "' +
         escP(best) +
-        '"</button></div><div style="text-align:center"><button class="btn-salva" data-verify-usa="nome" style="background:var(--paper2);color:var(--muted);border:1px solid var(--line);padding:10px 20px;font-size:.88rem;box-shadow:none">No, usa "' +
+        '"</button></div><div style="text-align:center"><button class="btn-salva" data-verify-usa="nome" style="background:var(--paper2);color:var(--muted);border:1px solid var(--line);padding:10px 20px;font-size:var(--fs-md,.875rem);box-shadow:none">No, usa "' +
         escP(nome) +
         '" cosi com\'e</button></div>';
       const scelte = { best, nome };
@@ -388,9 +389,9 @@ async function _verificaNome(nome) {
     b.innerHTML =
       '<h3>Collaboratore non trovato</h3><p style="margin-bottom:16px"><strong>"' +
       escP(nome) +
-      '"</strong> non e nella lista collaboratori.</p><div style="text-align:center;margin-bottom:16px"><button class="btn-salva" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\');document.querySelector(\'[data-verify-resolve]\').dataset.result=\'add\';document.querySelector(\'[data-verify-resolve]\').click()" style="background:#2c6e49;padding:12px 24px;font-size:.95rem">Aggiungi "' +
+      '"</strong> non e nella lista collaboratori.</p><div style="text-align:center;margin-bottom:16px"><button class="btn-salva" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\');document.querySelector(\'[data-verify-resolve]\').dataset.result=\'add\';document.querySelector(\'[data-verify-resolve]\').click()" style="background:#2c6e49;padding:12px 24px;font-size:var(--fs-base,.9375rem)">Aggiungi "' +
       escP(nome) +
-      "\" alla lista</button></div><div style=\"text-align:center\"><button class=\"btn-salva\" onclick=\"document.getElementById('pwd-modal').classList.add('hidden');document.querySelector('[data-verify-resolve]').dataset.result='use';document.querySelector('[data-verify-resolve]').click()\" style=\"background:var(--paper2);color:var(--muted);border:1px solid var(--line);padding:10px 20px;font-size:.88rem;box-shadow:none\">Usa senza aggiungere</button></div>";
+      "\" alla lista</button></div><div style=\"text-align:center\"><button class=\"btn-salva\" onclick=\"document.getElementById('pwd-modal').classList.add('hidden');document.querySelector('[data-verify-resolve]').dataset.result='use';document.querySelector('[data-verify-resolve]').click()\" style=\"background:var(--paper2);color:var(--muted);border:1px solid var(--line);padding:10px 20px;font-size:var(--fs-md,.875rem);box-shadow:none\">Usa senza aggiungere</button></div>";
     const resolver = document.createElement('button');
     resolver.style.display = 'none';
     resolver.dataset.verifyResolve = '1';
@@ -639,12 +640,12 @@ function repartoLettera(key) {
 function _repBadge(rep, piccolo) {
   if (!rep || rep === 'entrambi' || !getRepartoInfo(rep)) return '';
   return piccolo
-    ? '<span style="font-size:.82rem;color:' +
+    ? '<span style="font-size:var(--fs-sm,.8125rem);color:' +
         repartoColore(rep) +
         ';font-weight:700;margin-left:4px">' +
         repartoLettera(rep) +
         '</span>'
-    : ' <span style="font-size:.82rem;color:' +
+    : ' <span style="font-size:var(--fs-sm,.8125rem);color:' +
         repartoColore(rep) +
         ';font-weight:700">' +
         repartoLettera(rep) +

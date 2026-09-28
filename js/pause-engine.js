@@ -2718,15 +2718,16 @@ function _briefRenderPauseSlots(c) {
     h +=
       '<div style="border:1px solid #999;background:' +
       (tit.bg || '#FFFF00') +
-      ';font-weight:bold;text-align:center;padding:4px;font-size:.95rem">' +
+      ';font-weight:bold;text-align:center;padding:4px;font-size:var(--fs-base,.9375rem)">' +
       escP(tit.v) +
       '</div>';
-  if (dataC) h += '<div style="font-weight:bold;font-size:.8rem;padding:2px 0">' + escP(dataC.v) + '</div>';
+  if (dataC)
+    h += '<div style="font-weight:bold;font-size:var(--fs-sm,.8125rem);padding:2px 0">' + escP(dataC.v) + '</div>';
   if (sotto)
     h +=
       '<div style="border:1px solid #999;background:' +
       (sotto.bg || '#FFFF00') +
-      ';font-weight:bold;text-align:center;padding:3px;font-size:.85rem">' +
+      ';font-weight:bold;text-align:center;padding:3px;font-size:var(--fs-md,.875rem)">' +
       escP(sotto.v) +
       '</div>';
   h += '</div>';
@@ -2743,7 +2744,7 @@ function _briefRenderPauseSlots(c) {
     }
     if (!righe.length) return;
     let t =
-      '<table style="border-collapse:collapse;font-size:.82rem;table-layout:fixed"><colgroup><col style="width:46px"><col style="width:88px"></colgroup>';
+      '<table style="border-collapse:collapse;font-size:var(--fs-sm,.8125rem);table-layout:fixed"><colgroup><col style="width:46px"><col style="width:88px"></colgroup>';
     righe.forEach((riga, idx) => {
       const isHdr = (riga.a && riga.a.hdr) || (riga.b && riga.b.hdr);
       if (isHdr && idx > 0) t += '<tr><td colspan="2" style="border:none;height:12px"></td></tr>';
@@ -2793,7 +2794,7 @@ function _briefRenderPauseSlots(c) {
             col +
             ',this.value)" style="width:100%;border:none;background:transparent;color:inherit;font:inherit;' +
             (cell.b ? 'font-weight:bold;' : '') +
-            'padding:2px 4px;font-size:.82rem"></td>';
+            'padding:2px 4px;font-size:var(--fs-sm,.8125rem)"></td>';
         } else {
           t +=
             '<td style="' +
@@ -2834,7 +2835,7 @@ function _briefRenderPauseSlots(c) {
     h += '<div>' + t;
     if (puo)
       h +=
-        '<button class="btn-export" style="font-size:.82rem;padding:2px 8px;margin-top:4px" onclick="briefPausaInsRiga(' +
+        '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 8px;margin-top:4px" onclick="briefPausaInsRiga(' +
         base +
         ',' +
         (righe.length ? righe[righe.length - 1].r : 6) +
@@ -2844,7 +2845,7 @@ function _briefRenderPauseSlots(c) {
   h += '</div>';
   if (puo)
     h +=
-      '<div style="margin-top:8px"><button class="btn-export" style="font-size:.82rem;padding:4px 10px;border-color:#c0392b;color:#c0392b" onclick="briefEliminaPause()">Elimina pause</button></div>';
+      '<div style="margin-top:8px"><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;border-color:#c0392b;color:#c0392b" onclick="briefEliminaPause()">Elimina pause</button></div>';
   return h;
 }
 function _briefParseIntv(s) {
@@ -2867,12 +2868,15 @@ function _briefRenderCronoValet(c) {
   });
   eventi.sort((a, b) => a.s - b.s);
   let h =
-    '<table style="border-collapse:collapse;font-size:.8rem;margin-top:12px"><tr><td colspan="4" style="border:1px solid #999;background:#FFFF00;font-weight:bold;padding:3px 8px">ORDINE PAUSE (una alla volta)</td></tr>';
+    '<table style="border-collapse:collapse;font-size:var(--fs-sm,.8125rem);margin-top:12px"><tr><td colspan="4" style="border:1px solid #999;background:#FFFF00;font-weight:bold;padding:3px 8px">ORDINE PAUSE (una alla volta)</td></tr>';
   h +=
     '<tr>' +
     ['ORARIO', 'NOME', 'TURNO', 'DURATA']
       .map(
-        (x) => '<th style="border:1px solid #999;background:#DCDCDC;padding:3px 8px;font-size:.82rem">' + x + '</th>',
+        (x) =>
+          '<th style="border:1px solid #999;background:#DCDCDC;padding:3px 8px;font-size:var(--fs-sm,.8125rem)">' +
+          x +
+          '</th>',
       )
       .join('') +
     '</tr>';
@@ -2905,7 +2909,7 @@ function _briefRenderCronoValet(c) {
   h += '</table>';
   if (sovrapposte)
     h +=
-      '<p style="color:#c0392b;font-weight:bold;font-size:.8rem;margin-top:6px">Attenzione: ' +
+      '<p style="color:#c0392b;font-weight:bold;font-size:var(--fs-sm,.8125rem);margin-top:6px">Attenzione: ' +
       sovrapposte +
       ' sovrapposizioni (righe rosse)</p>';
   return h;
@@ -2913,12 +2917,15 @@ function _briefRenderCronoValet(c) {
 function _briefRenderPauseValet(c) {
   const puo = puoGestireBriefing();
   let h =
-    '<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:.82rem"><tr><td colspan="6" style="border:1px solid #999;background:#FFFF00;font-weight:bold;text-align:center;padding:4px">PAUSE VALET · ' +
+    '<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:var(--fs-sm,.8125rem)"><tr><td colspan="6" style="border:1px solid #999;background:#FFFF00;font-weight:bold;text-align:center;padding:4px">PAUSE VALET · ' +
     escP(c.tipoGiorno || '') +
     '</td></tr><tr>' +
     ['TURNO', 'NOME', 'ORARIO', 'PAUSA 1', 'PAUSA 2', 'PAUSA 3']
       .map(
-        (x) => '<th style="border:1px solid #999;background:#DCDCDC;padding:3px 8px;font-size:.82rem">' + x + '</th>',
+        (x) =>
+          '<th style="border:1px solid #999;background:#DCDCDC;padding:3px 8px;font-size:var(--fs-sm,.8125rem)">' +
+          x +
+          '</th>',
       )
       .join('') +
     '</tr>';
@@ -2936,7 +2943,7 @@ function _briefRenderPauseValet(c) {
           larg +
           'px;border:none;background:transparent;font:inherit;' +
           (extra || '') +
-          'padding:2px 6px;font-size:.82rem"></td>'
+          'padding:2px 6px;font-size:var(--fs-sm,.8125rem)"></td>'
         : '<td style="border:1px solid #999;padding:2px 8px;' + (extra || '') + '">' + escP(val || '') + '</td>';
     h += cInp('turno', r.turno, 55, 'font-weight:bold;');
     h += cInp('nome', r.nome, 150);
@@ -2953,7 +2960,7 @@ function _briefRenderPauseValet(c) {
           i +
           ",'p" +
           k +
-          '\',this.value)" style="width:86px;border:none;background:transparent;font:inherit;text-align:center;padding:2px 4px;font-size:.82rem"></td>';
+          '\',this.value)" style="width:86px;border:none;background:transparent;font:inherit;text-align:center;padding:2px 4px;font-size:var(--fs-sm,.8125rem)"></td>';
       } else {
         h +=
           '<td style="border:1px solid #999;background:' +
@@ -2973,16 +2980,16 @@ function _briefRenderPauseValet(c) {
   h += '</table></div>';
   if (puo)
     h +=
-      '<button class="btn-export" style="font-size:.82rem;padding:2px 8px;margin-top:4px" onclick="briefValetAddRiga()">+ Aggiungi riga</button>';
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 8px;margin-top:4px" onclick="briefValetAddRiga()">+ Aggiungi riga</button>';
   h += '<div id="brief-crono">' + _briefRenderCronoValet(c) + '</div>';
   if (c.nota)
     h +=
-      '<p style="font-size:.82rem;font-style:italic;background:#FFFFCC;border:1px solid #999;padding:6px 10px;margin-top:10px;max-width:560px">' +
+      '<p style="font-size:var(--fs-sm,.8125rem);font-style:italic;background:#FFFFCC;border:1px solid #999;padding:6px 10px;margin-top:10px;max-width:560px">' +
       escP(c.nota) +
       '</p>';
   if (puo)
     h +=
-      '<div style="margin-top:8px"><button class="btn-export" style="font-size:.82rem;padding:4px 10px;border-color:#c0392b;color:#c0392b" onclick="briefEliminaPause()">Elimina pause</button></div>';
+      '<div style="margin-top:8px"><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;border-color:#c0392b;color:#c0392b" onclick="briefEliminaPause()">Elimina pause</button></div>';
   return h;
 }
 
@@ -3359,7 +3366,7 @@ function _briefRenderPauseCfg() {
   const GGL = ['domenica', 'lunedi', 'martedi', 'mercoledi', 'giovedi', 'venerdi', 'sabato'];
   // tabella "turni, orari e pause spettanti" calcolata LIVE dalle regole
   let tab =
-    '<table style="border-collapse:collapse;font-size:.82rem;margin:8px 0"><tr>' +
+    '<table style="border-collapse:collapse;font-size:var(--fs-sm,.8125rem);margin:8px 0"><tr>' +
     ['TURNO', 'ORARIO', 'DURATA', 'PAUSE', 'DA QUALE REGOLA']
       .map((x) => '<th style="border:1px solid #999;background:#FFFF00;padding:3px 10px">' + x + '</th>')
       .join('') +
@@ -3477,7 +3484,7 @@ function _briefRenderPauseCfg() {
   form += '<div data-pt="insieme">Al massimo ' + inp('pcfg-n', '1', 56, 'number') + ' persone in pausa insieme</div>';
   form += '<div data-pt="nota">Testo: ' + inp('pcfg-testo', 'Chi esce prima non fa l ultima pausa', 420) + '</div>';
   form +=
-    '<div id="pcfg-esito" style="font-size:.8rem"></div>' +
+    '<div id="pcfg-esito" style="font-size:var(--fs-sm,.8125rem)"></div>' +
     '<div style="display:flex;gap:8px"><button class="btn-add-tipo" onclick="pePauseSalva()">Salva regola</button><button class="btn-secondario" onclick="pePauseAnnulla()">Annulla</button></div></div>';
   // guida rapida, senza parole tecniche
   const guida =
@@ -3499,7 +3506,7 @@ function _briefRenderPauseCfg() {
       : 'In questo settore le regole guidano direttamente la generazione delle pause.') +
     '</p></details>';
   let h =
-    '<details style="margin-top:14px;font-size:.82rem"><summary style="cursor:pointer;font-weight:bold">Regole pause · ' +
+    '<details style="margin-top:14px;font-size:var(--fs-sm,.8125rem)"><summary style="cursor:pointer;font-weight:bold">Regole pause · ' +
     escP(sett) +
     ' (' +
     regole.length +
@@ -3542,7 +3549,7 @@ function _briefRenderPauseCfg() {
   if (repCorr === 'slots') h += '</div>';
   if (repCorr === 'slots')
     h +=
-      '<div><button class="btn-export" style="font-size:.8rem;padding:4px 14px" onclick="salvaPauseCfg()">Salva numeri cassa</button></div>';
+      '<div><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 14px" onclick="salvaPauseCfg()">Salva numeri cassa</button></div>';
   h += '</div></details>';
   return h;
 }

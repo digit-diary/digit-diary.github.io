@@ -75,21 +75,21 @@ function renderCestino() {
           new Date(r.eliminato_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
         : '';
       html +=
-        '<div style="padding:8px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:.85rem"><div style="flex:1"><strong>' +
+        '<div style="padding:8px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:var(--fs-md,.875rem)"><div style="flex:1"><strong>' +
         escP(r.nome || '') +
         '</strong> · <span style="color:var(--muted)">' +
         escP(r.tipo || '') +
         '</span> · ' +
         d +
-        '<div style="font-size:.82rem;color:var(--muted)">' +
+        '<div style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
         escP((r.testo || '').substring(0, 60)) +
-        '</div><div style="font-size:.82rem;color:var(--accent)">Eliminato da ' +
+        '</div><div style="font-size:var(--fs-sm,.8125rem);color:var(--accent)">Eliminato da ' +
         escP(r.eliminato_da || '') +
         ' il ' +
         delAt +
-        '</div></div><button class="btn-salva" style="font-size:.82rem;padding:4px 10px;background:#2c6e49" onclick="ripristinaCestino(\'registrazioni\',' +
+        '</div></div><button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;background:#2c6e49" onclick="ripristinaCestino(\'registrazioni\',' +
         r.id +
-        ')">Ripristina</button><button class="btn-salva" style="font-size:.82rem;padding:4px 10px;background:var(--accent)" onclick="eliminaDefinitivo(\'registrazioni\',' +
+        ')">Ripristina</button><button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;background:var(--accent)" onclick="eliminaDefinitivo(\'registrazioni\',' +
         r.id +
         ')">Elimina</button></div>';
     });
@@ -105,26 +105,26 @@ function renderCestino() {
           new Date(m.eliminato_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
         : '';
       html +=
-        '<div style="padding:8px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:.85rem"><div style="flex:1"><strong>' +
+        '<div style="padding:8px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:var(--fs-md,.875rem)"><div style="flex:1"><strong>' +
         escP(m.collaboratore || '') +
         '</strong> · <span style="color:var(--muted)">' +
         escP(m.tipo || '') +
         '</span> · ' +
         escP(m.data_modulo || '') +
-        '<div style="font-size:.82rem;color:var(--accent)">Eliminato da ' +
+        '<div style="font-size:var(--fs-sm,.8125rem);color:var(--accent)">Eliminato da ' +
         escP(m.eliminato_da || '') +
         ' il ' +
         delAt +
-        '</div></div><button class="btn-salva" style="font-size:.82rem;padding:4px 10px;background:#2c6e49" onclick="ripristinaCestino(\'moduli\',' +
+        '</div></div><button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;background:#2c6e49" onclick="ripristinaCestino(\'moduli\',' +
         m.id +
-        ')">Ripristina</button><button class="btn-salva" style="font-size:.82rem;padding:4px 10px;background:var(--accent)" onclick="eliminaDefinitivo(\'moduli\',' +
+        ')">Ripristina</button><button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;background:var(--accent)" onclick="eliminaDefinitivo(\'moduli\',' +
         m.id +
         ')">Elimina</button></div>';
     });
     html += '</div>';
   }
   html +=
-    '<div style="margin-top:16px;display:flex;gap:8px"><button class="btn-salva" style="background:var(--accent);font-size:.82rem;padding:8px 16px" onclick="svuotaCestino()">Svuota cestino</button></div>';
+    '<div style="margin-top:16px;display:flex;gap:8px"><button class="btn-salva" style="background:var(--accent);font-size:var(--fs-sm,.8125rem);padding:8px 16px" onclick="svuotaCestino()">Svuota cestino</button></div>';
   el.innerHTML = html;
 }
 async function ripristinaCestino(tabella, id) {
@@ -282,33 +282,33 @@ async function apriFixImpiego() {
     return;
   }
   let h =
-    '<p style="font-size:.85rem;margin-bottom:10px"><b>' +
+    '<p style="font-size:var(--fs-md,.875rem);margin-bottom:10px"><b>' +
     senza.length +
     ' collaboratori senza impiego.</b> La proposta qui sotto &egrave; gi&agrave; compilata in base al vecchio campo del piano: correggi le righe sbagliate e salva. Serve per i recuperi festivi (CGF) e per i limiti di ore.</p>' +
-    '<div style="margin-bottom:10px"><button class="btn-salva" style="font-size:.8rem;padding:6px 14px" onclick="salvaFixImpiego()">Salva tutti</button> ' +
-    '<button class="btn-export" style="font-size:.8rem;padding:6px 14px" onclick="controlloSalute()">Annulla</button></div>';
+    '<div style="margin-bottom:10px"><button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:6px 14px" onclick="salvaFixImpiego()">Salva tutti</button> ' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:6px 14px" onclick="controlloSalute()">Annulla</button></div>';
   let repCorr = '';
   senza.forEach((c) => {
     const rep = c.reparto_dip || 'slots';
     if (rep !== repCorr) {
       repCorr = rep;
       h +=
-        '<p style="font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:12px 0 4px">' +
+        '<p style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:12px 0 4px">' +
         escP(repartoLabel(rep)) +
         '</p>';
     }
     h +=
       '<div style="display:flex;gap:10px;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)">' +
-      '<span style="flex:1;font-size:.85rem">' +
+      '<span style="flex:1;font-size:var(--fs-md,.875rem)">' +
       escP(c.nome) +
-      ' <span style="color:var(--muted);font-size:.82rem">' +
+      ' <span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">' +
       escP(c.funzione || '-') +
       ' &middot; ' +
       Math.round((parseFloat(c.percentuale) || 1) * 100) +
       '%</span></span>' +
       '<select data-fix-imp="' +
       c.id +
-      '" style="font-size:.8rem;padding:3px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)">' +
+      '" style="font-size:var(--fs-sm,.8125rem);padding:3px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)">' +
       '<option value="fisso"' +
       (c.is_jolly ? '' : ' selected') +
       '>Fisso</option>' +
@@ -436,13 +436,13 @@ async function apriFixDateNascita() {
   let h =
     '<h3>Date di nascita mancanti (' +
     mancanti.length +
-    ')</h3><p style="font-size:.85rem;color:var(--muted);margin-bottom:8px">Scrivi giorno e mese (per esempio 02.03) oppure la data completa (02.03.1985). Servono per i compleanni: il giorno del compleanno il piano segna il congedo con la nota. Si salvano solo le righe compilate.</p>' +
-    '<div style="max-height:52vh;overflow:auto"><table class="piano-table" style="min-width:100%;font-size:.9rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Settore</th><th>Data di nascita</th></tr></thead><tbody>';
+    ')</h3><p style="font-size:var(--fs-md,.875rem);color:var(--muted);margin-bottom:8px">Scrivi giorno e mese (per esempio 02.03) oppure la data completa (02.03.1985). Servono per i compleanni: il giorno del compleanno il piano segna il congedo con la nota. Si salvano solo le righe compilate.</p>' +
+    '<div style="max-height:52vh;overflow:auto"><table class="piano-table" style="min-width:100%;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Settore</th><th>Data di nascita</th></tr></thead><tbody>';
   mancanti.forEach((c) => {
     h +=
       '<tr><td style="text-align:left;font-weight:600">' +
       escP(c.nome) +
-      '</td><td style="font-size:.85rem;color:var(--muted)">' +
+      '</td><td style="font-size:var(--fs-md,.875rem);color:var(--muted)">' +
       escP(repartoLabel(c.reparto_dip || 'slots')) +
       '</td><td><input type="text" data-nasc-id="' +
       c.id +
@@ -603,17 +603,17 @@ async function apriFixOrfani() {
     .map((c) => c.nome)
     .sort();
   let h =
-    '<p style="font-size:.85rem;margin-bottom:10px"><b>' +
+    '<p style="font-size:var(--fs-md,.875rem);margin-bottom:10px"><b>' +
     lista.length +
     ' nomi hanno turni ma nessuna scheda.</b> Per ognuno puoi creare la scheda, spostare i turni su un collaboratore esistente (se &egrave; un nome scritto male) oppure eliminare i turni se non &egrave; una persona.</p>' +
-    '<div style="margin-bottom:10px"><button class="btn-export" style="font-size:.8rem;padding:6px 14px" onclick="controlloSalute()">Torna al controllo</button></div>';
+    '<div style="margin-bottom:10px"><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:6px 14px" onclick="controlloSalute()">Torna al controllo</button></div>';
   lista.forEach(([nome, o], i) => {
     const nomeJs = nome.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     h +=
       '<div style="padding:8px 0;border-bottom:1px solid var(--line)">' +
-      '<b style="font-size:.9rem">' +
+      '<b style="font-size:var(--fs-md,.875rem)">' +
       (nome ? escP(nome) : '(senza nome)') +
-      '</b> <span style="font-size:.82rem;color:var(--muted)">' +
+      '</b> <span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
       o.n +
       ' turni &middot; ' +
       escP(repartoLabel(o.rep)) +
@@ -631,27 +631,27 @@ async function apriFixOrfani() {
     if (!nome) {
       // senza nome non c'e' niente su cui creare, spostare o filtrare: solo segnalazione
       h +=
-        '<div style="font-size:.82rem;color:var(--muted);margin-top:4px">Righe del piano senza collaboratore: vanno corrette nel piano.</div></div>';
+        '<div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:4px">Righe del piano senza collaboratore: vanno corrette nel piano.</div></div>';
       return;
     }
     h +=
       '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">' +
-      '<button class="btn-export" style="font-size:.82rem;padding:4px 10px;border-color:#2c6e49;color:#2c6e49" onclick="orfanoCreaScheda(\'' +
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;border-color:#2c6e49;color:#2c6e49" onclick="orfanoCreaScheda(\'' +
       nomeJs +
       "','" +
       o.rep +
       '\')">Crea la scheda</button>' +
       '<select id="orf-dest-' +
       i +
-      '" style="font-size:.82rem;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><option value="">sposta i turni su...</option>' +
+      '" style="font-size:var(--fs-sm,.8125rem);padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><option value="">sposta i turni su...</option>' +
       attivi.map((n) => '<option value="' + escP(n) + '">' + escP(n) + '</option>').join('') +
       '</select>' +
-      '<button class="btn-export" style="font-size:.82rem;padding:4px 10px" onclick="orfanoSposta(\'' +
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" onclick="orfanoSposta(\'' +
       nomeJs +
       "'," +
       i +
       ')">Sposta</button>' +
-      '<button class="btn-export" style="font-size:.82rem;padding:4px 10px;border-color:#c0392b;color:#c0392b" onclick="orfanoElimina(\'' +
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;border-color:#c0392b;color:#c0392b" onclick="orfanoElimina(\'' +
       nomeJs +
       "'," +
       o.n +
@@ -940,7 +940,7 @@ async function controlloSalute() {
     const col = { ok: '#2c6e49', attenzione: '#e67e22', ko: '#c0392b', info: '#1a4a7a' };
     const lbl = { ok: 'OK', attenzione: 'DA VEDERE', ko: 'DA SISTEMARE', info: 'NOTA' };
     let h =
-      '<p style="font-size:.85rem;margin-bottom:10px"><b>' +
+      '<p style="font-size:var(--fs-md,.875rem);margin-bottom:10px"><b>' +
       (ko || att ? ko + ' da sistemare, ' + att + ' da vedere' : 'Tutto in ordine') +
       '</b> · controllo del ' +
       new Date().toLocaleString('it-CH') +
@@ -948,23 +948,23 @@ async function controlloSalute() {
     esiti.forEach((e) => {
       h +=
         '<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)">' +
-        '<span style="flex:0 0 auto;font-size:.82rem;font-weight:700;letter-spacing:.04em;color:#fff;background:' +
+        '<span style="flex:0 0 auto;font-size:var(--fs-sm,.8125rem);font-weight:700;letter-spacing:.04em;color:#fff;background:' +
         col[e.stato] +
         ';padding:2px 7px;border-radius:3px;margin-top:2px">' +
         lbl[e.stato] +
-        '</span><div style="flex:1"><b style="font-size:.88rem">' +
+        '</span><div style="flex:1"><b style="font-size:var(--fs-md,.875rem)">' +
         escP(e.titolo) +
-        '</b><br><span style="font-size:.82rem;color:var(--muted)">' +
+        '</b><br><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
         escP(e.dettaglio) +
         '</span>' +
         (e.azione
           ? e.azione.indexOf('FIX:') === 0
-            ? '<br><button class="btn-export" style="font-size:.82rem;padding:4px 12px;margin-top:5px;border-color:#1a4a7a;color:#1a4a7a" onclick="' +
+            ? '<br><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;margin-top:5px;border-color:#1a4a7a;color:#1a4a7a" onclick="' +
               e.azione.split('|')[0].substring(4) +
               '">' +
               escP(e.azione.split('|')[1] || 'Sistema') +
               '</button>'
-            : '<br><span style="font-size:.82rem;color:#1a4a7a;font-weight:700">Dove sistemarlo: ' +
+            : '<br><span style="font-size:var(--fs-sm,.8125rem);color:#1a4a7a;font-weight:700">Dove sistemarlo: ' +
               escP(e.azione) +
               '</span>'
           : '') +
@@ -1054,7 +1054,7 @@ async function caricaDbStats() {
   const totalDataBytes = tables.reduce((s, t) => s + (t.bytes || 0), 0);
   const totalDataMB = (totalDataBytes / 1024 / 1024).toFixed(1);
   h +=
-    '<p style="color:var(--muted);font-size:.85rem;margin-bottom:14px">Di cui dati reali: <strong style="color:var(--ink)">' +
+    '<p style="color:var(--muted);font-size:var(--fs-md,.875rem);margin-bottom:14px">Di cui dati reali: <strong style="color:var(--ink)">' +
     totalDataMB +
     ' MB</strong> · il resto e overhead PostgreSQL (fisso, non cresce)</p>';
   // Card grid con conteggio + dimensione
@@ -1062,16 +1062,16 @@ async function caricaDbStats() {
     '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px">';
   tables.forEach((t) => {
     h +=
-      '<div style="background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.3rem;font-weight:700;color:var(--ink)">' +
+      '<div style="background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:var(--ink)">' +
       t.righe +
-      '</div><div style="font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">' +
+      '</div><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">' +
       (labelMap[t.nome] || t.nome) +
-      '</div><div style="font-size:.82rem;color:var(--accent2);font-weight:600;margin-top:3px">' +
+      '</div><div style="font-size:var(--fs-sm,.8125rem);color:var(--accent2);font-weight:600;margin-top:3px">' +
       t.dimensione +
       '</div></div>';
   });
   h += '</div>';
-  h += '<p style="color:var(--muted);font-size:.82rem">Sessioni attive: ' + r.sessioni_attive + '</p>';
+  h += '<p style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">Sessioni attive: ' + r.sessioni_attive + '</p>';
   el.innerHTML = h;
 }
 async function _healthCheck() {

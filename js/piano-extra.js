@@ -390,12 +390,12 @@ function _pianoColoriBarHtml() {
         c +
         ';border:1px solid #999;border-radius:3px;margin:2px;cursor:pointer;vertical-align:middle"></span>',
     ).join('') +
-    '<button data-c="" class="btn-export" style="font-size:.82rem;padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="pianoApplicaColore(null)">Colore del turno</button>' +
+    '<button data-c="" class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="pianoApplicaColore(null)">Colore del turno</button>' +
     '<span style="display:inline-block;width:1px;height:20px;background:var(--line);margin:0 8px;vertical-align:middle"></span>' +
-    '<button class="btn-export" style="font-size:.82rem;font-weight:700;padding:2px 10px;vertical-align:middle" title="Grassetto sulle celle selezionate (vista e stampa)" onclick="pianoApplicaFormato(\'b\')">G</button> ' +
-    '<button class="btn-export" style="font-size:.82rem;font-style:italic;padding:2px 10px;vertical-align:middle" title="Corsivo sulle celle selezionate (vista e stampa)" onclick="pianoApplicaFormato(\'i\')">C</button>' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);font-weight:700;padding:2px 10px;vertical-align:middle" title="Grassetto sulle celle selezionate (vista e stampa)" onclick="pianoApplicaFormato(\'b\')">G</button> ' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);font-style:italic;padding:2px 10px;vertical-align:middle" title="Corsivo sulle celle selezionate (vista e stampa)" onclick="pianoApplicaFormato(\'i\')">C</button>' +
     '<div style="margin-top:7px;padding-top:6px;border-top:1px solid var(--line)">' +
-    '<span style="font-size:.82rem;color:var(--muted);vertical-align:middle;margin-right:4px">Testo:</span>' +
+    '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted);vertical-align:middle;margin-right:4px">Testo:</span>' +
     PIANO_COLORI_TESTO.map(
       (c) =>
         '<span title="Colore del testo" onclick="pianoApplicaColoreTesto(\'' +
@@ -404,12 +404,12 @@ function _pianoColoriBarHtml() {
         c +
         ';border:1px solid #999;border-radius:3px;margin:2px;cursor:pointer;vertical-align:middle"></span>',
     ).join('') +
-    '<button class="btn-export" style="font-size:.82rem;padding:2px 8px;margin-left:4px;vertical-align:middle" onclick="pianoApplicaColoreTesto(null)">Auto</button>' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 8px;margin-left:4px;vertical-align:middle" onclick="pianoApplicaColoreTesto(null)">Auto</button>' +
     '</div>' +
     '<div style="margin-top:7px;padding-top:6px;border-top:1px solid var(--line)">' +
-    '<button class="btn-export" style="font-size:.82rem;padding:2px 10px;vertical-align:middle" title="Memorizza colore e formato della prima cella selezionata" onclick="pianoCopiaFormato()">Copia formato</button> ' +
-    '<button class="btn-export" style="font-size:.82rem;padding:2px 10px;vertical-align:middle" title="Applica il formato memorizzato alle celle selezionate" onclick="pianoIncollaFormato()">Incolla formato</button> ' +
-    '<button class="btn-export" style="font-size:.82rem;padding:2px 10px;vertical-align:middle;border-color:#c0392b;color:#c0392b" title="Toglie colori, grassetto e corsivo dalle celle selezionate (i turni non cambiano)" onclick="pianoCancellaFormato()">Cancella formato</button>' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;vertical-align:middle" title="Memorizza colore e formato della prima cella selezionata" onclick="pianoCopiaFormato()">Copia formato</button> ' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;vertical-align:middle" title="Applica il formato memorizzato alle celle selezionate" onclick="pianoIncollaFormato()">Incolla formato</button> ' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;vertical-align:middle;border-color:#c0392b;color:#c0392b" title="Toglie colori, grassetto e corsivo dalle celle selezionate (i turni non cambiano)" onclick="pianoCancellaFormato()">Cancella formato</button>' +
     '</div>' +
     '</div></span>'
   );
@@ -1064,7 +1064,7 @@ function _pianoSparseBar() {
     document.body.appendChild(bar);
   }
   const b = (label, onclick, rosso) =>
-    '<button class="btn-export" style="font-size:.82rem;padding:4px 12px' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px' +
     (rosso ? ';border-color:#c0392b;color:#c0392b' : '') +
     '" onclick="' +
     onclick +
@@ -1359,11 +1359,11 @@ function _pianoApplicaNascosti() {
     wrap.closest('.piano-wrap').parentNode.insertBefore(bar, wrap.closest('.piano-wrap'));
   }
   bar.innerHTML =
-    '<span style="font-size:.82rem;color:var(--muted)">Nascosti: ' +
+    '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">Nascosti: ' +
     (o.nomi.length ? o.nomi.length + ' righe' : '') +
     (o.nomi.length && o.giorni.length ? ' + ' : '') +
     (o.giorni.length ? o.giorni.length + ' giorni (' + o.giorni.sort((a, b) => a - b).join(', ') + ')' : '') +
-    '</span> <button class="btn-export" style="font-size:.82rem;padding:2px 10px;margin-left:8px" onclick="pianoMostraNascosti()">Mostra tutto</button>';
+    '</span> <button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;margin-left:8px" onclick="pianoMostraNascosti()">Mostra tutto</button>';
   bar.style.cssText = 'padding:4px 2px 6px';
 }
 function pianoCopiaBlocco() {
@@ -1403,8 +1403,8 @@ async function _pianoTestoAppunti() {
       return;
     }
     mc.innerHTML =
-      '<h3 style="margin-bottom:8px">Incolla</h3><p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Premi Ctrl+V (Cmd+V su Mac) nel riquadro: puoi incollare celle copiate da Excel o dal Diario.</p>' +
-      '<textarea id="incolla-txt" style="width:100%;height:140px;font-family:monospace;font-size:.85rem;padding:8px"></textarea>' +
+      '<h3 style="margin-bottom:8px">Incolla</h3><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Premi Ctrl+V (Cmd+V su Mac) nel riquadro: puoi incollare celle copiate da Excel o dal Diario.</p>' +
+      '<textarea id="incolla-txt" style="width:100%;height:140px;font-family:monospace;font-size:var(--fs-md,.875rem);padding:8px"></textarea>' +
       '<div style="margin-top:10px;display:flex;gap:10px"><button class="btn-export" onclick="window._incollaOk()">Incolla</button><button class="btn-export" style="border-color:#c0392b;color:#c0392b" onclick="window._incollaAnnulla()">Annulla</button></div>';
     m.classList.remove('hidden');
     setTimeout(() => document.getElementById('incolla-txt').focus(), 100);
@@ -2108,23 +2108,23 @@ async function _renderPianoCreditiTab() {
     ' &middot; ' +
     escP(repartoLabel(_pianoReparto())) +
     '<span style="display:inline-flex;align-items:center;gap:6px">' +
-    '<button class="btn-export" style="padding:2px 10px;font-size:.9rem" title="Mese precedente" onclick="pianoCambiaMese(-1)">&#8592;</button>' +
+    '<button class="btn-export" style="padding:2px 10px;font-size:var(--fs-md,.875rem)" title="Mese precedente" onclick="pianoCambiaMese(-1)">&#8592;</button>' +
     '<b style="min-width:150px;text-align:center">' +
     escP(meseLbl) +
     '</b>' +
-    '<button class="btn-export" style="padding:2px 10px;font-size:.9rem" title="Mese successivo" onclick="pianoCambiaMese(1)">&#8594;</button></span>' +
-    '<input type="text" class="piano-cerca" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-crediti-table\')">' +
-    '<button class="btn-export" style="font-size:.8rem;padding:4px 12px" onclick="pianoCaricaSaldoAnno()">' +
+    '<button class="btn-export" style="padding:2px 10px;font-size:var(--fs-md,.875rem)" title="Mese successivo" onclick="pianoCambiaMese(1)">&#8594;</button></span>' +
+    '<input type="text" class="piano-cerca campo-cerca" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-crediti-table\')">' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px" onclick="pianoCaricaSaldoAnno()">' +
     (saldoPronto ? 'Ricalcola saldo ore' : 'Calcola saldo ore ' + anno) +
     '</button>' +
-    '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;margin-left:auto" onclick="pianoCreditiStampa()">Stampa</button>' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;margin-left:auto" onclick="pianoCreditiStampa()">Stampa</button>' +
     '</div><div style="padding:10px 14px">';
   h +=
-    '<p style="font-size:.85rem;color:var(--muted);line-height:1.55;margin-bottom:10px">Per ogni collaboratore quello che gli resta o che deve recuperare. <b>Vacanze</b>: giorni spettanti nell anno meno le settimane registrate, piu i giorni restituiti per malattia (scheda Vacanze). <b>CGF</b>: recuperi festivi maturati e goduti fino alla fine di ' +
+    '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);line-height:1.55;margin-bottom:10px">Per ogni collaboratore quello che gli resta o che deve recuperare. <b>Vacanze</b>: giorni spettanti nell anno meno le settimane registrate, piu i giorni restituiti per malattia (scheda Vacanze). <b>CGF</b>: recuperi festivi maturati e goduti fino alla fine di ' +
     escP(meseLbl) +
     ', mai i mesi futuri (scheda Festivi). <b>Saldo ore</b>: riporto piu i mesi dell anno, positivo = ore in piu fatte, negativo = ore da fare (scheda Saldo; va calcolato con il pulsante). <b>Recupero</b>: scostamenti del mese aperto (scheda Recupero ore). <b>Congedo NP</b>: giorni di congedo non pagato nell anno. Clic sulla riga per il dettaglio.</p>';
   h +=
-    '<div style="overflow:auto;max-height:72vh"><table id="piano-crediti-table" class="piano-table" style="min-width:1100px;font-size:.82rem"><thead><tr>' +
+    '<div style="overflow:auto;max-height:72vh"><table id="piano-crediti-table" class="piano-table" style="min-width:1100px;font-size:var(--fs-sm,.8125rem)"><thead><tr>' +
     '<th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th>' +
     '<th title="Giorni di vacanza dell anno secondo anzianita">Vacanze spettanti</th><th title="Giorni delle settimane registrate">Pianificate</th><th title="Giorni V coperti da malattia, tornati disponibili">Restituite</th><th>Vacanze restano</th>' +
     '<th title="Riporto dall anno prima">CGF riporto</th><th>CGF maturati</th><th>CGF goduti</th><th>CGF restano</th>' +

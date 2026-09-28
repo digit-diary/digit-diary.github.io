@@ -75,12 +75,12 @@ function _renderPianoTimbratureCard() {
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Timbrature · confronto con il piano</div><div style="padding:10px 14px" id="piano-timb-body">';
   h +=
     '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">' +
-    '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="caricaConfrontoTimbrature()">Carica confronto del mese</button>' +
-    '<button class="btn-export" style="font-size:.82rem;padding:5px 12px;border-color:#2c6e49;color:#2c6e49" onclick="document.getElementById(\'timb-file\').click()">Importa file timbratrice</button>' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px" onclick="caricaConfrontoTimbrature()">Carica confronto del mese</button>' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px;border-color:#2c6e49;color:#2c6e49" onclick="document.getElementById(\'timb-file\').click()">Importa file timbratrice</button>' +
     '<input type="file" id="timb-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="importaTimbrature(this)">' +
-    '<span style="font-size:.8rem;color:var(--muted)">CSV o Excel con colonne nome / data / entrata / uscita (riconosciute in automatico)</span></div>';
+    '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">CSV o Excel con colonne nome / data / entrata / uscita (riconosciute in automatico)</span></div>';
   h +=
-    '<p style="font-size:.82rem;color:var(--muted);margin-bottom:10px">Collegamento automatico alla timbratrice: nel pacchetto IT c\'è lo script <b>sync_timbratrice.py</b> che legge gli export della timbratrice e carica le timbrature qui da solo (in automatico ogni pochi minuti, lo configura l\'IT).</p>';
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:10px">Collegamento automatico alla timbratrice: nel pacchetto IT c\'è lo script <b>sync_timbratrice.py</b> che legge gli export della timbratrice e carica le timbrature qui da solo (in automatico ogni pochi minuti, lo configura l\'IT).</p>';
   // inserimento manuale
   h +=
     '<div class="add-tipo-row"><div class="field"><label>Collaboratore</label><select id="timb-collab" style="padding:8px">' +
@@ -243,11 +243,13 @@ async function importaTimbrature(input) {
 async function caricaConfrontoTimbrature() {
   const el = document.getElementById('timb-confronto');
   if (!el) return;
-  el.innerHTML = '<p style="color:var(--muted);font-size:.8rem;padding:6px 0">Caricamento...</p>';
+  el.innerHTML = '<p style="color:var(--muted);font-size:var(--fs-sm,.8125rem);padding:6px 0">Caricamento...</p>';
   await _pianoCaricaTimbrature();
   if (!_pianoTimbrature.length) {
     el.innerHTML =
-      '<p style="color:var(--muted);font-size:.8rem;padding:6px 0">Nessuna timbratura per ' + _pianoMeseSel + '.</p>';
+      '<p style="color:var(--muted);font-size:var(--fs-sm,.8125rem);padding:6px 0">Nessuna timbratura per ' +
+      _pianoMeseSel +
+      '.</p>';
     return;
   }
   // ore pianificate per collaboratore (turni del mese)
@@ -271,13 +273,16 @@ async function caricaConfrontoTimbrature() {
   const perNomeT = {};
   _pianoTimbrature.forEach((t) => (perNomeT[t.collaboratore] = (perNomeT[t.collaboratore] || []).concat(t)));
   let h =
-    '<div style="overflow-x:auto;margin-top:8px"><table class="piano-table" style="min-width:560px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Giorni timbrati</th><th>Ore timbrate</th><th>Ore pianificate</th><th>Differenza</th></tr></thead><tbody>';
+    '<div style="display:flex;margin-top:8px"><input type="text" class="campo-cerca" placeholder="Cerca collaboratore..." aria-label="Cerca collaboratore" oninput="pianoTabellaFiltra(this.value,\'piano-timb-table\')"></div>' +
+    '<div style="overflow-x:auto;margin-top:8px"><table class="piano-table" id="piano-timb-table" style="min-width:560px;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Giorni timbrati</th><th>Ore timbrate</th><th>Ore pianificate</th><th>Differenza</th></tr></thead><tbody>';
   let iDet = 0;
   ordineCollabPiano(Object.keys(timbOre), _pianoReparto()).forEach((n) => {
     const diff = Math.round((timbOre[n] - (pianOre[n] || 0)) * 10) / 10;
     iDet++;
     h +=
-      '<tr style="cursor:pointer" title="Clicca per il dettaglio dei giorni" onclick="const d=document.getElementById(\'timb-det-' +
+      '<tr data-nome="' +
+      escP(n) +
+      '" style="cursor:pointer" title="Clicca per il dettaglio dei giorni" onclick="const d=document.getElementById(\'timb-det-' +
       iDet +
       "');d.style.display=d.style.display==='none'?'':'none'\"><td style=\"text-align:left;font-weight:600\">▸ " +
       escP(n) +
@@ -295,7 +300,7 @@ async function caricaConfrontoTimbrature() {
       '</td></tr>';
     // dettaglio per giorno (chiuso di default, per non fare confusione)
     let det =
-      '<table class="piano-table" style="min-width:100%;font-size:.8rem"><thead><tr><th>Giorno</th><th>Turno</th><th>Entrata</th><th>Uscita</th><th>Ore eff.</th><th>Ore pian.</th><th>Diff</th><th></th></tr></thead><tbody>';
+      '<table class="piano-table" style="min-width:100%;font-size:var(--fs-sm,.8125rem)"><thead><tr><th>Giorno</th><th>Turno</th><th>Entrata</th><th>Uscita</th><th>Ore eff.</th><th>Ore pian.</th><th>Diff</th><th></th></tr></thead><tbody>';
     (perNomeT[n] || [])
       .slice()
       .sort((x, y) => x.data.localeCompare(y.data))
@@ -334,7 +339,7 @@ async function caricaConfrontoTimbrature() {
   });
   h += '</tbody></table></div>';
   h +=
-    '<p style="font-size:.82rem;color:var(--muted);margin-top:6px">Differenza = timbrate − pianificate del mese (' +
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:6px">Differenza = timbrate − pianificate del mese (' +
     _pianoMeseSel +
     ', ' +
     escP(repartoLabel(_pianoReparto())) +
@@ -348,13 +353,13 @@ async function caricaConfrontoTimbrature() {
 function _renderPianoStatCard() {
   return (
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Statistiche anno e panoramica mesi</div><div style="padding:10px 14px" id="piano-stat-body">' +
-    '<button class="btn-export" style="font-size:.82rem;padding:5px 12px" onclick="caricaStatisticheAnnoPiano(true)">Ricarica statistiche ' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px" onclick="caricaStatisticheAnnoPiano(true)">Ricarica statistiche ' +
     _pianoMeseSel.split('-')[0] +
     '</button><div id="piano-stat-anno"></div></div></div>' +
     '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Confronto anni · ' +
     escP(repartoLabel(_pianoReparto())) +
     '<span id="piano-confronto-sel"></span></div>' +
-    '<div style="padding:10px 14px" id="piano-confronto-anni"><p style="color:var(--muted);font-size:.8rem">Caricamento confronto...</p></div></div>'
+    '<div style="padding:10px 14px" id="piano-confronto-anni"><p style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">Caricamento confronto...</p></div></div>'
   );
 }
 // due anni QUALSIASI, scelti liberamente dalle tendine (non solo adiacenti)
@@ -369,9 +374,9 @@ function _pianoConfrontoSelHtml() {
     return s;
   };
   return (
-    '<label style="font-size:.8rem;font-weight:400">confronta <select onchange="window._pianoConfrontoAnnoB=parseInt(this.value);caricaConfrontoAnniPiano()" style="padding:3px 6px;font-size:.8rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a">' +
+    '<label style="font-size:var(--fs-sm,.8125rem);font-weight:400">confronta <select onchange="window._pianoConfrontoAnnoB=parseInt(this.value);caricaConfrontoAnniPiano()" style="padding:3px 6px;font-size:var(--fs-sm,.8125rem);border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a">' +
     opt(b) +
-    '</select> con <select onchange="window._pianoConfrontoAnno=parseInt(this.value);caricaConfrontoAnniPiano()" style="padding:3px 6px;font-size:.8rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a">' +
+    '</select> con <select onchange="window._pianoConfrontoAnno=parseInt(this.value);caricaConfrontoAnniPiano()" style="padding:3px 6px;font-size:var(--fs-sm,.8125rem);border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a">' +
     opt(a) +
     '</select></label>'
   );
@@ -443,7 +448,11 @@ async function caricaConfrontoAnniPiano() {
   const anno = window._pianoConfrontoAnno || parseInt(_pianoMeseSel.split('-')[0]);
   const annoB = window._pianoConfrontoAnnoB != null ? window._pianoConfrontoAnnoB : anno - 1;
   el.innerHTML =
-    '<p style="color:var(--muted);font-size:.8rem">Caricamento confronto ' + annoB + ' / ' + anno + '...</p>';
+    '<p style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">Caricamento confronto ' +
+    annoB +
+    ' / ' +
+    anno +
+    '...</p>';
   try {
     const [prec, corr] = await Promise.all([_pianoAggregatiAnno(annoB), _pianoAggregatiAnno(anno)]);
     const f1 = (v) => (Math.round(v * 10) / 10).toLocaleString('de-CH');
@@ -461,7 +470,7 @@ async function caricaConfrontoAnniPiano() {
       ['Recuperi festivi goduti (CGF)', prec.cgf, corr.cgf, 0, (v) => v],
     ];
     let h =
-      '<p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Confronto sui piani presenti in archivio: ' +
+      '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Confronto sui piani presenti in archivio: ' +
       annoB +
       ' (' +
       prec.mesi.size +
@@ -471,7 +480,7 @@ async function caricaConfrontoAnniPiano() {
       corr.mesi.size +
       ' mesi). Se un anno ha meno mesi pianificati, il confronto va letto di conseguenza.</p>';
     h +=
-      '<div style="overflow-x:auto"><table class="piano-table" style="min-width:560px;font-size:.85rem"><thead><tr><th style="text-align:left">Voce</th><th>' +
+      '<div style="overflow-x:auto"><table class="piano-table" style="min-width:560px;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Voce</th><th>' +
       annoB +
       '</th><th>' +
       anno +
@@ -498,7 +507,10 @@ async function caricaConfrontoAnniPiano() {
     h += '</tbody></table></div>';
     el.innerHTML = h;
   } catch (e) {
-    el.innerHTML = '<p style="color:var(--accent);font-size:.8rem">Errore confronto: ' + escP(e.message || '') + '</p>';
+    el.innerHTML =
+      '<p style="color:var(--accent);font-size:var(--fs-sm,.8125rem)">Errore confronto: ' +
+      escP(e.message || '') +
+      '</p>';
   }
 }
 // Filtro mese della scheda Statistiche: '' = tutto l'anno, altrimenti 'AAAA-MM'.
@@ -524,7 +536,8 @@ async function caricaStatisticheAnnoPiano(forza) {
   const rep = _pianoReparto();
   const c = window._pianoStatCache;
   if (forza || !c || c.anno !== anno || c.reparto !== rep) {
-    el.innerHTML = '<p style="color:var(--muted);font-size:.8rem;padding:6px 0">Caricamento anno...</p>';
+    el.innerHTML =
+      '<p style="color:var(--muted);font-size:var(--fs-sm,.8125rem);padding:6px 0">Caricamento anno...</p>';
     // le festivita dell anno servono per i turni con orario prolungato
     await _pianoCaricaFestivita(parseInt(anno));
     await _pianoCaricaCgfRiporto(anno); // riporto CGF dall'anno prima, per il saldo
@@ -575,7 +588,7 @@ async function caricaStatisticheAnnoPiano(forza) {
   const _attivo = 'border-color:#2c6e49;background:#2c6e49;color:#fff;font-weight:700';
   let h = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0;align-items:center">';
   h +=
-    '<button class="btn-export" style="font-size:.82rem;padding:4px 10px;' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;' +
     (meseFiltro ? '' : _attivo) +
     '" onclick="pianoStatMese(\'\')">Anno intero</button>';
   for (let m = 1; m <= 12; m++) {
@@ -583,7 +596,7 @@ async function caricaStatisticheAnnoPiano(forza) {
     const ha = mesiDati[mm];
     const sel = meseFiltro === anno + '-' + mm;
     h +=
-      '<button class="btn-export" style="font-size:.82rem;padding:4px 10px;' +
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;' +
       (sel ? _attivo : ha ? 'border-color:#2c6e49;color:#2c6e49;font-weight:700' : 'color:var(--muted)') +
       '" onclick="pianoStatMese(\'' +
       anno +
@@ -597,7 +610,7 @@ async function caricaStatisticheAnnoPiano(forza) {
   }
   if (meseFiltro)
     h +=
-      '<button class="btn-export" style="font-size:.82rem;padding:4px 10px" onclick="pianoStatApriMese()">Apri ' +
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" onclick="pianoStatApriMese()">Apri ' +
       (MESI[parseInt(meseFiltro.substring(5, 7)) - 1] || '') +
       ' nel calendario</button>';
   h += '</div>';
@@ -728,9 +741,9 @@ async function caricaStatisticheAnnoPiano(forza) {
     st[n].cgfSaldo = st[n].cgfRip + st[n].cgfMat - st[n].cgfGod;
   });
   h +=
-    '<div style="display:flex;padding:6px 0"><input type="text" class="piano-cerca" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-statanno-table\')"></div>';
+    '<div style="display:flex;padding:6px 0"><input type="text" class="piano-cerca campo-cerca" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-statanno-table\')"></div>';
   h +=
-    '<div style="overflow-x:auto"><table id="piano-statanno-table" class="piano-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Ore ' +
+    '<div style="overflow-x:auto"><table id="piano-statanno-table" class="piano-table" style="min-width:760px;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Ore ' +
     (meseFiltro ? escP(MESI[parseInt(meseFiltro.substring(5, 7)) - 1] || meseFiltro) : 'anno') +
     '</th><th title="Sui mesi con un piano">Ore dovute</th><th>Giorni lavorati</th><th>Diurni</th><th>Notturni</th><th>Weekend</th><th>Domeniche</th><th>Vacanze</th><th>Malattie</th><th title="Festivi con diritto lavorati, non in malattia, fino alla fine del mese aperto nel Piano (solo personale fisso)">CGF maturati</th><th title="Giorni CGF effettivamente goduti (quelli caduti in malattia non contano)">CGF goduti</th><th title="Riporto dall anno prima + maturati - goduti: quanti recuperi restano da dare">Saldo CGF</th><th title="Festivi parificati alle domeniche lavorati dagli ausiliari (jolly): danno diritto al supplemento del 50% sul salario orario lordo (RAP Allegato 1). Sono nove giorni fissi e valgono anche di domenica">Suppl. 50%</th><th title="Ore lavorate nella fascia notturna (23:00-06:00). Il supplemento del 10% e gia compreso nella durata dei turni: questa colonna serve da controllo, non e un credito da dare a parte">Ore notte</th><th title="Solo ausiliari (jolly): ore effettivamente lavorate nell anno e indennita calcolate su quel totale secondo il RAP Allegato 1 (vacanze 8.33% con 4 settimane o 10.65% con 5, tredicesima 8.33%). I jolly non hanno una percentuale contrattuale: tutto si calcola sulle ore fatte">Ore lavorate · indennita</th></tr></thead><tbody>';
   ordineCollabPiano(Object.keys(st), _pianoReparto()).forEach((n) => {
@@ -778,7 +791,9 @@ async function caricaStatisticheAnnoPiano(forza) {
       (o.cgfPersi ? ' title="' + o.cgfPersi + ' recuperi caduti in malattia: restano a credito"' : '') +
       '>' +
       (o.cgfGod || '') +
-      (o.cgfPersi ? ' <span style="color:#c0392b;font-size:.82rem">+' + o.cgfPersi + ' in malattia</span>' : '') +
+      (o.cgfPersi
+        ? ' <span style="color:#c0392b;font-size:var(--fs-sm,.8125rem)">+' + o.cgfPersi + ' in malattia</span>'
+        : '') +
       '</td><td style="font-weight:700;color:' +
       (o.cgfSaldo > 0 ? '#2c6e49' : o.cgfSaldo < 0 ? '#c0392b' : 'var(--muted)') +
       '"' +
@@ -810,7 +825,7 @@ async function caricaStatisticheAnnoPiano(forza) {
   });
   h += '</tbody></table></div>';
   h +=
-    '<p style="font-size:.82rem;color:var(--muted);margin-top:6px">Weekend: giallo da 12, rosso oltre 20 (equità). Click su un mese per vedere solo quel mese, "Anno intero" per tornare al totale.</p>';
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:6px">Weekend: giallo da 12, rosso oltre 20 (equità). Click su un mese per vedere solo quel mese, "Anno intero" per tornare al totale.</p>';
   el.innerHTML = h;
 }
 
@@ -911,7 +926,7 @@ async function _pianoVacDirittoCard(anno) {
     escP(repartoLabel(_pianoReparto())) +
     '</div><div style="padding:10px 14px">';
   h +=
-    '<p style="font-size:.85rem;color:var(--muted);margin-bottom:8px">Primi due anni ' +
+    '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);margin-bottom:8px">Primi due anni ' +
     cfg.base1 +
     ' giorni, poi ' +
     cfg.base2 +
@@ -926,11 +941,11 @@ async function _pianoVacDirittoCard(anno) {
     '. Gli ausiliari non compaiono: hanno l indennita in percentuale sulle ore.</p>';
   if (!righe.length) {
     h +=
-      '<p style="font-size:.85rem">Nessun calcolo possibile: manca la data di inizio contratto nelle schede.</p></div></div>';
+      '<p style="font-size:var(--fs-md,.875rem)">Nessun calcolo possibile: manca la data di inizio contratto nelle schede.</p></div></div>';
     return h;
   }
   h +=
-    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:640px;font-size:.9rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>In servizio dal</th><th>Anni</th><th>Spettanti</th><th title="Giorni delle settimane registrate qui sotto per l anno">Pianificati</th><th title="Giorni V davvero scritti nel calendario dell anno: se sono meno delle settimane registrate, manca Applica al piano per qualche mese">V nel calendario</th><th title="Giorni di vacanza coperti da una malattia registrata nel Diario: la V e diventata M e il giorno torna disponibile">Restituite per malattia</th><th>Restano</th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:640px;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>In servizio dal</th><th>Anni</th><th>Spettanti</th><th title="Giorni delle settimane registrate qui sotto per l anno">Pianificati</th><th title="Giorni V davvero scritti nel calendario dell anno: se sono meno delle settimane registrate, manca Applica al piano per qualche mese">V nel calendario</th><th title="Giorni di vacanza coperti da una malattia registrata nel Diario: la V e diventata M e il giorno torna disponibile">Restituite per malattia</th><th>Restano</th></tr></thead><tbody>';
   righe.forEach((x) => {
     const dal = String(x.c.data_assunzione).substring(0, 10);
     const anni = Math.floor((new Date(anno, 11, 31) - new Date(dal + 'T12:00:00')) / (365.25 * 86400000));
@@ -979,7 +994,7 @@ async function _pianoVacDirittoCard(anno) {
   h += '</tbody></table></div>';
   if (senzaData)
     h +=
-      '<p style="font-size:.82rem;color:#c0392b;margin-top:8px">' +
+      '<p style="font-size:var(--fs-sm,.8125rem);color:#c0392b;margin-top:8px">' +
       senzaData +
       ' collaboratori non compaiono perche manca la data di inizio contratto nella loro scheda.</p>';
   // AVVISO DI OTTOBRE: quando si pianificano le vacanze dell'anno dopo serve
@@ -1006,12 +1021,12 @@ async function _pianoVacDirittoCard(anno) {
     if (cambi.length)
       h +=
         '<div style="margin-top:12px;padding:10px 12px;background:#fff8e1;border-left:4px solid #b8860b;border-radius:3px">' +
-        '<b style="font-size:.92rem">Da tenere presente per il ' +
+        '<b style="font-size:var(--fs-base,.9375rem)">Da tenere presente per il ' +
         (anno + 1) +
-        '</b><p style="font-size:.86rem;margin:4px 0 0">Nel pianificare le vacanze del prossimo anno, ' +
+        '</b><p style="font-size:var(--fs-md,.875rem);margin:4px 0 0">Nel pianificare le vacanze del prossimo anno, ' +
         cambi.length +
         (cambi.length === 1 ? ' collaboratore avra' : ' collaboratori avranno') +
-        ' piu giorni:</p><ul style="margin:6px 0 0 18px;font-size:.88rem">' +
+        ' piu giorni:</p><ul style="margin:6px 0 0 18px;font-size:var(--fs-md,.875rem)">' +
         cambi
           .map(
             (x) =>
@@ -1056,38 +1071,38 @@ async function _renderPianoVacanzeTab() {
     vac.length +
     ')';
   h +=
-    '<select onchange="window._pianoVacAnno=parseInt(this.value);renderPiano()" style="padding:4px 8px;font-size:.8rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a">';
+    '<select onchange="window._pianoVacAnno=parseInt(this.value);renderPiano()" style="padding:4px 8px;font-size:var(--fs-sm,.8125rem);border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a">';
   for (let a = 2025; a <= 2031; a++)
     h += '<option value="' + a + '"' + (a === anno ? ' selected' : '') + '>' + a + '</option>';
   h += '</select>';
   h +=
-    '<select onchange="window._pianoVacFiltro=this.value;renderPiano()" style="padding:4px 8px;font-size:.8rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a;max-width:220px"><option value="">Tutti i collaboratori</option>' +
+    '<select onchange="window._pianoVacFiltro=this.value;renderPiano()" style="padding:4px 8px;font-size:var(--fs-sm,.8125rem);border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a;max-width:220px"><option value="">Tutti i collaboratori</option>' +
     nomiRep
       .map((n) => '<option value="' + escP(n) + '"' + (filtro === n ? ' selected' : '') + '>' + escP(n) + '</option>')
       .join('') +
     '</select>';
   if (puoMod) {
     h +=
-      '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49" onclick="apriNuovaVacanza()">Nuova vacanza</button>';
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:#2c6e49;color:#2c6e49" onclick="apriNuovaVacanza()">Nuova vacanza</button>';
     h +=
-      '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#d4b86a;color:#d4b86a" onclick="document.getElementById(\'vac-file\').click()">Importa (Excel o PDF)</button>' +
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:#d4b86a;color:#d4b86a" onclick="document.getElementById(\'vac-file\').click()">Importa (Excel o PDF)</button>' +
       '<input type="file" id="vac-file" accept=".xlsx,.xls,.pdf" style="display:none" onchange="importaVacanzePiano(this)">' +
-      '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49" title="Scarica il piano vacanze del settore nello stesso formato del file HR" onclick="esportaVacanzeExcel()">Scarica Excel</button>' +
-      '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#1a4a7a;color:#7ea8d8" onclick="esportaVacanzePdf()">Scarica PDF</button>';
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:#2c6e49;color:#2c6e49" title="Scarica il piano vacanze del settore nello stesso formato del file HR" onclick="esportaVacanzeExcel()">Scarica Excel</button>' +
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:#1a4a7a;color:#7ea8d8" onclick="esportaVacanzePdf()">Scarica PDF</button>';
     h +=
-      '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#1a4a7a;color:#7ea8d8" onclick="applicaVacanzePiano()">Applica al piano · ' +
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:#1a4a7a;color:#7ea8d8" onclick="applicaVacanzePiano()">Applica al piano · ' +
       escP(meseLbl) +
       '</button>';
     h +=
-      '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#8e44ad;color:#b07cc7" onclick="apriScambioSettimane()">Scambia settimane</button>';
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:#8e44ad;color:#b07cc7" onclick="apriScambioSettimane()">Scambia settimane</button>';
     h +=
-      '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:#8e44ad;color:#b07cc7" onclick="pdfCambioVacanza()">Formulario cambio vacanza</button>';
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:#8e44ad;color:#b07cc7" onclick="pdfCambioVacanza()">Formulario cambio vacanza</button>';
     h +=
-      '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:var(--accent);color:var(--accent)" onclick="eliminaTutteVacanze()">Elimina tutte</button>';
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--accent);color:var(--accent)" onclick="eliminaTutteVacanze()">Elimina tutte</button>';
   }
   h += '</div>';
   h +=
-    '<p style="font-size:.8rem;color:var(--muted);padding:8px 14px 0">Le vacanze sono settimane intere (lun-dom): una settimana vale 7 giornate di diritto, quindi 35 giorni sono 5 settimane. "Applica al piano" scrive le V (protette) del mese scelto nel Calendario e i congedi C prima/dopo secondo le regole (1 C prima per i fissi, 2 per i jolly; C dopo scalati per percentuale). Import Excel: colonna A cognome, B nome, colonne F-BE settimane 1-52 con X.</p>';
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);padding:8px 14px 0">Le vacanze sono settimane intere (lun-dom): una settimana vale 7 giornate di diritto, quindi 35 giorni sono 5 settimane. "Applica al piano" scrive le V (protette) del mese scelto nel Calendario e i congedi C prima/dopo secondo le regole (1 C prima per i fissi, 2 per i jolly; C dopo scalati per percentuale). Import Excel: colonna A cognome, B nome, colonne F-BE settimane 1-52 con X.</p>';
   if (!gruppi.length) h += '<p style="padding:14px;color:var(--muted)">Nessuna vacanza per il ' + anno + '.</p>';
   gruppi.forEach((nome) => {
     const lista = perCollab[nome];
@@ -1096,13 +1111,13 @@ async function _renderPianoVacanzeTab() {
       escP(nome) +
       '" title="Apri la scheda di ' +
       escP(nome) +
-      '" style="background:#ffc107;color:#212529;padding:6px 10px;font-weight:700;font-size:.82rem">' +
+      '" style="background:#ffc107;color:#212529;padding:6px 10px;font-weight:700;font-size:var(--fs-sm,.8125rem)">' +
       escP(nome) +
       ' (' +
       lista.length +
       ' settimane)</div>';
     h +=
-      '<table class="piano-table" style="min-width:100%;font-size:.85rem"><thead><tr><th style="text-align:left">Settimana</th><th title="Definitiva = va nel piano e conta nel saldo. Provvisoria = resta qui in attesa, non va nel piano e non conta">Definitiva</th>' +
+      '<table class="piano-table" style="min-width:100%;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Settimana</th><th title="Definitiva = va nel piano e conta nel saldo. Provvisoria = resta qui in attesa, non va nel piano e non conta">Definitiva</th>' +
       (puoMod ? '<th>Azioni</th>' : '') +
       '</tr></thead><tbody>';
     lista.forEach((v) => {
@@ -1113,7 +1128,7 @@ async function _renderPianoVacanzeTab() {
           : ' style="background:#fff3c4" title="Provvisoria: non va nel piano e non conta nel saldo"') +
         '><td style="text-align:left"><strong>Settimana ' +
         v.settimana +
-        '</strong> <span style="color:var(--muted);font-size:.8rem">(' +
+        '</strong> <span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">(' +
         _vacDateSettimana(anno, v.settimana) +
         ')</span></td>';
       h +=
@@ -1132,9 +1147,9 @@ async function _renderPianoVacanzeTab() {
         '</td>';
       if (puoMod)
         h +=
-          '<td><button class="btn-export" style="font-size:.8rem;padding:2px 10px;border-color:#1a4a7a;color:#1a4a7a;margin-right:6px" onclick="modificaVacanza(' +
+          '<td><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;border-color:#1a4a7a;color:#1a4a7a;margin-right:6px" onclick="modificaVacanza(' +
           v.id +
-          ')">Modifica</button><button class="btn-export" style="font-size:.8rem;padding:2px 10px;border-color:var(--accent);color:var(--accent)" onclick="eliminaVacanza(' +
+          ')">Modifica</button><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;border-color:var(--accent);color:var(--accent)" onclick="eliminaVacanza(' +
           v.id +
           ')">Elimina</button></td>';
       h += '</tr>';
@@ -1325,7 +1340,9 @@ function _pianoSaldoDelMese(dati, nome, mm, info) {
 async function pianoCaricaSaldoAnno() {
   const anno = parseInt(_pianoMeseSel.split('-')[0]);
   const el = document.getElementById('piano-saldoanno');
-  if (el) el.innerHTML = '<p style="color:var(--muted);font-size:.85rem;padding:8px 0">Calcolo dei dodici mesi...</p>';
+  if (el)
+    el.innerHTML =
+      '<p style="color:var(--muted);font-size:var(--fs-md,.875rem);padding:8px 0">Calcolo dei dodici mesi...</p>';
   await _pianoCaricaSaldoIniziale(anno);
   window._pianoSaldoAnnoDati = await _pianoSaldoAnnoCalcola(anno);
   window._pianoSaldoAnnoAperto = true;
@@ -1340,13 +1357,13 @@ function _renderPianoSaldoAnnoCard() {
     ' · anno intero';
   if (dati && dati.anno === anno)
     h +=
-      '<input type="text" class="piano-cerca" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-saldoanno-table\')">' +
-      '<button class="btn-export" style="font-size:.8rem;padding:4px 12px" onclick="pianoCaricaSaldoAnno()">Ricalcola</button>';
+      '<input type="text" class="piano-cerca campo-cerca" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-saldoanno-table\')">' +
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px" onclick="pianoCaricaSaldoAnno()">Ricalcola</button>';
   h += '</div><div style="padding:10px 14px" id="piano-saldoanno">';
   if (!dati || dati.anno !== anno) {
     h +=
-      '<p style="font-size:.85rem;color:var(--muted);margin-bottom:8px">Riporto di inizio anno piu il saldo di ogni mese, come il foglio Saldo Ore del piano. I mesi gia pianificati contano anche se sono nel futuro, cosi si vede in anticipo chi andra fuori dalla banda e chi deve recuperare.</p>' +
-      '<button class="btn-export" style="font-size:.85rem;padding:6px 14px;border-color:#2c6e49;color:#2c6e49" onclick="pianoCaricaSaldoAnno()">Calcola l anno ' +
+      '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);margin-bottom:8px">Riporto di inizio anno piu il saldo di ogni mese, come il foglio Saldo Ore del piano. I mesi gia pianificati contano anche se sono nel futuro, cosi si vede in anticipo chi andra fuori dalla banda e chi deve recuperare.</p>' +
+      '<button class="btn-export" style="font-size:var(--fs-md,.875rem);padding:6px 14px;border-color:#2c6e49;color:#2c6e49" onclick="pianoCaricaSaldoAnno()">Calcola l anno ' +
       anno +
       '</button></div></div>';
     return h;
@@ -1360,13 +1377,13 @@ function _renderPianoSaldoAnnoCard() {
     .map((c) => c.nome)
     .sort((x, y) => (pos[x] != null ? pos[x] : 9999) - (pos[y] != null ? pos[y] : 9999) || x.localeCompare(y));
   h +=
-    '<p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Saldo del mese = ore fatte meno ore dovute, con dentro gli scostamenti del Recupero ore. Il totale e il riporto piu i mesi. E in ordine (verde) se resta fra ' +
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Saldo del mese = ore fatte meno ore dovute, con dentro gli scostamenti del Recupero ore. Il totale e il riporto piu i mesi. E in ordine (verde) se resta fra ' +
     banda.min +
     ' e +' +
     banda.max +
     ' ore: la banda si cambia nella scheda Regole. Clic sul riporto per scriverlo: se gli dai una data, i mesi gia compresi restano grigi con un punto e non vengono contati due volte.</p>';
   h +=
-    '<div style="overflow:auto;max-height:72vh"><table id="piano-saldoanno-table" class="piano-table piano-fisse3" style="min-width:1100px;font-size:.8rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Fun</th><th>%</th><th title="Saldo con cui entra nell anno. Clic per scriverlo">Riporto</th>';
+    '<div style="overflow:auto;max-height:72vh"><table id="piano-saldoanno-table" class="piano-table piano-fisse3" style="min-width:1100px;font-size:var(--fs-sm,.8125rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Fun</th><th>%</th><th title="Saldo con cui entra nell anno. Clic per scriverlo">Riporto</th>';
   for (let m = 1; m <= 12; m++) h += '<th>' + (MESI[m - 1] || m) + '</th>';
   h += '<th>Totale mesi</th><th>Saldo ' + anno + '</th><th></th></tr></thead><tbody>';
   let righeScritte = 0;
@@ -1464,7 +1481,8 @@ function _renderPianoSaldoAnnoCard() {
   });
   h += '</tbody></table></div>';
   if (!righeScritte)
-    h += '<p style="color:var(--muted);font-size:.85rem">Nessun mese pianificato per il ' + anno + '.</p>';
+    h +=
+      '<p style="color:var(--muted);font-size:var(--fs-md,.875rem)">Nessun mese pianificato per il ' + anno + '.</p>';
   h += '</div></div>';
   return h;
 }
@@ -1500,11 +1518,11 @@ async function _renderPianoSaldoTab() {
     '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Saldo ore · ' +
     escP(label) +
     '<button class="btn-act pin" onclick="pianoCambiaMese(-1)">&larr;</button><button class="btn-act pin" onclick="pianoCambiaMese(1)">&rarr;</button>' +
-    '<input type="text" class="piano-cerca" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-saldo-table\')"></div>';
+    '<input type="text" class="piano-cerca campo-cerca" placeholder="Cerca collaboratore..." oninput="pianoTabellaFiltra(this.value,\'piano-saldo-table\')"></div>';
   h +=
     // scorrimento DENTRO il riquadro: l'intestazione resta in alto e le prime
     // tre colonne (nome, funzione, percentuale) restano ferme a sinistra
-    '<div style="overflow:auto;max-height:72vh;padding:0 6px 8px"><table id="piano-saldo-table" class="piano-table piano-fisse3" style="min-width:760px;font-size:.8rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Fun</th><th>%</th><th>Ore dovute</th><th title="Timbrate se presenti, altrimenti piano">Ore lavorate</th><th>Saldo mese</th><th>Saldo anno (YTD)</th></tr></thead><tbody>';
+    '<div style="overflow:auto;max-height:72vh;padding:0 6px 8px"><table id="piano-saldo-table" class="piano-table piano-fisse3" style="min-width:760px;font-size:var(--fs-sm,.8125rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Fun</th><th>%</th><th>Ore dovute</th><th title="Timbrate se presenti, altrimenti piano">Ore lavorate</th><th>Saldo mese</th><th>Saldo anno (YTD)</th></tr></thead><tbody>';
   let totD = 0;
   let totP = 0;
   let totS = 0;
@@ -1585,7 +1603,7 @@ async function _renderPianoSaldoTab() {
     totS.toFixed(1) +
     '</td><td></td></tr>';
   h +=
-    '</tbody></table></div><p style="font-size:.8rem;color:var(--muted);padding:8px 14px">Dovute = giorni/7 × ' +
+    '</tbody></table></div><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);padding:8px 14px">Dovute = giorni/7 × ' +
     _pianoOreSett +
     'h × percentuale (jolly esclusi). Pianificate = ore turni + codici speciali (V, M... scalati per percentuale). YTD = cumulato da gennaio: nei mesi passati valgono le ore timbrate se presenti, altrimenti il piano. Clic su "Saldo mese" per scrivere le ore reali del mese: un mese gia chiuso si corregge solo indicando il motivo.</p></div>';
   return h;
@@ -1625,7 +1643,7 @@ async function _renderPianoStoricoTab() {
     visibili.length +
     ')';
   h +=
-    '<select onchange="window._pianoStoricoFiltro=this.value;renderPiano()" style="padding:4px 8px;font-size:.8rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a"><option value="">Tutte le azioni</option>' +
+    '<select onchange="window._pianoStoricoFiltro=this.value;renderPiano()" style="padding:4px 8px;font-size:var(--fs-sm,.8125rem);border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a"><option value="">Tutte le azioni</option>' +
     azioni
       .map((a) => '<option value="' + escP(a) + '"' + (filtro === a ? ' selected' : '') + '>' + escP(a) + '</option>')
       .join('') +
@@ -1633,10 +1651,10 @@ async function _renderPianoStoricoTab() {
   h +=
     '<input type="text" value="' +
     escP(window._pianoStoricoCerca || '') +
-    '" placeholder="Cerca nome o voce..." onchange="window._pianoStoricoCerca=this.value;renderPiano()" style="padding:4px 8px;font-size:.8rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a;width:170px">';
+    '" placeholder="Cerca nome o voce..." onchange="window._pianoStoricoCerca=this.value;renderPiano()" class="piano-cerca campo-cerca">';
   h += '</div>';
   h +=
-    '<div style="overflow-x:auto;padding:0 6px 8px"><table class="piano-table" style="min-width:700px;font-size:.85rem"><thead><tr>' +
+    '<div style="overflow-x:auto;padding:0 6px 8px"><table class="piano-table" style="min-width:700px;font-size:var(--fs-md,.875rem)"><thead><tr>' +
     [
       ['created_at', 'Data e ora', ''],
       ['operatore', 'Operatore', ''],
@@ -1857,7 +1875,7 @@ function apriScambioSettimane() {
     '</select></div><div class="field" style="text-align:left;margin-top:8px"><label>Collaboratore B (accetta lo scambio)</label><select id="ss-b" style="width:100%;padding:8px">' +
     opzioni +
     '</select></div>' +
-    '<p style="font-size:.82rem;color:var(--muted);margin-top:8px">Le due settimane vengono scambiate; nei mesi già pianificati le V e i congedi vengono sistemati di conseguenza. Alla fine si genera il modulo PDF precompilato per le firme.</p>' +
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:8px">Le due settimane vengono scambiate; nei mesi già pianificati le V e i congedi vengono sistemati di conseguenza. Alla fine si genera il modulo PDF precompilato per le firme.</p>' +
     '<div class="pwd-modal-btns" style="margin-top:14px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="confermaScambioSettimane()">Scambia</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
@@ -1988,7 +2006,7 @@ function apriNuovaVacanza() {
     '</h3><div class="field" style="text-align:left"><label>Collaboratore</label><select id="nv-collab" style="width:100%;padding:8px">' +
     nomiRep.map((n) => '<option value="' + escP(n) + '">' + escP(n) + '</option>').join('') +
     '</select></div><div class="field" style="text-align:left;margin-top:8px"><label>Settimana (1-53)</label><input type="number" id="nv-sett" min="1" max="53" style="width:110px;padding:8px"></div>' +
-    '<div style="text-align:left;margin-top:8px"><label style="font-size:.82rem"><input type="checkbox" id="nv-conf" checked> Definitiva (va nel piano e conta nel saldo; senza spunta resta provvisoria)</label></div>' +
+    '<div style="text-align:left;margin-top:8px"><label style="font-size:var(--fs-sm,.8125rem)"><input type="checkbox" id="nv-conf" checked> Definitiva (va nel piano e conta nel saldo; senza spunta resta provvisoria)</label></div>' +
     '<div class="pwd-modal-btns" style="margin-top:14px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaNuovaVacanza()">Aggiungi</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
   setTimeout(() => {

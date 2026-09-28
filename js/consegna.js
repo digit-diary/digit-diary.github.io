@@ -147,8 +147,14 @@ function renderConsegne() {
   const op = getOperatore();
   const _consDal = (document.getElementById('cons-filt-dal') || {}).value || '';
   const _consAl = (document.getElementById('cons-filt-al') || {}).value || '';
+  const _consCerca = ((document.getElementById('cons-filt-cerca') || {}).value || '').trim().toLowerCase();
   var _cr = _consegneVisibiliA(op).filter((c) => {
     const d = (c.data_giornata || c.created_at || '').substring(0, 10);
+    if (
+      _consCerca &&
+      ![c.messaggio, c.operatore, c.destinatario, c.turno_uscente].join(' ').toLowerCase().includes(_consCerca)
+    )
+      return false;
     if (_consDal && d < _consDal) return false;
     if (_consAl && d > _consAl) return false;
     return true;
@@ -173,13 +179,14 @@ function renderConsegne() {
           btns +=
             '<button class="btn-act edit" onclick="modificaConsegna(' +
             c.id +
-            ')" style="font-size:.82rem">Modifica</button>';
+            ')" style="font-size:var(--fs-sm,.8125rem)">Modifica</button>';
           btns +=
             '<button class="btn-act del" onclick="annullaConsegna(' +
             c.id +
-            ')" style="font-size:.82rem">Annulla invio</button>';
+            ')" style="font-size:var(--fs-sm,.8125rem)">Annulla invio</button>';
         } else if (letto) {
-          btns += '<span style="font-size:.82rem;color:var(--muted);font-style:italic">Non modificabile (letta)</span>';
+          btns +=
+            '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted);font-style:italic">Non modificabile (letta)</span>';
         }
       }
       // La lettura la conferma l'operatore con il bottone: segnarla al render la faceva
@@ -188,7 +195,7 @@ function renderConsegne() {
         btns +=
           '<button class="btn-act pin" onclick="segnaConsegnaLetta(' +
           c.id +
-          ')" style="font-size:.82rem;color:#2c6e49;border-color:#2c6e49">Letta</button>';
+          ')" style="font-size:var(--fs-sm,.8125rem);color:#2c6e49;border-color:#2c6e49">Letta</button>';
       }
       return (
         '<div style="padding:14px;margin-bottom:12px;border-radius:3px;border-left:3px solid ' +
@@ -201,16 +208,18 @@ function renderConsegne() {
         c.turno_uscente +
         '</span><strong>' +
         escP(c.operatore) +
-        '</strong><span style="font-size:.82rem;color:#2980b9;font-weight:600">→ ' +
+        '</strong><span style="font-size:var(--fs-sm,.8125rem);color:#2980b9;font-weight:600">→ ' +
         escP(destLabel) +
-        '</span><span style="color:var(--muted);font-size:.82rem">' +
+        '</span><span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">' +
         d.toLocaleDateString('it-IT') +
         ' ' +
         d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) +
         '</span>' +
-        (isAlta ? '<span style="color:var(--accent);font-size:.82rem;font-weight:700">PRIORITA ALTA</span>' : '') +
+        (isAlta
+          ? '<span style="color:var(--accent);font-size:var(--fs-sm,.8125rem);font-weight:700">PRIORITA ALTA</span>'
+          : '') +
         (letto
-          ? '<span style="color:#2c6e49;font-size:.82rem;font-weight:600">Letto da ' +
+          ? '<span style="color:#2c6e49;font-size:var(--fs-sm,.8125rem);font-weight:600">Letto da ' +
             escP(c.letto_da) +
             ' il ' +
             new Date(c.letto_at).toLocaleDateString('it-IT') +
@@ -218,7 +227,7 @@ function renderConsegne() {
           : '') +
         '<div style="display:flex;gap:6px">' +
         btns +
-        '</div></div><div style="white-space:pre-line;font-size:.92rem;line-height:1.5">' +
+        '</div></div><div style="white-space:pre-line;font-size:var(--fs-base,.9375rem);line-height:1.5">' +
         esc(c.messaggio) +
         '</div></div>'
       );
@@ -230,7 +239,7 @@ function modificaConsegna(id) {
   if (!c || c.letto_da) return;
   const b = document.getElementById('pwd-modal-content');
   b.innerHTML =
-    '<h3>Modifica consegna</h3><div class="pwd-field"><label>Messaggio</label><textarea id="edit-cons-msg" style="width:100%;min-height:100px;padding:10px;font-family:Source Sans 3,sans-serif;font-size:.95rem;border:1.5px solid var(--line);border-radius:2px;resize:vertical">' +
+    '<h3>Modifica consegna</h3><div class="pwd-field"><label>Messaggio</label><textarea id="edit-cons-msg" style="width:100%;min-height:100px;padding:10px;font-family:Source Sans 3,sans-serif;font-size:var(--fs-base,.9375rem);border:1.5px solid var(--line);border-radius:2px;resize:vertical">' +
     escP(c.messaggio) +
     '</textarea></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaModificaConsegna(' +
     id +
@@ -305,7 +314,7 @@ function mostraConsegnaLogin() {
     (isAlta ? '<span style="color:var(--accent)"><i class="icx icx-avviso"></i></span> ' : '') +
     'Consegna dal turno ' +
     ultima.turno_uscente +
-    '</h3><p style="color:var(--accent2);font-size:.85rem;margin-bottom:12px">da ' +
+    '</h3><p style="color:var(--accent2);font-size:var(--fs-md,.875rem);margin-bottom:12px">da ' +
     escP(ultima.operatore) +
     ' · ' +
     new Date(ultima.created_at).toLocaleDateString('it-IT') +
@@ -316,16 +325,17 @@ function mostraConsegnaLogin() {
     }) +
     '</p>';
   if (isAlta)
-    html += '<p style="color:var(--accent);font-size:.82rem;font-weight:700;margin-bottom:10px">PRIORITA ALTA</p>';
+    html +=
+      '<p style="color:var(--accent);font-size:var(--fs-sm,.8125rem);font-weight:700;margin-bottom:10px">PRIORITA ALTA</p>';
   html +=
     '<div style="background:var(--paper2);border-radius:3px;padding:14px;border-left:3px solid ' +
     (isAlta ? 'var(--accent)' : 'var(--accent2)') +
-    ';white-space:pre-line;font-size:.95rem;line-height:1.6;margin-bottom:16px">' +
+    ';white-space:pre-line;font-size:var(--fs-base,.9375rem);line-height:1.6;margin-bottom:16px">' +
     esc(ultima.messaggio) +
     '</div>';
   if (nonLette.length > 1)
     html +=
-      '<p style="color:var(--muted);font-size:.82rem;margin-bottom:12px">+ altre ' +
+      '<p style="color:var(--muted);font-size:var(--fs-sm,.8125rem);margin-bottom:12px">+ altre ' +
       (nonLette.length - 1) +
       ' consegne non lette</p>';
   html +=
@@ -443,29 +453,29 @@ function renderDashboard() {
     todoH +=
       '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="color:' +
       (isScaduto ? 'var(--accent)' : '#e67e22') +
-      ';font-weight:700;font-size:1.1rem">' +
+      ';font-weight:700;font-size:var(--fs-lg,1.0625rem)">' +
       (isScaduto ? '!' : '&#9679;') +
       '</span><span style="flex:1;cursor:pointer" onclick="switchPage(\'promemoria\')"><strong>' +
       escP(p.titolo) +
       '</strong>' +
       (p.data_scadenza !== oggi
-        ? ' <span style="color:var(--muted);font-size:.82rem">scade ' +
+        ? ' <span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">scade ' +
           new Date(p.data_scadenza + 'T12:00:00').toLocaleDateString('it-IT') +
           '</span>'
         : '') +
       '</span><button class="btn-act pin" onclick="_completaPromemoriaDaHome(' +
       p.id +
-      ')" style="color:#2c6e49;border-color:#2c6e49;font-size:.82rem">Fatto</button></div>';
+      ')" style="color:#2c6e49;border-color:#2c6e49;font-size:var(--fs-sm,.8125rem)">Fatto</button></div>';
   });
   if (noteNL)
     todoH +=
-      '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="switchPage(\'note-collega\')"><span style="color:#2980b9;font-size:1.1rem"><i class="icx icx-mail"></i></span><span>' +
+      '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="switchPage(\'note-collega\')"><span style="color:#2980b9;font-size:var(--fs-lg,1.0625rem)"><i class="icx icx-mail"></i></span><span>' +
       noteNL +
       ' nota/e non letta/e</span></div>';
   const bdays = isVis('alert_compleanni') ? _getCompleanniProssimi(0) : [];
   bdays.forEach((bd) => {
     todoH +=
-      '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="font-size:1.1rem"><i class="icx icx-torta"></i></span><span style="flex:1"><strong>' +
+      '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="font-size:var(--fs-lg,1.0625rem)"><i class="icx icx-torta"></i></span><span style="flex:1"><strong>' +
       escP(bd.nome) +
       '</strong> · <span style="color:var(--accent2);font-weight:700">Compleanno OGGI!</span></span></div>';
   });
@@ -473,7 +483,7 @@ function renderDashboard() {
   ammA.forEach((a) => {
     const ne = _jsArg(a.nome);
     todoH +=
-      '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="color:#e67e22;font-weight:700;font-size:1.1rem">!</span><span style="flex:1;cursor:pointer" onclick="apriProfilo(\'' +
+      '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="color:#e67e22;font-weight:700;font-size:var(--fs-lg,1.0625rem)">!</span><span style="flex:1;cursor:pointer" onclick="apriProfilo(\'' +
       ne +
       '\')"><strong>' +
       escP(a.nome) +
@@ -492,16 +502,16 @@ function renderDashboard() {
   });
   pmDomani.forEach((p) => {
     domH +=
-      '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="switchPage(\'promemoria\')"><span style="color:#8e44ad;font-size:1.1rem">&#9679;</span><span style="flex:1"><strong>' +
+      '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="switchPage(\'promemoria\')"><span style="color:#8e44ad;font-size:var(--fs-lg,1.0625rem)">&#9679;</span><span style="flex:1"><strong>' +
       escP(p.titolo) +
-      '</strong> <span style="color:var(--muted);font-size:.82rem">scade ' +
+      '</strong> <span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">scade ' +
       new Date(p.data_scadenza + 'T12:00:00').toLocaleDateString('it-IT') +
       '</span></span></div>';
   });
   const bdaysDomani = isVis('alert_compleanni') ? _getCompleanniProssimi(1).filter((b) => b.giorni === 1) : [];
   bdaysDomani.forEach((bd) => {
     domH +=
-      '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="font-size:1.1rem"><i class="icx icx-torta"></i></span><span style="flex:1"><strong>' +
+      '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="font-size:var(--fs-lg,1.0625rem)"><i class="icx icx-torta"></i></span><span style="flex:1"><strong>' +
       escP(bd.nome) +
       '</strong> · compleanno domani</span></div>';
   });
@@ -555,7 +565,7 @@ function renderDashboard() {
     let compH = '';
     if (bdaysCollab.length) {
       compH +=
-        '<div style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;font-weight:600">Collaboratori</div>';
+        '<div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;font-weight:600">Collaboratori</div>';
       bdaysCollab
         .sort((a, b) => a.giorni - b.giorni)
         .forEach((bd) => {
@@ -565,9 +575,9 @@ function renderDashboard() {
             (isOggi
               ? 'background:rgba(184,134,11,0.12);border-left:3px solid var(--accent2)'
               : 'border-bottom:1px solid var(--line)') +
-            '"><span style="font-size:1.4rem"><i class="icx icx-torta"></i></span><div style="flex:1"><strong>' +
+            '"><span style="font-size:var(--fs-2xl,1.5rem)"><i class="icx icx-torta"></i></span><div style="flex:1"><strong>' +
             escP(bd.nome) +
-            '</strong> <span style="font-size:.82rem;font-weight:700;color:' +
+            '</strong> <span style="font-size:var(--fs-sm,.8125rem);font-weight:700;color:' +
             (isOggi ? 'var(--accent2)' : 'var(--muted)') +
             '">' +
             (isOggi ? 'COMPLEANNO OGGI!' : 'tra ' + bd.giorni + ' giorno/i') +
@@ -576,7 +586,7 @@ function renderDashboard() {
     }
     if (bdaysMaison.length) {
       compH +=
-        '<div style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent2);margin:' +
+        '<div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.1em;text-transform:uppercase;color:var(--accent2);margin:' +
         (bdaysCollab.length ? '10px' : '0') +
         ' 0 6px;font-weight:600">Clienti Maison</div>';
       bdaysMaison
@@ -589,11 +599,11 @@ function renderDashboard() {
             (isOggi
               ? 'background:rgba(184,134,11,0.12);border-left:3px solid var(--accent2)'
               : 'border-bottom:1px solid var(--line)') +
-            '"><span style="font-size:1.4rem"><i class="icx icx-torta"></i></span><div style="flex:1"><strong class="entry-name" onclick="apriDettaglioMaison(\'' +
+            '"><span style="font-size:var(--fs-2xl,1.5rem)"><i class="icx icx-torta"></i></span><div style="flex:1"><strong class="entry-name" onclick="apriDettaglioMaison(\'' +
             ne +
             '\')">' +
             escP(bd.nome) +
-            '</strong> <span style="font-size:.82rem;font-weight:700;color:' +
+            '</strong> <span style="font-size:var(--fs-sm,.8125rem);font-weight:700;color:' +
             (isOggi ? 'var(--accent2)' : 'var(--muted)') +
             '">' +
             (isOggi ? 'COMPLEANNO OGGI!' : 'tra ' + bd.giorni + ' giorno/i') +
@@ -687,22 +697,22 @@ function renderDashboard() {
   const _consRecenti = _consegneVisibiliA(op).slice(0, 3);
   if (_consRecenti.length) {
     alertH +=
-      '<div style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:10px;margin-bottom:6px;font-weight:600">Ultime consegne</div>';
+      '<div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:10px;margin-bottom:6px;font-weight:600">Ultime consegne</div>';
     _consRecenti.forEach((c) => {
       const cd = new Date(c.created_at);
       const isAlta = c.priorita === 'alta';
       alertH +=
-        '<div style="padding:6px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.85rem" onclick="switchPage(\'consegna\')"><span class="mini-badge" style="background:' +
+        '<div style="padding:6px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-md,.875rem)" onclick="switchPage(\'consegna\')"><span class="mini-badge" style="background:' +
         (c.turno_uscente === 'PRESTO' ? '#e67e22' : '#2c3e50') +
-        ';font-size:.82rem">' +
+        ';font-size:var(--fs-sm,.8125rem)">' +
         c.turno_uscente +
         '</span><strong>' +
         escP(c.operatore) +
         '</strong><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)">' +
         escP(c.messaggio.substring(0, 50)) +
         '</span>' +
-        (isAlta ? '<span style="color:var(--accent);font-size:.82rem;font-weight:700">!</span>' : '') +
-        '<span style="color:var(--muted);font-size:.82rem">' +
+        (isAlta ? '<span style="color:var(--accent);font-size:var(--fs-sm,.8125rem);font-weight:700">!</span>' : '') +
+        '<span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">' +
         cd.toLocaleDateString('it-IT') +
         '</span></div>';
     });
@@ -728,7 +738,7 @@ function renderDashboard() {
               '</span>'
             : '';
           return (
-            '<div style="padding:6px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:.88rem"><span style="color:var(--muted);font-size:.82rem;min-width:38px">' +
+            '<div style="padding:6px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:var(--fs-md,.875rem)"><span style="color:var(--muted);font-size:var(--fs-sm,.8125rem);min-width:38px">' +
             d.toLocaleTimeString('it-IT', {
               hour: '2-digit',
               minute: '2-digit',
@@ -764,7 +774,7 @@ function renderDashboard() {
         .map(([n, c]) => {
           const ne = _jsArg(n);
           return (
-            '<div style="padding:5px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;font-size:.88rem"><span class="entry-name" onclick="apriDettaglioMaison(\'' +
+            '<div style="padding:5px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;font-size:var(--fs-md,.875rem)"><span class="entry-name" onclick="apriDettaglioMaison(\'' +
             ne +
             '\')">' +
             escP(n) +
@@ -908,7 +918,7 @@ function apriReportConfig(tipo) {
     sez
       .map(function (s) {
         return (
-          '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.9rem"><input type="checkbox" id="rep-sez-' +
+          '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-md,.875rem)"><input type="checkbox" id="rep-sez-' +
           s.key +
           '" ' +
           (s.checked ? 'checked' : '') +

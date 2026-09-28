@@ -27,9 +27,9 @@ function apriModulo(tipo) {
   });
   let html = '<div class="main-card" style="margin-top:18px"><div class="card-header">';
   const aiBox =
-    '<div class="ai-gen-box"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:1.1rem"><i class="icx icx-stella-piena"></i></span><strong style="font-size:.92rem">Genera con AI</strong><span style="font-size:.82rem;color:var(--muted)">Descrivi la situazione e l\'AI compila tutti i campi</span></div><textarea id="ai-gen-prompt" placeholder="Es: Cognome Nome – cassa – acquisto crediti senza documento – cliente non identificato – 22:45 – 08.03.2026 – 2000 CHF – LOG 7834&#10;&#10;Oppure: Cognome Nome – valet – alle 23:10 ha consegnato il veicolo sbagliato al cliente – 05.03.2026 – IR 4521" style="width:100%;min-height:70px;padding:10px;border:1px solid var(--line);border-radius:4px;font-size:.88rem;background:var(--paper);color:var(--ink);resize:vertical"></textarea><div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn-ai" id="btn-ai-gen" onclick="generaModuloAI(\'' +
+    '<div class="ai-gen-box"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:var(--fs-lg,1.0625rem)"><i class="icx icx-stella-piena"></i></span><strong style="font-size:var(--fs-base,.9375rem)">Genera con AI</strong><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">Descrivi la situazione e l\'AI compila tutti i campi</span></div><textarea id="ai-gen-prompt" placeholder="Es: Cognome Nome – cassa – acquisto crediti senza documento – cliente non identificato – 22:45 – 08.03.2026 – 2000 CHF – LOG 7834&#10;&#10;Oppure: Cognome Nome – valet – alle 23:10 ha consegnato il veicolo sbagliato al cliente – 05.03.2026 – IR 4521" style="width:100%;min-height:70px;padding:10px;border:1px solid var(--line);border-radius:4px;font-size:var(--fs-md,.875rem);background:var(--paper);color:var(--ink);resize:vertical"></textarea><div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn-ai" id="btn-ai-gen" onclick="generaModuloAI(\'' +
     tipo +
-    '\')">Genera tutti i campi</button><button class="btn-ai btn-ai-oro" onclick="document.getElementById(\'modulo-foto-input\').click()" title="La foto resta sul tuo computer come riferimento: per riservatezza non viene inviata all\'AI">Allega foto (resta locale)</button><input type="file" id="modulo-foto-input" accept="image/*" style="display:none" onchange="moduloFotoPreview(this)"><span id="modulo-foto-name" style="font-size:.82rem;color:var(--muted)"></span><button id="modulo-foto-remove" onclick="moduloFotoRimuovi()" style="display:none;background:none;border:1px solid var(--accent);color:var(--accent);padding:2px 8px;border-radius:2px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:Source Sans 3,sans-serif">X</button><span id="ai-gen-status" style="font-size:.82rem;color:var(--muted)"></span></div><div id="modulo-foto-preview" style="display:none;margin-top:8px"><img id="modulo-foto-img" style="max-width:200px;max-height:140px;border-radius:3px;border:1px solid var(--line)"></div></div>';
+    '\')">Genera tutti i campi</button><button class="btn-ai btn-ai-oro" onclick="document.getElementById(\'modulo-foto-input\').click()" title="La foto resta sul tuo computer come riferimento: per riservatezza non viene inviata all\'AI">Allega foto (resta locale)</button><input type="file" id="modulo-foto-input" accept="image/*" style="display:none" onchange="moduloFotoPreview(this)"><span id="modulo-foto-name" style="font-size:var(--fs-sm,.8125rem);color:var(--muted)"></span><button id="modulo-foto-remove" onclick="moduloFotoRimuovi()" style="display:none;background:none;border:1px solid var(--accent);color:var(--accent);padding:2px 8px;border-radius:2px;font-size:var(--fs-sm,.8125rem);font-weight:700;cursor:pointer;font-family:Source Sans 3,sans-serif">X</button><span id="ai-gen-status" style="font-size:var(--fs-sm,.8125rem);color:var(--muted)"></span></div><div id="modulo-foto-preview" style="display:none;margin-top:8px"><img id="modulo-foto-img" style="max-width:200px;max-height:140px;border-radius:3px;border:1px solid var(--line)"></div></div>';
   if (tipo === 'allineamento') {
     html += 'Rilevamento di non conformità e colloquio di allineamento</div><div style="padding:18px">';
     html += aiBox;
@@ -88,7 +88,7 @@ function apriModulo(tipo) {
       '<div class="modulo-field"><label>Livello RDI</label><select id="mod-livello"><option value="I">I° livello</option><option value="II">II° livello (grave)</option></select></div>';
   }
   html +=
-    '<div class="modulo-field" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)"><label>Modalit\u00E0 firma</label><div style="display:flex;gap:18px;margin-bottom:8px"><label style="display:flex;align-items:center;gap:5px;font-size:.88rem;cursor:pointer"><input type="radio" name="firma-tipo" value="cartacea" checked onchange="toggleFirmaDigitale()"> <i class="icx icx-penna"></i> Cartacea (stampa e firma a mano)</label><label style="display:flex;align-items:center;gap:5px;font-size:.88rem;cursor:pointer"><input type="radio" name="firma-tipo" value="digitale" onchange="toggleFirmaDigitale()"> <i class="icx icx-modifica"></i> Digitale (firma sullo schermo)</label></div><div id="firma-digitale-box" style="display:none"><div class="firma-canvas-wrap"><div class="firma-canvas-box"><small>Firma Resp. Settore</small><canvas id="firma-resp-canvas" class="firma-canvas" width="560" height="200"></canvas><button onclick="clearFirma(\'firma-resp-canvas\')">Cancella</button></div><div class="firma-canvas-box"><small>Firma Collaboratore</small><canvas id="firma-collab-canvas" class="firma-canvas" width="560" height="200"></canvas><button onclick="clearFirma(\'firma-collab-canvas\')">Cancella</button></div></div></div></div>';
+    '<div class="modulo-field" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)"><label>Modalit\u00E0 firma</label><div style="display:flex;gap:18px;margin-bottom:8px"><label style="display:flex;align-items:center;gap:5px;font-size:var(--fs-md,.875rem);cursor:pointer"><input type="radio" name="firma-tipo" value="cartacea" checked onchange="toggleFirmaDigitale()"> <i class="icx icx-penna"></i> Cartacea (stampa e firma a mano)</label><label style="display:flex;align-items:center;gap:5px;font-size:var(--fs-md,.875rem);cursor:pointer"><input type="radio" name="firma-tipo" value="digitale" onchange="toggleFirmaDigitale()"> <i class="icx icx-modifica"></i> Digitale (firma sullo schermo)</label></div><div id="firma-digitale-box" style="display:none"><div class="firma-canvas-wrap"><div class="firma-canvas-box"><small>Firma Resp. Settore</small><canvas id="firma-resp-canvas" class="firma-canvas" width="560" height="200"></canvas><button onclick="clearFirma(\'firma-resp-canvas\')">Cancella</button></div><div class="firma-canvas-box"><small>Firma Collaboratore</small><canvas id="firma-collab-canvas" class="firma-canvas" width="560" height="200"></canvas><button onclick="clearFirma(\'firma-collab-canvas\')">Cancella</button></div></div></div></div>';
   html +=
     '<div style="display:flex;gap:12px;margin-top:18px"><button class="btn-salva" onclick="generaModuloPDF(\'' +
     tipo +
@@ -252,7 +252,7 @@ function _moduloScadenzaAiuti() {
   const voci = [MODULI_SCADENZA_DEFAULT, 'Entro 30 giorni', fra30];
   return (
     '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px;align-items:center">' +
-    '<span style="font-size:.78rem;color:var(--muted)">E un termine, non una frase. Vuoto = "' +
+    '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">E un termine, non una frase. Vuoto = "' +
     escP(MODULI_SCADENZA_DEFAULT) +
     '". Esempi:</span>' +
     voci
@@ -260,7 +260,7 @@ function _moduloScadenzaAiuti() {
         (v) =>
           '<button type="button" onclick="_moduloScadenzaMetti(\'' +
           escP(v.replace(/'/g, "\\'")) +
-          '\')" style="font-size:.78rem;padding:2px 8px;border:1px solid var(--line);border-radius:10px;background:var(--paper2);color:var(--ink);cursor:pointer">' +
+          '\')" style="font-size:var(--fs-sm,.8125rem);padding:2px 8px;border:1px solid var(--line);border-radius:10px;background:var(--paper2);color:var(--ink);cursor:pointer">' +
           escP(v) +
           '</button>',
       )
@@ -827,7 +827,7 @@ function renderModuliList() {
       '</span>)</div>';
     hdr += '<div class="filters">';
     hdr +=
-      '<div class="filter-group"><span class="filter-label">Collaboratore</span><div class="ac-wrap"><input type="text" id="mod-filt-nome" placeholder="Cerca nome..." oninput="acFiltraModuli(\'mod-filt-nome\',\'ac-mod-filt-nomi\')" onfocus="acFiltraModuli(\'mod-filt-nome\',\'ac-mod-filt-nomi\')"><div class="ac-drop" id="ac-mod-filt-nomi"></div></div></div>';
+      '<div class="filter-group filter-cerca"><span class="filter-label">Collaboratore</span><div class="ac-wrap"><input type="text" id="mod-filt-nome" class="campo-cerca" placeholder="Cerca collaboratore..." oninput="acFiltraModuli(\'mod-filt-nome\',\'ac-mod-filt-nomi\')" onfocus="acFiltraModuli(\'mod-filt-nome\',\'ac-mod-filt-nomi\')"><div class="ac-drop" id="ac-mod-filt-nomi"></div></div></div>';
     hdr +=
       '<div class="filter-group"><span class="filter-label">Tipo</span><select id="mod-filt-tipo" onchange="aggiornaModuliLista()"><option value="">Tutti</option><option value="allineamento">Allineamento</option><option value="apprezzamento">Apprezzamento</option><option value="rdi">RDI</option><option value="cambio_turno">Cambio turno</option></select></div>';
     hdr +=
@@ -913,9 +913,9 @@ function aggiornaModuliLista() {
         escP(m.collaboratore) +
         '</strong></span><span class="badge" style="background:' +
         (tc[m.tipo] || '#888') +
-        ';color:white;padding:2px 10px;border-radius:2px;font-size:.82rem">' +
+        ';color:white;padding:2px 10px;border-radius:2px;font-size:var(--fs-sm,.8125rem)">' +
         (tl[m.tipo] || escP(m.tipo || 'Modulo')) +
-        '</span><span style="font-size:.82rem;color:var(--muted)">' +
+        '</span><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
         (m.tipo === 'cambio_turno'
           ? 'Cambio del ' +
             escP(
@@ -1169,11 +1169,11 @@ async function renderCollaboratoriUI() {
   const el = document.getElementById('collaboratori-list');
   // link incrociati: da qui si raggiungono al volo le altre due "case" del collaboratore
   const linkBar =
-    '<p style="font-size:.8rem;color:var(--muted);margin-bottom:8px">Qui: anagrafica (nome, funzione, %, impiego, categoria, lingue). ' +
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Qui: anagrafica (nome, funzione, %, impiego, categoria, lingue). ' +
     '<a href="#" onclick="switchPage(\'formazione\');return false" style="color:#2c6e49;font-weight:700">Competenze e livelli → Formazione</a> · ' +
     '<a href="#" onclick="switchPage(\'piano\');if(typeof pianoCambiaTab===\'function\')pianoCambiaTab(\'impostazioni\');return false" style="color:#1a4a7a;font-weight:700">Preferenze turni → Piano/Impostazioni</a></p>';
   const selStyle =
-    'font-size:.82rem;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)';
+    'font-size:var(--fs-sm,.8125rem);padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)';
   const rigaCollab = (c) => {
     const rep = c.reparto_dip || 'slots';
     const imp = c.impiego || '';
@@ -1184,7 +1184,9 @@ async function renderCollaboratoriUI() {
       '" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border:1px solid var(--line);flex-wrap:wrap"><span style="flex:1;font-weight:400;min-width:140px">' +
       escP(c.nome) +
       (cat && (puoCat || (typeof puoVedereCategorie === 'function' && puoVedereCategorie()))
-        ? ' <span class="mini-badge" style="background:var(--accent2);font-size:.82rem">' + cat + '&ordf;</span>'
+        ? ' <span class="mini-badge" style="background:var(--accent2);font-size:var(--fs-sm,.8125rem)">' +
+          cat +
+          '&ordf;</span>'
         : '') +
       '</span><select ' +
       (puoImp ? '' : 'disabled ') +
@@ -1247,7 +1249,7 @@ async function renderCollaboratoriUI() {
           // DATE scritte a mano, come nella scheda: si accetta 12.01.1997 e
           // anche solo 12.01 quando l'anno non si conosce. Il campo calendario
           // obbligava a passare dal selettore e rendeva scomodo mettere l'anno.
-          '<span style="display:inline-flex;align-items:center;gap:4px"><span style="font-size:.8rem;color:var(--muted)">Nascita</span>' +
+          '<span style="display:inline-flex;align-items:center;gap:4px"><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">Nascita</span>' +
           '<input type="text" value="' +
           escP(c.data_nascita ? dataNascitaLabel(c.data_nascita, false) : '') +
           '" placeholder="12.01.1997" title="Data di nascita: 12.01.1997 oppure solo 12.01 se l anno non si conosce" onchange="cambiaDataCollaboratore(' +
@@ -1255,7 +1257,7 @@ async function renderCollaboratoriUI() {
           ',\'data_nascita\',this.value)" style="' +
           selStyle +
           ';width:104px"></span>' +
-          '<span style="display:inline-flex;align-items:center;gap:4px"><span style="font-size:.8rem;color:var(--muted)">Inizio attivita</span>' +
+          '<span style="display:inline-flex;align-items:center;gap:4px"><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">Inizio attivita</span>' +
           '<input type="text" value="' +
           escP(c.data_assunzione ? String(c.data_assunzione).substring(0, 10).split('-').reverse().join('.') : '') +
           '" placeholder="01.05.2024" title="Inizio attivita: serve per anzianita, giubilei e giorni di vacanza" onchange="cambiaDataCollaboratore(' +
@@ -1296,7 +1298,7 @@ async function renderCollaboratoriUI() {
   const jolly = ordina(attivi.filter((c) => c.impiego === 'jolly'));
   const senza = ordina(attivi.filter((c) => !c.impiego));
   const titoloSez = (t, n) =>
-    '<p style="font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:12px 0 6px">' +
+    '<p style="font-size:var(--fs-sm,.8125rem);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:12px 0 6px">' +
     t +
     ' (' +
     n +
@@ -1304,21 +1306,21 @@ async function renderCollaboratoriUI() {
   let html = '';
   if (attivi.length > 8)
     html +=
-      '<input type="text" id="collab-cerca" placeholder="Cerca collaboratore..." oninput="filtraCollaboratoriUI(this.value)" style="width:100%;max-width:280px;padding:7px 10px;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--ink);font-size:.85rem;margin-bottom:4px">';
+      '<input type="text" id="collab-cerca" placeholder="Cerca collaboratore..." oninput="filtraCollaboratoriUI(this.value)" class="campo-cerca">';
   if (fissi.length) html += titoloSez('Fissi', fissi.length) + fissi.map(rigaCollab).join('');
   if (jolly.length) html += titoloSez('Jolly', jolly.length) + jolly.map(rigaCollab).join('');
   if (senza.length)
     html +=
       (fissi.length || jolly.length ? titoloSez('Senza inquadramento', senza.length) : '') +
       senza.map(rigaCollab).join('');
-  if (!attivi.length) html = '<p style="color:var(--muted);font-size:.85rem">Nessun collaboratore.</p>';
+  if (!attivi.length) html = '<p style="color:var(--muted);font-size:var(--fs-md,.875rem)">Nessun collaboratore.</p>';
   if (inattivi.length && adminFull) {
     html +=
       '<div style="margin-top:12px;padding:10px;background:var(--paper2);border-radius:3px"><small style="color:var(--muted);display:block;margin-bottom:6px">Collaboratori disattivati (clicca per riattivare):</small><div style="display:flex;flex-wrap:wrap;gap:6px">' +
       inattivi
         .map(
           (c) =>
-            '<button style="padding:4px 10px;font-size:.82rem;border:1px solid var(--line);border-radius:2px;cursor:pointer;background:var(--paper);color:var(--muted)" onclick="riattivaCollaboratore(\'' +
+            '<button style="padding:4px 10px;font-size:var(--fs-sm,.8125rem);border:1px solid var(--line);border-radius:2px;cursor:pointer;background:var(--paper);color:var(--muted)" onclick="riattivaCollaboratore(\'' +
             c.nome.replace(/'/g, "\\'") +
             '\')">+ ' +
             escP(c.nome) +
@@ -1524,12 +1526,12 @@ function apriCoperturaCollab(id) {
     ].sort();
   let h =
     '<h3>Copertura altri settori</h3>' +
-    '<p style="font-size:.85rem;color:var(--muted);margin-bottom:4px"><b>' +
+    '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);margin-bottom:4px"><b>' +
     escP(c.nome || '') +
     '</b> &middot; settore: <b>' +
     escP(repartoLabel(principale)) +
     '</b></p>' +
-    "<p style=\"font-size:.82rem;color:var(--muted);margin-bottom:12px\">Il contratto e le ore dovute restano nel suo settore. Qui indichi dove puo' andare a coprire i buchi: comparira' anche in quei piani e la generazione automatica potra' usarlo, entro i limiti che imposti.</p>";
+    "<p style=\"font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:12px\">Il contratto e le ore dovute restano nel suo settore. Qui indichi dove puo' andare a coprire i buchi: comparira' anche in quei piani e la generazione automatica potra' usarlo, entro i limiti che imposti.</p>";
   getReparti()
     .filter((r) => r.key !== principale)
     .forEach((r) => {
@@ -1538,7 +1540,7 @@ function apriCoperturaCollab(id) {
       const gg = gruppiDi(r.key);
       h +=
         '<div style="border:1px solid var(--line);border-radius:4px;padding:8px 10px;margin-bottom:8px;background:var(--paper2)">' +
-        '<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:.88rem;cursor:pointer">' +
+        '<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:var(--fs-md,.875rem);cursor:pointer">' +
         '<input type="checkbox" id="cop-on-' +
         r.key +
         '"' +
@@ -1555,13 +1557,13 @@ function apriCoperturaCollab(id) {
         ';margin-top:8px;padding-left:24px;display:' +
         (on ? 'block' : 'none') +
         '">' +
-        '<label style="font-size:.8rem;display:block;margin-bottom:6px">Massimo turni al mese <input type="number" min="0" max="31" id="cop-max-' +
+        '<label style="font-size:var(--fs-sm,.8125rem);display:block;margin-bottom:6px">Massimo turni al mese <input type="number" min="0" max="31" id="cop-max-' +
         r.key +
         '" value="' +
         (d.max_turni || '') +
         '" placeholder="nessun limite" style="width:110px;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></label>' +
         (gg.length
-          ? '<label style="font-size:.8rem;display:block;margin-bottom:6px">Solo questi gruppi di turni <select id="cop-gr-' +
+          ? '<label style="font-size:var(--fs-sm,.8125rem);display:block;margin-bottom:6px">Solo questi gruppi di turni <select id="cop-gr-' +
             r.key +
             '" style="padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><option value="">tutti</option>' +
             gg
@@ -1578,7 +1580,7 @@ function apriCoperturaCollab(id) {
               .join('') +
             '</select></label>'
           : '') +
-        '<label style="font-size:.8rem;display:flex;align-items:center;gap:6px"><input type="checkbox" id="cop-acc-' +
+        '<label style="font-size:var(--fs-sm,.8125rem);display:flex;align-items:center;gap:6px"><input type="checkbox" id="cop-acc-' +
         r.key +
         '"' +
         (d.accompagnato ? ' checked' : '') +
@@ -1806,13 +1808,13 @@ function renderRegistro() {
     return;
   }
   el.innerHTML =
-    '<table style="width:100%;border-collapse:collapse;font-size:.88rem"><thead><tr style="border-bottom:2px solid var(--line);text-align:left"><th style="padding:8px">Data/Ora</th><th style="padding:8px">Operatore</th><th style="padding:8px">Azione</th><th style="padding:8px">Dettaglio</th></tr></thead><tbody>' +
+    '<table style="width:100%;border-collapse:collapse;font-size:var(--fs-md,.875rem)"><thead><tr style="border-bottom:2px solid var(--line);text-align:left"><th style="padding:8px">Data/Ora</th><th style="padding:8px">Operatore</th><th style="padding:8px">Azione</th><th style="padding:8px">Dettaglio</th></tr></thead><tbody>' +
     filtered
       .slice(0, 200)
       .map((l) => {
         const d = new Date(l.created_at);
         return (
-          '<tr style="border-bottom:1px solid var(--line)"><td style="padding:6px 8px;white-space:nowrap;color:var(--muted);font-size:.82rem">' +
+          '<tr style="border-bottom:1px solid var(--line)"><td style="padding:6px 8px;white-space:nowrap;color:var(--muted);font-size:var(--fs-sm,.8125rem)">' +
           d.toLocaleDateString('it-IT') +
           ' ' +
           d.toLocaleTimeString('it-IT', {
@@ -1823,7 +1825,7 @@ function renderRegistro() {
           escP(l.operatore) +
           '</td><td style="padding:6px 8px">' +
           escP(l.azione) +
-          '</td><td style="padding:6px 8px;color:var(--muted);font-size:.84rem">' +
+          '</td><td style="padding:6px 8px;color:var(--muted);font-size:var(--fs-md,.875rem)">' +
           escP(l.dettaglio) +
           '</td></tr>'
         );
@@ -2655,7 +2657,7 @@ function render() {
         te = e.tipo.replace(/'/g, "\\'"),
         pin = pinnedIds.has(e.id);
       const rep = e.reparto
-        ? '<span style="display:inline-block;margin-left:6px;padding:2px 8px;background:var(--muted);color:white;border-radius:2px;font-size:.82rem;font-weight:600">' +
+        ? '<span style="display:inline-block;margin-left:6px;padding:2px 8px;background:var(--muted);color:white;border-radius:2px;font-size:var(--fs-sm,.8125rem);font-weight:600">' +
           escP(e.reparto) +
           '</span>'
         : '';
@@ -2663,7 +2665,7 @@ function render() {
       const imp = _impS
         ? '<span style="display:inline-block;margin-left:6px;padding:2px 8px;background:' +
           (_impS.colore || 'var(--accent)') +
-          ';color:white;border-radius:2px;font-size:.82rem;font-weight:700">' +
+          ';color:white;border-radius:2px;font-size:var(--fs-sm,.8125rem);font-weight:700">' +
           _impS.txt +
           ' ' +
           (e.valuta || 'CHF') +
@@ -2675,7 +2677,7 @@ function render() {
       const gdDiff = d.getHours() < 6;
       const gdDate = gdDiff ? new Date(d.getTime() - 86400000) : d;
       const gdBadge = gdDiff
-        ? '<span style="font-size:.82rem;padding:2px 7px;border-radius:2px;background:var(--accent2);color:white;font-weight:700">GD ' +
+        ? '<span style="font-size:var(--fs-sm,.8125rem);padding:2px 7px;border-radius:2px;background:var(--accent2);color:white;font-weight:700">GD ' +
           gdDate.getDate() +
           '.' +
           String(gdDate.getMonth() + 1).padStart(2, '0') +

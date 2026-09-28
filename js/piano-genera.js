@@ -416,13 +416,13 @@ function _pianoRenderViolazioni() {
   if (!el || _pianoViolLista === null) return;
   if (!_pianoViolLista.length) {
     el.innerHTML =
-      '<p style="padding:8px 14px;font-size:.82rem;color:#2c6e49;font-weight:600">✓ Nessuna violazione delle regole attive nel mese.</p>';
+      '<p style="padding:8px 14px;font-size:var(--fs-sm,.8125rem);color:#2c6e49;font-weight:600"><i class="icx icx-check"></i> Nessuna violazione delle regole attive nel mese.</p>';
     return;
   }
   let h =
-    '<div style="padding:8px 14px"><p style="font-size:.82rem;font-weight:700;color:var(--accent);margin-bottom:6px">' +
+    '<div style="padding:8px 14px"><p style="font-size:var(--fs-sm,.8125rem);font-weight:700;color:var(--accent);margin-bottom:6px">' +
     _pianoViolLista.length +
-    ' violazioni (celle evidenziate in rosso):</p><div style="max-height:180px;overflow-y:auto;font-size:.85rem;line-height:1.7">';
+    ' violazioni (celle evidenziate in rosso):</p><div style="max-height:180px;overflow-y:auto;font-size:var(--fs-md,.875rem);line-height:1.7">';
   _pianoViolLista.forEach((v) => {
     h += '<div>• <strong>' + escP(v.nome) + '</strong> · giorno ' + v.giorno + ': ' + escP(v.msg) + '</div>';
   });
@@ -1139,7 +1139,7 @@ async function cancellaBozzaPiano() {
   b.innerHTML =
     '<h3>Cancella piano · ' +
     ym +
-    '</h3><p style="margin-bottom:14px;font-size:.88rem">' +
+    '</h3><p style="margin-bottom:14px;font-size:var(--fs-md,.875rem)">' +
     nonProtette +
     ' celle generate/non protette, ' +
     protette +

@@ -544,7 +544,7 @@ function _renderPianoRegoleCard() {
   });
   let h =
     '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Regole del piano' +
-    '<select onchange="window._pianoRegoleSettoreVista=this.value;renderPiano()" style="padding:4px 8px;font-size:.8rem;border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a"><option value=""' +
+    '<select onchange="window._pianoRegoleSettoreVista=this.value;renderPiano()" style="padding:4px 8px;font-size:var(--fs-sm,.8125rem);border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a"><option value=""' +
     (vista ? '' : ' selected') +
     '>Tutti i settori (valori generali)</option>' +
     settori
@@ -561,8 +561,8 @@ function _renderPianoRegoleCard() {
       .join('') +
     '</select></div><div style="padding:10px 14px">';
   h +=
-    '<details style="margin-bottom:12px;background:var(--paper2);border:1px solid var(--line);border-radius:3px;padding:8px 12px"><summary style="cursor:pointer;font-weight:700;font-size:.9rem">Come si usano le regole (guida in 6 punti)</summary>' +
-    '<ol style="font-size:.85rem;margin:8px 0 4px 18px;line-height:1.5">' +
+    '<details style="margin-bottom:12px;background:var(--paper2);border:1px solid var(--line);border-radius:3px;padding:8px 12px"><summary style="cursor:pointer;font-weight:700;font-size:var(--fs-md,.875rem)">Come si usano le regole (guida in 6 punti)</summary>' +
+    '<ol style="font-size:var(--fs-md,.875rem);margin:8px 0 4px 18px;line-height:1.5">' +
     '<li><b>Cambia il valore</b> nella casella e premi Invio o clicca fuori: si salva da solo e vale subito in tutto il programma. La colonna "Dove agisce" dice in quali schermate la regola conta.</li>' +
     '<li><b>Si / No</b> accende o spegne una preferenza. La casella <b>Attiva</b> spegne qualsiasi regola senza perdere il valore: spenta, e come se non esistesse.</li>' +
     '<li><b>Un valore diverso per un settore</b>: scegli il settore nel menu in alto e cambia il numero. Nasce l eccezione per quel settore; gli altri tengono il valore generale. "Torna al generale" la toglie. Esempio: riposo 11 ore ovunque, 12 ai Tavoli.</li>' +
@@ -572,7 +572,7 @@ function _renderPianoRegoleCard() {
     '</ol></details>';
   if (vista)
     h +=
-      '<p style="font-size:.82rem;color:#8b6914;margin-bottom:8px">Stai vedendo i valori validi per <b>' +
+      '<p style="font-size:var(--fs-sm,.8125rem);color:#8b6914;margin-bottom:8px">Stai vedendo i valori validi per <b>' +
       escP(repartoLabel(vista)) +
       '</b>. Le righe con il segno <b>eccezione</b> hanno un valore proprio; le altre usano quello generale. Modificando una casella crei l eccezione per questo settore.</p>';
   const valoreInput = (r, tipo, onch) => {
@@ -598,7 +598,8 @@ function _renderPianoRegoleCard() {
       'px;padding:3px;text-align:center;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)">'
     );
   };
-  h += '<div style="overflow-x:auto"><table class="piano-table" style="min-width:760px;font-size:.85rem">';
+  h +=
+    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:760px;font-size:var(--fs-md,.875rem)">';
   h +=
     '<thead><tr><th style="text-align:left">Regola</th><th>Valore</th><th style="min-width:170px">' +
     (vista ? 'Per questo settore' : 'Eccezioni') +
@@ -632,7 +633,7 @@ function _renderPianoRegoleCard() {
         let colSett = '';
         if (vista) {
           colSett = spec
-            ? '<span style="color:#8b6914;font-weight:700">eccezione</span> <button class="btn-del-tipo" style="font-size:.8rem;padding:1px 6px" onclick="eliminaPianoRegolaSettore(' +
+            ? '<span style="color:#8b6914;font-weight:700">eccezione</span> <button class="btn-del-tipo" style="font-size:var(--fs-sm,.8125rem);padding:1px 6px" onclick="eliminaPianoRegolaSettore(' +
               spec.id +
               ')">Torna al generale</button>'
             : '<span style="color:var(--muted)">valore generale</span>';
@@ -648,18 +649,18 @@ function _renderPianoRegoleCard() {
           (r.attivo === false ? ' style="opacity:.55"' : '') +
           '><td style="text-align:left;white-space:normal;min-width:260px"><b>' +
           escP(g.n) +
-          '</b><br><span style="font-size:.78rem;color:var(--muted)">' +
+          '</b><br><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
           escP(nome) +
           (PIANO_REGOLE_FONTE[nome] ? ' · ' + escP(PIANO_REGOLE_FONTE[nome]) : '') +
           '</span></td><td>' +
           valoreInput(r, g.t, onch) +
-          '</td><td style="text-align:left;font-size:.8rem">' +
+          '</td><td style="text-align:left;font-size:var(--fs-sm,.8125rem)">' +
           colSett +
           '</td><td><input type="checkbox"' +
           (r.attivo !== false ? ' checked' : '') +
           ' onchange="' +
           onAtt +
-          '"></td><td style="font-size:.82rem;text-align:left;color:#2c6e49">' +
+          '"></td><td style="font-size:var(--fs-sm,.8125rem);text-align:left;color:#2c6e49">' +
           escP(g.d) +
           '</td></tr>';
       });
@@ -671,11 +672,11 @@ function _renderPianoRegoleCard() {
       h +=
         '<tr style="opacity:.6"><td style="text-align:left;white-space:normal">' +
         escP(r.nome) +
-        '<br><span style="font-size:.78rem;color:var(--muted)">' +
+        '<br><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
         escP(r.descrizione || '') +
         '</span></td><td>' +
         escP(r.valore || '') +
-        '</td><td colspan="2" style="text-align:left;font-size:.8rem;color:var(--muted)">nessun effetto</td><td style="font-size:.8rem;text-align:left"><button class="btn-del-tipo" onclick="eliminaPianoRegola(' +
+        '</td><td colspan="2" style="text-align:left;font-size:var(--fs-sm,.8125rem);color:var(--muted)">nessun effetto</td><td style="font-size:var(--fs-sm,.8125rem);text-align:left"><button class="btn-del-tipo" onclick="eliminaPianoRegola(' +
         r.id +
         ')">Elimina</button></td></tr>';
     });
@@ -1660,7 +1661,7 @@ async function pianoVerificaDurateNotte() {
   let h =
     '<h3>Supplemento notturno del ' +
     perc +
-    '%</h3><p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Fascia notturna ' +
+    '%</h3><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Fascia notturna ' +
     (parseFloat(_pianoRegolaVal('notte_inizio')) || 23) +
     ':00-' +
     (parseFloat(_pianoRegolaVal('notte_fine')) || 6) +
@@ -1671,10 +1672,10 @@ async function pianoVerificaDurateNotte() {
     '</b> con durata da sistemare (qualunque scarto, anche di un solo minuto).</p>';
   if (!problemi.length) {
     h +=
-      '<p style="font-size:.9rem;color:#2c6e49;font-weight:700">Tutte le durate comprendono correttamente il supplemento notturno.</p>';
+      '<p style="font-size:var(--fs-md,.875rem);color:#2c6e49;font-weight:700">Tutte le durate comprendono correttamente il supplemento notturno.</p>';
   } else {
     h +=
-      '<div style="max-height:48vh;overflow:auto"><table class="piano-table" style="min-width:100%;font-size:.82rem"><thead><tr><th style="text-align:left">Turno</th><th>Orario</th><th title="Dall entrata all uscita">Durata reale</th><th>Ore notturne</th><th title="10% delle ore notturne">Supplemento</th><th>Durata scritta ora</th><th>Durata corretta</th><th>Differenza</th></tr></thead><tbody>';
+      '<div style="max-height:48vh;overflow:auto"><table class="piano-table" style="min-width:100%;font-size:var(--fs-sm,.8125rem)"><thead><tr><th style="text-align:left">Turno</th><th>Orario</th><th title="Dall entrata all uscita">Durata reale</th><th>Ore notturne</th><th title="10% delle ore notturne">Supplemento</th><th>Durata scritta ora</th><th>Durata corretta</th><th>Differenza</th></tr></thead><tbody>';
     problemi.forEach((p) => {
       h +=
         '<tr><td style="text-align:left;font-weight:600">' +
@@ -1708,7 +1709,7 @@ async function pianoVerificaDurateNotte() {
     });
     h += '</tbody></table></div>';
     h +=
-      '<p style="font-size:.8rem;color:var(--muted);margin-top:8px">In rosso i turni in cui manca il supplemento (le ore andrebbero aumentate), in giallo quelli che ne hanno piu\' del previsto. Controlla prima di correggere: un turno puo\' avere una durata diversa per accordi particolari (per esempio pause non pagate).</p>';
+      '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:8px">In rosso i turni in cui manca il supplemento (le ore andrebbero aumentate), in giallo quelli che ne hanno piu\' del previsto. Controlla prima di correggere: un turno puo\' avere una durata diversa per accordi particolari (per esempio pause non pagate).</p>';
     h +=
       '<div class="pwd-modal-btns" style="margin-top:12px;flex-wrap:wrap;gap:6px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button>' +
       '<button class="btn-modal-ok" onclick="pianoCorreggiDurateNotte()">Correggi tutte le durate</button></div>';

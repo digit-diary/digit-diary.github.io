@@ -260,7 +260,8 @@ function _visRadioHtml(k, v, opList) {
       escP(nome) +
       '</label>';
   });
-  if (!opList.length) html += '<span style="color:var(--muted);font-size:.82rem">Nessun operatore creato</span>';
+  if (!opList.length)
+    html += '<span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">Nessun operatore creato</span>';
   html += '</div>';
   return html;
 }
@@ -496,7 +497,8 @@ function renderProfiliUI(opList) {
     });
     html += '</select></div>';
   });
-  if (!opList.length) html += '<span style="color:var(--muted);font-size:.82rem">Nessun operatore creato</span>';
+  if (!opList.length)
+    html += '<span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">Nessun operatore creato</span>';
   html += '</div>';
   html +=
     '<button class="btn-add-tipo" onclick="applicaProfili()" style="margin-bottom:8px">Applica i profili</button>';
@@ -526,7 +528,7 @@ function _profiliCustomHtml() {
     h +=
       '<div class="tipo-item"><span class="tipo-item-name">' +
       escP(cust[id].nome) +
-      '</span><span style="font-size:.8rem;color:var(--muted)">' +
+      '</span><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
       nM +
       ' voci in modifica · ' +
       nV +
@@ -538,7 +540,8 @@ function _profiliCustomHtml() {
       id +
       '\')">Elimina</button></div>';
   });
-  if (!ids.length) h += '<p style="color:var(--muted);font-size:.84rem;margin:0">Nessun profilo personalizzato.</p>';
+  if (!ids.length)
+    h += '<p style="color:var(--muted);font-size:var(--fs-md,.875rem);margin:0">Nessun profilo personalizzato.</p>';
   h += '</div>';
   h +=
     '<div class="add-tipo-row sez-form"><div class="field"><label>Nome del nuovo profilo</label><input type="text" id="prof-nuovo-nome" placeholder="es. Compliance"></div><div class="field"><label>Parti da una copia di</label><select id="prof-nuovo-base">' +
@@ -566,7 +569,7 @@ function _profCustomEditorHtml() {
     escP(ed.nome) +
     '" style="padding:6px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);min-width:220px"><span style="flex:1"></span>' +
     '<button class="btn-add-tipo" onclick="profCustomSalva()">Salva profilo</button><button class="btn-secondario" onclick="profCustomAnnulla()">Annulla</button></div>' +
-    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;font-size:.84rem"><span>Parti da una copia di:</span><select id="prof-edit-base" style="padding:5px 8px"><option value="">scegli</option><optgroup label="Profilo">' +
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;font-size:var(--fs-md,.875rem)"><span>Parti da una copia di:</span><select id="prof-edit-base" style="padding:5px 8px"><option value="">scegli</option><optgroup label="Profilo">' +
     _profiliTuttiIds()
       .filter((p) => p !== ed.id)
       .map((p) => '<option value="prof:' + p + '">' + escP(_profiloNome(p)) + '</option>')
@@ -588,7 +591,7 @@ function _profCustomEditorHtml() {
     Object.entries(voci).forEach(([k, label]) => {
       const cur = ed.voci[k] || '-';
       h +=
-        '<label style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 8px;background:var(--paper);border:1px solid var(--line);border-radius:3px;font-size:.84rem"><span>' +
+        '<label style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 8px;background:var(--paper);border:1px solid var(--line);border-radius:3px;font-size:var(--fs-md,.875rem)"><span>' +
         label +
         '</span><select class="prof-edit-voce" data-k="' +
         k +
@@ -1024,7 +1027,7 @@ function apriAccessiExtra(nome) {
   let h =
     '<h3>Accessi extra · ' +
     escP(nome) +
-    '</h3><p style="font-size:.82rem;color:var(--muted);margin-bottom:10px">Reparto principale: <b>' +
+    '</h3><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:10px">Reparto principale: <b>' +
     escP(repartoLabel(proprio)) +
     '</b>. Concedi l\'accesso a sezioni di altri reparti: tutte, oppure solo quelle che spunti. Senza "può modificare" l\'accesso è in sola lettura.</p>' +
     '<div style="max-height:52vh;overflow:auto;text-align:left">';
@@ -1054,7 +1057,7 @@ function apriAccessiExtra(nome) {
       '>Solo sezioni scelte</option><option value="tutte"' +
       (modalita === 'tutte' ? ' selected' : '') +
       '>Tutte le sezioni</option></select>' +
-      '<label style="font-size:.8rem"><input type="checkbox" id="ae-scrivi-' +
+      '<label style="font-size:var(--fs-sm,.8125rem)"><input type="checkbox" id="ae-scrivi-' +
       r.key +
       '"' +
       (modifica ? ' checked' : '') +
@@ -1067,7 +1070,7 @@ function apriAccessiExtra(nome) {
       pagineDisponibili
         .map(
           ([k, lbl]) =>
-            '<label style="font-size:.82rem;background:var(--paper2);padding:3px 8px;border-radius:10px;border:1px solid var(--line)"><input type="checkbox" class="ae-pag-' +
+            '<label style="font-size:var(--fs-sm,.8125rem);background:var(--paper2);padding:3px 8px;border-radius:10px;border:1px solid var(--line)"><input type="checkbox" class="ae-pag-' +
             r.key +
             '" value="' +
             k +
@@ -1231,7 +1234,9 @@ function renderOperatoriUI() {
             escP(n) +
             '</span>' +
             repBadge +
-            (hasAuth ? '<span style="font-size:.82rem;color:#2c6e49;font-weight:600">Con password</span>' : '') +
+            (hasAuth
+              ? '<span style="font-size:var(--fs-sm,.8125rem);color:#2c6e49;font-weight:600">Con password</span>'
+              : '') +
             (admin
               ? '<span style="flex:1"></span><button class="btn-del-tipo" onclick="apriAccessiExtra(\'' +
                 ne +
@@ -1255,7 +1260,7 @@ function renderOperatoriUI() {
           );
         })
         .join('')
-    : '<p style="color:var(--muted);font-size:.85rem">Nessun operatore.</p>';
+    : '<p style="color:var(--muted);font-size:var(--fs-md,.875rem)">Nessun operatore.</p>';
   // Nascondi form creazione se non admin
   const addRow = el.parentElement.querySelector('.add-tipo-row');
   if (addRow) addRow.style.display = admin ? '' : 'none';
@@ -1502,7 +1507,7 @@ function renderCampiRapportoUI() {
         reps
           .map(
             (r) =>
-              '<label style="display:inline-flex;align-items:center;gap:3px;font-size:.82rem;color:var(--muted);cursor:pointer" title="Il campo appare nel rapporto di questo settore"><input type="checkbox"' +
+              '<label style="display:inline-flex;align-items:center;gap:3px;font-size:var(--fs-sm,.8125rem);color:var(--muted);cursor:pointer" title="Il campo appare nel rapporto di questo settore"><input type="checkbox"' +
               (campoInReparto(key, r.key) ? ' checked' : '') +
               ' onchange="toggleCampoReparto(\'' +
               key +
@@ -1554,7 +1559,7 @@ function renderCampiRapportoUI() {
         .map((k) => {
           const d = CAMPI_RAPPORTO_DEFAULT.find((x) => x.key === k);
           return (
-            '<button style="margin:2px 4px;padding:3px 10px;font-size:.82rem;cursor:pointer;border:1px dashed var(--accent2);color:var(--accent2);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif" onclick="ripristinaCampoDefault(\'' +
+            '<button style="margin:2px 4px;padding:3px 10px;font-size:var(--fs-sm,.8125rem);cursor:pointer;border:1px dashed var(--accent2);color:var(--accent2);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif" onclick="ripristinaCampoDefault(\'' +
             k +
             '\')">+ ' +
             (d ? escP(d.label) : k) +
@@ -1581,7 +1586,55 @@ function toggleTema() {
     ? '<i class="icx icx-sole"></i> Tema chiaro'
     : '<i class="icx icx-luna"></i> Tema scuro';
 }
+// DIMENSIONE DEL TESTO PER OPERATORE: dal 90% al 130%. Si applica cambiando la
+// base di tutte le misure (--scala-testo). Salvata sul dispositivo, per partire
+// subito, e nel database, cosi segue l operatore su ogni PC.
+const TESTO_SCALE = [0.9, 1, 1.1, 1.2, 1.3];
+function _testoChiave() {
+  return 'testo_operatore_' + (getOperatore() || 'default');
+}
+function applicaDimensioneTesto(v) {
+  const n = TESTO_SCALE.includes(Number(v)) ? Number(v) : 1;
+  document.documentElement.style.setProperty('--scala-testo', String(n));
+  const lbl = document.getElementById('testo-dim-lbl');
+  if (lbl) lbl.textContent = Math.round(n * 100) + '%';
+  return n;
+}
+async function cambiaDimensioneTesto(passo) {
+  const ora = Number(getComputedStyle(document.documentElement).getPropertyValue('--scala-testo')) || 1;
+  const i = Math.max(0, Math.min(TESTO_SCALE.length - 1, TESTO_SCALE.indexOf(ora) + passo));
+  const v = applicaDimensioneTesto(TESTO_SCALE[i < 0 ? 1 : i]);
+  try {
+    localStorage.setItem(_testoChiave(), String(v));
+  } catch (e) {}
+  // preferenza personale: fuori da Annulla (_setImpRaw), come il tema
+  if (getOperatore() && typeof _setImpRaw === 'function') {
+    try {
+      await _setImpRaw(_testoChiave(), String(v));
+    } catch (e) {
+      console.warn('Dimensione testo non salvata nel database:', e.message);
+    }
+  }
+}
+async function caricaDimensioneTesto() {
+  let v = null;
+  try {
+    v = localStorage.getItem(_testoChiave());
+  } catch (e) {}
+  applicaDimensioneTesto(v || 1);
+  if (!getOperatore()) return;
+  try {
+    const db = await getImp(_testoChiave());
+    if (db && db !== v) {
+      applicaDimensioneTesto(db);
+      try {
+        localStorage.setItem(_testoChiave(), db);
+      } catch (e) {}
+    }
+  } catch (e) {}
+}
 function applicaTemaOperatore() {
+  caricaDimensioneTesto();
   const t = localStorage.getItem(getTemaKey()) || localStorage.getItem('tema') || 'light';
   if (t === 'dark') {
     document.body.classList.add('dark-theme');
@@ -1808,11 +1861,15 @@ function renderSettoriUI() {
       (disattivo ? ';opacity:.55' : '') +
       '"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">';
     html +=
-      '<span class="mini-badge" style="background:' + r.colore + ';font-size:.82rem">' + escP(r.label) + '</span>';
+      '<span class="mini-badge" style="background:' +
+      r.colore +
+      ';font-size:var(--fs-sm,.8125rem)">' +
+      escP(r.label) +
+      '</span>';
     if (custom) {
       html += '<input type="text" id="settore-label-' + r.key + '" value="' + escP(r.label) + '" style="width:170px">';
     } else {
-      html += '<span style="font-size:.82rem;color:var(--muted)">settore di base (fisso)</span>';
+      html += '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">settore di base (fisso)</span>';
     }
     html +=
       '<input type="color" id="settore-colore-' +
@@ -1828,14 +1885,16 @@ function renderSettoriUI() {
         '\')" style="margin-left:4px">' +
         (disattivo ? 'Riattiva' : 'Disattiva') +
         '</button>';
-      if (nDati) html += '<span style="font-size:.82rem;color:var(--muted)">' + nDati + ' record collegati</span>';
+      if (nDati)
+        html +=
+          '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' + nDati + ' record collegati</span>';
     }
     html += '</div>';
     // pagine abilitate per questo settore
     html += '<div style="display:flex;flex-wrap:wrap;gap:4px 14px;padding-left:4px">';
     Object.entries(PAGINE_REPARTO).forEach(([pk, plabel]) => {
       html +=
-        '<label style="display:flex;align-items:center;gap:4px;font-size:.82rem;color:var(--muted);cursor:pointer"><input type="checkbox"' +
+        '<label style="display:flex;align-items:center;gap:4px;font-size:var(--fs-sm,.8125rem);color:var(--muted);cursor:pointer"><input type="checkbox"' +
         (paginaAbilitataReparto(pk, r.key) ? ' checked' : '') +
         ' onchange="salvaPaginaSettore(\'' +
         r.key +
@@ -1964,12 +2023,12 @@ function renderGiubileoUI() {
             g.importo +
             '" min="0" step="50" onchange="modificaGiubileo(' +
             i +
-            ',this.value)" style="width:110px;text-align:center"> <span style="font-size:.8rem;color:var(--muted)">CHF</span><span style="flex:1"></span><button class="btn-del-tipo pericolo" onclick="rimuoviGiubileo(' +
+            ',this.value)" style="width:110px;text-align:center"> <span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">CHF</span><span style="flex:1"></span><button class="btn-del-tipo pericolo" onclick="rimuoviGiubileo(' +
             i +
             ')">Rimuovi</button></div>',
         )
         .join('')
-    : '<p style="color:var(--muted);font-size:.84rem">Nessuno scaglione configurato.</p>';
+    : '<p style="color:var(--muted);font-size:var(--fs-md,.875rem)">Nessuno scaglione configurato.</p>';
 }
 async function _salvaGiubileoConfig(cfg) {
   giubileoConfig = cfg;
@@ -2256,7 +2315,7 @@ function stampaSchedaPermessi() {
   ];
   const oggi = new Date().toLocaleDateString('it-IT');
   let h =
-    '<!DOCTYPE html><html lang="it"><head><meta charset="utf-8"><title>Scheda permessi</title><style>body{font-family:Georgia,serif;color:#1c1a17;margin:24px;font-size:13px}h1{font-size:1.3rem;margin:0 0 4px}h2{font-size:1rem;margin:22px 0 6px;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid #000;padding-bottom:4px}table{border-collapse:collapse;width:100%;font-size:11.5px}th,td{border:1px solid #999;padding:3px 6px;text-align:center}th{background:#eee}td.l{text-align:left}tr.g td{background:#f3efe6;text-align:left;font-weight:700}.si{background:#e3f0e8;font-weight:700}.no{color:#999}p{margin:4px 0;color:#444}.nb{margin:12px 0}@media print{.nb{display:none}body{margin:10mm}table{font-size:10px}}</style></head><body>' +
+    '<!DOCTYPE html><html lang="it"><head><meta charset="utf-8"><title>Scheda permessi</title><style>body{font-family:Georgia,serif;color:#1c1a17;margin:24px;font-size:13px}h1{font-size:var(--fs-xl,1.25rem);margin:0 0 4px}h2{font-size:var(--fs-lg,1.0625rem);margin:22px 0 6px;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid #000;padding-bottom:4px}table{border-collapse:collapse;width:100%;font-size:11.5px}th,td{border:1px solid #999;padding:3px 6px;text-align:center}th{background:#eee}td.l{text-align:left}tr.g td{background:#f3efe6;text-align:left;font-weight:700}.si{background:#e3f0e8;font-weight:700}.no{color:#999}p{margin:4px 0;color:#444}.nb{margin:12px 0}@media print{.nb{display:none}body{margin:10mm}table{font-size:10px}}</style></head><body>' +
     '<h1>Diario Collaboratori · scheda dei permessi attuali</h1><p>Stato delle Impostazioni al ' +
     oggi +
     '. Si = puo (vedere la pagina o la scheda, oppure eseguire la funzione); vuoto = no. L amministratore puo tutto ed e escluso dalla tabella.</p><div class="nb"><button onclick="window.print()">Stampa / PDF</button></div>';

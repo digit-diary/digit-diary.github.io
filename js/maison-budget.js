@@ -38,7 +38,7 @@ function renderMaisonBudgetUI() {
   const nBL = clientiCat.filter((b) => b.categoria === 'bl').length;
   const _filtNomeBudget = (document.getElementById('maison-filt-nome-budget') || {}).value || '';
   let html =
-    '<div style="display:flex;gap:10px;margin-bottom:12px;align-items:center;flex-wrap:wrap"><select id="maison-filt-cat-lista" onchange="renderMaisonBudgetUI()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.85rem;background:var(--paper);color:var(--ink)"><option value="">Tutti categorizzati (' +
+    '<div style="display:flex;gap:10px;margin-bottom:12px;align-items:center;flex-wrap:wrap"><select id="maison-filt-cat-lista" onchange="renderMaisonBudgetUI()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:var(--fs-md,.875rem);background:var(--paper);color:var(--ink)"><option value="">Tutti categorizzati (' +
     tuttiNomi.length +
     ')</option><option value="full_maison"' +
     (filtCat === 'full_maison' ? ' selected' : '') +
@@ -62,7 +62,7 @@ function renderMaisonBudgetUI() {
     nBL +
     ')</option></select><input type="text" id="maison-filt-nome-budget" placeholder="Cerca cliente..." value="' +
     escP(_filtNomeBudget) +
-    '" oninput="renderMaisonBudgetUI()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.85rem;background:var(--paper);color:var(--ink);width:180px"></div>';
+    '" oninput="renderMaisonBudgetUI()" class="campo-cerca"></div>';
   // Build client data
   const clients = tuttiNomi.map((nome) => {
     const b = _br.find((x) => x.nome.toLowerCase() === nome.toLowerCase());
@@ -134,7 +134,7 @@ function renderMaisonBudgetUI() {
     const _catBadgeRow = c.cat
       ? '<span class="mini-badge" style="background:' +
         borderColor +
-        ';font-size:.82rem;margin-left:6px">' +
+        ';font-size:var(--fs-sm,.8125rem);margin-left:6px">' +
         ({ full_maison: 'Full Maison', maison: 'Maison', direzione: 'Direzione', bu: 'BU', bl: 'BL' }[c.cat] || '') +
         '</span>'
       : '';
@@ -148,26 +148,35 @@ function renderMaisonBudgetUI() {
       '\')">' +
       escP(c.nome) +
       _catBadgeRow +
-      (isBday ? ' <span style="font-size:1.1rem"><i class="icx icx-torta"></i></span>' : '') +
+      (isBday ? ' <span style="font-size:var(--fs-lg,1.0625rem)"><i class="icx icx-torta"></i></span>' : '') +
       '</span>' +
       (c.spent
-        ? '<span style="font-size:.82rem;color:var(--muted)">' + fmtCHF(c.spent) + ' CHF questo mese</span>'
+        ? '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
+          fmtCHF(c.spent) +
+          ' CHF questo mese</span>'
         : '') +
       (c.b && c.b.budget_chf
-        ? '<span style="font-size:.82rem;color:' + pctColor + ';font-weight:600">' + pct + '%</span>' + budgetBar
+        ? '<span style="font-size:var(--fs-sm,.8125rem);color:' +
+          pctColor +
+          ';font-weight:600">' +
+          pct +
+          '%</span>' +
+          budgetBar
         : '') +
       (nascitaLabel
-        ? '<span style="font-size:.82rem;color:var(--muted)"><i class="icx icx-torta"></i> ' + nascitaLabel + '</span>'
+        ? '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)"><i class="icx icx-torta"></i> ' +
+          nascitaLabel +
+          '</span>'
         : '') +
       (c.b
-        ? '<button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2);font-size:.82rem" onclick="modificaMaisonInfo(' +
+        ? '<button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2);font-size:var(--fs-sm,.8125rem)" onclick="modificaMaisonInfo(' +
           c.b.id +
           ')">Modifica</button>'
-        : '<button class="btn-del-tipo" style="color:#2980b9;border-color:#2980b9;font-size:.82rem" onclick="assegnaCatRapida(\'' +
+        : '<button class="btn-del-tipo" style="color:#2980b9;border-color:#2980b9;font-size:var(--fs-sm,.8125rem)" onclick="assegnaCatRapida(\'' +
           ne +
           '\')">Assegna</button>') +
       (c.b
-        ? '<button class="btn-del-tipo" style="font-size:.82rem" onclick="rimuoviMaisonBudget(' +
+        ? '<button class="btn-del-tipo" style="font-size:var(--fs-sm,.8125rem)" onclick="rimuoviMaisonBudget(' +
           c.b.id +
           ')">Rimuovi</button>'
         : '') +
@@ -329,7 +338,7 @@ function modificaMaisonInfo(id) {
     (b.budget_bu || '') +
     '"></div><div class="pwd-field" style="flex:1"><label>Max BL/mese</label><input type="number" id="edit-mb-bl" value="' +
     (b.budget_bl || '') +
-    '"></div></div><p style="font-size:.82rem;color:var(--muted);margin:4px 0 8px">I valori sono mensili. Per il controllo annuale il sistema moltiplica &times;12.</p><div class="pwd-field"><label>Data nascita</label><input type="text" id="edit-mb-nascita" value="' +
+    '"></div></div><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:4px 0 8px">I valori sono mensili. Per il controllo annuale il sistema moltiplica &times;12.</p><div class="pwd-field"><label>Data nascita</label><input type="text" id="edit-mb-nascita" value="' +
     nascitaDisplay +
     '" placeholder="es: 12.01.1997"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaModificaMaisonInfo(' +
     id +
@@ -383,7 +392,7 @@ function apriListaClientiMaison() {
   const blCat = _br.filter((b) => b.categoria === 'bl').sort((a, b) => a.nome.localeCompare(b.nome));
   const tot = fullM.length + maison.length + direz.length + buCat.length + blCat.length;
   let html =
-    '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px"><div><h3 style="font-family:Playfair Display,serif;color:var(--ink);margin-bottom:4px">Clienti Categorizzati</h3><p style="color:var(--muted);font-size:.82rem">' +
+    '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px"><div><h3 style="font-family:Playfair Display,serif;color:var(--ink);margin-bottom:4px">Clienti Categorizzati</h3><p style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">' +
     tot +
     ' clienti · ' +
     fullM.length +
@@ -395,13 +404,13 @@ function apriListaClientiMaison() {
     buCat.length +
     ' BU · ' +
     blCat.length +
-    ' BL</p></div><button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\')" style="padding:6px 12px;font-size:.82rem">Chiudi</button></div>';
+    ' BL</p></div><button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\')" style="padding:6px 12px;font-size:var(--fs-sm,.8125rem)">Chiudi</button></div>';
   html +=
-    '<div style="display:flex;gap:10px;margin-bottom:16px"><button class="btn-export" onclick="esportaListaMaisonCSV()" style="font-size:.82rem;padding:5px 14px">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaListaMaisonPDF()" style="font-size:.82rem;padding:5px 14px">PDF</button></div>';
+    '<div style="display:flex;gap:10px;margin-bottom:16px"><button class="btn-export" onclick="esportaListaMaisonCSV()" style="font-size:var(--fs-sm,.8125rem);padding:5px 14px">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaListaMaisonPDF()" style="font-size:var(--fs-sm,.8125rem);padding:5px 14px">PDF</button></div>';
   function renderCatBlock(items, label, color) {
     if (!items.length) return '';
     let h =
-      '<div style="margin-bottom:16px"><div style="font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:' +
+      '<div style="margin-bottom:16px"><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.1em;text-transform:uppercase;color:' +
       color +
       ';font-weight:700;margin-bottom:8px;border-bottom:2px solid ' +
       color +
@@ -688,23 +697,23 @@ async function importaCategorieMaison(input) {
     );
     const nNuovi = nomi.length - esist.length;
     let prev =
-      '<div style="text-align:center;margin-bottom:16px"><h3 style="font-family:Playfair Display,serif;margin-bottom:4px">Importa Categorie Clienti</h3><p style="color:var(--muted);font-size:.84rem">File: ' +
+      '<div style="text-align:center;margin-bottom:16px"><h3 style="font-family:Playfair Display,serif;margin-bottom:4px">Importa Categorie Clienti</h3><p style="color:var(--muted);font-size:var(--fs-md,.875rem)">File: ' +
       escP(file.name) +
       '</p></div>';
     // KPI cards
     prev += '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">';
     prev +=
-      '<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.3rem;font-weight:700;color:var(--ink)">' +
+      '<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:var(--ink)">' +
       nomi.length +
-      '</div><div style="font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Totale</div></div>';
+      '</div><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Totale</div></div>';
     prev +=
-      '<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.3rem;font-weight:700;color:#2c6e49">' +
+      '<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:#2c6e49">' +
       nNuovi +
-      '</div><div style="font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Nuovi</div></div>';
+      '</div><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Nuovi</div></div>';
     prev +=
-      '<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.3rem;font-weight:700;color:var(--accent2)">' +
+      '<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:var(--accent2)">' +
       esist.length +
-      '</div><div style="font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Aggiornati</div></div>';
+      '</div><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Aggiornati</div></div>';
     prev += '</div>';
     // Categorie con lista espandibile
     prev += '<div style="max-height:350px;overflow-y:auto">';
@@ -714,16 +723,16 @@ async function importaCategorieMaison(input) {
       prev +=
         '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span class="mini-badge" style="background:' +
         catColors[cat] +
-        ';font-size:.82rem;padding:3px 10px">' +
+        ';font-size:var(--fs-sm,.8125rem);padding:3px 10px">' +
         catLabels[cat] +
-        '</span><span style="font-size:.82rem;color:var(--muted)">' +
+        '</span><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
         lista.length +
         ' clienti</span></div>';
       prev += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
       lista.forEach((n) => {
         const isExist = esist.includes(n);
         prev +=
-          '<span style="font-size:.82rem;padding:2px 8px;border-radius:2px;background:' +
+          '<span style="font-size:var(--fs-sm,.8125rem);padding:2px 8px;border-radius:2px;background:' +
           (isExist ? catColors[cat] + '15' : 'var(--paper2)') +
           ';color:' +
           (isExist ? catColors[cat] : 'var(--ink)') +
@@ -739,7 +748,7 @@ async function importaCategorieMaison(input) {
     prev += '</div>';
     // Barra progresso (nascosta)
     prev +=
-      '<div id="import-cat-progress" style="display:none;margin-top:12px"><div style="height:6px;border-radius:3px;background:var(--line);overflow:hidden"><div id="import-cat-bar" style="height:100%;width:0%;background:#b8860b;border-radius:3px;transition:width .2s"></div></div><p id="import-cat-status" style="text-align:center;font-size:.82rem;color:var(--muted);margin-top:4px"></p></div>';
+      '<div id="import-cat-progress" style="display:none;margin-top:12px"><div style="height:6px;border-radius:3px;background:var(--line);overflow:hidden"><div id="import-cat-bar" style="height:100%;width:0%;background:#b8860b;border-radius:3px;transition:width .2s"></div></div><p id="import-cat-status" style="text-align:center;font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:4px"></p></div>';
     prev +=
       '<div id="import-cat-btns" class="pwd-modal-btns" style="margin-top:16px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" id="btn-conf-import-cat">Importa ' +
       nomi.length +
@@ -812,17 +821,17 @@ async function importaCategorieMaison(input) {
       }
       // Riepilogo finale
       mc.innerHTML =
-        '<div style="text-align:center;padding:20px"><div style="font-size:2.5rem;margin-bottom:8px">' +
+        '<div style="text-align:center;padding:20px"><div style="font-size:var(--fs-4xl,2.5rem);margin-bottom:8px">' +
         (errori ? '<i class="icx icx-avviso"></i>' : '<i class="icx icx-check"></i>') +
-        '</div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Importazione completata</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:#2c6e49">' +
+        '</div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Importazione completata</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:#2c6e49">' +
         nuovi +
-        '</div><div style="font-size:.82rem;color:var(--muted);text-transform:uppercase">Nuovi</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--accent2)">' +
+        '</div><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);text-transform:uppercase">Nuovi</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:var(--accent2)">' +
         aggiornati +
-        '</div><div style="font-size:.82rem;color:var(--muted);text-transform:uppercase">Aggiornati</div></div>' +
+        '</div><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);text-transform:uppercase">Aggiornati</div></div>' +
         (errori
-          ? '<div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--accent)">' +
+          ? '<div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:var(--accent)">' +
             errori +
-            '</div><div style="font-size:.82rem;color:var(--muted);text-transform:uppercase">Errori</div></div>'
+            '</div><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);text-transform:uppercase">Errori</div></div>'
           : '') +
         '</div><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
       renderMaisonBudgetUI();
@@ -966,42 +975,42 @@ async function importaCompleanniMaison(input) {
       'Dicembre',
     ];
     let prev =
-      '<div style="text-align:center;margin-bottom:16px"><h3 style="font-family:Playfair Display,serif;margin-bottom:4px">Importa Compleanni</h3><p style="color:var(--muted);font-size:.84rem">File: ' +
+      '<div style="text-align:center;margin-bottom:16px"><h3 style="font-family:Playfair Display,serif;margin-bottom:4px">Importa Compleanni</h3><p style="color:var(--muted);font-size:var(--fs-md,.875rem)">File: ' +
       escP(file.name) +
       '</p></div>';
     // KPI cards
     prev += '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">';
     prev +=
-      '<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.3rem;font-weight:700;color:var(--ink)">' +
+      '<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:var(--ink)">' +
       compleanni.length +
-      '</div><div style="font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Compleanni</div></div>';
+      '</div><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Compleanni</div></div>';
     prev +=
-      '<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.3rem;font-weight:700;color:#2c6e49">' +
+      '<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:#2c6e49">' +
       esistenti.length +
-      '</div><div style="font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Clienti esistenti</div></div>';
+      '</div><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Clienti esistenti</div></div>';
     prev +=
-      '<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.3rem;font-weight:700;color:#2980b9">' +
+      '<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:#2980b9">' +
       nuovi.length +
-      '</div><div style="font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Familiari / Nuovi</div></div>';
+      '</div><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Familiari / Nuovi</div></div>';
     if (daConfermare.length)
       prev +=
-        '<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.3rem;font-weight:700;color:#e67e22">' +
+        '<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:#e67e22">' +
         daConfermare.length +
-        '</div><div style="font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Da confermare</div></div>';
+        '</div><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Da confermare</div></div>';
     prev += '</div>';
     // Nomi simili: l'operatore decide per ognuno (default: salta). Nessuna rinomina automatica.
     if (daConfermare.length) {
       prev +=
-        '<div style="margin-bottom:12px;padding:10px;background:rgba(230,126,34,0.08);border-left:3px solid #e67e22;border-radius:3px"><div style="font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:#e67e22;font-weight:700;margin-bottom:6px">Nomi simili: conferma cosa fare</div>';
+        '<div style="margin-bottom:12px;padding:10px;background:rgba(230,126,34,0.08);border-left:3px solid #e67e22;border-radius:3px"><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:#e67e22;font-weight:700;margin-bottom:6px">Nomi simili: conferma cosa fare</div>';
       daConfermare.forEach((m) => {
         prev +=
-          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0;font-size:.85rem"><strong>' +
+          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0;font-size:var(--fs-md,.875rem)"><strong>' +
           escP(m.nome) +
           '</strong><span style="color:var(--muted)">' +
           new Date(m.data + 'T12:00:00').toLocaleDateString('it-IT') +
           '</span><select class="import-compl-scelta" data-idx="' +
           m.idx +
-          '" style="padding:3px 6px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper);color:var(--ink)"><option value="salta" selected>Salta</option><option value="aggiorna">Aggiorna data di ' +
+          '" style="padding:3px 6px;border:1px solid var(--line);border-radius:2px;font-size:var(--fs-sm,.8125rem);background:var(--paper);color:var(--ink)"><option value="salta" selected>Salta</option><option value="aggiorna">Aggiorna data di ' +
           escP(m.nomeDB) +
           '</option><option value="nuovo">Crea nuovo cliente ' +
           escP(m.nome) +
@@ -1026,7 +1035,7 @@ async function importaCompleanniMaison(input) {
         return da - db;
       });
       prev +=
-        '<div style="margin-bottom:12px"><div style="font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:#b8860b;font-weight:700;margin-bottom:6px;border-bottom:1px solid var(--line);padding-bottom:4px">' +
+        '<div style="margin-bottom:12px"><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.08em;text-transform:uppercase;color:#b8860b;font-weight:700;margin-bottom:6px;border-bottom:1px solid var(--line);padding-bottom:4px">' +
         mesiNomi[mi] +
         ' (' +
         lista.length +
@@ -1039,7 +1048,7 @@ async function importaCompleanniMaison(input) {
         const border = m.simile ? '#e67e22' : m.isNew ? '#2980b9' : '#2c6e49';
         const fuzzyNote = m.simile ? ' title="Simile a: ' + escP(m.nomeDB) + '" style="cursor:help"' : '';
         prev +=
-          '<span style="font-size:.82rem;padding:3px 8px;border-radius:2px;background:' +
+          '<span style="font-size:var(--fs-sm,.8125rem);padding:3px 8px;border-radius:2px;background:' +
           bg +
           ';border:1px solid ' +
           border +
@@ -1051,8 +1060,8 @@ async function importaCompleanniMaison(input) {
           giorno +
           '</strong> ' +
           escP(m.nome) +
-          (m.isNew ? ' <span style="font-size:.82rem;color:#2980b9;font-weight:700">NEW</span>' : '') +
-          (m.simile ? ' <span style="font-size:.82rem;color:#e67e22;font-weight:700">?</span>' : '') +
+          (m.isNew ? ' <span style="font-size:var(--fs-sm,.8125rem);color:#2980b9;font-weight:700">NEW</span>' : '') +
+          (m.simile ? ' <span style="font-size:var(--fs-sm,.8125rem);color:#e67e22;font-weight:700">?</span>' : '') +
           '</span>';
       });
       prev += '</div></div>';
@@ -1060,7 +1069,7 @@ async function importaCompleanniMaison(input) {
     prev += '</div>';
     // Barra progresso
     prev +=
-      '<div id="import-compl-progress" style="display:none;margin-top:12px"><div style="height:6px;border-radius:3px;background:var(--line);overflow:hidden"><div id="import-compl-bar" style="height:100%;width:0%;background:#8e44ad;border-radius:3px;transition:width .2s"></div></div><p id="import-compl-status" style="text-align:center;font-size:.82rem;color:var(--muted);margin-top:4px"></p></div>';
+      '<div id="import-compl-progress" style="display:none;margin-top:12px"><div style="height:6px;border-radius:3px;background:var(--line);overflow:hidden"><div id="import-compl-bar" style="height:100%;width:0%;background:#8e44ad;border-radius:3px;transition:width .2s"></div></div><p id="import-compl-status" style="text-align:center;font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:4px"></p></div>';
     prev +=
       '<div id="import-compl-btns" class="pwd-modal-btns" style="margin-top:16px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" id="btn-conf-import-compl">Importa ' +
       compleanni.length +
@@ -1125,24 +1134,24 @@ async function importaCompleanniMaison(input) {
       }
       // Riepilogo finale
       mc.innerHTML =
-        '<div style="text-align:center;padding:20px"><div style="font-size:2.5rem;margin-bottom:8px">' +
+        '<div style="text-align:center;padding:20px"><div style="font-size:var(--fs-4xl,2.5rem);margin-bottom:8px">' +
         (nErrori ? '<i class="icx icx-avviso"></i>' : '<i class="icx icx-torta"></i>') +
-        '</div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Compleanni importati</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:#2c6e49">' +
+        '</div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Compleanni importati</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:#2c6e49">' +
         nAggiornati +
-        '</div><div style="font-size:.82rem;color:var(--muted);text-transform:uppercase">Aggiornati</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:#2980b9">' +
+        '</div><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);text-transform:uppercase">Aggiornati</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:#2980b9">' +
         nNuovi +
-        '</div><div style="font-size:.82rem;color:var(--muted);text-transform:uppercase">Nuovi / Familiari</div></div>' +
+        '</div><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);text-transform:uppercase">Nuovi / Familiari</div></div>' +
         (nSaltati
-          ? '<div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:#e67e22">' +
+          ? '<div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:#e67e22">' +
             nSaltati +
-            '</div><div style="font-size:.82rem;color:var(--muted);text-transform:uppercase">Saltati</div></div>'
+            '</div><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);text-transform:uppercase">Saltati</div></div>'
           : '') +
         (nErrori
-          ? '<div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--accent)">' +
+          ? '<div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:var(--accent)">' +
             nErrori +
-            '</div><div style="font-size:.82rem;color:var(--muted);text-transform:uppercase">Errori</div></div>'
+            '</div><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);text-transform:uppercase">Errori</div></div>'
           : '') +
-        '</div><p style="font-size:.84rem;color:var(--muted)">I compleanni appariranno nella dashboard e nelle notifiche.</p><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')" style="margin-top:12px">Chiudi</button></div>';
+        '</div><p style="font-size:var(--fs-md,.875rem);color:var(--muted)">I compleanni appariranno nella dashboard e nelle notifiche.</p><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')" style="margin-top:12px">Chiudi</button></div>';
       renderMaisonBudgetUI();
       renderMaisonDashboard();
       logAzione(

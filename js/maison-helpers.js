@@ -81,7 +81,7 @@ function apriMultiSelectOperatori(hiddenInputId, btnId, title) {
   const mc = document.getElementById('pwd-modal-content');
   let html = '<h3>' + escP(title || 'Seleziona operatori') + '</h3>';
   html +=
-    '<p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Seleziona uno o piu\' destinatari, oppure "Tutti" per inviare a tutto il reparto.</p>';
+    '<p style="color:var(--muted);font-size:var(--fs-md,.875rem);margin-bottom:12px">Seleziona uno o piu\' destinatari, oppure "Tutti" per inviare a tutto il reparto.</p>';
   // Opzione "Tutti"
   html +=
     '<div style="padding:10px 12px;background:var(--paper2);border-radius:3px;margin-bottom:10px"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:600"><input type="checkbox" id="msop-tutti"' +
@@ -96,7 +96,7 @@ function apriMultiSelectOperatori(hiddenInputId, btnId, title) {
     const badge = _repBadge(rep);
     const isMe = n === op ? ' (Tu)' : '';
     html +=
-      '<div style="padding:5px 0"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:.92rem"><input type="checkbox" class="msop-cb" value="' +
+      '<div style="padding:5px 0"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:var(--fs-base,.9375rem)"><input type="checkbox" class="msop-cb" value="' +
       escP(n).replace(/"/g, '&quot;') +
       '"' +
       (selected.has(n) ? ' checked' : '') +
@@ -158,7 +158,7 @@ function _scegliCandidatoNome(input, candidates) {
     const mc = document.getElementById('pwd-modal-content');
     let html = '<h3>Quale "' + escP(input) + '"?</h3>';
     html +=
-      '<p style="color:var(--muted);font-size:.84rem;margin-bottom:12px">Esistono piu\' clienti con questo cognome. Seleziona quello giusto:</p>';
+      '<p style="color:var(--muted);font-size:var(--fs-md,.875rem);margin-bottom:12px">Esistono piu\' clienti con questo cognome. Seleziona quello giusto:</p>';
     html += '<div style="max-height:280px;overflow-y:auto">';
     candidates.forEach((c, i) => {
       html +=
@@ -170,12 +170,12 @@ function _scegliCandidatoNome(input, candidates) {
         (i === 0 ? ' checked' : '') +
         ' style="width:18px;height:18px"><label for="dis-nome-' +
         i +
-        '" style="cursor:pointer;font-size:.95rem">' +
+        '" style="cursor:pointer;font-size:var(--fs-base,.9375rem)">' +
         escP(c) +
         '</label></div>';
     });
     html +=
-      '<div style="padding:8px 0;display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);margin-top:6px"><input type="radio" name="dis-nome-radio" value="-1" id="dis-nome-new" style="width:18px;height:18px"><label for="dis-nome-new" style="cursor:pointer;font-size:.92rem;color:var(--muted)">Crea come nuovo cliente "' +
+      '<div style="padding:8px 0;display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);margin-top:6px"><input type="radio" name="dis-nome-radio" value="-1" id="dis-nome-new" style="width:18px;height:18px"><label for="dis-nome-new" style="cursor:pointer;font-size:var(--fs-base,.9375rem);color:var(--muted)">Crea come nuovo cliente "' +
       escP(input) +
       '"</label></div>';
     html += '</div>';
@@ -294,13 +294,13 @@ function _renderRiallineaUI() {
   if (!rimaste.length) {
     // Riepilogo finale
     mc.innerHTML =
-      '<div style="text-align:center;padding:20px"><div style="font-size:2.5rem;margin-bottom:8px"><i class="icx icx-check"></i></div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Riallineamento completato</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:#2c6e49">' +
+      '<div style="text-align:center;padding:20px"><div style="font-size:var(--fs-4xl,2.5rem);margin-bottom:8px"><i class="icx icx-check"></i></div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Riallineamento completato</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:#2c6e49">' +
       st.confermati +
-      '</div><div style="font-size:.82rem;color:var(--muted);text-transform:uppercase">Confermati</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--muted)">' +
+      '</div><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);text-transform:uppercase">Confermati</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:var(--muted)">' +
       st.saltati +
-      '</div><div style="font-size:.82rem;color:var(--muted);text-transform:uppercase">Saltati</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--ink)">' +
+      '</div><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);text-transform:uppercase">Saltati</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:var(--ink)">' +
       st.vociCorr +
-      '</div><div style="font-size:.82rem;color:var(--muted);text-transform:uppercase">Voci corrette</div></div></div><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
+      '</div><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);text-transform:uppercase">Voci corrette</div></div></div><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
     renderMaisonDashboard();
     renderSpeseExtra();
     logAzione('Riallinea nomi', st.confermati + ' confermati, ' + st.saltati + ' saltati, ' + st.vociCorr + ' voci');
@@ -308,15 +308,18 @@ function _renderRiallineaUI() {
   }
   const totOrig = st.correzioni.length;
   let html =
-    '<div style="text-align:center;margin-bottom:12px"><h3 style="font-family:Playfair Display,serif;margin-bottom:4px">Riallinea Nomi</h3><p style="color:var(--muted);font-size:.84rem">' +
+    '<div style="text-align:center;margin-bottom:12px"><h3 style="font-family:Playfair Display,serif;margin-bottom:4px">Riallinea Nomi</h3><p style="color:var(--muted);font-size:var(--fs-md,.875rem)">' +
     rimaste.length +
     ' di ' +
     totOrig +
     ' rimaste</p></div>';
   // Contatori
   html += '<div style="display:flex;gap:8px;margin-bottom:12px;justify-content:center">';
-  html += '<span style="font-size:.82rem;color:#2c6e49;font-weight:600">' + st.confermati + ' confermati</span>';
-  html += '<span style="font-size:.82rem;color:var(--muted)">' + st.saltati + ' saltati</span>';
+  html +=
+    '<span style="font-size:var(--fs-sm,.8125rem);color:#2c6e49;font-weight:600">' +
+    st.confermati +
+    ' confermati</span>';
+  html += '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' + st.saltati + ' saltati</span>';
   html += '</div>';
   // Lista con bottoni per ogni voce
   html += '<div id="riallinea-lista" style="max-height:400px;overflow-y:auto">';
@@ -327,21 +330,23 @@ function _renderRiallineaUI() {
       idx +
       '" style="padding:10px 12px;margin-bottom:6px;border-radius:3px;background:var(--paper2);display:flex;align-items:center;gap:8px;flex-wrap:wrap;transition:all .3s">';
     html +=
-      '<span style="font-size:.85rem;color:var(--accent);text-decoration:line-through">' + escP(c.vecchio) + '</span>';
+      '<span style="font-size:var(--fs-md,.875rem);color:var(--accent);text-decoration:line-through">' +
+      escP(c.vecchio) +
+      '</span>';
     html += '<span style="color:var(--muted)">&#8594;</span>';
-    html += '<strong style="font-size:.85rem;color:#2c6e49">' + escP(c.nuovo) + '</strong>';
-    html += '<span style="font-size:.82rem;color:var(--muted)">';
+    html += '<strong style="font-size:var(--fs-md,.875rem);color:#2c6e49">' + escP(c.nuovo) + '</strong>';
+    html += '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">';
     if (c.costiCount) html += c.costiCount + ' costi';
     if (c.costiCount && c.extraCount) html += ' + ';
     if (c.extraCount) html += c.extraCount + ' extra';
     html += '</span>';
     html += '<div style="margin-left:auto;display:flex;gap:6px;flex-shrink:0">';
     html +=
-      '<button class="btn-salva" style="font-size:.82rem;padding:5px 12px;background:#2c6e49" onclick="confermaRiallinea(' +
+      '<button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px;background:#2c6e49" onclick="confermaRiallinea(' +
       idx +
       ')">Conferma</button>';
     html +=
-      '<button class="btn-modal-cancel" style="font-size:.82rem;padding:5px 12px" onclick="saltaRiallinea(' +
+      '<button class="btn-modal-cancel" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px" onclick="saltaRiallinea(' +
       idx +
       ')">Salta</button>';
     html += '</div></div>';
@@ -386,7 +391,7 @@ async function confermaRiallinea(idx) {
   if (row) {
     row.style.background = 'rgba(44,110,73,0.1)';
     row.innerHTML =
-      '<span style="color:#2c6e49;font-size:.85rem"><i class="icx icx-check"></i> ' +
+      '<span style="color:#2c6e49;font-size:var(--fs-md,.875rem)"><i class="icx icx-check"></i> ' +
       escP(c.vecchio) +
       ' → <strong>' +
       escP(c.nuovo) +
@@ -409,7 +414,9 @@ function saltaRiallinea(idx) {
   if (row) {
     row.style.opacity = '0.3';
     row.innerHTML =
-      '<span style="color:var(--muted);font-size:.85rem">&#10060; ' + escP(c.vecchio) + ' · saltato</span>';
+      '<span style="color:var(--muted);font-size:var(--fs-md,.875rem)">&#10060; ' +
+      escP(c.vecchio) +
+      ' · saltato</span>';
     setTimeout(() => {
       row.style.maxHeight = '0';
       row.style.padding = '0';
@@ -502,13 +509,13 @@ function _renderUnisciUI() {
   const rimaste = st.coppie.filter((c) => !c._done);
   if (!rimaste.length) {
     mc.innerHTML =
-      '<div style="text-align:center;padding:20px"><div style="font-size:2.5rem;margin-bottom:8px"><i class="icx icx-check"></i></div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Unione duplicati completata</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:#2c6e49">' +
+      '<div style="text-align:center;padding:20px"><div style="font-size:var(--fs-4xl,2.5rem);margin-bottom:8px"><i class="icx icx-check"></i></div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Unione duplicati completata</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:#2c6e49">' +
       st.confermati +
-      '</div><div style="font-size:.82rem;color:var(--muted);text-transform:uppercase">Uniti</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--muted)">' +
+      '</div><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);text-transform:uppercase">Uniti</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:var(--muted)">' +
       st.saltati +
-      '</div><div style="font-size:.82rem;color:var(--muted);text-transform:uppercase">Saltati</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.5rem;font-weight:700;color:var(--ink)">' +
+      '</div><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);text-transform:uppercase">Saltati</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:var(--ink)">' +
       st.vociCorr +
-      '</div><div style="font-size:.82rem;color:var(--muted);text-transform:uppercase">Voci aggiornate</div></div></div><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
+      '</div><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);text-transform:uppercase">Voci aggiornate</div></div></div><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
     renderMaisonBudgetUI();
     renderMaisonDashboard();
     renderSpeseExtra();
@@ -538,14 +545,15 @@ function _renderUnisciUI() {
     return p[2] + '/' + p[1];
   };
   let html =
-    '<div style="text-align:center;margin-bottom:12px"><h3 style="font-family:Playfair Display,serif;margin-bottom:4px">Unisci Duplicati</h3><p style="color:var(--muted);font-size:.84rem">' +
+    '<div style="text-align:center;margin-bottom:12px"><h3 style="font-family:Playfair Display,serif;margin-bottom:4px">Unisci Duplicati</h3><p style="color:var(--muted);font-size:var(--fs-md,.875rem)">' +
     rimaste.length +
     ' di ' +
     totOrig +
     ' coppie</p></div>';
   html += '<div style="display:flex;gap:8px;margin-bottom:12px;justify-content:center">';
-  html += '<span style="font-size:.82rem;color:#2c6e49;font-weight:600">' + st.confermati + ' uniti</span>';
-  html += '<span style="font-size:.82rem;color:var(--muted)">' + st.saltati + ' saltati</span>';
+  html +=
+    '<span style="font-size:var(--fs-sm,.8125rem);color:#2c6e49;font-weight:600">' + st.confermati + ' uniti</span>';
+  html += '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' + st.saltati + ' saltati</span>';
   html += '</div>';
   html += '<div id="unisci-lista" style="max-height:400px;overflow-y:auto">';
   rimaste.forEach(function (c) {
@@ -567,28 +575,32 @@ function _renderUnisciUI() {
       idx +
       '" style="padding:10px 12px;margin-bottom:8px;border-radius:3px;background:var(--paper2);transition:all .3s">';
     html +=
-      '<div style="font-size:.85rem;margin-bottom:4px"><strong>' +
+      '<div style="font-size:var(--fs-md,.875rem);margin-bottom:4px"><strong>' +
       escP(c.remove.nome) +
       '</strong>' +
-      (rInfo.length ? ' <span style="color:var(--muted);font-size:.82rem">(' + rInfo.join(', ') + ')</span>' : '') +
+      (rInfo.length
+        ? ' <span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">(' + rInfo.join(', ') + ')</span>'
+        : '') +
       ' <span style="color:var(--muted)">+</span> <strong>' +
       escP(c.keep.nome) +
       '</strong>' +
-      (kInfo.length ? ' <span style="color:var(--muted);font-size:.82rem">(' + kInfo.join(', ') + ')</span>' : '') +
+      (kInfo.length
+        ? ' <span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">(' + kInfo.join(', ') + ')</span>'
+        : '') +
       '</div>';
     html +=
-      '<div style="font-size:.82rem;color:#1a4a7a;margin-bottom:8px">&#8594; Unisci in: <strong>' +
+      '<div style="font-size:var(--fs-sm,.8125rem);color:#1a4a7a;margin-bottom:8px">&#8594; Unisci in: <strong>' +
       escP(c.merged.nome) +
       '</strong>' +
       (mInfo.length ? ' (' + mInfo.join(', ') + ')' : '') +
       '</div>';
     html += '<div style="display:flex;gap:6px;justify-content:flex-end">';
     html +=
-      '<button class="btn-salva" style="font-size:.82rem;padding:5px 12px;background:#2c6e49" onclick="confermaUnisci(' +
+      '<button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px;background:#2c6e49" onclick="confermaUnisci(' +
       idx +
       ')">Conferma</button>';
     html +=
-      '<button class="btn-modal-cancel" style="font-size:.82rem;padding:5px 12px" onclick="saltaUnisci(' +
+      '<button class="btn-modal-cancel" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px" onclick="saltaUnisci(' +
       idx +
       ')">Salta</button>';
     html += '</div></div>';
@@ -654,7 +666,7 @@ async function confermaUnisci(idx) {
     if (row) {
       row.style.background = 'rgba(44,110,73,0.1)';
       row.innerHTML =
-        '<span style="color:#2c6e49;font-size:.85rem"><i class="icx icx-check"></i> ' +
+        '<span style="color:#2c6e49;font-size:var(--fs-md,.875rem)"><i class="icx icx-check"></i> ' +
         escP(c.remove.nome) +
         ' unito in <strong>' +
         escP(c.merged.nome) +
@@ -686,7 +698,7 @@ function saltaUnisci(idx) {
   if (row) {
     row.style.opacity = '0.3';
     row.innerHTML =
-      '<span style="color:var(--muted);font-size:.85rem">&#10060; ' +
+      '<span style="color:var(--muted);font-size:var(--fs-md,.875rem)">&#10060; ' +
       escP(c.remove.nome) +
       ' / ' +
       escP(c.keep.nome) +
@@ -769,11 +781,11 @@ function renderMaisonBudgetAlerts() {
     if (budgetBl && nBL >= budgetBl) alerts.push({ nome: b.nome, tipo: 'bl_over', count: nBL, max: budgetBl });
   });
   let html =
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="font-size:.82rem;color:var(--muted)">Periodo budget:</span><select id="maison-budget-periodo" onchange="renderMaisonBudgetAlerts()" style="padding:4px 8px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper);color:var(--ink)"><option value="mese"' +
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">Periodo budget:</span><select id="maison-budget-periodo" onchange="renderMaisonBudgetAlerts()" style="padding:4px 8px;border:1px solid var(--line);border-radius:2px;font-size:var(--fs-sm,.8125rem);background:var(--paper);color:var(--ink)"><option value="mese"' +
     (periodo === 'mese' ? ' selected' : '') +
     '>Mese corrente</option><option value="anno"' +
     (periodo === 'anno' ? ' selected' : '') +
-    '>Anno corrente</option></select><span style="font-size:.82rem;color:var(--muted)">(' +
+    '>Anno corrente</option></select><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">(' +
     periodoLabel +
     ')</span></div>';
   if (!alerts.length) {
@@ -855,7 +867,7 @@ function acFiltraMaison(inputId, dropId) {
       const badge = item.cat
         ? '<span class="mini-badge" style="background:' +
           (_catColorsAc[item.cat] || 'var(--muted)') +
-          ';margin-left:6px;font-size:.82rem;vertical-align:middle">' +
+          ';margin-left:6px;font-size:var(--fs-sm,.8125rem);vertical-align:middle">' +
           escP(_catLabelsAc[item.cat] || '') +
           '</span>'
         : '';
@@ -1424,7 +1436,7 @@ function _renderSpeseExtraDel() {
     return;
   }
   const stile =
-    'padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper);color:var(--ink)';
+    'padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:var(--fs-sm,.8125rem);background:var(--paper);color:var(--ink)';
   const giorni = [...new Set(tutte.map((r) => r.data_spesa))].filter(Boolean).sort().reverse();
   const mesi = [...new Set(tutte.map((r) => (r.data_spesa || '').substring(0, 7)))].filter(Boolean).sort().reverse();
   wrap.style.display = 'inline-flex';
@@ -1560,7 +1572,7 @@ function renderSpeseExtra() {
     nBenef +
     '</div><div class="mini-stat-label">Beneficiari</div></div>' +
     (topTipoLabel
-      ? '<div class="mini-stat"><div class="mini-stat-num" style="font-size:1rem">' +
+      ? '<div class="mini-stat"><div class="mini-stat-num" style="font-size:var(--fs-lg,1.0625rem)">' +
         topTipoLabel +
         '</div><div class="mini-stat-label">Tipo frequente</div></div>'
       : '') +
@@ -1586,22 +1598,22 @@ function renderSpeseExtra() {
     }
     const _seCatBadge =
       _seBudget && _seBudget.categoria === 'full_maison'
-        ? ' <span class="mini-badge" style="background:#b8860b;font-size:.82rem">Full Maison</span>'
+        ? ' <span class="mini-badge" style="background:#b8860b;font-size:var(--fs-sm,.8125rem)">Full Maison</span>'
         : _seBudget && _seBudget.categoria === 'maison'
-          ? ' <span class="mini-badge" style="background:#2980b9;font-size:.82rem">Maison</span>'
+          ? ' <span class="mini-badge" style="background:#2980b9;font-size:var(--fs-sm,.8125rem)">Maison</span>'
           : _seBudget && _seBudget.categoria === 'direzione'
-            ? ' <span class="mini-badge" style="background:#8e44ad;font-size:.82rem">Direzione</span>'
+            ? ' <span class="mini-badge" style="background:#8e44ad;font-size:var(--fs-sm,.8125rem)">Direzione</span>'
             : _seBudget && _seBudget.categoria === 'bu'
-              ? ' <span class="mini-badge" style="background:#e67e22;font-size:.82rem">Buono Unico</span>'
+              ? ' <span class="mini-badge" style="background:#e67e22;font-size:var(--fs-sm,.8125rem)">Buono Unico</span>'
               : _seBudget && _seBudget.categoria === 'bl'
-                ? ' <span class="mini-badge" style="background:#2c6e49;font-size:.82rem">Buono Lounge</span>'
+                ? ' <span class="mini-badge" style="background:#2c6e49;font-size:var(--fs-sm,.8125rem)">Buono Lounge</span>'
                 : '';
     const tipiBadges = Object.entries(d.tipi)
       .map(
         ([t, n]) =>
           '<span class="mini-badge" style="background:' +
           (SE_TIPI_COLOR[t] || 'var(--muted)') +
-          ';font-size:.82rem">' +
+          ';font-size:var(--fs-sm,.8125rem)">' +
           n +
           ' ' +
           (SE_TIPI_LABEL[t] || t) +
@@ -1627,9 +1639,9 @@ function renderSpeseExtra() {
       fmtCHF(d.tot / d.visite) +
       '</td><td style="white-space:nowrap"><button class="btn-act edit" onclick="rinominaSpeseExtraBenef(\'' +
       ne +
-      '\')" style="font-size:.82rem;padding:3px 8px">Rinomina</button> <button class="btn-act del" onclick="eliminaSpeseExtraBenef(\'' +
+      '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 8px">Rinomina</button> <button class="btn-act del" onclick="eliminaSpeseExtraBenef(\'' +
       ne +
-      '\')" style="font-size:.82rem;padding:3px 8px">Elimina</button></td></tr>';
+      '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 8px">Elimina</button></td></tr>';
   });
   h +=
     '<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td class="num"><strong>' +
@@ -1664,7 +1676,7 @@ async function eliminaSpeseExtraBenef(nome) {
 function rinominaSpeseExtraBenef(vecchio) {
   const mc = document.getElementById('pwd-modal-content');
   mc.innerHTML =
-    '<h3>Rinomina beneficiario</h3><p style="color:var(--muted);font-size:.85rem;margin-bottom:12px">Rinomina tutte le spese extra di <strong>' +
+    '<h3>Rinomina beneficiario</h3><p style="color:var(--muted);font-size:var(--fs-md,.875rem);margin-bottom:12px">Rinomina tutte le spese extra di <strong>' +
     escP(vecchio) +
     '</strong></p><div class="pwd-field"><label>Nuovo nome</label><input type="text" id="se-rename-nuovo" value="' +
     escP(vecchio) +
@@ -2158,14 +2170,14 @@ window._hrAllegatiScheda = []; // ultimo elenco caricato (per apri/elimina)
 async function caricaAllegatiCollab(nome) {
   const el = document.getElementById('hr-allegati-list');
   if (!el) return;
-  el.innerHTML = '<p style="color:var(--muted);font-size:.82rem">Caricamento allegati...</p>';
+  el.innerHTML = '<p style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">Caricamento allegati...</p>';
   try {
     const rows = await secGet(
       'hr_allegati?collaboratore=eq.' + encodeURIComponent(nome) + '&order=created_at.desc&limit=50',
     );
     window._hrAllegatiScheda = rows || [];
     if (!rows || !rows.length) {
-      el.innerHTML = '<p style="color:var(--muted);font-size:.82rem">Nessun allegato caricato.</p>';
+      el.innerHTML = '<p style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">Nessun allegato caricato.</p>';
       return;
     }
     el.innerHTML = rows
@@ -2194,7 +2206,7 @@ async function caricaAllegatiCollab(nome) {
       })
       .join('');
   } catch (e) {
-    el.innerHTML = '<p style="color:var(--accent);font-size:.82rem">Errore caricamento allegati.</p>';
+    el.innerHTML = '<p style="color:var(--accent);font-size:var(--fs-sm,.8125rem)">Errore caricamento allegati.</p>';
   }
 }
 function apriHrAllegato(id) {
@@ -2495,7 +2507,7 @@ function _renderInvTabs() {
     .querySelectorAll('.inv-tab-btn:not(.inv-tab-custom)')
     .forEach((b) => (b.style.display = _invConBase() ? '' : 'none'));
   const stile =
-    'padding:8px 20px;border:2px solid var(--line);background:var(--paper);color:var(--ink);border-radius:2px;font-size:.88rem;font-weight:600;cursor:pointer;transition:all .2s';
+    'padding:8px 20px;border:2px solid var(--line);background:var(--paper);color:var(--ink);border-radius:2px;font-size:var(--fs-md,.875rem);font-weight:600;cursor:pointer;transition:all .2s';
   getInvCategorieExtra().forEach((cat) => {
     const b = document.createElement('button');
     b.className = 'inv-tab-btn inv-tab-custom';
@@ -2635,9 +2647,9 @@ function renderInventarioCustom(cat) {
     (adm
       ? '<span><button onclick="rinominaCategoriaInventario(\'' +
         cat.key +
-        '\')" style="font-size:.82rem;padding:3px 10px;background:none;border:1px solid var(--paper);color:var(--paper);border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif">Rinomina</button> <button onclick="rimuoviCategoriaInventario(\'' +
+        '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid var(--paper);color:var(--paper);border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif">Rinomina</button> <button onclick="rimuoviCategoriaInventario(\'' +
         cat.key +
-        '\')" style="font-size:.82rem;padding:3px 10px;background:none;border:1px solid #e74c3c;color:#e74c3c;border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif">Rimuovi categoria</button></span>'
+        '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid #e74c3c;color:#e74c3c;border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif">Rimuovi categoria</button></span>'
       : '') +
     '</div>';
   html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;padding:16px">';
@@ -2696,12 +2708,12 @@ function renderInventarioCustom(cat) {
   if (!rows.length) html += '<p style="color:var(--muted);padding:16px;text-align:center">Nessun movimento</p>';
   else {
     html +=
-      '<div style="padding:12px 18px;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.88rem"><thead><tr style="border-bottom:2px solid var(--line);text-align:left"><th style="padding:8px">Data</th><th style="padding:8px">Articolo</th><th style="padding:8px">Qty</th><th style="padding:8px">Movimento</th><th style="padding:8px">Destinazione</th><th style="padding:8px">Nota</th><th style="padding:8px"></th></tr></thead><tbody>';
+      '<div style="padding:12px 18px;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:var(--fs-md,.875rem)"><thead><tr style="border-bottom:2px solid var(--line);text-align:left"><th style="padding:8px">Data</th><th style="padding:8px">Articolo</th><th style="padding:8px">Qty</th><th style="padding:8px">Movimento</th><th style="padding:8px">Destinazione</th><th style="padding:8px">Nota</th><th style="padding:8px"></th></tr></thead><tbody>';
     rows.forEach((r) => {
       const d = r.data_movimento ? new Date(r.data_movimento + 'T12:00:00').toLocaleDateString('it-IT') : '';
       const isIn = r.movimento === 'entrata';
       html +=
-        '<tr style="border-bottom:1px solid var(--line)"><td style="padding:6px 8px;color:var(--muted);font-size:.82rem">' +
+        '<tr style="border-bottom:1px solid var(--line)"><td style="padding:6px 8px;color:var(--muted);font-size:var(--fs-sm,.8125rem)">' +
         d +
         '</td><td style="padding:6px 8px;font-weight:600">' +
         escP(r.tipo) +
@@ -2726,7 +2738,7 @@ function renderInventarioCustom(cat) {
     });
     html += '</tbody></table></div>';
     html +=
-      '<div style="padding:8px 18px 16px;display:flex;gap:8px"><button class="btn-export" onclick="esportaInventarioCSV()" style="padding:6px 14px;font-size:.82rem">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaInventarioPDF()" style="padding:6px 14px;font-size:.82rem">PDF</button></div>';
+      '<div style="padding:8px 18px 16px;display:flex;gap:8px"><button class="btn-export" onclick="esportaInventarioCSV()" style="padding:6px 14px;font-size:var(--fs-sm,.8125rem)">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaInventarioPDF()" style="padding:6px 14px;font-size:var(--fs-sm,.8125rem)">PDF</button></div>';
   }
   html += '</div>';
   el.innerHTML = html;
@@ -2815,17 +2827,17 @@ function renderInventarioBuoni() {
         })
         .join('') +
       (_scortaFinita.length
-        ? '<div style="width:100%;grid-column:1/-1;margin-top:8px;padding:8px;background:rgba(192,57,43,0.15);color:var(--accent);border-radius:3px;font-size:.85rem;font-weight:600"><i class="icx icx-avviso"></i> Scorta esaurita: ' +
+        ? '<div style="width:100%;grid-column:1/-1;margin-top:8px;padding:8px;background:rgba(192,57,43,0.15);color:var(--accent);border-radius:3px;font-size:var(--fs-md,.875rem);font-weight:600"><i class="icx icx-avviso"></i> Scorta esaurita: ' +
           _scortaFinita.join(', ') +
           '</div>'
         : '') +
       (_scortaBassa.length
-        ? '<div style="width:100%;grid-column:1/-1;margin-top:8px;padding:8px;background:rgba(230,126,34,0.12);color:#e67e22;border-radius:3px;font-size:.85rem"><i class="icx icx-avviso"></i> Scorta bassa (&le;10): ' +
+        ? '<div style="width:100%;grid-column:1/-1;margin-top:8px;padding:8px;background:rgba(230,126,34,0.12);color:#e67e22;border-radius:3px;font-size:var(--fs-md,.875rem)"><i class="icx icx-avviso"></i> Scorta bassa (&le;10): ' +
           _scortaBassa.map((t) => t + ' (' + giacenze[t] + ')').join(', ') +
           '</div>'
         : '') +
       (nonPareggiati
-        ? '<div style="width:100%;grid-column:1/-1;margin-top:8px;padding:8px;background:rgba(230,126,34,0.12);color:#e67e22;border-radius:3px;font-size:.85rem"><i class="icx icx-avviso"></i> ' +
+        ? '<div style="width:100%;grid-column:1/-1;margin-top:8px;padding:8px;background:rgba(230,126,34,0.12);color:#e67e22;border-radius:3px;font-size:var(--fs-md,.875rem)"><i class="icx icx-avviso"></i> ' +
           nonPareggiati +
           ' buoni pre-assegnati non pareggiati</div>'
         : '');
@@ -2939,7 +2951,7 @@ function renderInventarioBuoniTable() {
     WL: '#7b2d8b',
   };
   let html =
-    '<table style="width:100%;border-collapse:collapse;font-size:.88rem"><thead><tr style="border-bottom:2px solid var(--line);text-align:left"><th style="padding:8px">Data</th><th style="padding:8px">Tipo</th><th style="padding:8px">Qty</th><th style="padding:8px">Movimento</th><th style="padding:8px">Cliente</th><th style="padding:8px">Stato</th><th style="padding:8px"></th></tr></thead><tbody>';
+    '<table style="width:100%;border-collapse:collapse;font-size:var(--fs-md,.875rem)"><thead><tr style="border-bottom:2px solid var(--line);text-align:left"><th style="padding:8px">Data</th><th style="padding:8px">Tipo</th><th style="padding:8px">Qty</th><th style="padding:8px">Movimento</th><th style="padding:8px">Cliente</th><th style="padding:8px">Stato</th><th style="padding:8px"></th></tr></thead><tbody>';
   all.forEach((r) => {
     const d = r.data_movimento ? new Date(r.data_movimento + 'T12:00:00').toLocaleDateString('it-IT') : '';
     const mov = movLabels[r.movimento] || r.movimento;
@@ -2961,11 +2973,11 @@ function renderInventarioBuoniTable() {
         r.id +
         ')" title="Elimina"><i class="icx icx-cestino"></i></button></div>';
     html +=
-      '<tr style="border-bottom:1px solid var(--line)"><td style="padding:6px 8px;white-space:nowrap;color:var(--muted);font-size:.82rem">' +
+      '<tr style="border-bottom:1px solid var(--line)"><td style="padding:6px 8px;white-space:nowrap;color:var(--muted);font-size:var(--fs-sm,.8125rem)">' +
       d +
       '</td><td style="padding:6px 8px"><span style="background:' +
       (tipColors[r.tipo] || 'var(--muted)') +
-      ';color:white;padding:2px 8px;border-radius:2px;font-size:.82rem;font-weight:600">' +
+      ';color:white;padding:2px 8px;border-radius:2px;font-size:var(--fs-sm,.8125rem);font-weight:600">' +
       escP(r.tipo) +
       '</span></td><td style="padding:6px 8px;font-weight:700;color:' +
       col +
@@ -3046,12 +3058,12 @@ function renderInventarioSigTable() {
     return;
   }
   let html =
-    '<table style="width:100%;border-collapse:collapse;font-size:.88rem"><thead><tr style="border-bottom:2px solid var(--line);text-align:left"><th style="padding:8px">Data</th><th style="padding:8px">Marca</th><th style="padding:8px">Qty</th><th style="padding:8px">Movimento</th><th style="padding:8px">Cliente</th><th style="padding:8px">Collaboratore</th><th style="padding:8px"></th></tr></thead><tbody>';
+    '<table style="width:100%;border-collapse:collapse;font-size:var(--fs-md,.875rem)"><thead><tr style="border-bottom:2px solid var(--line);text-align:left"><th style="padding:8px">Data</th><th style="padding:8px">Marca</th><th style="padding:8px">Qty</th><th style="padding:8px">Movimento</th><th style="padding:8px">Cliente</th><th style="padding:8px">Collaboratore</th><th style="padding:8px"></th></tr></thead><tbody>';
   rows.forEach((r) => {
     const d = r.data_movimento ? new Date(r.data_movimento + 'T12:00:00').toLocaleDateString('it-IT') : '';
     const isIn = r.movimento === 'entrata';
     html +=
-      '<tr style="border-bottom:1px solid var(--line)"><td style="padding:6px 8px;color:var(--muted);font-size:.82rem">' +
+      '<tr style="border-bottom:1px solid var(--line)"><td style="padding:6px 8px;color:var(--muted);font-size:var(--fs-sm,.8125rem)">' +
       d +
       '</td><td style="padding:6px 8px;font-weight:600">' +
       escP(r.tipo) +
@@ -3797,7 +3809,7 @@ window.addEventListener('load', async () => {
     MESI[n.getMonth()] +
     ' ' +
     n.getFullYear() +
-    '<br><small style="color:var(--muted);font-size:.82rem">' +
+    '<br><small style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">' +
     GIORNI[n.getDay()] +
     '</small>';
   // Render gia eseguito nel blocco login sopra (dopo loadAll)

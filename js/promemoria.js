@@ -234,7 +234,10 @@ function getPromemoriaFiltrati() {
   const admin = isAdmin();
   const stato = (document.getElementById('pm-filt-stato') || {}).value || 'attivi';
   const filtOp = (document.getElementById('pm-filt-op') || {}).value || '';
+  const cerca = ((document.getElementById('pm-filt-cerca') || {}).value || '').trim().toLowerCase();
   return promemoriaCache.filter((p) => {
+    if (cerca && ![p.titolo, p.descrizione, p.assegnato_a, p.creato_da].join(' ').toLowerCase().includes(cerca))
+      return false;
     if (stato === 'attivi' && p.completata) return false;
     if (stato === 'completati' && !p.completata) return false;
     if (filtOp && !_includeOpInCsv(p.assegnato_a, filtOp)) return false;
@@ -274,18 +277,20 @@ function renderPromemoria() {
         (scaduto ? ' overdue' : '') +
         '">' +
         new Date(p.data_scadenza + 'T12:00:00').toLocaleDateString('it-IT') +
-        '</span><strong style="flex:1;font-size:1rem;' +
+        '</span><strong style="flex:1;font-size:var(--fs-lg,1.0625rem);' +
         (p.completata ? 'text-decoration:line-through' : '') +
         '">' +
         escP(p.titolo) +
-        '</strong><span style="font-size:.82rem;padding:2px 8px;border-radius:2px;background:' +
+        '</strong><span style="font-size:var(--fs-sm,.8125rem);padding:2px 8px;border-radius:2px;background:' +
         (p.assegnato_a === 'tutti' ? 'var(--accent2)' : '#2980b9') +
         ';color:white;font-weight:600">' +
         escP(p.assegnato_a === 'tutti' ? 'Tutti' : p.assegnato_a) +
         '</span>' +
-        (scaduto ? '<span style="font-size:.82rem;color:var(--accent);font-weight:700">SCADUTO</span>' : '') +
+        (scaduto
+          ? '<span style="font-size:var(--fs-sm,.8125rem);color:var(--accent);font-weight:700">SCADUTO</span>'
+          : '') +
         (p.completata
-          ? '<span style="font-size:.82rem;color:#2c6e49;font-weight:600">Fatto da ' +
+          ? '<span style="font-size:var(--fs-sm,.8125rem);color:#2c6e49;font-weight:600">Fatto da ' +
             escP(p.completata_da || '?') +
             ' il ' +
             new Date(p.completata_at).toLocaleDateString('it-IT') +
@@ -300,11 +305,11 @@ function renderPromemoria() {
         (admin ? '<button class="btn-act del" onclick="eliminaPromemoria(' + p.id + ')">Elimina</button>' : '') +
         '</div></div>' +
         (p.descrizione
-          ? '<div style="width:100%;padding:6px 0 0;color:var(--muted);font-size:.88rem">' +
+          ? '<div style="width:100%;padding:6px 0 0;color:var(--muted);font-size:var(--fs-md,.875rem)">' +
             esc(p.descrizione) +
             '</div>'
           : '') +
-        '<div style="width:100%;font-size:.82rem;color:var(--muted);margin-top:4px">Creato da ' +
+        '<div style="width:100%;font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:4px">Creato da ' +
         escP(p.creato_da || 'Admin') +
         '</div></div>'
       );
@@ -393,12 +398,13 @@ function mostraPromemoriaLogin() {
   let html = '<h3 style="margin-bottom:4px">Promemoria</h3>';
   if (scaduti.length)
     html +=
-      '<p style="color:var(--accent);font-size:.85rem;margin-bottom:12px;font-weight:600">' +
+      '<p style="color:var(--accent);font-size:var(--fs-md,.875rem);margin-bottom:12px;font-weight:600">' +
       scaduti.length +
       ' promemoria scadut' +
       (scaduti.length === 1 ? 'o' : 'i') +
       '!</p>';
-  else html += '<p style="color:var(--muted);font-size:.82rem;margin-bottom:12px">Promemoria per oggi</p>';
+  else
+    html += '<p style="color:var(--muted);font-size:var(--fs-sm,.8125rem);margin-bottom:12px">Promemoria per oggi</p>';
   html += lista
     .map((p) => {
       const scaduto = p.data_scadenza < oggi;
@@ -407,12 +413,14 @@ function mostraPromemoriaLogin() {
         (scaduto ? 'var(--accent)' : '#e67e22') +
         '"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><strong>' +
         escP(p.titolo) +
-        '</strong><span style="font-size:.82rem;color:' +
+        '</strong><span style="font-size:var(--fs-sm,.8125rem);color:' +
         (scaduto ? 'var(--accent)' : '#e67e22') +
         ';font-weight:600">' +
         new Date(p.data_scadenza + 'T12:00:00').toLocaleDateString('it-IT') +
         '</span></div>' +
-        (p.descrizione ? '<div style="font-size:.85rem;color:var(--muted)">' + esc(p.descrizione) + '</div>' : '') +
+        (p.descrizione
+          ? '<div style="font-size:var(--fs-md,.875rem);color:var(--muted)">' + esc(p.descrizione) + '</div>'
+          : '') +
         '</div>'
       );
     })
@@ -807,7 +815,7 @@ async function caricaMaisonFile(input, forzaSostituisci) {
             const badge =
               '<span class="mini-badge" style="background:' +
               catColor +
-              ';margin-left:6px;font-size:.82rem">' +
+              ';margin-left:6px;font-size:var(--fs-sm,.8125rem)">' +
               escP(catLabel) +
               '</span>';
             mHtml +=
@@ -1055,16 +1063,16 @@ async function caricaMaisonFile(input, forzaSostituisci) {
         '</span>';
     if (giorniSaltati.length) {
       msg +=
-        '<br><span style="color:var(--accent2);font-size:.82rem">Giorni già presenti (saltati): ' +
+        '<br><span style="color:var(--accent2);font-size:var(--fs-sm,.8125rem)">Giorni già presenti (saltati): ' +
         giorniSaltati.join(', ') +
         '</span>';
       msg +=
-        ' <button onclick="caricaMaisonFile(document.getElementById(\'maison-file-input\'),true)" style="font-size:.82rem;padding:3px 10px;cursor:pointer;border:1px solid var(--accent);color:var(--accent);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif;font-weight:600;margin-left:6px">Sostituisci tutto</button>';
+        ' <button onclick="caricaMaisonFile(document.getElementById(\'maison-file-input\'),true)" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;cursor:pointer;border:1px solid var(--accent);color:var(--accent);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif;font-weight:600;margin-left:6px">Sostituisci tutto</button>';
     }
     if (!totalRows && !giorniSaltati.length) msg = '<span style="color:var(--muted)">Nessun dato nuovo trovato</span>';
     if (dupCount) {
       msg +=
-        '<br><span style="color:#c0392b;font-size:.82rem;font-weight:600"><i class="icx icx-avviso"></i> ' +
+        '<br><span style="color:#c0392b;font-size:var(--fs-sm,.8125rem);font-weight:600"><i class="icx icx-avviso"></i> ' +
         dupCount +
         ' duplicati trovati nello stesso giorno (inseriti comunque)</span>';
     }
@@ -1072,13 +1080,13 @@ async function caricaMaisonFile(input, forzaSostituisci) {
     if (warnSimili.length) {
       const uniq = [...new Set(warnSimili)];
       msg +=
-        '<br><span style="color:var(--accent);font-size:.82rem">Nomi simili: ' +
+        '<br><span style="color:var(--accent);font-size:var(--fs-sm,.8125rem)">Nomi simili: ' +
         uniq.slice(0, 5).join('; ') +
         '</span>';
     }
     if (sevenCount)
       msg +=
-        '<br><span style="color:#8e44ad;font-size:.82rem">' +
+        '<br><span style="color:#8e44ad;font-size:var(--fs-sm,.8125rem)">' +
         sevenCount +
         ' righe "Seven" spostate in Spese Extra</span>';
     status.innerHTML = msg;

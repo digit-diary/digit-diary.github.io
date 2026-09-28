@@ -14,7 +14,7 @@ function _renderPianoMappatureCard() {
     escP(repartoLabel(_pianoReparto())) +
     ' (admin)</div><div style="padding:10px 14px">';
   h +=
-    '<p style="font-size:.82rem;color:var(--muted);margin-bottom:6px">Valgono per il settore aperto: ogni settore ha le sue sigle. PRINCIPALE = turni normali della funzione. AMMESSO = permessi quando serve. PREFERITO = la bozza li privilegia. Chi ha una funzione con mappature riceve SOLO i turni elencati; chi non ne ha segue i settori abilitati e le regole di gruppo.</p>';
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:6px">Valgono per il settore aperto: ogni settore ha le sue sigle. PRINCIPALE = turni normali della funzione. AMMESSO = permessi quando serve. PREFERITO = la bozza li privilegia. Chi ha una funzione con mappature riceve SOLO i turni elencati; chi non ne ha segue i settori abilitati e le regole di gruppo.</p>';
   const ordine = { PRINCIPALE: 1, AMMESSO: 2, PREFERITO: 3 };
   const perFz = {};
   pianoMappatureCache
@@ -24,7 +24,7 @@ function _renderPianoMappatureCard() {
     .sort()
     .forEach((fz) => {
       h +=
-        '<p style="font-size:.85rem;font-weight:700;margin:8px 0 4px">' +
+        '<p style="font-size:var(--fs-md,.875rem);font-weight:700;margin:8px 0 4px">' +
         escP(fz) +
         '</p><div style="display:flex;gap:6px;flex-wrap:wrap">';
       perFz[fz]
@@ -149,13 +149,13 @@ function _renderPianoImpostazioniCard() {
   const GG_LBL = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
   const wk = _pianoGiorniWeekend();
   h +=
-    '<p style="font-size:.85rem;font-weight:700;margin:12px 0 4px">Giorni weekend</p>' +
-    '<p style="font-size:.82rem;color:var(--muted);margin-bottom:6px">Colonne evidenziate in verde nel calendario e conteggio weekend nelle statistiche. La domenica ha sempre il suo colore.</p>' +
+    '<p style="font-size:var(--fs-md,.875rem);font-weight:700;margin:12px 0 4px">Giorni weekend</p>' +
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:6px">Colonne evidenziate in verde nel calendario e conteggio weekend nelle statistiche. La domenica ha sempre il suo colore.</p>' +
     '<div style="display:flex;gap:12px;flex-wrap:wrap">' +
     [1, 2, 3, 4, 5, 6, 0]
       .map(
         (d) =>
-          '<label style="font-size:.82rem"><input type="checkbox"' +
+          '<label style="font-size:var(--fs-sm,.8125rem)"><input type="checkbox"' +
           (wk.includes(d) ? ' checked' : '') +
           ' onchange="salvaGiornoWeekend(' +
           d +
@@ -167,8 +167,8 @@ function _renderPianoImpostazioniCard() {
     '</div>';
   // competenze Formazione -> gruppi del piano
   h +=
-    '<p style="font-size:.85rem;font-weight:700;margin:12px 0 4px">Competenze Formazione → gruppi del piano</p>' +
-    '<p style="font-size:.82rem;color:var(--muted);margin-bottom:6px">Chi ha la competenza CERTIFICATA in Formazione diventa idoneo anche al gruppo indicato (in aggiunta ai suoi Settori). "-" = nessun collegamento.</p>';
+    '<p style="font-size:var(--fs-md,.875rem);font-weight:700;margin:12px 0 4px">Competenze Formazione → gruppi del piano</p>' +
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:6px">Chi ha la competenza CERTIFICATA in Formazione diventa idoneo anche al gruppo indicato (in aggiunta ai suoi Settori). "-" = nessun collegamento.</p>';
   // solo i gruppi dei turni DI QUESTO settore (i turni sono divisi per settore)
   const gruppiDisp = [
     ...new Set(
@@ -183,7 +183,7 @@ function _renderPianoImpostazioniCard() {
     h += '<div style="display:flex;gap:12px;flex-wrap:wrap">';
     compRep.forEach((k) => {
       h +=
-        '<label style="font-size:.8rem;display:flex;align-items:center;gap:4px">' +
+        '<label style="font-size:var(--fs-sm,.8125rem);display:flex;align-items:center;gap:4px">' +
         escP(k.label) +
         ' → <select onchange="salvaCompetenzaGruppo(\'' +
         escP(k.key) +
@@ -198,7 +198,7 @@ function _renderPianoImpostazioniCard() {
     h += '</div>';
   }
   h +=
-    '<p style="font-size:.8rem;color:var(--muted);margin-top:10px">Le funzioni compaiono nei menu di Gestione collaboratori e nelle mappature. Preferenze per collaboratore (solo diurni, turni bloccati, settori...) nella card qui sotto.</p>';
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:10px">Le funzioni compaiono nei menu di Gestione collaboratori e nelle mappature. Preferenze per collaboratore (solo diurni, turni bloccati, settori...) nella card qui sotto.</p>';
   h += '</div></div>';
   return h;
 }
@@ -629,7 +629,7 @@ function scaricaTemplatePiano(tipo) {
 function _renderPianoImportExportCard() {
   if (!puoGestirePiano()) return '';
   const btn = (testo, onclick, colore) =>
-    '<button class="btn-export" style="font-size:.8rem;padding:4px 12px;border-color:' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:' +
     (colore || '#b8a98a') +
     ';color:' +
     (colore || '#b8a98a') +
@@ -641,7 +641,7 @@ function _renderPianoImportExportCard() {
   let h =
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Import / Export dati</div><div style="padding:10px 14px">';
   h +=
-    '<p style="font-size:.85rem;font-weight:700;margin-bottom:6px">Esporta (CSV, apribile in Excel)</p><div style="display:flex;gap:8px;flex-wrap:wrap">';
+    '<p style="font-size:var(--fs-md,.875rem);font-weight:700;margin-bottom:6px">Esporta (CSV, apribile in Excel)</p><div style="display:flex;gap:8px;flex-wrap:wrap">';
   h += btn('Piano del mese', "esportaPianoDati('piano')");
   h += btn('Fabbisogno del mese', "esportaPianoDati('fabbisogno')");
   h += btn('Collaboratori', "esportaPianoDati('collaboratori')");
@@ -651,13 +651,13 @@ function _renderPianoImportExportCard() {
   h += btn('Timbrature del mese', "esportaPianoDati('timbrature')");
   h += '</div>';
   h +=
-    '<p style="font-size:.85rem;font-weight:700;margin:12px 0 6px">Template per l\'import</p><div style="display:flex;gap:8px;flex-wrap:wrap">';
+    '<p style="font-size:var(--fs-md,.875rem);font-weight:700;margin:12px 0 6px">Template per l\'import</p><div style="display:flex;gap:8px;flex-wrap:wrap">';
   h += btn('Template fabbisogno', "scaricaTemplatePiano('fabbisogno')", '#2c6e49');
   h += btn('Template vacanze', "scaricaTemplatePiano('vacanze')", '#2c6e49');
   h += btn('Template timbrature', "scaricaTemplatePiano('timbrature')", '#2c6e49');
   h += '</div>';
   h +=
-    '<p style="font-size:.82rem;color:var(--muted);margin-top:8px">Gli import si fanno nelle rispettive schermate: fabbisogno nel Calendario, vacanze nella tab Vacanze, timbrature nella tab Timbrature (o in automatico dalla timbratrice). L\'export copre anche il backup completo in Impostazioni del Diario.</p>';
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:8px">Gli import si fanno nelle rispettive schermate: fabbisogno nel Calendario, vacanze nella tab Vacanze, timbrature nella tab Timbrature (o in automatico dalla timbratrice). L\'export copre anche il backup completo in Impostazioni del Diario.</p>';
   h += '</div></div>';
   return h;
 }
@@ -703,9 +703,9 @@ async function _renderPianoFormulariTab() {
   const riga = (titolo, desc, onclick, etichetta) =>
     '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:260px"><b>' +
     titolo +
-    '</b><br><span style="font-size:.8rem;color:var(--muted)">' +
+    '</b><br><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
     desc +
-    '</span></div><button class="btn-export" style="font-size:.82rem;padding:5px 14px" onclick="' +
+    '</span></div><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 14px" onclick="' +
     onclick +
     '">' +
     (etichetta || 'Stampa PDF') +
@@ -731,11 +731,11 @@ async function _renderPianoFormulariTab() {
   const rigaProtocollo = (titolo, nomeOriginale, chiave) =>
     '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:260px"><b>' +
     titolo +
-    '</b><br><span style="font-size:.8rem;color:var(--muted)">Modulo ufficiale Word da stampare/compilare. In alternativa, la versione Excel si compila al computer e si reimporta in Formazione per la certificazione automatica.</span></div>' +
-    '<button class="btn-export" style="font-size:.82rem;padding:5px 14px;border-color:#1a4a7a;color:#1a4a7a" onclick="apriFormularioPerNome(\'' +
+    '</b><br><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">Modulo ufficiale Word da stampare/compilare. In alternativa, la versione Excel si compila al computer e si reimporta in Formazione per la certificazione automatica.</span></div>' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 14px;border-color:#1a4a7a;color:#1a4a7a" onclick="apriFormularioPerNome(\'' +
     nomeOriginale.replace(/'/g, "\\'") +
     '\')">Scarica Word (originale)</button>' +
-    '<button class="btn-export" style="font-size:.82rem;padding:4px 10px" onclick="pianoScaricaProtocollo(\'' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" onclick="pianoScaricaProtocollo(\'' +
     chiave +
     '\')">Excel per import</button></div>';
   h += rigaProtocollo(
@@ -760,11 +760,11 @@ async function _renderPianoFormulariTab() {
     ')';
   if (puoMod)
     h +=
-      '<button class="btn-export" style="font-size:.82rem;padding:4px 12px;border-color:#2c6e49;color:#2c6e49" onclick="document.getElementById(\'form-arch-file\').click()">Carica formulario</button>' +
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:#2c6e49;color:#2c6e49" onclick="document.getElementById(\'form-arch-file\').click()">Carica formulario</button>' +
       '<input type="file" id="form-arch-file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv" style="display:none" onchange="caricaFormulario(this)">';
   h += '</div><div style="padding:6px 16px 14px">';
   h +=
-    '<p style="font-size:.8rem;color:var(--muted);margin-bottom:8px">PDF, Word ed Excel fino a 2 MB, organizzati in cartelle per settore. I PDF si aprono e stampano direttamente; Word ed Excel si scaricano e si stampano dal programma.</p>';
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">PDF, Word ed Excel fino a 2 MB, organizzati in cartelle per settore. I PDF si aprono e stampano direttamente; Word ed Excel si scaricano e si stampano dal programma.</p>';
   if (!_pianoFormulariCache.length) h += '<p style="color:var(--muted);padding:8px 0">Nessun formulario caricato.</p>';
   const perCartella = {};
   _pianoFormulariCache.forEach(
@@ -774,30 +774,31 @@ async function _renderPianoFormulariTab() {
     .sort()
     .forEach((cart) => {
       h +=
-        '<div style="margin:10px 0 4px;font-weight:700;font-size:.9rem">📁 ' +
+        '<div style="margin:10px 0 4px;font-weight:700;font-size:var(--fs-md,.875rem)"><i class="icx icx-file"></i> ' +
         escP(cart) +
         ' <span style="font-weight:400;color:var(--muted)">(' +
         perCartella[cart].length +
         ')</span></div>';
       perCartella[cart].forEach((f) => {
-        const icona = f.mime === 'application/pdf' ? '📄' : f.mime && f.mime.includes('sheet') ? '📊' : '📝';
+        const icona =
+          f.mime && f.mime.includes('sheet') ? '<i class="icx icx-stats"></i>' : '<i class="icx icx-file"></i>';
         h +=
           '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0 6px 14px;border-bottom:1px solid var(--line)"><span style="flex:1;min-width:220px">' +
           icona +
           ' ' +
           escP(f.nome) +
-          ' <span style="font-size:.82rem;color:var(--muted)">(' +
+          ' <span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">(' +
           Math.round((f.dimensione || 0) / 1024) +
           ' KB)</span></span>' +
-          '<button class="btn-export" style="font-size:.82rem;padding:3px 10px" onclick="apriFormulario(' +
+          '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px" onclick="apriFormulario(' +
           f.id +
           ')">' +
           (f.mime === 'application/pdf' ? 'Apri / Stampa' : 'Scarica') +
           '</button>' +
           (puoMod
-            ? '<button class="btn-export" style="font-size:.82rem;padding:3px 10px;border-color:#1a4a7a;color:#1a4a7a" onclick="rinominaFormulario(' +
+            ? '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:#1a4a7a;color:#1a4a7a" onclick="rinominaFormulario(' +
               f.id +
-              ')">Rinomina/Sposta</button><button class="btn-export" style="font-size:.82rem;padding:3px 10px;border-color:var(--accent);color:var(--accent)" onclick="eliminaFormulario(' +
+              ')">Rinomina/Sposta</button><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:var(--accent);color:var(--accent)" onclick="eliminaFormulario(' +
               f.id +
               ')">Elimina</button>'
             : '') +
@@ -1033,9 +1034,9 @@ function _renderPianoRegoleGruppoCard() {
   let h =
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Regole di gruppo (admin)</div><div style="padding:10px 14px">';
   h +=
-    '<p style="font-size:.82rem;color:var(--muted);margin-bottom:6px">Regole di idoneità per settore/gruppo: chi può lavorare in un gruppo, limiti e minimi per funzione. Applicate dalla bozza automatica e dal validatore.</p>';
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:6px">Regole di idoneità per settore/gruppo: chi può lavorare in un gruppo, limiti e minimi per funzione. Applicate dalla bozza automatica e dal validatore.</p>';
   h +=
-    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:680px;font-size:.85rem"><thead><tr><th>Gruppo</th><th style="text-align:left">Regola</th><th style="text-align:left">Valore</th><th>Attiva</th><th></th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:680px;font-size:var(--fs-md,.875rem)"><thead><tr><th>Gruppo</th><th style="text-align:left">Regola</th><th style="text-align:left">Valore</th><th>Attiva</th><th></th></tr></thead><tbody>';
   pianoRegoleGruppoCache
     .filter((r) => (r.reparto_dip || 'slots') === _pianoReparto())
     .sort((a, b) => (a.gruppo || '').localeCompare(b.gruppo || '') || a.id - b.id)
@@ -1047,7 +1048,7 @@ function _renderPianoRegoleGruppoCard() {
         escP(_REGOLE_GRUPPO_TIPI[r.tipo_regola] || '') +
         '"><b>' +
         escP(_REGOLE_GRUPPO_ETICHETTE[r.tipo_regola] || r.tipo_regola) +
-        '</b><br><span style="font-size:.78rem;color:var(--muted)">' +
+        '</b><br><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
         escP(r.tipo_regola) +
         '</span></td><td style="text-align:left"><input type="text" value="' +
         escP(r.valore || '') +
@@ -1063,8 +1064,8 @@ function _renderPianoRegoleGruppoCard() {
     });
   h += '</tbody></table></div>';
   h +=
-    '<details style="margin:10px 0;background:var(--paper2);border:1px solid var(--line);border-radius:3px;padding:8px 12px"><summary style="cursor:pointer;font-weight:700;font-size:.9rem">Come si crea una regola di gruppo (esempi)</summary>' +
-    '<ol style="font-size:.85rem;margin:8px 0 4px 18px;line-height:1.5">' +
+    '<details style="margin:10px 0;background:var(--paper2);border:1px solid var(--line);border-radius:3px;padding:8px 12px"><summary style="cursor:pointer;font-weight:700;font-size:var(--fs-md,.875rem)">Come si crea una regola di gruppo (esempi)</summary>' +
+    '<ol style="font-size:var(--fs-md,.875rem);margin:8px 0 4px 18px;line-height:1.5">' +
     '<li>Scegli il <b>gruppo</b> di turni a cui la regola si riferisce (quello scritto nella scheda Turni, colonna Gruppo). "tutti" vale per ogni gruppo del settore.</li>' +
     '<li>Scegli il <b>tipo</b>: sotto compare la spiegazione con un esempio del valore.</li>' +
     '<li>Scrivi il <b>valore</b> nel formato dell esempio e premi Aggiungi. Il programma controlla che gruppo, funzioni e sigle esistano in questo settore: se qualcosa non torna te lo dice.</li>' +
@@ -1080,7 +1081,7 @@ function _renderPianoRegoleGruppoCard() {
       .join('') +
     '</select></div><div class="field"><label>Valore</label><input type="text" id="rg-valore" placeholder="SUP:1" style="width:150px"></div>' +
     '<button class="btn-add-tipo" onclick="aggiungiRegolaGruppo()">+ Aggiungi regola</button></div>' +
-    '<p id="rg-aiuto" style="font-size:.82rem;color:var(--muted);margin-top:4px">' +
+    '<p id="rg-aiuto" style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:4px">' +
     _REGOLE_GRUPPO_TIPI.richiede_funzione +
     '</p>';
   h += '</div></div>';
@@ -1280,7 +1281,7 @@ function _renderPianoCongediNpCard() {
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Congedi non pagati · ' +
     escP(repartoLabel(rep)) +
     '</div><div style="padding:10px 14px">' +
-    '<p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">Regolamento aziendale 5.14: domanda scritta, concessione della Direzione. Nel piano i giorni diventano <b>CNP</b> (zero ore, non contano fra le ore dovute). Oltre <b>' +
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Regolamento aziendale 5.14: domanda scritta, concessione della Direzione. Nel piano i giorni diventano <b>CNP</b> (zero ore, non contano fra le ore dovute). Oltre <b>' +
     sg +
     ' giorni</b> il diritto vacanze dell anno si riduce in proporzione; oltre <b>' +
     sm +
@@ -1296,10 +1297,11 @@ function _renderPianoCongediNpCard() {
     '<div class="field" style="margin:0"><label>Autorizzato da</label><input type="text" id="cnp-aut" placeholder="Direzione" style="padding:6px"></div>' +
     '<button class="btn-add-tipo" onclick="aggiungiCongedoNp()">Registra congedo</button></div>';
   if (!lista.length)
-    h += '<p style="font-size:.85rem;color:var(--muted)">Nessun congedo registrato in questo settore.</p>';
+    h +=
+      '<p style="font-size:var(--fs-md,.875rem);color:var(--muted)">Nessun congedo registrato in questo settore.</p>';
   else {
     h +=
-      '<div style="overflow-x:auto"><table class="piano-table" style="min-width:700px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Dal</th><th>Al</th><th>Giorni</th><th style="text-align:left">Motivo</th><th style="text-align:left">Autorizzato da</th><th style="text-align:left">Effetti</th><th></th></tr></thead><tbody>';
+      '<div style="overflow-x:auto"><table class="piano-table" style="min-width:700px;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Dal</th><th>Al</th><th>Giorni</th><th style="text-align:left">Motivo</th><th style="text-align:left">Autorizzato da</th><th style="text-align:left">Effetti</th><th></th></tr></thead><tbody>';
     lista.forEach((c) => {
       const gg = _pianoGiorniCongedo(c);
       const eff = [];
@@ -1319,7 +1321,7 @@ function _renderPianoCongediNpCard() {
         escP(c.motivo || '') +
         '</td><td style="text-align:left">' +
         escP(c.autorizzato_da || '') +
-        '</td><td style="text-align:left;font-size:.8rem;color:var(--muted)">' +
+        '</td><td style="text-align:left;font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
         escP(eff.join(', ')) +
         '</td><td><button class="btn-del-tipo" onclick="eliminaCongedoNp(' +
         c.id +
@@ -1464,9 +1466,9 @@ function _renderPianoPreferenzeCard() {
     escP(repartoLabel(_pianoReparto())) +
     '</div><div style="padding:10px 14px">';
   h +=
-    '<div style="display:flex;margin-bottom:8px"><input type="text" id="pref-collab-cerca" class="piano-cerca" placeholder="Cerca collaboratore..." oninput="_filtraPrefCollab(this.value)"></div>';
+    '<div style="display:flex;margin-bottom:8px"><input type="text" id="pref-collab-cerca" class="piano-cerca campo-cerca" placeholder="Cerca collaboratore..." oninput="_filtraPrefCollab(this.value)"></div>';
   h +=
-    '<div style="overflow-x:auto"><table class="piano-table" id="pref-collab-table" style="min-width:760px;font-size:.85rem"><thead><tr><th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th><th>Solo diurni</th><th style="text-align:left">Turni bloccati (CSV)</th><th title="La bozza le privilegia sui turni L1">Preferisce L1</th><th title="Livello accoglienza (0-2): serve per il gruppo ACCOGLIENZA">Accoglienza</th><th style="text-align:left" title="Gruppi dove NON può lavorare da solo (CSV, es: REC)">Accompagnamento</th><th style="text-align:left" title="Altri reparti in cui lavora (CSV, es: valet): appare anche nei loro piani e le ore si sommano">Reparti extra</th><th style="text-align:left" title="Derivati dalle competenze certificate in Formazione (sola lettura)">Settori</th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table class="piano-table" id="pref-collab-table" style="min-width:760px;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th><th>Solo diurni</th><th style="text-align:left">Turni bloccati (CSV)</th><th title="La bozza le privilegia sui turni L1">Preferisce L1</th><th title="Livello accoglienza (0-2): serve per il gruppo ACCOGLIENZA">Accoglienza</th><th style="text-align:left" title="Gruppi dove NON può lavorare da solo (CSV, es: REC)">Accompagnamento</th><th style="text-align:left" title="Altri reparti in cui lavora (CSV, es: valet): appare anche nei loro piani e le ore si sommano">Reparti extra</th><th style="text-align:left" title="Derivati dalle competenze certificate in Formazione (sola lettura)">Settori</th></tr></thead><tbody>';
   collabs.forEach((c) => {
     h +=
       '<tr data-pref-nome="' +
@@ -1499,7 +1501,7 @@ function _renderPianoPreferenzeCard() {
       c.id +
       ',\'accompagnamento_settori\',this.value)" style="width:90px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td style="text-align:left">' +
       (typeof apriCoperturaCollab === 'function'
-        ? '<button class="btn-export" style="font-size:.82rem;padding:2px 8px" title="Copertura altri settori: si imposta qui e in Gestione collaboratori (stessa finestra)" onclick="apriCoperturaCollab(' +
+        ? '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 8px" title="Copertura altri settori: si imposta qui e in Gestione collaboratori (stessa finestra)" onclick="apriCoperturaCollab(' +
           c.id +
           ')">' +
           escP(
@@ -1512,13 +1514,13 @@ function _renderPianoPreferenzeCard() {
           ) +
           '</button>'
         : escP(c.reparti_extra || '-')) +
-      '</td><td style="text-align:left;font-size:.82rem;color:var(--muted)" title="Si gestiscono con le spunte in Formazione">' +
+      '</td><td style="text-align:left;font-size:var(--fs-sm,.8125rem);color:var(--muted)" title="Si gestiscono con le spunte in Formazione">' +
       escP((_pianoSettoriEffettivi(c) || []).join(', ') || '-') +
       '</td></tr>';
   });
   h += '</tbody></table></div>';
   h +=
-    '<p style="font-size:.82rem;color:var(--muted);margin-top:6px">"Solo diurni" e i turni bloccati vengono rispettati dalla bozza automatica. Funzione e percentuale si modificano in Impostazioni del Diario → Gestione collaboratori; i <b>Settori</b> derivano dalle competenze certificate in <b>Formazione</b> (spunta = idoneo, sola lettura qui).</p>';
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:6px">"Solo diurni" e i turni bloccati vengono rispettati dalla bozza automatica. Funzione e percentuale si modificano in Impostazioni del Diario → Gestione collaboratori; i <b>Settori</b> derivano dalle competenze certificate in <b>Formazione</b> (spunta = idoneo, sola lettura qui).</p>';
   h += '</div></div>';
   return h;
 }

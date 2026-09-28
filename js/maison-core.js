@@ -349,15 +349,15 @@ function renderRegali() {
     }
     var _regCatBadge =
       _regBudget && _regBudget.categoria === 'full_maison'
-        ? ' <span class="mini-badge" style="background:#b8860b;font-size:.82rem">Full Maison</span>'
+        ? ' <span class="mini-badge" style="background:#b8860b;font-size:var(--fs-sm,.8125rem)">Full Maison</span>'
         : _regBudget && _regBudget.categoria === 'maison'
-          ? ' <span class="mini-badge" style="background:#2980b9;font-size:.82rem">Maison</span>'
+          ? ' <span class="mini-badge" style="background:#2980b9;font-size:var(--fs-sm,.8125rem)">Maison</span>'
           : _regBudget && _regBudget.categoria === 'direzione'
-            ? ' <span class="mini-badge" style="background:#8e44ad;font-size:.82rem">Direzione</span>'
+            ? ' <span class="mini-badge" style="background:#8e44ad;font-size:var(--fs-sm,.8125rem)">Direzione</span>'
             : _regBudget && _regBudget.categoria === 'bu'
-              ? ' <span class="mini-badge" style="background:#e67e22;font-size:.82rem">Buono Unico</span>'
+              ? ' <span class="mini-badge" style="background:#e67e22;font-size:var(--fs-sm,.8125rem)">Buono Unico</span>'
               : _regBudget && _regBudget.categoria === 'bl'
-                ? ' <span class="mini-badge" style="background:#2c6e49;font-size:.82rem">Buono Lounge</span>'
+                ? ' <span class="mini-badge" style="background:#2c6e49;font-size:var(--fs-sm,.8125rem)">Buono Lounge</span>'
                 : '';
     html +=
       '<tr><td style="font-weight:600">' +
@@ -372,11 +372,11 @@ function renderRegali() {
       escP(r.descrizione || '') +
       '</td><td class="num">' +
       (r.importo ? fmtCHF(r.importo) : '-') +
-      '</td><td style="color:var(--muted);font-size:.82rem">' +
+      '</td><td style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">' +
       escP(r.operatore || '') +
       '</td><td style="white-space:nowrap"><button class="btn-act edit" onclick="rinominaRegalo(' +
       r.id +
-      ')" style="font-size:.82rem;padding:3px 8px">Rinomina</button> <button class="btn-act del" onclick="eliminaRegalo(' +
+      ')" style="font-size:var(--fs-sm,.8125rem);padding:3px 8px">Rinomina</button> <button class="btn-act del" onclick="eliminaRegalo(' +
       r.id +
       ')">Elimina</button></td></tr>';
   });
@@ -488,7 +488,7 @@ function renderMaisonDashboard() {
     const delta = (((costoMeseCorr - costoMesePrec) / costoMesePrec) * 100).toFixed(1);
     const colore = delta > 0 ? 'var(--accent)' : delta < 0 ? '#2c6e49' : 'var(--muted)';
     confrontoHtml =
-      '<div style="text-align:center;margin-bottom:10px;font-size:.88rem;color:' +
+      '<div style="text-align:center;margin-bottom:10px;font-size:var(--fs-md,.875rem);color:' +
       colore +
       ';font-weight:600">' +
       (delta > 0 ? '+' : '') +
@@ -501,7 +501,7 @@ function renderMaisonDashboard() {
   }
   sb.innerHTML =
     (periodoLabel
-      ? '<div style="text-align:center;margin-bottom:10px;font-family:Playfair Display,serif;font-size:1.2rem;color:var(--ink)">' +
+      ? '<div style="text-align:center;margin-bottom:10px;font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);color:var(--ink)">' +
         periodoLabel +
         '</div>'
       : '') +
@@ -574,11 +574,11 @@ function renderMaisonDashboard() {
   const mesiDisp = [...new Set(data.map((r) => r.data_giornata.substring(0, 7)))].sort();
   const MESI_SHORT_M = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
   let thtml =
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h4 style="font-family:Playfair Display,serif;margin:0;color:var(--ink)">Dettaglio per cliente</h4><button class="btn-reset" onclick="toggleSezione(\'maison-table-inner\',this)" style="font-size:.92rem;padding:6px 16px">&#9650; Nascondi</button></div><div id="maison-table-inner"><div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px;flex-wrap:wrap"><select id="maison-del-giorno" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper);color:var(--ink)"><option value="">Seleziona giorno...</option>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h4 style="font-family:Playfair Display,serif;margin:0;color:var(--ink)">Dettaglio per cliente</h4><button class="btn-reset" onclick="toggleSezione(\'maison-table-inner\',this)" style="font-size:var(--fs-base,.9375rem);padding:6px 16px">&#9650; Nascondi</button></div><div id="maison-table-inner"><div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px;flex-wrap:wrap"><select id="maison-del-giorno" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:var(--fs-sm,.8125rem);background:var(--paper);color:var(--ink)"><option value="">Seleziona giorno...</option>' +
     giorniDisp
       .map((d) => '<option value="' + d + '">' + new Date(d + 'T12:00:00').toLocaleDateString('it-IT') + '</option>')
       .join('') +
-    '</select><button class="btn-act del" onclick="eliminaMaisonGiorno()" style="padding:5px 12px">Elimina giorno</button><select id="maison-del-mese" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper);color:var(--ink)"><option value="">Seleziona mese...</option>' +
+    '</select><button class="btn-act del" onclick="eliminaMaisonGiorno()" style="padding:5px 12px">Elimina giorno</button><select id="maison-del-mese" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:var(--fs-sm,.8125rem);background:var(--paper);color:var(--ink)"><option value="">Seleziona mese...</option>' +
     mesiDisp
       .map(
         (m) =>
@@ -642,7 +642,7 @@ function renderMaisonDashboard() {
     const condBadge = d.condivise
       ? ' <span title="' +
         d.condivise +
-        ' voci condivise (costo diviso)" style="font-size:.82rem;color:var(--accent2);font-weight:600;cursor:help">÷' +
+        ' voci condivise (costo diviso)" style="font-size:var(--fs-sm,.8125rem);color:var(--accent2);font-weight:600;cursor:help">÷' +
         [...new Set(d.condivisiGruppi)].length +
         '</span>'
       : '';
@@ -656,9 +656,9 @@ function renderMaisonDashboard() {
       '</span></strong>' +
       catBadge +
       (overBudget
-        ? ' <span style="color:var(--accent);font-size:.82rem;font-weight:700">BUDGET SUPERATO (questo mese)</span>'
+        ? ' <span style="color:var(--accent);font-size:var(--fs-sm,.8125rem);font-weight:700">BUDGET SUPERATO (questo mese)</span>'
         : nearBudget
-          ? ' <span style="color:#e67e22;font-size:.82rem;font-weight:700">80% BUDGET (questo mese)</span>'
+          ? ' <span style="color:#e67e22;font-size:var(--fs-sm,.8125rem);font-weight:700">80% BUDGET (questo mese)</span>'
           : '') +
       '</td><td class="num">' +
       d.visite +
@@ -742,20 +742,23 @@ function renderMaisonGdOggi() {
       '<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div style="display:flex;align-items:center;gap:6px">';
     if (haAltriDati)
       emptyH +=
-        '<button onclick="cambiaGdMaison(-1)" style="background:var(--accent2);color:white;border:none;border-radius:2px;cursor:pointer;padding:6px 14px;font-size:.9rem;font-weight:700">&#9664;</button>';
+        '<button onclick="cambiaGdMaison(-1)" style="background:var(--accent2);color:white;border:none;border-radius:2px;cursor:pointer;padding:6px 14px;font-size:var(--fs-md,.875rem);font-weight:700">&#9664;</button>';
     emptyH +=
       '<input type="text" id="gd-date-picker" value="' +
       dataFmt +
-      '" readonly style="cursor:pointer;padding:5px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink);width:130px;text-align:center;font-weight:600">';
+      '" readonly style="cursor:pointer;padding:5px 10px;border:1px solid var(--line);border-radius:2px;font-size:var(--fs-md,.875rem);background:var(--paper);color:var(--ink);width:130px;text-align:center;font-weight:600">';
     if (haAltriDati)
       emptyH +=
-        '<button onclick="cambiaGdMaison(1)" style="background:var(--accent2);color:white;border:none;border-radius:2px;cursor:pointer;padding:6px 14px;font-size:.9rem;font-weight:700">&#9654;</button>';
-    emptyH += '<span style="font-weight:400;font-size:.85rem;color:var(--muted)">' + GIORNI[dt.getDay()] + '</span>';
+        '<button onclick="cambiaGdMaison(1)" style="background:var(--accent2);color:white;border:none;border-radius:2px;cursor:pointer;padding:6px 14px;font-size:var(--fs-md,.875rem);font-weight:700">&#9654;</button>';
+    emptyH +=
+      '<span style="font-weight:400;font-size:var(--fs-md,.875rem);color:var(--muted)">' +
+      GIORNI[dt.getDay()] +
+      '</span>';
     if (!isOggi)
       emptyH +=
-        '<button onclick="cambiaGdMaison(0)" style="background:none;border:1px solid var(--accent2);border-radius:2px;cursor:pointer;padding:4px 10px;color:var(--accent2);font-size:.82rem;font-weight:600">Oggi</button>';
+        '<button onclick="cambiaGdMaison(0)" style="background:none;border:1px solid var(--accent2);border-radius:2px;cursor:pointer;padding:4px 10px;color:var(--accent2);font-size:var(--fs-sm,.8125rem);font-weight:600">Oggi</button>';
     emptyH +=
-      '</div></div><div style="padding:16px;text-align:center;color:var(--muted);font-size:.88rem">Nessun costo Maison per questa GD</div>';
+      '</div></div><div style="padding:16px;text-align:center;color:var(--muted);font-size:var(--fs-md,.875rem)">Nessun costo Maison per questa GD</div>';
     container.innerHTML = emptyH;
     container.style.display = '';
     const _ep = document.getElementById('gd-date-picker');
@@ -799,20 +802,23 @@ function renderMaisonGdOggi() {
     '<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
   h += '<div style="display:flex;align-items:center;gap:6px">';
   h +=
-    '<button onclick="cambiaGdMaison(-1)" style="background:var(--accent2);color:white;border:none;border-radius:2px;cursor:pointer;padding:6px 14px;font-size:.9rem;font-weight:700" title="Giorno precedente">&#9664;</button>';
+    '<button onclick="cambiaGdMaison(-1)" style="background:var(--accent2);color:white;border:none;border-radius:2px;cursor:pointer;padding:6px 14px;font-size:var(--fs-md,.875rem);font-weight:700" title="Giorno precedente">&#9664;</button>';
   h +=
     '<input type="text" id="gd-date-picker" value="' +
     dataFmt +
-    '" readonly style="cursor:pointer;padding:5px 10px;border:1px solid var(--line);border-radius:2px;font-size:.88rem;background:var(--paper);color:var(--ink);width:130px;text-align:center;font-weight:600">';
+    '" readonly style="cursor:pointer;padding:5px 10px;border:1px solid var(--line);border-radius:2px;font-size:var(--fs-md,.875rem);background:var(--paper);color:var(--ink);width:130px;text-align:center;font-weight:600">';
   h +=
-    '<button onclick="cambiaGdMaison(1)" style="background:var(--accent2);color:white;border:none;border-radius:2px;cursor:pointer;padding:6px 14px;font-size:.9rem;font-weight:700" title="Giorno successivo">&#9654;</button>';
-  h += '<span style="font-weight:400;font-size:.85rem;color:var(--muted)">' + GIORNI[dt.getDay()] + '</span>';
+    '<button onclick="cambiaGdMaison(1)" style="background:var(--accent2);color:white;border:none;border-radius:2px;cursor:pointer;padding:6px 14px;font-size:var(--fs-md,.875rem);font-weight:700" title="Giorno successivo">&#9654;</button>';
+  h +=
+    '<span style="font-weight:400;font-size:var(--fs-md,.875rem);color:var(--muted)">' +
+    GIORNI[dt.getDay()] +
+    '</span>';
   if (!isOggi)
     h +=
-      '<button onclick="cambiaGdMaison(0)" style="background:none;border:1px solid var(--accent2);border-radius:2px;cursor:pointer;padding:4px 10px;color:var(--accent2);font-size:.82rem;font-weight:600">Oggi</button>';
+      '<button onclick="cambiaGdMaison(0)" style="background:none;border:1px solid var(--accent2);border-radius:2px;cursor:pointer;padding:4px 10px;color:var(--accent2);font-size:var(--fs-sm,.8125rem);font-weight:600">Oggi</button>';
   h += '</div>';
   h +=
-    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-weight:400;font-size:.85rem;color:var(--muted)">CHF ' +
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-weight:400;font-size:var(--fs-md,.875rem);color:var(--muted)">CHF ' +
     fmtCHF(totCHF) +
     ' &middot; ' +
     totPX +
@@ -823,9 +829,9 @@ function renderMaisonGdOggi() {
     (_gdWL ? ' &middot; ' + _gdWL + ' WL' : '') +
     '</span>';
   h +=
-    '<button onclick="esportaGdOggiCSV()" style="font-size:.82rem;padding:4px 10px;background:none;border:1px solid white;color:white;border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif;font-weight:600">CSV</button>';
+    '<button onclick="esportaGdOggiCSV()" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;background:none;border:1px solid white;color:white;border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif;font-weight:600">CSV</button>';
   h +=
-    '<button onclick="esportaGdOggiPDF()" style="font-size:.82rem;padding:4px 10px;background:none;border:1px solid #c0392b;color:#c0392b;border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif;font-weight:600">PDF</button></div></div>';
+    '<button onclick="esportaGdOggiPDF()" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;background:none;border:1px solid #c0392b;color:#c0392b;border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif;font-weight:600">PDF</button></div></div>';
   h +=
     '<div style="padding:0 16px 16px;overflow-x:auto"><table class="collab-table"><thead><tr><th style="background:var(--paper)">Cliente</th><th style="background:var(--paper)">Tipo</th><th class="num" style="background:var(--paper)">PX</th><th class="num" style="background:var(--paper)">Costo CHF</th><th style="background:var(--paper)"></th></tr></thead><tbody>';
   // Raggruppa righe con stesso gruppo (es. Bonomelli/Grignani)
@@ -889,7 +895,7 @@ function renderMaisonGdOggi() {
                   bu: '#e67e22',
                   bl: '#2c6e49',
                 }[bAltro.categoria] || 'var(--muted)') +
-                ';font-size:.82rem">' +
+                ';font-size:var(--fs-sm,.8125rem)">' +
                 ({
                   full_maison: 'FM',
                   maison: 'M',
@@ -921,7 +927,9 @@ function renderMaisonGdOggi() {
         escP(primoNome) +
         '</span></strong>' +
         catBadge +
-        (altriNomi ? ' <span style="color:var(--muted);font-size:.82rem"> /' + altriNomi + '</span>' : '') +
+        (altriNomi
+          ? ' <span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)"> /' + altriNomi + '</span>'
+          : '') +
         '</td><td>' +
         tipoBadge +
         '</td><td class="num">' +
@@ -1001,7 +1009,7 @@ function renderMaisonGdOggi() {
     .filter(Boolean)
     .join(' · ');
   h +=
-    '<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td style="font-size:.82rem;color:var(--muted)">' +
+    '<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
     (_totBuoni || '') +
     '</td><td class="num"><strong>' +
     totPX +
@@ -1510,15 +1518,15 @@ function apriDettaglioMaison(nome) {
     : '';
   const catBadgeD =
     budget && budget.categoria === 'full_maison'
-      ? ' <span class="mini-badge" style="background:#b8860b;font-size:.82rem">Full Maison</span>'
+      ? ' <span class="mini-badge" style="background:#b8860b;font-size:var(--fs-sm,.8125rem)">Full Maison</span>'
       : budget && budget.categoria === 'maison'
-        ? ' <span class="mini-badge" style="background:#2980b9;font-size:.82rem">Maison</span>'
+        ? ' <span class="mini-badge" style="background:#2980b9;font-size:var(--fs-sm,.8125rem)">Maison</span>'
         : budget && budget.categoria === 'direzione'
-          ? ' <span class="mini-badge" style="background:#8e44ad;font-size:.82rem">Direzione</span>'
+          ? ' <span class="mini-badge" style="background:#8e44ad;font-size:var(--fs-sm,.8125rem)">Direzione</span>'
           : budget && budget.categoria === 'bu'
-            ? ' <span class="mini-badge" style="background:#e67e22;font-size:.82rem">Buono Unico</span>'
+            ? ' <span class="mini-badge" style="background:#e67e22;font-size:var(--fs-sm,.8125rem)">Buono Unico</span>'
             : budget && budget.categoria === 'bl'
-              ? ' <span class="mini-badge" style="background:#2c6e49;font-size:.82rem">Buono Lounge</span>'
+              ? ' <span class="mini-badge" style="background:#2c6e49;font-size:var(--fs-sm,.8125rem)">Buono Lounge</span>'
               : '';
   const nascitaStr =
     budget && budget.data_nascita ? new Date(budget.data_nascita + 'T12:00:00').toLocaleDateString('it-IT') : '';
@@ -1529,7 +1537,7 @@ function apriDettaglioMaison(nome) {
   const catSelect =
     ' <select id="detail-cat-select" onchange="salvaDetailCat(\'' +
     ne +
-    '\')" style="font-size:.82rem;padding:3px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink);vertical-align:middle;cursor:pointer"><option value=""' +
+    '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink);vertical-align:middle;cursor:pointer"><option value=""' +
     (!_curCat ? ' selected' : '') +
     '>· Categoria ·</option><option value="full_maison"' +
     (_curCat === 'full_maison' ? ' selected' : '') +
@@ -1547,9 +1555,9 @@ function apriDettaglioMaison(nome) {
     escP(nome) +
     catBadgeD +
     catSelect +
-    '</h3><p style="color:var(--accent2);font-size:.9rem;font-weight:600;margin-bottom:2px">' +
+    '</h3><p style="color:var(--accent2);font-size:var(--fs-md,.875rem);font-weight:600;margin-bottom:2px">' +
     mesiCliente +
-    '</p><p style="color:var(--muted);font-size:.82rem">' +
+    '</p><p style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">' +
     righe.length +
     ' visite · ' +
     totPx +
@@ -1560,7 +1568,7 @@ function apriDettaglioMaison(nome) {
     (nBL ? ' · ' + nBL + ' BL' : '') +
     '</p>' +
     (budget && budget.budget_chf
-      ? '<p style="font-size:.82rem;color:' +
+      ? '<p style="font-size:var(--fs-sm,.8125rem);color:' +
         (_spesoMeseD >= budget.budget_chf
           ? 'var(--accent)'
           : _spesoMeseD >= budget.budget_chf * 0.8
@@ -1574,15 +1582,17 @@ function apriDettaglioMaison(nome) {
         Math.round((_spesoMeseD / budget.budget_chf) * 100) +
         '%)</p>'
       : '') +
-    '<div style="display:flex;align-items:center;gap:8px;margin-top:6px"><span style="font-size:.82rem;color:var(--muted)">Data nascita:</span><input type="text" id="detail-nascita" value="' +
+    '<div style="display:flex;align-items:center;gap:8px;margin-top:6px"><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">Data nascita:</span><input type="text" id="detail-nascita" value="' +
     ((budget && budget.data_nascita) || '') +
-    '" placeholder="Seleziona..." readonly style="cursor:pointer;padding:4px 10px;border:1px solid var(--line);border-radius:2px;font-size:.82rem;background:var(--paper2);color:var(--ink);width:120px"><button class="btn-salva" onclick="salvaDetailNascita(\'' +
+    '" placeholder="Seleziona..." readonly style="cursor:pointer;padding:4px 10px;border:1px solid var(--line);border-radius:2px;font-size:var(--fs-sm,.8125rem);background:var(--paper2);color:var(--ink);width:120px"><button class="btn-salva" onclick="salvaDetailNascita(\'' +
     ne +
-    '\')" style="font-size:.82rem;padding:5px 14px;background:var(--accent2)">Salva</button>' +
-    (nascitaStr ? ' <span style="font-size:.82rem;color:var(--muted)">Attuale: ' + nascitaStr + '</span>' : '') +
+    '\')" style="font-size:var(--fs-sm,.8125rem);padding:5px 14px;background:var(--accent2)">Salva</button>' +
+    (nascitaStr
+      ? ' <span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">Attuale: ' + nascitaStr + '</span>'
+      : '') +
     '</div>' +
     (budget && budget.aggiornato_da
-      ? '<p style="font-size:.82rem;color:var(--muted);margin-top:4px">Ultimo aggiornamento: ' +
+      ? '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:4px">Ultimo aggiornamento: ' +
         escP(budget.aggiornato_da) +
         (budget.aggiornato_at
           ? ' · ' +
@@ -1595,7 +1605,7 @@ function apriDettaglioMaison(nome) {
           : '') +
         '</p>'
       : '') +
-    '</div><button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\')" style="padding:6px 12px;font-size:.82rem">Chiudi</button></div>';
+    '</div><button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\')" style="padding:6px 12px;font-size:var(--fs-sm,.8125rem)">Chiudi</button></div>';
   // Pre-compute spese extra e regali per KPI (riusa dati gia calcolati sopra)
   const seRighe = _seCheck.sort((a, b) => a.data_spesa.localeCompare(b.data_spesa));
   const totSE = seRighe.reduce((s, r) => s + parseFloat(r.importo || 0), 0);
@@ -1616,29 +1626,29 @@ function apriDettaglioMaison(nome) {
     : '-';
   html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">';
   html +=
-    '<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.2rem;font-weight:700;color:#b8860b">CHF ' +
+    '<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:#b8860b">CHF ' +
     fmtCHF(tot) +
-    '</div><div style="font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Totale Ristorante</div></div>';
+    '</div><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Totale Ristorante</div></div>';
   html +=
-    '<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.2rem;font-weight:700;color:#2980b9">CHF ' +
+    '<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:#2980b9">CHF ' +
     fmtCHF(totSE) +
-    '</div><div style="font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Totale Extra</div></div>';
+    '</div><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Totale Extra</div></div>';
   html +=
-    '<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.2rem;font-weight:700;color:#1a7a6d">CHF ' +
+    '<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:#1a7a6d">CHF ' +
     fmtCHF(totReg) +
-    '</div><div style="font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Totale Regali</div></div>';
+    '</div><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Totale Regali</div></div>';
   html +=
-    '<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.2rem;font-weight:700;color:var(--ink)">CHF ' +
+    '<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:var(--ink)">CHF ' +
     fmtCHF(_mediaVisita) +
-    '</div><div style="font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Media/visita</div></div>';
+    '</div><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Media/visita</div></div>';
   html +=
-    '<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.2rem;font-weight:700;color:var(--ink)">' +
+    '<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:var(--ink)">' +
     righe.length +
-    '</div><div style="font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Visite totali</div></div>';
+    '</div><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Visite totali</div></div>';
   html +=
-    '<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:1.2rem;font-weight:700;color:var(--ink)">' +
+    '<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:var(--ink)">' +
     _ultimoStr +
-    '</div><div style="font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Ultimo passaggio</div></div>';
+    '</div><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Ultimo passaggio</div></div>';
   html += '</div>';
   // --- Frequenza visite + giorno preferito ---
   if (righe.length) {
@@ -1658,7 +1668,8 @@ function apriDettaglioMaison(nome) {
     } else if (_dateSort.length === 1) {
       _freqStr = '1 visita';
     }
-    html += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;font-size:.85rem;color:var(--muted)">';
+    html +=
+      '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;font-size:var(--fs-md,.875rem);color:var(--muted)">';
     html += '<span>Ultimo passaggio: <strong style="color:var(--ink)">' + _ultimoStr + '</strong></span>';
     html += '<span>Giorno preferito: <strong style="color:var(--ink)">' + _giornoPreferito + '</strong></span>';
     html += '<span>Frequenza: <strong style="color:var(--ink)">' + _freqStr + '</strong></span>';
@@ -1692,7 +1703,7 @@ function apriDettaglioMaison(nome) {
           const pct = (((val - prev) / prev) * 100).toFixed(0);
           const isUp = val > prev;
           deltaHtml =
-            ' <span style="font-size:.82rem;font-weight:700;color:' +
+            ' <span style="font-size:var(--fs-sm,.8125rem);font-weight:700;color:' +
             (isUp ? '#c0392b' : '#27ae60') +
             ';background:' +
             (isUp ? '#c0392b1a' : '#27ae601a') +
@@ -1703,14 +1714,15 @@ function apriDettaglioMaison(nome) {
         }
       }
       html +=
-        '<div style="background:var(--paper2);border-radius:3px;padding:6px 12px;font-size:.82rem;color:var(--ink);white-space:nowrap"><strong>' +
+        '<div style="background:var(--paper2);border-radius:3px;padding:6px 12px;font-size:var(--fs-sm,.8125rem);color:var(--ink);white-space:nowrap"><strong>' +
         lbl +
         '</strong>: ' +
         fmtCHF(val) +
         ' CHF' +
         deltaHtml +
         '</div>';
-      if (i < _mesiArr.length - 1) html += '<span style="color:var(--muted);font-size:.82rem">&rarr;</span>';
+      if (i < _mesiArr.length - 1)
+        html += '<span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">&rarr;</span>';
     });
     html += '</div>';
   }
@@ -1718,16 +1730,19 @@ function apriDettaglioMaison(nome) {
   if (_mesiArr.length > 1) {
     const _maxMese = Math.max(..._mesiArr.map((m) => m[1]));
     html +=
-      '<div style="margin-bottom:16px;padding:10px;background:var(--paper2);border-radius:3px"><div style="font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Trend mensile</div>';
+      '<div style="margin-bottom:16px;padding:10px;background:var(--paper2);border-radius:3px"><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Trend mensile</div>';
     html += '<div style="display:flex;gap:4px;align-items:flex-end;height:120px">';
     _mesiArr.forEach(function (m) {
       const h = _maxMese > 0 ? Math.max(4, Math.round((m[1] / _maxMese) * 100)) : 4;
       html +=
         '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;justify-content:flex-end;height:100%">';
-      html += '<div style="font-size:.82rem;color:var(--muted)">' + m[1].toFixed(0) + '</div>';
+      html += '<div style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' + m[1].toFixed(0) + '</div>';
       html +=
         '<div style="width:100%;max-width:40px;background:#b8860b;border-radius:2px 2px 0 0;height:' + h + 'px"></div>';
-      html += '<div style="font-size:.82rem;color:var(--muted);white-space:nowrap">' + m[0].split(' ')[0] + '</div>';
+      html +=
+        '<div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);white-space:nowrap">' +
+        m[0].split(' ')[0] +
+        '</div>';
       html += '</div>';
     });
     html += '</div></div>';
@@ -1761,7 +1776,7 @@ function apriDettaglioMaison(nome) {
         '>' +
         fmtCHF(r.costo) +
         (r._costoOriginale
-          ? ' <span style="font-size:.82rem;color:var(--accent2)">÷' + r._nCondiviso + '</span>'
+          ? ' <span style="font-size:var(--fs-sm,.8125rem);color:var(--accent2)">÷' + r._nCondiviso + '</span>'
           : '') +
         '</strong></td><td>' +
         (r.tipo_buono
@@ -1777,23 +1792,23 @@ function apriDettaglioMaison(nome) {
             r.tipo_buono +
             '</span>'
           : '-') +
-        '</td><td style="color:var(--muted);font-size:.85rem">' +
+        '</td><td style="color:var(--muted);font-size:var(--fs-md,.875rem)">' +
         escP(r._gruppoOriginale || r.gruppo || '') +
-        '</td><td style="color:var(--muted);font-size:.85rem">' +
+        '</td><td style="color:var(--muted);font-size:var(--fs-md,.875rem)">' +
         escP(r.note || '') +
         '</td><td style="white-space:nowrap"><button class="btn-act edit" onclick="modificaMaisonRiga(' +
         r.id +
         ",'" +
         ne +
-        '\')" style="font-size:.82rem;padding:3px 8px">Modifica</button> <button class="btn-act" onclick="spostaMaisonToExtra(' +
+        '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 8px">Modifica</button> <button class="btn-act" onclick="spostaMaisonToExtra(' +
         r.id +
         ",'" +
         ne +
-        '\')" style="font-size:.82rem;padding:3px 8px;color:#e67e22;border-color:#e67e22" title="Sposta in Spese Extra">&#8594; Extra</button> <button class="btn-act del" onclick="eliminaMaisonRigaDettaglio(' +
+        '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 8px;color:#e67e22;border-color:#e67e22" title="Sposta in Spese Extra">&#8594; Extra</button> <button class="btn-act del" onclick="eliminaMaisonRigaDettaglio(' +
         r.id +
         ",'" +
         ne +
-        '\')" style="font-size:.82rem;padding:3px 8px">Elimina</button></td></tr>';
+        '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 8px">Elimina</button></td></tr>';
     });
     const _detBuoniTot = [
       nBU ? nBU + ' BU' : '',
@@ -1808,13 +1823,13 @@ function apriDettaglioMaison(nome) {
       totPx +
       ' PX</strong></td><td class="num"><strong>CHF ' +
       fmtCHF(tot) +
-      '</strong></td><td style="font-size:.82rem;color:var(--muted)">' +
+      '</strong></td><td style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
       (_detBuoniTot || '') +
       '</td><td colspan="2"></td></tr>';
     html += '</tbody></table></div>';
   } else {
     html +=
-      '<p style="color:var(--muted);text-align:center;padding:12px;font-size:.9rem">Nessun costo ristorante (tutte le voci sono in Spese Extra)</p>';
+      '<p style="color:var(--muted);text-align:center;padding:12px;font-size:var(--fs-md,.875rem)">Nessun costo ristorante (tutte le voci sono in Spese Extra)</p>';
   }
   // Spese Extra per questo cliente (seRighe/totSE already computed above for KPI)
   if (seRighe.length) {
@@ -1836,23 +1851,23 @@ function apriDettaglioMaison(nome) {
         tc +
         '">' +
         (SE_TIPI_LABEL[r.tipo] || r.tipo) +
-        '</span></td><td style="font-size:.85rem">' +
+        '</span></td><td style="font-size:var(--fs-md,.875rem)">' +
         escP(r.luogo || '') +
-        '</td><td style="font-size:.85rem;color:var(--muted)">' +
+        '</td><td style="font-size:var(--fs-md,.875rem);color:var(--muted)">' +
         escP(r.descrizione || '') +
         '</td><td class="num"><strong>' +
         fmtCHF(r.importo) +
         '</strong></td><td style="white-space:nowrap"><button class="btn-act edit" onclick="modificaSpeseExtra(' +
         r.id +
-        ')" style="font-size:.82rem;padding:3px 8px">Modifica</button> <button class="btn-act del" onclick="eliminaSpeseExtra(' +
+        ')" style="font-size:var(--fs-sm,.8125rem);padding:3px 8px">Modifica</button> <button class="btn-act del" onclick="eliminaSpeseExtra(' +
         r.id +
         ").then(function(){apriDettaglioMaison('" +
         ne +
-        '\')})" style="font-size:.82rem;padding:3px 8px">Elimina</button> <button class="btn-act" onclick="spostaExtraToMaison(' +
+        '\')})" style="font-size:var(--fs-sm,.8125rem);padding:3px 8px">Elimina</button> <button class="btn-act" onclick="spostaExtraToMaison(' +
         r.id +
         ",'" +
         ne +
-        '\')" style="font-size:.82rem;padding:3px 8px;color:#2c6e49;border-color:#2c6e49" title="Sposta in Costi Maison">&#8594; Maison</button></td></tr>';
+        '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 8px;color:#2c6e49;border-color:#2c6e49" title="Sposta in Costi Maison">&#8594; Maison</button></td></tr>';
     });
     html +=
       '<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td colspan="4"><strong>TOTALE EXTRA</strong></td><td class="num"><strong>CHF ' +
@@ -1876,7 +1891,7 @@ function apriDettaglioMaison(nome) {
         escP(r.descrizione || '') +
         '</td><td class="num">' +
         (r.importo ? fmtCHF(r.importo) : '-') +
-        '</td><td style="color:var(--muted);font-size:.82rem">' +
+        '</td><td style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">' +
         escP(r.operatore || '') +
         '</td></tr>';
     });
@@ -1901,7 +1916,7 @@ function apriDettaglioMaison(nome) {
         r.id +
         ",'" +
         ne2 +
-        '\')" style="font-size:.82rem;flex-shrink:0">Elimina</button></div>';
+        '\')" style="font-size:var(--fs-sm,.8125rem);flex-shrink:0">Elimina</button></div>';
     });
   }
   // Totale complessivo aggiornato
@@ -1915,15 +1930,15 @@ function apriDettaglioMaison(nome) {
     totReg;
   if (grandTotal > tot) {
     html +=
-      '<div style="margin-top:10px;padding:10px;background:var(--paper2);border-radius:3px;text-align:center;font-weight:700;font-size:1rem;color:var(--accent2)">TOTALE COMPLESSIVO: CHF ' +
+      '<div style="margin-top:10px;padding:10px;background:var(--paper2);border-radius:3px;text-align:center;font-weight:700;font-size:var(--fs-lg,1.0625rem);color:var(--accent2)">TOTALE COMPLESSIVO: CHF ' +
       fmtCHF(grandTotal) +
       '</div>';
   }
   // Form aggiungi nota
   html +=
-    '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--line)"><h4 style="font-family:Playfair Display,serif;margin-bottom:8px;color:var(--ink)">Aggiungi nota privata</h4><textarea id="detail-nota-input" rows="2" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:2px;font-family:Source Sans 3,sans-serif;font-size:.9rem;resize:vertical;background:var(--paper2);color:var(--ink)" placeholder="Scrivi una nota..."></textarea><button class="btn-salva" onclick="salvaNotaCliente(\'' +
+    '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--line)"><h4 style="font-family:Playfair Display,serif;margin-bottom:8px;color:var(--ink)">Aggiungi nota privata</h4><textarea id="detail-nota-input" rows="2" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:2px;font-family:Source Sans 3,sans-serif;font-size:var(--fs-md,.875rem);resize:vertical;background:var(--paper2);color:var(--ink)" placeholder="Scrivi una nota..."></textarea><button class="btn-salva" onclick="salvaNotaCliente(\'' +
     ne +
-    '\')" style="margin-top:6px;font-size:.82rem;padding:8px 16px">Salva nota</button></div>';
+    '\')" style="margin-top:6px;font-size:var(--fs-sm,.8125rem);padding:8px 16px">Salva nota</button></div>';
   html +=
     '<div style="display:flex;gap:10px;justify-content:center;margin-top:14px"><button class="btn-export" onclick="esportaMaisonClienteCSV(\'' +
     _jsArg(nome) +
@@ -2060,14 +2075,14 @@ function stampaSchedaCliente() {
     'body{font-family:Source Sans 3,sans-serif;padding:30px;color:#1a1208;max-width:800px;margin:0 auto}',
   );
   win.document.write('h3,h4{font-family:Playfair Display,serif}');
-  win.document.write('table{width:100%;border-collapse:collapse;font-size:.85rem;margin:10px 0}');
+  win.document.write('table{width:100%;border-collapse:collapse;font-size:var(--fs-md,.875rem);margin:10px 0}');
   win.document.write(
-    'th{text-align:left;padding:6px 8px;font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:#8a7d6b;border-bottom:2px solid #e8dfd0}',
+    'th{text-align:left;padding:6px 8px;font-size:var(--fs-sm,.8125rem);letter-spacing:.1em;text-transform:uppercase;color:#8a7d6b;border-bottom:2px solid #e8dfd0}',
   );
   win.document.write('td{padding:6px 8px;border-bottom:1px solid #e8dfd0}');
   win.document.write('.num{text-align:center;font-weight:600}');
   win.document.write(
-    '.mini-badge{display:inline-block;font-size:.82rem;font-weight:700;padding:1px 5px;border-radius:2px;color:white;margin:1px}',
+    '.mini-badge{display:inline-block;font-size:var(--fs-sm,.8125rem);font-weight:700;padding:1px 5px;border-radius:2px;color:white;margin:1px}',
   );
   win.document.write(
     '.budget-bar{height:4px;border-radius:2px;background:#e8dfd0;margin-top:4px;overflow:hidden;min-width:60px}',
@@ -2077,11 +2092,11 @@ function stampaSchedaCliente() {
   win.document.write('textarea,input[type=text]{display:none!important}');
   win.document.write('@media print{body{padding:10px}}</style></head><body>');
   win.document.write(
-    '<div style="text-align:center;margin-bottom:20px;font-size:.8rem;color:#8a7d6b">Casino Lugano SA · Scheda Cliente</div>',
+    '<div style="text-align:center;margin-bottom:20px;font-size:var(--fs-sm,.8125rem);color:#8a7d6b">Casino Lugano SA · Scheda Cliente</div>',
   );
   win.document.write(content);
   win.document.write(
-    '<div style="text-align:center;margin-top:20px;font-size:.82rem;color:#8a7d6b">Stampato il ' +
+    '<div style="text-align:center;margin-top:20px;font-size:var(--fs-sm,.8125rem);color:#8a7d6b">Stampato il ' +
       new Date().toLocaleDateString('it-IT') +
       ' alle ' +
       new Date().toLocaleTimeString('it-IT', {
@@ -2114,10 +2129,10 @@ function apriConfrontoClienti() {
   }
   var mc = document.getElementById('profilo-content');
   var html =
-    '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px"><div><h3 style="font-family:Playfair Display,serif;color:var(--ink)">Confronto clienti</h3><p style="color:var(--muted);font-size:.82rem">Seleziona 2 o 3 clienti da confrontare</p></div><button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\')" style="padding:6px 12px;font-size:.82rem">Chiudi</button></div>';
+    '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px"><div><h3 style="font-family:Playfair Display,serif;color:var(--ink)">Confronto clienti</h3><p style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">Seleziona 2 o 3 clienti da confrontare</p></div><button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\')" style="padding:6px 12px;font-size:var(--fs-sm,.8125rem)">Chiudi</button></div>';
   html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">';
   html +=
-    '<select id="conf-cl-1" style="padding:8px 12px;border:1.5px solid var(--line);border-radius:2px;font-size:.9rem;background:var(--paper2);color:var(--ink);min-width:180px"><option value="">-- Cliente 1 --</option>' +
+    '<select id="conf-cl-1" style="padding:8px 12px;border:1.5px solid var(--line);border-radius:2px;font-size:var(--fs-md,.875rem);background:var(--paper2);color:var(--ink);min-width:180px"><option value="">-- Cliente 1 --</option>' +
     nomi
       .map(function (n) {
         return '<option value="' + escP(n) + '">' + escP(n) + '</option>';
@@ -2125,7 +2140,7 @@ function apriConfrontoClienti() {
       .join('') +
     '</select>';
   html +=
-    '<select id="conf-cl-2" style="padding:8px 12px;border:1.5px solid var(--line);border-radius:2px;font-size:.9rem;background:var(--paper2);color:var(--ink);min-width:180px"><option value="">-- Cliente 2 --</option>' +
+    '<select id="conf-cl-2" style="padding:8px 12px;border:1.5px solid var(--line);border-radius:2px;font-size:var(--fs-md,.875rem);background:var(--paper2);color:var(--ink);min-width:180px"><option value="">-- Cliente 2 --</option>' +
     nomi
       .map(function (n) {
         return '<option value="' + escP(n) + '">' + escP(n) + '</option>';
@@ -2133,7 +2148,7 @@ function apriConfrontoClienti() {
       .join('') +
     '</select>';
   html +=
-    '<select id="conf-cl-3" style="padding:8px 12px;border:1.5px solid var(--line);border-radius:2px;font-size:.9rem;background:var(--paper2);color:var(--ink);min-width:180px"><option value="">-- Cliente 3 (opz.) --</option>' +
+    '<select id="conf-cl-3" style="padding:8px 12px;border:1.5px solid var(--line);border-radius:2px;font-size:var(--fs-md,.875rem);background:var(--paper2);color:var(--ink);min-width:180px"><option value="">-- Cliente 3 (opz.) --</option>' +
     nomi
       .map(function (n) {
         return '<option value="' + escP(n) + '">' + escP(n) + '</option>';
@@ -2141,7 +2156,7 @@ function apriConfrontoClienti() {
       .join('') +
     '</select>';
   html +=
-    '<button class="btn-salva" onclick="eseguiConfrontoMaison()" style="padding:8px 20px;font-size:.82rem">Confronta</button></div>';
+    '<button class="btn-salva" onclick="eseguiConfrontoMaison()" style="padding:8px 20px;font-size:var(--fs-sm,.8125rem)">Confronta</button></div>';
   html += '<div id="conf-risultato"></div>';
   mc.innerHTML = html;
   document.getElementById('profilo-modal').classList.remove('hidden');
@@ -2226,7 +2241,7 @@ function eseguiConfrontoMaison() {
   var h = '<h4 style="font-family:Playfair Display,serif;color:var(--ink);margin-bottom:12px">Risultato confronto</h4>';
   h += '<div style="overflow-x:auto"><table class="collab-table"><thead><tr><th></th>';
   dati.forEach(function (d) {
-    h += '<th style="text-align:center;color:' + d.color + ';font-size:.85rem">' + escP(d.nome) + '</th>';
+    h += '<th style="text-align:center;color:' + d.color + ';font-size:var(--fs-md,.875rem)">' + escP(d.nome) + '</th>';
   });
   h += '</tr></thead><tbody>';
   var righeConf = [
@@ -2307,7 +2322,7 @@ function eseguiConfrontoMaison() {
     h +=
       '<tr' +
       (rc.bold ? ' style="background:var(--paper2);font-weight:700"' : '') +
-      '><td style="font-weight:600;font-size:.82rem;white-space:nowrap">' +
+      '><td style="font-weight:600;font-size:var(--fs-sm,.8125rem);white-space:nowrap">' +
       rc.label +
       '</td>';
     var vals = dati.map(function (d) {
@@ -2356,14 +2371,19 @@ function eseguiConfrontoMaison() {
     mesiOrd.forEach(function (m) {
       var parts = m.split('-');
       h +=
-        '<div style="flex:1;text-align:center;font-size:.82rem;color:var(--muted)">' +
+        '<div style="flex:1;text-align:center;font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
         MESI[parseInt(parts[1]) - 1] +
         '</div>';
     });
     h += '</div>';
     h += '<div style="display:flex;gap:14px;justify-content:center;margin-top:8px">';
     dati.forEach(function (d) {
-      h += '<span style="font-size:.82rem;color:' + d.color + ';font-weight:600">&#9632; ' + escP(d.nome) + '</span>';
+      h +=
+        '<span style="font-size:var(--fs-sm,.8125rem);color:' +
+        d.color +
+        ';font-weight:600">&#9632; ' +
+        escP(d.nome) +
+        '</span>';
     });
     h += '</div>';
   }
@@ -2467,7 +2487,7 @@ function esportaMaisonClienteCSV(nome) {
 function apriPdfSchedaMaison(nome) {
   const mc = document.getElementById('pwd-modal-content');
   mc.innerHTML =
-    '<h3>PDF Scheda Cliente</h3><p style="color:var(--muted);font-size:.85rem;margin-bottom:14px">Seleziona le sezioni da includere nel PDF di <strong>' +
+    '<h3>PDF Scheda Cliente</h3><p style="color:var(--muted);font-size:var(--fs-md,.875rem);margin-bottom:14px">Seleziona le sezioni da includere nel PDF di <strong>' +
     escP(nome) +
     '</strong>:</p><div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">' +
     [
@@ -2807,7 +2827,7 @@ function _eliminaCondivisoModal(nome) {
     count +
     ' registrazioni condivise</strong> con: <strong>' +
     escP(altri.join(', ')) +
-    '</strong></p><p style="font-size:.88rem;color:var(--muted);margin-bottom:16px">Il costo era diviso tra i due. Cosa vuoi fare?</p><div class="pwd-modal-btns" style="flex-wrap:wrap;gap:8px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" style="background:var(--accent)" onclick="_eseguiEliminaCondiviso(\'' +
+    '</strong></p><p style="font-size:var(--fs-md,.875rem);color:var(--muted);margin-bottom:16px">Il costo era diviso tra i due. Cosa vuoi fare?</p><div class="pwd-modal-btns" style="flex-wrap:wrap;gap:8px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" style="background:var(--accent)" onclick="_eseguiEliminaCondiviso(\'' +
     ne +
     '\',true)">Elimina entrambi (' +
     count +
@@ -2869,7 +2889,7 @@ function rinominaMaisonCliente(nome) {
     const orig = _getNomiCondivisiOriginali(nome);
     const ne = _jsArg(nome);
     b.innerHTML =
-      '<h3>Rinomina cliente Maison</h3><p style="margin-bottom:8px;font-size:.88rem;color:var(--accent2)">' +
+      '<h3>Rinomina cliente Maison</h3><p style="margin-bottom:8px;font-size:var(--fs-md,.875rem);color:var(--accent2)">' +
       escP(nome) +
       ' è registrato insieme a: <strong>' +
       escP(orig.join(', ')) +
@@ -2980,7 +3000,7 @@ function modificaMaisonRiga(id, nome) {
   const ne = _jsArg(nome);
   const mc = document.getElementById('pwd-modal-content');
   mc.innerHTML =
-    '<h3>Modifica riga</h3><p style="color:var(--muted);font-size:.85rem;margin-bottom:12px">' +
+    '<h3>Modifica riga</h3><p style="color:var(--muted);font-size:var(--fs-md,.875rem);margin-bottom:12px">' +
     escP(r.nome) +
     ' · ' +
     new Date(r.data_giornata + 'T12:00:00').toLocaleDateString('it-IT') +
