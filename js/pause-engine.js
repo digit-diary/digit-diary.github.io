@@ -2317,9 +2317,86 @@ function _peGeneraSlots(righe, dstr) {
   const biglietto = _peBigliettoMattino(ctx);
   const out = { tipo: 'slots', celle: sh.celle, nR: _peMaxR(sh), tipoGiorno: tipoGiorno };
   if (biglietto) out.biglietti = [biglietto];
-  const proposte = _peCompletaPause(out, ctx, righe, dstr);
+  const proposte = _peCompletaPause(out, ctx, righe, dstr).concat(_peRisolviSalaVuota(out, righe, dstr));
   if (proposte.length) out.proposte = proposte;
   window._peDowCorrente = null;
+  return out;
+}
+// ---------- SALA MAI VUOTA: spostamenti come con le frecce ----------
+// Se in un momento nessuno e in sala (chi da i cambi e in cassa o al rec mentre
+// l altro di sala e in pausa), il programma prova gli spostamenti che farebbe un
+// responsabile con le frecce: scambiare una pausa o un cambio con la riga vicina.
+// Tiene lo spostamento che toglie piu sala vuota senza creare altri problemi
+// (regola delle ore, distanza, pause nella prima o nell ultima mezz ora) e
+// ripete finche migliora. Ogni spostamento e una proposta (blu) con il motivo.
+function _pcPunteggio(c, persone) {
+  const PC = window.PauseControlli;
+  const pp = PC.pausePersone(c, persone, c.biglietti);
+  let v = 0;
+  PC.salaVuota(c, persone, pp, c.biglietti).forEach((b) => (v += 100 * (b.fin - b.ini)));
+  PC.controlla(c, persone, { biglietti: c.biglietti }).forEach((a) => {
+    if (a.tipo !== 'sala') v += 5000;
+  });
+  // pause nella prima o nell ultima mezz ora del turno: da evitare
+  persone.forEach((p) => {
+    const i = pp[p.nome];
+    if (!i || !i.alternative[0] || p.ini == null) return;
+    i.alternative[0].pause.forEach((x) => {
+      if (x.ini < p.ini + 30 || x.fin > p.fin - 30) v += 400;
+    });
+  });
+  return v;
+}
+function _peRisolviSalaVuota(c, righe, dstr) {
+  const PC = window.PauseControlli;
+  const out = [];
+  if (!PC) return out;
+  const persone = _pcPersone(righe, dstr);
+  const vuota = () => PC.salaVuota(c, persone, PC.pausePersone(c, persone, c.biglietti), c.biglietti).length;
+  if (!vuota()) return out;
+  let attuale = _pcPunteggio(c, persone);
+  for (let giro = 0; giro < 8 && vuota(); giro++) {
+    let meglio = null;
+    PC.blocchi(c)
+      .filter((b) => !/ALT/.test(b.post))
+      .forEach((b) => {
+        b.righe.forEach((x) => {
+          // si spostano pause e cambi, non le righe libere
+          if (_PC_LIBERE.includes(x.pos)) return;
+          [-1, 1].forEach((dir) => {
+            const copia = JSON.stringify({ celle: c.celle, nR: c.nR });
+            const r2 = _pbScambia(c, b.base, x.r, dir);
+            if (r2) {
+              const v = _pcPunteggio(c, persone);
+              if (v < attuale && (!meglio || v < meglio.v)) meglio = { v: v, b: b, x: x, dir: dir, r2: r2 };
+            }
+            const o = JSON.parse(copia);
+            c.celle = o.celle;
+            c.nR = o.nR;
+          });
+        });
+      });
+    if (!meglio) break;
+    const prima = { pos: meglio.x.pos, ini: meglio.x.ini, fin: meglio.x.fin };
+    _pbScambia(c, meglio.b.base, meglio.x.r, meglio.dir);
+    [meglio.x.r, meglio.r2].forEach((r) => {
+      [meglio.b.base, meglio.b.base + 1].forEach((col) => {
+        if (c.celle[r + '|' + col]) c.celle[r + '|' + col].prop = 1;
+      });
+    });
+    const dopo = _pbIntervallo((c.celle[meglio.r2 + '|' + (meglio.b.base + 1)] || {}).v) || prima;
+    out.push({
+      modo: 'spostata',
+      nome: meglio.b.nome,
+      turno: meglio.b.post,
+      pos: prima.pos,
+      ini: dopo.ini,
+      fin: dopo.fin,
+      daIni: prima.ini,
+      daFin: prima.fin,
+    });
+    attuale = meglio.v;
+  }
   return out;
 }
 // ---------- COMPLETAMENTO: le pause che la regola prevede e il foglio non da ----------
@@ -4000,6 +4077,23 @@ function pdfPauseGiorno() {
   mostraPdfPreview(doc, 'pause_' + dstr + '_' + _pianoReparto() + '.pdf', 'Pause ' + lbl);
 }
 // ---------- controlli, proposte e bigliettino nel briefing ----------
+// bigliettino del mattino: quello del foglio; per i fogli generati prima che
+// esistesse (v303 e precedenti) si ricava dal briefing del giorno, cosi le mezz
+// ore del mattino (R22, S22, C4) non risultano mancanti
+function _pcBigliettiFoglio(c) {
+  if (c && Array.isArray(c.biglietti)) return c.biglietti;
+  if (!_briefState || !Array.isArray(_briefState.righe)) return [];
+  const dT = {};
+  _briefState.righe.forEach((r) => {
+    const nome = String(r.nome || '').trim();
+    const t = String(r.turno || '')
+      .trim()
+      .toUpperCase();
+    if (nome && t && nome.toUpperCase() !== 'XXX') (dT[t] = dT[t] || []).push(nome);
+  });
+  const bg = _peBigliettoMattino({ dT: dT });
+  return bg ? [bg] : [];
+}
 // tutti gli avvisi del foglio: pausa e cambio collegati, regola delle ore,
 // distanza, sala vuota, righe che non coprono nessuno (senza doppioni)
 function _pcAvvisiFoglio(c) {
@@ -4010,7 +4104,7 @@ function _pcAvvisiFoglio(c) {
   const gia = new Set();
   out.forEach((x) => x.celle.forEach((k) => gia.add(k)));
   const persone = _pcPersone(_briefState.righe, _briefData);
-  window.PauseControlli.controlla(c, persone, { biglietti: c.biglietti }).forEach((x) => {
+  window.PauseControlli.controlla(c, persone, { biglietti: _pcBigliettiFoglio(c) }).forEach((x) => {
     if (x.tipo === 'riga' && x.celle.some((k) => gia.has(k))) return;
     out.push(x);
   });
@@ -4038,6 +4132,19 @@ function _pcProposteHtml(c) {
     const ora = o(x.ini) + '-' + o(x.fin);
     if (x.modo === 'cambio') return chi + ': pausa ' + ora + ', cambio da ' + escP(x.chiTurno) + ' ' + escP(x.chi);
     if (x.modo === 'solo') return chi + ': pausa ' + ora + ' da solo (nel reparto resta un collega)';
+    if (x.modo === 'spostata')
+      return (
+        chi +
+        ': ' +
+        (x.pos === 'PAUSA' ? 'pausa' : 'cambio ' + escP(x.pos)) +
+        ' spostato da ' +
+        o(x.daIni) +
+        '-' +
+        o(x.daFin) +
+        ' a ' +
+        ora +
+        ', perche la sala non resti vuota'
+      );
     return (
       '<b style="color:var(--c-rosso,#c0392b)">' +
       chi +
