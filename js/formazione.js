@@ -531,7 +531,7 @@ function _renderProtocolliCard() {
       '</b><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px" onclick="scaricaProtocolloExcel(\'' +
       k +
       '\')">Scarica template</button>' +
-      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:#2c6e49;color:#2c6e49" onclick="document.getElementById(\'prot-file-' +
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="document.getElementById(\'prot-file-' +
       k +
       '\').click()">Importa compilato</button><input type="file" id="prot-file-' +
       k +
@@ -844,7 +844,7 @@ function renderFormazione() {
       '>' +
       escP(k.label) +
       (k.livello
-        ? ' <span style="font-size:var(--fs-sm,.8125rem);color:#00000099">' + escP(livelloSigla(k.livello)) + '</span>'
+        ? ' <span style="font-size:var(--fs-sm,.8125rem);opacity:.65">' + escP(livelloSigla(k.livello)) + '</span>'
         : '') +
       '</th>';
   });
@@ -1130,9 +1130,9 @@ function renderFormazione() {
             ' a: ' +
             escP(next.premio) +
             '</span>'
-          : '<span style="font-size:var(--fs-sm,.8125rem);color:#2c6e49;font-weight:700">Tutte le soglie raggiunte!</span>') +
+          : '<span style="font-size:var(--fs-sm,.8125rem);color:var(--c-verde,#2c6e49);font-weight:700">Tutte le soglie raggiunte!</span>') +
         (raggiunti.length
-          ? '<span style="font-size:var(--fs-sm,.8125rem);color:#2c6e49"><i class="icx icx-trofeo"></i> ' +
+          ? '<span style="font-size:var(--fs-sm,.8125rem);color:var(--c-verde,#2c6e49)"><i class="icx icx-trofeo"></i> ' +
             raggiunti.map(escP).join(', ') +
             '</span>'
           : '') +
@@ -2904,7 +2904,7 @@ function _renderGiubileiCard(collabs) {
         x.g.anni +
         ' anni</span><span style="font-size:var(--fs-md,.875rem)">maturato il ' +
         x.g.dataLabel +
-        '</span><strong style="color:#8b6914">' +
+        '</span><strong style="color:var(--c-oro,#8b6914)">' +
         fmtCHF(x.g.importo) +
         ' CHF</strong></div>';
     });

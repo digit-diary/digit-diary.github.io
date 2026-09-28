@@ -491,7 +491,7 @@ async function _renderPianoBriefingTab() {
         '<div style="margin-top:7px;padding-top:6px;border-top:1px solid var(--line)">' +
         '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;vertical-align:middle" title="Memorizza il formato della prima cella marcata" onclick="briefCopiaFormato()">Copia formato</button> ' +
         '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;vertical-align:middle" title="Applica il formato memorizzato alle celle marcate" onclick="briefIncollaFormato()">Incolla formato</button> ' +
-        '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;vertical-align:middle;border-color:#c0392b;color:#c0392b" title="Toglie colori e formato dalle celle o righe marcate" onclick="briefCancellaFormato()">Cancella formato</button>' +
+        '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;vertical-align:middle;border-color:var(--c-rosso,#c0392b);color:var(--c-rosso,#c0392b)" title="Toglie colori e formato dalle celle o righe marcate" onclick="briefCancellaFormato()">Cancella formato</button>' +
         '</div>' +
         '</div></span></span>'
       : '') +
@@ -616,7 +616,7 @@ async function _renderPianoBriefingTab() {
     if (puo)
       h +=
         '<td style="border:none;padding:0 5px;white-space:nowrap;font-size:var(--fs-md,.875rem)">' +
-        '<span style="cursor:pointer;color:#2c6e49;font-weight:bold" title="Inserisci riga sotto" onclick="briefInserisciRiga(' +
+        '<span style="cursor:pointer;color:var(--c-verde,#2c6e49);font-weight:bold" title="Inserisci riga sotto" onclick="briefInserisciRiga(' +
         i +
         ')">+</span> ' +
         '<span style="cursor:pointer;color:var(--muted)" title="Sposta su" onclick="briefMuoviRiga(' +
@@ -625,7 +625,7 @@ async function _renderPianoBriefingTab() {
         '<span style="cursor:pointer;color:var(--muted)" title="Sposta giù" onclick="briefMuoviRiga(' +
         i +
         ',1)">▼</span> ' +
-        '<span style="cursor:pointer;color:#c0392b;font-weight:bold" title="Elimina riga" onclick="briefEliminaRiga(' +
+        '<span style="cursor:pointer;color:var(--c-rosso,#c0392b);font-weight:bold" title="Elimina riga" onclick="briefEliminaRiga(' +
         i +
         ')">×</span></td>';
     h += '</tr>';
@@ -1436,7 +1436,7 @@ function _renderPianoCorsiCard() {
     '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" title="La prossima volta questo corso partirà con questo orario" onclick="corsoSalvaOrarioDefault()">Salva orario predefinito</button>';
   h += '</div>';
   h +=
-    '<div style="margin-bottom:6px;font-size:var(--fs-sm,.8125rem)"><b>Partecipanti</b> · <span style="cursor:pointer;color:#1a4a7a;text-decoration:underline" onclick="document.querySelectorAll(\'.corso-part\').forEach(c=>c.checked=true)">tutti</span> / <span style="cursor:pointer;color:#1a4a7a;text-decoration:underline" onclick="document.querySelectorAll(\'.corso-part\').forEach(c=>c.checked=false)">nessuno</span></div>';
+    '<div style="margin-bottom:6px;font-size:var(--fs-sm,.8125rem)"><b>Partecipanti</b> · <span style="cursor:pointer;color:var(--c-blu,#1a4a7a);text-decoration:underline" onclick="document.querySelectorAll(\'.corso-part\').forEach(c=>c.checked=true)">tutti</span> / <span style="cursor:pointer;color:var(--c-blu,#1a4a7a);text-decoration:underline" onclick="document.querySelectorAll(\'.corso-part\').forEach(c=>c.checked=false)">nessuno</span></div>';
   h +=
     '<div style="max-height:180px;overflow-y:auto;border:1px solid var(--border,#ccc);padding:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:2px 12px;font-size:var(--fs-md,.875rem)">';
   collabs.forEach((c) => {
@@ -1449,7 +1449,7 @@ function _renderPianoCorsiCard() {
   });
   h += '</div>';
   h +=
-    '<button class="btn-export" style="font-size:var(--fs-md,.875rem);padding:6px 16px;margin-top:10px;border-color:#2c6e49;color:#2c6e49" onclick="pianoInserisciCorso()">Inserisci nel piano</button>';
+    '<button class="btn-export" style="font-size:var(--fs-md,.875rem);padding:6px 16px;margin-top:10px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="pianoInserisciCorso()">Inserisci nel piano</button>';
   // gestione della LISTA corsi (admin): aggiungi sigla, rinomina, rimuovi
   if (isAdmin()) {
     h +=

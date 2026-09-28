@@ -732,7 +732,7 @@ async function _renderPianoFormulariTab() {
     '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:260px"><b>' +
     titolo +
     '</b><br><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">Modulo ufficiale Word da stampare/compilare. In alternativa, la versione Excel si compila al computer e si reimporta in Formazione per la certificazione automatica.</span></div>' +
-    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 14px;border-color:#1a4a7a;color:#1a4a7a" onclick="apriFormularioPerNome(\'' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 14px;border-color:var(--c-blu,#1a4a7a);color:var(--c-blu,#1a4a7a)" onclick="apriFormularioPerNome(\'' +
     nomeOriginale.replace(/'/g, "\\'") +
     '\')">Scarica Word (originale)</button>' +
     '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" onclick="pianoScaricaProtocollo(\'' +
@@ -760,7 +760,7 @@ async function _renderPianoFormulariTab() {
     ')';
   if (puoMod)
     h +=
-      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:#2c6e49;color:#2c6e49" onclick="document.getElementById(\'form-arch-file\').click()">Carica formulario</button>' +
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="document.getElementById(\'form-arch-file\').click()">Carica formulario</button>' +
       '<input type="file" id="form-arch-file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv" style="display:none" onchange="caricaFormulario(this)">';
   h += '</div><div style="padding:6px 16px 14px">';
   h +=
@@ -796,7 +796,7 @@ async function _renderPianoFormulariTab() {
           (f.mime === 'application/pdf' ? 'Apri / Stampa' : 'Scarica') +
           '</button>' +
           (puoMod
-            ? '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:#1a4a7a;color:#1a4a7a" onclick="rinominaFormulario(' +
+            ? '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:var(--c-blu,#1a4a7a);color:var(--c-blu,#1a4a7a)" onclick="rinominaFormulario(' +
               f.id +
               ')">Rinomina/Sposta</button><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:var(--accent);color:var(--accent)" onclick="eliminaFormulario(' +
               f.id +

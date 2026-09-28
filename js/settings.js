@@ -1235,7 +1235,7 @@ function renderOperatoriUI() {
             '</span>' +
             repBadge +
             (hasAuth
-              ? '<span style="font-size:var(--fs-sm,.8125rem);color:#2c6e49;font-weight:600">Con password</span>'
+              ? '<span style="font-size:var(--fs-sm,.8125rem);color:var(--c-verde,#2c6e49);font-weight:600">Con password</span>'
               : '') +
             (admin
               ? '<span style="flex:1"></span><button class="btn-del-tipo" onclick="apriAccessiExtra(\'' +
@@ -1590,6 +1590,31 @@ function toggleTema() {
   document.getElementById('btn-tema').innerHTML = isDark
     ? '<i class="icx icx-sole"></i> Tema chiaro'
     : '<i class="icx icx-luna"></i> Tema scuro';
+  graficiColoriTema();
+}
+// GRAFICI: scritte e griglia con i colori del tema attivo (nel tema scuro il
+// grigio predefinito di Chart.js non si leggeva). Vale per i grafici nuovi e
+// aggiorna quelli gia disegnati.
+function graficiColoriTema() {
+  if (typeof Chart === 'undefined') return;
+  const cs = getComputedStyle(document.body);
+  const testo = cs.getPropertyValue('--ink').trim() || '#1a1208';
+  const griglia = cs.getPropertyValue('--line').trim() || '#e8dfd0';
+  Chart.defaults.color = testo;
+  Chart.defaults.borderColor = griglia;
+  Object.values(Chart.instances || {}).forEach((ch) => {
+    try {
+      ch.options.color = testo;
+      Object.values(ch.options.scales || {}).forEach((sc) => {
+        if (sc.ticks) sc.ticks.color = testo;
+        if (sc.pointLabels) sc.pointLabels.color = testo;
+        if (sc.grid) sc.grid.color = griglia;
+      });
+      if (ch.options.plugins && ch.options.plugins.legend && ch.options.plugins.legend.labels)
+        ch.options.plugins.legend.labels.color = testo;
+      ch.update('none');
+    } catch (e) {}
+  });
 }
 // DIMENSIONE DEL TESTO PER OPERATORE: dal 90% al 130%. Si applica cambiando la
 // base di tutte le misure (--scala-testo). Salvata sul dispositivo, per partire
@@ -1648,6 +1673,7 @@ function applicaTemaOperatore() {
     document.body.classList.remove('dark-theme');
     document.getElementById('btn-tema').innerHTML = '<i class="icx icx-luna"></i> Tema scuro';
   }
+  graficiColoriTema();
 }
 
 // NAVIGATION

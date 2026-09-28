@@ -409,7 +409,7 @@ function _pianoColoriBarHtml() {
     '<div style="margin-top:7px;padding-top:6px;border-top:1px solid var(--line)">' +
     '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;vertical-align:middle" title="Memorizza colore e formato della prima cella selezionata" onclick="pianoCopiaFormato()">Copia formato</button> ' +
     '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;vertical-align:middle" title="Applica il formato memorizzato alle celle selezionate" onclick="pianoIncollaFormato()">Incolla formato</button> ' +
-    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;vertical-align:middle;border-color:#c0392b;color:#c0392b" title="Toglie colori, grassetto e corsivo dalle celle selezionate (i turni non cambiano)" onclick="pianoCancellaFormato()">Cancella formato</button>' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;vertical-align:middle;border-color:var(--c-rosso,#c0392b);color:var(--c-rosso,#c0392b)" title="Toglie colori, grassetto e corsivo dalle celle selezionate (i turni non cambiano)" onclick="pianoCancellaFormato()">Cancella formato</button>' +
     '</div>' +
     '</div></span>'
   );
@@ -1065,7 +1065,7 @@ function _pianoSparseBar() {
   }
   const b = (label, onclick, rosso) =>
     '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px' +
-    (rosso ? ';border-color:#c0392b;color:#c0392b' : '') +
+    (rosso ? ';border-color:var(--c-rosso,#c0392b);color:var(--c-rosso,#c0392b)' : '') +
     '" onclick="' +
     onclick +
     '">' +
@@ -1407,7 +1407,7 @@ async function _pianoTestoAppunti() {
     mc.innerHTML =
       '<h3 style="margin-bottom:8px">Incolla</h3><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Premi Ctrl+V (Cmd+V su Mac) nel riquadro: puoi incollare celle copiate da Excel o dal Diario.</p>' +
       '<textarea id="incolla-txt" style="width:100%;height:140px;font-family:monospace;font-size:var(--fs-md,.875rem);padding:8px"></textarea>' +
-      '<div style="margin-top:10px;display:flex;gap:10px"><button class="btn-export" onclick="window._incollaOk()">Incolla</button><button class="btn-export" style="border-color:#c0392b;color:#c0392b" onclick="window._incollaAnnulla()">Annulla</button></div>';
+      '<div style="margin-top:10px;display:flex;gap:10px"><button class="btn-export" onclick="window._incollaOk()">Incolla</button><button class="btn-export" style="border-color:var(--c-rosso,#c0392b);color:var(--c-rosso,#c0392b)" onclick="window._incollaAnnulla()">Annulla</button></div>';
     m.classList.remove('hidden');
     setTimeout(() => document.getElementById('incolla-txt').focus(), 100);
     window._incollaOk = () => {
@@ -2142,7 +2142,7 @@ async function _renderPianoCreditiTab() {
       ')"><td style="text-align:left;font-weight:600">' +
       escP(d.nome) +
       (d.senzaData
-        ? ' <span title="Manca la data di assunzione: vacanze non calcolabili" style="color:#c0392b">*</span>'
+        ? ' <span title="Manca la data di assunzione: vacanze non calcolabili" style="color:var(--c-rosso,#c0392b)">*</span>'
         : '') +
       '</td><td>' +
       escP(d.funzione) +

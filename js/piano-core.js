@@ -1400,7 +1400,7 @@ async function renderPiano() {
         const ssnap = (window._pianoSessSnap || {})[_pianoMeseSel + '|' + _pianoReparto()];
         if (ssnap)
           h +=
-            '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 9px;border-color:#c0392b;color:#c0392b" title="Riporta questo mese a com\'era quando hai iniziato a modificarlo in questa sessione (' +
+            '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 9px;border-color:var(--c-rosso,#c0392b);color:var(--c-rosso,#c0392b)" title="Riporta questo mese a com\'era quando hai iniziato a modificarlo in questa sessione (' +
             ssnap.n +
             ' operazioni tue)" onclick="pianoAnnullaTutto()">Annulla tutto (' +
             ssnap.n +
@@ -1900,7 +1900,7 @@ async function renderPiano() {
         if (puoMod)
           hFabb +=
             '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:#d4b86a;color:#d4b86a" onclick="copiaFabbisognoMese()">Copia dal mese precedente</button>' +
-            '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:#2c6e49;color:#2c6e49" onclick="document.getElementById(\'fabb-file\').click()">Importa da Excel</button>' +
+            '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="document.getElementById(\'fabb-file\').click()">Importa da Excel</button>' +
             '<input type="file" id="fabb-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="importaFabbisognoExcel(this)">' +
             '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:var(--accent);color:var(--accent)" onclick="eliminaFabbisognoMese()">Svuota mese</button>' +
             '<span style="font-size:var(--fs-sm,.8125rem);color:#b8a98a;font-weight:400">clicca una cella per impostare le persone necessarie</span>';
@@ -2008,7 +2008,7 @@ async function renderPiano() {
           });
         hFabb += '</tbody></table></div>';
         hFabb +=
-          '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);padding:8px 14px">assegnati/richiesti · celle gialle (weekend verdi) come la PIANIFICAZIONE dell&#39;Excel; numero <span style="color:#c0392b;font-weight:700">rosso</span> = carenza. Il fabbisogno guida "Genera bozza".</p></div>';
+          '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);padding:8px 14px">assegnati/richiesti · celle gialle (weekend verdi) come la PIANIFICAZIONE dell&#39;Excel; numero <span style="color:var(--c-rosso,#c0392b);font-weight:700">rosso</span> = carenza. Il fabbisogno guida "Genera bozza".</p></div>';
 
         // DIFFERENZE + EFFETTIVI · schema IDENTICO a Turnivo (calendario.html):
         // differenze = effettivi - pianificazione (verde >0, rosso <0, vuoto 0),

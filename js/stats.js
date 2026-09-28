@@ -143,6 +143,14 @@ function renderStatistiche() {
       }).length,
     );
   }
+  // si parte dal primo mese con registrazioni (almeno gli ultimi 3 mesi): niente
+  // mesi vuoti in testa al grafico quando i dati iniziano da poco
+  let _mDa = md.findIndex((n) => n > 0);
+  _mDa = _mDa < 0 ? 9 : Math.min(_mDa, 9);
+  [ml, md, me].forEach((arr) => arr.splice(0, _mDa));
+  const _mTitolo = document.getElementById('chart-mesi');
+  const _mH4 = _mTitolo && _mTitolo.closest('.chart-card') && _mTitolo.closest('.chart-card').querySelector('h4');
+  if (_mH4) _mH4.textContent = 'Registrazioni negli ultimi ' + ml.length + ' mesi';
   renderChart(
     'chart-mesi',
     'bar',
@@ -172,7 +180,7 @@ function renderStatistiche() {
       },
       scales: {
         y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 12 } } },
-        x: { ticks: { font: { size: 11 } } },
+        x: { ticks: { font: { size: 12 } } },
       },
     },
   );
@@ -375,9 +383,9 @@ function renderStatistiche() {
         (d.totCHF
           ? fmtCHF(d.totCHF) +
             (d.amm || d.ecc
-              ? '<br><span style="font-size:var(--fs-sm,.8125rem)"><span style="color:#c62828">-' +
+              ? '<br><span style="font-size:var(--fs-sm,.8125rem)"><span style="color:var(--c-rosso,#c0392b)">-' +
                 fmtCHF(d.amm) +
-                '</span> / <span style="color:#2e7d32">+' +
+                '</span> / <span style="color:var(--c-verde,#2c6e49)">+' +
                 fmtCHF(d.ecc) +
                 '</span></span>'
               : '')
@@ -392,9 +400,9 @@ function renderStatistiche() {
       '</strong></td><td></td><td class="num"><strong>' +
       (gCHF ? fmtCHF(gCHF) + ' CHF' : '-') +
       (gAmm || gEcc
-        ? '<br><span style="font-size:var(--fs-sm,.8125rem);font-weight:400"><span style="color:#c62828">-' +
+        ? '<br><span style="font-size:var(--fs-sm,.8125rem);font-weight:400"><span style="color:var(--c-rosso,#c0392b)">-' +
           fmtCHF(gAmm) +
-          '</span> / <span style="color:#2e7d32">+' +
+          '</span> / <span style="color:var(--c-verde,#2c6e49)">+' +
           fmtCHF(gEcc) +
           '</span></span>'
         : '') +

@@ -167,7 +167,7 @@ function _renderValutazioneSezione(nome) {
       (v ? ',' + v.anno + ",'" + escP(v.tipo) + "'" : '') +
       ')" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px">+ Nuova / Modifica</button>';
     html +=
-      '<button class="btn-export" onclick="document.getElementById(\'val-import-file\').click()" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:#2c6e49;color:#2c6e49">Importa Excel</button>' +
+      '<button class="btn-export" onclick="document.getElementById(\'val-import-file\').click()" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)">Importa Excel</button>' +
       '<input type="file" id="val-import-file" accept=".xlsx,.xls" style="display:none" onchange="importaValutazioneExcel(this,\'' +
       ne +
       '\')">';
@@ -287,7 +287,7 @@ function _renderValutazioneSezione(nome) {
       '</strong>' +
       (prec ? deltaBadge(val, areePrec[a.key]) : '') +
       ((v.auto_aree || {})[a.key] != null
-        ? '<span style="font-size:var(--fs-sm,.8125rem);color:#1a4a7a;min-width:58px;text-align:right" title="Autovalutazione del collaboratore">auto: ' +
+        ? '<span style="font-size:var(--fs-sm,.8125rem);color:var(--c-blu,#1a4a7a);min-width:58px;text-align:right" title="Autovalutazione del collaboratore">auto: ' +
           v.auto_aree[a.key] +
           '%</span>'
         : '') +
@@ -354,12 +354,12 @@ function _initSchedaValutazione(nome) {
         r: {
           min: 0,
           max: 100,
-          ticks: { stepSize: 20, font: { size: 9 } },
-          pointLabels: { font: { size: 9 } },
+          ticks: { stepSize: 20, font: { size: 12 } },
+          pointLabels: { font: { size: 12 } },
         },
       },
       plugins: {
-        legend: { position: 'bottom', labels: { font: { size: 10 } } },
+        legend: { position: 'bottom', labels: { font: { size: 12 } } },
       },
     },
   });
@@ -859,7 +859,7 @@ async function importaValutazioneExcel(input, nome) {
           '</p>'
         : '') +
       (autoAree && Object.keys(autoAree).length
-        ? '<p style="font-size:var(--fs-sm,.8125rem);color:#1a4a7a;margin:0 0 10px">Autovalutazione trovata: ' +
+        ? '<p style="font-size:var(--fs-sm,.8125rem);color:var(--c-blu,#1a4a7a);margin:0 0 10px">Autovalutazione trovata: ' +
           Object.keys(autoAree).length +
           ' aree (verrà salvata accanto alla valutazione)</p>'
         : '') +

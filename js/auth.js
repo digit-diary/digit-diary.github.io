@@ -609,7 +609,7 @@ function renderBiometricSettings() {
         bn +
         '</strong><br><span style="font-size:var(--fs-md,.875rem);color:var(--muted)">Attivo per: ' +
         escP(curOp) +
-        '</span></div><button onclick="disattivaBiometrico()" style="padding:8px 16px;font-size:var(--fs-md,.875rem);font-family:Source Sans 3,sans-serif;font-weight:600;border:1.5px solid #c0392b;color:#c0392b;background:none;border-radius:2px;cursor:pointer">Disattiva</button></div>';
+        '</span></div><button onclick="disattivaBiometrico()" style="padding:8px 16px;font-size:var(--fs-md,.875rem);font-family:Source Sans 3,sans-serif;font-weight:600;border:1.5px solid #c0392b;color:var(--c-rosso,#c0392b);background:none;border-radius:2px;cursor:pointer">Disattiva</button></div>';
     } else {
       biometricAvailable().then(function (ok) {
         el.innerHTML = ok

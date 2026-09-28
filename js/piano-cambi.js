@@ -874,7 +874,7 @@ async function apriScambioTurno() {
           '<option value="' +
           escP(c.collaboratore) +
           '"' +
-          (prob ? ' style="color:#c0392b"' : '') +
+          (prob ? ' style="color:var(--c-rosso,#c0392b)"' : '') +
           '>' +
           escP(c.collaboratore) +
           ' · ' +
@@ -1549,7 +1549,7 @@ async function cercaSostitutiMalattia() {
         d.g +
         '</td><td>' +
         escP(d.codice) +
-        '</td><td style="color:#c0392b;font-weight:700;text-align:left">NESSUN SOSTITUTO DISPONIBILE (nemmeno con cambi a catena)</td></tr>';
+        '</td><td style="color:var(--c-rosso,#c0392b);font-weight:700;text-align:left">NESSUN SOSTITUTO DISPONIBILE (nemmeno con cambi a catena)</td></tr>';
     else
       h +=
         '<tr><td><input type="checkbox" class="mal-sel" data-g="' +
@@ -1560,11 +1560,11 @@ async function cercaSostitutiMalattia() {
         escP(d.codice) +
         '</b> ' +
         d.orari +
-        '</td><td style="text-align:left;color:#2c6e49;font-weight:700">' +
+        '</td><td style="text-align:left;color:var(--c-verde,#2c6e49);font-weight:700">' +
         escP(d.sostituto) +
         (d.era ? ' <span style="color:var(--muted);font-weight:400">(era ' + escP(d.era) + ')</span>' : '') +
         (d.catena
-          ? '<div style="font-weight:400;color:#b8860b;font-size:var(--fs-sm,.8125rem)">' +
+          ? '<div style="font-weight:400;color:var(--c-oro,#8b6914);font-size:var(--fs-sm,.8125rem)">' +
             escP(descCatena(d)) +
             '</div>'
           : '') +
@@ -1577,7 +1577,7 @@ async function cercaSostitutiMalattia() {
     '<p style="font-size:var(--fs-sm,.8125rem);margin-top:6px">' +
     coperti +
     ' giorni coperti' +
-    (scoperti ? ', <b style="color:#c0392b">' + scoperti + ' scoperti</b>' : '') +
+    (scoperti ? ', <b style="color:var(--c-rosso,#c0392b)">' + scoperti + ' scoperti</b>' : '') +
     '. Alla conferma: M (protetta) al malato su tutti i giorni; turni protetti SOLO per le soluzioni con la spunta' +
     (coperti ? ', punti incentivo con conferma' : '') +
     '. Le mosse a catena scrivono il commento anche sulle celle del giorno prima.</p>';

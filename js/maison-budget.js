@@ -172,7 +172,7 @@ function renderMaisonBudgetUI() {
         ? '<button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2);font-size:var(--fs-sm,.8125rem)" onclick="modificaMaisonInfo(' +
           c.b.id +
           ')">Modifica</button>'
-        : '<button class="btn-del-tipo" style="color:#2980b9;border-color:#2980b9;font-size:var(--fs-sm,.8125rem)" onclick="assegnaCatRapida(\'' +
+        : '<button class="btn-del-tipo" style="color:var(--c-azzurro,#1f6fa3);border-color:var(--c-azzurro,#1f6fa3);font-size:var(--fs-sm,.8125rem)" onclick="assegnaCatRapida(\'' +
           ne +
           '\')">Assegna</button>') +
       (c.b
@@ -272,7 +272,7 @@ function assegnaCatRapida(nome) {
     _jsArg(nome) +
     '\',\'maison\')">Maison</button><button class="btn-salva" style="background:#8e44ad" onclick="salvaAssegnaCat(\'' +
     _jsArg(nome) +
-    '\',\'direzione\')">Direzione</button><button class="btn-salva" style="background:#e67e22" onclick="salvaAssegnaCat(\'' +
+    '\',\'direzione\')">Direzione</button><button class="btn-salva" style="background:#c8671a" onclick="salvaAssegnaCat(\'' +
     _jsArg(nome) +
     '\',\'bu\')">Buono Unico</button><button class="btn-salva" style="background:#2c6e49" onclick="salvaAssegnaCat(\'' +
     _jsArg(nome) +
@@ -707,7 +707,7 @@ async function importaCategorieMaison(input) {
       nomi.length +
       '</div><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Totale</div></div>';
     prev +=
-      '<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:#2c6e49">' +
+      '<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:var(--c-verde,#2c6e49)">' +
       nNuovi +
       '</div><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Nuovi</div></div>';
     prev +=
@@ -823,7 +823,7 @@ async function importaCategorieMaison(input) {
       mc.innerHTML =
         '<div style="text-align:center;padding:20px"><div style="font-size:var(--fs-4xl,2.5rem);margin-bottom:8px">' +
         (errori ? '<i class="icx icx-avviso"></i>' : '<i class="icx icx-check"></i>') +
-        '</div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Importazione completata</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:#2c6e49">' +
+        '</div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Importazione completata</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:var(--c-verde,#2c6e49)">' +
         nuovi +
         '</div><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);text-transform:uppercase">Nuovi</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:var(--accent2)">' +
         aggiornati +
@@ -985,23 +985,23 @@ async function importaCompleanniMaison(input) {
       compleanni.length +
       '</div><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Compleanni</div></div>';
     prev +=
-      '<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:#2c6e49">' +
+      '<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:var(--c-verde,#2c6e49)">' +
       esistenti.length +
       '</div><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Clienti esistenti</div></div>';
     prev +=
-      '<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:#2980b9">' +
+      '<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:var(--c-azzurro,#1f6fa3)">' +
       nuovi.length +
       '</div><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Familiari / Nuovi</div></div>';
     if (daConfermare.length)
       prev +=
-        '<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:#e67e22">' +
+        '<div style="flex:1;min-width:80px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:var(--c-arancio,#b85c0e)">' +
         daConfermare.length +
         '</div><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Da confermare</div></div>';
     prev += '</div>';
     // Nomi simili: l'operatore decide per ognuno (default: salta). Nessuna rinomina automatica.
     if (daConfermare.length) {
       prev +=
-        '<div style="margin-bottom:12px;padding:10px;background:rgba(230,126,34,0.08);border-left:3px solid #e67e22;border-radius:3px"><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:#e67e22;font-weight:700;margin-bottom:6px">Nomi simili: conferma cosa fare</div>';
+        '<div style="margin-bottom:12px;padding:10px;background:rgba(230,126,34,0.08);border-left:3px solid #e67e22;border-radius:3px"><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:var(--c-arancio,#b85c0e);font-weight:700;margin-bottom:6px">Nomi simili: conferma cosa fare</div>';
       daConfermare.forEach((m) => {
         prev +=
           '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0;font-size:var(--fs-md,.875rem)"><strong>' +
@@ -1035,7 +1035,7 @@ async function importaCompleanniMaison(input) {
         return da - db;
       });
       prev +=
-        '<div style="margin-bottom:12px"><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.08em;text-transform:uppercase;color:#b8860b;font-weight:700;margin-bottom:6px;border-bottom:1px solid var(--line);padding-bottom:4px">' +
+        '<div style="margin-bottom:12px"><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.08em;text-transform:uppercase;color:var(--c-oro,#8b6914);font-weight:700;margin-bottom:6px;border-bottom:1px solid var(--line);padding-bottom:4px">' +
         mesiNomi[mi] +
         ' (' +
         lista.length +
@@ -1060,8 +1060,8 @@ async function importaCompleanniMaison(input) {
           giorno +
           '</strong> ' +
           escP(m.nome) +
-          (m.isNew ? ' <span style="font-size:var(--fs-sm,.8125rem);color:#2980b9;font-weight:700">NEW</span>' : '') +
-          (m.simile ? ' <span style="font-size:var(--fs-sm,.8125rem);color:#e67e22;font-weight:700">?</span>' : '') +
+          (m.isNew ? ' <span style="font-size:var(--fs-sm,.8125rem);color:var(--c-azzurro,#1f6fa3);font-weight:700">NEW</span>' : '') +
+          (m.simile ? ' <span style="font-size:var(--fs-sm,.8125rem);color:var(--c-arancio,#b85c0e);font-weight:700">?</span>' : '') +
           '</span>';
       });
       prev += '</div></div>';
@@ -1136,13 +1136,13 @@ async function importaCompleanniMaison(input) {
       mc.innerHTML =
         '<div style="text-align:center;padding:20px"><div style="font-size:var(--fs-4xl,2.5rem);margin-bottom:8px">' +
         (nErrori ? '<i class="icx icx-avviso"></i>' : '<i class="icx icx-torta"></i>') +
-        '</div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Compleanni importati</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:#2c6e49">' +
+        '</div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Compleanni importati</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:var(--c-verde,#2c6e49)">' +
         nAggiornati +
-        '</div><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);text-transform:uppercase">Aggiornati</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:#2980b9">' +
+        '</div><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);text-transform:uppercase">Aggiornati</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:var(--c-azzurro,#1f6fa3)">' +
         nNuovi +
         '</div><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);text-transform:uppercase">Nuovi / Familiari</div></div>' +
         (nSaltati
-          ? '<div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:#e67e22">' +
+          ? '<div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:var(--c-arancio,#b85c0e)">' +
             nSaltati +
             '</div><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);text-transform:uppercase">Saltati</div></div>'
           : '') +

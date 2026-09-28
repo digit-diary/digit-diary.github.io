@@ -1193,7 +1193,7 @@ function renderNoteChat(partner) {
     // Sender label for group chats (WhatsApp style)
     let senderLabel = '';
     if (isGroup && !isSent) senderLabel = '<div class="chat-sender-label">' + escP(n.da_operatore) + '</div>';
-    if (isGroup && isSent) senderLabel = '<div class="chat-sender-label" style="color:#b8860b">Tu</div>';
+    if (isGroup && isSent) senderLabel = '<div class="chat-sender-label" style="color:var(--c-oro,#8b6914)">Tu</div>';
     // Group read status: aggregated (3/5 letti)
     let destLabel = '';
     if (isSent && n.gruppo_id && isGroup) {
@@ -1223,7 +1223,7 @@ function renderNoteChat(partner) {
           '" style="display:none;position:absolute;bottom:100%;left:0;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:8px 12px;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:100;font-size:var(--fs-sm,.8125rem);min-width:160px;max-width:280px">';
         if (lettiList.length)
           tooltipHtml +=
-            '<div style="color:#2c6e49;margin-bottom:4px"><strong>&#10003;&#10003; Letto da:</strong></div>' +
+            '<div style="color:var(--c-verde,#2c6e49);margin-bottom:4px"><strong>&#10003;&#10003; Letto da:</strong></div>' +
             lettiList.map((n) => '<div style="padding:1px 0">' + escP(n) + '</div>').join('');
         if (nonLettiList.length)
           tooltipHtml +=
@@ -1561,11 +1561,11 @@ function inoltraMessaggio(noteId) {
   html +=
     '<div onclick="_eseguiInoltro(' +
     noteId +
-    ',\'gruppo:__gruppo_slots\')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--line);font-weight:600;color:#1a4a7a" onmouseenter="this.style.background=\'rgba(184,134,11,.08)\'" onmouseleave="this.style.background=\'\'">Tutti Slots</div>';
+    ',\'gruppo:__gruppo_slots\')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--line);font-weight:600;color:var(--c-blu,#1a4a7a)" onmouseenter="this.style.background=\'rgba(184,134,11,.08)\'" onmouseleave="this.style.background=\'\'">Tutti Slots</div>';
   html +=
     '<div onclick="_eseguiInoltro(' +
     noteId +
-    ',\'gruppo:__gruppo_tavoli\')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--line);font-weight:600;color:#8e44ad" onmouseenter="this.style.background=\'rgba(184,134,11,.08)\'" onmouseleave="this.style.background=\'\'">Tutti Tavoli</div>';
+    ',\'gruppo:__gruppo_tavoli\')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--line);font-weight:600;color:var(--c-viola,#7b2d8b)" onmouseenter="this.style.background=\'rgba(184,134,11,.08)\'" onmouseleave="this.style.background=\'\'">Tutti Tavoli</div>';
   html += '<div style="height:1px;background:var(--line)"></div>';
   // Individual operators
   const tutti = operatoriAuthCache
@@ -2296,7 +2296,7 @@ function apriSchedaCollaboratore(nome) {
   html +=
     '<button class="btn-export" onclick="apriConfrontoScheda(\'' +
     neS +
-    '\')" style="font-size:var(--fs-sm,.8125rem);padding:5px 14px;border-color:#1a7a6d;color:#1a7a6d">Confronta</button>';
+    '\')" style="font-size:var(--fs-sm,.8125rem);padding:5px 14px;border-color:var(--c-verdeacqua,#1a7a6d);color:var(--c-verdeacqua,#1a7a6d)">Confronta</button>';
   html +=
     '<button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\');_destroySchedaCharts()" style="padding:6px 12px;font-size:var(--fs-sm,.8125rem)">Chiudi</button></div></div>';
 
@@ -2346,9 +2346,9 @@ function apriSchedaCollaboratore(nome) {
       fmtCHF(totErrCost) +
       ' CHF</div>' +
       (totAmmanchi || totEccedenze
-        ? '<div style="font-size:11px;margin-top:2px;font-weight:600"><span style="color:#c62828">-' +
+        ? '<div style="font-size:11px;margin-top:2px;font-weight:600"><span style="color:var(--c-rosso,#c0392b)">-' +
           fmtCHF(totAmmanchi) +
-          '</span> / <span style="color:#2e7d32">+' +
+          '</span> / <span style="color:var(--c-verde,#2c6e49)">+' +
           fmtCHF(totEccedenze) +
           '</span></div>'
         : '') +
@@ -2371,7 +2371,7 @@ function apriSchedaCollaboratore(nome) {
     html +=
       '<div class="scheda-kpi"' +
       _kpiAttr('reg', tipoAmm) +
-      '><div class="kpi-val" style="color:#7b2d8b">' +
+      '><div class="kpi-val" style="color:var(--c-viola,#7b2d8b)">' +
       totAmm +
       '</div><div class="kpi-lbl">Amm. verbali</div></div>';
   if (totND)
@@ -2385,14 +2385,14 @@ function apriSchedaCollaboratore(nome) {
     html +=
       '<div class="scheda-kpi"' +
       _kpiAttr('mod', 'Allineamento') +
-      '><div class="kpi-val" style="color:#1a4a7a">' +
+      '><div class="kpi-val" style="color:var(--c-blu,#1a4a7a)">' +
       allineamenti +
       '</div><div class="kpi-lbl">Allineamenti</div></div>';
   if (apprezzamenti)
     html +=
       '<div class="scheda-kpi"' +
       _kpiAttr('mod', 'Apprezzamento') +
-      '><div class="kpi-val" style="color:#b8860b">' +
+      '><div class="kpi-val" style="color:var(--c-oro,#8b6914)">' +
       apprezzamenti +
       '</div><div class="kpi-lbl">Apprezzamenti</div></div>';
   if (apprezzamenti && totNeg) {
@@ -2481,7 +2481,7 @@ function apriSchedaCollaboratore(nome) {
       (momDiff > 0
         ? 'rgba(192,57,43,0.1);color:var(--accent)'
         : momDiff < 0
-          ? 'rgba(44,110,73,0.1);color:#2c6e49'
+          ? 'rgba(44,110,73,0.1);color:var(--c-verde,#2c6e49)'
           : 'rgba(138,125,107,0.1);color:var(--muted)') +
       '">' +
       MESI[curMonth.getMonth()] +
@@ -2505,14 +2505,14 @@ function apriSchedaCollaboratore(nome) {
     html += '<div class="scheda-section"><h4>Percorso disciplinare</h4>';
     html += '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">';
     html +=
-      '<span class="scheda-path-step" style="background:rgba(123,45,139,0.12);color:#7b2d8b;cursor:pointer" title="Clicca per vedere le voci"' +
+      '<span class="scheda-path-step" style="background:rgba(123,45,139,0.12);color:var(--c-viola,#7b2d8b);cursor:pointer" title="Clicca per vedere le voci"' +
       _kpiClick('reg', tipoAmm) +
       '>' +
       totAmm +
       ' Amm. verbali</span>';
     html += '<span class="scheda-path-arrow">&#10132;</span>';
     html +=
-      '<span class="scheda-path-step" style="background:rgba(26,74,122,0.12);color:#1a4a7a;cursor:pointer" title="Clicca per vedere le voci"' +
+      '<span class="scheda-path-step" style="background:rgba(26,74,122,0.12);color:var(--c-blu,#1a4a7a);cursor:pointer" title="Clicca per vedere le voci"' +
       _kpiClick('mod', 'Allineamento') +
       '>' +
       allineamenti +
@@ -2543,7 +2543,7 @@ function apriSchedaCollaboratore(nome) {
     const _ammMaxSame = _ammGruppi.reduce((mx, g) => Math.max(mx, g.count), 0);
     if (_ammMaxSame >= getSoglieDisciplinari().amm && allineamenti === 0) {
       html +=
-        '<div class="scheda-suggestion" style="background:rgba(230,126,34,0.12);color:#e67e22"><i class="icx icx-avviso"></i> ' +
+        '<div class="scheda-suggestion" style="background:rgba(230,126,34,0.12);color:var(--c-arancio,#b85c0e)"><i class="icx icx-avviso"></i> ' +
         _ammMaxSame +
         ' ammonimenti stesso motivo senza allineamento &#8594; Preparare allineamento</div>';
     }
@@ -2570,7 +2570,7 @@ function apriSchedaCollaboratore(nome) {
         ' allineamenti stesso motivo senza RDI &#8594; Recidiva, preparare RDI</div>';
     } else if (_allinMods.length >= getSoglieDisciplinari().accumulo && rdiCount === 0) {
       html +=
-        '<div class="scheda-suggestion" style="background:rgba(230,126,34,0.12);color:#e67e22"><i class="icx icx-avviso"></i> ' +
+        '<div class="scheda-suggestion" style="background:rgba(230,126,34,0.12);color:var(--c-arancio,#b85c0e)"><i class="icx icx-avviso"></i> ' +
         _allinMods.length +
         ' allineamenti totali senza RDI &#8594; Valutare RDI</div>';
     }
@@ -2582,12 +2582,12 @@ function apriSchedaCollaboratore(nome) {
     ).length;
     if (recentErr === 0 && recentApprMod > 0) {
       html +=
-        '<div class="scheda-suggestion" style="background:rgba(44,110,73,0.12);color:#2c6e49">&#11088; 0 errori da 3 mesi + ' +
+        '<div class="scheda-suggestion" style="background:rgba(44,110,73,0.12);color:var(--c-verde,#2c6e49)">&#11088; 0 errori da 3 mesi + ' +
         recentApprMod +
         ' apprezzamenti &#8594; Candidato per premio</div>';
     } else if (recentErr === 0 && totReg > 5) {
       html +=
-        '<div class="scheda-suggestion" style="background:rgba(44,110,73,0.12);color:#2c6e49"><i class="icx icx-check"></i> 0 errori negli ultimi 3 mesi</div>';
+        '<div class="scheda-suggestion" style="background:rgba(44,110,73,0.12);color:var(--c-verde,#2c6e49)"><i class="icx icx-check"></i> 0 errori negli ultimi 3 mesi</div>';
     }
     html += '</div>';
   } // fine percorso disciplinare
@@ -2648,7 +2648,7 @@ function apriSchedaCollaboratore(nome) {
       ' giorni di malattia/collaboratore · ' +
       (totMal > avgMal
         ? '<span style="color:var(--accent);font-weight:600">Sopra media</span>'
-        : '<span style="color:#2c6e49;font-weight:600">Nella norma</span>') +
+        : '<span style="color:var(--c-verde,#2c6e49);font-weight:600">Nella norma</span>') +
       '</div>';
     html += '</div>';
   }
@@ -2994,7 +2994,7 @@ function _renderStoricoHrSezione(nome) {
       '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px" onclick="caricaAllegatiCollab(\'' +
       neS +
       '\')">Mostra</button>' +
-      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:#2c6e49;color:#2c6e49" onclick="document.getElementById(\'hr-allegato-file\').click()">+ Carica file</button>' +
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="document.getElementById(\'hr-allegato-file\').click()">+ Carica file</button>' +
       '<input type="file" id="hr-allegato-file" accept=".pdf,.xlsx,.xls,.jpg,.jpeg,.png" style="display:none" onchange="caricaNuovoAllegatoScheda(this,\'' +
       neS +
       '\')">' +
@@ -3274,10 +3274,10 @@ function _renderSchedaTrendChart(nome, entries) {
       responsive: true,
       maintainAspectRatio: false,
       animation: false,
-      plugins: { legend: { position: 'top', labels: { font: { size: 11 } } } },
+      plugins: { legend: { position: 'top', labels: { font: { size: 12 } } } },
       scales: {
-        y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } } },
-        x: { ticks: { font: { size: 10 } } },
+        y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 12 } } },
+        x: { ticks: { font: { size: 12 } } },
       },
     },
   });
@@ -3777,11 +3777,11 @@ function _mostraConfronto(nomi) {
         maintainAspectRatio: true,
         animation: { duration: 400 },
         plugins: {
-          legend: { position: 'top', labels: { font: { size: 11 } } },
+          legend: { position: 'top', labels: { font: { size: 12 } } },
         },
         scales: {
           y: { beginAtZero: true, ticks: { stepSize: 1 } },
-          x: { ticks: { font: { size: 10 } } },
+          x: { ticks: { font: { size: 12 } } },
         },
       },
     });

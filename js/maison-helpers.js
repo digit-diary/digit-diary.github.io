@@ -294,7 +294,7 @@ function _renderRiallineaUI() {
   if (!rimaste.length) {
     // Riepilogo finale
     mc.innerHTML =
-      '<div style="text-align:center;padding:20px"><div style="font-size:var(--fs-4xl,2.5rem);margin-bottom:8px"><i class="icx icx-check"></i></div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Riallineamento completato</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:#2c6e49">' +
+      '<div style="text-align:center;padding:20px"><div style="font-size:var(--fs-4xl,2.5rem);margin-bottom:8px"><i class="icx icx-check"></i></div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Riallineamento completato</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:var(--c-verde,#2c6e49)">' +
       st.confermati +
       '</div><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);text-transform:uppercase">Confermati</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:var(--muted)">' +
       st.saltati +
@@ -316,7 +316,7 @@ function _renderRiallineaUI() {
   // Contatori
   html += '<div style="display:flex;gap:8px;margin-bottom:12px;justify-content:center">';
   html +=
-    '<span style="font-size:var(--fs-sm,.8125rem);color:#2c6e49;font-weight:600">' +
+    '<span style="font-size:var(--fs-sm,.8125rem);color:var(--c-verde,#2c6e49);font-weight:600">' +
     st.confermati +
     ' confermati</span>';
   html += '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' + st.saltati + ' saltati</span>';
@@ -334,7 +334,7 @@ function _renderRiallineaUI() {
       escP(c.vecchio) +
       '</span>';
     html += '<span style="color:var(--muted)">&#8594;</span>';
-    html += '<strong style="font-size:var(--fs-md,.875rem);color:#2c6e49">' + escP(c.nuovo) + '</strong>';
+    html += '<strong style="font-size:var(--fs-md,.875rem);color:var(--c-verde,#2c6e49)">' + escP(c.nuovo) + '</strong>';
     html += '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">';
     if (c.costiCount) html += c.costiCount + ' costi';
     if (c.costiCount && c.extraCount) html += ' + ';
@@ -391,7 +391,7 @@ async function confermaRiallinea(idx) {
   if (row) {
     row.style.background = 'rgba(44,110,73,0.1)';
     row.innerHTML =
-      '<span style="color:#2c6e49;font-size:var(--fs-md,.875rem)"><i class="icx icx-check"></i> ' +
+      '<span style="color:var(--c-verde,#2c6e49);font-size:var(--fs-md,.875rem)"><i class="icx icx-check"></i> ' +
       escP(c.vecchio) +
       ' → <strong>' +
       escP(c.nuovo) +
@@ -509,7 +509,7 @@ function _renderUnisciUI() {
   const rimaste = st.coppie.filter((c) => !c._done);
   if (!rimaste.length) {
     mc.innerHTML =
-      '<div style="text-align:center;padding:20px"><div style="font-size:var(--fs-4xl,2.5rem);margin-bottom:8px"><i class="icx icx-check"></i></div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Unione duplicati completata</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:#2c6e49">' +
+      '<div style="text-align:center;padding:20px"><div style="font-size:var(--fs-4xl,2.5rem);margin-bottom:8px"><i class="icx icx-check"></i></div><h3 style="font-family:Playfair Display,serif;margin-bottom:12px">Unione duplicati completata</h3><div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px"><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:var(--c-verde,#2c6e49)">' +
       st.confermati +
       '</div><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);text-transform:uppercase">Uniti</div></div><div style="text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-2xl,1.5rem);font-weight:700;color:var(--muted)">' +
       st.saltati +
@@ -552,7 +552,7 @@ function _renderUnisciUI() {
     ' coppie</p></div>';
   html += '<div style="display:flex;gap:8px;margin-bottom:12px;justify-content:center">';
   html +=
-    '<span style="font-size:var(--fs-sm,.8125rem);color:#2c6e49;font-weight:600">' + st.confermati + ' uniti</span>';
+    '<span style="font-size:var(--fs-sm,.8125rem);color:var(--c-verde,#2c6e49);font-weight:600">' + st.confermati + ' uniti</span>';
   html += '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' + st.saltati + ' saltati</span>';
   html += '</div>';
   html += '<div id="unisci-lista" style="max-height:400px;overflow-y:auto">';
@@ -589,7 +589,7 @@ function _renderUnisciUI() {
         : '') +
       '</div>';
     html +=
-      '<div style="font-size:var(--fs-sm,.8125rem);color:#1a4a7a;margin-bottom:8px">&#8594; Unisci in: <strong>' +
+      '<div style="font-size:var(--fs-sm,.8125rem);color:var(--c-blu,#1a4a7a);margin-bottom:8px">&#8594; Unisci in: <strong>' +
       escP(c.merged.nome) +
       '</strong>' +
       (mInfo.length ? ' (' + mInfo.join(', ') + ')' : '') +
@@ -666,7 +666,7 @@ async function confermaUnisci(idx) {
     if (row) {
       row.style.background = 'rgba(44,110,73,0.1)';
       row.innerHTML =
-        '<span style="color:#2c6e49;font-size:var(--fs-md,.875rem)"><i class="icx icx-check"></i> ' +
+        '<span style="color:var(--c-verde,#2c6e49);font-size:var(--fs-md,.875rem)"><i class="icx icx-check"></i> ' +
         escP(c.remove.nome) +
         ' unito in <strong>' +
         escP(c.merged.nome) +
@@ -1608,7 +1608,7 @@ function renderSpeseExtra() {
           : _seBudget && _seBudget.categoria === 'direzione'
             ? ' <span class="mini-badge" style="background:#8e44ad;font-size:var(--fs-sm,.8125rem)">Direzione</span>'
             : _seBudget && _seBudget.categoria === 'bu'
-              ? ' <span class="mini-badge" style="background:#e67e22;font-size:var(--fs-sm,.8125rem)">Buono Unico</span>'
+              ? ' <span class="mini-badge" style="background:#c8671a;font-size:var(--fs-sm,.8125rem)">Buono Unico</span>'
               : _seBudget && _seBudget.categoria === 'bl'
                 ? ' <span class="mini-badge" style="background:#2c6e49;font-size:var(--fs-sm,.8125rem)">Buono Lounge</span>'
                 : '';
@@ -2655,7 +2655,7 @@ function renderInventarioCustom(cat) {
         cat.key +
         '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid var(--paper);color:var(--paper);border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif">Rinomina</button> <button onclick="rimuoviCategoriaInventario(\'' +
         cat.key +
-        '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid #e74c3c;color:#e74c3c;border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif">Rimuovi categoria</button></span>'
+        '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid #e74c3c;color:var(--c-rosso,#c0392b);border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif">Rimuovi categoria</button></span>'
       : '') +
     '</div>';
   html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;padding:16px">';
@@ -2838,12 +2838,12 @@ function renderInventarioBuoni() {
           '</div>'
         : '') +
       (_scortaBassa.length
-        ? '<div style="width:100%;grid-column:1/-1;margin-top:8px;padding:8px;background:rgba(230,126,34,0.12);color:#e67e22;border-radius:3px;font-size:var(--fs-md,.875rem)"><i class="icx icx-avviso"></i> Scorta bassa (&le;10): ' +
+        ? '<div style="width:100%;grid-column:1/-1;margin-top:8px;padding:8px;background:rgba(230,126,34,0.12);color:var(--c-arancio,#b85c0e);border-radius:3px;font-size:var(--fs-md,.875rem)"><i class="icx icx-avviso"></i> Scorta bassa (&le;10): ' +
           _scortaBassa.map((t) => t + ' (' + giacenze[t] + ')').join(', ') +
           '</div>'
         : '') +
       (nonPareggiati
-        ? '<div style="width:100%;grid-column:1/-1;margin-top:8px;padding:8px;background:rgba(230,126,34,0.12);color:#e67e22;border-radius:3px;font-size:var(--fs-md,.875rem)"><i class="icx icx-avviso"></i> ' +
+        ? '<div style="width:100%;grid-column:1/-1;margin-top:8px;padding:8px;background:rgba(230,126,34,0.12);color:var(--c-arancio,#b85c0e);border-radius:3px;font-size:var(--fs-md,.875rem)"><i class="icx icx-avviso"></i> ' +
           nonPareggiati +
           ' buoni pre-assegnati non pareggiati</div>'
         : '');
@@ -2966,8 +2966,8 @@ function renderInventarioBuoniTable() {
     const stato =
       r.movimento === 'preassegno'
         ? r.pareggiato
-          ? '<span style="color:#2c6e49">&#10003; Pareggiato</span>'
-          : '<span style="color:#e67e22">&#9203; In attesa</span>'
+          ? '<span style="color:var(--c-verde,#2c6e49)">&#10003; Pareggiato</span>'
+          : '<span style="color:var(--c-arancio,#b85c0e)">&#9203; In attesa</span>'
         : r._auto
           ? '<span style="color:var(--muted)">auto</span>'
           : '';

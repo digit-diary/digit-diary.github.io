@@ -2809,7 +2809,7 @@ function _briefRenderPauseSlots(c) {
       if (puo)
         t +=
           '<td style="border:none;padding:0 3px;white-space:nowrap">' +
-          '<span style="cursor:pointer;color:#2c6e49;font-weight:bold" title="Inserisci riga sotto" onclick="briefPausaInsRiga(' +
+          '<span style="cursor:pointer;color:var(--c-verde,#2c6e49);font-weight:bold" title="Inserisci riga sotto" onclick="briefPausaInsRiga(' +
           base +
           ',' +
           riga.r +
@@ -2824,7 +2824,7 @@ function _briefRenderPauseSlots(c) {
           ',' +
           riga.r +
           ',1)">▼</span> ' +
-          '<span style="cursor:pointer;color:#c0392b;font-weight:bold" title="Elimina riga" onclick="briefPausaDelRiga(' +
+          '<span style="cursor:pointer;color:var(--c-rosso,#c0392b);font-weight:bold" title="Elimina riga" onclick="briefPausaDelRiga(' +
           base +
           ',' +
           riga.r +
@@ -2845,7 +2845,7 @@ function _briefRenderPauseSlots(c) {
   h += '</div>';
   if (puo)
     h +=
-      '<div style="margin-top:8px"><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;border-color:#c0392b;color:#c0392b" onclick="briefEliminaPause()">Elimina pause</button></div>';
+      '<div style="margin-top:8px"><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;border-color:var(--c-rosso,#c0392b);color:var(--c-rosso,#c0392b)" onclick="briefEliminaPause()">Elimina pause</button></div>';
   return h;
 }
 function _briefParseIntv(s) {
@@ -2909,7 +2909,7 @@ function _briefRenderCronoValet(c) {
   h += '</table>';
   if (sovrapposte)
     h +=
-      '<p style="color:#c0392b;font-weight:bold;font-size:var(--fs-sm,.8125rem);margin-top:6px">Attenzione: ' +
+      '<p style="color:var(--c-rosso,#c0392b);font-weight:bold;font-size:var(--fs-sm,.8125rem);margin-top:6px">Attenzione: ' +
       sovrapposte +
       ' sovrapposizioni (righe rosse)</p>';
   return h;
@@ -2972,7 +2972,7 @@ function _briefRenderPauseValet(c) {
     }
     if (puo)
       h +=
-        '<td style="border:none;padding:0 4px"><span style="cursor:pointer;color:#c0392b;font-weight:bold" title="Elimina riga" onclick="briefValetDelRiga(' +
+        '<td style="border:none;padding:0 4px"><span style="cursor:pointer;color:var(--c-rosso,#c0392b);font-weight:bold" title="Elimina riga" onclick="briefValetDelRiga(' +
         i +
         ')">×</span></td>';
     h += '</tr>';
@@ -2989,7 +2989,7 @@ function _briefRenderPauseValet(c) {
       '</p>';
   if (puo)
     h +=
-      '<div style="margin-top:8px"><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;border-color:#c0392b;color:#c0392b" onclick="briefEliminaPause()">Elimina pause</button></div>';
+      '<div style="margin-top:8px"><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;border-color:var(--c-rosso,#c0392b);color:var(--c-rosso,#c0392b)" onclick="briefEliminaPause()">Elimina pause</button></div>';
   return h;
 }
 
@@ -3384,7 +3384,7 @@ function _briefRenderPauseCfg() {
         tab +=
           '<tr>' +
           td(escP(t.codice), ';font-weight:bold;background:' + (_pianoColore(t.codice) || '')) +
-          '<td colspan="4" style="border:1px solid #999;padding:2px 10px;color:#c0392b">orari mancanti · impostali nella scheda Turni per far funzionare le pause</td></tr>';
+          '<td colspan="4" style="border:1px solid #999;padding:2px 10px;color:var(--c-rosso,#c0392b)">orari mancanti · impostali nella scheda Turni per far funzionare le pause</td></tr>';
         return;
       }
       const split = _pePauseSplit(orari, t.codice, sett, dowTab);
@@ -3651,7 +3651,7 @@ async function pePauseSalva() {
   const es = document.getElementById('pcfg-esito');
   const chk = _peValidaRegolaPausa(r, _peSettoreCorrente(), altre);
   if (chk.errore) {
-    if (es) es.innerHTML = '<span style="color:#c0392b;font-weight:700">' + escP(chk.errore) + '</span>';
+    if (es) es.innerHTML = '<span style="color:var(--c-rosso,#c0392b);font-weight:700">' + escP(chk.errore) + '</span>';
     return;
   }
   if (

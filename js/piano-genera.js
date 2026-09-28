@@ -416,7 +416,7 @@ function _pianoRenderViolazioni() {
   if (!el || _pianoViolLista === null) return;
   if (!_pianoViolLista.length) {
     el.innerHTML =
-      '<p style="padding:8px 14px;font-size:var(--fs-sm,.8125rem);color:#2c6e49;font-weight:600"><i class="icx icx-check"></i> Nessuna violazione delle regole attive nel mese.</p>';
+      '<p style="padding:8px 14px;font-size:var(--fs-sm,.8125rem);color:var(--c-verde,#2c6e49);font-weight:600"><i class="icx icx-check"></i> Nessuna violazione delle regole attive nel mese.</p>';
     return;
   }
   let h =

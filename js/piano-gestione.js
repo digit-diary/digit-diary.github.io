@@ -455,17 +455,17 @@ async function caricaBenesserePiano() {
           '</td><td>' +
           x.p.notti +
           '</td><td' +
-          (x.p.riposiIsolati > 2 ? ' style="color:#c0392b;font-weight:700"' : '') +
+          (x.p.riposiIsolati > 2 ? ' style="color:var(--c-rosso,#c0392b);font-weight:700"' : '') +
           '>' +
           x.p.riposiIsolati +
           '</td><td' +
-          (x.p.serieMax > soglie.maxConsecutivi ? ' style="color:#c0392b;font-weight:700"' : '') +
+          (x.p.serieMax > soglie.maxConsecutivi ? ' style="color:var(--c-rosso,#c0392b);font-weight:700"' : '') +
           '>' +
           x.p.serieMax +
           '</td><td>' +
           x.p.vac +
           '</td><td' +
-          (x.p.mal > 20 ? ' style="color:#b8860b;font-weight:700"' : '') +
+          (x.p.mal > 20 ? ' style="color:var(--c-oro,#8b6914);font-weight:700"' : '') +
           '>' +
           x.p.mal +
           '</td><td>' +
@@ -536,8 +536,8 @@ async function caricaBenesserePiano() {
             tooltip: { callbacks: { label: (c) => c.dataset.label + ': ' + c.parsed.y + '% del massimo' } },
           },
           scales: {
-            y: { min: 0, max: 100, ticks: { stepSize: 25, font: { size: 11 }, callback: (v) => v + '%' } },
-            x: { ticks: { font: { size: 11 } } },
+            y: { min: 0, max: 100, ticks: { stepSize: 25, font: { size: 12 }, callback: (v) => v + '%' } },
+            x: { ticks: { font: { size: 12 } } },
           },
         },
       );
@@ -705,7 +705,7 @@ function _renderPianoTurniCard() {
         (_mod.length
           ? ' <span title="Modificato adesso: ' +
             escP(_mod.map((m) => m.campo + ' ' + m.prima + ' \u2192 ' + m.dopo).join(' \u00b7 ')) +
-            '" style="color:#b8860b">\u25cf</span>'
+            '" style="color:var(--c-oro,#8b6914)">\u25cf</span>'
           : '') +
         '</td><td><input type="text" value="' +
         escP(t.gruppo || '') +
@@ -2175,7 +2175,7 @@ async function _renderPianoRecuperoTab() {
     '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">' +
     _recColoriBarHtml() +
     '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px" onclick="pianoRecSelPulisci()">Deseleziona</button>' +
-    '<b id="rec-sel-info" style="font-size:var(--fs-md,.875rem);color:#b8860b"></b>' +
+    '<b id="rec-sel-info" style="font-size:var(--fs-md,.875rem);color:var(--c-oro,#8b6914)"></b>' +
     '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-left:auto">Click sul nome = riga &middot; click sul giorno = colonna &middot; Ctrl+click aggiunge (anche singole caselle)</span>' +
     '</div>';
   h +=

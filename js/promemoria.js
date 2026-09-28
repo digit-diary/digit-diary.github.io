@@ -290,7 +290,7 @@ function renderPromemoria() {
           ? '<span style="font-size:var(--fs-sm,.8125rem);color:var(--accent);font-weight:700">SCADUTO</span>'
           : '') +
         (p.completata
-          ? '<span style="font-size:var(--fs-sm,.8125rem);color:#2c6e49;font-weight:600">Fatto da ' +
+          ? '<span style="font-size:var(--fs-sm,.8125rem);color:var(--c-verde,#2c6e49);font-weight:600">Fatto da ' +
             escP(p.completata_da || '?') +
             ' il ' +
             new Date(p.completata_at).toLocaleDateString('it-IT') +
@@ -300,7 +300,7 @@ function renderPromemoria() {
         (!p.completata
           ? '<button class="btn-act pin" onclick="completaPromemoria(' +
             p.id +
-            ')" style="color:#2c6e49;border-color:#2c6e49">Fatto</button>'
+            ')" style="color:var(--c-verde,#2c6e49);border-color:var(--c-verde,#2c6e49)">Fatto</button>'
           : '<button class="btn-act tipo" onclick="riattivaPromemoria(' + p.id + ')">Riattiva</button>') +
         (admin ? '<button class="btn-act del" onclick="eliminaPromemoria(' + p.id + ')">Elimina</button>' : '') +
         '</div></div>' +
@@ -1055,7 +1055,7 @@ async function caricaMaisonFile(input, forzaSostituisci) {
     let msg = '';
     if (totalRows)
       msg +=
-        '<span style="color:#2c6e49;font-weight:600">' +
+        '<span style="color:var(--c-verde,#2c6e49);font-weight:600">' +
         totalRows +
         ' righe importate' +
         (giorniNuovi ? ' (' + giorniNuovi + ' giorni nuovi)' : '') +
@@ -1072,7 +1072,7 @@ async function caricaMaisonFile(input, forzaSostituisci) {
     if (!totalRows && !giorniSaltati.length) msg = '<span style="color:var(--muted)">Nessun dato nuovo trovato</span>';
     if (dupCount) {
       msg +=
-        '<br><span style="color:#c0392b;font-size:var(--fs-sm,.8125rem);font-weight:600"><i class="icx icx-avviso"></i> ' +
+        '<br><span style="color:var(--c-rosso,#c0392b);font-size:var(--fs-sm,.8125rem);font-weight:600"><i class="icx icx-avviso"></i> ' +
         dupCount +
         ' duplicati trovati nello stesso giorno (inseriti comunque)</span>';
     }
@@ -1086,7 +1086,7 @@ async function caricaMaisonFile(input, forzaSostituisci) {
     }
     if (sevenCount)
       msg +=
-        '<br><span style="color:#8e44ad;font-size:var(--fs-sm,.8125rem)">' +
+        '<br><span style="color:var(--c-viola,#7b2d8b);font-size:var(--fs-sm,.8125rem)">' +
         sevenCount +
         ' righe "Seven" spostate in Spese Extra</span>';
     status.innerHTML = msg;

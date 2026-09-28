@@ -1170,8 +1170,8 @@ async function renderCollaboratoriUI() {
   // link incrociati: da qui si raggiungono al volo le altre due "case" del collaboratore
   const linkBar =
     '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Qui: anagrafica (nome, funzione, %, impiego, categoria, lingue). ' +
-    '<a href="#" onclick="switchPage(\'formazione\');return false" style="color:#2c6e49;font-weight:700">Competenze e livelli → Formazione</a> · ' +
-    '<a href="#" onclick="switchPage(\'piano\');if(typeof pianoCambiaTab===\'function\')pianoCambiaTab(\'impostazioni\');return false" style="color:#1a4a7a;font-weight:700">Preferenze turni → Piano/Impostazioni</a></p>';
+    '<a href="#" onclick="switchPage(\'formazione\');return false" style="color:var(--c-verde,#2c6e49);font-weight:700">Competenze e livelli → Formazione</a> · ' +
+    '<a href="#" onclick="switchPage(\'piano\');if(typeof pianoCambiaTab===\'function\')pianoCambiaTab(\'impostazioni\');return false" style="color:var(--c-blu,#1a4a7a);font-weight:700">Preferenze turni → Piano/Impostazioni</a></p>';
   const selStyle =
     'font-size:var(--fs-sm,.8125rem);padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)';
   const rigaCollab = (c) => {
@@ -1502,7 +1502,7 @@ function _coperturaChipHtml(c) {
     : 'Copertura...';
   return (
     '<button class="btn-del-tipo" title="Settori in cui questo collaboratore puo\' coprire i buchi" style="' +
-    (sett.length ? 'color:#1a4a7a;border-color:#1a4a7a;font-weight:600' : 'color:var(--muted)') +
+    (sett.length ? 'color:var(--c-blu,#1a4a7a);border-color:var(--c-blu,#1a4a7a);font-weight:600' : 'color:var(--muted)') +
     '" onclick="apriCoperturaCollab(' +
     c.id +
     ')">' +
@@ -2077,7 +2077,7 @@ async function salvaGroqKey() {
   groqKey = k;
   document.getElementById('groq-key-input').value = '';
   document.getElementById('groq-status').innerHTML =
-    '<span style="color:#2c6e49;font-weight:600">Chiave salvata</span>';
+    '<span style="color:var(--c-verde,#2c6e49);font-weight:600">Chiave salvata</span>';
   toast('Chiave Groq salvata');
 }
 // PRIVACY: i dati personali dei collaboratori non escono mai verso l'AI
@@ -2290,7 +2290,7 @@ async function generaModuloAI(tipo) {
       }
     }
     if (status)
-      status.innerHTML = '<span style="color:#2c6e49">Campi compilati! Verifica e modifica se necessario.</span>';
+      status.innerHTML = '<span style="color:var(--c-verde,#2c6e49)">Campi compilati! Verifica e modifica se necessario.</span>';
     // Auto-resize textarea dopo AI
     document.querySelectorAll('#modulo-form-area textarea').forEach((ta) => {
       if (ta.value) {
@@ -2302,7 +2302,7 @@ async function generaModuloAI(tipo) {
   } catch (e) {
     console.error(e);
     const msg = e.message || 'Errore AI';
-    if (status) status.innerHTML = '<span style="color:#c0392b">' + escP(msg) + '</span>';
+    if (status) status.innerHTML = '<span style="color:var(--c-rosso,#c0392b)">' + escP(msg) + '</span>';
     toast(msg);
   }
   if (btn) {
@@ -2412,11 +2412,11 @@ async function assistenteGenera() {
     });
     document.getElementById('assist-output').value = _aiRipristina(result).trim();
     document.getElementById('assist-output-wrap').style.display = 'block';
-    if (status) status.innerHTML = '<span style="color:#2c6e49">Testo riscritto!</span>';
+    if (status) status.innerHTML = '<span style="color:var(--c-verde,#2c6e49)">Testo riscritto!</span>';
     toast('Testo riscritto!');
   } catch (e) {
     console.error(e);
-    if (status) status.innerHTML = '<span style="color:#c0392b">' + escP(e.message || 'Errore AI') + '</span>';
+    if (status) status.innerHTML = '<span style="color:var(--c-rosso,#c0392b)">' + escP(e.message || 'Errore AI') + '</span>';
     toast(e.message || 'Errore AI');
   }
   btn.disabled = false;
@@ -2723,7 +2723,7 @@ function render() {
         e.id +
         ')">Modifica</button>' +
         (e.tipo === nomeCorrente('Malattia') && typeof apriPopupCopertura === 'function'
-          ? '<button class="btn-act" style="color:#1a7a6d;border-color:#1a7a6d" onclick="apriPopupCopertura(\'' +
+          ? '<button class="btn-act" style="color:var(--c-verdeacqua,#1a7a6d);border-color:var(--c-verdeacqua,#1a7a6d)" onclick="apriPopupCopertura(\'' +
             e.nome.replace(/'/g, "\\'") +
             "','" +
             _dataRifCopertura(e) +

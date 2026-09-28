@@ -76,7 +76,7 @@ function _renderPianoTimbratureCard() {
   h +=
     '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">' +
     '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px" onclick="caricaConfrontoTimbrature()">Carica confronto del mese</button>' +
-    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px;border-color:#2c6e49;color:#2c6e49" onclick="document.getElementById(\'timb-file\').click()">Importa file timbratrice</button>' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="document.getElementById(\'timb-file\').click()">Importa file timbratrice</button>' +
     '<input type="file" id="timb-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="importaTimbrature(this)">' +
     '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">CSV o Excel con colonne nome / data / entrata / uscita (riconosciute in automatico)</span></div>';
   h +=
@@ -585,7 +585,7 @@ async function caricaStatisticheAnnoPiano(forza) {
   // I mesi sono un FILTRO della tabella qui sotto, non un salto nel calendario:
   // prima cliccarli cambiava il mese del piano e ricaricava tutto, e i numeri
   // restavano quelli dell'anno intero. Ora si vede il mese scelto.
-  const _attivo = 'border-color:#2c6e49;background:#2c6e49;color:#fff;font-weight:700';
+  const _attivo = 'border-color:var(--c-verde,#2c6e49);background:#2c6e49;color:#fff;font-weight:700';
   let h = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0;align-items:center">';
   h +=
     '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;' +
@@ -597,7 +597,7 @@ async function caricaStatisticheAnnoPiano(forza) {
     const sel = meseFiltro === anno + '-' + mm;
     h +=
       '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;' +
-      (sel ? _attivo : ha ? 'border-color:#2c6e49;color:#2c6e49;font-weight:700' : 'color:var(--muted)') +
+      (sel ? _attivo : ha ? 'border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49);font-weight:700' : 'color:var(--muted)') +
       '" onclick="pianoStatMese(\'' +
       anno +
       '-' +
@@ -773,9 +773,9 @@ async function caricaStatisticheAnnoPiano(forza) {
       o.n +
       '</td><td' +
       (o.we > 20
-        ? ' style="color:#c0392b;font-weight:700"'
+        ? ' style="color:var(--c-rosso,#c0392b);font-weight:700"'
         : o.we >= 12
-          ? ' style="color:#b39b00;font-weight:700"'
+          ? ' style="color:var(--c-oro,#8b6914);font-weight:700"'
           : '') +
       '>' +
       o.we +
@@ -792,7 +792,7 @@ async function caricaStatisticheAnnoPiano(forza) {
       '>' +
       (o.cgfGod || '') +
       (o.cgfPersi
-        ? ' <span style="color:#c0392b;font-size:var(--fs-sm,.8125rem)">+' + o.cgfPersi + ' in malattia</span>'
+        ? ' <span style="color:var(--c-rosso,#c0392b);font-size:var(--fs-sm,.8125rem)">+' + o.cgfPersi + ' in malattia</span>'
         : '') +
       '</td><td style="font-weight:700;color:' +
       (o.cgfSaldo > 0 ? '#2c6e49' : o.cgfSaldo < 0 ? '#c0392b' : 'var(--muted)') +
@@ -981,7 +981,7 @@ async function _pianoVacDirittoCard(anno) {
       (pian && inCal !== pian ? 'Registrate ' + pian + ' giornate, nel calendario ce ne sono ' + inCal : '') +
       '">' +
       (inCal || '') +
-      '</td><td style="color:#2c6e49;font-weight:' +
+      '</td><td style="color:var(--c-verde,#2c6e49);font-weight:' +
       (rest ? '700' : '400') +
       '">' +
       (rest || '') +
@@ -994,7 +994,7 @@ async function _pianoVacDirittoCard(anno) {
   h += '</tbody></table></div>';
   if (senzaData)
     h +=
-      '<p style="font-size:var(--fs-sm,.8125rem);color:#c0392b;margin-top:8px">' +
+      '<p style="font-size:var(--fs-sm,.8125rem);color:var(--c-rosso,#c0392b);margin-top:8px">' +
       senzaData +
       ' collaboratori non compaiono perche manca la data di inizio contratto nella loro scheda.</p>';
   // AVVISO DI OTTOBRE: quando si pianificano le vacanze dell'anno dopo serve
@@ -1083,20 +1083,20 @@ async function _renderPianoVacanzeTab() {
     '</select>';
   if (puoMod) {
     h +=
-      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:#2c6e49;color:#2c6e49" onclick="apriNuovaVacanza()">Nuova vacanza</button>';
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="apriNuovaVacanza()">Nuova vacanza</button>';
     h +=
       '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:#d4b86a;color:#d4b86a" onclick="document.getElementById(\'vac-file\').click()">Importa (Excel o PDF)</button>' +
       '<input type="file" id="vac-file" accept=".xlsx,.xls,.pdf" style="display:none" onchange="importaVacanzePiano(this)">' +
-      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:#2c6e49;color:#2c6e49" title="Scarica il piano vacanze del settore nello stesso formato del file HR" onclick="esportaVacanzeExcel()">Scarica Excel</button>' +
-      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:#1a4a7a;color:#7ea8d8" onclick="esportaVacanzePdf()">Scarica PDF</button>';
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" title="Scarica il piano vacanze del settore nello stesso formato del file HR" onclick="esportaVacanzeExcel()">Scarica Excel</button>' +
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-blu,#1a4a7a);color:#7ea8d8" onclick="esportaVacanzePdf()">Scarica PDF</button>';
     h +=
-      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:#1a4a7a;color:#7ea8d8" onclick="applicaVacanzePiano()">Applica al piano · ' +
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-blu,#1a4a7a);color:#7ea8d8" onclick="applicaVacanzePiano()">Applica al piano · ' +
       escP(meseLbl) +
       '</button>';
     h +=
-      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:#8e44ad;color:#b07cc7" onclick="apriScambioSettimane()">Scambia settimane</button>';
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-viola,#7b2d8b);color:#b07cc7" onclick="apriScambioSettimane()">Scambia settimane</button>';
     h +=
-      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:#8e44ad;color:#b07cc7" onclick="pdfCambioVacanza()">Formulario cambio vacanza</button>';
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-viola,#7b2d8b);color:#b07cc7" onclick="pdfCambioVacanza()">Formulario cambio vacanza</button>';
     h +=
       '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--accent);color:var(--accent)" onclick="eliminaTutteVacanze()">Elimina tutte</button>';
   }
@@ -1147,7 +1147,7 @@ async function _renderPianoVacanzeTab() {
         '</td>';
       if (puoMod)
         h +=
-          '<td><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;border-color:#1a4a7a;color:#1a4a7a;margin-right:6px" onclick="modificaVacanza(' +
+          '<td><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;border-color:var(--c-blu,#1a4a7a);color:var(--c-blu,#1a4a7a);margin-right:6px" onclick="modificaVacanza(' +
           v.id +
           ')">Modifica</button><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;border-color:var(--accent);color:var(--accent)" onclick="eliminaVacanza(' +
           v.id +
@@ -1363,7 +1363,7 @@ function _renderPianoSaldoAnnoCard() {
   if (!dati || dati.anno !== anno) {
     h +=
       '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);margin-bottom:8px">Riporto di inizio anno piu il saldo di ogni mese, come il foglio Saldo Ore del piano. I mesi gia pianificati contano anche se sono nel futuro, cosi si vede in anticipo chi andra fuori dalla banda e chi deve recuperare.</p>' +
-      '<button class="btn-export" style="font-size:var(--fs-md,.875rem);padding:6px 14px;border-color:#2c6e49;color:#2c6e49" onclick="pianoCaricaSaldoAnno()">Calcola l anno ' +
+      '<button class="btn-export" style="font-size:var(--fs-md,.875rem);padding:6px 14px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="pianoCaricaSaldoAnno()">Calcola l anno ' +
       anno +
       '</button></div></div>';
     return h;
@@ -1471,8 +1471,8 @@ function _renderPianoSaldoAnnoCard() {
       (jolly
         ? '<span style="color:var(--muted)">–</span>'
         : dentro
-          ? '<span style="color:#2c6e49;font-weight:700">ok</span>'
-          : '<span style="color:#c0392b;font-weight:700" title="Fuori dalla banda ' +
+          ? '<span style="color:var(--c-verde,#2c6e49);font-weight:700">ok</span>'
+          : '<span style="color:var(--c-rosso,#c0392b);font-weight:700" title="Fuori dalla banda ' +
             banda.min +
             ' / +' +
             banda.max +

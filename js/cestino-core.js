@@ -58,7 +58,7 @@ function renderCestino() {
   }
   if (!filtMod.length && !filtReg.length) {
     el.innerHTML =
-      '<p style="color:#2c6e49;font-weight:600">' +
+      '<p style="color:var(--c-verde,#2c6e49);font-weight:600">' +
       (_cestinoModuli.length || _cestinoReg.length ? 'Nessun risultato con i filtri applicati' : 'Cestino vuoto') +
       '</p>';
     return;
@@ -278,7 +278,7 @@ async function apriFixImpiego() {
     .sort((a, b) => (a.reparto_dip || '').localeCompare(b.reparto_dip || '') || a.nome.localeCompare(b.nome));
   if (!senza.length) {
     el.innerHTML =
-      '<p style="color:#2c6e49;font-weight:700">Tutti i collaboratori attivi hanno gia&#39; l&#39;impiego indicato.</p>';
+      '<p style="color:var(--c-verde,#2c6e49);font-weight:700">Tutti i collaboratori attivi hanno gia&#39; l&#39;impiego indicato.</p>';
     return;
   }
   let h =
@@ -597,7 +597,7 @@ async function apriFixOrfani() {
   const lista = Object.entries(orf).sort((a, b) => b[1].n - a[1].n);
   if (!lista.length) {
     el.innerHTML =
-      '<p style="color:#2c6e49;font-weight:700">Nessun nome senza scheda: tutti i turni appartengono a un collaboratore.</p>';
+      '<p style="color:var(--c-verde,#2c6e49);font-weight:700">Nessun nome senza scheda: tutti i turni appartengono a un collaboratore.</p>';
     return;
   }
   const attivi = (collab || [])
@@ -638,7 +638,7 @@ async function apriFixOrfani() {
     }
     h +=
       '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">' +
-      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;border-color:#2c6e49;color:#2c6e49" onclick="orfanoCreaScheda(\'' +
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="orfanoCreaScheda(\'' +
       nomeJs +
       "','" +
       o.rep +
@@ -653,7 +653,7 @@ async function apriFixOrfani() {
       "'," +
       i +
       ')">Sposta</button>' +
-      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;border-color:#c0392b;color:#c0392b" onclick="orfanoElimina(\'' +
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;border-color:var(--c-rosso,#c0392b);color:var(--c-rosso,#c0392b)" onclick="orfanoElimina(\'' +
       nomeJs +
       "'," +
       o.n +
@@ -961,12 +961,12 @@ async function controlloSalute() {
         '</span>' +
         (e.azione
           ? e.azione.indexOf('FIX:') === 0
-            ? '<br><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;margin-top:5px;border-color:#1a4a7a;color:#1a4a7a" onclick="' +
+            ? '<br><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;margin-top:5px;border-color:var(--c-blu,#1a4a7a);color:var(--c-blu,#1a4a7a)" onclick="' +
               e.azione.split('|')[0].substring(4) +
               '">' +
               escP(e.azione.split('|')[1] || 'Sistema') +
               '</button>'
-            : '<br><span style="font-size:var(--fs-sm,.8125rem);color:#1a4a7a;font-weight:700">Dove sistemarlo: ' +
+            : '<br><span style="font-size:var(--fs-sm,.8125rem);color:var(--c-blu,#1a4a7a);font-weight:700">Dove sistemarlo: ' +
               escP(e.azione) +
               '</span>'
           : '') +

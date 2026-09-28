@@ -411,7 +411,7 @@ function modificaRegistrazione(id) {
       (_cop ? '#1a7a6d' : 'var(--muted)') +
       ';font-size:var(--fs-md,.875rem)"><strong>Copertura turno:</strong> ' +
       (_cop
-        ? '<span style="color:#1a7a6d;font-weight:700">' + escP(_cop.collaboratore) + ' (+' + _cop.punti + ')</span>'
+        ? '<span style="color:var(--c-verdeacqua,#1a7a6d);font-weight:700">' + escP(_cop.collaboratore) + ' (+' + _cop.punti + ')</span>'
         : '<span style="color:var(--muted)">nessuna registrata</span>') +
       (_rif
         ? ' · <span style="color:var(--accent);font-weight:600">' +
@@ -766,7 +766,7 @@ function toggleScadenzeDropdown() {
           escP(s.titolo) +
           '</strong>' +
           (s.descrizione ? ' - ' + escP(s.descrizione) : '') +
-          '</span><button style="color:#2c6e49;border-color:#2c6e49" onclick="completaScadenza(' +
+          '</span><button style="color:var(--c-verde,#2c6e49);border-color:var(--c-verde,#2c6e49)" onclick="completaScadenza(' +
           s.id +
           ')">Fatto</button><button style="color:var(--accent);border-color:var(--accent)" onclick="eliminaScadenza(' +
           s.id +
@@ -788,7 +788,7 @@ function toggleScadenzeDropdown() {
             escP(s.titolo) +
             '</strong>' +
             (s.descrizione ? ' - ' + escP(s.descrizione) : '') +
-            '</span><span style="color:#2c6e49;font-weight:700;font-size:var(--fs-sm,.8125rem)">' +
+            '</span><span style="color:var(--c-verde,#2c6e49);font-weight:700;font-size:var(--fs-sm,.8125rem)">' +
             (s.completata_da ? 'Fatto da ' + escP(s.completata_da) : 'Fatto') +
             '</span></div>',
         )
@@ -813,7 +813,7 @@ function renderScadenzeSettings() {
         escP(s.titolo) +
         '</strong>' +
         (s.descrizione ? ' - ' + escP(s.descrizione) : '') +
-        '</span><button style="color:#2c6e49;border-color:#2c6e49" onclick="completaScadenza(' +
+        '</span><button style="color:var(--c-verde,#2c6e49);border-color:var(--c-verde,#2c6e49)" onclick="completaScadenza(' +
         s.id +
         ');renderScadenzeSettings()">Fatto</button><button style="color:var(--accent);border-color:var(--accent)" onclick="eliminaScadenza(' +
         s.id +

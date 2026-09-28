@@ -572,7 +572,7 @@ function _renderPianoRegoleCard() {
     '</ol></details>';
   if (vista)
     h +=
-      '<p style="font-size:var(--fs-sm,.8125rem);color:#8b6914;margin-bottom:8px">Stai vedendo i valori validi per <b>' +
+      '<p style="font-size:var(--fs-sm,.8125rem);color:var(--c-oro,#8b6914);margin-bottom:8px">Stai vedendo i valori validi per <b>' +
       escP(repartoLabel(vista)) +
       '</b>. Le righe con il segno <b>eccezione</b> hanno un valore proprio; le altre usano quello generale. Modificando una casella crei l eccezione per questo settore.</p>';
   const valoreInput = (r, tipo, onch) => {
@@ -633,7 +633,7 @@ function _renderPianoRegoleCard() {
         let colSett = '';
         if (vista) {
           colSett = spec
-            ? '<span style="color:#8b6914;font-weight:700">eccezione</span> <button class="btn-del-tipo" style="font-size:var(--fs-sm,.8125rem);padding:1px 6px" onclick="eliminaPianoRegolaSettore(' +
+            ? '<span style="color:var(--c-oro,#8b6914);font-weight:700">eccezione</span> <button class="btn-del-tipo" style="font-size:var(--fs-sm,.8125rem);padding:1px 6px" onclick="eliminaPianoRegolaSettore(' +
               spec.id +
               ')">Torna al generale</button>'
             : '<span style="color:var(--muted)">valore generale</span>';
@@ -660,7 +660,7 @@ function _renderPianoRegoleCard() {
           (r.attivo !== false ? ' checked' : '') +
           ' onchange="' +
           onAtt +
-          '"></td><td style="font-size:var(--fs-sm,.8125rem);text-align:left;color:#2c6e49">' +
+          '"></td><td style="font-size:var(--fs-sm,.8125rem);text-align:left;color:var(--c-verde,#2c6e49)">' +
           escP(g.d) +
           '</td></tr>';
       });
@@ -1677,7 +1677,7 @@ async function pianoVerificaDurateNotte() {
     '</b> con durata da sistemare (qualunque scarto, anche di un solo minuto).</p>';
   if (!problemi.length) {
     h +=
-      '<p style="font-size:var(--fs-md,.875rem);color:#2c6e49;font-weight:700">Tutte le durate comprendono correttamente il supplemento notturno.</p>';
+      '<p style="font-size:var(--fs-md,.875rem);color:var(--c-verde,#2c6e49);font-weight:700">Tutte le durate comprendono correttamente il supplemento notturno.</p>';
   } else {
     h +=
       '<div style="max-height:48vh;overflow:auto"><table class="piano-table" style="min-width:100%;font-size:var(--fs-sm,.8125rem)"><thead><tr><th style="text-align:left">Turno</th><th>Orario</th><th title="Dall entrata all uscita">Durata reale</th><th>Ore notturne</th><th title="10% delle ore notturne">Supplemento</th><th>Durata scritta ora</th><th>Durata corretta</th><th>Differenza</th></tr></thead><tbody>';

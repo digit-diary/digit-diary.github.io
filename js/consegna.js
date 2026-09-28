@@ -195,7 +195,7 @@ function renderConsegne() {
         btns +=
           '<button class="btn-act pin" onclick="segnaConsegnaLetta(' +
           c.id +
-          ')" style="font-size:var(--fs-sm,.8125rem);color:#2c6e49;border-color:#2c6e49">Letta</button>';
+          ')" style="font-size:var(--fs-sm,.8125rem);color:var(--c-verde,#2c6e49);border-color:var(--c-verde,#2c6e49)">Letta</button>';
       }
       return (
         '<div style="padding:14px;margin-bottom:12px;border-radius:3px;border-left:3px solid ' +
@@ -208,7 +208,7 @@ function renderConsegne() {
         c.turno_uscente +
         '</span><strong>' +
         escP(c.operatore) +
-        '</strong><span style="font-size:var(--fs-sm,.8125rem);color:#2980b9;font-weight:600">→ ' +
+        '</strong><span style="font-size:var(--fs-sm,.8125rem);color:var(--c-azzurro,#1f6fa3);font-weight:600">→ ' +
         escP(destLabel) +
         '</span><span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">' +
         d.toLocaleDateString('it-IT') +
@@ -219,7 +219,7 @@ function renderConsegne() {
           ? '<span style="color:var(--accent);font-size:var(--fs-sm,.8125rem);font-weight:700">PRIORITA ALTA</span>'
           : '') +
         (letto
-          ? '<span style="color:#2c6e49;font-size:var(--fs-sm,.8125rem);font-weight:600">Letto da ' +
+          ? '<span style="color:var(--c-verde,#2c6e49);font-size:var(--fs-sm,.8125rem);font-weight:600">Letto da ' +
             escP(c.letto_da) +
             ' il ' +
             new Date(c.letto_at).toLocaleDateString('it-IT') +
@@ -465,11 +465,11 @@ function renderDashboard() {
         : '') +
       '</span><button class="btn-act pin" onclick="_completaPromemoriaDaHome(' +
       p.id +
-      ')" style="color:#2c6e49;border-color:#2c6e49;font-size:var(--fs-sm,.8125rem)">Fatto</button></div>';
+      ')" style="color:var(--c-verde,#2c6e49);border-color:var(--c-verde,#2c6e49);font-size:var(--fs-sm,.8125rem)">Fatto</button></div>';
   });
   if (noteNL)
     todoH +=
-      '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="switchPage(\'note-collega\')"><span style="color:#2980b9;font-size:var(--fs-lg,1.0625rem)"><i class="icx icx-mail"></i></span><span>' +
+      '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="switchPage(\'note-collega\')"><span style="color:var(--c-azzurro,#1f6fa3);font-size:var(--fs-lg,1.0625rem)"><i class="icx icx-mail"></i></span><span>' +
       noteNL +
       ' nota/e non letta/e</span></div>';
   const bdays = isVis('alert_compleanni') ? _getCompleanniProssimi(0) : [];
@@ -483,7 +483,7 @@ function renderDashboard() {
   ammA.forEach((a) => {
     const ne = _jsArg(a.nome);
     todoH +=
-      '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="color:#e67e22;font-weight:700;font-size:var(--fs-lg,1.0625rem)">!</span><span style="flex:1;cursor:pointer" onclick="apriProfilo(\'' +
+      '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="color:var(--c-arancio,#b85c0e);font-weight:700;font-size:var(--fs-lg,1.0625rem)">!</span><span style="flex:1;cursor:pointer" onclick="apriProfilo(\'' +
       ne +
       '\')"><strong>' +
       escP(a.nome) +
@@ -491,7 +491,7 @@ function renderDashboard() {
       a.count +
       ' ammonimenti verbali</span></div>';
   });
-  if (!todoH) todoH = '<p style="color:#2c6e49;text-align:center;padding:20px;font-weight:600">Tutto in ordine!</p>';
+  if (!todoH) todoH = '<p style="color:var(--c-verde,#2c6e49);text-align:center;padding:20px;font-weight:600">Tutto in ordine!</p>';
   todoEl.innerHTML = todoH;
   // DA FARE DOMANI: reminder di domani + scadenze domani + compleanni domani
   const domaniEl = document.getElementById('dash-domani-list');
@@ -502,7 +502,7 @@ function renderDashboard() {
   });
   pmDomani.forEach((p) => {
     domH +=
-      '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="switchPage(\'promemoria\')"><span style="color:#8e44ad;font-size:var(--fs-lg,1.0625rem)">&#9679;</span><span style="flex:1"><strong>' +
+      '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="switchPage(\'promemoria\')"><span style="color:var(--c-viola,#7b2d8b);font-size:var(--fs-lg,1.0625rem)">&#9679;</span><span style="flex:1"><strong>' +
       escP(p.titolo) +
       '</strong> <span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">scade ' +
       new Date(p.data_scadenza + 'T12:00:00').toLocaleDateString('it-IT') +
@@ -688,10 +688,10 @@ function renderDashboard() {
     const rapp = _rapportoCacheGet(oggi);
     if (!rapp.PRESTO)
       alertH +=
-        '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="switchPage(\'rapporto\')"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#e67e22;margin-right:8px"></span><strong>Rapporto PRESTO:</strong> <span style="color:#e67e22;font-weight:700">da compilare</span></div>';
+        '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="switchPage(\'rapporto\')"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#c8671a;margin-right:8px"></span><strong>Rapporto PRESTO:</strong> <span style="color:var(--c-arancio,#b85c0e);font-weight:700">da compilare</span></div>';
     if (!rapp.NOTTE)
       alertH +=
-        '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="switchPage(\'rapporto\')"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#e67e22;margin-right:8px"></span><strong>Rapporto NOTTE:</strong> <span style="color:#e67e22;font-weight:700">da compilare</span></div>';
+        '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="switchPage(\'rapporto\')"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#c8671a;margin-right:8px"></span><strong>Rapporto NOTTE:</strong> <span style="color:var(--c-arancio,#b85c0e);font-weight:700">da compilare</span></div>';
   }
   // Consegne recenti
   const _consRecenti = _consegneVisibiliA(op).slice(0, 3);
@@ -718,7 +718,7 @@ function renderDashboard() {
     });
   }
   if (!alertH)
-    alertH = '<p style="color:#2c6e49;text-align:center;padding:20px;font-weight:600">Nessun alert attivo</p>';
+    alertH = '<p style="color:var(--c-verde,#2c6e49);text-align:center;padding:20px;font-weight:600">Nessun alert attivo</p>';
   alertEl.innerHTML = alertH;
   // ULTIME REGISTRAZIONI
   const recEl = document.getElementById('dash-recenti-list');

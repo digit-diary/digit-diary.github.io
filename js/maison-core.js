@@ -101,10 +101,10 @@ async function salvaMaisonAutoDelete(val) {
         ? '<span style="color:var(--accent);font-weight:600">Attenzione: ' +
           vecchie +
           ' registrazioni esistenti verranno eliminate alla prossima apertura.</span>'
-        : '<span style="color:#2c6e49">Impostazione salvata.</span>';
+        : '<span style="color:var(--c-verde,#2c6e49)">Impostazione salvata.</span>';
     toast('Auto-cancellazione attiva: conserva ' + maisonAutoDeleteGiorni + ' giorni');
   } else {
-    if (st) st.innerHTML = '<span style="color:#2c6e49">Auto-cancellazione disattivata.</span>';
+    if (st) st.innerHTML = '<span style="color:var(--c-verde,#2c6e49)">Auto-cancellazione disattivata.</span>';
     toast('Auto-cancellazione disattivata');
   }
 }
@@ -357,7 +357,7 @@ function renderRegali() {
           : _regBudget && _regBudget.categoria === 'direzione'
             ? ' <span class="mini-badge" style="background:#8e44ad;font-size:var(--fs-sm,.8125rem)">Direzione</span>'
             : _regBudget && _regBudget.categoria === 'bu'
-              ? ' <span class="mini-badge" style="background:#e67e22;font-size:var(--fs-sm,.8125rem)">Buono Unico</span>'
+              ? ' <span class="mini-badge" style="background:#c8671a;font-size:var(--fs-sm,.8125rem)">Buono Unico</span>'
               : _regBudget && _regBudget.categoria === 'bl'
                 ? ' <span class="mini-badge" style="background:#2c6e49;font-size:var(--fs-sm,.8125rem)">Buono Lounge</span>'
                 : '';
@@ -637,7 +637,7 @@ function renderMaisonDashboard() {
           : clientInfo && clientInfo.categoria === 'direzione'
             ? '<span class="mini-badge" style="background:#8e44ad;margin-left:6px">Direzione</span>'
             : clientInfo && clientInfo.categoria === 'bu'
-              ? '<span class="mini-badge" style="background:#e67e22;margin-left:6px">Buono Unico</span>'
+              ? '<span class="mini-badge" style="background:#c8671a;margin-left:6px">Buono Unico</span>'
               : clientInfo && clientInfo.categoria === 'bl'
                 ? '<span class="mini-badge" style="background:#2c6e49;margin-left:6px">Buono Lounge</span>'
                 : '';
@@ -660,7 +660,7 @@ function renderMaisonDashboard() {
       (overBudget
         ? ' <span style="color:var(--accent);font-size:var(--fs-sm,.8125rem);font-weight:700">BUDGET SUPERATO (questo mese)</span>'
         : nearBudget
-          ? ' <span style="color:#e67e22;font-size:var(--fs-sm,.8125rem);font-weight:700">80% BUDGET (questo mese)</span>'
+          ? ' <span style="color:var(--c-arancio,#b85c0e);font-size:var(--fs-sm,.8125rem);font-weight:700">80% BUDGET (questo mese)</span>'
           : '') +
       '</td><td class="num">' +
       d.visite +
@@ -833,7 +833,7 @@ function renderMaisonGdOggi() {
   h +=
     '<button onclick="esportaGdOggiCSV()" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;background:none;border:1px solid white;color:white;border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif;font-weight:600">CSV</button>';
   h +=
-    '<button onclick="esportaGdOggiPDF()" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;background:none;border:1px solid #c0392b;color:#c0392b;border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif;font-weight:600">PDF</button></div></div>';
+    '<button onclick="esportaGdOggiPDF()" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;background:none;border:1px solid #c0392b;color:var(--c-rosso,#c0392b);border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif;font-weight:600">PDF</button></div></div>';
   h +=
     '<div style="padding:0 16px 16px;overflow-x:auto"><table class="collab-table"><thead><tr><th style="background:var(--paper)">Cliente</th><th style="background:var(--paper)">Tipo</th><th class="num" style="background:var(--paper)">PX</th><th class="num" style="background:var(--paper)">Costo CHF</th><th style="background:var(--paper)"></th></tr></thead><tbody>';
   // Raggruppa righe con stesso gruppo (es. Bonomelli/Grignani)
@@ -1400,7 +1400,7 @@ function renderMaisonCharts(data, sorted) {
             },
           },
         },
-        y: { ticks: { autoSkip: false, font: { size: 11 } } },
+        y: { ticks: { autoSkip: false, font: { size: 12 } } },
       },
     },
   );
@@ -1526,7 +1526,7 @@ function apriDettaglioMaison(nome) {
         : budget && budget.categoria === 'direzione'
           ? ' <span class="mini-badge" style="background:#8e44ad;font-size:var(--fs-sm,.8125rem)">Direzione</span>'
           : budget && budget.categoria === 'bu'
-            ? ' <span class="mini-badge" style="background:#e67e22;font-size:var(--fs-sm,.8125rem)">Buono Unico</span>'
+            ? ' <span class="mini-badge" style="background:#c8671a;font-size:var(--fs-sm,.8125rem)">Buono Unico</span>'
             : budget && budget.categoria === 'bl'
               ? ' <span class="mini-badge" style="background:#2c6e49;font-size:var(--fs-sm,.8125rem)">Buono Lounge</span>'
               : '';
@@ -1628,15 +1628,15 @@ function apriDettaglioMaison(nome) {
     : '-';
   html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">';
   html +=
-    '<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:#b8860b">CHF ' +
+    '<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:var(--c-oro,#8b6914)">CHF ' +
     fmtCHF(tot) +
     '</div><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Totale Ristorante</div></div>';
   html +=
-    '<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:#2980b9">CHF ' +
+    '<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:var(--c-azzurro,#1f6fa3)">CHF ' +
     fmtCHF(totSE) +
     '</div><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Totale Extra</div></div>';
   html +=
-    '<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:#1a7a6d">CHF ' +
+    '<div style="flex:1;min-width:100px;background:var(--paper2);border-radius:3px;padding:10px;text-align:center"><div style="font-family:Playfair Display,serif;font-size:var(--fs-xl,1.25rem);font-weight:700;color:var(--c-verdeacqua,#1a7a6d)">CHF ' +
     fmtCHF(totReg) +
     '</div><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px">Totale Regali</div></div>';
   html +=
@@ -1806,7 +1806,7 @@ function apriDettaglioMaison(nome) {
         r.id +
         ",'" +
         ne +
-        '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 8px;color:#e67e22;border-color:#e67e22" title="Sposta in Spese Extra">&#8594; Extra</button> <button class="btn-act del" onclick="eliminaMaisonRigaDettaglio(' +
+        '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 8px;color:var(--c-arancio,#b85c0e);border-color:var(--c-arancio,#b85c0e)" title="Sposta in Spese Extra">&#8594; Extra</button> <button class="btn-act del" onclick="eliminaMaisonRigaDettaglio(' +
         r.id +
         ",'" +
         ne +
@@ -1869,7 +1869,7 @@ function apriDettaglioMaison(nome) {
         r.id +
         ",'" +
         ne +
-        '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 8px;color:#2c6e49;border-color:#2c6e49" title="Sposta in Costi Maison">&#8594; Maison</button></td></tr>';
+        '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 8px;color:var(--c-verde,#2c6e49);border-color:var(--c-verde,#2c6e49)" title="Sposta in Costi Maison">&#8594; Maison</button></td></tr>';
     });
     html +=
       '<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td colspan="4"><strong>TOTALE EXTRA</strong></td><td class="num"><strong>CHF ' +
@@ -1946,7 +1946,7 @@ function apriDettaglioMaison(nome) {
     _jsArg(nome) +
     '\')">CSV</button><button class="btn-export btn-export-pdf" onclick="apriPdfSchedaMaison(\'' +
     _jsArg(nome) +
-    '\')">PDF</button><button class="btn-export" onclick="stampaSchedaCliente()" style="border-color:#2c6e49;color:#2c6e49">Stampa</button></div>';
+    '\')">PDF</button><button class="btn-export" onclick="stampaSchedaCliente()" style="border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)">Stampa</button></div>';
   var _pb = document.getElementById('profilo-content');
   _pb.className = 'profilo-box';
   _pb.innerHTML = html;

@@ -464,7 +464,7 @@ function renderRischioAlerts() {
   }
   if (accumuli.length) {
     html +=
-      '<div class="rischio-alert-banner" style="background:#e67e22;margin-top:6px" onclick="toggleAccDD()"><i class="icx icx-avviso"></i> ' +
+      '<div class="rischio-alert-banner" style="background:#c8671a;margin-top:6px" onclick="toggleAccDD()"><i class="icx icx-avviso"></i> ' +
       accumuli.length +
       ' collaboratore/i con ' +
       getSoglieDisciplinari().accumulo +
@@ -481,7 +481,7 @@ function renderRischioAlerts() {
         a.count +
         ' allineamenti totali (ultimo: ' +
         dt +
-        '). Valutare provvedimento.</span><button class="alert-action" style="background:#e67e22" onclick="apriModuloVeloce(\'rdi\',\'' +
+        '). Valutare provvedimento.</span><button class="alert-action" style="background:#c8671a" onclick="apriModuloVeloce(\'rdi\',\'' +
         a.nome.replace(/'/g, "\\'") +
         '\')">Crea RDI</button><button class="alert-action" style="background:var(--muted);margin-left:4px" onclick="ignoraAlertSuggerimento(\'' +
         escP(a.nome.replace(/'/g, "\\'")) +
@@ -571,7 +571,7 @@ function renderAmmonimentiAlerts() {
   }
   let html = '<div id="amm-alerts-block">';
   html +=
-    '<div class="cassa-alert-banner" style="background:#e67e22;margin-bottom:8px;cursor:pointer" onclick="toggleAmmDD()"><i class="icx icx-avviso"></i> ' +
+    '<div class="cassa-alert-banner" style="background:#c8671a;margin-bottom:8px;cursor:pointer" onclick="toggleAmmDD()"><i class="icx icx-avviso"></i> ' +
     ammAlerts.length +
     ' collaboratore/i con ' +
     getSoglieDisciplinari().amm +
@@ -588,7 +588,7 @@ function renderAmmonimentiAlerts() {
       escP(a.motivo) +
       ' (ultimo: ' +
       dt +
-      ')</span><button class="alert-action" style="background:#e67e22" onclick="apriModuloVeloce(\'allineamento\',\'' +
+      ')</span><button class="alert-action" style="background:#c8671a" onclick="apriModuloVeloce(\'allineamento\',\'' +
       a.nome.replace(/'/g, "\\'") +
       '\')">Crea Allineamento</button></div>';
   });
