@@ -7,6 +7,7 @@
  *   await chiediConferma(testo, { titolo, ok, annulla, pericolo })  -> true / false
  *   await chiediTesto(testo, predefinito, { titolo, ok })            -> testo / null
  *   await mostraAvviso(testo, { titolo })                            -> dopo OK
+ *   await chiediModulo(testo, gruppi, { titolo, ok, controlla })     -> { id: valore } / null
  * Invio conferma, Esc annulla. Se ne arrivano due insieme, la seconda aspetta
  * la prima (come facevano quelle del browser).
  */
@@ -95,4 +96,144 @@ function chiediTesto(testo, predefinito, opz) {
 }
 function mostraAvviso(testo, opz) {
   return _finestraApri('avviso', testo, null, opz);
+}
+
+// FINESTRA CON PIU CAMPI (es. orari dei JG): un gruppo per riga con titolo,
+// scelte a pulsante e caselle di testo. Restituisce { id: valore } oppure null.
+//   await chiediModulo(testo, [{ titolo, campi: [{ id, tipo: 'scelta'|'testo',
+//     opzioni: [{ valore, etichetta }], valore, etichetta, segnaposto, larghezza }] }], { titolo, ok })
+function chiediModulo(testo, gruppi, opz) {
+  const turno = _finestraCoda.then(() => _finestraModulo(testo, gruppi || [], opz || {}));
+  _finestraCoda = turno.catch(() => {});
+  return turno;
+}
+function _finestraModulo(testo, gruppi, opz) {
+  return new Promise((risolvi) => {
+    const velo = document.createElement('div');
+    velo.className = 'finestra-velo';
+    const box = document.createElement('div');
+    box.className = 'finestra-box';
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.style.maxWidth = '640px';
+    const h = document.createElement('h3');
+    h.textContent = opz.titolo || 'Inserisci';
+    const t = document.createElement('div');
+    t.className = 'finestra-testo';
+    t.textContent = String(testo || '');
+    box.appendChild(h);
+    box.appendChild(t);
+    const elenco = document.createElement('div');
+    elenco.style.cssText = 'display:flex;flex-direction:column;gap:10px;max-height:55vh;overflow:auto;margin:6px 0';
+    const leggi = [];
+    gruppi.forEach((g, gi) => {
+      const riq = document.createElement('fieldset');
+      riq.style.cssText =
+        'border:1px solid var(--line,#ccc);border-radius:4px;padding:8px 10px;margin:0;display:flex;flex-direction:column;gap:6px';
+      const leg = document.createElement('legend');
+      leg.style.cssText = 'font-weight:bold;padding:0 4px';
+      leg.textContent = g.titolo || '';
+      riq.appendChild(leg);
+      if (g.nota) {
+        const n = document.createElement('div');
+        n.style.cssText = 'color:var(--muted,#666);font-size:.9em';
+        n.textContent = g.nota;
+        riq.appendChild(n);
+      }
+      const riga = document.createElement('div');
+      riga.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap';
+      (g.campi || []).forEach((cp) => {
+        if (cp.tipo === 'scelta') {
+          (cp.opzioni || []).forEach((o) => {
+            const l = document.createElement('label');
+            l.style.cssText = 'display:inline-flex;align-items:center;gap:4px;cursor:pointer';
+            const r = document.createElement('input');
+            r.type = 'radio';
+            r.name = 'fm-' + gi + '-' + cp.id;
+            r.value = o.valore;
+            if (o.valore === cp.valore) r.checked = true;
+            l.appendChild(r);
+            l.appendChild(document.createTextNode(o.etichetta));
+            riga.appendChild(l);
+          });
+          leggi.push(() => {
+            const x = riq.querySelector('input[name="fm-' + gi + '-' + cp.id + '"]:checked');
+            return [cp.id, x ? x.value : ''];
+          });
+        } else {
+          if (cp.etichetta) riga.appendChild(document.createTextNode(cp.etichetta));
+          const inp = document.createElement('input');
+          inp.type = 'text';
+          inp.className = 'finestra-campo';
+          inp.style.cssText = 'width:' + (cp.larghezza || 80) + 'px;margin:0';
+          inp.placeholder = cp.segnaposto || '';
+          inp.value = cp.valore == null ? '' : String(cp.valore);
+          inp.autocomplete = 'off';
+          riga.appendChild(inp);
+          leggi.push(() => [cp.id, inp.value]);
+        }
+      });
+      riq.appendChild(riga);
+      elenco.appendChild(riq);
+    });
+    box.appendChild(elenco);
+    const errore = document.createElement('div');
+    errore.style.cssText = 'color:var(--c-rosso,#c0392b);font-weight:bold;min-height:1.2em';
+    box.appendChild(errore);
+    const puls = document.createElement('div');
+    puls.className = 'finestra-pulsanti';
+    const bNo = document.createElement('button');
+    bNo.type = 'button';
+    bNo.className = 'finestra-no';
+    bNo.textContent = opz.annulla || 'Annulla';
+    const bOk = document.createElement('button');
+    bOk.type = 'button';
+    bOk.className = 'finestra-ok';
+    bOk.textContent = opz.ok || 'Conferma';
+    puls.appendChild(bNo);
+    puls.appendChild(bOk);
+    box.appendChild(puls);
+    velo.appendChild(box);
+    const primaFocus = document.activeElement;
+    const chiudi = (esito) => {
+      document.removeEventListener('keydown', tasti, true);
+      velo.remove();
+      try {
+        if (primaFocus && primaFocus.focus) primaFocus.focus();
+      } catch (e) {}
+      risolvi(esito);
+    };
+    const conferma = () => {
+      const v = Object.fromEntries(leggi.map((f) => f()));
+      // controllo facoltativo: restituisce il testo dell errore o ''
+      const err = opz.controlla ? opz.controlla(v) : '';
+      if (err) {
+        errore.textContent = err;
+        return;
+      }
+      chiudi(v);
+    };
+    const tasti = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        chiudi(null);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        conferma();
+      } else if (e.key === 'Tab') {
+        const el = [...velo.querySelectorAll('input,button')];
+        const i = el.indexOf(document.activeElement);
+        e.preventDefault();
+        el[(i + (e.shiftKey ? -1 : 1) + el.length) % el.length].focus();
+      }
+    };
+    bOk.addEventListener('click', conferma);
+    bNo.addEventListener('click', () => chiudi(null));
+    document.addEventListener('keydown', tasti, true);
+    document.body.appendChild(velo);
+    const primo = velo.querySelector('input[type="text"]') || bOk;
+    primo.focus();
+  });
 }

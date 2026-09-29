@@ -1423,6 +1423,7 @@ function _briefPauseBodyHtml() {
       h += _pcFormazioneHtml(p.contenuto);
       h += _pcProposteHtml(p.contenuto);
       h += _pcAvvisiHtml(p.contenuto);
+      h += _pcAtteseHtml(p.contenuto);
     }
     h += _briefRenderPause(p.contenuto);
     const viol = typeof _peVerificaRegolePause === 'function' ? _peVerificaRegolePause(p.contenuto, _briefData) : [];

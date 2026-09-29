@@ -302,6 +302,43 @@ console.log('\n== sistemazione automatica: attese troppo lunghe senza pausa ==')
   ctx._briefPauseCfgObj = {};
 }
 
+console.log('\n== JG (Jolly Giornata): reparto e orario scelti per il giorno ==');
+{
+  const PC = ctx.PauseControlli;
+  eq(PC.settore({ turno: 'JG', sett: 'S' }), 'S', 'JG in sala: reparto S');
+  eq(PC.settore({ turno: 'JG' }), null, 'JG senza scelta: nessun reparto dalla sigla');
+  const jg = { nome: 'FERDINANDO', turno: 'JG', sett: 'S', ini: 840, fin: 1320 };
+  eq(PC.posizione(jg, null, [], 900), 'sala', 'JG in sala alle 15.00 conta in sala');
+  eq(PC.salaVuota({ celle: {}, nR: 0 }, [jg], {}, []).length, 0, 'con il JG in sala la sala non e vuota');
+  const jgC = Object.assign({}, jg, { sett: 'C' });
+  eq(PC.posizione(jgC, null, [], 900), 'altro', 'JG in cassa non e in sala');
+  eq(PC.reparto(jgC, null, [], 900), 'C', 'JG in cassa: reparto cassa');
+  ctx._briefState = {
+    righe: [],
+    pianoRighe: [{ codice: 'JG', collaboratore: 'Ferdinando Peraino', ora_inizio: '14:00:00', ora_fine: '22:00:00' }],
+  };
+  eq(
+    ctx._peJgOrario({ nome: 'FERDINANDO', nomeFull: 'Ferdinando Peraino', oi: '', of: '' }),
+    { ini: 840, fin: 1320 },
+    'orario del JG preso dalla cella del Piano',
+  );
+  ctx.window._peJg = { FERDINANDO: 'corso' };
+  eq(
+    ctx._pcPersone([{ nome: 'FERDINANDO', nomeFull: 'Ferdinando Peraino', turno: 'JG' }], '2026-03-31').length,
+    0,
+    'JG al corso: non conta',
+  );
+  ctx.window._peJg = { FERDINANDO: 'S' };
+  const pj = ctx._pcPersone([{ nome: 'FERDINANDO', nomeFull: 'Ferdinando Peraino', turno: 'JG' }], '2026-03-31');
+  eq(
+    pj.map((x) => [x.sett, x.ini, x.fin, x.attese.length]),
+    [['S', 840, 1320, 3]],
+    'JG in sala 14.00-22.00: persona di sala con le pause della regola delle ore',
+  );
+  ctx.window._peJg = null;
+  ctx._briefState = null;
+}
+
 console.log(
   '\n=======================================\n  ' +
     passati +

@@ -434,6 +434,19 @@
   }
 
   // dove si trova una persona in un momento: 'sala', 'pausa', 'altro', null (fuori turno)
+  // reparto di una persona: quello indicato (es. JG in sala, sigla che non lo dice)
+  // oppure la prima lettera della sigla (S sala, C cassa, R rec)
+  function settore(p) {
+    if (p.sett) return p.sett;
+    const t = norm(p.turno);
+    return /^[SCR]/.test(t) ? t[0] : null;
+  }
+  // riga di cambio per un JG: il reparto e quello scelto per il JG quel giorno
+  // (sala, rec o cassa), registrato quando si leggono le persone
+  function settoreJG(x) {
+    const m = (typeof globalThis !== 'undefined' && globalThis._pcSettJG) || {};
+    return m[norm(x.per || '')] || 'S';
+  }
   function posizione(p, info, bl, t) {
     const nome = norm(p.nome);
     const propri = bl.filter((b) => norm(b.nome) === nome && !/ALT/.test(b.post));
@@ -441,13 +454,14 @@
       const x = b.righe.find((y) => y.ini <= t && t < y.fin);
       if (x) {
         if (x.pos === 'PAUSA') return 'pausa';
+        if (x.pos === 'JG') return settoreJG(x) === 'S' ? 'sala' : 'altro';
         return x.pos === 'SALA' || /^S\d/.test(x.pos) ? 'sala' : 'altro';
       }
     }
     if (p.ini == null || t < p.ini || t >= p.fin) return null;
     const alt = info && info.alternative[0];
     if (alt && alt.pause.some((x) => x.ini <= t && t < x.fin)) return 'pausa';
-    return /^S/.test(norm(p.turno)) && !p.acc ? 'sala' : 'altro';
+    return settore(p) === 'S' && !p.acc ? 'sala' : 'altro';
   }
 
   // in quale reparto e una persona in un momento, leggendo il foglio: 'S' sala,
@@ -464,6 +478,7 @@
         if (x.pos === 'SALA') return 'S';
         if (x.pos === 'REC') return 'R';
         if (x.pos === 'CASSA') return 'C';
+        if (x.pos === 'JG') return settoreJG(x);
         return /^[SCR]/.test(x.pos) ? x.pos[0] : 'S';
       }
     }
@@ -472,12 +487,12 @@
     if (alt && alt.pause.some((x) => x.ini <= t && t < x.fin)) return 'pausa';
     // l accoglienza al suo posto non e in sala
     if (p.acc) return 'A';
-    return /^[SCR]/.test(norm(p.turno)) ? norm(p.turno)[0] : null;
+    return settore(p);
   }
   // quarti d ora in cui in sala non c e nessuno
   function salaVuota(c, persone, pp, biglietti) {
     const bl = blocchi(c);
-    const sala = persone.filter((p) => /^S/.test(norm(p.turno)) && !p.acc && p.ini != null);
+    const sala = persone.filter((p) => settore(p) === 'S' && !p.acc && p.ini != null);
     if (!sala.length) return [];
     const da = Math.ceil(Math.min(...sala.map((p) => p.ini)) / 15) * 15;
     const a = Math.max(...sala.map((p) => p.fin));
@@ -567,6 +582,7 @@
   return {
     INIZIO_GIORNATA,
     DISTANZA_MIN,
+    settore,
     ROTAZIONE,
     minuti,
     ora,

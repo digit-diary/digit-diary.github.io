@@ -2388,18 +2388,17 @@ function _peGeneraSlots(righeTutte, dstr) {
   return out;
 }
 // ---------- OTTIMIZZATORE: il foglio migliore con le mosse delle frecce ----------
-// Dopo lo schema e il completamento il programma da un voto al foglio (piu basso e
-// meglio) e prova le mosse che farebbe un responsabile con le frecce: spostare un
-// cambio o una pausa di un quarto d ora dentro la sala (solo dove la sala resta
-// coperta) o scambiarlo con la riga vicina; la pausa e il cambio collegati si
-// spostano insieme, e se non possono seguire la mossa si scarta. Tiene la mossa
-// che migliora di piu (e solo se migliora chiaramente) e ripete finche trova
-// meglio. Le regole non si rompono mai: una mossa che crea un avviso costa piu di
-// quanto guadagna.
-// Voto: sala vuota, avvisi (regola delle ore, distanza, cambio senza pausa...),
-// pause nella prima o ultima mezz ora, attese troppo lunghe senza pausa (oltre il
-// massimo, 3h se non impostato: lo schema abituale arriva a 2h45), pause troppo
-// vicine (sotto 1h30).
+// Dopo lo schema, il completamento e il risolutore della sala vuota, il programma
+// prova le mosse che farebbe un responsabile con le frecce: spostare un cambio o una
+// pausa di un quarto d ora dentro la sala (solo dove la sala resta coperta) o
+// scambiarlo con la riga vicina; la pausa e il cambio collegati si spostano insieme,
+// e se non possono seguire la mossa si scarta. Interviene SOLO per problemi veri:
+// sala vuota, avvisi (regola delle ore, distanza sotto l ora, cambio senza pausa...)
+// e pause nella prima o nell ultima mezz ora del turno. Nelle giornate normali lo
+// schema resta com e. Una mossa che aumenta la sala vuota o gli avvisi non si fa mai.
+// Le attese lunghe senza pausa (oltre il massimo impostato, di base 3h) non si
+// spostano da sole: sono un avviso leggero ("Da tenere d occhio") e decide il
+// responsabile con le frecce.
 function _peDurata(m) {
   return Math.floor(m / 60) + 'h' + (m % 60 ? String(m % 60).padStart(2, '0') : '');
 }
@@ -2487,7 +2486,7 @@ function _peOttimizza(c, righe, dstr) {
     return !msg.some((m) => /non spostat/.test(m));
   };
   try {
-    let attuale = _pcPunteggio(c, persone);
+    let attuale = _pcPunteggio(c, persone, true).vRegole;
     // regole che non si scambiano con niente: la sala vuota e gli avvisi non
     // possono aumentare, qualunque cosa la mossa guadagni altrove
     let base = _pcPunteggio(c, persone, true);
@@ -2507,7 +2506,9 @@ function _peOttimizza(c, righe, dstr) {
               const f = fermo();
               if (muovi(b, x, dir, tipo)) {
                 const det = _pcPunteggio(c, persone, true);
-                const v = det.vuota > base.vuota || det.avvisi > base.avvisi ? Infinity : det.v;
+                // solo problemi veri (sala vuota, avvisi, pause ai bordi del turno): nelle
+                // giornate normali lo schema resta com e; le attese lunghe sono un avviso
+                const v = det.vuota > base.vuota || det.avvisi > base.avvisi ? Infinity : det.vRegole;
                 if (v + _PE_OTT.COSTO_MOSSA < attuale && (!meglio || v < meglio.v))
                   meglio = { v: v, base: b.base, r: x.r, dir: dir, tipo: tipo, nome: b.nome, post: b.post, x: x };
               }
@@ -2524,9 +2525,7 @@ function _peOttimizza(c, righe, dstr) {
           ? 'cosi la sala non resta vuota'
           : d1.avvisi < d0.avvisi
             ? 'cosi le pause rispettano le regole'
-            : d1.attesa < d0.attesa
-              ? 'cosi nessuno aspetta la pausa oltre ' + _peDurata(_peOttimizzaCfg().attesaMax)
-              : 'pause distribuite meglio';
+            : 'cosi nessuno va in pausa nella prima o nell ultima mezz ora del turno';
       // dove e finita la riga spostata (stessa postazione, orario vicino)
       const blk = PC.blocchi(c).find((b) => b.base === meglio.base && b.nome === meglio.nome);
       const dopo =
@@ -2725,7 +2724,7 @@ function _pcBloccoPersonale(c, p, pause, opz) {
   };
   const base = [1, 4, 7].sort((a, b) => ultima(a) - ultima(b))[0];
   let r = Math.max(ultima(base) + 3, 7);
-  const sett = _peSettoreTurno(p.turno);
+  const sett = _pcSett(p);
   const clr = sett === 'S' ? _PE_CLR.sala : sett === 'R' ? _PE_CLR.rec : sett === 'C' ? _PE_CLR.cassa : _PE_CLR.grigio;
   // pers: colonnina personale (non da cambi ad altri)
   c.celle[r + '|' + base] = { v: p.turno, b: 1, bg: clr, sz: 10, hdr: 1, pers: 1 };
@@ -2788,7 +2787,7 @@ function _peCompletaPause(c, ctx, righe, dstr) {
   // cambi non conta). Prima bastava che il collega non fosse in pausa.
   const colleghiLiberi = (p, t1, t2, pp) => {
     const bl = PC.blocchi(c);
-    const sett = _peSettoreTurno(p.turno);
+    const sett = _pcSett(p);
     let minimo = Infinity;
     for (let t = t1; t < t2; t += 15) {
       let n = 0;
@@ -2809,12 +2808,8 @@ function _peCompletaPause(c, ctx, righe, dstr) {
     return minimo === Infinity ? 0 : minimo;
   };
   const inPausaInsieme = (p, t1, t2, pp) =>
-    persone.filter(
-      (q) =>
-        q !== p &&
-        _peSettoreTurno(q.turno) === _peSettoreTurno(p.turno) &&
-        pauseDi(q, pp).some((x) => x.ini < t2 && x.fin > t1),
-    ).length;
+    persone.filter((q) => q !== p && _pcSett(q) === _pcSett(p) && pauseDi(q, pp).some((x) => x.ini < t2 && x.fin > t1))
+      .length;
   // punteggio di un orario per la persona: equilibrio fra le sue pause
   const valuta = (p, fatte, t, d) => {
     if (t < p.ini + 30 || t + d > p.fin - 30) return null;
@@ -2834,7 +2829,7 @@ function _peCompletaPause(c, ctx, righe, dstr) {
   };
   const ordine = persone.filter((p) => p.ini != null && p.attese && p.attese.length).sort((a, b) => a.ini - b.ini);
   for (const p of ordine) {
-    const sett = _peSettoreTurno(p.turno);
+    const sett = _pcSett(p);
     let pp = leggi();
     const info = pp[p.nome];
     if (!info || info.colonna || info.rotazione) continue;
@@ -2896,7 +2891,7 @@ function _peCompletaPause(c, ctx, righe, dstr) {
         .filter((b) => !/ALT/.test(b.post) && !b.personale && b.nome && !/^\(/.test(b.nome))
         .forEach((b) => {
           if (String(b.nome).toUpperCase() === p.nome.toUpperCase()) return;
-          if (!_pePuoCoprire(ctx.dc, b.nome, p.turno)) return;
+          if (!_pePuoCoprire(ctx.dc, b.nome, p.sett || p.turno)) return;
           const giaCopre = b.righe.some((x) => x.pos === p.turno);
           b.righe.forEach((riga) => {
             if (!_PC_LIBERE.includes(riga.pos)) return;
@@ -2999,6 +2994,51 @@ function _peBigliettoMattino(ctx) {
 }
 // persone del giorno per i controlli: turno, orario (da Turni) e pause attese
 // (dalla regola del turno o di durata, scheda Regole pause)
+// reparto di una persona del foglio: quello indicato (JG in sala) o dalla sigla
+function _pcSett(p) {
+  return (p && p.sett) || _peSettoreTurno(p && p.turno);
+}
+// JG (Jolly Giornata): la sigla non dice ne l orario ne il reparto. Quando si
+// generano le pause il programma chiede per ogni JG dove lavora (sala, rec, cassa)
+// o se e a un corso, con l orario (salvato nella cella del Piano). In sala, rec o
+// cassa conta per quel reparto e riceve le pause della regola delle ore; al corso o
+// senza orario non conta. Con l orario ma senza scelta (foglio vecchio) vale sala.
+function _pcOraMin(v) {
+  const m = /^(\d{1,2})[:.](\d{2})/.exec(String(v || '').trim());
+  return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : null;
+}
+// scelta del giorno per ogni JG: 'S' sala, 'R' rec, 'C' cassa, 'corso' (non conta);
+// durante la generazione quella appena data, poi quella salvata nel foglio pause
+function _pcJgScelte() {
+  const c = typeof _briefState !== 'undefined' && _briefState && _briefState.pause && _briefState.pause.contenuto;
+  const m = window._peJg || (c && c.jg) || {};
+  const out = {};
+  Object.keys(m).forEach((k) => (out[k.toUpperCase()] = m[k]));
+  return out;
+}
+// cella del Piano del giorno del briefing per un JG (commento e orario)
+function _peJgCella(r) {
+  const l = (typeof _briefState !== 'undefined' && _briefState && _briefState.pianoRighe) || [];
+  const nome = String(r.nomeFull || r.nome || '')
+    .trim()
+    .toUpperCase();
+  return (
+    l.find(
+      (x) =>
+        String(x.codice).toUpperCase() === 'JG' &&
+        String(x.collaboratore || '')
+          .trim()
+          .toUpperCase() === nome,
+    ) || null
+  );
+}
+// orario di un JG: quello della riga del briefing, altrimenti quello della cella
+function _peJgOrario(r) {
+  const x = _peJgCella(r);
+  const oi = _pcOraMin(r.oi) != null ? r.oi : x && x.ora_inizio;
+  const of = _pcOraMin(r.of) != null ? r.of : x && x.ora_fine;
+  return { ini: _pcOraMin(oi), fin: _pcOraMin(of) };
+}
 function _pcPersone(righeTutte, dstr) {
   const righe = _pcFormazione(righeTutte).righe;
   const orari = _peOrariTurni();
@@ -3011,6 +3051,33 @@ function _pcPersone(righeTutte, dstr) {
       .trim()
       .toUpperCase();
     if (!nome || !turno || visti.has(nome.toUpperCase())) return;
+    if (turno === 'JG') {
+      const oJg = _peJgOrario(r);
+      let a = oJg.ini;
+      let bb = oJg.fin;
+      const scelta = _pcJgScelte()[nome.toUpperCase()] || 'S';
+      if (a == null || bb == null || !['S', 'R', 'C', 'A'].includes(scelta)) return;
+      if (bb <= a) bb += 1440;
+      if (a < 660) {
+        a += 1440;
+        bb += 1440;
+      }
+      visti.add(nome.toUpperCase());
+      const oJ = { JG: { ini: a, fin: bb, dur: bb - a } };
+      out.push({
+        nome: nome,
+        turno: 'JG',
+        // accoglienza: al suo posto non e in sala e si organizza da sola
+        sett: scelta === 'A' ? 'S' : scelta,
+        ini: a,
+        fin: bb,
+        attese: _pePauseSplit(oJ, 'JG', 'slots', dow),
+        acc: scelta === 'A',
+      });
+      window._pcSettJG = window._pcSettJG || {};
+      window._pcSettJG[nome.toUpperCase()] = scelta === 'A' ? 'A' : scelta;
+      return;
+    }
     if (String(nome).toUpperCase() === 'XXX' || !_peSettoreTurno(turno)) return;
     visti.add(nome.toUpperCase());
     const o = orari[turno];
@@ -3167,6 +3234,137 @@ function _peGeneraValet(righe, dstr) {
 // ============================================================
 // GENERAZIONE + RENDERING + EDITING (chiamati da piano.js)
 // ============================================================
+// posti possibili per un JG: i gruppi della tabella Turni del settore (negli Slots
+// sala, rec, cassa, accoglienza, sup), piu il corso. Ognuno segue le regole del suo
+// ruolo: sala, rec e cassa contano e ricevono le pause; accoglienza si organizza da
+// sola (colonna facoltativa, come S31); sup non conta (come i responsabili Z);
+// corso non conta.
+const _PE_JG_GRUPPI = { SALA: 'S', REC: 'R', CASSA: 'C', ACCOGLIENZA: 'A', SUP: 'Z' };
+const _PE_JG_NOMI = { S: 'sala', R: 'rec', C: 'cassa', A: 'accoglienza', Z: 'sup' };
+function _peJgOpzioni() {
+  const presenti = new Set(
+    (typeof _pianoTurniReparto === 'function' ? _pianoTurniReparto() : [])
+      .map((t) => _PE_JG_GRUPPI[String(t.gruppo || '').toUpperCase()])
+      .filter(Boolean),
+  );
+  const ordine = ['S', 'R', 'C', 'A', 'Z'].filter((k) => presenti.has(k));
+  return (ordine.length ? ordine : ['S', 'R', 'C'])
+    .map((k) => ({ valore: k, etichetta: _PE_JG_NOMI[k] }))
+    .concat([{ valore: 'corso', etichetta: 'corso (non conta)' }]);
+}
+// JG (Jolly Giornata) nel briefing: una finestra per tutti quelli senza orario o
+// senza scelta per il giorno. Per ciascuno: sala, rec, cassa o corso, con l orario
+// di inizio e fine (per le pause; al corso l orario e facoltativo). Se il commento
+// del Piano dice CORSO si propone "corso"; un orario scritto nel commento (es. CORSO
+// ACC 15:30-19_30, dalle 18.00 alle 03.00) si propone nelle caselle. L orario si
+// salva nella cella del Piano, la scelta nel foglio pause (non si richiede piu).
+// Restituisce { jg: { NOME: 'S'|'R'|'C'|'corso' } } oppure null se si annulla.
+async function _peChiediOrariJG(righe) {
+  const prima =
+    (_briefState && _briefState.pause && _briefState.pause.contenuto && _briefState.pause.contenuto.jg) || {};
+  const scelte = Object.assign({}, prima);
+  const nomeU = (r) => String(r.nome).trim().toUpperCase();
+  const tutti = righe.filter(
+    (r) =>
+      String(r.turno || '')
+        .trim()
+        .toUpperCase() === 'JG',
+  );
+  const conOrario = (r) => {
+    const o = _peJgOrario(r);
+    return o.ini != null && o.fin != null;
+  };
+  const daChiedere = tutti.filter(
+    (r) => !scelte[nomeU(r)] || (!['corso', 'Z'].includes(scelte[nomeU(r)]) && !conOrario(r)),
+  );
+  if (!daChiedere.length) return { jg: scelte };
+  const cella = _peJgCella;
+  const hh = (m) => String(Math.floor(m / 60) % 24).padStart(2, '0') + '.' + String(m % 60).padStart(2, '0');
+  const gruppi = daChiedere.map((r, i) => {
+    const cm = String((cella(r) || {}).commento || '');
+    const o = /(\d{1,2})[:._](\d{2})\s*(?:-|–|alle)\s*(\d{1,2})[:._](\d{2})/i.exec(cm);
+    return {
+      titolo: String(r.nome).trim() + ' · JG',
+      nota: cm ? 'Commento nel Piano: ' + cm : '',
+      campi: [
+        {
+          id: 'scelta' + i,
+          tipo: 'scelta',
+          valore: scelte[nomeU(r)] || (/corso/i.test(cm) ? 'corso' : 'S'),
+          opzioni: _peJgOpzioni(),
+        },
+        {
+          id: 'da' + i,
+          tipo: 'testo',
+          etichetta: 'dalle',
+          segnaposto: '14.00',
+          larghezza: 70,
+          valore: (_peJgOrario(r).ini != null ? hh(_peJgOrario(r).ini) : '') || (o ? o[1] + '.' + o[2] : ''),
+        },
+        {
+          id: 'a' + i,
+          tipo: 'testo',
+          etichetta: 'alle',
+          segnaposto: '22.00',
+          larghezza: 70,
+          valore: (_peJgOrario(r).fin != null ? hh(_peJgOrario(r).fin) : '') || (o ? o[3] + '.' + o[4] : ''),
+        },
+      ],
+    };
+  });
+  const v = await chiediModulo(
+    'Nel briefing ci sono Jolly Giornata (JG). Indica dove lavorano oggi e l orario di inizio e fine. In sala, al rec o in cassa contano per quel reparto e ricevono le pause della regola delle ore; in accoglienza si organizzano da soli (come S31); sup e corso non contano. L orario si salva nel Piano.',
+    gruppi,
+    {
+      titolo: 'Jolly Giornata di oggi',
+      ok: 'Genera pause',
+      controlla: (x) => {
+        for (let i = 0; i < daChiedere.length; i++) {
+          const n = String(daChiedere[i].nome).trim();
+          if (!x['scelta' + i]) return n + ': scegli dove lavora oggi';
+          const a = _pcOraMin(x['da' + i]);
+          const b = _pcOraMin(x['a' + i]);
+          if (['corso', 'Z'].includes(x['scelta' + i]) && !String(x['da' + i]).trim() && !String(x['a' + i]).trim())
+            continue;
+          if (a == null || b == null) return n + ': scrivi l orario come 14.00 e 22.00';
+          if (a === b) return n + ': inizio e fine uguali';
+        }
+        return '';
+      },
+    },
+  );
+  if (!v) return null;
+  for (let i = 0; i < daChiedere.length; i++) {
+    const r = daChiedere[i];
+    scelte[nomeU(r)] = v['scelta' + i];
+    const a = _pcOraMin(v['da' + i]);
+    const b = _pcOraMin(v['a' + i]);
+    if (a == null || b == null) continue;
+    r.oi = hh(a);
+    r.of = hh(b);
+    const x = cella(r);
+    if (!x || !x.id) continue;
+    const oi = r.oi.replace('.', ':');
+    const of = r.of.replace('.', ':');
+    try {
+      await secPatch('piano', 'id=eq.' + x.id, {
+        ora_inizio: oi,
+        ora_fine: of,
+        operatore: getOperatore(),
+        updated_at: new Date().toISOString(),
+      });
+      x.ora_inizio = oi;
+      x.ora_fine = of;
+      logAzione(
+        'Orario JG',
+        String(r.nomeFull || r.nome) + ' ' + _briefData + ' ' + r.oi + '-' + r.of + ' ' + v['scelta' + i],
+      );
+    } catch (e) {
+      toast('Orario di ' + String(r.nome).trim() + ' non salvato nel Piano (vale per queste pause)');
+    }
+  }
+  return { jg: scelte };
+}
 async function briefGeneraPause() {
   if (!puoGestireBriefing() || !_briefState) return;
   // XXX = posizione scoperta del fabbisogno: si vede sul foglio ma NON è un collaboratore
@@ -3180,11 +3378,21 @@ async function briefGeneraPause() {
   if (_briefState.pause && _briefState.pause.contenuto && _briefState.pause.contenuto.tipo) {
     if (!(await chiediConferma('Sovrascrivo le pause già generate per questa data?'))) return;
   }
+  // JG senza orario: il programma chiede se oggi e in sala e con che orario
+  const jg = _pianoReparto() === 'slots' ? await _peChiediOrariJG(righe) : { jg: {} };
+  if (!jg) return;
   _briefRicorda();
   window._briefPauseAvviso = null;
   // slots = pattern manuali (dal tuo Excel); valet e ogni altro settore =
   // motore algoritmico (durate per fascia, gap, una-alla-volta)
-  const contenuto = _pianoReparto() === 'slots' ? _peGeneraSlots(righe, _briefData) : _peGeneraValet(righe, _briefData);
+  window._peJg = jg.jg;
+  let contenuto;
+  try {
+    contenuto = _pianoReparto() === 'slots' ? _peGeneraSlots(righe, _briefData) : _peGeneraValet(righe, _briefData);
+  } finally {
+    window._peJg = null;
+  }
+  if (contenuto && Object.keys(jg.jg).length) contenuto.jg = jg.jg;
   if (!contenuto) {
     toast('Nessun turno riconosciuto per generare le pause');
     return;
@@ -3605,7 +3813,7 @@ function _pbSpostaQuarto(c, base, r, dir) {
   // in ogni quarto d ora: se ci sono altri di sala in turno, almeno uno e in sala
   const salaCoperta = (t1, t2) => {
     for (let t = t1; t < t2; t += 15) {
-      const inTurno = altri.filter((p) => /^S/.test(p.turno) && !p.acc && p.ini != null && p.ini <= t && t < p.fin);
+      const inTurno = altri.filter((p) => _pcSett(p) === 'S' && !p.acc && p.ini != null && p.ini <= t && t < p.fin);
       if (inTurno.length && !altri.some((p) => PC.reparto(p, pp[p.nome], bl, t) === 'S')) return false;
     }
     return true;
@@ -4741,6 +4949,59 @@ function _pcAvvisiFoglio(c) {
   });
   return out;
 }
+// attese lunghe senza pausa (oltre il massimo impostato): avviso leggero
+function _pcAtteseLunghe(c) {
+  const PC = window.PauseControlli;
+  if (!c || c.tipo !== 'slots' || !PC || !_briefState) return [];
+  const max = _peOttimizzaCfg().attesaMax;
+  const persone = _pcPersone(_briefState.righe, _briefData);
+  const pp = PC.pausePersone(c, persone, _pcBigliettiFoglio(c));
+  const out = [];
+  persone.forEach((p) => {
+    const i = pp[p.nome];
+    if (!i || i.rotazione || !i.alternative[0] || p.ini == null || p.acc) return;
+    if ((PC.ROTAZIONE || []).includes(p.turno) || i.alternative.length > 1) return;
+    const pause = i.alternative[0].pause.slice().sort((a, b) => a.ini - b.ini);
+    if (!pause.length) return;
+    let t = p.ini;
+    const tratti = [];
+    pause.forEach((x) => {
+      tratti.push([t, x.ini]);
+      t = Math.max(t, x.fin);
+    });
+    tratti.push([t, p.fin]);
+    tratti.forEach(([a, b]) => {
+      if (b - a > max) out.push({ nome: p.nome, turno: p.turno, ini: a, fin: b });
+    });
+  });
+  return out;
+}
+function _pcAtteseHtml(c) {
+  const l = _pcAtteseLunghe(c);
+  if (!l.length) return '';
+  return (
+    '<details class="pb-attese" style="margin:0 0 8px;padding:6px 10px;font-size:var(--fs-sm,.8125rem);background:var(--card-bg,#fff);border-left:3px solid var(--muted,#888)"><summary style="cursor:pointer"><b>Da tenere d occhio (' +
+    l.length +
+    ')</b>: attese oltre ' +
+    _peDurata(_peOttimizzaCfg().attesaMax) +
+    ' senza pausa (lo schema resta com e; se vuoi, sposta con le frecce)</summary>' +
+    l
+      .map(
+        (x) =>
+          escP(x.turno) +
+          ' ' +
+          escP(x.nome) +
+          ': ' +
+          _peDurata(x.fin - x.ini) +
+          ' senza pausa, dalle ' +
+          _pbOra(x.ini) +
+          ' alle ' +
+          _pbOra(x.fin),
+      )
+      .join('<br>') +
+    '</details>'
+  );
+}
 function _pcAvvisiHtml(c) {
   const avvisi = _pcAvvisiFoglio(c);
   if (!avvisi.length) return '';
@@ -5157,7 +5418,7 @@ function _briefRenderPauseCfg() {
       '<label style="display:inline-flex;align-items:center;gap:4px"><input type="checkbox" id="pcfg-ott-attivo"' +
       (oc.attivo ? ' checked' : '') +
       '> attiva</label>' +
-      '<span>nessuno aspetta la pausa piu di</span><select id="pcfg-ott-max" style="padding:4px">' +
+      '<span>segnala chi aspetta la pausa piu di</span><select id="pcfg-ott-max" style="padding:4px">' +
       [120, 150, 165, 180, 195, 210, 240]
         .map(
           (m) =>
@@ -5165,7 +5426,7 @@ function _briefRenderPauseCfg() {
         )
         .join('') +
       '</select><button class="btn-add-tipo" onclick="peOttimizzaSalva()">Salva</button>' +
-      '<div style="flex-basis:100%;color:var(--muted)">Dopo lo schema il programma sposta cambi e pause come con le frecce (sala mai vuota, regole sempre rispettate) per togliere sala vuota e attese troppo lunghe. Applica da solo; chiede conferma solo nei casi eccezionali (postazione senza cambio, avvisi che restano, molte righe spostate). Consigliato 3h: lo schema abituale arriva a 2h45.</div></div>';
+      '<div style="flex-basis:100%;color:var(--muted)">Nelle giornate normali lo schema resta com e. Solo se c e un problema (sala vuota, pause mancanti, avvisi) il programma sposta cambi e pause come con le frecce, rispettando sempre le regole; applica da solo e chiede conferma solo nei casi eccezionali (postazione senza cambio, avvisi che restano, molte righe spostate). Le attese oltre il massimo compaiono in "Da tenere d occhio". Consigliato 3h: lo schema abituale arriva a 2h45.</div></div>';
   }
   const repCorr = sett;
   h += '<div style="margin-top:8px"></div>';
