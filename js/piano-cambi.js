@@ -591,6 +591,8 @@ async function confermaCercaCambioLibero() {
   const dataRest = (document.getElementById('cc-rest') || {}).value || '';
   const motivo = ((document.getElementById('cc-motivo') || {}).value || '').trim();
   const rInfo = cand.rest.find((x) => x.data === dataRest);
+  // anche il giorno della RESTITUZIONE deve essere aperto (prima si controllava solo il primo)
+  if (rInfo && !(await _pianoConsentiScrittura(dataRest))) return;
   const dataIt = _ccDati.data.split('-').reverse().join('.');
   const op = getOperatore();
   // limite cambi mensile: a carico di chi RICHIEDE il giorno libero
@@ -1840,6 +1842,8 @@ async function confermaCoperturaMalattia() {
           codice: 'M',
           protetto: true,
           generato: false,
+          // la malattia scioglie il blocco, come negli altri percorsi
+          motivo_blocco: null,
           commento: ('Ex ' + d.codice + ' - ' + op).substring(0, 400),
           operatore: op,
           updated_at: new Date().toISOString(),
@@ -1989,6 +1993,15 @@ async function confermaCoperturaMalattia() {
     // piano, Rapporto e Diario sempre allineati: la malattia si registra nel Rapporto
     // del primo giorno e da li nel Diario
     const primo = m.giorni.find((d) => !d.salta);
+    // STESSI COLLEGAMENTI della M scritta a mano: CGF caduto in malattia (si
+    // propone il giorno sostitutivo) e festivi con recupero non piu lavorati
+    const giorniM = m.giorni.filter((d) => !d.salta);
+    for (const d of giorniM)
+      if (d.codice === 'CGF' && typeof _pianoRimettiCgf === 'function') await _pianoRimettiCgf(m.nome, dstrDi(d.g));
+    await _pianoFestiviPersiDopo(
+      m.nome,
+      giorniM.map((d) => ({ data: dstrDi(d.g), codice: d.codice })),
+    );
     const nDiario = await _pianoMalattiaNelDiario(m.nome, dstrDi(m.da), dstrDi(m.al), false, primo ? primo.codice : '');
     toast(
       'Copertura registrata: ' +

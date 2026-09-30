@@ -1974,7 +1974,11 @@ async function confermaScambioSettimane() {
       for (const nome of [vA.collaboratore, vB.collaboratore]) {
         for (const r of righeMese.filter(
           (x) =>
-            x.collaboratore === nome && (x.codice === 'V' || ((x.codice === 'C' || x.codice === 'WD') && x.generato)),
+            x.collaboratore === nome &&
+            // solo i giorni aperti: _applicaVacanzeMese non riscrive i giorni chiusi,
+            // quindi cancellarli li lascerebbe vuoti (prima si toglieva tutto il mese)
+            _pianoGiornoScrivibile(String(x.data).substring(0, 10)) &&
+            (x.codice === 'V' || ((x.codice === 'C' || x.codice === 'WD') && x.generato)),
         )) {
           await secDel('piano', 'id=eq.' + r.id);
         }

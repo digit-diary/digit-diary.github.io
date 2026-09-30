@@ -75,7 +75,6 @@ function switchPage(name) {
   }
   if (name === 'impostazioni') {
     renderTipiUI();
-    renderScadenzeSettings();
     renderOperatoriUI();
     renderCampiRapportoUI();
     const sb = document.getElementById('sicurezza-btns');
@@ -267,7 +266,6 @@ function _renderPostLogin() {
     aggiornaNomi();
     render();
     updateStats();
-    renderScadenzeBanner();
     renderCassaAlerts();
     renderRischioAlerts();
     renderAmmonimentiAlerts();

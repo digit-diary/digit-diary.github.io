@@ -230,7 +230,6 @@ async function loadAll() {
   const [
     dati,
     pins,
-    scadenze,
     chatMsgs,
     chatGrps,
     chatGrpMembers,
@@ -256,7 +255,6 @@ async function loadAll() {
     // il caricamento (catch qui sotto) e le cache precedenti restano intatte
     secGet('registrazioni?order=data.desc'),
     secGet('note_fissate?select=registrazione_id'),
-    secGet('scadenze?order=data_scadenza.asc'),
     // ENTERPRISE CHAT: carica le 5 nuove tabelle invece di note_colleghi
     secGet('chat_messages?order=created_at.desc'),
     secGet('chat_groups?order=id.asc'),
@@ -286,7 +284,8 @@ async function loadAll() {
   if (!dati) return;
   datiCache = (dati || []).filter((e) => !e.eliminato);
   pinnedIds = new Set(pins.map((p) => p.registrazione_id));
-  scadenzeCache = scadenze;
+  // le vecchie "scadenze" del Diario non si caricano piu: i follow-up sono Promemoria
+  scadenzeCache = [];
   // ENTERPRISE CHAT: popola caches enterprise
   chatMessagesCache = chatMsgs || [];
   chatGroupsCache = chatGrps || [];

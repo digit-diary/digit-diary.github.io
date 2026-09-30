@@ -521,19 +521,6 @@ header h1 .casino {
 .scadenze-banner.hidden {
   display: none;
 }
-.scadenze-dropdown {
-  width: 100%;
-  max-width: 1280px;
-  background: var(--paper);
-  border-radius: 3px;
-  box-shadow: 2px 2px 0 #b8aa95;
-  margin-bottom: 16px;
-  padding: 16px;
-  font-size: var(--fs-md);
-}
-.scadenze-dropdown.hidden {
-  display: none;
-}
 .scad-item {
   display: flex;
   align-items: center;

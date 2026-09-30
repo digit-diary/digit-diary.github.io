@@ -878,7 +878,8 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
     for (const d of daTogliere) {
       if (copertoAltrove(d)) continue;
       const righe =
-        (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=eq.' + d + '&codice=eq.M')) || [];
+        (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=eq.' + d + '&codice=in.(M,M1)')) ||
+        [];
       for (const r of righe) {
         // la M aveva coperto un altra sigla (turno, V, CGF, JG...): quella torna al suo posto
         // nota "Ex C0 - operatore" (dal 30.09) o quella vecchia "Malattia dal Diario · era C0"
@@ -2446,6 +2447,7 @@ async function rimuoviPianoCella(giaChiuso) {
     logAzione('Piano: cella rimossa', sel.nome + ' ' + sel.data + ' (era ' + r.codice + ')');
     toast('Cella rimossa');
     if (r.codice === 'M' || r.codice === 'M1') await _pianoMalattiaViaDiario(sel.nome, [sel.data]);
+    await _pianoFestiviPersiDopo(sel.nome, [{ data: sel.data, codice: r.codice }]);
     renderPiano();
   } catch (e) {
     toast('Errore rimozione');

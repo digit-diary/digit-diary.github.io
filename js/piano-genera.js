@@ -784,7 +784,6 @@ function _pianoCalcolaViolazioni() {
   // DOMENICHE LIBERE (OLL2 art. 24: minimo 12 all'anno · regola aziendale:
   // la domenica conta solo se il sabato si finisce entro le 23)
   if (_pianoRegolaVal('domeniche_libere_anno') != null) {
-    const chkSab = _pianoRegolaVal('turno_prima_domenica_libera') === 'TRUE';
     Object.keys(perNome).forEach((nome) => {
       const info = _pianoCollabInfo(nome);
       if (!info || info.funzione === 'RESP') return;
@@ -804,7 +803,7 @@ function _pianoCalcolaViolazioni() {
         const isoSab = dSab.toISOString().substring(0, 10);
         const rSab = _pianoRigheSettimane().find((r) => r.collaboratore === nome && String(r.data).startsWith(isoSab));
         const codSab = rSab ? rSab.codice : g > 1 ? perNome[nome][g - 1] : null;
-        if (chkSab && !_pianoSabatoEntro23(codSab, isoSab, rSab)) {
+        if (!_pianoDomenicaValida(cod, codSab, isoSab, rSab)) {
           aggiungi(nome, g, 'domenica non conteggiabile come libera: il sabato finisce oltre le 23');
           continue;
         }
@@ -878,8 +877,8 @@ async function completaConCoperture() {
 // settore d'origine. Con true (bottone "Completa con coperture") si tappano i
 // buchi rimasti usando chi e' abilitato a coprire da altri settori.
 async function generaBozzaPiano(usaCoperture) {
-  _pianoUndoSnap((usaCoperture ? 'coperture ' : 'genera bozza ') + _pianoMeseSel);
   if (!puoGestirePiano()) return;
+  _pianoUndoSnap((usaCoperture ? 'coperture ' : 'genera bozza ') + _pianoMeseSel);
   const ym = _pianoMeseSel;
   const nGiorni = _pianoUltimoGiorno(ym);
   const da = ym + '-01';

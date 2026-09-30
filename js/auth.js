@@ -277,7 +277,7 @@ function confermaOperatore() {
   setTimeout(() => mostraNoteNonLette(), 500);
 }
 function chiudiTuttiModali() {
-  ['pwd-modal', 'operatore-modal', 'modal-overlay', 'profilo-modal', 'scadenza-modal', 'note-modal'].forEach((id) => {
+  ['pwd-modal', 'operatore-modal', 'modal-overlay', 'profilo-modal', 'note-modal'].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.classList.add('hidden');
   });

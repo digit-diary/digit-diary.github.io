@@ -1394,6 +1394,51 @@ function rinominaCollaboratore(nome) {
     }
   }, 100);
 }
+// Chat e note colleghi di un nome (usata solo quando la persona NON e un
+// operatore: allora i messaggi a suo nome non sono legati a un accesso)
+async function _rinominaChatOperatore(vecchio, nuovo) {
+  const q = encodeURIComponent(vecchio);
+  const passi = [
+    ['chat_messages', 'da_operatore'],
+    ['chat_messages', 'a_operatore'],
+    ['chat_group_members', 'operatore'],
+    ['chat_message_letti', 'operatore'],
+    ['chat_message_hidden', 'operatore'],
+    ['note_colleghi', 'da_operatore'],
+    ['note_colleghi', 'a_operatore'],
+  ];
+  for (const [tab, col] of passi) {
+    try {
+      await secPatch(tab, col + '=eq.' + q, { [col]: nuovo });
+    } catch (_) {}
+  }
+}
+// BRIEFING DA OGGI IN POI: il nome nelle righe gia preparate segue la rinomina
+// (quelli passati restano documenti con il nome di allora)
+async function _rinominaBriefingFuturi(vecchio, nuovo) {
+  const breve = (n) => {
+    const p = String(n).trim().split(/\s+/);
+    return (p.length > 1 ? p.slice(0, -1).join(' ') : p[0]).toUpperCase();
+  };
+  const righe = (await secGet('piano_briefing?data=gte.' + oggiLocale() + '&limit=500')) || [];
+  let n = 0;
+  for (const b of righe) {
+    const c = b.contenuto || {};
+    let cambiato = false;
+    (c.righe || []).forEach((r) => {
+      if (r && r.nomeFull === vecchio) {
+        r.nomeFull = nuovo;
+        if (r.nome === breve(vecchio)) r.nome = breve(nuovo);
+        cambiato = true;
+      }
+    });
+    if (cambiato) {
+      await secPatch('piano_briefing', 'id=eq.' + b.id, { contenuto: c });
+      n++;
+    }
+  }
+  return n;
+}
 async function salvaRinominaCollaboratore(vecchio) {
   if (!_soloAdminAnagrafica()) return;
   const nuovo = document.getElementById('rin-collab-nuovo').value.trim();
@@ -1412,22 +1457,15 @@ async function salvaRinominaCollaboratore(vecchio) {
     await secPatch('registrazioni', 'nome=eq.' + encodeURIComponent(vecchio), {
       nome: nuovo,
     });
-    // ENTERPRISE: rinomina anche su chat_messages, chat_group_members, chat_message_letti, chat_message_hidden
+    // CHAT: e legata al NOME DI ACCESSO dell operatore, non all anagrafica. Se chi
+    // si rinomina e anche un operatore del programma, la chat resta al nome di
+    // accesso (prima si spostava e al login l operatore non vedeva piu i suoi
+    // messaggi); il nome di accesso per ora non si rinomina dal programma.
+    let eOperatore = false;
     try {
-      await secPatch('chat_messages', 'da_operatore=eq.' + encodeURIComponent(vecchio), { da_operatore: nuovo });
+      eOperatore = (JSON.parse((await getImp('operatori_lista')) || '[]') || []).includes(vecchio);
     } catch (_) {}
-    try {
-      await secPatch('chat_messages', 'a_operatore=eq.' + encodeURIComponent(vecchio), { a_operatore: nuovo });
-    } catch (_) {}
-    try {
-      await secPatch('chat_group_members', 'operatore=eq.' + encodeURIComponent(vecchio), { operatore: nuovo });
-    } catch (_) {}
-    try {
-      await secPatch('chat_message_letti', 'operatore=eq.' + encodeURIComponent(vecchio), { operatore: nuovo });
-    } catch (_) {}
-    try {
-      await secPatch('chat_message_hidden', 'operatore=eq.' + encodeURIComponent(vecchio), { operatore: nuovo });
-    } catch (_) {}
+    if (!eOperatore) await _rinominaChatOperatore(vecchio, nuovo);
     await secPatch('moduli', 'collaboratore=eq.' + encodeURIComponent(vecchio), { collaboratore: nuovo });
     // TUTTE le tabelle con il nome del collaboratore: valutazioni, punti, storico HR,
     // allegati, piano e i dati del piano legati alla persona (vacanze, riporti CGF e
@@ -1469,8 +1507,25 @@ async function salvaRinominaCollaboratore(vecchio) {
       });
       if (cambiato && (await salvaImp('piano_ordine_collab', JSON.stringify(ord)))) window._pianoOrdineCollab = ord;
     } catch (_) {}
+    try {
+      await _rinominaBriefingFuturi(vecchio, nuovo);
+    } catch (_) {
+      nonRiuscite.push('briefing futuri');
+    }
+    // avvisi di giubileo gia inviati: la chiave e "nome|anni", altrimenti HR li riceverebbe di nuovo
+    try {
+      const gn = JSON.parse((await getImp('giubileo_notificati')) || '[]');
+      const gn2 = gn.map((k) =>
+        String(k).startsWith(vecchio + '|') ? nuovo + String(k).substring(vecchio.length) : k,
+      );
+      if (JSON.stringify(gn) !== JSON.stringify(gn2)) await setImp('giubileo_notificati', JSON.stringify(gn2));
+    } catch (_) {}
     const ci = collaboratoriCache.findIndex((c) => c.nome === vecchio);
     if (ci !== -1) collaboratoriCache[ci].nome = nuovo;
+    // moduli in memoria (prima restavano al nome vecchio fino al ricaricamento)
+    (typeof moduliCache !== 'undefined' ? moduliCache : []).forEach((m) => {
+      if (m.collaboratore === vecchio) m.collaboratore = nuovo;
+    });
     datiCache.forEach((e) => {
       if (e.nome === vecchio) e.nome = nuovo;
     });
@@ -1497,6 +1552,16 @@ async function salvaRinominaCollaboratore(vecchio) {
     aggiornaNomi();
     render();
     toast('Collaboratore rinominato');
+    if (eOperatore)
+      await mostraAvviso(
+        vecchio +
+          ' e anche un operatore del programma. Anagrafica, Diario, Piano e schede sono passati a "' +
+          nuovo +
+          '"; il nome di ACCESSO e la chat restano "' +
+          vecchio +
+          '", cosi al login ritrova i suoi messaggi. Il nome di accesso per ora non si cambia dal programma.',
+        { titolo: 'Anche operatore' },
+      );
   } catch (e) {
     toast('Errore: nome già esistente?');
   }
@@ -2651,6 +2716,9 @@ function render() {
             _dataRifCopertura(e) +
             '\')" title="Chi copre / chi ha rifiutato">Copertura</button>'
           : '') +
+        '<button class="btn-act" onclick="promemoriaDaRegistrazione(' +
+        e.id +
+        ')" title="Crea un promemoria di follow-up gia compilato">Promemoria</button>' +
         '<button class="btn-act del" onclick="elimina(' +
         e.id +
         ')">Elimina</button></div></div>'

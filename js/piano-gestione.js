@@ -111,17 +111,9 @@ function _renderPianoDomenicheBody() {
           return;
         }
         if (_pianoDomenicaEsclusa(cod)) return; // vacanza o malattia: non conta tra le 12
-        if (chkSab) {
-          const prima = new Date(dstr + 'T12:00:00');
-          prima.setDate(prima.getDate() - 1);
-          const sab =
-            prima.getFullYear() +
-            '-' +
-            String(prima.getMonth() + 1).padStart(2, '0') +
-            '-' +
-            String(prima.getDate()).padStart(2, '0');
-          if (!_pianoSabatoEntro23(perG(nome, sab), sab, (dati.rigaGiorno || {})[nome + '|' + sab])) return;
-        }
+        // stessa regola delle C rosse del calendario (una sola funzione)
+        const sab = _pianoGiornoPrima(dstr);
+        if (!_pianoDomenicaValida(cod, perG(nome, sab), sab, (dati.rigaGiorno || {})[nome + '|' + sab])) return;
         lib++;
       });
       libere += lib;
@@ -324,7 +316,8 @@ async function caricaBenesserePiano() {
           String(sab.getMonth() + 1).padStart(2, '0') +
           '-' +
           String(sab.getDate()).padStart(2, '0');
-        if (!_pianoSabatoEntro23(p.giorni[isoSab], isoSab, (p.righe || {})[isoSab])) {
+        // stessa regola delle C rosse (anche con il controllo del sabato spento)
+        if (!_pianoDomenicaValida(cod, p.giorni[isoSab], isoSab, (p.righe || {})[isoSab])) {
           p.domTardi++;
           return;
         }
@@ -2832,6 +2825,21 @@ function _pianoCgfNonSpettanti(nome, ym, righeMese, conto, mal, conManuali, mass
 // tolto a mano il turno di un festivo: "il CGF anticipato del 18 non spetta piu").
 // opz.festivi: i festivi appena persi (turno tolto o malattia): al massimo un CGF
 // ciascuno
+// Festivi con diritto al recupero che non si lavorano piu: dopo QUALSIASI
+// rimozione o sostituzione di turni (cella, cancella cella, cancella selezione)
+// si ricontrolla il conto CGF. celle = [{ data, codice (quello di prima) }].
+// Prima solo la sostituzione con un altro codice lo faceva: cancellare no.
+async function _pianoFestiviPersiDopo(nome, celle, nuovoCodice) {
+  if (typeof _pianoFestiviCgfSet !== 'function') return;
+  if (nuovoCodice && _pianoTurnoInfo(nuovoCodice)) return;
+  const fest = _pianoFestiviCgfSet();
+  const persi = (celle || [])
+    .filter((c) => c && c.codice && _pianoTurnoInfo(c.codice) && fest.has(String(c.data).substring(0, 10)))
+    .map((c) => String(c.data).substring(0, 10));
+  const perMese = {};
+  persi.forEach((d) => (perMese[d.substring(0, 7)] = (perMese[d.substring(0, 7)] || []).concat([d])));
+  for (const ym of Object.keys(perMese)) await _pianoRiconciliaCgf(nome, ym, { manuali: true, festivi: perMese[ym] });
+}
 async function _pianoRiconciliaCgf(nome, ym, opz) {
   opz = opz || {};
   try {

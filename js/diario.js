@@ -605,11 +605,12 @@ async function salvaModificaRegistrazione(id, conCopertura) {
     if (e) Object.assign(e, update);
     // malattia con date corrette: il piano si allinea da solo (le M salvate
     // nei giorni sbagliati vengono tolte, i giorni giusti ricevono la M)
-    if (tipo === nomeCorrente('Malattia') && typeof sincronizzaMalattiaPiano === 'function' && testoVecchio !== testo) {
-      const sync = await sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testo);
-      if (sync && (sync.tolte || sync.messe))
-        toast('Piano allineato: ' + sync.tolte + ' M tolte, ' + sync.messe + ' M spostate');
-    }
+    const sync = await _diarioAllineaMalattiaPiano(
+      { nome: nomeVecchio, tipo: eV ? eV.tipo : '', testo: testoVecchio, data: dataVecchia },
+      { nome: nome, tipo: tipo, testo: testo, data: dataVecchia },
+    );
+    if (sync && (sync.tolte || sync.messe))
+      toast('Piano allineato: ' + sync.tolte + ' M tolte, ' + sync.messe + ' M messe');
     logAzione('Modifica registrazione', nome + ' - ' + tipo + ': ' + testo.substring(0, 60));
     // nata dal Rapporto giornaliero: si chiede se correggere anche il Rapporto
     const _rapO = e && typeof _rapportoOrigineDi === 'function' ? _rapportoOrigineDi(e) : null;
@@ -617,7 +618,7 @@ async function salvaModificaRegistrazione(id, conCopertura) {
       _rapO &&
       (testoVecchio !== testo ||
         nomeVecchio !== nome ||
-        importoVecchio !== (parseFloat(update.importo) || importoVecchio)) &&
+        (impEl && importoVecchio !== (parseFloat(update.importo) || 0))) &&
       (await chiediConferma(
         'Questa registrazione viene dal Rapporto ' +
           _rapO.turno +
@@ -653,6 +654,35 @@ function apriModal(id, tipo) {
   renderTipiUI();
   document.getElementById('modal-overlay').classList.remove('hidden');
 }
+// PIANO ALLINEATO A OGNI MODIFICA DI UNA MALATTIA nel Diario: date cambiate,
+// persona cambiata (le M del nome vecchio si tolgono), tipo cambiato da o verso
+// Malattia. Prima si allineava solo quando cambiava il testo, e sul nome nuovo.
+async function _diarioAllineaMalattiaPiano(vecchia, nuova) {
+  if (typeof sincronizzaMalattiaPiano !== 'function') return null;
+  const malT = nomeCorrente('Malattia');
+  const eraMal = vecchia.tipo === malT;
+  const eMal = nuova.tipo === malT;
+  const altraPersona = String(vecchia.nome || '').toLowerCase() !== String(nuova.nome || '').toLowerCase();
+  const tot = { tolte: 0, messe: 0 };
+  const somma = (r) => {
+    if (r) {
+      tot.tolte += r.tolte || 0;
+      tot.messe += r.messe || 0;
+    }
+  };
+  try {
+    if (eraMal && eMal && !altraPersona) {
+      if (vecchia.testo !== nuova.testo)
+        somma(await sincronizzaMalattiaPiano(nuova.nome, vecchia.testo, vecchia.data, nuova.testo));
+      return tot;
+    }
+    if (eraMal) somma(await sincronizzaMalattiaPiano(vecchia.nome, vecchia.testo, vecchia.data, ''));
+    if (eMal) somma(await sincronizzaMalattiaPiano(nuova.nome, '', nuova.data, nuova.testo));
+  } catch (e) {
+    toastErrore('Piano non allineato alla malattia: ' + ((e && e.message) || e));
+  }
+  return tot;
+}
 function chiudiModal() {
   document.getElementById('modal-overlay').classList.add('hidden');
   modalEntryId = null;
@@ -674,9 +704,15 @@ async function confermaCambioTipo() {
       modificato_da: mod,
     });
     const e = datiCache.find((e) => e.id === modalEntryId);
+    const tipoVecchio = e ? e.tipo : '';
     if (e) {
       e.tipo = modalTipoSel;
       e.modificato_da = mod;
+      // diventata (o non piu) malattia: il piano si allinea come nelle altre strade
+      await _diarioAllineaMalattiaPiano(
+        { nome: e.nome, tipo: tipoVecchio, testo: e.testo, data: e.data },
+        { nome: e.nome, tipo: modalTipoSel, testo: e.testo, data: e.data },
+      );
     }
     render();
     updateStats();
@@ -687,178 +723,9 @@ async function confermaCambioTipo() {
   chiudiModal();
 }
 
-// SCADENZE
-function apriScadenza(id) {
-  const b = document.getElementById('scadenza-content');
-  b.innerHTML =
-    '<h3>Nuova scadenza</h3><p>Imposta un promemoria per questa registrazione</p><div class="pwd-field"><label>Titolo</label><input type="text" id="scad-titolo" placeholder="es. Follow-up ammonimento..."></div><div class="pwd-field"><label>Data scadenza</label><input type="text" id="scad-data" placeholder="Seleziona data..." readonly style="cursor:pointer;min-width:200px"></div><div class="pwd-field"><label>Note (opzionale)</label><input type="text" id="scad-desc" placeholder="Dettagli..."></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'scadenza-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaScadenza(' +
-    id +
-    ')">Salva</button></div>';
-  document.getElementById('scadenza-modal').classList.remove('hidden');
-  if (window.flatpickr)
-    flatpickr('#scad-data', {
-      locale: 'it',
-      dateFormat: 'Y-m-d',
-      altInput: true,
-      altFormat: 'd/m/Y',
-      allowInput: false,
-      minDate: 'today',
-    });
-}
-async function salvaScadenza(regId) {
-  const t = document.getElementById('scad-titolo').value.trim(),
-    d = document.getElementById('scad-data').value,
-    desc = document.getElementById('scad-desc').value.trim();
-  if (!t || !d) {
-    toast('Compila titolo e data');
-    return;
-  }
-  try {
-    const r = await secPost('scadenze', {
-      registrazione_id: regId,
-      titolo: t,
-      data_scadenza: d,
-      descrizione: desc,
-    });
-    scadenzeCache.push(r[0]);
-    logAzione('Scadenza creata', t + ' - ' + d);
-    renderScadenzeBanner();
-    document.getElementById('scadenza-modal').classList.add('hidden');
-    toast('Scadenza impostata');
-  } catch (e) {
-    toast('Errore creazione scadenza');
-  }
-}
-async function completaScadenza(id) {
-  try {
-    await secPatch('scadenze', 'id=eq.' + id, {
-      completata: true,
-      completata_da: getOperatore() || '?',
-    });
-    const s = scadenzeCache.find((s) => s.id === id);
-    if (s) {
-      s.completata = true;
-      s.completata_da = getOperatore() || '?';
-      logAzione('Scadenza completata', s.titolo);
-    }
-    renderScadenzeBanner();
-    renderScadenzeSettings();
-    toggleScadenzeDropdown();
-    toggleScadenzeDropdown();
-    toast('Completata');
-  } catch (e) {
-    toast('Errore completamento scadenza');
-  }
-}
-async function eliminaScadenza(id) {
-  try {
-    await secDel('scadenze', 'id=eq.' + id);
-    scadenzeCache = scadenzeCache.filter((s) => s.id !== id);
-    renderScadenzeBanner();
-    renderScadenzeSettings();
-    toast('Eliminata');
-  } catch (e) {
-    toast('Errore eliminazione scadenza');
-  }
-}
-function renderScadenzeBanner() {
-  const banner = document.getElementById('scadenze-banner'),
-    dd = document.getElementById('scadenze-dropdown');
-  const oggi = oggiLocale();
-  const attive = scadenzeCache.filter((s) => !s.completata);
-  const scadute = attive.filter((s) => s.data_scadenza < oggi);
-  const diOggi = attive.filter((s) => s.data_scadenza === oggi);
-  const prossime = attive.filter((s) => s.data_scadenza > oggi);
-  const tot = attive.length;
-  if (!tot) {
-    if (banner) banner.classList.add('hidden');
-    if (dd) dd.classList.add('hidden');
-    return;
-  }
-  banner.classList.remove('hidden');
-  // Le scadenze di oggi contano nel totale: senza il loro gruppo la striscia
-  // compariva vuota quando c'erano solo quelle
-  const parti = [];
-  if (scadute.length) parti.push('<i class="icx icx-avviso"></i> ' + scadute.length + ' scadenza/e scaduta/e!');
-  if (diOggi.length) parti.push(diOggi.length + ' in scadenza oggi');
-  if (prossime.length) parti.push(prossime.length + ' in arrivo');
-  banner.innerHTML = parti.join(' ');
-  banner.style.background = scadute.length ? 'var(--accent)' : 'var(--accent2)';
-}
-function toggleScadenzeDropdown() {
-  const dd = document.getElementById('scadenze-dropdown');
-  dd.classList.toggle('hidden');
-  if (!dd.classList.contains('hidden')) {
-    const oggi = oggiLocale();
-    const attive = scadenzeCache.filter((s) => !s.completata);
-    const fatte = scadenzeCache.filter((s) => s.completata).slice(0, 10);
-    let html = attive
-      .map((s) => {
-        const over = s.data_scadenza <= oggi;
-        return (
-          '<div class="scad-item"><span class="scad-date' +
-          (over ? ' overdue' : '') +
-          '">' +
-          new Date(s.data_scadenza + 'T12:00:00').toLocaleDateString('it-IT') +
-          '</span><span class="scad-title"><strong>' +
-          escP(s.titolo) +
-          '</strong>' +
-          (s.descrizione ? ' - ' + escP(s.descrizione) : '') +
-          '</span><button style="color:var(--c-verde,#2c6e49);border-color:var(--c-verde,#2c6e49)" onclick="completaScadenza(' +
-          s.id +
-          ')">Fatto</button><button style="color:var(--accent);border-color:var(--accent)" onclick="eliminaScadenza(' +
-          s.id +
-          ')">Elimina</button></div>'
-        );
-      })
-      .join('');
-    if (!attive.length)
-      html = '<p style="color:var(--muted);text-align:center;padding:8px">Nessuna scadenza attiva</p>';
-    if (fatte.length) {
-      html +=
-        '<div style="margin-top:12px;padding-top:10px;border-top:2px solid var(--line)"><span style="font-size:var(--fs-sm,.8125rem);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600">Completate</span></div>';
-      html += fatte
-        .map(
-          (s) =>
-            '<div class="scad-item" style="opacity:.55"><span class="scad-date">' +
-            new Date(s.data_scadenza + 'T12:00:00').toLocaleDateString('it-IT') +
-            '</span><span class="scad-title" style="text-decoration:line-through"><strong>' +
-            escP(s.titolo) +
-            '</strong>' +
-            (s.descrizione ? ' - ' + escP(s.descrizione) : '') +
-            '</span><span style="color:var(--c-verde,#2c6e49);font-weight:700;font-size:var(--fs-sm,.8125rem)">' +
-            (s.completata_da ? 'Fatto da ' + escP(s.completata_da) : 'Fatto') +
-            '</span></div>',
-        )
-        .join('');
-    }
-    dd.innerHTML = html;
-  }
-}
-function renderScadenzeSettings() {
-  const el = document.getElementById('scadenze-settings-list');
-  if (!el) return;
-  if (!scadenzeCache.length) {
-    el.innerHTML = '<p style="color:var(--muted)">Nessuna scadenza attiva</p>';
-    return;
-  }
-  el.innerHTML = scadenzeCache
-    .map(
-      (s) =>
-        '<div class="scad-item"><span class="scad-date">' +
-        new Date(s.data_scadenza + 'T12:00:00').toLocaleDateString('it-IT') +
-        '</span><span class="scad-title"><strong>' +
-        escP(s.titolo) +
-        '</strong>' +
-        (s.descrizione ? ' - ' + escP(s.descrizione) : '') +
-        '</span><button style="color:var(--c-verde,#2c6e49);border-color:var(--c-verde,#2c6e49)" onclick="completaScadenza(' +
-        s.id +
-        ');renderScadenzeSettings()">Fatto</button><button style="color:var(--accent);border-color:var(--accent)" onclick="eliminaScadenza(' +
-        s.id +
-        ');renderScadenzeSettings()">Elimina</button></div>',
-    )
-    .join('');
-}
+// SCADENZE: sostituite dal pulsante "Promemoria" su ogni registrazione
+// (promemoriaDaRegistrazione in promemoria.js). La tabella scadenze resta nel
+// database (vuota in produzione al 01.10.2026) e nei backup.
 
 // CASSA ALERTS SYSTEM
 function _levenshtein(a, b) {

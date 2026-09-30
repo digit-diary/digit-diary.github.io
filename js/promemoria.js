@@ -44,6 +44,31 @@ function initPromemoriaUI() {
       ops.map((n) => '<option' + (n === fcv ? ' selected' : '') + '>' + escP(n) + '</option>').join('');
   }
 }
+// FOLLOW-UP DI UNA REGISTRAZIONE DEL DIARIO: apre il promemoria gia compilato
+// (titolo e descrizione); resta da scegliere la data. Sostituisce le vecchie
+// "scadenze" del Diario, che nessun pulsante apriva e facevano lo stesso lavoro.
+function promemoriaDaRegistrazione(id) {
+  const e = (typeof datiCache !== 'undefined' ? datiCache : []).find((x) => x.id === id);
+  if (!e) return;
+  switchPage('promemoria');
+  setTimeout(() => {
+    initPromemoriaUI();
+    const t = document.getElementById('pm-titolo');
+    const d = document.getElementById('pm-descrizione');
+    if (t) t.value = ('Follow-up: ' + e.nome + ' \u00b7 ' + e.tipo).substring(0, 120);
+    if (d)
+      d.value = (
+        String(e.testo || '').substring(0, 300) +
+        ' (Diario del ' +
+        new Date(e.data).toLocaleDateString('it-IT') +
+        ')'
+      ).trim();
+    const sc = document.getElementById('pm-scadenza');
+    if (sc && sc._flatpickr) sc._flatpickr.open();
+    if (t) t.scrollIntoView({ block: 'center' });
+    toast('Promemoria compilato: scegli la data e salva');
+  }, 150);
+}
 async function salvaPromemoria() {
   const titolo = document.getElementById('pm-titolo').value.trim();
   const scadenza = document.getElementById('pm-scadenza').value;

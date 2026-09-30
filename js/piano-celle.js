@@ -196,7 +196,7 @@ async function _pianoNotaRapida(nome, dstr) {
         reparto_dip: _pianoReparto(),
         operatore: op,
       });
-      if (nuovo && nuovo[0]) _pianoRighe.push(nuovo[0]);
+      if (nuovo) _pianoRighe.push(Array.isArray(nuovo) ? nuovo[0] : nuovo);
     } else {
       await secPatch('piano', 'id=eq.' + r.id, {
         commento: commento || null,
@@ -890,7 +890,6 @@ async function pianoSalvaCella(nome, dstr, codice) {
     toastErrore(_pianoMessaggioSiglaSbagliata(codice));
     return false;
   }
-  _pianoUndoSnap('modifica cella ' + nome.split(' ')[0] + ' ' + dstr.substring(8));
   const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
   const attuale = r ? r.codice : '';
   // CELLA PROTETTA: sovrascriverla e' possibile, ma si dice chiaramente cosa si
@@ -951,12 +950,16 @@ async function pianoSalvaCella(nome, dstr, codice) {
       if (avvisi.length) commentoRegole = '\u26a0 ' + avvisi.join(' \u00b7 ');
     }
   }
+  // la fotografia per Annulla si prende solo ora, dopo le conferme: una rinuncia
+  // non lascia piu un passo vuoto (che svuotava anche Ripristina)
+  _pianoUndoSnap('modifica cella ' + nome.split(' ')[0] + ' ' + dstr.substring(8));
   try {
     if (!codice) {
       if (r) {
         await secDel('piano', 'id=eq.' + r.id);
         _pianoRighe = _pianoRighe.filter((x) => x.id !== r.id);
         logAzione('Piano: turno rimosso', nome + ' ' + dstr + ' (era ' + attuale + ')');
+        await _pianoFestiviPersiDopo(nome, [{ data: dstr, codice: attuale }]);
         // era una malattia: proposta di toglierla anche dal Diario
         if (attuale === 'M' || attuale === 'M1') await _pianoMalattiaViaDiario(nome, [dstr]);
         renderPiano();
@@ -1004,20 +1007,14 @@ async function pianoSalvaCella(nome, dstr, codice) {
         reparto_dip: _pianoReparto(),
         operatore: getOperatore(),
       });
-      if (nuovo && nuovo[0]) _pianoRighe.push(nuovo[0]);
+      // _pianoInserisciCella restituisce la riga (non un elenco): prima nuovo[0]
+      // era sempre vuoto e la cella nuova mancava in memoria fino al ridisegno
+      if (nuovo) _pianoRighe.push(Array.isArray(nuovo) ? nuovo[0] : nuovo);
     }
     logAzione('Piano modificato', nome + ' ' + dstr + ' → ' + codice);
     // festivo con diritto al recupero che non si lavora piu (turno tolto): un CGF
     // anticipato nel mese non spetta piu, si propone di trasformarlo in C
-    if (
-      attuale &&
-      _pianoTurnoInfo(attuale) &&
-      !_pianoTurnoInfo(codice) &&
-      typeof _pianoFestiviCgfSet === 'function' &&
-      _pianoFestiviCgfSet().has(dstr) &&
-      typeof _pianoRiconciliaCgf === 'function'
-    )
-      await _pianoRiconciliaCgf(nome, dstr.substring(0, 7), { manuali: true, festivi: [dstr] });
+    await _pianoFestiviPersiDopo(nome, [{ data: dstr, codice: attuale }], codice);
     // M scritta a mano nel piano: proposta di registrarla nel Rapporto e nel Diario,
     // cosi' piano, Rapporto, Diario e scheda collaboratore restano allineati
     if (codice === 'M' || codice === 'M1') {

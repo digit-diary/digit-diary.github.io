@@ -1929,7 +1929,6 @@ function setReparto(rep) {
   renderCassaAlerts();
   renderRischioAlerts();
   renderAmmonimentiAlerts();
-  renderScadenzeBanner();
 }
 // Switch reparti dinamico: i bottoni vengono generati da getReparti() (configurabile da admin)
 function renderRepartoSwitch() {
@@ -3883,9 +3882,6 @@ document.getElementById('modal-overlay').addEventListener('click', function (e) 
   if (e.target === this) chiudiModal();
 });
 document.getElementById('profilo-modal').addEventListener('click', function (e) {
-  if (e.target === this) this.classList.add('hidden');
-});
-document.getElementById('scadenza-modal').addEventListener('click', function (e) {
   if (e.target === this) this.classList.add('hidden');
 });
 document.getElementById('note-modal').addEventListener('click', function (e) {

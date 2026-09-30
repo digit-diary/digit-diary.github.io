@@ -293,7 +293,7 @@ async function rinominaRegalo(id) {
     renderRegali();
     toast('Rinominato');
   } catch (e) {
-    toast('Errore rinomina');
+    toastErrore('Rinomina non riuscita: ' + ((e && e.message) || e));
   }
 }
 async function eliminaRegalo(id) {
@@ -432,9 +432,9 @@ function getMaisonFiltrati() {
   const fa = (document.getElementById('maison-filt-al') || {}).value || '';
   return getMaisonRepartoExpanded().filter((r) => {
     if (fn && !r.nome.toLowerCase().includes(fn.toLowerCase())) return false;
-    if (ft === 'BU' && r.tipo_buono !== 'BU') return false;
-    if (ft === 'BL' && r.tipo_buono !== 'BL') return false;
+    // un tipo scelto mostra solo quel tipo (prima C.Gourmet e Welcome Lounge mostravano tutto)
     if (ft === 'normale' && r.tipo_buono) return false;
+    if (ft && ft !== 'normale' && r.tipo_buono !== ft) return false;
     if (fd && r.data_giornata < fd) return false;
     if (fa && r.data_giornata > fa) return false;
     return true;
@@ -576,7 +576,9 @@ function renderMaisonDashboard() {
   const mesiDisp = [...new Set(data.map((r) => r.data_giornata.substring(0, 7)))].sort();
   const MESI_SHORT_M = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
   let thtml =
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h4 style="font-family:Playfair Display,serif;margin:0;color:var(--ink)">Dettaglio per cliente</h4><button class="btn-reset" onclick="toggleSezione(\'maison-table-inner\',this)" style="font-size:var(--fs-base,.9375rem);padding:6px 16px">&#9650; Nascondi</button></div><div id="maison-table-inner"><div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px;flex-wrap:wrap"><select id="maison-del-giorno" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:var(--fs-sm,.8125rem);background:var(--paper);color:var(--ink)"><option value="">Seleziona giorno...</option>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h4 style="font-family:Playfair Display,serif;margin:0;color:var(--ink)">Dettaglio per cliente</h4><button class="btn-reset" onclick="toggleSezione(\'maison-table-inner\',this)" style="font-size:var(--fs-base,.9375rem);padding:6px 16px">&#9650; Nascondi</button></div><div id="maison-table-inner"><div ' +
+    (isAdmin() ? '' : 'hidden ') +
+    'style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px;flex-wrap:wrap"><select id="maison-del-giorno" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:var(--fs-sm,.8125rem);background:var(--paper);color:var(--ink)"><option value="">Seleziona giorno...</option>' +
     giorniDisp
       .map((d) => '<option value="' + d + '">' + new Date(d + 'T12:00:00').toLocaleDateString('it-IT') + '</option>')
       .join('') +
@@ -682,9 +684,11 @@ function renderMaisonDashboard() {
       fmtCHF(d.tot / d.visite) +
       '</td><td style="white-space:nowrap"><button class="btn-act edit" onclick="rinominaMaisonCliente(\'' +
       ne +
-      '\')" title="Rinomina">Rinomina</button> <button class="btn-act del" onclick="eliminaMaisonCliente(\'' +
-      ne +
-      '\')" title="Elimina">Elimina</button></td></tr>';
+      '\')" title="Rinomina">Rinomina</button>' +
+      (isAdmin()
+        ? ' <button class="btn-act del" onclick="eliminaMaisonCliente(\'' + ne + '\')" title="Elimina">Elimina</button>'
+        : '') +
+      '</td></tr>';
   });
   thtml +=
     '<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td class="num"><strong>' +
@@ -2787,6 +2791,12 @@ function _getNomiCondivisiOriginali(nome) {
 }
 // Elimina singolo cliente (tutte le righe)
 async function eliminaMaisonCliente(nome) {
+  // eliminazioni in blocco: solo amministratore, come per le Spese extra
+  // (prima i pulsanti erano aperti a ogni operatore)
+  if (!isAdmin()) {
+    toast("Solo un amministratore puo' eliminare tutte le righe di un cliente");
+    return;
+  }
   if (_isSoloCondiviso(nome)) {
     _eliminaCondivisoModal(nome);
     return;
@@ -2930,6 +2940,25 @@ function rinominaMaisonCliente(nome) {
     i.select();
   }, 100);
 }
+// Note e regali del cliente seguono la rinomina (settore aperto). Prima restavano
+// al nome vecchio e sparivano dalla scheda del cliente.
+async function _rinominaMaisonCollegati(vecchio, nuovo) {
+  const q = 'nome=eq.' + encodeURIComponent(vecchio);
+  await _secPatchReparto('note_clienti', q, { nome: nuovo });
+  await _secPatchReparto('regali_maison', q, { nome: nuovo });
+  [noteClientiCache, regaliCache].forEach((c) =>
+    (c || []).forEach((r) => {
+      if (r.nome === vecchio && (r.reparto_dip || 'slots') === currentReparto) r.nome = nuovo;
+    }),
+  );
+  const bIdx = maisonBudgetCache.findIndex(
+    (b) => b.nome.toLowerCase() === vecchio.toLowerCase() && (b.reparto_dip || 'slots') === currentReparto,
+  );
+  if (bIdx !== -1) {
+    await secPatch('maison_budget', 'id=eq.' + maisonBudgetCache[bIdx].id, { nome: nuovo });
+    maisonBudgetCache[bIdx].nome = nuovo;
+  }
+}
 async function eseguiRinominaMaison(vecchio) {
   const nuovo = capitalizzaNome(document.getElementById('rin-maison-nuovo').value.trim());
   if (!nuovo) {
@@ -2945,16 +2974,8 @@ async function eseguiRinominaMaison(vecchio) {
     maisonCache.forEach((r) => {
       if (r.nome === vecchio && (r.reparto_dip || 'slots') === currentReparto) r.nome = nuovo;
     });
-    // Aggiorna anche budget se presente (solo reparto corrente)
-    const bIdx = maisonBudgetCache.findIndex(
-      (b) => b.nome.toLowerCase() === vecchio.toLowerCase() && (b.reparto_dip || 'slots') === currentReparto,
-    );
-    if (bIdx !== -1) {
-      await secPatch('maison_budget', 'id=eq.' + maisonBudgetCache[bIdx].id, {
-        nome: nuovo,
-      });
-      maisonBudgetCache[bIdx].nome = nuovo;
-    }
+    // budget, note e regali del cliente (solo settore aperto)
+    await _rinominaMaisonCollegati(vecchio, nuovo);
     logAzione('Maison: rinominato', vecchio + ' → ' + nuovo);
     document.getElementById('pwd-modal').classList.add('hidden');
     renderMaisonDashboard();
@@ -2962,7 +2983,7 @@ async function eseguiRinominaMaison(vecchio) {
     renderMaisonBudgetAlerts();
     toast(vecchio + ' → ' + nuovo);
   } catch (e) {
-    toast('Errore rinomina');
+    toastErrore('Rinomina non riuscita: ' + ((e && e.message) || e));
   }
 }
 async function _eseguiRinominaCondiviso(vecchio) {
@@ -2990,6 +3011,7 @@ async function _eseguiRinominaCondiviso(vecchio) {
       await secPatch('costi_maison', 'id=eq.' + id, { nome: nuovoNome });
       rec.nome = nuovoNome;
     }
+    await _rinominaMaisonCollegati(vecchio, nuovo);
     logAzione('Maison: rinominato condiviso', vecchio + ' → ' + nuovo);
     document.getElementById('pwd-modal').classList.add('hidden');
     renderMaisonDashboard();
@@ -2997,7 +3019,7 @@ async function _eseguiRinominaCondiviso(vecchio) {
     renderMaisonBudgetAlerts();
     toast(vecchio + ' → ' + nuovo);
   } catch (e) {
-    toast('Errore rinomina');
+    toastErrore('Rinomina non riuscita: ' + ((e && e.message) || e));
   }
 }
 // Modifica singola riga maison (PX, tipo, costo, note)
@@ -3162,6 +3184,12 @@ async function spostaExtraToMaison(id, nome) {
 }
 // Elimina tutti i dati di un giorno
 async function eliminaMaisonGiorno() {
+  // eliminazioni in blocco: solo amministratore, come per le Spese extra
+  // (prima i pulsanti erano aperti a ogni operatore)
+  if (!isAdmin()) {
+    toast("Solo un amministratore puo' eliminare le registrazioni di un giorno");
+    return;
+  }
   const sel = document.getElementById('maison-del-giorno');
   if (!sel || !sel.value) {
     toast('Seleziona un giorno');
@@ -3190,6 +3218,12 @@ async function eliminaMaisonGiorno() {
   }
 }
 async function eliminaMaisonMese() {
+  // eliminazioni in blocco: solo amministratore, come per le Spese extra
+  // (prima i pulsanti erano aperti a ogni operatore)
+  if (!isAdmin()) {
+    toast("Solo un amministratore puo' eliminare le registrazioni di un mese");
+    return;
+  }
   const sel = document.getElementById('maison-del-mese');
   if (!sel || !sel.value) {
     toast('Seleziona un mese');
