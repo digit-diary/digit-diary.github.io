@@ -41,7 +41,7 @@ function renderStatistiche() {
   const _sfDal = (document.getElementById('stats-filt-dal') || {}).value || '';
   const _sfAl = (document.getElementById('stats-filt-al') || {}).value || '';
   const _ds = _dsAll.filter((e) => {
-    const d = (e.data || '').substring(0, 10);
+    const d = giornoDi(e.data);
     if (_sfDal && d < _sfDal) return false;
     if (_sfAl && d > _sfAl) return false;
     return true;

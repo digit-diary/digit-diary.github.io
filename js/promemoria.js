@@ -249,7 +249,7 @@ function renderPromemoria() {
   const data = getPromemoriaFiltrati();
   const el = document.getElementById('promemoria-list');
   if (!el) return;
-  const oggi = new Date().toISOString().split('T')[0];
+  const oggi = oggiLocale();
   const op = getOperatore();
   const admin = isAdmin();
   if (!data.length) {
@@ -261,7 +261,7 @@ function renderPromemoria() {
     .map((p) => {
       const scaduto = !p.completata && p.data_scadenza < oggi;
       const prossimo =
-        !p.completata && !scaduto && p.data_scadenza <= new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0];
+        !p.completata && !scaduto && p.data_scadenza <= dataLocaleISO(new Date(Date.now() + 3 * 86400000));
       const mio = _includeOpInCsv(p.assegnato_a, op);
       const bgStyle = p.completata
         ? 'opacity:.6;border-left:3px solid #2c6e49'
@@ -318,7 +318,7 @@ function renderPromemoria() {
 }
 function aggiornaPromemoriaBadge() {
   const op = getOperatore();
-  const oggi = new Date().toISOString().split('T')[0];
+  const oggi = oggiLocale();
   const miei = promemoriaCache.filter(
     (p) => !p.completata && _promemoriaNelReparto(p) && _includeOpInCsv(p.assegnato_a, op),
   );
@@ -346,7 +346,7 @@ function _getDataRemindGlobal(p) {
 function mostraPromemoriaLogin() {
   const op = getOperatore();
   if (!op) return;
-  const oggi = new Date().toISOString().split('T')[0];
+  const oggi = oggiLocale();
   const miei = promemoriaCache.filter(
     (p) => !p.completata && _promemoriaNelReparto(p) && _includeOpInCsv(p.assegnato_a, op),
   );

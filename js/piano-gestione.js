@@ -1310,11 +1310,19 @@ async function pianoAssegnaCgfMese() {
   // stessa griglia di lavoro della bozza: nome|g -> codice
   const cella = {};
   Object.keys(occupato).forEach((k) => (cella[k] = occupato[k]));
-  const ctx = { ym: ym, nGiorni: nGiorni, cella: cella, malattie: malattie, compleanni: compleanni };
+  // i recuperi nuovi vanno solo nei giorni che devono ancora arrivare e aperti
+  // (prima potevano cadere su un giorno passato: la scrittura si fermava a meta)
+  const _oggiCgf = _pianoOggiStr();
+  const chiusiCgf = new Set();
+  for (let g = 1; g <= nGiorni; g++) {
+    const d = ym + '-' + String(g).padStart(2, '0');
+    if (d <= _oggiCgf || !_pianoGiornoScrivibile(d)) chiusiCgf.add(g);
+  }
+  const ctx = { ym: ym, nGiorni: nGiorni, cella: cella, malattie: malattie, compleanni: compleanni, chiusi: chiusiCgf };
   const daTogliere = []; // CGF generati in piu' (festivo saltato per malattia)
   nomi.forEach((n) => {
     const s = saldo[n];
-    // CGF che non spettano piu' (festivo non lavorato), anche nei giorni chiusi
+    // CGF che non spettano piu' (festivo non lavorato): solo quelli che devono ancora arrivare (v321)
     const via = _pianoCgfNonSpettanti(n, ym, _pianoRighe, s, malattie);
     via.forEach((r) => daTogliere.push(r));
     if (via.length || s.resta <= 0) return;
@@ -1420,7 +1428,10 @@ async function pianoAssegnaCgfMese() {
     toast(fatti + ' recuperi assegnati');
     renderPiano();
   } catch (e) {
-    toast('Errore: assegnati ' + fatti + ' su ' + daFare.length);
+    toastErrore(
+      'Assegna CGF interrotto: assegnati ' + fatti + ' su ' + daFare.length + ' (' + ((e && e.message) || e) + ')',
+    );
+    renderPiano();
   }
 }
 function _renderPianoFestiviCard() {

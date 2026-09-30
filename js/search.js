@@ -213,7 +213,7 @@ function _eseguiRicercaGlobale(q) {
   if (isVis('promemoria') && pmRes.length) {
     html += '<div class="rg-section">Promemoria (' + pmRes.length + (pmRes.length >= 5 ? '+' : '') + ')</div>';
     pmRes.forEach((p) => {
-      const scaduto = !p.completata && p.data_scadenza <= new Date().toISOString().split('T')[0];
+      const scaduto = !p.completata && p.data_scadenza <= oggiLocale();
       html +=
         '<div class="rg-item" onclick="_rgVai(this)" data-tipo="promemoria" data-x="' +
         escP(p.titolo) +

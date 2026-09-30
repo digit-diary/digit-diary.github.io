@@ -4,6 +4,25 @@
  * Utility: capitalizzaNome, toast, escP, fmtCHF
  */
 
+// DATE DEL GIORNO IN ORA LOCALE (Svizzera). toISOString() da la data di Londra:
+// tra mezzanotte e le 2 (ora legale) restituiva il giorno PRIMA, e una malattia
+// registrata alle 00.30 finiva sul giorno sbagliato. Usare sempre queste due.
+function dataLocaleISO(d) {
+  d = d || new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function oggiLocale() {
+  return dataLocaleISO(new Date());
+}
+// Giorno (ora locale) di un valore salvato: un istante con l ora ("...T22:30:00Z")
+// diventa il giorno svizzero; una data semplice ("2026-10-05") resta com e.
+function giornoDi(v) {
+  const s = String(v || '');
+  if (!s) return '';
+  if (s.length <= 10 || !/T\d/.test(s)) return s.substring(0, 10);
+  const d = new Date(s);
+  return isNaN(d) ? s.substring(0, 10) : dataLocaleISO(d);
+}
 function capitalizzaNome(s) {
   return s.replace(/\S+/g, (w) => {
     const l = w.toLowerCase();
@@ -180,7 +199,7 @@ function _renderNdCal() {
   const ultimoGiorno = new Date(_ndCalYear, _ndCalMonth + 1, 0).getDate();
   let startDay = primo.getDay() - 1;
   if (startDay < 0) startDay = 6; // lunedì=0
-  const oggi = new Date().toISOString().substring(0, 10);
+  const oggi = oggiLocale();
   let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
   html +=
     '<button onclick="_ndCalNav(-1)" style="background:none;border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:4px 10px;color:var(--ink);font-size:var(--fs-lg,1.0625rem)">&#9664;</button>';
@@ -429,7 +448,7 @@ function annoNascitaDaDueCifre(a) {
 // data di nascita ISO nel futuro (anno letto male): la si riporta al secolo prima
 function nascitaNonFutura(iso) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(iso || '')) return iso;
-  const oggi = new Date().toISOString().slice(0, 10);
+  const oggi = oggiLocale();
   return iso > oggi ? String(parseInt(iso.slice(0, 4)) - 100) + iso.slice(4) : iso;
 }
 function _parseDataNascita(input) {

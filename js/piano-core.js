@@ -814,7 +814,8 @@ function _pianoNdMese(ym) {
 // giorno)", "N giorni" dalla data della registrazione
 function _pianoDateMalattia(testo, dataReg) {
   testo = String(testo || '');
-  let da = String(dataReg || '').substring(0, 10);
+  // giorno svizzero della registrazione (non quello UTC dei primi 10 caratteri)
+  let da = typeof giornoDi === 'function' ? giornoDi(dataReg) : String(dataReg || '').substring(0, 10);
   let a = da;
   const mRange = testo.match(/dal\s+(\d{1,2})[./](\d{1,2})[./](\d{4})\s+al\s+(\d{1,2})[./](\d{1,2})[./](\d{4})/i);
   const mIl = testo.match(/\bil\s+(\d{1,2})[./](\d{1,2})[./](\d{4})/i);

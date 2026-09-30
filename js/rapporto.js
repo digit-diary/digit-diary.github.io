@@ -290,7 +290,7 @@ function _getRangeMalattiaRec(rec) {
       f: m[6] + '-' + m[5].padStart(2, '0') + '-' + m[4].padStart(2, '0'),
     };
   if (rec.data) {
-    const d = (rec.data || '').substring(0, 10);
+    const d = giornoDi(rec.data);
     return { i: d, f: d };
   }
   return null;
@@ -354,7 +354,9 @@ function _vociAssenzaDaFrammento(riga, _rigaPulita) {
   const _cm = riga.match(/\b([A-Z])\s*(\d{1,2})\b/);
   return trovati.map((n) => [riga, n, _cm ? _cm[0] : 'assente', _cm ? _cm[1] : null, _cm ? _cm[2] : null]);
 }
-function _analizzaAssenzeRapporto(assenzeText, ds, turno) {
+// scelte = { "somma": "Somma Alfonso" }: nomi ambigui gia chiariti dall operatore
+// (un nome ambiguo senza scelta finisce in ops.ambigui e non si registra)
+function _analizzaAssenzeRapporto(assenzeText, ds, turno, scelte) {
   const _rappDateStr = new Date(ds + 'T12:00:00').toLocaleDateString('it-IT');
   const _rapLabel = 'da rapporto ' + turno + ' del ' + _rappDateStr;
   const _rapLabelOld = 'da rapporto ' + turno;
@@ -372,6 +374,7 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno) {
     deletes: [],
     skipped: [],
     errors: [],
+    ambigui: [],
     meta: { rapLabel: _rapLabel, malTipo: _malTipo, turno, ds, rappDateStr: _rappDateStr },
   };
   if (!assenzeText.trim()) {
@@ -522,7 +525,22 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno) {
           dataFine = new Date(dataRapp.getFullYear(), mFine, gFine, 12);
           if (dataFine < dataInizio) dataFine.setFullYear(dataFine.getFullYear() + 1);
         }
-        const nomeFinale = matchCollaboratore(nome) || capitalizzaNome(nome);
+        // OMONIMI: chi ha gia la registrazione di questo rapporto vale come scelta
+        const _sc = scegliCollaboratore(
+          nome,
+          _esistenti.map((e) => e.nome),
+          scelte,
+        );
+        if (_sc && _sc.ambigui) {
+          if (!ops.ambigui.some((a) => a.testo.toLowerCase() === nome.toLowerCase()))
+            ops.ambigui.push({ testo: nome, nomi: _sc.ambigui });
+          continue;
+        }
+        if (_sc && _sc.nome === '') {
+          ops.errors.push({ nome: nome, motivo: 'nome da chiarire: piu collaboratori con questo nome', riga });
+          continue;
+        }
+        const nomeFinale = (_sc && _sc.nome) || capitalizzaNome(nome);
         // === D7: VALIDAZIONE DATE ===
         if (dataFine < dataInizio) {
           const _tmp = dataInizio;
@@ -904,7 +922,14 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
 }
 // === ORCHESTRATOR ===
 async function _processaAssenzeRapporto(assenzeText, ds, turno) {
-  const ops = _analizzaAssenzeRapporto(assenzeText, ds, turno);
+  let ops = _analizzaAssenzeRapporto(assenzeText, ds, turno);
+  // nomi ambigui (due "Somma"): si chiede una volta per nome, poi si rifa l analisi
+  if (ops.ambigui.length) {
+    const scelte = {};
+    for (const a of ops.ambigui)
+      scelte[a.testo.toLowerCase()] = (await chiediOmonimo(a.testo, a.nomi, 'nelle assenze del rapporto')) || '';
+    ops = _analizzaAssenzeRapporto(assenzeText, ds, turno, scelte);
+  }
   await _eseguiAssenzeOps(ops, ds, turno);
 }
 // =================================================================================

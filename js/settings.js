@@ -1779,7 +1779,7 @@ async function esportaBackupCompleto() {
     const blob = new Blob([JSON.stringify(backup, null, 1)], { type: 'application/json' });
     Object.assign(document.createElement('a'), {
       href: URL.createObjectURL(blob),
-      download: 'diario_backup_' + new Date().toISOString().split('T')[0] + '.json',
+      download: 'diario_backup_' + oggiLocale() + '.json',
     }).click();
     logAzione('Backup completo esportato', totale + ' record, ' + _TABELLE_BACKUP.length + ' tabelle');
     await setImp('backup_ultimo', new Date().toISOString());

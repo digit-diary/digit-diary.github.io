@@ -177,7 +177,7 @@ async function salva() {
     return;
   }
   // Controllo duplicati: stesso nome + stesso tipo + oggi
-  const oggi = new Date().toISOString().split('T')[0];
+  const oggi = oggiLocale();
   const dupExact = getDatiReparto().find(
     (e) =>
       e.nome.toLowerCase() === nome.toLowerCase() &&
@@ -254,7 +254,7 @@ async function salva() {
     }
     // Malattia (giorno singolo) → popup copertura turno
     if (tipoSelezionato === nomeCorrente('Malattia') && typeof apriPopupCopertura === 'function') {
-      apriPopupCopertura(nome, new Date().toISOString().split('T')[0]);
+      apriPopupCopertura(nome, oggiLocale());
     }
   } catch (e) {
     toast('Errore salvataggio');
@@ -263,10 +263,10 @@ async function salva() {
 function _suggerisciFollowUp(nome, testo) {
   const b = document.getElementById('pwd-modal-content');
   const testoBreve = testo.substring(0, 80);
-  const fra3 = new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0];
-  const fra7 = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
-  const fra14 = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
-  const fra30 = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
+  const fra3 = dataLocaleISO(new Date(Date.now() + 3 * 86400000));
+  const fra7 = dataLocaleISO(new Date(Date.now() + 7 * 86400000));
+  const fra14 = dataLocaleISO(new Date(Date.now() + 14 * 86400000));
+  const fra30 = dataLocaleISO(new Date(Date.now() + 30 * 86400000));
   function _fmtD(iso) {
     return new Date(iso + 'T12:00:00').toLocaleDateString('it-IT', {
       day: '2-digit',
@@ -638,7 +638,7 @@ async function salvaModificaRegistrazione(id, conCopertura) {
     toast('Registrazione modificata');
     // "Salva + Copertura": apre il popup chi copre / chi ha rifiutato
     if (conCopertura && tipo === nomeCorrente('Malattia') && typeof apriPopupCopertura === 'function') {
-      const dataRef = _copDataRef || (e && e.data ? e.data.substring(0, 10) : new Date().toISOString().split('T')[0]);
+      const dataRef = _copDataRef || (e && e.data ? giornoDi(e.data) : oggiLocale());
       setTimeout(() => apriPopupCopertura(nome, dataRef), 150);
     }
   } catch (e) {
@@ -764,7 +764,7 @@ async function eliminaScadenza(id) {
 function renderScadenzeBanner() {
   const banner = document.getElementById('scadenze-banner'),
     dd = document.getElementById('scadenze-dropdown');
-  const oggi = new Date().toISOString().split('T')[0];
+  const oggi = oggiLocale();
   const attive = scadenzeCache.filter((s) => !s.completata);
   const scadute = attive.filter((s) => s.data_scadenza < oggi);
   const diOggi = attive.filter((s) => s.data_scadenza === oggi);
@@ -789,7 +789,7 @@ function toggleScadenzeDropdown() {
   const dd = document.getElementById('scadenze-dropdown');
   dd.classList.toggle('hidden');
   if (!dd.classList.contains('hidden')) {
-    const oggi = new Date().toISOString().split('T')[0];
+    const oggi = oggiLocale();
     const attive = scadenzeCache.filter((s) => !s.completata);
     const fatte = scadenzeCache.filter((s) => s.completata).slice(0, 10);
     let html = attive
@@ -870,49 +870,106 @@ function _levenshtein(a, b) {
       d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] !== b[j - 1] ? 1 : 0));
   return d[m][n];
 }
+// RICONOSCIMENTO DEI NOMI scritti nel rapporto ("Somma -50", "Rossi malato").
+// Stessi passi di prima (nome intero, cognome, cognome di piu parole, inizio
+// del nome, errore di battitura), ma ogni passo raccoglie TUTTI i collaboratori
+// che corrispondono: con due "Somma" non si sceglie piu il primo dell elenco.
+function candidatiCollaboratore(testo) {
+  const t = String(testo || '')
+    .trim()
+    .toLowerCase();
+  if (!t) return { nomi: [], battitura: false };
+  const tutti = collaboratoriCache || [];
+  const parole = (c) => c.nome.toLowerCase().split(/\s+/);
+  const solo = (l) => ({ nomi: [...new Set(l.map((c) => c.nome))], battitura: false });
+  const esatto = tutti.filter((c) => c.nome.toLowerCase() === t);
+  if (esatto.length) return solo(esatto);
+  const parola = tutti.filter((c) => parole(c).includes(t));
+  if (parola.length) return solo(parola);
+  if (t.includes(' ')) {
+    const multi = tutti.filter((c) => c.nome.toLowerCase().startsWith(t + ' '));
+    if (multi.length) return solo(multi);
+  }
+  // inizio del nome (almeno 4 lettere: "Mai" non diventa "Maira")
+  if (t.length >= 4) {
+    const pref = tutti.filter((c) => parole(c).some((w) => w.startsWith(t)));
+    if (pref.length) return solo(pref);
+  }
+  // errore di battitura (al massimo 2 lettere): tutti quelli alla distanza minima
+  if (t.length >= 3) {
+    let min = 3;
+    let vicini = [];
+    tutti.forEach((c) =>
+      parole(c).forEach((w) => {
+        if (w.length < 3) return;
+        const d = _levenshtein(t, w);
+        if (d < min) {
+          min = d;
+          vicini = [c];
+        } else if (d === min && !vicini.includes(c)) vicini.push(c);
+      }),
+    );
+    if (vicini.length) return { nomi: [...new Set(vicini.map((c) => c.nome))], battitura: true };
+  }
+  return { nomi: [], battitura: false };
+}
+function _collabNelSettoreAperto(nome) {
+  const c = (collaboratoriCache || []).find((x) => x.nome === nome);
+  if (!c) return false;
+  if ((c.reparto_dip || 'slots') === currentReparto) return true;
+  return String(c.reparti_extra || '')
+    .split(',')
+    .map((x) => x.trim().toLowerCase())
+    .includes(currentReparto);
+}
+// Sceglie SENZA chiedere quando la scelta e sicura: un solo candidato, uno solo
+// nel settore aperto, uno solo fra i "preferiti" (es. chi ha gia la registrazione
+// di questo rapporto), oppure la scelta gia fatta dall operatore (scelte).
+// Ritorna { nome } oppure { ambigui: [nomi] } oppure null (nessuno).
+function scegliCollaboratore(testo, preferiti, scelte) {
+  const chiave = String(testo || '')
+    .trim()
+    .toLowerCase();
+  if (scelte && Object.prototype.hasOwnProperty.call(scelte, chiave)) return { nome: scelte[chiave] };
+  const c = candidatiCollaboratore(testo);
+  if (!c.nomi.length) return null;
+  let pool = c.nomi;
+  const nelSettore = pool.filter(_collabNelSettoreAperto);
+  if (nelSettore.length) pool = nelSettore;
+  if (pool.length > 1 && preferiti && preferiti.length) {
+    const pref = pool.filter((n) => preferiti.some((p) => String(p).toLowerCase() === n.toLowerCase()));
+    if (pref.length === 1) pool = pref;
+  }
+  if (pool.length === 1) {
+    if (c.battitura) toast('Corretto: "' + capitalizzaNome(chiave) + '" \u2192 ' + pool[0] + ' (errore battitura)');
+    return { nome: pool[0] };
+  }
+  return { ambigui: pool };
+}
+// Solo quando il nome e davvero ambiguo: finestra con i candidati (settore e
+// funzione accanto al nome). Ritorna il nome scelto, oppure null se si salta.
+async function chiediOmonimo(testo, nomi, contesto) {
+  const info = (n) => {
+    const c = (collaboratoriCache || []).find((x) => x.nome === n) || {};
+    const rep = typeof repartoLabel === 'function' ? repartoLabel(c.reparto_dip || 'slots') : c.reparto_dip || '';
+    return n + ' (' + [rep, c.funzione].filter(Boolean).join(', ') + ')';
+  };
+  const r = await chiediModulo(
+    '"' + testo + '"' + (contesto ? ' ' + contesto : '') + ' corrisponde a piu collaboratori. Chi e?',
+    [
+      {
+        titolo: 'Collaboratore',
+        campi: [{ id: 'n', tipo: 'scelta', opzioni: nomi.map((n) => ({ valore: n, etichetta: info(n) })) }],
+      },
+    ],
+    { titolo: 'Nome da chiarire', ok: 'Conferma' },
+  );
+  return r && r.n ? r.n : null;
+}
+// Compatibilita: ritorna il nome solo se la scelta e sicura (altrimenti null).
 function matchCollaboratore(cognome) {
-  cognome = cognome.trim().toLowerCase();
-  if (!cognome) return null;
-  // 1. Match esatto nome completo
-  const exact = collaboratoriCache.find((c) => c.nome.toLowerCase() === cognome);
-  if (exact) return exact.nome;
-  // 2. Match cognome o nome singolo esatto
-  for (const c of collaboratoriCache) {
-    const words = c.nome.toLowerCase().split(/\s+/);
-    if (words.some((w) => w === cognome)) return c.nome;
-  }
-  // 2b. Match cognome multi-parola (es. "de lima" → "De Lima Marco")
-  if (cognome.includes(' ')) {
-    for (const c of collaboratoriCache) {
-      if (c.nome.toLowerCase().startsWith(cognome + ' ') || c.nome.toLowerCase() === cognome) return c.nome;
-    }
-  }
-  // 3. Match prefisso (min 4 caratteri, evita falsi positivi su nomi corti come "Mai"→"Maira")
-  for (const c of collaboratoriCache) {
-    const words = c.nome.toLowerCase().split(/\s+/);
-    if (words.some((w) => w.startsWith(cognome) && cognome.length >= 4)) return c.nome;
-  }
-  // 4. Match fuzzy (Levenshtein ≤ 2) per errori di battitura
-  if (cognome.length >= 3) {
-    let best = null,
-      bestDist = 3;
-    for (const c of collaboratoriCache) {
-      const words = c.nome.toLowerCase().split(/\s+/);
-      for (const w of words) {
-        if (w.length < 3) continue;
-        const dist = _levenshtein(cognome, w);
-        if (dist < bestDist) {
-          bestDist = dist;
-          best = c.nome;
-        }
-      }
-    }
-    if (best) {
-      toast('Corretto: "' + capitalizzaNome(cognome) + '" → ' + best + ' (errore battitura)');
-      return best;
-    }
-  }
-  return null;
+  const r = scegliCollaboratore(cognome);
+  return r && r.nome ? r.nome : null;
 }
 async function parseDifferenzeCassa(text, ds, turno) {
   if (!text || !text.trim()) return;
@@ -977,13 +1034,25 @@ async function parseDifferenzeCassa(text, ds, turno) {
       const sign = m[2];
       const amount = parseFloat(m[3].replace(',', '.'));
       if (!amount || amount < 0.01) continue;
-      const nomeCompleto = matchCollaboratore(cognome);
-      if (!nomeCompleto) {
-        toast('Differenza: "' + cognome + '" non trovato tra i collaboratori');
-        continue;
-      }
       const direction = sign === '+' ? 'eccedenza' : 'ammanco';
       const _rappRef = 'da rapporto ' + turno + ' del ' + new Date(ds + 'T12:00:00').toLocaleDateString('it-IT');
+      // OMONIMI: chi ha gia la differenza di QUESTO rapporto vale come scelta fatta
+      // (risalvando il rapporto non si richiede); altrimenti si chiede una volta sola
+      const _gia = datiCache
+        .filter((e) => e.tipo === nomeCorrente('Errore') && e.reparto === 'Cassa' && (e.testo || '').includes(_rappRef))
+        .map((e) => e.nome);
+      const _sc = scegliCollaboratore(cognome, _gia);
+      let nomeCompleto = _sc && _sc.nome;
+      if (_sc && _sc.ambigui) nomeCompleto = await chiediOmonimo(cognome, _sc.ambigui, 'nelle differenze di cassa');
+      if (!nomeCompleto) {
+        toast(
+          'Differenza: "' +
+            cognome +
+            '" ' +
+            (_sc && _sc.ambigui ? 'saltata (nome da chiarire)' : 'non trovato tra i collaboratori'),
+        );
+        continue;
+      }
       // FIX: check per nome + turno/data rapporto (non per importo esatto). Se cambi importo → aggiorna, non duplica.
       const esiste = datiCache.find(
         (e) =>
@@ -1012,11 +1081,15 @@ async function parseDifferenzeCassa(text, ds, turno) {
         nome: nomeCompleto,
         tipo: nomeCorrente('Errore'),
         testo: newTesto,
-        data: ds + 'T' + new Date().toTimeString().slice(0, 8) + '.000Z',
+        // giorno del rapporto con l ora locale, convertito come le altre
+        // registrazioni (prima l ora locale era marcata UTC: dopo le 22 la
+        // differenza finiva sul giorno dopo)
+        data: new Date(ds + 'T' + new Date().toTimeString().slice(0, 8)).toISOString(),
         operatore: getOperatore(),
         importo: amount,
         valuta: 'CHF',
         reparto: 'Cassa',
+        reparto_dip: currentReparto,
       };
       try {
         await secPost('registrazioni', rec);

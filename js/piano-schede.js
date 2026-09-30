@@ -1953,9 +1953,8 @@ async function confermaScambioSettimane() {
     const anno = window._pianoVacAnno;
     const mesi = new Set();
     [vA.settimana, vB.settimana].forEach((sett) =>
-      _pianoGiorniSettimana(anno, sett).forEach((dstr) => {
-        if (dstr.startsWith(String(anno))) mesi.add(dstr.substring(0, 7));
-      }),
+      // anche il mese dell altro anno, per le settimane a cavallo d anno
+      _pianoGiorniSettimana(anno, sett).forEach((dstr) => mesi.add(dstr.substring(0, 7))),
     );
     for (const ym of mesi) {
       const nG = _pianoUltimoGiorno(ym);
@@ -2202,7 +2201,13 @@ async function _applicaVacanzeMese(interattivo) {
   };
   const wdPrima = parseInt(_pianoRegolaVal('wd_prima_vacanza'));
   const nWd = !cAttorno ? 0 : isNaN(wdPrima) ? 4 : wdPrima;
-  const vacanze = (await secGet('piano_vacanze?anno=eq.' + anno + '&limit=2000')) || [];
+  // SETTIMANE A CAVALLO D ANNO: la settimana 53 del 2026 (28.12-03.01) e la
+  // settimana 1 del 2026 (dal 29.12.2025) portano giorni nel mese di un altro
+  // anno. Si leggono anche le vacanze dell anno prima e dopo e ogni settimana
+  // si calcola con il SUO anno; restano solo i giorni del mese aperto. Prima a
+  // gennaio le V di fine dicembre mancavano e venivano tolte come "orfane".
+  const vacanze =
+    (await secGet('piano_vacanze?anno=in.(' + (anno - 1) + ',' + anno + ',' + (anno + 1) + ')&limit=6000')) || [];
   const nomiRep = collaboratoriCache
     .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
     .map((c) => c.nome);
@@ -2213,14 +2218,27 @@ async function _applicaVacanzeMese(interattivo) {
     if (!nomiRep.includes(v.collaboratore)) return;
     if (!v.confermata) return; // provvisoria: resta in elenco, non va nel piano
     const sigla = _vacCodice(v);
-    _pianoGiorniSettimana(anno, v.settimana).forEach((dstr) => {
+    _pianoGiorniSettimana(parseInt(v.anno) || anno, v.settimana).forEach((dstr) => {
       const p = dstr.split('-');
       if (parseInt(p[0]) !== anno || parseInt(p[1]) !== mese) return;
       if (sigla === 'V') (vacGiorni[v.collaboratore] = vacGiorni[v.collaboratore] || new Set()).add(parseInt(p[2]));
       else (altreGiorni[v.collaboratore] = altreGiorni[v.collaboratore] || {})[parseInt(p[2])] = sigla;
     });
   });
-  const da = ym + '-01';
+  // GIORNI CHIUSI: il piano dei giorni passati e un documento. Si lavora solo
+  // dal primo giorno aperto; nei giorni chiusi non si cancella e non si scrive
+  // niente, e le differenze che restano si elencano (niente di nascosto).
+  // Prima si cancellavano le V/C/WD di tutto il mese e il reinserimento sui
+  // giorni chiusi falliva: le vacanze restavano perse.
+  const _chiuso = (dstr) => _pianoGiornoBloccato(dstr) && !_pianoGiornoSbloccato(dstr);
+  let primoAperto = 1;
+  while (primoAperto <= nGiorni && _chiuso(ym + '-' + String(primoAperto).padStart(2, '0'))) primoAperto++;
+  const nonToccati = []; // { nome, data, voluto, attuale }
+  if (primoAperto > nGiorni) {
+    if (interattivo) toast('Il mese ' + ym + ' e tutto chiuso: le vacanze non vengono riapplicate');
+    return { v: 0, c: 0, wd: 0, orfane: 0, altre: 0, nonToccati: nonToccati, primoAperto: primoAperto };
+  }
+  const da = ym + '-' + String(primoAperto).padStart(2, '0');
   const a = ym + '-' + String(nGiorni).padStart(2, '0');
   // V ORFANE: se una vacanza e' stata spostata o tolta dalla scheda Vacanze,
   // le V rimaste nel piano senza settimana corrispondente vengono rimosse
@@ -2284,6 +2302,10 @@ async function _applicaVacanzeMese(interattivo) {
       for (const g of Object.keys(altreGiorni[nome])) {
         const sigla = altreGiorni[nome][g];
         const r = perCellaM[nome + '|' + g];
+        if (parseInt(g) < primoAperto) {
+          nonToccati.push({ nome: nome, data: ym + '-' + String(g).padStart(2, '0'), voluto: sigla });
+          continue;
+        }
         if (r && String(r.commento || '').startsWith(COMMENTO_ALTRE) && r.codice === sigla) continue;
         if (r && r.protetto && !String(r.commento || '').startsWith(COMMENTO_ALTRE)) continue; // protette: mai toccate
         const dati = {
@@ -2330,6 +2352,12 @@ async function _applicaVacanzeMese(interattivo) {
   const op = getOperatore();
   const scrivi = async (nome, g, codice, protetto, generato) => {
     const r = perCella[nome + '|' + g];
+    if (g < primoAperto) {
+      // giorno chiuso: niente scrittura, ma se la cella e diversa si segnala
+      if (!r || (r.codice !== codice && !r.protetto))
+        nonToccati.push({ nome: nome, data: dstrDi(g), voluto: codice, attuale: r ? r.codice : '' });
+      return false;
+    }
     if (r) {
       if (r.protetto) return false; // mai toccare le protette
       if (r.codice === codice) return false;
@@ -2422,6 +2450,10 @@ async function _applicaVacanzeMese(interattivo) {
     for (const gPrec of cMesePrec) {
       const ymPrec = dPrec.getFullYear() + '-' + String(dPrec.getMonth() + 1).padStart(2, '0');
       const dstrP = ymPrec + '-' + String(gPrec).padStart(2, '0');
+      if (_chiuso(dstrP)) {
+        nonToccati.push({ nome: nome, data: dstrP, voluto: 'C' });
+        continue;
+      }
       const es = (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=eq.' + dstrP)) || [];
       if (es.length) {
         if (!es[0].protetto) {
@@ -2454,7 +2486,17 @@ async function _applicaVacanzeMese(interattivo) {
       ' WD' +
       (nAltre ? ', ' + nAltre + ' altre assenze (PC, MT...)' : ''),
   );
-  return { v: nV, c: nC, wd: nWdP, orfane: nOrfane, altre: nAltre };
+  if (nonToccati.length)
+    logAzione(
+      'Vacanze: giorni chiusi non toccati',
+      ym +
+        ' · ' +
+        nonToccati
+          .map((x) => x.nome + ' ' + x.data + ' ' + x.voluto)
+          .join(', ')
+          .substring(0, 900),
+    );
+  return { v: nV, c: nC, wd: nWdP, orfane: nOrfane, altre: nAltre, nonToccati: nonToccati, primoAperto: primoAperto };
 }
 async function applicaVacanzePiano() {
   const MESI_L = MESI_FULL || [];
@@ -2470,7 +2512,13 @@ async function applicaVacanzePiano() {
   )
     return;
   _pianoUndoSnap('applica vacanze ' + _pianoMeseSel);
-  const r = await _applicaVacanzeMese(true);
+  let r = null;
+  try {
+    r = await _applicaVacanzeMese(true);
+  } catch (e) {
+    // prima l errore finiva solo nella console e la griglia non si aggiornava
+    toastErrore('Applica vacanze interrotto: ' + ((e && e.message) || e) + '. Il calendario mostra lo stato attuale.');
+  }
   if (r)
     toast(
       'Piazzate ' +
@@ -2482,6 +2530,28 @@ async function applicaVacanzePiano() {
         ' WD' +
         (r.altre ? ', ' + r.altre + ' altre assenze' : '') +
         (r.orfane ? ' · rimosse ' + r.orfane + ' V di vacanze spostate' : ''),
+    );
+  if (r && r.nonToccati && r.nonToccati.length)
+    await mostraAvviso(
+      'Giorni chiusi non toccati (' +
+        r.nonToccati.length +
+        '): il piano dei giorni passati non si modifica senza sblocco.\n\n' +
+        r.nonToccati
+          .slice(0, 30)
+          .map(
+            (x) =>
+              '\u2022 ' +
+              x.nome +
+              ' ' +
+              x.data.split('-').reverse().join('.') +
+              ': previsto ' +
+              x.voluto +
+              (x.attuale != null ? ', oggi ' + (x.attuale || 'vuoto') : ''),
+          )
+          .join('\n') +
+        (r.nonToccati.length > 30 ? '\n... e altri ' + (r.nonToccati.length - 30) : '') +
+        '\n\nPer correggerli: sblocca il giorno (permesso "Giorni chiusi") e riapplica.',
+      { titolo: 'Vacanze applicate dal ' + r.primoAperto + ' in poi' },
     );
   _pianoTab = 'calendario';
   localStorage.setItem('piano_tab', 'calendario');

@@ -412,8 +412,8 @@ function _chatTimeShort(isoStr) {
   if (!isoStr) return '';
   const d = new Date(isoStr);
   const now = new Date();
-  const today = now.toISOString().substring(0, 10);
-  const dateStr = isoStr.substring(0, 10);
+  const today = oggiLocale();
+  const dateStr = dataLocaleISO(d);
   if (dateStr === today)
     return d.toLocaleTimeString('it-IT', {
       hour: '2-digit',
@@ -421,19 +421,19 @@ function _chatTimeShort(isoStr) {
     });
   const ieri = new Date(now);
   ieri.setDate(ieri.getDate() - 1);
-  if (dateStr === ieri.toISOString().substring(0, 10)) return 'Ieri';
+  if (dateStr === dataLocaleISO(ieri)) return 'Ieri';
   return d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' });
 }
 function _chatDateLabel(isoStr) {
   if (!isoStr) return '';
   const d = new Date(isoStr);
   const now = new Date();
-  const today = now.toISOString().substring(0, 10);
-  const dateStr = isoStr.substring(0, 10);
+  const today = oggiLocale();
+  const dateStr = dataLocaleISO(d);
   if (dateStr === today) return 'Oggi';
   const ieri = new Date(now);
   ieri.setDate(ieri.getDate() - 1);
-  if (dateStr === ieri.toISOString().substring(0, 10)) return 'Ieri';
+  if (dateStr === dataLocaleISO(ieri)) return 'Ieri';
   return d.toLocaleDateString('it-IT', {
     weekday: 'long',
     day: 'numeric',

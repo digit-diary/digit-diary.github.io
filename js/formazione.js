@@ -1159,7 +1159,7 @@ function renderFormazione() {
       '"></div>';
     html +=
       '<div class="field"><label>Data</label><input type="date" id="frm-data" value="' +
-      new Date().toISOString().split('T')[0] +
+      oggiLocale() +
       '" style="padding:9px"></div>';
     html += '<button class="btn-add-tipo" onclick="registraFormazioneSvolta()">+ Registra</button></div>';
     if (puoPunti) {
@@ -1217,7 +1217,7 @@ async function registraFormazioneSvolta() {
   const nome = (document.getElementById('frm-collab') || {}).value;
   const desc = ((document.getElementById('frm-desc') || {}).value || '').trim();
   const formatore = ((document.getElementById('frm-formatore') || {}).value || '').trim();
-  const data = (document.getElementById('frm-data') || {}).value || new Date().toISOString().split('T')[0];
+  const data = (document.getElementById('frm-data') || {}).value || oggiLocale();
   if (!nome || !desc) {
     toast('Indica collaboratore e formazione svolta');
     return;
@@ -1549,7 +1549,7 @@ async function _insertPuntiEvento(nome, punti, azione, descrizione) {
   // ANTI-DOPPIONI (vale per OGNI incentivo: coperture, cambi, competenze, livelli, premi, manuali).
   // Controlla sul database, non solo in cache, cosi' vede anche i punti dati da altri operatori.
   const _desc = (descrizione || '').trim();
-  const _oggi = new Date().toISOString().split('T')[0];
+  const _oggi = oggiLocale();
   let _giaDati = null;
   try {
     _giaDati = await secGet(
@@ -1607,7 +1607,7 @@ async function _insertPuntiEvento(nome, punti, azione, descrizione) {
     punti: punti,
     azione: azione,
     descrizione: descrizione || '',
-    data_evento: new Date().toISOString().split('T')[0],
+    data_evento: oggiLocale(),
     operatore: getOperatore(),
     reparto_dip: currentReparto,
   });
@@ -1812,7 +1812,7 @@ function esportaMatriceCSV() {
   );
   Object.assign(document.createElement('a'), {
     href: URL.createObjectURL(blob),
-    download: 'matrice_competenze_' + currentReparto + '_' + new Date().toISOString().split('T')[0] + '.csv',
+    download: 'matrice_competenze_' + currentReparto + '_' + oggiLocale() + '.csv',
   }).click();
   toast('Matrice CSV esportata!');
 }
@@ -2511,7 +2511,7 @@ async function modificaPuntiLivello(lv, val) {
 function _dataRifCopertura(entry) {
   const m = (entry.testo || '').match(/dal (\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (m) return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
-  return (entry.data || '').substring(0, 10);
+  return giornoDi(entry.data);
 }
 // Eventi copertura/rifiuto già registrati per una specifica assenza
 function eventiCopertura(assente, dataRif, dataFine) {
@@ -2591,7 +2591,7 @@ function apriPopupCopertura(assente, dataRif, modo, dataFine) {
   if (typeof incentiviAttivi === 'function' && !incentiviAttivi(azione)) return Promise.resolve(null);
   return new Promise((resolve) => {
     window._copResolve = resolve;
-    const dal = dataRif || new Date().toISOString().split('T')[0];
+    const dal = dataRif || oggiLocale();
     window._copCtx = {
       assente,
       dataRif: dal,

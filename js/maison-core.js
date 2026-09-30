@@ -62,7 +62,7 @@ async function salvaMaisonAutoDelete(val) {
     const gd = getGiornataCasino();
     const cutoff = new Date(gd + 'T12:00:00');
     cutoff.setDate(cutoff.getDate() - (nuovo - 1));
-    const cutoffStr = cutoff.toISOString().split('T')[0];
+    const cutoffStr = dataLocaleISO(cutoff);
     const daEliminare = maisonCache.filter((r) => r.data_giornata < cutoffStr).length;
     if (daEliminare > 0) {
       if (
@@ -94,7 +94,7 @@ async function salvaMaisonAutoDelete(val) {
       const gd = getGiornataCasino();
       const cutoff = new Date(gd + 'T12:00:00');
       cutoff.setDate(cutoff.getDate() - (maisonAutoDeleteGiorni - 1));
-      return r.data_giornata < cutoff.toISOString().split('T')[0];
+      return r.data_giornata < dataLocaleISO(cutoff);
     }).length;
     if (st)
       st.innerHTML = vecchie
@@ -257,7 +257,7 @@ async function salvaRegalo() {
     return;
   }
   const importo = parseFloat(document.getElementById('regalo-importo').value) || null;
-  const data = document.getElementById('regalo-data').value || new Date().toISOString().split('T')[0];
+  const data = document.getElementById('regalo-data').value || oggiLocale();
   try {
     const r = await secPost('regali_maison', {
       nome: nome,

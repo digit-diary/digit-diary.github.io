@@ -1650,7 +1650,6 @@ async function fabbIncollaDaClipboard() {
 // riposo 11h, tolleranza). La copertura del fabbisogno non cambia.
 // ============================================================
 async function miglioraOrePiano() {
-  _pianoUndoSnap('migliora ore ' + _pianoMeseSel);
   if (!puoGestirePiano()) return;
   const ym = _pianoMeseSel;
   const nGiorni = _pianoUltimoGiorno(ym);
@@ -1718,9 +1717,14 @@ async function miglioraOrePiano() {
   };
   const malattie = _pianoMalattieMese(ym);
   // donatori: turni GENERATI non protetti di chi è sopra (fissi sopra o jolly)
+  // solo giorni che devono ancora arrivare e aperti: il passato e un documento,
+  // e oggi si sta gia lavorando (prima si spostavano anche i turni passati)
+  const _oggiMO = _pianoOggiStr();
   const donatrici = righe
     .filter(
       (r) =>
+        String(r.data).substring(0, 10) > _oggiMO &&
+        _pianoGiornoScrivibile(String(r.data).substring(0, 10)) &&
         r.generato &&
         !r.protetto &&
         _pianoTurnoInfo(r.codice) &&
@@ -1793,11 +1797,13 @@ async function miglioraOrePiano() {
     ))
   )
     return;
+  _pianoUndoSnap('migliora ore ' + ym);
   try {
+    // prima chi RICEVE il turno, poi chi lo cede: se una scrittura non riesce il
+    // turno non sparisce (prima il donatore diventava C per primo)
     for (let i = 0; i < scambi.length; i += 8)
       await Promise.all(
         scambi.slice(i, i + 8).map(async (sc) => {
-          await secPatch('piano', 'id=eq.' + sc.rT.id, { codice: 'C' });
           if (sc.rigaR) await secPatch('piano', 'id=eq.' + sc.rigaR.id, { codice: sc.cod });
           else
             await _pianoInserisciCella({
@@ -1808,6 +1814,7 @@ async function miglioraOrePiano() {
               generato: true,
               reparto_dip: _pianoReparto(),
             });
+          await secPatch('piano', 'id=eq.' + sc.rT.id, { codice: 'C' });
         }),
       );
     logAzione(
@@ -1828,7 +1835,8 @@ async function miglioraOrePiano() {
     renderPiano();
   } catch (e) {
     console.error(e);
-    toast('Errore migliora ore');
+    toastErrore('Migliora ore interrotto: ' + ((e && e.message) || e) + '. Il calendario mostra lo stato attuale.');
+    renderPiano();
   }
 }
 

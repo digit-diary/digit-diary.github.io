@@ -542,7 +542,7 @@ async function salvaValutazione(nome) {
     proposta_sviluppo: ((document.getElementById('val-proposta') || {}).value || '').trim(),
     osservazioni: ((document.getElementById('val-osservazioni') || {}).value || '').trim(),
     valutatore: ((document.getElementById('val-valutatore') || {}).value || '').trim(),
-    data_valutazione: new Date().toISOString().split('T')[0],
+    data_valutazione: oggiLocale(),
     reparto_dip: currentReparto,
   };
   try {
@@ -908,7 +908,7 @@ async function _confermaImportValutazione() {
         ...testi,
         aree: p.aree,
         valutatore: getOperatore(),
-        data_valutazione: new Date().toISOString().split('T')[0],
+        data_valutazione: oggiLocale(),
         reparto_dip: currentReparto,
       });
       if (r && r[0]) valutazioniCache.unshift(r[0]);

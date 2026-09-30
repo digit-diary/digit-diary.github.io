@@ -2129,7 +2129,7 @@ async function _insertHrEvento(nome, tipo, descrizione, dataEvento) {
       collaboratore: nome,
       tipo: tipo,
       descrizione: descrizione || '',
-      data_evento: dataEvento || new Date().toISOString().split('T')[0],
+      data_evento: dataEvento || oggiLocale(),
       operatore: getOperatore(),
       reparto_dip: currentReparto,
     });
@@ -2175,7 +2175,7 @@ async function _uploadHrAllegato(file, collaboratore, titolo) {
     filename: file.name,
     mime: mime,
     dati: b64,
-    data_evento: new Date().toISOString().split('T')[0],
+    data_evento: oggiLocale(),
     operatore: getOperatore(),
     reparto_dip: currentReparto,
   });
@@ -2774,9 +2774,7 @@ async function salvaInvCustomMovimento(catKey, movimento) {
     ? capitalizzaNome(((document.getElementById('inv-cust-marca') || {}).value || '').trim())
     : (document.getElementById('inv-cust-usc-marca') || {}).value;
   const qty = parseInt((document.getElementById(isIn ? 'inv-cust-qty' : 'inv-cust-usc-qty') || {}).value) || 0;
-  const data =
-    (document.getElementById(isIn ? 'inv-cust-data' : 'inv-cust-usc-data') || {}).value ||
-    new Date().toISOString().split('T')[0];
+  const data = (document.getElementById(isIn ? 'inv-cust-data' : 'inv-cust-usc-data') || {}).value || oggiLocale();
   const nota = isIn ? ((document.getElementById('inv-cust-nota') || {}).value || '').trim() : '';
   const cliente = isIn ? '' : ((document.getElementById('inv-cust-usc-cliente') || {}).value || '').trim();
   if (!art) {
@@ -3110,7 +3108,7 @@ function renderInventarioSigTable() {
 async function salvaInventarioCarico() {
   const tipo = (document.getElementById('inv-carico-tipo') || {}).value;
   const qty = parseInt((document.getElementById('inv-carico-qty') || {}).value) || 0;
-  const data = (document.getElementById('inv-carico-data') || {}).value || new Date().toISOString().split('T')[0];
+  const data = (document.getElementById('inv-carico-data') || {}).value || oggiLocale();
   const nota = (document.getElementById('inv-carico-nota') || {}).value || '';
   if (!tipo) {
     toast('Seleziona il tipo');
@@ -3148,7 +3146,7 @@ async function salvaInventarioUscita() {
   const cliente = capitalizzaNome((document.getElementById('inv-usc-cliente') || {}).value.trim());
   const tipo = (document.getElementById('inv-usc-tipo') || {}).value;
   const qty = parseInt((document.getElementById('inv-usc-qty') || {}).value) || 0;
-  const data = (document.getElementById('inv-usc-data') || {}).value || new Date().toISOString().split('T')[0];
+  const data = (document.getElementById('inv-usc-data') || {}).value || oggiLocale();
   const nota = (document.getElementById('inv-usc-nota') || {}).value || '';
   if (!cliente) {
     toast('Inserisci il cliente');
@@ -3194,7 +3192,7 @@ async function salvaInventarioSigEntrata() {
   const collab = (document.getElementById('inv-sig-collab') || {}).value.trim();
   const cliente = (document.getElementById('inv-sig-cliente') || {}).value.trim();
   const qty = parseInt((document.getElementById('inv-sig-qty') || {}).value) || 1;
-  const data = (document.getElementById('inv-sig-data') || {}).value || new Date().toISOString().split('T')[0];
+  const data = (document.getElementById('inv-sig-data') || {}).value || oggiLocale();
   if (!marca) {
     toast('Inserisci la marca');
     return;
@@ -3227,7 +3225,7 @@ async function salvaInventarioSigUscita() {
   const marca = (document.getElementById('inv-sig-usc-marca') || {}).value;
   const cliente = (document.getElementById('inv-sig-usc-cliente') || {}).value.trim();
   const qty = parseInt((document.getElementById('inv-sig-usc-qty') || {}).value) || 1;
-  const data = (document.getElementById('inv-sig-usc-data') || {}).value || new Date().toISOString().split('T')[0];
+  const data = (document.getElementById('inv-sig-usc-data') || {}).value || oggiLocale();
   if (!marca) {
     toast('Seleziona la marca');
     return;
@@ -3464,8 +3462,7 @@ function esportaInventarioCSV() {
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download =
-    'inventario_' + _catLbl.toLowerCase().replace(/\s+/g, '_') + '_' + new Date().toISOString().split('T')[0] + '.csv';
+  a.download = 'inventario_' + _catLbl.toLowerCase().replace(/\s+/g, '_') + '_' + oggiLocale() + '.csv';
   a.click();
 }
 function esportaInventarioPDF() {
@@ -3548,9 +3545,7 @@ function esportaInventarioPDF() {
     headStyles: { fillColor: [44, 62, 80], textColor: 255, fontStyle: 'bold' },
     footStyles: { fillColor: [245, 245, 245], fontStyle: 'bold' },
   });
-  doc.save(
-    'inventario_' + _catLbl.toLowerCase().replace(/\s+/g, '_') + '_' + new Date().toISOString().split('T')[0] + '.pdf',
-  );
+  doc.save('inventario_' + _catLbl.toLowerCase().replace(/\s+/g, '_') + '_' + oggiLocale() + '.pdf');
 }
 
 // MENU MOBILE
