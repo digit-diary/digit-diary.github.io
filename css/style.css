@@ -3931,6 +3931,14 @@ button:focus-visible,
   border: 1px dashed #c0392b !important;
   font-weight: 700;
 }
+/* domenica libera VALIDA (conta per le 12 dell anno): lettera rossa */
+.piano-dom-valida {
+  color: #c0392b !important;
+  font-weight: 800 !important;
+}
+body.dark-theme .piano-dom-valida {
+  color: #ff6b5b !important;
+}
 /* malattia su giorno di CONGEDO (MC): si vede che è malattia ma conta 0 ore */
 .piano-malattia-c {
   background: repeating-linear-gradient(

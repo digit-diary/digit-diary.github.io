@@ -1877,6 +1877,22 @@ async function renderPiano() {
             cls += ' piano-nd-auto';
             titolo = "Non disponibilita' registrata nel Diario (automatica): la bozza non assegna turni";
           }
+          // DOMENICA LIBERA VALIDA (una delle 12): lettera rossa, calcolata dai dati
+          // a ogni disegno, quindi segue qualsiasi cambio (piano, Rapporto, Diario).
+          // Un sabato di malattia (anche solo nel Diario) non si lavora: conta.
+          if (r && cella === escP(codice) && !_pianoTurnoInfo(codice) && new Date(dstr + 'T12:00:00').getDay() === 0) {
+            const sab = _pianoGiornoPrima(dstr);
+            const rs =
+              g > 1
+                ? mappa[nome + '|' + sab]
+                : (window._pianoRigheBordo || []).find(
+                    (x) => x.collaboratore === nome && String(x.data).substring(0, 10) === sab,
+                  );
+            if (_pianoDomenicaValida(codice, rs && rs.codice, sab, rs, !!malattie[nome + '|' + sab])) {
+              cls += ' piano-dom-valida';
+              titolo += (titolo ? ' · ' : '') + 'Domenica libera valida: conta per le 12 domeniche dell anno';
+            }
+          }
           const violMsg = _pianoViolCelle[nome + '|' + dstr];
           if (violMsg) {
             cls += ' piano-viol';
@@ -2038,6 +2054,8 @@ async function renderPiano() {
       h +=
         '<span><span class="piano-leg piano-comm" style="background:var(--paper2)"></span> triangolo = commento (passa il mouse)</span>';
       h += '<span><span class="piano-leg piano-malattia-c"></span> MC = malattia su giorno di congedo (0 ore)</span>';
+      h +=
+        '<span><span class="piano-leg piano-dom-valida" style="background:var(--paper2)">C</span> rossa = domenica libera valida (conta per le 12)</span>';
       h +=
         '<span><span class="piano-leg piano-malattia-auto" style="background:var(--paper2)">M</span> = malattia dal Diario (automatica)</span>';
       h += '<span>icona rossa = stampa piano del collaboratore · tasto destro su una cella = menu opzioni</span>';

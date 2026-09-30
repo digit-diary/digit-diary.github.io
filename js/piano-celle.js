@@ -717,8 +717,9 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
     const maxCons = parseInt(_pianoRegolaVal('max_consecutivi')) || 0;
     const minRiposo = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 0;
     const maxSett = _pianoOreSettimanaMax();
-    if (!maxCons && !minRiposo && !maxSett) return [];
     const d0 = new Date(dstr + 'T12:00:00');
+    const weekend = d0.getDay() === 0 || d0.getDay() === 6;
+    if (!maxCons && !minRiposo && !maxSett && !weekend) return [];
     const iso = (d) => d.toISOString().substring(0, 10);
     const da = new Date(d0);
     da.setDate(da.getDate() - Math.max(14, maxCons + 1));
@@ -745,6 +746,12 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
     // periodo di vacanza servono al riposo previsto dalle regole. Scriverci
     // sopra un turno toglie quel riposo, quindi si avvisa.
     const avvisiExtra = [];
+    // DOMENICA LIBERA VALIDA (una delle 12): il cambio la toglie? Vale per la cella
+    // di domenica e per il sabato che finirebbe oltre le 23
+    if (weekend && codiceNuovo !== undefined) {
+      const domPersa = _pianoDomenicaPersa(dstr, codiceNuovo, righe);
+      if (domPersa) avvisiExtra.push(await _pianoTestoDomenicaPersa(nome, domPersa));
+    }
     const codOra = codPrec[dstr];
     if (
       codiceNuovo &&

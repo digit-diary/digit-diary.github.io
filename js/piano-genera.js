@@ -344,6 +344,13 @@ function _pianoIsLavoro(codice) {
 function _pianoSabatoEntro23(codice, dstrSab, riga) {
   if (!codice) return true;
   const t = _pianoTurnoInfo(codice);
+  // codice di assenza (M, V, C...): quel sabato non si lavora, anche se la cella
+  // tiene ancora l orario del turno sostituito. Fanno eccezione i codici con
+  // l orario scritto a mano (JG, corsi): quelli sono lavoro vero.
+  if (!t) {
+    const cs = typeof _pianoCodiceInfo === 'function' ? _pianoCodiceInfo(codice) : null;
+    if (cs && !cs.richiede_orario) return true;
+  }
   let ini = null;
   let fin = null;
   if (riga && riga.ora_inizio && riga.ora_fine) {
@@ -361,6 +368,119 @@ function _pianoSabatoEntro23(codice, dstrSab, riga) {
   if (fi == null) return true;
   if (ii != null && fi < ii) return false; // finisce dopo mezzanotte
   return fi <= 23; // _pianoOra e' in ore decimali
+}
+// DOMENICA LIBERA VALIDA: una di quelle che contano per le 12 dell anno. La domenica
+// non si lavora, non e vacanza o malattia, e il sabato prima si finisce entro le 23
+// (regola turno_prima_domenica_libera). Un sabato di malattia o vacanza non si
+// lavora: la domenica dopo conta. sabatoMalato = malattia registrata nel Diario.
+function _pianoDomenicaValida(codDom, codSab, dstrSab, rigaSab, sabatoMalato) {
+  if (codDom && _pianoTurnoInfo(codDom)) return false;
+  if (_pianoDomenicaEsclusa(codDom)) return false;
+  if (sabatoMalato) return true;
+  if (String(_pianoRegolaVal('turno_prima_domenica_libera')).toUpperCase() !== 'TRUE') return true;
+  return _pianoSabatoEntro23(codSab, dstrSab, rigaSab);
+}
+function _pianoGiornoPrima(dstr, n) {
+  const d = new Date(dstr + 'T12:00:00');
+  d.setDate(d.getDate() - (n || 1));
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+// Domeniche libere valide dell anno (tutte le domeniche gia pianificate) di una persona.
+async function _pianoDomenicheValideAnno(nome, anno) {
+  const righe =
+    (await secGet(
+      'piano?collaboratore=eq.' +
+        encodeURIComponent(nome) +
+        '&data=gte.' +
+        (anno - 1) +
+        '-12-31&data=lte.' +
+        anno +
+        '-12-31&select=data,codice,ora_inizio,ora_fine&limit=500',
+    )) || [];
+  const per = {};
+  righe.forEach((r) => (per[String(r.data).substring(0, 10)] = r));
+  let n = 0;
+  let daPianificare = 0; // domeniche dell anno ancora senza cella: possono diventare libere
+  for (let d = new Date(anno, 0, 1, 12); d.getFullYear() === anno; d.setDate(d.getDate() + 1)) {
+    if (d.getDay() !== 0) continue;
+    const ds = anno + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    if (!per[ds]) {
+      daPianificare++;
+      continue;
+    }
+    const sab = _pianoGiornoPrima(ds);
+    const rs = per[sab];
+    if (_pianoDomenicaValida(per[ds].codice, rs && rs.codice, sab, rs)) n++;
+  }
+  return { valide: n, daPianificare: daPianificare };
+}
+// Un cambio toglie una domenica libera valida? Guarda la domenica della cella (se la
+// cella e domenica) o quella dopo (se la cella e sabato). righe = celle della persona
+// attorno al giorno, PRIMA del cambio. Ritorna la data della domenica persa o null.
+function _pianoDomenicaPersa(dstr, codiceNuovo, righe) {
+  const dow = new Date(dstr + 'T12:00:00').getDay();
+  if (dow !== 0 && dow !== 6) return null;
+  const per = {};
+  (righe || []).forEach((r) => (per[String(r.data).substring(0, 10)] = r));
+  const dom = dow === 0 ? dstr : _pianoGiornoPrima(dstr, -1);
+  const sab = _pianoGiornoPrima(dom);
+  const rd = per[dom];
+  const rs = per[sab];
+  if (!_pianoDomenicaValida(rd && rd.codice, rs && rs.codice, sab, rs)) return null;
+  const nuovoDom = dow === 0 ? codiceNuovo : rd && rd.codice;
+  const nuovoSab = dow === 6 ? { codice: codiceNuovo } : rs;
+  // la riga nuova del sabato non ha ancora l orario scritto: vale quello del turno
+  if (_pianoDomenicaValida(nuovoDom, nuovoSab && nuovoSab.codice, sab, dow === 6 ? null : rs)) return null;
+  if (!_pianoTurnoInfo(codiceNuovo) && !(dow === 6 && !_pianoSabatoEntro23(codiceNuovo, sab, null))) return null;
+  return dom;
+}
+// Testo dell avviso: quante domeniche valide resterebbero nell anno.
+async function _pianoTestoDomenicaPersa(nome, dom) {
+  const anno = parseInt(dom.substring(0, 4));
+  const min = parseInt(_pianoRegolaVal('domeniche_libere_anno')) || 12;
+  const conto = await _pianoDomenicheValideAnno(nome, anno);
+  const ora = conto.valide;
+  const dopo = Math.max(0, ora - 1);
+  // sotto il minimo solo se neanche le domeniche ancora da pianificare bastano
+  const sotto = dopo + conto.daPianificare < min;
+  return (
+    (sotto ? 'ATTENZIONE, NON ARRIVA PIU AL MINIMO: ' : '') +
+    nome +
+    ' perde la domenica libera del ' +
+    dom.split('-').reverse().join('.') +
+    ' (una di quelle che contano): le domeniche libere valide del ' +
+    anno +
+    ' scenderebbero da ' +
+    ora +
+    ' a ' +
+    dopo +
+    ' (minimo ' +
+    min +
+    (conto.daPianificare ? ', ancora ' + conto.daPianificare + ' domeniche da pianificare' : '') +
+    ')'
+  );
+}
+// Stesso controllo per piu mosse insieme (cerca cambio, copertura malattia):
+// mosse = [{nome, data, codice}]. Ritorna i testi degli avvisi.
+async function _pianoAvvisiDomenichePerse(mosse) {
+  const out = [];
+  for (const m of mosse || []) {
+    const dow = new Date(m.data + 'T12:00:00').getDay();
+    if ((dow !== 0 && dow !== 6) || !m.codice) continue;
+    const righe =
+      (await secGet(
+        'piano?collaboratore=eq.' +
+          encodeURIComponent(m.nome) +
+          '&data=gte.' +
+          _pianoGiornoPrima(m.data, 2) +
+          '&data=lte.' +
+          _pianoGiornoPrima(m.data, -2) +
+          '&limit=20',
+      )) || [];
+    const dom = _pianoDomenicaPersa(m.data, m.codice, righe);
+    if (dom) out.push(await _pianoTestoDomenicaPersa(m.nome, dom));
+  }
+  return out;
 }
 function _pianoCalcolaViolazioni() {
   const ym = _pianoMeseSel;

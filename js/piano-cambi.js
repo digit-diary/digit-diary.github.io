@@ -628,8 +628,16 @@ async function confermaCercaCambioLibero() {
       cand.nome.split(' ')[0] +
       ', che va a riposo (C).';
   else msg += '\n\nSenza restituzione automatica.';
+  // DOMENICHE LIBERE VALIDE: chi copre (o chi restituisce) puo perdere una delle 12
+  const domPerse = await _pianoAvvisiDomenichePerse(
+    [{ nome: cand.nome, data: _ccDati.data, codice: _ccDati.codice }].concat(
+      rInfo ? [{ nome: _ccDati.nome, data: dataRest, codice: rInfo.codice }] : [],
+    ),
+  );
+  if (domPerse.length) msg += '\n\nDOMENICA LIBERA:\n• ' + domPerse.join('\n• ');
   if (!(await chiediConferma(msg + "\n\nConfermi? Verra' generato il formulario cambio turno da stampare e firmare.")))
     return;
+  if (domPerse.length) logAzione('Piano: domenica libera persa confermata', domPerse.join(' | '));
   _pianoUndoSnap('cerca cambio ' + _ccDati.data);
   const scrivi = async (nome, dstr, codice, exCod, commento) => {
     const righe =
@@ -1786,8 +1794,34 @@ async function confermaCoperturaMalattia() {
   if (_g0 && !(await _pianoConsentiScrittura(_g0))) return;
   // soluzioni selezionate: senza spunta la M resta ma il sostituto non si tocca
   const selGiorni = new Set([...document.querySelectorAll('.mal-sel:checked')].map((c) => parseInt(c.dataset.g)));
-  document.getElementById('pwd-modal').classList.add('hidden');
   const ym = _pianoMeseSel;
+  // DOMENICHE LIBERE VALIDE: il sostituto (o chi entra nella catena) puo perdere
+  // una delle 12. Si chiede prima di scrivere qualsiasi cella.
+  const dstrG = (g) => ym + '-' + String(g).padStart(2, '0');
+  const mosseDom = [];
+  (m.giorni || []).forEach((d) => {
+    if (d.salta || !d.sostituto || !selGiorni.has(d.g)) return;
+    mosseDom.push({ nome: d.sostituto, data: dstrG(d.g), codice: d.codice });
+    if (d.catena && d.catena.tipo === 'scambio') {
+      mosseDom.push({ nome: d.sostituto, data: dstrG(d.catena.g1), codice: d.catena.turnoCon });
+      mosseDom.push({ nome: d.catena.con, data: dstrG(d.catena.g1), codice: d.catena.turnoX });
+    } else if (d.catena) mosseDom.push({ nome: d.catena.con, data: dstrG(d.catena.g1), codice: d.catena.turnoX });
+  });
+  const domPerse = await _pianoAvvisiDomenichePerse(mosseDom);
+  if (domPerse.length) {
+    if (
+      !(await chiediConferma(
+        'DOMENICA LIBERA · copertura malattia di ' +
+          m.nome +
+          ':\n\n• ' +
+          domPerse.join('\n• ') +
+          '\n\nConfermi comunque la copertura?',
+      ))
+    )
+      return;
+    logAzione('Piano: domenica libera persa confermata', domPerse.join(' | '));
+  }
+  document.getElementById('pwd-modal').classList.add('hidden');
   const op = getOperatore();
   const dstrDi = (g) => ym + '-' + String(g).padStart(2, '0');
   const rigaDi = {};
