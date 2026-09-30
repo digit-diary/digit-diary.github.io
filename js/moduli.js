@@ -1429,12 +1429,46 @@ async function salvaRinominaCollaboratore(vecchio) {
       await secPatch('chat_message_hidden', 'operatore=eq.' + encodeURIComponent(vecchio), { operatore: nuovo });
     } catch (_) {}
     await secPatch('moduli', 'collaboratore=eq.' + encodeURIComponent(vecchio), { collaboratore: nuovo });
-    // Tabelle nome-collaboratore aggiunte dopo: valutazioni, punti, storico HR, allegati, piano
-    for (const tab of ['valutazioni', 'punti_eventi', 'hr_eventi', 'hr_allegati', 'piano']) {
+    // TUTTE le tabelle con il nome del collaboratore: valutazioni, punti, storico HR,
+    // allegati, piano e i dati del piano legati alla persona (vacanze, riporti CGF e
+    // ore, recupero ore, timbrature, ore del mese, congedi non pagati). Prima le
+    // ultime sette restavano con il nome vecchio: le vacanze sparivano dalla persona.
+    const tabelle = [
+      'valutazioni',
+      'punti_eventi',
+      'hr_eventi',
+      'hr_allegati',
+      'piano',
+      'piano_vacanze',
+      'piano_cgf_riporto',
+      'piano_saldo_iniziale',
+      'piano_recupero_ore',
+      'piano_timbrature',
+      'piano_ore_mese',
+      'collab_congedi_np',
+    ];
+    const nonRiuscite = [];
+    for (const tab of tabelle) {
       try {
         await secPatch(tab, 'collaboratore=eq.' + encodeURIComponent(vecchio), { collaboratore: nuovo });
-      } catch (_) {}
+      } catch (_) {
+        nonRiuscite.push(tab);
+      }
     }
+    // ordine manuale delle righe del piano (per nome): la persona resta al suo posto
+    try {
+      const ord = JSON.parse((await getImp('piano_ordine_collab')) || '{}');
+      let cambiato = false;
+      Object.keys(ord).forEach((rep) => {
+        if (Array.isArray(ord[rep]))
+          ord[rep] = ord[rep].map((n) => {
+            if (n !== vecchio) return n;
+            cambiato = true;
+            return nuovo;
+          });
+      });
+      if (cambiato && (await salvaImp('piano_ordine_collab', JSON.stringify(ord)))) window._pianoOrdineCollab = ord;
+    } catch (_) {}
     const ci = collaboratoriCache.findIndex((c) => c.nome === vecchio);
     if (ci !== -1) collaboratoriCache[ci].nome = nuovo;
     datiCache.forEach((e) => {
@@ -1446,13 +1480,18 @@ async function salvaRinominaCollaboratore(vecchio) {
       typeof puntiEventiCache !== 'undefined' ? puntiEventiCache : [],
       typeof hrEventiCache !== 'undefined' ? hrEventiCache : [],
       typeof _pianoRighe !== 'undefined' ? _pianoRighe : [],
+      typeof _pianoCongediNp !== 'undefined' ? _pianoCongediNp : [],
     ].forEach((cache) => {
       cache.forEach((r) => {
         if (r.collaboratore === vecchio) r.collaboratore = nuovo;
       });
     });
     collaboratoriCache.sort((a, b) => a.nome.localeCompare(b.nome));
-    logAzione('Rinomina collaboratore', vecchio + ' → ' + nuovo);
+    logAzione(
+      'Rinomina collaboratore',
+      vecchio + ' → ' + nuovo + (nonRiuscite.length ? ' · non aggiornate: ' + nonRiuscite.join(', ') : ''),
+    );
+    if (nonRiuscite.length) toast('Rinominato, ma non aggiornate: ' + nonRiuscite.join(', '));
     document.getElementById('pwd-modal').classList.add('hidden');
     renderCollaboratoriUI();
     aggiornaNomi();
