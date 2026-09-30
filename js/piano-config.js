@@ -124,11 +124,11 @@ const PIANO_REGOLE_GUIDA = {
     g: 'Domeniche',
     n: 'Domenica libera: ore consecutive minime di riposo (comprese le 23 del sabato - 23 della domenica)',
     t: 'numero',
-    d: 'Validatore, avviso sulla cella, scheda Avvisi',
+    d: 'Validatore, avviso sulla cella, bozza, scheda Avvisi',
   },
   riposo_domenica_lavorata_ore: {
     g: 'Domeniche',
-    n: 'Settimana con la domenica lavorata: ore consecutive minime di riposo nella settimana',
+    n: 'Domenica lavorata: ore consecutive minime di riposo nella settimana prima oppure in quella dopo (lunedi-sabato)',
     t: 'numero',
     d: 'Validatore, avviso sulla cella, scheda Avvisi',
   },

@@ -133,8 +133,9 @@ function _pianoTestoOreSettimana(s) {
 // del riposo all inizio del turno successivo, con gli orari veri (prolungamenti, JG).
 //  - domenica libera (nessun lavoro dalle 23 del sabato alle 23 della domenica): il
 //    riposo che comprende quell intervallo deve durare almeno 35 ore;
-//  - domenica lavorata: nella settimana lunedi-domenica ci deve essere un riposo di
-//    almeno 47 ore consecutive (conta la parte del riposo dentro la settimana).
+//  - domenica lavorata (anche con il sabato oltre le 23): nella settimana prima
+//    (lunedi-sabato) OPPURE in quella dopo (lunedi-sabato) ci deve essere un riposo di
+//    almeno 47 ore consecutive (36 settimanali + 11 giornaliere).
 function _pianoIntervalloLavoro(r) {
   if (!r || !r.codice) return null;
   const d = String(r.data).substring(0, 10);
@@ -211,20 +212,38 @@ function _pianoRiposiSettimanali(righe) {
           });
       } else {
         if (!minLav) return;
-        const l0 = oraDi(lun, 0);
-        const l1 = oraDi(domS, 24);
-        // riposi che toccano la settimana; ai bordi serve il turno prima/dopo (altrimenti non si giudica)
-        const nella = riposi.filter((x) => x.a > l0 && x.da < l1);
-        const primoTurno = iv.find((x) => x.ini >= l0);
-        const ultimoTurno = iv.filter((x) => x.fin <= l1).pop();
-        const haPrima = iv.some((x) => x.fin <= l0);
-        const haDopo = iv.some((x) => x.ini >= l1);
-        if (!haPrima || !haDopo || !primoTurno || !ultimoTurno) return;
-        // conta solo la parte del riposo che cade nella settimana (lunedi 0 - domenica 24):
-        // un riposo del fine settimana prima che finisce il lunedi mattina non basta
-        const max = nella.reduce((m, x) => Math.max(m, Math.min(x.a, l1) - Math.max(x.da, l0)), 0);
-        if (max < minLav - 0.001)
-          out.push({ nome: nome, lunedi: lun, domenica: domS, tipo: 'lavorata', ore: r1(max), min: minLav });
+        // domenica lavorata: 47 ore consecutive nella settimana PRIMA (lunedi-sabato)
+        // oppure in quella DOPO (lunedi-sabato); conta la parte di ogni riposo che cade
+        // dentro quei giorni. Se la settimana dopo non e ancora pianificata non si giudica.
+        const p0 = oraDi(lun, 0);
+        const p1 = oraDi(domS, 0);
+        const d0 = oraDi(domS, 24);
+        const d1 = oraDi(domS, 24 + 6 * 24);
+        const maxIn = (a, b) => riposi.reduce((m, x) => Math.max(m, Math.min(x.a, b) - Math.max(x.da, a)), 0);
+        const miglior = (a, b) =>
+          riposi
+            .filter((x) => x.a > a && x.da < b)
+            .sort((x, y) => Math.min(y.a, b) - Math.max(y.da, a) - (Math.min(x.a, b) - Math.max(x.da, a)))[0];
+        const prima = maxIn(p0, p1);
+        const dopo = maxIn(d0, d1);
+        if (prima >= minLav - 0.001 || dopo >= minLav - 0.001) return;
+        if (!iv.some((x) => x.ini >= d1) || !iv.some((x) => x.fin <= p0)) return;
+        const mp = miglior(p0, p1);
+        const md = miglior(d0, d1);
+        // da/a: le ore contate (la parte del riposo dentro la settimana prima o dopo)
+        const usa = prima >= dopo ? { r: mp, a: p0, b: p1 } : { r: md, a: d0, b: d1 };
+        out.push({
+          nome: nome,
+          lunedi: lun,
+          domenica: domS,
+          tipo: 'lavorata',
+          ore: r1(Math.max(prima, dopo)),
+          prima: r1(prima),
+          dopo: r1(dopo),
+          min: minLav,
+          dal: usa.r ? Math.max(usa.r.da, usa.a) : null,
+          al: usa.r ? Math.min(usa.r.a, usa.b) : null,
+        });
       }
     });
   });
@@ -232,22 +251,39 @@ function _pianoRiposiSettimanali(righe) {
 }
 function _pianoTestoRiposo(v) {
   return v.tipo === 'libera'
-    ? 'riposo attorno alla domenica libera ' +
+    ? 'domenica ' +
         _pianoGgMm(v.domenica) +
-        ': ' +
+        ' libera: riposo di ' +
         v.ore +
         ' ore consecutive (minimo ' +
         v.min +
-        ', comprese le 23 sab - 23 dom)'
-    : 'settimana ' +
-        _pianoGgMm(v.lunedi) +
-        '-' +
+        ', comprese le 23 del sabato e le 23 della domenica)'
+    : 'domenica ' +
         _pianoGgMm(v.domenica) +
-        ' con la domenica lavorata: riposo piu lungo ' +
-        v.ore +
-        ' ore (minimo ' +
+        ' lavorata: nessun riposo di ' +
         v.min +
-        ' consecutive)';
+        ' ore ne nella settimana prima ne in quella dopo (il piu lungo: prima ' +
+        v.prima +
+        ', dopo ' +
+        v.dopo +
+        ' ore)';
+}
+// "ven 18.09 ore 14.00" da ore assolute
+function _pianoOraLeggibile(h) {
+  if (h == null) return '';
+  const d = new Date(h * 3600000);
+  const gg = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'][d.getDay()];
+  return (
+    gg +
+    ' ' +
+    String(d.getDate()).padStart(2, '0') +
+    '.' +
+    String(d.getMonth() + 1).padStart(2, '0') +
+    ' ore ' +
+    String(d.getHours()).padStart(2, '0') +
+    '.' +
+    String(d.getMinutes()).padStart(2, '0')
+  );
 }
 // righe del mese aperto piu i giorni delle settimane a cavallo (mese prima e dopo)
 function _pianoRigheSettimane() {
@@ -984,6 +1020,9 @@ async function generaBozzaPiano(usaCoperture) {
   // lo usano il giro principale e la passata di riparazione (che chiede
   // ignoraOccupato = true per chi ha gia' un turno da spostare, con oreDelta
   // = ore del turno che lascia, negative).
+  const riposoDomAttivo =
+    !!parseFloat(_pianoRegolaVal('riposo_domenica_libera_ore')) ||
+    !!parseFloat(_pianoRegolaVal('riposo_domenica_lavorata_ore'));
   const candidatoOk = (n, f, t, g, dstr, dowG, ignoraOccupato, oreDelta) => {
     const esistente = cella[n + '|' + g];
     if (malattie[n + '|' + dstr]) return false;
@@ -1042,6 +1081,30 @@ async function generaBozzaPiano(usaCoperture) {
         }
       }
       if (oreSett > maxSettB + 0.001) return false;
+    }
+    // riposo settimanale attorno alla domenica (35 / 47 ore): mai un turno che crea un
+    // riposo troppo corto per una domenica vicina (quelli gia presenti non bloccano)
+    if (riposoDomAttivo) {
+      const righeN = [];
+      for (let k = 1; k <= nGiorni; k++) {
+        const cod = cella[n + '|' + k];
+        if (!cod) continue;
+        const rg = rigaDi[n + '|' + k];
+        righeN.push(
+          rg && rg.codice === cod ? rg : { collaboratore: n, data: ym + '-' + String(k).padStart(2, '0'), codice: cod },
+        );
+      }
+      (window._pianoRigheBordo || []).forEach((x) => {
+        if (x.collaboratore === n) righeN.push(x);
+      });
+      const vicina = (v) => Math.abs(new Date(v.domenica + 'T12:00:00') - new Date(dstr + 'T12:00:00')) <= 8 * 86400000;
+      const prima = _pianoRiposiSettimanali(righeN).filter(vicina);
+      const dopo = _pianoRiposiSettimanali(
+        righeN
+          .filter((x) => String(x.data).substring(0, 10) !== dstr)
+          .concat([{ collaboratore: n, data: dstr, codice: t.codice }]),
+      ).filter(vicina);
+      if (dopo.some((x) => !prima.some((y) => y.domenica === x.domenica && y.tipo === x.tipo))) return false;
     }
     // mappature per funzione (SUP/BO limitati ai loro turni; regole settimana SUP)
     const fz = infoC && infoC.funzione;
@@ -1294,6 +1357,106 @@ async function generaBozzaPiano(usaCoperture) {
   });
   scoperti.length = 0;
   scopertiRestanti.forEach((x) => scoperti.push(x));
+  // ===== RIPOSO SETTIMANALE: PASSATA DI SISTEMAZIONE =====
+  // La bozza decide un giorno alla volta: quando assegna un turno i giorni dopo sono
+  // ancora vuoti e sembrano riposo, quindi il riposo attorno alla domenica (35 ore se
+  // libera, 47 nella settimana prima o dopo se lavorata) si vede solo a mese finito.
+  // Qui, per ogni domenica senza il riposo giusto, si cerca nei giorni vicini un turno
+  // messo da QUESTA bozza che, tolto, crea il riposo; il turno passa a un collega libero
+  // quel giorno per cui tutte le regole valgono. Le celle esistenti non si toccano.
+  let riposiSistemati = 0;
+  const riposiRestano = [];
+  if (riposoDomAttivo) {
+    const righeDiN = (n) => {
+      const out = [];
+      for (let k = 1; k <= nGiorni; k++) {
+        const cod = cella[n + '|' + k];
+        if (!cod) continue;
+        const rg = rigaDi[n + '|' + k];
+        out.push(
+          rg && rg.codice === cod ? rg : { collaboratore: n, data: ym + '-' + String(k).padStart(2, '0'), codice: cod },
+        );
+      }
+      (window._pianoRigheBordo || []).forEach((x) => {
+        if (x.collaboratore === n) out.push(x);
+      });
+      return out;
+    };
+    const nelMese = (v) => {
+      const d = new Date(v.domenica + 'T12:00:00');
+      const da = new Date(d);
+      da.setDate(da.getDate() - 6);
+      const a = new Date(d);
+      a.setDate(a.getDate() + 6);
+      return a.toISOString().substring(0, 7) >= ym && da.toISOString().substring(0, 7) <= ym;
+    };
+    nomi.forEach((n) => {
+      for (let giro = 0; giro < 8; giro++) {
+        const viol = _pianoRiposiSettimanali(righeDiN(n)).filter(nelMese);
+        if (!viol.length) return;
+        const v = viol[0];
+        const dom = new Date(v.domenica + 'T12:00:00');
+        let risolto = false;
+        // giorni vicini alla domenica (prima i piu vicini), solo turni messi da questa bozza
+        const giorni = [];
+        for (let off = 1; off <= 6; off++)
+          [-off, off].forEach((o) => {
+            const d = new Date(dom);
+            d.setDate(d.getDate() + o);
+            const iso = d.toISOString().substring(0, 10);
+            if (iso.startsWith(ym)) giorni.push(parseInt(iso.substring(8, 10)));
+          });
+        for (const g of giorni) {
+          if (risolto) break;
+          const kN = n + '|' + g;
+          if (!assegnatiRun.has(kN)) continue;
+          const cod = cella[kN];
+          const t = _pianoTurnoInfo(cod);
+          if (!t) continue;
+          const dstrG = ym + '-' + String(g).padStart(2, '0');
+          // togliendo questo turno la domenica ha il suo riposo?
+          const senza = righeDiN(n).filter((x) => String(x.data).substring(0, 10) !== dstrG);
+          if (_pianoRiposiSettimanali(senza).some((x) => x.domenica === v.domenica && x.tipo === v.tipo)) continue;
+          const dowG = new Date(dstrG + 'T12:00:00').getDay();
+          for (const b of nomi) {
+            if (b === n || cella[b + '|' + g]) continue;
+            if (!candidatoOk(b, { turno_codice: cod }, t, g, dstrG, dowG, false, 0)) continue;
+            const dur = parseFloat(t.durata_ore) || 0;
+            // n: il turno si toglie (a fine bozza ricevera C)
+            delete cella[kN];
+            assegnatiRun.delete(kN);
+            const iN = nuove.findIndex((x) => x.collaboratore === n && x.data === dstrG && x.codice === cod);
+            if (iN >= 0) nuove.splice(iN, 1);
+            const grT = (t.gruppo || '').toUpperCase();
+            const fzN = (((_pianoCollabInfo(n) || {}).funzione || '') + '').toUpperCase();
+            contaGiornoFz[grT + '|' + fzN + '|' + g] = Math.max(0, (contaGiornoFz[grT + '|' + fzN + '|' + g] || 0) - 1);
+            contaGiornoTot[grT + '|' + g] = Math.max(0, (contaGiornoTot[grT + '|' + g] || 0) - 1);
+            oreMese[n] = (oreMese[n] || 0) - dur;
+            // b: prende il turno
+            cella[b + '|' + g] = cod;
+            assegnatiRun.add(b + '|' + g);
+            registraAssegnazione(b, cod, g);
+            oreMese[b] = (oreMese[b] || 0) + dur;
+            nuove.push({
+              collaboratore: b,
+              data: dstrG,
+              codice: cod,
+              protetto: false,
+              generato: true,
+              reparto_dip: _pianoReparto(),
+            });
+            riposiSistemati++;
+            risolto = true;
+            break;
+          }
+        }
+        if (!risolto) {
+          riposiRestano.push(n.split(' ')[0] + ' domenica ' + _pianoGgMm(v.domenica));
+          return;
+        }
+      }
+    });
+  }
   // ===== CGF DEI FESTIVI LAVORATI IN QUESTO MESE =====
   // Chi ha appena ricevuto un turno in un festivo con diritto matura un
   // recupero: si mette nei giorni DOPO il festivo, con le stesse regole.
@@ -1370,6 +1533,12 @@ async function generaBozzaPiano(usaCoperture) {
         scoperti.length +
         ' posti senza candidato idoneo' +
         (riparati ? ' (altri ' + riparati + ' risolti spostando un turno)' : '') +
+        (riposiSistemati
+          ? '\n• ' + riposiSistemati + ' riposi attorno alla domenica sistemati spostando un turno a un collega'
+          : '') +
+        (riposiRestano.length
+          ? '\n• riposo attorno alla domenica ancora da sistemare a mano: ' + riposiRestano.join(', ')
+          : '') +
         '\n\nLe celle esistenti (vacanze, protette, malattie) NON vengono toccate.\nLa bozza si può eliminare con "Cancella piano". Procedere?',
     ))
   ) {

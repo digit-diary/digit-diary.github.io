@@ -2291,6 +2291,7 @@ async function _pianoCreditiScheda(nome) {
 // Il numero compare anche sulla scheda Avvisi e sulla voce Piano del menu.
 const _AVV_SEZIONI = [
   ['sett', 'Ore settimanali'],
+  ['riposo', 'Riposo settimanale'],
   ['regole', 'Regole del mese'],
   ['anno', 'Chiusura anno'],
   ['scoperti', 'Posti scoperti'],
@@ -2316,9 +2317,14 @@ function _pianoAvvisiVeloci() {
     .sort((a, b) => a.nome.localeCompare(b.nome) || a.lunedi.localeCompare(b.lunedi));
   let regole = [];
   try {
-    regole = _pianoCalcolaViolazioni().lista.filter((x) => !/lavorate nella settimana/.test(x.msg));
+    regole = _pianoCalcolaViolazioni().lista.filter(
+      (x) => !/lavorate nella settimana/.test(x.msg) && !/^domenica \d\d\.\d\d (libera|lavorata):/.test(x.msg),
+    );
   } catch (e) {}
-  return { max: max, conNotte: _pianoSettimanaConNotturno(), sett: sett, regole: regole };
+  const riposo = _pianoRiposiSettimanali(_pianoRigheSettimane())
+    .filter((x) => x.domenica.startsWith(ym))
+    .sort((a, b) => a.nome.localeCompare(b.nome) || a.domenica.localeCompare(b.domenica));
+  return { max: max, conNotte: _pianoSettimanaConNotturno(), sett: sett, regole: regole, riposo: riposo };
 }
 // parti lente (anno, fabbisogno, malattie): calcolate a richiesta e tenute 5 minuti
 async function _pianoAvvisiLenti(forza) {
@@ -2492,6 +2498,7 @@ async function _pianoAvvisiLenti(forza) {
 function _pianoAvvisiImportanti(v, l) {
   return (
     v.sett.length +
+    v.riposo.length +
     (l
       ? l.scoperti.length +
         l.malattie.filter((m) => m.giorno > 14).length +
@@ -2502,6 +2509,7 @@ function _pianoAvvisiImportanti(v, l) {
 function _pianoAvvisiConteggi(v, l) {
   return {
     sett: v.sett.length,
+    riposo: v.riposo.length,
     regole: v.regole.length,
     anno: l ? l.anno.length : 0,
     scoperti: l ? l.scoperti.length : 0,
@@ -2615,6 +2623,41 @@ async function _renderPianoAvvisiTab() {
                 '</td></tr>',
             ),
           ));
+  // riposo settimanale attorno alla domenica
+  sez.riposo =
+    '<p class="avv-intro">Ore consecutive dalla fine dell ultimo turno all inizio del successivo. <b>Domenica libera</b>: almeno ' +
+    (parseFloat(_pianoRegolaVal('riposo_domenica_libera_ore')) || '-') +
+    ' ore comprese le 23 del sabato e le 23 della domenica. <b>Domenica lavorata</b> (anche con il sabato oltre le 23): almeno ' +
+    (parseFloat(_pianoRegolaVal('riposo_domenica_lavorata_ore')) || '-') +
+    ' ore consecutive nella settimana prima oppure in quella dopo (lunedi-sabato). La bozza non li crea; i valori si cambiano nella scheda Regole.</p>' +
+    (!v.riposo.length
+      ? vuoto('Tutte le domeniche del mese hanno il riposo giusto.')
+      : tabella(
+          ['Collaboratore', 'Domenica', 'Tipo', 'Riposo piu lungo', 'Minimo', 'Da', 'A'],
+          v.riposo.map(
+            (x) =>
+              '<tr' +
+              cerca(x.nome + ' ' + _pianoGgMm(x.domenica) + ' ' + x.tipo) +
+              '>' +
+              nome(x.nome) +
+              '<td>' +
+              _pianoGgMm(x.domenica) +
+              '</td><td>' +
+              x.tipo +
+              '</td><td class="avv-rosso">' +
+              x.ore +
+              (x.tipo === 'lavorata'
+                ? ' <span class="avv-piccolo">(prima ' + x.prima + ', dopo ' + x.dopo + ')</span>'
+                : '') +
+              '</td><td>' +
+              x.min +
+              '</td><td class="avv-piccolo">' +
+              _pianoOraLeggibile(x.dal) +
+              '</td><td class="avv-piccolo">' +
+              _pianoOraLeggibile(x.al) +
+              '</td></tr>',
+          ),
+        ));
   // regole del mese
   sez.regole =
     '<p class="avv-intro">Riposo minimo, giorni di lavoro di fila, idoneita e le altre regole del settore nel mese di ' +
