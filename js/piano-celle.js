@@ -716,7 +716,8 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
   try {
     const maxCons = parseInt(_pianoRegolaVal('max_consecutivi')) || 0;
     const minRiposo = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 0;
-    if (!maxCons && !minRiposo) return [];
+    const maxSett = _pianoOreSettimanaMax();
+    if (!maxCons && !minRiposo && !maxSett) return [];
     const d0 = new Date(dstr + 'T12:00:00');
     const iso = (d) => d.toISOString().substring(0, 10);
     const da = new Date(d0);
@@ -776,6 +777,26 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
       if (dedicato)
         avvisiExtra.push(
           "questo giorno e' un " + dedicato + ': assegnandogli il turno ' + codiceNuovo + ' quel riposo viene tolto',
+        );
+    }
+    // ore lavorate nella settimana lunedi-domenica (45.1): con la cella nuova
+    if (maxSett && codiceNuovo !== undefined) {
+      const lun = _pianoLunediDi(dstr);
+      const sim = righe
+        .filter((r) => String(r.data).substring(0, 10) !== dstr)
+        .concat([{ collaboratore: nome, data: dstr, codice: codiceNuovo }]);
+      const s = _pianoSettimaneOltre(sim, maxSett).find((x) => x.lunedi === lun);
+      if (s)
+        avvisiExtra.push(
+          'arriverebbe a ' +
+            s.ore.toFixed(2) +
+            ' ore lavorate nella settimana ' +
+            _pianoGgMm(s.lunedi) +
+            '-' +
+            _pianoGgMm(s.domenica) +
+            ' (max ' +
+            maxSett +
+            ', da orologio senza il 10% notturno)',
         );
     }
     // la logica riposo/consecutivi/idoneita' vive nel motore puro PianoRegole

@@ -965,6 +965,11 @@ let _pianoTab = localStorage.getItem('piano_tab') || 'calendario';
 // Icone = Bootstrap Icons (le stesse della navbar di Turnivo), incorporate SVG
 const _PIANO_TABS = [
   [
+    'avvisi',
+    'Avvisi',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2M8 1.918l-.797.161A4 4 0 0 0 4 6c0 .628-.134 2.197-.459 3.742-.16.767-.376 1.566-.663 2.258h10.244c-.287-.692-.502-1.49-.663-2.258C12.134 8.197 12 6.628 12 6a4 4 0 0 0-3.203-3.92zM14.22 12c.223.447.481.801.78 1H1c.299-.199.557-.553.78-1C2.68 10.2 3 6.88 3 6c0-2.42 1.72-4.44 4.005-4.901a1 1 0 1 1 1.99 0A5 5 0 0 1 13 6c0 .88.32 4.2 1.22 6"/></svg>',
+  ],
+  [
     'cambi',
     'Cambi turno',
     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1 11.5a.5.5 0 0 0 .5.5h11.793l-3.147 3.146a.5.5 0 0 0 .708.708l4-4a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 11H1.5a.5.5 0 0 0-.5.5m14-7a.5.5 0 0 1-.5.5H2.707l3.147 3.146a.5.5 0 1 1-.708.708l-4-4a.5.5 0 0 1 0-.708l4-4a.5.5 0 1 1 .708.708L2.707 4H14.5a.5.5 0 0 1 .5.5"/></svg>',
@@ -1062,7 +1067,7 @@ function pianoCambiaTab(t) {
 }
 // Le 13 tab raggruppate in 3 famiglie: si trova tutto a colpo d'occhio
 const PIANO_TAB_GRUPPI = [
-  ['Giornata', ['calendario', 'briefing']],
+  ['Giornata', ['calendario', 'briefing', 'avvisi']],
   [
     'Gestione',
     [
@@ -1391,6 +1396,27 @@ async function _pianoCaricaMeseSettore(da, a, rep) {
   _pianoRegistraGiorniTurno(righe);
   // malattie dell anno: servono per le ore di malattia (giorno 1-14 o dal 15.)
   await _pianoCaricaMalattieAnno(parseInt(String(da).substring(0, 4)), rep);
+  // giorni delle settimane a cavallo del mese (lunedi-domenica): servono per le ore
+  // lavorate nella settimana
+  try {
+    const iso = (d) => d.toISOString().substring(0, 10);
+    const l = new Date(da + 'T12:00:00');
+    l.setDate(l.getDate() - ((l.getDay() + 6) % 7));
+    const dm = new Date(a + 'T12:00:00');
+    dm.setDate(dm.getDate() + ((7 - dm.getDay()) % 7));
+    const bordo = [];
+    if (iso(l) < da)
+      (
+        (await secGet('piano?data=gte.' + iso(l) + '&data=lt.' + da + '&reparto_dip=eq.' + rep + '&limit=2000')) || []
+      ).forEach((r) => bordo.push(r));
+    if (iso(dm) > a)
+      (
+        (await secGet('piano?data=gt.' + a + '&data=lte.' + iso(dm) + '&reparto_dip=eq.' + rep + '&limit=2000')) || []
+      ).forEach((r) => bordo.push(r));
+    window._pianoRigheBordo = bordo;
+  } catch (e) {
+    window._pianoRigheBordo = [];
+  }
   const coprenti = collaboratoriCache
     .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') !== rep && _pianoAppartieneAlReparto(c))
     .map((c) => c.nome);
@@ -2255,6 +2281,8 @@ async function renderPiano() {
       }
     } else if (_pianoTab === 'briefing') {
       h += await _renderPianoBriefingTab();
+    } else if (_pianoTab === 'avvisi') {
+      h += await _renderPianoAvvisiTab();
     } else if (_pianoTab === 'crediti') {
       h += await _renderPianoCreditiTab();
     } else if (_pianoTab === 'vacanze') {

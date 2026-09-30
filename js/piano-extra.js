@@ -2277,3 +2277,113 @@ async function _pianoCreditiScheda(nome) {
     el.innerHTML = '';
   }
 }
+
+// ===== SCHEDA AVVISI DEL PIANO =====
+// Tutto quello che nel piano del mese va tenuto d occhio, in un posto solo:
+// ore lavorate nella settimana oltre il massimo (45.1, lunedi-domenica, senza il 10%
+// notturno) e le altre regole del mese (riposo minimo, giorni consecutivi, idoneita...).
+// La Home mostra solo una riga di richiamo ("Piano: N avvisi") che porta qui.
+function _pianoAvvisiDati() {
+  const max = _pianoOreSettimanaMax();
+  const ym = _pianoMeseSel;
+  const sett = _pianoSettimaneOltre(_pianoRigheSettimane(), max)
+    .filter((s) => s.giorni.some((d) => d.startsWith(ym)))
+    .sort((a, b) => a.nome.localeCompare(b.nome) || a.lunedi.localeCompare(b.lunedi));
+  let altre = [];
+  try {
+    altre = _pianoCalcolaViolazioni().lista.filter((x) => !/ore lavorate nella settimana/.test(x.msg));
+  } catch (e) {}
+  return { max: max, sett: sett, altre: altre };
+}
+async function _renderPianoAvvisiTab() {
+  const d = _pianoAvvisiDati();
+  const [a, m] = _pianoMeseSel.split('-');
+  const mese = (typeof MESI_FULL !== 'undefined' ? MESI_FULL[parseInt(m) - 1] : m) + ' ' + a;
+  const vai = (nome) =>
+    ' style="cursor:pointer;text-decoration:underline" onclick="pianoCambiaTab(\'calendario\')" title="Apri il calendario"';
+  let h =
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Avvisi del piano · ' +
+    escP(mese) +
+    '</div><div style="padding:12px 16px;display:flex;flex-direction:column;gap:14px;font-size:var(--fs-sm,.8125rem)">';
+  // ore settimanali
+  h +=
+    '<div><b>Ore lavorate nella settimana oltre ' +
+    (d.max || '-') +
+    '</b> <span style="color:var(--muted)">(lunedi-domenica, da orologio senza il 10% notturno; il turno conta nella settimana in cui inizia; limite modificabile nella scheda Regole)</span>';
+  if (!d.max) h += '<p style="color:var(--muted)">Regola spenta.</p>';
+  else if (!d.sett.length)
+    h += '<p style="color:var(--c-verde,#2e7d32)">Nessuno supera il limite nelle settimane di questo mese.</p>';
+  else
+    h +=
+      '<div style="overflow-x:auto"><table class="piano-tab-dati" style="border-collapse:collapse;margin-top:6px"><tr>' +
+      ['Collaboratore', 'Settimana', 'Ore lavorate', 'Oltre il limite', 'Giorni lavorati']
+        .map((x) => '<th style="text-align:left;padding:4px 10px;border-bottom:1px solid var(--line)">' + x + '</th>')
+        .join('') +
+      '</tr>' +
+      d.sett
+        .map(
+          (s) =>
+            '<tr><td style="padding:4px 10px"' +
+            vai(s.nome) +
+            '>' +
+            escP(s.nome) +
+            '</td><td style="padding:4px 10px">' +
+            _pianoGgMm(s.lunedi) +
+            ' - ' +
+            _pianoGgMm(s.domenica) +
+            '</td><td style="padding:4px 10px;font-weight:700;color:var(--c-rosso,#c0392b)">' +
+            s.ore.toFixed(2) +
+            '</td><td style="padding:4px 10px">+' +
+            (s.ore - d.max).toFixed(2) +
+            '</td><td style="padding:4px 10px">' +
+            s.giorni.sort().map(_pianoGgMm).join(', ') +
+            '</td></tr>',
+        )
+        .join('') +
+      '</table></div>';
+  h += '</div>';
+  // altre regole del mese
+  h +=
+    '<div><b>Altre regole del mese</b> <span style="color:var(--muted)">(riposo minimo, giorni di lavoro di fila, idoneita e le altre regole del settore)</span>';
+  if (!d.altre.length) h += '<p style="color:var(--c-verde,#2e7d32)">Nessuna violazione.</p>';
+  else {
+    const per = {};
+    d.altre.forEach((x) => (per[x.nome] = per[x.nome] || []).push(x));
+    h +=
+      '<ul style="margin:6px 0 0 18px;padding:0;line-height:1.55">' +
+      Object.keys(per)
+        .sort()
+        .map(
+          (n) =>
+            '<li><span' +
+            vai(n) +
+            '><b>' +
+            escP(n) +
+            '</b></span>: ' +
+            per[n].map((x) => (x.giorno ? 'giorno ' + x.giorno : 'mese') + ' · ' + escP(x.msg)).join('; ') +
+            '</li>',
+        )
+        .join('') +
+      '</ul>';
+  }
+  h += '</div></div></div>';
+  window._pianoAvvisiConteggio = { ym: _pianoMeseSel, rep: _pianoReparto(), n: d.sett.length + d.altre.length };
+  return h;
+}
+// Home: quanti avvisi ha il piano del mese in corso (settore aperto), per la riga di
+// richiamo. Legge solo le righe del mese e delle settimane a cavallo.
+async function _pianoAvvisiConteggioHome(rep) {
+  const ym = _pianoYmOggi();
+  const da = ym + '-01';
+  const a = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
+  const l = new Date(da + 'T12:00:00');
+  l.setDate(l.getDate() - ((l.getDay() + 6) % 7));
+  const dm = new Date(a + 'T12:00:00');
+  dm.setDate(dm.getDate() + ((7 - dm.getDay()) % 7));
+  const iso = (x) => x.toISOString().substring(0, 10);
+  const righe =
+    (await secGet('piano?data=gte.' + iso(l) + '&data=lte.' + iso(dm) + '&reparto_dip=eq.' + rep + '&limit=20000')) ||
+    [];
+  const max = _pianoOreSettimanaMax();
+  return _pianoSettimaneOltre(righe, max).filter((s) => s.giorni.some((d) => d.startsWith(ym))).length;
+}

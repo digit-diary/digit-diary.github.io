@@ -491,7 +491,9 @@ function renderDashboard() {
       a.count +
       ' ammonimenti verbali</span></div>';
   });
-  if (!todoH) todoH = '<p style="color:var(--c-verde,#2c6e49);text-align:center;padding:20px;font-weight:600">Tutto in ordine!</p>';
+  if (!todoH)
+    todoH =
+      '<p style="color:var(--c-verde,#2c6e49);text-align:center;padding:20px;font-weight:600">Tutto in ordine!</p>';
   todoEl.innerHTML = todoH;
   // DA FARE DOMANI: reminder di domani + scadenze domani + compleanni domani
   const domaniEl = document.getElementById('dash-domani-list');
@@ -718,7 +720,8 @@ function renderDashboard() {
     });
   }
   if (!alertH)
-    alertH = '<p style="color:var(--c-verde,#2c6e49);text-align:center;padding:20px;font-weight:600">Nessun alert attivo</p>';
+    alertH =
+      '<p style="color:var(--c-verde,#2c6e49);text-align:center;padding:20px;font-weight:600">Nessun alert attivo</p>';
   alertEl.innerHTML = alertH;
   // ULTIME REGISTRAZIONI
   const recEl = document.getElementById('dash-recenti-list');
@@ -802,8 +805,39 @@ function renderDashboard() {
     if (!hasCassa && !hasRischio) dashAlerts.style.display = 'none';
     else dashAlerts.style.display = '';
   }
+  // PIANO: una riga di richiamo agli avvisi del piano (il dettaglio e nella scheda
+  // Piano > Avvisi)
+  _dashRigaAvvisiPiano();
   // GRAFICO SETTIMANALE
   _renderDashSettimana(_rd, _rm);
+}
+async function _dashRigaAvvisiPiano() {
+  try {
+    if (typeof _pianoAvvisiConteggioHome !== 'function' || typeof pianoTabVisibile !== 'function') return;
+    if (!pianoTabVisibile('avvisi') || (typeof isVis === 'function' && !isVis('piano'))) return;
+    if (typeof pianoRegoleCache !== 'undefined' && !pianoRegoleCache.length && typeof _pianoCaricaCfg === 'function')
+      await _pianoCaricaCfg();
+    const n = await _pianoAvvisiConteggioHome(currentReparto);
+    const el = document.getElementById('dash-alert-list');
+    if (!el || !n) return;
+    const vecchia = document.getElementById('dash-avvisi-piano');
+    if (vecchia) vecchia.remove();
+    const riga = document.createElement('div');
+    riga.id = 'dash-avvisi-piano';
+    riga.style.cssText = 'padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer';
+    riga.innerHTML =
+      '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#e67e22;margin-right:8px"></span><strong>Piano</strong>: ' +
+      n +
+      (n === 1 ? ' settimana' : ' settimane') +
+      ' con ore lavorate oltre il massimo · apri Avvisi';
+    riga.onclick = () => {
+      switchPage('piano');
+      setTimeout(() => pianoCambiaTab('avvisi'), 300);
+    };
+    el.insertBefore(riga, el.firstChild);
+    const box = document.getElementById('dash-alerts');
+    if (box) box.style.display = '';
+  } catch (e) {}
 }
 var _dashSettOffset = 0;
 function navigaDashSettimana(dir) {

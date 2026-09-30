@@ -41,6 +41,64 @@ function _pianoRegolaVal(nome, rep) {
   if (!gen || gen.attivo === false) return null;
   return gen.valore;
 }
+// ORE LAVORATE NELLA SETTIMANA (lunedi-domenica), regola ore_settimana_max (45.1):
+// contano solo le ore LAVORATE, da orologio e SENZA il 10% notturno: i turni (con
+// l orario del giorno, anche prolungato) e le celle con orario proprio (JG); non
+// contano vacanze, malattie, CGF, riposi. Un turno che passa la mezzanotte conta
+// nella settimana in cui inizia.
+function _pianoOreSettimanaMax() {
+  const v = parseFloat(_pianoRegolaVal('ore_settimana_max'));
+  return v > 0 ? v : 0;
+}
+function _pianoLunediDi(dstr) {
+  const d = new Date(String(dstr).substring(0, 10) + 'T12:00:00');
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d.toISOString().substring(0, 10);
+}
+function _pianoOreLavorateCella(r) {
+  if (!r || !r.codice) return 0;
+  const t = _pianoTurnoInfo(r.codice);
+  if (t) return _pianoOreEffettiveTurno(t, r);
+  if (String(r.codice).toUpperCase() === 'JG' && r.ora_inizio && r.ora_fine) {
+    const e = _pianoOra(r.ora_inizio);
+    const u = _pianoOra(r.ora_fine);
+    if (e != null && u != null) return Math.round((u >= e ? u - e : 24 + u - e) * 100) / 100;
+  }
+  return 0;
+}
+// settimane oltre il massimo: [{ nome, lunedi, domenica, ore, giorni: [date lavorate] }]
+function _pianoSettimaneOltre(righe, max) {
+  max = max == null ? _pianoOreSettimanaMax() : max;
+  if (!max) return [];
+  const visti = new Set();
+  const sett = {};
+  (righe || []).forEach((r) => {
+    const d = String(r.data).substring(0, 10);
+    const k0 = r.collaboratore + '|' + d;
+    if (visti.has(k0)) return;
+    visti.add(k0);
+    const ore = _pianoOreLavorateCella(r);
+    if (!ore) return;
+    const k = r.collaboratore + '|' + _pianoLunediDi(d);
+    const s = (sett[k] = sett[k] || { nome: r.collaboratore, lunedi: _pianoLunediDi(d), ore: 0, giorni: [] });
+    s.ore += ore;
+    s.giorni.push(d);
+  });
+  return Object.values(sett)
+    .filter((s) => s.ore > max + 0.001)
+    .map((s) => {
+      const dom = new Date(s.lunedi + 'T12:00:00');
+      dom.setDate(dom.getDate() + 6);
+      return Object.assign(s, { ore: Math.round(s.ore * 100) / 100, domenica: dom.toISOString().substring(0, 10) });
+    });
+}
+// righe del mese aperto piu i giorni delle settimane a cavallo (mese prima e dopo)
+function _pianoRigheSettimane() {
+  return (typeof _pianoRighe !== 'undefined' ? _pianoRighe : []).concat(window._pianoRigheBordo || []);
+}
+function _pianoGgMm(d) {
+  return String(d).substring(8, 10) + '.' + String(d).substring(5, 7);
+}
 // Limiti ORE MENSILI personalizzabili (pannello Regole):
 // - fissi e jolly CON percentuale: obiettivo = giorni/7 × ore sett × %;
 //   max = obiettivo + tolleranza_ore_sopra, min = obiettivo − tolleranza_ore_sotto
@@ -115,6 +173,23 @@ function _pianoCalcolaViolazioni() {
   _pianoRighe.forEach((r) => {
     const g = parseInt(r.data.split('-')[2]);
     (perNome[r.collaboratore] = perNome[r.collaboratore] || {})[g] = r.codice;
+  });
+  // ore lavorate nella settimana lunedi-domenica oltre il massimo (45.1)
+  const maxSett = _pianoOreSettimanaMax();
+  _pianoSettimaneOltre(_pianoRigheSettimane(), maxSett).forEach((s) => {
+    const nelMese = s.giorni.filter((d) => d.startsWith(ym)).sort();
+    if (!nelMese.length) return;
+    const msg =
+      s.ore.toFixed(2) +
+      ' ore lavorate nella settimana ' +
+      _pianoGgMm(s.lunedi) +
+      '-' +
+      _pianoGgMm(s.domenica) +
+      ' (max ' +
+      maxSett +
+      ')';
+    nelMese.forEach((d) => (celle[s.nome + '|' + d] = celle[s.nome + '|' + d] || []).push(msg));
+    lista.push({ nome: s.nome, giorno: parseInt(nelMese[0].substring(8, 10)), msg: msg });
   });
   Object.keys(perNome).forEach((nome) => {
     const giorni = perNome[nome];
@@ -757,6 +832,29 @@ async function generaBozzaPiano(usaCoperture) {
         }
         if (fatti >= cop.max_turni) return false;
       }
+    }
+    // ore lavorate nella settimana lunedi-domenica: mai oltre il massimo (45.1)
+    const maxSettB = _pianoOreSettimanaMax();
+    if (maxSettB) {
+      const lun = _pianoLunediDi(dstr);
+      let oreSett = _pianoOreEffettiveTurno(t, { data: dstr });
+      for (let k = 0; k < 7; k++) {
+        const dd = new Date(lun + 'T12:00:00');
+        dd.setDate(dd.getDate() + k);
+        const dk = dd.toISOString().substring(0, 10);
+        if (dk === dstr) continue;
+        if (dk.startsWith(ym)) {
+          const cod = cella[n + '|' + parseInt(dk.substring(8, 10))];
+          const rg = rigaDi[n + '|' + parseInt(dk.substring(8, 10))];
+          if (cod) oreSett += _pianoOreLavorateCella(rg && rg.codice === cod ? rg : { codice: cod, data: dk });
+        } else {
+          const rb = (window._pianoRigheBordo || []).find(
+            (x) => x.collaboratore === n && String(x.data).startsWith(dk),
+          );
+          if (rb) oreSett += _pianoOreLavorateCella(rb);
+        }
+      }
+      if (oreSett > maxSettB + 0.001) return false;
     }
     // mappature per funzione (SUP/BO limitati ai loro turni; regole settimana SUP)
     const fz = infoC && infoC.funzione;

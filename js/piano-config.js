@@ -27,6 +27,7 @@ const PIANO_REGOLE_FONTE = {
   jolly_ore_max: 'RAP All. 1 · personale ausiliario',
   tolleranza_ore: 'RAP 3.1: 41 ore settimanali su media mensile',
   tolleranza_ore_sopra: 'RAP 3.1: max 45 ore in alta stagione',
+  ore_settimana_max: 'Legge sul lavoro · indicazione del titolare: 45.1 ore lavorate lunedi-domenica',
 };
 // NOMI SEMPLICI, GRUPPO E TIPO DI OGNI REGOLA. La scheda Regole parla la
 // lingua di chi la usa: niente HARD/SOFT/peso, ma "cosa fa", "dove agisce",
@@ -115,6 +116,12 @@ const PIANO_REGOLE_GUIDA = {
     n: 'Ore massime sotto le dovute del mese (se attiva vince sulla precedente)',
     t: 'numero',
     d: 'Validatore',
+  },
+  ore_settimana_max: {
+    g: 'Ore e saldo',
+    n: 'Ore lavorate massime nella settimana lunedi-domenica (da orologio, senza il 10% notturno)',
+    t: 'numero',
+    d: 'Validatore, avviso sulla cella, bozza, scheda Avvisi',
   },
   saldo_ore_max: {
     g: 'Ore e saldo',
@@ -371,6 +378,7 @@ const PIANO_REGOLE_GUIDA = {
 // settore riceve lo stesso controllo.
 const PIANO_REGOLE_LIMITI = {
   min_riposo_ore: [8, 16],
+  ore_settimana_max: [30, 60],
   max_consecutivi: [1, 7],
   pattern_lavoro: [1, 7],
   domeniche_libere_anno: [0, 52],
