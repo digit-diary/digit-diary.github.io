@@ -180,13 +180,27 @@ function _pianoIsLavoro(codice) {
 // Calcola le violazioni del mese corrente. Ritorna la lista e riempie _pianoViolCelle.
 // Il sabato "chiude entro le 23"? Se il turno finisce oltre (o dopo la
 // mezzanotte), la domenica seguente NON conta tra le 12 libere (LL art. 18)
-function _pianoSabatoEntro23(codice) {
+// il sabato finisce entro le 23? (domenica libera valida solo se il riposo comprende
+// le 23 del sabato - art. 21 OLL 1). Si guarda l orario VERO di quel sabato: il turno
+// prolungato nelle sere di chiusura tardi e l orario scritto sulla cella (es. JG).
+// dstrSab e riga sono facoltativi (senza, vale l orario di base del turno).
+function _pianoSabatoEntro23(codice, dstrSab, riga) {
   if (!codice) return true;
   const t = _pianoTurnoInfo(codice);
-  if (!t) return true; // codici speciali: niente lavoro
-  if (t.oltre23) return false;
-  const fi = _pianoOra(String(t.ora_fine || '').substring(0, 5));
-  const ii = _pianoOra(String(t.ora_inizio || '').substring(0, 5));
+  let ini = null;
+  let fin = null;
+  if (riga && riga.ora_inizio && riga.ora_fine) {
+    ini = riga.ora_inizio;
+    fin = riga.ora_fine;
+  } else if (t) {
+    const eff = dstrSab ? _pianoTurnoDelGiorno(t, dstrSab) : null;
+    if (t.oltre23 && !(eff && eff.prolungato)) return false;
+    ini = (eff && eff.ora_inizio) || t.ora_inizio;
+    fin = (eff && eff.ora_fine) || t.ora_fine;
+    if (eff && eff.prolungato && t.oltre23) return false;
+  } else return true; // codici speciali: niente lavoro
+  const fi = _pianoOra(String(fin || '').substring(0, 5));
+  const ii = _pianoOra(String(ini || '').substring(0, 5));
   if (fi == null) return true;
   if (ii != null && fi < ii) return false; // finisce dopo mezzanotte
   return fi <= 23; // _pianoOra e' in ore decimali
@@ -499,8 +513,13 @@ function _pianoCalcolaViolazioni() {
         const lavora = cod && _pianoTurnoInfo(cod);
         if (lavora) continue;
         if (_pianoDomenicaEsclusa(cod)) continue; // vacanza o malattia: non conta tra le 12
-        const codSab = g > 1 ? perNome[nome][g - 1] : null;
-        if (chkSab && !_pianoSabatoEntro23(codSab)) {
+        // il sabato prima (per la prima domenica del mese: dal mese precedente)
+        const dSab = new Date(ym + '-' + String(g).padStart(2, '0') + 'T12:00:00');
+        dSab.setDate(dSab.getDate() - 1);
+        const isoSab = dSab.toISOString().substring(0, 10);
+        const rSab = _pianoRigheSettimane().find((r) => r.collaboratore === nome && String(r.data).startsWith(isoSab));
+        const codSab = rSab ? rSab.codice : g > 1 ? perNome[nome][g - 1] : null;
+        if (chkSab && !_pianoSabatoEntro23(codSab, isoSab, rSab)) {
           aggiungi(nome, g, 'domenica non conteggiabile come libera: il sabato finisce oltre le 23');
           continue;
         }

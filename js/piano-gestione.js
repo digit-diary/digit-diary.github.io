@@ -29,16 +29,19 @@ async function pianoCaricaDomenicheAnno() {
       'piano?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&reparto_dip=eq.' + rep + '&limit=40000',
     )) || [];
   const perGiorno = {}; // 'nome|data' -> codice
+  const rigaGiorno = {}; // 'nome|data' -> riga (orari scritti sulla cella)
   const mesiConPiano = {};
   const mesiPersona = {}; // 'nome|MM' -> true: la persona ha celle in quel mese
   righe.forEach((r) => {
     perGiorno[r.collaboratore + '|' + r.data] = r.codice;
+    rigaGiorno[r.collaboratore + '|' + r.data] = r;
     mesiConPiano[String(r.data).substring(5, 7)] = true;
     mesiPersona[r.collaboratore + '|' + String(r.data).substring(5, 7)] = true;
   });
   window._pianoDomenicheDati = {
     anno: anno,
     perGiorno: perGiorno,
+    rigaGiorno: rigaGiorno,
     mesiConPiano: mesiConPiano,
     mesiPersona: mesiPersona,
   };
@@ -117,7 +120,7 @@ function _renderPianoDomenicheBody() {
             String(prima.getMonth() + 1).padStart(2, '0') +
             '-' +
             String(prima.getDate()).padStart(2, '0');
-          if (!_pianoSabatoEntro23(perG(nome, sab))) return;
+          if (!_pianoSabatoEntro23(perG(nome, sab), sab, (dati.rigaGiorno || {})[nome + '|' + sab])) return;
         }
         lib++;
       });
@@ -235,6 +238,7 @@ async function caricaBenesserePiano() {
       const p = per[r.collaboratore];
       if (!p) return;
       p.giorni[r.data] = r.codice;
+      (p.righe = p.righe || {})[r.data] = r;
     });
     const domeniche = {};
     for (let m = 0; m < 12; m++) {
@@ -320,7 +324,7 @@ async function caricaBenesserePiano() {
           String(sab.getMonth() + 1).padStart(2, '0') +
           '-' +
           String(sab.getDate()).padStart(2, '0');
-        if (!_pianoSabatoEntro23(p.giorni[isoSab])) {
+        if (!_pianoSabatoEntro23(p.giorni[isoSab], isoSab, (p.righe || {})[isoSab])) {
           p.domTardi++;
           return;
         }

@@ -2345,9 +2345,12 @@ async function _pianoAvvisiLenti(forza) {
         'piano?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&reparto_dip=eq.' + rep + '&limit=40000',
       )) || [];
     const perG = {};
+    const perR = {};
     const mesiPersona = {};
+    const chkSab = String(_pianoRegolaVal('turno_prima_domenica_libera')).toUpperCase() === 'TRUE';
     righeAnno.forEach((r) => {
       perG[r.collaboratore + '|' + String(r.data).substring(0, 10)] = r.codice;
+      perR[r.collaboratore + '|' + String(r.data).substring(0, 10)] = r;
       mesiPersona[r.collaboratore + '|' + String(r.data).substring(5, 7)] = true;
     });
     const oggi = _pianoOggiStr();
@@ -2405,6 +2408,13 @@ async function _pianoAvvisiLenti(forza) {
         const cod = perG[nome + '|' + dstr];
         if (cod && _pianoTurnoInfo(cod)) return;
         if (_pianoDomenicaEsclusa(cod)) return;
+        // libera solo se il sabato finisce entro le 23 (riposo 23 sab - 23 dom)
+        if (chkSab) {
+          const sb = new Date(dstr + 'T12:00:00');
+          sb.setDate(sb.getDate() - 1);
+          const sab = _pianoIsoData(sb);
+          if (!_pianoSabatoEntro23(perG[nome + '|' + sab], sab, perR[nome + '|' + sab])) return;
+        }
         libere++;
       });
       if (visto && libere < diritto) {
