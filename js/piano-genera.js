@@ -541,7 +541,9 @@ async function generaBozzaPiano(usaCoperture) {
       // ricevere turni fino all'obiettivo pieno (validatore e calendario li contano)
       const cs = _pianoCodiceInfo(cella[k]);
       if (cs)
-        oreMese[nomeK] = (oreMese[nomeK] || 0) + _pianoOreCodiceSpeciale(cs, _pianoCollabInfo(nomeK) || {}, cella[k]);
+        oreMese[nomeK] =
+          (oreMese[nomeK] || 0) +
+          _pianoOreSpecialeDelGiorno(rigaDi[k] || { codice: cella[k] }, cs, _pianoCollabInfo(nomeK) || {});
     }
   });
   const nomi = collaboratoriCache.filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c)).map((c) => c.nome);

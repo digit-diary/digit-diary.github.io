@@ -585,6 +585,116 @@ function _pianoTurnoDelGiorno(t, dstr) {
     tipo: t.tipo,
   };
 }
+// ORE DI UN GIORNO DI MALATTIA (regola del titolare, 30.09.2026). Malattia CONTINUA =
+// giorni di calendario uno dopo l altro con malattia (Diario o M nel piano); un
+// prolungamento attaccato e la stessa malattia; un giorno senza malattia in mezzo,
+// anche un riposo, la interrompe e il conteggio riparte.
+//  - dal 1. al 14. giorno: le ore del turno che la persona aveva quel giorno (da
+//    orologio, MAI con il 10% notturno); un riposo (C) vale 0 ore (MC) ma conta
+//    come giorno; una vacanza (V) vale le ore della V e la vacanza torna da
+//    recuperare; senza la sigla coperta si usa il valore del codice M;
+//  - dal 15. giorno: 41 ore settimanali / 7 = 5.857 ore per OGNI giorno di
+//    calendario, che lavorasse o no (per la percentuale se il codice M la usa).
+const PIANO_MALATTIA_GIORNI_TURNO = 14;
+const PIANO_MALATTIA_ORE_GIORNO = 41 / 7;
+let _pianoMalMemo = { t: 0, giorni: {} };
+// M del piano di tutto l anno del settore (anche i mesi non aperti e le M importate
+// dall Excel senza registrazione nel Diario): 'nome minuscolo' -> Set di date
+let _pianoMalCelle = {};
+let _pianoMalCelleChiave = '';
+async function _pianoCaricaMalattieAnno(anno, rep) {
+  rep = rep || _pianoReparto();
+  const chiave = anno + '|' + rep;
+  const da = anno - 1 + '-12-01';
+  const a = anno + '-12-31';
+  const righe = [];
+  for (const cod of ['M', 'M1']) {
+    try {
+      (
+        (await secGet(
+          'piano?codice=eq.' + cod + '&data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + rep + '&limit=20000',
+        )) || []
+      ).forEach((r) => righe.push(r));
+    } catch (e) {}
+  }
+  const celle = {};
+  righe.forEach((r) => {
+    const k = String(r.collaboratore || '').toLowerCase();
+    (celle[k] = celle[k] || new Set()).add(String(r.data).substring(0, 10));
+  });
+  _pianoMalCelle = celle;
+  _pianoMalCelleChiave = chiave;
+  _pianoMalMemo = { t: 0, giorni: {} };
+}
+function _pianoGiorniMalattiaDi(nome) {
+  const ora = Date.now();
+  if (ora - _pianoMalMemo.t > 1500) _pianoMalMemo = { t: ora, giorni: {} };
+  const k = String(nome || '').toLowerCase();
+  if (_pianoMalMemo.giorni[k]) return _pianoMalMemo.giorni[k];
+  const set = new Set();
+  const tipoMal = typeof nomeCorrente === 'function' ? nomeCorrente('Malattia') : 'Malattia';
+  (typeof datiCache !== 'undefined' ? datiCache : []).forEach((e) => {
+    if (e.eliminato || e.tipo !== tipoMal || String(e.nome || '').toLowerCase() !== k) return;
+    _pianoDateMalattia(e.testo || '', e.data).forEach((d) => set.add(d));
+  });
+  (typeof _pianoRighe !== 'undefined' ? _pianoRighe : []).forEach((r) => {
+    if ((r.codice === 'M' || r.codice === 'M1') && String(r.collaboratore || '').toLowerCase() === k)
+      set.add(String(r.data).substring(0, 10));
+  });
+  (_pianoMalCelle[k] || new Set()).forEach((d) => set.add(d));
+  _pianoMalMemo.giorni[k] = set;
+  return set;
+}
+// giorno numero quanti della malattia continua (0 se quel giorno non e malattia)
+function _pianoGiornoDiMalattia(nome, dstr) {
+  const set = _pianoGiorniMalattiaDi(nome);
+  if (!set.has(dstr)) return 0;
+  let n = 0;
+  const d = new Date(dstr + 'T12:00:00');
+  while (n < 400 && set.has(d.toISOString().substring(0, 10))) {
+    n++;
+    d.setDate(d.getDate() - 1);
+  }
+  return n;
+}
+function _pianoOreMalattiaLunga(info) {
+  const cs = _pianoCodiceInfo('M');
+  const jolly = !!(info && (info.is_jolly || info.impiego === 'jolly'));
+  const pct = cs && cs.scala_percentuale && !jolly ? parseFloat(info && info.percentuale) || 1 : 1;
+  return Math.round(PIANO_MALATTIA_ORE_GIORNO * pct * 1000) / 1000;
+}
+// sigla coperta dalla malattia, dalla nota della cella ("Ex R23 - Admin" o la vecchia
+// "Malattia dal Diario · era R23")
+function _pianoSiglaSottoMalattia(r) {
+  const m = String((r && r.commento) || '').match(/^(?:Malattia dal Diario · era|Ex) ([A-Z0-9]+)\b/);
+  return m ? m[1] : '';
+}
+// ore di una cella in un giorno di malattia; null se il giorno non e malattia
+function _pianoOreGiornoMalattia(r, info) {
+  if (!r || !r.collaboratore || !r.data) return null;
+  const dstr = String(r.data).substring(0, 10);
+  const eM = r.codice === 'M' || r.codice === 'M1';
+  const n = _pianoGiornoDiMalattia(r.collaboratore, dstr) || (eM ? 1 : 0);
+  if (!n) return null;
+  if (n > PIANO_MALATTIA_GIORNI_TURNO) return _pianoOreMalattiaLunga(info);
+  // primi 14 giorni: la sigla che la persona aveva quel giorno
+  const sotto = eM ? _pianoSiglaSottoMalattia(r) : r.codice;
+  const t = sotto ? _pianoTurnoInfo(sotto) : null;
+  if (t) return _pianoOreEffettiveTurno(t, { data: dstr });
+  if (sotto === 'C' || (!eM && !sotto)) return 0;
+  const csS = sotto ? _pianoCodiceInfo(sotto) : null;
+  if (csS && sotto !== 'M' && sotto !== 'M1') return _pianoOreCodiceSpeciale(csS, info, sotto);
+  if (!eM) return null;
+  // M senza sigla coperta (dati vecchi o M su giorno vuoto): valore del codice M
+  return _pianoOreCodiceSpeciale(_pianoCodiceInfo(r.codice), info, r.codice);
+}
+// ore di un codice speciale in un giorno preciso: come _pianoOreCodiceSpeciale, ma
+// nei giorni di malattia segue la regola della malattia (anche un C dal 15. giorno)
+function _pianoOreSpecialeDelGiorno(r, cs, info) {
+  const oreMal = _pianoOreGiornoMalattia(r, info);
+  if (oreMal != null) return oreMal;
+  return _pianoOreCodiceSpeciale(cs, info, r.codice);
+}
 // Ore pianificate di una RIGA del piano: turno → durata del turno;
 // codice con orario personalizzato (es. JG con inizio/fine) → differenza;
 // altrimenti ore CCL del codice speciale (scalate per percentuale se previsto)
@@ -601,10 +711,11 @@ function _pianoOreDiRiga(r, pct) {
     if (e != null && u != null) return Math.round((u >= e ? u - e : 24 + u - e) * 100) / 100;
   }
   const cs = _pianoCodiceInfo(r.codice);
-  if (cs && parseFloat(cs.ore) > 0) {
-    const infoR = r && r.collaboratore ? _pianoCollabInfo(r.collaboratore) : null;
-    return _pianoOreCodiceSpeciale(cs, infoR || { percentuale: pct }, r.codice);
-  }
+  const infoR = r && r.collaboratore ? _pianoCollabInfo(r.collaboratore) : null;
+  // giorno di malattia (M, o un riposo dal 15. giorno): regola della malattia
+  const oreMal = cs ? _pianoOreGiornoMalattia(r, infoR || { percentuale: pct }) : null;
+  if (oreMal != null) return oreMal;
+  if (cs && parseFloat(cs.ore) > 0) return _pianoOreCodiceSpeciale(cs, infoR || { percentuale: pct }, r.codice);
   return 0;
 }
 // Codici che per gli AUSILIARI (jolly) valgono ZERO ore, perche' l'indennita'
@@ -1278,6 +1389,8 @@ async function _pianoCaricaMeseSettore(da, a, rep) {
   // subito, PRIMA di qualunque uscita anticipata: serve a sapere in quali giorni
   // e' previsto il turno che fa prolungare un altro (es. Z12 per Z0)
   _pianoRegistraGiorniTurno(righe);
+  // malattie dell anno: servono per le ore di malattia (giorno 1-14 o dal 15.)
+  await _pianoCaricaMalattieAnno(parseInt(String(da).substring(0, 4)), rep);
   const coprenti = collaboratoriCache
     .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') !== rep && _pianoAppartieneAlReparto(c))
     .map((c) => c.nome);

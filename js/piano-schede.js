@@ -530,6 +530,9 @@ function pianoStatApriMese() {
   pianoCambiaTab('calendario');
 }
 async function caricaStatisticheAnnoPiano(forza) {
+  // malattie dell anno per le ore di malattia (giorno 1-14 o dal 15.)
+  if (typeof _pianoCaricaMalattieAnno === 'function')
+    await _pianoCaricaMalattieAnno(parseInt(String(_pianoMeseSel).substring(0, 4)));
   const el = document.getElementById('piano-stat-anno');
   if (!el) return;
   const anno = _pianoMeseSel.split('-')[0];
@@ -700,7 +703,7 @@ async function caricaStatisticheAnnoPiano(forza) {
         if (malattieAnno[r.collaboratore + '|' + r.data]) o.cgfPersi++;
         else o.cgfGod++;
       }
-      const _oCs = _pianoOreCodiceSpeciale(cs, info, r.codice);
+      const _oCs = _pianoOreSpecialeDelGiorno(r, cs, info);
       o.ore += _oCs;
       _addMese(_oCs);
     }
@@ -1294,6 +1297,7 @@ async function pianoSaldoIniziale(nome) {
 // con gli stessi criteri della scheda Saldo. Si carica una volta sola e resta
 // in memoria finche' non si cambia anno o non si tocca qualcosa.
 async function _pianoSaldoAnnoCalcola(anno) {
+  await _pianoCaricaMalattieAnno(parseInt(anno));
   const rep = _pianoReparto();
   const righe =
     (await secGet(

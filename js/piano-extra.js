@@ -1993,6 +1993,7 @@ async function salvaGiorniFormazione() {
 // schede Vacanze, Festivi, Saldo e Recupero ore, messi uno accanto all altro.
 // ============================================================
 async function _pianoCreditiDati(anno, soloNomi) {
+  await _pianoCaricaMalattieAnno(parseInt(anno));
   const nomi = soloNomi
     ? soloNomi
     : ordineCollabPiano(
