@@ -1306,20 +1306,10 @@ async function pianoAssegnaCgfMese() {
   const daTogliere = []; // CGF generati in piu' (festivo saltato per malattia)
   nomi.forEach((n) => {
     const s = saldo[n];
-    if (s.resta < 0) {
-      let extra = -s.resta;
-      _pianoRighe
-        .filter((r) => r.collaboratore === n && r.codice === 'CGF' && r.generato && !r.protetto && !r.motivo_blocco)
-        .sort((a, b) => String(b.data).localeCompare(String(a.data)))
-        .forEach((r) => {
-          if (extra > 0 && _pianoGiornoScrivibile(r.data)) {
-            daTogliere.push(r);
-            extra--;
-          }
-        });
-      return;
-    }
-    if (s.resta <= 0) return;
+    // CGF che non spettano piu' (festivo non lavorato), anche nei giorni chiusi
+    const via = _pianoCgfNonSpettanti(n, ym, _pianoRighe, s, malattie);
+    via.forEach((r) => daTogliere.push(r));
+    if (via.length || s.resta <= 0) return;
     // prima i giorni dopo i festivi lavorati questo mese, poi il resto
     const preferiti = [];
     (s.festiviMeseSel || []).forEach((g) => {
@@ -2645,10 +2635,68 @@ function _pianoCongedoNpEffetti(nome, anno) {
   });
   return { giorniVacanze: giorniVacanze, giorniAnzianita: giorniAnzianita };
 }
+// CGF CHE NON SPETTANO PIU' in un mese, per una persona (festivo poi non lavorato):
+//  - goduti oltre il credito (resta < 0): i CGF automatici piu' recenti del mese;
+//  - CGF ANTICIPATI caduti in malattia (MCG) prima di un festivo del mese che poi
+//    non e' stato lavorato: il recupero non e' dovuto, quindi non resta a credito.
+// Valgono anche i giorni gia' chiusi: e' una correzione del conto dei recuperi, non
+// una modifica del turno (resta scritta nella nota della cella e nel registro).
+// righeMese: righe del piano della persona nel mese; mal: nome|data -> malattia.
+// conManuali: anche i CGF scritti a mano (protetti), da confermare con l operatore.
+// massimo: quanti festivi sono appena stati persi (ognuno toglie al massimo un CGF):
+// un conto gia sbilanciato da prima non fa togliere recuperi che non c entrano.
+function _pianoCgfNonSpettanti(nome, ym, righeMese, conto, mal, conManuali, massimo) {
+  const tetto = massimo == null ? Infinity : massimo;
+  const auto = righeMese
+    .filter(
+      (r) =>
+        r.collaboratore === nome &&
+        String(r.data).startsWith(ym) &&
+        r.codice === 'CGF' &&
+        !r.motivo_blocco &&
+        (conManuali || (r.generato && !r.protetto)),
+    )
+    .sort((a, b) => String(b.data).localeCompare(String(a.data)));
+  const malato = (r) => !!mal[nome + '|' + String(r.data).substring(0, 10)];
+  const out = [];
+  let extra = Math.min(tetto, conto.resta < 0 ? -conto.resta : 0);
+  auto
+    .filter((r) => !malato(r))
+    .forEach((r) => {
+      if (extra > 0) {
+        out.push(r);
+        extra--;
+      }
+    });
+  // festivi del mese non lavorati (nessun turno o malattia quel giorno)
+  const fest = _pianoFestiviCgfSet();
+  const nonLavorati = [...fest]
+    .filter((d) => String(d).startsWith(ym))
+    .filter((d) => {
+      const r = righeMese.find((x) => x.collaboratore === nome && String(x.data).substring(0, 10) === d);
+      return !(r && _pianoTurnoInfo(r.codice) && !mal[nome + '|' + d]);
+    });
+  const persiMese = auto.filter(malato);
+  let extraP = Math.min(tetto - out.length, Math.max(0, persiMese.length - Math.max(0, conto.resta)));
+  persiMese
+    .filter((r) => nonLavorati.some((d) => String(r.data).substring(0, 10) < d))
+    .forEach((r) => {
+      if (extraP > 0) {
+        out.push(r);
+        extraP--;
+      }
+    });
+  return out;
+}
 // RICONCILIAZIONE: se per 'nome' nel mese ym i recuperi goduti superano
 // quelli maturati (un festivo e' saltato per malattia dopo che la bozza aveva
 // gia' messo il CGF), i CGF automatici in piu' del mese tornano congedo C.
-async function _pianoRiconciliaCgf(nome, ym) {
+// opz.manuali: considera anche i CGF scritti a mano e chiede conferma (es. dopo aver
+// tolto a mano il turno di un festivo: "il CGF anticipato del 18 non spetta piu").
+// opz.festivi: i festivi appena persi (turno tolto o malattia): al massimo un CGF
+// ciascuno
+async function _pianoRiconciliaCgf(nome, ym, opz) {
+  opz = opz || {};
   try {
     const info = _pianoCollabInfo(nome);
     if (!info || !_pianoMaturaCgf(info)) return 0;
@@ -2657,35 +2705,43 @@ async function _pianoRiconciliaCgf(nome, ym) {
     await _pianoCaricaCgfRiporto(anno);
     const righe = await _pianoCaricaRigheCgf(anno, finoA);
     const conto = _pianoContabilitaCgf(righe, [nome], anno, finoA)[nome];
-    if (!conto || conto.resta >= 0) return 0;
-    let extra = -conto.resta;
-    const candidati = righe
-      .filter(
-        (r) =>
-          r.collaboratore === nome &&
-          String(r.data).startsWith(ym) &&
-          r.codice === 'CGF' &&
-          r.generato &&
-          !r.protetto &&
-          !r.motivo_blocco,
-      )
-      .sort((a, b) => String(b.data).localeCompare(String(a.data)));
+    if (!conto) return 0;
+    const persi = Array.isArray(opz.festivi) ? opz.festivi.length : null;
+    if (persi === 0) return 0;
+    const candidati = _pianoCgfNonSpettanti(nome, ym, righe, conto, _pianoMalattieMese(ym), !!opz.manuali, persi);
+    if (!candidati.length) return 0;
+    if (
+      opz.manuali &&
+      !(await chiediConferma(
+        nome +
+          ' non lavora piu un festivo del mese: ' +
+          (candidati.length === 1 ? 'il recupero CGF del ' : 'i recuperi CGF del ') +
+          candidati.map((r) => String(r.data).substring(8, 10) + '.' + String(r.data).substring(5, 7)).join(', ') +
+          (candidati.length === 1 ? ' non spetta piu.' : ' non spettano piu.') +
+          '\n\nLo trasformo in congedo C? (se no resta CGF e nell elenco dei recuperi risulta "in piu")',
+        { titolo: 'Recupero festivo non piu dovuto', ok: 'Si, diventa C', annulla: 'No, lascia CGF' },
+      ))
+    )
+      return 0;
     let fatte = 0;
     for (const r of candidati) {
-      if (extra <= 0) break;
-      if (_pianoGiornoBloccato(r.data) && !_pianoGiornoSbloccato(r.data)) continue;
+      const chiuso = _pianoGiornoBloccato(r.data) && !_pianoGiornoSbloccato(r.data);
+      const nota =
+        'CGF tolto: festivo non lavorato' +
+        (opz.manuali ? '' : ' (malattia)') +
+        (chiuso ? ' · giorno gia chiuso' : '') +
+        (opz.manuali ? ' - ' + getOperatore() : '');
       await secPatch('piano', 'id=eq.' + r.id, {
         codice: 'C',
-        commento: 'CGF tolto: festivo non lavorato (malattia)',
+        commento: nota,
         operatore: getOperatore(),
         updated_at: new Date().toISOString(),
       });
       const inMem = _pianoRighe.find((x) => x.id === r.id);
       if (inMem) {
         inMem.codice = 'C';
-        inMem.commento = 'CGF tolto: festivo non lavorato (malattia)';
+        inMem.commento = nota;
       }
-      extra--;
       fatte++;
     }
     if (fatte) {

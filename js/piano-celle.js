@@ -962,6 +962,17 @@ async function pianoSalvaCella(nome, dstr, codice) {
       if (nuovo && nuovo[0]) _pianoRighe.push(nuovo[0]);
     }
     logAzione('Piano modificato', nome + ' ' + dstr + ' → ' + codice);
+    // festivo con diritto al recupero che non si lavora piu (turno tolto): un CGF
+    // anticipato nel mese non spetta piu, si propone di trasformarlo in C
+    if (
+      attuale &&
+      _pianoTurnoInfo(attuale) &&
+      !_pianoTurnoInfo(codice) &&
+      typeof _pianoFestiviCgfSet === 'function' &&
+      _pianoFestiviCgfSet().has(dstr) &&
+      typeof _pianoRiconciliaCgf === 'function'
+    )
+      await _pianoRiconciliaCgf(nome, dstr.substring(0, 7), { manuali: true, festivi: [dstr] });
     // M scritta a mano nel piano: proposta di registrarla anche nel Diario,
     // cosi' piano, Diario e scheda collaboratore restano allineati
     if (codice === 'M' || codice === 'M1') {

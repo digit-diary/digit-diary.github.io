@@ -785,9 +785,13 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
     // La sigla coperta resta scritta nel commento ("era V") cosi, se la
     // malattia viene tolta dal Diario, torna al suo posto. Senza cella, basta
     // la M automatica dal Diario.
+    // festivi con diritto al recupero che si perdono per la malattia (c era un turno)
+    const festiviPersi = [];
+    const festCgf = typeof _pianoFestiviCgfSet === 'function' ? _pianoFestiviCgfSet() : new Set();
     for (const d of daMettere) {
       const righe = (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=eq.' + d)) || [];
       const r = righe[0];
+      if (r && festCgf.has(d) && _pianoTurnoInfo(r.codice)) festiviPersi.push(d);
       if (r && r.codice !== 'M' && r.codice !== 'M1') {
         await secPatch('piano', 'id=eq.' + r.id, {
           codice: 'M',
@@ -802,7 +806,8 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
       }
     }
     // festivo saltato per malattia: i recuperi automatici in piu' tornano C
-    for (const ymM of new Set(nuove.map((d) => d.substring(0, 7)))) await _pianoRiconciliaCgf(nome, ymM);
+    for (const ymM of new Set(festiviPersi.map((d) => d.substring(0, 7))))
+      await _pianoRiconciliaCgf(nome, ymM, { festivi: festiviPersi.filter((d) => d.startsWith(ymM)) });
     if (tolte || messe) {
       logAzione('Malattia: piano allineato', nome + ' · ' + tolte + ' M tolte, ' + messe + ' celle diventate M');
       if (typeof _pianoRighe !== 'undefined' && _pianoRighe.length && typeof renderPiano === 'function') {
