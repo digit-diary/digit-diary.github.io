@@ -721,9 +721,9 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
     const d0 = new Date(dstr + 'T12:00:00');
     const iso = (d) => d.toISOString().substring(0, 10);
     const da = new Date(d0);
-    da.setDate(da.getDate() - Math.max(7, maxCons + 1));
+    da.setDate(da.getDate() - Math.max(14, maxCons + 1));
     const fin = new Date(d0);
-    fin.setDate(fin.getDate() + Math.max(7, maxCons + 1));
+    fin.setDate(fin.getDate() + Math.max(14, maxCons + 1));
     const righe =
       (await secGet(
         'piano?collaboratore=eq.' +
@@ -799,6 +799,18 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
             (_pianoSettimanaConNotturno() ? ' compreso il 10%' : ' da orologio') +
             ')',
         );
+    }
+    // riposo settimanale attorno alla domenica (35 / 47 ore): la settimana della cella,
+    // solo se la modifica lo peggiora (una violazione gia presente non si ripete)
+    if (codiceNuovo !== undefined) {
+      const lun = _pianoLunediDi(dstr);
+      const prima = _pianoRiposiSettimanali(righe).filter((x) => x.lunedi === lun);
+      const sim2 = righe
+        .filter((r) => String(r.data).substring(0, 10) !== dstr)
+        .concat([{ collaboratore: nome, data: dstr, codice: codiceNuovo }]);
+      _pianoRiposiSettimanali(sim2)
+        .filter((x) => x.lunedi === lun && !prima.some((y) => y.tipo === x.tipo && y.ore <= x.ore))
+        .forEach((x) => avvisiExtra.push(_pianoTestoRiposo(x)));
     }
     // la logica riposo/consecutivi/idoneita' vive nel motore puro PianoRegole
     const tNuovo = codiceNuovo !== undefined ? _pianoTurnoInfo(codiceNuovo) : null;

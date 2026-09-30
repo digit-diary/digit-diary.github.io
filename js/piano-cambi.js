@@ -2057,8 +2057,12 @@ function _pianoInitSticky() {
       if (!o.tab || !o.tab.isConnected) return;
       const r = o.tab.getBoundingClientRect();
       const hHead = o.ths[0] ? o.ths[0].offsetHeight : 24;
+      // la riga dei giorni si ferma SOTTO il menu delle pagine (fermo in alto), non
+      // al bordo dello schermo: prima finiva sotto il menu e copriva i giorni
+      const nav = document.querySelector('.nav-tabs');
+      const off = nav && getComputedStyle(nav).position === 'sticky' ? nav.getBoundingClientRect().bottom : 0;
       let y = 0;
-      if (r.top < 0) y = Math.min(-r.top, r.height - hHead * 2);
+      if (r.top < off) y = Math.min(off - r.top, r.height - hHead * 2);
       if (y < 0) y = 0;
       const t = y ? 'translateY(' + Math.round(y) + 'px)' : '';
       o.ths.forEach((th) => {

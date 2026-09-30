@@ -1401,9 +1401,9 @@ async function _pianoCaricaMeseSettore(da, a, rep) {
   try {
     const iso = (d) => d.toISOString().substring(0, 10);
     const l = new Date(da + 'T12:00:00');
-    l.setDate(l.getDate() - ((l.getDay() + 6) % 7));
+    l.setDate(l.getDate() - ((l.getDay() + 6) % 7) - 7); // una settimana in piu: riposi a cavallo
     const dm = new Date(a + 'T12:00:00');
-    dm.setDate(dm.getDate() + ((7 - dm.getDay()) % 7));
+    dm.setDate(dm.getDate() + ((7 - dm.getDay()) % 7) + 7);
     const bordo = [];
     if (iso(l) < da)
       (
@@ -2332,7 +2332,8 @@ async function renderPiano() {
     el.style.opacity = '';
     if (scrollPrec) requestAnimationFrame(() => window.scrollTo(0, scrollPrec));
     // numero degli avvisi sulla scheda Avvisi e sulla voce Piano del menu
-    if (_pianoTab !== 'avvisi' && typeof _pianoAvvisiAggiornaBadge === 'function') setTimeout(_pianoAvvisiAggiornaBadge, 0);
+    if (_pianoTab !== 'avvisi' && typeof _pianoAvvisiAggiornaBadge === 'function')
+      setTimeout(_pianoAvvisiAggiornaBadge, 0);
     if (typeof initCardRichiudibili === 'function' && document.getElementById('piano-config'))
       initCardRichiudibili('piano-config', []);
     if (_pianoTab === 'calendario') {

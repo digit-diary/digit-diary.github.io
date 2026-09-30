@@ -5967,3 +5967,4 @@ html {
 .settings-tab-n.avv-n-on { background: var(--c-rosso, #c0392b); color: #fff; }
 .settings-tab.attiva .settings-tab-n.avv-n-on { background: var(--c-rosso, #c0392b); color: #fff; }
 .avv-badge { display: inline-block; min-width: 18px; margin-left: 6px; padding: 0 5px; border-radius: 9px; background: var(--c-rosso, #c0392b); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; letter-spacing: 0; vertical-align: middle; }
+

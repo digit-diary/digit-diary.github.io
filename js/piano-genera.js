@@ -128,6 +128,127 @@ function _pianoSettimaneOltre(righe, max) {
 function _pianoTestoOreSettimana(s) {
   return s.totale.toFixed(2) + ' ore (' + s.ore.toFixed(2) + ' da orologio + ' + s.notte.toFixed(2) + ' notturno)';
 }
+// RIPOSO SETTIMANALE ATTORNO ALLA DOMENICA (regole riposo_domenica_libera_ore 35 e
+// riposo_domenica_lavorata_ore 47): ore consecutive dalla fine dell ultimo turno prima
+// del riposo all inizio del turno successivo, con gli orari veri (prolungamenti, JG).
+//  - domenica libera (nessun lavoro dalle 23 del sabato alle 23 della domenica): il
+//    riposo che comprende quell intervallo deve durare almeno 35 ore;
+//  - domenica lavorata: nella settimana lunedi-domenica ci deve essere un riposo di
+//    almeno 47 ore consecutive (conta la parte del riposo dentro la settimana).
+function _pianoIntervalloLavoro(r) {
+  if (!r || !r.codice) return null;
+  const d = String(r.data).substring(0, 10);
+  const t = _pianoTurnoInfo(r.codice);
+  let ini = null;
+  let fin = null;
+  if (r.ora_inizio && r.ora_fine && (t || String(r.codice).toUpperCase() === 'JG')) {
+    ini = r.ora_inizio;
+    fin = r.ora_fine;
+  } else if (t) {
+    const eff = _pianoTurnoDelGiorno(t, d);
+    ini = (eff && eff.ora_inizio) || t.ora_inizio;
+    fin = (eff && eff.ora_fine) || t.ora_fine;
+  } else return null;
+  const i = _pianoOra(String(ini || '').substring(0, 5));
+  let f = _pianoOra(String(fin || '').substring(0, 5));
+  if (i == null || f == null) return null;
+  if (f <= i) f += 24;
+  const base = new Date(d + 'T00:00:00').getTime() / 3600000; // ore
+  return { ini: base + i, fin: base + f, data: d };
+}
+function _pianoRiposiSettimanali(righe) {
+  const minLib = parseFloat(_pianoRegolaVal('riposo_domenica_libera_ore')) || 0;
+  const minLav = parseFloat(_pianoRegolaVal('riposo_domenica_lavorata_ore')) || 0;
+  if (!minLib && !minLav) return [];
+  const per = {};
+  const visti = new Set();
+  (righe || []).forEach((r) => {
+    const k0 = r.collaboratore + '|' + String(r.data).substring(0, 10);
+    if (visti.has(k0)) return;
+    visti.add(k0);
+    const iv = _pianoIntervalloLavoro(r);
+    if (iv) (per[r.collaboratore] = per[r.collaboratore] || []).push(iv);
+  });
+  const out = [];
+  const oraDi = (dstr, h) => new Date(dstr + 'T00:00:00').getTime() / 3600000 + h;
+  const r1 = (x) => Math.round(x * 10) / 10;
+  Object.keys(per).forEach((nome) => {
+    const info = _pianoCollabInfo(nome);
+    if (info && info.funzione === 'RESP') return;
+    const iv = per[nome].sort((a, b) => a.ini - b.ini);
+    // riposi = intervalli fra un turno e il successivo
+    const riposi = [];
+    for (let k = 1; k < iv.length; k++) if (iv[k].ini > iv[k - 1].fin) riposi.push({ da: iv[k - 1].fin, a: iv[k].ini });
+    // settimane con almeno un turno
+    const settimane = new Set(iv.map((x) => _pianoLunediDi(x.data)));
+    settimane.forEach((lun) => {
+      const dom = new Date(lun + 'T12:00:00');
+      dom.setDate(dom.getDate() + 6);
+      const domS = dom.toISOString().substring(0, 10);
+      const sab = new Date(lun + 'T12:00:00');
+      sab.setDate(sab.getDate() + 5);
+      const sabS = sab.toISOString().substring(0, 10);
+      const w0 = oraDi(sabS, 23);
+      const w1 = oraDi(domS, 23);
+      const lavoraDom = iv.some((x) => x.ini < w1 && x.fin > w0);
+      if (!lavoraDom) {
+        if (!minLib) return;
+        // il riposo che comprende 23 sab - 23 dom: serve un turno prima e uno dopo
+        const prima = iv.filter((x) => x.fin <= w0).pop();
+        const dopo = iv.find((x) => x.ini >= w1);
+        if (!prima || !dopo) return;
+        const ore = dopo.ini - prima.fin;
+        if (ore < minLib - 0.001)
+          out.push({
+            nome: nome,
+            lunedi: lun,
+            domenica: domS,
+            tipo: 'libera',
+            ore: r1(ore),
+            min: minLib,
+            dal: prima.fin,
+            al: dopo.ini,
+          });
+      } else {
+        if (!minLav) return;
+        const l0 = oraDi(lun, 0);
+        const l1 = oraDi(domS, 24);
+        // riposi che toccano la settimana; ai bordi serve il turno prima/dopo (altrimenti non si giudica)
+        const nella = riposi.filter((x) => x.a > l0 && x.da < l1);
+        const primoTurno = iv.find((x) => x.ini >= l0);
+        const ultimoTurno = iv.filter((x) => x.fin <= l1).pop();
+        const haPrima = iv.some((x) => x.fin <= l0);
+        const haDopo = iv.some((x) => x.ini >= l1);
+        if (!haPrima || !haDopo || !primoTurno || !ultimoTurno) return;
+        // conta solo la parte del riposo che cade nella settimana (lunedi 0 - domenica 24):
+        // un riposo del fine settimana prima che finisce il lunedi mattina non basta
+        const max = nella.reduce((m, x) => Math.max(m, Math.min(x.a, l1) - Math.max(x.da, l0)), 0);
+        if (max < minLav - 0.001)
+          out.push({ nome: nome, lunedi: lun, domenica: domS, tipo: 'lavorata', ore: r1(max), min: minLav });
+      }
+    });
+  });
+  return out;
+}
+function _pianoTestoRiposo(v) {
+  return v.tipo === 'libera'
+    ? 'riposo attorno alla domenica libera ' +
+        _pianoGgMm(v.domenica) +
+        ': ' +
+        v.ore +
+        ' ore consecutive (minimo ' +
+        v.min +
+        ', comprese le 23 sab - 23 dom)'
+    : 'settimana ' +
+        _pianoGgMm(v.lunedi) +
+        '-' +
+        _pianoGgMm(v.domenica) +
+        ' con la domenica lavorata: riposo piu lungo ' +
+        v.ore +
+        ' ore (minimo ' +
+        v.min +
+        ' consecutive)';
+}
 // righe del mese aperto piu i giorni delle settimane a cavallo (mese prima e dopo)
 function _pianoRigheSettimane() {
   return (typeof _pianoRighe !== 'undefined' ? _pianoRighe : []).concat(window._pianoRigheBordo || []);
@@ -223,6 +344,14 @@ function _pianoCalcolaViolazioni() {
   _pianoRighe.forEach((r) => {
     const g = parseInt(r.data.split('-')[2]);
     (perNome[r.collaboratore] = perNome[r.collaboratore] || {})[g] = r.codice;
+  });
+  // riposo settimanale attorno alla domenica (35 / 47 ore)
+  _pianoRiposiSettimanali(_pianoRigheSettimane()).forEach((v) => {
+    const g = v.tipo === 'libera' ? v.domenica : v.domenica;
+    if (!g.startsWith(ym)) return;
+    const msg = _pianoTestoRiposo(v);
+    (celle[v.nome + '|' + g] = celle[v.nome + '|' + g] || []).push(msg);
+    lista.push({ nome: v.nome, giorno: parseInt(g.substring(8, 10)), msg: msg });
   });
   // ore lavorate nella settimana lunedi-domenica oltre il massimo (45.1)
   const maxSett = _pianoOreSettimanaMax();

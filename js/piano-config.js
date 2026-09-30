@@ -29,6 +29,8 @@ const PIANO_REGOLE_FONTE = {
   tolleranza_ore_sopra: 'RAP 3.1: max 45 ore in alta stagione',
   ore_settimana_max: 'Legge sul lavoro · indicazione del titolare: 45.1 ore lavorate lunedi-domenica',
   ore_settimana_con_notturno: 'Indicazione del titolare (30.09): il massimo comprende il 10% notturno',
+  riposo_domenica_libera_ore: 'LL art. 18-20a, OLL 1 art. 21: 35 ore (11 + 24) comprese le 23 sab - 23 dom',
+  riposo_domenica_lavorata_ore: 'OLL 2 art. 12 cpv. 2 (case da gioco): 36 + 11 = 47 ore consecutive',
 };
 // NOMI SEMPLICI, GRUPPO E TIPO DI OGNI REGOLA. La scheda Regole parla la
 // lingua di chi la usa: niente HARD/SOFT/peso, ma "cosa fa", "dove agisce",
@@ -117,6 +119,18 @@ const PIANO_REGOLE_GUIDA = {
     n: 'Ore massime sotto le dovute del mese (se attiva vince sulla precedente)',
     t: 'numero',
     d: 'Validatore',
+  },
+  riposo_domenica_libera_ore: {
+    g: 'Domeniche',
+    n: 'Domenica libera: ore consecutive minime di riposo (comprese le 23 del sabato - 23 della domenica)',
+    t: 'numero',
+    d: 'Validatore, avviso sulla cella, scheda Avvisi',
+  },
+  riposo_domenica_lavorata_ore: {
+    g: 'Domeniche',
+    n: 'Settimana con la domenica lavorata: ore consecutive minime di riposo nella settimana',
+    t: 'numero',
+    d: 'Validatore, avviso sulla cella, scheda Avvisi',
   },
   ore_settimana_con_notturno: {
     g: 'Ore e saldo',
@@ -386,6 +400,8 @@ const PIANO_REGOLE_GUIDA = {
 const PIANO_REGOLE_LIMITI = {
   min_riposo_ore: [8, 16],
   ore_settimana_max: [30, 60],
+  riposo_domenica_libera_ore: [24, 72],
+  riposo_domenica_lavorata_ore: [24, 96],
   max_consecutivi: [1, 7],
   pattern_lavoro: [1, 7],
   domeniche_libere_anno: [0, 52],
