@@ -353,6 +353,14 @@ async function elimina(id) {
     datiCache = datiCache.filter((e) => !e.eliminato);
     pinnedIds.delete(id);
     if (_e) logAzione('Registrazione nel cestino', _e.nome + ' - ' + _e.tipo + ' (da ' + op + ')');
+    // nata dal Rapporto giornaliero: la persona sparisce anche da li
+    const _rap = _e && typeof _rapportoTogliRegistrazione === 'function' ? await _rapportoTogliRegistrazione(_e) : null;
+    if (_rap)
+      setTimeout(
+        () =>
+          toast(_e.nome + ' tolto anche dal Rapporto ' + _rap.turno + ' del ' + _rap.ds.split('-').reverse().join('.')),
+        900,
+      );
     aggiornaNomi();
     render();
     updateStats();
@@ -411,7 +419,11 @@ function modificaRegistrazione(id) {
       (_cop ? '#1a7a6d' : 'var(--muted)') +
       ';font-size:var(--fs-md,.875rem)"><strong>Copertura turno:</strong> ' +
       (_cop
-        ? '<span style="color:var(--c-verdeacqua,#1a7a6d);font-weight:700">' + escP(_cop.collaboratore) + ' (+' + _cop.punti + ')</span>'
+        ? '<span style="color:var(--c-verdeacqua,#1a7a6d);font-weight:700">' +
+          escP(_cop.collaboratore) +
+          ' (+' +
+          _cop.punti +
+          ')</span>'
         : '<span style="color:var(--muted)">nessuna registrata</span>') +
       (_rif
         ? ' · <span style="color:var(--accent);font-weight:600">' +
@@ -580,6 +592,8 @@ async function salvaModificaRegistrazione(id, conCopertura) {
     const eV = datiCache.find((x) => x.id === id);
     const testoVecchio = eV ? eV.testo : '';
     const dataVecchia = eV ? eV.data : '';
+    const nomeVecchio = eV ? eV.nome : '';
+    const importoVecchio = eV ? parseFloat(eV.importo) || 0 : 0;
     await secPatch('registrazioni', 'id=eq.' + id, update);
     const e = datiCache.find((x) => x.id === id);
     if (e) Object.assign(e, update);
@@ -591,6 +605,24 @@ async function salvaModificaRegistrazione(id, conCopertura) {
         toast('Piano allineato: ' + sync.tolte + ' M tolte, ' + sync.messe + ' M spostate');
     }
     logAzione('Modifica registrazione', nome + ' - ' + tipo + ': ' + testo.substring(0, 60));
+    // nata dal Rapporto giornaliero: si chiede se correggere anche il Rapporto
+    const _rapO = e && typeof _rapportoOrigineDi === 'function' ? _rapportoOrigineDi(e) : null;
+    if (
+      _rapO &&
+      (testoVecchio !== testo ||
+        nomeVecchio !== nome ||
+        importoVecchio !== (parseFloat(update.importo) || importoVecchio)) &&
+      (await chiediConferma(
+        'Questa registrazione viene dal Rapporto ' +
+          _rapO.turno +
+          ' del ' +
+          _rapO.ds.split('-').reverse().join('.') +
+          ': la correggo anche li?',
+        { titolo: 'Correggere anche il Rapporto', ok: 'Si, correggi il Rapporto', annulla: 'No' },
+      ))
+    ) {
+      if (await _rapportoCorreggiRegistrazione(e, nomeVecchio)) toast('Rapporto corretto');
+    }
     document.getElementById('pwd-modal').classList.add('hidden');
     render();
     updateStats();

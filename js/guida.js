@@ -69,6 +69,7 @@ function GUIDA_CAPITOLI() {
         'I campi del rapporto sono personalizzabili per settore: se ne manca uno, si aggiunge dalle Impostazioni.',
         'Il pulsante di <b>importazione</b> legge il rapporto scritto altrove e compila i campi da solo, chiedendo conferma quando trova qualcosa di ambiguo.',
         'A fine mese il rapporto alimenta le statistiche e gli avvisi sulle differenze di cassa oltre soglia.',
+        '<b>Rapporto e Diario collegati</b>: le assenze e le differenze di cassa scritte nel Rapporto creano le registrazioni nel Diario ("da rapporto PRESTO del 30/09/2026"). Se cancelli la registrazione dal Diario, la persona sparisce anche dal Rapporto di quel giorno (il resto del testo resta: "Rossi e Bianchi assenti" diventa "Bianchi assenti"). Se la togli dal Rapporto, il Diario resta: la registrazione diventa "tolta dal rapporto" e un avviso lo dice. Se la modifichi nel Diario (giorni di malattia, importo), il programma chiede se correggere anche il Rapporto.',
       ],
     },
     {

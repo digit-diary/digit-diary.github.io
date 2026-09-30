@@ -679,6 +679,32 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
       logAzione('Validazione assenza fallita', e.nome + ' - ' + e.motivo + ' (rapporto ' + turno + ' del ' + ds + ')');
     } catch (_) {}
   }
+  // TOLTE DAL RAPPORTO: il Diario resta (regola del titolare). La registrazione si
+  // stacca dal Rapporto: nel testo "da rapporto" diventa "tolta dal rapporto" e non
+  // viene piu aggiornata dal Rapporto; un avviso lo dice.
+  const staccate = ops.deletes;
+  ops.deletes = [];
+  for (const d of staccate) {
+    const rec = datiCache.find((e) => e.id === d.id);
+    if (!rec) continue;
+    const nuovoTesto = String(rec.testo || '').replace(/\bda rapporto (PRESTO|NOTTE)/, 'tolta dal rapporto $1');
+    const patch = { testo: nuovoTesto };
+    if (_origineSchemaSupported) patch.origine = 'manual';
+    try {
+      await secPatch('registrazioni', 'id=eq.' + d.id, patch);
+    } catch (e) {
+      try {
+        await secPatch('registrazioni', 'id=eq.' + d.id, { testo: nuovoTesto });
+      } catch (e2) {
+        continue;
+      }
+    }
+    Object.assign(rec, patch);
+    toast(d.nome + ' tolto dal Rapporto: nel Diario la registrazione resta');
+    try {
+      logAzione('Tolto dal rapporto (Diario invariato)', d.nome + ' · rapporto ' + turno + ' del ' + ds);
+    } catch (_) {}
+  }
   const totaleDb = ops.creates.length + ops.updates.length + ops.deletes.length;
   if (totaleDb === 0 && ops.skipped.length === 0) return;
   // D6: TRANSACTIONAL · costruisci batch operazioni per RPC
@@ -1092,5 +1118,153 @@ async function esportaRapportoPDF() {
   } catch (e) {
     console.error('PDF error:', e);
     toast('Errore generazione PDF: ' + e.message);
+  }
+}
+// ===== DIARIO <-> RAPPORTO =====
+// Una registrazione del Diario nata dal Rapporto (assenza o differenza di cassa)
+// porta nel testo "da rapporto PRESTO del 30/09/2026". Regole (titolare, 30.09):
+//  - cancellata dal Diario -> la persona sparisce anche dal Rapporto di quel giorno;
+//  - tolta dal Rapporto -> il Diario resta (la registrazione si stacca dal Rapporto
+//    e diventa a se, con un avviso);
+//  - modificata nel Diario -> il programma chiede se correggere anche il Rapporto.
+function _rapportoOrigineDi(rec) {
+  if (!rec || rec.origine === 'manual') return null;
+  const m = String(rec.testo || '').match(/da rapporto (PRESTO|NOTTE) del (\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (!m) return null;
+  const ds = m[4] + '-' + m[3].padStart(2, '0') + '-' + m[2].padStart(2, '0');
+  const campo =
+    rec.tipo === nomeCorrente('Malattia')
+      ? 'assenze'
+      : /^Differenza cassa/.test(String(rec.testo || ''))
+        ? 'differenze_cassa'
+        : '';
+  if (!campo) return null;
+  return { turno: m[1], ds: ds, campo: campo, reparto: rec.reparto_dip || currentReparto };
+}
+// parole del nome (almeno 3 lettere) presenti nel testo, come erano scritte li
+function _rapportoParolaNome(testo, nome) {
+  const parole = String(nome || '')
+    .split(/\s+/)
+    .filter((w) => w.replace(/[^A-Za-zÀ-ü]/g, '').length >= 3);
+  for (const w of parole) {
+    const re = new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+    const m = String(testo || '').match(re);
+    if (m) return m[0];
+  }
+  return '';
+}
+// toglie (o sostituisce con 'nuovo') la parte del testo che riguarda la persona:
+// "Rossi malato, Bianchi ferie" -> "Bianchi ferie"; "Rossi e Bianchi assenti" ->
+// "Bianchi assenti". Righe e frammenti (separati da virgola o punto e virgola).
+function _rapportoTogliNome(testo, nome, nuovo) {
+  let fatto = false;
+  const righe = String(testo || '')
+    .split('\n')
+    .map((riga) => {
+      const pezzi = riga.split(/(\s*[;,]\s*)/);
+      const out = [];
+      for (let i = 0; i < pezzi.length; i += 2) {
+        const fr = pezzi[i];
+        const sep = pezzi[i + 1] || '';
+        const w = _rapportoParolaNome(fr, nome);
+        if (!w || fatto) {
+          out.push(fr, sep);
+          continue;
+        }
+        fatto = true;
+        const e = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const conAltri = new RegExp('(^|\\s)' + e + '\\s+(?:e|ed|&)\\s+|\\s+(?:e|ed|&)\\s+' + e + '(?=\\s|$)', 'i');
+        if (conAltri.test(fr)) {
+          // piu persone nello stesso frammento: si toglie solo il nome
+          out.push(fr.replace(conAltri, (x, a) => a || '').trim(), sep);
+          if (nuovo) out.push(nuovo, sep || ', ');
+        } else if (nuovo) out.push(nuovo, sep);
+        else out.push('', '');
+      }
+      return out
+        .join('')
+        .replace(/^\s*[;,]\s*|\s*[;,]\s*$/g, '')
+        .replace(/\s*([;,])\s*[;,]\s*/g, '$1 ')
+        .trim();
+    })
+    .filter((r) => r);
+  if (!fatto && nuovo) righe.push(nuovo);
+  return { testo: righe.join('\n'), fatto: fatto || !!nuovo };
+}
+async function _rapportoRiga(o) {
+  const r =
+    (await secGet(
+      'rapporti_giornalieri?data_rapporto=eq.' + o.ds + '&turno=eq.' + o.turno + '&reparto_dip=eq.' + o.reparto,
+    )) || [];
+  return r[0] || null;
+}
+// scrive il campo nel rapporto (assenze e colonna, differenze_cassa e in note_extra)
+async function _rapportoScriviCampo(o, riga, valore) {
+  const filtro = 'data_rapporto=eq.' + o.ds + '&turno=eq.' + o.turno + '&reparto_dip=eq.' + o.reparto;
+  const patch = { operatore: getOperatore(), updated_at: new Date().toISOString() };
+  if (o.campo === 'assenze') patch.assenze = valore;
+  else {
+    let extra = {};
+    try {
+      extra = JSON.parse(riga.note_extra || '{}') || {};
+    } catch (e) {}
+    extra[o.campo] = valore;
+    patch.note_extra = JSON.stringify(extra);
+  }
+  await secPatch('rapporti_giornalieri', filtro, patch);
+  if (o.reparto === currentReparto) _rapportoCacheSet(o.ds, o.turno, Object.assign({}, riga, patch));
+}
+function _rapportoValoreCampo(riga, campo) {
+  if (!riga) return '';
+  if (campo === 'assenze') return riga.assenze || '';
+  try {
+    return (JSON.parse(riga.note_extra || '{}') || {})[campo] || '';
+  } catch (e) {
+    return '';
+  }
+}
+// cancellata dal Diario: la persona sparisce dal Rapporto di quel giorno
+async function _rapportoTogliRegistrazione(rec) {
+  const o = _rapportoOrigineDi(rec);
+  if (!o) return false;
+  try {
+    const riga = await _rapportoRiga(o);
+    if (!riga) return false;
+    const r = _rapportoTogliNome(_rapportoValoreCampo(riga, o.campo), rec.nome);
+    if (!r.fatto) return false;
+    await _rapportoScriviCampo(o, riga, r.testo);
+    logAzione('Rapporto aggiornato dal Diario', rec.nome + ' tolto dal rapporto ' + o.turno + ' del ' + o.ds);
+    return o;
+  } catch (e) {
+    console.error('rapporto: togli', e);
+    return false;
+  }
+}
+// modificata nel Diario: la voce del Rapporto si riscrive con i dati nuovi
+async function _rapportoCorreggiRegistrazione(rec, nomeVecchio) {
+  const o = _rapportoOrigineDi(rec);
+  if (!o) return false;
+  try {
+    const riga = await _rapportoRiga(o);
+    if (!riga) return false;
+    const vecchio = _rapportoValoreCampo(riga, o.campo);
+    const parola = _rapportoParolaNome(vecchio, nomeVecchio || rec.nome) || String(rec.nome).split(/\s+/)[0];
+    let nuovo = '';
+    if (o.campo === 'assenze') {
+      const rg = _getRangeMalattiaRec(rec);
+      if (!rg) return false;
+      const f = (d) => d.split('-').reverse().join('/');
+      nuovo = parola + ' malato dal ' + f(rg.i) + ' al ' + f(rg.f);
+    } else {
+      const segno = /eccedenza/i.test(rec.testo || '') ? '+' : '-';
+      nuovo = parola + ' ' + segno + (parseFloat(rec.importo) || 0).toFixed(2);
+    }
+    const r = _rapportoTogliNome(vecchio, nomeVecchio || rec.nome, nuovo);
+    await _rapportoScriviCampo(o, riga, r.testo);
+    logAzione('Rapporto corretto dal Diario', rec.nome + ' nel rapporto ' + o.turno + ' del ' + o.ds + ': ' + nuovo);
+    return o;
+  } catch (e) {
+    console.error('rapporto: correggi', e);
+    return false;
   }
 }
