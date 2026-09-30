@@ -353,6 +353,12 @@ async function elimina(id) {
     datiCache = datiCache.filter((e) => !e.eliminato);
     pinnedIds.delete(id);
     if (_e) logAzione('Registrazione nel cestino', _e.nome + ' - ' + _e.tipo + ' (da ' + op + ')');
+    // malattia cancellata: nel Piano tornano le sigle che la M aveva coperto ("Ex R23")
+    if (_e && _e.tipo === nomeCorrente('Malattia') && typeof sincronizzaMalattiaPiano === 'function') {
+      try {
+        await sincronizzaMalattiaPiano(_e.nome, _e.testo || '', _e.data, '');
+      } catch (e2) {}
+    }
     // nata dal Rapporto giornaliero: la persona sparisce anche da li
     const _rap = _e && typeof _rapportoTogliRegistrazione === 'function' ? await _rapportoTogliRegistrazione(_e) : null;
     if (_rap)

@@ -854,6 +854,21 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
       );
     } catch (_) {}
   }
+  // PIANO: la malattia scritta nel Rapporto scrive le M nel Piano come quella registrata
+  // nel Diario (nota "Ex C0 - operatore", recuperi CGF, festivi persi)
+  if (typeof sincronizzaMalattiaPiano === 'function') {
+    for (const c of ops.creates) {
+      try {
+        await sincronizzaMalattiaPiano(c.nome, '', c.record.data, c.record.testo || '');
+      } catch (e) {}
+    }
+    for (const u of ops.updates) {
+      try {
+        const rec = datiCache.find((x) => x.id === u.id);
+        await sincronizzaMalattiaPiano(u.nome, u.vecchioTesto || '', rec ? rec.data : '', u.nuovoTesto || '');
+      } catch (e) {}
+    }
+  }
   // SKIPPED: solo audit + toast
   for (const s of ops.skipped) {
     toast(s.nome + ': ' + s.motivo + ', non duplicato');
@@ -871,8 +886,9 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
   if (result.deleted) summary.push(result.deleted + ' eliminate');
   if (ops.skipped.length) summary.push(ops.skipped.length + ' duplicati saltati');
   if (summary.length) toast('Assenze: ' + summary.join(', ') + (usedFallback ? ' (modalita compatibilita)' : ''));
-  // Popup copertura per ogni NUOVA assenza creata dal rapporto (in sequenza)
-  if (ops.creates.length && typeof apriPopupCopertura === 'function') {
+  // Popup copertura per ogni NUOVA assenza creata dal rapporto (in sequenza); non quando
+  // l assenza arriva dal Piano (M o Copertura malattia: la copertura e gia decisa li)
+  if (ops.creates.length && typeof apriPopupCopertura === 'function' && !window._rapportoDalPiano) {
     for (const c of ops.creates) {
       const dIso =
         c.dataInizio instanceof Date
@@ -1267,4 +1283,41 @@ async function _rapportoCorreggiRegistrazione(rec, nomeVecchio) {
     console.error('rapporto: correggi', e);
     return false;
   }
+}
+
+// M NEL PIANO O COPERTURA MALATTIA: come se l assenza fosse scritta nel Rapporto. Si
+// aggiunge "Rossi malato dal 30/09/2026 al 02/10/2026" alle assenze del Rapporto del
+// primo giorno (PRESTO se il turno sostituito e diurno o era un riposo, NOTTE se
+// notturno) e il Rapporto crea la registrazione nel Diario, come sempre.
+async function _rapportoAggiungiAssenza(nome, dal, al, codiceSostituito) {
+  const t = codiceSostituito && typeof _pianoTurnoInfo === 'function' ? _pianoTurnoInfo(codiceSostituito) : null;
+  const turno = t && String(t.tipo || '').toUpperCase() === 'NOTTURNO' ? 'NOTTE' : 'PRESTO';
+  const o = { ds: dal, turno: turno, reparto: currentReparto, campo: 'assenze' };
+  const riga = await _rapportoRiga(o);
+  const f = (d) => d.split('-').reverse().join('/');
+  const voce = String(nome).trim() + ' malato dal ' + f(dal) + ' al ' + f(al);
+  const vecchio = riga ? riga.assenze || '' : '';
+  const nuovo = _rapportoParolaNome(vecchio, nome)
+    ? _rapportoTogliNome(vecchio, nome, voce).testo
+    : (vecchio.trim() ? vecchio.replace(/\s+$/, '') + '\n' : '') + voce;
+  if (riga) await _rapportoScriviCampo(o, riga, nuovo);
+  else {
+    await secPost('rapporti_giornalieri', {
+      data_rapporto: dal,
+      turno: turno,
+      reparto_dip: currentReparto,
+      operatore: getOperatore(),
+      updated_at: new Date().toISOString(),
+      assenze: nuovo,
+    });
+    _rapportoCacheSet(dal, turno, { data_rapporto: dal, turno: turno, assenze: nuovo });
+  }
+  window._rapportoDalPiano = true;
+  try {
+    await _processaAssenzeRapporto(nuovo, dal, turno);
+  } finally {
+    window._rapportoDalPiano = false;
+  }
+  logAzione('Malattia dal piano nel Rapporto', nome + ' ' + dal + '-' + al + ' · rapporto ' + turno);
+  return o;
 }

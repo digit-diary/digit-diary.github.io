@@ -940,8 +940,12 @@ async function pianoSalvaCella(nome, dstr, codice) {
       }
       if (commentoRegole)
         patchCella.commento = (commentoRegole + (r.commento ? ' \u00b7 ' + r.commento : '')).substring(0, 400);
+      // malattia scritta a mano sopra una sigla: stessa nota della malattia dal Diario
+      // ("Ex R23 - operatore"), cosi togliendo la malattia la sigla torna
+      if ((codice === 'M' || codice === 'M1') && attuale && attuale !== 'M' && attuale !== 'M1')
+        patchCella.commento = ('Ex ' + attuale + ' - ' + getOperatore()).substring(0, 400);
       await secPatch('piano', 'id=eq.' + r.id, patchCella);
-      if (commentoRegole) r.commento = patchCella.commento;
+      if (patchCella.commento !== undefined) r.commento = patchCella.commento;
       r.codice = codice;
       r.protetto = true;
       r.ora_inizio = orarioJG ? orarioJG.ora_inizio : null;
@@ -973,11 +977,13 @@ async function pianoSalvaCella(nome, dstr, codice) {
       typeof _pianoRiconciliaCgf === 'function'
     )
       await _pianoRiconciliaCgf(nome, dstr.substring(0, 7), { manuali: true, festivi: [dstr] });
-    // M scritta a mano nel piano: proposta di registrarla anche nel Diario,
-    // cosi' piano, Diario e scheda collaboratore restano allineati
+    // M scritta a mano nel piano: proposta di registrarla nel Rapporto e nel Diario,
+    // cosi' piano, Rapporto, Diario e scheda collaboratore restano allineati
     if (codice === 'M' || codice === 'M1') {
-      const nDia = await _pianoMalattiaNelDiario(nome, dstr, dstr, true);
-      if (nDia) toast('Malattia registrata anche nel Diario: conta nella scheda di ' + nome);
+      // il giorno era un CGF: il recupero non e goduto, si propone un giorno sostitutivo
+      if (attuale === 'CGF' && typeof _pianoRimettiCgf === 'function') await _pianoRimettiCgf(nome, dstr);
+      const nDia = await _pianoMalattiaNelDiario(nome, dstr, dstr, true, attuale);
+      if (nDia) toast('Malattia registrata anche nel Rapporto e nel Diario: conta nella scheda di ' + nome);
     } else if (attuale === 'M' || attuale === 'M1') {
       // la M e' stata sovrascritta con un turno: il giorno non e' piu' malattia
       await _pianoMalattiaViaDiario(nome, [dstr]);

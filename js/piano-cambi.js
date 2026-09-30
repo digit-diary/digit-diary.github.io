@@ -1646,7 +1646,8 @@ async function stampaPropostaCopertura() {
 // PIANO → DIARIO: una malattia scritta nel piano si registra anche nel Diario,
 // cosi' la scheda collaboratore conta i giorni (i giorni C dentro il range,
 // mostrati come MC, sono inclusi). Un giorno gia' registrato non si duplica.
-async function _pianoMalattiaNelDiario(nome, dal, al, chiedi) {
+// codiceSostituito: la sigla che la M ha preso (sceglie il Rapporto PRESTO o NOTTE)
+async function _pianoMalattiaNelDiario(nome, dal, al, chiedi, codiceSostituito) {
   if (typeof datiCache === 'undefined' || typeof secPost !== 'function') return 0;
   const tipoMal = typeof nomeCorrente === 'function' ? nomeCorrente('Malattia') : 'Malattia';
   const dI = new Date(dal + 'T12:00:00'),
@@ -1664,6 +1665,36 @@ async function _pianoMalattiaNelDiario(nome, dal, al, chiedi) {
     if (!esiste) giorniNuovi.push(dStr);
   }
   if (!giorniNuovi.length) return 0;
+  // TUTTO COLLEGATO: come se la malattia fosse scritta nel Rapporto del primo giorno
+  // (Rapporto + Diario). Solo se il Piano aperto e del settore del Diario.
+  const viaRapporto = typeof _rapportoAggiungiAssenza === 'function' && currentReparto === _pianoReparto();
+  if (viaRapporto) {
+    const tInfo = codiceSostituito ? _pianoTurnoInfo(codiceSostituito) : null;
+    const tr = tInfo && String(tInfo.tipo || '').toUpperCase() === 'NOTTURNO' ? 'NOTTE' : 'PRESTO';
+    if (
+      chiedi &&
+      !(await chiediConferma(
+        'Registro la malattia di ' +
+          nome +
+          ' anche nel Rapporto ' +
+          tr +
+          ' del ' +
+          dal.split('-').reverse().join('.') +
+          ' e nel Diario (' +
+          giorniNuovi.length +
+          (giorniNuovi.length === 1 ? ' giorno' : ' giorni') +
+          ')?',
+      ))
+    )
+      return 0;
+    try {
+      await _rapportoAggiungiAssenza(nome, dal, al, codiceSostituito);
+      return giorniNuovi.length;
+    } catch (e) {
+      console.error('malattia nel rapporto', e);
+      toast('Rapporto non aggiornato: la malattia va solo nel Diario');
+    }
+  }
   if (
     chiedi &&
     !(await chiediConferma(
@@ -1921,8 +1952,10 @@ async function confermaCoperturaMalattia() {
       'Copertura malattia',
       m.nome + ' ' + m.da + '-' + m.al + ' ' + ym + ': ' + nM + ' M, ' + nSost + ' sostituzioni',
     );
-    // piano e Diario sempre allineati: la malattia si registra anche nel Diario
-    const nDiario = await _pianoMalattiaNelDiario(m.nome, dstrDi(m.da), dstrDi(m.al), false);
+    // piano, Rapporto e Diario sempre allineati: la malattia si registra nel Rapporto
+    // del primo giorno e da li nel Diario
+    const primo = m.giorni.find((d) => !d.salta);
+    const nDiario = await _pianoMalattiaNelDiario(m.nome, dstrDi(m.da), dstrDi(m.al), false, primo ? primo.codice : '');
     toast(
       'Copertura registrata: ' +
         nM +

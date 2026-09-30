@@ -735,8 +735,11 @@ function _pianoDateMalattia(testo, dataReg) {
 // ricevono la M protetta. Chiamata da salvaModificaRegistrazione
 async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNuovo) {
   try {
-    const vecchie = _pianoDateMalattia(testoVecchio, dataVecchia);
-    const nuove = _pianoDateMalattia(testoNuovo, dataVecchia);
+    // testo vuoto = nessun giorno (malattia nuova o cancellata). Prima un testo vuoto
+    // valeva come "il giorno della registrazione": una malattia di un giorno appena
+    // creata non riceveva la M e una cancellata non restituiva il turno
+    const vecchie = String(testoVecchio || '').trim() ? _pianoDateMalattia(testoVecchio, dataVecchia) : [];
+    const nuove = String(testoNuovo || '').trim() ? _pianoDateMalattia(testoNuovo, dataVecchia) : [];
     if (!vecchie.length && !nuove.length) return null;
     const daTogliere = vecchie.filter((d) => !nuove.includes(d));
     const daMettere = nuove.filter((d) => !vecchie.includes(d));
