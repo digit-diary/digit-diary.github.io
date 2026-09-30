@@ -1,0 +1,840 @@
+{
+ "area": "Piano di lavoro (calendario, cambi, bozza, ore, vacanze, CGF)",
+ "sezioni": [
+  {
+   "titolo": "Piano · Calendario: celle e sigle",
+   "prove": [
+    {
+     "azione": "Calendario: clicca una cella vuota di un giorno futuro, scrivi 'C0' e premi Invio",
+     "atteso": "La cella mostra C0 con il colore del turno, compare 'Salvataggio automatico' e le colonne OL/OP/SM della riga si aggiornano",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Calendario: scrivi 'co' in minuscolo in una cella",
+     "atteso": "Avviso rosso 'Sigla o codice sbagliato: \"CO\" non esiste ... Forse intendevi \"C0\"?', la cella lampeggia in rosso e torna com era",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Calendario: clicca una cella con un turno, cancella il testo e premi Invio",
+     "atteso": "La cella resta vuota e le ore della riga scendono",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Calendario: scrivi un turno notturno (es. R23) la sera e un turno del mattino il giorno dopo per la stessa persona",
+     "atteso": "Compare un solo avviso con la regola violata (riposo minimo 11 ore); confermando comunque, la violazione resta scritta nel commento della cella",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Calendario: scrivi 'V' su una cella di un fisso",
+     "atteso": "Compare V (codice speciale comune a tutti i settori) e OP conta le ore della giornata di vacanza secondo la percentuale (5.857 ore al 100%)",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Calendario: scrivi 'JG' in una cella",
+     "atteso": "Il programma chiede 'Orario di INIZIO per JG (es. 10:00)' e poi 'Orario di FINE'; dopo il salvataggio passando il mouse sulla cella si legge l orario",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Calendario: scrivi 'JG' e come orario di inizio scrivi '10' senza minuti",
+     "atteso": "Messaggio 'Orario non valido (usa hh:mm)', la cella non cambia",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Calendario: scrivi un nuovo turno sopra una cella protetta (V applicata dalle vacanze)",
+     "atteso": "Conferma che dice esattamente cosa si sta sostituendo; con Annulla la V resta",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Calendario: scrivi Z0 in un venerdi e in un martedi normale, poi passa il mouse sulle due celle",
+     "atteso": "Venerdi fine 20:30, martedi fine 19:45; la durata del venerdi e maggiore e OP ne tiene conto",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Calendario: guarda l intestazione di un giorno di festivita infrasettimanale e del 31 dicembre",
+     "atteso": "Marcatore viola CH5 sul festivo, CH7 sul 31 dicembre; nessun marcatore sui venerdi e sabato normali",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Calendario: con un operatore senza permesso Piano di lavoro prova a cliccare una cella e scrivere",
+     "atteso": "La cella non si modifica; in barra si legge 'sola lettura' e non ci sono i gruppi Pianifica/Controlla/Strumenti",
+     "ruolo": "operatore"
+    }
+   ]
+  },
+  {
+   "titolo": "Piano · Calendario: menu del tasto destro, commenti, colori, blocco",
+   "prove": [
+    {
+     "azione": "Tasto destro su una cella con C0",
+     "atteso": "Menu con intestazione 'Nome · data (C0)' e voci Modifica turno, Aggiungi commento, Colore cella, Cambia turno con..., Cerca cambio · giorno libero, Cambio per esigenze, Blocca questa cella (con motivo), Rimuovi cella, Copia cella, Incolla qui, Nascondi riga, Nascondi giorno, Stampa piano di ...",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Tasto destro su una cella con C (congedo, non turno)",
+     "atteso": "Non compaiono Cambia turno con..., Cerca cambio e Cambio per esigenze",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Tasto destro > Aggiungi commento, scrivi 'visita ore 10' e conferma",
+     "atteso": "Nella cella compare il triangolino del commento; passando il mouse si legge il testo",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Tasto destro > Colore cella, scegli un colore e poi Grassetto",
+     "atteso": "La cella prende sfondo e grassetto; la voce ora dice 'Colore cella (attivo)'; un altro operatore vede lo stesso colore",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Palette colori: prova Copia formato su una cella colorata, Incolla formato su un altra, poi Cancella formato",
+     "atteso": "Il formato passa alla seconda cella, poi Cancella formato la riporta al colore del turno",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Tasto destro > Blocca questa cella (con motivo), scrivi 'visita medica'",
+     "atteso": "Lucchetto rosso nella cella; al tasto destro la voce diventa 'Sblocca questa cella'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Prova a scrivere un altra sigla sulla cella bloccata",
+     "atteso": "Compare una conferma che mostra il motivo 'visita medica'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Tasto destro su una cella V applicata dalle vacanze (protetta ma non bloccata)",
+     "atteso": "Compare 'Blocca questa cella', NON 'Sblocca'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Tasto destro > Sblocca questa cella e conferma",
+     "atteso": "Il lucchetto sparisce, l azione e nel registro attivita",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Tasto destro > Rimuovi cella su una cella con S22",
+     "atteso": "La cella si svuota e la freccia Annulla diventa blu",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Tasto destro sul NOME di un collaboratore",
+     "atteso": "Menu corto con Nascondi riga, Mostra nascosti (se ce ne sono) e Stampa piano di ...",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Piano · Calendario: selezione, copia, incolla, nascondi, ordine righe, ricerca",
+   "prove": [
+    {
+     "azione": "Trascina il mouse su 3 righe x 4 giorni",
+     "atteso": "Blocco evidenziato; la barra in basso a destra mostra somma, media, minimo e massimo",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Con un blocco selezionato premi Canc",
+     "atteso": "Chiede conferma; confermando le celle si svuotano",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Seleziona un blocco, premi Ctrl+C, poi tasto destro su un altra cella > Incolla qui (Excel/blocco)",
+     "atteso": "Si apre il riquadro 'Incolla'; con Ctrl+V il blocco viene copiato a partire da quella cella",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Copia 3 celle da un foglio Excel con C0, S22, V e incollale nel riquadro Incolla",
+     "atteso": "Le tre sigle entrano nelle celle; una sigla inesistente viene segnalata e non scritta",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Tasto destro > Nascondi riga e Nascondi giorno 10, poi Mostra nascosti (2)",
+     "atteso": "Riga e giorno spariscono; con Mostra nascosti tornano visibili",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Trascina il nome di un collaboratore in cima alla lista",
+     "atteso": "Messaggio 'Ordine salvato'; ricaricando la pagina l ordine resta",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi Ordine predefinito",
+     "atteso": "Messaggio 'Ordine predefinito: SUP, BO, poi gli altri'; i jolly in fondo",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scrivi 'C8' nella casella 'Cerca nome o sigla...'",
+     "atteso": "Restano solo i collaboratori che hanno C8 nel mese; svuotando la casella tornano tutti",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Clic singolo e poi doppio clic sul nome di un collaboratore",
+     "atteso": "Il clic seleziona la riga, il doppio clic apre la scheda del collaboratore",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Piano · Calendario: Annulla, Ripristina, Annulla tutto",
+   "prove": [
+    {
+     "azione": "Modifica una cella, poi passa il mouse sulla freccia Annulla",
+     "atteso": "Freccia blu con suggerimento 'Annulla: modifica cella ...'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi Annulla e poi Ripristina",
+     "atteso": "La cella torna al valore precedente e poi di nuovo alla modifica",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Dopo 4 modifiche premi il bottone rosso 'Annulla tutto (4)' e conferma",
+     "atteso": "Il mese torna esattamente com era a inizio sessione",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Fai uno scambio turno e poi premi Annulla",
+     "atteso": "Tornano i turni originali, i colori, gli orari e i motivi di blocco del mese",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Piano · Calendario: giorni chiusi e sblocco",
+   "prove": [
+    {
+     "azione": "Guarda un giorno di ieri prima di mezzogiorno e dopo mezzogiorno",
+     "atteso": "Prima di mezzogiorno il giorno e ancora modificabile; dopo porta il piccolo lucchetto sotto il numero",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Senza permesso Giorni chiusi prova a modificare una cella di un giorno chiuso",
+     "atteso": "Messaggio che il giorno e chiuso e serve il permesso; la cella non cambia",
+     "ruolo": "operatore"
+    },
+    {
+     "azione": "Con il permesso Giorni chiusi clicca una cella di un giorno chiuso, lascia vuoto il motivo",
+     "atteso": "Senza motivo non si sblocca",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Con il permesso Giorni chiusi scrivi il motivo 'correzione timbratura' e modifica la cella",
+     "atteso": "Il giorno resta aperto per 10 minuti; sblocco e motivo compaiono nel registro attivita",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Doppio clic su OP di un mese passato (es. agosto, oggi settembre dopo il 1 alle 12)",
+     "atteso": "Chiede lo sblocco motivato prima di correggere le ore reali",
+     "ruolo": "admin"
+    }
+   ]
+  },
+  {
+   "titolo": "Piano · Calendario: malattia dal Diario, compleanno riservato",
+   "prove": [
+    {
+     "azione": "Nel Diario registra una malattia per un collaboratore che nel Piano ha V quel giorno",
+     "atteso": "Nel Piano la cella diventa M protetta con commento 'era V'; nella scheda Vacanze il giorno compare in 'Restituite per malattia'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Registra nel Diario una malattia su un giorno con CGF",
+     "atteso": "La cella diventa M, il CGF resta a credito (Crediti e Festivi lo contano ancora da godere)",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Registra nel Diario una malattia su un giorno con turno S22",
+     "atteso": "La cella diventa M con commento 'era S22'; OL della riga scende, OP conta la malattia",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Togli dal Diario la malattia appena inserita",
+     "atteso": "Nel Piano torna la sigla coperta (V, CGF o S22)",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Genera la bozza in un mese in cui cade il compleanno di un collaboratore (data di nascita in anagrafica)",
+     "atteso": "Quel giorno riceve C con nota 'Compleanno'; nel piano dell altro settore (se lavora in due) si vede la stessa cella",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Prova Cerca cambio o Copertura malattia su un giorno in cui il collega ha il C del compleanno",
+     "atteso": "Quel collega non viene mai proposto",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Piano · Calendario: colonne ore e saldo del mese",
+   "prove": [
+    {
+     "azione": "Doppio clic su SM di un collaboratore, scrivi 150 come ore reali e il motivo 'uscite anticipate'",
+     "atteso": "Il valore porta un asterisco; passando il mouse si legge chi, quando e perche; SM e YTD cambiano",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Doppio clic di nuovo su OP dello stesso e lascia il campo vuoto",
+     "atteso": "Si torna alle ore del piano, l asterisco sparisce",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Doppio clic su SM di un ausiliario",
+     "atteso": "Nessun saldo da correggere (gli ausiliari non hanno ore dovute)",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Piano · Calendario: stampa, esportazione, import, fabbisogno",
+   "prove": [
+    {
+     "azione": "Premi Stampa PDF nel gruppo Esporta",
+     "atteso": "Messaggio 'Caricamento PDF...', poi il PDF del mese del settore con il nome ufficiale del settore (es. FoBoSlot)",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Tasto destro > Stampa piano di Mario (o icona stampa accanto al nome)",
+     "atteso": "PDF con il solo piano del mese di quel collaboratore",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi Copia per Excel e incolla in un foglio Excel",
+     "atteso": "Messaggio 'Piano copiato: incollalo in Excel'; in Excel compare la griglia nomi x giorni",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi Importa piano e scegli il file Excel dei piani del settore",
+     "atteso": "Il programma riconosce il mese e i nomi; le celle gia presenti non vengono toccate; collaboratori nuovi, da riattivare o da disattivare vengono proposti con conferma separata",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Nel riquadro Pianificazione (fabbisogno) premi Copia dal mese precedente",
+     "atteso": "Il fabbisogno del mese si riempie con quello del mese prima",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Premi Svuota mese nel fabbisogno e poi Importa fabbisogno dallo stesso file Excel",
+     "atteso": "Il fabbisogno si svuota, poi viene sostituito da quello del file; le celle col numero assegnati/richiesti mostrano i buchi in rosso",
+     "ruolo": "admin"
+    }
+   ]
+  },
+  {
+   "titolo": "Piano · Cambi turno: scambio con un collega e limite mensile",
+   "prove": [
+    {
+     "azione": "Tasto destro su S22 di Mario > Cambia turno con...",
+     "atteso": "Finestra 'Scambio turno' con l elenco dei colleghi che quel giorno hanno un turno nello stesso settore, campo Motivazione e spunta per la restituzione",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scegli un collega con C0 e premi Scambia senza restituzione",
+     "atteso": "Mario ha C0 e il collega S22; messaggio di conferma; si apre il formulario da firmare; lo scambio compare nella scheda Cambi turno",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Spunta la restituzione e metti una data PRIMA del giorno del cambio",
+     "atteso": "Messaggio 'La data di restituzione deve essere successiva al giorno del cambio', nulla cambia",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scambio con restituzione in un giorno del mese successivo",
+     "atteso": "Le celle del mese dopo vengono scritte davvero, con commento 'Ex ... - restituzione cambio con ...'; chi quel giorno non aveva nulla riceve C",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scegli un collega per cui lo scambio violerebbe il riposo di 11 ore",
+     "atteso": "Il collega e segnalato o escluso con la regola violata",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Con limite cambi a 3, fai richiedere a Mario il 4 cambio del mese",
+     "atteso": "Nell elenco compare 'limite superato (3/3): serve autorizzazione'; alla conferma 'Autorizzi comunque lo scambio come responsabile?'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Rispondi Annulla alla richiesta di autorizzazione oltre limite",
+     "atteso": "Nessuno scambio fatto, nessuna autorizzazione nel registro",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Rispondi OK all autorizzazione oltre limite",
+     "atteso": "Scambio fatto; nel registro 'Piano: scambio autorizzato oltre limite'; il collega che accetta non consuma il suo limite",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Impostazioni piano: imposta il massimo cambi al mese a 40",
+     "atteso": "Avviso rosso 'Il massimo di cambi al mese va da 0 (illimitati) a 31'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Prova Cambia turno con... verso un collega che ha la cella bloccata con motivo",
+     "atteso": "Il collega non viene proposto",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Tasto destro su una cella con commento 'cambio con' > Ristampa foglio cambio",
+     "atteso": "Si riapre il PDF archiviato di quel cambio; se non c e compare 'Nessun foglio cambio archiviato per ...'",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Piano · Cambi turno: cerca cambio, esigenze operative, copertura malattia",
+   "prove": [
+    {
+     "azione": "Tasto destro su S22 > Cerca cambio · giorno libero",
+     "atteso": "Messaggio 'Cerco con chi puo cambiare...', poi finestra 'Cerca cambio' con i colleghi a riposo che possono prendere S22 e le date possibili per la restituzione",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nella finestra Cerca cambio premi Stampa lista colleghi",
+     "atteso": "PDF con la lista dei colleghi e le righe 'Collega scelto' e 'Data restituzione' da compilare",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scegli un collega, 'senza restituzione (solo copertura)' e premi Applica cambio",
+     "atteso": "Il collega prende S22, Mario resta libero; messaggio 'Cambio applicato'; formulario da firmare",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Cerca cambio in un giorno in cui nessun collega a riposo puo coprire",
+     "atteso": "Messaggio 'Nessun collega a riposo quel giorno puo coprire S22 rispettando le regole'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Tasto destro > Cambio per esigenze, scegli un altro turno e un motivo, premi Cambia turno",
+     "atteso": "La cella prende il nuovo turno; il foglio risulta di tipo 'esigenze operative'; i turni per cui non e formato sono segnati 'NON FORMATO'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Barra > Copertura malattia: scegli il collaboratore, Dal giorno 5 Al giorno 8, premi Cerca sostituti",
+     "atteso": "Per ogni giorno la lista dei sostituti possibili, anche con mossa a catena sul giorno prima",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Copertura malattia con Dal giorno 9 e Al giorno 3",
+     "atteso": "Messaggio 'Compila collaboratore e periodo (dal ≤ al)'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scegli un sostituto e premi Conferma copertura",
+     "atteso": "Il sostituto riceve il turno; il malato ha M; il foglio di copertura e archiviato",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Prova a fare un cambio su un giorno chiuso senza permesso",
+     "atteso": "Il cambio viene rifiutato come per la modifica manuale",
+     "ruolo": "operatore"
+    }
+   ]
+  },
+  {
+   "titolo": "Piano · Scheda Cambi turno (elenco fogli)",
+   "prove": [
+    {
+     "azione": "Apri Piano > Cambi turno",
+     "atteso": "Tabella dal piu recente con Data del cambio, Tipo, Collaboratori e turni, restituzione, Motivo, Fatto da, data di creazione e Apri PDF",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scrivi il cognome di un collaboratore in 'Cerca nei cambi turno...'",
+     "atteso": "Restano solo i fogli con quel nome; lo stesso funziona con il motivo o con il nome di chi l ha fatto",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scegli un mese nel filtro",
+     "atteso": "Solo i cambi di quel mese",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi Apri PDF su una riga",
+     "atteso": "Si apre il formulario di quel cambio con firme, restituzione e riquadro autorizzazione",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi Formulario vuoto",
+     "atteso": "PDF vuoto da compilare a mano con il nome ufficiale del settore",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nella scheda collaboratore premi Anteprima su uno degli ultimi tre cambi e poi Tutti nel Piano",
+     "atteso": "Anteprima apre il foglio; Tutti nel Piano apre la scheda Cambi turno gia filtrata su di lui",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Piano · Bozza automatica (generare il mese)",
+   "prove": [
+    {
+     "azione": "Premi Genera bozza in un mese senza fabbisogno",
+     "atteso": "Messaggio 'Nessun fabbisogno configurato per questo mese: la bozza non sa cosa riempire'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Con fabbisogno e vacanze applicate premi Genera bozza",
+     "atteso": "Riepilogo: turni da assegnare, CGF automatici, congedi C di riempimento, posti senza candidato; 'Le celle esistenti NON vengono toccate'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Alla conferma della bozza rispondi Annulla",
+     "atteso": "Messaggio 'Bozza annullata: il mese e tornato com era', nessuna cella nuova",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Conferma la bozza",
+     "atteso": "Messaggio 'Bozza generata: N celle scritte · X scoperti'; V, M e celle bloccate intatte",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Dopo la bozza controlla un collaboratore con una settimana di V",
+     "atteso": "Riceve turni solo fino alle ore dovute (le V valgono ore)",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Nelle Preferenze collaboratori metti 'Solo diurni' a un collaboratore e rigenera",
+     "atteso": "Non riceve turni notturni",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Metti un turno in 'Turni bloccati' (es. R23) a un collaboratore e rigenera",
+     "atteso": "Non riceve mai R23",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Genera bozza in un mese con giorni gia chiusi",
+     "atteso": "I giorni chiusi non vengono toccati; se tutti sono chiusi 'Tutti i giorni di ... sono chiusi: niente da generare'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Premi Valida regole",
+     "atteso": "Elenco delle violazioni (riposi, consecutivi, idoneita, ore fuori tolleranza) e celle evidenziate",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Premi Migliora ore",
+     "atteso": "Scambia turni generati tra chi e sopra e chi e sotto le ore dovute; SM si avvicina a zero",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Con un collaboratore di altro settore abilitato alla copertura premi Completa con coperture",
+     "atteso": "I buchi vengono tappati entro i limiti della sua scheda; senza abilitati il pulsante non compare",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Premi Cancella piano",
+     "atteso": "Finestra con 'Solo non protette (N)' e 'TUTTE (N)'; con Solo non protette le V restano",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Cancella piano > TUTTE, poi freccia Annulla",
+     "atteso": "Conferma 'ATTENZIONE: verranno eliminate ANCHE le celle protette'; dopo Annulla il mese torna com era",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Guarda la barra senza indirizzo del solver in Impostazioni",
+     "atteso": "Il pulsante 'Genera con il solver' non compare",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Scrivi l indirizzo del solver spento e premi Genera con il solver",
+     "atteso": "Avviso 'Solver non raggiungibile ... Resta disponibile Genera bozza'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Operatore senza permesso Piano: guarda la barra",
+     "atteso": "Nessun pulsante Genera bozza, Migliora ore, Cancella piano",
+     "ruolo": "operatore"
+    }
+   ]
+  },
+  {
+   "titolo": "Piano · Crediti e Recupero ore",
+   "prove": [
+    {
+     "azione": "Apri Piano > Crediti",
+     "atteso": "Per ogni collaboratore: vacanze spettanti, pianificate, restituite, restanti; CGF riportati, maturati, goduti, restanti; saldo ore; recupero ore; congedo non pagato",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Crediti: premi Calcola del saldo, poi clicca una riga",
+     "atteso": "Il saldo si riempie come nella scheda Saldo; il clic mostra il dettaglio",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Crediti: premi Stampa",
+     "atteso": "Foglio A4 con i crediti del settore",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Recupero ore: scrivi '-1' in una casella",
+     "atteso": "Casella rossa, totale del collaboratore -1, riepilogo del settore aggiornato",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Recupero ore: scrivi '1:30' in una casella e '1.5' in un altra",
+     "atteso": "Tutte e due valgono 1.5 ore",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Recupero ore: scrivi '+3', poi torna al Calendario",
+     "atteso": "Casella verde; nel Calendario OP e SM dello stesso collaboratore salgono di 3",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Recupero ore: scrivi in un giorno chiuso",
+     "atteso": "Si salva senza chiedere lo sblocco",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Piano · Vacanze",
+   "prove": [
+    {
+     "azione": "Apri Piano > Vacanze",
+     "atteso": "Tabella giorni spettanti (In servizio dal, spettanti, pianificate, Restituite per malattia) ed elenco settimane lun-dom",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi Nuova vacanza, scegli collaboratore e settimana, lascia spuntato 'Definitiva' e premi Aggiungi",
+     "atteso": "La settimana compare con badge Definitiva",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Clicca il badge Definitiva",
+     "atteso": "Diventa Provvisoria, riga gialla; il cambio e nel registro",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi Applica al piano",
+     "atteso": "Nel Calendario V protette sulle settimane Definitive, C prima e dopo secondo la percentuale e il giorno diurno prima della partenza; le Provvisorie non vanno nel piano",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Importa (Excel o PDF) un file HR con X e con 'pc' in una settimana",
+     "atteso": "Anteprima con i nomi riconosciuti; la settimana PC compare con la sua sigla e non conta come vacanza",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Importa un file con un simbolo sconosciuto (es. 'Q')",
+     "atteso": "Il simbolo viene segnalato e non importato",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Reimporta lo stesso file con una settimana tolta e una sigla cambiata",
+     "atteso": "Riepilogo persona per persona: nuove, tolte, sigla cambiata; le uguali restano (anche se Provvisoria)",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Applica al piano con una settimana MT",
+     "atteso": "Nel calendario compare MT con gli stessi C prima e dopo delle vacanze",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi Scarica Excel e Scarica PDF",
+     "atteso": "File nel formato del file HR; il PDF si apre prima in anteprima",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi Scambia settimane, scegli due settimane e premi Scambia",
+     "atteso": "Le due settimane si scambiano; il Formulario cambio vacanza produce il foglio",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Controlla un collaboratore con 10 anni di servizio e uno con 2 anni appena compiuti",
+     "atteso": "36 giorni per il primo; pro-rata mensile per il secondo (passando il mouse il valore esatto, es. 32.67 diventa 33)",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Apri la scheda da ottobre in poi",
+     "atteso": "Avviso con chi avra piu giorni l anno successivo",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Cerca un ausiliario nella tabella spettanti",
+     "atteso": "Non compare",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Piano · Turni, codici, regole, regole di gruppo, mappature",
+   "prove": [
+    {
+     "azione": "Turni: premi + Aggiungi turno, crea 'T9' con orario, durata, tipo diurno e colore",
+     "atteso": "Il turno compare nella tabella solo per il settore scelto; nel Calendario T9 si puo scrivere",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Turni: imposta 'Fine (chiusura 5)' per Z0",
+     "atteso": "Z0 finisce piu tardi nei giorni di chiusura tardiva",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Turni: premi Controlla le durate dei turni",
+     "atteso": "Tabella con durata scritta e calcolata in ore e minuti e decimali; solo scarti di almeno 3 minuti",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Codici speciali: + Aggiungi codice senza scrivere il codice",
+     "atteso": "Avviso 'Inserisci il codice'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Regole: scegli il settore Tavoli e cambia il riposo minimo da 11 a 12",
+     "atteso": "La riga dice 'eccezione'; Slots resta 'valore generale'; Torna al generale la toglie",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Regole: scrivi 3 nel riposo minimo o un testo in un campo numerico",
+     "atteso": "Avviso rosso con il motivo, resta il valore di prima",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Regole di gruppo: + Aggiungi regola 'Turni riservati a certe funzioni' con valore L1,9:BO,SUP ai Tavoli",
+     "atteso": "Rifiutata con avviso rosso se L1 o 9 non esistono ai Tavoli; accettata agli Slots",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Mappature: + Aggiungi una mappatura funzione-gruppo",
+     "atteso": "La riga compare; con Elimina sparisce",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Operatore senza permesso Regole apre Piano > Regole",
+     "atteso": "Messaggio che dice cosa serve e a chi chiederlo, non pagina bianca",
+     "ruolo": "operatore"
+    }
+   ]
+  },
+  {
+   "titolo": "Piano · Festivi, CGF e chiusure CH5/CH7",
+   "prove": [
+    {
+     "azione": "Apri Festivi per un anno futuro (es. 2028)",
+     "atteso": "I festivi del Ticino si generano da soli; ogni giorno dice se da CGF o perche e escluso (non parificato o domenica)",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Festivi: premi Chi ha diritto a un recupero",
+     "atteso": "Elenco con maturati, goduti e saldo dell anno",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Festivi: premi Assegna i CGF del mese",
+     "atteso": "CGF nei giorni liberi, senza doppioni, senza celle occupate, mai sul compleanno o vicino alle vacanze",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Festivi: Riporto CGF dall anno precedente, scrivi 3 per un collaboratore e premi Salva",
+     "atteso": "Crediti e Chi ha diritto contano il riporto 3",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Metti CGF il 18 dicembre a chi lavora il 25, poi togli il turno del 25",
+     "atteso": "Il CGF del 18 diventa C con nota 'CGF tolto: festivo non lavorato'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Con un CGF anticipato, registra malattia nel Diario sul giorno del CGF",
+     "atteso": "Resta la M e il CGF torna a credito",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Guarda un ausiliario che lavora il 1 Agosto",
+     "atteso": "Nessun CGF; nelle Statistiche anno compare in 'Suppl. 50%'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Festivita e orari di chiusura: premi Inserisci le festivita del 2027, poi spegni una riga e aggiungine una a mano",
+     "atteso": "Righe inserite; la riga spenta non da piu CH5 nel calendario; la nuova da CH5",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Operatore senza permesso Festivi apre la scheda",
+     "atteso": "Messaggio che spiega il permesso che manca",
+     "ruolo": "operatore"
+    }
+   ]
+  },
+  {
+   "titolo": "Piano · Timbrature, Saldo, Statistiche, Benessere, Congedi non pagati",
+   "prove": [
+    {
+     "azione": "Timbrature: + Registra entrata e uscita per un giorno",
+     "atteso": "Messaggio 'Timbratura registrata'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Timbrature: Importa file timbratrice, poi Carica confronto del mese e clicca un collaboratore",
+     "atteso": "'Timbrature importate'; nel confronto per giorno entrata, uscita, ore effettive e pianificate",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Saldo: premi Ricalcola",
+     "atteso": "Saldo del mese e YTD; valgono le ore timbrate dove esistono, altrimenti il piano",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Statistiche: premi Anno intero e poi Confronto anni con 2026 e 2023",
+     "atteso": "Tabella con ore, jolly, malattie, weekend, vacanze e recuperi; nota con i mesi in archivio",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Benessere: apri la scheda e passa il mouse su una riga",
+     "atteso": "Indice 0-100 per fissi e ausiliari separati, dettaglio punteggi; sotto 55 nella lista di chi guardare",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Congedi non pagati: Registra congedo dal 10 al 5",
+     "atteso": "Rifiutato (date invertite)",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Registra congedo senza motivo",
+     "atteso": "Rifiutato",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Registra congedo 1-15 del mese con motivo e chi ha autorizzato",
+     "atteso": "'Congedo non pagato registrato'; nel calendario CNP protette, OD del mese scende",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Registra un secondo congedo che si sovrappone al primo, poi elimina il primo",
+     "atteso": "Sovrapposto rifiutato; eliminando il primo le CNP spariscono",
+     "ruolo": "admin"
+    }
+   ]
+  },
+  {
+   "titolo": "Piano · Schede personalizzabili per operatore",
+   "prove": [
+    {
+     "azione": "Visibilita e permessi: nascondi 'Piano · Benessere' a un operatore",
+     "atteso": "Per quell operatore la scheda sparisce dal menu del Piano",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Rendi 'Piano · Vacanze' visibile ma non modificabile",
+     "atteso": "L operatore vede la scheda ma Nuova vacanza, Applica al piano e Importa sono spenti",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Operatore con Calendario in sola lettura prova a scrivere una cella",
+     "atteso": "Nessuna modifica possibile",
+     "ruolo": "operatore"
+    },
+    {
+     "azione": "Con Calendario in sola lettura, registra una malattia dal Diario",
+     "atteso": "La M arriva comunque nel Piano (scrittura automatica)",
+     "ruolo": "operatore"
+    },
+    {
+     "azione": "Visibilita e permessi: nascondi 'Piano · Crediti'",
+     "atteso": "La scheda Crediti sparisce; l admin continua a vedere tutto",
+     "ruolo": "admin"
+    }
+   ]
+  }
+ ]
+}

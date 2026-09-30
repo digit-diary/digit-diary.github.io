@@ -25,3 +25,7 @@ MAIL_PRESENTAZIONE.txt
 # materiale riservato, non per GitHub ne per l IT
 _riservato_non_consegnare/
 _generatori_documenti_it/
+
+# file di collaudo (si compilano con nomi e note)
+COLLAUDO_FUNZIONI_*.html
+collaudo_compilato_*.html

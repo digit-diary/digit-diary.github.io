@@ -1,0 +1,450 @@
+{
+ "area": "Chat, Promemoria, Consegne, Inventario, Assistente AI",
+ "sezioni": [
+  {
+   "titolo": "Chat · Messaggi diretti",
+   "prove": [
+    {
+     "azione": "Clic su '+ Nuova conversazione', poi clic sul nome di un collega (es. Rossi Mario)",
+     "atteso": "Si apre la chat con Rossi Mario vuota, con la scritta 'Nessun messaggio. Inizia la conversazione!'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scrivi 'Cassa 3 chiusa alle 22' e premi Invio",
+     "atteso": "Il messaggio compare a destra con l'ora e una spunta grigia; messaggio 'Nota inviata'; la conversazione sale in cima alla lista con 'Tu: Cassa 3 chiusa...'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Sulla seconda postazione entra come Rossi Mario e aspetta qualche secondo senza ricaricare",
+     "atteso": "Compare l'avviso 'Hai 1 nota/e non letta/e!', il contatore rosso sul menu Note Colleghi e il numero accanto alla conversazione",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Rossi Mario apre la conversazione; poi torna alla prima postazione",
+     "atteso": "Sul messaggio inviato compaiono le due spunte colorate (letto); il contatore di Rossi Mario sparisce",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nella lista conversazioni guarda il pallino accanto a un collega che ha usato il programma negli ultimi 5 minuti",
+     "atteso": "Pallino verde; in testata della chat 'online' oppure 'attivo X min fa'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Rientra con un collega che ha note non lette (primo accesso della giornata)",
+     "atteso": "Si apre la finestra 'Hai N nota/e non letta/e' con mittente, ora e pulsante 'Rispondi' per ognuna; chiusa con 'Chiudi', le note risultano lette",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nella finestra delle note non lette clicca 'Rispondi' su una nota",
+     "atteso": "Si apre la chat con quel collega pronta per rispondere",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Chat · Azioni sui messaggi",
+   "prove": [
+    {
+     "azione": "Su un tuo messaggio NON ancora letto clicca 'Modifica', cambia '22' in '23' e Salva",
+     "atteso": "Il testo si aggiorna per entrambi",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Guarda un tuo messaggio già letto dal destinatario",
+     "atteso": "Il pulsante 'Modifica' non c'è più",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Clic sul cestino ('Elimina') di un tuo messaggio NON letto e conferma",
+     "atteso": "Domanda 'Nessuno ha ancora letto. Annullare l'invio per tutti?'; dopo conferma 'Invio annullato per tutti' e sparisce anche al collega",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Clic sul cestino di un tuo messaggio GIÀ letto e conferma",
+     "atteso": "Domanda 'Eliminare dalla tua vista?'; sparisce solo da te, il collega lo vede ancora",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Su un messaggio ricevuto clicca 'Elimina per me'",
+     "atteso": "Sparisce solo dalla tua chat; il mittente lo vede ancora",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Clic su 'Rispondi' (freccia) di un messaggio, scrivi 'Ok, ricevuto' e invia",
+     "atteso": "Sopra il campo compare l'anteprima del messaggio citato; il nuovo messaggio mostra la citazione; clic sulla citazione porta al messaggio originale",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Clic su 'Inoltra' di un messaggio e scegli 'Tutti Slots'",
+     "atteso": "Finestra 'Inoltra messaggio' con testo e destinatari; dopo la scelta il messaggio arriva nel gruppo Tutti Slots",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Doppio clic su un messaggio (su telefono: tieni premuto) e scegli una reazione",
+     "atteso": "La reazione compare sotto il messaggio con il conteggio; rifare la stessa scelta la toglie",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Clic sulla stella 'Importante' di due messaggi, poi 'Solo importanti'",
+     "atteso": "Restano visibili solo i due messaggi con la stella; senza stelle compare 'Nessun messaggio importante'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Attiva il pulsante '!' (Urgente) e invia 'Cliente agitato al tavolo 5'",
+     "atteso": "'Messaggio urgente inviato'; il messaggio ha l'etichetta URGENTE; il pulsante '!' si disattiva da solo dopo l'invio",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Clic sulla lente in testata chat, scrivi 'cassa', usa le frecce su/giù",
+     "atteso": "Compare il numero di risultati; le frecce passano da un risultato all'altro evidenziandolo; la X chiude la ricerca",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Chat · Gruppi",
+   "prove": [
+    {
+     "azione": "'+ Nuova conversazione' > clic su 'Tutti Slots' e invia 'Briefing alle 19.45'",
+     "atteso": "Tutti gli operatori Slots ricevono il messaggio nel gruppo 'Tutti Slots'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Un operatore del solo settore Tavoli apre '+ Nuova conversazione'",
+     "atteso": "Vede 'Tutti' e 'Tutti Tavoli', non 'Tutti Slots'",
+     "ruolo": "operatore"
+    },
+    {
+     "azione": "'+ Nuova conversazione': spunta la casella di un solo collega",
+     "atteso": "Il pulsante 'Crea gruppo' non compare (servono almeno 2 persone)",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Spunta 3 colleghi, clic 'Crea gruppo (3)', scrivi il nome 'Chiusura sala' e invia un primo messaggio",
+     "atteso": "Nasce il gruppo 'Chiusura sala'; i 3 colleghi lo vedono in lista con quel nome",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nel gruppo inviato, passa sulle spunte di un tuo messaggio",
+     "atteso": "Compare l'elenco 'Letto da:' e di chi non l'ha ancora letto",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Come creatore clic sulla matita 'Rinomina gruppo', scrivi 'Chiusura sala NOTTE'",
+     "atteso": "'Gruppo rinominato'; nella chat compare il messaggio 'Gruppo rinominato in ...'; il nuovo nome si vede anche sulle postazioni degli altri membri",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Come creatore clic su '+' (Aggiungi membri), aggiungi un collega",
+     "atteso": "Nella chat compare '... aggiunto/a al gruppo' e il collega riceve i messaggi successivi",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Come creatore clic su 'Rimuovi membro', spunta un collega e 'Rimuovi'",
+     "atteso": "Compare '... rimosso/a dal gruppo'; quel collega non riceve più i messaggi nuovi. Con 2 soli membri: 'Il gruppo deve avere almeno 2 membri'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Entra con un membro che NON ha creato il gruppo e apri la chat",
+     "atteso": "Non vede i pulsanti Aggiungi, Rinomina, Rimuovi; nella lista membri il creatore ha la lettera A",
+     "ruolo": "operatore"
+    }
+   ]
+  },
+  {
+   "titolo": "Promemoria",
+   "prove": [
+    {
+     "azione": "Promemoria > 'Crea promemoria' con Titolo vuoto",
+     "atteso": "'Inserisci un titolo' e il campo si evidenzia",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Titolo 'Verificare uniformi' senza Scadenza, clic 'Crea promemoria'",
+     "atteso": "'Seleziona una data di scadenza'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Crea 'Verificare uniformi', scadenza fra 5 giorni, Assegnato a: Rossi Mario, Ricordami 3 giorni prima, ore 08:00",
+     "atteso": "'Promemoria creato'; in lista compaiono data, titolo, etichetta blu 'Rossi Mario', descrizione 'Promemoria: 3 giorno/i prima alle 08:00', 'Creato da' con il tuo nome",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Rossi Mario entra nel programma 3 giorni prima della scadenza",
+     "atteso": "Finestra 'Promemoria per oggi' con il titolo, pulsanti 'Vedi tutti' e 'Chiudi'; il promemoria compare anche in Home in 'Da fare oggi'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Lascia scadere un promemoria assegnato a te (scadenza passata, non fatto) e rientra nel programma",
+     "atteso": "In lista bordo rosso e scritta SCADUTO; al login finestra 'N promemoria scaduto!' e contatore rosso sul menu",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nuovo: 'Controllo estintori', scadenza 31 gennaio, Ripeti 'Ogni mese'; poi clic 'Fatto'",
+     "atteso": "'Completato!' e 'Prossimo: ...-02-28' (29 negli anni bisestili): la nuova occorrenza cade l'ultimo giorno di febbraio, non il 3 marzo",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Promemoria 'Ogni settimana' con scadenza lunedì: clic 'Fatto' due volte velocemente",
+     "atteso": "Nasce UNA sola nuova occorrenza al lunedì successivo",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Filtro Stato su 'Completati', poi 'Riattiva' su uno",
+     "atteso": "Si vede 'Fatto da [nome] il [data]' barrato; dopo Riattiva torna tra gli Attivi",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Filtro 'Assegnato a' = Rossi Mario e ricerca 'uniformi'",
+     "atteso": "Restano solo i promemoria di Rossi Mario (o di tutti) con quella parola; nessun risultato mostra 'Nessun promemoria'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Entra con un operatore diverso da Rossi Mario",
+     "atteso": "Non vede il promemoria assegnato solo a Rossi Mario; vede quelli assegnati a 'Tutti'",
+     "ruolo": "operatore"
+    },
+    {
+     "azione": "Guarda i pulsanti di un promemoria da operatore e da amministratore",
+     "atteso": "L'operatore vede solo 'Fatto'/'Riattiva'; l'amministratore vede anche 'Elimina', che chiede 'Eliminare questo promemoria?'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Crea un promemoria nel settore Slots e passa al settore Tavoli",
+     "atteso": "Nel settore Tavoli il promemoria non compare",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Home > 'Da fare oggi' > 'Fatto' su un promemoria",
+     "atteso": "Il promemoria sparisce dalla Home e risulta completato in Promemoria",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Consegna del turno",
+   "prove": [
+    {
+     "azione": "Apri Consegna turno alle 15:00",
+     "atteso": "'Turno uscente' già su PRESTO (dopo le 20:00, o 20:45 ven-sab, su NOTTE)",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Apri la pagina quando nel Rapporto di oggi è indicato il supervisore dell'altro turno",
+     "atteso": "Destinatari già impostato sul suo nome con '(suggerito dal rapporto)' e avviso 'Destinatario suggerito: ...'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Clic 'Invia consegna' con messaggio vuoto",
+     "atteso": "'Scrivi un messaggio di consegna', nulla viene salvato",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scrivi '- Cassa 3 fuori servizio', Priorità Alta, Destinatari: scegli Bianchi Luca, premi Ctrl+Invio",
+     "atteso": "'Consegna inviata!'; in 'Consegne precedenti' compare con PRESTO, '→ Bianchi Luca', PRIORITA ALTA, bordo rosso, pulsanti 'Modifica' e 'Annulla invio'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "'Annulla invio' su una consegna non letta e conferma",
+     "atteso": "'Consegna annullata', sparisce anche per il destinatario",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Bianchi Luca fa l'accesso",
+     "atteso": "Finestra 'Consegna dal turno PRESTO' con autore, ora, PRIORITA ALTA e testo, pulsanti 'OK' e 'Vedi tutte'; se ce ne sono altre '+ altre N consegne non lette'; la consegna risulta letta",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Un destinatario clicca 'Letta' su una consegna in elenco",
+     "atteso": "Compare 'Letto da [nome] il [data]', la card si schiarisce, il contatore sul menu scende",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "L'autore guarda la consegna già letta",
+     "atteso": "Al posto di Modifica/Annulla compare 'Non modificabile (letta)'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Entra con un operatore NON destinatario (consegna a Bianchi Luca)",
+     "atteso": "Non vede quella consegna né in pagina né in Home",
+     "ruolo": "operatore"
+    },
+    {
+     "azione": "Filtri Dal/Al su ieri e ricerca 'cassa', poi 'Reset'",
+     "atteso": "Restano solo le consegne di ieri con 'cassa'; Reset le mostra tutte (massimo le 20 più recenti)",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Inventario · Buoni",
+   "prove": [
+    {
+     "azione": "Inventario nel settore Slots",
+     "atteso": "Schede 'Buoni' e 'Sigarette'; in 'Giacenza Buoni' i riquadri Buono Unico, Buono Lounge, C. Gourmet, Welcome L.",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "'Carico Buoni': Tipo BU, Quantità 50, clic 'Carica buoni'",
+     "atteso": "'50 BU caricati', Buono Unico sale di 50 in verde, in Movimenti una riga +50",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Porta la giacenza BL a 8",
+     "atteso": "Numero arancione e avviso 'Scorta bassa (≤10): BL (8)'; a 0 numero rosso e 'Scorta esaurita: BL'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "'Buono a Cliente': cliente 'Müller Hans', Tipo BU, Quantità 2, 'Assegna buono'",
+     "atteso": "'2 BU assegnati a Müller Hans'; giacenza BU scende di 2; riga 'In attesa'; avviso '1 buoni pre-assegnati non pareggiati'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "In Costi Maison carica il formulario dove Müller Hans consuma 2 BU nello stesso giorno o dopo; torna in Inventario",
+     "atteso": "La riga diventa 'Pareggiato' e l'avviso dei non pareggiati sparisce; la giacenza non scende una seconda volta",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Guarda un consumo BU in Maison senza pre-assegnazione",
+     "atteso": "Compare in Movimenti con nota 'Da Maison' e stato 'auto', senza matita né cestino",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Movimenti Buoni: filtri Tipo BU, Cliente 'Müller', Mese, Anno, Dal/Al, Stato 'Non pareggiato', poi 'Reset'",
+     "atteso": "Ogni filtro restringe la tabella; Reset svuota tutti i filtri e mostra tutto",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Matita su un movimento, cambia quantità da 50 a 40, Salva; poi cestino e conferma",
+     "atteso": "'Movimento modificato' e giacenza aggiornata; poi 'Eliminare questo movimento?' e 'Movimento eliminato'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Clic 'CSV' e 'PDF' sotto Movimenti Buoni",
+     "atteso": "Si scaricano i file con Data, Tipo, Quantità, Movimento, Cliente, Stato, Nota; con inventario vuoto 'Nessun dato'",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Inventario · Sigarette e categorie",
+   "prove": [
+    {
+     "azione": "Scheda Sigarette > 'Sigaretta Sbagliata': Marca 'Marlboro Gold', Collaboratore, Cliente, Qty 1, 'Aggiungi alla scorta'",
+     "atteso": "'Marlboro Gold aggiunta alla scorta'; in 'Scorta Sigarette' riquadro Marlboro Gold 1 e 'Totale pacchetti'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "'Usa dalla Scorta': apri l'elenco Marca",
+     "atteso": "Compaiono solo le marche con scorta maggiore di zero",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Marca Marlboro Gold, Cliente 'Rossi Anna', 'Dai a cliente'; senza cliente riprova",
+     "atteso": "'Marlboro Gold data a Rossi Anna' e scorta scende a 0 (la marca sparisce dall'elenco); senza cliente 'Inserisci il cliente'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Settore Valet o Cleaning > Inventario",
+     "atteso": "Nessuna scheda Buoni/Sigarette; se non ci sono categorie 'Nessuna categoria inventario per il settore ...'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Da amministratore clic '+ Categoria', nome 'Pettorine'",
+     "atteso": "'Categoria \"Pettorine\" aggiunta', nuova scheda con Scorta, Carico e Uscita; un secondo 'Pettorine' dà 'Categoria già esistente'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Nella categoria 'Pettorine' carica 10 'Taglia M', poi esci 3 verso 'Guardaroba'",
+     "atteso": "'Caricati 10 × Taglia M', poi 'Usciti 3 ...'; in Scorta Taglia M = 7",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Amministratore: 'Rinomina' la categoria in 'Pettorine sala', poi 'Rimuovi categoria'",
+     "atteso": "Nome aggiornato; alla rimozione avviso che gli N movimenti restano salvati ma non visibili",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Operatore senza permessi apre Inventario",
+     "atteso": "Non vede '+ Categoria' né i pulsanti Rinomina/Rimuovi categoria",
+     "ruolo": "operatore"
+    }
+   ]
+  },
+  {
+   "titolo": "Assistente AI",
+   "prove": [
+    {
+     "azione": "Assistente: Tipo 'Mail formale', Tono 'Formale', Lingua Italiano, testo 'scrivi a hr che domani mario rossi è malato e serve sostituto turno sera cassa', 'Riscrivi con AI'",
+     "atteso": "Il pulsante mostra 'Elaborazione...', poi 'Testo riscritto!' e il box Risultato con una mail formale che contiene il nome giusto",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "'Allega foto' con una foto, poi 'Rimuovi'",
+     "atteso": "Anteprima e nome file con '(resta locale, non inviata all'AI)'; Rimuovi torna a 'Nessuna foto'. Foto oltre 20MB: 'Foto troppo grande (max 20MB)'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "'Copia negli appunti', 'Riprova', 'Pulisci tutto'",
+     "atteso": "'Copiato negli appunti!' e testo incollabile; Riprova genera una nuova versione; Pulisci svuota tutto e mostra 'Pulito'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Con nessun fornitore configurato clic 'Riscrivi con AI'",
+     "atteso": "Avviso 'Intelligenza artificiale non configurata: Impostazioni > Persone e accessi > Intelligenza artificiale'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Impostazioni > Intelligenza artificiale > '+ Aggiungi fornitore', tipo Ollama, nome 'Llama sul server', lascia vuoto il modello testi, Salva",
+     "atteso": "'Nome, indirizzo e modello per i testi sono obbligatori'; compilato tutto: 'Fornitore salvato: usa \"Prova\" per verificarlo'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Clic 'Prova' sul fornitore",
+     "atteso": "'Prova in corso...' poi 'Funziona: risposta in X s · modelli disponibili...' oppure in rosso 'Non funziona:' con il motivo (es. chiave non valida, non raggiungibile)",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "'Usa' su un altro fornitore e scegli una 'Riserva'; spegni il fornitore in uso e riscrivi un testo",
+     "atteso": "Etichette 'In uso' e 'Riserva'; il testo viene comunque riscritto dalla riserva",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "'Elimina' su un fornitore non in uso",
+     "atteso": "Chiede conferma e sparisce; sul fornitore 'In uso' Elimina non c'è",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Operatore senza permessi apre Impostazioni",
+     "atteso": "Non vede la sezione Intelligenza artificiale",
+     "ruolo": "operatore"
+    }
+   ]
+  },
+  {
+   "titolo": "Notifiche, Home e permessi pagina",
+   "prove": [
+    {
+     "azione": "Primo accesso da un browser nuovo",
+     "atteso": "Il browser chiede il permesso per le notifiche",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Con notifiche permesse e programma chiuso, un collega ti manda una nota, un promemoria e una consegna",
+     "atteso": "Arrivano tre notifiche: 'Nota da ...' (o 'URGENTE da ...'), 'Promemoria: ...', 'Consegna PRESTO da ...'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Home il giorno del compleanno di un collaboratore del settore (con data di nascita in anagrafica)",
+     "atteso": "Banner 'Buon compleanno a: [nome]!' e in 'Da fare oggi' '[nome] · Compleanno OGGI!'; i disattivati o di altri settori non compaiono",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Amministratore imposta la pagina 'Inventario' (o 'Assistente') come nascosta per gli operatori; entra un operatore",
+     "atteso": "L'operatore non vede la voce nel menu",
+     "ruolo": "operatore"
+    }
+   ]
+  }
+ ]
+}

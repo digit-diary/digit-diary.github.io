@@ -1,0 +1,665 @@
+{
+ "area": "Piano · Briefing e pause",
+ "sezioni": [
+  {
+   "titolo": "Briefing · Composizione dal piano",
+   "prove": [
+    {
+     "azione": "Apri Piano, settore Slots, scheda Briefing senza toccare la data",
+     "atteso": "La data proposta e quella di domani, non oggi",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scegli un giorno con turni nel piano e premi Compila dal piano",
+     "atteso": "Compaiono i nomi e le sigle dei turni del giorno, ordinati per gruppo: prima i presti poi le notti; la tabella ORARI accanto mostra solo i turni presenti",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi di nuovo Compila dal piano su un briefing gia compilato",
+     "atteso": "Chiede conferma 'Sostituisco le righe attuali con i turni del piano di ...?'; con Annulla non cambia nulla",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scegli un giorno senza turni nel piano",
+     "atteso": "Compare la scritta 'Nessun turno nel piano per questa data'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Guarda le intestazioni del briefing Slots",
+     "atteso": "Colonne E (verde), U (rossa), HOST, T, CD, USCITA, FIRMA (gialle)",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Passa al settore Valet e compila dal piano",
+     "atteso": "Colonne E, U, COLLABORATORE, TURNO, USCITA, FIRMA, RADIO, BADGE; nessuna colonna CD",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Guarda le colonne E e U dopo la compilazione",
+     "atteso": "Restano vuote: servono per la spunta a penna sul foglio stampato",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Modifica a mano il nome in una riga e cambia pagina, poi torna",
+     "atteso": "Compare 'Salvato' e il nome modificato resta",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Usa il piu su una riga, poi le frecce su e giu, poi la crocetta",
+     "atteso": "Si inserisce una riga vuota sotto, la riga si sposta di un posto alla volta, la crocetta la elimina",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scrivi un cognome molto lungo in una cella del nome",
+     "atteso": "La colonna si allarga mentre scrivi, senza rimpicciolire le altre",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Guarda le sigle dei turni (S3, C0, R22) nella colonna T",
+     "atteso": "Le sigle stanno al centro della casella, a schermo e in stampa",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Entra con un operatore senza permesso sul briefing e prova a scrivere in una cella o premere Compila dal piano",
+     "atteso": "Non puo modificare: nessun salvataggio e il briefing resta com era",
+     "ruolo": "operatore"
+    }
+   ]
+  },
+  {
+   "titolo": "Briefing · Numeri cassa CD",
+   "prove": [
+    {
+     "azione": "Compila un martedi dove ieri il C23 aveva la cassa 3 e il C20 la cassa 4",
+     "atteso": "Oggi chi fa il presto (C23) apre con la cassa che ieri ha chiuso (chi chiude riapre); la coppia 3/4 si scambia",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Controlla le tre coppie di partenza su due giorni di fila",
+     "atteso": "Le coppie 2/7 (C0-C5), 3/4 (C23-C20), 8/9 (C4-C15) si alternano ogni giorno",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Compila un venerdi con un C8 nel piano",
+     "atteso": "Il C8 riceve in ordine la cassa del presto di una coppia",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Compila un giorno dopo due giorni mai salvati nel briefing",
+     "atteso": "I numeri seguono comunque la rotazione, ricostruita dall ultimo briefing salvato (fino a 14 giorni prima)",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scrivi a mano 5 nella CD del C0, poi ricompila o ricarica la pagina",
+     "atteso": "Il 5 scritto a mano resta: la rotazione non lo sovrascrive",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Cambia a mano le CD di ieri e apri il briefing di oggi, premi Aggiorna numeri cassa",
+     "atteso": "Chiede conferma; solo la colonna CD viene ricalcolata, nomi e turni restano uguali",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Admin: in Regole pause cambia la coppia CD C0-C5 da 2/7 a 2/6 e compila un giorno nuovo",
+     "atteso": "La nuova coppia viene usata nella rotazione",
+     "ruolo": "admin"
+    }
+   ]
+  },
+  {
+   "titolo": "Briefing · Colori, evidenziazioni e annulla",
+   "prove": [
+    {
+     "azione": "Clicca la cella nome di S3, con Ctrl clicca anche C0, premi Colora",
+     "atteso": "Le due celle prendono il colore della barretta",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Con la freccia accanto a Colora scegli un altro colore e applicalo",
+     "atteso": "La cella marcata prende il colore scelto",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Marca una cella e premi G, poi C",
+     "atteso": "Il testo diventa grassetto e poi corsivo",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Rimuovi un evidenziazione",
+     "atteso": "Chiede 'Rimuovere questa evidenziazione?' e dopo il si il colore sparisce",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Cambia un nome, un colore, elimina una riga, poi premi tre volte Annulla (accanto a Salvato)",
+     "atteso": "Torna indietro un passo alla volta: riga ricompare, colore tolto, nome originale",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Dopo gli Annulla premi Ripristina due volte",
+     "atteso": "Ritornano la riga eliminata e il colore, nell ordine",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Con il cursore fuori dalle celle premi Ctrl+Z e poi Ctrl+Y",
+     "atteso": "Stesso effetto di Annulla e Ripristina",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Genera le pause, sposta una pausa, poi premi Annulla due volte",
+     "atteso": "Il primo Annulla rimette la pausa al posto, il secondo toglie le pause generate: righe e pause stanno nella stessa storia del giorno",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Briefing · Stampa",
+   "prove": [
+    {
+     "azione": "Slots: premi Stampa briefing con 25 righe",
+     "atteso": "Anteprima PDF A4 in verticale, tutto su un foglio solo, carattere piu grande possibile",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Stampa con un nome lunghissimo in una riga",
+     "atteso": "Il nome va a capo invece di rimpicciolire tutto il foglio",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Stampa un giorno con molte righe negli Slots",
+     "atteso": "Il riquadro ORARI va sotto la tabella se manca spazio a lato",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Valet: premi Stampa briefing",
+     "atteso": "PDF verticale su un foglio solo, con RADIO e BADGE",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Stampa un briefing con celle colorate e in grassetto",
+     "atteso": "Colori e grassetto compaiono anche nel PDF",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Pause · Generazione e Jolly Giornata",
+   "prove": [
+    {
+     "azione": "Senza briefing apri la parte pause",
+     "atteso": "Messaggio 'Nessuna pausa generata per questa data. Compila il briefing e premi Genera pause.'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Slots: compila e premi Genera pause",
+     "atteso": "Compare il foglio pause con colonne per chi da i cambi e righe con orari",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Valet: compila e premi Genera pause",
+     "atteso": "Compare il foglio pause Valet con righe modificabili, + Aggiungi riga e il riepilogo orario sotto",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Valet: aggiungi una riga con + Aggiungi riga, modifica un orario, poi eliminala con la x",
+     "atteso": "Riga aggiunta, orario salvato e riepilogo aggiornato, riga eliminata",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Valet: venerdi con fascia senza pause 23.00-01.00 nelle regole",
+     "atteso": "Nessuna pausa cade fra 23.00 e 01.00",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Slots con un JG nel briefing: premi Genera pause",
+     "atteso": "Si apre la finestra 'Jolly Giornata di oggi' con le scelte sala, rec, cassa, accoglienza, sup, corso e le caselle dalle / alle",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nella finestra JG non scegliere nulla e premi Genera pause",
+     "atteso": "Messaggio '[nome]: scegli dove lavora oggi'; la finestra resta aperta",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scegli sala e scrivi 14.00 in entrambe le caselle",
+     "atteso": "Messaggio 'inizio e fine uguali'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scegli sala e scrivi 'abc' come orario",
+     "atteso": "Messaggio 'scrivi l orario come 14.00 e 22.00'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scegli corso e lascia vuoto l orario",
+     "atteso": "Accetta: per corso l orario non e obbligatorio",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "JG in sala 14.00-22.00 (8 ore)",
+     "atteso": "Riceve 30+15+15 e conta come presenza in sala nel controllo sala vuota",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "JG in accoglienza",
+     "atteso": "Le sue pause sono suggerite fra le Facoltative come S31, senza avvisi",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "JG su sup",
+     "atteso": "Non riceve pause e non conta nella sala",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nel Piano scrivi nel commento della cella del JG 'CORSO 15:30-19_30' e premi Genera pause",
+     "atteso": "La finestra propone gia corso con 15.30 e 19.30",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Commento 'dalle 18.00 alle 03.00' e scelta sala",
+     "atteso": "Le caselle propongono 18.00 e 03.00",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Dopo aver confermato il JG, premi di nuovo Genera pause",
+     "atteso": "La finestra non viene richiesta; nel Piano la cella del JG mostra l orario salvato",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Pause · Regola delle ore e controlli",
+   "prove": [
+    {
+     "azione": "Genera con una persona su turno di 6 ore",
+     "atteso": "Riceve 15+15",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Turno di 7 ore",
+     "atteso": "Riceve 30+15",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Turno di 8 ore o piu (es. 8h30)",
+     "atteso": "Riceve 30+15+15",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Cancella a mano una delle due pause da 15 di un turno di 6 ore",
+     "atteso": "Riquadro rosso 'Da controllare' con la pausa mancante per quella persona",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scrivi a mano due pause della stessa persona a 40 minuti di distanza",
+     "atteso": "Avviso 'meno di un ora fra due pause'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scrivi una pausa alle 13.00 per chi inizia alle 14.00",
+     "atteso": "Avviso di pausa fuori dal turno",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scrivi una riga di cambio che non copre la pausa di nessuno",
+     "atteso": "Avviso: riga che non copre nessuno",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Controlla una persona senza colonna propria (es. S22)",
+     "atteso": "Le sue pause risultano dalle righe di chi gli da il cambio e vengono controllate lo stesso",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Con gli avvisi rossi presenti, prova a modificare e salvare altre celle",
+     "atteso": "Gli avvisi non bloccano: si salva normalmente",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Aggiungi un secondo C0 nel briefing e rigenera",
+     "atteso": "Il programma propone le pause mancanti del secondo C0 con un cambio da chi e formato in cassa e libero",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Caso in cui nessuno puo dare il cambio a una cassa",
+     "atteso": "La proposta per quella cassa e scritta in rosso",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Pause · Sala mai vuota e sistemazione",
+   "prove": [
+    {
+     "azione": "Pomeriggio con un solo turno di sala che deve dare i cambi in cassa",
+     "atteso": "Resta l avviso di sala vuota: non c e mossa che lo risolva",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Serata con S3 in cassa a dare i cambi mentre S7 e in pausa alle 21.30",
+     "atteso": "Il programma sposta la pausa e lo scrive, es. 'pausa spostata da 21.30 a 20.00, cosi la sala non resta vuota'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Serata con un JG in sala nello stesso momento",
+     "atteso": "Nessun avviso di sala vuota",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Un responsabile Z resta solo in sala mentre gli altri sono in pausa",
+     "atteso": "Compare comunque l avviso sala vuota: Z non conta",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "S1 con sigla S22 nella riga",
+     "atteso": "Il controllo lo considera in sala al posto di S22",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Giornata normale senza problemi: genera",
+     "atteso": "Lo schema abituale resta identico; nessuno spostamento",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Giornata con correzioni automatiche: clicca il riquadro 'Sistemato dal programma'",
+     "atteso": "Si apre l elenco degli spostamenti, ognuno con il motivo",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Caso eccezionale (una postazione resta senza cambio)",
+     "atteso": "Righe bordate di blu e riquadro 'Da confermare' con il motivo",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi Tengo le proposte",
+     "atteso": "Il riquadro blu sparisce e le righe restano come proposte",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Persona che aspetta la prima pausa piu di 3 ore",
+     "atteso": "Compare nel riquadro 'Da tenere d occhio'; la pausa non viene spostata da sola",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Pause · Schemi fissi del settore Slots",
+   "prove": [
+    {
+     "azione": "Foglio pause di un lunedi con S3 e R24: guarda la colonna di chi da i cambi alle 22.15",
+     "atteso": "S3 in pausa 22.15-22.30, R24 dalle 22.30 alle 23.00",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Stesso lunedi: guarda chi copre S3 (S7C, S7 o S5)",
+     "atteso": "Copre S3 alle 22.15 e poi resta in SALA fino alle 23.45",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Domenica con S3 e R24",
+     "atteso": "R24 22.15-22.45 e pausa di S3 alle 22.45",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Venerdi con due S7, S1 e S5",
+     "atteso": "L S7 che da i cambi va in pausa alle 20.30 mentre S1 e in sala; alle 21.00 da la mezz ora all altro S7; alle 21.30 il quarto d ora a S5",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Mattino con C4 (dalle 11.40), due R22 e S22",
+     "atteso": "Bigliettino del mattino: C4 da la mezz ora ai due R22 fra 12.00 e 13.00, a S22 alle 13.00, poi C4 in pausa 13.30-14.00",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Togli la pausa di un R22 dal bigliettino C4",
+     "atteso": "Avviso di pausa mancante: le pause del bigliettino contano nella regola delle ore",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Venerdi con C8 in cassa di rotazione, sposta una pausa collegata",
+     "atteso": "Le righe C8 di sola rotazione non vengono toccate",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Chi da i cambi di sala e rec e anche primo candidato per la cassa",
+     "atteso": "I cambi di cassa passano a un altro collega: nessuno fa due colonne nello stesso orario",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Pause · Formazione e accoglienza",
+   "prove": [
+    {
+     "azione": "Nel Piano scrivi 'formazione' nel commento di un R22 con un altro R22 nello stesso turno, poi genera",
+     "atteso": "I due hanno stessa postazione e stesse pause e contano come una persona; compare la riga 'In formazione' con chi va con chi",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scrivi FORMAZIONE su entrambi i S22 dello stesso turno",
+     "atteso": "Sono loro la coppia e vanno in pausa insieme",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "'formazione' su una persona sola sul suo turno",
+     "atteso": "E trattata come persona normale, nessuna riga 'In formazione'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Stampa pause con una coppia in formazione",
+     "atteso": "La riga 'In formazione' compare anche sul PDF",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Genera con S31 in accoglienza",
+     "atteso": "Le pause di S31 sono in una colonna fra le Facoltative, senza avvisi e senza proposte",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "S31 unico presente nella zona sala in un momento",
+     "atteso": "Avviso sala vuota: al suo posto l accoglienza non conta come presenza",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "S31 che copre qualcuno in sala",
+     "atteso": "In quel momento conta come presenza in sala",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Pause · Facoltative e modifica del foglio",
+   "prove": [
+    {
+     "azione": "Venerdi con due S5: guarda sotto il foglio",
+     "atteso": "Sezione Facoltative con la colonnina del secondo S5 (pausa da solo)",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Stampa pause senza spuntare nulla",
+     "atteso": "Le colonnine Facoltative (S31, secondo S5, C4 mattino) non sono nel PDF",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Spunta 'nel foglio stampato' sul secondo S5 e stampa",
+     "atteso": "La sua colonnina entra nel foglio stampato",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi Stampa bigliettino sulla colonnina di S31",
+     "atteso": "PDF piccolo con solo quella colonnina, da tagliare",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Sposta una riga e poi rimettila, premi Annulla",
+     "atteso": "Servono due Annulla per tornare all inizio",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi la x sull intestazione della colonna di S3",
+     "atteso": "Chiede conferma, poi sparisce tutta la colonna con le sue righe",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Dopo la x premi Annulla",
+     "atteso": "La colonna di S3 torna con tutte le righe",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi il + sull intestazione di una colonna",
+     "atteso": "Si aggiunge una riga sotto l orario del turno",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi Elimina pause in fondo",
+     "atteso": "Dopo la conferma sparisce tutto il foglio pause del giorno; Annulla lo rimette",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Operatore senza permesso sul briefing: prova a spuntare 'nel foglio stampato' o a premere la x",
+     "atteso": "Nessun effetto: il foglio non cambia",
+     "ruolo": "operatore"
+    }
+   ]
+  },
+  {
+   "titolo": "Pause · Frecce e pausa-cambio collegati",
+   "prove": [
+    {
+     "azione": "Freccia su sulla riga S7 01.45 con S3 in cassa alle 01.30 e in sala fino alle 01.15",
+     "atteso": "S7 va subito a 01.00-01.15, non oltre tutta la riga SALA; la sala si divide e si riunisce da sola",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Freccia giu su un cambio vicino a una riga SALA 20.00-22.00",
+     "atteso": "Il cambio scende di un quarto d ora alla volta, fermandosi solo dove la sala resta coperta",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Freccia su una riga vicina a un altro cambio",
+     "atteso": "Le due righe si scambiano",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Sposta con le frecce la pausa S3 di Sassi collegata al cambio S3 di Nicole",
+     "atteso": "Si sposta anche il cambio; dove c era torna SALA; compare un avviso con Annulla",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nell avviso premi Annulla",
+     "atteso": "Pausa e cambio tornano entrambi all orario di prima",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Sposta il cambio S3 di Nicole invece della pausa",
+     "atteso": "Si sposta anche la pausa di Sassi, se basta uno scambio con la riga vicina",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Sposta di un quarto d ora un cambio collegato che non puo essere seguito dalla pausa",
+     "atteso": "Si fa lo scambio intero invece del quarto d ora",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scrivi a mano un orario diverso per il cambio S3 di Nicole",
+     "atteso": "Avviso rosso con chi resta scoperto e righe interessate bordate di rosso",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Dopo ogni modifica (frecce, x, scrittura, Annulla) guarda lo schermo in fondo alla pagina",
+     "atteso": "La pagina resta ferma nello stesso punto, non torna in cima",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Pause · Stampa del foglio",
+   "prove": [
+    {
+     "azione": "Premi Stampa pause su un venerdi pieno",
+     "atteso": "PDF A4 su un foglio solo",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Stampa con molte colonnine",
+     "atteso": "Si usa una quarta colonna e il testo si rimpicciolisce quanto serve, sempre un foglio",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Guarda i bigliettini nel PDF",
+     "atteso": "Bigliettini stretti con un piccolo spazio fra l uno e l altro, facili da tagliare",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Spunta un voce in 'In stampa anche' (es. C4 bigliettino del mattino) e stampa",
+     "atteso": "Il bigliettino C4 entra nel foglio",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Regole pause (amministratore)",
+   "prove": [
+    {
+     "azione": "Admin: apri Regole pause sotto le pause",
+     "atteso": "Elenco regole del settore in parole semplici con Modifica ed Elimina, tabella turni, orari e pause con la regola di origine",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Operatore: apri la stessa pagina",
+     "atteso": "Regole pause non compare",
+     "ruolo": "operatore"
+    },
+    {
+     "azione": "Nuova regola: pause di un turno preciso S3 = 15+15",
+     "atteso": "Salvata; nella tabella S3 mostra 15+15 da questa regola",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Nuova regola per turno con pausa 0",
+     "atteso": "Il turno risulta senza pause",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Nuova regola con sigla inesistente S99",
+     "atteso": "Rifiutata con avviso che la sigla non esiste nel settore",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Nuova regola fascia senza pause con orario '25.00'",
+     "atteso": "Rifiutata: orario scritto male",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Seconda regola per durata che si accavalla con quella di 7 ore",
+     "atteso": "Segnalata come regola che si accavalla",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Regola per durata 8 ore solo Ven-Sab con pause diverse, genera un venerdi e un martedi",
+     "atteso": "Il venerdi usa la nuova, il martedi la regola generale",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Negli Slots scrivi a mano una pausa fuori regola",
+     "atteso": "Elencata in giallo sotto il foglio",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Premi Ripristina regole di partenza",
+     "atteso": "Tornano 6h=15+15, 7h=30+15, 8h+=30+15+15",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Togli la spunta 'attiva' in Sistemazione automatica, Salva, rigenera un giorno con sala vuota",
+     "atteso": "Nessuno spostamento automatico; resta l avviso",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Imposta il massimo attesa a 2h30, Salva, rigenera",
+     "atteso": "'Da tenere d occhio' elenca chi aspetta oltre 2h30",
+     "ruolo": "admin"
+    }
+   ]
+  }
+ ]
+}

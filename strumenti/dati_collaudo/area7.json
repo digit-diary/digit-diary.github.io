@@ -1,0 +1,620 @@
+{
+ "area": "Accesso, Impostazioni, Sistema",
+ "sezioni": [
+  {
+   "titolo": "Accesso · Login",
+   "prove": [
+    {
+     "azione": "Apri il programma senza essere entrato",
+     "atteso": "Compare la schermata Accesso Protetto con logo, scelta del settore, scelta dell operatore, campo Password, pulsante Entra e link Password dimenticata?",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scegli il settore Slots e apri la tendina degli operatori",
+     "atteso": "Prima voce -- Admin (password master) --, poi solo gli operatori con password di Slots e quelli con Tutti i settori, in ordine alfabetico. Nessun operatore solo Tavoli",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Settore Slots, scegli un operatore, scrivi la sua password giusta e premi Invio (non il pulsante)",
+     "atteso": "Si entra come con Entra: in alto compare Operatore: seguito dal nome, si apre il Diario del settore Slots",
+     "ruolo": "operatore"
+    },
+    {
+     "azione": "Scegli un operatore e scrivi una password sbagliata, poi premi Entra",
+     "atteso": "Messaggio rosso Password errata per seguito dal nome; il campo password si svuota e il messaggio sparisce dopo circa 2 secondi. Senza operatore scelto il messaggio è Password errata",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Login: sbaglia la password dello stesso operatore 5 volte di fila, poi prova subito una sesta volta con la password giusta",
+     "atteso": "Dopo il quinto errore compare Troppi tentativi. Riprova tra ... s con il conto dei secondi (circa 30); finché il tempo non scade non si entra nemmeno con la password giusta",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Lascia -- Admin (password master) -- e scrivi la password master giusta",
+     "atteso": "Si entra come amministratore: in alto compare Admin, la pagina Registro è visibile, in Impostazioni si vedono tutte le sezioni",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Scegli un operatore (es. Rossi) ma scrivi la password master invece della sua",
+     "atteso": "Si entra come amministratore con il nome dell operatore mostrato in alto (Operatore: Rossi) e con tutti i poteri admin",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Entra con il settore Tavoli scelto nella schermata di accesso",
+     "atteso": "Dopo l accesso il programma è già nel settore Tavoli (colore e dati di Tavoli), non in Slots",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi Esci in alto a destra",
+     "atteso": "Il programma si ricarica sulla schermata Accesso Protetto; premendo Indietro nel browser non si rivedono i dati",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Accesso · Password personale, reset e primo accesso",
+   "prove": [
+    {
+     "azione": "Admin: in Impostazioni > Operatori crea un operatore nuovo con password di 4 caratteri, poi entra con quel nome",
+     "atteso": "Dopo l accesso compare la finestra Benvenuto seguito dal nome, Per sicurezza, scegli una nuova password personale",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Nella finestra Benvenuto scrivi una nuova password di 3 caratteri e premi Imposta",
+     "atteso": "Messaggio Troppo corta (min 4); la finestra resta aperta",
+     "ruolo": "operatore"
+    },
+    {
+     "azione": "Nella finestra Benvenuto scrivi due volte la stessa password valida e premi Imposta",
+     "atteso": "Finestra Password impostata! Da ora accedi con la tua nuova password; dopo OK si vedono le note non lette. Uscendo e rientrando la vecchia password non funziona più, la nuova sì",
+     "ruolo": "operatore"
+    },
+    {
+     "azione": "Admin: in Impostazioni > Operatori premi Nuova password accanto a un operatore, scrivi 12 e premi Resetta",
+     "atteso": "Messaggio Minimo 4 caratteri; nessun reset",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: Nuova password su un operatore con due password uguali valide, poi l operatore entra con quella",
+     "atteso": "Finestra Password resettata! ... dovrà cambiarla al prossimo accesso. Al suo accesso compare di nuovo la finestra Benvenuto con l obbligo di cambio",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Operatore: in Impostazioni > Sicurezza premi Cambia la mia password e scrivi una password attuale sbagliata",
+     "atteso": "Messaggio Password attuale errata; la password non cambia",
+     "ruolo": "operatore"
+    },
+    {
+     "azione": "Operatore: Cambia la mia password con password attuale giusta e nuova valida ripetuta due volte",
+     "atteso": "Finestra Password aggiornata! e avviso Password operatore aggiornata!; al prossimo accesso vale solo la nuova",
+     "ruolo": "operatore"
+    },
+    {
+     "azione": "Operatore: nella sezione Sicurezza controlla quali pulsanti ci sono",
+     "atteso": "C è solo Cambia la mia password; il pulsante Cambia password master non compare",
+     "ruolo": "operatore"
+    }
+   ]
+  },
+  {
+   "titolo": "Accesso · Password master e codice di recupero",
+   "prove": [
+    {
+     "azione": "Admin: in Impostazioni > Sicurezza premi Cambia password master, scrivi password attuale sbagliata",
+     "atteso": "Messaggio Password attuale errata; la master resta quella di prima",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: Cambia password master con dati corretti. Annota il codice mostrato",
+     "atteso": "Finestra Aggiornata! con un codice di recupero di 8 lettere e cifre in grande (Nuovo codice di recupero); il vecchio codice non vale più",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Nella schermata di accesso premi Password dimenticata?, scrivi un codice di recupero sbagliato e una nuova password valida",
+     "atteso": "Finestra Recupero; premendo Reimposta compare Codice errato e la master non cambia",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Password dimenticata? con il codice giusto (anche scritto in minuscolo) e nuova password valida ripetuta",
+     "atteso": "Finestra Reimpostata! con un NUOVO codice di recupero; si entra come admin con la nuova master; il codice appena usato non funziona una seconda volta",
+     "ruolo": "admin"
+    }
+   ]
+  },
+  {
+   "titolo": "Accesso · Sessioni, 8 ore e più postazioni",
+   "prove": [
+    {
+     "azione": "Entra con lo stesso operatore su PC e su telefono, poi lavora su entrambi",
+     "atteso": "Tutte e due le postazioni restano aperte: entrare dal telefono non fa uscire dal PC",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Entra e lascia il programma aperto per 7 ore e mezza (oppure chiedi all IT di simularlo)",
+     "atteso": "Compare l avviso La sessione scadra tra 30 minuti. Salva il tuo lavoro. (una sola volta)",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Lascia il programma aperto fino a 8 ore dall accesso",
+     "atteso": "Avviso Sessione scaduta dopo 8 ore. Disconnessione automatica. e dopo 2 secondi si torna alla schermata di accesso",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Con la sessione scaduta sul server ma la pagina ancora aperta, prova a salvare una registrazione",
+     "atteso": "Compare in rosso Sessione scaduta: esci e rientra con la password per continuare a salvare. La registrazione non risulta salvata in silenzio",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Accesso · Sblocco biometrico",
+   "prove": [
+    {
+     "azione": "Su un telefono o Mac con impronta/Face ID: entra con password e apri Impostazioni > Sicurezza",
+     "atteso": "Riquadro con il nome del sistema (Face ID, Touch ID, Windows Hello o Sblocco biometrico), Non attivo e pulsante Attiva",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi Attiva e conferma con impronta o volto",
+     "atteso": "Avviso ... attivato!; il riquadro mostra Attivo per: seguito dal tuo nome e il pulsante Disattiva",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Esci e riapri il programma sullo stesso dispositivo, premi il pulsante con il lucchetto",
+     "atteso": "Dopo impronta o volto si entra senza password come lo stesso operatore",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Con biometrico attivo per Rossi, entra con password come Bianchi sullo stesso dispositivo e premi Attiva",
+     "atteso": "Il programma chiede conferma prima di sostituire lo sblocco di un altro operatore",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi Disattiva in Impostazioni > Sicurezza",
+     "atteso": "Avviso ... disattivato; al prossimo accesso il lucchetto non funziona più e serve la password",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Admin resetta la password di un operatore che usa lo sblocco biometrico; l operatore entra con l impronta",
+     "atteso": "Dopo l impronta compare comunque la finestra Benvenuto con l obbligo di nuova password",
+     "ruolo": "admin"
+    }
+   ]
+  },
+  {
+   "titolo": "Impostazioni · Schede e visibilità per ruolo",
+   "prove": [
+    {
+     "azione": "Admin: clicca la chip Backup dei dati mentre sei nella scheda Registrazioni",
+     "atteso": "Si apre la scheda Sistema, la pagina scorre fino a Backup dei dati e la sezione si evidenzia per un attimo",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Operatore senza permessi speciali: apri Impostazioni",
+     "atteso": "Non vede le schede Maison, Personale, Sistema né le sezioni Settori, Visibilita e permessi, Intelligenza artificiale, Backup, Cestino; vede Sicurezza",
+     "ruolo": "operatore"
+    },
+    {
+     "azione": "Operatore senza permessi: guarda le sezioni Tipi di evento, Campi del rapporto e Operatori se visibili",
+     "atteso": "Nessun campo per aggiungere, nessun pulsante Rinomina, Rimuovi, frecce o selettore colore; nella lista Operatori compare Nessun operatore",
+     "ruolo": "operatore"
+    },
+    {
+     "azione": "Operatore con permesso Impiego o Categorie (es. HR): apri Collaboratori",
+     "atteso": "Vede la lista e può cambiare solo impiego o categoria; non vede il campo Nome nuovo collaboratore, Importa da Excel o CSV, Rinomina, Rimuovi",
+     "ruolo": "operatore"
+    }
+   ]
+  },
+  {
+   "titolo": "Impostazioni · Tipi di evento",
+   "prove": [
+    {
+     "azione": "Admin: in Tipi di evento scrivi Ritardo, scegli un colore e premi Aggiungi tipo",
+     "atteso": "Avviso Tipo aggiunto; Ritardo compare in fondo alla lista e fra i pulsanti tipo del modulo nel Diario, con il colore scelto",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: aggiungi il tipo ritardo (minuscolo, già esistente), poi premi Aggiungi tipo con il nome vuoto",
+     "atteso": "Prima avviso Già esistente, poi Inserisci un nome; nessun tipo nuovo in lista",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: premi Rinomina su un tipo predefinito (es. Errore) e scrivi Errore operativo",
+     "atteso": "Avviso Tipo rinominato; il nuovo nome compare nella lista, nei pulsanti del Diario, nel filtro Tipo e su tutte le registrazioni vecchie di quel tipo",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: premi Rimuovi su un tipo predefinito",
+     "atteso": "Finestra del programma chiede di nasconderlo (le registrazioni esistenti restano); dopo la conferma il tipo appare in Tipi nascosti con + e cliccandolo torna",
+     "ruolo": "admin"
+    }
+   ]
+  },
+  {
+   "titolo": "Impostazioni · Campi del rapporto",
+   "prove": [
+    {
+     "azione": "Admin: scrivi Bar in Nome nuovo campo e premi Aggiungi campo",
+     "atteso": "Avviso Campo aggiunto; il campo Bar compare nel Rapporto giornaliero",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: rinomina il campo Cassa in Cassa principale",
+     "atteso": "Avviso Campo rinominato; nel Rapporto l intestazione diventa Cassa principale e i testi già scritti restano",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: togli la spunta Tavoli a un campo e apri il Rapporto di Tavoli e quello di Slots",
+     "atteso": "In Tavoli il campo non c è, in Slots sì",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: Rimuovi su un campo aggiunto (es. Bar)",
+     "atteso": "Finestra di conferma con pulsante rosso; dopo la conferma avviso Campo rimosso e il campo sparisce dal Rapporto",
+     "ruolo": "admin"
+    }
+   ]
+  },
+  {
+   "titolo": "Impostazioni · Collaboratori",
+   "prove": [
+    {
+     "azione": "Admin: scrivi rossi mario in Nome nuovo collaboratore e premi Aggiungi; poi riprova con lo stesso nome e con il campo vuoto",
+     "atteso": "La prima volta avviso Collaboratore aggiunto e in lista Rossi Mario con le iniziali maiuscole; poi Collaboratore già esistente e Inserisci un nome, senza doppioni",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: Importa da Excel o CSV con un file di 10 nomi di cui 2 già presenti",
+     "atteso": "Avviso 8 collaboratori importati (2 già esistenti)",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: cambia impiego, categoria, funzione, percentuale, lingue (IT EN), data di nascita 12.01.1997 e inizio attività 01.05.2024 di un collaboratore",
+     "atteso": "Ogni cambio mostra un avviso di conferma e resta dopo il ricaricamento; le lingue compaiono nel Piano accanto al nome",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: premi Rimuovi su un collaboratore",
+     "atteso": "Finestra Disattivare ... Non apparirà più nell autocomplete; dopo la conferma avviso Collaboratore disattivato; il nome passa nel riquadro Collaboratori disattivati",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: clicca + nome nel riquadro Collaboratori disattivati",
+     "atteso": "Il collaboratore torna attivo in lista con tutti i suoi dati (impiego, categoria) e nel Diario si può di nuovo scegliere",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: Rinomina un collaboratore che ha registrazioni, moduli, turni nel Piano, vacanze e messaggi in chat (es. Rossi Mario in Rossi Mario Luigi)",
+     "atteso": "Avviso Collaboratore rinominato; il nuovo nome compare nel Diario, nei moduli, nella griglia del Piano allo stesso posto, nelle vacanze, nei crediti, nella chat. Nessuna voce resta col nome vecchio",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: Rinomina un collaboratore usando il nome di un altro già esistente, poi con il nome cancellato",
+     "atteso": "Prima avviso Errore: nome già esistente? e nessun dato cambia; poi Inserisci un nome",
+     "ruolo": "admin"
+    }
+   ]
+  },
+  {
+   "titolo": "Impostazioni · Operatori e accessi extra",
+   "prove": [
+    {
+     "azione": "Admin: Crea operatore con nome vuoto, poi senza password, poi con password di 3 caratteri, poi senza conferma, poi con conferma diversa",
+     "atteso": "Nell ordine: Scrivi il nome del nuovo operatore; Manca la password; La password deve avere almeno 4 caratteri (ne hai scritti 3); Manca la conferma; Le due password non coincidono",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: Crea operatore Verdi, settore Tavoli, Posizione e permessi Supervisor",
+     "atteso": "Avviso Operatore Verdi creato (tavoli); in lista con etichetta Tavoli e Con password; le sue pagine seguono il profilo Supervisor",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: Crea operatore scegliendo in Posizione e permessi la copia degli accessi di un collega",
+     "atteso": "Il nuovo operatore ha lo stesso profilo, gli stessi accessi extra e le stesse voci del collega",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: Crea operatore con Nuovo profilo personalizzato...",
+     "atteso": "Si apre la tabella del nuovo profilo con l avviso di scrivere il nome e scegliere le voci; al salvataggio il profilo viene assegnato all operatore appena creato",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: cambia il settore di un operatore dalla tendina nella sua riga",
+     "atteso": "Avviso nome → settore; al suo prossimo accesso compare solo sotto quel settore nella schermata di login",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: Accessi extra su un operatore di Slots, concedi Tavoli con la sola pagina Diario e premi Salva",
+     "atteso": "Avviso Accessi extra salvati per ...; il pulsante mostra Accessi extra (1); l operatore può passare a Tavoli e vedere solo il Diario lì",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: premi Rimuovi su un operatore e conferma",
+     "atteso": "Finestra di conferma con pulsante rosso; dopo, avviso Rimosso, sparisce dalla lista e dalla schermata di accesso",
+     "ruolo": "admin"
+    }
+   ]
+  },
+  {
+   "titolo": "Impostazioni · Settori e responsabili moduli",
+   "prove": [
+    {
+     "azione": "Admin: in Settori scrivi Bar, scegli un colore e premi Aggiungi settore",
+     "atteso": "Avviso Settore Bar creato; compare fra i settori, nello scambio settore e nelle tendine Settore",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: rinomina il settore Bar, cambia colore e Nome nei documenti (es. FoBoBar) e premi Salva",
+     "atteso": "Avviso Settore salvato; nei menu resta il nome breve, nelle stampe (foglio cambio turno, Piano, briefing) compare FoBoBar",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: premi Disattiva su un settore aggiunto che ha dati",
+     "atteso": "Finestra che dice che nessun dato viene toccato e quanti record restano; dopo, il settore sparisce dai menu. Riattiva lo rimette con tutti i dati",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: togli la spunta Costi Maison dalle pagine di Tavoli ed entra come operatore di Tavoli",
+     "atteso": "Avviso Disattivata Costi Maison per Tavoli; l operatore di Tavoli non vede la pagina Maison, quello di Slots sì",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: in Responsabile di settore nei moduli scrivi un nome per Tavoli, poi crea un Allineamento in Tavoli",
+     "atteso": "Avviso Salvato · Tavoli: nome; nel modulo il campo Responsabile di settore è già compilato con quel nome",
+     "ruolo": "admin"
+    }
+   ]
+  },
+  {
+   "titolo": "Impostazioni · Visibilità, permessi e profili",
+   "prove": [
+    {
+     "azione": "Admin: imposta la pagina Statistiche su Solo admin e entra come operatore",
+     "atteso": "L operatore non vede più Statistiche nel menu",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: imposta una voce su Operatori selezionati e spunta solo Verdi",
+     "atteso": "Compaiono le caselle con i nomi; solo Verdi vede la voce, gli altri no",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: assegna a un operatore il profilo HR e premi Applica i profili",
+     "atteso": "Finestra di conferma; poi avviso Profili applicati a N operatori; le righe di Visibilita e permessi cambiano secondo la tabella del profilo",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: crea profilo Compliance partendo da una copia di HR, cambia due voci e salva",
+     "atteso": "Il profilo compare con Modifica ed Elimina e nella tendina dei profili; avviso Profilo Compliance salvato. Un secondo profilo con lo stesso nome dà Esiste gia un profilo con questo nome; i cinque profili fissi non hanno Modifica né Elimina",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: Elimina un profilo personalizzato assegnato a un operatore",
+     "atteso": "Finestra che elenca a chi è assegnato; dopo, avviso Profilo eliminato e l operatore resta senza profilo ma con i permessi di prima",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: premi Stampa scheda permessi",
+     "atteso": "Si apre un foglio pronto per stampa o PDF con ogni operatore, profilo, settori, accessi extra e cosa vede e modifica",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Operatore con profilo Supervisor: prova a modificare una pagina che il profilo dà solo in lettura (V)",
+     "atteso": "Può vedere ma i comandi di modifica mancano o rispondono che non ha il permesso",
+     "ruolo": "operatore"
+    }
+   ]
+  },
+  {
+   "titolo": "Impostazioni · Intelligenza artificiale",
+   "prove": [
+    {
+     "azione": "Admin: aggiungi un fornitore completo (es. Llama sul server, /ai/v1, llama3.1:8b) e premi Salva",
+     "atteso": "Avviso Fornitore salvato: usa Prova per verificarlo; la riga mostra tipo, indirizzo, modelli e chiave",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: premi Prova su un fornitore che funziona e su uno con indirizzo sbagliato",
+     "atteso": "Prima Prova in corso..., poi in verde Funziona: risposta in X s con i modelli; per quello sbagliato in rosso Non funziona: con il motivo",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: premi Usa su un altro fornitore e scegli una Riserva",
+     "atteso": "Avviso Ora l intelligenza artificiale usa ...; etichette In uso e Riserva sulle righe giuste; il fornitore in uso non ha Usa né Elimina",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: Elimina un fornitore non in uso",
+     "atteso": "Finestra Eliminare il fornitore ... La sua chiave viene cancellata; dopo la conferma sparisce",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Con nessun fornitore funzionante, in un modulo premi Migliora testo",
+     "atteso": "Avviso che l intelligenza artificiale non è configurata o messaggio di errore; il testo scritto resta intatto",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Impostazioni · Maison e Personale",
+   "prove": [
+    {
+     "azione": "Admin: in Conservazione dati Maison scegli Conserva 7 giorni",
+     "atteso": "La scelta resta dopo il ricaricamento; le registrazioni Maison più vecchie di 7 giorni spariscono all apertura del programma",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: in Alert cassa imposta Allineamento 100 e RDI 600 e premi Salva soglie",
+     "atteso": "Conferma sotto la sezione; gli alert della Panoramica usano i nuovi importi",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: in Valori dei buoni cambia BU in 60 e premi Salva valori",
+     "atteso": "Il nuovo valore resta dopo il ricaricamento ed è usato nei calcoli Maison",
+     "ruolo": "admin"
+    }
+   ]
+  },
+  {
+   "titolo": "Impostazioni · Sistema: conservazione, backup, stato",
+   "prove": [
+    {
+     "azione": "Admin: in Conservazione dei dati scrivi 3 anni",
+     "atteso": "Finestra Il regolamento chiede almeno 5 anni. Confermi comunque 3 anni?; con Annulla il valore resta quello di prima",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: in Conservazione dei dati scrivi 0 anni, poi 50 anni",
+     "atteso": "Con 0: avviso Protezione conservazione disattivata e sotto Protezione DISATTIVATA. Con 50 il valore viene portato al massimo di 30 anni",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: premi Esporta backup completo",
+     "atteso": "Prima Esportazione in corso..., poi si scarica un file JSON e compare Backup scaricato: N record da N tabelle; Ultimo backup mostra data e ora di adesso",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: imposta Backup automatico ogni 1 giorno, poi il giorno dopo entra come admin",
+     "atteso": "Avviso Backup automatico: ogni 1 giorni; al primo accesso admin del giorno dopo compare Backup automatico in corso e parte il download",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: premi Controlla il sistema in Stato del sistema",
+     "atteso": "Elenco di cosa non torna (impiego mancante, nomi con turni senza scheda, disattivati con turni, festivi mancanti) con i pulsanti Assegna l impiego adesso e Sistema questi nomi",
+     "ruolo": "admin"
+    }
+   ]
+  },
+  {
+   "titolo": "Cestino e ripristino",
+   "prove": [
+    {
+     "azione": "Elimina una registrazione dal Diario, poi admin: Impostazioni > Cestino > Carica cestino",
+     "atteso": "La registrazione è in Registrazioni con nome, tipo, data, inizio del testo e Eliminato da ... il ... con data e ora",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: premi Ripristina sulla registrazione e conferma",
+     "atteso": "Avviso Ripristinato!; la registrazione torna nel Diario con tutti i dati e sparisce dal Cestino",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin (protezione 5 anni, 30 giorni): premi Elimina su una voce inserita più di 30 giorni fa",
+     "atteso": "Finestra Non si può eliminare definitivamente ... archivio da conservare per 5 anni; la voce resta nel Cestino",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: premi Elimina su una voce inserita oggi e conferma",
+     "atteso": "Finestra Eliminare DEFINITIVAMENTE? con pulsante rosso; dopo, avviso Eliminato definitivamente",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Admin: Svuota cestino con voci recenti e voci protette",
+     "atteso": "La finestra dice quante voci vengono eliminate e quante restano protette; dopo, avviso Cestino svuotato (N voci protette restano)",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Operatore: cerca la sezione Cestino in Impostazioni",
+     "atteso": "Non compare: il Cestino è riservato all amministratore",
+     "ruolo": "operatore"
+    }
+   ]
+  },
+  {
+   "titolo": "Annulla e Ripristina generale",
+   "prove": [
+    {
+     "azione": "Salva una registrazione nel Diario e guarda in basso a sinistra",
+     "atteso": "Compare la barretta con Annulla, Ripristina e l ultima azione in parole (es. Creata registrazione · Rossi)",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi Annulla sulla barretta e conferma",
+     "atteso": "Finestra Annullare: ...?; dopo, avviso Annullato: ...; la registrazione va nel Cestino e sparisce dal Diario; nel Registro compare Annullata azione",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Fuori dai campi di testo premi Ctrl+Z e poi Ctrl+Y (su Mac Cmd+Z e Cmd+Y)",
+     "atteso": "Fanno lo stesso dei pulsanti Annulla e Ripristina",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scrivendo dentro un campo di testo premi Ctrl+Z",
+     "atteso": "Si annulla solo la battitura nel campo, non l ultima azione del programma",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Modifica una scheda collaboratore; da un altra postazione un collega modifica lo stesso campo; poi premi Annulla",
+     "atteso": "Messaggio rosso Nel frattempo scheda collaboratore è stata modificata da qualcun altro: annullamento fermato; la modifica del collega resta",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Admin: cambia un impostazione (es. rinomina un campo del rapporto) e premi Annulla",
+     "atteso": "L impostazione torna come prima e la pagina Impostazioni si ridisegna",
+     "ruolo": "admin"
+    }
+   ]
+  },
+  {
+   "titolo": "Avvisi, finestre del programma, tempo reale",
+   "prove": [
+    {
+     "azione": "Admin: stacca la rete (Wi-Fi spento) e cambia un impostazione, es. aggiungi un tipo",
+     "atteso": "Avviso rosso Impostazione non salvata: ... (o sessione scaduta); il programma non dice mai che ha salvato",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Richiedi un eliminazione qualsiasi (es. Rimuovi un campo)",
+     "atteso": "Si apre una finestra del programma (non quella grigia del browser) con titolo, testo e pulsante rosso Elimina; Esc chiude come Annulla, Invio conferma",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Apri due postazioni con operatori diversi e invia una nota in chat dalla prima",
+     "atteso": "Sulla seconda il messaggio e il numerino arrivano entro pochi secondi senza ricaricare",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Pagina ferma, aspetto, installazione e guida",
+   "prove": [
+    {
+     "azione": "Nel Diario scorri a metà lista e salva una modifica a una registrazione",
+     "atteso": "Dopo il salvataggio la pagina resta allo stesso punto, non torna in cima",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nel calendario del Piano scorri a destra fino al giorno 29 e premi F5",
+     "atteso": "Dopo il ricaricamento sei sulla stessa pagina e il calendario è ancora al giorno 29",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi A+ in alto tre volte, poi A- una volta; poi entra con lo stesso operatore da un altro PC",
+     "atteso": "L etichetta passa 110%, 120%, 130% poi 120% e i testi si ingrandiscono; oltre 130% e sotto 90% non va; sull altro PC ritrovi 120%",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi Tema scuro, poi esci e rientra con lo stesso operatore; poi entra con un altro operatore",
+     "atteso": "Tutto diventa scuro e leggibile anche nei grafici, il pulsante diventa Tema chiaro; la scelta resta per quell operatore, l altro operatore ha il suo tema",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Dopo che l IT ha pubblicato una nuova versione, premi una volta F5",
+     "atteso": "La nuova versione si vede subito al primo ricaricamento, senza svuotare la cache",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Su telefono installa il programma (Aggiungi a schermata Home), aprilo, passa a un altra app e torna",
+     "atteso": "Si apre a schermo intero come un app; con sblocco biometrico attivo, al ritorno chiede di nuovo impronta o volto",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Apri la Guida come operatore e come admin",
+     "atteso": "L operatore vede solo gli argomenti del suo ruolo; l admin vede anche Impostazioni del programma e Controllo e manutenzione",
+     "ruolo": "tutti"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,510 @@
+{
+ "area": "Home, Diario, Rapporto, Registro, Statistiche, Ricerca",
+ "sezioni": [
+  {
+   "titolo": "Home · riepilogo e riquadri",
+   "prove": [
+    {
+     "azione": "Aprire la scheda Home dopo il login",
+     "atteso": "In alto compare 'Dashboard · GD' con la data della giornata di gioco (dopo mezzanotte resta il giorno prima) e sotto il giorno, il turno in corso e il nome dell'operatore",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Home: guardare la fila di numeri in alto e confrontare 'Registrazioni oggi' con le voci di oggi nel Diario",
+     "atteso": "Il numero 'Registrazioni oggi' coincide con le voci di oggi del Diario; 'Promemoria', 'Note non lette', 'Maison oggi CHF', 'Alert cassa' e 'A rischio' compaiono solo se quelle sezioni sono attive per l'operatore",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Home: premere '+ Nuova registrazione', poi tornare in Home e premere 'Scrivi consegna', poi 'Nuovo promemoria'",
+     "atteso": "Ogni pulsante apre la pagina giusta: Diario, Consegne, Promemoria",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Creare un promemoria assegnato a sé con scadenza oggi, poi aprire Home e premere il pulsante di completamento accanto al promemoria in 'Da fare oggi'",
+     "atteso": "Il promemoria compare in 'Da fare oggi', dopo il clic sparisce dalla lista e il contatore 'Promemoria' in alto scende di 1",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Inserire a un collaboratore la data di nascita di domani (es. 01.10), poi aprire Home",
+     "atteso": "In 'Da fare domani' compare '<nome> · compleanno domani'; nel riquadro 'Compleanni · collaboratori e clienti' compare lo stesso nome",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Home in un giorno in cui il rapporto PRESTO non è ancora compilato: guardare 'Alert attivi' e cliccare la riga 'Rapporto PRESTO: da compilare'",
+     "atteso": "La riga è presente in arancione; il clic apre la pagina Rapporto. Dopo aver scritto il rapporto PRESTO e tornati in Home la riga non c'è più",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Registrare 2 'Ammonimento Verbale' a 'Rossi Mario' e tornare in Home, poi cliccare la riga di Rossi in 'Da fare oggi'",
+     "atteso": "Compare 'Rossi Mario · 2 ammonimenti verbali' con il punto esclamativo; il clic apre la scheda del collaboratore",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Home: cliccare un nome nel riquadro 'Ultime registrazioni'",
+     "atteso": "Si apre la scheda di quel collaboratore; la lista mostra le registrazioni più recenti del settore in ordine dalla più nuova",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Home: nel grafico 'Andamento settimanale' premere 'Settimana precedente' due volte e poi 'Settimana successiva' una volta",
+     "atteso": "Il titolo del grafico cambia settimana ad ogni clic e le barre si aggiornano; si torna di una settimana indietro rispetto a quella attuale",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Home · report settimanale e annuale",
+   "prove": [
+    {
+     "azione": "Home: premere 'Report Settimanale PDF'",
+     "atteso": "Si apre la finestra 'Report Settimanale' con le caselle Panoramica, Differenze Cassa, Costi Maison, Spese Extra, Regali, Moduli Disciplinari, Promemoria spuntate e 'Registrazioni dettagliate' non spuntata",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nella finestra del report settimanale togliere la spunta a 'Costi Maison', spuntare 'Registrazioni dettagliate' e premere 'Genera PDF'",
+     "atteso": "Si scarica un PDF della settimana senza la parte Costi Maison e con l'elenco delle registrazioni una per una",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premere 'Report Settimanale CSV' e poi 'Report Annuale CSV'",
+     "atteso": "Si scaricano due file che si aprono in Excel con colonne leggibili, accenti corretti e importi in CHF",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Diario · Nuova registrazione",
+   "prove": [
+    {
+     "azione": "Diario > Nuova registrazione: scrivere 'ros' nel campo Collaboratore",
+     "atteso": "Si apre un elenco con i nomi del settore che contengono 'ros' (es. 'Rossi Mario'); cliccando un nome il campo si riempie",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scegliere 'Rossi Mario', tipo 'Attività', descrizione 'Aiuto in cassa durante la pausa' e premere 'Salva nel Diario'",
+     "atteso": "Compare il messaggio 'Registrato per Rossi Mario'; la voce appare in cima alla lista con data, ora, badge del tipo e 'Inserita da <operatore>'; il numero 'Totale' sale di 1",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premere 'Salva nel Diario' lasciando vuoto il Collaboratore",
+     "atteso": "Messaggio 'Inserisci il nome' e il campo Collaboratore viene evidenziato; non si salva nulla",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scrivere il nome sbagliato 'Rosi Mario' (manca una s), descrizione qualsiasi, e salvare",
+     "atteso": "Si apre la finestra 'Nome simile trovato' con 'Usa \"Rossi Mario\"' e 'No, usa \"Rosi Mario\" cosi com'e'; scegliendo il primo la voce viene salvata con il nome corretto",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scrivere un nome del tutto nuovo, es. 'Verdi Giulia', e salvare; nella finestra 'Collaboratore non trovato' premere 'Usa senza aggiungere'",
+     "atteso": "La voce viene salvata con 'Verdi Giulia' ma il nome non viene aggiunto all'elenco collaboratori in Impostazioni",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Ripetere con 'Neri Paolo' e nella finestra 'Collaboratore non trovato' premere 'Aggiungi \"Neri Paolo\" alla lista'",
+     "atteso": "Messaggio 'Neri Paolo aggiunto alla lista'; il nome compare poi nell'elenco a tendina del campo Collaboratore e nel filtro Persona",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Salvare due volte di fila la stessa voce identica (stesso nome, tipo e testo) nello stesso giorno",
+     "atteso": "Alla seconda volta compare 'Registrazione identica già presente per oggi' e non si crea un doppione",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Registrare per 'Rossi Mario' un 'Ammonimento Verbale' con testo 'Ritardo di 10 minuti', poi un secondo con testo 'Ritardo di 15 minuti' lo stesso giorno",
+     "atteso": "Alla seconda compare l'avviso che ha già 1 registrazione di quel tipo oggi, con il consiglio di preparare un modulo di Allineamento e la domanda 'Vuoi aggiungere comunque?'; con Annulla non si salva, con conferma si salva",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scegliere il tipo 'Errore': compilare Reparto 'Cassa', Importo 50, Valuta 'EUR', testo 'Resto sbagliato al cliente'",
+     "atteso": "Appaiono i campi Reparto, Importo e Valuta solo per il tipo Errore; la voce salvata mostra il badge 'Cassa' e l'importo '50 EUR'; il numero Errore in alto sale di 1",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scegliere il tipo 'Richiesta' per 'Bianchi Anna', testo 'Chiede il sabato 10 libero', salvare e nella finestra 'Scadenza follow-up' premere 'Fra 1 settimana'",
+     "atteso": "Si apre la finestra con i pulsanti Fra 3 giorni / Fra 1 settimana / Fra 2 settimane / Fra 1 mese; dopo il clic compare 'Promemoria follow-up creato per Bianchi Anna' e in Promemoria c'è 'Follow-up: Bianchi Anna' con scadenza tra 7 giorni",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Diario · Malattia e Non disponibilità",
+   "prove": [
+    {
+     "azione": "Tipo 'Malattia' per 'Rossi Mario', Dal 3 ottobre e Al 5 ottobre, testo 'Certificato medico', premere 'Salva nel Diario'",
+     "atteso": "Chiede conferma 'Rossi Mario: registrare 3 giorni di malattia dal 03.10 al 05.10?'; dopo il sì compare '3 giorni malattia registrati', nella lista ci sono 3 voci (una per giorno) con '(dal ... al ...)' nel testo",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Dopo la malattia 3-5 ottobre aprire il Piano di ottobre sulla riga di Rossi Mario",
+     "atteso": "Nei giorni con turno del 3, 4 e 5 ottobre compare M; compare anche il messaggio con quanti turni sono stati segnati M; si apre la finestra 'Copertura turno' per scegliere chi copre",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nella finestra 'Copertura turno' scegliere in 'Chi copre il turno' un collega e salvare; poi nel Diario premere 'Copertura' sulla voce di malattia",
+     "atteso": "La voce di malattia mostra il segno della copertura; il pulsante 'Copertura' riapre la finestra con il collega scelto",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Registrare di nuovo la malattia 3-5 ottobre per lo stesso collaboratore",
+     "atteso": "I giorni già presenti non vengono duplicati: il messaggio dice 0 giorni registrati",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Tipo 'Non Disponibilità' per 'Bianchi Anna': nel calendario cliccare il 12 e il 14 del mese prossimo, cliccare di nuovo il 14 per toglierlo, poi il 15; testo 'Esame universitario'",
+     "atteso": "Sotto il calendario compaiono solo il 12 e il 15; salvando appare 'non disponibilità registrata (2 giorni)' e il testo della voce termina con '(2 giorni: 12..., 15...)'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Tipo 'Non Disponibilità' scegliendo un giorno già oltre il termine di consegna",
+     "atteso": "Compare l'avviso 'FUORI TEMPO' con l'elenco dei giorni; confermando la voce viene salvata con la nota '[consegna fuori termine]'",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Diario · Elenco, modifica, tipo, fissa, elimina",
+   "prove": [
+    {
+     "azione": "Su una voce del Diario premere 'Modifica', cambiare il testo in 'Aiuto in cassa 30 minuti' e salvare",
+     "atteso": "Messaggio 'Registrazione modificata'; il testo è aggiornato e sotto compare 'Modificata da <operatore>'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Su una malattia 'dal 03.10 al 05.10' premere 'Modifica' e cambiare Al in 06.10.26",
+     "atteso": "La modifica viene accettata; nel Piano il 6 ottobre diventa M e compare il messaggio 'Piano allineato'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "In Modifica di una malattia scrivere nel campo Al un valore sbagliato come '35/13'",
+     "atteso": "Messaggio 'Formato data non valido (usa GG/MM/AA o GG.MM.AA)'; non si salva",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Su una voce di tipo 'Attività' premere 'Tipo', scegliere 'Errore' e premere 'Conferma'",
+     "atteso": "Si apre 'Cambia tipo evento'; dopo Conferma compare 'Tipo aggiornato', il badge diventa Errore e il contatore Errore in alto sale di 1",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premere 'Fissa' su una voce vecchia di una settimana",
+     "atteso": "La voce sale in cima alla lista, evidenziata, e il pulsante diventa 'Rimuovi pin'; premendo 'Rimuovi pin' torna al suo posto in ordine di data",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premere 'Elimina' su una voce e confermare 'Eliminare? Sarà spostata nel cestino.'",
+     "atteso": "Messaggio 'Spostata nel cestino'; la voce sparisce dalla lista e i contatori in alto scendono",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Diario · Filtri ed esportazione",
+   "prove": [
+    {
+     "azione": "Filtro Persona = 'Rossi Mario'",
+     "atteso": "La lista mostra solo le voci di Rossi Mario",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Filtri Dal = 01/09 e Al = 15/09",
+     "atteso": "Si vedono solo le voci dal 1 al 15 settembre compreso l'ultimo giorno intero",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nel campo Cerca scrivere 'cassa'",
+     "atteso": "Restano le voci che contengono 'cassa' nel testo o nel nome, senza differenza tra maiuscole e minuscole",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Impostare Persona e Tipo, passare alla pagina Home e poi tornare al Diario",
+     "atteso": "I filtri scelti sono ancora impostati",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premere 'Reset' nella riga dei filtri",
+     "atteso": "Persona, Tipo, Dal, Al e Cerca si svuotano e ricompare l'elenco completo",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Con filtro Persona = 'Rossi Mario' premere 'CSV'",
+     "atteso": "Si scarica un file con colonne Data, Ora, Collaboratore, Tipo, Reparto, Descrizione, Importo, Valuta, Operatore e solo le righe di Rossi Mario",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Con filtro Tipo = 'Errore' premere 'PDF'",
+     "atteso": "Si scarica un PDF con solo gli errori filtrati, leggibile e con gli importi",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Diario · Annulla/Ripristina, cestino, scadenze",
+   "prove": [
+    {
+     "azione": "Salvare una registrazione e subito premere '↶ Annulla' nella barra in basso (o Ctrl+Z fuori dai campi di testo)",
+     "atteso": "Chiede 'Annullare: ...?'; dopo il sì compare 'Annullato: ...' e la registrazione sparisce dal Diario e finisce nel Cestino",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Dopo l'annullamento premere '↷ Ripristina' (o Ctrl+Y)",
+     "atteso": "Compare 'Ripristinato: ...' e la registrazione torna visibile nel Diario",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Annullare una malattia di 3 giorni appena registrata",
+     "atteso": "Spariscono tutte e 3 le voci insieme e nel Piano le M tornano come prima",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Impostazioni > Cestino: premere 'Carica cestino', filtrare Tipo 'Registrazioni' e Nome 'Rossi', poi premere 'Ripristina' sulla voce eliminata prima",
+     "atteso": "Compare la voce con chi l'ha eliminata; dopo la conferma 'Ripristinare questo elemento?' la voce torna nel Diario",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Accedere come operatore semplice e aprire Impostazioni",
+     "atteso": "La sezione Cestino non è visibile",
+     "ruolo": "operatore"
+    },
+    {
+     "azione": "Se esistono scadenze aperte, cliccare la striscia colorata delle scadenze sotto l'intestazione e premere 'Fatto' su una",
+     "atteso": "Si apre l'elenco delle scadenze; dopo 'Fatto' compare 'Completata' e il conteggio nella striscia scende; con 'Elimina' la scadenza sparisce ('Eliminata')",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Rapporto giornaliero",
+   "prove": [
+    {
+     "azione": "Aprire la scheda Rapporto",
+     "atteso": "Si apre direttamente il giorno della giornata di gioco corrente, con le colonne PRESTO e NOTTE e i campi Supervisore, Cassa, Differenze Cassa, Sala, Incasso Assegni, Prelievi, Assenze",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premere '← Torna al calendario', poi le frecce < e > e cambiare l'anno dal menu accanto al mese",
+     "atteso": "Il calendario cambia mese e anno; oggi è evidenziato; i giorni con rapporto hanno un pallino per PRESTO e/o NOTTE",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Aprire un giorno, scrivere nel campo Sala della colonna PRESTO 'Tavolo 3 chiuso alle 22'",
+     "atteso": "Sotto la colonna compare 'Salvando...' e dopo circa un secondo 'Salvato'; tornando al calendario il giorno ha il pallino PRESTO",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nel campo Assenze del PRESTO scrivere 'Rossi malato dal 3 al 5'",
+     "atteso": "Compare 'Assenze: 1 create'; nel Diario c'è una malattia per Rossi Mario con 'da rapporto PRESTO del ...'; si apre la finestra Copertura turno",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nel campo Assenze scrivere su una riga 'Rossi ferie, Bianchi malata'",
+     "atteso": "Viene registrata solo la malattia di Bianchi; per Rossi (ferie) nessuna registrazione",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nel campo Assenze scrivere una frase che non si capisce, es. 'xx yy'",
+     "atteso": "Compare l'avviso 'Attenzione · xx yy: frammento non riconosciuto, controllare a mano'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Svuotare il campo Assenze dove prima c'era 'Rossi malato'",
+     "atteso": "La malattia creata da quel rapporto viene tolta dal Diario ('Assenze: 1 eliminate'); le malattie inserite a mano nel Diario restano",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nel campo Differenze Cassa del NOTTE scrivere due righe: 'Rossi -100' e 'Bianchi +50'",
+     "atteso": "Nel Diario compaiono due Errori reparto Cassa: 'Differenza cassa: ammanco di 100.00 CHF' per Rossi e 'eccedenza di 50.00 CHF' per Bianchi, con 'da rapporto NOTTE del ...'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Cambiare 'Rossi -100' in 'Rossi -120'",
+     "atteso": "La voce esistente di Rossi viene aggiornata a 120.00 CHF, non viene creato un doppione",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nel campo Differenze Cassa scrivere un cognome inesistente, es. 'Pinco -30'",
+     "atteso": "Messaggio 'Differenza: \"Pinco\" non trovato tra i collaboratori'; nessuna registrazione",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scrivere il rapporto nel settore Tavoli, poi passare al settore Slots e aprire lo stesso giorno",
+     "atteso": "Il rapporto di Slots è separato: i campi scritti per Tavoli non compaiono; i campi limitati a un settore appaiono solo lì",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scegliere un periodo senza rapporti e premere 'Esporta CSV'",
+     "atteso": "Messaggio 'Nessun rapporto nel periodo selezionato'",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Registro attività",
+   "prove": [
+    {
+     "azione": "Accedere come amministratore e aprire la scheda Registro",
+     "atteso": "Compare 'Registro attività operatori' con le azioni fatte (es. 'Nuova registrazione Rossi Mario - Attività: ...') con operatore, data e ora",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Accedere come operatore semplice e cercare la scheda Registro nel menu",
+     "atteso": "La scheda Registro non è visibile",
+     "ruolo": "operatore"
+    },
+    {
+     "azione": "Registro: filtro Operatore = un operatore specifico, Categoria = 'Registrazioni'",
+     "atteso": "Restano solo le azioni di quell'operatore sulle registrazioni del Diario",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Registro: nel campo Cerca scrivere 'cestino', poi impostare Dal e Al a oggi",
+     "atteso": "Restano solo le azioni di oggi che contengono 'cestino' (es. 'Registrazione nel cestino')",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Registro: premere 'CSV' con i filtri impostati",
+     "atteso": "Si scarica un file con le sole righe filtrate",
+     "ruolo": "admin"
+    }
+   ]
+  },
+  {
+   "titolo": "Statistiche e report",
+   "prove": [
+    {
+     "azione": "Aprire Statistiche senza filtri",
+     "atteso": "In alto: Registrazioni totali, Collaboratori, Errore (con confronto col mese scorso), Malattia (giorni), Importo totale; sotto i grafici 'Registrazioni negli ultimi 12 mesi', 'Tipologia eventi', 'Attività per giorno della settimana', 'Collaboratori con più registrazioni'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Controllare che una malattia di 3 giorni conti 3 in 'Malattia (giorni)' e nella 'Tabella completa per collaboratore'",
+     "atteso": "Il numero dei giorni di malattia coincide con quelli registrati (3), non con il numero di voci",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Statistiche: Dal 01/09 e Al 30/09, poi premere 'Reset'",
+     "atteso": "Numeri, grafici e tabelle mostrano solo settembre; dopo Reset tornano a tutto il periodo",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nella 'Tabella completa per collaboratore' cliccare il nome 'Rossi Mario'",
+     "atteso": "Si apre la scheda del collaboratore; la riga TOTALE in fondo somma le colonne",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premere 'Riepilogo mensile PDF', scegliere Settembre 2026, premere 'Deseleziona tutti' e poi spuntare solo 'Differenze cassa' e premere 'Genera PDF'",
+     "atteso": "Si scarica un PDF di settembre con la sola sezione differenze cassa; 'Seleziona tutti' rispunta tutte le caselle; 'Annulla' chiude senza file",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Come amministratore: in Statistiche usare 'Report Direzione · periodo del PDF', Mese = mese scorso, e premere 'Report Direzione PDF'",
+     "atteso": "Accanto compare 'PDF su: <mese>'; si scarica il PDF con le sezioni Organico, Operativo e Sviluppo",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Report Direzione: togliere la spunta a Organico, Operativo e Sviluppo e premere 'Report Direzione PDF'",
+     "atteso": "Messaggio 'Seleziona almeno una sezione'; nessun file",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Accedere come operatore semplice e aprire Statistiche",
+     "atteso": "Il riquadro 'Report Direzione' non è visibile; restano i grafici e 'Riepilogo mensile PDF'",
+     "ruolo": "operatore"
+    }
+   ]
+  },
+  {
+   "titolo": "Ricerca globale",
+   "prove": [
+    {
+     "azione": "Scrivere 'rossi' nella barra 'Cerca ovunque'",
+     "atteso": "Si apre l'elenco diviso per gruppi (Collaboratori, Diario, Moduli, Cambi turno, Note Colleghi, Costi Maison, Promemoria, Spese Extra) con il numero dei risultati di ciascuno",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nei risultati cliccare la riga 'scheda' di Rossi Mario nel gruppo Collaboratori",
+     "atteso": "Si apre la scheda del collaboratore e la barra di ricerca si svuota",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Cercare 'certificato' e cliccare un risultato del gruppo Diario",
+     "atteso": "Si apre il Diario con 'certificato' nel campo Cerca; la voce trovata viene portata al centro dello schermo e lampeggia evidenziata",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Cercare il nome di un collaboratore con un cambio turno e cliccare il risultato 'Cambi turno'",
+     "atteso": "Si apre Piano > Cambi turno filtrato su quel nome con il foglio evidenziato",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Cercare 'zzqq'",
+     "atteso": "Compare 'Nessun risultato per \"zzqq\"'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Come amministratore cercare 'cestino'",
+     "atteso": "Compare anche il gruppo 'Registro' con le azioni; cliccandolo si apre il Registro filtrato su 'cestino'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Come operatore semplice cercare 'cestino'",
+     "atteso": "Il gruppo 'Registro' non compare nei risultati",
+     "ruolo": "operatore"
+    }
+   ]
+  },
+  {
+   "titolo": "Scheda del collaboratore",
+   "prove": [
+    {
+     "azione": "Aprire la scheda di 'Rossi Mario' dal Diario",
+     "atteso": "Si vedono nome, 'Data di nascita', 'In servizio dal' con gli anni di servizio (se inseriti), i riquadri Registrazioni, Errori, Costo errori, Amm. verbali, Non disponib., Allineamenti, Apprezzamenti e i giorni di malattia",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nella scheda cliccare il riquadro 'Errori'",
+     "atteso": "La cronologia in basso si filtra sui soli errori e compare un'etichetta del filtro con il pulsante per toglierlo",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nella 'Cronologia completa' impostare Dal 01/09 e Al 30/09, poi premere 'Reset'",
+     "atteso": "Restano solo gli eventi di settembre; se non ce ne sono compare 'Nessun evento nel periodo selezionato'; Reset li rimostra tutti",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Aprire la scheda di un collaboratore senza data di nascita, scrivere '12.01' e premere 'Salva'",
+     "atteso": "Messaggio 'Data nascita salvata'; al posto del campo compare '12 gennaio' in sola lettura, senza anno",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Aprire la scheda di un collaboratore che ha già la data di nascita",
+     "atteso": "La data è in sola lettura (niente campo né Salva); passandoci sopra il mouse dice che si modifica in Gestione collaboratori",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Aprire la scheda di un collaboratore con fogli di cambio turno e premere 'Anteprima' su uno dei cambi, poi 'Tutti nel Piano'",
+     "atteso": "La riga 'Cambi turno: N (ultimi 3)' mostra data e collega; 'Anteprima' apre il foglio del cambio; 'Tutti nel Piano' apre Piano > Cambi turno filtrato su quel nome",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nella scheda premere 'PDF'",
+     "atteso": "Si scarica il PDF della scheda con gli stessi numeri visti a schermo",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nella scheda premere 'Confronta' e scegliere un secondo collaboratore",
+     "atteso": "Si apre il confronto fianco a fianco; le malattie sono contate in giorni come nella scheda",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Come amministratore (o con permesso Storico HR) aprire la scheda di un collaboratore con eventi in Tavoli e in Slots",
+     "atteso": "Compare il pulsante di salto 'Storico HR' e la cronologia ha l'etichetta 'TUTTI I SETTORI' con gli eventi di entrambi i settori",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Come operatore semplice aprire la stessa scheda",
+     "atteso": "Niente 'Storico HR', niente 'TUTTI I SETTORI' e niente sezione 'Pattern malattie': solo gli eventi del settore corrente; il conteggio dei giorni di malattia resta visibile",
+     "ruolo": "operatore"
+    }
+   ]
+  }
+ ]
+}

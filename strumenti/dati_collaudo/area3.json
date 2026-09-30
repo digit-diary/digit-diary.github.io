@@ -1,0 +1,480 @@
+{
+ "area": "Maison e budget clienti",
+ "sezioni": [
+  {
+   "titolo": "Maison · Accesso alla pagina",
+   "prove": [
+    {
+     "azione": "Accedere come operatore con la pagina Costi Maison visibile e aprire la scheda Maison dal menu",
+     "atteso": "Si vedono in ordine: Costi Maison - Caricamento dati, il riquadro della giornata (GD), Riepilogo Costi Maison, i grafici, Scheda clienti Maison, Spese Extra e Regali per clienti Maison",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Da admin: Impostazioni > Persone e accessi > Visibilita e permessi, mettere Costi Maison su Solo admin. Poi entrare con un operatore normale",
+     "atteso": "Per l operatore la voce Maison sparisce dal menu; per l admin resta",
+     "ruolo": "operatore"
+    },
+    {
+     "azione": "Passare dal settore Slots a un altro settore con la pagina Maison aperta",
+     "atteso": "Tabelle, budget, spese extra e regali mostrano solo i dati del settore scelto; tornando a Slots ricompaiono quelli di Slots",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Maison · Importare il file del ristorante",
+   "prove": [
+    {
+     "azione": "Premere Carica Excel ristorante e scegliere un file .xlsx con un foglio chiamato 14.09.2026 (colonne Cognome, PX, Costo) con 5 righe compilate",
+     "atteso": "Sotto il pulsante compare in verde '5 righe importate (1 giorni nuovi)' e un messaggio in basso; le righe compaiono nel riepilogo con data 14.09.2026",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Importare un file con tre fogli: 13.09.2026, 14.09.2026 e un foglio chiamato Riepilogo",
+     "atteso": "Vengono importati solo i due fogli con la data nel nome; il foglio Riepilogo e ignorato",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Importare di nuovo lo stesso file del 14.09.2026",
+     "atteso": "Nessuna riga doppia; compare 'Giorni gia presenti (saltati): 14.9.2026' con il pulsante Sostituisci tutto",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Dopo il messaggio 'Giorni gia presenti', premere Sostituisci tutto",
+     "atteso": "Il giorno viene sostituito: il messaggio dice '(1 giorni aggiornati)' e i totali del giorno corrispondono al file, senza doppioni",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Importare un foglio in cui una riga ha il nome ma PX e Costo vuoti, e un altra ha PX e costo ma nessun nome",
+     "atteso": "Entrambe le righe vengono saltate; le altre righe entrano normalmente",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scegliere un file non Excel rinominato .xlsx (es. un PDF) o un file rovinato",
+     "atteso": "Compare 'Errore: ...' sotto il pulsante e il messaggio 'Errore importazione'; nessun dato modificato",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nel file scrivere 'Rosi' mentre in Scheda clienti esiste 'Rossi Mario'",
+     "atteso": "Dopo l import compare 'Nomi simili: Rosi -> corretto in \"Rossi\"'; la riga e registrata a nome Rossi",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "In Scheda clienti esistono 'Bianchi Anna' e 'Bianchi Marco'; nel file c e solo 'Bianchi'",
+     "atteso": "Si apre la finestra 'Nomi ambigui trovati' con i due clienti da scegliere e il pulsante Continua importazione; la riga va al cliente scelto",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Maison · Riconoscimento delle sigle nel file",
+   "prove": [
+    {
+     "azione": "Riga 'Verdi Paolo BU' da 60 CHF, 1 persona",
+     "atteso": "Riga di tipo BU per Verdi Paolo, 60 CHF, colonna BU = 1; la sigla non resta nel nome",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Riga 'Neri 2BL' da 120 CHF",
+     "atteso": "Riga di tipo BL con nota 2BL; nel riepilogo la colonna BL di Neri vale 2",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Riga 'Gialli coupon gourmet' da 90 CHF",
+     "atteso": "Tipo C. Gourmet (CG), nota C. Gourmet; nel nome resta solo Gialli",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Riga 'Blu welcome lounge' da 40 CHF (provare anche 'Blu W.L.')",
+     "atteso": "Tipo Welcome Lounge (WL) in entrambi i casi; nome Blu",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Riga 'Rossi Seven' da 120 CHF",
+     "atteso": "La riga NON va nei Costi Maison: compare in Spese Extra come Cena esterna, luogo Ristorante Seven, 120 CHF; il messaggio dice '1 righe \"Seven\" spostate in Spese Extra'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Riga 'Rossi 1BL + 2CG' da 250 CHF",
+     "atteso": "Due righe per Rossi: una BL da 40 CHF e una CG da 210 CHF, nota '(da 1BL+2CG)'; la somma e 250",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Maison · Quote per ospite e buoni",
+   "prove": [
+    {
+     "azione": "Nel file: riga 'Aili BL / Bertaggia' da 360 CHF, 2 persone (valore BL 40)",
+     "atteso": "Aili 40 CHF con 1 BL, Bertaggia 320 CHF; 1 persona a testa; la somma resta 360",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nel file: riga 'Rossi / Bianchi / Verdi' da 100 CHF, 3 persone, nessun buono",
+     "atteso": "Tre righe: 33.33, 33.33 e 33.34 CHF (somma esatta 100); 1 persona a testa",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nel file: riga 'Rossi BU / Verdi BU' da 100 CHF",
+     "atteso": "Tutti hanno il buono: ognuno 15 del buono piu meta del resto, cioe 50 e 50",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nel file: riga 'Rossi BL' da 25 CHF (buono BL da 40)",
+     "atteso": "Rossi 25 CHF: il buono non supera mai il costo della riga",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Riepilogo: guardare una riga di un cliente registrato insieme a un altro",
+     "atteso": "Accanto al totale c e il segno di divisione con il numero di gruppi; passando sopra appare 'voci condivise (costo diviso)'",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Maison · Inserimento manuale",
+   "prove": [
+    {
+     "azione": "Compilare Cliente 'Rossi Mario', PX 2, Importo 180, Tipo Normale e premere + Aggiungi spesa maison",
+     "atteso": "Messaggio 'Spesa aggiunta per Rossi Mario'; la riga compare nel riquadro della GD di oggi; i campi tornano vuoti e PX torna 1",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scegliere Tipo BL",
+     "atteso": "Compare il campo N° buoni con valore 1; con Tipo Normale il campo sparisce",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Cliente 'Rossi Mario / Bianchi Luca', PX 2, Importo 360, Tipo BL, N° buoni 1",
+     "atteso": "Rossi Mario 40 CHF con BL, Bianchi Luca 320 CHF; 1 persona ciascuno",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Stessa prova con N° buoni 2",
+     "atteso": "Rossi Mario 80 CHF (nota 2BL), Bianchi Luca 280 CHF",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premere + Aggiungi spesa maison con Cliente vuoto",
+     "atteso": "Messaggio 'Inserisci il nome' e il campo Cliente evidenziato; nessuna riga salvata",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Cliente compilato ma Importo vuoto o 0",
+     "atteso": "Messaggio 'Inserisci un importo'; nessuna riga salvata",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scrivere 'Bia' nel campo Cliente",
+     "atteso": "Si apre l elenco suggerimenti con i clienti che contengono 'Bia', prima quelli con categoria; scegliendone uno con categoria BU il Tipo si imposta su BU",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Dopo un inserimento manuale premere Annulla nella barra in basso (o Ctrl+Z)",
+     "atteso": "La riga appena aggiunta sparisce; con Ripristina (Ctrl+Y) torna",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Maison · Riquadro della giornata (GD)",
+   "prove": [
+    {
+     "azione": "Aprire Maison in un giorno con costi",
+     "atteso": "Il riquadro mostra la data della GD corrente con il giorno della settimana e la tabella Cliente/Tipo/... delle righe di oggi",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premere le frecce a sinistra e destra, poi Oggi",
+     "atteso": "Si passa al giorno precedente/successivo con dati; il pulsante Oggi riporta alla GD corrente e poi sparisce",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premere CSV e poi PDF nel riquadro GD",
+     "atteso": "Si scaricano il CSV e il PDF della giornata mostrata, con clienti, tipo e importi uguali a quelli a schermo; su giornata vuota compare 'Nessun dato'",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Maison · Riepilogo, filtri e grafici",
+   "prove": [
+    {
+     "azione": "Scrivere 'ros' in Cerca cliente",
+     "atteso": "Restano solo i clienti che contengono 'ros'; totali e grafici si aggiornano",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Filtro Tipo: provare uno per uno Normale, Buono Unico, Buono Lounge, C. Gourmet, Welcome Lounge",
+     "atteso": "Ogni scelta mostra solo le righe di quel tipo (C. Gourmet solo CG, Welcome Lounge solo WL)",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Impostare Dal 01.09.2026 e Al 15.09.2026, poi premere Reset",
+     "atteso": "Con le date restano solo le righe del periodo; Reset svuota tutti i filtri e torna a vedere tutto",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Guardare i grafici Spesa giornaliera, Top clienti per spesa e Distribuzione tipo pagamento",
+     "atteso": "I grafici corrispondono ai dati filtrati; nel grafico a torta compaiono C. Gourmet e Welcome L. con il loro totale",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Riepilogo > CSV e PDF con un filtro attivo",
+     "atteso": "Si scarica il file costi_maison_ con il periodo nel nome, con solo i dati filtrati; senza dati compare 'Nessun dato'",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Maison · Budget mensile e avvisi",
+   "prove": [
+    {
+     "azione": "Scheda clienti Maison: Cliente 'Rossi Mario', Budget CHF 2000, Categoria Full Maison, premere + Salva",
+     "atteso": "Messaggio 'Budget impostato per Rossi Mario'; il cliente compare nel gruppo Full Maison",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premere + Salva con Cliente vuoto, poi con solo il nome e nessun altro campo",
+     "atteso": "Prima 'Inserisci il nome del cliente', poi 'Imposta almeno un campo'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Rossi Mario con budget 2000 e 1650 CHF spesi questo mese",
+     "atteso": "Nella tabella accanto al nome '80% BUDGET (questo mese)' in arancione; in alto l avviso 'Quasi al budget (80%+): Rossi Mario (1 650.00/2 000.00 CHF)'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Aggiungere una spesa che porta Rossi Mario a 2050 CHF nel mese",
+     "atteso": "Riga rossa con 'BUDGET SUPERATO (questo mese)' e avviso 'Budget superato: Rossi Mario (...)'; nella scheda percentuale 103% in rosso",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Rossi Mario ha speso 3000 CHF il mese scorso e 100 questo mese",
+     "atteso": "Nessun avviso: conta solo il mese corrente (5%)",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Periodo budget: scegliere Anno corrente",
+     "atteso": "L etichetta diventa 'anno 2026' e il budget viene contato x12 (2000 diventa 24 000)",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premere Modifica su un cliente, cambiare Budget CHF/mese in 1500 e Max BL/mese in 4, Salva",
+     "atteso": "Messaggio 'Info aggiornate'; percentuale e avvisi ricalcolati sul nuovo budget",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Maison · Scheda del cliente, note e modifiche",
+   "prove": [
+    {
+     "azione": "Cliccare sul nome di un cliente nella tabella",
+     "atteso": "Si apre la scheda con categoria, Visite totali, Ultimo passaggio, Media/visita, 'Budget questo mese: X / Y CHF (Z%)', le righe ristorante, spese extra, regali e Trend mensile",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nella scheda cambiare la categoria dal menu a tendina",
+     "atteso": "Messaggio di conferma con la nuova categoria; il badge si aggiorna anche nella tabella",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scrivere una nota in 'Scrivi una nota...' e premere Salva nota; poi Elimina sulla nota e confermare",
+     "atteso": "La nota compare in Note Private con operatore e data; dopo la conferma sparisce con 'Nota eliminata'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Su una riga ristorante premere Modifica, cambiare Costo CHF da 120 a 95 e Tipo in BU, Salva",
+     "atteso": "Messaggio 'Riga modificata'; totale del cliente e riepilogo scendono di 25 CHF",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Su una riga ristorante premere '-> Extra' e confermare",
+     "atteso": "La riga passa in Spese Extra ('Spostato in Spese Extra') ed esce dai Costi Maison",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premere Stampa e poi il pulsante PDF e CSV della scheda",
+     "atteso": "Si apre la stampa della scheda cliente; PDF e CSV contengono le stesse righe e gli stessi totali della scheda",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Maison · Rinomina, elimina, riallinea, unisci",
+   "prove": [
+    {
+     "azione": "Tabella > Rinomina su 'Rosi Mario', scrivere 'Rossi Mario', Salva",
+     "atteso": "Messaggio 'Rosi Mario -> Rossi Mario'; tutte le righe e il budget passano al nuovo nome",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Dopo la rinomina aprire la scheda di Rossi Mario",
+     "atteso": "Le note private e i regali del vecchio nome sono ancora visibili nella scheda",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Tabella > Elimina su un cliente con 4 righe, confermare",
+     "atteso": "Domanda 'Eliminare tutte le 4 registrazioni di ...'; dopo la conferma '... eliminato (4 righe)'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Elimina su un cliente con righe condivise",
+     "atteso": "Finestra con Annulla, 'Elimina entrambi (N righe)' e 'Solo ... (mantieni ...)'; con 'Solo' l altro cliente resta",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scegliere un giorno in 'Seleziona giorno...' e premere Elimina giorno; poi un mese con Elimina mese",
+     "atteso": "Chiede conferma con il numero di registrazioni; dopo la conferma il giorno o il mese sparisce; senza scelta compare 'Seleziona un giorno' / 'Seleziona un mese'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premere Riallinea Nomi con vecchie righe 'Rossi' e cliente 'Rossi Mario' in scheda",
+     "atteso": "Finestra Riallinea Nomi con le proposte, Conferma e Salta per ciascuna; alla fine il riepilogo Confermati / Saltati / Voci corrette",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premere Unisci Duplicati con 'Bianchi' e 'Bianchi Anna' nella scheda clienti",
+     "atteso": "Finestra Unisci Duplicati; con Conferma resta un solo cliente con il nome lungo; se non ce ne sono 'Nessun duplicato trovato!'",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Maison · Date di nascita e compleanni",
+   "prove": [
+    {
+     "azione": "Nel form Scheda clienti scrivere Data nascita '12.01.1997' e salvare",
+     "atteso": "Nella lista accanto al cliente compare la torta con 12.01",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nella scheda del cliente scegliere una data nel campo Data nascita e premere Salva",
+     "atteso": "Messaggio 'Data nascita salvata per ...' e 'Attuale:' mostra la nuova data; senza data compare 'Inserisci una data valida'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premere Importa Compleanni e scegliere il file Excel dei compleanni (nome e data per mese)",
+     "atteso": "Anteprima Importa Compleanni con Compleanni, Clienti esistenti, Familiari/Nuovi, Da confermare; dopo l import il riepilogo Aggiornati / Nuovi / Saltati",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nel file compleanni c e 'Rossi' e in scheda c e 'Rossi Mario'",
+     "atteso": "La voce e fra 'Da confermare' con scelta Salta (predefinita); con Salta la data di Rossi Mario non cambia e il nome non viene toccato",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nel file compleanni una data scritta con anno a due cifre, es. 03/15/43",
+     "atteso": "Il cliente risulta nato nel 1943, non nel 2043",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Maison · Categorie, lista e confronto",
+   "prove": [
+    {
+     "azione": "Premere Importa Categorie e scegliere il file Excel con le colonne Full Maison / Maison / Buono Unico",
+     "atteso": "Anteprima con Totale, Nuovi, Aggiornati e liste per categoria; confermando compare 'Importazione completata'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premere Mostra Lista",
+     "atteso": "Si apre 'Clienti Categorizzati' con i clienti raggruppati per categoria e i pulsanti CSV e PDF; Chiudi la chiude",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nella Scheda clienti premere CSV e PDF",
+     "atteso": "Si scaricano clienti_maison.csv e clienti_maison.pdf con categoria, budget e data di nascita",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premere Confronta clienti, scegliere due clienti diversi e premere Confronta",
+     "atteso": "Compare 'Risultato confronto' con Visite, Persone, Buoni BU/BL, Totale ristorante, extra, regali e Trend mensile per ognuno",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Maison · Spese extra",
+   "prove": [
+    {
+     "azione": "Compilare Beneficiario 'Rossi Mario', Tipo Cena esterna, Data 20.09.2026, Luogo 'Ristorante Da Mario, Zurigo', Importo 280, PX 2 e premere Aggiungi spesa",
+     "atteso": "Messaggio 'Spesa aggiunta'; la spesa compare nell elenco sotto e nella scheda del cliente",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Aggiungi spesa senza beneficiario, poi senza data, poi senza importo",
+     "atteso": "Messaggi 'Inserisci il beneficiario', 'Seleziona la data', 'Inserisci l importo'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Usare i filtri Beneficiario, Tipo, Dal/Al e poi Reset; poi CSV e PDF",
+     "atteso": "L elenco si restringe; Reset riporta tutto; i file scaricati contengono solo le spese filtrate",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Da admin: scegliere un giorno e premere Elimina giorno delle spese extra, poi un mese con Elimina mese",
+     "atteso": "Chiede conferma e poi 'Spese extra del ... eliminate'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Entrare come operatore normale nella sezione Spese Extra",
+     "atteso": "I menu Seleziona giorno/mese e i pulsanti Elimina giorno/Elimina mese non ci sono",
+     "ruolo": "operatore"
+    }
+   ]
+  },
+  {
+   "titolo": "Maison · Regali",
+   "prove": [
+    {
+     "azione": "Regali per clienti Maison: Cliente 'Rossi Mario', Descrizione 'Bottiglia di vino', Importo 85, Data 22.09.2026, premere Aggiungi regalo",
+     "atteso": "Messaggio 'Regalo registrato'; la riga compare con badge categoria; in alto Totale CHF, Regali e Clienti aggiornati",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Aggiungi regalo senza cliente, poi senza descrizione",
+     "atteso": "Messaggi 'Inserisci il nome del cliente' e 'Inserisci una descrizione'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Aggiungi regalo con Importo vuoto",
+     "atteso": "Il regalo si salva e nella colonna CHF compare '-'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premere Rinomina su un regalo e poi Elimina confermando",
+     "atteso": "Il nome cambia ('Rinominato'); dopo l eliminazione compare 'Eliminato' e i totali scendono",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Maison · Impostazioni Maison",
+   "prove": [
+    {
+     "azione": "Da admin: Impostazioni > scheda Maison > Valori dei buoni, mettere BL 50 e premere Salva valori",
+     "atteso": "Messaggio 'Valori buoni salvati'; una nuova riga 'A BL / B' da 360 CHF da ora in poi da 50 e 310",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Valori dei buoni: lasciare CG vuoto o scrivere 0 e premere Salva valori",
+     "atteso": "Messaggio 'Inserisci un valore valido per CG'; i valori non cambiano",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Da admin: Conservazione dati Maison, scegliere 'Conserva 7 giorni' con registrazioni piu vecchie presenti",
+     "atteso": "Chiede conferma con il numero di registrazioni che verranno eliminate; confermando compare 'Auto-cancellazione attiva: conserva 7 giorni' e il testo di avviso",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Entrare come operatore normale in Impostazioni",
+     "atteso": "Le sezioni Valori dei buoni e Conservazione dati Maison non si vedono",
+     "ruolo": "operatore"
+    }
+   ]
+  }
+ ]
+}

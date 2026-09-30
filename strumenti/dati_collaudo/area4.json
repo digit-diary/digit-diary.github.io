@@ -1,0 +1,515 @@
+{
+ "area": "Moduli, Formazione, Valutazioni, Storico HR",
+ "sezioni": [
+  {
+   "titolo": "Moduli · Allineamento",
+   "prove": [
+    {
+     "azione": "Moduli > clicca la scheda Allineamento",
+     "atteso": "Sotto compare il modulo 'Rilevamento di non conformità e colloquio di allineamento' con Collaboratore, Resp. Settore, Data di oggi, Non conformità, Obiettivo concordato, Scadenza, Modalità firma e i pulsanti Genera PDF e Annulla",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scrivi il nome con un errore di battitura (es. 'Rosi Mario' al posto di 'Rossi Mario'), compila i testi e premi Genera PDF",
+     "atteso": "Compare la finestra 'Nome simile trovato' con 'Usa \"Rossi Mario\"' e 'No, usa ... così com'è'; scegliendo il primo il nome corretto va nel PDF",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Lascia vuoto il campo Collaboratore e premi Genera PDF",
+     "atteso": "Messaggio 'Inserisci il nome del collaboratore', il campo viene evidenziato e non si crea nessun PDF",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Compila il Collaboratore ma lascia vuoti Non conformità e Obiettivo, poi premi Genera PDF",
+     "atteso": "Chiede conferma: il documento va nel fascicolo personale e mancano 'Non conformita rilevata' e 'Obiettivo concordato'. Con Annulla non si crea nulla e il campo vuoto viene evidenziato",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scrivi in Scadenza 'Entro il 31.10.2026' e genera il PDF",
+     "atteso": "Nel PDF compare 'Entro il 31.10.2026' in un solo punto, non ripetuto nella frase di chiusura",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Compila tutto un Allineamento e premi Annulla",
+     "atteso": "Il modulo si chiude, non si crea nessun PDF e l'elenco 'Moduli generati' non cambia",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Genera un Allineamento completo e guarda il nome del file e la lista",
+     "atteso": "Anteprima PDF con logo, tabella Collaboratore / Resp. Settore / Data, file chiamato Modulo_Allineamento_Cognome_Nome_data.pdf; messaggio 'PDF generato e modulo salvato!'; il contatore di 'Moduli generati' sale di 1",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Moduli · Apprezzamento e RDI",
+   "prove": [
+    {
+     "azione": "Moduli > clicca Apprezzamento",
+     "atteso": "Il modulo ha Descrizione e 'Osservazioni da parte del Resp. Settore', senza Scadenza né Livello",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Moduli > clicca RDI",
+     "atteso": "Il modulo ha anche 'Scadenza (termine di verifica)' e il menu Livello RDI con 'I° livello' e 'II° livello (grave)'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Genera un RDI scegliendo 'II° livello (grave)'",
+     "atteso": "Il PDF riporta il II livello; il modulo compare in lista con l'etichetta rossa RDI",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Con un Allineamento aperto dalla lista (pulsante Apri) clicca la scheda RDI in alto e genera il PDF",
+     "atteso": "Si crea un RDI nuovo; l'Allineamento resta in elenco invariato (due moduli distinti)",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Moduli · Template rapidi, AI e importazione",
+   "prove": [
+    {
+     "azione": "Moduli > Template rapidi > premi 'Errore cassa'",
+     "atteso": "Si apre un Allineamento con Non conformità già scritta con la data di oggi e 'CHF ___', Obiettivo compilato e Scadenza 'A partire da subito'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nel riquadro 'Genera con AI' lascia la descrizione vuota e premi 'Genera tutti i campi'",
+     "atteso": "Messaggio che chiede di scrivere una descrizione; nessun campo viene cambiato",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scrivi 'Rossi Mario – cassa – differenza 120 CHF – 22:45 – 08.09.2026' e premi 'Genera tutti i campi'",
+     "atteso": "I campi Collaboratore, Non conformità e Obiettivo si compilano. Se l'AI non è configurata compare il messaggio che indica Impostazioni > Persone e accessi > Intelligenza artificiale",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scrivi una frase nella Non conformità e premi 'Migliora testo con AI'",
+     "atteso": "Il testo viene riscritto in forma più formale; il nome della persona resta corretto",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi 'Importa modulo esistente (Word/PDF)' e scegli un vecchio allineamento in .docx",
+     "atteso": "Messaggio 'Lettura file in corso...', poi si apre il modulo del tipo giusto con i campi compilati e il messaggio 'Modulo importato - controlla i campi e genera il PDF'",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Moduli · Firme digitali",
+   "prove": [
+    {
+     "azione": "In un modulo aperto scegli 'Digitale (firma sullo schermo)'",
+     "atteso": "Compaiono due riquadri: Firma Resp. Settore e Firma Collaboratore, ognuno con il pulsante Cancella",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Firma con il mouse nei due riquadri (e su tablet con il dito)",
+     "atteso": "Il tratto segue il puntatore senza scostamenti; sul tablet la pagina non scorre mentre si firma",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Genera il PDF con le due firme",
+     "atteso": "Le firme compaiono nel PDF sulle righe di firma corrette",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Apri dalla lista un modulo firmato digitalmente",
+     "atteso": "È già scelta la modalità Digitale e le due firme sono ricaricate nei riquadri",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Moduli · Elenco, ristampa, modifica ed eliminazione",
+   "prove": [
+    {
+     "azione": "Nella sezione 'Moduli generati' scrivi un nome nel filtro Collaboratore",
+     "atteso": "Restano solo i moduli di quella persona",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Scegli Tipo 'RDI', poi imposta Dal e Al su un mese",
+     "atteso": "Restano solo gli RDI creati nel periodo; se nessuno corrisponde appare 'Nessun modulo trovato'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi PDF su un Allineamento in lista",
+     "atteso": "Si apre il PDF identico all'originale (stesse firme, stesso codice QR); il contatore non cambia e nel Registro compare 'Ristampato modulo allineamento'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi Apri su un modulo, non cambiare nulla e premi Genera PDF",
+     "atteso": "Messaggio 'PDF rigenerato (nessuna modifica)'; in lista non compare 'Modificato da'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi Apri, correggi l'Obiettivo e premi Genera PDF (con un operatore diverso da chi l'ha creato)",
+     "atteso": "Messaggio 'Modulo aggiornato e PDF generato!'; in lista resta un solo modulo con 'Creato da X · Modificato da Y'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi Elimina e conferma",
+     "atteso": "Messaggio 'Modulo spostato nel cestino'; sparisce dalla lista e il contatore scende; si ritrova nel Cestino",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Inquadra con il telefono il codice QR stampato su un modulo",
+     "atteso": "Dopo il login si apre la pagina Moduli con quel modulo già aperto; con un codice inesistente appare 'Modulo non trovato'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Clicca il nome di un collaboratore in 'Moduli generati'",
+     "atteso": "Si apre la sua scheda e nella cronologia (fascicolo) ci sono i suoi moduli",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Entra con un operatore che vede un settore extra solo in lettura, apri un modulo e premi Genera PDF o Elimina",
+     "atteso": "Messaggio 'Non hai il permesso'; nulla viene salvato o eliminato",
+     "ruolo": "operatore"
+    }
+   ]
+  },
+  {
+   "titolo": "Moduli · Responsabile per settore",
+   "prove": [
+    {
+     "azione": "Impostazioni > Persone e accessi > 'Responsabile di settore nei moduli': scrivi 'Sig. Bianchi Luca' per Tavoli e premi fuori dal campo",
+     "atteso": "Messaggio 'Salvato · Tavoli: Sig. Bianchi Luca'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Passa al settore Tavoli e apri un nuovo Allineamento",
+     "atteso": "Il campo Resp. Settore è già 'Sig. Bianchi Luca'; negli Slots resta il responsabile degli Slots",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Entra come operatore senza permessi e apri Impostazioni",
+     "atteso": "La sezione 'Responsabile di settore nei moduli' non si vede",
+     "ruolo": "operatore"
+    }
+   ]
+  },
+  {
+   "titolo": "Alert cassa e rischio (soglie)",
+   "prove": [
+    {
+     "azione": "Impostazioni > Alert cassa e percorso disciplinare: metti Allineamento 90 e RDI 500, premi 'Salva soglie'",
+     "atteso": "Messaggio 'Soglie alert salvate' e sotto 'Salvato: allineamento da CHF 90, RDI cumulativo da CHF 500.'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Nel Diario registra un Errore di cassa di 120 CHF per un collaboratore senza allineamenti",
+     "atteso": "In Panoramica compare il banner '1 collaboratore/i con differenza cassa ≥ CHF 90 · Preparare allineamento'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Clicca il banner e poi 'Crea Allineamento'",
+     "atteso": "Si apre la tendina con nome, importo e data; il pulsante porta a Moduli con un Allineamento già intestato a quella persona",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Registra per la stessa persona errori di cassa che insieme superano 500 CHF",
+     "atteso": "Compare il banner rosso 'differenze cumulative ≥ CHF 500 · Fare RDI' con 'Crea RDI' al posto degli avvisi di allineamento",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Registra due Ammonimenti Verbali per 'ritardo in sala' alla stessa persona",
+     "atteso": "Banner '1 collaboratore/i con 2+ ammonimenti stesso motivo · Preparare allineamento' con 'Crea Allineamento'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Crea tre Allineamenti per lo stesso motivo (es. ritardo) alla stessa persona",
+     "atteso": "Banner viola '3+ allineamenti stesso motivo · Preparare RDI'; sparisce dopo aver creato l'RDI",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Crea tre Allineamenti per motivi diversi, apri il banner arancione 'Valutare RDI' e premi Ignora, poi conferma",
+     "atteso": "Messaggio 'Suggerimento ignorato per ...'; la riga sparisce e nel Registro compare 'Alert ignorato'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Fai in modo che ci siano due o più banner insieme",
+     "atteso": "Si vede una sola striscia 'N segnalazioni operative · mostra dettagli'; il clic apre e chiude i banner",
+     "ruolo": "tutti"
+    }
+   ]
+  },
+  {
+   "titolo": "Formazione · Matrice competenze e livelli",
+   "prove": [
+    {
+     "azione": "Apri Formazione",
+     "atteso": "In alto i numeri: Collaboratori, uno per livello (l'ultimo con '(multiruolo)') e uno per ogni competenza; sotto la 'Matrice competenze · chi sa fare cosa'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Spunta una competenza di livello 1 per un collaboratore",
+     "atteso": "Chiede il formatore (facoltativo) e se assegnare i punti della competenza; la spunta resta dopo aver ricaricato",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Spunta una competenza di livello alto (es. Back Office) a chi non ha i livelli inferiori",
+     "atteso": "Messaggio 'Spuntati anche i livelli inferiori: ...' e le caselle inferiori risultano spuntate",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Togli la spunta a una competenza per cui erano stati dati punti",
+     "atteso": "Chiede 'Togliere anche i punti?'; con OK messaggio 'Rimossi N punti a ...'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Completa l'ultima competenza che fa salire una persona al livello 2",
+     "atteso": "Finestra 'Nome → Livello 2' con il premio previsto e i pulsanti 'Registra premio consegnato' e 'Più tardi'; nello Storico HR compare 'Raggiunto Livello 2'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Premi CSV e poi PDF sopra la matrice",
+     "atteso": "Si scaricano il file CSV e il PDF con tutte le righe e le colonne della matrice",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Entra con un operatore senza il permesso Competenze e prova a cliccare una casella",
+     "atteso": "Le caselle sono grigie e non si possono cambiare",
+     "ruolo": "operatore"
+    },
+    {
+     "azione": "Compila il protocollo (X sui punti, voti 1-5) e usa 'Importa compilato'",
+     "atteso": "Il programma riconosce allievo e voti, lo registra nello Storico HR e a protocollo completo propone la certificazione",
+     "ruolo": "admin"
+    }
+   ]
+  },
+  {
+   "titolo": "Formazione · Giorni di formazione e registrazione",
+   "prove": [
+    {
+     "azione": "Piano > Impostazioni: metti 'Giorni formazione per certificare' a 3",
+     "atteso": "Messaggio 'Soglia giorni di formazione: 3'; con 0 o 40 appare l'errore 'vanno da 1 a 30'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Nel Piano scrivi 'formazione' nel commento di 3 turni passati di Sala per una persona non formata in Sala, poi genera o apri il piano",
+     "atteso": "Chiede se certificare: 'ha COMPLETATO la formazione in SALA: 3 giorni di affiancamento'; con OK la spunta Sala compare in matrice",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Formazione > 'Registra formazione svolta': lascia vuoto 'Formazione svolta' e premi '+ Registra'",
+     "atteso": "Messaggio 'Indica collaboratore e formazione svolta'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Scegli un collaboratore, scrivi 'procedura LRD', lascia la spunta punti e premi '+ Registra'",
+     "atteso": "Messaggio 'Formazione registrata per ...'; nella scheda compare la formazione con formatore e data, e i punti 'Sessione formativa' nello storico punti",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Allega una scheda PDF di 1 MB e registra; poi prova con un file di 3 MB",
+     "atteso": "Col primo 'Scheda allegata allo Storico HR'; col secondo 'File troppo grande: massimo 2 MB'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Entra con un supervisor che ha solo il permesso Formazioni",
+     "atteso": "Vede e usa 'Registra formazione svolta'; nella scheda vede solo 'Formazioni svolte' (senza contratto, premi, giubilei)",
+     "ruolo": "admin"
+    }
+   ]
+  },
+  {
+   "titolo": "Punti, premi e incentivi",
+   "prove": [
+    {
+     "azione": "Formazione > 'Punti · assegnazione': scegli collaboratore, un'azione, scrivi una nota e premi '+ Assegna'",
+     "atteso": "Messaggio 'Nome: +N punti (totale X)'; la riga compare nello storico punti con data, azione, nota e operatore",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Ripeti subito la stessa assegnazione con la stessa nota",
+     "atteso": "Avviso 'ATTENZIONE: punti già assegnati' con data; con Annulla messaggio 'Nessun doppione: punti non assegnati'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Scegli 'Punti manuali...' e scrivi -5",
+     "atteso": "Vengono tolti 5 punti; il totale in matrice scende e il numero è rosso se negativo",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Assegna punti fino a superare una soglia premio (es. 100)",
+     "atteso": "Finestra 'Traguardo raggiunto!' con premio e pulsanti 'Registra premio consegnato' / 'Più tardi'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Premi 'Registra premio consegnato' su un premio con Max/mese già raggiunto",
+     "atteso": "Chiede se mettere in attesa; la persona compare in 'In attesa (priorità dal mese dopo)' con il pulsante 'Consegna ora'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Consegna un premio collegato a un oggetto dell'inventario",
+     "atteso": "Messaggio 'Premio registrato per ...'; i pezzi a magazzino scendono di 1; con 0 pezzi chiede se registrare comunque",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Traguardi e premi: scegli l'anno e premi 'Report Incentivi PDF'",
+     "atteso": "Si apre il PDF con punti, premi e traguardi dell'anno scelto",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Configurazione (admin): spegni 'Incentivi attivi' e prova ad assegnare punti",
+     "atteso": "La scritta dice 'SPENTI: nessun punto e nessun popup'; nessun punto viene scritto e non compaiono finestre di premio",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Configurazione: aggiungi una soglia 150 punti 'Buono ristorante' con Max/mese 2, e un oggetto 'Cuffie' con 3 pezzi",
+     "atteso": "La soglia compare in 'Soglie punti' e in 'Premi del mese 0/2'; le Cuffie si possono collegare alla soglia",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Configurazione: cambia il nome del livello L1 in 'Base Sala' e aggiungi una competenza 'Chef de table' di livello 2",
+     "atteso": "Il nuovo nome appare nei riquadri in alto e la nuova colonna appare nella matrice",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Entra con un operatore senza permesso Punti",
+     "atteso": "Al posto del form vede 'I punti vengono assegnati dal responsabile.'; nessun pulsante X, niente Configurazione",
+     "ruolo": "operatore"
+    }
+   ]
+  },
+  {
+   "titolo": "Valutazioni",
+   "prove": [
+    {
+     "azione": "Apri la scheda di un collaboratore senza valutazioni",
+     "atteso": "Nella sezione 'Valutazione annuale' c'è 'VALUTAZIONE ASSENTE'",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Premi '+ Nuova / Modifica'",
+     "atteso": "Si apre l'editor con Anno, Tipo (valutazione, autovalutazione, intermedia), Valutatore, Settore, Funzione, le aree con i punteggi e i campi Sintesi, Punti di forza, 3 obiettivi, Esigenze formative, Proposta sviluppo, Osservazioni",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Scrivi 150 in un'area e premi 'Salva valutazione'",
+     "atteso": "Viene salvato 100 (massimo); messaggio 'Valutazione 2026 salvata'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Crea una seconda valutazione per l'anno precedente",
+     "atteso": "Compaiono le etichette degli anni per passare da una all'altra; la più recente mostra le frecce ▲/▼ rispetto all'anno prima",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Premi 'Importa Excel' e scegli la scheda HR compilata",
+     "atteso": "Finestra 'Importa valutazione' con anno e aree riconosciute; con Importa messaggio 'Valutazione importata' e il file resta tra gli allegati",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Premi 'PDF scheda HR'",
+     "atteso": "Si apre il PDF nel formato ufficiale HR con aree, punteggi e spazi per la firma",
+     "ruolo": "tutti"
+    },
+    {
+     "azione": "Nell'editor di una valutazione esistente elimina la valutazione e conferma",
+     "atteso": "Messaggio 'Valutazione eliminata'; la scheda non la mostra più",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Entra con un operatore senza permesso Valutazioni",
+     "atteso": "Nella scheda non ci sono '+ Nuova / Modifica' né 'Importa Excel'",
+     "ruolo": "operatore"
+    }
+   ]
+  },
+  {
+   "titolo": "Storico HR, allegati e giubilei (riservato)",
+   "prove": [
+    {
+     "azione": "Con admin apri una scheda collaboratore",
+     "atteso": "C'è la sezione 'Storico HR' con badge RISERVATO, Inizio contratto, Anzianità e la cronologia degli eventi",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Cambia 'Inizio contratto' e premi Salva; poi svuota la data e premi Salva",
+     "atteso": "Prima 'Inizio contratto salvato' con nuovo evento nello storico e anzianità aggiornata; poi 'Seleziona una data'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Con un collaboratore che ha superato 5 anni di servizio guarda 'Premio giubileo' e premi 'Registra consegna'",
+     "atteso": "Il badge '5 anni maturato il ...' sparisce e nello storico compare il giubileo",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Allegati: premi '+ Carica file', scegli un PDF sotto 2 MB e dai un titolo",
+     "atteso": "Messaggio 'Allegato caricato' e il file compare con titolo, data e operatore",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Premi Mostra, poi Apri su un allegato, poi Elimina e conferma",
+     "atteso": "Il file si apre in una nuova scheda (o si scarica); dopo Elimina messaggio 'Allegato eliminato'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Premi X su un evento dello storico e conferma",
+     "atteso": "L'evento sparisce dalla cronologia",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "In Formazione, con admin, guarda in fondo alla pagina",
+     "atteso": "Ci sono le schede 'Panoramica HR', 'Premi giubileo' e 'Equità categorie', tutte con badge RISERVATO",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Entra con un operatore senza permesso Storico HR e apri una scheda collaboratore",
+     "atteso": "La sezione Storico HR e gli allegati non compaiono",
+     "ruolo": "operatore"
+    },
+    {
+     "azione": "Con lo stesso operatore apri Formazione",
+     "atteso": "Non si vedono Panoramica HR, Premi giubileo ed Equità categorie",
+     "ruolo": "operatore"
+    },
+    {
+     "azione": "Con un operatore che ha Storico HR ma non è admin apri la cronologia e gli allegati",
+     "atteso": "Vede tutto, ma non ha la X sugli eventi né Elimina sugli allegati",
+     "ruolo": "admin"
+    }
+   ]
+  },
+  {
+   "titolo": "Anagrafica collaboratori",
+   "prove": [
+    {
+     "azione": "Impostazioni > Collaboratori: scrivi 'Verdi Anna' e premi Aggiungi",
+     "atteso": "Messaggio 'Collaboratore aggiunto'; il nome è in elenco e nel campo Collaboratore dei moduli",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Sulla riga cambia Impiego (Fisso/Jolly), Categoria, Funzione, percentuale e lingue 'IT EN'",
+     "atteso": "Ogni valore resta dopo aver ricaricato; il badge Fisso/Jolly compare nella matrice di Formazione",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Scrivi Nascita '12.01' (senza anno), poi scrivi 'abc' in Inizio attività",
+     "atteso": "La nascita senza anno viene accettata; per 'abc' compare 'Data non valida' e il valore torna quello di prima",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Premi Rinomina, scrivi il nuovo nome e premi Salva",
+     "atteso": "Il nome cambia ovunque: moduli, punti, storico HR e scheda",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Premi Rimuovi e conferma, poi riattiva dall'elenco 'Collaboratori disattivati'",
+     "atteso": "Prima 'Collaboratore disattivato' e sparisce dai suggerimenti; poi 'Collaboratore riattivato'",
+     "ruolo": "admin"
+    },
+    {
+     "azione": "Entra con un operatore che ha solo il permesso Categorie",
+     "atteso": "Vede la lista e può cambiare solo la categoria; non vede la riga Aggiungi e le date non si salvano ('Non hai il permesso')",
+     "ruolo": "operatore"
+    }
+   ]
+  }
+ ]
+}
