@@ -66,10 +66,33 @@ function _pianoOreLavorateCella(r) {
   }
   return 0;
 }
-// settimane oltre il massimo: [{ nome, lunedi, domenica, ore, giorni: [date lavorate] }]
+// supplemento notturno (10% delle ore fra le 23 e le 6) di una cella lavorata
+function _pianoNotturnoCella(r) {
+  if (!r || !r.codice) return 0;
+  const t = _pianoTurnoInfo(r.codice);
+  let orari = null;
+  if (t) {
+    const eff = _pianoTurnoDelGiorno(t, String(r.data || '').substring(0, 10));
+    orari = {
+      ora_inizio: r.ora_inizio || (eff && eff.ora_inizio) || t.ora_inizio,
+      ora_fine: r.ora_fine || (eff && eff.ora_fine) || t.ora_fine,
+    };
+  } else if (String(r.codice).toUpperCase() === 'JG' && r.ora_inizio && r.ora_fine)
+    orari = { ora_inizio: r.ora_inizio, ora_fine: r.ora_fine };
+  return orari ? _pianoNotteRecupero(_pianoOreNotturneTurno(orari)) : 0;
+}
+// il massimo si confronta con il totale compreso il 10% notturno (di base) o con le
+// sole ore da orologio (regola ore_settimana_con_notturno)
+function _pianoSettimanaConNotturno() {
+  const v = _pianoRegolaVal('ore_settimana_con_notturno');
+  return v == null || String(v).toUpperCase() !== 'FALSE';
+}
+// settimane oltre il massimo: [{ nome, lunedi, domenica, ore (da orologio), notte (10%),
+// totale, conta (il numero confrontato con il massimo), giorni: [date lavorate] }]
 function _pianoSettimaneOltre(righe, max) {
   max = max == null ? _pianoOreSettimanaMax() : max;
   if (!max) return [];
+  const conNotte = _pianoSettimanaConNotturno();
   const visti = new Set();
   const sett = {};
   (righe || []).forEach((r) => {
@@ -80,17 +103,30 @@ function _pianoSettimaneOltre(righe, max) {
     const ore = _pianoOreLavorateCella(r);
     if (!ore) return;
     const k = r.collaboratore + '|' + _pianoLunediDi(d);
-    const s = (sett[k] = sett[k] || { nome: r.collaboratore, lunedi: _pianoLunediDi(d), ore: 0, giorni: [] });
+    const s = (sett[k] = sett[k] || { nome: r.collaboratore, lunedi: _pianoLunediDi(d), ore: 0, notte: 0, giorni: [] });
     s.ore += ore;
+    s.notte += _pianoNotturnoCella(r);
     s.giorni.push(d);
   });
+  const r2 = (x) => Math.round(x * 100) / 100;
   return Object.values(sett)
-    .filter((s) => s.ore > max + 0.001)
     .map((s) => {
       const dom = new Date(s.lunedi + 'T12:00:00');
       dom.setDate(dom.getDate() + 6);
-      return Object.assign(s, { ore: Math.round(s.ore * 100) / 100, domenica: dom.toISOString().substring(0, 10) });
-    });
+      const totale = s.ore + s.notte;
+      return Object.assign(s, {
+        ore: r2(s.ore),
+        notte: r2(s.notte),
+        totale: r2(totale),
+        conta: r2(conNotte ? totale : s.ore),
+        domenica: dom.toISOString().substring(0, 10),
+      });
+    })
+    .filter((s) => s.conta > max + 0.001);
+}
+// "51.68 ore (49.18 da orologio + 2.50 notturno)"
+function _pianoTestoOreSettimana(s) {
+  return s.totale.toFixed(2) + ' ore (' + s.ore.toFixed(2) + ' da orologio + ' + s.notte.toFixed(2) + ' notturno)';
 }
 // righe del mese aperto piu i giorni delle settimane a cavallo (mese prima e dopo)
 function _pianoRigheSettimane() {
@@ -180,13 +216,14 @@ function _pianoCalcolaViolazioni() {
     const nelMese = s.giorni.filter((d) => d.startsWith(ym)).sort();
     if (!nelMese.length) return;
     const msg =
-      s.ore.toFixed(2) +
-      ' ore lavorate nella settimana ' +
+      _pianoTestoOreSettimana(s) +
+      ' lavorate nella settimana ' +
       _pianoGgMm(s.lunedi) +
       '-' +
       _pianoGgMm(s.domenica) +
       ' (max ' +
       maxSett +
+      (_pianoSettimanaConNotturno() ? ' compreso il 10%' : ' da orologio') +
       ')';
     nelMese.forEach((d) => (celle[s.nome + '|' + d] = celle[s.nome + '|' + d] || []).push(msg));
     lista.push({ nome: s.nome, giorno: parseInt(nelMese[0].substring(8, 10)), msg: msg });
@@ -837,7 +874,9 @@ async function generaBozzaPiano(usaCoperture) {
     const maxSettB = _pianoOreSettimanaMax();
     if (maxSettB) {
       const lun = _pianoLunediDi(dstr);
-      let oreSett = _pianoOreEffettiveTurno(t, { data: dstr });
+      const conNotteB = _pianoSettimanaConNotturno();
+      const oreCella = (rr) => _pianoOreLavorateCella(rr) + (conNotteB ? _pianoNotturnoCella(rr) : 0);
+      let oreSett = oreCella({ codice: t.codice, data: dstr });
       for (let k = 0; k < 7; k++) {
         const dd = new Date(lun + 'T12:00:00');
         dd.setDate(dd.getDate() + k);
@@ -846,12 +885,12 @@ async function generaBozzaPiano(usaCoperture) {
         if (dk.startsWith(ym)) {
           const cod = cella[n + '|' + parseInt(dk.substring(8, 10))];
           const rg = rigaDi[n + '|' + parseInt(dk.substring(8, 10))];
-          if (cod) oreSett += _pianoOreLavorateCella(rg && rg.codice === cod ? rg : { codice: cod, data: dk });
+          if (cod) oreSett += oreCella(rg && rg.codice === cod ? rg : { codice: cod, data: dk });
         } else {
           const rb = (window._pianoRigheBordo || []).find(
             (x) => x.collaboratore === n && String(x.data).startsWith(dk),
           );
-          if (rb) oreSett += _pianoOreLavorateCella(rb);
+          if (rb) oreSett += oreCella(rb);
         }
       }
       if (oreSett > maxSettB + 0.001) return false;

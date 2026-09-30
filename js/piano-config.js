@@ -28,6 +28,7 @@ const PIANO_REGOLE_FONTE = {
   tolleranza_ore: 'RAP 3.1: 41 ore settimanali su media mensile',
   tolleranza_ore_sopra: 'RAP 3.1: max 45 ore in alta stagione',
   ore_settimana_max: 'Legge sul lavoro · indicazione del titolare: 45.1 ore lavorate lunedi-domenica',
+  ore_settimana_con_notturno: 'Indicazione del titolare (30.09): il massimo comprende il 10% notturno',
 };
 // NOMI SEMPLICI, GRUPPO E TIPO DI OGNI REGOLA. La scheda Regole parla la
 // lingua di chi la usa: niente HARD/SOFT/peso, ma "cosa fa", "dove agisce",
@@ -117,9 +118,15 @@ const PIANO_REGOLE_GUIDA = {
     t: 'numero',
     d: 'Validatore',
   },
+  ore_settimana_con_notturno: {
+    g: 'Ore e saldo',
+    n: 'Il massimo di ore della settimana comprende il 10% notturno (Si) o solo le ore da orologio (No)',
+    t: 'sino',
+    d: 'Validatore, avviso sulla cella, bozza, scheda Avvisi',
+  },
   ore_settimana_max: {
     g: 'Ore e saldo',
-    n: 'Ore lavorate massime nella settimana lunedi-domenica (da orologio, senza il 10% notturno)',
+    n: 'Ore lavorate massime nella settimana lunedi-domenica (con o senza il 10% notturno: vedi la regola sotto)',
     t: 'numero',
     d: 'Validatore, avviso sulla cella, bozza, scheda Avvisi',
   },

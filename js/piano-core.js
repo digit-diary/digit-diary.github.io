@@ -2331,6 +2331,8 @@ async function renderPiano() {
     el.innerHTML = h;
     el.style.opacity = '';
     if (scrollPrec) requestAnimationFrame(() => window.scrollTo(0, scrollPrec));
+    // numero degli avvisi sulla scheda Avvisi e sulla voce Piano del menu
+    if (_pianoTab !== 'avvisi' && typeof _pianoAvvisiAggiornaBadge === 'function') setTimeout(_pianoAvvisiAggiornaBadge, 0);
     if (typeof initCardRichiudibili === 'function' && document.getElementById('piano-config'))
       initCardRichiudibili('piano-config', []);
     if (_pianoTab === 'calendario') {

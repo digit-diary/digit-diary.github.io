@@ -5946,3 +5946,24 @@ html {
   font-size: var(--fs-sm);
   padding: 2px 10px;
 }
+
+/* ===== Piano > Avvisi ===== */
+.avv-card .avv-strumenti { display: inline-flex; align-items: center; gap: 8px; text-transform: none; letter-spacing: 0; font-weight: 400; }
+.avv-card #avv-cerca { font: inherit; font-size: var(--fs-sm); padding: 6px 10px; min-width: 220px; border: 1px solid var(--line); border-radius: 2px; background: var(--paper); color: var(--ink); }
+.avv-corpo { padding: 14px 18px 18px; }
+.avv-intro { margin: 0 0 10px; color: var(--muted); font-size: var(--fs-sm); max-width: 90ch; line-height: 1.5; }
+.avv-vuoto { margin: 6px 0; padding: 10px 12px; border-left: 3px solid var(--c-verde, #2e7d32); background: var(--paper2); font-size: var(--fs-sm); }
+.avv-tab-wrap { overflow-x: auto; }
+.avv-tabella { border-collapse: collapse; width: 100%; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.avv-tabella th { text-align: left; font-size: var(--fs-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.avv-tabella td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.avv-tabella tbody tr:hover { background: var(--paper2); }
+.avv-tabella tr[hidden] { display: none; }
+.avv-nome { font-weight: 600; white-space: nowrap; }
+.avv-forte { font-weight: 700; }
+.avv-rosso { color: var(--c-rosso, #c0392b); font-weight: 700; }
+.avv-arancio { color: #b9770e; font-weight: 600; }
+.avv-piccolo { color: var(--muted); font-size: var(--fs-xs); }
+.settings-tab-n.avv-n-on { background: var(--c-rosso, #c0392b); color: #fff; }
+.settings-tab.attiva .settings-tab-n.avv-n-on { background: var(--c-rosso, #c0392b); color: #fff; }
+.avv-badge { display: inline-block; min-width: 18px; margin-left: 6px; padding: 0 5px; border-radius: 9px; background: var(--c-rosso, #c0392b); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; letter-spacing: 0; vertical-align: middle; }

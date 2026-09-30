@@ -2279,95 +2279,468 @@ async function _pianoCreditiScheda(nome) {
 }
 
 // ===== SCHEDA AVVISI DEL PIANO =====
-// Tutto quello che nel piano del mese va tenuto d occhio, in un posto solo:
-// ore lavorate nella settimana oltre il massimo (45.1, lunedi-domenica, senza il 10%
-// notturno) e le altre regole del mese (riposo minimo, giorni consecutivi, idoneita...).
-// La Home mostra solo una riga di richiamo ("Piano: N avvisi") che porta qui.
-function _pianoAvvisiDati() {
+// Tutto quello che nel piano va tenuto d occhio, diviso in sotto-schede con il numero
+// di avvisi e una ricerca per nome o testo:
+//  - Ore settimanali: settimane lunedi-domenica oltre il massimo (45.1), con ore da
+//    orologio, 10% notturno e totale;
+//  - Regole del mese: riposo minimo, giorni di fila, idoneita...;
+//  - Chiusura d anno: chi al 31.12 non arriva in pari con saldo ore, recuperi CGF,
+//    domeniche libere (mesi gia pianificati);
+//  - Posti scoperti: fabbisogno non coperto nei prossimi 7 giorni;
+//  - Malattie lunghe: malattie in corso oltre il 14. giorno (5.857 ore al giorno).
+// Il numero compare anche sulla scheda Avvisi e sulla voce Piano del menu.
+const _AVV_SEZIONI = [
+  ['sett', 'Ore settimanali'],
+  ['regole', 'Regole del mese'],
+  ['anno', 'Chiusura anno'],
+  ['scoperti', 'Posti scoperti'],
+  ['malattie', 'Malattie lunghe'],
+];
+let _pianoAvvSub = (() => {
+  try {
+    return localStorage.getItem('piano_avvisi_sub') || 'sett';
+  } catch (e) {
+    return 'sett';
+  }
+})();
+let _pianoAvvCache = null; // { chiave, t, anno, scoperti, malattie }
+function _pianoIsoData(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+// parti veloci (dal mese gia caricato): ore settimanali e regole del mese
+function _pianoAvvisiVeloci() {
   const max = _pianoOreSettimanaMax();
   const ym = _pianoMeseSel;
   const sett = _pianoSettimaneOltre(_pianoRigheSettimane(), max)
     .filter((s) => s.giorni.some((d) => d.startsWith(ym)))
     .sort((a, b) => a.nome.localeCompare(b.nome) || a.lunedi.localeCompare(b.lunedi));
-  let altre = [];
+  let regole = [];
   try {
-    altre = _pianoCalcolaViolazioni().lista.filter((x) => !/ore lavorate nella settimana/.test(x.msg));
+    regole = _pianoCalcolaViolazioni().lista.filter((x) => !/lavorate nella settimana/.test(x.msg));
   } catch (e) {}
-  return { max: max, sett: sett, altre: altre };
+  return { max: max, conNotte: _pianoSettimanaConNotturno(), sett: sett, regole: regole };
+}
+// parti lente (anno, fabbisogno, malattie): calcolate a richiesta e tenute 5 minuti
+async function _pianoAvvisiLenti(forza) {
+  const rep = _pianoReparto();
+  const anno = parseInt(String(_pianoMeseSel).substring(0, 4));
+  const chiave = rep + '|' + anno + '|' + _pianoMeseSel;
+  if (!forza && _pianoAvvCache && _pianoAvvCache.chiave === chiave && Date.now() - _pianoAvvCache.t < 300000)
+    return _pianoAvvCache;
+  const out = { chiave: chiave, t: Date.now(), anno: [], scoperti: [], malattie: [] };
+  const nomi = collaboratoriCache
+    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && c.funzione !== 'RESP')
+    .map((c) => c.nome);
+  // --- chiusura d anno: saldo ore (mesi pianificati), CGF, domeniche ---
+  try {
+    await _pianoCaricaSaldoIniziale(anno);
+    const dati = await _pianoSaldoAnnoCalcola(anno);
+    const banda = _pianoSaldoBanda();
+    const mesiPian = Object.keys(dati.mesiConPiano || {}).sort();
+    const ultimo = mesiPian.length ? mesiPian[mesiPian.length - 1] : '';
+    const cgf = (await _pianoSaldoCgf(anno + '-12')).saldo;
+    const diritto = parseInt(_pianoRegolaVal('domeniche_libere_anno')) || 12;
+    const righeAnno =
+      (await secGet(
+        'piano?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&reparto_dip=eq.' + rep + '&limit=40000',
+      )) || [];
+    const perG = {};
+    const mesiPersona = {};
+    righeAnno.forEach((r) => {
+      perG[r.collaboratore + '|' + String(r.data).substring(0, 10)] = r.codice;
+      mesiPersona[r.collaboratore + '|' + String(r.data).substring(5, 7)] = true;
+    });
+    const oggi = _pianoOggiStr();
+    const domeniche = [];
+    for (let d = new Date(anno, 0, 1, 12); d.getFullYear() === anno; d.setDate(d.getDate() + 1))
+      if (d.getDay() === 0) domeniche.push(_pianoIsoData(d));
+    nomi.forEach((nome) => {
+      const info = _pianoCollabInfo(nome) || {};
+      const voci = [];
+      // saldo ore
+      if (!info.is_jolly) {
+        let somma = 0;
+        let qualcosa = false;
+        for (let m = 1; m <= 12; m++) {
+          const mm = String(m).padStart(2, '0');
+          if (_pianoMeseDentroRiporto(nome, anno, mm)) continue;
+          const v = _pianoSaldoDelMese(dati, nome, mm, info);
+          if (v != null) {
+            somma += v;
+            qualcosa = true;
+          }
+        }
+        const rip = _pianoRiporto(nome, anno);
+        if (qualcosa || rip) {
+          const tot = Math.round((rip + somma) * 10) / 10;
+          if (tot > banda.max || tot < banda.min)
+            voci.push({
+              grave: true,
+              testo:
+                'saldo ore ' +
+                (tot > 0 ? '+' : '') +
+                tot.toFixed(1) +
+                ' (banda da ' +
+                banda.min +
+                ' a +' +
+                banda.max +
+                ', mesi pianificati fino a ' +
+                (ultimo ? MESI_FULL[parseInt(ultimo) - 1] : '-') +
+                ')',
+            });
+        }
+      }
+      // recuperi CGF
+      const c = cgf[nome];
+      if (c && c.resta > 0) voci.push({ grave: false, testo: c.resta + ' CGF da dare entro il 31.12' });
+      if (c && c.resta < 0) voci.push({ grave: true, testo: -c.resta + ' CGF in piu (da pareggiare)' });
+      // domeniche libere
+      let libere = 0;
+      let future = 0;
+      let visto = false;
+      domeniche.forEach((dstr) => {
+        if (dstr > oggi) future++;
+        if (!mesiPersona[nome + '|' + dstr.substring(5, 7)]) return;
+        visto = true;
+        const cod = perG[nome + '|' + dstr];
+        if (cod && _pianoTurnoInfo(cod)) return;
+        if (_pianoDomenicaEsclusa(cod)) return;
+        libere++;
+      });
+      if (visto && libere < diritto) {
+        const restano = diritto - libere;
+        voci.push({
+          grave: restano > future,
+          testo:
+            'domeniche libere ' +
+            libere +
+            ' su ' +
+            diritto +
+            (restano > future ? ', non piu raggiungibile' : ', ne mancano ' + restano),
+        });
+      }
+      if (voci.length) out.anno.push({ nome: nome, voci: voci });
+    });
+  } catch (e) {
+    console.error('avvisi: chiusura anno', e);
+  }
+  // --- posti scoperti nei prossimi 7 giorni ---
+  try {
+    const da = new Date();
+    const a = new Date();
+    a.setDate(a.getDate() + 6);
+    const dI = _pianoIsoData(da);
+    const dF = _pianoIsoData(a);
+    const fabb =
+      (await secGet(
+        'piano_fabbisogni?data=gte.' + dI + '&data=lte.' + dF + '&reparto_dip=eq.' + rep + '&limit=5000',
+      )) || [];
+    const righe =
+      (await secGet('piano?data=gte.' + dI + '&data=lte.' + dF + '&reparto_dip=eq.' + rep + '&limit=5000')) || [];
+    const ass = {};
+    righe.forEach((r) => {
+      const k = String(r.data).substring(0, 10) + '|' + r.codice;
+      ass[k] = (ass[k] || 0) + 1;
+    });
+    fabb.forEach((f) => {
+      const k = String(f.data).substring(0, 10) + '|' + f.turno_codice;
+      const manca = (parseInt(f.quantita) || 0) - (ass[k] || 0);
+      if (manca > 0)
+        out.scoperti.push({
+          data: String(f.data).substring(0, 10),
+          turno: f.turno_codice,
+          manca: manca,
+          richiesti: parseInt(f.quantita) || 0,
+        });
+    });
+    out.scoperti.sort((x, y) => x.data.localeCompare(y.data) || x.turno.localeCompare(y.turno));
+  } catch (e) {
+    console.error('avvisi: scoperti', e);
+  }
+  // --- malattie lunghe in corso ---
+  try {
+    await _pianoCaricaMalattieAnno(anno, rep);
+    const oggi = _pianoOggiStr();
+    nomi.forEach((nome) => {
+      const n = _pianoGiornoDiMalattia(nome, oggi);
+      if (n >= 10) {
+        const inizio = new Date(oggi + 'T12:00:00');
+        inizio.setDate(inizio.getDate() - n + 1);
+        out.malattie.push({ nome: nome, giorno: n, dal: _pianoIsoData(inizio) });
+      }
+    });
+    out.malattie.sort((x, y) => y.giorno - x.giorno);
+  } catch (e) {
+    console.error('avvisi: malattie', e);
+  }
+  _pianoAvvCache = out;
+  return out;
+}
+// numero della campanella: solo cio che conta davvero (settimane oltre il massimo,
+// posti scoperti, malattie oltre il 14. giorno, chiusura anno in rosso); le regole
+// del mese restano con il loro numero nella sotto-scheda
+function _pianoAvvisiImportanti(v, l) {
+  return (
+    v.sett.length +
+    (l
+      ? l.scoperti.length +
+        l.malattie.filter((m) => m.giorno > 14).length +
+        l.anno.filter((x) => x.voci.some((y) => y.grave)).length
+      : 0)
+  );
+}
+function _pianoAvvisiConteggi(v, l) {
+  return {
+    sett: v.sett.length,
+    regole: v.regole.length,
+    anno: l ? l.anno.length : 0,
+    scoperti: l ? l.scoperti.length : 0,
+    malattie: l ? l.malattie.filter((m) => m.giorno > 14).length : 0,
+  };
+}
+// numero sulla scheda Avvisi e sulla voce Piano del menu
+function _pianoAvvisiBadge(totale) {
+  document.querySelectorAll('.avv-badge').forEach((b) => b.remove());
+  if (!totale) return;
+  const mk = () => {
+    const b = document.createElement('span');
+    b.className = 'avv-badge';
+    b.textContent = totale > 99 ? '99+' : String(totale);
+    b.title = totale + ' avvisi del piano';
+    return b;
+  };
+  const tab = [...document.querySelectorAll('.piano-tab')].find((x) => /Avvisi/.test(x.textContent));
+  if (tab) tab.appendChild(mk());
+  const nav = document.querySelector('.nav-tab[data-page="piano"]');
+  if (nav) nav.appendChild(mk());
+}
+async function _pianoAvvisiAggiornaBadge() {
+  try {
+    if (typeof pianoTabVisibile === 'function' && !pianoTabVisibile('avvisi')) return;
+    const v = _pianoAvvisiVeloci();
+    const l = _pianoAvvCache && _pianoAvvCache.chiave.startsWith(_pianoReparto() + '|') ? _pianoAvvCache : null;
+    _pianoAvvisiBadge(_pianoAvvisiImportanti(v, l));
+  } catch (e) {}
+}
+function pianoAvvisiSub(k) {
+  _pianoAvvSub = k;
+  try {
+    localStorage.setItem('piano_avvisi_sub', k);
+  } catch (e) {}
+  document.querySelectorAll('.avv-sub').forEach((x) => (x.hidden = x.dataset.sub !== k));
+  document
+    .querySelectorAll('.avv-tabs .settings-tab')
+    .forEach((x) => x.classList.toggle('attiva', x.dataset.sub === k));
+  pianoAvvisiCerca();
+}
+function pianoAvvisiCerca() {
+  const el = document.getElementById('avv-cerca');
+  const q = (el ? el.value : '').trim().toLowerCase();
+  let n = 0;
+  document.querySelectorAll('.avv-sub:not([hidden]) [data-cerca]').forEach((r) => {
+    const ok = !q || r.dataset.cerca.includes(q);
+    r.hidden = !ok;
+    if (ok) n++;
+  });
+  const c = document.getElementById('avv-cerca-n');
+  if (c) c.textContent = q ? n + (n === 1 ? ' risultato' : ' risultati') : '';
+}
+async function pianoAvvisiAggiorna() {
+  _pianoAvvCache = null;
+  renderPiano();
 }
 async function _renderPianoAvvisiTab() {
-  const d = _pianoAvvisiDati();
+  const v = _pianoAvvisiVeloci();
+  const l = await _pianoAvvisiLenti(false);
+  const c = _pianoAvvisiConteggi(v, l);
   const [a, m] = _pianoMeseSel.split('-');
   const mese = (typeof MESI_FULL !== 'undefined' ? MESI_FULL[parseInt(m) - 1] : m) + ' ' + a;
-  const vai = (nome) =>
-    ' style="cursor:pointer;text-decoration:underline" onclick="pianoCambiaTab(\'calendario\')" title="Apri il calendario"';
-  let h =
-    '<div class="main-card" style="margin-top:16px"><div class="card-header">Avvisi del piano · ' +
-    escP(mese) +
-    '</div><div style="padding:12px 16px;display:flex;flex-direction:column;gap:14px;font-size:var(--fs-sm,.8125rem)">';
+  const cerca = (t) => ' data-cerca="' + escP(String(t).toLowerCase()) + '"';
+  const vuoto = (t) => '<p class="avv-vuoto">' + t + '</p>';
+  const tabella = (intest, righe) =>
+    '<div class="avv-tab-wrap"><table class="avv-tabella"><thead><tr>' +
+    intest.map((x) => '<th>' + x + '</th>').join('') +
+    '</tr></thead><tbody>' +
+    righe.join('') +
+    '</tbody></table></div>';
+  const nome = (n) => '<td class="avv-nome">' + escP(n) + '</td>';
+  const sez = {};
   // ore settimanali
-  h +=
-    '<div><b>Ore lavorate nella settimana oltre ' +
-    (d.max || '-') +
-    '</b> <span style="color:var(--muted)">(lunedi-domenica, da orologio senza il 10% notturno; il turno conta nella settimana in cui inizia; limite modificabile nella scheda Regole)</span>';
-  if (!d.max) h += '<p style="color:var(--muted)">Regola spenta.</p>';
-  else if (!d.sett.length)
-    h += '<p style="color:var(--c-verde,#2e7d32)">Nessuno supera il limite nelle settimane di questo mese.</p>';
-  else
-    h +=
-      '<div style="overflow-x:auto"><table class="piano-tab-dati" style="border-collapse:collapse;margin-top:6px"><tr>' +
-      ['Collaboratore', 'Settimana', 'Ore lavorate', 'Oltre il limite', 'Giorni lavorati']
-        .map((x) => '<th style="text-align:left;padding:4px 10px;border-bottom:1px solid var(--line)">' + x + '</th>')
-        .join('') +
-      '</tr>' +
-      d.sett
-        .map(
-          (s) =>
-            '<tr><td style="padding:4px 10px"' +
-            vai(s.nome) +
-            '>' +
-            escP(s.nome) +
-            '</td><td style="padding:4px 10px">' +
-            _pianoGgMm(s.lunedi) +
-            ' - ' +
-            _pianoGgMm(s.domenica) +
-            '</td><td style="padding:4px 10px;font-weight:700;color:var(--c-rosso,#c0392b)">' +
-            s.ore.toFixed(2) +
-            '</td><td style="padding:4px 10px">+' +
-            (s.ore - d.max).toFixed(2) +
-            '</td><td style="padding:4px 10px">' +
-            s.giorni.sort().map(_pianoGgMm).join(', ') +
-            '</td></tr>',
-        )
-        .join('') +
-      '</table></div>';
-  h += '</div>';
-  // altre regole del mese
-  h +=
-    '<div><b>Altre regole del mese</b> <span style="color:var(--muted)">(riposo minimo, giorni di lavoro di fila, idoneita e le altre regole del settore)</span>';
-  if (!d.altre.length) h += '<p style="color:var(--c-verde,#2e7d32)">Nessuna violazione.</p>';
-  else {
-    const per = {};
-    d.altre.forEach((x) => (per[x.nome] = per[x.nome] || []).push(x));
-    h +=
-      '<ul style="margin:6px 0 0 18px;padding:0;line-height:1.55">' +
-      Object.keys(per)
-        .sort()
-        .map(
-          (n) =>
-            '<li><span' +
-            vai(n) +
-            '><b>' +
-            escP(n) +
-            '</b></span>: ' +
-            per[n].map((x) => (x.giorno ? 'giorno ' + x.giorno : 'mese') + ' · ' + escP(x.msg)).join('; ') +
-            '</li>',
-        )
-        .join('') +
-      '</ul>';
-  }
-  h += '</div></div></div>';
-  window._pianoAvvisiConteggio = { ym: _pianoMeseSel, rep: _pianoReparto(), n: d.sett.length + d.altre.length };
+  sez.sett =
+    '<p class="avv-intro">Settimane lunedi-domenica oltre <b>' +
+    (v.max || '-') +
+    ' ore' +
+    (v.conNotte ? ' compreso il 10% notturno' : ' da orologio') +
+    '</b>. Contano turni e JG (non vacanze, malattie, CGF, riposi); il turno che passa la mezzanotte conta nella settimana in cui inizia. Limite e 10% si cambiano nella scheda Regole.</p>' +
+    (!v.max
+      ? vuoto('Regola spenta.')
+      : !v.sett.length
+        ? vuoto('Nessuno supera il limite nelle settimane di questo mese.')
+        : tabella(
+            ['Collaboratore', 'Settimana', 'Da orologio', '10% notturno', 'Totale', 'Oltre', 'Giorni lavorati'],
+            v.sett.map(
+              (s) =>
+                '<tr' +
+                cerca(s.nome + ' ' + _pianoGgMm(s.lunedi)) +
+                '>' +
+                nome(s.nome) +
+                '<td>' +
+                _pianoGgMm(s.lunedi) +
+                ' - ' +
+                _pianoGgMm(s.domenica) +
+                '</td><td class="' +
+                (v.conNotte ? '' : 'avv-forte') +
+                '">' +
+                s.ore.toFixed(2) +
+                '</td><td>+' +
+                s.notte.toFixed(2) +
+                '</td><td class="' +
+                (v.conNotte ? 'avv-forte' : '') +
+                '">' +
+                s.totale.toFixed(2) +
+                '</td><td class="avv-rosso">+' +
+                (s.conta - v.max).toFixed(2) +
+                '</td><td class="avv-piccolo">' +
+                s.giorni.sort().map(_pianoGgMm).join(', ') +
+                '</td></tr>',
+            ),
+          ));
+  // regole del mese
+  sez.regole =
+    '<p class="avv-intro">Riposo minimo, giorni di lavoro di fila, idoneita e le altre regole del settore nel mese di ' +
+    escP(mese) +
+    '.</p>' +
+    (!v.regole.length
+      ? vuoto('Nessuna violazione.')
+      : tabella(
+          ['Collaboratore', 'Quando', 'Regola'],
+          v.regole
+            .slice()
+            .sort((x, y) => x.nome.localeCompare(y.nome) || x.giorno - y.giorno)
+            .map(
+              (x) =>
+                '<tr' +
+                cerca(x.nome + ' ' + x.msg) +
+                '>' +
+                nome(x.nome) +
+                '<td>' +
+                (x.giorno ? 'giorno ' + x.giorno : 'mese') +
+                '</td><td>' +
+                escP(x.msg) +
+                '</td></tr>',
+            ),
+        ));
+  // chiusura d anno
+  sez.anno =
+    '<p class="avv-intro">Chi al 31.12.' +
+    a +
+    ' non arriva in pari: saldo ore fuori banda (mesi gia pianificati), recuperi CGF da dare o in piu, domeniche libere sotto il diritto. In rosso cio che non si sistema piu da solo.</p>' +
+    (!l.anno.length
+      ? vuoto('Tutti in pari con i mesi pianificati.')
+      : tabella(
+          ['Collaboratore', 'Da tenere d occhio'],
+          l.anno.map(
+            (x) =>
+              '<tr' +
+              cerca(x.nome + ' ' + x.voci.map((y) => y.testo).join(' ')) +
+              '>' +
+              nome(x.nome) +
+              '<td>' +
+              x.voci
+                .map(
+                  (y) => '<span class="' + (y.grave ? 'avv-rosso' : 'avv-arancio') + '">' + escP(y.testo) + '</span>',
+                )
+                .join('<br>') +
+              '</td></tr>',
+          ),
+        ));
+  // scoperti
+  sez.scoperti =
+    '<p class="avv-intro">Fabbisogno non coperto dal piano nei prossimi 7 giorni.</p>' +
+    (!l.scoperti.length
+      ? vuoto('Tutti i posti sono coperti.')
+      : tabella(
+          ['Giorno', 'Turno', 'Mancano', 'Richiesti'],
+          l.scoperti.map((x) => {
+            const g = new Date(x.data + 'T12:00:00');
+            const gg = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'][g.getDay()] + ' ' + _pianoGgMm(x.data);
+            return (
+              '<tr' +
+              cerca(gg + ' ' + x.turno) +
+              '><td class="avv-nome">' +
+              gg +
+              '</td><td><b>' +
+              escP(x.turno) +
+              '</b></td><td class="avv-rosso">' +
+              x.manca +
+              '</td><td>' +
+              x.richiesti +
+              '</td></tr>'
+            );
+          }),
+        ));
+  // malattie lunghe
+  sez.malattie =
+    '<p class="avv-intro">Malattie in corso da 10 giorni o piu. Dal 15. giorno ogni giorno vale 5.857 ore (41/7), che lavorasse o no.</p>' +
+    (!l.malattie.length
+      ? vuoto('Nessuna malattia lunga in corso.')
+      : tabella(
+          ['Collaboratore', 'In malattia dal', 'Giorno di oggi', 'Ore al giorno'],
+          l.malattie.map(
+            (x) =>
+              '<tr' +
+              cerca(x.nome) +
+              '>' +
+              nome(x.nome) +
+              '<td>' +
+              x.dal.split('-').reverse().join('.') +
+              '</td><td class="' +
+              (x.giorno > 14 ? 'avv-rosso' : 'avv-arancio') +
+              '">' +
+              x.giorno +
+              '.</td><td>' +
+              (x.giorno > 14 ? '5.857 (dal 15. giorno)' : 'ore del turno (fino al 14.)') +
+              '</td></tr>',
+          ),
+        ));
+  if (!_AVV_SEZIONI.some(([k]) => k === _pianoAvvSub)) _pianoAvvSub = 'sett';
+  let h =
+    '<div class="main-card avv-card" style="margin-top:16px"><div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Avvisi del piano · ' +
+    escP(mese) +
+    '</span><span class="avv-strumenti"><input id="avv-cerca" type="search" placeholder="Cerca per nome o testo" oninput="pianoAvvisiCerca()" autocomplete="off"><span id="avv-cerca-n" class="avv-piccolo"></span><button class="btn-secondario" onclick="pianoAvvisiAggiorna()" title="Ricalcola chiusura d anno, scoperti e malattie">Aggiorna</button></span></div>' +
+    '<div class="settings-tabs avv-tabs">' +
+    _AVV_SEZIONI
+      .map(
+        ([k, t]) =>
+          '<button type="button" class="settings-tab' +
+          (k === _pianoAvvSub ? ' attiva' : '') +
+          '" data-sub="' +
+          k +
+          '" onclick="pianoAvvisiSub(\'' +
+          k +
+          '\')">' +
+          t +
+          ' <span class="settings-tab-n' +
+          (c[k] ? ' avv-n-on' : '') +
+          '">' +
+          c[k] +
+          '</span></button>',
+      )
+      .join('') +
+    '</div><div class="avv-corpo">' +
+    _AVV_SEZIONI
+      .map(
+        ([k]) =>
+          '<div class="avv-sub" data-sub="' + k + '"' + (k === _pianoAvvSub ? '' : ' hidden') + '>' + sez[k] + '</div>',
+      )
+      .join('') +
+    '</div></div>';
+  window._pianoAvvisiConteggio = {
+    ym: _pianoMeseSel,
+    rep: _pianoReparto(),
+    n: _pianoAvvisiImportanti(v, l),
+  };
+  setTimeout(() => _pianoAvvisiBadge(window._pianoAvvisiConteggio.n), 0);
   return h;
 }
 // Home: quanti avvisi ha il piano del mese in corso (settore aperto), per la riga di

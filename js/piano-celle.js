@@ -789,14 +789,15 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
       if (s)
         avvisiExtra.push(
           'arriverebbe a ' +
-            s.ore.toFixed(2) +
-            ' ore lavorate nella settimana ' +
+            _pianoTestoOreSettimana(s) +
+            ' lavorate nella settimana ' +
             _pianoGgMm(s.lunedi) +
             '-' +
             _pianoGgMm(s.domenica) +
             ' (max ' +
             maxSett +
-            ', da orologio senza il 10% notturno)',
+            (_pianoSettimanaConNotturno() ? ' compreso il 10%' : ' da orologio') +
+            ')',
         );
     }
     // la logica riposo/consecutivi/idoneita' vive nel motore puro PianoRegole
