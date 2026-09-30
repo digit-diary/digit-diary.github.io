@@ -895,11 +895,11 @@ async function _pianoVacDirittoCard(anno) {
         '&select=collaboratore,data&limit=20000',
     )) || []
   ).forEach((r) => (vCal[r.collaboratore] = (vCal[r.collaboratore] || 0) + 1));
-  // vacanze restituite: giorni V coperti da una malattia (M con "era V")
+  // vacanze restituite: giorni V coperti da una malattia (M con "Ex V" o, nelle note vecchie, "era V")
   const vRest = {};
   (
     (await secGet(
-      'piano?codice=eq.M&commento=like.Malattia%20dal%20Diario%20*era%20V*&data=gte.' +
+      'piano?codice=eq.M&data=gte.' +
         anno +
         '-01-01&data=lte.' +
         anno +
@@ -908,7 +908,7 @@ async function _pianoVacDirittoCard(anno) {
         '&select=collaboratore,data,commento&limit=5000',
     )) || []
   ).forEach((r) => {
-    if (/era V1?\b/.test(String(r.commento || ''))) vRest[r.collaboratore] = (vRest[r.collaboratore] || 0) + 1;
+    if (/(?:era|^Ex) V1?\b/.test(String(r.commento || ''))) vRest[r.collaboratore] = (vRest[r.collaboratore] || 0) + 1;
   });
   const righe = collaboratoriCache
     .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && _pianoMaturaCgf(c) && c.data_assunzione)

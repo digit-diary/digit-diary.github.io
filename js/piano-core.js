@@ -766,7 +766,8 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
         (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=eq.' + d + '&codice=eq.M')) || [];
       for (const r of righe) {
         // la M aveva coperto un altra sigla (turno, V, CGF, JG...): quella torna al suo posto
-        const era = String(r.commento || '').match(/^Malattia dal Diario \u00b7 era ([A-Z0-9]+)/);
+        // nota "Ex C0 - operatore" (dal 30.09) o quella vecchia "Malattia dal Diario · era C0"
+        const era = String(r.commento || '').match(/^(?:Malattia dal Diario \u00b7 era|Ex) ([A-Z0-9]+)\b/);
         if (era && era[1] && era[1] !== 'M') {
           await secPatch('piano', 'id=eq.' + r.id, {
             codice: era[1],
@@ -782,23 +783,25 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
     // M protetta su QUALSIASI sigla del giorno: turno, vacanza V, CGF, JG, C...
     // La malattia prevale (regola del casino): il giorno di vacanza viene
     // restituito, il CGF resta a credito, il turno perso diventa malattia.
-    // La sigla coperta resta scritta nel commento ("era V") cosi, se la
+    // La sigla coperta resta scritta nel commento ("Ex V - operatore") cosi, se la
     // malattia viene tolta dal Diario, torna al suo posto. Senza cella, basta
     // la M automatica dal Diario.
     // festivi con diritto al recupero che si perdono per la malattia (c era un turno)
     const festiviPersi = [];
+    const cgfPersi = []; // giorni di CGF caduti in malattia: il recupero va rimesso
     const festCgf = typeof _pianoFestiviCgfSet === 'function' ? _pianoFestiviCgfSet() : new Set();
     for (const d of daMettere) {
       const righe = (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=eq.' + d)) || [];
       const r = righe[0];
       if (r && festCgf.has(d) && _pianoTurnoInfo(r.codice)) festiviPersi.push(d);
+      if (r && r.codice === 'CGF') cgfPersi.push(d);
       if (r && r.codice !== 'M' && r.codice !== 'M1') {
         await secPatch('piano', 'id=eq.' + r.id, {
           codice: 'M',
           protetto: true,
           generato: false,
           motivo_blocco: null, // la malattia scioglie il blocco con motivo
-          commento: ('Malattia dal Diario · era ' + r.codice).substring(0, 400),
+          commento: ('Ex ' + r.codice + ' - ' + getOperatore()).substring(0, 400),
           operatore: getOperatore(),
           updated_at: new Date().toISOString(),
         });
@@ -808,6 +811,9 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
     // festivo saltato per malattia: i recuperi automatici in piu' tornano C
     for (const ymM of new Set(festiviPersi.map((d) => d.substring(0, 7))))
       await _pianoRiconciliaCgf(nome, ymM, { festivi: festiviPersi.filter((d) => d.startsWith(ymM)) });
+    // CGF caduto in malattia: si propone subito un giorno sostitutivo nello stesso mese
+    if (cgfPersi.length && typeof _pianoRimettiCgf === 'function')
+      for (const d of cgfPersi) await _pianoRimettiCgf(nome, d);
     if (tolte || messe) {
       logAzione('Malattia: piano allineato', nome + ' · ' + tolte + ' M tolte, ' + messe + ' celle diventate M');
       if (typeof _pianoRighe !== 'undefined' && _pianoRighe.length && typeof renderPiano === 'function') {

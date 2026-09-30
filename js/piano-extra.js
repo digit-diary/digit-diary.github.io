@@ -2012,14 +2012,14 @@ async function _pianoCreditiDati(anno, soloNomi) {
   const vRest = {};
   (
     (await secGet(
-      'piano?codice=eq.M&commento=like.Malattia%20dal%20Diario%20*era%20V*&data=gte.' +
+      'piano?codice=eq.M&data=gte.' +
         anno +
         '-01-01&data=lte.' +
         anno +
         '-12-31&select=collaboratore,data,commento&limit=5000',
     )) || []
   ).forEach((r) => {
-    if (/era V1?\b/.test(String(r.commento || ''))) vRest[r.collaboratore] = (vRest[r.collaboratore] || 0) + 1;
+    if (/(?:era|^Ex) V1?\b/.test(String(r.commento || ''))) vRest[r.collaboratore] = (vRest[r.collaboratore] || 0) + 1;
   });
   // CGF: fino alla fine del mese aperto nel Piano, mai i mesi futuri
   const annoSel = _pianoMeseSel.substring(0, 4);

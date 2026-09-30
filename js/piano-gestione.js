@@ -1292,7 +1292,11 @@ async function pianoAssegnaCgfMese() {
   const nGiorni = _pianoUltimoGiorno(ym);
   const malattie = _pianoMalattieMese(ym);
   const occupato = {};
-  _pianoRighe.forEach((r) => (occupato[r.collaboratore + '|' + parseInt(r.data.split('-')[2])] = r.codice));
+  // un C messo dalla bozza (non a mano, non bloccato, giorno non ancora arrivato) conta
+  // come libero: a mese gia pianificato il recupero prende il suo posto
+  _pianoRighe.forEach((r) => {
+    if (!_pianoCSostituibile(r)) occupato[r.collaboratore + '|' + parseInt(r.data.split('-')[2])] = r.codice;
+  });
   const daFare = [];
   const compleanni = {};
   collaboratoriCache.forEach((c) => {
@@ -1355,7 +1359,7 @@ async function pianoAssegnaCgfMese() {
     await mostraAvviso(
       'Nessun recupero da assegnare in ' +
         ym +
-        ".\n\nO i saldi sono gia' a posto, oppure non ci sono giorni liberi dove metterli (le celle gia' occupate non vengono toccate).",
+        ".\n\nO i saldi sono gia' a posto, oppure non ci sono giorni liberi dove metterli (giorni vuoti o C messi dalla bozza; le celle scritte a mano non vengono toccate).",
     );
     return;
   }
@@ -1369,12 +1373,12 @@ async function pianoAssegnaCgfMese() {
         daFare.length +
         ' recuper' +
         (daFare.length === 1 ? 'o' : 'i') +
-        ' (CGF) nei giorni liberi di ' +
+        ' (CGF) nei giorni liberi (vuoti o C della bozza) di ' +
         ym +
         ':\n\n' +
         elenco +
         (daFare.length > 25 ? '\n... e altri ' + (daFare.length - 25) : '') +
-        "\n\nIl conteggio tiene conto del riporto e dei recuperi gia' dati nei mesi precedenti; valgono le regole cgf_max_mese, cgf_distanza_giorni e cgf_non_con_vacanze. Le celle occupate non vengono toccate.",
+        "\n\nIl conteggio tiene conto del riporto e dei recuperi gia' dati nei mesi precedenti; valgono le regole cgf_max_mese, cgf_distanza_giorni e cgf_non_con_vacanze. Le celle scritte a mano non vengono toccate.",
     ))
   )
     return;
@@ -1382,16 +1386,30 @@ async function pianoAssegnaCgfMese() {
   let fatti = 0;
   try {
     for (const x of daFare) {
-      const nuovo = await _pianoInserisciCella({
-        collaboratore: x.nome,
-        data: x.data,
-        codice: 'CGF',
-        protetto: false,
-        generato: true,
-        reparto_dip: _pianoReparto(),
-        operatore: getOperatore(),
-      });
-      if (nuovo) _pianoRighe.push(Array.isArray(nuovo) ? nuovo[0] : nuovo);
+      const rC = _pianoRighe.find((r) => r.collaboratore === x.nome && r.data === x.data && _pianoCSostituibile(r));
+      if (rC) {
+        const nota = ('Ex C - ' + getOperatore()).substring(0, 400);
+        await secPatch('piano', 'id=eq.' + rC.id, {
+          codice: 'CGF',
+          generato: true,
+          protetto: false,
+          commento: nota,
+          operatore: getOperatore(),
+          updated_at: new Date().toISOString(),
+        });
+        Object.assign(rC, { codice: 'CGF', commento: nota });
+      } else {
+        const nuovo = await _pianoInserisciCella({
+          collaboratore: x.nome,
+          data: x.data,
+          codice: 'CGF',
+          protetto: false,
+          generato: true,
+          reparto_dip: _pianoReparto(),
+          operatore: getOperatore(),
+        });
+        if (nuovo) _pianoRighe.push(Array.isArray(nuovo) ? nuovo[0] : nuovo);
+      }
       fatti++;
     }
     logAzione('Piano: CGF assegnati a mano', ym + ' · ' + fatti + ' recuperi');
@@ -2634,6 +2652,125 @@ function _pianoCongedoNpEffetti(nome, anno) {
     if (tot > sm * 30.44) giorniAnzianita += tot;
   });
   return { giorniVacanze: giorniVacanze, giorniAnzianita: giorniAnzianita };
+}
+// C MESSO DALLA BOZZA che puo diventare un recupero (CGF): giorno libero generato
+// dal programma, non scritto a mano, non bloccato, non di compleanno, non ancora
+// arrivato e scrivibile. Serve quando il mese e gia pianificato e non ci sono piu
+// giorni vuoti: il recupero prende il posto di un C della bozza.
+function _pianoCSostituibile(r) {
+  if (!r || r.codice !== 'C' || !r.generato || r.protetto || _pianoCellaRiservata(r)) return false;
+  const d = String(r.data).substring(0, 10);
+  return d > _pianoOggiStr() && _pianoGiornoScrivibile(d);
+}
+// CGF CADUTO IN MALATTIA: il recupero non e stato goduto e va rimesso. Si cerca un
+// giorno sostitutivo nello stesso mese (un giorno vuoto o un C della bozza, con le
+// regole dei recuperi: massimo al mese, distanza, non attaccato alle vacanze, meno
+// fabbisogno) e lo si propone: "Il CGF del 09.12 e caduto in malattia. Lo rimetto il
+// 15.12 (oggi C)?". Con Si il giorno diventa CGF con la nota "Ex C - operatore".
+async function _pianoRimettiCgf(nome, dstr) {
+  try {
+    const ym = dstr.substring(0, 7);
+    const nG = _pianoUltimoGiorno(ym);
+    const righe =
+      (await secGet(
+        'piano?collaboratore=eq.' +
+          encodeURIComponent(nome) +
+          '&data=gte.' +
+          ym +
+          '-01&data=lte.' +
+          ym +
+          '-' +
+          String(nG).padStart(2, '0') +
+          '&limit=100',
+      )) || [];
+    const oggi = _pianoOggiStr();
+    const cella = {};
+    const perGiorno = {};
+    righe.forEach((r) => {
+      const g = parseInt(String(r.data).substring(8, 10));
+      perGiorno[g] = r;
+      if (!_pianoCSostituibile(r)) cella[nome + '|' + g] = r.codice;
+    });
+    const chiusi = new Set();
+    for (let g = 1; g <= nG; g++) {
+      const d = ym + '-' + String(g).padStart(2, '0');
+      if (d <= oggi || !_pianoGiornoScrivibile(d)) chiusi.add(g);
+    }
+    const compleanni = {};
+    const info = _pianoCollabInfo(nome);
+    const md = info && info.data_nascita ? String(info.data_nascita).substring(5, 10) : '';
+    if (md && md.substring(0, 2) === ym.substring(5, 7)) compleanni[nome + '|' + parseInt(md.substring(3, 5))] = true;
+    const g0 = parseInt(dstr.substring(8, 10));
+    const preferiti = [];
+    for (let k = g0 + 1; k <= nG; k++) preferiti.push(k);
+    const scelti = _pianoPiazzaCgf(nome, 1, {
+      ym: ym,
+      nGiorni: nG,
+      cella: cella,
+      malattie: _pianoMalattieMese(ym),
+      compleanni: compleanni,
+      chiusi: chiusi,
+      preferiti: preferiti,
+    });
+    const gg = (d) => d.substring(8, 10) + '.' + d.substring(5, 7);
+    if (!scelti.length) {
+      toast(
+        'Il CGF del ' +
+          gg(dstr) +
+          ' di ' +
+          nome.split(' ')[0] +
+          ' e caduto in malattia: nel mese non c e un giorno per rimetterlo, resta da dare',
+      );
+      return 0;
+    }
+    const g = scelti[0];
+    const d = ym + '-' + String(g).padStart(2, '0');
+    const r = perGiorno[g];
+    if (
+      !(await chiediConferma(
+        'Il CGF del ' +
+          gg(dstr) +
+          ' di ' +
+          nome +
+          ' e caduto in malattia: il recupero non e stato goduto.\n\nLo rimetto il ' +
+          gg(d) +
+          (r ? ' (oggi ' + r.codice + ')' : '') +
+          '?',
+        { titolo: 'Recupero festivo da rimettere', ok: 'Si, rimetti il CGF', annulla: 'No, lo metto io' },
+      ))
+    )
+      return 0;
+    const nota = ((r ? 'Ex ' + r.codice + ' - ' : '') + getOperatore()).substring(0, 400);
+    if (r) {
+      await secPatch('piano', 'id=eq.' + r.id, {
+        codice: 'CGF',
+        generato: true,
+        protetto: false,
+        commento: nota,
+        operatore: getOperatore(),
+        updated_at: new Date().toISOString(),
+      });
+      const inMem = (typeof _pianoRighe !== 'undefined' ? _pianoRighe : []).find((x) => x.id === r.id);
+      if (inMem) Object.assign(inMem, { codice: 'CGF', generato: true, protetto: false, commento: nota });
+    } else {
+      const nuovo = await _pianoInserisciCella({
+        collaboratore: nome,
+        data: d,
+        codice: 'CGF',
+        protetto: false,
+        generato: true,
+        commento: nota,
+        reparto_dip: (r && r.reparto_dip) || _pianoReparto(),
+        operatore: getOperatore(),
+      });
+      if (nuovo && typeof _pianoRighe !== 'undefined') _pianoRighe.push(Array.isArray(nuovo) ? nuovo[0] : nuovo);
+    }
+    logAzione('Piano: CGF rimesso dopo malattia', nome + ' · ' + dstr + ' -> ' + d);
+    return 1;
+  } catch (e) {
+    console.error('rimetti CGF', e);
+    return 0;
+  }
 }
 // CGF CHE NON SPETTANO PIU' in un mese, per una persona, quando un festivo non si
 // lavora piu (turno tolto, malattia). Regola del titolare (30.09):

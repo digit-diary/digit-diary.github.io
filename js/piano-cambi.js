@@ -1775,7 +1775,7 @@ async function confermaCoperturaMalattia() {
           codice: 'M',
           protetto: true,
           generato: false,
-          commento: ('Ex ' + d.codice + ' - assenza - ' + op).substring(0, 400),
+          commento: ('Ex ' + d.codice + ' - ' + op).substring(0, 400),
           operatore: op,
           updated_at: new Date().toISOString(),
         });
@@ -1804,14 +1804,7 @@ async function confermaCoperturaMalattia() {
                 codice: d.catena.turnoCon,
                 protetto: true,
                 generato: false,
-                commento: (
-                  'Ex ' +
-                  d.catena.turnoX +
-                  ' - scambio per coprire malattia di ' +
-                  m.nome +
-                  ' - ' +
-                  op
-                ).substring(0, 400),
+                commento: ('Ex ' + d.catena.turnoX + ' - cambio per esigenze operative - ' + op).substring(0, 400),
                 operatore: op,
                 updated_at: new Date().toISOString(),
               });
@@ -1819,14 +1812,7 @@ async function confermaCoperturaMalattia() {
                 codice: d.catena.turnoX,
                 protetto: true,
                 generato: false,
-                commento: (
-                  'Ex ' +
-                  d.catena.turnoCon +
-                  ' - scambio per coprire malattia di ' +
-                  m.nome +
-                  ' - ' +
-                  op
-                ).substring(0, 400),
+                commento: ('Ex ' + d.catena.turnoCon + ' - cambio per esigenze operative - ' + op).substring(0, 400),
                 operatore: op,
                 updated_at: new Date().toISOString(),
               });
@@ -1838,25 +1824,14 @@ async function confermaCoperturaMalattia() {
                 codice: 'C',
                 protetto: true,
                 generato: false,
-                commento: (
-                  'Ex ' +
-                  d.catena.turnoX +
-                  ' - liberato per coprire malattia di ' +
-                  m.nome +
-                  ' - ' +
-                  op
-                ).substring(0, 400),
+                commento: ('Ex ' + d.catena.turnoX + ' - cambio per esigenze operative - ' + op).substring(0, 400),
                 operatore: op,
                 updated_at: new Date().toISOString(),
               });
             const rY = rigaDi[d.catena.con + '|' + g1];
             const commY = (
               (d.catena.eraCon ? 'Ex ' + d.catena.eraCon + ' - ' : '') +
-              'prende il turno di ' +
-              d.sostituto.split(' ')[0] +
-              ' (copertura malattia di ' +
-              m.nome.split(' ')[0] +
-              ') - ' +
+              'cambio per esigenze operative - ' +
               op
             ).substring(0, 400);
             if (rY) {
