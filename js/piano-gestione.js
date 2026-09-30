@@ -2635,58 +2635,43 @@ function _pianoCongedoNpEffetti(nome, anno) {
   });
   return { giorniVacanze: giorniVacanze, giorniAnzianita: giorniAnzianita };
 }
-// CGF CHE NON SPETTANO PIU' in un mese, per una persona (festivo poi non lavorato):
-//  - goduti oltre il credito (resta < 0): i CGF automatici piu' recenti del mese;
-//  - CGF ANTICIPATI caduti in malattia (MCG) prima di un festivo del mese che poi
-//    non e' stato lavorato: il recupero non e' dovuto, quindi non resta a credito.
-// Valgono anche i giorni gia' chiusi: e' una correzione del conto dei recuperi, non
-// una modifica del turno (resta scritta nella nota della cella e nel registro).
-// righeMese: righe del piano della persona nel mese; mal: nome|data -> malattia.
-// conManuali: anche i CGF scritti a mano (protetti), da confermare con l operatore.
-// massimo: quanti festivi sono appena stati persi (ognuno toglie al massimo un CGF):
-// un conto gia sbilanciato da prima non fa togliere recuperi che non c entrano.
-function _pianoCgfNonSpettanti(nome, ym, righeMese, conto, mal, conManuali, massimo) {
+// CGF CHE NON SPETTANO PIU' in un mese, per una persona, quando un festivo non si
+// lavora piu (turno tolto, malattia). Regola del titolare (30.09):
+//  - un CGF GIA GODUTO (giorno di oggi o passato) non si tocca mai: resta CGF e, se
+//    non c e altro da togliere, la persona va a -1 (recupero preso in piu, da pareggiare);
+//  - si toglie un CGF che deve ANCORA ARRIVARE: prima quello anticipato prima del
+//    festivo perso (il piu vicino), poi gli altri futuri del mese;
+//  - solo se il conto va sotto zero, e al massimo uno per festivo perso (massimo).
+// Esempio: CGF il 18 per il 25. Il 16 si toglie il 25: il 18 diventa C. Il 19 si
+// toglie il 25: il 18 resta CGF (goduto), -1. CGF il 18 e il 29, il 20 si toglie il
+// 25: il 18 resta, diventa C il 29 (conto a 0).
+// conManuali: anche i CGF scritti a mano (protetti); chi chiama chiede conferma.
+// festiviPersi: date dei festivi appena persi (per scegliere l anticipato).
+function _pianoCgfNonSpettanti(nome, ym, righeMese, conto, mal, conManuali, massimo, festiviPersi) {
   const tetto = massimo == null ? Infinity : massimo;
-  const auto = righeMese
-    .filter(
-      (r) =>
-        r.collaboratore === nome &&
-        String(r.data).startsWith(ym) &&
-        r.codice === 'CGF' &&
-        !r.motivo_blocco &&
-        (conManuali || (r.generato && !r.protetto)),
-    )
-    .sort((a, b) => String(b.data).localeCompare(String(a.data)));
-  const malato = (r) => !!mal[nome + '|' + String(r.data).substring(0, 10)];
-  const out = [];
-  let extra = Math.min(tetto, conto.resta < 0 ? -conto.resta : 0);
-  auto
-    .filter((r) => !malato(r))
-    .forEach((r) => {
-      if (extra > 0) {
-        out.push(r);
-        extra--;
-      }
-    });
-  // festivi del mese non lavorati (nessun turno o malattia quel giorno)
-  const fest = _pianoFestiviCgfSet();
-  const nonLavorati = [...fest]
-    .filter((d) => String(d).startsWith(ym))
-    .filter((d) => {
-      const r = righeMese.find((x) => x.collaboratore === nome && String(x.data).substring(0, 10) === d);
-      return !(r && _pianoTurnoInfo(r.codice) && !mal[nome + '|' + d]);
-    });
-  const persiMese = auto.filter(malato);
-  let extraP = Math.min(tetto - out.length, Math.max(0, persiMese.length - Math.max(0, conto.resta)));
-  persiMese
-    .filter((r) => nonLavorati.some((d) => String(r.data).substring(0, 10) < d))
-    .forEach((r) => {
-      if (extraP > 0) {
-        out.push(r);
-        extraP--;
-      }
-    });
-  return out;
+  const oggi = _pianoOggiStr();
+  const futuri = righeMese.filter(
+    (r) =>
+      r.collaboratore === nome &&
+      String(r.data).startsWith(ym) &&
+      r.codice === 'CGF' &&
+      !r.motivo_blocco &&
+      String(r.data).substring(0, 10) > oggi &&
+      (conManuali || (r.generato && !r.protetto)),
+  );
+  const persi = (festiviPersi || []).slice().sort();
+  const d = (r) => String(r.data).substring(0, 10);
+  // prima gli anticipati: prima di un festivo perso, il piu vicino al festivo
+  const anticipato = (r) => persi.find((f) => d(r) < f);
+  futuri.sort((a, b) => {
+    const fa = anticipato(a);
+    const fb = anticipato(b);
+    if (!!fa !== !!fb) return fa ? -1 : 1;
+    if (fa && fb) return d(b).localeCompare(d(a));
+    return d(a).localeCompare(d(b));
+  });
+  const extra = Math.min(tetto, conto.resta < 0 ? -conto.resta : 0);
+  return futuri.slice(0, Math.max(0, extra));
 }
 // RICONCILIAZIONE: se per 'nome' nel mese ym i recuperi goduti superano
 // quelli maturati (un festivo e' saltato per malattia dopo che la bozza aveva
@@ -2708,10 +2693,12 @@ async function _pianoRiconciliaCgf(nome, ym, opz) {
     if (!conto) return 0;
     const persi = Array.isArray(opz.festivi) ? opz.festivi.length : null;
     if (persi === 0) return 0;
-    const candidati = _pianoCgfNonSpettanti(nome, ym, righe, conto, _pianoMalattieMese(ym), !!opz.manuali, persi);
+    const candidati = _pianoCgfNonSpettanti(nome, ym, righe, conto, _pianoMalattieMese(ym), true, persi, opz.festivi);
     if (!candidati.length) return 0;
+    // chiede conferma quando si cambia il piano a mano o quando c e un CGF scritto a mano
+    const aMano = candidati.some((r) => r.protetto || !r.generato);
     if (
-      opz.manuali &&
+      (opz.manuali || aMano) &&
       !(await chiediConferma(
         nome +
           ' non lavora piu un festivo del mese: ' +
@@ -2725,12 +2712,10 @@ async function _pianoRiconciliaCgf(nome, ym, opz) {
       return 0;
     let fatte = 0;
     for (const r of candidati) {
-      const chiuso = _pianoGiornoBloccato(r.data) && !_pianoGiornoSbloccato(r.data);
       const nota =
         'CGF tolto: festivo non lavorato' +
         (opz.manuali ? '' : ' (malattia)') +
-        (chiuso ? ' · giorno gia chiuso' : '') +
-        (opz.manuali ? ' - ' + getOperatore() : '');
+        (opz.manuali || aMano ? ' - ' + getOperatore() : '');
       await secPatch('piano', 'id=eq.' + r.id, {
         codice: 'C',
         commento: nota,
