@@ -1,10 +1,70 @@
 # Genera QUESTIONARIO_VERIFICA_REGOLE_<versione>.html: tutte le regole e i
 # valori del programma, riga per riga, con Vero / Falso / Non so e nota,
 # divisi per chi deve rispondere. Dati letti da dati_q.json (esportazione DB).
-import json, html, datetime, sys
+import json, html, datetime, sys, re, hashlib, difflib
 E = html.escape
 DATI = json.load(open(sys.argv[1]))
 VERS = sys.argv[2] if len(sys.argv) > 2 else 'v262'
+# 3. argomento facoltativo: un questionario COMPILATO di una versione precedente.
+# Le voci uguali riprendono risposta e nota; quelle cambiate mostrano la risposta
+# di allora da ricontrollare; le nuove sono segnate. Si produce anche la copia
+# precompilata per la stessa persona.
+PREC = sys.argv[3] if len(sys.argv) > 3 else None
+def norm(t): return re.sub(r'^\d+\s+', '', re.sub(r'\s+', ' ', str(t)).strip()).lower()
+def chiave(*parti): return 'k' + hashlib.md5('|'.join(norm(x) for x in parti).encode()).hexdigest()[:10]
+prec = None
+if PREC:
+    _h = open(PREC, encoding='utf-8').read()
+    _m = re.search(r'window.__RISPOSTE=(\{.*?\});</script>', _h, re.S)
+    _R = json.loads(_m.group(1).replace('<\\/', '</'))
+    _txt = {}
+    for mm in re.finditer(r'<div class="voce[^"]*" data-k="(\w+)"[^>]*>(.*?)<div class="risp">', _h, re.S):
+        _txt[mm.group(1)] = ('voce', norm(html.unescape(re.sub('<[^>]+>', ' ', re.sub(r'<span class="badge[^"]*">.*?</span>', '', mm.group(2))))))
+    for mm in re.finditer(r'<tr data-k="(\w+)"[^>]*>(.*?)<td><div class="risp">', _h, re.S):
+        celle = [re.sub(r'\s+', ' ', html.unescape(re.sub('<[^>]+>', ' ', c))).strip() for c in re.findall(r'<td[^>]*>(.*?)</td>', mm.group(2), re.S)]
+        km = re.search(r'\((\w+)\)\s*$', celle[0]) if celle else None
+        if km and '·' in celle[0]: _txt[mm.group(1)] = ('mat', (km.group(1), [norm(c) for c in celle[1:]]))
+        else: _txt[mm.group(1)] = ('riga', [norm(c) for c in celle])
+    prec = {'R': _R, 'txt': _txt}
+    print('precedente:', _R.get('meta'), len(_R.get('risposte', {})), 'risposte')
+PRECOMP = {'risposte': {}, 'note': {}, 'precedenti': {}}
+STATO = {'nuova': 0, 'modificata': 0, 'uguale': 0}
+def confronta(k, tipo, ident):
+    # ritorna lo stato della voce rispetto al compilato precedente
+    if not prec: return ''
+    R0 = prec['R']; best = None; bestr = 0
+    for k0, (t0, v0) in prec['txt'].items():
+        if t0 != tipo: continue
+        if tipo == 'mat':
+            if v0[0] == ident[0]: best, bestr = k0, (1.0 if v0[1] == ident[1] else 0.9); break
+            continue
+        if tipo == 'riga':
+            if v0 == ident: best, bestr = k0, 1.0; break
+            if v0[:2] == ident[:2] and bestr < 0.9: best, bestr = k0, 0.9
+            continue
+        if v0 == ident: best, bestr = k0, 1.0; break
+        r = difflib.SequenceMatcher(None, v0, ident, autojunk=False).ratio()
+        if r > bestr: best, bestr = k0, r
+    risp = R0.get('risposte', {}).get(best) if best else None
+    nota = R0.get('note', {}).get(best, '') if best else ''
+    if best and bestr >= 0.999:
+        STATO['uguale'] += 1
+        if risp: PRECOMP['risposte'][k] = risp
+        if nota: PRECOMP['note'][k] = nota
+        return ''
+    if best and bestr >= 0.55:
+        STATO['modificata'] += 1
+        if risp or nota: PRECOMP['precedenti'][k] = {'r': risp or '', 'nota': nota}
+        return 'mod'
+    STATO['nuova'] += 1
+    return 'nuova'
+def badge(st):
+    return {'mod': '<span class="badge b-mod">modificata</span>', 'nuova': '<span class="badge b-nuova">nuova</span>'}.get(st, '')
+usate = set()
+def unica(k):
+    i = 1; k0 = k
+    while k in usate: i += 1; k = k0 + '_' + str(i)
+    usate.add(k); return k
 imp = DATI['imp']
 J = lambda k, d=None: json.loads(imp[k]) if k in imp else d
 
@@ -45,7 +105,10 @@ sez(B, 'B · Turni: durate e orari', 'La durata e l orario da orologio piu il 10
 ])
 sez(B, 'C · Codici speciali (assenze e congedi): ore che valgono', 'Ore = valore nel saldo; "scala %" = si moltiplica per la percentuale di impiego; "riposo" = conta come giorno libero.', [
  T(['Codice', 'Descrizione', 'Ore', 'Formula', 'Scala %', 'Riposo', 'Protetto'], [[c['codice'], c['descrizione'] or '', str(c['ore']), c['formula'] or '', 'si' if c['scala_percentuale'] else 'no', 'si' if c['is_riposo'] else 'no', 'si' if c['protetto'] else 'no'] for c in DATI['codici']]),
- ('Vacanza V = 41/7 = 5.857 ore al giorno (scalata per la percentuale); malattia M = 41/4.667 = 8.787 ore; CGF = 8.5 ore fisse non scalate.', 'Un 80% in V: 4.686 ore.'),
+ ('Vacanza V = 41/7 = 5.857 ore al giorno (scalata per la percentuale); CGF = 8.5 ore fisse non scalate.', 'Un 80% in V: 4.686 ore.'),
+ ('Malattia continua = giorni di calendario consecutivi con malattia (Diario o M nel piano); i prolungamenti attaccati si uniscono; un giorno senza malattia in mezzo, anche un riposo, interrompe e il conteggio riparte da 1.', 'Malato 1-10, sta bene l 11, malato dal 12: il 12 e di nuovo il giorno 1.'),
+ ('Giorni 1-14 della malattia: ogni giorno vale le ore del turno che copre (scritto nella nota "Ex R23"), da orologio e MAI con il 10% notturno; un giorno di congedo C in malattia (MC) vale 0 ore ma conta come giorno; una V in malattia vale come V e la vacanza viene restituita; una M senza sigla coperta (importata) vale il codice M (8.787).', 'R23 in malattia: 8.17 ore (non 8.67 con il 10%).'),
+ ('Dal 15. giorno di malattia: 41/7 = 5.857 ore per OGNI giorno di calendario, lavorativo o di riposo (scalate per la percentuale se il codice M la usa), sempre senza 10%.', 'Malattia di 20 giorni: dal 15 al 20 sei giorni da 5.857 ore.'),
  ('Il corso CS vale 3 ore e il corso LRD 2 ore (il foglio Excel conta 2 per entrambi: si e deciso di lasciare 3 per CS, modificabile).', 'Giornata CS: 3 ore nel saldo.'),
  ('Il congedo C vale 0 ore e conta come riposo; CNP (congedo non pagato) vale 0 ore, e protetto e riduce le ore dovute.', 'C il sabato: giorno libero.'),
 ])
@@ -57,10 +120,16 @@ sez(B, 'D · Orari di chiusura', 'Da qui dipendono le ore dei turni prolungati.'
 ])
 sez(B, 'E · Riposi, giorni consecutivi, domeniche', 'Legge sul lavoro e regole aziendali.', [
  ('Almeno 11 ore di riposo fra due turni' + rs('min_riposo_ore') + '; il giorno dopo si aggiunge solo se il turno finisce dopo la mezzanotte.', 'Z8 finisce alle 04:30: il turno dopo non prima delle 15:30.'),
+ ('In caso di necessita si puo scendere sotto le 11 ore (prassi: al massimo 2 volte al mese, solo urgenze): il programma avvisa e chiede conferma, la deroga resta scritta nel commento della cella; non conta da solo quante deroghe ci sono nel mese.', 'Z8 fino alle 04:30 e C0 alle 11:40: avviso, confermato, nota nella cella.'),
+ ('Ore lavorate nella settimana lunedi-domenica: al massimo 45.1' + rs('ore_settimana_max') + ', compreso il 10% notturno' + rs('ore_settimana_con_notturno') + '; contano solo turni e JG con orario (vacanze, malattie, CGF no); il turno che passa la mezzanotte conta nella settimana in cui inizia. Oltre il limite: avviso sulla cella, in Valida regole, in Piano > Avvisi; la bozza non lo supera mai.', '49.18 da orologio + 2.50 di notte = 51.68: avviso.'),
+ ('Riposo attorno alla domenica, dalla fine di un turno all inizio del successivo. Domenica libera: almeno 35 ore consecutive che comprendono dalle 23 del sabato alle 23 della domenica' + rs('riposo_domenica_libera_ore') + '. Domenica lavorata (anche il sabato finito dopo le 23): almeno 47 ore consecutive (36 + 11) nella settimana PRIMA oppure in quella DOPO, lunedi-sabato' + rs('riposo_domenica_lavorata_ore') + '. Avviso sulla cella, in Valida regole e in Piano > Avvisi > Riposo settimanale; la bozza lo rispetta e sistema a fine generazione.', 'Rossi lavora domenica 18: serve un riposo di 47 ore fra lunedi 12 e sabato 17 oppure fra lunedi 19 e sabato 24.'),
  ('Al massimo 5 giorni di lavoro consecutivi' + rs('max_consecutivi') + '.', 'Sei turni di fila: il sesto e segnalato.'),
- ('Vietato il pattern 4 giorni di lavoro, 1 di riposo, poi lavoro' + rs('no_4w1c1w') + '.', 'Lun-gio lavoro, ven riposo, sab lavoro: segnalato.'),
+ ('Lo schema 4 giorni di lavoro, 1 di riposo, poi di nuovo lavoro e evitato' + rs('no_4w1c1w') + ': non e un divieto di legge, serve a fare un piano piu equo (decisione del 30.09); a mano si puo fare, il programma avvisa e chiede conferma.', 'Lun-gio lavoro, ven riposo, sab lavoro: avviso, confermabile.'),
  ('12 domeniche libere all anno' + rs('domeniche_libere_anno') + '; una domenica conta come libera solo se il sabato prima si finisce entro le 23' + rs('turno_prima_domenica_libera') + '.', 'Sabato Z8 fino alle 04:30: la domenica non conta.'),
  ('Domenica in vacanza o in malattia: ne libera ne lavorata, in tutte le schermate.', 'Domenica in V: fuori dal conteggio.'),
+ ('Il controllo del sabato usa l orario VERO di quel sabato: turno prolungato nelle sere di chiusura tardi e orario scritto sulla cella (JG). Un sabato in malattia o vacanza non si lavora: la domenica dopo conta.', 'JG sabato 16.00-23.30: la domenica non conta. Sabato M: la domenica C conta.'),
+ ('Nel calendario la lettera della domenica e ROSSA quando quella domenica conta per le 12 (non lavorata, non V/M, sabato entro le 23); si aggiorna da sola a ogni cambio, anche dal Rapporto o dal Diario.', 'Rossi domenica 13.09 C rossa: sabato 12 libero.'),
+ ('Se un cambio toglie una domenica rossa (turno di domenica o sabato oltre le 23) il programma avvisa prima di salvare, con quante domeniche valide restano nell anno e quante sono ancora da pianificare; vale per modifica a mano, cambio per esigenze, scambio, cerca cambio e copertura malattia; la conferma va nello storico.', '"Rossi perde la domenica libera del 18.10: da 11 a 10 (minimo 12, ancora 5 domeniche da pianificare)".'),
  ('Se le domeniche rimaste nell anno non bastano a raggiungere 12, la tabella lo segna in rosso.', 'A novembre 7 libere e 5 domeniche rimaste: rosso.'),
  ('Il giorno prima delle vacanze il turno deve essere diurno' + rs('diurno_prima_vacanza') + '.', 'Vacanza da lunedi: la domenica niente notte.'),
 ])
@@ -70,15 +139,16 @@ sez(B, 'F · Festivi e recuperi (CGF)', 'Regolamento aziendale 4.3 e Allegato 1.
  ('Il CGF spetta solo al personale fisso; gli ausiliari mai.', 'Jolly il 1 agosto: nessun CGF.'),
  ('Il CGF matura solo sui nove festivi parificati alla domenica (Capodanno, Epifania, Lunedi di Pasqua, Ascensione, 1 Agosto, Assunzione, Ognissanti, Natale, Santo Stefano)' + rs('cgf_solo_parificati') + '; gli altri sei festivi cantonali no; il festivo di domenica no.', 'Turno il 19 marzo: 0 CGF. Il 15 agosto: 1 CGF.'),
  ('Il festivo matura solo se lavorato davvero: turno in cella e nessuna malattia quel giorno.', 'Turno a Natale ma malato: nessun credito.'),
- ('Il recupero del festivo del mese va nei giorni dopo il festivo nello stesso mese; se non c e spazio passa al mese dopo.', 'Festivo il 25.10: CGF fra il 26 e il 31.'),
+ ('Il recupero del festivo va di preferenza nei giorni dopo il festivo, nello stesso mese; se dopo non c e posto (dicembre, giugno) anche PRIMA del festivo (CGF anticipato); se nel mese non c e posto passa al mese dopo.', 'Dicembre: CGF il 18 per il festivo del 25.'),
  ('Il credito conta solo il passato e il mese aperto; i CGF gia pianificati nei mesi futuri non contano.', '5 maturati, 4 goduti: resta 1.'),
  ('Massimo 2 recuperi automatici a persona al mese' + rs('cgf_max_mese') + ', ad almeno 5 giorni uno dall altro' + rs('cgf_distanza_giorni') + ', mai il giorno prima o dopo una vacanza' + rs('cgf_non_con_vacanze') + '.', 'Tre crediti: due a ottobre, uno a novembre.'),
- ('La malattia registrata nel Diario prevale su qualsiasi sigla del giorno: turno, vacanza V, CGF, JG, C diventano M; la sigla coperta resta nel commento e torna al suo posto se la malattia viene tolta.', 'V il 12, malattia dal 10 al 14: il 12 diventa M (era V).'),
+ ('La malattia registrata nel Diario prevale su qualsiasi sigla del giorno: turno, vacanza V, CGF, JG, C diventano M; la sigla coperta resta nella nota "Ex V - operatore" e torna al suo posto se la malattia viene tolta.', 'V il 12, malattia dal 10 al 14: il 12 diventa M, nota "Ex V - Rossi".'),
  ('Giorno di vacanza caduto in malattia: viene restituito e la scheda Vacanze lo conta nella colonna "Restituite per malattia".', '5 V in malattia: 5 giorni tornano disponibili.'),
- ('CGF caduto in malattia: diventa M, non goduto, il credito resta.', 'CGF il 10, malattia il 10: si ridara.'),
+ ('CGF caduto in malattia: diventa M con la nota "Ex CGF - operatore", non e goduto e il credito resta; il programma propone subito un giorno sostitutivo nello stesso mese (giorno vuoto o C della bozza, mai celle a mano, bloccate o compleanno).', '"Il CGF del 09.12 di Rossi e caduto in malattia. Lo rimetto il 15.12 (oggi C)?"'),
  ('La scheda Crediti del Piano mostra per ogni collaboratore vacanze che restano, CGF da recuperare, saldo ore dell anno, recupero del mese e congedi non pagati: stessi numeri delle schede Vacanze, Festivi, Saldo e Recupero.', 'Rossi: vacanze 12, CGF 2, saldo +6 h.'),
  ('Il congedo del compleanno e le celle bloccate con motivo non vengono usati per coprire malattie ne per gli scambi.', 'C Compleanno il 14: mai proposto come sostituto.'),
- ('CGF gia messo per un festivo poi saltato per malattia: diventa C con la nota "CGF tolto: festivo non lavorato".', 'Malattia il 25.10 dal Diario: il CGF del 27 diventa C.'),
+ ('Festivo che non si lavora piu (malattia, cambio): si toglie un solo CGF che deve ANCORA ARRIVARE, prima quello anticipato prima del festivo, e solo se il conto va sotto zero; diventa C con la nota "CGF tolto: festivo non lavorato". Un CGF gia goduto resta CGF e la persona va a -1 da pareggiare.', 'CGF il 18.12 per il 25; il 23.12 si ammala per il 25: il 18 resta CGF, conto -1.'),
+ ('Conferma: sempre quando si cambia la cella del festivo a mano; con la malattia dal Diario solo se il CGF da togliere e scritto a mano (quelli della bozza diventano C da soli). Rispondendo No il CGF resta e nell elenco risulta "in piu".', 'Il 16.12 metti C il 25: "il recupero CGF del 18.12 non spetta piu, lo trasformo in C?"'),
  ('Riporto dei recuperi dall anno precedente per persona nella scheda Festivi; con riporto registrato l anno prima non si conta.', 'Peraino riporto 2026 +1, Sapio −2.'),
  ('Ausiliari: supplemento del 50% sul salario orario per i nove festivi parificati (anche di domenica), niente sugli altri; 10% delle ore notturne come tempo libero pagato' + rs('notte_percentuale') + '.', 'Jolly a Natale: 50%.'),
 ])
@@ -125,7 +195,9 @@ sez(B, 'K · Cambi turno, coperture, restituzioni', '', [
  ('"Cerca cambio, giorno libero" propone i colleghi liberi quel giorno (non chi lavora in un altro settore, non le celle bloccate) e le date di restituzione possibili; il primo nome e il richiedente.', 'Mario in BU il 15: non libero per WL.'),
  ('Limite cambi richiesti al mese: ' + str(imp.get('piano_max_cambi_mese','0')) + ' (0 = illimitati); chi accetta non consuma; il responsabile puo autorizzare oltre e la deroga si registra a scambio fatto.', 'Al quarto cambio serve autorizzazione.'),
  ('Ogni cambio produce il formulario da firmare, finisce nel registro e si ristampa dalla cella.', 'Ristampa foglio del 28.09.'),
- ('"Copertura malattia" cerca sostituti liberi giorno per giorno, anche con una mossa a catena sul giorno prima dentro il mese; scrive M protetta al malato e propone di togliere la malattia dal Diario se gia registrata.', 'Malato 10-12: tre sostituti.'),
+ ('"Copertura malattia" cerca sostituti liberi giorno per giorno, anche con una mossa a catena sul giorno prima dentro il mese; scrive M protetta al malato e registra la malattia nel Rapporto del primo giorno (PRESTO se il turno era diurno o un riposo, NOTTE se notturno), che la porta nel Diario.', 'Malato 10-12: tre sostituti; nel Rapporto "Rossi Mario malato dal 10/10/2026 al 12/10/2026".'),
+ ('Note delle celle, uguali ovunque: scambio fra colleghi "Ex X - cambio con Nome - operatore"; cambio per esigenze e chi copre una malattia (anche nella mossa a catena) "Ex X - cambio per esigenze operative - operatore"; malattia "Ex X - operatore".', 'Chi copre la malattia di Rossi con C0: "Ex C - cambio per esigenze operative - operatore".'),
+ ('La scheda Piano > Cambi turno elenca tutti i fogli di cambio (scambi, cerca cambio, esigenze) con Apri PDF; la scheda del collaboratore ne mostra l anteprima; la ricerca globale trova i cambi turno.', 'Cerca "Rossi": anche i suoi cambi turno.'),
  ('"Cambio per esigenze operative" cambia il turno con motivo, rispetta i giorni chiusi e chiede conferma sulle celle bloccate.', 'Da C0 a C23 per esigenze.'),
  ('"Scambia settimane" di vacanza controlla i giorni chiusi prima di toccare il piano e produce il modulo.', 'Settimane 32 e 35 scambiate.'),
 ])
@@ -147,7 +219,8 @@ sez(B, 'M · Regole di gruppo e "chi fa cosa"', 'Per settore; gruppo "*" = tutti
  ('Le funzioni disponibili sono ' + ', '.join(J('piano_funzioni', [])) + '; i giorni evidenziati come weekend sono ' + str(J('piano_giorni_weekend', [5, 6])) + ' (5 venerdi, 6 sabato).', 'Colonne verdi ven-sab.'),
  ('Ogni regola con valore numerico o Si/No vale per tutti i settori e puo avere un valore proprio per un settore; un valore fuori scala o senza senso per quel settore viene rifiutato con la spiegazione.', 'Riposo 11 ovunque, 12 ai Tavoli.'),
 ])
-sez(B, 'N · Timbrature, recupero ore, statistiche', '', [
+sez(B, 'N · Timbrature, recupero ore, statistiche, avvisi', '', [
+ ('Piano > Avvisi raccoglie in sotto-schede con ricerca: Ore settimanali, Riposo settimanale, Regole del mese, Chiusura anno (saldo ore fuori banda, CGF da dare o in piu, domeniche libere sotto il diritto), Posti scoperti dei prossimi 7 giorni, Malattie lunghe; il numero sulla voce Piano del menu conta solo le cose importanti; in Home una riga li riassume.', 'Settembre: 14 settimane oltre 45.1, 3 posti scoperti.'),
  ('Le timbrature importate si confrontano con il piano usando le stesse ore del calendario; le ore timbrate del mese sostituiscono il piano nel saldo.', 'Pianificate 181.6, timbrate 178: −3.6.'),
  ('Il recupero ore si registra per settore con la selezione come nel calendario, si aggiorna ogni giorno, senza ausiliari.', 'Scostamento +0.5 il 12.'),
  ('Le Statistiche del piano sono un filtro per mese sull anno (senza ricaricare); CGF e domeniche seguono gli stessi criteri del calendario.', 'Clic su marzo: solo marzo.'),
@@ -159,6 +232,16 @@ sez(B, 'O · Briefing, pause, corsi', 'Slots.', [
  ('Il briefing del giorno si compila dal piano (entrata, uscita, nome, turno, numero cassa CD, uscita, firma); i numeri cassa seguono la rotazione (chi chiude riapre il giorno dopo); un numero scritto a mano non viene sovrascritto.', 'Chi chiude con CD 5 riapre con CD 5.'),
  T(['Coppia CD', 'Apre con', 'Chiude con'], [[' / '.join(c['cd']), c['apre'], c['chiude']] for c in cd]),
  ('Le pause si generano dal briefing con durate per fascia (6h, 7h...) e competenze S/R/C; il foglio pause usa i numeri cassa delle coppie configurate.', 'Cassa principale = coppia che apre con C23.'),
+ ('Regola delle ore per tutti (scheda Regole pause): turno di 6 ore 15+15 minuti, di 7 ore 30+15, da 8 ore 30+15+15; mai meno di un ora fra due pause, mai fuori dal turno. Lo schema predefinito resta la base; le pause mancanti le propone il programma.', 'C0 di 8h20: 30+15+15.'),
+ ('Sala mai vuota: i responsabili Z non contano; se in un quarto d ora nessuno e in sala il programma prova gli spostamenti delle frecce e tiene quello che la copre senza creare altri problemi. Nelle giornate normali lo schema non si tocca: il programma interviene solo per problemi veri (sala vuota, avvisi, pausa nella prima o ultima mezz ora del turno) e chiede conferma solo nei casi eccezionali (postazione senza cambio, avvisi rimasti).', '31.03: sala vuota nel pomeriggio risolta con uno spostamento, senza domande.'),
+ ('Attese lunghe senza pausa (oltre 3 ore, configurabile): solo un avviso "Da tenere d occhio", decide il responsabile con le frecce.', '"R8 ROSSI: 3h10 senza pausa, dalle 20.50 alle 24.00".'),
+ ('Formazione: chi ha nel commento della cella "formazione" o "affiancamento" va in pausa con il collega dello stesso turno (conta come una persona sola); se la scritta e su due persone dello stesso turno, sono loro la coppia.', 'Due R22 con la scritta formazione: vanno in pausa insieme, non con il terzo R22.'),
+ ('Accoglienza (gruppo ACCOGLIENZA, es. S31, Z5) si organizza da sola: pause suggerite, nessun avviso, non conta come presenza in sala.', 'S31: colonna nelle Facoltative.'),
+ ('Bigliettini solo a chi da i cambi: colonnine personali (secondo S5, S7C, R22, secondo C0), accoglienza e bigliettino del mattino di C4 sono Facoltative, sotto il foglio, stampate solo se spuntate.', 'S7C: nessun bigliettino se non spuntato.'),
+ ('Slots, lunedi-giovedi: S3 in pausa 22.15-22.30 e R24 22.30-23.00, chi gli da il cambio si sposta insieme. Venerdi-sabato con due S7, S1 e S5: l S7 va in pausa 20.30-21.00, 21.00-21.30 cambio all altro S7, 21.30-21.45 cambio all S5.', '02.10: S5 pause 19.30, 21.30, 23.45.'),
+ ('Jolly Giornata (JG): premendo Genera pause il programma chiede per ogni JG senza orario dove lavora oggi (sala, rec, cassa, accoglienza, supervisione o un corso, secondo le posizioni del settore) e l orario; la risposta resta nel piano.', 'JG 14.00-22.00 in sala: 3 pause, conta per la sala.'),
+ ('Frecce: una pausa o un cambio si sposta di un quarto d ora alla volta, fermandosi solo dove la sala resta coperta; pausa e cambio collegati si spostano insieme; x elimina una colonna intera; Annulla/Ripristina e Ctrl+Z/Ctrl+Y anche nel briefing.', 'S7 01.45: freccia su, 01.30.'),
+ ('Stampa: briefing sempre verticale su un foglio con colonne larghe quanto il testo; foglio pause su un foglio con bigliettini stretti e 3 mm fra uno e l altro (un taglio di forbici).', 'Briefing Valet: nessun nome tagliato.'),
  ('I corsi (' + ', '.join(J('piano_corsi_lista', ['CS','LRD','ANTINCENDIO'])) + ') si inseriscono nel piano con data, orario e partecipanti; chi ha un turno compatibile lo tiene con nota; orari predefiniti ' + ', '.join(k + ' ' + (v or 'da definire') for k, v in corsi.items()) + '.', 'CS 14:30-17:30.'),
  ('Le evidenziazioni: una cella colorata nel piano evidenzia il nome nel briefing secondo la mappa colori del settore.', 'Cella gialla → nome evidenziato.'),
 ])
@@ -183,7 +266,7 @@ sez(B, 'P · Regole generali degli accessi', '', [
  ('Ogni operatore ha un profilo (Direzione, Responsabile FoBoSlot, Sostituto, Supervisor, HR) e "Applica i profili" riscrive i suoi permessi; chi non ha profilo non viene toccato; i singoli permessi restano modificabili a mano.', 'Nuovo supervisor: profilo Supervisor.'),
  ('L amministratore (password master) vede e modifica tutto, incluso il Registro attivita, che gli altri non vedono.', 'Solo admin svuota il registro.'),
  ('Ogni operatore accede solo ai settori assegnati (uno, piu di uno o tutti); un settore "extra" puo essere di sola lettura; le pagine possono essere nascoste per settore (es. Maison nel Valet).', 'Operatore Valet: niente Maison.'),
- ('La chat fra colleghi e cifrata; i dati personali non vanno mai all assistente AI esterno (nomi sostituiti, foto non inviate).', '"Rossi" → "[COLLABORATORE]".'),
+ ('La chat fra colleghi e cifrata; i dati personali non vanno mai all assistente AI esterno (nomi sostituiti, foto non inviate). L assistente si puo configurare anche con un modello sul server interno (Llama), senza servizi esterni.', '"Rossi" → "[COLLABORATORE]".'),
  ('Le impostazioni di configurazione le salva solo l amministratore, verificato dal server; ogni salvataggio fallito e segnalato.', 'Operatore dalla console: rifiutato.'),
 ])
 sez(B, 'MATRICE', 'V = vede, M = modifica, − = non accede. Per ogni riga: la combinazione e giusta? Se Falso, scrivere quella corretta (es. "HR: M").', [('MATRICE', gruppi_m, matrice, etich, profili)])
@@ -232,11 +315,14 @@ sez(B, 'S · Moduli disciplinari e alert', '', [
  ('Annulla e Ripristina valgono in tutto il programma (barretta in basso a sinistra, Ctrl+Z e Ctrl+Y): si annullano le proprie azioni della sessione, un azione intera alla volta (fino a 30); se un altro operatore ha toccato la stessa riga nel frattempo il programma avvisa e non sovrascrive; un documento creato e annullato va nel Cestino; ogni annullamento e registrato.', 'RDI creato per sbaglio: Annulla, l RDI finisce nel Cestino.'),
  ('Ogni modulo nuovo e un record separato: con un allineamento aperto, premere Nuovo RDI crea un RDI nuovo e non sovrascrive l allineamento (difetto del vecchio Diario, corretto).', 'Allineamento del 3.9 aperto, Nuovo RDI: due moduli in elenco.'),
  ('La ristampa di un modulo firmato digitalmente contiene le firme; ogni modulo va nel fascicolo e nel registro.', 'RDI ristampata: firme presenti.'),
- ('Una malattia registrata nel Diario (un giorno o un periodo) allinea subito il piano: i giorni con un turno diventano M protetta (8.787 ore, era il turno), i giorni di congedo C restano C e si vedono come MC (0 ore, era gia riposo), un CGF resta a credito (MCG); i recuperi automatici in piu tornano C. Correggere il periodo toglie le M dei giorni non piu coperti da nessuna registrazione.', 'Malattia 1-10 con turni 1-7 e C 8-10: sette M da 8.787 ore, tre MC da 0 ore; la scheda conta 10 giorni.'),
+ ('Una malattia registrata nel Diario (un giorno o un periodo) allinea subito il piano: i giorni con un turno diventano M protetta (ore secondo la regola dei 14 giorni, nota "Ex turno - operatore"), i giorni di congedo C restano C e si vedono come MC (0 ore, contano come giorni), un CGF resta a credito; i recuperi automatici in piu tornano C. Correggere il periodo toglie le M dei giorni non piu coperti da nessuna registrazione.', 'Malattia 1-10 con R23 1-7 e C 8-10: sette M da 8.17 ore, tre MC da 0 ore; la scheda conta 10 giorni.'),
 ])
 buoni = J('buono_valori', {})
 sez(B, 'T · Diario, rapporto, Maison, consegne, promemoria', '', [
  ('Il Diario registra eventi per tipo (predefiniti e personalizzati) con nome verificato contro l anagrafica (suggerimento del nome simile), follow-up e scadenze.', '"Damico" → "D Amico?"'),
+ ('Diario e Rapporto collegati: cancellando dal Diario una registrazione nata dal Rapporto la persona sparisce anche dal Rapporto (solo la sua parte); togliendola dal Rapporto il Diario RESTA e si stacca ("tolta dal rapporto"); modificandola nel Diario il programma chiede se correggere anche il Rapporto.', '"Rossi -50, Bianchi +20": cancello Rossi dal Diario, nel Rapporto resta "Bianchi +20".'),
+ ('Piano, Rapporto e Diario collegati: una M scritta nel Piano o dalla Copertura malattia va nel Rapporto e quindi nel Diario; una malattia scritta nel Rapporto o nel Diario mette le M nel Piano; cancellata, nel Piano torna la sigla coperta.', 'M a mano il 03.11 su R23: Rapporto NOTTE "malato dal 03/11/2026 al 03/11/2026", Diario creato.'),
+ ('Rinomina di un collaboratore (Impostazioni > Gestione collaboratori): il nome cambia dappertutto (Diario, Piano, vacanze, riporti, timbrature, ore, congedi, moduli, valutazioni, punti, storico HR, chat, ordine del piano); restano con il nome di allora solo il Registro attivita e i fogli pause e briefing gia salvati.', 'Rossi Maria → Rossi Bianchi Maria: celle, vacanze e Diario al nome nuovo.'),
  ('Il rapporto giornaliero e per settore e giorno con campi configurabili; la Home mostra lo stato del settore aperto; il parser assenze riconosce singolari e plurali per nome e segnala cio che non capisce.', '"Rossi e Bianchi assenti": due righe.'),
  T(['Buono', 'Valore CHF'], [[k, str(v)] for k, v in buoni.items()]),
  ('Maison: quando un ospite ha il buono, il valore del buono va a lui e il resto del costo agli altri; le quote sommano sempre al costo della riga; il budget cliente e mensile e lo speso confrontato e quello del mese corrente in tutte le schermate.', '360 CHF, Aili BL: 40 e 320.'),
@@ -274,7 +360,10 @@ section .intro{padding:9px 18px;color:var(--muted);font-size:.88rem;border-botto
 .voce .num{font-weight:700;color:var(--oro)}.voce .testo{font-size:.96rem}.voce .es{display:block;margin-top:4px;color:var(--muted);font-size:.85rem}.voce .es b{color:var(--ink);font-weight:600}
 .risp{display:flex;flex-direction:column;gap:6px}.risp .opz{display:flex;gap:6px}
 .opz label{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;border:1px solid var(--line);padding:6px 4px;cursor:pointer;font-size:.85rem;background:#fff;user-select:none}
-.opz input{margin:0}body.solo-falsi .voce:not(.e-falso),body.solo-falsi tr[data-k]:not(.e-falso){display:none}body.solo-falsi tr.grp{display:none}.opz label.on-vero{background:#e3f0e8;border-color:var(--ok);font-weight:700}.opz label.on-falso{background:#f8e1de;border-color:var(--no);font-weight:700}.opz label.on-nonso{background:#efe9d9;border-color:var(--oro);font-weight:700}
+.opz input{margin:0}.filtrato{display:none!important}
+.badge{display:inline-block;font-family:system-ui,sans-serif;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;padding:1px 6px;margin-right:6px;border-radius:2px;vertical-align:1px}.b-nuova{background:#e3f0e8;color:var(--ok);border:1px solid var(--ok)}.b-mod{background:#fbf0d9;color:#8a6414;border:1px solid var(--oro)}
+.prec{margin-top:6px;font-size:.82rem;background:#fbf0d9;border-left:3px solid var(--oro);padding:5px 8px;color:var(--ink)}
+.barra select{font:inherit;font-size:.88rem;padding:6px 8px;border:1px solid var(--ink);background:var(--paper);border-radius:2px}.opz label.on-vero{background:#e3f0e8;border-color:var(--ok);font-weight:700}.opz label.on-falso{background:#f8e1de;border-color:var(--no);font-weight:700}.opz label.on-nonso{background:#efe9d9;border-color:var(--oro);font-weight:700}
 .risp textarea{font:inherit;font-size:.85rem;width:100%;min-height:36px;padding:5px 7px;border:1px solid var(--line);background:#fff;resize:vertical}
 table.mat{width:100%;border-collapse:collapse;font-size:.85rem}table.mat th,table.mat td{border:1px solid var(--line);padding:5px 7px;text-align:center;vertical-align:top}table.mat th{background:var(--paper2);font-weight:700}table.mat td.lbl{text-align:left}
 table.mat tr.grp td{background:var(--paper2);font-weight:700;text-align:left;letter-spacing:.04em}
@@ -288,8 +377,8 @@ header{background:#fff;color:#000;border-bottom:2px solid #000;padding:6px 0}hea
 .intest{grid-template-columns:repeat(3,1fr);border:0;padding:6px 0}.intest input{border:0;border-bottom:1px solid #444}.legenda{border-left:2px solid #000}table.mat{font-size:9.5px}table.mat th,table.mat td{padding:2px 4px;border-color:#666}.mat .risp .opz{min-width:150px}.mat .risp textarea{min-width:90px;min-height:24px}}
 @page{size:A4 portrait;margin:11mm 10mm}@media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact}thead{display:table-header-group}tr{break-inside:avoid}h2,h3,h4{break-after:avoid}textarea{resize:none;overflow:hidden}}
 </style></head><body>
-<header><h1>Diario Collaboratori · verifica di tutte le regole</h1><p>Ogni riga dice come il programma si comporta oggi, con un esempio. Chi conosce il regolamento segna <b>Vero</b> se e giusto, <b>Falso</b> se e sbagliato (scrivendo nella nota come dovrebbe essere), <b>Non so</b> se non e di sua competenza. Le risposte restano salvate in questo browser; alla fine <b>Salva copia compilata</b> crea il questionario completo con le risposte dentro, da rinviare: chi lo riceve lo apre e vede tutto, e con <b>Mostra solo i Falso</b> legge subito i punti da correggere. <b>Stampa</b> produce la versione su carta o PDF, un blocco per pagina.</p></header>
-<div class="barra no-stampa"><button class="prim" onclick="salvaCopia()">Salva copia compilata (da inviare)</button><button onclick="salvaRisposte()">Salva solo le risposte (.json)</button><button onclick="document.getElementById('carica').click()">Carica risposte</button><button id="btn-falsi" onclick="soloFalsi()">Mostra solo i Falso</button><input type="file" id="carica" accept=".json" style="display:none" onchange="caricaRisposte(this)"><button onclick="window.print()">Stampa / PDF</button><button onclick="azzera()">Azzera</button>''' + ''.join('<a href="#b-%s">%s</a>' % (b[0], E(b[1].split('·')[0].strip())) for b in blocchi) + '''<span class="prog" id="prog"></span></div>
+<header><h1>Diario Collaboratori · verifica di tutte le regole</h1><p>Ogni riga dice come il programma si comporta oggi, con un esempio. Chi conosce il regolamento segna <b>Vero</b> se e giusto, <b>Falso</b> se e sbagliato (scrivendo nella nota come dovrebbe essere), <b>Non so</b> se non e di sua competenza. Le risposte restano salvate in questo browser; alla fine <b>Salva copia compilata</b> crea il questionario completo con le risposte dentro, da rinviare: chi lo riceve lo apre e vede tutto, e con il filtro (per esempio <b>Solo Non so o con nota</b>) legge subito i punti da guardare. Le voci segnate <b>nuova</b> o <b>modificata</b> sono cambiate rispetto al questionario precedente; sotto quelle modificate c e la risposta data allora. <b>Stampa</b> produce la versione su carta o PDF, un blocco per pagina.</p></header>
+<div class="barra no-stampa"><button class="prim" onclick="salvaCopia()">Salva copia compilata (da inviare)</button><button onclick="salvaRisposte()">Salva solo le risposte (.json)</button><button onclick="document.getElementById('carica').click()">Carica risposte</button><select id="filtro" onchange="filtra()" title="Quali voci mostrare (vale anche per la stampa)"><option value="">Mostra tutte le voci</option><option value="nonso_nota">Solo Non so o con nota</option><option value="nonso">Solo Non so</option><option value="nota">Solo con nota</option><option value="falso">Solo Falso</option><option value="vuote">Solo da rispondere</option><option value="novita">Solo nuove o modificate</option></select><input type="file" id="carica" accept=".json" style="display:none" onchange="caricaRisposte(this)"><button onclick="window.print()">Stampa / PDF</button><button onclick="azzera()">Azzera</button>''' + ''.join('<a href="#b-%s">%s</a>' % (b[0], E(b[1].split('·')[0].strip())) for b in blocchi) + '''<span class="prog" id="prog"></span></div>
 <main>
 <div class="intest"><div><label>Compilato da</label><input data-meta="nome"></div><div><label>Funzione</label><input data-meta="funzione"></div><div><label>Data</label><input data-meta="data" value="''' + oggi + '''"></div><div><label>Versione del programma</label><input value="''' + VERS + ''' · ''' + oggi + '''" readonly></div></div>
 <div class="legenda"><b>Come leggere.</b> Ogni voce e una regola o un valore cosi come il programma lo applica oggi. I nomi fra parentesi (regola ...) sono modificabili dalla scheda Regole senza toccare il programma: se e sbagliato solo il numero, scriverlo nella nota. Le tabelle (turni, codici, festivi, punti...) chiedono una risposta per riga. I quattro blocchi sono indipendenti: ognuno compila il suo.</div>''')
@@ -302,8 +391,9 @@ for bid, btit, bdest, sezioni in blocchi:
                 _, intest, righe = v
                 out.append('<div class="tab"><table class="mat"><thead><tr>%s<th style="min-width:330px">Verifica</th></tr></thead><tbody>' % ''.join('<th>%s</th>' % E(c) for c in intest))
                 for r in righe:
-                    n += 1; k = 'v%03d' % n
-                    out.append('<tr data-k="%s">%s<td><div class="risp"><div class="opz">%s</div><textarea data-nota="%s" placeholder="Nota"></textarea></div></td></tr>' % (k, ''.join('<td%s>%s</td>' % (' class="lbl"' if i == 0 or i == 1 else '', E(str(c))) for i, c in enumerate(r)), opz(k), k))
+                    n += 1; k = unica(chiave(*intest, *[str(c) for c in r[:2]]))
+                    st = confronta(k, 'riga', [norm(c) for c in r])
+                    out.append('<tr data-k="%s" data-st="%s">%s<td><div class="risp"><div class="opz">%s</div><textarea data-nota="%s" placeholder="Nota"></textarea></div></td></tr>' % (k, st, ''.join('<td%s>%s%s</td>' % (' class="lbl"' if i == 0 or i == 1 else '', E(str(c)), badge(st) if i == 0 else '') for i, c in enumerate(r)), opz(k), k))
                 out.append('</tbody></table></div>')
             elif v[0] == 'MATRICE':
                 _, gm, mat, et, prof = v
@@ -311,8 +401,9 @@ for bid, btit, bdest, sezioni in blocchi:
                 for gt, keys in gm:
                     out.append('<tr class="grp"><td colspan="%d">%s</td></tr>' % (len(prof) + 2, E(gt)))
                     for k2 in keys:
-                        n += 1; k = 'v%03d' % n
-                        out.append('<tr data-k="%s"><td class="lbl">%d · %s <span style="color:var(--muted);font-size:.76rem">(%s)</span></td>%s<td><div class="risp"><div class="opz">%s</div><textarea data-nota="%s" placeholder="Nota"></textarea></div></td></tr>' % (k, n, E(et.get(k2, k2)), k2, ''.join('<td>%s</td>' % x for x in mat[k2]), opz(k), k))
+                        n += 1; k = unica('m_' + k2)
+                        st = confronta(k, 'mat', (k2, [norm(x) for x in mat[k2]]))
+                        out.append('<tr data-k="%s" data-st="%s"><td class="lbl">%d · %s <span style="color:var(--muted);font-size:.76rem">(%s)</span></td>%s<td><div class="risp"><div class="opz">%s</div><textarea data-nota="%s" placeholder="Nota"></textarea></div></td></tr>' % (k, st, n, E(et.get(k2, k2)), k2, ''.join('<td>%s</td>' % x for x in mat[k2]), opz(k), k))
                 out.append('</tbody></table></div>')
             elif v[0] == 'DATI':
                 _, ds, prof = v
@@ -323,14 +414,15 @@ for bid, btit, bdest, sezioni in blocchi:
                 out.append('</tbody></table></div><div class="voce"><div class="num">*</div><div class="testo">Altre figure o casi particolari (Compliance stessa, revisori esterni, un supervisor che vede solo il proprio settore): scrivere qui.</div><div class="risp"><textarea data-nota="dxx" style="min-height:70px" placeholder="Note"></textarea></div></div>')
             else:
                 testo, es = v
-                n += 1; k = 'v%03d' % n
-                out.append('<div class="voce" data-k="%s"><div class="num">%d</div><div class="testo">%s<span class="es"><b>Esempio:</b> %s</span></div><div class="risp"><div class="opz">%s</div><textarea placeholder="Nota (se Falso: come dovrebbe essere)" data-nota="%s"></textarea></div></div>' % (k, n, E(testo), E(es), opz(k), k))
+                n += 1; k = unica(chiave(testo))
+                st = confronta(k, 'voce', norm(testo + ' Esempio: ' + es))
+                out.append('<div class="voce" data-k="%s" data-st="%s"><div class="num">%d</div><div class="testo">%s%s<span class="es"><b>Esempio:</b> %s</span></div><div class="risp"><div class="opz">%s</div><textarea placeholder="Nota (se Falso: come dovrebbe essere)" data-nota="%s"></textarea></div></div>' % (k, st, n, badge(st), E(testo), E(es), opz(k), k))
         out.append('</section>')
     out.append(firma_html(bid, btit.split('·')[0].strip() + ' (' + bdest.replace('Da compilare da ', '') + ')'))
 out.append('''<section><h3>Osservazioni generali</h3><div class="voce"><div class="num">*</div><div class="testo">Regole o situazioni che nel programma mancano del tutto, oppure che andrebbero fatte in un altro modo.</div><div class="risp"><textarea data-nota="gen" style="min-height:110px" placeholder="Scrivi qui"></textarea></div></div></section>''' + firma_html('generale', 'Osservazioni generali') + '''</main>
 <script>
-const CH='diario_verifica_regole_''' + VERS + '''';
-function stato(){const s={meta:{},risposte:{},note:{},dati:{}};document.querySelectorAll('[data-meta]').forEach(i=>s.meta[i.dataset.meta]=i.value);document.querySelectorAll('input[type=radio]:checked').forEach(r=>s.risposte[r.name]=r.value);document.querySelectorAll('textarea[data-nota]').forEach(t=>{if(t.value.trim())s.note[t.dataset.nota]=t.value});document.querySelectorAll('select[data-sel]').forEach(x=>{if(x.value)s.dati[x.dataset.sel]=x.value});firmeStato(s);return s}
+let CH='diario_verifica_regole_''' + VERS + '''';
+function stato(){const s={meta:{},risposte:{},note:{},dati:{}};document.querySelectorAll('[data-meta]').forEach(i=>s.meta[i.dataset.meta]=i.value);document.querySelectorAll('input[type=radio]:checked').forEach(r=>s.risposte[r.name]=r.value);document.querySelectorAll('textarea[data-nota]').forEach(t=>{if(t.value.trim())s.note[t.dataset.nota]=t.value});document.querySelectorAll('select[data-sel]').forEach(x=>{if(x.value)s.dati[x.dataset.sel]=x.value});firmeStato(s);if(window.__RISPOSTE&&window.__RISPOSTE.precedenti)s.precedenti=window.__RISPOSTE.precedenti;return s}
 // FIRME: per ogni blocco uno o piu firmatari (ruolo, nome, data, firma
 // disegnata con mouse o dito). Le firme finiscono nelle risposte e nella
 // copia compilata; in stampa restano ruolo, nome, data e la firma o la riga.
@@ -347,15 +439,28 @@ function firmeApplica(s){Object.keys((s&&s.firme)||{}).forEach(bl=>{const lista=
 
 function applica(s){if(!s)return;Object.keys(s.meta||{}).forEach(k=>{const i=document.querySelector('[data-meta="'+k+'"]');if(i)i.value=s.meta[k]});Object.keys(s.risposte||{}).forEach(k=>{const r=document.querySelector('input[name="'+k+'"][value="'+s.risposte[k]+'"]');if(r)r.checked=true});Object.keys(s.note||{}).forEach(k=>{const t=document.querySelector('textarea[data-nota="'+k+'"]');if(t)t.value=s.note[k]});Object.keys(s.dati||{}).forEach(k=>{const x=document.querySelector('select[data-sel="'+k+'"]');if(x)x.value=s.dati[k]});firmeApplica(s);colora();progresso()}
 function colora(){document.querySelectorAll('.opz label').forEach(l=>{l.classList.remove('on-vero','on-falso','on-nonso');const i=l.querySelector('input');if(i&&i.checked)l.classList.add('on-'+i.value)});document.querySelectorAll('[data-k]').forEach(el=>{const r=el.querySelector('input[type=radio]:checked');el.classList.toggle('e-falso',!!(r&&r.value==='falso'))})}
-function soloFalsi(){document.body.classList.toggle('solo-falsi');document.getElementById('btn-falsi').textContent=document.body.classList.contains('solo-falsi')?'Mostra tutto':'Mostra solo i Falso'}
+function filtra(){const f=(document.getElementById('filtro')||{}).value||'';document.querySelectorAll('.filtrato').forEach(e=>e.classList.remove('filtrato'));if(!f)return;document.querySelectorAll('[data-k]').forEach(el=>{const r=el.querySelector('input[type=radio]:checked');const v=r?r.value:'';const t=el.querySelector('textarea[data-nota]');const nota=!!(t&&t.value.trim());const st=el.dataset.st||'';let ok=true;if(f==='nonso_nota')ok=v==='nonso'||nota;else if(f==='nonso')ok=v==='nonso';else if(f==='nota')ok=nota;else if(f==='falso')ok=v==='falso';else if(f==='vuote')ok=!v;else if(f==='novita')ok=!!st;if(!ok)el.classList.add('filtrato')});document.querySelectorAll('tr.grp').forEach(g=>g.classList.add('filtrato'));document.querySelectorAll('.tab').forEach(t=>{if(t.querySelector('tr[data-k]')&&!t.querySelector('tr[data-k]:not(.filtrato)'))t.classList.add('filtrato')});document.querySelectorAll('main>section').forEach(sec=>{if(sec.querySelector('[data-k]')&&!sec.querySelector('[data-k]:not(.filtrato)'))sec.classList.add('filtrato')})}
+function precedenti(p){Object.keys(p||{}).forEach(k=>{const el=document.querySelector('[data-k="'+k+'"]');if(!el)return;const box=el.querySelector('.risp');if(!box||box.querySelector('.prec'))return;const x=p[k];const lab={vero:'Vero',falso:'Falso',nonso:'Non so'}[x.r]||'nessuna';const d=document.createElement('div');d.className='prec';d.textContent='Risposta precedente: '+lab+(x.nota?' · nota: '+x.nota:'')+' (voce cambiata: ricontrollare)';box.appendChild(d)})}
 function salvaCopia(){const s=stato();s.versione=CH;s.salvatoIl=new Date().toISOString();const tagS='<'+'script id="risposte-incorporate">';const tagE='<'+'/script>';let html=document.documentElement.outerHTML;const i1=html.indexOf(tagS);if(i1>=0){const i2=html.indexOf(tagE,i1);html=html.slice(0,i1)+html.slice(i2+tagE.length)}const json=JSON.stringify(s).split('</').join('<'+String.fromCharCode(92)+'/');html='<!DOCTYPE html>'+String.fromCharCode(10)+html.replace('</body>',tagS+'window.__RISPOSTE='+json+';'+tagE+'</body>');const b=new Blob([html],{type:'text/html'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='questionario_compilato_'+(s.meta.nome||'compilato').replace(/[^a-z0-9]+/gi,'_')+'.html';a.click()}
-function progresso(){const tot=document.querySelectorAll('.opz').length;const fatte=new Set([...document.querySelectorAll('input[type=radio]:checked')].map(r=>r.name)).size;const falsi=[...document.querySelectorAll('input[type=radio]:checked')].filter(r=>r.value==='falso').length;document.getElementById('prog').textContent='Compilate '+fatte+' su '+tot+(falsi?' · Falso: '+falsi:'')}
+function progresso(){const tot=document.querySelectorAll('.opz').length;const fatte=new Set([...document.querySelectorAll('input[type=radio]:checked')].map(r=>r.name)).size;const cont=v=>[...document.querySelectorAll('input[type=radio]:checked')].filter(r=>r.value===v).length;const falsi=cont('falso'),nonso=cont('nonso');const note=[...document.querySelectorAll('[data-k] textarea[data-nota]')].filter(t=>t.value.trim()).length;document.getElementById('prog').textContent='Compilate '+fatte+' su '+tot+(falsi?' · Falso: '+falsi:'')+(nonso?' · Non so: '+nonso:'')+(note?' · con nota: '+note:'')}
 function salvaLocale(){try{localStorage.setItem(CH,JSON.stringify(stato()))}catch(e){}}
 document.addEventListener('change',()=>{colora();progresso();salvaLocale()});document.addEventListener('input',salvaLocale);
 function salvaRisposte(){const s=stato();const mancanti=[...document.querySelectorAll('input[type=radio][value=falso]:checked')].filter(r=>!(s.note[r.name]||'').trim());if(mancanti.length&&!confirm(mancanti.length+' risposte Falso senza nota: salvo lo stesso?'))return;s.versione=CH;s.salvatoIl=new Date().toISOString();const b=new Blob([JSON.stringify(s,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='verifica_regole_'+(s.meta.nome||'compilato').replace(/[^a-z0-9]+/gi,'_')+'.json';a.click()}
 function caricaRisposte(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{applica(JSON.parse(r.result));salvaLocale()}catch(e){alert('File non valido')}};r.readAsText(f);inp.value=''}
 function azzera(){if(!confirm('Cancellare tutte le risposte?'))return;localStorage.removeItem(CH);location.reload()}
-firmaInit();if(window.__RISPOSTE){applica(window.__RISPOSTE)}else{try{applica(JSON.parse(localStorage.getItem(CH)||'null'))}catch(e){}}progresso();
+// le risposte incorporate stanno in uno script DOPO questo: si parte a pagina letta
+document.addEventListener('DOMContentLoaded',()=>{firmaInit();if(window.__RISPOSTE){CH+='_'+String((window.__RISPOSTE.meta||{}).nome||'compilato').replace(/[^a-z0-9]+/gi,'_');try{const loc=JSON.parse(localStorage.getItem(CH)||'null');if(loc&&loc.risposte){loc.precedenti=window.__RISPOSTE.precedenti;window.__RISPOSTE=loc}}catch(e){}applica(window.__RISPOSTE);precedenti(window.__RISPOSTE.precedenti)}else{try{applica(JSON.parse(localStorage.getItem(CH)||'null'))}catch(e){}}progresso()});
 </script></body></html>''')
-open('QUESTIONARIO_VERIFICA_REGOLE_%s.html' % VERS, 'w').write('\n'.join(out))
-print('voci con Vero/Falso:', n)
+pagina = '\n'.join(out)
+open('QUESTIONARIO_VERIFICA_REGOLE_%s.html' % VERS, 'w').write(pagina)
+print('voci con Vero/Falso:', n, STATO)
+if prec:
+    R0 = prec['R']
+    risp = {'meta': dict(R0.get('meta', {}), data=oggi), 'risposte': PRECOMP['risposte'], 'note': dict(PRECOMP['note']), 'dati': R0.get('dati', {}), 'precedenti': PRECOMP['precedenti'], 'firme': {}}
+    # note libere (dati personali, osservazioni generali) con la stessa chiave
+    for k0, t in R0.get('note', {}).items():
+        if not re.match(r'^v\d+$', k0): risp['note'][k0] = t
+    js = json.dumps(risp, ensure_ascii=False).replace('</', '<\\/')
+    nome = re.sub(r'[^a-z0-9]+', '_', (R0.get('meta', {}).get('nome') or 'compilato').lower()).strip('_')
+    open('questionario_%s_%s.html' % (nome, VERS), 'w').write(('<script id="risposte-incorporate">window.__RISPOSTE=' + js + ';</script></body>').join(pagina.rsplit('</body>', 1)))
+    print('precompilato:', len(PRECOMP['risposte']), 'risposte riprese,', len(PRECOMP['precedenti']), 'da ricontrollare')
