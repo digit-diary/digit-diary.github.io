@@ -1280,8 +1280,13 @@ function _renderPianoCongediNpCard() {
     .sort();
   const fmt = (d) => String(d).substring(0, 10).split('-').reverse().join('.');
   let h =
-    '<div class="main-card" style="margin-top:16px"><div class="card-header">Congedi non pagati · ' +
+    '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:10px">Congedi non pagati · ' +
     escP(repartoLabel(rep)) +
+    (lista.length
+      ? '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px" onclick="esportaTabellaExcel(\'piano-congedi-table\',\'congedi_' +
+        rep +
+        '\')">Excel</button>'
+      : '') +
     '</div><div style="padding:10px 14px">' +
     '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Regolamento aziendale 5.14: domanda scritta, concessione della Direzione. Nel piano i giorni diventano <b>CNP</b> (zero ore, non contano fra le ore dovute). ' +
     (sg

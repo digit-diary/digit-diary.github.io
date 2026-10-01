@@ -76,6 +76,28 @@ async function assicuraLibreria(nome) {
     return false;
   }
 }
+// ESPORTA UNA TABELLA IN EXCEL cosi come si vede: solo le righe visibili (dopo una
+// ricerca), senza pulsanti e campi. tabella = elemento o id/selettore.
+async function esportaTabellaExcel(tabella, nomeFile) {
+  const t = typeof tabella === 'string' ? document.getElementById(tabella) || document.querySelector(tabella) : tabella;
+  if (!t || !t.querySelector('tbody tr')) {
+    toast('Niente da esportare');
+    return;
+  }
+  if (!(await assicuraLibreria('xlsx'))) return;
+  const copia = t.cloneNode(true);
+  const originali = t.querySelectorAll('tr');
+  copia.querySelectorAll('tr').forEach((tr, i) => {
+    const o = originali[i];
+    if (o && (o.hidden || o.style.display === 'none' || o.offsetParent === null)) tr.remove();
+  });
+  copia.querySelectorAll('button, input, select, textarea, svg').forEach((x) => x.remove());
+  const wb = XLSX.utils.table_to_book(copia, { raw: false });
+  const nome = String(nomeFile || 'tabella').replace(/[^a-z0-9_-]+/gi, '_') + '_' + oggiLocale() + '.xlsx';
+  XLSX.writeFile(wb, nome);
+  if (typeof logAzione === 'function') logAzione('Esportazione Excel', nome);
+  toast('Esportato: ' + nome);
+}
 function preparaLibrerie() {
   const via = () => Object.keys(_LIBRERIE).forEach((n) => libreria(n).catch(() => {}));
   if (typeof requestIdleCallback === 'function') requestIdleCallback(via, { timeout: 3000 });

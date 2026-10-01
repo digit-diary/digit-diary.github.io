@@ -74,8 +74,8 @@ async function diarioCaricaPersona(nome) {
 // ricerca nell archivio (nome o testo) prima della finestra
 async function diarioCercaArchivio(q) {
   if (!diarioFinestraDa || !q || q.length < 3) return 0;
-  // il canale sicuro traduce ilike in ILIKE di SQL: il jolly e %
-  const pat = encodeURIComponent('%' + q.replace(/[*%_,()\\]/g, ' ').trim() + '%');
+  // jolly * (il canale sicuro lo traduce in % di SQL)
+  const pat = encodeURIComponent('*' + q.replace(/[*%_,()\\]/g, ' ').trim() + '*');
   const [a, b] = await Promise.all([
     secGet('registrazioni?nome=ilike.' + pat + '&data=lt.' + diarioFinestraDa + '&limit=200'),
     secGet('registrazioni?testo=ilike.' + pat + '&data=lt.' + diarioFinestraDa + '&limit=200'),

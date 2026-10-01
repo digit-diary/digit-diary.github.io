@@ -104,17 +104,27 @@ function _renderPianoDomenicheBody() {
       }
       let lib = 0;
       let lav = 0;
+      const dett = []; // per la finestrella: ogni domenica del mese e come conta
       (domMese[mm] || []).forEach((dstr) => {
+        const gg = dstr.substring(8, 10) + '.' + mm;
         const cod = perG(nome, dstr);
         if (cod && _pianoTurnoInfo(cod)) {
           lav++;
+          dett.push(gg + ' lavorata (' + cod + ')');
           return;
         }
-        if (_pianoDomenicaEsclusa(cod)) return; // vacanza o malattia: non conta tra le 12
+        if (_pianoDomenicaEsclusa(cod)) {
+          dett.push(gg + ' ' + cod + ' (non conta)');
+          return; // vacanza o malattia: non conta tra le 12
+        }
         // stessa regola delle C rosse del calendario (una sola funzione)
         const sab = _pianoGiornoPrima(dstr);
-        if (!_pianoDomenicaValida(cod, perG(nome, sab), sab, (dati.rigaGiorno || {})[nome + '|' + sab])) return;
+        if (!_pianoDomenicaValida(cod, perG(nome, sab), sab, (dati.rigaGiorno || {})[nome + '|' + sab])) {
+          dett.push(gg + ' libera ma non valida (sabato oltre le 23: ' + (perG(nome, sab) || '-') + ')');
+          return;
+        }
         lib++;
+        dett.push(gg + ' libera valida');
       });
       libere += lib;
       lavorate += lav;
@@ -124,9 +134,7 @@ function _renderPianoDomenicheBody() {
         (lib ? '#2c6e49' : lav ? '#c0392b' : 'var(--muted)') +
         (lav && !lib ? ';font-weight:700' : '') +
         '" title="' +
-        lib +
-        ' libere' +
-        (lav ? ', ' + lav + ' lavorate' : '') +
+        escP(lib + ' libere' + (lav ? ', ' + lav + ' lavorate' : '') + (dett.length ? '\n' + dett.join('\n') : '')) +
         '">' +
         (lib || (lav ? '0' : '')) +
         '</td>';
@@ -416,7 +424,12 @@ async function caricaBenesserePiano() {
       lista.forEach((x) => {
         t +=
           '<tr title="' +
-          escP(x.res.voci.map((v) => v.nome + ': ' + v.punti + '/' + v.max + ' (' + v.valore + ')').join(' · ')) +
+          escP(
+            'Indice ' +
+              x.res.punteggio +
+              ' su 100:\n' +
+              x.res.voci.map((v) => v.nome + ': ' + v.punti + '/' + v.max + ' (' + v.valore + ')').join('\n'),
+          ) +
           '" data-nome="' +
           escP(x.nome) +
           '"><td style="text-align:left;font-weight:600">' +

@@ -505,6 +505,9 @@ function _filtroSqlClausola(k, v) {
     m[1]
   ];
   if (m[1] === 'is' && !/^(true|false|null)$/.test(m[2])) throw new Error('Filtro non valido: ' + k + '=is.' + m[2]);
+  // like/ilike: il jolly e * (come PostgREST), tradotto qui in % di SQL; il %
+  // scritto direttamente puo essere scambiato per un codice (es. "%Be")
+  if (m[1] === 'like' || m[1] === 'ilike') return k + ' ' + op + ' ' + lit(m[2].replace(/\*/g, '%'));
   return k + ' ' + op + ' ' + lit(m[2]);
 }
 // Chiamata RPC che NON puo' fallire in silenzio: se il database risponde con

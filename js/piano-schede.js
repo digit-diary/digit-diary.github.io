@@ -1668,7 +1668,7 @@ async function _renderPianoStoricoTab() {
   const cerca = (window._pianoStoricoCerca || '').toLowerCase();
   const srt = window._pianoStoricoSort || { campo: 'created_at', dir: -1 };
   // ogni settore vede il SUO storico; i log vecchi (senza settore) restano visibili
-  const logsTutti = (await secGet('log_attivita?azione=ilike.%25piano%25&order=created_at.desc&limit=400')) || [];
+  const logsTutti = (await secGet('log_attivita?azione=ilike.*piano*&order=created_at.desc&limit=400')) || [];
   const repCorr = _pianoReparto();
   const logs = logsTutti.filter((l) => !l.reparto_dip || l.reparto_dip === repCorr);
   let visibili = filtro ? logs.filter((l) => l.azione === filtro) : logs;

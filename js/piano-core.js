@@ -1739,6 +1739,7 @@ async function _renderPianoCore() {
         else if (dow === 0) cls = 'piano-domenica';
         else if (_pianoGiorniWeekend().includes(dow)) cls = 'piano-weekend';
         if (g === 1) cls += ' piano-sep-left';
+        if (dstr === oggiLocale()) cls += ' piano-oggi'; // colonna di oggi
         h +=
           '<th class="' +
           cls +
@@ -1790,6 +1791,7 @@ async function _renderPianoCore() {
 
       await _pianoAggiornaYtd(nomi);
       await _pianoCaricaOreMese(_pianoMeseSel);
+      const _oggiCal = oggiLocale();
       nomi.forEach((nome) => {
         const ne = nome.replace(/'/g, "\\'");
         const infoC0 = _pianoCollabInfo(nome);
@@ -1812,6 +1814,7 @@ async function _renderPianoCore() {
           let stile = '';
           let cls = 'piano-cella';
           if (g === 1) cls += ' piano-sep-left';
+          if (dstr === _oggiCal) cls += ' piano-oggi';
           let titolo = '';
           if (r) {
             const t = _pianoTurnoInfo(codice);
@@ -2027,11 +2030,29 @@ async function _renderPianoCore() {
           riga +
           '<td class="piano-tot piano-sep-left" data-tot="0" title="ore effettivamente lavorate">' +
           (oreLav ? oreLav.toFixed(1) : '') +
-          '</td><td class="piano-tot" data-tot="1">' +
+          '</td><td class="piano-tot" data-tot="1" title="Turni di giorno nel mese">' +
           (nD || '') +
-          '</td><td class="piano-tot" data-tot="2">' +
+          '</td><td class="piano-tot" data-tot="2" title="Turni di notte nel mese">' +
           (nN || '') +
-          '</td><td class="piano-tot" data-tot="3" style="color:var(--muted)">' +
+          '</td><td class="piano-tot" data-tot="3" style="color:var(--muted)" title="' +
+          escP(
+            infoC && infoC.is_jolly
+              ? 'Ausiliario: nessuna ora dovuta'
+              : 'Ore dovute: ' +
+                  _pianoGgDovuti(nome, ym) +
+                  ' giorni' +
+                  (_pianoGiorniCnp(nome, ym) ? ' (meno ' + _pianoGiorniCnp(nome, ym) + ' di congedo non pagato)' : '') +
+                  (_pianoGiorniDopoFine(nome, ym)
+                    ? ' (meno ' + _pianoGiorniDopoFine(nome, ym) + ' dopo la fine del contratto)'
+                    : '') +
+                  ' / 7 x ' +
+                  _pianoOreSett +
+                  ' ore x ' +
+                  Math.round(perc * 100) +
+                  '% = ' +
+                  dovute.toFixed(1),
+          ) +
+          '">' +
           (dovute ? dovute.toFixed(1) : '') +
           '</td><td class="piano-tot piano-op" data-tot="4"' +
           (_rett
@@ -2054,11 +2075,35 @@ async function _renderPianoCore() {
           '>' +
           (orePiano ? orePiano.toFixed(1) : '') +
           (_rett ? '<span class="piano-rett" title="valore scritto a mano">*</span>' : '') +
-          '</td><td class="piano-tot piano-sm" data-tot="5" title="Saldo del mese. Doppio clic per scrivere le ore realmente fatte" style="color:' +
+          '</td><td class="piano-tot piano-sm" data-tot="5" title="' +
+          escP(
+            'Saldo del mese: ' +
+              (_rett ? 'ore reali ' : 'ore pianificate ') +
+              orePiano.toFixed(1) +
+              ' - ore dovute ' +
+              dovute.toFixed(1) +
+              ' = ' +
+              (saldo > 0 ? '+' : '') +
+              saldo.toFixed(1) +
+              '. Doppio clic per scrivere le ore realmente fatte',
+          ) +
+          '" style="color:' +
           (saldo > 0 ? '#2c6e49' : saldo < 0 ? '#c0392b' : 'var(--muted)') +
           '">' +
           (orePiano || dovute ? (saldo > 0 ? '+' : '') + saldo.toFixed(1) : '') +
-          '</td><td class="piano-tot" data-tot="6" style="font-weight:700;color:' +
+          '</td><td class="piano-tot" data-tot="6" title="' +
+          escP(
+            'Saldo dell anno dal piano (gennaio - mese prima, senza riporto) ' +
+              ((_pianoYtdMap[nome] || 0) > 0 ? '+' : '') +
+              (Math.round((_pianoYtdMap[nome] || 0) * 10) / 10).toFixed(1) +
+              ' + questo mese ' +
+              (saldo > 0 ? '+' : '') +
+              saldo.toFixed(1) +
+              ' = ' +
+              (ytd > 0 ? '+' : '') +
+              ytd.toFixed(1),
+          ) +
+          '" style="font-weight:700;color:' +
           (ytd > 0 ? '#2c6e49' : ytd < 0 ? '#c0392b' : 'var(--muted)') +
           '">' +
           (orePiano || _pianoYtdMap[nome] ? (ytd > 0 ? '+' : '') + ytd.toFixed(1) : '') +

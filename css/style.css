@@ -6224,3 +6224,14 @@ tr[data-cella-nome]:hover td {
   font-size: var(--fs-xs);
   color: var(--muted);
 }
+
+/* colonna di oggi nel calendario: bordo oro ai lati, intestazione evidenziata */
+.piano-table th.piano-oggi {
+  box-shadow: inset 0 -3px 0 #d4a72c;
+  font-weight: 800;
+}
+.piano-table td.piano-oggi {
+  box-shadow:
+    inset 2px 0 0 #d4a72c,
+    inset -2px 0 0 #d4a72c;
+}

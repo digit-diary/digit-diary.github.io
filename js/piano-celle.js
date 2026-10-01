@@ -282,6 +282,7 @@ function mostraPianoCtx(e, nome, dstr) {
   if (r && r.motivo_blocco) h += voce('Sblocca questa cella', 'icx-lucchetto', "pianoCtxAzione('sblocca')", puoMod);
   else h += voce('Blocca questa cella (con motivo)', 'icx-lucchetto', "pianoCtxAzione('blocca')", puoMod && !!r);
   h += voce('Rimuovi cella', 'icx-cestino', "pianoCtxAzione('rimuovi')", puoMod && !!r);
+  h += voce('Storia della cella', 'icx-clipboard', "pianoCtxAzione('storia')", true);
   h += voce('Copia cella', 'icx-modifica', "pianoCtxAzione('copia')", !!r);
   h += voce(
     'Copia blocco selezionato',
@@ -525,6 +526,7 @@ async function pianoCtxAzione(azione) {
     apriCercaCambioLibero();
   } else if (azione === 'ristampaCambio') ristampaFoglioCambio(sel.nome, sel.data);
   else if (azione === 'esigenze') apriCambioEsigenze(sel.nome, sel.data);
+  else if (azione === 'storia') pianoStoriaCella(sel.nome, sel.data);
   else if (azione === 'copia') {
     const r2 = _pianoRighe.find((x) => x.collaboratore === sel.nome && x.data === sel.data);
     if (r2) navigator.clipboard.writeText(r2.codice).then(() => toast('Copiato: ' + r2.codice));
@@ -1109,4 +1111,71 @@ function pianoCellaInline(nome, dstr, el) {
   });
   inp.addEventListener('click', (e) => e.stopPropagation());
   inp.addEventListener('blur', conferma);
+}
+
+// STORIA DELLA CELLA (menu del tasto destro): com e oggi la cella e, per chi vede
+// lo Storico del Piano, tutte le modifiche registrate per quella persona e quel
+// giorno (stessa regola di accesso della scheda Storico)
+async function pianoStoriaCella(nome, dstr) {
+  const dataIt = dstr.split('-').reverse().join('.');
+  let r = null;
+  try {
+    r = ((await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=eq.' + dstr + '&limit=1')) ||
+      [])[0];
+  } catch (e) {}
+  const righe = [];
+  if (r) {
+    righe.push(
+      'Oggi: ' +
+        r.codice +
+        (r.ora_inizio && r.ora_fine
+          ? ' ' + String(r.ora_inizio).substring(0, 5) + '-' + String(r.ora_fine).substring(0, 5)
+          : ''),
+    );
+    if (r.updated_at || r.created_at)
+      righe.push(
+        'Ultima modifica: ' +
+          new Date(r.updated_at || r.created_at).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' }) +
+          (r.operatore ? ' da ' + r.operatore : ''),
+      );
+    if (r.commento) righe.push('Nota: ' + r.commento);
+    if (r.motivo_blocco) righe.push('Bloccata: ' + r.motivo_blocco);
+    righe.push(
+      r.generato ? 'Messa dalla bozza' : r.protetto ? 'Scritta a mano o confermata (protetta)' : 'Scritta a mano',
+    );
+  } else righe.push('Oggi: cella vuota');
+  if (typeof pianoTabVisibile !== 'function' || pianoTabVisibile('storico') || isAdmin()) {
+    let log = [];
+    try {
+      log =
+        (await secGet(
+          'log_attivita?dettaglio=ilike.' +
+            encodeURIComponent('*' + nome + '*') +
+            '&dettaglio=ilike.' +
+            encodeURIComponent('*' + dstr + '*') +
+            '&order=created_at.desc&limit=60',
+        )) || [];
+    } catch (e) {}
+    righe.push('');
+    righe.push(
+      log.length
+        ? 'Modifiche registrate (' + log.length + '):'
+        : 'Nessuna modifica registrata a mano per questo giorno.',
+    );
+    log.forEach((l) =>
+      righe.push(
+        '\u2022 ' +
+          new Date(l.created_at).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' }) +
+          ' · ' +
+          (l.operatore || '') +
+          ' · ' +
+          (l.azione || '') +
+          ': ' +
+          String(l.dettaglio || '').substring(0, 160),
+      ),
+    );
+    righe.push('');
+    righe.push('Le operazioni su tutto il mese (bozza, importazione, vacanze) sono nella scheda Storico.');
+  }
+  await mostraAvviso(righe.join('\n'), { titolo: 'Storia della cella · ' + nome + ' · ' + dataIt });
 }

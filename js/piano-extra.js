@@ -2354,7 +2354,12 @@ async function _renderPianoCreditiTab() {
     '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px" onclick="pianoCaricaSaldoAnno()">' +
     (saldoPronto ? 'Ricalcola saldo ore' : 'Calcola saldo ore ' + anno) +
     '</button>' +
-    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;margin-left:auto" onclick="pianoCreditiStampa()">Stampa</button>' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;margin-left:auto" onclick="esportaTabellaExcel(\'piano-crediti-table\',\'crediti_' +
+    anno +
+    '_' +
+    _pianoReparto() +
+    '\')">Excel</button>' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px" onclick="pianoCreditiStampa()">Stampa</button>' +
     '</div><div style="padding:10px 14px">';
   h +=
     '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);line-height:1.55;margin-bottom:10px">Per ogni collaboratore quello che gli resta o che deve recuperare. <b>Vacanze</b>: giorni spettanti nell anno meno le settimane registrate, piu i giorni restituiti per malattia (scheda Vacanze). <b>CGF</b>: recuperi festivi maturati e goduti fino alla fine di ' +
@@ -3265,7 +3270,7 @@ async function _renderPianoAvvisiTab() {
   let h =
     '<div class="main-card avv-card" style="margin-top:16px"><div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Avvisi del piano · ' +
     escP(mese) +
-    '</span><span class="avv-strumenti"><input id="avv-cerca" type="search" placeholder="Cerca per nome o testo" oninput="pianoAvvisiCerca()" autocomplete="off"><span id="avv-cerca-n" class="avv-piccolo"></span><button class="btn-secondario" onclick="pianoAvvisiAggiorna()" title="Ricalcola chiusura d anno, scoperti e malattie">Aggiorna</button></span></div>' +
+    '</span><span class="avv-strumenti"><input id="avv-cerca" type="search" placeholder="Cerca per nome o testo" oninput="pianoAvvisiCerca()" autocomplete="off"><span id="avv-cerca-n" class="avv-piccolo"></span><button class="btn-secondario" onclick="pianoAvvisiAggiorna()" title="Ricalcola chiusura d anno, scoperti e malattie">Aggiorna</button><button class="btn-secondario" onclick="esportaTabellaExcel(document.querySelector(\'.avv-sub:not([hidden]) table\'),\'avvisi_\' + _pianoAvvSub + \'_\' + _pianoMeseSel)" title="La sotto-scheda aperta, come si vede">Excel</button></span></div>' +
     '<div class="settings-tabs avv-tabs">' +
     _AVV_SEZIONI
       .map(
