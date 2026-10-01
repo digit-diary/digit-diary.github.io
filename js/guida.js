@@ -71,6 +71,8 @@ function GUIDA_CAPITOLI() {
         'A fine mese il rapporto alimenta le statistiche e gli avvisi sulle differenze di cassa oltre soglia.',
         '<b>Ore lavorate nella settimana</b>: se un collaboratore supera 45.1 ore dal lunedi alla domenica il programma avvisa quando scrivi la cella o fai un cambio, lo mostra in Valida regole e in Piano > Avvisi, e la bozza non lo supera mai. Contano turni e JG (non vacanze, malattie, CGF, riposi); il turno che passa la mezzanotte conta nella settimana in cui inizia. Si vedono sempre tre cifre: ore da orologio, 10% notturno e totale (es. 51.68 = 49.18 + 2.50); il limite si confronta con il totale compreso il 10% (regola ore_settimana_con_notturno, si puo cambiare in Regole insieme al limite ore_settimana_max).',
         '<b>Piano > Avvisi</b>: sotto-schede Ore settimanali, Regole del mese, Chiusura anno (saldo ore fuori banda, CGF da dare o in piu, domeniche libere sotto il diritto), Posti scoperti (prossimi 7 giorni) e Malattie lunghe (in corso da 10 giorni o piu), ognuna con il suo numero, e una ricerca per nome o testo. Il numero sulla scheda Avvisi e sulla voce Piano del menu conta solo le cose importanti (settimane oltre il limite, scoperti, malattie oltre il 14. giorno, chiusura anno in rosso). Aggiorna ricalcola le parti dell anno. Il saldo delle domeniche per persona e mese resta in Piano > Benessere.',
+        '<b>Dalle liste al calendario</b>: in Avvisi, Valida regole, Cambi turno, Storico del Piano e Registro attivita un clic su una riga con un collaboratore e un giorno apre il calendario su quel mese e fa lampeggiare la cella. Nella ricerca in alto, sotto il nome di un collaboratore, "Apri nel Piano" porta alla sua cella di oggi.',
+        '<b>Ricerche</b>: la Guida ha una casella di ricerca (restano solo le righe con la parola), la scheda Vacanze cerca per nome o numero di settimana.',
         '<b>Diario veloce e completo</b>: all apertura il Diario porta in memoria gli ultimi 24 mesi di tutti i settori, piu gli ammonimenti verbali e le differenze di cassa di sempre (cosi gli avvisi disciplinari e di cassa contano tutta la storia). Le registrazioni piu vecchie non spariscono: la scheda del collaboratore mostra sempre tutta la sua storia, la ricerca cerca anche nell archivio, le Statistiche contano tutto, un filtro "Dal" piu vecchio porta quel periodo, e in fondo all elenco c e "Mostra registrazioni piu vecchie".',
         '<b>Vacanze non nel piano</b> (Piano > Avvisi): le settimane confermate nel file vacanze i cui giorni nel piano non hanno la V (le malattie non contano). Per ogni riga: Apri nel calendario, Metti le V (i giorni chiusi chiedono un solo motivo per tutta la settimana) oppure Il piano e giusto (la vacanza non e stata fatta: la scelta resta registrata con nome, data e nota, e la riga sparisce).',
         '<b>Apri nel calendario</b>: dalle liste porta il Piano sul mese giusto e fa lampeggiare la cella del collaboratore.',
@@ -573,7 +575,7 @@ function renderGuidaHtml(area) {
     return '<div class="main-card"><div style="padding:16px">Nessuna guida disponibile per il tuo profilo.</div></div>';
   const idDi = (t) => 'guida-' + t.toLowerCase().replace(/[^a-z0-9]+/g, '-');
   let h =
-    '<div class="main-card"><div class="card-header">Guida &middot; scegli l\'argomento</div><div style="padding:12px 14px">' +
+    '<div class="guida-radice"><div class="main-card"><div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Guida &middot; scegli l\'argomento</span><input type="search" class="campo-cerca" placeholder="Cerca nella guida (es. CGF, malattia, pause)" oninput="guidaCerca(this)" autocomplete="off" style="min-width:260px"></div><div style="padding:12px 14px">' +
     '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);margin-bottom:10px">Qui trovi solo gli argomenti che riguardano quello che puoi fare tu. Se e la prima volta, parti da <b>Da dove iniziare</b>.</p>' +
     '<div style="display:flex;flex-wrap:wrap;gap:8px">' +
     cap
@@ -594,10 +596,35 @@ function renderGuidaHtml(area) {
       '" style="margin-top:12px"><div class="card-header">' +
       escP(c.titolo) +
       '</div><div style="padding:10px 16px;font-size:var(--fs-md,.875rem);line-height:1.55">' +
-      c.righe.map((r) => '<p style="margin:4px 0">• ' + r + '</p>').join('') +
+      c.righe.map((r) => '<p class="guida-riga" style="margin:4px 0">• ' + r + '</p>').join('') +
       '</div></div>';
   });
-  return h;
+  return (
+    h +
+    '<p class="guida-nessuno" hidden style="padding:14px;color:var(--muted)">Nessun argomento contiene questa parola.</p></div>'
+  );
+}
+// RICERCA NELLA GUIDA: restano visibili solo le righe che contengono la parola
+// (in tutti i capitoli), i capitoli senza righe si nascondono
+function guidaCerca(inp) {
+  const radice = inp.closest('.guida-radice');
+  if (!radice) return;
+  const q = inp.value.trim().toLowerCase();
+  let tot = 0;
+  radice.querySelectorAll('.main-card[id^="guida-"]').forEach((cap) => {
+    let n = 0;
+    cap.querySelectorAll('.guida-riga').forEach((r) => {
+      const ok = !q || r.textContent.toLowerCase().includes(q);
+      r.hidden = !ok;
+      if (ok) n++;
+    });
+    const titoloOk = q && cap.querySelector('.card-header').textContent.toLowerCase().includes(q);
+    if (titoloOk) cap.querySelectorAll('.guida-riga').forEach((r) => (r.hidden = false));
+    cap.hidden = !(n || titoloOk || !q);
+    tot += n || titoloOk ? 1 : 0;
+  });
+  const nessuno = radice.querySelector('.guida-nessuno');
+  if (nessuno) nessuno.hidden = !q || tot > 0;
 }
 
 function renderGuida() {

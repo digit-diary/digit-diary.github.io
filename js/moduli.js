@@ -1922,7 +1922,9 @@ function renderRegistro() {
       .map((l) => {
         const d = new Date(l.created_at);
         return (
-          '<tr style="border-bottom:1px solid var(--line)"><td style="padding:6px 8px;white-space:nowrap;color:var(--muted);font-size:var(--fs-sm,.8125rem)">' +
+          '<tr style="border-bottom:1px solid var(--line)"' +
+          (typeof _attrCellaDaTesto === 'function' ? _attrCellaDaTesto(l.dettaglio) : '') +
+          '><td style="padding:6px 8px;white-space:nowrap;color:var(--muted);font-size:var(--fs-sm,.8125rem)">' +
           d.toLocaleDateString('it-IT') +
           ' ' +
           d.toLocaleTimeString('it-IT', {

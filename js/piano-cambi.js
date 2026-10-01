@@ -2484,7 +2484,9 @@ function _renderPianoCambiTab() {
       Number(m.id) +
       '" data-nome="' +
       escP(chiave) +
-      '"><td style="text-align:left;white-space:nowrap">' +
+      '"' +
+      (typeof _attrCella === 'function' ? _attrCella(a.nome || m.collaboratore, m.data_modulo) : '') +
+      '><td style="text-align:left;white-space:nowrap">' +
       dataIt(m.data_modulo) +
       '</td><td style="text-align:left">' +
       tipo +

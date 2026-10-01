@@ -45,6 +45,14 @@ function _eseguiRicercaGlobale(q) {
         '</strong>' +
         (c.attivo === false ? ' · non piu attivo' : '') +
         '</span></div>';
+      // dal nome direttamente al Piano: mese corrente, cella di oggi
+      if (c.attivo !== false && typeof pianoApriCella === 'function' && (typeof isVis !== 'function' || isVis('piano')))
+        html +=
+          '<div class="rg-item" onclick="_rgVai(this)" data-tipo="piano" data-x="' +
+          escP(c.nome) +
+          '"><span class="rg-badge" style="background:var(--accent2)">piano</span><span class="rg-text">Apri nel Piano: <strong>' +
+          escP(c.nome) +
+          '</strong> (oggi)</span></div>';
     });
     tot += collabRes.length;
   }
@@ -339,6 +347,8 @@ function _rgVai(it) {
   chiudiRicercaGlobale();
   if (tipo === 'collaboratore') {
     apriSchedaCollaboratoreSicuro(x);
+  } else if (tipo === 'piano') {
+    pianoApriCella(x, oggiLocale());
   } else if (tipo === 'diario') {
     switchPage('diario');
     _rgImposta('filt-cerca', q);

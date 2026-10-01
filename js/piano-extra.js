@@ -2789,6 +2789,38 @@ async function pianoApriCella(nome, dstr) {
   if (!_pianoApplicaEvidenzia())
     toast(nome + ' non e nel calendario di questo settore per ' + String(dstr).split('-').reverse().join('.'));
 }
+// Attributi per rendere una riga di elenco "apribile nel calendario"
+function _attrCella(nome, dstr) {
+  if (!nome || !dstr) return '';
+  // solo i collaboratori hanno una cella (non le righe di gruppo come "(SALA)")
+  if (typeof collaboratoriCache !== 'undefined' && !collaboratoriCache.some((c) => c.nome === nome)) return '';
+  return (
+    ' data-cella-nome="' +
+    escP(nome) +
+    '" data-cella-data="' +
+    escP(String(dstr).substring(0, 10)) +
+    '" title="Clic: apri nel calendario"'
+  );
+}
+// righe di registro ("Piano modificato Rossi Mario 2026-10-14 -> C0"): se il testo
+// contiene un collaboratore e una data, la riga si apre nel calendario
+function _attrCellaDaTesto(testo) {
+  const t = String(testo || '');
+  const m = t.match(/(\d{4}-\d{2}-\d{2})/);
+  if (!m) return '';
+  const nome = (typeof collaboratoriCache !== 'undefined' ? collaboratoriCache : [])
+    .map((c) => c.nome)
+    .filter((n) => n && t.includes(n + ' ' + m[1]))
+    .sort((x, y) => y.length - x.length)[0];
+  return nome ? _attrCella(nome, m[1]) : '';
+}
+// un solo gestore per tutte le liste (Avvisi, Valida regole, Storico, Cambi turno...)
+if (typeof document !== 'undefined')
+  document.addEventListener('click', (ev) => {
+    const riga = ev.target.closest && ev.target.closest('[data-cella-nome]');
+    if (!riga || ev.target.closest('button, a, input, select, textarea')) return;
+    pianoApriCella(riga.dataset.cellaNome, riga.dataset.cellaData);
+  });
 // chiamata alla fine di ogni ridisegno del calendario
 function _pianoApplicaEvidenzia() {
   const ev = window._pianoEvidenzia;
@@ -2947,6 +2979,7 @@ async function _renderPianoAvvisiTab() {
               (s) =>
                 '<tr' +
                 cerca(s.nome + ' ' + _pianoGgMm(s.lunedi)) +
+                _attrCella(s.nome, s.giorni.slice().sort()[0] || s.lunedi) +
                 '>' +
                 nome(s.nome) +
                 '<td>' +
@@ -2985,6 +3018,7 @@ async function _renderPianoAvvisiTab() {
             (x) =>
               '<tr' +
               cerca(x.nome + ' ' + _pianoGgMm(x.domenica) + ' ' + x.tipo) +
+              _attrCella(x.nome, x.domenica) +
               '>' +
               nome(x.nome) +
               '<td>' +
@@ -3021,6 +3055,7 @@ async function _renderPianoAvvisiTab() {
               (x) =>
                 '<tr' +
                 cerca(x.nome + ' ' + x.msg) +
+                (x.giorno ? _attrCella(x.nome, _pianoMeseSel + '-' + String(x.giorno).padStart(2, '0')) : '') +
                 '>' +
                 nome(x.nome) +
                 '<td>' +
@@ -3090,6 +3125,7 @@ async function _renderPianoAvvisiTab() {
             (x) =>
               '<tr' +
               cerca(x.nome) +
+              _attrCella(x.nome, x.dal) +
               '>' +
               nome(x.nome) +
               '<td>' +

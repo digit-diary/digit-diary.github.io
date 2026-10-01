@@ -839,7 +839,17 @@ function _pianoRenderViolazioni() {
     _pianoViolLista.length +
     ' violazioni (celle evidenziate in rosso):</p><div style="max-height:180px;overflow-y:auto;font-size:var(--fs-md,.875rem);line-height:1.7">';
   _pianoViolLista.forEach((v) => {
-    h += '<div>• <strong>' + escP(v.nome) + '</strong> · giorno ' + v.giorno + ': ' + escP(v.msg) + '</div>';
+    const dV = v.giorno ? _pianoMeseSel + '-' + String(v.giorno).padStart(2, '0') : '';
+    h +=
+      '<div' +
+      (typeof _attrCella === 'function' && dV ? _attrCella(v.nome, dV) : '') +
+      '>• <strong>' +
+      escP(v.nome) +
+      '</strong> · giorno ' +
+      v.giorno +
+      ': ' +
+      escP(v.msg) +
+      '</div>';
   });
   h += '</div></div>';
   el.innerHTML = h;

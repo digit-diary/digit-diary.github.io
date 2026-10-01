@@ -1048,6 +1048,15 @@ async function _pianoVacDirittoCard(anno) {
   h += '</div></div>';
   return h;
 }
+// ricerca nella scheda Vacanze: per nome o numero di settimana
+function vacanzeCerca(q) {
+  const t = String(q || '')
+    .trim()
+    .toLowerCase();
+  document.querySelectorAll('.vac-blocco').forEach((b) => {
+    b.hidden = !!t && !b.dataset.cerca.split(' ').some((w) => w.startsWith(t)) && !b.dataset.cerca.includes(t);
+  });
+}
 async function _renderPianoVacanzeTab() {
   const anno = window._pianoVacAnno || parseInt(_pianoMeseSel.split('-')[0]);
   window._pianoVacAnno = anno;
@@ -1114,10 +1123,15 @@ async function _renderPianoVacanzeTab() {
   h +=
     '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);padding:8px 14px 0">Le vacanze sono settimane intere (lun-dom): una settimana vale 7 giornate di diritto, quindi 35 giorni sono 5 settimane. "Applica al piano" scrive le V (protette) del mese scelto nel Calendario e i congedi C prima/dopo secondo le regole (1 C prima per i fissi, 2 per i jolly; C dopo scalati per percentuale). Import Excel: colonna A cognome, B nome, colonne F-BE settimane 1-52 con X.</p>';
   if (!gruppi.length) h += '<p style="padding:14px;color:var(--muted)">Nessuna vacanza per il ' + anno + '.</p>';
+  else
+    h +=
+      '<div style="padding:8px 14px 0"><input type="search" class="campo-cerca" placeholder="Cerca collaboratore o settimana..." oninput="vacanzeCerca(this.value)" autocomplete="off" style="min-width:280px"></div>';
   gruppi.forEach((nome) => {
     const lista = perCollab[nome];
     h +=
-      '<div style="margin:10px 14px;border:1px solid var(--line);border-radius:3px;overflow:hidden"><div data-collab="' +
+      '<div class="vac-blocco" data-cerca="' +
+      escP((nome + ' ' + lista.map((v) => 'sett ' + v.settimana + ' ' + v.settimana).join(' ')).toLowerCase()) +
+      '" style="margin:10px 14px;border:1px solid var(--line);border-radius:3px;overflow:hidden"><div data-collab="' +
       escP(nome) +
       '" title="Apri la scheda di ' +
       escP(nome) +
@@ -1704,7 +1718,9 @@ async function _renderPianoStoricoTab() {
   visibili.forEach((l) => {
     const d = l.created_at ? new Date(l.created_at) : null;
     h +=
-      '<tr><td>' +
+      '<tr' +
+      (typeof _attrCellaDaTesto === 'function' ? _attrCellaDaTesto(l.dettaglio) : '') +
+      '><td>' +
       (d
         ? d.toLocaleDateString('it-IT') + ' ' + d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
         : '') +
