@@ -3349,7 +3349,8 @@ async function salvaSchedaNascita(nome) {
   }
 }
 
-function stampaSchedaPDF(nome) {
+async function stampaSchedaPDF(nome) {
+  if (!(await assicuraLibreria('jspdf'))) return;
   if (!window.jspdf) {
     toast('Libreria PDF non caricata');
     return;

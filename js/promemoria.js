@@ -738,6 +738,7 @@ function _parseMaisonNome(raw) {
   return { nome: nome ? capitalizzaNome(nome) : '', tipoBuono, tipiBuono, note, isSeven };
 }
 async function caricaMaisonFile(input, forzaSostituisci) {
+  if (!(await assicuraLibreria('xlsx'))) return;
   const file = input.files[0];
   if (!file && !forzaSostituisci) return;
   if (forzaSostituisci && window._maisonPendingFile) {

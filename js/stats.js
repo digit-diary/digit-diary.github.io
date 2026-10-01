@@ -486,29 +486,7 @@ function esportaCSV() {
 // EXPORT PDF
 async function caricaJsPDF() {
   if (window.jspdf) return true;
-  try {
-    await new Promise((ok, ko) => {
-      const s = document.createElement('script');
-      s.src = 'libs/jspdf.umd.min.js';
-      s.integrity = 'sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk';
-      s.crossOrigin = 'anonymous';
-      s.onload = ok;
-      s.onerror = ko;
-      document.head.appendChild(s);
-    });
-    await new Promise((ok, ko) => {
-      const s = document.createElement('script');
-      s.src = 'libs/jspdf.plugin.autotable.min.js';
-      s.integrity = 'sha384-Xl/CUCfJbzsngMp0CFxkmF0VW/8C160IsGujqeQlIhaGxKz2+JsIGORFqtCPeldF';
-      s.crossOrigin = 'anonymous';
-      s.onload = ok;
-      s.onerror = ko;
-      document.head.appendChild(s);
-    });
-    return true;
-  } catch (e) {
-    return false;
-  }
+  return assicuraLibreria('jspdf');
 }
 async function esportaPDF() {
   const f = getFiltrati();

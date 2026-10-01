@@ -3464,7 +3464,8 @@ function esportaInventarioCSV() {
   a.download = 'inventario_' + _catLbl.toLowerCase().replace(/\s+/g, '_') + '_' + oggiLocale() + '.csv';
   a.click();
 }
-function esportaInventarioPDF() {
+async function esportaInventarioPDF() {
+  if (!(await assicuraLibreria('jspdf'))) return;
   if (!window.jspdf) {
     toast('Libreria PDF non caricata');
     return;

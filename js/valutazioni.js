@@ -788,6 +788,7 @@ function _parseValutazioneWorkbook(wb) {
   return { aree, annoTrovato, extra, autoAree };
 }
 async function importaValutazioneExcel(input, nome) {
+  if (!(await assicuraLibreria('xlsx'))) return;
   if (typeof puoModificare === 'function' && !puoModificare('gestione_valutazioni')) {
     input.value = '';
     toast('Non hai il permesso di importare valutazioni');

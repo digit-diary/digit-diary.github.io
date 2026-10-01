@@ -15,36 +15,36 @@ async function loadAll() {
   // invece di ripartire con tutto azzerato come se non ci fossero dati
   let impostazioni;
   try {
-    impostazioni = await Promise.all([
-      getImp('tipi_personalizzati'),
-      getImp('colori_override'),
-      getImp('operatori_lista'),
-      getImp('campi_rapporto_extra'),
-      getImp('tipi_nascosti'),
-      getImp('campi_nascosti'),
-      getImp('tipi_ordine'),
-      getImp('campi_ordine'),
-      getImp('campi_label_override'),
-      getImp('tipi_rinominati'),
-      getImp('visibilita'),
-      getImp('profili_operatori'),
-      getImp('moduli_responsabili'),
-      getImp('competenze_config'),
-      getImp('formazione_livelli_nomi'),
-      getImp('punti_config'),
-      getImp('maison_auto_delete_giorni'),
-      getImp('inventario_categorie_extra'),
-      getImp('soglie_alert'),
-      getImp('soglie_disciplinari'),
-      getImp('buono_valori'),
-      getImp('equita_mesi'),
-      getImp('reparti_config'),
-      getImp('reparti_pagine'),
-      getImp('reparti_nomi_documenti'),
-      getImp('giubileo_config'),
-      getImp('giubileo_preavviso'),
-      getImp('conservazione_anni'),
-      getImp('conservazione_giorni_grazia'),
+    impostazioni = await getImpMolte([
+      'tipi_personalizzati',
+      'colori_override',
+      'operatori_lista',
+      'campi_rapporto_extra',
+      'tipi_nascosti',
+      'campi_nascosti',
+      'tipi_ordine',
+      'campi_ordine',
+      'campi_label_override',
+      'tipi_rinominati',
+      'visibilita',
+      'profili_operatori',
+      'moduli_responsabili',
+      'competenze_config',
+      'formazione_livelli_nomi',
+      'punti_config',
+      'maison_auto_delete_giorni',
+      'inventario_categorie_extra',
+      'soglie_alert',
+      'soglie_disciplinari',
+      'buono_valori',
+      'equita_mesi',
+      'reparti_config',
+      'reparti_pagine',
+      'reparti_nomi_documenti',
+      'giubileo_config',
+      'giubileo_preavviso',
+      'conservazione_anni',
+      'conservazione_giorni_grazia',
     ]);
   } catch (e) {
     toastErrore('Caricamento dati non riuscito: ' + e.message);
@@ -350,6 +350,7 @@ async function loadAll() {
   // dati pronti: se l'utente ha già aperto il Piano (era vuoto in attesa
   // dei dati), lo ridisegniamo ora che collaboratori e cache ci sono
   window._loadAllDone = true;
+  if (typeof preparaLibrerie === 'function') preparaLibrerie();
   // backup automatico: parte da solo (solo admin) senza intralciare il login
   if (typeof _backupAutoCheck === 'function') setTimeout(() => _backupAutoCheck(), 6000);
   try {

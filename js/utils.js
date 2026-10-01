@@ -23,6 +23,64 @@ function giornoDi(v) {
   const d = new Date(s);
   return isNaN(d) ? s.substring(0, 10) : dataLocaleISO(d);
 }
+// LIBRERIE PESANTI A RICHIESTA (Excel, Word, PDF, QR: circa 2.6 MB). Non si
+// caricano piu all apertura: partono in sottofondo appena il programma e pronto
+// (preparaLibrerie) e ogni funzione che le usa le aspetta con libreria(nome).
+// Stessi file e stessi controlli di integrita di prima.
+const _LIBRERIE = {
+  jspdf: [
+    ['libs/jspdf.umd.min.js', 'sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk'],
+    ['libs/jspdf.plugin.autotable.min.js', 'sha384-Xl/CUCfJbzsngMp0CFxkmF0VW/8C160IsGujqeQlIhaGxKz2+JsIGORFqtCPeldF'],
+  ],
+  xlsx: [['libs/xlsx.full.min.js', 'sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw']],
+  mammoth: [['libs/mammoth.browser.min.js', 'sha384-nFoSjZIoH3CCp8W639jJyQkuPHinJ2NHe7on1xvlUA7SuGfJAfvMldrsoAVm6ECz']],
+  pdf: [['libs/pdf.min.js', 'sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e']],
+  qrcode: [['libs/qrcode.min.js', 'sha384-lQXOAyZwHXE55JFyrOMB7nY2Wv+m5ZWNtJcHrd1rceRQXAYNLak8ukN5TjBTcIwz']],
+};
+const _libreriePromesse = {};
+function libreria(nome) {
+  if (_libreriePromesse[nome]) return _libreriePromesse[nome];
+  const file = _LIBRERIE[nome];
+  if (!file) return Promise.reject(new Error('libreria sconosciuta: ' + nome));
+  _libreriePromesse[nome] = file
+    .reduce(
+      (prima, [src, sri]) =>
+        prima.then(
+          () =>
+            new Promise((ok, ko) => {
+              const s = document.createElement('script');
+              s.src = src;
+              s.integrity = sri;
+              s.crossOrigin = 'anonymous';
+              s.onload = ok;
+              s.onerror = () => ko(new Error('libreria non caricata: ' + src));
+              document.head.appendChild(s);
+            }),
+        ),
+      Promise.resolve(),
+    )
+    .catch((e) => {
+      delete _libreriePromesse[nome]; // al prossimo uso si riprova
+      throw e;
+    });
+  return _libreriePromesse[nome];
+}
+// da usare all inizio di ogni funzione che ne ha bisogno: true se pronta,
+// altrimenti avviso rosso con il motivo (mai un errore muto)
+async function assicuraLibreria(nome) {
+  try {
+    await libreria(nome);
+    return true;
+  } catch (e) {
+    toastErrore('Funzione non disponibile: ' + ((e && e.message) || e) + '. Ricarica la pagina e riprova.');
+    return false;
+  }
+}
+function preparaLibrerie() {
+  const via = () => Object.keys(_LIBRERIE).forEach((n) => libreria(n).catch(() => {}));
+  if (typeof requestIdleCallback === 'function') requestIdleCallback(via, { timeout: 3000 });
+  else setTimeout(via, 1200);
+}
 function capitalizzaNome(s) {
   return s.replace(/\S+/g, (w) => {
     const l = w.toLowerCase();

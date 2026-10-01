@@ -1072,6 +1072,7 @@ function _xlsNormaNome(s) {
 }
 
 async function importaFabbisognoExcel(input) {
+  if (!(await assicuraLibreria('xlsx'))) return;
   if (!puoGestirePiano()) return;
   const file = input.files[0];
   input.value = '';
@@ -1215,6 +1216,7 @@ async function importaFabbisognoExcel(input) {
 // L'ordine delle righe resta quello predefinito (SUP, BO, poi gli
 // altri) e si può sempre riordinare trascinando i nomi.
 async function importaPianoExcel(input) {
+  if (!(await assicuraLibreria('xlsx'))) return;
   if (!puoGestirePiano()) return;
   const file = input.files[0];
   input.value = '';

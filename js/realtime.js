@@ -451,18 +451,20 @@ async function sbRpc(fn, params) {
 function _parseRestFilter(path) {
   // Converte 'table?col=eq.val&col2=gte.val2' in {table, filter SQL, order, limit}
   const qIdx = path.indexOf('?');
-  if (qIdx === -1) return { table: path, filter: '', order: '', limit: 5000 };
+  if (qIdx === -1) return { table: path, filter: '', order: '', limit: 5000, limitEsplicito: false };
   const table = path.substring(0, qIdx);
   const params = new URLSearchParams(path.substring(qIdx + 1));
   let filters = [],
     order = '',
     limit = 5000,
+    limitEsplicito = false,
     selectCols = '';
   for (const [k, v] of params.entries()) {
     if (k === 'order') {
       order = v.replace(/\./g, ' ').replace(/,/g, ', ');
     } else if (k === 'limit') {
       limit = parseInt(v) || 5000;
+      limitEsplicito = true;
     } else if (k === 'select') {
       selectCols = v;
     } else {
@@ -472,7 +474,7 @@ function _parseRestFilter(path) {
       filters.push(_filtroSqlClausola(k, v));
     }
   }
-  return { table, filter: filters.join(' AND '), order, limit };
+  return { table, filter: filters.join(' AND '), order, limit, limitEsplicito };
 }
 // UNICO traduttore REST -> SQL per una clausola 'colonna' + 'op.valore'.
 // Operatori: eq neq gt gte lt lte like ilike is in. Tutto il resto e' errore.
@@ -526,18 +528,50 @@ function _sbErroreTesto(e) {
   } catch (x) {}
   return (e.testo || 'errore ' + e.status).substring(0, 300);
 }
+// LETTURA A PAGINE, niente tagli silenziosi. Senza "limit" si legge TUTTO, a
+// pagine da 5000; con un "limit" si leggono fino a quel numero (pagine da max
+// 10000). Se una lettura con limite arriva proprio al limite, nel registro della
+// console resta l avviso: vuol dire che c erano altre righe.
+const _SEC_PAGINA_MAX = 10000;
+async function _secLeggiTutto(t, p) {
+  const leggi = (offset, dim, ordine) =>
+    _rpcSicura(
+      'secure_read',
+      Object.assign(
+        { p_token: t, p_table: p.table, p_filter: p.filter, p_order: ordine, p_limit: dim },
+        offset ? { p_offset: offset } : {},
+      ),
+    );
+  const voluto = p.limitEsplicito ? p.limit : Infinity;
+  const dim = Math.min(p.limitEsplicito ? p.limit : 5000, _SEC_PAGINA_MAX);
+  let righe = (await leggi(0, dim, p.order)) || [];
+  if (righe.length < dim || righe.length >= voluto) {
+    if (p.limitEsplicito && righe.length >= voluto && voluto >= 2000)
+      console.warn('Lettura arrivata al limite di ' + voluto + ' righe: ' + p.table + ' ' + p.filter);
+    return righe;
+  }
+  // servono altre pagine: l ordine deve essere stabile (senza ordine si usa l id)
+  let ordine = p.order;
+  if (!ordine) {
+    if (!righe[0] || !Object.prototype.hasOwnProperty.call(righe[0], 'id')) {
+      console.warn('Lettura oltre ' + dim + ' righe senza ordine stabile: ' + p.table);
+      return righe;
+    }
+    ordine = 'id ASC';
+    righe = (await leggi(0, dim, ordine)) || [];
+  }
+  for (let pagina = 1; pagina < 60 && righe.length < voluto; pagina++) {
+    const altre = (await leggi(righe.length, Math.min(dim, voluto - righe.length), ordine)) || [];
+    righe = righe.concat(altre);
+    if (altre.length < dim) break;
+  }
+  return righe;
+}
 async function secGet(path) {
   let tk = getOpToken();
   if (tk) {
     const p = _parseRestFilter(path); // un filtro non valido e' un errore del programma: si vede subito
-    const leggi = (t) =>
-      _rpcSicura('secure_read', {
-        p_token: t,
-        p_table: p.table,
-        p_filter: p.filter,
-        p_order: p.order,
-        p_limit: p.limit,
-      });
+    const leggi = (t) => _secLeggiTutto(t, p);
     try {
       return (await leggi(tk)) || [];
     } catch (e) {
@@ -653,6 +687,14 @@ async function _secDelRaw(table, filter) {
 async function getImp(k) {
   const d = await secGet('impostazioni?chiave=eq.' + k + '&select=valore');
   return d.length ? d[0].valore : null;
+}
+// PIU IMPOSTAZIONI IN UNA SOLA LETTURA (all avvio erano 29 letture separate):
+// ritorna i valori nello stesso ordine delle chiavi, null se la chiave non c e
+async function getImpMolte(chiavi) {
+  const d = (await secGet('impostazioni?chiave=in.(' + chiavi.join(',') + ')&select=chiave,valore&limit=1000')) || [];
+  const per = {};
+  d.forEach((r) => (per[r.chiave] = r.valore));
+  return chiavi.map((k) => (Object.prototype.hasOwnProperty.call(per, k) ? per[k] : null));
 }
 async function _setImpRaw(k, v) {
   const tk = getOpToken();

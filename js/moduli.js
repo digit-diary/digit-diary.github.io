@@ -297,6 +297,8 @@ function moduloRespSettore(rep) {
   return MODULI_RESP_DEFAULT[k] || '';
 }
 async function generaModuloPDF(tipo) {
+  if (!(await assicuraLibreria('jspdf'))) return;
+  if (!(await assicuraLibreria('qrcode'))) return;
   // Cattura SUBITO i flag, prima di qualsiasi await (race condition con ristampaModuloPDF)
   const _isRistampaSnap = !!window._isRistampa;
   let _isEditSnap = !!window._editModuloId;
@@ -1999,6 +2001,7 @@ function esportaRegistroCSV() {
 
 // IMPORTA COLLABORATORI DA FILE
 async function importaCollaboratori(input) {
+  if (!(await assicuraLibreria('xlsx'))) return;
   const file = input.files[0];
   if (!file) return;
   if (!_soloAdminAnagrafica()) {
@@ -2435,6 +2438,9 @@ function assistenteReset() {
 
 // IMPORTA MODULO DA WORD/PDF
 async function importaModuloFile(input) {
+  if (!(await assicuraLibreria('xlsx'))) return;
+  if (!(await assicuraLibreria('mammoth'))) return;
+  if (!(await assicuraLibreria('pdf'))) return;
   const file = input.files[0];
   if (!file) return;
   const ext = file.name.split('.').pop().toLowerCase();

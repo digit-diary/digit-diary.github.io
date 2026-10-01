@@ -1167,43 +1167,19 @@ async function _pianoAggiornaYtd(nomi) {
   if (mese <= 1) return;
   const fine = ym + '-01';
   // SCALA CON MOLTI SETTORI: le ore YTD di un collaboratore possono stare in
-  // piu' reparti (coperture), quindi si caricano per collaboratore (solo i nomi
-  // del settore corrente) a piccoli gruppi, senza scaricare l'intero anno di
-  // tutti i settori (che con 20+ settori troncherebbe e falserebbe il saldo)
-  const righe = [];
-  const timbrate = [];
+  // piu reparti (coperture), quindi si leggono per NOME (solo i nomi del settore
+  // corrente), non l anno intero di tutti i settori. Una lettura sola per tutti i
+  // nomi (a pagine, senza tagli): prima era una lettura per persona, oltre 120
+  // richieste a ogni cambio mese ai Tavoli.
   const _daA = anno + '-01-01';
-  for (let i = 0; i < nomi.length; i += 8) {
-    const grp = nomi.slice(i, i + 8);
-    const res = await Promise.all(
-      grp
-        .map((n) =>
-          secGet(
-            'piano?collaboratore=eq.' + encodeURIComponent(n) + '&data=gte.' + _daA + '&data=lt.' + fine + '&limit=500',
-          ),
-        )
-        .concat(
-          grp.map((n) =>
-            secGet(
-              'piano_timbrature?collaboratore=eq.' +
-                encodeURIComponent(n) +
-                '&data=gte.' +
-                _daA +
-                '&data=lt.' +
-                fine +
-                '&limit=500',
-            ),
-          ),
-        ),
-    );
-    res.slice(0, grp.length).forEach((rr) => {
-      if (rr) {
-        righe.push(...rr);
-        _pianoRegistraGiorniTurno(rr);
-      }
-    });
-    res.slice(grp.length).forEach((rr) => rr && timbrate.push(...rr));
-  }
+  const lista = nomi.map((n) => encodeURIComponent(n)).join(',');
+  const [righe, timbrate] = nomi.length
+    ? await Promise.all([
+        secGet('piano?collaboratore=in.(' + lista + ')&data=gte.' + _daA + '&data=lt.' + fine),
+        secGet('piano_timbrature?collaboratore=in.(' + lista + ')&data=gte.' + _daA + '&data=lt.' + fine),
+      ])
+    : [[], []];
+  _pianoRegistraGiorniTurno(righe || []);
   const perMese = {}; // nome|m -> ore piano
   (righe || []).forEach((r) => {
     const m = parseInt(r.data.split('-')[1]);

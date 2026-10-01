@@ -1080,11 +1080,19 @@ async function _healthCheck() {
   const problems = [];
   // 1. Supabase connessione (verifica tramite dati caricati, no fetch extra)
   // 2. Librerie CDN
-  if (!window.jspdf && !document.querySelector('script[src*="jspdf"]'))
-    problems.push('Libreria PDF (jsPDF) non caricata');
+  // librerie a richiesta: si prova davvero a caricarle (dalla cache, in pochi ms)
+  for (const [lib, lbl] of [
+    ['jspdf', 'PDF (jsPDF)'],
+    ['xlsx', 'Excel (XLSX)'],
+  ]) {
+    try {
+      await libreria(lib);
+    } catch (e) {
+      problems.push('Libreria ' + lbl + ' non caricabile');
+    }
+  }
   if (!window.Chart) problems.push('Libreria grafici (Chart.js) non caricata');
   if (!window.flatpickr) problems.push('Libreria calendario (Flatpickr) non caricata');
-  if (!window.XLSX) problems.push('Libreria Excel (XLSX) non caricata');
   // 3. Intelligenza artificiale (solo se configurata): prova il fornitore in uso
   if (typeof aiPronta === 'function' && aiPronta()) {
     const f = aiFornitoreAttivo();

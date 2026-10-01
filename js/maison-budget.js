@@ -562,6 +562,7 @@ async function esportaListaMaisonPDF() {
 }
 // IMPORTA CATEGORIE DA FILE EXCEL (Maison slots)
 async function importaCategorieMaison(input) {
+  if (!(await assicuraLibreria('xlsx'))) return;
   const file = input.files[0];
   if (!file) return;
   input.value = '';
@@ -844,6 +845,7 @@ async function importaCategorieMaison(input) {
 }
 // IMPORTA COMPLEANNI DA FILE EXCEL
 async function importaCompleanniMaison(input) {
+  if (!(await assicuraLibreria('xlsx'))) return;
   const file = input.files[0];
   if (!file) return;
   input.value = '';

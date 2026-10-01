@@ -542,7 +542,8 @@ function _renderProtocolliCard() {
   h += '</div></div>';
   return h;
 }
-function scaricaProtocolloExcel(compKey) {
+async function scaricaProtocolloExcel(compKey) {
+  if (!(await assicuraLibreria('xlsx'))) return;
   if (!window.XLSX) {
     toast('Libreria Excel non caricata');
     return;
@@ -595,6 +596,7 @@ function scaricaProtocolloExcel(compKey) {
   logAzione('Protocollo scaricato', compKey);
 }
 async function importaProtocolloExcel(compKey, input) {
+  if (!(await assicuraLibreria('xlsx'))) return;
   if (typeof puoModificare === 'function' && !puoModificare('gestione_competenze')) {
     toast('Non hai il permesso');
     input.value = '';

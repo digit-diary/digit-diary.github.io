@@ -4407,7 +4407,8 @@ function _peHexRgb(hex) {
   const h = hex.replace('#', '');
   return [parseInt(h.substring(0, 2), 16), parseInt(h.substring(2, 4), 16), parseInt(h.substring(4, 6), 16)];
 }
-function pdfBriefingGiorno() {
+async function pdfBriefingGiorno() {
+  if (!(await assicuraLibreria('jspdf'))) return;
   if (!_briefState) return;
   const { jsPDF } = window.jspdf;
   const valet = _briefIsValet();
@@ -4648,7 +4649,8 @@ function pdfBriefingGiorno() {
   logAzione('Briefing stampato', _pianoReparto() + ' ' + dstr);
   mostraPdfPreview(doc, 'briefing_' + dstr + '_' + _pianoReparto() + '.pdf', 'Briefing ' + lbl);
 }
-function pdfPauseGiorno() {
+async function pdfPauseGiorno() {
+  if (!(await assicuraLibreria('jspdf'))) return;
   if (!_briefState || !_briefState.pause || !_briefState.pause.contenuto) return;
   const c = _briefState.pause.contenuto;
   const { jsPDF } = window.jspdf;
@@ -5192,7 +5194,8 @@ function _pcBigliettoHtml(c) {
 }
 // bigliettino da tagliare (formato A6): cambi del mattino di C4 o una colonna
 // facoltativa (accoglienza, secondo S5...)
-function pdfBigliettoPause(i) {
+async function pdfBigliettoPause(i) {
+  if (!(await assicuraLibreria('jspdf'))) return;
   const c = _briefState && _briefState.pause && _briefState.pause.contenuto;
   const bg = c && c.biglietti && c.biglietti[i];
   if (bg) _pdfBiglietto(bg);
@@ -5204,7 +5207,8 @@ function _pcBigliettoDaColonna(c, blk) {
     righe: blk.righe.map((x) => ({ pos: x.pos, nome: '', ini: x.ini, fin: x.fin })),
   };
 }
-function pdfBigliettoColonna(base, r) {
+async function pdfBigliettoColonna(base, r) {
+  if (!(await assicuraLibreria('jspdf'))) return;
   const c = _briefState && _briefState.pause && _briefState.pause.contenuto;
   if (!c || !window.PauseControlli) return;
   const blk = window.PauseControlli.blocchi(c).find((b) => b.base === base && b.r === r);
@@ -5651,6 +5655,7 @@ async function salvaPauseCfg() {
   toast('Regole pause e numeri cassa salvati');
 }
 async function importaBriefingExcel(input) {
+  if (!(await assicuraLibreria('xlsx'))) return;
   if (!puoGestireBriefing() || !_briefState) return;
   const file = input.files[0];
   input.value = '';

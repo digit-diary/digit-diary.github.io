@@ -126,6 +126,7 @@ async function aggiungiTimbratura() {
   }
 }
 async function importaTimbrature(input) {
+  if (!(await assicuraLibreria('xlsx'))) return;
   if (!puoGestirePiano()) return;
   const file = input.files[0];
   input.value = '';
@@ -2777,6 +2778,8 @@ async function _vacRigheDaPdf(file) {
   return { righe: out, ignoti: ignoti };
 }
 async function importaVacanzePiano(input) {
+  if (!(await assicuraLibreria('xlsx'))) return;
+  if (!(await assicuraLibreria('pdf'))) return;
   if (!puoGestirePiano()) return;
   const file = input.files[0];
   input.value = '';
@@ -3117,7 +3120,8 @@ async function esportaVacanzeExcel() {
   logAzione('Vacanze esportate', anno + ' · Excel · ' + dati.length + ' collaboratori');
   toast('File Excel creato (formato HR con colori)');
 }
-function esportaVacanzePdf() {
+async function esportaVacanzePdf() {
+  if (!(await assicuraLibreria('jspdf'))) return;
   const anno = window._pianoVacAnno || parseInt(_pianoMeseSel.split('-')[0]);
   const dati = _vacDatiEsport(anno);
   const fasce = _vacFasce(anno);
