@@ -2657,7 +2657,15 @@ function _pianoCongedoNpEffetti(nome, anno) {
       const a = String(c.al).substring(0, 10) < fine ? String(c.al).substring(0, 10) : fine;
       if (a >= da) giorniVacanze += Math.round((new Date(a + 'T12:00:00') - new Date(da + 'T12:00:00')) / 86400000) + 1;
     }
-    if (tot > sm * 30.44) giorniAnzianita += tot;
+    // anzianita: solo la parte del congedo gia trascorsa entro la fine dell anno
+    // (un congedo futuro non sposta gli anniversari di quest anno)
+    if (tot > sm * 30.44) {
+      const fineA = anno + '-12-31';
+      const daA = String(c.dal).substring(0, 10);
+      const aA = String(c.al).substring(0, 10) < fineA ? String(c.al).substring(0, 10) : fineA;
+      if (aA >= daA)
+        giorniAnzianita += Math.round((new Date(aA + 'T12:00:00') - new Date(daA + 'T12:00:00')) / 86400000) + 1;
+    }
   });
   return { giorniVacanze: giorniVacanze, giorniAnzianita: giorniAnzianita };
 }

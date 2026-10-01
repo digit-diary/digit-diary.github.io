@@ -2295,6 +2295,16 @@ function apriSchedaCollaboratore(nome) {
           .join('; ') +
         '</div>';
     }
+    // registrare un congedo non pagato direttamente dalla scheda (stesso salvataggio
+    // della sezione Piano > Impostazioni > Congedi non pagati)
+    if (
+      typeof apriCongedoNpScheda === 'function' &&
+      (typeof puoGestirePiano !== 'function' || puoGestirePiano() || isAdmin())
+    )
+      html +=
+        '<button class="btn-act" style="margin-top:6px" onclick="apriCongedoNpScheda(\'' +
+        neS +
+        '\')">Registra congedo non pagato</button>';
   }
   html += '<div id="collab-crediti" style="font-size:var(--fs-sm,.8125rem);margin-top:6px"></div>';
   if (typeof _schedaCambiTurnoRiga === 'function') html += _schedaCambiTurnoRiga(nome);

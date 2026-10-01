@@ -382,7 +382,7 @@ const PIANO_REGOLE_GUIDA = {
   },
   congedo_np_mesi_anzianita: {
     g: 'Congedi non pagati',
-    n: 'Oltre questi mesi di congedo l anzianita si sposta in avanti (giubilei e scaglioni)',
+    n: 'Oltre questi mesi di congedo l anzianita si sposta in avanti (0 = ogni giorno di congedo la sposta)',
     t: 'numero',
     d: 'Giubilei, scheda Vacanze, scheda Congedi',
   },

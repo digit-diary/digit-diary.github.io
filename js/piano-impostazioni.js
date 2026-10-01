@@ -1284,9 +1284,11 @@ function _renderPianoCongediNpCard() {
     '</div><div style="padding:10px 14px">' +
     '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Regolamento aziendale 5.14: domanda scritta, concessione della Direzione. Nel piano i giorni diventano <b>CNP</b> (zero ore, non contano fra le ore dovute). Oltre <b>' +
     sg +
-    ' giorni</b> il diritto vacanze dell anno si riduce in proporzione; oltre <b>' +
-    sm +
-    ' mesi</b> l anzianita di servizio si sposta in avanti di tutta la durata (giubilei e scaglioni vacanze). Le due soglie si cambiano nella scheda Regole.</p>';
+    ' giorni</b> il diritto vacanze dell anno si riduce in proporzione; ' +
+    (sm
+      ? 'oltre <b>' + sm + ' mesi</b> l anzianita di servizio si sposta in avanti di tutta la durata'
+      : '<b>ogni giorno</b> di congedo sposta in avanti l anzianita di servizio') +
+    ' (giubilei e giorni di vacanza in piu). Le due soglie si cambiano nella scheda Regole. Il congedo si registra anche dalla scheda del collaboratore.</p>';
   h +=
     '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:10px">' +
     '<div class="field" style="margin:0"><label>Collaboratore</label><select id="cnp-nome" style="padding:6px">' +
@@ -1335,27 +1337,81 @@ function _renderPianoCongediNpCard() {
 }
 async function aggiungiCongedoNp() {
   if (!puoGestirePiano() && !isAdmin()) return;
-  const nome = (document.getElementById('cnp-nome') || {}).value;
-  const dal = (document.getElementById('cnp-dal') || {}).value;
-  const al = (document.getElementById('cnp-al') || {}).value;
-  const motivo = ((document.getElementById('cnp-motivo') || {}).value || '').trim();
-  const aut = ((document.getElementById('cnp-aut') || {}).value || '').trim();
+  const ok = await registraCongedoNp({
+    nome: (document.getElementById('cnp-nome') || {}).value,
+    dal: (document.getElementById('cnp-dal') || {}).value,
+    al: (document.getElementById('cnp-al') || {}).value,
+    motivo: ((document.getElementById('cnp-motivo') || {}).value || '').trim(),
+    aut: ((document.getElementById('cnp-aut') || {}).value || '').trim(),
+  });
+  if (ok) renderPiano();
+}
+// dalla scheda del collaboratore: finestra con dal, al, motivo, autorizzato da
+async function apriCongedoNpScheda(nome) {
+  if (!puoGestirePiano() && !isAdmin()) return;
+  const r = await chiediModulo(
+    'Congedo non pagato di ' +
+      nome +
+      ': nel piano i giorni diventano CNP (zero ore) e non contano per l anzianita (giubilei e giorni di vacanza in piu).',
+    [
+      {
+        titolo: 'Periodo',
+        campi: [
+          { id: 'dal', tipo: 'testo', etichetta: 'dal', segnaposto: 'gg.mm.aaaa', larghezza: 110 },
+          { id: 'al', tipo: 'testo', etichetta: 'al', segnaposto: 'gg.mm.aaaa', larghezza: 110 },
+        ],
+      },
+      {
+        titolo: 'Dettagli',
+        campi: [
+          { id: 'motivo', tipo: 'testo', etichetta: 'motivo', segnaposto: 'es. viaggio, famiglia', larghezza: 200 },
+          { id: 'aut', tipo: 'testo', etichetta: 'autorizzato da', segnaposto: 'Direzione', larghezza: 140 },
+        ],
+      },
+    ],
+    { titolo: 'Registra congedo non pagato', ok: 'Registra' },
+  );
+  if (!r) return;
+  const iso = (t) => {
+    const m = String(t || '')
+      .trim()
+      .match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+    if (!m) return '';
+    const a = m[3].length === 2 ? '20' + m[3] : m[3];
+    return a + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  };
+  const ok = await registraCongedoNp({
+    nome: nome,
+    dal: iso(r.dal),
+    al: iso(r.al),
+    motivo: (r.motivo || '').trim(),
+    aut: (r.aut || '').trim(),
+  });
+  if (ok && typeof apriSchedaCollaboratoreSicuro === 'function') apriSchedaCollaboratoreSicuro(nome);
+}
+// salvataggio unico del congedo (Piano e scheda): controlli, conferma, piano CNP, storico HR
+async function registraCongedoNp(x) {
+  const nome = x.nome;
+  const dal = x.dal;
+  const al = x.al;
+  const motivo = x.motivo;
+  const aut = x.aut;
   if (!nome || !dal || !al) {
-    toastErrore('Servono collaboratore, data di inizio e data di fine');
-    return;
+    toastErrore('Servono collaboratore, data di inizio e data di fine (gg.mm.aaaa)');
+    return false;
   }
   if (al < dal) {
     toastErrore('La data di fine e prima di quella di inizio');
-    return;
+    return false;
   }
   const gg = Math.round((new Date(al + 'T12:00:00') - new Date(dal + 'T12:00:00')) / 86400000) + 1;
   if (gg > 366) {
-    toastErrore('Un congedo di piu di un anno non e previsto dal regolamento (massimo 6 mesi concordati)');
-    return;
+    toastErrore('Un congedo di piu di un anno non e previsto dal regolamento');
+    return false;
   }
   if (!motivo) {
     toastErrore('Scrivi il motivo: serve per la scheda e per HR');
-    return;
+    return false;
   }
   const sovrapposto = _pianoCongediDi(nome).find(
     (c) => !(String(c.al).substring(0, 10) < dal || String(c.dal).substring(0, 10) > al),
@@ -1368,17 +1424,13 @@ async function aggiungiCongedoNp() {
         String(sovrapposto.al).substring(0, 10) +
         ')',
     );
-    return;
+    return false;
   }
   const sogliaMesi = parseInt(_pianoRegolaVal('congedo_np_mesi_anzianita'));
   const sm = isNaN(sogliaMesi) ? 6 : sogliaMesi;
   const avviso =
     gg > sm * 30.44
-      ? '\n\nATTENZIONE: supera ' +
-        sm +
-        ' mesi: l anzianita di servizio si sposta in avanti di ' +
-        gg +
-        ' giorni (giubilei e scaglioni vacanze).'
+      ? '\n\nL anzianita di servizio si sposta in avanti di ' + gg + ' giorni (giubilei e giorni di vacanza in piu).'
       : '';
   if (
     !(await chiediConferma(
@@ -1394,24 +1446,20 @@ async function aggiungiCongedoNp() {
         avviso,
     ))
   )
-    return;
+    return false;
+  const info = (typeof collaboratoriCache !== 'undefined' ? collaboratoriCache : []).find((c) => c.nome === nome) || {};
+  const rep = info.reparto_dip || _pianoReparto();
   try {
     const nuovo = await secPost('collab_congedi_np', {
       collaboratore: nome,
-      reparto_dip: _pianoReparto(),
+      reparto_dip: rep,
       dal: dal,
       al: al,
       motivo: motivo,
       autorizzato_da: aut || null,
       operatore: getOperatore(),
     });
-    const rec = (nuovo && nuovo[0]) || {
-      collaboratore: nome,
-      reparto_dip: _pianoReparto(),
-      dal: dal,
-      al: al,
-      motivo: motivo,
-    };
+    const rec = (nuovo && nuovo[0]) || { collaboratore: nome, reparto_dip: rep, dal: dal, al: al, motivo: motivo };
     _pianoCongediNp.push(rec);
     const celle = await _pianoSincronizzaCongedoNp(rec, false);
     logAzione('Congedo non pagato registrato', nome + ' ' + dal + ' / ' + al + ' (' + gg + ' giorni): ' + motivo);
@@ -1422,9 +1470,10 @@ async function aggiungiCongedoNp() {
         descrizione: 'Congedo non pagato dal ' + dal + ' al ' + al + ' (' + gg + ' giorni): ' + motivo,
       });
     toast('Congedo registrato · ' + celle + ' giorni segnati CNP nel piano');
-    renderPiano();
+    return true;
   } catch (e) {
     toastErrore('Errore nel salvataggio del congedo: ' + (e.message || ''));
+    return false;
   }
 }
 async function eliminaCongedoNp(id) {
