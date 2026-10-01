@@ -531,6 +531,18 @@ function _pianoCopreQui(r, repAperto) {
   const qui = repAperto || _pianoReparto();
   return _pianoSettoreTurno(r, qui) === qui;
 }
+// Definizione del turno di una RIGA: quella del settore a cui il turno appartiene
+// (oggi solo "9" ha due orari: Slots 06-14, Tavoli 21-05). Tutti i settori leggono
+// ore e orari di tutti i turni del casino.
+function _pianoTurnoInfoRiga(r) {
+  if (!r || !r.codice) return null;
+  const s = _pianoSettoreTurno(r);
+  return (
+    (pianoTurniCache || []).find(
+      (t) => t.attivo !== false && t.codice === r.codice && (t.reparto_dip || 'slots') === s,
+    ) || _pianoTurnoInfo(r.codice)
+  );
+}
 function _pianoTurnoInfo(codice) {
   return _pianoTurniReparto().find((t) => t.codice === codice) || pianoTurniCache.find((t) => t.codice === codice);
 }
@@ -721,7 +733,7 @@ function _pianoOreSpecialeDelGiorno(r, cs, info) {
 // codice con orario personalizzato (es. JG con inizio/fine) → differenza;
 // altrimenti ore CCL del codice speciale (scalate per percentuale se previsto)
 function _pianoOreDiRiga(r, pct) {
-  const t = _pianoTurnoInfo(r.codice);
+  const t = _pianoTurnoInfoRiga(r);
   if (t) {
     // il turno puo' finire piu' tardi nei giorni di chiusura alle 5
     const eff = _pianoTurnoDelGiorno(t, r.data ? String(r.data).substring(0, 10) : '');
@@ -1929,7 +1941,7 @@ async function _renderPianoCore() {
           if (dstr === _oggiCal) cls += ' piano-oggi';
           let titolo = '';
           if (r) {
-            const t = _pianoTurnoInfo(codice);
+            const t = _pianoTurnoInfoRiga(r);
             const cs = _pianoCodiceInfo(codice);
             cella = escP(codice);
             const _col = _pianoColore(codice);
@@ -1964,21 +1976,19 @@ async function _renderPianoCore() {
             } else if (r.protetto) {
               cls += ' piano-prot';
             }
-            if ((r.reparto_dip || 'slots') !== _pianoReparto()) {
-              if (_pianoCopreQui(r)) {
-                // turno di QUESTO settore scritto nel foglio di un altro: copre qui
-                titolo =
-                  'Turno ' +
-                  repartoLabel(_pianoReparto()) +
-                  ' (scritto nel piano ' +
-                  repartoLabel(r.reparto_dip) +
-                  ') ' +
-                  titolo;
-              } else {
-                // cella dell'ALTRO settore: la persona e occupata, non copre qui
-                stile += (stile ? ';' : '') + 'opacity:.65;font-style:italic';
-                titolo = '[' + repartoLabel(_pianoSettoreTurno(r)) + '] ' + titolo;
-              }
+            // CORSIVO = turno di un ALTRO settore (la persona e occupata, non copre qui),
+            // in qualunque piano sia scritto: dipende dalla sigla, non da chi l ha scritta.
+            // Congedi, vacanze e malattie valgono per la persona: sempre normali.
+            if (_pianoTurnoInfo(codice) && !_pianoCopreQui(r)) {
+              stile += (stile ? ';' : '') + 'opacity:.65;font-style:italic';
+              titolo = '[' + repartoLabel(_pianoSettoreTurno(r)) + '] ' + titolo;
+            } else if ((r.reparto_dip || 'slots') !== _pianoReparto()) {
+              titolo =
+                (_pianoTurnoInfo(codice) ? 'Turno ' + repartoLabel(_pianoReparto()) + ' ' : '') +
+                '(scritto nel piano ' +
+                repartoLabel(r.reparto_dip) +
+                ') ' +
+                titolo;
             }
             if (r.commento) {
               cls += ' piano-comm';
