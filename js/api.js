@@ -8,6 +8,80 @@
 // secGet, secPost, secPatch, secDel, loadAll
 // ================================================================
 // DATA LOADING
+// DIARIO A FINESTRA: all avvio si leggono gli ultimi 24 mesi (tutti i settori),
+// piu SEMPRE l intera storia di ammonimenti verbali e differenze di cassa, perche
+// gli avvisi disciplinari e di cassa contano su tutta la storia. Il resto
+// dell archivio entra in memoria quando serve: scheda del collaboratore (tutta
+// la sua storia), statistiche (tutto), filtro "dal" piu vecchio, ricerca, e il
+// pulsante "Mostra registrazioni piu vecchie" in fondo al Diario. Niente sparisce.
+const DIARIO_FINESTRA_MESI = 24;
+let diarioFinestraDa = null; // 'YYYY-MM-DD': in memoria tutto da qui in poi (null = archivio completo)
+function _diarioInizioFinestra() {
+  const d = new Date();
+  d.setMonth(d.getMonth() - DIARIO_FINESTRA_MESI);
+  return dataLocaleISO(d);
+}
+async function _diarioLeggiIniziale() {
+  const da = _diarioInizioFinestra();
+  const sempre = [nomeCorrente('Ammonimento Verbale'), nomeCorrente('Errore')];
+  const [recenti, storiaDisc] = await Promise.all([
+    secGet('registrazioni?data=gte.' + da + '&order=data.desc'),
+    secGet(
+      'registrazioni?data=lt.' +
+        da +
+        '&tipo=in.(' +
+        sempre.map((t) => encodeURIComponent(t)).join(',') +
+        ')&order=data.desc',
+    ),
+  ]);
+  diarioFinestraDa = da;
+  return (recenti || []).concat(storiaDisc || []);
+}
+function _diarioUnisci(righe) {
+  const ids = new Set(datiCache.map((e) => e.id));
+  let n = 0;
+  (righe || []).forEach((r) => {
+    if (r.eliminato || ids.has(r.id)) return;
+    datiCache.push(r);
+    ids.add(r.id);
+    n++;
+  });
+  if (n) datiCache.sort((a, b) => String(b.data).localeCompare(String(a.data)));
+  return n;
+}
+// porta in memoria le registrazioni dal giorno indicato fino all inizio della finestra
+async function diarioCaricaDal(dataISO) {
+  if (!diarioFinestraDa || !dataISO || dataISO >= diarioFinestraDa) return 0;
+  const righe = await secGet('registrazioni?data=gte.' + dataISO + '&data=lt.' + diarioFinestraDa + '&order=data.desc');
+  const n = _diarioUnisci(righe);
+  diarioFinestraDa = dataISO;
+  return n;
+}
+async function diarioCaricaTutto() {
+  if (!diarioFinestraDa) return 0;
+  const righe = await secGet('registrazioni?data=lt.' + diarioFinestraDa + '&order=data.desc');
+  const n = _diarioUnisci(righe);
+  diarioFinestraDa = null;
+  return n;
+}
+// tutta la storia di una persona (scheda del collaboratore)
+async function diarioCaricaPersona(nome) {
+  if (!diarioFinestraDa || !nome) return 0;
+  return _diarioUnisci(
+    await secGet('registrazioni?nome=eq.' + encodeURIComponent(nome) + '&data=lt.' + diarioFinestraDa),
+  );
+}
+// ricerca nell archivio (nome o testo) prima della finestra
+async function diarioCercaArchivio(q) {
+  if (!diarioFinestraDa || !q || q.length < 3) return 0;
+  // il canale sicuro traduce ilike in ILIKE di SQL: il jolly e %
+  const pat = encodeURIComponent('%' + q.replace(/[*%_,()\\]/g, ' ').trim() + '%');
+  const [a, b] = await Promise.all([
+    secGet('registrazioni?nome=ilike.' + pat + '&data=lt.' + diarioFinestraDa + '&limit=200'),
+    secGet('registrazioni?testo=ilike.' + pat + '&data=lt.' + diarioFinestraDa + '&limit=200'),
+  ]);
+  return _diarioUnisci((a || []).concat(b || []));
+}
 async function loadAll() {
   // Caricamento parallelo: impostazioni + dati + tabelle.
   // secGet ora lancia se il database rifiuta: se la lettura fallisce si avvisa
@@ -253,7 +327,7 @@ async function loadAll() {
   ] = await Promise.all([
     // niente ripiego silenzioso: se una tabella non si legge, l'errore ferma
     // il caricamento (catch qui sotto) e le cache precedenti restano intatte
-    secGet('registrazioni?order=data.desc'),
+    _diarioLeggiIniziale(),
     secGet('note_fissate?select=registrazione_id'),
     // ENTERPRISE CHAT: carica le 5 nuove tabelle invece di note_colleghi
     secGet('chat_messages?order=created_at.desc'),

@@ -32,6 +32,11 @@ function switchPage(name) {
   if (name === 'statistiche') {
     initStatsFlatpickr();
     renderStatistiche();
+    // le statistiche contano su tutto l archivio: si completa e si ridisegna
+    if (typeof diarioFinestraDa !== 'undefined' && diarioFinestraDa)
+      diarioCaricaTutto()
+        .then((n) => n && renderStatistiche())
+        .catch((e) => toastErrore('Archivio del Diario non caricato: ' + ((e && e.message) || e)));
     const rdWrap = document.getElementById('report-direzione-wrap');
     if (rdWrap) {
       rdWrap.style.display = isAdmin() ? 'flex' : 'none';

@@ -2096,8 +2096,17 @@ document.addEventListener('click', function (e) {
 // Apertura protetta: se qualcosa va storto l'operatore deve VEDERE il motivo.
 // Un clic che non produce nulla e' il peggior modo di fallire, perche' sembra
 // che il programma ignori il comando.
-function apriSchedaCollaboratoreSicuro(nome) {
+async function apriSchedaCollaboratoreSicuro(nome) {
   try {
+    // la scheda mostra TUTTA la storia: le registrazioni piu vecchie della
+    // finestra del Diario si leggono ora, solo per questa persona
+    if (typeof diarioCaricaPersona === 'function') {
+      try {
+        await diarioCaricaPersona(nome);
+      } catch (e) {
+        toastErrore('Storia completa non caricata: ' + ((e && e.message) || e));
+      }
+    }
     apriSchedaCollaboratore(nome);
     const box = document.getElementById('profilo-modal');
     if (!box || box.classList.contains('hidden')) {

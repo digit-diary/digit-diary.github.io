@@ -2633,104 +2633,160 @@ function getFiltrati() {
   });
   return list;
 }
+// fondo dell elenco: da che data sono in memoria le registrazioni e come vedere le altre
+function _diarioPiedeArchivio() {
+  if (typeof diarioFinestraDa === 'undefined' || !diarioFinestraDa) return '';
+  return (
+    '<div class="diario-archivio">Registrazioni dal ' +
+    diarioFinestraDa.split('-').reverse().join('.') +
+    ' (piu gli ammonimenti e le differenze di cassa di sempre). <button class="btn-act" onclick="diarioMostraArchivio()">Mostra registrazioni piu vecchie</button></div>'
+  );
+}
+async function diarioMostraArchivio() {
+  try {
+    const n = await diarioCaricaTutto();
+    render();
+    updateStats();
+    toast(n ? n + ' registrazioni dall archivio' : 'Nessuna registrazione piu vecchia');
+  } catch (e) {
+    toastErrore('Archivio non caricato: ' + ((e && e.message) || e));
+  }
+}
 function render() {
+  // ARCHIVIO A RICHIESTA: filtro "dal" piu vecchio della finestra, una persona
+  // scelta (tutta la sua storia) o una parola cercata: si legge dal database
+  // quello che manca e si ridisegna una volta
+  if (typeof diarioFinestraDa !== 'undefined' && diarioFinestraDa && !window._diarioArchInCorso) {
+    const _dal = (document.getElementById('filt-dal') || {}).value || '';
+    const _per = (document.getElementById('filt-persona') || {}).value || '';
+    const _cerca = ((document.getElementById('filt-cerca') || {}).value || '').trim().toLowerCase();
+    window._diarioArchFatto = window._diarioArchFatto || {};
+    let lavoro = null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(_dal) && _dal < diarioFinestraDa) lavoro = () => diarioCaricaDal(_dal);
+    else if (_per && !window._diarioArchFatto['p|' + _per]) {
+      window._diarioArchFatto['p|' + _per] = true;
+      lavoro = () => diarioCaricaPersona(_per);
+    } else if (_cerca.length >= 3 && !window._diarioArchFatto['c|' + _cerca]) {
+      window._diarioArchFatto['c|' + _cerca] = true;
+      lavoro = () => diarioCercaArchivio(_cerca);
+    }
+    if (lavoro) {
+      window._diarioArchInCorso = true;
+      lavoro()
+        .then((n) => {
+          window._diarioArchInCorso = false;
+          if (n) {
+            render();
+            updateStats();
+          }
+        })
+        .catch((e) => {
+          window._diarioArchInCorso = false;
+          toastErrore('Archivio non caricato: ' + ((e && e.message) || e));
+        });
+    }
+  }
   const f = getFiltrati(),
     el = document.getElementById('entries-list');
   if (!f.length) {
     el.innerHTML =
-      '<div class="empty-state"><p>Nessuna registrazione</p><small>Modifica i filtri o aggiungi voci</small></div>';
+      '<div class="empty-state"><p>Nessuna registrazione</p><small>Modifica i filtri o aggiungi voci</small></div>' +
+      _diarioPiedeArchivio();
     return;
   }
-  el.innerHTML = f
-    .map((e) => {
-      const d = new Date(e.data),
-        bc = 'badge-' + e.tipo.replace(/ /g, '-'),
-        te = e.tipo.replace(/'/g, "\\'"),
-        pin = pinnedIds.has(e.id);
-      const rep = e.reparto
-        ? '<span style="display:inline-block;margin-left:6px;padding:2px 8px;background:var(--muted);color:white;border-radius:2px;font-size:var(--fs-sm,.8125rem);font-weight:600">' +
-          escP(e.reparto) +
-          '</span>'
-        : '';
-      const _impS = importoConSegno(e);
-      const imp = _impS
-        ? '<span style="display:inline-block;margin-left:6px;padding:2px 8px;background:' +
-          (_impS.colore || 'var(--accent)') +
-          ';color:white;border-radius:2px;font-size:var(--fs-sm,.8125rem);font-weight:700">' +
-          _impS.txt +
+  el.innerHTML =
+    f
+      .map((e) => {
+        const d = new Date(e.data),
+          bc = 'badge-' + e.tipo.replace(/ /g, '-'),
+          te = e.tipo.replace(/'/g, "\\'"),
+          pin = pinnedIds.has(e.id);
+        const rep = e.reparto
+          ? '<span style="display:inline-block;margin-left:6px;padding:2px 8px;background:var(--muted);color:white;border-radius:2px;font-size:var(--fs-sm,.8125rem);font-weight:600">' +
+            escP(e.reparto) +
+            '</span>'
+          : '';
+        const _impS = importoConSegno(e);
+        const imp = _impS
+          ? '<span style="display:inline-block;margin-left:6px;padding:2px 8px;background:' +
+            (_impS.colore || 'var(--accent)') +
+            ';color:white;border-radius:2px;font-size:var(--fs-sm,.8125rem);font-weight:700">' +
+            _impS.txt +
+            ' ' +
+            (e.valuta || 'CHF') +
+            '</span>'
+          : '';
+        const metaLines = [];
+        if (e.operatore) metaLines.push('Inserita da ' + escP(e.operatore));
+        if (e.modificato_da) metaLines.push('Modificata da ' + escP(e.modificato_da));
+        const gdDiff = d.getHours() < 6;
+        const gdDate = gdDiff ? new Date(d.getTime() - 86400000) : d;
+        const gdBadge = gdDiff
+          ? '<span style="font-size:var(--fs-sm,.8125rem);padding:2px 7px;border-radius:2px;background:var(--accent2);color:white;font-weight:700">GD ' +
+            gdDate.getDate() +
+            '.' +
+            String(gdDate.getMonth() + 1).padStart(2, '0') +
+            '</span>'
+          : '';
+        return (
+          '<div class="entry' +
+          (pin ? ' pinned' : '') +
+          '" data-id="' +
+          escP(String(e.id)) +
+          '"><div class="entry-date"><div class="entry-day">' +
+          d.getDate() +
+          '</div><div class="entry-month">' +
+          MESI[d.getMonth()] +
           ' ' +
-          (e.valuta || 'CHF') +
-          '</span>'
-        : '';
-      const metaLines = [];
-      if (e.operatore) metaLines.push('Inserita da ' + escP(e.operatore));
-      if (e.modificato_da) metaLines.push('Modificata da ' + escP(e.modificato_da));
-      const gdDiff = d.getHours() < 6;
-      const gdDate = gdDiff ? new Date(d.getTime() - 86400000) : d;
-      const gdBadge = gdDiff
-        ? '<span style="font-size:var(--fs-sm,.8125rem);padding:2px 7px;border-radius:2px;background:var(--accent2);color:white;font-weight:700">GD ' +
-          gdDate.getDate() +
-          '.' +
-          String(gdDate.getMonth() + 1).padStart(2, '0') +
-          '</span>'
-        : '';
-      return (
-        '<div class="entry' +
-        (pin ? ' pinned' : '') +
-        '" data-id="' +
-        escP(String(e.id)) +
-        '"><div class="entry-date"><div class="entry-day">' +
-        d.getDate() +
-        '</div><div class="entry-month">' +
-        MESI[d.getMonth()] +
-        ' ' +
-        d.getFullYear() +
-        '</div><div class="entry-time">' +
-        d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) +
-        '</div></div><div class="entry-body"><div class="entry-top"><span class="entry-name" onclick="apriProfilo(\'' +
-        e.nome.replace(/'/g, "\\'") +
-        '\')">' +
-        esc(e.nome) +
-        '</span><span class="badge ' +
-        bc +
-        '">' +
-        escP(e.tipo) +
-        '</span>' +
-        gdBadge +
-        rep +
-        imp +
-        (e.tipo === nomeCorrente('Malattia') && typeof badgeCoperturaHtml === 'function' ? badgeCoperturaHtml(e) : '') +
-        '</div><div class="entry-text">' +
-        esc(e.testo) +
-        '</div>' +
-        (metaLines.length ? '<div class="entry-meta">' + metaLines.join(' · ') + '</div>' : '') +
-        '</div><div class="entry-actions"><button class="btn-act pin" onclick="togglePin(' +
-        e.id +
-        ')">' +
-        (pin ? 'Rimuovi pin' : 'Fissa') +
-        '</button><button class="btn-act tipo" onclick="apriModal(' +
-        e.id +
-        ",'" +
-        te +
-        '\')">Tipo</button><button class="btn-act edit" onclick="modificaRegistrazione(' +
-        e.id +
-        ')">Modifica</button>' +
-        (e.tipo === nomeCorrente('Malattia') && typeof apriPopupCopertura === 'function'
-          ? '<button class="btn-act" style="color:var(--c-verdeacqua,#1a7a6d);border-color:var(--c-verdeacqua,#1a7a6d)" onclick="apriPopupCopertura(\'' +
-            e.nome.replace(/'/g, "\\'") +
-            "','" +
-            _dataRifCopertura(e) +
-            '\')" title="Chi copre / chi ha rifiutato">Copertura</button>'
-          : '') +
-        '<button class="btn-act" onclick="promemoriaDaRegistrazione(' +
-        e.id +
-        ')" title="Crea un promemoria di follow-up gia compilato">Promemoria</button>' +
-        '<button class="btn-act del" onclick="elimina(' +
-        e.id +
-        ')">Elimina</button></div></div>'
-      );
-    })
-    .join('');
+          d.getFullYear() +
+          '</div><div class="entry-time">' +
+          d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) +
+          '</div></div><div class="entry-body"><div class="entry-top"><span class="entry-name" onclick="apriProfilo(\'' +
+          e.nome.replace(/'/g, "\\'") +
+          '\')">' +
+          esc(e.nome) +
+          '</span><span class="badge ' +
+          bc +
+          '">' +
+          escP(e.tipo) +
+          '</span>' +
+          gdBadge +
+          rep +
+          imp +
+          (e.tipo === nomeCorrente('Malattia') && typeof badgeCoperturaHtml === 'function'
+            ? badgeCoperturaHtml(e)
+            : '') +
+          '</div><div class="entry-text">' +
+          esc(e.testo) +
+          '</div>' +
+          (metaLines.length ? '<div class="entry-meta">' + metaLines.join(' · ') + '</div>' : '') +
+          '</div><div class="entry-actions"><button class="btn-act pin" onclick="togglePin(' +
+          e.id +
+          ')">' +
+          (pin ? 'Rimuovi pin' : 'Fissa') +
+          '</button><button class="btn-act tipo" onclick="apriModal(' +
+          e.id +
+          ",'" +
+          te +
+          '\')">Tipo</button><button class="btn-act edit" onclick="modificaRegistrazione(' +
+          e.id +
+          ')">Modifica</button>' +
+          (e.tipo === nomeCorrente('Malattia') && typeof apriPopupCopertura === 'function'
+            ? '<button class="btn-act" style="color:var(--c-verdeacqua,#1a7a6d);border-color:var(--c-verdeacqua,#1a7a6d)" onclick="apriPopupCopertura(\'' +
+              e.nome.replace(/'/g, "\\'") +
+              "','" +
+              _dataRifCopertura(e) +
+              '\')" title="Chi copre / chi ha rifiutato">Copertura</button>'
+            : '') +
+          '<button class="btn-act" onclick="promemoriaDaRegistrazione(' +
+          e.id +
+          ')" title="Crea un promemoria di follow-up gia compilato">Promemoria</button>' +
+          '<button class="btn-act del" onclick="elimina(' +
+          e.id +
+          ')">Elimina</button></div></div>'
+        );
+      })
+      .join('') + _diarioPiedeArchivio();
   _saveFiltri();
 }
 function getNomiLista() {

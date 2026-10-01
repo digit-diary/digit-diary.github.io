@@ -15,7 +15,16 @@ function cercaGlobale(q) {
     _eseguiRicercaGlobale(q.toLowerCase());
   }, 200);
 }
+const _rgArchivioFatto = {};
 function _eseguiRicercaGlobale(q) {
+  // nel Diario si cerca anche nell archivio (prima della finestra in memoria):
+  // i risultati vecchi entrano in memoria e la ricerca si ripete una volta
+  if (typeof diarioFinestraDa !== 'undefined' && diarioFinestraDa && q.length >= 3 && !_rgArchivioFatto[q]) {
+    _rgArchivioFatto[q] = true;
+    diarioCercaArchivio(q)
+      .then((n) => n && _eseguiRicercaGlobale(q))
+      .catch(() => {});
+  }
   const dd = document.getElementById('ricerca-globale-results');
   let html = '';
   let tot = 0;
