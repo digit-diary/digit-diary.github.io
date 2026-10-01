@@ -30,8 +30,18 @@
   'use strict';
 
   // la giornata del casino va dalle 11.00 alle 11.00 del giorno dopo:
-  // un orario prima delle 11.00 e dopo mezzanotte
+  // un orario prima delle 11.00 e dopo mezzanotte. Se quel giorno qualcuno
+  // comincia prima (es. JG dalle 10.00), la giornata parte da li: prima un JG
+  // 10.00-20.00 diventava "dalle 10 alle 20 di notte" (pausa appena arrivato,
+  // falsa sala vuota 04.15-10.15). Mai prima delle 07.00 (chiusura del 31.12).
   const INIZIO_GIORNATA = 660;
+  let inizioOggi = INIZIO_GIORNATA;
+  function impostaInizioGiornata(m) {
+    inizioOggi = m != null && m >= 420 && m < INIZIO_GIORNATA ? m : INIZIO_GIORNATA;
+  }
+  function inizioGiornata() {
+    return inizioOggi;
+  }
   // distanza minima tra due pause della stessa persona (sotto: avviso)
   const DISTANZA_MIN = 60;
   // turni le cui righe nel foglio sono rotazioni, non cambi per la pausa
@@ -41,7 +51,7 @@
     const m = String(s == null ? '' : s).match(/^\s*(\d{1,2})[.:](\d{2})/);
     if (!m) return null;
     let v = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
-    if (v < INIZIO_GIORNATA) v += 1440;
+    if (v < inizioOggi) v += 1440;
     return v;
   }
   // stile del foglio: la fascia 24.00-24.59 si scrive 24.xx
@@ -581,6 +591,8 @@
 
   return {
     INIZIO_GIORNATA,
+    impostaInizioGiornata,
+    inizioGiornata,
     DISTANZA_MIN,
     settore,
     ROTAZIONE,

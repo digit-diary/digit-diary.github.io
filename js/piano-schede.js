@@ -940,7 +940,9 @@ async function _pianoVacDirittoCard(anno) {
     cfg.base1 +
     ' giorni, poi ' +
     cfg.base2 +
-    '; nell anno del passaggio si matura mese per mese. Giorni in piu per anzianita, NON cumulativi (vale lo scaglione piu alto raggiunto) e pieni dall anno dell anniversario: 10 anni +' +
+    '; nell anno del passaggio si matura mese per mese. Giorni in piu per anzianita UNA VOLTA SOLA, nell anno dell anniversario (l anno dopo si torna a ' +
+    cfg.base2 +
+    '): 10 anni +' +
     cfg.bonus[0].giorni +
     ', 15 anni +' +
     cfg.bonus[1].giorni +
@@ -968,7 +970,11 @@ async function _pianoVacDirittoCard(anno) {
       x.r.base +
       ' giorni di base' +
       (x.r.bonus
-        ? ' + ' + x.r.bonus + ' per anzianita (' + x.r.voci.map((v) => v.anni + ' anni dal ' + v.dal).join(', ') + ')'
+        ? ' + ' +
+          x.r.bonus +
+          ' per anzianita (' +
+          x.r.voci.map((v) => v.anni + ' anni, solo nel ' + v.dal).join(', ') +
+          ')'
         : '') +
       (x.r.giorniEsatti != null && x.r.giorniEsatti !== x.r.giorni
         ? ' · esatti ' + x.r.giorniEsatti + ', arrotondati a ' + x.r.giorni

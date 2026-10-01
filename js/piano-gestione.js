@@ -3033,6 +3033,8 @@ function _pianoContabilitaCgf(righe, nomi, anno, finoA) {
       conRiporto: !!rip,
       festivi: [],
       festiviMese: {},
+      godutiDate: [], // date dei CGF goduti (finestrella in Crediti)
+      persiDate: [], // date dei CGF caduti in malattia
     };
   });
   righe.forEach((r) => {
@@ -3047,8 +3049,13 @@ function _pianoContabilitaCgf(righe, nomi, anno, finoA) {
       (o.festiviMese[m] = o.festiviMese[m] || []).push(parseInt(r.data.split('-')[2]));
     }
     if (r.codice === 'CGF') {
-      if (mal[r.collaboratore + '|' + r.data]) o.persi++;
-      else o.goduti++;
+      if (mal[r.collaboratore + '|' + r.data]) {
+        o.persi++;
+        o.persiDate.push(r.data);
+      } else {
+        o.goduti++;
+        o.godutiDate.push(r.data);
+      }
     }
   });
   nomi.forEach((n) => (s[n].resta = s[n].riporto + s[n].maturati - s[n].goduti));

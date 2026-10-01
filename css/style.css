@@ -32,6 +32,7 @@
   --accent2: #8b6914;
   --muted: #6f6454; /* leggibile anche sul fondo sabbia (contrasto 3,6); era #8a7d6b */
   --shadow: rgba(26, 18, 8, 0.1);
+  --sfondo-pagina: #d4c9b5; /* fondo della pagina (anche dietro al menu fisso) */
 }
 body.dark-theme {
   --c-verde: #6cc594;
@@ -52,6 +53,7 @@ body.dark-theme {
   --accent2: #d4a017;
   --muted: #9a9aaa;
   --shadow: rgba(0, 0, 0, 0.3);
+  --sfondo-pagina: #0f0f1a;
   background: #0f0f1a;
   background-image: repeating-linear-gradient(
     45deg,
@@ -5767,13 +5769,18 @@ header h1 {
     padding: 7px 26px;
   }
 }
-/* menu delle pagine: resta in alto quando si scorre */
+/* menu delle pagine: resta in alto quando si scorre. Lo sfondo copre TUTTA la
+   larghezza della finestra (non solo i 1280 px del menu): prima, con il Piano
+   piu largo, ai lati del menu si vedevano scorrere le tabelle sotto */
 .nav-tabs {
   position: sticky;
   top: 0;
   z-index: 60;
   margin-bottom: 16px;
-  box-shadow: 0 2px 6px rgba(26, 18, 8, 0.08);
+  box-shadow:
+    0 2px 6px rgba(26, 18, 8, 0.08),
+    0 0 0 100vmax var(--sfondo-pagina, #d4c9b5);
+  clip-path: inset(0 -100vmax -8px -100vmax);
 }
 .nav-tab {
   padding: 9px 10px;
@@ -6102,4 +6109,11 @@ html {
 }
 tr[data-cella-nome]:hover td {
   background: var(--paper2);
+}
+
+/* Crediti: i numeri con il dettaglio al passaggio del mouse */
+.crediti-info {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: help;
 }

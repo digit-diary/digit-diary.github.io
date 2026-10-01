@@ -339,9 +339,9 @@
   //  - dal compimento dei 2 anni: 35 giorni all'anno
   //  - nell'anno del passaggio il diritto si matura mese per mese (pro rata):
   //    i mesi prima dell'anniversario valgono 28/12, quelli dopo 35/12
-  //  - giorni in piu' per anzianita', CUMULATIVI e riconosciuti per intero
-  //    nell'anno in cui cade l'anniversario: 10 anni +1, 15 anni +2,
-  //    20 anni +3, 25 anni +5 (quindi 36, 38, 41, 46 giorni)
+  //  - giorni in piu' per anzianita' UNA VOLTA SOLA, nell'anno in cui cade
+  //    l'anniversario: 10 anni +1, 15 anni +2, 20 anni +3, 25 anni +4; l'anno
+  //    dopo si torna a 35 (regola confermata dal titolare il 01.10.2026)
   // Gli ausiliari non rientrano: hanno l'indennita' in percentuale (RAP All. 1).
   //
   // dataAssunzione: 'YYYY-MM-DD' · anno: anno civile da calcolare
@@ -390,9 +390,9 @@
       void inizioMese;
     }
     const parteBase = (base1 / 12) * mesiBase1 + (base2 / 12) * mesiBase2;
-    // bonus: NON si sommano tra loro, lo scaglione nuovo SOSTITUISCE il vecchio.
-    // Chi ha 10 anni ha 1 giorno; quando arriva a 15 ne ha 2 in tutto, non 3.
-    // Vale quindi lo scaglione piu' alto gia' raggiunto entro la fine dell'anno.
+    // bonus: SOLO NELL'ANNO DELL'ANNIVERSARIO (10, 15, 20, 25 anni) e per intero;
+    // gli altri anni niente. Prima restava per sempre dallo scaglione raggiunto
+    // (Giannace, 20 anni nel 2025, aveva 38 anche nel 2026: deve avere 35).
     const fineAnno = new Date(anno, 11, 31, 12);
     const voci = [];
     let totBonus = 0;
@@ -405,7 +405,7 @@
         // il giorno in piu' spetta DAL GIORNO DOPO l'anniversario: se cade il
         // 31 dicembre, vale dall'anno seguente
         dataB.setDate(dataB.getDate() + 1);
-        if (dataB <= fineAnno) {
+        if (dataB <= fineAnno && dataB.getFullYear() === anno) {
           totBonus = parseFloat(b.giorni) || 0;
           voci.length = 0;
           voci.push({ anni: parseInt(b.anni), giorni: parseFloat(b.giorni) || 0, dal: dataB.getFullYear() });

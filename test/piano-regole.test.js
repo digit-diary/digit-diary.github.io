@@ -274,15 +274,19 @@ console.log('\n== giorniVacanzaSpettanti ==');
 eq(R.giorniVacanzaSpettanti('2000-01-01', 2001).giorni, 28, 'primo anno = 28 giorni');
 eq(R.giorniVacanzaSpettanti('2000-01-01', 2002).giorni, 35, 'dal secondo anniversario = 35 giorni');
 eq(R.giorniVacanzaSpettanti('2000-01-01', 2009).giorni, 35, 'nove anni = ancora 35');
-eq(R.giorniVacanzaSpettanti('2000-01-01', 2010).giorni, 36, 'dieci anni = 36 (+1)');
-eq(R.giorniVacanzaSpettanti('2000-01-01', 2015).giorni, 37, 'quindici anni = 37 (+2, sostituisce l +1)');
-eq(R.giorniVacanzaSpettanti('2000-01-01', 2020).giorni, 38, 'venti anni = 38 (+3, sostituisce l +2)');
-eq(R.giorniVacanzaSpettanti('2000-01-01', 2025).giorni, 39, 'venticinque anni = 39 (+4, sostituisce l +3)');
-eq(R.giorniVacanzaSpettanti('2000-01-01', 2030).giorni, 39, 'oltre i venticinque resta 39');
-// gli scaglioni NON si sommano: vale solo il piu' alto raggiunto
-eq(R.giorniVacanzaSpettanti('2000-01-01', 2016).bonus, 2, 'a 16 anni il bonus e 2, non 1+2');
-eq(R.giorniVacanzaSpettanti('2000-01-01', 2026).voci.length, 1, 'resta una sola voce di bonus, la piu alta');
-eq(R.giorniVacanzaSpettanti('2000-01-01', 2026).voci[0].anni, 25, 'la voce e lo scaglione dei 25 anni');
+// giorni in piu per anzianita: UNA VOLTA SOLA, nell anno dell anniversario
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2010).giorni, 36, 'anno dei dieci anni = 36 (+1)');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2011).giorni, 35, 'l anno dopo i dieci anni si torna a 35');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2015).giorni, 37, 'anno dei quindici anni = 37 (+2)');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2016).giorni, 35, 'l anno dopo i quindici anni = 35');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2020).giorni, 38, 'anno dei venti anni = 38 (+3)');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2025).giorni, 39, 'anno dei venticinque anni = 39 (+4)');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2030).giorni, 35, 'oltre i venticinque: 35');
+eq(R.giorniVacanzaSpettanti('2005-03-12', 2025).giorni, 38, 'esempio Giannace: 20 anni nel 2025 = 38');
+eq(R.giorniVacanzaSpettanti('2005-03-12', 2026).giorni, 35, 'esempio Giannace: nel 2026 di nuovo 35');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2016).bonus, 0, 'a 16 anni nessun giorno in piu');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2026).voci.length, 0, 'nessuna voce di anzianita fuori dagli anni giusti');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2025).voci[0].anni, 25, 'nell anno dei 25 anni la voce e quella dei 25 anni');
 
 // PRO RATA nell'anno in cui si compiono i due anni: assunto 1 maggio 2024,
 // nel 2026 compie 2 anni il 1 maggio -> gen-apr a 28/12, mag-dic a 35/12

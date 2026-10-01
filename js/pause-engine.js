@@ -11,6 +11,25 @@
 // ============================================================
 
 // ---------- util orari ----------
+// INIZIO DELLA GIORNATA del foglio pause (vedi PauseControlli): 11.00, oppure
+// prima se quel giorno un JG comincia prima (es. 10.00)
+function _peInizio() {
+  return typeof window !== 'undefined' && window.PauseControlli ? window.PauseControlli.inizioGiornata() : 660;
+}
+function _peImpostaInizio(righe) {
+  let m = 660;
+  (righe || []).forEach((r) => {
+    if (
+      String(r.turno || '')
+        .trim()
+        .toUpperCase() !== 'JG'
+    )
+      return;
+    const o = _peJgOrario(r);
+    if (o && o.ini != null && o.fin != null && o.fin > o.ini && o.ini < m) m = o.ini;
+  });
+  if (typeof window !== 'undefined' && window.PauseControlli) window.PauseControlli.impostaInizioGiornata(m);
+}
 function _peOraMin(s) {
   if (!s) return null;
   const m = String(s).match(/^(\d{1,2})[.:](\d{2})/);
@@ -306,7 +325,7 @@ function _peVerificaRegolePause(contenuto, dstr, settore) {
   if (!contenuto) return [];
   const regole = _peRegolePause(settore);
   const dow = new Date(dstr + 'T12:00:00').getDay();
-  const norm = (m) => (m < 660 ? m + 1440 : m);
+  const norm = (m) => (m < _peInizio() ? m + 1440 : m);
   const intv = (txt) => {
     const m = String(txt || '').match(/(\d{1,2}[.:]\d{2})\s*-\s*(\d{1,2}[.:]\d{2})/);
     if (!m) return null;
@@ -2343,6 +2362,7 @@ function _pcFormazione(righe) {
   };
 }
 function _peGeneraSlots(righeTutte, dstr) {
+  _peImpostaInizio(righeTutte);
   const form = _pcFormazione(righeTutte);
   const righe = form.righe;
   const dow = new Date(dstr + 'T12:00:00').getDay();
@@ -2825,6 +2845,12 @@ function _peCompletaPause(c, ctx, righe, dstr) {
     if ((prima != null && dPrima < PC.DISTANZA_MIN) || (dopo != null && dDopo < PC.DISTANZA_MIN)) return null;
     let punti = Math.min(dPrima, dDopo);
     if ((prima != null && dPrima < 90) || (dopo != null && dDopo < 90)) punti -= 60;
+    // JG DEL MATTINO (decisione del titolare 01.10): chi comincia prima di
+    // mezzogiorno fa la mezz'ora a pranzo, fra le 12.00 e le 13.30
+    if (p.turno === 'JG' && d >= 30 && p.ini < 720 && t >= 720 && t + d <= 810) punti += 600;
+    // e per il JG nessuna attesa oltre le 3 ore fino a fine turno (soglia dell avviso)
+    if (p.turno === 'JG' && dopo == null && dDopo > 180) punti -= dDopo - 180;
+    if (p.turno === 'JG' && prima == null && dPrima > 180) punti -= dPrima - 180;
     return punti;
   };
   const ordine = persone.filter((p) => p.ini != null && p.attese && p.attese.length).sort((a, b) => a.ini - b.ini);
@@ -3040,6 +3066,7 @@ function _peJgOrario(r) {
   return { ini: _pcOraMin(oi), fin: _pcOraMin(of) };
 }
 function _pcPersone(righeTutte, dstr) {
+  _peImpostaInizio(righeTutte);
   const righe = _pcFormazione(righeTutte).righe;
   const orari = _peOrariTurni();
   const dow = new Date(dstr + 'T12:00:00').getDay();
@@ -3058,7 +3085,7 @@ function _pcPersone(righeTutte, dstr) {
       const scelta = _pcJgScelte()[nome.toUpperCase()] || 'S';
       if (a == null || bb == null || !['S', 'R', 'C', 'A'].includes(scelta)) return;
       if (bb <= a) bb += 1440;
-      if (a < 660) {
+      if (a < _peInizio()) {
         a += 1440;
         bb += 1440;
       }
@@ -3082,7 +3109,7 @@ function _pcPersone(righeTutte, dstr) {
     visti.add(nome.toUpperCase());
     const o = orari[turno];
     // stessa convenzione del foglio: prima delle 11.00 e dopo mezzanotte
-    const ini = o ? (o.ini < 660 ? o.ini + 1440 : o.ini) : null;
+    const ini = o ? (o.ini < _peInizio() ? o.ini + 1440 : o.ini) : null;
     const fin = o ? ini + o.dur : null;
     // accoglienza (gruppo ACCOGLIENZA nella tabella Turni, es. S31): si organizzano da soli
     const info =
@@ -3112,7 +3139,7 @@ function _peGeneraValet(righe, dstr) {
   const WIN_MIN = 90;
   const rIns = regole.find((r) => r.tipo === 'insieme');
   const N_INSIEME = rIns ? parseInt(rIns.n) || 1 : 1;
-  const norm = (m) => (m < 660 ? m + 1440 : m);
+  const norm = (m) => (m < _peInizio() ? m + 1440 : m);
   // fasce senza pause valide oggi
   const fasce = regole
     .filter((r) => r.tipo === 'fascia' && (!r.giorni || !r.giorni.length || r.giorni.map(Number).includes(dow)))
@@ -3482,8 +3509,8 @@ function _pbIntervallo(v) {
   const ini = _peOraMin(p[0].trim());
   const fin = _peOraMin(p[1].trim());
   if (ini == null || fin == null) return null;
-  const iniA = ini < 660 ? ini + 1440 : ini;
-  let finA = fin < 660 ? fin + 1440 : fin;
+  const iniA = ini < _peInizio() ? ini + 1440 : ini;
+  let finA = fin < _peInizio() ? fin + 1440 : fin;
   if (finA <= iniA) finA += 1440;
   return { ini: iniA, fin: finA };
 }
@@ -4260,7 +4287,7 @@ function _briefParseIntv(s) {
   let a = _peOraMin(p[0].trim());
   let b = _peOraMin(p[1].trim());
   if (a == null || b == null) return null;
-  if (a < 660) a += 1440; // dopo mezzanotte
+  if (a < _peInizio()) a += 1440; // dopo mezzanotte
   if (b <= a) b += 1440;
   return [a, b];
 }

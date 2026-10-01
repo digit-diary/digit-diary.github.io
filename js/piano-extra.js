@@ -2173,11 +2173,14 @@ async function _pianoCreditiDati(anno, soloNomi) {
   // vacanze: settimane registrate nell anno (come la scheda Vacanze)
   const vac = (await secGet('piano_vacanze?anno=eq.' + anno + '&limit=2000')) || [];
   const gia = {};
+  const settDi = {}; // nome -> [{ sett, dal, al }] per la finestrella
   vac.forEach((v) => {
     const sett = parseInt(v.settimana);
     if (!sett || !v.confermata || !_vacEVacanza(v)) return; // come la scheda Vacanze: provvisorie e altre assenze non contano
     const gg = _pianoGiorniSettimana(anno, sett).filter((d) => d.substring(0, 4) === String(anno));
     gia[v.collaboratore] = (gia[v.collaboratore] || 0) + gg.length;
+    if (gg.length)
+      (settDi[v.collaboratore] = settDi[v.collaboratore] || []).push({ sett: sett, dal: gg[0], al: gg[gg.length - 1] });
   });
   const vRest = {};
   (
@@ -2252,10 +2255,26 @@ async function _pianoCreditiDati(anno, soloNomi) {
       jolly: jolly,
       senzaData: !info.data_assunzione && fisso,
       vac: dir
-        ? { spett: dir.giorni, pian: pian, rest: rest, resta: Math.round((dir.giorni - pian + rest) * 10) / 10 }
+        ? {
+            spett: dir.giorni,
+            pian: pian,
+            rest: rest,
+            resta: Math.round((dir.giorni - pian + rest) * 10) / 10,
+            settimane: (settDi[n] || []).sort((x, y) => x.sett - y.sett),
+            spiega: dir,
+          }
         : null,
       cgf: cgf[n]
-        ? { mat: cgf[n].maturati, god: cgf[n].goduti, rip: cgf[n].riporto, persi: cgf[n].persi, resta: cgf[n].resta }
+        ? {
+            mat: cgf[n].maturati,
+            god: cgf[n].goduti,
+            rip: cgf[n].riporto,
+            persi: cgf[n].persi,
+            resta: cgf[n].resta,
+            festivi: cgf[n].festivi || [],
+            godutiDate: cgf[n].godutiDate || [],
+            persiDate: cgf[n].persiDate || [],
+          }
         : null,
       saldoOre: saldoOre,
       recMese: soloNomi || jolly ? null : _pianoRecuperoTotale(n, _pianoMeseSel),
@@ -2263,10 +2282,55 @@ async function _pianoCreditiDati(anno, soloNomi) {
     };
   });
 }
-function _pianoCreditiNum(v, unita, colore) {
+function _pianoCreditiNum(v, unita, colore, info) {
   if (v == null) return '<td style="color:var(--muted)">-</td>';
   const c = colore ? (v > 0 ? '#8b6914' : v < 0 ? '#c0392b' : '#2c6e49') : 'inherit';
-  return '<td style="font-weight:' + (colore ? 700 : 400) + ';color:' + c + '">' + v + (unita || '') + '</td>';
+  return (
+    '<td style="font-weight:' +
+    (colore ? 700 : 400) +
+    ';color:' +
+    c +
+    '"' +
+    (info ? ' class="crediti-info" title="' + escP(info) + '"' : '') +
+    '>' +
+    v +
+    (unita || '') +
+    '</td>'
+  );
+}
+// testi delle finestrelle (passando il mouse sul numero)
+function _crDate(lista) {
+  const gg = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
+  return (lista || [])
+    .slice()
+    .sort()
+    .map((d) => gg[new Date(d + 'T12:00:00').getDay()] + ' ' + d.split('-').reverse().join('.'))
+    .join('\n');
+}
+function _crInfoVacanzePian(v) {
+  if (!v || !v.settimane || !v.settimane.length) return '';
+  return (
+    'Settimane di vacanza registrate:\n' +
+    v.settimane
+      .map(
+        (s) =>
+          'sett. ' + s.sett + ': ' + s.dal.split('-').reverse().join('.') + ' - ' + s.al.split('-').reverse().join('.'),
+      )
+      .join('\n')
+  );
+}
+function _crInfoVacanzeResta(v) {
+  if (!v) return '';
+  return (
+    'Spettanti ' +
+    v.spett +
+    (v.spiega && v.spiega.bonus ? ' (di cui ' + v.spiega.bonus + ' per anzianita, solo quest anno)' : '') +
+    '\n- pianificate ' +
+    v.pian +
+    (v.rest ? '\n+ restituite per malattia ' + v.rest : '') +
+    '\n= restano ' +
+    v.resta
+  );
 }
 async function _renderPianoCreditiTab() {
   const anno = parseInt(_pianoMeseSel.split('-')[0]);
@@ -2319,13 +2383,33 @@ async function _renderPianoCreditiTab() {
       '</td><td>' +
       (d.pct == null ? '-' : d.pct + '%') +
       '</td>' +
-      _pianoCreditiNum(d.vac ? d.vac.spett : null) +
-      _pianoCreditiNum(d.vac ? d.vac.pian : null) +
+      _pianoCreditiNum(
+        d.vac ? d.vac.spett : null,
+        '',
+        false,
+        d.vac && d.vac.spiega && d.vac.spiega.bonus
+          ? d.vac.spiega.base + ' di base + ' + d.vac.spiega.bonus + ' per anzianita (solo quest anno)'
+          : '',
+      ) +
+      _pianoCreditiNum(d.vac ? d.vac.pian : null, '', false, _crInfoVacanzePian(d.vac)) +
       _pianoCreditiNum(d.vac ? d.vac.rest || null : null) +
-      _pianoCreditiNum(d.vac ? d.vac.resta : null, '', true) +
+      _pianoCreditiNum(d.vac ? d.vac.resta : null, '', true, _crInfoVacanzeResta(d.vac)) +
       _pianoCreditiNum(d.cgf ? d.cgf.rip : null) +
-      _pianoCreditiNum(d.cgf ? d.cgf.mat : null) +
-      _pianoCreditiNum(d.cgf ? d.cgf.god : null) +
+      _pianoCreditiNum(
+        d.cgf ? d.cgf.mat : null,
+        '',
+        false,
+        d.cgf && d.cgf.festivi.length ? 'Festivi lavorati:\n' + _crDate(d.cgf.festivi) : '',
+      ) +
+      _pianoCreditiNum(
+        d.cgf ? d.cgf.god : null,
+        '',
+        false,
+        d.cgf && (d.cgf.godutiDate.length || d.cgf.persiDate.length)
+          ? (d.cgf.godutiDate.length ? 'CGF goduti:\n' + _crDate(d.cgf.godutiDate) : '') +
+              (d.cgf.persiDate.length ? '\n\nCaduti in malattia (da ridare):\n' + _crDate(d.cgf.persiDate) : '')
+          : '',
+      ) +
       _pianoCreditiNum(d.cgf ? d.cgf.resta : null, '', true) +
       (d.jolly
         ? '<td style="color:var(--muted)">-</td>'
