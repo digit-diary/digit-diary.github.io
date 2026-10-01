@@ -864,6 +864,7 @@ function _pianoVacCfg() {
       { anni: 15, giorni: parseFloat(_pianoRegolaVal('vacanze_bonus_15anni')) || 2 },
       { anni: 20, giorni: parseFloat(_pianoRegolaVal('vacanze_bonus_20anni')) || 3 },
       { anni: 25, giorni: parseFloat(_pianoRegolaVal('vacanze_bonus_25anni')) || 4 },
+      { anni: 30, giorni: parseFloat(_pianoRegolaVal('vacanze_bonus_30anni')) || 5 },
     ],
     // arrotondamento al giorno pieno: dalla soglia in su si sale (32.67 -> 33,
     // 32.37 -> 33), sotto si resta al giorno intero (32.3 -> 32)
@@ -950,6 +951,8 @@ async function _pianoVacDirittoCard(anno) {
     cfg.bonus[2].giorni +
     ', 25 anni +' +
     cfg.bonus[3].giorni +
+    ', 30 anni +' +
+    cfg.bonus[4].giorni +
     '. Gli ausiliari non compaiono: hanno l indennita in percentuale sulle ore.</p>';
   if (!righe.length) {
     h +=

@@ -340,7 +340,8 @@
   //  - nell'anno del passaggio il diritto si matura mese per mese (pro rata):
   //    i mesi prima dell'anniversario valgono 28/12, quelli dopo 35/12
   //  - giorni in piu' per anzianita' UNA VOLTA SOLA, nell'anno in cui cade
-  //    l'anniversario: 10 anni +1, 15 anni +2, 20 anni +3, 25 anni +4; l'anno
+  //    l'anniversario: 10 anni +1, 15 anni +2, 20 anni +3, 25 anni +4,
+  //    30 anni +5; l'anno
   //    dopo si torna a 35 (regola confermata dal titolare il 01.10.2026)
   // Gli ausiliari non rientrano: hanno l'indennita' in percentuale (RAP All. 1).
   //
@@ -360,6 +361,7 @@
           { anni: 15, giorni: 2 },
           { anni: 20, giorni: 3 },
           { anni: 25, giorni: 4 },
+          { anni: 30, giorni: 5 },
         ];
     if (!dataAssunzione) return null;
     const ass = new Date(dataAssunzione + 'T12:00:00');

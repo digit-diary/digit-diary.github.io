@@ -442,7 +442,7 @@ function GUIDA_CAPITOLI() {
       righe: [
         'Nella scheda <b>Vacanze</b> il programma calcola quanti giorni spettano a ogni collaboratore fisso, partendo dalla data di inizio contratto.',
         'La regola: <b>28 giorni</b> nei primi due anni, <b>35</b> dal compimento dei due anni. Nell anno del passaggio il diritto matura mese per mese: i mesi prima dell anniversario valgono 28 diviso 12, quelli dopo 35 diviso 12.',
-        'Giorni in piu per anzianita <b>una volta sola</b>, nell anno in cui cade l anniversario (dal giorno dopo: un anniversario il 31.12 vale l anno seguente): <b>10 anni +1</b> (36), <b>15 anni +2</b> (37), <b>20 anni +3</b> (38), <b>25 anni +4</b> (39). L anno dopo si torna a 35.',
+        'Giorni in piu per anzianita <b>una volta sola</b>, nell anno in cui cade l anniversario (dal giorno dopo: un anniversario il 31.12 vale l anno seguente): <b>10 anni +1</b> (36), <b>15 anni +2</b> (37), <b>20 anni +3</b> (38), <b>25 anni +4</b> (39), <b>30 anni +5</b> (40). L anno dopo si torna a 35.',
         'I decimali del pro-rata si <b>arrotondano al giorno pieno</b> a favore del collaboratore: da <b>,35</b> in su si sale (32.67 e 32.37 diventano 33), sotto resta il giorno intero (32.3 resta 32). Passando il mouse sulla riga si legge comunque il valore esatto. La soglia si cambia nella regola vacanze_arrotonda_da (vuota = nessun arrotondamento).',
         'Esempio: chi compie 20 anni a marzo 2025 ha 38 giorni nel 2025 e di nuovo 35 nel 2026.',
         'I mesi di <b>congedo non pagato</b> spostano in avanti anche questi scaglioni, esattamente come fanno con i giubilei: l anzianita di servizio e una sola.',

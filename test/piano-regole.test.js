@@ -281,7 +281,9 @@ eq(R.giorniVacanzaSpettanti('2000-01-01', 2015).giorni, 37, 'anno dei quindici a
 eq(R.giorniVacanzaSpettanti('2000-01-01', 2016).giorni, 35, 'l anno dopo i quindici anni = 35');
 eq(R.giorniVacanzaSpettanti('2000-01-01', 2020).giorni, 38, 'anno dei venti anni = 38 (+3)');
 eq(R.giorniVacanzaSpettanti('2000-01-01', 2025).giorni, 39, 'anno dei venticinque anni = 39 (+4)');
-eq(R.giorniVacanzaSpettanti('2000-01-01', 2030).giorni, 35, 'oltre i venticinque: 35');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2026).giorni, 35, 'dopo i venticinque: 35');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2030).giorni, 40, 'anno dei trenta anni = 40 (+5)');
+eq(R.giorniVacanzaSpettanti('2000-01-01', 2031).giorni, 35, 'dopo i trenta: 35');
 eq(R.giorniVacanzaSpettanti('2005-03-12', 2025).giorni, 38, 'esempio Giannace: 20 anni nel 2025 = 38');
 eq(R.giorniVacanzaSpettanti('2005-03-12', 2026).giorni, 35, 'esempio Giannace: nel 2026 di nuovo 35');
 eq(R.giorniVacanzaSpettanti('2000-01-01', 2016).bonus, 0, 'a 16 anni nessun giorno in piu');

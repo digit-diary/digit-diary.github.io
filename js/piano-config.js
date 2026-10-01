@@ -282,6 +282,12 @@ const PIANO_REGOLE_GUIDA = {
     t: 'numero',
     d: 'Scheda Vacanze (diritto)',
   },
+  vacanze_bonus_30anni: {
+    g: 'Vacanze',
+    n: 'Giorni in piu nell anno dei 30 anni di servizio (una volta sola)',
+    t: 'numero',
+    d: 'Scheda Vacanze (diritto)',
+  },
   vacanze_arrotonda_da: {
     g: 'Vacanze',
     n: 'Da questa frazione in su i giorni si arrotondano al giorno pieno (0.35: 32.37 diventa 33)',
@@ -428,6 +434,7 @@ const PIANO_REGOLE_LIMITI = {
   vacanze_bonus_15anni: [0, 10],
   vacanze_bonus_20anni: [0, 10],
   vacanze_bonus_25anni: [0, 10],
+  vacanze_bonus_30anni: [0, 10],
   vacanze_arrotonda_da: [0, 1],
   vacanze_giorni_anno: [10, 45],
   c_prima_fissi: [0, 5],
