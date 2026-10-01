@@ -1876,7 +1876,8 @@ async function miglioraOrePiano() {
     }
     return true;
   };
-  const malattie = _pianoMalattieMese(ym);
+  // malattie e giorni dopo la fine del rapporto: chi e li non riceve turni
+  const malattie = Object.assign(_pianoMalattieMese(ym), _pianoFineMese(ym));
   // donatori: turni GENERATI non protetti di chi è sopra (fissi sopra o jolly)
   // solo giorni che devono ancora arrivare e aperti: il passato e un documento,
   // e oggi si sta gia lavorando (prima si spostavano anche i turni passati)

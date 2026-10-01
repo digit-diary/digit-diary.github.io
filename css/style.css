@@ -6117,3 +6117,15 @@ tr[data-cella-nome]:hover td {
   text-underline-offset: 3px;
   cursor: help;
 }
+
+/* giorni dopo la fine del rapporto di lavoro */
+.piano-cella.piano-fuori-rapporto {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--paper2),
+    var(--paper2) 4px,
+    var(--line) 4px,
+    var(--line) 6px
+  ) !important;
+  color: var(--muted) !important;
+}

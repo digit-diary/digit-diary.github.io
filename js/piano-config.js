@@ -376,7 +376,7 @@ const PIANO_REGOLE_GUIDA = {
   },
   congedo_np_giorni_vacanze: {
     g: 'Congedi non pagati',
-    n: 'Oltre questi giorni di congedo il diritto vacanze dell anno si riduce in proporzione',
+    n: 'Oltre questi giorni di congedo il diritto vacanze si riduce in proporzione (0 = ogni giorno lo riduce)',
     t: 'numero',
     d: 'Scheda Vacanze (diritto), scheda Congedi',
   },

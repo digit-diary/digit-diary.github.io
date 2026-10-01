@@ -967,6 +967,11 @@ let _pianoTab = localStorage.getItem('piano_tab') || 'calendario';
 // Icone = Bootstrap Icons (le stesse della navbar di Turnivo), incorporate SVG
 const _PIANO_TABS = [
   [
+    'congedi',
+    'Congedi',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4zm5.15 3.15a.5.5 0 0 1 .7 0L8 8.29l1.15-1.14a.5.5 0 0 1 .7.7L8.71 9l1.14 1.15a.5.5 0 0 1-.7.7L8 9.71l-1.15 1.14a.5.5 0 0 1-.7-.7L7.29 9 6.15 7.85a.5.5 0 0 1 0-.7"/></svg>',
+  ],
+  [
     'avvisi',
     'Avvisi',
     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2M8 1.918l-.797.161A4 4 0 0 0 4 6c0 .628-.134 2.197-.459 3.742-.16.767-.376 1.566-.663 2.258h10.244c-.287-.692-.502-1.49-.663-2.258C12.134 8.197 12 6.628 12 6a4 4 0 0 0-3.203-3.92zM14.22 12c.223.447.481.801.78 1H1c.299-.199.557-.553.78-1C2.68 10.2 3 6.88 3 6c0-2.42 1.72-4.44 4.005-4.901a1 1 0 1 1 1.99 0A5 5 0 0 1 13 6c0 .88.32 4.2 1.22 6"/></svg>',
@@ -1077,6 +1082,7 @@ const PIANO_TAB_GRUPPI = [
       'vacanze',
       'saldo',
       'recupero',
+      'congedi',
       'timbrature',
       'statistiche',
       'benessere',
@@ -1498,7 +1504,12 @@ async function _renderPianoCore() {
     };
     const ordinePred = (x, y) => rangoFn(x) - rangoFn(y) || x.localeCompare(y);
     const collabs = collaboratoriCache
-      .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
+      .filter(
+        (c) =>
+          c.attivo !== false &&
+          _pianoAppartieneAlReparto(c) &&
+          (_pianoOperativoNelMese(c, ym) || _pianoRighe.some((r) => r.collaboratore === c.nome)),
+      )
       .map((c) => c.nome)
       .sort(ordinePred);
     const extra = [...new Set(_pianoRighe.map((r) => r.collaboratore))]
@@ -1891,6 +1902,14 @@ async function _renderPianoCore() {
               titolo += (titolo ? ' · ' : '') + 'Domenica libera valida: conta per le 12 domeniche dell anno';
             }
           }
+          // dopo la fine del rapporto: cella grigia con la spiegazione
+          if (!_pianoOperativoIl(nome, dstr)) {
+            cls += ' piano-fuori-rapporto';
+            titolo +=
+              (titolo ? ' · ' : '') +
+              'Fuori contratto: ultimo giorno ' +
+              _pianoFineRapporto(nome).split('-').reverse().join('.');
+          }
           const violMsg = _pianoViolCelle[nome + '|' + dstr];
           if (violMsg) {
             cls += ' piano-viol';
@@ -1924,7 +1943,9 @@ async function _renderPianoCore() {
         const infoC = infoC0;
         const perc = perc0;
         // come Turnivo: OD=(giorni/7)*ore_sett*pct (jolly=0), OP=turni+speciali, SM=OP-OD, YTD=cumulato da gennaio
-        const dovute = infoC && infoC.is_jolly ? 0 : Math.round(((_pianoOreSett * perc * nGiorni) / 7) * 10) / 10;
+        // giorni dovuti: meno congedi non pagati e giorni dopo la fine del rapporto
+        const dovute =
+          infoC && infoC.is_jolly ? 0 : Math.round(((_pianoOreSett * perc * _pianoGgDovuti(nome, ym)) / 7) * 10) / 10;
         const _rett = _pianoRettificaMese(nome);
         // scostamenti giornaliati (scheda Recupero ore): sommati alle ore del
         // piano, cosi' il saldo e' aggiornato giorno per giorno
@@ -2299,6 +2320,9 @@ async function _renderPianoCore() {
       h += await _renderPianoBriefingTab();
     } else if (_pianoTab === 'avvisi') {
       h += await _renderPianoAvvisiTab();
+    } else if (_pianoTab === 'congedi') {
+      // congedi non pagati: chi, quando, quanti giorni, effetti (scheda propria)
+      h += _renderPianoCongediNpCard();
     } else if (_pianoTab === 'crediti') {
       h += await _renderPianoCreditiTab();
     } else if (_pianoTab === 'vacanze') {
@@ -2340,7 +2364,6 @@ async function _renderPianoCore() {
         _renderPianoImportExportCard() +
         _renderPianoMappatureCard() +
         _renderPianoPreferenzeCard() +
-        _renderPianoCongediNpCard() +
         _renderPianoImpostazioniCard() +
         '</div>';
     }

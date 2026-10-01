@@ -946,7 +946,8 @@ async function generaBozzaPiano(usaCoperture) {
     (idoneita[r.collaboratore] = idoneita[r.collaboratore] || new Set()).add(t.gruppo);
     familiarita[r.collaboratore + '|' + r.codice] = (familiarita[r.collaboratore + '|' + r.codice] || 0) + 1;
   });
-  const malattie = Object.assign(_pianoMalattieMese(ym), _pianoCnpMese(ym)); // malattie e congedi non pagati: giorni non assegnabili
+  // malattie, congedi non pagati e giorni dopo la fine del rapporto: non assegnabili
+  const malattie = Object.assign(_pianoMalattieMese(ym), _pianoCnpMese(ym), _pianoFineMese(ym));
   const ndDiario = _pianoNdMese(ym);
   // stato griglia: esistenti + assegnazioni della bozza
   const cella = {}; // 'nome|g' -> codice

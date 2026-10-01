@@ -2885,6 +2885,8 @@ var _HR_TIPO_STILE = {
   livello: { label: 'Livello', col: '#2c6e49' },
   formazione: { label: 'Formazione', col: '#1a4a7a' },
   nota: { label: 'Nota', col: 'var(--muted)' },
+  congedo_np: { label: 'Congedo non pagato', col: '#7b2d8b' },
+  cessazione: { label: 'Fine contratto', col: '#c0392b' },
 };
 function _renderStoricoHrSezione(nome) {
   const _hrFull = typeof puoVedereStoricoHr === 'function' && puoVedereStoricoHr();
@@ -2933,6 +2935,37 @@ function _renderStoricoHrSezione(nome) {
         anzianitaLabel(dataAss, c && c.mesi_congedo_non_pagato, c && c.nome) +
         '</span>';
     html += '</div>';
+    // FINE CONTRATTO (data_fine_rapporto): compare solo se c e; altrimenti un piccolo
+    // pulsante la apre. Dal giorno dopo non e piu operativo nel Piano; il resto resta.
+    var dataFine = (c && c.data_fine_rapporto ? String(c.data_fine_rapporto).substring(0, 10) : '') || '';
+    var spiegaFine =
+      'Ultimo giorno di lavoro: dal giorno dopo non e piu nel calendario, nella bozza, nelle coperture e nei cambi e non ha ore dovute. Diario, scheda, storico, vacanze e CGF restano.';
+    html +=
+      '<div id="hr-fine-riga" style="display:' +
+      (dataFine ? 'flex' : 'none') +
+      ';align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px" title="' +
+      escP(spiegaFine) +
+      '">';
+    html += '<span style="font-size:var(--fs-md,.875rem);color:var(--muted)">Fine contratto:</span>';
+    html +=
+      '<input type="date" id="hr-fine" value="' +
+      escP(dataFine) +
+      '" style="padding:5px 10px;border:1px solid var(--line);border-radius:2px;font-size:var(--fs-md,.875rem);background:var(--paper2);color:var(--ink)">';
+    html +=
+      '<button class="btn-salva" onclick="salvaFineRapporto(\'' +
+      neS +
+      '\')" style="font-size:var(--fs-sm,.8125rem);padding:5px 14px;background:var(--accent2)">Salva</button>';
+    if (dataFine)
+      html +=
+        '<button class="btn-act" onclick="salvaFineRapporto(\'' +
+        neS +
+        '\', true)" title="Torna operativo">Togli</button>';
+    html += '</div>';
+    if (!dataFine)
+      html +=
+        '<button class="btn-act" style="margin-bottom:10px" title="' +
+        escP(spiegaFine) +
+        "\" onclick=\"document.getElementById('hr-fine-riga').style.display='flex';this.remove()\">+ Fine contratto</button>";
     // Premio giubileo (ogni N anni di servizio, importi configurabili da admin)
     if (dataAss && typeof giubileiCollaboratore === 'function') {
       var gb = giubileiCollaboratore(c);
@@ -3054,6 +3087,70 @@ async function salvaDataAssunzione(nome) {
     apriSchedaCollaboratore(nome);
   } catch (e) {
     toast('Errore salvataggio');
+  }
+}
+async function salvaFineRapporto(nome, togli) {
+  if (typeof puoVedereStoricoHr !== 'function' || !puoVedereStoricoHr()) {
+    toast('Non hai il permesso');
+    return;
+  }
+  var c = collaboratoriCache.find(function (x) {
+    return x.nome === nome;
+  });
+  if (!c) return;
+  var val = togli ? null : (document.getElementById('hr-fine') || {}).value || '';
+  if (!togli && !val) {
+    toast('Scegli l ultimo giorno di lavoro');
+    return;
+  }
+  if (val && c.data_assunzione && val < String(c.data_assunzione).substring(0, 10)) {
+    toastErrore('La fine del contratto e prima dell inizio del contratto');
+    return;
+  }
+  // turni gia scritti nel piano dopo la fine: si dicono (non si cancellano da soli)
+  var dopo = [];
+  if (val) {
+    try {
+      dopo =
+        (await secGet(
+          'piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=gt.' + val + '&order=data.asc&limit=400',
+        )) || [];
+    } catch (e) {}
+    dopo = dopo.filter(function (r) {
+      return typeof _pianoTurnoInfo === 'function' ? !!_pianoTurnoInfo(r.codice) : true;
+    });
+  }
+  var msg = togli
+    ? 'Tolgo la fine del contratto di ' + nome + '? Torna operativo nel Piano.'
+    : 'Fine contratto di ' +
+      nome +
+      ': ultimo giorno ' +
+      val.split('-').reverse().join('.') +
+      '.\n\nDal giorno dopo non e piu nel calendario, nella bozza, nelle coperture e nei cambi e non ha ore dovute. Diario, scheda, storico, vacanze e CGF restano.' +
+      (dopo.length
+        ? '\n\nATTENZIONE: ha ancora ' +
+          dopo.length +
+          ' turni nel piano dopo quella data (dal ' +
+          String(dopo[0].data).substring(0, 10).split('-').reverse().join('.') +
+          '): restano scritti finche non li sposti o li cancelli; nel calendario sono a righe grigie.'
+        : '');
+  if (!(await chiediConferma(msg, { titolo: togli ? 'Torna operativo' : 'Fine contratto' }))) return;
+  try {
+    await secPatch('collaboratori', 'id=eq.' + c.id, { data_fine_rapporto: val });
+    c.data_fine_rapporto = val;
+    await _insertHrEvento(
+      nome,
+      togli ? 'altro' : 'cessazione',
+      togli
+        ? 'Fine contratto tolta: torna operativo'
+        : 'Fine contratto: ultimo giorno ' + new Date(val + 'T12:00:00').toLocaleDateString('it-IT'),
+      val || oggiLocale(),
+    );
+    logAzione(togli ? 'Fine contratto tolta' : 'Fine contratto', nome + (val ? ' · ultimo giorno ' + val : ''));
+    toast(togli ? nome + ' torna operativo' : 'Fine contratto salvata');
+    apriSchedaCollaboratore(nome);
+  } catch (e) {
+    toastErrore('Fine contratto non salvata: ' + ((e && e.message) || e));
   }
 }
 async function eliminaHrEvento(id, nome) {

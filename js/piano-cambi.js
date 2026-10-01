@@ -411,7 +411,14 @@ async function apriCercaCambioLibero() {
   // CANDIDATI: a riposo il giorno X, idonei al turno, regole rispettate
   const candidati = [];
   collaboratoriCache
-    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && c.nome !== sel.nome && c.funzione !== 'RESP')
+    .filter(
+      (c) =>
+        c.attivo !== false &&
+        _pianoAppartieneAlReparto(c) &&
+        c.nome !== sel.nome &&
+        c.funzione !== 'RESP' &&
+        _pianoOperativoIl(c, sel.data), // non chi ha finito il rapporto
+    )
     .forEach((c) => {
       const mia = mappe[c.nome] || {};
       if (!eLibero(mia[sel.data])) return;
@@ -443,6 +450,7 @@ async function apriCercaCambioLibero() {
         const tSuo = _pianoTurnoInfo(codSuo);
         if (!tSuo) continue;
         if (!eLibero(mioPiano[y])) continue;
+        if (!_pianoOperativoIl(sel.nome, y)) continue; // dopo la fine del rapporto non si restituisce
         if (bloccate[c.nome + '|' + y] || bloccate[sel.nome + '|' + y]) continue;
         if (!_pianoIdoneoPerTurno(sel.nome, tSuo)) continue;
         if (problema(mioPiano, y, codSuo)) continue;
@@ -1268,6 +1276,10 @@ async function cercaSostitutiMalattia() {
       cella[r.collaboratore + '|' + idx] = r.codice;
     });
   } catch (e) {}
+  // dopo la fine del rapporto il giorno non e libero: nessuna proposta
+  for (const nf of nomi)
+    for (let g = 1; g <= _pianoUltimoGiorno(ym); g++)
+      if (!_pianoOperativoIl(nf, ym + '-' + String(g).padStart(2, '0'))) cella[nf + '|' + g] = 'FINE';
   const oreMese = {};
   _pianoRighe.forEach((r) => {
     const t = _pianoTurnoInfo(r.codice);

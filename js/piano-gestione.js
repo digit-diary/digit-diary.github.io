@@ -1311,7 +1311,16 @@ async function pianoAssegnaCgfMese() {
     const d = ym + '-' + String(g).padStart(2, '0');
     if (d <= _oggiCgf || !_pianoGiornoScrivibile(d)) chiusiCgf.add(g);
   }
-  const ctx = { ym: ym, nGiorni: nGiorni, cella: cella, malattie: malattie, compleanni: compleanni, chiusi: chiusiCgf };
+  // giorni non utilizzabili per un recupero: malattia e dopo la fine del rapporto
+  const nonDisponibili = Object.assign({}, malattie, _pianoFineMese(ym));
+  const ctx = {
+    ym: ym,
+    nGiorni: nGiorni,
+    cella: cella,
+    malattie: nonDisponibili,
+    compleanni: compleanni,
+    chiusi: chiusiCgf,
+  };
   const daTogliere = []; // CGF generati in piu' (festivo saltato per malattia)
   nomi.forEach((n) => {
     const s = saldo[n];
@@ -2619,7 +2628,45 @@ function _pianoGiorniCnp(nome, ym) {
 }
 // giorni del mese che contano per le ore dovute: tutti meno quelli di congedo
 function _pianoGgDovuti(nome, ym) {
-  return Math.max(0, _pianoUltimoGiorno(ym) - _pianoGiorniCnp(nome, ym));
+  // meno i giorni di congedo non pagato e i giorni dopo la fine del rapporto
+  return Math.max(0, _pianoUltimoGiorno(ym) - _pianoGiorniCnp(nome, ym) - _pianoGiorniDopoFine(nome, ym));
+}
+// FINE RAPPORTO (data_fine_rapporto nella scheda): dal giorno dopo il collaboratore
+// non e piu operativo (calendario dei mesi dopo, bozza, coperture, cambi, ore
+// dovute); prima tutto resta com era e Diario, schede, storico restano consultabili.
+function _pianoFineRapporto(c) {
+  const info = typeof c === 'string' ? _pianoCollabInfo(c) : c;
+  return info && info.data_fine_rapporto ? String(info.data_fine_rapporto).substring(0, 10) : '';
+}
+function _pianoOperativoIl(c, dstr) {
+  const f = _pianoFineRapporto(c);
+  return !f || String(dstr).substring(0, 10) <= f;
+}
+function _pianoOperativoNelMese(c, ym) {
+  const f = _pianoFineRapporto(c);
+  return !f || f >= ym + '-01';
+}
+// mappa 'nome|YYYY-MM-DD' -> true dei giorni dopo la fine del rapporto (per la bozza)
+function _pianoFineMese(ym) {
+  const out = {};
+  const n = _pianoUltimoGiorno(ym);
+  (typeof collaboratoriCache !== 'undefined' ? collaboratoriCache : []).forEach((c) => {
+    const f = _pianoFineRapporto(c);
+    if (!f) return;
+    for (let g = 1; g <= n; g++) {
+      const d = ym + '-' + String(g).padStart(2, '0');
+      if (d > f) out[c.nome + '|' + d] = true;
+    }
+  });
+  return out;
+}
+function _pianoGiorniDopoFine(nome, ym) {
+  const f = _pianoFineRapporto(nome);
+  if (!f) return 0;
+  const n = _pianoUltimoGiorno(ym);
+  if (f >= ym + '-' + String(n).padStart(2, '0')) return 0;
+  if (f < ym + '-01') return n;
+  return n - parseInt(f.substring(8, 10));
 }
 // mappa 'nome|YYYY-MM-DD' -> true dei giorni di congedo nel mese (per la bozza)
 function _pianoCnpMese(ym) {

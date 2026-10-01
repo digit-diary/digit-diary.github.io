@@ -1263,7 +1263,8 @@ async function eliminaRegolaGruppo(id) {
 
 // ===== CARD CONGEDI NON PAGATI =====
 function _renderPianoCongediNpCard() {
-  if (!puoGestirePiano() && !isAdmin()) return '';
+  // chi vede la scheda Congedi vede l elenco; registra ed elimina solo chi gestisce il piano
+  const puoModCnp = puoGestirePiano() || isAdmin();
   const rep = _pianoReparto();
   const lista = _pianoCongediNp
     .filter((c) => (c.reparto_dip || 'slots') === rep)
@@ -1282,37 +1283,85 @@ function _renderPianoCongediNpCard() {
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Congedi non pagati · ' +
     escP(repartoLabel(rep)) +
     '</div><div style="padding:10px 14px">' +
-    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Regolamento aziendale 5.14: domanda scritta, concessione della Direzione. Nel piano i giorni diventano <b>CNP</b> (zero ore, non contano fra le ore dovute). Oltre <b>' +
-    sg +
-    ' giorni</b> il diritto vacanze dell anno si riduce in proporzione; ' +
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Regolamento aziendale 5.14: domanda scritta, concessione della Direzione. Nel piano i giorni diventano <b>CNP</b> (zero ore, non contano fra le ore dovute). ' +
+    (sg
+      ? 'Oltre <b>' + sg + ' giorni</b> il diritto vacanze dell anno si riduce in proporzione; '
+      : '<b>Ogni giorno</b> di congedo riduce in proporzione il diritto vacanze dell anno; ') +
     (sm
       ? 'oltre <b>' + sm + ' mesi</b> l anzianita di servizio si sposta in avanti di tutta la durata'
       : '<b>ogni giorno</b> di congedo sposta in avanti l anzianita di servizio') +
     ' (giubilei e giorni di vacanza in piu). Le due soglie si cambiano nella scheda Regole. Il congedo si registra anche dalla scheda del collaboratore.</p>';
-  h +=
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:10px">' +
-    '<div class="field" style="margin:0"><label>Collaboratore</label><select id="cnp-nome" style="padding:6px">' +
-    nomi.map((n) => '<option value="' + escP(n) + '">' + escP(n) + '</option>').join('') +
-    '</select></div>' +
-    '<div class="field" style="margin:0"><label>Dal</label><input type="date" id="cnp-dal" style="padding:6px"></div>' +
-    '<div class="field" style="margin:0"><label>Al</label><input type="date" id="cnp-al" style="padding:6px"></div>' +
-    '<div class="field" style="margin:0;min-width:180px"><label>Motivo</label><input type="text" id="cnp-motivo" placeholder="es. viaggio, famiglia, studio" style="padding:6px"></div>' +
-    '<div class="field" style="margin:0"><label>Autorizzato da</label><input type="text" id="cnp-aut" placeholder="Direzione" style="padding:6px"></div>' +
-    '<button class="btn-add-tipo" onclick="aggiungiCongedoNp()">Registra congedo</button></div>';
+  if (puoModCnp)
+    h +=
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:10px">' +
+      '<div class="field" style="margin:0"><label>Collaboratore</label><select id="cnp-nome" style="padding:6px">' +
+      nomi.map((n) => '<option value="' + escP(n) + '">' + escP(n) + '</option>').join('') +
+      '</select></div>' +
+      '<div class="field" style="margin:0"><label>Dal</label><input type="date" id="cnp-dal" style="padding:6px"></div>' +
+      '<div class="field" style="margin:0"><label>Al</label><input type="date" id="cnp-al" style="padding:6px"></div>' +
+      '<div class="field" style="margin:0;min-width:180px"><label>Motivo</label><input type="text" id="cnp-motivo" placeholder="es. viaggio, famiglia, studio" style="padding:6px"></div>' +
+      '<div class="field" style="margin:0"><label>Autorizzato da</label><input type="text" id="cnp-aut" placeholder="Direzione" style="padding:6px"></div>' +
+      '<button class="btn-add-tipo" onclick="aggiungiCongedoNp()">Registra congedo</button></div>';
   if (!lista.length)
     h +=
       '<p style="font-size:var(--fs-md,.875rem);color:var(--muted)">Nessun congedo registrato in questo settore.</p>';
   else {
+    // riepilogo per persona: giorni di congedo per anno
+    const tot = {};
+    lista.forEach((c) => {
+      const k = c.collaboratore + '|' + String(c.dal).substring(0, 4);
+      tot[k] = (tot[k] || 0) + _pianoGiorniCongedo(c);
+    });
     h +=
-      '<div style="overflow-x:auto"><table class="piano-table" style="min-width:700px;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Dal</th><th>Al</th><th>Giorni</th><th style="text-align:left">Motivo</th><th style="text-align:left">Autorizzato da</th><th style="text-align:left">Effetti</th><th></th></tr></thead><tbody>';
+      '<p style="font-size:var(--fs-md,.875rem);margin:6px 0">' +
+      Object.keys(tot)
+        .sort()
+        .map((k) => '<b>' + escP(k.split('|')[0]) + '</b> ' + k.split('|')[1] + ': ' + tot[k] + ' giorni')
+        .join(' &middot; ') +
+      '</p><input type="search" class="campo-cerca" placeholder="Cerca collaboratore o motivo..." oninput="pianoTabellaFiltra(this.value,\'piano-congedi-table\')" style="min-width:260px;margin-bottom:8px">';
+    h +=
+      '<div style="overflow-x:auto"><table id="piano-congedi-table" class="piano-table" style="min-width:700px;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Dal</th><th>Al</th><th>Giorni</th><th style="text-align:left">Motivo</th><th style="text-align:left">Autorizzato da</th><th style="text-align:left">Effetti</th><th></th></tr></thead><tbody>';
     lista.forEach((c) => {
       const gg = _pianoGiorniCongedo(c);
       const eff = [];
-      if (gg > sg) eff.push('vacanze ridotte');
+      if (gg > sg) {
+        // per ogni anno toccato: giorni di vacanza tolti (proporzione sui 365)
+        const anni = [...new Set([String(c.dal).substring(0, 4), String(c.al).substring(0, 4)])];
+        anni.forEach((a) => {
+          const info = _pianoCollabInfo(c.collaboratore) || {};
+          const effA = _pianoCongedoNpEffetti(c.collaboratore, parseInt(a));
+          const base =
+            info.data_assunzione && typeof PianoRegole !== 'undefined'
+              ? PianoRegole.giorniVacanzaSpettanti(
+                  String(info.data_assunzione).substring(0, 10),
+                  parseInt(a),
+                  _pianoVacCfg(),
+                )
+              : null;
+          const ridotte =
+            info.data_assunzione && typeof PianoRegole !== 'undefined'
+              ? PianoRegole.giorniVacanzaSpettanti(
+                  String(info.data_assunzione).substring(0, 10),
+                  parseInt(a),
+                  Object.assign({}, _pianoVacCfg(), {
+                    giorniCongedo: effA.giorniVacanze,
+                    giorniAnzianita: effA.giorniAnzianita,
+                  }),
+                )
+              : null;
+          eff.push(
+            base && ridotte
+              ? 'vacanze ' + a + ': ' + base.giorni + ' -> ' + ridotte.giorni
+              : 'vacanze ' + a + ' ridotte in proporzione',
+          );
+        });
+      }
       if (gg > sm * 30.44) eff.push('anzianita spostata di ' + gg + ' giorni');
       if (!eff.length) eff.push('solo piano (CNP)');
       h +=
-        '<tr><td style="text-align:left;font-weight:600">' +
+        '<tr data-nome="' +
+        escP(String(c.collaboratore).toLowerCase() + ' ' + (c.motivo || '').toLowerCase()) +
+        '"><td style="text-align:left;font-weight:600">' +
         escP(c.collaboratore) +
         '</td><td>' +
         fmt(c.dal) +
@@ -1326,9 +1375,9 @@ function _renderPianoCongediNpCard() {
         escP(c.autorizzato_da || '') +
         '</td><td style="text-align:left;font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
         escP(eff.join(', ')) +
-        '</td><td><button class="btn-del-tipo" onclick="eliminaCongedoNp(' +
-        c.id +
-        ')">Elimina</button></td></tr>';
+        '</td><td>' +
+        (puoModCnp ? '<button class="btn-del-tipo" onclick="eliminaCongedoNp(' + c.id + ')">Elimina</button>' : '') +
+        '</td></tr>';
     });
     h += '</tbody></table></div>';
   }
@@ -1464,11 +1513,21 @@ async function registraCongedoNp(x) {
     const celle = await _pianoSincronizzaCongedoNp(rec, false);
     logAzione('Congedo non pagato registrato', nome + ' ' + dal + ' / ' + al + ' (' + gg + ' giorni): ' + motivo);
     if (typeof _insertHrEvento === 'function')
-      _insertHrEvento({
-        tipo: 'congedo_np',
-        collaboratore: nome,
-        descrizione: 'Congedo non pagato dal ' + dal + ' al ' + al + ' (' + gg + ' giorni): ' + motivo,
-      });
+      // (nome, tipo, descrizione, data): prima riceveva un oggetto e la riga
+      // nello storico HR non veniva scritta
+      await _insertHrEvento(
+        nome,
+        'congedo_np',
+        'Congedo non pagato dal ' +
+          dal.split('-').reverse().join('.') +
+          ' al ' +
+          al.split('-').reverse().join('.') +
+          ' (' +
+          gg +
+          ' giorni): ' +
+          motivo,
+        dal,
+      );
     toast('Congedo registrato · ' + celle + ' giorni segnati CNP nel piano');
     return true;
   } catch (e) {
