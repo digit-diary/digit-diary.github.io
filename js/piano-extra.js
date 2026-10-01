@@ -2465,6 +2465,7 @@ const _AVV_SEZIONI = [
   ['anno', 'Chiusura anno'],
   ['scoperti', 'Posti scoperti'],
   ['malattie', 'Malattie lunghe'],
+  ['vacanze', 'Vacanze non nel piano'],
 ];
 let _pianoAvvSub = (() => {
   try {
@@ -2502,7 +2503,7 @@ async function _pianoAvvisiLenti(forza) {
   const chiave = rep + '|' + anno + '|' + _pianoMeseSel;
   if (!forza && _pianoAvvCache && _pianoAvvCache.chiave === chiave && Date.now() - _pianoAvvCache.t < 300000)
     return _pianoAvvCache;
-  const out = { chiave: chiave, t: Date.now(), anno: [], scoperti: [], malattie: [] };
+  const out = { chiave: chiave, t: Date.now(), anno: [], scoperti: [], malattie: [], vacanze: [] };
   const nomi = collaboratoriCache
     .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && c.funzione !== 'RESP')
     .map((c) => c.nome);
@@ -2527,6 +2528,45 @@ async function _pianoAvvisiLenti(forza) {
       perR[r.collaboratore + '|' + String(r.data).substring(0, 10)] = r;
       mesiPersona[r.collaboratore + '|' + String(r.data).substring(5, 7)] = true;
     });
+    // --- VACANZE NON NEL PIANO: settimane di vacanza (V, confermate) del file vacanze
+    // i cui giorni nel piano non hanno V (ne malattia, che restituisce la vacanza).
+    // Solo mesi gia pianificati per quella persona; le scelte "il piano e giusto"
+    // restano registrate in piano_vacanze_ok e non si ripresentano.
+    try {
+      const vac =
+        (await secGet(
+          'piano_vacanze?anno=in.(' + (anno - 1) + ',' + anno + ',' + (anno + 1) + ')&confermata=eq.true&limit=6000',
+        )) || [];
+      let ok = {};
+      try {
+        ok = JSON.parse((await getImp('piano_vacanze_ok')) || '{}') || {};
+      } catch (e) {}
+      const delSettore = new Set(
+        collaboratoriCache.filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === rep).map((c) => c.nome),
+      );
+      const oggiV = _pianoOggiStr();
+      vac.forEach((v) => {
+        if (!delSettore.has(v.collaboratore) || _vacCodice(v) !== 'V') return;
+        const giorni = _pianoGiorniSettimana(parseInt(v.anno), v.settimana).filter(
+          (d) =>
+            d.startsWith(anno + '-') &&
+            mesiPersona[v.collaboratore + '|' + d.substring(5, 7)] &&
+            !ok[v.collaboratore + '|' + d] &&
+            !['V', 'V1', 'M', 'M1'].includes(perG[v.collaboratore + '|' + d]),
+        );
+        if (!giorni.length) return;
+        out.vacanze.push({
+          nome: v.collaboratore,
+          anno: parseInt(v.anno),
+          settimana: v.settimana,
+          giorni: giorni.map((d) => ({ data: d, attuale: perG[v.collaboratore + '|' + d] || '' })),
+          passati: giorni.filter((d) => d < oggiV).length,
+        });
+      });
+      out.vacanze.sort((x, y) => x.nome.localeCompare(y.nome) || x.giorni[0].data.localeCompare(y.giorni[0].data));
+    } catch (e) {
+      console.error('avvisi: vacanze', e);
+    }
     const oggi = _pianoOggiStr();
     const domeniche = [];
     for (let d = new Date(anno, 0, 1, 12); d.getFullYear() === anno; d.setDate(d.getDate() + 1))
@@ -2676,6 +2716,7 @@ function _pianoAvvisiConteggi(v, l) {
     anno: l ? l.anno.length : 0,
     scoperti: l ? l.scoperti.length : 0,
     malattie: l ? l.malattie.filter((m) => m.giorno > 14).length : 0,
+    vacanze: l && l.vacanze ? l.vacanze.length : 0,
   };
 }
 // numero sulla scheda Avvisi e sulla voce Piano del menu
@@ -2724,6 +2765,150 @@ function pianoAvvisiCerca() {
   });
   const c = document.getElementById('avv-cerca-n');
   if (c) c.textContent = q ? n + (n === 1 ? ' risultato' : ' risultati') : '';
+}
+// VAI ALLA CELLA: apre il calendario sul mese del giorno, porta in vista la
+// cella del collaboratore e la fa lampeggiare. Usata da Avvisi (e dalle altre liste).
+async function pianoApriCella(nome, dstr) {
+  if (!nome || !dstr) return;
+  const pagPiano = document.getElementById('page-piano');
+  if (!pagPiano || !pagPiano.classList.contains('active')) switchPage('piano');
+  _pianoMeseSel = String(dstr).substring(0, 7);
+  _pianoTab = 'calendario';
+  try {
+    localStorage.setItem('piano_tab', 'calendario');
+  } catch (e) {}
+  // la cella da evidenziare resta "in attesa" per qualche secondo: ogni ridisegno
+  // del calendario la ritrova (anche quello automatico che segue il primo)
+  window._pianoEvidenzia = {
+    nome: nome,
+    g: parseInt(String(dstr).substring(8, 10)),
+    fino: Date.now() + 3500,
+    vista: false,
+  };
+  await renderPiano();
+  if (!_pianoApplicaEvidenzia())
+    toast(nome + ' non e nel calendario di questo settore per ' + String(dstr).split('-').reverse().join('.'));
+}
+// chiamata alla fine di ogni ridisegno del calendario
+function _pianoApplicaEvidenzia() {
+  const ev = window._pianoEvidenzia;
+  if (!ev || Date.now() > ev.fino) return false;
+  const tr = [...document.querySelectorAll('table[data-seltab="piano"] tbody tr[data-nome]')].find(
+    (r) => r.dataset.nome === ev.nome,
+  );
+  const td = tr && tr.querySelector('td[data-g="' + ev.g + '"]');
+  if (!td) return false;
+  if (!ev.vista) {
+    td.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
+    ev.vista = true;
+  }
+  td.classList.add('piano-cella-trovata');
+  return true;
+}
+// sblocco di PIU giorni chiusi con un solo motivo (stessa regola di _pianoConsentiScrittura)
+async function _pianoSbloccaGiorni(giorni, perche) {
+  const chiusi = giorni.filter((d) => _pianoGiornoBloccato(d) && !_pianoGiornoSbloccato(d));
+  if (!chiusi.length) return true;
+  if (!puoSbloccareGiorniChiusi()) {
+    toast('Giorni chiusi: per correggerli serve il permesso "Giorni chiusi"');
+    return false;
+  }
+  const motivo = await chiediTesto(
+    'GIORNI CHIUSI \u00b7 ' +
+      chiusi.map((d) => d.split('-').reverse().join('.')).join(', ') +
+      '\n\n' +
+      (perche || 'Correzione del piano dei giorni passati.') +
+      '\n\nScrivi il MOTIVO (obbligatorio, resta nel registro). I giorni restano sbloccati per dieci minuti:',
+  );
+  if (motivo === null || !String(motivo).trim()) {
+    toast('Annullato: senza motivo i giorni restano chiusi');
+    return false;
+  }
+  chiusi.forEach((d) => (_pianoSbloccati[d] = Date.now() + 10 * 60 * 1000));
+  logAzione('Giorni chiusi sbloccati', chiusi.join(', ') + ': ' + String(motivo).trim().substring(0, 200));
+  return true;
+}
+async function pianoVacanzeMettiV(i) {
+  const x = (window._avvVacanze || [])[i];
+  if (!x || !puoGestirePiano()) return;
+  const giorni = x.giorni.map((g) => g.data);
+  if (
+    !(await chiediConferma(
+      x.nome +
+        ', settimana ' +
+        x.settimana +
+        ': metto la V (protetta) in ' +
+        giorni.map((d) => d.split('-').reverse().join('.')).join(', ') +
+        '?\n\nOggi nel piano: ' +
+        x.giorni.map((g) => g.attuale || 'vuoto').join(', ') +
+        '. Le ore del saldo cambiano di conseguenza.',
+      { titolo: 'Vacanze dal file nel piano' },
+    ))
+  )
+    return;
+  if (!(await _pianoSbloccaGiorni(giorni, 'Le V del file vacanze vanno nel piano.'))) return;
+  const op = getOperatore();
+  let n = 0;
+  try {
+    for (const g of x.giorni) {
+      const es =
+        (await secGet('piano?collaboratore=eq.' + encodeURIComponent(x.nome) + '&data=eq.' + g.data + '&limit=1')) ||
+        [];
+      const dati = {
+        codice: 'V',
+        protetto: true,
+        generato: false,
+        motivo_blocco: null,
+        commento: ((es[0] && es[0].codice ? 'Ex ' + es[0].codice + ' - ' : '') + 'vacanza dal file - ' + op).substring(
+          0,
+          400,
+        ),
+        operatore: op,
+      };
+      if (es[0])
+        await secPatch('piano', 'id=eq.' + es[0].id, Object.assign({ updated_at: new Date().toISOString() }, dati));
+      else
+        await _pianoInserisciCella(
+          Object.assign({ collaboratore: x.nome, data: g.data, reparto_dip: _pianoReparto() }, dati),
+        );
+      n++;
+    }
+    await _pianoFestiviPersiDopo(
+      x.nome,
+      x.giorni.filter((g) => g.attuale).map((g) => ({ data: g.data, codice: g.attuale })),
+      'V',
+    );
+    logAzione('Vacanze: V dal file nel piano', x.nome + ' sett. ' + x.settimana + ' · ' + giorni.join(', '));
+    toast(n + ' V messe nel piano per ' + x.nome);
+  } catch (e) {
+    toastErrore('V messe ' + n + ' su ' + giorni.length + ': ' + ((e && e.message) || e));
+  }
+  _pianoAvvCache = null;
+  renderPiano();
+}
+async function pianoVacanzePianoGiusto(i) {
+  const x = (window._avvVacanze || [])[i];
+  if (!x || !puoGestirePiano()) return;
+  const nota = await chiediTesto(
+    x.nome +
+      ', settimana ' +
+      x.settimana +
+      ': il piano resta com e (la vacanza non e stata fatta in quei giorni).\n\nNota facoltativa (es. "spostata alla settimana 40"):',
+    '',
+  );
+  if (nota === null) return;
+  try {
+    const ok = JSON.parse((await getImp('piano_vacanze_ok')) || '{}') || {};
+    const firma = getOperatore() + ' ' + oggiLocale() + (String(nota).trim() ? ': ' + String(nota).trim() : '');
+    x.giorni.forEach((g) => (ok[x.nome + '|' + g.data] = firma.substring(0, 200)));
+    await setImp('piano_vacanze_ok', JSON.stringify(ok));
+    logAzione('Vacanze: piano confermato giusto', x.nome + ' sett. ' + x.settimana + ' · ' + firma);
+    toast('Segnalazione chiusa per ' + x.nome + ' (settimana ' + x.settimana + ')');
+  } catch (e) {
+    toastErrore('Scelta non salvata: ' + ((e && e.message) || e));
+  }
+  _pianoAvvCache = null;
+  renderPiano();
 }
 async function pianoAvvisiAggiorna() {
   _pianoAvvCache = null;
@@ -2915,6 +3100,43 @@ async function _renderPianoAvvisiTab() {
               x.giorno +
               '.</td><td>' +
               (x.giorno > 14 ? '5.857 (dal 15. giorno)' : 'ore del turno (fino al 14.)') +
+              '</td></tr>',
+          ),
+        ));
+  // vacanze del file che nel piano non ci sono
+  window._avvVacanze = l.vacanze || [];
+  sez.vacanze =
+    '<p class="avv-intro">Settimane di vacanza <b>confermate nel file vacanze</b> i cui giorni nel piano non hanno la V (le malattie non contano: restituiscono la vacanza). Per ogni riga scegli: <b>Metti le V</b> se vale il file (i giorni chiusi chiedono lo sblocco con il motivo), <b>Il piano e giusto</b> se la vacanza non e stata fatta (la scelta resta registrata). I giorni futuri li sistema anche Applica vacanze.</p>' +
+    (!(l.vacanze || []).length
+      ? vuoto('Il piano corrisponde al file vacanze.')
+      : tabella(
+          ['Collaboratore', 'Settimana', 'Giorni senza V', 'Oggi nel piano', ''],
+          l.vacanze.map(
+            (x, i) =>
+              '<tr' +
+              cerca(x.nome + ' ' + x.settimana + ' ' + x.giorni.map((g) => _pianoGgMm(g.data)).join(' ')) +
+              '>' +
+              nome(x.nome) +
+              '<td>' +
+              x.settimana +
+              (x.anno !== parseInt(a) ? '/' + x.anno : '') +
+              '</td><td>' +
+              x.giorni.map((g) => _pianoGgMm(g.data)).join(', ') +
+              (x.passati ? ' <span class="avv-piccolo">(' + x.passati + ' passati)</span>' : '') +
+              '</td><td class="avv-piccolo">' +
+              x.giorni.map((g) => escP(g.attuale || 'vuoto')).join(', ') +
+              '</td><td style="white-space:nowrap"><button class="btn-act" onclick="pianoApriCella(window._avvVacanze[' +
+              i +
+              '].nome, window._avvVacanze[' +
+              i +
+              '].giorni[0].data)">Apri nel calendario</button> ' +
+              (puoGestirePiano()
+                ? '<button class="btn-act" onclick="pianoVacanzeMettiV(' +
+                  i +
+                  ')">Metti le V</button> <button class="btn-act" onclick="pianoVacanzePianoGiusto(' +
+                  i +
+                  ')">Il piano e giusto</button>'
+                : '') +
               '</td></tr>',
           ),
         ));

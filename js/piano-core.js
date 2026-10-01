@@ -1449,7 +1449,27 @@ async function _pianoCaricaMeseSettore(da, a, rep) {
   }
   return righe;
 }
-async function renderPiano() {
+// RIDISEGNI IN FILA: se ne arriva uno mentre un altro e in corso, si accoda e
+// alla fine se ne fa UNO solo con lo stato piu recente. Prima due ridisegni
+// sovrapposti potevano finire nell ordine sbagliato: il piu vecchio riscriveva
+// lo schermo (e i dati in memoria) del mese o della scheda precedente.
+let _pianoRenderInCorso = null;
+let _pianoRenderCoda = null;
+function renderPiano() {
+  if (_pianoRenderInCorso) {
+    if (!_pianoRenderCoda)
+      _pianoRenderCoda = _pianoRenderInCorso.then(() => {
+        _pianoRenderCoda = null;
+        return renderPiano();
+      });
+    return _pianoRenderCoda;
+  }
+  _pianoRenderInCorso = _renderPianoCore().finally(() => {
+    _pianoRenderInCorso = null;
+  });
+  return _pianoRenderInCorso;
+}
+async function _renderPianoCore() {
   const el = document.getElementById('piano-content');
   if (!el) return;
   // dati non ancora arrivati (login appena fatto): mostra l'attesa e riprova
@@ -2369,6 +2389,7 @@ async function renderPiano() {
       _pianoDragBind();
       _pianoTipBind();
       _pianoApplicaNascosti();
+      if (typeof _pianoApplicaEvidenzia === 'function') _pianoApplicaEvidenzia();
     }
     if (_pianoTab === 'recupero' && typeof _pianoRecuperoTotaliGenerali === 'function') {
       _pianoRecuperoTotaliGenerali();
