@@ -1,4 +1,4 @@
-const CACHE_NAME = 'diario-cl-v341';
+const CACHE_NAME = 'diario-cl-v342';
 const SHELL_URLS = ['/', '/manifest.json', '/logo_casino.png', '/icon-192.png', '/icon-512.png',
   '/css/style.css',
   '/js/config.js', '/js/finestre.js', '/js/crypto.js', '/js/chat-core.js', '/js/annulla.js', '/js/realtime.js',
@@ -7,7 +7,7 @@ const SHELL_URLS = ['/', '/manifest.json', '/logo_casino.png', '/icon-192.png', 
   '/js/chat-ui.js', '/js/ai.js', '/js/moduli.js', '/js/formazione.js', '/js/valutazioni.js',
   '/js/rapporto.js', '/js/stats.js',
   '/js/consegna.js', '/js/promemoria.js',
-  '/js/maison-core.js', '/js/maison-budget.js', '/js/maison-helpers.js', '/js/piano-regole.js', '/js/piano-core.js', '/js/piano-genera.js', '/js/piano-config.js', '/js/piano-gestione.js', '/js/piano-cambi.js', '/js/piano-schede.js', '/js/piano-impostazioni.js', '/js/piano-celle.js', '/js/piano-briefing-ui.js', '/js/piano-extra.js', '/js/pause-controlli.js', '/js/pause-engine.js', '/js/posizione.js',
+  '/js/maison-core.js', '/js/maison-budget.js', '/js/maison-helpers.js', '/js/piano-regole.js', '/js/piano-core.js', '/js/piano-genera.js', '/js/piano-config.js', '/js/piano-gestione.js', '/js/piano-cambi.js', '/js/piano-schede.js', '/js/piano-impostazioni.js', '/js/piano-celle.js', '/js/piano-briefing-ui.js', '/js/piano-extra.js', '/js/pause-controlli.js', '/js/pause-engine.js', '/js/mini-scheda.js', '/js/posizione.js',
   '/js/guida.js',
   '/libs/supabase.min.js', '/libs/chart.umd.min.js', '/libs/flatpickr.min.css', '/libs/flatpickr.min.js',
   '/libs/flatpickr.it.js', '/libs/qrcode.min.js', '/libs/xlsx.full.min.js', '/libs/jspdf.umd.min.js',

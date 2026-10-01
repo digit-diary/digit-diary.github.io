@@ -6129,3 +6129,98 @@ tr[data-cella-nome]:hover td {
   ) !important;
   color: var(--muted) !important;
 }
+
+/* MINI-SCHEDA DEL COLLABORATORE (mouse fermo sul nome, o pressione lunga) */
+#mini-scheda {
+  position: fixed;
+  z-index: 3000;
+  width: 290px;
+  max-width: calc(100vw - 16px);
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--accent2);
+  border-radius: 6px;
+  box-shadow: 0 10px 30px rgba(26, 18, 8, 0.18);
+  padding: 10px 12px 8px;
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  pointer-events: none;
+}
+#mini-scheda .ms-testa {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+#mini-scheda .ms-testa b {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: var(--fs-base);
+}
+#mini-scheda .ms-sotto {
+  color: var(--muted);
+}
+#mini-scheda .ms-chip {
+  align-self: flex-start;
+  margin-top: 3px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  border: 1px solid currentColor;
+}
+#mini-scheda .ms-rosso {
+  color: var(--c-rosso);
+}
+#mini-scheda .ms-blocco {
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+  margin-top: 6px;
+}
+#mini-scheda .ms-et {
+  font-size: var(--fs-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+#mini-scheda .ms-turni {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+#mini-scheda .ms-giorno {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3px 2px;
+  border-radius: 4px;
+  background: var(--paper2);
+}
+#mini-scheda .ms-giorno span,
+#mini-scheda .ms-giorno small {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+#mini-scheda .ms-oggi {
+  outline: 1px solid var(--accent2);
+}
+#mini-scheda .ms-voce {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+#mini-scheda .ms-avviso {
+  color: var(--c-arancio);
+}
+#mini-scheda .ms-attesa {
+  color: var(--muted);
+  font-style: italic;
+}
+#mini-scheda .ms-piede {
+  margin-top: 8px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
