@@ -383,6 +383,8 @@ async function _renderPianoBriefingTab() {
     if (!valetR && rep === 'slots') await _briefAssegnaCd(righe, dstr);
     salvato = false;
   }
+  // inizio della giornata del foglio pause (JG del mattino): vale per questo giorno
+  if (typeof _peImpostaInizio === 'function') _peImpostaInizio(righe);
   _briefState = {
     id: rigaBrief ? rigaBrief.id : null,
     righe: righe,

@@ -23,6 +23,8 @@ function _diarioInizioFinestra() {
 }
 async function _diarioLeggiIniziale() {
   const da = _diarioInizioFinestra();
+  window._diarioArchFatto = {}; // dopo un ricaricamento (es. Annulla) l archivio si rilegge
+  if (typeof _rgArchivioFatto !== 'undefined') Object.keys(_rgArchivioFatto).forEach((k) => delete _rgArchivioFatto[k]);
   const sempre = [nomeCorrente('Ammonimento Verbale'), nomeCorrente('Errore')];
   const [recenti, storiaDisc] = await Promise.all([
     secGet('registrazioni?data=gte.' + da + '&order=data.desc'),

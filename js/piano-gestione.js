@@ -119,7 +119,9 @@ function _renderPianoDomenicheBody() {
         }
         // stessa regola delle C rosse del calendario (una sola funzione)
         const sab = _pianoGiornoPrima(dstr);
-        if (!_pianoDomenicaValida(cod, perG(nome, sab), sab, (dati.rigaGiorno || {})[nome + '|' + sab])) {
+        if (
+          !_pianoDomenicaValida(cod, perG(nome, sab), sab, (dati.rigaGiorno || {})[nome + '|' + sab], undefined, nome)
+        ) {
           dett.push(gg + ' libera ma non valida (sabato oltre le 23: ' + (perG(nome, sab) || '-') + ')');
           return;
         }
@@ -325,7 +327,7 @@ async function caricaBenesserePiano() {
           '-' +
           String(sab.getDate()).padStart(2, '0');
         // stessa regola delle C rosse (anche con il controllo del sabato spento)
-        if (!_pianoDomenicaValida(cod, p.giorni[isoSab], isoSab, (p.righe || {})[isoSab])) {
+        if (!_pianoDomenicaValida(cod, p.giorni[isoSab], isoSab, (p.righe || {})[isoSab], undefined, n)) {
           p.domTardi++;
           return;
         }
@@ -2642,7 +2644,17 @@ function _pianoGiorniCnp(nome, ym) {
 // giorni del mese che contano per le ore dovute: tutti meno quelli di congedo
 function _pianoGgDovuti(nome, ym) {
   // meno i giorni di congedo non pagato e i giorni dopo la fine del rapporto
-  return Math.max(0, _pianoUltimoGiorno(ym) - _pianoGiorniCnp(nome, ym) - _pianoGiorniDopoFine(nome, ym));
+  const fine = _pianoFineRapporto(nome);
+  const cnp = _pianoGiorniCnp(nome, ym);
+  if (!fine) return Math.max(0, _pianoUltimoGiorno(ym) - cnp);
+  // giorni non dovuti = congedo OPPURE dopo la fine (contati una volta sola)
+  const mappaCnp = cnp ? _pianoCnpMese(ym) : {};
+  let fuori = 0;
+  for (let g = 1; g <= _pianoUltimoGiorno(ym); g++) {
+    const d = ym + '-' + String(g).padStart(2, '0');
+    if (d > fine || mappaCnp[nome + '|' + d]) fuori++;
+  }
+  return Math.max(0, _pianoUltimoGiorno(ym) - fuori);
 }
 // FINE RAPPORTO (data_fine_rapporto nella scheda): dal giorno dopo il collaboratore
 // non e piu operativo (calendario dei mesi dopo, bozza, coperture, cambi, ore

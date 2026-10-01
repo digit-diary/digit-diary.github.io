@@ -927,7 +927,13 @@ async function _processaAssenzeRapporto(assenzeText, ds, turno) {
   if (ops.ambigui.length) {
     const scelte = {};
     for (const a of ops.ambigui)
-      scelte[a.testo.toLowerCase()] = (await chiediOmonimo(a.testo, a.nomi, 'nelle assenze del rapporto')) || '';
+      scelte[a.testo.toLowerCase()] =
+        (await chiediOmonimo(
+          a.testo,
+          a.nomi,
+          'nelle assenze del rapporto',
+          'ass|' + ds + '|' + turno + '|' + a.testo.toLowerCase(),
+        )) || '';
     ops = _analizzaAssenzeRapporto(assenzeText, ds, turno, scelte);
   }
   await _eseguiAssenzeOps(ops, ds, turno);

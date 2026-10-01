@@ -577,8 +577,9 @@ function renderMaisonDashboard() {
   const MESI_SHORT_M = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
   let thtml =
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h4 style="font-family:Playfair Display,serif;margin:0;color:var(--ink)">Dettaglio per cliente</h4><button class="btn-reset" onclick="toggleSezione(\'maison-table-inner\',this)" style="font-size:var(--fs-base,.9375rem);padding:6px 16px">&#9650; Nascondi</button></div><div id="maison-table-inner"><div ' +
-    (isAdmin() ? '' : 'hidden ') +
-    'style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px;flex-wrap:wrap"><select id="maison-del-giorno" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:var(--fs-sm,.8125rem);background:var(--paper);color:var(--ink)"><option value="">Seleziona giorno...</option>' +
+    'style="display:' +
+    (isAdmin() ? 'flex' : 'none') +
+    ';justify-content:flex-end;gap:8px;margin-bottom:10px;flex-wrap:wrap"><select id="maison-del-giorno" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:var(--fs-sm,.8125rem);background:var(--paper);color:var(--ink)"><option value="">Seleziona giorno...</option>' +
     giorniDisp
       .map((d) => '<option value="' + d + '">' + new Date(d + 'T12:00:00').toLocaleDateString('it-IT') + '</option>')
       .join('') +

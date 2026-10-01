@@ -762,14 +762,17 @@ function candidatiCollaboratore(testo) {
     const pref = tutti.filter((c) => parole(c).some((w) => w.startsWith(t)));
     if (pref.length) return solo(pref);
   }
-  // errore di battitura (al massimo 2 lettere): tutti quelli alla distanza minima
+  // errore di battitura: tutti quelli alla distanza minima. Al massimo 1 lettera
+  // sotto le 6 (con 2 "Rossi" diventava "Sassi"), 2 per le parole piu lunghe
   if (t.length >= 3) {
-    let min = 3;
+    const maxD = t.length < 6 ? 1 : 2;
+    let min = maxD + 1;
     let vicini = [];
     tutti.forEach((c) =>
       parole(c).forEach((w) => {
         if (w.length < 3) return;
         const d = _levenshtein(t, w);
+        if (d > maxD) return;
         if (d < min) {
           min = d;
           vicini = [c];
@@ -815,7 +818,14 @@ function scegliCollaboratore(testo, preferiti, scelte) {
 }
 // Solo quando il nome e davvero ambiguo: finestra con i candidati (settore e
 // funzione accanto al nome). Ritorna il nome scelto, oppure null se si salta.
-async function chiediOmonimo(testo, nomi, contesto) {
+// chiave (facoltativa): la risposta, anche "salta", vale per tutta la sessione,
+// cosi il salvataggio automatico del rapporto non ripropone la stessa domanda.
+const _omonimiRisposte = {};
+async function chiediOmonimo(testo, nomi, contesto, chiave) {
+  if (chiave && Object.prototype.hasOwnProperty.call(_omonimiRisposte, chiave)) {
+    const g = _omonimiRisposte[chiave];
+    return g && nomi.includes(g) ? g : null;
+  }
   const info = (n) => {
     const c = (collaboratoriCache || []).find((x) => x.nome === n) || {};
     const rep = typeof repartoLabel === 'function' ? repartoLabel(c.reparto_dip || 'slots') : c.reparto_dip || '';
@@ -831,7 +841,9 @@ async function chiediOmonimo(testo, nomi, contesto) {
     ],
     { titolo: 'Nome da chiarire', ok: 'Conferma' },
   );
-  return r && r.n ? r.n : null;
+  const scelto = r && r.n ? r.n : null;
+  if (chiave) _omonimiRisposte[chiave] = scelto;
+  return scelto;
 }
 // Compatibilita: ritorna il nome solo se la scelta e sicura (altrimenti null).
 function matchCollaboratore(cognome) {
@@ -910,7 +922,20 @@ async function parseDifferenzeCassa(text, ds, turno) {
         .map((e) => e.nome);
       const _sc = scegliCollaboratore(cognome, _gia);
       let nomeCompleto = _sc && _sc.nome;
-      if (_sc && _sc.ambigui) nomeCompleto = await chiediOmonimo(cognome, _sc.ambigui, 'nelle differenze di cassa');
+      // si chiede solo con il nome intero (parola completa in tutti i candidati):
+      // "Som" a meta battitura non apre la finestra
+      const _parolaIntera = (n) =>
+        String(n)
+          .toLowerCase()
+          .split(/[\s'-]+/)
+          .includes(cognome.toLowerCase());
+      if (_sc && _sc.ambigui && _sc.ambigui.every(_parolaIntera))
+        nomeCompleto = await chiediOmonimo(
+          cognome,
+          _sc.ambigui,
+          'nelle differenze di cassa',
+          'cassa|' + _rappRef + '|' + cognome.toLowerCase(),
+        );
       if (!nomeCompleto) {
         toast(
           'Differenza: "' +

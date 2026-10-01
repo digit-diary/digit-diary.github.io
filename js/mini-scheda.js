@@ -187,7 +187,8 @@
       '<span class="ms-sotto">' +
       [settore, c.funzione, pct, jolly ? 'jolly' : 'fisso'].filter(Boolean).map(_esc).join(' · ') +
       '</span>';
-    if (fine)
+    // data di fine contratto: solo per chi vede i dati HR (come nella scheda)
+    if (fine && typeof puoVedereStoricoHr === 'function' && puoVedereStoricoHr())
       h += '<span class="ms-chip ms-rosso">ultimo giorno ' + _esc(fine.split('-').reverse().join('.')) + '</span>';
     h += '</div>';
     // turni

@@ -757,7 +757,7 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
     // DOMENICA LIBERA VALIDA (una delle 12): il cambio la toglie? Vale per la cella
     // di domenica e per il sabato che finirebbe oltre le 23
     if (weekend && codiceNuovo !== undefined) {
-      const domPersa = _pianoDomenicaPersa(dstr, codiceNuovo, righe);
+      const domPersa = _pianoDomenicaPersa(dstr, codiceNuovo, righe, nome);
       if (domPersa) avvisiExtra.push(await _pianoTestoDomenicaPersa(nome, domPersa));
     }
     const codOra = codPrec[dstr];

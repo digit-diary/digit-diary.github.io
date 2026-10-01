@@ -536,6 +536,14 @@ function _sbErroreTesto(e) {
 // 10000). Se una lettura con limite arriva proprio al limite, nel registro della
 // console resta l avviso: vuol dire che c erano altre righe.
 const _SEC_PAGINA_MAX = 10000;
+// chiave delle tabelle senza colonna id (per leggere a pagine in ordine stabile)
+const _SEC_CHIAVE_SENZA_ID = {
+  chat_group_members: 'group_id ASC, operatore ASC',
+  chat_message_hidden: 'message_id ASC, operatore ASC',
+  chat_message_letti: 'message_id ASC, operatore ASC',
+  impostazioni: 'chiave ASC',
+  note_fissate: 'registrazione_id ASC',
+};
 async function _secLeggiTutto(t, p) {
   const leggi = (offset, dim, ordine) =>
     _rpcSicura(
@@ -553,16 +561,14 @@ async function _secLeggiTutto(t, p) {
       console.warn('Lettura arrivata al limite di ' + voluto + ' righe: ' + p.table + ' ' + p.filter);
     return righe;
   }
-  // servono altre pagine: l ordine deve essere stabile (senza ordine si usa l id)
-  let ordine = p.order;
-  if (!ordine) {
-    if (!righe[0] || !Object.prototype.hasOwnProperty.call(righe[0], 'id')) {
-      console.warn('Lettura oltre ' + dim + ' righe senza ordine stabile: ' + p.table);
-      return righe;
-    }
-    ordine = 'id ASC';
-    righe = (await leggi(0, dim, ordine)) || [];
-  }
+  // servono altre pagine: l ordine deve essere STABILE e univoco, altrimenti fra
+  // una pagina e l altra righe con lo stesso valore (stessa data) possono comparire
+  // due volte o mancare. Spareggio: la chiave per le tabelle senza id, altrimenti
+  // l id (vale anche se la lettura sceglie colonne senza id: l ordine e nel database;
+  // una tabella senza id non elencata da errore dal database invece di dati a meta).
+  const spareggio = _SEC_CHIAVE_SENZA_ID[p.table] || 'id ASC';
+  const ordine = p.order ? p.order + ', ' + spareggio : spareggio;
+  righe = (await leggi(0, dim, ordine)) || [];
   for (let pagina = 1; pagina < 60 && righe.length < voluto; pagina++) {
     const altre = (await leggi(righe.length, Math.min(dim, voluto - righe.length), ordine)) || [];
     righe = righe.concat(altre);

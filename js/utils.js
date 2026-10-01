@@ -92,7 +92,21 @@ async function esportaTabellaExcel(tabella, nomeFile) {
     if (o && (o.hidden || o.style.display === 'none' || o.offsetParent === null)) tr.remove();
   });
   copia.querySelectorAll('button, input, select, textarea, svg').forEach((x) => x.remove());
-  const wb = XLSX.utils.table_to_book(copia, { raw: false });
+  // raw: il testo resta com e (con raw:false SheetJS leggeva "03.10.2026" come
+  // 10 marzo e "Mar 06.10" come numero). Solo i numeri puri diventano numeri.
+  const wb = XLSX.utils.table_to_book(copia, { raw: true });
+  wb.SheetNames.forEach((sn) => {
+    const ws = wb.Sheets[sn];
+    Object.keys(ws).forEach((k) => {
+      const c = ws[k];
+      if (k[0] === '!' || !c || typeof c.v !== 'string') return;
+      const v = c.v.trim();
+      if (/^[+-]?\d+(\.\d+)?$/.test(v) && !/^0\d/.test(v)) {
+        c.t = 'n';
+        c.v = parseFloat(v);
+      }
+    });
+  });
   const nome = String(nomeFile || 'tabella').replace(/[^a-z0-9_-]+/gi, '_') + '_' + oggiLocale() + '.xlsx';
   XLSX.writeFile(wb, nome);
   if (typeof logAzione === 'function') logAzione('Esportazione Excel', nome);

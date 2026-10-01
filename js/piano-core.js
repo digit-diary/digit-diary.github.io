@@ -1440,10 +1440,16 @@ let _pianoRenderCoda = null;
 function renderPiano() {
   if (_pianoRenderInCorso) {
     if (!_pianoRenderCoda)
-      _pianoRenderCoda = _pianoRenderInCorso.then(() => {
-        _pianoRenderCoda = null;
-        return renderPiano();
-      });
+      _pianoRenderCoda = _pianoRenderInCorso.then(
+        () => {
+          _pianoRenderCoda = null;
+          return renderPiano();
+        },
+        () => {
+          _pianoRenderCoda = null;
+          return renderPiano();
+        },
+      );
     return _pianoRenderCoda;
   }
   _pianoRenderInCorso = _renderPianoCore().finally(() => {

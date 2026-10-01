@@ -4,6 +4,8 @@
 -- Corpo identico a quello in produzione al 01.10.2026 piu OFFSET (e un tetto
 -- di 10000 righe per pagina). Le chiamate senza p_offset restano identiche.
 DROP FUNCTION IF EXISTS public.secure_read(text, text, text, text, integer);
+-- rieseguibile: si toglie anche la versione con p_offset se c e gia
+DROP FUNCTION IF EXISTS public.secure_read(text, text, text, text, integer, integer);
 CREATE FUNCTION public.secure_read(p_token text, p_table text, p_filter text DEFAULT ''::text, p_order text DEFAULT ''::text, p_limit integer DEFAULT 5000, p_offset integer DEFAULT 0)
  RETURNS json
  LANGUAGE plpgsql

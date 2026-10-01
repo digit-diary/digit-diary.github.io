@@ -6133,7 +6133,7 @@ tr[data-cella-nome]:hover td {
 /* MINI-SCHEDA DEL COLLABORATORE (mouse fermo sul nome, o pressione lunga) */
 #mini-scheda {
   position: fixed;
-  z-index: 3000;
+  z-index: 10060; /* sopra le finestre (modal 10030), sotto il velo */
   width: 290px;
   max-width: calc(100vw - 16px);
   background: var(--paper);

@@ -3029,7 +3029,11 @@ function _vacDataIt(dstr) {
 }
 // libreria Excel CON stili (colori): si carica solo quando serve, senza
 // toccare la XLSX globale usata da tutto il resto del programma
-function _vacXlsxStyle() {
+async function _vacXlsxStyle() {
+  // xlsx (a richiesta) deve essere gia caricata: la libreria degli stili la
+  // sovrascrive e si rimette l originale (prima, se xlsx arrivava dopo, restava undefined)
+  if (window._XLSXStyle) return window._XLSXStyle;
+  await libreria('xlsx');
   return new Promise((resolve, reject) => {
     if (window._XLSXStyle) return resolve(window._XLSXStyle);
     const orig = window.XLSX;

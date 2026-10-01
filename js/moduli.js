@@ -2669,18 +2669,26 @@ function render() {
       window._diarioArchFatto['p|' + _per] = true;
       lavoro = () => diarioCaricaPersona(_per);
     } else if (_cerca.length >= 3 && !window._diarioArchFatto['c|' + _cerca]) {
-      window._diarioArchFatto['c|' + _cerca] = true;
-      lavoro = () => diarioCercaArchivio(_cerca);
+      // si cerca nell archivio solo quando si smette di scrivere (300 ms):
+      // prima ogni tasto faceva due letture sull intero archivio
+      const u = window._diarioCercaUltimo;
+      if (!u || u.q !== _cerca) {
+        window._diarioCercaUltimo = { q: _cerca, t: Date.now() };
+        clearTimeout(window._diarioCercaTimer);
+        window._diarioCercaTimer = setTimeout(render, 320);
+      } else if (Date.now() - u.t >= 300) {
+        window._diarioArchFatto['c|' + _cerca] = true;
+        lavoro = () => diarioCercaArchivio(_cerca);
+      }
     }
     if (lavoro) {
       window._diarioArchInCorso = true;
       lavoro()
         .then((n) => {
           window._diarioArchInCorso = false;
-          if (n) {
-            render();
-            updateStats();
-          }
+          // ridisegno sempre: se nel frattempo e cambiato un altro filtro, riparte da qui
+          render();
+          if (n) updateStats();
         })
         .catch((e) => {
           window._diarioArchInCorso = false;
@@ -2780,9 +2788,11 @@ function render() {
               _dataRifCopertura(e) +
               '\')" title="Chi copre / chi ha rifiutato">Copertura</button>'
             : '') +
-          '<button class="btn-act" onclick="promemoriaDaRegistrazione(' +
-          e.id +
-          ')" title="Crea un promemoria di follow-up gia compilato">Promemoria</button>' +
+          (typeof isVis !== 'function' || isVis('promemoria')
+            ? '<button class="btn-act" onclick="promemoriaDaRegistrazione(' +
+              e.id +
+              ')" title="Crea un promemoria di follow-up gia compilato">Promemoria</button>'
+            : '') +
           '<button class="btn-act del" onclick="elimina(' +
           e.id +
           ')">Elimina</button></div></div>'

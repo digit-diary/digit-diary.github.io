@@ -321,7 +321,13 @@ function _peValidaRegolaPausa(r, settore, altre) {
 }
 // verifica delle pause generate contro le regole (per gli Slots e l unico
 // modo di far valere fascia, distanza e persone insieme)
+// inizio della giornata dalle righe del giorno aperto (per i controlli fatti fuori
+// dalla generazione: foglio salvato riaperto, cambio di giorno)
+function _peInizioDalGiorno() {
+  if (typeof _briefState !== 'undefined' && _briefState && _briefState.righe) _peImpostaInizio(_briefState.righe);
+}
 function _peVerificaRegolePause(contenuto, dstr, settore) {
+  _peInizioDalGiorno();
   if (!contenuto) return [];
   const regole = _peRegolePause(settore);
   const dow = new Date(dstr + 'T12:00:00').getDay();
@@ -3561,6 +3567,7 @@ function _pbLegami(c) {
 }
 // avvisi (non bloccano): pausa senza cambio, cambio senza pausa
 function _pbControlla(c) {
+  _peInizioDalGiorno();
   const avvisi = [];
   if (!c || !c.celle) return avvisi;
   const legami = _pbLegami(c);
@@ -4965,6 +4972,7 @@ function _pcBigliettiFoglio(c) {
 // tutti gli avvisi del foglio: pausa e cambio collegati, regola delle ore,
 // distanza, sala vuota, righe che non coprono nessuno (senza doppioni)
 function _pcAvvisiFoglio(c) {
+  _peInizioDalGiorno();
   const out = (typeof _pbControlla === 'function' ? _pbControlla(c) : []).map((x) =>
     Object.assign({ tipo: 'cambio' }, x),
   );

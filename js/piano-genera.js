@@ -373,12 +373,28 @@ function _pianoSabatoEntro23(codice, dstrSab, riga) {
 // non si lavora, non e vacanza o malattia, e il sabato prima si finisce entro le 23
 // (regola turno_prima_domenica_libera). Un sabato di malattia o vacanza non si
 // lavora: la domenica dopo conta. sabatoMalato = malattia registrata nel Diario.
-function _pianoDomenicaValida(codDom, codSab, dstrSab, rigaSab, sabatoMalato) {
+function _pianoDomenicaValida(codDom, codSab, dstrSab, rigaSab, sabatoMalato, nome) {
   if (codDom && _pianoTurnoInfo(codDom)) return false;
   if (_pianoDomenicaEsclusa(codDom)) return false;
+  // malattia del sabato registrata solo nel Diario (non ancora nel piano):
+  // vale come nel calendario, in ogni controllo che passa il nome
+  if (sabatoMalato === undefined && nome && dstrSab) sabatoMalato = _pianoSabatoMalatoDiario(nome, dstrSab);
   if (sabatoMalato) return true;
   if (String(_pianoRegolaVal('turno_prima_domenica_libera')).toUpperCase() !== 'TRUE') return true;
   return _pianoSabatoEntro23(codSab, dstrSab, rigaSab);
+}
+// Mappa malattie del Diario per mese, ricalcolata quando cambia il Diario
+// (lunghezza/oggetto di datiCache) o dopo 10 secondi.
+const _pianoMalDiarioCache = {};
+function _pianoSabatoMalatoDiario(nome, dstr) {
+  if (typeof _pianoMalattieMese !== 'function') return false;
+  const ym = String(dstr).substring(0, 7);
+  const dc = typeof datiCache !== 'undefined' ? datiCache : null;
+  const c = _pianoMalDiarioCache[ym];
+  if (!c || c.rif !== dc || c.n !== (dc ? dc.length : 0) || Date.now() - c.t > 10000) {
+    _pianoMalDiarioCache[ym] = { rif: dc, n: dc ? dc.length : 0, t: Date.now(), mappa: _pianoMalattieMese(ym) };
+  }
+  return !!_pianoMalDiarioCache[ym].mappa[nome + '|' + dstr];
 }
 function _pianoGiornoPrima(dstr, n) {
   const d = new Date(dstr + 'T12:00:00');
@@ -410,14 +426,14 @@ async function _pianoDomenicheValideAnno(nome, anno) {
     }
     const sab = _pianoGiornoPrima(ds);
     const rs = per[sab];
-    if (_pianoDomenicaValida(per[ds].codice, rs && rs.codice, sab, rs)) n++;
+    if (_pianoDomenicaValida(per[ds].codice, rs && rs.codice, sab, rs, undefined, nome)) n++;
   }
   return { valide: n, daPianificare: daPianificare };
 }
 // Un cambio toglie una domenica libera valida? Guarda la domenica della cella (se la
 // cella e domenica) o quella dopo (se la cella e sabato). righe = celle della persona
 // attorno al giorno, PRIMA del cambio. Ritorna la data della domenica persa o null.
-function _pianoDomenicaPersa(dstr, codiceNuovo, righe) {
+function _pianoDomenicaPersa(dstr, codiceNuovo, righe, nomeP) {
   const dow = new Date(dstr + 'T12:00:00').getDay();
   if (dow !== 0 && dow !== 6) return null;
   const per = {};
@@ -426,11 +442,13 @@ function _pianoDomenicaPersa(dstr, codiceNuovo, righe) {
   const sab = _pianoGiornoPrima(dom);
   const rd = per[dom];
   const rs = per[sab];
-  if (!_pianoDomenicaValida(rd && rd.codice, rs && rs.codice, sab, rs)) return null;
+  const nome = nomeP || ((righe || []).find((r) => r && r.collaboratore) || {}).collaboratore;
+  if (!_pianoDomenicaValida(rd && rd.codice, rs && rs.codice, sab, rs, undefined, nome)) return null;
   const nuovoDom = dow === 0 ? codiceNuovo : rd && rd.codice;
   const nuovoSab = dow === 6 ? { codice: codiceNuovo } : rs;
   // la riga nuova del sabato non ha ancora l orario scritto: vale quello del turno
-  if (_pianoDomenicaValida(nuovoDom, nuovoSab && nuovoSab.codice, sab, dow === 6 ? null : rs)) return null;
+  if (_pianoDomenicaValida(nuovoDom, nuovoSab && nuovoSab.codice, sab, dow === 6 ? null : rs, undefined, nome))
+    return null;
   if (!_pianoTurnoInfo(codiceNuovo) && !(dow === 6 && !_pianoSabatoEntro23(codiceNuovo, sab, null))) return null;
   return dom;
 }
@@ -477,7 +495,7 @@ async function _pianoAvvisiDomenichePerse(mosse) {
           _pianoGiornoPrima(m.data, -2) +
           '&limit=20',
       )) || [];
-    const dom = _pianoDomenicaPersa(m.data, m.codice, righe);
+    const dom = _pianoDomenicaPersa(m.data, m.codice, righe, m.nome);
     if (dom) out.push(await _pianoTestoDomenicaPersa(m.nome, dom));
   }
   return out;
@@ -803,7 +821,7 @@ function _pianoCalcolaViolazioni() {
         const isoSab = dSab.toISOString().substring(0, 10);
         const rSab = _pianoRigheSettimane().find((r) => r.collaboratore === nome && String(r.data).startsWith(isoSab));
         const codSab = rSab ? rSab.codice : g > 1 ? perNome[nome][g - 1] : null;
-        if (!_pianoDomenicaValida(cod, codSab, isoSab, rSab)) {
+        if (!_pianoDomenicaValida(cod, codSab, isoSab, rSab, undefined, nome)) {
           aggiungi(nome, g, 'domenica non conteggiabile come libera: il sabato finisce oltre le 23');
           continue;
         }

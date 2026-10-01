@@ -238,6 +238,7 @@ async function pianoAnnulla() {
   if (!puoGestirePiano()) return;
   const st = u.pop();
   const memoria = _pianoMemoriaDi(st);
+  let redoAggiunto = false;
   // torna al mese/settore dell'operazione se nel frattempo sei altrove
   _pianoMeseSel = st.ym;
   if (st.rep !== currentReparto) _pianoRepartoSel = st.rep;
@@ -251,6 +252,7 @@ async function pianoAnnulla() {
       )) || [];
     window._pianoRedo = window._pianoRedo || [];
     window._pianoRedo.push({ ym: st.ym, rep: st.rep, label: st.label, righe: _pianoMappaRighe(cur, st.rep) });
+    redoAggiunto = true;
   } catch (e) {}
   try {
     const esito = await _pianoRipristinaStato(st, { memoria: memoria });
@@ -258,6 +260,7 @@ async function pianoAnnulla() {
     toast('Annullato: ' + st.label + ' (' + esito.cambiate + ' celle)');
   } catch (e) {
     u.push(st);
+    if (redoAggiunto) (window._pianoRedo || []).pop(); // lo stato messo in Ripristina non vale
     toastErrore('Annulla non riuscito: ' + ((e && e.message) || e));
   }
   renderPiano();
@@ -2712,7 +2715,7 @@ async function _pianoAvvisiLenti(forza) {
         const cod = perG[nome + '|' + dstr];
         // stessa regola delle C rosse del calendario (una sola funzione)
         const sab = _pianoGiornoPrima(dstr);
-        if (!_pianoDomenicaValida(cod, perG[nome + '|' + sab], sab, perR[nome + '|' + sab])) return;
+        if (!_pianoDomenicaValida(cod, perG[nome + '|' + sab], sab, perR[nome + '|' + sab], undefined, nome)) return;
         libere++;
       });
       if (visto && libere < diritto) {
