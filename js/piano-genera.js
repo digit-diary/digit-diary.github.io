@@ -664,7 +664,7 @@ function _pianoCalcolaViolazioni() {
     const perGruppoMeseFz = {}; // GRUPPO|FZ -> Set(nomi)
     const perGruppoGiornoTot = {}; // GRUPPO|g -> n
     _pianoRighe.forEach((r) => {
-      if ((r.reparto_dip || 'slots') !== _pianoReparto()) return; // copertura: solo le celle di questo settore
+      if (!_pianoCopreQui(r)) return; // copertura: solo i turni di questo settore
       const t = _pianoTurnoInfo(r.codice);
       if (!t) return;
       const gr = (t.gruppo || '').toUpperCase();
@@ -766,7 +766,7 @@ function _pianoCalcolaViolazioni() {
             let conta = 0;
             _pianoRighe.forEach((r) => {
               if (parseInt(r.data.split('-')[2]) !== g) return;
-              if ((r.reparto_dip || 'slots') !== _pianoReparto()) return;
+              if (!_pianoCopreQui(r)) return;
               const t = _pianoTurnoInfo(r.codice);
               if (!t || (t.gruppo || '').toUpperCase() !== gr) return;
               if (tipoF && (t.tipo || '').toUpperCase() !== tipoF) return;
@@ -776,7 +776,7 @@ function _pianoCalcolaViolazioni() {
             let turniQuelGiorno = 0;
             _pianoRighe.forEach((r) => {
               if (parseInt(r.data.split('-')[2]) !== g) return;
-              if ((r.reparto_dip || 'slots') !== _pianoReparto()) return;
+              if (!_pianoCopreQui(r)) return;
               const t = _pianoTurnoInfo(r.codice);
               if (t && (t.gruppo || '').toUpperCase() === gr && (!tipoF || (t.tipo || '').toUpperCase() === tipoF))
                 turniQuelGiorno++;
@@ -994,8 +994,9 @@ async function generaBozzaPiano(usaCoperture) {
     const k = r.collaboratore + '|' + parseInt(r.data.split('-')[2]);
     cella[k] = r.codice;
     rigaDi[k] = r;
-    if ((r.reparto_dip || 'slots') !== _pianoReparto()) altroSettore[k] = true;
+    if (!_pianoCopreQui(r)) altroSettore[k] = true; // la sigla e di un altro settore
   });
+  const nomiCellaSet = new Set(_pianoRighe.map((r) => r.collaboratore)); // completata con i nomi del settore piu sotto
   const oreMese = {}; // equità: ore gia' nel mese, turni E codici speciali (V, M, CGF...)
   Object.keys(cella).forEach((k) => {
     const nomeK = k.substring(0, k.lastIndexOf('|'));
@@ -1012,6 +1013,8 @@ async function generaBozzaPiano(usaCoperture) {
     }
   });
   const nomi = collaboratoriCache.filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c)).map((c) => c.nome);
+  nomi.forEach((n) => nomiCellaSet.add(n));
+  const nomiCella = [...nomiCellaSet];
   // OBIETTIVO ORE mensile (come la tolleranza ore del solver Turnivo):
   // giorni/7 × ore settimanali × percentuale, corretto col saldo cumulato
   // dei mesi precedenti. La bozza dà i turni a chi è più LONTANO dal
@@ -1369,7 +1372,9 @@ async function generaBozzaPiano(usaCoperture) {
       const t = _pianoTurnoInfo(f.turno_codice);
       if (!t) return;
       const dstr = ym + '-' + String(g).padStart(2, '0');
-      let have = nomi.filter((n) => cella[n + '|' + g] === f.turno_codice && !altroSettore[n + '|' + g]).length;
+      // contano anche le persone di altri settori che fanno un turno di questo
+      // (es. Papa del Valet su R22): hanno la cella, ma non sono tra i nomi del settore
+      let have = nomiCella.filter((n) => cella[n + '|' + g] === f.turno_codice && !altroSettore[n + '|' + g]).length;
       while (have < f.quantita) {
         const dowG = new Date(dstr + 'T12:00:00').getDay();
         const candidati = nomi

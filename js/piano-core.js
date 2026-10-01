@@ -509,6 +509,28 @@ function _pianoCollabInfo(nome) {
 function _pianoTurniReparto() {
   return pianoTurniCache.filter((t) => t.attivo !== false && (t.reparto_dip || 'slots') === _pianoReparto());
 }
+// SETTORE DEL TURNO di una cella: la sigla dice di quale settore e il posto
+// coperto, qualunque foglio l abbia scritta (Balliu e Papa al Valet con R22/R23,
+// che sono turni della Reception Slots). Stessa regola del briefing: se la sigla
+// esiste nel settore della riga vale quello (es. "9" in Slots e in Tavoli),
+// altrimenti il settore aperto se la conosce, altrimenti l unico che la conosce.
+// Celle senza turno (C, V, M...) restano al settore della riga.
+function _pianoSettoreTurno(r, repAperto) {
+  const qui = repAperto || _pianoReparto();
+  const repRiga = (r && r.reparto_dip) || 'slots';
+  const cod = r && r.codice;
+  const settori = new Set(
+    (pianoTurniCache || []).filter((t) => t.attivo !== false && t.codice === cod).map((t) => t.reparto_dip || 'slots'),
+  );
+  if (!settori.size || settori.has(repRiga)) return repRiga;
+  if (settori.has(qui)) return qui;
+  return settori.size === 1 ? [...settori][0] : repRiga;
+}
+// la cella copre un posto del settore aperto?
+function _pianoCopreQui(r, repAperto) {
+  const qui = repAperto || _pianoReparto();
+  return _pianoSettoreTurno(r, qui) === qui;
+}
 function _pianoTurnoInfo(codice) {
   return _pianoTurniReparto().find((t) => t.codice === codice) || pianoTurniCache.find((t) => t.codice === codice);
 }
@@ -1472,15 +1494,23 @@ async function _pianoCaricaMeseSettore(da, a, rep) {
   // casa i giorni passati al Valet sembravano vuoti, la bozza ci metteva turni
   // (che il database poi scartava in silenzio) e riposi e ore della settimana
   // non li contavano. Si leggono anche i giorni del bordo (riposi a cavallo).
+  // tutti i collaboratori del settore, anche chi e solo di questo settore: puo avere
+  // celle scritte nel piano di un altro (Tonati con R23 nel foglio Valet)
   const altrove = collaboratoriCache
-    .filter(
-      (c) =>
-        c.attivo !== false &&
-        _pianoAppartieneAlReparto(c, rep) &&
-        ((c.reparto_dip || 'slots') !== rep || String(c.reparti_extra || '').trim()),
-    )
+    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c, rep))
     .map((c) => c.nome);
-  if (!altrove.length) return righe;
+  // sigle che esistono SOLO in questo settore: una cella con quella sigla nel piano
+  // di un altro settore copre un posto qui (Papa del Valet su R22 della Reception)
+  const soloQui = (pianoTurniCache || [])
+    .filter((t) => t.attivo !== false && (t.reparto_dip || 'slots') === rep)
+    .map((t) => t.codice)
+    .filter(
+      (cod) =>
+        !(pianoTurniCache || []).some(
+          (t) => t.attivo !== false && t.codice === cod && (t.reparto_dip || 'slots') !== rep,
+        ),
+    );
+  if (!altrove.length && !soloQui.length) return righe;
   const visti = new Set(righe.map((r) => r.id).concat((window._pianoRigheBordo || []).map((r) => r.id)));
   // stessa finestra del bordo: una settimana in piu prima e dopo
   const _l = new Date(da + 'T12:00:00');
@@ -1489,18 +1519,16 @@ async function _pianoCaricaMeseSettore(da, a, rep) {
   _dm.setDate(_dm.getDate() + ((7 - _dm.getDay()) % 7) + 7);
   const dalB = dataLocaleISO(_l) < da ? dataLocaleISO(_l) : da;
   const alB = dataLocaleISO(_dm) > a ? dataLocaleISO(_dm) : a;
-  const loro =
-    (await secGet(
-      'piano?collaboratore=in.(' +
-        altrove.map((n) => encodeURIComponent(n)).join(',') +
-        ')&reparto_dip=neq.' +
-        rep +
-        '&data=gte.' +
-        dalB +
-        '&data=lte.' +
-        alB,
-    )) || [];
-  loro.forEach((r) => {
+  const periodo = '&reparto_dip=neq.' + rep + '&data=gte.' + dalB + '&data=lte.' + alB;
+  const [loro, conSigleQui] = await Promise.all([
+    altrove.length
+      ? secGet('piano?collaboratore=in.(' + altrove.map((n) => encodeURIComponent(n)).join(',') + ')' + periodo)
+      : [],
+    soloQui.length
+      ? secGet('piano?codice=in.(' + soloQui.map((c) => encodeURIComponent(c)).join(',') + ')' + periodo)
+      : [],
+  ]);
+  (loro || []).concat(conSigleQui || []).forEach((r) => {
     if (visti.has(r.id)) return;
     visti.add(r.id);
     const d = String(r.data).substring(0, 10);
@@ -1937,9 +1965,20 @@ async function _renderPianoCore() {
               cls += ' piano-prot';
             }
             if ((r.reparto_dip || 'slots') !== _pianoReparto()) {
-              // cella dell'ALTRO reparto di un collaboratore multi-reparto
-              stile += (stile ? ';' : '') + 'opacity:.65;font-style:italic';
-              titolo = '[' + repartoLabel(r.reparto_dip) + '] ' + titolo;
+              if (_pianoCopreQui(r)) {
+                // turno di QUESTO settore scritto nel foglio di un altro: copre qui
+                titolo =
+                  'Turno ' +
+                  repartoLabel(_pianoReparto()) +
+                  ' (scritto nel piano ' +
+                  repartoLabel(r.reparto_dip) +
+                  ') ' +
+                  titolo;
+              } else {
+                // cella dell'ALTRO settore: la persona e occupata, non copre qui
+                stile += (stile ? ';' : '') + 'opacity:.65;font-style:italic';
+                titolo = '[' + repartoLabel(_pianoSettoreTurno(r)) + '] ' + titolo;
+              }
             }
             if (r.commento) {
               cls += ' piano-comm';
@@ -2214,6 +2253,7 @@ async function _renderPianoCore() {
         });
         const assMap = {}; // codice -> {giorno: n}
         _pianoRighe.forEach((r) => {
+          if (!_pianoCopreQui(r)) return; // turno di un altro settore: non copre questo fabbisogno
           const g = parseInt(r.data.split('-')[2]);
           (assMap[r.codice] = assMap[r.codice] || {})[g] =
             (assMap[r.codice] && assMap[r.codice][g] ? assMap[r.codice][g] : 0) + 1;

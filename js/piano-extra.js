@@ -2750,10 +2750,23 @@ async function _pianoAvvisiLenti(forza) {
       (await secGet(
         'piano_fabbisogni?data=gte.' + dI + '&data=lte.' + dF + '&reparto_dip=eq.' + rep + '&limit=5000',
       )) || [];
-    const righe =
-      (await secGet('piano?data=gte.' + dI + '&data=lte.' + dF + '&reparto_dip=eq.' + rep + '&limit=5000')) || [];
+    // tutte le celle con le sigle richieste, in qualunque piano siano scritte:
+    // copre chi fa un turno di QUESTO settore (anche dal foglio Valet)
+    const sigle = [...new Set(fabb.map((f) => f.turno_codice))];
+    const righe = sigle.length
+      ? (await secGet(
+          'piano?data=gte.' +
+            dI +
+            '&data=lte.' +
+            dF +
+            '&codice=in.(' +
+            sigle.map((c) => encodeURIComponent(c)).join(',') +
+            ')',
+        )) || []
+      : [];
     const ass = {};
     righe.forEach((r) => {
+      if (!_pianoCopreQui(r, rep)) return;
       const k = String(r.data).substring(0, 10) + '|' + r.codice;
       ass[k] = (ass[k] || 0) + 1;
     });
