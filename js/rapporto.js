@@ -865,6 +865,7 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
   // DELETES: rimuovi da cache + audit
   for (const d of ops.deletes) {
     datiCache = datiCache.filter((x) => x.id !== d.id);
+    _diarioTogliArchivioLeggero(d.id);
     try {
       logAzione(
         'Malattia eliminata da rapporto',

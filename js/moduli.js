@@ -2955,7 +2955,17 @@ function resetFiltri() {
   render();
 }
 function updateStats() {
+  // intero archivio del settore: le righe in memoria (aggiornate al momento)
+  // piu nome e tipo di quelle piu vecchie della finestra, contate una volta sola.
+  // Una riga vecchia eliminata in questa sessione resta in memoria come eliminata.
   const rd = getDatiReparto();
+  const visti = new Set(rd.map((e) => e.id));
+  const tolti = new Set((typeof cestinoCache !== 'undefined' ? cestinoCache : []).map((e) => e.id));
+  (window._diarioArchivioLeggero || []).forEach((r) => {
+    if ((r.reparto_dip || 'slots') !== currentReparto || visti.has(r.id) || tolti.has(r.id)) return;
+    visti.add(r.id);
+    rd.push(r);
+  });
   document.getElementById('stats-bar').innerHTML =
     '<div class="stat"><div class="stat-num">' +
     rd.length +

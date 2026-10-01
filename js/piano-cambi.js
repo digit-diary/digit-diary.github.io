@@ -1789,6 +1789,7 @@ async function _pianoMalattiaViaDiario(nome, giorniDstr) {
     try {
       await secPatch('registrazioni', 'id=eq.' + e.id, { eliminato: true, eliminato_da: op, eliminato_at: now });
       e.eliminato = true;
+      _diarioTogliArchivioLeggero(e.id);
       tolte++;
     } catch (err) {}
   }

@@ -1158,8 +1158,49 @@ function _pianoRettificaMese(nome, ym) {
 // compute_ytd_saldo_map di Turnivo): per ogni mese usa le ore timbrate se
 // presenti, altrimenti le ore piano (turni + codici speciali scalati);
 // saldo_mese = ore - dovute; jolly esclusi.
+// Dal 02.10.2026 comprende il RIPORTO della scheda Saldo (piano_saldo_iniziale):
+// riporto + mesi non gia compresi nel riporto, esattamente come la scheda Saldo.
+// Lo usano il calendario (colonna YTD) e la bozza (chi e in piu riceve meno ore).
 let _pianoYtdMap = {};
+let _pianoYtdRip = {}; // nome -> riporto compreso nell YTD (per la finestrella)
 let _pianoYtdKey = '';
+// YTD fino a fine mese aperto: si aggiunge il saldo del mese solo se il mese
+// non e gia dentro il riporto (es. agosto con riporto al 31.08)
+function _pianoYtdConMese(nome, saldoMese, oreMese) {
+  const ym = _pianoMeseSel;
+  // mese senza ore (non ancora pianificato): come nella scheda Saldo non conta
+  if (oreMese !== undefined && !oreMese) return Math.round((_pianoYtdMap[nome] || 0) * 10) / 10;
+  const dentro =
+    typeof _pianoMeseDentroRiporto === 'function' &&
+    _pianoMeseDentroRiporto(nome, parseInt(ym.split('-')[0]), ym.split('-')[1]);
+  return Math.round(((_pianoYtdMap[nome] || 0) + (dentro ? 0 : saldoMese)) * 10) / 10;
+}
+function _pianoTestoYtd(nome, saldo, ytd, ore) {
+  const f = (v) => (v > 0 ? '+' : '') + (Math.round(v * 10) / 10).toFixed(1);
+  const rip = _pianoYtdRip[nome] || 0;
+  const mesi = (_pianoYtdMap[nome] || 0) - rip;
+  const anno = parseInt(_pianoMeseSel.split('-')[0]);
+  const rec = typeof _pianoSaldoIniz !== 'undefined' ? _pianoSaldoIniz[nome + '|' + anno] : null;
+  const dataRip =
+    rec && rec.data_riferimento
+      ? ' al ' + String(rec.data_riferimento).substring(0, 10).split('-').reverse().join('.')
+      : '';
+  const dentro = _pianoMeseDentroRiporto(nome, anno, _pianoMeseSel.split('-')[1]);
+  return (
+    'Saldo ore dell anno (come la scheda Saldo)\n' +
+    (rip ? 'Riporto' + dataRip + ': ' + f(rip) + '\n' : 'Nessun riporto registrato\n') +
+    'Mesi precedenti' +
+    (rip && dataRip ? ' dopo il riporto' : ' da gennaio') +
+    ': ' +
+    f(mesi) +
+    '\n' +
+    'Questo mese: ' +
+    (dentro ? 'gia compreso nel riporto' : !ore ? 'senza ore, non conta' : f(saldo)) +
+    '\n' +
+    'Totale: ' +
+    f(ytd)
+  );
+}
 async function _pianoAggiornaYtd(nomi) {
   const ym = _pianoMeseSel;
   // servono per sapere quali giorni chiudono tardi (turni con orario prolungato)
@@ -1169,8 +1210,22 @@ async function _pianoAggiornaYtd(nomi) {
   const anno = parseInt(ym.split('-')[0]);
   const mese = parseInt(ym.split('-')[1]);
   _pianoYtdMap = {};
+  _pianoYtdRip = {};
   _pianoYtdKey = chiave;
-  if (mese <= 1) return;
+  await _pianoCaricaSaldoIniziale(anno);
+  const _conRiporto = () =>
+    nomi.forEach((n) => {
+      const info = _pianoCollabInfo(n) || {};
+      if (info.is_jolly) return;
+      const rip = _pianoRiporto(n, anno);
+      if (!rip) return;
+      _pianoYtdRip[n] = rip;
+      _pianoYtdMap[n] = Math.round(((_pianoYtdMap[n] || 0) + rip) * 100) / 100;
+    });
+  if (mese <= 1) {
+    _conRiporto();
+    return;
+  }
   const fine = ym + '-01';
   // SCALA CON MOLTI SETTORI: le ore YTD di un collaboratore possono stare in
   // piu reparti (coperture), quindi si leggono per NOME (solo i nomi del settore
@@ -1224,21 +1279,31 @@ async function _pianoAggiornaYtd(nomi) {
     const k = x.collaboratore + '|' + m;
     recMese[k] = (recMese[k] || 0) + (parseFloat(x.ore) || 0);
   });
+  // STESSA REGOLA DELLA SCHEDA SALDO (_pianoSaldoDelMese): un mese conta solo se
+  // ha un piano e la persona ha ore (altrimenti un mese non pianificato, o prima
+  // dell assunzione, risultava un buco di 175 ore); saldo del mese arrotondato
+  // a un decimale come nella scheda Saldo.
+  const mesiConPiano = {};
+  (righe || []).forEach((r) => (mesiConPiano[parseInt(r.data.split('-')[1])] = true));
   nomi.forEach((n) => {
     const info = _pianoCollabInfo(n) || {};
     if (info.is_jolly) return;
     const pct = parseFloat(info.percentuale) || 1; // senza percentuale vale 100%, come nel calcolo del mese
     let cum = 0;
     for (let m = 1; m < mese; m++) {
-      const dim = _pianoGgDovuti(n, anno + '-' + String(m).padStart(2, '0')); // meno i giorni di congedo non pagato
-      const dovute = Math.round((dim / 7) * _pianoOreSett * pct * 100) / 100;
+      if (_pianoMeseDentroRiporto(n, anno, String(m).padStart(2, '0'))) continue; // gia nel riporto
+      if (!mesiConPiano[m]) continue;
       const k = n + '|' + m;
       const effettive =
         rettMese[k] != null ? rettMese[k] : timbMese[k] != null ? timbMese[k] : (perMese[k] || 0) + (recMese[k] || 0);
-      cum += effettive - dovute;
+      if (!effettive) continue;
+      const dim = _pianoGgDovuti(n, anno + '-' + String(m).padStart(2, '0')); // meno i giorni di congedo non pagato
+      const dovute = Math.round((dim / 7) * _pianoOreSett * pct * 10) / 10;
+      cum += Math.round((Math.round(effettive * 100) / 100 - dovute) * 10) / 10;
     }
     _pianoYtdMap[n] = Math.round(cum * 100) / 100;
   });
+  _conRiporto();
 }
 
 // Scrive le ORE REALI di un mese per un collaboratore. Il saldo del mese e'
@@ -1401,34 +1466,47 @@ async function _pianoCaricaMeseSettore(da, a, rep) {
   } catch (e) {
     window._pianoRigheBordo = [];
   }
-  const coprenti = collaboratoriCache
-    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') !== rep && _pianoAppartieneAlReparto(c))
+  // CELLE DEGLI ALTRI SETTORI di chi lavora anche altrove: sia chi viene a coprire
+  // da un altro settore, sia chi e di questo settore ma ne ha altri (es. Balliu,
+  // Slots con anche Valet). Prima il secondo caso non si leggeva: nel settore di
+  // casa i giorni passati al Valet sembravano vuoti, la bozza ci metteva turni
+  // (che il database poi scartava in silenzio) e riposi e ore della settimana
+  // non li contavano. Si leggono anche i giorni del bordo (riposi a cavallo).
+  const altrove = collaboratoriCache
+    .filter(
+      (c) =>
+        c.attivo !== false &&
+        _pianoAppartieneAlReparto(c, rep) &&
+        ((c.reparto_dip || 'slots') !== rep || String(c.reparti_extra || '').trim()),
+    )
     .map((c) => c.nome);
-  if (!coprenti.length) return righe;
-  // dedup per id: una copertura del coprente gia' nel settore corrente e' gia'
-  // tra le righe caricate sopra e non va aggiunta due volte
-  const visti = new Set(righe.map((r) => r.id));
-  for (let i = 0; i < coprenti.length; i += 25) {
-    const blocchi = await Promise.all(
-      coprenti
-        .slice(i, i + 25)
-        .map((n) =>
-          secGet(
-            'piano?collaboratore=eq.' + encodeURIComponent(n) + '&data=gte.' + da + '&data=lte.' + a + '&limit=400',
-          ),
-        ),
-    );
-    blocchi.forEach(
-      (rr) =>
-        rr &&
-        rr.forEach((r) => {
-          if (!visti.has(r.id)) {
-            visti.add(r.id);
-            righe.push(r);
-          }
-        }),
-    );
-  }
+  if (!altrove.length) return righe;
+  const visti = new Set(righe.map((r) => r.id).concat((window._pianoRigheBordo || []).map((r) => r.id)));
+  // stessa finestra del bordo: una settimana in piu prima e dopo
+  const _l = new Date(da + 'T12:00:00');
+  _l.setDate(_l.getDate() - ((_l.getDay() + 6) % 7) - 7);
+  const _dm = new Date(a + 'T12:00:00');
+  _dm.setDate(_dm.getDate() + ((7 - _dm.getDay()) % 7) + 7);
+  const dalB = dataLocaleISO(_l) < da ? dataLocaleISO(_l) : da;
+  const alB = dataLocaleISO(_dm) > a ? dataLocaleISO(_dm) : a;
+  const loro =
+    (await secGet(
+      'piano?collaboratore=in.(' +
+        altrove.map((n) => encodeURIComponent(n)).join(',') +
+        ')&reparto_dip=neq.' +
+        rep +
+        '&data=gte.' +
+        dalB +
+        '&data=lte.' +
+        alB,
+    )) || [];
+  loro.forEach((r) => {
+    if (visti.has(r.id)) return;
+    visti.add(r.id);
+    const d = String(r.data).substring(0, 10);
+    if (d >= da && d <= a) righe.push(r);
+    else (window._pianoRigheBordo = window._pianoRigheBordo || []).push(r);
+  });
   return righe;
 }
 // RIDISEGNI IN FILA: se ne arriva uno mentre un altro e in corso, si accoda e
@@ -1964,7 +2042,7 @@ async function _renderPianoCore() {
         // reale del mese, quello che finisce in busta paga
         const orePiano = _rett ? Math.round(parseFloat(_rett.ore_reali) * 100) / 100 : orePianificate;
         const saldo = Math.round((orePiano - dovute) * 10) / 10;
-        const ytd = Math.round(((_pianoYtdMap[nome] || 0) + saldo) * 10) / 10;
+        const ytd = _pianoYtdConMese(nome, saldo, orePiano);
         const _clsRiga =
           infoC && infoC.funzione === 'SUP'
             ? ' class="piano-row-sup"'
@@ -2098,17 +2176,7 @@ async function _renderPianoCore() {
           '">' +
           (orePiano || dovute ? (saldo > 0 ? '+' : '') + saldo.toFixed(1) : '') +
           '</td><td class="piano-tot" data-tot="6" title="' +
-          escP(
-            'Saldo dell anno dal piano (gennaio - mese prima, senza riporto) ' +
-              ((_pianoYtdMap[nome] || 0) > 0 ? '+' : '') +
-              (Math.round((_pianoYtdMap[nome] || 0) * 10) / 10).toFixed(1) +
-              ' + questo mese ' +
-              (saldo > 0 ? '+' : '') +
-              saldo.toFixed(1) +
-              ' = ' +
-              (ytd > 0 ? '+' : '') +
-              ytd.toFixed(1),
-          ) +
+          escP(_pianoTestoYtd(nome, saldo, ytd, orePiano)) +
           '" style="font-weight:700;color:' +
           (ytd > 0 ? '#2c6e49' : ytd < 0 ? '#c0392b' : 'var(--muted)') +
           '">' +

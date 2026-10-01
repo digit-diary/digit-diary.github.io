@@ -1851,7 +1851,11 @@ async function miglioraOrePiano() {
   const fissi = nomi.filter((n) => !infoDi[n].is_jolly);
   fissi.forEach((n) => {
     const pct = parseFloat(infoDi[n].percentuale) || 1;
-    const obiettivo = (_pianoGgDovuti(n, ym) / 7) * _pianoOreSett * pct - (_pianoYtdMap[n] || 0);
+    const obiettivo = _pianoObiettivoConSaldo(
+      n,
+      (_pianoGgDovuti(n, ym) / 7) * _pianoOreSett * pct,
+      _pianoUltimoGiorno(ym),
+    );
     saldo[n] = (ore[n] || 0) - obiettivo;
   });
   const maxCons = parseInt(_pianoRegolaVal('max_consecutivi')) || 5;

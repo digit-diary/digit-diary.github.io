@@ -26,7 +26,10 @@ async function _diarioLeggiIniziale() {
   window._diarioArchFatto = {}; // dopo un ricaricamento (es. Annulla) l archivio si rilegge
   if (typeof _rgArchivioFatto !== 'undefined') Object.keys(_rgArchivioFatto).forEach((k) => delete _rgArchivioFatto[k]);
   const sempre = [nomeCorrente('Ammonimento Verbale'), nomeCorrente('Errore')];
-  const [recenti, storiaDisc] = await Promise.all([
+  // per i numeri della barra del Diario (Totale, Collaboratori, ...): delle
+  // registrazioni prima della finestra servono solo nome e tipo, cosi i numeri
+  // sono quelli dell intero archivio e non cambiano dopo una ricerca
+  const [recenti, storiaDisc, leggere] = await Promise.all([
     secGet('registrazioni?data=gte.' + da + '&order=data.desc'),
     secGet(
       'registrazioni?data=lt.' +
@@ -35,9 +38,16 @@ async function _diarioLeggiIniziale() {
         sempre.map((t) => encodeURIComponent(t)).join(',') +
         ')&order=data.desc',
     ),
+    secGet('registrazioni?data=lt.' + da + '&select=id,nome,tipo,reparto_dip,eliminato'),
   ]);
+  window._diarioArchivioLeggero = (leggere || []).filter((r) => !r.eliminato);
   diarioFinestraDa = da;
   return (recenti || []).concat(storiaDisc || []);
+}
+// una registrazione eliminata esce anche dai numeri dell archivio
+function _diarioTogliArchivioLeggero(ids) {
+  const via = new Set([].concat(ids));
+  window._diarioArchivioLeggero = (window._diarioArchivioLeggero || []).filter((r) => !via.has(r.id));
 }
 function _diarioUnisci(righe) {
   const ids = new Set(datiCache.map((e) => e.id));

@@ -351,6 +351,7 @@ async function elimina(id) {
       _e.eliminato_at = now;
     }
     datiCache = datiCache.filter((e) => !e.eliminato);
+    _diarioTogliArchivioLeggero(id);
     pinnedIds.delete(id);
     if (_e) logAzione('Registrazione nel cestino', _e.nome + ' - ' + _e.tipo + ' (da ' + op + ')');
     // malattia cancellata: nel Piano tornano le sigle che la M aveva coperto ("Ex R23")

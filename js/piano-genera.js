@@ -298,6 +298,19 @@ function _pianoGgMm(d) {
 //   (se sopra/sotto sono spente vale la tolleranza_ore simmetrica ±);
 // - jolly SENZA percentuale: range assoluto jolly_ore_min / jolly_ore_max.
 // min/max null = nessun limite su quel lato (regole spente).
+// OBIETTIVO ORE DEL MESE CON IL SALDO (riporto + mesi passati): chi e in piu
+// riceve meno ore, chi e in meno di piu, ma sempre DENTRO la tolleranza del mese
+// (tolleranza_ore_sopra/sotto). Il saldo si recupera un po per mese invece di
+// creare mesi fuori regola. base = ore dovute del mese.
+function _pianoObiettivoConSaldo(nome, base, nGiorni) {
+  const ytd = _pianoYtdMap[nome] || 0;
+  let ob = base - ytd;
+  const lim = _pianoLimitiOre(nome, nGiorni);
+  if (lim.obiettivo == null) return ob; // jolly puri: range assoluto, come prima
+  if (lim.min != null) ob = Math.max(ob, lim.min);
+  if (lim.max != null) ob = Math.min(ob, lim.max);
+  return ob;
+}
 function _pianoLimitiOre(nome, nGiorni) {
   const info = _pianoCollabInfo(nome) || {};
   // jolly con percentuale PIENA (o vuota) = jolly puro → range assoluto;
@@ -651,6 +664,7 @@ function _pianoCalcolaViolazioni() {
     const perGruppoMeseFz = {}; // GRUPPO|FZ -> Set(nomi)
     const perGruppoGiornoTot = {}; // GRUPPO|g -> n
     _pianoRighe.forEach((r) => {
+      if ((r.reparto_dip || 'slots') !== _pianoReparto()) return; // copertura: solo le celle di questo settore
       const t = _pianoTurnoInfo(r.codice);
       if (!t) return;
       const gr = (t.gruppo || '').toUpperCase();
@@ -752,6 +766,7 @@ function _pianoCalcolaViolazioni() {
             let conta = 0;
             _pianoRighe.forEach((r) => {
               if (parseInt(r.data.split('-')[2]) !== g) return;
+              if ((r.reparto_dip || 'slots') !== _pianoReparto()) return;
               const t = _pianoTurnoInfo(r.codice);
               if (!t || (t.gruppo || '').toUpperCase() !== gr) return;
               if (tipoF && (t.tipo || '').toUpperCase() !== tipoF) return;
@@ -761,6 +776,7 @@ function _pianoCalcolaViolazioni() {
             let turniQuelGiorno = 0;
             _pianoRighe.forEach((r) => {
               if (parseInt(r.data.split('-')[2]) !== g) return;
+              if ((r.reparto_dip || 'slots') !== _pianoReparto()) return;
               const t = _pianoTurnoInfo(r.codice);
               if (t && (t.gruppo || '').toUpperCase() === gr && (!tipoF || (t.tipo || '').toUpperCase() === tipoF))
                 turniQuelGiorno++;
@@ -970,10 +986,15 @@ async function generaBozzaPiano(usaCoperture) {
   // stato griglia: esistenti + assegnazioni della bozza
   const cella = {}; // 'nome|g' -> codice
   const rigaDi = {}; // 'nome|g' -> riga (per sostituire i segnaposto WD)
+  // giorni passati in un ALTRO settore: la persona e occupata (non si assegna,
+  // contano per ore e riposi) ma NON copre i posti di questo settore, anche se
+  // la sigla e uguale (al Valet ci sono R23 e C15 come agli Slots)
+  const altroSettore = {}; // 'nome|g' -> true
   _pianoRighe.forEach((r) => {
     const k = r.collaboratore + '|' + parseInt(r.data.split('-')[2]);
     cella[k] = r.codice;
     rigaDi[k] = r;
+    if ((r.reparto_dip || 'slots') !== _pianoReparto()) altroSettore[k] = true;
   });
   const oreMese = {}; // equità: ore gia' nel mese, turni E codici speciali (V, M, CGF...)
   Object.keys(cella).forEach((k) => {
@@ -1001,7 +1022,7 @@ async function generaBozzaPiano(usaCoperture) {
   nomi.forEach((n) => {
     const info = _pianoCollabInfo(n) || {};
     const pct = parseFloat(info.percentuale) || 1;
-    obiettivo[n] = (_pianoGgDovuti(n, ym) / 7) * _pianoOreSett * pct - (_pianoYtdMap[n] || 0);
+    obiettivo[n] = _pianoObiettivoConSaldo(n, (_pianoGgDovuti(n, ym) / 7) * _pianoOreSett * pct, nGiorni);
   });
   const gapOre = (n) => (obiettivo[n] || 0) - (oreMese[n] || 0);
   const consecPrima = (nome, g) => {
@@ -1073,6 +1094,7 @@ async function generaBozzaPiano(usaCoperture) {
     (collabMeseFz[gr + '|' + fzC] = collabMeseFz[gr + '|' + fzC] || new Set()).add(nomeC);
   };
   Object.keys(cella).forEach((k) => {
+    if (altroSettore[k]) return; // non copre i posti di questo settore
     const [nomeK, gK] = [k.substring(0, k.lastIndexOf('|')), parseInt(k.substring(k.lastIndexOf('|') + 1))];
     registraAssegnazione(nomeK, cella[k], gK);
   });
@@ -1173,6 +1195,7 @@ async function generaBozzaPiano(usaCoperture) {
     !!parseFloat(_pianoRegolaVal('riposo_domenica_lavorata_ore'));
   const candidatoOk = (n, f, t, g, dstr, dowG, ignoraOccupato, oreDelta) => {
     const esistente = cella[n + '|' + g];
+    if (altroSettore[n + '|' + g]) return false; // quel giorno lavora in un altro settore
     if (malattie[n + '|' + dstr]) return false;
     if (ndDiario[n + '|' + dstr]) return false; // non disponibile (dal Diario)
     if (!ignoraOccupato && esistente && esistente !== 'WD') return false;
@@ -1267,6 +1290,13 @@ async function generaBozzaPiano(usaCoperture) {
         for (let k = g - 2; k >= 1 && _pianoIsLavoro(cella[n + '|' + k] || ''); k--) streakPrec++;
         if (streakPrec >= 4) return false;
       }
+      // anche IN AVANTI: il turno allunga una serie che finisce con un riposo
+      // singolo gia fissato e un rientro (succedeva tappando i buchi dopo)
+      let fineSerie = g;
+      while (fineSerie + 1 <= nGiorni && _pianoIsLavoro(cella[n + '|' + (fineSerie + 1)] || '')) fineSerie++;
+      const riposo = fineSerie + 1;
+      if (riposo + 1 <= nGiorni && fineSerie - g + 1 + cp0 >= 4 && _pianoIsLavoro(cella[n + '|' + (riposo + 1)] || ''))
+        return false;
     }
     // REGOLE DI GRUPPO (port di eligibility.py Turnivo): i settori
     // assegnati al collaboratore (settori_piano, M2M di Turnivo) sono la
@@ -1311,7 +1341,11 @@ async function generaBozzaPiano(usaCoperture) {
       const limN = _pianoLimitiOre(n, nGiorni);
       if (limN.max != null) {
         // per chi ha obiettivo il max segue anche il saldo cumulato (YTD)
-        const maxEff = limN.obiettivo != null ? limN.max - (_pianoYtdMap[n] || 0) : limN.max;
+        // con il saldo, ma mai oltre il massimo del mese ne sotto il minimo
+        const maxEff =
+          limN.obiettivo != null
+            ? Math.min(limN.max, Math.max(limN.max - (_pianoYtdMap[n] || 0), limN.min != null ? limN.min : 0))
+            : limN.max;
         if ((oreMese[n] || 0) + (oreDelta || 0) + (parseFloat(t.durata_ore) || 0) > maxEff) return false;
       }
     }
@@ -1335,7 +1369,7 @@ async function generaBozzaPiano(usaCoperture) {
       const t = _pianoTurnoInfo(f.turno_codice);
       if (!t) return;
       const dstr = ym + '-' + String(g).padStart(2, '0');
-      let have = nomi.filter((n) => cella[n + '|' + g] === f.turno_codice).length;
+      let have = nomi.filter((n) => cella[n + '|' + g] === f.turno_codice && !altroSettore[n + '|' + g]).length;
       while (have < f.quantita) {
         const dowG = new Date(dstr + 'T12:00:00').getDay();
         const candidati = nomi
@@ -1704,6 +1738,14 @@ async function generaBozzaPiano(usaCoperture) {
     }
     const r = { inserite: inseriteTot };
     if (nuove.length && !inseriteTot) throw new Error('nessuna cella scritta dal database');
+    // il database non sovrascrive una cella gia presente (una per persona e giorno):
+    // se qualcuna e stata scartata si dice, invece di lasciare un buco nascosto
+    if (inseriteTot < nuove.length)
+      toastErrore(
+        nuove.length -
+          inseriteTot +
+          ' celle della bozza non scritte: in quei giorni c era gia una cella (scritta da un altro settore o nel frattempo). Controlla gli Avvisi',
+      );
     for (const sw of sostituzioniWd) {
       await secPatch('piano', 'id=eq.' + sw.id, {
         codice: sw.codice,

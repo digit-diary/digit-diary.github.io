@@ -1311,6 +1311,7 @@ async function pianoSaldoIniziale(nome) {
       toast('Salvato · riporto di ' + nome + ': ' + ore + 'h');
     }
     window._pianoSaldoAnnoDati = null;
+    _pianoYtdKey = ''; // il saldo del calendario e della bozza comprende il riporto
     renderPiano();
   } catch (e) {
     console.error('riporto saldo', e);
@@ -1322,11 +1323,26 @@ async function pianoSaldoIniziale(nome) {
 // in memoria finche' non si cambia anno o non si tocca qualcosa.
 async function _pianoSaldoAnnoCalcola(anno) {
   await _pianoCaricaMalattieAnno(parseInt(anno));
+  // le ore di una persona contano tutte, anche quelle fatte in un altro settore
+  // (coperture, cambio di settore durante l anno): le righe del settore piu
+  // quelle dei suoi collaboratori negli altri settori, come il saldo YTD del
+  // calendario. Prima chi passava al Valet a novembre risultava con 100 ore in meno.
   const rep = _pianoReparto();
-  const righe =
-    (await secGet(
-      'piano?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&reparto_dip=eq.' + rep + '&limit=40000',
-    )) || [];
+  const nomi = collaboratoriCache.filter((c) => _pianoAppartieneAlReparto(c)).map((c) => c.nome);
+  const periodo = '&data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31';
+  const [delSettore, altrove] = await Promise.all([
+    secGet('piano?reparto_dip=eq.' + rep + periodo),
+    nomi.length
+      ? secGet(
+          'piano?collaboratore=in.(' +
+            nomi.map((n) => encodeURIComponent(n)).join(',') +
+            ')&reparto_dip=neq.' +
+            rep +
+            periodo,
+        )
+      : [],
+  ]);
+  const righe = (delSettore || []).concat(altrove || []);
   _pianoRegistraGiorniTurno(righe);
   const rec =
     (await secGet(
@@ -1599,7 +1615,7 @@ async function _renderPianoSaldoTab() {
     // schede per un centesimo di differenza
     const od = info.is_jolly ? 0 : Math.round((_pianoGgDovuti(nome, ym) / 7) * _pianoOreSett * pct * 10) / 10;
     const sm = Math.round((Math.round(op * 100) / 100 - od) * 10) / 10;
-    const ytd = Math.round(((_pianoYtdMap[nome] || 0) + sm) * 10) / 10;
+    const ytd = _pianoYtdConMese(nome, sm, op);
     totD += od;
     totP += op;
     if (!info.is_jolly) totS += sm;
