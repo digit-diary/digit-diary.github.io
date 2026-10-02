@@ -2989,7 +2989,7 @@ function _renderPanoramicaHrCard(collabs) {
   html += kpi(jolly, 'Jolly', '#e67e22');
   if (senza) html += kpi(senza, 'Senza inquadramento', 'var(--muted)');
   html += kpi(premiAnno, 'Premi consegnati ' + anno, '#b8860b');
-  if (senzaVal) html += kpi(senzaVal, 'Senza valutazione', '#8a1c1c');
+  if (senzaVal && puoVedereValutazioni()) html += kpi(senzaVal, 'Senza valutazione', '#8a1c1c');
   html += kpi(fmtCHF(spesaGiubAnno) + ' CHF', 'Giubilei erogati ' + anno, '#8b6914');
   html += kpi(fmtCHF(spesaGiubTot) + ' CHF', 'Giubilei totali storici', '#8b6914');
   html += '</div>';

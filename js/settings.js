@@ -54,7 +54,11 @@ const VIS_ITEMS = {
     gestione_corsi: 'Corsi · pianificare corsi nel piano: data, orario e partecipanti (es. supervisor)',
     gestione_briefing:
       'Briefing · compilare e modificare il foglio del giorno e le pause (senza toccare la griglia turni)',
-    storico_hr: 'Storico HR · inizio contratto, tracciato categorie/premi/formazioni, equità (sezione riservata)',
+    storico_hr:
+      'Storico HR · VEDERE: contratto, anzianita, giubilei, congedi, allegati, costo errori, malattie e percorso disciplinare nella scheda (sezione riservata)',
+    storico_hr_modifica:
+      'Storico HR · MODIFICARE: inizio e fine contratto, data di nascita, giubilei, congedi non pagati (es. HR)',
+    vista_valutazioni: 'Valutazioni · VEDERE le valutazioni annuali (chi le gestisce le vede comunque)',
   },
   // Schede del PIANO: chi le VEDE. Default 'tutti'; 'nascosto' le toglie dal
   // menu, 'operatori selezionati' le mostra solo a quei nomi. L'admin vede
@@ -350,6 +354,8 @@ const MATRICE_PROFILI = {
   gestione_corsi: ['V', 'M', 'M', 'M', 'M'],
   gestione_briefing: ['-', 'M', 'M', 'M', '-'],
   storico_hr: ['V', 'V', 'V', 'V', 'M'],
+  storico_hr_modifica: ['-', '-', '-', '-', 'M'],
+  vista_valutazioni: ['V', 'V', 'V', '-', 'V'],
   gestione_regole: ['-', 'M', 'M', '-', 'M'],
   gestione_festivi: ['V', 'M', 'M', 'V', 'M'],
   sblocco_piano_chiuso: ['V', 'M', 'M', 'V', 'M'],
@@ -357,7 +363,7 @@ const MATRICE_PROFILI = {
 };
 // Le voci dove basta la V per essere abilitati: sono viste riservate, non
 // azioni di modifica. Tutte le altre "gestione_*" richiedono la M.
-const PROFILI_VOCI_DI_SOLA_VISTA = ['vista_categorie', 'vista_malattie_pct', 'storico_hr'];
+const PROFILI_VOCI_DI_SOLA_VISTA = ['vista_categorie', 'vista_malattie_pct', 'storico_hr', 'vista_valutazioni'];
 
 // Un profilo concede la voce? Le pagine, le funzioni e le schede del Piano si
 // aprono sia con V sia con M; i permessi di modifica solo con M, tranne le

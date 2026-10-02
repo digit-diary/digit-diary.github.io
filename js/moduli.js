@@ -1090,7 +1090,7 @@ async function eliminaModulo(id) {
 // vacanza: si correggono qui, dove sta l'anagrafica, e si leggono nella scheda.
 async function cambiaDataCollaboratore(id, campo, valore) {
   if (campo !== 'data_nascita' && campo !== 'data_assunzione') return;
-  if (!isAdmin() && !(typeof puoModificare === 'function' && puoModificare('storico_hr'))) {
+  if (!puoModificareStoricoHr()) {
     toast('Non hai il permesso');
     renderCollaboratoriUI();
     return;
@@ -1154,8 +1154,13 @@ async function renderCollaboratoriUI() {
   const adminFull = isAdmin();
   const puoImp = adminFull || (typeof puoModificare === 'function' && puoModificare('gestione_impiego'));
   const puoCat = adminFull || (typeof puoModificare === 'function' && puoModificare('gestione_categorie'));
-  const puoHr = adminFull || (typeof puoModificare === 'function' && puoModificare('storico_hr'));
-  const accesso = adminFull || puoImp || puoCat;
+  // funzione, percentuale e lingue: chi gestisce l impiego; date: chi modifica lo Storico HR
+  const puoImpiegoDati =
+    adminFull ||
+    (typeof puoModificare === 'function' && puoModificare('gestione_impiego')) ||
+    (typeof puoModificareStoricoHr === 'function' && puoModificareStoricoHr());
+  const puoHrMod = adminFull || (typeof puoModificareStoricoHr === 'function' && puoModificareStoricoHr());
+  const accesso = adminFull || puoImp || puoCat || puoHrMod;
   section.style.display = accesso ? '' : 'none';
   const addRow = section.querySelector('.add-tipo-row');
   if (addRow) addRow.style.display = adminFull ? '' : 'none';
@@ -1218,7 +1223,7 @@ async function renderCollaboratoriUI() {
             .join('') +
           '</select>'
         : '') +
-      (puoHr
+      (puoImpiegoDati
         ? '<select onchange="cambiaFunzioneCollaboratore(' +
           c.id +
           ',this.value)" title="Funzione (per il Piano di lavoro: regole SUP/BO)" style="' +
@@ -1247,8 +1252,10 @@ async function renderCollaboratoriUI() {
           c.id +
           ',this.value)" style="' +
           selStyle +
-          ';width:76px">' +
-          // DATE scritte a mano, come nella scheda: si accetta 12.01.1997 e
+          ';width:76px">'
+        : '') +
+      (puoHrMod
+        ? // DATE scritte a mano, come nella scheda: si accetta 12.01.1997 e
           // anche solo 12.01 quando l'anno non si conosce. Il campo calendario
           // obbligava a passare dal selettore e rendeva scomodo mettere l'anno.
           '<span style="display:inline-flex;align-items:center;gap:4px"><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">Nascita</span>' +
@@ -2984,7 +2991,11 @@ function updateStats() {
 
 // Funzione e percentuale d'impiego (per il Piano di lavoro e il saldo ore)
 async function cambiaFunzioneCollaboratore(id, funzione) {
-  if (!isAdmin() && !(typeof puoModificare === 'function' && puoModificare('storico_hr'))) {
+  if (
+    !isAdmin() &&
+    !(typeof puoModificare === 'function' && puoModificare('gestione_impiego')) &&
+    !puoModificareStoricoHr()
+  ) {
     toast('Non hai il permesso');
     return;
   }
@@ -2999,7 +3010,11 @@ async function cambiaFunzioneCollaboratore(id, funzione) {
   }
 }
 async function cambiaLingueCollaboratore(id, lingue) {
-  if (!isAdmin() && !(typeof puoModificare === 'function' && puoModificare('storico_hr'))) {
+  if (
+    !isAdmin() &&
+    !(typeof puoModificare === 'function' && puoModificare('gestione_impiego')) &&
+    !puoModificareStoricoHr()
+  ) {
     toast('Non hai il permesso');
     return;
   }
@@ -3020,7 +3035,11 @@ async function cambiaLingueCollaboratore(id, lingue) {
   }
 }
 async function cambiaPercentualeCollaboratore(id, perc) {
-  if (!isAdmin() && !(typeof puoModificare === 'function' && puoModificare('storico_hr'))) {
+  if (
+    !isAdmin() &&
+    !(typeof puoModificare === 'function' && puoModificare('gestione_impiego')) &&
+    !puoModificareStoricoHr()
+  ) {
     toast('Non hai il permesso');
     return;
   }

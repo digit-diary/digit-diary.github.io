@@ -2343,7 +2343,7 @@ function giubileiCollaboratore(c) {
   return { maturati: maturati, prossimo: prossimo };
 }
 async function registraGiubileo(nome, anni, importo, dataMat) {
-  if (!puoVedereStoricoHr()) {
+  if (!puoModificareStoricoHr()) {
     toast('Non hai il permesso');
     return;
   }
@@ -2373,7 +2373,8 @@ async function registraGiubileo(nome, anni, importo, dataMat) {
 async function _checkGiubileiNotifiche() {
   const giorni = typeof giubileoPreavviso !== 'undefined' ? giubileoPreavviso : 60;
   if (!giorni || giorni <= 0) return;
-  const cfgHr = visibilitaConfig && visibilitaConfig.storico_hr;
+  // avvisi a chi registra la consegna (Storico HR, modificare); senza, a chi lo vede
+  const cfgHr = visibilitaConfig && (visibilitaConfig.storico_hr_modifica || visibilitaConfig.storico_hr);
   const destinatari = cfgHr && cfgHr.tipo === 'selezionati' && Array.isArray(cfgHr.operatori) ? cfgHr.operatori : [];
   if (!destinatari.length) return; // nessun operatore HR configurato: resta la card in Formazione
   const limite = new Date();
@@ -2414,8 +2415,26 @@ async function _checkGiubileiNotifiche() {
   await setImp('giubileo_notificati', JSON.stringify(notificati.slice(-500)));
   logAzione('Notifiche giubileo', nuovi.length + ' avvisi inviati a HR');
 }
+// STORICO HR: due permessi distinti (v348). "storico_hr" = VEDERE i dati HR
+// (contratto, anzianita, giubilei, congedi, allegati, costo errori, malattie,
+// percorso disciplinare); "storico_hr_modifica" = MODIFICARLI. Il database
+// applica le stesse regole (migrazione 20260887).
 function puoVedereStoricoHr() {
-  return isAdmin() || (typeof puoModificare === 'function' && puoModificare('storico_hr'));
+  return (
+    isAdmin() ||
+    (typeof puoModificare === 'function' && (puoModificare('storico_hr') || puoModificare('storico_hr_modifica')))
+  );
+}
+function puoModificareStoricoHr() {
+  return isAdmin() || (typeof puoModificare === 'function' && puoModificare('storico_hr_modifica'));
+}
+// VALUTAZIONI ANNUALI: le vede chi ha "vista_valutazioni" o chi le gestisce
+function puoVedereValutazioni() {
+  return (
+    isAdmin() ||
+    (typeof puoModificare === 'function' &&
+      (puoModificare('vista_valutazioni') || puoModificare('gestione_valutazioni')))
+  );
 }
 // Anzianità leggibile da data_assunzione
 function anzianitaLabel(dataAss, mesiFermo, nome) {

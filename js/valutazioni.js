@@ -153,6 +153,9 @@ function selezionaValutazione(nome, id) {
   apriSchedaCollaboratore(nome);
 }
 function _renderValutazioneSezione(nome) {
+  // le valutazioni annuali le vede solo chi ha il permesso (v348: anche il
+  // database non le invia agli altri)
+  if (typeof puoVedereValutazioni === 'function' && !puoVedereValutazioni()) return '';
   const vals = getValutazioniCollab(nome);
   const ne = nome.replace(/'/g, "\\'");
   const puoVal = typeof puoModificare === 'function' ? puoModificare('gestione_valutazioni') : isAdmin();

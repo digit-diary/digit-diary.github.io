@@ -1264,7 +1264,8 @@ async function eliminaRegolaGruppo(id) {
 // ===== CARD CONGEDI NON PAGATI =====
 function _renderPianoCongediNpCard() {
   // chi vede la scheda Congedi vede l elenco; registra ed elimina solo chi gestisce il piano
-  const puoModCnp = puoGestirePiano() || isAdmin();
+  // registrare ed eliminare i congedi non pagati: Storico HR, modificare (v348)
+  const puoModCnp = typeof puoModificareStoricoHr === 'function' && puoModificareStoricoHr();
   const rep = _pianoReparto();
   const lista = _pianoCongediNp
     .filter((c) => (c.reparto_dip || 'slots') === rep)
@@ -1296,6 +1297,9 @@ function _renderPianoCongediNpCard() {
       ? 'oltre <b>' + sm + ' mesi</b> l anzianita di servizio si sposta in avanti di tutta la durata'
       : '<b>ogni giorno</b> di congedo sposta in avanti l anzianita di servizio') +
     ' (giubilei e giorni di vacanza in piu). Le due soglie si cambiano nella scheda Regole. Il congedo si registra anche dalla scheda del collaboratore.</p>';
+  if (!puoModCnp)
+    h +=
+      '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:0 0 10px">Registrare o eliminare un congedo: serve il permesso Storico HR (modificare).</p>';
   if (puoModCnp)
     h +=
       '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:10px">' +
@@ -1390,7 +1394,7 @@ function _renderPianoCongediNpCard() {
   return h;
 }
 async function aggiungiCongedoNp() {
-  if (!puoGestirePiano() && !isAdmin()) return;
+  if (!puoModificareStoricoHr()) return;
   const ok = await registraCongedoNp({
     nome: (document.getElementById('cnp-nome') || {}).value,
     dal: (document.getElementById('cnp-dal') || {}).value,
@@ -1402,7 +1406,10 @@ async function aggiungiCongedoNp() {
 }
 // dalla scheda del collaboratore: finestra con dal, al, motivo, autorizzato da
 async function apriCongedoNpScheda(nome) {
-  if (!puoGestirePiano() && !isAdmin()) return;
+  if (!puoModificareStoricoHr()) {
+    toast('Serve il permesso Storico HR (modificare)');
+    return;
+  }
   const r = await chiediModulo(
     'Congedo non pagato di ' +
       nome +
@@ -1445,6 +1452,10 @@ async function apriCongedoNpScheda(nome) {
 }
 // salvataggio unico del congedo (Piano e scheda): controlli, conferma, piano CNP, storico HR
 async function registraCongedoNp(x) {
+  if (!puoModificareStoricoHr()) {
+    toast('Serve il permesso Storico HR (modificare)');
+    return false;
+  }
   const nome = x.nome;
   const dal = x.dal;
   const al = x.al;
@@ -1541,7 +1552,7 @@ async function registraCongedoNp(x) {
   }
 }
 async function eliminaCongedoNp(id) {
-  if (!puoGestirePiano() && !isAdmin()) return;
+  if (!puoModificareStoricoHr()) return;
   const c = _pianoCongediNp.find((x) => x.id === id);
   if (!c) return;
   if (
@@ -1571,7 +1582,7 @@ async function eliminaCongedoNp(id) {
   }
 }
 function _renderPianoPreferenzeCard() {
-  if (!isAdmin() && !(typeof puoModificare === 'function' && puoModificare('storico_hr'))) return '';
+  if (!puoVedereStoricoHr()) return '';
   const collabs = collaboratoriCache
     .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
     .sort((a, b) => a.nome.localeCompare(b.nome));
@@ -1646,7 +1657,11 @@ function _filtraPrefCollab(testo) {
   });
 }
 async function salvaPreferenzaCollab(id, campo, valore) {
-  if (!isAdmin() && !(typeof puoModificare === 'function' && puoModificare('storico_hr'))) return;
+  // preferenze del piano (es. solo diurni): chi gestisce il piano o lo Storico HR
+  if (!puoGestirePiano() && !puoModificareStoricoHr()) {
+    toast('Non hai il permesso');
+    return;
+  }
   try {
     const patch = {};
     if (campo === 'solo_diurni' || campo === 'prefers_l1') patch[campo] = !!valore;

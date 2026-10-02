@@ -801,7 +801,15 @@ async function esportaReportDirezionePDF() {
     const valAnno = getValutazioniReparto().filter(
       (v) => parseInt(v.anno) >= annoDa && parseInt(v.anno) <= annoA,
     ).length;
-    righeSviluppo.push([r.label, form, puntiTot, premi, giubChf ? fmtCHF(giubChf) : '-', valAnno]);
+    // giubilei e valutazioni: dati riservati (v348), senza permesso si scrive "riservato"
+    righeSviluppo.push([
+      r.label,
+      form,
+      puntiTot,
+      premi,
+      !puoVedereStoricoHr() ? 'riservato' : giubChf ? fmtCHF(giubChf) : '-',
+      !puoVedereValutazioni() ? 'riservato' : valAnno,
+    ]);
     tot.form += form;
     tot.punti += puntiTot;
     tot.premi += premi;
@@ -939,7 +947,16 @@ async function esportaReportDirezionePDF() {
           ],
         ],
         body: righeSviluppo,
-        foot: [['Totale', tot.form, tot.punti, tot.premi, tot.giub ? fmtCHF(tot.giub) : '-', '']],
+        foot: [
+          [
+            'Totale',
+            tot.form,
+            tot.punti,
+            tot.premi,
+            !puoVedereStoricoHr() ? 'riservato' : tot.giub ? fmtCHF(tot.giub) : '-',
+            '',
+          ],
+        ],
         footStyles: {
           fillColor: [240, 236, 228],
           textColor: [26, 18, 8],

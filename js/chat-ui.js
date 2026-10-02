@@ -2215,6 +2215,12 @@ function apriSchedaCollaboratore(nome) {
   const dataNascita = collabRec && collabRec.data_nascita ? collabRec.data_nascita : '';
   const isBirthday = dataNascita ? _isCompleannoOggi(dataNascita) : false;
   const neS = nome.replace(/'/g, "\\'");
+  // PERMESSI DELLA SCHEDA (v348): tutti vedono il lavoro (turni, registrazioni,
+  // errori del Diario); i dati HR (contratto, anzianita, congedi, costo errori,
+  // malattie, percorso disciplinare) solo chi vede lo Storico HR; si modificano
+  // solo con "Storico HR, modificare". Il database applica le stesse regole.
+  const _hrVede = typeof puoVedereStoricoHr === 'function' && puoVedereStoricoHr();
+  const _hrMod = typeof puoModificareStoricoHr === 'function' && puoModificareStoricoHr();
 
   // HEADER
   let html =
@@ -2239,8 +2245,15 @@ function apriSchedaCollaboratore(nome) {
       : '') +
     '</h3>';
   html += '<div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap">';
-  html += '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">Data di nascita:</span>';
-  if (dataNascita) {
+  html +=
+    '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
+    (_hrVede ? 'Data di nascita:' : 'Compleanno:') +
+    '</span>';
+  if (dataNascita && !_hrVede) {
+    // senza permesso HR: solo giorno e mese (per il compleanno), non l eta
+    const _gm = String(dataNascita).substring(0, 10).split('-');
+    html += '<b style="font-size:var(--fs-md,.875rem)">' + escP(_gm[2] + '.' + _gm[1]) + '</b>';
+  } else if (dataNascita) {
     // DATA PRESENTE: solo lettura, come l'inizio contratto. L'anno 1900 e' il
     // segnaposto di "solo giorno e mese": non si mostra, cosi' non sembra un
     // errore. La modifica passa da Gestione collaboratori (con conferma).
@@ -2248,6 +2261,8 @@ function apriSchedaCollaboratore(nome) {
       '<b style="font-size:var(--fs-md,.875rem)" title="Si modifica in Gestione collaboratori, dove sta l anagrafica">' +
       escP(dataNascitaLabel(dataNascita)) +
       '</b>';
+  } else if (!_hrMod) {
+    html += '<span style="font-size:var(--fs-md,.875rem);color:var(--muted)">non inserita</span>';
   } else {
     // DATA MANCANTE: campo e Salva compaiono solo qui, per inserirla al volo
     html +=
@@ -2259,7 +2274,7 @@ function apriSchedaCollaboratore(nome) {
   }
   // INIZIO CONTRATTO: si legge qui, dove si consulta il fascicolo. Si modifica
   // in Gestione collaboratori, che e' il posto dell'anagrafica.
-  if (collabRec && collabRec.data_assunzione) {
+  if (_hrVede && collabRec && collabRec.data_assunzione) {
     const _dAss = String(collabRec.data_assunzione).substring(0, 10);
     const _anni =
       typeof anzianitaLabel === 'function'
@@ -2297,10 +2312,7 @@ function apriSchedaCollaboratore(nome) {
     }
     // registrare un congedo non pagato direttamente dalla scheda (stesso salvataggio
     // della sezione Piano > Impostazioni > Congedi non pagati)
-    if (
-      typeof apriCongedoNpScheda === 'function' &&
-      (typeof puoGestirePiano !== 'function' || puoGestirePiano() || isAdmin())
-    )
+    if (typeof apriCongedoNpScheda === 'function' && _hrMod)
       html +=
         '<button class="btn-act" style="margin-top:6px" onclick="apriCongedoNpScheda(\'' +
         neS +
@@ -2358,7 +2370,7 @@ function apriSchedaCollaboratore(nome) {
     '><div class="kpi-val" style="color:var(--accent)">' +
     totErr +
     '</div><div class="kpi-lbl">Errori</div></div>';
-  if (totErrCost)
+  if (totErrCost && _hrVede)
     html +=
       '<div class="scheda-kpi"' +
       _kpiAttr('reg', tipoErr) +
@@ -2373,21 +2385,22 @@ function apriSchedaCollaboratore(nome) {
           '</span></div>'
         : '') +
       '<div class="kpi-lbl">Costo errori</div></div>';
-  html +=
-    '<div class="scheda-kpi"' +
-    _kpiAttr('reg', tipoMal) +
-    '><div class="kpi-val" style="color:' +
-    _malColor +
-    '">' +
-    totMal +
-    (_mal.episodi
-      ? ' <span style="font-size:var(--fs-sm,.8125rem);font-weight:400">(' +
-        _mal.episodi +
-        (_mal.episodi === 1 ? ' episodio' : ' episodi') +
-        ')</span>'
-      : '') +
-    '</div><div class="kpi-lbl">Malattie (giorni)</div></div>';
-  if (totAmm)
+  if (_hrVede)
+    html +=
+      '<div class="scheda-kpi"' +
+      _kpiAttr('reg', tipoMal) +
+      '><div class="kpi-val" style="color:' +
+      _malColor +
+      '">' +
+      totMal +
+      (_mal.episodi
+        ? ' <span style="font-size:var(--fs-sm,.8125rem);font-weight:400">(' +
+          _mal.episodi +
+          (_mal.episodi === 1 ? ' episodio' : ' episodi') +
+          ')</span>'
+        : '') +
+      '</div><div class="kpi-lbl">Malattie (giorni)</div></div>';
+  if (totAmm && _hrVede)
     html +=
       '<div class="scheda-kpi"' +
       _kpiAttr('reg', tipoAmm) +
@@ -2521,7 +2534,7 @@ function apriSchedaCollaboratore(nome) {
   } // fine _hasChartData
 
   // DISCIPLINARY PATH · solo se c'è almeno 1 evento
-  if (totAmm || allineamenti || rdiCount) {
+  if (_hrVede && (totAmm || allineamenti || rdiCount)) {
     html += '<div class="scheda-section"><h4>Percorso disciplinare</h4>';
     html += '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">';
     html +=
@@ -2614,8 +2627,8 @@ function apriSchedaCollaboratore(nome) {
 
   // SICK DAY PATTERNS · analisi riservata (richiesta HR): percentuali per
   // giorno, avviso Lunedi/Venerdi e confronto col team li vede solo chi ha il
-  // permesso "Pattern malattie" (o l'admin). Il CONTEGGIO dei giorni di
-  // malattia nei riquadri in alto resta visibile a tutti.
+  // permesso "Pattern malattie" (o l'admin). Il CONTEGGIO dei giorni di malattia
+  // nei riquadri in alto lo vede chi vede lo Storico HR (v348; prima tutti).
   const _vedePatternMal = isAdmin() || (typeof puoModificare === 'function' && puoModificare('vista_malattie_pct'));
   if (totMal > 0 && _vedePatternMal) {
     html += '<div class="scheda-section"><h4>Pattern malattie</h4>';
@@ -2894,6 +2907,11 @@ function _renderStoricoHrSezione(nome) {
   // senza contratti, categorie, premi e giubilei
   const _soloFormazioni = !_hrFull && typeof puoModificare === 'function' && puoModificare('gestione_formazioni');
   if (!_hrFull && !_soloFormazioni) return '';
+  // chi VEDE lo Storico HR legge le date; solo chi lo MODIFICA ha campi e pulsanti
+  const _hrMod = typeof puoModificareStoricoHr === 'function' && puoModificareStoricoHr();
+  const _dataIt = function (d) {
+    return d ? String(d).substring(0, 10).split('-').reverse().join('.') : '';
+  };
   var c = collaboratoriCache.find(function (x) {
     return x.nome === nome;
   });
@@ -2915,14 +2933,18 @@ function _renderStoricoHrSezione(nome) {
   if (!_soloFormazioni) {
     html += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">';
     html += '<span style="font-size:var(--fs-md,.875rem);color:var(--muted)">Inizio contratto:</span>';
-    html +=
-      '<input type="date" id="hr-assunzione" value="' +
-      escP(dataAss) +
-      '" style="padding:5px 10px;border:1px solid var(--line);border-radius:2px;font-size:var(--fs-md,.875rem);background:var(--paper2);color:var(--ink)">';
-    html +=
-      '<button class="btn-salva" onclick="salvaDataAssunzione(\'' +
-      neS +
-      '\')" style="font-size:var(--fs-sm,.8125rem);padding:5px 14px;background:var(--accent2)">Salva</button>';
+    if (_hrMod) {
+      html +=
+        '<input type="date" id="hr-assunzione" value="' +
+        escP(dataAss) +
+        '" style="padding:5px 10px;border:1px solid var(--line);border-radius:2px;font-size:var(--fs-md,.875rem);background:var(--paper2);color:var(--ink)">';
+      html +=
+        '<button class="btn-salva" onclick="salvaDataAssunzione(\'' +
+        neS +
+        '\')" style="font-size:var(--fs-sm,.8125rem);padding:5px 14px;background:var(--accent2)">Salva</button>';
+    } else {
+      html += '<b style="font-size:var(--fs-md,.875rem)">' + escP(_dataIt(dataAss) || 'non inserito') + '</b>';
+    }
     if (dataAss)
       html +=
         '<span class="mini-badge" style="background:#1a7a6d;font-size:var(--fs-sm,.8125rem)" title="' +
@@ -2947,21 +2969,22 @@ function _renderStoricoHrSezione(nome) {
       escP(spiegaFine) +
       '">';
     html += '<span style="font-size:var(--fs-md,.875rem);color:var(--muted)">Fine contratto:</span>';
-    html +=
-      '<input type="date" id="hr-fine" value="' +
-      escP(dataFine) +
-      '" style="padding:5px 10px;border:1px solid var(--line);border-radius:2px;font-size:var(--fs-md,.875rem);background:var(--paper2);color:var(--ink)">';
-    html +=
-      '<button class="btn-salva" onclick="salvaFineRapporto(\'' +
-      neS +
-      '\')" style="font-size:var(--fs-sm,.8125rem);padding:5px 14px;background:var(--accent2)">Salva</button>';
-    if (dataFine)
+    if (!_hrMod) html += '<b style="font-size:var(--fs-md,.875rem)">' + escP(_dataIt(dataFine)) + '</b>';
+    else
+      html +=
+        '<input type="date" id="hr-fine" value="' +
+        escP(dataFine) +
+        '" style="padding:5px 10px;border:1px solid var(--line);border-radius:2px;font-size:var(--fs-md,.875rem);background:var(--paper2);color:var(--ink)">' +
+        '<button class="btn-salva" onclick="salvaFineRapporto(\'' +
+        neS +
+        '\')" style="font-size:var(--fs-sm,.8125rem);padding:5px 14px;background:var(--accent2)">Salva</button>';
+    if (dataFine && _hrMod)
       html +=
         '<button class="btn-act" onclick="salvaFineRapporto(\'' +
         neS +
         '\', true)" title="Torna operativo">Togli</button>';
     html += '</div>';
-    if (!dataFine)
+    if (!dataFine && _hrMod)
       html +=
         '<button class="btn-act" style="margin-bottom:10px" title="' +
         escP(spiegaFine) +
@@ -2983,15 +3006,18 @@ function _renderStoricoHrSezione(nome) {
             g.dataLabel +
             ' · ' +
             fmtCHF(g.importo) +
-            ' CHF</span><button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;background:#8b6914" onclick="registraGiubileo(\'' +
-            nome.replace(/'/g, "\\'") +
-            "'," +
-            g.anni +
-            ',' +
-            g.importo +
-            ",'" +
-            g.data +
-            '\')">Registra consegna</button>';
+            ' CHF</span>' +
+            (_hrMod
+              ? '<button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;background:#8b6914" onclick="registraGiubileo(\'' +
+                nome.replace(/'/g, "\\'") +
+                "'," +
+                g.anni +
+                ',' +
+                g.importo +
+                ",'" +
+                g.data +
+                '\')">Registra consegna</button>'
+              : '');
         });
         if (!daConsegnare.length && gb.prossimo)
           html +=
@@ -3058,7 +3084,7 @@ function _renderStoricoHrSezione(nome) {
   return html;
 }
 async function salvaDataAssunzione(nome) {
-  if (typeof puoVedereStoricoHr !== 'function' || !puoVedereStoricoHr()) {
+  if (typeof puoModificareStoricoHr !== 'function' || !puoModificareStoricoHr()) {
     toast('Non hai il permesso');
     return;
   }
@@ -3090,7 +3116,7 @@ async function salvaDataAssunzione(nome) {
   }
 }
 async function salvaFineRapporto(nome, togli) {
-  if (typeof puoVedereStoricoHr !== 'function' || !puoVedereStoricoHr()) {
+  if (typeof puoModificareStoricoHr !== 'function' || !puoModificareStoricoHr()) {
     toast('Non hai il permesso');
     return;
   }
@@ -3401,6 +3427,10 @@ function _renderSchedaTrendChart(nome, entries) {
 }
 
 async function salvaSchedaNascita(nome) {
+  if (typeof puoModificareStoricoHr !== 'function' || !puoModificareStoricoHr()) {
+    toast('Non hai il permesso di modificare i dati HR');
+    return;
+  }
   var inp = document.getElementById('scheda-nascita');
   if (!inp) return;
   var val = _parseDataNascita(inp.value) || inp.dataset.isoValue || '';
@@ -3411,57 +3441,56 @@ async function salvaSchedaNascita(nome) {
   var coll = collaboratoriCache.find(function (c) {
     return c.nome === nome;
   });
-  if (coll) {
-    // La data di nascita e' un dato personale: modificarla o cancellarla
-    // richiede una conferma esplicita, cosi' non si perde per un clic
-    var _vecchia = coll.data_nascita || '';
-    if (_vecchia && !val) {
-      if (
-        !(await chiediConferma(
-          'ELIMINA\n\nCancellare la data di nascita di ' + nome + ' (' + dataNascitaLabel(_vecchia) + ')?',
-        ))
-      ) {
-        apriSchedaCollaboratore(nome);
-        return;
-      }
-    } else if (_vecchia && val && _vecchia !== val) {
-      if (
-        !(await chiediConferma(
-          'MODIFICA\n\nCambiare la data di nascita di ' +
-            nome +
-            '?\n\nDa ' +
-            dataNascitaLabel(_vecchia) +
-            ' a ' +
-            dataNascitaLabel(val),
-        ))
-      ) {
-        apriSchedaCollaboratore(nome);
-        return;
-      }
-    }
+  // non in memoria (es. collaboratore disattivato, scheda aperta dalle
+  // Statistiche): si cerca nell anagrafica. Prima qui si creava un NUOVO
+  // collaboratore attivo con lo stesso nome, cioe un doppione.
+  if (!coll) {
     try {
-      await secPatch('collaboratori', 'id=eq.' + coll.id, {
-        data_nascita: val || null,
-      });
-      coll.data_nascita = val || null;
-      logAzione('Data nascita collaboratore', nome + ' → ' + (val || 'rimossa'));
-      toast(val ? 'Data nascita salvata' : 'Data nascita eliminata');
+      coll = ((await secGet('collaboratori?nome=eq.' + encodeURIComponent(nome) + '&limit=1')) || [])[0] || null;
     } catch (e) {
-      toast('Errore salvataggio');
+      coll = null;
     }
-  } else {
-    try {
-      var r = await secPost('collaboratori', {
-        nome: nome,
-        attivo: true,
-        data_nascita: val || null,
-        reparto_dip: currentReparto,
-      });
-      if (r && r[0]) collaboratoriCache.push(r[0]);
-      toast('Data nascita salvata');
-    } catch (e) {
-      toast('Errore salvataggio');
+  }
+  if (!coll) {
+    toast(nome + ' non e nell anagrafica: aggiungilo da Gestione collaboratori');
+    return;
+  }
+  // La data di nascita e' un dato personale: modificarla o cancellarla
+  // richiede una conferma esplicita, cosi' non si perde per un clic
+  var _vecchia = coll.data_nascita || '';
+  if (_vecchia && !val) {
+    if (
+      !(await chiediConferma(
+        'ELIMINA\n\nCancellare la data di nascita di ' + nome + ' (' + dataNascitaLabel(_vecchia) + ')?',
+      ))
+    ) {
+      apriSchedaCollaboratore(nome);
+      return;
     }
+  } else if (_vecchia && val && _vecchia !== val) {
+    if (
+      !(await chiediConferma(
+        'MODIFICA\n\nCambiare la data di nascita di ' +
+          nome +
+          '?\n\nDa ' +
+          dataNascitaLabel(_vecchia) +
+          ' a ' +
+          dataNascitaLabel(val),
+      ))
+    ) {
+      apriSchedaCollaboratore(nome);
+      return;
+    }
+  }
+  try {
+    await secPatch('collaboratori', 'id=eq.' + coll.id, {
+      data_nascita: val || null,
+    });
+    coll.data_nascita = val || null;
+    logAzione('Data nascita collaboratore', nome + ' → ' + (val || 'rimossa'));
+    toast(val ? 'Data nascita salvata' : 'Data nascita eliminata');
+  } catch (e) {
+    toast('Errore salvataggio');
   }
 }
 
@@ -3538,10 +3567,13 @@ async function stampaSchedaPDF(nome) {
   if (cRec && cRec.impiego) anag.push(cRec.impiego === 'fisso' ? 'Fisso' : 'Jolly');
   if (cRec && cRec.categoria && typeof puoVedereCategorie === 'function' && puoVedereCategorie())
     anag.push('Categoria ' + cRec.categoria + 'ª');
+  // stessi permessi della scheda a video (v348)
+  var _pdfHr = typeof puoVedereStoricoHr === 'function' && puoVedereStoricoHr();
   if (cRec && cRec.data_nascita)
     anag.push(
-      (String(cRec.data_nascita).substring(0, 4) <= '1900' ? 'Compleanno ' : 'Nato/a il ') +
-        compleannoLabel(cRec.data_nascita),
+      _pdfHr && String(cRec.data_nascita).substring(0, 4) > '1900'
+        ? 'Nato/a il ' + compleannoLabel(cRec.data_nascita)
+        : 'Compleanno ' + String(cRec.data_nascita).substring(8, 10) + '.' + String(cRec.data_nascita).substring(5, 7),
     );
   anag.push('Reparto ' + currentReparto.charAt(0).toUpperCase() + currentReparto.slice(1));
   anag.push('Generata il ' + new Date().toLocaleDateString('it-IT'));
@@ -3550,38 +3582,33 @@ async function stampaSchedaPDF(nome) {
   doc.setTextColor(0);
   y += 6;
 
-  // KPI table
+  // KPI table: costo errori, malattie e dati disciplinari solo con lo Storico HR
+  var _kpiTesta = ['Registrazioni', 'Errori'];
+  var _kpiRiga = [entries.length, totErr];
+  if (_pdfHr) {
+    _kpiTesta.push('Costo Errori', 'Malattie (giorni)', 'Amm. Verbali', 'Allineamenti');
+    _kpiRiga.push(
+      totErrCost
+        ? 'CHF ' +
+            fmtCHF(totErrCost) +
+            (_pdfAmm || _pdfEcc ? ' (-' + fmtCHF(_pdfAmm) + ' / +' + fmtCHF(_pdfEcc) + ')' : '')
+        : '0',
+      totMal,
+      totAmm,
+      allin,
+    );
+  }
+  _kpiTesta.push('Apprezzamenti');
+  _kpiRiga.push(apprMod);
+  if (_pdfHr) {
+    _kpiTesta.push('RDI');
+    _kpiRiga.push(rdi);
+  }
   doc.autoTable({
     theme: 'grid',
     startY: y,
-    head: [
-      [
-        'Registrazioni',
-        'Errori',
-        'Costo Errori',
-        'Malattie (giorni)',
-        'Amm. Verbali',
-        'Allineamenti',
-        'Apprezzamenti',
-        'RDI',
-      ],
-    ],
-    body: [
-      [
-        entries.length,
-        totErr,
-        totErrCost
-          ? 'CHF ' +
-            fmtCHF(totErrCost) +
-            (_pdfAmm || _pdfEcc ? ' (-' + fmtCHF(_pdfAmm) + ' / +' + fmtCHF(_pdfEcc) + ')' : '')
-          : '0',
-        totMal,
-        totAmm,
-        allin,
-        apprMod,
-        rdi,
-      ],
-    ],
+    head: [_kpiTesta],
+    body: [_kpiRiga],
     headStyles: { fillColor: [26, 74, 122], fontSize: 7 },
     bodyStyles: { fontSize: 8, halign: 'center' },
     margin: { left: 14, right: 14 },
@@ -3627,8 +3654,12 @@ async function stampaSchedaPDF(nome) {
     });
   }
 
-  // Valutazione più recente: media + aree
-  if (typeof getValutazioniCollab === 'function') {
+  // Valutazione più recente: media + aree (solo chi vede le valutazioni)
+  if (
+    typeof getValutazioniCollab === 'function' &&
+    typeof puoVedereValutazioni === 'function' &&
+    puoVedereValutazioni()
+  ) {
     var valsPdf = getValutazioniCollab(nome);
     if (valsPdf.length) {
       var vP = valsPdf[0];
@@ -3829,6 +3860,8 @@ function _mostraConfronto(nomi) {
   // Build KPI comparison table
   var tipoMal = nomeCorrente('Malattia'),
     tipoAmm = nomeCorrente('Ammonimento Verbale');
+  // malattie e dati disciplinari: solo chi vede lo Storico HR (come nella scheda)
+  var _cfHr = typeof puoVedereStoricoHr === 'function' && puoVedereStoricoHr();
   var tableRows = nomi
     .map(function (nome) {
       var entries = allData.filter(function (e) {
@@ -3846,16 +3879,18 @@ function _mostraConfronto(nomi) {
         entries.filter(function (e) {
           return e.tipo === tipoErr;
         }).length +
-        '</td><td class="num">' +
-        _malattieLabel(_malattieDi(entries, tipoMal)) +
-        '</td><td class="num">' +
-        entries.filter(function (e) {
-          return e.tipo === tipoAmm;
-        }).length +
-        '</td><td class="num">' +
-        moduli.filter(function (m) {
-          return m.tipo === 'allineamento';
-        }).length +
+        (_cfHr
+          ? '</td><td class="num">' +
+            _malattieLabel(_malattieDi(entries, tipoMal)) +
+            '</td><td class="num">' +
+            entries.filter(function (e) {
+              return e.tipo === tipoAmm;
+            }).length +
+            '</td><td class="num">' +
+            moduli.filter(function (m) {
+              return m.tipo === 'allineamento';
+            }).length
+          : '') +
         '</td><td class="num">' +
         moduli.filter(function (m) {
           return m.tipo === 'apprezzamento';
@@ -3872,7 +3907,11 @@ function _mostraConfronto(nomi) {
   html +=
     '<button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\');_destroySchedaCharts()" style="padding:6px 12px;font-size:var(--fs-sm,.8125rem)">Chiudi</button></div>';
   html +=
-    '<table class="collab-table" style="margin-bottom:16px"><thead><tr><th>Collaboratore</th><th class="num">Tot</th><th class="num">Errori</th><th class="num">Malattie (giorni)</th><th class="num">Amm. Verb.</th><th class="num">Allineam.</th><th class="num">Appr.</th></tr></thead><tbody>' +
+    '<table class="collab-table" style="margin-bottom:16px"><thead><tr><th>Collaboratore</th><th class="num">Tot</th><th class="num">Errori</th>' +
+    (_cfHr
+      ? '<th class="num">Malattie (giorni)</th><th class="num">Amm. Verb.</th><th class="num">Allineam.</th>'
+      : '') +
+    '<th class="num">Appr.</th></tr></thead><tbody>' +
     tableRows +
     '</tbody></table>';
   html +=
