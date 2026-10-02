@@ -519,6 +519,8 @@ function GUIDA_CAPITOLI() {
       vis: () => _guidaVis('piano') && _guidaPuo('puoGestirePiano'),
       righe: [
         '<b>Importa piano</b> legge il file dei piani del settore: riconosce il foglio del mese, le colonne dei giorni e i nomi anche con piccoli refusi.',
+        '<b>Nomi</b>: se nel file c e prima il nome e poi il cognome (o mancano accenti e apostrofi) il collaboratore viene riconosciuto lo stesso, e resta sempre il nome scritto in Gestione collaboratori: l import non rinomina mai nessuno.',
+        '<b>Ordine</b>: dopo l import il calendario del settore ha i collaboratori nell ordine del file; chi non e nel file resta in fondo. Si cambia trascinando le righe o con Ordine predefinito.',
         '<b>Prima di scrivere mostra l anteprima</b>: celle nuove, celle diverse dal piano (con i primi esempi), colori e orari JG da allineare, celle gia uguali. Si sceglie <b>Aggiorna dal file</b> (il file aggiornato sovrascrive turni, ore e colori) oppure <b>Solo le celle nuove</b>.',
         'Restano come sono, anche se nel file sono diverse: le <b>malattie registrate</b> (vale il Diario), i <b>giorni chiusi</b> (si sbloccano con motivo), le <b>celle bloccate</b> con motivo e le celle scritte dal piano di <b>un altro settore</b>. L anteprima le elenca.',
         'Tutto l import si toglie con <b>Annulla</b> del piano.',

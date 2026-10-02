@@ -1446,11 +1446,38 @@ function _xlsColoreDaTenere(cod, cs) {
 }
 function _xlsNormaNome(s) {
   return String(s || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // accenti: Nicolo = Nicolò
     .toUpperCase()
     .replace(/0/g, 'O')
     .replace(/1/g, 'I')
+    .replace(/[’'`.]/g, ' ') // D'Amico = D Amico
     .replace(/\s+/g, ' ')
     .trim();
+}
+// NOME DEL FILE -> COLLABORATORE: nel file a volte c e prima il nome e poi il
+// cognome; vale sempre il nome scritto in Gestione collaboratori (l import non
+// rinomina mai nessuno). Dal riscontro piu sicuro al piu largo:
+// 1. uguale; 2. stesse parole in altro ordine (Mario Rossi = Rossi Mario);
+// 3. tutte le parole del file sono parole intere del nome (Marco Azevedo =
+//    Azevedo Morais Marco Paulo); 4. come prima: parole contenute nel nome.
+// A parita si preferisce un collaboratore attivo.
+function _xlsTrovaCollab(nome, lista) {
+  const n = _xlsNormaNome(nome).toLowerCase();
+  if (!n) return null;
+  const pn = n.split(' ');
+  const chiave = (x) => x.slice().sort().join(' ');
+  const livelli = [
+    (cn) => cn === n,
+    (cn) => chiave(cn.split(' ')) === chiave(pn),
+    (cn) => pn.length > 1 && pn.every((p) => cn.split(' ').includes(p)),
+    (cn) => pn.length > 1 && pn.every((p) => cn.includes(p)),
+  ];
+  for (const ok of livelli) {
+    const trovati = (lista || []).filter((c) => ok(_xlsNormaNome(c.nome).toLowerCase()));
+    if (trovati.length) return trovati.find((c) => c.attivo !== false) || trovati[0];
+  }
+  return null;
 }
 
 async function importaFabbisognoExcel(input) {
@@ -1612,16 +1639,7 @@ async function importaPianoExcel(input) {
     const wb = XLSX.read(buf, { bookFiles: true }); // file interni: servono per i colori delle celle
     const collabs = collaboratoriCache.filter((c) => c.attivo !== false);
     // match nomi robusto: maiuscole/minuscole, ordine parole, refusi tipo 0/O e 1/I
-    const trova = (nome) => {
-      const n = _xlsNormaNome(nome).toLowerCase();
-      if (!n) return null;
-      return (
-        collabs.find((c) => {
-          const cn = _xlsNormaNome(c.nome).toLowerCase();
-          return cn === n || (n.split(' ').length > 1 && n.split(' ').every((p) => cn.includes(p)));
-        }) || null
-      );
-    };
+    const trova = (nome) => _xlsTrovaCollab(nome, collabs);
     // layout: file REALE (foglio del mese, giorni da riga seriale, nomi nella
     // colonna con più riscontri) oppure formato semplice (nome + giorni 1..N)
     const foglioMese = _xlsFoglioMese(wb, ym);
@@ -1678,20 +1696,15 @@ async function importaPianoExcel(input) {
     }
     // match anche sui DISATTIVATI (da riattivare) e raccolta dei NUOVI
     const tuttiCollabs = collaboratoriCache;
-    const trovaTutti = (nome) => {
-      const nrm = _xlsNormaNome(nome).toLowerCase();
-      if (!nrm) return null;
-      return (
-        tuttiCollabs.find((c) => {
-          const cn = _xlsNormaNome(c.nome).toLowerCase();
-          return cn === nrm || (nrm.split(' ').length > 1 && nrm.split(' ').every((p) => cn.includes(p)));
-        }) || null
-      );
-    };
+    const trovaTutti = (nome) => _xlsTrovaCollab(nome, tuttiCollabs);
+    // nome di un collaboratore NUOVO come e scritto nel file (accenti e apostrofi
+    // compresi), con le iniziali maiuscole
     const titolo = (str) =>
-      _xlsNormaNome(str)
+      String(str || '')
+        .replace(/\s+/g, ' ')
+        .trim()
         .toLowerCase()
-        .replace(/(^|[\s.'-])(\w)/g, (m, a, b) => a + b.toUpperCase());
+        .replace(/(^|[\s.'’-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
     const righeCollab = []; // {nome, celle:[{g,cod}], stato:'ok'|'riattiva'|'nuovo', funzione, percentuale, ref}
     const saltatiDisattivati = []; // disattivati con soli riposi nel file: righe di riempimento, non si importano
     const nomiOk = new Set();
@@ -1942,6 +1955,7 @@ async function importaPianoExcel(input) {
         (saltatiDisattivati.length
           ? '\n• Saltati (disattivati, nel file solo riposi): ' + saltatiDisattivati.join(', ')
           : '') +
+        '\n• Ordine dei collaboratori nel calendario: come nel file' +
         '\n\nSi puo annullare con Annulla del piano.',
       [
         {
@@ -2061,6 +2075,22 @@ async function importaPianoExcel(input) {
       }
     }
     // fotografia per Annulla, poi celle nuove e celle corrette
+    // ORDINE DEI COLLABORATORI come nel file (nel settore del piano importato):
+    // chi non e nel file resta dopo, nell ordine che aveva
+    {
+      const rep = _pianoReparto();
+      const ordineFile = [...new Set(righeCollab.map((x) => x.nome))];
+      const tutto = window._pianoOrdineCollab || {};
+      const prima = Array.isArray(tutto[rep]) ? tutto[rep] : [];
+      const nuovo = ordineFile.concat(prima.filter((n) => !ordineFile.includes(n)));
+      if (ordineFile.length && nuovo.join('|') !== prima.join('|')) {
+        const copia = Object.assign({}, tutto, { [rep]: nuovo });
+        if (await salvaImp('piano_ordine_collab', JSON.stringify(copia))) {
+          window._pianoOrdineCollab = copia;
+          logAzione('Piano: ordine collaboratori dal file', rep + ' · ' + ym);
+        }
+      }
+    }
     _pianoUndoSnap('importa piano ' + ym);
     const r = nuoveCelle.length
       ? await _rpcSicura('piano_bulk_upsert', { p_token: getOpToken(), p_rows: nuoveCelle })
