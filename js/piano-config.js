@@ -1391,32 +1391,123 @@ async function importaPianoExcel(input) {
     }
     const MESI_L = MESI_FULL || [];
     const lbl = (MESI_L[parseInt(ym.split('-')[1]) - 1] || ym) + ' ' + ym.split('-')[0];
-    if (
-      !(await chiediConferma(
-        'Importare il piano di ' +
-          lbl +
-          '?\n\n• Letto da: ' +
-          fonte +
-          '\n• ' +
-          nomiOk.size +
-          ' collaboratori riconosciuti\n• ' +
-          nuove.length +
-          ' celle da importare (protette)' +
-          (sigleScartate ? '\n• ' + sigleScartate + ' sigle sconosciute scartate' : '') +
-          (nuoviCollab.length
-            ? '\n• NUOVI collaboratori da creare: ' +
-              nuoviCollab.map((x) => x.nome + ' (' + x.funzione + ')').join(', ')
-            : '') +
-          (daRiattivare.length
-            ? '\n• Da RIATTIVARE (disattivati ma presenti nel file): ' + daRiattivare.map((x) => x.nome).join(', ')
-            : '') +
-          (saltatiDisattivati.length
-            ? '\n• Saltati (disattivati, nel file solo riposi): ' + saltatiDisattivati.join(', ')
-            : '') +
-          '\n\nLe celle già presenti NON vengono toccate.',
-      ))
-    )
-      return;
+    // CONFRONTO CON IL PIANO: il file aggiornato deve poter correggere le celle
+    // gia presenti (prima venivano aggiunte solo le celle nuove e le correzioni
+    // del file si perdevano senza avviso). Restano com erano solo i casi in cui
+    // il file non puo sapere di piu del programma.
+    const rep = _pianoReparto();
+    const gg = (d) => d.substring(8, 10) + '.' + d.substring(5, 7);
+    const nomiFile = [...new Set(nuove.map((x) => x.collaboratore))];
+    const esistenti =
+      (await secGet(
+        'piano?collaboratore=in.(' +
+          nomiFile.map((n) => encodeURIComponent(n)).join(',') +
+          ')&data=gte.' +
+          ym +
+          '-01&data=lte.' +
+          ym +
+          '-' +
+          String(nGiorni).padStart(2, '0'),
+      )) || [];
+    const perChiave = {};
+    esistenti.forEach((r) => (perChiave[r.collaboratore + '|' + String(r.data).substring(0, 10)] = r));
+    const MAL = ['M', 'M1', 'I', 'I1'];
+    const nuoveCelle = [];
+    const cambiate = [];
+    const tenute = { malattia: [], chiuso: [], bloccata: [], altroSettore: [] };
+    let uguali = 0;
+    nuove.forEach((x) => {
+      const r = perChiave[x.collaboratore + '|' + x.data];
+      if (!r) {
+        nuoveCelle.push(x);
+        return;
+      }
+      const cod = String(r.codice || '').toUpperCase();
+      if (cod === x.codice) {
+        uguali++;
+        return;
+      }
+      const voce = x.collaboratore + ' ' + gg(x.data) + ': ' + cod + ' (file ' + x.codice + ')';
+      // cella scritta dal piano di un altro settore: la decide quel settore
+      if ((r.reparto_dip || 'slots') !== rep) tenute.altroSettore.push(voce);
+      // malattia registrata (dal Diario o a mano): vale la malattia, non il turno del file
+      else if (MAL.includes(cod) && !MAL.includes(x.codice)) tenute.malattia.push(voce);
+      // giorno chiuso: si corregge solo sbloccandolo, con motivo
+      else if (_pianoGiornoBloccato(x.data) && !_pianoGiornoSbloccato(x.data)) tenute.chiuso.push(voce);
+      // cella bloccata con un motivo (es. C dedicato alle vacanze)
+      else if (r.motivo_blocco) tenute.bloccata.push(voce + ' · ' + r.motivo_blocco);
+      else cambiate.push({ riga: r, nuovo: x });
+    });
+    const nTenute = Object.values(tenute).reduce((t, l) => t + l.length, 0);
+    const righeTenute = [
+      [tenute.malattia, 'malattie registrate (vale il Diario)'],
+      [tenute.chiuso, 'giorni chiusi (si sbloccano con motivo)'],
+      [tenute.bloccata, 'celle bloccate con motivo'],
+      [tenute.altroSettore, 'celle del piano di un altro settore'],
+    ]
+      .filter((x) => x[0].length)
+      .map((x) => '   ' + x[0].length + ' ' + x[1] + (x[0].length <= 3 ? ': ' + x[0].join('; ') : ''));
+    const scelta = await chiediModulo(
+      'Importare il piano di ' +
+        lbl +
+        '?\n\n• Letto da: ' +
+        fonte +
+        '\n• ' +
+        nomiOk.size +
+        ' collaboratori riconosciuti' +
+        '\n• ' +
+        nuoveCelle.length +
+        ' celle nuove' +
+        '\n• ' +
+        cambiate.length +
+        ' celle diverse dal piano' +
+        (cambiate.length
+          ? ': ' +
+            cambiate
+              .slice(0, 8)
+              .map((c) => c.nuovo.collaboratore + ' ' + gg(c.nuovo.data) + ' ' + c.riga.codice + ' > ' + c.nuovo.codice)
+              .join('; ') +
+            (cambiate.length > 8 ? ' e altre ' + (cambiate.length - 8) : '')
+          : '') +
+        '\n• ' +
+        uguali +
+        ' celle gia uguali' +
+        (nTenute ? '\n• ' + nTenute + ' celle diverse che restano come sono:\n' + righeTenute.join('\n') : '') +
+        (sigleScartate ? '\n• ' + sigleScartate + ' sigle sconosciute scartate' : '') +
+        (nuoviCollab.length
+          ? '\n• NUOVI collaboratori da creare: ' + nuoviCollab.map((x) => x.nome + ' (' + x.funzione + ')').join(', ')
+          : '') +
+        (daRiattivare.length
+          ? '\n• Da RIATTIVARE (disattivati ma presenti nel file): ' + daRiattivare.map((x) => x.nome).join(', ')
+          : '') +
+        (saltatiDisattivati.length
+          ? '\n• Saltati (disattivati, nel file solo riposi): ' + saltatiDisattivati.join(', ')
+          : '') +
+        '\n\nSi puo annullare con Annulla del piano.',
+      [
+        {
+          titolo: 'Come importare',
+          campi: [
+            {
+              id: 'modo',
+              tipo: 'scelta',
+              valore: 'aggiorna',
+              opzioni: [
+                {
+                  valore: 'aggiorna',
+                  etichetta:
+                    'Aggiorna dal file: ' + cambiate.length + ' celle corrette e ' + nuoveCelle.length + ' nuove',
+                },
+                { valore: 'nuove', etichetta: 'Solo le ' + nuoveCelle.length + ' celle nuove' },
+              ],
+            },
+          ],
+        },
+      ],
+      { titolo: 'Importa piano da Excel', ok: 'Importa' },
+    );
+    if (!scelta) return;
+    const aggiorna = scelta.modo !== 'nuove';
     for (const nc of nuoviCollab) {
       const creato = await secPost('collaboratori', {
         nome: nc.nome,
@@ -1447,13 +1538,23 @@ async function importaPianoExcel(input) {
     // oppure compare ma ha SOLO congedo (tutto il mese a C, nessun turno
     // né malattia)
     const lavoranti = new Set(righeCollab.filter((x) => x.celle.some((c) => c.cod !== 'C')).map((x) => x.nome));
-    const daDisattivare = collaboratoriCache.filter(
-      (c) =>
-        c.attivo !== false &&
-        (c.reparto_dip || 'slots') === _pianoReparto() &&
-        !lavoranti.has(c.nome) &&
-        !String(c.reparti_extra || '').trim(), // i multi-reparto lavorano altrove
-    );
+    // solo se il file e davvero il piano del mese: con un mese vuoto o a meta nel
+    // file (es. novembre non ancora compilato) proponeva di disattivare tutti
+    const attiviSettore = collaboratoriCache.filter(
+      (c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto(),
+    ).length;
+    const fileCompleto = lavoranti.size >= Math.max(3, attiviSettore * 0.6);
+    const daDisattivare = !fileCompleto
+      ? []
+      : collaboratoriCache.filter(
+          (c) =>
+            c.attivo !== false &&
+            (c.reparto_dip || 'slots') === _pianoReparto() &&
+            !lavoranti.has(c.nome) &&
+            !String(c.reparti_extra || '').trim(), // i multi-reparto lavorano altrove
+        );
+    if (!fileCompleto && lavoranti.size)
+      toast('Nel file il mese e compilato solo in parte: nessuna proposta di disattivare collaboratori');
     if (
       daDisattivare.length &&
       (await chiediConferma(
@@ -1468,9 +1569,56 @@ async function importaPianoExcel(input) {
         logAzione('Collaboratore disattivato da import piano', c.nome + ' (assente dal file ' + ym + ')');
       }
     }
-    const r = await _rpcSicura('piano_bulk_upsert', { p_token: getOpToken(), p_rows: nuove });
-    logAzione('Piano importato da Excel', ym + ' · ' + ((r && r.inserite) || 0) + '/' + nuove.length + ' celle');
-    toast('Piano importato: ' + ((r && r.inserite) || 0) + ' celle nuove');
+    // fotografia per Annulla, poi celle nuove e celle corrette
+    _pianoUndoSnap('importa piano ' + ym);
+    const r = nuoveCelle.length
+      ? await _rpcSicura('piano_bulk_upsert', { p_token: getOpToken(), p_rows: nuoveCelle })
+      : { inserite: 0 };
+    let aggiornate = 0;
+    if (aggiorna) {
+      const op = getOperatore();
+      const ora = new Date().toISOString();
+      for (let i = 0; i < cambiate.length; i += 10)
+        await Promise.all(
+          cambiate.slice(i, i + 10).map(async (c) => {
+            const patch = {
+              codice: c.nuovo.codice,
+              protetto: true,
+              generato: false,
+              ora_inizio: null,
+              ora_fine: null,
+              operatore: op,
+              updated_at: ora,
+            };
+            // la nota del file sostituisce quella vecchia solo se c e
+            if (c.nuovo.commento) patch.commento = c.nuovo.commento;
+            await secPatch('piano', 'id=eq.' + c.riga.id, patch);
+            aggiornate++;
+          }),
+        );
+    }
+    const inserite = (r && r.inserite) || 0;
+    logAzione(
+      'Piano importato da Excel',
+      ym +
+        ' · ' +
+        inserite +
+        ' nuove, ' +
+        aggiornate +
+        ' corrette, ' +
+        uguali +
+        ' uguali, ' +
+        nTenute +
+        ' tenute (malattie, giorni chiusi, bloccate, altri settori)' +
+        (aggiorna ? '' : ' · modo: solo nuove'),
+    );
+    toast(
+      'Piano importato: ' +
+        inserite +
+        ' celle nuove' +
+        (aggiorna ? ', ' + aggiornate + ' corrette' : '') +
+        (nTenute ? ', ' + nTenute + ' tenute come erano' : ''),
+    );
     setTimeout(async () => {
       await _pianoProponiCertificazioniBulk(
         nuove.map((x) => ({ nome: x.collaboratore, codice: x.codice, commento: x.commento || '' })),

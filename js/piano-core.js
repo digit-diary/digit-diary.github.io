@@ -440,6 +440,12 @@ async function _pianoCaricaCfg() {
     _pianoCongediNp = [];
   }
   _pianoOreSett = parseFloat(oreSett) || 41;
+  // analisi dell organico: attiva salvo che l amministratore l abbia spenta
+  try {
+    window._organicoAttivo = (await getImp('piano_organico_attivo')) !== 'false';
+  } catch (e) {
+    window._organicoAttivo = true;
+  }
   try {
     window._pianoFunzioni = funzioni ? JSON.parse(funzioni) : null;
   } catch (e) {}
@@ -1085,6 +1091,11 @@ const _PIANO_TABS = [
     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M11 2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12h.5a.5.5 0 0 1 0 1H.5a.5.5 0 0 1 0-1H1v-3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3h1V7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v7h1zm1 12h2V2h-2zm-3 0V7H7v7zm-5 0v-3H2v3z"/></svg>',
   ],
   [
+    'organico',
+    'Organico',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M15 14s1 0 1-1-1-4-5-4-5 3-5 4 1 1 1 1zm-7.978-1L7 12.996c.001-.264.167-1.03.76-1.72C8.312 10.629 9.282 10 11 10c1.717 0 2.687.63 3.24 1.276.593.69.758 1.457.76 1.72l-.008.002-.014.002zM11 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4m3-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0M6.936 9.28a6 6 0 0 0-1.23-.247A7 7 0 0 0 5 9c-4 0-5 3-5 4q0 1 1 1h4.216A2.24 2.24 0 0 1 5 13c0-1.01.377-2.042 1.09-2.904.243-.294.526-.569.846-.816M4.92 10A5.5 5.5 0 0 0 4 13H1c0-.26.164-1.03.76-1.724.545-.636 1.492-1.256 3.16-1.275ZM1.5 5.5a3 3 0 1 1 6 0 3 3 0 0 1-6 0m3-2a2 2 0 1 0 0 4 2 2 0 0 0 0-4"/></svg>',
+  ],
+  [
     'benessere',
     'Benessere',
     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="m8 2.748-.717-.737C5.6.281 2.514.878 1.4 3.053c-.523 1.023-.641 2.5.314 4.385.92 1.815 2.834 3.989 6.286 6.357 3.452-2.368 5.365-4.542 6.286-6.357.955-1.886.838-3.362.314-4.385C13.486.878 10.4.28 8.717 2.01zM8 15C-7.333 4.868 3.279-3.04 7.824 1.143q.09.083.176.171a3 3 0 0 1 .176-.17C12.72-3.042 23.333 4.867 8 15"/></svg>',
@@ -1133,6 +1144,7 @@ const PIANO_TAB_GRUPPI = [
       'congedi',
       'timbrature',
       'statistiche',
+      'organico',
       'benessere',
       'storico',
       'cambi',
@@ -1146,6 +1158,7 @@ function _pianoTabBar() {
     const t = _PIANO_TABS.find((x) => x[0] === k);
     if (!t) return '';
     if (!pianoTabVisibile(k)) return ''; // scheda nascosta a questo operatore
+    if (k === 'organico' && typeof organicoAttivo === 'function' && !organicoAttivo()) return ''; // disattivata
     return (
       '<span class="piano-tab' +
       (k === _pianoTab ? ' attiva' : '') +
@@ -2541,6 +2554,8 @@ async function _renderPianoCore() {
       h += '<div id="piano-config">' + _renderPianoBenessereCard() + _renderPianoDomenicheCard() + '</div>';
     } else if (_pianoTab === 'statistiche') {
       h += '<div id="piano-config">' + _renderPianoStatCard() + '</div>';
+    } else if (_pianoTab === 'organico') {
+      h += await _renderPianoOrganicoTab();
     } else if (_pianoTab === 'saldo') {
       h += await _renderPianoSaldoTab();
     } else if (_pianoTab === 'recupero') {
@@ -2560,6 +2575,7 @@ async function _renderPianoCore() {
         _renderPianoMappatureCard() +
         _renderPianoPreferenzeCard() +
         _renderPianoImpostazioniCard() +
+        (typeof _renderOrganicoInterruttoreCard === 'function' ? _renderOrganicoInterruttoreCard() : '') +
         '</div>';
     }
     el.innerHTML = h;
