@@ -250,6 +250,40 @@ function getColore(n) {
 function getOperatore() {
   return localStorage.getItem('operatore_corrente') || '';
 }
+// Settore dell app, settore e mese del Piano ricordati per la scheda del browser:
+// aggiornando la pagina si resta dove si era (prima si tornava sempre a Slots).
+// Un nuovo accesso parte dal settore scelto nella schermata di accesso.
+// Finche il ripristino dopo un aggiornamento non e fatto non si scrive niente:
+// il primo disegno della pagina (settore di partenza) cancellava il ricordo.
+let _settorePronto = false;
+function _ricordaSettore(nuovoAccesso) {
+  if (nuovoAccesso) _settorePronto = true;
+  if (!_settorePronto) return;
+  try {
+    sessionStorage.setItem('settore_app', currentReparto);
+    if (nuovoAccesso) {
+      sessionStorage.removeItem('settore_piano');
+      sessionStorage.removeItem('piano_mese');
+      return;
+    }
+    if (typeof _pianoRepartoSel !== 'undefined') sessionStorage.setItem('settore_piano', _pianoRepartoSel || '');
+    if (typeof _pianoMeseSel !== 'undefined') sessionStorage.setItem('piano_mese', _pianoMeseSel || '');
+  } catch (e) {}
+}
+// dopo loadAll: i permessi (settori ammessi) sono gia noti e si controllano
+function _ripristinaSettore() {
+  _settorePronto = true;
+  try {
+    const a = sessionStorage.getItem('settore_app');
+    if (a && getReparti().some((r) => r.key === a)) currentReparto = a;
+    if (typeof applicaRepartoVisibilita === 'function') applicaRepartoVisibilita();
+    const p = sessionStorage.getItem('settore_piano');
+    if (typeof _pianoRepartoSel !== 'undefined')
+      _pianoRepartoSel = p && p !== currentReparto && _pianoRepartiAmmessi().includes(p) ? p : null;
+    const m = sessionStorage.getItem('piano_mese');
+    if (m && /^\d{4}-\d{2}$/.test(m) && typeof _pianoMeseSel !== 'undefined') _pianoMeseSel = m;
+  } catch (e) {}
+}
 function _isSessionValid() {
   var ts = parseInt(localStorage.getItem('diario_auth_ts') || '0');
   if (!ts) return false;
@@ -331,9 +365,22 @@ function setOpToken(t) {
 // dell'operatore, quindi chiunque con la chiave pubblica poteva ottenere una
 // sessione. Se il token non e' piu' rinnovabile si prova il dispositivo
 // biometrico registrato; altrimenti serve rifare l'accesso.
+// Pagina che si chiude o si ricarica: le letture in corso vengono interrotte dal
+// browser e sembrano errori di rete. Rinnovare la sessione in quel momento
+// faceva cancellare il token vecchio dal server senza che il nuovo arrivasse
+// alla pagina: dopo l aggiornamento si tornava all accesso (e l admin perdeva
+// i diritti). Mentre la pagina si chiude non si rinnova niente.
+let _paginaInChiusura = false;
+window.addEventListener('pagehide', () => (_paginaInChiusura = true));
+window.addEventListener('beforeunload', () => {
+  _paginaInChiusura = true;
+  // se l uscita viene annullata (es. briefing non salvato) la pagina resta: si torna normali
+  setTimeout(() => (_paginaInChiusura = false), 5000);
+});
+window.addEventListener('pageshow', () => (_paginaInChiusura = false));
 async function _renewToken() {
   const op = getOperatore();
-  if (!op) return false;
+  if (!op || _paginaInChiusura) return false;
   const tk = getOpToken();
   try {
     if (tk) {

@@ -1881,6 +1881,7 @@ function setReparto(rep) {
     }
   }
   currentReparto = rep;
+  _ricordaSettore();
   _aggiornaBottoniReparto();
   // pagine abilitate per settore: nascondi tab e, se la pagina corrente non è disponibile, torna alla Home
   if (typeof applicaVisibilita === 'function') applicaVisibilita();
@@ -1907,6 +1908,7 @@ function setReparto(rep) {
   };
   if (_pgAttiva('page-formazione') && typeof renderFormazione === 'function') renderFormazione();
   if (typeof _pianoRepartoSel !== 'undefined') _pianoRepartoSel = null; // il Piano torna a seguire il settore dell'app
+  _ricordaSettore();
   if (_pgAttiva('page-piano') && typeof renderPiano === 'function') renderPiano();
   if (_pgAttiva('page-impostazioni') && typeof renderCollaboratoriUI === 'function') renderCollaboratoriUI();
   if (typeof renderPromemoria === 'function') renderPromemoria();
@@ -3783,6 +3785,7 @@ window.addEventListener('load', async () => {
       console.warn('Init: dati vuoti, rinnovo token...');
       if (await _renewToken()) await loadAll();
     }
+    _ripristinaSettore();
     _initNoteRealtime();
     applicaVisibilita();
     var _sp = localStorage.getItem('pagina_corrente');

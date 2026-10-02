@@ -662,15 +662,14 @@ async function _pianoCaricaMalattieAnno(anno, rep) {
   const da = anno - 1 + '-12-01';
   const a = anno + '-12-31';
   const righe = [];
-  for (const cod of ['M', 'M1']) {
-    try {
-      (
-        (await secGet(
-          'piano?codice=eq.' + cod + '&data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + rep + '&limit=20000',
-        )) || []
-      ).forEach((r) => righe.push(r));
-    } catch (e) {}
-  }
+  const lette = await Promise.all(
+    ['M', 'M1'].map((cod) =>
+      secGet(
+        'piano?codice=eq.' + cod + '&data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + rep + '&limit=20000',
+      ).catch(() => []),
+    ),
+  );
+  lette.forEach((l) => (l || []).forEach((r) => righe.push(r)));
   const celle = {};
   righe.forEach((r) => {
     const k = String(r.collaboratore || '').toLowerCase();
@@ -1499,34 +1498,16 @@ async function _pianoInserisciCella(dati) {
 // coprenti girano in parallelo a gruppi: il tempo dipende dai coprenti del
 // settore aperto, non dal numero totale di settori, e non c'e' troncamento.
 async function _pianoCaricaMeseSettore(da, a, rep) {
-  const righe =
-    (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + rep + '&limit=20000')) || [];
-  // subito, PRIMA di qualunque uscita anticipata: serve a sapere in quali giorni
-  // e' previsto il turno che fa prolungare un altro (es. Z12 per Z0)
-  _pianoRegistraGiorniTurno(righe);
-  // malattie dell anno: servono per le ore di malattia (giorno 1-14 o dal 15.)
-  await _pianoCaricaMalattieAnno(parseInt(String(da).substring(0, 4)), rep);
-  // giorni delle settimane a cavallo del mese (lunedi-domenica): servono per le ore
-  // lavorate nella settimana
-  try {
-    const iso = (d) => d.toISOString().substring(0, 10);
-    const l = new Date(da + 'T12:00:00');
-    l.setDate(l.getDate() - ((l.getDay() + 6) % 7) - 7); // una settimana in piu: riposi a cavallo
-    const dm = new Date(a + 'T12:00:00');
-    dm.setDate(dm.getDate() + ((7 - dm.getDay()) % 7) + 7);
-    const bordo = [];
-    if (iso(l) < da)
-      (
-        (await secGet('piano?data=gte.' + iso(l) + '&data=lt.' + da + '&reparto_dip=eq.' + rep + '&limit=2000')) || []
-      ).forEach((r) => bordo.push(r));
-    if (iso(dm) > a)
-      (
-        (await secGet('piano?data=gt.' + a + '&data=lte.' + iso(dm) + '&reparto_dip=eq.' + rep + '&limit=2000')) || []
-      ).forEach((r) => bordo.push(r));
-    window._pianoRigheBordo = bordo;
-  } catch (e) {
-    window._pianoRigheBordo = [];
-  }
+  // Tutte le letture partono INSIEME (prima una dopo l altra: in produzione ogni
+  // lettura aspettava il giro su internet della precedente). Il risultato e lo stesso.
+  // Giorni delle settimane a cavallo del mese (lunedi-domenica, una settimana in
+  // piu: riposi a cavallo): servono per le ore lavorate nella settimana.
+  const l = new Date(da + 'T12:00:00');
+  l.setDate(l.getDate() - ((l.getDay() + 6) % 7) - 7);
+  const dm = new Date(a + 'T12:00:00');
+  dm.setDate(dm.getDate() + ((7 - dm.getDay()) % 7) + 7);
+  const dalB = dataLocaleISO(l) < da ? dataLocaleISO(l) : da;
+  const alB = dataLocaleISO(dm) > a ? dataLocaleISO(dm) : a;
   // CELLE DEGLI ALTRI SETTORI di chi lavora anche altrove: sia chi viene a coprire
   // da un altro settore, sia chi e di questo settore ma ne ha altri (es. Balliu,
   // Slots con anche Valet). Prima il secondo caso non si leggeva: nel settore di
@@ -1549,17 +1530,18 @@ async function _pianoCaricaMeseSettore(da, a, rep) {
           (t) => t.attivo !== false && t.codice === cod && (t.reparto_dip || 'slots') !== rep,
         ),
     );
-  if (!altrove.length && !soloQui.length) return righe;
-  const visti = new Set(righe.map((r) => r.id).concat((window._pianoRigheBordo || []).map((r) => r.id)));
-  // stessa finestra del bordo: una settimana in piu prima e dopo
-  const _l = new Date(da + 'T12:00:00');
-  _l.setDate(_l.getDate() - ((_l.getDay() + 6) % 7) - 7);
-  const _dm = new Date(a + 'T12:00:00');
-  _dm.setDate(_dm.getDate() + ((7 - _dm.getDay()) % 7) + 7);
-  const dalB = dataLocaleISO(_l) < da ? dataLocaleISO(_l) : da;
-  const alB = dataLocaleISO(_dm) > a ? dataLocaleISO(_dm) : a;
   const periodo = '&reparto_dip=neq.' + rep + '&data=gte.' + dalB + '&data=lte.' + alB;
-  const [loro, conSigleQui] = await Promise.all([
+  const bordoNulla = (pr) => pr.catch(() => []);
+  const [righeLette, , prima, dopo, loro, conSigleQui] = await Promise.all([
+    secGet('piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + rep + '&limit=20000'),
+    // malattie dell anno: servono per le ore di malattia (giorno 1-14 o dal 15.)
+    _pianoCaricaMalattieAnno(parseInt(String(da).substring(0, 4)), rep),
+    dalB < da
+      ? bordoNulla(secGet('piano?data=gte.' + dalB + '&data=lt.' + da + '&reparto_dip=eq.' + rep + '&limit=2000'))
+      : [],
+    alB > a
+      ? bordoNulla(secGet('piano?data=gt.' + a + '&data=lte.' + alB + '&reparto_dip=eq.' + rep + '&limit=2000'))
+      : [],
     altrove.length
       ? secGet('piano?collaboratore=in.(' + altrove.map((n) => encodeURIComponent(n)).join(',') + ')' + periodo)
       : [],
@@ -1567,12 +1549,18 @@ async function _pianoCaricaMeseSettore(da, a, rep) {
       ? secGet('piano?codice=in.(' + soloQui.map((c) => encodeURIComponent(c)).join(',') + ')' + periodo)
       : [],
   ]);
+  const righe = righeLette || [];
+  // serve a sapere in quali giorni e previsto il turno che fa prolungare un altro
+  // (es. Z12 per Z0)
+  _pianoRegistraGiorniTurno(righe);
+  window._pianoRigheBordo = (prima || []).concat(dopo || []);
+  const visti = new Set(righe.map((r) => r.id).concat(window._pianoRigheBordo.map((r) => r.id)));
   (loro || []).concat(conSigleQui || []).forEach((r) => {
     if (visti.has(r.id)) return;
     visti.add(r.id);
     const d = String(r.data).substring(0, 10);
     if (d >= da && d <= a) righe.push(r);
-    else (window._pianoRigheBordo = window._pianoRigheBordo || []).push(r);
+    else window._pianoRigheBordo.push(r);
   });
   return righe;
 }
@@ -1597,6 +1585,7 @@ function renderPiano() {
       );
     return _pianoRenderCoda;
   }
+  if (typeof _ricordaSettore === 'function') _ricordaSettore(); // settore e mese restano dopo un aggiornamento
   _pianoRenderInCorso = _renderPianoCore().finally(() => {
     _pianoRenderInCorso = null;
   });

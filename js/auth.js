@@ -37,6 +37,7 @@ async function checkPwd() {
       document.getElementById('operatore-display').textContent = 'Operatore: ' + nome;
       var loginSettore = document.getElementById('login-settore');
       if (loginSettore && loginSettore.value) currentReparto = loginSettore.value;
+      _ricordaSettore(true);
       applicaTemaOperatore();
       registraPushSubscription();
       await loadAll();
@@ -92,6 +93,7 @@ async function checkPwd() {
     }
     var loginSettore = document.getElementById('login-settore');
     if (loginSettore && loginSettore.value) currentReparto = loginSettore.value;
+    _ricordaSettore(true);
     if (nome) {
       localStorage.setItem('operatore_corrente', nome);
       document.getElementById('operatore-display').textContent = 'Operatore: ' + nome;
@@ -552,6 +554,7 @@ async function tentaBiometrico() {
     }
     var loginSettore = document.getElementById('login-settore');
     if (loginSettore && loginSettore.value) currentReparto = loginSettore.value;
+    _ricordaSettore(true);
     document.getElementById('login-overlay').classList.add('hidden');
     document.getElementById('operatore-display').textContent = 'Operatore: ' + stored.op;
     applicaTemaOperatore();
