@@ -2107,9 +2107,13 @@ async function _renderPianoCore() {
             '"' +
             (titolo ? ' title="' + escP(titolo) + '"' : '') +
             (r && r.commento ? ' data-commento="' + escP(r.commento) + '"' : '') +
-            (puoMod
-              ? ' onclick="pianoCellaInline(\'' + ne + "','" + dstr + '\',this)"'
-              : ' onclick="pianoCellaClick(\'' + ne + "','" + dstr + '\',this)"') +
+            // come Excel: clic = seleziona la cella, doppio clic (o scrivere) = modifica
+            ' onclick="pianoCellaClick(\'' +
+            ne +
+            "','" +
+            dstr +
+            '\',this)"' +
+            (puoMod ? ' ondblclick="pianoCellaInline(\'' + ne + "','" + dstr + '\',this)"' : '') +
             '>' +
             cella +
             '</td>';
@@ -2599,6 +2603,8 @@ async function _renderPianoCore() {
       _pianoDragBind();
       _pianoTipBind();
       _pianoApplicaNascosti();
+      // la cella attiva resta selezionata anche dopo il ridisegno (salvataggio)
+      if (typeof _pianoRipristinaCellaAttiva === 'function') _pianoRipristinaCellaAttiva();
       if (typeof _pianoApplicaEvidenzia === 'function') _pianoApplicaEvidenzia();
     }
     if (_pianoTab === 'recupero' && typeof _pianoRecuperoTotaliGenerali === 'function') {
@@ -2607,7 +2613,10 @@ async function _renderPianoCore() {
       _recDragBind();
     }
     if (_pianoTab === 'saldo') _pianoSaldoBind();
-    if (_pianoTab === 'briefing') _briefSelezioneBind();
+    if (_pianoTab === 'briefing') {
+      _briefSelezioneBind();
+      if (typeof _briefGrigliaCollega === 'function') _briefGrigliaCollega();
+    }
     if (_pianoTab === 'benessere' && typeof caricaBenesserePiano === 'function')
       setTimeout(() => caricaBenesserePiano(), 60);
     if (_pianoTab === 'benessere' && typeof pianoCaricaDomenicheAnno === 'function')

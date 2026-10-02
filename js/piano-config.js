@@ -1069,6 +1069,117 @@ function _xlsCercaMappaGiorni(dati, nGiorni, daRiga, aRiga) {
   }
   return null;
 }
+// COLORI DATI A MANO nelle celle del file Excel (es. le X dei coordinatori in rosso):
+// sfondo e colore del testo letti dagli stili interni del file (xl/styles.xml, tema,
+// foglio). I colori che Excel mette con le regole automatiche (formattazione
+// condizionale) non sono nelle celle: per quelli valgono i colori dei turni del
+// programma. Ritorna (riga, colonna) -> '#SFONDO||#TESTO' oppure ''.
+function _xlsColoriFoglio(wb, nomeFoglio) {
+  const nessuno = () => '';
+  try {
+    const files = wb && wb.files;
+    if (!files) return nessuno;
+    const testo = (n) => {
+      const f = files[n] || files['/' + n];
+      if (!f || !f.content) return '';
+      return typeof f.content === 'string' ? f.content : new TextDecoder('utf-8').decode(f.content);
+    };
+    const wbx = testo('xl/workbook.xml');
+    const rels = testo('xl/_rels/workbook.xml.rels');
+    const esc = nomeFoglio.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const mS = wbx.match(new RegExp('<sheet[^>]*name="' + esc + '"[^>]*r:id="([^"]+)"'));
+    if (!mS) return nessuno;
+    const mR =
+      rels.match(new RegExp('Id="' + mS[1] + '"[^>]*Target="([^"]+)"')) ||
+      rels.match(new RegExp('Target="([^"]+)"[^>]*Id="' + mS[1] + '"'));
+    if (!mR) return nessuno;
+    const percorso = mR[1].replace(/^\//, '').replace(/^xl\//, '');
+    const foglio = testo('xl/' + percorso);
+    const stili = testo('xl/styles.xml');
+    if (!foglio || !stili) return nessuno;
+    // tema: lt1 dk1 lt2 dk2 accent1..6 (ordine degli indici di Excel)
+    const tema = testo('xl/theme/theme1.xml');
+    const temaCol = [];
+    ['lt1', 'dk1', 'lt2', 'dk2', 'accent1', 'accent2', 'accent3', 'accent4', 'accent5', 'accent6'].forEach((k) => {
+      const m = tema.match(
+        new RegExp('<a:' + k + '>[\\s\\S]*?(?:srgbClr val="([0-9A-Fa-f]{6})"|lastClr="([0-9A-Fa-f]{6})")'),
+      );
+      temaCol.push(m ? (m[1] || m[2]).toUpperCase() : null);
+    });
+    const PAL = {
+      2: 'FFFFFF',
+      3: 'FF0000',
+      4: '00FF00',
+      5: '0000FF',
+      6: 'FFFF00',
+      7: 'FF00FF',
+      8: '00FFFF',
+      10: 'FF0000',
+      13: 'FFFF00',
+      17: '008000',
+      53: 'FF6600',
+      52: 'FF9900',
+    };
+    const tinta = (hex, t) => {
+      if (!t) return hex;
+      const c = [0, 2, 4].map((i) => parseInt(hex.substr(i, 2), 16));
+      const n = c.map((x) => Math.round(t < 0 ? x * (1 + t) : x + (255 - x) * t));
+      return n
+        .map((x) => Math.max(0, Math.min(255, x)).toString(16).padStart(2, '0'))
+        .join('')
+        .toUpperCase();
+    };
+    const colore = (tag) => {
+      if (!tag) return '';
+      const a = (k) => {
+        const m = tag.match(new RegExp(k + '="([^"]+)"'));
+        return m ? m[1] : null;
+      };
+      let hex = null;
+      if (a('rgb')) hex = a('rgb').slice(-6).toUpperCase();
+      else if (a('theme') != null) hex = temaCol[parseInt(a('theme'))] || null;
+      else if (a('indexed') != null) hex = PAL[parseInt(a('indexed'))] || null;
+      if (!hex) return '';
+      return tinta(hex, parseFloat(a('tint')) || 0);
+    };
+    const blocco = (nome) => {
+      const m = stili.match(new RegExp('<' + nome + '[^>]*>([\\s\\S]*?)</' + nome + '>'));
+      return m ? m[1] : '';
+    };
+    const fills = (blocco('fills').match(/<fill>[\s\S]*?<\/fill>|<fill\/>/g) || []).map((f) => {
+      if (!/patternType="solid"/.test(f)) return '';
+      return colore((f.match(/<fgColor[^>]*\/>/) || [])[0]);
+    });
+    const fonts = (blocco('fonts').match(/<font>[\s\S]*?<\/font>|<font\/>/g) || []).map((f) =>
+      colore((f.match(/<color[^>]*\/>/) || [])[0]),
+    );
+    const xfs = (blocco('cellXfs').match(/<xf [^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g) || []).map((x) => {
+      const n = (k) => {
+        const m = x.match(new RegExp(k + '="(\\d+)"'));
+        return m ? parseInt(m[1]) : 0;
+      };
+      const bg = fills[n('fillId')] || '';
+      const fg = fonts[n('fontId')] || '';
+      return {
+        bg: bg && bg !== 'FFFFFF' ? '#' + bg : '',
+        fg: fg && fg !== '000000' ? '#' + fg : '',
+      };
+    });
+    const perCella = {};
+    const re = /<c r="([A-Z]+)(\d+)"[^>]*?\ss="(\d+)"/g;
+    let m;
+    while ((m = re.exec(foglio))) {
+      const st = xfs[parseInt(m[3])];
+      if (!st || (!st.bg && !st.fg)) continue;
+      const col = m[1].split('').reduce((t, ch) => t * 26 + ch.charCodeAt(0) - 64, 0) - 1;
+      perCella[parseInt(m[2]) - 1 + '|' + col] = st.bg + (st.fg ? '||' + st.fg : '');
+    }
+    return (r, c) => perCella[r + '|' + c] || '';
+  } catch (e) {
+    console.warn('colori del file non letti', e);
+    return nessuno;
+  }
+}
 function _xlsNormaNome(s) {
   return String(s || '')
     .toUpperCase()
@@ -1234,7 +1345,7 @@ async function importaPianoExcel(input) {
   const nGiorni = _pianoUltimoGiorno(ym);
   try {
     const buf = await file.arrayBuffer();
-    const wb = XLSX.read(buf);
+    const wb = XLSX.read(buf, { bookFiles: true }); // file interni: servono per i colori delle celle
     const collabs = collaboratoriCache.filter((c) => c.attivo !== false);
     // match nomi robusto: maiuscole/minuscole, ordine parole, refusi tipo 0/O e 1/I
     const trova = (nome) => {
@@ -1256,6 +1367,7 @@ async function importaPianoExcel(input) {
       mappa = _xlsCercaMappaGiorni(dati, nGiorni, 0, 8);
     }
     const wsCommenti = foglioMese ? wb.Sheets[foglioMese] : null;
+    const coloreCella = foglioMese ? _xlsColoriFoglio(wb, foglioMese) : () => '';
     const commentoCella = (rIdx, cIdx) => {
       if (!wsCommenti) return '';
       try {
@@ -1329,7 +1441,23 @@ async function importaPianoExcel(input) {
           sigleScartate++;
           continue;
         }
-        celle.push({ g: g, cod: cod, commento: mappa ? commentoCella(inizio + idxRiga, mappa[g]) : '' });
+        const commento = mappa ? commentoCella(inizio + idxRiga, mappa[g]) : '';
+        // JG (codici con orario): se la nota della cella dice l orario intero
+        // ("DALLE 14:30 ALLE 21:30") si prende; altrimenti si aggiunge dopo, con
+        // doppio clic sul JG
+        const csO = _pianoCodiceInfo(cod);
+        const or =
+          csO && csO.richiede_orario && commento && typeof _pianoOrarioDaNota === 'function'
+            ? _pianoOrarioDaNota(commento)
+            : null;
+        celle.push({
+          g: g,
+          cod: cod,
+          commento: commento,
+          colore: mappa ? coloreCella(inizio + idxRiga, mappa[g]) : '',
+          ora_inizio: or && or.ini && or.fin ? or.ini : null,
+          ora_fine: or && or.ini && or.fin ? or.fin : null,
+        });
       }
       const hit = trovaTutti(raw);
       if (hit && hit.attivo !== false) {
@@ -1381,6 +1509,9 @@ async function importaPianoExcel(input) {
           protetto: true,
           generato: false,
           commento: c.commento || null,
+          colore: c.colore || null,
+          ora_inizio: c.ora_inizio,
+          ora_fine: c.ora_fine,
           reparto_dip: _pianoReparto(),
         }),
       ),
@@ -1416,6 +1547,8 @@ async function importaPianoExcel(input) {
     const cambiate = [];
     const tenute = { malattia: [], chiuso: [], bloccata: [], altroSettore: [] };
     let uguali = 0;
+    const coloriDiversi = []; // stessa sigla, colore dato a mano nel file diverso da quello del piano
+    const orariNuovi = []; // JG gia nel piano senza orario, con l orario nella nota del file
     nuove.forEach((x) => {
       const r = perChiave[x.collaboratore + '|' + x.data];
       if (!r) {
@@ -1424,7 +1557,16 @@ async function importaPianoExcel(input) {
       }
       const cod = String(r.codice || '').toUpperCase();
       if (cod === x.codice) {
-        uguali++;
+        // JG gia nel piano senza orario: l orario della nota del file si aggiunge
+        if (x.ora_inizio && !r.ora_inizio && (r.reparto_dip || 'slots') === rep) orariNuovi.push({ riga: r, nuovo: x });
+        if (
+          x.colore &&
+          x.colore !== (r.colore || '') &&
+          (r.reparto_dip || 'slots') === rep &&
+          !(_pianoGiornoBloccato(x.data) && !_pianoGiornoSbloccato(x.data))
+        )
+          coloriDiversi.push({ riga: r, nuovo: x });
+        else uguali++;
         return;
       }
       const voce = x.collaboratore + ' ' + gg(x.data) + ': ' + cod + ' (file ' + x.codice + ')';
@@ -1469,6 +1611,10 @@ async function importaPianoExcel(input) {
               .join('; ') +
             (cambiate.length > 8 ? ' e altre ' + (cambiate.length - 8) : '')
           : '') +
+        (coloriDiversi.length
+          ? '\n• ' + coloriDiversi.length + ' celle con il colore del file diverso (stessa sigla)'
+          : '') +
+        (orariNuovi.length ? '\n• ' + orariNuovi.length + ' JG con l orario preso dalla nota del file' : '') +
         '\n• ' +
         uguali +
         ' celle gia uguali' +
@@ -1496,7 +1642,12 @@ async function importaPianoExcel(input) {
                 {
                   valore: 'aggiorna',
                   etichetta:
-                    'Aggiorna dal file: ' + cambiate.length + ' celle corrette e ' + nuoveCelle.length + ' nuove',
+                    'Aggiorna dal file: ' +
+                    cambiate.length +
+                    ' celle corrette, ' +
+                    nuoveCelle.length +
+                    ' nuove' +
+                    (coloriDiversi.length ? ', ' + coloriDiversi.length + ' colori' : ''),
                 },
                 { valore: 'nuove', etichetta: 'Solo le ' + nuoveCelle.length + ' celle nuove' },
               ],
@@ -1585,16 +1736,32 @@ async function importaPianoExcel(input) {
               codice: c.nuovo.codice,
               protetto: true,
               generato: false,
-              ora_inizio: null,
-              ora_fine: null,
+              ora_inizio: c.nuovo.ora_inizio || null,
+              ora_fine: c.nuovo.ora_fine || null,
               operatore: op,
               updated_at: ora,
             };
-            // la nota del file sostituisce quella vecchia solo se c e
+            // la nota e il colore del file sostituiscono quelli vecchi solo se ci sono
             if (c.nuovo.commento) patch.commento = c.nuovo.commento;
+            if (c.nuovo.colore) patch.colore = c.nuovo.colore;
             await secPatch('piano', 'id=eq.' + c.riga.id, patch);
             aggiornate++;
           }),
+        );
+      for (const c of orariNuovi)
+        await secPatch('piano', 'id=eq.' + c.riga.id, {
+          ora_inizio: c.nuovo.ora_inizio,
+          ora_fine: c.nuovo.ora_fine,
+          operatore: op,
+          updated_at: ora,
+        });
+      for (let i = 0; i < coloriDiversi.length; i += 10)
+        await Promise.all(
+          coloriDiversi
+            .slice(i, i + 10)
+            .map((c) =>
+              secPatch('piano', 'id=eq.' + c.riga.id, { colore: c.nuovo.colore, operatore: op, updated_at: ora }),
+            ),
         );
     }
     const inserite = (r && r.inserite) || 0;
@@ -1606,6 +1773,8 @@ async function importaPianoExcel(input) {
         ' nuove, ' +
         aggiornate +
         ' corrette, ' +
+        (aggiorna ? coloriDiversi.length : 0) +
+        ' colori, ' +
         uguali +
         ' uguali, ' +
         nTenute +

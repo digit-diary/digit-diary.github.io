@@ -368,6 +368,11 @@ async function _renderPianoBriefingTab() {
   const valetR = _briefIsValet();
   const rigaBrief = (salvati || []).find((x) => x.sezione === 'briefing');
   const rigaPause = (salvati || []).find((x) => x.sezione === 'pause');
+  // fogli con intestazioni rovinate da una correzione a mano: si riparano aprendoli
+  const intestRiparate =
+    rigaPause && rigaPause.contenuto && typeof _pbSanaIntestazioni === 'function'
+      ? _pbSanaIntestazioni(rigaPause.contenuto)
+      : 0;
   let righe, salvato;
   if (
     rigaBrief &&
@@ -395,6 +400,11 @@ async function _renderPianoBriefingTab() {
     // la rotazione non li sovrascrive (prima il flag spariva a ogni render)
     cdManuale: !!(rigaBrief && rigaBrief.contenuto && rigaBrief.contenuto.cdManuale),
   };
+  if (intestRiparate && puoGestireBriefing() && typeof _briefSalvaPauseDebounce === 'function') {
+    _briefSalvaPauseDebounce();
+    logAzione('Pause: intestazioni riparate', dstr + ' · ' + intestRiparate);
+  }
+
   // se il briefing era gia' salvato, controlla che i numeri cassa seguano
   // ancora la rotazione (ieri potrebbe essere stato corretto a mano)
   let cdDaAggiornare = false;
@@ -510,7 +520,8 @@ async function _renderPianoBriefingTab() {
     '</span></div>';
   // tabella briefing + tabella orari affiancate (stessa vista dell'Excel)
   h += '<div style="display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap"><div style="overflow-x:auto">';
-  h += '<table class="brief-table" style="border-collapse:collapse;font-size:var(--fs-md,.875rem)"><thead><tr>';
+  h +=
+    '<table id="brief-tabella" class="brief-table" style="border-collapse:collapse;font-size:var(--fs-md,.875rem)"><thead><tr>';
   // ogni reparto ha il SUO briefing: slots con CD (numeri cassa), valet con
   // radio/badge, gli altri (es. tavoli, senza casse) tabella essenziale
   const cols = valet
@@ -560,6 +571,10 @@ async function _renderPianoBriefingTab() {
       return (
         '<td data-campo="' +
         campo +
+        '" data-ge="b|' +
+        i +
+        '|' +
+        campo +
         '" style="border:1px solid #999;padding:0' +
         (bg ? ';background:' + bg : '') +
         '"><input ' +
@@ -586,15 +601,19 @@ async function _renderPianoBriefingTab() {
       );
     };
     h += '<tr data-bidx="' + i + '">';
-    // E e U si spuntano A PENNA sul foglio stampato: celle vuote
-    h += '<td style="border:1px solid #999;width:34px;padding:3px 4px">&nbsp;</td>';
-    h += '<td style="border:1px solid #999;width:34px;padding:3px 4px">&nbsp;</td>';
+    // E e U si spuntano A PENNA sul foglio stampato: celle vuote. A video sono la
+    // maniglia della riga: si trascinano per spostare la riga intera
+    const maniglia = puo ? ' data-ge-maniglia="1"' : '';
+    h += '<td' + maniglia + ' style="border:1px solid #999;width:34px;padding:3px 4px">&nbsp;</td>';
+    h += '<td' + maniglia + ' style="border:1px solid #999;width:34px;padding:3px 4px">&nbsp;</td>';
     const stNome = stDi('nome');
     const bgNome = stNome.c || r.col || (r.fm ? '#FFFF00' : '');
     if (r.fm || bgNome) {
       // in formazione (giallo) o colorata: sfondo sulla cella del nome
       h +=
-        '<td data-campo="nome" style="border:1px solid #999;padding:0;white-space:nowrap;background:' +
+        '<td data-campo="nome" data-ge="b|' +
+        i +
+        '|nome" style="border:1px solid #999;padding:0;white-space:nowrap;background:' +
         (bgNome || 'transparent') +
         '"><input ' +
         (puo ? '' : 'disabled ') +
@@ -638,12 +657,6 @@ async function _renderPianoBriefingTab() {
         '<span style="cursor:pointer;color:var(--c-verde,#2c6e49);font-weight:bold" title="Inserisci riga sotto" onclick="briefInserisciRiga(' +
         i +
         ')">+</span> ' +
-        '<span style="cursor:pointer;color:var(--muted)" title="Sposta su" onclick="briefMuoviRiga(' +
-        i +
-        ',-1)">▲</span> ' +
-        '<span style="cursor:pointer;color:var(--muted)" title="Sposta giù" onclick="briefMuoviRiga(' +
-        i +
-        ',1)">▼</span> ' +
         '<span style="cursor:pointer;color:var(--c-rosso,#c0392b);font-weight:bold" title="Elimina riga" onclick="briefEliminaRiga(' +
         i +
         ')">×</span></td>';
@@ -1126,6 +1139,9 @@ function _briefSelezioneBind() {
   window._briefSelBound = true;
   document.addEventListener('click', (e) => {
     if (e.target.closest('select, textarea, button, a, span[onclick], #brief-colori-bar')) return;
+    // rilascio dopo una selezione a trascinamento (griglia-excel.js): la selezione resta
+    const tabGe = e.target.closest('.ge-tabella');
+    if (tabGe && Date.now() - (tabGe._geDopoArea || 0) < 500) return;
     const tr = e.target.closest('tr[data-bidx]');
     if (!tr) {
       // click fuori dal briefing: deseleziona tutto (gli input di altre
@@ -1252,6 +1268,84 @@ async function briefFormatoApplica(f) {
   await briefSalvaBriefing();
   toast((f === 'b' ? 'Grassetto' : 'Corsivo') + (on ? ' applicato (' : ' tolto (') + n + ')');
   renderPiano();
+}
+// TRASCINAMENTO (griglia-excel.js): riga intera da una posizione all altra
+async function briefMuoviRigaA(da, a) {
+  if (!_briefState || !puoGestireBriefing()) return;
+  const n = _briefState.righe.length;
+  if (da === a || da < 0 || a < 0 || da >= n || a >= n) return;
+  _briefRicorda();
+  const [riga] = _briefState.righe.splice(da, 1);
+  _briefState.righe.splice(a, 0, riga);
+  clearTimeout(_briefSaveTimer);
+  await briefSalvaBriefing();
+  renderPiano();
+}
+// TRASCINAMENTO di una cella sola: si SCAMBIA con la cella di arrivo (stessa
+// colonna), formato compreso; il nome si porta dietro nome completo e formazione
+async function briefScambiaCelle(i, j, campo) {
+  if (!_briefState || !puoGestireBriefing()) return;
+  const R = _briefState.righe;
+  if (!R[i] || !R[j] || i === j) return;
+  _briefRicorda();
+  const campi = campo === 'nome' ? ['nome', 'nomeFull', 'fm'] : [campo];
+  campi.forEach((c) => {
+    const t = R[i][c];
+    R[i][c] = R[j][c];
+    R[j][c] = t;
+  });
+  R[i].cs = R[i].cs || {};
+  R[j].cs = R[j].cs || {};
+  const t = R[i].cs[campo];
+  R[i].cs[campo] = R[j].cs[campo];
+  R[j].cs[campo] = t;
+  if (campo === 'cd') _briefState.cdManuale = true;
+  clearTimeout(_briefSaveTimer);
+  await briefSalvaBriefing();
+  renderPiano();
+}
+function _briefGrigliaCollega() {
+  const tab = document.getElementById('brief-tabella');
+  if (!tab || typeof GrigliaExcel === 'undefined') return;
+  const parte = (td) => String(td.dataset.ge || '').split('|');
+  GrigliaExcel.collega(tab, {
+    id: 'brief',
+    // incolla / svuota piu celle: un solo passo di Annulla, un salvataggio
+    scrivi: (lista) => {
+      if (!puoGestireBriefing() || !_briefState) return;
+      _briefRicorda();
+      lista.forEach(({ td, val }) => {
+        const [, i, campo] = parte(td);
+        const r = _briefState.righe[parseInt(i)];
+        if (!r) return;
+        r[campo] = val;
+        if (campo === 'nome') r.nomeFull = null;
+        if (campo === 'cd') _briefState.cdManuale = true;
+        const inp = td.querySelector('input');
+        if (inp) {
+          inp.value = val;
+          if (typeof _briefAllarga === 'function') _briefAllarga(inp);
+        }
+      });
+      _briefDirtySalva();
+    },
+    // la selezione vale anche per colori e formato (come il clic con Ctrl)
+    selezione: (celle) => {
+      if (celle.length < 2) return;
+      _briefSelPulisci();
+      celle.forEach((td) => {
+        const tr = td.closest('tr[data-bidx]');
+        if (!tr) return;
+        _briefCelleSel().add(tr.dataset.bidx + '|' + td.dataset.campo);
+        td.classList.add('brief-cella-sel');
+      });
+    },
+    spostaRiga: (daTr, aTr) => briefMuoviRigaA(parseInt(daTr.dataset.bidx), parseInt(aTr.dataset.bidx)),
+    stessaColonna: (a, b) => parte(a)[2] === parte(b)[2],
+    scambiaCelle: (a, b) => briefScambiaCelle(parseInt(parte(a)[1]), parseInt(parte(b)[1]), parte(a)[2]),
+  });
+  GrigliaExcel.ripristina('brief');
+  if (typeof _pauseGrigliaCollega === 'function') _pauseGrigliaCollega();
 }
 async function briefMuoviRiga(i, delta) {
   if (!_briefState || !puoGestireBriefing()) return;

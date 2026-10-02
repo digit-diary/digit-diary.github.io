@@ -2102,18 +2102,23 @@ function _peGeneraVenSab(sh, ctx, dataStr) {
     }
   }
 
-  if (nCassaSec && numC8Eff >= 3) {
-    _peScrHeader(sh, startR2, 4, lblSec, nCassaSec, '20.50 - 05.00', _PE_CLR.azzurro);
-    r = startR2 + 2;
+  // SECONDA CASSA (con almeno 3 cassieri): pause NORMALI (una pausa alle 02.15) o
+  // ALTERNATIVE (23.30, 01.30, 02.45). Si sceglie quando si generano le pause
+  // (window._peCassaVenSab: 'normale' | 'alternativa'); senza scelta si scrivono
+  // tutte e due, come prima, e si cancella quella che non serve.
+  const scriviCassaNormale = (start, lbl) => {
+    _peScrHeader(sh, start, 4, lbl, nCassaSec, '20.50 - 05.00', _PE_CLR.azzurro);
+    r = start + 2;
     r = _peSPPC(sh, ctx, r, 4, 'C5', '01.45 - 02.00', nCassaSec);
     r = _peSPPC(sh, ctx, r, 4, 'C15', '02.00 - 02.15', nCassaSec);
     r = _peSS(sh, r, 4, 'PAUSA', '02.15 - 02.30');
     r = _peSN(sh, ctx, r, 4, 'C8', '02.30 - 02.45', nCassaSec, nCassaSec);
     r = _peSN(sh, ctx, r, 4, 'C8', '02.45 - 03.00', nCassaSec, nCassaSec);
     r = _peSS(sh, r, 4, 'CASSA', '03.00 - 05.00');
-    const startAlt = _peMaxR(sh) + 3;
-    _peScrHeader(sh, startAlt, 4, lblSec + ' (ALT.)', nCassaSec, '20.50 - 05.00', _PE_CLR.azzurro);
-    r = startAlt + 2;
+  };
+  const scriviCassaAlternativa = (start, lbl) => {
+    _peScrHeader(sh, start, 4, lbl, nCassaSec, '20.50 - 05.00', _PE_CLR.azzurro);
+    r = start + 2;
     r = _peSPPC(sh, ctx, r, 4, 'C5', '21.00 - 21.30', nCassaSec);
     r = _peSPPC(sh, ctx, r, 4, 'C15', '21.30 - 22.00', nCassaSec);
     r = _peSPPC(sh, ctx, r, 4, 'C20', '22.00 - 22.30', nCassaSec);
@@ -2133,6 +2138,14 @@ function _peGeneraVenSab(sh, ctx, dataStr) {
     r = _peSN(sh, ctx, r, 4, 'C8', '02.30 - 02.45', nCassaSec, nCassaSec);
     r = _peSS(sh, r, 4, 'PAUSA', '02.45 - 03.00');
     r = _peSS(sh, r, 4, 'CASSA', '03.00 - 05.00');
+  };
+  if (nCassaSec && numC8Eff >= 3) {
+    const scelta = window._peCassaVenSab;
+    if (scelta === 'alternativa') scriviCassaAlternativa(startR2, lblSec);
+    else {
+      scriviCassaNormale(startR2, lblSec);
+      if (scelta !== 'normale') scriviCassaAlternativa(_peMaxR(sh) + 3, lblSec + ' (ALT.)');
+    }
   }
 
   if (numR8 === 1 && nR8) {
@@ -3414,17 +3427,63 @@ async function briefGeneraPause() {
   // JG senza orario: il programma chiede se oggi e in sala e con che orario
   const jg = _pianoReparto() === 'slots' ? await _peChiediOrariJG(righe) : { jg: {} };
   if (!jg) return;
+  // VENERDI e SABATO con due casse (almeno 3 cassieri): pause della seconda cassa
+  // normali o alternative. Si scrive solo quella scelta (prima uscivano tutte e due)
+  let sceltaCassa = null;
+  const dowG = new Date(_briefData + 'T12:00:00').getDay();
+  if (_pianoReparto() === 'slots' && (dowG === 5 || dowG === 6)) {
+    const t = (x) =>
+      String(x.turno || '')
+        .trim()
+        .toUpperCase();
+    const nC8 = righe.filter((x) => t(x) === 'C8').length;
+    const eff = righe.some((x) => t(x) === 'C20') ? nC8 : nC8 - 1;
+    if (eff >= 3) {
+      let pred = 'normale';
+      try {
+        pred = localStorage.getItem('pause_cassa_vensab') || 'normale';
+      } catch (e) {}
+      const sc = await chiediModulo(
+        'Venerdi e sabato con due casse: che pause per la seconda cassa?',
+        [
+          {
+            titolo: 'Seconda cassa',
+            campi: [
+              {
+                id: 'cassa',
+                tipo: 'scelta',
+                valore: pred,
+                opzioni: [
+                  { valore: 'normale', etichetta: 'Normale (pausa alle 02.15)' },
+                  { valore: 'alternativa', etichetta: 'Alternativa (pause alle 23.30, 01.30 e 02.45)' },
+                ],
+              },
+            ],
+          },
+        ],
+        { titolo: 'Pause della cassa', ok: 'Genera' },
+      );
+      if (!sc) return;
+      sceltaCassa = sc.cassa === 'alternativa' ? 'alternativa' : 'normale';
+      try {
+        localStorage.setItem('pause_cassa_vensab', sceltaCassa);
+      } catch (e) {}
+    }
+  }
   _briefRicorda();
   window._briefPauseAvviso = null;
   // slots = pattern manuali (dal tuo Excel); valet e ogni altro settore =
   // motore algoritmico (durate per fascia, gap, una-alla-volta)
   window._peJg = jg.jg;
+  window._peCassaVenSab = sceltaCassa;
   let contenuto;
   try {
     contenuto = _pianoReparto() === 'slots' ? _peGeneraSlots(righe, _briefData) : _peGeneraValet(righe, _briefData);
   } finally {
     window._peJg = null;
+    window._peCassaVenSab = null;
   }
+  if (contenuto && sceltaCassa) contenuto.cassaVenSab = sceltaCassa;
   if (contenuto && Object.keys(jg.jg).length) contenuto.jg = jg.jg;
   if (!contenuto) {
     toast('Nessun turno riconosciuto per generare le pause');
@@ -3473,6 +3532,7 @@ function _briefSalvaPauseDebounce() {
 function _briefRefreshPause() {
   const el = document.getElementById('brief-pause-body');
   if (el && typeof _briefPauseBodyHtml === 'function') el.innerHTML = _briefPauseBodyHtml();
+  _pauseGrigliaCollega(); // tastiera e trascinamento come Excel, cella attiva ritrovata
 }
 function briefPausaInsRiga(base, r) {
   if (!puoGestireBriefing() || !_briefState || !_briefState.pause) return;
@@ -3519,6 +3579,25 @@ function _pbIntervallo(v) {
   let finA = fin < _peInizio() ? fin + 1440 : fin;
   if (finA <= iniA) finA += 1440;
   return { ini: iniA, fin: finA };
+}
+// RIPARA LE INTESTAZIONI dei fogli toccati prima della v351: correggendo a mano la
+// sigla di un intestazione (es. "CD 02 (ALT.)" in "CD 02") la cella perdeva il segno
+// di intestazione e il colore; la colonna si univa a quella sopra nei controlli.
+// Riconosce la riga perche il nome accanto e ancora marcato. Ritorna quante ne ripara.
+function _pbSanaIntestazioni(c) {
+  if (!c || c.tipo !== 'slots' || !c.celle) return 0;
+  let n = 0;
+  for (let r = 1; r <= (c.nR || 0) + 1; r++)
+    [1, 4, 7].forEach((base) => {
+      const a = c.celle[r + '|' + base];
+      const b = c.celle[r + '|' + (base + 1)];
+      if (!a || a.hdr || a.span || !b || !b.hdr || b.ora) return;
+      a.hdr = 1;
+      a.b = 1;
+      if (!a.bg) a.bg = b.bg || (/^C/i.test(String(a.v || '')) ? _PE_CLR.azzurro : '');
+      n++;
+    });
+  return n;
 }
 function _pbBlocchi(c) {
   // stessa lettura del modulo dei controlli (con chi e la riga, proposte, colonnine personali)
@@ -3898,6 +3977,103 @@ function _pbSpostaQuarto(c, base, r, dir) {
   _pbScriviRighe(c, blk, uniti);
   return 'fatto';
 }
+// TRASCINAMENTO della riga: gli stessi scambi delle vecchie frecce, uno dopo
+// l altro fino alla riga di arrivo; se uno non si puo fare torna tutto com era
+function briefPausaSpostaA(base, rDa, rA) {
+  if (!puoGestireBriefing() || !_briefState || !_briefState.pause || rDa === rA) return;
+  const c = _briefState.pause.contenuto;
+  _pbLegami(c);
+  const copia = JSON.stringify({ celle: c.celle, nR: c.nR });
+  _briefRicorda();
+  const prima = _pbBlocchi(c);
+  const dir = rA > rDa ? 1 : -1;
+  const datiRiga = (rr) => {
+    const a = c.celle[rr + '|' + base];
+    const b = c.celle[rr + '|' + (base + 1)];
+    return !!(a && b && !a.hdr && !a.span && !b.hdr && _pbIntervallo(b.v));
+  };
+  let cur = rDa;
+  let passi = 0;
+  while (cur !== rA && passi < 120) {
+    let r2 = cur + dir;
+    while (r2 >= 4 && r2 <= c.nR + 1 && !datiRiga(r2) && !c.celle[r2 + '|' + base] && !c.celle[r2 + '|' + (base + 1)])
+      r2 += dir;
+    if (!datiRiga(r2) || !_pbScambia(c, base, cur, dir)) {
+      const o = JSON.parse(copia);
+      c.celle = o.celle;
+      c.nR = o.nR;
+      _briefDimentica();
+      toast('Qui la riga non si puo spostare: tra le due posizioni c e una riga che non si scambia');
+      _briefRefreshPause();
+      return;
+    }
+    cur = r2;
+    passi++;
+    if (dir > 0 ? cur > rA : cur < rA) break;
+  }
+  const msg = _pbSincronizza(c, prima, base);
+  window._briefPauseAvviso = msg.length ? msg.join(' · ') : null;
+  if (msg.length) toast(msg.join(' · '), 5000);
+  _briefSalvaPauseDebounce();
+  _briefRefreshPause();
+}
+// TRASCINAMENTO di una cella sola: due postazioni della stessa colonna si scambiano,
+// gli orari restano dove sono (colore e "per chi e" seguono la postazione)
+function briefPausaScambiaPost(base, r1, r2) {
+  if (!puoGestireBriefing() || !_briefState || !_briefState.pause || r1 === r2) return;
+  const c = _briefState.pause.contenuto;
+  const a1 = c.celle[r1 + '|' + base];
+  const a2 = c.celle[r2 + '|' + base];
+  if (!a1 || !a2 || a1.hdr || a2.hdr || a1.span || a2.span) return;
+  _pbLegami(c);
+  _briefRicorda();
+  const prima = _pbBlocchi(c);
+  ['v', 'per', 'prop'].forEach((k) => {
+    const t = a1[k];
+    if (a2[k] != null) a1[k] = a2[k];
+    else delete a1[k];
+    if (t != null) a2[k] = t;
+    else delete a2[k];
+  });
+  [
+    [r1, a1],
+    [r2, a2],
+  ].forEach(([rr, a]) => {
+    const clr = _peColoreSettore(a.v);
+    a.bg = clr;
+    delete a.fg;
+    const b = c.celle[rr + '|' + (base + 1)];
+    if (b && !b.span) {
+      b.bg = clr;
+      delete b.fg;
+    }
+  });
+  const msg = _pbSincronizza(c, prima, base);
+  window._briefPauseAvviso = msg.length ? msg.join(' · ') : null;
+  _briefSalvaPauseDebounce();
+  _briefRefreshPause();
+}
+function _pauseGrigliaCollega() {
+  if (typeof GrigliaExcel === 'undefined') return;
+  document.querySelectorAll('#brief-pause-body table.pb-tabella').forEach((tab) => {
+    const base = parseInt(tab.dataset.base);
+    // pause valet: solo tastiera (nessuno spostamento di righe)
+    if (!base) return GrigliaExcel.collega(tab, { id: 'pause' });
+    const parte = (td) => String(td.dataset.ge || '').split('|');
+    GrigliaExcel.collega(tab, {
+      id: 'pause',
+      scrivi: (lista) =>
+        briefPausaScriviCelle(
+          lista.map(({ td, val }) => ({ r: parseInt(parte(td)[1]), c: parseInt(parte(td)[2]), val: val })),
+        ),
+      spostaRiga: (daTr, aTr) => briefPausaSpostaA(base, parseInt(daTr.dataset.pr), parseInt(aTr.dataset.pr)),
+      // una cella sola: solo le postazioni (gli orari seguono la sequenza)
+      stessaColonna: (a, b) => parte(a)[2] === parte(b)[2] && parseInt(parte(a)[2]) === base,
+      scambiaCelle: (a, b) => briefPausaScambiaPost(base, parseInt(parte(a)[1]), parseInt(parte(b)[1])),
+    });
+  });
+  GrigliaExcel.ripristina('pause');
+}
 function briefPausaSposta(base, r, dir) {
   if (!puoGestireBriefing() || !_briefState || !_briefState.pause) return;
   const c = _briefState.pause.contenuto;
@@ -3991,15 +4167,35 @@ function briefPausaCellaSlots(r, c, val) {
   _pbLegami(_briefState.pause.contenuto);
   _briefRicorda();
   window._briefPauseAvviso = null;
+  _pbScriviCella(r, c, val);
+  _briefSalvaPauseDebounce();
+  _briefRefreshPause(); // avvisi pausa/cambio aggiornati
+}
+// incolla / svuota piu celle del foglio pause: un passo di Annulla, un ridisegno
+function briefPausaScriviCelle(lista) {
+  if (!puoGestireBriefing() || !_briefState || !_briefState.pause || !lista.length) return;
+  _pbLegami(_briefState.pause.contenuto);
+  _briefRicorda();
+  window._briefPauseAvviso = null;
+  lista.forEach((x) => _pbScriviCella(x.r, x.c, x.val));
+  _briefSalvaPauseDebounce();
+  _briefRefreshPause();
+}
+function _pbScriviCella(r, c, val) {
   const g = _briefState.pause.contenuto.celle;
   const k = r + '|' + c;
   if (!val.trim()) {
-    delete g[k];
+    // un intestazione svuotata resta intestazione (altrimenti la colonna si unisce a quella sopra)
+    if (g[k] && g[k].hdr) g[k] = Object.assign({}, g[k], { v: '' });
+    else delete g[k];
   } else {
     const prev = g[k] || {};
     const isPos = c % 3 === 1; // colonne 1/4/7 = postazione
-    const nuovo = { v: val.trim(), b: prev.b, sz: prev.sz, span: prev.span, center: prev.center };
-    if (isPos && !prev.span) {
+    // si cambia solo il testo: le altre proprieta restano (intestazione di colonna,
+    // colonna facoltativa, persona, formato). Prima si perdevano e una colonna con
+    // l intestazione corretta a mano si univa a quella sopra nei controlli
+    const nuovo = Object.assign({}, prev, { v: val.trim() });
+    if (isPos && !prev.span && !prev.hdr) {
       const clr = _peColoreSettore(val.trim());
       nuovo.bg = clr;
       // aggiorna anche la cella orario affiancata
@@ -4010,18 +4206,14 @@ function briefPausaCellaSlots(r, c, val) {
         delete ora.prop;
         ora.v = String(ora.v).replace(/\s*\[!\]\s*$/, '');
       }
-    } else {
-      nuovo.bg = prev.bg;
-      nuovo.fg = prev.fg;
+    } else if (!isPos) {
       // orario scritto a mano: la riga non e piu una proposta; resta per chi e
       const pos = g[r + '|' + (c - 1)];
       if (pos) delete pos.prop;
-      if (prev.per) nuovo.per = prev.per;
+      delete nuovo.prop;
     }
     g[k] = nuovo;
   }
-  _briefSalvaPauseDebounce();
-  _briefRefreshPause(); // avvisi pausa/cambio aggiornati
 }
 // modifica pause valet (riga i, pausa k o campo)
 function briefPausaCellaValet(i, campo, val) {
@@ -4120,7 +4312,9 @@ function _briefRenderPauseSlots(c) {
       ? righeTutte.filter((x, k) => !(k <= 1 && ((x.a && x.a.hdr) || (x.b && (x.b.hdr || x.b.ora)))))
       : righeTutte;
     let t =
-      '<table style="border-collapse:collapse;font-size:var(--fs-sm,.8125rem);table-layout:fixed"><colgroup><col style="width:46px"><col style="width:88px"></colgroup>';
+      '<table class="pb-tabella" data-base="' +
+      base +
+      '" style="border-collapse:collapse;font-size:var(--fs-sm,.8125rem);table-layout:fixed"><colgroup><col style="width:46px"><col style="width:88px"></colgroup>';
     righe.forEach((riga, idx) => {
       const isHdr = (riga.a && riga.a.hdr) || (riga.b && riga.b.hdr);
       if (isHdr && idx > 0) t += '<tr><td colspan="2" style="border:none;height:12px"></td></tr>';
@@ -4143,7 +4337,7 @@ function _briefRenderPauseSlots(c) {
           '</td></tr>';
         return;
       }
-      t += '<tr>';
+      t += '<tr data-pr="' + riga.r + '">';
       [
         [riga.a, base],
         [riga.b, base + 1],
@@ -4166,7 +4360,11 @@ function _briefRenderPauseSlots(c) {
           ';padding:0';
         if (puo) {
           t +=
-            '<td style="' +
+            '<td data-ge="p|' +
+            riga.r +
+            '|' +
+            col +
+            '" style="' +
             stile +
             '"><input value="' +
             escP(cell.v) +
@@ -4203,23 +4401,15 @@ function _briefRenderPauseSlots(c) {
           riga.r +
           ')">×</span></td>';
       else if (puo)
+        // maniglia: si trascina la riga (al posto delle frecce su/giu)
         t +=
+          '<td data-ge-maniglia="1" class="pb-maniglia" title="Trascina per spostare la riga (orari ricalcolati)">&#8942;&#8942;</td>' +
           '<td style="border:none;padding:0 3px;white-space:nowrap">' +
           '<span style="cursor:pointer;color:var(--c-verde,#2c6e49);font-weight:bold" title="Inserisci riga sotto" onclick="briefPausaInsRiga(' +
           base +
           ',' +
           riga.r +
           ')">+</span> ' +
-          '<span style="cursor:pointer;color:var(--muted)" title="Scambia con la riga sopra (orari ricalcolati)" onclick="briefPausaSposta(' +
-          base +
-          ',' +
-          riga.r +
-          ',-1)">▲</span> ' +
-          '<span style="cursor:pointer;color:var(--muted)" title="Scambia con la riga sotto (orari ricalcolati)" onclick="briefPausaSposta(' +
-          base +
-          ',' +
-          riga.r +
-          ',1)">▼</span> ' +
           '<span style="cursor:pointer;color:var(--c-rosso,#c0392b);font-weight:bold" title="Elimina riga" onclick="briefPausaDelRiga(' +
           base +
           ',' +
@@ -4357,7 +4547,7 @@ function _briefRenderCronoValet(c) {
 function _briefRenderPauseValet(c) {
   const puo = puoGestireBriefing();
   let h =
-    '<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:var(--fs-sm,.8125rem)"><tr><td colspan="6" style="border:1px solid #999;background:#FFFF00;font-weight:bold;text-align:center;padding:4px">PAUSE VALET · ' +
+    '<div style="overflow-x:auto"><table class="pb-tabella" data-base="0" style="border-collapse:collapse;font-size:var(--fs-sm,.8125rem)"><tr><td colspan="6" style="border:1px solid #999;background:#FFFF00;font-weight:bold;text-align:center;padding:4px">PAUSE VALET · ' +
     escP(c.tipoGiorno || '') +
     '</td></tr><tr>' +
     ['TURNO', 'NOME', 'ORARIO', 'PAUSA 1', 'PAUSA 2', 'PAUSA 3']
@@ -4373,7 +4563,11 @@ function _briefRenderPauseValet(c) {
     h += '<tr>';
     const cInp = (campo, val, larg, extra) =>
       puo
-        ? '<td style="border:1px solid #999;padding:0"><input value="' +
+        ? '<td data-ge="v|' +
+          i +
+          '|' +
+          campo +
+          '" style="border:1px solid #999;padding:0"><input value="' +
           escP(val || '') +
           '" onchange="briefPausaCellaValet(' +
           i +

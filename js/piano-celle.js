@@ -256,6 +256,17 @@ function mostraPianoCtx(e, nome, dstr) {
       ? '<div class="piano-ctx-item" onclick="' + azione + '"><i class="icx ' + icona + '"></i> ' + label + '</div>'
       : '';
   h += voce('Modifica turno', 'icx-modifica', "pianoCtxAzione('modifica')", puoMod);
+  // codici con orario (JG): orario di inizio e fine, anche per quelli arrivati dall Excel
+  const csCtx = r && r.codice ? _pianoCodiceInfo(r.codice) : null;
+  if (csCtx && csCtx.richiede_orario)
+    h += voce(
+      r.ora_inizio
+        ? 'Orario ' + r.codice + ' (' + r.ora_inizio + '-' + (r.ora_fine || '?') + ')'
+        : 'Aggiungi orario ' + r.codice,
+      'icx-modifica',
+      "pianoCtxAzione('orario')",
+      puoMod,
+    );
   if (r && (r.commento || '').trim()) {
     h += voce('Modifica commento', 'icx-penna', "pianoCtxAzione('nota')", puoMod);
     h += voce('Elimina commento', 'icx-cestino', "pianoCtxAzione('commentoElimina')", puoMod);
@@ -467,7 +478,8 @@ async function pianoCtxAzione(azione) {
     const cel = tr ? tr.querySelector('td[data-g="' + parseInt(sel.data.split('-')[2]) + '"]') : null;
     if (cel) pianoCellaInline(sel.nome, sel.data, cel);
     else pianoCellaPrompt(sel.nome, sel.data);
-  } else if (azione === 'nota') _pianoNotaRapida(sel.nome, sel.data);
+  } else if (azione === 'orario') pianoOrarioJG(sel.nome, sel.data);
+  else if (azione === 'nota') _pianoNotaRapida(sel.nome, sel.data);
   else if (azione === 'commentoElimina') {
     (async () => {
       const r = _pianoRighe.find((x) => x.collaboratore === sel.nome && x.data === sel.data);
@@ -1059,17 +1071,122 @@ async function pianoCellaPrompt(nome, dstr) {
   if (v === null) return;
   await pianoSalvaCella(nome, dstr, v.trim().toUpperCase());
 }
-// Modifica INLINE: click sulla cella = si scrive direttamente lì (niente finestra)
-function pianoCellaInline(nome, dstr, el) {
-  if (window.event && window.event.shiftKey) {
+// ORARIO DI UN JG (o di un altro codice con orario): dal piano importato dall Excel
+// il JG arriva senza orario, con la nota della cella ("CORSO CONCIERGE DALLE 14:30
+// ALLE 21:30", "INIZIO 9:45 C4"). Qui si aggiunge o corregge l orario; la sigla e
+// la nota restano come sono. La nota si usa per proporre l orario.
+function _pianoOrarioDaNota(testo) {
+  const t = String(testo || '').replace(/(\d)\.(\d{2})/g, '$1:$2');
+  // ora con o senza minuti ("12" = 12:00), parole intere ("alle" non dentro "dalle")
+  const ora = '(\\d{1,2}(?::\\d{2})?)';
+  const piena = (x) => {
+    if (!x) return '';
+    const [h, m] = x.split(':');
+    const hh = parseInt(h);
+    return hh >= 0 && hh <= 24 ? String(hh).padStart(2, '0') + ':' + (m || '00') : '';
+  };
+  const due =
+    t.match(new RegExp('\\bdalle\\s+(?:ore\\s+)?' + ora + '\\s+alle\\s+(?:ore\\s+)?' + ora + '\\b', 'i')) ||
+    t.match(/(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})/);
+  if (due) {
+    const a = piena(due[1]);
+    const b = piena(due[2]);
+    if (a && b && a !== b) return { ini: a, fin: b };
+  }
+  const ini = t.match(new RegExp('\\b(?:inizio|dalle)\\s+(?:ore\\s+)?' + ora + '\\b', 'i'));
+  const fin = t.match(new RegExp('\\b(?:fine|alle|fino alle)\\s+(?:ore\\s+)?' + ora + '\\b', 'i'));
+  const a = ini ? piena(ini[1]) : '';
+  const b = fin ? piena(fin[1]) : '';
+  return { ini: a, fin: b && b !== a ? b : '' };
+}
+async function pianoOrarioJG(nome, dstr) {
+  if (!puoGestirePiano()) return;
+  const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
+  if (!r) return;
+  if (!(await _pianoConsentiScrittura(dstr))) return;
+  const dalla = _pianoOrarioDaNota(r.commento);
+  const v = await chiediModulo(
+    'Orario del ' +
+      r.codice +
+      ' di ' +
+      nome +
+      ' il ' +
+      dstr.split('-').reverse().join('.') +
+      (r.commento ? '\n\nNota: ' + r.commento : ''),
+    [
+      {
+        titolo: 'Orario',
+        nota: !r.ora_inizio && (dalla.ini || dalla.fin) ? 'Proposto dalla nota della cella' : '',
+        campi: [
+          {
+            id: 'ini',
+            etichetta: 'Inizio',
+            valore: r.ora_inizio || dalla.ini || '',
+            segnaposto: '10:00',
+            larghezza: 70,
+          },
+          { id: 'fin', etichetta: 'Fine', valore: r.ora_fine || dalla.fin || '', segnaposto: '18:00', larghezza: 70 },
+        ],
+      },
+    ],
+    { titolo: 'Orario ' + r.codice, ok: 'Salva' },
+  );
+  if (!v) return;
+  const norma = (x) =>
+    String(x || '')
+      .trim()
+      .replace('.', ':');
+  const ini = norma(v.ini);
+  const fin = norma(v.fin);
+  const ok = (x) => /^\d{1,2}:\d{2}$/.test(x);
+  if ((ini || fin) && (!ok(ini) || !ok(fin))) {
+    toast('Orario non valido: inizio e fine nel formato hh:mm (es. 09:45)');
+    return;
+  }
+  try {
+    await secPatch('piano', 'id=eq.' + r.id, {
+      ora_inizio: ini || null,
+      ora_fine: fin || null,
+      operatore: getOperatore(),
+      updated_at: new Date().toISOString(),
+    });
+    r.ora_inizio = ini || null;
+    r.ora_fine = fin || null;
+    logAzione('Piano: orario ' + r.codice, nome + ' ' + dstr + ' · ' + (ini ? ini + '-' + fin : 'tolto'));
+    toast(ini ? 'Orario salvato: ' + ini + ' - ' + fin : 'Orario tolto');
+    renderPiano();
+  } catch (e) {
+    toastErrore('Orario non salvato: ' + (e.message || ''));
+  }
+}
+// Modifica INLINE (doppio clic, Invio/F2 o una sigla scritta sulla cella selezionata).
+// opz.iniziale: il tasto premuto, che sostituisce la sigla (come Excel). In quel caso
+// anche le frecce destra/sinistra confermano e spostano; con doppio clic o F2
+// destra/sinistra muovono il cursore nel testo. Su/giu, Invio e Tab confermano sempre
+// e passano alla cella vicina.
+function pianoCellaInline(nome, dstr, el, opz) {
+  opz = opz || {};
+  if (window.event && window.event.shiftKey && window.event.type === 'dblclick') {
     pianoBloccoClick('piano', el);
     return;
   }
   if (!puoGestirePiano() || !el || el.querySelector('input')) return;
-  _pianoBloccoPulisci();
-  // la cella cliccata resta SELEZIONATA (come la cella attiva di Excel):
-  // cosi' "clicco la cella e poi scelgo il colore" funziona al primo colpo
-  window._pianoBlocco = { tab: 'piano', t1: el, t2: el, completo: true };
+  // JG senza orario (arrivato dall Excel): doppio clic o Invio = orario, la sigla resta.
+  // Scrivendo una sigla invece si cambia il turno come sempre.
+  if (!opz.iniziale) {
+    const rJ = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
+    const csJ = rJ && rJ.codice ? _pianoCodiceInfo(rJ.codice) : null;
+    if (csJ && csJ.richiede_orario && !rJ.ora_inizio) {
+      if (typeof _pianoSelezionaCella === 'function') _pianoSelezionaCella(el);
+      pianoOrarioJG(nome, dstr);
+      return;
+    }
+  }
+  if (typeof _pianoSelezionaCella === 'function') _pianoSelezionaCella(el);
+  else {
+    _pianoBloccoPulisci();
+    window._pianoBlocco = { tab: 'piano', t1: el, t2: el, completo: true };
+  }
   const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
   const attuale = r ? r.codice : '';
   const vecchio = el.innerHTML;
@@ -1079,14 +1196,31 @@ function pianoCellaInline(nome, dstr, el) {
     '" size="1" maxlength="6" style="width:100%;min-width:0;box-sizing:border-box;border:1px solid #1a4a7a;border-radius:0;padding:0;margin:0;font:inherit;font-weight:700;text-transform:uppercase;text-align:center;background:transparent;color:inherit">';
   const inp = el.querySelector('input');
   inp.focus();
-  inp.select();
+  if (opz.iniziale) {
+    inp.value = opz.iniziale;
+    inp.setSelectionRange(inp.value.length, inp.value.length);
+  } else inp.select();
+  const digitato = !!opz.iniziale;
   let chiuso = false;
+  let dopo = null; // cella su cui spostarsi dopo la conferma
   const conferma = async () => {
     if (chiuso) return;
     chiuso = true;
     const v = inp.value.trim().toUpperCase();
+    // la cella attiva passa subito alla destinazione: dopo il salvataggio il
+    // ridisegno la ritrova (persona + giorno)
+    if (dopo) {
+      const trD = dopo.closest('tr[data-nome]');
+      window._pianoCellaAttiva = {
+        nome: trD ? trD.dataset.nome : '',
+        g: dopo.dataset.g,
+        ym: _pianoMeseSel,
+        rep: _pianoReparto(),
+      };
+    }
     if (v === attuale) {
       el.innerHTML = vecchio;
+      if (dopo && typeof _pianoVaiACella === 'function') _pianoVaiACella(dopo);
       return;
     }
     const ok = await pianoSalvaCella(nome, dstr, v);
@@ -1099,14 +1233,24 @@ function pianoCellaInline(nome, dstr, el) {
       setTimeout(() => el.classList.remove('piano-cella-rifiutata'), 1700);
     }
   };
+  const vicina = (dx, dy) => (typeof _pianoCellaVicina === 'function' ? _pianoCellaVicina(el, dx, dy) : null);
   inp.addEventListener('keydown', (e) => {
     e.stopPropagation();
-    if (e.key === 'Enter') {
+    let mossa = null;
+    if (e.key === 'Enter') mossa = [0, e.shiftKey ? -1 : 1];
+    else if (e.key === 'Tab') mossa = [e.shiftKey ? -1 : 1, 0];
+    else if (e.key === 'ArrowDown') mossa = [0, 1];
+    else if (e.key === 'ArrowUp') mossa = [0, -1];
+    else if (digitato && e.key === 'ArrowRight') mossa = [1, 0];
+    else if (digitato && e.key === 'ArrowLeft') mossa = [-1, 0];
+    if (mossa) {
       e.preventDefault();
+      dopo = vicina(mossa[0], mossa[1]) || el;
       conferma();
     } else if (e.key === 'Escape') {
       chiuso = true;
       el.innerHTML = vecchio;
+      if (typeof _pianoSelezionaCella === 'function') _pianoSelezionaCella(el);
     }
   });
   inp.addEventListener('click', (e) => e.stopPropagation());

@@ -88,7 +88,9 @@
       for (let r = 4; r <= (c.nR || 0) + 1; r++) {
         const a = c.celle[r + '|' + base];
         const b = c.celle[r + '|' + (base + 1)];
-        if (a && a.hdr) {
+        // intestazione: sigla marcata, oppure nome marcato con la sigla accanto
+        // (fogli in cui la sigla era stata corretta a mano e aveva perso il segno)
+        if ((a && a.hdr) || (a && !a.span && b && b.hdr && !b.ora)) {
           blk = {
             base: base,
             r: r,

@@ -753,16 +753,124 @@ async function pianoApplicaFormato(f) {
     toast('Errore salvataggio formato');
   }
 }
-// Click SINGOLO sulla cella della griglia: la MARCA soltanto (come Excel);
-// la modifica manuale parte col DOPPIO click
+// Click SINGOLO sulla cella della griglia: la SELEZIONA soltanto (come Excel);
+// la modifica parte col DOPPIO click, con Invio/F2 o scrivendo una sigla.
+// Le frecce spostano la cella attiva (vedi _pianoTastiCalendario).
 function pianoCellaClick(nome, dstr, el) {
   if (window.event && window.event.shiftKey) {
     pianoBloccoClick('piano', el);
     return;
   }
-  _pianoBloccoPulisci();
-  window._pianoBlocco = { tab: 'piano', t1: el, t2: el, completo: true };
+  if (el && el.querySelector('input')) return; // gia in modifica
+  _pianoSelezionaCella(el);
+}
+// cella attiva: si ricorda per persona e giorno, cosi sopravvive al ridisegno
+function _pianoSelezionaCella(el, estendi) {
+  if (!el) return;
+  const tr = el.closest('tr[data-nome]');
+  if (estendi && window._pianoBlocco && window._pianoBlocco.tab === 'piano') {
+    window._pianoBlocco.t2 = el;
+  } else {
+    _pianoBloccoPulisci();
+    window._pianoBlocco = { tab: 'piano', t1: el, t2: el, completo: true };
+  }
+  window._pianoCellaAttiva = {
+    nome: tr ? tr.dataset.nome : '',
+    g: el.dataset.g,
+    ym: _pianoMeseSel,
+    rep: _pianoReparto(),
+  };
+  window._pianoCellaAttivaEl = el;
   _pianoBloccoEvidenzia();
+  // niente focus rimasto in un campo: i tasti vanno alla griglia
+  const att = document.activeElement;
+  if (att && att !== document.body && att.closest && att.closest('#piano-content') && att.tagName === 'INPUT')
+    att.blur();
+}
+function _pianoCellaDi(nome, g) {
+  const tr = document.querySelector(
+    '#piano-content table[data-seltab="piano"] tr[data-nome="' + CSS.escape(nome) + '"]',
+  );
+  return tr ? tr.querySelector('td.piano-cella[data-g="' + g + '"]') : null;
+}
+function _pianoRipristinaCellaAttiva() {
+  const a = window._pianoCellaAttiva;
+  if (!a || _pianoTab !== 'calendario' || a.ym !== _pianoMeseSel || a.rep !== _pianoReparto()) return;
+  const el = _pianoCellaDi(a.nome, a.g);
+  if (!el) return;
+  window._pianoBlocco = { tab: 'piano', t1: el, t2: el, completo: true };
+  window._pianoCellaAttivaEl = el;
+  _pianoBloccoEvidenzia();
+}
+// cella vicina: dx = colonne (giorni), dy = righe (collaboratori)
+function _pianoCellaVicina(el, dx, dy) {
+  if (!el) return null;
+  const tr = el.closest('tr[data-nome]');
+  if (!tr) return null;
+  if (dx) {
+    let td = el;
+    do td = dx > 0 ? td.nextElementSibling : td.previousElementSibling;
+    while (td && !(td.classList.contains('piano-cella') && td.dataset.g));
+    return td;
+  }
+  let riga = tr;
+  do riga = dy > 0 ? riga.nextElementSibling : riga.previousElementSibling;
+  while (riga && !(riga.dataset && riga.dataset.nome && riga.offsetParent !== null));
+  return riga ? riga.querySelector('td.piano-cella[data-g="' + el.dataset.g + '"]') : null;
+}
+function _pianoVaiACella(el, estendi) {
+  if (!el) return;
+  _pianoSelezionaCella(el, estendi);
+  el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+// TASTIERA DEL CALENDARIO (come Excel), con una cella selezionata e nessun campo aperto:
+// frecce = sposta (Maiusc = allarga la selezione), Tab = destra/sinistra,
+// Invio o F2 = modifica, una lettera o un numero = modifica partendo da quel tasto
+function _pianoTastiCalendario(e) {
+  if (_pianoTab !== 'calendario' || typeof switchPage === 'undefined') return false;
+  const b = window._pianoBlocco;
+  if (!b || b.tab !== 'piano' || !b.t1 || !document.body.contains(b.t1)) return false;
+  if (e.target && e.target.closest && e.target.closest('input,textarea,select,[contenteditable="true"]')) return false;
+  if (document.querySelector('.finestra-velo:not([hidden]), #pwd-modal:not(.hidden), #profilo-modal:not(.hidden)'))
+    return false;
+  if (e.ctrlKey || e.metaKey || e.altKey) return false;
+  const attiva =
+    window._pianoCellaAttivaEl && document.body.contains(window._pianoCellaAttivaEl)
+      ? window._pianoCellaAttivaEl
+      : b.t1;
+  const mosse = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowDown: [0, 1], ArrowUp: [0, -1] };
+  if (mosse[e.key]) {
+    e.preventDefault();
+    const base = e.shiftKey ? b.t2 || attiva : attiva;
+    const dest = _pianoCellaVicina(base, mosse[e.key][0], mosse[e.key][1]);
+    if (!dest) return true;
+    if (e.shiftKey) {
+      window._pianoBlocco.t2 = dest;
+      _pianoBloccoEvidenzia();
+      dest.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    } else _pianoVaiACella(dest);
+    return true;
+  }
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    _pianoVaiACella(_pianoCellaVicina(attiva, e.shiftKey ? -1 : 1, 0));
+    return true;
+  }
+  const editabile = attiva.hasAttribute('ondblclick');
+  if (!editabile) return false;
+  const tr = attiva.closest('tr[data-nome]');
+  const dstr = _pianoMeseSel + '-' + String(attiva.dataset.g).padStart(2, '0');
+  if (e.key === 'Enter' || e.key === 'F2') {
+    e.preventDefault();
+    pianoCellaInline(tr.dataset.nome, dstr, attiva);
+    return true;
+  }
+  if (e.key.length === 1 && /[0-9A-Za-z]/.test(e.key)) {
+    e.preventDefault();
+    pianoCellaInline(tr.dataset.nome, dstr, attiva, { iniziale: e.key.toUpperCase() });
+    return true;
+  }
+  return false;
 }
 function fabbCellaClick(codice, dstr, el) {
   if (window.event && window.event.shiftKey) {
@@ -879,6 +987,7 @@ function _pianoDragBind() {
     setTimeout(_pianoStatSelezione, 60);
   });
   document.addEventListener('keydown', (e) => {
+    if (_pianoTastiCalendario(e)) return;
     if (e.key === 'Escape' && window._pianoBlocco) _pianoBloccoPulisci();
     // CANC/Backspace: cancella le celle selezionate (con conferma)
     if (
