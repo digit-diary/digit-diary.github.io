@@ -1069,13 +1069,17 @@ function _xlsCercaMappaGiorni(dati, nGiorni, daRiga, aRiga) {
   }
   return null;
 }
-// COLORI DATI A MANO nelle celle del file Excel (es. le X dei coordinatori in rosso):
-// sfondo e colore del testo letti dagli stili interni del file (xl/styles.xml, tema,
-// foglio). I colori che Excel mette con le regole automatiche (formattazione
-// condizionale) non sono nelle celle: per quelli valgono i colori dei turni del
-// programma. Ritorna (riga, colonna) -> '#SFONDO||#TESTO' oppure ''.
+// COLORI DEL FILE EXCEL, come li vede chi apre il file. Due fonti:
+// 1. i colori dati a mano alla cella (es. le X dei coordinatori in rosso);
+// 2. le REGOLE AUTOMATICHE di Excel (formattazione condizionale, es. "se la
+//    cella e V sfondo blu"): stanno sopra al colore a mano e sono quelle che
+//    si vedono. Il programma le calcola come Excel: per ogni cella le regole
+//    che la coprono, in ordine di priorita, la prima vera vince.
+// Ritorna (riga, colonna) -> { sfondo, testo, sfondoRegola, testoRegola, diretto }
+// (colori '#RRGGBB' o ''; diretto = '#SFONDO||#TESTO' dato a mano alla cella,
+// anche se una regola lo copre).
 function _xlsColoriFoglio(wb, nomeFoglio) {
-  const nessuno = () => '';
+  const nessuno = () => null;
   try {
     const files = wb && wb.files;
     if (!files) return nessuno;
@@ -1097,61 +1101,18 @@ function _xlsColoriFoglio(wb, nomeFoglio) {
     const foglio = testo('xl/' + percorso);
     const stili = testo('xl/styles.xml');
     if (!foglio || !stili) return nessuno;
-    // tema: lt1 dk1 lt2 dk2 accent1..6 (ordine degli indici di Excel)
-    const tema = testo('xl/theme/theme1.xml');
-    const temaCol = [];
-    ['lt1', 'dk1', 'lt2', 'dk2', 'accent1', 'accent2', 'accent3', 'accent4', 'accent5', 'accent6'].forEach((k) => {
-      const m = tema.match(
-        new RegExp('<a:' + k + '>[\\s\\S]*?(?:srgbClr val="([0-9A-Fa-f]{6})"|lastClr="([0-9A-Fa-f]{6})")'),
-      );
-      temaCol.push(m ? (m[1] || m[2]).toUpperCase() : null);
-    });
-    const PAL = {
-      2: 'FFFFFF',
-      3: 'FF0000',
-      4: '00FF00',
-      5: '0000FF',
-      6: 'FFFF00',
-      7: 'FF00FF',
-      8: '00FFFF',
-      10: 'FF0000',
-      13: 'FFFF00',
-      17: '008000',
-      53: 'FF6600',
-      52: 'FF9900',
-    };
-    const tinta = (hex, t) => {
-      if (!t) return hex;
-      const c = [0, 2, 4].map((i) => parseInt(hex.substr(i, 2), 16));
-      const n = c.map((x) => Math.round(t < 0 ? x * (1 + t) : x + (255 - x) * t));
-      return n
-        .map((x) => Math.max(0, Math.min(255, x)).toString(16).padStart(2, '0'))
-        .join('')
-        .toUpperCase();
-    };
-    const colore = (tag) => {
-      if (!tag) return '';
-      const a = (k) => {
-        const m = tag.match(new RegExp(k + '="([^"]+)"'));
-        return m ? m[1] : null;
-      };
-      let hex = null;
-      if (a('rgb')) hex = a('rgb').slice(-6).toUpperCase();
-      else if (a('theme') != null) hex = temaCol[parseInt(a('theme'))] || null;
-      else if (a('indexed') != null) hex = PAL[parseInt(a('indexed'))] || null;
-      if (!hex) return '';
-      return tinta(hex, parseFloat(a('tint')) || 0);
-    };
+    const ws = wb.Sheets && wb.Sheets[nomeFoglio];
+    const pal = _xlsTavolozza(testo('xl/theme/theme1.xml'));
     const blocco = (nome) => {
       const m = stili.match(new RegExp('<' + nome + '[^>]*>([\\s\\S]*?)</' + nome + '>'));
       return m ? m[1] : '';
     };
     const fills = (blocco('fills').match(/<fill>[\s\S]*?<\/fill>|<fill\/>/g) || []).map((f) => {
       if (!/patternType="solid"/.test(f)) return '';
-      return colore((f.match(/<fgColor[^>]*\/>/) || [])[0]);
+      return pal((f.match(/<fgColor[^>]*\/>/) || [])[0]);
     });
     const fonts = (blocco('fonts').match(/<font>[\s\S]*?<\/font>|<font\/>/g) || []).map((f) =>
-      colore((f.match(/<color[^>]*\/>/) || [])[0]),
+      pal((f.match(/<color[^>]*\/>/) || [])[0]),
     );
     const xfs = (blocco('cellXfs').match(/<xf [^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g) || []).map((x) => {
       const n = (k) => {
@@ -1160,25 +1121,328 @@ function _xlsColoriFoglio(wb, nomeFoglio) {
       };
       const bg = fills[n('fillId')] || '';
       const fg = fonts[n('fontId')] || '';
-      return {
-        bg: bg && bg !== 'FFFFFF' ? '#' + bg : '',
-        fg: fg && fg !== '000000' ? '#' + fg : '',
-      };
+      return { bg: bg && bg !== 'FFFFFF' ? '#' + bg : '', fg: fg && fg !== '000000' ? '#' + fg : '' };
     });
-    const perCella = {};
+    const numCol = (lett) => lett.split('').reduce((t, ch) => t * 26 + ch.charCodeAt(0) - 64, 0) - 1;
+    const diretti = {};
     const re = /<c r="([A-Z]+)(\d+)"[^>]*?\ss="(\d+)"/g;
     let m;
     while ((m = re.exec(foglio))) {
       const st = xfs[parseInt(m[3])];
-      if (!st || (!st.bg && !st.fg)) continue;
-      const col = m[1].split('').reduce((t, ch) => t * 26 + ch.charCodeAt(0) - 64, 0) - 1;
-      perCella[parseInt(m[2]) - 1 + '|' + col] = st.bg + (st.fg ? '||' + st.fg : '');
+      if (st && (st.bg || st.fg)) diretti[parseInt(m[2]) - 1 + '|' + numCol(m[1])] = st;
     }
-    return (r, c) => perCella[r + '|' + c] || '';
+    // stili delle regole (dxf): in una regola lo sfondo e bgColor
+    const dxfs = (blocco('dxfs').match(/<dxf>[\s\S]*?<\/dxf>|<dxf\/>/g) || []).map((d) => {
+      const fill = (d.match(/<fill>[\s\S]*?<\/fill>/) || [''])[0];
+      const font = (d.match(/<font>[\s\S]*?<\/font>/) || [''])[0];
+      const bg = pal((fill.match(/<bgColor[^>]*\/>/) || fill.match(/<fgColor[^>]*\/>/) || [])[0]);
+      const fg = pal((font.match(/<color[^>]*\/>/) || [])[0]);
+      return { bg: bg ? '#' + bg : '', fg: fg ? '#' + fg : '' };
+    });
+    const regole = _xlsRegoleCondizionali(foglio, numCol);
+    const valore = (r, c) => {
+      if (!ws || typeof XLSX === 'undefined') return null;
+      const x = ws[XLSX.utils.encode_cell({ r: r, c: c })];
+      return x ? x.v : null;
+    };
+    return (r, c) => {
+      const dir = diretti[r + '|' + c] || { bg: '', fg: '' };
+      const out = {
+        sfondo: dir.bg,
+        testo: dir.fg,
+        sfondoRegola: false,
+        testoRegola: false,
+        diretto: dir.bg || dir.fg ? dir.bg + (dir.fg ? '||' + dir.fg : '') : '',
+      };
+      let bgFatto = false;
+      let fgFatto = false;
+      const v = valore(r, c);
+      for (const rg of regole) {
+        if (bgFatto && fgFatto) break;
+        if (!rg.aree.some((a) => r >= a[0] && r <= a[2] && c >= a[1] && c <= a[3])) continue;
+        if (!_xlsRegolaVera(rg, v)) continue;
+        const st = dxfs[rg.dxf];
+        if (st && st.bg && !bgFatto) {
+          out.sfondo = st.bg;
+          out.sfondoRegola = true;
+          bgFatto = true;
+        }
+        if (st && st.fg && !fgFatto) {
+          out.testo = st.fg;
+          out.testoRegola = true;
+          fgFatto = true;
+        }
+        if (rg.ferma) break;
+      }
+      if (out.sfondo === '#FFFFFF') out.sfondo = '';
+      if (out.testo === '#000000') out.testo = '';
+      return out;
+    };
   } catch (e) {
     console.warn('colori del file non letti', e);
     return nessuno;
   }
+}
+// colori del tema e della tavolozza di Excel; la tinta (schiarire/scurire) si
+// applica alla luminosita come fa Excel, non ai tre canali
+function _xlsTavolozza(tema) {
+  const temaCol = [];
+  ['lt1', 'dk1', 'lt2', 'dk2', 'accent1', 'accent2', 'accent3', 'accent4', 'accent5', 'accent6'].forEach((k) => {
+    const m = String(tema || '').match(
+      new RegExp('<a:' + k + '>[\\s\\S]*?(?:srgbClr val="([0-9A-Fa-f]{6})"|lastClr="([0-9A-Fa-f]{6})")'),
+    );
+    temaCol.push(m ? (m[1] || m[2]).toUpperCase() : null);
+  });
+  const PAL = {
+    0: '000000',
+    1: 'FFFFFF',
+    2: 'FF0000',
+    3: '00FF00',
+    4: '0000FF',
+    5: 'FFFF00',
+    6: 'FF00FF',
+    7: '00FFFF',
+    8: '000000',
+    9: 'FFFFFF',
+    10: 'FF0000',
+    11: '00FF00',
+    12: '0000FF',
+    13: 'FFFF00',
+    14: 'FF00FF',
+    15: '00FFFF',
+    16: '800000',
+    17: '008000',
+    18: '000080',
+    19: '808000',
+    20: '800080',
+    21: '008080',
+    22: 'C0C0C0',
+    23: '808080',
+    40: '00CCFF',
+    41: 'CCFFFF',
+    42: 'CCFFCC',
+    43: 'FFFF99',
+    44: '99CCFF',
+    45: 'FF99CC',
+    46: 'CC99FF',
+    47: 'FFCC99',
+    48: '3366FF',
+    49: '33CCCC',
+    50: '99CC00',
+    51: 'FFCC00',
+    52: 'FF9900',
+    53: 'FF6600',
+    54: '666699',
+    55: '969696',
+  };
+  return (tag) => {
+    if (!tag) return '';
+    const a = (k) => {
+      const m = tag.match(new RegExp('\\s' + k + '="([^"]+)"'));
+      return m ? m[1] : null;
+    };
+    let hex = null;
+    if (a('rgb')) hex = a('rgb').slice(-6).toUpperCase();
+    else if (a('theme') != null) hex = temaCol[parseInt(a('theme'))] || null;
+    else if (a('indexed') != null) hex = PAL[parseInt(a('indexed'))] || null;
+    if (!hex) return '';
+    return _xlsTinta(hex, parseFloat(a('tint')) || 0);
+  };
+}
+function _xlsTinta(hex, t) {
+  if (!t) return hex;
+  let [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.substr(i, 2), 16) / 255);
+  const mx = Math.max(r, g, b);
+  const mn = Math.min(r, g, b);
+  let h = 0;
+  let s = 0;
+  let l = (mx + mn) / 2;
+  if (mx !== mn) {
+    const d = mx - mn;
+    s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+    h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    h /= 6;
+  }
+  l = t < 0 ? l * (1 + t) : l * (1 - t) + t;
+  const f = (p, q, x) => {
+    if (x < 0) x += 1;
+    if (x > 1) x -= 1;
+    if (x < 1 / 6) return p + (q - p) * 6 * x;
+    if (x < 1 / 2) return q;
+    if (x < 2 / 3) return p + (q - p) * (2 / 3 - x) * 6;
+    return p;
+  };
+  if (s === 0) r = g = b = l;
+  else {
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = f(p, q, h + 1 / 3);
+    g = f(p, q, h);
+    b = f(p, q, h - 1 / 3);
+  }
+  return [r, g, b]
+    .map((x) =>
+      Math.round(x * 255)
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('')
+    .toUpperCase();
+}
+// regole automatiche del foglio, in ordine di priorita (numero piu basso = prima)
+function _xlsRegoleCondizionali(foglio, numCol) {
+  const regole = [];
+  const deXml = (s) =>
+    String(s)
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'")
+      .replace(/&amp;/g, '&');
+  const blocchi = foglio.match(/<conditionalFormatting[^>]*>[\s\S]*?<\/conditionalFormatting>/g) || [];
+  blocchi.forEach((bl) => {
+    const sq = (bl.match(/sqref="([^"]+)"/) || [])[1];
+    if (!sq) return;
+    const aree = sq
+      .split(/\s+/)
+      .map((p) => {
+        const m = p.match(/^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/);
+        if (!m) return null;
+        const r1 = parseInt(m[2]) - 1;
+        const c1 = numCol(m[1]);
+        return [r1, c1, m[4] ? parseInt(m[4]) - 1 : r1, m[3] ? numCol(m[3]) : c1];
+      })
+      .filter(Boolean);
+    if (!aree.length) return;
+    // i riferimenti relativi delle formule partono dall angolo in alto a sinistra
+    const angolo = { r: Math.min(...aree.map((a) => a[0])), c: Math.min(...aree.map((a) => a[1])) };
+    (bl.match(/<cfRule[^>]*\/>|<cfRule[\s\S]*?<\/cfRule>/g) || []).forEach((cr) => {
+      const at = (k) => {
+        const m = cr.match(new RegExp('\\s' + k + '="([^"]*)"'));
+        return m ? deXml(m[1]) : null;
+      };
+      if (at('dxfId') == null) return;
+      regole.push({
+        aree: aree,
+        angolo: angolo,
+        numCol: numCol,
+        tipo: at('type'),
+        op: at('operator'),
+        testo: at('text'),
+        formule: (cr.match(/<formula>[\s\S]*?<\/formula>/g) || []).map((f) => deXml(f.replace(/<\/?formula>/g, ''))),
+        dxf: parseInt(at('dxfId')),
+        priorita: parseInt(at('priority')) || 0,
+        ferma: at('stopIfTrue') === '1',
+      });
+    });
+  });
+  return regole.sort((a, b) => a.priorita - b.priorita);
+}
+// valore di una costante di formula: "testo" o numero; null = non calcolabile
+function _xlsCostante(f) {
+  const s = String(f || '').trim();
+  const m = s.match(/^"((?:[^"]|"")*)"$/);
+  if (m) return m[1].replace(/""/g, '"');
+  if (/^-?\d+(\.\d+)?$/.test(s)) return parseFloat(s);
+  return null;
+}
+// confronto come Excel: numeri prima dei testi, testi senza maiuscole/minuscole
+function _xlsConfronta(a, b) {
+  const na = typeof a === 'number';
+  const nb = typeof b === 'number';
+  if (na && nb) return a - b;
+  if (na !== nb) return na ? -1 : 1;
+  const x = String(a).toUpperCase();
+  const y = String(b).toUpperCase();
+  return x < y ? -1 : x > y ? 1 : 0;
+}
+function _xlsRegolaVera(rg, v) {
+  const vuota = v == null || v === '';
+  const val = typeof v === 'number' ? v : vuota ? '' : String(v);
+  const txt = vuota ? '' : String(v).toUpperCase();
+  if (rg.tipo === 'cellIs') {
+    const k = rg.formule.map(_xlsCostante);
+    if (k[0] == null || (rg.formule.length > 1 && k[1] == null)) return false;
+    if (vuota && rg.op !== 'notEqual') return false;
+    const c0 = _xlsConfronta(val, k[0]);
+    switch (rg.op) {
+      case 'equal':
+        return c0 === 0;
+      case 'notEqual':
+        return c0 !== 0;
+      case 'greaterThan':
+        return c0 > 0;
+      case 'lessThan':
+        return c0 < 0;
+      case 'greaterThanOrEqual':
+        return c0 >= 0;
+      case 'lessThanOrEqual':
+        return c0 <= 0;
+      case 'between':
+      case 'notBetween': {
+        const lo = _xlsConfronta(k[0], k[1]) <= 0 ? k[0] : k[1];
+        const hi = lo === k[0] ? k[1] : k[0];
+        const dentro = _xlsConfronta(val, lo) >= 0 && _xlsConfronta(val, hi) <= 0;
+        return rg.op === 'between' ? dentro : !dentro;
+      }
+    }
+    return false;
+  }
+  const t = String(rg.testo || '').toUpperCase();
+  if (rg.tipo === 'containsText') return !!t && txt.indexOf(t) >= 0;
+  if (rg.tipo === 'notContainsText') return !!t && txt.indexOf(t) < 0;
+  if (rg.tipo === 'beginsWith') return !!t && txt.startsWith(t);
+  if (rg.tipo === 'endsWith') return !!t && txt.endsWith(t);
+  if (rg.tipo === 'containsBlanks') return !txt.trim();
+  if (rg.tipo === 'notContainsBlanks') return !!txt.trim();
+  if (rg.tipo === 'expression') return _xlsEspressioneVera(rg, txt);
+  return false;
+}
+// espressioni sulla cella stessa: LEFT(A1;n)="x", RIGHT(A1;n)="x", A1="x"
+// (anche con <>). Le altre (che guardano altre celle) non si calcolano.
+function _xlsEspressioneVera(rg, txt) {
+  const f = String(rg.formule[0] || '')
+    .replace(/\s+/g, '')
+    .toUpperCase();
+  const stessa = (ref) => {
+    const m = ref.replace(/\$/g, '').match(/^([A-Z]+)(\d+)$/);
+    return !!m && parseInt(m[2]) - 1 === rg.angolo.r && rg.numCol(m[1]) === rg.angolo.c;
+  };
+  let m = f.match(/^(LEFT|RIGHT)\(([$A-Z0-9]+),(\d+)\)(=|<>)"((?:[^"]|"")*)"$/);
+  if (m && stessa(m[2])) {
+    const n = parseInt(m[3]);
+    const pezzo = m[1] === 'LEFT' ? txt.slice(0, n) : txt.slice(-n);
+    const ug = pezzo === m[5].replace(/""/g, '"');
+    return m[4] === '=' ? ug : !ug;
+  }
+  m = f.match(/^([$A-Z0-9]+)(=|<>)"((?:[^"]|"")*)"$/);
+  if (m && stessa(m[1])) {
+    const ug = txt === m[3].replace(/""/g, '"');
+    return m[2] === '=' ? ug : !ug;
+  }
+  return false;
+}
+// colori quasi uguali (le tinte di Excel arrotondano di qualche punto)
+function _xlsColoriVicini(a, b) {
+  const h = (x) =>
+    String(x || '')
+      .replace('#', '')
+      .toUpperCase();
+  const x = h(a);
+  const y = h(b);
+  if (!/^[0-9A-F]{6}$/.test(x) || !/^[0-9A-F]{6}$/.test(y)) return x === y;
+  return [0, 2, 4].every((i) => Math.abs(parseInt(x.substr(i, 2), 16) - parseInt(y.substr(i, 2), 16)) <= 8);
+}
+// colore da salvare nella cella del piano: solo quello dato a mano nel file e
+// che Excel mostra davvero (non coperto da una regola), se diverso dal colore
+// della sigla. I colori delle regole sono i colori delle sigle: valgono per
+// tutte le celle con quella sigla, non si copiano cella per cella.
+function _xlsColoreDaTenere(cod, cs) {
+  if (!cs) return '';
+  let bg = cs.sfondoRegola ? '' : cs.sfondo;
+  if (bg && _xlsColoriVicini(bg, _pianoColore(cod))) bg = '';
+  const fg = cs.testoRegola ? '' : cs.testo;
+  return bg || fg ? bg + (fg ? '||' + fg : '') : '';
 }
 function _xlsNormaNome(s) {
   return String(s || '')
@@ -1367,7 +1631,11 @@ async function importaPianoExcel(input) {
       mappa = _xlsCercaMappaGiorni(dati, nGiorni, 0, 8);
     }
     const wsCommenti = foglioMese ? wb.Sheets[foglioMese] : null;
-    const coloreCella = foglioMese ? _xlsColoriFoglio(wb, foglioMese) : () => '';
+    const coloreCella = foglioMese ? _xlsColoriFoglio(wb, foglioMese) : () => null;
+    // colori che le regole di Excel danno alle sigle (per proporli ai turni) e
+    // colore che la vecchia lettura dava alla cella (per ripulire i colori sbagliati)
+    const coloriSigla = {};
+    const coloreLettoPrima = {};
     const commentoCella = (rIdx, cIdx) => {
       if (!wsCommenti) return '';
       try {
@@ -1442,6 +1710,11 @@ async function importaPianoExcel(input) {
           continue;
         }
         const commento = mappa ? commentoCella(inizio + idxRiga, mappa[g]) : '';
+        const cs = mappa ? coloreCella(inizio + idxRiga, mappa[g]) : null;
+        if (cs && cs.sfondoRegola) {
+          const k = (coloriSigla[cod] = coloriSigla[cod] || {});
+          k[cs.sfondo] = (k[cs.sfondo] || 0) + 1;
+        }
         // JG (codici con orario): se la nota della cella dice l orario intero
         // ("DALLE 14:30 ALLE 21:30") si prende; altrimenti si aggiunge dopo, con
         // doppio clic sul JG
@@ -1454,7 +1727,8 @@ async function importaPianoExcel(input) {
           g: g,
           cod: cod,
           commento: commento,
-          colore: mappa ? coloreCella(inizio + idxRiga, mappa[g]) : '',
+          colore: _xlsColoreDaTenere(cod, cs),
+          coloreVecchio: cs ? cs.diretto : '',
           ora_inizio: or && or.ini && or.fin ? or.ini : null,
           ora_fine: or && or.ini && or.fin ? or.fin : null,
         });
@@ -1501,7 +1775,8 @@ async function importaPianoExcel(input) {
     const daRiattivare = righeCollab.filter((r) => r.stato === 'riattiva');
     const nuove = [];
     righeCollab.forEach((rc) =>
-      rc.celle.forEach((c) =>
+      rc.celle.forEach((c) => {
+        coloreLettoPrima[rc.nome + '|' + ym + '-' + String(c.g).padStart(2, '0')] = c.coloreVecchio || '';
         nuove.push({
           collaboratore: rc.nome,
           data: ym + '-' + String(c.g).padStart(2, '0'),
@@ -1513,8 +1788,8 @@ async function importaPianoExcel(input) {
           ora_inizio: c.ora_inizio,
           ora_fine: c.ora_fine,
           reparto_dip: _pianoReparto(),
-        }),
-      ),
+        });
+      }),
     );
     if (!nuove.length) {
       toast('Nessuna cella riconosciuta nel file');
@@ -1547,7 +1822,30 @@ async function importaPianoExcel(input) {
     const cambiate = [];
     const tenute = { malattia: [], chiuso: [], bloccata: [], altroSettore: [] };
     let uguali = 0;
-    const coloriDiversi = []; // stessa sigla, colore dato a mano nel file diverso da quello del piano
+    const coloriDiversi = []; // stessa sigla, colore del file diverso da quello della cella nel piano
+    // colore che la cella deve avere dopo l import (grassetto e corsivo restano):
+    // - il colore che Excel mostra davvero, se e diverso da quello della sigla;
+    // - un colore messo da un import di prima che leggeva solo il colore dato a
+    //   mano, quando nel file una regola lo copre (Excel non lo mostra), si toglie
+    //   (es. V con verde sotto: Excel le fa blu);
+    // - un colore dato nel programma resta.
+    const coloreVoluto = (r, x) => {
+      const ora = r.colore || '';
+      const st = _stileCella(ora);
+      if (x.colore) {
+        const n = _stileCella(x.colore);
+        st.c = n.c;
+        st.t = n.t;
+      } else {
+        const vecchio = coloreLettoPrima[x.collaboratore + '|' + x.data];
+        if (!vecchio || ora.split('|')[0] !== vecchio.split('|')[0]) return ora;
+        st.c = '';
+        if (_stileCella(vecchio).t === st.t) st.t = '';
+      }
+      const nuovo = _stileStr(st) || '';
+      // stesso colore scritto in modo diverso ('#FFFF00' e '#FFFF00|'): non cambia
+      return nuovo === (_stileStr(_stileCella(ora)) || '') ? ora : nuovo;
+    };
     const orariNuovi = []; // JG gia nel piano senza orario, con l orario nella nota del file
     nuove.forEach((x) => {
       const r = perChiave[x.collaboratore + '|' + x.data];
@@ -1559,13 +1857,13 @@ async function importaPianoExcel(input) {
       if (cod === x.codice) {
         // JG gia nel piano senza orario: l orario della nota del file si aggiunge
         if (x.ora_inizio && !r.ora_inizio && (r.reparto_dip || 'slots') === rep) orariNuovi.push({ riga: r, nuovo: x });
+        const voluto = coloreVoluto(r, x);
         if (
-          x.colore &&
-          x.colore !== (r.colore || '') &&
+          voluto !== (r.colore || '') &&
           (r.reparto_dip || 'slots') === rep &&
           !(_pianoGiornoBloccato(x.data) && !_pianoGiornoSbloccato(x.data))
         )
-          coloriDiversi.push({ riga: r, nuovo: x });
+          coloriDiversi.push({ riga: r, nuovo: x, colore: voluto || null });
         else uguali++;
         return;
       }
@@ -1579,6 +1877,16 @@ async function importaPianoExcel(input) {
       // cella bloccata con un motivo (es. C dedicato alle vacanze)
       else if (r.motivo_blocco) tenute.bloccata.push(voce + ' · ' + r.motivo_blocco);
       else cambiate.push({ riga: r, nuovo: x });
+    });
+    // colori delle sigle: quello che le regole di Excel danno piu spesso alla
+    // sigla, se diverso dal colore del turno nel programma (lo cambia l admin,
+    // come nella tabella dei turni)
+    const coloriTurni = [];
+    Object.keys(coloriSigla).forEach((cod) => {
+      const t = _pianoTurniReparto().find((x) => x.codice === cod);
+      if (!t) return;
+      const col = Object.entries(coloriSigla[cod]).sort((a, b) => b[1] - a[1])[0][0];
+      if (!_xlsColoriVicini(col, t.colore)) coloriTurni.push({ turno: t, colore: col });
     });
     const nTenute = Object.values(tenute).reduce((t, l) => t + l.length, 0);
     const righeTenute = [
@@ -1612,9 +1920,14 @@ async function importaPianoExcel(input) {
             (cambiate.length > 8 ? ' e altre ' + (cambiate.length - 8) : '')
           : '') +
         (coloriDiversi.length
-          ? '\n• ' + coloriDiversi.length + ' celle con il colore del file diverso (stessa sigla)'
+          ? '\n• ' + coloriDiversi.length + ' celle con il colore da allineare al file (stessa sigla)'
           : '') +
         (orariNuovi.length ? '\n• ' + orariNuovi.length + ' JG con l orario preso dalla nota del file' : '') +
+        (coloriTurni.length
+          ? '\n• Colore delle sigle nel file diverso dal programma: ' +
+            coloriTurni.map((c) => c.turno.codice + ' ' + (c.turno.colore || 'bianco') + ' > ' + c.colore).join('; ') +
+            (isAdmin() ? '' : ' (li cambia l amministratore nella tabella dei turni)')
+          : '') +
         '\n• ' +
         uguali +
         ' celle gia uguali' +
@@ -1654,11 +1967,38 @@ async function importaPianoExcel(input) {
             },
           ],
         },
-      ],
+      ].concat(
+        coloriTurni.length && isAdmin()
+          ? [
+              {
+                titolo: 'Colore delle sigle',
+                nota: 'Il colore della sigla vale per tutte le sue celle, in tutti i mesi del settore. Si cambia di nuovo dalla tabella dei turni.',
+                campi: [
+                  {
+                    id: 'colsigle',
+                    tipo: 'scelta',
+                    valore: 'file',
+                    opzioni: [
+                      { valore: 'file', etichetta: 'Come nel file (' + coloriTurni.length + ' sigle)' },
+                      { valore: 'tieni', etichetta: 'Tieni i colori del programma' },
+                    ],
+                  },
+                ],
+              },
+            ]
+          : [],
+      ),
       { titolo: 'Importa piano da Excel', ok: 'Importa' },
     );
     if (!scelta) return;
     const aggiorna = scelta.modo !== 'nuove';
+    if (scelta.colsigle === 'file' && isAdmin())
+      for (const c of coloriTurni) {
+        const prima = c.turno.colore || '';
+        await secPatch('piano_turni', 'id=eq.' + c.turno.id, { colore: c.colore });
+        c.turno.colore = c.colore;
+        logAzione('Colore sigla da import piano', c.turno.codice + ': ' + (prima || 'bianco') + ' > ' + c.colore);
+      }
     for (const nc of nuoviCollab) {
       const creato = await secPost('collaboratori', {
         nome: nc.nome,
@@ -1741,9 +2081,10 @@ async function importaPianoExcel(input) {
               operatore: op,
               updated_at: ora,
             };
-            // la nota e il colore del file sostituiscono quelli vecchi solo se ci sono
+            // la nota del file sostituisce quella vecchia solo se c e
             if (c.nuovo.commento) patch.commento = c.nuovo.commento;
-            if (c.nuovo.colore) patch.colore = c.nuovo.colore;
+            const voluto = coloreVoluto(c.riga, c.nuovo);
+            if (voluto !== (c.riga.colore || '')) patch.colore = voluto || null;
             await secPatch('piano', 'id=eq.' + c.riga.id, patch);
             aggiornate++;
           }),
@@ -1759,9 +2100,7 @@ async function importaPianoExcel(input) {
         await Promise.all(
           coloriDiversi
             .slice(i, i + 10)
-            .map((c) =>
-              secPatch('piano', 'id=eq.' + c.riga.id, { colore: c.nuovo.colore, operatore: op, updated_at: ora }),
-            ),
+            .map((c) => secPatch('piano', 'id=eq.' + c.riga.id, { colore: c.colore, operatore: op, updated_at: ora })),
         );
     }
     const inserite = (r && r.inserite) || 0;

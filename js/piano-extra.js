@@ -469,16 +469,18 @@ function _pianoColoriBarHtml() {
     '</span></button>' +
     '<button class="btn-export pbar-btn pbar-color" style="padding-left:6px;padding-right:6px" title="Scegli un altro colore o il formato (grassetto, corsivo)" onclick="event.stopPropagation();pianoColoriToggle()">&#9662;</button>' +
     '<div id="piano-colori-pop" style="display:none;position:absolute;top:110%;left:0;z-index:1000;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:8px;box-shadow:0 4px 14px rgba(0,0,0,.25);white-space:nowrap">' +
-    PIANO_COLORI_CELLA.map(
-      (c) =>
-        '<span data-c="' +
-        c +
-        '" onclick="pianoApplicaColore(\'' +
-        c +
-        '\')" style="display:inline-block;width:22px;height:22px;background:' +
-        c +
-        ';border:1px solid #999;border-radius:3px;margin:2px;cursor:pointer;vertical-align:middle"></span>',
-    ).join('') +
+    PIANO_COLORI_CELLA.concat(_pianoColoriUsati())
+      .map(
+        (c) =>
+          '<span data-c="' +
+          c +
+          '" onclick="pianoApplicaColore(\'' +
+          c +
+          '\')" style="display:inline-block;width:22px;height:22px;background:' +
+          c +
+          ';border:1px solid #999;border-radius:3px;margin:2px;cursor:pointer;vertical-align:middle"></span>',
+      )
+      .join('') +
     '<button data-c="" class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 8px;margin-left:6px;vertical-align:middle" onclick="pianoApplicaColore(null)">Colore del turno</button>' +
     '<span style="display:inline-block;width:1px;height:20px;background:var(--line);margin:0 8px;vertical-align:middle"></span>' +
     '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);font-weight:700;padding:2px 10px;vertical-align:middle" title="Grassetto sulle celle selezionate (vista e stampa)" onclick="pianoApplicaFormato(\'b\')">G</button> ' +
@@ -502,6 +504,20 @@ function _pianoColoriBarHtml() {
     '</div>' +
     '</div></span>'
   );
+}
+// colori gia usati nelle celle del mese (es. il rosso dei coordinatori preso dal
+// file Excel): si mettono nella tavolozza per poterli dare uguali ad altre celle
+function _pianoColoriUsati() {
+  const conti = {};
+  (typeof _pianoRighe !== 'undefined' ? _pianoRighe : []).forEach((r) => {
+    const c = _stileCella(r.colore).c.toUpperCase();
+    if (c) conti[c] = (conti[c] || 0) + 1;
+  });
+  const base = PIANO_COLORI_CELLA.map((c) => c.toUpperCase());
+  return Object.keys(conti)
+    .filter((c) => !base.includes(c))
+    .sort((a, b) => conti[b] - conti[a])
+    .slice(0, 8);
 }
 const PIANO_COLORI_TESTO = ['#000000', '#c0392b', '#1a4a7a', '#2c6e49', '#e67e22', '#8e44ad', '#ffffff'];
 // helper comune: righe del piano dentro la selezione corrente della griglia

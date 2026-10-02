@@ -6300,3 +6300,26 @@ body.ge-trascino * {
 .ge-tabella td.ge-sel {
   box-shadow: inset 0 0 0 999px rgba(26, 115, 232, 0.14);
 }
+.ge-tabella:focus {
+  outline: none;
+}
+.ge-tabella th.ge-sel {
+  box-shadow: inset 0 0 0 999px rgba(26, 115, 232, 0.22);
+}
+#ge-ctx {
+  position: fixed;
+  z-index: 100002;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  min-width: 220px;
+  font-size: var(--fs-md, 0.875rem);
+  overflow: hidden;
+}
+#ge-ctx .ge-ctx-tasto {
+  float: right;
+  margin-left: 18px;
+  color: var(--muted);
+  font-size: var(--fs-sm, 0.8125rem);
+}
