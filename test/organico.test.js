@@ -245,6 +245,87 @@ ok(dist.righe[0].diagnosi === 'distribuzione', 'posti scoperti con ore non usate
 ok(v.righe.length === 4, 'quattro mesi passati confrontati');
 vicino(v.correlazione, 1, 0.0001, 'mancanza del modello e pressione reale crescono insieme: correlazione 1');
 
+console.log('== gruppi: che tipo di persona serve ==');
+// luglio-dicembre: ogni giorno 2 posti in CASSA (8 ore) e 2 in SALA (9 ore)
+const fabbG = [];
+for (let m = 7; m <= 12; m++)
+  for (let g = 1; g <= new Date(2026, m, 0).getDate(); g++) {
+    const d = '2026-' + String(m).padStart(2, '0') + '-' + String(g).padStart(2, '0');
+    fabbG.push({ data: d, codice: 'A', quantita: 2 }, { data: d, codice: 'N', quantita: 2 });
+  }
+const pers = (nome, gr) => ({ nome: nome, pct: 1, vacanzeAnno: 0, gruppi: gr });
+const datiG = {
+  anno: 2026,
+  fabbisogni: fabbG,
+  turni: turni,
+  persone: [
+    pers('Cassa1', ['CASSA']),
+    pers('Cassa2', ['CASSA']),
+    pers('Sala1', ['SALA']),
+    pers('Sala2', ['SALA']),
+    pers('Sala3', ['SALA']),
+    pers('Sala4', ['SALA']),
+  ],
+  righe: [],
+  festiviAnno: 0,
+  storiaGruppi: { Sala4: { CASSA: true } }, // ha gia fatto turni di cassa: abilitato
+};
+const parG = { oggi: '2026-06-30' };
+const AG = O.analizza(datiG, parG);
+const GG = O.gruppi(datiG, AG);
+const gC = GG.find((x) => x.gruppo === 'CASSA');
+const gS = GG.find((x) => x.gruppo === 'SALA');
+ok(gC.abilitati === 3, 'CASSA: 2 di settore + 1 con turni di cassa gia fatti = 3 abilitati');
+ok(gS.abilitati === 4, 'SALA: 4 abilitati');
+ok(gC.minime === 2 || gC.minime === 3, 'CASSA: persone minime per 2 posti di punta (con le assenze)');
+ok(gC.candidati.indexOf('Sala4') < 0 && gC.candidati.length === 3, 'da formare per CASSA: solo chi non e abilitato');
+// tolgo Sala4 dalla cassa: CASSA scoperta, si propone di formare chi c e
+const datiG2 = Object.assign({}, datiG, { storiaGruppi: {} });
+const sG2 = O.suggerimenti(datiG2, parG);
+const formare = sG2.find((g) => g.tipo === 'gruppo' && g.gruppo === 'CASSA');
+ok(!!formare && /formare/.test(formare.titolo), 'CASSA con pochi abilitati: proposta di formare chi c e gia');
+ok(
+  !!formare && formare.formare.length >= 1 && formare.formare.every((n) => /^Sala/.test(n)),
+  'da formare: persone di sala',
+);
+// nessuno da formare: solo cassieri, la sala resta senza abilitati
+const datiG3 = Object.assign({}, datiG, {
+  persone: [pers('Cassa1', ['CASSA']), pers('Cassa2', ['CASSA'])],
+  storiaGruppi: {},
+});
+const sG3 = O.suggerimenti(datiG3, parG);
+const cerca = sG3.find((g) => g.tipo === 'gruppo' && g.gruppo === 'SALA');
+ok(!!cerca && /serve/.test(cerca.titolo), 'SALA senza nessuno da formare: serve cercare persone abilitate');
+const assunz = sG3.find((g) => g.scenario && (g.scenario.aggiunte || []).length);
+ok(!!assunz && (assunz.profilo || []).includes('SALA'), 'proposta di assunzione con il profilo: abilitato a SALA');
+ok(!!assunz && /Profilo da cercare: abilitato a/.test(assunz.motivo), 'il profilo e scritto nella proposta');
+
+console.log('== costi (facoltativi) ==');
+const fisso = { aggiunte: [{ jolly: false, pct: 1, dal: '2026-07-01', nome: 'F' }] };
+const BF = O.analizza(datiG, parG, fisso);
+const cF = O.costoScenario(AG, BF, { fissoAnno: 100000, ausiliarioOra: 40 }, parG);
+const oreF = 184 * ORE_GIORNO; // luglio-dicembre
+vicino(cF.ore, oreF, 1, 'fisso dal 1 luglio: ore di contratto in piu');
+vicino(cF.chf, oreF * (100000 / (41 * 52)), 2, 'costo = ore x costo orario di un tempo pieno');
+const aus = { aggiunte: [{ jolly: true, pct: 0.5, dal: '2026-07-01', al: '2026-12-31', nome: 'J' }] };
+const cJ = O.costoScenario(AG, O.analizza(datiG, parG, aus), { fissoAnno: 100000, ausiliarioOra: 40 }, parG);
+vicino(cJ.chf, oreF * 0.5 * 40, 2, 'ausiliario al 50%: ore pianificate x costo orario');
+const vac = { vacanzeSposta: [{ da: 8, a: 11, ore: 80 }] };
+const cV = O.costoScenario(AG, O.analizza(datiG, parG, vac), { fissoAnno: 100000, ausiliarioOra: 40 }, parG);
+ok(cV.chf === 0, 'spostare vacanze non costa');
+ok(O.costoScenario(AG, BF, null, parG) === null, 'senza costi inseriti: nessun costo');
+const sCosti = O.suggerimenti(datiG3, Object.assign({ costi: { fissoAnno: 100000, ausiliarioOra: 40 } }, parG));
+ok(
+  sCosti.filter((g) => g.effetto).every((g) => g.effetto.costo && g.effetto.costo.chf >= 0),
+  'con i costi: ogni proposta calcolata ha il suo costo',
+);
+ok(
+  O.suggerimenti(datiG3, parG)
+    .filter((g) => g.effetto)
+    .every((g) => !g.effetto.costo),
+  'senza costi: le proposte non mostrano costi',
+);
+
 console.log('\n=======================================');
 console.log('  ' + passati + ' passati, ' + falliti + ' falliti');
 console.log('=======================================');

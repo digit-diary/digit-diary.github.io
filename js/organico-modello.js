@@ -63,6 +63,10 @@
     const n = mesi.map((m) => NOMI_MESI[+m - 1]);
     return n.length <= 1 ? n.join('') : n.slice(0, -1).join(', ') + ' e ' + n[n.length - 1];
   }
+  // "A" · "A e B" · "A, B e C"
+  function elencoMesiTesto(v) {
+    return v.length <= 1 ? v.join('') : v.slice(0, -1).join(', ') + ' e ' + v[v.length - 1];
+  }
   // "a novembre" · "nei mesi di novembre e dicembre"
   const neiMesi = (mesi) => (mesi.length === 1 ? 'a ' : 'nei mesi di ') + elencoMesi(mesi);
   const iso = (anno, m, g) => anno + '-' + String(m).padStart(2, '0') + '-' + String(g).padStart(2, '0');
@@ -385,6 +389,87 @@
     return 'in equilibrio';
   }
 
+  // persona abilitata a un gruppo: settori del piano o competenze, oppure ha gia
+  // fatto turni di quel gruppo (stesso criterio della bozza quando i settori non bastano)
+  function abilitato(p, g, storia) {
+    return !p.gruppi || p.gruppi.includes(g) || !!((storia || {})[p.nome] || {})[g];
+  }
+  // GRUPPI (reparti interni dei turni: sala, cassa, accoglienza...) nei mesi
+  // rimasti: ore e persone che servono contro le persone abilitate. Dice di quale
+  // TIPO di persona c e bisogno, non solo quante.
+  function gruppi(dati, analisi) {
+    const A = analisi;
+    const futuri = A.mesi.filter((x) => !x.passato && x.oreRichieste);
+    const tot = {};
+    const postiMax = {};
+    futuri.forEach((x) => {
+      Object.keys(x.carico.perGruppo).forEach((g) => (tot[g] = (tot[g] || 0) + x.carico.perGruppo[g]));
+      Object.keys(x.carico.perGruppoPosti).forEach(
+        (g) => (postiMax[g] = Math.max(postiMax[g] || 0, Math.max.apply(null, x.carico.perGruppoPosti[g]))),
+      );
+    });
+    const oreNetteFte = futuri.reduce((t, x) => t + x.orePieno * (x.quotaNetta || 0.85), 0) || 1;
+    const quota = futuri.length ? futuri.reduce((t, x) => t + (x.quotaNetta || 0.85), 0) / futuri.length : 0.85;
+    // ore nette di ognuno nei mesi rimasti
+    const netto = {};
+    futuri.forEach((x) => x.offerta.persone.forEach((p) => (netto[p.nome] = (netto[p.nome] || 0) + p.netto)));
+    const persone = (dati.persone || []).filter((p) => netto[p.nome] > 0);
+    const storia = dati.storiaGruppi || {};
+    const oreMedia = persone.length ? persone.reduce((t, p) => t + netto[p.nome], 0) / persone.length : 0;
+    return Object.keys(tot)
+      .sort((a, b) => tot[b] - tot[a])
+      .map((g) => {
+        const abil = persone.filter((p) => abilitato(p, g, storia));
+        const oreAbil = abil.reduce((t, p) => t + netto[p.nome], 0);
+        const minime = Math.ceil((postiMax[g] || 0) / quota);
+        const mancaPersone = Math.max(0, minime - abil.length);
+        // ore del gruppo oltre tutte le ore degli abilitati (che lavorano anche altrove)
+        const mancaOre = Math.max(0, tot[g] - oreAbil);
+        const perOre = oreMedia ? Math.ceil(mancaOre / oreMedia) : 0;
+        // da formare: chi c e gia e non e abilitato, prima chi ha piu ore nette
+        const candidati = persone
+          .filter((p) => !abilitato(p, g, storia))
+          .sort((a, b) => netto[b.nome] - netto[a.nome])
+          .map((p) => p.nome);
+        return {
+          gruppo: g,
+          ore: tot[g],
+          fte: tot[g] / oreNetteFte,
+          postiMax: postiMax[g] || 0,
+          minime: minime,
+          abilitati: abil.length,
+          nomiAbilitati: abil.map((p) => p.nome),
+          oreAbilitati: oreAbil,
+          mancaPersone: mancaPersone,
+          mancaOre: mancaOre,
+          servono: Math.max(mancaPersone, perOre),
+          candidati: candidati,
+        };
+      });
+  }
+  // COSTO di uno scenario (facoltativo, con i costi inseriti dall amministratore):
+  // ore di contratto in piu nei mesi rimasti per il costo orario di un fisso
+  // (costo annuo di un tempo pieno / ore dell anno) o di un ausiliario.
+  // Spostare vacanze non costa: le ore di contratto restano le stesse.
+  function costoScenario(A, B, costi, par) {
+    if (!costi || !B || !(costi.fissoAnno > 0 || costi.ausiliarioOra > 0)) return null;
+    const P = Object.assign({}, PARAMETRI_PREDEFINITI, par || {});
+    const oraFisso = (costi.fissoAnno || 0) / (P.oreSett * 52);
+    const oraAus = costi.ausiliarioOra || 0;
+    const somma = (o, j) => o.persone.filter((p) => p.jolly === j).reduce((t, p) => t + p.contratto, 0);
+    let chf = 0;
+    let ore = 0;
+    B.mesi.forEach((x, i) => {
+      const a = A.mesi[i];
+      if (a.passato) return;
+      const dF = somma(x.offerta, false) - somma(a.offerta, false);
+      const dJ = somma(x.offerta, true) - somma(a.offerta, true);
+      chf += dF * oraFisso + dJ * oraAus;
+      ore += dF + dJ;
+    });
+    return { chf: Math.round(chf), ore: Math.round(ore) };
+  }
+
   // SUGGERIMENTI: la soluzione piu leggera che copre i mesi sotto, con l effetto
   // calcolato rifacendo l analisi con la proposta dentro.
   function suggerimenti(dati, par, analisi) {
@@ -407,7 +492,15 @@
         if (a.passato) return s;
         return s + Math.max(0, Math.min(-a.differenzaOre, x.oreNette - a.oreNette));
       }, 0);
-      return { mesiSottoPrima: prima, mesiSottoDopo: dopo, oreCoperte: Math.round(oreCoperte), analisi: B };
+      const costo = costoScenario(A, B, P.costi, P);
+      if (costo) costo.perOra = oreCoperte > 0 ? Math.round((costo.chf / oreCoperte) * 10) / 10 : null;
+      return {
+        mesiSottoPrima: prima,
+        mesiSottoDopo: dopo,
+        oreCoperte: Math.round(oreCoperte),
+        analisi: B,
+        costo: costo,
+      };
     };
     const primoFuturo = futuri[0].mese;
     const meseOggi = P.oggi && +P.oggi.substring(0, 4) === anno ? +P.oggi.substring(5, 7) : 0;
@@ -634,6 +727,85 @@
             : ': la riserva va completata.'),
         informativo: jollyOggi >= riserva,
       });
+    // 6) GRUPPI: che TIPO di persona serve. Prima si guarda chi c e gia e si
+    //    potrebbe formare (costa meno di assumere); se non basta, il profilo da cercare.
+    const G = gruppi(dati, A);
+    const scoperti = G.filter((g) => g.servono > 0);
+    scoperti.forEach((g) => {
+      const nome = g.gruppo;
+      const daFormare = g.candidati.slice(0, g.servono);
+      const perche =
+        (g.mancaPersone
+          ? 'Nel giorno di punta servono ' +
+            g.minime +
+            ' persone abilitate a ' +
+            nome +
+            ', oggi sono ' +
+            g.abilitati +
+            '. '
+          : '') +
+        (g.mancaOre
+          ? 'Le ore di ' +
+            nome +
+            ' nei mesi rimasti (' +
+            Math.round(g.ore) +
+            ') superano tutte le ore nette degli abilitati (' +
+            Math.round(g.oreAbilitati) +
+            '), che lavorano anche in altri gruppi. '
+          : '');
+      if (daFormare.length >= g.servono)
+        out.push({
+          tipo: 'gruppo',
+          gruppo: nome,
+          titolo:
+            nome +
+            ': formare ' +
+            (g.servono === 1 ? 'un collaboratore' : g.servono + ' collaboratori') +
+            ' gia in organico',
+          motivo:
+            perche +
+            'Si possono abilitare persone che ci sono gia (prima chi ha piu ore libere): ' +
+            daFormare.join(', ') +
+            '. Formare chi conosce gia il casino costa meno di una nuova assunzione.',
+          effettoTesto: 'persone abilitate a ' + nome + ' da ' + g.abilitati + ' a ' + (g.abilitati + g.servono),
+          formare: daFormare,
+          informativo: false,
+        });
+      else
+        out.push({
+          tipo: 'gruppo',
+          gruppo: nome,
+          titolo: nome + ': serve ' + (g.servono === 1 ? 'una persona' : g.servono + ' persone') + ' abilitate in piu',
+          motivo:
+            perche +
+            (daFormare.length
+              ? 'Formando chi c e gia (' + daFormare.join(', ') + ') non si arriva al numero: '
+              : 'Non ci sono altri collaboratori da formare: ') +
+            'nelle nuove ricerche conviene cercare persone abilitate a ' +
+            nome +
+            '.',
+          effettoTesto: 'persone abilitate a ' + nome + ' da ' + g.abilitati + ' a ' + (g.abilitati + g.servono),
+          formare: daFormare,
+          informativo: false,
+        });
+    });
+    // profilo per le proposte di assunzione: i gruppi scoperti senza abbastanza
+    // persone da formare, poi gli altri scoperti, altrimenti il gruppo con piu ore
+    const profilo = scoperti
+      .slice()
+      .sort((a, b) => (a.candidati.length >= a.servono) - (b.candidati.length >= b.servono))
+      .map((g) => g.gruppo);
+    const testoProfilo = profilo.length
+      ? 'Profilo da cercare: abilitato a ' + elencoMesiTesto(profilo.slice(0, 3)) + '.'
+      : G.length
+        ? 'Profilo: il gruppo con piu ore e ' + G[0].gruppo + '.'
+        : '';
+    out.forEach((g) => {
+      if (testoProfilo && g.scenario && (g.scenario.aggiunte || []).length) {
+        g.profilo = profilo.length ? profilo.slice(0, 3) : G.length ? [G[0].gruppo] : [];
+        g.motivo += ' ' + testoProfilo;
+      }
+    });
     // 5) MARGINE: mesi con capacita in piu (recuperi, formazione, vacanze)
     const margine = futuri.filter((x) => statoMese(x) === 'margine');
     if (margine.length)
@@ -655,7 +827,10 @@
       const migliore = azioni
         .slice()
         .sort(
-          (a, b) => a.effetto.mesiSottoDopo - b.effetto.mesiSottoDopo || (costo[a.tipo] || 9) - (costo[b.tipo] || 9),
+          (a, b) =>
+            a.effetto.mesiSottoDopo - b.effetto.mesiSottoDopo ||
+            (a.effetto.costo && b.effetto.costo ? a.effetto.costo.chf - b.effetto.costo.chf : 0) ||
+            (costo[a.tipo] || 9) - (costo[b.tipo] || 9),
         )[0];
       migliore.consigliato = true;
     }
@@ -717,5 +892,7 @@
     suggerimenti: suggerimenti,
     verifica: verifica,
     elencoMesi: elencoMesi,
+    gruppi: gruppi,
+    costoScenario: costoScenario,
   };
 });

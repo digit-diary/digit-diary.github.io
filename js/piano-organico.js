@@ -51,6 +51,85 @@ const _orgUno = (x) => (Math.round((x || 0) * 10) / 10).toFixed(1);
 const _orgSegno = (x, f) => (x > 0 ? '+' : '') + f(x);
 const _orgMeseNome = (m) => (typeof MESI_FULL !== 'undefined' && MESI_FULL[m - 1]) || String(m);
 const _orgMeseBreve = (m) => (typeof MESI !== 'undefined' && MESI[m - 1]) || String(m);
+const _orgCHF = (x) => 'CHF ' + (Math.round(x || 0) || 0).toLocaleString('de-CH');
+// costo di una proposta in parole (solo con i costi inseriti dall amministratore)
+function _organicoCostoTesto(c) {
+  if (!c) return '';
+  if (!c.chf) return 'nessun costo in piu (le ore di contratto restano le stesse)';
+  return (
+    _orgCHF(c.chf) +
+    ' nei mesi rimasti (' +
+    _orgOre(c.ore) +
+    ' ore di contratto in piu)' +
+    (c.perOra ? ' · ' + _orgCHF(c.perOra) + ' per ora di carenza coperta' : '')
+  );
+}
+
+// COSTI PER LE STIME (facoltativi): costo annuo di un tempo pieno (oneri compresi)
+// e costo orario di un ausiliario. Li inserisce l amministratore; li legge solo chi
+// vede la scheda Organico (anche nel database, migrazione 20260890).
+async function _organicoCaricaCosti() {
+  let c = null;
+  try {
+    c = JSON.parse((await getImp('piano_organico_costi')) || 'null');
+  } catch (e) {
+    c = null;
+  }
+  window._organicoCosti = c && typeof c === 'object' ? c : null;
+}
+function _organicoCostiAttivi() {
+  const c = window._organicoCosti;
+  return c && c.attivo && (c.fissoAnno > 0 || c.ausiliarioOra > 0)
+    ? { fissoAnno: +c.fissoAnno || 0, ausiliarioOra: +c.ausiliarioOra || 0 }
+    : null;
+}
+function _organicoCostiCardHtml() {
+  if (!isAdmin()) return '';
+  const c = window._organicoCosti || {};
+  const on = !!c.attivo;
+  return (
+    '<h4 style="margin:16px 0 8px">Costi per le stime (facoltativo, solo amministratore)</h4>' +
+    '<div style="border:1px solid var(--line);border-radius:3px;padding:10px 12px;background:var(--paper2);font-size:var(--fs-sm,.8125rem)">' +
+    '<p style="margin:0 0 8px;color:var(--muted);max-width:900px">Con i costi accesi ogni proposta e il simulatore mostrano quanto costano nei mesi rimasti e quanto costa ogni ora di carenza coperta: si confrontano le soluzioni anche in franchi. Sono costi medi, non stipendi di persone. Li vede solo chi vede questa scheda.</p>' +
+    '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end">' +
+    '<label><input type="checkbox" id="org-costi-on"' +
+    (on ? ' checked' : '') +
+    '> Mostra i costi</label>' +
+    '<label>Costo annuo di un tempo pieno (CHF, oneri compresi)<br><input id="org-costi-fisso" class="finestra-campo" style="width:140px;margin:0" inputmode="decimal" value="' +
+    (c.fissoAnno || '') +
+    '"></label>' +
+    '<label>Costo orario di un ausiliario (CHF, oneri compresi)<br><input id="org-costi-aus" class="finestra-campo" style="width:140px;margin:0" inputmode="decimal" value="' +
+    (c.ausiliarioOra || '') +
+    '"></label>' +
+    '<button class="btn-export" onclick="organicoSalvaCosti()">Salva</button></div></div>'
+  );
+}
+async function organicoSalvaCosti() {
+  if (!isAdmin()) return;
+  const num = (id) => {
+    const v = parseFloat(
+      String((document.getElementById(id) || {}).value || '')
+        .replace(/'/g, '')
+        .replace(',', '.'),
+    );
+    return isNaN(v) || v < 0 ? 0 : v;
+  };
+  const c = {
+    attivo: !!(document.getElementById('org-costi-on') || {}).checked,
+    fissoAnno: num('org-costi-fisso'),
+    ausiliarioOra: num('org-costi-aus'),
+  };
+  if (c.attivo && !c.fissoAnno && !c.ausiliarioOra) {
+    toastErrore('Per mostrare i costi inserisci almeno un costo');
+    return;
+  }
+  if (!(await salvaImp('piano_organico_costi', JSON.stringify(c)))) return;
+  window._organicoCosti = c;
+  logAzione('Piano: costi organico', c.attivo ? 'mostrati' : 'nascosti');
+  toast('Costi salvati');
+  await _organicoCalcola(true);
+  renderPiano();
+}
 
 // ---------------------------------------------------------------- dati
 async function _organicoCaricaDati(anno) {
@@ -211,6 +290,7 @@ function _organicoParametri() {
     jollyPct: num('jolly_percentuale_piano', 0.8),
     livelloServizio: window._organicoLivello || 0.95,
     codiciImpegni: P.codiciImpegni.concat(['ALTRO_SETTORE']),
+    costi: _organicoCostiAttivi(),
   };
 }
 
@@ -218,7 +298,7 @@ async function _organicoCalcola(forza) {
   const anno = window._organicoAnno || parseInt(_pianoMeseSel.split('-')[0]);
   const chiave = anno + '|' + _pianoReparto();
   if (!forza && _orgStato && _orgStato.chiave === chiave) return _orgStato;
-  const dati = await _organicoCaricaDati(anno);
+  const [dati] = await Promise.all([_organicoCaricaDati(anno), _organicoCaricaCosti()]);
   const par = _organicoParametri();
   const base = OrganicoModello.analizza(dati, par);
   _orgStato = {
@@ -360,11 +440,17 @@ async function _renderPianoOrganicoTab() {
         ' · ' +
         _orgOre(g.effetto.oreCoperte) +
         ' ore di carenza coperte nel resto dell anno' +
+        (g.effetto.costo ? '<br><b>Costo stimato:</b> ' + escP(_organicoCostoTesto(g.effetto.costo)) : '') +
         (g.scenario
           ? ' <button class="btn-act" style="margin-left:8px" onclick="organicoProvaSuggerimento(' +
             i +
             ')">Prova nel simulatore</button>'
           : '') +
+        '</div>';
+    if (g.effettoTesto)
+      h +=
+        '<div style="font-size:var(--fs-sm,.8125rem);margin-top:6px"><b>Effetto:</b> ' +
+        escP(g.effettoTesto) +
         '</div>';
     h += '</div>';
   });
@@ -381,6 +467,8 @@ async function _renderPianoOrganicoTab() {
   h += _organicoVerificaHtml(s);
   // METODO
   h += _organicoMetodoHtml(s);
+  // COSTI (amministratore)
+  h += _organicoCostiCardHtml();
   h += '</div></div>';
   return h;
 }
@@ -486,49 +574,40 @@ function _organicoTabellaMesi(A, B) {
 }
 
 function _organicoTabellaGruppi(s) {
-  const A = s.base;
-  const tot = {};
-  const postiMax = {};
-  A.mesi.forEach((x) => {
-    if (x.passato) return;
-    Object.keys(x.carico.perGruppo).forEach((g) => (tot[g] = (tot[g] || 0) + x.carico.perGruppo[g]));
-    Object.keys(x.carico.perGruppoPosti).forEach(
-      (g) => (postiMax[g] = Math.max(postiMax[g] || 0, Math.max.apply(null, x.carico.perGruppoPosti[g]))),
-    );
-  });
-  const gruppi = Object.keys(tot).sort((a, b) => tot[b] - tot[a]);
-  if (!gruppi.length) return '<p style="color:var(--muted)">Nessun fabbisogno nei mesi rimasti.</p>';
-  const futuri = A.mesi.filter((x) => !x.passato && x.oreRichieste);
-  const oreNetteFte = futuri.reduce((t, x) => t + x.orePieno * (x.quotaNetta || 0.85), 0) || 1;
-  const quota = futuri.length ? futuri.reduce((t, x) => t + (x.quotaNetta || 0.85), 0) / futuri.length : 0.85;
+  // stesso calcolo dei suggerimenti per gruppo (OrganicoModello.gruppi)
+  const G = OrganicoModello.gruppi(s.dati, s.base);
+  if (!G.length) return '<p style="color:var(--muted)">Nessun fabbisogno nei mesi rimasti.</p>';
   let h =
-    '<div style="overflow:auto"><table id="organico-gruppi" class="piano-table" style="font-size:var(--fs-sm,.8125rem)"><thead><tr><th style="text-align:left">Gruppo</th><th>Ore richieste (mesi rimasti)</th><th title="Ore richieste diviso le ore nette di un tempo pieno">Tempi pieni netti</th><th>Posti massimi in un giorno</th><th title="Posti del giorno di punta divisi per la quota di presenza media">Persone minime</th><th title="Collaboratori abilitati a quel gruppo: settori del piano, competenze o turni gia fatti in quel gruppo">Persone abilitate</th></tr></thead><tbody>';
-  gruppi.forEach((g) => {
-    // abilitati: settori del piano o competenze, oppure chi ha gia fatto turni di
-    // quel gruppo (stesso criterio della bozza quando i settori non bastano)
-    const abilitati = s.dati.persone.filter(
-      (p) => !p.gruppi || p.gruppi.includes(g) || (s.dati.storiaGruppi[p.nome] || {})[g],
-    ).length;
-    const minime = Math.ceil((postiMax[g] || 0) / quota);
+    '<div style="overflow:auto"><table id="organico-gruppi" class="piano-table" style="font-size:var(--fs-sm,.8125rem)"><thead><tr><th style="text-align:left">Gruppo</th><th>Ore richieste (mesi rimasti)</th><th title="Ore richieste diviso le ore nette di un tempo pieno">Tempi pieni netti</th><th>Posti massimi in un giorno</th><th title="Posti del giorno di punta divisi per la quota di presenza media">Persone minime</th><th title="Collaboratori abilitati a quel gruppo: settori del piano, competenze o turni gia fatti in quel gruppo">Persone abilitate</th><th title="Persone abilitate in piu che servono: per il giorno di punta o perche le ore del gruppo superano le ore degli abilitati">Mancano</th><th style="text-align:left" title="Collaboratori gia in organico non abilitati, prima chi ha piu ore nette">Si potrebbero formare</th></tr></thead><tbody>';
+  G.forEach((g) => {
+    const rosso = g.servono > 0;
     h +=
       '<tr><td style="text-align:left;font-weight:600">' +
-      escP(g) +
+      escP(g.gruppo) +
       '</td><td>' +
-      _orgOre(tot[g]) +
+      _orgOre(g.ore) +
       '</td><td>' +
-      _orgUno(tot[g] / oreNetteFte) +
+      _orgUno(g.fte) +
       '</td><td>' +
-      (postiMax[g] || 0) +
+      g.postiMax +
       '</td><td>' +
-      minime +
+      g.minime +
       '</td><td style="color:' +
-      (abilitati < minime ? 'var(--c-rosso,#c0392b)' : 'inherit') +
+      (rosso ? 'var(--c-rosso,#c0392b)' : 'inherit') +
+      '" title="' +
+      escP(g.nomiAbilitati.join(', ')) +
       '">' +
-      abilitati +
+      g.abilitati +
+      '</td><td style="color:' +
+      (rosso ? 'var(--c-rosso,#c0392b);font-weight:600' : 'inherit') +
+      '">' +
+      (g.servono || '') +
+      '</td><td style="text-align:left">' +
+      (g.servono ? escP(g.candidati.slice(0, Math.max(g.servono, 3)).join(', ') || 'nessuno: cercare fuori') : '') +
       '</td></tr>';
   });
   h +=
-    '</tbody></table></div><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:4px 0 0">In rosso: meno persone abilitate di quelle che servono nel giorno di punta di quel gruppo. Senza settori impostati una persona vale per tutti i gruppi.</p>';
+    '</tbody></table></div><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:4px 0 0">In rosso: servono persone abilitate in piu (per il giorno di punta o perche le ore del gruppo superano tutte le ore degli abilitati). Passa il mouse sul numero degli abilitati per vedere chi sono. Senza settori impostati una persona vale per tutti i gruppi.</p>';
   return h;
 }
 
@@ -643,7 +722,12 @@ function _organicoSimulatoreHtml(s) {
       sotto(s.ipotesi) +
       ' · ' +
       _orgSegno(Math.round(ore), _orgOre) +
-      ' ore nette nei mesi rimasti</div>';
+      ' ore nette nei mesi rimasti' +
+      (s.par.costi
+        ? ' · <b>Costo stimato:</b> ' +
+          escP(_organicoCostoTesto(OrganicoModello.costoScenario(s.base, s.ipotesi, s.par.costi, s.par)))
+        : '') +
+      '</div>';
   }
   h += '</div>';
   return h;
@@ -755,7 +839,17 @@ function _organicoMetodoHtml(s) {
   h +=
     '<p style="margin:0 0 6px"><b>Dati.</b> Mesi passati: assenze vere dal piano. Mesi futuri: vacanze, CGF e congedi gia nel piano; dove il mese non e ancora pianificato, la quota media del diritto annuo; malattie e impegni dal tasso storico del mese, avvicinato alla media annua quando i giorni osservati sono pochi. I turni fatti in un altro settore contano come impegni. Organico = collaboratori di questo settore (chi copre da un altro resta nel suo).</p>';
   h +=
-    '<p style="margin:0 0 6px"><b>Suggerimenti.</b> Una carenza presente in tutti i mesi rimasti diventa un fisso (o percentuali piu alte per chi lo desidera); una carenza solo in alcuni mesi un ausiliario per quel periodo; poche persone per domeniche e punte un ausiliario a percentuale bassa. Ogni suggerimento mostra l effetto ricalcolato. Sono proposte da valutare, non decisioni automatiche.</p>';
+    '<p style="margin:0 0 6px"><b>Suggerimenti.</b> Una carenza presente in tutti i mesi rimasti diventa un fisso (o percentuali piu alte per chi lo desidera); una carenza solo in alcuni mesi un ausiliario per quel periodo; poche persone per domeniche e punte un ausiliario a percentuale bassa. Ogni suggerimento mostra l effetto ricalcolato. Sono proposte da valutare, non decisioni automatiche.</p>' +
+    '<p style="margin:0 0 6px"><b>Per gruppo.</b> Per ogni gruppo dei turni (sala, cassa, accoglienza...) servono abbastanza persone abilitate per il giorno di punta, e le loro ore nette devono bastare per le ore del gruppo (lavorano anche negli altri gruppi, quindi e il minimo). Quando mancano, prima si propone di formare chi c e gia, partendo da chi ha piu ore libere; se non basta, le proposte di assunzione dicono quale profilo cercare.</p>' +
+    (P.costi
+      ? '<p style="margin:0 0 6px"><b>Costi.</b> Ore di contratto in piu nei mesi rimasti per il costo orario: fisso = ' +
+        _orgCHF(P.costi.fissoAnno) +
+        ' all anno / ' +
+        P.oreSett * 52 +
+        ' ore; ausiliario = ' +
+        _orgCHF(P.costi.ausiliarioOra) +
+        ' all ora sulle ore pianificate. Spostare vacanze e formare chi c e gia non aggiungono ore di contratto (la formazione ha costi propri, non calcolati).</p>'
+      : '');
   h += '</div>';
   return h;
 }
@@ -878,8 +972,10 @@ async function organicoRapportoPdf() {
             g.effetto.mesiSottoDopo +
             ', ' +
             _orgOre(g.effetto.oreCoperte) +
-            ' ore di carenza coperte.'
-          : ''),
+            ' ore di carenza coperte.' +
+            (g.effetto.costo ? ' Costo stimato: ' + _organicoCostoTesto(g.effetto.costo) + '.' : '')
+          : '') +
+        (g.effettoTesto ? ' Effetto: ' + g.effettoTesto + '.' : ''),
     );
   });
   doc.autoTable({
@@ -922,6 +1018,39 @@ async function organicoRapportoPdf() {
     margin: { left: 14, right: 14 },
   });
   y = doc.lastAutoTable.finalY + 6;
+  const GP = OrganicoModello.gruppi(s.dati, A);
+  if (GP.length) {
+    testo('Per gruppo (mesi rimasti)', 11);
+    doc.autoTable({
+      startY: y,
+      theme: 'grid',
+      head: [
+        [
+          'Gruppo',
+          'Ore richieste',
+          'Tempi pieni netti',
+          'Persone minime',
+          'Abilitate',
+          'Mancano',
+          'Si potrebbero formare',
+        ],
+      ],
+      body: GP.map((g) => [
+        g.gruppo,
+        _orgOre(g.ore),
+        _orgUno(g.fte),
+        g.minime,
+        g.abilitati,
+        g.servono || '',
+        g.servono ? g.candidati.slice(0, Math.max(g.servono, 3)).join(', ') || 'nessuno: cercare fuori' : '',
+      ]),
+      headStyles: { fillColor: [26, 74, 122], fontSize: 7 },
+      bodyStyles: { fontSize: 7.5, halign: 'center' },
+      columnStyles: { 6: { halign: 'left' } },
+      margin: { left: 14, right: 14 },
+    });
+    y = doc.lastAutoTable.finalY + 6;
+  }
   if (s.verifica.righe.length) {
     testo(
       'Verifica sui mesi passati' +
