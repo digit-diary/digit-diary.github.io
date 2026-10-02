@@ -126,6 +126,7 @@ async function aggiungiTimbratura() {
   }
 }
 async function importaTimbrature(input) {
+  if (!_pianoAzioneAutoConsentita()) return; // azione automatica: permesso apposito
   if (!(await assicuraLibreria('xlsx'))) return;
   if (!puoGestirePiano()) return;
   const file = input.files[0];
@@ -1112,21 +1113,27 @@ async function _renderPianoVacanzeTab() {
   if (puoMod) {
     h +=
       '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="apriNuovaVacanza()">Nuova vacanza</button>';
+    // importa, applica al piano ed elimina tutte: azioni automatiche (permesso apposito)
+    const _auto = puoAzioniAutoPiano();
     h +=
-      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:#d4b86a;color:#d4b86a" onclick="document.getElementById(\'vac-file\').click()">Importa (Excel o PDF)</button>' +
-      '<input type="file" id="vac-file" accept=".xlsx,.xls,.pdf" style="display:none" onchange="importaVacanzePiano(this)">' +
+      (_auto
+        ? '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:#d4b86a;color:#d4b86a" onclick="document.getElementById(\'vac-file\').click()">Importa (Excel o PDF)</button>' +
+          '<input type="file" id="vac-file" accept=".xlsx,.xls,.pdf" style="display:none" onchange="importaVacanzePiano(this)">'
+        : '') +
       '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" title="Scarica il piano vacanze del settore nello stesso formato del file HR" onclick="esportaVacanzeExcel()">Scarica Excel</button>' +
       '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-blu,#1a4a7a);color:#7ea8d8" onclick="esportaVacanzePdf()">Scarica PDF</button>';
-    h +=
-      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-blu,#1a4a7a);color:#7ea8d8" onclick="applicaVacanzePiano()">Applica al piano · ' +
-      escP(meseLbl) +
-      '</button>';
+    if (_auto)
+      h +=
+        '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-blu,#1a4a7a);color:#7ea8d8" onclick="applicaVacanzePiano()">Applica al piano · ' +
+        escP(meseLbl) +
+        '</button>';
     h +=
       '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-viola,#7b2d8b);color:#b07cc7" onclick="apriScambioSettimane()">Scambia settimane</button>';
     h +=
       '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-viola,#7b2d8b);color:#b07cc7" onclick="pdfCambioVacanza()">Formulario cambio vacanza</button>';
-    h +=
-      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--accent);color:var(--accent)" onclick="eliminaTutteVacanze()">Elimina tutte</button>';
+    if (_auto)
+      h +=
+        '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--accent);color:var(--accent)" onclick="eliminaTutteVacanze()">Elimina tutte</button>';
   }
   h += '</div>';
   h +=
@@ -2180,6 +2187,7 @@ async function eliminaVacanza(id) {
   }
 }
 async function eliminaTutteVacanze() {
+  if (!_pianoAzioneAutoConsentita()) return; // azione automatica: permesso apposito
   if (!puoGestirePiano()) return;
   const anno = window._pianoVacAnno;
   if (
@@ -2545,6 +2553,7 @@ async function _applicaVacanzeMese(interattivo) {
   return { v: nV, c: nC, wd: nWdP, orfane: nOrfane, altre: nAltre, nonToccati: nonToccati, primoAperto: primoAperto };
 }
 async function applicaVacanzePiano() {
+  if (!_pianoAzioneAutoConsentita()) return; // azione automatica: permesso apposito
   const MESI_L = MESI_FULL || [];
   const lbl = (MESI_L[parseInt(_pianoMeseSel.split('-')[1]) - 1] || '') + ' ' + _pianoMeseSel.split('-')[0];
   if (
@@ -2819,6 +2828,7 @@ async function _vacRigheDaPdf(file) {
   return { righe: out, ignoti: ignoti };
 }
 async function importaVacanzePiano(input) {
+  if (!_pianoAzioneAutoConsentita()) return; // azione automatica: permesso apposito
   if (!(await assicuraLibreria('xlsx'))) return;
   if (!(await assicuraLibreria('pdf'))) return;
   if (!puoGestirePiano()) return;

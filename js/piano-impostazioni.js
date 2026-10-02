@@ -247,6 +247,7 @@ async function salvaSolverUrl(v) {
   renderPiano();
 }
 async function generaConSolver() {
+  if (!_pianoAzioneAutoConsentita()) return; // azione automatica: permesso apposito
   if (!puoGestirePiano()) return;
   const url = window._pianoSolverUrl;
   if (!url) return;

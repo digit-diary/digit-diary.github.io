@@ -44,6 +44,8 @@ const VIS_ITEMS = {
     gestione_valutazioni: 'Valutazioni · inserire e importare schede',
     gestione_formazioni: 'Formazioni · registrare sessioni formative svolte (es. supervisor)',
     gestione_piano: 'Piano di lavoro · modificare la griglia turni del mese (es. supervisor)',
+    piano_azioni_auto:
+      'Piano · AZIONI AUTOMATICHE: genera bozza e coperture, applica vacanze, assegna CGF, migliora ore, cancella il piano, importa da Excel, fabbisogno del mese (oltre a modificare il piano)',
     gestione_regole:
       'Regole del piano · vedere e modificare le regole (riposo minimo, giorni consecutivi, RAP, vacanze)',
     gestione_festivi: 'Festivi e CGF · gestire il calendario dei giorni festivi e i recuperi',
@@ -351,6 +353,7 @@ const MATRICE_PROFILI = {
   gestione_valutazioni: ['V', 'M', 'M', 'V', 'V'],
   gestione_formazioni: ['V', 'M', 'M', 'V', 'V'],
   gestione_piano: ['V', 'M', 'M', 'M', 'V'],
+  piano_azioni_auto: ['-', 'M', 'M', '-', '-'],
   gestione_corsi: ['V', 'M', 'M', 'M', 'M'],
   gestione_briefing: ['-', 'M', 'M', 'M', '-'],
   storico_hr: ['V', 'V', 'V', 'V', 'M'],

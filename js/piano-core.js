@@ -195,6 +195,20 @@ async function _pianoConsentiScrittura(dstr, silenzioso) {
   toast('Giorno ' + dataIt + ' sbloccato per 10 minuti');
   return true;
 }
+// AZIONI AUTOMATICHE DEL PIANO (genera bozza, vacanze, CGF, migliora ore,
+// cancella, importazioni, fabbisogno del mese): permesso apposito
+// "piano_azioni_auto", oltre a poter modificare il piano. Cosi chi corregge le
+// celle non lancia per sbaglio un azione che cambia tutto il mese. Il database
+// blocca anche le cancellazioni a intervallo (migrazione 20260888).
+function puoAzioniAutoPiano() {
+  if (isAdmin()) return true;
+  return puoGestirePiano() && typeof puoModificare === 'function' && puoModificare('piano_azioni_auto');
+}
+function _pianoAzioneAutoConsentita() {
+  if (puoAzioniAutoPiano()) return true;
+  toast('Serve il permesso Azioni automatiche del piano (Impostazioni > Visibilita e permessi)');
+  return false;
+}
 function puoGestirePiano() {
   const base = typeof puoModificare === 'function' ? puoModificare('gestione_piano') : isAdmin();
   return base && _pianoModTabOk();
@@ -1723,33 +1737,42 @@ async function _renderPianoCore() {
       const pgrp = (label, inner) =>
         inner ? '<span class="pbar-grp"><span class="pbar-grp-lbl">' + label + '</span>' + inner + '</span>' : '';
       h += '<div class="pbar-riga">';
+      // azioni automatiche (bozza, coperture, migliora ore, cancella, importa): solo
+      // con il permesso apposito; senza, i pulsanti non compaiono
+      const puoAuto = puoMod && puoAzioniAutoPiano();
       if (puoMod) {
-        let g = pbtn(
-          'Genera bozza',
-          'generaBozzaPiano()',
-          'pbar-ok',
-          'Riempie il fabbisogno con i collaboratori di questo settore (chi copre da altri settori NON viene usato)',
-        );
-        if (window._pianoSolverUrl)
+        let g = '';
+        if (puoAuto)
+          g += pbtn(
+            'Genera bozza',
+            'generaBozzaPiano()',
+            'pbar-ok',
+            'Riempie il fabbisogno con i collaboratori di questo settore (chi copre da altri settori NON viene usato)',
+          );
+        if (puoAuto && window._pianoSolverUrl)
           g += pbtn(
             'Genera con il solver',
             'generaConSolver()',
             'pbar-ok',
             'Motore di ottimizzazione sul server interno (OR-Tools): piano ottimo del mese, equita garantita. Usa le stesse regole del settore e non tocca le celle esistenti',
           );
-        if (collaboratoriCache.some((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && _pianoCoperturaCfg(c)))
+        if (
+          puoAuto &&
+          collaboratoriCache.some((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && _pianoCoperturaCfg(c))
+        )
           g += pbtn(
             'Completa con coperture',
             'completaConCoperture()',
             '',
             'Tappa i buchi rimasti usando i collaboratori di altri settori abilitati a coprire qui. Da usare DOPO aver generato i piani dei loro reparti',
           );
-        g += pbtn(
-          'Migliora ore',
-          'miglioraOrePiano()',
-          '',
-          'Dopo la bozza: scambia turni generati tra chi è sopra e chi è sotto le ore dovute (stesso giorno, regole rispettate)',
-        );
+        if (puoAuto)
+          g += pbtn(
+            'Migliora ore',
+            'miglioraOrePiano()',
+            '',
+            'Dopo la bozza: scambia turni generati tra chi è sopra e chi è sotto le ore dovute (stesso giorno, regole rispettate)',
+          );
         h += pgrp('Pianifica', g);
         h += pgrp(
           'Controlla',
@@ -1775,17 +1798,19 @@ async function _renderPianoCore() {
             'Trascina i nomi per riordinare; questo pulsante ripristina SUP, BO, poi gli altri',
           ) +
             _pianoColoriBarHtml() +
-            pbtn(
-              'Cancella piano',
-              'cancellaBozzaPiano()',
-              'pbar-warn',
-              'Svuota il mese di questo settore (si puo annullare)',
-            ),
+            (puoAuto
+              ? pbtn(
+                  'Cancella piano',
+                  'cancellaBozzaPiano()',
+                  'pbar-warn',
+                  'Svuota il mese di questo settore (si puo annullare)',
+                )
+              : ''),
         );
       }
       let ge =
         pbtn('Copia per Excel', 'copiaPianoExcel()', 'pbar-soft') + pbtn('Stampa PDF', 'stampaPianoPDF()', 'pbar-soft');
-      if (puoMod) {
+      if (puoAuto) {
         ge += pbtn('Importa piano', "document.getElementById('piano-imp-file').click()", 'pbar-soft');
         ge +=
           '<input type="file" id="piano-imp-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importaPianoExcel(this)">';
@@ -2272,7 +2297,8 @@ async function _renderPianoCore() {
         hFabb +=
           '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Pianificazione (fabbisogno) vs assegnati · ' +
           escP(label);
-        if (puoMod)
+        // copia, importa e svuota il fabbisogno del mese: azioni automatiche
+        if (puoMod && puoAzioniAutoPiano())
           hFabb +=
             '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:#d4b86a;color:#d4b86a" onclick="copiaFabbisognoMese()">Copia dal mese precedente</button>' +
             '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="document.getElementById(\'fabb-file\').click()">Importa da Excel</button>' +

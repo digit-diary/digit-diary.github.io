@@ -351,6 +351,7 @@ async function salvaFixImpiego() {
 // righe di riempimento arrivate dagli import Excel: si tolgono dal piano,
 // i mesi con turni veri restano come storia di lavoro
 async function pulisciPianoDisattivati() {
+  if (!_pianoAzioneAutoConsentita()) return; // azione automatica: permesso apposito
   // cancella righe del piano: stesso permesso della griglia turni
   if (!puoModificare('gestione_piano')) {
     toast('Riservato all amministratore');

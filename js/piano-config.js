@@ -1079,6 +1079,7 @@ function _xlsNormaNome(s) {
 }
 
 async function importaFabbisognoExcel(input) {
+  if (!_pianoAzioneAutoConsentita()) return; // azione automatica: permesso apposito
   if (!(await assicuraLibreria('xlsx'))) return;
   if (!puoGestirePiano()) return;
   const file = input.files[0];
@@ -1223,6 +1224,7 @@ async function importaFabbisognoExcel(input) {
 // L'ordine delle righe resta quello predefinito (SUP, BO, poi gli
 // altri) e si può sempre riordinare trascinando i nomi.
 async function importaPianoExcel(input) {
+  if (!_pianoAzioneAutoConsentita()) return; // azione automatica: permesso apposito
   if (!(await assicuraLibreria('xlsx'))) return;
   if (!puoGestirePiano()) return;
   const file = input.files[0];
@@ -1486,6 +1488,7 @@ async function importaPianoExcel(input) {
 
 // come fabbisogno.elimina di Turnivo: cancella tutto il fabbisogno del mese
 async function eliminaFabbisognoMese() {
+  if (!_pianoAzioneAutoConsentita()) return; // azione automatica: permesso apposito
   if (!puoGestirePiano()) return;
   const ym = _pianoMeseSel;
   const n = _pianoFabbCache.length;
@@ -1540,6 +1543,7 @@ function _pianoProfiloGiorno(dstr) {
   return 'D' + dow; // lunedi..giovedi restano distinti
 }
 async function copiaFabbisognoMese() {
+  if (!_pianoAzioneAutoConsentita()) return; // azione automatica: permesso apposito
   if (!puoGestirePiano()) return;
   const p = _pianoMeseSel.split('-');
   const dPrec = new Date(parseInt(p[0]), parseInt(p[1]) - 2, 15);

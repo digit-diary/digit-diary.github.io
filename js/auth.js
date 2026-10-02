@@ -310,7 +310,8 @@ async function eseguiForzaCambioPwdOp(nome) {
   }
   const nh = await secureHash(p1, nome);
   try {
-    await sbRpc('force_change_pwd', { p_nome: nome, p_new_hash: nh, p_deve_cambiare: false });
+    // la sessione della persona stessa (appena entrata con la password provvisoria)
+    await sbRpc('force_change_pwd', { p_nome: nome, p_new_hash: nh, p_deve_cambiare: false, p_token: getOpToken() });
     document.getElementById('pwd-modal-content').innerHTML =
       '<h3>Password impostata!</h3><p style="text-align:center;color:var(--muted)">Da ora accedi con la tua nuova password.</p><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\');mostraNoteNonLette()">OK</button></div>';
     toast('Password personale impostata!');

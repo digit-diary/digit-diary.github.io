@@ -1297,6 +1297,7 @@ async function pianoElencoCgfDaDare() {
 }
 // Assegna i CGF mancanti nei giorni liberi del mese aperto
 async function pianoAssegnaCgfMese() {
+  if (!_pianoAzioneAutoConsentita()) return; // azione automatica: permesso apposito
   if (!puoGestirePiano()) return;
   const ym = _pianoMeseSel;
   toast('Calcolo i recuperi da assegnare...');
@@ -1488,9 +1489,11 @@ function _renderPianoFestiviCard() {
     '<div style="background:var(--paper2);border:1px solid var(--line);border-radius:3px;padding:10px 12px;margin-bottom:12px">' +
     '<b style="font-size:var(--fs-md,.875rem)">Recuperi festivi (CGF) sul piano</b>' +
     '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:4px 0 8px">Per chi compila il piano a mano: assegna i giorni di recupero ai <b>fissi</b> che hanno lavorato nei festivi, senza rigenerare nulla. Gli ausiliari non ricevono CGF: per loro vale il supplemento del 50% (RAP Allegato 1), che si legge nelle Statistiche.</p>' +
-    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px" onclick="pianoAssegnaCgfMese()">Assegna i CGF del mese di ' +
-    escP(_pianoMeseSel) +
-    '</button> ' +
+    (puoAzioniAutoPiano()
+      ? '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px" onclick="pianoAssegnaCgfMese()">Assegna i CGF del mese di ' +
+        escP(_pianoMeseSel) +
+        '</button> '
+      : '') +
     '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px" onclick="pianoElencoCgfDaDare()">Chi ha diritto a un recupero</button> ' +
     '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px" onclick="pianoRiportoCgf()">Riporto CGF dall\'anno precedente</button>' +
     '</div>';
