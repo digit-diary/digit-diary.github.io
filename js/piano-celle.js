@@ -588,7 +588,7 @@ function apriCambioEsigenze(nome, dstr) {
           '-' +
           (t.ora_fine || '').substring(0, 5) +
           ')' +
-          (_pianoIdoneoPerTurno(nome, t) ? '' : ' · NON FORMATO') +
+          (_pianoIdoneoAMano(nome, t) ? '' : ' · NON FORMATO') +
           '</option>',
       )
       .join('') +
@@ -853,7 +853,8 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
         maxCons: maxCons,
         turnoDi: (c) => _pianoTurnoInfo(c),
         isLavoro: (c) => _pianoIsLavoro(c),
-        idoneo: tNuovo ? _pianoIdoneoPerTurno(nome, tNuovo) : null,
+        // scritta a mano: un turno bloccato non da avviso, un reparto non formato si
+        idoneo: tNuovo ? _pianoIdoneoAMano(nome, tNuovo) : null,
         codiceNuovo: codiceNuovo,
       }),
     );

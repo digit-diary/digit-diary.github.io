@@ -869,8 +869,9 @@ async function apriScambioTurno() {
     if (maxCambi > 0 && mieiCambi >= maxCambi)
       return 'limite superato (' + mieiCambi + '/' + maxCambi + '): serve autorizzazione';
     const tSuo = _pianoTurnoInfo(c.codice);
-    if (!_pianoIdoneoPerTurno(sel.nome, tSuo)) return 'tu non sei idoneo a ' + c.codice;
-    if (!_pianoIdoneoPerTurno(c.collaboratore, tMio)) return 'non idoneo a ' + r.codice;
+    // scambio scelto a mano: i turni bloccati non contano (vedi _pianoIdoneoAMano)
+    if (!_pianoIdoneoAMano(sel.nome, tSuo)) return 'tu non sei idoneo a ' + c.codice;
+    if (!_pianoIdoneoAMano(c.collaboratore, tMio)) return 'non idoneo a ' + r.codice;
     if (!riposoOkCon(sel.nome, g, tSuo) || !riposoOkCon(c.collaboratore, g, tMio)) return 'riposo 11h violato';
     return null;
   };
@@ -1190,6 +1191,23 @@ function _pianoIdoneoPerTurno(nome, turno) {
   // funzione, regola L1): la logica vive nel motore puro PianoRegole, qui si
   // iniettano solo gli accessi allo stato dell'app
   const info = _pianoCollabInfo(nome) || {};
+  return PianoRegole.idoneoPerTurno(info, turno, {
+    settoriDi: (i) => _pianoSettoriEffettivi(i),
+    regoleGruppoDi: (gr) => _pianoRegoleGruppoDi(gr),
+    campoOk: (i, v) => _pianoCampoOk(i, v),
+    mappFunzione: (fz) => _pianoMappFunzione(fz),
+    regolaVal: (n) => _pianoRegolaVal(n),
+    regoleTurnoFunzione: () => _pianoRegoleTurnoFunzione(),
+    fannoTutto: (fz) => _pianoFunzioniFannoTutto().has(fz),
+  });
+}
+// IDONEITA PER LE SCELTE A MANO: come _pianoIdoneoPerTurno ma senza i turni bloccati
+// della persona (es. S1 e S3 a chi non copre sala, reception e cassa). I turni bloccati
+// non vengono mai PROPOSTI (bozza, ricerca, cerca cambio, coperture, formazioni), ma chi
+// li scrive o li scambia a mano non riceve l avviso "non formato": restano turni del
+// suo reparto. L avviso resta per un reparto davvero non formato.
+function _pianoIdoneoAMano(nome, turno) {
+  const info = Object.assign({}, _pianoCollabInfo(nome) || {}, { turni_bloccati: '' });
   return PianoRegole.idoneoPerTurno(info, turno, {
     settoriDi: (i) => _pianoSettoriEffettivi(i),
     regoleGruppoDi: (gr) => _pianoRegoleGruppoDi(gr),
