@@ -2131,7 +2131,10 @@ function _schedaSorgenti(nome) {
     entries: (completa ? datiCache : getDatiReparto()).filter(function (e) {
       return e.nome === nome;
     }),
-    moduli: (completa ? moduliCache.filter((m) => m.tipo !== 'cambio_turno') : getModuliReparto()).filter(function (m) {
+    moduli: (completa
+      ? moduliCache.filter((m) => m.tipo !== 'cambio_turno' && m.tipo !== 'non_disponibilita')
+      : getModuliReparto()
+    ).filter(function (m) {
       return m.collaboratore && m.collaboratore.toLowerCase() === nomeL;
     }),
   };
@@ -2320,6 +2323,7 @@ function apriSchedaCollaboratore(nome) {
   }
   html += '<div id="collab-crediti" style="font-size:var(--fs-sm,.8125rem);margin-top:6px"></div>';
   if (typeof _schedaCambiTurnoRiga === 'function') html += _schedaCambiTurnoRiga(nome);
+  if (typeof _schedaNdRiga === 'function') html += _schedaNdRiga(nome);
   html += '</div></div>';
   html +=
     '<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-export btn-export-pdf" onclick="stampaSchedaPDF(\'' +

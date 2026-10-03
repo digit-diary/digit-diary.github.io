@@ -167,6 +167,9 @@ async function salva() {
       document.getElementById('inp-testo').value = '';
       resetNdFiltri();
       logAzione('Non disponibilità', nome + descDate);
+      // modulo di non disponibilita del mese (uno per mese toccato), salvato nella scheda
+      if (typeof ndSincronizzaPersona === 'function')
+        [...new Set(sorted.map((ds) => ds.substring(0, 7)))].forEach((ym) => ndSincronizzaPersona(nome, ym));
       toast(nome + ': non disponibilità registrata (' + nGiorni + ' giorni)');
       aggiornaNomi();
       render();

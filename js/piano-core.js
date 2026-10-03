@@ -1610,6 +1610,8 @@ function renderPiano() {
   if (typeof _ricordaSettore === 'function') _ricordaSettore(); // settore e mese restano dopo un aggiornamento
   _pianoRenderInCorso = _renderPianoCore().finally(() => {
     _pianoRenderInCorso = null;
+    // moduli di non disponibilita: si creano o aggiornano se gli ND del mese cambiano
+    if (typeof ndProgramma === 'function') ndProgramma();
   });
   return _pianoRenderInCorso;
 }

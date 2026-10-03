@@ -2086,7 +2086,7 @@ function getSpeseReparto() {
 // Piano > Cambi turno e non entrano in conteggi, rapporti e ricerche dei moduli.
 function getModuliReparto() {
   return moduliCache.filter(function (m) {
-    return (m.reparto_dip || 'slots') === currentReparto && m.tipo !== 'cambio_turno';
+    return (m.reparto_dip || 'slots') === currentReparto && m.tipo !== 'cambio_turno' && m.tipo !== 'non_disponibilita';
   });
 }
 function getFogliCambioReparto(rep) {

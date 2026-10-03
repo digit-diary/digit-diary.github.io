@@ -888,12 +888,14 @@ function aggiornaModuliLista() {
     apprezzamento: 'Apprezzamento',
     rdi: 'RDI',
     cambio_turno: 'Cambio turno',
+    non_disponibilita: 'Non disponibilita',
   };
   const tc = {
     allineamento: '#1a4a7a',
     apprezzamento: '#b8860b',
     rdi: '#c0392b',
     cambio_turno: '#5a6b7a',
+    non_disponibilita: '#5d6d7e',
   };
   const box = document.getElementById('mod-list-results');
   if (!box) return;
@@ -948,7 +950,7 @@ function apriModuloSalvato(id) {
   const m = moduliCache.find((x) => x.id === id);
   if (!m) return Promise.resolve(false);
   // il foglio di cambio turno non ha un modulo di modifica: si apre il PDF archiviato
-  if (m.tipo === 'cambio_turno') return ristampaModuloPDF(id).then(() => false);
+  if (m.tipo === 'cambio_turno' || m.tipo === 'non_disponibilita') return ristampaModuloPDF(id).then(() => false);
   apriModulo(m.tipo);
   window._editModuloId = id;
   // Salva snapshot originale per confronto
@@ -1021,6 +1023,7 @@ function checkQrHash() {
 }
 async function ristampaModuloPDF(id) {
   const m = moduliCache.find((x) => x.id === id);
+  if (m && m.tipo === 'non_disponibilita' && typeof ndApriModulo === 'function') return ndApriModulo(id);
   if (m && m.tipo === 'cambio_turno') {
     try {
       if (!window.jspdf) await caricaJsPDF();
