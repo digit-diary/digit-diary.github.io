@@ -2016,14 +2016,27 @@ async function importaPianoExcel(input) {
         logAzione('Colore sigla da import piano', c.turno.codice + ': ' + (prima || 'bianco') + ' > ' + c.colore);
       }
     for (const nc of nuoviCollab) {
-      const creato = await secPost('collaboratori', {
+      const nuovo = {
         nome: nc.nome,
         attivo: true,
         reparto_dip: _pianoReparto(),
         funzione: nc.funzione,
         percentuale: nc.percentuale,
         is_jolly: !!nc.isJolly,
-      });
+      };
+      // turni bloccati di partenza (es. S1, S3): non a chi nel file fa gia turni di
+      // tutti i reparti richiesti (sala, reception, cassa)
+      if (
+        typeof _pianoRequisitiMancanti === 'function' &&
+        pianoBloccatiDiPartenza(_pianoReparto()) &&
+        !_pianoRequisitiMancanti(
+          null,
+          _pianoReparto(),
+          (nc.celle || []).map((x) => x.cod),
+        ).length
+      )
+        nuovo.turni_bloccati = null;
+      const creato = await secPost('collaboratori', nuovo);
       if (creato && creato[0]) collaboratoriCache.push(creato[0]);
       logAzione('Collaboratore creato da import piano', nc.nome + ' (' + nc.funzione + ')');
     }

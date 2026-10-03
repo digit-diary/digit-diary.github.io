@@ -778,7 +778,21 @@ async function _setImpRaw(k, v) {
 function _annullaPronto() {
   return typeof window !== 'undefined' && window.Annulla && typeof window.Annulla.primaDiPatch === 'function';
 }
+// COLLABORATORE NUOVO, da qualsiasi strada (import Excel, Diario, moduli, Gestione
+// collaboratori, cestino): riceve i turni bloccati di partenza del suo settore
+// (Piano > Impostazioni > Preferenze, es. Slots S1 e S3 che danno le pause in cassa e
+// reception). Poi si cambiano come sempre. Se il salvataggio indica gia i turni
+// bloccati, vale quello.
+function _collabNuovoConBloccati(data) {
+  const una = (d) => {
+    if (!d || typeof d !== 'object' || d.turni_bloccati !== undefined) return d;
+    const cod = typeof pianoBloccatiDiPartenza === 'function' ? pianoBloccatiDiPartenza(d.reparto_dip || 'slots') : '';
+    return cod ? Object.assign({}, d, { turni_bloccati: cod }) : d;
+  };
+  return Array.isArray(data) ? data.map(una) : una(data);
+}
 async function secPost(table, data) {
+  if (table === 'collaboratori') data = _collabNuovoConBloccati(data);
   const r = await _secPostRaw(table, data);
   if (_annullaPronto()) window.Annulla.dopoPost(table, Array.isArray(r) ? r : r ? [r] : []);
   return r;

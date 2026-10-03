@@ -1593,6 +1593,31 @@ function _renderPianoPreferenzeCard() {
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Preferenze collaboratori · ' +
     escP(repartoLabel(_pianoReparto())) +
     '</div><div style="padding:10px 14px">';
+  // turni bloccati di partenza e requisiti (solo amministratore)
+  if (isAdmin()) {
+    const rep = _pianoReparto();
+    const bc = _pianoBloccatiCfg(rep);
+    const inp = (id, campo, val, ph, w) =>
+      '<input type="text" id="' +
+      id +
+      '" value="' +
+      escP(val) +
+      '" placeholder="' +
+      ph +
+      '" onchange="salvaBloccatiNuovi(\'' +
+      campo +
+      '\',this.value)" style="width:' +
+      w +
+      'px;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)">';
+    h +=
+      '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;padding:8px 10px;background:var(--paper2);border-radius:3px;font-size:var(--fs-md,.875rem)">' +
+      '<label for="pref-bloccati-nuovi">Turni bloccati</label>' +
+      inp('pref-bloccati-nuovi', 'codici', bc.codici, 'Es: S1, S3', 100) +
+      '<label for="pref-bloccati-gruppi" title="Reparti dei turni: competenza certificata in Formazione oppure turni di quel reparto nel piano dell ultimo anno">a chi non copre</label>' +
+      inp('pref-bloccati-gruppi', 'gruppi', bc.gruppi, 'Es: SALA, REC, CASSA', 150) +
+      '<button class="btn-act" onclick="pianoBloccaSenzaRequisiti()" title="Mostra chi oggi non ha i requisiti e, dopo la conferma, aggiunge i turni bloccati">Applica ora</button>' +
+      '<span style="flex-basis:100%;font-size:var(--fs-xs,.75rem);color:var(--muted)">I collaboratori nuovi partono con questi turni bloccati (all import Excel non chi nel file fa gia tutti quei reparti); poi si cambiano nella loro riga.</span></div>';
+  }
   h +=
     '<div style="display:flex;margin-bottom:8px"><input type="text" id="pref-collab-cerca" class="piano-cerca campo-cerca" placeholder="Cerca collaboratore..." oninput="_filtraPrefCollab(this.value)"></div>';
   h +=
@@ -1658,6 +1683,205 @@ function _filtraPrefCollab(testo) {
   document.querySelectorAll('#pref-collab-table tbody tr').forEach((tr) => {
     tr.style.display = !q || (tr.dataset.prefNome || '').includes(q) ? '' : 'none';
   });
+}
+// TURNI BLOCCATI DI PARTENZA (v365): per settore, i turni che si possono fare solo
+// coprendo alcuni reparti (Slots: S1 e S3 danno le pause in cassa e reception, quindi
+// servono sala, reception e cassa). Un reparto e coperto se la competenza e
+// certificata in Formazione OPPURE se nell ultimo anno (giorni gia passati) la persona
+// ha lavorato turni di quel reparto (dai piani importati). All import Excel contano le
+// sigle del file. Chi non li copre tutti li ha bloccati:
+//  - ogni collaboratore nuovo li riceve da solo (_collabNuovoConBloccati in
+//    realtime.js); all import Excel non li riceve chi nel file fa gia tutti i reparti;
+//  - il pulsante li aggiunge a chi oggi non ha i requisiti (elenco prima di salvare).
+// Poi si cambiano a mano nella riga del collaboratore. Responsabili esclusi.
+// Impostazione piano_turni_bloccati_nuovi = { settore: { codici, gruppi } }.
+const PIANO_BLOCCATI_NUOVI_BASE = { slots: { codici: 'S1, S3', gruppi: 'SALA, REC, CASSA' } };
+function _pianoBloccatiCfg(rep) {
+  const cfg =
+    window._pianoBloccatiNuovi && typeof window._pianoBloccatiNuovi === 'object'
+      ? window._pianoBloccatiNuovi
+      : PIANO_BLOCCATI_NUOVI_BASE;
+  const v = cfg[rep || 'slots'];
+  if (!v) return { codici: '', gruppi: '' };
+  if (typeof v === 'string') return { codici: v, gruppi: '' }; // forma semplice
+  return { codici: String(v.codici || ''), gruppi: String(v.gruppi || '') };
+}
+function pianoBloccatiDiPartenza(rep) {
+  return _pianoBloccatiCfg(rep).codici.trim();
+}
+function _pianoListaCodici(v) {
+  return [
+    ...new Set(
+      String(v || '')
+        .split(/[,\s]+/)
+        .map((x) => x.trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  ];
+}
+// reparti dei turni (gruppo) che una lista di sigle copre, nel settore rep
+function _pianoGruppiDiCodici(codici, rep) {
+  const perCod = {};
+  (pianoTurniCache || [])
+    .filter((t) => (t.reparto_dip || 'slots') === rep)
+    .forEach((t) => (perCod[String(t.codice).toUpperCase()] = String(t.gruppo || '').toUpperCase()));
+  const out = new Set();
+  codici.forEach((c) => {
+    const g = perCod[String(c).toUpperCase()];
+    if (g) out.add(g);
+  });
+  return out;
+}
+// requisiti mancanti per i turni bloccati di partenza: [] = li puo fare.
+// codiciFatti: sigle lavorate (piano o file); c: collaboratore (competenze)
+function _pianoRequisitiMancanti(c, rep, codiciFatti) {
+  const cfg = _pianoBloccatiCfg(rep);
+  const gruppi = _pianoListaCodici(cfg.gruppi);
+  // contano solo i reparti: avere fatto un S1 o S3 non basta (puo essere stato un
+  // errore del piano, es. un S3 dato a chi non ha mai fatto cassa)
+  const fatti = (codiciFatti || []).map((x) => String(x).toUpperCase());
+  const daTurni = _pianoGruppiDiCodici(fatti, rep);
+  const sp = (c && c.competenze) || {};
+  const comps = (typeof getCompetenzeConfigAll === 'function' ? getCompetenzeConfigAll() : {})[rep] || [];
+  const daComp = new Set(
+    comps
+      .filter((k) => sp[k.key] === true)
+      .map((k) => (typeof _formGruppoDi === 'function' ? _formGruppoDi(k) : null))
+      .filter(Boolean),
+  );
+  return gruppi.filter((g) => !daTurni.has(g) && !daComp.has(g));
+}
+async function salvaBloccatiNuovi(campo, valore) {
+  if (!isAdmin()) return;
+  const rep = _pianoReparto();
+  const lista = _pianoListaCodici(valore);
+  const ammessi =
+    campo === 'codici'
+      ? new Set(_pianoTurniReparto().map((t) => String(t.codice).toUpperCase()))
+      : new Set(_pianoTurniReparto().map((t) => String(t.gruppo || '').toUpperCase()));
+  const sbagliati = lista.filter((c) => !ammessi.has(c));
+  if (sbagliati.length) {
+    toastErrore(
+      (campo === 'codici' ? 'Non sono turni di ' : 'Non sono reparti dei turni di ') +
+        repartoLabel(rep) +
+        ': ' +
+        sbagliati.join(', '),
+    );
+    renderPiano();
+    return;
+  }
+  const base =
+    window._pianoBloccatiNuovi && typeof window._pianoBloccatiNuovi === 'object'
+      ? window._pianoBloccatiNuovi
+      : PIANO_BLOCCATI_NUOVI_BASE;
+  const cfg = JSON.parse(JSON.stringify(base));
+  const prima = _pianoBloccatiCfg(rep);
+  cfg[rep] = { codici: prima.codici, gruppi: prima.gruppi };
+  cfg[rep][campo] = lista.join(', ');
+  if (!(await salvaImp('piano_turni_bloccati_nuovi', JSON.stringify(cfg)))) return;
+  window._pianoBloccatiNuovi = cfg;
+  logAzione(
+    'Piano: turni bloccati dei nuovi',
+    rep + ' · ' + campo + ' ' + (prima[campo] || 'nessuno') + ' → ' + (cfg[rep][campo] || 'nessuno'),
+  );
+  toast('Salvato');
+}
+// chi oggi non ha i requisiti: elenco con le spunte e il motivo, poi si salva
+async function pianoBloccaSenzaRequisiti() {
+  if (!isAdmin()) return;
+  const rep = _pianoReparto();
+  const cfg = _pianoBloccatiCfg(rep);
+  const codici = _pianoListaCodici(cfg.codici);
+  if (!codici.length || !_pianoListaCodici(cfg.gruppi).length) {
+    toastErrore('Scrivi prima i turni (es. S1, S3) e i reparti che servono (es. SALA, REC, CASSA)');
+    return;
+  }
+  // turni LAVORATI nel settore nell ultimo anno: solo giorni passati (una bozza o il
+  // piano dei prossimi mesi non dimostrano che la persona sa fare quel reparto)
+  const da = new Date();
+  da.setFullYear(da.getFullYear() - 1);
+  const oggi = oggiLocale();
+  let storia;
+  try {
+    storia =
+      (await secGet(
+        'piano?reparto_dip=eq.' +
+          rep +
+          '&data=gte.' +
+          dataLocaleISO(da) +
+          '&data=lt.' +
+          oggi +
+          '&select=collaboratore,codice&limit=60000',
+      )) || [];
+  } catch (e) {
+    toastErrore('Lettura del piano non riuscita: ' + (e.message || e));
+    return;
+  }
+  const fatti = {};
+  storia.forEach((r) => (fatti[r.collaboratore] = fatti[r.collaboratore] || new Set()).add(r.codice));
+  const ha = (c) => _pianoListaCodici(c.turni_bloccati);
+  const nomi = [];
+  const motivo = {};
+  collaboratoriCache
+    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === rep)
+    .filter((c) => !['RESP', 'VICERESP'].includes(String(c.funzione || '').toUpperCase()))
+    .filter((c) => !codici.every((x) => ha(c).includes(x)))
+    .sort((a, b) => a.nome.localeCompare(b.nome))
+    .forEach((c) => {
+      const manca = _pianoRequisitiMancanti(c, rep, [...(fatti[c.nome] || [])]);
+      if (!manca.length) return;
+      nomi.push(c.nome);
+      motivo[c.nome] = 'manca ' + manca.join(', ');
+    });
+  if (!nomi.length) {
+    toast('Tutti quelli senza ' + cfg.gruppi + ' hanno gia ' + codici.join(', ') + ' bloccati');
+    return;
+  }
+  const velo = document.createElement('div');
+  velo.className = 'finestra-velo';
+  velo.innerHTML =
+    '<div class="finestra-box" role="dialog" aria-modal="true" style="width:min(560px,100%)"><h3>Bloccare ' +
+    escP(codici.join(', ')) +
+    '</h3><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:0 0 10px">Collaboratori di ' +
+    escP(repartoLabel(rep)) +
+    ' che non coprono ' +
+    escP(cfg.gruppi) +
+    ': ne la competenza certificata in Formazione, ne turni di quel reparto nel piano dell ultimo anno. Togli la spunta a chi vuoi lasciare libero; i turni bloccati che hanno gia restano.</p>' +
+    _selPersHtml('blk-sel', [{ titolo: 'Da bloccare', nomi: nomi }], nomi, { dettagli: motivo }) +
+    '<div class="finestra-pulsanti"><button type="button" class="finestra-no" id="blk-no">Annulla</button><button type="button" class="finestra-ok" id="blk-ok">Blocca ' +
+    escP(codici.join(', ')) +
+    '</button></div></div>';
+  document.body.appendChild(velo);
+  selPersDisegna('blk-sel');
+  const scelti = await new Promise((fine) => {
+    document.getElementById('blk-no').onclick = () => fine(null);
+    document.getElementById('blk-ok').onclick = () => fine(selPersValori('blk-sel'));
+  });
+  velo.remove();
+  if (!scelti || !scelti.length) return;
+  let n = 0;
+  try {
+    for (const nome of scelti) {
+      const c = collaboratoriCache.find((x) => x.nome === nome && x.attivo !== false);
+      if (!c) continue;
+      const val = ha(c)
+        .concat(codici.filter((x) => !ha(c).includes(x)))
+        .join(',');
+      await secPatch('collaboratori', 'id=eq.' + c.id, { turni_bloccati: val });
+      c.turni_bloccati = val;
+      n++;
+    }
+  } catch (e) {
+    toastErrore('Salvataggio interrotto dopo ' + n + ' collaboratori: ' + (e.message || e));
+    renderPiano();
+    return;
+  }
+  logAzione(
+    'Piano: turni bloccati a chi non ha i requisiti',
+    rep + ' · ' + codici.join(', ') + ' · ' + scelti.join(', '),
+  );
+  toast(codici.join(', ') + ' bloccati a ' + n + (n === 1 ? ' collaboratore' : ' collaboratori'));
+  renderPiano();
 }
 async function salvaPreferenzaCollab(id, campo, valore) {
   // preferenze del piano (es. solo diurni): chi gestisce il piano o lo Storico HR

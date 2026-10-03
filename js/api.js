@@ -131,6 +131,7 @@ async function loadAll() {
       'giubileo_preavviso',
       'conservazione_anni',
       'conservazione_giorni_grazia',
+      'piano_turni_bloccati_nuovi',
     ]);
   } catch (e) {
     toastErrore('Caricamento dati non riuscito: ' + e.message);
@@ -166,7 +167,14 @@ async function loadAll() {
     giubPre,
     consAnni,
     consGrazia,
+    bloccatiNuovi,
   ] = impostazioni;
+  // turni bloccati di partenza dei collaboratori nuovi (Piano > Impostazioni > Preferenze)
+  window._pianoBloccatiNuovi = null;
+  if (bloccatiNuovi)
+    try {
+      window._pianoBloccatiNuovi = JSON.parse(bloccatiNuovi);
+    } catch (e) {}
   if (tp)
     try {
       tipiPersonalizzati = JSON.parse(tp);

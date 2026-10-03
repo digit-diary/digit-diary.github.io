@@ -18,6 +18,8 @@
 --
 -- Corpi di secure_delete e piano_bulk_upsert identici alla 20260891, di
 -- upsert_impostazione alla 20260890, piu le righe segnate v364.
+-- Riservata all amministratore anche piano_turni_bloccati_nuovi (v365: turni bloccati
+-- di partenza dei collaboratori nuovi, per settore).
 -- Richiede 20260890 e 20260891.
 
 CREATE TABLE IF NOT EXISTS piano_auto_esecuzioni (
@@ -447,7 +449,7 @@ BEGIN
     'piano_cd_config', 'piano_pause_cfg', 'piano_funzioni', 'piano_ore_settimanali', 'piano_max_cambi_mese',
     'piano_giorni_weekend', 'piano_giorni_formazione', 'piano_corsi_lista', 'piano_competenze_gruppi',
     'piano_solver_url', 'maison_auto_delete_giorni', 'piano_organico_attivo', 'piano_organico_costi',
-    'piano_auto_generazione'
+    'piano_auto_generazione', 'piano_turni_bloccati_nuovi'
   ) THEN
     IF NOT COALESCE(v_admin, false) THEN
       RAISE EXCEPTION 'Impostazione riservata all amministratore: %', p_chiave;

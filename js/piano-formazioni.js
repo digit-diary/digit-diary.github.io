@@ -119,6 +119,7 @@ function _selPersHtml(id, gruppi, scelti, opz) {
     tutti: tutti,
     scelti: (scelti || []).filter((n) => tutti.includes(n)),
     numeri: !!opz.numeri,
+    dettagli: opz.dettagli || {},
   };
   return (
     '<div class="selpers" id="' +
@@ -175,6 +176,9 @@ function selPersDisegna(id) {
         st.tutti.indexOf(n) +
         ',this.checked)"> ' +
         escP(n) +
+        (st.dettagli[n]
+          ? ' <span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">· ' + escP(st.dettagli[n]) + '</span>'
+          : '') +
         '</label>';
     });
   });
