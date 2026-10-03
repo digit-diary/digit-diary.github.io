@@ -250,7 +250,111 @@
       if (sost.length && rnd() < 0.7) mossa.push({ n: scegli(sost), d: d1, c: c1 });
       return mossa;
     }
-    const MOSSE = [mossaScambio, mossaScambio, mossaCopri, mossaCambia, mossaSposta, mossaSposta];
+    // 6) mirata: si lavora su chi ha un problema (punteggio della persona sopra zero):
+    //    un suo giorno cambia (anche in riposo) e, se lascia scoperto un posto, lo prende
+    //    chi quel giorno e libero. Le mosse a caso su 40 persone e 30 giorni trovano
+    //    raramente proprio la cella giusta.
+    function mossaMirata() {
+      const problemi = persone.filter((n) => costoP[n] > 1e-6);
+      if (!problemi.length) return null;
+      const n = scegli(problemi);
+      const gg = giorni.filter((d) => puo(n, d));
+      if (!gg.length) return null;
+      const d = scegli(gg);
+      const amm = ammessi(n, d);
+      if (!amm.length) return null;
+      const vecchio = stato[n][d] || '';
+      const c = scegli(amm);
+      if ((c || '') === vecchio) return null;
+      const mossa = [{ n: n, d: d, c: c }];
+      const f = fab[d] || {};
+      if (vecchio && (f[vecchio] || 0) > 0) {
+        const sost = mobili[d].filter(
+          (x) => x !== n && (stato[x][d] || riposo) === riposo && ammessi(x, d).includes(vecchio),
+        );
+        if (sost.length) mossa.push({ n: scegli(sost), d: d, c: vecchio });
+      }
+      return mossa;
+    }
+    // 5) ripristina: una cella cambiata torna com era (con il peso dei cambi: meno cambi)
+    function mossaRipristina() {
+      const cand = [];
+      giorni.forEach((d) =>
+        mobili[d].forEach((n) => {
+          if ((stato[n][d] || '') !== (partenza[n][d] || '')) cand.push([n, d]);
+        }),
+      );
+      if (!cand.length) return null;
+      const [n, d] = scegli(cand);
+      return [{ n: n, d: d, c: partenza[n][d] || '' }];
+    }
+    const MOSSE = [
+      mossaScambio,
+      mossaScambio,
+      mossaCopri,
+      mossaCambia,
+      mossaSposta,
+      mossaSposta,
+      mossaMirata,
+      mossaMirata,
+    ].concat(o.pesoCambio ? [mossaRipristina, mossaRipristina] : []);
+    // ricarica lo stato migliore trovato (per la rifinitura finale)
+    function ricaricaMigliore() {
+      persone.forEach((n) => (stato[n] = Object.assign({}, migliore.stato[n])));
+      giorni.forEach((d) => {
+        assegnati[d] = {};
+        persone.forEach((n) => {
+          const c = stato[n][d];
+          if (c) assegnati[d][c] = (assegnati[d][c] || 0) + 1;
+        });
+      });
+      persone.forEach((n) => (costoP[n] = P.costoPersona(n, stato[n]) + o.pesoCambio * cambiPersona(n)));
+      giorni.forEach((d) => {
+        costoG[d] = P.costoGiorno ? P.costoGiorno(d, perNomeGiorno(d)) : 0;
+        scopG[d] = scopertiGiorno(d);
+      });
+      costoM = P.costoMese ? P.costoMese(stato) : 0;
+      totale = somma(costoP) + somma(costoG) + costoM + o.pesoScoperto * somma(scopG);
+    }
+    // RIFINITURA: ogni cella cambiata prova a tornare com era (da sola, poi insieme a
+    // un altra cella cambiata dello stesso giorno, come negli scambi): resta solo se
+    // niente peggiora. Toglie i cambi non necessari.
+    function rifinisci() {
+      ricaricaMigliore();
+      let giro = true;
+      for (let volte = 0; giro && volte < 4; volte++) {
+        giro = false;
+        const cambiate = [];
+        giorni.forEach((d) =>
+          mobili[d].forEach((n) => {
+            if ((stato[n][d] || '') !== (partenza[n][d] || '')) cambiate.push([n, d]);
+          }),
+        );
+        for (const [n, d] of cambiate) {
+          if ((stato[n][d] || '') === (partenza[n][d] || '')) continue;
+          if (prova([{ n: n, d: d, c: partenza[n][d] || '' }], 0)) {
+            giro = true;
+            continue;
+          }
+          const stessoGiorno = cambiate.filter(
+            ([n2, d2]) => d2 === d && n2 !== n && (stato[n2][d2] || '') !== (partenza[n2][d2] || ''),
+          );
+          for (const [n2] of stessoGiorno)
+            if (
+              prova(
+                [
+                  { n: n, d: d, c: partenza[n][d] || '' },
+                  { n: n2, d: d, c: partenza[n2][d] || '' },
+                ],
+                0,
+              )
+            ) {
+              giro = true;
+              break;
+            }
+        }
+      }
+    }
 
     // lavora per ms millisecondi (o per un numero di iterazioni nei test)
     // temperatura: alta all inizio (frazione 0), zero alla fine (frazione 1)
@@ -271,6 +375,7 @@
     }
     // il risultato: il piano migliore trovato e le celle cambiate
     function risultato() {
+      if (o.pesoCambio) rifinisci();
       const cambi = [];
       persone.forEach((n) =>
         giorni.forEach((d) => {

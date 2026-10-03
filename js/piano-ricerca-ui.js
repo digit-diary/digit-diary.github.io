@@ -31,7 +31,22 @@ function _ricercaRegolaDiLegge(msg) {
 }
 
 // prepara il problema del mese aperto (settore del piano). Ritorna { problema, ... }
-async function _ricercaPrepara() {
+// opz.estesa: anche i turni inseriti a mano si possono spostare (proposte su un
+// piano gia sistemato, con il peso dei cambi); mai assenze, blocchi, giorni chiusi.
+// opz.giorni: Set di date: solo in quei giorni si possono cambiare celle (formazioni:
+// i giorni della formazione e quelli accanto, per i riposi).
+// opz.giorniPersona: { nome: Set di date } giorni in piu per alcune persone (formatore e
+// allievo: la settimana prima e dopo, per giorni di fila, ore della settimana e riposi).
+// opz.soloNuoviBuchi: un posto conta come scoperto solo se la modifica lo lascia
+// scoperto; i buchi che c erano gia non si cercano di coprire.
+// opz.soloPeggioramenti: ogni persona, giorno e mese parte dal suo punteggio di oggi e
+// conta solo quello che peggiora (non si correggono le violazioni gia presenti:
+// per quello c e Migliora la bozza).
+// opz.fissi: { nome: { dstr: codice } } celle obbligate (formazioni); un codice che
+// comincia con ~ e il turno dell allievo: conta per le sue regole e ore, ma non
+// copre un posto del fabbisogno (l allievo e in piu).
+async function _ricercaPrepara(opz) {
+  opz = opz || {};
   const ym = _pianoMeseSel;
   const rep = _pianoReparto();
   const nGiorni = _pianoUltimoGiorno(ym);
@@ -80,6 +95,8 @@ async function _ricercaPrepara() {
   nomi.forEach((n) => {
     const info = _pianoCollabInfo(n) || {};
     giorniAperti.forEach((d) => {
+      if (opz.giorni && !opz.giorni.has(d) && !(opz.giorniPersona && (opz.giorniPersona[n] || new Set()).has(d)))
+        return;
       if (assenze[n + '|' + d]) return;
       if (info.data_assunzione && d < String(info.data_assunzione).substring(0, 10)) return;
       const rr = righeDi[n + '|' + d] || [];
@@ -90,10 +107,17 @@ async function _ricercaPrepara() {
       if (rr.length > 1) return;
       const r = rr[0];
       if (!_pianoCopreQui(r)) return; // giorno passato in un altro settore
-      if (!r.generato || r.protetto || r.motivo_blocco) return;
+      if (r.motivo_blocco) return;
+      if (!opz.estesa && (!r.generato || r.protetto)) return;
       if (r.codice === 'WD' || turniSettore.has(r.codice) || riempimento(r)) mobile[n + '|' + d] = true;
     });
   });
+  // le celle obbligate (formazioni) sono sempre della ricerca (controllate prima)
+  Object.keys(opz.fissi || {}).forEach((n) =>
+    Object.keys(opz.fissi[n]).forEach((d) => {
+      if (nomi.includes(n)) mobile[n + '|' + d] = true;
+    }),
+  );
   // stato di partenza: i codici delle celle mobili ('' = riposo); le altre celle
   // entrano con un segno, cosi non contano per il fabbisogno del settore
   const stato = {};
@@ -120,6 +144,24 @@ async function _ricercaPrepara() {
     if (nomiSet.has(r.collaboratore) || !fabbisogno[d] || !fabbisogno[d][r.codice] || !_pianoCopreQui(r)) return;
     fabbisogno[d][r.codice] = Math.max(0, fabbisogno[d][r.codice] - 1);
   });
+  // solo i buchi nuovi: il fabbisogno non supera quanti posti sono coperti oggi
+  if (opz.soloNuoviBuchi) {
+    const oggiCoperti = {};
+    _pianoRighe.forEach((r) => {
+      if (!_pianoCopreQui(r)) return;
+      const k = String(r.data).substring(0, 10) + '|' + r.codice;
+      oggiCoperti[k] = (oggiCoperti[k] || 0) + 1;
+    });
+    Object.keys(fabbisogno).forEach((d) =>
+      Object.keys(fabbisogno[d]).forEach((c) => {
+        // i posti coperti da chi non partecipa sono gia stati tolti sopra
+        const esterni = _pianoRighe.filter(
+          (r) => !nomiSet.has(r.collaboratore) && String(r.data).startsWith(d) && r.codice === c && _pianoCopreQui(r),
+        ).length;
+        fabbisogno[d][c] = Math.min(fabbisogno[d][c], Math.max(0, (oggiCoperti[d + '|' + c] || 0) - esterni));
+      }),
+    );
+  }
   // chi puo fare cosa, giorno per giorno: i turni che servono quel giorno e per cui
   // la persona e idonea (stesso criterio della bozza), piu il riposo
   const turnoInfoDi = {};
@@ -152,7 +194,8 @@ async function _ricercaPrepara() {
       const d = dstrDi(g);
       if (mobile[n + '|' + d]) {
         // riposo: la C di riempimento come la scrive la bozza
-        const c = mappa[d] || (conRiempimento ? 'C' : '');
+        let c = mappa[d] || (conRiempimento ? 'C' : '');
+        if (c && c[0] === '~') c = c.slice(1); // turno dell allievo in formazione
         if (c) out.push({ collaboratore: n, data: d, codice: c, reparto_dip: rep, generato: true, protetto: false });
       } else (righeDi[n + '|' + d] || []).forEach((r) => out.push(r));
     }
@@ -193,7 +236,9 @@ async function _ricercaPrepara() {
         const righe = estranei.filter((r) => String(r.data).startsWith(d));
         Object.keys(perNome).forEach((n) => {
           if (mobile[n + '|' + d]) {
-            if (perNome[n]) righe.push({ collaboratore: n, data: d, codice: perNome[n], reparto_dip: rep });
+            // l allievo in formazione (~) non conta per le regole fra persone
+            if (perNome[n] && perNome[n][0] !== '~')
+              righe.push({ collaboratore: n, data: d, codice: perNome[n], reparto_dip: rep });
           } else (righeDi[n + '|' + d] || []).forEach((r) => righe.push(r));
         });
         return RICERCA_PESI.regola * _pianoViolazioniGruppi(righe, ctx).filter((v) => v.giorno === g).length;
@@ -229,6 +274,28 @@ async function _ricercaPrepara() {
         return RICERCA_PESI.regola * _pianoViolazioniGruppi(righe, ctx).filter((v) => v.giorno === 0).length;
       }
     : null;
+  // solo peggioramenti: punteggio di partenza (piano di oggi, senza le celle obbligate)
+  let cP = costoPersona;
+  let cG = costoGiorno;
+  let cM = costoMese;
+  if (opz.soloPeggioramenti) {
+    const baseP = {};
+    nomi.forEach((n) => (baseP[n] = costoPersona(n, stato[n])));
+    cP = (n, mappa) => Math.max(0, costoPersona(n, mappa) - (baseP[n] || 0));
+    if (costoGiorno) {
+      const baseG = {};
+      giorniAperti.forEach((d) => {
+        const x = {};
+        nomi.forEach((n) => (x[n] = stato[n][d] || ''));
+        baseG[d] = costoGiorno(d, x);
+      });
+      cG = (d, x) => Math.max(0, costoGiorno(d, x) - (baseG[d] || 0));
+    }
+    if (costoMese) {
+      const baseM = costoMese(stato);
+      cM = (st) => Math.max(0, costoMese(st) - baseM);
+    }
+  }
   return {
     ym: ym,
     reparto: rep,
@@ -245,10 +312,11 @@ async function _ricercaPrepara() {
       fabbisogno: fabbisogno,
       modificabile: (n, d) => !!mobile[n + '|' + d],
       ammessi: ammessi,
-      costoPersona: costoPersona,
-      costoGiorno: costoGiorno,
-      costoMese: costoMese,
+      costoPersona: cP,
+      costoGiorno: cG,
+      costoMese: cM,
       toccaMese: toccaMese,
+      fissi: opz.fissi || null,
     },
   };
 }
@@ -294,6 +362,7 @@ function _ricercaMisuraUfficiale(righe, fabbOriginale) {
     return {
       violazioni: v.lista.length,
       legge: v.lista.filter((x) => _ricercaRegolaDiLegge(x.msg)).length,
+      voci: v.lista.map((x) => x.nome + (x.giorno ? ' ' + x.giorno : '') + ': ' + x.msg),
       regole: v.lista.length - sotto,
       oreSotto: sotto,
       tipi: tipi,

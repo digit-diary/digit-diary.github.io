@@ -50,6 +50,8 @@ const VIS_ITEMS = {
       'Piano · VACANZE E CGF AUTOMATICI: importa il file vacanze, applica le vacanze del mese al piano, assegna i CGF del mese (la V di una persona dagli Avvisi resta libera)',
     piano_auto_import:
       'Piano · IMPORT DA FILE: importa il piano da Excel, il fabbisogno da Excel e il file della timbratrice (copiare, incollare ed esportare restano liberi)',
+    piano_formazioni:
+      'Piano · PIANIFICARE FORMAZIONI: nuova formazione, proposte di cambi e applica, annulla, segna svolta (con certificazione della competenza), formatori e modelli',
     piano_fabbisogno:
       'Piano · MODIFICARE IL FABBISOGNO: le celle del fabbisogno (persone necessarie per turno), incolla, copia dal mese precedente, import e svuota (il fabbisogno lo vedono tutti)',
     piano_auto_cancella:
@@ -86,6 +88,7 @@ const VIS_ITEMS = {
     ptab_timbrature: 'Piano · Timbrature',
     ptab_statistiche: 'Piano · Statistiche',
     ptab_organico: 'Piano · Organico (analisi del personale necessario, suggerimenti, rapporto per la Direzione)',
+    ptab_formazioni: 'Piano · Formazioni (pianificate, svolte, storico di ognuno)',
     ptab_benessere: 'Piano · Benessere',
     ptab_storico: 'Piano · Storico',
     ptab_cambi: 'Piano · Cambi turno (fogli archiviati)',
@@ -158,6 +161,7 @@ const PIANO_AUTO_EREDITATI = [
   'piano_auto_import',
   'piano_auto_cancella',
   'piano_fabbisogno',
+  'piano_formazioni',
 ];
 function _visEreditata(key, nome) {
   const v = visibilitaConfig.piano_azioni_auto || 'admin';
@@ -353,6 +357,7 @@ const MATRICE_PROFILI = {
   ptab_recupero: ['-', 'M', 'M', 'V', '-'],
   ptab_timbrature: ['V', 'M', 'M', 'M', 'M'],
   ptab_statistiche: ['V', 'M', 'M', 'V', 'V'],
+  ptab_formazioni: ['V', 'M', 'M', 'V', 'V'],
   ptab_organico: ['V', 'V', 'V', '-', 'V'],
   ptab_benessere: ['V', 'M', 'M', 'V', 'V'],
   ptab_storico: ['-', 'M', 'M', 'V', '-'],
@@ -387,6 +392,7 @@ const MATRICE_PROFILI = {
   piano_auto_import: ['-', 'M', 'M', '-', '-'],
   piano_auto_cancella: ['-', 'M', 'M', '-', '-'],
   piano_fabbisogno: ['-', 'M', 'M', '-', '-'],
+  piano_formazioni: ['-', 'M', 'M', '-', '-'],
   gestione_corsi: ['V', 'M', 'M', 'M', 'M'],
   gestione_briefing: ['-', 'M', 'M', 'M', '-'],
   storico_hr: ['V', 'V', 'V', 'V', 'M'],

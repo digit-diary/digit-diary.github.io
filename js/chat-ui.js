@@ -2132,7 +2132,9 @@ function _schedaSorgenti(nome) {
       return e.nome === nome;
     }),
     moduli: (completa
-      ? moduliCache.filter((m) => m.tipo !== 'cambio_turno' && m.tipo !== 'non_disponibilita')
+      ? moduliCache.filter(
+          (m) => m.tipo !== 'cambio_turno' && m.tipo !== 'non_disponibilita' && m.tipo !== 'formazione_piano',
+        )
       : getModuliReparto()
     ).filter(function (m) {
       return m.collaboratore && m.collaboratore.toLowerCase() === nomeL;

@@ -549,6 +549,19 @@ function GUIDA_CAPITOLI() {
       ],
     },
     {
+      area: 'piano',
+      titolo: 'Piano: formazioni (pianificare, proposte di cambi, storico)',
+      vis: () => _guidaVis('piano'),
+      righe: [
+        '<b>Nuova formazione</b> (scheda Formazioni, permesso Pianificare formazioni): allievo, competenza (le stesse della scheda Formazione: se aggiungi una competenza o un livello compare anche qui), formatore (anche uno per i diurni e uno per le notti), quanti giorni (5 proposti, il programma chiede conferma prima di generare) e il periodo nel mese aperto.',
+        'I turni vengono dal <b>modello del reparto</b>, presi dai piani veri e modificabili in fondo alla scheda: cassa C0, C4, C23 poi C15, C5; rec R22 x2 poi R23 x3; sala S22 x2 poi S7 x3. Prima i diurni, poi le notti, se possibile nel fine settimana. L allievo e <b>in piu</b> rispetto al fabbisogno: il posto lo copre il formatore.',
+        '<b>Proposte</b>: il programma prova i periodi possibili (senza vacanze, malattie, ND, CGF di allievo e formatore) e, se il piano e gia fatto, trova i cambi necessari con lo stesso motore di Migliora la bozza e le stesse regole di Valida regole, toccando meno celle possibile: solo i giorni della formazione (e la settimana prima e dopo per formatore e allievo) e solo per coprire i posti lasciati liberi. Ogni proposta mostra le celle che cambiano e le eventuali violazioni nuove; si <b>stampa</b> prima di confermare. Annulla = non cambia niente.',
+        '<b>Applica</b>: nel piano le celle hanno il commento "FORMAZIONE CASSA con ..." (al formatore il nome dell allievo, all allievo il nome del formatore). Si annulla con Annulla del piano o, piu tardi, con Annulla nella scheda (le celle della formazione tornano come erano).',
+        '<b>Fine formazione</b>: dopo l ultimo giorno, all apertura della scheda (o con Segna svolta) la formazione risulta svolta nello storico HR, la competenza viene certificata (con i livelli inferiori, il livello si aggiorna da solo nella scheda Formazione) e, se gli incentivi sono attivi, formatore e allievo ricevono i punti.',
+        '<b>Storico di ognuno</b>: quante formazioni da formatore e da allievo; passando il mouse si vede con chi e in quali giorni. <b>Formatori</b>: chi puo formare per ogni competenza (proposti per primi). Dall <b>Organico</b>, sui gruppi scoperti, il bottone Pianifica formazione apre la scheda gia compilata.',
+      ],
+    },
+    {
       area: 'hr',
       titolo: 'Formazione e competenze',
       vis: () => _guidaVis('formazione'),

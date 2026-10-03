@@ -451,6 +451,13 @@ async function _renderPianoOrganicoTab() {
       h +=
         '<div style="font-size:var(--fs-sm,.8125rem);margin-top:6px"><b>Effetto:</b> ' +
         escP(g.effettoTesto) +
+        (g.tipo === 'gruppo' && typeof puoPianificareFormazioni === 'function' && puoPianificareFormazioni()
+          ? ' <button class="btn-act" style="margin-left:8px" onclick="formazioniApriDaOrganico(\'' +
+            escP(g.gruppo) +
+            "','" +
+            escP(((g.formare || [])[0] || '').replace(/'/g, "\\'")) +
+            '\')">Pianifica formazione</button>'
+          : '') +
         '</div>';
     h += '</div>';
   });

@@ -207,6 +207,7 @@ const PIANO_AUTO_PERMESSI = {
   import: 'piano_auto_import', // importa piano, fabbisogno e timbrature da file
   cancella: 'piano_auto_cancella', // cancella il piano intero, tutte le vacanze, il fabbisogno, pulizia
   fabbisogno: 'piano_fabbisogno', // modificare il fabbisogno a mano (celle, incolla, copia dal mese prima)
+  formazioni: 'piano_formazioni', // pianificare formazioni (proposte di cambi, applica, annulla, svolta)
 };
 const PIANO_AUTO_NOMI = {
   genera: 'Piano: genera',
@@ -214,6 +215,7 @@ const PIANO_AUTO_NOMI = {
   import: 'Piano: import da file',
   cancella: 'Piano: cancellazioni di massa',
   fabbisogno: 'Piano: modificare il fabbisogno',
+  formazioni: 'Piano: pianificare formazioni',
 };
 // senza tipo: almeno una delle quattro
 function puoAzioniAutoPiano(tipo) {
@@ -1117,6 +1119,11 @@ const _PIANO_TABS = [
     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M15 14s1 0 1-1-1-4-5-4-5 3-5 4 1 1 1 1zm-7.978-1L7 12.996c.001-.264.167-1.03.76-1.72C8.312 10.629 9.282 10 11 10c1.717 0 2.687.63 3.24 1.276.593.69.758 1.457.76 1.72l-.008.002-.014.002zM11 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4m3-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0M6.936 9.28a6 6 0 0 0-1.23-.247A7 7 0 0 0 5 9c-4 0-5 3-5 4q0 1 1 1h4.216A2.24 2.24 0 0 1 5 13c0-1.01.377-2.042 1.09-2.904.243-.294.526-.569.846-.816M4.92 10A5.5 5.5 0 0 0 4 13H1c0-.26.164-1.03.76-1.724.545-.636 1.492-1.256 3.16-1.275ZM1.5 5.5a3 3 0 1 1 6 0 3 3 0 0 1-6 0m3-2a2 2 0 1 0 0 4 2 2 0 0 0 0-4"/></svg>',
   ],
   [
+    'formazioni',
+    'Formazioni',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 7.14V13a1 1 0 0 0-1 1v2h3v-2a1 1 0 0 0-1-1V6.739l.686-.275a.5.5 0 0 0 .025-.917zM8 8.46 1.758 5.965 8 3.052l6.242 2.913z"/><path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466zm-.068 1.873.22-.748 3.496 1.311a.5.5 0 0 0 .352 0l3.496-1.311.22.748L8 12.46z"/></svg>',
+  ],
+  [
     'benessere',
     'Benessere',
     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="m8 2.748-.717-.737C5.6.281 2.514.878 1.4 3.053c-.523 1.023-.641 2.5.314 4.385.92 1.815 2.834 3.989 6.286 6.357 3.452-2.368 5.365-4.542 6.286-6.357.955-1.886.838-3.362.314-4.385C13.486.878 10.4.28 8.717 2.01zM8 15C-7.333 4.868 3.279-3.04 7.824 1.143q.09.083.176.171a3 3 0 0 1 .176-.17C12.72-3.042 23.333 4.867 8 15"/></svg>',
@@ -1166,6 +1173,7 @@ const PIANO_TAB_GRUPPI = [
       'timbrature',
       'statistiche',
       'organico',
+      'formazioni',
       'benessere',
       'storico',
       'cambi',
@@ -2589,6 +2597,8 @@ async function _renderPianoCore() {
       h += '<div id="piano-config">' + _renderPianoStatCard() + '</div>';
     } else if (_pianoTab === 'organico') {
       h += await _renderPianoOrganicoTab();
+    } else if (_pianoTab === 'formazioni') {
+      h += await _renderPianoFormazioniTab();
     } else if (_pianoTab === 'saldo') {
       h += await _renderPianoSaldoTab();
     } else if (_pianoTab === 'recupero') {
