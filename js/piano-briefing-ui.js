@@ -1700,12 +1700,17 @@ function _renderPianoCorsiCard() {
     '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" title="La prossima volta questo corso partirà con questo orario" onclick="corsoSalvaOrarioDefault()">Salva orario predefinito</button>';
   h += '</div>';
   h +=
-    '<div style="margin-bottom:6px;font-size:var(--fs-sm,.8125rem)"><b>Partecipanti</b> · <span style="cursor:pointer;color:var(--c-blu,#1a4a7a);text-decoration:underline" onclick="document.querySelectorAll(\'.corso-part\').forEach(c=>c.checked=true)">tutti</span> / <span style="cursor:pointer;color:var(--c-blu,#1a4a7a);text-decoration:underline" onclick="document.querySelectorAll(\'.corso-part\').forEach(c=>c.checked=false)">nessuno</span></div>';
+    '<div style="margin-bottom:6px;font-size:var(--fs-sm,.8125rem)"><b>Partecipanti</b> · <span style="cursor:pointer;color:var(--c-blu,#1a4a7a);text-decoration:underline" onclick="document.querySelectorAll(\'.corso-part\').forEach(c=>c.checked=true);corsoContaPartecipanti()">tutti</span> / <span style="cursor:pointer;color:var(--c-blu,#1a4a7a);text-decoration:underline" onclick="document.querySelectorAll(\'.corso-part\').forEach(c=>c.checked=false);corsoContaPartecipanti()">nessuno</span></div>';
+  // ricerca: filtra l elenco mentre si scrive (anche cognome e nome invertiti)
   h +=
-    '<div style="max-height:180px;overflow-y:auto;border:1px solid var(--border,#ccc);padding:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:2px 12px;font-size:var(--fs-md,.875rem)">';
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><input type="search" id="corso-cerca" placeholder="Cerca collaboratore..." autocomplete="off" oninput="corsoFiltraPartecipanti(this.value)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();corsoSpuntaPrimo()}" style="padding:6px 10px;min-width:220px"><span id="corso-cerca-info" style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">Invio spunta il primo trovato</span><span id="corso-sel-n" style="font-size:var(--fs-sm,.8125rem);margin-left:auto">0 selezionati</span></div>';
+  h +=
+    '<div id="corso-part-elenco" onchange="corsoContaPartecipanti()" style="max-height:180px;overflow-y:auto;border:1px solid var(--border,#ccc);padding:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:2px 12px;font-size:var(--fs-md,.875rem)">';
   collabs.forEach((c) => {
     h +=
-      '<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="corso-part" value="' +
+      '<label data-nome="' +
+      escP(c.nome) +
+      '" style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="corso-part" value="' +
       escP(c.nome) +
       '">' +
       escP(c.nome) +
@@ -1741,6 +1746,47 @@ function _renderPianoCorsiCard() {
   }
   h += '</div></div>';
   return h;
+}
+// ricerca nell elenco dei partecipanti: tutte le parole scritte, in qualsiasi ordine
+function corsoFiltraPartecipanti(testo) {
+  const parole = String(testo || '')
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+  let n = 0;
+  document.querySelectorAll('#corso-part-elenco label[data-nome]').forEach((l) => {
+    const nome = (l.dataset.nome || '').toLowerCase();
+    const ok = parole.every((p) => nome.includes(p));
+    l.style.display = ok ? '' : 'none';
+    if (ok) n++;
+  });
+  const info = document.getElementById('corso-cerca-info');
+  if (info)
+    info.textContent = !parole.length
+      ? 'Invio spunta il primo trovato'
+      : n
+        ? n + (n === 1 ? ' trovato · Invio lo spunta' : ' trovati · Invio spunta il primo')
+        : 'nessuno in questo settore con questo nome';
+}
+function corsoSpuntaPrimo() {
+  const l = [...document.querySelectorAll('#corso-part-elenco label[data-nome]')].find(
+    (x) => x.style.display !== 'none',
+  );
+  if (!l) return;
+  const cb = l.querySelector('input');
+  cb.checked = true;
+  const c = document.getElementById('corso-cerca');
+  if (c) {
+    c.value = '';
+    corsoFiltraPartecipanti('');
+    c.focus();
+  }
+  corsoContaPartecipanti();
+}
+function corsoContaPartecipanti() {
+  const n = document.querySelectorAll('.corso-part:checked').length;
+  const el = document.getElementById('corso-sel-n');
+  if (el) el.textContent = n + (n === 1 ? ' selezionato' : ' selezionati');
 }
 function corsoPrefillOrari() {
   const cod = (document.getElementById('corso-cod') || {}).value;

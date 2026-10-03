@@ -1829,7 +1829,15 @@ function _peGeneraVenSab(sh, ctx, dataStr) {
     if (bgRecPrima) _peScrHeader(sh, 5, 4, lblRecBG, bgRecPrima, '20.00 - 02.00', _PE_CLR.verdeScuro);
     else _peScrHeader(sh, 5, 4, 'REC', '(nessun BG)', 'REC copertura', _PE_CLR.verdeScuro);
   }
-  if (nCassaPrinc) _peScrHeader(sh, 5, 7, lblPrinc, nCassaPrinc, '20.50 - 05.00', _PE_CLR.azzurro);
+  // VENERDI E SABATO con tre C8 o piu, scelta alla generazione:
+  //  - normale: la cassa al primo (CD 3/4) da le pause a tutte le casse e la cassa
+  //    allo 0 (CD 2/7) ne da alcune dopo l 1.45 (due cassieri);
+  //  - alternativa: UN cassiere solo (la cassa allo 0) da le pause a tutte le casse;
+  //    la cassa al primo non ha il suo blocco e la colonna resta libera.
+  // (v351 scriveva in alternativa sia la cassa al primo sia il blocco completo
+  // della cassa allo 0: due cassieri con le stesse pause)
+  const cassaAltVenSab = numC8Eff >= 3 && nCassaSec && window._peCassaVenSab === 'alternativa';
+  if (nCassaPrinc && !cassaAltVenSab) _peScrHeader(sh, 5, 7, lblPrinc, nCassaPrinc, '20.50 - 05.00', _PE_CLR.azzurro);
 
   // Q1
   if (bg1.bg1IsC23) {
@@ -1970,8 +1978,9 @@ function _peGeneraVenSab(sh, ctx, dataStr) {
 
   // Q3 CASSA · solo se quel giorno c'è almeno un C8
   r = 7;
-  if (!nCassaPrinc) {
-    // nessun C8: la terza colonna resta per gli extra
+  if (!nCassaPrinc || cassaAltVenSab) {
+    // nessun C8, oppure cassa alternativa del venerdi e sabato: la terza colonna
+    // resta per gli extra
   } else if (numC8Eff <= 2) {
     if (dT['C20']) {
       r = _peSPPC(sh, ctx, r, 7, 'C5', '21.00 - 21.30', nCassaPrinc);
@@ -3444,18 +3453,25 @@ async function briefGeneraPause() {
         pred = localStorage.getItem('pause_cassa_vensab') || 'normale';
       } catch (e) {}
       const sc = await chiediModulo(
-        'Venerdi e sabato con due casse: che pause per la seconda cassa?',
+        'Venerdi e sabato con tre cassieri o piu: chi da le pause delle casse?',
         [
           {
-            titolo: 'Seconda cassa',
+            titolo: 'Pause delle casse',
             campi: [
               {
                 id: 'cassa',
                 tipo: 'scelta',
                 valore: pred,
                 opzioni: [
-                  { valore: 'normale', etichetta: 'Normale (pausa alle 02.15)' },
-                  { valore: 'alternativa', etichetta: 'Alternativa (pause alle 23.30, 01.30 e 02.45)' },
+                  {
+                    valore: 'normale',
+                    etichetta:
+                      'Normale: due cassieri (la cassa al primo da le pause a tutte le casse, la cassa allo 0 ne da alcune dopo l 1.45)',
+                  },
+                  {
+                    valore: 'alternativa',
+                    etichetta: 'Alternativa: un cassiere solo (la cassa allo 0) da le pause a tutte le casse',
+                  },
                 ],
               },
             ],
