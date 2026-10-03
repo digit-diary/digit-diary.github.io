@@ -1853,7 +1853,7 @@ function fabbCtxMenu(e, codice, dstr) {
   menu.style.top = Math.min(e.clientY, window.innerHeight - 120) + 'px';
 }
 async function fabbIncollaDaClipboard() {
-  if (!_pianoAzioneAutoConsentita()) return; // azione automatica: permesso apposito
+  // copiare e incollare il fabbisogno e libero per chi modifica il piano (v356)
   if (!puoGestirePiano() || !window._fabbCtxSel) return;
   const target = window._fabbCtxSel;
   const testo = await _pianoTestoAppunti();
@@ -1940,7 +1940,7 @@ async function fabbIncollaDaClipboard() {
 // riposo 11h, tolleranza). La copertura del fabbisogno non cambia.
 // ============================================================
 async function miglioraOrePiano() {
-  if (!_pianoAzioneAutoConsentita()) return; // azione automatica: permesso apposito
+  if (!_pianoAzioneAutoConsentita('genera')) return; // azione automatica: permesso apposito
   if (!puoGestirePiano()) return;
   const ym = _pianoMeseSel;
   const nGiorni = _pianoUltimoGiorno(ym);
@@ -3098,7 +3098,7 @@ async function _pianoSbloccaGiorni(giorni, perche) {
   return true;
 }
 async function pianoVacanzeMettiV(i) {
-  if (!_pianoAzioneAutoConsentita()) return; // azione automatica: permesso apposito
+  if (!_pianoAzioneAutoConsentita('vacanze')) return; // azione automatica: permesso apposito
   const x = (window._avvVacanze || [])[i];
   if (!x || !puoGestirePiano()) return;
   const giorni = x.giorni.map((g) => g.data);

@@ -196,17 +196,37 @@ async function _pianoConsentiScrittura(dstr, silenzioso) {
   return true;
 }
 // AZIONI AUTOMATICHE DEL PIANO (genera bozza, vacanze, CGF, migliora ore,
-// cancella, importazioni, fabbisogno del mese): permesso apposito
-// "piano_azioni_auto", oltre a poter modificare il piano. Cosi chi corregge le
+// cancella, importazioni): permessi appositi, oltre a poter modificare il piano. Cosi chi corregge le
 // celle non lancia per sbaglio un azione che cambia tutto il mese. Il database
 // blocca anche le cancellazioni a intervallo (migrazione 20260888).
-function puoAzioniAutoPiano() {
+// v356: quattro permessi invece di uno. Copiare e incollare il fabbisogno e
+// esportare restano a chi modifica il piano.
+const PIANO_AUTO_PERMESSI = {
+  genera: 'piano_auto_genera', // genera bozza, solver, coperture, migliora ore, cancella la bozza
+  vacanze: 'piano_auto_vacanze', // applica e importa vacanze, metti V, assegna CGF
+  import: 'piano_auto_import', // importa piano, fabbisogno e timbrature da file
+  cancella: 'piano_auto_cancella', // cancella il piano intero, tutte le vacanze, il fabbisogno, pulizia
+};
+const PIANO_AUTO_NOMI = {
+  genera: 'Piano: genera',
+  vacanze: 'Piano: vacanze e CGF automatici',
+  import: 'Piano: import da file',
+  cancella: 'Piano: cancellazioni di massa',
+};
+// senza tipo: almeno una delle quattro
+function puoAzioniAutoPiano(tipo) {
   if (isAdmin()) return true;
-  return puoGestirePiano() && typeof puoModificare === 'function' && puoModificare('piano_azioni_auto');
+  if (!puoGestirePiano() || typeof puoModificare !== 'function') return false;
+  if (!tipo) return Object.keys(PIANO_AUTO_PERMESSI).some((k) => puoModificare(PIANO_AUTO_PERMESSI[k]));
+  return puoModificare(PIANO_AUTO_PERMESSI[tipo]);
 }
-function _pianoAzioneAutoConsentita() {
-  if (puoAzioniAutoPiano()) return true;
-  toast('Serve il permesso Azioni automatiche del piano (Impostazioni > Visibilita e permessi)');
+function _pianoAzioneAutoConsentita(tipo) {
+  if (puoAzioniAutoPiano(tipo)) return true;
+  toast(
+    'Serve il permesso ' +
+      (PIANO_AUTO_NOMI[tipo] || 'azioni automatiche del piano') +
+      ' (Impostazioni > Visibilita e permessi)',
+  );
   return false;
 }
 function puoGestirePiano() {
@@ -1741,7 +1761,7 @@ async function _renderPianoCore() {
       h += '<div class="pbar-riga">';
       // azioni automatiche (bozza, coperture, migliora ore, cancella, importa): solo
       // con il permesso apposito; senza, i pulsanti non compaiono
-      const puoAuto = puoMod && puoAzioniAutoPiano();
+      const puoAuto = puoMod && puoAzioniAutoPiano('genera');
       if (puoMod) {
         let g = '';
         if (puoAuto)
@@ -1800,7 +1820,7 @@ async function _renderPianoCore() {
             'Trascina i nomi per riordinare; questo pulsante ripristina SUP, BO, poi gli altri',
           ) +
             _pianoColoriBarHtml() +
-            (puoAuto
+            (puoAuto || (puoMod && puoAzioniAutoPiano('cancella'))
               ? pbtn(
                   'Cancella piano',
                   'cancellaBozzaPiano()',
@@ -1812,7 +1832,7 @@ async function _renderPianoCore() {
       }
       let ge =
         pbtn('Copia per Excel', 'copiaPianoExcel()', 'pbar-soft') + pbtn('Stampa PDF', 'stampaPianoPDF()', 'pbar-soft');
-      if (puoAuto) {
+      if (puoMod && puoAzioniAutoPiano('import')) {
         ge += pbtn('Importa piano', "document.getElementById('piano-imp-file').click()", 'pbar-soft');
         ge +=
           '<input type="file" id="piano-imp-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importaPianoExcel(this)">';
@@ -2303,13 +2323,18 @@ async function _renderPianoCore() {
         hFabb +=
           '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Pianificazione (fabbisogno) vs assegnati · ' +
           escP(label);
-        // copia, importa e svuota il fabbisogno del mese: azioni automatiche
-        if (puoMod && puoAzioniAutoPiano())
+        // copiare e libero per chi modifica il piano; importare e svuotare hanno il
+        // loro permesso (import da file, cancellazioni di massa)
+        if (puoMod)
           hFabb +=
             '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:#d4b86a;color:#d4b86a" onclick="copiaFabbisognoMese()">Copia dal mese precedente</button>' +
-            '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="document.getElementById(\'fabb-file\').click()">Importa da Excel</button>' +
-            '<input type="file" id="fabb-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="importaFabbisognoExcel(this)">' +
-            '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:var(--accent);color:var(--accent)" onclick="eliminaFabbisognoMese()">Svuota mese</button>' +
+            (puoAzioniAutoPiano('import')
+              ? '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="document.getElementById(\'fabb-file\').click()">Importa da Excel</button>' +
+                '<input type="file" id="fabb-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="importaFabbisognoExcel(this)">'
+              : '') +
+            (puoAzioniAutoPiano('cancella')
+              ? '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:var(--accent);color:var(--accent)" onclick="eliminaFabbisognoMese()">Svuota mese</button>'
+              : '') +
             '<span style="font-size:var(--fs-sm,.8125rem);color:#b8a98a;font-weight:400">clicca una cella per impostare le persone necessarie</span>';
         hFabb += '</div>';
         // testata giorni con sigla settimana (D/L/M...), festivi e weekend:

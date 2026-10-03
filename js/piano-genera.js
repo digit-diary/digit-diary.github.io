@@ -896,7 +896,7 @@ function _pianoRenderViolazioni() {
 // Le celle esistenti (V, protette, malattie Diario) non si toccano.
 // ================================================================
 async function completaConCoperture() {
-  if (!_pianoAzioneAutoConsentita()) return; // azione automatica: permesso apposito
+  if (!_pianoAzioneAutoConsentita('genera')) return; // azione automatica: permesso apposito
   if (!puoGestirePiano()) return;
   const chi = collaboratoriCache
     .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && _pianoCoperturaCfg(c))
@@ -922,7 +922,7 @@ async function completaConCoperture() {
 // settore d'origine. Con true (bottone "Completa con coperture") si tappano i
 // buchi rimasti usando chi e' abilitato a coprire da altri settori.
 async function generaBozzaPiano(usaCoperture) {
-  if (!_pianoAzioneAutoConsentita()) return; // azione automatica: permesso apposito
+  if (!_pianoAzioneAutoConsentita('genera')) return; // azione automatica: permesso apposito
   if (!puoGestirePiano()) return;
   _pianoUndoSnap((usaCoperture ? 'coperture ' : 'genera bozza ') + _pianoMeseSel);
   const ym = _pianoMeseSel;
@@ -1780,7 +1780,7 @@ async function generaBozzaPiano(usaCoperture) {
 }
 
 async function cancellaBozzaPiano() {
-  if (!_pianoAzioneAutoConsentita()) return; // azione automatica: permesso apposito
+  if (!_pianoAzioneAutoConsentita('genera')) return; // azione automatica: permesso apposito
   // IDENTICO a Turnivo (cancella_piano): elimina le celle NON protette del mese;
   // opzione "cancella tutto" per includere anche le protette.
   if (!puoGestirePiano()) return;
@@ -1802,7 +1802,7 @@ async function cancellaBozzaPiano() {
     '<button class="btn-modal-ok" onclick="eseguiCancellaPiano(false)">Solo non protette (' +
     nonProtette +
     ')</button>' +
-    (isAdmin()
+    (puoAzioniAutoPiano('cancella')
       ? '<button class="btn-modal-ok" style="background:var(--accent)" onclick="eseguiCancellaPiano(true)">TUTTE (' +
         _pianoRighe.length +
         ')</button>'
@@ -1811,9 +1811,8 @@ async function cancellaBozzaPiano() {
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
 async function eseguiCancellaPiano(tutto) {
-  if (!_pianoAzioneAutoConsentita()) return; // azione automatica: permesso apposito
-  // cancellare ANCHE le celle protette (piano reale) e' riservato all'admin
-  if (tutto && !isAdmin()) return;
+  // solo le celle generate = Genera piano; anche le protette = Cancellazioni di massa
+  if (!_pianoAzioneAutoConsentita(tutto ? 'cancella' : 'genera')) return;
   document.getElementById('pwd-modal').classList.add('hidden');
   const ym = _pianoMeseSel;
   const da = ym + '-01';

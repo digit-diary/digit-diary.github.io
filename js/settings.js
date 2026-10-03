@@ -44,8 +44,14 @@ const VIS_ITEMS = {
     gestione_valutazioni: 'Valutazioni · inserire e importare schede',
     gestione_formazioni: 'Formazioni · registrare sessioni formative svolte (es. supervisor)',
     gestione_piano: 'Piano di lavoro · modificare la griglia turni del mese (es. supervisor)',
-    piano_azioni_auto:
-      'Piano · AZIONI AUTOMATICHE: genera bozza e coperture, applica vacanze, assegna CGF, migliora ore, cancella il piano, importa da Excel, fabbisogno del mese (oltre a modificare il piano)',
+    piano_auto_genera:
+      'Piano · GENERA: genera bozza, genera con il solver, completa con coperture, migliora ore, cancella la bozza (celle non protette)',
+    piano_auto_vacanze:
+      'Piano · VACANZE E CGF AUTOMATICI: importa il file vacanze, applica le vacanze al piano, metti V, assegna i CGF del mese',
+    piano_auto_import:
+      'Piano · IMPORT DA FILE: importa il piano da Excel, il fabbisogno da Excel e il file della timbratrice (copiare, incollare ed esportare restano liberi)',
+    piano_auto_cancella:
+      'Piano · CANCELLAZIONI DI MASSA: cancella il piano intero (anche le celle protette), elimina tutte le vacanze, svuota il fabbisogno del mese, togli i mesi dei disattivati',
     gestione_regole:
       'Regole del piano · vedere e modificare le regole (riposo minimo, giorni consecutivi, RAP, vacanze)',
     gestione_festivi: 'Festivi e CGF · gestire il calendario dei giorni festivi e i recuperi',
@@ -140,9 +146,22 @@ function _extraPuoModificare() {
   const v = _accessiExtraDi(getOperatore())[currentReparto];
   return !!(v && v.modifica === true);
 }
+// v356: le azioni automatiche del piano divise in quattro permessi. Finche una
+// voce nuova non e salvata in Visibilita vale il permesso unico di prima
+// (piano_azioni_auto: Responsabile e Sostituto). Stessa regola nel database
+// (migrazione 20260891).
+const PIANO_AUTO_EREDITATI = ['piano_auto_genera', 'piano_auto_vacanze', 'piano_auto_import', 'piano_auto_cancella'];
+function _visEreditata(key, nome) {
+  const v = visibilitaConfig.piano_azioni_auto || 'admin';
+  let ha = false;
+  if (v === 'tutti') ha = true;
+  else if (typeof v === 'object' && v.tipo === 'selezionati') ha = !!(v.operatori && v.operatori.includes(nome));
+  return ha;
+}
 function puoModificare(key) {
   if (isAdmin()) return true;
   if (_inRepartoExtra() && !_extraPuoModificare()) return false; // extra in sola lettura
+  if (visibilitaConfig[key] == null && PIANO_AUTO_EREDITATI.includes(key)) return _visEreditata(key, getOperatore());
   const v = visibilitaConfig[key] || 'admin';
   if (v === 'admin' || v === 'nascosto') return false;
   if (typeof v === 'object' && v.tipo === 'selezionati') {
@@ -355,7 +374,10 @@ const MATRICE_PROFILI = {
   gestione_valutazioni: ['V', 'M', 'M', 'V', 'V'],
   gestione_formazioni: ['V', 'M', 'M', 'V', 'V'],
   gestione_piano: ['V', 'M', 'M', 'M', 'V'],
-  piano_azioni_auto: ['-', 'M', 'M', '-', '-'],
+  piano_auto_genera: ['-', 'M', 'M', '-', '-'],
+  piano_auto_vacanze: ['-', 'M', 'M', '-', '-'],
+  piano_auto_import: ['-', 'M', 'M', '-', '-'],
+  piano_auto_cancella: ['-', 'M', 'M', '-', '-'],
   gestione_corsi: ['V', 'M', 'M', 'M', 'M'],
   gestione_briefing: ['-', 'M', 'M', 'M', '-'],
   storico_hr: ['V', 'V', 'V', 'V', 'M'],
@@ -423,6 +445,7 @@ function _profiloConcede(key, prof) {
 // Con la configurazione di oggi, questo operatore ha accesso alla voce?
 // Serve per non toccare chi non ha un profilo assegnato.
 function _visHaAccessoOggi(key, nome) {
+  if (visibilitaConfig[key] == null && PIANO_AUTO_EREDITATI.includes(key)) return _visEreditata(key, nome);
   const permesso = !!(VIS_ITEMS.permessi && VIS_ITEMS.permessi[key]);
   const v = visibilitaConfig[key] != null ? visibilitaConfig[key] : permesso ? 'admin' : 'tutti';
   if (v === 'tutti') return true;

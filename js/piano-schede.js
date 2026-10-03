@@ -76,8 +76,10 @@ function _renderPianoTimbratureCard() {
   h +=
     '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">' +
     '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px" onclick="caricaConfrontoTimbrature()">Carica confronto del mese</button>' +
-    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="document.getElementById(\'timb-file\').click()">Importa file timbratrice</button>' +
-    '<input type="file" id="timb-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="importaTimbrature(this)">' +
+    (puoAzioniAutoPiano('import')
+      ? '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="document.getElementById(\'timb-file\').click()">Importa file timbratrice</button>' +
+        '<input type="file" id="timb-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="importaTimbrature(this)">'
+      : '') +
     '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">CSV o Excel con colonne nome / data / entrata / uscita (riconosciute in automatico)</span></div>';
   h +=
     '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:10px">Collegamento automatico alla timbratrice: nel pacchetto IT c\'è lo script <b>sync_timbratrice.py</b> che legge gli export della timbratrice e carica le timbrature qui da solo (in automatico ogni pochi minuti, lo configura l\'IT).</p>';
@@ -126,7 +128,7 @@ async function aggiungiTimbratura() {
   }
 }
 async function importaTimbrature(input) {
-  if (!_pianoAzioneAutoConsentita()) return; // azione automatica: permesso apposito
+  if (!_pianoAzioneAutoConsentita('import')) return; // azione automatica: permesso apposito
   if (!(await assicuraLibreria('xlsx'))) return;
   if (!puoGestirePiano()) return;
   const file = input.files[0];
@@ -1114,7 +1116,8 @@ async function _renderPianoVacanzeTab() {
     h +=
       '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="apriNuovaVacanza()">Nuova vacanza</button>';
     // importa, applica al piano ed elimina tutte: azioni automatiche (permesso apposito)
-    const _auto = puoAzioniAutoPiano();
+    const _auto = puoAzioniAutoPiano('vacanze');
+    const _cancella = puoAzioniAutoPiano('cancella');
     h +=
       (_auto
         ? '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:#d4b86a;color:#d4b86a" onclick="document.getElementById(\'vac-file\').click()">Importa (Excel o PDF)</button>' +
@@ -1131,7 +1134,7 @@ async function _renderPianoVacanzeTab() {
       '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-viola,#7b2d8b);color:#b07cc7" onclick="apriScambioSettimane()">Scambia settimane</button>';
     h +=
       '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-viola,#7b2d8b);color:#b07cc7" onclick="pdfCambioVacanza()">Formulario cambio vacanza</button>';
-    if (_auto)
+    if (_cancella)
       h +=
         '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--accent);color:var(--accent)" onclick="eliminaTutteVacanze()">Elimina tutte</button>';
   }
@@ -2187,7 +2190,7 @@ async function eliminaVacanza(id) {
   }
 }
 async function eliminaTutteVacanze() {
-  if (!_pianoAzioneAutoConsentita()) return; // azione automatica: permesso apposito
+  if (!_pianoAzioneAutoConsentita('cancella')) return; // azione automatica: permesso apposito
   if (!puoGestirePiano()) return;
   const anno = window._pianoVacAnno;
   if (
@@ -2553,7 +2556,7 @@ async function _applicaVacanzeMese(interattivo) {
   return { v: nV, c: nC, wd: nWdP, orfane: nOrfane, altre: nAltre, nonToccati: nonToccati, primoAperto: primoAperto };
 }
 async function applicaVacanzePiano() {
-  if (!_pianoAzioneAutoConsentita()) return; // azione automatica: permesso apposito
+  if (!_pianoAzioneAutoConsentita('vacanze')) return; // azione automatica: permesso apposito
   const MESI_L = MESI_FULL || [];
   const lbl = (MESI_L[parseInt(_pianoMeseSel.split('-')[1]) - 1] || '') + ' ' + _pianoMeseSel.split('-')[0];
   if (
@@ -2828,7 +2831,7 @@ async function _vacRigheDaPdf(file) {
   return { righe: out, ignoti: ignoti };
 }
 async function importaVacanzePiano(input) {
-  if (!_pianoAzioneAutoConsentita()) return; // azione automatica: permesso apposito
+  if (!_pianoAzioneAutoConsentita('vacanze')) return; // azione automatica: permesso apposito
   if (!(await assicuraLibreria('xlsx'))) return;
   if (!(await assicuraLibreria('pdf'))) return;
   if (!puoGestirePiano()) return;
