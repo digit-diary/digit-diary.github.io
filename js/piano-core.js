@@ -206,12 +206,14 @@ const PIANO_AUTO_PERMESSI = {
   vacanze: 'piano_auto_vacanze', // applica e importa vacanze, metti V, assegna CGF
   import: 'piano_auto_import', // importa piano, fabbisogno e timbrature da file
   cancella: 'piano_auto_cancella', // cancella il piano intero, tutte le vacanze, il fabbisogno, pulizia
+  fabbisogno: 'piano_fabbisogno', // modificare il fabbisogno a mano (celle, incolla, copia dal mese prima)
 };
 const PIANO_AUTO_NOMI = {
   genera: 'Piano: genera',
   vacanze: 'Piano: vacanze e CGF automatici',
   import: 'Piano: import da file',
   cancella: 'Piano: cancellazioni di massa',
+  fabbisogno: 'Piano: modificare il fabbisogno',
 };
 // senza tipo: almeno una delle quattro
 function puoAzioniAutoPiano(tipo) {
@@ -2333,9 +2335,10 @@ async function _renderPianoCore() {
         hFabb +=
           '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Pianificazione (fabbisogno) vs assegnati · ' +
           escP(label);
-        // copiare e libero per chi modifica il piano; importare e svuotare hanno il
-        // loro permesso (import da file, cancellazioni di massa)
-        if (puoMod)
+        // il fabbisogno lo vedono tutti; lo modifica (a mano, copia, incolla, import,
+        // svuota) solo chi ha il permesso Modificare il fabbisogno
+        const puoFabb = puoMod && puoAzioniAutoPiano('fabbisogno');
+        if (puoFabb)
           hFabb +=
             '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:#d4b86a;color:#d4b86a" onclick="copiaFabbisognoMese()">Copia dal mese precedente</button>' +
             (puoAzioniAutoPiano('import')
@@ -2432,9 +2435,9 @@ async function _renderPianoCore() {
                 '"' +
                 ' style="' +
                 stile +
-                (puoMod ? 'cursor:pointer' : '') +
+                (puoFabb ? 'cursor:pointer' : '') +
                 '"' +
-                (puoMod
+                (puoFabb
                   ? ' onclick="fabbisognoInline(\'' + escP(cod) + "','" + dstr + '\',this)"'
                   : ' onclick="fabbCellaClick(\'' + escP(cod) + "','" + dstr + '\',this)"') +
                 ' oncontextmenu="fabbCtxMenu(event,\'' +

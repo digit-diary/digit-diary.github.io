@@ -934,6 +934,7 @@ let _pianoFabbCache = [];
 
 async function setPianoFabbisogno(codice, dstr, qDiretta) {
   if (!puoGestirePiano()) return;
+  if (!_pianoAzioneAutoConsentita('fabbisogno')) return; // visibile a tutti, modificabile con il permesso
   const esistente = _pianoFabbCache.find(
     (f) => f.turno_codice === codice && f.data === dstr && (f.reparto_dip || 'slots') === _pianoReparto(),
   );
@@ -1482,6 +1483,7 @@ function _xlsTrovaCollab(nome, lista) {
 
 async function importaFabbisognoExcel(input) {
   if (!_pianoAzioneAutoConsentita('import')) return; // azione automatica: permesso apposito
+  if (!_pianoAzioneAutoConsentita('fabbisogno')) return; // scrive il fabbisogno
   if (!(await assicuraLibreria('xlsx'))) return;
   if (!puoGestirePiano()) return;
   const file = input.files[0];
@@ -2175,6 +2177,7 @@ async function importaPianoExcel(input) {
 // come fabbisogno.elimina di Turnivo: cancella tutto il fabbisogno del mese
 async function eliminaFabbisognoMese() {
   if (!_pianoAzioneAutoConsentita('cancella')) return; // azione automatica: permesso apposito
+  if (!_pianoAzioneAutoConsentita('fabbisogno')) return; // scrive il fabbisogno
   if (!puoGestirePiano()) return;
   const ym = _pianoMeseSel;
   const n = _pianoFabbCache.length;
@@ -2229,7 +2232,8 @@ function _pianoProfiloGiorno(dstr) {
   return 'D' + dow; // lunedi..giovedi restano distinti
 }
 async function copiaFabbisognoMese() {
-  // copiare e incollare il fabbisogno e libero per chi modifica il piano (v356)
+  // il fabbisogno si modifica solo con il permesso Modificare il fabbisogno (v359)
+  if (!_pianoAzioneAutoConsentita('fabbisogno')) return;
   if (!puoGestirePiano()) return;
   const p = _pianoMeseSel.split('-');
   const dPrec = new Date(parseInt(p[0]), parseInt(p[1]) - 2, 15);

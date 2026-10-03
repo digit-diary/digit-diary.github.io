@@ -1834,7 +1834,7 @@ function fabbCtxMenu(e, codice, dstr) {
   let menu = document.getElementById('piano-ctx');
   if (!menu) return;
   window._fabbCtxSel = { codice: codice, dstr: dstr };
-  const puoMod = puoGestirePiano();
+  const puoMod = puoGestirePiano() && puoAzioniAutoPiano('fabbisogno');
   let h =
     '<div class="piano-ctx-head">Fabbisogno ' +
     escP(codice) +
@@ -1853,7 +1853,8 @@ function fabbCtxMenu(e, codice, dstr) {
   menu.style.top = Math.min(e.clientY, window.innerHeight - 120) + 'px';
 }
 async function fabbIncollaDaClipboard() {
-  // copiare e incollare il fabbisogno e libero per chi modifica il piano (v356)
+  // il fabbisogno si modifica solo con il permesso Modificare il fabbisogno (v359)
+  if (!_pianoAzioneAutoConsentita('fabbisogno')) return;
   if (!puoGestirePiano() || !window._fabbCtxSel) return;
   const target = window._fabbCtxSel;
   const testo = await _pianoTestoAppunti();

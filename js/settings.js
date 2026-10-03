@@ -50,6 +50,8 @@ const VIS_ITEMS = {
       'Piano · VACANZE E CGF AUTOMATICI: importa il file vacanze, applica le vacanze del mese al piano, assegna i CGF del mese (la V di una persona dagli Avvisi resta libera)',
     piano_auto_import:
       'Piano · IMPORT DA FILE: importa il piano da Excel, il fabbisogno da Excel e il file della timbratrice (copiare, incollare ed esportare restano liberi)',
+    piano_fabbisogno:
+      'Piano · MODIFICARE IL FABBISOGNO: le celle del fabbisogno (persone necessarie per turno), incolla, copia dal mese precedente, import e svuota (il fabbisogno lo vedono tutti)',
     piano_auto_cancella:
       'Piano · CANCELLAZIONI DI MASSA: cancella il piano intero (anche le celle protette), elimina tutte le vacanze, svuota il fabbisogno del mese, togli i mesi dei disattivati',
     gestione_regole:
@@ -150,7 +152,13 @@ function _extraPuoModificare() {
 // voce nuova non e salvata in Visibilita vale il permesso unico di prima
 // (piano_azioni_auto: Responsabile e Sostituto). Stessa regola nel database
 // (migrazione 20260891).
-const PIANO_AUTO_EREDITATI = ['piano_auto_genera', 'piano_auto_vacanze', 'piano_auto_import', 'piano_auto_cancella'];
+const PIANO_AUTO_EREDITATI = [
+  'piano_auto_genera',
+  'piano_auto_vacanze',
+  'piano_auto_import',
+  'piano_auto_cancella',
+  'piano_fabbisogno',
+];
 function _visEreditata(key, nome) {
   const v = visibilitaConfig.piano_azioni_auto || 'admin';
   let ha = false;
@@ -378,6 +386,7 @@ const MATRICE_PROFILI = {
   piano_auto_vacanze: ['-', 'M', 'M', '-', '-'],
   piano_auto_import: ['-', 'M', 'M', '-', '-'],
   piano_auto_cancella: ['-', 'M', 'M', '-', '-'],
+  piano_fabbisogno: ['-', 'M', 'M', '-', '-'],
   gestione_corsi: ['V', 'M', 'M', 'M', 'M'],
   gestione_briefing: ['-', 'M', 'M', 'M', '-'],
   storico_hr: ['V', 'V', 'V', 'V', 'M'],
