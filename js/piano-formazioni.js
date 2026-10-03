@@ -4,8 +4,9 @@
  *
  * SCHEDA FORMAZIONI del Piano: si sceglie l allievo, la competenza (dalla
  * configurazione della scheda Formazione: reparti, competenze e livelli sono gli
- * stessi), il formatore (anche uno per i diurni e uno per le notti), quanti giorni e
- * in che periodo. Il programma:
+ * stessi), uno o piu formatori (anche diversi per diurni e notti: per ogni giorno il
+ * primo libero nell ordine scelto), quanti giorni e in che periodo (in qualsiasi mese,
+ * anche a cavallo di due: ogni proposta sta dentro un mese). Il programma:
  *  - prende la sequenza dei turni dal MODELLO del reparto (dai piani veri: cassa
  *    C0, C4, C23 poi C15, C5; rec R22 x2 poi R23 x3; sala S22 x2 poi S7 x3),
  *    prima i diurni poi le notti, le notti se possibile nel fine settimana;
@@ -92,6 +93,103 @@ function _formFormatori(compKey) {
 }
 function _formNomeReparto(comp) {
   return String((comp && comp.label) || '').toUpperCase();
+}
+function _formMeseDopo(ym) {
+  const p = ym.split('-');
+  const d = new Date(parseInt(p[0]), parseInt(p[1]), 15);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+function _formMeseNome(ym) {
+  const p = String(ym).split('-');
+  return ((typeof MESI_FULL !== 'undefined' && MESI_FULL[parseInt(p[1]) - 1]) || ym) + ' ' + p[0];
+}
+
+// ---------------------------------------------------------------- scelta persone
+// LISTA CON RICERCA E SPUNTE: si scrive per filtrare, si spuntano una o piu persone;
+// le scelte restano in alto come etichette numerate (l ordine e la preferenza: il
+// primo formatore e quello proposto per primo) e si tolgono con la x.
+// gruppi: [{ titolo, nomi }]
+window._selPers = window._selPers || {};
+function _selPersHtml(id, gruppi, scelti, opz) {
+  opz = opz || {};
+  const tutti = [];
+  gruppi.forEach((g) => g.nomi.forEach((n) => tutti.includes(n) || tutti.push(n)));
+  window._selPers[id] = {
+    gruppi: gruppi,
+    tutti: tutti,
+    scelti: (scelti || []).filter((n) => tutti.includes(n)),
+    numeri: !!opz.numeri,
+  };
+  return (
+    '<div class="selpers" id="' +
+    id +
+    '"><div class="selpers-scelti" id="' +
+    id +
+    '-scelti"></div><input type="search" class="selpers-cerca" id="' +
+    id +
+    '-cerca" placeholder="' +
+    escP(opz.segnaposto || 'Cerca per nome...') +
+    '" oninput="selPersDisegna(\'' +
+    id +
+    '\')" autocomplete="off"><div class="selpers-lista" id="' +
+    id +
+    '-lista"></div></div>'
+  );
+}
+function selPersDisegna(id) {
+  const st = window._selPers[id];
+  if (!st) return;
+  const elS = document.getElementById(id + '-scelti');
+  const elL = document.getElementById(id + '-lista');
+  if (!elS || !elL) return;
+  elS.innerHTML = st.scelti
+    .map(
+      (n, k) =>
+        '<span class="selpers-chip">' +
+        (st.numeri && st.scelti.length > 1 ? '<b>' + (k + 1) + '.</b> ' : '') +
+        escP(n) +
+        '<button type="button" title="Togli" aria-label="Togli ' +
+        escP(n) +
+        '" onclick="selPersCambia(\'' +
+        id +
+        "'," +
+        st.tutti.indexOf(n) +
+        ',false)">&times;</button></span>',
+    )
+    .join('');
+  const q = String((document.getElementById(id + '-cerca') || {}).value || '')
+    .trim()
+    .toLowerCase();
+  let h = '';
+  st.gruppi.forEach((g) => {
+    const righe = g.nomi.filter((n) => !q || n.toLowerCase().includes(q));
+    if (!righe.length) return;
+    if (st.gruppi.length > 1) h += '<div class="selpers-gruppo">' + escP(g.titolo) + '</div>';
+    righe.forEach((n) => {
+      h +=
+        '<label class="selpers-riga"><input type="checkbox"' +
+        (st.scelti.includes(n) ? ' checked' : '') +
+        ' onchange="selPersCambia(\'' +
+        id +
+        "'," +
+        st.tutti.indexOf(n) +
+        ',this.checked)"> ' +
+        escP(n) +
+        '</label>';
+    });
+  });
+  elL.innerHTML = h || '<div class="selpers-vuota">Nessun nome trovato</div>';
+}
+function selPersCambia(id, i, on) {
+  const st = window._selPers[id];
+  const n = st && st.tutti[i];
+  if (!n) return;
+  st.scelti = st.scelti.filter((x) => x !== n);
+  if (on) st.scelti.push(n);
+  selPersDisegna(id);
+}
+function selPersValori(id) {
+  return ((window._selPers[id] || {}).scelti || []).slice();
 }
 
 // ---------------------------------------------------------------- archivio
@@ -320,47 +418,52 @@ async function formazioneScegliFormatori(compKey) {
   const membri = collaboratoriCache
     .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
     .sort((a, b) => a.nome.localeCompare(b.nome));
-  const scelta = await chiediModulo(
-    'Formatori per ' +
-      comp.label +
-      ': scrivi i nomi separati da virgola (cognome e nome come in Gestione collaboratori).',
-    [
-      {
-        titolo: 'Formatori',
-        campi: [{ id: 'nomi', etichetta: '', valore: _formFormatori(compKey).join(', '), larghezza: 520 }],
-      },
-    ],
-    { titolo: 'Formatori · ' + comp.label, ok: 'Salva' },
-  );
-  if (!scelta) return;
-  const voluti = String(scelta.nomi || '')
-    .split(',')
-    .map((x) => x.trim())
-    .filter(Boolean);
-  const trovati = [];
-  const non = [];
-  voluti.forEach((v) => {
-    const c = typeof _xlsTrovaCollab === 'function' ? _xlsTrovaCollab(v, membri) : membri.find((m) => m.nome === v);
-    if (c) trovati.push(c.nome);
-    else non.push(v);
+  // prima chi e gia abilitato al reparto dei turni (gruppo), poi gli altri del settore
+  const t = _pianoTurniReparto().find((x) => String(x.gruppo || '').toUpperCase() === comp.gruppo);
+  const abil = membri.filter((c) => !t || _pianoIdoneoStatico(c.nome, t, null, null)).map((c) => c.nome);
+  const altri = membri.map((c) => c.nome).filter((n) => !abil.includes(n));
+  const prima = _formFormatori(compKey);
+  const velo = document.createElement('div');
+  velo.className = 'finestra-velo';
+  velo.innerHTML =
+    '<div class="finestra-box" role="dialog" aria-modal="true" style="width:min(520px,100%)"><h3>Formatori · ' +
+    escP(comp.label) +
+    '</h3><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:0 0 10px">Spunta chi puo formare per questa competenza: nelle nuove formazioni viene proposto per primo. Cerca scrivendo una parte del nome.</p>' +
+    _selPersHtml(
+      'fzf-sel',
+      [
+        { titolo: 'Abilitati a ' + comp.gruppo, nomi: abil },
+        { titolo: 'Altri del settore', nomi: altri },
+      ],
+      prima,
+    ) +
+    '<div class="finestra-pulsanti"><button type="button" class="finestra-no" id="fzf-no">Annulla</button><button type="button" class="finestra-ok" id="fzf-ok">Salva</button></div></div>';
+  document.body.appendChild(velo);
+  selPersDisegna('fzf-sel');
+  const scelti = await new Promise((fine) => {
+    document.getElementById('fzf-no').onclick = () => fine(null);
+    document.getElementById('fzf-ok').onclick = () => fine(selPersValori('fzf-sel'));
   });
-  if (non.length) {
-    toastErrore('Non trovati nel settore: ' + non.join(', '));
+  velo.remove();
+  if (!scelti) return;
+  const chiave = 'fmt_' + compKey;
+  try {
+    for (const c of membri) {
+      const ha = (c.competenze || {})[chiave] === true;
+      const deve = scelti.includes(c.nome);
+      if (ha === deve) continue;
+      const nuove = Object.assign({}, c.competenze || {});
+      if (deve) nuove[chiave] = true;
+      else delete nuove[chiave];
+      await secPatch('collaboratori', 'id=eq.' + c.id, { competenze: nuove });
+      c.competenze = nuove;
+    }
+  } catch (e) {
+    toastErrore('Formatori non salvati: ' + (e.message || e));
     return;
   }
-  const chiave = 'fmt_' + compKey;
-  for (const c of membri) {
-    const ha = (c.competenze || {})[chiave] === true;
-    const deve = trovati.includes(c.nome);
-    if (ha === deve) continue;
-    const nuove = Object.assign({}, c.competenze || {});
-    if (deve) nuove[chiave] = true;
-    else delete nuove[chiave];
-    await secPatch('collaboratori', 'id=eq.' + c.id, { competenze: nuove });
-    c.competenze = nuove;
-  }
-  logAzione('Formazioni: formatori', comp.label + ': ' + (trovati.join(', ') || 'nessuno'));
-  toast('Formatori salvati');
+  logAzione('Formazioni: formatori', comp.label + ': ' + (scelti.join(', ') || 'nessuno'));
+  toast('Formatori salvati: ' + (scelti.length ? scelti.join(', ') : 'nessuno'));
   renderPiano();
 }
 
@@ -378,65 +481,96 @@ async function formazioneNuova(pre) {
     .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
     .map((c) => c.nome)
     .sort((a, b) => a.localeCompare(b));
+  // PERIODO IN QUALSIASI MESE: si parte dal mese aperto nel piano (da oggi se e il
+  // mese in corso); le date si possono spostare anche nei mesi dopo
   const ym = _pianoMeseSel;
   const oggi = oggiLocale();
   const ultimo = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
-  const dal = pre.dal || (oggi > ym + '-01' && oggi.startsWith(ym) ? oggi : ym + '-01');
+  let dal = pre.dal || (oggi > ym + '-01' && oggi.startsWith(ym) ? oggi : ym + '-01');
+  if (dal < oggi) dal = oggi;
+  const al = pre.al || (ultimo >= dal ? ultimo : _formPiu(dal, 27));
   const compPre = pre.compKey ? comps.find((c) => c.key === pre.compKey) : comps.find((c) => c.gruppo === pre.gruppo);
-  const opt = (lista, sel) =>
-    lista
-      .map((n) => '<option value="' + escP(n) + '"' + (n === sel ? ' selected' : '') + '>' + escP(n) + '</option>')
-      .join('');
+  const riga = (et, campo, nota) =>
+    '<div style="display:grid;grid-template-columns:140px 1fr;gap:10px;align-items:start;margin:10px 0">' +
+    '<label style="padding-top:6px;font-weight:600">' +
+    et +
+    '</label><div>' +
+    campo +
+    (nota ? '<div style="font-size:var(--fs-xs,.75rem);color:var(--muted);margin-top:3px">' + nota + '</div>' : '') +
+    '</div></div>';
   const velo = document.createElement('div');
   velo.className = 'finestra-velo';
   velo.innerHTML =
-    '<div class="finestra-box" role="dialog" aria-modal="true" style="max-width:640px"><h3>Nuova formazione</h3>' +
-    '<div style="display:grid;grid-template-columns:150px 1fr;gap:8px 10px;align-items:center;font-size:var(--fs-md,.875rem)">' +
-    '<label>Allievo</label><input id="fz-allievo" list="fz-nomi" value="' +
-    escP(pre.allievo || '') +
-    '" placeholder="Cerca collaboratore..." autocomplete="off">' +
-    '<datalist id="fz-nomi">' +
-    opt(membri, '') +
-    '</datalist>' +
-    '<label>Competenza</label><select id="fz-comp" onchange="formazioneAggiornaFormatori()">' +
-    comps
-      .map(
-        (c) =>
-          '<option value="' +
-          escP(c.key) +
-          '"' +
-          (compPre && compPre.key === c.key ? ' selected' : '') +
-          '>' +
-          escP(c.label) +
-          ' (' +
-          escP(c.gruppo) +
-          ')</option>',
-      )
-      .join('') +
-    '</select>' +
-    '<label>Formatore diurni</label><select id="fz-fmt-d"></select>' +
-    '<label>Formatore notti</label><select id="fz-fmt-n"></select>' +
-    '<label>Giorni</label><input id="fz-n" type="number" min="1" max="10" value="5" style="width:80px">' +
-    '<label>Periodo</label><span><input id="fz-dal" type="date" value="' +
-    dal +
-    '" min="' +
-    ym +
-    '-01" max="' +
-    ultimo +
-    '"> al <input id="fz-al" type="date" value="' +
-    ultimo +
-    '" min="' +
-    ym +
-    '-01" max="' +
-    ultimo +
-    '"></span>' +
-    '<label>Preferenze</label><span><label><input type="checkbox" id="fz-weekend" checked> notti nel fine settimana se possibile</label></span>' +
-    '<label>Tempo di ricerca</label><select id="fz-tempo"><option value="20">20 secondi</option><option value="45" selected>45 secondi</option><option value="90">90 secondi</option></select>' +
-    '</div><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:8px 0 0">I giorni sono di fila, nel mese aperto nel piano (' +
-    escP(ym) +
-    '). Nella proposta vedi le celle che cambiano; puoi stamparla prima di confermare.</p>' +
-    '<div class="finestra-pulsanti"><button type="button" class="finestra-no" id="fz-no">Annulla</button><button type="button" class="finestra-ok" id="fz-ok">Cerca proposte</button></div></div>';
+    '<div class="finestra-box" role="dialog" aria-modal="true" style="width:min(680px,100%)"><h3>Nuova formazione</h3>' +
+    '<div style="font-size:var(--fs-md,.875rem)">' +
+    riga(
+      'Allievo',
+      '<input id="fz-allievo" list="fz-nomi" value="' +
+        escP(pre.allievo || '') +
+        '" placeholder="Cerca collaboratore..." autocomplete="off" style="width:100%;padding:6px 8px"><datalist id="fz-nomi">' +
+        membri.map((n) => '<option value="' + escP(n) + '">').join('') +
+        '</datalist>',
+    ) +
+    riga(
+      'Competenza',
+      '<select id="fz-comp" onchange="formazioneAggiornaFormatori()" style="width:100%;padding:6px 8px">' +
+        comps
+          .map(
+            (c) =>
+              '<option value="' +
+              escP(c.key) +
+              '"' +
+              (compPre && compPre.key === c.key ? ' selected' : '') +
+              '>' +
+              escP(c.label) +
+              ' (' +
+              escP(c.gruppo) +
+              ')</option>',
+          )
+          .join('') +
+        '</select>',
+    ) +
+    riga(
+      'Formatori diurni',
+      '<div id="fz-box-d"></div>',
+      'Uno o piu: per ogni giorno si prende il primo libero, nell ordine scelto.',
+    ) +
+    riga(
+      'Formatori notti',
+      '<label style="display:inline-flex;gap:6px;align-items:center;margin-bottom:6px"><input type="checkbox" id="fz-stessi" checked onchange="document.getElementById(\'fz-box-n\').hidden=this.checked"> gli stessi dei diurni</label><div id="fz-box-n" hidden></div>',
+    ) +
+    riga(
+      'Giorni',
+      '<input id="fz-n" type="number" min="1" max="10" value="5" style="width:80px;padding:6px 8px">',
+      'Di fila, con i turni del modello del reparto (prima i diurni, poi le notti).',
+    ) +
+    riga(
+      'Periodo',
+      '<input id="fz-dal" type="date" value="' +
+        dal +
+        '" min="' +
+        oggi +
+        '"> al <input id="fz-al" type="date" value="' +
+        al +
+        '" min="' +
+        oggi +
+        '">',
+      'Anche in un altro mese o a cavallo di due mesi (al massimo 3 mesi). Ogni proposta sta dentro un mese.',
+    ) +
+    riga(
+      'Preferenze',
+      '<label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="fz-weekend" checked> notti nel fine settimana se possibile</label>',
+    ) +
+    riga(
+      'Tempo di ricerca',
+      '<select id="fz-tempo" style="padding:6px 8px"><option value="20">20 secondi</option><option value="45" selected>45 secondi</option><option value="90">90 secondi</option></select>',
+      'Nella proposta vedi le celle che cambiano; puoi stamparla prima di confermare.',
+    ) +
+    '</div><div class="finestra-pulsanti"><button type="button" class="finestra-no" id="fz-no">Annulla</button><button type="button" class="finestra-ok" id="fz-ok">Cerca proposte</button></div></div>';
   document.body.appendChild(velo);
+  // scelte di una finestra precedente: si riparte da capo
+  delete window._selPers['fz-fmt-d'];
+  delete window._selPers['fz-fmt-n'];
   formazioneAggiornaFormatori(pre.formatore);
   await new Promise((fine) => {
     document.getElementById('fz-no').onclick = () => {
@@ -457,27 +591,38 @@ async function formazioneNuova(pre) {
         toastErrore('Allievo non trovato nel settore');
         return;
       }
+      const formatoriD = selPersValori('fz-fmt-d');
+      const stessi = !!(document.getElementById('fz-stessi') || {}).checked;
+      const formatoriN = stessi ? formatoriD.slice() : selPersValori('fz-fmt-n');
       const richiesta = {
         allievo: trovato.nome,
         comp: comps.find((c) => c.key === v('fz-comp')),
-        fmtD: v('fz-fmt-d'),
-        fmtN: v('fz-fmt-n') || v('fz-fmt-d'),
+        formatoriD: formatoriD,
+        formatoriN: formatoriN.length ? formatoriN : formatoriD.slice(),
         n: Math.max(1, Math.min(10, parseInt(v('fz-n')) || 5)),
         dal: v('fz-dal'),
         al: v('fz-al'),
         weekend: !!(document.getElementById('fz-weekend') || {}).checked,
         secondi: parseInt(v('fz-tempo')) || 45,
       };
-      if (!richiesta.fmtD) {
-        toastErrore('Scegli il formatore');
+      if (!richiesta.formatoriD.length) {
+        toastErrore('Scegli almeno un formatore');
         return;
       }
-      if (richiesta.fmtD === richiesta.allievo || richiesta.fmtN === richiesta.allievo) {
-        toastErrore('Formatore e allievo devono essere persone diverse');
+      if (richiesta.formatoriD.concat(richiesta.formatoriN).includes(richiesta.allievo)) {
+        toastErrore('L allievo non puo essere anche formatore');
         return;
       }
       if (!richiesta.dal || !richiesta.al || richiesta.al < richiesta.dal) {
-        toastErrore('Periodo non valido');
+        toastErrore('Periodo non valido: la data di fine viene prima di quella di inizio');
+        return;
+      }
+      if (richiesta.dal < oggi) {
+        toastErrore('Il periodo non puo cominciare nel passato');
+        return;
+      }
+      if (_formPiu(richiesta.dal, 92) < richiesta.al) {
+        toastErrore('Periodo troppo lungo: al massimo 3 mesi');
         return;
       }
       // numero di giorni: si conferma prima di generare
@@ -486,6 +631,7 @@ async function formazioneNuova(pre) {
         toastErrore('Nessun modello di turni per ' + richiesta.comp.gruppo);
         return;
       }
+      const elenco = (l) => l.join(', ');
       const ok = await chiediConferma(
         richiesta.allievo +
           ' · ' +
@@ -495,9 +641,15 @@ async function formazioneNuova(pre) {
           (richiesta.n === 1 ? ' giorno' : ' giorni') +
           ' con questi turni: ' +
           seq.map((x) => x.codice).join(', ') +
-          '\nFormatore: ' +
-          richiesta.fmtD +
-          (richiesta.fmtN !== richiesta.fmtD ? ' (diurni), ' + richiesta.fmtN + ' (notti)' : '') +
+          '\nFormatori: ' +
+          elenco(richiesta.formatoriD) +
+          (elenco(richiesta.formatoriN) !== elenco(richiesta.formatoriD)
+            ? ' (diurni), ' + elenco(richiesta.formatoriN) + ' (notti)'
+            : '') +
+          '\nPeriodo: dal ' +
+          _formGg(richiesta.dal) +
+          ' al ' +
+          _formGg(richiesta.al) +
           '\n\nCerco le proposte?',
         { titolo: 'Nuova formazione' },
       );
@@ -508,7 +660,8 @@ async function formazioneNuova(pre) {
     };
   });
 }
-// formatori proposti per la competenza scelta: prima i formatori, poi gli abilitati
+// formatori proposti per la competenza scelta: prima i formatori, poi gli abilitati.
+// Le scelte gia fatte restano se la persona e ancora nella lista.
 function formazioneAggiornaFormatori(preferito) {
   const sel = document.getElementById('fz-comp');
   if (!sel) return;
@@ -521,60 +674,77 @@ function formazioneAggiornaFormatori(preferito) {
     .filter((c) => !t || _pianoIdoneoStatico(c.nome, t, null, null))
     .map((c) => c.nome)
     .sort((a, b) => a.localeCompare(b));
-  const html =
-    (fm.length
-      ? '<optgroup label="Formatori">' + fm.map((n) => '<option>' + escP(n) + '</option>').join('') + '</optgroup>'
-      : '') +
-    '<optgroup label="Altri abilitati">' +
-    abil.map((n) => '<option>' + escP(n) + '</option>').join('') +
-    '</optgroup>';
-  ['fz-fmt-d', 'fz-fmt-n'].forEach((id) => {
-    const s = document.getElementById(id);
-    if (!s) return;
-    s.innerHTML = (id === 'fz-fmt-n' ? '<option value="">come i diurni</option>' : '') + html;
-    if (id === 'fz-fmt-d' && preferito) s.value = preferito;
+  const gruppi = [
+    { titolo: 'Formatori di ' + comp.label, nomi: fm.slice().sort((a, b) => a.localeCompare(b)) },
+    { titolo: 'Altri abilitati a ' + comp.gruppo, nomi: abil },
+  ].filter((g) => g.nomi.length);
+  [
+    ['fz-box-d', 'fz-fmt-d'],
+    ['fz-box-n', 'fz-fmt-n'],
+  ].forEach(([box, id]) => {
+    const el = document.getElementById(box);
+    if (!el) return;
+    const prima = selPersValori(id);
+    // di partenza: il formatore indicato (da Organico) o tutti i formatori della competenza
+    const scelti = prima.length ? prima : preferito ? [preferito] : fm.slice();
+    el.innerHTML = _selPersHtml(id, gruppi, scelti, { numeri: true, segnaposto: 'Cerca formatore...' });
+    selPersDisegna(id);
   });
 }
 
 // ---------------------------------------------------------------- proposte
-// giorni candidati: n giorni di fila nel periodo, senza assenze di allievo e formatori
-async function _formCandidati(r, seq) {
+// giorni candidati nel mese ym: n giorni di fila dentro il periodo e dentro il mese,
+// senza assenze dell allievo; per ogni giorno il primo formatore libero nell ordine
+// scelto (lo stesso del giorno prima se possibile: meno cambi di formatore)
+async function _formCandidati(r, seq, ym, righe) {
   const out = [];
-  const ym = _pianoMeseSel;
   const malattie = Object.assign({}, _pianoMalattieMese(ym), _pianoCnpMese(ym), _pianoFineMese(ym), _pianoNdMese(ym));
-  const cellaDi = (n, d) => _pianoRighe.find((x) => x.collaboratore === n && String(x.data).startsWith(d));
-  const piu = (d, k) => {
-    const x = new Date(d + 'T12:00:00');
-    x.setDate(x.getDate() + k);
-    return dataLocaleISO(x);
+  const cellaDi = (n, d) => righe.find((x) => x.collaboratore === n && String(x.data).startsWith(d));
+  const piu = _formPiu;
+  const libero = (n, d) => {
+    if (malattie[n + '|' + d]) return false;
+    const c = cellaDi(n, d);
+    return !(c && (c.motivo_blocco || FORM_ASSENZE.includes(String(c.codice).toUpperCase()) || !_pianoCopreQui(c)));
   };
-  for (let s = r.dal; piu(s, seq.length - 1) <= r.al; s = piu(s, 1)) {
+  const inizio = r.dal > ym + '-01' ? r.dal : ym + '-01';
+  for (let s = inizio; s.startsWith(ym) && piu(s, seq.length - 1) <= r.al; s = piu(s, 1)) {
     const giorni = seq.map((x, i) => Object.assign({ data: piu(s, i) }, x));
     if (!giorni.every((g) => g.data.startsWith(ym))) break;
     let ok = true;
     let conflitti = 0;
     let weekend = 0;
+    let prec = null;
     giorni.forEach((g) => {
       if (_pianoGiornoBloccato(g.data) && !_pianoGiornoSbloccato(g.data)) ok = false;
-      g.formatore = g.fase === 'N' ? r.fmtN : r.fmtD;
-      [r.allievo, g.formatore].forEach((n) => {
-        if (malattie[n + '|' + g.data]) ok = false;
+      if (!libero(r.allievo, g.data)) ok = false;
+      const lista = (g.fase === 'N' ? r.formatoriN : r.formatoriD).filter((n) => libero(n, g.data));
+      if (!lista.length) {
+        ok = false;
+        return;
+      }
+      const giaQui = lista.find((n) => {
         const c = cellaDi(n, g.data);
-        if (!c) return;
-        if (c.motivo_blocco || FORM_ASSENZE.includes(String(c.codice).toUpperCase()) || !_pianoCopreQui(c)) ok = false;
-        else if (c.codice !== g.codice) conflitti++;
+        return c && c.codice === g.codice;
+      });
+      g.formatore = prec && lista.includes(prec) ? prec : giaQui || lista[0];
+      prec = g.formatore;
+      [r.allievo, g.formatore].forEach((n) => {
+        const c = cellaDi(n, g.data);
+        if (c && c.codice !== g.codice) conflitti++;
       });
       // notte di venerdi, sabato o domenica: piu lavoro, si vede di piu
       const dow = new Date(g.data + 'T12:00:00').getDay();
       if (g.fase === 'N' && (dow === 5 || dow === 6 || dow === 0)) weekend++;
     });
-    if (ok) out.push({ inizio: s, giorni: giorni, conflitti: conflitti, weekend: weekend });
+    if (ok) out.push({ inizio: s, ym: ym, giorni: giorni, conflitti: conflitti, weekend: weekend });
   }
-  out.sort(
+  return out;
+}
+function _formOrdinaCandidati(r, lista) {
+  return lista.sort(
     (a, b) =>
       (r.weekend ? b.weekend - a.weekend : 0) * 2 + (a.conflitti - b.conflitti) || a.inizio.localeCompare(b.inizio),
   );
-  return out;
 }
 async function _formCercaProposte(r, seq) {
   const reparto = _formNomeReparto(r.comp);
@@ -590,26 +760,49 @@ async function _formCercaProposte(r, seq) {
     if (b) b.style.width = Math.round(f * 100) + '%';
   };
   const proposte = [];
+  const meseAperto = _pianoMeseSel;
+  // dati di ogni mese del periodo: celle, fabbisogno e misura di partenza
+  const mesi = {};
+  const caricaMese = async (ym) => {
+    _pianoMeseSel = ym;
+    if (!mesi[ym]) {
+      const righe = await _pianoCaricaMeseSettore(
+        ym + '-01',
+        ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0'),
+        _pianoReparto(),
+      );
+      mesi[ym] = { righe: righe };
+    }
+    _pianoRighe = mesi[ym].righe;
+    return mesi[ym];
+  };
   try {
-    _pianoRighe = await _pianoCaricaMeseSettore(
-      _pianoMeseSel + '-01',
-      _pianoMeseSel + '-' + String(_pianoUltimoGiorno(_pianoMeseSel)).padStart(2, '0'),
-      _pianoReparto(),
-    );
-    const cand = (await _formCandidati(r, seq)).slice(0, 5);
+    // il periodo puo toccare piu mesi: si cercano i giorni in ognuno
+    let tutti = [];
+    for (let ym = r.dal.substring(0, 7); ym <= r.al.substring(0, 7); ym = _formMeseDopo(ym)) {
+      prog('Cerco i giorni possibili in ' + _formMeseNome(ym) + '...', 0);
+      const m = await caricaMese(ym);
+      tutti = tutti.concat(await _formCandidati(r, seq, ym, m.righe));
+    }
+    const cand = _formOrdinaCandidati(r, tutti).slice(0, 5);
     if (!cand.length) {
+      _pianoMeseSel = meseAperto;
       velo.remove();
       toastErrore(
         'Nessun periodo possibile: nei giorni scelti allievo o formatore sono assenti (vacanze, malattie, ND, CGF) o i giorni sono chiusi',
       );
       return;
     }
-    const fabb = await _formFabbisogno();
-    const righePrima = _pianoRighe.slice();
-    const primaUff = _formMisura(righePrima, fabb, null);
     const ms = (r.secondi * 1000) / cand.length;
     for (let i = 0; i < cand.length; i++) {
       const c = cand[i];
+      const m = await caricaMese(c.ym);
+      if (!m.fabb) {
+        m.fabb = await _formFabbisogno();
+        m.prima = _formMisura(m.righe.slice(), m.fabb, null);
+      }
+      const fabb = m.fabb;
+      const primaUff = m.prima;
       prog('Proposta ' + (i + 1) + ' di ' + cand.length + ': dal ' + _formGg(c.inizio), i / cand.length);
       const fissi = {};
       c.giorni.forEach((g) => {
@@ -665,6 +858,7 @@ async function _formCercaProposte(r, seq) {
       });
       const sotto = (x) => / SOTTO il minimo /.test(x);
       proposte.push({
+        ym: c.ym,
         candidato: c,
         prep: prep,
         cambi: ris.cambi.map((x) => Object.assign({}, x, { dopo: String(x.dopo || '').replace(/^~/, '') })),
@@ -679,11 +873,14 @@ async function _formCercaProposte(r, seq) {
       });
     }
   } catch (e) {
+    _pianoMeseSel = meseAperto;
     velo.remove();
     console.error(e);
     toastErrore('Ricerca non riuscita: ' + (e.message || e));
     return;
   }
+  // il piano resta sul mese che era aperto; applicando si va al mese della proposta
+  _pianoMeseSel = meseAperto;
   velo.remove();
   // le migliori: prima nessuna regola peggiorata, poi meno cambi, poi le notti nel weekend
   proposte.sort(
@@ -740,78 +937,104 @@ function _formMostraProposte() {
   const velo = document.createElement('div');
   velo.className = 'finestra-velo';
   velo.id = 'fz-proposte';
+  const gg3 = (d) => GIORNI[new Date(d + 'T12:00:00').getDay()].slice(0, 3);
+  const cella = (c) => (c ? escP(c) : '<span style="color:var(--muted)">riposo</span>');
   let h =
-    '<div class="finestra-box" role="dialog" aria-modal="true" style="max-width:760px;max-height:88vh;overflow:auto"><h3>Proposte · ' +
+    '<div class="finestra-box" role="dialog" aria-modal="true" style="width:min(820px,100%);max-height:90vh"><h3>Proposte di formazione</h3>' +
+    '<div style="font-size:var(--fs-md,.875rem);line-height:1.6"><b>' +
     escP(r.allievo) +
-    ' · ' +
+    '</b> · ' +
     escP(r.comp.label) +
-    '</h3>';
-  if (!P.lista.length) h += '<p>Nessuna proposta trovata.</p>';
+    ' · ' +
+    r.n +
+    (r.n === 1 ? ' giorno' : ' giorni') +
+    ' · dal ' +
+    _formGg(r.dal) +
+    ' al ' +
+    _formGg(r.al) +
+    '</div><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:4px 0 0">Le proposte sono ordinate dalla migliore. Niente cambia finche non premi Applica; Stampa per farla vedere prima.</p>';
+  if (!P.lista.length) h += '<p style="margin-top:12px">Nessuna proposta trovata.</p>';
   P.lista.forEach((p, i) => {
     const c = p.candidato;
     const ok = !p.nuoveLegge && !p.nuoveRegole;
+    const nViol = p.nuoveLegge + p.nuoveRegole;
     h +=
-      '<div style="border:1px solid var(--line);border-left:4px solid ' +
-      (ok ? 'var(--c-verde,#2c6e49)' : '#b8860b') +
-      ';border-radius:3px;padding:10px 12px;margin:10px 0;background:var(--paper2)">' +
-      '<b>Proposta ' +
+      '<div class="fzp-card' +
+      (ok ? ' ok' : '') +
+      '"><div class="fzp-testa"><b>Proposta ' +
       (i + 1) +
-      ': dal ' +
+      ' · ' +
       _formGg(c.giorni[0].data) +
-      ' al ' +
+      ' - ' +
       _formGg(c.giorni[c.giorni.length - 1].data) +
-      '</b>' +
-      (c.weekend ? ' · ' + c.weekend + (c.weekend === 1 ? ' notte' : ' notti') + ' nel fine settimana' : '') +
-      '<div style="font-size:var(--fs-sm,.8125rem);margin-top:4px">' +
-      c.giorni
-        .map(
-          (g) =>
-            _formGg(g.data) +
-            ' ' +
-            GIORNI[new Date(g.data + 'T12:00:00').getDay()].slice(0, 3) +
-            ' <b>' +
-            g.codice +
-            '</b> con ' +
-            escP(g.formatore),
-        )
-        .join(' · ') +
-      '</div><div style="font-size:var(--fs-sm,.8125rem);margin-top:6px">' +
-      (p.altri.length
-        ? '<b>' + p.altri.length + ' altre celle cambiano</b> (' + escP(p.persone.join(', ')) + ')'
-        : '<b>Nessun altro cambio</b>') +
-      ' · regole: ' +
+      ' ' +
+      escP(_formMeseNome(p.ym || c.giorni[0].data.substring(0, 7))) +
+      '</b><span class="fzp-stato">' +
       (ok
-        ? '<span style="color:var(--c-verde,#2c6e49)">nessuna violazione nuova</span>'
-        : '<span style="color:#b8860b">' + (p.nuoveLegge + p.nuoveRegole) + ' violazioni nuove</span>') +
-      ' · posti scoperti: ' +
+        ? 'Nessuna regola nuova violata'
+        : nViol +
+          (nViol === 1 ? ' regola nuova violata' : ' regole nuove violate') +
+          (p.nuoveLegge ? ', ' + p.nuoveLegge + ' di legge' : '')) +
+      '</span></div>' +
+      '<div class="fzp-numeri"><span>Altre celle che cambiano: <b>' +
+      p.altri.length +
+      '</b></span><span>Posti scoperti: <b>' +
       p.prima.scoperti +
       ' → ' +
       p.dopo.scoperti +
-      '</div>' +
-      ((p.violNuove || []).length
-        ? '<div style="font-size:var(--fs-sm,.8125rem);color:#8a6d0b;margin-top:4px">' +
-          p.violNuove.map((x) => escP(x)).join('<br>') +
-          '</div>'
-        : '') +
-      (p.altri.length
-        ? '<div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:4px">' +
-          p.altri
-            .slice(0, 12)
-            .map(
-              (x) => escP(x.nome) + ' ' + _formGg(x.data) + ': ' + (x.prima || 'riposo') + ' → ' + (x.dopo || 'riposo'),
-            )
-            .join('; ') +
-          (p.altri.length > 12 ? ' e altri ' + (p.altri.length - 12) : '') +
-          '</div>'
-        : '') +
-      '<div style="margin-top:8px;display:flex;gap:8px"><button class="btn-export" onclick="formazioneStampaProposta(' +
+      '</b></span>' +
+      (c.weekend ? '<span>Notti nel fine settimana: <b>' + c.weekend + '</b></span>' : '') +
+      '</div><div class="fzp-sotto">Giorni della formazione</div><div style="overflow-x:auto"><table class="fzp-tab"><thead><tr><th>Giorno</th><th>Turno</th><th>Formatore</th></tr></thead><tbody>' +
+      c.giorni
+        .map(
+          (g) =>
+            '<tr><td>' +
+            gg3(g.data) +
+            ' ' +
+            _formGg(g.data) +
+            '</td><td><b>' +
+            escP(g.codice) +
+            '</b></td><td>' +
+            escP(g.formatore) +
+            '</td></tr>',
+        )
+        .join('') +
+      '</tbody></table></div>';
+    if (p.altri.length) {
+      const ord = p.altri.slice().sort((a, b) => a.nome.localeCompare(b.nome) || a.data.localeCompare(b.data));
+      h +=
+        '<div class="fzp-sotto">Celle di altri colleghi che cambiano</div><div class="fzp-scorri"><table class="fzp-tab"><thead><tr><th>Collaboratore</th><th>Giorno</th><th>Prima</th><th>Dopo</th></tr></thead><tbody>' +
+        ord
+          .map(
+            (x) =>
+              '<tr' +
+              (typeof _attrCella === 'function' ? _attrCella(x.nome, x.data) : '') +
+              '><td>' +
+              escP(x.nome) +
+              '</td><td>' +
+              gg3(x.data) +
+              ' ' +
+              _formGg(x.data) +
+              '</td><td>' +
+              cella(x.prima) +
+              '</td><td class="fzp-dopo">' +
+              cella(x.dopo) +
+              '</td></tr>',
+          )
+          .join('') +
+        '</tbody></table></div>';
+    } else h += '<div class="fzp-sotto">Nessun altro collega cambia turno</div>';
+    if ((p.violNuove || []).length)
+      h += '<div class="fzp-avvisi"><b>Da sapere:</b><br>' + p.violNuove.map((x) => escP(x)).join('<br>') + '</div>';
+    h +=
+      '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn-export" onclick="formazioneStampaProposta(' +
       i +
       ')">Stampa</button><button class="btn-export" style="border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="formazioneApplicaProposta(' +
       i +
-      ')">Applica</button></div></div>';
+      ')">Applica questa proposta</button></div></div>';
   });
   h +=
-    '<div class="finestra-pulsanti"><button type="button" class="finestra-no" onclick="document.getElementById(\'fz-proposte\').remove();window._formProposte=null;toast(\'Nessuna modifica: proposte chiuse\')">Annulla</button></div></div>';
+    '<div class="finestra-pulsanti"><button type="button" class="finestra-no" onclick="document.getElementById(\'fz-proposte\').remove();window._formProposte=null;toast(\'Nessuna modifica: proposte chiuse\')">Chiudi senza cambiare niente</button></div></div>';
   velo.innerHTML = h;
   document.body.appendChild(velo);
 }
@@ -920,6 +1143,18 @@ async function formazioneApplicaProposta(i) {
   const prep = p.prep;
   const box = document.getElementById('fz-proposte');
   if (box) box.remove();
+  // la proposta puo essere di un altro mese: si apre quel mese (Annulla del piano
+  // fotografa il mese giusto)
+  if (p.ym && p.ym !== _pianoMeseSel) {
+    _pianoMeseSel = p.ym;
+    _pianoViolCelle = {};
+    _pianoViolLista = null;
+  }
+  _pianoRighe = await _pianoCaricaMeseSettore(
+    _pianoMeseSel + '-01',
+    _pianoMeseSel + '-' + String(_pianoUltimoGiorno(_pianoMeseSel)).padStart(2, '0'),
+    _pianoReparto(),
+  );
   _pianoUndoSnap('formazione ' + r.allievo);
   const op = getOperatore();
   const ora = new Date().toISOString();

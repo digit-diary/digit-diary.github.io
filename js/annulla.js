@@ -103,11 +103,32 @@
     impostazioni: 'impostazione',
   };
   const copia = (x) => (x == null ? x : JSON.parse(JSON.stringify(x)));
+  // DATA E ORA: lo stesso istante arriva scritto in modi diversi (il programma scrive
+  // 2026-10-03T22:12:34.567Z, il database rilegge 2026-10-04 00:12:34.567+02): si
+  // confrontano gli istanti, non il testo. Prima un Elimina seguito da Annulla
+  // finiva sempre in "modificata da qualcun altro". Solo date con l ora e il fuso.
+  const RE_ISTANTE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}(:?\d{2})?)$/;
+  const istante = (v) => {
+    if (typeof v !== 'string' || !RE_ISTANTE.test(v)) return NaN;
+    // fuso corto del database (+02 o +0200) nella forma che ogni browser legge (+02:00)
+    const t = v
+      .replace(' ', 'T')
+      .replace(/([+-]\d{2})$/, '$1:00')
+      .replace(/([+-]\d{2})(\d{2})$/, '$1:$2');
+    return Date.parse(t);
+  };
   const uguale = (a, b) => {
     if (a == null && b == null) return true;
     if (a == null || b == null) return String(a || '') === String(b || '');
     if (typeof a === 'object' || typeof b === 'object') return JSON.stringify(a) === JSON.stringify(b);
-    return String(a) === String(b);
+    if (String(a) === String(b)) return true;
+    const ta = istante(a);
+    const tb = istante(b);
+    if (!isNaN(ta) && !isNaN(tb)) return ta === tb;
+    // numeri: 1.5 e "1.50" sono lo stesso valore (colonne numeriche rilette come testo)
+    if ((typeof a === 'number' || typeof b === 'number') && String(a).trim() !== '' && String(b).trim() !== '')
+      return Number(a) === Number(b);
+    return false;
   };
 
   // canale = { leggi(query), patch(tabella, filtro, dati), post(tabella, riga), del(tabella, filtro),

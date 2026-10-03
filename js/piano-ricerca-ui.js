@@ -374,9 +374,12 @@ function _ricercaMisuraUfficiale(righe, fabbOriginale) {
 }
 
 // RICERCA sul mese aperto, senza scrivere niente: ritorna prima/dopo e i cambi.
-// secondi: tempo a disposizione; onPasso(stato) per la barra di avanzamento
-async function pianoRicercaCalcola(secondi, onPasso) {
-  const prep = await _ricercaPrepara();
+// secondi: tempo a disposizione; onPasso(stato) per la barra di avanzamento;
+// opz (facoltativo): { prepara: opzioni di _ricercaPrepara, motore: opzioni del
+// motore, es. pesoCambio } per le correzioni mirate (confine fra due mesi)
+async function pianoRicercaCalcola(secondi, onPasso, opz) {
+  opz = opz || {};
+  const prep = await _ricercaPrepara(opz.prepara);
   const fabbOriginale = {};
   // fabbisogno intero (con i posti coperti da altri settori) per il conteggio ufficiale
   const fr =
@@ -399,7 +402,10 @@ async function pianoRicercaCalcola(secondi, onPasso) {
       ] = q;
   });
   const prima = _ricercaMisuraUfficiale(_pianoRighe, fabbOriginale);
-  const motore = PianoRicerca.crea(prep.problema, { pesoScoperto: RICERCA_PESI.scoperto, seme: Date.now() % 100000 });
+  const motore = PianoRicerca.crea(
+    prep.problema,
+    Object.assign({ pesoScoperto: RICERCA_PESI.scoperto, seme: Date.now() % 100000 }, opz.motore || {}),
+  );
   const ms = Math.max(1, secondi) * 1000;
   const inizio = Date.now();
   // a fette da 40 ms: la pagina resta usabile
@@ -590,8 +596,9 @@ async function _ricercaScrivi(res) {
         togli.length +
         ' tolte)',
     );
-    toast('Bozza migliorata: ' + res.cambi.length + ' celle');
+    if (!window._pianoAutoInCorso) toast('Bozza migliorata: ' + res.cambi.length + ' celle');
   } catch (e) {
+    if (window._pianoAutoInCorso) throw e;
     toastErrore('Scrittura interrotta: ' + (e.message || e) + '. Con Annulla del piano si torna a prima.');
   }
   _pianoViolCelle = {};

@@ -200,6 +200,8 @@ function _renderPianoImpostazioniCard() {
   h +=
     '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:10px">Le funzioni compaiono nei menu di Gestione collaboratori e nelle mappature. Preferenze per collaboratore (solo diurni, turni bloccati, settori...) nella card qui sotto.</p>';
   h += '</div></div>';
+  // generazione automatica (js/piano-auto.js): scheda propria, si riempie da sola
+  if (typeof _pianoAutoCardSegnaposto === 'function') h += _pianoAutoCardSegnaposto();
   return h;
 }
 // Cambi RICHIESTI nel mese per collaboratore (dal Registro: nel log dello

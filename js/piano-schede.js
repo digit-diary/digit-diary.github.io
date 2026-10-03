@@ -2240,7 +2240,7 @@ function _pianoCongediAttornoVacanze() {
   return v == null ? true : String(v).toUpperCase() !== 'FALSE';
 }
 async function _applicaVacanzeMese(interattivo) {
-  if (!puoGestirePiano()) return null;
+  if (!puoGestirePiano() && !window._pianoAutoInCorso) return null; // anche dentro la generazione automatica
   const ym = _pianoMeseSel;
   const anno = parseInt(ym.split('-')[0]);
   const mese = parseInt(ym.split('-')[1]);
@@ -2418,6 +2418,18 @@ async function _applicaVacanzeMese(interattivo) {
     if (r) {
       if (r.protetto) return false; // mai toccare le protette
       if (r.codice === codice) return false;
+      // GENERAZIONE AUTOMATICA: le celle scritte a mano non si toccano mai, nemmeno
+      // per una vacanza; il conflitto va nel resoconto da controllare
+      const auto = window._pianoAutoInCorso;
+      if (auto && !r.generato) {
+        (auto.aManoNonToccate = auto.aManoNonToccate || []).push({
+          nome: nome,
+          data: dstrDi(g),
+          voluto: codice,
+          attuale: r.codice,
+        });
+        return false;
+      }
       await secPatch('piano', 'id=eq.' + r.id, {
         codice: codice,
         protetto: protetto,

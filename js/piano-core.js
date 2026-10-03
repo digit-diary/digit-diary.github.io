@@ -1601,6 +1601,12 @@ async function _pianoCaricaMeseSettore(da, a, rep) {
 let _pianoRenderInCorso = null;
 let _pianoRenderCoda = null;
 function renderPiano() {
+  // generazione automatica in corso su questo PC (js/piano-auto.js): il mese e il
+  // settore in memoria sono i suoi, la pagina mostra l avviso finche finisce
+  if (window._pianoAutoInCorso) {
+    if (typeof _pianoAutoBanner === 'function') _pianoAutoBanner();
+    return Promise.resolve();
+  }
   if (_pianoRenderInCorso) {
     if (!_pianoRenderCoda)
       _pianoRenderCoda = _pianoRenderInCorso.then(
@@ -1620,6 +1626,8 @@ function renderPiano() {
     _pianoRenderInCorso = null;
     // moduli di non disponibilita: si creano o aggiornano se gli ND del mese cambiano
     if (typeof ndProgramma === 'function') ndProgramma();
+    // confine fra due mesi: regole rotte nei primi giorni del mese dopo gia pianificato
+    if (typeof _pianoConfineMostra === 'function' && _pianoTab === 'calendario') _pianoConfineMostra();
   });
   return _pianoRenderInCorso;
 }
@@ -1866,7 +1874,7 @@ async function _renderPianoCore() {
         ' assegnazioni' +
         (puoMod ? ' · click modifica, trascina o Shift+click per selezionare' : ' · sola lettura') +
         '</span></div></div>';
-      h += '<div id="piano-violazioni"></div>';
+      h += '<div id="piano-violazioni"></div><div id="piano-confine"></div>';
 
       // NON DISPONIBILITA' JOLLY: promemoria discreto (una riga, chiudibile),
       // scadenza dalla regola nd_jolly_giorno. Niente toni allarmistici.

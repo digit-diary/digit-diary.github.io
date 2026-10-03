@@ -440,6 +440,8 @@ async function loadAll() {
   if (typeof preparaLibrerie === 'function') preparaLibrerie();
   // backup automatico: parte da solo (solo admin) senza intralciare il login
   if (typeof _backupAutoCheck === 'function') setTimeout(() => _backupAutoCheck(), 6000);
+  // generazione automatica del piano: controllo all avvio e ogni mezz ora
+  if (typeof pianoAutoAvvia === 'function') pianoAutoAvvia();
   try {
     if ((localStorage.getItem('pagina_corrente') || '') === 'piano' && typeof renderPiano === 'function') renderPiano();
   } catch (e) {}

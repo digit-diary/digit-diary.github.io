@@ -544,6 +544,18 @@ function _pianoViolazioniPersona(nome, righeMese, righeSett, ctx) {
   const aggiungi = (giorno, msg) => out.push({ nome: nome, giorno: giorno, msg: msg, celle: [dstrDi(giorno)] });
   const giorni = {};
   righeMese.forEach((r) => (giorni[parseInt(r.data.split('-')[2])] = r.codice));
+  // FINE DEL MESE PRIMA (dalle settimane a cavallo): giorno 0 = ultimo giorno del mese
+  // prima, -1 il penultimo... Contano per i giorni di fila, il riposo fra l ultimo
+  // turno del mese prima e il primo di questo e il riposo singolo 4+1+1. Prima questi
+  // controlli si fermavano al giorno 1: un turno di notte il 31 seguito da un turno
+  // alle 6 dell 1 non risultava. Le violazioni si segnano sempre nei giorni del mese.
+  const inizioMese = new Date(ym + '-01T12:00:00');
+  (righeSett || []).forEach((r) => {
+    const d = String(r.data).substring(0, 10);
+    if (d >= ym + '-01') return;
+    const diff = Math.round((inizioMese - new Date(d + 'T12:00:00')) / 86400000);
+    if (diff >= 1 && diff <= 14) giorni[1 - diff] = r.codice;
+  });
   // riposo settimanale attorno alla domenica (35 / 47 ore)
   _pianoRiposiSettimanali(righeSett).forEach((v) => {
     const g = v.domenica;
@@ -571,11 +583,16 @@ function _pianoViolazioniPersona(nome, righeMese, righeSett, ctx) {
     const maxCons = ctx.maxCons;
     const minRiposo = ctx.minRiposo;
     let consec = 0;
-    for (let g = 1; g <= nGiorni; g++) {
+    // giorni di fila gia lavorati alla fine del mese prima
+    for (let k = 0; k >= -13 && _pianoIsLavoro(giorni[k] || ''); k--) consec++;
+    // da g = 0: il riposo fra l ultimo giorno del mese prima e il primo di questo
+    for (let g = 0; g <= nGiorni; g++) {
       const cod = giorni[g] || '';
       const lavoro = _pianoIsLavoro(cod);
       // 1) massimo giorni lavorativi consecutivi
-      if (lavoro) {
+      if (g === 0) {
+        // giorno del mese prima: gia contato sopra
+      } else if (lavoro) {
         consec++;
         if (maxCons && consec === maxCons + 1)
           aggiungi(g, consec - 1 + '+ giorni lavorativi consecutivi (max ' + maxCons + ')');
@@ -598,21 +615,28 @@ function _pianoViolazioniPersona(nome, righeMese, righeSett, ctx) {
         }
       }
       // 3) vietato 4 lavoro + 1 riposo + 1 lavoro
-      if (ctx.no4w1c1w && !lavoro && cod && g >= 5) {
+      if (ctx.no4w1c1w && !lavoro && cod && g >= 1) {
         let prima = 0;
-        for (let k = g - 1; k >= 1 && _pianoIsLavoro(giorni[k]); k--) prima++;
+        for (let k = g - 1; k >= -13 && _pianoIsLavoro(giorni[k] || ''); k--) prima++;
         if (prima >= 4 && _pianoIsLavoro(giorni[g + 1] || ''))
           aggiungi(g, 'riposo singolo dopo ' + prima + ' giorni di lavoro (vietato 4+1+1)');
       }
       // 4) turno diurno il giorno prima delle vacanze
-      if (ctx.diurnoPreV && (cod === 'V' || cod === 'V1') && (giorni[g - 1] || '') && _pianoIsLavoro(giorni[g - 1])) {
+      // (il giorno prima nel mese prima resta del mese prima: si segna li)
+      if (
+        g >= 2 &&
+        ctx.diurnoPreV &&
+        (cod === 'V' || cod === 'V1') &&
+        (giorni[g - 1] || '') &&
+        _pianoIsLavoro(giorni[g - 1])
+      ) {
         const tp = _pianoTurnoInfo(giorni[g - 1]);
         if (tp && tp.tipo === 'NOTTURNO')
           aggiungi(g - 1, 'turno notturno il giorno prima delle vacanze (deve essere diurno)');
       }
       // 5) regole "chi fa cosa" del settore (regole di gruppo turni_solo_funzioni
       //    e funzione_turni_giorni: create e modificate dalla scheda Regole di gruppo)
-      if (lavoro) {
+      if (lavoro && g >= 1) {
         const t = _pianoTurnoInfo(cod);
         const dow = new Date(ym + '-' + String(g).padStart(2, '0') + 'T12:00:00').getDay();
         const vfz = t ? _pianoViolazioneFunzioneTurno(nome, t, dow, false) : null;
@@ -995,8 +1019,14 @@ function _pianoIdoneoStatico(n, t, dowG, idoneita) {
   return true;
 }
 async function generaBozzaPiano(usaCoperture) {
-  if (!_pianoAzioneAutoConsentita('genera')) return; // azione automatica: permesso apposito
-  if (!puoGestirePiano()) return;
+  // GENERAZIONE AUTOMATICA (js/piano-auto.js): niente domande e niente messaggi,
+  // il risultato va nel resoconto; i permessi li controlla il database
+  // (lasciapassare limitato al mese e al settore prenotati)
+  const auto = window._pianoAutoInCorso || null;
+  if (!auto) {
+    if (!_pianoAzioneAutoConsentita('genera')) return; // azione automatica: permesso apposito
+    if (!puoGestirePiano()) return;
+  }
   _pianoUndoSnap((usaCoperture ? 'coperture ' : 'genera bozza ') + _pianoMeseSel);
   const ym = _pianoMeseSel;
   const nGiorni = _pianoUltimoGiorno(ym);
@@ -1007,6 +1037,10 @@ async function generaBozzaPiano(usaCoperture) {
       'piano_fabbisogni?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=3000',
     )) || [];
   if (!fabb.length) {
+    if (auto) {
+      auto.bozza = { saltata: 'nessun fabbisogno configurato per il mese' };
+      return;
+    }
     toast('Nessun fabbisogno configurato per questo mese: la bozza non sa cosa riempire');
     return;
   }
@@ -1740,6 +1774,10 @@ async function generaBozzaPiano(usaCoperture) {
     }
   });
   if (!nuove.length && !sostituzioniWd.length) {
+    if (auto) {
+      auto.bozza = { celle: 0, scoperti: scoperti.length };
+      return;
+    }
     toast(
       'Niente da generare: fabbisogni già coperti' +
         (scoperti.length ? ' (' + scoperti.length + ' scoperti senza candidati)' : ''),
@@ -1748,6 +1786,7 @@ async function generaBozzaPiano(usaCoperture) {
     return;
   }
   if (
+    !auto &&
     !(await chiediConferma(
       'Genera bozza per ' +
         ym +
@@ -1790,7 +1829,7 @@ async function generaBozzaPiano(usaCoperture) {
     if (nuove.length && !inseriteTot) throw new Error('nessuna cella scritta dal database');
     // il database non sovrascrive una cella gia presente (una per persona e giorno):
     // se qualcuna e stata scartata si dice, invece di lasciare un buco nascosto
-    if (inseriteTot < nuove.length)
+    if (inseriteTot < nuove.length && !auto)
       toastErrore(
         nuove.length -
           inseriteTot +
@@ -1805,7 +1844,21 @@ async function generaBozzaPiano(usaCoperture) {
         updated_at: new Date().toISOString(),
       });
     }
-    logAzione('Piano: bozza generata', ym + ' · ' + nuove.length + ' turni, ' + scoperti.length + ' scoperti');
+    logAzione(
+      auto ? 'Piano: bozza generata in automatico' : 'Piano: bozza generata',
+      ym + ' · ' + nuove.length + ' turni, ' + scoperti.length + ' scoperti',
+    );
+    if (auto) {
+      auto.bozza = {
+        celle: inseriteTot,
+        volute: nuove.length,
+        scoperti: scoperti.length,
+        cgf: nCgfAuto,
+        congedi: nCongedi,
+        riposiDaSistemare: riposiRestano.slice(),
+      };
+      return;
+    }
     toast(
       'Bozza generata: ' +
         r.inserite +
@@ -1818,6 +1871,7 @@ async function generaBozzaPiano(usaCoperture) {
     renderPiano();
   } catch (e) {
     console.error(e);
+    if (auto) throw e;
     toast('Errore generazione bozza');
   }
 }

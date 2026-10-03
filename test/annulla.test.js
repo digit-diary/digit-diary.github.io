@@ -315,6 +315,48 @@ function canaleSicuro(c, A) {
     ok(!messaggi.some((m) => /^ERRORE/.test(m)), 'nessun messaggio di errore (' + messaggi.join(' / ') + ')');
   }
 
+  console.log('\n== modulo eliminato: l ora riletta dal database ha un altro formato ==');
+  {
+    // il programma scrive 2026-10-03T22:12:34.567Z, il database rilegge lo stesso
+    // istante come 2026-10-04 00:12:34.567+02: non e una modifica di qualcun altro
+    const c = canaleFinto();
+    const A = creaAnnulla(c);
+    const S = canaleSicuro(c, A);
+    c.db.moduli.push({ id: 5, tipo: 'allineamento', collaboratore: 'Aricci Alessandro', eliminato: false });
+    await S.patch('moduli', 'id=eq.5', {
+      eliminato: true,
+      eliminato_da: 'Tester',
+      eliminato_at: '2026-10-03T22:12:34.567Z',
+    });
+    A.chiudiGruppo('Modulo nel cestino');
+    c.db.moduli[0].eliminato_at = '2026-10-04 00:12:34.567+02';
+    let errore = null;
+    try {
+      await A.annulla();
+    } catch (e) {
+      errore = e.message;
+    }
+    eq(errore, null, 'Annulla non si ferma per il formato diverso dell ora');
+    eq(c.db.moduli[0].eliminato, false, 'il modulo torna fuori dal cestino');
+    await A.ripristina();
+    eq(c.db.moduli[0].eliminato, true, 'Ripristina lo rimette nel cestino');
+    // un cambio vero di un altro resta un conflitto
+    const c2 = canaleFinto();
+    const A2 = creaAnnulla(c2);
+    const S2 = canaleSicuro(c2, A2);
+    c2.db.moduli.push({ id: 6, eliminato: false, eliminato_at: null });
+    await S2.patch('moduli', 'id=eq.6', { eliminato: true, eliminato_at: '2026-10-03T22:12:34.567Z' });
+    A2.chiudiGruppo('x');
+    c2.db.moduli[0].eliminato_at = '2026-10-04 00:15:00+02';
+    let err2 = null;
+    try {
+      await A2.annulla();
+    } catch (e) {
+      err2 = e.message;
+    }
+    ok(/qualcun altro/.test(String(err2)), 'un orario davvero diverso resta un conflitto');
+  }
+
   console.log(
     '\n=======================================\n  ' +
       passati +
