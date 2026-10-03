@@ -1729,23 +1729,121 @@ function applicaTemaOperatore() {
 // ================================================================
 // PERSONALIZZAZIONI ADMIN: valori buoni Maison + backup completo
 // ================================================================
-async function salvaBuonoValori() {
-  const nuovi = {};
-  for (const k of ['BU', 'BL', 'CG', 'WL']) {
-    const v = parseFloat((document.getElementById('buono-' + k.toLowerCase() + '-input') || {}).value);
-    if (!(v > 0)) {
-      toast('Inserisci un valore valido per ' + k);
-      return;
+// TIPI DI BUONO (admin): sigla bloccata, nome, valore, attivo, parole chiave per
+// riconoscere un tipo nuovo nel file Maison importato
+function renderBuoniTipiUI() {
+  const box = document.getElementById('buoni-tipi-box');
+  if (!box || typeof BUONI_TIPI === 'undefined') return;
+  const inp = (cls, val, w, extra) =>
+    '<input class="' +
+    cls +
+    '" value="' +
+    escP(val == null ? '' : String(val)) +
+    '" style="width:' +
+    w +
+    'px;padding:6px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"' +
+    (extra || '') +
+    '>';
+  let h =
+    '<div style="overflow:auto"><table class="piano-table" style="font-size:var(--fs-md,.875rem);min-width:640px"><thead><tr><th>Sigla</th><th style="text-align:left">Nome</th><th>Valore CHF</th><th>Attivo</th><th style="text-align:left" title="Per i tipi aggiunti: parole che, scritte nel file Maison, indicano questo buono (separate da virgola). La sigla con la quantita (es. 2 XX) si riconosce sempre">Parole nel file importato</th></tr></thead><tbody>';
+  BUONI_TIPI.forEach((t) => {
+    const base = BUONI_TIPI_BASE.some((b) => b.codice === t.codice);
+    h +=
+      '<tr data-codice="' +
+      escP(t.codice) +
+      '"><td style="font-weight:700">' +
+      escP(t.codice) +
+      '</td><td style="text-align:left">' +
+      inp('bt-nome', t.nome, 200) +
+      '</td><td>' +
+      inp('bt-valore', t.valore, 80, ' type="number" min="0" step="0.5"') +
+      '</td><td><input type="checkbox" class="bt-attivo"' +
+      (t.attivo !== false ? ' checked' : '') +
+      '></td><td style="text-align:left">' +
+      (base
+        ? '<span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">riconoscimento integrato</span>'
+        : inp('bt-parole', t.parole, 220, ' placeholder="es. brunch, colazione"')) +
+      '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  h +=
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:10px"><button class="btn-add-tipo" onclick="salvaBuonoValori()">Salva</button></div>';
+  h +=
+    '<div class="add-tipo-row sez-form" style="margin-top:12px"><div class="field"><label>Nuova sigla</label><input id="bt-nuovo-cod" maxlength="6" placeholder="es. BR" style="width:90px;text-transform:uppercase"></div><div class="field"><label>Nome</label><input id="bt-nuovo-nome" placeholder="es. Buono Brunch"></div><div class="field"><label>Valore CHF</label><input id="bt-nuovo-val" type="number" min="0" step="0.5" style="width:90px"></div><div class="field"><label>Parole nel file (facoltative)</label><input id="bt-nuovo-parole" placeholder="es. brunch"></div><button class="btn-add-tipo" onclick="aggiungiBuonoTipo()">+ Aggiungi</button></div>';
+  h +=
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:6px 0 0">La sigla non si puo cambiare dopo l aggiunta: e scritta nelle registrazioni. Un tipo che non si usa piu si disattiva: sparisce dai menu ma resta leggibile nello storico, nelle statistiche e negli export.</p>';
+  box.innerHTML = h;
+}
+function _buoniLeggiTabella() {
+  const out = [];
+  document.querySelectorAll('#buoni-tipi-box tr[data-codice]').forEach((tr) => {
+    const t = BUONI_TIPI.find((x) => x.codice === tr.dataset.codice) || { codice: tr.dataset.codice };
+    const v = parseFloat(String((tr.querySelector('.bt-valore') || {}).value || '').replace(',', '.'));
+    out.push({
+      codice: t.codice,
+      nome: ((tr.querySelector('.bt-nome') || {}).value || '').trim() || t.codice,
+      valore: isNaN(v) ? 0 : v,
+      attivo: !!(tr.querySelector('.bt-attivo') || {}).checked,
+      parole: ((tr.querySelector('.bt-parole') || {}).value || t.parole || '').trim(),
+    });
+  });
+  return out;
+}
+async function _buoniSalvaLista(lista, cosa) {
+  for (const t of lista)
+    if (t.attivo && !(t.valore > 0)) {
+      toast('Inserisci un valore valido per ' + t.codice);
+      return false;
     }
-    nuovi[k] = v;
-  }
-  Object.assign(BUONO_VALORI, nuovi);
-  if (!(await salvaImp('buono_valori', JSON.stringify(nuovi)))) return;
+  const bv = {};
+  lista.forEach((t) => (bv[t.codice] = t.valore));
+  bv._tipi = lista.map((t) => ({ codice: t.codice, nome: t.nome, attivo: t.attivo, parole: t.parole || '' }));
+  if (!(await salvaImp('buono_valori', JSON.stringify(bv)))) return false;
+  _buoniDaImpostazione(bv);
   logAzione(
-    'Valori buoni Maison',
-    'BU ' + nuovi.BU + ' / BL ' + nuovi.BL + ' / CG ' + nuovi.CG + ' / WL ' + nuovi.WL + ' CHF',
+    'Tipi di buono Maison',
+    (cosa ? cosa + ' · ' : '') +
+      lista.map((t) => t.codice + ' ' + t.nome + ' ' + t.valore + (t.attivo ? '' : ' (disattivato)')).join(' / '),
   );
-  toast('Valori buoni salvati');
+  renderBuoniTipiUI();
+  if (typeof renderMaisonDashboard === 'function' && document.getElementById('maison-filt-tipo')) {
+    try {
+      renderMaisonDashboard();
+    } catch (e) {}
+  }
+  return true;
+}
+async function salvaBuonoValori() {
+  if (!isAdmin()) return;
+  if (await _buoniSalvaLista(_buoniLeggiTabella())) toast('Tipi di buono salvati');
+}
+async function aggiungiBuonoTipo() {
+  if (!isAdmin()) return;
+  const cod = String((document.getElementById('bt-nuovo-cod') || {}).value || '')
+    .trim()
+    .toUpperCase();
+  const nome = String((document.getElementById('bt-nuovo-nome') || {}).value || '').trim();
+  const val = parseFloat(String((document.getElementById('bt-nuovo-val') || {}).value || '').replace(',', '.'));
+  const parole = String((document.getElementById('bt-nuovo-parole') || {}).value || '').trim();
+  if (!/^[A-Z][A-Z0-9]{1,5}$/.test(cod)) {
+    toast('Sigla: da 2 a 6 lettere o cifre, inizia con una lettera');
+    return;
+  }
+  if (BUONI_TIPI.some((t) => t.codice === cod)) {
+    toast('La sigla ' + cod + ' esiste gia');
+    return;
+  }
+  if (!nome) {
+    toast('Scrivi il nome del buono');
+    return;
+  }
+  if (!(val > 0)) {
+    toast('Inserisci il valore in CHF');
+    return;
+  }
+  const lista = _buoniLeggiTabella();
+  lista.push({ codice: cod, nome: nome, valore: val, attivo: true, parole: parole });
+  if (await _buoniSalvaLista(lista, 'aggiunto ' + cod)) toast('Buono ' + cod + ' aggiunto');
 }
 
 // Backup completo di tutti i dati in un file JSON scaricabile (solo admin)

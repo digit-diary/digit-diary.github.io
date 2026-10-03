@@ -1734,7 +1734,7 @@
             </div>
             <div class="field">
               <label>Tipo</label
-              ><select
+              ><select data-formato="codice" class="sel-buono"
                 id="maison-man-tipo"
                 style="padding: 11px"
                 onchange="
@@ -1743,12 +1743,8 @@
                   _autoCalcolaBuoniManuale();
                 "
               >
-                <option value="">Normale</option>
-                <option value="BU">BU</option>
-                <option value="BL">BL</option>
-                <option value="CG">C. Gourmet</option>
-                <option value="WL">Welcome Lounge</option>
-              </select>
+                <option value="" data-fissa="1">Normale</option>
+                </select>
             </div>
             <div class="field" id="maison-man-qty-wrap" style="display: none">
               <label>N° buoni</label
@@ -1797,7 +1793,7 @@
           </div>
           <div class="filter-group">
             <span class="filter-label">Tipo</span
-            ><select
+            ><select data-formato="nome" class="sel-buono"
               id="maison-filt-tipo"
               onchange="renderMaisonDashboard()"
               style="
@@ -1809,13 +1805,9 @@
                 color: var(--ink);
               "
             >
-              <option value="">Tutti</option>
-              <option value="normale">Normale</option>
-              <option value="BU">Buono Unico</option>
-              <option value="BL">Buono Lounge</option>
-              <option value="CG">C. Gourmet</option>
-              <option value="WL">Welcome Lounge</option>
-            </select>
+              <option value="" data-fissa="1">Tutti</option>
+              <option value="normale" data-fissa="1">Normale</option>
+              </select>
           </div>
           <div class="filter-group">
             <span class="filter-label">Dal</span
@@ -2367,7 +2359,7 @@
             >
               <div class="field">
                 <label>Tipo</label
-                ><select
+                ><select data-formato="entrambi" class="sel-buono"
                   id="inv-carico-tipo"
                   style="
                     padding: 11px;
@@ -2377,12 +2369,8 @@
                     color: var(--ink);
                   "
                 >
-                  <option value="">Seleziona...</option>
-                  <option value="BU">BU - Buono Unico</option>
-                  <option value="BL">BL - Buono Lounge</option>
-                  <option value="CG">CG - Coupon Gourmet</option>
-                  <option value="WL">WL - Welcome Lounge</option>
-                </select>
+                  <option value="" data-fissa="1">Seleziona...</option>
+                  </select>
               </div>
               <div class="field">
                 <label>Quantit&agrave;</label
@@ -2457,7 +2445,7 @@
               </div>
               <div class="field">
                 <label>Tipo</label
-                ><select
+                ><select data-formato="codice" class="sel-buono"
                   id="inv-usc-tipo"
                   style="
                     padding: 11px;
@@ -2467,12 +2455,8 @@
                     color: var(--ink);
                   "
                 >
-                  <option value="">Seleziona...</option>
-                  <option value="BU">BU</option>
-                  <option value="BL">BL</option>
-                  <option value="CG">CG</option>
-                  <option value="WL">WL</option>
-                </select>
+                  <option value="" data-fissa="1">Seleziona...</option>
+                  </select>
               </div>
               <div class="field">
                 <label>Quantit&agrave;</label
@@ -2530,7 +2514,7 @@
           >
             <div class="filter-group">
               <span class="filter-label">Tipo</span
-              ><select
+              ><select data-formato="codice" class="sel-buono"
                 id="inv-b-filt-tipo"
                 onchange="renderInventarioBuoniTable()"
                 style="
@@ -2542,12 +2526,8 @@
                   color: var(--ink);
                 "
               >
-                <option value="">Tutti</option>
-                <option value="BU">BU</option>
-                <option value="BL">BL</option>
-                <option value="CG">CG</option>
-                <option value="WL">WL</option>
-              </select>
+                <option value="" data-fissa="1">Tutti</option>
+                </select>
             </div>
             <div class="filter-group filter-cerca">
               <span class="filter-label">Cliente</span
@@ -3662,8 +3642,8 @@
         <div class="add-tipo-row sez-form"><div class="field"><label>Ammonimenti stesso motivo, poi Allineamento</label><input type="number" id="soglia-amm-input" min="1" step="1" /></div><div class="field"><label>Allineamenti stesso motivo, poi RDI</label><input type="number" id="soglia-recidiva-input" min="1" step="1" /></div><div class="field"><label>Allineamenti totali, poi valutare RDI</label><input type="number" id="soglia-accumulo-input" min="1" step="1" /></div><button class="btn-add-tipo" onclick="salvaSoglieDisciplinari()">Salva</button></div>
       </div>
       <div class="settings-section" data-gruppo="Maison" id="buoni-valori-section" style="display: none">
-        <div class="sez-head"><div><h4>Valori dei buoni</h4><p class="sez-desc">Valore in CHF di ogni buono: serve per dividere il costo fra gli ospiti e per la giacenza.</p></div></div>
-        <div class="add-tipo-row sez-form"><div class="field"><label>BU</label><input type="number" id="buono-bu-input" min="1" step="1" /></div><div class="field"><label>BL</label><input type="number" id="buono-bl-input" min="1" step="1" /></div><div class="field"><label>CG</label><input type="number" id="buono-cg-input" min="1" step="1" /></div><div class="field"><label>WL</label><input type="number" id="buono-wl-input" min="1" step="1" /></div><button class="btn-add-tipo" onclick="salvaBuonoValori()">Salva valori</button></div>
+        <div class="sez-head"><div><h4>Tipi e valori dei buoni</h4><p class="sez-desc">Tipi di buono: nome, valore in CHF (serve per dividere il costo fra gli ospiti e per la giacenza), attivo. Si puo aggiungere un tipo nuovo e rinominare quelli esistenti; la sigla resta quella scritta nelle registrazioni.</p></div></div>
+        <div id="buoni-tipi-box"></div>
       </div>
       <div class="settings-section" data-gruppo="Personale" id="giubileo-section" style="display: none">
         <div class="sez-head"><div><h4>Premio giubileo</h4><p class="sez-desc">Somma riconosciuta al raggiungimento degli anni di servizio, dalla data di assunzione. I giubilei maturati compaiono nello Storico HR della scheda, visibile a chi ha il permesso.</p></div></div>

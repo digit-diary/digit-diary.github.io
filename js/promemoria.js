@@ -536,6 +536,125 @@ function _trovaNomeSimileMaison(nome) {
 }
 // Valori CHF dei buoni Maison · personalizzabili da admin in Impostazioni (chiave 'buono_valori')
 let BUONO_VALORI = { BU: 15, BL: 40, CG: 80, WL: 40 };
+// TIPI DI BUONO personalizzabili (admin, Impostazioni > Maison): sigla, nome, valore,
+// attivo, parole chiave per riconoscerlo nel file importato. La SIGLA non si cambia
+// dopo l uso (e scritta nelle registrazioni passate); il nome si puo rinominare; un
+// tipo non piu usato si disattiva (resta leggibile nello storico).
+const BUONI_TIPI_BASE = [
+  { codice: 'BU', nome: 'Buono Unico', valore: 15 },
+  { codice: 'BL', nome: 'Buono Lounge', valore: 40 },
+  { codice: 'CG', nome: 'Coupon Gourmet', valore: 80 },
+  { codice: 'WL', nome: 'Welcome Lounge', valore: 40 },
+];
+let BUONI_TIPI = BUONI_TIPI_BASE.map((t) => Object.assign({ attivo: true, parole: '' }, t));
+// tutti = anche i disattivati (servono per leggere lo storico)
+function buoniTipi(tutti) {
+  return tutti ? BUONI_TIPI : BUONI_TIPI.filter((t) => t.attivo !== false);
+}
+function buoniCodici(tutti) {
+  return buoniTipi(tutti).map((t) => t.codice);
+}
+function buonoNome(cod) {
+  const t = BUONI_TIPI.find((x) => x.codice === cod);
+  return t ? t.nome : cod || '';
+}
+// "2 BU", "3BL", "1 XX" nelle note: quantita e sigla (tutte le sigle, anche disattivate)
+function _buoniEsc(x) {
+  return String(x).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+function buonoRegexQta(globale) {
+  const cod = buoniCodici(true)
+    .slice()
+    .sort((a, b) => b.length - a.length)
+    .map(_buoniEsc)
+    .join('|');
+  return new RegExp('(\\d+)\\s*(' + cod + ')' + (globale ? '\\b' : ''), globale ? 'gi' : 'i');
+}
+// colore del distintivo del buono: i quattro storici come prima, gli altri da una tavolozza
+function buonoColore(cod) {
+  const base = { BU: '#e67e22', BL: '#2c6e49', CG: '#8e44ad', WL: '#2980b9' };
+  if (base[cod]) return base[cod];
+  const extra = ['#b5651d', '#1a7a6d', '#7b2d8b', '#c0392b', '#5a6b7a', '#8b6914'];
+  const i = BUONI_TIPI.findIndex((t) => t.codice === cod);
+  return i >= 0 ? extra[i % extra.length] : 'var(--muted)';
+}
+// la quantita con la sigla, per toglierla da una nota ("2 BU")
+function buonoRegexTogli() {
+  const cod = buoniCodici(true)
+    .slice()
+    .sort((a, b) => b.length - a.length)
+    .map(_buoniEsc)
+    .join('|');
+  return new RegExp('\\d*\\s*(' + cod + ')\\b', 'gi');
+}
+// colonne dei buoni in tabelle ed export: i tipi attivi, piu quelli disattivati (o
+// sconosciuti) che compaiono nelle righe, cosi lo storico resta leggibile
+function buoniColonne(righe) {
+  const presenti = new Set((righe || []).map((r) => r.tipo_buono).filter(Boolean));
+  return buoniTipi(true)
+    .filter((t) => t.attivo !== false || presenti.has(t.codice))
+    .map((t) => t.codice)
+    .concat([...presenti].filter((c) => !BUONI_TIPI.some((t) => t.codice === c)));
+}
+// configurazione salvata (chiave buono_valori): { BU: 15, ..., _tipi: [{codice, nome, attivo, parole}] }
+function _buoniDaImpostazione(bv) {
+  if (!bv || typeof bv !== 'object') return;
+  const meta = Array.isArray(bv._tipi) ? bv._tipi : null;
+  if (meta) {
+    BUONI_TIPI = meta
+      .filter((t) => t && t.codice)
+      .map((t) => ({
+        codice: String(t.codice).toUpperCase(),
+        nome: t.nome || t.codice,
+        valore: parseFloat(bv[String(t.codice).toUpperCase()]) || 0,
+        attivo: t.attivo !== false,
+        parole: t.parole || '',
+      }));
+  } else {
+    BUONI_TIPI.forEach((t) => {
+      if (bv[t.codice] != null) t.valore = parseFloat(bv[t.codice]) || t.valore;
+    });
+  }
+  BUONO_VALORI = {};
+  BUONI_TIPI.forEach((t) => (BUONO_VALORI[t.codice] = t.valore));
+  if (typeof buoniRiempiSelect === 'function') buoniRiempiSelect();
+}
+// <option> dei buoni: formato 'codice' (BU), 'nome' (Buono Unico) o 'entrambi' (BU - Buono Unico)
+function buoniOpzioniHtml(selezionato, formato) {
+  const tipi = buoniTipi(false).slice();
+  // un valore gia salvato con un tipo disattivato resta selezionabile
+  if (selezionato && !tipi.some((t) => t.codice === selezionato)) {
+    const t = BUONI_TIPI.find((x) => x.codice === selezionato);
+    tipi.push(t || { codice: selezionato, nome: selezionato });
+  }
+  return tipi
+    .map(
+      (t) =>
+        '<option value="' +
+        escP(t.codice) +
+        '"' +
+        (t.codice === selezionato ? ' selected' : '') +
+        '>' +
+        escP(formato === 'nome' ? t.nome : formato === 'entrambi' ? t.codice + ' - ' + t.nome : t.codice) +
+        '</option>',
+    )
+    .join('');
+}
+// riempie i menu dei buoni della pagina (select.sel-buono): la prima opzione (Normale,
+// Tutti, Seleziona...) resta, il resto si rifa dalla configurazione
+function buoniRiempiSelect() {
+  if (typeof document === 'undefined') return;
+  document.querySelectorAll('select.sel-buono').forEach((sel) => {
+    const val = sel.value;
+    const prime = [...sel.options]
+      .filter((o) => o.dataset.fissa === '1')
+      .map((o) => o.outerHTML)
+      .join('');
+    sel.innerHTML = prime + buoniOpzioniHtml(val, sel.dataset.formato || 'codice');
+    sel.value = val;
+  });
+}
+buoniRiempiSelect();
 // Ripartisce il costo di una riga Maison fra piu' nomi. Regola unica per import Excel,
 // form manuale e righe vecchie "A / B": chi ha un buono paga qty x valore (mai oltre il costo
 // della riga), il resto va a chi non ha buono; se tutti hanno un buono il resto si divide fra
@@ -626,7 +745,7 @@ function _contaBuoni(righe, tipo) {
   return righe
     .filter((r) => r.tipo_buono === tipo)
     .reduce((s, r) => {
-      const m = (r.note || '').match(/(\d+)\s*(?:BU|BL|CG|WL)/i);
+      const m = (r.note || '').match(buonoRegexQta());
       return s + (m ? parseInt(m[1]) : 1);
     }, 0);
 }
@@ -704,6 +823,33 @@ function _parseMaisonNome(raw) {
     note = (note ? note + ', ' : '') + (_blQty || 1) + 'BL';
     nome = nome.replace(blM[0], '').trim();
   }
+  // 7b. TIPI DI BUONO AGGIUNTI in Impostazioni: la sigla con la quantita ("2 XX") o
+  //     una delle parole chiave scritte per quel tipo
+  buoniTipi(true)
+    .filter((t) => !BUONI_TIPI_BASE.some((b) => b.codice === t.codice))
+    .forEach((t) => {
+      const parole = [t.codice]
+        .concat(
+          String(t.parole || '')
+            .split(',')
+            .map((x) => x.trim())
+            .filter(Boolean),
+        )
+        .map(_buoniEsc)
+        .join('|');
+      const re = new RegExp('\\s*\\+?\\s*(\\d*)\\s*\\b(?:' + parole + ')\\b', 'i');
+      const mNome = nome.match(re);
+      const mT = mNome || note.match(re);
+      if (!mT) return;
+      const q = mT[1] ? parseInt(mT[1]) : 1;
+      tipiBuono.push({ tipo: t.codice, qty: q || 1 });
+      if (!tipoBuono) tipoBuono = t.codice;
+      // trovato nel nome: si toglie da li e si scrive nella nota; gia nella nota: resta com e
+      if (mNome) {
+        note = (note ? note + ', ' : '') + (q || 1) + t.codice;
+        nome = nome.replace(mNome[0], '').trim();
+      }
+    });
   // 8. Note aggiuntive: direzione, pranzo, GD
   const noteM = nome.match(/\b(direzione|pranzo\s*\w*|GD)\b/gi);
   if (noteM) {

@@ -447,10 +447,10 @@ function renderMaisonDashboard() {
   const totPx = data.reduce((s, r) => s + (r.px || 0), 0);
   const nClienti = new Set(data.map((r) => r.nome)).size;
   const nGiorni = new Set(data.map((r) => r.data_giornata)).size;
-  const nBU = _contaBuoni(data, 'BU');
-  const nBL = _contaBuoni(data, 'BL');
-  const nCG = _contaBuoni(data, 'CG');
-  const nWL = _contaBuoni(data, 'WL');
+  // buoni del periodo, per tipo (colonne dalla configurazione dei buoni)
+  const _colsB = buoniColonne(data);
+  const _nB = {};
+  _colsB.forEach((c) => (_nB[c] = _contaBuoni(data, c)));
   const sb = document.getElementById('maison-stats-bar');
   // Determina periodo visualizzato
   const fd = (document.getElementById('maison-filt-dal') || {}).value,
@@ -517,14 +517,8 @@ function renderMaisonDashboard() {
     '</div><div class="stat-label">Persone</div></div><div class="stat"><div class="stat-num teal">' +
     nGiorni +
     '</div><div class="stat-label">Giorni</div></div><div class="stat"><div class="stat-num red">' +
-    nBU +
-    ' BU / ' +
-    nBL +
-    ' BL / ' +
-    nCG +
-    ' CG / ' +
-    nWL +
-    ' WL</div><div class="stat-label">Buoni</div></div></div>';
+    _colsB.map((c) => _nB[c] + ' ' + escP(c)).join(' / ') +
+    '</div><div class="stat-label">Buoni</div></div></div>';
   // Tabella
   const byNome = {};
   data.forEach((r) => {
@@ -533,10 +527,7 @@ function renderMaisonDashboard() {
         tot: 0,
         px: 0,
         visite: 0,
-        bu: 0,
-        bl: 0,
-        cg: 0,
-        wl: 0,
+        buoni: {},
         condivise: 0,
         condivisiGruppi: [],
       };
@@ -545,13 +536,10 @@ function renderMaisonDashboard() {
     _bn.px += r.px || 0;
     _bn.visite++;
     const _bq = (() => {
-      const m = (r.note || '').match(/(\d+)\s*(?:BU|BL|CG|WL)/i);
+      const m = (r.note || '').match(buonoRegexQta());
       return m ? parseInt(m[1]) : 1;
     })();
-    if (r.tipo_buono === 'BU') _bn.bu += _bq;
-    if (r.tipo_buono === 'BL') _bn.bl += _bq;
-    if (r.tipo_buono === 'CG') _bn.cg += _bq;
-    if (r.tipo_buono === 'WL') _bn.wl += _bq;
+    if (r.tipo_buono) _bn.buoni[r.tipo_buono] = (_bn.buoni[r.tipo_buono] || 0) + _bq;
     if (r._costoOriginale) {
       _bn.condivise++;
       _bn.condivisiGruppi.push(r._gruppoOriginale);
@@ -598,7 +586,14 @@ function renderMaisonDashboard() {
       .join('') +
     '</select><button class="btn-act del" onclick="eliminaMaisonMese()" style="padding:5px 12px">Elimina mese</button></div>';
   thtml +=
-    '<div style="overflow-x:auto"><table class="collab-table"><thead style="position:sticky;top:0;z-index:2"><tr><th style="background:var(--paper)">Cliente</th><th class="num" style="background:var(--paper)">Visite</th><th class="num" style="background:var(--paper)">Persone</th><th class="num" style="background:var(--paper)">BU</th><th class="num" style="background:var(--paper)">BL</th><th class="num" style="background:var(--paper)">CG</th><th class="num" style="background:var(--paper)">WL</th><th class="num" style="background:var(--paper)">Totale CHF</th><th class="num" style="background:var(--paper)">Media CHF</th><th style="background:var(--paper)"></th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table class="collab-table"><thead style="position:sticky;top:0;z-index:2"><tr><th style="background:var(--paper)">Cliente</th><th class="num" style="background:var(--paper)">Visite</th><th class="num" style="background:var(--paper)">Persone</th>' +
+    _colsB
+      .map(
+        (c) =>
+          '<th class="num" style="background:var(--paper)" title="' + escP(buonoNome(c)) + '">' + escP(c) + '</th>',
+      )
+      .join('') +
+    '<th class="num" style="background:var(--paper)">Totale CHF</th><th class="num" style="background:var(--paper)">Media CHF</th><th style="background:var(--paper)"></th></tr></thead><tbody>';
   const _brDash = getBudgetReparto();
   sorted.forEach(([nome, d], _idx) => {
     let budget = _brDash.find((b) => b.nome.toLowerCase() === nome.toLowerCase());
@@ -669,15 +664,9 @@ function renderMaisonDashboard() {
       d.visite +
       '</td><td class="num">' +
       d.px +
-      '</td><td class="num">' +
-      (d.bu || '-') +
-      '</td><td class="num">' +
-      (d.bl || '-') +
-      '</td><td class="num">' +
-      (d.cg || '-') +
-      '</td><td class="num">' +
-      (d.wl || '-') +
-      '</td><td class="num"><strong>' +
+      '</td>' +
+      _colsB.map((c) => '<td class="num">' + (d.buoni[c] || '-') + '</td>').join('') +
+      '<td class="num"><strong>' +
       fmtCHF(d.tot) +
       '</strong>' +
       condBadge +
@@ -696,15 +685,9 @@ function renderMaisonDashboard() {
     sorted.reduce((s, c) => s + c[1].visite, 0) +
     '</strong></td><td class="num"><strong>' +
     totPx +
-    '</strong></td><td class="num"><strong>' +
-    _contaBuoni(data, 'BU') +
-    '</strong></td><td class="num"><strong>' +
-    _contaBuoni(data, 'BL') +
-    '</strong></td><td class="num"><strong>' +
-    _contaBuoni(data, 'CG') +
-    '</strong></td><td class="num"><strong>' +
-    _contaBuoni(data, 'WL') +
-    '</strong></td><td class="num"><strong>' +
+    '</strong></td>' +
+    _colsB.map((c) => '<td class="num"><strong>' + _nB[c] + '</strong></td>').join('') +
+    '<td class="num"><strong>' +
     fmtCHF(totCosto) +
     '</strong></td><td></td><td></td></tr>';
   thtml += '</tbody></table></div></div>';
@@ -801,10 +784,9 @@ function renderMaisonGdOggi() {
   });
   const _brGd = getBudgetReparto();
   // Conteggio buoni per l'header
-  const _gdBU = _contaBuoni(righe, 'BU'),
-    _gdBL = _contaBuoni(righe, 'BL');
-  const _gdCG = _contaBuoni(righe, 'CG'),
-    _gdWL = _contaBuoni(righe, 'WL');
+  const _gdB = buoniColonne(righe)
+    .map((c) => [c, _contaBuoni(righe, c)])
+    .filter((x) => x[1]);
   let h =
     '<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
   h += '<div style="display:flex;align-items:center;gap:6px">';
@@ -830,10 +812,7 @@ function renderMaisonGdOggi() {
     ' &middot; ' +
     totPX +
     ' PX' +
-    (_gdBU ? ' &middot; ' + _gdBU + ' BU' : '') +
-    (_gdBL ? ' &middot; ' + _gdBL + ' BL' : '') +
-    (_gdCG ? ' &middot; ' + _gdCG + ' CG' : '') +
-    (_gdWL ? ' &middot; ' + _gdWL + ' WL' : '') +
+    _gdB.map(([c, n]) => ' &middot; ' + n + ' ' + escP(c)).join('') +
     '</span>';
   h +=
     '<button onclick="esportaGdOggiCSV()" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;background:none;border:1px solid white;color:white;border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif;font-weight:600">CSV</button>';
@@ -915,11 +894,13 @@ function renderMaisonGdOggi() {
           return escP(x.nome) + cBadge;
         })
         .join(' / ');
-      var _qtyM = (r.note || '').match(/(\d+)\s*(BU|BL|CG|WL)/i);
+      var _qtyM = (r.note || '').match(buonoRegexQta());
       var _qtyN = _qtyM ? parseInt(_qtyM[1]) : 1;
       var tipoBadge = r.tipo_buono
         ? '<span class="mini-badge" style="background:' +
-          ({ BU: '#e67e22', BL: '#2c6e49', CG: '#8e44ad', WL: '#2980b9' }[r.tipo_buono] || 'var(--muted)') +
+          buonoColore(r.tipo_buono) +
+          '" title="' +
+          escP(buonoNome(r.tipo_buono)) +
           '">' +
           _qtyN +
           ' ' +
@@ -978,11 +959,13 @@ function renderMaisonGdOggi() {
             }[budget.categoria] || '') +
             '</span>'
           : '';
-      var _qtyM = (r.note || '').match(/(\d+)\s*(BU|BL|CG|WL)/i);
+      var _qtyM = (r.note || '').match(buonoRegexQta());
       var _qtyN = _qtyM ? parseInt(_qtyM[1]) : 1;
       var tipoBadge = r.tipo_buono
         ? '<span class="mini-badge" style="background:' +
-          ({ BU: '#e67e22', BL: '#2c6e49', CG: '#8e44ad', WL: '#2980b9' }[r.tipo_buono] || 'var(--muted)') +
+          buonoColore(r.tipo_buono) +
+          '" title="' +
+          escP(buonoNome(r.tipo_buono)) +
           '">' +
           _qtyN +
           ' ' +
@@ -1007,14 +990,7 @@ function renderMaisonGdOggi() {
         ')" title="Elimina">Elimina</button></td></tr>';
     }
   });
-  const _totBuoni = [
-    _gdBU ? _gdBU + ' BU' : '',
-    _gdBL ? _gdBL + ' BL' : '',
-    _gdCG ? _gdCG + ' CG' : '',
-    _gdWL ? _gdWL + ' WL' : '',
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  const _totBuoni = _gdB.map(([c, n]) => n + ' ' + c).join(' · ');
   h +=
     '<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td><strong>TOTALE</strong></td><td style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
     (_totBuoni || '') +
@@ -1154,7 +1130,7 @@ function esportaGdOggiCSV() {
       if (c.length >= 3) b = _br.find((x) => x.nome.toLowerCase().split(/\s+/)[0] === c);
     }
     const label = g.nome + (g.altriNomi.length ? '/' + g.altriNomi.join('/') : '');
-    const _qm = (g.note || '').match(/(\d+)\s*(BU|BL|CG|WL)/i);
+    const _qm = (g.note || '').match(buonoRegexQta());
     const _qn = _qm ? parseInt(_qm[1]) : 1;
     rows.push([
       label,
@@ -1247,7 +1223,7 @@ async function esportaGdOggiPDF() {
           if (c.length >= 3) b = _br.find((x) => x.nome.toLowerCase().split(/\s+/)[0] === c);
         }
         const label = g.nome + (g.altriNomi.length ? '/' + g.altriNomi.join('/') : '');
-        const _qm = (g.note || '').match(/(\d+)\s*(BU|BL|CG|WL)/i);
+        const _qm = (g.note || '').match(buonoRegexQta());
         const _qn = _qm ? parseInt(_qm[1]) : 1;
         return [
           label,
@@ -1262,12 +1238,8 @@ async function esportaGdOggiPDF() {
           'TOTALE',
           '',
           righe.filter((r) => r.tipo_buono).length
-            ? [
-                _contaBuoni(righe, 'BU') ? _contaBuoni(righe, 'BU') + ' BU' : '',
-                _contaBuoni(righe, 'BL') ? _contaBuoni(righe, 'BL') + ' BL' : '',
-                _contaBuoni(righe, 'CG') ? _contaBuoni(righe, 'CG') + ' CG' : '',
-                _contaBuoni(righe, 'WL') ? _contaBuoni(righe, 'WL') + ' WL' : '',
-              ]
+            ? buoniColonne(righe)
+                .map((c) => (_contaBuoni(righe, c) ? _contaBuoni(righe, c) + ' ' + c : ''))
                 .filter(Boolean)
                 .join(' · ')
             : '',
@@ -1411,25 +1383,22 @@ function renderMaisonCharts(data, sorted) {
   );
   // Distribuzione tipo
   const normale = data.filter((r) => !r.tipo_buono).reduce((s, r) => s + parseFloat(r.costo || 0), 0);
-  const buTot = data.filter((r) => r.tipo_buono === 'BU').reduce((s, r) => s + parseFloat(r.costo || 0), 0);
-  const blTot = data.filter((r) => r.tipo_buono === 'BL').reduce((s, r) => s + parseFloat(r.costo || 0), 0);
-  const cgTot = data.filter((r) => r.tipo_buono === 'CG').reduce((s, r) => s + parseFloat(r.costo || 0), 0);
-  const wlTot = data.filter((r) => r.tipo_buono === 'WL').reduce((s, r) => s + parseFloat(r.costo || 0), 0);
+  // un settore della torta per ogni tipo di buono (configurazione dei buoni)
+  const _tipiTorta = buoniColonne(data).map((c) => ({
+    c: c,
+    tot: data.filter((r) => r.tipo_buono === c).reduce((s, r) => s + parseFloat(r.costo || 0), 0),
+  }));
   renderChart(
     'chart-maison-tipi',
     'doughnut',
     {
-      labels: [
-        'Consumazione (' + fmtCHF(normale) + ' CHF)',
-        'Buono Unico (' + fmtCHF(buTot) + ' CHF)',
-        'Buono Lounge (' + fmtCHF(blTot) + ' CHF)',
-        'C. Gourmet (' + fmtCHF(cgTot) + ' CHF)',
-        'Welcome L. (' + fmtCHF(wlTot) + ' CHF)',
-      ],
+      labels: ['Consumazione (' + fmtCHF(normale) + ' CHF)'].concat(
+        _tipiTorta.map((x) => buonoNome(x.c) + ' (' + fmtCHF(x.tot) + ' CHF)'),
+      ),
       datasets: [
         {
-          data: [normale, buTot, blTot, cgTot, wlTot],
-          backgroundColor: ['#b8860b', '#e67e22', '#2c6e49', '#8e44ad', '#2980b9'],
+          data: [normale].concat(_tipiTorta.map((x) => x.tot)),
+          backgroundColor: ['#b8860b'].concat(_tipiTorta.map((x) => buonoColore(x.c))),
           borderWidth: 2,
           borderColor: 'white',
         },
@@ -1509,10 +1478,10 @@ function apriDettaglioMaison(nome) {
   }
   const tot = righe.reduce((s, r) => s + parseFloat(r.costo || 0), 0);
   const totPx = righe.reduce((s, r) => s + (r.px || 0), 0);
-  const nBU = _contaBuoni(righe, 'BU'),
-    nBL = _contaBuoni(righe, 'BL'),
-    nCG_d = _contaBuoni(righe, 'CG'),
-    nWL_d = _contaBuoni(righe, 'WL');
+  // buoni del cliente per tipo (configurazione dei buoni)
+  const _detB = buoniColonne(righe)
+    .map((c) => [c, _contaBuoni(righe, c)])
+    .filter((x) => x[1]);
   const mesiCliente = righe.length
     ? [
         ...new Set(
@@ -1571,8 +1540,7 @@ function apriDettaglioMaison(nome) {
     ' persone · ' +
     fmtCHF(tot) +
     ' CHF' +
-    (nBU ? ' · ' + nBU + ' BU' : '') +
-    (nBL ? ' · ' + nBL + ' BL' : '') +
+    _detB.map(([c, n]) => ' · ' + n + ' ' + escP(c)).join('') +
     '</p>' +
     (budget && budget.budget_chf
       ? '<p style="font-size:var(--fs-sm,.8125rem);color:' +
@@ -1788,13 +1756,9 @@ function apriDettaglioMaison(nome) {
         '</strong></td><td>' +
         (r.tipo_buono
           ? '<span class="mini-badge" style="background:' +
-            (r.tipo_buono === 'BU'
-              ? '#e67e22'
-              : r.tipo_buono === 'CG'
-                ? '#8e44ad'
-                : r.tipo_buono === 'WL'
-                  ? '#2980b9'
-                  : '#2c6e49') +
+            buonoColore(r.tipo_buono) +
+            '" title="' +
+            escP(buonoNome(r.tipo_buono)) +
             '">' +
             r.tipo_buono +
             '</span>'
@@ -1817,14 +1781,7 @@ function apriDettaglioMaison(nome) {
         ne +
         '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 8px">Elimina</button></td></tr>';
     });
-    const _detBuoniTot = [
-      nBU ? nBU + ' BU' : '',
-      nBL ? nBL + ' BL' : '',
-      nCG_d ? nCG_d + ' CG' : '',
-      nWL_d ? nWL_d + ' WL' : '',
-    ]
-      .filter(Boolean)
-      .join(' · ');
+    const _detBuoniTot = _detB.map(([c, n]) => n + ' ' + c).join(' · ');
     html +=
       '<tr style="border-top:2px solid var(--ink);background:var(--paper2)"><td colspan="2"><strong>TOTALE RISTORANTE</strong></td><td class="num"><strong>' +
       totPx +
@@ -2213,8 +2170,12 @@ function eseguiConfrontoMaison() {
     var px = righe.reduce(function (s, r) {
       return s + (r.px || 0);
     }, 0);
-    var nBU = _contaBuoni(righe, 'BU');
-    var nBL = _contaBuoni(righe, 'BL');
+    // buoni per tipo (configurazione dei buoni)
+    var buoni = {};
+    buoniColonne(righe).forEach(function (c) {
+      var n = _contaBuoni(righe, c);
+      if (n) buoni[c] = n;
+    });
     var cat = budget ? budget.categoria || '' : '';
     var byMese = {};
     righe.forEach(function (r) {
@@ -2231,8 +2192,7 @@ function eseguiConfrontoMaison() {
       totale: totRist + totExtra + totRegali,
       visite: visite,
       px: px,
-      nBU: nBU,
-      nBL: nBL,
+      buoni: buoni,
       cat: cat,
       media: visite ? totRist / visite : 0,
       byMese: byMese,
@@ -2312,19 +2272,23 @@ function eseguiConfrontoMaison() {
         return fmtCHF(d.media) + ' CHF';
       },
     },
-    {
-      label: 'Buoni BU',
-      fn: function (d) {
-        return d.nBU || '-';
-      },
-    },
-    {
-      label: 'Buoni BL',
-      fn: function (d) {
-        return d.nBL || '-';
-      },
-    },
-  ];
+  ].concat(
+    // una riga per ogni tipo di buono usato da almeno uno dei clienti confrontati
+    buoniCodici(true)
+      .filter(function (c) {
+        return dati.some(function (d) {
+          return d.buoni[c];
+        });
+      })
+      .map(function (c) {
+        return {
+          label: 'Buoni ' + c,
+          fn: function (d) {
+            return d.buoni[c] || '-';
+          },
+        };
+      }),
+  );
   righeConf.forEach(function (rc, ri) {
     h +=
       '<tr' +
@@ -2438,19 +2402,10 @@ function esportaMaisonClienteCSV(nome) {
     ]);
   });
   const tot = righe.reduce((s, r) => s + parseFloat(r.costo || 0), 0);
-  const _nBU = _contaBuoni(righe, 'BU'),
-    _nBL = _contaBuoni(righe, 'BL'),
-    _nCG = _contaBuoni(righe, 'CG'),
-    _nWL = _contaBuoni(righe, 'WL');
-  rows.push([
-    'TOTALE',
-    '',
-    righe.reduce((s, r) => s + (r.px || 0), 0),
-    fmtCHF(tot),
-    'BU:' + _nBU + ' BL:' + _nBL + ' CG:' + _nCG + ' WL:' + _nWL,
-    '',
-    '',
-  ]);
+  const _totB = buoniColonne(righe)
+    .map((c) => c + ':' + _contaBuoni(righe, c))
+    .join(' ');
+  rows.push(['TOTALE', '', righe.reduce((s, r) => s + (r.px || 0), 0), fmtCHF(tot), _totB, '', '']);
   // Spese Extra
   if (seRighe.length) {
     rows.push([]);
@@ -2536,8 +2491,9 @@ async function esportaMaisonClientePDF(nome) {
   }
   const tot = righe.reduce((s, r) => s + parseFloat(r.costo || 0), 0);
   const totPx = righe.reduce((s, r) => s + (r.px || 0), 0);
-  const nBU = _contaBuoni(righe, 'BU'),
-    nBL = _contaBuoni(righe, 'BL');
+  // buoni per tipo (configurazione dei buoni)
+  const _colsR = buoniColonne(righe);
+  const _nR = _colsR.map((c) => _contaBuoni(righe, c));
   const _mesiMap = {};
   righe.forEach((r) => {
     const d = new Date(r.data_giornata + 'T12:00:00');
@@ -2599,16 +2555,19 @@ async function esportaMaisonClientePDF(nome) {
     y += 8;
     doc.setTextColor(0);
     // KPI
-    const nCG = _contaBuoni(righe, 'CG'),
-      nWL = _contaBuoni(righe, 'WL');
     if (sez.kpi) {
       const media = righe.length ? fmtCHF(tot / righe.length) : '0';
       doc.autoTable({
         theme: 'grid',
         startY: y,
         margin: { left: 16, right: 16 },
-        head: [['Visite', 'Persone', 'BU', 'BL', 'CG', 'WL', 'Totale CHF', 'Media/visita']],
-        body: [[righe.length, totPx, nBU || '-', nBL || '-', nCG || '-', nWL || '-', 'CHF ' + fmtCHF(tot), media]],
+        head: [['Visite', 'Persone'].concat(_colsR, ['Totale CHF', 'Media/visita'])],
+        body: [
+          [righe.length, totPx].concat(
+            _nR.map((n) => n || '-'),
+            ['CHF ' + fmtCHF(tot), media],
+          ),
+        ],
         headStyles: { fillColor: [184, 134, 11] },
         styles: {
           lineColor: [220, 215, 205],
@@ -2617,7 +2576,7 @@ async function esportaMaisonClientePDF(nome) {
           cellPadding: 4,
           halign: 'center',
         },
-        columnStyles: { 6: { fontStyle: 'bold' } },
+        columnStyles: { [2 + _colsR.length]: { fontStyle: 'bold' } },
       });
       y = doc.lastAutoTable.finalY + 8;
     }
@@ -3040,15 +2999,9 @@ function modificaMaisonRiga(id, nome) {
     parseFloat(r.costo).toFixed(2) +
     '" step="0.01"></div><div class="pwd-field" style="flex:1;min-width:100px"><label>Tipo</label><select id="edit-mr-tipo" style="width:100%;padding:8px"><option value=""' +
     (!r.tipo_buono ? ' selected' : '') +
-    '>Normale</option><option value="BU"' +
-    (r.tipo_buono === 'BU' ? ' selected' : '') +
-    '>Buono Unico</option><option value="BL"' +
-    (r.tipo_buono === 'BL' ? ' selected' : '') +
-    '>Buono Lounge</option><option value="CG"' +
-    (r.tipo_buono === 'CG' ? ' selected' : '') +
-    '>C. Gourmet</option><option value="WL"' +
-    (r.tipo_buono === 'WL' ? ' selected' : '') +
-    '>Welcome Lounge</option></select></div></div><div class="pwd-field"><label>Note</label><input type="text" id="edit-mr-note" value="' +
+    '>Normale</option>' +
+    buoniOpzioniHtml(r.tipo_buono || '', 'nome') +
+    '</select></div></div><div class="pwd-field"><label>Note</label><input type="text" id="edit-mr-note" value="' +
     escP(r.note || '') +
     '"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaModificaMaisonRiga(' +
     id +

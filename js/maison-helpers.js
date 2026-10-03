@@ -934,22 +934,20 @@ function esportaMaisonCSV() {
   };
   const byNome = {};
   data.forEach((r) => {
-    if (!byNome[r.nome]) byNome[r.nome] = { tot: 0, px: 0, visite: 0, bu: 0, bl: 0, cg: 0, wl: 0 };
+    if (!byNome[r.nome]) byNome[r.nome] = { tot: 0, px: 0, visite: 0, buoni: {} };
     const d = byNome[r.nome];
     d.tot += parseFloat(r.costo || 0);
     d.px += r.px || 0;
     d.visite++;
     const _bq = (() => {
-      const m = (r.note || '').match(/(\d+)\s*(?:BU|BL|CG|WL)/i);
+      const m = (r.note || '').match(buonoRegexQta());
       return m ? parseInt(m[1]) : 1;
     })();
-    if (r.tipo_buono === 'BU') d.bu += _bq;
-    if (r.tipo_buono === 'BL') d.bl += _bq;
-    if (r.tipo_buono === 'CG') d.cg += _bq;
-    if (r.tipo_buono === 'WL') d.wl += _bq;
+    if (r.tipo_buono) d.buoni[r.tipo_buono] = (d.buoni[r.tipo_buono] || 0) + _bq;
   });
   const sorted = Object.entries(byNome).sort((a, b) => b[1].tot - a[1].tot);
-  const rows = [['Cliente', 'Categoria', 'Visite', 'PX', 'BU', 'BL', 'CG', 'WL', 'Totale CHF', 'Media CHF']];
+  const _cols = buoniColonne(data);
+  const rows = [['Cliente', 'Categoria', 'Visite', 'PX'].concat(_cols, ['Totale CHF', 'Media CHF'])];
   sorted.forEach(([n, d]) => {
     let budget = getBudgetReparto().find((b) => b.nome.toLowerCase() === n.toLowerCase());
     if (!budget) {
@@ -957,28 +955,17 @@ function esportaMaisonCSV() {
       if (_cog.length >= 3) budget = getBudgetReparto().find((b) => b.nome.toLowerCase().split(/\s+/)[0] === _cog);
     }
     const cat = budget && budget.categoria ? _catLabels[budget.categoria] || '' : '';
-    rows.push([
-      n,
-      cat,
-      d.visite,
-      d.px,
-      d.bu || '',
-      d.bl || '',
-      d.cg || '',
-      d.wl || '',
-      fmtCHF(d.tot),
-      fmtCHF(d.tot / d.visite),
-    ]);
+    rows.push([n, cat, d.visite, d.px, ..._cols.map((c) => d.buoni[c] || ''), fmtCHF(d.tot), fmtCHF(d.tot / d.visite)]);
   });
   rows.push([
     'TOTALE',
     '',
     sorted.reduce((s, c) => s + c[1].visite, 0),
     sorted.reduce((s, c) => s + c[1].px, 0) + ' PX',
-    sorted.reduce((s, c) => s + c[1].bu, 0) ? sorted.reduce((s, c) => s + c[1].bu, 0) + ' BU' : '',
-    sorted.reduce((s, c) => s + c[1].bl, 0) ? sorted.reduce((s, c) => s + c[1].bl, 0) + ' BL' : '',
-    sorted.reduce((s, c) => s + c[1].cg, 0) ? sorted.reduce((s, c) => s + c[1].cg, 0) + ' CG' : '',
-    sorted.reduce((s, c) => s + c[1].wl, 0) ? sorted.reduce((s, c) => s + c[1].wl, 0) + ' WL' : '',
+    ..._cols.map((b) => {
+      const t = sorted.reduce((s, c) => s + (c[1].buoni[b] || 0), 0);
+      return t ? t + ' ' + b : '';
+    }),
     'CHF ' + fmtCHF(sorted.reduce((s, c) => s + c[1].tot, 0)),
     '',
   ]);
@@ -1021,22 +1008,20 @@ async function esportaMaisonPDF() {
   };
   const byNome = {};
   data.forEach((r) => {
-    if (!byNome[r.nome]) byNome[r.nome] = { tot: 0, px: 0, visite: 0, bu: 0, bl: 0, cg: 0, wl: 0 };
+    if (!byNome[r.nome]) byNome[r.nome] = { tot: 0, px: 0, visite: 0, buoni: {} };
     const d = byNome[r.nome];
     d.tot += parseFloat(r.costo || 0);
     d.px += r.px || 0;
     d.visite++;
     const _bq = (() => {
-      const m = (r.note || '').match(/(\d+)\s*(?:BU|BL|CG|WL)/i);
+      const m = (r.note || '').match(buonoRegexQta());
       return m ? parseInt(m[1]) : 1;
     })();
-    if (r.tipo_buono === 'BU') d.bu += _bq;
-    if (r.tipo_buono === 'BL') d.bl += _bq;
-    if (r.tipo_buono === 'CG') d.cg += _bq;
-    if (r.tipo_buono === 'WL') d.wl += _bq;
+    if (r.tipo_buono) d.buoni[r.tipo_buono] = (d.buoni[r.tipo_buono] || 0) + _bq;
   });
   const sorted = Object.entries(byNome).sort((a, b) => b[1].tot - a[1].tot);
   const totale = sorted.reduce((s, c) => s + c[1].tot, 0);
+  const _cols = buoniColonne(data);
   try {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('portrait', 'mm', 'a4');
@@ -1089,7 +1074,7 @@ async function esportaMaisonPDF() {
       theme: 'grid',
       startY: y,
       margin: { left: 16, right: 16 },
-      head: [['Cliente', 'Categoria', 'Visite', 'PX', 'BU', 'BL', 'CG', 'WL', 'Totale CHF', 'Media CHF']],
+      head: [['Cliente', 'Categoria', 'Visite', 'PX'].concat(_cols, ['Totale CHF', 'Media CHF'])],
       body: sorted.map(([n, d]) => {
         let budget = getBudgetReparto().find((b) => b.nome.toLowerCase() === n.toLowerCase());
         if (!budget) {
@@ -1097,18 +1082,7 @@ async function esportaMaisonPDF() {
           if (_cog.length >= 3) budget = getBudgetReparto().find((b) => b.nome.toLowerCase().split(/\s+/)[0] === _cog);
         }
         const cat = budget && budget.categoria ? _catLabels[budget.categoria] || '' : '';
-        return [
-          n,
-          cat,
-          d.visite,
-          d.px,
-          d.bu || '',
-          d.bl || '',
-          d.cg || '',
-          d.wl || '',
-          fmtCHF(d.tot),
-          fmtCHF(d.tot / d.visite),
-        ];
+        return [n, cat, d.visite, d.px, ..._cols.map((c) => d.buoni[c] || ''), fmtCHF(d.tot), fmtCHF(d.tot / d.visite)];
       }),
       foot: [
         [
@@ -1116,10 +1090,10 @@ async function esportaMaisonPDF() {
           '',
           sorted.reduce((s, c) => s + c[1].visite, 0),
           sorted.reduce((s, c) => s + c[1].px, 0) + ' PX',
-          sorted.reduce((s, c) => s + c[1].bu, 0) ? sorted.reduce((s, c) => s + c[1].bu, 0) + ' BU' : '',
-          sorted.reduce((s, c) => s + c[1].bl, 0) ? sorted.reduce((s, c) => s + c[1].bl, 0) + ' BL' : '',
-          sorted.reduce((s, c) => s + c[1].cg, 0) ? sorted.reduce((s, c) => s + c[1].cg, 0) + ' CG' : '',
-          sorted.reduce((s, c) => s + c[1].wl, 0) ? sorted.reduce((s, c) => s + c[1].wl, 0) + ' WL' : '',
+          ..._cols.map((b) => {
+            const t = sorted.reduce((s, c) => s + (c[1].buoni[b] || 0), 0);
+            return t ? t + ' ' + b : '';
+          }),
           'CHF ' + fmtCHF(totale),
           '',
         ],
@@ -1143,12 +1117,9 @@ async function esportaMaisonPDF() {
         1: { cellWidth: 28, halign: 'left' },
         2: { halign: 'center', cellWidth: 14 },
         3: { halign: 'center', cellWidth: 12 },
-        4: { halign: 'center', cellWidth: 10 },
-        5: { halign: 'center', cellWidth: 10 },
-        6: { halign: 'center', cellWidth: 10 },
-        7: { halign: 'center', cellWidth: 10 },
-        8: { halign: 'right', cellWidth: 22 },
-        9: { halign: 'right', cellWidth: 18 },
+        ...Object.fromEntries(_cols.map((c, i) => [4 + i, { halign: 'center', cellWidth: 10 }])),
+        [4 + _cols.length]: { halign: 'right', cellWidth: 22 },
+        [5 + _cols.length]: { halign: 'right', cellWidth: 18 },
       },
       didParseCell: function (d) {
         if (d.section === 'body' && d.column.index === 1) {
@@ -2061,7 +2032,7 @@ function getMaisonRepartoExpanded() {
         note: haBuono
           ? r.note
           : (r.note || '')
-              .replace(/\d*\s*(BU|BL|CG|WL)\b/gi, '')
+              .replace(buonoRegexTogli(), '')
               .replace(/^[,\s]+|[,\s]+$/g, '')
               .trim(),
         _costoOriginale: parseFloat(r.costo || 0),
@@ -2466,8 +2437,11 @@ function getInventarioReparto() {
 }
 function calcolaGiacenzaBuoni() {
   const inv = getInventarioReparto().filter((r) => r.categoria === 'buono');
-  const giacenze = { BU: 0, BL: 0, CG: 0, WL: 0 };
-  ['BU', 'BL', 'CG', 'WL'].forEach((t) => {
+  const giacenze = {};
+  // tipi attivi e quelli disattivati che hanno ancora movimenti
+  const _tipiInv = [...new Set(buoniCodici(false).concat(inv.map((r) => r.tipo).filter(Boolean)))];
+  _tipiInv.forEach((t) => (giacenze[t] = 0));
+  _tipiInv.forEach((t) => {
     const recs = inv.filter((r) => r.tipo === t);
     const entrate = recs.filter((r) => r.movimento === 'entrata').reduce((s, r) => s + r.quantita, 0);
     const uscite = recs.filter((r) => r.movimento === 'uscita').reduce((s, r) => s + r.quantita, 0);
@@ -2495,7 +2469,7 @@ function calcolaGiacenzaBuoni() {
   return giacenze;
 }
 function _contaBuoniFromNote(r) {
-  const m = (r.note || '').match(/(\d+)\s*(?:BU|BL|CG|WL)/i);
+  const m = (r.note || '').match(buonoRegexQta());
   return m ? parseInt(m[1]) : 1;
 }
 function calcolaGiacenzeSigarette() {
@@ -2836,18 +2810,13 @@ function renderInventarioBuoni() {
   ).length;
   const kpiEl = document.getElementById('inv-buoni-kpi');
   if (kpiEl) {
-    const labels = {
-      BU: 'Buono Unico',
-      BL: 'Buono Lounge',
-      CG: 'C. Gourmet',
-      WL: 'Welcome L.',
-    };
-    const _scortaBassa = ['BU', 'BL', 'CG', 'WL'].filter((t) => (giacenze[t] || 0) > 0 && (giacenze[t] || 0) <= 10);
-    const _scortaFinita = ['BU', 'BL', 'CG', 'WL'].filter(
+    const _tipiKpi = Object.keys(giacenze);
+    const _scortaBassa = _tipiKpi.filter((t) => (giacenze[t] || 0) > 0 && (giacenze[t] || 0) <= 10);
+    const _scortaFinita = _tipiKpi.filter(
       (t) => (giacenze[t] || 0) <= 0 && getInventarioReparto().some((r) => r.categoria === 'buono' && r.tipo === t),
     );
     kpiEl.innerHTML =
-      ['BU', 'BL', 'CG', 'WL']
+      _tipiKpi
         .map((t) => {
           const v = giacenze[t] || 0;
           const col = v <= 0 ? 'var(--accent)' : v <= 10 ? '#e67e22' : '#2c6e49';
@@ -2857,7 +2826,7 @@ function renderInventarioBuoni() {
             '">' +
             v +
             '</div><div class="mini-stat-label">' +
-            labels[t] +
+            escP(buonoNome(t)) +
             '</div></div>'
           );
         })
@@ -3295,15 +3264,9 @@ function modificaInventario(id) {
   let html = '<h3>Modifica movimento</h3>';
   if (isBuono) {
     html +=
-      '<div class="pwd-field"><label>Tipo</label><select id="inv-edit-tipo" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"><option value="BU"' +
-      (r.tipo === 'BU' ? ' selected' : '') +
-      '>BU</option><option value="BL"' +
-      (r.tipo === 'BL' ? ' selected' : '') +
-      '>BL</option><option value="CG"' +
-      (r.tipo === 'CG' ? ' selected' : '') +
-      '>CG</option><option value="WL"' +
-      (r.tipo === 'WL' ? ' selected' : '') +
-      '>WL</option></select></div>';
+      '<div class="pwd-field"><label>Tipo</label><select id="inv-edit-tipo" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)">' +
+      buoniOpzioniHtml(r.tipo, 'codice') +
+      '</select></div>';
   } else {
     html +=
       '<div class="pwd-field"><label>Marca</label><input type="text" id="inv-edit-tipo" value="' +

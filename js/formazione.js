@@ -517,30 +517,121 @@ function getProtocolli() {
 function _renderProtocolliCard() {
   const prot = getProtocolli();
   const chiavi = Object.keys(prot);
-  if (!chiavi.length) return '';
   const comps = getCompetenzeReparto();
   let h =
     '<div class="main-card"><div class="card-header">Protocolli di formazione (formulari ufficiali)</div><div style="padding:10px 16px">';
   h +=
-    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Scarica il protocollo in Excel, il formatore lo compila (X sui punti svolti, voti 1-5 nella valutazione) e lo reimporti qui: il sistema riconosce allievo, punti e voti, registra tutto nello storico HR e a protocollo completo propone la certificazione della competenza. Il foglio firmato si allega alla scheda del collaboratore (Allegati HR).</p>';
-  chiavi.forEach((k) => {
-    const c = comps.find((x) => x.key === k);
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">I protocolli sono i documenti Word originali di <b>Piano &gt; Formulari</b> (cartella <b>Formazione</b>): si aprono identici, si stampano e il formatore li compila e li firma con l allievo. Un formulario caricato o sostituito in quella cartella compare subito anche qui. Il foglio firmato si allega alla scheda del collaboratore (Allegati HR).</p>';
+  // riempito dopo il disegno: i formulari si leggono dal database
+  h += '<div id="prot-formulari" style="font-size:var(--fs-md,.875rem);color:var(--muted)">Carico i formulari...</div>';
+  if (chiavi.length) {
     h +=
-      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0"><b style="min-width:180px">' +
-      escP(c ? c.label : k) +
-      '</b><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px" onclick="scaricaProtocolloExcel(\'' +
-      k +
-      '\')">Scarica template</button>' +
-      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="document.getElementById(\'prot-file-' +
-      k +
-      '\').click()">Importa compilato</button><input type="file" id="prot-file-' +
-      k +
-      '" accept=".xlsx,.xls,.csv" style="display:none" onchange="importaProtocolloExcel(\'' +
-      k +
-      '\',this)"></div>';
-  });
+      '<details style="margin-top:12px"><summary style="cursor:pointer;font-size:var(--fs-sm,.8125rem);color:var(--muted)">Registro digitale in Excel (facoltativo): punti svolti e voti da importare</summary><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:6px 0">Se il formatore preferisce segnare punti e voti al computer: scarica il registro, scrivi X sui punti svolti e i voti 1-5, poi reimportalo. Il sistema registra tutto nello storico HR e a registro completo propone la certificazione della competenza.</p>';
+    chiavi.forEach((k) => {
+      const c = comps.find((x) => x.key === k);
+      h +=
+        '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0"><b style="min-width:180px">' +
+        escP(c ? c.label : k) +
+        '</b><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px" onclick="scaricaProtocolloExcel(\'' +
+        k +
+        '\')">Scarica registro Excel</button>' +
+        '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="document.getElementById(\'prot-file-' +
+        k +
+        '\').click()">Importa registro compilato</button><input type="file" id="prot-file-' +
+        k +
+        '" accept=".xlsx,.xls,.csv" style="display:none" onchange="importaProtocolloExcel(\'' +
+        k +
+        '\',this)"></div>';
+    });
+    h += '</details>';
+  }
   h += '</div></div>';
+  setTimeout(_protCaricaFormulari, 0);
   return h;
+}
+// formulari della cartella Formazione (Piano > Formulari) per competenza: lo
+// stesso file, cosi le due parti si vedono uguali
+const _PROT_PAROLE = [
+  [/cass/i, /cass/i],
+  [/(recep|ricez|^rec$)/i, /(recep|ricez)/i],
+  [/(sala|slot)/i, /slot/i],
+  [/accogl/i, /accogl/i],
+  [/(^bo$|back)/i, /(back office|\bbo\b)/i],
+  [/(^sup$|superv)/i, /superv/i],
+];
+async function _protCaricaFormulari() {
+  const box = document.getElementById('prot-formulari');
+  if (!box) return;
+  let lista = [];
+  try {
+    lista =
+      (await secGet(
+        'piano_formulari?reparto_dip=eq.' + currentReparto + '&cartella=eq.Formazione&order=nome.asc&limit=100',
+      )) || [];
+  } catch (e) {
+    box.textContent = 'Formulari non leggibili: ' + (e.message || e);
+    return;
+  }
+  // i file servono gia caricati ad apriFormulario
+  if (typeof _pianoFormulariCache !== 'undefined')
+    lista.forEach((f) => {
+      if (!_pianoFormulariCache.some((x) => x.id === f.id)) _pianoFormulariCache.push(f);
+    });
+  if (!lista.length) {
+    box.innerHTML =
+      'Nella cartella <b>Formazione</b> di Piano &gt; Formulari non ci sono ancora protocolli: caricali da li (Carica formulario, cartella Formazione).';
+    return;
+  }
+  const apri = (f) =>
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px" onclick="apriFormulario(' +
+    Number(f.id) +
+    ')">' +
+    (String(f.estensione || '').startsWith('doc') ? 'Apri Word' : 'Apri') +
+    '</button>';
+  // per competenza: il formulario piu recente che le corrisponde
+  const comps = getCompetenzeReparto();
+  let h = '';
+  const usati = new Set();
+  comps.forEach((c) => {
+    const regola = _PROT_PAROLE.find((x) => x[0].test(c.key) || x[0].test(c.label));
+    if (!regola) return;
+    const trovati = lista.filter((f) => regola[1].test(f.nome)).sort((a, b) => b.id - a.id);
+    if (!trovati.length) return;
+    trovati.forEach((f) => usati.add(f.id));
+    h +=
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0;color:var(--ink)"><b style="min-width:180px">' +
+      escP(c.label) +
+      '</b>' +
+      trovati
+        .map((f, i) => (i ? '' : apri(f)) + (i ? '' : ' <span style="color:var(--muted)">' + escP(f.nome) + '</span>'))
+        .join('') +
+      (trovati.length > 1
+        ? ' <span style="color:var(--muted)">· anche: ' +
+          trovati
+            .slice(1)
+            .map(
+              (f) => '<a href="#" onclick="apriFormulario(' + Number(f.id) + ');return false">' + escP(f.nome) + '</a>',
+            )
+            .join(', ') +
+          '</span>'
+        : '') +
+      '</div>';
+  });
+  const altri = lista.filter((f) => !usati.has(f.id));
+  if (altri.length)
+    h +=
+      '<div style="margin-top:10px;color:var(--ink)"><b>Altri formulari della cartella Formazione</b></div>' +
+      altri
+        .map(
+          (f) =>
+            '<div style="display:flex;gap:8px;align-items:center;margin:4px 0;color:var(--ink)">' +
+            apri(f) +
+            ' ' +
+            escP(f.nome) +
+            '</div>',
+        )
+        .join('');
+  box.innerHTML = h;
 }
 async function scaricaProtocolloExcel(compKey) {
   if (!(await assicuraLibreria('xlsx'))) return;

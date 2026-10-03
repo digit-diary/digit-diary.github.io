@@ -139,6 +139,7 @@ function GUIDA_CAPITOLI() {
       titolo: 'Maison e budget clienti',
       vis: () => _guidaVis('maison'),
       righe: [
+        '<b>Tipi di buono</b> (Impostazioni &gt; Maison, solo amministratore): per ogni buono sigla, nome, valore in CHF e attivo. Si puo <b>rinominare</b> un buono e <b>aggiungere</b> un tipo nuovo (sigla da 2 a 6 lettere o cifre, nome, valore e, se serve, le parole che nel file Maison lo indicano, es. brunch). La sigla non si cambia dopo l aggiunta, perche e scritta nelle registrazioni; un tipo che non si usa piu si <b>disattiva</b>: sparisce dai menu ma resta nello storico, nelle statistiche e negli export. Menu, tabelle, grafici, export e magazzino si adeguano da soli.',
         'Gestione delle consumazioni offerte ai clienti: budget per cliente, categorie, buoni e conteggi mensili.',
         'Il testo del gestionale si incolla nel riquadro di importazione e il programma riconosce da solo cliente, importo e tipo di consumazione.',
         'I <b>buoni</b> si calcolano in automatico dal costo, con i valori impostati in Impostazioni.',
@@ -552,6 +553,7 @@ function GUIDA_CAPITOLI() {
       titolo: 'Formazione e competenze',
       vis: () => _guidaVis('formazione'),
       righe: [
+        '<b>Protocolli di formazione</b>: sono i documenti Word originali della cartella <b>Formazione</b> di Piano &gt; Formulari, gli stessi file: per ogni competenza (cassa, reception, sala...) il bottone Apri Word scarica il protocollo giusto, identico, da stampare, compilare e firmare. Un formulario caricato o sostituito in quella cartella compare subito qui. Il registro in Excel per importare punti e voti resta come scelta facoltativa.',
         'La <b>matrice delle competenze</b> mostra chi sa fare cosa: le spunte segnano le competenze certificate e i livelli raggiunti.',
         'Al completamento di un livello il programma assegna i punti previsti e avvisa la persona interessata.',
         'I <b>punti e i premi</b> seguono le azioni configurate (coperture, cambi turno, formazioni svolte) e sono consultabili nella scheda del collaboratore.',

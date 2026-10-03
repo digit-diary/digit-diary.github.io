@@ -247,8 +247,9 @@ async function loadAll() {
   if (buonoVal)
     try {
       const bv = JSON.parse(buonoVal);
-      if (bv && typeof BUONO_VALORI !== 'undefined') Object.assign(BUONO_VALORI, bv);
+      if (bv && typeof _buoniDaImpostazione === 'function') _buoniDaImpostazione(bv);
     } catch (e) {}
+  if (typeof buoniRiempiSelect === 'function') buoniRiempiSelect();
   if (eqMesi && parseInt(eqMesi) > 0) equitaMesi = parseInt(eqMesi);
   if (repCfg)
     try {

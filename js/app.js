@@ -123,12 +123,7 @@ function switchPage(name) {
     const bvSec = document.getElementById('buoni-valori-section');
     if (bvSec) {
       bvSec.style.display = isAdmin() ? '' : 'none';
-      if (isAdmin() && typeof BUONO_VALORI !== 'undefined') {
-        ['bu', 'bl', 'cg', 'wl'].forEach((k) => {
-          const el = document.getElementById('buono-' + k + '-input');
-          if (el) el.value = BUONO_VALORI[k.toUpperCase()];
-        });
-      }
+      if (isAdmin() && typeof renderBuoniTipiUI === 'function') renderBuoniTipiUI();
     }
     const gbSec = document.getElementById('giubileo-section');
     if (gbSec) {
