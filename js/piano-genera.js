@@ -513,36 +513,46 @@ async function _pianoAvvisiDomenichePerse(mosse) {
   }
   return out;
 }
-function _pianoCalcolaViolazioni() {
-  const ym = _pianoMeseSel;
-  const nGiorni = _pianoUltimoGiorno(ym);
-  const maxCons = parseInt(_pianoRegolaVal('max_consecutivi')) || 0;
-  const minRiposo = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 0;
-  const no4w1c1w = _pianoRegolaVal('no_4w1c1w') === 'TRUE';
-  const diurnoPreV = _pianoRegolaVal('diurno_prima_vacanza') === 'TRUE';
-  const celle = {};
-  const lista = [];
-  const aggiungi = (nome, giorno, msg) => {
-    const dstr = ym + '-' + String(giorno).padStart(2, '0');
-    (celle[nome + '|' + dstr] = celle[nome + '|' + dstr] || []).push(msg);
-    lista.push({ nome: nome, giorno: giorno, msg: msg });
+// CONTROLLO DELLE REGOLE (Valida regole) diviso in due parti riutilizzabili,
+// cosi la ricerca della bozza e le proposte di cambio usano le STESSE regole:
+//  - _pianoViolazioniPersona: tutto quello che riguarda una persona sola
+//    (riposi, consecutivi, ore della settimana e del mese, domeniche, chi fa
+//    cosa, non disponibilita);
+//  - _pianoViolazioniGruppi: le regole fra persone (accompagnamento, limiti e
+//    minimi per gruppo).
+// Ogni voce: { nome, giorno, msg, celle: [date segnate nel calendario] }.
+function _pianoCtxViolazioni(ym) {
+  return {
+    ym: ym,
+    nGiorni: _pianoUltimoGiorno(ym),
+    maxCons: parseInt(_pianoRegolaVal('max_consecutivi')) || 0,
+    minRiposo: parseFloat(_pianoRegolaVal('min_riposo_ore')) || 0,
+    no4w1c1w: _pianoRegolaVal('no_4w1c1w') === 'TRUE',
+    diurnoPreV: _pianoRegolaVal('diurno_prima_vacanza') === 'TRUE',
+    maxSett: _pianoOreSettimanaMax(),
+    ndV: _pianoNdMese(ym),
+    domeniche: _pianoRegolaVal('domeniche_libere_anno') != null,
   };
-  const perNome = {};
-  _pianoRighe.forEach((r) => {
-    const g = parseInt(r.data.split('-')[2]);
-    (perNome[r.collaboratore] = perNome[r.collaboratore] || {})[g] = r.codice;
-  });
+}
+// righeMese: celle della persona nel mese; righeSett: le stesse piu i giorni delle
+// settimane a cavallo (mese prima e dopo)
+function _pianoViolazioniPersona(nome, righeMese, righeSett, ctx) {
+  const ym = ctx.ym;
+  const nGiorni = ctx.nGiorni;
+  const out = [];
+  const dstrDi = (g) => ym + '-' + String(g).padStart(2, '0');
+  const aggiungi = (giorno, msg) => out.push({ nome: nome, giorno: giorno, msg: msg, celle: [dstrDi(giorno)] });
+  const giorni = {};
+  righeMese.forEach((r) => (giorni[parseInt(r.data.split('-')[2])] = r.codice));
   // riposo settimanale attorno alla domenica (35 / 47 ore)
-  _pianoRiposiSettimanali(_pianoRigheSettimane()).forEach((v) => {
-    const g = v.tipo === 'libera' ? v.domenica : v.domenica;
+  _pianoRiposiSettimanali(righeSett).forEach((v) => {
+    const g = v.domenica;
     if (!g.startsWith(ym)) return;
-    const msg = _pianoTestoRiposo(v);
-    (celle[v.nome + '|' + g] = celle[v.nome + '|' + g] || []).push(msg);
-    lista.push({ nome: v.nome, giorno: parseInt(g.substring(8, 10)), msg: msg });
+    out.push({ nome: v.nome, giorno: parseInt(g.substring(8, 10)), msg: _pianoTestoRiposo(v), celle: [g] });
   });
   // ore lavorate nella settimana lunedi-domenica oltre il massimo (45.1)
-  const maxSett = _pianoOreSettimanaMax();
-  _pianoSettimaneOltre(_pianoRigheSettimane(), maxSett).forEach((s) => {
+  const maxSett = ctx.maxSett;
+  _pianoSettimaneOltre(righeSett, maxSett).forEach((s) => {
     const nelMese = s.giorni.filter((d) => d.startsWith(ym)).sort();
     if (!nelMese.length) return;
     const msg =
@@ -555,11 +565,11 @@ function _pianoCalcolaViolazioni() {
       maxSett +
       (_pianoSettimanaConNotturno() ? ' compreso il 10%' : ' da orologio') +
       ')';
-    nelMese.forEach((d) => (celle[s.nome + '|' + d] = celle[s.nome + '|' + d] || []).push(msg));
-    lista.push({ nome: s.nome, giorno: parseInt(nelMese[0].substring(8, 10)), msg: msg });
+    out.push({ nome: s.nome, giorno: parseInt(nelMese[0].substring(8, 10)), msg: msg, celle: nelMese });
   });
-  Object.keys(perNome).forEach((nome) => {
-    const giorni = perNome[nome];
+  if (righeMese.length) {
+    const maxCons = ctx.maxCons;
+    const minRiposo = ctx.minRiposo;
     let consec = 0;
     for (let g = 1; g <= nGiorni; g++) {
       const cod = giorni[g] || '';
@@ -568,7 +578,7 @@ function _pianoCalcolaViolazioni() {
       if (lavoro) {
         consec++;
         if (maxCons && consec === maxCons + 1)
-          aggiungi(nome, g, consec - 1 + '+ giorni lavorativi consecutivi (max ' + maxCons + ')');
+          aggiungi(g, consec - 1 + '+ giorni lavorativi consecutivi (max ' + maxCons + ')');
       } else {
         consec = 0;
       }
@@ -584,25 +594,21 @@ function _pianoCalcolaViolazioni() {
           const fineAbs = fine1 <= _pianoOra(t1.ora_inizio) ? 24 + fine1 : fine1;
           const riposo = 24 + inizio2 - fineAbs;
           if (riposo < minRiposo)
-            aggiungi(
-              nome,
-              g + 1,
-              'solo ' + riposo.toFixed(1) + 'h di riposo dopo ' + cod + ' (min ' + minRiposo + 'h)',
-            );
+            aggiungi(g + 1, 'solo ' + riposo.toFixed(1) + 'h di riposo dopo ' + cod + ' (min ' + minRiposo + 'h)');
         }
       }
       // 3) vietato 4 lavoro + 1 riposo + 1 lavoro
-      if (no4w1c1w && !lavoro && cod && g >= 5) {
+      if (ctx.no4w1c1w && !lavoro && cod && g >= 5) {
         let prima = 0;
         for (let k = g - 1; k >= 1 && _pianoIsLavoro(giorni[k]); k--) prima++;
         if (prima >= 4 && _pianoIsLavoro(giorni[g + 1] || ''))
-          aggiungi(nome, g, 'riposo singolo dopo ' + prima + ' giorni di lavoro (vietato 4+1+1)');
+          aggiungi(g, 'riposo singolo dopo ' + prima + ' giorni di lavoro (vietato 4+1+1)');
       }
       // 4) turno diurno il giorno prima delle vacanze
-      if (diurnoPreV && (cod === 'V' || cod === 'V1') && (giorni[g - 1] || '') && _pianoIsLavoro(giorni[g - 1])) {
+      if (ctx.diurnoPreV && (cod === 'V' || cod === 'V1') && (giorni[g - 1] || '') && _pianoIsLavoro(giorni[g - 1])) {
         const tp = _pianoTurnoInfo(giorni[g - 1]);
         if (tp && tp.tipo === 'NOTTURNO')
-          aggiungi(nome, g - 1, 'turno notturno il giorno prima delle vacanze (deve essere diurno)');
+          aggiungi(g - 1, 'turno notturno il giorno prima delle vacanze (deve essere diurno)');
       }
       // 5) regole "chi fa cosa" del settore (regole di gruppo turni_solo_funzioni
       //    e funzione_turni_giorni: create e modificate dalla scheda Regole di gruppo)
@@ -610,54 +616,95 @@ function _pianoCalcolaViolazioni() {
         const t = _pianoTurnoInfo(cod);
         const dow = new Date(ym + '-' + String(g).padStart(2, '0') + 'T12:00:00').getDay();
         const vfz = t ? _pianoViolazioneFunzioneTurno(nome, t, dow, false) : null;
-        if (vfz) aggiungi(nome, g, vfz);
+        if (vfz) aggiungi(g, vfz);
       }
     }
-  });
-
-  // ===== TOLLERANZA ORE (regole personalizzabili: tolleranza_ore ±,
-  // tolleranza_ore_sopra/sotto per fissi e jolly con %, jolly_ore_min/max) =====
-  {
-    const orePerNome = {};
-    _pianoRighe.forEach((r) => {
-      const info = _pianoCollabInfo(r.collaboratore) || {};
-      const pct = parseFloat(info.percentuale) || 1;
-      const o = _pianoOreDiRiga(r, pct);
-      if (o) orePerNome[r.collaboratore] = (orePerNome[r.collaboratore] || 0) + o;
-    });
-    Object.keys(orePerNome).forEach((nome) => {
-      const lim = _pianoLimitiOre(nome, nGiorni);
-      if (lim.min == null && lim.max == null) return; // regole spente per questo profilo
-      const oreT = Math.round(orePerNome[nome] * 10) / 10;
-      const arr = (x) => Math.round(x * 10) / 10;
-      if (lim.max != null && oreT > lim.max)
-        lista.push({
-          nome: nome,
-          giorno: 0,
-          msg:
-            'ore mese ' +
-            oreT +
-            'h SOPRA il massimo ' +
-            arr(lim.max) +
-            'h (regole tolleranza' +
-            (lim.obiettivo == null ? ' jolly' : '') +
-            ')',
-        });
-      else if (lim.min != null && oreT < lim.min)
-        lista.push({
-          nome: nome,
-          giorno: 0,
-          msg:
-            'ore mese ' +
-            oreT +
-            'h SOTTO il minimo ' +
-            arr(lim.min) +
-            'h (regole tolleranza' +
-            (lim.obiettivo == null ? ' jolly' : '') +
-            ')',
-        });
-    });
   }
+  // TOLLERANZA ORE (regole personalizzabili: tolleranza_ore ±, tolleranza_ore_sopra/
+  // sotto per fissi e jolly con %, jolly_ore_min/max)
+  {
+    const info = _pianoCollabInfo(nome) || {};
+    const pct = parseFloat(info.percentuale) || 1;
+    let ore = 0;
+    let conOre = false;
+    righeMese.forEach((r) => {
+      const o = _pianoOreDiRiga(r, pct);
+      if (o) {
+        ore += o;
+        conOre = true;
+      }
+    });
+    if (conOre) {
+      const lim = _pianoLimitiOre(nome, nGiorni);
+      if (lim.min != null || lim.max != null) {
+        const oreT = Math.round(ore * 10) / 10;
+        const arr = (x) => Math.round(x * 10) / 10;
+        const coda = 'h (regole tolleranza' + (lim.obiettivo == null ? ' jolly' : '') + ')';
+        if (lim.max != null && oreT > lim.max)
+          out.push({
+            nome: nome,
+            giorno: 0,
+            msg: 'ore mese ' + oreT + 'h SOPRA il massimo ' + arr(lim.max) + coda,
+            celle: [],
+          });
+        else if (lim.min != null && oreT < lim.min)
+          out.push({
+            nome: nome,
+            giorno: 0,
+            msg: 'ore mese ' + oreT + 'h SOTTO il minimo ' + arr(lim.min) + coda,
+            celle: [],
+          });
+      }
+    }
+  }
+  // NON DISPONIBILITA': un turno assegnato in un giorno dichiarato ND
+  righeMese.forEach((r) => {
+    if (!_pianoTurnoInfo(r.codice)) return;
+    if (ctx.ndV[r.collaboratore + '|' + r.data])
+      aggiungi(parseInt(r.data.split('-')[2]), "turno su un giorno di NON disponibilita' (dal Diario)");
+  });
+  // DOMENICHE LIBERE (OLL2 art. 24: minimo 12 all'anno · regola aziendale:
+  // la domenica conta solo se il sabato si finisce entro le 23)
+  if (ctx.domeniche && righeMese.length) {
+    const info = _pianoCollabInfo(nome);
+    if (info && info.funzione !== 'RESP') {
+      let libere = 0;
+      let ultimaDom = 0;
+      for (let g = 1; g <= nGiorni; g++) {
+        const dow = new Date(ym + '-' + String(g).padStart(2, '0') + 'T12:00:00').getDay();
+        if (dow !== 0) continue;
+        ultimaDom = g;
+        const cod = giorni[g];
+        const lavora = cod && _pianoTurnoInfo(cod);
+        if (lavora) continue;
+        if (_pianoDomenicaEsclusa(cod)) continue; // vacanza o malattia: non conta tra le 12
+        // il sabato prima (per la prima domenica del mese: dal mese precedente)
+        const dSab = new Date(ym + '-' + String(g).padStart(2, '0') + 'T12:00:00');
+        dSab.setDate(dSab.getDate() - 1);
+        const isoSab = dSab.toISOString().substring(0, 10);
+        const rSab = righeSett.find((r) => r.collaboratore === nome && String(r.data).startsWith(isoSab));
+        const codSab = rSab ? rSab.codice : g > 1 ? giorni[g - 1] : null;
+        if (!_pianoDomenicaValida(cod, codSab, isoSab, rSab, undefined, nome)) {
+          aggiungi(g, 'domenica non conteggiabile come libera: il sabato finisce oltre le 23');
+          continue;
+        }
+        libere++;
+      }
+      if (ultimaDom && libere === 0)
+        aggiungi(ultimaDom, "nessuna domenica libera valida nel mese (minimo 12 all'anno)");
+    }
+  }
+  return out;
+}
+// regole fra persone: accompagnamento, limiti e minimi per gruppo (righe del mese)
+function _pianoViolazioniGruppi(righe, ctx) {
+  const ym = ctx.ym;
+  const nGiorni = ctx.nGiorni;
+  const _pianoRighe = righe;
+  const out = [];
+  const lista = { push: (x) => out.push({ nome: x.nome, giorno: x.giorno, msg: x.msg, celle: [] }) };
+  const aggiungi = (nome, giorno, msg) =>
+    out.push({ nome: nome, giorno: giorno, msg: msg, celle: [ym + '-' + String(giorno).padStart(2, '0')] });
   // ===== REGOLE DI GRUPPO (come il solver Turnivo) =====
   if (pianoRegoleGruppoCache.length) {
     const perGruppoGiornoFz = {}; // GRUPPO|FZ|g -> [nomi]
@@ -804,50 +851,25 @@ function _pianoCalcolaViolazioni() {
       }
     }
   }
-  // NON DISPONIBILITA': un turno assegnato in un giorno dichiarato ND
-  const ndV = _pianoNdMese(ym);
-  _pianoRighe.forEach((r) => {
-    if (!_pianoTurnoInfo(r.codice)) return;
-    if (ndV[r.collaboratore + '|' + r.data])
-      aggiungi(
-        r.collaboratore,
-        parseInt(r.data.split('-')[2]),
-        "turno su un giorno di NON disponibilita' (dal Diario)",
-      );
-  });
-  // DOMENICHE LIBERE (OLL2 art. 24: minimo 12 all'anno · regola aziendale:
-  // la domenica conta solo se il sabato si finisce entro le 23)
-  if (_pianoRegolaVal('domeniche_libere_anno') != null) {
-    Object.keys(perNome).forEach((nome) => {
-      const info = _pianoCollabInfo(nome);
-      if (!info || info.funzione === 'RESP') return;
-      let libere = 0;
-      let ultimaDom = 0;
-      for (let g = 1; g <= nGiorni; g++) {
-        const dow = new Date(ym + '-' + String(g).padStart(2, '0') + 'T12:00:00').getDay();
-        if (dow !== 0) continue;
-        ultimaDom = g;
-        const cod = perNome[nome][g];
-        const lavora = cod && _pianoTurnoInfo(cod);
-        if (lavora) continue;
-        if (_pianoDomenicaEsclusa(cod)) continue; // vacanza o malattia: non conta tra le 12
-        // il sabato prima (per la prima domenica del mese: dal mese precedente)
-        const dSab = new Date(ym + '-' + String(g).padStart(2, '0') + 'T12:00:00');
-        dSab.setDate(dSab.getDate() - 1);
-        const isoSab = dSab.toISOString().substring(0, 10);
-        const rSab = _pianoRigheSettimane().find((r) => r.collaboratore === nome && String(r.data).startsWith(isoSab));
-        const codSab = rSab ? rSab.codice : g > 1 ? perNome[nome][g - 1] : null;
-        if (!_pianoDomenicaValida(cod, codSab, isoSab, rSab, undefined, nome)) {
-          aggiungi(nome, g, 'domenica non conteggiabile come libera: il sabato finisce oltre le 23');
-          continue;
-        }
-        libere++;
-      }
-      if (ultimaDom && libere === 0)
-        aggiungi(nome, ultimaDom, "nessuna domenica libera valida nel mese (minimo 12 all'anno)");
-    });
-  }
-
+  return out;
+}
+function _pianoCalcolaViolazioni() {
+  const ym = _pianoMeseSel;
+  const ctx = _pianoCtxViolazioni(ym);
+  const celle = {};
+  const lista = [];
+  const metti = (v) => {
+    v.celle.forEach((d) => (celle[v.nome + '|' + d] = celle[v.nome + '|' + d] || []).push(v.msg));
+    lista.push({ nome: v.nome, giorno: v.giorno, msg: v.msg });
+  };
+  const mese = {};
+  _pianoRighe.forEach((r) => (mese[r.collaboratore] = mese[r.collaboratore] || []).push(r));
+  const sett = {};
+  _pianoRigheSettimane().forEach((r) => (sett[r.collaboratore] = sett[r.collaboratore] || []).push(r));
+  Object.keys(Object.assign({}, sett, mese)).forEach((nome) =>
+    _pianoViolazioniPersona(nome, mese[nome] || [], sett[nome] || [], ctx).forEach(metti),
+  );
+  _pianoViolazioniGruppi(_pianoRighe, ctx).forEach(metti);
   return { celle: celle, lista: lista };
 }
 
@@ -922,6 +944,56 @@ async function completaConCoperture() {
 // reparto, cosi' l'ordine con cui generi i piani non toglie nessuno al suo
 // settore d'origine. Con true (bottone "Completa con coperture") si tappano i
 // buchi rimasti usando chi e' abilitato a coprire da altri settori.
+// IDONEITA "STATICA" di una persona per un turno in un giorno, cioe quello che non
+// dipende dal resto del piano: preferenze (solo diurni, turni bloccati), regole
+// "chi fa cosa", settori del collaboratore o, se non sono impostati, i gruppi
+// gia fatti (storia), regole di gruppo, mappature per funzione. La usano la bozza
+// e la ricerca sul piano: stesso criterio. idoneita = { nome: Set(gruppi fatti) }.
+function _pianoIdoneoStatico(n, t, dowG, idoneita) {
+  const infoC = _pianoCollabInfo(n);
+  if (infoC && infoC.solo_diurni && t.tipo === 'NOTTURNO') return false;
+  if (
+    infoC &&
+    infoC.turni_bloccati &&
+    infoC.turni_bloccati
+      .split(',')
+      .map((x) => x.trim())
+      .includes(t.codice)
+  )
+    return false;
+  // regole "chi fa cosa" del settore (turni riservati, funzione-turni-giorni)
+  if (_pianoViolazioneFunzioneTurno(n, t, dowG, true)) return false;
+  const fz = infoC && infoC.funzione;
+  const gruppoT = (t.gruppo || '').toUpperCase();
+  const fzU = (fz || '').toUpperCase();
+  // REGOLE DI GRUPPO (port di eligibility.py Turnivo): i settori assegnati al
+  // collaboratore sono la fonte di verita; la storia vale solo se non ci sono
+  const settoriC = _pianoSettoriEffettivi(infoC);
+  const haStoria = settoriC ? settoriC.includes(gruppoT) : !!(idoneita && idoneita[n] && idoneita[n].has(t.gruppo));
+  let campoGrant = false;
+  for (const rg of _pianoRegoleGruppoDi(gruppoT)) {
+    const tipoR = (rg.tipo_regola || '').toLowerCase();
+    if (tipoR === 'richiede_funzione') {
+      // come in PianoRegole: la funzione ammessa e' un lasciapassare
+      const ammesse = rg.valore.split(',').map((x) => x.trim().toUpperCase());
+      if (ammesse.includes(fzU)) campoGrant = true;
+      else if (!haStoria) return false;
+    } else if (tipoR === 'blocca_tipo_turno') {
+      const tipi = rg.valore.split(',').map((x) => x.trim().toUpperCase());
+      if (tipi.includes((t.tipo || '').toUpperCase())) return false;
+    } else if (tipoR === 'richiede_campo') {
+      if (!_pianoCampoOk(infoC, rg.valore)) return false;
+      campoGrant = true;
+    }
+  }
+  // mappature per funzione (SUP/BO limitati ai loro turni)
+  const mapp = _pianoMappFunzione(fz);
+  if (mapp) {
+    const voci = mapp.filter((m) => m.tipo === 'PRINCIPALE' || m.tipo === 'AMMESSO').map((m) => m.turno_codice);
+    if (voci.length && !voci.includes(t.codice)) return false;
+  } else if (!haStoria && !campoGrant) return false;
+  return true;
+}
 async function generaBozzaPiano(usaCoperture) {
   if (!_pianoAzioneAutoConsentita('genera')) return; // azione automatica: permesso apposito
   if (!puoGestirePiano()) return;
@@ -1207,17 +1279,9 @@ async function generaBozzaPiano(usaCoperture) {
     if (!ignoraOccupato && esistente && esistente !== 'WD') return false;
     if (esistente === 'WD' && t.tipo === 'NOTTURNO') return false; // WD = diurno forzato
     const infoC = _pianoCollabInfo(n);
-    // preferenze collaboratore
-    if (infoC && infoC.solo_diurni && t.tipo === 'NOTTURNO') return false;
-    if (
-      infoC &&
-      infoC.turni_bloccati &&
-      infoC.turni_bloccati
-        .split(',')
-        .map((x) => x.trim())
-        .includes(f.turno_codice)
-    )
-      return false;
+    // chi puo fare questo turno (preferenze, chi fa cosa, settori o storia, regole
+    // di gruppo, mappature): stesso criterio della ricerca sul piano
+    if (!_pianoIdoneoStatico(n, t, dowG, idoneita)) return false;
     // COPERTURA da un altro settore: rispetta i gruppi ammessi e il
     // tetto mensile di turni impostati nella scheda del collaboratore
     const cop = _pianoCoperturaCfg(infoC);
@@ -1283,10 +1347,7 @@ async function generaBozzaPiano(usaCoperture) {
       ).filter(vicina);
       if (dopo.some((x) => !prima.some((y) => y.domenica === x.domenica && y.tipo === x.tipo))) return false;
     }
-    // mappature per funzione (SUP/BO limitati ai loro turni; regole settimana SUP)
     const fz = infoC && infoC.funzione;
-    // regole "chi fa cosa" del settore (turni riservati, funzione-turni-giorni)
-    if (_pianoViolazioneFunzioneTurno(n, t, dowG, true)) return false;
     // regola HARD no_4w1c1w: niente rientro dopo UN solo giorno di riposo
     // se prima c'erano 4+ giorni di lavoro consecutivi
     if (String(_pianoRegolaVal('no_4w1c1w')).toUpperCase() === 'TRUE') {
@@ -1309,23 +1370,9 @@ async function generaBozzaPiano(usaCoperture) {
     // fonte di verità; la storia vale solo se i settori non sono configurati
     const gruppoT = (t.gruppo || '').toUpperCase();
     const fzU = (fz || '').toUpperCase();
-    const settoriC = _pianoSettoriEffettivi(infoC);
-    const haStoria = settoriC ? settoriC.includes(gruppoT) : !!(idoneita[n] && idoneita[n].has(t.gruppo));
-    let campoGrant = false;
     for (const rg of _pianoRegoleGruppoDi(gruppoT)) {
       const tipoR = (rg.tipo_regola || '').toLowerCase();
-      if (tipoR === 'richiede_funzione') {
-        // come in PianoRegole: la funzione ammessa e' un lasciapassare
-        const ammesse = rg.valore.split(',').map((x) => x.trim().toUpperCase());
-        if (ammesse.includes(fzU)) campoGrant = true;
-        else if (!haStoria) return false;
-      } else if (tipoR === 'blocca_tipo_turno') {
-        const tipi = rg.valore.split(',').map((x) => x.trim().toUpperCase());
-        if (tipi.includes((t.tipo || '').toUpperCase())) return false;
-      } else if (tipoR === 'richiede_campo') {
-        if (!_pianoCampoOk(infoC, rg.valore)) return false;
-        campoGrant = true;
-      } else if (tipoR === 'limite_funzione_giorno') {
+      if (tipoR === 'limite_funzione_giorno') {
         const [fu, nMax] = rg.valore.split(':');
         if (
           fzU === (fu || '').toUpperCase() &&
@@ -1362,11 +1409,6 @@ async function generaBozzaPiano(usaCoperture) {
     }
     // accompagnato SOLO dove copre (spunta nella scheda): stessa regola
     if (cop && cop.accompagnato && !(contaGiornoTot[gruppoT + '|' + g] || 0)) return false;
-    const mapp = _pianoMappFunzione(fz);
-    if (mapp) {
-      const voci = mapp.filter((m) => m.tipo === 'PRINCIPALE' || m.tipo === 'AMMESSO').map((m) => m.turno_codice);
-      if (voci.length && !voci.includes(f.turno_codice)) return false;
-    } else if (!haStoria && !campoGrant) return false;
     return consecPrima(n, g) < maxCons && riposoOk(n, g, t);
   };
   for (let g = 1; g <= nGiorni; g++) {

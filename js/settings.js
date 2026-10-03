@@ -45,7 +45,7 @@ const VIS_ITEMS = {
     gestione_formazioni: 'Formazioni · registrare sessioni formative svolte (es. supervisor)',
     gestione_piano: 'Piano di lavoro · modificare la griglia turni del mese (es. supervisor)',
     piano_auto_genera:
-      'Piano · GENERA: genera bozza, genera con il solver, completa con coperture, migliora ore, valida regole, cancella la bozza (celle non protette)',
+      'Piano · GENERA: genera bozza, migliora la bozza, genera con il solver, completa con coperture, migliora ore, valida regole, cancella la bozza (celle non protette)',
     piano_auto_vacanze:
       'Piano · VACANZE E CGF AUTOMATICI: importa il file vacanze, applica le vacanze del mese al piano, assegna i CGF del mese (la V di una persona dagli Avvisi resta libera)',
     piano_auto_import:

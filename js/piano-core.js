@@ -1790,6 +1790,13 @@ async function _renderPianoCore() {
           );
         if (puoAuto)
           g += pbtn(
+            'Migliora la bozza',
+            'pianoMigliora()',
+            'pbar-ok',
+            'Ricerca a tempo sulla bozza: prova scambi e spostamenti e tiene solo quelli che migliorano regole, posti scoperti e ore. Piu tempo, risultato migliore. Mostra prima e dopo e chiede prima di applicare',
+          );
+        if (puoAuto)
+          g += pbtn(
             'Migliora ore',
             'miglioraOrePiano()',
             '',
