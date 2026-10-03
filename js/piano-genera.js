@@ -852,6 +852,7 @@ function _pianoCalcolaViolazioni() {
 }
 
 function validaPiano() {
+  if (!_pianoAzioneAutoConsentita('genera')) return; // Valida regole: con il permesso Genera
   setTimeout(() => controllaFormazioniCompletate(true), 800);
   const r = _pianoCalcolaViolazioni();
   _pianoViolCelle = r.celle;

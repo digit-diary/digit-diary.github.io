@@ -1798,12 +1798,15 @@ async function _renderPianoCore() {
         h += pgrp('Pianifica', g);
         h += pgrp(
           'Controlla',
-          pbtn(
-            'Valida regole',
-            'validaPiano()',
-            '',
-            'Controlla tutto il mese contro le regole del settore e mostra le violazioni',
-          ) +
+          // Valida regole: con il permesso Genera (scelta del titolare, v357)
+          (puoAuto
+            ? pbtn(
+                'Valida regole',
+                'validaPiano()',
+                '',
+                'Controlla tutto il mese contro le regole del settore e mostra le violazioni',
+              )
+            : '') +
             pbtn(
               'Copertura malattia',
               'apriCoperturaMalattia()',

@@ -3098,7 +3098,8 @@ async function _pianoSbloccaGiorni(giorni, perche) {
   return true;
 }
 async function pianoVacanzeMettiV(i) {
-  if (!_pianoAzioneAutoConsentita('vacanze')) return; // azione automatica: permesso apposito
+  // la vacanza di una persona per una settimana e lavoro quotidiano: basta poter
+  // modificare il piano (le azioni sul mese intero restano con il permesso)
   const x = (window._avvVacanze || [])[i];
   if (!x || !puoGestirePiano()) return;
   const giorni = x.giorni.map((g) => g.data);
