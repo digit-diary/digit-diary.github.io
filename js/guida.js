@@ -139,7 +139,7 @@ function GUIDA_CAPITOLI() {
       titolo: 'Maison e budget clienti',
       vis: () => _guidaVis('maison'),
       righe: [
-        '<b>Tipi di buono</b> (Impostazioni &gt; Maison, solo amministratore): per ogni buono sigla, nome, valore in CHF e attivo. Si puo <b>rinominare</b> un buono e <b>aggiungere</b> un tipo nuovo (sigla da 2 a 6 lettere o cifre, nome, valore e, se serve, le parole che nel file Maison lo indicano, es. brunch). La sigla non si cambia dopo l aggiunta, perche e scritta nelle registrazioni; un tipo che non si usa piu si <b>disattiva</b>: sparisce dai menu ma resta nello storico, nelle statistiche e negli export. Menu, tabelle, grafici, export e magazzino si adeguano da soli.',
+        '<b>Tipi di buono</b> (Impostazioni &gt; Maison, solo amministratore): per ogni buono sigla, nome, valore in CHF e attivo. Si puo <b>rinominare</b> un buono e <b>aggiungere</b> un tipo nuovo (sigla da 2 a 6 lettere o cifre, nome, valore e, se serve, le parole che nel file Maison lo indicano, es. brunch). La sigla non si cambia dopo l aggiunta, perche e scritta nelle registrazioni; un tipo che non si usa piu si <b>disattiva</b>: sparisce dai menu ma resta nello storico, nelle statistiche e negli export. Con le spunte <b>Settori</b> un buono compare solo nei menu di quei settori (es. un buono solo ai Tavoli); nessuna spunta = in tutti. Menu, tabelle, grafici, export e magazzino si adeguano da soli.',
         'Gestione delle consumazioni offerte ai clienti: budget per cliente, categorie, buoni e conteggi mensili.',
         'Il testo del gestionale si incolla nel riquadro di importazione e il programma riconosce da solo cliente, importo e tipo di consumazione.',
         'I <b>buoni</b> si calcolano in automatico dal costo, con i valori impostati in Impostazioni.',
@@ -153,6 +153,7 @@ function GUIDA_CAPITOLI() {
       righe: [
         'Scorte e giacenze del settore, con movimenti di carico e scarico e categorie personalizzabili.',
         'Ogni movimento resta registrato con chi lo ha fatto e quando.',
+        '<b>Categorie</b> (amministratore): in Slots e Tavoli ci sono Buoni (collegati ai buoni della Maison) e Sigarette; per ogni settore si possono <b>rinominare</b> o <b>nascondere</b> (es. Sigarette ai Tavoli) con i pulsanti nel titolo della scorta, e rimettere con "Mostra ..." accanto alle schede. I movimenti restano. <b>+ Categoria</b> aggiunge categorie libere (Valet, Cleaning: pettorine, chiavi, prodotti...), rinominabili e rimovibili.',
       ],
     },
     {

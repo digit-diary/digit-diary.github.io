@@ -547,9 +547,15 @@ const BUONI_TIPI_BASE = [
   { codice: 'WL', nome: 'Welcome Lounge', valore: 40 },
 ];
 let BUONI_TIPI = BUONI_TIPI_BASE.map((t) => Object.assign({ attivo: true, parole: '' }, t));
-// tutti = anche i disattivati (servono per leggere lo storico)
+// tutti = anche i disattivati (servono per leggere lo storico). I tipi attivi si
+// possono limitare ad alcuni settori (t.settori, es. ['tavoli']; vuoto = tutti):
+// nei menu del settore aperto compaiono solo i suoi (v368)
+function buonoNelSettore(t, rep) {
+  const r = rep || (typeof currentReparto !== 'undefined' ? currentReparto : 'slots');
+  return !Array.isArray(t.settori) || !t.settori.length || t.settori.includes(r);
+}
 function buoniTipi(tutti) {
-  return tutti ? BUONI_TIPI : BUONI_TIPI.filter((t) => t.attivo !== false);
+  return tutti ? BUONI_TIPI : BUONI_TIPI.filter((t) => t.attivo !== false && buonoNelSettore(t));
 }
 function buoniCodici(tutti) {
   return buoniTipi(tutti).map((t) => t.codice);
@@ -609,6 +615,7 @@ function _buoniDaImpostazione(bv) {
         valore: parseFloat(bv[String(t.codice).toUpperCase()]) || 0,
         attivo: t.attivo !== false,
         parole: t.parole || '',
+        settori: Array.isArray(t.settori) && t.settori.length ? t.settori.slice() : null,
       }));
   } else {
     BUONI_TIPI.forEach((t) => {

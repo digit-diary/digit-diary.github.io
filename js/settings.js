@@ -1751,7 +1751,7 @@ function renderBuoniTipiUI() {
     (extra || '') +
     '>';
   let h =
-    '<div style="overflow:auto"><table class="piano-table" style="font-size:var(--fs-md,.875rem);min-width:640px"><thead><tr><th>Sigla</th><th style="text-align:left">Nome</th><th>Valore CHF</th><th>Attivo</th><th style="text-align:left" title="Per i tipi aggiunti: parole che, scritte nel file Maison, indicano questo buono (separate da virgola). La sigla con la quantita (es. 2 XX) si riconosce sempre">Parole nel file importato</th></tr></thead><tbody>';
+    '<div style="overflow:auto"><table class="piano-table" style="font-size:var(--fs-md,.875rem);min-width:640px"><thead><tr><th>Sigla</th><th style="text-align:left">Nome</th><th>Valore CHF</th><th>Attivo</th><th style="text-align:left" title="Settori in cui il buono compare nei menu (Maison, Inventario). Nessuna spunta = tutti">Settori</th><th style="text-align:left" title="Per i tipi aggiunti: parole che, scritte nel file Maison, indicano questo buono (separate da virgola). La sigla con la quantita (es. 2 XX) si riconosce sempre">Parole nel file importato</th></tr></thead><tbody>';
   BUONI_TIPI.forEach((t) => {
     const base = BUONI_TIPI_BASE.some((b) => b.codice === t.codice);
     h +=
@@ -1765,7 +1765,20 @@ function renderBuoniTipiUI() {
       inp('bt-valore', t.valore, 80, ' type="number" min="0" step="0.5"') +
       '</td><td><input type="checkbox" class="bt-attivo"' +
       (t.attivo !== false ? ' checked' : '') +
-      '></td><td style="text-align:left">' +
+      '></td><td style="text-align:left;white-space:nowrap">' +
+      _buoniSettoriMaison()
+        .map(
+          (r) =>
+            '<label style="margin-right:8px;font-size:var(--fs-sm,.8125rem)"><input type="checkbox" class="bt-settore" value="' +
+            escP(r.key) +
+            '"' +
+            (Array.isArray(t.settori) && t.settori.includes(r.key) ? ' checked' : '') +
+            '> ' +
+            escP(r.label) +
+            '</label>',
+        )
+        .join('') +
+      '</td><td style="text-align:left">' +
       (base
         ? '<span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">riconoscimento integrato</span>'
         : inp('bt-parole', t.parole, 220, ' placeholder="es. brunch, colazione"')) +
@@ -1777,8 +1790,12 @@ function renderBuoniTipiUI() {
   h +=
     '<div class="add-tipo-row sez-form" style="margin-top:12px"><div class="field"><label>Nuova sigla</label><input id="bt-nuovo-cod" maxlength="6" placeholder="es. BR" style="width:90px;text-transform:uppercase"></div><div class="field"><label>Nome</label><input id="bt-nuovo-nome" placeholder="es. Buono Brunch"></div><div class="field"><label>Valore CHF</label><input id="bt-nuovo-val" type="number" min="0" step="0.5" style="width:90px"></div><div class="field"><label>Parole nel file (facoltative)</label><input id="bt-nuovo-parole" placeholder="es. brunch"></div><button class="btn-add-tipo" onclick="aggiungiBuonoTipo()">+ Aggiungi</button></div>';
   h +=
-    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:6px 0 0">La sigla non si puo cambiare dopo l aggiunta: e scritta nelle registrazioni. Un tipo che non si usa piu si disattiva: sparisce dai menu ma resta leggibile nello storico, nelle statistiche e negli export.</p>';
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:6px 0 0">La sigla non si puo cambiare dopo l aggiunta: e scritta nelle registrazioni. Un tipo che non si usa piu si disattiva: sparisce dai menu ma resta leggibile nello storico, nelle statistiche e negli export. Con le spunte dei Settori un buono compare solo nei menu di quei settori (nessuna spunta = in tutti).</p>';
   box.innerHTML = h;
+}
+// settori con la Maison (buoni): quelli dove l inventario ha la categoria Buoni
+function _buoniSettoriMaison() {
+  return (typeof getReparti === 'function' ? getReparti() : []).filter((r) => ['slots', 'tavoli'].includes(r.key));
 }
 function _buoniLeggiTabella() {
   const out = [];
@@ -1791,6 +1808,7 @@ function _buoniLeggiTabella() {
       valore: isNaN(v) ? 0 : v,
       attivo: !!(tr.querySelector('.bt-attivo') || {}).checked,
       parole: ((tr.querySelector('.bt-parole') || {}).value || t.parole || '').trim(),
+      settori: [...tr.querySelectorAll('.bt-settore:checked')].map((x) => x.value),
     });
   });
   return out;
@@ -1803,7 +1821,13 @@ async function _buoniSalvaLista(lista, cosa) {
     }
   const bv = {};
   lista.forEach((t) => (bv[t.codice] = t.valore));
-  bv._tipi = lista.map((t) => ({ codice: t.codice, nome: t.nome, attivo: t.attivo, parole: t.parole || '' }));
+  bv._tipi = lista.map((t) => ({
+    codice: t.codice,
+    nome: t.nome,
+    attivo: t.attivo,
+    parole: t.parole || '',
+    settori: Array.isArray(t.settori) && t.settori.length ? t.settori : undefined,
+  }));
   if (!(await salvaImp('buono_valori', JSON.stringify(bv)))) return false;
   _buoniDaImpostazione(bv);
   logAzione(

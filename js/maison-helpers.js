@@ -1854,6 +1854,8 @@ function setReparto(rep) {
   currentReparto = rep;
   _ricordaSettore();
   _aggiornaBottoniReparto();
+  // menu dei buoni: i tipi attivi in questo settore
+  if (typeof buoniRiempiSelect === 'function') buoniRiempiSelect();
   // pagine abilitate per settore: nascondi tab e, se la pagina corrente non è disponibile, torna alla Home
   if (typeof applicaVisibilita === 'function') applicaVisibilita();
   var _pgCur = localStorage.getItem('pagina_corrente') || 'dashboard';
@@ -2499,8 +2501,110 @@ function getInvCategorieExtra() {
 function _invConBase() {
   return ['slots', 'tavoli'].includes(currentReparto);
 }
+// CATEGORIE BASE PERSONALIZZABILI (v368, solo admin): per settore Buoni e Sigarette si
+// possono rinominare o nascondere (es. Sigarette ai Tavoli). Calcoli, collegamento con
+// i buoni della Maison e movimenti non cambiano: cambia solo come si chiamano e se
+// compaiono. Salvato nella stessa impostazione delle categorie personalizzate
+// (inventario_categorie_extra, riservata all admin) sotto _base: { settore: { buoni:
+// { label, nascosta }, sigarette: {...} } }.
+const INV_BASE_NOMI = { buoni: 'Buoni', sigarette: 'Sigarette' };
+function _invBaseCfg(key) {
+  const raw = inventarioCategorieExtra;
+  const b = raw && !Array.isArray(raw) && typeof raw === 'object' && raw._base ? raw._base[currentReparto] || {} : {};
+  return b[key] || {};
+}
+function invNomeBase(key) {
+  return String(_invBaseCfg(key).label || INV_BASE_NOMI[key] || key);
+}
+function _invBaseVisibile(key) {
+  return _invConBase() && !_invBaseCfg(key).nascosta;
+}
+async function _setInvBase(key, campi) {
+  let obj = inventarioCategorieExtra;
+  if (Array.isArray(obj)) obj = { slots: obj, tavoli: obj.slice() };
+  if (!obj || typeof obj !== 'object') obj = {};
+  obj._base = obj._base || {};
+  obj._base[currentReparto] = obj._base[currentReparto] || {};
+  obj._base[currentReparto][key] = Object.assign({}, obj._base[currentReparto][key] || {}, campi);
+  inventarioCategorieExtra = obj;
+  await _saveInvCategorieExtra();
+}
+async function rinominaCategoriaBase(key) {
+  if (!isAdmin()) return;
+  const prima = invNomeBase(key);
+  const nuovo = await chiediTesto(
+    'Nuovo nome per "' +
+      prima +
+      '" nel settore ' +
+      repartoLabel(currentReparto) +
+      ' (vuoto = ' +
+      INV_BASE_NOMI[key] +
+      '):',
+    prima,
+  );
+  if (nuovo === null) return;
+  const label = nuovo.trim();
+  if (label && getInvCategorieExtra().some((c) => c.label.toLowerCase() === label.toLowerCase())) {
+    toast('Esiste gia una categoria con questo nome');
+    return;
+  }
+  await _setInvBase(key, { label: label && label !== INV_BASE_NOMI[key] ? label : '' });
+  logAzione(
+    'Inventario: categoria rinominata',
+    repartoLabel(currentReparto) + ' · ' + prima + ' → ' + invNomeBase(key),
+  );
+  renderInventario();
+}
+async function nascondiCategoriaBase(key, nascondi) {
+  if (!isAdmin()) return;
+  const nome = invNomeBase(key);
+  if (
+    nascondi &&
+    !(await chiediConferma(
+      'Nascondere "' +
+        nome +
+        '" nel settore ' +
+        repartoLabel(currentReparto) +
+        '?\n\nI movimenti registrati restano nel database' +
+        (key === 'buoni' ? ' e i buoni della Maison continuano a funzionare' : '') +
+        '. Si rimette con "Mostra ' +
+        nome +
+        '" accanto alle schede.',
+    ))
+  )
+    return;
+  await _setInvBase(key, { nascosta: !!nascondi });
+  logAzione(
+    'Inventario: categoria ' + (nascondi ? 'nascosta' : 'mostrata'),
+    repartoLabel(currentReparto) + ' · ' + nome,
+  );
+  if (nascondi && _invTab === key) _invTab = '';
+  else if (!nascondi) _invTab = key;
+  renderInventario();
+}
+// titoli delle sezioni Buoni/Sigarette con il nome scelto (testo originale se non rinominata)
+function _invAggiornaTitoli() {
+  document.querySelectorAll('[data-inv-titolo]').forEach((el) => {
+    const k = el.dataset.invCat;
+    const rinominata = !!_invBaseCfg(k).label;
+    const testo = rinominata ? el.dataset.invTitolo.replace('{n}', invNomeBase(k)) : el.dataset.invOriginale;
+    let comandi = '';
+    if (isAdmin() && /^(Giacenza|Scorta) /.test(el.dataset.invOriginale))
+      comandi =
+        '<span><button onclick="rinominaCategoriaBase(\'' +
+        k +
+        '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid var(--paper);color:var(--paper);border-radius:2px;cursor:pointer">Rinomina</button> <button onclick="nascondiCategoriaBase(\'' +
+        k +
+        '\',true)" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid var(--paper);color:var(--paper);border-radius:2px;cursor:pointer">Nascondi in questo settore</button></span>';
+    if (comandi) {
+      el.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap';
+      el.innerHTML = '<span>' + escP(testo) + '</span>' + comandi;
+    } else el.textContent = testo;
+  });
+}
 function _invTabDefault() {
-  if (_invConBase()) return 'buoni';
+  if (_invBaseVisibile('buoni')) return 'buoni';
+  if (_invBaseVisibile('sigarette')) return 'sigarette';
   const c = getInvCategorieExtra();
   return c.length ? c[0].key : '';
 }
@@ -2519,10 +2623,11 @@ function _renderInvTabs() {
   if (!wrap) return;
   // Rimuovi tab custom esistenti (rigenerate ogni volta), tieni Buoni/Sigarette
   wrap.querySelectorAll('.inv-tab-custom, .inv-tab-admin').forEach((b) => b.remove());
-  // Buoni/Sigarette solo nei settori Maison (Slots/Tavoli)
-  wrap
-    .querySelectorAll('.inv-tab-btn:not(.inv-tab-custom)')
-    .forEach((b) => (b.style.display = _invConBase() ? '' : 'none'));
+  // Buoni/Sigarette solo nei settori Maison (Slots/Tavoli), con il nome scelto, se non nascoste
+  wrap.querySelectorAll('.inv-tab-btn:not(.inv-tab-custom)').forEach((b) => {
+    b.style.display = _invBaseVisibile(b.dataset.tab) ? '' : 'none';
+    b.textContent = invNomeBase(b.dataset.tab);
+  });
   const stile =
     'padding:8px 20px;border:2px solid var(--line);background:var(--paper);color:var(--ink);border-radius:2px;font-size:var(--fs-md,.875rem);font-weight:600;cursor:pointer;transition:all .2s';
   getInvCategorieExtra().forEach((cat) => {
@@ -2542,15 +2647,29 @@ function _renderInvTabs() {
     add.title = 'Aggiungi una categoria inventario personalizzata';
     add.onclick = aggiungiCategoriaInventario;
     wrap.appendChild(add);
+    // categorie base nascoste: si rimettono da qui
+    if (_invConBase())
+      ['buoni', 'sigarette']
+        .filter((k) => _invBaseCfg(k).nascosta)
+        .forEach((k) => {
+          const m = document.createElement('button');
+          m.className = 'inv-tab-admin';
+          m.style.cssText = stile + ';border-style:dashed;color:var(--muted)';
+          m.textContent = 'Mostra ' + invNomeBase(k);
+          m.title = 'Categoria nascosta in questo settore: rimettila';
+          m.onclick = () => nascondiCategoriaBase(k, false);
+          wrap.appendChild(m);
+        });
   }
 }
 function renderInventario() {
   // tab corrente valida per questo settore? (es. 'buoni' non esiste in Valet/Cleaning)
   const _valida =
-    (_invConBase() && ['buoni', 'sigarette'].includes(_invTab)) ||
+    (['buoni', 'sigarette'].includes(_invTab) && _invBaseVisibile(_invTab)) ||
     getInvCategorieExtra().some((c) => c.key === _invTab);
   if (!_valida) _invTab = _invTabDefault();
   _renderInvTabs();
+  _invAggiornaTitoli();
   const custom = getInvCategorieExtra().find((c) => c.key === _invTab);
   document.getElementById('inv-section-buoni').style.display = _invTab === 'buoni' ? '' : 'none';
   document.getElementById('inv-section-sigarette').style.display = _invTab === 'sigarette' ? '' : 'none';
@@ -2594,7 +2713,11 @@ async function aggiungiCategoriaInventario() {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '_')
       .replace(/^_+|_+$/g, '');
-  if (['buoni', 'sigarette'].includes(key) || getInvCategorieExtra().find((c) => c.key === key)) {
+  if (
+    ['buoni', 'sigarette'].includes(key) ||
+    getInvCategorieExtra().find((c) => c.key === key) ||
+    (_invConBase() && ['buoni', 'sigarette'].some((k) => invNomeBase(k).toLowerCase() === label.toLowerCase()))
+  ) {
     toast('Categoria già esistente');
     return;
   }
@@ -3410,11 +3533,9 @@ function initInventarioFP() {
 function esportaInventarioCSV() {
   const isBuoni = _invTab === 'buoni';
   const _catCsv = _invTab === 'buoni' ? 'buono' : _invTab === 'sigarette' ? 'sigaretta' : _invTab;
-  const _catLbl = isBuoni
-    ? 'buoni'
-    : _invTab === 'sigarette'
-      ? 'sigarette'
-      : (getInvCategorieExtra().find((c) => c.key === _invTab) || {}).label || _invTab;
+  const _catLbl = ['buoni', 'sigarette'].includes(_invTab)
+    ? invNomeBase(_invTab).toLowerCase()
+    : (getInvCategorieExtra().find((c) => c.key === _invTab) || {}).label || _invTab;
   const data = getInventarioReparto().filter((r) => r.categoria === _catCsv);
   if (!data.length) {
     toast('Nessun dato');
@@ -3461,11 +3582,9 @@ async function esportaInventarioPDF() {
   }
   const isBuoni = _invTab === 'buoni';
   const _catPdf = _invTab === 'buoni' ? 'buono' : _invTab === 'sigarette' ? 'sigaretta' : _invTab;
-  const _catLbl = isBuoni
-    ? 'Buoni'
-    : _invTab === 'sigarette'
-      ? 'Sigarette'
-      : (getInvCategorieExtra().find((c) => c.key === _invTab) || {}).label || _invTab;
+  const _catLbl = ['buoni', 'sigarette'].includes(_invTab)
+    ? invNomeBase(_invTab)
+    : (getInvCategorieExtra().find((c) => c.key === _invTab) || {}).label || _invTab;
   const data = getInventarioReparto().filter((r) => r.categoria === _catPdf);
   if (!data.length) {
     toast('Nessun dato');
