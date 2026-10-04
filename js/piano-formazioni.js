@@ -104,6 +104,67 @@ function _formMeseNome(ym) {
   return ((typeof MESI_FULL !== 'undefined' && MESI_FULL[parseInt(p[1]) - 1]) || ym) + ' ' + p[0];
 }
 
+// ---------------------------------------------------------------- allievo nuovo
+// NUOVO ALLIEVO dalla Nuova formazione: entra come gli altri jolly del settore
+// (funzione e percentuale piu frequenti fra i jolly attivi; HOST 80% se non ce ne
+// sono). Finche non si applica una proposta resta solo in memoria (provvisorio):
+// chiudendo senza applicare non resta niente; applicando si salva nel database e
+// riceve i turni bloccati di partenza come ogni collaboratore nuovo.
+function _formJollyBase() {
+  const jolly = collaboratoriCache.filter(
+    (c) => c.attivo !== false && c.is_jolly && !c._provvisorio && (c.reparto_dip || 'slots') === _pianoReparto(),
+  );
+  const piuFrequente = (f, base) => {
+    const conta = {};
+    jolly.forEach((c) => {
+      const k = c[f];
+      if (k != null && k !== '') conta[k] = (conta[k] || 0) + 1;
+    });
+    const k = Object.keys(conta).sort((a, b) => conta[b] - conta[a])[0];
+    return k == null ? base : k;
+  };
+  return {
+    funzione: String(piuFrequente('funzione', 'HOST')),
+    percentuale: parseFloat(piuFrequente('percentuale', 0.8)) || 0.8,
+    is_jolly: true,
+  };
+}
+function _formTogliAllievoProvvisorio() {
+  if (typeof collaboratoriCache === 'undefined') return;
+  for (let i = collaboratoriCache.length - 1; i >= 0; i--)
+    if (collaboratoriCache[i] && collaboratoriCache[i]._provvisorio) collaboratoriCache.splice(i, 1);
+}
+// salva l allievo provvisorio (al momento di Applica); false se non riesce
+async function _formSalvaAllievoNuovo(nome) {
+  const prov = collaboratoriCache.find((c) => c._provvisorio && c.nome === nome);
+  if (!prov) return true;
+  try {
+    const dati = {
+      nome: prov.nome,
+      attivo: true,
+      reparto_dip: prov.reparto_dip,
+      funzione: prov.funzione,
+      percentuale: prov.percentuale,
+      is_jolly: true,
+    };
+    const cr = await secPost('collaboratori', dati);
+    const nuovo = cr && cr[0];
+    if (!nuovo) throw new Error('il database non ha restituito il collaboratore');
+    Object.keys(prov).forEach((k) => delete prov[k]);
+    Object.assign(prov, nuovo);
+    logAzione('Collaboratore creato da formazione', nuovo.nome + ' (jolly ' + (nuovo.funzione || '') + ')');
+    // collegato dappertutto come con "Aggiungi collaboratore": stessa lista per piano,
+    // Gestione collaboratori, Organico, schede e menu dei nomi
+    collaboratoriCache.sort((a, b) => a.nome.localeCompare(b.nome));
+    if (typeof aggiornaNomi === 'function') aggiornaNomi();
+    if (typeof renderCollaboratoriUI === 'function') renderCollaboratoriUI();
+    return true;
+  } catch (e) {
+    toastErrore('Nuovo allievo non salvato: ' + (e.message || e) + '. La formazione non e stata applicata');
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------- scelta persone
 // LISTA CON RICERCA E SPUNTE: si scrive per filtrare, si spuntano una o piu persone;
 // le scelte restano in alto come etichette numerate (l ordine e la preferenza: il
@@ -509,11 +570,18 @@ async function formazioneNuova(pre) {
     '<div style="font-size:var(--fs-md,.875rem)">' +
     riga(
       'Allievo',
-      '<input id="fz-allievo" list="fz-nomi" value="' +
+      '<label style="display:inline-flex;gap:6px;align-items:center;margin-bottom:6px;font-size:var(--fs-sm,.8125rem)"><input type="checkbox" id="fz-nuovo" onchange="document.getElementById(\'fz-box-nuovo\').hidden=!this.checked;document.getElementById(\'fz-box-esistente\').hidden=this.checked"> Nuovo allievo, non ancora nel programma</label>' +
+        '<div id="fz-box-esistente"><input id="fz-allievo" list="fz-nomi" value="' +
         escP(pre.allievo || '') +
         '" placeholder="Cerca collaboratore..." autocomplete="off" style="width:100%;padding:6px 8px"><datalist id="fz-nomi">' +
         membri.map((n) => '<option value="' + escP(n) + '">').join('') +
-        '</datalist>',
+        '</datalist></div>' +
+        '<div id="fz-box-nuovo" hidden><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="fz-cognome" placeholder="Cognome" autocomplete="off" style="flex:1;min-width:140px;padding:6px 8px"><input id="fz-nome" placeholder="Nome" autocomplete="off" style="flex:1;min-width:140px;padding:6px 8px"></div>' +
+        '<div style="font-size:var(--fs-xs,.75rem);color:var(--muted);margin-top:3px">Entra nel piano come gli altri jolly (' +
+        escP(_formJollyBase().funzione) +
+        ', ' +
+        Math.round(_formJollyBase().percentuale * 100) +
+        '%) quando applichi la proposta; si completa poi in Gestione collaboratori.</div></div>',
     ) +
     riga(
       'Competenza',
@@ -578,28 +646,68 @@ async function formazioneNuova(pre) {
   formazioneAggiornaFormatori(pre.formatore);
   await new Promise((fine) => {
     document.getElementById('fz-no').onclick = () => {
+      _formTogliAllievoProvvisorio();
       velo.remove();
       fine();
     };
     document.getElementById('fz-ok').onclick = async () => {
+      _formTogliAllievoProvvisorio();
       const v = (id) => (document.getElementById(id) || {}).value;
-      const allievoIn = String(v('fz-allievo') || '').trim();
-      const trovato =
-        typeof _xlsTrovaCollab === 'function'
-          ? _xlsTrovaCollab(
-              allievoIn,
-              collaboratoriCache.filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c)),
-            )
-          : null;
-      if (!trovato) {
-        toastErrore('Allievo non trovato nel settore');
-        return;
+      const nuovoAllievo = !!(document.getElementById('fz-nuovo') || {}).checked;
+      let trovato = null;
+      if (nuovoAllievo) {
+        const cognome = String(v('fz-cognome') || '').trim();
+        const nome = String(v('fz-nome') || '').trim();
+        if (!cognome || !nome) {
+          toastErrore('Scrivi cognome e nome del nuovo allievo');
+          return;
+        }
+        const completo = capitalizzaNome(cognome + ' ' + nome);
+        // esiste gia (anche disattivato, anche scritto nome e cognome)?
+        const gia =
+          (typeof _xlsTrovaCollab === 'function' ? _xlsTrovaCollab(completo, collaboratoriCache) : null) ||
+          collaboratoriCache.find((c) => c.nome.toLowerCase() === completo.toLowerCase());
+        if (gia) {
+          toastErrore(
+            'Esiste gia: ' +
+              gia.nome +
+              (gia.attivo === false ? ' (disattivato: riattivalo in Gestione collaboratori)' : '') +
+              '. Toglie la spunta Nuovo allievo e sceglilo dalla lista',
+          );
+          return;
+        }
+        _formTogliAllievoProvvisorio();
+        trovato = Object.assign(
+          { nome: completo, attivo: true, reparto_dip: _pianoReparto(), competenze: {} },
+          _formJollyBase(),
+          {
+            _provvisorio: true,
+          },
+        );
+        // turni bloccati di partenza come ogni collaboratore nuovo (es. S1, S3)
+        if (typeof pianoBloccatiDiPartenza === 'function')
+          trovato.turni_bloccati = pianoBloccatiDiPartenza(_pianoReparto()) || null;
+        collaboratoriCache.push(trovato);
+      } else {
+        const allievoIn = String(v('fz-allievo') || '').trim();
+        trovato =
+          typeof _xlsTrovaCollab === 'function'
+            ? _xlsTrovaCollab(
+                allievoIn,
+                collaboratoriCache.filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c)),
+              )
+            : null;
+        if (!trovato) {
+          toastErrore('Allievo non trovato nel settore (per uno nuovo spunta "Nuovo allievo")');
+          return;
+        }
       }
       const formatoriD = selPersValori('fz-fmt-d');
       const stessi = !!(document.getElementById('fz-stessi') || {}).checked;
       const formatoriN = stessi ? formatoriD.slice() : selPersValori('fz-fmt-n');
       const richiesta = {
         allievo: trovato.nome,
+        nuovoAllievo: nuovoAllievo,
         comp: comps.find((c) => c.key === v('fz-comp')),
         formatoriD: formatoriD,
         formatoriN: formatoriN.length ? formatoriN : formatoriD.slice(),
@@ -654,10 +762,16 @@ async function formazioneNuova(pre) {
           _formGg(richiesta.dal) +
           ' al ' +
           _formGg(richiesta.al) +
+          (nuovoAllievo
+            ? '\n\n' + richiesta.allievo + ' e nuovo: viene aggiunto come jolly solo se applichi una proposta.'
+            : '') +
           '\n\nCerco le proposte?',
         { titolo: 'Nuova formazione' },
       );
-      if (!ok) return;
+      if (!ok) {
+        _formTogliAllievoProvvisorio();
+        return;
+      }
       velo.remove();
       fine();
       await _formCercaProposte(richiesta, seq);
@@ -791,6 +905,7 @@ async function _formCercaProposte(r, seq) {
     const cand = _formOrdinaCandidati(r, tutti).slice(0, 5);
     if (!cand.length) {
       _pianoMeseSel = meseAperto;
+      _formTogliAllievoProvvisorio();
       velo.remove();
       toastErrore(
         'Nessun periodo possibile: nei giorni scelti allievo o formatore sono assenti (vacanze, malattie, ND, CGF) o i giorni sono chiusi',
@@ -878,6 +993,7 @@ async function _formCercaProposte(r, seq) {
     }
   } catch (e) {
     _pianoMeseSel = meseAperto;
+    _formTogliAllievoProvvisorio();
     velo.remove();
     console.error(e);
     toastErrore('Ricerca non riuscita: ' + (e.message || e));
@@ -1038,7 +1154,7 @@ function _formMostraProposte() {
       ')">Applica questa proposta</button></div></div>';
   });
   h +=
-    '<div class="finestra-pulsanti"><button type="button" class="finestra-no" onclick="document.getElementById(\'fz-proposte\').remove();window._formProposte=null;toast(\'Nessuna modifica: proposte chiuse\')">Chiudi senza cambiare niente</button></div></div>';
+    '<div class="finestra-pulsanti"><button type="button" class="finestra-no" onclick="document.getElementById(\'fz-proposte\').remove();window._formProposte=null;_formTogliAllievoProvvisorio();toast(\'Nessuna modifica: proposte chiuse\')">Chiudi senza cambiare niente</button></div></div>';
   velo.innerHTML = h;
   document.body.appendChild(velo);
 }
@@ -1145,6 +1261,8 @@ async function formazioneApplicaProposta(i) {
   if (!p || !_pianoAzioneAutoConsentita('formazioni')) return;
   const r = P.richiesta;
   const prep = p.prep;
+  // allievo nuovo: si salva adesso, prima delle celle
+  if (r.nuovoAllievo && !(await _formSalvaAllievoNuovo(r.allievo))) return;
   const box = document.getElementById('fz-proposte');
   if (box) box.remove();
   // la proposta puo essere di un altro mese: si apre quel mese (Annulla del piano
