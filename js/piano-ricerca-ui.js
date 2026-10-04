@@ -552,12 +552,14 @@ async function _ricercaScrivi(res) {
   const ora = new Date().toISOString();
   _pianoUndoSnap('migliora bozza ' + prep.ym);
   const nuove = [];
-  const cambia = [];
-  const togli = [];
+  let cambia = [];
+  let togli = [];
+  const attesa = {}; // id -> cella come la ricerca l ha letta (codice, generato, nome, data)
   res.cambi.forEach((c) => {
     const r = (prep.righeDi[c.nome + '|' + c.data] || [])[0];
     const cod = c.dopo || (prep.conRiempimento ? 'C' : '');
     if (r) {
+      attesa[r.id] = { codice: r.codice, generato: r.generato, nome: c.nome, data: c.data };
       if (!cod) togli.push(r.id);
       else if (cod !== r.codice) cambia.push({ id: r.id, codice: cod });
     } else if (cod)
@@ -570,6 +572,33 @@ async function _ricercaScrivi(res) {
         reparto_dip: prep.reparto,
       });
   });
+  // SCRITTURA PRUDENTE: la ricerca ha lavorato per minuti su una fotografia del mese.
+  // Una cella cambiata nel frattempo (da un collega, a mano) non si tocca: vince la
+  // modifica fatta a mano. Le celle nuove le protegge gia il database (una cella per
+  // persona e giorno: se nel frattempo c e, l inserimento si scarta).
+  const saltate = [];
+  try {
+    const ids = togli.concat(cambia.map((x) => x.id));
+    const ora2 = {};
+    for (let i = 0; i < ids.length; i += 150) {
+      const righe =
+        (await secGet('piano?id=in.(' + ids.slice(i, i + 150).join(',') + ')&select=id,codice,generato&limit=1000')) ||
+        [];
+      righe.forEach((r) => (ora2[r.id] = r));
+    }
+    const intatta = (id) => {
+      const a = attesa[id];
+      const c = ora2[id];
+      return !!(a && c && c.codice === a.codice && !(a.generato && c.generato === false));
+    };
+    ids.filter((id) => !intatta(id)).forEach((id) => saltate.push(attesa[id]));
+    togli = togli.filter(intatta);
+    cambia = cambia.filter((x) => intatta(x.id));
+  } catch (e) {
+    toastErrore('Controllo delle celle non riuscito: ' + (e.message || e) + '. Niente scritto.');
+    return;
+  }
+  res.saltate = saltate;
   try {
     for (let i = 0; i < togli.length; i += 50)
       await secDel('piano', 'id=in.(' + togli.slice(i, i + 50).join(',') + ')');
@@ -577,7 +606,15 @@ async function _ricercaScrivi(res) {
       await Promise.all(
         cambia
           .slice(i, i + 10)
-          .map((x) => secPatch('piano', 'id=eq.' + x.id, { codice: x.codice, operatore: op, updated_at: ora })),
+          // anche qui solo se la cella ha ancora il codice letto (un cambio arrivato
+          // nell ultimo istante non viene sovrascritto)
+          .map((x) =>
+            secPatch('piano', 'id=eq.' + x.id + '&codice=eq.' + encodeURIComponent(attesa[x.id].codice), {
+              codice: x.codice,
+              operatore: op,
+              updated_at: ora,
+            }),
+          ),
       );
     for (let i = 0; i < nuove.length; i += 2500)
       await _rpcSicura('piano_bulk_upsert', { p_token: getOpToken(), p_rows: nuove.slice(i, i + 2500) });
@@ -594,9 +631,17 @@ async function _ricercaScrivi(res) {
         nuove.length +
         ' nuove, ' +
         togli.length +
-        ' tolte)',
+        ' tolte' +
+        (saltate.length ? ', ' + saltate.length + ' lasciate perche modificate nel frattempo' : '') +
+        ')',
     );
-    if (!window._pianoAutoInCorso) toast('Bozza migliorata: ' + res.cambi.length + ' celle');
+    if (!window._pianoAutoInCorso)
+      toast(
+        'Bozza migliorata: ' +
+          (res.cambi.length - saltate.length) +
+          ' celle' +
+          (saltate.length ? ' · ' + saltate.length + ' lasciate come sono perche modificate a mano nel frattempo' : ''),
+      );
   } catch (e) {
     if (window._pianoAutoInCorso) throw e;
     toastErrore('Scrittura interrotta: ' + (e.message || e) + '. Con Annulla del piano si torna a prima.');

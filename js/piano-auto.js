@@ -219,6 +219,21 @@ async function _pianoAutoEsegui(rep, ym, minuti) {
             _pianoAutoFase('Scrivo i miglioramenti...');
             await _ricercaScrivi(res);
             esito.ricerca.applicata = true;
+            // celle modificate a mano mentre il programma lavorava: rispettate
+            if (res.saltate && res.saltate.length) {
+              esito.ricerca.saltate = res.saltate.length;
+              righe.push(
+                '• ' +
+                  res.saltate.length +
+                  ' celle modificate a mano durante la generazione: lasciate come le ha scritte il collega (' +
+                  res.saltate
+                    .slice(0, 6)
+                    .map((x) => x.nome + ' ' + String(x.data).substring(8, 10) + '.' + String(x.data).substring(5, 7))
+                    .join(', ') +
+                  (res.saltate.length > 6 ? '...' : '') +
+                  ')',
+              );
+            }
             righe.push(
               '• Migliorata (' +
                 Math.round(secondi / 60) +
@@ -481,4 +496,34 @@ async function pianoAutoRiprova(rep, mese) {
   await pianoAutoRenderCard();
   await pianoAutoControlla();
   pianoAutoRenderCard();
+}
+
+// ============================================================ AVVISO SUGLI ALTRI PC
+// Chi apre nel calendario il mese che un altro PC sta generando vede un avviso; nulla
+// e bloccato: le modifiche a mano vengono rispettate (la scrittura dei miglioramenti
+// salta le celle cambiate nel frattempo, _ricercaScrivi). Stato letto al massimo una
+// volta al minuto.
+let _pianoAutoStatoCache = { t: 0, dati: null };
+async function pianoAutoAvvisoMese() {
+  const el = document.getElementById('piano-auto-avviso');
+  if (!el || window._pianoAutoInCorso || typeof getOpToken !== 'function' || !getOpToken()) return;
+  const ym = _pianoMeseSel;
+  const rep = _pianoReparto();
+  try {
+    if (Date.now() - _pianoAutoStatoCache.t > 60000) {
+      _pianoAutoStatoCache = { t: Date.now(), dati: await _rpcSicura('piano_auto_stato', { p_token: getOpToken() }) };
+    }
+  } catch (e) {
+    return; // database senza la migrazione o rete assente: nessun avviso
+  }
+  const es = ((_pianoAutoStatoCache.dati || {}).esecuzioni || []).find(
+    (x) => x.attiva && x.reparto_dip === rep && x.mese === ym,
+  );
+  const el2 = document.getElementById('piano-auto-avviso');
+  if (!el2 || ym !== _pianoMeseSel || rep !== _pianoReparto()) return;
+  el2.innerHTML = es
+    ? '<div style="border-left:3px solid var(--accent2,#1a4a7a);background:var(--paper2);padding:8px 12px;margin:6px 0;font-size:var(--fs-sm,.8125rem)"><b>Generazione automatica in corso</b> su un altro PC' +
+      (es.avviata_da ? ' (' + escP(es.avviata_da) + ')' : '') +
+      ': fra pochi minuti il mese si completa da solo. Puoi lavorare normalmente: le modifiche a mano vengono rispettate.</div>'
+    : '';
 }

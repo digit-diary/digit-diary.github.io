@@ -1628,6 +1628,8 @@ function renderPiano() {
     if (typeof ndProgramma === 'function') ndProgramma();
     // confine fra due mesi: regole rotte nei primi giorni del mese dopo gia pianificato
     if (typeof _pianoConfineMostra === 'function' && _pianoTab === 'calendario') _pianoConfineMostra();
+    // un altro PC sta generando questo mese: avviso, senza bloccare
+    if (typeof pianoAutoAvvisoMese === 'function' && _pianoTab === 'calendario') pianoAutoAvvisoMese();
   });
   return _pianoRenderInCorso;
 }
@@ -1874,7 +1876,7 @@ async function _renderPianoCore() {
         ' assegnazioni' +
         (puoMod ? ' · click modifica, trascina o Shift+click per selezionare' : ' · sola lettura') +
         '</span></div></div>';
-      h += '<div id="piano-violazioni"></div><div id="piano-confine"></div>';
+      h += '<div id="piano-violazioni"></div><div id="piano-auto-avviso"></div><div id="piano-confine"></div>';
 
       // NON DISPONIBILITA' JOLLY: promemoria discreto (una riga, chiudibile),
       // scadenza dalla regola nd_jolly_giorno. Niente toni allarmistici.
