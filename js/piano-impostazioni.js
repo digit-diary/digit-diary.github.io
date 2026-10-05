@@ -178,7 +178,8 @@ function _renderPianoImpostazioniCard() {
     ),
   ].sort();
   const mappaCG = _pianoCompetenzeGruppi();
-  const compRep = typeof getCompetenzeConfigAll === 'function' ? getCompetenzeConfigAll()[_pianoReparto()] || [] : [];
+  const compRep0 = typeof getCompetenzeConfigAll === 'function' ? getCompetenzeConfigAll()[_pianoReparto()] || [] : [];
+  const compRep = typeof _compOrdinate === 'function' ? _compOrdinate(compRep0) : compRep0;
   if (compRep.length) {
     h += '<div style="display:flex;gap:12px;flex-wrap:wrap">';
     compRep.forEach((k) => {

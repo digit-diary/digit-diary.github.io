@@ -74,7 +74,8 @@ function _formGruppoAuto(comp, gruppi) {
 // dell app: dal Piano si puo guardare un altro settore)
 function _formCompetenzeSettore(rep) {
   const all = typeof getCompetenzeConfigAll === 'function' ? getCompetenzeConfigAll() : {};
-  return all[rep || _pianoReparto()] || [];
+  const l = all[rep || _pianoReparto()] || [];
+  return typeof _compOrdinate === 'function' ? _compOrdinate(l) : l;
 }
 function _formCompetenze() {
   const comps = _formCompetenzeSettore();

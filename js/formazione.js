@@ -137,8 +137,10 @@ function _opzioniLivello(rep) {
   for (let lv = 1; lv <= max + 1; lv++) h += '<option value="' + lv + '">L' + lv + '</option>';
   return h + '<option value="0">Extra</option>';
 }
+// sempre in ordine di livello (L1, L2, ...), anche se l elenco salvato e in disordine;
+// dentro lo stesso livello vale l ordine scelto con le frecce (v377)
 function getCompetenzeReparto() {
-  return getCompetenzeConfigAll()[currentReparto] || [];
+  return _compOrdinate(getCompetenzeConfigAll()[currentReparto] || []);
 }
 async function saveCompetenzeConfig(cfg) {
   competenzeConfig = cfg;
@@ -914,7 +916,12 @@ function renderFormazione() {
 
   // MATRICE COMPETENZE
   html += _renderProtocolliCard();
-  html += '<div class="main-card"><div class="card-header">Matrice competenze · chi sa fare cosa</div>';
+  html +=
+    '<div class="main-card"><div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span>Matrice competenze · chi sa fare cosa</span>' +
+    (isAdmin()
+      ? '<button onclick="apriRiordinoCompetenze()" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid var(--paper);color:var(--paper);border-radius:2px;cursor:pointer">Riordina competenze</button>'
+      : '') +
+    '</div>';
   html +=
     '<div class="filters" style="padding:10px 16px"><div class="filter-group filter-cerca"><span class="filter-label">Cerca</span><input type="text" id="form-matr-cerca" class="campo-cerca" placeholder="Cerca collaboratore..." aria-label="Cerca collaboratore" oninput="_filtraMatrice()"></div>' +
     '<div class="export-btns"><button class="btn-export" onclick="esportaMatriceCSV()">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaMatricePDF()">PDF</button></div></div>';
@@ -2158,9 +2165,11 @@ function _renderFormazioneConfig() {
     .map((r) => r.key)
     .forEach((rep) => {
       html +=
-        '<p style="font-size:var(--fs-sm,.8125rem);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:12px 0 6px">Competenze ' +
+        '<p id="cfg-comp-' +
+        rep +
+        '" style="font-size:var(--fs-sm,.8125rem);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:12px 0 6px">Competenze ' +
         escP(repartoLabel(rep)) +
-        '</p>';
+        '</p><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:0 0 6px">Ordine: prima L1, poi L2, poi L3... Con le frecce scegli l ordine dentro lo stesso livello; dal menu cambi il livello di una competenza.</p>';
       const lista = cfgC[rep] || [];
       // elenco fuori ordine (es. un L1 aggiunto dopo un L2 prima della v376): si rimette
       // in ordine di livello con un clic
@@ -2190,9 +2199,24 @@ function _renderFormazioneConfig() {
           freccia(1, giu, '&#9660;') +
           '<div class="tipo-item-name">' +
           escP(k.label) +
-          ' <span class="tipo-item-default">(L' +
-          k.livello +
-          ')</span></div><button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2)" onclick="rinominaCompetenzaCfg(\'' +
+          '</div><select title="Livello della competenza" onchange="cambiaLivelloCompetenzaCfg(\'' +
+          rep +
+          "'," +
+          i +
+          ',this.value)" style="margin-right:6px;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)">' +
+          Array.from({ length: Math.max(_lvMaxReparto(rep), parseInt(k.livello) || 1) + 1 }, (_, n) => n + 1)
+            .map(
+              (n) =>
+                '<option value="' +
+                n +
+                '"' +
+                (n === (parseInt(k.livello) || 1) ? ' selected' : '') +
+                '>L' +
+                n +
+                '</option>',
+            )
+            .join('') +
+          '</select><button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2)" onclick="rinominaCompetenzaCfg(\'' +
           rep +
           "'," +
           i +
@@ -2400,6 +2424,48 @@ function _compOrdinate(lista) {
 }
 function _compFuoriOrdine(lista) {
   return lista.some((k, i) => i > 0 && (parseInt(k.livello) || 0) < (parseInt(lista[i - 1].livello) || 0));
+}
+// cambia il livello di una competenza: cambia anche il livello dei collaboratori
+// (L(n) = tutte le competenze fino a n), quindi si chiede conferma
+async function cambiaLivelloCompetenzaCfg(rep, idx, val) {
+  if (!_soloAdminCfg()) return;
+  const cfg = getCompetenzeConfigAll();
+  const k = (cfg[rep] || [])[idx];
+  const lv = parseInt(val);
+  if (!k || !lv || lv === parseInt(k.livello)) return;
+  if (
+    !(await chiediConferma(
+      'Portare "' +
+        k.label +
+        '" da L' +
+        k.livello +
+        ' a L' +
+        lv +
+        '?\n\nIl livello dei collaboratori si ricalcola (un livello richiede tutte le competenze fino a quel livello). Le spunte gia date restano.',
+    ))
+  ) {
+    renderFormazione();
+    return;
+  }
+  const prima = k.livello;
+  const l = (cfg[rep] || []).slice();
+  l[idx] = Object.assign({}, k, { livello: lv });
+  // nel nuovo livello va in fondo: tolta e rimessa, poi in ordine di livello
+  const voce = l.splice(idx, 1)[0];
+  l.push(voce);
+  cfg[rep] = _compOrdinate(l);
+  await saveCompetenzeConfig(cfg);
+  logAzione('Competenza: livello cambiato', rep + ': ' + k.label + ' L' + prima + ' -> L' + lv);
+  renderFormazione();
+  toast(k.label + ': ora L' + lv);
+}
+// dalla matrice: apre la configurazione e porta alle competenze del settore
+function apriRiordinoCompetenze() {
+  const p = document.getElementById('cfg-comp-' + currentReparto);
+  if (!p) return;
+  const sec = p.closest('.settings-section');
+  if (sec) sec.classList.remove('sec-collapsed');
+  p.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 async function ordinaCompetenzeCfg(rep) {
   if (!_soloAdminCfg()) return;
