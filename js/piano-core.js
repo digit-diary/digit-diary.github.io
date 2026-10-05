@@ -2120,10 +2120,7 @@ async function _renderPianoCore() {
           // dopo la fine del rapporto: cella grigia con la spiegazione
           if (!_pianoOperativoIl(nome, dstr)) {
             cls += ' piano-fuori-rapporto';
-            titolo +=
-              (titolo ? ' · ' : '') +
-              'Fuori contratto: ultimo giorno ' +
-              _pianoFineRapporto(nome).split('-').reverse().join('.');
+            titolo += (titolo ? ' · ' : '') + 'Fuori contratto: ' + _pianoMotivoFuoriRapporto(nome, dstr);
           }
           const violMsg = _pianoViolCelle[nome + '|' + dstr];
           if (violMsg) {

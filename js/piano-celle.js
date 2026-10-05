@@ -761,11 +761,7 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
     // sopra un turno toglie quel riposo, quindi si avvisa.
     const avvisiExtra = [];
     if (codiceNuovo && _pianoTurnoInfo(codiceNuovo) && !_pianoOperativoIl(nome, dstr))
-      avvisiExtra.push(
-        'il contratto e finito il ' +
-          _pianoFineRapporto(nome).split('-').reverse().join('.') +
-          ': dopo quella data non e piu operativo',
-      );
+      avvisiExtra.push(_pianoMotivoFuoriRapporto(nome, dstr) + ': quel giorno non e operativo');
     // DOMENICA LIBERA VALIDA (una delle 12): il cambio la toglie? Vale per la cella
     // di domenica e per il sabato che finirebbe oltre le 23
     if (weekend && codiceNuovo !== undefined) {

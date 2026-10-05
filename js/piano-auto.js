@@ -195,6 +195,14 @@ async function _pianoAutoEsegui(rep, ym, minuti) {
               (conflitti.length > 12 ? ' e altre ' + (conflitti.length - 12) : ''),
           );
         }
+        // V scritte a mano o importate senza vacanza nel file: mai cancellate, da controllare
+        if (auto.vSenzaFile && auto.vSenzaFile.length) {
+          esito.vSenzaFile = auto.vSenzaFile.slice(0, 100);
+          righe.push(
+            '• Da controllare, V nel piano senza vacanza nel file (lasciate come sono):\n' +
+              _vacElencoGiorni(auto.vSenzaFile),
+          );
+        }
         if (b.volute > b.celle)
           righe.push('• ' + (b.volute - b.celle) + ' celle non scritte perche in quei giorni c era gia una cella');
         // MIGLIORA LA BOZZA per i minuti scelti

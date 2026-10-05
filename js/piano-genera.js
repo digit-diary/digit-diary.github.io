@@ -142,7 +142,7 @@ function _pianoIntervalloLavoro(r) {
   const t = _pianoTurnoInfo(r.codice);
   let ini = null;
   let fin = null;
-  if (r.ora_inizio && r.ora_fine && (t || String(r.codice).toUpperCase() === 'JG')) {
+  if (r.ora_inizio && r.ora_fine && (t || _pianoIsLavoro(r.codice))) {
     ini = r.ora_inizio;
     fin = r.ora_fine;
   } else if (t) {
@@ -343,8 +343,50 @@ function _pianoLimitiOre(nome, nGiorni) {
     max: isNaN(su) ? null : obiettivo + su,
   };
 }
+// GIORNO DI LAVORO (decisione del titolare 05.10): un turno, oppure un codice di
+// lavoro che non e un turno (JG, ufficio, uscita per servizio, corsi, formazione).
+// Conta ovunque allo stesso modo: giorni di fila, riposo minimo, 4+1+1, domenica non
+// libera. Elenco nella regola "codici_lavoro" (sigle separate da virgola); senza
+// regola valgono quelle qui sotto. Una cella vuota NON e lavoro (= riposo).
+const _PIANO_CODICI_LAVORO = 'JG,U,US,CS,LRD,F,1F';
+let _pianoCodLavCache = null;
+function _pianoCodiciLavoro() {
+  // si rilegge solo se cambiano le regole o il settore (si chiama migliaia di volte)
+  const regole = typeof pianoRegoleCache !== 'undefined' ? pianoRegoleCache : null;
+  const rep = typeof _pianoReparto === 'function' ? _pianoReparto() : '';
+  const c = _pianoCodLavCache;
+  if (c && c.regole === regole && c.rep === rep && c.n === (regole ? regole.length : 0)) return c.set;
+  const v = regole ? _pianoRegolaVal('codici_lavoro') : null;
+  const testo = String(v == null ? _PIANO_CODICI_LAVORO : v).toUpperCase();
+  _pianoCodLavCache = {
+    regole: regole,
+    rep: rep,
+    n: regole ? regole.length : 0,
+    set: new Set(testo.split(/[\s,;]+/).filter(Boolean)),
+  };
+  return _pianoCodLavCache.set;
+}
 function _pianoIsLavoro(codice) {
-  return !!_pianoTurnoInfo(codice);
+  if (!codice) return false;
+  if (_pianoTurnoInfo(codice)) return true;
+  return _pianoCodiciLavoro().has(String(codice).toUpperCase().trim());
+}
+// LEGGE SEMPRE ATTIVA (decisione del titolare 05.10): riposo minimo fra due giorni di
+// lavoro e massimo di giorni di fila valgono in tutti i controlli e motori con il
+// valore delle Regole; se la regola e spenta o a 0 vale il minimo di legge (11 h, 5).
+function _pianoLimitiLegge() {
+  const mc = parseInt(_pianoRegolaVal('max_consecutivi'));
+  const mr = parseFloat(_pianoRegolaVal('min_riposo_ore'));
+  return { maxCons: mc > 0 ? mc : 5, minRiposo: mr > 0 ? mr : 11 };
+}
+// ore di riposo fra due celle di lavoro (righe o {codice, data, ora_inizio?, ora_fine?}),
+// con gli orari VERI del giorno (prolungamenti, orario scritto sulla cella, JG).
+// null = non si sa (codice di lavoro senza orario): nessun avviso.
+function _pianoRiposoOreTra(a, b) {
+  const x = _pianoIntervalloLavoro(a);
+  const y = _pianoIntervalloLavoro(b);
+  if (!x || !y) return null;
+  return Math.round((y.ini - x.fin) * 100) / 100;
 }
 
 // Calcola le violazioni del mese corrente. Ritorna la lista e riempie _pianoViolCelle.
@@ -525,8 +567,8 @@ function _pianoCtxViolazioni(ym) {
   return {
     ym: ym,
     nGiorni: _pianoUltimoGiorno(ym),
-    maxCons: parseInt(_pianoRegolaVal('max_consecutivi')) || 0,
-    minRiposo: parseFloat(_pianoRegolaVal('min_riposo_ore')) || 0,
+    maxCons: _pianoLimitiLegge().maxCons,
+    minRiposo: _pianoLimitiLegge().minRiposo,
     no4w1c1w: _pianoRegolaVal('no_4w1c1w') === 'TRUE',
     diurnoPreV: _pianoRegolaVal('diurno_prima_vacanza') === 'TRUE',
     maxSett: _pianoOreSettimanaMax(),
@@ -543,7 +585,11 @@ function _pianoViolazioniPersona(nome, righeMese, righeSett, ctx) {
   const dstrDi = (g) => ym + '-' + String(g).padStart(2, '0');
   const aggiungi = (giorno, msg) => out.push({ nome: nome, giorno: giorno, msg: msg, celle: [dstrDi(giorno)] });
   const giorni = {};
-  righeMese.forEach((r) => (giorni[parseInt(r.data.split('-')[2])] = r.codice));
+  const righeG = {}; // g -> riga (orari veri per il riposo)
+  righeMese.forEach((r) => {
+    giorni[parseInt(r.data.split('-')[2])] = r.codice;
+    righeG[parseInt(r.data.split('-')[2])] = r;
+  });
   // FINE DEL MESE PRIMA (dalle settimane a cavallo): giorno 0 = ultimo giorno del mese
   // prima, -1 il penultimo... Contano per i giorni di fila, il riposo fra l ultimo
   // turno del mese prima e il primo di questo e il riposo singolo 4+1+1. Prima questi
@@ -554,8 +600,24 @@ function _pianoViolazioniPersona(nome, righeMese, righeSett, ctx) {
     const d = String(r.data).substring(0, 10);
     if (d >= ym + '-01') return;
     const diff = Math.round((inizioMese - new Date(d + 'T12:00:00')) / 86400000);
-    if (diff >= 1 && diff <= 14) giorni[1 - diff] = r.codice;
+    if (diff >= 1 && diff <= 14) {
+      giorni[1 - diff] = r.codice;
+      righeG[1 - diff] = r;
+    }
   });
+  // INIZIO DEL MESE DOPO (gia pianificato): i giorni nGiorni+1... continuano le serie
+  // di giorni di fila e il riposo dell ultimo giorno del mese
+  const fineMese = new Date(dstrDi(nGiorni) + 'T12:00:00');
+  (righeSett || []).forEach((r) => {
+    const d = String(r.data).substring(0, 10);
+    if (d <= dstrDi(nGiorni)) return;
+    const diff = Math.round((new Date(d + 'T12:00:00') - fineMese) / 86400000);
+    if (diff >= 1 && diff <= 14) {
+      giorni[nGiorni + diff] = r.codice;
+      righeG[nGiorni + diff] = r;
+    }
+  });
+  const rigaDi = (g) => righeG[g] || { codice: giorni[g] || '', data: dstrDi(g) };
   // riposo settimanale attorno alla domenica (35 / 47 ore)
   _pianoRiposiSettimanali(righeSett).forEach((v) => {
     const g = v.domenica;
@@ -583,39 +645,41 @@ function _pianoViolazioniPersona(nome, righeMese, righeSett, ctx) {
     const maxCons = ctx.maxCons;
     const minRiposo = ctx.minRiposo;
     let consec = 0;
+    let segnalata = false;
     // giorni di fila gia lavorati alla fine del mese prima
     for (let k = 0; k >= -13 && _pianoIsLavoro(giorni[k] || ''); k--) consec++;
     // da g = 0: il riposo fra l ultimo giorno del mese prima e il primo di questo
     for (let g = 0; g <= nGiorni; g++) {
       const cod = giorni[g] || '';
       const lavoro = _pianoIsLavoro(cod);
-      // 1) massimo giorni lavorativi consecutivi
+      // 1) massimo giorni lavorativi consecutivi: una volta per serie, nel primo giorno
+      //    oltre il massimo (anche se la serie arriva gia lunga dal mese prima), con la
+      //    lunghezza vera della serie (contando anche il mese dopo gia pianificato)
       if (g === 0) {
         // giorno del mese prima: gia contato sopra
       } else if (lavoro) {
         consec++;
-        if (maxCons && consec === maxCons + 1)
-          aggiungi(g, consec - 1 + '+ giorni lavorativi consecutivi (max ' + maxCons + ')');
+        if (maxCons && consec > maxCons && !segnalata) {
+          let tot = consec;
+          for (let k = g + 1; k <= nGiorni + 14 && _pianoIsLavoro(giorni[k] || ''); k++) tot++;
+          aggiungi(g, tot + ' giorni lavorativi consecutivi (max ' + maxCons + ')');
+          segnalata = true;
+        }
       } else {
         consec = 0;
+        segnalata = false;
       }
-      // 2) riposo minimo tra due turni consecutivi
-      if (minRiposo && lavoro && giorni[g + 1] && _pianoIsLavoro(giorni[g + 1])) {
-        const t1 = _pianoTurnoInfo(cod);
-        const t2 = _pianoTurnoInfo(giorni[g + 1]);
-        const fine1 = _pianoOra(t1.ora_fine);
-        const inizio2 = _pianoOra(t2.ora_inizio);
-        if (fine1 != null && inizio2 != null) {
-          // fine oltre mezzanotte = fine prima dell'inizio. Il flag "oltre le 23"
-          // vale anche per un turno che chiude alle 23:30 e NON sposta il giorno
-          const fineAbs = fine1 <= _pianoOra(t1.ora_inizio) ? 24 + fine1 : fine1;
-          const riposo = 24 + inizio2 - fineAbs;
-          if (riposo < minRiposo)
-            aggiungi(g + 1, 'solo ' + riposo.toFixed(1) + 'h di riposo dopo ' + cod + ' (min ' + minRiposo + 'h)');
-        }
+      // 2) riposo minimo fra due giorni di lavoro, con gli orari veri delle celle
+      if (minRiposo && lavoro && _pianoIsLavoro(giorni[g + 1] || '')) {
+        const riposo = _pianoRiposoOreTra(rigaDi(g), rigaDi(g + 1));
+        if (riposo != null && riposo < minRiposo - 0.001)
+          aggiungi(
+            Math.min(g + 1, nGiorni),
+            'solo ' + riposo.toFixed(1) + 'h di riposo dopo ' + cod + ' (min ' + minRiposo + 'h)',
+          );
       }
-      // 3) vietato 4 lavoro + 1 riposo + 1 lavoro
-      if (ctx.no4w1c1w && !lavoro && cod && g >= 1) {
+      // 3) vietato 4 lavoro + 1 riposo + 1 lavoro (una cella vuota e un riposo)
+      if (ctx.no4w1c1w && !lavoro && g >= 1) {
         let prima = 0;
         for (let k = g - 1; k >= -13 && _pianoIsLavoro(giorni[k] || ''); k--) prima++;
         if (prima >= 4 && _pianoIsLavoro(giorni[g + 1] || ''))
@@ -909,15 +973,15 @@ function validaPiano() {
 
 // CONTROLLO DI BASE DEL PIANO (v374), come il file "CONTROLLO PIANO SLOT/VALET AUTO"
 // del titolare: solo riposo minimo fra due turni e giorni lavorativi di fila, con il
-// mese precedente. Regole dal programma (min_riposo_ore, max_consecutivi). Una cella
-// VUOTA non conta come riposo (come nell Excel: un giorno non compilato non e un
-// riposo garantito); ogni altro codice che non e un turno (C, V, M, CGF...) azzera.
+// mese precedente. Regole dal programma (min_riposo_ore, max_consecutivi, sempre
+// attive: _pianoLimitiLegge). Decisione del titolare 05.10: una cella VUOTA e un
+// riposo (prima, come nell Excel, non azzerava); i codici di lavoro che non sono turni
+// (JG, U, corsi...) contano come lavoro; ogni altro codice (C, V, M, CGF...) azzera.
 // piano: { nome: { 'YYYY-MM-DD': { cod, ini, fin } } } con il mese ym e i giorni prima.
 // Ritorna [{ nome, data, errore, dettagli, turni, daPrima }], una riga per riposo
 // insufficiente e una per periodo di troppi giorni di fila.
 function _pianoControlloBase(ym, piano) {
-  const minRiposo = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 11;
-  const maxCons = parseInt(_pianoRegolaVal('max_consecutivi')) || 5;
+  const { minRiposo, maxCons } = _pianoLimitiLegge();
   const MESI_L = typeof MESI_FULL !== 'undefined' ? MESI_FULL : [];
   const pr = new Date(ym + '-01T12:00:00');
   pr.setMonth(pr.getMonth() - 1);
@@ -951,10 +1015,9 @@ function _pianoControlloBase(ym, piano) {
       tutti.forEach((dstr, i) => {
         const cella = piano[nome][dstr];
         const cod = cella ? String(cella.cod || '').toUpperCase() : '';
-        if (!cod) return; // vuoto: non e un riposo, non azzera
         const t = _pianoTurnoInfo(cod);
-        if (!t) {
-          // giorno di riposo o assenza: azzera
+        if (!_pianoIsLavoro(cod)) {
+          // giorno di riposo, assenza o cella vuota: azzera
           chiudiSerie();
           cons = 0;
           inizioSerie = null;
@@ -979,26 +1042,26 @@ function _pianoControlloBase(ym, piano) {
             };
           if (serieSegnata) {
             serieSegnata._fine = dstr;
-            // giorni del calendario nel periodo: se sono di piu, in mezzo c erano celle vuote
-            const span =
-              Math.round((new Date(dstr + 'T12:00:00') - new Date(serieSegnata._inizio + 'T12:00:00')) / 86400000) + 1;
             serieSegnata.dettagli =
               cons +
-              (span > cons ? ' giorni di lavoro senza un riposo segnato' : ' giorni di fila') +
-              ' dal ' +
+              ' giorni di fila dal ' +
               gg(serieSegnata._inizio) +
               ' al ' +
               gg(dstr) +
               ' (max ' +
               maxCons +
               ')' +
-              (span > cons ? ' (le celle vuote non contano come riposo)' : '') +
               (serieSegnata.daPrima ? ' (da ' + nomePrima + ')' : '');
           }
         }
-        const ini = ora((cella && cella.ini) || t.ora_inizio);
-        const fin = ora((cella && cella.fin) || t.ora_fine);
-        if (ini == null || fin == null) return;
+        // orario: quello scritto sulla cella, altrimenti quello del turno; un codice di
+        // lavoro senza orario (es. U) conta per i giorni di fila ma non per il riposo
+        const ini = ora((cella && cella.ini) || (t && t.ora_inizio));
+        const fin = ora((cella && cella.fin) || (t && t.ora_fine));
+        if (ini == null || fin == null) {
+          fineAss = null;
+          return;
+        }
         const inizioAss = i * 1440 + ini;
         if (fineAss != null && nelMese) {
           const riposo = (inizioAss - fineAss) / 60;
@@ -1476,8 +1539,7 @@ async function generaBozzaPiano(usaCoperture) {
   // ricarico includendo le celle degli ALTRI reparti dei multi-reparto
   // (stessa funzione scalabile di renderPiano)
   _pianoRighe = await _pianoCaricaMeseSettore(da, a, _pianoReparto());
-  const maxCons = parseInt(_pianoRegolaVal('max_consecutivi')) || 5;
-  const minRiposo = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 11;
+  const { maxCons, minRiposo } = _pianoLimitiLegge();
   // storia per idoneità (chi ha già fatto quel gruppo) e familiarità:
   // tutte le assegnazioni passate del settore (le più recenti prima)
   const storia =
@@ -1538,25 +1600,51 @@ async function generaBozzaPiano(usaCoperture) {
     obiettivo[n] = _pianoObiettivoConSaldo(n, (_pianoGgDovuti(n, ym) / 7) * _pianoOreSett * pct, nGiorni);
   });
   const gapOre = (n) => (obiettivo[n] || 0) - (oreMese[n] || 0);
+  // BORDO DEL MESE (controllo completo 05.10): la fine del mese prima (giorni 0, -1...)
+  // e l inizio del mese dopo gia pianificato (nGiorni+1...) contano per giorni di fila,
+  // riposo minimo e 4+1+1. Prima la bozza si fermava al giorno 1 e all ultimo: l 1.11
+  // un L1 alle 06:00 dopo un S7 finito alle 04:10 del 31.10, serie di 8 giorni.
+  const primoG = new Date(ym + '-01T12:00:00');
+  const dataDiG = (g) => {
+    const d = new Date(primoG);
+    d.setDate(d.getDate() + g - 1);
+    return dataLocaleISO(d);
+  };
+  const bordoRiga = {}; // 'nome|g' (g <= 0 o > nGiorni) -> riga
+  (window._pianoRigheBordo || []).forEach((r) => {
+    const g = 1 + Math.round((new Date(String(r.data).substring(0, 10) + 'T12:00:00') - primoG) / 86400000);
+    if (g >= 1 && g <= nGiorni) return;
+    bordoRiga[r.collaboratore + '|' + g] = r;
+  });
+  const codDi = (nome, g) =>
+    g >= 1 && g <= nGiorni ? cella[nome + '|' + g] || '' : (bordoRiga[nome + '|' + g] || {}).codice || '';
+  // la cella come riga (orari veri): quella letta se e la stessa, altrimenti codice e data
+  const rigaCella = (nome, g) => {
+    if (g < 1 || g > nGiorni) return bordoRiga[nome + '|' + g] || { codice: '', data: dataDiG(g) };
+    const k = nome + '|' + g;
+    const r = rigaDi[k];
+    return r && r.codice === cella[k] ? r : { codice: cella[k] || '', data: dataDiG(g) };
+  };
   const consecPrima = (nome, g) => {
     let n = 0;
-    for (let k = g - 1; k >= 1 && _pianoIsLavoro(cella[nome + '|' + k] || ''); k--) n++;
+    for (let k = g - 1; k >= -13 && _pianoIsLavoro(codDi(nome, k)); k--) n++;
+    return n;
+  };
+  const consecDopo = (nome, g) => {
+    let n = 0;
+    for (let k = g + 1; k <= nGiorni + 14 && _pianoIsLavoro(codDi(nome, k)); k++) n++;
     return n;
   };
   const riposoOk = (nome, g, t) => {
-    // verso il giorno prima
-    const prev = _pianoTurnoInfo(cella[nome + '|' + (g - 1)] || '');
-    if (prev) {
-      const finePrev = _pianoOra(prev.ora_fine);
-      const fineAbs = finePrev <= _pianoOra(prev.ora_inizio) ? 24 + finePrev : finePrev;
-      if (24 + _pianoOra(t.ora_inizio) - fineAbs < minRiposo) return false;
-    }
-    // verso il giorno dopo (se già assegnato, es. cella protetta)
-    const next = _pianoTurnoInfo(cella[nome + '|' + (g + 1)] || '');
-    if (next) {
-      const fine = _pianoOra(t.ora_fine);
-      const fineAbs = fine <= _pianoOra(t.ora_inizio) ? 24 + fine : fine;
-      if (24 + _pianoOra(next.ora_inizio) - fineAbs < minRiposo) return false;
+    const qui = { codice: t.codice, data: dataDiG(g) };
+    // verso il giorno prima e verso il giorno dopo (gia scritto, anche nel mese dopo)
+    for (const [x, y] of [
+      [rigaCella(nome, g - 1), qui],
+      [qui, rigaCella(nome, g + 1)],
+    ]) {
+      if (!_pianoIsLavoro(x.codice) || !_pianoIsLavoro(y.codice)) continue;
+      const ore = _pianoRiposoOreTra(x, y);
+      if (ore != null && ore < minRiposo - 0.001) return false;
     }
     return true;
   };
@@ -1787,18 +1875,17 @@ async function generaBozzaPiano(usaCoperture) {
     // se prima c'erano 4+ giorni di lavoro consecutivi
     if (String(_pianoRegolaVal('no_4w1c1w')).toUpperCase() === 'TRUE') {
       const cp0 = consecPrima(n, g);
-      if (cp0 === 0 && !_pianoIsLavoro(cella[n + '|' + (g - 1)] || '')) {
+      if (cp0 === 0 && !_pianoIsLavoro(codDi(n, g - 1))) {
         let streakPrec = 0;
-        for (let k = g - 2; k >= 1 && _pianoIsLavoro(cella[n + '|' + k] || ''); k--) streakPrec++;
+        for (let k = g - 2; k >= -13 && _pianoIsLavoro(codDi(n, k)); k--) streakPrec++;
         if (streakPrec >= 4) return false;
       }
       // anche IN AVANTI: il turno allunga una serie che finisce con un riposo
       // singolo gia fissato e un rientro (succedeva tappando i buchi dopo)
       let fineSerie = g;
-      while (fineSerie + 1 <= nGiorni && _pianoIsLavoro(cella[n + '|' + (fineSerie + 1)] || '')) fineSerie++;
+      while (fineSerie + 1 <= nGiorni + 14 && _pianoIsLavoro(codDi(n, fineSerie + 1))) fineSerie++;
       const riposo = fineSerie + 1;
-      if (riposo + 1 <= nGiorni && fineSerie - g + 1 + cp0 >= 4 && _pianoIsLavoro(cella[n + '|' + (riposo + 1)] || ''))
-        return false;
+      if (fineSerie - g + 1 + cp0 >= 4 && _pianoIsLavoro(codDi(n, riposo + 1))) return false;
     }
     // REGOLE DI GRUPPO (port di eligibility.py Turnivo): i settori
     // assegnati al collaboratore (settori_piano, M2M di Turnivo) sono la
@@ -1844,7 +1931,9 @@ async function generaBozzaPiano(usaCoperture) {
     }
     // accompagnato SOLO dove copre (spunta nella scheda): stessa regola
     if (cop && cop.accompagnato && !(contaGiornoTot[gruppoT + '|' + g] || 0)) return false;
-    return consecPrima(n, g) < maxCons && riposoOk(n, g, t);
+    // giorni di fila contando IN AVANTI: il turno puo unire due serie (le passate di
+    // riparazione riempivano un giorno con i giorni dopo gia pieni: serie di 6)
+    return consecPrima(n, g) + 1 + consecDopo(n, g) <= maxCons && riposoOk(n, g, t);
   };
   for (let g = 1; g <= nGiorni; g++) {
     if (giorniChiusi.has(g)) continue; // giorno chiuso: resta com'e'

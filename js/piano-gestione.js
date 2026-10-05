@@ -2646,16 +2646,18 @@ function _pianoGiorniCnp(nome, ym) {
 }
 // giorni del mese che contano per le ore dovute: tutti meno quelli di congedo
 function _pianoGgDovuti(nome, ym) {
-  // meno i giorni di congedo non pagato e i giorni dopo la fine del rapporto
+  // meno i giorni di congedo non pagato, quelli prima dell assunzione e dopo la fine
+  // del rapporto
   const fine = _pianoFineRapporto(nome);
+  const inizio = _pianoInizioRapporto(nome);
   const cnp = _pianoGiorniCnp(nome, ym);
-  if (!fine) return Math.max(0, _pianoUltimoGiorno(ym) - cnp);
-  // giorni non dovuti = congedo OPPURE dopo la fine (contati una volta sola)
+  if (!fine && !(inizio && inizio > ym + '-01')) return Math.max(0, _pianoUltimoGiorno(ym) - cnp);
+  // giorni non dovuti = congedo OPPURE fuori dal rapporto (contati una volta sola)
   const mappaCnp = cnp ? _pianoCnpMese(ym) : {};
   let fuori = 0;
   for (let g = 1; g <= _pianoUltimoGiorno(ym); g++) {
     const d = ym + '-' + String(g).padStart(2, '0');
-    if (d > fine || mappaCnp[nome + '|' + d]) fuori++;
+    if ((fine && d > fine) || (inizio && d < inizio) || mappaCnp[nome + '|' + d]) fuori++;
   }
   return Math.max(0, _pianoUltimoGiorno(ym) - fuori);
 }
@@ -2666,24 +2668,45 @@ function _pianoFineRapporto(c) {
   const info = typeof c === 'string' ? _pianoCollabInfo(c) : c;
   return info && info.data_fine_rapporto ? String(info.data_fine_rapporto).substring(0, 10) : '';
 }
+// INIZIO DEL RAPPORTO (data_assunzione): prima di quel giorno il collaboratore non
+// e operativo (bozza, coperture, cambi, ore dovute). Prima la bozza dava turni anche
+// prima dell entrata (controllo 05.10: 10 turni prima del 16.11)
+function _pianoInizioRapporto(c) {
+  const info = typeof c === 'string' ? _pianoCollabInfo(c) : c;
+  return info && info.data_assunzione ? String(info.data_assunzione).substring(0, 10) : '';
+}
+// "assunto dal 16.11" / "contratto finito il 10.11": perche quel giorno non e operativo
+function _pianoMotivoFuoriRapporto(c, dstr) {
+  const d = String(dstr).substring(0, 10);
+  const i = _pianoInizioRapporto(c);
+  if (i && d < i) return 'assunto dal ' + i.split('-').reverse().join('.');
+  const f = _pianoFineRapporto(c);
+  if (f && d > f) return 'contratto finito il ' + f.split('-').reverse().join('.');
+  return '';
+}
 function _pianoOperativoIl(c, dstr) {
   const f = _pianoFineRapporto(c);
-  return !f || String(dstr).substring(0, 10) <= f;
+  const i = _pianoInizioRapporto(c);
+  const d = String(dstr).substring(0, 10);
+  return (!f || d <= f) && (!i || d >= i);
 }
 function _pianoOperativoNelMese(c, ym) {
   const f = _pianoFineRapporto(c);
-  return !f || f >= ym + '-01';
+  const i = _pianoInizioRapporto(c);
+  return (!f || f >= ym + '-01') && (!i || i <= ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0'));
 }
-// mappa 'nome|YYYY-MM-DD' -> true dei giorni dopo la fine del rapporto (per la bozza)
+// mappa 'nome|YYYY-MM-DD' -> true dei giorni fuori dal rapporto, prima dell assunzione
+// o dopo la fine (per la bozza: non assegnabili)
 function _pianoFineMese(ym) {
   const out = {};
   const n = _pianoUltimoGiorno(ym);
   (typeof collaboratoriCache !== 'undefined' ? collaboratoriCache : []).forEach((c) => {
     const f = _pianoFineRapporto(c);
-    if (!f) return;
+    const i = _pianoInizioRapporto(c);
+    if (!f && !(i && i > ym + '-01')) return;
     for (let g = 1; g <= n; g++) {
       const d = ym + '-' + String(g).padStart(2, '0');
-      if (d > f) out[c.nome + '|' + d] = true;
+      if ((f && d > f) || (i && d < i)) out[c.nome + '|' + d] = true;
     }
   });
   return out;

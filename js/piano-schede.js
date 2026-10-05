@@ -2278,6 +2278,7 @@ async function _applicaVacanzeMese(interattivo) {
     _pianoGiorniSettimana(parseInt(v.anno) || anno, v.settimana).forEach((dstr) => {
       const p = dstr.split('-');
       if (parseInt(p[0]) !== anno || parseInt(p[1]) !== mese) return;
+      if (!_pianoOperativoIl(v.collaboratore, dstr)) return; // fuori dal rapporto: niente V
       if (sigla === 'V') (vacGiorni[v.collaboratore] = vacGiorni[v.collaboratore] || new Set()).add(parseInt(p[2]));
       else (altreGiorni[v.collaboratore] = altreGiorni[v.collaboratore] || {})[parseInt(p[2])] = sigla;
     });
@@ -2297,19 +2298,33 @@ async function _applicaVacanzeMese(interattivo) {
   }
   const da = ym + '-' + String(primoAperto).padStart(2, '0');
   const a = ym + '-' + String(nGiorni).padStart(2, '0');
+  // le celle scritte da qui (V, PC, MT...) portano questo commento: cosi ai giri
+  // successivi si aggiornano senza toccare le stesse sigle inserite a mano
+  const COMMENTO_ALTRE = 'Piano vacanze: ';
+  const COMMENTO_V = COMMENTO_ALTRE + 'Vacanza';
+  const daVacanze = (r) => String(r.commento || '').startsWith(COMMENTO_ALTRE);
   // V ORFANE: se una vacanza e' stata spostata o tolta dalla scheda Vacanze,
-  // le V rimaste nel piano senza settimana corrispondente vengono rimosse
+  // le V scritte da qui rimaste senza settimana corrispondente vengono rimosse.
+  // Le V scritte a mano (o importate) senza vacanza nel file NON si toccano: si
+  // elencano da controllare (prima si cancellavano anche quelle, controllo 05.10:
+  // 14 V protette tolte a Valet novembre e sostituite con turni)
   let nOrfane = 0;
+  const vSenzaFile = []; // { nome, data }
   {
     const righeV =
       (await secGet(
         'piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&codice=eq.V&limit=2000',
       )) || [];
-    const orfane = righeV.filter((r) => {
+    const senza = righeV.filter((r) => {
       if (!nomiRep.includes(r.collaboratore)) return false;
       const g = parseInt(r.data.split('-')[2]);
       return !(vacGiorni[r.collaboratore] && vacGiorni[r.collaboratore].has(g));
     });
+    // nella generazione automatica non si cancella niente di protetto: anche le V delle
+    // vacanze spostate restano e vanno nel resoconto da controllare
+    const auto = !!window._pianoAutoInCorso;
+    const orfane = auto ? [] : senza.filter(daVacanze);
+    senza.filter((r) => auto || !daVacanze(r)).forEach((r) => vSenzaFile.push({ nome: r.collaboratore, data: r.data }));
     for (let i = 0; i < orfane.length; i += 10) {
       await Promise.all(orfane.slice(i, i + 10).map((r) => secDel('piano', 'id=eq.' + r.id)));
     }
@@ -2338,16 +2353,15 @@ async function _applicaVacanzeMese(interattivo) {
       _pianoReparto() +
       '&protetto=eq.true&generato=eq.true&codice=eq.C',
   );
-  // ALTRE ASSENZE (PC, MT...): scritte con un commento che le riconosce, cosi ai giri
-  // successivi si aggiornano senza toccare le stesse sigle inserite a mano
-  const COMMENTO_ALTRE = 'Piano vacanze: ';
+  // ALTRE ASSENZE (PC, MT...): scritte con il commento COMMENTO_ALTRE
   let nAltre = 0;
   {
     const righeMese =
       (await secGet(
         'piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=5000',
       )) || [];
-    const giaScritte = righeMese.filter((r) => String(r.commento || '').startsWith(COMMENTO_ALTRE));
+    // le V hanno il loro giro (sopra e sotto): qui solo le altre assenze
+    const giaScritte = righeMese.filter((r) => r.codice !== 'V' && daVacanze(r));
     for (const r of giaScritte) {
       const g = parseInt(r.data.split('-')[2]);
       const voluta = altreGiorni[r.collaboratore] && altreGiorni[r.collaboratore][g];
@@ -2395,7 +2409,7 @@ async function _applicaVacanzeMese(interattivo) {
           ? nOrfane + ' V rimosse (vacanze spostate); nessuna vacanza cade in ' + ym
           : 'Nessuna vacanza cade in ' + ym + ' per questo settore',
       );
-    return { v: 0, c: 0, wd: 0, orfane: nOrfane, altre: nAltre };
+    return { v: 0, c: 0, wd: 0, orfane: nOrfane, altre: nAltre, vSenzaFile: vSenzaFile };
   }
   const righe =
     (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=5000')) ||
@@ -2407,8 +2421,10 @@ async function _applicaVacanzeMese(interattivo) {
   let nC = 0;
   let nWdP = 0;
   const op = getOperatore();
-  const scrivi = async (nome, g, codice, protetto, generato) => {
+  const scrivi = async (nome, g, codice, protetto, generato, commento) => {
     const r = perCella[nome + '|' + g];
+    // prima dell assunzione o dopo la fine del rapporto non si scrive niente (C, WD)
+    if (!_pianoOperativoIl(nome, dstrDi(g))) return false;
     if (g < primoAperto) {
       // giorno chiuso: niente scrittura, ma se la cella e diversa si segnala
       if (!r || (r.codice !== codice && !r.protetto))
@@ -2430,25 +2446,37 @@ async function _applicaVacanzeMese(interattivo) {
         });
         return false;
       }
-      await secPatch('piano', 'id=eq.' + r.id, {
-        codice: codice,
-        protetto: protetto,
-        generato: generato,
-        operatore: op,
-        updated_at: new Date().toISOString(),
-      });
+      await secPatch(
+        'piano',
+        'id=eq.' + r.id,
+        Object.assign(
+          {
+            codice: codice,
+            protetto: protetto,
+            generato: generato,
+            operatore: op,
+            updated_at: new Date().toISOString(),
+          },
+          commento ? { commento: commento } : {},
+        ),
+      );
       r.codice = codice;
       r.protetto = protetto;
     } else {
-      const n = await _pianoInserisciCella({
-        collaboratore: nome,
-        data: dstrDi(g),
-        codice: codice,
-        protetto: protetto,
-        generato: generato,
-        reparto_dip: _pianoReparto(),
-        operatore: op,
-      });
+      const n = await _pianoInserisciCella(
+        Object.assign(
+          {
+            collaboratore: nome,
+            data: dstrDi(g),
+            codice: codice,
+            protetto: protetto,
+            generato: generato,
+            reparto_dip: _pianoReparto(),
+            operatore: op,
+          },
+          commento ? { commento: commento } : {},
+        ),
+      );
       if (n) perCella[nome + '|' + g] = n;
     }
     return true;
@@ -2461,8 +2489,16 @@ async function _applicaVacanzeMese(interattivo) {
     // V protette su ogni giorno di vacanza (le protette esistenti restano)
     for (const g of soloV) {
       const r = perCella[nome + '|' + g];
-      if (r && r.protetto) continue;
-      if (await scrivi(nome, g, 'V', true, false)) nV++;
+      if (r && r.protetto) {
+        // una V gia presente sul giorno di una vacanza del file prende il segno delle
+        // vacanze: se la vacanza si sposta, si toglie con le altre
+        if (r.codice === 'V' && !daVacanze(r) && !r.commento && g >= primoAperto) {
+          await secPatch('piano', 'id=eq.' + r.id, { commento: COMMENTO_V, updated_at: new Date().toISOString() });
+          r.commento = COMMENTO_V;
+        }
+        continue;
+      }
+      if (await scrivi(nome, g, 'V', true, false, COMMENTO_V)) nV++;
     }
     // blocchi contigui
     const blocchi = [];
@@ -2565,7 +2601,38 @@ async function _applicaVacanzeMese(interattivo) {
           .join(', ')
           .substring(0, 900),
     );
-  return { v: nV, c: nC, wd: nWdP, orfane: nOrfane, altre: nAltre, nonToccati: nonToccati, primoAperto: primoAperto };
+  if (window._pianoAutoInCorso && vSenzaFile.length) window._pianoAutoInCorso.vSenzaFile = vSenzaFile;
+  return {
+    v: nV,
+    c: nC,
+    wd: nWdP,
+    orfane: nOrfane,
+    altre: nAltre,
+    nonToccati: nonToccati,
+    primoAperto: primoAperto,
+    vSenzaFile: vSenzaFile,
+  };
+}
+// "Rossi Mario 03.11-09.11, Bianchi Anna 21.11": giorni di fila raccolti per persona
+function _vacElencoGiorni(l) {
+  const per = {};
+  l.forEach((x) => (per[x.nome] = per[x.nome] || []).push(x.data));
+  return Object.keys(per)
+    .sort()
+    .map((nome) => {
+      const d = per[nome].sort();
+      const tratti = [];
+      d.forEach((x) => {
+        const u = tratti[tratti.length - 1];
+        const ieri = new Date(x + 'T12:00:00');
+        ieri.setDate(ieri.getDate() - 1);
+        if (u && u[1] === giornoDi(ieri)) u[1] = x;
+        else tratti.push([x, x]);
+      });
+      const f = (x) => x.substring(8, 10) + '.' + x.substring(5, 7);
+      return '\u2022 ' + nome + ' ' + tratti.map((t) => (t[0] === t[1] ? f(t[0]) : f(t[0]) + '-' + f(t[1]))).join(', ');
+    })
+    .join('\n');
 }
 async function applicaVacanzePiano() {
   if (!_pianoAzioneAutoConsentita('vacanze')) return; // azione automatica: permesso apposito
@@ -2600,6 +2667,14 @@ async function applicaVacanzePiano() {
         ' WD' +
         (r.altre ? ', ' + r.altre + ' altre assenze' : '') +
         (r.orfane ? ' · rimosse ' + r.orfane + ' V di vacanze spostate' : ''),
+    );
+  if (r && r.vSenzaFile && r.vSenzaFile.length)
+    await mostraAvviso(
+      'V scritte nel piano senza vacanza nel file (' +
+        r.vSenzaFile.length +
+        ' giorni): lasciate come sono. Se la vacanza non c e piu, toglile a mano; se c e, aggiungila nella scheda Vacanze.\n\n' +
+        _vacElencoGiorni(r.vSenzaFile),
+      { titolo: 'Vacanze da controllare' },
     );
   if (r && r.nonToccati && r.nonToccati.length)
     await mostraAvviso(
