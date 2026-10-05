@@ -2965,13 +2965,29 @@ async function importaVacanzePiano(input) {
     }
     // CONFRONTO con l'archivio, persona per persona: si cambia solo cio che e diverso.
     // Le settimane uguali restano come sono (anche Provvisoria).
+    // le vacanze di OGNI persona del file, di qualsiasi settore: chi lavora in due settori
+    // (es. Papa Giacomo Aldo, Valet, nel file degli Slots) ha le settimane gia registrate
+    // dall altro file. Prima si guardava solo il settore aperto: la settimana risultava
+    // nuova, il database rifiutava il doppione e l import si fermava a meta (05.10)
+    const archivio =
+      (await secGet(
+        'piano_vacanze?anno=eq.' +
+          anno +
+          '&collaboratore=in.(' +
+          trovati.map((t) => encodeURIComponent(t.nome)).join(',') +
+          ')',
+      )) || [];
     const piano = [];
     const righeMsg = [];
     let nAgg = 0,
       nTolte = 0,
       nCamb = 0;
     trovati.forEach((t) => {
-      const vecchie = _pianoVacCache.filter((v) => v.collaboratore === t.nome && v.anno === anno);
+      const vecchie = archivio.filter((v) => v.collaboratore === t.nome && parseInt(v.anno) === anno);
+      // chi e di un altro settore: dal file di questo settore si aggiunge e si corregge,
+      // ma non si toglie (le sue settimane le decide anche il file del suo settore)
+      const info = _pianoCollabInfo(t.nome);
+      const diQui = !info || _pianoAppartieneAlReparto(info);
       const perSett = {};
       vecchie.forEach((v) => (perSett[v.settimana] = v));
       const agg = [];
@@ -2983,9 +2999,10 @@ async function importaVacanzePiano(input) {
         if (!v) agg.push({ w: parseInt(w), codice: c });
         else if (_vacCodice(v) !== c) camb.push({ v: v, da: _vacCodice(v), a: c });
       });
-      vecchie.forEach((v) => {
-        if (t.settimane[v.settimana] === undefined) tolte.push(v);
-      });
+      if (diQui)
+        vecchie.forEach((v) => {
+          if (t.settimane[v.settimana] === undefined) tolte.push(v);
+        });
       if (!agg.length && !tolte.length && !camb.length) return;
       piano.push({ nome: t.nome, agg, tolte, camb });
       nAgg += agg.length;
@@ -3031,24 +3048,55 @@ async function importaVacanzePiano(input) {
     }
     if (!(await chiediConferma(msg, { titolo: 'Importa vacanze', ok: 'Applica i cambiamenti', pericolo: false })))
       return;
+    // ogni scrittura per conto suo: un rifiuto non ferma le altre, e si dice quali
+    const nonFatte = [];
+    const prova = async (cosa, fn) => {
+      try {
+        await fn();
+      } catch (e) {
+        nonFatte.push(cosa + ': ' + String((e && e.message) || e).substring(0, 120));
+      }
+    };
     for (const p of piano) {
-      for (const v of p.tolte) await secDel('piano_vacanze', 'id=eq.' + v.id);
-      for (const x of p.camb) await secPatch('piano_vacanze', 'id=eq.' + x.v.id, { codice: x.a === 'V' ? null : x.a });
+      for (const v of p.tolte)
+        await prova(p.nome + ' sett. ' + v.settimana, () => secDel('piano_vacanze', 'id=eq.' + v.id));
+      for (const x of p.camb)
+        await prova(p.nome + ' sett. ' + x.v.settimana, () =>
+          secPatch('piano_vacanze', 'id=eq.' + x.v.id, { codice: x.a === 'V' ? null : x.a }),
+        );
       for (const x of p.agg)
-        await secPost('piano_vacanze', {
-          collaboratore: p.nome,
-          settimana: x.w,
-          anno: anno,
-          confermata: true,
-          codice: x.codice === 'V' ? null : x.codice,
-          operatore: getOperatore(),
-        });
+        await prova(p.nome + ' sett. ' + x.w, () =>
+          secPost('piano_vacanze', {
+            collaboratore: p.nome,
+            settimana: x.w,
+            anno: anno,
+            confermata: true,
+            codice: x.codice === 'V' ? null : x.codice,
+            operatore: getOperatore(),
+          }),
+        );
     }
+    if (nonFatte.length)
+      await mostraAvviso(
+        'Queste settimane NON sono state salvate (le altre si):\n\n' +
+          nonFatte.slice(0, 20).join('\n') +
+          (nonFatte.length > 20 ? '\n... e altre ' + (nonFatte.length - 20) : ''),
+        { titolo: 'Importa vacanze' },
+      );
     logAzione(
       'Vacanze importate',
       anno + ' · ' + nAgg + ' nuove, ' + nTolte + ' tolte, ' + nCamb + ' cambiate · ' + piano.length + ' collaboratori',
     );
-    toast('Vacanze aggiornate: ' + nAgg + ' nuove, ' + nTolte + ' tolte, ' + nCamb + ' cambiate');
+    toast(
+      'Vacanze aggiornate: ' +
+        nAgg +
+        ' nuove, ' +
+        nTolte +
+        ' tolte, ' +
+        nCamb +
+        ' cambiate' +
+        (nonFatte.length ? ' · ' + nonFatte.length + ' NON salvate (elenco nella finestra)' : ''),
+    );
     renderPiano();
   } catch (e) {
     console.error(e);
