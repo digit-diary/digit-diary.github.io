@@ -527,11 +527,10 @@ async function pianoMigliora() {
       (res.migliore ? '' : ' · non applicabile'),
   );
   if (!res.migliore || !res.cambi.length) {
-    await chiediModulo(
+    await mostraAvviso(
       riepilogo +
         '\n\nNessun miglioramento sicuro: il piano resta com e. (Si applica solo se nessuna regola peggiora e i posti scoperti non aumentano.)',
-      [],
-      { titolo: 'Migliora la bozza', ok: 'Chiudi', annulla: 'Chiudi' },
+      { titolo: 'Migliora la bozza', ok: 'Ho capito' },
     );
     return;
   }

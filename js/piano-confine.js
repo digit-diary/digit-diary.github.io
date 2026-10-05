@@ -229,17 +229,20 @@ async function pianoConfineCorreggi(ymB) {
     ymB + ' ' + _pianoReparto() + ' · legge ' + P.legge + '>' + D.legge + ' · ' + res.cambi.length + ' celle',
   );
   if (!res.migliore || !res.cambi.length || D.legge >= P.legge) {
-    await chiediModulo(
-      'Nessuna correzione sicura trovata spostando le celle generate dei primi 10 giorni (regole di legge nel mese: ' +
-        P.legge +
-        '). Restano da sistemare a mano: ' +
-        prima.lista
-          .slice(0, 6)
-          .map((v) => v.nome + ' ' + _pianoGgMm(v.data))
-          .join(', ') +
-        '.',
-      [],
-      { titolo: 'Correzione al confine', ok: 'Chiudi', annulla: 'Chiudi' },
+    // una sola finestra con un pulsante (prima: due "Chiudi" uguali)
+    const nomi = [...new Set(prima.lista.map((v) => v.nome + ' ' + _pianoGgMm(v.data)))];
+    await mostraAvviso(
+      'Il programma non ha trovato cambi sicuri: ogni spostamento delle celle generate nei primi 10 giorni avrebbe peggiorato un altra regola o lasciato un posto scoperto. Non ha cambiato niente.\n\n' +
+        'Da sistemare a mano (' +
+        nomi.length +
+        '):\n' +
+        nomi
+          .slice(0, 10)
+          .map((x) => '• ' + x)
+          .join('\n') +
+        (nomi.length > 10 ? '\n• e altri ' + (nomi.length - 10) : '') +
+        '\n\nIl motivo di ognuno (riposo corto, giorni di fila, 4+1+1) e nel riquadro "da ricontrollare" sopra il calendario: passando sul nome si va alla cella. Spesso sono celle scritte a mano o importate, che il programma non sposta mai.',
+      { titolo: 'Correzione al confine', ok: 'Ho capito' },
     );
     return;
   }
