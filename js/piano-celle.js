@@ -889,7 +889,83 @@ function _pianoMessaggioSiglaSbagliata(codice) {
     (vicina ? ' Forse intendevi "' + vicina + '"?' : '')
   );
 }
+// NON DISPONIBILITA (ND): la danno solo i JOLLY; i fissi non danno disponibilita, quindi
+// per loro l ND non si scrive. Per un jolly si sceglie se e un ND normale (chiesto
+// entro il 3 dal Diario o dato) o "chiamata ma non disponibile": allora la cella ha il
+// commento "Ex <turno di prima> - chiamata ma non disponibile - operatore" e il modulo
+// ND del mese lo riporta nelle osservazioni.
+function _pianoEJolly(nome) {
+  const info = _pianoCollabInfo(nome) || {};
+  return !!(info.is_jolly || String(info.impiego || '').toLowerCase() === 'jolly');
+}
 async function pianoSalvaCella(nome, dstr, codice) {
+  const cod = String(codice == null ? '' : codice)
+    .trim()
+    .toUpperCase();
+  const prima = (_pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr) || {}).codice || '';
+  if (cod !== 'ND' || prima === 'ND') return _pianoSalvaCellaBase(nome, dstr, codice);
+  if (!_pianoEJolly(nome)) {
+    toastErrore(
+      nome + ' e fisso: i fissi non danno disponibilita, quindi l ND non si mette (vale solo per i jolly).',
+      8000,
+    );
+    return false;
+  }
+  const sc = await chiediModulo(
+    'ND a ' + nome + ' il ' + dstr.split('-').reverse().join('.') + (prima ? ' (oggi ' + prima + ')' : '') + '.',
+    [
+      {
+        titolo: 'Tipo di non disponibilita',
+        campi: [
+          {
+            id: 'tipo',
+            tipo: 'scelta',
+            valore: 'normale',
+            opzioni: [
+              { valore: 'normale', etichetta: 'Non disponibilita data dal collaboratore' },
+              { valore: 'chiamata', etichetta: 'Chiamata ma non disponibile' },
+            ],
+          },
+        ],
+      },
+    ],
+    { titolo: 'Non disponibilita', ok: 'Salva' },
+  );
+  if (!sc) return false;
+  if (sc.tipo !== 'chiamata') return _pianoSalvaCellaBase(nome, dstr, 'ND');
+  return _pianoNdChiamata(nome, dstr);
+}
+// ND "chiamata ma non disponibile" (dal calendario o dalla Copertura malattia)
+async function _pianoNdChiamata(nome, dstr) {
+  if (!_pianoEJolly(nome)) {
+    toastErrore(nome + ' e fisso: l ND vale solo per i jolly.');
+    return false;
+  }
+  const r0 = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
+  const prima = r0 ? r0.codice : '';
+  const ok = await _pianoSalvaCellaBase(nome, dstr, 'ND');
+  if (ok === false) return false;
+  // la cella e davvero ND? (es. sovrascrittura di una protetta annullata)
+  const ora =
+    (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=eq.' + dstr + '&codice=eq.ND')) || [];
+  if (!ora.length) return false;
+  const commento = 'Ex ' + (prima || '-') + ' - chiamata ma non disponibile - ' + getOperatore();
+  try {
+    await secPatch('piano', 'collaboratore=eq.' + encodeURIComponent(nome) + '&data=eq.' + dstr + '&codice=eq.ND', {
+      commento: commento,
+      updated_at: new Date().toISOString(),
+    });
+    const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
+    if (r) r.commento = commento;
+    logAzione('Piano: ND chiamata ma non disponibile', nome + ' ' + dstr + ' (era ' + (prima || 'vuoto') + ')');
+    if (typeof ndSincronizzaPersona === 'function') await ndSincronizzaPersona(nome, dstr.substring(0, 7));
+    renderPiano();
+  } catch (e) {
+    toastErrore('ND scritto, ma il commento non e stato salvato: ' + (e.message || e));
+  }
+  return true;
+}
+async function _pianoSalvaCellaBase(nome, dstr, codice) {
   if (!puoGestirePiano()) return false;
   // giorno chiuso: si procede solo con lo sblocco motivato
   if (!(await _pianoConsentiScrittura(dstr))) return false;

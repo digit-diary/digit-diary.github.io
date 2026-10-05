@@ -1613,6 +1613,12 @@ async function cercaSostitutiMalattia() {
         '</td><td style="text-align:left;color:var(--c-verde,#2c6e49);font-weight:700">' +
         escP(d.sostituto) +
         (d.era ? ' <span style="color:var(--muted);font-weight:400">(era ' + escP(d.era) + ')</span>' : '') +
+        // jolly chiamato che non e disponibile: ND con commento e nuova ricerca
+        (_pianoEJolly(d.sostituto)
+          ? ' <button class="btn-act" style="font-size:var(--fs-xs,.75rem);padding:1px 6px;margin-left:6px" title="Il jolly e stato chiamato ma non e disponibile: si scrive ND con il commento e si cerca un altro sostituto" onclick="malNdChiamata(' +
+            d.g +
+            ')">Chiamato, non disponibile</button>'
+          : '') +
         (d.catena
           ? '<div style="font-weight:400;color:var(--c-oro,#8b6914);font-size:var(--fs-sm,.8125rem)">' +
             escP(descCatena(d)) +
@@ -1635,6 +1641,28 @@ async function cercaSostitutiMalattia() {
     '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 14px;margin-top:4px" onclick="stampaPropostaCopertura()">Stampa proposta</button>';
   out.innerHTML = h;
   document.getElementById('mal-btn-conferma').style.display = coperti || giorni.some((d) => d.codice) ? '' : 'none';
+}
+async function malNdChiamata(g) {
+  const m = _malattiaPiano;
+  const d = m && m.giorni.find((x) => x.g === g);
+  if (!d || !d.sostituto) return;
+  const dstr = _pianoMeseSel + '-' + String(g).padStart(2, '0');
+  if (
+    !(await chiediConferma(
+      d.sostituto +
+        ' e stato chiamato per il ' +
+        g +
+        ' ma non e disponibile: scrivo ND con il commento e cerco un altro sostituto?',
+    ))
+  )
+    return;
+  if ((await _pianoNdChiamata(d.sostituto, dstr)) === false) return;
+  _pianoRighe = await _pianoCaricaMeseSettore(
+    _pianoMeseSel + '-01',
+    _pianoMeseSel + '-' + String(_pianoUltimoGiorno(_pianoMeseSel)).padStart(2, '0'),
+    _pianoReparto(),
+  );
+  await cercaSostitutiMalattia();
 }
 // PDF della proposta di copertura: lista giorni, sostituti e mosse a catena,
 // da stampare e discutere prima di confermare

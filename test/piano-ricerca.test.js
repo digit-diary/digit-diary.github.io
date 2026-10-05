@@ -133,6 +133,27 @@ ok(r4.cambi.length <= 8, 'cambi limitati: ' + r4.cambi.length + ' celle toccate'
 ok(r4.dopo.scoperti === 0, 'sempre tutto coperto');
 ok(persone.reduce((t, n) => t + violazioni(n, r4.stato[n]), 0) === 0, 'sempre nessuna regola violata');
 
+console.log('== mai doppioni oltre il fabbisogno ==');
+// 5 persone che vogliono 6 turni ciascuna (30) ma il fabbisogno ne offre 28: prima la
+// ricerca poteva aggiungere un secondo M nello stesso giorno per dare ore a qualcuno
+const r5 = R.cerca(problema(), { seme: 9 }, 40000);
+const doppi = giorni.filter(
+  (d) =>
+    persone.filter((n) => r5.stato[n][d] === 'M').length > 1 ||
+    persone.filter((n) => r5.stato[n][d] === 'N').length > 1,
+);
+ok(doppi.length === 0, 'nessun giorno con piu persone del fabbisogno (' + doppi.join(', ') + ')');
+ok(r5.dopo.eccesso === 0, 'eccesso finale 0 (' + r5.dopo.eccesso + ')');
+// partenza con un doppione: la ricerca lo toglie, non ne aggiunge
+const statoDoppio = JSON.parse(JSON.stringify(r1.stato));
+const libero = persone.find((n) => statoDoppio[n]['2026-11-04'] === 'C');
+statoDoppio[libero]['2026-11-04'] = 'M';
+const r6 = R.cerca(problema({ stato: statoDoppio }), { seme: 4 }, 30000);
+ok(
+  r6.prima.eccesso >= 1 && r6.dopo.eccesso <= r6.prima.eccesso,
+  'un doppione di partenza non aumenta (' + r6.prima.eccesso + ' -> ' + r6.dopo.eccesso + ')',
+);
+
 console.log('== non peggiora mai ==');
 ok(
   r1.dopo.punteggio <= r1.prima.punteggio && r2.dopo.punteggio <= r2.prima.punteggio,

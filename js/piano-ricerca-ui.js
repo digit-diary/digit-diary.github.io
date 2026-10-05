@@ -438,6 +438,8 @@ async function pianoRicercaCalcola(secondi, onPasso, opz) {
   const dopo = _ricercaMisuraUfficiale(righeDopo, fabbOriginale);
   // si usa solo se nessuna regola peggiora e i posti scoperti non aumentano
   const migliore =
+    // mai persone in piu del fabbisogno rispetto a prima (doppioni)
+    (ris.dopo.eccesso || 0) <= (ris.prima.eccesso || 0) &&
     dopo.legge <= prima.legge &&
     dopo.regole <= prima.regole &&
     dopo.scoperti <= prima.scoperti &&
@@ -452,6 +454,7 @@ async function pianoRicercaCalcola(secondi, onPasso, opz) {
     cambi: ris.cambi,
     iterazioni: ris.iterazioni,
     punteggio: { prima: ris.prima.punteggio, dopo: ris.dopo.punteggio },
+    eccesso: { prima: ris.prima.eccesso || 0, dopo: ris.dopo.eccesso || 0 },
     migliore: migliore,
   };
 }
@@ -524,6 +527,7 @@ async function pianoMigliora() {
     riga('Altre regole violate', P.regole - P.legge, D.regole - D.legge) +
     riga('Posti del fabbisogno scoperti', P.scoperti, D.scoperti) +
     riga('Persone sotto il minimo di ore', P.oreSotto, D.oreSotto) +
+    riga('Turni oltre il fabbisogno (doppioni)', res.eccesso.prima, res.eccesso.dopo) +
     '\n• Celle cambiate: ' +
     res.cambi.length;
   logAzione(

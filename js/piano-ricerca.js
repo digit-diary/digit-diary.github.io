@@ -31,6 +31,11 @@
  *   fissi         { nome: { dstr: codice } } (facoltativo) celle obbligate (formazioni)
  * Opzioni:
  *   pesoScoperto  punti per ogni posto del fabbisogno senza nessuno (default 300)
+ *   pesoEccesso   punti per ogni persona IN PIU del fabbisogno su un turno (default
+ *                 1.000.000 = vietato): prima la ricerca aggiungeva turni gia coperti per
+ *                 dare ore a chi era sotto il minimo del mese (40 doppioni in un minuto su
+ *                 novembre Slots). Le ore mancanti con un fabbisogno pieno sono un tema di
+ *                 organico, non si risolvono con doppioni.
  *   pesoCambio    punti per ogni cella diversa dal piano di partenza (default 0;
  *                 per le proposte su un piano gia sistemato: meno cambi possibile)
  *   maxScoperti   il risultato non puo lasciare piu posti scoperti di cosi
@@ -59,7 +64,7 @@
 
   function crea(problema, opzioni) {
     const P = problema;
-    const o = Object.assign({ pesoScoperto: 300, pesoCambio: 0, seme: 1 }, opzioni || {});
+    const o = Object.assign({ pesoScoperto: 300, pesoEccesso: 1000000, pesoCambio: 0, seme: 1 }, opzioni || {});
     const rnd = casuale(o.seme);
     const scegli = (arr) => arr[Math.floor(rnd() * arr.length)];
     const giorni = P.giorni.slice();
@@ -100,6 +105,13 @@
       Object.keys(f).forEach((c) => (s += Math.max(0, (f[c] || 0) - (assegnati[d][c] || 0))));
       return s;
     };
+    // persone in piu del fabbisogno sui turni del fabbisogno di quel giorno
+    const eccessoGiorno = (d) => {
+      let e = 0;
+      const f = fab[d] || {};
+      Object.keys(f).forEach((c) => (e += Math.max(0, (assegnati[d][c] || 0) - (f[c] || 0))));
+      return e;
+    };
     const cambiPersona = (n) => {
       if (!o.pesoCambio) return 0;
       let k = 0;
@@ -116,18 +128,21 @@
     const costoP = {};
     const costoG = {};
     const scopG = {};
+    const eccG = {};
     // regole sul mese intero (facoltative): ricalcolate a ogni mossa
     let costoM = P.costoMese ? P.costoMese(stato) : 0;
     persone.forEach((n) => (costoP[n] = P.costoPersona(n, stato[n]) + o.pesoCambio * cambiPersona(n)));
     giorni.forEach((d) => {
       costoG[d] = P.costoGiorno ? P.costoGiorno(d, perNomeGiorno(d)) : 0;
       scopG[d] = scopertiGiorno(d);
+      eccG[d] = eccessoGiorno(d);
     });
     const somma = (obj) => Object.keys(obj).reduce((t, k) => t + obj[k], 0);
-    let totale = somma(costoP) + somma(costoG) + costoM + o.pesoScoperto * somma(scopG);
+    let totale = somma(costoP) + somma(costoG) + costoM + o.pesoScoperto * somma(scopG) + o.pesoEccesso * somma(eccG);
     const misura = () => ({
       punteggio: totale,
       scoperti: somma(scopG),
+      eccesso: somma(eccG),
       regole: somma(costoP) + somma(costoG) + costoM,
     });
     const iniziale = misura();
@@ -145,6 +160,7 @@
       const primaP = nomi.map((n) => costoP[n]);
       const primaG = gg.map((d) => costoG[d]);
       const primaS = gg.map((d) => scopG[d]);
+      const primaE = gg.map((d) => eccG[d]);
       // applica
       mossa.forEach((m, i) => {
         const v = vecchi[i];
@@ -155,11 +171,16 @@
       const dopoP = nomi.map((n) => P.costoPersona(n, stato[n]) + o.pesoCambio * cambiPersona(n));
       const dopoG = gg.map((d) => (P.costoGiorno ? P.costoGiorno(d, perNomeGiorno(d)) : 0));
       const dopoS = gg.map((d) => scopertiGiorno(d));
+      const dopoE = gg.map((d) => eccessoGiorno(d));
       // regole del mese: solo se la mossa tocca chi conta (es. le funzioni con un limite nel mese)
       const dopoM = P.costoMese && (!P.toccaMese || nomi.some((n) => P.toccaMese(n))) ? P.costoMese(stato) : costoM;
       let delta = dopoM - costoM;
       nomi.forEach((n, i) => (delta += dopoP[i] - primaP[i]));
-      gg.forEach((d, i) => (delta += dopoG[i] - primaG[i] + o.pesoScoperto * (dopoS[i] - primaS[i])));
+      gg.forEach(
+        (d, i) =>
+          (delta +=
+            dopoG[i] - primaG[i] + o.pesoScoperto * (dopoS[i] - primaS[i]) + o.pesoEccesso * (dopoE[i] - primaE[i])),
+      );
       const tieni = delta <= 0 || (temperatura > 0 && rnd() < Math.exp(-delta / temperatura));
       if (!tieni) {
         mossa.forEach((m, i) => {
@@ -174,6 +195,7 @@
       gg.forEach((d, i) => {
         costoG[d] = dopoG[i];
         scopG[d] = dopoS[i];
+        eccG[d] = dopoE[i];
       });
       totale += delta;
       accettate++;
@@ -312,9 +334,10 @@
       giorni.forEach((d) => {
         costoG[d] = P.costoGiorno ? P.costoGiorno(d, perNomeGiorno(d)) : 0;
         scopG[d] = scopertiGiorno(d);
+        eccG[d] = eccessoGiorno(d);
       });
       costoM = P.costoMese ? P.costoMese(stato) : 0;
-      totale = somma(costoP) + somma(costoG) + costoM + o.pesoScoperto * somma(scopG);
+      totale = somma(costoP) + somma(costoG) + costoM + o.pesoScoperto * somma(scopG) + o.pesoEccesso * somma(eccG);
     }
     // RIFINITURA: ogni cella cambiata prova a tornare com era (da sola, poi insieme a
     // un altra cella cambiata dello stesso giorno, come negli scambi): resta solo se
@@ -388,6 +411,7 @@
       let regole = P.costoMese ? P.costoMese(s) : 0;
       persone.forEach((n) => (regole += P.costoPersona(n, s[n])));
       let scop = 0;
+      let ecc = 0;
       giorni.forEach((d) => {
         const x = {};
         persone.forEach((n) => (x[n] = s[n][d] || ''));
@@ -399,6 +423,7 @@
           if (c) cnt[c] = (cnt[c] || 0) + 1;
         });
         Object.keys(f).forEach((c) => (scop += Math.max(0, (f[c] || 0) - (cnt[c] || 0))));
+        Object.keys(f).forEach((c) => (ecc += Math.max(0, (cnt[c] || 0) - (f[c] || 0))));
       });
       return {
         stato: s,
@@ -406,8 +431,9 @@
         prima: iniziale,
         dopo: {
           scoperti: scop,
+          eccesso: ecc,
           regole: regole,
-          punteggio: regole + o.pesoScoperto * scop + o.pesoCambio * cambi.length,
+          punteggio: regole + o.pesoScoperto * scop + o.pesoEccesso * ecc + o.pesoCambio * cambi.length,
         },
         iterazioni: iterazioni,
         accettate: accettate,

@@ -2161,9 +2161,34 @@ function _renderFormazioneConfig() {
         '<p style="font-size:var(--fs-sm,.8125rem);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:12px 0 6px">Competenze ' +
         escP(repartoLabel(rep)) +
         '</p>';
-      (cfgC[rep] || []).forEach((k, i) => {
+      const lista = cfgC[rep] || [];
+      // elenco fuori ordine (es. un L1 aggiunto dopo un L2 prima della v376): si rimette
+      // in ordine di livello con un clic
+      if (_compFuoriOrdine(lista))
         html +=
-          '<div class="tipo-item"><div class="tipo-item-name">' +
+          '<button class="btn-act" style="margin:0 0 6px" onclick="ordinaCompetenzeCfg(\'' +
+          rep +
+          '\')">Ordina per livello (L1, L2, ...)</button>';
+      lista.forEach((k, i) => {
+        const su = i > 0 && lista[i - 1].livello === k.livello;
+        const giu = i < lista.length - 1 && lista[i + 1].livello === k.livello;
+        const freccia = (dir, attiva, sim) =>
+          '<button class="btn-del-tipo" style="margin-right:4px;padding:2px 8px' +
+          (attiva ? '' : ';visibility:hidden') +
+          '" title="Sposta fra le competenze dello stesso livello" onclick="spostaCompetenzaCfg(\'' +
+          rep +
+          "'," +
+          i +
+          ',' +
+          dir +
+          ')">' +
+          sim +
+          '</button>';
+        html +=
+          '<div class="tipo-item">' +
+          freccia(-1, su, '&#9650;') +
+          freccia(1, giu, '&#9660;') +
+          '<div class="tipo-item-name">' +
           escP(k.label) +
           ' <span class="tipo-item-default">(L' +
           k.livello +
@@ -2365,6 +2390,37 @@ async function modificaNotificheCfg(val) {
       (cfg.notifiche === 'tutti' ? 'annuncio a tutti' : cfg.notifiche === 'off' ? 'disattivate' : 'privato'),
   );
 }
+// ORDINE DELLE COMPETENZE: sempre per livello (L1, L2, ...); dentro lo stesso livello
+// l ordine lo sceglie l amministratore con le frecce
+function _compOrdinate(lista) {
+  return lista
+    .map((k, i) => ({ k: k, i: i }))
+    .sort((a, b) => (parseInt(a.k.livello) || 0) - (parseInt(b.k.livello) || 0) || a.i - b.i)
+    .map((x) => x.k);
+}
+function _compFuoriOrdine(lista) {
+  return lista.some((k, i) => i > 0 && (parseInt(k.livello) || 0) < (parseInt(lista[i - 1].livello) || 0));
+}
+async function ordinaCompetenzeCfg(rep) {
+  if (!_soloAdminCfg()) return;
+  const cfg = getCompetenzeConfigAll();
+  cfg[rep] = _compOrdinate(cfg[rep] || []);
+  await saveCompetenzeConfig(cfg);
+  logAzione('Competenze ordinate per livello', rep);
+  renderFormazione();
+}
+async function spostaCompetenzaCfg(rep, idx, dir) {
+  if (!_soloAdminCfg()) return;
+  const cfg = getCompetenzeConfigAll();
+  const l = (cfg[rep] || []).slice();
+  const j = idx + dir;
+  if (!l[idx] || !l[j] || l[j].livello !== l[idx].livello) return;
+  [l[idx], l[j]] = [l[j], l[idx]];
+  cfg[rep] = l;
+  await saveCompetenzeConfig(cfg);
+  logAzione('Competenza spostata', rep + ': ' + l[j].label);
+  renderFormazione();
+}
 async function aggiungiCompetenzaCfg(rep) {
   if (!_soloAdminCfg()) return;
   const nome = (document.getElementById('cfg-comp-nome-' + rep) || {}).value.trim();
@@ -2382,7 +2438,8 @@ async function aggiungiCompetenzaCfg(rep) {
     toast('Competenza già esistente');
     return;
   }
-  cfg[rep] = [...cfg[rep], { key, label: nome, livello: lv }];
+  // in ordine di livello: la nuova va dopo l ultima del suo livello (v376)
+  cfg[rep] = _compOrdinate([...cfg[rep], { key, label: nome, livello: lv }]);
   await saveCompetenzeConfig(cfg);
   logAzione('Competenza config aggiunta', rep + ': ' + nome + ' (L' + lv + ')');
   renderFormazione();

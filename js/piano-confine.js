@@ -75,7 +75,16 @@ async function _pianoConfineCalcola(ymA, rep) {
       return;
     }
     con
-      .filter((v) => v.giorno && v.giorno <= 7 && _ricercaRegolaDiLegge(v.msg) && !senza.has(chiave(v)))
+      // solo giorni da oggi in poi: un giorno passato e un documento, non si corregge
+      // (es. il 5.10 non si segnala piu l 1.10)
+      .filter(
+        (v) =>
+          v.giorno &&
+          v.giorno <= 7 &&
+          ymB + '-' + String(v.giorno).padStart(2, '0') >= oggiLocale() &&
+          _ricercaRegolaDiLegge(v.msg) &&
+          !senza.has(chiave(v)),
+      )
       .forEach((v) =>
         lista.push({ nome: nome, data: ymB + '-' + String(v.giorno).padStart(2, '0'), giorno: v.giorno, msg: v.msg }),
       );
