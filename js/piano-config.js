@@ -2172,15 +2172,22 @@ async function importaPianoExcel(input) {
         (aggiorna ? ', ' + aggiornate + ' corrette' : '') +
         (nTenute ? ', ' + nTenute + ' tenute come erano' : ''),
     );
+    _pianoViolCelle = {};
+    _pianoViolLista = null;
+    const fatto = renderPiano();
     setTimeout(async () => {
       await _pianoProponiCertificazioniBulk(
         nuove.map((x) => ({ nome: x.collaboratore, codice: x.codice, commento: x.commento || '' })),
       );
       await controllaFormazioniCompletate(true);
+      // CONTROLLO DELLE REGOLE del mese importato (ogni settore): il file e il piano
+      // ufficiale e si importa com e; qui si dice subito cosa non rispetta le regole
+      try {
+        await fatto;
+      } catch (e) {}
+      if (typeof pianoRiepilogoViolazioni === 'function')
+        await pianoRiepilogoViolazioni(ym, 'Controllo del piano importato');
     }, 400);
-    _pianoViolCelle = {};
-    _pianoViolLista = null;
-    renderPiano();
   } catch (e) {
     console.error(e);
     toast('Errore lettura file piano');

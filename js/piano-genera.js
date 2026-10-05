@@ -907,6 +907,66 @@ function validaPiano() {
   renderPiano();
 }
 
+// RIEPILOGO DELLE VIOLAZIONI del mese aperto, per tipo (dopo l import da Excel, in
+// ogni settore): una finestra con i numeri e "Mostra nel calendario", che evidenzia
+// le celle come Valida regole. Conta anche la fine del mese prima (riposo fra il 31
+// e l 1, giorni di fila, 4+1+1).
+const _PIANO_TIPI_VIOLAZIONE = [
+  ['riposo sotto il minimo fra due turni', /di riposo dopo/],
+  ['troppi giorni lavorativi di fila', /giorni lavorativi consecutivi/],
+  ['riposo singolo dopo 4 o piu giorni (4+1+1)', /riposo singolo dopo/],
+  ['troppe ore nella settimana', /lavorate nella settimana/],
+  ['riposo attorno alla domenica o domeniche libere', /domenica/i],
+  ['ore del mese fuori tolleranza', /ore mese/],
+  ['idoneita, accompagnamento e regole del settore', /./],
+];
+async function pianoRiepilogoViolazioni(ym, titolo) {
+  if (_pianoMeseSel !== ym) return;
+  const r = _pianoCalcolaViolazioni();
+  if (!r.lista.length) {
+    toast('Controllo delle regole: nessuna violazione in ' + ym);
+    return;
+  }
+  const conta = {};
+  r.lista.forEach((v) => {
+    const t = _PIANO_TIPI_VIOLAZIONE.find(([, re]) => re.test(v.msg));
+    conta[t[0]] = (conta[t[0]] || 0) + 1;
+  });
+  const perPersona = {};
+  r.lista.forEach((v) => (perPersona[v.nome] = (perPersona[v.nome] || 0) + 1));
+  const persone = Object.keys(perPersona).length;
+  const righe = _PIANO_TIPI_VIOLAZIONE.filter(([et]) => conta[et]).map(([et]) => '• ' + conta[et] + ' ' + et);
+  const chi = Object.entries(perPersona)
+    .sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]))
+    .slice(0, 8)
+    .map(([n, k]) => n + ' (' + k + ')');
+  const meseNome =
+    ((typeof MESI_FULL !== 'undefined' && MESI_FULL[parseInt(ym.split('-')[1]) - 1]) || ym) + ' ' + ym.split('-')[0];
+  const vedi = await chiediConferma(
+    repartoLabel(_pianoReparto()) +
+      ', ' +
+      meseNome +
+      ': ' +
+      r.lista.length +
+      (r.lista.length === 1 ? ' regola non rispettata' : ' regole non rispettate') +
+      ' (' +
+      persone +
+      (persone === 1 ? ' persona' : ' persone') +
+      '):\n' +
+      righe.join('\n') +
+      '\n\nPiu coinvolti: ' +
+      chi.join(', ') +
+      (persone > chi.length ? ' e altri ' + (persone - chi.length) : '') +
+      '.\n\nCon "Mostra nel calendario" le celle si colorano in rosso e sotto compare l elenco con nome, giorno e motivo. Il piano e stato importato com e: il programma non sposta le celle importate.',
+    { titolo: titolo || 'Controllo delle regole', ok: 'Mostra nel calendario', annulla: 'Piu tardi' },
+  );
+  if (!vedi || _pianoMeseSel !== ym) return;
+  _pianoViolCelle = r.celle;
+  _pianoViolLista = r.lista.sort((a, b) => a.nome.localeCompare(b.nome) || a.giorno - b.giorno);
+  if (typeof pianoCambiaTab === 'function' && _pianoTab !== 'calendario') pianoCambiaTab('calendario');
+  else renderPiano();
+}
+
 function _pianoRenderViolazioni() {
   const el = document.getElementById('piano-violazioni');
   if (!el || _pianoViolLista === null) return;
