@@ -163,7 +163,7 @@ function _finestraModulo(testo, gruppi, opz) {
         } else {
           if (cp.etichetta) riga.appendChild(document.createTextNode(cp.etichetta));
           const inp = document.createElement('input');
-          inp.type = 'text';
+          inp.type = cp.tipo === 'data' ? 'date' : 'text';
           inp.className = 'finestra-campo';
           inp.style.cssText = 'width:' + (cp.larghezza || 80) + 'px;margin:0';
           inp.placeholder = cp.segnaposto || '';

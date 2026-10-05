@@ -1185,6 +1185,8 @@ async function _renderPianoVacanzeTab() {
             escP(_vacCodice(v)) +
             '</span> ' +
             escP(_vacDescrSigla(_vacCodice(v)))) +
+        (_vacDalAlTesto(v) ? ' <strong>' + escP(_vacDalAlTesto(v)) + '</strong>' : '') +
+        (v.nota ? '<div style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">' + escP(v.nota) + '</div>' : '') +
         '</td>';
       h +=
         '<td>' +
@@ -2155,22 +2157,80 @@ async function modificaVacanza(id) {
   if (!puoGestirePiano()) return;
   const v = _pianoVacCache.find((x) => x.id === id);
   if (!v) return;
-  const risp = await chiediTesto('Nuova settimana per ' + v.collaboratore + ' (1-53):', String(v.settimana));
-  if (risp === null) return;
-  const sett = parseInt(risp);
+  // settimana, giorni precisi (dal / al: per PC, MI, MT... che non durano tutta la
+  // settimana; vuoti = tutta la settimana) e nota
+  const anno = parseInt(v.anno) || window._pianoVacAnno;
+  const r = await chiediModulo(
+    v.collaboratore + ' · ' + (_vacEVacanza(v) ? 'Vacanza' : _vacCodice(v) + ' ' + _vacDescrSigla(_vacCodice(v))),
+    [
+      { titolo: 'Settimana', campi: [{ id: 'sett', valore: String(v.settimana), larghezza: 60 }] },
+      {
+        titolo: 'Giorni',
+        nota: 'Solo se non e tutta la settimana: dal / al (dentro la settimana). Vuoti = tutta la settimana.',
+        campi: [
+          {
+            id: 'dal',
+            tipo: 'data',
+            etichetta: 'dal',
+            valore: v.dal ? String(v.dal).substring(0, 10) : '',
+            larghezza: 150,
+          },
+          {
+            id: 'al',
+            tipo: 'data',
+            etichetta: 'al',
+            valore: v.al ? String(v.al).substring(0, 10) : '',
+            larghezza: 150,
+          },
+        ],
+      },
+      { titolo: 'Nota', campi: [{ id: 'nota', valore: v.nota || '', larghezza: 420 }] },
+    ],
+    { titolo: 'Modifica vacanza', ok: 'Salva' },
+  );
+  if (!r) return;
+  const sett = parseInt(r.sett);
   if (isNaN(sett) || sett < 1 || sett > 53) {
     toast('Settimana non valida (1-53)');
     return;
   }
-  if (sett === v.settimana) return;
-  if (_pianoVacCache.find((x) => x.collaboratore === v.collaboratore && x.settimana === sett && x.id !== id)) {
+  if (
+    sett !== v.settimana &&
+    _pianoVacCache.find((x) => x.collaboratore === v.collaboratore && x.settimana === sett && x.id !== id)
+  ) {
     toast('Settimana ' + sett + ' già assegnata a questo collaboratore');
     return;
   }
+  const giorniS = _pianoGiorniSettimana(anno, sett);
+  const dal = r.dal || null;
+  const al = r.al || null;
+  if (
+    (dal && (dal < giorniS[0] || dal > giorniS[6])) ||
+    (al && (al < giorniS[0] || al > giorniS[6])) ||
+    (dal && al && al < dal)
+  ) {
+    toast(
+      'Dal / al devono stare nella settimana ' + sett + ' (' + _vacDateSettimana(anno, sett) + '), dal prima di al',
+    );
+    return;
+  }
   try {
-    await secPatch('piano_vacanze', 'id=eq.' + id, { settimana: sett });
-    logAzione('Vacanza modificata', v.collaboratore + ' settimana ' + v.settimana + ' → ' + sett);
-    toast('Vacanza aggiornata a settimana ' + sett);
+    await secPatch('piano_vacanze', 'id=eq.' + id, {
+      settimana: sett,
+      dal: dal === giorniS[0] ? null : dal,
+      al: al === giorniS[6] ? null : al,
+      nota: String(r.nota || '').trim() || null,
+    });
+    logAzione(
+      'Vacanza modificata',
+      v.collaboratore +
+        ' settimana ' +
+        v.settimana +
+        ' → ' +
+        sett +
+        (dal || al ? ' (' + (dal || '') + ' / ' + (al || '') + ')' : ''),
+    );
+    toast('Vacanza aggiornata: riapplica le vacanze al mese per aggiornare il piano');
     renderPiano();
   } catch (e) {
     toast('Errore modifica vacanza');
@@ -2216,6 +2276,80 @@ async function eliminaTutteVacanze() {
   }
 }
 
+// GIORNI PRECISI DI UNA SETTIMANA DEL FILE VACANZE (05.10, richiesta del titolare):
+// le assenze che non durano tutta la settimana (PC, MI, MT...) hanno le date nel
+// commento della cella del file ("27-28 APRILE PC", "PROTEZIONE CIVILE 31.03-13.04",
+// "24-27.06 CONGEDO MATRIMONIO", "DAL 14.02.2026", "7-18 SETTEMBRE"). Si leggono come
+// dal / al (solo la parte dentro la settimana) e si correggono dalla scheda Vacanze.
+const _VAC_MESI = [
+  'GENNAIO',
+  'FEBBRAIO',
+  'MARZO',
+  'APRILE',
+  'MAGGIO',
+  'GIUGNO',
+  'LUGLIO',
+  'AGOSTO',
+  'SETTEMBRE',
+  'OTTOBRE',
+  'NOVEMBRE',
+  'DICEMBRE',
+];
+function _vacDateDaNota(nota, anno, settimana) {
+  const t = String(nota || '').toUpperCase();
+  if (!t) return null;
+  const iso = (g, m, a) => {
+    const aa = a ? (String(a).length === 2 ? 2000 + parseInt(a) : parseInt(a)) : anno;
+    const gi = parseInt(g);
+    const mi = parseInt(m);
+    if (!(gi >= 1 && gi <= 31 && mi >= 1 && mi <= 12)) return null;
+    return aa + '-' + String(mi).padStart(2, '0') + '-' + String(gi).padStart(2, '0');
+  };
+  let da = null;
+  let a = null;
+  let m;
+  const meseRe = '(' + _VAC_MESI.join('|') + ')';
+  if ((m = t.match(/(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?\s*[-–]\s*(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?/))) {
+    da = iso(m[1], m[2], m[3]);
+    a = iso(m[4], m[5], m[6] || m[3]);
+  } else if ((m = t.match(/(\d{1,2})\s*[-–]\s*(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?/))) {
+    da = iso(m[1], m[3], m[4]);
+    a = iso(m[2], m[3], m[4]);
+  } else if ((m = t.match(new RegExp('(\\d{1,2})\\s*[-–]\\s*(\\d{1,2})\\s+' + meseRe)))) {
+    const mi = _VAC_MESI.indexOf(m[3]) + 1;
+    da = iso(m[1], mi);
+    a = iso(m[2], mi);
+  } else if ((m = t.match(/\b(?:DAL|DA\s+[A-Z]+)\s+(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?/))) {
+    da = iso(m[1], m[2], m[3]);
+  } else if ((m = t.match(/\b(?:AL|FINO\s+AL)\s+(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?/))) {
+    a = iso(m[1], m[2], m[3]);
+  }
+  if (!da && !a) return null;
+  if (da && a && a < da) return null;
+  // solo la parte dentro la settimana; tutta la settimana = nessun limite
+  const sett = _pianoGiorniSettimana(anno, settimana);
+  const dentro = sett.filter((d) => (!da || d >= da) && (!a || d <= a));
+  if (!dentro.length) return { fuori: true };
+  const dal = dentro[0] === sett[0] ? null : dentro[0];
+  const al = dentro[dentro.length - 1] === sett[6] ? null : dentro[dentro.length - 1];
+  return dal || al ? { dal: dal, al: al } : null;
+}
+// giorni del piano di una riga di piano_vacanze (dal / al se ci sono)
+function _vacGiorni(v, annoDefault) {
+  const dal = v.dal ? String(v.dal).substring(0, 10) : '';
+  const al = v.al ? String(v.al).substring(0, 10) : '';
+  return _pianoGiorniSettimana(parseInt(v.anno) || annoDefault, v.settimana).filter(
+    (d) => (!dal || d >= dal) && (!al || d <= al),
+  );
+}
+// "27.04-28.04" / "dal 14.02" / "" per l elenco
+function _vacDalAlTesto(v) {
+  const f = (x) => String(x).substring(8, 10) + '.' + String(x).substring(5, 7);
+  if (v.dal && v.al) return f(v.dal) + '-' + f(v.al);
+  if (v.dal) return 'dal ' + f(v.dal);
+  if (v.al) return 'fino al ' + f(v.al);
+  return '';
+}
 function _pianoGiorniSettimana(anno, settimana) {
   // ISO 8601: settimana 1 = quella che contiene il 4 gennaio; lunedì = primo giorno
   const d = new Date(anno, 0, 4, 12);
@@ -2275,7 +2409,7 @@ async function _applicaVacanzeMese(interattivo) {
     if (!nomiRep.includes(v.collaboratore)) return;
     if (!v.confermata) return; // provvisoria: resta in elenco, non va nel piano
     const sigla = _vacCodice(v);
-    _pianoGiorniSettimana(parseInt(v.anno) || anno, v.settimana).forEach((dstr) => {
+    _vacGiorni(v, anno).forEach((dstr) => {
       const p = dstr.split('-');
       if (parseInt(p[0]) !== anno || parseInt(p[1]) !== mese) return;
       if (!_pianoOperativoIl(v.collaboratore, dstr)) return; // fuori dal rapporto: niente V
@@ -2815,29 +2949,51 @@ function _vacLeggiCella(testo) {
 function _vacRigheDaExcel(wb) {
   // il foglio giusto e' quello che contiene l'intestazione COGNOME/NOME
   let rows = null;
+  let ws = null;
+  const leggiFoglio = (w) => XLSX.utils.sheet_to_json(w, { header: 1, defval: '', blankrows: true });
   for (const sn of wb.SheetNames) {
-    const r = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' });
+    const r = leggiFoglio(wb.Sheets[sn]);
     if (r.some((x) => /cognome/i.test(String(x[0] || '')) && /nome/i.test(String(x[1] || '')))) {
       rows = r;
+      ws = wb.Sheets[sn];
       break;
     }
   }
-  if (!rows) rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+  if (!rows) {
+    ws = wb.Sheets[wb.SheetNames[0]];
+    rows = leggiFoglio(ws);
+  }
+  // COMMENTI DELLE CELLE (note di Excel): date precise e note della settimana. La prima
+  // riga del commento e l autore ("OpTable:"), si toglie
+  const inizio = ws && ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']).s : { r: 0, c: 0 };
+  const commento = (i, col) => {
+    const cell = ws && ws[XLSX.utils.encode_cell({ r: inizio.r + i, c: inizio.c + col })];
+    if (!cell || !cell.c || !cell.c.length) return '';
+    return cell.c
+      .map((x) => String(x.t || ''))
+      .join(' ')
+      .replace(/^[^\n:]{1,40}:\s*\n?/, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
   const out = [];
   const ignoti = [];
-  rows.forEach((r) => {
+  const noteSenzaX = []; // commenti su settimane senza X (richieste, cambi): da controllare
+  rows.forEach((r, i) => {
     const cognome = String(r[0] || '').trim();
     const nome = String(r[1] || '').trim();
     if (!cognome || /cognome/i.test(cognome)) return;
     const sett = [];
     for (let w = 1; w <= 52; w++) {
       const c = _vacLeggiCella(r[4 + w]);
+      const nota = commento(i, 4 + w);
       if (c && c.ignoto) ignoti.push('"' + c.ignoto + '" per ' + (cognome + ' ' + nome).trim() + ', settimana ' + w);
-      else if (c) sett.push({ w: w, codice: c });
+      else if (c) sett.push({ w: w, codice: c, nota: nota });
+      else if (nota) noteSenzaX.push((cognome + ' ' + nome).trim() + ', settimana ' + w + ': ' + nota);
     }
     out.push({ cognome: cognome, nome: nome, settimane: sett });
   });
-  return { righe: out, ignoti: ignoti };
+  return { righe: out, ignoti: ignoti, noteSenzaX: noteSenzaX };
 }
 async function _vacRigheDaPdf(file) {
   // pdf.js: si prendono le posizioni orizzontali dei numeri di settimana
@@ -2957,7 +3113,10 @@ async function importaVacanzePiano(input) {
         g = { nome: m.c.nome, settimane: {} };
         trovati.push(g);
       }
-      r.settimane.forEach((x) => (g.settimane[x.w] = x.codice));
+      r.settimane.forEach((x) => {
+        g.settimane[x.w] = x.codice;
+        if (x.nota) (g.note = g.note || {})[x.w] = x.nota;
+      });
     });
     if (!trovati.length) {
       toast('Nessun collaboratore riconosciuto nel file');
@@ -2979,6 +3138,7 @@ async function importaVacanzePiano(input) {
       )) || [];
     const piano = [];
     const righeMsg = [];
+    const fuoriSett = []; // note con date che non cadono nella settimana della X
     let nAgg = 0,
       nTolte = 0,
       nCamb = 0;
@@ -2996,8 +3156,22 @@ async function importaVacanzePiano(input) {
       Object.keys(t.settimane).forEach((w) => {
         const c = t.settimane[w];
         const v = perSett[w];
-        if (!v) agg.push({ w: parseInt(w), codice: c });
-        else if (_vacCodice(v) !== c) camb.push({ v: v, da: _vacCodice(v), a: c });
+        // nota del file e date precise lette dalla nota (se la nota non ha date, le
+        // date gia corrette a mano nel programma restano)
+        const nota = (t.note && t.note[w]) || '';
+        const dd = nota ? _vacDateDaNota(nota, anno, parseInt(w)) : null;
+        if (dd && dd.fuori) fuoriSett.push(t.nome + ', settimana ' + w + ': ' + nota);
+        const extra = { nota: nota || null };
+        if (dd && !dd.fuori) Object.assign(extra, { dal: dd.dal, al: dd.al });
+        if (!v) agg.push(Object.assign({ w: parseInt(w), codice: c }, extra));
+        else {
+          const diverse =
+            String(v.nota || '') !== String(extra.nota || '') ||
+            ('dal' in extra &&
+              (String(v.dal || '').substring(0, 10) !== String(extra.dal || '') ||
+                String(v.al || '').substring(0, 10) !== String(extra.al || '')));
+          if (_vacCodice(v) !== c || diverse) camb.push({ v: v, da: _vacCodice(v), a: c, extra: extra });
+        }
       });
       if (diQui)
         vecchie.forEach((v) => {
@@ -3010,9 +3184,21 @@ async function importaVacanzePiano(input) {
       nCamb += camb.length;
       const sig = (c) => (c === 'V' ? '' : ' ' + c);
       const parti = [];
-      if (agg.length) parti.push('+ ' + agg.map((x) => x.w + sig(x.codice)).join(', '));
+      const gg = (x) => (x.dal || x.al ? ' (' + _vacDalAlTesto(x) + ')' : '');
+      if (agg.length) parti.push('+ ' + agg.map((x) => x.w + sig(x.codice) + gg(x)).join(', '));
       if (tolte.length) parti.push('- ' + tolte.map((v) => v.settimana + sig(_vacCodice(v))).join(', '));
-      if (camb.length) parti.push(camb.map((x) => 'sett. ' + x.v.settimana + ' ' + x.da + ' -> ' + x.a).join(', '));
+      if (camb.length)
+        parti.push(
+          camb
+            .map(
+              (x) =>
+                'sett. ' +
+                x.v.settimana +
+                (x.da !== x.a ? ' ' + x.da + ' -> ' + x.a : ' nota/date') +
+                gg(x.extra.dal !== undefined ? x.extra : {}),
+            )
+            .join(', '),
+        );
       righeMsg.push('  ' + t.nome + ': ' + parti.join(' · '));
     });
     let msg =
@@ -3039,6 +3225,18 @@ async function importaVacanzePiano(input) {
           .map((x) => '  ' + x)
           .join('\n') +
         (letto.ignoti.length > 15 ? '\n  ... e altri ' + (letto.ignoti.length - 15) : '');
+    if (letto.noteSenzaX && letto.noteSenzaX.length)
+      msg +=
+        '\n\nNote su settimane senza X (richieste o cambi, da controllare):\n' +
+        letto.noteSenzaX
+          .slice(0, 15)
+          .map((x) => '  ' + x)
+          .join('\n') +
+        (letto.noteSenzaX.length > 15 ? '\n  ... e altre ' + (letto.noteSenzaX.length - 15) : '');
+    if (fuoriSett.length)
+      msg +=
+        '\n\nNote con date fuori dalla settimana segnata (vale la settimana intera, correggi dal/al se serve):\n' +
+        fuoriSett.map((x) => '  ' + x).join('\n');
     if (deboli.length)
       msg += '\n\nLetti con piccole differenze di scrittura:\n' + deboli.map((x) => '  ' + x).join('\n');
     if (persi.length) msg += '\n\nNON riconosciuti (restano fuori):\n' + persi.map((x) => '  ' + x).join('\n');
@@ -3062,7 +3260,7 @@ async function importaVacanzePiano(input) {
         await prova(p.nome + ' sett. ' + v.settimana, () => secDel('piano_vacanze', 'id=eq.' + v.id));
       for (const x of p.camb)
         await prova(p.nome + ' sett. ' + x.v.settimana, () =>
-          secPatch('piano_vacanze', 'id=eq.' + x.v.id, { codice: x.a === 'V' ? null : x.a }),
+          secPatch('piano_vacanze', 'id=eq.' + x.v.id, Object.assign({ codice: x.a === 'V' ? null : x.a }, x.extra)),
         );
       for (const x of p.agg)
         await prova(p.nome + ' sett. ' + x.w, () =>
@@ -3072,6 +3270,9 @@ async function importaVacanzePiano(input) {
             anno: anno,
             confermata: true,
             codice: x.codice === 'V' ? null : x.codice,
+            dal: x.dal || null,
+            al: x.al || null,
+            nota: x.nota || null,
             operatore: getOperatore(),
           }),
         );
