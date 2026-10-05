@@ -340,7 +340,7 @@ function renderNoteCollega() {
       '" data-conv-name="' +
       (c.partner + ' ' + preview).toLowerCase().replace(/"/g, '') +
       '" onclick="apriConversazione(\'' +
-      escP(c.partner.replace(/'/g, "\\'")) +
+      _jsArg(c.partner) +
       '\')">';
     html += '<div style="display:flex;justify-content:space-between;align-items:center">';
     const _pLog = !isGroup ? logCache.find((l) => l.operatore === c.partner) : null;
@@ -478,7 +478,7 @@ function toggleConvNewDropdown(ev) {
       '<div style="display:flex;align-items:center;gap:8px" onclick="event.stopPropagation()"><input type="checkbox" class="conv-group-cb" value="' +
       escP(n).replace(/"/g, '&quot;') +
       '" onchange="_aggiornaGruppoBtn()" style="cursor:pointer;width:16px;height:16px;flex-shrink:0"><span onclick="apriConversazione(\'' +
-      escP(n.replace(/'/g, "\\'")) +
+      _jsArg(n) +
       "');document.getElementById('conv-new-dropdown').style.display='none'\" style=\"flex:1;cursor:pointer\">" +
       escP(n) +
       badge +
@@ -583,9 +583,9 @@ function _apriRimuoviMembri(gid, partner) {
   html += '</div>';
   html +=
     '<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" style="background:var(--accent)" onclick="_confermaRimuoviMembri(\'' +
-    escP(gid.replace(/'/g, "\\'")) +
+    _jsArg(gid) +
     "','" +
-    escP(partner.replace(/'/g, "\\'")) +
+    _jsArg(partner) +
     '\')">Rimuovi</button></div>';
   mc.innerHTML = html;
   document.getElementById('pwd-modal').classList.remove('hidden');
@@ -745,9 +745,9 @@ function _apriAggiungiMembri(gid, partner) {
   html += '</div>';
   html +=
     '<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="_confermaAggiungiMembri(\'' +
-    escP(gid.replace(/'/g, "\\'")) +
+    _jsArg(gid) +
     "','" +
-    escP(partner.replace(/'/g, "\\'")) +
+    _jsArg(partner) +
     '\')">Aggiungi</button></div>';
   mc.innerHTML = html;
   document.getElementById('pwd-modal').classList.remove('hidden');
@@ -1116,8 +1116,8 @@ function renderNoteChat(partner) {
     '<button class="chat-back-btn" onclick="_chatBackToList()" style="display:none;background:none;border:none;cursor:pointer;font-size:var(--fs-xl,1.25rem);color:var(--ink);padding:4px 8px" title="Indietro">&#8592;</button>';
   const searchBtn =
     '<button onclick="apriCercaChat()" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:var(--fs-lg,1.0625rem);color:var(--muted);padding:4px 8px" title="Cerca"><i class="icx icx-cerca"></i></button>';
-  const _gpEsc = escP(_gidChat.replace(/'/g, "\\'"));
-  const _ptEsc = escP(partner.replace(/'/g, "\\'"));
+  const _gpEsc = _jsArg(_gidChat);
+  const _ptEsc = _jsArg(partner);
   const _amIAdmin = isCustomGroup && _grpAdmin === op;
   const addMemberBtn =
     isCustomGroup && _amIAdmin
@@ -1522,10 +1522,10 @@ function renderReazioni(note) {
       '" onclick="event.stopPropagation();toggleReazione(' +
       note.id +
       ",'" +
-      emoji +
+      _jsArg(emoji) +
       '\')">';
     html += '<span class="reaction-tooltip">' + escP(tooltipText) + '</span>';
-    html += '<span class="r-emoji">' + emoji + '</span>';
+    html += '<span class="r-emoji">' + escP(emoji) + '</span>';
     if (nomi.length > 1) html += '<span class="r-count">' + nomi.length + '</span>';
     html += '</span>';
   });
@@ -1579,7 +1579,7 @@ function inoltraMessaggio(noteId) {
       '<div onclick="_eseguiInoltro(' +
       noteId +
       ",'" +
-      escP(nome.replace(/'/g, "\\'")) +
+      _jsArg(nome) +
       '\',true)" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--line);font-size:var(--fs-md,.875rem)" onmouseenter="this.style.background=\'rgba(184,134,11,.08)\'" onmouseleave="this.style.background=\'\'">' +
       escP(nome) +
       badge +
@@ -1646,7 +1646,11 @@ async function _eseguiInoltro(noteId, destKey, isSingle) {
     toast('Errore inoltro: ' + e.message);
   }
 }
-async function inviaNotaChat() {
+// un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
+function inviaNotaChat() {
+  return unaVoltaSola('chat-invia', () => _inviaNotaChatEsegui());
+}
+async function _inviaNotaChatEsegui() {
   const ta = document.getElementById('nota-msg-chat');
   if (!ta) return;
   let msg = ta.value.trim();
@@ -2219,7 +2223,7 @@ function apriSchedaCollaboratore(nome) {
   const collabRec = collaboratoriCache.find((c) => c.nome === nome);
   const dataNascita = collabRec && collabRec.data_nascita ? collabRec.data_nascita : '';
   const isBirthday = dataNascita ? _isCompleannoOggi(dataNascita) : false;
-  const neS = nome.replace(/'/g, "\\'");
+  const neS = _jsArg(nome);
   // PERMESSI DELLA SCHEDA (v348): tutti vedono il lavoro (turni, registrazioni,
   // errori del Diario); i dati HR (contratto, anzianita, congedi, costo errori,
   // malattie, percorso disciplinare) solo chi vede lo Storico HR; si modificano
@@ -2358,7 +2362,7 @@ function apriSchedaCollaboratore(nome) {
 
   // KPI CARDS · cliccabili: aprono l'anteprima delle voci nella cronologia
   const _kpiClick = function (source, tipo) {
-    return ' onclick="schedaKpiFiltra(\'' + neS + "','" + source + "','" + String(tipo).replace(/'/g, "\\'") + '\')"';
+    return ' onclick="schedaKpiFiltra(\'' + neS + "','" + source + "','" + _jsArg(String(tipo)) + '\')"';
   };
   const _kpiAttr = function (source, tipo) {
     return ' style="cursor:pointer" title="Clicca per vedere le voci"' + _kpiClick(source, tipo);
@@ -2880,7 +2884,7 @@ function schedaKpiFiltra(nome, source, tipo) {
   if (chip)
     chip.innerHTML = tipo
       ? '<span class="mini-badge" style="background:var(--accent2);cursor:pointer;font-size:var(--fs-sm,.8125rem)" title="Rimuovi filtro" onclick="schedaKpiFiltra(\'' +
-        nome.replace(/'/g, "\\'") +
+        _jsArg(nome) +
         "','','')\">" +
         escP(tipo) +
         ' &#10005;</span>'
@@ -2929,7 +2933,7 @@ function _renderStoricoHrSezione(nome) {
     .sort(function (a, b) {
       return (b.data_evento || '').localeCompare(a.data_evento || '') || (b.id || 0) - (a.id || 0);
     });
-  var neS = nome.replace(/'/g, "\\'");
+  var neS = _jsArg(nome);
   var html = _soloFormazioni
     ? '<div class="scheda-section"><h4 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Formazioni svolte <span class="mini-badge" style="background:#1a4a7a;font-size:var(--fs-sm,.8125rem)">SUPERVISOR</span></h4>'
     : '<div class="scheda-section"><h4 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Storico HR <span class="mini-badge" style="background:var(--accent);font-size:var(--fs-sm,.8125rem)">RISERVATO</span></h4>';
@@ -3015,7 +3019,7 @@ function _renderStoricoHrSezione(nome) {
             ' CHF</span>' +
             (_hrMod
               ? '<button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;background:#8b6914" onclick="registraGiubileo(\'' +
-                nome.replace(/'/g, "\\'") +
+                _jsArg(nome) +
                 "'," +
                 g.anni +
                 ',' +
@@ -4172,7 +4176,7 @@ function mostraNoteNonLette() {
           '</span></div><div style="font-size:var(--fs-base,.9375rem)">' +
           esc(testoPulito) +
           "</div><button style=\"margin-top:8px;color:var(--accent2);border:1px solid var(--accent2);background:none;padding:4px 14px;border-radius:2px;font-size:var(--fs-sm,.8125rem);font-weight:600;cursor:pointer;font-family:Source Sans 3,sans-serif\" onclick=\"document.getElementById('note-modal').classList.add('hidden');switchPage('note-collega');setTimeout(function(){rispondiNota('" +
-          escP(n.da_operatore.replace(/'/g, "\\'")) +
+          _jsArg(n.da_operatore) +
           "'," +
           n.id +
           ')},300)">Rispondi</button></div>'

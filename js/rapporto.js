@@ -15,16 +15,6 @@ function getGiornataCasino() {
     now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0')
   );
 }
-// Testo da mettere in un attributo onclick tra apici singoli. Prima si scappava solo
-// l'apostrofo: un nome con virgolette, backslash o "<" rompeva il click in ogni schermata.
-function _jsArg(s) {
-  return String(s == null ? '' : s)
-    .replace(/\\/g, '\\\\')
-    .replace(/'/g, "\\'")
-    .replace(/</g, '\\x3c')
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;');
-}
 // La cache dei rapporti e' indicizzata per data E settore: con la sola data, dopo un cambio
 // settore la Home mostrava lo stato del rapporto del settore precedente.
 function _rapportoKey(ds, reparto) {
@@ -622,8 +612,8 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno, scelte) {
           // else: no-op
         } else {
           // Cross-rapporto dedup: include ANCHE record manuali (per evitare duplicati visivi)
-          const _newKeyI = dataInizio.toISOString().substring(0, 10);
-          const _newKeyF = dataFine.toISOString().substring(0, 10);
+          const _newKeyI = dataLocaleISO(dataInizio);
+          const _newKeyF = dataLocaleISO(dataFine);
           const _giaInAltro = datiCache.find((e) => {
             if (e.tipo !== _malTipo) return false;
             if (e.nome.toLowerCase() !== nomeFinale.toLowerCase()) return false;
@@ -714,6 +704,7 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
       try {
         await secPatch('registrazioni', 'id=eq.' + d.id, { testo: nuovoTesto });
       } catch (e2) {
+        toastErrore(d.nome + ': non staccata dal Rapporto, ' + (e2.message || 'errore del database'));
         continue;
       }
     }
@@ -731,6 +722,10 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
   for (const u of ops.updates) rpcOps.push({ action: 'update', id: u.id, data: { testo: u.nuovoTesto } });
   for (const d of ops.deletes) rpcOps.push({ action: 'delete', id: d.id });
   let result = { created_ids: [], created: 0, updated: 0, deleted: 0 };
+  // cio che il database ha DAVVERO salvato: solo questo entra in memoria, nel
+  // registro e nel Piano (creates con l id vero dato dal database)
+  const salvate = { creates: [], updates: [], deletes: [] };
+  const falliti = []; // nomi delle operazioni che il database non ha salvato
   let usedFallback = false;
   // Strip origine dalle ops se schema non supporta la colonna (graceful degradation pre-migration)
   const _maybeStripOrigineFromOps = () => {
@@ -744,36 +739,53 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
   if (rpcOps.length > 0) {
     const tk = getOpToken();
     if (tk && _transactionalRpcSupported) {
+      // Tutto o niente: se il database rifiuta, la transazione e annullata e NULLA
+      // e salvato. Si ripiega sulle chiamate una per una solo se la funzione non
+      // e raggiungibile (non esiste, rete); un rifiuto del database si dice e basta.
+      const _chiama = () => _rpcSicura('parse_assenze_transactional', { p_token: getOpToken(), p_ops: rpcOps });
+      let _rpcResult = null;
       try {
-        const _rpcResult = await sbRpc('parse_assenze_transactional', { p_token: tk, p_ops: rpcOps });
-        if (_rpcResult) result = _rpcResult;
-      } catch (e) {
-        const _msg = (e.message || '').toLowerCase();
-        // Detect schema mismatch sulla colonna origine
-        if (_msg.includes('origine') || _msg.includes('column')) {
-          console.warn('Colonna origine non disponibile, switching schema legacy');
-          _origineSchemaSupported = false;
-          _maybeStripOrigineFromOps();
-          // Retry RPC senza origine
-          try {
-            const _rpcResult = await sbRpc('parse_assenze_transactional', { p_token: tk, p_ops: rpcOps });
-            if (_rpcResult) result = _rpcResult;
-          } catch (e2) {
-            console.warn('parse_assenze_transactional non disponibile, fallback REST:', e2.message);
-            _transactionalRpcSupported = false;
-            usedFallback = true;
+        try {
+          _rpcResult = await _chiama();
+        } catch (e) {
+          const _msg = (e.message || '').toLowerCase();
+          if (e.sessione && (await _renewToken())) {
+            _rpcResult = await _chiama();
+          } else if (_origineSchemaSupported && _msg.includes('origine')) {
+            // colonna origine non ancora presente nel database: si riprova senza
+            console.warn('Colonna origine non disponibile, switching schema legacy');
+            _origineSchemaSupported = false;
+            _maybeStripOrigineFromOps();
+            _rpcResult = await _chiama();
+          } else {
+            throw e;
           }
-        } else {
-          console.warn('parse_assenze_transactional non disponibile, fallback REST sequenziale:', e.message);
-          _transactionalRpcSupported = false;
-          usedFallback = true;
         }
+        if (!_rpcResult || !Array.isArray(_rpcResult.created_ids))
+          throw Object.assign(new Error('risposta vuota dal database'), { dalDatabase: true });
+        result = _rpcResult;
+        salvate.creates = ops.creates.map((c, i) => ({ c: c, id: _rpcResult.created_ids[i] }));
+        salvate.updates = ops.updates.slice();
+        salvate.deletes = ops.deletes.slice();
+      } catch (e) {
+        if (e.dalDatabase && e.status !== 404) {
+          console.error('parse_assenze_transactional rifiutata:', e.message);
+          toastErrore('Assenze del rapporto NON salvate: ' + e.message, 9000);
+          try {
+            logAzione('Assenze da rapporto non salvate', e.message + ' (rapporto ' + turno + ' del ' + ds + ')');
+          } catch (_) {}
+          return;
+        }
+        console.warn('parse_assenze_transactional non disponibile, fallback REST sequenziale:', e.message);
+        _transactionalRpcSupported = false;
+        usedFallback = true;
       }
     } else {
       usedFallback = true;
     }
     if (usedFallback) {
-      // Fallback: chiamate REST sequenziali (no atomicità ma recupero degradato)
+      // Fallback: chiamate REST una per una (senza atomicita). Si tiene SOLO cio
+      // che il database ha davvero salvato: un errore resta un errore visibile.
       for (const c of ops.creates) {
         let _recToSend = _origineSchemaSupported ? c.record : _stripOrigine(c.record);
         try {
@@ -789,40 +801,41 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
               throw innerErr;
             }
           }
-          if (_saved && _saved[0] && _saved[0].id) result.created_ids.push(_saved[0].id);
-          else result.created_ids.push(Date.now() + Math.floor(Math.random() * 1000));
+          const _id = _saved && _saved[0] && _saved[0].id;
+          if (!_id) throw new Error('il database non ha restituito la registrazione');
+          salvate.creates.push({ c: c, id: _id });
           result.created++;
         } catch (err) {
           console.error('Fallback create ' + c.nome + ':', err);
-          toast('Errore creazione ' + c.nome);
+          falliti.push(c.nome + ' (creazione)');
         }
       }
       for (const u of ops.updates) {
         try {
           await secPatch('registrazioni', 'id=eq.' + u.id, { testo: u.nuovoTesto });
+          salvate.updates.push(u);
           result.updated++;
         } catch (err) {
           console.error('Fallback update ' + u.nome + ':', err);
-          toast('Errore aggiornamento ' + u.nome);
+          falliti.push(u.nome + ' (aggiornamento)');
         }
       }
       for (const d of ops.deletes) {
         try {
           await secDel('registrazioni', 'id=eq.' + d.id);
+          salvate.deletes.push(d);
           result.deleted++;
         } catch (err) {
           console.error('Fallback delete ' + d.nome + ':', err);
-          toast('Errore rimozione ' + d.nome);
+          falliti.push(d.nome + ' (rimozione)');
         }
       }
     }
   }
   // Aggiorna cache locale + audit log
   // CREATES: assegna ID dal DB e unshift in datiCache
-  for (let i = 0; i < ops.creates.length; i++) {
-    const c = ops.creates[i];
-    const newId = (result.created_ids && result.created_ids[i]) || Date.now() + Math.floor(Math.random() * 1000);
-    const fullRec = Object.assign({ id: newId }, c.record);
+  for (const { c, id } of salvate.creates) {
+    const fullRec = Object.assign({ id: id }, c.record);
     datiCache.unshift(fullRec);
     try {
       logAzione(
@@ -843,7 +856,7 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
     } catch (_) {}
   }
   // UPDATES: patch testo in cache + audit con diff giorni
-  for (const u of ops.updates) {
+  for (const u of salvate.updates) {
     const cached = datiCache.find((x) => x.id === u.id);
     if (cached) cached.testo = u.nuovoTesto;
     const _vecchiGiorniMatch = (u.vecchioTesto || '').match(/\((\d+) giorni/);
@@ -863,7 +876,7 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
     } catch (_) {}
   }
   // DELETES: rimuovi da cache + audit
-  for (const d of ops.deletes) {
+  for (const d of salvate.deletes) {
     datiCache = datiCache.filter((x) => x.id !== d.id);
     _diarioTogliArchivioLeggero(d.id);
     try {
@@ -876,12 +889,12 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
   // PIANO: la malattia scritta nel Rapporto scrive le M nel Piano come quella registrata
   // nel Diario (nota "Ex C0 - operatore", recuperi CGF, festivi persi)
   if (typeof sincronizzaMalattiaPiano === 'function') {
-    for (const c of ops.creates) {
+    for (const { c } of salvate.creates) {
       try {
         await sincronizzaMalattiaPiano(c.nome, '', c.record.data, c.record.testo || '');
       } catch (e) {}
     }
-    for (const u of ops.updates) {
+    for (const u of salvate.updates) {
       try {
         const rec = datiCache.find((x) => x.id === u.id);
         await sincronizzaMalattiaPiano(u.nome, u.vecchioTesto || '', rec ? rec.data : '', u.nuovoTesto || '');
@@ -905,10 +918,17 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
   if (result.deleted) summary.push(result.deleted + ' eliminate');
   if (ops.skipped.length) summary.push(ops.skipped.length + ' duplicati saltati');
   if (summary.length) toast('Assenze: ' + summary.join(', ') + (usedFallback ? ' (modalita compatibilita)' : ''));
+  // per ultimo, perche nessun altro avviso lo copra
+  if (falliti.length) {
+    toastErrore('Assenze NON salvate per: ' + falliti.join(', ') + '. Riprova a salvare il rapporto.', 9000);
+    try {
+      logAzione('Assenze da rapporto non salvate', falliti.join(', ') + ' (rapporto ' + turno + ' del ' + ds + ')');
+    } catch (_) {}
+  }
   // Popup copertura per ogni NUOVA assenza creata dal rapporto (in sequenza); non quando
   // l assenza arriva dal Piano (M o Copertura malattia: la copertura e gia decisa li)
-  if (ops.creates.length && typeof apriPopupCopertura === 'function' && !window._rapportoDalPiano) {
-    for (const c of ops.creates) {
+  if (salvate.creates.length && typeof apriPopupCopertura === 'function' && !window._rapportoDalPiano) {
+    for (const { c } of salvate.creates) {
       const dIso =
         c.dataInizio instanceof Date
           ? c.dataInizio.getFullYear() +
@@ -940,7 +960,11 @@ async function _processaAssenzeRapporto(assenzeText, ds, turno) {
   await _eseguiAssenzeOps(ops, ds, turno);
 }
 // =================================================================================
-async function salvaRapportoTurno(ds, turno, cls) {
+// un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
+function salvaRapportoTurno(ds, turno, cls) {
+  return unaVoltaSola('rapporto-salva|' + ds + '|' + turno, () => _salvaRapportoTurnoEsegui(ds, turno, cls));
+}
+async function _salvaRapportoTurnoEsegui(ds, turno, cls) {
   const campi = getCampiRapporto();
   const extra = {};
   const data = {

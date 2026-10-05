@@ -4,7 +4,11 @@
  * Diario: salva, modifica, elimina registrazioni
  */
 
-async function salva() {
+// un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
+function salva() {
+  return unaVoltaSola('diario-salva', () => _salvaEsegui());
+}
+async function _salvaEsegui() {
   let nome = capitalizzaNome(document.getElementById('inp-nome').value.trim());
   const testo = document.getElementById('inp-testo').value.trim();
   if (!nome) {
@@ -44,6 +48,7 @@ async function salva() {
       )
         return;
       let creati = 0;
+      const nonSalvati = []; // giorni che il database non ha salvato: si dicono
       for (let d = new Date(dInizio); d <= dFine; d.setDate(d.getDate() + 1)) {
         const dStr =
           d.getFullYear() +
@@ -55,7 +60,7 @@ async function salva() {
           (e) =>
             e.nome.toLowerCase() === nome.toLowerCase() &&
             e.tipo === nomeCorrente('Malattia') &&
-            e.data.startsWith(dStr),
+            giornoDi(e.data) === dStr,
         );
         if (!esiste) {
           const rec = {
@@ -72,7 +77,10 @@ async function salva() {
             await secPost('registrazioni', rec);
             datiCache.unshift(rec);
             creati++;
-          } catch (e) {}
+          } catch (e) {
+            console.error('Malattia del ' + dStr + ' non salvata:', e);
+            nonSalvati.push(dStr.split('-').reverse().join('.'));
+          }
         }
       }
       if (!getCollaboratoriReparto().find((c) => c.nome.toLowerCase() === nome.toLowerCase())) {
@@ -103,7 +111,17 @@ async function salva() {
           toastErrore('Piano non allineato alla malattia: ' + (e.message || ''));
         }
       }
-      toast(nome + ': ' + creati + ' giorni malattia registrati');
+      if (nonSalvati.length)
+        toastErrore(
+          nome +
+            ': ' +
+            creati +
+            ' giorni registrati, NON salvati: ' +
+            nonSalvati.join(', ') +
+            '. Riprova per quei giorni.',
+          9000,
+        );
+      else toast(nome + ': ' + creati + ' giorni malattia registrati');
       aggiornaNomi();
       render();
       updateStats();
@@ -179,21 +197,23 @@ async function salva() {
     }
     return;
   }
-  // Controllo duplicati: stesso nome + stesso tipo + oggi
+  // Controllo duplicati: stesso nome + stesso tipo + oggi. "data" e un istante in
+  // UTC: il giorno si confronta in ora locale (giornoDi), altrimenti fra mezzanotte
+  // e le 2 una registrazione di oggi risultava di ieri e il doppione passava.
   const oggi = oggiLocale();
   const dupExact = getDatiReparto().find(
     (e) =>
       e.nome.toLowerCase() === nome.toLowerCase() &&
       e.tipo === tipoSelezionato &&
       e.testo === testo &&
-      e.data.startsWith(oggi),
+      giornoDi(e.data) === oggi,
   );
   if (dupExact) {
     toast('Registrazione identica già presente per oggi');
     return;
   }
   const dupSimile = getDatiReparto().filter(
-    (e) => e.nome.toLowerCase() === nome.toLowerCase() && e.tipo === tipoSelezionato && e.data.startsWith(oggi),
+    (e) => e.nome.toLowerCase() === nome.toLowerCase() && e.tipo === tipoSelezionato && giornoDi(e.data) === oggi,
   );
   if (dupSimile.length) {
     const tipoAmm = nomeCorrente('Ammonimento Verbale');

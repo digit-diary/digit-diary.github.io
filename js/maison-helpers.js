@@ -883,7 +883,7 @@ function acFiltraMaison(inputId, dropId) {
         "';document.getElementById('" +
         dropId +
         "').classList.remove('show');_preimpostaTipoMaison('" +
-        escP(item.cat || '') +
+        _jsArg(item.cat || '') +
         '\')" style="display:flex;align-items:center;justify-content:space-between">' +
         escP(item.nome) +
         badge +
@@ -1218,7 +1218,11 @@ function acFiltraSpeseExtra() {
     .join('');
   drop.classList.add('show');
 }
-async function salvaSpeseExtra() {
+// un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
+function salvaSpeseExtra() {
+  return unaVoltaSola('spese-extra-salva', () => _salvaSpeseExtraEsegui());
+}
+async function _salvaSpeseExtraEsegui() {
   let benef = capitalizzaNome(document.getElementById('se-beneficiario').value.trim());
   const tipo = document.getElementById('se-tipo').value;
   const data = document.getElementById('se-data').value;
@@ -2516,6 +2520,15 @@ function _invBaseCfg(key) {
 function invNomeBase(key) {
   return String(_invBaseCfg(key).label || INV_BASE_NOMI[key] || key);
 }
+// Nome da mostrare per il valore della colonna "categoria" di una riga di inventario
+// ('buono', 'sigaretta' o la chiave di una categoria personalizzata), con il nome
+// rinominato dall admin per le categorie base
+function invNomeCategoriaRiga(categoria) {
+  if (categoria === 'buono') return invNomeBase('buoni');
+  if (categoria === 'sigaretta') return invNomeBase('sigarette');
+  const c = getInvCategorieExtra().find((x) => x.key === categoria);
+  return (c && c.label) || String(categoria || '');
+}
 function _invBaseVisibile(key) {
   return _invConBase() && !_invBaseCfg(key).nascosta;
 }
@@ -2897,7 +2910,11 @@ function renderInventarioCustom(cat) {
     });
   }
 }
-async function salvaInvCustomMovimento(catKey, movimento) {
+// un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
+function salvaInvCustomMovimento(catKey, movimento) {
+  return unaVoltaSola('inventario-salva|' + catKey, () => _salvaInvCustomMovimentoEsegui(catKey, movimento));
+}
+async function _salvaInvCustomMovimentoEsegui(catKey, movimento) {
   const isIn = movimento === 'entrata';
   const art = isIn
     ? capitalizzaNome(((document.getElementById('inv-cust-marca') || {}).value || '').trim())
@@ -3238,7 +3255,11 @@ function renderInventarioSigTable() {
   html += '</tbody></table>';
   el.innerHTML = html;
 }
-async function salvaInventarioCarico() {
+// un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
+function salvaInventarioCarico() {
+  return unaVoltaSola('inventario-salva|buoni', () => _salvaInventarioCaricoEsegui());
+}
+async function _salvaInventarioCaricoEsegui() {
   const tipo = (document.getElementById('inv-carico-tipo') || {}).value;
   const qty = parseInt((document.getElementById('inv-carico-qty') || {}).value) || 0;
   const data = (document.getElementById('inv-carico-data') || {}).value || oggiLocale();
@@ -3275,7 +3296,11 @@ async function salvaInventarioCarico() {
     toast('Errore: ' + e.message);
   }
 }
-async function salvaInventarioUscita() {
+// un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
+function salvaInventarioUscita() {
+  return unaVoltaSola('inventario-salva|buoni', () => _salvaInventarioUscitaEsegui());
+}
+async function _salvaInventarioUscitaEsegui() {
   const cliente = capitalizzaNome((document.getElementById('inv-usc-cliente') || {}).value.trim());
   const tipo = (document.getElementById('inv-usc-tipo') || {}).value;
   const qty = parseInt((document.getElementById('inv-usc-qty') || {}).value) || 0;
@@ -3320,7 +3345,11 @@ async function salvaInventarioUscita() {
     toast('Errore: ' + e.message);
   }
 }
-async function salvaInventarioSigEntrata() {
+// un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
+function salvaInventarioSigEntrata() {
+  return unaVoltaSola('inventario-salva|sigarette', () => _salvaInventarioSigEntrataEsegui());
+}
+async function _salvaInventarioSigEntrataEsegui() {
   const marca = capitalizzaNome((document.getElementById('inv-sig-marca') || {}).value.trim());
   const collab = (document.getElementById('inv-sig-collab') || {}).value.trim();
   const cliente = (document.getElementById('inv-sig-cliente') || {}).value.trim();
@@ -3354,7 +3383,11 @@ async function salvaInventarioSigEntrata() {
     toast('Errore: ' + e.message);
   }
 }
-async function salvaInventarioSigUscita() {
+// un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
+function salvaInventarioSigUscita() {
+  return unaVoltaSola('inventario-salva|sigarette', () => _salvaInventarioSigUscitaEsegui());
+}
+async function _salvaInventarioSigUscitaEsegui() {
   const marca = (document.getElementById('inv-sig-usc-marca') || {}).value;
   const cliente = (document.getElementById('inv-sig-usc-cliente') || {}).value.trim();
   const qty = parseInt((document.getElementById('inv-sig-usc-qty') || {}).value) || 1;

@@ -392,15 +392,15 @@ function renderTipiUI() {
     let tlHtml = tutti
       .map((t, idx) => {
         const d = t._orig ? TIPI_DEFAULT.find((x) => x.nome === t._orig) : null;
-        const ne = t.nome.replace(/'/g, "\\'");
-        const origNe = t._orig ? t._orig.replace(/'/g, "\\'") : ne;
+        const ne = _jsArg(t.nome);
+        const origNe = t._orig ? _jsArg(t._orig) : ne;
         return (
           '<div class="tipo-item">' +
           (adm
             ? '<input type="color" class="tipo-color-picker" value="' +
               t.colore +
               '" onchange="cambiaColoreTipo(\'' +
-              (t._orig || ne) +
+              origNe +
               '\',this.value)">'
             : '<div class="tipo-color" style="background:' + t.colore + '"></div>') +
           '<div class="tipo-item-name">' +
@@ -433,7 +433,7 @@ function renderTipiUI() {
           .map(
             (n) =>
               '<button style="margin:2px 4px;padding:3px 10px;font-size:var(--fs-sm,.8125rem);cursor:pointer;border:1px dashed var(--accent2);color:var(--accent2);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif" onclick="ripristinaTipoDefault(\'' +
-              n.replace(/'/g, "\\'") +
+              _jsArg(n) +
               '\')">+ ' +
               escP(n) +
               '</button>',

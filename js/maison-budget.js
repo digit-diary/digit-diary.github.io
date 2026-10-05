@@ -214,7 +214,11 @@ function renderMaisonBudgetUI() {
     }
   }
 }
-async function salvaMaisonBudget() {
+// un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
+function salvaMaisonBudget() {
+  return unaVoltaSola('maison-budget-salva', () => _salvaMaisonBudgetEsegui());
+}
+async function _salvaMaisonBudgetEsegui() {
   const nome = capitalizzaNome(document.getElementById('maison-budget-nome').value.trim());
   const chf = parseFloat(document.getElementById('maison-budget-chf').value) || null;
   const bu = parseInt(document.getElementById('maison-budget-bu').value) || null;

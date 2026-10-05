@@ -69,7 +69,11 @@ function promemoriaDaRegistrazione(id) {
     toast('Promemoria compilato: scegli la data e salva');
   }, 150);
 }
-async function salvaPromemoria() {
+// un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
+function salvaPromemoria() {
+  return unaVoltaSola('promemoria-salva', () => _salvaPromemoriaEsegui());
+}
+async function _salvaPromemoriaEsegui() {
   const titolo = document.getElementById('pm-titolo').value.trim();
   const scadenza = document.getElementById('pm-scadenza').value;
   const descrizione = document.getElementById('pm-descrizione').value.trim();
@@ -156,7 +160,11 @@ function _aggiungiMesi(data, n) {
   return d;
 }
 const _pmCompletaInCorso = new Set();
-async function completaPromemoria(id) {
+// un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
+function completaPromemoria(id) {
+  return unaVoltaSola('promemoria-completa|' + id, () => _completaPromemoriaEsegui(id));
+}
+async function _completaPromemoriaEsegui(id) {
   const op = getOperatore();
   const p = promemoriaCache.find((x) => x.id === id);
   // Guardia: un secondo click (o un doppio click) creava un'altra occorrenza del ripetitivo

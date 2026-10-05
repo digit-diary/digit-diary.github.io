@@ -135,7 +135,7 @@ function renderCassaAlerts() {
         ' CHF' +
         (a.dataErr ? ' del ' + a.dataErr : '') +
         '</span><button class="alert-action" onclick="apriModuloVeloce(\'allineamento\',\'' +
-        a.nome.replace(/'/g, "\\'") +
+        _jsArg(a.nome) +
         '\')">Crea Allineamento</button></div>';
     });
     html += '</div>';
@@ -157,7 +157,7 @@ function renderCassaAlerts() {
         ' CHF (' +
         a.count +
         ' errori dal ultimo RDI)</span><button class="alert-action" onclick="apriModuloVeloce(\'rdi\',\'' +
-        a.nome.replace(/'/g, "\\'") +
+        _jsArg(a.nome) +
         '\')">Crea RDI</button></div>';
     });
     html += '</div>';
@@ -457,7 +457,7 @@ function renderRischioAlerts() {
         ' (ultimo: ' +
         dt +
         '). Recidiva · preparare RDI.</span><button class="alert-action" style="background:#8e44ad" onclick="apriModuloVeloce(\'rdi\',\'' +
-        a.nome.replace(/'/g, "\\'") +
+        _jsArg(a.nome) +
         '\')">Crea RDI</button></div>';
     });
     html += '</div>';
@@ -482,9 +482,9 @@ function renderRischioAlerts() {
         ' allineamenti totali (ultimo: ' +
         dt +
         '). Valutare provvedimento.</span><button class="alert-action" style="background:#c8671a" onclick="apriModuloVeloce(\'rdi\',\'' +
-        a.nome.replace(/'/g, "\\'") +
+        _jsArg(a.nome) +
         '\')">Crea RDI</button><button class="alert-action" style="background:var(--muted);margin-left:4px" onclick="ignoraAlertSuggerimento(\'' +
-        escP(a.nome.replace(/'/g, "\\'")) +
+        _jsArg(a.nome) +
         "','acc')\">Ignora</button></div>";
     });
     html += '</div>';
@@ -589,7 +589,7 @@ function renderAmmonimentiAlerts() {
       ' (ultimo: ' +
       dt +
       ')</span><button class="alert-action" style="background:#c8671a" onclick="apriModuloVeloce(\'allineamento\',\'' +
-      a.nome.replace(/'/g, "\\'") +
+      _jsArg(a.nome) +
       '\')">Crea Allineamento</button></div>';
   });
   html += '</div></div>';

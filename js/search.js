@@ -479,12 +479,15 @@ async function _eseguiRiepilogoMensile() {
   });
   const meseName = MESI_FULL[mese] + ' ' + anno;
   const primoGiorno = anno + '-' + String(mese + 1).padStart(2, '0') + '-01';
+  // primo giorno del mese DOPO ("mese" parte da 0: il mese dopo, contato da 1, e mese + 2).
+  // Con mese + 1 la fine coincideva con l inizio e ogni sezione restava vuota (tranne dicembre).
   const nextAnno = mese === 11 ? anno + 1 : anno,
-    nextMese = mese === 11 ? 1 : mese + 1;
+    nextMese = mese === 11 ? 1 : mese + 2;
   const fineStr = nextAnno + '-' + String(nextMese).padStart(2, '0') + '-01';
-  const meseData = getDatiReparto().filter((e) => e.data >= primoGiorno && e.data < fineStr);
+  // "data" e un istante in UTC: il giorno si prende in ora locale (giornoDi)
+  const meseData = getDatiReparto().filter((e) => giornoDi(e.data) >= primoGiorno && giornoDi(e.data) < fineStr);
   const meseModuli = getModuliReparto().filter((m) => {
-    const d = m.created_at || m.data_modulo || '';
+    const d = giornoDi(m.created_at || m.data_modulo || '');
     return d >= primoGiorno && d < fineStr;
   });
   try {
@@ -647,7 +650,7 @@ async function _eseguiRiepilogoMensile() {
         y += 2;
         const cassaBody = cassaEntries.map((e) => [
           e.nome,
-          e.data ? new Date(e.data + 'T12:00:00').toLocaleDateString('it-IT') : '',
+          e.data ? new Date(giornoDi(e.data) + 'T12:00:00').toLocaleDateString('it-IT') : '',
           'CHF ' + fmtCHF(parseFloat(e.importo) || 0),
           (e.descrizione || '').substring(0, 60),
         ]);
@@ -814,9 +817,11 @@ async function _eseguiRiepilogoMensile() {
         y += 2;
         const invBody = invData
           .sort((a, b) => (b.data_movimento || '').localeCompare(a.data_movimento || ''))
+          // colonne vere della tabella inventario: categoria + tipo (l articolo) e
+          // movimento; la categoria con il nome eventualmente rinominato dall admin
           .map((r) => [
-            r.articolo || '',
-            (r.tipo_movimento || '').charAt(0).toUpperCase() + (r.tipo_movimento || '').slice(1),
+            invNomeCategoriaRiga(r.categoria) + (r.tipo ? ' - ' + r.tipo : ''),
+            (r.movimento || '').charAt(0).toUpperCase() + (r.movimento || '').slice(1),
             String(r.quantita || 0),
             r.data_movimento ? new Date(r.data_movimento + 'T12:00:00').toLocaleDateString('it-IT') : '',
             (r.note || '').substring(0, 40),
@@ -865,7 +870,7 @@ async function _eseguiRiepilogoMensile() {
       const giorniCount = [0, 0, 0, 0, 0, 0, 0];
       meseData.forEach((e) => {
         if (e.data) {
-          const d = new Date(e.data + 'T12:00:00');
+          const d = new Date(giornoDi(e.data) + 'T12:00:00');
           giorniCount[d.getDay()]++;
         }
       });

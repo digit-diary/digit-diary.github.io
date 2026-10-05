@@ -157,7 +157,7 @@ function _renderValutazioneSezione(nome) {
   // database non le invia agli altri)
   if (typeof puoVedereValutazioni === 'function' && !puoVedereValutazioni()) return '';
   const vals = getValutazioniCollab(nome);
-  const ne = nome.replace(/'/g, "\\'");
+  const ne = _jsArg(nome);
   const puoVal = typeof puoModificare === 'function' ? puoModificare('gestione_valutazioni') : isAdmin();
   const v = vals.length ? _valSchedaCorrente(vals) : null;
   let html =
@@ -167,7 +167,7 @@ function _renderValutazioneSezione(nome) {
       '<button class="btn-export" onclick="apriValutazioneEditor(\'' +
       ne +
       "'" +
-      (v ? ',' + v.anno + ",'" + escP(v.tipo) + "'" : '') +
+      (v ? ',' + v.anno + ",'" + _jsArg(v.tipo) + "'" : '') +
       ')" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px">+ Nuova / Modifica</button>';
     html +=
       '<button class="btn-export" onclick="document.getElementById(\'val-import-file\').click()" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)">Importa Excel</button>' +
@@ -378,7 +378,7 @@ function apriValutazioneEditor(nome, anno, tipo) {
   const aree = _areeNormalizza((esistente && esistente.aree) || {});
   const note = (esistente && esistente.aree_note) || {};
   const sug = _suggerisciAree(nome);
-  const ne = nome.replace(/'/g, "\\'");
+  const ne = _jsArg(nome);
   let html =
     '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px"><div><h3 style="font-family:Playfair Display,serif;color:var(--ink)">Valutazione · ' +
     escP(nome) +
@@ -502,7 +502,11 @@ function apriValutazioneEditor(nome, anno, tipo) {
   box.innerHTML = html;
   document.getElementById('profilo-modal').classList.remove('hidden');
 }
-async function salvaValutazione(nome) {
+// un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
+function salvaValutazione(nome) {
+  return unaVoltaSola('valutazione-salva|' + nome, () => _salvaValutazioneEsegui(nome));
+}
+async function _salvaValutazioneEsegui(nome) {
   if (typeof puoModificare === 'function' && !puoModificare('gestione_valutazioni')) {
     toast('Non hai il permesso di salvare valutazioni');
     return;
@@ -816,7 +820,7 @@ async function importaValutazioneExcel(input, nome) {
     const anno = annoTrovato || new Date().getFullYear();
     // anteprima conferma
     const b = document.getElementById('pwd-modal-content');
-    const ne = nome.replace(/'/g, "\\'");
+    const ne = _jsArg(nome);
     window._valImportPending = { nome, anno, aree, extra, autoAree, file };
     b.innerHTML =
       '<h3>Importa valutazione</h3><p style="margin-bottom:10px"><strong>' +
@@ -875,7 +879,11 @@ async function importaValutazioneExcel(input, nome) {
     toast('Errore lettura file: ' + e.message);
   }
 }
-async function _confermaImportValutazione() {
+// un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
+function _confermaImportValutazione() {
+  return unaVoltaSola('valutazione-import', () => _confermaImportValutazioneEsegui());
+}
+async function _confermaImportValutazioneEsegui() {
   const p = window._valImportPending;
   if (!p) return;
   document.getElementById('pwd-modal').classList.add('hidden');

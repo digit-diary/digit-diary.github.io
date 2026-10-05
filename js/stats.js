@@ -631,7 +631,7 @@ function aggiornaRdPeriodo() {
 function _rdPeriodo() {
   const tipo = (document.getElementById('rd-tipo') || {}).value || 'mese';
   const val = (id, fb) => (document.getElementById(id) || {}).value || fb;
-  const oggiYm = new Date().toISOString().substring(0, 7);
+  const oggiYm = oggiLocale().substring(0, 7); // mese in ora locale (in UTC il 1° alle 00.30 era ancora il mese prima)
   const addMesi = (ym, n) => {
     const d = new Date(ym + '-15T12:00:00');
     d.setMonth(d.getMonth() + n);

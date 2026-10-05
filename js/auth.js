@@ -153,12 +153,19 @@ async function eseguiPrimoCambio() {
   const nh = await sha256(p1),
     nhV2 = await secureHash(p1, '__master__'),
     nc = genCode();
-  await sbRpc('setup_master_pwd', {
-    p_default_hash: DEFAULT_PWD_HASH,
-    p_new_hash: nh,
-    p_new_recovery: nc,
-    p_new_hash_v2: nhV2,
-  });
+  // il codice di recupero si mostra SOLO se il database l ha salvato: un codice
+  // mostrato ma non salvato non servirebbe a nulla il giorno che serve
+  try {
+    await _rpcConEsito('setup_master_pwd', {
+      p_default_hash: DEFAULT_PWD_HASH,
+      p_new_hash: nh,
+      p_new_recovery: nc,
+      p_new_hash_v2: nhV2,
+    });
+  } catch (e) {
+    err.textContent = 'Password NON salvata: ' + (e.message || e);
+    return;
+  }
   document.getElementById('pwd-modal-content').innerHTML =
     '<h3>Password impostata!</h3><div class="recovery-code-box"><div class="code">' +
     nc +
@@ -293,7 +300,7 @@ function forzaCambioPwdOperatore(nome) {
     '<h3>Benvenuto ' +
     escP(nome) +
     '!</h3><p>Per sicurezza, scegli una nuova password personale.</p><div class="pwd-field"><label>Nuova password (min 4 car.)</label><input type="password" id="op-new-pwd-1"></div><div class="pwd-field"><label>Conferma password</label><input type="password" id="op-new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="eseguiForzaCambioPwdOp(\'' +
-    nome.replace(/'/g, "\\'") +
+    _jsArg(nome) +
     '\')">Imposta</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
   setTimeout(() => document.getElementById('op-new-pwd-1').focus(), 100);
@@ -313,12 +320,17 @@ async function eseguiForzaCambioPwdOp(nome) {
   const nh = await secureHash(p1, nome);
   try {
     // la sessione della persona stessa (appena entrata con la password provvisoria)
-    await sbRpc('force_change_pwd', { p_nome: nome, p_new_hash: nh, p_deve_cambiare: false, p_token: getOpToken() });
+    await _rpcConEsito('force_change_pwd', {
+      p_nome: nome,
+      p_new_hash: nh,
+      p_deve_cambiare: false,
+      p_token: getOpToken(),
+    });
     document.getElementById('pwd-modal-content').innerHTML =
       '<h3>Password impostata!</h3><p style="text-align:center;color:var(--muted)">Da ora accedi con la tua nuova password.</p><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\');mostraNoteNonLette()">OK</button></div>';
     toast('Password personale impostata!');
   } catch (e) {
-    err.textContent = 'Errore salvataggio';
+    err.textContent = 'Password NON salvata: ' + (e.message || e);
   }
 }
 async function esci() {
@@ -643,7 +655,7 @@ async function resetPasswordOperatore(nome) {
     '<h3>Resetta password</h3><p>Imposta una nuova password temporanea per <strong>' +
     escP(nome) +
     '</strong></p><div class="pwd-field"><label>Nuova password</label><input type="password" id="reset-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="reset-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiResetPwdOp(\'' +
-    nome.replace(/'/g, "\\'") +
+    _jsArg(nome) +
     '\')">Resetta</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
@@ -661,13 +673,18 @@ async function eseguiResetPwdOp(nome) {
   }
   const nh = await secureHash(p1, nome);
   try {
-    await sbRpc('force_change_pwd', { p_nome: nome, p_new_hash: nh, p_deve_cambiare: true, p_token: getAdminToken() });
+    await _rpcConEsito('force_change_pwd', {
+      p_nome: nome,
+      p_new_hash: nh,
+      p_deve_cambiare: true,
+      p_token: getAdminToken(),
+    });
     document.getElementById('pwd-modal-content').innerHTML =
       '<h3>Password resettata!</h3><p style="text-align:center">' +
       escP(nome) +
       ' dovrà cambiarla al prossimo accesso.</p><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">OK</button></div>';
     toast('Password di ' + nome + ' resettata');
   } catch (e) {
-    err.textContent = 'Errore';
+    err.textContent = 'Password NON resettata: ' + (e.message || e);
   }
 }
