@@ -470,6 +470,7 @@ async function _renderPianoOrganicoTab() {
   h += _organicoTabellaGruppi(s);
   // SIMULATORE
   h += _organicoSimulatoreHtml(s);
+  h += _organicoCalcoloHtml(s);
   // VERIFICA
   h += _organicoVerificaHtml(s);
   // METODO
@@ -1202,4 +1203,324 @@ async function organicoRapportoPdf() {
   const nome = 'analisi_organico_' + s.dati.reparto + '_' + A.anno + '.pdf';
   doc.save(nome);
   logAzione('Rapporto organico PDF', nome);
+}
+
+// CALCOLO DEL FABBISOGNO (05.10, richiesta del titolare): "mi servono due persone, una
+// dalle 15 alle 18 e una dalle 16 alle 22, dal lunedi al giovedi, da ... a ...":
+// ore sui giorni veri del periodo (anche di notte), quanti collaboratori servono
+// (percentuale scelta, assenze medie dello storico, persone insieme negli orari che si
+// sovrappongono) e costo con notturno e indennita degli ausiliari (Regole).
+const _ORG_GIORNI = ['L', 'M', 'M', 'G', 'V', 'S', 'D']; // lunedi = 0
+let _orgCalc = null;
+function _orgCalcStato(s) {
+  if (!_orgCalc) {
+    const anno = s.base.anno;
+    const m = Math.min(12, parseInt(oggiLocale().substring(5, 7)) + 1);
+    _orgCalc = {
+      dal: anno + '-' + String(m).padStart(2, '0') + '-01',
+      al: anno + '-12-31',
+      tipo: 'jolly',
+      pct: 0.8,
+      costo: (s.par.costi || {}).ausiliarioOra || '',
+      righe: [{ da: '15:00', a: '18:00', giorni: [0, 1, 2, 3], quante: 1 }],
+      esito: null,
+    };
+  }
+  return _orgCalc;
+}
+function _organicoCalcoloHtml(s) {
+  const c = _orgCalcStato(s);
+  const lab = (t, campo) => '<label style="font-size:var(--fs-sm,.8125rem)">' + t + '<br>' + campo + '</label>';
+  let h =
+    '<h4 style="margin:16px 0 8px">Calcolo del fabbisogno: quanti collaboratori servono</h4>' +
+    '<div style="border:1px solid var(--line);border-radius:3px;padding:10px 12px;background:var(--paper2)">' +
+    '<p style="margin:0 0 8px;color:var(--muted);font-size:var(--fs-sm,.8125rem)">Le postazioni che servono (orario, giorni, quante persone insieme) nel periodo: il programma calcola le ore, quante persone servono e il costo.</p>';
+  h += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">';
+  h += lab('Dal', '<input type="date" id="orgc-dal" value="' + c.dal + '" onchange="organicoCalcSalva()">');
+  h += lab('Al', '<input type="date" id="orgc-al" value="' + c.al + '" onchange="organicoCalcSalva()">');
+  h += lab(
+    'Con',
+    '<select id="orgc-tipo" onchange="organicoCalcSalva(true)"><option value="jolly"' +
+      (c.tipo === 'jolly' ? ' selected' : '') +
+      '>Ausiliari (jolly)</option><option value="fisso"' +
+      (c.tipo === 'fisso' ? ' selected' : '') +
+      '>Fissi</option></select>',
+  );
+  h += lab(
+    'Percentuale di ognuno',
+    '<select id="orgc-pct" onchange="organicoCalcSalva()">' +
+      [100, 90, 80, 70, 60, 50, 40, 30, 20]
+        .map(
+          (p) =>
+            '<option value="' +
+            p / 100 +
+            '"' +
+            (Math.round(c.pct * 100) === p ? ' selected' : '') +
+            '>' +
+            p +
+            '%</option>',
+        )
+        .join('') +
+      '</select>',
+  );
+  h += lab(
+    'Costo orario CHF',
+    '<input type="number" id="orgc-costo" min="0" step="0.5" style="width:80px" value="' +
+      escP(String(c.costo)) +
+      '" onchange="organicoCalcSalva()">',
+  );
+  h +=
+    '</div><table class="fzp-tab" style="margin-top:8px"><thead><tr><th>Dalle</th><th>Alle</th><th>Giorni</th><th>Persone insieme</th><th></th></tr></thead><tbody>';
+  c.righe.forEach((r, i) => {
+    h +=
+      '<tr><td><input type="time" value="' +
+      r.da +
+      '" onchange="organicoCalcRiga(' +
+      i +
+      ',\'da\',this.value)"></td><td><input type="time" value="' +
+      r.a +
+      '" onchange="organicoCalcRiga(' +
+      i +
+      ',\'a\',this.value)"></td><td style="white-space:nowrap">' +
+      _ORG_GIORNI
+        .map(
+          (g, k) =>
+            '<label style="margin-right:4px"><input type="checkbox"' +
+            (r.giorni.includes(k) ? ' checked' : '') +
+            ' onchange="organicoCalcGiorno(' +
+            i +
+            ',' +
+            k +
+            ',this.checked)">' +
+            g +
+            '</label>',
+        )
+        .join('') +
+      '</td><td><input type="number" min="1" max="20" value="' +
+      r.quante +
+      '" style="width:56px" onchange="organicoCalcRiga(' +
+      i +
+      ',\'quante\',this.value)"></td><td><button class="btn-del-tipo" onclick="organicoCalcTogli(' +
+      i +
+      ')">Togli</button></td></tr>';
+  });
+  h +=
+    '</tbody></table><div style="margin-top:8px;display:flex;gap:8px"><button class="btn-act" onclick="organicoCalcAggiungi()">+ Postazione</button><button class="btn-export" onclick="organicoCalcola()">Calcola</button></div>';
+  if (c.esito) h += c.esito;
+  h += '</div>';
+  return h;
+}
+function organicoCalcSalva(tipoCambiato) {
+  const c = _orgCalc;
+  if (!c) return;
+  const v = (id) => (document.getElementById(id) || {}).value;
+  c.dal = v('orgc-dal') || c.dal;
+  c.al = v('orgc-al') || c.al;
+  c.tipo = v('orgc-tipo') || c.tipo;
+  c.pct = parseFloat(v('orgc-pct')) || c.pct;
+  c.costo = v('orgc-costo');
+  if (tipoCambiato && _orgStato) {
+    const k = _orgStato.par.costi || {};
+    c.costo =
+      c.tipo === 'fisso'
+        ? k.fissoAnno > 0
+          ? Math.round((k.fissoAnno / ((_orgStato.par.oreSett || 41) * 52)) * 100) / 100
+          : ''
+        : k.ausiliarioOra || '';
+    c.pct = c.tipo === 'fisso' ? 1 : 0.8;
+    renderPiano();
+  }
+}
+function organicoCalcRiga(i, campo, val) {
+  const r = _orgCalc && _orgCalc.righe[i];
+  if (!r) return;
+  r[campo] = campo === 'quante' ? Math.max(1, Math.min(20, parseInt(val) || 1)) : val;
+}
+function organicoCalcGiorno(i, k, si) {
+  const r = _orgCalc && _orgCalc.righe[i];
+  if (!r) return;
+  r.giorni = si ? [...new Set(r.giorni.concat([k]))].sort() : r.giorni.filter((x) => x !== k);
+}
+function organicoCalcAggiungi() {
+  organicoCalcSalva();
+  _orgCalc.righe.push({ da: '16:00', a: '22:00', giorni: [0, 1, 2, 3], quante: 1 });
+  renderPiano();
+}
+function organicoCalcTogli(i) {
+  organicoCalcSalva();
+  _orgCalc.righe.splice(i, 1);
+  renderPiano();
+}
+function organicoCalcola() {
+  if (!_orgStato || !_orgCalc) return;
+  organicoCalcSalva();
+  const c = _orgCalc;
+  const s = _orgStato;
+  if (!c.dal || !c.al || c.al < c.dal) {
+    toast('Periodo: la data "al" e prima di "dal"');
+    return;
+  }
+  const min = (x) => parseInt(String(x).substring(0, 2)) * 60 + parseInt(String(x).substring(3, 5));
+  const righe = c.righe.filter((r) => r.da && r.a && r.giorni.length);
+  if (!righe.length) {
+    toast('Aggiungi almeno una postazione con orario e giorni');
+    return;
+  }
+  // giorni del periodo per giorno della settimana
+  const perDow = [0, 0, 0, 0, 0, 0, 0];
+  let nGiorni = 0;
+  for (let d = new Date(c.dal + 'T12:00:00'); dataLocaleISO(d) <= c.al; d.setDate(d.getDate() + 1)) {
+    perDow[(d.getDay() + 6) % 7]++;
+    nGiorni++;
+  }
+  let ore = 0;
+  let oreNotte = 0;
+  const dettagli = righe.map((r) => {
+    let durata = (min(r.a) - min(r.da)) / 60;
+    if (durata <= 0) durata += 24;
+    const notte =
+      typeof _pianoOreNotturneTurno === 'function' ? _pianoOreNotturneTurno({ ora_inizio: r.da, ora_fine: r.a }) : 0;
+    const giorni = r.giorni.reduce((t, k) => t + perDow[k], 0);
+    const o = durata * giorni * r.quante;
+    const n = notte * giorni * r.quante;
+    ore += o;
+    oreNotte += n;
+    return { r: r, durata: durata, giorni: giorni, ore: o, notte: n };
+  });
+  // persone insieme: il massimo di postazioni aperte nello stesso quarto d ora, giorno per giorno
+  let insieme = 0;
+  for (let k = 0; k < 7; k++) {
+    const conta = new Array(96 * 2).fill(0); // due giorni di quarti (orari oltre la mezzanotte)
+    righe
+      .filter((r) => r.giorni.includes(k))
+      .forEach((r) => {
+        let a = min(r.da) / 15;
+        let b = min(r.a) / 15;
+        if (b <= a) b += 96;
+        for (let q = a; q < b; q++) conta[q] += r.quante;
+      });
+    insieme = Math.max(insieme, ...conta);
+  }
+  // quota netta (assenze medie: malattie, impegni, vacanze dei fissi) dallo storico
+  // del settore, solo i mesi rimasti e il tipo di persona scelto
+  const jolly = c.tipo === 'jolly';
+  let contr = 0;
+  let netto = 0;
+  s.base.mesi.forEach((x) => {
+    if (x.passato) return;
+    (x.offerta.persone || [])
+      .filter((p) => !!p.jolly === jolly && !p.ipotetica)
+      .forEach((p) => {
+        contr += p.contratto;
+        netto += p.netto;
+      });
+  });
+  const quota = contr > 0 ? netto / contr : jolly ? 0.9 : 0.8;
+  const oreSett = s.par.oreSett || 41;
+  const oreNettePersona = nGiorni * (oreSett / 7) * c.pct * quota;
+  const perOre = oreNettePersona > 0 ? Math.ceil(ore / oreNettePersona - 0.001) : 0;
+  const perInsieme = Math.ceil(insieme / Math.max(0.5, quota) - 0.001);
+  const persone = Math.max(perOre, perInsieme);
+  const fte = oreNettePersona > 0 ? ore / (nGiorni * (oreSett / 7) * quota) : 0;
+  // costo: ore per il costo orario + notturno + (ausiliari) indennita
+  const prezzo = parseFloat(c.costo) || 0;
+  const regola = (n, def) => {
+    const x = parseFloat(typeof _pianoRegolaVal === 'function' ? _pianoRegolaVal(n) : NaN);
+    return !isNaN(x) ? x : def;
+  };
+  const pNotte = regola('notte_percentuale', 10);
+  const pVac = jolly ? regola('jolly_indennita_vacanze_4sett', 8.33) : 0;
+  const p13 = jolly ? regola('jolly_indennita_tredicesima', 8.33) : 0;
+  const base = ore * prezzo;
+  const cNotte = oreNotte * prezzo * (pNotte / 100);
+  const cInd = (base + cNotte) * ((pVac + p13) / 100);
+  const tot = base + cNotte + cInd;
+  const f1 = (x) => (Math.round(x * 10) / 10).toLocaleString('it-CH');
+  const gg = (d) => d.substring(8, 10) + '.' + d.substring(5, 7) + '.' + d.substring(0, 4);
+  let e =
+    '<div style="margin-top:10px;font-size:var(--fs-md,.875rem);line-height:1.6"><b>Periodo ' +
+    gg(c.dal) +
+    ' - ' +
+    gg(c.al) +
+    '</b> (' +
+    nGiorni +
+    ' giorni)<br>' +
+    dettagli
+      .map(
+        (d) =>
+          '&bull; ' +
+          d.r.da +
+          '-' +
+          d.r.a +
+          ' ' +
+          d.r.giorni.map((k) => _ORG_GIORNI[k]).join('') +
+          (d.r.quante > 1 ? ' x ' + d.r.quante : '') +
+          ': ' +
+          d.giorni +
+          ' giorni, ' +
+          f1(d.ore) +
+          ' ore' +
+          (d.notte ? ' (di notte ' + f1(d.notte) + ')' : ''),
+      )
+      .join('<br>') +
+    '<br><b>Totale: ' +
+    f1(ore) +
+    ' ore</b>' +
+    (oreNotte ? ', di cui ' + f1(oreNotte) + ' di notte' : '') +
+    '<br><b>Servono ' +
+    persone +
+    ' ' +
+    (jolly ? 'ausiliari' : 'fissi') +
+    ' al ' +
+    Math.round(c.pct * 100) +
+    '%</b> (' +
+    perOre +
+    ' per le ore, ' +
+    perInsieme +
+    ' per avere sempre ' +
+    insieme +
+    (insieme === 1 ? ' persona' : ' persone insieme') +
+    ' anche con le assenze) · pari a ' +
+    f1(fte) +
+    ' tempi pieni · assenze medie dello storico ' +
+    Math.round((1 - quota) * 100) +
+    '%';
+  if (prezzo)
+    e +=
+      '<br><b>Costo: ' +
+      _orgCHF(Math.round(tot)) +
+      '</b> = ' +
+      f1(ore) +
+      ' h x ' +
+      prezzo +
+      ' CHF (' +
+      _orgCHF(Math.round(base)) +
+      ')' +
+      (cNotte ? ' + notturno ' + pNotte + '% su ' + f1(oreNotte) + ' h (' + _orgCHF(Math.round(cNotte)) + ')' : '') +
+      (cInd ? ' + vacanze ' + pVac + '% e tredicesima ' + p13 + '% (' + _orgCHF(Math.round(cInd)) + ')' : '');
+  else e += '<br><span style="color:var(--muted)">Inserisci il costo orario per avere il costo.</span>';
+  e +=
+    '<br><button class="btn-export" style="margin-top:6px" onclick="organicoCalcNelSimulatore(' +
+    persone +
+    ',' +
+    (base > 0 ? Math.round((tot / base) * 10000) / 10000 : 1) +
+    ')">Prova nel simulatore</button></div>';
+  c.esito = e;
+  renderPiano();
+}
+function organicoCalcNelSimulatore(persone, fattore) {
+  if (!_orgStato || !_orgCalc) return;
+  const c = _orgCalc;
+  _orgStato.scenario.aggiunte.push({
+    jolly: c.tipo === 'jolly',
+    pct: c.pct,
+    quanti: persone,
+    dal: c.dal,
+    al: c.al,
+    oraCosto: parseFloat(c.costo) > 0 ? parseFloat(c.costo) : null,
+    fattoreCosto: fattore || 1,
+  });
+  _organicoRicalcolaScenario();
+  renderPiano();
+  toast(persone + ' ' + (c.tipo === 'jolly' ? 'ausiliari' : 'fissi') + ' aggiunti al simulatore');
 }
