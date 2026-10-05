@@ -2175,32 +2175,38 @@ async function modificaVacanza(id) {
   // piu settimane questa riga diventa la prima e le altre si aggiungono; se cambia
   // settimana la riga si sposta. Senza date vale la settimana scritta (tutta).
   const anno = parseInt(v.anno) || window._pianoVacAnno;
+  // le date si vedono sempre: quelle della riga o, per una settimana intera, il
+  // lunedi e la domenica di quella settimana
+  const gW = _pianoGiorniSettimana(anno, v.settimana);
   const r = await chiediModulo(
-    v.collaboratore + ' · ' + (_vacEVacanza(v) ? 'Vacanza' : _vacCodice(v) + ' ' + _vacDescrSigla(_vacCodice(v))),
+    v.collaboratore +
+      ' · ' +
+      (_vacEVacanza(v) ? 'Vacanza' : _vacCodice(v) + ' ' + _vacDescrSigla(_vacCodice(v))) +
+      ' · settimana ' +
+      v.settimana +
+      ' (' +
+      _vacDateSettimana(anno, v.settimana) +
+      ')',
     [
       {
         titolo: 'Giorni',
-        nota: 'Dal / al: il periodo vero (anche su piu settimane). Vuoti = tutta la settimana qui sotto.',
+        nota: 'Il periodo vero, anche su piu settimane: le settimane le mette il programma (sposta la riga o ne aggiunge).',
         campi: [
           {
             id: 'dal',
             tipo: 'data',
             etichetta: 'dal',
-            valore: v.dal ? String(v.dal).substring(0, 10) : '',
+            valore: v.dal ? String(v.dal).substring(0, 10) : gW[0],
             larghezza: 150,
           },
           {
             id: 'al',
             tipo: 'data',
             etichetta: 'al',
-            valore: v.al ? String(v.al).substring(0, 10) : '',
+            valore: v.al ? String(v.al).substring(0, 10) : gW[6],
             larghezza: 150,
           },
         ],
-      },
-      {
-        titolo: 'Settimana (se non ci sono date)',
-        campi: [{ id: 'sett', valore: String(v.settimana), larghezza: 60 }],
       },
       { titolo: 'Nota', campi: [{ id: 'nota', valore: v.nota || '', larghezza: 420 }] },
     ],
@@ -2240,7 +2246,7 @@ async function modificaVacanza(id) {
       if (p.al === g[6]) p.al = null;
     });
   } else {
-    const sett = parseInt(r.sett);
+    const sett = parseInt(r.sett || v.settimana); // date cancellate: tutta la sua settimana
     if (isNaN(sett) || sett < 1 || sett > 53) {
       toast('Settimana non valida (1-53)');
       return;
