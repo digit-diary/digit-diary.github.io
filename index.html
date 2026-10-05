@@ -2349,7 +2349,7 @@
                 margin-bottom: 14px;
               "
             >
-              Registra l'arrivo di nuovi buoni in scorta.
+              <span data-inv-cat="buoni" data-inv-titolo="Registra l'arrivo di nuovi {nm} in scorta." data-inv-originale="Registra l'arrivo di nuovi buoni in scorta.">Registra l'arrivo di nuovi buoni in scorta.</span>
             </p>
             <div
               class="form-row"
@@ -2406,7 +2406,7 @@
               onclick="salvaInventarioCarico()"
               style="background: #2c6e49"
             >
-              &#9650; Carica buoni
+              <span data-inv-cat="buoni" data-inv-titolo="▲ Carica {nm}" data-inv-originale="▲ Carica buoni">&#9650; Carica buoni</span>
             </button>
           </div>
         </div>
@@ -2421,8 +2421,8 @@
                 margin-bottom: 14px;
               "
             >
-              Pre-assegna buoni a un cliente. Verr&agrave; pareggiato
-              automaticamente quando il cliente consuma in Maison.
+              <span data-inv-cat="buoni" data-inv-titolo="Pre-assegna {nm} a un cliente. Verrà pareggiato automaticamente quando il cliente consuma in Maison." data-inv-originale="Pre-assegna buoni a un cliente. Verrà pareggiato automaticamente quando il cliente consuma in Maison.">Pre-assegna buoni a un cliente. Verr&agrave; pareggiato
+              automaticamente quando il cliente consuma in Maison.</span>
             </p>
             <div
               class="form-row"
@@ -2493,7 +2493,7 @@
               onclick="salvaInventarioUscita()"
               style="background: #c8671a"
             >
-              &#9660; Assegna buono
+              <span data-inv-cat="buoni" data-inv-titolo="▼ Assegna {nm}" data-inv-originale="▼ Assegna buono">&#9660; Assegna buono</span>
             </button>
           </div>
         </div>
@@ -2716,8 +2716,8 @@
                 margin-bottom: 14px;
               "
             >
-              Registra una sigaretta sbagliata data al cliente (entra in
-              scorta).
+              <span data-inv-cat="sigarette" data-inv-titolo="Registra un pezzo di {nm} sbagliato dato al cliente (entra in scorta)." data-inv-originale="Registra una sigaretta sbagliata data al cliente (entra in scorta).">Registra una sigaretta sbagliata data al cliente (entra in
+              scorta).</span>
             </p>
             <div
               class="form-row"
@@ -2726,11 +2726,11 @@
               "
             >
               <div class="field">
-                <label>Marca</label
+                <label data-inv-cat="sigarette" data-inv-titolo="Articolo" data-inv-originale="Marca">Marca</label
                 ><input
                   type="text"
                   id="inv-sig-marca"
-                  placeholder="Es: Marlboro Gold..."
+                  placeholder="Es: Marlboro Gold..." data-inv-cat="sigarette" data-inv-ph="Es: nome dell articolo..."
                 />
               </div>
               <div class="field">
@@ -2800,7 +2800,7 @@
                 margin-bottom: 14px;
               "
             >
-              Dai una sigaretta dalla scorta a un cliente.
+              <span data-inv-cat="sigarette" data-inv-titolo="Dai un pezzo di {nm} dalla scorta a un cliente." data-inv-originale="Dai una sigaretta dalla scorta a un cliente.">Dai una sigaretta dalla scorta a un cliente.</span>
             </p>
             <div
               class="form-row"
@@ -2809,7 +2809,7 @@
               "
             >
               <div class="field">
-                <label>Marca</label
+                <label data-inv-cat="sigarette" data-inv-titolo="Articolo" data-inv-originale="Marca">Marca</label
                 ><select
                   id="inv-sig-usc-marca"
                   style="
@@ -2886,11 +2886,11 @@
             "
           >
             <div class="filter-group filter-cerca">
-              <span class="filter-label">Marca</span
+              <span class="filter-label" data-inv-cat="sigarette" data-inv-titolo="Articolo" data-inv-originale="Marca">Marca</span
               ><input class="campo-cerca"
                 type="text"
                 id="inv-s-filt-marca"
-                placeholder="Cerca marca..." aria-label="Cerca marca"
+                placeholder="Cerca marca..." data-inv-cat="sigarette" data-inv-ph="Cerca articolo..." aria-label="Cerca marca"
                 oninput="renderInventarioSigTable()"
               />
             </div>

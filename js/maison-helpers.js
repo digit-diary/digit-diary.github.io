@@ -2584,10 +2584,17 @@ async function nascondiCategoriaBase(key, nascondi) {
 }
 // titoli delle sezioni Buoni/Sigarette con il nome scelto (testo originale se non rinominata)
 function _invAggiornaTitoli() {
+  // segnaposto (Es: Marlboro Gold...) generici quando la categoria e rinominata
+  document.querySelectorAll('[data-inv-ph]').forEach((el) => {
+    if (!el.dataset.invPhOrig) el.dataset.invPhOrig = el.placeholder;
+    el.placeholder = _invBaseCfg(el.dataset.invCat).label ? el.dataset.invPh : el.dataset.invPhOrig;
+  });
   document.querySelectorAll('[data-inv-titolo]').forEach((el) => {
     const k = el.dataset.invCat;
     const rinominata = !!_invBaseCfg(k).label;
-    const testo = rinominata ? el.dataset.invTitolo.replace('{n}', invNomeBase(k)) : el.dataset.invOriginale;
+    const testo = rinominata
+      ? el.dataset.invTitolo.replace('{n}', invNomeBase(k)).replace('{nm}', invNomeBase(k).toLowerCase())
+      : el.dataset.invOriginale;
     let comandi = '';
     if (isAdmin() && /^(Giacenza|Scorta) /.test(el.dataset.invOriginale))
       comandi =
@@ -2972,7 +2979,9 @@ function renderInventarioBuoni() {
       (nonPareggiati
         ? '<div style="width:100%;grid-column:1/-1;margin-top:8px;padding:8px;background:rgba(230,126,34,0.12);color:var(--c-arancio,#b85c0e);border-radius:3px;font-size:var(--fs-md,.875rem)"><i class="icx icx-avviso"></i> ' +
           nonPareggiati +
-          ' buoni pre-assegnati non pareggiati</div>'
+          ' ' +
+          escP(invNomeBase('buoni').toLowerCase()) +
+          ' pre-assegnati non pareggiati</div>'
         : '');
   }
   renderInventarioBuoniTable();
@@ -3153,9 +3162,16 @@ function renderInventarioSigarette() {
         .join('') +
       '<div class="mini-stat"><div class="mini-stat-num" style="color:var(--ink)">' +
       totale +
-      '</div><div class="mini-stat-label">Totale pacchetti</div></div>';
+      '</div><div class="mini-stat-label">' +
+      (_invBaseCfg('sigarette').label ? 'Totale pezzi' : 'Totale pacchetti') +
+      '</div></div>';
     if (!brands.length)
-      kpiEl.innerHTML = '<p style="color:var(--muted);text-align:center;padding:12px">Nessuna sigaretta in scorta</p>';
+      kpiEl.innerHTML =
+        '<p style="color:var(--muted);text-align:center;padding:12px">' +
+        (_invBaseCfg('sigarette').label
+          ? 'Nessun pezzo di ' + escP(invNomeBase('sigarette')) + ' in scorta'
+          : 'Nessuna sigaretta in scorta') +
+        '</p>';
   }
   renderInventarioSigTable();
   _aggiornaMarche();

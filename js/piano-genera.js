@@ -1010,11 +1010,18 @@ function _pianoIdoneoStatico(n, t, dowG, idoneita) {
       campoGrant = true;
     }
   }
-  // mappature per funzione (SUP/BO limitati ai loro turni)
+  // MAPPATURE PER FUNZIONE: limitano la funzione ai suoi turni SOLO se elencano turni
+  // principali o ammessi (SUP, BO). Una mappatura con soli turni PREFERITI (es. HOST:
+  // S22, S31, S7, Z5) e una preferenza, non un lasciapassare: valgono i reparti della
+  // persona (settori, competenze, turni gia fatti). Prima la sola presenza della
+  // mappatura saltava questo controllo: per un HOST ogni turno era idoneo, anche di
+  // cassa o reception senza formazione (bozza, Migliora, formazioni).
   const mapp = _pianoMappFunzione(fz);
-  if (mapp) {
-    const voci = mapp.filter((m) => m.tipo === 'PRINCIPALE' || m.tipo === 'AMMESSO').map((m) => m.turno_codice);
-    if (voci.length && !voci.includes(t.codice)) return false;
+  const voci = mapp
+    ? mapp.filter((m) => m.tipo === 'PRINCIPALE' || m.tipo === 'AMMESSO').map((m) => m.turno_codice)
+    : [];
+  if (voci.length) {
+    if (!voci.includes(t.codice)) return false;
   } else if (!haStoria && !campoGrant) return false;
   return true;
 }
