@@ -363,6 +363,9 @@
         const alt = propri.filter((b) => /ALT/.test(b.post));
         const alternative = [];
         if (principali.length) alternative.push({ alt: false, pause: pauseDi(principali) });
+        // solo colonne ALT. (es. "S5 tra loro"): resta valida anche la giornata nel
+        // foglio, cioe le pause che riceve nelle colonne di chi da i cambi
+        else alternative.push({ alt: false, pause: coperture[p.nome] || [] });
         alt.forEach((b) => alternative.push({ alt: true, pause: pauseDi([b]) }));
         res[p.nome] = { colonna: true, alternative: alternative };
       } else if (ROTAZIONE.includes(norm(p.turno))) {

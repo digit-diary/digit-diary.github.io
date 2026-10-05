@@ -2794,6 +2794,69 @@ function _pcBloccoPersonale(c, p, pause, opz) {
   if (t < p.fin) _pcScriviRiga(c, r++, base, lbl, t, p.fin, null, false);
   c.nR = Math.max(c.nR, r);
 }
+// S5 TRA LORO: gli S5 si danno le pause fra loro, in modo equo. Prima pausa (la piu
+// lunga) 2 ore e mezza dopo l inizio, una persona dopo l altra (es. 19.30-20.00 e
+// 20.00-20.30); poi i quarti, distribuiti nella serata, con l ordine che si alterna
+// a ogni giro. Chi rientra copre il collega successivo. Colonne "S5 ALT." facoltative:
+// per i controlli sono un alternativa alla giornata nel foglio, non si sommano.
+function _peS5TraLoro(c, s5) {
+  if (!s5 || s5.length < 2) return;
+  const lista = s5.slice().sort((a, b) => a.ini - b.ini || a.nome.localeCompare(b.nome));
+  const durate = lista.map((p) => p.attese.slice().sort((a, b) => b - a));
+  const giri = Math.max(...durate.map((d) => d.length));
+  const q15 = (m) => Math.ceil(m / 15) * 15;
+  const iniMax = Math.max(...lista.map((p) => p.ini));
+  const finMin = Math.min(...lista.map((p) => p.fin));
+  const t1 = q15(iniMax + 150);
+  const len1 = durate.reduce((t, d) => t + (d[0] || 0), 0);
+  // i giri dopo il primo si distribuiscono fino a fine turno: l ultimo finisce
+  // mezz ora prima della fine (es. 17.00-02.00: 22.45 e 01.00)
+  const lenUltimo = durate.reduce((t, d) => t + (d[giri - 1] || 0), 0);
+  const disponibile = Math.max(0, finMin - 30 - lenUltimo - (t1 + len1));
+  const pause = lista.map(() => []); // per persona: { ini, fin, da: chi copre }
+  const coperture = lista.map(() => []); // per persona: { ini, fin, per: chi e in pausa }
+  for (let k = 0; k < giri; k++) {
+    const ordine = lista.map((_, i) => (i + k) % lista.length);
+    let t = k === 0 ? t1 : Math.floor((t1 + len1 + (disponibile * k) / Math.max(1, giri - 1)) / 15) * 15;
+    ordine.forEach((i, pos) => {
+      const d = durate[i][k];
+      if (!d) return;
+      if (t < lista[i].ini + 30 || t + d > lista[i].fin - 30) return;
+      const chi = ordine[(pos + 1) % ordine.length];
+      pause[i].push({ ini: t, fin: t + d });
+      coperture[chi].push({ ini: t, fin: t + d, per: lista[i].nome });
+      t += d;
+    });
+  }
+  lista.forEach((p, i) => {
+    const ultima = (base) => {
+      let m = 0;
+      Object.keys(c.celle).forEach((key) => {
+        const [r, col] = key.split('|').map(Number);
+        if ((col === base || col === base + 1) && r > m) m = r;
+      });
+      return m;
+    };
+    const base = [1, 4, 7].sort((a, b) => ultima(a) - ultima(b))[0];
+    let r = Math.max(ultima(base) + 3, 7);
+    c.celle[r + '|' + base] = { v: 'S5 ALT.', b: 1, bg: _PE_CLR.sala, sz: 10, hdr: 1, pers: 1, opz: 'S5 tra loro' };
+    c.celle[r + '|' + (base + 1)] = { v: p.nome, b: 1, bg: _PE_CLR.sala, sz: 9, hdr: 1 };
+    c.celle[r + 1 + '|' + (base + 1)] = { v: _pbOra(p.ini) + ' - ' + _pbOra(p.fin), b: 1, sz: 9, ora: 1 };
+    r += 2;
+    const eventi = pause[i]
+      .map((x) => ({ ini: x.ini, fin: x.fin, pos: 'PAUSA' }))
+      .concat(coperture[i].map((x) => ({ ini: x.ini, fin: x.fin, pos: 'S5', per: x.per })))
+      .sort((a, b) => a.ini - b.ini);
+    let t = p.ini;
+    eventi.forEach((x) => {
+      if (x.ini > t) _pcScriviRiga(c, r++, base, 'SALA', t, x.ini, null, false);
+      _pcScriviRiga(c, r++, base, x.pos, x.ini, x.fin, null, false, x.per);
+      t = x.fin;
+    });
+    if (t < p.fin) _pcScriviRiga(c, r++, base, 'SALA', t, p.fin, null, false);
+    c.nR = Math.max(c.nR, r);
+  });
+}
 function _peCompletaPause(c, ctx, righe, dstr) {
   const PC = window.PauseControlli;
   const proposte = [];
@@ -2935,7 +2998,10 @@ function _peCompletaPause(c, ctx, righe, dstr) {
           if (!daSolo || punti > daSolo.punti) daSolo = { punti: punti, t: t };
         }
       }
-      if (daSolo) {
+      // S5: prima il cambio da chi e libero in sala (es. S7 alle 24.45), cosi nel foglio
+      // si vede chi copre; "da solo" resta il ripiego (v375)
+      const cambioPrima = p.turno === 'S5';
+      if (daSolo && !cambioPrima) {
         soli.push({ ini: daSolo.t, fin: daSolo.t + d, nuova: true });
         continue;
       }
@@ -2986,6 +3052,10 @@ function _peCompletaPause(c, ctx, righe, dstr) {
           continue;
         }
       }
+      if (daSolo) {
+        soli.push({ ini: daSolo.t, fin: daSolo.t + d, nuova: true });
+        continue;
+      }
       // 3. nessuno puo dare il cambio: la pausa si propone comunque, con avviso
       let ripiego = null;
       for (let t = Math.ceil((p.ini + 30) / 15) * 15; t + d <= p.fin - 30; t += 15) {
@@ -3028,6 +3098,11 @@ function _peCompletaPause(c, ctx, righe, dstr) {
       );
     }
   }
+  // S5 TRA LORO (facoltative, v375): con due o piu S5 una colonna alternativa ciascuno
+  _peS5TraLoro(
+    c,
+    persone.filter((p) => p.turno === 'S5' && p.ini != null && p.fin != null && p.attese && p.attese.length),
+  );
   return proposte;
 }
 // BIGLIETTINO DEL MATTINO (C4, cassa tavoli): apre alle 11.40, da la mezz ora ai
