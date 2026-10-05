@@ -2858,6 +2858,8 @@ function _peS5TraLoro(c, s5) {
   });
 }
 function _peCompletaPause(c, ctx, righe, dstr) {
+  const dowCP = dstr ? new Date(dstr + 'T12:00:00').getDay() : -1;
+  const venSab = dowCP === 5 || dowCP === 6;
   const PC = window.PauseControlli;
   const proposte = [];
   if (!PC) return proposte;
@@ -3011,6 +3013,9 @@ function _peCompletaPause(c, ctx, righe, dstr) {
         .filter((b) => !/ALT/.test(b.post) && !b.personale && b.nome && !/^\(/.test(b.nome))
         .forEach((b) => {
           if (String(b.nome).toUpperCase() === p.nome.toUpperCase()) return;
+          // venerdi e sabato chi da le pause in cassa (CD, C8...) resta in cassa: niente
+          // cambi di sala (decisione del titolare 05.10: Carla CD 03 non copre l S5)
+          if (venSab && sett === 'S' && /^C/.test(b.post)) return;
           if (!_pePuoCoprire(ctx.dc, b.nome, p.sett || p.turno)) return;
           const giaCopre = b.righe.some((x) => x.pos === p.turno);
           b.righe.forEach((riga) => {

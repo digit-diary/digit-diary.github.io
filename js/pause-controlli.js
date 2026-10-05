@@ -20,7 +20,10 @@
  *     seconda; con una sola persona le righe attaccate sono una pausa sola;
  *  3. il bigliettino del mattino (C4), se c e.
  * Le righe C8 sono rotazioni tra i cassieri, non cambi per la pausa: chi e
- * su C8 senza colonna propria non si controlla.
+ * su C8 senza colonna propria non si controlla. Chi e su C8 e ha una colonna
+ * propria solo per una parte della notte (es. CD 07 dalle 01.45) riceve le altre
+ * pause da chi da le pause in cassa (righe C8 di CD 03 fuori dalla sua colonna):
+ * quelle righe sono sue finche aspetta una pausa di quella durata.
  */
 (function (root, factory) {
   const mod = factory();
@@ -133,10 +136,12 @@
     const turni = {};
     persone.forEach((p) => (turni[norm(p.turno)] = 1));
     Object.keys(turni).forEach((t) => {
-      if (ROTAZIONE.includes(t)) return;
+      const rotazione = ROTAZIONE.includes(t);
       const tutti = persone.filter((p) => norm(p.turno) === t);
       const conCol = tutti.filter((p) => bl.some((b) => norm(b.nome) === norm(p.nome)));
-      const liberi = tutti.filter((p) => !conCol.includes(p));
+      if (rotazione && !conCol.length) return;
+      // rotazione (C8): chi non ha colonna non si controlla, le righe non sue restano rotazioni
+      const liberi = rotazione ? [] : tutti.filter((p) => !conCol.includes(p));
       const righe = [];
       // le colonne ALT. sono un alternativa a un altra colonna: non si sommano
       bl.forEach((b) => {
@@ -217,7 +222,7 @@
           .map((p, k) => ({ p: p, k: k }))
           .filter((o) => !spanCol[o.k].some((y) => y.ini < x.fin && y.fin > x.ini));
         const chiAspetta = liberiOra.find((o) => restoCol[o.k].includes(x.fin - x.ini));
-        const scelto = chiAspetta || (!liberi.length ? liberiOra[0] : null);
+        const scelto = chiAspetta || (!liberi.length && !rotazione ? liberiOra[0] : null);
         if (scelto) {
           const k = restoCol[scelto.k].indexOf(x.fin - x.ini);
           if (k >= 0) restoCol[scelto.k].splice(k, 1);
