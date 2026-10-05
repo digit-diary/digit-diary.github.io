@@ -2214,15 +2214,16 @@ function _renderFormazioneConfig() {
           "'," +
           i +
           ',this.value)" style="padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);font-weight:700">' +
-          Array.from({ length: Math.max(_lvMaxReparto(rep), parseInt(k.livello) || 1) + 1 }, (_, n) => n + 1)
+          // un gradino in piu del massimo (L5 quando c e L4) ed Extra, fuori dalla scala
+          [...Array.from({ length: Math.max(_lvMaxReparto(rep), parseInt(k.livello) || 0) + 1 }, (_, n) => n + 1), 0]
             .map(
               (n) =>
                 '<option value="' +
                 n +
                 '"' +
-                (n === (parseInt(k.livello) || 1) ? ' selected' : '') +
-                '>L' +
-                n +
+                (n === (parseInt(k.livello) || 0) ? ' selected' : '') +
+                '>' +
+                _compLvTesto(n) +
                 '</option>',
             )
             .join('') +
@@ -2230,7 +2231,7 @@ function _renderFormazioneConfig() {
           escP(k.label) +
           (doppi.length
             ? ' <span style="font-weight:400;font-size:var(--fs-sm,.8125rem);color:var(--accent2)">stesso nome di ' +
-              doppi.map((x) => escP(x.label) + ' (L' + (parseInt(x.livello) || 0) + ')').join(', ') +
+              doppi.map((x) => escP(x.label) + ' (' + _compLvTesto(x.livello) + ')').join(', ') +
               '</span> <button class="btn-act" style="margin-left:6px;padding:2px 8px" title="Tiene questa (nome e livello) e le passa le spunte dell altra, poi toglie l altra" onclick="unisciCompetenzaCfg(\'' +
               rep +
               "'," +
@@ -2437,14 +2438,22 @@ async function modificaNotificheCfg(val) {
 }
 // ORDINE DELLE COMPETENZE: sempre per livello (L1, L2, ...); dentro lo stesso livello
 // l ordine lo sceglie l amministratore con le frecce
+// posto nell ordine: L1, L2, ... e Extra (livello 0, fuori dalla scala) in fondo
+function _compPosto(k) {
+  const lv = parseInt(k.livello) || 0;
+  return lv > 0 ? lv : 9999;
+}
 function _compOrdinate(lista) {
   return lista
     .map((k, i) => ({ k: k, i: i }))
-    .sort((a, b) => (parseInt(a.k.livello) || 0) - (parseInt(b.k.livello) || 0) || a.i - b.i)
+    .sort((a, b) => _compPosto(a.k) - _compPosto(b.k) || a.i - b.i)
     .map((x) => x.k);
 }
 function _compFuoriOrdine(lista) {
-  return lista.some((k, i) => i > 0 && (parseInt(k.livello) || 0) < (parseInt(lista[i - 1].livello) || 0));
+  return lista.some((k, i) => i > 0 && _compPosto(k) < _compPosto(lista[i - 1]));
+}
+function _compLvTesto(lv) {
+  return (parseInt(lv) || 0) > 0 ? 'L' + parseInt(lv) : 'Extra';
 }
 // cambia il livello di una competenza: cambia anche il livello dei collaboratori
 // (L(n) = tutte le competenze fino a n), quindi si chiede conferma
@@ -2453,15 +2462,15 @@ async function cambiaLivelloCompetenzaCfg(rep, idx, val) {
   const cfg = getCompetenzeConfigAll();
   const k = (cfg[rep] || [])[idx];
   const lv = parseInt(val);
-  if (!k || !lv || lv === parseInt(k.livello)) return;
+  if (!k || isNaN(lv) || lv < 0 || lv === (parseInt(k.livello) || 0)) return;
   if (
     !(await chiediConferma(
       'Portare "' +
         k.label +
-        '" da L' +
-        k.livello +
-        ' a L' +
-        lv +
+        '" da ' +
+        _compLvTesto(k.livello) +
+        ' a ' +
+        _compLvTesto(lv) +
         '?\n\nIl livello dei collaboratori si ricalcola (un livello richiede tutte le competenze fino a quel livello). Le spunte gia date restano.',
     ))
   ) {
@@ -2476,9 +2485,12 @@ async function cambiaLivelloCompetenzaCfg(rep, idx, val) {
   l.push(voce);
   cfg[rep] = _compOrdinate(l);
   await saveCompetenzeConfig(cfg);
-  logAzione('Competenza: livello cambiato', rep + ': ' + k.label + ' L' + prima + ' -> L' + lv);
+  logAzione(
+    'Competenza: livello cambiato',
+    rep + ': ' + k.label + ' ' + _compLvTesto(prima) + ' -> ' + _compLvTesto(lv),
+  );
   renderFormazione();
-  toast(k.label + ': ora L' + lv);
+  toast(k.label + ': ora ' + _compLvTesto(lv));
 }
 // dalla matrice: apre la configurazione e porta alle competenze del settore
 function apriRiordinoCompetenze() {
@@ -2524,7 +2536,7 @@ async function aggiungiCompetenzaCfg(rep) {
   const gia = cfg[rep].findIndex((k) => k.key === key || _compNomeNorm(k.label) === _compNomeNorm(nome));
   if (gia >= 0) {
     const g = cfg[rep][gia];
-    if ((parseInt(g.livello) || 0) === lv) toast('"' + g.label + '" esiste gia in L' + lv);
+    if ((parseInt(g.livello) || 0) === lv) toast('"' + g.label + '" esiste gia in ' + _compLvTesto(lv));
     // stessa competenza in un altro livello: si sposta quella (le spunte restano)
     else await cambiaLivelloCompetenzaCfg(rep, gia, lv);
     return;
@@ -2532,7 +2544,7 @@ async function aggiungiCompetenzaCfg(rep) {
   // in ordine di livello: la nuova va dopo l ultima del suo livello (v376)
   cfg[rep] = _compOrdinate([...cfg[rep], { key, label: nome, livello: lv }]);
   await saveCompetenzeConfig(cfg);
-  logAzione('Competenza config aggiunta', rep + ': ' + nome + ' (L' + lv + ')');
+  logAzione('Competenza config aggiunta', rep + ': ' + nome + ' (' + _compLvTesto(lv) + ')');
   renderFormazione();
   toast('Competenza aggiunta');
 }
@@ -2580,10 +2592,10 @@ async function unisciCompetenzaCfg(rep, idx) {
     !(await chiediConferma(
       'Tenere "' +
         tieni.label +
-        '" (L' +
-        tieni.livello +
+        '" (' +
+        _compLvTesto(tieni.livello) +
         ') e togliere ' +
-        via.map((x) => '"' + x.label + '" (L' + x.livello + ')').join(', ') +
+        via.map((x) => '"' + x.label + '" (' + _compLvTesto(x.livello) + ')').join(', ') +
         '?\n\nLe spunte passano a quella tenuta (' +
         conSpunta +
         ' collaboratori certificati, formatori compresi), insieme al gruppo di turni e al modello delle Formazioni. Il livello dei collaboratori si ricalcola.',
@@ -2643,10 +2655,16 @@ async function unisciCompetenzaCfg(rep, idx) {
   await saveCompetenzeConfig(cfg);
   logAzione(
     'Competenze unite',
-    rep + ': ' + via.map((x) => x.label + ' L' + x.livello).join(', ') + ' -> ' + tieni.label + ' L' + tieni.livello,
+    rep +
+      ': ' +
+      via.map((x) => x.label + ' ' + _compLvTesto(x.livello)).join(', ') +
+      ' -> ' +
+      tieni.label +
+      ' ' +
+      _compLvTesto(tieni.livello),
   );
   renderFormazione();
-  toast('Unite in "' + tieni.label + '" (L' + tieni.livello + ')');
+  toast('Unite in "' + tieni.label + '" (' + _compLvTesto(tieni.livello) + ')');
 }
 async function rimuoviCompetenzaCfg(rep, idx) {
   if (!_soloAdminCfg()) return;
