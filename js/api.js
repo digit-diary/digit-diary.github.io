@@ -435,7 +435,8 @@ async function loadAll() {
   await loadGroqKey();
   _loadLogo();
   // Pulizia automatica: sessioni scadute + log > 12 mesi
-  sbRpc('cleanup_old_data').catch(() => {});
+  // con la sessione: senza, il database la rifiuta (migrazione 20260895)
+  sbRpc('cleanup_old_data', { p_token: getOpToken() || getAdminToken() }).catch(() => {});
   // Maison: auto-cancellazione GD precedenti se configurata (privacy)
   if (typeof _maisonAutoCleanup === 'function') _maisonAutoCleanup().catch(() => {});
   // Giubilei in arrivo: notifica una tantum agli operatori HR (se configurato il preavviso)
