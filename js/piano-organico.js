@@ -630,16 +630,49 @@ function _organicoSimulatoreHtml(s) {
   let h =
     '<h4 style="margin:16px 0 8px">Simulatore</h4><div style="border:1px solid var(--line);border-radius:3px;padding:10px 12px;background:var(--paper2)">';
   h += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">';
-  h +=
-    '<label style="font-size:var(--fs-sm,.8125rem)">Ipotesi<br><select id="org-tipo"><option value="jolly">Ausiliario (jolly)</option><option value="fisso">Fisso</option></select></label>';
-  h +=
-    '<label style="font-size:var(--fs-sm,.8125rem)">Percentuale<br><select id="org-pct">' +
-    [100, 90, 80, 70, 60, 50, 40, 30, 20]
-      .map((p) => '<option value="' + p / 100 + '"' + (p === 80 ? ' selected' : '') + '>' + p + '%</option>')
-      .join('') +
-    '</select></label>';
-  h += '<label style="font-size:var(--fs-sm,.8125rem)">Dal<br><select id="org-dal">' + opMese(da) + '</select></label>';
-  h += '<label style="font-size:var(--fs-sm,.8125rem)">Al<br><select id="org-al">' + opMese(12) + '</select></label>';
+  // IPOTESI (05.10, richiesta del titolare): tipo, quante persone, dal / al come date,
+  // orario dalle / alle con i giorni a settimana (oppure la percentuale) e il costo
+  // orario di quell ipotesi. L orario diventa la percentuale: 20:00-02:00 per 5
+  // giorni = 30 ore a settimana.
+  const lab = (t, campo) => '<label style="font-size:var(--fs-sm,.8125rem)">' + t + '<br>' + campo + '</label>';
+  const annoS = s.base.anno;
+  const dalDef = annoS + '-' + String(da).padStart(2, '0') + '-01';
+  const costi = s.par.costi || {};
+  const oraFissoDef =
+    costi.fissoAnno > 0 ? Math.round((costi.fissoAnno / ((s.par.oreSett || 41) * 52)) * 100) / 100 : '';
+  h += lab(
+    'Ipotesi',
+    '<select id="org-tipo" onchange="organicoCostoDefault()"><option value="jolly">Ausiliario (jolly)</option><option value="fisso">Fisso</option></select>',
+  );
+  h += lab('Quanti', '<input type="number" id="org-quanti" min="1" max="50" value="1" style="width:56px">');
+  h += lab('Dal', '<input type="date" id="org-dal" value="' + dalDef + '">');
+  h += lab('Al', '<input type="date" id="org-al" value="' + annoS + '-12-31">');
+  h += lab('Orario dalle', '<input type="time" id="org-ora-da" style="width:96px">');
+  h += lab('alle', '<input type="time" id="org-ora-a" style="width:96px">');
+  h += lab(
+    'Giorni/sett.',
+    '<select id="org-giorni">' +
+      [1, 2, 3, 4, 5, 6, 7].map((g) => '<option' + (g === 5 ? ' selected' : '') + '>' + g + '</option>').join('') +
+      '</select>',
+  );
+  h += lab(
+    'oppure %',
+    '<select id="org-pct">' +
+      [100, 90, 80, 70, 60, 50, 40, 30, 20]
+        .map((p) => '<option value="' + p / 100 + '"' + (p === 80 ? ' selected' : '') + '>' + p + '%</option>')
+        .join('') +
+      '</select>',
+  );
+  h += lab(
+    'Costo orario CHF',
+    '<input type="number" id="org-costo-ora" min="0" step="0.5" style="width:80px" data-fisso="' +
+      oraFissoDef +
+      '" data-aus="' +
+      (costi.ausiliarioOra || '') +
+      '" value="' +
+      (costi.ausiliarioOra || '') +
+      '">',
+  );
   h += '<button class="btn-export" onclick="organicoAggiungiIpotesi()">Aggiungi</button>';
   h += '<span style="width:16px"></span>';
   h +=
@@ -658,17 +691,37 @@ function _organicoSimulatoreHtml(s) {
   h += '<button class="btn-export" onclick="organicoCambiaPercentuale()">Applica</button>';
   h += '</div>';
   const sc = s.scenario;
+  const costoS = s.ipotesi ? OrganicoModello.costoScenario(s.base, s.ipotesi, s.par.costi, s.par) : null;
+  const gg = (d) => d.substring(8, 10) + '.' + d.substring(5, 7);
   const voci = sc.aggiunte
     .map(
       (a, i) =>
         '<span class="mini-badge" style="background:var(--accent2);font-size:var(--fs-sm,.8125rem)">' +
         escP(
-          (a.jolly ? 'Ausiliario ' : 'Fisso ') +
-            Math.round(a.pct * 100) +
-            '% ' +
-            _orgMeseBreve(+a.dal.substring(5, 7)) +
+          ((a.quanti || 1) > 1 ? a.quanti + ' x ' : '') +
+            (a.jolly ? 'Ausiliario ' : 'Fisso ') +
+            (a.orario
+              ? a.orario.da + '-' + a.orario.a + ' ' + a.orario.giorni + ' g/sett. (' + Math.round(a.pct * 100) + '%) '
+              : Math.round(a.pct * 100) + '% ') +
+            gg(a.dal) +
             '-' +
-            _orgMeseBreve(+a.al.substring(5, 7)),
+            gg(a.al) +
+            (a.oraCosto ? ' · ' + a.oraCosto + ' CHF/h' : '') +
+            (a.oraCosto && a.maggiorazioni
+              ? [
+                  a.maggiorazioni.notte
+                    ? 'notturno 10% su ' + a.orario.notte + ' h di notte (+' + a.maggiorazioni.notte + '%)'
+                    : '',
+                  a.maggiorazioni.vacanze ? '+' + a.maggiorazioni.vacanze + '% vacanze' : '',
+                  a.maggiorazioni.tredicesima ? '+' + a.maggiorazioni.tredicesima + '% 13a' : '',
+                ]
+                  .filter(Boolean)
+                  .map((x) => ' ' + x)
+                  .join('')
+              : '') +
+            (costoS && costoS.dettaglio && costoS.dettaglio[i] && costoS.dettaglio[i].chf
+              ? ' = ' + _orgCHF(costoS.dettaglio[i].chf) + ' (' + _orgOre(costoS.dettaglio[i].ore) + ' h)'
+              : ''),
         ) +
         ' <a href="#" style="color:#fff" onclick="organicoTogliIpotesi(' +
         i +
@@ -730,10 +783,7 @@ function _organicoSimulatoreHtml(s) {
       ' · ' +
       _orgSegno(Math.round(ore), _orgOre) +
       ' ore nette nei mesi rimasti' +
-      (s.par.costi
-        ? ' · <b>Costo stimato:</b> ' +
-          escP(_organicoCostoTesto(OrganicoModello.costoScenario(s.base, s.ipotesi, s.par.costi, s.par)))
-        : '') +
+      (costoS ? ' · <b>Costo stimato:</b> ' + escP(_organicoCostoTesto(costoS)) : '') +
       '</div>';
   }
   h += '</div>';
@@ -877,17 +927,75 @@ function organicoProvaSuggerimento(i) {
   _organicoRicalcolaScenario();
   renderPiano();
 }
+// costo orario proposto secondo il tipo (medio dell ausiliario o del fisso)
+function organicoCostoDefault() {
+  const c = document.getElementById('org-costo-ora');
+  const t = (document.getElementById('org-tipo') || {}).value;
+  if (c) c.value = t === 'fisso' ? c.dataset.fisso || '' : c.dataset.aus || '';
+}
 function organicoAggiungiIpotesi() {
   if (!_orgStato) return;
   const anno = _orgStato.base.anno;
   const v = (id) => (document.getElementById(id) || {}).value;
-  const dal = parseInt(v('org-dal'));
-  const al = Math.max(dal, parseInt(v('org-al')));
+  const dal = v('org-dal') || anno + '-01-01';
+  const al = v('org-al') || anno + '-12-31';
+  if (al < dal) {
+    toast('La data "al" e prima di "dal"');
+    return;
+  }
+  if (dal.substring(0, 4) !== String(anno) || al.substring(0, 4) !== String(anno)) {
+    toast('Le date devono stare nel ' + anno + ' (l anno dell analisi)');
+    return;
+  }
+  // orario dalle / alle: ore al giorno per i giorni a settimana = la percentuale
+  const oraDa = v('org-ora-da');
+  const oraA = v('org-ora-a');
+  let pct = parseFloat(v('org-pct'));
+  let orario = null;
+  if (oraDa && oraA) {
+    const min = (x) => parseInt(x.substring(0, 2)) * 60 + parseInt(x.substring(3, 5));
+    let ore = (min(oraA) - min(oraDa)) / 60;
+    if (ore <= 0) ore += 24; // oltre la mezzanotte
+    const gg = parseInt(v('org-giorni')) || 5;
+    const oreSett = _orgStato.par.oreSett || 41;
+    pct = Math.round(Math.min(1, (ore * gg) / oreSett) * 1000) / 1000;
+    orario = { da: oraDa, a: oraA, ore: Math.round(ore * 100) / 100, giorni: gg };
+  } else if (oraDa || oraA) {
+    toast('Orario: servono sia "dalle" sia "alle" (oppure nessuno dei due e la percentuale)');
+    return;
+  }
+  const costo = parseFloat(v('org-costo-ora'));
+  // MAGGIORAZIONI sul costo orario (dalle Regole, come nel piano): notturno sulle ore
+  // fra notte_inizio e notte_fine (10%); per gli ausiliari anche le indennita di
+  // vacanze (4 settimane, 8.33%) e tredicesima (8.33%) del RAP Allegato 1
+  const jolly = v('org-tipo') === 'jolly';
+  const regola = (n, def) => {
+    const x = parseFloat(typeof _pianoRegolaVal === 'function' ? _pianoRegolaVal(n) : NaN);
+    return !isNaN(x) ? x : def;
+  };
+  let pNotte = 0;
+  if (orario && typeof _pianoOreNotturneTurno === 'function') {
+    const oreN = _pianoOreNotturneTurno({ ora_inizio: orario.da, ora_fine: orario.a });
+    if (oreN && orario.ore) pNotte = (_pianoNotteRecupero(oreN) / orario.ore) * 100;
+    orario.notte = Math.round(oreN * 100) / 100;
+  }
+  const pVac = jolly ? regola('jolly_indennita_vacanze_4sett', 8.33) : 0;
+  const p13 = jolly ? regola('jolly_indennita_tredicesima', 8.33) : 0;
+  const maggiorazioni = {
+    notte: Math.round(pNotte * 100) / 100,
+    vacanze: pVac,
+    tredicesima: p13,
+  };
   _orgStato.scenario.aggiunte.push({
-    jolly: v('org-tipo') === 'jolly',
-    pct: parseFloat(v('org-pct')),
-    dal: anno + '-' + String(dal).padStart(2, '0') + '-01',
-    al: anno + '-' + String(al).padStart(2, '0') + '-' + String(new Date(anno, al, 0).getDate()).padStart(2, '0'),
+    maggiorazioni: maggiorazioni,
+    fattoreCosto: 1 + (pNotte + pVac + p13) / 100,
+    jolly: jolly,
+    pct: pct,
+    quanti: Math.max(1, Math.min(50, parseInt(v('org-quanti')) || 1)),
+    dal: dal,
+    al: al,
+    orario: orario,
+    oraCosto: costo > 0 ? costo : null,
   });
   _organicoRicalcolaScenario();
   renderPiano();

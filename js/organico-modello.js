@@ -278,6 +278,10 @@
         contratto: contratto,
         netto: netto,
         pianoNoto: pianoNoto,
+        ipotetica: !!x.ipotetica,
+        gruppo: x.gruppo,
+        oraCosto: x.oraCosto || null,
+        fattoreCosto: x.fattoreCosto || 1,
       });
     });
     return res;
@@ -296,17 +300,24 @@
       persone.forEach((x) => {
         if (sc.percentuali[x.nome] != null) x.pct = sc.percentuali[x.nome];
       });
+    // ipotesi del simulatore: quante persone uguali (quanti), dal / al come date,
+    // costo orario proprio (oraCosto, facoltativo: senza vale il costo medio)
     (sc.aggiunte || []).forEach((a, i) => {
-      persone.push({
-        nome: a.nome || 'Ipotesi ' + (i + 1),
-        pct: a.jolly ? 1 : a.pct,
-        pctPiano: a.jolly ? a.pct : undefined,
-        jolly: !!a.jolly,
-        dal: a.dal || iso(anno, 1, 1),
-        al: a.al || iso(anno, 12, 31),
-        vacanzeAnno: a.jolly ? 0 : a.vacanzeAnno != null ? a.vacanzeAnno : 35,
-        ipotetica: true,
-      });
+      const n = Math.max(1, Math.min(50, parseInt(a.quanti) || 1));
+      for (let k = 0; k < n; k++)
+        persone.push({
+          nome: (a.nome || 'Ipotesi ' + (i + 1)) + (n > 1 ? ' / ' + (k + 1) : ''),
+          pct: a.jolly ? 1 : a.pct,
+          pctPiano: a.jolly ? a.pct : undefined,
+          jolly: !!a.jolly,
+          dal: a.dal || iso(anno, 1, 1),
+          al: a.al || iso(anno, 12, 31),
+          vacanzeAnno: a.jolly ? 0 : a.vacanzeAnno != null ? a.vacanzeAnno : 35,
+          ipotetica: true,
+          gruppo: i,
+          oraCosto: parseFloat(a.oraCosto) > 0 ? parseFloat(a.oraCosto) : null,
+          fattoreCosto: parseFloat(a.fattoreCosto) > 0 ? parseFloat(a.fattoreCosto) : 1,
+        });
     });
     const righePer = {};
     (dati.righe || []).forEach((r) => (righePer[r.collaboratore + '|' + String(r.data).substring(0, 10)] = r.codice));
@@ -451,14 +462,21 @@
   // ore di contratto in piu nei mesi rimasti per il costo orario di un fisso
   // (costo annuo di un tempo pieno / ore dell anno) o di un ausiliario.
   // Spostare vacanze non costa: le ore di contratto restano le stesse.
+  // Un ipotesi del simulatore con il suo costo orario (oraCosto) costa le sue ore di
+  // contratto per quel prezzo; dettaglio = costo e ore per ogni ipotesi (gruppo).
   function costoScenario(A, B, costi, par) {
-    if (!costi || !B || !(costi.fissoAnno > 0 || costi.ausiliarioOra > 0)) return null;
+    if (!B) return null;
+    const c = costi || {};
+    const proprie = B.mesi.some((x) => x.offerta.persone.some((p) => p.ipotetica && p.oraCosto > 0));
+    if (!proprie && !(c.fissoAnno > 0 || c.ausiliarioOra > 0)) return null;
     const P = Object.assign({}, PARAMETRI_PREDEFINITI, par || {});
-    const oraFisso = (costi.fissoAnno || 0) / (P.oreSett * 52);
-    const oraAus = costi.ausiliarioOra || 0;
-    const somma = (o, j) => o.persone.filter((p) => p.jolly === j).reduce((t, p) => t + p.contratto, 0);
+    const oraFisso = (c.fissoAnno || 0) / (P.oreSett * 52);
+    const oraAus = c.ausiliarioOra || 0;
+    const media = (p) => !(p.ipotetica && p.oraCosto > 0);
+    const somma = (o, j) => o.persone.filter((p) => p.jolly === j && media(p)).reduce((t, p) => t + p.contratto, 0);
     let chf = 0;
     let ore = 0;
+    const dettaglio = {};
     B.mesi.forEach((x, i) => {
       const a = A.mesi[i];
       if (a.passato) return;
@@ -466,8 +484,25 @@
       const dJ = somma(x.offerta, true) - somma(a.offerta, true);
       chf += dF * oraFisso + dJ * oraAus;
       ore += dF + dJ;
+      x.offerta.persone.forEach((p) => {
+        if (!p.ipotetica) return;
+        // maggiorazioni dell ipotesi (notturno 10%, indennita degli ausiliari) solo sul
+        // suo costo orario proprio; il costo medio le comprende gia
+        const prezzo = p.oraCosto > 0 ? p.oraCosto * (p.fattoreCosto || 1) : p.jolly ? oraAus : oraFisso;
+        if (p.oraCosto > 0) {
+          chf += p.contratto * prezzo;
+          ore += p.contratto;
+        }
+        const d = (dettaglio[p.gruppo] = dettaglio[p.gruppo] || { chf: 0, ore: 0 });
+        d.chf += p.contratto * prezzo;
+        d.ore += p.contratto;
+      });
     });
-    return { chf: Math.round(chf), ore: Math.round(ore) };
+    Object.keys(dettaglio).forEach((k) => {
+      dettaglio[k].chf = Math.round(dettaglio[k].chf);
+      dettaglio[k].ore = Math.round(dettaglio[k].ore);
+    });
+    return { chf: Math.round(chf), ore: Math.round(ore), dettaglio: dettaglio };
   }
 
   // SUGGERIMENTI: la soluzione piu leggera che copre i mesi sotto, con l effetto
