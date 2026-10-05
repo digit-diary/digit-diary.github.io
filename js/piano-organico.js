@@ -674,6 +674,8 @@ function _organicoSimulatoreHtml(s) {
       (costi.ausiliarioOra || '') +
       '">',
   );
+  h += lab('Prezzo orario (ausiliari)', _orgSelPrezzo('org-prezzo', 'base'));
+  h += lab('Vacanze (RAP)', _orgSelVac('org-vac', false));
   h += '<button class="btn-export" onclick="organicoAggiungiIpotesi()">Aggiungi</button>';
   h += '<span style="width:16px"></span>';
   h +=
@@ -707,7 +709,7 @@ function _organicoSimulatoreHtml(s) {
             gg(a.dal) +
             '-' +
             gg(a.al) +
-            (a.oraCosto ? ' · ' + a.oraCosto + ' CHF/h' : '') +
+            (a.oraCosto ? ' · ' + a.oraCosto + ' CHF/h' + (a.prezzoTipo === 'comprensivo' ? ' comprensivo' : '') : '') +
             (a.oraCosto && a.maggiorazioni
               ? [
                   a.maggiorazioni.notte
@@ -970,18 +972,16 @@ function organicoAggiungiIpotesi() {
   // fra notte_inizio e notte_fine (10%); per gli ausiliari anche le indennita di
   // vacanze (4 settimane, 8.33%) e tredicesima (8.33%) del RAP Allegato 1
   const jolly = v('org-tipo') === 'jolly';
-  const regola = (n, def) => {
-    const x = parseFloat(typeof _pianoRegolaVal === 'function' ? _pianoRegolaVal(n) : NaN);
-    return !isNaN(x) ? x : def;
-  };
+  const prezzoTipo = v('org-prezzo') || 'base';
+  const rap = _orgRapPercentuali(jolly, prezzoTipo, v('org-vac') === '5');
   let pNotte = 0;
   if (orario && typeof _pianoOreNotturneTurno === 'function') {
     const oreN = _pianoOreNotturneTurno({ ora_inizio: orario.da, ora_fine: orario.a });
-    if (oreN && orario.ore) pNotte = (_pianoNotteRecupero(oreN) / orario.ore) * 100;
+    if (oreN && orario.ore) pNotte = ((oreN * rap.notte) / 100 / orario.ore) * 100;
     orario.notte = Math.round(oreN * 100) / 100;
   }
-  const pVac = jolly ? regola('jolly_indennita_vacanze_4sett', 8.33) : 0;
-  const p13 = jolly ? regola('jolly_indennita_tredicesima', 8.33) : 0;
+  const pVac = rap.vacanze;
+  const p13 = rap.tredicesima;
   const maggiorazioni = {
     notte: Math.round(pNotte * 100) / 100,
     vacanze: pVac,
@@ -989,7 +989,9 @@ function organicoAggiungiIpotesi() {
   };
   _orgStato.scenario.aggiunte.push({
     maggiorazioni: maggiorazioni,
-    fattoreCosto: 1 + (pNotte + pVac + p13) / 100,
+    prezzoTipo: jolly ? prezzoTipo : null,
+    // indennita RAP calcolate anche sul supplemento notturno (salario delle ore lavorate)
+    fattoreCosto: (1 + pNotte / 100) * (1 + (pVac + p13) / 100),
     jolly: jolly,
     pct: pct,
     quanti: Math.max(1, Math.min(50, parseInt(v('org-quanti')) || 1)),
@@ -1205,6 +1207,51 @@ async function organicoRapportoPdf() {
   logAzione('Rapporto organico PDF', nome);
 }
 
+// MAGGIORAZIONI SECONDO IL RAP (Allegato 1), percentuali dalle Regole:
+//  - ausiliari: indennita vacanze 8.33% (4 settimane) o 10.65% (5) e tredicesima 8.33%
+//    sul salario orario, pagate con le ore lavorate. Si aggiungono solo se il prezzo
+//    inserito e il SALARIO DI BASE; con il prezzo COMPRENSIVO sono gia dentro;
+//  - notturno: 10% delle ore fra notte_inizio e notte_fine (tempo libero pagato);
+//  - festivi (ausiliari): +50% nelle ore dei nove festivi parificati alle domeniche.
+function _orgRapPercentuali(jolly, prezzoTipo, vac5) {
+  const regola = (n, def) => {
+    const x = parseFloat(typeof _pianoRegolaVal === 'function' ? _pianoRegolaVal(n) : NaN);
+    return !isNaN(x) ? x : def;
+  };
+  const base = jolly && prezzoTipo !== 'comprensivo';
+  return {
+    vacanze: base
+      ? vac5
+        ? regola('jolly_indennita_vacanze_5sett', 10.65)
+        : regola('jolly_indennita_vacanze_4sett', 8.33)
+      : 0,
+    tredicesima: base ? regola('jolly_indennita_tredicesima', 8.33) : 0,
+    notte: regola('notte_percentuale', 10),
+    festivo: jolly ? 50 : 0,
+  };
+}
+function _orgSelPrezzo(id, val) {
+  return (
+    '<select id="' +
+    id +
+    '" title="RAP Allegato 1: con il salario di base si aggiungono indennita vacanze e tredicesima; il prezzo comprensivo le contiene gia"><option value="base"' +
+    (val !== 'comprensivo' ? ' selected' : '') +
+    '>Salario di base (+ indennita RAP)</option><option value="comprensivo"' +
+    (val === 'comprensivo' ? ' selected' : '') +
+    '>Comprensivo di vacanze e 13a</option></select>'
+  );
+}
+function _orgSelVac(id, v5) {
+  return (
+    '<select id="' +
+    id +
+    '"><option value="4"' +
+    (!v5 ? ' selected' : '') +
+    '>4 settimane (8.33%)</option><option value="5"' +
+    (v5 ? ' selected' : '') +
+    '>5 settimane (10.65%)</option></select>'
+  );
+}
 // CALCOLO DEL FABBISOGNO (05.10, richiesta del titolare): "mi servono due persone, una
 // dalle 15 alle 18 e una dalle 16 alle 22, dal lunedi al giovedi, da ... a ...":
 // ore sui giorni veri del periodo (anche di notte), quanti collaboratori servono
@@ -1269,6 +1316,16 @@ function _organicoCalcoloHtml(s) {
       escP(String(c.costo)) +
       '" onchange="organicoCalcSalva()">',
   );
+  if (c.tipo === 'jolly') {
+    h += lab(
+      'Prezzo orario',
+      _orgSelPrezzo('orgc-prezzo', c.prezzoTipo).replace('<select ', '<select onchange="organicoCalcSalva()" '),
+    );
+    h += lab(
+      'Vacanze (RAP)',
+      _orgSelVac('orgc-vac', c.vac5).replace('<select ', '<select onchange="organicoCalcSalva()" '),
+    );
+  }
   h +=
     '</div><table class="fzp-tab" style="margin-top:8px"><thead><tr><th>Dalle</th><th>Alle</th><th>Giorni</th><th>Persone insieme</th><th></th></tr></thead><tbody>';
   c.righe.forEach((r, i) => {
@@ -1319,6 +1376,8 @@ function organicoCalcSalva(tipoCambiato) {
   c.tipo = v('orgc-tipo') || c.tipo;
   c.pct = parseFloat(v('orgc-pct')) || c.pct;
   c.costo = v('orgc-costo');
+  if (document.getElementById('orgc-prezzo')) c.prezzoTipo = v('orgc-prezzo');
+  if (document.getElementById('orgc-vac')) c.vac5 = v('orgc-vac') === '5';
   if (tipoCambiato && _orgStato) {
     const k = _orgStato.par.costi || {};
     c.costo =
@@ -1373,6 +1432,12 @@ function organicoCalcola() {
     perDow[(d.getDay() + 6) % 7]++;
     nGiorni++;
   }
+  // festivi parificati del periodo (supplemento 50% degli ausiliari)
+  const festPar = (typeof pianoFestiviCache !== 'undefined' ? pianoFestiviCache : []).filter(
+    (f) =>
+      f.data >= c.dal && f.data <= c.al && typeof _pianoFestivoParificato === 'function' && _pianoFestivoParificato(f),
+  );
+  let oreFestivi = 0;
   let ore = 0;
   let oreNotte = 0;
   const dettagli = righe.map((r) => {
@@ -1383,6 +1448,9 @@ function organicoCalcola() {
     const giorni = r.giorni.reduce((t, k) => t + perDow[k], 0);
     const o = durata * giorni * r.quante;
     const n = notte * giorni * r.quante;
+    festPar.forEach((f) => {
+      if (r.giorni.includes((new Date(f.data + 'T12:00:00').getDay() + 6) % 7)) oreFestivi += durata * r.quante;
+    });
     ore += o;
     oreNotte += n;
     return { r: r, durata: durata, giorni: giorni, ore: o, notte: n };
@@ -1424,17 +1492,16 @@ function organicoCalcola() {
   const fte = oreNettePersona > 0 ? ore / (nGiorni * (oreSett / 7) * quota) : 0;
   // costo: ore per il costo orario + notturno + (ausiliari) indennita
   const prezzo = parseFloat(c.costo) || 0;
-  const regola = (n, def) => {
-    const x = parseFloat(typeof _pianoRegolaVal === 'function' ? _pianoRegolaVal(n) : NaN);
-    return !isNaN(x) ? x : def;
-  };
-  const pNotte = regola('notte_percentuale', 10);
-  const pVac = jolly ? regola('jolly_indennita_vacanze_4sett', 8.33) : 0;
-  const p13 = jolly ? regola('jolly_indennita_tredicesima', 8.33) : 0;
+  const rap = _orgRapPercentuali(jolly, c.prezzoTipo, c.vac5);
+  const pNotte = rap.notte;
+  const pVac = rap.vacanze;
+  const p13 = rap.tredicesima;
   const base = ore * prezzo;
   const cNotte = oreNotte * prezzo * (pNotte / 100);
-  const cInd = (base + cNotte) * ((pVac + p13) / 100);
-  const tot = base + cNotte + cInd;
+  const cFest = oreFestivi * prezzo * (rap.festivo / 100);
+  // indennita RAP sul salario delle ore lavorate (con supplementi), solo con il salario di base
+  const cInd = (base + cNotte + cFest) * ((pVac + p13) / 100);
+  const tot = base + cNotte + cFest + cInd;
   const f1 = (x) => (Math.round(x * 10) / 10).toLocaleString('it-CH');
   const gg = (d) => d.substring(8, 10) + '.' + d.substring(5, 7) + '.' + d.substring(0, 4);
   let e =
@@ -1497,7 +1564,19 @@ function organicoCalcola() {
       _orgCHF(Math.round(base)) +
       ')' +
       (cNotte ? ' + notturno ' + pNotte + '% su ' + f1(oreNotte) + ' h (' + _orgCHF(Math.round(cNotte)) + ')' : '') +
-      (cInd ? ' + vacanze ' + pVac + '% e tredicesima ' + p13 + '% (' + _orgCHF(Math.round(cInd)) + ')' : '');
+      (cFest
+        ? ' + festivi parificati ' +
+          rap.festivo +
+          '% su ' +
+          f1(oreFestivi) +
+          ' h (' +
+          festPar.map((f) => f.data.substring(8, 10) + '.' + f.data.substring(5, 7)).join(', ') +
+          ': ' +
+          _orgCHF(Math.round(cFest)) +
+          ')'
+        : '') +
+      (cInd ? ' + vacanze ' + pVac + '% e tredicesima ' + p13 + '% (' + _orgCHF(Math.round(cInd)) + ')' : '') +
+      (jolly && c.prezzoTipo === 'comprensivo' ? ' · prezzo comprensivo: vacanze e tredicesima gia dentro (RAP)' : '');
   else e += '<br><span style="color:var(--muted)">Inserisci il costo orario per avere il costo.</span>';
   e +=
     '<br><button class="btn-export" style="margin-top:6px" onclick="organicoCalcNelSimulatore(' +
