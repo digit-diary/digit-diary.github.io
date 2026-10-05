@@ -137,6 +137,15 @@ function _opzioniLivello(rep) {
   for (let lv = 1; lv <= max + 1; lv++) h += '<option value="' + lv + '">L' + lv + '</option>';
   return h + '<option value="0">Extra</option>';
 }
+// due competenze con lo stesso nome (maiuscole, spazi e accenti a parte) sono la stessa
+function _compNomeNorm(t) {
+  return String(t || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
 // sempre in ordine di livello (L1, L2, ...), anche se l elenco salvato e in disordine;
 // dentro lo stesso livello vale l ordine scelto con le frecce (v377)
 function getCompetenzeReparto() {
@@ -2193,17 +2202,18 @@ function _renderFormazioneConfig() {
           ')">' +
           sim +
           '</button>';
+        const doppi = lista.filter((x, j) => j !== i && _compNomeNorm(x.label) === _compNomeNorm(k.label));
         html +=
           '<div class="tipo-item">' +
           freccia(-1, su, '&#9650;') +
           freccia(1, giu, '&#9660;') +
-          '<div class="tipo-item-name">' +
+          '<select title="Livello della competenza: sceglilo per spostarla in un altro livello" aria-label="Livello di ' +
           escP(k.label) +
-          '</div><select title="Livello della competenza" onchange="cambiaLivelloCompetenzaCfg(\'' +
+          '" onchange="cambiaLivelloCompetenzaCfg(\'' +
           rep +
           "'," +
           i +
-          ',this.value)" style="margin-right:6px;padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)">' +
+          ',this.value)" style="padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);font-weight:700">' +
           Array.from({ length: Math.max(_lvMaxReparto(rep), parseInt(k.livello) || 1) + 1 }, (_, n) => n + 1)
             .map(
               (n) =>
@@ -2216,7 +2226,18 @@ function _renderFormazioneConfig() {
                 '</option>',
             )
             .join('') +
-          '</select><button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2)" onclick="rinominaCompetenzaCfg(\'' +
+          '</select><div class="tipo-item-name">' +
+          escP(k.label) +
+          (doppi.length
+            ? ' <span style="font-weight:400;font-size:var(--fs-sm,.8125rem);color:var(--accent2)">stesso nome di ' +
+              doppi.map((x) => escP(x.label) + ' (L' + (parseInt(x.livello) || 0) + ')').join(', ') +
+              '</span> <button class="btn-act" style="margin-left:6px;padding:2px 8px" title="Tiene questa (nome e livello) e le passa le spunte dell altra, poi toglie l altra" onclick="unisciCompetenzaCfg(\'' +
+              rep +
+              "'," +
+              i +
+              ')">Tieni questa</button>'
+            : '') +
+          '</div><button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2)" onclick="rinominaCompetenzaCfg(\'' +
           rep +
           "'," +
           i +
@@ -2500,8 +2521,12 @@ async function aggiungiCompetenzaCfg(rep) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '');
-  if (cfg[rep].find((k) => k.key === key)) {
-    toast('Competenza già esistente');
+  const gia = cfg[rep].findIndex((k) => k.key === key || _compNomeNorm(k.label) === _compNomeNorm(nome));
+  if (gia >= 0) {
+    const g = cfg[rep][gia];
+    if ((parseInt(g.livello) || 0) === lv) toast('"' + g.label + '" esiste gia in L' + lv);
+    // stessa competenza in un altro livello: si sposta quella (le spunte restano)
+    else await cambiaLivelloCompetenzaCfg(rep, gia, lv);
     return;
   }
   // in ordine di livello: la nuova va dopo l ultima del suo livello (v376)
@@ -2525,12 +2550,103 @@ async function rinominaCompetenzaCfg(rep, idx) {
     toast('Inserisci un nome');
     return;
   }
+  if (cfg[rep].some((x, j) => j !== idx && _compNomeNorm(x.label) === _compNomeNorm(label))) {
+    toast('Esiste gia una competenza "' + label + '" in questo settore');
+    return;
+  }
   const vecchio = k.label;
   cfg[rep][idx] = Object.assign({}, k, { label });
   await saveCompetenzeConfig(cfg);
   logAzione('Competenza rinominata', rep + ': ' + vecchio + ' → ' + label);
   renderFormazione();
   toast(vecchio + ' → ' + label);
+}
+// Doppioni (stesso nome, chiavi diverse): si tiene la competenza scelta, con il suo nome e
+// livello; le spunte dei collaboratori (anche formatore fmt_), il gruppo di turni e il
+// modello delle Formazioni delle altre passano a questa, poi le altre si tolgono.
+async function unisciCompetenzaCfg(rep, idx) {
+  if (!_soloAdminCfg()) return;
+  const cfg = getCompetenzeConfigAll();
+  const tieni = (cfg[rep] || [])[idx];
+  if (!tieni) return;
+  const via = cfg[rep].filter((x, j) => j !== idx && _compNomeNorm(x.label) === _compNomeNorm(tieni.label));
+  if (!via.length) return;
+  const chiavi = via.map((x) => x.key).filter((x) => x !== tieni.key);
+  const daCambiare = collaboratoriCache.filter((c) =>
+    chiavi.some((k) => (c.competenze || {})[k] !== undefined || (c.competenze || {})['fmt_' + k] !== undefined),
+  );
+  const conSpunta = daCambiare.filter((c) => chiavi.some((k) => (c.competenze || {})[k] === true)).length;
+  if (
+    !(await chiediConferma(
+      'Tenere "' +
+        tieni.label +
+        '" (L' +
+        tieni.livello +
+        ') e togliere ' +
+        via.map((x) => '"' + x.label + '" (L' + x.livello + ')').join(', ') +
+        '?\n\nLe spunte passano a quella tenuta (' +
+        conSpunta +
+        ' collaboratori certificati, formatori compresi), insieme al gruppo di turni e al modello delle Formazioni. Il livello dei collaboratori si ricalcola.',
+    ))
+  )
+    return;
+  let errori = 0;
+  for (const c of daCambiare) {
+    const nuove = Object.assign({}, c.competenze || {});
+    chiavi.forEach((k) => {
+      ['', 'fmt_'].forEach((pre) => {
+        if (nuove[pre + k] === true) nuove[pre + tieni.key] = true;
+        delete nuove[pre + k];
+      });
+    });
+    try {
+      await secPatch('collaboratori', 'id=eq.' + c.id, { competenze: nuove });
+      c.competenze = nuove;
+    } catch (e) {
+      errori++;
+    }
+  }
+  if (errori) {
+    // configurazione lasciata com e: si puo ripetere senza perdere niente
+    toast('Unione non completata: ' + errori + ' collaboratori non aggiornati. Riprova.');
+    return;
+  }
+  // gruppo di turni e modello delle Formazioni (per settore) e mappa competenza -> gruppo
+  try {
+    const mod = JSON.parse((await getImp('piano_formazione_modelli')) || '{}') || {};
+    let cambiato = false;
+    Object.values(mod).forEach((set) => {
+      ['_gruppi', '_comp'].forEach((campo) => {
+        const m = set && set[campo];
+        if (!m) return;
+        chiavi.forEach((k) => {
+          if (m[k] === undefined) return;
+          if (m[tieni.key] === undefined) m[tieni.key] = m[k];
+          delete m[k];
+          cambiato = true;
+        });
+      });
+    });
+    if (cambiato && (await salvaImp('piano_formazione_modelli', JSON.stringify(mod)))) window._formModelli = mod;
+    const mg = JSON.parse((await getImp('piano_competenze_gruppi')) || 'null');
+    if (mg && typeof mg === 'object' && chiavi.some((k) => mg[k] !== undefined)) {
+      chiavi.forEach((k) => {
+        if (mg[k] !== undefined && mg[tieni.key] === undefined) mg[tieni.key] = mg[k];
+        delete mg[k];
+      });
+      if (await salvaImp('piano_competenze_gruppi', JSON.stringify(mg))) window._pianoCompGruppiCfg = mg;
+    }
+  } catch (e) {
+    console.warn('unione competenze: impostazioni del piano', e);
+  }
+  cfg[rep] = cfg[rep].filter((x, j) => j === idx || !via.includes(x));
+  await saveCompetenzeConfig(cfg);
+  logAzione(
+    'Competenze unite',
+    rep + ': ' + via.map((x) => x.label + ' L' + x.livello).join(', ') + ' -> ' + tieni.label + ' L' + tieni.livello,
+  );
+  renderFormazione();
+  toast('Unite in "' + tieni.label + '" (L' + tieni.livello + ')');
 }
 async function rimuoviCompetenzaCfg(rep, idx) {
   if (!_soloAdminCfg()) return;
