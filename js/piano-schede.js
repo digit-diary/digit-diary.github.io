@@ -2152,21 +2152,34 @@ async function toggleVacanzaConfermata(id) {
     toast('Errore');
   }
 }
+// settimana ISO (anno, numero) di una data
+function _vacSettimanaDi(dstr) {
+  const d = new Date(dstr + 'T12:00:00');
+  const gio = new Date(d);
+  gio.setDate(gio.getDate() + 3 - ((gio.getDay() + 6) % 7)); // il giovedi della settimana: decide l anno
+  const anno = gio.getFullYear();
+  const lun1 = new Date(anno, 0, 4, 12); // la settimana 1 contiene il 4 gennaio
+  lun1.setDate(lun1.getDate() - ((lun1.getDay() + 6) % 7));
+  const lun = new Date(d);
+  lun.setDate(lun.getDate() - ((lun.getDay() + 6) % 7));
+  return { anno: anno, settimana: 1 + Math.round((lun - lun1) / 86400000 / 7) };
+}
 async function modificaVacanza(id) {
   // come vacanze.modifica di Turnivo: cambia la settimana, controllo duplicati
   if (!puoGestirePiano()) return;
   const v = _pianoVacCache.find((x) => x.id === id);
   if (!v) return;
-  // settimana, giorni precisi (dal / al: per PC, MI, MT... che non durano tutta la
-  // settimana; vuoti = tutta la settimana) e nota
+  // DATE LIBERE (05.10, richiesta del titolare): per MT, MI, PC... conta il periodo
+  // vero. Con dal / al il programma mette da solo le settimane: se il periodo cade su
+  // piu settimane questa riga diventa la prima e le altre si aggiungono; se cambia
+  // settimana la riga si sposta. Senza date vale la settimana scritta (tutta).
   const anno = parseInt(v.anno) || window._pianoVacAnno;
   const r = await chiediModulo(
     v.collaboratore + ' · ' + (_vacEVacanza(v) ? 'Vacanza' : _vacCodice(v) + ' ' + _vacDescrSigla(_vacCodice(v))),
     [
-      { titolo: 'Settimana', campi: [{ id: 'sett', valore: String(v.settimana), larghezza: 60 }] },
       {
         titolo: 'Giorni',
-        nota: 'Solo se non e tutta la settimana: dal / al (dentro la settimana). Vuoti = tutta la settimana.',
+        nota: 'Dal / al: il periodo vero (anche su piu settimane). Vuoti = tutta la settimana qui sotto.',
         campi: [
           {
             id: 'dal',
@@ -2184,56 +2197,117 @@ async function modificaVacanza(id) {
           },
         ],
       },
+      {
+        titolo: 'Settimana (se non ci sono date)',
+        campi: [{ id: 'sett', valore: String(v.settimana), larghezza: 60 }],
+      },
       { titolo: 'Nota', campi: [{ id: 'nota', valore: v.nota || '', larghezza: 420 }] },
     ],
-    { titolo: 'Modifica vacanza', ok: 'Salva' },
+    { titolo: 'Modifica ' + (_vacEVacanza(v) ? 'vacanza' : 'assenza'), ok: 'Salva' },
   );
   if (!r) return;
-  const sett = parseInt(r.sett);
-  if (isNaN(sett) || sett < 1 || sett > 53) {
-    toast('Settimana non valida (1-53)');
-    return;
+  const nota = String(r.nota || '').trim() || null;
+  let dal = r.dal || null;
+  let al = r.al || null;
+  if (dal && !al) al = dal;
+  if (al && !dal) dal = al;
+  // pezzi: [{ anno, settimana, dal, al }] (dal / al null = tutta la settimana)
+  const pezzi = [];
+  if (dal) {
+    if (al < dal) {
+      toast('La data "al" e prima di "dal"');
+      return;
+    }
+    const giorni = Math.round((new Date(al + 'T12:00:00') - new Date(dal + 'T12:00:00')) / 86400000) + 1;
+    if (giorni > 120) {
+      toast('Periodo troppo lungo (piu di 120 giorni): controlla le date');
+      return;
+    }
+    const cur = new Date(dal + 'T12:00:00');
+    while (dataLocaleISO(cur) <= al) {
+      const d = dataLocaleISO(cur);
+      const w = _vacSettimanaDi(d);
+      let p = pezzi.find((x) => x.anno === w.anno && x.settimana === w.settimana);
+      if (!p) pezzi.push((p = { anno: w.anno, settimana: w.settimana, dal: d, al: d }));
+      p.al = d;
+      cur.setDate(cur.getDate() + 1);
+    }
+    // tutta la settimana = nessun limite
+    pezzi.forEach((p) => {
+      const g = _pianoGiorniSettimana(p.anno, p.settimana);
+      if (p.dal === g[0]) p.dal = null;
+      if (p.al === g[6]) p.al = null;
+    });
+  } else {
+    const sett = parseInt(r.sett);
+    if (isNaN(sett) || sett < 1 || sett > 53) {
+      toast('Settimana non valida (1-53)');
+      return;
+    }
+    pezzi.push({ anno: anno, settimana: sett, dal: null, al: null });
   }
-  if (
-    sett !== v.settimana &&
-    _pianoVacCache.find((x) => x.collaboratore === v.collaboratore && x.settimana === sett && x.id !== id)
-  ) {
-    toast('Settimana ' + sett + ' già assegnata a questo collaboratore');
-    return;
-  }
-  const giorniS = _pianoGiorniSettimana(anno, sett);
-  const dal = r.dal || null;
-  const al = r.al || null;
-  if (
-    (dal && (dal < giorniS[0] || dal > giorniS[6])) ||
-    (al && (al < giorniS[0] || al > giorniS[6])) ||
-    (dal && al && al < dal)
-  ) {
-    toast(
-      'Dal / al devono stare nella settimana ' + sett + ' (' + _vacDateSettimana(anno, sett) + '), dal prima di al',
+  // le altre settimane della persona: lette dall archivio (anche di altri settori)
+  const anni = [...new Set(pezzi.map((p) => p.anno))];
+  const esistenti =
+    (await secGet(
+      'piano_vacanze?collaboratore=eq.' + encodeURIComponent(v.collaboratore) + '&anno=in.(' + anni.join(',') + ')',
+    )) || [];
+  const occupata = (p) =>
+    esistenti.find((x) => x.id !== id && parseInt(x.anno) === p.anno && x.settimana === p.settimana);
+  const conflitti = pezzi.filter((p) => {
+    const o = occupata(p);
+    return o && _vacCodice(o) !== _vacCodice(v);
+  });
+  if (conflitti.length) {
+    await mostraAvviso(
+      v.collaboratore +
+        ' ha gia altro in ' +
+        conflitti.map((p) => 'settimana ' + p.settimana + ' (' + _vacCodice(occupata(p)) + ')').join(', ') +
+        ': correggi prima quella riga.',
+      { titolo: 'Modifica vacanza' },
     );
     return;
   }
   try {
+    const [primo, ...altri] = pezzi;
     await secPatch('piano_vacanze', 'id=eq.' + id, {
-      settimana: sett,
-      dal: dal === giorniS[0] ? null : dal,
-      al: al === giorniS[6] ? null : al,
-      nota: String(r.nota || '').trim() || null,
+      anno: primo.anno,
+      settimana: primo.settimana,
+      dal: primo.dal,
+      al: primo.al,
+      nota: nota,
     });
-    logAzione(
-      'Vacanza modificata',
+    for (const p of altri) {
+      const o = occupata(p); // stessa sigla gia presente: si aggiornano solo le date
+      if (o) await secPatch('piano_vacanze', 'id=eq.' + o.id, { dal: p.dal, al: p.al, nota: nota || o.nota || null });
+      else
+        await secPost('piano_vacanze', {
+          collaboratore: v.collaboratore,
+          anno: p.anno,
+          settimana: p.settimana,
+          dal: p.dal,
+          al: p.al,
+          nota: nota,
+          codice: v.codice || null,
+          confermata: v.confermata !== false,
+          operatore: getOperatore(),
+        });
+    }
+    const descr = pezzi
+      .map((p) => 'sett. ' + p.settimana + (p.dal || p.al ? ' (' + _vacDalAlTesto(p) + ')' : ''))
+      .join(', ');
+    logAzione('Vacanza modificata', v.collaboratore + ' ' + _vacCodice(v) + ': ' + descr);
+    toast(
       v.collaboratore +
-        ' settimana ' +
-        v.settimana +
-        ' → ' +
-        sett +
-        (dal || al ? ' (' + (dal || '') + ' / ' + (al || '') + ')' : ''),
+        ': ' +
+        descr +
+        (pezzi.length > 1 ? ' (settimane aggiunte da sole)' : '') +
+        '. Riapplica le vacanze al mese per aggiornare il piano',
+      7000,
     );
-    toast('Vacanza aggiornata: riapplica le vacanze al mese per aggiornare il piano');
     renderPiano();
   } catch (e) {
-    toast('Errore modifica vacanza');
+    toastErrore('Modifica vacanza non salvata: ' + ((e && e.message) || e));
   }
 }
 async function eliminaVacanza(id) {
@@ -2760,7 +2834,7 @@ function _vacElencoGiorni(l) {
         const u = tratti[tratti.length - 1];
         const ieri = new Date(x + 'T12:00:00');
         ieri.setDate(ieri.getDate() - 1);
-        if (u && u[1] === giornoDi(ieri)) u[1] = x;
+        if (u && u[1] === dataLocaleISO(ieri)) u[1] = x;
         else tratti.push([x, x]);
       });
       const f = (x) => x.substring(8, 10) + '.' + x.substring(5, 7);
