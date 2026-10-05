@@ -38,9 +38,25 @@ function puoPianificareFormazioni() {
 }
 
 // ---------------------------------------------------------------- competenze e gruppi
-// la competenza (scheda Formazione) e il gruppo dei turni del settore
+// la competenza (scheda Formazione) e il gruppo dei turni del settore. In ordine:
+// 1) l abbinamento scelto nella scheda Formazioni (impostazione piano_formazione_modelli,
+//    settore._gruppi); 2) quello automatico dal nome (Slots: cassa, reception, sala...);
+// 3) se il settore ha un solo gruppo di turni (Tavoli, Valet, Cleaning), quello (v371).
+function _formGruppiSettore() {
+  return [...new Set(_pianoTurniReparto().map((t) => String(t.gruppo || '').toUpperCase()))].filter(Boolean);
+}
+function _formCfgSettore() {
+  return (window._formModelli || {})[_pianoReparto()] || {};
+}
 function _formGruppoDi(comp) {
-  const gruppi = [...new Set(_pianoTurniReparto().map((t) => String(t.gruppo || '').toUpperCase()))].filter(Boolean);
+  const gruppi = _formGruppiSettore();
+  const scelto = String((_formCfgSettore()._gruppi || {})[comp.key] || '').toUpperCase();
+  if (scelto && gruppi.includes(scelto)) return scelto;
+  const auto = _formGruppoAuto(comp, gruppi);
+  if (auto) return auto;
+  return gruppi.length === 1 ? gruppi[0] : null;
+}
+function _formGruppoAuto(comp, gruppi) {
   const k = String(comp.key || '') + ' ' + String(comp.label || '');
   const prova = [
     [/cass/i, 'CASSA'],
@@ -54,14 +70,24 @@ function _formGruppoDi(comp) {
   const diretto = String(comp.key || '').toUpperCase();
   return gruppi.includes(diretto) ? diretto : null;
 }
+// competenze della scheda Formazione per il settore APERTO NEL PIANO (non quello
+// dell app: dal Piano si puo guardare un altro settore)
+function _formCompetenzeSettore(rep) {
+  const all = typeof getCompetenzeConfigAll === 'function' ? getCompetenzeConfigAll() : {};
+  return all[rep || _pianoReparto()] || [];
+}
 function _formCompetenze() {
-  const comps = typeof getCompetenzeReparto === 'function' ? getCompetenzeReparto() : [];
+  const comps = _formCompetenzeSettore();
   return comps.map((c) => Object.assign({}, c, { gruppo: _formGruppoDi(c) })).filter((c) => c.gruppo);
 }
-// modello del gruppo: impostazione del settore, altrimenti i predefiniti, altrimenti
-// i turni piu usati del gruppo (un diurno e una notte)
-function _formModello(gruppo) {
-  const cfg = (window._formModelli || {})[_pianoReparto()] || {};
+// modello della competenza: quello salvato per la competenza (settore._comp), poi
+// quello salvato per il gruppo (come finora in Slots), poi i predefiniti, poi i turni
+// del gruppo (un diurno e una notte). Accetta anche il solo nome del gruppo.
+function _formModello(comp) {
+  const cfg = _formCfgSettore();
+  const gruppo = typeof comp === 'string' ? comp : comp.gruppo;
+  const perComp = typeof comp === 'string' ? null : (cfg._comp || {})[comp.key];
+  if (perComp && ((perComp.diurni || []).length || (perComp.notti || []).length)) return perComp;
   if (cfg[gruppo] && (cfg[gruppo].diurni || []).length) return cfg[gruppo];
   if (FORM_MODELLI_BASE[gruppo]) return FORM_MODELLI_BASE[gruppo];
   const turni = _pianoTurniReparto().filter(
@@ -72,8 +98,8 @@ function _formModello(gruppo) {
   return { diurni: d ? [d.codice, d.codice] : [], notti: n ? [n.codice, n.codice, n.codice] : [] };
 }
 // sequenza dei turni per n giorni: prima i diurni poi le notti, nella proporzione del modello
-function _formSequenza(gruppo, n) {
-  const m = _formModello(gruppo);
+function _formSequenza(comp, n) {
+  const m = _formModello(comp);
   const lD = (m.diurni || []).length;
   const lN = (m.notti || []).length;
   if (!lD && !lN) return [];
@@ -102,6 +128,17 @@ function _formMeseDopo(ym) {
 function _formMeseNome(ym) {
   const p = String(ym).split('-');
   return ((typeof MESI_FULL !== 'undefined' && MESI_FULL[parseInt(p[1]) - 1]) || ym) + ' ' + p[0];
+}
+
+// gruppi di turni fatti da ognuno nel mese aperto e nelle settimane a cavallo: come
+// la bozza, chi non ha settori assegnati e abilitato ai gruppi che fa davvero
+function _formIdoneitaStoria() {
+  const out = {};
+  (typeof _pianoRigheSettimane === 'function' ? _pianoRigheSettimane() : _pianoRighe || []).forEach((r) => {
+    const t = _pianoTurnoInfo(r.codice);
+    if (t) (out[r.collaboratore] = out[r.collaboratore] || new Set()).add(t.gruppo);
+  });
+  return out;
 }
 
 // ---------------------------------------------------------------- allievo nuovo
@@ -406,31 +443,43 @@ function _formFormatoriHtml(puo) {
   });
   return h;
 }
-// MODELLI per reparto: turni dei diurni e delle notti
+// MODELLI per competenza: gruppo dei turni e turni dei diurni e delle notti
 function _formModelliHtml(puo) {
   const comps = _formCompetenze();
-  if (!comps.length) return '';
-  const gruppi = [...new Set(comps.map((c) => c.gruppo))];
+  const tutte = _formCompetenzeSettore();
+  if (!tutte.length) return '';
+  const gruppi = _formGruppiSettore();
+  const dis = puo ? '' : ' disabled';
   let h =
-    '<h4 style="margin:14px 0 8px">Modelli dei turni</h4><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:0 0 6px">I turni della formazione, nell ordine: prima i diurni, poi le notti. Con un numero di giorni diverso si tiene la stessa proporzione.</p>';
-  gruppi.forEach((g) => {
-    const m = _formModello(g);
+    '<h4 style="margin:14px 0 8px">Modelli dei turni</h4><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:0 0 6px">Per ogni competenza: il gruppo di turni dove si fa la formazione e i turni, nell ordine (prima i diurni, poi le notti). Con un numero di giorni diverso si tiene la stessa proporzione. Le sigle devono essere turni del gruppo scelto.</p>';
+  tutte.forEach((c0) => {
+    const c = comps.find((x) => x.key === c0.key) || Object.assign({}, c0, { gruppo: null });
+    const m = c.gruppo ? _formModello(c) : { diurni: [], notti: [] };
+    const id = escP(c.key);
     h +=
-      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0;font-size:var(--fs-md,.875rem)"><b style="min-width:120px">' +
-      escP(g) +
-      '</b>diurni <input id="fm-d-' +
-      escP(g) +
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0;font-size:var(--fs-md,.875rem)"><b style="min-width:150px">' +
+      escP(c.label) +
+      '</b><select id="fm-g-' +
+      id +
+      '"' +
+      dis +
+      ' style="padding:4px 6px"><option value="">gruppo...</option>' +
+      gruppi.map((g) => '<option' + (g === c.gruppo ? ' selected' : '') + '>' + escP(g) + '</option>').join('') +
+      '</select> diurni <input id="fm-d-' +
+      id +
       '" value="' +
       escP((m.diurni || []).join(', ')) +
       '"' +
-      (puo ? '' : ' disabled') +
-      ' style="width:170px;padding:4px 6px"> notti <input id="fm-n-' +
-      escP(g) +
+      dis +
+      ' style="width:150px;padding:4px 6px"> notti <input id="fm-n-' +
+      id +
       '" value="' +
       escP((m.notti || []).join(', ')) +
       '"' +
-      (puo ? '' : ' disabled') +
-      ' style="width:170px;padding:4px 6px"></div>';
+      dis +
+      ' style="width:150px;padding:4px 6px">' +
+      (c.gruppo ? '' : '<span style="color:#b8860b;font-size:var(--fs-sm,.8125rem)">scegli il gruppo</span>') +
+      '</div>';
   });
   if (puo)
     h += '<button class="btn-export" style="margin-top:6px" onclick="formazioneSalvaModelli()">Salva modelli</button>';
@@ -451,25 +500,49 @@ async function formazioneSalvaModelli() {
   const rep = _pianoReparto();
   const cfg = Object.assign({}, window._formModelli || {});
   cfg[rep] = Object.assign({}, cfg[rep] || {});
-  const sigle = new Set(_pianoTurniReparto().map((t) => t.codice));
+  const gruppoDi = {};
+  _pianoTurniReparto().forEach(
+    (t) => (gruppoDi[String(t.codice).toUpperCase()] = String(t.gruppo || '').toUpperCase()),
+  );
   const lista = (id) =>
     String((document.getElementById(id) || {}).value || '')
       .split(/[,\s]+/)
       .map((x) => x.trim().toUpperCase())
       .filter(Boolean);
-  const sbagliate = [];
-  [...new Set(_formCompetenze().map((c) => c.gruppo))].forEach((g) => {
-    const d = lista('fm-d-' + g);
-    const n = lista('fm-n-' + g);
-    d.concat(n).forEach((x) => {
-      if (!sigle.has(x)) sbagliate.push(x);
-    });
-    cfg[rep][g] = { diurni: d, notti: n };
+  const errori = [];
+  const gruppiScelti = Object.assign({}, cfg[rep]._gruppi || {});
+  const modelli = Object.assign({}, cfg[rep]._comp || {});
+  _formCompetenzeSettore().forEach((c) => {
+    const sel = document.getElementById('fm-g-' + c.key);
+    if (!sel) return;
+    const g = String(sel.value || '').toUpperCase();
+    const d = lista('fm-d-' + c.key);
+    const n = lista('fm-n-' + c.key);
+    if (!g) {
+      if (d.length || n.length) errori.push(c.label + ': scegli il gruppo dei turni');
+      delete gruppiScelti[c.key];
+      delete modelli[c.key];
+      return;
+    }
+    const fuori = d.concat(n).filter((x) => gruppoDi[x] !== g);
+    if (fuori.length)
+      errori.push(
+        c.label +
+          ': ' +
+          fuori.join(', ') +
+          (fuori.some((x) => !gruppoDi[x])
+            ? ' (non sono turni di questo settore)'
+            : ' (non sono turni del gruppo ' + g + ')'),
+      );
+    gruppiScelti[c.key] = g;
+    modelli[c.key] = { diurni: d, notti: n };
   });
-  if (sbagliate.length) {
-    toastErrore('Sigle che non sono turni di questo settore: ' + [...new Set(sbagliate)].join(', '));
+  if (errori.length) {
+    toastErrore('Modelli non salvati. ' + errori.join(' · '));
     return;
   }
+  cfg[rep]._gruppi = gruppiScelti;
+  cfg[rep]._comp = modelli;
   if (!(await salvaImp('piano_formazione_modelli', JSON.stringify(cfg)))) return;
   window._formModelli = cfg;
   logAzione('Formazioni: modelli dei turni', rep);
@@ -485,7 +558,8 @@ async function formazioneScegliFormatori(compKey) {
     .sort((a, b) => a.nome.localeCompare(b.nome));
   // prima chi e gia abilitato al reparto dei turni (gruppo), poi gli altri del settore
   const t = _pianoTurniReparto().find((x) => String(x.gruppo || '').toUpperCase() === comp.gruppo);
-  const abil = membri.filter((c) => !t || _pianoIdoneoStatico(c.nome, t, null, null)).map((c) => c.nome);
+  const storia = _formIdoneitaStoria();
+  const abil = membri.filter((c) => !t || _pianoIdoneoStatico(c.nome, t, null, storia)).map((c) => c.nome);
   const altri = membri.map((c) => c.nome).filter((n) => !abil.includes(n));
   const prima = _formFormatori(compKey);
   const velo = document.createElement('div');
@@ -738,7 +812,7 @@ async function formazioneNuova(pre) {
         return;
       }
       // numero di giorni: si conferma prima di generare
-      const seq = _formSequenza(richiesta.comp.gruppo, richiesta.n);
+      const seq = _formSequenza(richiesta.comp, richiesta.n);
       if (!seq.length) {
         toastErrore('Nessun modello di turni per ' + richiesta.comp.gruppo);
         return;
@@ -787,14 +861,17 @@ function formazioneAggiornaFormatori(preferito) {
   if (!comp) return;
   const fm = _formFormatori(comp.key);
   const t = _pianoTurniReparto().find((x) => String(x.gruppo || '').toUpperCase() === comp.gruppo);
-  const abil = collaboratoriCache
+  const storia = _formIdoneitaStoria();
+  const membri = collaboratoriCache
     .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && !fm.includes(c.nome))
-    .filter((c) => !t || _pianoIdoneoStatico(c.nome, t, null, null))
-    .map((c) => c.nome)
-    .sort((a, b) => a.localeCompare(b));
+    .sort((a, b) => a.nome.localeCompare(b.nome));
+  const abil = membri.filter((c) => !t || _pianoIdoneoStatico(c.nome, t, null, storia)).map((c) => c.nome);
+  // anche chi non risulta abilitato si puo scegliere (in fondo): decide chi pianifica
+  const altri = membri.map((c) => c.nome).filter((n) => !abil.includes(n));
   const gruppi = [
     { titolo: 'Formatori di ' + comp.label, nomi: fm.slice().sort((a, b) => a.localeCompare(b)) },
     { titolo: 'Altri abilitati a ' + comp.gruppo, nomi: abil },
+    { titolo: 'Altri del settore', nomi: altri },
   ].filter((g) => g.nomi.length);
   [
     ['fz-box-d', 'fz-fmt-d'],
@@ -1466,7 +1543,8 @@ async function formazioneSegnaSvolta(id, automatica) {
       const nuove = Object.assign({}, c.competenze || {});
       nuove[d.comp.key] = true;
       // un livello implica quelli sotto, come nella matrice della scheda Formazione
-      const comps = getCompetenzeReparto();
+      // competenze del settore della formazione (non quello aperto nell app)
+      const comps = _formCompetenzeSettore(f.reparto_dip || 'slots');
       const lv = parseInt((comps.find((k) => k.key === d.comp.key) || {}).livello) || 0;
       comps.forEach((k) => {
         const l = parseInt(k.livello) || 0;
