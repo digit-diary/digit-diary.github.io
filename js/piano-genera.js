@@ -907,6 +907,340 @@ function validaPiano() {
   renderPiano();
 }
 
+// CONTROLLO DI BASE DEL PIANO (v374), come il file "CONTROLLO PIANO SLOT/VALET AUTO"
+// del titolare: solo riposo minimo fra due turni e giorni lavorativi di fila, con il
+// mese precedente. Regole dal programma (min_riposo_ore, max_consecutivi). Una cella
+// VUOTA non conta come riposo (come nell Excel: un giorno non compilato non e un
+// riposo garantito); ogni altro codice che non e un turno (C, V, M, CGF...) azzera.
+// piano: { nome: { 'YYYY-MM-DD': { cod, ini, fin } } } con il mese ym e i giorni prima.
+// Ritorna [{ nome, data, errore, dettagli, turni, daPrima }], una riga per riposo
+// insufficiente e una per periodo di troppi giorni di fila.
+function _pianoControlloBase(ym, piano) {
+  const minRiposo = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 11;
+  const maxCons = parseInt(_pianoRegolaVal('max_consecutivi')) || 5;
+  const MESI_L = typeof MESI_FULL !== 'undefined' ? MESI_FULL : [];
+  const pr = new Date(ym + '-01T12:00:00');
+  pr.setMonth(pr.getMonth() - 1);
+  const nomePrima = (MESI_L[pr.getMonth()] || '').toLowerCase();
+  const gg = (d) => d.substring(8, 10) + '.' + d.substring(5, 7);
+  const ora = (hhmm) => {
+    const p = String(hhmm || '').split(':');
+    return p.length >= 2 ? parseInt(p[0]) * 60 + parseInt(p[1]) : null;
+  };
+  const out = [];
+  Object.keys(piano)
+    .sort((a, b) => a.localeCompare(b))
+    .forEach((nome) => {
+      const giorni = Object.keys(piano[nome]).sort();
+      if (!giorni.length) return;
+      // tutti i giorni dal primo noto all ultimo del mese, anche quelli senza cella
+      const tutti = [];
+      const d0 = new Date(giorni[0] + 'T12:00:00');
+      const ultimo = giorni[giorni.length - 1];
+      for (let d = new Date(d0); dataLocaleISO(d) <= ultimo; d.setDate(d.getDate() + 1)) tutti.push(dataLocaleISO(d));
+      let cons = 0;
+      let inizioSerie = null;
+      let fineAss = null; // minuti assoluti dalla mezzanotte del primo giorno
+      let codPrec = '';
+      let dataPrec = '';
+      let serieSegnata = null;
+      const chiudiSerie = () => {
+        if (serieSegnata) out.push(serieSegnata);
+        serieSegnata = null;
+      };
+      tutti.forEach((dstr, i) => {
+        const cella = piano[nome][dstr];
+        const cod = cella ? String(cella.cod || '').toUpperCase() : '';
+        if (!cod) return; // vuoto: non e un riposo, non azzera
+        const t = _pianoTurnoInfo(cod);
+        if (!t) {
+          // giorno di riposo o assenza: azzera
+          chiudiSerie();
+          cons = 0;
+          inizioSerie = null;
+          fineAss = null;
+          codPrec = '';
+          dataPrec = '';
+          return;
+        }
+        cons++;
+        if (cons === 1) inizioSerie = dstr;
+        const nelMese = dstr.startsWith(ym);
+        if (cons > maxCons) {
+          if (!serieSegnata && nelMese)
+            serieSegnata = {
+              nome: nome,
+              data: dstr,
+              errore: 'Troppi giorni di fila',
+              dettagli: '',
+              turni: '',
+              daPrima: !inizioSerie.startsWith(ym),
+              _inizio: inizioSerie,
+            };
+          if (serieSegnata) {
+            serieSegnata._fine = dstr;
+            // giorni del calendario nel periodo: se sono di piu, in mezzo c erano celle vuote
+            const span =
+              Math.round((new Date(dstr + 'T12:00:00') - new Date(serieSegnata._inizio + 'T12:00:00')) / 86400000) + 1;
+            serieSegnata.dettagli =
+              cons +
+              (span > cons ? ' giorni di lavoro senza un riposo segnato' : ' giorni di fila') +
+              ' dal ' +
+              gg(serieSegnata._inizio) +
+              ' al ' +
+              gg(dstr) +
+              ' (max ' +
+              maxCons +
+              ')' +
+              (span > cons ? ' (le celle vuote non contano come riposo)' : '') +
+              (serieSegnata.daPrima ? ' (da ' + nomePrima + ')' : '');
+          }
+        }
+        const ini = ora((cella && cella.ini) || t.ora_inizio);
+        const fin = ora((cella && cella.fin) || t.ora_fine);
+        if (ini == null || fin == null) return;
+        const inizioAss = i * 1440 + ini;
+        if (fineAss != null && nelMese) {
+          const riposo = (inizioAss - fineAss) / 60;
+          if (riposo >= 0 && riposo < minRiposo && riposo <= 48)
+            out.push({
+              nome: nome,
+              data: dstr,
+              errore: 'Riposo insufficiente',
+              dettagli:
+                'Solo ' +
+                riposo.toFixed(1) +
+                ' ore tra turni (min ' +
+                minRiposo +
+                ')' +
+                (dataPrec && !dataPrec.startsWith(ym) ? ' (da ' + nomePrima + ')' : ''),
+              turni: codPrec + ' -> ' + cod,
+              daPrima: !!(dataPrec && !dataPrec.startsWith(ym)),
+            });
+        }
+        fineAss = i * 1440 + (fin <= ini ? fin + 1440 : fin);
+        codPrec = cod;
+        dataPrec = dstr;
+      });
+      chiudiSerie();
+    });
+  return out.sort((a, b) => a.nome.localeCompare(b.nome) || a.data.localeCompare(b.data));
+}
+
+// finestra con la tabella come il foglio "Errori Turni": Importa com e / Importa e
+// proponi correzioni / Annulla. Ritorna 'importa' | 'correggi' | null
+function _pianoFinestraControllo(titolo, testo, errori) {
+  return new Promise((fine) => {
+    const gg = (d) => d.substring(8, 10) + '.' + d.substring(5, 7);
+    const velo = document.createElement('div');
+    velo.className = 'finestra-velo';
+    velo.innerHTML =
+      '<div class="finestra-box" role="dialog" aria-modal="true" style="width:min(860px,100%);max-height:90vh"><h3>' +
+      escP(titolo) +
+      '</h3><div class="finestra-testo" style="margin-bottom:8px">' +
+      escP(testo) +
+      '</div><div class="fzp-scorri" style="max-height:46vh"><table class="fzp-tab" style="width:100%"><thead><tr><th>Collaboratore</th><th>Data</th><th>Errore</th><th>Dettagli</th><th>Turni</th></tr></thead><tbody>' +
+      errori
+        .map(
+          (e) =>
+            '<tr><td>' +
+            escP(e.nome) +
+            '</td><td>' +
+            gg(e.data) +
+            '</td><td>' +
+            escP(e.errore) +
+            '</td><td>' +
+            escP(e.dettagli) +
+            '</td><td>' +
+            escP(e.turni || '') +
+            '</td></tr>',
+        )
+        .join('') +
+      '</tbody></table></div><div class="finestra-pulsanti" style="flex-wrap:wrap;gap:8px"><button type="button" class="finestra-no" data-s="">Annulla</button><button type="button" class="finestra-no" data-s="importa">Importa com e</button><button type="button" class="finestra-ok" data-s="correggi">Importa e proponi correzioni</button></div></div>';
+    document.body.appendChild(velo);
+    velo.querySelectorAll('button[data-s]').forEach((b) =>
+      b.addEventListener('click', () => {
+        velo.remove();
+        fine(b.dataset.s || null);
+      }),
+    );
+  });
+}
+
+// PROPOSTA DI CORREZIONE dopo l import: la ricerca lavora solo attorno ai giorni con
+// un errore (3 giorni prima e dopo), puo spostare anche le celle del file e i C
+// (non vacanze, malattie, celle bloccate, giorni chiusi), con pochi cambi. Mostra
+// prima/dopo e scrive solo con Applica.
+async function pianoProponiCorrezioniImport(ym, errori) {
+  if (_pianoMeseSel !== ym || !errori.length) return;
+  // MIRATA: solo i giorni degli errori (riposo: anche il giorno prima; giorni di fila:
+  // tutto il periodo), cosi i cambi restano pochi e vicini al problema
+  const giorni = new Set();
+  const aggiungi = (dstr) => dstr.startsWith(ym) && giorni.add(dstr);
+  errori.forEach((e) => {
+    const d = new Date(e.data + 'T12:00:00');
+    aggiungi(e.data);
+    d.setDate(d.getDate() - 1);
+    aggiungi(dataLocaleISO(d));
+    if (e._inizio && e._fine)
+      for (let x = new Date(e._inizio + 'T12:00:00'); dataLocaleISO(x) <= e._fine; x.setDate(x.getDate() + 1))
+        aggiungi(dataLocaleISO(x));
+  });
+  const velo = document.createElement('div');
+  velo.className = 'finestra-velo';
+  velo.innerHTML =
+    '<div class="finestra-box" style="max-width:460px"><h3>Cerco le correzioni</h3><div class="finestra-testo" id="imp-cor">Preparo il mese...</div></div>';
+  document.body.appendChild(velo);
+  let res;
+  try {
+    res = await pianoRicercaCalcola(
+      60,
+      (x) => {
+        const el = document.getElementById('imp-cor');
+        if (el) el.textContent = 'Provo combinazioni: ' + Math.round(x.frazione * 100) + '%';
+      },
+      {
+        prepara: { estesa: true, cMobili: true, cMobiliPer: new Set(errori.map((e) => e.nome)), giorni: giorni },
+        motore: { pesoCambio: 2000 },
+        // stesso metro del controllo di base: solo riposi e giorni di fila (con il mese
+        // prima); gli altri controlli li fa la verifica finale
+        costoPersona: (prep) => {
+          const coda = {};
+          _pianoRigheSettimane().forEach((r) => {
+            const d = String(r.data).substring(0, 10);
+            if (d < ym + '-01') (coda[r.collaboratore] = coda[r.collaboratore] || {})[d] = { cod: r.codice };
+          });
+          return (nome, mappa) => {
+            const p = Object.assign({}, coda[nome] || {});
+            Object.keys(mappa || {}).forEach((d) => {
+              const c = String(mappa[d] || '').replace(/^[#~]/, '');
+              p[d] = { cod: c || (prep.conRiempimento ? 'C' : '') };
+            });
+            return 300000 * _pianoControlloBase(ym, { [nome]: p }).length;
+          };
+        },
+      },
+    );
+  } catch (e) {
+    velo.remove();
+    toastErrore('Ricerca non riuscita: ' + (e.message || e));
+    return;
+  }
+  velo.remove();
+  // stesso controllo di base prima e dopo i cambi proposti
+  const mappa = (righe) => {
+    const m = {};
+    righe.forEach((r) => {
+      if ((r.reparto_dip || 'slots') !== _pianoReparto() && !_pianoCopreQui(r)) return;
+      (m[r.collaboratore] = m[r.collaboratore] || {})[String(r.data).substring(0, 10)] = {
+        cod: r.codice,
+        ini: r.ora_inizio,
+        fin: r.ora_fine,
+      };
+    });
+    return m;
+  };
+  const primaRighe = _pianoRigheSettimane();
+  const prima = _pianoControlloBase(ym, mappa(primaRighe));
+  const dopoMappa = mappa(primaRighe);
+  res.cambi.forEach((c) => {
+    const cod = c.dopo || (res.prep.conRiempimento ? 'C' : '');
+    (dopoMappa[c.nome] = dopoMappa[c.nome] || {})[c.data] = cod ? { cod: cod } : undefined;
+  });
+  const dopo = _pianoControlloBase(ym, dopoMappa);
+  const gg = (d) => d.substring(8, 10) + '.' + d.substring(5, 7);
+  // si accetta solo se gli errori calano e non ne nasce nessuno nuovo
+  // per persona e tipo: una serie di giorni di fila spezzata da un cambio puo
+  // cominciare un altro giorno, ma non e un errore nuovo
+  const chiave = (e) => e.nome + '|' + e.errore;
+  const contaPer = (lista) => {
+    const m = {};
+    lista.forEach((e) => (m[chiave(e)] = (m[chiave(e)] || 0) + 1));
+    return m;
+  };
+  const cPrima = contaPer(prima);
+  const cDopo = contaPer(dopo);
+  const nuoviErrori = Object.keys(cDopo)
+    .filter((k) => cDopo[k] > (cPrima[k] || 0))
+    .map((k) => ({ nome: k.split('|')[0], data: '', errore: k.split('|')[1] }));
+  // traccia per capire una proposta scartata (console del browser)
+  window._ultimaCorrezioneImport = {
+    migliore: res.migliore,
+    cambi: res.cambi.map((c) => c.nome + ' ' + c.data + ' ' + (c.prima || '-') + '>' + (c.dopo || '-')),
+    prima: prima.length,
+    dopo: dopo.length,
+    nuovi: nuoviErrori.map((e) => e.nome + ' ' + e.errore),
+    legge: res.prima.legge + '>' + res.dopo.legge,
+    scoperti: res.prima.scoperti + '>' + res.dopo.scoperti,
+  };
+  // e le regole di legge del programma non devono peggiorare rispetto al file
+  if (
+    !res.cambi.length ||
+    dopo.length >= prima.length ||
+    nuoviErrori.length ||
+    res.dopo.legge > res.prima.legge ||
+    res.dopo.scoperti > res.prima.scoperti
+  ) {
+    await mostraAvviso(
+      'Non ho trovato correzioni sicure: ogni cambio provato avrebbe peggiorato un altra regola o lasciato un posto scoperto. Il piano resta come nel file.\n\nI ' +
+        prima.length +
+        ' errori di riposo e giorni di fila restano da sistemare a mano: li trovi con Valida regole.',
+      { titolo: 'Correzioni del piano importato', ok: 'Ho capito' },
+    );
+    return;
+  }
+  const cambi = res.cambi
+    .slice()
+    .sort((a, b) => a.nome.localeCompare(b.nome) || a.data.localeCompare(b.data))
+    .map(
+      (c) =>
+        '<tr><td>' +
+        escP(c.nome) +
+        '</td><td>' +
+        gg(c.data) +
+        '</td><td>' +
+        escP(c.prima || (res.prep.conRiempimento ? 'C' : 'riposo')) +
+        '</td><td class="fzp-dopo">' +
+        escP(c.dopo || (res.prep.conRiempimento ? 'C' : 'riposo')) +
+        '</td></tr>',
+    )
+    .join('');
+  const scelta = await new Promise((fine) => {
+    const v = document.createElement('div');
+    v.className = 'finestra-velo';
+    v.innerHTML =
+      '<div class="finestra-box" role="dialog" aria-modal="true" style="width:min(720px,100%);max-height:90vh"><h3>Correzioni proposte</h3><div class="finestra-testo">Errori di riposo e giorni di fila: <b>' +
+      prima.length +
+      ' → ' +
+      dopo.length +
+      '</b> · posti scoperti: ' +
+      res.prima.scoperti +
+      ' → ' +
+      res.dopo.scoperti +
+      ' · celle che cambiano: ' +
+      res.cambi.length +
+      '\nNessuna altra regola peggiora. Niente cambia finche non premi Applica.</div><div class="fzp-scorri" style="max-height:46vh;margin-top:8px"><table class="fzp-tab" style="width:100%"><thead><tr><th>Collaboratore</th><th>Giorno</th><th>Nel file</th><th>Proposto</th></tr></thead><tbody>' +
+      cambi +
+      '</tbody></table></div><div class="finestra-pulsanti"><button type="button" class="finestra-no" data-s="">Lascia il piano del file</button><button type="button" class="finestra-ok" data-s="ok">Applica</button></div></div>';
+    document.body.appendChild(v);
+    v.querySelectorAll('button[data-s]').forEach((b) =>
+      b.addEventListener('click', () => {
+        v.remove();
+        fine(b.dataset.s);
+      }),
+    );
+  });
+  if (scelta !== 'ok') {
+    toast('Piano lasciato come nel file');
+    return;
+  }
+  await _ricercaScrivi(res);
+  logAzione(
+    'Piano: correzioni dopo import',
+    ym + ' ' + _pianoReparto() + ' · errori ' + prima.length + '>' + dopo.length,
+  );
+}
+
 // RIEPILOGO DELLE VIOLAZIONI del mese aperto, per tipo (dopo l import da Excel, in
 // ogni settore): una finestra con i numeri e "Mostra nel calendario", che evidenzia
 // le celle come Valida regole. Conta anche la fine del mese prima (riposo fra il 31

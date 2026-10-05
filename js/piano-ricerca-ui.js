@@ -88,8 +88,16 @@ async function _ricercaPrepara(opz) {
   // C DI RIEMPIMENTO: la bozza segna i giorni di riposo con una C generata (non
   // protetta). Sono riposi della bozza, quindi spostabili; le C protette (congedi
   // legati alle vacanze, inserite a mano) restano come sono
-  const riempimento = (r) => r.codice === 'C' && r.generato && !r.protetto && !r.motivo_blocco;
-  const conRiempimento = _pianoRighe.some((r) => (r.reparto_dip || 'slots') === rep && riempimento(r));
+  // opz.cMobili (correzioni dopo l import): anche i C del file, senza nota e senza
+  // blocco, sono riposi che si possono spostare; un riposo si scrive come C
+  // opz.cMobiliPer (Set di nomi): i C del file si spostano solo per queste persone
+  // (chi ha l errore), mai quelli dei colleghi
+  const riempimento = (r) =>
+    r.codice === 'C' &&
+    !r.motivo_blocco &&
+    ((r.generato && !r.protetto) ||
+      (opz.cMobili && !String(r.commento || '').trim() && (!opz.cMobiliPer || opz.cMobiliPer.has(r.collaboratore))));
+  const conRiempimento = !!opz.cMobili || _pianoRighe.some((r) => (r.reparto_dip || 'slots') === rep && riempimento(r));
   const apertiSet = new Set(giorniAperti);
   const mobile = {};
   nomi.forEach((n) => {
@@ -101,7 +109,8 @@ async function _ricercaPrepara(opz) {
       if (info.data_assunzione && d < String(info.data_assunzione).substring(0, 10)) return;
       const rr = righeDi[n + '|' + d] || [];
       if (!rr.length) {
-        mobile[n + '|' + d] = true;
+        // correzioni mirate: un giorno vuoto si riempie solo per chi ha l errore
+        if (!opz.cMobiliPer || opz.cMobiliPer.has(n)) mobile[n + '|' + d] = true;
         return;
       }
       if (rr.length > 1) return;
@@ -380,6 +389,14 @@ function _ricercaMisuraUfficiale(righe, fabbOriginale) {
 async function pianoRicercaCalcola(secondi, onPasso, opz) {
   opz = opz || {};
   const prep = await _ricercaPrepara(opz.prepara);
+  // metro diverso per le persone (es. correzioni dopo l import: solo riposi e giorni
+  // di fila): opz.costoPersona(prep) -> (nome, mappa) => costo; i gruppi non contano
+  if (typeof opz.costoPersona === 'function') {
+    const base = prep.problema.costoPersona;
+    const extra = opz.costoPersona(prep);
+    // il metro richiesto pesa di piu, le regole di sempre restano (non si peggiorano)
+    prep.problema.costoPersona = (n, mappa) => extra(n, mappa) + base(n, mappa);
+  }
   const fabbOriginale = {};
   // fabbisogno intero (con i posti coperti da altri settori) per il conteggio ufficiale
   const fr =

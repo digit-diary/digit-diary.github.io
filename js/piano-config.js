@@ -2008,6 +2008,64 @@ async function importaPianoExcel(input) {
     );
     if (!scelta) return;
     const aggiorna = scelta.modo !== 'nuove';
+    // CONTROLLO PRIMA DI SCRIVERE (v374), come il file Excel di controllo del titolare:
+    // riposo minimo e giorni di fila, con la fine del mese prima, sul mese come sara
+    // DOPO l import (celle del file, celle che restano, scelta aggiorna/solo nuove)
+    let erroriBase = [];
+    let correggiDopo = false;
+    {
+      const finale = {};
+      const metti = (r) =>
+        ((finale[r.collaboratore] = finale[r.collaboratore] || {})[String(r.data).substring(0, 10)] = {
+          cod: r.codice,
+          ini: r.ora_inizio,
+          fin: r.ora_fine,
+        });
+      const d0 = new Date(ym + '-01T12:00:00');
+      d0.setDate(d0.getDate() - 14);
+      const primaMese =
+        (await secGet(
+          'piano?collaboratore=in.(' +
+            nomiFile.map((n) => encodeURIComponent(n)).join(',') +
+            ')&data=gte.' +
+            dataLocaleISO(d0) +
+            '&data=lt.' +
+            ym +
+            '-01&limit=5000',
+        )) || [];
+      primaMese.forEach((r) => metti(r));
+      (esistenti || []).forEach((r) => metti(r));
+      const sostituite = new Set((aggiorna ? cambiate : []).map((c) => c.riga.id));
+      const esistentePer = {};
+      (esistenti || []).forEach((r) => (esistentePer[r.collaboratore + '|' + String(r.data).substring(0, 10)] = r));
+      nuove.forEach((x) => {
+        const r = esistentePer[x.collaboratore + '|' + x.data];
+        if (!r || sostituite.has(r.id)) metti(x);
+      });
+      erroriBase = _pianoControlloBase(ym, finale);
+      if (erroriBase.length) {
+        const persone = new Set(erroriBase.map((e) => e.nome)).size;
+        const sc = await _pianoFinestraControllo(
+          'Controllo del piano prima dell import',
+          lbl +
+            ' (' +
+            repartoLabel(_pianoReparto()) +
+            '): ' +
+            erroriBase.length +
+            (erroriBase.length === 1 ? ' errore' : ' errori') +
+            ' di riposo o giorni di fila (' +
+            persone +
+            (persone === 1 ? ' persona' : ' persone') +
+            '), contando anche la fine del mese prima. Nessuna cella e ancora stata scritta.',
+          erroriBase,
+        );
+        if (!sc) {
+          toast('Import annullato: il piano non e stato modificato');
+          return;
+        }
+        correggiDopo = sc === 'correggi';
+      }
+    }
     if (scelta.colsigle === 'file' && isAdmin())
       for (const c of coloriTurni) {
         const prima = c.turno.colore || '';
@@ -2185,6 +2243,9 @@ async function importaPianoExcel(input) {
       try {
         await fatto;
       } catch (e) {}
+      // correzioni proposte per riposi e giorni di fila, se scelte prima dell import
+      if (correggiDopo && typeof pianoProponiCorrezioniImport === 'function')
+        await pianoProponiCorrezioniImport(ym, erroriBase);
       if (typeof pianoRiepilogoViolazioni === 'function')
         await pianoRiepilogoViolazioni(ym, 'Controllo del piano importato');
     }, 400);
