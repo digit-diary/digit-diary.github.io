@@ -185,6 +185,47 @@ function escP(s) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
+// Testo da mettere come argomento tra apici singoli dentro un attributo onclick="..."
+// (o un altro on...="..."). Due livelli: prima la stringa JavaScript (backslash,
+// apostrofo, a capo, "<"), poi l attributo HTML (& e virgolette). Con il solo
+// apostrofo scappato un nome come  x\');alert(1);//  o con le virgolette usciva
+// dalla stringa e veniva eseguito. Usarla SEMPRE per i testi nei click.
+function _jsArg(s) {
+  return String(s == null ? '' : s)
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029')
+    .replace(/</g, '\\x3c')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;');
+}
+// UN SALVATAGGIO ALLA VOLTA. Il doppio click (o Ctrl+Invio premuto due volte) su
+// Salva faceva partire due salvataggi insieme: due righe uguali nel database.
+// Finche il primo e in corso, un secondo con la stessa chiave viene ignorato; il
+// pulsante (quello passato, o quello appena cliccato) resta disabilitato e torna
+// attivo alla fine, anche se il salvataggio fallisce.
+const _salvataggiInCorso = new Set();
+async function unaVoltaSola(chiave, fn, pulsante) {
+  // il pulsante si prende SUBITO: dopo il primo await l evento del click non c e piu
+  let btn = typeof pulsante === 'string' ? document.getElementById(pulsante) : pulsante || null;
+  if (!btn && typeof window !== 'undefined' && window.event && window.event.type === 'click') {
+    const t = window.event.currentTarget || window.event.target;
+    btn = t && t.closest ? t.closest('button') : null;
+  }
+  if (_salvataggiInCorso.has(chiave)) return;
+  _salvataggiInCorso.add(chiave);
+  const eraDisabilitato = btn ? btn.disabled : false;
+  if (btn) btn.disabled = true;
+  try {
+    return await fn();
+  } finally {
+    _salvataggiInCorso.delete(chiave);
+    if (btn && !eraDisabilitato) btn.disabled = false;
+  }
+}
 // Salva un'impostazione e rende visibile il rifiuto: setImp lancia se il
 // database non risponde e chi chiama da un bottone non avrebbe altro avviso.
 // Ritorna false se non salvata, cosi' chi chiama non annuncia un successo.

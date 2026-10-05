@@ -439,9 +439,13 @@ function sbH(x) {
     x || {},
   );
 }
+// Le chiamate dirette (senza sessione) sono oneste come quelle del canale
+// sicuro: un errore del server e un errore, mai una lista vuota o un "fatto".
+// Chiamate solo da secGet e _secDelRaw quando non c e sessione.
 async function sbGet(path) {
   const r = await fetch(SB_URL + '/rest/v1/' + path, { headers: sbH() });
-  return r.ok ? r.json() : [];
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
 }
 async function sbPost(table, data, extra) {
   const r = await fetch(SB_URL + '/rest/v1/' + table, {
@@ -461,10 +465,11 @@ async function sbPatch(table, filter, data) {
   if (!r.ok) throw new Error(await r.text());
 }
 async function sbDel(table, filter) {
-  await fetch(SB_URL + '/rest/v1/' + table + '?' + filter, {
+  const r = await fetch(SB_URL + '/rest/v1/' + table + '?' + filter, {
     method: 'DELETE',
     headers: sbH(),
   });
+  if (!r.ok) throw new Error(await r.text());
 }
 let _sbUltimoErrore = null; // ultimo errore ricevuto dal database via RPC
 async function sbRpc(fn, params) {
@@ -566,6 +571,18 @@ async function _rpcSicura(fn, params) {
     const err = new Error(_sbErroreTesto(_sbUltimoErrore));
     err.status = _sbUltimoErrore.status;
     err.sessione = /Sessione non valida|sessione/i.test(_sbUltimoErrore.testo || '');
+    err.dalDatabase = true;
+    throw err;
+  }
+  return r;
+}
+// Come _rpcSicura, per le funzioni che rispondono { success, error } invece di
+// lanciare (operatori, password): anche "success: false" e un errore, con il
+// motivo dato dal database. Chi chiama aggiorna l interfaccia solo se non lancia.
+async function _rpcConEsito(fn, params) {
+  const r = await _rpcSicura(fn, params);
+  if (!r || r.success !== true) {
+    const err = new Error((r && r.error) || 'il database non ha confermato il salvataggio');
     err.dalDatabase = true;
     throw err;
   }

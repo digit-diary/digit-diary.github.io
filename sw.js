@@ -24,28 +24,53 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
+// Il service worker serve SOLO i file del programma. Tutto il resto va dritto alla
+// rete, senza passare di qui: le chiamate al database e ai servizi (stesso
+// indirizzo sul server interno: /rest/, /ai/, /solver/, /functions/), ogni metodo
+// diverso da GET (POST/PATCH/DELETE: cache.put fallirebbe) e gli altri siti.
+// Prima bastava includes('supabase.co'): sul server interno non scattava piu e le
+// risposte con i dati personali finivano nella Cache Storage del browser.
+const _PERCORSI_SERVIZI = ['rest/', 'ai/', 'solver/', 'functions/', 'auth/', 'storage/', 'realtime/'];
+const _SHELL_PERCORSI = new Set(SHELL_URLS);
+function _percorsoRelativo(url) {
+  // percorso rispetto alla cartella del programma (anche se non e la radice del sito)
+  const base = new URL(self.registration.scope).pathname;
+  return url.pathname.startsWith(base) ? url.pathname.substring(base.length) : url.pathname.replace(/^\//, '');
+}
+function _eFileDelProgramma(url) {
+  if (_SHELL_PERCORSI.has(url.pathname)) return true;
+  const p = _percorsoRelativo(url);
+  return /^(js|css|libs)\/[^?]+\.(js|css|map|woff2?|ttf)$/.test(p) || /^[\w.-]+\.(png|ico|svg|json)$/.test(p);
+}
 self.addEventListener('fetch', e => {
-  // Always network for API calls
-  if (e.request.url.includes('supabase.co')) return;
-  // Same-origin: bypassa la cache HTTP di GitHub Pages (max-age=600) rivalidando
-  // con l'ETag — gli aggiornamenti arrivano al primo reload invece che dopo 10 minuti.
-  // I CDN esterni restano con la cache normale (niente ri-download di librerie).
-  const sameOrigin = e.request.url.startsWith(self.location.origin);
-  const fetchOpts = sameOrigin ? { cache: 'no-cache' } : undefined;
-  // HTML pages: always network-first, never serve stale HTML
+  if (e.request.method !== 'GET') return;
+  const url = new URL(e.request.url);
+  if (url.origin !== self.location.origin) return;
+  const rel = _percorsoRelativo(url);
+  if (_PERCORSI_SERVIZI.some(p => rel.startsWith(p))) return;
+  // Bypassa la cache HTTP rivalidando con l'ETag: gli aggiornamenti arrivano al
+  // primo reload invece che dopo 10 minuti.
+  const fetchOpts = { cache: 'no-cache' };
+  // Pagine: sempre dalla rete; senza rete la pagina principale salvata
   if (e.request.mode === 'navigate') {
-    e.respondWith(fetch(e.request, fetchOpts).catch(() => caches.match(e.request)));
+    e.respondWith(
+      fetch(e.request, fetchOpts).catch(() =>
+        caches.match(e.request).then(r => r || caches.match('/')).then(r => r || Response.error())
+      )
+    );
     return;
   }
-  // Assets (icons, manifest): network-first with cache fallback
+  // Altro dello stesso sito che non e un file del programma: rete, mai in cache
+  if (!_eFileDelProgramma(url)) return;
+  // File del programma: dalla rete, con la copia salvata se manca la rete
   e.respondWith(
     fetch(e.request, fetchOpts).then(r => {
-      if (r.ok) {
+      if (r.ok && r.type === 'basic') {
         const clone = r.clone();
-        caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+        caches.open(CACHE_NAME).then(c => c.put(e.request, clone)).catch(() => {});
       }
       return r;
-    }).catch(() => caches.match(e.request))
+    }).catch(() => caches.match(e.request).then(r => r || Response.error()))
   );
 });
 

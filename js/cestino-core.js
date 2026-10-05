@@ -319,6 +319,20 @@ async function apriFixImpiego() {
   });
   el.innerHTML = h;
 }
+// Esito di un salvataggio fatto collaboratore per collaboratore: se qualcuno non
+// e stato salvato lo si dice per nome (in rosso), mai un "salvato" che non e vero
+function _esitoInBlocco(msgOk, falliti) {
+  if (!falliti.length) return toast(msgOk);
+  toastErrore(
+    msgOk +
+      '. NON salvati (' +
+      falliti.length +
+      '): ' +
+      falliti.slice(0, 8).join(', ') +
+      (falliti.length > 8 ? '...' : ''),
+    9000,
+  );
+}
 async function salvaFixImpiego() {
   // stesso permesso della scheda collaboratore (Impiego)
   if (!puoModificare('gestione_impiego')) {
@@ -329,22 +343,29 @@ async function salvaFixImpiego() {
   if (!sel.length) return;
   if (!(await chiediConferma("Salvo l'impiego di " + sel.length + ' collaboratori?'))) return;
   let n = 0;
+  const falliti = [];
   for (const s of sel) {
     const id = parseInt(s.dataset.fixImp);
     const val = s.value;
     if (!val) continue;
+    const c = collaboratoriCache.find((x) => x.id === id);
     try {
       await secPatch('collaboratori', 'id=eq.' + id, { impiego: val, is_jolly: val === 'jolly' });
-      const c = collaboratoriCache.find((x) => x.id === id);
       if (c) {
         c.impiego = val;
         c.is_jolly = val === 'jolly';
       }
       n++;
-    } catch (e) {}
+    } catch (e) {
+      console.error('Impiego non salvato (id ' + id + '):', e);
+      falliti.push(c ? c.nome : 'id ' + id);
+    }
   }
-  logAzione('Impiego assegnato in blocco', n + ' collaboratori');
-  toast('Impiego salvato per ' + n + ' collaboratori');
+  logAzione(
+    'Impiego assegnato in blocco',
+    n + ' collaboratori' + (falliti.length ? ', NON salvati: ' + falliti.join(', ') : ''),
+  );
+  _esitoInBlocco('Impiego salvato per ' + n + ' collaboratori', falliti);
   controlloSalute();
 }
 // I disattivati con mesi interi di soli riposi (C/V/WD senza commento) sono
@@ -358,9 +379,11 @@ async function pulisciPianoDisattivati() {
     return;
   }
   try {
+    // il piano si legge TUTTO (senza limite secGet legge a pagine in ordine
+    // stabile): con un tetto fisso i mesi oltre il tetto non venivano visti
     const [collab, righe] = await Promise.all([
       secGet('collaboratori?select=nome,attivo&limit=2000'),
-      secGet('piano?select=id,collaboratore,data,codice,commento&limit=40000'),
+      secGet('piano?select=id,collaboratore,data,codice,commento'),
     ]);
     const inattivi = new Set((collab || []).filter((c) => c.attivo === false).map((c) => (c.nome || '').toLowerCase()));
     const isRiposo = (cod) => {
@@ -401,18 +424,35 @@ async function pulisciPianoDisattivati() {
     )
       return;
     const ids = daPulire.flatMap(([, v]) => v.ids);
+    // si contano le cancellazioni riuscite: solo quelle escono dalla memoria
+    const tolti = new Set();
+    let nonTolte = 0;
     for (let i = 0; i < ids.length; i += 10) {
-      await Promise.all(ids.slice(i, i + 10).map((id) => secDel('piano', 'id=eq.' + id)));
+      const parte = ids.slice(i, i + 10);
+      const esiti = await Promise.allSettled(parte.map((id) => secDel('piano', 'id=eq.' + id)));
+      esiti.forEach((e, j) => {
+        if (e.status === 'fulfilled') tolti.add(parte[j]);
+        else {
+          nonTolte++;
+          console.error('Cella del piano non tolta (id ' + parte[j] + '):', e.reason);
+        }
+      });
     }
-    if (typeof _pianoRighe !== 'undefined') {
-      const idsSet = new Set(ids);
-      _pianoRighe = _pianoRighe.filter((r) => !idsSet.has(r.id));
-    }
+    if (typeof _pianoRighe !== 'undefined') _pianoRighe = _pianoRighe.filter((r) => !tolti.has(r.id));
     logAzione(
       'Pulizia piani disattivati',
-      totIds + ' celle di solo riposo tolte (' + Object.keys(perNome).length + ' collaboratori)',
+      tolti.size +
+        ' celle di solo riposo tolte (' +
+        Object.keys(perNome).length +
+        ' collaboratori)' +
+        (nonTolte ? ', ' + nonTolte + ' NON tolte' : ''),
     );
-    toast('Tolte ' + totIds + ' celle di riempimento');
+    if (nonTolte)
+      toastErrore(
+        'Tolte ' + tolti.size + ' celle di riempimento, ' + nonTolte + ' NON tolte: riprova la pulizia',
+        9000,
+      );
+    else toast('Tolte ' + tolti.size + ' celle di riempimento');
     controlloSalute();
   } catch (e) {
     toast('Errore pulizia: ' + (e.message || ''));
@@ -461,7 +501,8 @@ async function salvaFixDateNascita() {
     return;
   }
   let ok = 0;
-  const errori = [];
+  const errori = []; // valori non capiti
+  const nonSalvate = []; // valori giusti che il database non ha salvato
   for (const inp of campi) {
     const v = inp.value.trim();
     const m = v.match(/^(\d{1,2})[.\/-](\d{1,2})(?:[.\/-](\d{2,4}))?$/);
@@ -480,23 +521,42 @@ async function salvaFixDateNascita() {
       if (c) c.data_nascita = iso;
       ok++;
     } catch (e) {
-      errori.push(v);
+      // non e un valore sbagliato: e il database che non l ha salvato
+      const c = collaboratoriCache.find((x) => String(x.id) === String(inp.dataset.nascId));
+      console.error('Data di nascita non salvata:', e);
+      nonSalvate.push((c ? c.nome : 'id ' + inp.dataset.nascId) + ' (' + (e.message || 'errore') + ')');
     }
   }
-  logAzione('Date di nascita inserite', ok + ' collaboratori');
+  logAzione(
+    'Date di nascita inserite',
+    ok + ' collaboratori' + (nonSalvate.length ? ', NON salvate: ' + nonSalvate.length : ''),
+  );
   document.getElementById('pwd-modal').classList.add('hidden');
-  toast(ok + ' date salvate' + (errori.length ? ', ' + errori.length + ' non valide' : ''));
-  if (errori.length)
+  const msg =
+    ok +
+    ' date salvate' +
+    (errori.length ? ', ' + errori.length + ' non valide' : '') +
+    (nonSalvate.length ? ', ' + nonSalvate.length + ' NON salvate' : '');
+  if (nonSalvate.length) toastErrore(msg, 9000);
+  else toast(msg);
+  if (errori.length || nonSalvate.length)
     await mostraAvviso(
-      'Non ho capito questi valori: ' + errori.join(', ') + '\n\nUsa il formato gg.mm oppure gg.mm.aaaa',
+      (errori.length
+        ? 'Non ho capito questi valori: ' + errori.join(', ') + '\n\nUsa il formato gg.mm oppure gg.mm.aaaa'
+        : '') +
+        (nonSalvate.length
+          ? (errori.length ? '\n\n' : '') + 'Il database NON ha salvato: ' + nonSalvate.join(', ')
+          : ''),
     );
   if (typeof controlloSalute === 'function') controlloSalute();
 }
 async function pianoRilevaCongedoNonPagato() {
   try {
+    // tutti i mesi del piano (lettura a pagine): un mese di congedo oltre un
+    // tetto di righe non veniva contato
     const [collab, righe] = await Promise.all([
       secGet('collaboratori?select=id,nome,attivo,data_assunzione,mesi_congedo_non_pagato&limit=2000'),
-      secGet('piano?select=collaboratore,data,codice,commento&limit=40000'),
+      secGet('piano?select=collaboratore,data,codice,commento'),
     ]);
     const perMese = {};
     (righe || []).forEach((r) => {
@@ -555,16 +615,23 @@ async function pianoRilevaCongedoNonPagato() {
     )
       return;
     let fatti = 0;
+    const falliti = [];
     for (const x of proposte) {
       try {
         await secPatch('collaboratori', 'id=eq.' + x.id, { mesi_congedo_non_pagato: x.mesi.length });
         const c = collaboratoriCache.find((y) => y.id === x.id);
         if (c) c.mesi_congedo_non_pagato = x.mesi.length;
         fatti++;
-      } catch (e) {}
+      } catch (e) {
+        console.error('Congedo non salvato per ' + x.nome + ':', e);
+        falliti.push(x.nome);
+      }
     }
-    logAzione('Congedo non pagato registrato', fatti + ' collaboratori aggiornati');
-    toast(fatti + ' schede aggiornate: i giubilei tengono conto dei mesi fermi');
+    logAzione(
+      'Congedo non pagato registrato',
+      fatti + ' collaboratori aggiornati' + (falliti.length ? ', NON salvati: ' + falliti.join(', ') : ''),
+    );
+    _esitoInBlocco(fatti + ' schede aggiornate: i giubilei tengono conto dei mesi fermi', falliti);
     controlloSalute();
   } catch (e) {
     toast('Errore rilevamento: ' + (e.message || ''));
@@ -576,7 +643,7 @@ async function apriFixOrfani() {
   el.innerHTML = '<p style="color:var(--muted)">Caricamento...</p>';
   const [collab, righe] = await Promise.all([
     secGet('collaboratori?select=nome,attivo,reparto_dip&limit=2000'),
-    secGet('piano?select=collaboratore,data,reparto_dip&limit=40000'),
+    secGet('piano?select=collaboratore,data,reparto_dip'),
   ]);
   // una riga del piano senza nome (collaboratore nullo) non deve far saltare
   // tutto il controllo: si raggruppa a parte e si segnala come "senza nome"
@@ -611,7 +678,7 @@ async function apriFixOrfani() {
     ' nomi hanno turni ma nessuna scheda.</b> Per ognuno puoi creare la scheda, spostare i turni su un collaboratore esistente (se &egrave; un nome scritto male) oppure eliminare i turni se non &egrave; una persona.</p>' +
     '<div style="margin-bottom:10px"><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:6px 14px" onclick="controlloSalute()">Torna al controllo</button></div>';
   lista.forEach(([nome, o], i) => {
-    const nomeJs = nome.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const nomeJs = _jsArg(nome);
     h +=
       '<div style="padding:8px 0;border-bottom:1px solid var(--line)">' +
       '<b style="font-size:var(--fs-md,.875rem)">' +
@@ -662,7 +729,11 @@ async function apriFixOrfani() {
   });
   el.innerHTML = h;
 }
-async function orfanoCreaScheda(nome, rep) {
+// un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
+function orfanoCreaScheda(nome, rep) {
+  return unaVoltaSola('orfano-scheda|' + nome, () => _orfanoCreaSchedaEsegui(nome, rep));
+}
+async function _orfanoCreaSchedaEsegui(nome, rep) {
   if (
     !(await chiediConferma(
       'Creo la scheda di "' +
@@ -749,7 +820,7 @@ async function controlloSalute() {
       secGet(
         'collaboratori?select=nome,attivo,impiego,is_jolly,reparto_dip,reparti_extra,percentuale,mesi_congedo_non_pagato,data_nascita&limit=2000',
       ),
-      secGet('piano?data=gte.' + ym + '-01&limit=20000'),
+      secGet('piano?data=gte.' + ym + '-01'),
       secGet('piano_festivi?select=data&limit=500'),
       secGet('piano_turni?select=codice,reparto_dip,attivo&limit=500'),
     ]);

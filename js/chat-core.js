@@ -144,10 +144,14 @@ async function _chatPatchMessage(chatMessageId, updates) {
       }
     } else if ((k === 'nascosta_mitt' || k === 'nascosta_dest') && v === true) {
       // Nascondi per operatore corrente (per nascosta_mitt si nasconde solo a chi lo ha inviato)
+      // La memoria si aggiorna solo se il database ha accettato: altrimenti il
+      // messaggio spariva dalla vista e ricompariva al ricaricamento. L errore
+      // arriva a chi ha chiamato, che lo mostra.
       try {
-        await sbRpc('chat_hide_message', { p_token: tk, p_message_id: chatMessageId });
+        await _rpcSicura('chat_hide_message', { p_token: tk, p_message_id: chatMessageId });
       } catch (e) {
-        console.warn('chat_hide_message:', e.message);
+        console.error('chat_hide_message:', e.message);
+        throw e;
       }
       if (!chatHiddenCache.some((h) => h.message_id === chatMessageId && h.operatore === op)) {
         chatHiddenCache.push({ message_id: chatMessageId, operatore: op, hidden_at: new Date().toISOString() });

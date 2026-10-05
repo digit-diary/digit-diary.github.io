@@ -76,7 +76,11 @@ function matchCollaboratoreOps(nome, ops) {
     ''
   );
 }
-async function inviaConsegnaTurno() {
+// un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
+function inviaConsegnaTurno() {
+  return unaVoltaSola('consegna-invia', () => _inviaConsegnaTurnoEsegui());
+}
+async function _inviaConsegnaTurnoEsegui() {
   const turno = document.getElementById('cons-turno').value;
   const msg = document.getElementById('cons-messaggio').value.trim();
   const priorita = document.getElementById('cons-priorita').value;

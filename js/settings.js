@@ -536,7 +536,7 @@ function renderProfiliUI(opList) {
       '<div class="prof-riga"><span class="vis-nome">' +
       escP(nome) +
       '</span><select onchange="cambiaProfiloOperatore(\'' +
-      escP(nome.replace(/'/g, "\\'")) +
+      _jsArg(nome) +
       '\', this.value)"><option value="">Nessun profilo</option>';
     _profiliTuttiIds().forEach((p) => {
       html +=
@@ -951,11 +951,17 @@ async function aggiungiOperatoreConPwd() {
   }
   const h = await secureHash(p, n);
   try {
-    await sbRpc('add_operator', {
-      p_nome: n,
-      p_hash: h,
-      p_token: getAdminToken(),
-    });
+    try {
+      await _rpcConEsito('add_operator', {
+        p_nome: n,
+        p_hash: h,
+        p_token: getAdminToken(),
+      });
+    } catch (e) {
+      // l operatore non esiste nel database: niente in memoria, niente "creato"
+      toastErrore('Operatore non creato: ' + (e.message || e));
+      return;
+    }
     operatoriAuthCache.push({ nome: n, ruolo: 'operatore' });
     if (!operatoriSalvati.includes(n)) {
       operatoriSalvati.push(n);
@@ -1006,7 +1012,7 @@ async function aggiungiOperatoreConPwd() {
       toast('Scrivi il nome del nuovo profilo e scegli le voci: al salvataggio viene assegnato a ' + n, 6000);
     }
   } catch (e) {
-    toast('Errore creazione');
+    toastErrore('Operatore creato, ma impostazioni non completate: ' + (e.message || e));
   }
 }
 // Copia da un collega: profilo, accessi extra e presenza nelle voci "Operatori
@@ -1139,7 +1145,7 @@ function apriAccessiExtra(nome) {
   });
   h +=
     '</div><div class="pwd-modal-btns" style="margin-top:12px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaAccessiExtra(\'' +
-    nome.replace(/'/g, "\\'") +
+    _jsArg(nome) +
     '\')">Salva</button></div>';
   b.innerHTML = h;
   document.getElementById('pwd-modal').classList.remove('hidden');
@@ -1190,12 +1196,22 @@ async function cambiaRepartoOperatore(nome, rep) {
 }
 async function rimuoviOperatore(n) {
   if (!(await chiediConferma('Rimuovere operatore "' + n + '"?'))) return;
-  operatoriSalvati = operatoriSalvati.filter((o) => o !== n);
-  if (!(await saveOperatori())) return;
+  // prima l accesso (la password nel database): se il database rifiuta,
+  // l operatore resta com era, in elenco e in memoria, e lo si dice
   try {
-    await sbRpc('remove_operator', { p_nome: n, p_token: getAdminToken() });
-    operatoriAuthCache = operatoriAuthCache.filter((o) => o.nome !== n);
-  } catch (e) {}
+    await _rpcConEsito('remove_operator', { p_nome: n, p_token: getAdminToken() });
+  } catch (e) {
+    toastErrore('Operatore non rimosso: ' + (e.message || e));
+    return;
+  }
+  operatoriAuthCache = operatoriAuthCache.filter((o) => o.nome !== n);
+  const primaLista = operatoriSalvati;
+  operatoriSalvati = operatoriSalvati.filter((o) => o !== n);
+  if (!(await saveOperatori())) {
+    operatoriSalvati = primaLista;
+    renderOperatoriUI();
+    return;
+  }
   delete operatoriRepartoMap[n];
   if (!(await salvaImp('operatori_reparto', JSON.stringify(operatoriRepartoMap)))) return;
   logAzione('Operatore rimosso', n);
@@ -1278,7 +1294,7 @@ function renderOperatoriUI() {
                 '">' +
                 escP(repartoLabel(rep)) +
                 '</span>';
-          const ne = n.replace(/'/g, "\\'");
+          const ne = _jsArg(n);
           return (
             '<div class="tipo-item" style="flex-wrap:wrap' +
             (n === cur ? ';border-color:var(--accent2)' : '') +
@@ -1479,7 +1495,7 @@ function rinominaTipo(nome) {
     '<h3>Rinomina tipo evento</h3><div class="pwd-field"><label>Nuovo nome</label><input type="text" id="rename-tipo-val" value="' +
     escP(nome) +
     '"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiRinominaTipo(\'' +
-    nome.replace(/'/g, "\\'") +
+    _jsArg(nome) +
     '\')">Salva</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
   setTimeout(() => {
@@ -2447,7 +2463,7 @@ function _settingsAggiornaIndice() {
       '<button type="button" class="settings-tab" data-gruppo="' +
       escP(g) +
       '" onclick="_settingsMostraGruppo(\'' +
-      escP(g) +
+      _jsArg(g) +
       '\')">' +
       escP(g) +
       '<span class="settings-tab-n">' +

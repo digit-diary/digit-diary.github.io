@@ -261,14 +261,14 @@ function renderAiFornitoriUI() {
       '</div><div class="ai-esito" id="ai-esito-' +
       escP(f.id) +
       '"></div></div><div class="ai-azioni">' +
-      (attivo ? '' : '<button class="btn-secondario" onclick="aiUsa(\'' + escP(f.id) + '\')">Usa</button>') +
+      (attivo ? '' : '<button class="btn-secondario" onclick="aiUsa(\'' + _jsArg(f.id) + '\')">Usa</button>') +
       '<button class="btn-secondario" onclick="aiProvaUI(\'' +
-      escP(f.id) +
+      _jsArg(f.id) +
       '\')">Prova</button><button class="btn-secondario" onclick="aiModifica(\'' +
-      escP(f.id) +
+      _jsArg(f.id) +
       '\')">Modifica</button>' +
       (_aiConf.fornitori.length > 1 && !attivo
-        ? '<button class="btn-secondario btn-pericolo" onclick="aiElimina(\'' + escP(f.id) + '\')">Elimina</button>'
+        ? '<button class="btn-secondario btn-pericolo" onclick="aiElimina(\'' + _jsArg(f.id) + '\')">Elimina</button>'
         : '') +
       '</div></div>'
     );
@@ -377,7 +377,7 @@ function aiModifica(id) {
     '</label><input type="password" id="ai-f-chiave" autocomplete="new-password">' +
     '<p class="ai-nota" id="ai-f-nota"></p></div>' +
     '<div class="pwd-modal-btns" style="margin-top:14px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="aiSalvaFornitore(\'' +
-    escP(id) +
+    _jsArg(id) +
     '\')">Salva</button></div>';
   m.classList.remove('hidden');
   _aiPreset(f.tipo, !!id);

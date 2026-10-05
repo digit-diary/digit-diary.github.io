@@ -110,7 +110,11 @@ async function salvaMaisonAutoDelete(val) {
 }
 
 // MAISON MANUALE
-async function salvaMaisonManuale() {
+// un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
+function salvaMaisonManuale() {
+  return unaVoltaSola('maison-manuale-salva', () => _salvaMaisonManualeEsegui());
+}
+async function _salvaMaisonManualeEsegui() {
   const rawNome = document.getElementById('maison-man-nome').value.trim();
   if (!rawNome) {
     toast('Inserisci il nome');
@@ -234,7 +238,11 @@ function getRegaliReparto() {
     return (r.reparto_dip || 'slots') === currentReparto;
   });
 }
-async function salvaRegalo() {
+// un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
+function salvaRegalo() {
+  return unaVoltaSola('maison-regalo-salva', () => _salvaRegaloEsegui());
+}
+async function _salvaRegaloEsegui() {
   let nome = capitalizzaNome(document.getElementById('regalo-nome').value.trim());
   if (!nome) {
     toast('Inserisci il nome del cliente');
@@ -391,7 +399,11 @@ function getNoteClientiReparto() {
     return (r.reparto_dip || 'slots') === currentReparto;
   });
 }
-async function salvaNotaCliente(nome) {
+// un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
+function salvaNotaCliente(nome) {
+  return unaVoltaSola('maison-nota-salva|' + nome, () => _salvaNotaClienteEsegui(nome));
+}
+async function _salvaNotaClienteEsegui(nome) {
   var nota = document.getElementById('detail-nota-input').value.trim();
   if (!nota) {
     toast('Scrivi una nota');
