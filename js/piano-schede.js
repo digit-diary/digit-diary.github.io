@@ -885,7 +885,8 @@ async function _pianoVacDirittoCard(anno) {
     const sett = parseInt(v.settimana);
     if (!sett || !v.confermata || !_vacEVacanza(v)) return; // provvisorie e altre assenze (PC, MT) non contano
     // una settimana a cavallo d'anno porta giorni nell'altro anno: non contano
-    const gg = _pianoGiorniSettimana(anno, sett).filter((d) => d.substring(0, 4) === String(anno));
+    // settimana parziale (dal / al, es. 7-8.12 per chi ha pochi giorni): solo quei giorni
+    const gg = _vacGiorni(Object.assign({}, v, { anno: anno }), anno).filter((d) => d.substring(0, 4) === String(anno));
     gia[v.collaboratore] = (gia[v.collaboratore] || 0) + gg.length;
   });
   // Colonna di controllo: le V davvero scritte nel calendario dell'anno. Se il
@@ -2531,8 +2532,21 @@ async function _applicaVacanzeMese(interattivo) {
     // nella generazione automatica non si cancella niente di protetto: anche le V delle
     // vacanze spostate restano e vanno nel resoconto da controllare
     const auto = !!window._pianoAutoInCorso;
-    const orfane = auto ? [] : senza.filter(daVacanze);
-    senza.filter((r) => auto || !daVacanze(r)).forEach((r) => vSenzaFile.push({ nome: r.collaboratore, data: r.data }));
+    // una V in una settimana REGISTRATA nel file per quella persona viene dalla vacanza
+    // (anche se scritta prima del segno): se la settimana si accorcia (dal / al) o
+    // cambia, si toglie. Restano solo le V in settimane senza vacanza registrata
+    const settReg = new Set();
+    vacanze.forEach((v) => {
+      if (v.confermata && _vacEVacanza(v))
+        settReg.add(v.collaboratore + '|' + (parseInt(v.anno) || anno) + '|' + v.settimana);
+    });
+    const diSettReg = (r) => {
+      const w = _vacSettimanaDi(String(r.data).substring(0, 10));
+      return settReg.has(r.collaboratore + '|' + w.anno + '|' + w.settimana);
+    };
+    const dalFile = (r) => daVacanze(r) || diSettReg(r);
+    const orfane = auto ? [] : senza.filter(dalFile);
+    senza.filter((r) => auto || !dalFile(r)).forEach((r) => vSenzaFile.push({ nome: r.collaboratore, data: r.data }));
     for (let i = 0; i < orfane.length; i += 10) {
       await Promise.all(orfane.slice(i, i + 10).map((r) => secDel('piano', 'id=eq.' + r.id)));
     }

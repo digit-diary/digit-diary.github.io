@@ -2313,7 +2313,8 @@ async function _pianoCreditiDati(anno, soloNomi) {
   vac.forEach((v) => {
     const sett = parseInt(v.settimana);
     if (!sett || !v.confermata || !_vacEVacanza(v)) return; // come la scheda Vacanze: provvisorie e altre assenze non contano
-    const gg = _pianoGiorniSettimana(anno, sett).filter((d) => d.substring(0, 4) === String(anno));
+    // settimana parziale (dal / al, es. 7-8.12 per chi ha pochi giorni): solo quei giorni
+    const gg = _vacGiorni(Object.assign({}, v, { anno: anno }), anno).filter((d) => d.substring(0, 4) === String(anno));
     gia[v.collaboratore] = (gia[v.collaboratore] || 0) + gg.length;
     if (gg.length)
       (settDi[v.collaboratore] = settDi[v.collaboratore] || []).push({ sett: sett, dal: gg[0], al: gg[gg.length - 1] });
