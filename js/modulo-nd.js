@@ -60,7 +60,8 @@ async function _ndGiorniPersona(nome, ym) {
 }
 
 // crea o aggiorna il modulo del mese di una persona (nessun ND = modulo tolto)
-async function ndSincronizzaPersona(nome, ym) {
+async function ndSincronizzaPersona(nome, ym, opz) {
+  const senzaLog = !!(opz && opz.senzaLog);
   if (!nome || !/^\d{4}-\d{2}$/.test(ym)) return;
   try {
     const giorni = await _ndGiorniPersona(nome, ym);
@@ -91,10 +92,11 @@ async function ndSincronizzaPersona(nome, ym) {
       await secPatch('moduli', 'id=eq.' + attivo.id, patch);
       const c = cache.find((m) => m.id === attivo.id);
       if (c) Object.assign(c, patch);
-      logAzione(
-        'Modulo non disponibilita',
-        nome + ' ' + ym + (giorni.length ? ' aggiornato: ' + giorni.length + ' giorni' : ' tolto (nessun ND)'),
-      );
+      if (!senzaLog)
+        logAzione(
+          'Modulo non disponibilita',
+          nome + ' ' + ym + (giorni.length ? ' aggiornato: ' + giorni.length + ' giorni' : ' tolto (nessun ND)'),
+        );
     } else if (giorni.length) {
       const salvato = await secPost('moduli', {
         tipo: ND_TIPO_MODULO,
@@ -105,7 +107,7 @@ async function ndSincronizzaPersona(nome, ym) {
         reparto_dip: dati.reparto || 'slots',
       });
       if (salvato && salvato[0]) cache.unshift(salvato[0]);
-      logAzione('Modulo non disponibilita', nome + ' ' + ym + ' creato: ' + giorni.length + ' giorni');
+      if (!senzaLog) logAzione('Modulo non disponibilita', nome + ' ' + ym + ' creato: ' + giorni.length + ' giorni');
     }
   } catch (e) {
     console.warn('modulo non disponibilita', nome, ym, e);

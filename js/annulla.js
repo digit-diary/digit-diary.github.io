@@ -398,6 +398,14 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   async function _annullaRicarica(g) {
     const tab = new Set((g.ops || []).map((o) => (o.tipo === 'imp' ? 'impostazioni' : o.table)));
     if (typeof loadAll === 'function') await loadAll();
+    // non disponibilita del Diario annullate o ripristinate: modulo e piano si riallineano
+    // (il piano non fa parte di Annulla: le ND scritte sopra i turni tornano al turno)
+    const regND = [];
+    (g.ops || []).forEach((o) => {
+      if (o.table !== 'registrazioni') return;
+      (o.righe || o.prima || []).forEach((r) => regND.push(r));
+    });
+    if (regND.length && typeof _diarioNdRiallinea === 'function') await _diarioNdRiallinea(regND);
     const toccaPiano = [...tab].some((t) => /^piano_|^collab_congedi/.test(t));
     if (toccaPiano && typeof _pianoCaricaCfg === 'function') await _pianoCaricaCfg();
     const pg = localStorage.getItem('pagina_corrente') || 'dashboard';

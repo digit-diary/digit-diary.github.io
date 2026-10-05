@@ -1218,8 +1218,28 @@ function _pianoIdoneoAMano(nome, turno) {
     fannoTutto: (fz) => _pianoFunzioniFannoTutto().has(fz),
   });
 }
+// COPERTURA DI UNA NON DISPONIBILITA dal Diario: la stessa ricerca dei sostituti della
+// malattia, gia compilata, che alla conferma scrive ND (non M) con la nota del Diario
+async function apriCoperturaAssenza(nome, ym, gDa, gAl) {
+  if (!puoGestirePiano()) return;
+  const info = _pianoCollabInfo(nome) || {};
+  switchPage('piano');
+  if (info.reparto_dip && typeof pianoCambiaReparto === 'function') pianoCambiaReparto(info.reparto_dip);
+  _pianoMeseSel = ym;
+  _pianoTab = 'calendario';
+  await renderPiano();
+  apriCoperturaMalattia();
+  window._coperturaAssenza = { codice: 'ND', nota: _ND_NOTA_DIARIO };
+  const sel = document.getElementById('mal-collab');
+  if (sel) sel.value = nome;
+  document.getElementById('mal-da').value = gDa;
+  document.getElementById('mal-al').value = gAl;
+  await cercaSostitutiMalattia();
+}
 function apriCoperturaMalattia() {
   if (!puoGestirePiano()) return;
+  // aperta a mano = malattia; apriCoperturaAssenza la reimposta subito dopo
+  window._coperturaAssenza = null;
   const nomi = collaboratoriCache.filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c)).map((c) => c.nome);
   const nGiorni = _pianoUltimoGiorno(_pianoMeseSel);
   const b = document.getElementById('pwd-modal-content');
@@ -1634,7 +1654,11 @@ async function cercaSostitutiMalattia() {
     coperti +
     ' giorni coperti' +
     (scoperti ? ', <b style="color:var(--c-rosso,#c0392b)">' + scoperti + ' scoperti</b>' : '') +
-    '. Alla conferma: M (protetta) al malato su tutti i giorni; turni protetti SOLO per le soluzioni con la spunta' +
+    '. Alla conferma: ' +
+    (window._coperturaAssenza && window._coperturaAssenza.codice === 'ND'
+      ? 'ND (protetta) al jolly non disponibile'
+      : 'M (protetta) al malato') +
+    ' su tutti i giorni; turni protetti SOLO per le soluzioni con la spunta' +
     (coperti ? ', punti incentivo con conferma' : '') +
     '. Le mosse a catena scrivono il commento anche sulle celle del giorno prima.</p>';
   h +=
@@ -1884,10 +1908,13 @@ async function confermaCoperturaMalattia() {
   }
   document.getElementById('pwd-modal').classList.add('hidden');
   const op = getOperatore();
+  // codice dell assenza: M (malattia) o ND (non disponibilita dal Diario)
+  const ass = window._coperturaAssenza || { codice: 'M', nota: '' };
+  window._coperturaAssenza = null;
   const dstrDi = (g) => ym + '-' + String(g).padStart(2, '0');
   const rigaDi = {};
   _pianoRighe.forEach((r) => (rigaDi[r.collaboratore + '|' + parseInt(r.data.split('-')[2])] = r));
-  _pianoUndoSnap('copertura malattia ' + _pianoMeseSel);
+  _pianoUndoSnap('copertura ' + (ass.codice === 'ND' ? 'non disponibilita ' : 'malattia ') + _pianoMeseSel);
   let nM = 0;
   let nSost = 0;
   const sostituti = new Set();
@@ -1898,12 +1925,12 @@ async function confermaCoperturaMalattia() {
       const rMal = rigaDi[m.nome + '|' + d.g];
       if (rMal) {
         await secPatch('piano', 'id=eq.' + rMal.id, {
-          codice: 'M',
+          codice: ass.codice,
           protetto: true,
           generato: false,
           // la malattia scioglie il blocco, come negli altri percorsi
           motivo_blocco: null,
-          commento: ('Ex ' + d.codice + ' - ' + op).substring(0, 400),
+          commento: ('Ex ' + d.codice + ' - ' + (ass.nota ? ass.nota + ' - ' : '') + op).substring(0, 400),
           operatore: op,
           updated_at: new Date().toISOString(),
         });
@@ -1911,7 +1938,7 @@ async function confermaCoperturaMalattia() {
         await _pianoInserisciCella({
           collaboratore: m.nome,
           data: dstrDi(d.g),
-          codice: 'M',
+          codice: ass.codice,
           protetto: true,
           generato: false,
           reparto_dip: _pianoReparto(),

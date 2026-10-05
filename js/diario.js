@@ -132,6 +132,15 @@ async function _salvaEsegui() {
   }
   // Non Disponibilità con giorni selezionati dal calendario
   if (tipoSelezionato === nomeCorrente('Non Disponibilità') && _ndSelectedDates.length) {
+    // ND solo ai jolly (decisione del titolare, come nel calendario del Piano)
+    if (typeof _pianoEJolly === 'function' && _pianoCollabInfo(nome) && !_pianoEJolly(nome)) {
+      await mostraAvviso(
+        nome +
+          ' non e un jolly: la non disponibilita (ND) vale solo per i jolly. Per un collaboratore fisso si usa un congedo o un cambio turno.',
+        { titolo: 'Non disponibilita' },
+      );
+      return;
+    }
     const sorted = [..._ndSelectedDates].sort();
     const dateLabel = sorted.map((ds) => new Date(ds + 'T12:00:00').toLocaleDateString('it-IT')).join(', ');
     const nGiorni = sorted.length;
@@ -184,11 +193,15 @@ async function _salvaEsegui() {
       }
       document.getElementById('inp-testo').value = '';
       resetNdFiltri();
-      logAzione('Non disponibilità', nome + descDate);
-      // modulo di non disponibilita del mese (uno per mese toccato), salvato nella scheda
+      // modulo di non disponibilita del mese (uno per mese toccato), salvato nella scheda.
+      // Registrazione e modulo sono UNA azione per Annulla: prima il modulo arrivava
+      // dopo come azione separata e Annulla toglieva solo quello
+      const mesiNd = [...new Set(sorted.map((ds) => ds.substring(0, 7)))];
       if (typeof ndSincronizzaPersona === 'function')
-        [...new Set(sorted.map((ds) => ds.substring(0, 7)))].forEach((ym) => ndSincronizzaPersona(nome, ym));
+        for (const ym of mesiNd) await ndSincronizzaPersona(nome, ym, { senzaLog: true });
+      logAzione('Non disponibilità', nome + descDate);
       toast(nome + ': non disponibilità registrata (' + nGiorni + ' giorni)');
+      await _diarioNdNelPiano(nome, sorted);
       aggiornaNomi();
       render();
       updateStats();
@@ -377,6 +390,8 @@ async function elimina(id) {
     _diarioTogliArchivioLeggero(id);
     pinnedIds.delete(id);
     if (_e) logAzione('Registrazione nel cestino', _e.nome + ' - ' + _e.tipo + ' (da ' + op + ')');
+    // ND cancellata: modulo e piano tornano come prima ("Ex R22")
+    if (_e && _e.tipo === nomeCorrente('Non Disponibilità')) await _diarioNdRiallinea([_e]);
     // malattia cancellata: nel Piano tornano le sigle che la M aveva coperto ("Ex R23")
     if (_e && _e.tipo === nomeCorrente('Malattia') && typeof sincronizzaMalattiaPiano === 'function') {
       try {
@@ -635,6 +650,11 @@ async function salvaModificaRegistrazione(id, conCopertura) {
     );
     if (sync && (sync.tolte || sync.messe))
       toast('Piano allineato: ' + sync.tolte + ' M tolte, ' + sync.messe + ' M messe');
+    // ND modificata (date, persona o tipo): vecchi e nuovi mesi riallineati
+    await _diarioNdRiallinea([
+      { nome: nomeVecchio, tipo: eV ? eV.tipo : '', testo: testoVecchio },
+      { nome: nome, tipo: tipo, testo: testo },
+    ]);
     logAzione('Modifica registrazione', nome + ' - ' + tipo + ': ' + testo.substring(0, 60));
     // nata dal Rapporto giornaliero: si chiede se correggere anche il Rapporto
     const _rapO = e && typeof _rapportoOrigineDi === 'function' ? _rapportoOrigineDi(e) : null;
@@ -677,6 +697,77 @@ function apriModal(id, tipo) {
   modalTipoSel = tipo;
   renderTipiUI();
   document.getElementById('modal-overlay').classList.remove('hidden');
+}
+// ND NEL PIANO GIA FATTO: se nei giorni di non disponibilita il jolly ha gia un turno
+// (piano del mese pubblicato), il programma lo dice e propone subito chi lo copre
+// (Copertura, gia compilata: alla conferma ND al jolly e turno al sostituto). Senza
+// copertura i turni diventano ND e i posti restano da coprire (Valida/Migliora).
+async function _diarioNdNelPiano(nome, giorni) {
+  if (typeof ndTurniNeiGiorni !== 'function') return;
+  let turni = [];
+  try {
+    turni = await ndTurniNeiGiorni(nome, giorni);
+  } catch (e) {
+    return;
+  }
+  const mesi = [...new Set(giorni.map((d) => d.substring(0, 7)))];
+  const gg = (d) => d.substring(8, 10) + '.' + d.substring(5, 7);
+  if (!turni.length) {
+    for (const ym of mesi) await ndAllineaPiano(nome, ym).catch(() => null);
+    return;
+  }
+  const elenco = turni.map((t) => gg(t.data) + ' ' + t.codice).join(', ');
+  const puo = typeof puoGestirePiano === 'function' && puoGestirePiano();
+  if (puo && turni.every((t) => t.data.substring(0, 7) === turni[0].data.substring(0, 7))) {
+    const cerca = await chiediConferma(
+      nome +
+        ' ha gia dei turni nel piano in quei giorni: ' +
+        elenco +
+        '.\n\nCerco subito chi li copre? (Copertura gia compilata: alla conferma ND a ' +
+        nome +
+        ' e turno al sostituto.)\nAnnulla = i turni diventano ND e i posti restano da coprire.',
+    );
+    if (cerca) {
+      const g = turni.map((t) => parseInt(t.data.substring(8, 10)));
+      await apriCoperturaAssenza(nome, turni[0].data.substring(0, 7), Math.min(...g), Math.max(...g));
+      return;
+    }
+  }
+  let r = { messe: 0 };
+  try {
+    for (const ym of mesi) {
+      const x = await ndAllineaPiano(nome, ym);
+      if (x) r.messe += x.messe;
+    }
+  } catch (e) {
+    toastErrore('Piano non aggiornato per la ND (' + elenco + '): da sistemare da chi gestisce il piano.');
+    return;
+  }
+  if (r.messe) toast(nome + ': ' + r.messe + ' turni diventati ND (' + elenco + '), posti da coprire', 6000);
+}
+// ND tolta o cambiata (elimina, modifica, Annulla): modulo e piano dei mesi toccati
+// tornano allineati alle registrazioni rimaste (i turni coperti dalla ND tornano)
+async function _diarioNdRiallinea(righe) {
+  const tipoNd = nomeCorrente('Non Disponibilità');
+  const da = {};
+  (righe || []).forEach((e) => {
+    if (!e || e.tipo !== tipoNd || !e.nome) return;
+    (String(e.testo || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/g) || []).forEach((dd) => {
+      const p = dd.split('/');
+      (da[e.nome] = da[e.nome] || new Set()).add(p[2] + '-' + p[1].padStart(2, '0'));
+    });
+  });
+  for (const nome of Object.keys(da))
+    for (const ym of da[nome]) {
+      try {
+        // prima il piano (le ND scritte sopra i turni tornano al turno), poi il modulo,
+        // che legge anche le ND del piano
+        if (typeof ndAllineaPiano === 'function') await ndAllineaPiano(nome, ym);
+        if (typeof ndSincronizzaPersona === 'function') await ndSincronizzaPersona(nome, ym, { senzaLog: true });
+      } catch (e) {
+        toastErrore('ND di ' + nome + ' ' + ym + ': piano non riallineato (' + ((e && e.message) || e) + ')');
+      }
+    }
 }
 // PIANO ALLINEATO A OGNI MODIFICA DI UNA MALATTIA nel Diario: date cambiate,
 // persona cambiata (le M del nome vecchio si tolgono), tipo cambiato da o verso

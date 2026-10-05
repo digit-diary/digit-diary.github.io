@@ -1022,6 +1022,81 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
     return null;
   }
 }
+// ND DAL DIARIO NEL PIANO (05.10, segnalazione del titolare): un giorno di non
+// disponibilita registrato nel Diario sopra un turno gia pianificato diventa ND
+// (protetta) con la nota "Ex <turno> - ND dal Diario - operatore": il posto resta da
+// coprire (Copertura, Valida, Migliora lo vedono). Senza turno basta la ND automatica
+// del calendario. Tolta o cambiata la registrazione (elimina, modifica, Annulla) le
+// ND scritte da qui tornano al turno di prima. Giorni chiusi: non si toccano.
+const _ND_NOTA_DIARIO = 'ND dal Diario';
+async function ndAllineaPiano(nome, ym) {
+  if (!nome || !/^\d{4}-\d{2}$/.test(ym)) return null;
+  const voluti = new Set(
+    Object.keys(_pianoNdMese(ym))
+      .filter((k) => k.substring(0, k.lastIndexOf('|')) === nome)
+      .map((k) => k.substring(k.lastIndexOf('|') + 1)),
+  );
+  const fine = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
+  const righe =
+    (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=gte.' + ym + '-01&data=lte.' + fine)) ||
+    [];
+  const chiuso = (d) =>
+    typeof _pianoGiornoBloccato === 'function' && _pianoGiornoBloccato(d) && !_pianoGiornoSbloccato(d);
+  const op = getOperatore();
+  const out = { messe: 0, tolte: 0, scoperti: [] };
+  for (const r of righe) {
+    const d = String(r.data).substring(0, 10);
+    if (chiuso(d)) continue;
+    const mia = r.codice === 'ND' && String(r.commento || '').includes(_ND_NOTA_DIARIO);
+    if (mia && !voluti.has(d)) {
+      const era = String(r.commento || '').match(/^Ex ([A-Z0-9]+)\b/);
+      if (era && era[1] !== 'ND')
+        await secPatch('piano', 'id=eq.' + r.id, {
+          codice: era[1],
+          protetto: false,
+          // "(bozza)" = era una cella scritta dal programma: torna tale (Cancella piano,
+          // Migliora la possono ancora spostare)
+          generato: /\(bozza\)/.test(String(r.commento || '')),
+          commento: '',
+          operatore: op,
+          updated_at: new Date().toISOString(),
+        });
+      else await secDel('piano', 'id=eq.' + r.id);
+      out.tolte++;
+    } else if (!mia && voluti.has(d) && r.codice !== 'ND' && _pianoIsLavoro(r.codice)) {
+      await secPatch('piano', 'id=eq.' + r.id, {
+        codice: 'ND',
+        protetto: true,
+        generato: false,
+        motivo_blocco: null,
+        commento: ('Ex ' + r.codice + ' - ' + _ND_NOTA_DIARIO + (r.generato ? ' (bozza)' : '') + ' - ' + op).substring(
+          0,
+          400,
+        ),
+        operatore: op,
+        updated_at: new Date().toISOString(),
+      });
+      out.messe++;
+      out.scoperti.push({ data: d, codice: r.codice, reparto: r.reparto_dip || 'slots' });
+    }
+  }
+  if (out.messe || out.tolte)
+    logAzione(
+      'ND: piano allineato',
+      nome + ' ' + ym + ' · ' + out.messe + ' turni diventati ND, ' + out.tolte + ' tornati',
+    );
+  return out;
+}
+// turni gia pianificati nei giorni di ND indicati: [{ data, codice, reparto }]
+async function ndTurniNeiGiorni(nome, giorni) {
+  if (!giorni.length) return [];
+  const righe =
+    (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=in.(' + giorni.join(',') + ')')) || [];
+  return righe
+    .filter((r) => _pianoIsLavoro(r.codice) && r.codice !== 'ND')
+    .map((r) => ({ data: String(r.data).substring(0, 10), codice: r.codice, reparto: r.reparto_dip || 'slots' }))
+    .sort((x, y) => x.data.localeCompare(y.data));
+}
 function _pianoMalattieMese(ym) {
   const out = {}; // 'nome|YYYY-MM-DD' -> true
   const tipoMal = typeof nomeCorrente === 'function' ? nomeCorrente('Malattia') : 'Malattia';
