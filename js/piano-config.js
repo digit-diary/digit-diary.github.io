@@ -1785,8 +1785,17 @@ async function importaPianoExcel(input) {
       if (!prima || prima.includes('collaborator') || prima.includes('nome')) inizio = 1;
       fonte = 'formato semplice';
     }
-    // match anche sui DISATTIVATI (da riattivare) e raccolta dei NUOVI
-    const tuttiCollabs = collaboratoriCache;
+    // match anche sui DISATTIVATI (in memoria ci sono solo gli attivi: si leggono dal
+    // database, ogni volta, cosi chi e disattivato non viene ricreato come nuovo)
+    let inattivi = [];
+    try {
+      inattivi = ((await secGet('collaboratori?attivo=eq.false&select=id,nome,reparto_dip,attivo')) || []).map((c) =>
+        Object.assign({}, c, { attivo: false }),
+      );
+    } catch (e) {}
+    const tuttiCollabs = collaboratoriCache.concat(
+      inattivi.filter((x) => !collaboratoriCache.some((c) => c.id === x.id)),
+    );
     const trovaTutti = (nome) => _xlsTrovaCollab(nome, tuttiCollabs);
     // nome di un collaboratore NUOVO come e scritto nel file (accenti e apostrofi
     // compresi), con le iniziali maiuscole
@@ -1856,7 +1865,11 @@ async function importaPianoExcel(input) {
           saltatiDisattivati.push(hit.nome);
           return;
         }
-        righeCollab.push({ nome: hit.nome, celle: celle, stato: 'riattiva', ref: hit });
+        // DISATTIVATO presente nel file (07.10, richiesta del titolare): resta disattivato e
+        // le sue celle non si importano (prima si proponeva di riattivarlo). Per farlo
+        // tornare: Impostazioni > Gestione collaboratori
+        saltatiDisattivati.push(hit.nome);
+        return;
       } else if (celle.length >= 3 && celle.some((c) => c.cod !== 'C')) {
         // collaboratore NUOVO trovato nel file: funzione e % dalle colonne
         // accanto (chi ha solo congedo C non viene creato)
@@ -1876,8 +1889,16 @@ async function importaPianoExcel(input) {
       }
     });
     const nuoviCollab = righeCollab.filter((r) => r.stato === 'nuovo');
-    const daRiattivare = righeCollab.filter((r) => r.stato === 'riattiva');
     const nuove = [];
+    // FINE CONTRATTO: dopo l ultimo giorno di lavoro le celle del file non si importano
+    const dopoFine = {}; // nome -> numero di celle saltate
+    righeCollab.forEach((rc) => {
+      const fine = typeof _pianoFineRapporto === 'function' ? _pianoFineRapporto(rc.nome) : '';
+      if (!fine) return;
+      const prima = rc.celle.length;
+      rc.celle = rc.celle.filter((c) => ym + '-' + String(c.g).padStart(2, '0') <= fine);
+      if (rc.celle.length < prima) dopoFine[rc.nome] = prima - rc.celle.length;
+    });
     righeCollab.forEach((rc) =>
       rc.celle.forEach((c) => {
         coloreLettoPrima[rc.nome + '|' + ym + '-' + String(c.g).padStart(2, '0')] = c.coloreVecchio || '';
@@ -2040,11 +2061,15 @@ async function importaPianoExcel(input) {
         (nuoviCollab.length
           ? '\n• NUOVI collaboratori da creare: ' + nuoviCollab.map((x) => x.nome + ' (' + x.funzione + ')').join(', ')
           : '') +
-        (daRiattivare.length
-          ? '\n• Da RIATTIVARE (disattivati ma presenti nel file): ' + daRiattivare.map((x) => x.nome).join(', ')
-          : '') +
         (saltatiDisattivati.length
-          ? '\n• Saltati (disattivati, nel file solo riposi): ' + saltatiDisattivati.join(', ')
+          ? '\n• Disattivati presenti nel file: restano disattivati, le loro celle non si importano: ' +
+            saltatiDisattivati.join(', ')
+          : '') +
+        (Object.keys(dopoFine).length
+          ? '\n• Dopo la fine del contratto (celle non importate): ' +
+            Object.keys(dopoFine)
+              .map((n) => n + ' (' + dopoFine[n] + ')')
+              .join(', ')
           : '') +
         '\n• Ordine dei collaboratori nel calendario: come nel file' +
         '\n\nSi puo annullare con Annulla del piano.',
@@ -2187,20 +2212,6 @@ async function importaPianoExcel(input) {
       if (creato && creato[0]) collaboratoriCache.push(creato[0]);
       logAzione('Collaboratore creato da import piano', nc.nome + ' (' + nc.funzione + ')');
     }
-    if (
-      daRiattivare.length &&
-      (await chiediConferma(
-        'Riattivo anche i collaboratori disattivati presenti nel file?\n\n' +
-          daRiattivare.map((x) => '• ' + x.nome).join('\n') +
-          '\n\n(Se rispondi Annulla, le loro celle vengono importate comunque ma restano disattivati)',
-      ))
-    ) {
-      for (const rc of daRiattivare) {
-        await secPatch('collaboratori', 'id=eq.' + rc.ref.id, { attivo: true });
-        rc.ref.attivo = true;
-        logAzione('Collaboratore riattivato da import piano', rc.nome);
-      }
-    }
     // proposta di disattivazione: chi è attivo ma NON compare nel file,
     // oppure compare ma ha SOLO congedo (tutto il mese a C, nessun turno
     // né malattia)
@@ -2222,18 +2233,42 @@ async function importaPianoExcel(input) {
         );
     if (!fileCompleto && lavoranti.size)
       toast('Nel file il mese e compilato solo in parte: nessuna proposta di disattivare collaboratori');
+    // chi non e nel file: FINE CONTRATTO all ultimo giorno del mese prima (la storia resta),
+    // non piu disattivato del tutto; chi ha gia una fine contratto non si propone
+    const ultimoPrima = (() => {
+      const d = new Date(ym + '-01T12:00:00');
+      d.setDate(d.getDate() - 1);
+      return dataLocaleISO(d);
+    })();
+    const daFermare = daDisattivare.filter((c) => !c.data_fine_rapporto);
     if (
-      daDisattivare.length &&
+      daFermare.length &&
       (await chiediConferma(
-        'Questi collaboratori attivi NON hanno turni nel file (assenti o con solo congedo C): li disattivo?\n\n' +
-          daDisattivare.map((x) => '• ' + x.nome).join('\n') +
-          '\n\n(Se rispondi Annulla restano attivi)',
+        'Questi collaboratori attivi NON hanno turni nel file (assenti o con solo congedo C). Segno la fine del contratto al ' +
+          ultimoPrima.split('-').reverse().join('.') +
+          '?\n\n' +
+          daFermare.map((x) => '• ' + x.nome).join('\n') +
+          '\n\nFino a quel giorno resta tutto (piano, ore, storico); dal giorno dopo non sono piu nel piano e nelle ore dovute. La data si cambia in Gestione collaboratori > Disattiva o nella scheda > Storico HR. Annulla = restano come sono.',
       ))
     ) {
-      for (const c of daDisattivare) {
-        await secPatch('collaboratori', 'id=eq.' + c.id, { attivo: false });
-        c.attivo = false;
-        logAzione('Collaboratore disattivato da import piano', c.nome + ' (assente dal file ' + ym + ')');
+      for (const c of daFermare) {
+        await secPatch('collaboratori', 'id=eq.' + c.id, { data_fine_rapporto: ultimoPrima });
+        c.data_fine_rapporto = ultimoPrima;
+        if (typeof _insertHrEvento === 'function')
+          await _insertHrEvento(
+            c.nome,
+            'cessazione',
+            'Fine contratto: ultimo giorno ' +
+              ultimoPrima.split('-').reverse().join('.') +
+              ' (assente dal piano ' +
+              ym +
+              ')',
+            ultimoPrima,
+          );
+        logAzione(
+          'Fine contratto da import piano',
+          c.nome + ' · ultimo giorno ' + ultimoPrima + ' (assente dal file ' + ym + ')',
+        );
       }
     }
     // fotografia per Annulla, poi celle nuove e celle corrette

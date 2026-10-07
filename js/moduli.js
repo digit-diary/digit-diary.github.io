@@ -1860,14 +1860,29 @@ async function disattivaCollaboratore(nome) {
                 valore: 'tutto',
                 etichetta: 'Rimuovi del tutto: solo per chi non e mai entrato o e stato inserito per errore',
               },
-            ],
+            ].concat(
+              // la data si cambia qui (scegli un altro giorno e Avanti) o si toglie
+              c.data_fine_rapporto
+                ? [{ valore: 'togli', etichetta: 'Torna operativo: togli la fine del contratto' }]
+                : [],
+            ),
           },
         ],
       },
     ],
-    { titolo: 'Disattiva collaboratore', ok: 'Avanti' },
+    {
+      titolo: c.data_fine_rapporto ? 'Fine contratto: cambia la data o togli' : 'Disattiva collaboratore',
+      ok: 'Avanti',
+    },
   );
   if (!r) return;
+  if (r.modo === 'togli') {
+    if (typeof _salvaFineContratto === 'function' && (await _salvaFineContratto(nome, null, true))) {
+      renderCollaboratoriUI();
+      aggiornaNomi();
+    }
+    return;
+  }
   if (r.modo !== 'tutto') {
     if (!r.data) return toast('Scegli l ultimo giorno di lavoro');
     if (typeof _salvaFineContratto === 'function' && (await _salvaFineContratto(nome, r.data, false))) {
