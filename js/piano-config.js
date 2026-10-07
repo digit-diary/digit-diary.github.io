@@ -1481,6 +1481,141 @@ function _xlsTrovaCollab(nome, lista) {
   return null;
 }
 
+// FABBISOGNO DAL FILE DEL PIANO: sezione PIANIFICAZIONE del foglio del mese (turno nelle
+// prime colonne, quantita sotto i giorni, fino a TOT). null = sezione non trovata.
+// Usato dall import del fabbisogno e dall import del piano (07.10, richiesta del titolare:
+// il fabbisogno si legge anche dal file del piano).
+function _xlsFabbisognoDaFile(wb, ym, nGiorni, codiciValidi) {
+  const foglioMese = _xlsFoglioMese(wb, ym);
+  if (!foglioMese) return null;
+  const nuovi = [];
+  const dati = XLSX.utils.sheet_to_json(wb.Sheets[foglioMese], { header: 1, defval: '', raw: true });
+  let rPian = -1;
+  for (let r = 0; r < dati.length; r++) {
+    if ((dati[r] || []).some((v) => String(v).toUpperCase().includes('PIANIFICAZIONE'))) {
+      rPian = r;
+      break;
+    }
+  }
+  if (rPian < 0) return null;
+  const mappa = _xlsMappaGiorni(dati[rPian], nGiorni) || _xlsCercaMappaGiorni(dati, nGiorni, 0, 8);
+  if (!mappa) return null;
+  let vuoteConsecutive = 0;
+  for (let r = rPian + 1; r < dati.length && vuoteConsecutive < 10; r++) {
+    const riga = dati[r] || [];
+    let cod = '';
+    for (let c = 0; c < 6; c++) {
+      const cand = String(riga[c] || '')
+        .trim()
+        .toUpperCase();
+      if (cand === 'TOT') {
+        cod = 'TOT';
+        break;
+      }
+      if (codiciValidi.has(cand)) {
+        cod = cand;
+        break;
+      }
+    }
+    if (cod === 'TOT') break;
+    if (!cod) {
+      vuoteConsecutive++;
+      continue;
+    }
+    vuoteConsecutive = 0;
+    for (let g = 1; g <= nGiorni; g++) {
+      const q = parseInt(riga[mappa[g]]);
+      if (!isNaN(q) && q > 0)
+        nuovi.push({
+          data: ym + '-' + String(g).padStart(2, '0'),
+          turno_codice: cod,
+          quantita: q,
+          reparto_dip: _pianoReparto(),
+        });
+    }
+  }
+  return { nuovi: nuovi, fonte: 'foglio "' + foglioMese + '" (sezione PIANIFICAZIONE)' };
+}
+// FABBISOGNO DEL MESE DOPO L IMPORT DEL PIANO: dal file (sezione PIANIFICAZIONE) o, se il
+// file non l ha, dai turni del piano importato (quante persone per turno ogni giorno).
+// Mese senza fabbisogno: si carica da solo; diverso da quello del programma: si chiede.
+async function _pianoFabbisognoDopoImport(wb, ym) {
+  // serve il permesso "Modificare il fabbisogno": senza, l import del piano resta com era
+  if (typeof puoAzioniAutoPiano === 'function' && !puoAzioniAutoPiano('fabbisogno')) return;
+  const nGiorni = _pianoUltimoGiorno(ym);
+  const rep = _pianoReparto();
+  const codiciRep = new Set(_pianoTurniReparto().map((t) => t.codice.toUpperCase()));
+  const dalFile = _xlsFabbisognoDaFile(wb, ym, nGiorni, codiciRep);
+  let nuovi = dalFile ? dalFile.nuovi : [];
+  let fonte = dalFile ? dalFile.fonte : '';
+  const fine = ym + '-' + String(nGiorni).padStart(2, '0');
+  const esistenti =
+    (await secGet(
+      'piano_fabbisogni?data=gte.' + ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + rep + '&limit=3000',
+    )) || [];
+  if (!nuovi.length) {
+    // nessuna sezione nel file: dai turni del piano appena importato, solo se il mese non
+    // ha ancora un fabbisogno (non si sostituisce quello impostato a mano)
+    if (esistenti.length) return;
+    const righe =
+      (await secGet('piano?data=gte.' + ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + rep + '&limit=8000')) || [];
+    const conta = {};
+    righe.forEach((r) => {
+      const c = String(r.codice || '').toUpperCase();
+      if (!codiciRep.has(c)) return;
+      const k = String(r.data).substring(0, 10) + '|' + c;
+      conta[k] = (conta[k] || 0) + 1;
+    });
+    nuovi = Object.keys(conta).map((k) => ({
+      data: k.split('|')[0],
+      turno_codice: k.split('|')[1],
+      quantita: conta[k],
+      reparto_dip: rep,
+    }));
+    if (!nuovi.length) return;
+    if (
+      !(await chiediConferma(
+        'Il mese ' +
+          ym +
+          ' (' +
+          repartoLabel(rep) +
+          ') non ha un fabbisogno e il file non ha la sezione PIANIFICAZIONE.\n\nLo creo dai turni del piano importato (quante persone per turno ogni giorno: ' +
+          nuovi.length +
+          ' celle)? Serve per generare, migliorare e per l Organico; si corregge poi in Piano > Fabbisogno.',
+        { titolo: 'Fabbisogno del mese', ok: 'Crea il fabbisogno' },
+      ))
+    )
+      return;
+    fonte = 'turni del piano importato';
+  } else if (esistenti.length) {
+    const firma = (l) =>
+      l
+        .map((f) => f.data.substring(0, 10) + '|' + String(f.turno_codice).toUpperCase() + '|' + f.quantita)
+        .sort()
+        .join(';');
+    if (firma(esistenti) === firma(nuovi)) return; // uguale: niente da fare
+    if (
+      !(await chiediConferma(
+        'Il file contiene anche il fabbisogno di ' +
+          ym +
+          ' (' +
+          fonte +
+          ', ' +
+          nuovi.length +
+          ' celle), diverso da quello nel programma (' +
+          esistenti.length +
+          ' celle).\n\nSostituisco il fabbisogno del programma con quello del file?',
+        { titolo: 'Fabbisogno del mese', ok: 'Sostituisci' },
+      ))
+    )
+      return;
+  }
+  await secDel('piano_fabbisogni', 'data=gte.' + ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + rep);
+  for (let i = 0; i < nuovi.length; i += 10)
+    await Promise.all(nuovi.slice(i, i + 10).map((f) => secPost('piano_fabbisogni', f)));
+  logAzione('Fabbisogno dal file del piano', ym + ' ' + rep + ' · ' + nuovi.length + ' celle · ' + fonte);
+  toast('Fabbisogno di ' + ym + ' caricato: ' + nuovi.length + ' celle (' + fonte + ')', 6000);
+}
 async function importaFabbisognoExcel(input) {
   if (!_pianoAzioneAutoConsentita('import')) return; // azione automatica: permesso apposito
   if (!_pianoAzioneAutoConsentita('fabbisogno')) return; // scrive il fabbisogno
@@ -1504,57 +1639,11 @@ async function importaFabbisognoExcel(input) {
     let fonte = '';
     // 1) file REALE (PIANO SLOTS/VALET): foglio del mese + sezione PIANIFICAZIONE
     const foglioMese = _xlsFoglioMese(wb, ym);
-    let smartOk = false;
-    if (foglioMese) {
-      const dati = XLSX.utils.sheet_to_json(wb.Sheets[foglioMese], { header: 1, defval: '', raw: true });
-      let rPian = -1;
-      for (let r = 0; r < dati.length; r++) {
-        if ((dati[r] || []).some((v) => String(v).toUpperCase().includes('PIANIFICAZIONE'))) {
-          rPian = r;
-          break;
-        }
-      }
-      if (rPian >= 0) {
-        const mappa = _xlsMappaGiorni(dati[rPian], nGiorni) || _xlsCercaMappaGiorni(dati, nGiorni, 0, 8);
-        if (mappa) {
-          let vuoteConsecutive = 0;
-          for (let r = rPian + 1; r < dati.length && vuoteConsecutive < 10; r++) {
-            const riga = dati[r] || [];
-            let cod = '';
-            for (let c = 0; c < 6; c++) {
-              const cand = String(riga[c] || '')
-                .trim()
-                .toUpperCase();
-              if (cand === 'TOT') {
-                cod = 'TOT';
-                break;
-              }
-              if (codiciValidi.has(cand)) {
-                cod = cand;
-                break;
-              }
-            }
-            if (cod === 'TOT') break;
-            if (!cod) {
-              vuoteConsecutive++;
-              continue;
-            }
-            vuoteConsecutive = 0;
-            for (let g = 1; g <= nGiorni; g++) {
-              const q = parseInt(riga[mappa[g]]);
-              if (!isNaN(q) && q > 0)
-                nuovi.push({
-                  data: ym + '-' + String(g).padStart(2, '0'),
-                  turno_codice: cod,
-                  quantita: q,
-                  reparto_dip: _pianoReparto(),
-                });
-            }
-          }
-          smartOk = true;
-          fonte = 'foglio "' + foglioMese + '" (sezione PIANIFICAZIONE)';
-        }
-      }
+    const dalFile = _xlsFabbisognoDaFile(wb, ym, nGiorni, codiciValidi);
+    let smartOk = !!dalFile;
+    if (dalFile) {
+      dalFile.nuovi.forEach((x) => nuovi.push(x));
+      fonte = dalFile.fonte;
     }
     // 2) ripiego: formato semplice (prima colonna = turno, colonne = giorni 1..N)
     if (!smartOk) {
@@ -2230,6 +2319,12 @@ async function importaPianoExcel(input) {
         (aggiorna ? ', ' + aggiornate + ' corrette' : '') +
         (nTenute ? ', ' + nTenute + ' tenute come erano' : ''),
     );
+    // il fabbisogno del mese dallo stesso file (o dai turni importati se il file non l ha)
+    try {
+      await _pianoFabbisognoDopoImport(wb, ym);
+    } catch (e) {
+      toastErrore('Fabbisogno non caricato dal file: ' + ((e && e.message) || e));
+    }
     _pianoViolCelle = {};
     _pianoViolLista = null;
     const fatto = renderPiano();
