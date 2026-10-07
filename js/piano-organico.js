@@ -60,7 +60,7 @@ function _organicoCostoTesto(c) {
     _orgCHF(c.chf) +
     ' nei mesi rimasti (' +
     _orgOre(c.ore) +
-    ' ore di contratto in piu)' +
+    ' ore pagate in piu)' +
     (c.perOra ? ' · ' + _orgCHF(c.perOra) + ' per ora di carenza coperta' : '')
   );
 }
@@ -90,7 +90,7 @@ function _organicoCostiCardHtml() {
   return (
     '<h4 style="margin:16px 0 8px">Costi per le stime (facoltativo, solo amministratore)</h4>' +
     '<div style="border:1px solid var(--line);border-radius:3px;padding:10px 12px;background:var(--paper2);font-size:var(--fs-sm,.8125rem)">' +
-    '<p style="margin:0 0 8px;color:var(--muted);max-width:900px">Con i costi accesi ogni proposta e il simulatore mostrano quanto costano nei mesi rimasti e quanto costa ogni ora di carenza coperta: si confrontano le soluzioni anche in franchi. Sono costi medi, non stipendi di persone. Li vede solo chi vede questa scheda.</p>' +
+    '<p style="margin:0 0 8px;color:var(--muted);max-width:900px">Con i costi accesi ogni proposta e il simulatore mostrano quanto costano nei mesi rimasti e quanto costa ogni ora di carenza coperta: si confrontano le soluzioni anche in franchi. Sono costi medi, non stipendi di persone. Li vede solo chi vede questa scheda. Il costo annuo dei fissi comprende gli oneri del datore di lavoro; il costo orario degli ausiliari e il prezzo pagato all ora (nel calcolo si sceglie se e di base o comprensivo di vacanze e tredicesima, RAP Allegato 1) e non comprende gli oneri.</p>' +
     '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end">' +
     '<label><input type="checkbox" id="org-costi-on"' +
     (on ? ' checked' : '') +
@@ -98,7 +98,7 @@ function _organicoCostiCardHtml() {
     '<label>Costo annuo di un tempo pieno (CHF, oneri compresi)<br><input id="org-costi-fisso" class="finestra-campo" style="width:140px;margin:0" inputmode="decimal" value="' +
     (c.fissoAnno || '') +
     '"></label>' +
-    '<label>Costo orario di un ausiliario (CHF, oneri compresi)<br><input id="org-costi-aus" class="finestra-campo" style="width:140px;margin:0" inputmode="decimal" value="' +
+    '<label>Costo orario di un ausiliario (CHF, prezzo pagato all ora)<br><input id="org-costi-aus" class="finestra-campo" style="width:140px;margin:0" inputmode="decimal" value="' +
     (c.ausiliarioOra || '') +
     '"></label>' +
     '<button class="btn-export" onclick="organicoSalvaCosti()">Salva</button></div></div>'
@@ -367,14 +367,87 @@ async function _renderPianoOrganicoTab() {
   h +=
     '<button class="btn-export btn-export-pdf" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px" onclick="organicoRapportoPdf()">Rapporto PDF</button>';
   h += '</div><div style="padding:12px 14px">';
+  // TRE PASSI (06.10, richiesta del titolare: "e professionale? non e complicato?"):
+  // 1 Situazione (la risposta in parole semplici), 2 Prova una soluzione (cosa serve,
+  // quanto costa, cosa cambia), 3 Dettagli (tabelle complete, verifica, metodo, costi)
+  if (!window._orgVista)
+    try {
+      window._orgVista = localStorage.getItem('organico_vista') || 'situazione';
+    } catch (e) {
+      window._orgVista = 'situazione';
+    }
+  const vista = window._orgVista;
+  const passo = (k, n, t) =>
+    '<button class="btn-act' +
+    (vista === k ? ' attivo' : '') +
+    '" style="' +
+    (vista === k ? 'background:var(--ink);color:var(--paper);border-color:var(--ink);' : '') +
+    'font-size:var(--fs-md,.875rem);padding:6px 14px" onclick="organicoVista(\'' +
+    k +
+    '\')">' +
+    n +
+    ' · ' +
+    t +
+    '</button>';
   h +=
-    '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);margin:0 0 12px;max-width:900px">Quante persone servono per coprire il fabbisogno del piano con le regole del settore (ore, riposi, ' +
-    s.par.domenicheLibere +
-    ' domeniche libere), tenendo conto di vacanze, CGF, malattie, congedi non pagati e altri impegni. I mesi passati usano i dati veri, quelli futuri le assenze gia note piu le malattie attese dallo storico. E un aiuto alla decisione: i numeri si aggiornano quando cambiano il piano o il fabbisogno.</p>';
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px">' +
+    passo('situazione', '1', 'Situazione') +
+    passo('soluzione', '2', 'Prova una soluzione') +
+    passo('dettagli', '3', 'Dettagli e metodo') +
+    '</div>';
+  if (vista === 'soluzione') h += _organicoVistaSoluzione(s);
+  else if (vista === 'dettagli') h += _organicoVistaDettagli(s);
+  else h += _organicoVistaSituazione(s, { futuri, conteggio, media, persone, fteContratto, shrink });
+  h += '</div></div>';
+  return h;
+}
 
-  // SINTESI
+function organicoVista(v) {
+  window._orgVista = v;
+  try {
+    localStorage.setItem('organico_vista', v);
+  } catch (e) {}
+  renderPiano();
+}
+// 1 · SITUAZIONE: la risposta in parole semplici, poi cosa conviene fare e i mesi
+function _organicoVistaSituazione(s, x) {
+  const A = s.base;
+  const anno = A.anno;
+  const mesiSotto = x.futuri.filter((m) => OrganicoModello.statoMese(m) === 'sotto');
+  const G = OrganicoModello.gruppi(s.dati, s.base);
+  const gruppiCorti = G.filter((g) => g.servono > 0);
+  const ok = !mesiSotto.length && !gruppiCorti.length;
+  let h =
+    '<div style="border:1px solid var(--line);border-left:5px solid ' +
+    (ok ? 'var(--c-verde,#2c6e49)' : 'var(--c-rosso,#c0392b)') +
+    ';border-radius:3px;padding:12px 14px;margin-bottom:12px;background:var(--paper2);font-size:var(--fs-md,.875rem)">';
+  if (!x.futuri.length) h += '<b>Nessun mese rimasto con fabbisogno nel ' + anno + '.</b>';
+  else if (ok)
+    h +=
+      '<b>Il personale basta.</b> Nei ' +
+      x.futuri.length +
+      ' mesi rimasti del ' +
+      anno +
+      ' il fabbisogno e coperto, anche contando vacanze, malattie e impegni.';
+  else
+    h +=
+      '<b>Manca personale.</b> ' +
+      (mesiSotto.length
+        ? 'Ore insufficienti in ' +
+          mesiSotto.length +
+          ' mesi: ' +
+          mesiSotto.map((m) => _orgMeseNome(m.mese)).join(', ') +
+          '. '
+        : '') +
+      (gruppiCorti.length
+        ? 'Persone abilitate insufficienti per: ' +
+          gruppiCorti.map((g) => g.gruppo + ' (ne mancano ' + g.servono + ')').join(', ') +
+          '.'
+        : '') +
+      ' Sotto, cosa conviene fare.';
+  h += '</div>';
   const tile = (val, lbl, sotto, col) =>
-    '<div class="scheda-kpi" style="min-width:150px"><div class="kpi-val" style="color:' +
+    '<div class="scheda-kpi" style="min-width:170px"><div class="kpi-val" style="color:' +
     (col || 'var(--ink)') +
     '">' +
     val +
@@ -383,35 +456,32 @@ async function _renderPianoOrganicoTab() {
     '</div>' +
     (sotto ? '<div style="font-size:11px;color:var(--muted);margin-top:2px">' + sotto + '</div>' : '') +
     '</div>';
-  h += '<div class="scheda-kpi-grid" style="margin-bottom:12px">';
+  const serv = x.media((m) => m.fteNecessari);
+  const disp = x.media((m) => m.fteDisponibili);
+  h += '<div class="scheda-kpi-grid" style="margin-bottom:14px">';
   h += tile(
-    persone.length,
+    x.persone.length,
     'Persone in organico',
-    _orgUno(fteContratto) + ' tempi pieni · ' + persone.filter((x) => x.jolly).length + ' ausiliari',
+    'di cui ' + x.persone.filter((p) => p.jolly).length + ' ausiliari',
   );
-  h += tile(_orgUno(media((x) => x.fteNecessari)), 'Tempi pieni netti necessari', 'media dei mesi rimasti del ' + anno);
+  h += tile(_orgUno(serv), 'Ne servono', 'a tempo pieno');
   h += tile(
-    _orgUno(media((x) => x.fteDisponibili)),
-    'Tempi pieni netti disponibili',
-    'dopo le assenze (' + Math.round(shrink * 100) + '% delle ore)',
-  );
-  h += tile(
-    (conteggio.sotto || 0) + ' / ' + futuri.length,
-    'Mesi sotto il fabbisogno',
-    (conteggio['in equilibrio'] || 0) + ' in equilibrio · ' + (conteggio.margine || 0) + ' con margine',
-    conteggio.sotto ? 'var(--c-rosso,#c0392b)' : 'var(--c-verde,#2c6e49)',
+    _orgUno(disp),
+    'Ce ne sono',
+    'a tempo pieno, tolte le assenze',
+    disp >= serv ? 'var(--c-verde,#2c6e49)' : 'var(--c-rosso,#c0392b)',
   );
   h += tile(
-    _orgUno(A.tassi.media.malattia * 100) + '%',
-    'Giorni di malattia',
-    'osservati su ' + _orgOre(A.tassi.giorniOsservati) + ' giorni di servizio',
+    mesiSotto.length + ' su ' + x.futuri.length,
+    'Mesi scoperti',
+    'mesi rimasti del ' + anno,
+    mesiSotto.length ? 'var(--c-rosso,#c0392b)' : 'var(--c-verde,#2c6e49)',
   );
   h += '</div>';
-
-  // SUGGERIMENTI
-  h += '<h4 style="margin:6px 0 8px">Suggerimenti</h4>';
+  // COSA CONVIENE FARE (suggerimenti)
+  h += '<h4 style="margin:6px 0 8px">Cosa conviene fare</h4>';
   if (!s.sugg.length)
-    h += '<p style="color:var(--muted)">Nessun intervento suggerito: il fabbisogno e coperto nei mesi rimasti.</p>';
+    h += '<p style="color:var(--muted)">Niente da fare: il fabbisogno e coperto nei mesi rimasti.</p>';
   s.sugg.forEach((g, i) => {
     const colore = g.informativo ? 'var(--line)' : g.tipo === 'margine' ? 'var(--c-verde,#2c6e49)' : 'var(--accent2)';
     h +=
@@ -433,18 +503,18 @@ async function _renderPianoOrganicoTab() {
         '</div>';
     if (g.effetto)
       h +=
-        '<div style="font-size:var(--fs-sm,.8125rem);margin-top:6px"><b>Effetto calcolato:</b> mesi sotto il fabbisogno da ' +
+        '<div style="font-size:var(--fs-sm,.8125rem);margin-top:6px"><b>Effetto:</b> mesi scoperti da ' +
         g.effetto.mesiSottoPrima +
         ' a ' +
         g.effetto.mesiSottoDopo +
         ' · ' +
         _orgOre(g.effetto.oreCoperte) +
-        ' ore di carenza coperte nel resto dell anno' +
+        ' ore mancanti coperte' +
         (g.effetto.costo ? '<br><b>Costo stimato:</b> ' + escP(_organicoCostoTesto(g.effetto.costo)) : '') +
         (g.scenario
           ? ' <button class="btn-act" style="margin-left:8px" onclick="organicoProvaSuggerimento(' +
             i +
-            ')">Prova nel simulatore</button>'
+            ')">Prova questa soluzione</button>'
           : '') +
         '</div>';
     if (g.effettoTesto)
@@ -452,35 +522,87 @@ async function _renderPianoOrganicoTab() {
         '<div style="font-size:var(--fs-sm,.8125rem);margin-top:6px"><b>Effetto:</b> ' +
         escP(g.effettoTesto) +
         (g.tipo === 'gruppo' && typeof puoPianificareFormazioni === 'function' && puoPianificareFormazioni()
-          ? ' <button class="btn-act" style="margin-left:8px" onclick="formazioniApriDaOrganico(\'' +
-            escP(g.gruppo) +
-            "','" +
-            escP(((g.formare || [])[0] || '').replace(/'/g, "\\'")) +
-            '\')">Pianifica formazione</button>'
+          ? ' <button class="btn-act" style="margin-left:8px" onclick="formazioniApriDaOrganico(' +
+            _jsArg(g.gruppo) +
+            ',' +
+            _jsArg((g.formare || [])[0] || '') +
+            ')">Pianifica formazione</button>'
           : '') +
         '</div>';
     h += '</div>';
   });
-
-  // TABELLA MESE PER MESE
+  // MESE PER MESE in breve
   h += '<h4 style="margin:14px 0 8px">Mese per mese</h4>';
-  h += _organicoTabellaMesi(A, s.ipotesi);
-  // GRUPPI
-  h += '<h4 style="margin:14px 0 8px">Per reparto interno (gruppo dei turni)</h4>';
-  h += _organicoTabellaGruppi(s);
-  // SIMULATORE
-  h += _organicoSimulatoreHtml(s);
-  h += _organicoCalcoloHtml(s);
-  // VERIFICA
-  h += _organicoVerificaHtml(s);
-  // METODO
-  h += _organicoMetodoHtml(s);
-  // COSTI (amministratore)
-  h += _organicoCostiCardHtml();
-  h += '</div></div>';
+  h += _organicoTabellaSemplice(A, null);
+  h +=
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:4px 0 0">Tutte le colonne (vacanze, CGF, malattie, persone minime, riserva) e i gruppi dei turni: <a href="#" onclick="organicoVista(\'dettagli\');return false">3 · Dettagli e metodo</a>.</p>';
   return h;
 }
-
+// tabella breve: le ore che servono, quelle che ci sono, la differenza e lo stato
+function _organicoTabellaSemplice(A, B) {
+  let h =
+    '<div style="overflow:auto"><table class="piano-table" style="font-size:var(--fs-sm,.8125rem)"><thead><tr><th style="text-align:left">Mese</th><th title="Posti del fabbisogno per la durata dei turni">Ore che servono</th><th title="Ore di contratto meno vacanze, CGF, malattie e impegni">Ore che ci sono</th><th>Differenza</th><th>Stato</th>' +
+    (B ? '<th>Con la soluzione</th>' : '') +
+    '</tr></thead><tbody>';
+  A.mesi.forEach((x, i) => {
+    if (!x.oreRichieste) return;
+    const st = OrganicoModello.statoMese(x);
+    const col = st === 'sotto' ? 'var(--c-rosso,#c0392b)' : st === 'margine' ? 'var(--c-verde,#2c6e49)' : 'var(--ink)';
+    const parola = st === 'sotto' ? 'manca personale' : st === 'margine' ? 'coperto, con margine' : 'coperto';
+    h +=
+      '<tr' +
+      (x.passato ? ' style="opacity:.6"' : '') +
+      '><td style="text-align:left;font-weight:600">' +
+      _orgMeseNome(x.mese) +
+      (x.passato ? ' <span style="font-weight:400;color:var(--muted)">passato</span>' : '') +
+      '</td><td>' +
+      _orgOre(x.oreRichieste) +
+      '</td><td>' +
+      _orgOre(x.oreNette) +
+      '</td><td style="color:' +
+      (x.differenzaOre < 0 ? 'var(--c-rosso,#c0392b)' : 'var(--c-verde,#2c6e49)') +
+      '">' +
+      _orgSegno(Math.round(x.differenzaOre), _orgOre) +
+      ' ore</td><td style="color:' +
+      col +
+      '">' +
+      parola +
+      '</td>';
+    if (B) {
+      const y = B.mesi[i];
+      const st2 = OrganicoModello.statoMese(y);
+      h +=
+        '<td style="color:' +
+        (st2 === 'sotto' ? 'var(--c-rosso,#c0392b)' : 'var(--c-verde,#2c6e49)') +
+        '">' +
+        _orgSegno(Math.round(y.differenzaOre), _orgOre) +
+        ' ore · ' +
+        (st2 === 'sotto' ? 'manca personale' : 'coperto') +
+        '</td>';
+    }
+    h += '</tr>';
+  });
+  return h + '</tbody></table></div>';
+}
+// 2 · PROVA UNA SOLUZIONE: cosa serve (calcolo) e confronto mese per mese
+function _organicoVistaSoluzione(s) {
+  let h =
+    '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);margin:0 0 10px;max-width:900px">Scrivi le postazioni che servono: il programma dice quante persone ci vogliono e quanto costano. Con "Aggiungi al confronto" vedi cosa cambia mese per mese.</p>';
+  h += _organicoCalcoloHtml(s);
+  h += _organicoSimulatoreHtml(s);
+  return h;
+}
+// 3 · DETTAGLI: tabelle complete, verifica sui mesi passati, metodo, costi
+function _organicoVistaDettagli(s) {
+  let h = '<h4 style="margin:0 0 8px">Mese per mese, tutte le colonne</h4>';
+  h += _organicoTabellaMesi(s.base, s.ipotesi);
+  h += '<h4 style="margin:14px 0 8px">Per gruppo dei turni</h4>';
+  h += _organicoTabellaGruppi(s);
+  h += _organicoVerificaHtml(s);
+  h += _organicoMetodoHtml(s);
+  h += _organicoCostiCardHtml();
+  return h;
+}
 function _organicoTabellaMesi(A, B) {
   const th = (t, tip) => '<th' + (tip ? ' title="' + escP(tip) + '"' : '') + '>' + t + '</th>';
   let h =
@@ -629,8 +751,13 @@ function _organicoSimulatoreHtml(s) {
   const meseOggi = parseInt(oggiLocale().substring(5, 7));
   const da = s.base.anno === parseInt(oggiLocale().substring(0, 4)) ? Math.min(12, meseOggi + 1) : 1;
   let h =
-    '<h4 style="margin:16px 0 8px">Simulatore</h4><div style="border:1px solid var(--line);border-radius:3px;padding:10px 12px;background:var(--paper2)">';
-  h += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">';
+    '<h4 style="margin:16px 0 8px">Confronto mese per mese</h4><div style="border:1px solid var(--line);border-radius:3px;padding:10px 12px;background:var(--paper2)">';
+  h += _organicoConfrontoHtml(s);
+  h +=
+    '<details style="margin-top:10px"' +
+    (window._orgManoAperta ? ' open' : '') +
+    ' ontoggle="window._orgManoAperta=this.open"><summary style="cursor:pointer;font-size:var(--fs-sm,.8125rem);font-weight:600">Aggiungi persone a mano o cambia la percentuale di un collaboratore</summary>';
+  h += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:8px">';
   // IPOTESI (05.10, richiesta del titolare): tipo, quante persone, dal / al come date,
   // orario dalle / alle con i giorni a settimana (oppure la percentuale) e il costo
   // orario di quell ipotesi. L orario diventa la percentuale: 20:00-02:00 per 5
@@ -692,9 +819,23 @@ function _organicoSimulatoreHtml(s) {
     [100, 90, 80, 70, 60, 50].map((p) => '<option value="' + p / 100 + '">' + p + '%</option>').join('') +
     '</select></label>';
   h += '<button class="btn-export" onclick="organicoCambiaPercentuale()">Applica</button>';
-  h += '</div>';
+  h += '</div></details></div>';
+  return h;
+}
+// ipotesi applicate, risultato e tabella breve con la colonna "Con la soluzione"
+function _organicoConfrontoHtml(s) {
+  let h = '';
   const sc = s.scenario;
   const costoS = s.ipotesi ? OrganicoModello.costoScenario(s.base, s.ipotesi, s.par.costi, s.par) : null;
+  // ipotesi nate dal calcolo con ausiliari: costo delle ore delle postazioni
+  if (costoS)
+    sc.aggiunte.forEach((a, i) => {
+      if (!a.costoCalcolato) return;
+      const d = (costoS.dettaglio || {})[i] || { chf: 0, ore: 0 };
+      costoS.chf += a.costoCalcolato.chf - d.chf;
+      costoS.ore += a.costoCalcolato.ore - d.ore;
+      (costoS.dettaglio = costoS.dettaglio || {})[i] = { chf: a.costoCalcolato.chf, ore: a.costoCalcolato.ore };
+    });
   const gg = (d) => d.substring(8, 10) + '.' + d.substring(5, 7);
   const voci = sc.aggiunte
     .map(
@@ -772,24 +913,24 @@ function _organicoSimulatoreHtml(s) {
     '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">' +
     (voci.length
       ? voci.join(' ') + ' <button class="btn-act" onclick="organicoSvuotaIpotesi()">Togli tutte</button>'
-      : '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">Nessuna ipotesi: aggiungine una, il risultato compare nella colonna "Con le ipotesi" della tabella.</span>') +
+      : '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">Ancora niente da confrontare: calcola cosa serve qui sopra e premi "Aggiungi al confronto", oppure prova una soluzione dalla Situazione.</span>') +
     '</div>';
   if (s.ipotesi) {
     const futuri = (A) => A.mesi.filter((x) => !x.passato && x.oreRichieste);
     const sotto = (A) => futuri(A).filter((x) => OrganicoModello.statoMese(x) === 'sotto').length;
     const ore = futuri(s.ipotesi).reduce((t, x, i) => t + (x.oreNette - futuri(s.base)[i].oreNette), 0);
     h +=
-      '<div style="margin-top:8px;font-size:var(--fs-md,.875rem)"><b>Risultato:</b> mesi sotto il fabbisogno da ' +
+      '<div style="margin-top:8px;font-size:var(--fs-md,.875rem)"><b>Risultato:</b> mesi scoperti da ' +
       sotto(s.base) +
       ' a ' +
       sotto(s.ipotesi) +
       ' · ' +
       _orgSegno(Math.round(ore), _orgOre) +
-      ' ore nette nei mesi rimasti' +
+      ' ore disponibili nei mesi rimasti' +
       (costoS ? ' · <b>Costo stimato:</b> ' + escP(_organicoCostoTesto(costoS)) : '') +
       '</div>';
+    h += '<div style="margin-top:8px">' + _organicoTabellaSemplice(s.base, s.ipotesi) + '</div>';
   }
-  h += '</div>';
   return h;
 }
 
@@ -928,6 +1069,7 @@ function organicoProvaSuggerimento(i) {
   if (g.scenario.vacanzeSposta) sc.vacanzeSposta = (sc.vacanzeSposta || []).concat(g.scenario.vacanzeSposta);
   if (g.scenario.jollyPctMesi) sc.jollyPctMesi = Object.assign({}, sc.jollyPctMesi || {}, g.scenario.jollyPctMesi);
   _organicoRicalcolaScenario();
+  window._orgVista = 'soluzione';
   renderPiano();
 }
 // costo orario proposto secondo il tipo (medio dell ausiliario o del fisso)
@@ -1030,8 +1172,12 @@ async function organicoEsportaExcel() {
   if (!_orgStato) return;
   if (!(await assicuraLibreria('xlsx'))) return;
   const wb = XLSX.utils.book_new();
+  // le tabelle complete si costruiscono qui: a schermo c e solo il passo aperto
+  const box = document.createElement('div');
+  box.innerHTML =
+    _organicoTabellaMesi(_orgStato.base, null) + _organicoTabellaGruppi(_orgStato) + _organicoVerificaHtml(_orgStato);
   ['organico-mesi', 'organico-gruppi', 'organico-verifica'].forEach((id, i) => {
-    const t = document.getElementById(id);
+    const t = box.querySelector('#' + id);
     if (!t) return;
     const ws = XLSX.utils.table_to_sheet(t, { raw: true });
     XLSX.utils.book_append_sheet(wb, ws, ['Mese per mese', 'Gruppi', 'Verifica'][i]);
@@ -1279,7 +1425,7 @@ function _organicoCalcoloHtml(s) {
   const c = _orgCalcStato(s);
   const lab = (t, campo) => '<label style="font-size:var(--fs-sm,.8125rem)">' + t + '<br>' + campo + '</label>';
   let h =
-    '<h4 style="margin:16px 0 8px">Calcolo del fabbisogno: quanti collaboratori servono</h4>' +
+    '<h4 style="margin:0 0 8px">Cosa serve</h4>' +
     '<div style="border:1px solid var(--line);border-radius:3px;padding:10px 12px;background:var(--paper2)">' +
     '<p style="margin:0 0 8px;color:var(--muted);font-size:var(--fs-sm,.8125rem)">Le postazioni che servono (orario, giorni, quante persone insieme) nel periodo: il programma calcola le ore, quante persone servono e il costo.</p>';
   h += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">';
@@ -1580,13 +1726,14 @@ function organicoCalcola() {
   else e += '<br><span style="color:var(--muted)">Inserisci il costo orario per avere il costo.</span>';
   // testo del risultato per la stampa (senza pulsanti)
   c.stampa = e + '</div>';
+  c.ultimoCosto = prezzo ? { chf: Math.round(tot), ore: Math.round(ore) } : null;
   e +=
     '<br><button class="btn-export" style="margin-top:6px;margin-right:6px" onclick="organicoCalcStampa()">Stampa</button>' +
     '<button class="btn-export" style="margin-top:6px" onclick="organicoCalcNelSimulatore(' +
     persone +
     ',' +
     (base > 0 ? Math.round((tot / base) * 10000) / 10000 : 1) +
-    ')">Prova nel simulatore</button></div>';
+    ')">Aggiungi al confronto</button></div>';
   c.esito = e;
   renderPiano();
 }
@@ -1639,12 +1786,13 @@ function organicoCalcStampa() {
       postazioni +
       '</tbody></table><h2>Risultato</h2>' +
       c.stampa.replace(/ style="[^"]*"/g, '').replace(/<button[^>]*>.*?<\/button>/g, '') +
-      '<h2>Come si legge</h2><p class="nota">Le persone necessarie sono il piu alto di due conti: le ore delle postazioni divise per le ore nette di una persona (giorni del periodo x ore settimanali di un tempo pieno / 7 x percentuale, meno le assenze medie dello storico del settore: malattie, impegni, vacanze), e le persone che devono essere presenti insieme nelle ore piu cariche, sempre con le assenze. Riposi settimanali, malattie e vacanze sono quindi gia compresi. Costi secondo il RAP (Allegato 1): notturno 10% sulle ore fra le 23 e le 6; per gli ausiliari 50% nei festivi parificati alle domeniche e, con il salario di base, indennita vacanze e tredicesima. Non comprende gli oneri sociali del datore di lavoro. E un calcolo su ore e presenze: il rispetto di riposi minimi e giorni di fila persona per persona si verifica con il piano.</p></body></html>',
+      '<h2>Come si legge</h2><p class="nota">Le persone necessarie sono il piu alto di due conti: le ore delle postazioni divise per le ore nette di una persona (giorni del periodo x ore settimanali di un tempo pieno / 7 x percentuale, meno le assenze medie dello storico del settore: malattie, impegni, vacanze), e le persone che devono essere presenti insieme nelle ore piu cariche, sempre con le assenze. Riposi settimanali, malattie e vacanze sono quindi gia compresi. Costi secondo il RAP (Allegato 1): notturno 10% sulle ore fra le 23 e le 6; per gli ausiliari 50% nei festivi parificati alle domeniche e, con il salario di base, indennita vacanze e tredicesima. Per gli ausiliari non comprende gli oneri sociali del datore di lavoro. E un calcolo su ore e presenze: il rispetto di riposi minimi e giorni di fila persona per persona si verifica con il piano.</p></body></html>',
   );
   w.document.close();
   setTimeout(() => w.print(), 300);
 }
 function organicoCalcNelSimulatore(persone, fattore) {
+  const ultimo = _orgCalc && _orgCalc.ultimoCosto;
   if (!_orgStato || !_orgCalc) return;
   const c = _orgCalc;
   _orgStato.scenario.aggiunte.push({
@@ -1655,8 +1803,11 @@ function organicoCalcNelSimulatore(persone, fattore) {
     al: c.al,
     oraCosto: parseFloat(c.costo) > 0 ? parseFloat(c.costo) : null,
     fattoreCosto: fattore || 1,
+    // gli ausiliari sono pagati per le ore lavorate: il costo e quello delle postazioni
+    // calcolate (non tutte le ore di contratto delle persone)
+    costoCalcolato: c.tipo === 'jolly' && ultimo ? ultimo : null,
   });
   _organicoRicalcolaScenario();
   renderPiano();
-  toast(persone + ' ' + (c.tipo === 'jolly' ? 'ausiliari' : 'fissi') + ' aggiunti al simulatore');
+  toast(persone + ' ' + (c.tipo === 'jolly' ? 'ausiliari' : 'fissi') + ' aggiunti al confronto qui sotto');
 }
