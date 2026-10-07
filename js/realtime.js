@@ -378,7 +378,23 @@ window.addEventListener('beforeunload', () => {
   setTimeout(() => (_paginaInChiusura = false), 5000);
 });
 window.addEventListener('pageshow', () => (_paginaInChiusura = false));
-async function _renewToken() {
+// UN SOLO RINNOVO ALLA VOLTA. Il server cancella il token vecchio quando ne rilascia
+// uno nuovo: con piu letture in parallelo fallite insieme (token scaduto dopo 24 ore,
+// rete che cade un attimo) ognuna chiedeva il rinnovo con lo stesso token vecchio, la
+// prima riusciva e le altre ricevevano "Sessione non valida" e mostravano "Sessione
+// scaduta" anche se la sessione era appena stata rinnovata. Ora chi arriva mentre un
+// rinnovo e in corso aspetta quello; e chi ha usato un token gia sostituito riprova
+// con quello nuovo senza chiedere altro (tkUsato = il token della richiesta fallita).
+let _rinnovoInCorso = null;
+function _renewToken(tkUsato) {
+  if (tkUsato && getOpToken() && getOpToken() !== tkUsato) return Promise.resolve(true);
+  if (!_rinnovoInCorso)
+    _rinnovoInCorso = _renewTokenUnaVolta().finally(() => {
+      _rinnovoInCorso = null;
+    });
+  return _rinnovoInCorso;
+}
+async function _renewTokenUnaVolta() {
   const op = getOperatore();
   if (!op || _paginaInChiusura) return false;
   const tk = getOpToken();
@@ -653,7 +669,7 @@ async function secGet(path) {
       // (la RLS blocca tutto) e l'app mostrava liste vuote come se fosse
       // normale, azzerando anche le cache.
       if (e.sessione || /Failed to fetch|NetworkError/i.test(e.message || '')) {
-        if (await _renewToken()) {
+        if (await _renewToken(tk)) {
           tk = getOpToken();
           return (await leggi(tk)) || [];
         }
@@ -725,7 +741,7 @@ async function _secPatchRaw(table, filter, data) {
       // Token scaduto? Rinnova e riprova UNA volta. Ogni altro errore e' VISIBILE:
       // il vecchio fallback anonimo veniva bloccato in silenzio dalla RLS (0 righe
       // toccate ma nessun errore) e l'app credeva di aver salvato · dati "fantasma".
-      if ((e.sessione || /Failed to fetch|NetworkError/i.test(e.message || '')) && (await _renewToken())) {
+      if ((e.sessione || /Failed to fetch|NetworkError/i.test(e.message || '')) && (await _renewToken(tk))) {
         await scrivi(getOpToken());
       } else {
         throw e;
@@ -747,7 +763,7 @@ async function _secDelRaw(table, filter) {
     } catch (e) {
       // Come secPatch: rinnova il token e riprova; mai fallback anonimo silenzioso
       // (la RLS rispondeva OK senza cancellare nulla → le righe "riapparivano")
-      if ((e.sessione || /Failed to fetch|NetworkError/i.test(e.message || '')) && (await _renewToken())) {
+      if ((e.sessione || /Failed to fetch|NetworkError/i.test(e.message || '')) && (await _renewToken(tk))) {
         await cancella(getOpToken());
       } else {
         throw e;
@@ -778,7 +794,7 @@ async function _setImpRaw(k, v) {
     try {
       await salva(tk);
     } catch (e) {
-      if ((e.sessione || /Failed to fetch|NetworkError/i.test(e.message || '')) && (await _renewToken())) {
+      if ((e.sessione || /Failed to fetch|NetworkError/i.test(e.message || '')) && (await _renewToken(tk))) {
         await salva(getOpToken());
       } else {
         throw e;

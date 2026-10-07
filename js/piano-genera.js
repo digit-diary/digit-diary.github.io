@@ -55,6 +55,23 @@ function _pianoLunediDi(dstr) {
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
   return d.toISOString().substring(0, 10);
 }
+// GIORNI A SETTIMANA (preferenza collaboratore, es. 3 fra giovedi e domenica): quanti
+// giorni di lavoro al massimo nella settimana lunedi-domenica; 0 = nessun limite
+function _pianoMaxGiorniSett(nome) {
+  const v = parseInt((_pianoCollabInfo(nome) || {}).giorni_settimana);
+  return v > 0 && v < 7 ? v : 0;
+}
+// mettendo un turno a "nome" il giorno dstr resta entro i giorni a settimana?
+// codRel(off) = codice della persona off giorni prima/dopo dstr (gli altri giorni
+// della stessa settimana lunedi-domenica, anche nel mese prima o dopo)
+function _pianoGiorniSettOk(nome, dstr, codRel) {
+  const max = _pianoMaxGiorniSett(nome);
+  if (!max) return true;
+  const i = (new Date(String(dstr).substring(0, 10) + 'T12:00:00').getDay() + 6) % 7; // lunedi = 0
+  let n = 1;
+  for (let off = -i; off <= 6 - i; off++) if (off !== 0 && _pianoIsLavoro(codRel(off) || '')) n++;
+  return n <= max;
+}
 function _pianoOreLavorateCella(r) {
   if (!r || !r.codice) return 0;
   const t = _pianoTurnoInfo(r.codice);
@@ -641,6 +658,31 @@ function _pianoViolazioniPersona(nome, righeMese, righeSett, ctx) {
       ')';
     out.push({ nome: s.nome, giorno: parseInt(nelMese[0].substring(8, 10)), msg: msg, celle: nelMese });
   });
+  // giorni di lavoro nella settimana oltre la preferenza "giorni a settimana" (una
+  // voce per settimana, anche a cavallo del mese: i giorni fuori dal mese contano)
+  const maxGS = _pianoMaxGiorniSett(nome);
+  if (maxGS) {
+    const dow1 = (new Date(dstrDi(1) + 'T12:00:00').getDay() + 6) % 7; // lunedi = 0
+    for (let lun = 1 - dow1; lun <= nGiorni; lun += 7) {
+      const lav = [];
+      for (let k = lun; k < lun + 7; k++) if (_pianoIsLavoro(giorni[k] || '')) lav.push(k);
+      if (lav.length <= maxGS) continue;
+      const nelMese = lav.filter((k) => k >= 1 && k <= nGiorni);
+      if (!nelMese.length) continue;
+      out.push({
+        nome: nome,
+        giorno: nelMese[0],
+        msg:
+          lav.length +
+          ' giorni di lavoro nella settimana ' +
+          _pianoGgMm(_pianoLunediDi(dstrDi(nelMese[0]))) +
+          ' (preferenza: massimo ' +
+          maxGS +
+          ' a settimana)',
+        celle: nelMese.map(dstrDi),
+      });
+    }
+  }
   if (righeMese.length) {
     const maxCons = ctx.maxCons;
     const minRiposo = ctx.minRiposo;
@@ -1907,6 +1949,8 @@ async function generaBozzaPiano(usaCoperture) {
       }
       if (oreSett > maxSettB + 0.001) return false;
     }
+    // giorni di lavoro nella settimana (preferenza "giorni a settimana")
+    if (!_pianoGiorniSettOk(n, dstr, (off) => codDi(n, g + off))) return false;
     // riposo settimanale attorno alla domenica (35 / 47 ore): mai un turno che crea un
     // riposo troppo corto per una domenica vicina (quelli gia presenti non bloccano)
     if (riposoDomAttivo) {

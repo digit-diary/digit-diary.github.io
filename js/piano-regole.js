@@ -187,16 +187,14 @@
   }
   // giorni della settimana in cui lavora (preferenza giorni_lavoro "5,6" = venerdi e
   // sabato; numeri di getDay, 0 domenica). Vuoto = tutti. dow null = giorno non noto
-  // giorni_lavoro e salvato 1=lunedi..7=domenica (caselle L M M G V S D); dow e
-  // il giorno JS (0=domenica), quindi la domenica 0 vale 7
+  // giorni_lavoro: giorni JS separati da virgola (0 = domenica, 1 = lunedi ... 6 =
+  // sabato), come li salvano le caselle L M M G V S D; la domenica vale anche 7 (numero
+  // della settimana italiana). dow e il giorno JS del turno (0 = domenica).
   function lavoraNelGiorno(info, dow) {
     const g = String((info && info.giorni_lavoro) || '').trim();
     if (!g || dow == null) return true;
-    const d = dow === 0 ? 7 : dow;
-    return g
-      .split(',')
-      .map((x) => parseInt(x))
-      .includes(d);
+    const set = g.split(',').map((x) => parseInt(x));
+    return set.includes(dow) || (dow === 0 && set.includes(7));
   }
   function idoneoPerTurno(info, turno, ctx) {
     info = info || {};

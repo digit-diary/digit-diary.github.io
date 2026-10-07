@@ -2983,7 +2983,10 @@ function _copStatoCollega(nome) {
   let formato = null;
   if (turnoScoperto && typeof _pianoIdoneoPerTurno === 'function') {
     try {
-      formato = _pianoIdoneoPerTurno(nome, turnoScoperto);
+      // con la data: giorni di lavoro della persona e fine del contratto
+      formato =
+        _pianoIdoneoPerTurno(nome, turnoScoperto, ctx.dataRif) &&
+        (!ctx.dataRif || typeof _pianoOperativoIl !== 'function' || _pianoOperativoIl(nome, ctx.dataRif));
     } catch (e) {
       formato = null;
     }

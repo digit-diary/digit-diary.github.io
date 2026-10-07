@@ -728,12 +728,11 @@ function _pianoAccompagnamentoAvviso(overrides) {
 }
 async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
   try {
-    const maxCons = parseInt(_pianoRegolaVal('max_consecutivi')) || 0;
-    const minRiposo = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 0;
+    // limiti di legge sempre attivi (decisione del titolare 05.10): come Valida e la bozza
+    const { maxCons, minRiposo } = _pianoLimitiLegge();
     const maxSett = _pianoOreSettimanaMax();
     const d0 = new Date(dstr + 'T12:00:00');
     const weekend = d0.getDay() === 0 || d0.getDay() === 6;
-    if (!maxCons && !minRiposo && !maxSett && !weekend) return [];
     const iso = (d) => d.toISOString().substring(0, 10);
     const da = new Date(d0);
     da.setDate(da.getDate() - Math.max(14, maxCons + 1));
@@ -769,6 +768,13 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
       const dowP = new Date(dstr + 'T12:00:00').getDay();
       if (!PianoRegole.lavoraNelGiorno(infoPref, dowP))
         avvisiExtra.push('lavora solo ' + _pianoGiorniLavoroTesto(infoPref.giorni_lavoro) + ' (preferenza)');
+      const dRel = (off) => {
+        const d = new Date(dstr + 'T12:00:00');
+        d.setDate(d.getDate() + off);
+        return mappa[dataLocaleISO(d)];
+      };
+      if (!_pianoGiorniSettOk(nome, dstr, dRel))
+        avvisiExtra.push('oltre ' + _pianoMaxGiorniSett(nome) + ' giorni di lavoro nella settimana (preferenza)');
     }
     if (codiceNuovo && _pianoTurnoInfo(codiceNuovo) && !_pianoOperativoIl(nome, dstr))
       avvisiExtra.push(_pianoMotivoFuoriRapporto(nome, dstr) + ': quel giorno non e operativo');

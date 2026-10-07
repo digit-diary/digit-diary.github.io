@@ -460,6 +460,7 @@ async function esportaPianoDati(tipo) {
           'Solo diurni',
           'Solo notturni',
           'Giorni di lavoro',
+          'Giorni a settimana',
           'Turni bloccati',
           'Preferisce L1',
           'Accoglienza',
@@ -467,6 +468,9 @@ async function esportaPianoDati(tipo) {
           'Lingue',
         ],
       ];
+      // Preferisce L1 e Accoglienza: solo slot
+      const soloSlotsCsv = _pianoReparto() === 'slots';
+      if (!soloSlotsCsv) righe[0].splice(9, 2);
       collaboratoriCache
         .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
         .forEach((c) =>
@@ -478,9 +482,9 @@ async function esportaPianoDati(tipo) {
             c.solo_diurni ? 'SI' : '',
             c.solo_notti ? 'SI' : '',
             _pianoGiorniLavoroTesto(c.giorni_lavoro),
+            c.giorni_settimana || '',
             c.turni_bloccati || '',
-            c.prefers_l1 ? 'SI' : '',
-            c.accoglienza || 0,
+            ...(soloSlotsCsv ? [c.prefers_l1 ? 'SI' : '', c.accoglienza || 0] : []),
             c.accompagnamento_settori || '',
             c.lingue || '',
           ]),
@@ -1625,8 +1629,14 @@ function _renderPianoPreferenzeCard() {
   }
   h +=
     '<div style="display:flex;margin-bottom:8px"><input type="text" id="pref-collab-cerca" class="piano-cerca campo-cerca" placeholder="Cerca collaboratore..." oninput="_filtraPrefCollab(this.value)"></div>';
+  // Preferisce L1 e Accoglienza riguardano solo le slot (turni L1, gruppo ACCOGLIENZA)
+  const soloSlots = _pianoReparto() === 'slots';
   h +=
-    '<div style="overflow-x:auto"><table class="piano-table" id="pref-collab-table" style="min-width:760px;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th><th>Solo diurni</th><th title="Solo turni notturni">Solo notturni</th><th style="text-align:left" title="Giorni in cui lavora: negli altri non viene mai proposto (bozza, Migliora, generazione automatica, cerca cambio, copertura malattia, formazioni). Nessuna spunta = tutti i giorni">Giorni di lavoro</th><th style="text-align:left">Turni bloccati (CSV)</th><th title="La bozza le privilegia sui turni L1">Preferisce L1</th><th title="Livello accoglienza (0-2): serve per il gruppo ACCOGLIENZA">Accoglienza</th><th style="text-align:left" title="Gruppi dove NON può lavorare da solo (CSV, es: REC)">Accompagnamento</th><th style="text-align:left" title="Altri reparti in cui lavora (CSV, es: valet): appare anche nei loro piani e le ore si sommano">Reparti extra</th><th style="text-align:left" title="Derivati dalle competenze certificate in Formazione (sola lettura)">Settori</th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table class="piano-table" id="pref-collab-table" style="min-width:760px;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th><th>Solo diurni</th><th title="Solo turni notturni">Solo notturni</th><th style="text-align:left" title="Giorni in cui lavora: negli altri non viene mai proposto (bozza, Migliora, generazione automatica, cerca cambio, copertura malattia, formazioni). Nessuna spunta = tutti i giorni">Giorni di lavoro</th><th style="text-align:left">Turni bloccati (CSV)</th>' +
+    (soloSlots
+      ? '<th title="La bozza le privilegia sui turni L1">Preferisce L1</th><th title="Livello accoglienza (0-2): serve per il gruppo ACCOGLIENZA">Accoglienza</th>'
+      : '') +
+    '<th style="text-align:left" title="Gruppi dove NON può lavorare da solo (CSV, es: REC)">Accompagnamento</th><th style="text-align:left" title="Altri reparti in cui lavora (CSV, es: valet): appare anche nei loro piani e le ore si sommano">Reparti extra</th><th style="text-align:left" title="Derivati dalle competenze certificate in Formazione (sola lettura)">Settori</th></tr></thead><tbody>';
   collabs.forEach((c) => {
     h +=
       '<tr data-pref-nome="' +
@@ -1647,19 +1657,24 @@ function _renderPianoPreferenzeCard() {
       c.id +
       ',\'solo_notti\',this.checked)"></td><td style="text-align:left;white-space:nowrap">' +
       _pianoGiorniLavoroChips(c) +
+      _pianoGiorniSettSelect(c) +
       '</td><td style="text-align:left"><input type="text" value="' +
       escP(c.turni_bloccati || '') +
       '" placeholder="Es: S8,S7C" onchange="salvaPreferenzaCollab(' +
       c.id +
-      ',\'turni_bloccati\',this.value)" style="width:140px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td><input type="checkbox"' +
-      (c.prefers_l1 ? ' checked' : '') +
-      ' onchange="salvaPreferenzaCollab(' +
-      c.id +
-      ',\'prefers_l1\',this.checked)"></td><td><input type="number" min="0" max="2" value="' +
-      (parseInt(c.accoglienza) || 0) +
-      '" onchange="salvaPreferenzaCollab(' +
-      c.id +
-      ',\'accoglienza\',this.value)" style="width:52px;padding:2px;text-align:center;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td style="text-align:left"><input type="text" value="' +
+      ',\'turni_bloccati\',this.value)" style="width:140px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td>' +
+      (soloSlots
+        ? '<td><input type="checkbox"' +
+          (c.prefers_l1 ? ' checked' : '') +
+          ' onchange="salvaPreferenzaCollab(' +
+          c.id +
+          ',\'prefers_l1\',this.checked)"></td><td><input type="number" min="0" max="2" value="' +
+          (parseInt(c.accoglienza) || 0) +
+          '" onchange="salvaPreferenzaCollab(' +
+          c.id +
+          ',\'accoglienza\',this.value)" style="width:52px;padding:2px;text-align:center;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td>'
+        : '') +
+      '<td style="text-align:left"><input type="text" value="' +
       escP(c.accompagnamento_settori || '') +
       '" placeholder="Es: REC" onchange="salvaPreferenzaCollab(' +
       c.id +
@@ -1907,7 +1922,7 @@ const _PIANO_GIORNI_SETT = [
 function _pianoGiorniLavoroTesto(v) {
   const set = String(v || '')
     .split(',')
-    .map((x) => parseInt(x))
+    .map((x) => (parseInt(x) === 7 ? 0 : parseInt(x))) // domenica: 0 (o 7)
     .filter((x) => !isNaN(x));
   return _PIANO_GIORNI_SETT
     .filter((g) => set.includes(g[0]))
@@ -1917,7 +1932,7 @@ function _pianoGiorniLavoroTesto(v) {
 function _pianoGiorniLavoroChips(c) {
   const set = String(c.giorni_lavoro || '')
     .split(',')
-    .map((x) => parseInt(x))
+    .map((x) => (parseInt(x) === 7 ? 0 : parseInt(x))) // domenica: 0 (o 7)
     .filter((x) => !isNaN(x));
   return _PIANO_GIORNI_SETT
     .map(
@@ -1936,11 +1951,53 @@ function _pianoGiorniLavoroChips(c) {
     )
     .join('');
 }
+// quanti giorni a settimana al massimo (vuoto = nessun limite): con piu giorni
+// spuntati che giorni a settimana il programma sceglie ogni settimana quali dare
+function _pianoGiorniSettSelect(c) {
+  const v = parseInt(c.giorni_settimana) || 0;
+  let o = '<option value=""' + (v ? '' : ' selected') + '>tutti</option>';
+  for (let k = 1; k <= 6; k++) o += '<option value="' + k + '"' + (v === k ? ' selected' : '') + '>' + k + '</option>';
+  return (
+    '<label style="margin-left:8px;font-size:var(--fs-xs,.75rem);white-space:nowrap" title="Giorni di lavoro al massimo nella settimana lunedi-domenica. Con piu giorni spuntati (es. G V S D e 3) il programma sceglie ogni settimana quali, cosi puo lasciare libere anche delle domeniche">a settimana <select onchange="salvaPreferenzaCollab(' +
+    c.id +
+    ',\'giorni_settimana\',this.value)" style="padding:1px 2px">' +
+    o +
+    '</select></label>'
+  );
+}
 async function salvaGiorniLavoro(id, el) {
   const td = el.closest('td');
   const scelti = [...td.querySelectorAll('input[data-giorno]:checked')].map((x) => x.dataset.giorno);
   // tutti o nessuno = tutti i giorni (nessun limite)
   await salvaPreferenzaCollab(id, 'giorni_lavoro', scelti.length === 7 ? '' : scelti.join(','));
+}
+// DOMENICHE LIBERE: chi puo lavorare la domenica e ha tanti giorni a settimana quanti
+// i giorni spuntati lavora ogni fine settimana, e le domeniche libere del
+// regolamento (minimo all anno) non sono garantite. Si avvisa con la soluzione.
+function _pianoAvvisoDomenicheGiorni(c) {
+  if (!c || _pianoRegolaVal('domeniche_libere_anno') == null) return;
+  const set = String(c.giorni_lavoro || '')
+    .split(',')
+    .map((x) => (parseInt(x) === 7 ? 0 : parseInt(x))) // domenica: 0 (o 7)
+    .filter((x) => x >= 0 && x <= 6);
+  if (!set.length || !set.includes(0)) return; // nessun limite o domenica esclusa
+  const max = parseInt(c.giorni_settimana) || 0;
+  if (max && max < set.length) return; // il programma puo scegliere: domeniche libere possibili
+  const min = parseInt(_pianoRegolaVal('domeniche_libere_anno')) || 12;
+  mostraAvviso(
+    c.nome +
+      ' lavora solo ' +
+      _pianoGiorniLavoroTesto(c.giorni_lavoro) +
+      (max ? ', ' + max + ' giorni a settimana' : '') +
+      '.\n\nCosi lavora tutte le domeniche: le domeniche libere del regolamento (almeno ' +
+      min +
+      ' all anno, con il sabato che finisce entro le 23) non sono garantite e Valida regole le segnalera.\n\nSoluzione: spunta un giorno in piu (es. giovedi) e scegli "a settimana" ' +
+      set.length +
+      ': ogni settimana il programma sceglie quali ' +
+      set.length +
+      ' giorni dare e puo lasciare libere alcune domeniche.',
+    { titolo: 'Domeniche libere non garantite' },
+  );
 }
 async function salvaPreferenzaCollab(id, campo, valore) {
   // preferenze del piano (es. solo diurni): chi gestisce il piano o lo Storico HR
@@ -1952,6 +2009,7 @@ async function salvaPreferenzaCollab(id, campo, valore) {
     const patch = {};
     if (campo === 'solo_diurni' || campo === 'solo_notti' || campo === 'prefers_l1') patch[campo] = !!valore;
     else if (campo === 'giorni_lavoro') patch[campo] = String(valore || '').trim() || null;
+    else if (campo === 'giorni_settimana') patch[campo] = parseInt(valore) > 0 ? Math.min(6, parseInt(valore)) : null;
     else if (campo === 'accoglienza') patch[campo] = Math.max(0, Math.min(2, parseInt(valore) || 0));
     else patch[campo] = String(valore).trim().toUpperCase() || null;
     // solo diurni e solo notti non vanno insieme: scegliendone uno si toglie l altro
@@ -1964,6 +2022,7 @@ async function salvaPreferenzaCollab(id, campo, valore) {
       renderPiano();
     logAzione('Piano: preferenza collaboratore', (c ? c.nome : id) + ' ' + campo);
     toast('Preferenza salvata');
+    if (campo === 'giorni_lavoro' || campo === 'giorni_settimana') _pianoAvvisoDomenicheGiorni(c);
   } catch (e) {
     toast('Errore salvataggio preferenza');
   }

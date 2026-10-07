@@ -392,10 +392,12 @@ async function apriCercaCambioLibero() {
   };
   // simula: nella mappa di "nome", il giorno dstr diventa "codice"; ritorna
   // l'eventuale problema (riposo o consecutivi), null se tutto ok
-  const problema = (mappa, dstr, codice) => {
+  const problema = (mappa, dstr, codice, nome) => {
     const m2 = Object.assign({}, mappa);
     m2[dstr] = codice;
     if (_pianoTurnoInfo(codice)) {
+      if (nome && !_pianoGiorniSettOk(nome, dstr, (off) => m2[giornoRel(dstr, off)]))
+        return 'oltre i giorni a settimana';
       const rP = riposoTra(m2[giornoRel(dstr, -1)], codice);
       if (rP != null && rP < minRiposo) return 'riposo ' + rP.toFixed(1) + 'h';
       const rD = riposoTra(codice, m2[giornoRel(dstr, 1)]);
@@ -424,7 +426,7 @@ async function apriCercaCambioLibero() {
       if (!eLibero(mia[sel.data])) return;
       if (bloccate[c.nome + '|' + sel.data]) return; // cella bloccata con motivo
       if (!_pianoIdoneoPerTurno(c.nome, tMio, sel.data)) return;
-      const prob = problema(mia, sel.data, r.codice);
+      const prob = problema(mia, sel.data, r.codice, c.nome);
       if (prob) return;
       // accompagnamento il giorno X: il richiedente esce (C), il collega entra
       if (
@@ -453,7 +455,7 @@ async function apriCercaCambioLibero() {
         if (!_pianoOperativoIl(sel.nome, y)) continue; // dopo la fine del rapporto non si restituisce
         if (bloccate[c.nome + '|' + y] || bloccate[sel.nome + '|' + y]) continue;
         if (!_pianoIdoneoPerTurno(sel.nome, tSuo, y)) continue;
-        if (problema(mioPiano, y, codSuo)) continue;
+        if (problema(mioPiano, y, codSuo, sel.nome)) continue;
         // accompagnamento il giorno di restituzione: il collega esce (C), il
         // richiedente entra prendendo il turno del collega
         if (
@@ -1380,6 +1382,7 @@ async function cercaSostitutiMalattia() {
       for (let k = g0 - 1; k >= g0 - 40 && _pianoIsLavoro(cella[n + '|' + k] || ''); k--) cons++;
       for (let k = g0 + 1; k <= g0 + 40 && _pianoIsLavoro(cella[n + '|' + k] || ''); k++) cons++;
       if (cons > maxCons) return false;
+      if (!_pianoGiorniSettOk(n, _pianoGiornoDiIndice(g0), (off) => cella[n + '|' + (g0 + off)])) return false;
     }
     return true;
   };
@@ -1438,6 +1441,7 @@ async function cercaSostitutiMalattia() {
       if (!_pianoIdoneoPerTurno(n, t, _pianoGiornoDiIndice(g))) continue;
       if (consecFinoA(n, g) >= maxCons) continue;
       if (!riposoOkSost(n, g, t)) continue;
+      if (!_pianoGiorniSettOk(n, _pianoGiornoDiIndice(g), (off) => cella[n + '|' + (g + off)])) continue;
       // accompagnamento: simula malato→M e sostituto→turno, poi verifica
       const _accM = cella[nome + '|' + g];
       const _accN = cella[n + '|' + g];

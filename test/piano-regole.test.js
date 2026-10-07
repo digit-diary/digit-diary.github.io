@@ -209,11 +209,13 @@ ok(
 );
 ok(R.idoneoPerTurno({ giorni_lavoro: '5,6' }, TURNI.PRESTO, ctxBase), 'giorno non noto: nessun limite');
 ok(R.lavoraNelGiorno({ giorni_lavoro: '' }, 3), 'nessun giorno scelto = tutti i giorni');
-ok(R.lavoraNelGiorno({ giorni_lavoro: '5,6,7' }, 0), 'lavora ven, sab e dom: la domenica (JS 0 = casella 7) si');
+ok(R.lavoraNelGiorno({ giorni_lavoro: '5,6,0' }, 0), 'caselle V S D (domenica salvata 0): la domenica si');
+ok(R.lavoraNelGiorno({ giorni_lavoro: '5,6,7' }, 0), 'domenica scritta 7: vale anche');
 ok(!R.lavoraNelGiorno({ giorni_lavoro: '1,2' }, 0), 'lavora lun e mar: la domenica no');
+ok(!R.lavoraNelGiorno({ giorni_lavoro: '5,6,0' }, 4), 'caselle V S D: il giovedi no');
 ok(
-  !R.idoneoPerTurno({ giorni_lavoro: '5,6,7' }, TURNI.PRESTO, { ...ctxBase, dow: 4 }),
-  'lavora ven-dom: il giovedi no',
+  !R.idoneoPerTurno({ giorni_lavoro: '4,5,6,0' }, TURNI.PRESTO, { ...ctxBase, dow: 3 }),
+  'lavora gio-dom: il mercoledi no',
 );
 // settore non assegnato senza campo -> non idoneo
 ok(

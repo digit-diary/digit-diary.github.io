@@ -23,9 +23,10 @@
 const RICERCA_PESI = { legge: 60000, regola: 20000, oreSotto: 200, scoperto: 300, oraObiettivo: 2 };
 // REGOLE DI LEGGE e di riposo: non possono mai aumentare (riposo minimo fra due
 // turni, giorni consecutivi, riposo singolo dopo 4 giorni, ore della settimana,
-// riposo attorno alla domenica)
+// riposo attorno alla domenica). Con lo stesso peso la preferenza "giorni a
+// settimana": Migliora non la scambia con un'altra regola per coprire un posto
 function _ricercaRegolaDiLegge(msg) {
-  return /di riposo dopo|giorni lavorativi consecutivi|riposo singolo dopo|lavorate nella settimana|domenica .*lavorata|domenica libera:|riposo di .* ore/.test(
+  return /di riposo dopo|giorni lavorativi consecutivi|riposo singolo dopo|lavorate nella settimana|domenica .*lavorata|domenica libera:|riposo di .* ore|preferenza: massimo \d+ a settimana/.test(
     String(msg || ''),
   );
 }

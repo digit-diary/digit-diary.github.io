@@ -1995,6 +1995,23 @@ async function miglioraOrePiano() {
     cella[k] = r.codice;
     rigaDi[k] = r;
   });
+  // CONFINE DEL MESE: le due settimane prima e dopo con indice continuo (0, -1... e
+  // oltre l ultimo giorno), cosi giorni di fila, riposo e giorni a settimana contano
+  // anche a cavallo del mese (come bozza e copertura malattia)
+  try {
+    const primo = new Date(da + 'T12:00:00');
+    const bDa = new Date(primo);
+    bDa.setDate(bDa.getDate() - 14);
+    const bAl = new Date(primo);
+    bAl.setDate(bAl.getDate() + nGiorni + 13);
+    const bordo = (await secGet('piano?data=gte.' + dataLocaleISO(bDa) + '&data=lt.' + da + '&limit=8000')) || [];
+    const bordo2 = (await secGet('piano?data=gt.' + a + '&data=lte.' + dataLocaleISO(bAl) + '&limit=8000')) || [];
+    [...bordo, ...bordo2].forEach((r) => {
+      const idx = Math.round((new Date(String(r.data).substring(0, 10) + 'T12:00:00') - primo) / 86400000) + 1;
+      if (_pianoTurnoInfo(r.codice) || !cella[r.collaboratore + '|' + idx])
+        cella[r.collaboratore + '|' + idx] = r.codice;
+    });
+  } catch (e) {}
   const infoDi = {};
   nomi.forEach((n) => (infoDi[n] = _pianoCollabInfo(n) || {}));
   const ore = {};
@@ -2018,12 +2035,14 @@ async function miglioraOrePiano() {
   });
   const maxCons = parseInt(_pianoRegolaVal('max_consecutivi')) || 5;
   const minRiposo = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 11;
-  const lavora = (cod) => !!_pianoTurnoInfo(cod);
+  // lavoro: turni e codici di lavoro (JG, U, corsi...), come in Valida
+  const lavora = (cod) => _pianoIsLavoro(cod);
   const consecOk = (nome, g) => {
-    // catena consecutiva risultante aggiungendo un turno il giorno g
+    // catena consecutiva risultante aggiungendo un turno il giorno g (anche a cavallo
+    // del mese: indici 0, -1... e oltre l ultimo giorno)
     let n = 1;
-    for (let k = g - 1; k >= 1 && lavora(cella[nome + '|' + k] || ''); k--) n++;
-    for (let k = g + 1; k <= nGiorni && lavora(cella[nome + '|' + k] || ''); k++) n++;
+    for (let k = g - 1; k >= g - 20 && lavora(cella[nome + '|' + k] || ''); k--) n++;
+    for (let k = g + 1; k <= g + 20 && lavora(cella[nome + '|' + k] || ''); k++) n++;
     return n <= maxCons;
   };
   const riposoOk = (nome, g, t) => {
@@ -2063,6 +2082,36 @@ async function miglioraOrePiano() {
         (saldo[y.collaboratore] === undefined ? 999 : saldo[y.collaboratore]) -
         (saldo[x.collaboratore] === undefined ? 999 : saldo[x.collaboratore]),
     );
+  // STESSE REGOLE DI VALIDA per chi da e chi riceve: uno spostamento non deve creare
+  // nessuna violazione nuova (riposo singolo dopo 4 giorni, riposo attorno alla
+  // domenica, ore della settimana, giorni a settimana, chi fa cosa...). Prima si
+  // controllavano solo riposo 11 ore e giorni di fila: il resto lo scopriva Valida dopo.
+  // Le ore del mese sono lo scopo dello spostamento: non contano qui.
+  const ctxV = _pianoCtxViolazioni(ym);
+  const primoMO = new Date(da + 'T12:00:00');
+  const dataIdx = (k) => {
+    const d = new Date(primoMO);
+    d.setDate(d.getDate() + k - 1);
+    return dataLocaleISO(d);
+  };
+  const violPersona = (n) => {
+    const mese = [];
+    const sett = [];
+    for (let k = -13; k <= nGiorni + 14; k++) {
+      const c = cella[n + '|' + k];
+      if (!c) continue;
+      const r = rigaDi[n + '|' + k];
+      const riga = r && r.codice === c ? r : { collaboratore: n, data: dataIdx(k), codice: c };
+      sett.push(riga);
+      if (k >= 1 && k <= nGiorni) mese.push(riga);
+    }
+    return new Set(
+      _pianoViolazioniPersona(n, mese, sett, ctxV)
+        .filter((v) => !/^ore mese /.test(v.msg))
+        .map((v) => v.giorno + '|' + v.msg.replace(/[0-9]+([.,][0-9]+)?/g, '#')),
+    );
+  };
+  const nuoveViolazioni = (n, prima) => [...violPersona(n)].some((k) => !prima.has(k));
   const scambi = [];
   const mediaPrima = fissi.reduce((acc, n) => acc + Math.abs(saldo[n] || 0), 0) / (fissi.length || 1);
   for (const rT of donatrici) {
@@ -2086,6 +2135,7 @@ async function miglioraOrePiano() {
       if (!_pianoIdoneoPerTurno(ric, t, rT.data)) continue;
       if (!consecOk(ric, g)) continue;
       if (!riposoOk(ric, g, t)) continue;
+      if (!_pianoGiorniSettOk(ric, rT.data, (off) => cella[ric + '|' + (g + off)])) continue;
       // il ricevente non supera il proprio massimo (tolleranza_ore_sopra o simmetrica)
       const limR = _pianoLimitiOre(ric, nGiorni);
       if (limR.obiettivo != null && limR.max != null && (saldo[ric] || 0) + oT > limR.max - limR.obiettivo) continue;
@@ -2093,10 +2143,27 @@ async function miglioraOrePiano() {
       const dopoD = sD === 999 ? 0 : Math.abs(sD - oT) - Math.abs(sD);
       const dopoR = Math.abs(sR + oT) - Math.abs(sR);
       if (dopoD + dopoR >= -0.25) continue; // deve migliorare davvero
-      scambi.push({ rT: rT, rigaR: rigaR, ric: ric, g: g, cod: rT.codice });
-      // aggiorna lo stato per i prossimi scambi
+      // accompagnamento nel giorno: il donatore esce, il ricevente entra
+      if (
+        _pianoAccompagnamentoAvviso([
+          { nome: donatore, data: rT.data, codice: 'C' },
+          { nome: ric, data: rT.data, codice: rT.codice },
+        ]).length
+      )
+        continue;
+      // simulazione: nessuna violazione nuova per nessuno dei due
+      const primaD = violPersona(donatore);
+      const primaR = violPersona(ric);
       cella[donatore + '|' + g] = 'C';
       cella[kR] = rT.codice;
+      if (nuoveViolazioni(donatore, primaD) || nuoveViolazioni(ric, primaR)) {
+        cella[donatore + '|' + g] = rT.codice;
+        if (celR) cella[kR] = celR;
+        else delete cella[kR];
+        continue;
+      }
+      scambi.push({ rT: rT, rigaR: rigaR, ric: ric, g: g, cod: rT.codice });
+      // aggiorna lo stato per i prossimi scambi (celle gia scritte nella simulazione)
       if (sD !== 999) saldo[donatore] = sD - oT;
       saldo[ric] = sR + oT;
       const pctD = parseFloat(infoDi[donatore].percentuale) || 1;
