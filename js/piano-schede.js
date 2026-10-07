@@ -2507,6 +2507,7 @@ async function _applicaVacanzeMese(interattivo) {
   let primoAperto = 1;
   while (primoAperto <= nGiorni && _chiuso(ym + '-' + String(primoAperto).padStart(2, '0'))) primoAperto++;
   const nonToccati = []; // { nome, data, voluto, attuale }
+  const cNonMesse = []; // C prima delle vacanze nel mese prima non messe (turno protetto): { nome, data, attuale }
   if (primoAperto > nGiorni) {
     if (interattivo) toast('Il mese ' + ym + ' e tutto chiuso: le vacanze non vengono riapplicate');
     return { v: 0, c: 0, wd: 0, orfane: 0, altre: 0, nonToccati: nonToccati, primoAperto: primoAperto };
@@ -2788,11 +2789,30 @@ async function _applicaVacanzeMese(interattivo) {
         continue;
       }
       const es = (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=eq.' + dstrP)) || [];
+      // gia un riposo o un assenza: la regola e rispettata
+      if (es.length && !_pianoIsLavoro(es[0].codice)) continue;
+      // GENERAZIONE AUTOMATICA: il mese prima non si tocca (si genera solo il mese
+      // prenotato); se c e un turno, il caso va nel resoconto da sistemare a mano
+      if (window._pianoAutoInCorso) {
+        if (es.length)
+          (window._pianoAutoInCorso.aManoNonToccate = window._pianoAutoInCorso.aManoNonToccate || []).push({
+            nome: nome,
+            data: dstrP,
+            voluto: 'C (prima delle vacanze)',
+            attuale: es[0].codice,
+          });
+        else
+          (window._pianoAutoInCorso.cMesePrima = window._pianoAutoInCorso.cMesePrima || []).push({
+            nome: nome,
+            data: dstrP,
+          });
+        continue;
+      }
       if (es.length) {
         if (!es[0].protetto) {
           await secPatch('piano', 'id=eq.' + es[0].id, { codice: 'C', generato: true, operatore: op });
           nC++;
-        }
+        } else cNonMesse.push({ nome: nome, data: dstrP, attuale: es[0].codice }); // turno protetto: si segnala
       } else {
         await _pianoInserisciCella({
           collaboratore: nome,
@@ -2839,6 +2859,7 @@ async function _applicaVacanzeMese(interattivo) {
     nonToccati: nonToccati,
     primoAperto: primoAperto,
     vSenzaFile: vSenzaFile,
+    cNonMesse: cNonMesse,
   };
 }
 // "Rossi Mario 03.11-09.11, Bianchi Anna 21.11": giorni di fila raccolti per persona
@@ -2895,6 +2916,14 @@ async function applicaVacanzePiano() {
         ' WD' +
         (r.altre ? ', ' + r.altre + ' altre assenze' : '') +
         (r.orfane ? ' · rimosse ' + r.orfane + ' V di vacanze spostate' : ''),
+    );
+  if (r && r.cNonMesse && r.cNonMesse.length)
+    await mostraAvviso(
+      'C prima delle vacanze NON messe nel mese precedente (c e un turno protetto o scritto a mano): da sistemare a mano.\n\n' +
+        r.cNonMesse
+          .map((x) => '\u2022 ' + x.nome + ' ' + x.data.split('-').reverse().join('.') + ': oggi ' + x.attuale)
+          .join('\n'),
+      { titolo: 'Vacanze da controllare' },
     );
   if (r && r.vSenzaFile && r.vSenzaFile.length)
     await mostraAvviso(

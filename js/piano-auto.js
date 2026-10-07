@@ -195,6 +195,14 @@ async function _pianoAutoEsegui(rep, ym, minuti) {
               (conflitti.length > 12 ? ' e altre ' + (conflitti.length - 12) : ''),
           );
         }
+        // C prima delle vacanze che cadono nel mese prima, ancora vuoto: si mettono a mano
+        if (auto.cMesePrima && auto.cMesePrima.length)
+          righe.push(
+            '• C prima delle vacanze da mettere nel mese precedente (la generazione automatica non lo tocca): ' +
+              auto.cMesePrima
+                .map((x) => x.nome + ' ' + x.data.substring(8, 10) + '.' + x.data.substring(5, 7))
+                .join(', '),
+          );
         // V scritte a mano o importate senza vacanza nel file: mai cancellate, da controllare
         if (auto.vSenzaFile && auto.vSenzaFile.length) {
           esito.vSenzaFile = auto.vSenzaFile.slice(0, 100);
