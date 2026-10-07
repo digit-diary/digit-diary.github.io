@@ -853,8 +853,9 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
     }
     // la logica riposo/consecutivi/idoneita' vive nel motore puro PianoRegole
     const tNuovo = codiceNuovo !== undefined ? _pianoTurnoInfo(codiceNuovo) : null;
+    let vfz = null;
     if (tNuovo) {
-      const vfz = _pianoViolazioneFunzioneTurno(nome, tNuovo, new Date(dstr + 'T12:00:00').getDay(), false);
+      vfz = _pianoViolazioneFunzioneTurno(nome, tNuovo, new Date(dstr + 'T12:00:00').getDay(), false);
       if (vfz) avvisiExtra.push(vfz);
     }
     return avvisiExtra.concat(
@@ -866,7 +867,8 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
         turnoDi: (c) => _pianoTurnoInfo(c),
         isLavoro: (c) => _pianoIsLavoro(c),
         // scritta a mano: un turno bloccato non da avviso, un reparto non formato si
-        idoneo: tNuovo ? _pianoIdoneoAMano(nome, tNuovo) : null,
+        // con il motivo preciso gia detto sopra (riservato, livello...) niente avviso generico
+        idoneo: tNuovo && !vfz ? _pianoIdoneoAMano(nome, tNuovo) : null,
         codiceNuovo: codiceNuovo,
       }),
     );

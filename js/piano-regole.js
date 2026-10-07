@@ -134,6 +134,10 @@
   //                         vuoto = sempre) la funzione fa SOLO turni che
   //                         combaciano con i modelli (Z* = tutte le sigle che
   //                         iniziano con Z)
+  //   livello_turni         '10,10C,9:2'           -> quei turni solo dal livello L2 di
+  //                         Formazione in su; '1,21:1-2' = solo L1 e L2. Chi ha la
+  //                         sigla fra i "turni consentiti" (Preferenze) e un'eccezione.
+  //                         info._livello: livello nel settore (null = senza scala)
   // dow: giorno JS (0=dom) oppure null quando il giorno non e' noto (in quel
   // caso le regole a giorni non si applicano). Ritorna il motivo o null.
   function violazioneFunzioneTurno(info, turno, dow, regole) {
@@ -163,6 +167,24 @@
         if (!turni.some(combacia)) continue;
         if (funzioni.includes(fz) || settori.some((x) => funzioni.includes(String(x).toUpperCase()))) continue;
         return 'turno ' + cod + ' riservato a ' + funzioni.join(', ') + ' (funzione: ' + (fz || 'nessuna') + ')';
+      }
+      if (tipo === 'livello_turni') {
+        const turni = (parti[0] || '').split(',').map((x) => x.trim());
+        if (!turni.some(combacia)) continue;
+        const lv = info && info._livello;
+        if (lv == null) continue; // settore senza livelli in Formazione
+        const consentiti = String((info && info.turni_consentiti) || '')
+          .split(',')
+          .map((x) => x.trim().toUpperCase())
+          .filter(Boolean);
+        if (consentiti.includes(cod)) continue;
+        const [minT, maxT] = String(parti[1] || '').split('-');
+        const min = parseInt(String(minT || '').replace(/^L/i, '')) || 0;
+        const max = parseInt(String(maxT || '').replace(/^L/i, '')) || 0;
+        if (lv < min)
+          return 'turno ' + cod + ' dal livello L' + min + ' in su (livello: ' + (lv ? 'L' + lv : 'nessuno') + ')';
+        if (max && lv > max) return 'turno ' + cod + ' solo fino al livello L' + max + ' (livello: L' + lv + ')';
+        continue;
       }
       if (tipo === 'funzione_turni_giorni') {
         if (dowPy == null) continue;
@@ -251,7 +273,10 @@
     }
     // regole "chi fa cosa" del settore (senza giorno: solo turni_solo_funzioni)
     if (typeof ctx.regoleTurnoFunzione === 'function') {
-      const infoS = Object.assign({}, info, { _settori: settoriC || [] });
+      const infoS = Object.assign({}, info, {
+        _settori: settoriC || [],
+        _livello: typeof ctx.livelloDi === 'function' ? ctx.livelloDi(info) : info._livello,
+      });
       if (violazioneFunzioneTurno(infoS, turno, null, ctx.regoleTurnoFunzione())) return false;
     }
     return true;

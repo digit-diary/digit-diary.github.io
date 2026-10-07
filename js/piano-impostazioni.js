@@ -177,7 +177,7 @@ function _renderPianoImpostazioniCard() {
         .filter(Boolean),
     ),
   ].sort();
-  const mappaCG = _pianoCompetenzeGruppi();
+  const mappaCG = _pianoCompetenzeGruppiGrezze();
   const compRep0 = typeof getCompetenzeConfigAll === 'function' ? getCompetenzeConfigAll()[_pianoReparto()] || [] : [];
   const compRep = typeof _compOrdinate === 'function' ? _compOrdinate(compRep0) : compRep0;
   if (compRep.length) {
@@ -194,6 +194,14 @@ function _renderPianoImpostazioniCard() {
             (g) => '<option' + ((mappaCG[k.key] || '').toUpperCase() === g ? ' selected' : '') + '>' + g + '</option>',
           )
           .join('') +
+        // collegamento salvato a un gruppo che qui non esiste: si vede (e non vale)
+        (mappaCG[k.key] && !gruppiDisp.includes(String(mappaCG[k.key]).toUpperCase())
+          ? '<option selected value="' +
+            escP(mappaCG[k.key]) +
+            '">' +
+            escP(mappaCG[k.key]) +
+            ' (non e un gruppo di questo settore: non vale)</option>'
+          : '') +
         '</select></label>';
     });
     h += '</div>';
@@ -462,6 +470,7 @@ async function esportaPianoDati(tipo) {
           'Giorni di lavoro',
           'Giorni a settimana',
           'Turni bloccati',
+          'Turni consentiti',
           'Preferisce L1',
           'Accoglienza',
           'Accompagnamento',
@@ -470,7 +479,7 @@ async function esportaPianoDati(tipo) {
       ];
       // Preferisce L1 e Accoglienza: solo slot
       const soloSlotsCsv = _pianoReparto() === 'slots';
-      if (!soloSlotsCsv) righe[0].splice(9, 2);
+      if (!soloSlotsCsv) righe[0].splice(10, 2);
       collaboratoriCache
         .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
         .forEach((c) =>
@@ -484,6 +493,7 @@ async function esportaPianoDati(tipo) {
             _pianoGiorniLavoroTesto(c.giorni_lavoro),
             c.giorni_settimana || '',
             c.turni_bloccati || '',
+            c.turni_consentiti || '',
             ...(soloSlotsCsv ? [c.prefers_l1 ? 'SI' : '', c.accoglienza || 0] : []),
             c.accompagnamento_settori || '',
             c.lingue || '',
@@ -686,6 +696,10 @@ const _REGOLE_GRUPPO_TIPI = {
   turni_solo_funzioni: 'Questi turni solo a queste funzioni (es: L1,9:BO,SUP · gruppo "tutti" = qualsiasi)',
   funzione_turni_giorni:
     'In questi giorni la funzione fa SOLO questi turni (es: SUP:Z*,L1,9:0,1,2,3 · Z* = tutte le sigle che iniziano con Z · giorni 0=lun ... 6=dom, vuoto = sempre)',
+  livello_turni:
+    'Questi turni solo da un livello di Formazione in su (es: 10,10C,9:L2 · L1-L2 = solo L1 e L2 · eccezioni per persona in Preferenze, Turni consentiti)',
+  minimo_livello_giorno:
+    'Almeno N persone di un livello di Formazione al giorno, con filtri (es: L3:2:NOTTURNO:4,5 = 2 di livello L3 o piu sui turni notturni, venerdi e sabato · 0=lun ... 6=dom)',
 };
 // Etichette in italiano per la scheda (la lingua di chi la usa)
 const _REGOLE_GRUPPO_ETICHETTE = {
@@ -698,6 +712,8 @@ const _REGOLE_GRUPPO_ETICHETTE = {
   minimo_funzione_giorno: 'Minimo di una funzione al giorno',
   turni_solo_funzioni: 'Turni riservati a certe funzioni',
   funzione_turni_giorni: 'Una funzione fa solo certi turni (per giorno)',
+  livello_turni: 'Turni per livello di Formazione',
+  minimo_livello_giorno: 'Minimo di un livello al giorno',
 };
 // TAB GUIDA · manuale rapido della sezione Piano (come la Guida di Turnivo)
 // ================================================================
@@ -1066,7 +1082,9 @@ function _renderPianoRegoleGruppoCard() {
         escP(r.valore || '') +
         '" onchange="salvaRegolaGruppo(' +
         r.id +
-        ',\'valore\',this.value)" style="width:170px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td><input type="checkbox"' +
+        ',\'valore\',this.value)" style="width:170px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)">' +
+        _pianoRegolaLivelloChi(r) +
+        '</td><td><input type="checkbox"' +
         (r.attivo !== false ? ' checked' : '') +
         ' onchange="salvaRegolaGruppo(' +
         r.id +
@@ -1082,6 +1100,7 @@ function _renderPianoRegoleGruppoCard() {
     '<li>Scegli il <b>tipo</b>: sotto compare la spiegazione con un esempio del valore.</li>' +
     '<li>Scrivi il <b>valore</b> nel formato dell esempio e premi Aggiungi. Il programma controlla che gruppo, funzioni e sigle esistano in questo settore: se qualcosa non torna te lo dice.</li>' +
     '<li>Esempi: <b>Turni riservati</b> con valore <code>L1,9:BO,SUP</code> = i turni L1 e 9 li fanno solo Back Office e Supervisor. <b>Una funzione fa solo certi turni</b> con <code>SUP:Z*,L1,9:0,1,2,3</code> = da lunedi a giovedi i Supervisor fanno solo turni che iniziano con Z (oppure L1 e 9); con <code>SUP:Z*,S*,L1,9:4,5</code> venerdi e sabato anche i turni S. <b>Massimo al giorno</b> con <code>SUP:1</code> nel gruppo BO = al massimo un Supervisor al giorno in Back Office.</li>' +
+    '<li><b>Livelli di Formazione</b> (il livello di ognuno e quello di Formazione: L2 = tutte le competenze fino a L2 certificate). <b>Turni per livello</b> con <code>10,10C,9:L2</code> = quei turni dal livello L2 in su; <code>1,21:L1-L2</code> = solo L1 e L2 (es. turni da principianti). Chi deve fare un turno anche senza il livello lo trova in Preferenze collaboratori, <b>Turni consentiti</b>. <b>Minimo di un livello al giorno</b> con <code>L3:2:NOTTURNO:4,5</code> = venerdi e sabato almeno 2 persone di livello L3 o piu sui turni notturni. Quando un collaboratore sale di livello in Formazione, i turni si aprono da soli. Sotto il valore si vede quante persone soddisfano la regola.</li>' +
     '<li>Le regole valgono per il <b>settore aperto</b>: ogni settore ha le sue, con le sue sigle e le sue funzioni. Agiscono nel validatore, nella bozza, nei cambi turno e nella scrittura manuale (avviso).</li>' +
     '</ol></details>' +
     '<div class="add-tipo-row" style="margin-top:8px"><div class="field"><label>Gruppo</label><select id="rg-gruppo" style="padding:8px">' +
@@ -1098,6 +1117,50 @@ function _renderPianoRegoleGruppoCard() {
     '</p>';
   h += '</div></div>';
   return h;
+}
+// REGOLE DI LIVELLO: quante persone del settore le soddisfano oggi (livello da
+// Formazione), cosi si vede subito se una regola e troppo stretta
+function _pianoRegolaLivelloChi(r) {
+  const tipo = String(r.tipo_regola || '').toLowerCase();
+  if (tipo !== 'livello_turni' && tipo !== 'minimo_livello_giorno') return '';
+  const parti = String(r.valore || '').split(':');
+  const [mi, ma] = String((tipo === 'livello_turni' ? parti[1] : parti[0]) || '').split('-');
+  const min = _pianoLivelloDaTesto(mi);
+  const max = tipo === 'livello_turni' ? _pianoLivelloDaTesto(ma) : 0;
+  const persone = collaboratoriCache.filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c));
+  if (!persone.some((c) => _pianoLivelloNelSettore(c) != null))
+    return '<div style="font-size:var(--fs-xs,.75rem);color:#c0392b">Il settore non ha livelli in Formazione: la regola non si applica</div>';
+  const ok = persone.filter((c) => {
+    const lv = _pianoLivelloNelSettore(c) || 0;
+    return lv >= min && (!max || lv <= max);
+  });
+  const eccezioni =
+    tipo === 'livello_turni'
+      ? persone.filter(
+          (c) =>
+            !ok.includes(c) &&
+            String(c.turni_consentiti || '')
+              .toUpperCase()
+              .split(',')
+              .map((x) => x.trim())
+              .some((x) => parti[0].toUpperCase().split(',').includes(x)),
+        ).length
+      : 0;
+  const nMin = tipo === 'minimo_livello_giorno' ? parseInt(parti[1]) || 1 : 1;
+  const poche = ok.length < nMin;
+  return (
+    '<div style="font-size:var(--fs-xs,.75rem);color:' +
+    (poche ? '#c0392b' : 'var(--muted)') +
+    '" title="' +
+    escP(ok.map((c) => c.nome).join(', ')) +
+    '">' +
+    ok.length +
+    ' persone con ' +
+    (max ? 'livello L' + min + '-L' + max : 'livello L' + min + ' o piu') +
+    (eccezioni ? ' + ' + eccezioni + ' eccezioni' : '') +
+    (poche ? ' · troppo poche' : '') +
+    '</div>'
+  );
 }
 // Il valore di una regola di gruppo deve avere il formato del suo tipo e
 // parlare di gruppi, funzioni e turni che nel settore esistono davvero.
@@ -1174,6 +1237,34 @@ function _pianoValidaRegolaGruppo(gruppo, tipo, valore, settore) {
     if (ign.length) return 'Sigle di turno che in ' + ctx.label + ' non esistono: ' + ign.join(', ');
     const fzIgn = funzioni.filter((f) => !fzOk(f));
     if (fzIgn.length) return 'Funzioni sconosciute in ' + ctx.label + ': ' + fzIgn.join(', ');
+    return null;
+  }
+  // livelli: la scala e quella delle competenze del settore in Formazione
+  const maxLv = typeof _lvMaxReparto === 'function' ? _lvMaxReparto(settore) : 9;
+  const lvOk = (x) => {
+    const n = _pianoLivelloDaTesto(x);
+    return n >= 1 && n <= maxLv;
+  };
+  if (t === 'livello_turni') {
+    const parti = v.split(':');
+    if (parti.length !== 2) return 'Formato atteso TURNI:LIVELLO, per esempio 10,10C,9:L2 (oppure 1,21:L1-L2)';
+    const turni = parti[0]
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean);
+    if (!turni.length) return 'Scrivi almeno un turno (es. 10,10C:L2)';
+    const ign = sigleIgnote(turni);
+    if (ign.length) return 'Sigle di turno che in ' + ctx.label + ' non esistono: ' + ign.join(', ');
+    const [mi, ma] = parti[1].split('-');
+    if (!lvOk(mi) || (ma != null && (!lvOk(ma) || _pianoLivelloDaTesto(ma) < _pianoLivelloDaTesto(mi))))
+      return 'Livello non valido: in ' + ctx.label + ' la scala va da L1 a L' + maxLv + ' (Formazione, competenze)';
+    return null;
+  }
+  if (t === 'minimo_livello_giorno') {
+    const m = v.match(/^(L?\d+):(\d+)(?::(DIURNO|NOTTURNO)?)?(?::([0-6](,[0-6])*))?$/);
+    if (!m)
+      return 'Formato atteso LIVELLO:NUMERO[:DIURNO|NOTTURNO[:giorni]], per esempio L3:2:NOTTURNO:4,5 (0=lunedi ... 6=domenica)';
+    if (!lvOk(m[1])) return 'Livello non valido: in ' + ctx.label + ' la scala va da L1 a L' + maxLv;
     return null;
   }
   if (t === 'funzione_turni_giorni') {
@@ -1632,7 +1723,7 @@ function _renderPianoPreferenzeCard() {
   // Preferisce L1 e Accoglienza riguardano solo le slot (turni L1, gruppo ACCOGLIENZA)
   const soloSlots = _pianoReparto() === 'slots';
   h +=
-    '<div style="overflow-x:auto"><table class="piano-table" id="pref-collab-table" style="min-width:760px;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th><th>Solo diurni</th><th title="Solo turni notturni">Solo notturni</th><th style="text-align:left" title="Giorni in cui lavora: negli altri non viene mai proposto (bozza, Migliora, generazione automatica, cerca cambio, copertura malattia, formazioni). Nessuna spunta = tutti i giorni">Giorni di lavoro</th><th style="text-align:left">Turni bloccati (CSV)</th>' +
+    '<div style="overflow-x:auto"><table class="piano-table" id="pref-collab-table" style="min-width:760px;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th><th>Solo diurni</th><th title="Solo turni notturni">Solo notturni</th><th style="text-align:left" title="Giorni in cui lavora: negli altri non viene mai proposto (bozza, Migliora, generazione automatica, cerca cambio, copertura malattia, formazioni). Nessuna spunta = tutti i giorni">Giorni di lavoro</th><th style="text-align:left">Turni bloccati (CSV)</th><th style="text-align:left" title="Eccezioni alle regole Turni per livello: questi turni li puo fare anche senza il livello richiesto (CSV)">Turni consentiti</th>' +
     (soloSlots
       ? '<th title="La bozza le privilegia sui turni L1">Preferisce L1</th><th title="Livello accoglienza (0-2): serve per il gruppo ACCOGLIENZA">Accoglienza</th>'
       : '') +
@@ -1662,7 +1753,11 @@ function _renderPianoPreferenzeCard() {
       escP(c.turni_bloccati || '') +
       '" placeholder="Es: S8,S7C" onchange="salvaPreferenzaCollab(' +
       c.id +
-      ',\'turni_bloccati\',this.value)" style="width:140px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td>' +
+      ',\'turni_bloccati\',this.value)" style="width:140px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td style="text-align:left"><input type="text" value="' +
+      escP(c.turni_consentiti || '') +
+      '" placeholder="Es: 10,9" title="Turni che puo fare anche senza il livello richiesto (regole Turni per livello)" onchange="salvaPreferenzaCollab(' +
+      c.id +
+      ',\'turni_consentiti\',this.value)" style="width:100px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td>' +
       (soloSlots
         ? '<td><input type="checkbox"' +
           (c.prefers_l1 ? ' checked' : '') +

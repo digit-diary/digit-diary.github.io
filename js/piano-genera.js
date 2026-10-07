@@ -977,6 +977,48 @@ function _pianoViolazioniGruppi(righe, ctx) {
                   ')',
               });
           }
+        } else if (tipoR === 'minimo_livello_giorno') {
+          // 'L3:2:NOTTURNO:4,5' = almeno 2 persone di livello L3 o piu (Formazione) sui
+          // turni NOTTURNO del gruppo, venerdi e sabato (0 = lunedi); tipo e giorni facoltativi
+          const lvMin = _pianoLivelloDaTesto(parti[0]);
+          const tipoF = (parti[2] || '').toUpperCase();
+          const dows = parti[3] ? parti[3].split(',').map((x) => parseInt(x)) : null;
+          const nelGruppo = (t) =>
+            t &&
+            (gr === '*' || (t.gruppo || '').toUpperCase() === gr) &&
+            (!tipoF || (t.tipo || '').toUpperCase() === tipoF);
+          for (let g = 1; g <= nGiorni; g++) {
+            const dstr = ym + '-' + String(g).padStart(2, '0');
+            const dowPy = (new Date(dstr + 'T12:00:00').getDay() + 6) % 7;
+            if (dows && !dows.includes(dowPy)) continue;
+            let conta = 0;
+            let turniQuelGiorno = 0;
+            _pianoRighe.forEach((r) => {
+              if (parseInt(r.data.split('-')[2]) !== g || !_pianoCopreQui(r)) return;
+              if (!nelGruppo(_pianoTurnoInfo(r.codice))) return;
+              turniQuelGiorno++;
+              const lv = _pianoLivelloNelSettore(_pianoCollabInfo(r.collaboratore));
+              if (lv != null && lv >= lvMin) conta++;
+            });
+            if (turniQuelGiorno && conta < nVal)
+              lista.push({
+                nome: '(' + (gr === '*' ? 'settore' : gr) + ')',
+                giorno: g,
+                msg:
+                  'giorno ' +
+                  g +
+                  ': servono ' +
+                  nVal +
+                  ' di livello L' +
+                  lvMin +
+                  ' o piu' +
+                  (gr !== '*' ? ' nel gruppo ' + gr : '') +
+                  (tipoF ? ' sui turni ' + tipoF : '') +
+                  ' (trovati ' +
+                  conta +
+                  ')',
+              });
+          }
         }
       }
     }
@@ -1784,6 +1826,11 @@ async function generaBozzaPiano(usaCoperture) {
     }
     return k;
   };
+  // livello di Formazione di ogni persona (regole di livello), calcolato una volta
+  const _livCache = {};
+  const livelloDi = (x) =>
+    x in _livCache ? _livCache[x] : (_livCache[x] = _pianoLivelloNelSettore(_pianoCollabInfo(x)));
+  const nomiLv = [...new Set(nomi.concat(nomiCella))]; // chi puo avere turni nel settore (anche coperture)
   // contatori per le regole di gruppo (limite/minimo funzione per giorno/mese)
   const contaGiornoFz = {}; // gruppo|FZ|g -> n assegnati
   const contaGiornoTot = {}; // gruppo|g -> n assegnati (per accompagnamento)
@@ -2086,6 +2133,28 @@ async function generaBozzaPiano(usaCoperture) {
               if (dowG === 0 && _pianoRegolaVal('domeniche_libere_anno') != null) p += contaDomeniche(n) * 1.5;
               // preferisce L1 (2 collaboratrici in produzione Turnivo)
               if (f.turno_codice === 'L1' && infoP.prefers_l1) p -= 1;
+              // minimo_livello_giorno non ancora soddisfatto: privilegia chi ha il livello
+              for (const rg of _pianoRegoleGruppoDi((t.gruppo || '').toUpperCase()).concat(_pianoRegoleGruppoDi('*'))) {
+                if ((rg.tipo_regola || '').toLowerCase() !== 'minimo_livello_giorno') continue;
+                const pL = rg.valore.split(':');
+                const lvMin = _pianoLivelloDaTesto(pL[0]);
+                const tipoL = (pL[2] || '').toUpperCase();
+                const dowsL = pL[3] ? pL[3].split(',').map((x) => parseInt(x)) : null;
+                if (tipoL && (t.tipo || '').toUpperCase() !== tipoL) continue;
+                if (dowsL && !dowsL.includes((dowG + 6) % 7)) continue;
+                const lvP = livelloDi(n);
+                if (lvP == null || lvP < lvMin) continue;
+                const grR = (rg.gruppo || '').toUpperCase();
+                let gia = 0;
+                for (const x of nomiLv) {
+                  const tx = _pianoTurnoInfo(cella[x + '|' + g] || '');
+                  if (!tx || (tipoL && (tx.tipo || '').toUpperCase() !== tipoL)) continue;
+                  if (grR !== '*' && (tx.gruppo || '').toUpperCase() !== grR) continue;
+                  const lx = livelloDi(x);
+                  if (lx != null && lx >= lvMin) gia++;
+                }
+                if (gia < (parseInt(pL[1]) || 1)) p -= 3;
+              }
               // minimo_funzione_giorno non ancora soddisfatto: privilegia la funzione richiesta
               const grT = (t.gruppo || '').toUpperCase();
               for (const rg of _pianoRegoleGruppoDi(grT)) {

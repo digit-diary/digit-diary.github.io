@@ -1209,6 +1209,7 @@ function _pianoIdoneoPerTurno(nome, turno, dstr) {
     regolaVal: (n) => _pianoRegolaVal(n),
     regoleTurnoFunzione: () => _pianoRegoleTurnoFunzione(),
     fannoTutto: (fz) => _pianoFunzioniFannoTutto().has(fz),
+    livelloDi: (i) => _pianoLivelloNelSettore(i),
   });
 }
 // IDONEITA PER LE SCELTE A MANO: come _pianoIdoneoPerTurno ma senza i turni bloccati
@@ -1226,6 +1227,7 @@ function _pianoIdoneoAMano(nome, turno) {
     regolaVal: (n) => _pianoRegolaVal(n),
     regoleTurnoFunzione: () => _pianoRegoleTurnoFunzione(),
     fannoTutto: (fz) => _pianoFunzioniFannoTutto().has(fz),
+    livelloDi: (i) => _pianoLivelloNelSettore(i),
   });
 }
 // COPERTURA DI UNA NON DISPONIBILITA dal Diario: la stessa ricerca dei sostituti della

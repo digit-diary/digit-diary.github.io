@@ -471,6 +471,24 @@ const tS1 = { codice: 'S1', gruppo: 'SALA' };
 eq(R.violazioneFunzioneTurno({ funzione: 'HOST' }, tL1, 2, RG) !== null, true, 'HOST su L1 = riservato');
 eq(R.violazioneFunzioneTurno({ funzione: 'BO' }, tL1, 2, RG), null, 'BO su L1 ok');
 eq(R.violazioneFunzioneTurno({ funzione: 'HOST', _settori: ['BO'] }, tL1, 2, RG), null, 'HOST con settore BO su L1 ok');
+// TURNI PER LIVELLO di Formazione (livello_turni)
+const RL = [
+  { tipo_regola: 'livello_turni', valore: '10,10C:L2' },
+  { tipo_regola: 'livello_turni', valore: '1:L1-L1' },
+];
+const t10 = { codice: '10', tipo: 'NOTTURNO', gruppo: 'TAVOLI' };
+const t1 = { codice: '1', tipo: 'DIURNO', gruppo: 'TAVOLI' };
+eq(R.violazioneFunzioneTurno({ _livello: 1 }, t10, 2, RL) !== null, true, 'livello L1 su turno da L2 = escluso');
+eq(R.violazioneFunzioneTurno({ _livello: 2 }, t10, 2, RL), null, 'livello L2 su turno da L2 ok');
+eq(R.violazioneFunzioneTurno({ _livello: 3 }, t10, 2, RL), null, 'livello L3 su turno da L2 ok');
+eq(
+  R.violazioneFunzioneTurno({ _livello: 2 }, t1, 2, RL) !== null,
+  true,
+  'livello L2 su turno solo L1 = escluso (massimo)',
+);
+eq(R.violazioneFunzioneTurno({ _livello: 1, turni_consentiti: '10' }, t10, 2, RL), null, 'eccezione Turni consentiti');
+eq(R.violazioneFunzioneTurno({ _livello: null }, t10, 2, RL), null, 'settore senza livelli: regola non applicata');
+eq(R.violazioneFunzioneTurno({ _livello: 0 }, t10, 2, RL) !== null, true, 'nessun livello su turno da L2 = escluso');
 eq(R.violazioneFunzioneTurno({ funzione: 'SUP' }, tC0, 2, RG) !== null, true, 'SUP con C0 martedi = vietato');
 eq(R.violazioneFunzioneTurno({ funzione: 'SUP' }, tZ8, 2, RG), null, 'SUP con Z8 martedi ok');
 eq(R.violazioneFunzioneTurno({ funzione: 'SUP' }, tS1, 5, RG), null, 'SUP con S1 venerdi ok');

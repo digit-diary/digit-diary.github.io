@@ -896,6 +896,7 @@ async function salvaPianoTurno(id, campo, valore) {
     const prima = t ? t[campo] : '';
     await secPatch('piano_turni', 'id=eq.' + id, patch);
     if (t) t[campo] = patch[campo];
+    if (campo === 'gruppo' || campo === 'attivo') _pianoCompGruppiMemo = null; // collegamenti competenze-gruppi da ricalcolare
     const et = _PT_ETICHETTE[campo] || campo;
     const daA = (v) =>
       campo === 'durata_ore'

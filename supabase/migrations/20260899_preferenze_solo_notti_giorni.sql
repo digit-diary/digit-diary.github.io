@@ -1,5 +1,5 @@
 -- ============================================================
--- PREFERENZE DEL PIANO: solo notturni, giorni di lavoro, giorni a settimana
+-- PREFERENZE DEL PIANO: solo notturni, giorni di lavoro, giorni a settimana, turni consentiti
 -- (07/10/2026, richieste del titolare)
 -- solo_notti: come solo_diurni, ma solo turni notturni.
 -- giorni_lavoro: giorni della settimana in cui il collaboratore puo lavorare
@@ -17,5 +17,8 @@
 ALTER TABLE collaboratori ADD COLUMN IF NOT EXISTS solo_notti BOOLEAN DEFAULT FALSE;
 ALTER TABLE collaboratori ADD COLUMN IF NOT EXISTS giorni_lavoro TEXT;
 ALTER TABLE collaboratori ADD COLUMN IF NOT EXISTS giorni_settimana INT;
+-- turni_consentiti: eccezioni alle regole "Turni per livello" (piano_regole_gruppo,
+-- tipo livello_turni): sigle che la persona fa anche senza il livello richiesto (CSV)
+ALTER TABLE collaboratori ADD COLUMN IF NOT EXISTS turni_consentiti TEXT;
 
 NOTIFY pgrst, 'reload schema';

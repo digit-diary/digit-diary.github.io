@@ -255,7 +255,7 @@ function _pianoRegoleTurnoFunzione() {
     (r) =>
       r.attivo !== false &&
       (r.reparto_dip || 'slots') === _pianoReparto() &&
-      /^(turni_solo_funzioni|funzione_turni_giorni)$/.test(String(r.tipo_regola || '').toLowerCase()),
+      /^(turni_solo_funzioni|funzione_turni_giorni|livello_turni)$/.test(String(r.tipo_regola || '').toLowerCase()),
   );
 }
 // Funzioni che a mano possono fare qualsiasi turno (regola funzioni_fanno_tutto):
@@ -273,11 +273,37 @@ function _pianoFunzioniFannoTutto() {
 // motivo della violazione per 'nome' con il turno t nel giorno dow (JS, 0=dom), o null.
 // automatica = true quando decide la bozza: li' le regole del settore valgono
 // per tutti; a mano (scrittura, validatore, cambi) chi "fa tutto" passa.
+// LIVELLO DI FORMAZIONE nel settore del piano (come in Formazione: L(n) = tutte le
+// competenze di livello <= n certificate; Extra fuori dalla scala). null = il settore
+// non ha competenze a livelli: le regole di livello non si applicano.
+function _pianoLivelloNelSettore(info, rep) {
+  if (!info || typeof getCompetenzeConfigAll !== 'function') return null;
+  const comps = (getCompetenzeConfigAll()[rep || _pianoReparto()] || []).filter((k) => parseInt(k.livello) >= 1);
+  if (!comps.length) return null;
+  const spunte = info.competenze || {};
+  const maxLv = Math.max(...comps.map((k) => parseInt(k.livello)));
+  let lv = 0;
+  for (let n = 1; n <= maxLv; n++) {
+    const richieste = comps.filter((k) => parseInt(k.livello) <= n);
+    if (!richieste.length) continue;
+    if (richieste.every((k) => spunte[k.key] === true)) lv = n;
+    else break;
+  }
+  return lv;
+}
+// "L3" o "3" -> 3 (livello minimo nelle regole di livello)
+function _pianoLivelloDaTesto(v) {
+  const n = parseInt(String(v || '').replace(/^L/i, ''));
+  return n > 0 ? n : 0;
+}
 function _pianoViolazioneFunzioneTurno(nome, t, dow, automatica) {
   const info = _pianoCollabInfo(nome) || {};
   const fz = String(info.funzione || '').toUpperCase();
   if (!automatica && fz && _pianoFunzioniFannoTutto().has(fz)) return null;
-  const infoS = Object.assign({}, info, { _settori: _pianoSettoriEffettivi(info) || [] });
+  const infoS = Object.assign({}, info, {
+    _settori: _pianoSettoriEffettivi(info) || [],
+    _livello: _pianoLivelloNelSettore(info),
+  });
   return PianoRegole.violazioneFunzioneTurno(infoS, t, dow, _pianoRegoleTurnoFunzione());
 }
 function _pianoRegoleGruppoDi(gruppo) {
@@ -295,17 +321,61 @@ const _COMPETENZE_GRUPPI_DEFAULT = {
   cassa: 'CASSA',
   bo: 'BO',
   sup: 'SUP',
-  croupier: 'SALA',
-  ispettore: 'SALA',
-  cassa_tavoli: 'CASSA',
+  // Tavoli e Valet: i loro turni hanno un solo gruppo (TAVOLI, VALET). Prima i Tavoli
+  // puntavano a SALA e CASSA e il Valet ad ACCOGLIENZA, gruppi delle Slots: chi aveva
+  // le competenze certificate risultava non idoneo ai turni del proprio settore.
+  croupier: 'TAVOLI',
+  ispettore: 'TAVOLI',
+  cassa_tavoli: 'TAVOLI',
   valet_servizio: 'VALET',
-  valet_accoglienza: 'ACCOGLIENZA',
+  valet_accoglienza: 'VALET',
 };
-function _pianoCompetenzeGruppi() {
+function _pianoCompetenzeGruppiGrezze() {
   const cfg = window._pianoCompGruppiCfg;
   return cfg && typeof cfg === 'object'
     ? Object.assign({}, _COMPETENZE_GRUPPI_DEFAULT, cfg)
     : _COMPETENZE_GRUPPI_DEFAULT;
+}
+// Un collegamento vale solo se il gruppo esiste fra i turni del settore a cui la
+// competenza appartiene in Formazione (es. Croupier dei Tavoli -> TAVOLI). Un gruppo di
+// un altro settore (Croupier -> SALA delle Slots) non conta: la persona resta come se
+// la competenza non fosse collegata (settori assegnati o storia dei turni).
+function _pianoCollegamentoValido(chiave, gruppo) {
+  const g = String(gruppo || '').toUpperCase();
+  if (!g) return false;
+  const tutte = typeof getCompetenzeConfigAll === 'function' ? getCompetenzeConfigAll() : {};
+  const reps = Object.keys(tutte).filter((r) => (tutte[r] || []).some((k) => k.key === chiave));
+  if (!reps.length) return true; // competenza non configurata: si lascia com e
+  return pianoTurniCache.some(
+    (t) => t.attivo !== false && reps.includes(t.reparto_dip || 'slots') && (t.gruppo || '').toUpperCase() === g,
+  );
+}
+// in memoria finche non cambiano collegamenti, turni o competenze (la bozza la chiama
+// per ogni candidato)
+let _pianoCompGruppiMemo = null;
+function _pianoCompetenzeGruppi() {
+  const grezze = _pianoCompetenzeGruppiGrezze();
+  if (!pianoTurniCache.length) return grezze;
+  const comp = typeof competenzeConfig !== 'undefined' ? competenzeConfig : null;
+  const m = _pianoCompGruppiMemo;
+  if (
+    m &&
+    m.cfg === window._pianoCompGruppiCfg &&
+    m.turni === pianoTurniCache &&
+    m.nTurni === pianoTurniCache.length &&
+    m.comp === comp
+  )
+    return m.out;
+  const out = {};
+  Object.keys(grezze).forEach((k) => (out[k] = _pianoCollegamentoValido(k, grezze[k]) ? grezze[k] : ''));
+  _pianoCompGruppiMemo = {
+    cfg: window._pianoCompGruppiCfg,
+    turni: pianoTurniCache,
+    nTurni: pianoTurniCache.length,
+    comp: comp,
+    out: out,
+  };
+  return out;
 }
 // Settori EFFETTIVI: settori assegnati (fonte di verità, M2M Turnivo) +
 // gruppi sbloccati dalle competenze CERTIFICATE in Formazione.
