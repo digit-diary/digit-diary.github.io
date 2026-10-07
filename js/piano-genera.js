@@ -958,6 +958,34 @@ function _pianoCalcolaViolazioni() {
     _pianoViolazioniPersona(nome, mese[nome] || [], sett[nome] || [], ctx).forEach(metti),
   );
   _pianoViolazioniGruppi(_pianoRighe, ctx).forEach(metti);
+  // PREFERENZE del collaboratore (solo diurni, solo notturni, giorni di lavoro): la
+  // bozza le rispetta, ma un turno scritto a mano o rimasto da una bozza fatta prima
+  // di cambiare la preferenza si segnala qui
+  const NOMI_G = ['domenica', 'lunedi', 'martedi', 'mercoledi', 'giovedi', 'venerdi', 'sabato'];
+  _pianoRighe.forEach((r) => {
+    const t = _pianoTurnoInfo(r.codice);
+    const info = t && _pianoCollabInfo(r.collaboratore);
+    if (!info) return;
+    const dstr = String(r.data).substring(0, 10);
+    if (dstr.substring(0, 7) !== ym) return;
+    const dow = new Date(dstr + 'T12:00:00').getDay();
+    let msg = null;
+    if (!PianoRegole.lavoraNelGiorno(info, dow))
+      msg =
+        'preferenza giorni di lavoro: ' +
+        r.codice +
+        ' di ' +
+        NOMI_G[dow] +
+        ' (lavora solo ' +
+        (typeof _pianoGiorniLavoroTesto === 'function'
+          ? _pianoGiorniLavoroTesto(info.giorni_lavoro)
+          : info.giorni_lavoro) +
+        ')';
+    else if (info.solo_diurni && t.tipo === 'NOTTURNO') msg = 'preferenza solo diurni: ' + r.codice + ' e notturno';
+    else if (info.solo_notti && t.tipo !== 'NOTTURNO')
+      msg = 'preferenza solo notturni: ' + r.codice + ' non e notturno';
+    if (msg) metti({ nome: r.collaboratore, giorno: parseInt(dstr.substring(8, 10)), msg: msg, celle: [dstr] });
+  });
   return { celle: celle, lista: lista };
 }
 

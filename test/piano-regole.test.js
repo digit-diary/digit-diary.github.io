@@ -203,9 +203,18 @@ ok(!R.idoneoPerTurno({ turni_bloccati: 'PRESTO' }, TURNI.PRESTO, ctxBase), 'turn
 ok(!R.idoneoPerTurno({ solo_notti: true }, TURNI.PRESTO, ctxBase), 'solo_notti = non idoneo al diurno');
 ok(R.idoneoPerTurno({ solo_notti: true }, TURNI.NOTTE, ctxBase), 'solo_notti = idoneo alla notte');
 ok(R.idoneoPerTurno({ giorni_lavoro: '5,6' }, TURNI.PRESTO, { ...ctxBase, dow: 5 }), 'lavora ven e sab: il venerdi si');
-ok(!R.idoneoPerTurno({ giorni_lavoro: '5,6' }, TURNI.PRESTO, { ...ctxBase, dow: 2 }), 'lavora ven e sab: il martedi no');
+ok(
+  !R.idoneoPerTurno({ giorni_lavoro: '5,6' }, TURNI.PRESTO, { ...ctxBase, dow: 2 }),
+  'lavora ven e sab: il martedi no',
+);
 ok(R.idoneoPerTurno({ giorni_lavoro: '5,6' }, TURNI.PRESTO, ctxBase), 'giorno non noto: nessun limite');
 ok(R.lavoraNelGiorno({ giorni_lavoro: '' }, 3), 'nessun giorno scelto = tutti i giorni');
+ok(R.lavoraNelGiorno({ giorni_lavoro: '5,6,7' }, 0), 'lavora ven, sab e dom: la domenica (JS 0 = casella 7) si');
+ok(!R.lavoraNelGiorno({ giorni_lavoro: '1,2' }, 0), 'lavora lun e mar: la domenica no');
+ok(
+  !R.idoneoPerTurno({ giorni_lavoro: '5,6,7' }, TURNI.PRESTO, { ...ctxBase, dow: 4 }),
+  'lavora ven-dom: il giovedi no',
+);
 // settore non assegnato senza campo -> non idoneo
 ok(
   !R.idoneoPerTurno({ funzione: 'SA' }, TURNI.REC, { ...ctxBase, settoriDi: () => ['SALA'] }),
