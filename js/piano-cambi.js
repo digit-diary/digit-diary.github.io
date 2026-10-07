@@ -423,7 +423,7 @@ async function apriCercaCambioLibero() {
       const mia = mappe[c.nome] || {};
       if (!eLibero(mia[sel.data])) return;
       if (bloccate[c.nome + '|' + sel.data]) return; // cella bloccata con motivo
-      if (!_pianoIdoneoPerTurno(c.nome, tMio)) return;
+      if (!_pianoIdoneoPerTurno(c.nome, tMio, sel.data)) return;
       const prob = problema(mia, sel.data, r.codice);
       if (prob) return;
       // accompagnamento il giorno X: il richiedente esce (C), il collega entra
@@ -452,7 +452,7 @@ async function apriCercaCambioLibero() {
         if (!eLibero(mioPiano[y])) continue;
         if (!_pianoOperativoIl(sel.nome, y)) continue; // dopo la fine del rapporto non si restituisce
         if (bloccate[c.nome + '|' + y] || bloccate[sel.nome + '|' + y]) continue;
-        if (!_pianoIdoneoPerTurno(sel.nome, tSuo)) continue;
+        if (!_pianoIdoneoPerTurno(sel.nome, tSuo, y)) continue;
         if (problema(mioPiano, y, codSuo)) continue;
         // accompagnamento il giorno di restituzione: il collega esce (C), il
         // richiedente entra prendendo il turno del collega
@@ -1186,12 +1186,20 @@ async function ripristinaOrdinePiano() {
 // libero e idoneo (greedy: meno ore mese + meno giorni consecutivi),
 // alla conferma mette M al malato e i turni (protetti) ai sostituti.
 // ================================================================
-function _pianoIdoneoPerTurno(nome, turno) {
+// giorno (YYYY-MM-DD) di un indice g del mese aperto, anche fuori dal mese (g <= 0)
+function _pianoGiornoDiIndice(g) {
+  const d = new Date(_pianoMeseSel + '-01T12:00:00');
+  d.setDate(d.getDate() + g - 1);
+  return dataLocaleISO(d);
+}
+// dstr (facoltativo): il giorno del turno, per la preferenza dei giorni di lavoro
+function _pianoIdoneoPerTurno(nome, turno, dstr) {
   // idoneita' (settori, regole di gruppo, solo_diurni, turni bloccati, mappatura
   // funzione, regola L1): la logica vive nel motore puro PianoRegole, qui si
   // iniettano solo gli accessi allo stato dell'app
   const info = _pianoCollabInfo(nome) || {};
   return PianoRegole.idoneoPerTurno(info, turno, {
+    dow: dstr ? new Date(String(dstr).substring(0, 10) + 'T12:00:00').getDay() : null,
     settoriDi: (i) => _pianoSettoriEffettivi(i),
     regoleGruppoDi: (gr) => _pianoRegoleGruppoDi(gr),
     campoOk: (i, v) => _pianoCampoOk(i, v),
@@ -1427,7 +1435,7 @@ async function cercaSostitutiMalattia() {
         if (rC && _pianoCellaRiservata(rC)) continue; // bloccata con motivo: non si tocca
         if (!(csC && csC.is_riposo && !(rC && rC.protetto && codC === 'V'))) continue; // occupato o vacanza protetta
       }
-      if (!_pianoIdoneoPerTurno(n, t)) continue;
+      if (!_pianoIdoneoPerTurno(n, t, _pianoGiornoDiIndice(g))) continue;
       if (consecFinoA(n, g) >= maxCons) continue;
       if (!riposoOkSost(n, g, t)) continue;
       // accompagnamento: simula malato→M e sostituto→turno, poi verifica
@@ -1463,7 +1471,7 @@ async function cercaSostitutiMalattia() {
           if (!(csX && csX.is_riposo && !(rX && rX.protetto && codX === 'V'))) continue;
         }
         if ((rigaDi[x + '|' + (g - 1)] || {}).motivo_blocco) continue; // il suo giorno prima e' bloccato
-        if (!_pianoIdoneoPerTurno(x, t)) continue;
+        if (!_pianoIdoneoPerTurno(x, t, _pianoGiornoDiIndice(g))) continue;
         if (consecFinoA(x, g) >= maxCons) continue;
         const codP = cella[x + '|' + (g - 1)] || '';
         const tP = _pianoTurnoInfo(codP);
@@ -1482,7 +1490,11 @@ async function cercaSostitutiMalattia() {
           const codS = cella[z + '|' + (g - 1)] || '';
           const tS = _pianoTurnoInfo(codS);
           if (!tS || codS === codP) continue;
-          if (!_pianoIdoneoPerTurno(x, tS) || !_pianoIdoneoPerTurno(z, tP)) continue;
+          if (
+            !_pianoIdoneoPerTurno(x, tS, _pianoGiornoDiIndice(g - 1)) ||
+            !_pianoIdoneoPerTurno(z, tP, _pianoGiornoDiIndice(g - 1))
+          )
+            continue;
           const s1 = cella[x + '|' + (g - 1)];
           const s2 = cella[z + '|' + (g - 1)];
           const sG = cella[x + '|' + g];
@@ -1520,7 +1532,7 @@ async function cercaSostitutiMalattia() {
               if (rY && _pianoCellaRiservata(rY)) continue; // bloccata con motivo o compleanno
               if (!(csY && csY.is_riposo && !(rY && rY.protetto && codY === 'V'))) continue;
             }
-            if (!_pianoIdoneoPerTurno(y, tP)) continue;
+            if (!_pianoIdoneoPerTurno(y, tP, _pianoGiornoDiIndice(g - 1))) continue;
             const sy = cella[y + '|' + (g - 1)];
             const sx1 = cella[x + '|' + (g - 1)];
             const sxG = cella[x + '|' + g];

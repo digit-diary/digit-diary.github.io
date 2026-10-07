@@ -199,6 +199,13 @@ const ctxBase = {
 ok(R.idoneoPerTurno({ funzione: 'SA' }, TURNI.PRESTO, ctxBase), 'nessun vincolo = idoneo');
 ok(!R.idoneoPerTurno({ solo_diurni: true }, TURNI.NOTTE, ctxBase), 'solo_diurni = non idoneo alla notte');
 ok(!R.idoneoPerTurno({ turni_bloccati: 'PRESTO' }, TURNI.PRESTO, ctxBase), 'turno bloccato = non idoneo');
+// preferenze 07.10: solo notti e giorni di lavoro (5 venerdi, 6 sabato)
+ok(!R.idoneoPerTurno({ solo_notti: true }, TURNI.PRESTO, ctxBase), 'solo_notti = non idoneo al diurno');
+ok(R.idoneoPerTurno({ solo_notti: true }, TURNI.NOTTE, ctxBase), 'solo_notti = idoneo alla notte');
+ok(R.idoneoPerTurno({ giorni_lavoro: '5,6' }, TURNI.PRESTO, { ...ctxBase, dow: 5 }), 'lavora ven e sab: il venerdi si');
+ok(!R.idoneoPerTurno({ giorni_lavoro: '5,6' }, TURNI.PRESTO, { ...ctxBase, dow: 2 }), 'lavora ven e sab: il martedi no');
+ok(R.idoneoPerTurno({ giorni_lavoro: '5,6' }, TURNI.PRESTO, ctxBase), 'giorno non noto: nessun limite');
+ok(R.lavoraNelGiorno({ giorni_lavoro: '' }, 3), 'nessun giorno scelto = tutti i giorni');
 // settore non assegnato senza campo -> non idoneo
 ok(
   !R.idoneoPerTurno({ funzione: 'SA' }, TURNI.REC, { ...ctxBase, settoriDi: () => ['SALA'] }),

@@ -1684,6 +1684,7 @@ async function pianoIncollaDaClipboard(target) {
   const daInserire = [];
   let scartate = 0;
   let fuori = 0;
+  let fuoriContratto = 0;
   grid.forEach((riga, i) => {
     const nome = nomiVis[start + i];
     if (!nome) {
@@ -1705,6 +1706,11 @@ async function pianoIncollaDaClipboard(target) {
         return;
       }
       const dstr = ym + '-' + String(g).padStart(2, '0');
+      // dopo la fine del contratto (o prima dell assunzione) non si incolla
+      if (typeof _pianoOperativoIl === 'function' && !_pianoOperativoIl(nome, dstr)) {
+        fuoriContratto++;
+        return;
+      }
       const ex = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
       if (ex) {
         if (ex.codice !== cod) daPatch.push({ id: ex.id, codice: cod, nomeRef: nome, data: dstr, prima: ex.codice });
@@ -1736,7 +1742,10 @@ async function pianoIncollaDaClipboard(target) {
         daPatch.length +
         ' celle sovrascritte' +
         (scartate ? '\n• ' + scartate + ' sigle sconosciute scartate' : '') +
-        (fuori ? '\n• ' + fuori + ' celle oltre i bordi del mese/lista (ignorate)' : ''),
+        (fuori ? '\n• ' + fuori + ' celle oltre i bordi del mese/lista (ignorate)' : '') +
+        (fuoriContratto
+          ? '\n• ' + fuoriContratto + ' celle fuori dal contratto (dopo la fine o prima dell assunzione: ignorate)'
+          : ''),
     ))
   )
     return;
@@ -2074,7 +2083,7 @@ async function miglioraOrePiano() {
       const libera = !celR || (celR === 'C' && rigaR && rigaR.generato && !rigaR.protetto);
       if (!libera) continue;
       if (malattie[ric + '|' + rT.data]) continue;
-      if (!_pianoIdoneoPerTurno(ric, t)) continue;
+      if (!_pianoIdoneoPerTurno(ric, t, rT.data)) continue;
       if (!consecOk(ric, g)) continue;
       if (!riposoOk(ric, g, t)) continue;
       // il ricevente non supera il proprio massimo (tolleranza_ore_sopra o simmetrica)

@@ -185,9 +185,21 @@
     }
     return null;
   }
+  // giorni della settimana in cui lavora (preferenza giorni_lavoro "5,6" = venerdi e
+  // sabato; numeri di getDay, 0 domenica). Vuoto = tutti. dow null = giorno non noto
+  function lavoraNelGiorno(info, dow) {
+    const g = String((info && info.giorni_lavoro) || '').trim();
+    if (!g || dow == null) return true;
+    return g
+      .split(',')
+      .map((x) => parseInt(x))
+      .includes(dow);
+  }
   function idoneoPerTurno(info, turno, ctx) {
     info = info || {};
     if (info.solo_diurni && turno.tipo === 'NOTTURNO') return false;
+    if (info.solo_notti && turno.tipo !== 'NOTTURNO') return false;
+    if (ctx && ctx.dow != null && !lavoraNelGiorno(info, ctx.dow)) return false;
     if (
       info.turni_bloccati &&
       info.turni_bloccati
@@ -601,6 +613,7 @@
     violazioniCella,
     violazioniAccompagnamento,
     idoneoPerTurno,
+    lavoraNelGiorno,
     violazioneFunzioneTurno,
     indiceBenessere,
     giorniVacanzaSpettanti,

@@ -760,6 +760,16 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
     // periodo di vacanza servono al riposo previsto dalle regole. Scriverci
     // sopra un turno toglie quel riposo, quindi si avvisa.
     const avvisiExtra = [];
+    // preferenze: solo diurni / solo notti / giorni di lavoro (a mano si puo, con avviso)
+    const tPref = codiceNuovo ? _pianoTurnoInfo(codiceNuovo) : null;
+    const infoPref = _pianoCollabInfo(nome) || {};
+    if (tPref) {
+      if (infoPref.solo_diurni && tPref.tipo === 'NOTTURNO') avvisiExtra.push('preferenza: solo turni diurni');
+      if (infoPref.solo_notti && tPref.tipo !== 'NOTTURNO') avvisiExtra.push('preferenza: solo turni notturni');
+      const dowP = new Date(dstr + 'T12:00:00').getDay();
+      if (!PianoRegole.lavoraNelGiorno(infoPref, dowP))
+        avvisiExtra.push('lavora solo ' + _pianoGiorniLavoroTesto(infoPref.giorni_lavoro) + ' (preferenza)');
+    }
     if (codiceNuovo && _pianoTurnoInfo(codiceNuovo) && !_pianoOperativoIl(nome, dstr))
       avvisiExtra.push(_pianoMotivoFuoriRapporto(nome, dstr) + ': quel giorno non e operativo');
     // DOMENICA LIBERA VALIDA (una delle 12): il cambio la toglie? Vale per la cella
@@ -899,6 +909,21 @@ async function pianoSalvaCella(nome, dstr, codice) {
     .trim()
     .toUpperCase();
   const prima = (_pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr) || {}).codice || '';
+  // FUORI DAL RAPPORTO (07.10, richiesta del titolare): dopo la fine del contratto (o prima
+  // dell assunzione) la cella non si scrive piu, si puo solo svuotare; per scriverci si
+  // cambia o si toglie la data (Gestione collaboratori > Disattiva, scheda > Storico HR)
+  if (cod && typeof _pianoOperativoIl === 'function' && !_pianoOperativoIl(nome, dstr)) {
+    toastErrore(
+      nome +
+        ': ' +
+        _pianoMotivoFuoriRapporto(nome, dstr) +
+        ', il ' +
+        dstr.split('-').reverse().join('.') +
+        ' non si modifica (si puo solo svuotare la cella). Per cambiarlo: Gestione collaboratori > Disattiva (cambia o togli la data) o scheda > Storico HR.',
+      9000,
+    );
+    return false;
+  }
   if (cod !== 'ND' || prima === 'ND') return _pianoSalvaCellaBase(nome, dstr, codice);
   if (!_pianoEJolly(nome)) {
     toastErrore(

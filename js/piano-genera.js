@@ -1464,6 +1464,8 @@ async function completaConCoperture() {
 function _pianoIdoneoStatico(n, t, dowG, idoneita) {
   const infoC = _pianoCollabInfo(n);
   if (infoC && infoC.solo_diurni && t.tipo === 'NOTTURNO') return false;
+  if (infoC && infoC.solo_notti && t.tipo !== 'NOTTURNO') return false;
+  if (infoC && dowG != null && !PianoRegole.lavoraNelGiorno(infoC, dowG)) return false;
   if (
     infoC &&
     infoC.turni_bloccati &&
