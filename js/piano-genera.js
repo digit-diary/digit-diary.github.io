@@ -1236,12 +1236,43 @@ async function pianoProponiCorrezioniImport(ym, errori) {
     legge: res.prima.legge + '>' + res.dopo.legge,
     scoperti: res.prima.scoperti + '>' + res.dopo.scoperti,
   };
+  // NESSUNA VIOLAZIONE NUOVA del programma per le persone toccate (controllo 05.10: la
+  // proposta Rondinella 9 -> S7 toglieva un riposo corto ma creava 45.6 ore nella
+  // settimana, e la finestra diceva "Nessuna altra regola peggiora"): per ogni persona
+  // cambiata si confrontano le violazioni per tipo prima e dopo
+  const tipoDi = (msg) => {
+    const i = _PIANO_TIPI_VIOLAZIONE.findIndex((t) => t[1].test(msg));
+    return i < 0 ? 'altro' : _PIANO_TIPI_VIOLAZIONE[i][0];
+  };
+  const nuoveRegole = [];
+  try {
+    const toccate = [...new Set(res.cambi.map((c) => c.nome))];
+    const prob = res.prep.problema;
+    toccate.forEach((n) => {
+      const conta = (lista) => {
+        const m = {};
+        lista.forEach((v) => (m[tipoDi(v.msg)] = (m[tipoDi(v.msg)] || 0) + 1));
+        return m;
+      };
+      const pA = conta(res.prep.dettaglioPersona(n, prob.stato[n] || {}));
+      const pB = conta(res.prep.dettaglioPersona(n, (res.stato || {})[n] || {}));
+      Object.keys(pB).forEach((t) => {
+        if (pB[t] > (pA[t] || 0)) nuoveRegole.push(n + ': ' + t);
+      });
+    });
+  } catch (e) {
+    nuoveRegole.push('controllo non riuscito (' + ((e && e.message) || e) + ')');
+  }
+  window._ultimaCorrezioneImport.nuoveRegole = nuoveRegole;
   // e le regole di legge del programma non devono peggiorare rispetto al file
   if (
     !res.cambi.length ||
     dopo.length >= prima.length ||
     nuoviErrori.length ||
+    nuoveRegole.length ||
     res.dopo.legge > res.prima.legge ||
+    res.dopo.regole > res.prima.regole ||
+    (res.dopo.eccesso || 0) > (res.prima.eccesso || 0) ||
     res.dopo.scoperti > res.prima.scoperti
   ) {
     await mostraAvviso(

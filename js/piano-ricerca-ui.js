@@ -69,9 +69,15 @@ async function _ricercaPrepara(opz) {
   const nomi = collaboratoriCache
     .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && !_pianoCoperturaCfg(c))
     .map((c) => c.nome);
+  // GIORNI CHE SI POSSONO CAMBIARE: solo da domani in poi (controllo 05.10: Migliora
+  // cambiava 23 celle di oggi, turni gia finiti o in corso, e i giorni passati quando un
+  // giorno era sbloccato). Oggi e il passato restano come sono; il blocco dei giorni
+  // chiusi vale in piu per le modifiche a mano
+  const oggi = oggiLocale();
   const giorniAperti = [];
   for (let g = 1; g <= nGiorni; g++) {
     const d = dstrDi(g);
+    if (d <= oggi) continue;
     if (!(_pianoGiornoBloccato(d) && !_pianoGiornoSbloccato(d))) giorniAperti.push(d);
   }
   const assenze = Object.assign({}, _pianoMalattieMese(ym), _pianoCnpMese(ym), _pianoFineMese(ym), _pianoNdMese(ym));
@@ -579,7 +585,15 @@ async function _ricercaScrivi(res) {
     const r = (prep.righeDi[c.nome + '|' + c.data] || [])[0];
     const cod = c.dopo || (prep.conRiempimento ? 'C' : '');
     if (r) {
-      attesa[r.id] = { codice: r.codice, generato: r.generato, nome: c.nome, data: c.data };
+      attesa[r.id] = {
+        codice: r.codice,
+        generato: r.generato,
+        protetto: !!r.protetto,
+        blocco: r.motivo_blocco || '',
+        commento: r.commento || '',
+        nome: c.nome,
+        data: c.data,
+      };
       if (!cod) togli.push(r.id);
       else if (cod !== r.codice) cambia.push({ id: r.id, codice: cod });
     } else if (cod)
@@ -602,14 +616,28 @@ async function _ricercaScrivi(res) {
     const ora2 = {};
     for (let i = 0; i < ids.length; i += 150) {
       const righe =
-        (await secGet('piano?id=in.(' + ids.slice(i, i + 150).join(',') + ')&select=id,codice,generato&limit=1000')) ||
-        [];
+        (await secGet(
+          'piano?id=in.(' +
+            ids.slice(i, i + 150).join(',') +
+            ')&select=id,codice,generato,protetto,motivo_blocco,commento&limit=1000',
+        )) || [];
       righe.forEach((r) => (ora2[r.id] = r));
     }
     const intatta = (id) => {
       const a = attesa[id];
       const c = ora2[id];
-      return !!(a && c && c.codice === a.codice && !(a.generato && c.generato === false));
+      // intatta = stesso codice, ancora del programma, non protetta, non bloccata e con la
+      // stessa nota di quando la ricerca l ha letta (prima si guardava solo il codice: una
+      // cella bloccata o protetta nel frattempo veniva sovrascritta)
+      return !!(
+        a &&
+        c &&
+        c.codice === a.codice &&
+        !(a.generato && c.generato === false) &&
+        !!c.protetto === a.protetto &&
+        (c.motivo_blocco || '') === a.blocco &&
+        (c.commento || '') === a.commento
+      );
     };
     ids.filter((id) => !intatta(id)).forEach((id) => saltate.push(attesa[id]));
     togli = togli.filter(intatta);
@@ -629,11 +657,20 @@ async function _ricercaScrivi(res) {
           // anche qui solo se la cella ha ancora il codice letto (un cambio arrivato
           // nell ultimo istante non viene sovrascritto)
           .map((x) =>
-            secPatch('piano', 'id=eq.' + x.id + '&codice=eq.' + encodeURIComponent(attesa[x.id].codice), {
-              codice: x.codice,
-              operatore: op,
-              updated_at: ora,
-            }),
+            secPatch(
+              'piano',
+              'id=eq.' +
+                x.id +
+                '&codice=eq.' +
+                encodeURIComponent(attesa[x.id].codice) +
+                '&motivo_blocco=is.null&protetto=eq.' +
+                attesa[x.id].protetto,
+              {
+                codice: x.codice,
+                operatore: op,
+                updated_at: ora,
+              },
+            ),
           ),
       );
     for (let i = 0; i < nuove.length; i += 2500)

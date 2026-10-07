@@ -154,6 +154,27 @@ ok(
   'un doppione di partenza non aumenta (' + r6.prima.eccesso + ' -> ' + r6.dopo.eccesso + ')',
 );
 
+console.log('== riposo come cella vuota (come lo passa il programma) ==');
+// il programma passa riposo: '' e celle vuote; prima il motore usava 'C' lo stesso: niente
+// scambi lavoro/riposo e cambi finti '' -> 'C'
+const statoV = {};
+persone.forEach((n) => {
+  statoV[n] = {};
+  giorni.forEach((d) => (statoV[n][d] = ''));
+});
+const r7 = R.cerca(
+  problema({ stato: statoV, riposo: '', ammessi: () => ['M', 'N', ''] }),
+  { seme: 7 },
+  40000,
+);
+ok(r7.dopo.scoperti === 0, 'con riposo vuoto copre tutti i posti (' + r7.dopo.scoperti + ')');
+ok(
+  persone.every((n) => giorni.every((d) => ['M', 'N', ''].includes(r7.stato[n][d] || ''))),
+  'nessuna C inventata: i riposi restano celle vuote',
+);
+const finti = (r7.cambi || []).filter((c) => !c.prima && !c.dopo).length;
+ok(finti === 0, 'nessun cambio finto da vuoto a vuoto (' + finti + ')');
+
 console.log('== non peggiora mai ==');
 ok(
   r1.dopo.punteggio <= r1.prima.punteggio && r2.dopo.punteggio <= r2.prima.punteggio,

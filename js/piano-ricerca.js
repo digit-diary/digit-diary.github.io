@@ -69,7 +69,9 @@
     const scegli = (arr) => arr[Math.floor(rnd() * arr.length)];
     const giorni = P.giorni.slice();
     const persone = P.persone.slice();
-    const riposo = P.riposo || 'C';
+    // codice di riposo del problema: '' (cella vuota) o 'C'. Prima '' diventava 'C': gli
+    // scambi lavoro/riposo non erano mai possibili e comparivano cambi finti '' -> 'C'
+    const riposo = P.riposo != null ? P.riposo : 'C';
     const fissi = P.fissi || {};
     // stato corrente (copia) e piano di partenza
     const stato = {};
