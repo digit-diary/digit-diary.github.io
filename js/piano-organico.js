@@ -1578,14 +1578,71 @@ function organicoCalcola() {
       (cInd ? ' + vacanze ' + pVac + '% e tredicesima ' + p13 + '% (' + _orgCHF(Math.round(cInd)) + ')' : '') +
       (jolly && c.prezzoTipo === 'comprensivo' ? ' · prezzo comprensivo: vacanze e tredicesima gia dentro (RAP)' : '');
   else e += '<br><span style="color:var(--muted)">Inserisci il costo orario per avere il costo.</span>';
+  // testo del risultato per la stampa (senza pulsanti)
+  c.stampa = e + '</div>';
   e +=
-    '<br><button class="btn-export" style="margin-top:6px" onclick="organicoCalcNelSimulatore(' +
+    '<br><button class="btn-export" style="margin-top:6px;margin-right:6px" onclick="organicoCalcStampa()">Stampa</button>' +
+    '<button class="btn-export" style="margin-top:6px" onclick="organicoCalcNelSimulatore(' +
     persone +
     ',' +
     (base > 0 ? Math.round((tot / base) * 10000) / 10000 : 1) +
     ')">Prova nel simulatore</button></div>';
   c.esito = e;
   renderPiano();
+}
+// STAMPA del calcolo (06.10, richiesta del titolare): settore, dati inseriti, postazioni,
+// risultato con persone necessarie e costo, come si legge e cosa non comprende
+function organicoCalcStampa() {
+  const c = _orgCalc;
+  if (!c || !c.stampa) return;
+  const w = window.open('', '_blank');
+  if (!w) {
+    toastErrore('Finestra bloccata dal browser: consenti i popup');
+    return;
+  }
+  const jolly = c.tipo === 'jolly';
+  const postazioni = c.righe
+    .filter((r) => r.da && r.a && r.giorni.length)
+    .map(
+      (r) =>
+        '<tr><td>' +
+        r.da +
+        '</td><td>' +
+        r.a +
+        '</td><td>' +
+        r.giorni.map((k) => ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'][k]).join(', ') +
+        '</td><td>' +
+        r.quante +
+        '</td></tr>',
+    )
+    .join('');
+  w.document.write(
+    '<!DOCTYPE html><html lang="it"><head><meta charset="utf-8"><title>Calcolo del fabbisogno</title><style>@page{size:A4;margin:14mm}body{font-family:Georgia,serif;font-size:12px;color:#000;margin:0;line-height:1.5}h1{font-size:17px;margin:0 0 4px}h2{font-size:13px;margin:14px 0 4px}p{margin:0 0 6px;color:#333}table{border-collapse:collapse;margin:4px 0}th,td{border:1px solid #888;padding:3px 8px;text-align:left}th{background:#eee}.nota{font-size:10.5px;color:#444}</style></head><body><h1>Calcolo del fabbisogno · ' +
+      escP(repartoNomeDocumento(_pianoReparto())) +
+      '</h1><p>Stampato il ' +
+      new Date().toLocaleDateString('it-IT') +
+      ' da ' +
+      escP(getOperatore() || '') +
+      '</p><h2>Dati</h2><p>' +
+      (jolly ? 'Ausiliari (jolly)' : 'Fissi') +
+      ' al ' +
+      Math.round(c.pct * 100) +
+      '% · costo orario ' +
+      (parseFloat(c.costo) > 0 ? escP(String(c.costo)) + ' CHF' : 'non indicato') +
+      (jolly
+        ? ' · prezzo ' +
+          (c.prezzoTipo === 'comprensivo'
+            ? 'comprensivo di vacanze e tredicesima'
+            : 'salario di base (+ indennita RAP, vacanze ' + (c.vac5 ? '5' : '4') + ' settimane)')
+        : '') +
+      '</p><table><thead><tr><th>Dalle</th><th>Alle</th><th>Giorni</th><th>Persone insieme</th></tr></thead><tbody>' +
+      postazioni +
+      '</tbody></table><h2>Risultato</h2>' +
+      c.stampa.replace(/ style="[^"]*"/g, '').replace(/<button[^>]*>.*?<\/button>/g, '') +
+      '<h2>Come si legge</h2><p class="nota">Le persone necessarie sono il piu alto di due conti: le ore delle postazioni divise per le ore nette di una persona (giorni del periodo x ore settimanali di un tempo pieno / 7 x percentuale, meno le assenze medie dello storico del settore: malattie, impegni, vacanze), e le persone che devono essere presenti insieme nelle ore piu cariche, sempre con le assenze. Riposi settimanali, malattie e vacanze sono quindi gia compresi. Costi secondo il RAP (Allegato 1): notturno 10% sulle ore fra le 23 e le 6; per gli ausiliari 50% nei festivi parificati alle domeniche e, con il salario di base, indennita vacanze e tredicesima. Non comprende gli oneri sociali del datore di lavoro. E un calcolo su ore e presenze: il rispetto di riposi minimi e giorni di fila persona per persona si verifica con il piano.</p></body></html>',
+  );
+  w.document.close();
+  setTimeout(() => w.print(), 300);
 }
 function organicoCalcNelSimulatore(persone, fattore) {
   if (!_orgStato || !_orgCalc) return;
